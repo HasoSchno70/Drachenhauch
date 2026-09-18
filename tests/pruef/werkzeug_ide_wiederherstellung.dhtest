@@ -1,0 +1,333 @@
+' Absturz-Wiederherstellung der IDE (ide/ide.dh, 2026-09-18).
+'
+' Jede laufende IDE schreibt im Takt die Texte ihrer ungesicherten Reiter nach
+' wiederherstellung/<kennung>/stand.json neben die ide.json (hier:
+' _programm/). Der Start bietet an, was VERWAIST ist -- als beendet markiert
+' ("offen": false) oder seit drei Takten ohne Lebenszeichen --, und laesst
+' stehen, was einer laufenden IDE gehoert. Sauber beendet (nichts
+' ungesichert, oder ueber die Rueckfrage) verschwindet der eigene Stand; endet
+' die IDE ungefragt mit ungesicherten Reitern -- hier ueber DHRT_FRAMES, also
+' denselben Weg wie das Fenster-Kreuz --, bleibt er als beendet liegen.
+'
+' Das `--- vorher` legt die fremden Staende an, wie eine andere IDE sie
+' geschrieben haette. Aufnahme: 2 Taste runter, 1 hoch; 257 Enter, 258 Tab,
+' 256 ESC. Der Dialog nimmt Enter fuer den ersten Knopf, ESC fuer den letzten.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ein verwaister stand wird angeboten und wiederhergestellt
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ide.json
+{"wiederherstellung_s": 1}
+--- datei _programm/ev.txt
+c 2
+e 20 2 257 0 0 0
+e 22 1 257 0 0 0
+
+--- vorher
+IMPORT "json"
+IMPORT "zeit"
+DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+JSON_SET_INT(h, "zeit", ZEIT_JETZT() - 5000)
+JSON_SET_BOOL(h, "offen", FALSE)
+JSON_SET_JSON(h, "reiter", JSON_NEW_ARRAY())
+DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+JSON_SET_STRING(e, "pfad", PATHJOIN(CWD$(), "spiel.dh"))
+JSON_SET_STRING(e, "text", "PRINT 2")
+JSON_APPEND_JSON(h, "reiter", e)
+DIM f AS JSON_HANDLE : f = JSON_NEW_OBJECT()
+JSON_SET_STRING(f, "pfad", "")
+JSON_SET_STRING(f, "text", "PRINT 3")
+JSON_APPEND_JSON(h, "reiter", f)
+MKDIR("_programm/wiederherstellung")
+MKDIR("_programm/wiederherstellung/alt")
+WRITEALL("_programm/wiederherstellung/alt/stand.json", JSON_STRINGIFY(h))
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+DIM geholt AS STRING : geholt = ""
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 18) = "wiederhergestellt " THEN
+        IF RIGHT$(z, 8) = "spiel.dh" THEN geholt = geholt + " datei" ELSE geholt = geholt + " " + MID$(z, 18)
+    END IF
+NEXT
+PRINT "angeboten "; hat("wiederherstellung angeboten 2")
+PRINT "geholt:"; geholt
+' Einmal schreibt das Zurueckholen selbst -- erst eine ZWEITE Zeile kommt
+' aus dem Takt. Die letzte beim Ende heisst "sicherung 2 beendet" und zaehlt
+' nicht mit (ohne diese Unterscheidung blieb der Fall gruen, als der Takt
+' ganz fehlte).
+DIM takt AS INTEGER : takt = 0
+FOR EACH z IN L
+    IF z = "sicherung 2" THEN takt = takt + 1
+NEXT
+PRINT "im takt gesichert "; takt >= 2
+PRINT "bleibt beim ende "; hat("sicherung 2 beendet") AND hat("sicherung bleibt")
+PRINT "alter stand weg "; NOT DIREXISTS("_programm/wiederherstellung/alt")
+DIM ds AS ARRAY OF STRING : ds = DIRLIST("_programm/wiederherstellung")
+PRINT "eigene staende "; LEN(ds)
+' Ohne eigenen Stand gaebe es nichts zu lesen -- dann sagen es die zwei
+' Zeilen, statt dass das Leseprogramm an ds[0] abbricht.
+DIM beendet AS BOOLEAN : beendet = FALSE
+DIM texte AS STRING : texte = ""
+IF LEN(ds) = 1 THEN
+    DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/wiederherstellung/" + ds[0] + "/stand.json")
+    beendet = NOT JSON_GET_BOOL(h, "offen")
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(h, "reiter") - 1
+        texte = texte + " [" + JSON_GET_STRING(h, "reiter." + STR$(k) + ".text") + "]"
+    NEXT
+END IF
+PRINT "als beendet markiert "; beendet
+PRINT "texte:"; texte
+PRINT "datei unberuehrt "; READLINES("spiel.dh")[0]
+--- erwartet
+angeboten TRUE
+geholt: datei (neu)
+im takt gesichert TRUE
+bleibt beim ende TRUE
+alter stand weg TRUE
+eigene staende 1
+als beendet markiert TRUE
+texte: [PRINT 2] [PRINT 3]
+datei unberuehrt PRINT 1
+
+=== verwerfen raeumt den stand weg
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=80
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ev.txt
+c 4
+e 20 2 258 0 0 0
+e 22 1 258 0 0 0
+e 26 2 257 0 0 0
+e 28 1 257 0 0 0
+
+--- vorher
+IMPORT "json"
+IMPORT "zeit"
+DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+JSON_SET_INT(h, "zeit", ZEIT_JETZT() - 5000)
+JSON_SET_BOOL(h, "offen", FALSE)
+JSON_SET_JSON(h, "reiter", JSON_NEW_ARRAY())
+DIM f AS JSON_HANDLE : f = JSON_NEW_OBJECT()
+JSON_SET_STRING(f, "pfad", "")
+JSON_SET_STRING(f, "text", "PRINT 3")
+JSON_APPEND_JSON(h, "reiter", f)
+MKDIR("_programm/wiederherstellung")
+MKDIR("_programm/wiederherstellung/alt")
+WRITEALL("_programm/wiederherstellung/alt/stand.json", JSON_STRINGIFY(h))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+DIM geholt AS INTEGER : geholt = 0
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 18) = "wiederhergestellt " THEN geholt = geholt + 1
+NEXT
+PRINT "angeboten "; hat("wiederherstellung angeboten 1")
+PRINT "verworfen "; hat("wiederherstellung verworfen")
+PRINT "geholt "; geholt
+PRINT "alter stand weg "; NOT DIREXISTS("_programm/wiederherstellung/alt")
+PRINT "eigener entfernt "; hat("sicherung entfernt")
+PRINT "staende "; LEN(DIRLIST("_programm/wiederherstellung"))
+--- erwartet
+angeboten TRUE
+verworfen TRUE
+geholt 0
+alter stand weg TRUE
+eigener entfernt TRUE
+staende 0
+
+=== spaeter laesst den stand liegen
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=80
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ev.txt
+c 2
+e 20 2 256 0 0 0
+e 22 1 256 0 0 0
+
+--- vorher
+IMPORT "json"
+IMPORT "zeit"
+DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+JSON_SET_INT(h, "zeit", ZEIT_JETZT() - 5000)
+JSON_SET_BOOL(h, "offen", FALSE)
+JSON_SET_JSON(h, "reiter", JSON_NEW_ARRAY())
+DIM f AS JSON_HANDLE : f = JSON_NEW_OBJECT()
+JSON_SET_STRING(f, "pfad", "")
+JSON_SET_STRING(f, "text", "PRINT 3")
+JSON_APPEND_JSON(h, "reiter", f)
+MKDIR("_programm/wiederherstellung")
+MKDIR("_programm/wiederherstellung/alt")
+WRITEALL("_programm/wiederherstellung/alt/stand.json", JSON_STRINGIFY(h))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "angeboten "; hat("wiederherstellung angeboten 1")
+PRINT "spaeter "; hat("wiederherstellung spaeter")
+PRINT "stand liegt noch "; FILEEXISTS("_programm/wiederherstellung/alt/stand.json")
+PRINT "staende "; JOIN$(DIRLIST("_programm/wiederherstellung"), ",")
+--- erwartet
+angeboten TRUE
+spaeter TRUE
+stand liegt noch TRUE
+staende alt
+
+=== der stand einer laufenden ide wird nicht angefasst
+' Lebenszeichen von eben, als offen markiert: das ist eine zweite IDE, die
+' gerade laeuft. Sie darf weder angeboten noch weggeraeumt werden.
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+IMPORT "json"
+IMPORT "zeit"
+DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+JSON_SET_INT(h, "zeit", ZEIT_JETZT())
+JSON_SET_BOOL(h, "offen", TRUE)
+JSON_SET_JSON(h, "reiter", JSON_NEW_ARRAY())
+DIM f AS JSON_HANDLE : f = JSON_NEW_OBJECT()
+JSON_SET_STRING(f, "pfad", "")
+JSON_SET_STRING(f, "text", "PRINT 4")
+JSON_APPEND_JSON(h, "reiter", f)
+MKDIR("_programm/wiederherstellung")
+MKDIR("_programm/wiederherstellung/lebt")
+WRITEALL("_programm/wiederherstellung/lebt/stand.json", JSON_STRINGIFY(h))
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM angeboten AS BOOLEAN : angeboten = FALSE
+DIM z AS STRING
+FOR EACH z IN L
+    IF LEFT$(z, 28) = "wiederherstellung angeboten " THEN angeboten = TRUE
+NEXT
+PRINT "angeboten "; angeboten
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/wiederherstellung/lebt/stand.json")
+PRINT "stand unveraendert "; JSON_GET_STRING(h, "reiter.0.text")
+PRINT "staende "; JOIN$(DIRLIST("_programm/wiederherstellung"), ",")
+--- erwartet
+angeboten FALSE
+stand unveraendert PRINT 4
+staende lebt
+
+=== ein abgestuerzter lauf wird angeboten, ein leerer still entfernt
+' Ein Absturz meldet sich nicht ab: der Stand steht noch auf offen, aber
+' sein Lebenszeichen ist alt. Der leere Stand daneben hat nichts zu bieten
+' und verschwindet ohne Frage.
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=80
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ev.txt
+c 2
+e 20 2 256 0 0 0
+e 22 1 256 0 0 0
+
+--- vorher
+IMPORT "json"
+IMPORT "zeit"
+DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+JSON_SET_INT(h, "zeit", ZEIT_JETZT() - 5000)
+JSON_SET_BOOL(h, "offen", TRUE)
+JSON_SET_JSON(h, "reiter", JSON_NEW_ARRAY())
+DIM f AS JSON_HANDLE : f = JSON_NEW_OBJECT()
+JSON_SET_STRING(f, "pfad", "")
+JSON_SET_STRING(f, "text", "PRINT 5")
+JSON_APPEND_JSON(h, "reiter", f)
+MKDIR("_programm/wiederherstellung")
+MKDIR("_programm/wiederherstellung/absturz")
+WRITEALL("_programm/wiederherstellung/absturz/stand.json", JSON_STRINGIFY(h))
+DIM g AS JSON_HANDLE : g = JSON_NEW_OBJECT()
+JSON_SET_INT(g, "zeit", ZEIT_JETZT() - 5000)
+JSON_SET_BOOL(g, "offen", FALSE)
+JSON_SET_JSON(g, "reiter", JSON_NEW_ARRAY())
+MKDIR("_programm/wiederherstellung/leer")
+WRITEALL("_programm/wiederherstellung/leer/stand.json", JSON_STRINGIFY(g))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "angeboten "; hat("wiederherstellung angeboten 1")
+PRINT "staende "; JOIN$(DIRLIST("_programm/wiederherstellung"), ",")
+--- erwartet
+angeboten TRUE
+staende absturz
+
+=== ohne aenderungen verschwindet der eigene stand beim ende
+' Das Lebenszeichen entsteht gleich beim Start (auch ohne ungesicherte
+' Reiter), und ein Ende ohne ungesicherte Reiter raeumt es wieder weg.
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "lebenszeichen beim start "; hat("sicherung 0")
+PRINT "entfernt "; hat("sicherung entfernt")
+PRINT "staende "; LEN(DIRLIST("_programm/wiederherstellung"))
+--- erwartet
+lebenszeichen beim start TRUE
+entfernt TRUE
+staende 0

@@ -111,6 +111,7 @@ IMPORT "json"
 IMPORT "pdf"
 IMPORT "imgfx"      ' fuer die gezeichneten Menue-Symbole (IMAGE_NEW/IMAGE_DRAW_*)
 IMPORT "regex"      ' fuer die Suche mit regulaeren Ausdruecken
+IMPORT "zeit"       ' ZEIT_JETZT fuer das Lebenszeichen der Absturz-Wiederherstellung
 
 CONST MAX_TABS = 12
 CONST NL = CHR$(10)
@@ -294,6 +295,22 @@ IF FILEEXISTS(konfigPfad) THEN
         konfig = JSON_PARSE("{}")     ' eine kaputte Datei ist kein Grund, nicht zu starten
     END TRY
 END IF
+
+' Absturz-Wiederherstellung: jede laufende IDE schreibt alle `whTakt`
+' Sekunden die Texte ihrer ungesicherten Reiter nach
+' wiederherstellung/<kennung>/stand.json neben die ide.json. Ein EIGENER
+' Ordner je IDE, nicht einer fuer alle wie in der Qt-Fassung: sonst hielte
+' eine zweite, gleichzeitig gestartete IDE die Sicherungen der ersten fuer
+' Absturzreste, und wer zuerst sauber beendet, loeschte die des anderen.
+' Die Zeit im Stand ist zugleich das Lebenszeichen.
+DIM whOrdner AS STRING : whOrdner = PATHJOIN(DIRNAME(konfigPfad), "wiederherstellung")
+DIM whKennung AS STRING : whKennung = UUID4$()
+DIM whTakt AS INTEGER : whTakt = 30
+IF JSON_HAS(konfig, "wiederherstellung_s") THEN whTakt = MAX(1, MIN(600, JSON_GET_INT(konfig, "wiederherstellung_s")))
+DIM whFaellig AS FLOAT : whFaellig = 0.0
+DIM whFremd AS ARRAY OF STRING : whFremd = []     ' verwaiste Staende, die angeboten werden
+DIM whGewarnt AS BOOLEAN : whGewarnt = FALSE
+DIM dlgWieder AS GUI_WINDOW : dlgWieder = 0
 ' Sitzung JE PROJEKT. Im Speicher als drei gleich lange Felder, nicht als
 ' JSON-Teilbaum: das json-Modul kann einen Teilbaum nicht herausloesen, und
 ' ein Pfad als JSON-Schluessel kollidierte ohnehin mit der Punkt-Notation
@@ -7174,6 +7191,172 @@ SUB eingabeSenden()
     GUI_SET_TEXT(tfEingabe, "")
 END SUB
 
+' --- Absturz-Wiederherstellung ---------------------------------------
+FUNCTION whEigen$() AS STRING
+    RETURN PATHJOIN(whOrdner, whKennung)
+END FUNCTION
+
+' Den Stand dieser IDE schreiben: je Reiter mit ungesicherten Aenderungen
+' Pfad und Text. `offen` = FALSE heisst "diese IDE laeuft nicht mehr" --
+' dann darf der naechste Start den Stand sofort anbieten, statt drei Takte
+' auf das ausbleibende Lebenszeichen zu warten. Geschrieben wird erst in
+' eine Nebendatei und dann umbenannt: ein Absturz MITTEN im Schreiben liesse
+' sonst einen halben Stand zurueck, und der waere genau der, den man braucht.
+SUB whSchreiben(offen AS BOOLEAN)
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_INT(h, "zeit", ZEIT_JETZT())
+    JSON_SET_BOOL(h, "offen", offen)
+    JSON_SET_JSON(h, "reiter", JSON_NEW_ARRAY())
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        DIM txt AS STRING : txt = GUI_TEXT(tabFelder[i])
+        IF txt <> tabGesichert[i] THEN
+            DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+            JSON_SET_STRING(e, "pfad", tabPfade[i])
+            JSON_SET_STRING(e, "text", txt)
+            JSON_APPEND_JSON(h, "reiter", e)
+            n = n + 1
+        END IF
+    NEXT
+    TRY
+        IF NOT DIREXISTS(whOrdner) THEN MKDIR(whOrdner)
+        IF NOT DIREXISTS(whEigen$()) THEN MKDIR(whEigen$())
+        DIM ziel AS STRING : ziel = PATHJOIN(whEigen$(), "stand.json")
+        DIM neben AS STRING : neben = PATHJOIN(whEigen$(), "stand.neu")
+        WRITEALL(neben, JSON_STRINGIFY(h))
+        RENAME(neben, ziel)
+        protokoll("sicherung " + STR$(n) + IIF(offen, "", " beendet"))
+    CATCH fehler
+        ' EINMAL sagen, nicht jeden Takt: ein schreibgeschuetztes Profil
+        ' soll die Arbeit nicht stoeren, aber man muss wissen, dass das
+        ' Netz fehlt.
+        IF NOT whGewarnt THEN
+            GUI_SET_TEXT(lblStatus, "Wiederherstellung kann nicht sichern: " + fehler)
+            whGewarnt = TRUE
+        END IF
+        protokoll("sicherung fehlgeschlagen")
+    END TRY
+END SUB
+
+' Verwaiste Staende anderer Laeufe einsammeln. Einer LEBT, solange er als
+' offen gilt und sein Lebenszeichen juenger als drei Takte ist -- den laesst
+' die Suche stehen, er gehoert einer IDE, die gerade laeuft. Ein verwaister
+' Stand ohne Reiter hat nichts zu bieten und wird still weggeraeumt.
+SUB whSuchen()
+    whFremd = []
+    IF NOT DIREXISTS(whOrdner) THEN RETURN
+    DIM name AS STRING
+    FOR EACH name IN DIRLIST(whOrdner)
+        DIM d AS STRING : d = PATHJOIN(whOrdner, name)
+        DIM st AS STRING : st = PATHJOIN(d, "stand.json")
+        DIM reiter AS INTEGER : reiter = -1
+        IF name <> whKennung AND FILEEXISTS(st) THEN
+            TRY
+                DIM h AS JSON_HANDLE : h = JSON_LOAD(st)
+                DIM lebt AS BOOLEAN
+                lebt = JSON_GET_BOOL(h, "offen") AND ZEIT_JETZT() - JSON_GET_INT(h, "zeit") < 3 * whTakt
+                IF NOT lebt THEN reiter = JSON_LEN(h, "reiter")
+            CATCH fehler
+                ' unlesbar: liegen lassen -- vielleicht schreibt ihn gerade jemand
+                reiter = -1
+            END TRY
+        END IF
+        IF reiter = 0 THEN
+            TRY
+                RMDIR(d, TRUE)
+            CATCH fehler
+                protokoll("wiederherstellung nicht entfernbar " + name)
+            END TRY
+        ELSEIF reiter > 0 THEN
+            ARRAY_PUSH(whFremd, d)
+        END IF
+    NEXT
+END SUB
+
+SUB whAnbieten()
+    whSuchen()
+    IF LEN(whFremd) = 0 THEN RETURN
+    DIM n AS INTEGER : n = 0
+    DIM namen AS STRING : namen = ""
+    DIM d AS STRING
+    FOR EACH d IN whFremd
+        TRY
+            DIM h AS JSON_HANDLE : h = JSON_LOAD(PATHJOIN(d, "stand.json"))
+            DIM k AS INTEGER
+            FOR k = 0 TO JSON_LEN(h, "reiter") - 1
+                DIM p AS STRING : p = JSON_GET_STRING(h, "reiter." + STR$(k) + ".pfad")
+                n = n + 1
+                IF n <= 6 THEN
+                    IF namen <> "" THEN namen = namen + ", "
+                    namen = namen + IIF(p = "", "(neu)", BASENAME(p))
+                END IF
+            NEXT
+        CATCH fehler
+            protokoll("wiederherstellung unlesbar " + BASENAME(d))
+        END TRY
+    NEXT
+    IF n = 0 THEN RETURN
+    IF n > 6 THEN namen = namen + " ..."
+    dlgWieder = GUI_DIALOG("Wiederherstellen", STR$(n) + " ungesicherte Reiter aus einer Sitzung, die nicht sauber endete: " + namen, "Wiederherstellen|Verwerfen|Spaeter")
+    protokoll("wiederherstellung angeboten " + STR$(n))
+END SUB
+
+' Die angebotenen Staende als Reiter zurueckholen -- UNGESICHERT: die Datei
+' auf der Platte bleibt, wie sie war, bis man selbst sichert. Eine Datei
+' geht ueber tabOeffnen und nicht ueber dateiOeffnen, sonst oeffnete eine
+' als Text bearbeitete .dhform den Form-Designer statt ihres Textes.
+SUB whHolen()
+    DIM n AS INTEGER : n = 0
+    DIM d AS STRING
+    FOR EACH d IN whFremd
+        TRY
+            DIM h AS JSON_HANDLE : h = JSON_LOAD(PATHJOIN(d, "stand.json"))
+            DIM k AS INTEGER
+            FOR k = 0 TO JSON_LEN(h, "reiter") - 1
+                DIM p AS STRING : p = JSON_GET_STRING(h, "reiter." + STR$(k) + ".pfad")
+                DIM txt AS STRING : txt = JSON_GET_STRING(h, "reiter." + STR$(k) + ".text")
+                DIM ziel AS INTEGER : ziel = -1
+                DIM vorher AS INTEGER : vorher = tabAnzahl
+                IF p = "" THEN
+                    tabOeffnen("", "")
+                    IF tabAnzahl > vorher THEN ziel = tabAnzahl - 1
+                ELSE
+                    IF FILEEXISTS(p) THEN tabOeffnen(p, dateiLesen(p)) ELSE tabOeffnen(p, "")
+                    ziel = tabMitPfad(p)
+                END IF
+                IF ziel >= 0 THEN
+                    GUI_SET_TEXT(tabFelder[ziel], txt)
+                    n = n + 1
+                    protokoll("wiederhergestellt " + IIF(p = "", "(neu)", p))
+                END IF
+            NEXT
+            RMDIR(d, TRUE)
+        CATCH fehler
+            protokoll("wiederherstellung fehlgeschlagen " + BASENAME(d))
+        END TRY
+    NEXT
+    whFremd = []
+    reiterNeuSetzen()
+    GUI_SET_TEXT(lblStatus, STR$(n) + " Reiter wiederhergestellt -- noch NICHT gesichert.")
+    ' Gleich in den eigenen Stand: stuerzt die IDE jetzt ab, waeren sie
+    ' sonst ein zweites Mal weg.
+    whSchreiben(TRUE)
+END SUB
+
+SUB whVerwerfen()
+    DIM d AS STRING
+    FOR EACH d IN whFremd
+        TRY
+            RMDIR(d, TRUE)
+        CATCH fehler
+            protokoll("wiederherstellung nicht entfernbar " + BASENAME(d))
+        END TRY
+    NEXT
+    whFremd = []
+    protokoll("wiederherstellung verworfen")
+END SUB
+
 ' --- Beenden mit Rueckfrage ------------------------------------------
 FUNCTION ungesichert() AS BOOLEAN
     DIM i AS INTEGER
@@ -7453,6 +7636,11 @@ IF ARGC() >= 1 THEN
     END IF
     IF FILEEXISTS(startDatei) THEN dateiOeffnen(startDatei) ELSE GUI_SET_TEXT(lblStatus, "Gibt es nicht: " + startDatei)
 END IF
+' Erst anbieten, DANN den eigenen Stand anlegen -- die Suche liesse ihn
+' zwar aus (whKennung), aber so ist die Reihenfolge auch ohne das richtig.
+whAnbieten()
+whSchreiben(TRUE)
+whFaellig = GET_TIME() + whTakt
 protokoll("projekt " + projektOrdner)
 protokoll("bereit")
 
@@ -7859,6 +8047,21 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             GUI_FOCUS(lstParam)
         END IF
     END IF
+    IF dlgWieder <> 0 THEN
+        DIM aw AS INTEGER : aw = GUI_ANSWER(dlgWieder)
+        IF aw = 1 THEN
+            dlgWieder = 0
+            whHolen()
+        ELSEIF aw = 2 THEN
+            dlgWieder = 0
+            whVerwerfen()
+        ELSEIF aw = 3 THEN
+            ' Spaeter: liegen lassen, der naechste Start fragt wieder.
+            dlgWieder = 0
+            whFremd = []
+            protokoll("wiederherstellung spaeter")
+        END IF
+    END IF
     IF dlgTabZu <> 0 THEN
         DIM a5 AS INTEGER : a5 = GUI_ANSWER(dlgTabZu)
         IF a5 = 1 THEN
@@ -7972,6 +8175,13 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     prozessNachsehen()
     exportNachsehen()
 
+    ' Absturz-Wiederherstellung: im Takt schreiben, auch wenn nichts
+    ' geaendert ist -- der Stand ist zugleich das Lebenszeichen.
+    IF GET_TIME() >= whFaellig THEN
+        whFaellig = GET_TIME() + whTakt
+        whSchreiben(TRUE)
+    END IF
+
     CLS(&H0B1119)
     GUI_DRAW()
     minimapZeichnen()
@@ -7982,6 +8192,23 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     FLIP()
 WEND
 
+' Sauber beendet heisst: ueber die Rueckfrage (alles gesichert oder
+' ausdruecklich verworfen) oder ohne ungesicherte Reiter -- dann ist der
+' Stand leer oder unerwuenscht und geht weg. Endete die IDE dagegen OHNE
+' Rueckfrage mit ungesicherten Reitern (das Fenster-Kreuz fragt nicht, und
+' ein Absturz schon gar nicht), bleibt er liegen, als beendet markiert --
+' der naechste Start bietet ihn an.
+IF beenden OR NOT ungesichert() THEN
+    TRY
+        IF DIREXISTS(whEigen$()) THEN RMDIR(whEigen$(), TRUE)
+        protokoll("sicherung entfernt")
+    CATCH fehler
+        protokoll("sicherung nicht entfernbar")
+    END TRY
+ELSE
+    whSchreiben(FALSE)
+    protokoll("sicherung bleibt")
+END IF
 konfigSichern()
 IF prozess >= 0 THEN PROCESS_KILL(prozess)
 IF exportProzess >= 0 THEN PROCESS_KILL(exportProzess)
