@@ -216,7 +216,9 @@ DIM gliederungZeilen AS ARRAY OF INTEGER : gliederungZeilen = []
 DIM gliederungSchluessel AS STRING : gliederungSchluessel = ""
 
 DIM hell AS BOOLEAN : hell = FALSE
-DIM codeGroesse AS INTEGER : codeGroesse = 16
+' Die Vorgabe ist auch das Ziel von Strg+0 ("Schrift normal").
+CONST SCHRIFT_NORMAL AS INTEGER = 16
+DIM codeGroesse AS INTEGER : codeGroesse = SCHRIFT_NORMAL
 DIM umbruchAn AS BOOLEAN : umbruchAn = FALSE
 ' Geteilte Ansicht: links ein ZWEITER Reiter, rechts der aktive. Beide sind
 ' echte Code-Felder -- nichts wird gespiegelt, es gibt nichts abzugleichen.
@@ -538,8 +540,9 @@ GUI_MENU_CHECK(miLeiste, leisteAn)
 DIM miFalten AS INTEGER : miFalten = GUI_MENU_ITEM(mAnsicht, "Block zuklappen/aufklappen", "F4")
 DIM miFaltenAlle AS INTEGER : miFaltenAlle = GUI_MENU_ITEM(mAnsicht, "Alles zuklappen", "Strg+F4")
 DIM miFaltenAuf AS INTEGER : miFaltenAuf = GUI_MENU_ITEM(mAnsicht, "Alles aufklappen", "Umschalt+F4")
-DIM miGroesser AS INTEGER : miGroesser = GUI_MENU_ITEM(mAnsicht, "Schrift groesser")
-DIM miKleiner AS INTEGER : miKleiner = GUI_MENU_ITEM(mAnsicht, "Schrift kleiner")
+DIM miGroesser AS INTEGER : miGroesser = GUI_MENU_ITEM(mAnsicht, "Schrift groesser", "Strg+Plus")
+DIM miKleiner AS INTEGER : miKleiner = GUI_MENU_ITEM(mAnsicht, "Schrift kleiner", "Strg+Minus")
+DIM miNormal AS INTEGER : miNormal = GUI_MENU_ITEM(mAnsicht, "Schrift normal", "Strg+0")
 
 DIM mHilfe AS INTEGER : mHilfe = GUI_MENU(win, "Hilfe")
 DIM miHandbuch AS INTEGER : miHandbuch = GUI_MENU_ITEM(mHilfe, "Handbuch (Wort unter der Marke)", "F1")
@@ -1182,7 +1185,22 @@ SUB schriftSetzen(groesse AS INTEGER)
         GUI_SET_FONT_SIZE(tabFelder[i], codeGroesse)
     NEXT
     GUI_SET_TEXT(lblStatus, "Schrift: " + STR$(codeGroesse) + " px")
+    ' Das Drehfeld der Einstellungen mitziehen -- sind sie offen, setzte es
+    ' die Schrift sonst im naechsten Bild auf seinen alten Wert zurueck.
+    GUI_SET_VALUE(spSchrift, codeGroesse)
+    protokoll("schrift " + STR$(codeGroesse))
     konfigSichern()
+END SUB
+
+' Strg+Rad zoomt die Code-Felder, ein Punkt je Schritt -- ueberall im
+' Fenster, nicht nur ueber dem Code: wer zoomt, sieht auf den Text, nicht
+' auf die Maus. Die gui rollt mit gedrueckter Strg-Taste nichts (die
+' Laufzeit laesst das Rad dann dem Programm), der Inhalt springt also nicht.
+SUB radZoom()
+    IF NOT (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) THEN RETURN
+    DIM r AS FLOAT : r = MOUSEWHEEL_Y()
+    IF r > 0 THEN schriftSetzen(codeGroesse + 1)
+    IF r < 0 THEN schriftSetzen(codeGroesse - 1)
 END SUB
 
 SUB debugPanelZeigen(an AS BOOLEAN)
@@ -7143,7 +7161,8 @@ paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Al
 paletteEintrag("Geteilte Ansicht", "geteilt", "Alt+G") : paletteEintrag("Uebersichtskarte", "minimap", "")
 paletteEintrag("Zeilenumbruch", "umbruch", "Alt+Z")
 paletteEintrag("Helles Thema", "thema", "") : paletteEintrag("Vollbild", "vollbild", "Alt+Enter")
-paletteEintrag("Schrift groesser", "groesser", "") : paletteEintrag("Schrift kleiner", "kleiner", "")
+paletteEintrag("Schrift groesser", "groesser", "Strg+Plus") : paletteEintrag("Schrift kleiner", "kleiner", "Strg+Minus")
+paletteEintrag("Schrift normal", "schrift_normal", "Strg+0")
 paletteEintrag("Ueber ...", "ueber", "") : paletteEintrag("Beenden", "beenden", "Strg+Q")
 paletteEintrag("Handbuch: gesetzt oder Quelltext", "hb_ansicht", "")
 paletteEintrag("Handbuch", "handbuch", "F1") : paletteEintrag("Tastenkuerzel", "kuerzel", "Strg+F1")
@@ -7508,6 +7527,7 @@ SUB befehl(k AS STRING)
         CASE "export" : exportieren()
         CASE "groesser" : schriftSetzen(codeGroesse + 2)
         CASE "kleiner" : schriftSetzen(codeGroesse - 2)
+        CASE "schrift_normal" : schriftSetzen(SCHRIFT_NORMAL)
         CASE "kuerzel" : kuerzelZeigen()
         CASE "sichern" : sichern(aktiverTab, FALSE)
         CASE "sichern_unter" : sichern(aktiverTab, TRUE)
@@ -7835,7 +7855,8 @@ WHILE NOT beenden
         END IF
     NEXT
     ' Mausrad ueber den Kacheln blaettert reihenweise.
-    IF tabAnzahl = 0 AND kachelReihenSichtbar > 0 THEN
+    radZoom()
+    IF tabAnzahl = 0 AND kachelReihenSichtbar > 0 AND NOT (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) THEN
         DIM kmx AS INTEGER : kmx = MOUSEX()
         DIM kmy AS INTEGER : kmy = MOUSEY()
         IF kmx >= kfX AND kmx < kfX + kfB AND kmy >= kfY AND kmy < kfY + kfH THEN
@@ -7916,6 +7937,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miExport) THEN befehl("export")
     IF GUI_CLICKED(miGroesser) THEN befehl("groesser")
     IF GUI_CLICKED(miKleiner) THEN befehl("kleiner")
+    IF GUI_CLICKED(miNormal) THEN befehl("schrift_normal")
     IF GUI_CLICKED(miKuerzel) THEN befehl("kuerzel")
     DIM zk AS INTEGER
     FOR zk = 0 TO ZULETZT_MAX - 1

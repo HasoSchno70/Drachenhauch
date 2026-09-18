@@ -1937,6 +1937,11 @@ pub struct Widget {
     // Auswahl. Ohne das setzte das naechste Bild -- die Taste ist noch
     // unten -- die Marke doch noch ans Feld.
     farbfeld_zug: bool,
+    // Mit dem Rad gerollt (nur TextArea): Marke, Anker und Zeichenzahl zu
+    // dem Zeitpunkt. Solange sich keins davon aendert, zieht die
+    // Editierschleife den Ausschnitt NICHT zur Marke zurueck -- sonst
+    // sprang ein gerollter Code nach einem Bild wieder zurueck.
+    rad_stand: Option<(i32, i32, usize)>,
     // Abkuerzungen (nur TextArea): Woerter, die der Tabulator MELDET statt
     // einzuruecken. Was an ihre Stelle kommt, weiss nur der Aufrufer -- die
     // Laufzeit kennt weder Schnipsel noch Sprache.
@@ -2106,10 +2111,33 @@ fn ist_funktionstaste(code: i64) -> bool {
     (1073741882..=1073741893).contains(&code)
 }
 
+/// Plus und Minus sind im Kuerzel KEINE einzelne Taste: raylib benennt die
+/// Tasten nach ihrer Lage im US-Layout, und das "+" einer deutschen Tastatur
+/// liegt dort, wo die US-Tastatur "]" hat, ihr "-" dort, wo "/" liegt.
+/// `Strg+Plus` trifft darum jede der Tasten, die auf einer der beiden
+/// Belegungen "+" bedeutet, dazu den Ziffernblock -- sonst zoomte Strg+Plus
+/// nur auf dem Ziffernblock oder nur auf einer Belegung.
+const K_PLUS: i64 = -43;
+const K_MINUS: i64 = -45;
+
+fn kuerzel_taste(g: &Graphics, code: i64) -> bool {
+    match code {
+        K_PLUS => [1073741911, 61, 93].iter().any(|&c| g.key_pressed(c)),
+        K_MINUS => [1073741910, 45, 47].iter().any(|&c| g.key_pressed(c)),
+        c => g.key_pressed(c),
+    }
+}
+
 fn kuerzel_parsen(s: &str) -> Result<(u8, i64), String> {
     let mut mods = 0u8;
     let mut code = 0i64;
-    for teil in s.split('+') {
+    // "Strg++" -- das Plus als Taste steht hinter dem Trenner-Plus.
+    let (s_teile, plus_am_ende) = match s.trim_end().strip_suffix("++") {
+        Some(rest) => (rest.to_string(), true),
+        None => (s.to_string(), false),
+    };
+    if plus_am_ende { code = K_PLUS; }
+    for teil in s_teile.split('+') {
         let t = teil.trim().to_lowercase();
         if t.is_empty() { continue; }
         match t.as_str() {
@@ -2142,6 +2170,8 @@ fn kuerzel_parsen(s: &str) -> Result<(u8, i64), String> {
             "rechts" | "right" => "key_right",
             "hoch" | "auf" | "up" => "key_up",
             "runter" | "ab" | "down" => "key_down",
+            "plus" => { code = K_PLUS; continue; }
+            "minus" | "-" => { code = K_MINUS; continue; }
             _ => {
                 if t.len() >= 2 && t.starts_with('f') && t[1..].chars().all(|c| c.is_ascii_digit()) {
                     // F1..F12 ueber die Tabelle unten
@@ -2149,7 +2179,7 @@ fn kuerzel_parsen(s: &str) -> Result<(u8, i64), String> {
                 } else {
                     return Err(format!(
                         "Tastenkuerzel '{}': Taste '{}' unbekannt -- Buchstabe, Ziffer, F1..F12, Entf, Einfg, \
-                         Pos1, Ende, Bild auf/ab, Leer, Enter, Esc, Tab, Rueck, Links/Rechts/Hoch/Runter",
+                         Pos1, Ende, Bild auf/ab, Leer, Enter, Esc, Tab, Rueck, Links/Rechts/Hoch/Runter, Plus, Minus",
                         s, teil.trim()));
                 }
             }
@@ -3202,7 +3232,7 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
-            farbfelder: Vec::new(), farbfeld_klick: -1, farbfeld_zug: false,
+            farbfelder: Vec::new(), farbfeld_klick: -1, farbfeld_zug: false, rad_stand: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
@@ -5519,7 +5549,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let vis = Self::tree_visible(self.windows[wi].widgets[idx].tree.as_ref().unwrap());
         let zeile_h = self.sk(TREE_ROW_H);   // vor dem mut-Zugriff auf den Baum
         let max_scroll = (vis.len() as i32 * zeile_h - (h - 2)).max(0);
-        let wheel = g.pop_mouse_wheel();
+        let wheel = Self::rad(g);
         let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
         t.scroll = t.scroll.clamp(0, max_scroll);
         if wheel != 0 { t.scroll = (t.scroll - wheel as i32 * zeile_h).clamp(0, max_scroll); }
@@ -6358,7 +6388,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     fn table_hover(&mut self, wi: usize, idx: usize, mx: i32, my: i32, g: &mut Graphics) {
         let gm = self.table_geom(wi, idx);
-        let wheel = g.pop_mouse_wheel();
+        let wheel = Self::rad(g);
         let over = Self::in_rect(mx, my, (gm.body_x, gm.body_y, gm.body_w, gm.body_h));
         let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
         t.scroll_y = t.scroll_y.clamp(0, gm.max_scroll_y);
@@ -7270,7 +7300,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     // loescht dort ein Zeichen) -- AUSSER F1..F12: die erzeugen nie
                     // Text, und F5 in einer IDE muss aus dem Code-Feld heraus starten.
                     if text_fokus && (mods & 5) == 0 && !ist_funktionstaste(it.k_code) { continue; }
-                    if g.key_pressed(it.k_code) { treffer = Some((wi, mi, ii)); break 'suche; }
+                    if kuerzel_taste(g, it.k_code) { treffer = Some((wi, mi, ii)); break 'suche; }
                 }
             }
         }
@@ -9571,7 +9601,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
         if let Some(top) = self.topmost_at(mx, my) {
             if self.windows[top].scrollable {
-                let wheel = g.pop_mouse_wheel();
+                let wheel = Self::rad(g);
                 if wheel != 0 {
                     let ms = self.max_scroll_y(top);
                     self.windows[top].scroll_y = (self.windows[top].scroll_y - wheel as i32 * 40).clamp(0, ms);
@@ -9667,6 +9697,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         if let Some(l) = self.windows[top].widgets[i].list.as_mut() { l.hover = k; }
                     }
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
+                    if kind == Kind::TextArea { self.textarea_wheel(top, i, g); }
                     if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
                     if kind == Kind::Tree { self.tree_hover(top, i, my, g); }
                     if kind == Kind::StatusBar {
@@ -9692,7 +9723,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     (self.abs_rect(top, w), w.panel.is_some() && self.widget_shown(top, w))
                 };
                 if rollt && Self::in_rect(mx, my, r) {
-                    let wheel = g.pop_mouse_wheel();
+                    let wheel = Self::rad(g);
                     if wheel != 0 { self.panel_scroll_um(top, i, -(wheel as i32) * 40); }
                 }
             }
@@ -11345,8 +11376,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let crow = Self::ta_row_of(&rows2, caret.max(0) as usize) as i32;
         let view_lines = ((fh - 2 * pad) / lh).max(1);
         let mut scroll = scroll;
-        if crow < scroll { scroll = crow; }
-        if crow >= scroll + view_lines { scroll = crow - view_lines + 1; }
+        let gerollt = caret == caret0
+            && self.windows[wi].widgets[i].rad_stand == Some((caret, anchor, chars.len()));
+        if !gerollt {
+            self.windows[wi].widgets[i].rad_stand = None;
+            if crow < scroll { scroll = crow; }
+            if crow >= scroll + view_lines { scroll = crow - view_lines + 1; }
+        }
         let max_scroll = (rows2.len() as i32 - view_lines).max(0);
         scroll = scroll.clamp(0, max_scroll);
 
@@ -11360,8 +11396,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let gut = self.ta_gutter(g, &self.windows[wi].widgets[i], starts2.len());
         let sicht = (fw - 2 * pad - gut).max(1);
         let mut sx = self.windows[wi].widgets[i].scroll_x;
-        if marke_px - sx > sicht - self.sk(8) { sx = marke_px - sicht + self.sk(8); }
-        if marke_px - sx < 0 { sx = marke_px; }
+        if !gerollt {
+            if marke_px - sx > sicht - self.sk(8) { sx = marke_px - sicht + self.sk(8); }
+            if marke_px - sx < 0 { sx = marke_px; }
+        }
         sx = sx.max(0);
         if self.windows[wi].widgets[i].umbruch { sx = 0; }
 
@@ -11383,8 +11421,37 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
     }
 
+    /// Das Mausrad fuer die gui. Mit gedrueckter Strg-Taste gehoert es dem
+    /// PROGRAMM -- Strg+Rad heisst in jedem Editor "Zoom", und wenn dabei
+    /// auch noch die Liste oder das Code-Feld unter der Maus rollte, sprang
+    /// der Inhalt bei jedem Schritt weg. `MOUSEWHEEL_Y` liefert den Wert
+    /// weiter, das Programm fragt dazu `KEYPRESSED(KEY_LCTRL)`.
+    fn rad(g: &Graphics) -> i64 {
+        if g.key_ctrl() { 0 } else { g.pop_mouse_wheel() }
+    }
+
+    /// Mausrad ueber einem Textbereich: drei Zeilen je Schritt. Bis
+    /// 2026-09-18 rollte er gar nicht -- nur Marke und Tasten bewegten den
+    /// Ausschnitt, und in einer IDE ist das das Code-Feld.
+    fn textarea_wheel(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let wheel = Self::rad(g);
+        if wheel == 0 { return; }
+        let (zeilen, sicht) = {
+            let wd = &self.windows[wi].widgets[i];
+            let chars: Vec<char> = wd.text.chars().collect();
+            let starts = Self::line_starts(&chars);
+            let lh = self.ta_line_h(g);
+            let n = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len())).len() as i32;
+            (n, ((wd.h - 2 * 5) / lh).max(1))
+        };
+        let max = (zeilen - sicht).max(0);
+        let w = &mut self.windows[wi].widgets[i];
+        w.scroll = (w.scroll - wheel as i32 * 3).clamp(0, max);
+        w.rad_stand = Some((w.caret, w.sel_anchor, w.text.chars().count()));
+    }
+
     fn listbox_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
-        let wheel = g.pop_mouse_wheel();
+        let wheel = Self::rad(g);
         if wheel == 0 { return; }
         let zeile_h = self.sk(DROPDOWN_ITEM_H);   // vor dem mut-Zugriff
         let w = &mut self.windows[wi].widgets[i];
@@ -11396,7 +11463,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Mausrad ueber gesetztem Text.
     fn richtext_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
-        let wheel = g.pop_mouse_wheel();
+        let wheel = Self::rad(g);
         if wheel == 0 { return; }
         let schritt = self.sk(48);
         let r = self.windows[wi].widgets[i].rich.as_mut().unwrap();
@@ -11441,7 +11508,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Mausrad ueber dem Spinner: hoch = +, runter = -.
     fn spinner_wheel(&mut self, wi: usize, i: usize, g: &mut Graphics) {
-        let wheel = g.pop_mouse_wheel();
+        let wheel = Self::rad(g);
         if wheel != 0 { self.spinner_step(wi, i, wheel as i32); }
     }
 
@@ -16221,6 +16288,17 @@ mod kuerzel_tests {
         assert!(kuerzel_parsen("Strg+").unwrap_err().contains("keine Taste"));
         assert!(kuerzel_parsen("Strg+Q+W").unwrap_err().contains("mehr als eine Taste"));
         assert!(kuerzel_parsen("Hyper").unwrap_err().contains("unbekannt"));
+    }
+
+    #[test]
+    fn plus_und_minus() {
+        use super::{K_MINUS, K_PLUS};
+        assert_eq!(kuerzel_parsen("Strg+Plus").unwrap(), (1, K_PLUS));
+        assert_eq!(kuerzel_parsen("Strg++").unwrap(), (1, K_PLUS));
+        assert_eq!(kuerzel_parsen("Strg+Minus").unwrap(), (1, K_MINUS));
+        assert_eq!(kuerzel_parsen("Strg+-").unwrap(), (1, K_MINUS));
+        assert_eq!(kuerzel_parsen("Strg+0").unwrap(), (1, '0' as i64));
+        assert!(kuerzel_parsen("Strg+Plus+Minus").unwrap_err().contains("mehr als eine Taste"));
     }
 }
 

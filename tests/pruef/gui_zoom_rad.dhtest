@@ -1,0 +1,191 @@
+' Mausrad im Textbereich, Strg+Rad und die Kuerzel Plus/Minus (2026-09-18).
+'
+' Bis hierher rollte ein Textbereich mit dem Rad GAR NICHT -- nur Marke und
+' Tasten bewegten den Ausschnitt, und in der IDE ist das das Code-Feld.
+' Jetzt drei Zeilen je Schritt; die Editierschleife zieht den Ausschnitt
+' nicht zur Marke zurueck, solange sich Marke und Text nicht aendern. Mit
+' gedrueckter Strg-Taste rollt die gui nichts: Strg+Rad gehoert dem Programm
+' (Zoom). Und ein Kuerzel kann "Plus"/"Minus" heissen -- es trifft dann die
+' Taste der US- UND der deutschen Belegung (raylib benennt nach der Lage im
+' US-Layout: das deutsche "+" liegt auf "]", das "-" auf "/") und den
+' Ziffernblock.
+'
+' Aufnahme: 7 Maus (x y), 8 Rad (0 dy), 2 Taste runter, 1 hoch; 341 Strg
+' links, 93 "]", 61 "=", 334 Ziffernblock +, 47 "/", 45 "-", 333
+' Ziffernblock -, 48 "0". Die Wiedergabe setzt beim ersten Ereignis an.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== das rad rollt den textbereich und die marke holt ihn nicht zurueck
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+DIM t AS STRING : t = ""
+DIM i AS INTEGER
+FOR i = 1 TO 100 : t = t + "zeile " + STR$(i) + CHR$(10) : NEXT
+GUI_SET_TEXT(ta, t)
+GUI_FOCUS(ta)
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM erste AS INTEGER
+DIM rest AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 OR n = 20 OR n = 40 THEN
+        (erste, rest, rest, rest) = GUI_TEXTAREA_VIEW(ta)
+        PRINT "bild "; n; " erste zeile "; erste
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 100 100 0
+e 5 8 0 -3 0
+e 6 8 0 -3 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+bild 3 erste zeile 0
+bild 20 erste zeile 18
+bild 40 erste zeile 18
+
+=== eine taste holt die marke wieder ins bild
+' Gegenprobe zum Stehenbleiben: Pfeil runter bewegt die Marke, dann zieht
+' der Ausschnitt nach -- sie steht in Zeile 2, also wieder oben.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+DIM t AS STRING : t = ""
+DIM i AS INTEGER
+FOR i = 1 TO 100 : t = t + "zeile " + STR$(i) + CHR$(10) : NEXT
+GUI_SET_TEXT(ta, t)
+GUI_FOCUS(ta)
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM erste AS INTEGER
+DIM rest AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 40 THEN
+        (erste, rest, rest, rest) = GUI_TEXTAREA_VIEW(ta)
+        PRINT "erste zeile "; erste
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 100 100 0
+e 5 8 0 -3 0
+e 6 8 0 -3 0
+e 20 2 264 0 0
+e 21 1 264 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+erste zeile 1
+
+=== mit strg rollt nichts und das programm bekommt das rad
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+DIM t AS STRING : t = ""
+DIM i AS INTEGER
+FOR i = 1 TO 100 : t = t + "zeile " + STR$(i) + CHR$(10) : NEXT
+GUI_SET_TEXT(ta, t)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+DIM erste AS INTEGER
+DIM rest AS INTEGER
+DIM zoom AS INTEGER : zoom = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF KEYPRESSED(KEY_LCTRL) AND MOUSEWHEEL_Y() <> 0 THEN zoom = zoom + 1
+    n = n + 1
+    IF n = 40 THEN
+        (erste, rest, rest, rest) = GUI_TEXTAREA_VIEW(ta)
+        PRINT "erste zeile "; erste; " zoom "; zoom
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 100 100 0
+e 3 2 341 0 0
+e 5 8 0 -3 0
+e 6 8 0 -3 0
+e 9 1 341 0 0
+
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+erste zeile 0 zoom 2
+
+=== plus minus und null treffen jede belegung
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM m AS INTEGER : m = GUI_MENU(w, "Ansicht")
+DIM iPlus AS INTEGER : iPlus = GUI_MENU_ITEM(m, "Groesser", "Strg+Plus")
+DIM iMinus AS INTEGER : iMinus = GUI_MENU_ITEM(m, "Kleiner", "Strg+Minus")
+DIM iNull AS INTEGER : iNull = GUI_MENU_ITEM(m, "Normal", "Strg+0")
+DIM iZwei AS INTEGER : iZwei = GUI_MENU_ITEM(m, "Zweite Schreibweise", "Umschalt++")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_CLICKED(iPlus) THEN PRINT "plus"
+    IF GUI_CLICKED(iMinus) THEN PRINT "minus"
+    IF GUI_CLICKED(iNull) THEN PRINT "null"
+    IF GUI_CLICKED(iZwei) THEN PRINT "umschalt plus"
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "ende"
+--- datei ev.txt
+c 20
+e 0 2 341 0 0
+e 2 2 93 0 0
+e 3 1 93 0 0
+e 5 2 61 0 0
+e 6 1 61 0 0
+e 8 2 334 0 0
+e 9 1 334 0 0
+e 11 2 47 0 0
+e 12 1 47 0 0
+e 14 2 45 0 0
+e 15 1 45 0 0
+e 17 2 333 0 0
+e 18 1 333 0 0
+e 20 2 48 0 0
+e 21 1 48 0 0
+e 23 1 341 0 0
+e 25 2 340 0 0
+e 27 2 93 0 0
+e 28 1 93 0 0
+e 30 1 340 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+plus
+plus
+plus
+minus
+minus
+minus
+null
+umschalt plus
+ende

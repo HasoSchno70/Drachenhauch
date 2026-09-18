@@ -469,8 +469,8 @@ darum, was beim Arbeiten fehlen würde.
 
 * **Stufe A, vor dem Abschalten der Qt-Fassung:** in der IDE
   ~~Absturz-Wiederherstellung~~ (18.09., `tests/pruef/werkzeug_ide_wiederherstellung.dhtest`),
-  ~~Klick auf `datei:zeile` in der Ausgabe~~ (18.09., `tests/pruef/werkzeug_ide_ausgabe.dhtest`), Zoom mit
-  Strg+Rad und Strg+Plus/Minus/0, Tooltip beim Überfahren und Strg+Klick
+  ~~Klick auf `datei:zeile` in der Ausgabe~~ (18.09., `tests/pruef/werkzeug_ide_ausgabe.dhtest`), ~~Zoom mit
+  Strg+Rad und Strg+Plus/Minus/0~~ (18.09., `tests/pruef/werkzeug_ide_zoom.dhtest`), Tooltip beim Überfahren und Strg+Klick
   zur Definition, Haltepunkt per Klick in die Nummernspalte, Suchen mit
   Groß/klein und ganzem Wort samt einzeln ersetzen; im Notenblatt die
   Warnungen beim Umrechnen in den Tracker (Akkorde werden heute still auf

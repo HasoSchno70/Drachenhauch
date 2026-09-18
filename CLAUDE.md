@@ -3455,6 +3455,25 @@ die Wiedergabe setzt beim ERSTEN Ereignis an -- Enter bei Aufnahmebild 160
 kam 140 Bilder nach F5, also VOR der Auswahl in Bild 150; eine Beilage darf
 keine Leerzeichen im Namen tragen (die Datei legt ein `--- vorher` an).
 
+**Zoom in der IDE und das Mausrad im Textbereich (2026-09-18, dritter
+Punkt der Stufe A):** Strg+Plus/Minus (2 px) und Strg+0 (zurueck auf
+`SCHRIFT_NORMAL` = 16) als Menue-Kuerzel, Strg+Rad (1 px je Schritt,
+`radZoom`) ueberall im Fenster; `schriftSetzen` zieht das Drehfeld der
+Einstellungen mit, sonst setzte es die Schrift bei offenen Einstellungen
+zurueck. **Drei Stuecke in der Laufzeit:** (1) **ein Textbereich rollte mit
+dem Rad GAR NICHT** -- gefunden beim Bau, das Code-Feld liess sich nur ueber
+Marke und Tasten bewegen. Jetzt drei Zeilen je Schritt (`textarea_wheel`),
+und die Editierschleife zieht den Ausschnitt nicht zur Marke zurueck,
+solange Marke, Anker und Zeichenzahl dem Stand beim Rollen gleichen
+(`Widget::rad_stand`) -- sie tat das in JEDEM Bild. (2) **Strg+Rad gehoert
+dem Programm:** alle sieben Radabfragen der gui laufen ueber `Gui::rad`, das
+mit Strg 0 liefert; `MOUSEWHEEL_Y` sieht den Wert weiter. (3) **`Plus`/`Minus`
+im Kuerzel** (`Strg+Plus`, `Strg++`, `Strg+-`): raylib benennt Tasten nach
+der US-Lage, das deutsche "+" liegt auf "]", das "-" auf "/" -- `K_PLUS`/
+`K_MINUS` treffen darum beide Belegungen und den Ziffernblock
+(`kuerzel_taste`). Tests `tests/pruef/gui_zoom_rad.dhtest` (4),
+`tests/pruef/werkzeug_ide_zoom.dhtest` (1), Rust-Test `plus_und_minus`.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
