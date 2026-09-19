@@ -52,8 +52,36 @@ an allen 370 Crates); Tests: `tests/pruef/werkzeug_installer.dhtest`.
 
 Die Verknuepfungen starten `dhrt.exe run "{app}\ide\ide.dh"` mit dem
 Beispielordner als Arbeitsverzeichnis; `.dh`-Dateien oeffnen sich in der
-IDE (`-- "%1"`). Kein Signieren, kein macOS/Linux-Paket -- das kommt,
-wenn die Qt-IDE faellt.
+IDE (`-- "%1"`). Kein Signieren.
+
+### macOS und Linux (seit 2026-09-19)
+
+Dasselbe `bauen.dh` packt auf dem jeweiligen System (tar behaelt die
+Ausfuehrungsrechte, `hdiutil` gibt es nur auf dem Mac):
+
+```
+cargo build --release --features "graphics dialogs db net http smtp"   # in rust/drachenhauch_runtime
+rust/drachenhauch_runtime/target/release/dhrt run installer/bauen.dh
+```
+
+- **Linux:** `installer/output/Drachenhauch-IDE-<fassung>-linux-<arch>.tar.gz`.
+  Installieren ohne root: `tar xzf ...` und `./Drachenhauch-IDE-.../install.sh`
+  -- nach `~/.local/share/drachenhauch-ide`, dazu Menueeintrag, `.dh`-Zuordnung
+  und `drachenhauch`/`dhrt` in `~/.local/bin`; `install.sh --entfernen`
+  raeumt es wieder ab (ein eigenes `dhrt` in `~/.local/bin` bleibt stehen).
+  Braucht zur Laufzeit ALSA, GTK 3 und OpenGL.
+- **macOS:** `installer/output/Drachenhauch-IDE-<fassung>-macos-<arch>.dmg` mit
+  `Drachenhauch.app` (Ad-hoc-signiert, nicht beglaubigt -- beim ersten Start
+  ctrl-Klick -> Oeffnen, steht im LIESMICH des Abbilds).
+
+Der Starter (`installer/posix/drachenhauch`) kopiert die Beispiele beim Start
+nach `Dokumente/Drachenhauch/examples` (nur, was fehlt) und oeffnet die IDE
+dort. Die Symbole liegen fertig in `installer/symbole/`; neu erzeugen mit
+`dhrt run installer/symbole.dh`, wenn sich das Logo aendert. Gebaut und
+ausprobiert werden beide Pakete im Paket-Lauf der CI (`package.yml`, Job
+`paket-ohne-python`); Tests `tests/pruef/werkzeug_paket.dhtest`.
+**Auf einem echten Mac ist die IDE noch nicht gestartet worden** -- die
+macOS-Laeufer der CI haben kein OpenGL.
 
 ## Schnellstart
 

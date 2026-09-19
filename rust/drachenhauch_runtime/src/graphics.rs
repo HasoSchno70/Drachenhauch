@@ -853,8 +853,6 @@ fn web_leinwand_groesse(w: i32, h: i32) {
 }
 
 pub struct Graphics {
-    rl: RaylibHandle,
-    thread: RaylibThread,
     /// Barrierefreiheit (a11y.rs): der Adapter am Fenster, ob in DIESEM Bild
     /// schon ein Baum geschickt wurde (sonst schickt FLIP einen ohne Widgets),
     /// und der Fenstertitel als Name des Wurzelknotens.
@@ -1102,6 +1100,15 @@ pub struct Graphics {
     /// am Bildende weg, der Zaehler muss ihm darin folgen.
     clip_tiefe: u32,
     scene_rt: Option<RenderTexture2D>,
+    /// Das Fenster steht mit Absicht ZULETZT: Rust raeumt Felder in der
+    /// Reihenfolge ihrer Deklaration ab, und `RaylibHandle` schliesst beim
+    /// Abraeumen das Fenster samt GL-Kontext. Stand es vorn, gaben Schriften,
+    /// Texturen, Shader und Render-Ziele ihren Grafikspeicher erst DANACH
+    /// frei -- ohne Kontext. Windows verzeiht das, Mesa unter Linux nicht:
+    /// jedes Programm mit Fenster stuerzte dort beim Beenden ab (gemessen
+    /// 2026-09-19, gdb: drop(Graphics) -> UnloadFont -> rlUnloadTexture).
+    rl: RaylibHandle,
+    thread: RaylibThread,
 }
 
 /// Welche Zeichen in einen geladenen Font gebacken werden: ASCII, der ganze

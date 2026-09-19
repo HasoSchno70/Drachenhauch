@@ -1,0 +1,186 @@
+' Pakete fuer macOS und Linux -- eingebunden von bauen.dh.
+'
+' Linux: ein Ordner Drachenhauch-IDE-<fassung>/ mit dhrt, ide/, docs/,
+'   examples/, dem Starter `drachenhauch` und install.sh (fuer den Nutzer,
+'   ohne root), gepackt als .tar.gz.
+' macOS: Drachenhauch.app (dhrt und der Starter in Contents/MacOS, alles
+'   andere in Contents/Resources) plus LIESMICH und ein Verweis auf den
+'   Programme-Ordner, gepackt als .dmg ueber hdiutil.
+'
+' Dieselbe Aufteilung wie der Windows-Installer (Drachenhauch-IDE.iss): die
+' IDE als Quelltext, das Handbuch, die Beispiele. Die Beispiele kopiert der
+' Starter beim Start in den Nutzerordner -- siehe installer/posix/drachenhauch.
+'
+' Gebaut wird auf dem System, fuer das das Paket ist (tar behaelt die
+' Ausfuehrungsrechte, hdiutil gibt es nur auf dem Mac). Der Ordner allein
+' entsteht ueberall -- `--ohne-archiv`; so prueft ihn die Sammlung
+' tests/pruef/werkzeug_paket.dhtest auch unter Windows.
+
+
+FUNCTION aufWindows() AS BOOLEAN
+    RETURN GETENV$("OS") = "Windows_NT"
+END FUNCTION
+
+' Ein kurzer Befehl, dessen Ausgabe gebraucht wird (uname). Leer, wenn es
+' ihn nicht gibt.
+FUNCTION ausgabe$(prog AS STRING, arg AS STRING) AS STRING
+    DIM p AS INTEGER
+    TRY
+        p = PROCESS_START(prog, arg)
+    CATCH e
+        RETURN ""
+    END TRY
+    DIM t AS STRING : t = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM s AS STRING : s = PROCESS_READ$(p)
+        IF s <> "" THEN
+            t = t + s
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    PROCESS_CLOSE(p)
+    RETURN TRIM$(REPLACE$(REPLACE$(t, CHR$(13), ""), CHR$(10), ""))
+END FUNCTION
+
+' Einen Befehl laufen lassen; ein Fehlschlag bricht das Paket ab.
+SUB mussLaufen(p AS INTEGER, was AS STRING)
+    IF lauf(p, TRUE) <> 0 THEN
+        PRINT was; " ist fehlgeschlagen."
+        EXIT(1)
+    END IF
+END SUB
+
+' Eine Vorlage als Text uebernehmen: ohne Wagenruecklauf (ein Shell-Skript
+' mit CRLF laeuft nicht -- "/bin/sh^M: bad interpreter") und mit der Fassung.
+SUB vorlageKopieren(von AS STRING, nach AS STRING, fassung AS STRING)
+    DIM t AS STRING : t = BUFFER_TO_STRING$(READALL_BYTES(von))
+    t = REPLACE$(t, CHR$(13), "")
+    t = REPLACE$(t, "@FASSUNG@", fassung)
+    WRITEALL_BYTES(nach, BUFFER_FROM_STRING(t))
+END SUB
+
+SUB dateiKopieren(von AS STRING, nach AS STRING)
+    IF NOT DIREXISTS(DIRNAME(nach)) THEN MKDIR(DIRNAME(nach))
+    COPYFILE(von, nach)
+END SUB
+
+' Einen Ordner kopieren. `tief` = mit Unterordnern; ohne nur die oberste
+' Ebene (ide/ und docs/ -- wie im Windows-Installer). Liefert die Zahl.
+' Uebergangen werden die Temp-Dateien der IDE (_dhtmp_*, siehe
+' editor_qt/tempdateien.py) und __pycache__.
+FUNCTION ordnerKopieren(von AS STRING, nach AS STRING, muster AS STRING, tief AS BOOLEAN) AS INTEGER
+    DIM l AS ARRAY OF STRING : l = DIRLIST_REC(von, muster)
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(l) - 1
+        DIM rel AS STRING : rel = REPLACE$(l[i], CHR$(92), "/")
+        IF NOT tief AND INSTR(rel, "/") >= 0 THEN CONTINUE
+        IF LEFT$(BASENAME(rel), 7) = "_dhtmp_" THEN CONTINUE
+        IF INSTR(rel, "__pycache__") >= 0 THEN CONTINUE
+        dateiKopieren(PATHJOIN(von, rel), PATHJOIN(nach, rel))
+        n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Was in jedes Paket gehoert. `bin` bekommt dhrt, `res` den Rest (unter
+' Linux derselbe Ordner, im .app-Bundle zwei verschiedene).
+SUB inhaltKopieren(wurzel AS STRING, laufzeit AS STRING, bin AS STRING, res AS STRING)
+    dateiKopieren(laufzeit, PATHJOIN(bin, "dhrt"))
+    PRINT "  ide/      "; ordnerKopieren(PATHJOIN(wurzel, "ide"), PATHJOIN(res, "ide"), "*.dh", FALSE); " Dateien"
+    PRINT "  docs/     "; ordnerKopieren(PATHJOIN(wurzel, "docs"), PATHJOIN(res, "docs"), "*.md", FALSE); " Dateien"
+    PRINT "  examples/ "; ordnerKopieren(PATHJOIN(wurzel, "examples"), PATHJOIN(res, "examples"), "*", TRUE); " Dateien"
+    DIM texte AS ARRAY OF STRING : texte = ["EULA.txt", "THIRD-PARTY-NOTICES-IDE.txt"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(texte) - 1
+        DIM q AS STRING : q = PATHJOIN(wurzel, "installer/" + texte[i])
+        IF FILEEXISTS(q) THEN dateiKopieren(q, PATHJOIN(res, texte[i]))
+    NEXT
+END SUB
+
+' --- Symbole ------------------------------------------------------------
+' Fertig im Repo (installer/symbole/, erzeugt von installer/symbole.dh aus dem
+' Logo): Bilder brauchen in der Laufzeit einen GL-Kontext, also ein
+' (verstecktes) Fenster -- und das gibt es auf einem Bau-Rechner ohne
+' Bildschirm nicht (Linux ohne DISPLAY, die macOS-Laeufer der CI ganz ohne
+' passendes OpenGL). Hier wird nur kopiert.
+SUB symbolKopieren(symbole AS STRING, name AS STRING, nach AS STRING)
+    DIM q AS STRING : q = PATHJOIN(symbole, name)
+    IF FILEEXISTS(q) THEN
+        dateiKopieren(q, nach)
+    ELSE
+        PRINT "  (kein "; name; " unter "; symbole; " -- ohne Symbol; erzeugen mit installer/symbole.dh)"
+    END IF
+END SUB
+
+SUB ausfuehrbar(pfade AS ARRAY OF STRING)
+    IF aufWindows() THEN RETURN      ' dort gibt es keine Rechte-Bits
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pfade) - 1
+        mussLaufen(PROCESS_START("chmod", "755", pfade[i]), "chmod")
+    NEXT
+END SUB
+
+' --- Linux --------------------------------------------------------------
+SUB linuxPaket(wurzel AS STRING, laufzeit AS STRING, vorlagen AS STRING, ausgabe AS STRING, fassung AS STRING, arch AS STRING, symbole AS STRING, archiv AS BOOLEAN)
+    DIM name AS STRING : name = "Drachenhauch-IDE-" + fassung + "-linux-" + arch
+    DIM buehne AS STRING : buehne = PATHJOIN(ausgabe, "paket")
+    IF DIREXISTS(buehne) THEN RMDIR(buehne, TRUE)
+    DIM ziel AS STRING : ziel = PATHJOIN(buehne, name)
+    MKDIR(ziel)
+    PRINT "Linux-Paket in "; ziel
+    inhaltKopieren(wurzel, laufzeit, ziel, ziel)
+    vorlageKopieren(PATHJOIN(vorlagen, "drachenhauch"), PATHJOIN(ziel, "drachenhauch"), fassung)
+    vorlageKopieren(PATHJOIN(vorlagen, "install.sh"), PATHJOIN(ziel, "install.sh"), fassung)
+    symbolKopieren(symbole, "drachenhauch.png", PATHJOIN(ziel, "drachenhauch.png"))
+    ausfuehrbar([PATHJOIN(ziel, "dhrt"), PATHJOIN(ziel, "drachenhauch"), PATHJOIN(ziel, "install.sh")])
+    IF NOT archiv THEN
+        PRINT "Fertig (ohne Archiv)."
+        RETURN
+    END IF
+    DIM tgz AS STRING : tgz = PATHJOIN(ausgabe, name + ".tar.gz")
+    IF FILEEXISTS(tgz) THEN DELETEFILE(tgz)
+    mussLaufen(PROCESS_START("tar", "-czf", tgz, "-C", buehne, name), "tar")
+    PRINT "FERTIG -> "; tgz; " ("; FILESIZE(tgz) \ 1048576; " MB)"
+    PRINT "Installieren:  tar xzf "; BASENAME(tgz); " && ./"; name; "/install.sh"
+END SUB
+
+' --- macOS --------------------------------------------------------------
+SUB macosPaket(wurzel AS STRING, laufzeit AS STRING, vorlagen AS STRING, ausgabe AS STRING, fassung AS STRING, arch AS STRING, symbole AS STRING, archiv AS BOOLEAN)
+    DIM buehne AS STRING : buehne = PATHJOIN(ausgabe, "paket/Drachenhauch")
+    IF DIREXISTS(PATHJOIN(ausgabe, "paket")) THEN RMDIR(PATHJOIN(ausgabe, "paket"), TRUE)
+    DIM app AS STRING : app = PATHJOIN(buehne, "Drachenhauch.app")
+    DIM bin AS STRING : bin = PATHJOIN(app, "Contents/MacOS")
+    DIM res AS STRING : res = PATHJOIN(app, "Contents/Resources")
+    MKDIR(bin)
+    MKDIR(res)
+    PRINT "macOS-Paket in "; app
+    ' dhrt liegt in Contents/MacOS: nur ein Programm dort zaehlt fuer macOS
+    ' zum Bundle -- sonst zeigte das Dock "dhrt" mit Allerweltssymbol.
+    inhaltKopieren(wurzel, laufzeit, bin, res)
+    vorlageKopieren(PATHJOIN(vorlagen, "drachenhauch"), PATHJOIN(bin, "Drachenhauch"), fassung)
+    vorlageKopieren(PATHJOIN(vorlagen, "Info.plist"), PATHJOIN(app, "Contents/Info.plist"), fassung)
+    WRITEALL_BYTES(PATHJOIN(app, "Contents/PkgInfo"), BUFFER_FROM_STRING("APPL????"))
+    vorlageKopieren(PATHJOIN(vorlagen, "LIESMICH-macos.txt"), PATHJOIN(buehne, "LIESMICH.txt"), fassung)
+    symbolKopieren(symbole, "Drachenhauch.icns", PATHJOIN(res, "Drachenhauch.icns"))
+    ausfuehrbar([PATHJOIN(bin, "dhrt"), PATHJOIN(bin, "Drachenhauch")])
+    IF NOT archiv THEN
+        PRINT "Fertig (ohne Archiv)."
+        RETURN
+    END IF
+    ' Ad-hoc-Signatur: ohne jede Signatur meldet macOS eine heruntergeladene
+    ' App als "beschaedigt"; so nur als "nicht verifizierter Entwickler",
+    ' und ctrl-Klick -> Oeffnen reicht (LIESMICH sagt es).
+    mussLaufen(PROCESS_START("codesign", "--force", "--deep", "--sign", "-", app), "codesign")
+    ' Der Verweis macht aus dem geoeffneten Abbild ein "hierher ziehen".
+    mussLaufen(PROCESS_START("ln", "-s", "/Applications", PATHJOIN(buehne, "Programme")), "ln")
+    DIM dmg AS STRING : dmg = PATHJOIN(ausgabe, "Drachenhauch-IDE-" + fassung + "-macos-" + arch + ".dmg")
+    IF FILEEXISTS(dmg) THEN DELETEFILE(dmg)
+    mussLaufen(PROCESS_START("hdiutil", "create", "-volname", "Drachenhauch " + fassung, _
+                             "-srcfolder", buehne, "-ov", "-format", "UDZO", dmg), "hdiutil")
+    PRINT "FERTIG -> "; dmg; " ("; FILESIZE(dmg) \ 1048576; " MB)"
+END SUB

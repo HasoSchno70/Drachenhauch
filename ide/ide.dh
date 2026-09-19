@@ -277,8 +277,13 @@ DIM profilZeilen AS ARRAY OF INTEGER : profilZeilen = []
 DIM wurzel AS STRING : wurzel = GETENV$("DH_IDE_WURZEL")
 IF wurzel = "" THEN wurzel = PATHJOIN(CWD$(), "..")
 DIM docsOrdner AS STRING : docsOrdner = PATHJOIN(wurzel, "docs")
-DIM beispielOrdner AS STRING : beispielOrdner = PATHJOIN(wurzel, "examples")
-IF NOT FILEEXISTS(PATHJOIN(beispielOrdner, "183_sfx_generator.dh")) AND GETENV$("PUBLIC") <> "" THEN
+' DH_IDE_BEISPIELE nennt den Ordner ausdruecklich: unter macOS und Linux liegen
+' ide/ und examples/ im Paket, das der Nutzer nicht beschreiben soll (in einem
+' .app-Bundle braeche jede Aenderung die Signatur) -- der Starter kopiert die
+' Beispiele beim ersten Start in den Nutzerordner und sagt der IDE, wo.
+DIM beispielOrdner AS STRING : beispielOrdner = GETENV$("DH_IDE_BEISPIELE")
+IF beispielOrdner = "" THEN beispielOrdner = PATHJOIN(wurzel, "examples")
+IF GETENV$("DH_IDE_BEISPIELE") = "" AND NOT FILEEXISTS(PATHJOIN(beispielOrdner, "183_sfx_generator.dh")) AND GETENV$("PUBLIC") <> "" THEN
     ' Installation: der Installer legt die Beispiele in die oeffentlichen Dokumente.
     beispielOrdner = PATHJOIN(GETENV$("PUBLIC"), "Documents/Drachenhauch/examples")
 END IF

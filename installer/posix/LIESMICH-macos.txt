@@ -1,0 +1,21 @@
+Drachenhauch IDE fuer macOS
+===========================
+
+Installieren: "Drachenhauch" auf den Ordner "Programme" (Applications)
+ziehen.
+
+Erster Start: die App ist nicht bei Apple beglaubigt. Beim ersten Mal
+darum im Finder mit gedrueckter ctrl-Taste auf "Drachenhauch" klicken,
+"Oeffnen" waehlen und die Rueckfrage bestaetigen. Danach startet sie wie
+jede andere App.
+
+Die Beispiele und Begleit-Editoren landen beim ersten Start unter
+Dokumente/Drachenhauch/examples -- dort darf man sie aendern.
+
+Im Terminal steht die Laufzeit unter
+    /Applications/Drachenhauch.app/Contents/MacOS/dhrt
+bereit, zum Beispiel:
+    /Applications/Drachenhauch.app/Contents/MacOS/dhrt run spiel.dh
+
+Bekannt: eine .dh-Datei per Doppelklick im Finder oeffnet die IDE noch
+nicht mit dieser Datei; in der IDE ueber Datei -> Oeffnen laden.

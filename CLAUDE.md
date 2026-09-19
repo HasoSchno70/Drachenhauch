@@ -3390,8 +3390,8 @@ Bauhilfe, die ein beliebiges Python 3 ohne venv nimmt. (a) **Keine
 Qt-Funktion blockiert das Loeschen, keine ist dauerhaft ausgeschlossen** --
 was fehlt, wird gebaut: erst die acht Punkte der Stufe A
 (`docs/entwurf-python-abbau.md`, am Ende von 7.7), der Rest bei Bedarf. Keine
-eigene Datei haengt an einer Qt-Funktion (nachgesehen). Offen: (b)
-macOS-/Linux-Paket.
+eigene Datei haengt an einer Qt-Funktion (nachgesehen). (b) entschieden
+am 2026-09-19: ja, macOS und Linux bekommen ein Paket ohne Python (unten).
 
 **Absturz-Wiederherstellung in der IDE (2026-09-18, erster Punkt der Stufe
 A):** jede laufende IDE schreibt alle 30 s (`wiederherstellung_s` in der
@@ -3636,6 +3636,58 @@ sofort, ESC fuer 185/187/189, SFX zurueckgestellt, Sprite ein Verlaufsschritt).
 Gegenprobe gegen die alten Werkzeuge: alle 13 Faelle mit ungesicherter Arbeit
 fallen; drei Verfaelschungen (Verlaufsschritt ohne Merker, SFX immer
 ungesichert, ESC vor GUI_UPDATE) lassen je genau ihre Faelle fallen.
+
+**Pakete fuer macOS und Linux ohne Python (2026-09-19, Entscheidung (b)):**
+`installer/bauen.dh` baut unter Linux `Drachenhauch-IDE-<fassung>-linux-<arch>.tar.gz`
+(Ordner mit dhrt, ide/, docs/, examples/, dem Starter `drachenhauch` und
+`install.sh` -- fuer den Nutzer, ohne root, nach XDG: Menueeintrag,
+`.dh`-Zuordnung ueber einen eigenen MIME-Typ, `~/.local/bin/drachenhauch`
+und `dhrt`; `--entfernen` raeumt ab) und unter macOS
+`Drachenhauch-IDE-<fassung>-macos-<arch>.dmg` (`Drachenhauch.app` mit dhrt
+UND Starter in Contents/MacOS -- nur ein Programm dort zaehlt fuer macOS zum
+Bundle --, Rest in Resources, Ad-hoc-Signatur, ein Verweis auf den
+Programme-Ordner, LIESMICH). Der Teil steht in `installer/paket.dh`, die
+Vorlagen in `installer/posix/` (LF erzwungen in `.gitattributes` -- ein
+Starter mit CRLF laeuft nicht). **Die Beispiele kopiert der Starter beim
+Start** nach Dokumente/Drachenhauch/examples (ohne Dokumente-Ordner nach
+~/Drachenhauch), nur was dort fehlt (`cp -Rn`: Bearbeitetes bleibt, Neues
+einer spaeteren Fassung kommt dazu), und nennt den Ordner der IDE ueber das
+neue **`DH_IDE_BEISPIELE`** -- im Paket soll niemand schreiben, in einem
+.app-Bundle braeche es die Signatur. `install.sh` fasst in ~/.local/bin nur
+EIGENE Starter an (erkannt am Pfad darin), ein fremdes `dhrt` bleibt. **Die
+Symbole liegen fertig im Repo** (`installer/symbole/`, erzeugt von
+`installer/symbole.dh` aus dem Logo, `.icns` mit PNG-Eintraegen 256/512
+ohne iconutil): Bilder brauchen in der Laufzeit einen GL-Kontext, also ein
+verstecktes Fenster, und das gab es auf den Bau-Rechnern der CI nicht (Linux
+ohne DISPLAY, macOS ohne passendes OpenGL) -- `bauen.dh` brach dort ab.
+Nebenbei liegt das Logo so nicht mehr nur im Python-Paket. **Zum ersten Mal
+lief dhrt MIT Grafik auf Linux und macOS** (neuer Job `paket-ohne-python`
+in `package.yml`, cargo direkt ohne Python, CFLAGS wie build_runtime.py) --
+und das fand einen **Absturz beim Beenden unter Linux**: `RaylibHandle` war
+das erste Feld von `Graphics` und schloss beim Abraeumen das Fenster samt
+GL-Kontext, bevor Schriften und Texturen freigegeben wurden; Mesa stuerzte
+daran ab (gdb im CI-Lauf: drop(Graphics) -> UnloadFont -> rlUnloadTexture),
+Windows verzeiht es. Jetzt ist es das letzte Feld,
+`tests/pruef/grafik_aufraeumen.dhtest` haelt die Reihenfolge fest
+(Gegenprobe mit der alten: faellt), und der Paket-Lauf laesst ein
+Fensterprogramm unter xvfb mit Rueckgabe 0 enden. **Gemessen im
+Paket-Lauf:** Linux (x86_64) 22 MB, install.sh in ein frisches HOME, die IDE
+startet unter xvfb und endet sauber, die Sammlung laeuft mit Grafik ganz;
+macOS (arm64) 22 MB, `codesign --verify` gueltig, die Laufzeit aus dem
+Bundle fuehrt Programme aus, der Starter legt die Beispiele an -- **ein
+Fenster geht auf den macOS-Laeufern nicht** (kein OpenGL), ob die IDE auf
+einem echten Mac aufgeht, ist ungeprueft. Bekannt offen: eine `.dh` per
+Doppelklick im Finder oeffnet die IDE nicht mit der Datei (dafuer braeuchte
+es ein Apple-Event, ein Shell-Starter bekommt es nicht), keine
+Beglaubigung (Notarisierung), und ein gescheitertes Fenster endet weiter in
+einem Panic statt einer Meldung. Tests `tests/pruef/werkzeug_paket.dhtest`
+(8: Linux-Ordner, macOS-Bundle samt .icns-Eintraegen, Symbole passen zum
+Logo, unbekanntes System, install.sh ein/aus mit fremdem dhrt, der Starter
+mit der echten Laufzeit zweimal, `DH_IDE_BEISPIELE` mit Gegenprobe); sieben
+Verfaelschungen (CRLF, dhrt in Resources, `cp -R` ohne `-n`, fremdes dhrt
+ueberschreiben, Entfernen ohne Menueeintrag, IDE ohne `DH_IDE_BEISPIELE`,
+Symbole nicht mitkopiert) und zwei am Symbol-Werkzeug (falsche
+.icns-Laenge, falsche Kante) lassen je genau ihre Faelle fallen.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die

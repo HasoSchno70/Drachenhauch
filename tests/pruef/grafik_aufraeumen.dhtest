@@ -1,0 +1,43 @@
+' Das Fenster schliesst als Letztes (rust/drachenhauch_runtime/src/graphics.rs,
+' 2026-09-19).
+'
+' Rust raeumt die Felder einer Struktur in der Reihenfolge ihrer Deklaration
+' ab, und `RaylibHandle` schliesst dabei das Fenster samt GL-Kontext. Stand es
+' vorn in `Graphics`, gaben Schriften, Texturen, Shader und Render-Ziele ihren
+' Grafikspeicher danach frei -- ohne Kontext. Unter Windows faellt das nicht
+' auf; unter Linux (Mesa) stuerzte jedes Programm mit Fenster beim Beenden ab.
+' Gemessen ist das nur im Paket-Lauf der CI mit Grafik (package.yml); hier
+' haelt ein Blick in den Quelltext die Reihenfolge fest, auch dort, wo ohne
+' Grafik gebaut wird.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== RaylibHandle und RaylibThread sind die letzten felder von Graphics
+DIM z AS ARRAY OF STRING : z = READLINES(ARG$(0))
+DIM anfang AS INTEGER : anfang = ARRAY_INDEXOF(z, "pub struct Graphics {")
+PRINT "struktur gefunden "; (anfang >= 0)
+DIM ende AS INTEGER : ende = anfang
+WHILE z[ende] <> "}"
+    ende = ende + 1
+WEND
+' Die letzten zwei Felder vor der schliessenden Klammer (Kommentare zaehlen nicht).
+DIM felder AS ARRAY OF STRING : felder = []
+DIM i AS INTEGER
+FOR i = anfang + 1 TO ende - 1
+    DIM t AS STRING : t = TRIM$(z[i])
+    IF t <> "" AND LEFT$(t, 2) <> "//" THEN ARRAY_PUSH(felder, t)
+NEXT
+PRINT "vorletztes "; felder[LEN(felder) - 2]
+PRINT "letztes "; felder[LEN(felder) - 1]
+' Und nur dort: ein zweites `rl:` weiter oben waere derselbe Fehler.
+DIM n AS INTEGER : n = 0
+FOR i = 0 TO LEN(felder) - 1
+    IF LEFT$(felder[i], 3) = "rl:" THEN n = n + 1
+NEXT
+PRINT "rl genau einmal "; (n = 1)
+--- argumente
+{sammlung}/../../rust/drachenhauch_runtime/src/graphics.rs
+--- erwartet
+struktur gefunden TRUE
+vorletztes rl: RaylibHandle,
+letztes thread: RaylibThread,
+rl genau einmal TRUE

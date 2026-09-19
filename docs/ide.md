@@ -433,5 +433,9 @@ diese hier gleichzieht. **Gebaut wird er seit 2026-09-16 in Drachenhauch**
 (`dhrt run installer/bauen.dh`: Fassung aus `VERSION$()`, Lizenzen über
 `installer/lizenzen.dh`, dann ISCC); nur die Laufzeit selbst baut weiterhin
 `rust/build_runtime.py` -- eine laufende `.exe` lässt sich nicht
-überschreiben. Die Liste steht in
+überschreiben. **Seit 2026-09-19 packt dasselbe `bauen.dh` auch für macOS
+(`.dmg`) und Linux (`.tar.gz` mit `install.sh`)**; der Starter kopiert die
+Beispiele beim Start in `Dokumente/Drachenhauch/examples` und sagt der IDE
+über `DH_IDE_BEISPIELE`, wo sie liegen (Einzelheiten in
+[installer/README.md](../installer/README.md)). Die Liste steht in
 [entwurf-python-abbau.md](entwurf-python-abbau.md), Abschnitt C.

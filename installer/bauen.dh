@@ -1,9 +1,15 @@
-' Baut die Python-freie Distribution: dhrt.exe, die IDE in Drachenhauch, das
-' Handbuch und die Beispiele -- verpackt von Inno Setup nach
-' installer/output/Drachenhauch-IDE-Setup-<fassung>.exe.
+' Baut die Python-freie Distribution: dhrt, die IDE in Drachenhauch, das
+' Handbuch und die Beispiele. Unter Windows verpackt von Inno Setup nach
+' installer/output/Drachenhauch-IDE-Setup-<fassung>.exe, unter Linux als
+' Drachenhauch-IDE-<fassung>-linux-<arch>.tar.gz, unter macOS als
+' Drachenhauch-IDE-<fassung>-macos-<arch>.dmg (installer/paket.dh).
 '
 '     dhrt run installer/bauen.dh
 '     dhrt run installer/bauen.dh -- --ohne-installer      ' nur die Lizenzdatei
+'
+' Fuer Pruefungen: --system linux|macos baut das Paket fuer ein anderes System
+' (nur als Ordner, mit --ohne-archiv), --laufzeit nimmt eine andere dhrt,
+' --ausgabe einen anderen Zielordner, --ohne-lizenzen laesst cargo weg.
 '
 ' Die FASSUNG kommt aus der Laufzeit selbst (VERSION$()) -- gepackt wird genau
 ' die dhrt.exe, die hier lauft, und damit stimmt die Nummer im Installer mit
@@ -39,7 +45,17 @@ FUNCTION lauf(p AS INTEGER, zeigen AS BOOLEAN) AS INTEGER
     RETURN PROCESS_CODE(p)
 END FUNCTION
 
+IMPORT "paket.dh"
+
 DIM wurzel AS STRING : wurzel = DIRNAME(CWD$())
+' Die Vorlagen liegen neben diesem Programm, egal welche Wurzel gebaut wird.
+DIM vorlagen AS STRING : vorlagen = PATHJOIN(CWD$(), "posix")
+DIM zielSystem AS STRING : zielSystem = ""
+DIM zielArch AS STRING : zielArch = ""
+DIM laufzeitArg AS STRING : laufzeitArg = ""
+DIM ausgabeArg AS STRING : ausgabeArg = ""
+DIM mitArchiv AS BOOLEAN : mitArchiv = TRUE
+DIM mitLizenzen AS BOOLEAN : mitLizenzen = TRUE
 DIM ohneInstaller AS BOOLEAN : ohneInstaller = FALSE
 DIM metaDatei AS STRING : metaDatei = ""
 DIM ai AS INTEGER : ai = 0
@@ -50,6 +66,24 @@ WHILE ai < ARGC()
     ELSEIF ARG$(ai) = "--wurzel" THEN
         wurzel = vomAufrufer$(ARG$(ai + 1))
         ai = ai + 2
+    ELSEIF ARG$(ai) = "--system" THEN
+        zielSystem = LOWER$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSEIF ARG$(ai) = "--arch" THEN
+        zielArch = ARG$(ai + 1)
+        ai = ai + 2
+    ELSEIF ARG$(ai) = "--laufzeit" THEN
+        laufzeitArg = vomAufrufer$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSEIF ARG$(ai) = "--ausgabe" THEN
+        ausgabeArg = vomAufrufer$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSEIF ARG$(ai) = "--ohne-archiv" THEN
+        mitArchiv = FALSE
+        ai = ai + 1
+    ELSEIF ARG$(ai) = "--ohne-lizenzen" THEN
+        mitLizenzen = FALSE
+        ai = ai + 1
     ELSEIF ARG$(ai) = "--metadata" THEN
         ' Nur fuer Pruefungen: die Crate-Liste aus einer Datei statt von cargo.
         metaDatei = vomAufrufer$(ARG$(ai + 1))
@@ -66,6 +100,25 @@ DIM fassung AS STRING : fassung = VERSION$()
 ' einfach beides; genau eine der zwei Dateien gibt es.
 DIM runtime AS STRING : runtime = wurzel + "/rust/drachenhauch_runtime/target/release/dhrt.exe"
 IF NOT FILEEXISTS(runtime) THEN runtime = wurzel + "/rust/drachenhauch_runtime/target/release/dhrt"
+IF laufzeitArg <> "" THEN runtime = laufzeitArg
+' Welches System: unter Windows sagt es die Umgebung, sonst uname.
+IF zielSystem = "" THEN
+    IF aufWindows() THEN
+        zielSystem = "windows"
+    ELSEIF ausgabe$("uname", "-s") = "Darwin" THEN
+        zielSystem = "macos"
+    ELSE
+        zielSystem = "linux"
+    END IF
+END IF
+IF zielSystem <> "windows" AND zielSystem <> "linux" AND zielSystem <> "macos" THEN
+    PRINT "Unbekanntes System: "; zielSystem; " (windows, linux, macos)"
+    EXIT(1)
+END IF
+IF zielArch = "" AND zielSystem <> "windows" THEN zielArch = ausgabe$("uname", "-m")
+IF zielArch = "" THEN zielArch = "x86_64"
+DIM ausgabeOrdner AS STRING : ausgabeOrdner = installer + "/output"
+IF ausgabeArg <> "" THEN ausgabeOrdner = ausgabeArg
 
 PRINT "Drachenhauch "; fassung; " -- Distribution ohne Python"
 IF NOT FILEEXISTS(runtime) THEN
@@ -76,20 +129,37 @@ END IF
 PRINT "Laufzeit: "; runtime; " ("; FILESIZE(runtime) \ 1048576; " MB)"
 
 ' --- Lizenzen der Drittkomponenten -------------------------------------
-PRINT "Lizenzen sammeln ..."
 DIM lz AS INTEGER
-IF metaDatei <> "" THEN
+IF NOT mitLizenzen THEN
+    PRINT "Lizenzen: uebersprungen."
+ELSEIF metaDatei <> "" THEN
+    PRINT "Lizenzen sammeln ..."
     lz = PROCESS_START("dhrt", "run", installer + "/lizenzen.dh", "--", "--wurzel", wurzel, "--metadata", metaDatei)
 ELSE
+    PRINT "Lizenzen sammeln ..."
     lz = PROCESS_START("dhrt", "run", installer + "/lizenzen.dh", "--", "--wurzel", wurzel)
 END IF
-IF lauf(lz, TRUE) <> 0 THEN
-    PRINT "Die Lizenzsammlung ist fehlgeschlagen -- ohne sie wird nicht verpackt."
-    EXIT(1)
+IF mitLizenzen THEN
+    IF lauf(lz, TRUE) <> 0 THEN
+        PRINT "Die Lizenzsammlung ist fehlgeschlagen -- ohne sie wird nicht verpackt."
+        EXIT(1)
+    END IF
 END IF
 
 IF ohneInstaller THEN
     PRINT "Fertig (ohne Installer)."
+    EXIT(0)
+END IF
+
+' --- macOS und Linux ---------------------------------------------------
+DIM symbole AS STRING : symbole = PATHJOIN(CWD$(), "symbole")
+IF zielSystem = "linux" THEN
+    MKDIR(ausgabeOrdner)
+    linuxPaket(wurzel, runtime, vorlagen, ausgabeOrdner, fassung, zielArch, symbole, mitArchiv)
+    EXIT(0)
+ELSEIF zielSystem = "macos" THEN
+    MKDIR(ausgabeOrdner)
+    macosPaket(wurzel, runtime, vorlagen, ausgabeOrdner, fassung, zielArch, symbole, mitArchiv)
     EXIT(0)
 END IF
 
