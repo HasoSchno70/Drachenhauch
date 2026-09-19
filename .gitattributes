@@ -1,2 +1,6 @@
 # Zeilenenden automatisch normalisieren (LF im Repo)
 * text=auto
+
+# Shell-Skripte und Vorlagen der macOS/Linux-Pakete: immer LF, auch in einem
+# Windows-Klon mit autocrlf -- "/bin/sh^M: bad interpreter".
+installer/posix/* text eol=lf

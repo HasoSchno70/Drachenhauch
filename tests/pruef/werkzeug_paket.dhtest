@@ -1,0 +1,422 @@
+' Die Pakete fuer macOS und Linux (installer/bauen.dh + installer/paket.dh,
+' Vorlagen in installer/posix/, 2026-09-19).
+'
+' Gebaut wird hier nur der ORDNER (--ohne-archiv): tar mit den richtigen
+' Rechten und hdiutil gibt es nur auf dem Zielsystem, das Archiv entsteht im
+' Paket-Lauf der CI (.github/workflows/package.yml). Der Ordner entsteht aber
+' ueberall -- und dessen Inhalt ist die eigentliche Zusage.
+'
+' Starter und install.sh laufen echt, mit einem erfundenen HOME: unter
+' Windows ueber das sh von Git, unter macOS/Linux ueber /bin/sh. Ohne sh
+' ueberspringen sich die Faelle; der Start der IDE braucht zusaetzlich eine
+' Laufzeit mit Grafik.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== linux: der ordner traegt alles, was starter und installer brauchen
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+FUNCTION ohneCR(pfad AS STRING) AS BOOLEAN
+    RETURN INSTR(BUFFER_TO_STRING$(READALL_BYTES(pfad)), CHR$(13)) < 0
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", ARG$(1), _
+    "--system", "linux", "--arch", "x86_64", "--laufzeit", CWD$() + "/dhrt-attrappe", _
+    "--ausgabe", CWD$() + "/raus", "--ohne-archiv", "--ohne-lizenzen")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM d AS STRING : d = "raus/paket/Drachenhauch-IDE-" + VERSION$() + "-linux-x86_64"
+PRINT "ordner "; DIREXISTS(d)
+PRINT "dhrt ist die genannte laufzeit "; (BUFFER_TO_STRING$(READALL_BYTES(d + "/dhrt")) = "ATTRAPPE")
+PRINT "ide "; FILEEXISTS(d + "/ide/ide.dh")
+PRINT "handbuch "; (LEN(DIRLIST(d + "/docs", "*.md")) > 50)
+PRINT "beispiele "; FILEEXISTS(d + "/examples/183_sfx_generator.dh"); " "; FILEEXISTS(d + "/examples/01_hello.dh")
+PRINT "unterordner der beispiele "; FILEEXISTS(d + "/examples/assets/editor_tileset.png")
+PRINT "starter ohne CR "; ohneCR(d + "/drachenhauch")
+PRINT "install.sh ohne CR "; ohneCR(d + "/install.sh")
+PRINT "starter beginnt mit sh "; (LEFT$(READLINES(d + "/drachenhauch")[0], 9) = "#!/bin/sh")
+PRINT "lizenzvertrag "; FILEEXISTS(d + "/EULA.txt")
+' Das Symbol entsteht nur, wenn DIESE Laufzeit Bilder kann.
+DIM v AS INTEGER : v = PROCESS_START("dhrt", "--version")
+DIM vt AS STRING : vt = lauf$(v)
+DIM mitGrafik AS BOOLEAN : mitGrafik = INSTR(vt, "grafik") >= 0 AND INSTR(vt, "fehlt: grafik") < 0
+DIM symbolOk AS BOOLEAN : symbolOk = (FILEEXISTS(d + "/drachenhauch.png") = mitGrafik)
+IF mitGrafik AND symbolOk THEN
+    DIM b AS IMAGE : b = LOADIMAGE(d + "/drachenhauch.png")
+    symbolOk = IMAGEWIDTH(b) = 256 AND IMAGEHEIGHT(b) = 256
+END IF
+PRINT "symbol "; symbolOk
+IF PROCESS_CODE(p) <> 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../installer/bauen.dh
+{sammlung}/../..
+--- datei dhrt-attrappe
+ATTRAPPE
+--- erwartet
+rueckgabe 0
+ordner TRUE
+dhrt ist die genannte laufzeit TRUE
+ide TRUE
+handbuch TRUE
+beispiele TRUE TRUE
+unterordner der beispiele TRUE
+starter ohne CR TRUE
+install.sh ohne CR TRUE
+starter beginnt mit sh TRUE
+lizenzvertrag TRUE
+symbol TRUE
+
+=== macos: das bundle hat seine teile an den richtigen stellen
+IMPORT "xml"
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+' Eine 32-Bit-Zahl, hoechstes Byte zuerst (so steht alles in einer .icns).
+FUNCTION u32(b AS BUFFER, i AS INTEGER) AS INTEGER
+    RETURN ((BUFFER_GET(b, i) * 256 + BUFFER_GET(b, i + 1)) * 256 + BUFFER_GET(b, i + 2)) * 256 + BUFFER_GET(b, i + 3)
+END FUNCTION
+FUNCTION kennung$(b AS BUFFER, i AS INTEGER) AS STRING
+    RETURN CHR$(BUFFER_GET(b, i)) + CHR$(BUFFER_GET(b, i + 1)) + CHR$(BUFFER_GET(b, i + 2)) + CHR$(BUFFER_GET(b, i + 3))
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", ARG$(1), _
+    "--system", "macos", "--arch", "arm64", "--laufzeit", CWD$() + "/dhrt-attrappe", _
+    "--ausgabe", CWD$() + "/raus", "--ohne-archiv", "--ohne-lizenzen")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM app AS STRING : app = "raus/paket/Drachenhauch/Drachenhauch.app/Contents"
+' Laufzeit UND Starter in MacOS/: nur ein Programm dort gehoert fuer macOS
+' zum Bundle.
+PRINT "dhrt in MacOS "; (BUFFER_TO_STRING$(READALL_BYTES(app + "/MacOS/dhrt")) = "ATTRAPPE")
+PRINT "starter in MacOS "; FILEEXISTS(app + "/MacOS/Drachenhauch")
+PRINT "ide in Resources "; FILEEXISTS(app + "/Resources/ide/ide.dh")
+PRINT "beispiele in Resources "; FILEEXISTS(app + "/Resources/examples/183_sfx_generator.dh")
+PRINT "kein handbuch neben dhrt "; NOT DIREXISTS(app + "/MacOS/docs")
+PRINT "liesmich im abbild "; FILEEXISTS("raus/paket/Drachenhauch/LIESMICH.txt")
+PRINT "pkginfo "; BUFFER_TO_STRING$(READALL_BYTES(app + "/PkgInfo"))
+' Info.plist: Programm, Symbol und Fassung -- die Fassung ist die der Laufzeit.
+DIM plist AS STRING : plist = BUFFER_TO_STRING$(READALL_BYTES(app + "/Info.plist"))
+PRINT "plist programm "; (INSTR(plist, "<key>CFBundleExecutable</key>" + CHR$(10) + "    <string>Drachenhauch</string>") >= 0)
+PRINT "plist fassung "; (INSTR(plist, "<string>" + VERSION$() + "</string>") >= 0); " "; (INSTR(plist, "@FASSUNG@") < 0)
+DIM x AS XML_HANDLE : x = XML_PARSE(plist)
+PRINT "plist ist xml "; (XML_NAME$(x) = "plist")
+' Die .icns: Kopf "icns" + Gesamtlaenge, dann Eintraege mit PNG.
+DIM v AS INTEGER : v = PROCESS_START("dhrt", "--version")
+DIM vt AS STRING : vt = lauf$(v)
+DIM mitGrafik AS BOOLEAN : mitGrafik = INSTR(vt, "grafik") >= 0 AND INSTR(vt, "fehlt: grafik") < 0
+DIM icns AS STRING : icns = app + "/Resources/Drachenhauch.icns"
+IF NOT mitGrafik THEN
+    PRINT "icns "; NOT FILEEXISTS(icns)
+    PRINT "ic08 256"
+    PRINT "ic09 512"
+    PRINT "ic10 1024"
+ELSE
+    DIM b AS BUFFER : b = READALL_BYTES(icns)
+    PRINT "icns "; (kennung$(b, 0) = "icns" AND u32(b, 4) = BUFFER_LEN(b))
+    DIM i AS INTEGER : i = 8
+    WHILE i < BUFFER_LEN(b)
+        ' PNG-Kennung, dann IHDR: Breite ab Byte 16 des PNG.
+        DIM istPng AS BOOLEAN : istPng = BUFFER_GET(b, i + 9) = 80 AND BUFFER_GET(b, i + 10) = 78 AND BUFFER_GET(b, i + 11) = 71
+        PRINT kennung$(b, i); " "; IIF(istPng, STR$(u32(b, i + 8 + 16)), "kein png")
+        i = i + u32(b, i + 4)
+    WEND
+END IF
+IF PROCESS_CODE(p) <> 0 THEN PRINT aus
+--- argumente
+{sammlung}/../../installer/bauen.dh
+{sammlung}/../..
+--- datei dhrt-attrappe
+ATTRAPPE
+--- erwartet
+rueckgabe 0
+dhrt in MacOS TRUE
+starter in MacOS TRUE
+ide in Resources TRUE
+beispiele in Resources TRUE
+kein handbuch neben dhrt TRUE
+liesmich im abbild TRUE
+pkginfo APPL????
+plist programm TRUE
+plist fassung TRUE TRUE
+plist ist xml TRUE
+icns TRUE
+ic08 256
+ic09 512
+ic10 1024
+
+=== ein unbekanntes system ist ein fehler
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--system", "amiga", "--ohne-lizenzen")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+PRINT "meldung "; (INSTR(aus, "Unbekanntes System: amiga") >= 0)
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- erwartet
+rueckgabe 1
+meldung TRUE
+
+=== install.sh richtet fuer den nutzer ein und raeumt wieder ab
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+FUNCTION shPfad$() AS STRING
+    DIM k AS ARRAY OF STRING : k = ["/bin/sh", "C:/Program Files/Git/bin/sh.exe", "C:/Program Files/Git/usr/bin/sh.exe"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(k) - 1
+        IF FILEEXISTS(k[i]) THEN RETURN k[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+DIM sh AS STRING : sh = shPfad$()
+IF sh = "" THEN
+    PRINT "UEBERSPRINGEN: kein sh"
+    EXIT(0)
+END IF
+DIM hier AS STRING : hier = REPLACE$(CWD$(), CHR$(92), "/")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", ARG$(1), _
+    "--system", "linux", "--arch", "x86_64", "--laufzeit", hier + "/dhrt-attrappe", _
+    "--ausgabe", hier + "/raus", "--ohne-archiv", "--ohne-lizenzen")
+DIM aus AS STRING : aus = lauf$(p)
+IF PROCESS_CODE(p) <> 0 THEN
+    PRINT aus
+    EXIT(1)
+END IF
+DIM paket AS STRING : paket = hier + "/raus/paket/Drachenhauch-IDE-" + VERSION$() + "-linux-x86_64"
+' Ein dhrt, das der Nutzer selbst in ~/.local/bin liegen hat, bleibt stehen.
+MKDIR("home/.local/bin")
+WRITEALL_BYTES("home/.local/bin/dhrt", BUFFER_FROM_STRING("MEINS"))
+DIM umg AS STRING : umg = "HOME='" + hier + "/home' XDG_DATA_HOME= "
+DIM i1 AS INTEGER : i1 = PROCESS_START(sh, "-c", umg + "sh '" + paket + "/install.sh'")
+DIM a1 AS STRING : a1 = lauf$(i1)
+PRINT "installieren "; PROCESS_CODE(i1)
+DIM ziel AS STRING : ziel = "home/.local/share/drachenhauch-ide"
+PRINT "kopiert "; FILEEXISTS(ziel + "/ide/ide.dh"); " "; FILEEXISTS(ziel + "/drachenhauch")
+PRINT "starter im pfad "; (INSTR(BUFFER_TO_STRING$(READALL_BYTES("home/.local/bin/drachenhauch")), "drachenhauch-ide/drachenhauch") >= 0)
+PRINT "fremdes dhrt bleibt "; BUFFER_TO_STRING$(READALL_BYTES("home/.local/bin/dhrt"))
+PRINT "hinweis darauf "; (INSTR(a1, "gibt es schon") >= 0)
+DIM desk AS ARRAY OF STRING : desk = READLINES("home/.local/share/applications/drachenhauch-ide.desktop")
+PRINT "desktop "; desk[0]; " | "; desk[2]
+PRINT "desktop oeffnet dh "; (ARRAY_INDEXOF(desk, "MimeType=text/x-drachenhauch;") >= 0)
+PRINT "mime "; FILEEXISTS("home/.local/share/mime/packages/drachenhauch-ide.xml")
+PRINT "symbol "; (FILEEXISTS(paket + "/drachenhauch.png") = FILEEXISTS("home/.local/share/icons/hicolor/256x256/apps/drachenhauch-ide.png"))
+' Entfernen: aus dem installierten Ordner, wie es der Nutzer taete.
+DIM i2 AS INTEGER : i2 = PROCESS_START(sh, "-c", umg + "sh '" + hier + "/" + ziel + "/install.sh' --entfernen")
+DIM a2 AS STRING : a2 = lauf$(i2)
+PRINT "entfernen "; PROCESS_CODE(i2)
+PRINT "ordner weg "; NOT DIREXISTS(ziel)
+PRINT "starter weg "; NOT FILEEXISTS("home/.local/bin/drachenhauch")
+PRINT "desktop weg "; NOT FILEEXISTS("home/.local/share/applications/drachenhauch-ide.desktop")
+PRINT "fremdes dhrt steht noch "; BUFFER_TO_STRING$(READALL_BYTES("home/.local/bin/dhrt"))
+--- argumente
+{sammlung}/../../installer/bauen.dh
+{sammlung}/../..
+--- datei dhrt-attrappe
+ATTRAPPE
+--- erwartet
+installieren 0
+kopiert TRUE TRUE
+starter im pfad TRUE
+fremdes dhrt bleibt MEINS
+hinweis darauf TRUE
+desktop [Desktop Entry] | Name=Drachenhauch IDE
+desktop oeffnet dh TRUE
+mime TRUE
+symbol TRUE
+entfernen 0
+ordner weg TRUE
+starter weg TRUE
+desktop weg TRUE
+fremdes dhrt steht noch MEINS
+
+=== der starter kopiert die beispiele und startet die ide in ihnen
+' Mit der ECHTEN Laufzeit dieses Baus: sie oeffnet die IDE fuer 60 Bilder.
+' DHRT_FRAMES geht ueber die Befehlszeile des sh -- PROCESS_START nimmt es
+' seinen Kindern sonst ab. Zweiter Start: ein bearbeitetes Beispiel bleibt,
+' ein geloeschtes kommt zurueck.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+FUNCTION shPfad$() AS STRING
+    DIM k AS ARRAY OF STRING : k = ["/bin/sh", "C:/Program Files/Git/bin/sh.exe", "C:/Program Files/Git/usr/bin/sh.exe"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(k) - 1
+        IF FILEEXISTS(k[i]) THEN RETURN k[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION hat(L AS ARRAY OF STRING, anfang AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(anfang)) = anfang THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+DIM sh AS STRING : sh = shPfad$()
+DIM v AS INTEGER : v = PROCESS_START("dhrt", "--version")
+DIM vt AS STRING : vt = lauf$(v)
+IF sh = "" THEN
+    PRINT "UEBERSPRINGEN: kein sh"
+    EXIT(0)
+END IF
+IF INSTR(vt, "fehlt: grafik") >= 0 OR INSTR(vt, "grafik") < 0 THEN
+    PRINT "UEBERSPRINGEN: Laufzeit ohne Grafik"
+    EXIT(0)
+END IF
+DIM hier AS STRING : hier = REPLACE$(CWD$(), CHR$(92), "/")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", ARG$(1), _
+    "--system", "linux", "--arch", "x86_64", _
+    "--ausgabe", hier + "/raus", "--ohne-archiv", "--ohne-lizenzen")
+DIM aus AS STRING : aus = lauf$(p)
+IF PROCESS_CODE(p) <> 0 THEN
+    PRINT aus
+    EXIT(1)
+END IF
+DIM paket AS STRING : paket = hier + "/raus/paket/Drachenhauch-IDE-" + VERSION$() + "-linux-x86_64"
+MKDIR("home")
+DIM befehl AS STRING
+befehl = "HOME='" + hier + "/home' DHRT_FRAMES=60 DH_IDE_LOG='" + hier + "/ide.log' DH_IDE_KONFIG='" + hier + "/ide.json' '" + paket + "/drachenhauch'"
+DIM s1 AS INTEGER : s1 = PROCESS_START(sh, "-c", befehl)
+DIM a1 AS STRING : a1 = lauf$(s1)
+PRINT "erster start "; PROCESS_CODE(s1)
+DIM bsp AS STRING : bsp = "home/Drachenhauch/examples"
+PRINT "beispiele beim nutzer "; FILEEXISTS(bsp + "/183_sfx_generator.dh"); " "; FILEEXISTS(bsp + "/assets/editor_tileset.png")
+PRINT "gleich viele "; (LEN(DIRLIST_REC(bsp)) = LEN(DIRLIST_REC(paket + "/examples")))
+DIM L AS ARRAY OF STRING : L = READLINES("ide.log")
+PRINT "ide bereit "; hat(L, "bereit")
+PRINT "projekt ist der beispielordner "; hat(L, "projekt ") AND INSTR(REPLACE$(L[ARRAY_INDEXOF(L, "bereit") - 1], CHR$(92), "/"), "Drachenhauch/examples") >= 0
+PRINT "kacheln "; hat(L, "kacheln ")
+' Zweiter Start: nichts ueberschreiben, Fehlendes nachliefern.
+DIM t AS STRING : t = BUFFER_TO_STRING$(READALL_BYTES(bsp + "/01_hello.dh"))
+WRITEALL_BYTES(bsp + "/01_hello.dh", BUFFER_FROM_STRING(t + "' meins" + CHR$(10)))
+DELETEFILE(bsp + "/02_variables.dh")
+DIM s2 AS INTEGER : s2 = PROCESS_START(sh, "-c", befehl)
+DIM a2 AS STRING : a2 = lauf$(s2)
+PRINT "zweiter start "; PROCESS_CODE(s2)
+PRINT "bearbeitet bleibt "; (INSTR(BUFFER_TO_STRING$(READALL_BYTES(bsp + "/01_hello.dh")), "' meins") >= 0)
+PRINT "geloescht kommt wieder "; FILEEXISTS(bsp + "/02_variables.dh")
+--- argumente
+{sammlung}/../../installer/bauen.dh
+{sammlung}/../..
+--- erwartet
+erster start 0
+beispiele beim nutzer TRUE TRUE
+gleich viele TRUE
+ide bereit TRUE
+projekt ist der beispielordner TRUE
+kacheln TRUE
+zweiter start 0
+bearbeitet bleibt TRUE
+geloescht kommt wieder TRUE
+
+=== die ide nimmt ihre beispiele aus DH_IDE_BEISPIELE
+' Der Starter setzt den Ordner; ohne ihn saehe die IDE die Beispiele IM Paket
+' (neben ide/) -- und dort soll niemand schreiben. Gefragt wird ueber
+' "Beispiele oeffnen", das den Ordner zum Projekt macht und ins Protokoll
+' schreibt.
+beispieleOeffnen()
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_BEISPIELE={fall}/meine
+--- datei meine/01_hello.dh
+PRINT "hallo"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING : z = ""
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 8) = "projekt " THEN z = REPLACE$(L[i], CHR$(92), "/")
+NEXT
+PRINT "projekt endet auf meine "; (RIGHT$(z, 6) = "/meine")
+--- erwartet
+projekt endet auf meine TRUE
+
+=== ohne DH_IDE_BEISPIELE bleibt es bei den beispielen neben ide
+beispieleOeffnen()
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM z AS STRING : z = ""
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 8) = "projekt " THEN z = REPLACE$(L[i], CHR$(92), "/")
+NEXT
+PRINT "projekt endet auf examples "; (RIGHT$(z, 9) = "/examples")
+--- erwartet
+projekt endet auf examples TRUE

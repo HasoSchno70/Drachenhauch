@@ -1,0 +1,40 @@
+#!/bin/sh
+# Startet die Drachenhauch-IDE (macOS und Linux).
+#
+# Liegt unter Linux im Paketordner neben dhrt, ide/, docs/ und examples/,
+# unter macOS in Drachenhauch.app/Contents/MacOS/ neben dhrt -- dort liegen
+# ide/, docs/ und examples/ in Contents/Resources/.
+#
+# Die Beispiele aus dem Paket kommen beim Start in einen Ordner des Nutzers
+# (nur, was dort noch fehlt -- bearbeitete Beispiele bleiben, neue einer
+# spaeteren Fassung kommen dazu). Im Paket selbst soll niemand schreiben: in
+# einem .app-Bundle braeche jede Aenderung die Signatur, und ein per Paket
+# installierter Ordner gehoert oft nicht dem Nutzer.
+#
+# DH_IDE_BEISPIELE setzt den Ordner fest; sonst Dokumente/Drachenhauch/examples.
+
+HIER="$(cd "$(dirname "$0")" && pwd)"
+if [ -d "$HIER/../Resources/ide" ]; then
+    RES="$(cd "$HIER/../Resources" && pwd)"
+else
+    RES="$HIER"
+fi
+
+if [ -z "$DH_IDE_BEISPIELE" ]; then
+    DOK="$(xdg-user-dir DOCUMENTS 2>/dev/null)"
+    if [ -z "$DOK" ] || [ "$DOK" = "$HOME" ]; then
+        if [ -d "$HOME/Documents" ]; then DOK="$HOME/Documents"; else DOK="$HOME"; fi
+    fi
+    DH_IDE_BEISPIELE="$DOK/Drachenhauch/examples"
+fi
+mkdir -p "$DH_IDE_BEISPIELE"
+# -n: nichts ueberschreiben. Der Rueckgabewert zaehlt nicht -- manche
+# cp-Fassungen melden das Uebergehen als Fehler.
+cp -Rn "$RES/examples/." "$DH_IDE_BEISPIELE/" 2>/dev/null
+
+export DH_IDE_BEISPIELE
+export DH_IDE_WURZEL="$RES"
+# Aus dem Beispielordner starten: dhrt merkt sich den Ort als DHRT_START_DIR,
+# und der Projektbaum zeigt beim ersten Start etwas.
+cd "$DH_IDE_BEISPIELE" || exit 1
+exec "$HIER/dhrt" run "$RES/ide/ide.dh" ${1:+--} "$@"
