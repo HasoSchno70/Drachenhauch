@@ -380,8 +380,9 @@ stumm (vorher klang es als Rechteck).
   `Drachenhauch.iss`) liefert heute: die Qt-IDE; **die Bücher als
   `.docx`/`.epub`**; die **ESP32-Sketche**; die Lizenzhinweise samt
   Qt/LGPL; das **Aufräumen einer alten GameBasic-Installation**; die
-  **Code-Signierung**; und **macOS-`.dmg` und Linux-Paket**. Der
-  Python-freie Weg (`bauen.dh`, `Drachenhauch-IDE.iss`) kennt nur Windows.
+  **Code-Signierung**; und ~~**macOS-`.dmg` und Linux-Paket**~~ (seit
+  19.09. auch ohne Python: `bauen.dh` baut unter macOS ein `.dmg`, unter
+  Linux ein `.tar.gz` mit `install.sh`, siehe (b)).
 * **Den Bau der Laufzeit** erledigt weiter `rust/build_runtime.py`: unter
   Windows cmake und libclang suchen, `LIBCLANG_PATH` und
   `CFLAGS=-DMAX_CHAR_PRESSED_QUEUE=256` setzen, Feature-Sätze wählen.
@@ -439,8 +440,8 @@ und fallen mit ihnen.
    siehe (d).
 4. **Verteilung:** der Python-freie Installer übernimmt Bücher,
    ESP32-Sketche, Signierung und das Aufräumen der alten Installation;
-   macOS und Linux brauchen einen eigenen Weg oder bleiben vorerst ohne
-   Paket.
+   ~~macOS und Linux brauchen einen eigenen Weg oder bleiben vorerst ohne
+   Paket~~ -- entschieden in (b), gebaut am 19.09.
 5. **Bau:** ~~`build_runtime.py` und `build_wasm.py` durch etwas ohne
    Python ersetzen~~ -- sie bleiben als letzte zwei Python-Dateien, siehe
    (c).
@@ -454,7 +455,7 @@ und fallen mit ihnen.
    Spiele laden); danach Anleitungen und Buchkapitel umschreiben.
 
 **Offene Entscheidungen:** ~~(a) welche Qt-Funktionen wegfallen dürfen~~,
-(b) ob macOS und Linux ein Paket brauchen, ~~(c) ob die zwei Bauskripte
+~~(b) ob macOS und Linux ein Paket brauchen~~, ~~(c) ob die zwei Bauskripte
 Python bleiben dürfen~~, ~~(d) ob alte Qt-`.dhsprite`-Dateien noch geöffnet
 werden müssen~~.
 
@@ -497,6 +498,21 @@ damit nur die Möglichkeit, ihre Ebenen im neuen Editor zu öffnen; die
 Pixel bleiben als PNG, und das Skript zeichnet sie jederzeit neu. Kein
 Umwandler, kein zweites Format in
 `189`. Die Dateien fallen in Schritt 7 mit dem Qt-Editor weg.
+
+**(b) entschieden am 19.09.2026: ja, und gebaut.** `installer/bauen.dh`
+packt unter Linux ein `.tar.gz` (Ordner mit `dhrt`, `ide/`, `docs/`,
+`examples/`, dem Starter `drachenhauch` und `install.sh` für den Nutzer ohne
+root nach XDG) und unter macOS ein `.dmg` mit `Drachenhauch.app`
+(Ad-hoc-signiert); der Teil steht in `installer/paket.dh`, die Vorlagen in
+`installer/posix/`, die Symbole fertig in `installer/symbole/`. Der Starter
+kopiert die Beispiele beim Start in den Nutzerordner und nennt ihn der IDE
+über `DH_IDE_BEISPIELE`. Gebaut und ausprobiert wird im Paket-Lauf der CI
+(`package.yml`, Job `paket-ohne-python`) -- dort lief `dhrt` zum ersten Mal
+mit Grafik auf Linux und macOS und fand einen Absturz beim Beenden unter
+Linux (das Fenster schloss vor den Schriften, behoben). Unter Linux startet
+die IDE aus dem installierten Paket; auf den macOS-Läufern gibt es kein
+OpenGL, dort ist alles bis zum Fenster geprüft. Offen: Beglaubigung durch
+Apple, eine `.dh` per Doppelklick im Finder, und ein echter Mac.
 
 **(c) entschieden am 18.09.2026: ja, mit einer Grenze.** `rust/build_runtime.py`
 und `rust/build_wasm.py` bleiben die bewusst letzten zwei Python-Dateien.
