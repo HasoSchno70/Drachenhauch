@@ -3559,6 +3559,30 @@ Skriptdatei. Und eine Aufnahme mit zu kleiner Zahl im Kopf (`c 20` bei 24
 Ereignissen) verliert die letzten -- ein "Datei unveraendert" waere dann
 auch ohne Sichern wahr; der Fall prueft darum das Sichern mit.
 
+**Warnungen beim Umrechnen in den Tracker (2026-09-19, siebter Punkt der
+Stufe A):** das Notenblatt (199) rechnete nach den Regeln von
+`score/convert.py`, verschwieg aber, was dabei verloren geht -- ein Akkord
+wurde still auf seine hoechste Note reduziert, eine Note an der
+64-Zeilen-Grenze still gekuerzt. `trackerJson` fuellt jetzt
+`trackerWarnungen` mit denselben vier Saetzen in derselben Reihenfolge
+(je Spur erst die Akkorde, dann je Note gerundet -> fiel heraus ->
+gekuerzt; Beats wie Pythons `:g` ueber `beat$`, weil `FORMAT$` kein `%g`
+kennt), und [In Tracker] zeigt sie VOR dem Schreiben in einem Kasten
+("Trotzdem oeffnen|Abbrechen", je Warnung zwei Zeilen -- der Kasten ist
+auf 640 Punkte begrenzt, hoechstens acht plus "... und k weitere"); die
+Qt-Fassung zeigte sie nur als Hinweis. **Dabei fiel eine Abweichung auf:**
+"fiel aus dem Song heraus" prueft Python an der Song-LAENGE
+(`start_row >= total_rows`), der Pilot an der Pattern-ZAHL -- eine Note,
+die hinter das Ende rundet, landete dort in einer Zeile jenseits von
+`rows` und fiel beim Ausgeben still weg; jetzt dieselbe Bedingung samt
+Warnung. Tests: zwei Faelle mehr in `tests/pruef/werkzeug_notenblatt.dhtest`
+(ein kleines Stueck, bei dem alle vier Regeln greifen: ESC schreibt
+nichts, Enter schreibt das Gitter von `to_tracker_song`), der Demo-Fall
+prueft die zwei Warnungen des Demo-Stuecks und drueckt Enter; die
+Erwartungen kommen aus einem Lauf von `to_tracker_song`. Fuenf
+Verfaelschungen (ohne Kasten, ohne je eine der vier Warnungen) lassen je
+genau ihre Faelle fallen.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber

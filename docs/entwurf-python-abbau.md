@@ -346,7 +346,7 @@ nicht.
 | Tracker (190) | dasselbe JSON; ein Sample-, Keymap- oder SoundFont-Instrument wird beim Laden stumm -- bis 2026-09-17 schrieb der Pilot es beim **Sichern als `synth`** zurück und die Samples waren weg (**behoben:** es läuft jetzt unverändert durch) | genau diese drei Instrumentarten; VU-Meter; Patterns benennen; der Sample-Offset-Effekt |
 | Form-Designer (197) | dieselbe `.dhform`, fremde Felder laufen durch; **Qt-Projekte** (`.dhproj`) nicht | Mehrfachauswahl und Ausrichten; Kopieren/Einfügen; Projekte mit mehreren Formularen; Code-Fenster; Zoom und Lineale; viele Inspektor-Felder (sichtbar, Gruppe, Platzhalter, Passwort, Regeln, Bindung, Layout-Zuordnung, Fokus-Handler) |
 | Anim-FSM (198) | voll verträglich | höchstens sechs Bedingungen je Übergang |
-| Notenblatt (199) | voll verträglich | Warnungen beim Umrechnen in den Tracker; Speicherort des Tracker-Projekts; Vollbild |
+| Notenblatt (199) | voll verträglich | ~~Warnungen beim Umrechnen in den Tracker~~ (19.09.); Speicherort des Tracker-Projekts; Vollbild |
 | Audio Studio | -- | bewusst nicht portiert (Reiterrahmen) |
 
 **Der Tracker-Befund war ein Fehler, keine Lücke** -- er vernichtete
@@ -475,8 +475,8 @@ darum, was beim Arbeiten fehlen würde.
   Nummernspalte~~ (19.09., `tests/pruef/werkzeug_ide_haltepunkt.dhtest`), ~~Suchen mit
   Groß/klein und ganzem Wort samt einzeln ersetzen~~ (19.09.,
   `tests/pruef/werkzeug_ide_suche.dhtest`); im Notenblatt die
-  Warnungen beim Umrechnen in den Tracker (Akkorde werden heute still auf
-  eine Note gekürzt); im Sprite-Editor die festen Grenzen anheben (16
+  ~~Warnungen beim Umrechnen in den Tracker~~ (19.09.,
+  `tests/pruef/werkzeug_notenblatt.dhtest`); im Sprite-Editor die festen Grenzen anheben (16
   Bilder, 128 px, 4 Ebenen).
 * **Stufe B, wenn es fehlt:** Fundstellen beliebiger Namen, Dateien ins
   Fenster ziehen, Klammern automatisch schließen; Tilemap: Kachelgröße aus

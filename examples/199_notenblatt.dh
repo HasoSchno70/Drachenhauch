@@ -695,7 +695,26 @@ FUNCTION beatZeile(beat AS FLOAT) AS INTEGER
     RETURN INT(ROUND(beat * ROWS_PER_BEAT))
 END FUNCTION
 
+' Eine Zahl wie Pythons `:g` -- sechs gueltige Stellen, ohne Nullen am Ende.
+' So stehen die Beats in den Warnungen genau wie bei score/convert.py.
+FUNCTION beat$(v AS FLOAT) AS STRING
+    IF v = INT(v) THEN RETURN STR$(INT(v))
+    DIM stellen AS INTEGER : stellen = 6
+    IF ABS(v) >= 1.0 THEN stellen = MAX(0, 6 - LEN(STR$(INT(ABS(v)))))
+    DIM t AS STRING : t = FORMAT$(v, "%." + STR$(stellen) + "f")
+    WHILE INSTR(t, ".") >= 0 AND RIGHT$(t, 1) = "0"
+        t = LEFT$(t, LEN(t) - 1)
+    WEND
+    IF RIGHT$(t, 1) = "." THEN t = LEFT$(t, LEN(t) - 1)
+    RETURN t
+END FUNCTION
+
+' Was beim Umrechnen verloren geht -- trackerJson fuellt die Liste, in
+' derselben Reihenfolge und mit denselben Saetzen wie score/convert.py.
+DIM trackerWarnungen AS ARRAY OF STRING : trackerWarnungen = []
+
 FUNCTION trackerJson() AS JSON_HANDLE
+    trackerWarnungen = []
     DIM n AS INTEGER : n = nt()
     DIM kanaele AS INTEGER : kanaele = MAX(4, n + 1)     ' + Pflicht-Drum-Kanal, mindestens 4
     DIM gesamt AS INTEGER : gesamt = MAX(1, beatZeile(stueckLaenge()))
@@ -721,6 +740,9 @@ FUNCTION trackerJson() AS JSON_HANDLE
         ' Akkord-Reduktion je Zeile: nur die hoechste Note bleibt (ein Kanal ist einstimmig).
         DIM besteZeile AS ARRAY OF INTEGER : besteZeile = []
         DIM besteNote AS ARRAY OF INTEGER : besteNote = []
+        DIM gruppeBeats AS ARRAY OF STRING : gruppeBeats = []
+        DIM gruppeAnz AS ARRAY OF INTEGER : gruppeAnz = []
+        DIM vor AS STRING : vor = "Spur " + STR$(i + 1) + " (" + text$(tp$(i, "name")) + "), "
         DIM k AS INTEGER
         FOR k = 0 TO nn(i) - 1
             IF istPause(i, k) THEN CONTINUE
@@ -728,22 +750,36 @@ FUNCTION trackerJson() AS JSON_HANDLE
             DIM j AS INTEGER : j = ARRAY_INDEXOF(besteZeile, z)
             IF j < 0 THEN
                 ARRAY_PUSH(besteZeile, z) : ARRAY_PUSH(besteNote, k)
-            ELSEIF nPitch(i, k) > nPitch(i, besteNote[j]) THEN
-                besteNote[j] = k
+                ARRAY_PUSH(gruppeBeats, beat$(nStart(i, k))) : ARRAY_PUSH(gruppeAnz, 1)
+            ELSE
+                gruppeBeats[j] = gruppeBeats[j] + ", " + beat$(nStart(i, k))
+                gruppeAnz[j] = gruppeAnz[j] + 1
+                IF nPitch(i, k) > nPitch(i, besteNote[j]) THEN besteNote[j] = k
             END IF
+        NEXT
+        FOR j = 0 TO LEN(besteZeile) - 1
+            IF gruppeAnz[j] > 1 THEN ARRAY_PUSH(trackerWarnungen, vor + "Zeile " + STR$(besteZeile[j]) + " (Beats " + gruppeBeats[j] + "): Akkord auf hoechste Note reduziert (Tracker-Kanal ist einstimmig)")
         NEXT
         ' in Reihenfolge der Zeilen (die Noten sind nach Beginn sortiert, also
         ' sind es die Zeilen auch)
         FOR j = 0 TO LEN(besteZeile) - 1
             k = besteNote[j]
+            DIM genau AS FLOAT : genau = nStart(i, k) * ROWS_PER_BEAT
+            IF ABS(genau - ROUND(genau)) > 0.000001 THEN ARRAY_PUSH(trackerWarnungen, vor + "Note bei Beat " + beat$(nStart(i, k)) + ": auf die naechste Tracker-Zeile gerundet")
             DIM startZ AS INTEGER : startZ = besteZeile[j]
             DIM endZ AS INTEGER : endZ = beatZeile(nStart(i, k) + nDauer(i, k))
             IF wahr(np$(i, k, "staccato"), FALSE) THEN endZ = MAX(startZ + 1, beatZeile(nStart(i, k) + nDauer(i, k) * 0.5))
             DIM sp AS INTEGER : sp = startZ \ MAX_ROWS
-            IF sp >= patAnz THEN CONTINUE
+            IF startZ >= gesamt THEN
+                ARRAY_PUSH(trackerWarnungen, vor + "Note bei Beat " + beat$(nStart(i, k)) + ": fiel aus dem Song heraus, uebersprungen")
+                CONTINUE
+            END IF
             zelle[sp, i, startZ - sp * MAX_ROWS] = nPitch(i, k)
             DIM patEnde AS INTEGER : patEnde = sp * MAX_ROWS + patRows[sp]
-            IF endZ > patEnde THEN CONTINUE           ' an der Pattern-Grenze gekuerzt
+            IF endZ > patEnde THEN
+                ARRAY_PUSH(trackerWarnungen, vor + "Note bei Beat " + beat$(nStart(i, k)) + ": an Pattern-Grenze gekuerzt (Reihe " + STR$(patEnde) + ")")
+                CONTINUE
+            END IF
             IF endZ < gesamt THEN
                 DIM ep AS INTEGER : ep = endZ \ MAX_ROWS
                 IF ep < patAnz THEN
@@ -805,6 +841,9 @@ FUNCTION trackerJson() AS JSON_HANDLE
 END FUNCTION
 
 DIM trackerProzess AS INTEGER : trackerProzess = -1
+DIM trackerWartet AS JSON_HANDLE                  ' umgerechnet, noch nicht geschrieben
+DIM dlgTracker AS GUI_WINDOW : dlgTracker = 0
+CONST WARN_ZEIGEN = 8
 
 FUNCTION trackerPilot$() AS STRING
     DIM k AS STRING
@@ -822,10 +861,37 @@ SUB inTrackerOeffnen()
     IF pfad = "" OR geaendert THEN
         IF NOT sichern(FALSE) THEN RETURN
     END IF
+    trackerWartet = trackerJson()
+    DIM w AS STRING
+    FOR EACH w IN trackerWarnungen
+        protokoll("warnung " + w)
+    NEXT
+    IF LEN(trackerWarnungen) = 0 THEN
+        trackerSchreiben()
+        RETURN
+    END IF
+    ' Was verloren geht, sagt der Kasten VOR dem Schreiben -- bis dahin
+    ' reduzierte der Export einen Akkord auf seine hoechste Note und kuerzte
+    ' an der Pattern-Grenze, ohne ein Wort. Je Warnung zwei Zeilen (Ort,
+    ' dann was passiert), sonst liefe sie ueber den Rand des Kastens.
+    DIM text AS STRING
+    text = "Beim Umrechnen geht etwas verloren (" + STR$(LEN(trackerWarnungen)) + "):"
+    DIM k AS INTEGER
+    FOR k = 0 TO MIN(LEN(trackerWarnungen), WARN_ZEIGEN) - 1
+        w = trackerWarnungen[k]
+        DIM t AS INTEGER : t = INSTR(w, "): ")
+        IF t < 0 THEN t = INSTR(w, ": ") - 1
+        text = text + CHR$(10) + LEFT$(w, t + 2) + CHR$(10) + "      " + MID$(w, t + 3)
+    NEXT
+    IF LEN(trackerWarnungen) > WARN_ZEIGEN THEN text = text + CHR$(10) + "... und " + STR$(LEN(trackerWarnungen) - WARN_ZEIGEN) + " weitere"
+    dlgTracker = GUI_DIALOG("Umrechnen in den Tracker", text, "Trotzdem oeffnen|Abbrechen")
+END SUB
+
+SUB trackerSchreiben()
     DIM stamm AS STRING : stamm = pfad
     IF LOWER$(RIGHT$(stamm, 5)) = ".json" THEN stamm = LEFT$(stamm, LEN(stamm) - 5)
     DIM ziel AS STRING : ziel = stamm + "_tracker.json"
-    DIM h AS JSON_HANDLE : h = trackerJson()
+    DIM h AS JSON_HANDLE : h = trackerWartet
     WRITEALL(ziel, JSON_PRETTY(h))
     protokoll("tracker " + ziel + " " + STR$(JSON_LEN(h, "patterns")))
     DIM pilot AS STRING : pilot = trackerPilot$()
@@ -1359,6 +1425,15 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miWieder) THEN wiederholen()
     IF GUI_CLICKED(miSpurPlus) OR GUI_CLICKED(btnSpurPlus) THEN spurHinzu()
     IF GUI_CLICKED(miSpurWeg) OR GUI_CLICKED(btnSpurWeg) THEN spurWeg()
+    IF dlgTracker <> 0 THEN
+        DIM at AS INTEGER : at = GUI_ANSWER(dlgTracker)
+        IF at = 1 THEN
+            dlgTracker = 0 : trackerSchreiben()
+        ELSEIF at = 2 THEN
+            dlgTracker = 0 : protokoll("tracker abgebrochen")
+            GUI_SET_TEXT(lblStatus, "Nicht umgerechnet.")
+        END IF
+    END IF
     IF dlgSchliessen <> 0 THEN
         DIM a AS INTEGER : a = GUI_ANSWER(dlgSchliessen)
         IF a = 1 THEN

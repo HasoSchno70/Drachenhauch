@@ -141,7 +141,7 @@ schlimmer als eine schlichte Form.
 | Schlüsselwechsel | Klappliste je Spur; liegen die Noten danach weit ab, rückt ein Oktavversatz sie heran und die Statuszeile sagt es (kein Dialog — Strg+Z nimmt es zurück) |
 | Abspielen | Leertaste oder F5: alle Noten auf einer Audio-Uhr (`AUDIO_CLOCK` + `AUDIO_PLAY_AT`, eine Sechzehntel je Tick), samplegenau statt bildgetrieben; Staccato halbiert wie beim Export |
 | Rollen | Mausrad = Zeit, Umschalt+Rad = Spuren (bis zu 8) |
-| In Tracker öffnen | Strg+T: schreibt `<name>_tracker.json` neben das Stück und startet den Tracker-Piloten (190, der seither ein Dateiargument nimmt) damit |
+| In Tracker öffnen | Strg+T: schreibt `<name>_tracker.json` neben das Stück und startet den Tracker-Piloten (190, der seither ein Dateiargument nimmt) damit. Geht dabei etwas verloren (Akkord auf eine Note reduziert, Beginn zwischen zwei Tracker-Zeilen, Note an der Pattern-Grenze gekürzt oder hinter dem Song-Ende), nennt ein Kasten es VORHER, mit denselben Sätzen wie die Qt-Fassung; „Abbrechen“ (ESC) schreibt nichts |
 
 **Der Tracker-Export rechnet mit denselben Regeln wie `score/convert.py`**
 (4 Zeilen je Beat, Patterns zu 64 Zeilen, Akkord → höchste Note, Staccato
