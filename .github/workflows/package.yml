@@ -82,6 +82,9 @@ jobs:
     env:
       CFLAGS: -DMAX_CHAR_PRESSED_QUEUE=256
       CARGO_PROFILE_RELEASE_LTO: thin
+      # Nur, damit `if:` fragen kann, ob es die Secrets gibt (secrets.* ist
+      # dort nicht erlaubt). Leer ohne Secrets -> ad hoc wie bisher.
+      MAC_ZERT_P12: ${{ secrets.MAC_ZERT_P12 }}
 
     steps:
       - uses: actions/checkout@v7
@@ -110,6 +113,38 @@ jobs:
 
       - name: Laufzeit ansehen
         run: rust/drachenhauch_runtime/target/release/dhrt --version
+
+      # Signieren mit Developer ID und Beglaubigen bei Apple -- NUR wenn die
+      # Zugangsdaten als Secrets hinterlegt sind (Einrichtung:
+      # installer/README.md). Ohne sie baut der Lauf wie bisher ad hoc.
+      # Das Zertifikat kommt in einen eigenen, kurzlebigen Schluesselbund;
+      # bauen.dh liest nur die Umgebung (DH_MAC_SIGNATUR, DH_NOTAR_*).
+      - name: Signatur und Beglaubigung vorbereiten (macOS, nur mit Secrets)
+        if: runner.os == 'macOS' && env.MAC_ZERT_P12 != ''
+        env:
+          MAC_ZERT_PASSWORT: ${{ secrets.MAC_ZERT_PASSWORT }}
+          MAC_NOTAR_KEY_P8: ${{ secrets.MAC_NOTAR_KEY_P8 }}
+          MAC_NOTAR_KEY_ID: ${{ secrets.MAC_NOTAR_KEY_ID }}
+          MAC_NOTAR_ISSUER: ${{ secrets.MAC_NOTAR_ISSUER }}
+        run: |
+          set -e
+          KC="$RUNNER_TEMP/signatur.keychain-db"
+          KPW="$(uuidgen)"
+          security create-keychain -p "$KPW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KPW" "$KC"
+          printf '%s' "$MAC_ZERT_P12" | base64 --decode > "$RUNNER_TEMP/zert.p12"
+          security import "$RUNNER_TEMP/zert.p12" -k "$KC" -P "$MAC_ZERT_PASSWORT" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/zert.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KPW" "$KC" > /dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          ID="$(security find-identity -v -p codesigning "$KC" | grep 'Developer ID Application' | head -1 | cut -d '"' -f 2)"
+          test -n "$ID"
+          echo "DH_MAC_SIGNATUR=$ID" >> "$GITHUB_ENV"
+          printf '%s' "$MAC_NOTAR_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notar.p8"
+          echo "DH_NOTAR_KEY=$RUNNER_TEMP/notar.p8" >> "$GITHUB_ENV"
+          echo "DH_NOTAR_KEY_ID=$MAC_NOTAR_KEY_ID" >> "$GITHUB_ENV"
+          echo "DH_NOTAR_ISSUER=$MAC_NOTAR_ISSUER" >> "$GITHUB_ENV"
 
       - name: Paket bauen
         run: rust/drachenhauch_runtime/target/release/dhrt run installer/bauen.dh
@@ -173,17 +208,28 @@ jobs:
           APP="$RUNNER_TEMP/abbild/Drachenhauch.app"
           ls -la "$RUNNER_TEMP/abbild"
           codesign --verify --deep --strict --verbose=2 "$APP"
+          # Hardened Runtime ist Pflicht fuer die Beglaubigung -- und muss
+          # schon im Lauf ohne Zugangsdaten gesetzt sein, damit man sieht,
+          # dass dhrt damit laeuft.
+          codesign -dv "$APP" 2>&1 | tee "$RUNNER_TEMP/signatur.txt"
+          grep -q "(runtime)" "$RUNNER_TEMP/signatur.txt"
           plutil -lint "$APP/Contents/Info.plist"
           test -x "$APP/Contents/MacOS/dhrt"
-          test -x "$APP/Contents/MacOS/Drachenhauch"
+          # dhrt IST das Hauptprogramm, ein Skript gibt es nicht mehr.
+          test "$(ls "$APP/Contents/MacOS")" = "dhrt"
+          if [ -n "$DH_MAC_SIGNATUR" ]; then
+            spctl --assess --type execute -vv "$APP"
+            xcrun stapler validate "$DMG"
+          fi
           test -f "$APP/Contents/Resources/Drachenhauch.icns"
           "$APP/Contents/MacOS/dhrt" --version
           "$APP/Contents/MacOS/dhrt" run "$APP/Contents/Resources/examples/01_hello.dh"
           export HOME="$RUNNER_TEMP/home"
           mkdir -p "$HOME/Documents"
           set +e
+          # Ohne Argumente = wie aus Finder oder Dock (appstart.rs).
           DHRT_FRAMES=60 DH_IDE_LOG="$RUNNER_TEMP/ide.log" DH_IDE_KONFIG="$RUNNER_TEMP/ide.json" \
-            "$APP/Contents/MacOS/Drachenhauch" >"$RUNNER_TEMP/start.txt" 2>&1
+            "$APP/Contents/MacOS/dhrt" >"$RUNNER_TEMP/start.txt" 2>&1
           RC=$?
           set -e
           cat "$RUNNER_TEMP/start.txt"
