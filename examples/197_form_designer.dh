@@ -1225,7 +1225,22 @@ DIM warHoehe AS INTEGER : warHoehe = SCREENHEIGHT()
 DIM beenden AS BOOLEAN : beenden = FALSE
 DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
 
-WHILE NOT QUITREQUESTED() AND NOT beenden
+' [Beenden] und das Kreuz fragen dasselbe -- bis 2026-09-19 beendete das
+' Kreuz ohne Rueckfrage. Ein anderer offener Kasten geht vor.
+SUB endeAnfragen()
+    IF dlgSchliessen <> 0 OR GUI_MODAL() THEN RETURN
+    IF geaendert THEN dlgSchliessen = GUI_DIALOG("Beenden", "Das Formular ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen") ELSE beenden = TRUE
+END SUB
+
+WHILE NOT beenden
+    ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
+    ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
+    ' Testlaufs -- dort endet das Programm hart wie bisher.
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        endeAnfragen()
+    ELSEIF QUITREQUESTED() THEN
+        BREAK
+    END IF
     GUI_UPDATE()
     IF SCREENWIDTH() <> warBreite OR SCREENHEIGHT() <> warHoehe THEN
         warBreite = SCREENWIDTH() : warHoehe = SCREENHEIGHT()
@@ -1243,9 +1258,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
     IF GUI_CLICKED(miLauf) THEN ausfuehren()
     IF GUI_CLICKED(miGbCode) THEN gbCodeSchreiben()
-    IF GUI_CLICKED(miBeenden) THEN
-        IF geaendert THEN dlgSchliessen = GUI_DIALOG("Beenden", "Das Formular ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen") ELSE beenden = TRUE
-    END IF
+    IF GUI_CLICKED(miBeenden) THEN endeAnfragen()
     IF GUI_CLICKED(miRueck) THEN rueckgaengig()
     IF GUI_CLICKED(miWieder) THEN wiederholen()
     IF GUI_CLICKED(miDoppel) THEN controlVerdoppeln()

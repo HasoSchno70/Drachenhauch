@@ -139,6 +139,11 @@ DIM ebene[MAXBILD, MAXEB] AS IMAGE
 ' Gibt es das Bild schon? Ein nie angelegter Platz traegt KEIN Bild, und
 ' IMAGE_FREE darauf gaebe ein fremdes frei -- darum eine eigene Buchfuehrung.
 DIM ebDa[MAXBILD, MAXEB] AS INTEGER
+' Etwas seit dem letzten Sichern als .dhsprite geaendert? Gesetzt von jedem
+' Verlaufsschritt und jedem Eingriff ausserhalb des Verlaufs (Bilder,
+' Ebenen, Namen, Dauern, Bereiche, Wandlungen); die Ausgabe als Streifen
+' setzt es NICHT zurueck -- dort sind die Ebenen weg.
+DIM ungesichert AS BOOLEAN : ungesichert = FALSE
 DIM ebName[MAXEB] AS STRING
 DIM ebSicht[MAXEB] AS INTEGER
 
@@ -564,6 +569,7 @@ END SUB
 ' positiver laesst Rand stehen -- Zuschneiden und Vergroessern sind damit
 ' derselbe Aufruf und koennen nicht auseinanderlaufen.
 SUB groesseAendern(nb AS INTEGER, nh AS INTEGER, vx AS INTEGER, vy AS INTEGER)
+    ungesichert = TRUE
     DIM i AS INTEGER
     DIM k AS INTEGER
     ' Alle ANGELEGTEN Plaetze bekommen die neue Groesse, auch die ausserhalb
@@ -601,6 +607,7 @@ END SUB
 ' Grad die Punkte (siehe docs/module-imgfx.md). `IMAGE_ROTATE_CW/CCW`
 ' sortieren sie nur um.
 SUB alleWandeln(art AS STRING)
+    ungesichert = TRUE
     DIM i AS INTEGER
     DIM k AS INTEGER
     FOR i = 0 TO MAXBILD - 1
@@ -729,6 +736,7 @@ SUB neuesSprite(b AS INTEGER, h AS INTEGER)
     ' es die Zeichenflaeche gibt (und ihre Groesse aendert sich mit dem
     ' Fenster). Also nur vormerken -- die Schleife rechnet ihn aus.
     anpassen = TRUE
+    ungesichert = FALSE
 END SUB
 
 ' ---------------------------------------------------------------- Verlauf
@@ -749,6 +757,7 @@ SUB schrittEnde()
     uEbe[s] = aktEb
     uAnz = uAnz + 1
     uPos = uAnz
+    ungesichert = TRUE
 END SUB
 
 SUB zurueck()
@@ -757,6 +766,7 @@ SUB zurueck()
         DIM s AS INTEGER : s = (uStart + uPos) MOD UNDO_MAX
         aktBild = uBild[s] : aktEb = uEbe[s]
         kopiere(ebene[aktBild, aktEb], uVor[s])
+        ungesichert = TRUE
     END IF
 END SUB
 
@@ -766,6 +776,7 @@ SUB wieder()
         aktBild = uBild[s] : aktEb = uEbe[s]
         kopiere(ebene[aktBild, aktEb], uNach[s])
         uPos = uPos + 1
+        ungesichert = TRUE
     END IF
 END SUB
 
@@ -1518,6 +1529,23 @@ SUB nativSichern(pfad AS STRING)
     meldung = STR$(anzBild) + " Bilder x " + STR$(anzEb) + " Ebenen: " + BASENAME(pfad)
 END SUB
 
+' [Sichern] und die Rueckfrage beim Beenden gehen durch DIESELBE Stelle --
+' zwei Dialogaufrufe liefen sonst auseinander (Vorschlag, Endung, Merker).
+' TRUE, wenn wirklich geschrieben wurde; Abbrechen im Dialog ist FALSE.
+FUNCTION alsDhspriteSichern() AS BOOLEAN
+    DIM ps AS STRING
+    ps = FILE_SAVE_DIALOG("Sichern", "sprite.dhsprite", "dhsprite")
+    IF ps = "" THEN RETURN FALSE
+    TRY
+        nativSichern(ps)
+        ungesichert = FALSE
+        RETURN TRUE
+    CATCH e
+        meldung = e
+    END TRY
+    RETURN FALSE
+END FUNCTION
+
 SUB nativLaden(pfad AS STRING)
     DIM h AS JSON_HANDLE : h = JSON_LOAD(pfad)
     DIM bw AS INTEGER : bw = JSON_GET_INT(h, "breite")
@@ -1971,16 +1999,51 @@ listenAuffrischen()
 
 DIM zeit AS FLOAT : zeit = 0.0
 
-WHILE NOT QUITREQUESTED()
+DIM beenden AS BOOLEAN : beenden = FALSE
+DIM dlgEnde AS GUI_WINDOW : dlgEnde = -1
+
+' ESC beendete den Editor bis 2026-09-19 ohne Rueckfrage, das Kreuz ebenso.
+SUB endeAnfragen()
+    IF ungesichert THEN
+        dlgEnde = GUI_DIALOG("Beenden", "Das Sprite ist nicht als .dhsprite gesichert.", "Sichern|Verwerfen|Abbrechen")
+    ELSE
+        beenden = TRUE
+    END IF
+END SUB
+
+WHILE NOT beenden
+    ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
+    ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
+    ' Testlaufs -- dort endet das Programm hart wie bisher.
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        IF dlgEnde < 0 THEN endeAnfragen()
+    ELSEIF QUITREQUESTED() THEN
+        BREAK
+    END IF
     ' Solange ein Fenster obenauf liegt, gehoert die Eingabe ihm. ESC waere
     ' sonst nicht "Dialog zu", sondern "Programm zu" -- und Tastenkuerzel
     ' wuerden hinter dem Dialog Werkzeuge umschalten.
-    DIM sperre AS BOOLEAN : sperre = neuOffen OR statOffen OR grOffen OR namOffen
-    IF KEYHIT(KEY_ESCAPE) AND NOT sperre THEN BREAK
+    DIM sperre AS BOOLEAN : sperre = neuOffen OR statOffen OR grOffen OR namOffen OR dlgEnde >= 0
     zeit = zeit + DELTA()
     SW = SCREENWIDTH() : SH = SCREENHEIGHT()
     GUI_WINDOW_SET_BOUNDS(win, 0, 0, SW, SH)
     GUI_UPDATE()
+    ' ESC erst NACH GUI_UPDATE: davor oeffnete dieselbe Taste den Kasten, und
+    ' das GUI_UPDATE desselben Bildes nahm sie gleich als "Abbrechen".
+    ' `sperre` stammt von vor GUI_UPDATE -- im Bild, in dem ESC den Kasten
+    ' abbricht, ist er darin noch offen, und die Taste oeffnet ihn nicht neu.
+    IF KEYHIT(KEY_ESCAPE) AND NOT sperre THEN endeAnfragen()
+    IF dlgEnde >= 0 THEN
+        DIM ea AS INTEGER : ea = GUI_ANSWER(dlgEnde)
+        IF ea = 1 THEN
+            dlgEnde = -1
+            IF alsDhspriteSichern() THEN beenden = TRUE
+        ELSEIF ea = 2 THEN
+            dlgEnde = -1 : beenden = TRUE
+        ELSEIF ea = 3 THEN
+            dlgEnde = -1
+        END IF
+    END IF
 
     DIM strg AS BOOLEAN
     strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
@@ -2182,15 +2245,7 @@ WHILE NOT QUITREQUESTED()
         END IF
     END IF
     IF GUI_CLICKED(bSichern) THEN
-        DIM ps AS STRING
-        ps = FILE_SAVE_DIALOG("Sichern", "sprite.dhsprite", "dhsprite")
-        IF ps <> "" THEN
-            TRY
-                nativSichern(ps)
-            CATCH e
-                meldung = e
-            END TRY
-        END IF
+        DIM ok AS BOOLEAN : ok = alsDhspriteSichern()
     END IF
     IF GUI_CLICKED(bBlatt) THEN
         DIM pb AS STRING : pb = FILE_SAVE_DIALOG("Streifen sichern", "sprites.png", "png")
@@ -2228,6 +2283,7 @@ WHILE NOT QUITREQUESTED()
         anzBild = anzBild + 1
         aktBild = anzBild - 1
         ebenenSichern()
+        ungesichert = TRUE
         ' Nur die benutzten Ebenen: ein Platz ausserhalb wird geleert, wenn
         ' seine Ebene dazukommt (siehe [+ Ebene]).
         DIM k2 AS INTEGER
@@ -2254,6 +2310,7 @@ WHILE NOT QUITREQUESTED()
         ' Kennung, sondern eine Eigenschaft des Bildes, und eine Kopie soll
         ' genauso lange stehen wie ihr Original.
         bildMs[aktBild] = bildMs[q]
+        ungesichert = TRUE
         listenAuffrischen()
     END IF
     IF GUI_CLICKED(bBildName) THEN
@@ -2274,6 +2331,7 @@ WHILE NOT QUITREQUESTED()
             meldung = IIF(nn = "", "Name entfernt", "Bild heisst jetzt " + nn)
         END IF
         bildName[aktBild] = nn
+        ungesichert = TRUE
         GUI_WINDOW_VISIBLE(winName, FALSE) : namOffen = FALSE
         listenAuffrischen()
     END IF
@@ -2295,6 +2353,7 @@ WHILE NOT QUITREQUESTED()
             IF aktBild >= anzBild THEN aktBild = anzBild - 1
             uStart = 0 : uAnz = 0 : uPos = 0
             bereicheNachLoeschen(weg)
+            ungesichert = TRUE
             listenAuffrischen()
         ELSE
             meldung = "Das letzte Bild bleibt."
@@ -2306,6 +2365,7 @@ WHILE NOT QUITREQUESTED()
     IF INT(GUI_VALUE(spMs)) <> msLetzt THEN
         msLetzt = INT(GUI_VALUE(spMs))
         bildMs[aktBild] = msLetzt
+        ungesichert = TRUE
         listenAuffrischen()
     END IF
 
@@ -2325,6 +2385,7 @@ WHILE NOT QUITREQUESTED()
             meldung = "Mehr als " + STR$(MAXANIM) + " Bereiche gehen nicht."
         ELSE
             bereichSchreiben(anzAnim)
+            ungesichert = TRUE
             aktAnim = anzAnim
             anzAnim = anzAnim + 1
             listenAuffrischen()
@@ -2332,6 +2393,7 @@ WHILE NOT QUITREQUESTED()
     END IF
     IF GUI_CLICKED(bAnimAend) AND aktAnim >= 0 THEN
         bereichSchreiben(aktAnim)
+        ungesichert = TRUE
         listenAuffrischen()
     END IF
     IF GUI_CLICKED(bAnimWeg) AND aktAnim >= 0 THEN
@@ -2341,6 +2403,7 @@ WHILE NOT QUITREQUESTED()
             anBis[q2] = anBis[q2 + 1] : anFps[q2] = anFps[q2 + 1]
         NEXT
         anzAnim = anzAnim - 1
+        ungesichert = TRUE
         aktAnim = MIN(aktAnim, anzAnim - 1)
         listenAuffrischen()
     END IF
@@ -2361,6 +2424,7 @@ WHILE NOT QUITREQUESTED()
             IMAGE_CLEAR(ebene[j2, aktEb])
         NEXT
         ebSicht[aktEb] = 1
+        ungesichert = TRUE
         listenAuffrischen()
     END IF
     IF GUI_CLICKED(bEbWeg) THEN
@@ -2374,6 +2438,7 @@ WHILE NOT QUITREQUESTED()
                 ebSicht[k5] = ebSicht[k5 + 1]
             NEXT
             anzEb = anzEb - 1
+            ungesichert = TRUE
             IF aktEb >= anzEb THEN aktEb = anzEb - 1
             uStart = 0 : uAnz = 0 : uPos = 0
             listenAuffrischen()
@@ -2383,6 +2448,7 @@ WHILE NOT QUITREQUESTED()
     END IF
     IF GUI_CLICKED(cbEbSicht) THEN
         ebSicht[aktEb] = IIF(GUI_CHECKED(cbEbSicht), 1, 0)
+        ungesichert = TRUE
         listenAuffrischen()
     END IF
 
@@ -2861,6 +2927,7 @@ WHILE NOT QUITREQUESTED()
     IF grOffen THEN GUI_DRAW_WINDOW(winGr)
     IF namOffen THEN GUI_DRAW_WINDOW(winName)
     IF statOffen THEN GUI_DRAW_WINDOW(statDlg)
+    IF dlgEnde >= 0 THEN GUI_DRAW_WINDOW(dlgEnde)
     GUI_DRAW_TOP()
 
     FLIP()

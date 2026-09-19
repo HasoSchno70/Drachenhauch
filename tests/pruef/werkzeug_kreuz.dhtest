@@ -1,0 +1,649 @@
+' Die Rueckfrage beim Kreuz in den Werkzeugen 183-199 (2026-09-19).
+'
+' Bis dahin beendete das Kreuz jedes dieser Programme ohne Rueckfrage, und
+' in 185, 187 und 189 tat ESC dasselbe -- ungesicherte Arbeit war weg. Jetzt
+' fragen beide (Sichern|Verwerfen|Abbrechen), aber nur, wenn wirklich etwas
+' ungesichert ist; sonst endet das Programm wie vorher sofort.
+'
+' Geschickt wird eine ECHTE Windows-Nachricht (WM_CLOSE bzw. ESC ueber
+' PostMessage, _hilfen/fenstersender.ps1) -- eine Aufnahme laeuft an der
+' Stelle vorbei, an der raylib das Kreuz und die Beenden-Taste meldet. Der
+' Einschub gibt dem Fenster einen Titel mit Kennung, startet den Sender und
+' schreibt je Bild, wie weit das Programm gekommen ist und ob ein Kasten
+' offen ist (GUI_MODAL). Das Bildlimit liegt weit hinter der Nachricht: wer
+' es erreicht, lief nach dem Kreuz weiter.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== sfx: ungesichert fragt das kreuz nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    GUI_DROPDOWN_SET_SELECTED(waehlWave, (GUI_DROPDOWN_SELECTED(waehlWave) + 1) MOD LEN(wellenformen))
+    SETWINDOWTITLE("DH-Kreuz-sfx-u")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-sfx-u", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== sfx: gesichert beendet das kreuz sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-sfx-g")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-sfx-g", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== partikel: ungesichert fragt das kreuz nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    GUI_SET_CHECKED(schalterFade, NOT GUI_CHECKED(schalterFade))
+    SETWINDOWTITLE("DH-Kreuz-partikel-u")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-partikel-u", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== partikel: gesichert beendet das kreuz sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-partikel-g")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-partikel-g", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== partikel: ungesichert fragt auch esc nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/185_partikel_editor.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    GUI_SET_CHECKED(schalterFade, NOT GUI_CHECKED(schalterFade))
+    SETWINDOWTITLE("DH-Kreuz-partikel-e")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-partikel-e", "esc")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== tilemap: ungesichert fragt das kreuz nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    geaendert = TRUE
+    SETWINDOWTITLE("DH-Kreuz-tilemap-u")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-tilemap-u", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== tilemap: gesichert beendet das kreuz sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-tilemap-g")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-tilemap-g", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== tilemap: ungesichert fragt auch esc nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    geaendert = TRUE
+    SETWINDOWTITLE("DH-Kreuz-tilemap-e")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-tilemap-e", "esc")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== sprite: ungesichert fragt das kreuz nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    ungesichert = TRUE
+    SETWINDOWTITLE("DH-Kreuz-sprite-u")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-sprite-u", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== sprite: gesichert beendet das kreuz sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-sprite-g")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-sprite-g", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== sprite: ungesichert fragt auch esc nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    ungesichert = TRUE
+    SETWINDOWTITLE("DH-Kreuz-sprite-e")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-sprite-e", "esc")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== tracker: ungesichert fragt das kreuz nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    dirty = TRUE
+    SETWINDOWTITLE("DH-Kreuz-tracker-u")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-tracker-u", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== tracker: gesichert beendet das kreuz sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-tracker-g")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-tracker-g", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== rechnungen: ungesichert fragt das kreuz nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    GUI_SET_TEXT(tfKName, "Geaendert")
+    SETWINDOWTITLE("DH-Kreuz-rechnungen-u")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-rechnungen-u", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== rechnungen: gesichert beendet das kreuz sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-rechnungen-g")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-rechnungen-g", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== formdesigner: ungesichert fragt das kreuz nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    geaendert = TRUE
+    SETWINDOWTITLE("DH-Kreuz-formdesigner-u")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-formdesigner-u", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== formdesigner: gesichert beendet das kreuz sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-formdesigner-g")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-formdesigner-g", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== animfsm: ungesichert fragt das kreuz nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    geaendert = TRUE
+    SETWINDOWTITLE("DH-Kreuz-animfsm-u")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-animfsm-u", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== animfsm: gesichert beendet das kreuz sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-animfsm-g")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-animfsm-g", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== notenblatt: ungesichert fragt das kreuz nach
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    geaendert = TRUE
+    SETWINDOWTITLE("DH-Kreuz-notenblatt-u")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-notenblatt-u", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage
+
+=== notenblatt: gesichert beendet das kreuz sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-notenblatt-g")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-notenblatt-g", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== tilemap: gesichert beendet esc sofort
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    SETWINDOWTITLE("DH-Kreuz-tilemap-eg")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-tilemap-eg", "esc")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== sfx: zurueckgestellt ist wieder gesichert
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 2 THEN GUI_DROPDOWN_SET_SELECTED(waehlWave, 1)
+IF prN = 3 THEN
+    GUI_DROPDOWN_SET_SELECTED(waehlWave, 0)
+    SETWINDOWTITLE("DH-Kreuz-sfx-z")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-sfx-z", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit FALSE
+kasten keine
+
+=== sprite: ein verlaufsschritt macht ungesichert
+DIM prN AS INTEGER
+DIM prS AS INTEGER
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prN = prN + 1
+IF prN = 3 THEN
+    schrittBeginn() : schrittEnde()
+    SETWINDOWTITLE("DH-Kreuz-sprite-v")
+    prS = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", GETENV$("PRSENDER"), "DH-Kreuz-sprite-v", "kreuz")
+END IF
+WRITEALL("probe.txt", STR$(prN) + " " + IIF(GUI_MODAL(), "frage", "keine"))
+
+--- umgebung
+DHRT_FRAMES=360
+PRSENDER={sammlung}/_hilfen/fenstersender.ps1
+--- nachher
+DIM f AS ARRAY OF STRING : f = SPLIT$(READLINES("_programm/probe.txt")[0], " ")
+PRINT "bis zum bildlimit "; VAL(f[0]) >= 350
+PRINT "kasten "; f[1]
+--- system windows
+--- erwartet
+bis zum bildlimit TRUE
+kasten frage

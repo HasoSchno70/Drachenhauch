@@ -252,6 +252,7 @@ SUB einstellungSichern()
         NEXT
         TRY
             INI_SAVE(datei, m)
+            standLesen(U_GESICHERT)
             GUI_SET_TEXT(lblStatus, "Gesichert: " + datei)
         CATCH e
             GUI_SET_TEXT(lblStatus, e)
@@ -287,6 +288,7 @@ SUB einstellungLaden()
             ' vergleicht jeden Regler mit `letzter[]` -- ein per
             ' GUI_SET_VALUE gesetzter Wert sieht fuer sie aus wie eine
             ' Bewegung von Hand.
+            standLesen(U_GESICHERT)
             IF gefunden = 0 THEN
                 GUI_SET_TEXT(lblStatus, "Keine bekannten Regler in " + datei)
             ELSE
@@ -378,7 +380,10 @@ END FUNCTION
 ' ============================================================
 CONST U_MAX = 32
 CONST U_FELDER = N_PARAM + 3           ' Regler + Darstellung + zwei Schalter
-DIM uStand[U_MAX, U_FELDER] AS FLOAT
+' Ein Platz mehr als der Verlauf braucht: dort liegt der Stand beim letzten
+' Sichern oder Laden -- ungesichert ist, was davon abweicht.
+DIM uStand[U_MAX + 1, U_FELDER] AS FLOAT
+CONST U_GESICHERT = U_MAX
 DIM uAnz AS INTEGER : uAnz = 0         ' wie viele Staende aufgezeichnet sind
 DIM uPos AS INTEGER : uPos = 0         ' auf welchem wir gerade stehen
 DIM uOffen AS BOOLEAN : uOffen = FALSE ' eine Aenderung wartet auf ihr Ende
@@ -498,15 +503,46 @@ pausiert = 0
 ' Aenderung und legt einen zweiten, gleichen Stand an.
 letzteAuffrischen()
 schrittSichern()
+standLesen(U_GESICHERT)
 
-WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+DIM frage AS GUI_WINDOW : frage = -1
+DIM beenden AS BOOLEAN : beenden = FALSE
+
+FUNCTION ungesichert() AS BOOLEAN
+    RETURN NOT standGleich(U_GESICHERT)
+END FUNCTION
+
+' ESC beendete den Editor bis 2026-09-19 sofort, das Kreuz ebenso -- auch mit
+' ungesicherten Reglern. Jetzt fragen beide nach, aber nur dann.
+SUB endeAnfragen()
+    IF ungesichert() THEN
+        frage = GUI_DIALOG("Beenden", "Die Einstellung ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
+    ELSE
+        beenden = TRUE
+    END IF
+END SUB
+
+WHILE NOT beenden
+    ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
+    ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
+    ' Testlaufs -- dort endet das Programm hart wie bisher.
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        IF frage < 0 THEN endeAnfragen()
+    ELSEIF QUITREQUESTED() THEN
+        BREAK
+    END IF
     CLS(&H0B1119)
     GUI_UPDATE()
+    ' ESC erst NACH GUI_UPDATE: davor oeffnete dieselbe Taste den Kasten, und
+    ' das GUI_UPDATE desselben Bildes nahm sie gleich als "Abbrechen".
+    IF KEYHIT(KEY_ESCAPE) AND frage < 0 THEN endeAnfragen()
 
     IF GUI_LISTBOX_SELECTED(liste) <> letzteWahl THEN
         letzteWahl = GUI_LISTBOX_SELECTED(liste)
         ladePreset(letzteWahl)
         PARTICLE_CLEAR(sys)
+        ' Eine Werkseinstellung laesst sich jederzeit wieder waehlen.
+        standLesen(U_GESICHERT)
     END IF
 
     ' --- Aenderungen erkennen ---
@@ -617,6 +653,22 @@ WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
         GUI_SET_TEXT(wertText[k], FORMAT$(GUI_VALUE(regler[k]), "%." + STR$(nachkomma[k]) + "f"))
     NEXT
     GUI_SET_TEXT(lblZahl, STR$(PARTICLE_COUNT(sys)) + " Teilchen")
+
+    IF frage >= 0 THEN
+        DIM ea AS INTEGER : ea = GUI_ANSWER(frage)
+        IF ea = 1 THEN
+            frage = -1
+            einstellungSichern()
+            IF NOT ungesichert() THEN beenden = TRUE
+        ELSEIF ea = 2 THEN
+            frage = -1 : beenden = TRUE
+        ELSEIF ea = 3 THEN
+            frage = -1
+        END IF
+        ' Die Vorschau entsteht nach GUI_DRAW -- ohne diesen Aufruf laege sie
+        ' ueber dem Kasten.
+        IF frage >= 0 THEN GUI_DRAW_WINDOW(frage)
+    END IF
 
     FLIP()
 WEND

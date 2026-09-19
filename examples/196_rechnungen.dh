@@ -997,6 +997,13 @@ SUB wechseln(ziel AS INTEGER, id AS INTEGER, zeile AS INTEGER, geaendert AS BOOL
     IF geaendert THEN nachfragen(ziel, id, zeile) ELSE zielZeigen(ziel, id, zeile)
 END SUB
 
+' Beenden (Menue, Strg+Q, das Kreuz) ist Ziel 4: dieselbe Rueckfrage, nach
+' dem Sichern werden ALLE geaenderten Formulare gesichert. Bis 2026-09-19
+' endeten Menue und Kreuz ohne Rueckfrage.
+SUB endeAnfragen(geaendert AS BOOLEAN)
+    IF geaendert THEN nachfragen(4, 0, -1) ELSE EXIT(0)
+END SUB
+
 ' ============================================================ Start
 kundenLaden() : artikelLaden() : kundenAuswahlFuellen() : artikelAuswahlFuellen() : rechnungenLaden()
 kundeZeigen(-1) : artikelZeigen(-1) : rechnungZeigen(-1)
@@ -1023,13 +1030,19 @@ DIM loeschFrage AS GUI_WINDOW : loeschFrage = -1
 DIM loeschWas AS INTEGER : loeschWas = 0       ' 1 Kunde, 2 Artikel, 3 Rechnung
 DIM mengeZeileAlt AS INTEGER : mengeZeileAlt = -1
 
-WHILE NOT QUITREQUESTED()
+WHILE TRUE
+    ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
+    ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
+    ' Testlaufs -- dort endet das Programm hart wie bisher.
+    DIM kreuz AS BOOLEAN : kreuz = WINDOW_CLOSE_REQUESTED()
+    IF QUITREQUESTED() AND NOT kreuz THEN BREAK
     IF WINDOW_RESIZED() THEN GUI_WINDOW_SET_BOUNDS(win, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
     GUI_UPDATE()
     DIM seite AS INTEGER : seite = GUI_ACTIVE_TAB(win)
     DIM kDirty AS BOOLEAN : kDirty = GUI_FORM_CHANGED(win, "kunde")
     DIM aDirty AS BOOLEAN : aDirty = GUI_FORM_CHANGED(win, "artikel")
     DIM rDirty AS BOOLEAN : rDirty = rFormular$() <> rStand
+    IF kreuz AND frage < 0 THEN endeAnfragen(kDirty OR aDirty OR rDirty)
 
     ' --- Antwort auf die Rueckfrage (ein Bild lang) ---
     IF frage >= 0 AND GUI_ANSWER(frage) <> 0 THEN
@@ -1040,8 +1053,15 @@ WHILE NOT QUITREQUESTED()
             IF frageZiel = 1 THEN ok = kundeSpeichern()
             IF frageZiel = 2 THEN ok = artikelSpeichern()
             IF frageZiel = 3 THEN ok = rechnungSpeichern()
+            IF frageZiel = 4 THEN
+                IF kDirty THEN ok = kundeSpeichern()
+                IF ok AND aDirty THEN ok = artikelSpeichern()
+                IF ok AND rDirty THEN ok = rechnungSpeichern()
+                IF ok THEN EXIT(0)
+            END IF
             IF ok THEN zielZeigen(frageZiel, frageId, frageZeile)
         ELSEIF a = 2 THEN
+            IF frageZiel = 4 THEN EXIT(0)
             zielZeigen(frageZiel, frageId, frageZeile)
         ELSE
             ' Abbrechen: die alte Zeile bleibt gewaehlt.
@@ -1089,7 +1109,7 @@ WHILE NOT QUITREQUESTED()
 
     IF NOT GUI_MODAL() THEN
         ' --- Menue ---
-        IF GUI_CLICKED(miEnde) THEN EXIT(0)
+        IF GUI_CLICKED(miEnde) THEN endeAnfragen(kDirty OR aDirty OR rDirty)
         IF GUI_CLICKED(miUeber) THEN
             frage = GUI_DIALOG("Ueber", "Rechnungen -- der sechste Pilot." + CHR$(10) + "Eine Geschaeftsanwendung in Drachenhauch.", "Schliessen")
             frageZiel = 0

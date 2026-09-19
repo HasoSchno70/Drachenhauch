@@ -33,14 +33,14 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 >
 > | Editor | Qt | Drachenhauch | Faktor |
 > |---|---|---|---|
-> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 631 | 1,21 |
-> | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 622 | 0,78 |
-> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2867 | 0,39 |
-> | Tracker (`examples/190_tracker.dh`) | 3911 | 2152 | 0,55 |
-> | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 1329 | 0,26 |
-> | Anim-FSM-Editor (`examples/198_anim_fsm_editor.dh`, Weg B) | 1728 | 1336 | 0,77 |
-> | Notenblatt (`examples/199_notenblatt.dh`, Weg B) | 1710 | 1449 | 0,85 |
+> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 674 | 1,29 |
+> | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 674 | 0,84 |
+> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1575 | 0,65 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2934 | 0,40 |
+> | Tracker (`examples/190_tracker.dh`) | 3911 | 2165 | 0,55 |
+> | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 1342 | 0,27 |
+> | Anim-FSM-Editor (`examples/198_anim_fsm_editor.dh`, Weg B) | 1728 | 1341 | 0,78 |
+> | Notenblatt (`examples/199_notenblatt.dh`, Weg B) | 1710 | 1536 | 0,90 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -3436,7 +3436,7 @@ Titel mit Kennung). Tests `tests/pruef/fenster_schliessen.dhtest` (5) und
 `tests/pruef/werkzeug_ide_schliessen.dhtest` (2); Gegenproben: ohne den
 ESC-Wechsel bzw. mit `quit_requested` statt `close_requested` fallen genau
 die zwei betroffenen Faelle, mit der alten IDE-Schleife beide IDE-Faelle.
-Offen: die Werkzeuge 183-199 fragen beim Kreuz ebenfalls nicht nach.
+Die Werkzeuge 183-199 zogen einen Tag spaeter nach (siehe unten).
 
 **Sprung aus der Ausgabe (2026-09-18, zweiter Punkt der Stufe A):** eine
 Zeile der Ausgabe mit `datei.dh:zeile` (`Laufzeitfehler in spiel.dh:3: ...`,
@@ -3609,6 +3609,33 @@ in 48x40 zurueck; ein wieder angelegtes Bild und eine wieder angelegte
 Ebene sind leer). Fuenf Verfaelschungen (alles vorab anlegen, alte Grenze,
 Groesse nur fuer benutzte Plaetze, Ebene bzw. Bild nicht leeren) lassen je
 genau ihren Fall fallen. Damit ist Stufe A erledigt.
+
+**Rueckfrage beim Kreuz in den Werkzeugen (2026-09-19):** das Kreuz beendete
+jedes der neun Werkzeuge 183-199 ohne Rueckfrage, und in 185, 187 und 189 tat
+ESC dasselbe -- ungesicherte Arbeit war wortlos weg. Jetzt fragen beide
+(Sichern|Verwerfen|Abbrechen), aber NUR, wenn etwas ungesichert ist; sonst
+endet das Programm wie vorher sofort. Muster wie in der IDE: Schleife
+`WHILE NOT beenden`, `WINDOW_CLOSE_REQUESTED()` -> `endeAnfragen()`,
+`QUITREQUESTED()` ohne Kreuz = Bildlimit eines Testlaufs -> BREAK. Was
+"ungesichert" heisst, ist je Werkzeug verschieden: SFX und Partikel haben
+keinen Merker, sondern vergleichen ihre Regler mit einer eigenen Zeile im
+Verlaufsspeicher (`U_GESICHERT`, gesetzt nach Sichern, Laden und
+Werkseinstellung) -- zurueckgestellt ist damit wieder gesichert; der
+Sprite-Editor bekam `ungesichert` (an jedem Verlaufsschritt, jeder Wandlung,
+jeder Bild-/Ebenen-/Bereichsaenderung; gesichert heisst als .dhsprite, ein
+Streifen-Export traegt keine Ebenen); Tilemap, Tracker und die drei Weg-B-
+Werkzeuge hatten ihren Merker schon, 196 fragt ueber seine drei Formulare
+(und `Ende` im Menue fragte dort bisher auch nicht). **Die Falle:** die
+ESC-Abfrage muss NACH `GUI_UPDATE` stehen -- davor oeffnete dieselbe Taste
+den Kasten, und das GUI_UPDATE desselben Bildes nahm sie gleich als
+"Abbrechen" (der Kasten war nie zu sehen); und VOR der Auswertung der
+Antwort, sonst oeffnet die abbrechende Taste ihn im selben Bild wieder.
+Tests `tests/pruef/werkzeug_kreuz.dhtest` (24, echte Fensternachrichten ueber
+`_hilfen/fenstersender.ps1`; je Werkzeug ungesichert fragt / gesichert endet
+sofort, ESC fuer 185/187/189, SFX zurueckgestellt, Sprite ein Verlaufsschritt).
+Gegenprobe gegen die alten Werkzeuge: alle 13 Faelle mit ungesicherter Arbeit
+fallen; drei Verfaelschungen (Verlaufsschritt ohne Merker, SFX immer
+ungesichert, ESC vor GUI_UPDATE) lassen je genau ihre Faelle fallen.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die

@@ -164,11 +164,11 @@ Antwort auf die Frage, ob die Sprache dafür taugt: gemessen statt geschätzt.
 
 | Werkzeug | Qt | Drachenhauch |
 |---|---|---|
-| SFX-Generator | 522 | 631 |
-| Partikel-Editor | 802 | 622 |
-| Tilemap-Editor | 2428 | 1536 |
-| Sprite-Editor | 7379 | 2867 |
-| Tracker | 3911 | 2152 |
+| SFX-Generator | 522 | 674 |
+| Partikel-Editor | 802 | 674 |
+| Tilemap-Editor | 2428 | 1575 |
+| Sprite-Editor | 7379 | 2934 |
+| Tracker | 3911 | 2165 |
 
 **Der Faktor ist nicht übertragbar.** Er misst vor allem, wie viel die
 Drachenhauch-Fassung gar nicht erst hat — beim Sprite-Editor waren allein die

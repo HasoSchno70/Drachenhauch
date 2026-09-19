@@ -1836,7 +1836,12 @@ IF ARGC() >= 1 THEN
     IF FILEEXISTS(startDatei) THEN ladeDatei(startDatei)
 END IF
 
-WHILE NOT QUITREQUESTED()
+WHILE TRUE
+    ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
+    ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
+    ' Testlaufs -- dort endet das Programm hart wie bisher.
+    DIM kreuz AS BOOLEAN : kreuz = WINDOW_CLOSE_REQUESTED()
+    IF QUITREQUESTED() AND NOT kreuz THEN BREAK
     bildNr = bildNr + 1
     GUI_UPDATE()
     DIM strg AS BOOLEAN : strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
@@ -2134,17 +2139,25 @@ WHILE NOT QUITREQUESTED()
     IF frageNeu >= 0 THEN GUI_DRAW_WINDOW(frageNeu)
 
     ' ---- Beenden
-    IF KEYHIT(KEY_ESCAPE) AND NOT dialogOffen THEN
+    IF (KEYHIT(KEY_ESCAPE) OR kreuz) AND NOT dialogOffen THEN
         IF dirty THEN
-            frage = GUI_DIALOG("Beenden", "Ungesicherte Aenderungen verwerfen und beenden?", "janein")
+            frage = GUI_DIALOG("Beenden", "Der Song ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
         ELSE
             stopp()
             EXIT(0)
         END IF
     END IF
     IF frage >= 0 THEN
-        IF GUI_ANSWER(frage) = 1 THEN stopp() : EXIT(0)
-        IF GUI_ANSWER(frage) = 2 THEN frage = -1
+        DIM ea AS INTEGER : ea = GUI_ANSWER(frage)
+        IF ea = 1 THEN
+            frage = -1
+            speichern(FALSE)
+            IF NOT dirty THEN stopp() : EXIT(0)
+        ELSEIF ea = 2 THEN
+            stopp() : EXIT(0)
+        ELSEIF ea = 3 THEN
+            frage = -1
+        END IF
     END IF
 
     FLIP()

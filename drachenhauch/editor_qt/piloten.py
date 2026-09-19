@@ -22,19 +22,19 @@ from pathlib import Path
 
 PILOTEN: list[dict] = [
     {"datei": "183_sfx_generator.dh", "titel": "SFX-Generator",
-     "qt": 522, "dh": 631,
+     "qt": 522, "dh": 674,
      "kurz": "16 Regler, Wellenform-Anzeige, WAV- und GB-Code-Ausgabe, Einstellungen sichern/laden, Rueckgaengig/Wiederholen"},
     {"datei": "185_partikel_editor.dh", "titel": "Partikel-Editor",
-     "qt": 802, "dh": 622,
+     "qt": 802, "dh": 674,
      "kurz": "17 Regler, echte Vorschau, GB-Code-Ausgabe, Einstellungen sichern/laden, Rueckgaengig/Wiederholen"},
     {"datei": "187_tilemap_editor.dh", "titel": "Tilemap-Editor",
-     "qt": 2428, "dh": 1536,
+     "qt": 2428, "dh": 1575,
      "kurz": "sechs Werkzeuge, Auswahl mit Zwischenablage, Ebenen (mit Umsortieren), Objekt-Ebenen, mehrere Tilesets, Kachel-Eigenschaften, Tiled-JSON, GB-Code-Ausgabe"},
     {"datei": "189_sprite_editor.dh", "titel": "Sprite-Editor",
-     "qt": 7379, "dh": 2867,
+     "qt": 7379, "dh": 2934,
      "kurz": "zwoelf Werkzeuge (mit Lasso, Zauberstab und Verschieben), Ebenen, benannte Einzelbilder, Kachel-Ansicht, Statistik, eigenes Format mit Ebenen, Streifen, Atlas, bewegtes GIF, .gpl-Paletten, Zuschneiden, Spiegeln und Vierteldrehen, Dauer je Einzelbild, Animationsbereiche, GB-Code und .dhanim"},
     {"datei": "190_tracker.dh", "titel": "Tracker",
-     "qt": 3911, "dh": 2152,
+     "qt": 3911, "dh": 2165,
      "kurz": "Patterns und Reihenfolge, 4..32 Kanaele, 18 Instrumente mit ADSR/Vibrato/Detune, je Note Lautstaerke/Slide/Effekt/Instrument, Blockauswahl mit Kopieren/Transponieren/Interpolieren, Stumm/Solo, Wiedergabe auf einer Audio-Uhr, Rueckgaengig ueber den ganzen Song, dasselbe JSON wie die Qt-Fassung, WAV-Mischung und GB-Code"},
 ]
 
