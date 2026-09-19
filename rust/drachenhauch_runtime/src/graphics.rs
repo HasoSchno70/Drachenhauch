@@ -1106,10 +1106,6 @@ pub struct Graphics {
     /// und raylib-rs gibt sie dabei frei: nach FILES_DROPPED() fand
     /// FILE_DROPPED(0) nichts mehr.
     abgelegt: Vec<String>,
-    /// `DHRT_ABLEGEN` (nur fuer Pruefungen, Pfade mit `;`): kommen nach dem
-    /// ersten Bild wie abgelegt an -- ein echtes Hineinziehen kann kein Test
-    /// ausloesen.
-    abgelegt_vorgetaeuscht: Vec<String>,
     /// Das Fenster steht mit Absicht ZULETZT: Rust raeumt Felder in der
     /// Reihenfolge ihrer Deklaration ab, und `RaylibHandle` schliesst beim
     /// Abraeumen das Fenster samt GL-Kontext. Stand es vorn, gaben Schriften,
@@ -1456,6 +1452,7 @@ impl Graphics {
         // Dateien vom Finder: der Delegate muss die Methode haben, BEVOR GLFW
         // sein NSApplication hochfaehrt -- das Start-Ereignis kommt dort an.
         crate::finder::einhaengen();
+        crate::finder::vortaeuschen();
         let vorgetaeuscht = std::env::var("DHRT_KEIN_FENSTER").is_ok();
         let alter_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_| {}));
@@ -1540,9 +1537,6 @@ impl Graphics {
             shaders: Vec::new(), shader_textures: HashMap::new(),
             post_shader_idx: None, gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
             abgelegt: Vec::new(),
-            abgelegt_vorgetaeuscht: std::env::var("DHRT_ABLEGEN").ok()
-                .map(|s| s.split(';').filter(|p| !p.is_empty()).map(String::from).collect())
-                .unwrap_or_default(),
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
             layer_names,
             active: 0,
@@ -5605,7 +5599,6 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             self.abgelegt.extend(liste.paths().iter().map(|s| s.to_string()));
         }
         self.abgelegt.extend(crate::finder::abholen());
-        self.abgelegt.append(&mut self.abgelegt_vorgetaeuscht);
 
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }

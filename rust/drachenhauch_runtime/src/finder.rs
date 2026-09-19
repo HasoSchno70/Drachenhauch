@@ -113,6 +113,20 @@ mod mac {
     }
 }
 
+/// `DHRT_ABLEGEN` (nur fuer Pruefungen, Pfade mit `;`): in DIESELBE
+/// Warteschlange wie der Finder -- so prueft jeder Test auch das Abholen.
+/// Ein echtes Hineinziehen kann kein Test ausloesen. Einmal je Prozess.
+pub fn vortaeuschen() {
+    static EINMAL: std::sync::Once = std::sync::Once::new();
+    EINMAL.call_once(|| {
+        if let Ok(s) = std::env::var("DHRT_ABLEGEN") {
+            for p in s.split(';').filter(|p| !p.is_empty()) {
+                merken(p.to_string());
+            }
+        }
+    });
+}
+
 /// Vor dem ersten Fenster aufrufen (GLFW faehrt NSApplication dort hoch).
 pub fn einhaengen() {
     #[cfg(target_os = "macos")]
