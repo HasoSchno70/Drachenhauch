@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1895,
+ "count": 1897,
  "builtins": [
   {
    "name": "ABS",
@@ -8496,6 +8496,18 @@
    "name": "REGEX_FIND",
    "kind": "core",
    "signature": "REGEX_FIND(text: STRING, pattern: STRING)",
+   "module": "regex"
+  },
+  {
+   "name": "REGEX_FIND_POS",
+   "kind": "core",
+   "signature": "REGEX_FIND_POS(text: STRING, pattern: STRING [, ab: INTEGER])",
+   "module": "regex"
+  },
+  {
+   "name": "REGEX_ESCAPE$",
+   "kind": "core",
+   "signature": "REGEX_ESCAPE$(text: STRING)",
    "module": "regex"
   },
   {

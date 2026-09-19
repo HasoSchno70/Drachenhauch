@@ -13,6 +13,8 @@ IMPORT "regex"
 | `REGEX_MATCH(text, pattern)` | BOOLEAN | Voller Match (Pattern muss ganzen Text abdecken) |
 | `REGEX_TEST(text, pattern)` | BOOLEAN | Sucht Vorkommen irgendwo im Text |
 | `REGEX_FIND(text, pattern)` | STRING | Erster Treffer (leerer String wenn nicht gefunden) |
+| `REGEX_FIND_POS(text, pattern [, ab])` | TUPLE | Lage des ersten Treffers als (start, laenge) in Zeichen ab 0 wie INSTR, (-1, 0) ohne Treffer; `ab` sucht ab diesem Zeichen weiter und sieht die Zeichen davor noch (eine Wortgrenze `\b` am Suchbeginn gilt nur, wo wirklich eine ist) |
+| `REGEX_ESCAPE$(text)` | STRING | Maskiert alle Sonderzeichen: das Ergebnis trifft genau den Text selbst -- fuer eine Suche, die woertlich oder als Ausdruck laufen kann |
 | `REGEX_FIND_ALL(text, pattern)` | ARRAY OF STRING | Alle nicht-ueberlappenden Treffer |
 | `REGEX_REPLACE(text, pattern, repl)` | STRING | Ersetzt alle Treffer |
 | `REGEX_REPLACE_ONCE(text, pattern, repl)` | STRING | Ersetzt nur den ersten Treffer |

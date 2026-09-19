@@ -15016,8 +15016,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     // zuerst, dann die weiteren.
                     let mut bereiche: Vec<(i32, i32)> = vec![(caret_anz, wdg.sel_anchor)];
                     bereiche.extend(wdg.marken_zusatz.iter().copied());
-                    if focused && wdg.vorschau.is_empty() {
-                        let selbg = self.selection_bg(wdg);
+                    // Auch OHNE Fokus, dann gedaempft: eine Suchleiste nimmt dem
+                    // Feld den Fokus und markiert darin den Treffer -- ohne das
+                    // saehe man nicht, was [Ersetzen] gleich ersetzt (jeder
+                    // Editor zeigt eine inaktive Auswahl so). Nur waehrend einer
+                    // Umwandlung der Eingabemethode bleibt sie weg, die Vorschau
+                    // hat dort den Platz.
+                    if !(focused && !wdg.vorschau.is_empty()) {
+                        let selbg = if focused { self.selection_bg(wdg) } else {
+                            let acc = self.wcol(wdg, "accent", "accent");
+                            (0x30i64 << 24) | (acc & 0xFFFFFF)
+                        };
                         for &(mc, ma) in bereiche.iter() {
                             let lo = mc.min(ma).clamp(0, chars.len() as i32);
                             let hi = mc.max(ma).clamp(0, chars.len() as i32);

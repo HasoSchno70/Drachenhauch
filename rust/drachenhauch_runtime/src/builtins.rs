@@ -4886,6 +4886,43 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let rep = translate_repl(need_str(&a[2], "REGEX_REPLACE_ONCE")?);
             Ok(Value::str_rc(re.replace(t, rep.as_str()).as_ref()))
         }
+        // Wo steht der Treffer? REGEX_FIND sagt nur WAS -- wer ihn im Text
+        // markieren will, suchte bisher mit INSTR nach dem gefundenen Text und
+        // traf damit das erste Vorkommen, nicht den Treffer (`\bhp\b` fand
+        // das `hp` in `hpmax`, wenn es davor stand). Zaehlung in ZEICHEN wie
+        // INSTR/MID$, ab 0; `ab` sucht ab diesem Zeichen weiter, sieht aber
+        // davor stehende Zeichen noch (`find_at`) -- sonst hielte `\b` jeden
+        // Suchbeginn fuer eine Wortgrenze.
+        "regex_find_pos" => {
+            if a.len() < 2 || a.len() > 3 {
+                return err("REGEX_FIND_POS: erwartet (text, pattern [, ab])".to_string());
+            }
+            let t = need_str(&a[0], "REGEX_FIND_POS")?;
+            let re = regex_compile(need_str(&a[1], "REGEX_FIND_POS")?)?;
+            let ab = if a.len() == 3 { need_int(&a[2], "REGEX_FIND_POS")? } else { 0 };
+            let keins = || -> R { Ok(Value::Tuple(Rc::new(vec![Value::Int(-1), Value::Int(0)]))) };
+            if ab < 0 { return keins(); }
+            let byte_ab = match t.char_indices().nth(ab as usize) {
+                Some((b, _)) => b,
+                None if ab as usize == t.chars().count() => t.len(),
+                None => return keins(),
+            };
+            match re.find_at(t, byte_ab) {
+                Some(m) => {
+                    let start = t[..m.start()].chars().count() as i64;
+                    let laenge = m.as_str().chars().count() as i64;
+                    Ok(Value::Tuple(Rc::new(vec![Value::Int(start), Value::Int(laenge)])))
+                }
+                None => keins(),
+            }
+        }
+        // Text als Muster, das nur sich selbst trifft -- fuer eine Suche, die
+        // wahlweise woertlich oder als Ausdruck laeuft und dafuer EINEN Weg
+        // nehmen will.
+        "regex_escape$" | "regex_escape" => {
+            arity!(1);
+            Ok(Value::str_rc(&regex::escape(need_str(&a[0], "REGEX_ESCAPE$")?)))
+        }
         "regex_split" => {
             arity!(2);
             let re = regex_compile(need_str(&a[1], "REGEX_SPLIT")?)?;
