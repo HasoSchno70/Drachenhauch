@@ -1,0 +1,120 @@
+' Kein Fenster: eine Meldung statt eines Absturzes (graphics.rs
+' `fenster_bauen`, 2026-09-19).
+'
+' raylib-rs bricht mit einem Panic ab, wenn kein Fenster aufgeht (kein
+' Bildschirm, kein passendes OpenGL) -- beim Nutzer kam das als
+' Rust-Rueckverfolgung an, und abfangen liess es sich nicht. Jetzt ist es ein
+' gewoehnlicher Laufzeitfehler: mit Zeile und Befehl, per TRY abfangbar.
+'
+' Auf einem Rechner mit Bildschirm taeuscht DHRT_KEIN_FENSTER den Fehler vor:
+' es loest DENSELBEN Panic an derselben Stelle aus, geprueft wird also das
+' echte Fangen. Der echte Fall laeuft im Paket-Lauf der CI (package.yml:
+' Linux ohne Bildschirm, macOS ohne OpenGL).
+'
+' Die Faelle geben nie die Meldung selbst aus: der Laeufer hielte sie sonst
+' fuer eine Maschine ohne Bildschirm und uebersprange den Fall.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== SCREEN ohne fenster laesst sich mit TRY abfangen
+DIM gefangen AS STRING : gefangen = ""
+TRY
+    SCREEN(320, 200)
+CATCH e
+    gefangen = e
+END TRY
+IF INSTR(gefangen, "im Rust-Kern") >= 0 OR INSTR(gefangen, "ohne Grafik") >= 0 THEN
+    PRINT "UEBERSPRINGEN: Laufzeit ohne Grafik"
+    EXIT(0)
+END IF
+PRINT "gefangen "; (gefangen <> "")
+PRINT "nennt SCREEN "; (LEFT$(gefangen, 8) = "SCREEN: ")
+PRINT "sagt kein fenster "; (INSTR(gefangen, "Kein Fenster moeglich") >= 0)
+PRINT "sagt was ohne geht "; (INSTR(gefangen, "PRINT, Dateien") >= 0)
+PRINT "danach geht es weiter"
+--- umgebung
+DHRT_KEIN_FENSTER=1
+--- erwartet
+gefangen TRUE
+nennt SCREEN TRUE
+sagt kein fenster TRUE
+sagt was ohne geht TRUE
+danach geht es weiter
+
+=== ein bildbefehl ohne SCREEN nennt sich selbst
+IMPORT "imgfx"
+' Bildbefehle legen ohne SCREEN ein verstecktes Fenster an -- scheitert das,
+' ist es ein Fehler DIESES Befehls, nicht von einem SCREEN, das es nie gab.
+DIM gefangen AS STRING : gefangen = ""
+TRY
+    DIM b AS IMAGE : b = IMAGE_NEW(4, 4)
+CATCH e
+    gefangen = e
+END TRY
+IF INSTR(gefangen, "im Rust-Kern") >= 0 OR INSTR(gefangen, "ohne Grafik") >= 0 THEN
+    PRINT "UEBERSPRINGEN: Laufzeit ohne Grafik"
+    EXIT(0)
+END IF
+PRINT "nennt IMAGE_NEW "; (LEFT$(gefangen, 11) = "IMAGE_NEW: ")
+PRINT "sagt kein fenster "; (INSTR(gefangen, "Kein Fenster moeglich") >= 0)
+' Ein zweiter Versuch scheitert genauso -- nicht anders, nicht mit Absturz.
+DIM zweiter AS STRING : zweiter = ""
+TRY
+    SCREEN(64, 64)
+CATCH e
+    zweiter = e
+END TRY
+PRINT "zweiter versuch ebenso "; (INSTR(zweiter, "Kein Fenster moeglich") >= 0)
+--- umgebung
+DHRT_KEIN_FENSTER=1
+--- erwartet
+nennt IMAGE_NEW TRUE
+sagt kein fenster TRUE
+zweiter versuch ebenso TRUE
+
+=== ungefangen endet das programm mit meldung und rueckgabe 2 statt panic
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM v AS INTEGER : v = PROCESS_START("dhrt", "--version")
+DIM vt AS STRING : vt = lauf$(v)
+IF INSTR(vt, "fehlt: grafik") >= 0 OR INSTR(vt, "grafik") < 0 THEN
+    PRINT "UEBERSPRINGEN: Laufzeit ohne Grafik"
+    EXIT(0)
+END IF
+SETENV("DHRT_KEIN_FENSTER", "1")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", CWD$() + "/spiel.dh")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+PRINT "vorher ausgegeben "; (INSTR(aus, "vor dem fenster") >= 0)
+PRINT "mit zeile und befehl "; (INSTR(aus, "spiel.dh:2: SCREEN: Kein Fenster moeglich") >= 0)
+PRINT "kein panic "; (INSTR(aus, "panicked") < 0 AND INSTR(aus, "RUST_BACKTRACE") < 0)
+PRINT "nichts danach "; (INSTR(aus, "nach dem fenster") < 0)
+--- datei spiel.dh
+PRINT "vor dem fenster"
+SCREEN(320, 200)
+PRINT "nach dem fenster"
+--- erwartet
+rueckgabe 2
+vorher ausgegeben TRUE
+mit zeile und befehl TRUE
+kein panic TRUE
+nichts danach TRUE
+
+=== ein programm ohne grafik merkt nichts davon
+PRINT "rechnet "; 6 * 7
+--- umgebung
+DHRT_KEIN_FENSTER=1
+--- erwartet
+rechnet 42

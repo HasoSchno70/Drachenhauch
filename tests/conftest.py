@@ -286,7 +286,8 @@ _DHRT = _find_dhrt()
 # mal als GLFW-Warnung, beim Ton als Kira-Fehler. Der erste Anlauf kannte nur
 # die Panik und liess deshalb 10 von 152 Faellen stehen.
 _KEIN_FENSTER = (
-    "Attempting to create window failed",          # raylib-Panik
+    "Kein Fenster moeglich",                       # dhrt seit 2026-09-19
+    "Attempting to create window failed",          # raylib-Panik (vorher)
     "does not appear to support OpenGL",           # GLFW/WGL auf dem CI-Runner
     "Failed to initialize Window",
     "Failed to initialize platform",

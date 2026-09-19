@@ -1373,17 +1373,37 @@ fn col(c: i64) -> Color {
     Color::new(((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8, a)
 }
 
+/// Warum kein Fenster aufgeht -- so genau, wie es sich von aussen sagen laesst.
+/// Die Einzelheiten stehen in den GLFW-Warnungen direkt darueber.
+fn kein_fenster_meldung() -> String {
+    let mut m = String::from("Kein Fenster moeglich");
+    #[allow(unused_mut)] // nur unter Linux umgesetzt
+    let mut grund = " -- das System stellt kein passendes OpenGL (3.3) bereit (Einzelheiten in den GLFW-Warnungen davor, falls es welche gibt).";
+    #[cfg(target_os = "linux")]
+    {
+        let leer = |n: &str| std::env::var(n).map(|v| v.is_empty()).unwrap_or(true);
+        if leer("DISPLAY") && leer("WAYLAND_DISPLAY") {
+            grund = " -- es gibt keinen Bildschirm (weder DISPLAY noch WAYLAND_DISPLAY ist gesetzt). \
+                     Auf einem Rechner ohne Bildschirm etwa ueber `xvfb-run` starten.";
+        }
+    }
+    m.push_str(grund);
+    // Beide Gruende enden mit demselben Satz: was OHNE Fenster geht.
+    m.push_str(" Ein Fenster brauchen SCREEN und alle Zeichen-, Bild- und gui-Befehle; PRINT, Dateien, Netz und Datenbank gehen ohne.");
+    m
+}
+
 impl Graphics {
     /// Lazy-Init ohne SCREEN: ein verstecktes Fenster, nur fuer den GL-Kontext
     /// (LOADIMAGE/imgfx-Texturen, Kamera-/Sprite-Logik ohne sichtbares Fenster).
     /// Damit funktionieren LOADIMAGE & Co. auch VOR (oder ganz ohne) SCREEN.
     /// Ein spaeteres SCREEN macht das Fenster via `reconfigure` sichtbar.
-    pub fn new_headless() -> Graphics {
+    pub fn new_headless() -> Result<Graphics, String> {
         Graphics::new_impl(64, 64, "Drachenhauch", 1, true, false)
     }
     /// Fenster mit transparentem Framebuffer (SCREEN_TRANSPARENT). Das Flag muss
     /// schon bei der Fenster-Erzeugung gesetzt sein -- nicht nachtraeglich machbar.
-    pub fn new_transparent(width: i32, height: i32, title: &str, scale: i32) -> Graphics {
+    pub fn new_transparent(width: i32, height: i32, title: &str, scale: i32) -> Result<Graphics, String> {
         Graphics::new_impl(width.max(1), height.max(1), title, scale, false, true)
     }
     /// Das (bereits erzeugte) Fenster den ganzen aktuellen Monitor abdecken lassen:
@@ -1403,11 +1423,38 @@ impl Graphics {
         self.rl.set_window_position(pos.x as i32, pos.y as i32);
     }
 
-    pub fn new(width: i32, height: i32, title: &str, scale: i32) -> Graphics {
+    pub fn new(width: i32, height: i32, title: &str, scale: i32) -> Result<Graphics, String> {
         Graphics::new_impl(width, height, title, scale, false, false)
     }
 
-    fn new_impl(width: i32, height: i32, title: &str, scale: i32, hidden: bool, transparent: bool) -> Graphics {
+    /// Das Fenster anlegen -- ein Scheitern ist ein FEHLER, kein Absturz.
+    /// raylib-rs bricht mit `panic!("Attempting to create window failed!")`
+    /// ab, wenn InitWindow scheitert: kein Bildschirm (Linux ohne DISPLAY),
+    /// kein passendes OpenGL (gemessen auf den macOS-Laeufern der CI). Das
+    /// kam als Panic samt Rust-Rueckverfolgung beim Nutzer an und liess sich
+    /// im Programm nicht abfangen. Der Panic wird hier gefangen (ohne dass der
+    /// Panic-Hook ihn ausgibt) und in eine Meldung verwandelt, die die VM als
+    /// gewoehnlichen Laufzeitfehler weitergibt -- mit Zeile, per TRY abfangbar.
+    ///
+    /// `DHRT_KEIN_FENSTER` tut so, als ginge keins: auf einem Rechner mit
+    /// Bildschirm ist der Weg sonst nicht zu pruefen
+    /// (tests/pruef/kein_fenster.dhtest). Der echte Weg laeuft im Paket-Lauf
+    /// der CI (package.yml: Linux ohne xvfb, macOS ohne OpenGL).
+    fn fenster_bauen(builder: raylib::RaylibBuilder) -> Result<(RaylibHandle, RaylibThread), String> {
+        // Der Schalter loest DENSELBEN Panic aus wie raylib-rs, und zwar an
+        // derselben Stelle -- so geht auch die Pruefung durch das Fangen.
+        let vorgetaeuscht = std::env::var("DHRT_KEIN_FENSTER").is_ok();
+        let alter_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let ergebnis = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            if vorgetaeuscht { panic!("Attempting to create window failed!"); }
+            builder.build()
+        }));
+        std::panic::set_hook(alter_hook);
+        ergebnis.map_err(|_| kein_fenster_meldung())
+    }
+
+    fn new_impl(width: i32, height: i32, title: &str, scale: i32, hidden: bool, transparent: bool) -> Result<Graphics, String> {
         // DHRT_SCALE erlaubt es, JEDEN SCREEN-Aufruf hochskaliert zu rendern
         // (z.B. fuer scharfe Buch-Screenshots), ohne die .dh-Quelle zu aendern.
         let scale = std::env::var("DHRT_SCALE").ok()
@@ -1427,7 +1474,7 @@ impl Graphics {
         // verlangt ein Fenster, das noch nie sichtbar war. Gezeigt wird es
         // gleich darunter -- ausser der Aufrufer wollte es ohnehin versteckt.
         builder.hidden();
-        let (mut rl, thread) = builder.build();
+        let (mut rl, thread) = Graphics::fenster_bauen(builder)?;
         let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
         crate::ime::einhaengen(unsafe { rl.get_window_handle() });
@@ -1615,7 +1662,7 @@ impl Graphics {
                 break;
             }
         }
-        g
+        Ok(g)
     }
 
     /// Welcher Font zeichnet diesen Text? Normalerweise der aktive. Steht

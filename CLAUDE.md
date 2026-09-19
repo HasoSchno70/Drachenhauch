@@ -3679,8 +3679,8 @@ Fenster geht auf den macOS-Laeufern nicht** (kein OpenGL), ob die IDE auf
 einem echten Mac aufgeht, ist ungeprueft. Bekannt offen: eine `.dh` per
 Doppelklick im Finder oeffnet die IDE nicht mit der Datei (dafuer braeuchte
 es ein Apple-Event, ein Shell-Starter bekommt es nicht), keine
-Beglaubigung (Notarisierung), und ein gescheitertes Fenster endet weiter in
-einem Panic statt einer Meldung. Tests `tests/pruef/werkzeug_paket.dhtest`
+Beglaubigung (Notarisierung); ein gescheitertes Fenster endete in einem
+Panic -- seit demselben Tag eine Meldung (naechster Absatz). Tests `tests/pruef/werkzeug_paket.dhtest`
 (8: Linux-Ordner, macOS-Bundle samt .icns-Eintraegen, Symbole passen zum
 Logo, unbekanntes System, install.sh ein/aus mit fremdem dhrt, der Starter
 mit der echten Laufzeit zweimal, `DH_IDE_BEISPIELE` mit Gegenprobe); sieben
@@ -3688,6 +3688,31 @@ Verfaelschungen (CRLF, dhrt in Resources, `cp -R` ohne `-n`, fremdes dhrt
 ueberschreiben, Entfernen ohne Menueeintrag, IDE ohne `DH_IDE_BEISPIELE`,
 Symbole nicht mitkopiert) und zwei am Symbol-Werkzeug (falsche
 .icns-Laenge, falsche Kante) lassen je genau ihre Faelle fallen.
+
+**Kein Fenster: Meldung statt Panic (2026-09-19):** raylib-rs bricht mit
+`panic!("Attempting to create window failed!")` ab, wenn `InitWindow`
+scheitert (kein Bildschirm, kein passendes OpenGL) -- beim Nutzer kam eine
+Rust-Rueckverfolgung an, Rueckgabe 101, nicht abfangbar. Jetzt faengt
+`Graphics::fenster_bauen` (graphics.rs) den Panic mit `catch_unwind`, schaltet
+dafuer kurz den Panic-Hook stumm (sonst stuende die Rueckverfolgung trotzdem
+da) und liefert `Err`; `new`/`new_headless`/`new_transparent` geben
+`Result` zurueck, und die drei Aufrufer in vm.rs machen daraus einen
+gewoehnlichen Laufzeitfehler des BEFEHLS: `SCREEN: Kein Fenster moeglich
+-- ...`, beim versteckten Fenster fuer Bildbefehle `LOADIMAGE: ...` bzw.
+`IMAGE_NEW: ...` (nicht SCREEN, das es nie gab). Mit Zeile, per `TRY`
+abfangbar, Rueckgabe 2. Unter Linux ohne `DISPLAY`/`WAYLAND_DISPLAY` sagt
+die Meldung das und nennt `xvfb-run`, sonst "kein passendes OpenGL (3.3)"
+und was ohne Fenster geht. **Pruefbar auf einem Rechner mit Bildschirm
+ueber `DHRT_KEIN_FENSTER`**: der Schalter loest DENSELBEN Panic an
+derselben Stelle aus, geht also durch das echte Fangen -- eine erste
+Fassung gab einfach `Err` zurueck und haette am `catch_unwind` vorbei
+geprueft. Der echte Fall laeuft im Paket-Lauf (Linux ohne xvfb, macOS ohne
+OpenGL). "Kein Fenster moeglich" steht in beiden Erkennungslisten fuer
+Maschinen ohne Bildschirm (`pruefsammlung::KEIN_FENSTER`, `conftest.py`).
+Tests `tests/pruef/kein_fenster.dhtest` (4, geben die Meldung nie selbst aus,
+sonst hielte der Laeufer sie fuer eine Maschine ohne Bildschirm); drei
+Verfaelschungen (ohne `catch_unwind`, Hook nicht stumm, Bildbefehl ohne
+eigenen Namen) lassen je genau ihre Faelle fallen.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die

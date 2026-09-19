@@ -122,6 +122,21 @@ jobs:
         if: runner.os == 'Linux'
         run: DHRT_FRAMES=10 xvfb-run -a -s "-screen 0 1920x1080x24" rust/drachenhauch_runtime/target/release/dhrt run examples/09_shapes.dh
 
+      # Der ECHTE Fall ohne Bildschirm (ohne xvfb, DISPLAY leer): eine Meldung
+      # mit Zeile und dem Hinweis auf xvfb-run, Rueckgabe 2, kein Panic.
+      - name: Ohne Bildschirm eine Meldung statt Panic (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set +e
+          env -u DISPLAY -u WAYLAND_DISPLAY rust/drachenhauch_runtime/target/release/dhrt run examples/09_shapes.dh > "$RUNNER_TEMP/ohne.txt" 2>&1
+          RC=$?
+          set -e
+          cat "$RUNNER_TEMP/ohne.txt"
+          test $RC -eq 2
+          grep -q "SCREEN: Kein Fenster moeglich -- es gibt keinen Bildschirm" "$RUNNER_TEMP/ohne.txt"
+          ! grep -q "panicked" "$RUNNER_TEMP/ohne.txt"
+          rust/drachenhauch_runtime/target/release/dhrt test tests/pruef/kein_fenster.dhtest
+
       - name: Paket ausprobieren (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -176,7 +191,10 @@ jobs:
           if [ $RC -eq 0 ]; then
             grep -qx bereit "$RUNNER_TEMP/ide.log"
             echo "IDE gestartet."
-          elif grep -q "Attempting to create window failed" "$RUNNER_TEMP/start.txt"; then
+          elif grep -q "Kein Fenster moeglich" "$RUNNER_TEMP/start.txt"; then
+            # Seit 2026-09-19 eine Meldung statt eines Panics -- der Panic
+            # darf hier nicht mehr auftauchen.
+            if grep -q "panicked" "$RUNNER_TEMP/start.txt"; then exit 1; fi
             echo "::notice::IDE-Start auf diesem Laeufer nicht moeglich (kein OpenGL); Starter und Laufzeit laufen."
           else
             exit $RC
