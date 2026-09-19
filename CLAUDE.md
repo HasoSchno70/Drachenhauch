@@ -3500,6 +3500,30 @@ vom Anfang des letzten Zeichens. (2) Eine Verfaelschung per `python -c
 unveraenderte Datei, und "gruen" hiess nichts; Verfaelschungen gehoeren in
 eine Skriptdatei, und die Zeile wird vor dem Bau per grep nachgesehen.
 
+**Haltepunkt per Klick in die Nummernspalte (2026-09-19, fuenfter Punkt der
+Stufe A):** neu **`GUI_TEXTAREA_GUTTER_CLICKED(ta [, taste])`** -> Zeile (ab
+1, logisch) des Klicks in die Nummernspalte, 0 = keiner; `taste` 0 links, 1
+rechts; ein Bild lang wie `GUI_CLICKED`. Erkannt im Hover-Durchlauf von
+`update` (`ta_rand_zeile`, dieselbe Zeilenrechnung wie ein Klick in den Text,
+der Faltpfeil bleibt beim Falten), gilt also auch fuer ein Feld ohne Fokus und
+fuer rechts. Die IDE (`randKlicksNachziehen`, jeder offene Reiter -- die
+geteilte Ansicht zeigt zwei) schaltet links um wie F9 und fragt rechts nach
+der Bedingung wie Umschalt+F9, beide fuer die ANGEKLICKTE Zeile
+(`haltepunktUmschaltenIn`/`haltepunktBedingungFragenIn`; die Bedingung merkt
+sich ihre Datei in `bedingungPfad`, statt beim Bestaetigen den Reiter zu
+nehmen, der gerade vorn ist). **Der Fund:** ein Linksklick in die Spalte liess
+die Marke im Druck-Bild stehen, aber die folgenden Bilder mit gehaltener
+Taste liefen durch den Zug-Zweig und zogen sie doch an den Rand -- jetzt
+sperrt der Druck den ganzen Zug (`farbfeld_zug`, wie beim Farbfeld). Gesehen
+hat es erst der IDE-Fall; der Laufzeit-Fall war zweimal zu schwach: die Marke
+stand vorher schon auf der angeklickten Zeile, und gefragt wurde nur im
+Druck-Bild. Jetzt steht sie auf Zeile 4 und wird nach dem Loslassen gelesen
+-- gegen den alten Bau faellt er. Tests `tests/pruef/gui_rand_klick.dhtest`
+(3) und `tests/pruef/werkzeug_ide_haltepunkt.dhtest` (3: links + Debugger
+haelt in 3 bei Marke in 1, zweimal = aus, rechts + Bedingung per
+Zwischenablage haelt genau einmal; Helfer `prRand` in
+`_hilfen/idemaus.dh`); ohne den Aufruf in der IDE fallen alle drei.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber

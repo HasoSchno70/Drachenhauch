@@ -54,3 +54,32 @@ SUB prProbe()
     (z, s) = GUI_TEXTAREA_CURSOR(aktivesFeld())
     protokoll("probe zeile " + STR$(z))
 END SUB
+
+' Klick in die Nummernspalte vor Zeile z des aktiven Code-Felds (taste 0 =
+' links, 1 = rechts): zehn Punkte vor dem ersten Zeichen. `weiter` sind
+' weitere Aufnahmezeilen (ab Bild 10 zu zaehlen, mit Zeilenumbruch), `nw`
+' ihre Zahl.
+SUB prRand(z AS INTEGER, taste AS INTEGER, weiter AS STRING, nw AS INTEGER)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    DIM py AS INTEGER : py = -1
+    DIM xt AS INTEGER : xt = -1
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    DIM zz AS INTEGER
+    DIM ss AS INTEGER
+    FOR y = 0 TO SCREENHEIGHT() - 1 STEP 2
+        FOR x = 0 TO SCREENWIDTH() - 1 STEP 4
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF zz = z AND py < 0 THEN py = y + 4
+            IF ss = 1 AND (xt < 0 OR x < xt) THEN xt = x
+        NEXT
+    NEXT
+    IF py < 0 OR xt < 0 THEN protokoll("ziel fehlt") : RETURN
+    protokoll("ziel gefunden")
+    DIM a AS STRING
+    a = "e 0 7 " + STR$(xt - 10) + " " + STR$(py) + " 0" + CHR$(10)
+    a = a + "e 2 6 " + STR$(taste) + " 0 0" + CHR$(10)
+    a = a + "e 4 5 " + STR$(taste) + " 0 0" + CHR$(10)
+    WRITEALL("prmaus.txt", "c " + STR$(3 + nw) + CHR$(10) + a + weiter + CHR$(10))
+    AUTOMATION_PLAY("prmaus.txt")
+END SUB
