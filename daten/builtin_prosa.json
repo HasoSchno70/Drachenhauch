@@ -404,7 +404,7 @@
   "FBM3": "dasselbe im Raum",
   "FILEEXISTS": "Datei vorhanden?",
   "FILESIZE": "Größe in Bytes",
-  "FILES_DROPPED": "wie viele Dateien wurden in diesem Bild ins Fenster gezogen?",
+  "FILES_DROPPED": "wie viele Dateien wurden in diesem Bild ins Fenster gezogen oder (macOS) vom Finder übergeben? Gilt genau ein Bild, beliebig oft abfragbar",
   "FILETIME": "zuletzt geändert, Sekunden wie im Modul zeit",
   "FILE_DROPPED": "Pfad der i-ten davon",
   "FILE_OPEN_DIALOG": "Datei zum Öffnen wählen",

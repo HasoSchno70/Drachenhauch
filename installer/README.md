@@ -73,6 +73,9 @@ rust/drachenhauch_runtime/target/release/dhrt run installer/bauen.dh
 - **macOS:** `installer/output/Drachenhauch-IDE-<fassung>-macos-<arch>.dmg` mit
   `Drachenhauch.app` (Ad-hoc-signiert, nicht beglaubigt -- beim ersten Start
   ctrl-Klick -> Oeffnen, steht im LIESMICH des Abbilds).
+  `.dh` ist als eigener Typ angemeldet; ein Doppelklick im Finder kommt als
+  Apple-Event in der Laufzeit an (`rust/drachenhauch_runtime/src/finder.rs`) und
+  oeffnet die Datei in der IDE wie eine ins Fenster gezogene.
 
 Der Starter (`installer/posix/drachenhauch`) kopiert die Beispiele beim Start
 nach `Dokumente/Drachenhauch/examples` (nur, was fehlt) und oeffnet die IDE
