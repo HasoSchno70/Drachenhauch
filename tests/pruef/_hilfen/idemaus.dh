@@ -1,0 +1,56 @@
+' Helfer fuer IDE-Faelle mit der Maus im Code-Feld (werkzeug_ide_tooltip):
+' die Bildschirmlage eines Zeichens suchen und eine Aufnahme dorthin
+' schreiben. Eingebunden hinter protokoll("bereit"), die Namen beginnen mit
+' `pr`, damit sie keine der IDE verdecken.
+
+' Maus auf Zeile z, Spalte s des aktiven Code-Felds (s = 0: weit rechts
+' hinter dem Zeilenende), mit Strg und/oder einem Klick.
+SUB prZiel(z AS INTEGER, s AS INTEGER, strg AS BOOLEAN, klick AS BOOLEAN)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    DIM px AS INTEGER : px = -1
+    DIM py AS INTEGER : py = -1
+    DIM rechts AS INTEGER : rechts = -1
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    DIM zz AS INTEGER
+    DIM ss AS INTEGER
+    ' erst die Zeile: senkrecht an wenigen x, dann waagerecht in ihr
+    FOR y = 0 TO SCREENHEIGHT() - 1 STEP 2
+        FOR x = 0 TO SCREENWIDTH() - 1 STEP 40
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF zz = z AND py < 0 THEN py = y + 4
+        NEXT
+    NEXT
+    IF py < 0 THEN protokoll("ziel fehlt") : RETURN
+    ' s = 0: hinter das Zeilenende -- vom ANFANG des letzten Zeichens aus
+    ' gemessen, nicht vom letzten Treffer: liefert die Laufzeit hinter dem
+    ' Ende faelschlich weiter das letzte Zeichen, laege der letzte Treffer am
+    ' Feldrand, und die Probe dahinter traefe gar nichts.
+    DIM letzteS AS INTEGER : letzteS = 0
+    FOR x = 0 TO SCREENWIDTH() - 1
+        (zz, ss) = GUI_TEXTAREA_POS_AT(ta, x, py)
+        IF zz = z AND ss = s AND px < 0 THEN px = x + 2
+        IF zz = z AND ss > letzteS THEN letzteS = ss : rechts = x
+    NEXT
+    IF s = 0 THEN px = rechts + 60
+    IF px < 0 THEN protokoll("ziel fehlt") : RETURN
+    protokoll("ziel gefunden")
+    DIM a AS STRING : a = ""
+    DIM n AS INTEGER : n = 1
+    a = a + "e 0 7 " + STR$(px) + " " + STR$(py) + " 0" + CHR$(10)
+    IF strg THEN a = a + "e 30 2 341 0 0" + CHR$(10) : n = n + 1
+    IF klick THEN
+        a = a + "e 40 6 0 0 0" + CHR$(10) + "e 42 5 0 0 0" + CHR$(10)
+        n = n + 2
+    END IF
+    IF strg THEN a = a + "e 50 1 341 0 0" + CHR$(10) : n = n + 1
+    WRITEALL("prmaus.txt", "c " + STR$(n) + CHR$(10) + a + CHR$(10))
+    AUTOMATION_PLAY("prmaus.txt")
+END SUB
+
+SUB prProbe()
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+    protokoll("probe zeile " + STR$(z))
+END SUB

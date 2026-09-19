@@ -1,0 +1,160 @@
+' Tooltip beim Ueberfahren und Strg+Klick zur Definition (ide/ide.dh,
+' 2026-09-19, vierter Punkt der Stufe A).
+'
+' Die Lage eines Worts steht erst zur Laufzeit fest: ein Einschub in der
+' Bildschleife sucht in Bild 40 mit GUI_TEXTAREA_POS_AT die Bildschirmlage
+' von (Zeile, Spalte), schreibt daraus eine Aufnahme (Maus dorthin, je nach
+' Fall Strg + Klick) und spielt sie ab. In Bild 150 schreibt er die Zeile der
+' Marke ins Protokoll. Gelesen werden `tooltip WORT`, `strg klick WORT` und
+' die Probe. Aufnahme: 7 Maus (x y), 2 Taste/Knopf runter, 1 hoch, 6/5
+' Maustaste runter/hoch; 341 Strg links.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== verweilen zeigt die hilfe zum eigenen unterprogramm
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN prZiel(5, 3, FALSE, FALSE)
+IF prBild = 150 THEN prProbe()
+--- einschub nach protokoll("bereit")
+IMPORT "hilfe.dh"
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=170
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+' Malt einen Stern.
+SUB malen()
+    PRINT 1
+END SUB
+malen()
+PRINT "ende"
+--- datei _programm/hilfe.dh
+IMPORT "{sammlung}/_hilfen/idemaus.dh"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 8) = "tooltip " OR LEFT$(L[i], 11) = "strg klick " OR LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 5) = "ziel " THEN PRINT L[i]
+NEXT
+--- erwartet
+ziel gefunden
+tooltip malen
+probe zeile 1
+
+=== hinter dem zeilenende kein tooltip
+' Gegenprobe: eine Zeile, die auf ein Wort MIT Hilfe endet (`stern`), die
+' Maus rechts hinter dem Text -- dort zeigt sie auf nichts.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN prZiel(8, 0, FALSE, FALSE)
+IF prBild = 150 THEN prProbe()
+--- einschub nach protokoll("bereit")
+IMPORT "hilfe.dh"
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=170
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+' Malt einen Stern.
+SUB malen()
+    PRINT 1
+END SUB
+malen()
+PRINT "ende"
+DIM stern AS INTEGER : stern = 1
+PRINT stern
+--- datei _programm/hilfe.dh
+IMPORT "{sammlung}/_hilfen/idemaus.dh"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 8) = "tooltip " OR LEFT$(L[i], 11) = "strg klick " OR LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 5) = "ziel " THEN PRINT L[i]
+NEXT
+--- erwartet
+ziel gefunden
+probe zeile 1
+
+=== strg klick springt zur definition
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN prZiel(5, 3, TRUE, TRUE)
+IF prBild = 150 THEN prProbe()
+--- einschub nach protokoll("bereit")
+IMPORT "hilfe.dh"
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=170
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+' Malt einen Stern.
+SUB malen()
+    PRINT 1
+END SUB
+malen()
+PRINT "ende"
+--- datei _programm/hilfe.dh
+IMPORT "{sammlung}/_hilfen/idemaus.dh"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 11) = "strg klick " OR LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 5) = "ziel " THEN PRINT L[i]
+NEXT
+--- erwartet
+ziel gefunden
+strg klick malen
+probe zeile 2
+
+=== ein klick ohne strg setzt nur die marke
+' Gegenprobe: derselbe Klick ohne Strg -- die Marke steht danach im Wort
+' (Zeile 5), gesprungen wird nicht.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN prZiel(5, 3, FALSE, TRUE)
+IF prBild = 150 THEN prProbe()
+--- einschub nach protokoll("bereit")
+IMPORT "hilfe.dh"
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=170
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+' Malt einen Stern.
+SUB malen()
+    PRINT 1
+END SUB
+malen()
+PRINT "ende"
+--- datei _programm/hilfe.dh
+IMPORT "{sammlung}/_hilfen/idemaus.dh"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 11) = "strg klick " OR LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 5) = "ziel " THEN PRINT L[i]
+NEXT
+--- erwartet
+ziel gefunden
+probe zeile 5

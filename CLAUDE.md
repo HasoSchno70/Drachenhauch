@@ -3474,6 +3474,32 @@ der US-Lage, das deutsche "+" liegt auf "]", das "-" auf "/" -- `K_PLUS`/
 (`kuerzel_taste`). Tests `tests/pruef/gui_zoom_rad.dhtest` (4),
 `tests/pruef/werkzeug_ide_zoom.dhtest` (1), Rust-Test `plus_und_minus`.
 
+**Tooltip beim Ueberfahren und Strg+Klick zur Definition (2026-09-19,
+vierter Punkt der Stufe A):** neu in der Laufzeit **`GUI_TEXTAREA_POS_AT(ta,
+x, y)`** -> (zeile, spalte) des Zeichens unter einem Bildschirmpunkt, mit
+derselben Rechnung wie der Klick (`ta_rows`, Nummernspalte, Scroll,
+waagerechter Versatz); (0, 0) ausserhalb, in der Nummernspalte, unter der
+letzten Zeile und HINTER dem Zeilenende -- dort zeigt die Maus auf nichts.
+Die IDE (`mausNachziehen`) setzt nach 8 ruhigen Bildern den Tooltip des
+Code-Felds auf `CODE_HOVER$` des Worts (umbrochen auf 72 Zeichen, hoechstens
+14 Zeilen); die gui zeigt ihn nach ihrer eigenen Ruhezeit und nimmt ihn bei
+jeder Bewegung weg, er steht also nie neben dem falschen Wort. **Strg+Klick
+springt beim LOSLASSEN**, nicht beim Druecken: der Textbereich setzt die
+Marke selbst beim Druck und zieht sie, solange die Taste haengt, als
+Auswahl hinter der Maus her -- ein Sprung beim Druecken stand im naechsten
+Bild wieder an der Klickstelle (der erste Testlauf zeigte es). Tests
+`tests/pruef/gui_textarea_pos.dhtest` (2, ohne feste Pixellagen: abgetastet,
+nur die Wechsel ausgegeben) und `tests/pruef/werkzeug_ide_tooltip.dhtest`
+(4; der Helfer `_hilfen/idemaus.dh` sucht die Lage des Worts mit POS_AT und
+schreibt die Aufnahme selbst). **Zwei Fallen beim Gegenproben:** (1) die
+Verfaelschung "hinter dem Zeilenende das letzte Zeichen" blieb erst gruen,
+weil beide Tests "hinter dem Ende" vom LETZTEN Treffer aus massen -- unter
+dem Fehler liegt der am Feldrand, die Probe dahinter traf gar nichts; jetzt
+vom Anfang des letzten Zeichens. (2) Eine Verfaelschung per `python -c
+"..."` mit `!` darin kam in der Shell nicht an -- der Bau lief ueber die
+unveraenderte Datei, und "gruen" hiess nichts; Verfaelschungen gehoeren in
+eine Skriptdatei, und die Zeile wird vor dem Bau per grep nachgesehen.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
