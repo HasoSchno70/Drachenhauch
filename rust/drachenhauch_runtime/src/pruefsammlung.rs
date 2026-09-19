@@ -550,6 +550,7 @@ pub enum Ergebnis {
 /// erkennt -- dieselben wie in `tests/conftest.py`: ein Fall, der daran
 /// scheitert, ist nicht falsch, er ist hier nicht pruefbar.
 pub const KEIN_FENSTER: &[&str] = &[
+    "Kein Fenster moeglich",              // dhrt seit 2026-09-19 (statt Panic)
     "Attempting to create window failed",
     "does not appear to support OpenGL",
     "Failed to initialize Window",

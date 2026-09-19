@@ -260,7 +260,9 @@ einer Datei parallel — außer die Datei trägt vor dem ersten Fall die Zeile
 Zwischenablage, einen festen Port oder die Soundkarte teilen); `dhrt test datei.dhtest --filter Text` lässt nur die
 Fälle laufen, deren Name den Text enthält. Ein Fall, der an einer Maschine
 ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
-falsch; mit `DHRT_OHNE_GRAFIK=1` auch einer, dem im Bau ohne raylib ein
+falsch (erkannt an der Meldung „Kein Fenster moeglich“, die `dhrt` dann
+statt eines Absturzes ausgibt; `DHRT_KEIN_FENSTER=1` täuscht genau diesen
+Fehler vor, zum Prüfen auf einem Rechner mit Bildschirm); mit `DHRT_OHNE_GRAFIK=1` auch einer, dem im Bau ohne raylib ein
 Grafik-Befehl fehlt. **Ein Fall darf sich auch selbst überspringen**: die Zeile
 `UEBERSPRINGEN: <grund>` auf stdout oder stderr, dann steht der Grund in der
 Bilanz. Das ist für fremde Werkzeuge gedacht, die nicht überall liegen (node,

@@ -6845,7 +6845,9 @@ impl<'p> Vm<'p> {
         macro_rules! g {
             () => {{
                 if self.gfx.is_none() {
-                    self.gfx = Some(crate::graphics::Graphics::new_headless());
+                    // Scheitert das Fenster, ist es ein Fehler DIESES Befehls.
+                    self.gfx = Some(crate::graphics::Graphics::new_headless()
+                        .map_err(|e| format!("{}: {}", name.to_uppercase(), e))?);
                 }
                 self.gfx.as_mut().unwrap()
             }};
@@ -6859,7 +6861,8 @@ impl<'p> Vm<'p> {
                 if scale < 1 { return Err("SCREEN: skala muss >= 1 sein".into()); }
                 match self.gfx.as_mut() {
                     Some(gfx) => gfx.reconfigure(w, h, &title, scale),
-                    None => self.gfx = Some(crate::graphics::Graphics::new(w, h, &title, scale)),
+                    None => self.gfx = Some(crate::graphics::Graphics::new(w, h, &title, scale)
+                        .map_err(|e| format!("SCREEN: {}", e))?),
                 }
                 Value::Nil
             }
@@ -6882,7 +6885,8 @@ impl<'p> Vm<'p> {
                 // laesst sich erst nach der Fenster-Erzeugung abfragen, darum zuerst
                 // transparent erzeugen, dann auf Monitorgroesse abdecken.
                 let native = w <= 0 || h <= 0;
-                let mut g = crate::graphics::Graphics::new_transparent(if native { 100 } else { w }, if native { 100 } else { h }, &title, scale);
+                let mut g = crate::graphics::Graphics::new_transparent(if native { 100 } else { w }, if native { 100 } else { h }, &title, scale)
+                    .map_err(|e| format!("SCREEN_TRANSPARENT: {}", e))?;
                 if native { g.cover_current_monitor(&title); }
                 self.gfx = Some(g);
                 Value::Nil
