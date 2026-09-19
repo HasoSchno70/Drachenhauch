@@ -10900,6 +10900,46 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Ok(Self::ta_zeile_spalte(&chars, wd.caret.max(0) as usize))
     }
 
+    /// GUI_TEXTAREA_POS_AT: welches Zeichen liegt unter dem Bildschirmpunkt
+    /// (x, y)? (zeile, spalte) ab 1 -- (0, 0) neben dem Text: ausserhalb des
+    /// Feldes, in der Nummernspalte, unter der letzten Zeile oder rechts
+    /// hinter dem Zeilenende. Das Letzte ist Absicht: wer die Maus ueber den
+    /// leeren Rest einer Zeile haelt, zeigt auf nichts, und ein Tooltip zum
+    /// letzten Wort dort waere eine Antwort auf eine Frage, die keiner
+    /// gestellt hat. Dieselbe Rechnung wie der Klick (Zeilenhoehe, Scroll,
+    /// Nummernspalte, waagerechter Versatz, Umbruch und Faltung ueber
+    /// `ta_rows`) -- liefe sie auseinander, zeigte der Tooltip das Wort
+    /// neben dem, auf das ein Klick die Marke setzt.
+    pub fn textarea_pos_at(&self, g: &Graphics, h: i64, x: i64, y: i64) -> Result<(i64, i64), String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_POS_AT")?;
+        let (wi, _) = Self::dec_widget(h);
+        let (ax, ay, fw, fh) = self.abs_rect(wi, wd);
+        let (mx, my) = (x as i32, y as i32);
+        if !Self::in_rect(mx, my, (ax, ay, fw, fh)) { return Ok((0, 0)); }
+        let pad = 5;
+        if my < ay + pad { return Ok((0, 0)); }
+        let lh = self.ta_line_h(g);
+        let chars: Vec<char> = wd.text.chars().collect();
+        let starts = Self::line_starts(&chars);
+        let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
+        let row = wd.scroll + (my - ay - pad) / lh;
+        if row < 0 || row as usize >= rows.len() { return Ok((0, 0)); }
+        let (rli, lstart, lend) = rows[row as usize];
+        let gut = self.ta_gutter(g, wd, starts.len());
+        if mx < ax + pad + gut { return Ok((0, 0)); }
+        let target = mx - (ax + pad + gut - wd.scroll_x);
+        let ms = self.mass(g, wd);
+        let sub: Vec<char> = chars[lstart..lend].to_vec();
+        for n in 1..=sub.len() {
+            let bis: String = sub[..n].iter().collect();
+            if target < ms.breite(g, &bis) {
+                let spalte = (lstart + n - 1) - starts[rli] + 1;
+                return Ok((rli as i64 + 1, spalte as i64));
+            }
+        }
+        Ok((0, 0))
+    }
+
     /// GUI_TEXTAREA_SELECTION_RANGE: Anfang und Ende der Auswahl als
     /// (z1, s1, z2, s2), ab 1, geordnet -- ohne Auswahl steht die Marke an
     /// beiden Enden. Der Text allein (SELECTION$) reicht einem Editor nicht:

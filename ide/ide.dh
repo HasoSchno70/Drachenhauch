@@ -3186,6 +3186,144 @@ SUB hilfeNachziehen()
     GUI_SET_TEXT(lblHilfe, md)
 END SUB
 
+' --- Tooltip beim Ueberfahren und Strg+Klick zur Definition -----------
+' Die Maus zeigt auf ein Wort: nach kurzer Ruhe steht seine Hilfe als
+' Tooltip daneben -- dieselbe wie unten rechts fuer das Wort unter der
+' Marke, nur ohne die Marke dorthin zu setzen. Gesetzt wird der Tooltip des
+' Code-Felds; die gui zeigt ihn nach ihrer eigenen Ruhezeit und nimmt ihn
+' bei jeder Bewegung weg, er steht also nie neben dem falschen Wort.
+' Strg+Klick springt zur Definition (wie F12), und solange Strg gehalten
+' ist, zeigt der Zeiger ueber einem Wort die Hand.
+DIM tippStelle AS STRING : tippStelle = ""
+DIM tippGefragt AS BOOLEAN : tippGefragt = FALSE
+DIM tippFeld AS GUI_WIDGET : tippFeld = -1
+DIM tippRuhe AS INTEGER : tippRuhe = 0
+DIM tippMx AS INTEGER : tippMx = -1
+DIM tippMy AS INTEGER : tippMy = -1
+DIM tippHand AS BOOLEAN : tippHand = FALSE
+DIM tippSprung AS STRING : tippSprung = ""
+DIM tippSprungZ AS INTEGER : tippSprungZ = 0
+DIM tippSprungS AS INTEGER : tippSprungS = 0
+CONST TIPP_RUHE = 8                  ' Bilder, bevor die Hilfe gefragt wird
+CONST TIPP_BREITE = 72               ' Zeichen je Tooltip-Zeile
+CONST TIPP_ZEILEN = 14
+
+' Das Wort, auf dessen Zeichen s (ab 1) die Maus steht, samt seiner
+' Anfangsspalte -- ("", 0), wenn dort kein Wortzeichen steht.
+FUNCTION wortBeiZeichen(zeile AS STRING, s AS INTEGER) AS TUPLE
+    IF s < 1 OR s > LEN(zeile) THEN RETURN ("", 0)
+    IF NOT istWortzeichen(MID$(zeile, s - 1, 1)) THEN RETURN ("", 0)
+    DIM a AS INTEGER : a = s - 1
+    DIM e AS INTEGER : e = s
+    WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    WHILE e < LEN(zeile) AND istWortzeichen(MID$(zeile, e, 1)) : e = e + 1 : WEND
+    RETURN (MID$(zeile, a, e - a), a + 1)
+END FUNCTION
+
+' Die Hilfe als Tooltip-Text: ohne Markdown-Zaeune, an Wortgrenzen
+' umbrochen (ein Tooltip bricht selbst nicht um und liefe sonst ueber den
+' Schirm) und gekuerzt -- wer mehr will, hat F1.
+FUNCTION tippText$(md AS STRING) AS STRING
+    md = REPLACE$(md, "```drachenhauch" + NL, "")
+    md = REPLACE$(md, NL + "```", "")
+    md = REPLACE$(md, "```", "")
+    md = TRIM$(md)
+    IF md = "" THEN RETURN ""
+    DIM raus AS STRING : raus = ""
+    DIM zahl AS INTEGER : zahl = 0
+    DIM absatz AS STRING
+    FOR EACH absatz IN SPLIT$(md, NL)
+        DIM rest AS STRING : rest = RTRIM$(absatz)
+        DO
+            DIM stueck AS STRING : stueck = rest
+            IF LEN(rest) > TIPP_BREITE THEN
+                DIM schnitt AS INTEGER : schnitt = TIPP_BREITE
+                WHILE schnitt > 20 AND MID$(rest, schnitt, 1) <> " " : schnitt = schnitt - 1 : WEND
+                IF schnitt <= 20 THEN schnitt = TIPP_BREITE
+                stueck = LEFT$(rest, schnitt)
+                rest = LTRIM$(MID$(rest, schnitt))
+            ELSE
+                rest = ""
+            END IF
+            IF zahl >= TIPP_ZEILEN THEN RETURN raus + NL + "..."
+            IF raus <> "" THEN raus = raus + NL
+            raus = raus + stueck
+            zahl = zahl + 1
+        LOOP UNTIL rest = ""
+    NEXT
+    RETURN raus
+END FUNCTION
+
+SUB tippWeg()
+    IF tippFeld >= 0 THEN GUI_TOOLTIP(tippFeld, "")
+    tippFeld = -1
+END SUB
+
+SUB mausNachziehen(ta AS GUI_WIDGET)
+    IF ta < 0 THEN RETURN
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    DIM strg AS BOOLEAN : strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_POS_AT(ta, mx, my)
+    ' Liegt ein Fenster davor (Dialog, Palette), zeigt die Maus nicht auf den Code.
+    IF NOT GUI_HOVERED(ta) THEN z = 0
+    DIM wort AS STRING : wort = ""
+    DIM anfang AS INTEGER : anfang = 0
+    IF z > 0 THEN
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        IF z <= LEN(zeilen) THEN (wort, anfang) = wortBeiZeichen(zeilen[z - 1], s)
+    END IF
+
+    ' Strg+Klick: gesprungen wird beim LOSLASSEN -- beim Druecken setzt der
+    ' Textbereich selbst die Marke, und solange die Taste haengt, zieht er
+    ' sie als Auswahl hinter der Maus her; ein Sprung beim Druecken stuende
+    ' im naechsten Bild wieder an der Klickstelle.
+    IF strg AND MOUSE_HIT(0) AND wort <> "" THEN
+        tippSprung = wort : tippSprungZ = z : tippSprungS = s
+    END IF
+    IF tippSprung <> "" AND MOUSE_RELEASED(0) THEN
+        DIM ziel AS STRING : ziel = tippSprung
+        tippSprung = ""
+        GUI_TEXTAREA_SELECT(ta, tippSprungZ, tippSprungS, tippSprungZ, tippSprungS)
+        protokoll("strg klick " + ziel)
+        tippWeg()
+        zurDefinition()
+        RETURN
+    END IF
+    DIM hand AS BOOLEAN : hand = strg AND wort <> ""
+    IF hand THEN
+        MOUSE_CURSOR("hand")
+    ELSEIF tippHand THEN
+        ' Nur zuruecknehmen, was hier gesetzt wurde -- die gui setzt ihre
+        ' Zeiger nur beim Wechsel und saehe die Hand sonst nie wieder weg.
+        MOUSE_CURSOR(IIF(z > 0, "ibeam", "default"))
+    END IF
+    tippHand = hand
+
+    IF mx <> tippMx OR my <> tippMy THEN
+        tippRuhe = 0
+    ELSE
+        tippRuhe = tippRuhe + 1
+    END IF
+    tippMx = mx : tippMy = my
+    DIM stelle AS STRING : stelle = ""
+    IF wort <> "" THEN stelle = STR$(ta) + ":" + STR$(z) + ":" + STR$(anfang)
+    IF stelle <> tippStelle THEN
+        tippStelle = stelle
+        tippGefragt = FALSE
+        tippWeg()
+    END IF
+    IF stelle = "" OR tippGefragt OR tippRuhe < TIPP_RUHE THEN RETURN
+    tippGefragt = TRUE
+    DIM text AS STRING : text = tippText$(CODE_HOVER$(GUI_TEXT(ta), z, anfang))
+    IF text = "" THEN RETURN
+    GUI_TOOLTIP(ta, text)
+    tippFeld = ta
+    protokoll("tooltip " + wort)
+END SUB
+
 ' --- Vervollstaendigen -------------------------------------------------
 ' `fokus` entscheidet, wer danach die Tasten bekommt. Beim Tippen bleibt
 ' die Marke im Code-Feld -- sonst tippte man in die Liste weiter; Strg+Leer
@@ -8285,6 +8423,7 @@ WHILE NOT beenden
         hilfeNachziehen()
         vervollNachziehen()
         spurNachziehen()
+        mausNachziehen(tf)
         IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig THEN
             pruefungFaellig = -1.0
             pruefen()
