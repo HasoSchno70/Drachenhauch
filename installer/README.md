@@ -77,14 +77,67 @@ rust/drachenhauch_runtime/target/release/dhrt run installer/bauen.dh
   Apple-Event in der Laufzeit an (`rust/drachenhauch_runtime/src/finder.rs`) und
   oeffnet die Datei in der IDE wie eine ins Fenster gezogene.
 
-Der Starter (`installer/posix/drachenhauch`) kopiert die Beispiele beim Start
-nach `Dokumente/Drachenhauch/examples` (nur, was fehlt) und oeffnet die IDE
-dort. Die Symbole liegen fertig in `installer/symbole/`; neu erzeugen mit
+Der Starter (`installer/posix/drachenhauch`, unter macOS `dhrt` selbst als
+Hauptprogramm des Bundles, siehe `rust/drachenhauch_runtime/src/appstart.rs`)
+kopiert die Beispiele beim Start nach `Dokumente/Drachenhauch/examples` (nur,
+was fehlt) und oeffnet die IDE dort. Die Symbole liegen fertig in `installer/symbole/`; neu erzeugen mit
 `dhrt run installer/symbole.dh`, wenn sich das Logo aendert. Gebaut und
 ausprobiert werden beide Pakete im Paket-Lauf der CI (`package.yml`, Job
 `paket-ohne-python`); Tests `tests/pruef/werkzeug_paket.dhtest`.
 **Auf einem echten Mac ist die IDE noch nicht gestartet worden** -- die
 macOS-Laeufer der CI haben kein OpenGL.
+
+### macOS: signieren und beglaubigen (Notarisierung)
+
+`bauen.dh` signiert immer mit Hardened Runtime. Mit zwei Dingen von Apple
+signiert es zusaetzlich mit **Developer ID** und laesst das `.dmg` von Apple
+**beglaubigen** -- dann oeffnet es sich auf jedem Mac ohne Rueckfrage
+(sonst: ctrl-Klick -> Oeffnen). Die Zugangsdaten gehoeren niemals ins Repo;
+`bauen.dh` liest sie nur aus der Umgebung:
+
+| Variable | Inhalt |
+|---|---|
+| `DH_MAC_SIGNATUR` | die Identitaet im Schluesselbund, `Developer ID Application: Name (TEAMID)` |
+| `DH_NOTAR_KEY` | Pfad zur `.p8` eines App-Store-Connect-API-Schluessels |
+| `DH_NOTAR_KEY_ID` | seine Kennung (Key ID) |
+| `DH_NOTAR_ISSUER` | die Aussteller-Kennung (Issuer ID) |
+
+Mit allen vier: `codesign --options runtime --timestamp` mit der Identitaet,
+das `.dmg` signiert, `xcrun notarytool submit --wait`, bei Ablehnung das
+Protokoll des Auftrags, dann `xcrun stapler staple` und `validate` (das
+Ticket haengt am Abbild, macOS prueft auch ohne Netz).
+
+**Einrichten, einmalig** (das kann nur, wer das Apple-Konto hat):
+
+1. Dem **Apple Developer Program** beitreten (kostenpflichtig, jaehrlich).
+2. Ein Zertifikat **Developer ID Application** anlegen
+   (developer.apple.com -> Certificates). Ohne Mac geht die
+   Zertifikatsanfrage auch mit OpenSSL:
+   `openssl req -new -newkey rsa:2048 -nodes -keyout dev.key -out dev.csr -subj "/CN=Dein Name/C=DE"`,
+   die `.cer` danach mit `openssl x509 -inform DER -in developerID_application.cer -out dev.pem`
+   und `openssl pkcs12 -export -legacy -inkey dev.key -in dev.pem -out zert.p12`
+   zur `.p12` machen (mit einem Passwort). Auf dem Mac: in der
+   Schluesselbundverwaltung als `.p12` exportieren.
+3. In **App Store Connect** -> Benutzer und Zugriff -> Integrationen ->
+   App Store Connect API einen Schluessel anlegen (Rolle "Developer"), die
+   `.p8` herunterladen (geht nur einmal), Key ID und Issuer ID notieren.
+4. Im GitHub-Repo unter Settings -> Secrets and variables -> Actions fuenf
+   Secrets anlegen: `MAC_ZERT_P12` (die `.p12` als Base64),
+   `MAC_ZERT_PASSWORT`, `MAC_NOTAR_KEY_P8` (die `.p8` als Base64),
+   `MAC_NOTAR_KEY_ID`, `MAC_NOTAR_ISSUER`. Base64 unter Windows:
+   `[Convert]::ToBase64String([IO.File]::ReadAllBytes("zert.p12")) | Set-Clipboard`,
+   auf dem Mac: `base64 -i zert.p12 | pbcopy`.
+5. Den Workflow **Package (manuell)** starten. Der Schritt "Signatur und
+   Beglaubigung vorbereiten" legt einen kurzlebigen Schluesselbund an und
+   setzt die vier Variablen; ohne die Secrets wird er uebersprungen und das
+   Paket entsteht ad hoc signiert wie bisher. Mit ihnen prueft der Lauf
+   danach `spctl --assess` (erwartet "Notarized Developer ID") und
+   `stapler validate`.
+
+**Ungeprueft, solange es die Secrets nicht gibt:** der Weg mit echter
+Identitaet und die Antwort von Apple. Geprueft ist alles davor -- Hardened
+Runtime ist gesetzt, und dhrt laeuft damit (Konsolenprogramm, Beispiele
+kopieren, Datei vom Finder).
 
 ## Schnellstart
 

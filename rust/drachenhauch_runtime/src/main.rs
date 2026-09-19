@@ -13,6 +13,9 @@
 //! --native` reicht den Namen der `.dh`-Quelldatei durch.
 
 mod animfsm;
+// dhrt als Hauptprogramm eines .app-Bundles (Notarisierung braucht ein echtes
+// Programm statt eines Shell-Starters).
+mod appstart;
 mod ast;
 mod namensraum;
 mod astar;
@@ -487,6 +490,16 @@ fn main() -> ExitCode {
     }
 
     let args: Vec<String> = std::env::args_os().map(|s| s.to_string_lossy().into_owned()).collect();
+    // Hauptprogramm eines .app-Bundles, ohne Argumente gestartet (Finder,
+    // Dock): die IDE aus Contents/Resources starten (appstart.rs).
+    if appstart::ohne_argumente(&args) {
+        if let Some(res) = std::env::current_exe().ok().map(strip_extended_prefix)
+            .and_then(|exe| appstart::bundle_resources(&exe))
+        {
+            let ide = appstart::vorbereiten(&res);
+            return run_main(&ide.to_string_lossy());
+        }
+    }
     if args.len() < 2 {
         // Review-Fund: `args[0]` indexierte unbedingt, aber `args.len() < 2`
         // schliesst auch `len == 0` (leeres argv, z.B. via execve) ein --

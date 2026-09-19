@@ -513,7 +513,9 @@ Linux (das Fenster schloss vor den Schriften, behoben). Unter Linux startet
 die IDE aus dem installierten Paket; auf den macOS-Läufern gibt es kein
 OpenGL, dort ist alles bis zum Fenster geprüft. Eine `.dh` per Doppelklick
 im Finder kommt seit demselben Tag an (`finder.rs`, im Paket-Lauf belegt).
-Offen: Beglaubigung durch Apple und ein echter Mac.
+Die Beglaubigung ist vorbereitet (dhrt als Hauptprogramm, Hardened Runtime,
+`notarytool` im Paket-Lauf aus GitHub-Secrets, Anleitung in
+`installer/README.md`); offen: das Apple-Konto dafür und ein echter Mac.
 
 **(c) entschieden am 18.09.2026: ja, mit einer Grenze.** `rust/build_runtime.py`
 und `rust/build_wasm.py` bleiben die bewusst letzten zwei Python-Dateien.

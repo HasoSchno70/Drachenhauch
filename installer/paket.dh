@@ -150,6 +150,86 @@ SUB linuxPaket(wurzel AS STRING, laufzeit AS STRING, vorlagen AS STRING, ausgabe
 END SUB
 
 ' --- macOS --------------------------------------------------------------
+' Ein Befehl, dessen Ausgabe gebraucht wird UND der sichtbar bleiben soll
+' (notarytool) -- Rueckgabe in `paketCode`.
+DIM paketCode AS INTEGER : paketCode = 0
+FUNCTION mitschreiben$(p AS INTEGER) AS STRING
+    DIM t AS STRING : t = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            leer = 0
+            PRINT REPLACE$(teil, CHR$(13), "");
+            t = t + teil
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(50)
+    WEND
+    paketCode = PROCESS_CODE(p)
+    RETURN t
+END FUNCTION
+
+' Signieren und beglaubigen. Die Zugangsdaten kommen NUR aus der Umgebung,
+' im Repo steht keins davon:
+'   DH_MAC_SIGNATUR   die Identitaet im Schluesselbund, etwa
+'                     "Developer ID Application: Name (TEAMID)"
+'   DH_NOTAR_KEY      Pfad zur .p8 eines App-Store-Connect-API-Schluessels
+'   DH_NOTAR_KEY_ID   seine Kennung
+'   DH_NOTAR_ISSUER   die Aussteller-Kennung (Issuer ID)
+' Ohne DH_MAC_SIGNATUR wird ad hoc signiert (wie bisher: heruntergeladen
+' meldet macOS dann "nicht verifizierter Entwickler", ctrl-Klick -> Oeffnen
+' reicht). Hardened Runtime gilt IMMER -- Apple verlangt sie fuer die
+' Beglaubigung, und so zeigt schon der Lauf ohne Zugangsdaten, dass dhrt
+' damit laeuft. Ohne DH_NOTAR_* wird nicht beglaubigt.
+SUB macosSignieren(ziel AS STRING, ident AS STRING, istApp AS BOOLEAN)
+    IF ident = "" THEN
+        IF istApp THEN mussLaufen(PROCESS_START("codesign", "--force", "--options", "runtime", "--sign", "-", ziel), "codesign")
+    ELSEIF istApp THEN
+        mussLaufen(PROCESS_START("codesign", "--force", "--options", "runtime", "--timestamp", "--sign", ident, ziel), "codesign")
+    ELSE
+        mussLaufen(PROCESS_START("codesign", "--force", "--timestamp", "--sign", ident, ziel), "codesign")
+    END IF
+END SUB
+
+SUB macosBeglaubigen(dmg AS STRING, ident AS STRING)
+    DIM key AS STRING : key = GETENV$("DH_NOTAR_KEY")
+    DIM kid AS STRING : kid = GETENV$("DH_NOTAR_KEY_ID")
+    DIM iss AS STRING : iss = GETENV$("DH_NOTAR_ISSUER")
+    IF key = "" OR kid = "" OR iss = "" THEN
+        PRINT "Nicht beglaubigt (DH_NOTAR_KEY/_KEY_ID/_ISSUER fehlen) -- beim ersten Start ctrl-Klick -> Oeffnen."
+        RETURN
+    END IF
+    IF ident = "" THEN
+        PRINT "Beglaubigen braucht eine Developer-ID-Signatur (DH_MAC_SIGNATUR) -- uebersprungen."
+        RETURN
+    END IF
+    PRINT "Beglaubigen bei Apple (notarytool, wartet auf das Ergebnis) ..."
+    DIM t AS STRING : t = mitschreiben$(PROCESS_START("xcrun", "notarytool", "submit", dmg, _
+        "--key", key, "--key-id", kid, "--issuer", iss, "--wait"))
+    IF INSTR(t, "status: Accepted") < 0 THEN
+        ' Warum abgelehnt, steht im Protokoll des Auftrags -- ohne es
+        ' saehe man nur "Invalid".
+        DIM z AS ARRAY OF STRING : z = SPLIT$(REPLACE$(t, CHR$(13), ""), CHR$(10))
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(z) - 1
+            IF LEFT$(TRIM$(z[i]), 4) = "id: " THEN
+                DIM auftrag AS STRING
+                auftrag = mitschreiben$(PROCESS_START("xcrun", "notarytool", "log", MID$(TRIM$(z[i]), 4), _
+                    "--key", key, "--key-id", kid, "--issuer", iss))
+                BREAK
+            END IF
+        NEXT
+        PRINT "Die Beglaubigung ist nicht durchgegangen."
+        EXIT(1)
+    END IF
+    ' Das Ticket ans Abbild heften: dann prueft macOS auch ohne Netz.
+    mussLaufen(PROCESS_START("xcrun", "stapler", "staple", dmg), "stapler staple")
+    mussLaufen(PROCESS_START("xcrun", "stapler", "validate", dmg), "stapler validate")
+    PRINT "Beglaubigt und geheftet."
+END SUB
+
 SUB macosPaket(wurzel AS STRING, laufzeit AS STRING, vorlagen AS STRING, ausgabe AS STRING, fassung AS STRING, arch AS STRING, symbole AS STRING, archiv AS BOOLEAN)
     DIM buehne AS STRING : buehne = PATHJOIN(ausgabe, "paket/Drachenhauch")
     IF DIREXISTS(PATHJOIN(ausgabe, "paket")) THEN RMDIR(PATHJOIN(ausgabe, "paket"), TRUE)
@@ -159,28 +239,34 @@ SUB macosPaket(wurzel AS STRING, laufzeit AS STRING, vorlagen AS STRING, ausgabe
     MKDIR(bin)
     MKDIR(res)
     PRINT "macOS-Paket in "; app
-    ' dhrt liegt in Contents/MacOS: nur ein Programm dort zaehlt fuer macOS
-    ' zum Bundle -- sonst zeigte das Dock "dhrt" mit Allerweltssymbol.
+    ' dhrt IST das Hauptprogramm (CFBundleExecutable): ohne Argumente aus dem
+    ' Bundle gestartet, kopiert es die Beispiele und startet die IDE
+    ' (appstart.rs). Ein Shell-Starter an dieser Stelle liesse sich nicht mit
+    ' Hardened Runtime signieren -- die Notarisierung verlangt sie.
     inhaltKopieren(wurzel, laufzeit, bin, res)
-    vorlageKopieren(PATHJOIN(vorlagen, "drachenhauch"), PATHJOIN(bin, "Drachenhauch"), fassung)
     vorlageKopieren(PATHJOIN(vorlagen, "Info.plist"), PATHJOIN(app, "Contents/Info.plist"), fassung)
     WRITEALL_BYTES(PATHJOIN(app, "Contents/PkgInfo"), BUFFER_FROM_STRING("APPL????"))
     vorlageKopieren(PATHJOIN(vorlagen, "LIESMICH-macos.txt"), PATHJOIN(buehne, "LIESMICH.txt"), fassung)
     symbolKopieren(symbole, "Drachenhauch.icns", PATHJOIN(res, "Drachenhauch.icns"))
-    ausfuehrbar([PATHJOIN(bin, "dhrt"), PATHJOIN(bin, "Drachenhauch")])
+    ausfuehrbar([PATHJOIN(bin, "dhrt")])
     IF NOT archiv THEN
         PRINT "Fertig (ohne Archiv)."
         RETURN
     END IF
-    ' Ad-hoc-Signatur: ohne jede Signatur meldet macOS eine heruntergeladene
-    ' App als "beschaedigt"; so nur als "nicht verifizierter Entwickler",
-    ' und ctrl-Klick -> Oeffnen reicht (LIESMICH sagt es).
-    mussLaufen(PROCESS_START("codesign", "--force", "--deep", "--sign", "-", app), "codesign")
+    DIM ident AS STRING : ident = GETENV$("DH_MAC_SIGNATUR")
+    IF ident = "" THEN
+        PRINT "Signatur: ad hoc (DH_MAC_SIGNATUR fehlt)"
+    ELSE
+        PRINT "Signatur: "; ident
+    END IF
+    macosSignieren(app, ident, TRUE)
     ' Der Verweis macht aus dem geoeffneten Abbild ein "hierher ziehen".
     mussLaufen(PROCESS_START("ln", "-s", "/Applications", PATHJOIN(buehne, "Programme")), "ln")
     DIM dmg AS STRING : dmg = PATHJOIN(ausgabe, "Drachenhauch-IDE-" + fassung + "-macos-" + arch + ".dmg")
     IF FILEEXISTS(dmg) THEN DELETEFILE(dmg)
     mussLaufen(PROCESS_START("hdiutil", "create", "-volname", "Drachenhauch " + fassung, _
                              "-srcfolder", buehne, "-ov", "-format", "UDZO", dmg), "hdiutil")
+    macosSignieren(dmg, ident, FALSE)
+    macosBeglaubigen(dmg, ident)
     PRINT "FERTIG -> "; dmg; " ("; FILESIZE(dmg) \ 1048576; " MB)"
 END SUB

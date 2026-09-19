@@ -105,7 +105,9 @@ DIM app AS STRING : app = "raus/paket/Drachenhauch/Drachenhauch.app/Contents"
 ' Laufzeit UND Starter in MacOS/: nur ein Programm dort gehoert fuer macOS
 ' zum Bundle.
 PRINT "dhrt in MacOS "; (BUFFER_TO_STRING$(READALL_BYTES(app + "/MacOS/dhrt")) = "ATTRAPPE")
-PRINT "starter in MacOS "; FILEEXISTS(app + "/MacOS/Drachenhauch")
+' Kein Shell-Starter mehr: dhrt IST das Hauptprogramm (appstart.rs) --
+' ein Skript liesse sich nicht mit Hardened Runtime signieren.
+PRINT "nur dhrt in MacOS "; (LEN(DIRLIST(app + "/MacOS")) = 1)
 PRINT "ide in Resources "; FILEEXISTS(app + "/Resources/ide/ide.dh")
 PRINT "beispiele in Resources "; FILEEXISTS(app + "/Resources/examples/183_sfx_generator.dh")
 PRINT "kein handbuch neben dhrt "; NOT DIREXISTS(app + "/MacOS/docs")
@@ -113,7 +115,7 @@ PRINT "liesmich im abbild "; FILEEXISTS("raus/paket/Drachenhauch/LIESMICH.txt")
 PRINT "pkginfo "; BUFFER_TO_STRING$(READALL_BYTES(app + "/PkgInfo"))
 ' Info.plist: Programm, Symbol und Fassung -- die Fassung ist die der Laufzeit.
 DIM plist AS STRING : plist = BUFFER_TO_STRING$(READALL_BYTES(app + "/Info.plist"))
-PRINT "plist programm "; (INSTR(plist, "<key>CFBundleExecutable</key>" + CHR$(10) + "    <string>Drachenhauch</string>") >= 0)
+PRINT "plist programm "; (INSTR(plist, "<key>CFBundleExecutable</key>" + CHR$(10) + "    <string>dhrt</string>") >= 0)
 PRINT "plist fassung "; (INSTR(plist, "<string>" + VERSION$() + "</string>") >= 0); " "; (INSTR(plist, "@FASSUNG@") < 0)
 DIM x AS XML_HANDLE : x = XML_PARSE(plist)
 PRINT "plist ist xml "; (XML_NAME$(x) = "plist")
@@ -141,7 +143,7 @@ ATTRAPPE
 --- erwartet
 rueckgabe 0
 dhrt in MacOS TRUE
-starter in MacOS TRUE
+nur dhrt in MacOS TRUE
 ide in Resources TRUE
 beispiele in Resources TRUE
 kein handbuch neben dhrt TRUE
@@ -198,6 +200,64 @@ NEXT
 rueckgabe 0
 drachenhauch.png TRUE
 Drachenhauch.icns TRUE
+
+=== das dhrt im bundle startet ohne argumente die ide mit den beispielen
+' Wie ein Start aus dem Finder oder Dock: kein Argument. Gebaut wird das
+' Bundle mit der ECHTEN Laufzeit; DHRT_KEIN_FENSTER laesst die IDE an ihrem
+' SCREEN enden -- bis dahin muss sie gekommen sein. Unter Windows heisst die
+' Datei im Bundle wie unter macOS "dhrt" (ohne .exe); der Weg haengt am
+' Aufbau des Ordners, nicht am System.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM hier AS STRING : hier = REPLACE$(CWD$(), CHR$(92), "/")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", ARG$(1), _
+    "--system", "macos", "--arch", "arm64", "--ausgabe", hier + "/raus", "--ohne-archiv", "--ohne-lizenzen")
+DIM aus AS STRING : aus = lauf$(p)
+IF PROCESS_CODE(p) <> 0 THEN
+    PRINT aus
+    EXIT(1)
+END IF
+DIM app AS STRING : app = hier + "/raus/paket/Drachenhauch/Drachenhauch.app/Contents"
+MKDIR("home/Documents")
+SETENV("HOME", hier + "/home")
+SETENV("USERPROFILE", hier + "/home")
+SETENV("DHRT_KEIN_FENSTER", "1")
+DIM s AS INTEGER : s = PROCESS_START(app + "/MacOS/dhrt")
+DIM a AS STRING : a = lauf$(s)
+DIM bsp AS STRING : bsp = "home/Documents/Drachenhauch/examples"
+PRINT "beispiele kopiert "; FILEEXISTS(bsp + "/183_sfx_generator.dh"); " "; FILEEXISTS(bsp + "/assets/editor_tileset.png")
+PRINT "gleich viele "; (LEN(DIRLIST_REC(bsp)) = LEN(DIRLIST_REC(app + "/Resources/examples")))
+' Die IDE lief bis zu ihrem Fenster: der Fehler steht in ide.dh.
+PRINT "die ide lief "; (INSTR(a, "Laufzeitfehler in ide.dh:") >= 0)
+PRINT "keine verwendung "; (INSTR(a, "Verwendung") < 0)
+' Gegenprobe: MIT Argument ist es wieder ein gewoehnliches dhrt.
+DIM s2 AS INTEGER : s2 = PROCESS_START(app + "/MacOS/dhrt", hier + "/hallo.dh")
+PRINT "mit argument: "; TRIM$(lauf$(s2))
+--- argumente
+{sammlung}/../../installer/bauen.dh
+{sammlung}/../..
+--- datei hallo.dh
+PRINT "nur dieses programm"
+--- erwartet
+beispiele kopiert TRUE TRUE
+gleich viele TRUE
+die ide lief TRUE
+keine verwendung TRUE
+mit argument: nur dieses programm
 
 === ein unbekanntes system ist ein fehler
 FUNCTION lauf$(p AS INTEGER) AS STRING

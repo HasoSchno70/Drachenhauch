@@ -4,10 +4,14 @@ Drachenhauch IDE fuer macOS
 Installieren: "Drachenhauch" auf den Ordner "Programme" (Applications)
 ziehen.
 
-Erster Start: die App ist nicht bei Apple beglaubigt. Beim ersten Mal
-darum im Finder mit gedrueckter ctrl-Taste auf "Drachenhauch" klicken,
-"Oeffnen" waehlen und die Rueckfrage bestaetigen. Danach startet sie wie
-jede andere App.
+Erster Start: meldet macOS, die App stamme von einem nicht
+verifizierten Entwickler (so ist es bei Fassungen, die nicht bei Apple
+beglaubigt sind), beim ersten Mal im Finder mit gedrueckter ctrl-Taste auf
+"Drachenhauch" klicken, "Oeffnen" waehlen und die Rueckfrage bestaetigen.
+Ab macOS 15 geht das nicht mehr ueber den Finder: nach dem ersten
+Startversuch unter Systemeinstellungen -> Datenschutz & Sicherheit ganz
+unten "Dennoch oeffnen" waehlen. Danach startet sie wie jede andere App.
+Eine beglaubigte Fassung oeffnet sich ohne diese Rueckfrage.
 
 Die Beispiele und Begleit-Editoren landen beim ersten Start unter
 Dokumente/Drachenhauch/examples -- dort darf man sie aendern.
