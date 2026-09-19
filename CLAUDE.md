@@ -3524,6 +3524,41 @@ haelt in 3 bei Marke in 1, zweimal = aus, rechts + Bedingung per
 Zwischenablage haelt genau einmal; Helfer `prRand` in
 `_hilfen/idemaus.dh`); ohne den Aufruf in der IDE fallen alle drei.
 
+**Die Suchleiste (2026-09-19, sechster Punkt der Stufe A):** statt zweier
+Eingabe-Kaesten hintereinander ein Fenster, das offen bleibt: Suchfeld mit
+Weiter/Zurueck und Trefferzahl, Schalter **Gross/klein**, **Ganzes Wort**,
+**Ausdruck** (Alt+C/Alt+W, in der ide.json gemerkt), alle Treffer im Code
+eingefaerbt (`F_SUCHTREFFER`), Ersetzen **einzeln** (Strg+Umschalt+1:
+ersetzt nur einen GENAU markierten Treffer, sonst springt der erste Druck
+bloss hin -- man sieht jede Stelle vorher) und **alle** (Strg+Alt+Enter,
+Auswahl ueber alles + INSERT = EIN Strg+Z). **Alle Suchen der IDE gehen
+durch EIN Muster** (`suchMuster$`: woertlich per `REGEX_ESCAPE$`, ganze
+Woerter zwischen `\b(?:...)\b`, ohne Gross/klein `(?i)`) -- vorher suchte
+das Ersetzen im Feld ohne Ruecksicht auf den Regex-Schalter, und die
+Projektsuche nimmt die Schalter jetzt mit. Gearbeitet wird ZEILENweise wie
+die Trefferliste, sonst hiesse `^` beim Ersetzen etwas anderes; woertlich
+bekommt der Ersatz verdoppelte Rueckstriche (`\1` bleibt Text).
+**Zwei Laufzeit-Stuecke:** (1) **`REGEX_FIND_POS(text, muster [, ab])`**
+-> (start, laenge) in Zeichen ab 0, und **`REGEX_ESCAPE$`** -- bis dahin
+gab es keinen Weg zur LAGE eines Treffers, die IDE rechnete
+`INSTR(zeile, REGEX_FIND(...))` und markierte bei `\bhp\b` das `hp` in
+`hpmax`, wenn es davor stand. `ab` sucht ueber `find_at` weiter, damit `\b`
+die Zeichen vor dem Suchbeginn noch sieht (Gegenprobe: mit abgeschnittenem
+Text faellt der Wortgrenzen-Fall). (2) **Ein Textbereich zeigt seine
+Auswahl auch OHNE Fokus**, gedaempft -- die Leiste nimmt dem Feld den
+Fokus, und der markierte Treffer war unsichtbar (gesehen erst im Bild).
+Tests `tests/pruef/werkzeug_ide_suche.dhtest` (10; fuenf Verfaelschungen
+der IDE -- ohne Wortgrenze, immer ohne Gross/klein, Ersatz unmaskiert,
+Ersetzen ohne Trefferpruefung, Lage per INSTR -- lassen je genau ihre
+Faelle fallen), drei Faelle in `tests/pruef/modules_regex.dhtest`,
+`tests/pruef/gui_auswahl_ohne_fokus.dhtest` (2, als Paar; gegen den alten
+Bau faellt der erste). **Falle beim Schreiben der Tests:** `\\2` in einem
+Bash-Heredoc kam als Steuerzeichen `\x02` an -- sogar in der Erwartung,
+die damit falsch UND unsichtbar war; Rueckstriche gehoeren in eine
+Skriptdatei. Und eine Aufnahme mit zu kleiner Zahl im Kopf (`c 20` bei 24
+Ereignissen) verliert die letzten -- ein "Datei unveraendert" waere dann
+auch ohne Sichern wahr; der Fall prueft darum das Sichern mit.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber

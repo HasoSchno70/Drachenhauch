@@ -125,6 +125,7 @@ CONST F_SCHLUESSEL = &H2BC4E8
 CONST F_OPERATOR   = &H9AA8B8
 CONST F_FUNDSTELLE = &HFFD070      ' das Wort unter der Marke, ueberall
 CONST F_KLAMMER    = &H70FFA0      ' das zusammengehoerende Klammernpaar
+CONST F_SUCHTREFFER = &HFF8AD0     ' die Treffer der offenen Suchleiste
 
 SCREEN(1280, 800, "Drachenhauch", 1)
 WINDOW_RESIZABLE(TRUE)
@@ -229,6 +230,11 @@ DIM minimapAn AS BOOLEAN : minimapAn = FALSE
 DIM gitRandAn AS BOOLEAN : gitRandAn = TRUE
 ' Suche mit regulaerem Ausdruck (Suchen, Ersetzen und Projektsuche).
 DIM regexAn AS BOOLEAN : regexAn = FALSE
+' Die beiden anderen Schalter der Suche (seit 2026-09-19): sie gelten fuer
+' JEDE Suche der IDE -- Suchleiste, Projektsuche, Ersetzen im Projekt --, weil
+' alle ueber suchMuster$ gehen.
+DIM grossKlein AS BOOLEAN : grossKlein = FALSE
+DIM ganzesWort AS BOOLEAN : ganzesWort = FALSE
 ' Zuletzt geschlossene Reiter -- Strg+Umschalt+T holt sie zurueck.
 DIM zuGemacht AS ARRAY OF STRING : zuGemacht = []
 ' Vorschlagsliste beim Tippen -- hier oben, weil die Einstellungen ganz am
@@ -349,6 +355,8 @@ IF JSON_HAS(konfig, "umbruch") THEN umbruchAn = JSON_GET_BOOL(konfig, "umbruch")
 IF JSON_HAS(konfig, "karte") THEN minimapAn = JSON_GET_BOOL(konfig, "karte")
 IF JSON_HAS(konfig, "git_rand") THEN gitRandAn = JSON_GET_BOOL(konfig, "git_rand")
 IF JSON_HAS(konfig, "regex") THEN regexAn = JSON_GET_BOOL(konfig, "regex")
+IF JSON_HAS(konfig, "gross_klein") THEN grossKlein = JSON_GET_BOOL(konfig, "gross_klein")
+IF JSON_HAS(konfig, "ganzes_wort") THEN ganzesWort = JSON_GET_BOOL(konfig, "ganzes_wort")
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
 IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
@@ -436,7 +444,10 @@ DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q"
 DIM mBearb AS INTEGER : mBearb = GUI_MENU(win, "Bearbeiten")
 DIM miSuchen AS INTEGER : miSuchen = GUI_MENU_ITEM(mBearb, "Suchen ...", "Strg+F")
 DIM miWeiter AS INTEGER : miWeiter = GUI_MENU_ITEM(mBearb, "Weitersuchen", "F3")
+DIM miZurueckSuchen AS INTEGER : miZurueckSuchen = GUI_MENU_ITEM(mBearb, "Rueckwaerts suchen", "Umschalt+F3")
 DIM miErsetzen AS INTEGER : miErsetzen = GUI_MENU_ITEM(mBearb, "Ersetzen ...", "Strg+H")
+DIM miErsetzenEins AS INTEGER : miErsetzenEins = GUI_MENU_ITEM(mBearb, "Ersetzen und weiter", "Strg+Umschalt+1")
+DIM miErsetzenAlle AS INTEGER : miErsetzenAlle = GUI_MENU_ITEM(mBearb, "Alle ersetzen", "Strg+Alt+Enter")
 DIM miZeile AS INTEGER : miZeile = GUI_MENU_ITEM(mBearb, "Gehe zu Zeile ...", "Strg+G")
 DIM miProjekt AS INTEGER : miProjekt = GUI_MENU_ITEM(mBearb, "Im Projekt suchen ...", "Strg+Umschalt+F")
 GUI_MENU_SEPARATOR(mBearb)
@@ -484,6 +495,10 @@ DIM miLzZurueck AS INTEGER : miLzZurueck = GUI_MENU_ITEM(mBearb, "Voriges Leseze
 DIM miLzListe AS INTEGER : miLzListe = GUI_MENU_ITEM(mBearb, "Alle Lesezeichen", "Alt+F2")
 DIM miRegex AS INTEGER : miRegex = GUI_MENU_ITEM(mBearb, "Suchen mit regulaerem Ausdruck")
 GUI_MENU_CHECK(miRegex, FALSE)
+DIM miGross AS INTEGER : miGross = GUI_MENU_ITEM(mBearb, "Suchen: Gross/klein beachten", "Alt+C")
+GUI_MENU_CHECK(miGross, FALSE)
+DIM miWort AS INTEGER : miWort = GUI_MENU_ITEM(mBearb, "Suchen: nur ganze Woerter", "Alt+W")
+GUI_MENU_CHECK(miWort, FALSE)
 DIM miTodo AS INTEGER : miTodo = GUI_MENU_ITEM(mBearb, "TODO / FIXME im Projekt", "Strg+Umschalt+M")
 DIM miBlame AS INTEGER : miBlame = GUI_MENU_ITEM(mBearb, "Wer hat das geschrieben (git blame)", "Strg+Umschalt+B")
 DIM miDiff AS INTEGER : miDiff = GUI_MENU_ITEM(mBearb, "Was habe ich geaendert (git diff)", "Strg+Umschalt+D")
@@ -957,6 +972,35 @@ DIM paletteKennungen AS ARRAY OF STRING : paletteKennungen = []
 DIM paletteDetails AS ARRAY OF STRING : paletteDetails = []
 DIM paletteSichtbar AS ARRAY OF STRING : paletteSichtbar = []
 
+' --- Suchleiste: ein Fenster, das offen bleibt (siehe sucheOeffnen) ---
+DIM winSuche AS GUI_WINDOW : winSuche = GUI_WINDOW("Suchen", 0, 0, 480, 146)
+DIM tfSuche AS GUI_WIDGET : tfSuche = GUI_TEXTINPUT(winSuche, 8, 8, 236, 26, "")
+DIM btnSuZurueck AS GUI_WIDGET : btnSuZurueck = GUI_BUTTON(winSuche, "<", 250, 8, 30, 26)
+DIM btnSuWeiter AS GUI_WIDGET : btnSuWeiter = GUI_BUTTON(winSuche, ">", 284, 8, 30, 26)
+DIM lblSuZahl AS GUI_WIDGET : lblSuZahl = GUI_LABEL(winSuche, "", 322, 12)
+DIM cbSuGross AS GUI_WIDGET : cbSuGross = GUI_CHECKBOX(winSuche, "Gross/klein", 8, 42, FALSE)
+DIM cbSuWort AS GUI_WIDGET : cbSuWort = GUI_CHECKBOX(winSuche, "Ganzes Wort", 142, 42, FALSE)
+DIM cbSuAusdruck AS GUI_WIDGET : cbSuAusdruck = GUI_CHECKBOX(winSuche, "Ausdruck", 284, 42, FALSE)
+DIM tfErsatz AS GUI_WIDGET : tfErsatz = GUI_TEXTINPUT(winSuche, 8, 72, 236, 26, "")
+DIM btnSuErsetzen AS GUI_WIDGET : btnSuErsetzen = GUI_BUTTON(winSuche, "Ersetzen", 250, 72, 100, 26)
+DIM btnSuAlle AS GUI_WIDGET : btnSuAlle = GUI_BUTTON(winSuche, "Alle", 356, 72, 70, 26)
+GUI_TOOLTIP(tfSuche, "Suchtext -- Enter: weiter, Umschalt+Enter: zurueck, ESC schliesst")
+GUI_TOOLTIP(btnSuZurueck, "Voriger Treffer (Umschalt+F3)")
+GUI_TOOLTIP(btnSuWeiter, "Naechster Treffer (F3)")
+GUI_TOOLTIP(cbSuGross, "Gross/klein beachten (Alt+C)")
+GUI_TOOLTIP(cbSuWort, "Nur ganze Woerter (Alt+W)")
+GUI_TOOLTIP(cbSuAusdruck, "Regulaerer Ausdruck")
+GUI_TOOLTIP(tfErsatz, "Ersatz -- Enter ersetzt den markierten Treffer und geht zum naechsten")
+GUI_TOOLTIP(btnSuErsetzen, "Den markierten Treffer ersetzen, dann weiter (Strg+Umschalt+1)")
+GUI_TOOLTIP(btnSuAlle, "Alle Treffer in dieser Datei ersetzen, ein Schritt fuer Strg+Z (Strg+Alt+Enter)")
+GUI_BUTTON_VARIANT(btnSuErsetzen, "primaer")
+GUI_WINDOW_VISIBLE(winSuche, FALSE)
+DIM sucheOffen AS BOOLEAN : sucheOffen = FALSE
+DIM sucheMitErsetzen AS BOOLEAN : sucheMitErsetzen = FALSE
+DIM sucheAnkerZ AS INTEGER : sucheAnkerZ = 1
+DIM sucheAnkerS AS INTEGER : sucheAnkerS = 1
+DIM sucheZahlAlt AS STRING : sucheZahlAlt = "-"
+
 ' Druckdialog: Drucker waehlen, Kopien, oder doch als PDF.
 DIM winDruck AS GUI_WINDOW : winDruck = GUI_WINDOW("Listing drucken", 440, 240, 400, 170)
 GUI_WINDOW_CLOSABLE(winDruck, TRUE)
@@ -1091,6 +1135,8 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "karte", minimapAn)
     JSON_SET_BOOL(konfig, "git_rand", gitRandAn)
     JSON_SET_BOOL(konfig, "regex", regexAn)
+    JSON_SET_BOOL(konfig, "gross_klein", grossKlein)
+    JSON_SET_BOOL(konfig, "ganzes_wort", ganzesWort)
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
     JSON_SET_BOOL(konfig, "linien", linienAn)
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
@@ -2246,7 +2292,8 @@ SUB faerben(ta AS GUI_WIDGET)
     ' Hat sich nichts geaendert, ist auch nichts neu zu rechnen. Ohne den
     ' Riegel liefen Einfaerbung UND Fundstellensuche in jedem Bild, auch
     ' wenn das Fenster nur dasteht.
-    DIM schl AS STRING : schl = STR$(von) + ":" + STR$(cz) + ":" + STR$(cs) + ":" + stueck
+    DIM schl AS STRING : schl = STR$(von) + ":" + STR$(cz) + ":" + STR$(cs) + ":" + _
+        IIF(sucheOffen, suchMuster$(suchtext), "") + ":" + stueck
     IF schl = faerbSchluessel THEN RETURN
     faerbSchluessel = schl
     DIM starts AS ARRAY OF INTEGER
@@ -2279,6 +2326,34 @@ SUB faerben(ta AS GUI_WIDGET)
             END IF
             ab = p + LEN(wort)
         WEND
+    END IF
+    ' Die Treffer der offenen Suchleiste, im Ausschnitt und zeilenweise wie
+    ' die Suche selbst -- sonst markierte `^` hier etwas anderes als dort.
+    IF sucheOffen AND suchtext <> "" THEN
+        DIM sm AS STRING : sm = suchMuster$(suchtext)
+        DIM suz AS ARRAY OF STRING : suz = SPLIT$(stueck, NL)
+        DIM sOff AS INTEGER : sOff = 0
+        DIM szi AS INTEGER
+        FOR szi = 0 TO LEN(suz) - 1
+            DIM sab AS INTEGER : sab = 0
+            DIM swie AS INTEGER : swie = 0
+            WHILE sab <= LEN(suz[szi]) AND swie < 200
+                DIM sp AS INTEGER
+                DIM sl AS INTEGER
+                TRY
+                    (sp, sl) = REGEX_FIND_POS(suz[szi], sm, sab)
+                CATCH e
+                    sp = -1
+                END TRY
+                IF sp < 0 THEN BREAK
+                IF sl > 0 THEN
+                    ARRAY_PUSH(s2, von + sOff + sp) : ARRAY_PUSH(l2, sl) : ARRAY_PUSH(f2, F_SUCHTREFFER)
+                END IF
+                sab = sp + MAX(sl, 1)
+                swie = swie + 1
+            WEND
+            sOff = sOff + LEN(suz[szi]) + 1
+        NEXT
     END IF
     ' Das Klammernpaar um die Marke: erst links davon schauen, dann rechts
     ' -- so wie man es beim Tippen erwartet, wenn man gerade eine Klammer
@@ -3593,64 +3668,324 @@ SUB vervollUebernehmen()
 END SUB
 
 ' --- Suchen / Ersetzen / Zeile ----------------------------------------
-' Passt die Zeile? Mit `regexAn` ueber das regex-Modul, sonst als
-' Teiltext ohne Ruecksicht auf Gross/Klein. EINE Stelle fuer Suchen,
-' Ersetzen und die Projektsuche -- liefen sie auseinander, faende die eine
-' etwas anderes als die andere.
+' JEDE Suche der IDE geht durch EIN Muster: der Suchtext woertlich
+' (maskiert) oder als regulaerer Ausdruck, fuer ganze Woerter zwischen `\b`,
+' ohne Gross/klein mit `(?i)`. Liefen Suchleiste, Projektsuche und
+' Ersetzen im Projekt getrennte Wege, faende die eine etwas anderes als die
+' andere -- und genau das war vorher so: das Ersetzen im Feld suchte ohne
+' Ruecksicht auf den Regex-Schalter.
+FUNCTION suchMuster$(text AS STRING) AS STRING
+    IF text = "" THEN RETURN ""
+    DIM m AS STRING : m = IIF(regexAn, text, REGEX_ESCAPE$(text))
+    IF ganzesWort THEN m = "\b(?:" + m + ")\b"
+    IF NOT grossKlein THEN m = "(?i)" + m
+    RETURN m
+END FUNCTION
+
+' Passt die Zeile? Fuer die Projektsuche und das Zaehlen vor dem Ersetzen.
 FUNCTION passtSuche(zeile AS STRING, muster AS STRING) AS BOOLEAN
     IF muster = "" THEN RETURN FALSE
-    IF NOT regexAn THEN RETURN INSTR(LOWER$(zeile), LOWER$(muster)) >= 0
     TRY
-        RETURN REGEX_TEST(zeile, muster)
+        RETURN REGEX_TEST(zeile, suchMuster$(muster))
     CATCH e
         RETURN FALSE
     END TRY
 END FUNCTION
 
-FUNCTION weitersuchen(abNaechstem AS BOOLEAN) AS BOOLEAN
+' Ersetzen Zeile fuer Zeile -- dieselbe Einheit wie die Trefferliste, sonst
+' hiesse `^` beim Ersetzen etwas anderes als beim Suchen. Woertlich (ohne
+' Ausdruck) bekommt der Ersatz verdoppelte Rueckstriche: REGEX_REPLACE liest
+' `\1` als Gruppe, und wer woertlich `\1` einsetzen will, meint das nicht.
+FUNCTION textErsetzen$(text AS STRING, gesucht AS STRING, ersatz AS STRING) AS STRING
+    DIM m AS STRING : m = suchMuster$(gesucht)
+    IF m = "" THEN RETURN text
+    DIM r AS STRING : r = IIF(regexAn, ersatz, REPLACE$(ersatz, "\", "\\"))
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(text, NL)
+    DIM i AS INTEGER
+    TRY
+        FOR i = 0 TO LEN(zeilen) - 1
+            zeilen[i] = REGEX_REPLACE(zeilen[i], m, r)
+        NEXT
+    CATCH e
+        RETURN text
+    END TRY
+    RETURN JOIN$(zeilen, NL)
+END FUNCTION
+
+' --- Die Suchleiste (seit 2026-09-19) ---------------------------------
+' Statt zwei Eingabe-Kaesten hintereinander ein Fenster, das offen bleibt:
+' Suchfeld mit Weiter/Zurueck und Trefferzahl, die drei Schalter, und in der
+' Ersetzen-Form ein Ersatzfeld mit [Ersetzen] (EINE Stelle, dann die
+' naechste) und [Alle]. Tippen springt sofort zum ersten Treffer ab der
+' Stelle, an der die Leiste aufging; der Fokus bleibt dabei im Suchfeld.
+' Die Treffer eines Feldes: Zeile, Spalte (ab 1 wie GUI_TEXTAREA_SELECT) und
+' Laenge -- gerechnet, wenn sich Muster, Feld oder Text geaendert haben.
+DIM trefferZ AS ARRAY OF INTEGER : trefferZ = []
+DIM trefferS AS ARRAY OF INTEGER : trefferS = []
+DIM trefferL AS ARRAY OF INTEGER : trefferL = []
+DIM trefferFehler AS BOOLEAN : trefferFehler = FALSE
+DIM trefferMusterAlt AS STRING : trefferMusterAlt = "-"
+DIM trefferFeldAlt AS GUI_WIDGET : trefferFeldAlt = -2
+DIM trefferTextAlt AS STRING : trefferTextAlt = ""
+CONST TREFFER_HOECHSTENS = 20000
+
+SUB trefferAktuell(ta AS GUI_WIDGET)
+    DIM m AS STRING : m = ""
+    IF ta >= 0 THEN m = suchMuster$(suchtext)
+    DIM t AS STRING : t = ""
+    IF ta >= 0 THEN t = GUI_TEXT(ta)
+    IF m = trefferMusterAlt AND ta = trefferFeldAlt AND t = trefferTextAlt THEN RETURN
+    trefferMusterAlt = m : trefferFeldAlt = ta : trefferTextAlt = t
+    trefferZ = [] : trefferS = [] : trefferL = []
+    trefferFehler = FALSE
+    IF m = "" THEN RETURN
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(t, NL)
+    DIM z AS INTEGER
+    FOR z = 0 TO LEN(zeilen) - 1
+        DIM ab AS INTEGER : ab = 0
+        WHILE ab <= LEN(zeilen[z]) AND LEN(trefferZ) < TREFFER_HOECHSTENS
+            DIM p AS INTEGER
+            DIM l AS INTEGER
+            TRY
+                (p, l) = REGEX_FIND_POS(zeilen[z], m, ab)
+            CATCH e
+                trefferFehler = TRUE
+                RETURN
+            END TRY
+            IF p < 0 THEN BREAK
+            ' Ein leerer Treffer (`x*` auf einer Zeile ohne x) markiert
+            ' nichts -- er zaehlt nicht und schiebt nur weiter.
+            IF l > 0 THEN
+                ARRAY_PUSH(trefferZ, z + 1) : ARRAY_PUSH(trefferS, p + 1) : ARRAY_PUSH(trefferL, l)
+            END IF
+            ab = p + MAX(l, 1)
+        WEND
+    NEXT
+END SUB
+
+' Der naechste Treffer: vorwaerts der erste, der bei (z, s) oder dahinter
+' anfaengt, rueckwaerts der letzte davor -- mit Umlauf am Dateiende.
+FUNCTION trefferIndex(z AS INTEGER, s AS INTEGER, vorwaerts AS BOOLEAN) AS INTEGER
+    DIM n AS INTEGER : n = LEN(trefferZ)
+    IF n = 0 THEN RETURN -1
+    DIM k AS INTEGER
+    IF vorwaerts THEN
+        FOR k = 0 TO n - 1
+            IF trefferZ[k] > z OR (trefferZ[k] = z AND trefferS[k] >= s) THEN RETURN k
+        NEXT
+        RETURN 0
+    END IF
+    FOR k = n - 1 TO 0 STEP -1
+        IF trefferZ[k] < z OR (trefferZ[k] = z AND trefferS[k] < s) THEN RETURN k
+    NEXT
+    RETURN n - 1
+END FUNCTION
+
+' Welcher Treffer ist gerade GENAU markiert? -1 = keiner.
+FUNCTION trefferMarkiert(ta AS GUI_WIDGET) AS INTEGER
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    IF z1 <> z2 THEN RETURN -1
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(trefferZ) - 1
+        IF trefferZ[k] = z1 AND trefferS[k] = s1 AND trefferS[k] + trefferL[k] = s2 THEN RETURN k
+        IF trefferZ[k] > z1 THEN RETURN -1
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB trefferMarkieren(ta AS GUI_WIDGET, k AS INTEGER)
+    GUI_TEXTAREA_SELECT(ta, trefferZ[k], trefferS[k], trefferZ[k], trefferS[k] + trefferL[k])
+    protokoll("treffer " + STR$(k + 1) + " von " + STR$(LEN(trefferZ)) + " zeile " + STR$(trefferZ[k]) + _
+              " spalte " + STR$(trefferS[k]))
+END SUB
+
+' F3 / Umschalt+F3 / Enter im Suchfeld. Vorwaerts ab dem ENDE der Auswahl
+' (ein markierter Treffer ist damit erledigt), rueckwaerts ab ihrem Anfang.
+' Den Fokus holt es nur ins Code-Feld, wenn die Leiste zu ist -- aus dem
+' Suchfeld heraus will man mit Enter weiter springen, nicht ins Feld tippen.
+FUNCTION trefferSpringen(vorwaerts AS BOOLEAN) AS BOOLEAN
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 OR suchtext = "" THEN RETURN FALSE
-    DIM z AS INTEGER
-    DIM s AS INTEGER
-    (z, s) = GUI_TEXTAREA_CURSOR(ta)
-    IF regexAn THEN
-        ' Zeilenweise: ein regulaerer Ausdruck kann alles Moegliche treffen,
-        ' und GUI_TEXTAREA_FIND kennt nur Teiltexte.
-        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-        DIM n AS INTEGER : n = LEN(zeilen)
-        DIM k AS INTEGER
-        FOR k = 1 TO n
-            DIM zi AS INTEGER : zi = ((z - 1 + k) MOD n) + 1
-            IF passtSuche(zeilen[zi - 1], suchtext) THEN
-                DIM tr AS STRING : tr = ""
-                TRY
-                    tr = REGEX_FIND(zeilen[zi - 1], suchtext)
-                CATCH e
-                    tr = ""
-                END TRY
-                DIM sp AS INTEGER : sp = 1
-                IF tr <> "" THEN sp = INSTR(zeilen[zi - 1], tr) + 1
-                GUI_TEXTAREA_SELECT(ta, zi, sp, zi, sp + MAX(LEN(tr), 1))
-                GUI_FOCUS(ta)
-                RETURN TRUE
-            END IF
-        NEXT
-        GUI_SET_TEXT(lblStatus, "Kein Treffer fuer den Ausdruck: " + suchtext)
+    trefferAktuell(ta)
+    IF LEN(trefferZ) = 0 THEN
+        IF trefferFehler THEN
+            GUI_SET_TEXT(lblStatus, "Ungueltiger Ausdruck: " + suchtext)
+        ELSE
+            GUI_SET_TEXT(lblStatus, "Nicht gefunden: " + suchtext)
+        END IF
+        protokoll("treffer keine")
         RETURN FALSE
     END IF
-    IF abNaechstem THEN s = s + 1
-    DIM tz AS INTEGER
-    DIM ts AS INTEGER
-    (tz, ts) = GUI_TEXTAREA_FIND(ta, suchtext, z, s)
-    IF tz < 0 THEN (tz, ts) = GUI_TEXTAREA_FIND(ta, suchtext, 1, 1)
-    IF tz < 0 THEN
-        GUI_SET_TEXT(lblStatus, "Nicht gefunden: " + suchtext)
-        RETURN FALSE
-    END IF
-    GUI_TEXTAREA_SELECT(ta, tz, ts, tz, ts + LEN(suchtext))
-    GUI_FOCUS(ta)
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    DIM k AS INTEGER
+    IF vorwaerts THEN k = trefferIndex(z2, s2, TRUE) ELSE k = trefferIndex(z1, s1, FALSE)
+    trefferMarkieren(ta, k)
+    IF NOT sucheOffen THEN GUI_FOCUS(ta)
     RETURN TRUE
 END FUNCTION
+
+' Steht der Fokus in der Suchleiste? ESC schliesst sie nur dann -- im
+' Code-Feld raeumt ESC die weiteren Schreibmarken weg, und das soll es weiter.
+FUNCTION imSuchfenster() AS BOOLEAN
+    DIM f AS GUI_WIDGET : f = GUI_FOCUSED()
+    RETURN f = tfSuche OR f = tfErsatz OR f = btnSuWeiter OR f = btnSuZurueck OR f = btnSuErsetzen _
+        OR f = btnSuAlle OR f = cbSuGross OR f = cbSuWort OR f = cbSuAusdruck
+END FUNCTION
+
+SUB suchSchalterZeigen()
+    GUI_MENU_CHECK(miRegex, regexAn)
+    GUI_MENU_CHECK(miGross, grossKlein)
+    GUI_MENU_CHECK(miWort, ganzesWort)
+    GUI_SET_CHECKED(cbSuAusdruck, regexAn)
+    GUI_SET_CHECKED(cbSuGross, grossKlein)
+    GUI_SET_CHECKED(cbSuWort, ganzesWort)
+END SUB
+
+SUB sucheOeffnen(mitErsetzen AS BOOLEAN)
+    sucheMitErsetzen = mitErsetzen
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 THEN
+        ' Eine Auswahl in EINER Zeile ist das, wonach man suchen will. Im
+        ' Ausdrucksmodus maskiert -- sonst suchte `a.b` auch `axb`.
+        DIM sel AS STRING : sel = GUI_TEXTAREA_SELECTION$(ta)
+        IF sel <> "" AND INSTR(sel, NL) < 0 THEN suchtext = IIF(regexAn, REGEX_ESCAPE$(sel), sel)
+        DIM z2 AS INTEGER
+        DIM s2 AS INTEGER
+        (sucheAnkerZ, sucheAnkerS, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    END IF
+    GUI_SET_TEXT(tfSuche, suchtext)
+    GUI_SET_TEXT(tfErsatz, ersatztext)
+    suchSchalterZeigen()
+    GUI_SET_VISIBLE(tfErsatz, mitErsetzen)
+    GUI_SET_VISIBLE(btnSuErsetzen, mitErsetzen)
+    GUI_SET_VISIBLE(btnSuAlle, mitErsetzen)
+    GUI_WINDOW_TITLE(winSuche, IIF(mitErsetzen, "Suchen und ersetzen", "Suchen"))
+    GUI_WINDOW_SET_BOUNDS(winSuche, MAX(0, SCREENWIDTH() - 500), 104, 480, IIF(mitErsetzen, 146, 112))
+    GUI_WINDOW_VISIBLE(winSuche, TRUE)
+    sucheOffen = TRUE
+    GUI_FOCUS(tfSuche)
+    faerbSchluessel = ""
+    sucheZahlAlt = "-"
+    protokoll("suche offen" + IIF(mitErsetzen, " ersetzen", ""))
+END SUB
+
+SUB sucheSchliessen()
+    GUI_WINDOW_VISIBLE(winSuche, FALSE)
+    sucheOffen = FALSE
+    faerbSchluessel = ""
+    IF aktivesFeld() >= 0 THEN GUI_FOCUS(aktivesFeld())
+    protokoll("suche zu")
+END SUB
+
+' Ersetzen: ist GENAU ein Treffer markiert, wird er ersetzt; danach -- oder
+' wenn keiner markiert war -- geht es zum naechsten. So sieht man jede
+' Stelle, bevor sie sich aendert.
+SUB ersetzenEinzeln()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR suchtext = "" THEN RETURN
+    trefferAktuell(ta)
+    DIM k AS INTEGER : k = trefferMarkiert(ta)
+    IF k >= 0 THEN
+        DIM neu AS STRING : neu = ersatztext
+        IF regexAn THEN
+            ' Gruppen (`\1`) gelten auch beim einzelnen Ersetzen.
+            TRY
+                neu = REGEX_REPLACE_ONCE(GUI_TEXTAREA_SELECTION$(ta), suchMuster$(suchtext), ersatztext)
+            CATCH e
+                neu = ersatztext
+            END TRY
+        END IF
+        GUI_TEXTAREA_INSERT(ta, neu)
+        protokoll("ersetzt einzeln zeile " + STR$(trefferZ[k]))
+    END IF
+    trefferSpringen(TRUE)
+END SUB
+
+' Alle auf einmal, als EIN Schritt fuer Strg+Z (Auswahl ueber alles plus
+' INSERT); die Marke bleibt in ihrer Zeile.
+SUB alleErsetzen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR suchtext = "" THEN RETURN
+    trefferAktuell(ta)
+    DIM n AS INTEGER : n = LEN(trefferZ)
+    IF n = 0 THEN
+        GUI_SET_TEXT(lblStatus, IIF(trefferFehler, "Ungueltiger Ausdruck: ", "Nicht gefunden: ") + suchtext)
+        protokoll("ersetzt 0")
+        RETURN
+    END IF
+    DIM cz AS INTEGER
+    DIM cs AS INTEGER
+    (cz, cs) = GUI_TEXTAREA_CURSOR(ta)
+    DIM neu AS STRING : neu = textErsetzen$(GUI_TEXT(ta), suchtext, ersatztext)
+    GUI_TEXTAREA_SELECT(ta, 1, 1, 1000000, 1000000)
+    GUI_TEXTAREA_INSERT(ta, neu)
+    GUI_TEXTAREA_GOTO(ta, cz, 1)
+    GUI_SET_TEXT(lblStatus, STR$(n) + " mal ersetzt.")
+    protokoll("ersetzt " + STR$(n))
+END SUB
+
+' Je Bild, solange die Leiste offen ist.
+SUB sucheNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winSuche) THEN
+        ' mit dem Kreuz des Fensters geschlossen
+        sucheOffen = FALSE
+        faerbSchluessel = ""
+        protokoll("suche zu")
+        RETURN
+    END IF
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF GUI_TEXT(tfSuche) <> suchtext THEN
+        suchtext = GUI_TEXT(tfSuche)
+        faerbSchluessel = ""
+        ' Beim Tippen zum ersten Treffer ab der Stelle, an der die Leiste
+        ' aufging -- nicht ab dem letzten Treffer, sonst liefe die Auswahl
+        ' mit jedem Buchstaben weiter nach unten.
+        IF ta >= 0 THEN
+            trefferAktuell(ta)
+            IF LEN(trefferZ) > 0 THEN trefferMarkieren(ta, trefferIndex(sucheAnkerZ, sucheAnkerS, TRUE))
+        END IF
+    END IF
+    ersatztext = GUI_TEXT(tfErsatz)
+    IF GUI_CLICKED(cbSuGross) AND GUI_CHECKED(cbSuGross) <> grossKlein THEN befehl("gross_klein")
+    IF GUI_CLICKED(cbSuWort) AND GUI_CHECKED(cbSuWort) <> ganzesWort THEN befehl("ganzes_wort")
+    IF GUI_CLICKED(cbSuAusdruck) AND GUI_CHECKED(cbSuAusdruck) <> regexAn THEN befehl("regex")
+    DIM zurueck AS BOOLEAN : zurueck = KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT)
+    IF GUI_ENTERED(tfSuche) THEN trefferSpringen(NOT zurueck)
+    IF GUI_CLICKED(btnSuWeiter) THEN trefferSpringen(TRUE)
+    IF GUI_CLICKED(btnSuZurueck) THEN trefferSpringen(FALSE)
+    IF GUI_ENTERED(tfErsatz) OR GUI_CLICKED(btnSuErsetzen) THEN ersetzenEinzeln()
+    IF GUI_CLICKED(btnSuAlle) THEN alleErsetzen()
+    IF KEYHIT(KEY_ESCAPE) AND imSuchfenster() THEN
+        sucheSchliessen()
+        RETURN
+    END IF
+    ' Die Trefferzahl: "3 von 12", wenn einer markiert ist.
+    DIM zahl AS STRING : zahl = ""
+    IF ta >= 0 AND suchtext <> "" THEN
+        trefferAktuell(ta)
+        IF trefferFehler THEN
+            zahl = "Ausdruck ungueltig"
+        ELSEIF LEN(trefferZ) = 0 THEN
+            zahl = "keine Treffer"
+        ELSE
+            DIM k AS INTEGER : k = trefferMarkiert(ta)
+            IF k >= 0 THEN zahl = STR$(k + 1) + " von " + STR$(LEN(trefferZ)) ELSE zahl = STR$(LEN(trefferZ)) + " Treffer"
+        END IF
+    END IF
+    IF zahl <> sucheZahlAlt THEN
+        sucheZahlAlt = zahl
+        GUI_SET_TEXT(lblSuZahl, zahl)
+        protokoll("suche zahl " + zahl)
+    END IF
+END SUB
 
 SUB zurDefinition()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
@@ -5457,10 +5792,8 @@ SUB laufSchritt()
         ELSEIF laufArt = "umbenennen" THEN
             IF INSTR(alt, laufAlt) < 0 THEN CONTINUE
             frisch = umbenennenInText$(alt, laufAlt, laufNeu)
-        ELSEIF regexAn THEN
-            frisch = REGEX_REPLACE(alt, laufAlt, laufNeu)
         ELSE
-            frisch = REPLACE$(alt, laufAlt, laufNeu)
+            frisch = textErsetzen$(alt, laufAlt, laufNeu)
         END IF
         ' Auf die PLATTE, nicht in den Reiter: beide Umbauten arbeiten auf
         ' den Dateien (sie brechen vorher ab, wenn ein Reiter ungesichert
@@ -7284,6 +7617,11 @@ paletteEintrag("Lesezeichen setzen/entfernen", "lesezeichen", "Strg+F2") : palet
 paletteEintrag("Voriges Lesezeichen", "lz_zurueck", "Umschalt+F2")
 paletteEintrag("Alle Lesezeichen", "lz_liste", "Alt+F2")
 paletteEintrag("Suchen mit regulaerem Ausdruck", "regex", "")
+paletteEintrag("Suchen: Gross/klein beachten", "gross_klein", "Alt+C")
+paletteEintrag("Suchen: nur ganze Woerter", "ganzes_wort", "Alt+W")
+paletteEintrag("Rueckwaerts suchen", "zurueck_suchen", "Umschalt+F3")
+paletteEintrag("Ersetzen und weiter", "ersetzen_eins", "Strg+Umschalt+1")
+paletteEintrag("Alle ersetzen", "ersetzen_alle", "Strg+Alt+Enter")
 paletteEintrag("Geschlossenen Reiter wieder oeffnen", "wiederauf", "Strg+Umschalt+T")
 paletteEintrag("Starten", "start", "F5") : paletteEintrag("Stoppen", "stopp", "Umschalt+F5") : paletteEintrag("Pruefen", "pruefen", "Umschalt+F7")
 paletteEintrag("Debuggen", "debug", "F7") : paletteEintrag("Haltepunkt setzen/entfernen", "haltepunkt", "F9")
@@ -7684,7 +8022,7 @@ SUB befehl(k AS STRING)
         CASE "lz_liste" : lesezeichenListe()
         CASE "regex"
             regexAn = NOT regexAn
-            GUI_MENU_CHECK(miRegex, regexAn)
+            suchSchalterZeigen()
             GUI_SET_TEXT(lblStatus, IIF(regexAn, "Suche mit regulaerem Ausdruck (z. B. ^SUB .*\\(\\)).", "Suche als Teiltext."))
             konfigSichern()
         CASE "wiederauf"
@@ -7705,9 +8043,24 @@ SUB befehl(k AS STRING)
         CASE "sichern_unter" : sichern(aktiverTab, TRUE)
         CASE "schliessen" : tabSchliessenFragen(aktiverTab)
         CASE "beenden" : beendenAnfragen()
-        CASE "suchen" : dlgSuche = GUI_PROMPT("Suchen", "Wonach?", suchtext)
-        CASE "weiter" : weitersuchen(TRUE)
-        CASE "ersetzen" : ersetzenZiel = "feld" : dlgSuche = GUI_PROMPT("Ersetzen", "Wonach suchen?", suchtext) : schliessenNachDialog = TRUE
+        CASE "suchen" : sucheOeffnen(FALSE)
+        CASE "weiter" : trefferSpringen(TRUE)
+        CASE "zurueck_suchen" : trefferSpringen(FALSE)
+        CASE "ersetzen" : sucheOeffnen(TRUE)
+        ' Ohne offene Ersetzen-Leiste waere unklar, WOMIT ersetzt wird -- dann
+        ' geht sie erst einmal auf.
+        CASE "ersetzen_eins" : IF sucheOffen AND sucheMitErsetzen THEN ersetzenEinzeln() ELSE sucheOeffnen(TRUE)
+        CASE "ersetzen_alle" : IF sucheOffen AND sucheMitErsetzen THEN alleErsetzen() ELSE sucheOeffnen(TRUE)
+        CASE "gross_klein"
+            grossKlein = NOT grossKlein
+            suchSchalterZeigen()
+            GUI_SET_TEXT(lblStatus, IIF(grossKlein, "Suche beachtet Gross/klein.", "Suche ohne Ruecksicht auf Gross/klein."))
+            konfigSichern()
+        CASE "ganzes_wort"
+            ganzesWort = NOT ganzesWort
+            suchSchalterZeigen()
+            GUI_SET_TEXT(lblStatus, IIF(ganzesWort, "Suche nur nach ganzen Woertern.", "Suche auch mitten im Wort."))
+            konfigSichern()
         CASE "ersetzen_projekt"
             ersetzenZiel = "projekt"
             dlgSuche = GUI_PROMPT("Im ganzen Projekt ersetzen", "Wonach suchen?", suchtext)
@@ -7971,7 +8324,10 @@ WHILE NOT beenden
     IF GUI_CLICKED(miBeenden) THEN befehl("beenden")
     IF GUI_CLICKED(miSuchen) THEN befehl("suchen")
     IF GUI_CLICKED(miWeiter) THEN befehl("weiter")
+    IF GUI_CLICKED(miZurueckSuchen) THEN befehl("zurueck_suchen")
     IF GUI_CLICKED(miErsetzen) THEN befehl("ersetzen")
+    IF GUI_CLICKED(miErsetzenEins) THEN befehl("ersetzen_eins")
+    IF GUI_CLICKED(miErsetzenAlle) THEN befehl("ersetzen_alle")
     IF GUI_CLICKED(miZeile) THEN befehl("zeile")
     IF GUI_CLICKED(miProjekt) THEN befehl("projekt")
     IF GUI_CLICKED(miVervoll) THEN befehl("vervoll")
@@ -8104,6 +8460,8 @@ WHILE NOT beenden
     IF GUI_CLICKED(miLzZurueck) THEN befehl("lz_zurueck")
     IF GUI_CLICKED(miLzListe) THEN befehl("lz_liste")
     IF GUI_CLICKED(miRegex) THEN befehl("regex")
+    IF GUI_CLICKED(miGross) THEN befehl("gross_klein")
+    IF GUI_CLICKED(miWort) THEN befehl("ganzes_wort")
     IF GUI_CLICKED(miWiederauf) THEN befehl("wiederauf")
     IF GUI_CLICKED(miBedingung) THEN befehl("bedingung")
     IF GUI_CLICKED(miExport) THEN befehl("export")
@@ -8184,7 +8542,7 @@ WHILE NOT beenden
                 schliessenNachDialog = FALSE
                 dlgErsetze = GUI_PROMPT("Ersetzen", "Ersetzen durch:", ersatztext)
             ELSE
-                weitersuchen(FALSE)
+                trefferSpringen(TRUE)
             END IF
         ELSEIF a = 2 THEN
             dlgSuche = 0 : schliessenNachDialog = FALSE
@@ -8216,25 +8574,6 @@ WHILE NOT beenden
                         "Ersetzen|Abbrechen")
                 END IF
             END IF
-        ELSEIF a2 = 1 THEN
-            ersatztext = GUI_DIALOG_TEXT(dlgErsetze)
-            dlgErsetze = 0
-            DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-            DIM anzahl AS INTEGER : anzahl = 0
-            IF ta >= 0 THEN
-                GUI_TEXTAREA_GOTO(ta, 1, 1)
-                DIM tz AS INTEGER
-                DIM ts AS INTEGER
-                (tz, ts) = GUI_TEXTAREA_FIND(ta, suchtext, 1, 1)
-                WHILE tz >= 0 AND anzahl < 10000
-                    GUI_TEXTAREA_SELECT(ta, tz, ts, tz, ts + LEN(suchtext))
-                    GUI_TEXTAREA_INSERT(ta, ersatztext)
-                    anzahl = anzahl + 1
-                    (tz, ts) = GUI_TEXTAREA_FIND(ta, suchtext, tz, ts + LEN(ersatztext))
-                WEND
-            END IF
-            GUI_SET_TEXT(lblStatus, STR$(anzahl) + " mal ersetzt.")
-            protokoll("ersetzt " + STR$(anzahl))
         ELSEIF a2 = 2 THEN
             dlgErsetze = 0 : ersetzenZiel = "feld"
         END IF
@@ -8396,6 +8735,9 @@ WHILE NOT beenden
             dlgBedingung = 0
         END IF
     END IF
+
+    ' --- Suchleiste ---
+    IF sucheOffen THEN sucheNachziehen()
 
     ' --- Befehlspalette: tippen filtert, Enter/Doppelklick fuehrt aus, ESC schliesst ---
     IF paletteOffen THEN
