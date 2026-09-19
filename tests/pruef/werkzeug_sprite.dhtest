@@ -8365,3 +8365,903 @@ DHRT_FRAMES=86
 |neu ohne bereiche 0|
 |zurueck 1|
 
+=== 64 bilder und 8 ebenen, angelegt erst bei bedarf
+' Die Grenzen seit 2026-09-19: [Neu] bei den Bildern 70-mal, bei den Ebenen
+' 10-mal geklickt -- es bleibt bei 64 und 8, und jedes Bild jeder Ebene ist
+' da (das letzte liest sich als durchsichtig, nicht als -1 = kein Bild).
+' Vorher war genau EINS angelegt: ein Platz entsteht erst, wenn er gebraucht
+' wird, sonst laegen 512 Bilder samt Textur im Speicher.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prG AS INTEGER : prG = 0
+DIM prD AS INTEGER : prD = 0
+DIM prL AS INTEGER : prL = 0
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prE4 AS INTEGER : prE4 = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prKnopf(f AS INTEGER, x AS INTEGER, y AS INTEGER, breite AS INTEGER)
+    ' Mitte eines Knopfes -- die Lage ist seine linke obere Ecke.
+    prKlick(f, x + breite \ 2, y + 14)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prE(f, 2, code, 0)
+    prE(f + 1, 1, code, 0)
+END SUB
+SUB prStrg(f AS INTEGER, code AS INTEGER)
+    ' Strg in JEDEM Bild; der Buchstabe hat seine Flanke, waehrend Strg steht.
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        prE(f + i, 2, 341, 0)
+    NEXT
+    prE(f + 2, 2, code, 0)
+    prE(f + 3, 1, code, 0)
+    prE(f + 5, 1, 341, 0)
+END SUB
+FUNCTION prMx(x AS INTEGER) AS INTEGER
+    RETURN ox + x * zoom + zoom \ 2
+END FUNCTION
+FUNCTION prMy(y AS INTEGER) AS INTEGER
+    RETURN oy + y * zoom + zoom \ 2
+END FUNCTION
+SUB prZugPunkte(f AS INTEGER, xs AS ARRAY OF INTEGER, ys AS ARRAY OF INTEGER)
+    ' Ein Mausweg in Bildpunkten; der Knopf wird in JEDEM Bild gemeldet.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        prE(f + i, 7, prMx(xs[i]), prMy(ys[i]))
+        prE(f + i, 6, 0, 0)
+    NEXT
+    prE(f + LEN(xs), 5, 0, 0)
+END SUB
+FUNCTION prStrich(f AS INTEGER, y AS INTEGER, von AS INTEGER, bis AS INTEGER) AS INTEGER
+    ' Waagerechter Strich x = von .. bis - 1; liefert die Zahl der Punkte.
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM x AS INTEGER
+    FOR x = von TO bis - 1
+        ARRAY_PUSH(xs, x) : ARRAY_PUSH(ys, y)
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+FUNCTION prDreieck(f AS INTEGER) AS INTEGER
+    ' Ein Weg um das Dreieck (2,2)-(20,2)-(2,20), je Kante 7 Punkte.
+    DIM ex AS ARRAY OF INTEGER : ex = [2, 20, 2]
+    DIM ey AS ARRAY OF INTEGER : ey = [2, 2, 20]
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM i AS INTEGER
+    DIM t AS INTEGER
+    FOR i = 0 TO 2
+        DIM ax AS INTEGER : ax = ex[i]
+        DIM ay AS INTEGER : ay = ey[i]
+        DIM bx AS INTEGER : bx = ex[(i + 1) MOD 3]
+        DIM by AS INTEGER : by = ey[(i + 1) MOD 3]
+        FOR t = 0 TO 6
+            ARRAY_PUSH(xs, INT(ROUND(ax + (bx - ax) * t / 7.0)))
+            ARRAY_PUSH(ys, INT(ROUND(ay + (by - ay) * t / 7.0)))
+        NEXT
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prZaehlen()
+    ' Gemalt auf der aktiven Ebene, davon ausserhalb der Auswahl, und Loecher
+    ' (nicht gewaehlte Punkte zwischen gewaehlten Nachbarn einer Zeile).
+    prG = 0 : prD = 0 : prL = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[aktBild, aktEb], x, y) > 0 THEN
+                prG = prG + 1
+                IF NOT gewaehlt(x, y) THEN prD = prD + 1
+            END IF
+        NEXT
+    NEXT
+    IF selAn THEN
+        FOR y = selY TO selY + selH - 1
+            DIM links AS BOOLEAN : links = FALSE
+            DIM luecke AS INTEGER : luecke = 0
+            FOR x = selX TO selX + selB - 1
+                IF gewaehlt(x, y) THEN
+                    prL = prL + luecke
+                    luecke = 0
+                    links = TRUE
+                ELSE
+                    IF links THEN luecke = luecke + 1
+                END IF
+            NEXT
+        NEXT
+    END IF
+END SUB
+FUNCTION prEcken$() AS STRING
+    RETURN STR$(GETALPHA(ebene[0, 0], 0, 0)) + " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + " " + _
+           STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1))
+END FUNCTION
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+DIM prEnde AS INTEGER : prEnde = 100000
+FUNCTION prAngelegt() AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO MAXBILD - 1
+        FOR k = 0 TO MAXEB - 1
+            n = n + ebDa[i, k]
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION prGemalt(i AS INTEGER, k AS INTEGER) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[i, k], x, y) > 0 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+SUB prFall()
+    prMerke("vorher angelegt " + STR$(prAngelegt()))
+    DIM t AS INTEGER : t = 1
+    DIM n AS INTEGER
+    FOR n = 1 TO 70
+        prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+        t = t + 4
+    NEXT
+    FOR n = 1 TO 10
+        prKnopf(t, GUI_GET_X(bEbNeu), GUI_GET_Y(bEbNeu), 78)
+        t = t + 4
+    NEXT
+    prEnde = t + 4
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k >= prEnde THEN
+        prSchreib("bilder " + STR$(anzBild) + " ebenen " + STR$(anzEb) + _
+                  " angelegt " + STR$(prAngelegt()) + " letzte " + STR$(GETALPHA(ebene[63, 7], 0, 0)))
+    END IF
+END SUB
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+
+--- umgebung
+DHRT_FRAMES=340
+--- inhalt _programm/probe.txt
+|vorher angelegt 1|
+|bilder 64 ebenen 8 angelegt 512 letzte 0|
+
+=== ein zurueckgelassener platz bekommt die neue groesse
+' [Neu] bei den Bildern, ein Strich auf Bild 2, [Weg] -- Bild 2 ist jetzt
+' ausserhalb des benutzten Bereichs, aber angelegt. Dann auf 48x40 und
+' wieder [Neu]: das Bild muss leer sein UND die neue Groesse haben (der
+' Punkt rechts unten liest sich als 0, nicht als -1 = ausserhalb).
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prG AS INTEGER : prG = 0
+DIM prD AS INTEGER : prD = 0
+DIM prL AS INTEGER : prL = 0
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prE4 AS INTEGER : prE4 = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prKnopf(f AS INTEGER, x AS INTEGER, y AS INTEGER, breite AS INTEGER)
+    ' Mitte eines Knopfes -- die Lage ist seine linke obere Ecke.
+    prKlick(f, x + breite \ 2, y + 14)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prE(f, 2, code, 0)
+    prE(f + 1, 1, code, 0)
+END SUB
+SUB prStrg(f AS INTEGER, code AS INTEGER)
+    ' Strg in JEDEM Bild; der Buchstabe hat seine Flanke, waehrend Strg steht.
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        prE(f + i, 2, 341, 0)
+    NEXT
+    prE(f + 2, 2, code, 0)
+    prE(f + 3, 1, code, 0)
+    prE(f + 5, 1, 341, 0)
+END SUB
+FUNCTION prMx(x AS INTEGER) AS INTEGER
+    RETURN ox + x * zoom + zoom \ 2
+END FUNCTION
+FUNCTION prMy(y AS INTEGER) AS INTEGER
+    RETURN oy + y * zoom + zoom \ 2
+END FUNCTION
+SUB prZugPunkte(f AS INTEGER, xs AS ARRAY OF INTEGER, ys AS ARRAY OF INTEGER)
+    ' Ein Mausweg in Bildpunkten; der Knopf wird in JEDEM Bild gemeldet.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        prE(f + i, 7, prMx(xs[i]), prMy(ys[i]))
+        prE(f + i, 6, 0, 0)
+    NEXT
+    prE(f + LEN(xs), 5, 0, 0)
+END SUB
+FUNCTION prStrich(f AS INTEGER, y AS INTEGER, von AS INTEGER, bis AS INTEGER) AS INTEGER
+    ' Waagerechter Strich x = von .. bis - 1; liefert die Zahl der Punkte.
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM x AS INTEGER
+    FOR x = von TO bis - 1
+        ARRAY_PUSH(xs, x) : ARRAY_PUSH(ys, y)
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+FUNCTION prDreieck(f AS INTEGER) AS INTEGER
+    ' Ein Weg um das Dreieck (2,2)-(20,2)-(2,20), je Kante 7 Punkte.
+    DIM ex AS ARRAY OF INTEGER : ex = [2, 20, 2]
+    DIM ey AS ARRAY OF INTEGER : ey = [2, 2, 20]
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM i AS INTEGER
+    DIM t AS INTEGER
+    FOR i = 0 TO 2
+        DIM ax AS INTEGER : ax = ex[i]
+        DIM ay AS INTEGER : ay = ey[i]
+        DIM bx AS INTEGER : bx = ex[(i + 1) MOD 3]
+        DIM by AS INTEGER : by = ey[(i + 1) MOD 3]
+        FOR t = 0 TO 6
+            ARRAY_PUSH(xs, INT(ROUND(ax + (bx - ax) * t / 7.0)))
+            ARRAY_PUSH(ys, INT(ROUND(ay + (by - ay) * t / 7.0)))
+        NEXT
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prZaehlen()
+    ' Gemalt auf der aktiven Ebene, davon ausserhalb der Auswahl, und Loecher
+    ' (nicht gewaehlte Punkte zwischen gewaehlten Nachbarn einer Zeile).
+    prG = 0 : prD = 0 : prL = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[aktBild, aktEb], x, y) > 0 THEN
+                prG = prG + 1
+                IF NOT gewaehlt(x, y) THEN prD = prD + 1
+            END IF
+        NEXT
+    NEXT
+    IF selAn THEN
+        FOR y = selY TO selY + selH - 1
+            DIM links AS BOOLEAN : links = FALSE
+            DIM luecke AS INTEGER : luecke = 0
+            FOR x = selX TO selX + selB - 1
+                IF gewaehlt(x, y) THEN
+                    prL = prL + luecke
+                    luecke = 0
+                    links = TRUE
+                ELSE
+                    IF links THEN luecke = luecke + 1
+                END IF
+            NEXT
+        NEXT
+    END IF
+END SUB
+FUNCTION prEcken$() AS STRING
+    RETURN STR$(GETALPHA(ebene[0, 0], 0, 0)) + " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + " " + _
+           STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1))
+END FUNCTION
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+DIM prEnde AS INTEGER : prEnde = 100000
+FUNCTION prAngelegt() AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO MAXBILD - 1
+        FOR k = 0 TO MAXEB - 1
+            n = n + ebDa[i, k]
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION prGemalt(i AS INTEGER, k AS INTEGER) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[i, k], x, y) > 0 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+SUB prFall()
+    DIM t AS INTEGER : t = 1
+    prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+    t = t + 4
+    t = t + prStrich(t, 3, 2, 9) + 3
+    prKnopf(t, GUI_GET_X(bBildWeg), GUI_GET_Y(bBildWeg), 70)
+    t = t + 4
+    prKnopf(t, GUI_GET_X(bGroesse), GUI_GET_Y(bGroesse), 128)
+    prKnopf(t + 6, GUI_WINDOW_GET_X(winGr) + GUI_GET_X(bGrOk), GUI_WINDOW_GET_Y(winGr) + GUI_GET_Y(bGrOk), 128)
+    t = t + 12
+    prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+    prEnde = t + 6
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 14 THEN prMerke("bild 2 gemalt " + STR$(prGemalt(1, 0)))
+    IF k >= prEnde THEN
+        prSchreib(STR$(gw) + "x" + STR$(gh) + " bilder " + STR$(anzBild) + " gemalt " + _
+                  STR$(prGemalt(1, 0)) + " rand " + STR$(GETALPHA(ebene[1, 0], 47, 39)))
+    END IF
+END SUB
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen DIM grOffen
+GUI_WINDOW_CHROME(winGr, FALSE)
+GUI_WINDOW_SET_BOUNDS(winGr, 100, 100, 300, 170)
+DIM grOffen
+
+--- ersetzen DIM ngb AS INTEGER : ngb = INT(GUI_VALUE(spGrB))
+DIM ngb AS INTEGER : ngb = 48
+
+--- ersetzen DIM ngh AS INTEGER : ngh = INT(GUI_VALUE(spGrH))
+DIM ngh AS INTEGER : ngh = 40
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+
+--- umgebung
+DHRT_FRAMES=60
+--- inhalt _programm/probe.txt
+|bild 2 gemalt 7|
+|48x40 bilder 2 gemalt 0 rand 0|
+
+=== eine wieder angelegte ebene ist leer
+' [Neu] bei den Ebenen, ein Strich darauf, [Weg], wieder [Neu]: der Platz
+' war schon angelegt und traegt noch den Strich -- das Hinzufuegen muss ihn
+' leeren.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prG AS INTEGER : prG = 0
+DIM prD AS INTEGER : prD = 0
+DIM prL AS INTEGER : prL = 0
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prE4 AS INTEGER : prE4 = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prKnopf(f AS INTEGER, x AS INTEGER, y AS INTEGER, breite AS INTEGER)
+    ' Mitte eines Knopfes -- die Lage ist seine linke obere Ecke.
+    prKlick(f, x + breite \ 2, y + 14)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prE(f, 2, code, 0)
+    prE(f + 1, 1, code, 0)
+END SUB
+SUB prStrg(f AS INTEGER, code AS INTEGER)
+    ' Strg in JEDEM Bild; der Buchstabe hat seine Flanke, waehrend Strg steht.
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        prE(f + i, 2, 341, 0)
+    NEXT
+    prE(f + 2, 2, code, 0)
+    prE(f + 3, 1, code, 0)
+    prE(f + 5, 1, 341, 0)
+END SUB
+FUNCTION prMx(x AS INTEGER) AS INTEGER
+    RETURN ox + x * zoom + zoom \ 2
+END FUNCTION
+FUNCTION prMy(y AS INTEGER) AS INTEGER
+    RETURN oy + y * zoom + zoom \ 2
+END FUNCTION
+SUB prZugPunkte(f AS INTEGER, xs AS ARRAY OF INTEGER, ys AS ARRAY OF INTEGER)
+    ' Ein Mausweg in Bildpunkten; der Knopf wird in JEDEM Bild gemeldet.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        prE(f + i, 7, prMx(xs[i]), prMy(ys[i]))
+        prE(f + i, 6, 0, 0)
+    NEXT
+    prE(f + LEN(xs), 5, 0, 0)
+END SUB
+FUNCTION prStrich(f AS INTEGER, y AS INTEGER, von AS INTEGER, bis AS INTEGER) AS INTEGER
+    ' Waagerechter Strich x = von .. bis - 1; liefert die Zahl der Punkte.
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM x AS INTEGER
+    FOR x = von TO bis - 1
+        ARRAY_PUSH(xs, x) : ARRAY_PUSH(ys, y)
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+FUNCTION prDreieck(f AS INTEGER) AS INTEGER
+    ' Ein Weg um das Dreieck (2,2)-(20,2)-(2,20), je Kante 7 Punkte.
+    DIM ex AS ARRAY OF INTEGER : ex = [2, 20, 2]
+    DIM ey AS ARRAY OF INTEGER : ey = [2, 2, 20]
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM i AS INTEGER
+    DIM t AS INTEGER
+    FOR i = 0 TO 2
+        DIM ax AS INTEGER : ax = ex[i]
+        DIM ay AS INTEGER : ay = ey[i]
+        DIM bx AS INTEGER : bx = ex[(i + 1) MOD 3]
+        DIM by AS INTEGER : by = ey[(i + 1) MOD 3]
+        FOR t = 0 TO 6
+            ARRAY_PUSH(xs, INT(ROUND(ax + (bx - ax) * t / 7.0)))
+            ARRAY_PUSH(ys, INT(ROUND(ay + (by - ay) * t / 7.0)))
+        NEXT
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prZaehlen()
+    ' Gemalt auf der aktiven Ebene, davon ausserhalb der Auswahl, und Loecher
+    ' (nicht gewaehlte Punkte zwischen gewaehlten Nachbarn einer Zeile).
+    prG = 0 : prD = 0 : prL = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[aktBild, aktEb], x, y) > 0 THEN
+                prG = prG + 1
+                IF NOT gewaehlt(x, y) THEN prD = prD + 1
+            END IF
+        NEXT
+    NEXT
+    IF selAn THEN
+        FOR y = selY TO selY + selH - 1
+            DIM links AS BOOLEAN : links = FALSE
+            DIM luecke AS INTEGER : luecke = 0
+            FOR x = selX TO selX + selB - 1
+                IF gewaehlt(x, y) THEN
+                    prL = prL + luecke
+                    luecke = 0
+                    links = TRUE
+                ELSE
+                    IF links THEN luecke = luecke + 1
+                END IF
+            NEXT
+        NEXT
+    END IF
+END SUB
+FUNCTION prEcken$() AS STRING
+    RETURN STR$(GETALPHA(ebene[0, 0], 0, 0)) + " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + " " + _
+           STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1))
+END FUNCTION
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+DIM prEnde AS INTEGER : prEnde = 100000
+FUNCTION prAngelegt() AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO MAXBILD - 1
+        FOR k = 0 TO MAXEB - 1
+            n = n + ebDa[i, k]
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION prGemalt(i AS INTEGER, k AS INTEGER) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[i, k], x, y) > 0 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+SUB prFall()
+    DIM t AS INTEGER : t = 1
+    prKnopf(t, GUI_GET_X(bEbNeu), GUI_GET_Y(bEbNeu), 78)
+    t = t + 4
+    t = t + prStrich(t, 3, 2, 9) + 3
+    prKnopf(t, GUI_GET_X(bEbWeg), GUI_GET_Y(bEbWeg), 70)
+    t = t + 4
+    prKnopf(t, GUI_GET_X(bEbNeu), GUI_GET_Y(bEbNeu), 78)
+    prEnde = t + 6
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 14 THEN prMerke("ebene 2 gemalt " + STR$(prGemalt(0, 1)))
+    IF k >= prEnde THEN
+        prSchreib("ebenen " + STR$(anzEb) + " gemalt " + STR$(prGemalt(0, 1)))
+    END IF
+END SUB
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+
+--- umgebung
+DHRT_FRAMES=40
+--- inhalt _programm/probe.txt
+|ebene 2 gemalt 7|
+|ebenen 2 gemalt 0|
+
+=== ein wieder angelegtes bild ist leer
+' Dasselbe fuer ein Bild: [Neu], ein Strich, [Weg], wieder [Neu] -- ohne
+' Groessenaenderung dazwischen, die den Platz sonst ohnehin leerte.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prG AS INTEGER : prG = 0
+DIM prD AS INTEGER : prD = 0
+DIM prL AS INTEGER : prL = 0
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prE4 AS INTEGER : prE4 = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prKnopf(f AS INTEGER, x AS INTEGER, y AS INTEGER, breite AS INTEGER)
+    ' Mitte eines Knopfes -- die Lage ist seine linke obere Ecke.
+    prKlick(f, x + breite \ 2, y + 14)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER)
+    prE(f, 2, code, 0)
+    prE(f + 1, 1, code, 0)
+END SUB
+SUB prStrg(f AS INTEGER, code AS INTEGER)
+    ' Strg in JEDEM Bild; der Buchstabe hat seine Flanke, waehrend Strg steht.
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        prE(f + i, 2, 341, 0)
+    NEXT
+    prE(f + 2, 2, code, 0)
+    prE(f + 3, 1, code, 0)
+    prE(f + 5, 1, 341, 0)
+END SUB
+FUNCTION prMx(x AS INTEGER) AS INTEGER
+    RETURN ox + x * zoom + zoom \ 2
+END FUNCTION
+FUNCTION prMy(y AS INTEGER) AS INTEGER
+    RETURN oy + y * zoom + zoom \ 2
+END FUNCTION
+SUB prZugPunkte(f AS INTEGER, xs AS ARRAY OF INTEGER, ys AS ARRAY OF INTEGER)
+    ' Ein Mausweg in Bildpunkten; der Knopf wird in JEDEM Bild gemeldet.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        prE(f + i, 7, prMx(xs[i]), prMy(ys[i]))
+        prE(f + i, 6, 0, 0)
+    NEXT
+    prE(f + LEN(xs), 5, 0, 0)
+END SUB
+FUNCTION prStrich(f AS INTEGER, y AS INTEGER, von AS INTEGER, bis AS INTEGER) AS INTEGER
+    ' Waagerechter Strich x = von .. bis - 1; liefert die Zahl der Punkte.
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM x AS INTEGER
+    FOR x = von TO bis - 1
+        ARRAY_PUSH(xs, x) : ARRAY_PUSH(ys, y)
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+FUNCTION prDreieck(f AS INTEGER) AS INTEGER
+    ' Ein Weg um das Dreieck (2,2)-(20,2)-(2,20), je Kante 7 Punkte.
+    DIM ex AS ARRAY OF INTEGER : ex = [2, 20, 2]
+    DIM ey AS ARRAY OF INTEGER : ey = [2, 2, 20]
+    DIM xs AS ARRAY OF INTEGER : xs = []
+    DIM ys AS ARRAY OF INTEGER : ys = []
+    DIM i AS INTEGER
+    DIM t AS INTEGER
+    FOR i = 0 TO 2
+        DIM ax AS INTEGER : ax = ex[i]
+        DIM ay AS INTEGER : ay = ey[i]
+        DIM bx AS INTEGER : bx = ex[(i + 1) MOD 3]
+        DIM by AS INTEGER : by = ey[(i + 1) MOD 3]
+        FOR t = 0 TO 6
+            ARRAY_PUSH(xs, INT(ROUND(ax + (bx - ax) * t / 7.0)))
+            ARRAY_PUSH(ys, INT(ROUND(ay + (by - ay) * t / 7.0)))
+        NEXT
+    NEXT
+    prZugPunkte(f, xs, ys)
+    RETURN LEN(xs)
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prZaehlen()
+    ' Gemalt auf der aktiven Ebene, davon ausserhalb der Auswahl, und Loecher
+    ' (nicht gewaehlte Punkte zwischen gewaehlten Nachbarn einer Zeile).
+    prG = 0 : prD = 0 : prL = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[aktBild, aktEb], x, y) > 0 THEN
+                prG = prG + 1
+                IF NOT gewaehlt(x, y) THEN prD = prD + 1
+            END IF
+        NEXT
+    NEXT
+    IF selAn THEN
+        FOR y = selY TO selY + selH - 1
+            DIM links AS BOOLEAN : links = FALSE
+            DIM luecke AS INTEGER : luecke = 0
+            FOR x = selX TO selX + selB - 1
+                IF gewaehlt(x, y) THEN
+                    prL = prL + luecke
+                    luecke = 0
+                    links = TRUE
+                ELSE
+                    IF links THEN luecke = luecke + 1
+                END IF
+            NEXT
+        NEXT
+    END IF
+END SUB
+FUNCTION prEcken$() AS STRING
+    RETURN STR$(GETALPHA(ebene[0, 0], 0, 0)) + " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + " " + _
+           STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1))
+END FUNCTION
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+DIM prEnde AS INTEGER : prEnde = 100000
+FUNCTION prAngelegt() AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO MAXBILD - 1
+        FOR k = 0 TO MAXEB - 1
+            n = n + ebDa[i, k]
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION prGemalt(i AS INTEGER, k AS INTEGER) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF GETALPHA(ebene[i, k], x, y) > 0 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+SUB prFall()
+    DIM t AS INTEGER : t = 1
+    prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+    t = t + 4
+    t = t + prStrich(t, 3, 2, 9) + 3
+    prKnopf(t, GUI_GET_X(bBildWeg), GUI_GET_Y(bBildWeg), 70)
+    t = t + 4
+    prKnopf(t, GUI_GET_X(bBildNeu), GUI_GET_Y(bBildNeu), 78)
+    prEnde = t + 6
+    prAbspielen()
+END SUB
+SUB prProbe(k AS INTEGER)
+    IF k = 14 THEN prMerke("bild 2 gemalt " + STR$(prGemalt(1, 0)))
+    IF k >= prEnde THEN
+        prSchreib("bilder " + STR$(anzBild) + " gemalt " + STR$(prGemalt(1, 0)))
+    END IF
+END SUB
+--- programm ../../examples/189_sprite_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe(prBild - prStart)
+
+--- umgebung
+DHRT_FRAMES=40
+--- inhalt _programm/probe.txt
+|bild 2 gemalt 7|
+|bilder 2 gemalt 0|
