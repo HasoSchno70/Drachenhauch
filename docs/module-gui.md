@@ -2756,6 +2756,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_INSERT(ta, text$)` | ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, `GUI_ON_CHANGE` feuert wie beim Tippen |
 | `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text |
 | `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` | Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht `&H`-Literale |
+| `GUI_TEXTAREA_GUTTER_CLICKED(ta [, taste])` → INTEGER | welche Zeile (ab 1) in diesem Bild in der Nummernspalte angeklickt wurde, 0 = keine; `taste` 0 = links (Vorgabe), 1 = rechts. Gilt ein Bild lang wie `GUI_CLICKED`; ein Linksklick dort setzt die Schreibmarke NICHT, der Faltpfeil klappt weiter um. Fuer Haltepunkte und Lesezeichen |
 | `GUI_TEXTAREA_SWATCH_CLICKED(ta)` → INTEGER | welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie `GUI_CLICKED`, die Schreibmarke bleibt dabei stehen |
 | `GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` | drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück |
 | `GUI_TABS_CLOSABLE(win, an)` | jeder Reiter bekommt ein Kreuz. Geschlossen wird nichts — die Laufzeit meldet nur, welches getroffen wurde |

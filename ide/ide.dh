@@ -380,6 +380,7 @@ DIM umbenennWort AS STRING : umbenennWort = ""
 DIM umbenennZeile AS INTEGER : umbenennZeile = 0
 DIM umbenennSpalte AS INTEGER : umbenennSpalte = 0
 DIM bedingungZeile AS INTEGER : bedingungZeile = 0
+DIM bedingungPfad AS STRING : bedingungPfad = ""
 DIM schliessenNachDialog AS BOOLEAN : schliessenNachDialog = FALSE
 ' Wohin das Ersetzen geht: "feld" (der vordere Reiter) oder "projekt".
 DIM ersetzenZiel AS STRING : ersetzenZiel = "feld"
@@ -2884,11 +2885,17 @@ END FUNCTION
 
 SUB haltepunktUmschalten()
     IF aktiverTab < 0 THEN RETURN
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
-    IF pfad = "" THEN GUI_SET_TEXT(lblStatus, "Erst sichern -- Haltepunkte gehoeren zu einer Datei.") : RETURN
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    haltepunktUmschaltenIn(tabPfade[aktiverTab], z)
+END SUB
+
+' Derselbe Schalter fuer eine BESTIMMTE Zeile -- F9 nimmt die der Marke,
+' ein Klick in die Nummernspalte die angeklickte (die Marke bleibt dabei,
+' wo sie ist).
+SUB haltepunktUmschaltenIn(pfad AS STRING, z AS INTEGER)
+    IF pfad = "" THEN GUI_SET_TEXT(lblStatus, "Erst sichern -- Haltepunkte gehoeren zu einer Datei.") : RETURN
     DIM k AS INTEGER : k = haltepunktIndex(pfad, z)
     IF k >= 0 THEN
         ARRAY_REMOVE_AT(hpDateien, k)
@@ -2910,10 +2917,16 @@ END SUB
 ' set-breakpoints-Kommando), die IDE fragt nur nach dem Ausdruck.
 SUB haltepunktBedingungFragen()
     IF aktiverTab < 0 THEN RETURN
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
-    IF pfad = "" THEN GUI_SET_TEXT(lblStatus, "Erst sichern -- Haltepunkte gehoeren zu einer Datei.") : RETURN
+    DIM z AS INTEGER
     DIM s AS INTEGER
-    (bedingungZeile, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    haltepunktBedingungFragenIn(tabPfade[aktiverTab], z)
+END SUB
+
+SUB haltepunktBedingungFragenIn(pfad AS STRING, z AS INTEGER)
+    IF pfad = "" THEN GUI_SET_TEXT(lblStatus, "Erst sichern -- Haltepunkte gehoeren zu einer Datei.") : RETURN
+    bedingungZeile = z
+    bedingungPfad = pfad
     DIM vorgabe AS STRING : vorgabe = ""
     DIM k AS INTEGER : k = haltepunktIndex(pfad, bedingungZeile)
     IF k >= 0 THEN vorgabe = hpBedingungen[k]
@@ -2921,8 +2934,8 @@ SUB haltepunktBedingungFragen()
 END SUB
 
 SUB haltepunktBedingungSetzen(ausdruck AS STRING)
-    IF aktiverTab < 0 THEN RETURN
-    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM pfad AS STRING : pfad = bedingungPfad
+    IF pfad = "" THEN RETURN
     DIM k AS INTEGER : k = haltepunktIndex(pfad, bedingungZeile)
     IF k < 0 THEN
         ARRAY_PUSH(hpDateien, pfad) : ARRAY_PUSH(hpZeilen, bedingungZeile) : ARRAY_PUSH(hpBedingungen, TRIM$(ausdruck))
@@ -3322,6 +3335,27 @@ SUB mausNachziehen(ta AS GUI_WIDGET)
     GUI_TOOLTIP(ta, text)
     tippFeld = ta
     protokoll("tooltip " + wort)
+END SUB
+
+' --- Haltepunkt per Klick in die Nummernspalte ---------------------------
+' Links schaltet ihn um wie F9, rechts fragt nach einer Bedingung wie
+' Umschalt+F9 -- beides fuer die ANGEKLICKTE Zeile, die Marke bleibt stehen.
+' Jeder offene Reiter wird gefragt: in der geteilten Ansicht sind zwei zu
+' sehen, und ein Klick links gehoert der Datei links.
+SUB randKlicksNachziehen()
+    DIM t AS INTEGER
+    FOR t = 0 TO tabAnzahl - 1
+        DIM z AS INTEGER : z = GUI_TEXTAREA_GUTTER_CLICKED(tabFelder[t])
+        IF z > 0 THEN
+            protokoll("rand klick " + STR$(z))
+            haltepunktUmschaltenIn(tabPfade[t], z)
+        END IF
+        z = GUI_TEXTAREA_GUTTER_CLICKED(tabFelder[t], 1)
+        IF z > 0 THEN
+            protokoll("rand rechts " + STR$(z))
+            haltepunktBedingungFragenIn(tabPfade[t], z)
+        END IF
+    NEXT
 END SUB
 
 ' --- Vervollstaendigen -------------------------------------------------
@@ -8424,6 +8458,7 @@ WHILE NOT beenden
         vervollNachziehen()
         spurNachziehen()
         mausNachziehen(tf)
+        randKlicksNachziehen()
         IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig THEN
             pruefungFaellig = -1.0
             pruefen()
