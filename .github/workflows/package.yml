@@ -212,7 +212,7 @@ jobs:
           # schon im Lauf ohne Zugangsdaten gesetzt sein, damit man sieht,
           # dass dhrt damit laeuft.
           codesign -dv "$APP" 2>&1 | tee "$RUNNER_TEMP/signatur.txt"
-          grep -q "(runtime)" "$RUNNER_TEMP/signatur.txt"
+          grep -Eq 'flags=0x[0-9a-f]+\([^)]*runtime' "$RUNNER_TEMP/signatur.txt"
           plutil -lint "$APP/Contents/Info.plist"
           test -x "$APP/Contents/MacOS/dhrt"
           # dhrt IST das Hauptprogramm, ein Skript gibt es nicht mehr.
