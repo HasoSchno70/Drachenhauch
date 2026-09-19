@@ -3749,6 +3749,35 @@ Verfaelschungen (Liste nicht je Bild geleert, Finder-Warteschlange nicht
 abgeholt, IDE ohne Abfrage, Ordner wie Datei) lassen je genau ihre Faelle
 fallen.
 
+**Beglaubigung (Notarisierung) vorbereitet (2026-09-19):** Apple verlangt
+fuer die Notarisierung, dass jedes Programm im Bundle mit **Hardened
+Runtime** signiert ist -- ein Shell-Skript als Hauptprogramm (bis dahin
+`installer/posix/drachenhauch` in Contents/MacOS) kann das nicht. **dhrt ist
+jetzt selbst das Hauptprogramm** (`CFBundleExecutable` = dhrt): gestartet OHNE
+Argumente (bzw. nur mit dem alten `-psn_...`) aus `<Name>.app/Contents/MacOS/`
+mit einer IDE unter `Contents/Resources/ide/` kopiert es die Beispiele (nur
+Fehlendes), setzt `DH_IDE_BEISPIELE`/`DH_IDE_WURZEL`, wechselt dorthin und
+startet die IDE (`appstart.rs`, 4 Rust-Tests). Erkannt am Aufbau des Ordners,
+nicht am System -- darum auch unter Windows pruefbar: der neue Fall in
+`werkzeug_paket.dhtest` baut das Bundle mit der echten Laufzeit und startet
+dessen `dhrt` ohne Argumente (Gegenprobe ohne den App-Start: faellt); mit
+Argument bleibt es ein gewoehnliches dhrt. Der Linux-Starter bleibt ein
+Skript. **`bauen.dh` signiert immer mit Hardened Runtime** (ad hoc:
+`flags=0x10002(adhoc,runtime)`, im Paket-Lauf geprueft -- und dhrt laeuft
+damit: Konsolenprogramm, App-Start, Datei vom Finder). Mit `DH_MAC_SIGNATUR`
+per Developer ID (`--timestamp`, auch das `.dmg`), mit `DH_NOTAR_KEY`/
+`_KEY_ID`/`_ISSUER` (App-Store-Connect-API-Schluessel) ueber `xcrun notarytool
+submit --wait`, bei Ablehnung mit dem Protokoll des Auftrags, dann `stapler
+staple` + `validate`. Zugangsdaten NUR aus der Umgebung. Der Paket-Lauf
+richtet sie aus fuenf GitHub-Secrets ein (`MAC_ZERT_P12`, `MAC_ZERT_PASSWORT`,
+`MAC_NOTAR_KEY_P8`, `MAC_NOTAR_KEY_ID`, `MAC_NOTAR_ISSUER`; kurzlebiger
+Schluesselbund), nur wenn es sie gibt, und prueft dann `spctl --assess`.
+Anleitung fuer das Apple-Konto in `installer/README.md`. **Ungeprueft, bis es
+die Secrets gibt:** der Weg mit echter Identitaet und die Antwort von Apple.
+Das LIESMICH nennt fuer nicht beglaubigte Fassungen auch den Weg ab macOS 15
+(Systemeinstellungen -> Datenschutz & Sicherheit -> "Dennoch oeffnen"; der
+ctrl-Klick reicht dort nicht mehr).
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
