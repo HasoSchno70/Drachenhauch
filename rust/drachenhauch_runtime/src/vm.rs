@@ -6212,6 +6212,12 @@ impl<'p> Vm<'p> {
                 let (z, s) = self.gui.textarea_cursor(gi(a, 0, "GUI_TEXTAREA_CURSOR")?)?;
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(z), Value::Int(s)]))
             }
+            "gui_textarea_pos_at" => {
+                let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_POS_AT: vor SCREEN aufgerufen")?;
+                let (z, s) = self.gui.textarea_pos_at(g, gi(a, 0, "GUI_TEXTAREA_POS_AT")?,
+                    gi(a, 1, "GUI_TEXTAREA_POS_AT")?, gi(a, 2, "GUI_TEXTAREA_POS_AT")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(z), Value::Int(s)]))
+            }
             "gui_textarea_goto" => {
                 let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_GOTO: vor SCREEN aufgerufen")?;
                 let spalte = if a.len() > 2 { gi(a, 2, "GUI_TEXTAREA_GOTO")? } else { 1 };

@@ -1,0 +1,120 @@
+' GUI_TEXTAREA_POS_AT(ta, x, y) -- welches Zeichen unter einem
+' Bildschirmpunkt liegt (2026-09-19, fuer den Tooltip beim Ueberfahren und
+' Strg+Klick in der IDE).
+'
+' Geprueft wird ohne feste Pixellagen: eine Zeile von links nach rechts
+' abgetastet muss die Spalten 1, 2, 3 ... der Reihe nach liefern und davor
+' (Rand, Nummernspalte) und dahinter 0 -- dicht hinter dem Zeilenende eigens
+' geprueft, weil die letzte 0 der Abtastung vom Feldrand kommt; senkrecht
+' abgetastet die Zeilen der Reihe nach und darunter 0. Ausgegeben werden nur
+' die WECHSEL, so steht die Abfolge in einer Zeile.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== waagerecht der reihe nach und daneben null
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+GUI_SET_TEXT(ta, "hallo" + CHR$(10) + "ab" + CHR$(10) + "xyz")
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 THEN
+        DIM t AS INTEGER
+        DIM zz AS INTEGER
+        DIM ss AS INTEGER
+        ' Zeile 1 ueber die ganze Breite: zuerst ein x, das in Zeile 1 liegt
+        DIM yz AS INTEGER : yz = -1
+        FOR t = 0 TO 299
+            DIM xx AS INTEGER
+            FOR xx = 0 TO 399 STEP 2
+                (zz, ss) = GUI_TEXTAREA_POS_AT(ta, xx, t)
+                IF zz = 1 AND yz < 0 THEN yz = t + 3
+            NEXT
+        NEXT
+        DIM folge AS STRING : folge = ""
+        DIM letzt AS INTEGER : letzt = -1
+        FOR xx = 0 TO 399
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, xx, yz)
+            IF ss <> letzt THEN folge = folge + " " + STR$(ss) : letzt = ss
+        NEXT
+        PRINT "spalten" + folge
+        ' dicht hinter dem Zeilenende, aber noch im Feld: kein Zeichen. Gemessen
+        ' vom ANFANG des letzten Zeichens -- vom letzten Treffer aus laege die
+        ' Probe bei einem Fehler am Feldrand und traefe wieder nichts.
+        DIM x5 AS INTEGER : x5 = -1
+        FOR xx = 0 TO 399
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, xx, yz)
+            IF ss = 5 AND x5 < 0 THEN x5 = xx
+        NEXT
+        (zz, ss) = GUI_TEXTAREA_POS_AT(ta, x5 + 60, yz)
+        PRINT "hinter dem ende "; zz; " "; ss
+        ' senkrecht an einem x ueber dem ersten Zeichen
+        DIM x1 AS INTEGER : x1 = -1
+        FOR xx = 0 TO 399
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, xx, yz)
+            IF ss = 1 AND x1 < 0 THEN x1 = xx + 1
+        NEXT
+        folge = "" : letzt = -1
+        FOR t = 0 TO 299
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, x1, t)
+            IF zz <> letzt THEN folge = folge + " " + STR$(zz) : letzt = zz
+        NEXT
+        PRINT "zeilen" + folge
+        ' ausserhalb des Fensters und des Feldes
+        (zz, ss) = GUI_TEXTAREA_POS_AT(ta, -50, yz)
+        PRINT "draussen "; zz; " "; ss
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+spalten 0 1 2 3 4 5 0
+hinter dem ende 0 0
+zeilen 0 1 2 3 0
+draussen 0 0
+
+=== gerollt zaehlt ab der ersten sichtbaren zeile
+' Nach GUI_TEXTAREA_GOTO steht Zeile 50 im Bild -- die oberste sichtbare
+' Zeile ist die aus GUI_TEXTAREA_VIEW, nicht Zeile 1.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+DIM text AS STRING : text = ""
+DIM i AS INTEGER
+FOR i = 1 TO 100 : text = text + "zeile" + STR$(i) + CHR$(10) : NEXT
+GUI_SET_TEXT(ta, text)
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 2 THEN GUI_TEXTAREA_GOTO(ta, 50, 1)
+    IF n = 4 THEN
+        DIM erste AS INTEGER
+        DIM r AS INTEGER
+        (erste, r, r, r) = GUI_TEXTAREA_VIEW(ta)
+        DIM zz AS INTEGER
+        DIM ss AS INTEGER
+        DIM oben AS INTEGER : oben = 0
+        DIM t AS INTEGER
+        DIM xx AS INTEGER
+        FOR t = 0 TO 299
+            FOR xx = 0 TO 399 STEP 4
+                (zz, ss) = GUI_TEXTAREA_POS_AT(ta, xx, t)
+                IF zz > 0 AND oben = 0 THEN oben = zz
+            NEXT
+        NEXT
+        PRINT "oberste zeile ist die erste sichtbare "; oben = erste + 1; " "; oben > 1
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=6
+--- erwartet
+oberste zeile ist die erste sichtbare TRUE TRUE
