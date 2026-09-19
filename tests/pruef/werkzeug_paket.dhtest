@@ -49,16 +49,8 @@ PRINT "starter ohne CR "; ohneCR(d + "/drachenhauch")
 PRINT "install.sh ohne CR "; ohneCR(d + "/install.sh")
 PRINT "starter beginnt mit sh "; (LEFT$(READLINES(d + "/drachenhauch")[0], 9) = "#!/bin/sh")
 PRINT "lizenzvertrag "; FILEEXISTS(d + "/EULA.txt")
-' Das Symbol entsteht nur, wenn DIESE Laufzeit Bilder kann.
-DIM v AS INTEGER : v = PROCESS_START("dhrt", "--version")
-DIM vt AS STRING : vt = lauf$(v)
-DIM mitGrafik AS BOOLEAN : mitGrafik = INSTR(vt, "grafik") >= 0 AND INSTR(vt, "fehlt: grafik") < 0
-DIM symbolOk AS BOOLEAN : symbolOk = (FILEEXISTS(d + "/drachenhauch.png") = mitGrafik)
-IF mitGrafik AND symbolOk THEN
-    DIM b AS IMAGE : b = LOADIMAGE(d + "/drachenhauch.png")
-    symbolOk = IMAGEWIDTH(b) = 256 AND IMAGEHEIGHT(b) = 256
-END IF
-PRINT "symbol "; symbolOk
+' Das Symbol ist das aus installer/symbole/ -- kopiert, nicht erzeugt.
+PRINT "symbol "; (BUFFER_TO_HEX$(READALL_BYTES(d + "/drachenhauch.png")) = BUFFER_TO_HEX$(READALL_BYTES(ARG$(1) + "/installer/symbole/drachenhauch.png")))
 IF PROCESS_CODE(p) <> 0 THEN PRINT aus
 --- argumente
 {sammlung}/../../installer/bauen.dh
@@ -125,27 +117,17 @@ PRINT "plist programm "; (INSTR(plist, "<key>CFBundleExecutable</key>" + CHR$(10
 PRINT "plist fassung "; (INSTR(plist, "<string>" + VERSION$() + "</string>") >= 0); " "; (INSTR(plist, "@FASSUNG@") < 0)
 DIM x AS XML_HANDLE : x = XML_PARSE(plist)
 PRINT "plist ist xml "; (XML_NAME$(x) = "plist")
-' Die .icns: Kopf "icns" + Gesamtlaenge, dann Eintraege mit PNG.
-DIM v AS INTEGER : v = PROCESS_START("dhrt", "--version")
-DIM vt AS STRING : vt = lauf$(v)
-DIM mitGrafik AS BOOLEAN : mitGrafik = INSTR(vt, "grafik") >= 0 AND INSTR(vt, "fehlt: grafik") < 0
-DIM icns AS STRING : icns = app + "/Resources/Drachenhauch.icns"
-IF NOT mitGrafik THEN
-    PRINT "icns "; NOT FILEEXISTS(icns)
-    PRINT "ic08 256"
-    PRINT "ic09 512"
-    PRINT "ic10 1024"
-ELSE
-    DIM b AS BUFFER : b = READALL_BYTES(icns)
-    PRINT "icns "; (kennung$(b, 0) = "icns" AND u32(b, 4) = BUFFER_LEN(b))
-    DIM i AS INTEGER : i = 8
-    WHILE i < BUFFER_LEN(b)
-        ' PNG-Kennung, dann IHDR: Breite ab Byte 16 des PNG.
-        DIM istPng AS BOOLEAN : istPng = BUFFER_GET(b, i + 9) = 80 AND BUFFER_GET(b, i + 10) = 78 AND BUFFER_GET(b, i + 11) = 71
-        PRINT kennung$(b, i); " "; IIF(istPng, STR$(u32(b, i + 8 + 16)), "kein png")
-        i = i + u32(b, i + 4)
-    WEND
-END IF
+' Die .icns: Kopf "icns" + Gesamtlaenge, dann Eintraege mit PNG -- gelesen,
+' wie macOS sie liest, damit ein Fehler im Werkzeug hier auffaellt.
+DIM b AS BUFFER : b = READALL_BYTES(app + "/Resources/Drachenhauch.icns")
+PRINT "icns "; (kennung$(b, 0) = "icns" AND u32(b, 4) = BUFFER_LEN(b))
+DIM i AS INTEGER : i = 8
+WHILE i < BUFFER_LEN(b)
+    ' PNG-Kennung, dann IHDR: Breite ab Byte 16 des PNG.
+    DIM istPng AS BOOLEAN : istPng = BUFFER_GET(b, i + 9) = 80 AND BUFFER_GET(b, i + 10) = 78 AND BUFFER_GET(b, i + 11) = 71
+    PRINT kennung$(b, i); " "; IIF(istPng, STR$(u32(b, i + 8 + 16)), "kein png")
+    i = i + u32(b, i + 4)
+WEND
 IF PROCESS_CODE(p) <> 0 THEN PRINT aus
 --- argumente
 {sammlung}/../../installer/bauen.dh
@@ -167,7 +149,49 @@ plist ist xml TRUE
 icns TRUE
 ic08 256
 ic09 512
-ic10 1024
+
+=== die symbole im repo sind die aus dem logo
+' installer/symbole.dh noch einmal in den Fallordner: die eingecheckten
+' Dateien muessen Byte fuer Byte dieselben sein -- wer das Logo aendert und
+' das Werkzeug vergisst, faellt hier auf.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM v AS INTEGER : v = PROCESS_START("dhrt", "--version")
+DIM vt AS STRING : vt = lauf$(v)
+IF INSTR(vt, "fehlt: grafik") >= 0 OR INSTR(vt, "grafik") < 0 THEN
+    PRINT "UEBERSPRINGEN: Laufzeit ohne Grafik"
+    EXIT(0)
+END IF
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(1) + "/installer/symbole.dh", "--", "--ziel", CWD$() + "/neu")
+DIM aus AS STRING : aus = lauf$(p)
+IF PROCESS_CODE(p) <> 0 THEN PRINT aus
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM namen AS ARRAY OF STRING : namen = ["drachenhauch.png", "Drachenhauch.icns"]
+DIM i AS INTEGER
+FOR i = 0 TO 1
+    PRINT namen[i]; " "; (BUFFER_TO_HEX$(READALL_BYTES("neu/" + namen[i])) = BUFFER_TO_HEX$(READALL_BYTES(ARG$(1) + "/installer/symbole/" + namen[i])))
+NEXT
+--- argumente
+{sammlung}/../../installer/bauen.dh
+{sammlung}/../..
+--- erwartet
+rueckgabe 0
+drachenhauch.png TRUE
+Drachenhauch.icns TRUE
 
 === ein unbekanntes system ist ein fehler
 FUNCTION lauf$(p AS INTEGER) AS STRING
@@ -343,6 +367,10 @@ DIM befehl AS STRING
 befehl = "HOME='" + hier + "/home' DHRT_FRAMES=60 DH_IDE_LOG='" + hier + "/ide.log' DH_IDE_KONFIG='" + hier + "/ide.json' '" + paket + "/drachenhauch'"
 DIM s1 AS INTEGER : s1 = PROCESS_START(sh, "-c", befehl)
 DIM a1 AS STRING : a1 = lauf$(s1)
+' Scheitert der Start, steht die Meldung in der Ausgabe -- ein Rechner ohne
+' Bildschirm ("Attempting to create window failed") gilt dann als
+' uebersprungen, nicht als Fehler.
+IF PROCESS_CODE(s1) <> 0 THEN PRINT a1
 PRINT "erster start "; PROCESS_CODE(s1)
 DIM bsp AS STRING : bsp = "home/Drachenhauch/examples"
 PRINT "beispiele beim nutzer "; FILEEXISTS(bsp + "/183_sfx_generator.dh"); " "; FILEEXISTS(bsp + "/assets/editor_tileset.png")

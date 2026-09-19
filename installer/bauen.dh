@@ -152,14 +152,14 @@ IF ohneInstaller THEN
 END IF
 
 ' --- macOS und Linux ---------------------------------------------------
-DIM logo AS STRING : logo = wurzel + "/drachenhauch/assets/logo.png"
+DIM symbole AS STRING : symbole = PATHJOIN(CWD$(), "symbole")
 IF zielSystem = "linux" THEN
     MKDIR(ausgabeOrdner)
-    linuxPaket(wurzel, runtime, vorlagen, ausgabeOrdner, fassung, zielArch, logo, mitArchiv)
+    linuxPaket(wurzel, runtime, vorlagen, ausgabeOrdner, fassung, zielArch, symbole, mitArchiv)
     EXIT(0)
 ELSEIF zielSystem = "macos" THEN
     MKDIR(ausgabeOrdner)
-    macosPaket(wurzel, runtime, vorlagen, ausgabeOrdner, fassung, zielArch, logo, mitArchiv)
+    macosPaket(wurzel, runtime, vorlagen, ausgabeOrdner, fassung, zielArch, symbole, mitArchiv)
     EXIT(0)
 END IF
 

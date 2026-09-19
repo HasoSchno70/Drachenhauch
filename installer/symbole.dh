@@ -1,0 +1,85 @@
+' Erzeugt die Programmsymbole der macOS- und Linux-Pakete aus dem Logo:
+'
+'     installer/symbole/drachenhauch.png    256 x 256, fuer den Linux-Desktop
+'     installer/symbole/Drachenhauch.icns   256 und 512, fuer das .app-Bundle
+'
+'     dhrt run installer/symbole.dh [-- --logo PFAD] [--ziel ORDNER]
+'
+' Die Dateien liegen im Repo, und installer/bauen.dh kopiert sie nur: Bilder
+' brauchen in der Laufzeit einen GL-Kontext und damit ein Fenster, und das
+' gibt es auf einem Bau-Rechner ohne Bildschirm nicht -- gemessen in der CI:
+' Linux ohne DISPLAY, die macOS-Laeufer finden gar kein passendes OpenGL.
+' Neu erzeugen nur, wenn sich das Logo aendert; ob die Dateien zum Logo
+' passen, prueft tests/pruef/werkzeug_paket.dhtest.
+'
+' .icns: "icns" + Gesamtlaenge, dann je Groesse Kennung + Laenge + PNG
+' (ic08 = 256, ic09 = 512). PNG-Eintraege versteht macOS seit 10.7, und so
+' braucht es kein iconutil, das es nur auf dem Mac gibt. Ohne ic10 (1024):
+' der Eintrag allein waere 2 MB, und 512 reicht bis zur groessten Ansicht im
+' Finder.
+IMPORT "imgfx"
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+
+' Nicht quadratisch waere es verzerrt, darum erst auf ein durchsichtiges Quadrat.
+FUNCTION logoQuadrat(logo AS STRING) AS IMAGE
+    DIM b AS IMAGE : b = LOADIMAGE(logo)
+    DIM w AS INTEGER : w = IMAGEWIDTH(b)
+    DIM h AS INTEGER : h = IMAGEHEIGHT(b)
+    IF w = h THEN RETURN b
+    DIM s AS INTEGER : s = MAX(w, h)
+    DIM q AS IMAGE : q = IMAGE_NEW(s, s)
+    IMAGE_DRAW_IMAGE(q, b, (s - w) \ 2, (s - h) \ 2)
+    RETURN q
+END FUNCTION
+
+FUNCTION u32be(n AS INTEGER) AS BUFFER
+    DIM b AS BUFFER : b = BUFFER_NEW(4)
+    BUFFER_SET_U32(b, 0, n, "be")
+    RETURN b
+END FUNCTION
+
+DIM logo AS STRING : logo = PATHJOIN(DIRNAME(CWD$()), "drachenhauch/assets/logo.png")
+DIM ziel AS STRING : ziel = PATHJOIN(CWD$(), "symbole")
+DIM ai AS INTEGER : ai = 0
+WHILE ai < ARGC()
+    IF ARG$(ai) = "--logo" THEN
+        logo = vomAufrufer$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSEIF ARG$(ai) = "--ziel" THEN
+        ziel = vomAufrufer$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSE
+        PRINT "Unbekanntes Argument: "; ARG$(ai)
+        EXIT(1)
+    END IF
+WEND
+IF NOT FILEEXISTS(logo) THEN
+    PRINT "Kein Logo unter "; logo
+    EXIT(1)
+END IF
+MKDIR(ziel)
+
+DIM q AS IMAGE : q = logoQuadrat(logo)
+IMAGE_SAVE(IMAGE_SCALE(q, 256, 256), PATHJOIN(ziel, "drachenhauch.png"))
+
+DIM kennung AS ARRAY OF STRING : kennung = ["ic08", "ic09"]
+DIM kante AS ARRAY OF INTEGER : kante = [256, 512]
+DIM rumpf AS BUFFER : rumpf = BUFFER_NEW(0)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(kennung) - 1
+    DIM tmp AS STRING : tmp = PATHJOIN(ziel, "_icon.png")
+    IMAGE_SAVE(IMAGE_SCALE(q, kante[i], kante[i]), tmp)
+    DIM png AS BUFFER : png = READALL_BYTES(tmp)
+    DELETEFILE(tmp)
+    rumpf = BUFFER_CONCAT(rumpf, BUFFER_FROM_STRING(kennung[i]))
+    rumpf = BUFFER_CONCAT(rumpf, u32be(BUFFER_LEN(png) + 8))
+    rumpf = BUFFER_CONCAT(rumpf, png)
+NEXT
+DIM kopf AS BUFFER : kopf = BUFFER_CONCAT(BUFFER_FROM_STRING("icns"), u32be(BUFFER_LEN(rumpf) + 8))
+WRITEALL_BYTES(PATHJOIN(ziel, "Drachenhauch.icns"), BUFFER_CONCAT(kopf, rumpf))
+PRINT "Symbole in "; ziel; ": drachenhauch.png, Drachenhauch.icns ("; FILESIZE(PATHJOIN(ziel, "Drachenhauch.icns")) \ 1024; " KB)"

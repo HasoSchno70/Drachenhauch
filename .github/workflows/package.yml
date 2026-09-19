@@ -135,6 +135,12 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run -a rust/drachenhauch_runtime/target/release/dhrt test tests/pruef/werkzeug_paket.dhtest
 
+      # Die macOS-Laeufer haben kein passendes OpenGL ("NSGL: Failed to find a
+      # suitable pixel format", gemessen 2026-09-19) -- ein Fenster geht dort
+      # nicht. Geprueft wird darum alles bis zum Fenster: Bundle, Signatur,
+      # die Laufzeit mit einem Konsolenprogramm und dass der Starter die
+      # Beispiele in den Nutzerordner legt und die IDE aufruft. Ob die IDE
+      # auf einem echten Mac aufgeht, sagt erst ein echter Mac.
       - name: Paket ausprobieren (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -147,14 +153,26 @@ jobs:
           plutil -lint "$APP/Contents/Info.plist"
           test -x "$APP/Contents/MacOS/dhrt"
           test -x "$APP/Contents/MacOS/Drachenhauch"
+          test -f "$APP/Contents/Resources/Drachenhauch.icns"
           "$APP/Contents/MacOS/dhrt" --version
+          "$APP/Contents/MacOS/dhrt" run "$APP/Contents/Resources/examples/01_hello.dh"
           export HOME="$RUNNER_TEMP/home"
           mkdir -p "$HOME/Documents"
+          set +e
           DHRT_FRAMES=60 DH_IDE_LOG="$RUNNER_TEMP/ide.log" DH_IDE_KONFIG="$RUNNER_TEMP/ide.json" \
-            "$APP/Contents/MacOS/Drachenhauch"
-          cat "$RUNNER_TEMP/ide.log" | head -20
-          grep -qx bereit "$RUNNER_TEMP/ide.log"
+            "$APP/Contents/MacOS/Drachenhauch" >"$RUNNER_TEMP/start.txt" 2>&1
+          RC=$?
+          set -e
+          cat "$RUNNER_TEMP/start.txt"
           test -f "$HOME/Documents/Drachenhauch/examples/183_sfx_generator.dh"
+          if [ $RC -eq 0 ]; then
+            grep -qx bereit "$RUNNER_TEMP/ide.log"
+            echo "IDE gestartet."
+          elif grep -q "Attempting to create window failed" "$RUNNER_TEMP/start.txt"; then
+            echo "::notice::IDE-Start auf diesem Laeufer nicht moeglich (kein OpenGL); Starter und Laufzeit laufen."
+          else
+            exit $RC
+          fi
           hdiutil detach "$RUNNER_TEMP/abbild"
 
       - name: Sammlung werkzeug_paket (macOS, mit Grafik)
