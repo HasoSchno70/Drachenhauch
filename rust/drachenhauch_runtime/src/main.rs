@@ -100,6 +100,9 @@ mod gui;
 mod a11y;
 #[cfg(feature = "graphics")]
 mod ime;
+// Dateien vom Finder (macOS): nur die Objective-C-Laufzeit, darum ungegatet --
+// so uebersetzt es jeder macOS-Lauf der CI mit.
+mod finder;
 mod lexer;
 mod model;
 mod physics;

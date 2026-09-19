@@ -117,6 +117,10 @@ PRINT "plist programm "; (INSTR(plist, "<key>CFBundleExecutable</key>" + CHR$(10
 PRINT "plist fassung "; (INSTR(plist, "<string>" + VERSION$() + "</string>") >= 0); " "; (INSTR(plist, "@FASSUNG@") < 0)
 DIM x AS XML_HANDLE : x = XML_PARSE(plist)
 PRINT "plist ist xml "; (XML_NAME$(x) = "plist")
+' .dh als eigener Typ und die App als sein Editor -- sonst bietet der
+' Finder sie beim Doppelklick gar nicht an.
+PRINT "plist kennt .dh "; (INSTR(plist, "<string>dh</string>") >= 0 AND INSTR(plist, "<key>UTExportedTypeDeclarations</key>") >= 0)
+PRINT "app ist editor dafuer "; (INSTR(plist, "<string>de.drachenhauch.quelltext</string>") >= 0 AND INSTR(plist, "<string>Editor</string>") >= 0)
 ' Die .icns: Kopf "icns" + Gesamtlaenge, dann Eintraege mit PNG -- gelesen,
 ' wie macOS sie liest, damit ein Fehler im Werkzeug hier auffaellt.
 DIM b AS BUFFER : b = READALL_BYTES(app + "/Resources/Drachenhauch.icns")
@@ -146,6 +150,8 @@ pkginfo APPL????
 plist programm TRUE
 plist fassung TRUE TRUE
 plist ist xml TRUE
+plist kennt .dh TRUE
+app ist editor dafuer TRUE
 icns TRUE
 ic08 256
 ic09 512

@@ -17,5 +17,8 @@ Im Terminal steht die Laufzeit unter
 bereit, zum Beispiel:
     /Applications/Drachenhauch.app/Contents/MacOS/dhrt run spiel.dh
 
-Bekannt: eine .dh-Datei per Doppelklick im Finder oeffnet die IDE noch
-nicht mit dieser Datei; in der IDE ueber Datei -> Oeffnen laden.
+.dh-Dateien oeffnen sich per Doppelklick in der IDE, auch wenn sie
+schon laeuft; Dateien und Ordner lassen sich ausserdem ins Fenster ziehen
+(ein Ordner wird das Projekt). Oeffnet ein anderes Programm sie: im
+Finder auf eine .dh-Datei, Ablage -> Informationen, bei "Oeffnen mit"
+Drachenhauch waehlen und "Alle aendern".
