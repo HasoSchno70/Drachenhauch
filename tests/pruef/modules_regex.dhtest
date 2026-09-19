@@ -231,3 +231,58 @@ PRINT count
 --- erwartet
 5
 
+
+=== regex find pos liefert die lage des treffers
+' Der Grund fuer den Befehl: INSTR mit dem Text von REGEX_FIND traefe das
+' `hp` in `hpmax`, das VOR dem ganzen Wort steht.
+IMPORT "regex"
+DIM s AS INTEGER
+DIM l AS INTEGER
+(s, l) = REGEX_FIND_POS("hpmax = hp + 1", "\bhp\b")
+PRINT s; " "; l
+PRINT INSTR("hpmax = hp + 1", REGEX_FIND("hpmax = hp + 1", "\bhp\b"))
+(s, l) = REGEX_FIND_POS("abc", "x")
+PRINT s; " "; l
+' Zeichen, nicht Bytes: vor dem Treffer stehen zwei Umlaute
+(s, l) = REGEX_FIND_POS("äöz", "z")
+PRINT s; " "; l
+--- erwartet
+8 2
+0
+-1 0
+2 1
+
+=== regex find pos sucht ab einer stelle weiter
+IMPORT "regex"
+DIM s AS INTEGER
+DIM l AS INTEGER
+(s, l) = REGEX_FIND_POS("ab ab ab", "ab", 1)
+PRINT s; " "; l
+(s, l) = REGEX_FIND_POS("ab ab ab", "ab", 7)
+PRINT s; " "; l
+' am Ende des Textes: kein Treffer, kein Fehler
+(s, l) = REGEX_FIND_POS("ab", "b", 2)
+PRINT s; " "; l
+(s, l) = REGEX_FIND_POS("ab", "b", 9)
+PRINT s; " "; l
+' die Wortgrenze sieht die Zeichen vor dem Suchbeginn: mitten in `xhp` ist
+' keine, obwohl die Suche dort anfaengt
+(s, l) = REGEX_FIND_POS("xhp hp", "\bhp\b", 1)
+PRINT s; " "; l
+--- erwartet
+3 2
+-1 0
+-1 0
+-1 0
+4 2
+
+=== regex escape trifft genau den text
+IMPORT "regex"
+DIM m AS STRING : m = REGEX_ESCAPE$("a.b(c)*")
+PRINT REGEX_TEST("a.b(c)*", m)
+PRINT REGEX_TEST("axb(c)*", m)
+PRINT REGEX_TEST("axb(c)", "a.b(c)*")
+--- erwartet
+TRUE
+FALSE
+TRUE

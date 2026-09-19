@@ -1,0 +1,101 @@
+' Ein Textbereich zeigt seine Auswahl auch OHNE Fokus, gedaempft
+' (2026-09-19, gefunden an der Suchleiste der IDE: sie nimmt dem Code-Feld
+' den Fokus und markiert darin den Treffer -- der war nicht zu sehen).
+' Gemessen im Bild an zwei Stellen derselben Zeile knapp unter ihrer
+' Oberkante (dort steht kein Zeichen): im markierten Wort und im
+' unmarkierten. Die Lagen sucht GUI_TEXTAREA_POS_AT, das Programm schreibt
+' sie in pos.txt; das Bild legt DHRT_SCREENSHOT in den Fallordner.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ohne fokus bleibt die auswahl sichtbar
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 100)
+DIM kn AS GUI_WIDGET : kn = GUI_BUTTON(w, "Knopf", 10, 120, 80, 26)
+GUI_SET_TEXT(ta, "hallo welt")
+GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 6)
+GUI_FOCUS(kn)
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 THEN
+        DIM z AS INTEGER
+        DIM s AS INTEGER
+        DIM oben AS INTEGER : oben = -1
+        DIM x2 AS INTEGER : x2 = -1
+        DIM x8 AS INTEGER : x8 = -1
+        DIM t AS INTEGER
+        DIM xx AS INTEGER
+        FOR t = 0 TO 199
+            FOR xx = 0 TO 399
+                (z, s) = GUI_TEXTAREA_POS_AT(ta, xx, t)
+                IF z = 1 AND oben < 0 THEN oben = t
+                IF z = 1 AND s = 2 AND x2 < 0 THEN x2 = xx + 2
+                IF z = 1 AND s = 8 AND x8 < 0 THEN x8 = xx + 2
+            NEXT
+        NEXT
+        WRITEALL("pos.txt", STR$(x2) + " " + STR$(x8) + " " + STR$(oben + 1) + " " + STR$(IIF(GUI_FOCUSED() = kn, 1, 0)))
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=6
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+DIM p AS ARRAY OF STRING : p = SPLIT$(READLINES("pos.txt")[0], " ")
+DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+DIM y AS INTEGER : y = VAL(p[2])
+PRINT "fokus beim knopf "; p[3] = "1"
+PRINT "markiert anders als unmarkiert "; GETPIXEL(b, VAL(p[0]), y) <> GETPIXEL(b, VAL(p[1]), y)
+--- erwartet
+fokus beim knopf TRUE
+markiert anders als unmarkiert TRUE
+
+=== ohne auswahl gleich
+' Die Gegenprobe: dieselben Stellen ohne Auswahl haben dieselbe Farbe --
+' sonst bewiese der Fall oben nur, dass die Zeile ungleichmaessig gefaerbt
+' ist.
+IMPORT "gui"
+SCREEN(400, 200, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 200)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 100)
+DIM kn AS GUI_WIDGET : kn = GUI_BUTTON(w, "Knopf", 10, 120, 80, 26)
+GUI_SET_TEXT(ta, "hallo welt")
+GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 1)
+GUI_FOCUS(kn)
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 THEN
+        DIM z AS INTEGER
+        DIM s AS INTEGER
+        DIM oben AS INTEGER : oben = -1
+        DIM x2 AS INTEGER : x2 = -1
+        DIM x8 AS INTEGER : x8 = -1
+        DIM t AS INTEGER
+        DIM xx AS INTEGER
+        FOR t = 0 TO 199
+            FOR xx = 0 TO 399
+                (z, s) = GUI_TEXTAREA_POS_AT(ta, xx, t)
+                IF z = 1 AND oben < 0 THEN oben = t
+                IF z = 1 AND s = 2 AND x2 < 0 THEN x2 = xx + 2
+                IF z = 1 AND s = 8 AND x8 < 0 THEN x8 = xx + 2
+            NEXT
+        NEXT
+        WRITEALL("pos.txt", STR$(x2) + " " + STR$(x8) + " " + STR$(oben + 1))
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=6
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+DIM p AS ARRAY OF STRING : p = SPLIT$(READLINES("pos.txt")[0], " ")
+DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+DIM y AS INTEGER : y = VAL(p[2])
+PRINT "beide gleich "; GETPIXEL(b, VAL(p[0]), y) = GETPIXEL(b, VAL(p[1]), y)
+--- erwartet
+beide gleich TRUE

@@ -472,8 +472,9 @@ darum, was beim Arbeiten fehlen würde.
   ~~Klick auf `datei:zeile` in der Ausgabe~~ (18.09., `tests/pruef/werkzeug_ide_ausgabe.dhtest`), ~~Zoom mit
   Strg+Rad und Strg+Plus/Minus/0~~ (18.09., `tests/pruef/werkzeug_ide_zoom.dhtest`), ~~Tooltip beim Überfahren und Strg+Klick
   zur Definition~~ (19.09., `tests/pruef/werkzeug_ide_tooltip.dhtest`), ~~Haltepunkt per Klick in die
-  Nummernspalte~~ (19.09., `tests/pruef/werkzeug_ide_haltepunkt.dhtest`), Suchen mit
-  Groß/klein und ganzem Wort samt einzeln ersetzen; im Notenblatt die
+  Nummernspalte~~ (19.09., `tests/pruef/werkzeug_ide_haltepunkt.dhtest`), ~~Suchen mit
+  Groß/klein und ganzem Wort samt einzeln ersetzen~~ (19.09.,
+  `tests/pruef/werkzeug_ide_suche.dhtest`); im Notenblatt die
   Warnungen beim Umrechnen in den Tracker (Akkorde werden heute still auf
   eine Note gekürzt); im Sprite-Editor die festen Grenzen anheben (16
   Bilder, 128 px, 4 Ebenen).

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1861,
+ "count": 1863,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1383,8 +1383,10 @@
   "RECTROUND": "Rechteck-Rahmen mit runden Ecken",
   "RED": "Kanal 0..255 aus &HRRGGBB",
   "REDIM": "auf länge bringen — wächst mit Typ-Default, schrumpft schneidet ab; vorhandene Werte bleiben",
+  "REGEX_ESCAPE$": "STRING — Maskiert alle Sonderzeichen: das Ergebnis trifft genau den Text selbst -- fuer eine Suche, die woertlich oder als Ausdruck laufen kann",
   "REGEX_FIND": "STRING — Erster Treffer (leerer String wenn nicht gefunden)",
   "REGEX_FIND_ALL": "ARRAY OF STRING Alle nicht-ueberlappenden Treffer",
+  "REGEX_FIND_POS": "TUPLE — Lage des ersten Treffers als (start, laenge) in Zeichen ab 0 wie INSTR, (-1, 0) ohne Treffer; ab sucht ab diesem Zeichen weiter und sieht die Zeichen davor noch (eine Wortgrenze \\b am Suchbeginn gilt nur, wo wirklich eine ist)",
   "REGEX_MATCH": "BOOLEAN — Voller Match (Pattern muss ganzen Text abdecken)",
   "REGEX_REPLACE": "STRING — Ersetzt alle Treffer",
   "REGEX_REPLACE_ONCE": "STRING — Ersetzt nur den ersten Treffer",
