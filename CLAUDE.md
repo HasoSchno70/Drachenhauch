@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 631 | 1,21 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 622 | 0,78 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2811 | 0,38 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2867 | 0,39 |
 > | Tracker (`examples/190_tracker.dh`) | 3911 | 2152 | 0,55 |
 > | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 1329 | 0,26 |
 > | Anim-FSM-Editor (`examples/198_anim_fsm_editor.dh`, Weg B) | 1728 | 1336 | 0,77 |
@@ -3582,6 +3582,33 @@ prueft die zwei Warnungen des Demo-Stuecks und drueckt Enter; die
 Erwartungen kommen aus einem Lauf von `to_tracker_song`. Fuenf
 Verfaelschungen (ohne Kasten, ohne je eine der vier Warnungen) lassen je
 genau ihre Faelle fallen.
+
+**Die Grenzen des Sprite-Editors (2026-09-19, achter und letzter Punkt der
+Stufe A):** 64 Bilder, 256 px, 8 Ebenen statt 16 / 128 / 4. Die Zahlen
+waren nicht das Problem, sondern die BAUART: der Pilot legte jedes Bild
+jeder Ebene vorab an (`ebene[MAXBILD, MAXEB]`, 64 Bilder samt Textur schon
+fuer ein leeres Sprite) -- bei 64 x 8 waeren es 512 geworden. Jetzt entsteht
+ein Platz erst, wenn er gebraucht wird (`ebenenSichern` nach jedem
+Wachsen von `anzBild`/`anzEb`, Buchfuehrung `ebDa`, weil ein nie angelegter
+Platz KEIN Bild traegt und IMAGE_FREE darauf ein fremdes freigaebe). Ein
+einmal angelegter Platz bleibt, auch wenn der Bereich schrumpft -- darum
+bekommt er beim Groesse-Aendern und Drehen die neue Groesse mit (sonst kaeme
+er mit der alten zurueck), und [Neu] bei Bildern bzw. Ebenen leert ihn,
+statt ihn neu anzulegen; die Schleifen dafuer laufen nur noch ueber den
+benutzten Bereich. Der Export-Streifen wird in `baueStreifen` in der
+belegten Breite angelegt statt vorab `MAXBILD` Felder breit. **Warum 256
+und nicht die 1024 der Qt-Fassung:** die 48 Verlaufsplaetze liegen fest in
+Sprite-Groesse (bei 1024 x 1024 200 MB, bevor ein Punkt gemalt ist), und
+Zuschneiden/Statistik gehen Punkt fuer Punkt -- gemessen am vollen Mass
+Zuschneiden 1 s (je Bild EINMAL ueber die zusammengerechneten Ebenen statt
+je Ebene, sonst acht Mal so viele Abfragen), Statistik 2 s. Tests: vier
+Faelle mehr in `tests/pruef/werkzeug_sprite.dhtest` (70 x [Neu] Bild und
+10 x [Neu] Ebene ergeben 64 und 8 mit 512 angelegten Plaetzen, vorher genau
+einer; ein zurueckgelassener Platz kommt nach dem Groesse-Aendern leer und
+in 48x40 zurueck; ein wieder angelegtes Bild und eine wieder angelegte
+Ebene sind leer). Fuenf Verfaelschungen (alles vorab anlegen, alte Grenze,
+Groesse nur fuer benutzte Plaetze, Ebene bzw. Bild nicht leeren) lassen je
+genau ihren Fall fallen. Damit ist Stufe A erledigt.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die

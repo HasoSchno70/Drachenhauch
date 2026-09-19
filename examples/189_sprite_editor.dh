@@ -91,9 +91,19 @@ IMPORT "imgfx"
 IMPORT "json"
 IMPORT "physics"   ' PHYSICS_POINT_POLY fuer das Lasso
 
-CONST MAXG = 128               ' groesste Kantenlaenge eines Sprites
-CONST MAXBILD = 16             ' Einzelbilder
-CONST MAXEB = 4                ' Ebenen
+' Die Grenzen (2026-09-19 angehoben, vorher 128 / 16 / 4). Sie kosten
+' nur, was benutzt wird: ein Bild einer Ebene entsteht erst, wenn es
+' gebraucht wird (`ebenenSichern`), sonst laegen bei 64 x 8 Plaetzen 512
+' Bilder samt Textur im Speicher, auch fuer ein Sprite mit einem Bild.
+' Fest angelegt werden nur die 48 Verlaufsplaetze in Sprite-Groesse --
+' darum 256 und nicht die 1024 der Qt-Fassung: bei 1024 x 1024 waeren das
+' 200 MB, bevor ein Punkt gemalt ist. Zuschneiden und Statistik gehen Punkt
+' fuer Punkt ueber jedes Bild -- gemessen am vollen Mass (256 x 256, 64
+' Bilder, 8 Ebenen): Zuschneiden 1 s, Statistik 2 s. Mehr sollte ein
+' Knopfdruck nicht kosten.
+CONST MAXG = 256               ' groesste Kantenlaenge eines Sprites
+CONST MAXBILD = 64             ' Einzelbilder
+CONST MAXEB = 8                ' Ebenen
 CONST UNDO_MAX = 24
 CONST MAXANIM = 8              ' benannte Animationsbereiche
 CONST MAXPKT = MAXG * MAXG     ' Punkte einer Form
@@ -126,6 +136,9 @@ DIM aktEb AS INTEGER : aktEb = 0
 ' Aseprite und Verwandte. Der Qt-Editor haengt sie an das einzelne Bild;
 ' das macht "Ebene ueberall ausblenden" unmoeglich.
 DIM ebene[MAXBILD, MAXEB] AS IMAGE
+' Gibt es das Bild schon? Ein nie angelegter Platz traegt KEIN Bild, und
+' IMAGE_FREE darauf gaebe ein fremdes frei -- darum eine eigene Buchfuehrung.
+DIM ebDa[MAXBILD, MAXEB] AS INTEGER
 DIM ebName[MAXEB] AS STRING
 DIM ebSicht[MAXEB] AS INTEGER
 
@@ -301,8 +314,8 @@ END SUB
 
 SUB maskeBeginn()
     ' Nur den bisherigen Rahmen raeumen -- ausserhalb ist die Maske per
-    ' Bauart leer. Ueber das ganze Feld zu laufen waeren bei 128x128
-    ' sechzehntausend Schritte, und der Zauberstab macht das bei JEDEM Klick.
+    ' Bauart leer. Ueber das ganze Feld zu laufen waeren bei 256x256
+    ' 65536 Schritte, und der Zauberstab macht das bei JEDEM Klick.
     DIM x AS INTEGER
     DIM y AS INTEGER
     IF selAn THEN
@@ -487,6 +500,24 @@ END SUB
 ' Verlaufsplaetze, Arbeitspuffer, Streifen und Schachbrett. Herausgeloest,
 ' weil es zwei Anlaesse gibt -- ein neues Sprite und eine Groessenaenderung --
 ' und zwei Fassungen davon frueher oder spaeter auseinanderlaufen.
+' Jedes Bild im benutzten Bereich (anzBild x anzEb) anlegen, das es noch
+' nicht gibt. Aufgerufen, wann immer einer der beiden Zaehler waechst.
+' Ein Platz, der einmal angelegt war, bleibt es (auch wenn der Bereich
+' wieder schrumpft) -- er wird beim naechsten Hineinwachsen geleert, nicht
+' neu angelegt. Neu angelegte haben immer die aktuelle Groesse.
+SUB ebenenSichern()
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO anzBild - 1
+        FOR k = 0 TO anzEb - 1
+            IF ebDa[i, k] = 0 THEN
+                ebene[i, k] = IMAGE_NEW(gw, gh)
+                ebDa[i, k] = 1
+            END IF
+        NEXT
+    NEXT
+END SUB
+
 SUB hilfsbilderFrei()
     DIM i AS INTEGER
     FOR i = 0 TO UNDO_MAX - 1
@@ -506,7 +537,10 @@ SUB hilfsbilderNeu(alteFrei AS BOOLEAN)
         uNach[i] = IMAGE_NEW(gw, gh)
     NEXT
     puffer = IMAGE_NEW(gw, gh)
-    streifen = IMAGE_NEW(gw * MAXBILD, gh)
+    ' Der Streifen waechst mit der Bildzahl -- `baueStreifen` legt ihn
+    ' jedes Mal in der passenden Breite an. MAXBILD Felder vorab waeren bei
+    ' 64 x 256 schon 16384 Punkte breit, fast immer umsonst.
+    streifen = IMAGE_NEW(gw, gh)
     ' Der Verlauf wird geleert: seine Momentaufnahmen haetten die alte
     ' Groesse, und ein Zurueck darauf brauchte eine zweite Umrechnung.
     uStart = 0 : uAnz = 0 : uPos = 0
@@ -532,14 +566,19 @@ END SUB
 SUB groesseAendern(nb AS INTEGER, nh AS INTEGER, vx AS INTEGER, vy AS INTEGER)
     DIM i AS INTEGER
     DIM k AS INTEGER
+    ' Alle ANGELEGTEN Plaetze bekommen die neue Groesse, auch die ausserhalb
+    ' des benutzten Bereichs -- sonst kaeme ein Platz mit alter Groesse
+    ' zurueck, sobald der Bereich wieder waechst.
     FOR i = 0 TO MAXBILD - 1
         FOR k = 0 TO MAXEB - 1
-            DIM n AS IMAGE : n = IMAGE_NEW(nb, nh)
-            IF i < anzBild AND k < anzEb THEN
-                IMAGE_DRAW_IMAGE(n, ebene[i, k], -vx, -vy)
+            IF ebDa[i, k] = 1 THEN
+                DIM n AS IMAGE : n = IMAGE_NEW(nb, nh)
+                IF i < anzBild AND k < anzEb THEN
+                    IMAGE_DRAW_IMAGE(n, ebene[i, k], -vx, -vy)
+                END IF
+                IMAGE_FREE(ebene[i, k])
+                ebene[i, k] = n
             END IF
-            IMAGE_FREE(ebene[i, k])
-            ebene[i, k] = n
         NEXT
     NEXT
     gw = nb : gh = nh
@@ -566,6 +605,7 @@ SUB alleWandeln(art AS STRING)
     DIM k AS INTEGER
     FOR i = 0 TO MAXBILD - 1
         FOR k = 0 TO MAXEB - 1
+            IF ebDa[i, k] = 0 THEN CONTINUE
             DIM n AS IMAGE
             SELECT CASE art
                 CASE "cw"
@@ -616,20 +656,28 @@ SUB zuschneiden()
     DIM k AS INTEGER
     DIM x AS INTEGER
     DIM y AS INTEGER
+    ' Je Bild EINMAL ueber alle Ebenen zusammengerechnet: ein Punkt ist dort
+    ' genau dann nicht durchsichtig, wenn er es in irgendeiner Ebene nicht
+    ' ist. Je Ebene einzeln waeren es bei 8 Ebenen achtmal so viele
+    ' Abfragen -- mit den angehobenen Grenzen ueber 30 Millionen.
+    DIM eins AS IMAGE : eins = IMAGE_NEW(gw, gh)
     FOR i = 0 TO anzBild - 1
+        IMAGE_CLEAR(eins)
         FOR k = 0 TO anzEb - 1
-            FOR y = 0 TO gh - 1
-                FOR x = 0 TO gw - 1
-                    IF GETALPHA(ebene[i, k], x, y) > 0 THEN
-                        IF x < mnx THEN mnx = x
-                        IF y < mny THEN mny = y
-                        IF x > mxx THEN mxx = x
-                        IF y > mxy THEN mxy = y
-                    END IF
-                NEXT
+            IMAGE_DRAW_IMAGE(eins, ebene[i, k], 0, 0)
+        NEXT
+        FOR y = 0 TO gh - 1
+            FOR x = 0 TO gw - 1
+                IF GETALPHA(eins, x, y) > 0 THEN
+                    IF x < mnx THEN mnx = x
+                    IF y < mny THEN mny = y
+                    IF x > mxx THEN mxx = x
+                    IF y > mxy THEN mxy = y
+                END IF
             NEXT
         NEXT
     NEXT
+    IMAGE_FREE(eins)
     IF mxx < 0 THEN
         meldung = "Alles durchsichtig -- da bleibt nichts uebrig."
     ELIF mnx = 0 AND mny = 0 AND mxx = gw - 1 AND mxy = gh - 1 THEN
@@ -645,13 +693,14 @@ END SUB
 SUB neuesSprite(b AS INTEGER, h AS INTEGER)
     ' Beim zweiten Mal zuerst die alten Bilder freigeben -- sonst haengt
     ' jedes "Neu" einen kompletten Satz Texturen an, den niemand mehr
-    ' erreicht (bei 16x4 Ebenen plus Verlauf sind das ueber 90 Stueck).
+    ' erreicht (angelegte Ebenen plus 48 Verlaufsplaetze).
     IF angelegt THEN
         DIM fi AS INTEGER
         DIM fk AS INTEGER
         FOR fi = 0 TO MAXBILD - 1
             FOR fk = 0 TO MAXEB - 1
-                IMAGE_FREE(ebene[fi, fk])
+                IF ebDa[fi, fk] = 1 THEN IMAGE_FREE(ebene[fi, fk])
+                ebDa[fi, fk] = 0
             NEXT
         NEXT
         hilfsbilderFrei()
@@ -662,11 +711,7 @@ SUB neuesSprite(b AS INTEGER, h AS INTEGER)
     aktBild = 0 : aktEb = 0
     DIM i AS INTEGER
     DIM k AS INTEGER
-    FOR i = 0 TO MAXBILD - 1
-        FOR k = 0 TO MAXEB - 1
-            ebene[i, k] = IMAGE_NEW(gw, gh)
-        NEXT
-    NEXT
+    ebenenSichern()
     FOR k = 0 TO MAXEB - 1
         ebName[k] = "Ebene " + STR$(k + 1)
         ebSicht[k] = 1
@@ -1015,8 +1060,8 @@ END FUNCTION
 ' auch exportiert wuerde. Eine ausgeblendete Ebene taucht nicht auf; ohne
 ' diesen Satz im Ergebnis waere eine ploetzlich kleinere Zahl ein Raetsel.
 '
-' Gemessen: 16384 Punkte kosten mit Farbzaehlung rund 9 ms -- selbst bei
-' 128x128 und 16 Bildern bleibt das ein kurzer Halt auf Knopfdruck.
+' Gemessen: 16384 Punkte kosten mit Farbzaehlung rund 9 ms; am vollen Mass
+' (256x256, 64 Bilder) sind es 2 s -- ein Halt, aber einer auf Knopfdruck.
 DIM statZaehl AS MAP OF INTEGER          ' Farbe (als Text) -> Anzahl
 DIM statBild AS MAP OF INTEGER           ' dasselbe je Einzelbild
 
@@ -1248,7 +1293,8 @@ END SUB
 
 ' Die Auswahl leeren -- Ausschneiden und Entf teilen sich das. Punktweise,
 ' weil eine Freiform kein Rechteck ist; im schlimmsten Fall (128x128 ganz
-' gewaehlt) sind das gemessen rund 70 ms, und das genau einmal je Tastendruck.
+' gewaehlt) waren das gemessen rund 70 ms, bei 256x256 also rund 280 ms --
+' genau einmal je Tastendruck.
 SUB auswahlLeeren()
     DIM x AS INTEGER
     DIM y AS INTEGER
@@ -1295,7 +1341,8 @@ END SUB
 
 ' ----------------------------------------------------------- Ausgabe
 SUB baueStreifen()
-    IMAGE_CLEAR(streifen)
+    IMAGE_FREE(streifen)
+    streifen = IMAGE_NEW(gw * anzBild, gh)
     DIM i AS INTEGER
     DIM k AS INTEGER
     FOR i = 0 TO anzBild - 1
@@ -1490,6 +1537,7 @@ SUB nativLaden(pfad AS STRING)
             neuesSprite(bw, bh)
             anzBild = MIN(nb, MAXBILD)
             anzEb = MIN(ne, MAXEB)
+            ebenenSichern()
             DIM i AS INTEGER
             DIM k AS INTEGER
             FOR k = 0 TO anzEb - 1
@@ -1569,6 +1617,7 @@ SUB streifenLaden(pngPfad AS STRING)
                 DIM blatt AS IMAGE : blatt = LOADIMAGE(pngPfad)
                 neuesSprite(bw, bh)
                 anzBild = n
+                ebenenSichern()
                 DIM i AS INTEGER
                 FOR i = 0 TO n - 1
                     DIM qx AS INTEGER : qx = JSON_GET_INT(h, "sprites." + namen[i] + ".0")
@@ -2148,9 +2197,9 @@ WHILE NOT QUITREQUESTED()
         IF pb <> "" THEN
             baueStreifen()
             TRY
-                ' Der Streifen ist so breit wie MAXBILD -- fuer die Datei
-                ' auf die belegten Bilder zuschneiden, sonst schleppt jede
-                ' Ausgabe leere Felder mit.
+                ' `baueStreifen` legt ihn schon in der belegten Breite an;
+                ' der Ausschnitt bleibt, damit die Datei nie mehr Felder
+                ' traegt als Bilder da sind.
                 DIM eng AS IMAGE : eng = IMAGE_CROP(streifen, 0, 0, gw * anzBild, gh)
                 IMAGE_SAVE(eng, pb)
                 IMAGE_FREE(eng)          ' nur zum Schreiben gebraucht
@@ -2178,8 +2227,11 @@ WHILE NOT QUITREQUESTED()
     IF GUI_CLICKED(bBildNeu) AND anzBild < MAXBILD THEN
         anzBild = anzBild + 1
         aktBild = anzBild - 1
+        ebenenSichern()
+        ' Nur die benutzten Ebenen: ein Platz ausserhalb wird geleert, wenn
+        ' seine Ebene dazukommt (siehe [+ Ebene]).
         DIM k2 AS INTEGER
-        FOR k2 = 0 TO MAXEB - 1
+        FOR k2 = 0 TO anzEb - 1
             IMAGE_CLEAR(ebene[aktBild, k2])
         NEXT
         bildName[aktBild] = ""
@@ -2190,8 +2242,9 @@ WHILE NOT QUITREQUESTED()
         DIM q AS INTEGER : q = aktBild
         anzBild = anzBild + 1
         aktBild = anzBild - 1
+        ebenenSichern()
         DIM k3 AS INTEGER
-        FOR k3 = 0 TO MAXEB - 1
+        FOR k3 = 0 TO anzEb - 1
             kopiere(ebene[aktBild, k3], ebene[q, k3])
         NEXT
         ' Der Name wird NICHT mitkopiert: zwei Bilder mit demselben Namen
@@ -2230,7 +2283,7 @@ WHILE NOT QUITREQUESTED()
             DIM j AS INTEGER
             DIM k4 AS INTEGER
             FOR j = aktBild TO anzBild - 2
-                FOR k4 = 0 TO MAXEB - 1
+                FOR k4 = 0 TO anzEb - 1
                     kopiere(ebene[j, k4], ebene[j + 1, k4])
                 NEXT
                 bildName[j] = bildName[j + 1]
@@ -2300,8 +2353,11 @@ WHILE NOT QUITREQUESTED()
     IF GUI_CLICKED(bEbNeu) AND anzEb < MAXEB THEN
         anzEb = anzEb + 1
         aktEb = anzEb - 1
+        ebenenSichern()
+        ' Nur die benutzten Bilder -- ein Bild, das spaeter dazukommt, leert
+        ' seine Ebenen selbst (siehe [+ Bild]).
         DIM j2 AS INTEGER
-        FOR j2 = 0 TO MAXBILD - 1
+        FOR j2 = 0 TO anzBild - 1
             IMAGE_CLEAR(ebene[j2, aktEb])
         NEXT
         ebSicht[aktEb] = 1
@@ -2312,7 +2368,7 @@ WHILE NOT QUITREQUESTED()
             DIM j3 AS INTEGER
             DIM k5 AS INTEGER
             FOR k5 = aktEb TO anzEb - 2
-                FOR j3 = 0 TO MAXBILD - 1
+                FOR j3 = 0 TO anzBild - 1
                     kopiere(ebene[j3, k5], ebene[j3, k5 + 1])
                 NEXT
                 ebSicht[k5] = ebSicht[k5 + 1]
@@ -2415,7 +2471,7 @@ WHILE NOT QUITREQUESTED()
             CASE WZ_AUSWAHL
                 ' Die Maske entsteht erst beim LOSLASSEN. Waehrend des Zugs
                 ' ist nur ein Gummiband zu sehen -- sie bei jedem Bild neu
-                ' zu bauen waere bei 128x128 sechzehntausend Schritte, und
+                ' zu bauen waere bei 256x256 65536 Schritte, und
                 ' zu sehen gaebe es davon nichts.
                 lasN = 0
             CASE WZ_LASSO

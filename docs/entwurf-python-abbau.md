@@ -342,7 +342,7 @@ nicht.
 | SFX (183) | **verschieden**: Qt-Presets in `~/.drachenhauch/presets/sfx.json`, Drachenhauch in `.ini`-Dateien | Abtastrate beim WAV-Export; benannte Presets (~~der GB-Code übergeht den Pan-Regler~~ -- am 17.09. behoben, er liefert jetzt lauffähigen Code samt Pan) |
 | Partikel (185) | **verschieden** (wie SFX) | Hintergrund der Vorschau; „in Drachenhauch testen", „als .dh speichern"; benannte Presets |
 | Tilemap (187) | Tiled-JSON, **aber** `CONST KACHEL = 16` ✔ -- eine Qt-Karte mit anderer Kachelgröße wird falsch zerlegt; höchstens 128×128 ✔ (Qt 1000) | Kachelgröße wählen, Karte vergrößern; Eigenschaften an Objekten; Rückgängig für Ebenen und Objekte; „Speichern unter" |
-| Sprite (189) | **unverträglich** ✔: Qt-`.dhsprite` ist JSON mit base64-Pixeln, Drachenhauch liest PNG + JSON (bewusst, siehe Kopfkommentar); einziger Weg ist der Atlas-Export, ohne Ebenen | Farbe ersetzen; Frame-Werkzeuge (umkehren, Ping-Pong, zusammenfügen, ziehen); Deckkraft, Namen und Reihenfolge der Ebenen (höchstens 4); Sheet-Import mit Gitter; höchstens 16 Frames und 128 px |
+| Sprite (189) | **unverträglich** ✔: Qt-`.dhsprite` ist JSON mit base64-Pixeln, Drachenhauch liest PNG + JSON (bewusst, siehe Kopfkommentar); einziger Weg ist der Atlas-Export, ohne Ebenen | Farbe ersetzen; Frame-Werkzeuge (umkehren, Ping-Pong, zusammenfügen, ziehen); Deckkraft, Namen und Reihenfolge der Ebenen (höchstens 8); Sheet-Import mit Gitter; ~~höchstens 16 Frames und 128 px~~ (seit 19.09. 64 Bilder und 256 px; die Qt-Fassung erlaubte 1024 px) |
 | Tracker (190) | dasselbe JSON; ein Sample-, Keymap- oder SoundFont-Instrument wird beim Laden stumm -- bis 2026-09-17 schrieb der Pilot es beim **Sichern als `synth`** zurück und die Samples waren weg (**behoben:** es läuft jetzt unverändert durch) | genau diese drei Instrumentarten; VU-Meter; Patterns benennen; der Sample-Offset-Effekt |
 | Form-Designer (197) | dieselbe `.dhform`, fremde Felder laufen durch; **Qt-Projekte** (`.dhproj`) nicht | Mehrfachauswahl und Ausrichten; Kopieren/Einfügen; Projekte mit mehreren Formularen; Code-Fenster; Zoom und Lineale; viele Inspektor-Felder (sichtbar, Gruppe, Platzhalter, Passwort, Regeln, Bindung, Layout-Zuordnung, Fokus-Handler) |
 | Anim-FSM (198) | voll verträglich | höchstens sechs Bedingungen je Übergang |
@@ -476,8 +476,10 @@ darum, was beim Arbeiten fehlen würde.
   Groß/klein und ganzem Wort samt einzeln ersetzen~~ (19.09.,
   `tests/pruef/werkzeug_ide_suche.dhtest`); im Notenblatt die
   ~~Warnungen beim Umrechnen in den Tracker~~ (19.09.,
-  `tests/pruef/werkzeug_notenblatt.dhtest`); im Sprite-Editor die festen Grenzen anheben (16
-  Bilder, 128 px, 4 Ebenen).
+  `tests/pruef/werkzeug_notenblatt.dhtest`); im Sprite-Editor ~~die festen
+  Grenzen anheben (16 Bilder, 128 px, 4 Ebenen)~~ (19.09., jetzt 64 Bilder,
+  256 px, 8 Ebenen; `tests/pruef/werkzeug_sprite.dhtest`). Damit ist Stufe A
+  erledigt.
 * **Stufe B, wenn es fehlt:** Fundstellen beliebiger Namen, Dateien ins
   Fenster ziehen, Klammern automatisch schließen; Tilemap: Kachelgröße aus
   der Datei, Karte vergrößern, „Speichern unter“; Form-Designer:
