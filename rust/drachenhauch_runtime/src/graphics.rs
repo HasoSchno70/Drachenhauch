@@ -1377,16 +1377,18 @@ fn col(c: i64) -> Color {
 /// Die Einzelheiten stehen in den GLFW-Warnungen direkt darueber.
 fn kein_fenster_meldung() -> String {
     let mut m = String::from("Kein Fenster moeglich");
+    #[allow(unused_mut)] // nur unter Linux umgesetzt
+    let mut grund = " -- das System stellt kein passendes OpenGL (3.3) bereit (Einzelheiten in den GLFW-Warnungen davor, falls es welche gibt).";
     #[cfg(target_os = "linux")]
     {
         let leer = |n: &str| std::env::var(n).map(|v| v.is_empty()).unwrap_or(true);
         if leer("DISPLAY") && leer("WAYLAND_DISPLAY") {
-            m.push_str(" -- es gibt keinen Bildschirm (weder DISPLAY noch WAYLAND_DISPLAY ist gesetzt). \
-                        Auf einem Rechner ohne Bildschirm etwa ueber `xvfb-run` starten.");
-            return m;
+            grund = " -- es gibt keinen Bildschirm (weder DISPLAY noch WAYLAND_DISPLAY ist gesetzt). \
+                     Auf einem Rechner ohne Bildschirm etwa ueber `xvfb-run` starten.";
         }
     }
-    m.push_str(" -- das System stellt kein passendes OpenGL (3.3) bereit (Einzelheiten in den GLFW-Warnungen davor, falls es welche gibt).");
+    m.push_str(grund);
+    // Beide Gruende enden mit demselben Satz: was OHNE Fenster geht.
     m.push_str(" Ein Fenster brauchen SCREEN und alle Zeichen-, Bild- und gui-Befehle; PRINT, Dateien, Netz und Datenbank gehen ohne.");
     m
 }
