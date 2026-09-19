@@ -1,0 +1,132 @@
+' GUI_TEXTAREA_GUTTER_CLICKED(ta [, taste]) -- welche Zeile in der
+' Nummernspalte angeklickt wurde (2026-09-19, fuer Haltepunkte per Klick in
+' der IDE). Die Lagen werden mit GUI_TEXTAREA_POS_AT gesucht, nicht
+' festgeschrieben: die Zeile an einem x im Text, die Nummernspalte zehn
+' Punkte vor dem ersten Zeichen. Die Aufnahme schreibt das Programm im
+' dritten Bild selbst. Die Marke steht nach GUI_SET_TEXT am Ende (Zeile 4)
+' -- nicht auf der angeklickten Zeile, sonst bewiese "bleibt" nichts.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== links und rechts melden die zeile, die marke bleibt
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei" + CHR$(10) + "vier")
+DIM n AS INTEGER
+DIM z AS INTEGER
+DIM s AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 THEN
+        ' y je Zeile und das x des ersten Zeichens
+        DIM yz[5] AS INTEGER
+        DIM xt AS INTEGER : xt = -1
+        DIM t AS INTEGER
+        DIM xx AS INTEGER
+        FOR t = 0 TO 299
+            FOR xx = 0 TO 399 STEP 2
+                (z, s) = GUI_TEXTAREA_POS_AT(ta, xx, t)
+                IF z > 0 AND yz[z] = 0 THEN yz[z] = t + 4
+                IF s = 1 AND (xt < 0 OR xx < xt) THEN xt = xx
+            NEXT
+        NEXT
+        DIM rx AS INTEGER : rx = xt - 10
+        (z, s) = GUI_TEXTAREA_POS_AT(ta, rx, yz[2])
+        PRINT "am rand kein zeichen "; z; " "; s
+        DIM a AS STRING
+        a = "c 9" + CHR$(10)
+        a = a + "e 0 7 " + STR$(rx) + " " + STR$(yz[2]) + " 0" + CHR$(10)
+        a = a + "e 2 6 0 0 0" + CHR$(10) + "e 4 5 0 0 0" + CHR$(10)
+        a = a + "e 8 6 1 0 0" + CHR$(10) + "e 10 5 1 0 0" + CHR$(10)
+        a = a + "e 14 7 " + STR$(xt + 2) + " " + STR$(yz[1]) + " 0" + CHR$(10)
+        a = a + "e 16 6 0 0 0" + CHR$(10) + "e 18 5 0 0 0" + CHR$(10)
+        a = a + "e 20 7 0 0 0" + CHR$(10)
+        WRITEALL("ev.txt", a + CHR$(10))
+        AUTOMATION_PLAY("ev.txt")
+    END IF
+    IF GUI_TEXTAREA_GUTTER_CLICKED(ta) > 0 THEN
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "links "; GUI_TEXTAREA_GUTTER_CLICKED(ta); " rechts "; GUI_TEXTAREA_GUTTER_CLICKED(ta, 1); " marke "; z
+    END IF
+    IF GUI_TEXTAREA_GUTTER_CLICKED(ta, 1) > 0 THEN
+        PRINT "rechts "; GUI_TEXTAREA_GUTTER_CLICKED(ta, 1); " links "; GUI_TEXTAREA_GUTTER_CLICKED(ta)
+    END IF
+    ' nach dem Loslassen: die Bilder mit gehaltener Taste haben sie
+    ' nicht an den Rand gezogen
+    IF n = 16 THEN
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "nach dem zug marke "; z
+    END IF
+    IF n = 40 THEN
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "ende marke "; z
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=45
+--- erwartet
+am rand kein zeichen 0 0
+links 2 rechts 0 marke 4
+rechts 2 links 0
+nach dem zug marke 4
+ende marke 1
+
+=== ohne zeilennummern meldet nichts
+' Die Gegenprobe: derselbe Klick ohne Nummernspalte trifft den Text und
+' setzt die Marke in Zeile 2.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei")
+DIM n AS INTEGER
+DIM z AS INTEGER
+DIM s AS INTEGER
+DIM gemeldet AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 3 THEN
+        DIM y2 AS INTEGER : y2 = -1
+        DIM x1 AS INTEGER : x1 = -1
+        DIM t AS INTEGER
+        DIM xx AS INTEGER
+        FOR t = 0 TO 299
+            FOR xx = 0 TO 399 STEP 2
+                (z, s) = GUI_TEXTAREA_POS_AT(ta, xx, t)
+                IF z = 2 AND y2 < 0 THEN y2 = t + 4
+                IF s = 1 AND (x1 < 0 OR xx < x1) THEN x1 = xx
+            NEXT
+        NEXT
+        DIM a AS STRING
+        a = "c 3" + CHR$(10) + "e 0 7 " + STR$(x1 + 1) + " " + STR$(y2) + " 0" + CHR$(10)
+        a = a + "e 2 6 0 0 0" + CHR$(10) + "e 4 5 0 0 0" + CHR$(10)
+        WRITEALL("ev.txt", a + CHR$(10))
+        AUTOMATION_PLAY("ev.txt")
+    END IF
+    IF GUI_TEXTAREA_GUTTER_CLICKED(ta) > 0 OR GUI_TEXTAREA_GUTTER_CLICKED(ta, 1) > 0 THEN gemeldet = gemeldet + 1
+    IF n = 20 THEN
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "gemeldet "; gemeldet; " marke "; z
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=25
+--- erwartet
+gemeldet 0 marke 2
+
+=== falsche taste ist ein fehler
+IMPORT "gui"
+SCREEN(200, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 200, 200)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 150, 150)
+PRINT GUI_TEXTAREA_GUTTER_CLICKED(ta, 2)
+--- fehler
+GUI_TEXTAREA_GUTTER_CLICKED: taste ist 0 (links) oder 1 (rechts)

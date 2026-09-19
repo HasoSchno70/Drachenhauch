@@ -6280,6 +6280,16 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_swatches(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?, ganze(&a[3], n)?)?;
                 Value::Nil
             }
+            "gui_textarea_gutter_clicked" => {
+                if a.is_empty() || a.len() > 2 {
+                    return Err("GUI_TEXTAREA_GUTTER_CLICKED: erwartet (textarea [, taste])".into());
+                }
+                let taste = if a.len() == 2 { gi(a, 1, "GUI_TEXTAREA_GUTTER_CLICKED")? } else { 0 };
+                if taste != 0 && taste != 1 {
+                    return Err("GUI_TEXTAREA_GUTTER_CLICKED: taste ist 0 (links) oder 1 (rechts)".into());
+                }
+                Value::Int(self.gui.textarea_gutter_clicked(gi(a, 0, "GUI_TEXTAREA_GUTTER_CLICKED")?, taste)?)
+            }
             "gui_textarea_swatch_clicked" => Value::Int(
                 self.gui.textarea_swatch_clicked(gi(a, 0, "GUI_TEXTAREA_SWATCH_CLICKED")?)?),
             "gui_textarea_abbrev" => {

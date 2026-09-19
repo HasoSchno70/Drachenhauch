@@ -1933,7 +1933,12 @@ pub struct Widget {
     // Welches davon in diesem Bild angeklickt wurde (-1 = keins). Transient
     // wie `clicked`: ein Klick ist ein Ereignis, kein Zustand.
     farbfeld_klick: i32,
-    // Der laufende Zug begann auf einem Farbfeld: dann zieht er auch keine
+    // Klick in die Nummernspalte (nur TextArea): (Zeile ab 1, Taste 0 links /
+    // 1 rechts), (0, -1) = keiner. Transient wie `farbfeld_klick` -- was ein
+    // Klick dort bedeutet (Haltepunkt, Lesezeichen), weiss nur der Aufrufer.
+    rand_klick: (i32, i32),
+    // Der laufende Zug begann auf einem Farbfeld (oder in der Nummernspalte):
+    // dann zieht er auch keine
     // Auswahl. Ohne das setzte das naechste Bild -- die Taste ist noch
     // unten -- die Marke doch noch ans Feld.
     farbfeld_zug: bool,
@@ -2955,6 +2960,41 @@ impl Gui {
         Ok(self.ta_wdg(h, "GUI_TEXTAREA_SWATCH_CLICKED")?.farbfeld_klick as i64)
     }
 
+    /// Welche Zeile wurde in diesem Bild in der Nummernspalte angeklickt
+    /// (GUI_TEXTAREA_GUTTER_CLICKED)? `taste` 0 = links, 1 = rechts.
+    ///
+    /// Die Zeile zaehlt ab 1 (logische Zeile, wie GUI_TEXTAREA_CURSOR), 0 =
+    /// kein Klick dieser Taste. Gilt genau ein Bild lang, wie `GUI_CLICKED`.
+    pub fn textarea_gutter_clicked(&self, h: i64, taste: i64) -> Result<i64, String> {
+        let (z, t) = self.ta_wdg(h, "GUI_TEXTAREA_GUTTER_CLICKED")?.rand_klick;
+        Ok(if t as i64 == taste { z as i64 } else { 0 })
+    }
+
+    /// Die logische Zeile (ab 1) unter einem Punkt der Nummernspalte, `None`
+    /// ausserhalb -- auch auf dem Faltpfeil (der klappt, siehe edit_textarea)
+    /// und unter der letzten Zeile. Dieselbe Zeilenrechnung wie ein Klick in
+    /// den Text (`ta_rows`, `scroll`), sonst saesse ein Haltepunkt eine Zeile
+    /// daneben, sobald gefaltet oder umbrochen ist.
+    fn ta_rand_zeile(&self, g: &Graphics, wi: usize, i: usize, mx: i32, my: i32) -> Option<i32> {
+        let wd = &self.windows[wi].widgets[i];
+        let chars: Vec<char> = wd.text.chars().collect();
+        let starts = Self::line_starts(&chars);
+        let gut = self.ta_gutter(g, wd, starts.len());
+        if gut == 0 { return None; }
+        let (ax, ay, _, fh) = self.abs_rect(wi, wd);
+        let pad = 5;
+        if mx < ax || mx >= ax + pad + gut - self.sk(4) { return None; }
+        if my < ay + pad || my >= ay + fh - pad { return None; }
+        if let Some((fx, fbw)) = self.ta_falt_spalte(g, wd, ax, starts.len()) {
+            if mx >= fx && mx < fx + fbw { return None; }
+        }
+        let lh = self.ta_line_h(g);
+        let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
+        let row = wd.scroll + (my - ay - pad) / lh;
+        if row < 0 || row as usize >= rows.len() { return None; }
+        Some(rows[row as usize].0 as i32 + 1)
+    }
+
     /// Abkuerzungen, die der Tabulator meldet (GUI_TEXTAREA_ABBREV).
     ///
     /// Steht links der Schreibmarke eines dieser Woerter, rueckt der
@@ -3232,7 +3272,7 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
-            farbfelder: Vec::new(), farbfeld_klick: -1, farbfeld_zug: false, rad_stand: None,
+            farbfelder: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, rad_stand: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
@@ -9568,7 +9608,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if let Some(l) = wdg.list.as_mut() { l.hover = -1; }
                 if let Some(s) = wdg.status.as_mut() { s.hover = -1; s.geklickt = -1; }
                 if let Some(p) = wdg.pfad.as_mut() { p.hover = -1; p.geklickt = -1; }
-                wdg.farbfeld_klick = -1; wdg.abk_treffer = -1; wdg.tab_treffer = false;
+                wdg.farbfeld_klick = -1; wdg.rand_klick = (0, -1); wdg.abk_treffer = -1; wdg.tab_treffer = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
                 if let Some(t) = wdg.tree.as_mut() {
@@ -9697,7 +9737,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         if let Some(l) = self.windows[top].widgets[i].list.as_mut() { l.hover = k; }
                     }
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
-                    if kind == Kind::TextArea { self.textarea_wheel(top, i, g); }
+                    if kind == Kind::TextArea {
+                        self.textarea_wheel(top, i, g);
+                        if !menu_consumed && !tab_consumed && !scroll_consumed
+                           && (just_pressed || right_just) {
+                            let taste = if just_pressed { 0 } else { 1 };
+                            if let Some(z) = self.ta_rand_zeile(g, top, i, mx, my) {
+                                self.windows[top].widgets[i].rand_klick = (z, taste);
+                            }
+                        }
+                    }
                     if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
                     if kind == Kind::Tree { self.tree_hover(top, i, my, g); }
                     if kind == Kind::StatusBar {
@@ -11126,6 +11175,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         return;
                     }
                 }
+            }
+            // Klick in die Nummernspalte: gemeldet (GUI_TEXTAREA_GUTTER_CLICKED),
+            // die Marke bleibt, wo sie ist -- wer einen Haltepunkt setzt, will
+            // nicht an den Zeilenanfang springen.
+            // Der ganze Zug gehoert dazu (`farbfeld_zug` sperrt ihn wie beim
+            // Farbfeld), sonst zoege das naechste Bild -- die Taste ist noch
+            // unten -- die Marke doch noch an den Rand.
+            if !self.was_mouse_down && !alt
+               && self.ta_rand_zeile(g, wi, i, mx, my).is_some() {
+                self.windows[wi].widgets[i].farbfeld_zug = true;
+                return;
             }
             // Dieselbe Rechnung wie beim Zeichnen: hinter der Nummernspalte,
             // um den waagerechten Versatz verschoben. Liefe der Treffertest
