@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 674 | 1,29 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 674 | 0,84 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1575 | 0,65 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2935 | 0,40 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2934 | 0,40 |
 > | Tracker (`examples/190_tracker.dh`) | 3911 | 2165 | 0,55 |
 > | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 1342 | 0,27 |
 > | Anim-FSM-Editor (`examples/198_anim_fsm_editor.dh`, Weg B) | 1728 | 1341 | 0,78 |
