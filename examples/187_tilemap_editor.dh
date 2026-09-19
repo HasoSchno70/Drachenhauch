@@ -913,13 +913,48 @@ bloeckeUmschalten()
 
 DIM neuOffen AS BOOLEAN : neuOffen = FALSE
 DIM meldung AS STRING : meldung = ""
+DIM beenden AS BOOLEAN : beenden = FALSE
+DIM dlgEnde AS GUI_WINDOW : dlgEnde = -1
 
-WHILE NOT QUITREQUESTED()
-    IF KEYHIT(KEY_ESCAPE) AND NOT neuOffen THEN BREAK
+' ESC beendete den Editor bis 2026-09-19 ohne Rueckfrage, das Kreuz ebenso.
+SUB endeAnfragen()
+    IF geaendert THEN
+        dlgEnde = GUI_DIALOG("Beenden", "Die Karte ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
+    ELSE
+        beenden = TRUE
+    END IF
+END SUB
+
+WHILE NOT beenden
+    ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
+    ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
+    ' Testlaufs -- dort endet das Programm hart wie bisher.
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        IF dlgEnde < 0 THEN endeAnfragen()
+    ELSEIF QUITREQUESTED() THEN
+        BREAK
+    END IF
 
     SW = SCREENWIDTH() : SH = SCREENHEIGHT()
     GUI_WINDOW_SET_BOUNDS(win, 0, 0, SW, SH)
     GUI_UPDATE()
+    ' ESC erst NACH GUI_UPDATE: davor oeffnete dieselbe Taste den Kasten, und
+    ' das GUI_UPDATE desselben Bildes nahm sie gleich als "Abbrechen".
+    ' Und VOR der Antwort: im Bild, in dem ESC den Kasten abbricht, ist er
+    ' noch offen -- danach oeffnete dieselbe Taste ihn sofort wieder.
+    IF KEYHIT(KEY_ESCAPE) AND NOT neuOffen AND dlgEnde < 0 THEN endeAnfragen()
+    IF dlgEnde >= 0 THEN
+        DIM ea AS INTEGER : ea = GUI_ANSWER(dlgEnde)
+        IF ea = 1 THEN
+            dlgEnde = -1
+            speichern()
+            IF NOT geaendert THEN beenden = TRUE
+        ELSEIF ea = 2 THEN
+            dlgEnde = -1 : beenden = TRUE
+        ELSEIF ea = 3 THEN
+            dlgEnde = -1
+        END IF
+    END IF
 
     DIM strg AS BOOLEAN
     strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
@@ -1531,6 +1566,10 @@ WHILE NOT QUITREQUESTED()
     IF geaendert THEN info = info + " *"
     IF meldung <> "" THEN info = info + "   |   " + meldung
     GUI_SET_TEXT(status, info)
+
+    ' Die Karte entsteht nach GUI_DRAW -- ohne diesen Aufruf laege sie ueber
+    ' dem Kasten.
+    IF dlgEnde >= 0 THEN GUI_DRAW_WINDOW(dlgEnde)
 
     FLIP()
 WEND

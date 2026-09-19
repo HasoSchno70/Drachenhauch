@@ -248,6 +248,7 @@ SUB einstellungSichern()
         NEXT
         TRY
             INI_SAVE(datei, m)
+            standLesen(U_GESICHERT)
             GUI_SET_TEXT(lblStatus, "Gesichert: " + datei)
         CATCH e
             GUI_SET_TEXT(lblStatus, e)
@@ -282,6 +283,7 @@ SUB einstellungLaden()
             ' Der Klang baut sich von selbst neu: die Schleife vergleicht
             ' jeden Regler mit `letzter[]` -- ein per GUI_SET_VALUE gesetzter
             ' Wert sieht fuer sie aus wie eine Bewegung von Hand.
+            standLesen(U_GESICHERT)
             IF gefunden = 0 THEN
                 GUI_SET_TEXT(lblStatus, "Keine bekannten Regler in " + datei)
             ELSE
@@ -438,7 +440,11 @@ END SUB
 ' ============================================================
 CONST U_MAX = 32
 CONST U_FELDER = N_PARAM + 1           ' Regler + Wellenform
-DIM uStand[U_MAX, U_FELDER] AS FLOAT
+' Ein Platz mehr als der Verlauf braucht: dort liegt der Stand beim letzten
+' Sichern oder Laden. Ungesichert ist, was davon abweicht -- ein Zurueck auf
+' genau diesen Stand zaehlt also wieder als gesichert.
+DIM uStand[U_MAX + 1, U_FELDER] AS FLOAT
+CONST U_GESICHERT = U_MAX
 DIM uAnz AS INTEGER : uAnz = 0
 DIM uPos AS INTEGER : uPos = 0
 DIM uOffen AS BOOLEAN : uOffen = FALSE
@@ -527,13 +533,37 @@ GUI_LISTBOX_SET_SELECTED(liste, 0)
 baueKlang()
 letzteAuffrischen()
 schrittSichern()
+standLesen(U_GESICHERT)
 
 DIM frage AS GUI_WINDOW
 frage = -1                     ' -1 = keine Rueckfrage offen
+DIM beenden AS BOOLEAN : beenden = FALSE
+
+FUNCTION ungesichert() AS BOOLEAN
+    RETURN NOT standGleich(U_GESICHERT)
+END FUNCTION
+
+' ESC und das Kreuz fragen nur nach, wenn die Regler nicht so stehen wie
+' beim letzten Sichern, Laden oder Waehlen einer Werkseinstellung.
+SUB endeAnfragen()
+    IF ungesichert() THEN
+        frage = GUI_DIALOG("Beenden", "Die Einstellung ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
+    ELSE
+        beenden = TRUE
+    END IF
+END SUB
 DIM letztePreset AS INTEGER
 letztePreset = 0
 
-WHILE NOT QUITREQUESTED()
+WHILE NOT beenden
+    ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
+    ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
+    ' Testlaufs -- dort endet das Programm hart wie bisher.
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        IF frage < 0 THEN endeAnfragen()
+    ELSEIF QUITREQUESTED() THEN
+        BREAK
+    END IF
     CLS(&H0B1119)
     GUI_UPDATE()
 
@@ -541,6 +571,9 @@ WHILE NOT QUITREQUESTED()
     IF GUI_LISTBOX_SELECTED(liste) <> letztePreset THEN
         letztePreset = GUI_LISTBOX_SELECTED(liste)
         ladePreset(letztePreset)
+        ' Eine Werkseinstellung laesst sich jederzeit wieder waehlen -- es geht
+        ' nichts verloren, was nicht gesichert waere.
+        standLesen(U_GESICHERT)
     END IF
 
     IF GUI_CLICKED(knopfZufall) THEN wuerfle()
@@ -618,13 +651,23 @@ WHILE NOT QUITREQUESTED()
     GUI_DRAW()
     zeichneKurve()          ' NACH GUI_DRAW -- sonst zeichnet das Fenster darueber
 
-    ' ESC beendet -- aber nicht, wenn gerade eine Rueckfrage offen ist.
-    IF KEYHIT(KEY_ESCAPE) AND frage < 0 THEN
-        frage = GUI_DIALOG("Beenden", "SFX-Generator wirklich schliessen?", "janein")
-    END IF
+    ' ESC beendet -- aber nicht, wenn gerade eine Rueckfrage offen ist (dort
+    ' ist ESC das Abbrechen).
+    IF KEYHIT(KEY_ESCAPE) AND frage < 0 THEN endeAnfragen()
     IF frage >= 0 THEN
-        IF GUI_ANSWER(frage) = 1 THEN EXIT(0)
-        IF GUI_ANSWER(frage) = 2 THEN frage = -1
+        DIM ea AS INTEGER : ea = GUI_ANSWER(frage)
+        IF ea = 1 THEN
+            frage = -1
+            einstellungSichern()
+            IF NOT ungesichert() THEN beenden = TRUE
+        ELSEIF ea = 2 THEN
+            frage = -1 : beenden = TRUE
+        ELSEIF ea = 3 THEN
+            frage = -1
+        END IF
+        ' Ueber der Kurve liegt die Zeichenflaeche -- ohne diesen Aufruf
+        ' waere der Kasten dort nicht zu sehen.
+        IF frage >= 0 THEN GUI_DRAW_WINDOW(frage)
     END IF
 
     FLIP()
