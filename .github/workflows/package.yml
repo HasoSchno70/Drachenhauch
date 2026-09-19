@@ -199,7 +199,25 @@ jobs:
           else
             exit $RC
           fi
-          hdiutil detach "$RUNNER_TEMP/abbild"
+          # Doppelklick im Finder: macOS schickt die Datei als Apple-Event,
+          # nicht als Argument (finder.rs). `open -a APP datei` geht denselben
+          # Weg ueber LaunchServices. Ein Fenster geht hier nicht auf -- das
+          # Protokoll (DHRT_OEFFNEN_PROTOKOLL, ueber launchd an die App
+          # vererbt) belegt, dass die Datei in der Laufzeit ankommt.
+          LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+          "$LSREG" -f "$APP"
+          "$LSREG" -dump | grep -q "de.drachenhauch.quelltext"
+          echo 'PRINT "aus dem Finder"' > "$RUNNER_TEMP/finderprobe.dh"
+          launchctl setenv DHRT_OEFFNEN_PROTOKOLL "$RUNNER_TEMP/geoeffnet.txt"
+          open -a "$APP" "$RUNNER_TEMP/finderprobe.dh"
+          for i in $(seq 1 30); do
+            if grep -q "finderprobe.dh" "$RUNNER_TEMP/geoeffnet.txt" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          launchctl unsetenv DHRT_OEFFNEN_PROTOKOLL
+          cat "$RUNNER_TEMP/geoeffnet.txt"
+          grep -q "finderprobe.dh" "$RUNNER_TEMP/geoeffnet.txt"
+          hdiutil detach -force "$RUNNER_TEMP/abbild"
 
       - name: Sammlung werkzeug_paket (macOS, mit Grafik)
         if: runner.os == 'macOS'

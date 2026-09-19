@@ -323,7 +323,7 @@ Qt-IDE gewohnt ist:
 
 | Bereich | fehlt in `ide/ide.dh` |
 |---|---|
-| Datei | ~~**Absturz-Wiederherstellung**~~ (seit 18.09. da, siehe `docs/ide.md`; dabei gefunden: das **Kreuz des Fensters** beendete die IDE ohne Rückfrage, und ESC in einem Dialog beendete sie ganz -- beides seit 18.09. behoben, `WINDOW_CLOSE_REQUESTED`); **Dateien ins Fenster ziehen** ✔; Druckoptionen (Schriftgröße, Duplex, Ränder, Zeilennummern, Umfang); gefaltete Blöcke je Datei merken |
+| Datei | ~~**Absturz-Wiederherstellung**~~ (seit 18.09. da, siehe `docs/ide.md`; dabei gefunden: das **Kreuz des Fensters** beendete die IDE ohne Rückfrage, und ESC in einem Dialog beendete sie ganz -- beides seit 18.09. behoben, `WINDOW_CLOSE_REQUESTED`); **Dateien ins Fenster ziehen** ✔ (seit 19.09. wirklich -- das Häkchen stand schon vorher, `ide.dh` fragte hineingezogene Dateien aber gar nicht ab); Druckoptionen (Schriftgröße, Duplex, Ränder, Zeilennummern, Umfang); gefaltete Blöcke je Datei merken |
 | Bearbeiten | Suchen mit **Groß/klein** und **ganzes Wort** als Schalter ✔; **einzeln ersetzen** (nur „alle"); Fundstellen **beliebiger Namen** (heute nur „Wer ruft das auf?" für Unterprogramme); **Klammern und Anführungszeichen automatisch schließen**; Formatieren beim Sichern |
 | Ausführen | **nur die Auswahl ausführen** ✔; Haltepunkt per **Klick in die Nummernspalte**, Bedingung per Rechtsklick; Profil nach **Funktionen** gruppiert; ~~**Klick auf `datei:zeile` in der Ausgabe** springt dorthin~~ ✔; Ausgabe leeren |
 | Ansicht | **Zoom mit Strg+Rad und Strg+Plus/Minus/0**; **eine Datei geteilt** in zwei Ansichten (heute nur zwei verschiedene Reiter); ein- und ausblendbare Seitenleisten und Panels |
@@ -511,8 +511,9 @@ kopiert die Beispiele beim Start in den Nutzerordner und nennt ihn der IDE
 mit Grafik auf Linux und macOS und fand einen Absturz beim Beenden unter
 Linux (das Fenster schloss vor den Schriften, behoben). Unter Linux startet
 die IDE aus dem installierten Paket; auf den macOS-Läufern gibt es kein
-OpenGL, dort ist alles bis zum Fenster geprüft. Offen: Beglaubigung durch
-Apple, eine `.dh` per Doppelklick im Finder, und ein echter Mac.
+OpenGL, dort ist alles bis zum Fenster geprüft. Eine `.dh` per Doppelklick
+im Finder kommt seit demselben Tag an (`finder.rs`, im Paket-Lauf belegt).
+Offen: Beglaubigung durch Apple und ein echter Mac.
 
 **(c) entschieden am 18.09.2026: ja, mit einer Grenze.** `rust/build_runtime.py`
 und `rust/build_wasm.py` bleiben die bewusst letzten zwei Python-Dateien.

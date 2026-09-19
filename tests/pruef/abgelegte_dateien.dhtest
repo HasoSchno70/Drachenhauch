@@ -1,0 +1,65 @@
+' Abgelegte Dateien: ins Fenster gezogen oder vom Finder uebergeben
+' (graphics.rs `abgelegt`, finder.rs, ide/ide.dh `abgelegteNachziehen`,
+' 2026-09-19).
+'
+' Bis hierher holte jeder Aufruf von FILES_DROPPED/FILE_DROPPED die Liste bei
+' raylib ab, und raylib-rs gibt sie dabei frei: nach FILES_DROPPED() fand
+' FILE_DROPPED(0) nichts mehr. Jetzt wird je Bild EINMAL eingesammelt, und
+' die Liste gilt dieses eine Bild.
+'
+' Ein echtes Hineinziehen kann kein Test ausloesen; DHRT_ABLEGEN (Pfade mit
+' `;`) laesst Dateien nach dem ersten Bild wie abgelegt ankommen -- auf
+' demselben Weg wie die vom Finder. Den Finder selbst prueft der Paket-Lauf
+' der CI auf macOS (package.yml, DHRT_OEFFNEN_PROTOKOLL).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== abgelegte dateien gelten genau ein bild, und FILE_DROPPED findet sie
+SCREEN(64, 48)
+DIM b AS INTEGER
+FOR b = 0 TO 2
+    ' Zweimal FILES_DROPPED hintereinander: der erste Aufruf darf dem zweiten
+    ' nichts wegnehmen (genau daran war FILE_DROPPED vorher leer).
+    DIM n1 AS INTEGER : n1 = FILES_DROPPED()
+    DIM n2 AS INTEGER : n2 = FILES_DROPPED()
+    PRINT "bild "; b; ": "; n1; "/"; n2; " ["; FILE_DROPPED(0); "|"; FILE_DROPPED(1); "]"
+    FLIP()
+NEXT
+--- umgebung
+DHRT_ABLEGEN=eins.dh;zwei.dh
+DHRT_FRAMES=20
+--- erwartet
+bild 0: 0/0 [|]
+bild 1: 2/2 [eins.dh|zwei.dh]
+bild 2: 0/0 [|]
+
+=== die ide oeffnet eine abgelegte datei und macht einen ordner zum projekt
+' Auch auf der Willkommensseite (kein Reiter offen) -- dort landet man, wenn
+' man die App per Doppelklick auf eine Datei startet.
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=90
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DHRT_ABLEGEN={fall}/abgelegt.dh;{fall}/woanders
+--- datei abgelegt.dh
+PRINT "von draussen"
+--- datei woanders/mehr.dh
+PRINT "im anderen ordner"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(anfang AS STRING, ende AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        DIM z AS STRING : z = REPLACE$(L[i], CHR$(92), "/")
+        IF LEFT$(z, LEN(anfang)) = anfang AND RIGHT$(z, LEN(ende)) = ende THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "abgelegt gemeldet "; hat("abgelegt abgelegt.dh", "")
+PRINT "als reiter geoeffnet "; hat("geoeffnet ", "/abgelegt.dh")
+PRINT "ordner wird projekt "; hat("projekt ", "/woanders")
+--- erwartet
+abgelegt gemeldet TRUE
+als reiter geoeffnet TRUE
+ordner wird projekt TRUE

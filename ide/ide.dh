@@ -3417,6 +3417,35 @@ SUB mausNachziehen(ta AS GUI_WIDGET)
     protokoll("tooltip " + wort)
 END SUB
 
+' --- Abgelegte Dateien ---------------------------------------------------
+' Ins Fenster gezogen oder vom Finder uebergeben (macOS: Doppelklick auf eine
+' .dh, "Oeffnen mit" -- die Laufzeit reicht beides als FILES_DROPPED weiter,
+' siehe finder.rs). Eine Datei geht ueber dieselbe Weiche wie ein Klick im
+' Projektbaum, ein Ordner wird das Projekt. FILES_DROPPED gilt nur EIN Bild:
+' ist gerade ein Kasten offen, warten die Pfade, bis er zu ist -- ein Reiter,
+' der hinter einer Rueckfrage aufgeht, gehoerte zu keiner Antwort.
+DIM abgelegtWartend AS ARRAY OF STRING : abgelegtWartend = []
+SUB abgelegteNachziehen()
+    DIM i AS INTEGER
+    FOR i = 0 TO FILES_DROPPED() - 1
+        ARRAY_PUSH(abgelegtWartend, FILE_DROPPED(i))
+    NEXT
+    IF LEN(abgelegtWartend) = 0 OR GUI_MODAL() THEN RETURN
+    DIM liste AS ARRAY OF STRING : liste = abgelegtWartend
+    abgelegtWartend = []
+    FOR i = 0 TO LEN(liste) - 1
+        protokoll("abgelegt " + BASENAME(liste[i]))
+        IF DIREXISTS(liste[i]) THEN
+            projektOrdner = liste[i]
+            baumFuellen()
+            GUI_SET_TEXT(lblStatus, "Projekt: " + liste[i])
+            protokoll("projekt " + projektOrdner)
+        ELSE
+            dateiOeffnen(liste[i])
+        END IF
+    NEXT
+END SUB
+
 ' --- Haltepunkt per Klick in die Nummernspalte ---------------------------
 ' Links schaltet ihn um wie F9, rechts fragt nach einer Bedingung wie
 ' Umschalt+F9 -- beides fuer die ANGEKLICKTE Zeile, die Marke bleibt stehen.
@@ -8812,6 +8841,7 @@ WHILE NOT beenden
         END IF
     END IF
 
+    abgelegteNachziehen()
     prozessNachsehen()
     exportNachsehen()
 

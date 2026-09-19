@@ -721,7 +721,7 @@ Endung schreiben: `IMPORT "json.dh"`. Beide Engines verhalten sich identisch
 | Clip-Rechteck | `SCISSOR(x,y,b,h)` / `SCISSOR_END()` / `SCISSOR_DEPTH()` -- Zeichnen auf ein Rechteck beschraenken. Ein **Stapel**: innen wird mit aussen GESCHNITTEN. Die Mechanik lag laengst in `graphics.rs` (`push_clip`/`pop_clip`, vom `gui`-Modul benutzt) und war nur nicht herausgefuehrt; neu sind die drei Builtins plus ein Zaehler, damit ein SCISSOR_END zu viel ein Fehler ist statt dem Umgebenden seinen Clip wegzunehmen. Vorher blieb dafuer nur ein RENDERTARGET. | — |
 | Blend-Modes | `BLEND_MODE(modus$)` — `"alpha"`/`"add"`/`"mult"`/`"subtract"` fuer folgende Draws (Glow via additiv). **Nur native** (raylib `BeginBlendMode`); Tree-Walker konsolen-only -> wirft "nur dhrt". | — |
 | Prozedurale Texturen | **Nur native** (raylib `GenImage*`): `GENTEX_PERLIN(w,h,skala)`, `GENTEX_GRADIENT(w,h,c1,c2,vertikal)`, `GENTEX_CHECKED(w,h,fx,fy,c1,c2)`, `GENTEX_COLOR(w,h,c)`, **`GENTEX_RADIAL(w,h,inner,outer[,density])`** (radialer Verlauf Mitte→Rand — weiche Glows/Lichter/Vignetten, additiv gezeichnet) -> IMAGE-Handle (mit `DRAWIMAGE`/`DRAWIMAGEROT` nutzbar). Demo `examples/101_blend_gentex.dh`. | — |
-| Clipboard / Drag&Drop | **Nur native**: `CLIPBOARD_GET()->STRING` / `CLIPBOARD_SET(text$)` (System-Zwischenablage), `FILES_DROPPED()->INTEGER` (Anzahl gedroppter Dateien dieses Frame) + `FILE_DROPPED(i)->STRING` (Pfad). Tree-Walker konsolen-only -> wirft "nur dhrt". | — |
+| Clipboard / Drag&Drop | **Nur native**: `CLIPBOARD_GET()->STRING` / `CLIPBOARD_SET(text$)` (System-Zwischenablage), `FILES_DROPPED()->INTEGER` (Anzahl gedroppter Dateien dieses Frame, unter macOS auch die vom Finder uebergebenen; seit 2026-09-19 je Bild EINMAL eingesammelt -- vorher verbrauchte der erste Aufruf die Liste) + `FILE_DROPPED(i)->STRING` (Pfad). Tree-Walker konsolen-only -> wirft "nur dhrt". | — |
 | Render-Targets | **Nur native:** `RENDERTARGET_NEW(w,h[,behalten])->INTEGER` (Off-Screen-Render-Ziel; `behalten`=TRUE laesst den Inhalt ueber das Bild hinaus stehen -> **echte Rueckkopplung/Schweife**, `RENDERTARGET_CLEAR(rt[,farbe])` raeumt es von Hand), `RENDERTARGET_BEGIN(rt)` / `RENDERTARGET_END()` (folgende Draws ins Ziel — pro Frame transparent gecleart), `RENDERTARGET_DRAW(rt,x,y[,skala[,tint]])` (Ziel als Bild stempeln). dhrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die RenderTexture gerendert (y-flip); Tree-Walker konsolen-only -> wirft "nur dhrt". Demo `examples/102_render_target.dh`. *Grenze:* RtDraw innerhalb eines anderen Targets = No-Op -- ein Target kann sich also auch NICHT selbst zeichnen. Schweife entstehen ueber `behalten`=TRUE plus Verblassen mit `BLEND_MODE("mult")` + Vollbild-`BOX` in dunklem Grau (Rezept + Tests: `tests/pruef/rendertarget_persistenz.dhtest`). | — |
 | Zustand sichern | `GFX_PUSH()` / `GFX_POP()` — Zeichenzustand auf einen Stapel legen und zurueckholen: 2D-Kamera+Ruetteln, aktive Layer, Hintergrundfarbe, Licht (Ambient/Nebel/alle Lichtquellen), Umgebung (`LIGHT_ENV`, IBL-Schalter, `SKYBOX`), Schatten (an/Bereich/Ziel), 3D-Kamera samt View-/Projektions-Ueberschreibung, Schrift und `POSTFX`. **Nicht** enthalten: geladene Ressourcen (bleiben geladen — POP schaltet nur ihre Benutzung zurueck), die Schatten-AUFLOESUNG (haengt am allozierten Tiefenpuffer) und der Blend-Modus (ohnehin nur ein Bild lang gueltig). Analog `AUDIO_PUSH()` / `AUDIO_POP()` fuer alle Bus-Einstellungen (Lautstaerke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor, EQ) — eine laufende `AUDIO_MODULATE`-Bindung wird dabei abgeloest, weil das Zurueckschreiben denselben Kira-Parameter beschreibt (empirisch belegt in `tests/pruef/gfx_push_pop.dhtest`). `GFX_DEPTH`/`AUDIO_DEPTH` liefern die Stapeltiefe, ein POP ohne PUSH ist ein Fehler. **Der Grund:** dieser Zustand ist global, und eine vergessene Ruecknahme faellt erst Szenen spaeter auf. | — |
 | Fenster-Zustand | `WINDOW_FOCUSED()` (Spiel pausieren, wenn der Nutzer wegklickt), `WINDOW_MINIMIZED/MAXIMIZED/HIDDEN()`, `WINDOW_IS_FULLSCREEN()`, `WINDOW_FOCUS()` (nach vorne holen), `WINDOW_OPACITY(0..1)` (ganzes Fenster durchscheinend), **`WINDOW_ICON(bild)`** — ohne das trug jedes exportierte Spiel das raylib-Standardsymbol. `WINDOW_DPI_X/Y()` = Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI/Retina — ohne sie weiss ein Programm nicht, ob seine Pixelgroessen auf dem Zielgeraet winzig herauskommen). `GET_TIME()` = monotone Sekunden seit Programmstart. `OPENURL(adresse$)` oeffnet den Standardbrowser — **bewusst auf http/https begrenzt**, weil raylib die Zeichenkette an die Shell weiterreicht und ein `file:`-Schema sonst ein Weg waere, aus einem GB-Programm Beliebiges zu starten. | — |
@@ -3677,8 +3677,8 @@ macOS (arm64) 22 MB, `codesign --verify` gueltig, die Laufzeit aus dem
 Bundle fuehrt Programme aus, der Starter legt die Beispiele an -- **ein
 Fenster geht auf den macOS-Laeufern nicht** (kein OpenGL), ob die IDE auf
 einem echten Mac aufgeht, ist ungeprueft. Bekannt offen: eine `.dh` per
-Doppelklick im Finder oeffnet die IDE nicht mit der Datei (dafuer braeuchte
-es ein Apple-Event, ein Shell-Starter bekommt es nicht), keine
+Doppelklick im Finder oeffnete die IDE nicht mit der Datei (seit demselben
+Tag behoben, siehe "Dateien vom Finder" unten), keine
 Beglaubigung (Notarisierung); ein gescheitertes Fenster endete in einem
 Panic -- seit demselben Tag eine Meldung (naechster Absatz). Tests `tests/pruef/werkzeug_paket.dhtest`
 (8: Linux-Ordner, macOS-Bundle samt .icns-Eintraegen, Symbole passen zum
@@ -3713,6 +3713,41 @@ Tests `tests/pruef/kein_fenster.dhtest` (4, geben die Meldung nie selbst aus,
 sonst hielte der Laeufer sie fuer eine Maschine ohne Bildschirm); drei
 Verfaelschungen (ohne `catch_unwind`, Hook nicht stumm, Bildbefehl ohne
 eigenen Namen) lassen je genau ihre Faelle fallen.
+
+**Dateien vom Finder und ins Fenster gezogen (2026-09-19):** macOS gibt eine
+per Doppelklick geoeffnete Datei NICHT als Argument weiter, sondern als
+Apple-Event an die laufende App -- NSApplication reicht es an seinen Delegate
+(`application:openURLs:`), und das ist GLFWs `GLFWApplicationDelegate`, der die
+Methode nicht kennt: das Ereignis ging still verloren. `finder.rs` reicht sie
+per `class_addMethod` nach, BEVOR GLFW in `glfwInit` sein `[NSApp run]` dreht
+(dort kommt das Start-Ereignis an) -- nur die Objective-C-Laufzeit, keine
+Crates, darum ungegatet und von jedem macOS-Lauf der CI mit uebersetzt; die
+Pfade gehen in eine Warteschlange. `Info.plist` meldet `.dh` als eigenen Typ
+`de.drachenhauch.quelltext` an (Klartext/Quelltext) und die App als dessen
+Editor. **Dabei fiel ein alter Fehler auf:** `FILES_DROPPED`/`FILE_DROPPED`
+holten die Liste bei JEDEM Aufruf bei raylib ab, und raylib-rs gibt sie dabei
+frei (`Drop = UnloadDroppedFiles`) -- nach `FILES_DROPPED()` lieferte
+`FILE_DROPPED(0)` leer, `examples/115_modplayer.dh` hat so nie einen Pfad
+bekommen. Jetzt sammelt `flip` je Bild EINMAL ein (raylib + Finder, Feld
+`abgelegt`), und die Liste gilt dieses eine Bild. **Die IDE** oeffnet
+abgelegte Dateien ueber dieselbe Weiche wie der Projektbaum (`dateiOeffnen`:
+Reiter, Form-Designer oder System), ein Ordner wird das Projekt; waehrend
+eines Kastens warten die Pfade (`abgelegteNachziehen`). Das stand in der
+Luecken-Tabelle von `docs/entwurf-python-abbau.md` laengst als erledigt,
+in `ide.dh` gab es aber keine Zeile dafuer. **Pruefung:**
+`DHRT_ABLEGEN` (Pfade mit `;`) speist DIESELBE Warteschlange wie der Finder,
+geprueft wird also auch das Abholen; `DHRT_OEFFNEN_PROTOKOLL` schreibt jeden
+vom Finder uebergebenen Pfad mit. **Im Paket-Lauf auf macOS belegt:**
+`lsregister` kennt den Typ, und `open -a Drachenhauch.app datei.dh` (derselbe
+Weg ueber LaunchServices wie der Doppelklick) liefert den Pfad in der Laufzeit
+ab -- durch den Shell-Starter und dessen `exec` hindurch. Dass die IDE ihn
+dann als Reiter zeigt, ist auf einem echten Mac ungeprueft (die Laeufer haben
+kein Fenster); unter Windows zeigt es der Test. Tests
+`tests/pruef/abgelegte_dateien.dhtest` (2) plus zwei Zeilen in
+`werkzeug_paket.dhtest`, Rust-Test `warteschlange_liefert_einmal`; vier
+Verfaelschungen (Liste nicht je Bild geleert, Finder-Warteschlange nicht
+abgeholt, IDE ohne Abfrage, Ordner wie Datei) lassen je genau ihre Faelle
+fallen.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
