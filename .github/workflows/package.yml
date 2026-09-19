@@ -118,11 +118,16 @@ jobs:
         if: runner.os == 'Linux'
         continue-on-error: true
         run: |
+          set +e
           D=rust/drachenhauch_runtime/target/release/dhrt
           echo "== A: Beispiel, xvfb-Vorgabe"
           DHRT_FRAMES=10 xvfb-run -a $D run examples/09_shapes.dh; echo "rc=$?"
           echo "== B: Beispiel, 24 Bit"
           DHRT_FRAMES=10 xvfb-run -a -s "-screen 0 1920x1080x24" $D run examples/09_shapes.dh; echo "rc=$?"
+          echo "== B2: Beispiel, 24 Bit, unter gdb"
+          DHRT_FRAMES=10 xvfb-run -a -s "-screen 0 1920x1080x24" gdb -batch -ex run -ex bt             --args $D run examples/09_shapes.dh
+          echo "== B3: Beispiel, 24 Bit, ohne Szene-Ziel? LIBGL_ALWAYS_SOFTWARE"
+          DHRT_FRAMES=10 LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s "-screen 0 1920x1080x24" $D run examples/09_shapes.dh; echo "rc=$?"
           echo "== C: IDE, 24 Bit, unter gdb"
           DHRT_FRAMES=30 DH_IDE_LOG=/tmp/d.log DH_IDE_KONFIG=/tmp/d.json DH_IDE_WURZEL=$PWD \
             xvfb-run -a -s "-screen 0 1920x1080x24" gdb -batch -ex run -ex bt -ex "info registers rip" \
