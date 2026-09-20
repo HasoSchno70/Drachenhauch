@@ -6,6 +6,14 @@
 ' Die Umrechner (MIDI_NOTE_NAME$, MIDI_NOTE_FREQ) stehen in JEDEM Bau, die
 ' Geraetebefehle haengen am Feature `midi`.
 ' Format: docs/werkzeuge.md, dhrt test.
+'
+' SERIELL, weil ein MIDI-Port ein geteiltes Betriebsmittel ist: die beiden
+' Loopback-Faelle oeffnen DENSELBEN virtuellen Port, und parallel landen die
+' Noten des einen im Eingang des anderen (gemessen mit loopMIDI: der erste
+' Fall bekam "an 1 96 100" -- die aelteste ueberlebende Note aus dem
+' Pufferdeckel-Fall). Ohne einen solchen Port ueberspringen sich beide, und
+' der Fehler waere unsichtbar geblieben.
+--- seriell
 
 === die befehle stehen im verzeichnis
 FUNCTION bekannt(name AS STRING) AS BOOLEAN
