@@ -263,7 +263,12 @@ ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
 falsch (erkannt an der Meldung „Kein Fenster moeglich“, die `dhrt` dann
 statt eines Absturzes ausgibt; `DHRT_KEIN_FENSTER=1` täuscht genau diesen
 Fehler vor, zum Prüfen auf einem Rechner mit Bildschirm); mit `DHRT_OHNE_GRAFIK=1` auch einer, dem im Bau ohne raylib ein
-Grafik-Befehl fehlt. **Ein Fall darf sich auch selbst überspringen**: die Zeile
+Grafik-Befehl fehlt. **Das gilt auch, wenn der Fall selbst mit 0 endet** und
+nur sein KIND kein Fenster bekam — ein Fall, der ein Programm startet, fängt
+dessen Scheitern ja ab und gibt es als Text aus. Entschieden wird deshalb am
+Ergebnis: nur was sonst als falsch gälte, wird übersprungen; ein Fall, der die
+Meldung ERWARTET, bleibt grün (sonst wäre `kein_fenster.dhtest` stillschweigend
+nie geprüft worden). **Ein Fall darf sich auch selbst überspringen**: die Zeile
 `UEBERSPRINGEN: <grund>` auf stdout oder stderr, dann steht der Grund in der
 Bilanz. Das ist für fremde Werkzeuge gedacht, die nicht überall liegen (node,
 git, cargo); die Alternative wäre, die erwarteten Zeilen zu **erfinden** — grün
@@ -277,8 +282,11 @@ und wertlos. Die Bilanz nennt Dateien und Fälle:
 2 Datei(en), 1 ok, 1 mit Fehlern; 36 Faelle, 35 ok, 1 fehl, 0 uebersprungen  (1.52s)
 ```
 
-Die Sammlungen des Projekts liegen unter `tests/pruef/`; bis pytest ganz
-fällt, lässt `tests/test_dhrt_test.py` sie in der CI mitlaufen.
+Die Sammlungen des Projekts liegen unter `tests/pruef/`; die CI ruft
+`dhrt test tests/pruef` direkt auf (bis 2026-09-20 über einen pytest-Anker).
+Das Format selbst prüft `tests/pruef/dhrt_test_format.dhtest` — an einer
+Sammlung, die der Fall schreibt, mit erwarteten Meldungen, Zeilennummern und
+Bilanz.
 
 ## `dhrt fmt` — einheitlich schreiben
 

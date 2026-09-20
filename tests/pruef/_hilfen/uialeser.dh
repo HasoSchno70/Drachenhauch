@@ -2,7 +2,15 @@
 ' raylibs INFO-/WARNING-Zeilen fallen weg, Zeilenenden werden \n).
 ' Nach dem Ende noch ein paar Mal leer lesen: das Kind kann beendet sein,
 ' bevor sein Lesefaden die letzte Zeile abgelegt hat.
+' Die FEHLERausgabe landet nicht im Ergebnis -- sie wuerde jede Erwartung
+' stoeren --, aber auch nicht im Nichts: sie steht danach in `auslesenFehler`.
+' Ohne sie sah ein Fall nicht, dass sein Kind an SCREEN gestorben ist (auf dem
+' Windows-Runner der CI macht kein Fenster auf), und meldete stattdessen einen
+' Fehler ueber etwas ganz anderes.
+DIM auslesenFehler AS STRING
+
 FUNCTION auslesen$(p AS INTEGER, grenzeMs AS INTEGER) AS STRING
+    auslesenFehler = ""
     DIM roh AS STRING : roh = ""
     DIM leer AS INTEGER : leer = 0
     DIM t0 AS INTEGER : t0 = MILLIS()
@@ -11,6 +19,7 @@ FUNCTION auslesen$(p AS INTEGER, grenzeMs AS INTEGER) AS STRING
         DIM e AS STRING : e = PROCESS_ERR$(p)
         IF a <> "" OR e <> "" THEN
             roh = roh + a
+            auslesenFehler = auslesenFehler + e
             leer = 0
         ELSEIF NOT PROCESS_RUNNING(p) THEN
             leer = leer + 1

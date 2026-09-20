@@ -1,0 +1,120 @@
+' Das Format der Pruefsammlungen, gemessen am echten Laeufer: was `dhrt test`
+' meldet, wenn ein Fall nicht stimmt, dass `--- fehler` wirklich den Abbruch
+' verlangt, dass Beilage, Umgebung, `--- enthaelt` und `--filter` wirken, und
+' dass eine kaputte Sammlung ein Fehler der DATEI ist, kein stiller Ausfall.
+'
+' Bis 2026-09-20 tests/test_dhrt_test.py. Der vierte Test dort war der Anker
+' ueber `tests/pruef` selbst -- den ruft die CI jetzt direkt auf
+' (`dhrt test tests/pruef`), er braucht kein pytest mehr.
+'
+' Die innere Sammlung schreibt jeder Fall SELBST (WRITEALL) statt sie als
+' `--- datei`-Beilage mitzugeben: ihre Zeilen beginnen mit `===` und `---`,
+' und der AEUSSERE Laeufer haelt jede solche Zeile fuer seinen eigenen
+' Trenner (pruefsammlung.rs, `sammlung_parsen`) -- die Beilage waere also
+' mitten im Text zu Ende.
+'
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein fehlschlag nennt fall und zeile
+' Vier Faelle, zwei davon falsch: einer mit anderer Ausgabe als erwartet,
+' einer, der einen Fehler verspricht und einfach durchlaeuft. Die Zeile in
+' der Meldung ist die Zeile des `===` in der geprueften Datei -- ohne sie
+' sucht man in einer Sammlung mit 40 Faellen von Hand.
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "=== stimmt")
+ARRAY_PUSH(z, "PRINT 1 + 1")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "2")
+ARRAY_PUSH(z, "=== stimmt nicht")
+ARRAY_PUSH(z, "PRINT 1 + 1")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "3")
+ARRAY_PUSH(z, "=== faellt nicht")
+' Der Rueckstrich ist die ganzzahlige Division; in einer GEWOEHNLICHEN
+' Zeichenkette steht er woertlich (Escapes gibt es nur mit !"...").
+ARRAY_PUSH(z, "PRINT 1 \ 0")
+ARRAY_PUSH(z, "--- fehler")
+ARRAY_PUSH(z, "Division")
+ARRAY_PUSH(z, "=== faellt nicht obwohl es sollte")
+ARRAY_PUSH(z, "PRINT 5")
+ARRAY_PUSH(z, "--- fehler")
+ARRAY_PUSH(z, "Division")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+dlStarten(["test", "s.dhtest"])
+PRINT "rueckgabe "; dlCode
+PRINT "nennt fall und zeile "; (INSTR(dlAus, "FEHL  Zeile 5: stimmt nicht: Ausgabezeile 1: erwartet '3', erhalten '2'") >= 0)
+PRINT "ausgebliebener fehler faellt auf "; (INSTR(dlAus, "Zeile 13: faellt nicht obwohl es sollte: ein Fehler war erwartet") >= 0)
+PRINT "bilanz "; (INSTR(dlAus, "2 von 4 Faellen") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+nennt fall und zeile TRUE
+ausgebliebener fehler faellt auf TRUE
+bilanz TRUE
+
+=== beilage umgebung enthaelt und filter
+' Eine Beilage liegt NEBEN dem Programm (der Fall laeuft in seinem eigenen
+' Ordner), die Umgebung gilt nur fuer diesen einen Fall, `--- enthaelt`
+' verlangt die Zeile irgendwo statt der ganzen Ausgabe -- und `--filter`
+' waehlt Faelle aus, damit ein einzelner nicht die ganze Datei mitzieht.
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "=== liest die Beilage")
+ARRAY_PUSH(z, !"IMPORT \"json\"")
+ARRAY_PUSH(z, !"DIM h AS JSON_HANDLE : h = JSON_LOAD(\"daten.json\")")
+ARRAY_PUSH(z, !"PRINT JSON_GET_INT(h, \"x\")")
+ARRAY_PUSH(z, "--- datei daten.json")
+ARRAY_PUSH(z, !"{\"x\": 42}")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "42")
+ARRAY_PUSH(z, "=== sieht die Umgebung")
+ARRAY_PUSH(z, !"PRINT GETENV$(\"DH_PROBE\")")
+ARRAY_PUSH(z, "--- umgebung")
+ARRAY_PUSH(z, "DH_PROBE=hallo")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "hallo")
+ARRAY_PUSH(z, "=== enthaelt reicht")
+ARRAY_PUSH(z, !"PRINT \"a\"")
+ARRAY_PUSH(z, !"PRINT \"b\"")
+ARRAY_PUSH(z, !"PRINT \"c\"")
+ARRAY_PUSH(z, "--- enthaelt")
+ARRAY_PUSH(z, "b")
+ARRAY_PUSH(z, "=== kaputt")
+ARRAY_PUSH(z, "PRINT 1 \ 0")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+dlStarten(["test", "s.dhtest"])
+PRINT "rueckgabe "; dlCode
+PRINT "nur der kaputte faellt "; (INSTR(dlAus, "1 von 4 Faellen") >= 0)
+PRINT "abbruch wird gemeldet "; (INSTR(dlAus, "kaputt: Rueckgabewert") >= 0)
+dlStarten(["test", "s.dhtest", "--filter", "Beilage"])
+PRINT "gefiltert rueckgabe "; dlCode
+PRINT "gefiltert ein fall "; (INSTR(dlAus, "1 Faelle") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+nur der kaputte faellt TRUE
+abbruch wird gemeldet TRUE
+gefiltert rueckgabe 0
+gefiltert ein fall TRUE
+
+=== zwei faelle gleichen namens sind ein fehler der datei
+' Sonst waere der zweite stumm der erste: `--filter` traefe beide, und
+' welcher von beiden gelaufen ist, saehe man der Bilanz nicht an.
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "=== a")
+ARRAY_PUSH(z, "PRINT 1")
+ARRAY_PUSH(z, "=== a")
+ARRAY_PUSH(z, "PRINT 2")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+dlStarten(["test", "s.dhtest"])
+PRINT "rueckgabe "; dlCode
+PRINT "sagt was los ist "; (INSTR(dlAus + dlErr, "gibt es schon") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+sagt was los ist TRUE

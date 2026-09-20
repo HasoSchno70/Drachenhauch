@@ -131,6 +131,30 @@ jobs:
       # einer abgestuerzt, und xdist wartete auf einen Prozess, den es nicht
       # mehr gab. Bleibt als Netz stehen, auch wenn Durchgang 2 dem Absturz
       # die Grundlage nimmt.
+      # Die Pruefsammlungen laufen DIREKT, nicht ueber pytest: bis 2026-09-20
+      # rief `tests/test_dhrt_test.py` sie als Anker auf, und die Datei faellt
+      # mit dem Python-Teil weg (Weg D). Das FORMAT der Sammlungen prueft
+      # seither `tests/pruef/dhrt_test_format.dhtest` -- sie pruefen sich also
+      # selbst. Steht vor pytest, weil hier die Sprache selbst haengt: ein
+      # Fehler darin soll nicht hinter 3000 Python-Tests auftauchen.
+      #
+      # `DH_OHNE_AUDIO=1`: das setzte bisher conftest.py fuer die pytest-Laeufe,
+      # und der Anker erbte es. Ohne die Variable sucht jedes Programm mit Ton
+      # ein Ausgabegeraet -- der Runner hat keins ("NoDefaultOutputDevice").
+      #
+      # GEMESSEN am 2026-09-20, als dieser Schritt neu war: 24 Faelle rot, die
+      # tags zuvor ueber den Anker gruen waren -- bei GLEICHER Image-Version
+      # ("windows-2025-vs2026") und demselben Aufruf (nachgestellt, ebenfalls
+      # rot). Der Runner hat also mal einen OpenGL-Treiber und mal nicht
+      # ("WGL: The driver does not appear to support OpenGL"). Getragen wird
+      # das jetzt von der Ueberspring-Erkennung in `pruefsammlung.rs`, die seit
+      # demselben Tag auch greift, wenn der Fall selbst mit 0 endet und nur
+      # sein KIND kein Fenster bekam.
+      - name: Pruefsammlungen (dhrt test)
+        env:
+          DH_OHNE_AUDIO: 1
+        run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef
+
       - name: Run tests (parallel)
         run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
 
@@ -139,6 +163,7 @@ jobs:
 
       - name: Run tests (seriell -- exklusive Betriebsmittel)
         run: pytest tests/ -q -m seriell
+
 
   # Cross-Platform-Migration Phase 3: auf Linux UND macOS nicht nur BAUEN,
   # sondern TESTEN.
@@ -219,11 +244,20 @@ jobs:
       # der ist eine Windows-Desktop-Anwendung und wird oben getestet. Ein
       # Haufen X11-Pakete nur fuers headless-Starten von Dialogen waere der
       # falsche Handel.
+      # Wie im Windows-Job: die Sammlungen direkt, ohne pytest als Anker.
+      # Ohne Grafik ueberspringen sich die Fenster-Faelle selbst.
+      - name: Pruefsammlungen (dhrt test)
+        run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
+
       - name: Run tests (parallel, ohne Grafik, ohne Qt)
         run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
 
+      # Rueckgabewert 5 heisst bei pytest "keine Tests gesammelt" -- und genau
+      # das ist hier seit 2026-09-20 der Fall: die letzten seriellen
+      # Nicht-Qt-Dateien sind Pruefsammlungen geworden (Weg D). Der Schritt
+      # bleibt stehen, damit ein neuer serieller Test hier wieder mitlaeuft.
       - name: Run tests (seriell)
-        run: pytest tests/ -q -m "seriell and not qt"
+        run: pytest tests/ -q -m "seriell and not qt" || [ $? -eq 5 ]
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
   # Rust-Kern (dhrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1863,
+ "count": 1864,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -399,6 +399,7 @@
   "ENUM_NAME": "zu einem ENUM-Wert seinen Namen zurückgeben — für Anzeige und Fehlersuche",
   "EPRINT": "Zeile nach stderr statt stdout",
   "EURO$": "STRING — Cent-Betrag in deutscher Schreibweise anzeigen (1999 wird zu 19,99 €)",
+  "EXEPATH$": "Pfad der laufenden Programmdatei",
   "EXIT": "sofort beenden, code = Rückgabewert (0..255, Vorgabe 0)",
   "FBM": "mehrere Rauschlagen übereinander: grobe Form plus feine Details",
   "FBM3": "dasselbe im Raum",

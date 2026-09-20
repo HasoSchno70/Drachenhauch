@@ -3603,6 +3603,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             std::env::set_current_dir(p).map_err(|e| format!("CHDIR: {} ({})", e, p))?;
             Ok(Value::Nil)
         }
+        "exepath$" | "exepath" => {
+            arity!(0);
+            // Die Datei, die gerade LAEUFT: unter `dhrt run x.dh` die Laufzeit,
+            // in einem exportierten Spiel dessen eigene Exe. Ein Programm hatte
+            // bisher keinen Weg dorthin -- `PROCESS_START("dhrt", ...)` kennt
+            // die Laufzeit zwar unter diesem Namen, `SHELL`/`SHELL_OUT$` aber
+            // nicht, und wer seine Beilagen NEBEN der Exe sucht (statt im
+            // Startverzeichnis, DHRT_START_DIR) fand sie gar nicht.
+            let p = std::env::current_exe().map_err(|e| format!("EXEPATH$: {}", e))?;
+            Ok(Value::str_rc(&p.to_string_lossy()))
+        }
 
         // ===== Modul: tween (zeitbasiert -> nicht deterministisch) =====
         "tween_new" | "tween_new_loop" | "tween_new_pingpong" => {

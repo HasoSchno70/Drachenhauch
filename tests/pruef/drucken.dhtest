@@ -1,10 +1,11 @@
 ' Drucken (docs/entwurf-drucken.md, Wege A und C): PRINTERS, PRINTER_DEFAULT$,
 ' PDF_PREVIEW, die Fehlermeldungen von PDF_PRINT und OPENDOC.
 '
-' Bis 2026-09-16 in tests/test_drucken.py. Dort bleibt der Druck durch einen
-' ECHTEN Treiber ("Microsoft Print to PDF" in eine Datei): gelesen wird diese
-' Datei mit PyMuPDF samt Lage des Betrags, und der Leser hier (pdftext.dh in
-' pdf.dhtest) kennt nur PDFs, die dhrt selbst schreibt.
+' Bis 2026-09-16 in tests/test_drucken.py; der Druck durch einen ECHTEN
+' Treiber ("Microsoft Print to PDF" in eine Datei) blieb dort noch, weil der
+' Leser in Drachenhauch nur PDFs von dhrt selbst kannte. Seit 2026-09-20 liest
+' `_hilfen/pdftext.dh` auch fremde PDFs samt Textlagen -- damit steht auch
+' dieser Fall hier, und pytest braucht es fuer den Druck nicht mehr.
 
 === der standarddrucker ist leer oder steht in der liste
 IMPORT "pdf"
@@ -111,3 +112,68 @@ unbekannter drucker TRUE
 kopien TRUE
 fehlende datei TRUE
 programm abgewiesen TRUE
+
+=== der druck geht durch einen echten treiber
+' Pruefstein 1 aus docs/entwurf-drucken.md: PDF_PRINT schickt die Seiten
+' wirklich an einen Druckertreiber. "Microsoft Print to PDF" nimmt in DOCINFO
+' einen Ausgabepfad und fragt dann nicht nach -- was dabei herauskommt, ist
+' also das, was der Treiber aus unserem GDI-Weg gemacht hat: mm in
+' Geraeteeinheiten, PHYSICALOFFSET abgezogen, TA_TOP, Schriften abgebildet.
+'
+' Gelesen wird die Datei mit demselben Leser wie unsere eigenen PDFs
+' (_hilfen/pdftext.dh); bis 2026-09-20 ging das nicht und der Fall stand
+' deshalb als letzter Druck-Test in tests/test_drucken.py mit PyMuPDF.
+'
+' Der Fall fasst den Standarddrucker NICHT an, prueft aber, dass er sich nicht
+' verschoben hat: hat Windows "den zuletzt verwendeten Drucker als Standard
+' festlegen" eingeschaltet, verschiebt ihn jeder Druck -- dann faellt der Fall
+' auf, statt das stillschweigend zu tun.
+IMPORT "pdf"
+IMPORT "leser.dh"
+DIM da AS BOOLEAN : da = FALSE
+DIM n AS STRING
+FOR EACH n IN PRINTERS()
+    IF n = "Microsoft Print to PDF" THEN da = TRUE
+NEXT
+IF NOT da THEN
+    PRINT "UEBERSPRINGEN: kein 'Microsoft Print to PDF' auf dieser Maschine"
+    EXIT(0)
+END IF
+DIM vorher AS STRING : vorher = PRINTER_DEFAULT$()
+DIM p AS PDF : p = PDF_NEW()
+PDF_TITLE(p, "Drucktest")
+PDF_FONT(p, "helvetica-fett", 18)
+PDF_TEXT(p, 20, 25, "Rechnung 2026-0002")
+PDF_FONT(p, "helvetica", 11)
+PDF_TEXT(p, 20, 40, "Anna Berger")
+PDF_LINE(p, 20, 50, 190, 50)
+PDF_RECT_FILL(p, 20, 60, 40, 10)
+DIM sollX AS FLOAT : sollX = 190.0 - PDF_TEXT_WIDTH(p, "85,39 EUR")
+PDF_TEXT(p, sollX, 80, "85,39 EUR")
+PDF_PAGE(p)
+PDF_TEXT(p, 20, 25, "Seite zwei")
+PDF_PRINT(p, "Microsoft Print to PDF", 1, "druck.pdf")
+DIM s AS ARRAY OF STRING : s = pdfSeiten("druck.pdf")
+PRINT "seiten "; LEN(s)
+PRINT "ueberschrift "; (INSTR(s[0], "Rechnung 2026-0002") >= 0)
+PRINT "name "; (INSTR(s[0], "Anna Berger") >= 0)
+PRINT "betrag "; (INSTR(s[0], "85,39 EUR") >= 0)
+PRINT "zweite seite "; (INSTR(s[1], "Seite zwei") >= 0)
+' Die Lagen kommen aus den Textmatrizen der gedruckten Datei: der Betrag steht
+' rechtsbuendig an 190 mm, der Name am linken Rand. Ein Fehler im Massstab
+' oder im Versatz der mm-Umrechnung verschoebe genau diese zwei Zahlen.
+PRINT "name steht links "; (ABS(pdfStelleXmm("Anna Berger") - 20.0) < 1.0)
+PRINT "betrag steht rechts "; (ABS(pdfStelleXmm("85,39") - sollX) < 1.0)
+PRINT "standard unveraendert "; (PRINTER_DEFAULT$() = vorher)
+--- datei leser.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- system windows
+--- erwartet
+seiten 2
+ueberschrift TRUE
+name TRUE
+betrag TRUE
+zweite seite TRUE
+name steht links TRUE
+betrag steht rechts TRUE
+standard unveraendert TRUE

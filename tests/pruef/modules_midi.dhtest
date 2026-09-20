@@ -1,9 +1,19 @@
-' Modul `midi`: der Teil, der kein Geraet braucht. Bis Stufe 52 (2026-09-14)
-' in tests/test_midi_module.py; dort bleiben die Faelle mit einem echten oder
-' virtuellen MIDI-Anschluss (Senden, Loopback-Kreis, Pufferdeckel).
+' Modul `midi`. Bis Stufe 52 (2026-09-14) in tests/test_midi_module.py; die
+' Faelle mit einem echten oder virtuellen Anschluss (Senden, Loopback-Kreis,
+' Pufferdeckel) kamen am 2026-09-20 nach. Jeder von ihnen ueberspringt sich
+' selbst, wenn seine Stufe fehlt: das Feature `midi`, ein MIDI-Ausgang, ein
+' virtueller Loopback-Port.
 ' Die Umrechner (MIDI_NOTE_NAME$, MIDI_NOTE_FREQ) stehen in JEDEM Bau, die
 ' Geraetebefehle haengen am Feature `midi`.
 ' Format: docs/werkzeuge.md, dhrt test.
+'
+' SERIELL, weil ein MIDI-Port ein geteiltes Betriebsmittel ist: die beiden
+' Loopback-Faelle oeffnen DENSELBEN virtuellen Port, und parallel landen die
+' Noten des einen im Eingang des anderen (gemessen mit loopMIDI: der erste
+' Fall bekam "an 1 96 100" -- die aelteste ueberlebende Note aus dem
+' Pufferdeckel-Fall). Ohne einen solchen Port ueberspringen sich beide, und
+' der Fehler waere unsichtbar geblieben.
+--- seriell
 
 === die befehle stehen im verzeichnis
 FUNCTION bekannt(name AS STRING) AS BOOLEAN
@@ -99,3 +109,235 @@ CATCH e
 END TRY
 --- erwartet
 antwortet: TRUE
+
+=== ein unbekannter anschluss wird benannt
+IMPORT "midi"
+DIM c AS INTEGER
+TRY
+    c = MIDI_IN_COUNT()
+CATCH ohne
+    PRINT "UEBERSPRINGEN: Bau ohne das midi-Feature"
+    EXIT(0)
+END TRY
+DIM h AS MIDI_IN
+TRY
+    h = MIDI_IN_OPEN(999)
+CATCH e
+    PRINT "nennt die nummer "; (INSTR(e, "es gibt keinen Eingang 999") >= 0)
+END TRY
+--- erwartet
+nennt die nummer TRUE
+
+=== die wertebereiche beim senden werden vorher geprueft
+' Ein Wert ueber 127 setzte im Protokoll das Statusbit und wuerde als voellig
+' andere Nachricht gelesen -- das muss auffallen, bevor etwas hinausgeht.
+' Geprueft OHNE offenen Ausgang: die Bereichspruefung kommt vor dem Zugriff
+' aufs Geraet, sonst haette sie auf einer Maschine ohne Anschluss keine
+' Wirkung.
+IMPORT "midi"
+DIM c AS INTEGER
+TRY
+    c = MIDI_OUT_COUNT()
+CATCH ohne
+    PRINT "UEBERSPRINGEN: Bau ohne das midi-Feature"
+    EXIT(0)
+END TRY
+TRY
+    MIDI_NOTE_ON(0, 0, 60, 100)
+CATCH e1
+    PRINT "kanal 0 "; (INSTR(e1, "Kanal muss zwischen 1 und 16") >= 0)
+END TRY
+TRY
+    MIDI_NOTE_ON(0, 17, 60, 100)
+CATCH e2
+    PRINT "kanal 17 "; (INSTR(e2, "Kanal muss zwischen 1 und 16") >= 0)
+END TRY
+TRY
+    MIDI_NOTE_ON(0, 1, 128, 100)
+CATCH e3
+    PRINT "note 128 "; (INSTR(e3, "Note muss zwischen 0 und 127") >= 0)
+END TRY
+TRY
+    MIDI_NOTE_ON(0, 1, 60, -1)
+CATCH e4
+    PRINT "anschlag -1 "; (INSTR(e4, "Anschlag muss zwischen 0 und 127") >= 0)
+END TRY
+TRY
+    MIDI_CC(0, 1, 200, 0)
+CATCH e5
+    PRINT "regler 200 "; (INSTR(e5, "Reglernummer muss zwischen 0 und 127") >= 0)
+END TRY
+TRY
+    MIDI_SEND(0, 64, 0, 0)
+CATCH e6
+    PRINT "statusbyte 64 "; (INSTR(e6, "Statusbyte muss zwischen 128 und 255") >= 0)
+END TRY
+--- erwartet
+kanal 0 TRUE
+kanal 17 TRUE
+note 128 TRUE
+anschlag -1 TRUE
+regler 200 TRUE
+statusbyte 64 TRUE
+
+=== ein geschlossenes handle nimmt nichts mehr an
+IMPORT "midi"
+DIM c AS INTEGER
+TRY
+    c = MIDI_OUT_COUNT()
+CATCH ohne
+    PRINT "UEBERSPRINGEN: Bau ohne das midi-Feature"
+    EXIT(0)
+END TRY
+IF c = 0 THEN
+    PRINT "UEBERSPRINGEN: kein MIDI-Ausgang an dieser Maschine"
+    EXIT(0)
+END IF
+DIM s AS MIDI_OUT : s = MIDI_OUT_OPEN(0)
+MIDI_OUT_CLOSE(s)
+TRY
+    MIDI_NOTE_ON(s, 1, 60, 100)
+CATCH e
+    PRINT "sagt was los ist "; (INSTR(e, "geschlossenes MIDI_OUT") >= 0)
+END TRY
+--- erwartet
+sagt was los ist TRUE
+
+=== noten gehen wirklich hinaus
+' Der einzige Weg, den Sendepfad ohne fremdes Geraet zu belegen: Windows
+' bringt einen MIDI-Ausgang mit (GS Wavetable Synth). Hier laeuft also
+' wirklich ein Dreiklang zum Synthesizer und wieder aus.
+IMPORT "midi"
+DIM c AS INTEGER
+TRY
+    c = MIDI_OUT_COUNT()
+CATCH ohne
+    PRINT "UEBERSPRINGEN: Bau ohne das midi-Feature"
+    EXIT(0)
+END TRY
+IF c = 0 THEN
+    PRINT "UEBERSPRINGEN: kein MIDI-Ausgang an dieser Maschine"
+    EXIT(0)
+END IF
+DIM s AS MIDI_OUT : s = MIDI_OUT_OPEN(0)
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    MIDI_NOTE_ON(s, 1, 60 + i * 4, 100)
+NEXT
+FOR i = 0 TO 2
+    MIDI_NOTE_OFF(s, 1, 60 + i * 4)
+NEXT
+MIDI_CC(s, 1, 7, 90)
+MIDI_OUT_CLOSE(s)
+PRINT "durch"
+--- erwartet
+durch
+
+=== gesendetes kommt wieder an
+' Der ganze Kreis: senden, durch das Betriebssystem, wieder empfangen. Das ist
+' der Teil, den die Rust-Tests NICHT abdecken -- sie pruefen die
+' Entschluesselung mit erfundenen Bytes; hier laeuft eine echte Nachricht
+' durch midir, den Treiber und den Rueckruf-Faden zurueck.
+'
+' Die dritte Nachricht ist die wichtigste: ein Note-AN mit Anschlag 0. So
+' schicken die meisten Instrumente ein Note-aus, und hier ist belegt, dass es
+' auch ueber einen echten Transport so ankommt.
+'
+' Gebraucht wird ein VIRTUELLER Loopback-Port (unter Windows z.B. loopMIDI,
+' `winget install TobiasErichsen.loopMIDI`). Ein solcher Port erscheint unter
+' demselben Namen als Ein- UND Ausgang; genau daran erkennt der Fall ihn, ein
+' echtes Geraet nie. Ein Keyboard braucht es dafuer nicht.
+IMPORT "midi"
+DIM c AS INTEGER
+TRY
+    c = MIDI_OUT_COUNT()
+CATCH ohne
+    PRINT "UEBERSPRINGEN: Bau ohne das midi-Feature"
+    EXIT(0)
+END TRY
+DIM port AS STRING : port = ""
+DIM i AS INTEGER
+FOR i = 0 TO MIDI_IN_COUNT() - 1
+    DIM j AS INTEGER
+    FOR j = 0 TO MIDI_OUT_COUNT() - 1
+        IF port = "" AND MIDI_IN_NAME$(i) = MIDI_OUT_NAME$(j) THEN port = MIDI_IN_NAME$(i)
+    NEXT
+NEXT
+IF port = "" THEN
+    PRINT "UEBERSPRINGEN: kein virtueller MIDI-Loopback-Port vorhanden"
+    EXIT(0)
+END IF
+DIM ein AS MIDI_IN
+DIM aus AS MIDI_OUT
+FOR i = 0 TO MIDI_IN_COUNT() - 1
+    IF MIDI_IN_NAME$(i) = port THEN ein = MIDI_IN_OPEN(i)
+NEXT
+FOR i = 0 TO MIDI_OUT_COUNT() - 1
+    IF MIDI_OUT_NAME$(i) = port THEN aus = MIDI_OUT_OPEN(i)
+NEXT
+MIDI_NOTE_ON(aus, 3, 60, 100)
+MIDI_NOTE_OFF(aus, 3, 60)
+MIDI_NOTE_ON(aus, 1, 64, 0)
+MIDI_CC(aus, 16, 7, 90)
+SLEEP(400)
+DO WHILE MIDI_NEXT(ein)
+    DIM art AS STRING
+    art = "?"
+    IF MIDI_IS_NOTE_ON(ein) THEN art = "an"
+    IF MIDI_IS_NOTE_OFF(ein) THEN art = "aus"
+    IF MIDI_IS_CC(ein) THEN art = "cc"
+    PRINT art; " "; MIDI_CHANNEL(ein); " "; MIDI_DATA1(ein); " "; MIDI_DATA2(ein)
+LOOP
+MIDI_IN_CLOSE(ein)
+MIDI_OUT_CLOSE(aus)
+--- erwartet
+an 3 60 100
+aus 3 60 0
+aus 1 64 0
+cc 16 7 90
+
+=== der puffer deckelt und wirft das aelteste weg
+' Die Warteschlange fasst 1024 und wirft beim Ueberlauf die AELTESTE weg --
+' wer live spielt, will den aktuellen Anschlag. 1200 Nachrichten werden
+' geschickt und keine abgeholt; danach muessen genau 1024 warten, und die
+' erste ueberlebende muss die 176. gesendete sein (1200 - 1024) -- bei
+' "juengste faellt weg" waere es die erste.
+IMPORT "midi"
+DIM c AS INTEGER
+TRY
+    c = MIDI_OUT_COUNT()
+CATCH ohne
+    PRINT "UEBERSPRINGEN: Bau ohne das midi-Feature"
+    EXIT(0)
+END TRY
+DIM port AS STRING : port = ""
+DIM i AS INTEGER
+FOR i = 0 TO MIDI_IN_COUNT() - 1
+    DIM j AS INTEGER
+    FOR j = 0 TO MIDI_OUT_COUNT() - 1
+        IF port = "" AND MIDI_IN_NAME$(i) = MIDI_OUT_NAME$(j) THEN port = MIDI_IN_NAME$(i)
+    NEXT
+NEXT
+IF port = "" THEN
+    PRINT "UEBERSPRINGEN: kein virtueller MIDI-Loopback-Port vorhanden"
+    EXIT(0)
+END IF
+DIM ein AS MIDI_IN
+DIM aus AS MIDI_OUT
+FOR i = 0 TO MIDI_IN_COUNT() - 1
+    IF MIDI_IN_NAME$(i) = port THEN ein = MIDI_IN_OPEN(i)
+NEXT
+FOR i = 0 TO MIDI_OUT_COUNT() - 1
+    IF MIDI_OUT_NAME$(i) = port THEN aus = MIDI_OUT_OPEN(i)
+NEXT
+FOR i = 0 TO 1199
+    MIDI_NOTE_ON(aus, 1, 20 + (i MOD 100), 100)
+NEXT
+SLEEP(1800)
+PRINT "warten "; MIDI_PENDING(ein)
+IF MIDI_NEXT(ein) THEN PRINT "aelteste ueberlebende "; MIDI_NOTE(ein)
+MIDI_IN_CLOSE(ein)
+MIDI_OUT_CLOSE(aus)
+--- erwartet
+warten 1024
+aelteste ueberlebende 96

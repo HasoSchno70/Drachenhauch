@@ -128,8 +128,10 @@ PRINT PRINTER_DEFAULT$() : PRINT PRINTERS()                ' für einen eigenen 
   dort die PDF selbst.
 - **`zieldatei`** ist für Drucker gedacht, die in eine Datei schreiben —
   „Microsoft Print to PDF" fragt dann **nicht** nach. Genau so prüft
-  `tests/test_drucken.py` den Druck: durch einen echten Treiber, zurück-
-  gelesen mit PyMuPDF. Gemessen: zwei Seiten in ~0,9 s.
+  `tests/pruef/drucken.dhtest` den Druck: durch einen echten Treiber,
+  zurückgelesen mit dem eigenen Leser `tests/pruef/_hilfen/pdftext.dh` —
+  Text beider Seiten und, aus den Textmatrizen, die Lage des rechtsbündigen
+  Betrags. Gemessen: zwei Seiten in ~0,9 s.
 - `PRINTERS()` liefert die Namen, wie das System sie kennt, `PRINTER_DEFAULT$()`
   den Standarddrucker (`""`, wenn es keinen gibt). Eine Falle unter Windows: die
   Einstellung „Standarddrucker von Windows verwalten lassen“ macht den

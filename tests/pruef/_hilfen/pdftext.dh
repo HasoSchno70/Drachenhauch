@@ -1,0 +1,460 @@
+' Text und Textstellen aus einem PDF lesen -- ohne PyMuPDF.
+'
+' Die Schriften sind eingebettete CID-Schriften: im Inhaltsstrom stehen
+' Glyphennummern, die Zeichen verraet erst die ToUnicode-Tabelle der Schrift.
+' Der Weg: Objekte finden, Stroeme entpacken, je Seite die Schriftnamen ueber
+' die Ressourcen zur Tabelle aufloesen, dann die Zeichenketten der TJ/Tj-Befehle
+' in Zeichen uebersetzen. `pdfSeiten` liefert je Seite eine Zeichenkette, jeder
+' Textbefehl endet mit einem Zeilenumbruch.
+'
+' Er liest ZWEI Schreibweisen, und das ist der Punkt: die von dhrt selbst
+' (krilla) und die eines fremden Erzeugers -- gemessen an "Microsoft Print to
+' PDF". Die Unterschiede sind klein, aber jeder einzelne liess den Leser
+' vorher leer ausgehen: Leerraum zwischen Schluessel und Wert (`/Type /Pages`
+' statt `/Type/Pages`), `/Contents` als Feld (`[ 20 0 R ]`), Zeichenketten in
+' Hex (`<0035>` statt `(..)`), Stroeme ohne `/Filter` und mit CR LF hinter
+' `stream`.
+'
+' `pdfSeiten` fuellt nebenbei `pdfStellen`: je Textbefehl eine Zeile
+' "seite|x|y|text" mit x/y in PDF-Punkten vom linken UNTEREN Seitenrand
+' (die Grundlinie des Textes). Dafuer verfolgt der Leser die Matrizen `cm`
+' (Seite) und `Tm`/`Td` (Text) -- ohne sie waeren die Zahlen aus dem
+' Inhaltsstrom in einer beliebigen Einheit.
+DIM pdfDaten AS BUFFER
+DIM pdfObjAb AS MAP OF INTEGER
+DIM pdfObjBis AS MAP OF INTEGER
+' Schriftname + ":" + Glyphennummer -> Zeichen (eine MAP laesst sich nicht verschachtelt abfragen)
+DIM pdfZeichen AS MAP OF STRING
+' Je Textbefehl "seite|x|y|text", x/y in PDF-Punkten
+DIM pdfStellen AS ARRAY OF STRING
+
+FUNCTION pdfBytes$(ab AS INTEGER, bis AS INTEGER) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = ab TO bis - 1
+        r = r + CHR$(BUFFER_GET(pdfDaten, i))
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Kopf eines Objekts: alles bis "stream" oder "endobj".
+FUNCTION pdfKopf$(nr AS INTEGER) AS STRING
+    IF nr < 0 OR NOT MAPHAS(pdfObjAb, STR$(nr)) THEN RETURN ""
+    DIM ab AS INTEGER : ab = MAPGET(pdfObjAb, STR$(nr))
+    DIM bis AS INTEGER : bis = MAPGET(pdfObjBis, STR$(nr))
+    DIM s AS INTEGER : s = BUFFER_INDEXOF(pdfDaten, BUFFER_FROM_STRING("stream"), ab)
+    IF s >= 0 AND s < bis THEN bis = s
+    RETURN pdfBytes$(ab, bis)
+END FUNCTION
+
+' Stelle direkt hinter einem Schluessel, Leerraum uebersprungen; -1 = nicht da.
+' Das ist der ganze Unterschied zwischen "/Type/Pages" und "/Type /Pages".
+FUNCTION pdfNach(kopf AS STRING, schluessel AS STRING) AS INTEGER
+    DIM p AS INTEGER : p = INSTR(kopf, schluessel)
+    IF p < 0 THEN RETURN -1
+    p = p + LEN(schluessel)
+    WHILE p < LEN(kopf) AND (MID$(kopf, p, 1) = " " OR MID$(kopf, p, 1) = CHR$(10) OR MID$(kopf, p, 1) = CHR$(13) OR MID$(kopf, p, 1) = CHR$(9))
+        p = p + 1
+    WEND
+    RETURN p
+END FUNCTION
+
+' Hat der Kopf diesen Schluessel mit diesem Namen? ("/Type" -> "/Pages")
+FUNCTION pdfIst(kopf AS STRING, schluessel AS STRING, wert AS STRING) AS BOOLEAN
+    DIM p AS INTEGER : p = pdfNach(kopf, schluessel)
+    IF p < 0 THEN RETURN FALSE
+    RETURN MID$(kopf, p, LEN(wert)) = wert
+END FUNCTION
+
+' Die Zahl hinter einem Schluessel: "/Contents 10 0 R" -> 10, auch als Feld
+' geschrieben ("/Contents [ 20 0 R ]").
+FUNCTION pdfRef(kopf AS STRING, schluessel AS STRING) AS INTEGER
+    DIM p AS INTEGER : p = pdfNach(kopf, schluessel)
+    IF p < 0 THEN RETURN -1
+    IF MID$(kopf, p, 1) = "[" THEN
+        p = p + 1
+        WHILE p < LEN(kopf) AND MID$(kopf, p, 1) = " "
+            p = p + 1
+        WEND
+    END IF
+    DIM z AS STRING : z = ""
+    WHILE p < LEN(kopf) AND INSTR("0123456789", MID$(kopf, p, 1)) >= 0
+        z = z + MID$(kopf, p, 1)
+        p = p + 1
+    WEND
+    IF z = "" THEN RETURN -1
+    RETURN VAL(z)
+END FUNCTION
+
+' Die Laenge eines Stroms, wenn sie direkt dasteht; -1 wenn sie als Verweis
+' geschrieben ist (dann sucht der Aufrufer das Ende selbst). Gesucht wird
+' "/Length " MIT Leerzeichen -- sonst traefe es auch "/Length1", die Groesse
+' der eingebetteten Schriftdatei.
+'
+' GEMESSEN: fuer die beiden Erzeuger, die hier vorkommen (krilla und
+' "Microsoft Print to PDF"), braeuchte es das nicht -- der Rueckfall unten
+' (bis "endstream", Umbruch weg) liest beide genauso. Es bleibt trotzdem der
+' Hauptweg, weil nur er RICHTIG ist: enden die gepackten Daten zufaellig auf
+' 0x0A oder 0x0D, schneidet der Rueckfall ein echtes Byte ab, und zwar still.
+' Gezielt herstellen laesst sich dieser Fall nicht, er haengt am Zufall der
+' Kompression.
+FUNCTION pdfLaenge(kopf AS STRING) AS INTEGER
+    DIM p AS INTEGER : p = INSTR(kopf, "/Length ")
+    IF p < 0 THEN RETURN -1
+    p = p + 8
+    WHILE p < LEN(kopf) AND MID$(kopf, p, 1) = " "
+        p = p + 1
+    WEND
+    DIM z AS STRING : z = ""
+    WHILE p < LEN(kopf) AND INSTR("0123456789", MID$(kopf, p, 1)) >= 0
+        z = z + MID$(kopf, p, 1)
+        p = p + 1
+    WEND
+    IF z = "" THEN RETURN -1
+    ' "N 0 R" ist ein Verweis, keine Laenge
+    DIM rest AS STRING : rest = TRIM$(MID$(kopf, p, 4))
+    IF rest <> "" AND INSTR("0123456789", LEFT$(rest, 1)) >= 0 THEN RETURN -1
+    RETURN VAL(z)
+END FUNCTION
+
+FUNCTION pdfStrom(nr AS INTEGER) AS BUFFER
+    IF nr < 0 OR NOT MAPHAS(pdfObjAb, STR$(nr)) THEN RETURN BUFFER_NEW(0)
+    DIM ab AS INTEGER : ab = MAPGET(pdfObjAb, STR$(nr))
+    DIM kopf AS STRING : kopf = pdfKopf$(nr)
+    DIM s AS INTEGER : s = BUFFER_INDEXOF(pdfDaten, BUFFER_FROM_STRING("stream"), ab)
+    IF s < 0 THEN RETURN BUFFER_NEW(0)
+    s = s + 6
+    ' Hinter "stream" steht CR LF oder nur LF -- beides gehoert nicht zu den Daten.
+    IF BUFFER_GET(pdfDaten, s) = 13 THEN s = s + 1
+    IF BUFFER_GET(pdfDaten, s) = 10 THEN s = s + 1
+    DIM e AS INTEGER
+    DIM laenge AS INTEGER : laenge = pdfLaenge(kopf)
+    IF laenge > 0 THEN
+        e = s + laenge
+    ELSE
+        e = BUFFER_INDEXOF(pdfDaten, BUFFER_FROM_STRING("endstream"), s)
+        ' Der Umbruch vor "endstream" gehoert nicht zu den Daten
+        WHILE e > s AND (BUFFER_GET(pdfDaten, e - 1) = 10 OR BUFFER_GET(pdfDaten, e - 1) = 13)
+            e = e - 1
+        WEND
+    END IF
+    DIM roh AS BUFFER : roh = BUFFER_SLICE(pdfDaten, s, e)
+    IF INSTR(kopf, "/FlateDecode") >= 0 THEN RETURN BUFFER_INFLATE(roh)
+    RETURN roh
+END FUNCTION
+
+' Die fuehrende Zahl einer Zeichenkette: "3 0 R" -> 3 (VAL liest dort 0)
+FUNCTION pdfZahl(s AS STRING) AS INTEGER
+    DIM z AS STRING : z = ""
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(s) AND MID$(s, i, 1) = " "
+        i = i + 1
+    WEND
+    WHILE i < LEN(s) AND INSTR("0123456789", MID$(s, i, 1)) >= 0 AND MID$(s, i, 1) <> ""
+        z = z + MID$(s, i, 1)
+        i = i + 1
+    WEND
+    IF z = "" THEN RETURN -1
+    RETURN VAL(z)
+END FUNCTION
+
+FUNCTION pdfHex(h AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(h) - 1
+        n = n * 16 + INSTR("0123456789ABCDEF", UPPER$(MID$(h, i, 1)))
+    NEXT
+    RETURN n
+END FUNCTION
+
+' UTF-16BE als Hexziffern in Zeichen
+FUNCTION pdfUtf16$(h AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER : i = 0
+    WHILE i + 4 <= LEN(h)
+        DIM c AS INTEGER : c = pdfHex(MID$(h, i, 4))
+        i = i + 4
+        IF c >= 55296 AND c < 56320 AND i + 4 <= LEN(h) THEN
+            DIM lo AS INTEGER : lo = pdfHex(MID$(h, i, 4))
+            i = i + 4
+            c = 65536 + (c - 55296) * 1024 + (lo - 56320)
+        END IF
+        r = r + CHR$(c)
+    WEND
+    RETURN r
+END FUNCTION
+
+' ToUnicode-Tabelle: Glyphennummer -> Zeichen (bfchar und bfrange). Der Treiber
+' schreibt alles in EINE Zeile, krilla je Eintrag eine -- darum wird der Strom
+' an den Schluesselwoertern zerlegt statt zeilenweise gelesen.
+SUB pdfTabelle(nr AS INTEGER, praefix AS STRING)
+    IF nr < 0 THEN RETURN
+    DIM text AS STRING : text = BUFFER_TO_STRING$(pdfStrom(nr))
+    text = REPLACE$(REPLACE$(text, CHR$(10), " "), CHR$(13), " ")
+    DIM arten AS ARRAY OF STRING : arten = ["char", "range"]
+    DIM ai AS INTEGER
+    FOR ai = 0 TO 1
+        DIM art AS STRING : art = arten[ai]
+        DIM suche AS STRING : suche = "beginbf" + art
+        DIM p AS INTEGER : p = INSTR(text, suche)
+        WHILE p >= 0
+            DIM ende AS INTEGER : ende = INSTR(MID$(text, p, LEN(text)), "endbf" + art)
+            DIM block AS STRING
+            IF ende < 0 THEN
+                block = MID$(text, p + LEN(suche), LEN(text))
+            ELSE
+                block = MID$(text, p + LEN(suche), ende - LEN(suche))
+            END IF
+            ' "<0003> <0020>" -> Woerter ohne spitze Klammern
+            DIM teile AS ARRAY OF STRING : teile = SPLIT$(REPLACE$(REPLACE$(block, "<", " "), ">", " "), " ")
+            DIM w AS ARRAY OF STRING : w = []
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(teile) - 1
+                IF TRIM$(teile[k]) <> "" THEN ARRAY_PUSH(w, TRIM$(teile[k]))
+            NEXT
+            DIM q AS INTEGER : q = 0
+            IF art = "char" THEN
+                WHILE q + 1 < LEN(w)
+                    MAPPUT(pdfZeichen, praefix + STR$(pdfHex(w[q])), pdfUtf16$(w[q + 1]))
+                    q = q + 2
+                WEND
+            ELSE
+                WHILE q + 2 < LEN(w)
+                    DIM g AS INTEGER
+                    DIM von AS INTEGER : von = pdfHex(w[q])
+                    DIM basis AS INTEGER : basis = pdfHex(w[q + 2])
+                    FOR g = von TO pdfHex(w[q + 1])
+                        MAPPUT(pdfZeichen, praefix + STR$(g), CHR$(basis + g - von))
+                    NEXT
+                    q = q + 3
+                WEND
+            END IF
+            IF ende < 0 THEN BREAK
+            p = INSTR(MID$(text, p + ende, LEN(text)), suche)
+            IF p >= 0 THEN p = p + ende
+        WEND
+    NEXT
+END SUB
+
+FUNCTION pdfSeiten(pfad AS STRING) AS ARRAY OF STRING
+    pdfDaten = READALL_BYTES(pfad)
+    pdfObjAb = {}
+    pdfObjBis = {}
+    pdfStellen = []
+    ' Objekte: "N 0 obj"
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_STRING(" 0 obj")
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(pdfDaten, nadel, 0)
+    DIM nummern AS ARRAY OF INTEGER : nummern = []
+    WHILE p >= 0
+        DIM a AS INTEGER : a = p - 1
+        WHILE a >= 0 AND BUFFER_GET(pdfDaten, a) >= 48 AND BUFFER_GET(pdfDaten, a) <= 57
+            a = a - 1
+        WEND
+        DIM nr AS INTEGER : nr = pdfZahl(pdfBytes$(a + 1, p))
+        IF nr >= 0 THEN
+            MAPPUT(pdfObjAb, STR$(nr), p + 6)
+            MAPPUT(pdfObjBis, STR$(nr), BUFFER_INDEXOF(pdfDaten, BUFFER_FROM_STRING("endobj"), p))
+            ARRAY_PUSH(nummern, nr)
+        END IF
+        p = BUFFER_INDEXOF(pdfDaten, nadel, p + 6)
+    WEND
+    ' Seiten in der Reihenfolge des Seitenbaums
+    DIM seiten AS ARRAY OF STRING : seiten = []
+    DIM i AS INTEGER
+    DIM baum AS STRING : baum = ""
+    FOR i = 0 TO LEN(nummern) - 1
+        DIM kk AS STRING : kk = pdfKopf$(nummern[i])
+        IF pdfIst(kk, "/Type", "/Pages") THEN baum = kk
+    NEXT
+    DIM kp AS INTEGER : kp = pdfNach(baum, "/Kids")
+    IF kp < 0 THEN RETURN seiten
+    DIM kids AS STRING : kids = MID$(baum, kp + 1, LEN(baum))
+    kids = LEFT$(kids, INSTR(kids, "]"))
+    DIM refs AS ARRAY OF STRING : refs = SPLIT$(REPLACE$(kids, " 0 R", "|"), "|")
+    FOR i = 0 TO LEN(refs) - 1
+        IF pdfZahl(refs[i]) < 0 THEN CONTINUE
+        DIM seite AS STRING : seite = pdfKopf$(pdfZahl(refs[i]))
+        DIM res AS STRING : res = pdfKopf$(pdfRef(seite, "/Resources"))
+        DIM inhalt AS BUFFER : inhalt = pdfStrom(pdfRef(seite, "/Contents"))
+        ' Schriftnamen der Seite -> Tabelle
+        pdfZeichen = {}
+        DIM tabellen AS MAP OF INTEGER
+        tabellen = {}
+        DIM fp AS INTEGER : fp = pdfNach(res, "/Font")
+        IF fp >= 0 THEN
+            DIM fonts AS STRING : fonts = MID$(res, fp + 2, LEN(res))
+            fonts = LEFT$(fonts, INSTR(fonts, ">>"))
+            DIM stuecke AS ARRAY OF STRING : stuecke = SPLIT$(fonts, "/")
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(stuecke) - 1
+                DIM st AS STRING : st = TRIM$(stuecke[k])
+                IF st = "" THEN CONTINUE
+                DIM leer AS INTEGER : leer = INSTR(st, " ")
+                IF leer < 0 THEN CONTINUE
+                DIM fname AS STRING : fname = LEFT$(st, leer)
+                DIM fobj AS STRING : fobj = pdfKopf$(pdfZahl(MID$(st, leer + 1, LEN(st))))
+                MAPPUT(tabellen, fname, 1)
+                pdfTabelle(pdfRef(fobj, "/ToUnicode"), fname + ":")
+            NEXT
+        END IF
+        DIM text AS STRING : text = pdfInhalt$(inhalt, tabellen, LEN(seiten))
+        ARRAY_PUSH(seiten, text)
+    NEXT
+    RETURN seiten
+END FUNCTION
+
+' Ein Inhaltsstrom: Zeichenketten in Zeichen, dazu je Textbefehl seine Stelle.
+FUNCTION pdfInhalt$(inhalt AS BUFFER, tabellen AS MAP OF INTEGER, seitenNr AS INTEGER) AS STRING
+    DIM text AS STRING : text = ""
+    DIM akt AS STRING : akt = ""
+    DIM n AS INTEGER : n = BUFFER_LEN(inhalt)
+    DIM j AS INTEGER : j = 0
+    ' Seitenmatrix (cm) und Textmatrix (Tm/Td), beide anfangs neutral
+    DIM ca AS FLOAT : ca = 1.0
+    DIM cd AS FLOAT : cd = 1.0
+    DIM ce AS FLOAT : ce = 0.0
+    DIM cf AS FLOAT : cf = 0.0
+    DIM tx AS FLOAT : tx = 0.0
+    DIM ty AS FLOAT : ty = 0.0
+    DIM zahlen AS ARRAY OF FLOAT : zahlen = []
+    DIM stueck AS STRING : stueck = ""
+    WHILE j < n
+        DIM b AS INTEGER : b = BUFFER_GET(inhalt, j)
+        IF b = 47 THEN
+            ' Name, vielleicht eine Schrift: /F1 11 Tf
+            DIM nm AS STRING : nm = ""
+            j = j + 1
+            WHILE j < n AND BUFFER_GET(inhalt, j) > 32 AND BUFFER_GET(inhalt, j) <> 47 AND BUFFER_GET(inhalt, j) <> 40 AND BUFFER_GET(inhalt, j) <> 91
+                nm = nm + CHR$(BUFFER_GET(inhalt, j))
+                j = j + 1
+            WEND
+            IF MAPHAS(tabellen, nm) THEN akt = nm
+            CONTINUE
+        ELSEIF b = 40 THEN
+            ' Zeichenkette mit Schutzzeichen
+            j = j + 1
+            DIM roh AS ARRAY OF INTEGER : roh = []
+            WHILE j < n AND BUFFER_GET(inhalt, j) <> 41
+                DIM c AS INTEGER : c = BUFFER_GET(inhalt, j)
+                IF c = 92 THEN
+                    j = j + 1
+                    DIM esc AS INTEGER : esc = BUFFER_GET(inhalt, j)
+                    IF esc >= 48 AND esc <= 55 THEN
+                        DIM okt AS INTEGER : okt = 0
+                        DIM stellen AS INTEGER : stellen = 0
+                        WHILE stellen < 3 AND j < n AND BUFFER_GET(inhalt, j) >= 48 AND BUFFER_GET(inhalt, j) <= 55
+                            okt = okt * 8 + BUFFER_GET(inhalt, j) - 48
+                            j = j + 1
+                            stellen = stellen + 1
+                        WEND
+                        j = j - 1
+                        c = okt
+                    ELSEIF esc = 110 THEN
+                        c = 10
+                    ELSEIF esc = 114 THEN
+                        c = 13
+                    ELSEIF esc = 116 THEN
+                        c = 9
+                    ELSEIF esc = 98 THEN
+                        c = 8
+                    ELSEIF esc = 102 THEN
+                        c = 12
+                    ELSE
+                        c = esc
+                    END IF
+                END IF
+                ARRAY_PUSH(roh, c)
+                j = j + 1
+            WEND
+            stueck = stueck + pdfGids$(roh, akt)
+        ELSEIF b = 60 AND j + 1 < n AND BUFFER_GET(inhalt, j + 1) <> 60 THEN
+            ' Zeichenkette in Hex: <0035004800460048>
+            j = j + 1
+            DIM hx AS STRING : hx = ""
+            WHILE j < n AND BUFFER_GET(inhalt, j) <> 62
+                DIM hc AS INTEGER : hc = BUFFER_GET(inhalt, j)
+                IF hc > 32 THEN hx = hx + CHR$(hc)
+                j = j + 1
+            WEND
+            DIM hroh AS ARRAY OF INTEGER : hroh = []
+            DIM hp AS INTEGER : hp = 0
+            WHILE hp + 1 < LEN(hx)
+                ARRAY_PUSH(hroh, pdfHex(MID$(hx, hp, 2)))
+                hp = hp + 2
+            WEND
+            stueck = stueck + pdfGids$(hroh, akt)
+        ELSEIF (b >= 48 AND b <= 57) OR b = 45 OR b = 46 OR b = 43 THEN
+            DIM zs AS STRING : zs = ""
+            WHILE j < n AND ((BUFFER_GET(inhalt, j) >= 48 AND BUFFER_GET(inhalt, j) <= 57) OR BUFFER_GET(inhalt, j) = 45 OR BUFFER_GET(inhalt, j) = 46 OR BUFFER_GET(inhalt, j) = 43)
+                zs = zs + CHR$(BUFFER_GET(inhalt, j))
+                j = j + 1
+            WEND
+            ARRAY_PUSH(zahlen, VAL(zs))
+            CONTINUE
+        ELSEIF (b >= 65 AND b <= 90) OR (b >= 97 AND b <= 122) THEN
+            DIM op AS STRING : op = ""
+            WHILE j < n AND ((BUFFER_GET(inhalt, j) >= 65 AND BUFFER_GET(inhalt, j) <= 90) OR (BUFFER_GET(inhalt, j) >= 97 AND BUFFER_GET(inhalt, j) <= 122) OR BUFFER_GET(inhalt, j) = 42)
+                op = op + CHR$(BUFFER_GET(inhalt, j))
+                j = j + 1
+            WEND
+            IF op = "cm" AND LEN(zahlen) >= 6 THEN
+                ca = zahlen[0]
+                cd = zahlen[3]
+                ce = zahlen[4]
+                cf = zahlen[5]
+            ELSEIF op = "BT" THEN
+                tx = 0.0
+                ty = 0.0
+            ELSEIF op = "Tm" AND LEN(zahlen) >= 6 THEN
+                tx = zahlen[4]
+                ty = zahlen[5]
+            ELSEIF op = "Td" AND LEN(zahlen) >= 2 THEN
+                ' Td ist relativ zur vorigen Zeile
+                tx = tx + zahlen[0]
+                ty = ty + zahlen[1]
+            ELSEIF op = "TD" AND LEN(zahlen) >= 2 THEN
+                tx = tx + zahlen[0]
+                ty = ty + zahlen[1]
+            ELSEIF op = "TJ" OR op = "Tj" THEN
+                ' Ein Textbefehl ist zu Ende: Zeile schreiben und die Stelle merken
+                text = text + stueck + CHR$(10)
+                ARRAY_PUSH(pdfStellen, STR$(seitenNr) + "|" + STR$(ca * tx + ce) + "|" + STR$(cd * ty + cf) + "|" + stueck)
+                stueck = ""
+            END IF
+            zahlen = []
+            CONTINUE
+        END IF
+        j = j + 1
+    WEND
+    RETURN text
+END FUNCTION
+
+' Glyphennummern (je zwei Bytes) in Zeichen der aktuellen Schrift
+FUNCTION pdfGids$(roh AS ARRAY OF INTEGER, akt AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM q AS INTEGER : q = 0
+    WHILE q + 1 < LEN(roh)
+        DIM gid AS STRING : gid = STR$(roh[q] * 256 + roh[q + 1])
+        IF MAPHAS(pdfZeichen, akt + ":" + gid) THEN r = r + MAPGET(pdfZeichen, akt + ":" + gid)
+        q = q + 2
+    WEND
+    RETURN r
+END FUNCTION
+
+' Die Stelle des ersten Textbefehls, der `suche` enthaelt: "x|y" in Punkten,
+' "" wenn es ihn nicht gibt.
+FUNCTION pdfStelle$(suche AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pdfStellen) - 1
+        DIM t AS ARRAY OF STRING : t = SPLIT$(pdfStellen[i], "|")
+        IF LEN(t) >= 4 AND INSTR(t[3], suche) >= 0 THEN RETURN t[1] + "|" + t[2]
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' x der ersten Fundstelle in Millimetern vom linken Rand (-1 = nicht da)
+FUNCTION pdfStelleXmm(suche AS STRING) AS FLOAT
+    DIM s AS STRING : s = pdfStelle$(suche)
+    IF s = "" THEN RETURN -1.0
+    RETURN VAL(SPLIT$(s, "|")[0]) * 25.4 / 72.0
+END FUNCTION

@@ -1,4 +1,7 @@
-' Aus test_os_builtins.py uebertragen (23 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+' Aus test_os_builtins.py uebertragen (23 Faelle, aufgezeichnet 2026-09-08;
+' drei mehr in Stufe 44, die letzten zwei am 2026-09-20 -- sie brauchten
+' EXEPATH$, den Pfad der laufenden Laufzeit).
+' Format: docs/werkzeuge.md, dhrt test.
 
 === argc ohne argumente ist null
 PRINT ARGC()
@@ -262,3 +265,57 @@ PRINT CWD$()
 --- erwartet
 im unterordner TRUE
 nicht beim aufrufer TRUE
+
+=== print und eprint behalten ihre reihenfolge in einem strom
+' PRINT wird gepuffert (self.out, geschrieben erst am Ende). Ohne den Flush in
+' try_os erschienen ALLE PRINTs nach allen EPRINTs, sobald beide im selben
+' Terminal landen -- gesehen haette man es nur dort, nicht in getrennten
+' Kanaelen. PROCESS_START liest stdout und stderr getrennt und kann es deshalb
+' nicht zeigen; hier leitet die Shell beide in EINE Datei.
+' (Bis 2026-09-20 tests/test_os_builtins.py, dort ueber subprocess.)
+' Die Umleitung steht in einer SKRIPTDATEI, nicht in der Befehlszeile: ein
+' Pfad mit Leerzeichen braucht Anfuehrungszeichen, und die schreibt SHELL als
+' \" -- was cmd nicht versteht (es meldet den Namen als unbekannten Befehl).
+' In der Datei macht die Shell ihr Quoting selbst. Der Aufruf braucht ".\",
+' weil cmd bei gesetztem NoDefaultCurrentDirectoryInExePath nicht im
+' Arbeitsverzeichnis sucht.
+DIM zeile AS STRING : zeile = CHR$(34) + EXEPATH$() + CHR$(34) + " run kind.dh > beides.txt 2>&1"
+DIM rc AS INTEGER
+IF MID$(CWD$(), 1, 1) = ":" THEN
+    WRITEALL("lauf.cmd", "@echo off" + CHR$(10) + zeile + CHR$(10))
+    rc = SHELL("cmd", "/c", ".\lauf.cmd")
+ELSE
+    WRITEALL("lauf.sh", zeile + CHR$(10))
+    rc = SHELL("sh", "lauf.sh")
+END IF
+PRINT "rueckgabe "; rc
+DIM z AS ARRAY OF STRING : z = READLINES("beides.txt")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(z) - 1
+    IF TRIM$(z[i]) <> "" THEN PRINT TRIM$(z[i])
+NEXT
+--- datei kind.dh
+PRINT "eins"
+EPRINT("zwei")
+PRINT "drei"
+--- erwartet
+rueckgabe 0
+eins
+zwei
+drei
+
+=== shell reicht argumente einzeln weiter
+' Ein Wert mit Leerzeichen darf nicht in zwei Argumente zerfallen. Als Kind
+' laeuft bewusst dhrt selbst und nicht `cmd /c`: cmd bringt eigene, kaum
+' vorhersagbare Quoting-Regeln mit, die hier nur verdecken wuerden, was
+' geprueft werden soll. Nebenbei die `--`-Konvention von der anderen Seite:
+' SHELL gibt sie weiter, das Kind liest sie als ARGC/ARG$.
+' EXEPATH$ ist noetig, weil SHELL -- anders als PROCESS_START -- "dhrt" nicht
+' als Namen der laufenden Laufzeit kennt.
+PRINT TRIM$(SHELL_OUT$(EXEPATH$(), "run", "kind.dh", "--", "zwei woerter"))
+--- datei kind.dh
+PRINT ARGC()
+PRINT ARG$(0)
+--- erwartet
+1
+zwei woerter

@@ -2511,6 +2511,12 @@
    "module": "core"
   },
   {
+   "name": "EXEPATH$",
+   "kind": "core",
+   "signature": "EXEPATH$() AS STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "EXIT",
    "kind": "core",
    "signature": "EXIT(code = 0)",

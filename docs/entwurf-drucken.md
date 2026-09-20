@@ -6,9 +6,11 @@
 > (GDI unter Windows, `lp` unter macOS/Linux; dazu `PRINTERS()` und
 > `PRINTER_DEFAULT$()`) und `PDF_PREVIEW` (die Seite als `IMAGE`). Siehe
 > [module-pdf.md](module-pdf.md#drucken-und-vorschau). Prüfstein 1, gemessen:
-> zwei Seiten durch „Microsoft Print to PDF“ in eine Datei in ~0,9 s, PyMuPDF
-> findet Nummer, Name und den rechtsbündigen Betrag an seiner Stelle
-> (`tests/test_drucken.py`). Die Rechnungsverwaltung hat einen Druckdialog aus
+> zwei Seiten durch „Microsoft Print to PDF“ in eine Datei in ~0,9 s, und im
+> Ergebnis stehen Nummer, Name und der rechtsbündige Betrag an seiner Stelle
+> (`tests/pruef/drucken.dhtest`; gelesen wird die Datei des Treibers seit
+> 2026-09-20 mit dem eigenen Leser `tests/pruef/_hilfen/pdftext.dh` statt mit
+> PyMuPDF). Die Rechnungsverwaltung hat einen Druckdialog aus
 > Bordmitteln (Klappliste der Drucker, Kopien, Vorschau) und „PDF öffnen“.
 > B ist der Unix-Teil von C; D bleibt ungebaut.
 

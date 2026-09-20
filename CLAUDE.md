@@ -622,7 +622,7 @@ danebengeklickt meldet nichts).
 
 **Zeilenumbruch und Datenbindung** (2026-09-05, die letzten zwei Punkte der Lueckenliste): `GUI_TEXTAREA_SET(ta, "umbruch", 1)` -- der Textbereich bricht an Wortgrenzen um (`ta_rows` = EINE Quelle sichtbarer Zeilen `(logische Zeile, von, bis)` fuer Zeichnen, Klick, Pfeile, Schreibmarke und Scroll; `ta_row_of`: am Umbruch gehoert die Marke zur NEUEN Zeile; Pos1/Ende/Pfeile laufen in sichtbaren Zeilen; Zeilennummern nur an der ersten Zeile eines Absatzes; `GUI_TEXTAREA_VIEW` zaehlt weiter logische Zeilen; `scroll_x` bleibt 0). Test-Falle: es gibt keine Schreibmarken-Abfrage -- ein eingefuegtes `#` (Strg+V) verraet die Lage, und nach GUI_SET_TEXT steht die Marke am ENDE, also erst sechsmal Pfeil hoch. **Datenbindung:** `GUI_BIND(wdg, schluessel$[, formular$])`, `GUI_FORM_GET/SET/CLEAR/CLEAN/CHANGED(win[, formular$])`, `GUI_FORM_LOAD/SAVE(win, db, tabelle$, id[, formular$])` (in vm.rs, weil nur die VM db UND gui hat; `#[cfg(feature = "db")]`; Spalte heisst `id`; Tabellen- und Schluesselnamen nur `[A-Za-z0-9_]`). `wert_text` (Vergleich/MAP) und `wert_typisiert` (Datenbank: Zahlenfeld -> Zahl, ausser fuehrende Null wie eine PLZ -> Text; Kaestchen -> BOOL; Klappliste -> Index; Regler -> FLOAT), `wert_setzen` tolerant ("ja"/1/TRUE, Eintragstext oder Index). `Window.form_stand` = sauberer Stand (beim Binden, nach SET/LOAD/SAVE/CLEAR/CLEAN). Der Pilot 196 laedt/speichert Kunden ueber die Bindung (keine Spaltenliste mehr) und nutzt sie beim Artikel nur fuer "geaendert?", weil er Preis und MwSt umrechnet. `.dhform`: `wrap_text`, `bind`, `form`; Designer: Felder "Bindung"/"Formular", Kaestchen "Zeilenumbruch", Codegen. Bewusst NICHT: Listen an Tabellen binden, Fremdschluessel, Verbunde. Tests `tests/pruef/gui_bindung.dhtest` (bis 2026-09-16 pytest mit sqlite3; seither liest ein zweiter Prozess die Datei mit `typeof()`), `tests/pruef/gui_umbruch.dhtest` (seriell).
 
-**Drucken und OPENDOC** (2026-09-05, Wege A und C aus `docs/entwurf-drucken.md`): das pdf-Modul zeichnet seine Befehle jetzt AUF (`pdf::Op` je Seite, parallel zum Inhaltsstrom) und spielt sie auf drei Ziele: `PDF_SAVE` (wie immer), `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` und `PDF_PREVIEW(p, seite[, breite_px]) -> IMAGE` (graphics.rs, raylibs Standardschrift). `drucken.rs` (ungated): Windows = GDI ueber das `windows`-Crate (schon im Baum, jetzt direkte Abhaengigkeit unter `[target.'cfg(windows)']` mit Gdi/Printing/Xps/Shell-Features) -- `CreateDCW` auf den Drucker, `StartDocW` mit `lpszOutput` = zieldatei, mm -> Geraeteeinheiten ueber `GetDeviceCaps`, `PHYSICALOFFSET` abgezogen, `TA_TOP` weil unser y die Oberkante ist, Schriften Helvetica->Arial/Times->Times New Roman/Courier->Courier New; `EnumPrintersW` Level 4, `GetDefaultPrinterW`; macOS/Linux = `lp -d -n` mit temporaerer PDF, `lpstat -a/-d`, zieldatei = die PDF selbst. `OPENDOC(pfad$)` = ShellExecute/open/xdg-open mit Endungsliste (kein Programmstarter). **Gemessen:** zwei Seiten durch "Microsoft Print to PDF" in eine Datei ~0,9 s; PyMuPDF findet Text und die rechte Kante des Betrags (Test `tests/test_drucken.py`, laeuft auch auf dem Windows-Runner der CI, weil Windows den Drucker mitbringt). Kopien = der Auftrag n-mal, nicht DEVMODE. Bewusst NICHT: fremde PDFs drucken, nativer Druckdialog, Duplex/Papierfach. Pilot 196: Druckdialog aus Bordmitteln (Klappliste PRINTERS, Kopien, PDF_PREVIEW auf GUI_IMAGE) + "PDF oeffnen".
+**Drucken und OPENDOC** (2026-09-05, Wege A und C aus `docs/entwurf-drucken.md`): das pdf-Modul zeichnet seine Befehle jetzt AUF (`pdf::Op` je Seite, parallel zum Inhaltsstrom) und spielt sie auf drei Ziele: `PDF_SAVE` (wie immer), `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` und `PDF_PREVIEW(p, seite[, breite_px]) -> IMAGE` (graphics.rs, raylibs Standardschrift). `drucken.rs` (ungated): Windows = GDI ueber das `windows`-Crate (schon im Baum, jetzt direkte Abhaengigkeit unter `[target.'cfg(windows)']` mit Gdi/Printing/Xps/Shell-Features) -- `CreateDCW` auf den Drucker, `StartDocW` mit `lpszOutput` = zieldatei, mm -> Geraeteeinheiten ueber `GetDeviceCaps`, `PHYSICALOFFSET` abgezogen, `TA_TOP` weil unser y die Oberkante ist, Schriften Helvetica->Arial/Times->Times New Roman/Courier->Courier New; `EnumPrintersW` Level 4, `GetDefaultPrinterW`; macOS/Linux = `lp -d -n` mit temporaerer PDF, `lpstat -a/-d`, zieldatei = die PDF selbst. `OPENDOC(pfad$)` = ShellExecute/open/xdg-open mit Endungsliste (kein Programmstarter). **Gemessen:** zwei Seiten durch "Microsoft Print to PDF" in eine Datei ~0,9 s; im Ergebnis stehen Text und der rechtsbuendige Betrag an seiner Stelle (Test `tests/pruef/drucken.dhtest`, laeuft auch auf dem Windows-Runner der CI, weil Windows den Drucker mitbringt; gelesen mit dem eigenen Leser `tests/pruef/_hilfen/pdftext.dh`). Kopien = der Auftrag n-mal, nicht DEVMODE. Bewusst NICHT: fremde PDFs drucken, nativer Druckdialog, Duplex/Papierfach. Pilot 196: Druckdialog aus Bordmitteln (Klappliste PRINTERS, Kopien, PDF_PREVIEW auf GUI_IMAGE) + "PDF oeffnen".
 
 **Das pdf-Modul schreibt ueber krilla** (2026-09-14, auf Frage des Nutzers nach Rust-Bibliotheken wie typst): nicht typst selbst -- ein ganzes Satzsystem mit eigener Markup-Sprache passte nicht zur Befehlsfolge PDF_TEXT/PDF_LINE --, sondern **krilla**, die Bibliothek, mit der typst seine PDFs schreibt. Vorher standen in `pdf.rs` 440 Zeilen Handarbeit, die nur die vierzehn Standardschriften ohne Einbetten und nur cp1252 konnten, dazu `pdf_masse.rs` aus einem PyMuPDF-Skript. Jetzt: die Seiten zeichnen weiter nur `Op`s auf, `bauen()` spielt sie auf ein `krilla::Document` (von oben gezaehlt wie krilla selbst, Text-Y + Schriftgroesse = Grundlinie). **Schriften eingebettet und beschnitten**: eingebaut DejaVu Sans/Serif/Sans Mono in je vier Schnitten (Crate `dejavu`, 5,1 MB Schriftdaten im Bau) als `sans`/`serif`/`mono[-fett|-kursiv|-fett-kursiv]`, `helvetica`/`times`/`courier` bleiben Namen dafuer; `symbol`/`zapfdingbats` sind ein Fehler mit Hinweis. Neu `PDF_FONT_LOAD(p, pfad$, name$)`. **Text ist Unicode**; ein Zeichen, das die Schrift nicht hat, ist ein Fehler (`rustybuzz::Face::glyph_index`), kein leeres Kaestchen. **`PDF_TEXT_WIDTH` formt mit rustybuzz genau wie krillas `draw_text`** (Unterschneidung eingeschlossen) -- gegen PyMuPDF auf denselben Dateien nachgemessen: Serif/Mono gleich auf vier Stellen, `sans` schmaler um die Unterschneidungspaare. **Weiter reproduzierbar**: krilla schreibt kein Datum und bildet die Dokumentkennung aus dem Inhalt (Rust-Test + `--- nochmal`-Fall). **Folge fuer Tests**: im Inhaltsstrom stehen Glyphennummern statt Text; zwei Werkzeug-Sammlungen und `pdf.dhtest` lesen deshalb ueber `pdftext.dh` (Beilage, in Drachenhauch: Objekte, Seitenbaum, Ressourcen, ToUnicode-Tabellen, TJ-Zeichenketten) statt BUFFER_INFLATE + INSTR; Gegenprobe mit falschem Suchwort faellt. GDI-Druck bildet sans/serif/mono auf Arial/Times New Roman/Courier New ab, geladene Schriften auf Arial. Doku `docs/module-pdf.md`, Buch `79_dokumente.js`. **Stolpersteine beim Leser:** `VAL("3 0 R")` ist 0 (fuehrende Zahl selbst lesen), und eine MAP laesst sich nicht verschachtelt abfragen (`tabellen[akt]` ist ein Fehler) -- ein flacher Schluessel `schrift:glyph`.
 
@@ -2697,8 +2697,9 @@ Verzeichnis, die Faelle einer Datei laufen parallel (bis 8 Faeden);
 `--filter Text` waehlt Faelle. KEIN_FENSTER-Meldungen und (mit
 `DHRT_OHNE_GRAFIK=1`) fehlende Grafik-Builtins heissen "uebersprungen",
 wie in conftest.py. Doku `docs/werkzeuge.md`. **Die Sammlungen liegen unter
-`tests/pruef/`**, `tests/test_dhrt_test.py` ist der CI-Anker (ruft `dhrt
-test tests/pruef`) und prueft das Format am echten Laeufer. **Umgezogen und
+`tests/pruef/`**; die CI ruft `dhrt test tests/pruef` direkt auf (bis
+2026-09-20 ueber einen pytest-Anker), das Format
+prueft `tests/pruef/dhrt_test_format.dhtest` am echten Laeufer. **Umgezogen und
 aus `tests/` geloescht: 73 pytest-Dateien, 74 Sammlungen mit 1540 Faellen**
 (Stand 2026-09-07, `dhrt test tests/pruef` laeuft sie in ~6 s; die 74. ist
 `rekursionstiefe.dhtest`, dessen pytest-Datei mit drei Tests bleibt, die
@@ -3096,8 +3097,9 @@ Punkt deckend ist; die Deckkraft wird weggelassen, nicht verrechnet
 `tests/pruef/werkzeug_buch_bauen.dhtest` (Messen an einem PDF aus dem
 pdf-Modul: Ueberschrift gegen fruehere Erwaehnung, Gross/klein, fehlender Titel,
 beide Messarten; Bilder: Farbart, Breite, Weiss unter Durchsichtigem, fertiges
-Bild unberuehrt). PyMuPDF bleibt in requirements.txt nur fuer
-`tests/test_drucken.py`.
+Bild unberuehrt). PyMuPDF ist am 2026-09-20 ganz aus
+requirements.txt gefallen: kein Test importiert es mehr, seit
+`tests/pruef/_hilfen/pdftext.dh` auch fremde PDFs liest.
 
 **Showcase in Drachenhauch (2026-09-15):** die kuratierte Beispiel-Galerie
 steht in `examples/showcase.json` (file/title/desc/frames) statt in
@@ -3251,10 +3253,11 @@ Gegenproben: vier bzw. drei Verfaelschungen, jede faellt.
 **Drucken teilweise ohne Python (2026-09-16, Weg D):** Druckerliste,
 `PDF_PREVIEW` (am Bild mit GETPIXEL) und die Fehlermeldungen von `PDF_PRINT`
 und `OPENDOC` stehen in `tests/pruef/drucken.dhtest` (4). In
-`tests/test_drucken.py` bleibt NUR der Druck durch den echten Treiber
+der pytest-Datei blieb NUR der Druck durch den echten Treiber
 "Microsoft Print to PDF": dessen Datei ist kein PDF von dhrt, und der Leser
-in Drachenhauch (`pdftext.dh`) kennt nur krilla-PDFs und keine Textlagen --
-PyMuPDF bleibt dafuer. Gegenproben nur an der Vorschau: eine Verfaelschung
+in Drachenhauch (`pdftext.dh`) kannte nur krilla-PDFs und keine Textlagen --
+PyMuPDF blieb dafuer. **Am 2026-09-20 zog auch dieser Fall um**, weil der
+Leser beides lernte (siehe "Die letzten vier pytest-Dateien"). Gegenproben nur an der Vorschau: eine Verfaelschung
 der Druckbefehle koennte echt drucken.
 
 **Export, Uhr und Firmata ohne Python (2026-09-17, Weg D):**
@@ -3778,6 +3781,107 @@ Das LIESMICH nennt fuer nicht beglaubigte Fassungen auch den Weg ab macOS 15
 (Systemeinstellungen -> Datenschutz & Sicherheit -> "Dennoch oeffnen"; der
 ctrl-Klick reicht dort nicht mehr).
 
+**Die letzten vier pytest-Dateien (2026-09-20, Weg D):** von den 95
+verbliebenen pytest-Dateien pruefen nur vier etwas, das den Python-Abbau
+UEBERLEBT (`docs/entwurf-python-abbau.md` 7.6) -- alle vier sind jetzt
+Sammlungen, **keine ist aufgegeben worden**. (1) `test_dhrt_test.py`: der
+Anker laeuft in der CI direkt (`dhrt test tests/pruef`, neuer Schritt VOR
+pytest in beiden Job-Familien), das Format prueft
+`tests/pruef/dhrt_test_format.dhtest` (3). **Die innere Sammlung schreibt
+jeder Fall SELBST** (`WRITEALL` + `JOIN$`) statt als `--- datei`-Beilage:
+ihre Zeilen beginnen mit `===` und `---`, und der aeussere Laeufer haelt
+jede solche Zeile fuer seinen eigenen Trenner. (2) `test_drucken.py`:
+`tests/pruef/drucken.dhtest` (+1, `--- system windows`, ueberspringt sich
+ohne "Microsoft Print to PDF"). (3) `test_os_builtins.py`:
+`tests/pruef/os_builtins.dhtest` (+2). (4) `test_midi_module.py`:
+`tests/pruef/modules_midi.dhtest` (+6, Selbst-Ueberspringen je Stufe --
+Feature, Ausgang, Loopback-Port).
+
+**Neu dafuer `EXEPATH$()`** (builtins.rs neben `CWD$`): der Pfad der
+laufenden Programmdatei -- unter `dhrt run` die Laufzeit, in einem
+exportierten Spiel dessen eigene Exe. **Beide os_builtins-Faelle hingen an
+DIESEM Loch:** `PROCESS_START` kennt "dhrt" als Namen der eigenen Laufzeit,
+`SHELL`/`SHELL_OUT$` aber nicht, und wer seine Beilagen NEBEN der Exe sucht
+(statt im Startverzeichnis), fand sie gar nicht. Zwei Fallen beim Bauen des
+Reihenfolge-Falls: `SHELL` gibt Anfuehrungszeichen als `\"` weiter (die
+msvcrt-Regel), was cmd nicht versteht -- die Umleitung steht darum in einer
+SKRIPTDATEI, die der Fall schreibt; und cmd sucht bei gesetztem
+`NoDefaultCurrentDirectoryInExePath` nicht im Arbeitsverzeichnis, der Aufruf
+braucht `.\`.
+
+**Der PDF-Leser liest jetzt auch FREMDE PDFs** -- `pdftext.dh` ist aus
+`pdf.dhtest` nach `tests/pruef/_hilfen/pdftext.dh` gezogen (die Sammlung ist
+dadurch 254 Zeilen kuerzer; eingebunden per Zweizeiler-Beilage mit
+`IMPORT "{sammlung}/_hilfen/..."`, weil Platzhalter nur in Text-Beilagen
+gelten). Gemessen an der Datei von "Microsoft Print to PDF": jeder einzelne
+Unterschied liess ihn vorher LEER ausgehen -- Leerraum zwischen Schluessel
+und Wert (`/Type /Pages` statt `/Type/Pages`, dafuer `pdfNach`/`pdfIst`),
+`/Contents` als Feld (`[ 20 0 R ]`), Zeichenketten in Hex (`<0035>` statt
+`(..)`), Stroeme ohne `/Filter` und mit CR LF hinter `stream`, `/Length`
+statt Suche nach `endstream` (**gesucht wird `"/Length "` MIT Leerzeichen** --
+sonst trifft es `/Length1`, die Groesse der eingebetteten Schriftdatei).
+Dazu **Textstellen**: der Leser verfolgt `cm` und `Tm`/`Td` und fuellt
+`pdfStellen` mit "seite|x|y|text" in PDF-Punkten. Damit prueft der Druck-Fall
+die Lage des Betrags DIREKTER als vorher mit PyMuPDFs Textkaesten: er
+vergleicht sie mit `190 - PDF_TEXT_WIDTH(...)`, also genau mit dem, was das
+Programm gerechnet hat. Gegenprobe, dass der krilla-Weg unveraendert liest:
+alle 28 Faelle in `pdf.dhtest` bleiben gruen.
+
+**Der Druck-Fall fasst den Standarddrucker nicht an**, prueft aber, dass er
+sich nicht verschoben hat: hat Windows "den zuletzt verwendeten Drucker als
+Standard festlegen" eingeschaltet, verschiebt ihn jeder Druck -- dann faellt
+der Fall auf, statt es stillschweigend zu tun. (Eine Ruecksetzung waere
+selbst ungeprueft, weil die Einstellung hier aus ist.)
+
+**Der MIDI-Loopback lief doch scharf** -- der Nutzer hatte loopMIDI laufen,
+es fehlte nur der Port. Und damit zeigte sich sofort, was ohne ihn verborgen
+blieb: **ein MIDI-Port ist ein geteiltes Betriebsmittel.** Die beiden
+Loopback-Faelle oeffnen DENSELBEN Port, und parallel landen die Noten des
+einen im Eingang des anderen -- der erste Fall bekam `an 1 96 100`, die
+aelteste ueberlebende Note aus dem Pufferdeckel-Fall. Die Sammlung ist
+seither `--- seriell`. Gegenprobe am Modul (`pop_front` -> `pop_back`, also
+"die juengste faellt weg"): die erste ueberlebende ist dann 20 statt 96, der
+Fall faellt. Ohne das `midi`-Feature ueberspringen sich alle sechs
+Geraete-Faelle mit Begruendung, die CI bleibt also gruen.
+
+**Nebenbei gemessen, nicht Teil dieser Runde:**
+`werkzeug_notenblatt.dhtest` (Fall "zweite spur und instrument") fiel im
+`--hardware`-Bau 3 von 8 Mal, im Standardbau 0 von 8. Die Last war bei
+beiden Messungen nicht gleich, der Vergleich ist also nicht isoliert --
+aber wer mit `--hardware` baut, sollte mit sporadisch roten Klick-Faellen
+rechnen.
+
+**Was der Anker verdeckt hat, und was ihn ersetzt.** Der erste CI-Lauf mit
+dem direkten Aufruf meldete **24 Faelle rot, die tags zuvor ueber den
+pytest-Anker gruen waren** -- bei GLEICHER Image-Version
+(`windows-2025-vs2026`) und, nachgestellt, demselben Aufruf. Drei Ursachen,
+alle gemessen:
+(1) **Der Runner hat mal einen OpenGL-Treiber und mal nicht** (`WGL: The
+driver does not appear to support OpenGL`). Getragen wird das jetzt von der
+Ueberspring-Erkennung -- die lag bis dahin nur im Zweig `code != 0` und traf
+damit genau die Faelle NICHT, die ein KIND starten: die fangen dessen
+Scheitern ab, geben es als Text aus und enden selbst mit 0. Entschieden wird
+seither am ERGEBNIS (`bewerten` als Huelle um `bewerten_roh`): nur was sonst
+FEHL waere, wird uebersprungen -- ein Fall, der die Meldung ERWARTET
+(`kein_fenster.dhtest`), bleibt gruen, sonst waere er stillschweigend nie
+geprueft worden. In `KEIN_FENSTER` steht jetzt auch der SCHLUSSSATZ derselben
+Meldung: wer sie in eine Tabellenspalte schneidet, verliert den Anfang.
+(2) **`DH_OHNE_AUDIO=1` setzte nur conftest.py**, und der Anker erbte es --
+der neue Schritt setzt es selbst, sonst sucht jedes Programm mit Ton ein
+Geraet, das der Runner nicht hat.
+(3) **`core.autocrlf=true`** auf GitHubs Windows-Images: die Byte-Vergleiche
+gegen eingecheckte Dateien bekamen CRLF aus dem Checkout, waehrend das
+Werkzeug LF schreibt (`xsb hat CRLF: True`) -- dafuer `.gitattributes` mit
+`eol=lf` fuer `*.xsb`, `i18n/*.json` und die zwei circuitrunner-Dateien.
+**Die Reihenfolge war es nicht** (dieselben sieben Dateien fielen vor wie
+nach den pytest-Schritten), und die Fehlerausgabe des Kindes warf
+`_hilfen/uialeser.dh` bis dahin WEG -- ohne sie sah ein Fall gar nicht, dass
+sein Kind an SCREEN gestorben ist, und meldete einen Fehler ueber etwas ganz
+anderes (jetzt `auslesenFehler`). Gegenproben: ohne die Huelle faellt der
+Rust-Test; mit `DHRT_KEIN_FENSTER=1` werden die 24 uebersprungen, **ohne den
+Schalter laufen dieselben 45 Faelle scharf durch** (0 uebersprungen) -- die
+Reparatur legt nichts still.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
@@ -4178,9 +4282,10 @@ einer Zeichenkette ist ein Lexer-Fehler; der Text kommt jetzt ueber
 vor dem Schliessen", "ein Klick auf einen Ordner klappt ihn um") pruefen,
 dass NICHTS passiert -- in pytest genauso schwach. **Nebenfund der vollen
 Pruefung:** `dhrt test tests/pruef` braucht mit den IDE-Sammlungen 780 s
-(sie laufen in Echtzeit und nacheinander), der Anker in
-`tests/test_dhrt_test.py` gab nur 600 s und riss im seriellen Durchgang --
-er hat jetzt 1800 s, die Formattests daneben bleiben bei 600.
+(sie laufen in Echtzeit und nacheinander), der pytest-Anker
+gab nur 600 s und riss im seriellen Durchgang --
+er bekam 1800 s. (Seit 2026-09-20 ruft die CI `dhrt test tests/pruef` direkt
+auf, ohne Zeitgrenze von pytest.)
 
 **Stufe 35 (2026-09-13):** die Staende 6 bis 12 der IDE ohne Python -- 43
 Faelle aus `tests/test_ide.py` nach `tests/pruef/werkzeug_ide_6_12.dhtest`
