@@ -551,6 +551,10 @@ pub enum Ergebnis {
 /// scheitert, ist nicht falsch, er ist hier nicht pruefbar.
 pub const KEIN_FENSTER: &[&str] = &[
     "Kein Fenster moeglich",              // dhrt seit 2026-09-19 (statt Panic)
+    // Der Schlusssatz derselben Meldung: wer sie in eine Tabellenspalte
+    // schneidet, verliert den ANFANG -- so kam sie aus `shoot.dh` als
+    // "FEHLER mini  t). Ein Fenster brauchen SCREEN und ..." zurueck.
+    "Ein Fenster brauchen SCREEN",
     "Attempting to create window failed",
     "does not appear to support OpenGL",
     "Failed to initialize Window",
@@ -881,7 +885,31 @@ fn unterschied(erwartet: &str, ist: &str) -> String {
 
 /// Einen abgeschlossenen Lauf bewerten. `ohne_grafik`: ist `DHRT_OHNE_GRAFIK`
 /// gesetzt, ist ein fehlender Grafik-Builtin kein Fehlschlag (Build ohne raylib).
+/// Darunter dasselbe Netz: **was an einer fehlenden Anzeige scheitert, ist
+/// nicht falsch, sondern hier nicht pruefbar.**
+///
+/// Die Pruefung lag bis 2026-09-20 nur im Zweig `code != 0` und traf damit
+/// genau die Faelle nicht, die ein KIND starten: die fangen dessen Scheitern
+/// ab, geben es als Text aus und enden selbst mit 0. Auf dem Windows-Runner
+/// (kein OpenGL-Treiber) waren das 24 Faelle in sieben Sammlungen -- sie
+/// meldeten "erwartet '23 von 23 laufen', erhalten '... Kein Fenster
+/// moeglich ...'", also einen Fehler, der nichts ueber den Code aussagt.
+///
+/// Geprueft wird deshalb ERST das Ergebnis: nur was sonst FEHL waere, wird
+/// uebersprungen. Ein Fall, der die Meldung erwartet und trotzdem stimmt
+/// (`kein_fenster.dhtest`), bleibt gruen -- sonst waere er stillschweigend
+/// nie geprueft worden.
 pub fn bewerten(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik: bool) -> Ergebnis {
+    let e = bewerten_roh(fall, code, stdout, stderr, ohne_grafik);
+    if matches!(e, Ergebnis::Fehl(_)) {
+        if let Some(m) = KEIN_FENSTER.iter().find(|m| stderr.contains(*m) || stdout.contains(*m)) {
+            return Ergebnis::Uebersprungen(format!("kein Fenster moeglich ({})", m));
+        }
+    }
+    e
+}
+
+fn bewerten_roh(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik: bool) -> Ergebnis {
     // Ein Fall darf sich SELBST ueberspringen, wenn ihm ein fremdes Werkzeug
     // fehlt (node, git, cargo ...): die Zeile `UEBERSPRINGEN: <grund>` auf
     // stdout oder stderr. Die Alternative waere, im Fehlen des Werkzeugs die
@@ -891,6 +919,11 @@ pub fn bewerten(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik:
             return Ergebnis::Uebersprungen(grund.trim().to_string());
         }
     }
+    // Bricht der Fall SELBST ab, wird hier schon entschieden -- vor der
+    // Fehler-Erwartung: sonst koennte ein `--- fehler`-Fall gruen werden,
+    // weil sein Suchwort zufaellig in der Kein-Fenster-Meldung steht. Den
+    // umgekehrten Fall (Fall laeuft durch, das KIND bekam kein Fenster) faengt
+    // `bewerten` am Ergebnis ab, siehe dort.
     if code != 0 {
         if let Some(m) = KEIN_FENSTER.iter().find(|m| stderr.contains(*m) || stdout.contains(*m)) {
             return Ergebnis::Uebersprungen(format!("kein Fenster moeglich ({})", m));
@@ -1204,6 +1237,23 @@ mod tests {
         assert!(parsen("=== a\n--- erwartet\n1\n").unwrap_err().contains("keinen Quelltext"));
         assert!(parsen("=== a\nPRINT 1\n--- sonstwas\n").unwrap_err().contains("unbekannter Abschnitt"));
         assert!(parsen("=== \nPRINT 1\n").unwrap_err().contains("Namen"));
+    }
+
+    /// Ein Fall, der ein KIND startet, faengt dessen Scheitern ab und endet
+    /// selbst mit 0 -- ohne diese Pruefung meldete er auf einer Maschine ohne
+    /// Anzeige einen Fehler, der nichts ueber den Code aussagt.
+    #[test]
+    fn kein_fenster_im_kind_ueberspringt_auch_bei_rueckgabe_null() {
+        let f = &parsen(BEISPIEL).unwrap()[0];   // erwartet "1"
+        let kind = "29_camera: Rueckgabe 2 -- CAMERA_X: Kein Fenster moeglich -- ...\n";
+        assert!(matches!(bewerten(f, 0, kind, "", false), Ergebnis::Uebersprungen(_)));
+        // Erfuellt der Fall seine Erwartung TROTZ der Meldung, bleibt er gruen:
+        // sonst waere `kein_fenster.dhtest` stillschweigend nie geprueft.
+        let erwartet_die_meldung = "=== meldung\nPRINT 1\n--- erwartet\nKein Fenster moeglich\n";
+        let g = &parsen(erwartet_die_meldung).unwrap()[0];
+        assert_eq!(bewerten(g, 0, "Kein Fenster moeglich\n", "", false), Ergebnis::Ok);
+        // Und ohne die Meldung bleibt ein Fehler ein Fehler.
+        assert!(matches!(bewerten(f, 0, "2\n", "", false), Ergebnis::Fehl(_)));
     }
 
     #[test]
