@@ -263,7 +263,12 @@ ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
 falsch (erkannt an der Meldung „Kein Fenster moeglich“, die `dhrt` dann
 statt eines Absturzes ausgibt; `DHRT_KEIN_FENSTER=1` täuscht genau diesen
 Fehler vor, zum Prüfen auf einem Rechner mit Bildschirm); mit `DHRT_OHNE_GRAFIK=1` auch einer, dem im Bau ohne raylib ein
-Grafik-Befehl fehlt. **Ein Fall darf sich auch selbst überspringen**: die Zeile
+Grafik-Befehl fehlt. **Das gilt auch, wenn der Fall selbst mit 0 endet** und
+nur sein KIND kein Fenster bekam — ein Fall, der ein Programm startet, fängt
+dessen Scheitern ja ab und gibt es als Text aus. Entschieden wird deshalb am
+Ergebnis: nur was sonst als falsch gälte, wird übersprungen; ein Fall, der die
+Meldung ERWARTET, bleibt grün (sonst wäre `kein_fenster.dhtest` stillschweigend
+nie geprüft worden). **Ein Fall darf sich auch selbst überspringen**: die Zeile
 `UEBERSPRINGEN: <grund>` auf stdout oder stderr, dann steht der Grund in der
 Bilanz. Das ist für fremde Werkzeuge gedacht, die nicht überall liegen (node,
 git, cargo); die Alternative wäre, die erwarteten Zeilen zu **erfinden** — grün

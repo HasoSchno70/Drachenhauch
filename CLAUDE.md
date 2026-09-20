@@ -3851,6 +3851,37 @@ beiden Messungen nicht gleich, der Vergleich ist also nicht isoliert --
 aber wer mit `--hardware` baut, sollte mit sporadisch roten Klick-Faellen
 rechnen.
 
+**Was der Anker verdeckt hat, und was ihn ersetzt.** Der erste CI-Lauf mit
+dem direkten Aufruf meldete **24 Faelle rot, die tags zuvor ueber den
+pytest-Anker gruen waren** -- bei GLEICHER Image-Version
+(`windows-2025-vs2026`) und, nachgestellt, demselben Aufruf. Drei Ursachen,
+alle gemessen:
+(1) **Der Runner hat mal einen OpenGL-Treiber und mal nicht** (`WGL: The
+driver does not appear to support OpenGL`). Getragen wird das jetzt von der
+Ueberspring-Erkennung -- die lag bis dahin nur im Zweig `code != 0` und traf
+damit genau die Faelle NICHT, die ein KIND starten: die fangen dessen
+Scheitern ab, geben es als Text aus und enden selbst mit 0. Entschieden wird
+seither am ERGEBNIS (`bewerten` als Huelle um `bewerten_roh`): nur was sonst
+FEHL waere, wird uebersprungen -- ein Fall, der die Meldung ERWARTET
+(`kein_fenster.dhtest`), bleibt gruen, sonst waere er stillschweigend nie
+geprueft worden. In `KEIN_FENSTER` steht jetzt auch der SCHLUSSSATZ derselben
+Meldung: wer sie in eine Tabellenspalte schneidet, verliert den Anfang.
+(2) **`DH_OHNE_AUDIO=1` setzte nur conftest.py**, und der Anker erbte es --
+der neue Schritt setzt es selbst, sonst sucht jedes Programm mit Ton ein
+Geraet, das der Runner nicht hat.
+(3) **`core.autocrlf=true`** auf GitHubs Windows-Images: die Byte-Vergleiche
+gegen eingecheckte Dateien bekamen CRLF aus dem Checkout, waehrend das
+Werkzeug LF schreibt (`xsb hat CRLF: True`) -- dafuer `.gitattributes` mit
+`eol=lf` fuer `*.xsb`, `i18n/*.json` und die zwei circuitrunner-Dateien.
+**Die Reihenfolge war es nicht** (dieselben sieben Dateien fielen vor wie
+nach den pytest-Schritten), und die Fehlerausgabe des Kindes warf
+`_hilfen/uialeser.dh` bis dahin WEG -- ohne sie sah ein Fall gar nicht, dass
+sein Kind an SCREEN gestorben ist, und meldete einen Fehler ueber etwas ganz
+anderes (jetzt `auslesenFehler`). Gegenproben: ohne die Huelle faellt der
+Rust-Test; mit `DHRT_KEIN_FENSTER=1` werden die 24 uebersprungen, **ohne den
+Schalter laufen dieselben 45 Faelle scharf durch** (0 uebersprungen) -- die
+Reparatur legt nichts still.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
