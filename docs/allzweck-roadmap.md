@@ -99,9 +99,10 @@ darum zuerst (geteilter Helfer `flush_out`, den sich `flush_and_prompt` für
 starten — der Bundle-Zweig setzt seine eigenen). Profiler und Debugger melden
 `EXIT` nicht mehr als Fehler.
 
-Tests: `tests/test_os_builtins.py` (28), neue Fixtures `run_gb_roh` (liefert
-Rückgabewert + stderr, reicht Argumente durch) und `dhrt_pfad` in
-`conftest.py`. Beispiel: `examples/161_werkzeug.dh` — ein `wc`-artiges Werkzeug
+Tests: `tests/pruef/os_builtins.dhtest` (30; bis 2026-09-08 pytest, die
+letzten zwei Fälle — PRINT/EPRINT in einem Strom und `SHELL_OUT$` auf die
+eigene Exe — kamen am 2026-09-20 nach, als es mit `EXEPATH$()` einen Weg zur
+laufenden Programmdatei gab). Beispiel: `examples/161_werkzeug.dh` — ein `wc`-artiges Werkzeug
 ohne Fenster, mit Argumenten, stderr-Meldungen und Rückgabewerten. Doku:
 `docs/builtins-core.md`, Abschnitt „Betriebssystem".
 

@@ -1087,6 +1087,7 @@ geklappt hat.
 | `SETENV(name$, wert$)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) |
 | `CWD$()` → STRING | aktuelles Arbeitsverzeichnis |
 | `CHDIR(pfad$)` | Arbeitsverzeichnis wechseln |
+| `EXEPATH$()` → STRING | Pfad der laufenden Programmdatei |
 | `EXIT([code])` | sofort beenden, `code` = Rückgabewert (0..255, Vorgabe 0) |
 | `EPRINT(text)` | Zeile nach **stderr** statt stdout |
 | `SHELL(programm$, ...)` → INTEGER | Programm starten, warten, Rückgabewert |
@@ -1187,6 +1188,23 @@ und unterliegt dann deren eigenen Quoting-Regeln.
 `SHELL_OUT$` sammelt dessen **stdout** ein und liefert es als STRING, während
 sein **stderr** stderr bleibt — sonst mischten sich Fehlermeldungen unbemerkt
 in die Nutzdaten.
+
+### Wo liegt das Programm selbst?
+
+`CWD$()` sagt, von **wo aus** gearbeitet wird; `EXEPATH$()` sagt, **was
+läuft** — unter `dhrt run spiel.dh` also die Laufzeit, in einem mit
+`dhrt --export` gebauten Spiel dessen eigene `.exe`. Beides sind
+verschiedene Fragen, und für zwei Dinge zählt die zweite:
+
+```basic
+' Dieselbe Laufzeit noch einmal starten -- SHELL kennt "dhrt" nicht als Namen
+' der laufenden Runtime, PROCESS_START dagegen schon.
+PRINT SHELL_OUT$(EXEPATH$(), "run", "helfer.dh")
+
+' Eine Beilage NEBEN der Exe suchen statt im Startverzeichnis
+DIM daten AS STRING
+daten = PATHJOIN(DIRNAME(EXEPATH$()), "spielstand.json")
+```
 
 ### Ein Programm im Hintergrund
 
