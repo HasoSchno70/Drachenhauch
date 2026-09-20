@@ -4,3 +4,14 @@
 # Shell-Skripte und Vorlagen der macOS/Linux-Pakete: immer LF, auch in einem
 # Windows-Klon mit autocrlf -- "/bin/sh^M: bad interpreter".
 installer/posix/* text eol=lf
+
+# Dateien, die ein Test BYTE FUER BYTE mit der Ausgabe eines Werkzeugs
+# vergleicht -- sie muessen ueberall dieselben Zeilenenden haben. Auf einem
+# Windows-Runner mit `core.autocrlf=true` (so sind GitHubs Images eingestellt)
+# kaeme sonst CRLF aus dem Checkout, waehrend das Werkzeug LF schreibt.
+# Gemessen am 2026-09-20: `xsb hat CRLF: True`, und die zwei Faelle in
+# werkzeug_pyramid_levels und werkzeug_buch meldeten "byte-gleich FALSE".
+*.xsb text eol=lf
+buch-referenz/buch/i18n/*.json text eol=lf
+circuitrunner/assets/tiles.json text eol=lf
+circuitrunner/levels/circuit_runner.json text eol=lf
