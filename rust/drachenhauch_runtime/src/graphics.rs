@@ -156,6 +156,29 @@ struct Tex {
 /// Beleuchtung (Blinn-Phong via Standard-rlights-Shader). Bis zu 4 Lichter.
 const MAX_LIGHTS: usize = 4;
 
+/// Wie oft `clipboard_set` es hoechstens versucht und wie lange es dazwischen
+/// wartet. Windows gibt die Zwischenablage jeweils nur EINEM Prozess; wer sie
+/// gerade offen hat, laesst sie ueblicherweise nach Millisekunden los.
+///
+/// **Beide Zahlen sind gemessen, nicht gegriffen** (2026-09-20, Blocker haelt
+/// sie per OpenClipboard fest):
+///
+/// * EIN Aufruf von `SetClipboardText` braucht gegen eine gehaltene
+///   Zwischenablage schon **261 ms** -- GLFW wiederholt selbst
+///   (win32_window.c), und seine `Sleep(1)` haengen an Windows'
+///   Timer-Granularitaet. Viele Versuche waeren also nicht billig: zehn
+///   ergaeben rund 2,6 SEKUNDEN Stillstand.
+/// * Eine KURZE Pause bringt dabei nichts: mit 5 ms scheiterte der ganze
+///   Aufruf weiter nach 259 ms, die Folgeversuche liefen also ins Leere.
+///   Erst 150 ms Pause deckt echte Blockaden ab -- gemessen gelingt das
+///   Setzen bei 100/400/700 ms Blockade (nach 239/538/701 ms), und bei
+///   1500 ms gibt es nach **711 ms** auf.
+///
+/// Diese 711 ms sind die Obergrenze, und sie faellt nur dort an, wo es ohne
+/// die Schleife STILL schiefgegangen waere.
+const CLIP_VERSUCHE: u32 = 4;
+const CLIP_WARTE_MS: u64 = 150;
+
 /// Ein Licht + die gecachten Uniform-Locations im Lighting-Shader.
 struct LightData {
     enabled: bool,
@@ -3144,8 +3167,55 @@ impl Graphics {
     }
 
     // --- Clipboard + Drag&Drop (Batch 5) ---
-    pub fn clipboard_get(&self) -> String { self.rl.get_clipboard_text().unwrap_or_default() }
-    pub fn clipboard_set(&mut self, s: &str) { let _ = self.rl.set_clipboard_text(s); }
+
+    /// Die Zwischenablage auslesen, OHNE abzustuerzen -- leer, wenn sie gerade
+    /// nicht zu haben ist.
+    ///
+    /// **Der Grund:** raylib-rs' `get_clipboard_text` macht `CStr::from_ptr`
+    /// auf den Rueckgabewert, und GLFW liefert NULL, sobald `OpenClipboard`
+    /// scheitert (ein anderer Prozess haelt sie -- unter Windows gehoert sie
+    /// jeweils nur EINEM). Wer in dem Moment `CLIPBOARD_GET` rief, starb an
+    /// einer Speicherzugriffsverletzung: gemessen am 2026-09-20 mit einem
+    /// Blocker, der sie per OpenClipboard festhaelt -- Rueckgabe 139 (SIGSEGV),
+    /// davor die GLFW-Warnung "Failed to open clipboard: Zugriff verweigert".
+    /// Das traf JEDES Programm mit Strg+C/V, nicht nur die Tests.
+    fn clipboard_text_roh() -> Option<String> {
+        let p = unsafe { raylib::ffi::GetClipboardText() };
+        if p.is_null() { return None; }
+        unsafe { std::ffi::CStr::from_ptr(p as *const std::ffi::c_char) }
+            .to_str().ok().map(|s| s.to_owned())
+    }
+
+    pub fn clipboard_get(&self) -> String { Self::clipboard_text_roh().unwrap_or_default() }
+
+    /// Text in die Systemzwischenablage legen -- mit Zuruecklesen und
+    /// Wiederholen; liefert FALSE, wenn er danach nicht darin steht.
+    ///
+    /// **Der Grund:** unter Windows scheitert `OpenClipboard`, solange ein
+    /// anderer Prozess sie offen haelt, und davon erfaehrt der Aufrufer
+    /// NICHTS -- `glfwSetClipboardString` gibt void zurueck, und raylib-rs'
+    /// `Result` sagt nur, ob der Text ein Nullbyte enthielt. Das Setzen schlug
+    /// damit STILL fehl, und ein folgendes Einfuegen brachte den ALTEN Inhalt.
+    ///
+    /// Gemessen am 2026-09-20 in zwei vollen Laeufen von `dhrt test`: Faelle
+    /// fuegten den Text FREMDER Faelle ein ('pdf' statt 'X', 'zwei' statt
+    /// 'a/b/c/d') -- und zwar ueber Datei- und sogar Prozessgrenzen hinweg,
+    /// weil die Zwischenablage systemweit ist und ihren Inhalt behaelt. Eine
+    /// Markierung als seriell reicht dagegen nicht: getroffen wurde auch eine
+    /// Sammlung, die bereits `--- seriell` trug.
+    pub fn clipboard_set(&mut self, s: &str) -> bool {
+        for versuch in 0..CLIP_VERSUCHE {
+            // Ein Nullbyte im Text ist kein Wettlauf, sondern ein Inhalt, den
+            // die Zwischenablage nie annehmen wird -- da hilft Wiederholen
+            // nicht.
+            if self.rl.set_clipboard_text(s).is_err() { return false; }
+            if Self::clipboard_text_roh().map(|t| t == s).unwrap_or(false) { return true; }
+            if versuch + 1 < CLIP_VERSUCHE {
+                std::thread::sleep(std::time::Duration::from_millis(CLIP_WARTE_MS));
+            }
+        }
+        false
+    }
     pub fn dropped_files(&self) -> &[String] {
         &self.abgelegt
     }

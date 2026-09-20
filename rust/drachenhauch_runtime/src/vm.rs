@@ -7008,7 +7008,19 @@ impl<'p> Vm<'p> {
                 ]))
             }
             "clipboard_get" => Value::Str(g!().clipboard_get().into()),
-            "clipboard_set" => { let s = gs(a,0,"CLIPBOARD_SET")?.to_string(); g!().clipboard_set(&s); Value::Nil }
+            // Scheitert das Schreiben, ist das ein FEHLER und kein Schweigen:
+            // die Zwischenablage gehoert jeweils EINEM Prozess, und wer seinen
+            // Text nicht hineinbekommt, faendet beim naechsten Einfuegen den
+            // alten wieder -- der Schaden zeigt sich dann an ganz anderer
+            // Stelle. `clipboard_set` hat es da schon zehnmal versucht.
+            "clipboard_set" => {
+                let s = gs(a, 0, "CLIPBOARD_SET")?.to_string();
+                if !g!().clipboard_set(&s) {
+                    return Err("CLIPBOARD_SET: Text konnte nicht in die Zwischenablage gelegt werden \
+                                -- ein anderes Programm haelt sie offen, oder der Text enthaelt ein Nullbyte".into());
+                }
+                Value::Nil
+            }
             "files_dropped" => Value::Int(g!().dropped_files().len() as i64),
             "file_dropped" => {
                 let i = gi(a, 0, "FILE_DROPPED")? as usize;

@@ -1,0 +1,118 @@
+' CLIPBOARD_SET gegen eine BELEGTE Zwischenablage.
+'
+' Windows gibt die Zwischenablage jeweils nur EINEM Prozess. Wer sie nicht
+' bekommt, erfuhr davon bis 2026-09-20 nichts: `glfwSetClipboardString` gibt
+' void zurueck, und raylib-rs' Result sagt nur, ob der Text ein Nullbyte
+' enthielt -- das Setzen schlug STILL fehl, und das naechste Einfuegen brachte
+' den ALTEN Inhalt. Gemessen an zwei vollen Laeufen von `dhrt test`, in denen
+' Faelle den Text FREMDER Faelle einfuegten ('pdf' statt 'X', 'zwei' statt
+' 'a/b/c/d') -- ueber Datei- und Prozessgrenzen hinweg.
+'
+' Der Blocker haelt sie mit OpenClipboard echt fest (kein Nachbau): nur so
+' laeuft die Probe durch denselben Weg wie der Fehler im Alltag.
+--- seriell
+
+=== eine belegte zwischenablage wird abgewartet
+' Der Blocker haelt sie 400 ms -- die Zahl liegt zwischen zwei GEMESSENEN:
+' EIN Aufruf von SetClipboardText wartet intern schon 261 ms (GLFW wiederholt
+' selbst), genau so weit kommt der alte Stand. CLIPBOARD_SET deckt mit vier
+' Versuchen und 150 ms Pause rund 700 ms ab und gibt nach 711 ms auf.
+'
+' Der gesetzte Text ist eine ZUFALLSKENNUNG, und dafuer gibt es zwei Anlaeufe
+' als Begruendung: mit einem festen Text war der Fall gruen und WERTLOS (er
+' stand vom vorigen Lauf noch in der Zwischenablage, ein still gescheitertes
+' Setzen sah also aus wie ein gegluecktes) -- und mit MILLIS() ebenso, weil
+' das die Zeit seit PROGRAMMstart ist und der Ablauf hier jedes Mal gleich
+' lang dauert. Beide Fassungen bestanden gegen den alten, kaputten Bau.
+DIM skript AS STRING : skript = ARG$(0)
+DIM p AS INTEGER
+p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", skript, "m", "400")
+' Warten, bis er sie WIRKLICH hat -- sonst pruefte der Fall nichts.
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("m.auf") AND NOT FILEEXISTS("m.fehl") AND MILLIS() - t0 < 5000
+    SLEEP(10)
+WEND
+IF FILEEXISTS("m.fehl") THEN
+    PRINT "UEBERSPRINGEN: die Zwischenablage haelt gerade ein anderes Programm"
+    EXIT(0)
+END IF
+IF NOT FILEEXISTS("m.auf") THEN
+    PRINT "UEBERSPRINGEN: der Blocker kam nicht zum Zug"
+    EXIT(0)
+END IF
+DIM neu AS STRING : neu = "frisch-" + UUID4$()
+CLIPBOARD_SET(neu)
+IF CLIPBOARD_GET() = neu THEN
+    PRINT "angekommen"
+ELSE
+    PRINT "NICHT angekommen, drin steht: " + CLIPBOARD_GET()
+END IF
+PROCESS_CLOSE(p)
+--- argumente
+{sammlung}/_hilfen/zwischenablage_blocker.ps1
+--- erwartet
+angekommen
+
+=== eine dauerhaft belegte zwischenablage ist ein fehler
+' Zwei Sekunden -- darueber kommt auch das Wiederholen nicht, das nach
+' gemessenen 711 ms aufgibt. Frueher endete das Programm hier ohne ein Wort,
+' und der Text stand einfach nicht in der Zwischenablage.
+DIM skript AS STRING : skript = ARG$(0)
+DIM p AS INTEGER
+p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", skript, "m", "2000")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("m.auf") AND NOT FILEEXISTS("m.fehl") AND MILLIS() - t0 < 5000
+    SLEEP(10)
+WEND
+IF FILEEXISTS("m.fehl") THEN
+    PRINT "UEBERSPRINGEN: die Zwischenablage haelt gerade ein anderes Programm"
+    EXIT(0)
+END IF
+IF NOT FILEEXISTS("m.auf") THEN
+    PRINT "UEBERSPRINGEN: der Blocker kam nicht zum Zug"
+    EXIT(0)
+END IF
+CLIPBOARD_SET("kommt nicht an")
+PRINT "haette nicht laufen duerfen"
+--- argumente
+{sammlung}/_hilfen/zwischenablage_blocker.ps1
+--- fehler
+CLIPBOARD_SET: Text konnte nicht in die Zwischenablage gelegt werden
+
+=== eine belegte zwischenablage stuerzt beim lesen nicht ab
+' Bis 2026-09-20 starb das Programm hier mit einer
+' Speicherzugriffsverletzung (Rueckgabe 139): GLFW liefert NULL, sobald
+' OpenClipboard scheitert, und raylib-rs' get_clipboard_text macht
+' CStr::from_ptr darauf. Das traf JEDES Programm mit Strg+C/V.
+DIM skript AS STRING : skript = ARG$(0)
+DIM p AS INTEGER
+p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", skript, "m", "600")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("m.auf") AND NOT FILEEXISTS("m.fehl") AND MILLIS() - t0 < 5000
+    SLEEP(10)
+WEND
+IF FILEEXISTS("m.fehl") THEN
+    PRINT "UEBERSPRINGEN: die Zwischenablage haelt gerade ein anderes Programm"
+    EXIT(0)
+END IF
+IF NOT FILEEXISTS("m.auf") THEN
+    PRINT "UEBERSPRINGEN: der Blocker kam nicht zum Zug"
+    EXIT(0)
+END IF
+' Leer ist die richtige Antwort -- es gibt gerade nichts zu lesen.
+PRINT "gelesen: [" + CLIPBOARD_GET() + "]"
+PRINT "und das Programm laeuft weiter"
+--- argumente
+{sammlung}/_hilfen/zwischenablage_blocker.ps1
+--- erwartet
+gelesen: []
+und das Programm laeuft weiter
+
+=== ohne blocker bleibt alles wie bisher
+CLIPBOARD_SET("ganz gewoehnlich")
+PRINT CLIPBOARD_GET()
+CLIPBOARD_SET("")
+PRINT "[" + CLIPBOARD_GET() + "]"
+--- erwartet
+ganz gewoehnlich
+[]
