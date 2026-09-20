@@ -11,7 +11,17 @@
 > gefallen (18.09.): alte Qt-`.dhsprite` müssen nicht mehr aufgehen (d),
 > und die zwei Bauskripte bleiben Python, nur mit der Standardbibliothek
 > (c). Und keine Qt-Funktion blockiert das Löschen (a): was fehlt, wird
-> gebaut, erst die acht Punkte der Stufe A (7.7). Offen ist nur noch (b).
+> gebaut, erst die acht Punkte der Stufe A (7.7). **(b) fiel am 19.09.** --
+> macOS und Linux bekommen ein Paket, und es ist gebaut.
+>
+> **Stand 20.09.2026: die letzten vier pytest-Dateien, die etwas Bleibendes
+> prüfen, sind umgezogen** (7.6) -- `test_dhrt_test`, `test_drucken`,
+> `test_os_builtins` und `test_midi_module`. Keine davon wurde aufgegeben:
+> der eigene PDF-Leser kann jetzt auch fremde PDFs samt Textlagen, `EXEPATH$()`
+> schließt das Loch "ein Programm kennt seine eigene Exe nicht", und die CI
+> ruft `dhrt test tests/pruef` direkt auf statt über einen pytest-Anker.
+> Damit steht vor Schritt 6 und 7 (CI umstellen, löschen) keine
+> Test-Bedingung mehr.
 >
 > **Stand 06.09.2026: Weg A ist gebaut.** `dhrt lsp` (Sprachserver in Rust,
 > `lsp.rs` + `symbole.rs`), `dhrt doku prosa|grammatik|referenz` und
@@ -411,14 +421,15 @@ stumm (vorher klang es als Rechteck).
 ### 7.6 Tests, die nach dem Löschen noch fehlen würden
 
 Die 87 Dateien zu Qt und den Python-Modellen fallen mit ihrem Code. Von den
-übrigen prüfen nur vier etwas, das bleibt:
+übrigen prüften nur vier etwas, das bleibt — **alle vier sind am 20.09.2026
+umgezogen, keiner ist aufgegeben worden:**
 
-| Datei | prüft | Weg |
+| Datei | prüfte | wohin |
 |---|---|---|
-| `test_dhrt_test.py` | Anker: `dhrt test tests/pruef` | die CI ruft es direkt auf |
-| `test_drucken.py` | Druck durch „Microsoft Print to PDF", gelesen mit PyMuPDF | ein Leser für fremde PDFs in Drachenhauch -- oder den Fall aufgeben |
-| `test_os_builtins.py` (2) | PRINT/EPRINT-Reihenfolge in einem Strom; `SHELL_OUT$` mit der eigenen Exe | kleiner Baustein in `dhrt` (Ströme zusammenführen) oder aufgeben |
-| `test_midi_module.py` | echter und Loopback-MIDI-Anschluss | als Sammlung, die sich ohne Anschluss überspringt |
+| `test_dhrt_test.py` | Anker: `dhrt test tests/pruef`; das Format der Sammlungen | die CI ruft den Anker direkt auf; das Format prüft `tests/pruef/dhrt_test_format.dhtest` an einer Sammlung, die der Fall selbst schreibt (als Beilage ginge es nicht: ihre `===`/`---`-Zeilen wären die Trenner der äußeren) |
+| `test_drucken.py` | Druck durch „Microsoft Print to PDF", gelesen mit PyMuPDF | `tests/pruef/drucken.dhtest`; der eigene Leser `tests/pruef/_hilfen/pdftext.dh` liest jetzt auch **fremde** PDFs und liefert die Textstellen mit — der Betrag wird an seiner mm-Lage geprüft statt über PyMuPDFs Textkästen |
+| `test_os_builtins.py` (2) | PRINT/EPRINT-Reihenfolge in einem Strom; `SHELL_OUT$` mit der eigenen Exe | `tests/pruef/os_builtins.dhtest`; beides hing am selben Loch — ein Programm kannte den Pfad der laufenden Laufzeit nicht. Dafür neu **`EXEPATH$()`**; die Ströme führt eine Shell-Umleitung zusammen (in einer Skriptdatei, weil `SHELL` Anführungszeichen als `\"` weitergibt) |
+| `test_midi_module.py` | echter und Loopback-MIDI-Anschluss | `tests/pruef/modules_midi.dhtest`, mit Selbst-Überspringen je Stufe (Feature, Ausgang, Loopback-Port) |
 
 `test_pruefen.py` (LOG-Reihenfolge), `test_build_wasm.py`,
 `test_dhrun_chooser.py`, `test_seriell_liste.py` und
@@ -432,8 +443,8 @@ und fallen mit ihnen.
    GB-Code des SFX-Generators~~ -- alles drei am 17.09. erledigt.
 2. **Umzüge, die Python nicht stören:** ~~die drei `builtin_*.json` aus
    `drachenhauch/` heraus~~ (am 17.09. nach `daten/`, siehe 7.2);
-   `dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`; `test_midi_module` als
-   Sammlung.
+   `dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`; ~~`test_midi_module` als
+   Sammlung~~ (am 20.09., zusammen mit den drei anderen aus 7.6).
 3. **Lücken schließen, die man vermissen würde** -- entschieden in (a):
    zuerst die acht Punkte der Stufe A (Liste unten), der Rest bei Bedarf.
    ~~Für Qt-`.dhsprite`-Dateien ein einmaliger Import~~ -- entfällt,
