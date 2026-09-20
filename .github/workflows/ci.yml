@@ -137,7 +137,26 @@ jobs:
       # seither `tests/pruef/dhrt_test_format.dhtest` -- sie pruefen sich also
       # selbst. Steht vor pytest, weil hier die Sprache selbst haengt: ein
       # Fehler darin soll nicht hinter 3000 Python-Tests auftauchen.
+      # MESSUNG (voruebergehend, 2026-09-20): der erste Lauf dieses Schrittes
+      # meldete 24 Faelle rot, die ueber den pytest-Anker gruen waren -- kein
+      # Fenster ("kein passendes OpenGL 3.3") und Byte-Vergleiche gegen
+      # eingecheckte Dateien. Beides kann an der Reihenfolge haengen, also
+      # steht dieselbe Probe vor UND nach den pytest-Schritten.
+      - name: Probe vor den Sammlungen
+        continue-on-error: true
+        run: |
+          git config --get core.autocrlf
+          python -c "d=open('pyramid_pusher/levels/01_pyramid_pusher.xsb','rb').read(); print('xsb hat CRLF:', b'\r\n' in d)"
+          Set-Content -Encoding ascii diag.dh 'SCREEN(64, 48, "D", 1)'
+          Add-Content -Encoding ascii diag.dh 'PRINT "fenster geht auf"'
+          rust/drachenhauch_runtime/target/release/dhrt.exe run diag.dh
+
+      # conftest.py setzt `DH_OHNE_AUDIO=1` fuer die pytest-Laeufe, und der
+      # Anker erbte es. Ohne die Variable sucht jedes Programm mit Ton ein
+      # Ausgabegeraet -- der Runner hat keins ("NoDefaultOutputDevice").
       - name: Pruefsammlungen (dhrt test)
+        env:
+          DH_OHNE_AUDIO: 1
         run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef
 
       - name: Run tests (parallel)
@@ -148,6 +167,10 @@ jobs:
 
       - name: Run tests (seriell -- exklusive Betriebsmittel)
         run: pytest tests/ -q -m seriell
+
+      - name: Probe nach den pytest-Schritten
+        continue-on-error: true
+        run: rust/drachenhauch_runtime/target/release/dhrt.exe run diag.dh
 
   # Cross-Platform-Migration Phase 3: auf Linux UND macOS nicht nur BAUEN,
   # sondern TESTEN.
@@ -236,8 +259,12 @@ jobs:
       - name: Run tests (parallel, ohne Grafik, ohne Qt)
         run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
 
+      # Rueckgabewert 5 heisst bei pytest "keine Tests gesammelt" -- und genau
+      # das ist hier seit 2026-09-20 der Fall: die letzten seriellen
+      # Nicht-Qt-Dateien sind Pruefsammlungen geworden (Weg D). Der Schritt
+      # bleibt stehen, damit ein neuer serieller Test hier wieder mitlaeuft.
       - name: Run tests (seriell)
-        run: pytest tests/ -q -m "seriell and not qt"
+        run: pytest tests/ -q -m "seriell and not qt" || [ $? -eq 5 ]
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
   # Rust-Kern (dhrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher
