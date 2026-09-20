@@ -1081,6 +1081,18 @@ pub struct Graphics {
     /// `KEY_ANY_HIT` die Demo-Tasten als Nutzereingabe, und ein Attract-Modus
     /// ("bei Tastendruck abbrechen") wuerde sich selbst sofort beenden.
     auto_injected_keys: Vec<i32>,
+    /// Das zuletzt abgespielte Positions-Ereignis der Wiedergabe. raylib
+    /// zeichnet eine Mausposition NUR auf, wenn sie sich geaendert hat
+    /// (`rcore.c`: "only saved if changed") -- zwischen zwei solchen
+    /// Ereignissen sagt die Aufnahme also "die Maus steht still". Stellt die
+    /// Wiedergabe das nicht in JEDEM Bild her, fuellt der echte Rechner die
+    /// Luecke: schon ein Fenster, das unter dem Zeiger auftaucht oder
+    /// verschwindet, schickt unter Windows ein WM_MOUSEMOVE, und GLFW
+    /// schreibt damit raylibs Mausposition um. Ein aufgezeichneter Klick
+    /// steht aber in drei Bildern (Position, Taste runter, Taste hoch), und
+    /// ein Knopf zaehlt ihn erst beim LOSLASSEN auf demselben Knopf -- die
+    /// Bildzaehlung stimmt dann noch, der Klick landet nur woanders.
+    auto_maus: Option<usize>,
     /// Gemerkte Anzeigenamen je Tastencode (siehe `key_name`).
     key_names: HashMap<i64, String>,
     // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
@@ -1639,6 +1651,7 @@ impl Graphics {
             auto_play_frame: 0,
             auto_play_base: 0,
             auto_injected_keys: Vec::new(),
+            auto_maus: None,
             key_names: HashMap::new(),
         };
         // DHRT_FONT setzt einen TTF als Default-Font (scharfe Schrift in
@@ -4569,6 +4582,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         self.auto_play_base = self.auto_events.first().map(|e| e.frame()).unwrap_or(0);
         self.auto_play_idx = 0;
         self.auto_play_frame = 0;
+        self.auto_maus = None;
         self.auto_playing = !self.auto_events.is_empty();
         self.auto_list = Some(list);
         Ok(self.auto_events.len() as i64)
@@ -4590,6 +4604,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     fn automation_tick(&mut self) {
         self.auto_injected_keys.clear();
         if !self.auto_playing { return; }
+        let mut maus_neu = false;
         while self.auto_play_idx < self.auto_events.len() {
             let e = &self.auto_events[self.auto_play_idx];
             if e.frame().saturating_sub(self.auto_play_base) > self.auto_play_frame { break; }
@@ -4599,11 +4614,26 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             // brauchen das NICHT: deren Wiedergabe setzt nur `currentButtonState`,
             // nicht raylibs "zuletzt gedrueckter Knopf" -- JOYSTICK_ANY_BUTTON
             // sieht die Demo also ohnehin nicht.
-            if matches!(e.get_type(), 2 | 3) {
+            let typ = e.get_type();
+            if matches!(typ, 2 | 3) {
                 self.auto_injected_keys.push(e.params()[0]);
             }
             e.play();
+            // 7 = INPUT_MOUSE_POSITION (rcore.c). Merken, welches Ereignis die
+            // Lage zuletzt gesetzt hat -- unten wird sie damit gehalten.
+            if typ == 7 { self.auto_maus = Some(self.auto_play_idx); maus_neu = true; }
             self.auto_play_idx += 1;
+        }
+        // Kein neues Positions-Ereignis in diesem Bild: die zuletzt
+        // aufgezeichnete Lage noch einmal setzen. Die Aufnahme haelt eine
+        // stehende Maus gar nicht fest (siehe `auto_maus`), und was die
+        // Wiedergabe nicht selbst setzt, gehoert dem Rechner, auf dem sie
+        // laeuft. Dasselbe Ereignis noch einmal abzuspielen ist die
+        // guenstigste Art, sie zu halten: `PlayAutomationEvent` schreibt fuer
+        // diesen Typ nur raylibs `currentPosition` -- es bewegt KEINEN echten
+        // Zeiger (anders als `MOUSE_SET_POS` -> `SetMousePosition`).
+        if !maus_neu {
+            if let Some(i) = self.auto_maus { self.auto_events[i].play(); }
         }
         self.auto_play_frame += 1;
         if self.auto_play_idx >= self.auto_events.len() { self.auto_playing = false; }

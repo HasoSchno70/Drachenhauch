@@ -1,0 +1,89 @@
+' Eine laufende Wiedergabe haelt die aufgezeichnete Mausposition (2026-09-20).
+'
+' raylib zeichnet eine Mausposition NUR auf, wenn sie sich geaendert hat
+' (rcore.c: "only saved if changed"). Zwischen zwei solchen Ereignissen sagt
+' die Aufnahme also "die Maus steht still" -- und genau das muss die
+' Wiedergabe herstellen. Tat sie es nicht, schrieb der echte Rechner die
+' Luecke voll: schon ein Fenster, das unter dem Zeiger auftaucht oder
+' verschwindet, schickt unter Windows ein WM_MOUSEMOVE, GLFW setzt damit
+' raylibs Mausposition, und der aufgezeichnete Klick wurde woanders
+' LOSGELASSEN als gedrueckt. Ein Knopf zaehlt den Klick aber erst beim
+' Loslassen auf sich selbst -- der Klick kam an und blieb wirkungslos.
+'
+' Gestoert wird mit einer ECHTEN Fensternachricht (PostMessage WM_MOUSEMOVE
+' auf 200,150), nicht mit MOUSE_SET_POS: das ruft raylibs SetMousePosition
+' und bewegte den Zeiger des Nutzers mit. Der zweite Fall ist die Gegenprobe
+' -- er zeigt, dass die Nachricht wirklich ankommt und die Lage umschreibt.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== eine fremde mausbewegung verdirbt den aufgezeichneten klick nicht
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "klick.dh", "mausweg", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei klick.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+SETFPS(60)
+' Ohne Titelleiste: dann sind Widget- und Fensterkoordinaten dieselben, und
+' die Klicklage der Aufnahme laesst sich hinschreiben.
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 0, 0, 200, 100)
+AUTOMATION_PLAY("ev.txt")
+DIM geklickt AS BOOLEAN : geklickt = FALSE
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN geklickt = TRUE
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+' Die Klicklage muss den Knopf auch wirklich treffen -- sonst sagte der Fall
+' nur, dass danebengeklickt wurde.
+PRINT "trifft "; (GUI_HIT_TEST(100, 50) = b)
+PRINT IIF(geklickt, "geklickt", "nicht geklickt")
+--- datei ev.txt
+c 4
+e 30 7 100 50 0 0
+e 31 7 100 50 0 0
+e 31 6 0 0 0 0
+e 150 5 0 0 0 0
+
+--- system windows
+--- erwartet
+gesendet
+trifft TRUE
+geklickt
+
+=== die fremde mausbewegung kommt wirklich an
+' Gegenprobe zum Fall darueber: dasselbe Fenster, dieselbe Nachricht, nur
+' ohne laufende Wiedergabe -- dann setzt sie die Mausposition um. Ohne diesen
+' Fall bewiese der erste nichts: er waere auch dann gruen, wenn PostMessage
+' gar nichts ausloeste.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "lage.dh", "mausweg", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei lage.dh
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+SETFPS(60)
+DIM fremd AS BOOLEAN : fremd = FALSE
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 6000
+    IF MOUSEX() = 200 AND MOUSEY() = 150 THEN fremd = TRUE
+    CLS(0) : FLIP()
+WEND
+PRINT IIF(fremd, "lage umgeschrieben", "lage unveraendert")
+--- system windows
+--- erwartet
+gesendet
+lage umgeschrieben

@@ -89,6 +89,29 @@ Schon der erste Frame enthält darum meist zwei Ereignisse
 gedrückt hat. Wer eine Aufnahme auf „genau N Ereignisse" prüft, prüft in
 Wirklichkeit den Mausstand des Rechners.
 
+**Die Wiedergabe hält die Mausposition.** raylib schreibt eine Mausposition
+nur mit, wenn sie sich *geändert* hat — zwischen zwei solchen Ereignissen sagt
+die Aufnahme „die Maus steht still", und genau das stellt die Wiedergabe in
+jedem Frame wieder her. Ohne das schreibt der Rechner, auf dem sie läuft, die
+Lücke voll: unter Windows schickt schon ein Fenster, das unter dem Zeiger
+auftaucht oder verschwindet, ein `WM_MOUSEMOVE`, und damit steht raylibs
+Mausposition woanders. Ein aufgezeichneter Klick steht aber in drei Frames
+(Position, Taste runter, Taste hoch), und ein `gui`-Knopf zählt ihn erst beim
+**Loslassen auf ihm selbst** — eine fremde Bewegung dazwischen ließ den Klick
+ankommen und wirkungslos bleiben. Das traf Testläufe mit vielen gleichzeitigen
+Fenstern, die sich gegenseitig überdecken: einzeln nachgefahren war jeder Fall
+grün, im vollen Lauf fiel jedes Mal ein anderer. Nach dem letzten Ereignis
+endet die Wiedergabe, und die Maus gehört wieder dem Rechner.
+
+Das ändert eine Kleinigkeit für Programme, die **selbst** `MOUSE_SET_POS`
+rufen, während eine Wiedergabe läuft: im selben Frame gewinnt weiterhin das
+Programm, aber die gesetzte Lage bleibt nicht mehr stehen — sobald das Programm
+aufhört zu setzen, zieht die Aufnahme sie im nächsten Frame zurück (gemessen:
+`MOUSE_SET_POS(77,88)` in den Frames 4–8, danach steht die Maus ab Frame 9
+wieder auf der aufgezeichneten Lage; vorher blieb sie bei 77,88). Wer eine
+eigene Lage halten will, setzt sie weiter oder beendet die Wiedergabe mit
+`AUTOMATION_STOP()`.
+
 **`AUTOMATION_PLAY` gibt eine raylib-Warnung aus** — `AUTOMATION: [datei]
 Issue reading line to buffer`, bei *jeder* Datei, auch bei einer fehlerfreien.
 raylib liest bis zum Dateiende und beschwert sich über den letzten Leseversuch.
