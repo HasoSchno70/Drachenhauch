@@ -13,5 +13,14 @@ FUNCTION sende$(skript AS STRING, programm AS STRING, nachricht AS STRING, extra
     DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", skript, kennung, nachricht)
     DIM s AS STRING : s = auslesen$(ps, 30000)
     DIM k AS STRING : k = auslesen$(kind, 30000)
+    ' Ohne Anzeige gibt es kein Fenster, an das sich etwas schicken liesse --
+    ' der Sender meldet "kein Fenster", das Kind starb an SCREEN. Das ist kein
+    ' Fehlschlag, sondern hier nicht pruefbar; der Laeufer nimmt die Zeile.
+    ' (Gemessen auf dem Windows-Runner der CI: "WGL: The driver does not
+    ' appear to support OpenGL".)
+    IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN
+        PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+        EXIT(0)
+    END IF
     RETURN s + k
 END FUNCTION

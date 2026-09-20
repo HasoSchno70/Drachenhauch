@@ -209,6 +209,9 @@ DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPo
 DIM leser AS STRING : leser = auslesen$(ps, 60000)
 PRINT "leser rueckgabe "; PROCESS_CODE(ps)
 DIM kindAus AS STRING : kindAus = auslesen$(kind, 40000)
+' Ohne Anzeige startet das Formular gar nicht -- dann ist hier nichts zu
+' pruefen, und der Leser findet folgerichtig kein Fenster.
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN PRINT "UEBERSPRINGEN: kein Fenster moeglich"
 ' Vor dem Bau: null Nachkommen. Jetzt Rolle und Name je Bedienelement; das
 ' Feld heisst wie die Beschriftung links daneben.
 PRINT "knopf "; (INSTR(leser, "N: ControlType.Button [Speichern]") >= 0)
@@ -307,7 +310,10 @@ WRITEALL("fertig.txt", "ja")
 PRINT "leser rueckgabe "; PROCESS_CODE(ps)
 PRINT "ansage als text "; (INSTR(leser, "ANSAGE: ControlType.Text [Der Drache erwacht]") >= 0)
 IF PROCESS_CODE(ps) <> 0 THEN PRINT leser
-PRINT auslesen$(kind, 40000);
+DIM kindAus AS STRING : kindAus = auslesen$(kind, 40000)
+' Ohne Anzeige startet das Kind gar nicht -- dann ist hier nichts zu pruefen.
+IF INSTR(auslesenFehler, "Kein Fenster moeglich") >= 0 THEN PRINT "UEBERSPRINGEN: kein Fenster moeglich"
+PRINT kindAus;
 --- datei helfer.dh
 IMPORT "{sammlung}/_hilfen/uialeser.dh"
 --- datei sprecher.dh
