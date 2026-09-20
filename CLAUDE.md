@@ -3831,11 +3831,25 @@ alle 28 Faelle in `pdf.dhtest` bleiben gruen.
 sich nicht verschoben hat: hat Windows "den zuletzt verwendeten Drucker als
 Standard festlegen" eingeschaltet, verschiebt ihn jeder Druck -- dann faellt
 der Fall auf, statt es stillschweigend zu tun. (Eine Ruecksetzung waere
-selbst ungeprueft, weil die Einstellung hier aus ist.) **Nicht scharf
-gelaufen sind die zwei MIDI-Loopback-Faelle** -- dafuer braucht es einen
-virtuellen Port (loopMIDI), und den gibt es auf dieser Maschine nicht; sie
-ueberspringen sich mit Begruendung, die vier uebrigen MIDI-Faelle laufen
-scharf (Windows bringt den GS Wavetable Synth als Ausgang mit).
+selbst ungeprueft, weil die Einstellung hier aus ist.)
+
+**Der MIDI-Loopback lief doch scharf** -- der Nutzer hatte loopMIDI laufen,
+es fehlte nur der Port. Und damit zeigte sich sofort, was ohne ihn verborgen
+blieb: **ein MIDI-Port ist ein geteiltes Betriebsmittel.** Die beiden
+Loopback-Faelle oeffnen DENSELBEN Port, und parallel landen die Noten des
+einen im Eingang des anderen -- der erste Fall bekam `an 1 96 100`, die
+aelteste ueberlebende Note aus dem Pufferdeckel-Fall. Die Sammlung ist
+seither `--- seriell`. Gegenprobe am Modul (`pop_front` -> `pop_back`, also
+"die juengste faellt weg"): die erste ueberlebende ist dann 20 statt 96, der
+Fall faellt. Ohne das `midi`-Feature ueberspringen sich alle sechs
+Geraete-Faelle mit Begruendung, die CI bleibt also gruen.
+
+**Nebenbei gemessen, nicht Teil dieser Runde:**
+`werkzeug_notenblatt.dhtest` (Fall "zweite spur und instrument") fiel im
+`--hardware`-Bau 3 von 8 Mal, im Standardbau 0 von 8. Die Last war bei
+beiden Messungen nicht gleich, der Vergleich ist also nicht isoliert --
+aber wer mit `--hardware` baut, sollte mit sporadisch roten Klick-Faellen
+rechnen.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
