@@ -88,12 +88,6 @@ _SERIELL = {
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
     # zwei Laeufe gleichzeitig ueberschreiben sich gegenseitig den Inhalt.
     "test_profiler.py",
-    # Laesst `dhrt test tests/pruef` laufen, und darin stecken die Sammlungen
-    # mit eingespeisten Tasten und Klicks (AUTOMATION_PLAY). Innerhalb des
-    # Laeufers gehen die `--- seriell`-Dateien nacheinander -- gegen die
-    # Fenster der ANDEREN xdist-Arbeiter hilft das nicht, und dann faellt
-    # sporadisch ein Fall um, der einzeln gruen ist.
-    "test_dhrt_test.py",
 }
 
 
@@ -175,9 +169,10 @@ _NUR_WINDOWS = {
     "test_formdesigner_document.py",
 }
 
-_BRAUCHT_GRAFIK = {
-    "test_drucken.py",
-}
+# Leer, seit der Druck durch einen echten Treiber in
+# `tests/pruef/drucken.dhtest` steht (2026-09-20). Die Menge bleibt, weil der
+# Mechanismus fuer die naechste solche Datei gebraucht wuerde.
+_BRAUCHT_GRAFIK: set[str] = set()
 
 
 def _qt_laeuft() -> bool:

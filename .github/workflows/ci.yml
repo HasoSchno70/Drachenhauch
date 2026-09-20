@@ -131,6 +131,15 @@ jobs:
       # einer abgestuerzt, und xdist wartete auf einen Prozess, den es nicht
       # mehr gab. Bleibt als Netz stehen, auch wenn Durchgang 2 dem Absturz
       # die Grundlage nimmt.
+      # Die Pruefsammlungen laufen DIREKT, nicht ueber pytest: bis 2026-09-20
+      # rief `tests/test_dhrt_test.py` sie als Anker auf, und die Datei faellt
+      # mit dem Python-Teil weg (Weg D). Das FORMAT der Sammlungen prueft
+      # seither `tests/pruef/dhrt_test_format.dhtest` -- sie pruefen sich also
+      # selbst. Steht vor pytest, weil hier die Sprache selbst haengt: ein
+      # Fehler darin soll nicht hinter 3000 Python-Tests auftauchen.
+      - name: Pruefsammlungen (dhrt test)
+        run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef
+
       - name: Run tests (parallel)
         run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
 
@@ -219,6 +228,11 @@ jobs:
       # der ist eine Windows-Desktop-Anwendung und wird oben getestet. Ein
       # Haufen X11-Pakete nur fuers headless-Starten von Dialogen waere der
       # falsche Handel.
+      # Wie im Windows-Job: die Sammlungen direkt, ohne pytest als Anker.
+      # Ohne Grafik ueberspringen sich die Fenster-Faelle selbst.
+      - name: Pruefsammlungen (dhrt test)
+        run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
+
       - name: Run tests (parallel, ohne Grafik, ohne Qt)
         run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
 

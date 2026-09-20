@@ -277,8 +277,11 @@ und wertlos. Die Bilanz nennt Dateien und Fälle:
 2 Datei(en), 1 ok, 1 mit Fehlern; 36 Faelle, 35 ok, 1 fehl, 0 uebersprungen  (1.52s)
 ```
 
-Die Sammlungen des Projekts liegen unter `tests/pruef/`; bis pytest ganz
-fällt, lässt `tests/test_dhrt_test.py` sie in der CI mitlaufen.
+Die Sammlungen des Projekts liegen unter `tests/pruef/`; die CI ruft
+`dhrt test tests/pruef` direkt auf (bis 2026-09-20 über einen pytest-Anker).
+Das Format selbst prüft `tests/pruef/dhrt_test_format.dhtest` — an einer
+Sammlung, die der Fall schreibt, mit erwarteten Meldungen, Zeilennummern und
+Bilanz.
 
 ## `dhrt fmt` — einheitlich schreiben
 
