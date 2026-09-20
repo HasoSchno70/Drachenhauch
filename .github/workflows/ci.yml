@@ -160,6 +160,16 @@ jobs:
           DH_OHNE_AUDIO: 1
         run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef
 
+      # MESSUNG: derselbe Aufruf wie im geloeschten pytest-Anker -- absoluter
+      # Pfad, Ausgabe abgefangen. Ist DER gruen und der Schritt darueber rot,
+      # liegt der Unterschied im Aufruf und nicht im Inhalt.
+      - name: Probe mit dem Aufruf des alten Ankers
+        continue-on-error: true
+        env:
+          DH_OHNE_AUDIO: 1
+        run: |
+          python -c "import subprocess, pathlib; exe = pathlib.Path('rust/drachenhauch_runtime/target/release/dhrt.exe').resolve(); pruef = pathlib.Path('tests/pruef').resolve(); r = subprocess.run([str(exe), 'test', str(pruef)], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800); print('ANKER returncode', r.returncode); print(r.stdout[-2500:])"
+
       - name: Run tests (parallel)
         run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
 
