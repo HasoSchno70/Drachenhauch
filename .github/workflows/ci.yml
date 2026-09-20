@@ -137,38 +137,23 @@ jobs:
       # seither `tests/pruef/dhrt_test_format.dhtest` -- sie pruefen sich also
       # selbst. Steht vor pytest, weil hier die Sprache selbst haengt: ein
       # Fehler darin soll nicht hinter 3000 Python-Tests auftauchen.
-      # MESSUNG (voruebergehend, 2026-09-20): der erste Lauf dieses Schrittes
-      # meldete 24 Faelle rot, die ueber den pytest-Anker gruen waren -- kein
-      # Fenster ("kein passendes OpenGL 3.3") und Byte-Vergleiche gegen
-      # eingecheckte Dateien. Beides kann an der Reihenfolge haengen, also
-      # steht dieselbe Probe vor UND nach den pytest-Schritten.
-      - name: Probe vor den Sammlungen
-        continue-on-error: true
-        run: |
-          git config --get core.autocrlf
-          python -c "d=open('pyramid_pusher/levels/01_pyramid_pusher.xsb','rb').read(); print('xsb hat CRLF:', b'\r\n' in d)"
-          Set-Content -Encoding ascii diag.dh 'SCREEN(64, 48, "D", 1)'
-          Add-Content -Encoding ascii diag.dh 'PRINT "fenster geht auf"'
-          rust/drachenhauch_runtime/target/release/dhrt.exe run diag.dh
-
-      # conftest.py setzt `DH_OHNE_AUDIO=1` fuer die pytest-Laeufe, und der
-      # Anker erbte es. Ohne die Variable sucht jedes Programm mit Ton ein
-      # Ausgabegeraet -- der Runner hat keins ("NoDefaultOutputDevice").
+      #
+      # `DH_OHNE_AUDIO=1`: das setzte bisher conftest.py fuer die pytest-Laeufe,
+      # und der Anker erbte es. Ohne die Variable sucht jedes Programm mit Ton
+      # ein Ausgabegeraet -- der Runner hat keins ("NoDefaultOutputDevice").
+      #
+      # GEMESSEN am 2026-09-20, als dieser Schritt neu war: 24 Faelle rot, die
+      # tags zuvor ueber den Anker gruen waren -- bei GLEICHER Image-Version
+      # ("windows-2025-vs2026") und demselben Aufruf (nachgestellt, ebenfalls
+      # rot). Der Runner hat also mal einen OpenGL-Treiber und mal nicht
+      # ("WGL: The driver does not appear to support OpenGL"). Getragen wird
+      # das jetzt von der Ueberspring-Erkennung in `pruefsammlung.rs`, die seit
+      # demselben Tag auch greift, wenn der Fall selbst mit 0 endet und nur
+      # sein KIND kein Fenster bekam.
       - name: Pruefsammlungen (dhrt test)
-        continue-on-error: true
         env:
           DH_OHNE_AUDIO: 1
         run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef
-
-      # MESSUNG: derselbe Aufruf wie im geloeschten pytest-Anker -- absoluter
-      # Pfad, Ausgabe abgefangen. Ist DER gruen und der Schritt darueber rot,
-      # liegt der Unterschied im Aufruf und nicht im Inhalt.
-      - name: Probe mit dem Aufruf des alten Ankers
-        continue-on-error: true
-        env:
-          DH_OHNE_AUDIO: 1
-        run: |
-          python -c "import subprocess, pathlib; exe = pathlib.Path('rust/drachenhauch_runtime/target/release/dhrt.exe').resolve(); pruef = pathlib.Path('tests/pruef').resolve(); r = subprocess.run([str(exe), 'test', str(pruef)], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800); print('ANKER returncode', r.returncode); print(r.stdout[-2500:])"
 
       - name: Run tests (parallel)
         run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
@@ -179,20 +164,6 @@ jobs:
       - name: Run tests (seriell -- exklusive Betriebsmittel)
         run: pytest tests/ -q -m seriell
 
-      # Dieselben sieben Dateien noch einmal, jetzt NACH pytest: waren sie
-      # ueber den Anker gruen, muessen sie es hier auch sein -- dann haengt es
-      # an der Reihenfolge und nicht am Inhalt.
-      - name: Probe nach den pytest-Schritten
-        continue-on-error: true
-        env:
-          DH_OHNE_AUDIO: 1
-        run: |
-          rust/drachenhauch_runtime/target/release/dhrt.exe run diag.dh
-          rust/drachenhauch_runtime/target/release/dhrt.exe test `
-            tests/pruef/beispiele_laufen.dhtest tests/pruef/buch_tippspiel.dhtest `
-            tests/pruef/fenster_schliessen.dhtest tests/pruef/gui_barrierefreiheit.dhtest `
-            tests/pruef/modules_audio.dhtest tests/pruef/werkzeug_buch.dhtest `
-            tests/pruef/werkzeug_pyramid_levels.dhtest
 
   # Cross-Platform-Migration Phase 3: auf Linux UND macOS nicht nur BAUEN,
   # sondern TESTEN.
