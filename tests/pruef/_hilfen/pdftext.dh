@@ -90,6 +90,14 @@ END FUNCTION
 ' geschrieben ist (dann sucht der Aufrufer das Ende selbst). Gesucht wird
 ' "/Length " MIT Leerzeichen -- sonst traefe es auch "/Length1", die Groesse
 ' der eingebetteten Schriftdatei.
+'
+' GEMESSEN: fuer die beiden Erzeuger, die hier vorkommen (krilla und
+' "Microsoft Print to PDF"), braeuchte es das nicht -- der Rueckfall unten
+' (bis "endstream", Umbruch weg) liest beide genauso. Es bleibt trotzdem der
+' Hauptweg, weil nur er RICHTIG ist: enden die gepackten Daten zufaellig auf
+' 0x0A oder 0x0D, schneidet der Rueckfall ein echtes Byte ab, und zwar still.
+' Gezielt herstellen laesst sich dieser Fall nicht, er haengt am Zufall der
+' Kompression.
 FUNCTION pdfLaenge(kopf AS STRING) AS INTEGER
     DIM p AS INTEGER : p = INSTR(kopf, "/Length ")
     IF p < 0 THEN RETURN -1
