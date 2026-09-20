@@ -38,9 +38,10 @@ darin jede Überschrift; Pass 2 baut mit den gemessenen Zahlen neu. Das Layout
 bleibt zwischen beiden Pässen stabil, weil das Verzeichnis gleich viele Zeilen
 belegt — nur die Zahlen kommen hinzu.
 
-Braucht LibreOffice (`C:\Program Files\LibreOffice\program\soffice.exe`) und
-PyMuPDF (`pip install pymupdf`). Fehlt eines von beiden, sagt das Skript es und
-das Dokument entsteht trotzdem — nur ohne Seitenzahlen.
+Braucht LibreOffice (`C:\Program Files\LibreOffice\program\soffice.exe`);
+fehlt es, sagt das Werkzeug es und das Dokument entsteht trotzdem — nur ohne
+Seitenzahlen. Die Seiten misst es seit 2026-09-15 selbst (eigener PDF-Leser in
+`tools/buch_bauen.dh`), PyMuPDF braucht es nicht mehr.
 
 ## Bilder
 

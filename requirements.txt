@@ -21,10 +21,8 @@ numpy>=1.24                 # Synth-Mathematik (SFX/Tracker) + particles-Logik
 sounddevice>=0.4            # Audio-Vorschau in SFX-/Tracker-Editor
 soundfile>=0.12             # OGG/FLAC/WAV-Dekodierung beim Sample-Laden (Tracker)
 
-# --- Nur zum Pruefen (tests/test_drucken.py) ---
-# PyMuPDF liest gegen, was das Modul `pdf` schreibt -- eine eigene Datei mit
-# dem eigenen Schreiber gegenzulesen sagt nichts darueber, ob ein fremdes
-# Programm sie oeffnet. (Der Buch-Build misst seine Seiten seit 2026-09-15
-# selbst: tools/buch_bauen.dh.)
-PyMuPDF>=1.24               # prueft die PDF-Ausgabe gegen
+# PyMuPDF stand hier bis 2026-09-20: es las gegen, was das Modul `pdf`
+# schreibt. Beide Leser sind inzwischen eigene -- der Buch-Build misst seine
+# Seiten selbst (tools/buch_bauen.dh), und der Druck-Test liest die Datei des
+# Treibers mit tests/pruef/_hilfen/pdftext.dh. Kein Test importiert es mehr.
 

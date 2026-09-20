@@ -3097,9 +3097,9 @@ Punkt deckend ist; die Deckkraft wird weggelassen, nicht verrechnet
 `tests/pruef/werkzeug_buch_bauen.dhtest` (Messen an einem PDF aus dem
 pdf-Modul: Ueberschrift gegen fruehere Erwaehnung, Gross/klein, fehlender Titel,
 beide Messarten; Bilder: Farbart, Breite, Weiss unter Durchsichtigem, fertiges
-Bild unberuehrt). PyMuPDF bleibt in requirements.txt nur noch als Werkzeug fuer
-Handmessungen -- kein Test braucht es mehr (seit 2026-09-20 liest
-`tests/pruef/_hilfen/pdftext.dh` auch fremde PDFs).
+Bild unberuehrt). PyMuPDF ist am 2026-09-20 ganz aus
+requirements.txt gefallen: kein Test importiert es mehr, seit
+`tests/pruef/_hilfen/pdftext.dh` auch fremde PDFs liest.
 
 **Showcase in Drachenhauch (2026-09-15):** die kuratierte Beispiel-Galerie
 steht in `examples/showcase.json` (file/title/desc/frames) statt in
