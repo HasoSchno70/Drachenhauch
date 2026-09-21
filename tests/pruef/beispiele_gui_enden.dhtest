@@ -18,7 +18,7 @@ DIM namen AS ARRAY OF STRING
 namen = ["155_gui_glas", "156_gui_alle_widgets", "182_gui_tastatur_massstab", _
          "183_sfx_generator", "184_codefeld", "185_partikel_editor", _
          "186_farbe_und_datum", "187_tilemap_editor", "188_bild_erzeugen", _
-         "189_sprite_editor"]
+         "189_sprite_editor", "200_gui_akkordeon_assistent"]
 DIM i AS INTEGER
 FOR i = 0 TO LEN(namen) - 1
     DIM pfad AS STRING : pfad = ordner + "/" + namen[i] + ".dh"
@@ -65,3 +65,4 @@ NEXT
 187_tilemap_editor endet
 188_bild_erzeugen endet
 189_sprite_editor endet
+200_gui_akkordeon_assistent endet

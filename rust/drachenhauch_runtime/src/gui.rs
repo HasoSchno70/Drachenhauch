@@ -6028,9 +6028,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let kopf_h = self.sk(WZ_KOPF_H);
         let fuss_h = self.sk(WZ_FUSS_H);
         let fuss_y = ay + w.h - fuss_h;
-        let (kb, kh) = (self.sk(112), self.sk(30));
-        let ky = fuss_y + (fuss_h - kh) / 2;
         let rand = self.sk(10);
+        // Drei Knoepfe und zwei Luecken muessen in die Breite passen -- sonst
+        // laege Abbrechen in einem schmalen Assistenten ueber Zurueck.
+        let kb = self.sk(112).min(((w.w - 2 * rand - 2 * self.sk(8)) / 3).max(self.sk(40)));
+        let kh = self.sk(30);
+        let ky = fuss_y + (fuss_h - kh) / 2;
         let weiter = (ax + w.w - rand - kb, ky, kb, kh);
         let zurueck = (weiter.0 - self.sk(8) - kb, ky, kb, kh);
         let abbrechen = (ax + rand, ky, kb, kh);

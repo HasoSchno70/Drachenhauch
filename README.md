@@ -75,7 +75,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 43 MB, aktuell Fassung 2026.14.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 215 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 216 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
@@ -271,6 +271,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `98_coroutines.dh` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
 | `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `200_gui_akkordeon_assistent.dh` | **Akkordeon, Assistent, Baumtabelle** — eine kleine Projektablage: Einstellungen in aufklappbaren Abschnitten, Ordner und Dateien als Baum mit Spalten, neue Einträge über einen Assistenten mit Pflichtfeldern |
 | `196_rechnung_fenster.dh` | **Ein zweites OS-Fenster** — Kind der Rechnungsverwaltung: eigener `dhrt`, verbunden über `WINDOW_OPEN`/`PARENT_SEND` |
 | `196_rechnungen.dh` | **Rechnungen** — der sechste Pilot: eine Geschäftsanwendung (Kunden, Artikel, Rechnungen mit Positionen, SQLite, PDF, CSV, Rückfrage bei ungesicherten Änderungen) |
 | `195_gui_feinschliff.dh` | **gui-Feinschliff** — senkrechter Schieber, unbestimmter Fortschritt, Bildmodi, Baumsymbole, rollendes Panel, Ziehen zwischen Listen |

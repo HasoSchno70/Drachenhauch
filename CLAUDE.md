@@ -3832,6 +3832,19 @@ zeilen". Form-Designer: drei Palettenarten (Baumtabelle als `table` mit
 Kinder-Ausnahme, ohne Mitwandern, ohne Pruefung, ohne Vorfahren im Filter,
 Kinder beim Entfernen nach oben, ohne Dreieck, drei .dhform-Schluessel,
 ohne `rebuild_view` beim Laden) fallen je in ihrem Fall.
+**Beispiel** `examples/200_gui_akkordeon_assistent.dh` (2026-09-21, Wunsch
+des Nutzers): eine Projektablage mit allen dreien -- Einstellungen im
+Akkordeon wirken sofort auf die Tabelle, der Assistent legt Eintraege in
+den gewaehlten Ordner (Pflichtfeld, Groesse 1..99999, bei Ordnern
+gesperrt). **Der Fund dabei steckt in der Laufzeit:** die Knoepfe des
+Assistenten waren fest 112 Punkte breit, in einem 298 Punkte breiten lag
+Abbrechen halb ueber Zurueck -- gesehen nur im BILD. `wz_geom` teilt jetzt
+die Breite (hoechstens 112, mindestens 40). Tests
+`tests/pruef/beispiel_drei_widgets.dhtest` (4: Eintrag ueber den
+Assistenten samt Pflichtfeld und Bereich, Ordner ohne Groesse, Filter,
+echter Klick auf einen Akkordeon-Kopf), ein Fall mehr in
+`gui_assistent.dhtest` (Klick bei x 190 trifft Zurueck; mit festen Knoepfen
+lag dort Weiter) und das Beispiel in `beispiele_gui_enden.dhtest`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in

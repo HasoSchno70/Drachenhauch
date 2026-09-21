@@ -1,0 +1,188 @@
+' ============================================================
+'  gui: Akkordeon, Assistent und Baumtabelle -- eine kleine Projektablage
+' ============================================================
+'    GUI_ACCORDION   links: Einstellungen in Abschnitten, die auf- und
+'                    zuklappen; was darunter liegt, rueckt mit
+'    GUI_TREETABLE   Mitte: Ordner und Dateien als Baum mit Spalten --
+'                    Dreieck oder Pfeil rechts/links klappt, der Kopf sortiert
+'    GUI_WIZARD      rechts: legt in drei Schritten einen neuen Eintrag an;
+'                    Weiter geht erst, wenn die Pflichtfelder stimmen
+'
+'  Waehl im Baum einen Ordner und leg mit dem Assistenten eine Datei hinein.
+'  Die Einstellungen links wirken sofort auf die Tabelle.
+' ============================================================
+IMPORT "gui"
+
+SCREEN(960, 560, "Drachenhauch - Akkordeon, Assistent, Baumtabelle", 1)
+SETFPS(60)
+' Eine Systemschrift, wenn es eine gibt -- die eingebaute Pixelschrift kennt
+' keine Umlaute, und ein Text mit "ö" kaeme sonst in einer anderen Schrift.
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/arial.ttf", _
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Projektablage", 0, 0, 960, 560)
+GUI_WINDOW_CHROME(win, FALSE)
+
+' --- links: das Akkordeon ---------------------------------------------
+' Die Kinder werden NACH dem Akkordeon angelegt; ihre Lage zaehlt ab der
+' Oberkante ihres Abschnitts unter dem Kopf.
+DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(win, 12, 12, 250, 500)
+GUI_ACCORDION_ADD(acc, "Ansicht")
+GUI_ACCORDION_ADD(acc, "Filter")
+GUI_ACCORDION_ADD(acc, "Hilfe")
+
+DIM cbZebra AS GUI_WIDGET : cbZebra = GUI_CHECKBOX(win, "Zeilen abwechselnd tönen", 12, 10, TRUE)
+DIM cbGross AS GUI_WIDGET : cbGross = GUI_CHECKBOX(win, "Größe rechtsbündig", 12, 38, TRUE)
+DIM kAuf AS GUI_WIDGET : kAuf = GUI_BUTTON(win, "Alles aufklappen", 12, 70, 200, 28)
+DIM kZu AS GUI_WIDGET : kZu = GUI_BUTTON(win, "Alles zuklappen", 12, 104, 200, 28)
+GUI_ACCORDION_ADD_WIDGET(acc, cbZebra, 0)
+GUI_ACCORDION_ADD_WIDGET(acc, cbGross, 0)
+GUI_ACCORDION_ADD_WIDGET(acc, kAuf, 0)
+GUI_ACCORDION_ADD_WIDGET(acc, kZu, 0)
+
+DIM lFilter AS GUI_WIDGET : lFilter = GUI_LABEL(win, "Name enthält:", 12, 10)
+DIM tfFilter AS GUI_WIDGET : tfFilter = GUI_TEXTINPUT(win, 12, 30, 200, 26, "z.B. .dh")
+DIM cbKopf AS GUI_WIDGET : cbKopf = GUI_CHECKBOX(win, "Filterzeile im Kopf", 12, 66, FALSE)
+GUI_ACCORDION_ADD_WIDGET(acc, lFilter, 1)
+GUI_ACCORDION_ADD_WIDGET(acc, tfFilter, 1)
+GUI_ACCORDION_ADD_WIDGET(acc, cbKopf, 1)
+
+DIM lHilfe AS GUI_WIDGET
+lHilfe = GUI_LABEL(win, "Ein Klick auf das Dreieck klappt einen Ordner um, ohne ihn zu wählen. Ein Filter zeigt auch die Ordner, in denen ein Treffer liegt. Der Assistent legt neue Einträge in den gewählten Ordner.", 12, 10)
+GUI_SET_WRAP(lHilfe, 214)
+GUI_ACCORDION_ADD_WIDGET(acc, lHilfe, 2)
+GUI_ACCORDION_OPEN(acc, 0, TRUE)
+
+' --- Mitte: die Baumtabelle ---------------------------------------------
+DIM tt AS GUI_WIDGET : tt = GUI_TREETABLE(win, 276, 12, 360, 500, ["Name", "Art", "Größe"])
+GUI_TABLE_COL_WIDTHS(tt, [190, 80, 80])
+GUI_TABLE_COL_ALIGN(tt, 2, "rechts")
+GUI_TABLE_SET(tt, "zebra", 1)
+
+FUNCTION eintrag(eltern AS INTEGER, name AS STRING, art AS STRING, groesse AS STRING) AS INTEGER
+    RETURN GUI_TREETABLE_ADD(tt, eltern, [name, art, groesse])
+END FUNCTION
+
+DIM rProj AS INTEGER : rProj = eintrag(-1, "raumschiff", "Ordner", "")
+DIM rSrc AS INTEGER : rSrc = eintrag(rProj, "quellen", "Ordner", "")
+eintrag(rSrc, "main.dh", "Programm", "4 KB")
+eintrag(rSrc, "gegner.dh", "Programm", "2 KB")
+eintrag(rSrc, "punkte.dh", "Programm", "1 KB")
+DIM rAss AS INTEGER : rAss = eintrag(rProj, "assets", "Ordner", "")
+eintrag(rAss, "schiff.png", "Bild", "12 KB")
+eintrag(rAss, "laser.wav", "Ton", "36 KB")
+eintrag(rProj, "LIESMICH.md", "Text", "1 KB")
+DIM rDoc AS INTEGER : rDoc = eintrag(-1, "notizen", "Ordner", "")
+eintrag(rDoc, "ideen.md", "Text", "3 KB")
+GUI_TREETABLE_EXPAND(tt, rProj, TRUE)
+GUI_TREETABLE_EXPAND(tt, rSrc, TRUE)
+
+' --- rechts: der Assistent ----------------------------------------------
+' Der Inhalt eines Schritts liegt zwischen Schrittanzeige (52 Punkte) und
+' Knopfreihe (48 Punkte); die Felder behalten ihre Lage im Fenster.
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(win, 650, 12, 298, 330)
+GUI_WIZARD_ADD(wz, "Name")
+GUI_WIZARD_ADD(wz, "Art")
+GUI_WIZARD_ADD(wz, "Prüfen")
+GUI_WIZARD_SET(wz, "pruefen", 1)
+
+DIM lName AS GUI_WIDGET : lName = GUI_LABEL(win, "Wie soll der Eintrag heißen?", 666, 80)
+DIM tfName AS GUI_WIDGET : tfName = GUI_TEXTINPUT(win, 666, 104, 260, 26, "Dateiname")
+GUI_RULE(tfName, "pflicht", "Ohne Namen geht es nicht weiter.")
+GUI_WIZARD_ADD_WIDGET(wz, lName, 0)
+GUI_WIZARD_ADD_WIDGET(wz, tfName, 0)
+
+DIM lArt AS GUI_WIDGET : lArt = GUI_LABEL(win, "Was ist es?", 666, 80)
+DIM ddArt AS GUI_WIDGET : ddArt = GUI_DROPDOWN(win, 666, 104, 260, 26, ["Programm", "Bild", "Ton", "Text", "Ordner"])
+DIM lGroesse AS GUI_WIDGET : lGroesse = GUI_LABEL(win, "Größe in KB (bei Ordnern leer):", 666, 146)
+DIM tfGroesse AS GUI_WIDGET : tfGroesse = GUI_TEXTINPUT(win, 666, 170, 260, 26, "")
+GUI_TEXTINPUT_SET(tfGroesse, "zahlen", 1)
+GUI_RULE(tfGroesse, "bereich", 1, 99999, "Eine Größe zwischen 1 und 99999 KB.")
+GUI_WIZARD_ADD_WIDGET(wz, lArt, 1)
+GUI_WIZARD_ADD_WIDGET(wz, ddArt, 1)
+GUI_WIZARD_ADD_WIDGET(wz, lGroesse, 1)
+GUI_WIZARD_ADD_WIDGET(wz, tfGroesse, 1)
+
+DIM lZiel AS GUI_WIDGET : lZiel = GUI_LABEL(win, "", 666, 80)
+GUI_SET_WRAP(lZiel, 260)
+GUI_WIZARD_ADD_WIDGET(wz, lZiel, 2)
+
+DIM status AS GUI_WIDGET : status = GUI_LABEL(win, "Bereit.", 650, 356)
+GUI_SET_WRAP(status, 298)
+
+' Der gewaehlte Ordner -- eine Datei gilt als ihr Elternordner, nichts
+' gewaehlt heisst ganz oben.
+FUNCTION zielOrdner() AS INTEGER
+    DIM r AS INTEGER : r = GUI_TABLE_SELECTED(tt)
+    IF r < 0 THEN RETURN -1
+    IF GUI_TABLE_GET_CELL(tt, r, 1) = "Ordner" THEN RETURN r
+    RETURN GUI_TREETABLE_PARENT(tt, r)
+END FUNCTION
+
+FUNCTION ordnerName$(r AS INTEGER) AS STRING
+    IF r < 0 THEN RETURN "(ganz oben)"
+    RETURN GUI_TABLE_GET_CELL(tt, r, 0)
+END FUNCTION
+
+SUB assistentLeeren()
+    GUI_SET_TEXT(tfName, "")
+    GUI_SET_TEXT(tfGroesse, "")
+    GUI_DROPDOWN_SET_SELECTED(ddArt, 0)
+    GUI_CLEAR_ERRORS(win)
+    GUI_WIZARD_SET_STEP(wz, 0)
+END SUB
+
+' --- Hauptschleife ----------------------------------------------------
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+
+    ' Ansicht
+    IF GUI_CLICKED(cbZebra) THEN GUI_TABLE_SET(tt, "zebra", IIF(GUI_CHECKED(cbZebra), 1, 0))
+    IF GUI_CLICKED(cbGross) THEN GUI_TABLE_COL_ALIGN(tt, 2, IIF(GUI_CHECKED(cbGross), "rechts", "links"))
+    IF GUI_CLICKED(kAuf) THEN GUI_TREETABLE_EXPAND_ALL(tt, TRUE)
+    IF GUI_CLICKED(kZu) THEN GUI_TREETABLE_EXPAND_ALL(tt, FALSE)
+
+    ' Filter: der Baum zeigt auch die Ordner ueber jedem Treffer
+    IF GUI_TABLE_GET_FILTER(tt, 0) <> GUI_TEXT(tfFilter) THEN GUI_TABLE_FILTER(tt, 0, GUI_TEXT(tfFilter))
+    IF GUI_CLICKED(cbKopf) THEN GUI_TABLE_SET(tt, "filterzeile", IIF(GUI_CHECKED(cbKopf), 1, 0))
+
+    IF GUI_ACCORDION_TOGGLED(acc) >= 0 THEN
+        GUI_SET_TEXT(status, "Abschnitt " + GUI_ACCORDION_TITLE$(acc, GUI_ACCORDION_TOGGLED(acc)) + " umgeklappt.")
+    END IF
+
+    ' Assistent: Ordner brauchen keine Groesse
+    IF GUI_DROPDOWN_TEXT(ddArt) = "Ordner" THEN
+        GUI_SET_ENABLED(tfGroesse, FALSE)
+    ELSE
+        GUI_SET_ENABLED(tfGroesse, TRUE)
+    END IF
+    IF GUI_WIZARD_CHANGED(wz) AND GUI_WIZARD_STEP(wz) = 2 THEN
+        GUI_SET_TEXT(lZiel, f"„{GUI_TEXT(tfName)}“ ({GUI_DROPDOWN_TEXT(ddArt)}) kommt in den Ordner {ordnerName$(zielOrdner())}. Fertig legt ihn an.")
+    END IF
+    IF GUI_WIZARD_FINISHED(wz) THEN
+        DIM groesse AS STRING : groesse = ""
+        IF GUI_DROPDOWN_TEXT(ddArt) <> "Ordner" THEN groesse = GUI_TEXT(tfGroesse) + " KB"
+        DIM ziel AS INTEGER : ziel = zielOrdner()
+        DIM neu AS INTEGER : neu = eintrag(ziel, GUI_TEXT(tfName), GUI_DROPDOWN_TEXT(ddArt), groesse)
+        IF ziel >= 0 THEN GUI_TREETABLE_EXPAND(tt, ziel, TRUE)
+        GUI_TABLE_SET_SELECTED(tt, neu)
+        GUI_SET_TEXT(status, GUI_TEXT(tfName) + " angelegt in " + ordnerName$(ziel) + ".")
+        assistentLeeren()
+    END IF
+    IF GUI_WIZARD_CANCELLED(wz) THEN
+        assistentLeeren()
+        GUI_SET_TEXT(status, "Abgebrochen.")
+    END IF
+
+    CLS(RGB(16, 20, 28))
+    GUI_DRAW()
+    FLIP()
+WEND

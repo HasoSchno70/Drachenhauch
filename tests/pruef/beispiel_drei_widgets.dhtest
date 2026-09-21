@@ -1,0 +1,132 @@
+' Das Beispiel examples/200_gui_akkordeon_assistent.dh bedient: der Assistent
+' legt einen Eintrag in den gewaehlten Ordner, der Filter zeigt den Weg zum
+' Treffer, ein Klick auf einen Akkordeon-Kopf klappt um. Der Einschub steht
+' hinter GUI_UPDATE in der Bildschleife. Format: docs/werkzeuge.md.
+--- seriell
+
+=== der assistent legt einen eintrag in den gewaehlten ordner
+IF prBild = 1 THEN
+    GUI_TABLE_SET_SELECTED(tt, rSrc)
+    PRINT "leer weiter "; GUI_WIZARD_NEXT(wz); " schritt "; GUI_WIZARD_STEP(wz)
+    GUI_SET_TEXT(tfName, "boss.dh")
+    PRINT "mit namen "; GUI_WIZARD_NEXT(wz); " schritt "; GUI_WIZARD_STEP(wz)
+    GUI_SET_TEXT(tfGroesse, "0")
+    PRINT "groesse 0 "; GUI_WIZARD_NEXT(wz); " schritt "; GUI_WIZARD_STEP(wz)
+    GUI_SET_TEXT(tfGroesse, "7")
+    PRINT "groesse 7 "; GUI_WIZARD_NEXT(wz); " schritt "; GUI_WIZARD_STEP(wz)
+END IF
+IF prBild = 2 THEN PRINT "ziel "; GUI_TEXT(lZiel)
+IF prBild = 3 THEN PRINT "fertig "; GUI_WIZARD_NEXT(wz)
+IF prBild = 5 THEN
+    DIM prNeu AS INTEGER : prNeu = GUI_TABLE_ROW_COUNT(tt) - 1
+    PRINT "zeilen "; GUI_TABLE_ROW_COUNT(tt)
+    PRINT GUI_TABLE_GET_CELL(tt, prNeu, 0); " | "; GUI_TABLE_GET_CELL(tt, prNeu, 1); " | "; GUI_TABLE_GET_CELL(tt, prNeu, 2)
+    PRINT "eltern "; GUI_TABLE_GET_CELL(tt, GUI_TREETABLE_PARENT(tt, prNeu), 0); " gewaehlt "; (GUI_TABLE_SELECTED(tt) = prNeu)
+    PRINT "status "; GUI_TEXT(status)
+    PRINT "zurueck auf "; GUI_WIZARD_STEP(wz); " name leer "; (GUI_TEXT(tfName) = "")
+    EXIT(0)
+END IF
+prBild = prBild + 1
+--- programm ../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
+--- einschub nach SETFPS(60)
+DIM prBild AS INTEGER : prBild = 0
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+leer weiter FALSE schritt 0
+mit namen TRUE schritt 1
+groesse 0 FALSE schritt 1
+groesse 7 TRUE schritt 2
+ziel „boss.dh“ (Programm) kommt in den Ordner quellen. Fertig legt ihn an.
+fertig TRUE
+zeilen 12
+boss.dh | Programm | 7 KB
+eltern quellen gewaehlt TRUE
+status boss.dh angelegt in quellen.
+zurueck auf 0 name leer TRUE
+
+=== ein ordner braucht keine groesse
+IF prBild = 1 THEN
+    GUI_SET_TEXT(tfName, "musik")
+    GUI_WIZARD_NEXT(wz)
+    GUI_DROPDOWN_SET_SELECTED(ddArt, 4)
+END IF
+IF prBild = 2 THEN
+    PRINT "groessenfeld gesperrt "; NOT GUI_ENABLED(tfGroesse)
+    PRINT "weiter "; GUI_WIZARD_NEXT(wz); " "; GUI_WIZARD_NEXT(wz)
+END IF
+IF prBild = 4 THEN
+    DIM prNeu AS INTEGER : prNeu = GUI_TABLE_ROW_COUNT(tt) - 1
+    PRINT GUI_TABLE_GET_CELL(tt, prNeu, 0); " | "; GUI_TABLE_GET_CELL(tt, prNeu, 1); " | ["; GUI_TABLE_GET_CELL(tt, prNeu, 2); "]"
+    PRINT "oben "; GUI_TREETABLE_PARENT(tt, prNeu)
+    EXIT(0)
+END IF
+prBild = prBild + 1
+--- programm ../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
+--- einschub nach SETFPS(60)
+DIM prBild AS INTEGER : prBild = 0
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+groessenfeld gesperrt TRUE
+weiter TRUE TRUE
+musik | Ordner | []
+oben -1
+
+=== der filter zeigt den weg zum treffer
+' Alles zu -- der Filter oeffnet den Weg trotzdem; leer gibt die alte
+' Ansicht zurueck.
+IF prBild = 1 THEN
+    GUI_TREETABLE_EXPAND_ALL(tt, FALSE)
+    GUI_SET_TEXT(tfFilter, "laser")
+END IF
+IF prBild = 3 THEN
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_TABLE_VIEW_COUNT(tt) - 1
+        s = s + " " + GUI_TABLE_GET_CELL(tt, GUI_TABLE_VIEW_ROW(tt, i), 0)
+    NEXT
+    PRINT "mit filter:"; s
+    GUI_SET_TEXT(tfFilter, "")
+END IF
+IF prBild = 5 THEN
+    PRINT "ohne filter "; GUI_TABLE_VIEW_COUNT(tt)
+    EXIT(0)
+END IF
+prBild = prBild + 1
+--- programm ../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
+--- einschub nach SETFPS(60)
+DIM prBild AS INTEGER : prBild = 0
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+mit filter: raumschiff assets laser.wav
+ohne filter 2
+
+=== ein klick auf den kopf filter klappt um
+' Das Fenster ist randlos bei (0,0); der Kopf "Filter" liegt unter dem
+' offenen Abschnitt "Ansicht" bei y 183..212. Danach ist "Ansicht" zu, und das
+' Feld rueckt unter die zwei Koepfe: 12 + 30 + 30 + 30 = 102.
+IF GUI_ACCORDION_TOGGLED(acc) >= 0 THEN PRINT "umgeklappt, offen "; GUI_ACCORDION_IS_OPEN(acc, 0); " "; GUI_ACCORDION_IS_OPEN(acc, 1)
+IF prBild = 12 THEN
+    PRINT "status "; GUI_TEXT(status)
+    PRINT "filterfeld bei y "; GUI_GET_Y(tfFilter)
+    EXIT(0)
+END IF
+prBild = prBild + 1
+--- programm ../../examples/200_gui_akkordeon_assistent.dh nach     GUI_UPDATE()
+--- einschub nach SETFPS(60)
+DIM prBild AS INTEGER : prBild = 0
+AUTOMATION_PLAY(GETENV$("DHRT_START_DIR") + "/ev.txt")
+--- datei ev.txt
+c 3
+e 0 7 100 197 0 0
+e 1 6 0 0 0 0
+e 2 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+umgeklappt, offen FALSE TRUE
+status Abschnitt Filter umgeklappt.
+filterfeld bei y 102
