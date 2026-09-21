@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="drachenhauch/assets/schriftzug.png" alt="Drachenhauch" width="560">
+  <img src="daten/bilder/schriftzug.png" alt="Drachenhauch" width="560">
 </p>
 
 <p align="center"><strong>Let your ideas breathe fire.</strong></p>
 
 <p align="center"><em><a href="README.md">Deutsch</a> · English</em></p>
 
-A BASIC dialect with Pascal-strict typing and OOP, built for games. Programs run through **`dhrt`** — the native Rust runtime, which lexes, parses, compiles and executes the source itself. Graphics and 3D via **raylib**, sound via **[Kira](https://github.com/tesselode/kira)** on its own audio thread. Python is now only the editor/tooling layer.
+A BASIC dialect with Pascal-strict typing and OOP, built for games. Programs run through **`dhrt`** — the native Rust runtime, which lexes, parses, compiles and executes the source itself. Graphics and 3D via **raylib**, sound via **[Kira](https://github.com/tesselode/kira)** on its own audio thread. The IDE and all tools are written in Drachenhauch too; Python is only needed for the runtime's build script.
 
 ```basic
 IMPORT "sprite"
@@ -77,19 +77,15 @@ You do **not** need Python installed. It ships the complete development environm
 
 ## Working from source
 
-One-time setup (Python ≥ 3.12; `.venv/` is gitignored, so a fresh clone does
-not have one):
+You need Rust (`cargo`) and any Python 3 — only for the build script, with no
+venv and no packages (it uses the standard library only). Build the runtime
+once; after that everything runs through `dhrt`:
 
 ```
-py -3.12 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-Then:
-
-```
-.venv\Scripts\python.exe dhrun.py            # open the editor
-.venv\Scripts\python.exe dhrun.py file.dh    # run a program directly
+python rust\build_runtime.py                              # builds dhrt (with --hardware: serial/usb/bt/wifi/midi)
+rust\drachenhauch_runtime\target\release\dhrt run ide\ide.dh           # the IDE
+rust\drachenhauch_runtime\target\release\dhrt run file.dh              # a program
+rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # all checks
 ```
 
 ## The textbook
@@ -120,17 +116,17 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 - **[Graphics built-ins](docs/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
 - **[Performance](docs/PERFORMANCE.md)** — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
 - **Modules** — 38 of them, [table below](#modules)
-- **[Code editor](docs/editor.md)** — shortcuts, snippets, minimap, multi-cursor, sidebar, run/bench, signature help, **breadcrumbs** (scope path), **peek definition** (Alt+F12), **split view** (Ctrl+\\), **debugger** (breakpoints incl. **conditional** breakpoints/step/variables), **profiler** (hot path per line/function), **git-blame** panel, welcome showcase (demo gallery with screenshots)
-- **[Sprite editor](docs/sprite-editor.md)** — pixel-art editor (`dhsprites`): multi-frame, **layers** (visibility/opacity/merge-down, `.dhsprite` v5), animation, atlas export, **export scaling** (1x–8x, nearest-neighbor), **lasso selection** (real pixel mask) + rectangle selection, onion skin (adjustable opacity/range), tile preview
-- **[Particle editor](docs/particle-editor.md)** — effect editor (`dhparticles`): tune emitter parameters live with a real-time preview, **preset library** (factory + custom presets), GB code export
-- **[Audio Studio](docs/tracker.md#audio-studio)** — combines tracker + SFX generator in **one fullscreen window** with tabs (`dhsound` / `dhrun.py --audio`; `dhsfx`/`dhtracker` open the same window on the matching tab). `F11` fullscreen, `Ctrl+1/2` switch tabs.
-- **[SFX generator](docs/sfx-generator.md)** — retro sound effects (sfxr-style, SFX tab): synth with pitch slide/envelope/vibrato/stereo, **SID character** (pulse width/PWM + resonant filter sweep), **preset library** (save your own sounds), export WAV/GB code (`AUDIO_SFX`)
-- **[Tracker](docs/tracker.md)** — multi-track music editor (tracker tab), [table below](#tracker)
-- **[Score editor](docs/score-editor.md)** — real music-notation display (`dhscore`): place notes by clicking a 5-line staff (treble/bass clef, ledger lines, accidentals), note durations (whole/half/quarter/eighth/sixteenth + dotted + rest), one instrument per track, playback through the shared additive mixer, its own `.json` format **or** direct export/open in the tracker (`dhtracker`)
-- **[Tilemap/level editor](docs/tilemap-editor.md)** — paint tiles onto a grid (`dhtilemap`): multiple layers, object layer, **multiple tilesets**, per-tile properties (`solid`/`damage`), pencil/fill/rectangle/eyedropper/**selection** (copy/cut/paste), save/load as Tiled JSON (`TILED_LOAD`), GB code renderer export
-- **[Form designer (WYSIWYG)](docs/form-designer.md)** — visual GUI designer in Xojo style (`dhform`): place/configure controls, save as `.dhform`, use in your own code via `GUI_LOAD` or launch with F5
-- **[Animation FSM editor](docs/anim-editor.md)** — node graph for animation state machines, Unity-Mecanim style (`dhanim`): visually wire up states (bound to a sprite animation) + parameters + transitions with conditions, save as `.dhanim`, use via `ANIM_FSM_LOAD` ([module `animfsm`](docs/module-animfsm.md)), live preview with F5
-- **[Language server + VSCode extension](docs/lsp.md)** — Drachenhauch in any LSP editor: syntax highlighting, diagnostics, completion, hover, goto-definition, references, outline (`py -m drachenhauch.lsp`, `vscode-drachenhauch/`)
+- **[IDE](docs/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
+- **Tools** — all written in Drachenhauch, in the IDE under *Tools* or directly with `dhrt run examples/<file>`:
+  - **[Sprite editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — pixel art with frames, layers, lasso/magic wand/move, GIF with a duration per frame, atlas export for `ATLAS_LOAD`, GB code, `.dhanim` template
+  - **[Particle editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — emitter sliders with a live preview, factory presets, your own settings as `.ini`, GB code
+  - **[SFX generator](docs/sfx-generator.md)** (`183_sfx_generator.dh`) — sfxr-style retro sound effects, WAV export, GB code with `AUDIO_SFX`
+  - **[Tracker](docs/tracker.md)** (`190_tracker.dh`) — multi-track music editor, [table below](#tracker)
+  - **[Score](docs/score-editor.md)** (`199_notenblatt.dh`) — real music-notation display, playback, hand-over to the tracker
+  - **[Tilemap/level editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — layers, object layers, multiple tilesets, tile properties, Tiled JSON (`TILED_LOAD`), GB code renderer
+  - **[Form designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI forms in Xojo style, `.dhform` for `GUI_LOAD`, F5 launches, GB code
+  - **[Animation FSM editor](docs/anim-editor.md)** (`198_anim_fsm_editor.dh`) — states, transitions and conditions as a graph, `.dhanim` for `ANIM_FSM_LOAD` ([module `animfsm`](docs/module-animfsm.md)), preview with F5
+- **[Language server + VSCode extension](docs/lsp.md)** — Drachenhauch in any LSP editor: syntax highlighting, diagnostics, completion, hover, goto-definition, references, outline. The server is the runtime itself (`dhrt lsp`), no Python (`vscode-drachenhauch/`)
 - **[Web playground](docs/web-playground.md)** — `dhrt` as WebAssembly in the browser, [table below](#web-playground)
 - **[`cloud` module](docs/module-cloud.md)** — cloud save + leaderboard against the bundled, self-hostable reference server [`cloudserver/`](cloudserver/README.md) (a Drachenhauch program + SQLite, shared API-key secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core built-in) for idle-/incremental-game-style big-number formatting (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, falling back to scientific notation beyond that). Demo [examples/146_cloud_idle.dh](examples/146_cloud_idle.dh)
 - **[Connecting an ESP32 / ESP8266](esp32/README.md)** — a ready-made sketch skeleton (Wi-Fi, broker connection, reconnect, receiving) with four marked spots for your own code; **one file for both boards**, compiled for ESP32/ESP8266/ESP32-C3/ESP32-S3. Talks [`mqtt`](docs/module-mqtt.md) to its Drachenhauch counterpart [examples/159_esp32_bruecke.dh](examples/159_esp32_bruecke.dh) — which you can finish **without any board** using `mosquitto_pub`
@@ -145,7 +141,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 | Module | What for |
 |---|---|
 | [`sprite`](docs/module-sprite.md) | animated sheet sprites: position, velocity, named animations, collision |
-| [`animfsm`](docs/module-animfsm.md) | animation state machine, Unity-Mecanim style, loaded from `.dhanim` (editor `dhanim`) |
+| [`animfsm`](docs/module-animfsm.md) | animation state machine, Unity-Mecanim style, loaded from `.dhanim` (editor `examples/198_anim_fsm_editor.dh`) |
 | [`camera`](docs/module-camera.md) | world translation, zoom and rotation for **every** drawing command; follow, screen↔world |
 | [`controller`](docs/module-controller.md) | character controller with coyote time, jump buffer and variable jump height |
 | [`scene`](docs/module-scene.md) | scene stack (`PUSH`/`POP`/`SWITCH`) with per-scene data |
@@ -212,43 +208,17 @@ A ready-made sketch skeleton for the board lives in **[esp32/](esp32/README.md)*
 
 ### Tracker
 
-The multi-track music editor inside the [Audio Studio](docs/tracker.md) — a
-tracker in the tradition of ProTracker, FastTracker and Renoise.
-
-**Tracks**
-
-| | |
-|---|---|
-| Channel count | 4–32, configurable; the last one is always the drum channel |
-| Accent colour per channel | header, notes, VU meter and fader all pick it up |
-| Mixer fader | a real volume slider per track — applies to preview, WAV and the generated GB code |
-
-**Instruments**
+The multi-track music editor [`examples/190_tracker.dh`](docs/tracker.md) — a
+tracker in the tradition of ProTracker and FastTracker, written in Drachenhauch
+itself.
 
 | | |
 |---|---|
-| Library | grand piano, organ, strings, bass, bell … and drums; one sound per track by default |
-| Instrument **per note** | a channel is just a voice slot: every single note may bring its own instrument (`Instr:` dropdown) |
-| Sample instruments | load WAV/OGG and resample across the whole keyboard (the MOD/XM/IT principle), with a graphical loop editor and a pan slider |
-| Keymap / multisample | spread different samples across key zones — also as a drum kit |
-| SoundFont | import `.sf2`: real GM and vendor instruments |
-
-**Editing**
-
-| | |
-|---|---|
-| Patterns | several, each with its own length, arranged into a song |
-| Block selection | copy, cut, paste, transpose, interpolate |
-| Effect columns | volume, pitch slide/portamento, arpeggio, vibrato, retrigger, sample offset — per note, plus instrument pan |
-| Note-off | cut a note deliberately before the next one starts |
-
-**Output**
-
-| | |
-|---|---|
-| Project | save and load as `.json` |
-| GB player | export as frame-driven Drachenhauch code |
-| WAV | song mixed offline, **stereo with Amiga hard-panning** → straight into `PLAYMUSIC` |
+| Tracks | patterns of 1–64 rows across 4–32 channels, the last one is the drum channel; an order list arranges them into a song |
+| Instruments | 18 ready-made ones with envelope, vibrato and detune, all editable; every note may bring its own instrument |
+| Editing | volume, portamento and effect per note; block selection with copy, transpose, interpolate; mute/solo and a mixer fader per channel; undo across the whole song |
+| Playback | on an audio clock, not frame-driven — sixteenths stay in time even when the frame rate wobbles |
+| Output | song JSON (the same as the former Qt version's), WAV with stereo and Amiga panning, GB code as a standalone player |
 
 ### Web playground
 
@@ -296,7 +266,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 
 ## Architecture
 
-Pipeline: **source → preprocessor → lexer → parser → compiler → VM** — **all inside `dhrt`** (Rust). `dhrt run file.dh` is a self-contained end-to-end run with no Python involved. Correctness is guarded by **run_gb golden tests** (`assert run_gb(src) == expected`, spawns `dhrt run`) plus Rust `#[test]`s.
+Pipeline: **source → preprocessor → lexer → parser → compiler → VM** — **all inside `dhrt`** (Rust). `dhrt run file.dh` is a self-contained end-to-end run with no Python involved. Correctness is guarded by the **test collections** (`tests/pruef/*.dhtest`, one `dhrt run` per case) plus Rust `#[test]`s.
 
 > **History:** Programs used to also run through a Python **tree-walking interpreter** and two Python **bytecode VMs** (a plain Python VM and a Cython VM), guaranteeing "bit-identical output" across all three. As of **Stage B** the tree-walker and the entire Python toolchain (interpreter/compiler/vm/serialize) have been **removed** — `dhrt` is the only runtime and compiles the source itself.
 
@@ -316,9 +286,9 @@ front-end, no Python anywhere in the execution path. What runs natively:
 | Frame and loop | game loop (`DELTA`/`FPS`/`SETFPS`), GPU shaders and post-processing (`SHADER_LOAD`/`POSTFX`), TTF fonts ([demo](examples/87_ttf_fonts.dh)), gamepad |
 | Recording input | `AUTOMATION_RECORD`/`PLAY` for attract mode, replayable bug reports and automated playtests ([docs](docs/automation.md), [demo](examples/153_automation.dh)) |
 | Modules | **all of them** — including the formerly Python-only ones: `regex`, `tiled`, `tile_collide`, `controller`, extended `audio`; plus feature-gated `db` (rusqlite), `net`, `mqtt`, `html` (ureq) and the hardware side `serial`, `firmata`, `usb`, `wifi`, `bt` |
-| Shipping | `dhrun.py --export` (or Ctrl+F6 in the editor) bundles bytecode + `assets/` into a standalone `.exe` that runs without Python |
+| Shipping | `dhrt --export file.dh` (or Ctrl+F6 in the IDE) bundles bytecode + `assets/` into a standalone `.exe` |
 
-That leaves only the editor needing Python. The heavier modules come in with
+Only the build script still needs Python. The heavier modules come in with
 `build_runtime.py --hardware` or `--full` — **a build without those flags leaves
 them out again**, which is the most common reason a hardware example suddenly
 stops working. One showcase that exercises nearly all of it at once:
@@ -326,28 +296,19 @@ stops working. One showcase that exercises nearly all of it at once:
 of chrome spheres with IBL, shadows, bloom and stereo techno. Plan and status in
 [docs/rust-runtime.md](docs/rust-runtime.md).
 
-**Front-end port to Rust — complete.** The entire toolchain (lexer → parser → compiler → preprocessor) has been ported to Rust, each stage verified for output parity against the Python tree-walker. **`dhrt run file.dh` is a self-contained end-to-end run with no Python:** it preprocesses (`IMPORT` resolution for both source files and built-in modules), lexes, parses, compiles and executes — scalars/arithmetic/control flow, arrays/maps, functions, classes/OOP, `SELECT`/`FOR EACH`/tuples/`WITH`/`TRY`/slicing/comprehensions/coroutines. Like `dhrun.py`, it changes into the file's directory so relative `IMPORT` and asset paths resolve correctly (`dhrt file.dh` without `run` works the same way; `.dhc` files still use the direct VM path). Debug entry points: `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Self-export without Python:** `dhrt --export file.dh` compiles the source itself and bundles it into a self-contained `.exe` (appends the bytecode to a copy of the runtime, copies `assets/`). Aliased module imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) work natively too. This also makes the **web playground pure Rust WASM**, compiling the source in the browser (no Pyodide): `rust/build_wasm.py file.dh` produces `web/dhrt.{js,wasm}` with the source embedded (the emscripten toolchain on Windows is wired up automatically). **Console and animated graphics both run in the browser** — the GB render loop yields every frame via ASYNCIFY (`emscripten_sleep(0)` inside `flip()`), so `WHILE … FLIP() … WEND` doesn't freeze the tab; **shareable links** pack the source into the URL hash. Plan & stages in [docs/rust-frontend-port.md](docs/rust-frontend-port.md) (German).
+**Front-end port to Rust — complete.** The entire toolchain (lexer → parser → compiler → preprocessor) has been ported to Rust, each stage verified for output parity against the Python tree-walker. **`dhrt run file.dh` is a self-contained end-to-end run with no Python:** it preprocesses (`IMPORT` resolution for both source files and built-in modules), lexes, parses, compiles and executes — scalars/arithmetic/control flow, arrays/maps, functions, classes/OOP, `SELECT`/`FOR EACH`/tuples/`WITH`/`TRY`/slicing/comprehensions/coroutines. It changes into the file's directory so relative `IMPORT` and asset paths resolve correctly (`dhrt file.dh` without `run` works the same way; `.dhc` files still use the direct VM path). Debug entry points: `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Self-export without Python:** `dhrt --export file.dh` compiles the source itself and bundles it into a self-contained `.exe` (appends the bytecode to a copy of the runtime, copies `assets/`). Aliased module imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) work natively too. This also makes the **web playground pure Rust WASM**, compiling the source in the browser (no Pyodide): `rust/build_wasm.py file.dh` produces `web/dhrt.{js,wasm}` with the source embedded (the emscripten toolchain on Windows is wired up automatically). **Console and animated graphics both run in the browser** — the GB render loop yields every frame via ASYNCIFY (`emscripten_sleep(0)` inside `flip()`), so `WHILE … FLIP() … WEND` doesn't freeze the tab; **shareable links** pack the source into the URL hash. Plan & stages in [docs/rust-frontend-port.md](docs/rust-frontend-port.md) (German).
 
 Architecture details and extension notes in [CLAUDE.md](CLAUDE.md) (German).
 
 ## Tests
 
 ```
-.venv\Scripts\python.exe -m pytest tests/
+rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
 ```
 
-3224 tests — built-ins, every module, language constructs, editor features and example smoke tests. Correctness is guarded by **run_gb golden tests** (`assert run_gb(src) == expected`, spawn `dhrt run`) plus Rust `#[test]`s; they skip cleanly if `dhrt` isn't built.
+Checks live in **test collections** (`tests/pruef/*.dhtest`, format in [docs/werkzeuge.md](docs/werkzeuge.md), German): per case a program and its expected output, plus image probes, WAV probes, attached files, and real keyboard and mouse recordings for the tools and the IDE. Every case runs as its own `dhrt` process; whatever needs a window or sound skips itself when there is none. On top of that come Rust `#[test]`s (`cargo test` in `rust/drachenhauch_runtime`).
 
-**Faster in two passes** (this is how CI runs them):
-
-```
-.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile -m "not seriell"
-.venv\Scripts\python.exe -m pytest tests/ -q -m seriell
-```
-
-The suite barely computes — it spawns `dhrt` processes and waits for them. That is why it scales almost linearly: **10:40 serial against a little over a minute on 16 cores.** The second pass picks up four files that need a resource *exclusively* (input recording, the sound card, measured run times); the reason for each one sits in [tests/conftest.py](tests/conftest.py) next to `_SERIELL`.
-
-**CI** builds `dhrt` itself on every push and runs both passes (Windows, Python 3.12): **a little over 8 minutes** for the whole job — 3 for the Rust build, 2½ for the tests. Without that build the suite used to skip 1812 of 3096 tests there, and nothing said so. A second job **tests on Linux and macOS**: `dhrt` is built there without graphics (no raylib, so no X11 needed) and some 2200 tests run — the language itself, files, network, database, CSV, ZIP, sets, namespaces, background tasks. On top of that, a `cargo check` on Linux, macOS and Windows proves the Rust core compiles platform-independently.
+**CI** builds `dhrt` itself on every push and runs the collections on Windows (with graphics), Linux and macOS (without graphics); in addition, a `cargo check` on all three systems proves the Rust core compiles platform-independently. Until 2026-09-20 all of this ran through pytest — the Python tests were deleted along with the Python part, and whatever lasting thing they checked now lives in collections.
 
 ## License
 

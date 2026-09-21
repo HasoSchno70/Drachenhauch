@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 10 - Wenn etwas schiefgeht
-'  Start:  dhrun.py buch-tippspiel/code/kap10/robust.dh
+'  Start:  dhrt run buch-tippspiel/code/kap10/robust.dh
 ' ============================================================
 '  Bis hierher hat alles geklappt. In Wirklichkeit klappt es
 '  nicht immer: das Netz ist weg, die Antwort ist Unsinn, jemand

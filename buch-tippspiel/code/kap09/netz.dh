@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 9 - Daten aus dem Netz
-'  Start:  dhrun.py buch-tippspiel/code/kap09/netz.dh
+'  Start:  dhrt run buch-tippspiel/code/kap09/netz.dh
 ' ============================================================
 '  Den Spielplan von Hand einzutippen ist Arbeit, die schon
 '  jemand gemacht hat: OpenLigaDB gibt ihn her. Ein Abruf dauert

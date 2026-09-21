@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 2 - Wo die Daten wohnen
-'  Start:  dhrun.py buch-tippspiel/code/kap02/daten.dh
+'  Start:  dhrt run buch-tippspiel/code/kap02/daten.dh
 ' ============================================================
 '  Noch kein Fenster. Erst muss klar sein, WO die Daten liegen
 '  und WIE sie aussehen -- danach ist die Oberflaeche nur noch

@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 5 - Sternenhimmel mit Parallax und Funkeln
-'  Start:  dhrun.py buch-galaga/code/kap05/sternenhimmel.dh
+'  Start:  dhrt run buch-galaga/code/kap05/sternenhimmel.dh
 ' ============================================================
 
 SCREEN(480, 640, "Mein Galaga - Kapitel 5")

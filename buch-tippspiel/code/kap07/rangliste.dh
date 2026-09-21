@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 7 - Die Rangliste
-'  Start:  dhrun.py buch-tippspiel/code/kap07/rangliste.dh
+'  Start:  dhrt run buch-tippspiel/code/kap07/rangliste.dh
 ' ============================================================
 '  Ein Tippspiel ohne Tabelle ist kein Tippspiel. Die Rangliste
 '  bekommt einen eigenen Reiter -- und wird NICHT im Programm

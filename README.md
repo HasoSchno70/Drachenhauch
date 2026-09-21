@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="drachenhauch/assets/schriftzug.png" alt="Drachenhauch" width="560">
+  <img src="daten/bilder/schriftzug.png" alt="Drachenhauch" width="560">
 </p>
 
 <p align="center"><strong>Feuer frei für deine Ideen.</strong></p>
 
 <p align="center"><em>Deutsch · <a href="README.en.md">English</a></em></p>
 
-Ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`dhrt`** — die native Rust-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Grafik und 3D über **raylib**, Ton über **[Kira](https://github.com/tesselode/kira)** auf einem eigenen Audio-Thread. Python ist nur noch Editor-/Tooling-Schicht.
+Ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`dhrt`** — die native Rust-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Grafik und 3D über **raylib**, Ton über **[Kira](https://github.com/tesselode/kira)** auf einem eigenen Audio-Thread. Auch die IDE und alle Werkzeuge sind in Drachenhauch geschrieben; Python braucht nur noch das Bauskript der Laufzeit.
 
 ```basic
 IMPORT "sprite"
@@ -79,19 +79,15 @@ Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entw
 
 ## Aus dem Quelltext arbeiten
 
-Einmalig einrichten (Python ≥ 3.12; `.venv/` ist gitignoriert, ein frischer
-Klon hat es also nicht):
+Gebraucht werden Rust (`cargo`) und ein beliebiges Python 3 — nur für das
+Bauskript, ohne venv und ohne Pakete (es benutzt nur die Standardbibliothek).
+Einmal die Laufzeit bauen, danach läuft alles über `dhrt`:
 
 ```
-py -3.12 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-Danach:
-
-```
-.venv\Scripts\python.exe dhrun.py            # Editor öffnen
-.venv\Scripts\python.exe dhrun.py datei.dh   # Programm direkt ausführen
+python rust\build_runtime.py                              # baut dhrt (mit --hardware: serial/usb/bt/wifi/midi)
+rust\drachenhauch_runtime\target\release\dhrt run ide\ide.dh           # die IDE
+rust\drachenhauch_runtime\target\release\dhrt run datei.dh             # ein Programm
+rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # alle Prüfungen
 ```
 
 ## Das Lehrbuch
@@ -120,16 +116,16 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
 - **Module** — 47 Stück, [Tabelle unten](#module)
-- **[Code-Editor](docs/editor.md)** — Tastenkürzel, Snippets, Minimap, Multi-Cursor, Sidebar, Run/Bench, Signature-Help, **Breadcrumbs** (Scope-Pfad), **Peek-Definition** (Alt+F12), **Split-View** (Strg+\\), **Debugger** (Breakpoints inkl. **bedingter** Breakpoints/Step/Variablen), **Profiler** (Hotpath pro Zeile/Funktion), **Git-Blame**-Panel, Welcome-Showcase (Demo-Galerie mit Screenshots)
-- **[Sprite-Editor](docs/sprite-editor.md)** — Pixel-Art-Editor (`dhsprites`): Multi-Frame, **Ebenen** (Sichtbarkeit/Deckkraft/Merge-Down, `.dhsprite` v5), Animation, Atlas-Export, **Export-Skalierung** (1x–8x, Nearest-Neighbor), **Lasso-Auswahl** (echte Pixel-Maske) + Rechteck-Auswahl, Onion-Skin (Deckkraft/Reichweite einstellbar), Tile-Preview
-- **[Partikel-Editor](docs/particle-editor.md)** — Effekt-Editor (`dhparticles`): Emitter-Parameter live tunen mit Echtzeit-Vorschau, **Preset-Bibliothek** (Werks- + eigene Presets), GB-Code-Export
-- **[Audio Studio](docs/tracker.md#audio-studio)** — vereint Tracker + SFX-Generator in **einem fullscreen Fenster** mit Reitern (`dhsound` / `dhrun.py --audio`; `dhsfx`/`dhtracker` öffnen denselben auf dem passenden Tab). `F11` Vollbild, `Strg+1/2` Tabwechsel.
-- **[SFX-Generator](docs/sfx-generator.md)** — Retro-Soundeffekte (sfxr-Stil, SFX-Tab): Synth mit Pitch-Slide/Hüllkurve/Vibrato/Stereo, **SID-Charakter** (Pulsbreite/PWM + resonanter Filter-Sweep), **Preset-Bibliothek** (eigene Sounds speichern), Export WAV/GB-Code (`AUDIO_SFX`)
-- **[Tracker](docs/tracker.md)** — mehrspuriger Musik-Editor (Tracker-Tab), [Tabelle unten](#tracker)
-- **[Notenblatt-Editor](docs/score-editor.md)** — echte Notensatz-Darstellung (`dhscore`): Noten per Klick auf ein 5-Linien-System setzen (Violin-/Bassschlüssel, Hilfslinien, Vorzeichen), Notendauern (ganze/halbe/Viertel/Achtel/Sechzehntel + punktiert + Pause), ein Instrument pro Spur, Wiedergabe über den geteilten additiven Mixer, eigenes `.json`-Format **oder** direkter Export/Öffnen im Tracker (`dhtracker`)
-- **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** — Tiles aufs Gitter malen (`dhtilemap`): mehrere Layer, Object-Layer, **mehrere Tilesets**, Per-Tile-Properties (`solid`/`damage`), Stift/Füllen/Rechteck/Pipette/**Auswahl** (Copy/Cut/Paste), Speichern/Laden als Tiled-JSON (`TILED_LOAD`), GB-Code-Renderer-Export
-- **[Form-Designer (WYSIWYG)](docs/form-designer.md)** — visueller GUI-Designer im Xojo-Stil (`dhform`): Controls platzieren/konfigurieren, als `.dhform` speichern, per `GUI_LOAD` im eigenen Code nutzen oder mit F5 starten
-- **[Animations-FSM-Editor](docs/anim-editor.md)** — Knoten-Graph für Animation-State-Machines im Unity-Mecanim-Stil (`dhanim`): States (an Sprite-Anim gebunden) + Parameter + Transitions mit Bedingungen visuell verdrahten, als `.dhanim` speichern, per `ANIM_FSM_LOAD` ([Modul `animfsm`](docs/module-animfsm.md)) nutzen, Live-Vorschau mit F5
+- **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
+- **Werkzeuge** — alle in Drachenhauch geschrieben, in der IDE unter *Werkzeuge* oder direkt mit `dhrt run examples/<datei>`:
+  - **[Sprite-Editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Lasso/Zauberstab/Verschieben, GIF mit Dauer je Bild, Atlas-Export für `ATLAS_LOAD`, GB-Code, `.dhanim`-Vorlage
+  - **[Partikel-Editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — Emitter-Regler mit Live-Vorschau, Werkseinstellungen, eigene Stände als `.ini`, GB-Code
+  - **[SFX-Generator](docs/sfx-generator.md)** (`183_sfx_generator.dh`) — Retro-Soundeffekte im sfxr-Stil, WAV-Export, GB-Code mit `AUDIO_SFX`
+  - **[Tracker](docs/tracker.md)** (`190_tracker.dh`) — mehrspuriger Musik-Editor, [Tabelle unten](#tracker)
+  - **[Notenblatt](docs/score-editor.md)** (`199_notenblatt.dh`) — echte Notensatz-Darstellung, Wiedergabe, Übergabe an den Tracker
+  - **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — Ebenen, Objekt-Ebenen, mehrere Tilesets, Kachel-Eigenschaften, Tiled-JSON (`TILED_LOAD`), GB-Code-Renderer
+  - **[Form-Designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI-Formulare im Xojo-Stil, `.dhform` für `GUI_LOAD`, F5 startet, GB-Code
+  - **[Animations-FSM-Editor](docs/anim-editor.md)** (`198_anim_fsm_editor.dh`) — Zustände, Übergänge und Bedingungen als Graph, `.dhanim` für `ANIM_FSM_LOAD` ([Modul `animfsm`](docs/module-animfsm.md)), Vorschau mit F5
 - **[Sprachserver + VS Code](docs/lsp.md)** — Drachenhauch in jedem LSP-Editor: Syntax-Highlighting, Diagnostics, Completion, Hover, Goto-Definition, References, Outline. Der Server ist die Runtime selbst (`dhrt lsp`), ohne Python (`vscode-drachenhauch/`)
 - **[Web-Playground](docs/web-playground.md)** — `dhrt` als WebAssembly im Browser, [Tabelle unten](#web-playground)
 - **[`cloud`-Modul](docs/module-cloud.md)** — Cloud-Save + Leaderboard gegen den mitgelieferten, selbst hostbaren Referenz-Server [`cloudserver/`](cloudserver/README.md) (ein Drachenhauch-Programm + SQLite, geteiltes API-Key-Secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core-Builtin) für Idle-/Incremental-Game-taugliche Big-Number-Formatierung (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, danach wissenschaftliche Notation). Demo [examples/146_cloud_idle.dh](examples/146_cloud_idle.dh)
@@ -145,7 +141,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | Modul | Wofür |
 |---|---|
 | [`sprite`](docs/module-sprite.md) | animierte Sheet-Sprites: Position, Velocity, benannte Animationen, Kollision |
-| [`animfsm`](docs/module-animfsm.md) | Animations-Zustandsautomat im Unity-Mecanim-Stil, aus `.dhanim` (Editor `dhanim`) |
+| [`animfsm`](docs/module-animfsm.md) | Animations-Zustandsautomat im Unity-Mecanim-Stil, aus `.dhanim` (Editor `examples/198_anim_fsm_editor.dh`) |
 | [`camera`](docs/module-camera.md) | Weltverschiebung, Zoom und Drehung für **alle** Zeichenbefehle; Folgen, Bildschirm↔Welt |
 | [`controller`](docs/module-controller.md) | Figuren-Steuerung mit Coyote-Zeit, Sprung-Puffer und variabler Sprunghöhe |
 | [`scene`](docs/module-scene.md) | Szenen-Stapel (`PUSH`/`POP`/`SWITCH`) mit Daten pro Szene |
@@ -225,43 +221,17 @@ Ein fertiges Sketch-Grundgerüst fürs Board liegt in **[esp32/](esp32/README.md
 
 ### Tracker
 
-Der mehrspurige Musik-Editor im [Audio Studio](docs/tracker.md) — ein Tracker
-in der Tradition von ProTracker, FastTracker und Renoise.
-
-**Spuren**
-
-| | |
-|---|---|
-| Kanalzahl | 4–32 einstellbar, der letzte ist immer der Schlagzeug-Kanal |
-| Akzentfarbe je Kanal | Kopfzeile, Noten, Aussteuerung und Regler übernehmen sie |
-| Mixer-Fader | echter Lautstärkeregler pro Spur — wirkt beim Vorhören, in der WAV und im erzeugten GB-Code |
-
-**Instrumente**
+Der mehrspurige Musik-Editor [`examples/190_tracker.dh`](docs/tracker.md) —
+ein Tracker in der Tradition von ProTracker und FastTracker, geschrieben in
+Drachenhauch selbst.
 
 | | |
 |---|---|
-| Bibliothek | Flügel, Orgel, Streicher, Bass, Glocke … und Schlagzeug; ein Klang pro Spur als Vorgabe |
-| Instrument **pro Note** | ein Kanal ist nur ein Stimmen-Platz: jede einzelne Note darf ihr eigenes Instrument mitbringen (`Instr:`-Auswahl) |
-| Sample-Instrumente | WAV/OGG laden und über die ganze Klaviatur resampeln (MOD/XM/IT-Prinzip), mit grafischem Schleifen-Editor und Panorama-Regler |
-| Keymap / Multisample | verschiedene Samples auf Tastenbereiche verteilen — auch als Schlagzeug-Satz |
-| SoundFont | `.sf2` einlesen: echte GM- und Hersteller-Instrumente |
-
-**Bearbeiten**
-
-| | |
-|---|---|
-| Patterns | mehrere, jeweils eigene Länge, zu einem Song angeordnet |
-| Block-Auswahl | Kopieren, Ausschneiden, Einfügen, Transponieren, Zwischenwerte berechnen |
-| Effekt-Spalten | Lautstärke, Tonhöhen-Gleiten/Portamento, Arpeggio, Vibrato, Retrigger, Sample-Versatz — je Note, dazu Instrument-Panorama |
-| Note-Off | eine Note gezielt vor der nächsten abschneiden |
-
-**Ausgabe**
-
-| | |
-|---|---|
-| Projekt | speichern und laden als `.json` |
-| GB-Player | Export als bildweise abgespielter Drachenhauch-Code |
-| WAV | Song offline gemischt, **Stereo mit Amiga-Hard-Panning** → direkt für `PLAYMUSIC` |
+| Spuren | Patterns mit 1–64 Reihen über 4–32 Kanäle, der letzte ist der Schlagzeug-Kanal; eine Reihenfolge (Order) daraus |
+| Instrumente | 18 fertige mit Hüllkurve, Vibrato und Detune, alle änderbar; je Note ein eigenes Instrument möglich |
+| Bearbeiten | je Note Lautstärke, Portamento und Effekt; Blockauswahl mit Kopieren, Transponieren, Interpolieren; Stumm/Solo und Mixer-Regler je Kanal; Rückgängig über den ganzen Song |
+| Wiedergabe | auf einer Audio-Uhr, nicht bildgetrieben — Sechzehntel bleiben im Takt, auch wenn die Bildrate schwankt |
+| Ausgabe | Song-JSON (dasselbe wie das der früheren Qt-Fassung), WAV mit Stereo und Amiga-Panning, GB-Code als eigenständiger Abspieler |
 
 ### Web-Playground
 
@@ -334,7 +304,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 
 ## Architektur
 
-Pipeline: **Source → Preprocessor → Lexer → Parser → Compiler → VM** — **alles in `dhrt`** (Rust). `dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python. Korrektheit sichern **run_gb-Golden-Tests** (`assert run_gb(src) == expected`, spawnt `dhrt run`) + Rust-`#[test]`s.
+Pipeline: **Source → Preprocessor → Lexer → Parser → Compiler → VM** — **alles in `dhrt`** (Rust). `dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python. Korrektheit sichern die **Prüfsammlungen** (`tests/pruef/*.dhtest`, je Fall ein eigener `dhrt run`) + Rust-`#[test]`s.
 
 > **Geschichte:** Früher liefen Programme zusätzlich über einen Python-**Tree-Walker** und zwei Python-**Bytecode-VMs** (Python-VM, Cython-VM), mit „bit-identischem Output" als Garantie. Seit **Stufe B** sind Tree-Walker + Python-Toolchain (interpreter/compiler/vm/serialize) **alle entfernt** — `dhrt` ist die einzige Runtime und kompiliert den Quelltext selbst.
 
@@ -354,9 +324,9 @@ Rust-Frontend, kein Python im Ausführungspfad. Was davon nativ läuft:
 | Bild und Ablauf | Spielschleife (`DELTA`/`FPS`/`SETFPS`), GPU-Shader und Nachbearbeitung (`SHADER_LOAD`/`POSTFX`), TTF-Schriften ([Demo](examples/87_ttf_fonts.dh)), Gamepad |
 | Eingabe aufzeichnen | `AUTOMATION_RECORD`/`PLAY` für Demo-Modus, nachspielbare Fehlerberichte und automatische Spieltests ([Doku](docs/automation.md), [Demo](examples/153_automation.dh)) |
 | Module | **alle** — auch die früher Python-eigenen: `regex`, `tiled`, `tile_collide`, `controller`, das erweiterte `audio`; dazu per Feature `db` (rusqlite), `net`, `mqtt`, `html` (ureq) und die Hardware-Seite `serial`, `firmata`, `usb`, `wifi`, `bt` |
-| Ausliefern | `dhrun.py --export` (oder Strg+F6 im Editor) bündelt Bytecode + `assets/` zu einer eigenständigen `.exe`, die ohne Python läuft |
+| Ausliefern | `dhrt --export datei.dh` (oder Strg+F6 in der IDE) bündelt Bytecode + `assets/` zu einer eigenständigen `.exe` |
 
-Damit braucht nur noch der Editor Python. Die schweren Module kommen mit
+Python braucht nur noch das Bauskript. Die schweren Module kommen mit
 `build_runtime.py --hardware` bzw. `--full` dazu — **ein Bau ohne diese Schalter
 lässt sie wieder weg**, was der häufigste Grund dafür ist, dass ein Hardware-Beispiel
 plötzlich nicht mehr läuft. Ein Schaustück, das fast alles davon gleichzeitig zeigt:
@@ -364,31 +334,19 @@ plötzlich nicht mehr läuft. Ein Schaustück, das fast alles davon gleichzeitig
 Chrom-Kugeln mit IBL, Schatten, Bloom und Stereo-Techno. Plan und Stand in
 [docs/rust-runtime.md](docs/rust-runtime.md).
 
-**Front-End-Portierung nach Rust — abgeschlossen.** Die komplette Toolchain (Lexer → Parser → Compiler → Preprocessor) wurde nach Rust portiert, jede Stufe per Output-Parität gegen den Python-Tree-Walker verifiziert. **`dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python:** preprocesst (`IMPORT`-Auflösung von Quelldateien und Built-in-Modulen), lext, parst, kompiliert und führt aus — Skalare/Arithmetik/Kontrollfluss, Arrays/Maps, Funktionen, Klassen/OOP, `SELECT`/`FOR EACH`/Tupel/`WITH`/`TRY`/Slicing/Comprehensions/Coroutinen. Wie `dhrun.py` wird ins Datei-Verzeichnis gewechselt, sodass relative `IMPORT`- und Asset-Pfade stimmen (`dhrt datei.dh` ohne `run` funktioniert genauso; `.dhc`-Dateien laufen weiter den direkten VM-Pfad). Debug-Einstiege `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Selbst-Export ohne Python:** `dhrt --export datei.dh` kompiliert die Quelle selbst und bündelt sie zu einer eigenständigen `.exe` (hängt den Bytecode an eine Kopie der Runtime, kopiert `assets/`). Aliasierte Modul-Imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) funktionieren ebenfalls nativ. Damit ist auch der **Web-Playground ein reines Rust-WASM**, das die Quelle im Browser kompiliert (kein Pyodide): `rust/build_wasm.py datei.dh` erzeugt `web/dhrt.{js,wasm}` mit eingebetteter Quelle (emscripten-Toolchain auf Windows wird automatisch verdrahtet). **Konsole und animierte Grafik laufen im Browser** — der GB-Render-Loop yieldet pro Frame via ASYNCIFY (`emscripten_sleep(0)` in `flip()`), sodass `WHILE … FLIP() … WEND` den Tab nicht einfriert; **teilbare Links** packen die Quelle in den URL-Hash. Plan & Stufen in [docs/rust-frontend-port.md](docs/rust-frontend-port.md).
+**Front-End-Portierung nach Rust — abgeschlossen.** Die komplette Toolchain (Lexer → Parser → Compiler → Preprocessor) wurde nach Rust portiert, jede Stufe per Output-Parität gegen den Python-Tree-Walker verifiziert. **`dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python:** preprocesst (`IMPORT`-Auflösung von Quelldateien und Built-in-Modulen), lext, parst, kompiliert und führt aus — Skalare/Arithmetik/Kontrollfluss, Arrays/Maps, Funktionen, Klassen/OOP, `SELECT`/`FOR EACH`/Tupel/`WITH`/`TRY`/Slicing/Comprehensions/Coroutinen. Es wird ins Datei-Verzeichnis gewechselt, sodass relative `IMPORT`- und Asset-Pfade stimmen (`dhrt datei.dh` ohne `run` funktioniert genauso; `.dhc`-Dateien laufen weiter den direkten VM-Pfad). Debug-Einstiege `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Selbst-Export ohne Python:** `dhrt --export datei.dh` kompiliert die Quelle selbst und bündelt sie zu einer eigenständigen `.exe` (hängt den Bytecode an eine Kopie der Runtime, kopiert `assets/`). Aliasierte Modul-Imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) funktionieren ebenfalls nativ. Damit ist auch der **Web-Playground ein reines Rust-WASM**, das die Quelle im Browser kompiliert (kein Pyodide): `rust/build_wasm.py datei.dh` erzeugt `web/dhrt.{js,wasm}` mit eingebetteter Quelle (emscripten-Toolchain auf Windows wird automatisch verdrahtet). **Konsole und animierte Grafik laufen im Browser** — der GB-Render-Loop yieldet pro Frame via ASYNCIFY (`emscripten_sleep(0)` in `flip()`), sodass `WHILE … FLIP() … WEND` den Tab nicht einfriert; **teilbare Links** packen die Quelle in den URL-Hash. Plan & Stufen in [docs/rust-frontend-port.md](docs/rust-frontend-port.md).
 
 Architektur-Details und Erweiterungs-Hinweise in [CLAUDE.md](CLAUDE.md).
 
 ## Tests
 
 ```
-.venv\Scripts\python.exe -m pytest tests/
+rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
 ```
 
-Über 3400 Tests — Built-ins, alle Module, Sprach-Konstrukte, Editor-Features und Example-Smoke-Tests. Korrektheit sichern **run_gb-Golden-Tests** (`assert run_gb(src) == expected`, spawnen `dhrt run`) + Rust-`#[test]`s; sie skippen ohne gebautes `dhrt`.
+Geprüft wird in **Prüfsammlungen** (`tests/pruef/*.dhtest`, Format in [docs/werkzeuge.md](docs/werkzeuge.md)): je Fall ein Programm und seine erwartete Ausgabe, dazu Bildproben, WAV-Proben, Beilagen, echte Tasten- und Mausaufnahmen für die Werkzeuge und die IDE. Jeder Fall läuft als eigener `dhrt`-Prozess; ohne Fenster oder Ton überspringt sich, was sie braucht. Dazu Rust-`#[test]`s (`cargo test` in `rust/drachenhauch_runtime`).
 
-**Schneller in drei Durchgängen — genau die, die auch die CI fährt:**
-
-```
-.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
-.venv\Scripts\python.exe tools\qt_tests_einzeln.py
-.venv\Scripts\python.exe -m pytest tests/ -q -m seriell
-```
-
-Die Suite rechnet kaum — sie startet `dhrt`-Prozesse und wartet auf sie. Deshalb skaliert der erste Durchgang fast linear: **10:40 seriell gegen gut eine Minute auf 16 Kernen.**
-
-Die **Qt-Dateien laufen bewusst nicht parallel mit**: sie lassen ihre Fenster stehen, und alles, was über alle Fenster eines Prozesses läuft, fasst dann die Altlasten fremder Dateien an — der Arbeiter starb daran sporadisch mit einer Zugriffsverletzung. Jede Qt-Datei bekommt deshalb ihren eigenen Prozess ([tools/qt_tests_einzeln.py](tools/qt_tests_einzeln.py), 89 Dateien in rund 25 s). Der letzte Durchgang holt sieben Dateien nach, die ein Betriebsmittel *exklusiv* brauchen (Eingabe-Aufzeichnung, Soundkarte, gemessene Laufzeiten); Begründung je Datei in [tests/conftest.py](tests/conftest.py) bei `_SERIELL`.
-
-Die **CI** baut `dhrt` bei jedem Push selbst und fährt beide Durchgänge (Windows, Python 3.12): **gut 8 Minuten** für den ganzen Job — 3 für den Rust-Bau, 2½ für die Tests. Ohne den Bau übersprang die Suite dort früher 1812 von 3096 Tests, ohne dass es auffiel. Ein zweiter Job **testet auf Linux und macOS**: dort wird `dhrt` ohne Grafik gebaut (kein raylib, also kein X11 nötig), und rund 2200 Tests laufen durch — die Sprache selbst, Dateien, Netz, Datenbank, CSV, ZIP, Mengen, Namensräume, Hintergrund-Aufträge. Dazu prüft ein `cargo check` auf Linux, macOS und Windows, dass der Rust-Kern plattformunabhängig kompiliert.
+Die **CI** baut `dhrt` bei jedem Push selbst und fährt die Sammlungen auf Windows (mit Grafik), Linux und macOS (ohne Grafik); dazu prüft ein `cargo check` auf allen drei Systemen, dass der Rust-Kern plattformunabhängig kompiliert. Bis 2026-09-20 lief das Ganze über pytest — die Python-Tests sind mit dem Python-Teil gelöscht, was sie Bleibendes prüften, steht seither in Sammlungen.
 
 ## Lizenz
 

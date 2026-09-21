@@ -11,7 +11,7 @@
 '  2D:       FFT-Spektrum (BOXES-Bulk, oben+unten), Glow-Funken + Cyber-Regen,
 '            pulsierender Titel, Credits-Laufschrift, Beat-Flash.
 '
-'  NUR NATIV:  dhrun.py --native examples\85_cybermatic_demo.dh   (oder F6)
+'  NUR NATIV:  dhrt run examples\85_cybermatic_demo.dh   (oder F5 in der IDE)
 '  ESC beendet.
 '
 '  Musik: "Cybermatic pulse" von Alexandr Zhelanov (opengameart.org), CC-BY 4.0.

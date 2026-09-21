@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 6 - Gegner & Formation (mit einer Klasse)
-'  Start:  dhrun.py buch-galaga/code/kap06/gegner.dh
+'  Start:  dhrt run buch-galaga/code/kap06/gegner.dh
 ' ============================================================
 
 ' --- Eine Klasse beschreibt EINEN Gegner ---

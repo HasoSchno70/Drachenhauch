@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 8 - Zeit
-'  Start:  dhrun.py buch-tippspiel/code/kap08/zeit.dh
+'  Start:  dhrt run buch-tippspiel/code/kap08/zeit.dh
 ' ============================================================
 '  Bis jetzt durfte man jederzeit tippen -- auch nach dem
 '  Abpfiff. Jetzt bekommen die Spiele einen Anstoss, und daraus

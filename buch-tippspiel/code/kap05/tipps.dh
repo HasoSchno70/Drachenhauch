@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 5 - Tipps eingeben
-'  Start:  dhrun.py buch-tippspiel/code/kap05/tipps.dh
+'  Start:  dhrt run buch-tippspiel/code/kap05/tipps.dh
 ' ============================================================
 '  Bis jetzt hat das Programm nur GEZEIGT. Jetzt schreibt es
 '  zurueck: ein Tipp geht in die Datenbank.

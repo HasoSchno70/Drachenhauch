@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 13 - Weitergeben
-'  Start:  dhrun.py buch-tippspiel/code/kap13/weitergeben.dh
+'  Start:  dhrt run buch-tippspiel/code/kap13/weitergeben.dh
 ' ============================================================
 '  Das Programm laeuft. Jetzt soll es bei jemand anderem laufen
 '  -- auf einem Rechner ohne Drachenhauch, ohne Editor, ohne

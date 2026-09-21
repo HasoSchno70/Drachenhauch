@@ -1,5 +1,5 @@
 ' JSON-Modul Demo. IMPORT "json" laedt das Built-in-Modul gleichen Namens
-' (siehe drachenhauch/modules/json.py).
+' (siehe docs/module-json.md).
 IMPORT "json"
 
 DIM doc AS STRING

@@ -14,7 +14,7 @@
 '  wechselt das Kugel-Layout: RING (Kreis) -> WAVE (3D-Equalizer) -> HELIX (Spirale).
 '  Kamera kreist mit Bass-Punch.
 '
-'  NUR NATIV:  dhrun.py --native examples\97_pbr_reactor.dh   (oder F6).  ESC beendet.
+'  NUR NATIV:  dhrt run examples\97_pbr_reactor.dh   (oder F5 in der IDE).  ESC beendet.
 '
 '  Musik: "Technological Messup" von josepharaoh99 (opengameart.org), CC0.
 '  Fehlt die Datei:  dhrt run examples/assets/download_techno.dh

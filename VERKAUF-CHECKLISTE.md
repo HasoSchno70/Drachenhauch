@@ -13,17 +13,17 @@ verkauft werden kann. Aufgeteilt in „technisch erledigt" (im Repo gebaut) und
 
 | Baustein | Wo | Zweck |
 |---|---|---|
-| **Windows-Installer** (komplette IDE + Runtime, **ohne Python**) | `installer/` (`build_installer.py`, `Drachenhauch.spec`, `Drachenhauch.iss`) | Endkunden installieren per Doppelklick |
+| **Windows-Installer** (IDE + Runtime + Werkzeuge, **ohne Python**) | `installer/` (`bauen.dh`, `Drachenhauch-IDE.iss`) | Endkunden installieren per Doppelklick |
 | **Beispiele am beschreibbaren Ort** | `{commondocs}\Drachenhauch\examples` | Editor findet Beispiele + Showcase-Bilder, Demos können schreiben |
-| **Editor startet direkt** (kein Auswahlfenster) + findet `dhrt` | `dhrun.py`, `editor_qt/dhrt_locate.py` | „Ausführen" funktioniert in der Installation |
+| **IDE startet direkt** aus dem Startmenü | `installer/Drachenhauch-IDE.iss` (`dhrt.exe run ide\ide.dh`) | „Ausführen" (F5) funktioniert in der Installation |
 | **EULA** (Endbenutzer-Lizenzvertrag, Vorlage) | `installer/EULA.txt` | Zustimmungsseite im Setup; Nutzer besitzen + verkaufen ihre Spiele |
-| **Drittanbieter-Lizenzen** (auto-generiert) | `installer/gen_notices.py` → `THIRD-PARTY-NOTICES.txt` | Pflicht-Beilage für MIT/BSD/Apache/LGPL |
+| **Drittanbieter-Lizenzen** (auto-generiert) | `installer/lizenzen.dh` → `THIRD-PARTY-NOTICES-IDE.txt` | Pflicht-Beilage für MIT/BSD/Apache/MPL |
 | **Asset-Lizenzen geprüft + dokumentiert** | `examples/ASSET-CREDITS.md` | alles eigen/CC0/CC-BY (mit Attribution) |
 | **„Mario" → IP-sicherer Plattformer-Satz** | `examples/platformer/` | kein Nintendo-Marken-/Urheberrechtsrisiko |
-| **Code-Signing-Hook** (inert bis Zertifikat) | `installer/build_installer.py` (`sign()`) | signiert App/Runtime/Installer automatisch, sobald Zertifikat da |
+| **Code-Signing-Hook** (inert bis Zertifikat) | `installer/bauen.dh` (`signieren`) | signiert Runtime und Installer automatisch, sobald Zertifikat da |
 
-**Installer bauen:** `\.venv\Scripts\python.exe installer\build_installer.py`
-→ `installer/output/Drachenhauch-Setup-<version>.exe`. Details: `installer/README.md`.
+**Installer bauen:** `dhrt run installer\bauen.dh`
+→ `installer/output/Drachenhauch-IDE-Setup-<fassung>.exe`. Details: `installer/README.md`.
 
 ---
 
@@ -39,7 +39,7 @@ Ohne Signatur zeigt Windows bei **jedem** Käufer „Unbekannter Herausgeber"
   ```
   set GB_SIGN_CERT=C:\keys\meincert.pfx     (oder SHA1-Thumbprint bei EV-USB-Token)
   set GB_SIGN_PASS=geheim
-  \.venv\Scripts\python.exe installer\build_installer.py
+  dhrt run installer\bauen.dh
   ```
 
 ### 2. EULA fertigstellen
@@ -71,7 +71,7 @@ Anbietername/Firma, Anschrift, E-Mail, Jahr, Gerichtsstand, Lizenzmodell
   Die `onedir`-Konfiguration erfüllt das bereits.
 - **`THIRD-PARTY-NOTICES.txt` + `examples/ASSET-CREDITS.md` mitliefern** (tut der
   Installer). Bei `cybermatic_pulse.ogg` (CC-BY) bleibt die Autorennennung Pflicht.
-- Bei jedem Release `build_installer.py` laufen lassen – Notices werden frisch
+- Bei jedem Release `dhrt run installer/bauen.dh` laufen lassen – Notices werden frisch
   generiert, Signatur (falls konfiguriert) automatisch angewandt.
 
 ---

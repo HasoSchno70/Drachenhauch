@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 12 - Politur
-'  Start:  dhrun.py buch-tippspiel/code/kap12/politur.dh
+'  Start:  dhrt run buch-tippspiel/code/kap12/politur.dh
 ' ============================================================
 '  Das Programm kann jetzt alles, was es koennen muss. Dieses
 '  Kapitel macht es angenehm:

@@ -59,7 +59,7 @@ Level (Boden, Röhre, Brick/?-Block, Wasser, animierte Münzen, Wolken/Busch/
 Hügel) kommt aus dem Master-Atlas `sheet.json`.
 
 ```
-dhrun.py examples/platformer/platformer_demo.dh
+dhrt run examples/platformer/platformer_demo.dh
 ```
 
 ## Im eigenen Spiel verwenden
