@@ -9,13 +9,13 @@ gelöst, springt die Schatztruhe auf und zeigt den **Code** zur nächsten Kammer
 ## Starten
 
 ```
-.venv\Scripts\python.exe dhrun.py pyramid_pusher\pyramid_pusher.dh
+dhrt run pyramid_pusher\pyramid_pusher.dh
 ```
 
 …oder im **Drachenhauch-Editor** öffnen und **F5** drücken (läuft nativ über dhrt).
 
-> Grafik startet nur mit echtem OpenGL-Kontext — also aus dem Editor / per
-> `dhrun.py`, nicht aus einer headless-Shell.
+> Grafik startet nur mit echtem OpenGL-Kontext — also aus der IDE / per
+> `dhrt run`, nicht aus einer headless-Shell.
 
 ### Vollbild / Fenster
 
@@ -148,8 +148,8 @@ dhrt run pyramid_pusher/levels/_authoring/make_levels.dh
 ## Tests (headless, ohne Grafik)
 
 ```
-.venv\Scripts\python.exe dhrun.py pyramid_pusher\_test_headless.dh   # Parser + Codes
-.venv\Scripts\python.exe dhrun.py pyramid_pusher\_test_logic.dh      # Schieben/Undo/Lösung
+dhrt run pyramid_pusher\_test_headless.dh   # Parser + Codes
+dhrt run pyramid_pusher\_test_logic.dh      # Schieben/Undo/Lösung
 ```
 
 ## Schatzkarte & Kapitel

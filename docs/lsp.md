@@ -50,8 +50,9 @@ schickt nur, wenn er der neueste ist.
   Gliederung, kaputte Rahmung, sauberes Ende); dazu Rust-Tests in beiden
   Dateien.
 
-Der Qt-Editor benutzt für dieselben Aufgaben noch seine Python-Bausteine
-(`editor_qt/symbols.py`, `error_check.py`); sie wandern mit der IDE (Weg C).
+Die IDE in Drachenhauch (`ide/ide.dh`) fragt denselben Kern über die
+Befehle `CODE_CHECK$`, `CODE_HOVER$`, `CODE_COMPLETE` usw.; die früheren
+Python-Bausteine des Qt-Editors sind seit 2026-09-21 gelöscht.
 
 ## VS-Code-Erweiterung (`vscode-drachenhauch/`)
 

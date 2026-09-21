@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 6 - Ergebnisse und Punkte
-'  Start:  dhrun.py buch-tippspiel/code/kap06/punkte.dh
+'  Start:  dhrt run buch-tippspiel/code/kap06/punkte.dh
 ' ============================================================
 '  Jetzt kommt die Regel aus Kapitel 3 ins Programm. Wird ein
 '  Ergebnis eingetragen, sind ALLE Tipps auf dieses Spiel neu zu

@@ -12,7 +12,7 @@
 '  Das Modell ist das JSON der Qt-Fassung ("format": "dhscore-song",
 '  Zeiten in Viertel-Beats), das Rueckgaengig ein JSON-Text je Stand.
 '  [In Tracker oeffnen] rechnet das Stueck mit denselben Regeln wie
-'  drachenhauch/score/convert.py in ein Tracker-Projekt um (4 Zeilen je
+'  die fruehere Qt-Fassung (score/convert.py) in ein Tracker-Projekt um (4 Zeilen je
 '  Beat, Patterns zu 64 Zeilen, Akkord -> hoechste Note, Staccato halbiert,
 '  NOTE_OFF am Ende) und startet den Tracker-Piloten (190) damit.
 '
@@ -690,7 +690,7 @@ SUB starten()
     protokoll("spielt " + STR$(geplant))
 END SUB
 
-' --- Tracker-Projekt: dieselben Regeln wie drachenhauch/score/convert.py ----------
+' --- Tracker-Projekt: dieselben Regeln wie die fruehere score/convert.py ------------
 FUNCTION beatZeile(beat AS FLOAT) AS INTEGER
     RETURN INT(ROUND(beat * ROWS_PER_BEAT))
 END FUNCTION

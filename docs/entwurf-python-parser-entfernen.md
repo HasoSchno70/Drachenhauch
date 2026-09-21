@@ -16,27 +16,27 @@ Arbeit.
 | Datei | Zeilen |
 |---|---|
 | `drachenhauch/parser.py` | 1963 |
-| `drachenhauch/lexer.py` | 530 |
+| drachenhauch/lexer.py | 530 |
 | `drachenhauch/ast_nodes.py` | 487 |
-| `drachenhauch/tokens.py` | 216 |
+| drachenhauch/tokens.py | 216 |
 | **Summe** | **3196** |
 
-`drachenhauch/preprocess.py` (116 Zeilen) gehört **nicht** dazu. Sie hängt
+drachenhauch/preprocess.py (116 Zeilen) gehört **nicht** dazu. Sie hängt
 nicht am Parser und wird von sechs Stellen gebraucht (`error_check.py`,
-`output_console.py`, `dhrun.py`, `modules/__init__.py`, `__main__.py` und
+`output_console.py`, `dhrun.py`, modules/__init__.py, `__main__.py` und
 `tools/pruef_doku_aussagen.py`). Sie bleibt.
 
 ### Wer den Parser noch benutzt
 
 Außerhalb der Tests **zwei** Stellen:
 
-1. **`drachenhauch/__main__.py`** — nur `--tokens` und `--ast` zur Fehlersuche.
-2. **`editor_qt/error_check.py`** — als Rückfall, wenn `dhrt` nicht gebaut ist.
+1. **drachenhauch/__main__.py** — nur `--tokens` und `--ast` zur Fehlersuche.
+2. **editor_qt/error_check.py** — als Rückfall, wenn `dhrt` nicht gebaut ist.
 
 > **Korrektur (2026-08-19, beim Ausführen von Schritt 3).** Hier stand, außer
 > `parser.py`, `lexer.py` und `__main__.py` importiere keine Datei den Lexer,
 > die Syntaxhervorhebung hänge also nicht daran. **Das war falsch.**
-> `editor_qt/highlighter.py` importiert `..lexer` und `..tokens` — mein Grep
+> editor_qt/highlighter.py importiert `..lexer` und `..tokens` — mein Grep
 > hatte nur nach `from .lexer` gesucht, nicht nach `from ..lexer`, und die
 > Datei damit übersehen.
 >

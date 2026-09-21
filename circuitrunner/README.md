@@ -15,7 +15,7 @@ Stiefel und schiebbare Blöcke.
 ## Spielen
 
 ```
-dhrun.py circuitrunner\circuitrunner.dh        # oder im Editor F5
+dhrt run circuitrunner\circuitrunner.dh        # oder F5 in der IDE
 ```
 
 Läuft im **randlosen Vollbild**. Im Menü mit den Pfeiltasten ein **Level-Set**

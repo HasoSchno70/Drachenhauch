@@ -11,11 +11,8 @@
      Linker. Wo ein Fund behauptet wird, gehoert die Gegenprobe dazu: schlaegt
      der neue Test gegen den alten Stand wirklich fehl? -->
 
-- [ ] die drei Durchgaenge der CI:
-      `pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"`,
-      `python tools/qt_tests_einzeln.py`, `pytest tests/ -q -m seriell`
-      (die Qt-Dateien NICHT in den parallelen Durchgang -- sie fallen dort
-      sporadisch in FREMDEN Dateien um)
+- [ ] die Pruefsammlungen wie in der CI: `dhrt test tests/pruef`
+      (mit `DH_OHNE_AUDIO=1`, wenn der Rechner keine Soundkarte hat)
 - [ ] `rust/build_runtime.py` (bei Aenderungen an `rust/`)
 - [ ] Doku-Pruefer, wenn `docs/`, `CLAUDE.md` oder ein Buch betroffen ist:
       `dhrt pruef`, `dhrt doku prosa --pruefen`, `tools/pruef_meldungen.js`

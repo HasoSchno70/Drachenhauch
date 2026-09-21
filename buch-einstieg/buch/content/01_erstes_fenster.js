@@ -8,14 +8,14 @@ module.exports = (H) => [
 
   H.p("Wenn du das Installationsprogramm noch nicht ausgeführt hast, hol das zuerst nach. Es legt Drachenhauch auf deinen Rechner und richtet alles ein, was du zum Loslegen brauchst. Danach hast du zwei Dinge zur Verfügung: einen Editor, in dem du Programme schreibst, und die Laufzeit, die sie ausführt."),
 
-  H.pmix(["Den Editor öffnest du, indem du ", ["dh", true], " eingibst. Er sieht aus wie ein einfacher Texteditor — und das ist er auch, mit dem Unterschied, dass er deine Programme farbig darstellt und auf Knopfdruck startet."]),
+  H.pmix(["Den Editor öffnest du über den Eintrag ", ["Drachenhauch IDE", true], " im Startmenü. Er sieht aus wie ein einfacher Texteditor — und das ist er auch, mit dem Unterschied, dass er deine Programme farbig darstellt und auf Knopfdruck startet."]),
 
-  H.bulletRich("Neues Programm: ", "eine leere Datei anlegen und unter einem Namen speichern, der auf .dh endet — zum Beispiel sonne.dh."),
+  H.bulletRich("Neues Programm: ", "Strg+N legt eine leere Datei an; speichere sie unter einem Namen, der auf .dh endet — zum Beispiel sonne.dh."),
   H.bulletRich("Starten: ", "F5 drücken."),
   H.bulletRich("Speichern: ", "Strg+S, und zwar oft."),
 
   H.p("Du kannst ein Programm auch ohne Editor starten. Öffne dazu eine Eingabeaufforderung im Ordner deiner Datei und tippe:"),
-  H.code(["dhrun.py sonne.dh"]),
+  H.code(["dhrt run sonne.dh"]),
 
   H.tip("Wo soll das alles liegen?", "Leg dir einen Ordner an, in dem deine Programme wohnen — etwa Dokumente/Drachenhauch. Für jedes Kapitel dieses Buchs darin einen Unterordner. Das klingt pedantisch, aber ab Kapitel 15 wirst du dankbar sein."),
 

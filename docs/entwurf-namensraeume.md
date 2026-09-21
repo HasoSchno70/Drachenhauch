@@ -67,7 +67,7 @@ m3.dh:6: Warnung: 'zaehler' wurde in Zeile 2 schon als INTEGER angelegt …
 ```
 
 Zeile 6 in einer Datei mit zwei Zeilen. Der Editor rechnet das über die
-`origins`-Tabelle zurück (`editor_qt/error_check.py`), `dhrt` auf der
+`origins`-Tabelle zurück (editor_qt/error_check.py), `dhrt` auf der
 Kommandozeile nicht.
 
 > ✅ **Behoben in I.4.** `preprocess` liefert die Herkunftstabelle jetzt selbst

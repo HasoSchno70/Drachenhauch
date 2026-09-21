@@ -4,7 +4,7 @@
 ' Fragment-Shader auf den Screen praesentiert. Alle 3 Sekunden wechselt der
 ' Effekt:  AUS -> CRT -> BLOOM -> VIGNETTE.
 '
-' Ausfuehren:  dhrun.py --native examples\86_postfx_shaders.dh   (oder F6)
+' Ausfuehren:  dhrt run examples\86_postfx_shaders.dh   (oder F5 in der IDE)
 ' Shader brauchen die GPU -- also ein Fenster, das dhrt aufmacht.
 ' ESC beendet.
 

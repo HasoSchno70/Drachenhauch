@@ -6,13 +6,16 @@ Serielle Kommunikation über RS-232 / USB-COM. Typischer Anwendungsfall: Daten v
 IMPORT "serial"
 ```
 
-## Externe Dependency
+## Voraussetzung
+
+`serial` steckt nur in einem `dhrt`, der mit den Hardware-Features gebaut ist
+(Crate `serialport`, keine Python-Pakete):
 
 ```
-.venv\Scripts\python.exe -m pip install pyserial
+python rust/build_runtime.py --hardware
 ```
 
-Wenn `pyserial` nicht installiert ist, lädt das Modul trotzdem — der erste Aufruf einer `SERIAL_*`-Funktion wirft dann eine klare Meldung mit der `pip`-Anweisung.
+Fehlt das Feature, meldet der erste Aufruf einer `SERIAL_*`-Funktion, dass sie in diesem Build nicht verfuegbar ist.
 
 ## Übersicht
 

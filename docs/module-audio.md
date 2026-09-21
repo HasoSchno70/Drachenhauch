@@ -215,8 +215,8 @@ Generierte Sounds haben automatisch ein kurzes Fade-in/out (5 ms) gegen Clicks a
 Der prozedurale Effekt-Synth mit Pitch-Slide, ADSR, Vibrato, Stereo-Breite —
 und **SID-Erweiterungen** (Pulsbreite/PWM + resonanter Tiefpass-Sweep). Die
 SID-Argumente sind alle optional; weglassen reproduziert exakt den bisherigen
-Klang. Am bequemsten baut man `AUDIO_SFX`-Aufrufe im **Audio Studio** (SFX-Tab,
-`dhsound`) und kopiert den GB-Code.
+Klang. Am bequemsten baut man `AUDIO_SFX`-Aufrufe im **[SFX-Generator](sfx-generator.md)**
+(`examples/183_sfx_generator.dh`) und kopiert den GB-Code.
 
 ```
 AUDIO_SFX(waveform$, freq, slide, attack_ms, sustain_ms, decay_ms,

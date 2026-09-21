@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 12 - Politur: Sound, Wellen/Level
-'  Start:  dhrun.py buch-galaga/code/kap12/politur.dh
+'  Start:  dhrt run buch-galaga/code/kap12/politur.dh
 '  Export: dhrt --export buch-galaga/code/kap12/politur.dh
 ' ============================================================
 IMPORT "curves"

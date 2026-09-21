@@ -9,7 +9,7 @@
 '  darf nicht nur dann nachweisbar richtig sein, wenn jemand
 '  von Hand klickt.
 '
-'  Start:  dhrun.py buch-tippspiel/code/tippspiel_pruefung.dh
+'  Start:  dhrt run buch-tippspiel/code/tippspiel_pruefung.dh
 '
 '  Rueckgabewert: 0 = alles gruen, 1 = mindestens eine Pruefung
 '  fehlgeschlagen. Damit laesst sich der Aufruf in ein Skript

@@ -12,10 +12,10 @@ FFI-Bindings (bindgen). Dieses Skript stellt die noetige Umgebung her:
     wird nur geprueft, ob sie da sind, nicht nach Pfaden gesucht.
 
 Aufruf:
-    .venv\\Scripts\\python.exe rust\\build_runtime.py            # release, mit Grafik
-    .venv\\Scripts\\python.exe rust\\build_runtime.py --no-graphics
-    .venv\\Scripts\\python.exe rust\\build_runtime.py --debug
-    .venv\\Scripts\\python.exe rust\\build_runtime.py --hardware  # + serial/usb/bt/wifi/midi
+    python rust\\build_runtime.py            # release, mit Grafik
+    python rust\\build_runtime.py --no-graphics
+    python rust\\build_runtime.py --debug
+    python rust\\build_runtime.py --hardware  # + serial/usb/bt/wifi/midi
 
 Ohne Grafik (`--no-graphics`) baut der pure VM-Kern ganz ohne C-Toolchain.
 

@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 11 - Sicherung und Umbau
-'  Start:  dhrun.py buch-tippspiel/code/kap11/sicherung.dh
+'  Start:  dhrt run buch-tippspiel/code/kap11/sicherung.dh
 ' ============================================================
 '  Zwei Dinge, die jede Anwendung frueher oder spaeter braucht
 '  und die in keinem Spiel vorkommen:

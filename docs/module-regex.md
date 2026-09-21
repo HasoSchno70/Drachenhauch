@@ -167,4 +167,4 @@ END IF
 
 ## In der nativen Runtime (dhrt)
 
-`regex` laeuft auch nativ (`dhrun.py --native`, Standalone-`.exe`) — immer dabei (kein Feature-Flag, nutzt die Rust-`regex`-Crate). Bit-identisch zu den Python-Pfaden fuer die ueblichen Patterns (Zeichenklassen, Anker, Quantoren, Gruppen, Alternation). **Nicht unterstuetzt** (Rust-`regex`-Limit): Backreferences (`\1`) *im Pattern* sowie Lookahead/Lookbehind. In `REGEX_REPLACE` werden Python-Backrefs (`\1`, `\g<name>`) automatisch in die Rust-Syntax uebersetzt.
+`regex` laeuft in `dhrt` (`dhrt run`, Standalone-`.exe`) — immer dabei (kein Feature-Flag, nutzt die Rust-`regex`-Crate). Die Muster folgen der Python-`re`-Schreibweise; fuer die ueblichen Patterns (Zeichenklassen, Anker, Quantoren, Gruppen, Alternation). **Nicht unterstuetzt** (Rust-`regex`-Limit): Backreferences (`\1`) *im Pattern* sowie Lookahead/Lookbehind. In `REGEX_REPLACE` werden Python-Backrefs (`\1`, `\g<name>`) automatisch in die Rust-Syntax uebersetzt.

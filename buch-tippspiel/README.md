@@ -25,7 +25,7 @@ dazugeben: Anstoßzeiten und Tippschluss, Spielplan aus dem Netz, Sicherung und
 Einspielen, drei Reiter mit Punktediagramm:
 
 ```
-dhrun.py buch-tippspiel/code/kap12/politur.dh
+dhrt run buch-tippspiel/code/kap12/politur.dh
 ```
 
 Es legt seine Datenbank beim ersten Start selbst an (drei Spieler, fünf Spiele
@@ -40,7 +40,7 @@ Buch hinaus**. Die Kapitelstände tun das nicht: sie sind gedruckt, samt
 Screenshots, und bleiben stehen.
 
 ```
-dhrun.py buch-tippspiel/code/tippspiel.dh
+dhrt run buch-tippspiel/code/tippspiel.dh
 ```
 
 Was es über Kapitel 12 hinaus kann:
@@ -151,11 +151,11 @@ die eine Verbindung braucht, prüft an schlechten Tagen nichts.
 | [`code/stolpersteine.dh`](code/stolpersteine.dh) | Messprotokoll: wo Drachenhauch für so eine Anwendung an Grenzen stößt |
 
 ```
-dhrun.py buch-tippspiel/code/tippspiel_pruefung.dh
-dhrun.py buch-tippspiel/code/tabellen_pruefung.dh
-dhrun.py buch-tippspiel/code/zeit_pruefung.dh
-dhrun.py buch-tippspiel/code/abruf_pruefung.dh
-dhrun.py buch-tippspiel/code/stolpersteine.dh
+dhrt run buch-tippspiel/code/tippspiel_pruefung.dh
+dhrt run buch-tippspiel/code/tabellen_pruefung.dh
+dhrt run buch-tippspiel/code/zeit_pruefung.dh
+dhrt run buch-tippspiel/code/abruf_pruefung.dh
+dhrt run buch-tippspiel/code/stolpersteine.dh
 ```
 
 ## Gefundene Stolpersteine
@@ -240,7 +240,7 @@ Gemessen, nicht vermutet — Zahlen aus `stolpersteine.dh` vom 16.08.2026.
    wie viele; `--mit-daten` nimmt eine vorbereitete Datenbank ausdrücklich
    doch mit. Und er **räumt** seinen `_dist`-Ordner, aber nur den selbst
    gewählten und nur wenn darin eine Exe mit unserem Payload liegt.
-   → [docs/rust-runtime.md](../docs/rust-runtime.md#schritt-7-standalone-export-dhrunpy---export--editor)
+   → [docs/rust-runtime.md](../docs/rust-runtime.md#schritt-7-standalone-export-dhrt---export--ide)
 
 ### Offen
 

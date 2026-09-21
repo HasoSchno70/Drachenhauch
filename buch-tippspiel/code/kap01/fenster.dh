@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 1 - Das erste Fenster
-'  Start:  dhrun.py buch-tippspiel/code/kap01/fenster.dh
+'  Start:  dhrt run buch-tippspiel/code/kap01/fenster.dh
 ' ============================================================
 '  Ein Fenster, ein Titel, ein Knopf, der etwas tut. Mehr nicht
 '  -- aber alles, was jede Anwendung braucht: eine Schleife, die
