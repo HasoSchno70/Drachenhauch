@@ -44,11 +44,38 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `SETFPS(n)` | Ziel-Bildrate; `0` = so schnell wie möglich |
 | `FILES_DROPPED()` → INTEGER | wie viele Dateien wurden in diesem Bild ins Fenster gezogen oder (macOS) vom Finder übergeben? Gilt genau ein Bild, beliebig oft abfragbar |
 | `FILE_DROPPED(i)` → STRING | Pfad der `i`-ten davon |
-| `CLIPBOARD_GET()` → STRING | Text aus der Zwischenablage lesen |
-| `CLIPBOARD_SET(text$)` | Text in die Zwischenablage legen |
+| `CLIPBOARD_GET()` → STRING | Text aus der Zwischenablage lesen; leer, wenn sie gerade ein anderes Programm hält |
+| `CLIPBOARD_SET(text$)` | Text in die Zwischenablage legen — **Fehler**, wenn das nicht gelingt |
 | `GFX_PUSH()` | Zeichenzustand sichern: Kamera, Ebenen, Licht, Umgebung, Schatten, 3D-Kamera, Schrift, `POSTFX` |
 | `GFX_POP()` | ihn zurückholen — **ohne vorheriges `PUSH` ein Fehler** |
 | `GFX_DEPTH()` → INTEGER | wie tief ist der Stapel? |
+
+### Die Zwischenablage gehört jeweils einem Programm
+
+Unter Windows kann immer nur **ein** Prozess die Zwischenablage offen haben.
+Wer sie in dem Moment braucht, wird abgewiesen — und das passiert im Alltag
+laufend: ein Passwortmanager, ein Zwischenablage-Verlauf, ein zweites
+Programm, das gerade kopiert.
+
+`CLIPBOARD_SET` wartet deshalb ab und versucht es erneut (gemessen bis rund
+**700 ms** Blockade; danach gibt es nach 711 ms auf). Gelingt es trotzdem
+nicht, ist das ein **Laufzeitfehler** — kein Schweigen. Der Grund dafür ist
+unangenehm konkret: schlägt das Schreiben still fehl, steht beim nächsten
+Einfügen der **alte** Inhalt da, und der Schaden zeigt sich irgendwo ganz
+anders. Wer das abfangen will, nimmt `TRY ... CATCH`.
+
+`CLIPBOARD_GET` liefert in dem Fall einen **leeren Text**. Bis 2026-09-20
+stürzte es dort ab (Speicherzugriffsverletzung) — GLFW gibt einen Null-Zeiger
+zurück, auf den ungeprüft zugegriffen wurde. Das traf jedes Programm mit
+Strg+C/V, nicht nur Tests.
+
+```basic
+TRY
+    CLIPBOARD_SET(text$)
+CATCH e
+    TEXT(10, 10, "Kopieren ging gerade nicht")
+END TRY
+```
 
 Klassischer Game-Loop:
 
