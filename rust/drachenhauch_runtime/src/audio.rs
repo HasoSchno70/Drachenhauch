@@ -442,6 +442,18 @@ fn static_von_pfad(pfad: &str) -> Result<StaticSoundData, String> {
         .map_err(|e| format!("{:?}", e))
 }
 
+/// Eine Musikdatei zum Streamen oeffnen. FLAC geht ueber den eigenen Dekoder
+/// (`flac_strom.rs`): mit Kiras eigenem sprang eine FLAC-Musik nicht an den
+/// Anfang zurueck, und mit Schleife -- der Vorgabe -- blieb sie stumm.
+#[cfg(not(target_arch = "wasm32"))]
+fn musik_strom(pfad: &str) -> Result<StreamingSoundData<kira::sound::FromFileError>, kira::sound::FromFileError> {
+    if crate::flac_strom::ist_flac(pfad) {
+        Ok(StreamingSoundData::from_decoder(crate::flac_strom::FlacStrom::neu(pfad)?))
+    } else {
+        StreamingSoundData::from_file(pfad)
+    }
+}
+
 fn mh_state(h: &MusicHandle) -> PlaybackState {
     match h {
         #[cfg(not(target_arch = "wasm32"))]
@@ -2162,8 +2174,7 @@ resonance/reverb/distortion", other)),
         } else {
             // Testweise oeffnen, um Fehler frueh zu melden.
             #[cfg(not(target_arch = "wasm32"))]
-            StreamingSoundData::from_file(&resolved)
-                .map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
+            musik_strom(&resolved).map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
             #[cfg(target_arch = "wasm32")]
             static_von_pfad(&resolved).map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
             MusicSource::Stream(resolved)
@@ -2186,7 +2197,7 @@ resonance/reverb/distortion", other)),
             None => return Ok(()),
             #[cfg(not(target_arch = "wasm32"))]
             Some(MusicSource::Stream(path)) => {
-                let mut data = StreamingSoundData::from_file(path)
+                let mut data = musik_strom(path)
                     .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
                 if endless { data = data.loop_region(0.0..); }
                 data = data.volume(vol_db).playback_rate(pitch);
