@@ -1,0 +1,61 @@
+' Logo und Schriftzug in der IDE: das Logo wird Fenstersymbol, der Schriftzug
+' steht auf der Willkommensseite statt des Titels als Text. Beide sucht die
+' IDE unter daten/bilder/ neben ide/ (DH_IDE_WURZEL); fehlen sie, bleibt es
+' beim Titel als Text. Der Einschub steht hinter dem letzten Schritt des
+' Starts, zieht das Layout einmal nach und liest die Lage ab.
+
+=== das protokoll nennt fenstersymbol und schriftzug
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF L[i] = "fenstersymbol" OR L[i] = "schriftzug" THEN PRINT L[i]
+NEXT
+--- erwartet
+fenstersymbol
+schriftzug
+
+=== die masse der anzeige stimmen
+layout()
+PRINT "schriftzug sichtbar "; GUI_VISIBLE(imgWkTitel)
+PRINT "titel als text sichtbar "; GUI_VISIBLE(lblWkTitel)
+PRINT "masse "; GUI_GET_W(imgWkTitel); "x"; GUI_GET_H(imgWkTitel)
+PRINT "satz rechts daneben "; (GUI_GET_X(lblWkUnter) >= GUI_GET_X(imgWkTitel) + GUI_GET_W(imgWkTitel))
+PRINT "knoepfe darunter "; (GUI_GET_Y(btnWkNeu) >= GUI_GET_Y(imgWkTitel) + GUI_GET_H(imgWkTitel))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- erwartet
+schriftzug sichtbar TRUE
+titel als text sichtbar FALSE
+masse 240x112
+satz rechts daneben TRUE
+knoepfe darunter TRUE
+
+=== ohne bilder bleibt der titel als text
+' Die Wurzel ist der Fallordner -- dort liegt kein daten/bilder/.
+layout()
+PRINT "schriftzug geladen "; wkSchriftzug
+PRINT "titel als text sichtbar "; GUI_VISIBLE(lblWkTitel)
+PRINT "satz unter dem titel "; (GUI_GET_Y(lblWkUnter) > GUI_GET_Y(lblWkTitel))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+schriftzug geladen FALSE
+titel als text sichtbar TRUE
+satz unter dem titel TRUE

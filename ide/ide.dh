@@ -283,6 +283,15 @@ DIM docsOrdner AS STRING : docsOrdner = PATHJOIN(wurzel, "docs")
 ' Beispiele beim ersten Start in den Nutzerordner und sagt der IDE, wo.
 DIM beispielOrdner AS STRING : beispielOrdner = GETENV$("DH_IDE_BEISPIELE")
 IF beispielOrdner = "" THEN beispielOrdner = PATHJOIN(wurzel, "examples")
+
+' Logo und Schriftzug liegen unter daten/bilder/ neben ide/ -- im Repo wie in
+' der Installation. Fehlen sie (eine Kopie der IDE woanders), bleibt es beim
+' raylib-Symbol und beim Titel als Text.
+DIM bilderOrdner AS STRING : bilderOrdner = PATHJOIN(wurzel, "daten/bilder")
+IF FILEEXISTS(PATHJOIN(bilderOrdner, "logo.png")) THEN
+    WINDOW_ICON(IMAGE_SCALE(LOADIMAGE(PATHJOIN(bilderOrdner, "logo.png")), 128, 128))
+    protokoll("fenstersymbol")
+END IF
 IF GETENV$("DH_IDE_BEISPIELE") = "" AND NOT FILEEXISTS(PATHJOIN(beispielOrdner, "183_sfx_generator.dh")) AND GETENV$("PUBLIC") <> "" THEN
     ' Installation: der Installer legt die Beispiele in die oeffentlichen Dokumente.
     beispielOrdner = PATHJOIN(GETENV$("PUBLIC"), "Documents/Drachenhauch/examples")
@@ -691,6 +700,20 @@ DIM lstGliederung AS GUI_WIDGET : lstGliederung = GUI_LISTBOX(win, 0, 0, 10, 10,
 ' verschwindet mit dem ersten Reiter.
 DIM lblWkTitel AS GUI_WIDGET : lblWkTitel = GUI_LABEL(win, "Drachenhauch", 0, 0)
 GUI_SET_FONT_SIZE(lblWkTitel, 34)
+' Der Schriftzug statt des Titels -- vorab auf seine Anzeigegroesse gebracht:
+' 1200 Punkte breit beim Zeichnen auf ein Fuenftel gestaucht flimmerten die
+' feinen Linien. Ohne Bilddatei bleibt der Titel als Text.
+CONST WK_BILD_B = 240
+CONST WK_BILD_H = 112
+DIM wkSchriftzug AS BOOLEAN : wkSchriftzug = FILEEXISTS(PATHJOIN(bilderOrdner, "schriftzug.png"))
+DIM imgWkTitel AS GUI_WIDGET
+IF wkSchriftzug THEN
+    imgWkTitel = GUI_IMAGE(win, 0, 0, WK_BILD_B, WK_BILD_H, _
+        IMAGE_SCALE(LOADIMAGE(PATHJOIN(bilderOrdner, "schriftzug.png")), WK_BILD_B, WK_BILD_H))
+    GUI_TOOLTIP(imgWkTitel, "Drachenhauch " + VERSION$())
+    GUI_SET_VISIBLE(lblWkTitel, FALSE)
+    protokoll("schriftzug")
+END IF
 DIM lblWkUnter AS GUI_WIDGET : lblWkUnter = GUI_LABEL(win, "BASIC fuer Spiele -- mit Pascal-strikter Typisierung und OOP. Diese IDE ist selbst in Drachenhauch geschrieben.", 0, 0)
 DIM btnWkNeu AS GUI_WIDGET : btnWkNeu = GUI_BUTTON(win, "Neue Datei", 0, 0, 130, 30)
 GUI_BUTTON_VARIANT(btnWkNeu, "primaer")
@@ -1118,7 +1141,12 @@ SUB vorschauNeu()
 END SUB
 
 SUB willkommenZeigen(an AS BOOLEAN)
-    GUI_SET_VISIBLE(lblWkTitel, an) : GUI_SET_VISIBLE(lblWkUnter, an)
+    IF wkSchriftzug THEN
+        GUI_SET_VISIBLE(imgWkTitel, an)
+    ELSE
+        GUI_SET_VISIBLE(lblWkTitel, an)
+    END IF
+    GUI_SET_VISIBLE(lblWkUnter, an)
     GUI_SET_VISIBLE(btnWkNeu, an) : GUI_SET_VISIBLE(btnWkOeffnen, an) : GUI_SET_VISIBLE(btnWkBeispiele, an)
     GUI_SET_VISIBLE(lblWkZuletzt, an) : GUI_SET_VISIBLE(lstWkZuletzt, an) : GUI_SET_VISIBLE(lblWkKuerzel, an)
     IF NOT an THEN
@@ -1318,8 +1346,16 @@ SUB layout()
     ' Willkommensseite auf derselben Flaeche
     DIM wx AS INTEGER : wx = ex + 40
     GUI_SET_BOUNDS(lblWkTitel, wx, oben + 30, ew - 80, 44)
-    GUI_SET_BOUNDS(lblWkUnter, wx, oben + 84, ew - 80, 18)
-    GUI_SET_WRAP(lblWkUnter, ew - 80)
+    IF wkSchriftzug THEN
+        ' Schriftzug links oben, der Satz daneben -- darunter bleibt alles,
+        ' wo es war (Knoepfe ab oben + 130).
+        GUI_SET_BOUNDS(imgWkTitel, wx, oben + 10, WK_BILD_B, WK_BILD_H)
+        GUI_SET_BOUNDS(lblWkUnter, wx + WK_BILD_B + 20, oben + 52, MAX(120, ew - 80 - WK_BILD_B - 20), 18)
+        GUI_SET_WRAP(lblWkUnter, MAX(120, ew - 80 - WK_BILD_B - 20))
+    ELSE
+        GUI_SET_BOUNDS(lblWkUnter, wx, oben + 84, ew - 80, 18)
+        GUI_SET_WRAP(lblWkUnter, ew - 80)
+    END IF
     GUI_SET_BOUNDS(btnWkNeu, wx, oben + 130, 130, 30)
     GUI_SET_BOUNDS(btnWkOeffnen, wx + 140, oben + 130, 150, 30)
     GUI_SET_BOUNDS(btnWkBeispiele, wx + 300, oben + 130, 180, 30)
