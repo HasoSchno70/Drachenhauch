@@ -101,6 +101,7 @@ palette("timepicker", "Uhrzeit", 150, 28, FALSE)
 palette("tabcontrol", "Reiterwerk", 280, 180, FALSE)
 palette("statusbar", "Statusleiste", 320, 24, TRUE)
 palette("breadcrumb", "Pfadleiste", 280, 24, FALSE)
+palette("card", "Kachel", 200, 190, TRUE)       ' Bild, Titel, Beschreibung -- ganz ein Knopf
 
 ' --- Modell -----------------------------------------------------------------
 DIM doc AS JSON_HANDLE
@@ -277,6 +278,8 @@ DIM aWahl AS GUI_WIDGET : aWahl = artFeld("wahl", "Auswahl", ",table,", 16, "2 =
 DIM aMin AS GUI_WIDGET : aMin = artFeld("min", "Min", ",slider,progress,spinner,knob,", 12, "0")
 DIM aMax AS GUI_WIDGET : aMax = artFeld("max", "Max", ",slider,progress,spinner,knob,", 13, "100")
 DIM aWert AS GUI_WIDGET : aWert = artFeld("value", "Wert", ",slider,progress,spinner,knob,", 14, "50")
+' Die Beschreibung einer Kachel steht in der .dhform unter "placeholder".
+DIM aBeschr AS GUI_WIDGET : aBeschr = artFeld("placeholder", "Beschreibung", ",card,", 12, "Was die Kachel oeffnet")
 DIM cbZellen AS GUI_WIDGET : cbZellen = GUI_CHECKBOX(winInsp, "Zellmodus (Gitter)", 100, 36 + 17 * 34)
 
 DIM btnUebernehmen AS GUI_WIDGET : btnUebernehmen = GUI_BUTTON(winInsp, "Uebernehmen", 100, 36 + 18 * 34, 140, 28)
@@ -357,6 +360,7 @@ SUB artFuellen(i AS INTEGER)
     GUI_SET_TEXT(aMin, feldZahlText$(i, "min"))
     GUI_SET_TEXT(aMax, feldZahlText$(i, "max"))
     GUI_SET_TEXT(aWert, feldZahlText$(i, "value"))
+    GUI_SET_TEXT(aBeschr, feldText$(i, "placeholder"))
     DIM tp AS STRING : tp = wz$(i, "table")
     GUI_SET_TEXT(aSpalten, listeText$(tp + ".headers"))
     GUI_SET_TEXT(aBreiten, listeText$(tp + ".col_widths"))
@@ -392,6 +396,7 @@ SUB artUebernehmen(i AS INTEGER)
         IF TRIM$(GUI_TEXT(aMax)) <> "" THEN JSON_SET_FLOAT(doc, wz$(i, "max"), VAL(GUI_TEXT(aMax)))
         IF TRIM$(GUI_TEXT(aWert)) <> "" THEN JSON_SET_FLOAT(doc, wz$(i, "value"), VAL(GUI_TEXT(aWert)))
     END IF
+    IF art = "card" THEN JSON_SET_STRING(doc, wz$(i, "placeholder"), GUI_TEXT(aBeschr))
     IF art <> "table" THEN RETURN
     DIM tp AS STRING : tp = wz$(i, "table")
     IF NOT JSON_HAS(doc, tp) THEN JSON_SET_JSON(doc, tp, JSON_NEW_OBJECT())
@@ -939,6 +944,7 @@ SUB gbControl(i AS INTEGER)
         CASE "tabcontrol" : ctor = "GUI_TABCONTROL(frm, " + rahmen + ")"
         CASE "statusbar" : ctor = "GUI_STATUSBAR(frm, " + rahmen + ", " + t + ")"
         CASE "breadcrumb" : ctor = "GUI_BREADCRUMB(frm, " + rahmen + ")"
+        CASE "card" : ctor = "GUI_CARD(frm, " + rahmen + ", -1, " + t + ", " + gbText$(feldText$(i, "placeholder")) + ")"
     END SELECT
     IF ctor = "" THEN
         ' Ein Bild braucht eine Quelle (LOADIMAGE), die die .dhform nicht kennt.

@@ -500,6 +500,13 @@ module.exports = (H) => [
       'DIM bild AS GUI_WIDGET',
       'bild = GUI_IMAGE(win, 20, 20, 128, 64, logo)',
     ]),
+  H.cmd("GUI_CARD · GUI_CARD_SET_TEXT · GUI_CARD_TEXT$", 'GUI_CARD(win, x, y, w, h, bild [, titel$ [, text$]])   GUI_CARD_SET_TEXT(card, text$)   GUI_CARD_TEXT$(card)',
+    "Eine Kachel: oben ein Bild, darunter ein Titel und eine Beschreibung – und die ganze Fläche ist ein Knopf. Unter der Maus hebt sie sich mit einem Akzentrahmen, GUI_CLICKED meldet den Klick, mit Fokus lösen Enter und Leertaste sie aus. Ohne Bild (-1) steht nur der Text da. Die Beschreibung wird umgebrochen; passt sie nicht, endet sie mit „...“. Den Titel setzt GUI_SET_TEXT, die Beschreibung GUI_CARD_SET_TEXT.",
+    [
+      'DIM k AS GUI_WIDGET',
+      'k = GUI_CARD(win, 20, 60, 200, 190, LOADIMAGE("vorschau.png"), "Schatten", "Tiefenpuffer mit weichen Kanten")',
+      'IF GUI_CLICKED(k) THEN PRINT "Kachel geklickt"',
+    ]),
   H.cmd("GUI_SEPARATOR · GUI_GROUPBOX · GUI_PANEL", 'GUI_SEPARATOR(win, x, y, w)   GUI_GROUPBOX(win, x, y, w, h[, titel$])   GUI_PANEL(win, x, y, w, h[, titel$])',
     "Drei Ordnungshelfer ohne eigene Funktion: GUI_SEPARATOR zieht eine Trennlinie, GUI_GROUPBOX rahmt zusammengehörige Widgets mit eingelassenem Titel ein, GUI_PANEL ist eine schlichte Hintergrundfläche. Alle drei sind rein dekorativ – die Widgets darin bleiben eigenständig.",
     [
@@ -737,6 +744,11 @@ module.exports = (H) => [
     [
       'GUI_FOCUS(namensfeld)',
       'IF MOUSE_HIT(0) THEN PRINT GUI_HIT_TEST(MOUSEX(), MOUSEY())',
+    ]),
+  H.cmd("GUI_WINDOW_AT", 'GUI_WINDOW_AT(x, y)',
+    "Liefert das oberste sichtbare Fenster an einem Bildschirmpunkt oder -1. Wer das Mausrad selbst auswertet (etwa um eigene Kacheln zu blättern), fragt damit, ob seine Fläche gerade oben liegt – sonst rollte sie unter einem offenen Dialog mit.",
+    [
+      'IF GUI_WINDOW_AT(MOUSEX(), MOUSEY()) = win THEN versatz = versatz - SGN(MOUSEWHEEL_Y())',
     ]),
 
   H.h2("Fenster zur Laufzeit steuern"),
