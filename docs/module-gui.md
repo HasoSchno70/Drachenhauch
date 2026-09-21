@@ -173,6 +173,37 @@ IMPORT "gui"
 | `GUI_TIME$(tp)` | STRING | die Uhrzeit als `HH:MM:SS` — wie `TIME$()`, auch ohne Sekundenfeld |
 | `GUI_SET_TIME(tp, zeit$)` | — | Uhrzeit setzen (`HH:MM` oder `HH:MM:SS`; krumme Werte sind ein Fehler) |
 | `GUI_TIMEPICKER_SET(tp, key$, wert)` | — | `sekunden` (drittes Feld) und `schritt` (Schrittweite der Minute) |
+| `GUI_ACCORDION(win, x, y, w, h)` | GUI_WIDGET | **Akkordeon**: Abschnitte mit Kopf, die auf- und zuklappen; was darunter liegt, rückt beim Aufklappen nach unten |
+| `GUI_ACCORDION_ADD(acc, titel$)` | INTEGER | einen Abschnitt anhängen (zu), liefert seine Nummer |
+| `GUI_ACCORDION_ADD_WIDGET(acc, wdg, abschnitt)` | — | ein Widget in einen Abschnitt legen; seine Lage gilt ab dem Abschnitt (unter dem Kopf) |
+| `GUI_ACCORDION_OPEN(acc, abschnitt, an)` | — | einen Abschnitt auf- oder zuklappen; ohne `mehrere` schließt Aufklappen die anderen |
+| `GUI_ACCORDION_IS_OPEN(acc, abschnitt)` | BOOLEAN | ist der Abschnitt offen? |
+| `GUI_ACCORDION_COUNT(acc)` | INTEGER | wie viele Abschnitte es gibt |
+| `GUI_ACCORDION_TITLE$(acc, abschnitt)` / `GUI_ACCORDION_SET_TITLE(acc, abschnitt, titel$)` | STRING / — | Kopf eines Abschnitts lesen und setzen |
+| `GUI_ACCORDION_SET_HEIGHT(acc, abschnitt, px)` | — | feste Höhe eines offenen Abschnitts (0 = nach Inhalt) |
+| `GUI_ACCORDION_SET(acc, key$, wert)` | — | `mehrere`: mehrere Abschnitte zugleich offen (aus per Vorgabe) |
+| `GUI_ACCORDION_TOGGLED(acc)` | INTEGER | welcher Abschnitt in diesem Bild umgeklappt wurde (-1 = keiner) |
+| `GUI_WIZARD(win, x, y, w, h)` | GUI_WIDGET | **Assistent**: Schritte mit Schrittanzeige und Zurück/Weiter/Fertig/Abbrechen |
+| `GUI_WIZARD_ADD(wz, titel$)` | INTEGER | einen Schritt anhängen, liefert seine Nummer |
+| `GUI_WIZARD_ADD_WIDGET(wz, wdg, schritt)` | — | ein Widget auf einen Schritt legen; es behält seine Lage im Fenster |
+| `GUI_WIZARD_STEP(wz)` / `GUI_WIZARD_SET_STEP(wz, schritt)` | INTEGER / — | aktuellen Schritt lesen und setzen |
+| `GUI_WIZARD_COUNT(wz)` | INTEGER | wie viele Schritte es gibt |
+| `GUI_WIZARD_NEXT(wz)` | BOOLEAN | wie der Knopf Weiter (auf dem letzten Schritt: Fertig); FALSE, wenn gesperrt oder die Prüfung scheitert |
+| `GUI_WIZARD_BACK(wz)` | BOOLEAN | wie der Knopf Zurück; FALSE auf dem ersten Schritt |
+| `GUI_WIZARD_ENABLE_NEXT(wz, an)` | — | Weiter/Fertig sperren oder freigeben |
+| `GUI_WIZARD_CHANGED(wz)` | BOOLEAN | in diesem Bild den Schritt gewechselt? |
+| `GUI_WIZARD_FINISHED(wz)` | BOOLEAN | in diesem Bild Fertig gedrückt? |
+| `GUI_WIZARD_CANCELLED(wz)` | BOOLEAN | in diesem Bild Abbrechen gedrückt? |
+| `GUI_WIZARD_LABELS(wz, zurueck$, weiter$, fertig$, abbrechen$)` | — | Beschriftung der vier Knöpfe (etwa für eine englische Oberfläche) |
+| `GUI_WIZARD_SET(wz, key$, wert)` | — | `pruefen`: Weiter erst, wenn die Felder dieses Schritts ihre `GUI_RULE`n erfüllen |
+| `GUI_TREETABLE(win, x, y, w, h [, kopf])` | GUI_WIDGET | **Baumtabelle**: Tabelle, deren Zeilen einen Baum bilden (Einzug und Dreieck in der ersten Spalte) |
+| `GUI_TREETABLE_ADD(tt, eltern, zellen)` | INTEGER | eine Zeile unter `eltern` anhängen (-1 = oben); liefert die Datenzeile |
+| `GUI_TREETABLE_EXPAND(tt, zeile, an)` | — | eine Zeile auf- oder zuklappen |
+| `GUI_TREETABLE_EXPAND_ALL(tt, an)` | — | alles auf- oder zuklappen |
+| `GUI_TREETABLE_EXPANDED(tt, zeile)` | BOOLEAN | ist die Zeile aufgeklappt? |
+| `GUI_TREETABLE_PARENT(tt, zeile)` | INTEGER | Elternzeile (-1 = oben) |
+| `GUI_TREETABLE_LEVEL(tt, zeile)` | INTEGER | Tiefe im Baum (0 = oben) |
+| `GUI_TREETABLE_SET_PARENT(tt, zeile, eltern)` | — | eine Zeile umhängen; unter sich selbst oder einen Nachkommen ist ein Fehler |
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | Spaltenbreiten (1D ARRAY OF INTEGER; NIL = Auto) |
@@ -1637,12 +1668,81 @@ zwar bewusst als Liste, nicht als Versehen. (Zeitwähler und gesetzter Text
 standen hier bis Stand 25 und sind jetzt gebaut — die Liste wird kürzer,
 nicht länger.)
 
-* **Aufklapp-Gruppen** (Akkordeon) und **Assistenten** mit Zurück/Weiter.
-  Beides ist aus Knöpfen, Panels und dem Reiterwerk zu bauen.
-* **Baum mit Spalten** (Tabelle und Baum in einem).
+Im Augenblick steht hier nichts. Akkordeon, Assistent und Baum mit Spalten
+waren die letzten drei Punkte und sind seit 2026-09-21 gebaut (Abschnitt
+unten). Pfadleiste, Statusleiste mit Feldern und der Überlauf der
+Werkzeugleiste standen hier bis Stand 27.
 
-(Pfadleiste, Statusleiste mit Feldern und der Überlauf der Werkzeugleiste
-standen hier bis Stand 27 und sind jetzt gebaut.)
+## Akkordeon, Assistent, Baumtabelle
+
+Alle drei legen **keine eigenen Kinder an**: man baut die Felder wie immer
+ins Fenster und ordnet sie danach einem Abschnitt, einem Schritt oder (beim
+Baum) einer Elternzeile zu. Ein Kind muss NACH seinem Behälter angelegt
+sein. Das ist dieselbe Regel wie beim Reiterwerk, und der Grund ist die
+Reihenfolge der Treffer: ein Klick geht an das erste Widget, das ihn trifft.
+
+**Akkordeon.** Jeder Abschnitt hat einen Kopf (30 Punkte hoch); ein offener
+Abschnitt ist so hoch wie sein Inhalt plus Rand oder so hoch wie
+`GUI_ACCORDION_SET_HEIGHT` sagt. Die Lage eines Kindes zählt ab der
+Oberkante seines Abschnitts unter dem Kopf. Klappt ein Abschnitt darüber
+auf, **wandern die Kinder darunter mit**; ohne das lägen sie über dem
+aufgeklappten Inhalt. Ohne `mehrere` ist immer höchstens einer offen.
+Tastatur: Pfeile wählen einen Kopf, Enter und Leertaste klappen um. Passt
+nicht alles, rollt das Mausrad.
+
+```basic
+DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(win, 10, 10, 300, 360)
+GUI_ACCORDION_ADD(acc, "Allgemein")
+GUI_ACCORDION_ADD(acc, "Grafik")
+DIM vollbild AS GUI_WIDGET : vollbild = GUI_CHECKBOX(win, "Vollbild", 12, 8, FALSE)
+GUI_ACCORDION_ADD_WIDGET(acc, vollbild, 1)     ' 12/8 IM Abschnitt "Grafik"
+GUI_ACCORDION_OPEN(acc, 1, TRUE)
+```
+
+**Assistent.** Oben die Schrittanzeige, unten die Knopfreihe; dazwischen
+zeigt der Assistent nur die Kinder des aktuellen Schritts. Auf dem letzten
+Schritt heißt Weiter „Fertig". Die Ereignisse gelten **ein Bild lang** wie
+`GUI_CLICKED`. Mit `pruefen` geht Weiter erst, wenn die Felder DIESES
+Schritts ihre Regeln (`GUI_RULE`) erfüllen. Das erste falsche Feld bekommt
+den Fokus. Ein Fehler auf einem späteren Schritt zählt noch nicht, sonst gäbe
+es keinen Ausweg. Enter drückt Weiter.
+
+```basic
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(win, 10, 10, 420, 300)
+GUI_WIZARD_ADD(wz, "Konto") : GUI_WIZARD_ADD(wz, "Adresse")
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(win, 30, 90, 200, 26, "Name")
+GUI_WIZARD_ADD_WIDGET(wz, name, 0)
+GUI_RULE(name, "pflicht")
+GUI_WIZARD_SET(wz, "pruefen", 1)
+' in der Bildschleife:
+IF GUI_WIZARD_FINISHED(wz) THEN speichern()
+```
+
+**Baumtabelle.** Eine gewöhnliche Tabelle mit dem Schalter `baum`
+(`GUI_TABLE_SET(t, "baum", 1)`; `GUI_TREETABLE` legt sie so an). Sortieren,
+Filtern, Spaltenbreiten, Zellarten und Auswahl bleiben die der Tabelle.
+Anders ist nur die **Ansicht**: Kinder stehen unter ihren Eltern und nur
+unter aufgeklappten. Sortiert wird unter Geschwistern, sonst verließe ein
+Kind seinen Elternteil. Ein Filter zeigt eine Zeile, wenn sie selbst oder
+ein Nachkomme passt, und öffnet den Weg dorthin. Alle Nummern nach außen
+sind weiter DATENzeilen; die Reihenfolge auf dem Schirm liefern
+`GUI_TABLE_VIEW_COUNT`/`GUI_TABLE_VIEW_ROW`. Wird eine Zeile entfernt,
+rücken ihre Kinder zu deren Eltern auf. Ein Klick aufs Dreieck klappt um,
+ohne zu wählen. Rechts klappt auf bzw. springt zum ersten Kind, links klappt
+zu bzw. springt zu den Eltern.
+
+```basic
+DIM tt AS GUI_WIDGET : tt = GUI_TREETABLE(win, 10, 10, 400, 250, ["Name", "Größe"])
+DIM ex AS INTEGER : ex = GUI_TREETABLE_ADD(tt, -1, ["examples", ""])
+GUI_TREETABLE_ADD(tt, ex, ["hallo.dh", "1 KB"])
+GUI_TREETABLE_EXPAND(tt, ex, TRUE)
+```
+
+Alle drei stehen vollständig in der `.dhform`: offene Abschnitte, Höhen und
+Kinderlagen unter `akkordeon`, Prüfschalter und Knopftexte unter
+`assistent`, Elternangaben und Aufgeklapptes unter `table` (`baum`,
+`eltern`, `offen`). Der Form-Designer bietet sie in der Palette an; ihre
+Abschnitte und Schritte stehen im Feld „Einträge".
 
 ## Aussehen ändern (Theme, Metriken, Per-Widget)
 

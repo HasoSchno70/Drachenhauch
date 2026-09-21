@@ -1,0 +1,221 @@
+' GUI_TREETABLE -- eine Tabelle, deren Zeilen einen Baum bilden: Einzug und
+' Dreieck in der ersten Spalte, Kinder nur unter aufgeklappten Eltern. Alle
+' Nummern nach aussen bleiben DATENzeilen; der Baum steckt in der Ansicht
+' (GUI_TABLE_VIEW_COUNT/VIEW_ROW). Format: docs/werkzeuge.md.
+
+=== aufbau tiefe eltern und ansicht
+IMPORT "gui"
+SCREEN(600, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 600, 320)
+DIM tt AS GUI_WIDGET : tt = GUI_TREETABLE(w, 10, 10, 500, 250, ["Name", "Groesse"])
+DIM ex AS INTEGER : ex = GUI_TREETABLE_ADD(tt, -1, ["examples", ""])
+DIM ast AS INTEGER : ast = GUI_TREETABLE_ADD(tt, ex, ["assets", ""])
+DIM logo AS INTEGER : logo = GUI_TREETABLE_ADD(tt, ast, ["logo.png", "12"])
+DIM hallo AS INTEGER : hallo = GUI_TREETABLE_ADD(tt, ex, ["hallo.dh", "1"])
+DIM docs AS INTEGER : docs = GUI_TREETABLE_ADD(tt, -1, ["docs", ""])
+SUB zeige(titel AS STRING)
+    DIM s AS STRING : s = titel + ":"
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_TABLE_VIEW_COUNT(tt) - 1
+        s = s + " " + GUI_TABLE_GET_CELL(tt, GUI_TABLE_VIEW_ROW(tt, i), 0)
+    NEXT
+    PRINT s
+END SUB
+zeige("zu")
+GUI_TREETABLE_EXPAND(tt, ex, TRUE)
+zeige("examples auf")
+GUI_TREETABLE_EXPAND_ALL(tt, TRUE)
+zeige("alles auf")
+PRINT "tiefe "; GUI_TREETABLE_LEVEL(tt, logo); " eltern "; GUI_TREETABLE_PARENT(tt, logo); " offen "; GUI_TREETABLE_EXPANDED(tt, ast)
+PRINT "baum "; INT(GUI_TABLE_GET(tt, "baum"))
+GUI_TREETABLE_EXPAND(tt, ex, FALSE)
+zeige("examples zu")
+--- erwartet
+zu: examples docs
+examples auf: examples assets hallo.dh docs
+alles auf: examples assets logo.png hallo.dh docs
+tiefe 2 eltern 1 offen TRUE
+baum 1
+examples zu: examples docs
+
+=== filter zeigt den weg zum treffer und sortiert unter geschwistern
+IMPORT "gui"
+SCREEN(600, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 600, 320)
+DIM tt AS GUI_WIDGET : tt = GUI_TREETABLE(w, 10, 10, 500, 250, ["Name"])
+DIM ex AS INTEGER : ex = GUI_TREETABLE_ADD(tt, -1, ["examples"])
+DIM b AS INTEGER : b = GUI_TREETABLE_ADD(tt, ex, ["b"])
+GUI_TREETABLE_ADD(tt, b, ["logo.png"])
+GUI_TREETABLE_ADD(tt, ex, ["a"])
+GUI_TREETABLE_ADD(tt, -1, ["docs"])
+SUB zeige(titel AS STRING)
+    DIM s AS STRING : s = titel + ":"
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_TABLE_VIEW_COUNT(tt) - 1
+        s = s + " " + GUI_TABLE_GET_CELL(tt, GUI_TABLE_VIEW_ROW(tt, i), 0)
+    NEXT
+    PRINT s
+END SUB
+' Alles zu -- der Filter oeffnet den Weg trotzdem.
+GUI_TABLE_FILTER(tt, 0, "logo")
+zeige("filter")
+GUI_TABLE_FILTER(tt, 0, "")
+GUI_TREETABLE_EXPAND_ALL(tt, TRUE)
+GUI_TABLE_SORT(tt, 0, FALSE)
+zeige("sortiert")
+GUI_TABLE_SORT(tt, 0, TRUE)
+zeige("absteigend")
+--- erwartet
+filter: examples b logo.png
+sortiert: docs examples a b logo.png
+absteigend: examples b logo.png a docs
+
+=== entfernen haengt die kinder um und ein kreis ist ein fehler
+IMPORT "gui"
+SCREEN(600, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 600, 320)
+DIM tt AS GUI_WIDGET : tt = GUI_TREETABLE(w, 10, 10, 500, 250, ["Name"])
+DIM ex AS INTEGER : ex = GUI_TREETABLE_ADD(tt, -1, ["examples"])
+DIM ast AS INTEGER : ast = GUI_TREETABLE_ADD(tt, ex, ["assets"])
+DIM logo AS INTEGER : logo = GUI_TREETABLE_ADD(tt, ast, ["logo.png"])
+GUI_TABLE_REMOVE_ROW(tt, ast)
+' Aus logo (Zeile 2) wird Zeile 1, seine Eltern sind jetzt examples.
+PRINT "zeilen "; GUI_TABLE_ROW_COUNT(tt); " eltern "; GUI_TREETABLE_PARENT(tt, 1); " "; GUI_TABLE_GET_CELL(tt, 1, 0)
+TRY
+    GUI_TREETABLE_SET_PARENT(tt, 0, 1)
+CATCH e
+    PRINT e
+END TRY
+GUI_TREETABLE_SET_PARENT(tt, 1, -1)
+PRINT "oben "; GUI_TREETABLE_PARENT(tt, 1); " tiefe "; GUI_TREETABLE_LEVEL(tt, 1)
+TRY
+    GUI_TREETABLE_EXPAND(tt, 9, TRUE)
+CATCH e
+    PRINT e
+END TRY
+DIM flach AS GUI_WIDGET : flach = GUI_TABLE(w, 10, 10, 100, 100)
+TRY
+    GUI_TREETABLE_ADD(flach, -1, ["x"])
+CATCH e
+    PRINT LEFT$(e, 45)
+END TRY
+--- erwartet
+zeilen 2 eltern 0 logo.png
+GUI_TREETABLE_SET_PARENT: Zeile 0 kann nicht unter sich selbst oder ihren Nachkommen haengen
+oben -1 tiefe 0
+GUI_TREETABLE_EXPAND: Zeile 9 gibt es nicht
+GUI_TREETABLE_ADD: Tabelle ist kein Baum (GUI
+
+=== klick aufs dreieck klappt um, klick auf den namen waehlt
+' Die Lage kommt aus der Tabelle selbst (Kopf- und Zeilenhoehe); das Programm
+' schreibt die Aufnahme im ersten Bild. Das Dreieck liegt links in der
+' ersten Spalte, der Name dahinter.
+IMPORT "gui"
+SCREEN(600, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 600, 320)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tt AS GUI_WIDGET : tt = GUI_TREETABLE(w, 10, 10, 500, 250, ["Name", "Groesse"])
+DIM ex AS INTEGER : ex = GUI_TREETABLE_ADD(tt, -1, ["examples", ""])
+GUI_TREETABLE_ADD(tt, ex, ["hallo.dh", "1"])
+GUI_TREETABLE_ADD(tt, -1, ["docs", ""])
+DIM kh AS INTEGER : kh = INT(GUI_TABLE_GET(tt, "kopfhoehe"))
+DIM zh AS INTEGER : zh = INT(GUI_TABLE_GET(tt, "zeilenhoehe"))
+DIM y0 AS INTEGER : y0 = 10 + kh + zh \ 2
+' Dreieck bei x 10 + 7, Name ab x 10 + 16; zweite Zeile (nach dem Aufklappen
+' hallo.dh) wird angeklickt.
+DIM ev AS STRING
+ev = "c 6" + CHR$(10)
+ev = ev + "e 1 7 17 " + STR$(y0) + " 0 0" + CHR$(10) + "e 2 6 0 0 0 0" + CHR$(10) + "e 3 5 0 0 0 0" + CHR$(10)
+ev = ev + "e 5 7 80 " + STR$(y0 + zh) + " 0 0" + CHR$(10) + "e 6 6 0 0 0 0" + CHR$(10) + "e 7 5 0 0 0 0" + CHR$(10)
+WRITEALL("ev.txt", ev)
+AUTOMATION_PLAY("ev.txt")
+DIM bild AS INTEGER : bild = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF bild = 4 THEN PRINT "nach dreieck "; GUI_TABLE_VIEW_COUNT(tt); " offen "; GUI_TREETABLE_EXPANDED(tt, ex); " gewaehlt "; GUI_TABLE_SELECTED(tt)
+    bild = bild + 1
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "gewaehlt "; GUI_TABLE_GET_CELL(tt, GUI_TABLE_SELECTED(tt), 0)
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+nach dreieck 3 offen TRUE gewaehlt -1
+gewaehlt hallo.dh
+
+=== pfeile klappen und springen
+IMPORT "gui"
+SCREEN(600, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 600, 320)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tt AS GUI_WIDGET : tt = GUI_TREETABLE(w, 10, 10, 500, 250, ["Name"])
+DIM ex AS INTEGER : ex = GUI_TREETABLE_ADD(tt, -1, ["examples"])
+DIM ha AS INTEGER : ha = GUI_TREETABLE_ADD(tt, ex, ["hallo.dh"])
+GUI_TREETABLE_ADD(tt, -1, ["docs"])
+GUI_TABLE_SET_SELECTED(tt, ex)
+GUI_FOCUS(tt)
+DIM alt AS STRING : alt = ""
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    DIM jetzt AS STRING : jetzt = GUI_TABLE_GET_CELL(tt, GUI_TABLE_SELECTED(tt), 0) + " " + STR$(GUI_TREETABLE_EXPANDED(tt, ex))
+    IF jetzt <> alt THEN PRINT jetzt : alt = jetzt
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 8
+e 1 2 262 0 0 0
+e 2 1 262 0 0 0
+e 4 2 262 0 0 0
+e 5 1 262 0 0 0
+e 7 2 263 0 0 0
+e 8 1 263 0 0 0
+e 10 2 263 0 0 0
+e 11 1 263 0 0 0
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+examples FALSE
+examples TRUE
+hallo.dh TRUE
+examples TRUE
+examples FALSE
+
+=== der baum steht in der form
+IMPORT "gui"
+SCREEN(600, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 600, 320)
+DIM tt AS GUI_WIDGET : tt = GUI_TREETABLE(w, 10, 10, 500, 250, ["Name"])
+DIM ex AS INTEGER : ex = GUI_TREETABLE_ADD(tt, -1, ["examples"])
+GUI_TREETABLE_ADD(tt, ex, ["hallo.dh"])
+GUI_TREETABLE_EXPAND(tt, ex, TRUE)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(GUI_TO_JSON(w))
+DIM t2 AS GUI_WIDGET : t2 = GUI_WINDOW_WIDGET(w2, 0)
+PRINT "baum "; INT(GUI_TABLE_GET(t2, "baum")); " sichtbar "; GUI_TABLE_VIEW_COUNT(t2); " eltern "; GUI_TREETABLE_PARENT(t2, 1); " offen "; GUI_TREETABLE_EXPANDED(t2, 0)
+--- erwartet
+baum 1 sichtbar 2 eltern 0 offen TRUE
+
+=== eine geladene flache tabelle zeigt ihre zeilen
+' Gefunden beim Baum: nach GUI_FROM_JSON war die Ansicht jeder Tabelle leer.
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 10, 10, 200, 100)
+GUI_TABLE_HEADERS(t, ["A"])
+GUI_TABLE_ADD_ROW(t, ["x"]) : GUI_TABLE_ADD_ROW(t, ["y"])
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(GUI_TO_JSON(w))
+PRINT GUI_TABLE_VIEW_COUNT(t); " "; GUI_TABLE_VIEW_COUNT(GUI_WINDOW_WIDGET(w2, 0))
+--- erwartet
+2 2

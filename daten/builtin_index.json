@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1924,
+ "count": 1957,
  "builtins": [
   {
    "name": "ABS",
@@ -2907,6 +2907,72 @@
    "module": "g3d"
   },
   {
+   "name": "GUI_ACCORDION",
+   "kind": "core",
+   "signature": "GUI_ACCORDION(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_ADD",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_ADD(acc, titel$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_ADD_WIDGET",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_ADD_WIDGET(acc, wdg, abschnitt)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_COUNT",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_COUNT(acc)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_IS_OPEN",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_IS_OPEN(acc, abschnitt)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_OPEN",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_OPEN(acc, abschnitt, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_SET",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_SET(acc, key$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_SET_HEIGHT",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_SET_HEIGHT(acc, abschnitt, px)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_SET_TITLE",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_SET_TITLE(acc, abschnitt, titel$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_TITLE$",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_TITLE$(acc, abschnitt)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACCORDION_TOGGLED",
+   "kind": "core",
+   "signature": "GUI_ACCORDION_TOGGLED(acc)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_ACTIVE_TAB",
    "kind": "core",
    "signature": "GUI_ACTIVE_TAB(win) AS INTEGER",
@@ -5169,6 +5235,54 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TREETABLE",
+   "kind": "core",
+   "signature": "GUI_TREETABLE(win, x, y, w, h [, kopf])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREETABLE_ADD",
+   "kind": "core",
+   "signature": "GUI_TREETABLE_ADD(tt, eltern, zellen)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREETABLE_EXPAND",
+   "kind": "core",
+   "signature": "GUI_TREETABLE_EXPAND(tt, zeile, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREETABLE_EXPANDED",
+   "kind": "core",
+   "signature": "GUI_TREETABLE_EXPANDED(tt, zeile)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREETABLE_EXPAND_ALL",
+   "kind": "core",
+   "signature": "GUI_TREETABLE_EXPAND_ALL(tt, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREETABLE_LEVEL",
+   "kind": "core",
+   "signature": "GUI_TREETABLE_LEVEL(tt, zeile)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREETABLE_PARENT",
+   "kind": "core",
+   "signature": "GUI_TREETABLE_PARENT(tt, zeile)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREETABLE_SET_PARENT",
+   "kind": "core",
+   "signature": "GUI_TREETABLE_SET_PARENT(tt, zeile, eltern)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_ADD",
    "kind": "core",
    "signature": "GUI_TREE_ADD(tree, parent, label)",
@@ -5454,6 +5568,90 @@
    "name": "GUI_WINDOW_WIDGET_COUNT",
    "kind": "core",
    "signature": "GUI_WINDOW_WIDGET_COUNT(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD",
+   "kind": "core",
+   "signature": "GUI_WIZARD(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_ADD",
+   "kind": "core",
+   "signature": "GUI_WIZARD_ADD(wz, titel$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_ADD_WIDGET",
+   "kind": "core",
+   "signature": "GUI_WIZARD_ADD_WIDGET(wz, wdg, schritt)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_BACK",
+   "kind": "core",
+   "signature": "GUI_WIZARD_BACK(wz)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_CANCELLED",
+   "kind": "core",
+   "signature": "GUI_WIZARD_CANCELLED(wz)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_CHANGED",
+   "kind": "core",
+   "signature": "GUI_WIZARD_CHANGED(wz)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_COUNT",
+   "kind": "core",
+   "signature": "GUI_WIZARD_COUNT(wz)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_ENABLE_NEXT",
+   "kind": "core",
+   "signature": "GUI_WIZARD_ENABLE_NEXT(wz, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_FINISHED",
+   "kind": "core",
+   "signature": "GUI_WIZARD_FINISHED(wz)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_LABELS",
+   "kind": "core",
+   "signature": "GUI_WIZARD_LABELS(wz, zurueck$, weiter$, fertig$, abbrechen$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_NEXT",
+   "kind": "core",
+   "signature": "GUI_WIZARD_NEXT(wz)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_SET",
+   "kind": "core",
+   "signature": "GUI_WIZARD_SET(wz, key$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_SET_STEP",
+   "kind": "core",
+   "signature": "GUI_WIZARD_SET_STEP(wz, schritt)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WIZARD_STEP",
+   "kind": "core",
+   "signature": "GUI_WIZARD_STEP(wz)",
    "module": "gui"
   },
   {
