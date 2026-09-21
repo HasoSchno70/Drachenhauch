@@ -23,6 +23,9 @@ mod astar;
 // (raylib bleibt fuer Fenster/Input).
 #[cfg(feature = "graphics")]
 mod audio;
+// FLAC-Musik mit eigenem Dekoder (Symphonia springt sonst nicht zurueck).
+#[cfg(all(feature = "graphics", not(target_arch = "wasm32")))]
+mod flac_strom;
 #[cfg(feature = "graphics")]
 mod sprache;
 // Im Browser gibt es weder cpal-Host noch Audio-Thread -- die Ausgabe laeuft
