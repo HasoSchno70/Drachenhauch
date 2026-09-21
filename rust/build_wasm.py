@@ -21,8 +21,8 @@ Ablauf (mit vollstaendiger Toolchain):
   3. `dhrt.js` + `dhrt.wasm` nach `web/` kopieren.
 
 Aufruf:
-  .venv\\Scripts\\python.exe rust\\build_wasm.py examples\\01_hello.dh
-  .venv\\Scripts\\python.exe rust\\build_wasm.py examples\\01_hello.dh web
+  python rust\\build_wasm.py examples\\01_hello.dh
+  python rust\\build_wasm.py examples\\01_hello.dh web
 
 Grenzen: siehe docs/web-playground.md (Render-Loop/ASYNCIFY, Audio, Threads).
 """

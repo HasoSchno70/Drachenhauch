@@ -24,9 +24,11 @@ beginnt mit dhrt TRUE
 nennt die teile TRUE
 
 === die fassung stimmt mit dem projekt ueberein
-' Drei Stellen nennen sie -- sie muessen dasselbe sagen. (Die vierte,
-' drachenhauch/__init__.py, faellt mit dem Python-Teil weg; sie wird nur
-' geprueft, solange es sie gibt.)
+' Seit dem Loeschen des Python-Teils (2026-09-21) nennt nur noch
+' rust/drachenhauch_runtime/Cargo.toml die Fassung -- vorher standen
+' pyproject.toml und drachenhauch/__init__.py daneben und mussten dasselbe
+' sagen. Geprueft wird, dass die Laufzeit meldet, was dort steht: Cargo
+' verlangt drei Stellen, "2026.8.0" heisst nach aussen "2026.8".
 IMPORT "helfer.dh"
 FUNCTION ersteFassung$(pfad AS STRING) AS STRING
     DIM z AS ARRAY OF STRING : z = READLINES(pfad)
@@ -34,30 +36,24 @@ FUNCTION ersteFassung$(pfad AS STRING) AS STRING
     FOR i = 0 TO LEN(z) - 1
         DIM zeile AS STRING : zeile = TRIM$(z[i])
         IF LEFT$(zeile, 10) = "version = " THEN RETURN REPLACE$(MID$(zeile, 10), CHR$(34), "")
-        IF LEFT$(zeile, 14) = "__version__ = " THEN RETURN REPLACE$(MID$(zeile, 14), CHR$(34), "")
     NEXT
     RETURN ""
 END FUNCTION
-DIM wurzel AS STRING : wurzel = ARG$(0)
-DIM erwartet AS STRING : erwartet = TRIM$(ersteFassung$(wurzel + "/pyproject.toml"))
+DIM cargo AS STRING : cargo = TRIM$(ersteFassung$(ARG$(0) + "/rust/drachenhauch_runtime/Cargo.toml"))
+DIM kurz AS STRING : kurz = cargo
+IF RIGHT$(kurz, 2) = ".0" THEN kurz = LEFT$(kurz, LEN(kurz) - 2)
+PRINT "cargo gelesen "; (LEN(cargo) >= 6)
 dlStarten(["--version"])
-PRINT "laufzeit "; (TRIM$(SPLIT$(dlAus, CHR$(10))[0]) = "dhrt " + erwartet)
-DIM cargo AS STRING : cargo = TRIM$(ersteFassung$(wurzel + "/rust/drachenhauch_runtime/Cargo.toml"))
-' Cargo verlangt drei Stellen; "2026.8" wird dort zu "2026.8.0".
-PRINT "cargo "; (cargo = erwartet OR cargo = erwartet + ".0")
-IF FILEEXISTS(wurzel + "/drachenhauch/__init__.py") THEN
-    PRINT "python "; (TRIM$(ersteFassung$(wurzel + "/drachenhauch/__init__.py")) = erwartet)
-ELSE
-    PRINT "python TRUE"
-END IF
+PRINT "laufzeit "; (TRIM$(SPLIT$(dlAus, CHR$(10))[0]) = "dhrt " + kurz)
+PRINT "version$ "; (VERSION$() = kurz)
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
 IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
 --- erwartet
+cargo gelesen TRUE
 laufzeit TRUE
-cargo TRUE
-python TRUE
+version$ TRUE
 
 === die hilfe nennt die unterbefehle
 IMPORT "helfer.dh"

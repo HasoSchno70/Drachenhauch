@@ -9231,9 +9231,9 @@ wie viele Plaetze gelten", i + 1)),
     }
 }
 
-// Vordefinierte Globals -- Werte IDENTISCH zu drachenhauch/graphics.py
-// (COLORS/KEYS). Von Hand synchron; Drift-Schutz: tests/test_constants_sync.py
-// vergleicht jede Python-Konstante gegen PRINT-Output von dhrt.
+// Vordefinierte Globals (Farben, Tasten). Bis 2026-09-21 standen dieselben
+// Werte in drachenhauch/graphics.py und ein pytest hielt beide gleich; seit
+// dem Loeschen des Python-Teils ist das hier die einzige Quelle.
 /// Ist das einer der vorbelegten Namen (Farben, Tasten, pi, tau)?
 ///
 /// Sie bekommen beim Uebersetzen KEINEN Slot -- der Compiler kennt sie nicht

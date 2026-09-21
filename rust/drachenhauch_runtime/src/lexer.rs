@@ -1,7 +1,6 @@
-//! Lexer/Tokenizer fuer Drachenhauch -- Rust-Port von `drachenhauch/lexer.py` +
-//! `tokens.py`. Erster Schritt der Front-End-Portierung (Lexer -> Parser ->
-//! Compiler), damit `dhrt` perspektivisch ohne Python aus Quelltext Bytecode
-//! erzeugt.
+//! Lexer/Tokenizer fuer Drachenhauch -- entstanden als Rust-Port des
+//! Python-Lexers (`lexer.py` + `tokens.py`, 2026-09-21 geloescht); der erste
+//! Schritt der Front-End-Portierung (Lexer -> Parser -> Compiler).
 //!
 //! Verifiziert gegen den Python-Lexer ueber `dhrt --tokens` (kanonischer
 //! JSON-Dump `[TYP, wert, zeile]` pro Token) vs. Python -- siehe
@@ -91,7 +90,7 @@ mod keyword_tests {
     }
 }
 
-/// Keyword-Lookup (lowercase) -> Tt. Spiegelt `KEYWORDS` aus tokens.py.
+/// Keyword-Lookup (lowercase) -> Tt; muss zu `KEYWORDS` oben passen (Test).
 pub(crate) fn keyword(text: &str) -> Option<Tt> {
     use Tt::*;
     Some(match text {

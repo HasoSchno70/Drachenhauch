@@ -278,7 +278,7 @@ MKDIR("probe")
 DIM z AS STRING : z = CHR$(10)
 WRITEALL("probe/probe.md", "[tot](drachenhauch/gibtsnicht.py)" + z + _
     "[lebt](rust/build_wasm.py)" + z + "[ordner](docs/)" + z + _
-    "[mit Zeile](drachenhauch/lexer.py:114)" + z + _
+    "[mit Zeile](rust/drachenhauch_runtime/src/lexer.rs:114)" + z + _
     "[netz](https://example.invalid/x.py)" + z + _
     "`drachenhauch/interpreter.py` als Inline-Code ist geduldet" + z + _
     "[klick](drachenhauch/interpreter.py)" + z)

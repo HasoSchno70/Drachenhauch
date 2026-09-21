@@ -43,7 +43,7 @@ FUNCTION u32be(n AS INTEGER) AS BUFFER
     RETURN b
 END FUNCTION
 
-DIM logo AS STRING : logo = PATHJOIN(DIRNAME(CWD$()), "drachenhauch/assets/logo.png")
+DIM logo AS STRING : logo = PATHJOIN(DIRNAME(CWD$()), "daten/bilder/logo.png")
 DIM ziel AS STRING : ziel = PATHJOIN(CWD$(), "symbole")
 DIM ai AS INTEGER : ai = 0
 WHILE ai < ARGC()
