@@ -32,7 +32,7 @@ AppPublisher={#AppPublisher}
 DefaultDirName={autopf}\Drachenhauch-IDE
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
-UninstallDisplayIcon={app}\dhrt.exe
+UninstallDisplayIcon={app}\drachenhauch.ico
 OutputDir=output
 OutputBaseFilename=Drachenhauch-IDE-Setup-{#AppVersion}
 Compression=lzma2
@@ -68,6 +68,12 @@ Type: filesandordirs; Name: "{commondocs}\Drachenhauch\examples\screenshots"
 
 [Files]
 Source: "{#DhrtQuelle}"; DestDir: "{app}"; DestName: "dhrt.exe"; Flags: ignoreversion
+; Das Drachen-Symbol fuer Verknuepfungen, .dh-Dateien und die Deinstallation --
+; dhrt.exe selbst traegt keins (ein exportiertes Spiel ist eine Kopie davon).
+Source: "Drachenhauch.ico"; DestDir: "{app}"; DestName: "drachenhauch.ico"; Flags: ignoreversion
+; Logo und Schriftzug: die IDE sucht sie unter daten\bilder neben ide\
+; (Fenstersymbol, Schriftzug auf der Willkommensseite).
+Source: "..\daten\bilder\*.png"; DestDir: "{app}\daten\bilder"; Flags: ignoreversion
 ; Die IDE selbst -- Quelltext, den der Nutzer lesen und aendern kann.
 Source: "..\ide\*.dh"; DestDir: "{app}\ide"; Flags: ignoreversion
 ; Das Handbuch: die IDE liest docs\ neben ide\ (F1 schlaegt dort nach).
@@ -95,15 +101,15 @@ Source: "THIRD-PARTY-NOTICES-IDE.txt"; DestDir: "{app}"; Flags: ignoreversion sk
 [Icons]
 ; Die IDE startet aus dem Beispielordner -- so zeigt der Projektbaum beim
 ; ersten Start etwas (dhrt hinterlegt den Ort als DHRT_START_DIR).
-Name: "{group}\Drachenhauch IDE"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{app}\ide\ide.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"; IconFilename: "{app}\dhrt.exe"; Comment: "Die IDE in Drachenhauch"
-Name: "{group}\SFX-Generator"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\183_sfx_generator.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"
-Name: "{group}\Partikel-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\185_partikel_editor.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"
-Name: "{group}\Tilemap-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\187_tilemap_editor.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"
-Name: "{group}\Sprite-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\189_sprite_editor.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"
-Name: "{group}\Tracker"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\190_tracker.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"
-Name: "{group}\Form-Designer"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\197_form_designer.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"
-Name: "{group}\Anim-FSM-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\198_anim_fsm_editor.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"
-Name: "{group}\Notenblatt"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\199_notenblatt.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Drachenhauch IDE"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{app}\ide\ide.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"; Comment: "Die IDE in Drachenhauch"
+Name: "{group}\SFX-Generator"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\183_sfx_generator.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Partikel-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\185_partikel_editor.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Tilemap-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\187_tilemap_editor.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Sprite-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\189_sprite_editor.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Tracker"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\190_tracker.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Form-Designer"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\197_form_designer.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Anim-FSM-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\198_anim_fsm_editor.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Notenblatt"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\199_notenblatt.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Beispiele"; Filename: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Handbuch (Markdown)"; Filename: "{app}\docs"
 Name: "{group}\Einstieg (fuer Anfaenger)"; Filename: "{app}\buecher\Drachenhauch-Einstieg.docx"; Flags: createonlyiffileexists
@@ -113,13 +119,13 @@ Name: "{group}\ESP32-Sketche"; Filename: "{commondocs}\Drachenhauch\esp32"
 Name: "{group}\Lizenzen\Lizenzvertrag (EULA)"; Filename: "{app}\EULA.txt"
 Name: "{group}\Lizenzen\Drittanbieter-Lizenzen"; Filename: "{app}\THIRD-PARTY-NOTICES-IDE.txt"; Flags: createonlyiffileexists
 Name: "{group}\{cm:UninstallProgram,Drachenhauch IDE}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Drachenhauch IDE"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{app}\ide\ide.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"; Tasks: desktopicon
+Name: "{autodesktop}\Drachenhauch IDE"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{app}\ide\ide.dh"""; IconFilename: "{app}\drachenhauch.ico"; WorkingDir: "{commondocs}\Drachenhauch\examples"; Tasks: desktopicon
 
 [Registry]
 ; .dh-Dateiverknuepfung: Oeffnen = in der IDE (Argument nach --), Ausfuehren = dhrt run.
 Root: HKA; Subkey: "Software\Classes\.dh"; ValueType: string; ValueName: ""; ValueData: "DrachenhauchIDE.Source"; Tasks: assocdh; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source"; ValueType: string; ValueName: ""; ValueData: "Drachenhauch-Quelltext"; Tasks: assocdh; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\dhrt.exe,0"; Tasks: assocdh
+Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\drachenhauch.ico"; Tasks: assocdh
 Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dhrt.exe"" run ""{app}\ide\ide.dh"" -- ""%1"""; Tasks: assocdh
 Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\shell\run"; ValueType: string; ValueName: ""; ValueData: "Mit Drachenhauch ausfuehren"; Tasks: assocdh
 Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\shell\run\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dhrt.exe"" run ""%1"""; Tasks: assocdh

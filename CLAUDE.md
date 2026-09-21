@@ -3696,6 +3696,16 @@ wird eine KOPIE der Laufzeit (`<ausgabe>/stufe/dhrt.exe`, an ISCC als
 der Installer; ein Fehlschlag bricht VOR ISCC ab statt nur zu warnen. Tests mit
 Attrappen fuer ISCC/signtool (`.cmd`, die `PROCESS_START` direkt startet) in
 `tests/pruef/werkzeug_installer.dhtest`; vier Verfaelschungen fallen.
+**Logo und Schriftzug (2026-09-21):** `dhrt.exe` traegt kein Symbol (ein
+exportiertes Spiel ist eine Kopie davon) -- Verknuepfungen, `.dh`-Dateien und
+die Deinstallation zeigten darum das nackte Programm. Der Installer legt jetzt
+`drachenhauch.ico` nach `{app}` und nimmt es ueberall; dazu `daten/bilder/*.png`
+(auch in den macOS-/Linux-Paketen). Die IDE laedt beides aus
+`<wurzel>/daten/bilder/`: das Logo als `WINDOW_ICON`, der Schriftzug steht auf
+der Willkommensseite statt des Titels als Text (vorab auf 240x112 skaliert,
+der Satz rechts daneben, alles ab den Knoepfen bleibt an seiner Stelle); ohne
+die Dateien bleibt es beim Text. Tests `tests/pruef/werkzeug_ide_schriftzug.dhtest`
+(3) und zwei Zeilen in `werkzeug_paket.dhtest`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
