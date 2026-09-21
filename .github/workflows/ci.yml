@@ -17,25 +17,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Seit 2026-09-21 OHNE pytest, mypy und pip (docs/entwurf-python-abbau.md,
+  # 7.7 Punkt 6): geprueft wird nur noch ueber `dhrt test tests/pruef`. Python
+  # bleibt allein fuer den Bauschritt (`rust/build_runtime.py`, nur
+  # Standardbibliothek -- `tests/pruef/bauskripte.dhtest` haelt das fest) und
+  # fuer die Probe von `rust/build_wasm.py` in `tests/pruef/build_wasm.dhtest`.
+  # Die Qt-Editoren und ihre pytest-Dateien sind damit NICHT mehr geprueft;
+  # sie fallen im Loeschschritt (Punkt 7).
+  #
+  # Job-Name und Matrix bleiben, obwohl es nur noch eine Version gibt: `main`
+  # verlangt die Pruefung "test (3.12)" beim NAMEN. Ein neuer Name meldete
+  # sich nie, und jeder PR stuende fuer immer auf "erwartet".
   test:
     runs-on: windows-latest
-    # Eine Version: 3.12. Damit wird entwickelt, damit wird paketiert (der
-    # Windows-Installer buendelt 3.12, mypy prueft gegen 3.12) -- eine zweite
-    # Version zu testen hiess, etwas abzusichern, das niemand benutzt.
-    #
-    # 3.11 lief hier bis 2026-08-01 mit und starb reproduzierbar mit
-    # "Windows fatal exception: code 0xc0000374" (HEAP CORRUPTION im
-    # Qt-Teardown) -- auf 3.12 mit demselben PySide6-Wheel gruen. Die
-    # Fehlerursache (Zerstoerungs-Reihenfolge in den Editor-Widgets) ist damit
-    # NICHT behoben, nur nicht mehr getestet; Notizen dazu in conftest.py.
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.12"]
 
-    # Qt-Editoren headless testen (kein Display auf den Runnern).
     env:
-      QT_QPA_PLATFORM: offscreen
       # Fettes LTO (`lto = true` in Cargo.toml) optimiert beim Linken das ganze
       # Programm neu und parallelisiert dabei kaum -- auf einem Runner mit
       # wenigen Kernen ist das der teuerste einzelne Schritt. Gemessen lokal auf
@@ -63,20 +63,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,editors]"
-
-      - name: Type-check with mypy
-        run: mypy
-
-      # OHNE dhrt uebersprang die Suite 1812 von 3096 Tests -- lautlos, per
-      # `pytest.skip("native Runtime 'dhrt' nicht gebaut")` in conftest.py.
-      # Genau die sichern die SPRACHE ab (jeder run_gb-Golden-Test). Was das
-      # kostet, hat die Umbenennung gezeigt: ein kaputter `include_str!`-Pfad
-      # in compiler.rs zerlegte den Rust-Build, und die Tests merkten es
-      # nicht, weil sie die vorgebaute Exe von der Platte nahmen.
+      # Gebaut wird HIER, nicht vorgebaut von der Platte genommen: als die
+      # Tests noch pytest waren, zerlegte ein kaputter `include_str!`-Pfad in
+      # compiler.rs den Rust-Build, und niemand merkte es, weil die Tests die
+      # alte Exe nahmen.
       #
       # Gebaut wird ueber `rust/build_runtime.py` -- dasselbe Skript, das auch
       # Entwickler benutzen. Eine zweite Bau-Wahrheit in der CI waere genau
@@ -93,50 +83,14 @@ jobs:
         with:
           workspaces: rust/drachenhauch_runtime
 
-      - name: dhrt bauen (Runtime fuer die run_gb-Golden-Tests)
+      - name: dhrt bauen (Runtime fuer die Pruefsammlungen)
         run: python rust/build_runtime.py
 
-      # DREI Durchgaenge, die zusammen die Suite exakt einmal abdecken.
-      #
-      # 1. parallel (pytest-xdist): die Suite rechnet kaum, sie startet
-      #    dhrt-Prozesse und wartet auf sie -- deshalb skaliert sie fast linear
-      #    (lokal auf 16 Kernen: 10:40 -> 48 s). `--dist loadfile` haelt die
-      #    Tests einer Datei beim selben Arbeiter; Modul-Zustand und die
-      #    geleakten Qt-Fenster (siehe conftest.py) sind pro Prozess gedacht,
-      #    nicht pro Test.
-      #
-      # 2. die Qt-Editoren, JE DATEI EIN EIGENER PROZESS (gemessen 21,7 s fuer
-      #    alle 82 Dateien, vier gleichzeitig -- der gemeinsame Durchgang wird
-      #    um denselben Betrag kuerzer). Sie lassen ihre Fenster stehen (2284
-      #    ueber alle Dateien, gemessen 2026-08-22), und jede Operation, die
-      #    ueber alle Fenster des Prozesses laeuft -- `processEvents()` wie
-      #    `QApplication.setStyleSheet()` --, fasst dann die Altlasten FREMDER
-      #    Dateien an. Genau daran starb der Arbeiter sporadisch mit "Windows
-      #    fatal exception: access violation", zuletzt im ERSTEN
-      #    processEvents() einer Datei. Begruendung + Messungen in conftest.py,
-      #    Werkzeug in tools/qt_tests_einzeln.py (dasselbe Kommando lokal).
-      #
-      #    Nebenbei geschlossen: spriteeditor_qt_canvas und tilemapeditor_qt
-      #    standen frueher als `-k "not ..."` im parallelen Durchgang und
-      #    liefen dadurch in der CI GAR NICHT -- der serielle Durchgang holte
-      #    sie nicht nach. Jetzt laufen sie in Durchgang 2 mit.
-      #
-      # 3. die vier Dateien, die ein Betriebsmittel exklusiv brauchen
-      #    (Eingabe-Aufzeichnung, Soundkarte, gemessene Laufzeiten) --
-      #    Begruendung je Datei in conftest.py bei `_SERIELL`.
-      #
-      # `--max-worker-restart=0`: stirbt ein Arbeiter NATIV weg, bricht pytest
-      # sofort ab, statt auf ihn zu warten. Gemessen am 2026-08-20: ein solcher
-      # Absturz liess den Lauf 31 MINUTEN haengen -- 3135 Tests waren durch,
-      # einer abgestuerzt, und xdist wartete auf einen Prozess, den es nicht
-      # mehr gab. Bleibt als Netz stehen, auch wenn Durchgang 2 dem Absturz
-      # die Grundlage nimmt.
       # Die Pruefsammlungen laufen DIREKT, nicht ueber pytest: bis 2026-09-20
       # rief `tests/test_dhrt_test.py` sie als Anker auf, und die Datei faellt
       # mit dem Python-Teil weg (Weg D). Das FORMAT der Sammlungen prueft
       # seither `tests/pruef/dhrt_test_format.dhtest` -- sie pruefen sich also
-      # selbst. Steht vor pytest, weil hier die Sprache selbst haengt: ein
-      # Fehler darin soll nicht hinter 3000 Python-Tests auftauchen.
+      # selbst.
       #
       # `DH_OHNE_AUDIO=1`: das setzte bisher conftest.py fuer die pytest-Laeufe,
       # und der Anker erbte es. Ohne die Variable sucht jedes Programm mit Ton
@@ -154,16 +108,6 @@ jobs:
         env:
           DH_OHNE_AUDIO: 1
         run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef
-
-      - name: Run tests (parallel)
-        run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
-
-      - name: Run tests (Qt-Editoren -- je Datei ein Prozess)
-        run: python tools/qt_tests_einzeln.py
-
-      - name: Run tests (seriell -- exklusive Betriebsmittel)
-        run: pytest tests/ -q -m seriell
-
 
   # Cross-Platform-Migration Phase 3: auf Linux UND macOS nicht nur BAUEN,
   # sondern TESTEN.
@@ -198,24 +142,15 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     env:
-      QT_QPA_PLATFORM: offscreen
       DHRT_OHNE_GRAFIK: "1"
       # Wie im Windows-Job: fettes LTO ist der teuerste Schritt und fuer einen
       # Testlauf unnoetig. Begruendung dort.
       CARGO_PROFILE_RELEASE_LTO: thin
 
+    # Kein setup-python: gebaut wird mit cargo direkt, und die eine Probe, die
+    # Python braucht (build_wasm.dhtest), nimmt das python3 des Laeufers.
     steps:
       - uses: actions/checkout@v7
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev,editors]"
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -239,25 +174,10 @@ jobs:
         working-directory: rust/drachenhauch_runtime
         run: cargo build --release --locked --features "db net http smtp"
 
-      # `not qt`: die Editor-Tests brauchen PySide6 mit libEGL/X11 auf dem
-      # Runner. Diesen Job interessiert die SPRACHE, nicht der Qt-Editor --
-      # der ist eine Windows-Desktop-Anwendung und wird oben getestet. Ein
-      # Haufen X11-Pakete nur fuers headless-Starten von Dialogen waere der
-      # falsche Handel.
       # Wie im Windows-Job: die Sammlungen direkt, ohne pytest als Anker.
       # Ohne Grafik ueberspringen sich die Fenster-Faelle selbst.
       - name: Pruefsammlungen (dhrt test)
         run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
-
-      - name: Run tests (parallel, ohne Grafik, ohne Qt)
-        run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
-
-      # Rueckgabewert 5 heisst bei pytest "keine Tests gesammelt" -- und genau
-      # das ist hier seit 2026-09-20 der Fall: die letzten seriellen
-      # Nicht-Qt-Dateien sind Pruefsammlungen geworden (Weg D). Der Schritt
-      # bleibt stehen, damit ein neuer serieller Test hier wieder mitlaeuft.
-      - name: Run tests (seriell)
-        run: pytest tests/ -q -m "seriell and not qt" || [ $? -eq 5 ]
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
   # Rust-Kern (dhrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher

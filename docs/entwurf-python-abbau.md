@@ -431,10 +431,19 @@ umgezogen, keiner ist aufgegeben worden:**
 | `test_os_builtins.py` (2) | PRINT/EPRINT-Reihenfolge in einem Strom; `SHELL_OUT$` mit der eigenen Exe | `tests/pruef/os_builtins.dhtest`; beides hing am selben Loch — ein Programm kannte den Pfad der laufenden Laufzeit nicht. Dafür neu **`EXEPATH$()`**; die Ströme führt eine Shell-Umleitung zusammen (in einer Skriptdatei, weil `SHELL` Anführungszeichen als `\"` weitergibt) |
 | `test_midi_module.py` | echter und Loopback-MIDI-Anschluss | `tests/pruef/modules_midi.dhtest`, mit Selbst-Überspringen je Stufe (Feature, Ausgang, Loopback-Port) |
 
-`test_pruefen.py` (LOG-Reihenfolge), `test_build_wasm.py`,
 `test_dhrun_chooser.py`, `test_seriell_liste.py` und
 `test_testbefehle_stimmen.py` prüfen Python-Werkzeuge oder pytest selbst
-und fallen mit ihnen.
+und fallen mit ihnen. **Zwei standen hier zu Unrecht mit auf der Liste**
+(nachgesehen am 21.09., als pytest aus der CI fiel): `test_pruefen.py`
+prüft die Reihenfolge von PRINT und LOG_* in einem Strom -- eine
+Eigenschaft von `dhrt`, nicht von Python --, und `test_build_wasm.py`
+prüft `rust/build_wasm.py`, das nach (c) bleibt, samt Web-Harness und
+dem emscripten-Einstieg in `main.rs`. Beide stehen seither in
+`tests/pruef/pruefen.dhtest` und `tests/pruef/build_wasm.dhtest`; die
+Logik des Bauskripts prüft dort ein Python-Kind mit der
+Standardbibliothek (`python3`, `python` oder der Launcher `py` -- unter
+Windows können die ersten beiden Platzhalter aus WindowsApps sein, die
+sich nicht starten lassen).
 
 ### 7.7 Vorschlag: Reihenfolge
 
@@ -451,15 +460,20 @@ und fallen mit ihnen.
    siehe (d).
 4. **Verteilung:** ~~der Python-freie Installer übernimmt Bücher,
    ESP32-Sketche, Signierung und das Aufräumen der alten Installation~~ --
-   am 21.09. (`installer/README.md`, `tests/pruef/werkzeug_installer.dhtest`);
+   am 21.09. (`installer/README.md`, `tests/pruef/werkzeug_installer.dhtest`).
+   **Entschieden am 21.09.: er ersetzt die Qt-Fassung NICHT** -- beide
+   bleiben nebeneinander installierbar, bis Punkt 7 die Qt-Fassung löscht;
    ~~macOS und Linux brauchen einen eigenen Weg oder bleiben vorerst ohne
    Paket~~ -- entschieden in (b), gebaut am 19.09.
 5. **Bau:** ~~`build_runtime.py` und `build_wasm.py` durch etwas ohne
    Python ersetzen~~ -- sie bleiben als letzte zwei Python-Dateien, siehe
    (c).
-6. **CI:** `dhrt test tests/pruef` direkt aufrufen, dann `pip install`,
-   pytest, mypy und den Qt-Läufer streichen. Ein Python 3 bleibt für den
-   Bauschritt -- ohne venv und ohne Pakete, die Läufer bringen es mit.
+6. **CI:** ~~`dhrt test tests/pruef` direkt aufrufen, dann `pip install`,
+   pytest, mypy und den Qt-Läufer streichen~~ -- am 21.09. Ein Python 3
+   bleibt für den Bauschritt -- ohne venv und ohne Pakete. Der Windows-Job
+   heißt weiter `test (3.12)` samt einer Matrix mit einer Version: `main`
+   verlangt die Prüfung unter genau diesem Namen. Die Qt-Editoren und ihre
+   pytest-Dateien sind seither ungeprüft, bis Punkt 7 sie löscht.
 7. **Löschen:** `drachenhauch/`, `tests/*.py`, `conftest.py`, `dhrun.py`,
    die Starter, `pyproject.toml`, `requirements.txt`, dazu die 14
    Qt-`.dhsprite`-Dateien in `buch-galaga/assets/sprites/` und
@@ -550,5 +564,5 @@ Standardbibliothek“ -- wer ein Modul ergänzt, sieht dabei, dass er die
 Grenze berührt. Gegenprobe an den echten Skripten: `numpy`, ein Modul aus
 `drachenhauch/`, ein relativer Import, eine Komma-Zeile mit `requests` und
 ein eingerückter Import in einer Funktion -- jeder lässt den Fall fallen.
-Dass `tests/test_build_wasm.py` das Skript lädt, schadet nicht; es fällt
-mit pytest (7.6).
+Die Logik von `build_wasm.py` prüft seit 21.09. `tests/pruef/build_wasm.dhtest`
+über ein Python-Kind (7.6).
