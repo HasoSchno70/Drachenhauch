@@ -200,10 +200,11 @@ Voraussetzungen:
 Dann:
 
 ```bash
-.venv\Scripts\python.exe rust\build_wasm.py examples\01_hello.dh
+python rust/build_wasm.py examples/01_hello.dh
 ```
 
-Das Skript ist tolerant: fehlt die Toolchain, kompiliert es nur `program.dhc`
+`build_wasm.py` braucht nur ein Python 3 mit Standardbibliothek (kein venv).
+Das Skript ist tolerant: fehlt die Toolchain, legt es nur `web/program.dh` an
 und druckt den manuellen Build-Befehl. Mit vollständiger Toolchain entstehen
 `web/dhrt.js` + `web/dhrt.wasm`.
 

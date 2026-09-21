@@ -1,124 +1,102 @@
 # Form-Designer (WYSIWYG, Xojo-Stil)
 
-Visueller GUI-Designer für Drachenhauch — Controls per Klick platzieren, im
-Inspector konfigurieren, als `.dhform` speichern und mit den `gui`-Builtins zur
-Laufzeit laden. Sprache der Logik bleibt Drachenhauch.
+Oberflächen für das `gui`-Modul zusammenklicken: Controls ablegen, im
+Inspektor einstellen, als `.dhform` sichern und im eigenen Programm mit
+`GUI_LOAD` laden — oder gleich mit F5 laufen lassen. Der Designer ist selbst
+ein Drachenhauch-Programm:
+[`examples/197_form_designer.dh`](../examples/197_form_designer.dh)
+(1 342 Zeilen). Die frühere Qt-Fassung (PySide6) ist mit dem Python-Teil des
+Projekts entfernt.
 
-**Start:** `dhform [datei.dhform | projekt.dhproj]` (bzw. `dhrun.py --form`).
-Benötigt PySide6. Alternativ `gb` (oder `dhrun.py`) **ohne Argument** →
-Auswahl-Dialog *Code-Editor* / *Form-Designer*. `dhedit` öffnet direkt den
-Code-Editor.
+## Starten
 
-## Multi-Form-Projekte
+- **Aus der IDE:** Menü *Werkzeuge → Form-Designer* (oder in der
+  Befehlspalette „Werkzeug: Form-Designer"). Ein Klick auf eine `.dhform` im
+  Projektbaum öffnet den Designer **mit dieser Datei**; wer sie als Text sehen
+  will, nimmt in der Befehlspalette „Formular als Text öffnen".
+- **Von der Kommandozeile:**
 
-Der Designer hält **mehrere Formulare** gleichzeitig offen — jedes mit eigenem
-Pfad, eigener Undo-Historie und eigenem Dirty-Status (Undo läuft nie über
-Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
+```
+dhrt run examples/197_form_designer.dh [-- formular.dhform]
+```
 
-- **Neues Formular** (`Strg+N`), **Formular öffnen…** (`Strg+O`, fügt ein
-  bestehendes `.dhform` zum Projekt hinzu), **Formular schließen** (`Strg+W`).
-- **Speichern** (`Strg+S`) / **Speichern unter…** (`Strg+Umschalt+S`) betrifft das
-  aktive Formular; **Alle speichern** (`Strg+Alt+S`) alle offenen.
-- **Projekt** = eine `.dhproj`-Manifestdatei, die die zugehörigen `.dhform`-Pfade
-  (relativ) und das **Startformular** auflistet. *Projekt speichern…* sichert alle
-  Formulare + das Manifest; *Projekt öffnen…* lädt den ganzen Satz. *Als
-  Startformular setzen* markiert das aktive Formular als `main`.
+Ein relativer Dateiname gilt vom Ordner aus, in dem der Aufruf stand
+(`DHRT_START_DIR`). Gibt es die Datei noch nicht, beginnt ein leeres
+Formular, das beim ersten Sichern dorthin geschrieben wird.
 
-## Aufbau (wie Xojo)
+## Aufbau
 
-- **Links — Formulare + Controls:** oben der **Formular-Navigator** (alle im
-  Projekt geöffneten Formulare; Klick wechselt, `*` = ungespeichert, `★` =
-  Startformular), darunter die **grafische Palette aller 30 Widget-Arten** der
-  Laufzeit (Button, Label, Checkbox, Radio, Slider, TextInput, TextArea,
-  Zahlenfeld, Drehknopf, Umschalter, Dropdown, ListBox, Baum, ProgressBar,
-  Image, Tabelle, Canvas, Panel, GroupBox, Separator, Trenner,
-  Werkzeugleiste, Farbwähler, Datumswähler) — jeder Eintrag mit
-  Mini-Vorschau-Icon. Ein Test misst die Palette gegen `Kind::from_str` in
-  `gui.rs`: eine Art, die die Laufzeit kann und der Designer nicht, fällt
-  sonst niemandem auf — man vermisst nur etwas, das es gibt. Platzieren auf
-  zwei Wegen: **per Drag&Drop** auf die Fläche ziehen, **oder** Eintrag anklicken
-  („scharf") und auf die Fläche klicken.
-- **Mitte — Design-Fläche:** das Formular, mit **realistisch gerenderten Controls**
-  (Cyan-Theme, wie zur Laufzeit). Control anklicken = auswählen, ziehen =
-  verschieben, an den 8 **Resize-Griffen** ziehen = Größe ändern, `Entf` = löschen.
-  **Mehrfach-Auswahl:** `Strg`+Klick togglet einzelne Controls, ein **Auswahlrahmen**
-  (Ziehen im leeren Bereich) fasst alle berührten zusammen; eine Gruppe lässt sich
-  gemeinsam ziehen, nudgen und löschen. **Pfeiltasten** verschieben pixelweise
-  (`Umschalt`+Pfeil = ein Rasterschritt), **Rechtsklick** öffnet ein Kontextmenü.
-  Beim Ziehen erscheinen **Ausrichtungs-Hilfslinien** (Snap an Kanten/Mitten anderer
-  Controls + Formularränder). Bewegen/Platzieren/Resizen rasten am **8-px-Raster**
-  ein (Toggle `Ansicht → Am Raster ausrichten`, `Strg+G`). **Zoom** über `Strg`+`=`/
-  `-`/`0` oder `Strg`+Mausrad (0,25×–4×). Die **Statusleiste** zeigt Position + Größe
-  (bzw. Anzahl) der Selektion sowie die Zoom-Stufe.
-- **Die Fläche um das Formular** ist eine eigene Arbeitsfläche: leichter Verlauf,
-  bewusst **heller** als die Panels ringsum und als beide Formular-Themen, damit
-  ein **weicher Schlagschatten** das Formular sichtbar darauflegt. (Auf einem
-  fast schwarzen Grund hätte ein schwarzer Schatten keinen Spielraum — er war
-  dort messbar unsichtbar.) Das **Raster** mischt sich aus Fenster- und
-  Schriftfarbe des gewählten Themas, ist also in hellen wie dunklen Formularen
-  eine gleich dezente Andeutung; unter 0,5× Zoom entfällt es, weil die Punkte
-  dann als Rauschen lesen.
-- **Bearbeiten-Menü:** **Undo/Redo** (`Strg+Z` / `Strg+Y`, auch `Strg+Umschalt+Z`)
-  — eine Geste (Platzieren, Ziehen, Resizen, Pfeil-Burst, Inspector-/Code-Sitzung)
-  = ein Schritt. **Duplizieren** (`Strg+D`), **Kopieren/Einfügen** (`Strg+C` /
-  `Strg+V`), **Nach vorne/hinten** (`Strg+]` / `Strg+[`). Diese Kürzel wirken nur,
-  wenn die Design-Fläche fokussiert ist (kapern also nicht die Textbearbeitung im
-  Code-/Inspector-Panel).
-- **Anordnen-Menü** (für die Mehrfach-Auswahl): **Ausrichten** (links/rechts/oben/
-  unten/zentriert), **Gleiche Breite/Höhe/Größe** (an das zuletzt geklickte
-  „primäre" Control), **Horizontal/Vertikal verteilen** (gleiche Lücken, erstes +
-  letztes bleiben fix) — alles undobar.
-- **Werkzeugleisten** (zwei Zeilen, Symbole programmatisch gezeichnet):
-  oben die ständig gebrauchten Befehle — **Neu / Öffnen / Speichern**,
-  **Rückgängig / Wiederholen** (dieselben Aktionen wie im Menü, grauen also
-  gemeinsam aus), **Code-Fenster**, **Ausführen** (grün, `F5`). Darunter die
-  Anordnen-Befehle in vier Gruppen: waagerecht ausrichten, senkrecht
-  ausrichten, gleiche Größe, verteilen. Sie sind **grau, solange zu wenig
-  ausgewählt ist** (Ausrichten ab 2, Verteilen ab 3 Controls) — die Absage
-  steht damit am Knopf statt erst nach dem Klick in der Statuszeile.
-- **Rechts — Inspector:** bei gewähltem **Control** dessen Eigenschaften (Name,
-  Text, **Gruppe** (nur RadioButton — Radios derselben Gruppe schließen sich
-  gegenseitig aus), **Platzhalter** (nur TextInput), Position/Größe, **Anker**
-  L/R/O/U, `on_click`/`on_change`-Handler, Items, **Auswahl** (Dropdown/ListBox,
-  `-1` = keine), Min/Max/Wert, aktiviert, sichtbar …). Wird ein Handler hier
-  **umbenannt**, wandert sein Code-Rumpf mit (außer ein zweites Control nutzt
-  ihn noch). **Anker** = an welchen Fensterkanten das Control
-  klebt; beim Vergrößern des (resizeable) Formulars wandern/wachsen die Controls
-  entsprechend mit (Xojo-Reflow, `GUI_SET_ANCHOR` in der Runtime). Ist **kein**
-  Control gewählt, zeigt der Inspector das **Formular selbst** (Xojo-Stil):
-  Titel, Breite/Höhe, Min/Max-Größe, beweglich/schließbar/**größenveränderbar**/
-  sichtbar. Das Formular hat dann Resize-Griffe (rechts/unten/Ecke). Ist
-  „größenveränderbar" gesetzt, ist das **gebaute Fenster zur Laufzeit** am
-  unteren-rechten Griff ziehbar (geklemmt an Min/Max) — `GUI_WINDOW_RESIZABLE` /
-  `GUI_WINDOW_SET_MIN_SIZE`/`MAX_SIZE` in der `gui`-Runtime.
-- **Unten — Code:** integrierter Drachenhauch-Editor (syntax-gehighlightet). Eine
-  Combo listet die Event-Handler des Formulars, der Editor zeigt/ändert den Body
-  des gewählten. **Doppelklick auf ein Control** legt für sein Haupt-Event einen
-  Handler an (Name `<control>Click`/`Changed`) bzw. springt zu einem vorhandenen
-  und fokussiert den Editor.
+- **Links — Menü und Palette.** Die Palette listet **alle 30 Widget-Arten der
+  Laufzeit** und dazu das **Gitter** (eine Tabelle im Zellmodus, alle Spalten
+  bearbeitbar). Eintrag anklicken („scharf"), dann auf die Form klicken =
+  ablegen, am 8-px-Raster. Unter der Palette steht die Statuszeile.
+- **Mitte — die Form.** Sie ist ein **echtes `GUI_WINDOW` im Entwurfsmodus**
+  (`GUI_WINDOW_DESIGN(win, TRUE)`): die Laufzeit zeichnet die Controls genau
+  so, wie das Programm sie später bekommt, nimmt ihnen aber jede Eingabe; die
+  Maus verwaltet der Designer selbst (`GUI_HIT_TEST` geht weiter). Eine
+  nachgemalte Vorschau, die von der Laufzeit abweichen könnte, gibt es nicht.
+  Klick = auswählen, ziehen = verschieben, an den **acht Griffen** ziehen =
+  Größe ändern — alles am Raster.
+- **Rechts — Inspektor.** Mit ausgewähltem Control: Name, X, Y, Breite, Höhe,
+  Text, Tooltip, Anker (`lrtb`), `on_click`, `on_change`, `on_enter` und
+  *Aktiviert*, dazu die Felder je Art (unten). Ohne Auswahl zeigt er das
+  **Formular selbst**: Titel, Breite, Höhe, *Größenveränderbar* und das
+  **Thema** (`glas_dunkel`, `glas_hell`, `dark`, `light` oder keines).
+  Enter in einem Feld oder [Übernehmen] schreibt die Werte.
 
-## Workflow
+## Tasten
 
-1. **Entwerfen:** Controls platzieren, im Inspector benennen und Events
-   (Handler-Namen) eintragen, z.B. `on_save` für einen Button.
-2. **Speichern** (`Strg+S`) als `.dhform` — JSON im Runtime-Format.
-3. **Nutzen** — drei Wege:
-   - **Im eigenen Code:** `GUI_LOAD("meinform.dhform")` und die Handler-`SUB`s
-     schreiben; `GUI_UPDATE` ruft sie automatisch per Name auf.
-   - **Direkt testen:** `F5` (Ausführen) — der Designer schreibt das Layout +
-     ein generiertes Programm-Gerüst in einen Temp-Ordner, prüft es mit
-     `dhrt --check` (Fehler landen in einem Dialog statt im Nichts) und startet
-     dann `dhrt`. Ein erneutes F5 beendet den vorigen Lauf und räumt dessen
-     Temp-Ordner; das Schließen des Designers ebenso.
-     Die Form läuft **randlos auf dem echten OS-Fenster** (Fenstergröße =
-     Formgröße, Titel = Formtitel); ist sie „größenveränderbar", ist das
-     **Programmfenster nativ resizebar** und die Form füllt es jeden Frame —
-     die verankerten Controls fließen dabei mit (Reflow).
-   - **GB-Code exportieren:** *Datei → GB-Code exportieren…* schreibt ein
-     **eigenständiges** `.dh`, das das Formular mit den `GUI_*`-Konstruktoren
-     **explizit aufbaut** (`GUI_WINDOW`/`GUI_BUTTON`/… + Setter + `GUI_ON_CLICK`/
-     `GUI_ON_CHANGE`) statt `GUI_LOAD` — frei lesbar und weiter editierbar; die
-     im Code-Editor hinterlegten Handler-Körper sind als `SUB`s eingewebt.
+| Taste | Wirkung |
+|---|---|
+| `Strg+N` / `Strg+O` | neues Formular / Formular öffnen |
+| `Strg+S` / `Strg+Umschalt+S` | sichern / sichern unter |
+| `F5` | Formular ausführen (siehe unten) |
+| `Strg+G` | GB-Code schreiben (siehe unten) |
+| `Strg+Z` / `Strg+Y` | rückgängig / wiederholen |
+| `Strg+D` | Control verdoppeln (um ein Raster versetzt) |
+| `Entf` | Control löschen |
+| Pfeile | um ein Raster schieben, mit `Umschalt` um einen Punkt |
+| `Esc` | Palette entschärfen, Auswahl aufheben |
+| `Strg+Q` | beenden |
+
+*Nach vorn* und *Nach hinten* stehen im Menü *Bearbeiten*: die Reihenfolge
+der Controls ist ihre Zeichenreihenfolge, das letzte liegt vorn. Entf und die
+Pfeile wirken nur, solange kein Eingabefeld des Inspektors den Fokus hat.
+
+**Rückgängig** merkt sich je Schritt das ganze Formular als JSON-Text (bis zu
+200 Stände). Ein Zug mit der Maus ist **ein** Schritt, gemerkt beim
+Loslassen.
+
+**Beenden** — über das Menü, das Kreuz oder Alt+F4 — fragt nach
+(*Sichern|Verwerfen|Abbrechen*), wenn das Formular nicht gesichert ist;
+sonst endet der Designer sofort.
+
+## Felder je Art
+
+Sichtbar nur bei der passenden Art; Listen werden mit **Semikolon** getrennt,
+weil ein Komma zu oft in einem Eintrag selbst steht.
+
+| Art | Felder |
+|---|---|
+| Klappliste, Liste | Einträge (`Rot; Grün; Blau`) |
+| Tabelle, Gitter | Spalten, Breiten, Bearbeitbar (`0; 2` oder `alle`), Spaltenarten (`text; ganz; zahl; auswahl`), Auswahl (`2 = Rot\|Grün`), Kästchen *Zellmodus* |
+| Regler, Fortschritt, Zahlenfeld, Drehknopf | Min, Max, Wert |
+
+Eine Spalte mit Auswahlliste wird dabei **zur Auswahlspalte**, auch wenn es
+unter Spaltenarten nicht steht — beim Laden wirkte die Liste sonst nicht.
+
+Die **Datenzeilen einer Tabelle** trägt man bewusst nicht im Designer ein.
+Eine Tabelle wird im Normalfall zur Laufzeit gefüllt — aus einer Datei, einer
+Datenbank, dem Spielstand. Der Designer legt das Gerüst fest, die Zeilen
+kommen aus dem Programm (`GUI_TABLE_ADD_ROW`).
+
+## Nutzen: drei Wege
+
+1. **Im eigenen Code:** `GUI_LOAD("meinform.dhform")` und die Handler-`SUB`s
+   schreiben. Das `.dhform` speichert je Control den **Namen** seines
+   Handlers (`on_click`, `on_change`, …), und `GUI_UPDATE` ruft ausgelöste
+   Handler automatisch per Name auf — kein Verdrahten von Hand
+   (Formular-Workflow in [module-gui.md](module-gui.md)).
 
 ```basic
 ' So nutzt du ein gespeichertes Formular im eigenen Programm:
@@ -127,7 +105,7 @@ SCREEN(800, 480, "App", 1)
 DIM frm AS GUI_WINDOW
 frm = GUI_LOAD("forms/settings.dhform")
 
-SUB on_save()            ' Name = der im Inspector eingetragene Handler
+SUB on_save()            ' Name = der im Inspektor eingetragene Handler
     PRINT "gespeichert"
 END SUB
 
@@ -136,251 +114,100 @@ WHILE NOT QUITREQUESTED()
 WEND
 ```
 
-## Die Tabelle im Designer
-
-Die Tabelle lässt sich wie jedes andere Control platzieren; im Inspector gibt
-es dafür einen eigenen Abschnitt:
-
-| Feld | Wirkung |
-|---|---|
-| **Spalten (1/Zeile)** | Spaltentitel, ein Titel je Zeile |
-| **Breiten (px)** | z. B. `120, 80, 60` — leer heißt gleichmäßig verteilen |
-| **Zeilenhöhe / Kopfhöhe** | Bilder in Zellen brauchen mehr Höhe |
-| **Feste Spalten** | die ersten *n* scrollen waagerecht nicht mit |
-| **Bearbeitbar** | Spaltennummern, z. B. `1, 2` — nur diese lassen sich per Doppelklick ändern |
-| Schalter | Zebra, Gitter, Filterzeile, Sortieren, Breiten ziehbar, Spalten verschiebbar, Mehrfachauswahl |
-
-Die **Datenzeilen fehlen bewusst.** Eine Tabelle wird im Normalfall zur
-Laufzeit gefüllt — aus einer Datei, einer Datenbank, dem Spielstand — und nicht
-im Designer abgetippt. Der Designer legt das Gerüst fest, die Zeilen kommen aus
-dem Programm:
-
-```basic
-DIM z AS ARRAY OF STRING
-z = SPLIT$("Anna|Hamburg|420", "|")
-GUI_TABLE_ADD_ROW(tbl, z)
-```
-
-Auf der Design-Fläche zeigt die Vorschau Kopfzeile, Filterzeile, Zebra, Gitter
-und die Kante des festen Blocks — aber **keine erfundenen Inhalte**. Die Kante
-wird hier immer gezeigt (in der Laufzeit erst beim Scrollen): im Entwurf gibt
-es kein Scrollen, an dem man sie sonst erkennen könnte.
-
-Ein Formular, das mit `GUI_SAVE` aus einem laufenden Programm entstanden ist,
-bringt auch **Zeilen** mit. Der Designer stellt sie nicht dar, wirft sie aber
-auch nicht weg — Öffnen und Speichern verliert nichts.
+2. **Direkt ausführen (F5):** der Designer sichert (ein neues Formular fragt
+   dabei nach dem Namen), schreibt `<name>_lauf.dh` **neben die `.dhform`**
+   und startet es mit `dhrt run`. Das Gerüst setzt das Thema, lädt die Form
+   per `GUI_LOAD` randlos auf das Programmfenster (Fenstergröße = Formgröße)
+   und enthält je Handler eine `SUB` — mit dem Rumpf aus dem Feld `code` der
+   `.dhform`, sonst mit einem `' TODO`. Ein erneutes F5 beendet den vorigen
+   Lauf; beim Ende des Designers wird er ebenfalls beendet. Wie er ausging,
+   meldet die Statuszeile.
+3. **GB-Code (Strg+G):** `<name>_code.dh` baut das Formular **Aufruf für
+   Aufruf** — Konstruktor je Control, bei der Tabelle Kopf, Breiten,
+   Zellmodus, bearbeitbare Spalten, Spaltenarten und Auswahllisten, dazu
+   Datum und Uhrzeit, gesperrt, Anker, Tooltip und die Handler samt Rümpfen
+   aus `code`; ohne `GUI_LOAD` und ohne die `.dhform` zur Laufzeit, lesbar
+   und von Hand weiterzuschreiben. Die Konstruktoren, die sich selbst messen
+   (Beschriftung, Kästchen, Regler …), bekommen ein `GUI_SET_BOUNDS`
+   hinterher, sonst ginge die Größe aus dem Designer verloren. Übersprungen
+   wird nur das Bild (die `.dhform` kennt keine Bildquelle, und `GUI_IMAGE`
+   bräuchte ein `LOADIMAGE`) — mit einem Kommentar an der Stelle. Menüs baut
+   der Code nicht nach und sagt es ebenfalls in einem Kommentar.
 
 ## Dateiformat
 
-`.dhform` ist exakt das JSON, das `GUI_SAVE`/`GUI_LOAD` lesen/schreiben (siehe
-[module-gui.md](module-gui.md)) — plus zwei Designer-Felder, die die Runtime
-ignoriert: `name` pro Control und ein Top-Level-`code` (`{handler_name:
-gb-code}`) mit den Event-Handler-Körpern. Der Designer und ein handgeschriebenes
-`GUI_SAVE` erzeugen dieselbe Datei; beides ist austauschbar. Beim **Ausführen
-(F5)** webt der Designer die `code`-Körper als `SUB`-Rümpfe in das generierte
-Programm-Gerüst (Handler ohne Body werden zu `' TODO`-Stubs).
+`.dhform` ist exakt das JSON, das `GUI_SAVE`/`GUI_LOAD` und
+`GUI_TO_JSON`/`GUI_FROM_JSON` schreiben und lesen (siehe
+[module-gui.md](module-gui.md)) — plus zwei Designer-Felder, die die
+Laufzeit übergeht: `name` je Control und ein `code` auf oberster Ebene
+(`{handler_name: rumpf}`) mit den Handler-Rümpfen.
 
-**Felder, die der Designer nicht darstellt, reicht er unverändert durch.** Die
-`gui`-Laufzeit kennt mehr als der Inspector anbietet — auf Fenster-Ebene
-`chrome`, `menus`, `tabs`/`active_tab`, pro Widget `tab_page` und `font`.
-Bei den *Arten* gibt es diese Lücke seit 2026-08-31 nicht mehr: alle 30 lassen
-sich ablegen, zeichnen und exportieren. Beim **Reiterwerk** (`tabcontrol`, seit
-2026-09-12) stellt der Designer die Beschriftungen ein, nicht aber, welches
-Control auf welche Seite gehört — ein Programm, das das gesetzt hat, verliert
-es beim Öffnen und Speichern trotzdem nicht: `tabctl` läuft als unbekanntes
-Feld durch.
-Eine im Programm gebaute und mit `GUI_SAVE` gesicherte Form lässt sich also im
-Designer öffnen und nachjustieren, ohne dass Menüs, Reiter oder Tabellendaten
-verloren gehen; bearbeiten lassen sie sich dort aber nicht (sie werden auf der
-Design-Fläche auch nicht gezeichnet). Ein Golden-Test führt diesen Roundtrip
-real durch dhrt.
+**Das Modell des Designers IST dieses JSON** (json-Modul), die Form auf dem
+Schirm nur die Ansicht: jede Änderung schreibt ins JSON und baut die Ansicht
+neu (`GUI_FROM_JSON`). Sichern ist `JSON_PRETTY`, Laden `JSON_LOAD`. Daraus
+folgt: **alles, was der Inspektor nicht zeigt, läuft unverändert mit
+durch** — Menüs, Reiter, Tabellendaten, Baumknoten, `code`, Regeln,
+Bindungen. Eine im Programm gebaute und mit `GUI_SAVE` gesicherte Form lässt
+sich also im Designer öffnen und nachjustieren, ohne dass etwas davon
+verloren geht; bearbeiten lässt es sich dort aber nicht.
 
-**Robustheit beim Laden:** Beschädigte oder von Hand geschriebene Dateien
-(fehlende Felder, falsche Typen, `null`) fallen feldweise auf den Default
-zurück — genau wie `gui.rs` es tut — statt einen Fehler zu werfen. Ein
-`.dhproj`-Manifest wird beim Laden als Formular **abgelehnt** (sonst hätte ein
-anschließendes Speichern die Projektdatei überschrieben).
+Beispiel-Formular: `examples/forms/settings.dhform` mit
+[examples/105_form_runner.dh](../examples/105_form_runner.dh).
 
-## Architektur / Erweiterung
+## Was die Qt-Fassung hatte und diese nicht
 
-- Datenmodell Qt-frei in [`drachenhauch/formdesigner/document.py`](../drachenhauch/formdesigner/document.py)
-  (`FormDoc`/`Control`, `.dhform`-IO, `PALETTE`, Code-Generierung) — headless
-  getestet (`tests/test_formdesigner_document.py`).
-- UI in [`drachenhauch/formdesigner_qt.py`](../drachenhauch/formdesigner_qt.py)
-  (Palette/Canvas/Inspector/Code-Panel). Neue Control-Arten: Eintrag in `PALETTE`
-  ergänzen — Inspector/Canvas/Serialisierung ziehen daraus.
-- **Ungespeichert-Schutz:** `FormDesigner._confirm_dirty()` fragt für **alle**
-  offenen Formulare (nicht nur das aktive) und wird von `closeEvent`,
-  „Projekt öffnen…" und `close_form` benutzt. Qt-Tests dieser Datei müssen
-  modale Dialoge abfangen — dafür gibt es in `tests/test_formdesigner_qt.py`
-  eine Autouse-Fixture, die `QMessageBox.question/warning/critical` ersetzt.
-  Ohne sie hält der erste Dialog den ganzen pytest-Lauf an.
-- **Gotcha:** Das Code-Panel hängt einen `DHHighlighter` an sein Editor-Dokument.
-  Ein lebender `QSyntaxHighlighter` segfaultet beim Interpreter-Shutdown, wenn er
-  die Teardown-Race von Dokument + `QApplication` überlebt (im Test sichtbar als
-  Exit-Code 116, sobald vorher ein `dhrt`-Subprozess lief). Deshalb löst
-  `FormDesigner.closeEvent` ihn via `code_panel.detach_highlighter()`
-  (`setDocument(None)`); Qt-Tests müssen das Fenster mit `win.close()` schließen.
+Der Designer in Drachenhauch hat ein Viertel der Zeilen der Qt-Fassung
+(1 342 gegen 5 055, Faktor 0,27) — und der Faktor misst vor allem, was
+weggelassen ist. Nicht (oder nicht mehr) vorhanden:
 
-## In Drachenhauch: `examples/197_form_designer.dh`
+- **Mehrfachauswahl** samt Auswahlrahmen, **Ausrichten**, **gleiche Größe**
+  und **Verteilen**; ausgewählt ist immer genau ein Control.
+- **Ausrichtungs-Hilfslinien** beim Ziehen, **Zoom**, ein **Kontextmenü**.
+- **Kopieren/Einfügen** (nur Verdoppeln) und **Ablegen per Drag&Drop** aus
+  der Palette (nur anklicken, dann auf die Form klicken).
+- Ein **Code-Editor für Handler** (Doppelklick auf ein Control legte dort
+  einen Handler an). Hier steht der Rumpf im Feld `code` der `.dhform` und
+  wird nur durchgereicht; geschrieben wird er im eigenen Programm oder von
+  Hand in der Datei.
+- **Mehrformular-Projekte** (`.dhproj`): hier ist immer genau ein Formular
+  offen.
+- Im Inspektor: **Layout-/Panel-Zuordnung**, **Regeln** und **Bindung**,
+  Tab-Reihenfolge, Radio-**Gruppe**, **Platzhalter**, die **Auswahl** einer
+  Klappliste, Min/Max-Größe und *beweglich/schließbar/sichtbar* des
+  Formulars, die Schalter der Tabelle (Zebra, Filterzeile, Sortieren …) und
+  die Werte von Baum, Farb- und Datumswähler. Was davon in einer Datei
+  steht, bleibt beim Öffnen und Sichern erhalten (siehe Dateiformat).
+- **Menüs im GB-Code** — die Qt-Fassung schrieb sie mit, diese sagt nur in
+  einem Kommentar, dass `GUI_LOAD` sie baut. Einen Menü-*Editor* hatte auch
+  die Qt-Fassung nicht.
+- F5 prüft das Laufprogramm nicht vorher mit `dhrt --check`; ein Fehler zeigt
+  sich im gestarteten Programm.
+- Die Form auf dem Schirm erscheint im Thema des Designers, nicht im
+  eingestellten Thema des Formulars — das bekommt erst das erzeugte Programm.
 
-Seit 2026-09-06 gibt es den Designer auch **in Drachenhauch selbst** (Weg B
-aus [entwurf-python-abbau.md](entwurf-python-abbau.md), der erste der vier
-Editoren ohne Piloten). 1 329 Zeilen gegen 5 055 der Qt-Fassung (3 519 UI +
-1 536 Modell), Faktor 0,26 (beim ersten Stand 860 Zeilen, 0,17; seit Stand
-31 mit Feldern je Art und GB-Code) — mit demselben Vorbehalt wie bei allen
-Piloten: der Faktor misst, wie viel weggelassen ist (siehe unten). Die
-Qt-Fassung wird nicht mehr erweitert; Python soll ganz wegfallen.
+## Drei Fallen beim Bau
 
-```
-dhrt run examples/197_form_designer.dh [-- formular.dhform]
-```
+- **Eine Liste meldet kein `GUI_CLICKED`** — die Palette wird über ihre
+  AUSWAHL scharf, die Auswahl ist das Ereignis.
+- **Ein neu gebautes Fenster nimmt den Fokus**, und Menü-Kürzel galten nur im
+  Fenster mit Fokus. `ansichtBauen` merkt sich darum `GUI_FOCUSED()` und gibt
+  ihn zurück — ohne das wären Strg+S und F5 nach dem ersten Ablegen tot.
+  (Seit 2026-09-07 gelten Kürzel in allen sichtbaren Fenstern; das
+  Zurückgeben blieb.)
+- **Ganze Zahlen bleiben ganz:** `JSON_TYPE` sagt nur `number`. Beim Kopieren
+  eines Teilbaums (Verdoppeln, Umordnen) wird eine ganze Zahl darum als
+  ganze geschrieben — aus `48.0` liest `GUI_FROM_JSON` kein x mehr.
 
-Die Entwurfsfläche ist ein **echtes `GUI_WINDOW` im Entwurfsmodus**
-(`GUI_WINDOW_DESIGN(win, TRUE)`, neu in `gui`): die Laufzeit zeichnet die
-Controls genau so, wie das Programm sie später bekommt, nimmt ihnen aber
-jede Eingabe; die Maus verwaltet der Designer selbst (`GUI_HIT_TEST` geht
-weiter). Es gibt also keine nachgemalte Vorschau, die von der Laufzeit
-abweichen könnte — der Qt-Designer malt jede Widget-Art in QPainter nach.
+## Prüfung
 
-**Das Modell ist das `.dhform`-JSON** (json-Modul), das Fenster nur die
-Ansicht: jede Änderung schreibt ins JSON und baut die Ansicht neu
-(`GUI_FROM_JSON`). Sichern ist `JSON_PRETTY`, Laden `JSON_LOAD`,
-Rückgängig ein JSON-Text je Stand — und alles, was die Laufzeit kennt und
-der Inspektor nicht zeigt (Menüs, Reiter, Tabellendaten, `code`), läuft
-unverändert mit durch. Geprüft wird **ohne Python**
-(`tests/pruef/werkzeug_formdesigner.dhtest`, seit Stufe 32; vorher
-`test_pilot_formdesigner.py` mit dem Modell des Qt-Designers als Leser): ein
-Fall legt per echtem Klick einen Button ab, sichert mit Strg+S und prüft die
-gesicherte Datei; andere rufen Inspektor und GB-Code direkt auf und lassen den
-erzeugten Code durch `dhrt --check` und einen Lauf.
-
-Kann: Palette aller 30 Arten der Laufzeit und dazu das **Gitter** (eine
-Tabelle im Zellmodus, alle Spalten bearbeitbar), anklicken, dann auf die
-Form klicken; Ziehen, acht Griffe, Raster 8 px, Entf, Strg+D, Pfeile, Nach
-vorn/hinten, Strg+Z/Y, Inspektor (Name, Lage, Text, Tooltip, Anker,
-`on_click`/`on_change`/`on_enter`, aktiviert; ohne Auswahl: Titel, Größe,
-größenveränderbar, Thema), F5 erzeugt `<name>_lauf.dh` mit denselben
-Handler-Rümpfen wie `generate_runner` und startet es. Aus der IDE in
-Drachenhauch: Menü Werkzeuge — und seit Stand 31 **öffnet ein Klick auf eine
-`.dhform` im Projektbaum den Designer** mit dieser Datei.
-
-**Felder je Art** (seit Stand 31, sichtbar nur bei der passenden Art; Listen
-mit Semikolon, weil ein Komma zu oft in einem Eintrag selbst steht):
-
-| Art | Felder |
-|---|---|
-| Klappliste, Liste | Einträge (`Rot; Grün; Blau`) |
-| Tabelle, Gitter | Spalten, Breiten, Bearbeitbar (`0; 2` oder `alle`), Spaltenarten (`text; ganz; zahl; auswahl`), Auswahl (`2 = Rot\|Grün`), Kästchen Zellmodus |
-| Regler, Fortschritt, Zahlenfeld, Drehknopf | Min, Max, Wert |
-
-Eine Spalte mit Auswahlliste wird dabei **zur Auswahlspalte**, auch wenn es
-unter Spaltenarten nicht steht — beim Laden wirkte die Liste sonst nicht.
-
-**GB-Code** (Strg+G, seit Stand 31): `<name>_code.dh` baut das Formular
-Aufruf für Aufruf — Konstruktor je Control, Kopf, Breiten, Zellmodus,
-bearbeitbare Spalten, Spaltenarten und Auswahllisten der Tabelle, Datum und
-Uhrzeit, gesperrt, Anker, Tooltip und die Handler samt Rümpfen aus `code`;
-ohne `GUI_LOAD` und ohne die `.dhform` zur Laufzeit. Die Konstruktoren, die
-sich selbst messen (Beschriftung, Kästchen, Regler …), bekommen ein
-`GUI_SET_BOUNDS` hinterher, sonst ginge die Größe aus dem Designer verloren.
-Übersprungen wird nur das Bild (die `.dhform` kennt keine Bildquelle); Menüs
-baut der Code nicht nach und sagt es in einem Kommentar. Der Test legt ein
-Formular mit **jeder** Art an und prüft den erzeugten Code mit `dhrt --check`
-und einem Lauf.
-
-Noch nicht: Mehrfachauswahl und Ausrichten, Layout-/Panel-Zuordnung,
-Regeln und Bindung im Inspektor, Menü-Editor, Code-Editor für Handler
-(der Rumpf steht im `code`-Feld und wird durchgereicht),
-Mehrformular-Projekte. Zwei Fallen beim Bau: eine Liste meldet kein
-`GUI_CLICKED` (die Auswahl ist das Ereignis), und ein neu gebautes Fenster
-nimmt den Fokus — Kürzel gelten im Fenster mit Fokus, ohne Zurückgeben
-wären Strg+S und F5 nach dem ersten Ablegen tot.
-
-## Status / geplant
-
-Vorhanden: Platzieren, Auswählen, Verschieben, **Resize-Handles + Snap-Grid**,
-Löschen, **Undo/Redo**, Inspector (Kerneigenschaften + Events), **integrierter
-Code-Editor** (Doppelklick-auf-Control → Handler anlegen/anspringen),
-**Multi-Form-Projekte** (`.dhproj`), **GB-Code-Export** (explizite
-`GUI_*`-Konstruktion statt `GUI_LOAD`), Speichern/Laden, Ausführen (F5). Damit
-ist der geplante Funktionsumfang komplett.
-
-**GB-Code-Export-Detail:** `FormDoc.generate_gb_code()` (Qt-frei) emittiert pro
-Control den passenden Konstruktor (`GUI_LABEL` ohne w/h, `GUI_SLIDER` mit
-min/max/value, Items als sized `DIM x[n] AS STRING` …) plus nur die abweichenden
-Setter (`GUI_SET_ENABLED/VISIBLE/VALUE/FONT_SIZE/COLOR`, `*_SET_SELECTED`).
-Handler werden per `GUI_ON_CLICK/CHANGE`-FUNCREF verdrahtet. **Grenze:**
-`image`-Controls werden übersprungen (das `.dhform` speichert keine Bildquelle —
-`GUI_IMAGE` bräuchte ein `LOADIMAGE`). Strings escapen `"`→`""`. Ein
-run_gb-Golden-Test führt die erzeugte Konstruktion real in dhrt aus **und
-vergleicht sie gegen `GUI_LOAD` desselben `.dhform`** — beide Wege müssen
-dasselbe Formular bauen.
-
-**Zwei Eigenheiten der Konstruktoren**, die der Export ausgleicht:
-`GUI_LABEL`/`CHECKBOX`/`RADIO`/`SLIDER`/`SEPARATOR`/`TOGGLE`/`SPLITTER`/
-`SPINNER`/`KNOB` berechnen ihre Größe selbst, deshalb wird `GUI_SET_BOUNDS`
-nachgereicht (`_EIGENE_GROESSE` in `document.py`). `GUI_PROGRESS` liegt fest auf
-`min=0/max=1` und hat keinen Range-Setter, deshalb wird der Wert auf den Anteil
-normiert (optisch identisch — die Laufzeit zeichnet den Balken als
-`(value-min)/(max-min)`). *Restgrenze:* `GUI_SET_BOUNDS` aktualisiert die
-Anchor-Basis der Laufzeit nicht mit — wird ein exportiertes, resizebares Fenster
-gezogen, springen diese Control-Arten auf ihre Konstruktor-Größe zurück.
-
-**Wo die neuen Arten ihre Werte tragen.** Der Designer erfindet dafür keine
-eigenen Felder, sondern benutzt genau die Schlüssel, unter denen die Laufzeit
-sie in die `.dhform` schreibt (`gui.rs::widget_json`) — sonst käme der Wert
-beim nächsten Öffnen nicht zurück:
-
-| Art | Feld | Bedeutung |
-|---|---|---|
-| Farbwähler | `color_value` (`"#RRGGBB"`) | Startfarbe; ohne Angabe die Vorgabe der Laufzeit |
-| Datumswähler | `date` (`"JJJJ-MM-TT"`) | Startdatum; **leer heißt HEUTE** und schreibt gar kein Datum |
-| Trenner | `text` | Richtung `"h"`/`"v"`; `min`/`max` sind die Grenzen |
-| Zahlenfeld, Drehknopf | `min`/`max`/`value` | wie beim Schieber |
-| Baum | `items` ↔ `tree.nodes` | siehe unten |
-
-**Der Baum braucht eine Übersetzung.** Die Laufzeit legt seine Knoten nicht
-unter `items` ab (das bleibt Dropdown und ListBox vorbehalten), sondern unter
-`tree.nodes` mit Elternnummer und Ebene. Der Designer schreibt die Liste aus
-`items` als oberste Ebene dorthin und liest sie beim Öffnen zurück. **Ein
-tieferer Baum wird dabei nicht verflacht:** enthält die Datei Knoten mit
-Eltern, bleibt die Struktur unangetastet und der Designer zeigt nur die
-oberste Ebene. Wer eine von einem Programm gespeicherte Form öffnet, soll sie
-nicht dadurch verlieren, dass der Designer weniger anzeigt als darin steht.
-
-**Multi-Form-Architektur:** Qt-freies `FormProject` (in
-`formdesigner/document.py`) ist nur ein Manifest (`forms`-Liste + `main`); jede
-Form bleibt ihr eigenes `.dhform`. Im Fenster bündelt `_OpenForm` pro Formular
-Dokument + Pfad + `History` + Dirty; `FormDesigner.history`/`.path` sind
-Properties auf die aktive Form, `_switch_to` tauscht Canvas/Inspector/Code-Panel
-um.
-
-**Undo/Redo-Mechanik:** Snapshot-basiert — die Qt-freie `History` (in
-`formdesigner/document.py`) hält komplette `FormDoc`-Snapshots auf einem
-Undo-/Redo-Stack; die Canvas legt vor jeder Mutation einen Checkpoint an und
-fasst kontinuierliche Gesten (Drag/Resize) bzw. eine Inspector-Edit-Sitzung zu
-je einem Schritt zusammen.
-
-
-## Thema des Formulars
-
-In den Formular-Eigenschaften (Inspector, wenn kein Control gewählt ist) gibt
-es die Auswahl **Thema**. Sie bestimmt zweierlei:
-
-- Das erzeugte Programm setzt `GUI_THEME_PRESET(...)` **vor** `GUI_LOAD` — das
-  Preset legt auch Metriken wie den Eckenradius fest, und die gehen in die
-  Darstellung der Widgets ein.
-- Die Entwurfsfläche malt das Thema nach, damit der Entwurf zeigt, was das
-  Formular später wirklich tut.
-
-`(Vorgabe)` heißt: kein Preset-Aufruf, also das eingebaute Cyan-Thema der
-Laufzeit. Ein Formular ohne Eintrag bekommt beim Speichern **kein** neues
-Feld — bestehende `.dhform`-Dateien ändern sich also nicht.
-
-> **Achtung bei Änderungen:** `FORM_THEME_COLORS` in
-> `drachenhauch/formdesigner/document.py` ist ein **Nachbau** der Presets aus
-> `rust/drachenhauch_runtime/src/gui.rs` — der Designer zeichnet mit Qt und kann die
-> Laufzeit nicht fragen. `tests/test_formdesigner_theme.py` vergleicht beide
-> gegeneinander; wer ein Preset in gui.rs ändert oder hinzufügt, muss die
-> Tabelle nachziehen (der Test sagt genau, welcher Wert abweicht).
+[`tests/pruef/werkzeug_formdesigner.dhtest`](../tests/pruef/werkzeug_formdesigner.dhtest)
+(`dhrt test`): ein Fall legt per echtem Klick einen Button ab, sichert mit
+Strg+S und liest die Datei mit dem json-Modul; einer zieht ein Control und
+nimmt zweimal zurück; einer prüft das F5-Laufprogramm; einer, dass fremde
+Felder einer bestehenden Form erhalten bleiben; einer legt **jede** Art an
+und lässt den GB-Code durch `dhrt --check` und einen Lauf; zwei prüfen den
+Inspektor an Tabelle und Gitter; einer misst die Palette gegen
+`Kind::from_str` in `gui.rs` — eine Art, die die Laufzeit kann und der
+Designer nicht, fällt sonst niemandem auf; zwei belegen den Entwurfsmodus
+(mit Gegenprobe). `DH_FORM_LOG=<datei>` lässt den Designer seine Ereignisse
+zeilenweise protokollieren.

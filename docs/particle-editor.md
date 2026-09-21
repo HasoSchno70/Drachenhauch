@@ -1,58 +1,113 @@
-# Partikel-Editor
+# Partikel-Editor (`examples/185_partikel_editor.dh`)
 
-Standalone-Tool zum visuellen Tunen des [`particles`](README.md#module)-Moduls — Parameter live per Slider einstellen, Echtzeit-Vorschau, und das Ergebnis als GB-Code exportieren.
-
-## Starten
-
-Aus dem **Code-Editor** heraus: Toolbar-Button (buntes Partikel-Symbol neben dem Sprite-Editor) oder `Datei → Partikel-Editor öffnen ...` (`Strg+Shift+K`).
-
-Standalone:
-
-```
-dhparticles
-```
-
-oder
+Alle Parameter des [`particles`](module-particles.md)-Moduls live einstellen,
+mit echter Vorschau, und das Ergebnis als GB-Code mitnehmen — geschrieben in
+Drachenhauch auf dem eigenen `gui`-Modul. Die Vorschau ist **keine
+Nachbildung**: sie treibt ein echtes `PARTICLE_SYSTEM` mit denselben Aufrufen,
+die später im Spiel stehen, und zeichnet es mit `PARTICLE_DRAW`. Was man
+sieht, ist, was man bekommt.
 
 ```
-.venv\Scripts\python.exe dhrun.py --particles
+dhrt run examples/185_partikel_editor.dh
 ```
 
-(Braucht `PySide6` und `numpy`.)
+In der [IDE](ide.md) steht er im Menü **Werkzeuge** und läuft dort als eigenes
+Programm. Python braucht er nicht.
 
-## Bedienung
+## Das Fenster
 
-**Links** die Parameter (live in die Vorschau übernommen):
+| Bereich | Was geht |
+|---|---|
+| Vorschau | Die Teilchen, beschnitten auf die Fläche; die Quelle sitzt in der Mitte oder, mit **folgt der Maus**, unter dem Zeiger. Unten die Zahl der lebenden Teilchen |
+| Bedienung | **Pause**/**Weiter**, **Leeren**, **Salve** (200 Teilchen auf einmal — für Explosionen) |
+| Werkseinstellungen | Funken, Rauch, Feuer, Regen, Schnee, Explosion, Zauber, Springbrunnen — ein Klick setzt alle Regler, Darstellung und Schalter und leert die Vorschau |
+| Ausgabe | **Sichern ...**/**Laden ...** (`.ini`), **GB-Code kopieren** |
+| Verlauf | **Zurueck**/**Vor** oder Strg+Z/Strg+Y |
 
-- **Preset-Bibliothek** — Combo mit **Werks-Presets** (★ `Feuer`, `Rauch`, `Funken`, `Explosion`, `Regen`) als Startpunkt plus deinen **eigenen Presets**. „Speichern unter..." legt den aktuellen Zustand als benanntes Preset ab (persistiert unter `~/.drachenhauch/presets/particles.json`), „Loeschen" entfernt eigene Presets (Werks-Presets sind geschützt).
-- **Bewegung** — `vx/vy min/max` (Start-Geschwindigkeit, px/s), `Gravity x/y` (px/s²).
-- **Aussehen** — **Modus** (`circle` / `pixel` / `square` / `streak` / `glow` — `glow` wird aktuell identisch zu `circle` gezeichnet, kein additives Blending; für echtes additives Leuchten im Spiel selbst `BLEND_MODE("add")` um `PARTICLE_DRAW` legen), Größe min/max, **Farbe**, optionaler **Farbverlauf** zu einer End-Farbe (über die Lebenszeit interpoliert, z. B. Feuer gelb→rot), **Fade** (am Lebensende abdunkeln).
-- **Lebenszeit & Emission** — Lebensdauer min/max (ms), Emission pro Frame.
+Die Regler:
 
-**Rechts** die Echtzeit-Vorschau. Sie treibt eine echte `_ParticleSystem`-Instanz — **dasselbe Simulationsmodell wie die Engine**, also entspricht die Vorschau exakt dem späteren Verhalten im Spiel (inkl. `glow`, das bewusst wie `circle` aussieht — siehe oben).
+| Gruppe | Regler |
+|---|---|
+| Bewegung | Tempo X min/max, Tempo Y min/max (±400 px/s), Kraft X/Y (±600 px/s²) |
+| Lebenszeit (ms) und Ausstoss | Leben min/max (50..4000 ms), je Bild (0..60 Teilchen) |
+| Aussehen | Darstellung (`circle`, `pixel`, `square`, `streak`, `glow`), Groesse min/max, **am Ende ausblenden** |
+| Farbe am Anfang | Rot, Gruen, Blau, darunter ein Farbfeld mit dem Ergebnis |
+| Farbe am Ende | **Farbverlauf benutzen**, Rot, Gruen, Blau, Farbfeld |
 
-**Unten:** **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Parameter-Änderungen rückgängig bzw. wieder her — ein Slider-Drag zählt als ein Schritt. `Pause` friert die Simulation ein, `Leeren` entfernt alle Partikel, **`GB-Code exportieren`** öffnet ein Fenster mit dem fertigen `PARTICLE_*`-Setup-Snippet und kopiert es auf Wunsch in die Zwischenablage.
+Ohne Farbverlauf bekommt das System die Startfarbe auch als Endfarbe — das
+Modul kennt kein „aus“. `glow` zeichnet `PARTICLE_DRAW` derzeit wie `circle`;
+für echtes Leuchten im Spiel `BLEND_MODE("add")` um den Aufruf legen.
 
-## Beispiel-Export
+Alles geht auch ohne Maus: TAB wechselt das Bedienelement, die Leertaste löst
+aus, die Pfeile verstellen einen Regler.
+
+## Rückgängig
+
+Ein **Zug** am Regler ist **ein** Schritt: aufgezeichnet wird erst, wenn sich
+ein Bild lang nichts geändert hat und keine Maustaste mehr gedrückt ist.
+Werkseinstellung und geladene `.ini` sind auf demselben Weg je ein Schritt.
+Gemerkt wird der volle Stand (17 Regler, Darstellung, zwei Schalter), bis zu
+32 Schritte; ein neuer Zug nach einem Zurück schneidet den Vor-Weg ab.
+
+## Sichern und Laden
+
+**Sichern ...** schreibt alle Regler in eine `.ini`, **Laden ...** holt sie
+zurück. Schlüssel ist die **Beschriftung** des Reglers, dazu `modus` für die
+Darstellung — lesbar und von Hand änderbar. Ein unbekannter Schlüssel wird
+übergangen, ein Wert außerhalb des Reglerbereichs geklemmt. Die beiden Schalter
+(Ausblenden, Farbverlauf) stehen nicht in der Datei.
+
+Beim Schließen (Kreuz, Alt+F4 oder ESC) fragt der Editor nach
+(Sichern / Verwerfen / Abbrechen), aber nur, wenn etwas vom letzten Sichern,
+Laden oder Wählen einer Werkseinstellung abweicht.
+
+## GB-Code
+
+**GB-Code kopieren** legt die Aufrufe in die Zwischenablage, die dieses System
+im eigenen Programm erzeugen. Die Quelle steht dort als `x, y` — die Lage
+bestimmt das Spiel —, und den `IMPORT "particles"` schreibt man selbst dazu.
+Für die Werkseinstellung „Funken“, mit einer festen Lage davor:
 
 ```basic
 IMPORT "particles"
 
-DIM ps AS PARTICLE_SYSTEM
-ps = PARTICLE_SYSTEM_NEW(160, 120)
-PARTICLE_SET_VELOCITY(ps, -80, 80, -160, -60)
-PARTICLE_SET_LIFETIME(ps, 700, 1400)
-PARTICLE_SET_GRAVITY(ps, 0, 120)
-PARTICLE_SET_SIZE(ps, 2, 4)
-PARTICLE_SET_COLOR(ps, &HFFDD33)
-PARTICLE_SET_COLOR_END(ps, &HFF2000)
-PARTICLE_SET_FADE(ps, TRUE)
-PARTICLE_SET_MODE(ps, "glow")
+DIM x AS INTEGER
+DIM y AS INTEGER
+x = 160
+y = 120
 
-' --- im Game-Loop ---
-' PARTICLE_EMIT(ps, 8)
-' PARTICLE_UPDATE(ps, 16)
-' PARTICLE_DRAW(ps)
+DIM sys AS PARTICLE_SYSTEM
+sys = PARTICLE_SYSTEM_NEW(x, y)
+PARTICLE_SET_VELOCITY(sys, -90, 90, -200, -60)
+PARTICLE_SET_GRAVITY(sys, 0, 420)
+PARTICLE_SET_LIFETIME(sys, 300, 800)
+PARTICLE_SET_SIZE(sys, 2, 4)
+PARTICLE_SET_COLOR(sys, RGB(255, 220, 80))
+PARTICLE_SET_COLOR_END(sys, RGB(255, 60, 20))
+PARTICLE_SET_MODE(sys, "circle")
+PARTICLE_SET_FADE(sys, TRUE)
+
+' pro Bild:
+PARTICLE_EMIT(sys, 8)
+PARTICLE_UPDATE(sys, 16)
+PARTICLE_DRAW(sys)
 ```
 
-Den `PARTICLE_*`-Setup-Block ins Programm kopieren, die drei Loop-Zeilen in den Game-Loop übernehmen — fertig.
+Die drei Zeilen nach `' pro Bild:` gehören in die Bildschleife.
+
+## Gegenüber der alten Qt-Fassung
+
+Die frühere Qt-Fassung (`dhparticles`) hatte eine **Preset-Bibliothek** mit
+benannten eigenen Einstellungen in einer gemeinsamen Datei und zeigte den
+GB-Code in einem eigenen Fenster. Hier ist jede eigene Einstellung eine eigene
+`.ini`, und der Code geht direkt in die Zwischenablage.
+
+## Tests
+
+`tests/pruef/werkzeug_partikel.dhtest` fährt echte Mausklicks und Tasten über
+eine Aufnahme: ein Zug ist ein Schritt, Zurück nimmt den ganzen Zug zurück und
+Vor holt ihn wieder, Strg+Z/Strg+Y tun dasselbe wie die Knöpfe, eine
+Werkseinstellung ist ein Schritt, ein neuer Zug schneidet den Vor-Weg ab, und
+der erste Eintrag der Werkseinstellungen ist anklickbar (früher lagen die
+Knöpfe darauf). Die Rückfrage beim Schließen prüft
+`tests/pruef/werkzeug_kreuz.dhtest` mit echten Fensternachrichten.

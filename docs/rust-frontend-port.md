@@ -32,7 +32,7 @@ Stufen fertig.** dhrt führt `.dhc` weiterhin direkt aus (VM-Pfad); `dhrt run`
   `$`-Suffix.
 - Debug-Einstieg `dhrt --tokens <datei.dh>` → eine JSON-Zeile `[TYP, wert,
   zeile]` pro Token (kanonisch, umgeht Python-`repr`-Eigenheiten).
-- Test [`tests/test_rust_lexer_parity.py`](../tests/test_rust_lexer_parity.py):
+- Test tests/test_rust_lexer_parity.py:
   parst beide Seiten als JSON und vergleicht strukturell — **137 Fälle grün**
   (alle `examples/*.dh` + 17 Snippets).
 - Grenzen: Integer-Literale als `i64` (Python: bignum) — für reale Programme
@@ -124,7 +124,7 @@ DATA-Arrays ab).
 ## Stufe 4 — Preprocess / `IMPORT` (fertig)
 
 [`rust/drachenhauch_runtime/src/preprocess.rs`](../rust/drachenhauch_runtime/src/preprocess.rs):
-Port von `drachenhauch/preprocess.py`. `process(source, base)` expandiert
+Port von drachenhauch/preprocess.py. `process(source, base)` expandiert
 `IMPORT`-Zeilen rekursiv **vor dem Lexen** und liefert `(merged_source,
 imported_modules)`:
 - **Quellcode-IMPORT** (`IMPORT "helper.dh"` / relativer Pfad): Datei lesen,
@@ -142,7 +142,7 @@ imported_modules)`:
 
 `dhrt --runsrc` schaltet den Preprocessor jetzt vor; `dhrt --preprocess <datei>`
 gibt die gemergte Quelle aus. **Gate = Merge-Ergebnis-Gleichheit** gegen
-`process()` ([`tests/test_rust_preprocess_parity.py`](../tests/test_rust_preprocess_parity.py),
+`process()` (tests/test_rust_preprocess_parity.py,
 7 Tests: Quellcode-/Modul-/Alias-/nested+duplicate-/Trailing-Comment-IMPORT,
 fehlender Import = Fehler in beiden, plus End-to-End `--runsrc`-Output-Parität).
 Gotchas: (a) `MODULES`/`MODULE_TYPES` müssen mit `modules.discover_modules()`/
@@ -159,7 +159,7 @@ nicht.
 [`src/main.rs`](../rust/drachenhauch_runtime/src/main.rs): `dhrt run datei.dh` ist der
 eigenständige End-to-End-Lauf — preprocess → lex → parse → compile → VM, alles
 in Rust. `run_main` kanonisiert den Pfad, wechselt **ins Datei-Verzeichnis**
-(`set_current_dir`, wie `dhrun.py` `os.chdir(file.parent)`), damit relative
+(`set_current_dir`, wie damals der Python-Starter `dhrun.py`), damit relative
 IMPORT- **und** Laufzeit-Pfade (`OpenFile("data.txt")`, `LOADIMAGE("assets/…")`)
 stimmen, und nutzt den Dateinamen als Label für Laufzeitfehler. Komfort:
 `dhrt datei.dh` (ohne `run`, Endung `.dh`) wird genauso behandelt; `.dhc`-Pfade
@@ -179,8 +179,8 @@ Portierung erreicht.
 
 - **Selbst-Export** `dhrt --export datei.dh [out_dir]`: kompiliert die Quelle
   selbst → `.dhc` und hängt den Payload (`<gbc><u64 len><DHRTPAY1>`) an eine
-  Kopie der eigenen Runtime-Exe — eine eigenständige `.exe`, ohne Python, ganz
-  ohne `dhrun.py`/`export.py`. `assets/` neben der Quelle wird mitkopiert. Test
+  Kopie der eigenen Runtime-Exe — eine eigenständige `.exe`, ohne Python (der
+  frühere Weg über `dhrun.py`/`export.py` ist entfernt). `assets/` neben der Quelle wird mitkopiert. Test
   [`tests/pruef/dhrt_export.dhtest`](../tests/pruef/dhrt_export.dhtest)
   (exportiert, startet die Exe, vergleicht ihre Ausgabe).
 - **Aliasierte Modul-IMPORTs** `IMPORT "json" AS j`: `preprocess::compile_env`
@@ -188,7 +188,7 @@ Portierung erreicht.
   `(alias, modul)`-Liste; der Compiler bildet aliasierte Builtin-Namen
   (`j_parse` → `json_parse`, `v_new` → `vec2_new`) auf den kanonischen zurück,
   sodass dhrt sie nativ findet. Test in
-  [`tests/test_rust_preprocess_parity.py`](../tests/test_rust_preprocess_parity.py)
+  tests/test_rust_preprocess_parity.py
   (`test_e2e_runsrc_module_alias`).
 - **WASM-Quellkompilierung im Browser (gebaut + verifiziert 2026-06-04):** der
   emscripten-Einstieg in `main.rs` kompiliert `/program.dh` selbst (Fallback
@@ -210,5 +210,5 @@ Verhaltensgleichheit garantiert, weil `dhrt` es schon bit-identisch ausfuehrte).
 
 Dieses Geruest ist mit dem Ziel weggefallen. Es gibt keinen zweiten Pfad mehr,
 gegen den sich vergleichen liesse — `dhrt` ist die einzige Runtime, und
-Korrektheit sichern heute **run_gb-Golden-Tests** und Rust-`#[test]`s. Wer
+Korrektheit sichern heute die **Pruefsammlungen** (`tests/pruef/*.dhtest`) und Rust-`#[test]`s. Wer
 oben „bit-identisch" liest, liest ein Protokoll, keine laufende Zusage.

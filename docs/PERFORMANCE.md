@@ -3,7 +3,7 @@
 > **⚠️ HISTORISCH (vor Stufe B).** Dieses Dokument vergleicht drei
 > Ausfuehrungspfade — Tree-Walker, Python-Bytecode-VM, Cython-Native-VM —, die
 > seit Stufe B **alle entfernt** sind. Die EINZIGE Runtime ist heute `dhrt`
-> (Rust/raylib). Auch `dhrun.py --bench` existiert nicht mehr. Die Zahlen unten
+> (Rust/raylib). Auch das fruehere `--bench` des Python-Starters existiert nicht mehr. Die Zahlen unten
 > sind nur noch als Optimierungs-Logbuch interessant; gemessen wird heute gegen
 > `dhrt`. Siehe [docs/rust-runtime.md](rust-runtime.md).
 
@@ -205,8 +205,8 @@ Builtin-API wichtiger als jede VM-Optimierung*.
 ## Empfehlungen
 
 > Die Wahl zwischen Ausfuehrungspfaden gibt es nicht mehr — `dhrt` ist die
-> einzige Runtime, und `dhrun.py` kennt nur noch `--tokens`, `--ast`,
-> `--native` und `--export`. Von den drei Rats-Punkten, die hier standen
+> einzige Runtime (`dhrt run`, `dhrt --export`); den Python-Starter `dhrun.py`
+> gibt es nicht mehr. Von den drei Rats-Punkten, die hier standen
 > (Native-VM fuer Production, Tree-Walker fuer Entwicklung, Python-VM als
 > Referenz), ist damit keiner mehr anwendbar. Was bleibt, ist die Lehre, die
 > nicht an einem Pfad hing:
@@ -225,14 +225,10 @@ genauso.
 
 ## Reproduktion (historisch)
 
-> Nicht mehr lauffähig: `setup.py build_ext` und `dhrun.py --bench` sind mit den
-> Python-Pfaden entfernt. Heute misst man direkt gegen `dhrt`
-> (`dhrt run examples/bench_fib.dh`).
-
-```
-python setup.py build_ext --inplace      # Cython-VMs bauen  (entfernt)
-python dhrun.py --bench examples/bench_fib.dh                # (entfernt)
-```
+> Nicht mehr lauffähig: `setup.py build_ext` und der Python-Starter samt `--bench`
+> sind mit den Python-Pfaden entfernt. Heute misst man direkt gegen `dhrt`
+> (`dhrt run examples/bench_fib.dh`), den Bestwert aus mehreren Laeufen
+> liefert `dhrt run bench_dhrt.dh -- examples/bench_fib.dh`.
 
 ## Offene Pfade (historisch, mit ehrlicher Cost-Benefit-Einschaetzung)
 

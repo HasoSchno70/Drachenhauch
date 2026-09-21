@@ -25,8 +25,10 @@ die Meldung kam bisher erst beim ersten Aufruf, tief im Programm:
 fehlt: seriell, usb, bluetooth, wlan (neu bauen mit: python rust/build_runtime.py --hardware)
 ```
 
-Die Fassung ist dieselbe wie in `pyproject.toml` und
-`drachenhauch/__init__.py`; ein Test hält die drei Angaben zusammen.
+Die Fassung kommt aus `rust/drachenhauch_runtime/Cargo.toml` (dort mit drei
+Stellen, `2026.13.0` heißt nach außen `2026.13`); bis 2026-09-21 standen
+`pyproject.toml` und die Python-Fassung daneben. `tests/pruef/dhrt_werkzeuge.dhtest`
+prüft, dass die Laufzeit meldet, was dort steht.
 
 ## `dhrt bild` — ein Bild vom laufenden Programm
 
@@ -334,21 +336,30 @@ dabei gedacht.
 herumzurücken hilft niemandem; der Aufruf meldet es und lässt die Datei in
 Ruhe.
 
-## `dhrun.py --doku` — Referenz aus dem Quelltext
+## `dhrt doku referenz` — Referenz aus dem Quelltext
 
 Wer eine eigene Bibliothek schreibt (`zeitraum.dh`, `tabellen.dh`), soll sie
 nicht ein zweites Mal von Hand beschreiben müssen — eine handgepflegte
 Referenz driftet ab dem ersten Tag.
 
 ```bash
-dhrun.py --doku mathe.dh                     # nach stdout
-dhrun.py --doku lib/*.dh -o docs/referenz.md # in eine Datei
+dhrt doku referenz mathe.dh                     # nach stdout
+dhrt doku referenz lib/*.dh -o docs/referenz.md # in eine Datei
 ```
 
+Heraus kommt Markdown: `# Referenz`, darunter je Datei (nach Pfad sortiert)
+ein Abschnitt `## datei.dh` mit Konstanten, Aufzählungen, Strukturen, Klassen,
+Funktionen und Prozeduren in dieser Reihenfolge, je Eintrag Name, Signatur als
+Codeblock und die Beschreibung (fehlt sie: *(nicht beschrieben)*). Mit `-o`
+wird die Datei geschrieben und `geschrieben: <ziel>` gemeldet. Eine Datei, die
+es nicht gibt, ist ein Fehler (Rückgabe 2), bevor etwas geschrieben wird. Das
+`*` im Beispiel erweitert die Shell (Bash); `dhrt` selbst sucht nicht nach
+Mustern — unter cmd oder PowerShell die Dateien einzeln nennen.
+
 Genommen wird die **Signatur** und der **Kommentarblock direkt darüber** —
-dieselbe Quelle, aus der auch der Hover im Editor kommt
-(`editor_qt/symbols.py`); es gibt keine zweite Vorstellung davon, was eine
-Signatur ist. Ein Kommentarblock ganz am Dateianfang beschreibt die Datei
+dieselbe Quelle, aus der auch der Hover in der IDE und in `dhrt lsp` kommt
+(`rust/drachenhauch_runtime/src/symbole.rs`); es gibt keine zweite Vorstellung
+davon, was eine Signatur ist. Ein Kommentarblock ganz am Dateianfang beschreibt die Datei
 selbst.
 
 ```basic
@@ -364,10 +375,10 @@ wird zu einem Abschnitt mit Signatur und beiden Sätzen.
 **`PRIVATE` bleibt draußen.** Es gehört dem Modul; eine Referenz, die es
 auflistet, verspricht etwas, das beim nächsten Umbau verschwindet.
 
-**Warum `dhrun.py` und nicht `dhrt`:** der Rust-Lexer wirft Kommentare weg
-(er braucht sie nicht), der Python-Lexer behält die Zeilen. Eine Doku ohne
-Kommentare wäre eine Liste von Signaturen — und die kann man auch selbst
-lesen.
+**Warum nicht über den Lexer:** der Rust-Lexer wirft Kommentare weg (er
+braucht sie nicht). Die Referenz liest den Text deshalb über den
+Symbol-Scanner (`symbole.rs`), der die Zeilen behält. Bis 2026-09-06 lag das
+Werkzeug als `dhrun.py --doku` in Python — genau aus diesem Grund.
 
 ## `dhrt --check` — übersetzen ohne auszuführen
 
