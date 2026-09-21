@@ -1744,6 +1744,14 @@ Kinderlagen unter `akkordeon`, Prüfschalter und Knopftexte unter
 `eltern`, `offen`). Der Form-Designer bietet sie in der Palette an; ihre
 Abschnitte und Schritte stehen im Feld „Einträge".
 
+Der Assistent teilt seine Breite: die drei Knöpfe sind 112 Punkte breit,
+in einem schmalen Assistenten schmaler, damit sie nicht übereinander
+liegen.
+
+Beispiel: [`examples/200_gui_akkordeon_assistent.dh`](../examples/200_gui_akkordeon_assistent.dh)
+— eine kleine Projektablage mit allen dreien: Einstellungen im Akkordeon,
+Ordner und Dateien in der Baumtabelle, neue Einträge über den Assistenten.
+
 ## Aussehen ändern (Theme, Metriken, Per-Widget)
 
 Das Aussehen lässt sich auf drei Ebenen steuern:
