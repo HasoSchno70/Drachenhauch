@@ -250,7 +250,10 @@ DIM fAnker AS GUI_WIDGET : fAnker = inspFeld("anchor", "Anker (lrtb)", 7)
 DIM fClick AS GUI_WIDGET : fClick = inspFeld("on_click", "on_click", 8)
 DIM fChange AS GUI_WIDGET : fChange = inspFeld("on_change", "on_change", 9)
 DIM fEnter AS GUI_WIDGET : fEnter = inspFeld("on_enter", "on_enter", 10)
-DIM cbAktiv AS GUI_WIDGET : cbAktiv = GUI_CHECKBOX(winInsp, "Aktiviert", 100, 36 + 11 * 34)
+' Schriftstil als Text: fett, kursiv, unterstrichen, durchgestrichen mit +.
+DIM fStil AS GUI_WIDGET : fStil = inspFeld("font_style", "Schriftstil", 11)
+GUI_TOOLTIP(fStil, "fett, kursiv, unterstrichen, durchgestrichen -- verbunden mit +, z. B. fett+unterstrichen")
+DIM cbAktiv AS GUI_WIDGET : cbAktiv = GUI_CHECKBOX(winInsp, "Aktiviert", 250, 36 + 18 * 34 + 4)
 
 ' Felder je Art (seit Stand 31): sichtbar nur bei den Arten, die in ihrer
 ' Liste stehen. Listen werden mit Semikolon getrennt -- ein Komma steht zu
@@ -994,6 +997,7 @@ SUB gbControl(i AS INTEGER)
     DIM anker AS STRING : anker = feldText$(i, "anchor")
     IF anker <> "" AND anker <> "lt" THEN gb("GUI_SET_ANCHOR(" + v + ", " + gbText$(anker) + ")")
     IF feldText$(i, "tooltip") <> "" THEN gb("GUI_TOOLTIP(" + v + ", " + gbText$(feldText$(i, "tooltip")) + ")")
+    IF feldText$(i, "font_style") <> "" AND feldText$(i, "font_style") <> "normal" THEN gb("GUI_SET_FONT_STYLE(" + v + ", " + gbText$(feldText$(i, "font_style")) + ")")
     IF feldText$(i, "on_click") <> "" THEN gb("GUI_ON_CLICK(" + v + ", " + feldText$(i, "on_click") + ")")
     IF feldText$(i, "on_change") <> "" THEN gb("GUI_ON_CHANGE(" + v + ", " + feldText$(i, "on_change") + ")")
     IF feldText$(i, "on_enter") <> "" THEN gb("GUI_ON_ENTER(" + v + ", " + feldText$(i, "on_enter") + ")")

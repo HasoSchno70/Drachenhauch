@@ -3762,6 +3762,42 @@ Abschnitte, Zeilenhoehe ueber Bild ab), `tests/pruef/werkzeug_ide_lesbarkeit.dht
 weil sonst die Schluesselwort-Farbe der Werkzeugleiste mitzaehlte), Rust-Test
 `kontrast_nach_wcag`; sechs Verfaelschungen der IDE fallen je in ihrem Fall.
 
+**Fett, kursiv, unterstrichen, durchgestrichen (2026-09-21, Frage des
+Nutzers):** vorher waren `TEXT_BOLD`/`TEXT_ITALIC` No-Ops (raylib kennt
+keine Schnitte), der gesetzte Text zeichnete Fett doppelt und Kursiv nur
+gedaempft. Jetzt: **`TEXT_STYLE(stil$)`** / `TEXT_GET_STYLE$()` (Woerter
+deutsch oder englisch, verbunden mit `+`/Komma/Leerzeichen; unbekannt =
+Fehler mit Liste), `TEXT_BOLD`/`TEXT_ITALIC` schalten je ein Bit,
+**`FONT_STYLE(font, stil$)`** / `FONT_HAS_STYLE`, **`GUI_SET_FONT_STYLE`** /
+`GUI_GET_FONT_STYLE$` (in der `.dhform` als `font_style`, im Form-Designer
+ein Feld "Schriftstil" samt GB-Code), im gesetzten Text zusaetzlich
+`***beides***`, `~~durch~~`, `<u>unter</u>`; Verweise sind unterstrichen.
+**Echte Schnitte, wo es sie gibt** (`schnitt.rs`, rein und mit Rust-Tests):
+zu einer per LOADFONT geladenen Schrift sucht `schnitt_kandidaten` die
+Datei daneben -- Windows-Familien nach Tabelle (segoeui -> segoeuib/i/z,
+arial -> arialbd/ariali/arialbi ...), sonst `-Regular` -> `-Bold`/`-Italic`/
+`-BoldItalic` (ersatzweise Oblique/Semibold); `Graphics::schnitt` laedt
+einmal in derselben Groesse mit denselben Zeichen (`font_herkunft` je
+Handle) und merkt auch Fehlschlaege (`schnitte`). Fehlt fett+kursiv, wird
+der fette Schnitt genommen und nur die Neigung nachgebildet. **Sonst
+Ersatz** (`Cmd::TextStil`, `zeichne_text_stil`): Fett = zweiter Zug um
+`fett_versatz` (1 px je 16 px Schrift), Kursiv = Glyphenvierecke geschert
+ueber rlgl (`zeichne_schraeg`, raylibs DrawTextCodepoint nachgebaut --
+raylib kann drehen, nicht scheren), Linien als Rechtecke nach
+`linie_unter`/`linie_durch`. Ohne Stil bleibt es beim alten `Cmd::Text`, jedes
+bestehende Programm zeichnet wie zuvor (ausser denen mit TEXT_BOLD, die jetzt
+wirklich fett sind). Das Messen (`text_width_stil`, `&self`) kennt nur schon
+geladene Schnitte -- darum laedt `Gui::schnitte_laden` sie in GUI_UPDATE vor
+dem Setzen, und `wfont` gibt der gui den Schnitt-Handle, damit Schreibmarke
+und Auswahl mit der Schrift messen, die dasteht. GFX_PUSH/POP nimmt den Stil
+mit. Tests `tests/pruef/schriftstil.dhtest` (7: Stil-Rundweg samt PUSH/POP,
+Fehler, eingebaute Schrift ohne Schnitte, Segoe mit Schnitten und Tahoma ohne
+Kursiv, der Ersatz am Bild -- mehr Punkte, Neigung ueber die mittlere x-Lage
+oben gegen unten, Linien --, Widget samt `.dhform`, Widget-Linie im Bild),
+zwei Faelle in `werkzeug_formdesigner.dhtest`, Rust-Tests in `schnitt.rs` und
+`auszeichnungen_als_stil`; sieben Verfaelschungen der Laufzeit fallen je in
+ihrem Fall.
+
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
 `tests/pruef/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei

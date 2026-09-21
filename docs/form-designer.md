@@ -38,8 +38,9 @@ Formular, das beim ersten Sichern dorthin geschrieben wird.
   Klick = auswählen, ziehen = verschieben, an den **acht Griffen** ziehen =
   Größe ändern — alles am Raster.
 - **Rechts — Inspektor.** Mit ausgewähltem Control: Name, X, Y, Breite, Höhe,
-  Text, Tooltip, Anker (`lrtb`), `on_click`, `on_change`, `on_enter` und
-  *Aktiviert*, dazu die Felder je Art (unten). Ohne Auswahl zeigt er das
+  Text, Tooltip, Anker (`lrtb`), `on_click`, `on_change`, `on_enter`,
+  **Schriftstil** (`fett`, `kursiv`, `unterstrichen`, `durchgestrichen`,
+  verbunden mit `+`) und *Aktiviert*, dazu die Felder je Art (unten). Ohne Auswahl zeigt er das
   **Formular selbst**: Titel, Breite, Höhe, *Größenveränderbar* und das
   **Thema** (`glas_dunkel`, `glas_hell`, `dark`, `light` oder keines).
   Enter in einem Feld oder [Übernehmen] schreibt die Werte.
@@ -125,7 +126,7 @@ WEND
 3. **GB-Code (Strg+G):** `<name>_code.dh` baut das Formular **Aufruf für
    Aufruf** — Konstruktor je Control, bei der Tabelle Kopf, Breiten,
    Zellmodus, bearbeitbare Spalten, Spaltenarten und Auswahllisten, dazu
-   Datum und Uhrzeit, gesperrt, Anker, Tooltip und die Handler samt Rümpfen
+   Datum und Uhrzeit, gesperrt, Anker, Tooltip, Schriftstil und die Handler samt Rümpfen
    aus `code`; ohne `GUI_LOAD` und ohne die `.dhform` zur Laufzeit, lesbar
    und von Hand weiterzuschreiben. Die Konstruktoren, die sich selbst messen
    (Beschriftung, Kästchen, Regler …), bekommen ein `GUI_SET_BOUNDS`
