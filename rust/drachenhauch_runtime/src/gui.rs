@@ -1606,6 +1606,9 @@ struct ListState {
     tips: Vec<String>,    // Tooltip je Eintrag
     aus: Vec<bool>,       // gesperrt: sichtbar, aber nicht waehlbar
     kopf: Vec<bool>,      // Gruppenkopf: nicht waehlbar, gliedert die Liste
+    /// Farbabschnitte je Eintrag (Zeichen-Anfang, Zeichen-Laenge, Farbe) --
+    /// "function" in der Farbe der Schluesselwoerter, der Name in seiner.
+    spans: Vec<Vec<(usize, usize, i64)>>,
     filter: String,       // Teiltext; leer = alles sichtbar
     leer_text: String,    // Hinweis, wenn nichts zu sehen ist
     hover: i32,           // Eintrag unter der Maus (je Bild neu, fuer den Tooltip)
@@ -1628,6 +1631,7 @@ impl ListState {
         self.tips.resize(n, String::new());
         self.aus.resize(n, false);
         self.kopf.resize(n, false);
+        self.spans.resize(n, Vec::new());
     }
     fn einfuegen(&mut self, pos: usize) {
         self.icons.insert(pos, -1);
@@ -1639,6 +1643,7 @@ impl ListState {
         self.tips.insert(pos, String::new());
         self.aus.insert(pos, false);
         self.kopf.insert(pos, false);
+        self.spans.insert(pos, Vec::new());
     }
     fn entfernen(&mut self, pos: usize) {
         self.icons.remove(pos);
@@ -1650,6 +1655,7 @@ impl ListState {
         self.tips.remove(pos);
         self.aus.remove(pos);
         self.kopf.remove(pos);
+        self.spans.remove(pos);
     }
     /// Einen Eintrag von `a` nach `b` tragen -- alles, was an ihm haengt, reist mit.
     fn tragen(&mut self, a: usize, b: usize) {
@@ -1657,6 +1663,7 @@ impl ListState {
         zug(&mut self.icons, a, b); zug(&mut self.checks, a, b); zug(&mut self.colors, a, b);
         zug(&mut self.sel, a, b); zug(&mut self.daten, a, b); zug(&mut self.details, a, b);
         zug(&mut self.tips, a, b); zug(&mut self.aus, a, b); zug(&mut self.kopf, a, b);
+        zug(&mut self.spans, a, b);
     }
     /// Nach einer Umordnung: jeder Vektor in der Reihenfolge `ord` (alte Plaetze).
     fn umordnen(&mut self, ord: &[usize]) {
@@ -1664,6 +1671,7 @@ impl ListState {
         nach(&mut self.icons, ord); nach(&mut self.checks, ord); nach(&mut self.colors, ord);
         nach(&mut self.sel, ord); nach(&mut self.daten, ord); nach(&mut self.details, ord);
         nach(&mut self.tips, ord); nach(&mut self.aus, ord); nach(&mut self.kopf, ord);
+        nach(&mut self.spans, ord);
     }
     fn waehlbar(&self, k: usize) -> bool {
         !self.aus.get(k).copied().unwrap_or(false) && !self.kopf.get(k).copied().unwrap_or(false)
@@ -1674,6 +1682,7 @@ impl ListState {
             && self.daten.iter().all(|s| s.is_empty()) && self.details.iter().all(|s| s.is_empty())
             && self.tips.iter().all(|s| s.is_empty()) && !self.aus.iter().any(|&x| x)
             && !self.kopf.iter().any(|&x| x) && self.leer_text.is_empty()
+            && self.spans.iter().all(|s| s.is_empty())
     }
 }
 
@@ -1727,6 +1736,17 @@ fn natuerlich_vergleichen(a: &str, b: &str) -> std::cmp::Ordering {
 /// Lesbare Schrift auf einem Grund: dunkel auf hellem, weiss auf dunklem.
 /// Gewichtet wie das Auge (Gruen zaehlt am meisten) -- ein gelber Knopf mit
 /// weisser Schrift ist sonst unlesbar, obwohl sein Rotanteil niedrig ist.
+/// Relative Leuchtdichte nach WCAG (0 = schwarz, 1 = weiss).
+fn leuchtdichte(c: i64) -> f64 {
+    let k = |v: i64| { let s = v as f64 / 255.0; if s <= 0.03928 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) } };
+    0.2126 * k((c >> 16) & 0xFF) + 0.7152 * k((c >> 8) & 0xFF) + 0.0722 * k(c & 0xFF)
+}
+/// Kontrastverhaeltnis zweier Farben (1..21).
+fn kontrast(a: i64, b: i64) -> f64 {
+    let (la, lb) = (leuchtdichte(a), leuchtdichte(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
 fn lesbar_auf(bg: i64) -> i64 {
     let (r, g, b) = (((bg >> 16) & 0xFF) as f64, ((bg >> 8) & 0xFF) as f64, (bg & 0xFF) as f64);
     if 0.299 * r + 0.587 * g + 0.114 * b > 160.0 { 0x1C2026 } else { 0xFFFFFF }
@@ -4295,6 +4315,12 @@ impl Gui {
         if w.kind != Kind::ListBox { return Err("GUI_DOUBLE_CLICKED: bisher nur fuer Listen (GUI_LISTBOX)".into()); }
         Ok(w.list.as_ref().map(|l| l.doppel).unwrap_or(false))
     }
+    /// Zeilenhoehe einer Liste: 22 Punkte, mit eigener Schriftgroesse
+    /// (GUI_SET_FONT_SIZE) mindestens Schrift + 6 -- sonst stiessen groessere
+    /// Buchstaben oben und unten an. Ohne eigene Groesse bleibt es, wie es war.
+    fn list_zeile_h(&self, w: &Widget) -> i32 {
+        if w.font_size > 0 { self.sk(DROPDOWN_ITEM_H.max(w.font_size + 6)) } else { self.sk(DROPDOWN_ITEM_H) }
+    }
     /// Breite der Kaestchen-Spalte einer Liste (0 ohne Kaestchen).
     fn list_box_w(&self, w: &Widget) -> i32 {
         if w.list.as_ref().map(|l| l.kaestchen).unwrap_or(false) { self.sk(DROPDOWN_ITEM_H) } else { 0 }
@@ -4322,6 +4348,25 @@ impl Gui {
     pub fn list_find_data(&self, h: i64, wert: &str) -> Result<i64, String> {
         let w = self.list_ref(h, "GUI_LISTBOX_FIND_DATA")?;
         Ok(w.list.as_ref().and_then(|l| l.daten.iter().position(|d| d == wert)).map(|p| p as i64).unwrap_or(-1))
+    }
+    /// GUI_LISTBOX_SPANS: Abschnitte eines Eintrags einfaerben (Zeichen
+    /// ab 0). Leere Felder nehmen die Farben wieder weg. Die Abschnitte
+    /// gehoeren zum EINTRAG und wandern beim Sortieren, Verschieben und
+    /// Loeschen mit wie alles andere an ihm.
+    pub fn list_spans(&mut self, h: i64, i: i64, starts: Vec<i64>, laengen: Vec<i64>,
+                      farben: Vec<i64>) -> Result<(), String> {
+        let f = "GUI_LISTBOX_SPANS";
+        if starts.len() != laengen.len() || starts.len() != farben.len() {
+            return Err(format!("{}: starts, laengen und farben muessen gleich lang sein ({}, {}, {})",
+                f, starts.len(), laengen.len(), farben.len()));
+        }
+        let p = Self::list_idx(self.list_ref(h, f)?, i, f)?;
+        let mut v: Vec<(usize, usize, i64)> = starts.iter().zip(laengen.iter()).zip(farben.iter())
+            .filter(|((&s, &l), _)| s >= 0 && l > 0)
+            .map(|((&s, &l), &c)| (s as usize, l as usize, c)).collect();
+        v.sort_by_key(|x| x.0);
+        self.list_mut(h, f)?.spans[p] = v;
+        Ok(())
     }
     pub fn list_detail(&mut self, h: i64, i: i64, text: String) -> Result<(), String> {
         let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_DETAIL")?, i, "GUI_LISTBOX_DETAIL")?;
@@ -4433,7 +4478,7 @@ impl Gui {
     fn liste_zeile(&self, wi: usize, i: usize, my: i32) -> i32 {
         let w = &self.windows[wi].widgets[i];
         let (_, ay, _, _) = self.abs_rect(wi, w);
-        let r = (my - ay + w.value as i32).div_euclid(self.sk(DROPDOWN_ITEM_H));
+        let r = (my - ay + w.value as i32).div_euclid(self.list_zeile_h(w));
         let ansicht = liste_ansicht(&w.items, w.list.as_deref());
         if r < 0 || r as usize >= ansicht.len() { return -1; }
         ansicht[r as usize] as i32
@@ -9365,6 +9410,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if let Some(c) = w.ov.get(role) { *c } else { self.th(theme_key) }
     }
     // Styling-aware Farb-/Text-Helfer (beruecksichtigen den enabled-Zustand).
+    /// Die gedaempfte Farbe fuer Hinweise (Platzhalter, Zusatztext, leere
+    /// Liste) -- aber so weit zur Textfarbe hin geschoben, dass sie auf
+    /// DIESEM Grund mindestens 4,5:1 Kontrast hat (WCAG AA fuer Text). Das
+    /// Grau des Themas passt zu seiner eigenen Flaeche; auf einer getoenten
+    /// oder dunkleren war es kaum noch zu lesen.
+    fn leise(&self, bg: i64) -> i64 {
+        let (m, t) = (self.th("muted_fg") & 0xFF_FFFF, self.th("text_fg") & 0xFF_FFFF);
+        let bg = bg & 0xFF_FFFF;
+        let mut a = 0.0;
+        while a < 1.0 {
+            let c = mischen(m, t, a);
+            if kontrast(c, bg) >= 4.5 { return c; }
+            a += 0.05;
+        }
+        t
+    }
     fn txt_col(&self, w: &Widget) -> i64 {
         if !w.enabled { self.th("muted_fg") } else { self.wcol(w, "fg", "text_fg") }
     }
@@ -11594,7 +11655,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn listbox_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
         let wheel = Self::rad(g);
         if wheel == 0 { return; }
-        let zeile_h = self.sk(DROPDOWN_ITEM_H);   // vor dem mut-Zugriff
+        let zeile_h = self.list_zeile_h(&self.windows[wi].widgets[i]);   // vor dem mut-Zugriff
         let w = &mut self.windows[wi].widgets[i];
         let zeilen = liste_ansicht(&w.items, w.list.as_deref()).len() as i32;
         let max_scroll = (zeilen * zeile_h - h).max(0);
@@ -11819,7 +11880,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Platz in der ANSICHT (mit Filter steht sie woanders als in den Daten).
     fn liste_rollen_zu(&mut self, wi: usize, i: usize, k: i32) {
         let h = self.windows[wi].widgets[i].h;
-        let zeile_h = self.sk(DROPDOWN_ITEM_H);   // vor dem mut-Zugriff
+        let zeile_h = self.list_zeile_h(&self.windows[wi].widgets[i]);   // vor dem mut-Zugriff
         let w = &mut self.windows[wi].widgets[i];
         if k < 0 { return; }
         let pos = match liste_ansicht(&w.items, w.list.as_deref()).iter().position(|&x| x as i32 == k) {
@@ -12018,7 +12079,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             Kind::ListBox => {
-                let seite = (self.windows[wi].widgets[i].h / self.sk(DROPDOWN_ITEM_H)).max(1) - 1;
+                let seite = (self.windows[wi].widgets[i].h / self.list_zeile_h(&self.windows[wi].widgets[i])).max(1) - 1;
                 let mut d = ab as i32 - auf as i32;
                 if g.key_pressed(KEY_PAGEDOWN) { d += seite.max(1); }
                 if g.key_pressed(KEY_PAGEUP) { d -= seite.max(1); }
@@ -13159,7 +13220,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let (_, ay, _, _) = self.abs_rect(wi, w);
         match w.kind {
             Kind::ListBox => {
-                let ih = self.sk(DROPDOWN_ITEM_H);
+                let ih = self.list_zeile_h(w);
                 let k = (my - ay + w.value as i32) / ih;
                 if k >= 0 && (k as usize) < w.items.len() { k } else { -1 }
             }
@@ -13909,7 +13970,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let mut n = Node::new(Role::ListBox);
                 let l = w.list.as_ref();
                 if l.map_or(false, |l| l.multi) { n.set_multiselectable(); }
-                let zh = self.sk(DROPDOWN_ITEM_H);
+                let zh = self.list_zeile_h(w);
                 for (r, k) in liste_ansicht(&w.items, l.map(|b| &**b)).into_iter().enumerate().take(4000) {
                     let item = &w.items[k];
                     let mut o = Node::new(Role::ListBoxOption);
@@ -14959,7 +15020,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 g.push_clip(ax + 2, ay + 1, (w - 4).max(0), (h - 2).max(0));
                 if anzeige.is_empty() {
                     if !wdg.placeholder.is_empty() && !focused {
-                        self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.th("muted_fg"));
+                        self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
                     }
                 } else {
                     let chars: Vec<char> = anz_chars;
@@ -15003,7 +15064,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let scroll = wdg.scroll;
                 g.push_clip(ax + 2, ay + 2, (w - 4).max(0), (h - 4).max(0));
                 if wdg.text.is_empty() && !focused && !wdg.placeholder.is_empty() {
-                    self.wtext(g, wdg, ax + pad, ay + pad, wdg.placeholder.clone(), self.th("muted_fg"));
+                    self.wtext(g, wdg, ax + pad, ay + pad, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
                 } else {
                     let (chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
                     let starts = Self::line_starts(&chars);
@@ -15323,10 +15384,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 let fg = self.txt_col(wdg);
                 let acc = self.acc_col(wdg);
-                let muted = self.th("muted_fg");
+                let muted = self.leise(self.wcol(wdg, "bg", "widget_bg"));
                 let scroll = wdg.value as i32;
                 let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
-                let ih = self.sk(DROPDOWN_ITEM_H);
+                let ih = self.list_zeile_h(wdg);
                 let box_w = self.list_box_w(wdg);
                 let l = wdg.list.as_deref();
                 let hat_icon = l.map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
@@ -15404,7 +15465,36 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         None => ax + w - 2,
                     };
                     g.push_clip(tx, iy, (rechts - tx).max(0), ih);
-                    self.wtext(g, wdg, tx, ty, it.clone(), farbe);
+                    let spans = l.and_then(|l| l.spans.get(k)).filter(|s| !s.is_empty());
+                    match spans {
+                        // Auf der Auswahl und gesperrt: EINE Farbe, die dort
+                        // lesbar ist -- bunte Abschnitte auf Dunkelblau waeren
+                        // genau das Problem, das `lesbar_auf` loest.
+                        Some(sp) if !gewaehlt && !aus => {
+                            // Laeufe ueber die Breite des VORSPANNS setzen, nicht
+                            // Laufbreiten addieren -- wie im Textbereich, sonst
+                            // klebten die Woerter an der Farbgrenze zusammen.
+                            let zeichen: Vec<char> = it.chars().collect();
+                            let mut pos = 0usize;
+                            let mut laeufe: Vec<(usize, usize, i64)> = Vec::new();
+                            for &(s, n, c) in sp.iter() {
+                                let s = s.min(zeichen.len());
+                                let e = (s + n).min(zeichen.len());
+                                if s < pos || e <= s { continue; }
+                                if s > pos { laeufe.push((pos, s, farbe)); }
+                                laeufe.push((s, e, c));
+                                pos = e;
+                            }
+                            if pos < zeichen.len() { laeufe.push((pos, zeichen.len(), farbe)); }
+                            for (a, e, c) in laeufe {
+                                let vor: String = zeichen[..a].iter().collect();
+                                let teil: String = zeichen[a..e].iter().collect();
+                                let x = tx + self.wtext_width(g, wdg, &vor);
+                                self.wtext(g, wdg, x, ty, teil, c);
+                            }
+                        }
+                        _ => self.wtext(g, wdg, tx, ty, it.clone(), farbe),
+                    }
                     g.pop_clip();
                 }
                 g.pop_clip();
@@ -16040,7 +16130,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             } else if platz == 0 {
                 zeilen.clear();
             }
-            let farbe = mischen(self.txt_col(wdg), self.th("muted_fg"), 0.45);
+            let farbe = self.leise(bg);
             for z in zeilen {
                 self.wtext(g, wdg, ax + pad, y, z, farbe);
                 y += zeile_h;
@@ -16634,6 +16724,26 @@ mod gloss_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kontrast_nach_wcag() {
+        assert!((kontrast(0x000000, 0xFFFFFF) - 21.0).abs() < 0.01);
+        assert!((kontrast(0xFFFFFF, 0xFFFFFF) - 1.0).abs() < 0.001);
+        // Das Grau des dunklen Glas-Themas auf seinem Widget-Grund war zu
+        // schwach -- genau dafuer gibt es `leise`.
+        assert!(kontrast(0x8B97A6, 0x39424F) < 4.5);
+        let mut gui = Gui::new();
+        gui.theme_preset("glas_dunkel").unwrap();
+        for bg in [0x39424F, 0x375453, 0x232A33, 0x2E2A3C] {
+            let c = gui.leise(bg);
+            assert!(kontrast(c, bg) >= 4.5, "{:06X} auf {:06X}", c, bg);
+        }
+        gui.theme_preset("glas_hell").unwrap();
+        for bg in [0xFBFCFE, 0xDAEDE5, 0xE2E8EF] {
+            let c = gui.leise(bg);
+            assert!(kontrast(c, bg) >= 4.5, "{:06X} auf {:06X}", c, bg);
+        }
+    }
 
     // Checkbox-Klick (Press-basiert, ohne Graphics) muss togglen UND die
     /// Nur die Namen der ausgeloesten Rueckrufe -- die Tests hier pruefen

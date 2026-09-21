@@ -293,6 +293,13 @@ module.exports = (H) => [
       'GUI_LISTBOX_COLOR(aufgaben, 1, RED)',
       'IF GUI_DOUBLE_CLICKED(aufgaben) THEN PRINT "oeffnen: " + GUI_LISTBOX_TEXT(aufgaben)',
     ]),
+  H.cmd("GUI_LISTBOX_SPANS", 'GUI_LISTBOX_SPANS(lb, eintrag, starts, laengen, farben)',
+    "Färbt Abschnitte EINES Eintrags verschieden ein – etwa das Schlüsselwort in einer Farbe und den Namen dahinter in einer anderen, wie die Gliederung der IDE. Die Zeichen zählen ab 0, die drei Felder sind gleich lang; leere Felder nehmen die Abschnitte wieder weg. Ein gewählter oder gesperrter Eintrag steht in einer Farbe da.",
+    [
+      'DIM k AS INTEGER',
+      'k = GUI_LISTBOX_ADD(liste, "SUB malen")',
+      'GUI_LISTBOX_SPANS(liste, k, [0, 4], [3, 5], [CYAN, WHITE])',
+    ]),
   H.cmd("GUI_RADIO · GUI_RADIO_SELECTED", 'GUI_RADIO(win, gruppe$, text$, x, y)   GUI_RADIO_SELECTED(radio)',
     "Radioknöpfe derselben gruppe$ schließen sich gegenseitig aus – klickst du einen an, gehen die anderen der Gruppe aus. GUI_RADIO_SELECTED liefert TRUE für den gerade gewählten Knopf.",
     [
