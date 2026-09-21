@@ -17,6 +17,9 @@
 '    ganzen Song; Datei = dasselbe JSON wie die Qt-Fassung (`dhtracker-song`,
 '    in beide Richtungen); [WAV] mischt den Song offline zu einer Datei,
 '    [GB-Code] schreibt den frame-basierten Live-Player wie die Qt-Fassung.
+'    Sample-, Keymap- und SoundFont-Instrumente aus einer Datei der
+'    Qt-Fassung klingen (SAMPLE_FROM_BUFFER + SAMPLE_NOTE, Loop vorwaerts
+'    und pingpong) und kommen beim Sichern unveraendert zurueck.
 '
 '  Bedienung:
 '    Klick ins Gitter setzt den Cursor, Ziehen oder Umschalt+Klick waehlt
@@ -31,15 +34,16 @@
 '    Pattern. ESC beendet (fragt bei ungesicherten Aenderungen).
 '
 '  Nicht portiert (die Qt-Fassung hat es):
-'    Sample-Instrumente (WAV/OGG), Keymaps und SoundFonts -- alles, was
-'    eingebettete PCM-Daten braucht; VU-Meter je Kanal; Umbenennen von
-'    Patterns; der Sample-Offset-Effekt (er braucht Samples).
+'    Samples anlegen und bearbeiten (WAV/OGG/SF2 laden, Keymap-Dialog,
+'    Loop-Marker); VU-Meter je Kanal; Umbenennen von Patterns; der
+'    Sample-Offset-Effekt.
 '
 '  Was dieser Pilot in der Laufzeit freigelegt hat: AUDIO_NOTE (eine Note
 '  mit Sustain-PEGEL und Ausklingen -- AUDIO_SFX kennt nur drei Zeiten),
-'  AUDIO_SOUND_NEW/MIX/NORMALIZE (ohne Mischen kein WAV-Export) und
+'  AUDIO_SOUND_NEW/MIX/NORMALIZE (ohne Mischen kein WAV-Export),
 '  JSON_APPEND_NULL (eine Liste mit leeren Plaetzen liess sich nicht
-'  schreiben).
+'  schreiben) und SAMPLE_FROM_BUFFER/SAMPLE_NOTE (ein Sample aus den
+'  Base64-Daten der Datei, eine Note daraus als planbarer Klang).
 ' ============================================================
 IMPORT "gui"
 IMPORT "audio"
@@ -94,13 +98,28 @@ DIM iVibS[MAX_INST] AS FLOAT
 DIM iDet[MAX_INST] AS FLOAT
 DIM iPan[MAX_INST] AS FLOAT
 DIM iVol[MAX_INST] AS INTEGER       ' 1..15
-' Ein Instrument, das dieser Pilot nicht spielen kann (Sample, Keymap --
-' auch aus einer SoundFont), bleibt als stummer Platzhalter stehen, damit
-' die Nummern der anderen stimmen. Sein JSON wird dabei UNVERAENDERT
-' mitgefuehrt und beim Sichern zurueckgeschrieben: vorher schrieb der Pilot
-' es als synth, und die Samples eines Qt-Songs waren nach einem Sichern weg.
+' Ein Instrument, das hier nicht bearbeitet wird (Sample, Keymap -- auch
+' aus einer SoundFont), fuehrt sein JSON UNVERAENDERT mit, und das Sichern
+' schreibt es zurueck: vorher schrieb der Pilot es als synth, und die
+' Samples eines Qt-Songs waren nach einem Sichern weg.
 DIM iArt[MAX_INST] AS STRING        ' "synth", "sample", "keymap" ...
-DIM iRoh[MAX_INST] AS STRING        ' JSON des nicht spielbaren Instruments, sonst ""
+DIM iRoh[MAX_INST] AS STRING        ' JSON des Sample-/Keymap-Instruments, sonst ""
+' Gespielt werden Sample und Keymap ueber ZONEN: je Zone ein SAMPLE, der
+' Tastenbereich und die Taste, bei der es unverschoben klingt. Ein
+' Sample-Instrument ist eine Zone ueber alle Tasten. Die Zonen gehoeren
+' nicht einem Instrument, sondern ihrem INHALT (`zonenVon`): Rueckgaengig
+' laedt den ganzen Song neu, und jedes Mal die Samples neu zu dekodieren
+' kostete Zeit -- und Speicher, weil ein SAMPLE nicht freizugeben ist.
+' Ein Instrument, dessen Art hier unbekannt ist, hat keine Zonen und
+' bleibt stumm.
+CONST MAX_ZONEN = 512
+DIM zSamp[MAX_ZONEN] AS INTEGER     ' SAMPLE, -1 = Zone ohne Samples
+DIM zLo[MAX_ZONEN] AS INTEGER
+DIM zHi[MAX_ZONEN] AS INTEGER
+DIM zRoot[MAX_ZONEN] AS INTEGER
+DIM zAnz AS INTEGER : zAnz = 0
+DIM zonenVon AS MAP OF INTEGER
+DIM iZonen[MAX_INST] AS STRING      ' Zonen-Nummern mit Komma, "" = keine
 DIM instAnz AS INTEGER
 
 DIM wellenformen AS ARRAY OF STRING
@@ -210,14 +229,98 @@ SUB instrumentSetzen(i AS INTEGER, nm AS STRING, wf AS STRING, atk AS INTEGER, _
     iAtk[i] = atk : iDec[i] = dec : iSus[i] = sus : iRel[i] = rel
     iVibD[i] = vd : iVibS[i] = vs : iDet[i] = det
     iPan[i] = 0.0 : iVol[i] = 15
-    iArt[i] = "synth" : iRoh[i] = ""
+    iArt[i] = "synth" : iRoh[i] = "" : iZonen[i] = ""
 END SUB
 
-' Der Name, wie ihn Listen und Kopfzeile zeigen -- ein stummes Instrument
-' sagt es dazu; in der Datei steht der Name ohne den Zusatz.
+' Der Name, wie ihn Listen und Kopfzeile zeigen -- ein Sample-Instrument
+' sagt seine Art dazu, ein unbekanntes, dass es stumm bleibt; in der Datei
+' steht der Name ohne den Zusatz.
 FUNCTION instName$(i AS INTEGER) AS STRING
     IF iRoh[i] = "" THEN RETURN iName[i]
+    IF iZonen[i] <> "" THEN RETURN iName[i] + " [" + iArt[i] + "]"
     RETURN iName[i] + " [" + iArt[i] + ", hier stumm]"
+END FUNCTION
+
+' Eine Zone aus der Datei: Samples (Base64, 16-Bit-PCM), Abtastrate und
+' Loop an `zp`. Dieselben Regeln wie die Qt-Fassung: ein Loop gilt nur mit
+' vorwaerts/pingpong und 0 <= Anfang < Ende <= Laenge, sonst spielt das
+' Sample einmal durch.
+FUNCTION zoneAnlegen(h AS JSON_HANDLE, zp AS STRING, lo AS INTEGER, hi AS INTEGER, _
+                     root AS INTEGER) AS INTEGER
+    DIM b64 AS STRING : b64 = ""
+    IF JSON_TYPE(h, zp + ".samples") = "string" THEN b64 = JSON_GET_STRING(h, zp + ".samples")
+    DIM sr AS INTEGER : sr = zahlOder(h, zp + ".sample_rate", 44100)
+    DIM lm AS STRING : lm = "none"
+    IF JSON_TYPE(h, zp + ".loop_mode") = "string" THEN lm = JSON_GET_STRING(h, zp + ".loop_mode")
+    DIM ls AS INTEGER : ls = zahlOder(h, zp + ".loop_start", 0)
+    DIM le AS INTEGER : le = zahlOder(h, zp + ".loop_end", 0)
+    root = CLAMP(root, 0, 127)
+    DIM k AS STRING
+    k = STR$(sr) + "|" + STR$(lo) + "|" + STR$(hi) + "|" + STR$(root) + "|" + lm + "|" + _
+        STR$(ls) + "|" + STR$(le) + "|" + b64
+    IF MAPHAS(zonenVon, k) THEN RETURN MAPGET(zonenVon, k)
+    IF zAnz >= MAX_ZONEN THEN RETURN -1
+    DIM s AS INTEGER : s = -1
+    IF b64 <> "" THEN
+        TRY
+            DIM puf AS BUFFER : puf = BUFFER_FROM_BASE64(b64)
+            s = SAMPLE_FROM_BUFFER(puf, sr)
+            DIM n AS INTEGER : n = BUFFER_LEN(puf) \ 2
+            IF (lm = "forward" OR lm = "pingpong") AND ls >= 0 AND ls < le AND le <= n THEN
+                IF lm = "pingpong" THEN
+                    SAMPLE_SET_LOOP(s, ls, le, "pingpong")
+                ELSE
+                    SAMPLE_SET_LOOP(s, ls, le, "vorwaerts")
+                END IF
+            END IF
+        CATCH fehler
+            s = -1
+        END TRY
+    END IF
+    zSamp[zAnz] = s
+    zLo[zAnz] = lo : zHi[zAnz] = hi : zRoot[zAnz] = root
+    MAPPUT(zonenVon, k, zAnz)
+    zAnz = zAnz + 1
+    RETURN zAnz - 1
+END FUNCTION
+
+SUB zonenBauen(i AS INTEGER, h AS JSON_HANDLE, ip AS STRING, art AS STRING)
+    iZonen[i] = ""
+    DIM z AS INTEGER
+    IF art = "sample" THEN
+        z = zoneAnlegen(h, ip, 0, 127, zahlOder(h, ip + ".base_note", 60))
+        IF z >= 0 THEN iZonen[i] = STR$(z)
+    ELSEIF art = "keymap" AND JSON_HAS(h, ip + ".zones") THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(h, ip + ".zones") - 1
+            DIM zp AS STRING : zp = ip + ".zones." + STR$(k)
+            z = zoneAnlegen(h, zp, zahlOder(h, zp + ".lo_key", 0), _
+                            zahlOder(h, zp + ".hi_key", 127), zahlOder(h, zp + ".root_note", 60))
+            IF z >= 0 THEN
+                IF iZonen[i] <> "" THEN iZonen[i] = iZonen[i] + ","
+                iZonen[i] = iZonen[i] + STR$(z)
+            END IF
+        NEXT
+    END IF
+END SUB
+
+' Die Zone fuer eine Taste: die erste, die sie abdeckt -- sonst die
+' naechstgelegene, damit eine Note ausserhalb aller Bereiche trotzdem klingt
+' (wie `zone_for` der Qt-Fassung).
+FUNCTION zoneFuer(ii AS INTEGER, midi AS INTEGER) AS INTEGER
+    DIM best AS INTEGER : best = -1
+    DIM bestAbst AS INTEGER : bestAbst = 1000
+    DIM t AS STRING
+    FOR EACH t IN SPLIT$(iZonen[ii], ",")
+        DIM z AS INTEGER : z = INT(VAL(t))
+        DIM d AS INTEGER : d = 0
+        IF midi < zLo[z] THEN d = zLo[z] - midi
+        IF midi > zHi[z] THEN d = midi - zHi[z]
+        IF d < bestAbst THEN
+            best = z : bestAbst = d
+        END IF
+    NEXT
+    RETURN best
 END FUNCTION
 
 ' Dieselbe Tabelle wie `tracker/presets.py` -- ein Song, den die Qt-Fassung
@@ -523,6 +626,7 @@ SUB songAusHandle(h AS JSON_HANDLE)
             IF art <> "synth" THEN
                 iArt[instAnz] = art
                 iRoh[instAnz] = JSON_STRINGIFY(JSON_GET_JSON(h, ip))
+                zonenBauen(instAnz, h, ip, art)
             END IF
             instAnz = instAnz + 1
         NEXT
@@ -593,6 +697,7 @@ DIM gRel AS INTEGER
 DIM gVd AS FLOAT
 DIM gVs AS FLOAT
 DIM gDet AS FLOAT
+DIM gIi AS INTEGER : gIi = -1       ' das Instrument der Note, -1 = keins
 
 SUB cacheLeeren()
     DIM k AS STRING
@@ -605,7 +710,9 @@ END SUB
 ' Die Klang-Parameter fuer eine Note: das Instrument -- oder die nackte
 ' Wellenform des Kanals (Schlagzeugkanal: kurzes Rauschen).
 SUB parameterLaden(ii AS INTEGER, c AS INTEGER)
+    gIi = -1
     IF ii >= 0 AND ii < instAnz THEN
+        gIi = ii
         gWf = iWave[ii] : gAtk = iAtk[ii] : gDec = iDec[ii] : gSus = iSus[ii]
         gRel = iRel[ii] : gVd = iVibD[ii] : gVs = iVibS[ii] : gDet = iDet[ii]
     ELSEIF istDrum(c) THEN
@@ -619,6 +726,9 @@ END SUB
 
 FUNCTION klangFuer(midi AS INTEGER, tks AS INTEGER, sl AS INTEGER, _
                    vibX AS INTEGER, vibY AS INTEGER) AS INTEGER
+    IF gIi >= 0 THEN
+        IF iZonen[gIi] <> "" THEN RETURN sampleKlang(midi, tks, sl)
+    END IF
     DIM k AS STRING
     k = gWf + "|" + STR$(gAtk) + "|" + STR$(gDec) + "|" + FORMAT$(gSus, "%.2f") + "|" + _
         STR$(gRel) + "|" + FORMAT$(gVd, "%.3f") + "|" + FORMAT$(gVs, "%.1f") + "|" + _
@@ -638,6 +748,25 @@ FUNCTION klangFuer(midi AS INTEGER, tks AS INTEGER, sl AS INTEGER, _
     ' 0.6 als Kopfraum, wie die Qt-Fassung -- vier Kanaele uebereinander
     ' bei voller Lautstaerke wuerden sonst uebersteuern.
     s = AUDIO_NOTE(gWf, freqVon(midi), ms, gAtk, gDec, gSus, gRel, 0.6, vd, vs, gDet, sl)
+    MAPPUT(cache, k, s)
+    RETURN s
+END FUNCTION
+
+' Eine Note aus einem Sample-Instrument: die Zone der Taste, verschoben um
+' den Abstand zu ihrer Grundtaste. Dieselbe Huellkurve und derselbe
+' Kopfraum wie beim Synth; Vibrato gibt es fuer Samples nicht (auch in der
+' Qt-Fassung nicht). -1 = nichts zu spielen.
+FUNCTION sampleKlang(midi AS INTEGER, tks AS INTEGER, sl AS INTEGER) AS INTEGER
+    DIM z AS INTEGER : z = zoneFuer(gIi, midi)
+    IF z < 0 THEN RETURN -1
+    IF zSamp[z] < 0 THEN RETURN -1
+    DIM k AS STRING
+    k = "Z" + STR$(z) + "|" + STR$(gAtk) + "|" + STR$(gDec) + "|" + FORMAT$(gSus, "%.2f") + "|" + _
+        STR$(gRel) + "|" + STR$(midi) + "|" + STR$(tks) + "|" + STR$(sl)
+    IF MAPHAS(cache, k) THEN RETURN MAPGET(cache, k)
+    DIM ms AS INTEGER : ms = MAX(1, INT(tks * tickMs()))
+    DIM s AS INTEGER
+    s = SAMPLE_NOTE(zSamp[z], midi - zRoot[z], ms, gAtk, gDec, gSus, gRel, 0.6, sl)
     MAPPUT(cache, k, s)
     RETURN s
 END FUNCTION
@@ -666,6 +795,7 @@ DIM renderAmiga AS BOOLEAN : renderAmiga = FALSE
 DIM mixZiel AS INTEGER : mixZiel = -1
 
 SUB ausgeben(snd AS INTEGER, tick AS INTEGER, lautst AS FLOAT, pan AS FLOAT)
+    IF snd < 0 THEN RETURN
     IF rendern THEN
         IF renderStereo THEN
             AUDIO_SOUND_MIX(mixZiel, snd, tick * tickMs(), lautst, pan)
@@ -722,12 +852,11 @@ SUB reiheAusgeben(p AS INTEGER, r AS INTEGER, tick AS INTEGER, _
         IF n >= 0 AND (rendern OR hoerbar(c)) THEN
             DIM ii AS INTEGER : ii = inst[p, c, r]
             IF ii < 0 OR ii >= instAnz THEN ii = chInst[c]
-            ' Ein Instrument, das dieser Pilot nicht spielen kann, bleibt
-            ' STUMM -- bis 2026-09-17 klang es als Rechteck, weil ein
-            ' Sample-Instrument keine Wellenform traegt und "square" die
-            ' Vorgabe ist, obwohl sein Name "hier stumm" sagte.
+            ' Ein Instrument, dessen Art hier unbekannt ist, bleibt STUMM --
+            ' bis 2026-09-17 klang es als Rechteck, weil es keine
+            ' Wellenform traegt und "square" die Vorgabe ist.
             IF ii >= 0 THEN
-                IF iRoh[ii] <> "" THEN CONTINUE
+                IF iRoh[ii] <> "" AND iZonen[ii] = "" THEN CONTINUE
             END IF
             parameterLaden(ii, c)
             DIM ticksL AS INTEGER : ticksL = notenLaenge(p, c, r, weiter, opos) * TICKS
@@ -823,13 +952,14 @@ END SUB
 SUB vorhoeren(c AS INTEGER, midi AS INTEGER)
     DIM ii AS INTEGER : ii = chInst[c]
     IF ii >= 0 THEN
-        IF iRoh[ii] <> "" THEN RETURN
+        IF iRoh[ii] <> "" AND iZonen[ii] = "" THEN RETURN
     END IF
     parameterLaden(ii, c)
     DIM tks AS INTEGER : tks = MAX(TICKS * 2, INT(600.0 / tickMs()))
     DIM lautst AS FLOAT : lautst = chVol[c]
     IF ii >= 0 THEN lautst = lautst * iVol[ii] / 15.0
-    AUDIO_PLAY(klangFuer(midi, tks, 0, 0, 0), 0, lautst)
+    DIM s AS INTEGER : s = klangFuer(midi, tks, 0, 0, 0)
+    IF s >= 0 THEN AUDIO_PLAY(s, 0, lautst)
 END SUB
 
 ' ------------------------------------------------------------ WAV-Ausgabe
@@ -1533,7 +1663,7 @@ SUB instrumentNeu()
         instrumentSetzen(i, iName[q] + " (Kopie)", iWave[q], iAtk[q], iDec[q], iSus[q], _
                          iRel[q], iVibD[q], iVibS[q], iDet[q])
         iPan[i] = iPan[q] : iVol[i] = iVol[q]
-        iArt[i] = iArt[q] : iRoh[i] = iRoh[q]
+        iArt[i] = iArt[q] : iRoh[i] = iRoh[q] : iZonen[i] = iZonen[q]
     ELSE
         instrumentSetzen(i, "Neu", wave[curC], 0, 0, 1.0, 20, 0.0, 0.0, 0.0)
     END IF
@@ -1556,7 +1686,7 @@ SUB instrumentEntfernen()
         instrumentSetzen(i, iName[i + 1], iWave[i + 1], iAtk[i + 1], iDec[i + 1], iSus[i + 1], _
                          iRel[i + 1], iVibD[i + 1], iVibS[i + 1], iDet[i + 1])
         iPan[i] = iPan[i + 1] : iVol[i] = iVol[i + 1]
-        iArt[i] = iArt[i + 1] : iRoh[i] = iRoh[i + 1]
+        iArt[i] = iArt[i + 1] : iRoh[i] = iRoh[i + 1] : iZonen[i] = iZonen[i + 1]
     NEXT
     instAnz = instAnz - 1
     FOR i = 0 TO MAX_CH - 1

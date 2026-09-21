@@ -182,14 +182,25 @@ Beim Lesen fehlt nichts, was fehlen darf: ein unbekannter Wert wird
 übergangen, eine Instrument-Nummer ohne Instrument dahinter zurückgesetzt.
 
 **Sample-, Keymap- und SoundFont-Instrumente** der Qt-Fassung (eine
-SoundFont wurde dort zu einem Keymap-Instrument) kann dieser Tracker nicht
-spielen. Sie bleiben als **stummer Platzhalter** stehen — die Listen sagen
-„hier stumm", damit die Nummern der übrigen stimmen —, und ihr JSON wird
-beim Sichern **unverändert zurückgeschrieben**; nur Name, Lautstärke, Pan
-und Hüllkurve lassen sich daran ändern. Kopieren und Entfernen tragen es
-mit. Bis 2026-09-17 schrieb der Tracker ein solches Instrument als Synth
-zurück, und die eingebetteten Samples waren nach einem Sichern weg — ohne
-dass es jemand sah; und es klang als Rechteck, obwohl „stumm" dastand.
+SoundFont wurde dort zu einem Keymap-Instrument) **spielt** dieser Tracker
+— beim Abspielen, Vorhören und in der WAV. Die Listen nennen ihre Art
+(`Klavier [sample]`). Gespielt wird nach den Regeln der Qt-Fassung: die
+Tonhöhe ist der Abstand zur Grundtaste (`base_note` bzw. `root_note`), ein
+Loop gilt mit `forward` oder `pingpong`, wenn 0 ≤ Anfang < Ende ≤ Länge,
+sonst läuft das Sample einmal durch und verstummt; eine Keymap nimmt die
+erste Zone, die die Taste abdeckt, sonst die nächstgelegene. Die Hüllkurve
+ist dieselbe wie beim Synth (das Ausklingen hängt hinten an), ebenso der
+Slide; **Vibrato gibt es für Samples nicht** (auch in der Qt-Fassung nicht).
+
+Bearbeiten lassen sich an einem solchen Instrument nur Name, Lautstärke,
+Pan und Hüllkurve; sein JSON wird beim Sichern **unverändert
+zurückgeschrieben**, Kopieren und Entfernen tragen es mit. Bis 2026-09-17
+schrieb der Tracker es als Synth zurück, und die eingebetteten Samples waren
+nach einem Sichern weg. Ein Instrument einer Art, die der Tracker nicht
+kennt, bleibt erhalten und **stumm** („hier stumm" in der Liste). Die
+Samples werden je Inhalt einmal dekodiert und nicht bei jedem Rückgängig
+neu. Der **GB-Code** spielt weiterhin nur Wellenformen — ein
+Sample-Instrument klingt dort als die Wellenform seines Kanals.
 
 ## Beenden
 
@@ -199,10 +210,10 @@ gesichert ist. Sonst kommt die Frage **Sichern | Verwerfen | Abbrechen**.
 
 ## Was die Qt-Fassung hatte und hier fehlt
 
-- **Sample-, Keymap- und SoundFont-Instrumente abspielen** — alles, was
-  eingebettete PCM-Daten braucht; samt Laden von WAV/OGG/SF2, dem
-  Keymap-Dialog und dem Instrument-Editor mit Wellenform und Loop-Markern.
-  Solche Instrumente bleiben erhalten, klingen aber nicht (oben).
+- **Sample-Instrumente anlegen und bearbeiten** — Laden von WAV/OGG/SF2,
+  der Keymap-Dialog und der Instrument-Editor mit Wellenform und
+  Loop-Markern. Instrumente aus einer Datei der Qt-Fassung spielt der
+  Tracker (oben), neue Samples bringt man hier nicht hinein.
 - **VU-Meter** je Kanal.
 - **Pattern umbenennen** — die Namen aus der Datei bleiben, neue lassen
   sich nicht vergeben.
@@ -220,6 +231,14 @@ unterscheiden), `AUDIO_SOUND_NEW`/`AUDIO_SOUND_MIX`/`AUDIO_SOUND_NORMALIZE`
 Plätzen ließ sich nicht schreiben, und genau so notiert das Format eine
 Reihe ohne Note). Siehe [Audio](module-audio.md) und [JSON](module-json.md).
 
+Die Sample-Instrumente brauchten zwei weitere (2026-09-21):
+`SAMPLE_FROM_BUFFER` (ein Sample aus 16-Bit-PCM — so liegen die Samples
+Base64-kodiert in der Datei, mit `BUFFER_FROM_BASE64` davor ohne Umweg über
+eine Datei) und `SAMPLE_NOTE` (eine Note aus einem Sample als **SOUND**
+statt sofort abgespielt wie `SAMPLE_PLAY` — nur ein Klang lässt sich auf der
+Audio-Uhr planen und in die WAV mischen). Dazu kennt `SAMPLE_SET_LOOP` jetzt
+die Art `pingpong`.
+
 ## Geprüft
 
 `tests/pruef/werkzeug_tracker.dhtest` bedient den Tracker wie von Hand
@@ -229,8 +248,11 @@ die die Qt-Fassung las; dazu zwei Dateien, die die Qt-Fassung geschrieben
 hat), die **WAV** (Länge, Noten, Stereo- und Amiga-Pan) und den
 **GB-Code** (`dhrt --check` und ein Start). Dazu Tastatur, Rückgängig,
 Blockbefehle, Transponieren ohne das Schlagzeug, die Uhr per Leertaste,
-das Mitlaufen im Song-Modus, die Lage aller Bedienelemente und die stummen
-Sample-/Keymap-Instrumente.
+das Mitlaufen im Song-Modus, die Lage aller Bedienelemente und die
+Sample-/Keymap-Instrumente: ein Lied, das der Fall selbst baut (Sinus mit
+bekannter Frequenz, eine Keymap mit einer stillen und einer Loop-Zone),
+muss in der WAV mit der richtigen Tonhöhe klingen, das Sample ohne Loop
+verstummen und der Loop die Note bis zum Pattern-Ende halten.
 
 ## Audio Studio
 
