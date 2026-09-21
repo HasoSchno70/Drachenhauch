@@ -67,8 +67,11 @@ geplant und klingen samplegenau, nicht bildgetrieben. Gestoppt wird, indem
 die Uhr entfernt wird — ein Klang, der auf eine Uhr wartet, die es nicht
 mehr gibt, startet nie.
 
-**Beenden** (Menü, Fensterkreuz, Alt+F4) fragt nur dann nach, wenn das
-Stück nicht gesichert ist: Sichern / Verwerfen / Abbrechen.
+**Neu, Öffnen und Beenden** (Menü, Kürzel, Fensterkreuz, Alt+F4) fragen
+nur dann nach, wenn das Stück nicht gesichert ist: Sichern / Verwerfen /
+Abbrechen (Enter = Sichern, ESC = Abbrechen). Beim Öffnen kommt der
+Datei-Dialog erst nach der Antwort. Bis 2026-09-21 fragte nur das Beenden;
+Neu und Öffnen warfen ungesicherte Noten wortlos weg.
 
 ## Dateiformat
 
@@ -118,7 +121,9 @@ Instrument, Abspielen. Der Tracker-Export wird am Demo-Stück (Akkord,
 Staccato, Note über die 64-Zeilen-Grenze, zwei Spuren) Zelle für Zelle mit
 einem festen Stand verglichen, den der frühere Python-Konverter geliefert
 hat; zwei weitere Fälle prüfen den Warnkasten (Abbrechen schreibt nichts,
-„Trotzdem öffnen“ schreibt das Gitter). Stück und Tracker-Projekt liest
+„Trotzdem öffnen“ schreibt das Gitter), drei die Rückfrage bei Neu
+(ESC behält die Noten, Verwerfen leert das Blatt, ohne Änderung keine
+Frage). Stück und Tracker-Projekt liest
 dabei ein Drachenhauch-Programm mit dem `json`-Modul.
 
 ## Grenzen
@@ -140,6 +145,4 @@ Bewusste Vereinfachungen, nicht stillschweigend verschluckt:
   können sie sich überlappen.
 - **Schlüsselwechsel ohne Rückfrage** — die Qt-Fassung fragte vor dem
   Oktavversatz, hier wird verschoben und gesagt.
-- **Neu und Öffnen fragen nicht** nach ungesicherten Änderungen (nur das
-  Beenden tut es).
 - Kein echtes Vollbild per F11 (die Qt-Fassung hatte es).

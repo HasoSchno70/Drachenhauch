@@ -819,3 +819,111 @@ NEXT
 PRINT zeile
 --- erwartet
 67,.,.,.,-1,62,.,-1,.,.,.,.,.,.,.,.
+
+=== neu mit ungesicherten noten fragt und esc behaelt sie
+' Eine Note setzen, dann Strg+N: der Kasten "Sichern|Verwerfen|Abbrechen"
+' geht auf, ESC = Abbrechen -- die Note bleibt (bis 2026-09-21 warf [Neu] sie
+' wortlos weg). Gezeigt wird das Protokoll ab der gesetzten Note; "noten"
+' schreibt das Programm beim Ende.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.json
+--- umgebung
+DHRT_FRAMES=90
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 10
+e 20 7 454 162 0 0
+e 21 7 454 162 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 2 341 0 0 0
+e 40 2 78 0 0 0
+e 42 1 78 0 0 0
+e 42 1 341 0 0 0
+e 60 2 256 0 0 0
+e 62 1 256 0 0 0
+
+--- nachher
+DIM z AS STRING
+DIM ab AS BOOLEAN : ab = FALSE
+FOR EACH z IN READLINES("_programm/score.log")
+    IF LEFT$(z, 5) = "note " THEN ab = TRUE
+    IF ab AND (LEFT$(z, 5) = "note " OR LEFT$(z, 5) = "frage" OR LEFT$(z, 5) = "neues" OR LEFT$(z, 5) = "noten") THEN PRINT z
+NEXT
+--- erwartet
+note 0 2 71 1
+frage neu
+frage abgebrochen
+noten 1
+
+=== neu mit ungesicherten noten und verwerfen leert das blatt
+' Wie oben, im Kasten aber Tab auf den zweiten Knopf ("Verwerfen") und Enter:
+' jetzt entsteht das neue, leere Stueck.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.json
+--- umgebung
+DHRT_FRAMES=100
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 12
+e 20 7 454 162 0 0
+e 21 7 454 162 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 2 341 0 0 0
+e 40 2 78 0 0 0
+e 42 1 78 0 0 0
+e 42 1 341 0 0 0
+e 60 2 258 0 0 0
+e 62 1 258 0 0 0
+e 70 2 257 0 0 0
+e 72 1 257 0 0 0
+
+--- nachher
+DIM z AS STRING
+DIM ab AS BOOLEAN : ab = FALSE
+FOR EACH z IN READLINES("_programm/score.log")
+    IF LEFT$(z, 5) = "note " THEN ab = TRUE
+    IF ab AND (LEFT$(z, 5) = "note " OR LEFT$(z, 5) = "frage" OR LEFT$(z, 5) = "neues" OR LEFT$(z, 5) = "noten") THEN PRINT z
+NEXT
+--- erwartet
+note 0 2 71 1
+frage neu
+frage verworfen
+neues stueck
+noten 0
+
+=== neu ohne aenderungen fragt nicht
+' Nichts geaendert: Strg+N ersetzt sofort, ohne Kasten. Das erste
+' "neues stueck" ist der Start mit einer Datei, die es nicht gibt.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.json
+--- umgebung
+DHRT_FRAMES=70
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 5
+e 20 7 900 700 0 0
+e 40 2 341 0 0 0
+e 40 2 78 0 0 0
+e 42 1 78 0 0 0
+e 42 1 341 0 0 0
+
+--- nachher
+DIM z AS STRING
+FOR EACH z IN READLINES("_programm/score.log")
+    IF LEFT$(z, 5) = "frage" OR LEFT$(z, 5) = "neues" OR LEFT$(z, 5) = "noten" THEN PRINT z
+NEXT
+--- erwartet
+neues stueck
+neues stueck
+noten 0
