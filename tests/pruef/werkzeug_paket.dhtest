@@ -45,6 +45,8 @@ PRINT "ide "; FILEEXISTS(d + "/ide/ide.dh")
 PRINT "handbuch "; (LEN(DIRLIST(d + "/docs", "*.md")) > 50)
 PRINT "beispiele "; FILEEXISTS(d + "/examples/183_sfx_generator.dh"); " "; FILEEXISTS(d + "/examples/01_hello.dh")
 PRINT "unterordner der beispiele "; FILEEXISTS(d + "/examples/assets/editor_tileset.png")
+' Logo und Schriftzug fuer die IDE (Fenstersymbol, Willkommensseite).
+PRINT "bilder "; FILEEXISTS(d + "/daten/bilder/logo.png"); " "; FILEEXISTS(d + "/daten/bilder/schriftzug.png")
 PRINT "starter ohne CR "; ohneCR(d + "/drachenhauch")
 PRINT "install.sh ohne CR "; ohneCR(d + "/install.sh")
 PRINT "starter beginnt mit sh "; (LEFT$(READLINES(d + "/drachenhauch")[0], 9) = "#!/bin/sh")
@@ -65,6 +67,7 @@ ide TRUE
 handbuch TRUE
 beispiele TRUE TRUE
 unterordner der beispiele TRUE
+bilder TRUE TRUE
 starter ohne CR TRUE
 install.sh ohne CR TRUE
 starter beginnt mit sh TRUE
@@ -110,6 +113,7 @@ PRINT "dhrt in MacOS "; (BUFFER_TO_STRING$(READALL_BYTES(app + "/MacOS/dhrt")) =
 PRINT "nur dhrt in MacOS "; (LEN(DIRLIST(app + "/MacOS")) = 1)
 PRINT "ide in Resources "; FILEEXISTS(app + "/Resources/ide/ide.dh")
 PRINT "beispiele in Resources "; FILEEXISTS(app + "/Resources/examples/183_sfx_generator.dh")
+PRINT "bilder in Resources "; FILEEXISTS(app + "/Resources/daten/bilder/schriftzug.png")
 PRINT "kein handbuch neben dhrt "; NOT DIREXISTS(app + "/MacOS/docs")
 PRINT "liesmich im abbild "; FILEEXISTS("raus/paket/Drachenhauch/LIESMICH.txt")
 PRINT "pkginfo "; BUFFER_TO_STRING$(READALL_BYTES(app + "/PkgInfo"))
@@ -146,6 +150,7 @@ dhrt in MacOS TRUE
 nur dhrt in MacOS TRUE
 ide in Resources TRUE
 beispiele in Resources TRUE
+bilder in Resources TRUE
 kein handbuch neben dhrt TRUE
 liesmich im abbild TRUE
 pkginfo APPL????

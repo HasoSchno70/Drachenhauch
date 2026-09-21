@@ -188,6 +188,7 @@ Inno Setup haben die Läufer nicht.
 | `licenses/` | Der MPL-2.0-Volltext für `lizenzen.dh`. |
 | `posix/` | Vorlagen für Linux und macOS (Starter, `install.sh`, `Info.plist`, LIESMICH). |
 | `symbole/`, `symbole.dh` | Die Programmsymbole, fertig erzeugt aus `daten/bilder/logo.png`. |
+| `Drachenhauch.ico` | Symbol des Setup-Programms; installiert als `drachenhauch.ico` fuer Verknuepfungen, `.dh`-Dateien und die Deinstallation (dhrt.exe selbst traegt keins -- ein exportiertes Spiel ist eine Kopie davon). |
 | `EULA.txt` | Endbenutzer-Lizenzvertrag (**Vorlage** – vor Verkauf juristisch prüfen, `[PLATZHALTER]` ersetzen). |
 | `THIRD-PARTY-NOTICES-IDE.txt` · `output/` | erzeugt (gitignored). |
 

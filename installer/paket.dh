@@ -94,6 +94,8 @@ SUB inhaltKopieren(wurzel AS STRING, laufzeit AS STRING, bin AS STRING, res AS S
     PRINT "  ide/      "; ordnerKopieren(PATHJOIN(wurzel, "ide"), PATHJOIN(res, "ide"), "*.dh", FALSE); " Dateien"
     PRINT "  docs/     "; ordnerKopieren(PATHJOIN(wurzel, "docs"), PATHJOIN(res, "docs"), "*.md", FALSE); " Dateien"
     PRINT "  examples/ "; ordnerKopieren(PATHJOIN(wurzel, "examples"), PATHJOIN(res, "examples"), "*", TRUE); " Dateien"
+    ' Logo und Schriftzug -- die IDE sucht sie unter daten/bilder neben ide/.
+    PRINT "  bilder/   "; ordnerKopieren(PATHJOIN(wurzel, "daten/bilder"), PATHJOIN(res, "daten/bilder"), "*.png", FALSE); " Dateien"
     DIM texte AS ARRAY OF STRING : texte = ["EULA.txt", "THIRD-PARTY-NOTICES-IDE.txt"]
     DIM i AS INTEGER
     FOR i = 0 TO LEN(texte) - 1
