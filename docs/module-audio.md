@@ -754,3 +754,7 @@ Das `audio`-Modul laeuft nativ ueber **Kira** (cpal) — ein eigener Audio-Threa
 - Volume wird intern in Dezibel gefuehrt (Kira), die Builtins nehmen weiterhin linear 0..1.
 - Ton-Generierung (`AUDIO_TONE`/`AUDIO_NOISE`/`AUDIO_SFX`) und der Sampler bauen die Wellenform als Float-Buffer direkt als Kira-`StaticSoundData`.
 - **Tracker-Module** (`.mod`/`.xm`) als Musik werden in **Echtzeit gestreamt** (eigener Kira-Custom-Sound, der den reinen Rust-Player `xmrs` auf dem Audio-Thread pollt): sofort geladen (kein Vorab-Render), exaktes Endlos-Loopen, wenig RAM, mit Pitch-Resampler + klickfreien Volume-Fades. Stream-Formate (ogg/mp3/wav/flac) streamen von Platte.
+- **FLAC** geht als Klang (`LOADSOUND`) und als Musik. Die Musik laeuft ueber einen eigenen
+  Dekoder: mit Kiras eingebautem sprang Symphonia 0.6 nach dem ersten Durchlauf nicht sauber an
+  den Anfang zurueck, und eine FLAC-Musik mit Schleife (die Vorgabe von `AUDIO_MUSIC_PLAY`)
+  blieb stumm. Der eigene Dekoder oeffnet die Datei vor jedem Sprung neu.
