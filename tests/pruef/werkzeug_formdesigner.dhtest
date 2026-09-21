@@ -319,7 +319,7 @@ PRINT "gitter " + STR$(ARRAY_INDEXOF(palette, "grid") >= 0)
 {sammlung}/../../rust/drachenhauch_runtime/src/gui.rs
 {sammlung}/../../examples/197_form_designer.dh
 --- erwartet
-arten 30
+arten 31
 fehlen[]
 gitter TRUE
 

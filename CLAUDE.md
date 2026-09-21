@@ -3706,6 +3706,31 @@ der Willkommensseite statt des Titels als Text (vorab auf 240x112 skaliert,
 der Satz rechts daneben, alles ab den Knoepfen bleibt an seiner Stelle); ohne
 die Dateien bleibt es beim Text. Tests `tests/pruef/werkzeug_ide_schriftzug.dhtest`
 (3) und zwei Zeilen in `werkzeug_paket.dhtest`.
+**Kachel als Widget, Mausrad, Bereichsfarben (2026-09-21, Hinweise des
+Nutzers):** (1) **`GUI_CARD(win, x, y, w, h, bild[, titel$[, text$]])`** --
+Bild oben (16:10 der Innenbreite, `fuellen`), Titel kraeftig, Beschreibung in
+der Schrift des Widgets umgebrochen; die GANZE Kachel ist ein Knopf (Klick
+beim Loslassen, Enter/Leertaste, a11y-Rolle Button mit Beschreibung). Vorher
+baute die IDE jede Kachel aus Bild + Knopf + Beschriftung in 12 px, und nur
+der schmale Knopf nahm den Klick an. `Kind::Card` teilt sich mit
+`Kind::Button` Druck, Loslassen, Tastatur und a11y-Klick; die Beschreibung
+liegt im `placeholder`-Feld (die .dhform schreibt es schon), das Bild im
+`sel`-Feld wie beim Bild. Passt die Beschreibung nicht, rueckt der Rest in die
+letzte sichtbare Zeile und wird dort mit "..." gekuerzt -- sonst endete ein
+Text, dessen zweites Wort nicht passte, nach dem ersten. `GUI_CARD_SET_TEXT`/
+`GUI_CARD_TEXT$`, `GUI_SET_IMAGE`/`GUI_IMAGE_MODE` gelten auch fuer Kacheln;
+im Form-Designer Palette, Feld "Beschreibung" und GB-Code. (2) **Das Mausrad
+rollte alles zugleich**: die IDE blaetterte ihre Kacheln, sobald die Maus im
+Kachelrechteck stand -- auch unter dem offenen Handbuch. Neu
+**`GUI_WINDOW_AT(x, y)`** (oberstes sichtbares Fenster, -1 = keins); die IDE
+blaettert nur, wenn dort `win` oben liegt. (3) **Bereichsfarben**
+(`bereichsFarben` in ide.dh): Projekt/Gliederung/Zuletzt blau, Ausgabe und
+Eingabe gruen, Probleme orange, Debugger violett -- `GUI_SET_COLOR(..., "bg")`
+aus `GUI_THEME_GET("widget_bg")` gemischt (dunkel 20 %, hell 16 %), nach jedem
+Themawechsel neu. Tests `tests/pruef/gui_kachel.dhtest` (6), ein Fall in
+`werkzeug_showcase.dhtest` (Rad unter dem Handbuch; ohne die Fensterfrage
+faellt er) und einer in `werkzeug_ide_schriftzug.dhtest` (Farbwert beider
+Themen).
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in

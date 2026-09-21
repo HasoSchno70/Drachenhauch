@@ -1,0 +1,144 @@
+' GUI_CARD -- eine Kachel aus Bild, Titel und Beschreibung, die als GANZES
+' ein Knopf ist -- und GUI_WINDOW_AT, das oberste Fenster an einem Punkt.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein klick aufs bild zaehlt, daneben nicht
+' Fenster bei (10,10), Kachel im Inhalt bei (10,10) mit 160x120 -- auf dem
+' Schirm also etwa x 26..186, y 52..172. Erst ein Klick neben die Kachel
+' (250,70), dann einer mitten ins Bild (60,70), dann einer in den
+' Beschreibungstext unten (120,160).
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 10, 10, 300, 220)
+DIM k AS GUI_WIDGET : k = GUI_CARD(w, 10, 10, 160, 120, GENTEX_COLOR(64, 40, &HCC2020), "Titel", "Eine Beschreibung")
+DIM n AS INTEGER : n = 0
+DIM bild AS INTEGER : bild = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(k) THEN n = n + 1 : PRINT "klick "; n; " in bild "; bild
+    bild = bild + 1
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "klicks "; n
+--- datei ev.txt
+c 12
+e 1 7 250 70 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 5 7 60 70 0 0
+e 6 6 0 0 0 0
+e 7 5 0 0 0 0
+e 9 7 120 160 0 0
+e 10 6 0 0 0 0
+e 11 5 0 0 0 0
+e 13 7 300 230 0 0
+e 14 6 0 0 0 0
+e 15 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+klick 1 in bild 7
+klick 2 in bild 11
+klicks 2
+
+=== enter und leertaste loesen eine kachel mit fokus aus
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 10, 10, 300, 220)
+DIM k AS GUI_WIDGET : k = GUI_CARD(w, 10, 10, 160, 120, -1, "Ohne Bild", "")
+GUI_FOCUS(k)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(k) THEN n = n + 1
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "klicks "; n; " fokus "; (GUI_FOCUSED() = k)
+--- datei ev.txt
+c 4
+e 2 2 257 0 0 0
+e 3 1 257 0 0 0
+e 5 2 32 0 0 0
+e 6 1 32 0 0 0
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+klicks 2 fokus TRUE
+
+=== titel, beschreibung und art
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 10, 10, 300, 220)
+DIM k AS GUI_WIDGET : k = GUI_CARD(w, 10, 10, 160, 120, -1, "Titel")
+PRINT GUI_KIND(k); " '"; GUI_TEXT(k); "' '"; GUI_CARD_TEXT$(k); "'"
+GUI_SET_TEXT(k, "Neu")
+GUI_CARD_SET_TEXT(k, "Mehr dazu")
+PRINT GUI_KIND(k); " '"; GUI_TEXT(k); "' '"; GUI_CARD_TEXT$(k); "'"
+' Die .dhform traegt beides: den Titel im text, die Beschreibung im
+' placeholder -- und die Art.
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+DIM k2 AS GUI_WIDGET : k2 = GUI_WINDOW_WIDGET(w2, 0)
+PRINT GUI_KIND(k2); " '"; GUI_TEXT(k2); "' '"; GUI_CARD_TEXT$(k2); "'"
+--- erwartet
+card 'Titel' ''
+card 'Neu' 'Mehr dazu'
+card 'Neu' 'Mehr dazu'
+
+=== die beschreibung gehoert nur einer kachel
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 10, 10, 300, 220)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Knopf", 10, 10, 80, 30)
+GUI_CARD_SET_TEXT(b, "x")
+--- fehler
+GUI_CARD_SET_TEXT: Widget ist keine Kachel
+
+=== das bild fuellt den oberen teil, der text steht darunter
+' Rotes Bild: im oberen Teil der Kachel rot, unten (Titel und Text) nicht.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_CARD(w, 20, 20, 200, 190, GENTEX_COLOR(64, 40, &HCC2020), "Titel", "Eine Beschreibung")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- bild
+groesse 320 240
+120 60 #CC2020 +-10
+40 40 #CC2020 +-10
+120 200 nicht #CC2020 +-40
+
+=== das oberste fenster an einem punkt
+' b liegt ueber a (spaeter angelegt); ein ausgeblendetes zaehlt nicht.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 10, 10, 200, 150)
+DIM b AS GUI_WINDOW : b = GUI_WINDOW("B", 100, 60, 200, 150)
+PRINT "nur a "; (GUI_WINDOW_AT(20, 40) = a)
+PRINT "beide, b oben "; (GUI_WINDOW_AT(150, 100) = b)
+PRINT "draussen "; GUI_WINDOW_AT(5, 230)
+GUI_WINDOW_VISIBLE(b, FALSE)
+PRINT "b ausgeblendet "; (GUI_WINDOW_AT(150, 100) = a)
+--- erwartet
+nur a TRUE
+beide, b oben TRUE
+draussen -1
+b ausgeblendet TRUE

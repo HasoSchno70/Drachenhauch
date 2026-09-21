@@ -292,7 +292,10 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_SCROLL_TO(lb, i)` | — | so rollen, dass der Eintrag zu sehen ist |
 | `GUI_DOUBLE_CLICKED(lb)` | BOOLEAN | Doppelklick auf einen Eintrag, ein Bild lang |
 | `GUI_IMAGE(win, x, y, w, h, image)` | GUI_WIDGET | Bild oder Symbol im Fenster |
-| `GUI_SET_IMAGE(widget, image)` | — | Bild austauschen |
+| `GUI_SET_IMAGE(widget, image)` | — | Bild austauschen (auch das einer Kachel) |
+| `GUI_CARD(win, x, y, w, h, bild[, titel$[, text$]])` | GUI_WIDGET | Kachel: Bild oben, Titel, Beschreibung -- das Ganze ist ein Knopf (`GUI_CLICKED`, Enter/Leertaste); `bild` -1 = ohne |
+| `GUI_CARD_SET_TEXT(card, text$)` | — | Beschreibung einer Kachel setzen (den Titel setzt `GUI_SET_TEXT`) |
+| `GUI_CARD_TEXT$(card)` | STRING | Beschreibung einer Kachel |
 | `GUI_CANVAS(win, x, y, w, h)` | GUI_WIDGET | freie Zeichenflaeche -- hinein malt man mit den normalen Zeichenbefehlen, **nach** `GUI_DRAW` |
 | `GUI_CANVAS_X(canvas)` / `GUI_CANVAS_Y(canvas)` | INTEGER | **absolute** Bildschirmposition der Flaeche (wandert mit dem Fenster) |
 | `GUI_CANVAS_W(canvas)` / `GUI_CANVAS_H(canvas)` | INTEGER | Groesse der Flaeche |
@@ -1897,6 +1900,7 @@ stabil (Löschen markiert nur als „tot", verschiebt keine Indizes).
 | `GUI_SCALE(faktor)` | Anzeige-Maßstab (0.5–4.0), **vor** dem ersten Fenster |
 | `GUI_SCALE_GET()` → FLOAT | aktueller Maßstab |
 | `GUI_HIT_TEST(x, y)` → GUI_WIDGET | oberstes Widget am Bildschirmpunkt, oder `-1` (Selektion im Editor) |
+| `GUI_WINDOW_AT(x, y)` → GUI_WINDOW | oberstes sichtbares Fenster am Bildschirmpunkt, oder `-1` -- wer das Mausrad selbst auswertet, fragt hier, ob seine Fläche gerade oben liegt |
 | `GUI_WINDOW_SET_BOUNDS(win, x, y, w, h)` / `GUI_WINDOW_GET_X/Y/W/H(win)` | Fenster bewegen/skalieren/lesen |
 | `GUI_WINDOW_DESTROY(win)` | Fenster + Inhalt entfernen |
 | `GUI_WINDOW_WIDGET_COUNT(win)` → INTEGER | Anzahl lebender Widgets |
@@ -2057,6 +2061,32 @@ Glanzkante liegt ein Schatten unter dem oberen Rand. Ohne diesen Unterschied
 sieht ein Eingabefeld aus wie ein Knopf, und die Oberfläche verliert ihre
 Aussage darüber, was man anklickt und was man ausfüllt.
 
+
+## Kacheln
+
+Eine Kachel (`GUI_CARD`) zeigt ein Bild, darunter einen Titel und eine
+Beschreibung -- und nimmt **überall** den Klick an, nicht nur auf einem
+Knopf darunter. Unter der Maus hebt sie sich und bekommt einen Akzentrahmen,
+gedrückt sinkt sie; mit Fokus lösen Enter und Leertaste sie aus.
+
+```basic
+DIM k AS GUI_WIDGET
+k = GUI_CARD(win, 20, 60, 200, 190, LOADIMAGE("vorschau.png"), _
+             "Schatten", "Tiefenpuffer mit weichen Kanten")
+GUI_TOOLTIP(k, "examples/93_shadows.dh")
+' ...
+IF GUI_CLICKED(k) THEN starteBeispiel()
+```
+
+Das Bild nimmt die Innenbreite im Verhältnis 16:10 ein und füllt sie
+(`GUI_IMAGE_MODE` stellt es um); ohne Bild (-1) steht nur der Text da. Die
+Beschreibung wird in der Schrift des Widgets umgebrochen -- nicht kleiner;
+passt sie nicht, endet die letzte Zeile mit „...“, und ein Tooltip kann den
+Rest sagen. Den Titel setzt und liest man wie bei jedem Widget (`GUI_SET_TEXT`,
+`GUI_TEXT`), die Beschreibung mit `GUI_CARD_SET_TEXT`/`GUI_CARD_TEXT$`. In
+der `.dhform` steht die Art `card`, der Titel unter `text` und die
+Beschreibung unter `placeholder`; das Bild ist ein Handle und wird wie beim
+Bild-Widget nicht gespeichert.
 
 ## Kippschalter, Drehregler, runde Knöpfe
 

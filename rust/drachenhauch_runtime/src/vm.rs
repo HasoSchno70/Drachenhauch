@@ -5743,6 +5743,17 @@ impl<'p> Vm<'p> {
             "gui_image" => Value::Int(self.gui.image(gi(a,0,"GUI_IMAGE")?, gi(a,1,"GUI_IMAGE")? as i32,
                 gi(a,2,"GUI_IMAGE")? as i32, gi(a,3,"GUI_IMAGE")? as i32, gi(a,4,"GUI_IMAGE")? as i32, gi(a,5,"GUI_IMAGE")?)?),
             "gui_set_image" => { self.gui.set_image(gi(a,0,"GUI_SET_IMAGE")?, gi(a,1,"GUI_SET_IMAGE")?)?; Value::Nil }
+            "gui_card" => {
+                // GUI_CARD(win, x, y, w, h, bild [, titel$ [, text$]]) -- bild -1 = keins
+                let f = "GUI_CARD";
+                let titel = if a.len() >= 7 { gs(a,6,f)? } else { String::new() };
+                let text = if a.len() >= 8 { gs(a,7,f)? } else { String::new() };
+                Value::Int(self.gui.card(gi(a,0,f)?, gi(a,1,f)? as i32, gi(a,2,f)? as i32,
+                    gi(a,3,f)? as i32, gi(a,4,f)? as i32, gi(a,5,f)?, titel, text)?)
+            }
+            "gui_card_set_text" => { self.gui.card_set_text(gi(a,0,"GUI_CARD_SET_TEXT")?, gs(a,1,"GUI_CARD_SET_TEXT")?)?; Value::Nil }
+            "gui_card_text$" | "gui_card_text" => Value::str_rc(&self.gui.card_text(gi(a,0,"GUI_CARD_TEXT$")?)?),
+            "gui_window_at" => Value::Int(self.gui.window_at(gi(a,0,"GUI_WINDOW_AT")? as i32, gi(a,1,"GUI_WINDOW_AT")? as i32)),
             "gui_icon_button" => {
                 let text = if a.len() >= 7 { gs(a,6,"GUI_ICON_BUTTON")? } else { String::new() };
                 let (sym, tex) = gsym(a,5,"GUI_ICON_BUTTON")?;

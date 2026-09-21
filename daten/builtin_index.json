@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1913,
+ "count": 1917,
  "builtins": [
   {
    "name": "ABS",
@@ -3033,6 +3033,24 @@
    "module": "gui"
   },
   {
+   "name": "GUI_CARD",
+   "kind": "core",
+   "signature": "GUI_CARD(win, x, y, w, h, bild [, titel$ [, text$]])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CARD_SET_TEXT",
+   "kind": "core",
+   "signature": "GUI_CARD_SET_TEXT(card, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CARD_TEXT$",
+   "kind": "core",
+   "signature": "GUI_CARD_TEXT$(card)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CHECKBOX",
    "kind": "core",
    "signature": "GUI_CHECKBOX(4..5 Argumente)",
@@ -5262,6 +5280,12 @@
    "name": "GUI_WINDOW",
    "kind": "core",
    "signature": "GUI_WINDOW(title, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_AT",
+   "kind": "core",
+   "signature": "GUI_WINDOW_AT(x, y)",
    "module": "gui"
   },
   {

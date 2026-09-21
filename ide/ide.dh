@@ -143,6 +143,37 @@ GUI_THEME_PRESET("glas_dunkel")
 ' denen wirkt derselbe Verlauf wie ein Schlagschatten quer ueber die halbe
 ' Hoehe. Darum matter (Verlauf und Glanz herunter) und `verlauf_hoehe`:
 ' ueber 120 Pixeln klingt beides aus, ein Knopf woelbt sich weiter.
+' Jeder Bereich traegt einen Hauch seiner eigenen Farbe -- Projekt und
+' Gliederung blau, Ausgabe gruen, Probleme orange, Debugger violett --, sonst
+' ist alles dasselbe Weiss bzw. Grau und das Auge findet nichts. Gemischt
+' aus der Widget-Grundfarbe des Themas, damit es in beiden Themen passt;
+' der Verlauf des Themas liegt darueber wie auf jeder anderen Flaeche.
+FUNCTION farbMisch(a AS INTEGER, b AS INTEGER, t AS FLOAT) AS INTEGER
+    DIM r AS INTEGER : r = INT(((a SHR 16) BAND 255) * (1.0 - t) + ((b SHR 16) BAND 255) * t + 0.5)
+    DIM gg AS INTEGER : gg = INT(((a SHR 8) BAND 255) * (1.0 - t) + ((b SHR 8) BAND 255) * t + 0.5)
+    DIM bb AS INTEGER : bb = INT((a BAND 255) * (1.0 - t) + (b BAND 255) * t + 0.5)
+    RETURN (r SHL 16) BOR (gg SHL 8) BOR bb
+END FUNCTION
+
+CONST TON_PROJEKT = &H3B7BD8
+CONST TON_AUSGABE = &H2E9E62
+CONST TON_PROBLEME = &HD98B2B
+CONST TON_DEBUG = &H8C5BD6
+
+SUB bereichsFarben()
+    DIM grund AS INTEGER : grund = GUI_THEME_GET("widget_bg")
+    DIM anteil AS FLOAT : anteil = 0.2
+    IF hell THEN anteil = 0.16
+    GUI_SET_COLOR(baum, "bg", farbMisch(grund, TON_PROJEKT, anteil))
+    GUI_SET_COLOR(lstGliederung, "bg", farbMisch(grund, TON_PROJEKT, anteil))
+    GUI_SET_COLOR(lstWkZuletzt, "bg", farbMisch(grund, TON_PROJEKT, anteil))
+    GUI_SET_COLOR(lstAusgabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
+    GUI_SET_COLOR(tfEingabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
+    GUI_SET_COLOR(lstProbleme, "bg", farbMisch(grund, TON_PROBLEME, anteil))
+    GUI_SET_COLOR(tblVars, "bg", farbMisch(grund, TON_DEBUG, anteil))
+    protokoll("bereichsfarben " + COLOR_HEX$(farbMisch(grund, TON_AUSGABE, anteil)))
+END SUB
+
 SUB themaFeinschliff()
     GUI_METRIC_SET("gradient", 9)
     GUI_METRIC_SET("gloss", 12)
@@ -657,9 +688,10 @@ DIM kachelAnzahl AS INTEGER : kachelAnzahl = LEN(kachelDatei)
 ' Eine Beschreibung braucht eine eigene Zeile unter dem Titel -- ohne eine
 ' einzige bleibt die Kachel so hoch wie vorher.
 DIM kachelMitText AS BOOLEAN : kachelMitText = FALSE
-DIM kachelBild[KACHEL_PLAETZE] AS GUI_WIDGET
-DIM kachelKnopf[KACHEL_PLAETZE] AS GUI_WIDGET
-DIM kachelText[KACHEL_PLAETZE] AS GUI_WIDGET
+' Eine Kachel ist EIN Widget (GUI_CARD): Bild, Titel und Beschreibung, und
+' ueberall darauf nimmt sie den Klick an. Bis 2026-09-21 waren es drei --
+' Bild, Knopf, Beschriftung --, und nur der schmale Knopf reagierte.
+DIM kachelKarte[KACHEL_PLAETZE] AS GUI_WIDGET
 DIM kachelTextur[KACHEL_PLAETZE] AS IMAGE
 ' Weggeblaetterte Reihen (Mausrad ueber den Kacheln) und das Feld, in dem
 ' das Rad zaehlt -- beides setzt `layout`.
@@ -671,17 +703,13 @@ DIM kfB AS INTEGER : kfB = 0
 DIM kfH AS INTEGER : kfH = 0
 DIM lblKacheln AS GUI_WIDGET : lblKacheln = GUI_LABEL(win, "Showcase -- ein Klick oeffnet das Beispiel", 0, 0)
 FOR kai = 0 TO kachelAnzahl - 1
-    kachelBild[kai] = GUI_IMAGE(win, 0, 0, 10, 10, -1)
-    GUI_IMAGE_MODE(kachelBild[kai], "einpassen")
-    kachelKnopf[kai] = GUI_BUTTON(win, kachelName[kai], 0, 0, 10, 10)
+    kachelKarte[kai] = GUI_CARD(win, 0, 0, 10, 10, -1, kachelName[kai], kachelBeschr[kai])
     IF kachelBeschr[kai] <> "" THEN
         kachelMitText = TRUE
-        GUI_TOOLTIP(kachelKnopf[kai], kachelBeschr[kai] + "  (" + kachelDatei[kai] + ")")
+        GUI_TOOLTIP(kachelKarte[kai], kachelBeschr[kai] + "  (" + kachelDatei[kai] + ")")
     ELSE
-        GUI_TOOLTIP(kachelKnopf[kai], kachelDatei[kai])
+        GUI_TOOLTIP(kachelKarte[kai], kachelDatei[kai])
     END IF
-    kachelText[kai] = GUI_LABEL(win, kachelBeschr[kai], 0, 0)
-    GUI_SET_FONT_SIZE(kachelText[kai], 12)
 NEXT
 
 ' Bereiche -- die Masse setzt `layout` bei jeder Groessenaenderung.
@@ -1089,7 +1117,7 @@ SUB kachelBildSetzen(i AS INTEGER)
     TRY
         IF kachelTextur[i] >= 0 THEN IMAGE_FREE(kachelTextur[i])
         kachelTextur[i] = LOADIMAGE(pfad)
-        GUI_SET_IMAGE(kachelBild[i], kachelTextur[i])
+        GUI_SET_IMAGE(kachelKarte[i], kachelTextur[i])
     CATCH e
         kachelTextur[i] = -1
     END TRY
@@ -1131,7 +1159,7 @@ SUB vorschauNeu()
             IMAGE_FREE(kachelTextur[i])
             kachelTextur[i] = -1
         END IF
-        GUI_SET_IMAGE(kachelBild[i], -1)
+        GUI_SET_IMAGE(kachelKarte[i], -1)
         IF FILEEXISTS(vorschauPfad$(i)) THEN DELETEFILE(vorschauPfad$(i))
     NEXT
     vorschauFertig = 0
@@ -1153,9 +1181,7 @@ SUB willkommenZeigen(an AS BOOLEAN)
         GUI_SET_VISIBLE(lblKacheln, FALSE)
         DIM wk AS INTEGER
         FOR wk = 0 TO kachelAnzahl - 1
-            GUI_SET_VISIBLE(kachelBild[wk], FALSE)
-            GUI_SET_VISIBLE(kachelKnopf[wk], FALSE)
-            GUI_SET_VISIBLE(kachelText[wk], FALSE)
+            GUI_SET_VISIBLE(kachelKarte[wk], FALSE)
         NEXT
     END IF
 END SUB
@@ -1363,10 +1389,12 @@ SUB layout()
     ' nicht passt, blaettert das Mausrad heran (kachelVersatz).
     GUI_SET_BOUNDS(lblKacheln, wx, oben + 176, ew - 80, 18)
     DIM kb AS INTEGER : kb = MIN(190, (ew - 80 - 3 * 12) \ 4)
-    DIM khb AS INTEGER : khb = kb * 100 \ 160          ' Bild im Verhaeltnis 16:10
-    DIM ktH AS INTEGER : ktH = 0
-    IF kachelMitText THEN ktH = 34
-    DIM kh AS INTEGER : kh = khb + 26 + ktH
+    ' Hoehe: Bild 16:10 der Innenbreite (6 Punkte Rand), Titel, und mit
+    ' Beschreibung zwei Zeilen in der Schrift der IDE -- die Kachel kuerzt,
+    ' was darueber hinausgeht, und der Tooltip sagt den Rest.
+    DIM khb AS INTEGER : khb = (kb - 12) * 10 \ 16
+    DIM kh AS INTEGER : kh = khb + 40
+    IF kachelMitText THEN kh = kh + 2 * (TEXT_HEIGHT() + 3)
     DIM reihenGesamt AS INTEGER : reihenGesamt = (kachelAnzahl + 3) \ 4
     DIM reihen AS INTEGER : reihen = 0
     IF kb >= 110 THEN reihen = MIN(reihenGesamt, MAX(0, (mitteH - 420) \ (kh + 10)))
@@ -1380,18 +1408,11 @@ SUB layout()
     FOR kk = 0 TO kachelAnzahl - 1
         DIM kReihe AS INTEGER : kReihe = kk \ 4 - kachelVersatz
         DIM sichtbar AS BOOLEAN : sichtbar = tabAnzahl = 0 AND kReihe >= 0 AND kReihe < reihen
-        GUI_SET_VISIBLE(kachelBild[kk], sichtbar)
-        GUI_SET_VISIBLE(kachelKnopf[kk], sichtbar)
-        GUI_SET_VISIBLE(kachelText[kk], sichtbar AND kachelMitText)
+        GUI_SET_VISIBLE(kachelKarte[kk], sichtbar)
         IF sichtbar THEN
             DIM kx AS INTEGER : kx = wx + (kk MOD 4) * (kb + 12)
             DIM ky AS INTEGER : ky = oben + 198 + kReihe * (kh + 10)
-            GUI_SET_BOUNDS(kachelBild[kk], kx, ky, kb, khb)
-            GUI_SET_BOUNDS(kachelKnopf[kk], kx, ky + khb, kb, 24)
-            IF kachelMitText THEN
-                GUI_SET_BOUNDS(kachelText[kk], kx + 2, ky + khb + 26, kb - 4, ktH)
-                GUI_SET_WRAP(kachelText[kk], kb - 4)
-            END IF
+            GUI_SET_BOUNDS(kachelKarte[kk], kx, ky, kb, kh)
         END IF
     NEXT
     IF reihen > 0 AND reihen < reihenGesamt THEN
@@ -8214,6 +8235,7 @@ SUB befehl(k AS STRING)
             GUI_MENU_CHECK(miThema, hell)
             IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
             themaFeinschliff()
+            bereichsFarben()
             konfigSichern()
         CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
         CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
@@ -8341,6 +8363,7 @@ END IF
 whAnbieten()
 whSchreiben(TRUE)
 whFaellig = GET_TIME() + whTakt
+bereichsFarben()
 protokoll("projekt " + projektOrdner)
 protokoll("bereit")
 
@@ -8447,7 +8470,7 @@ WHILE NOT beenden
     ' Kacheln: ein Klick oeffnet das Beispiel.
     DIM kc AS INTEGER
     FOR kc = 0 TO kachelAnzahl - 1
-        IF GUI_CLICKED(kachelKnopf[kc]) THEN
+        IF GUI_CLICKED(kachelKarte[kc]) THEN
             protokoll("kachel " + kachelDatei[kc])
             dateiOeffnen(PATHJOIN(beispielOrdner, kachelDatei[kc]))
         END IF
@@ -8457,7 +8480,10 @@ WHILE NOT beenden
     IF tabAnzahl = 0 AND kachelReihenSichtbar > 0 AND NOT (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) THEN
         DIM kmx AS INTEGER : kmx = MOUSEX()
         DIM kmy AS INTEGER : kmy = MOUSEY()
-        IF kmx >= kfX AND kmx < kfX + kfB AND kmy >= kfY AND kmy < kfY + kfH THEN
+        ' Nur wenn das Hauptfenster an der Stelle OBEN liegt -- sonst gehoert
+        ' das Rad dem Fenster darueber (Handbuch, Palette ...), und bis
+        ' 2026-09-21 rollten beide zugleich.
+        IF kmx >= kfX AND kmx < kfX + kfB AND kmy >= kfY AND kmy < kfY + kfH AND GUI_WINDOW_AT(kmx, kmy) = win THEN
             DIM krad AS FLOAT : krad = MOUSEWHEEL_Y()
             IF krad <> 0 THEN
                 DIM kalt AS INTEGER : kalt = kachelVersatz

@@ -232,7 +232,7 @@ pub enum Kind {
     Toolbar, Tree,
     ColorPicker, DatePicker,
     Layout, TabControl, RichText, TimePicker,
-    StatusBar, Breadcrumb,
+    StatusBar, Breadcrumb, Card,
 }
 
 impl Kind {
@@ -250,6 +250,7 @@ impl Kind {
             Kind::Layout => "layout", Kind::TabControl => "tabcontrol",
             Kind::RichText => "richtext", Kind::TimePicker => "timepicker",
             Kind::StatusBar => "statusbar", Kind::Breadcrumb => "breadcrumb",
+            Kind::Card => "card",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -266,6 +267,7 @@ impl Kind {
             "layout" => Kind::Layout, "tabcontrol" => Kind::TabControl,
             "richtext" => Kind::RichText, "timepicker" => Kind::TimePicker,
             "statusbar" => Kind::StatusBar, "breadcrumb" => Kind::Breadcrumb,
+            "card" => Kind::Card,
             _ => return None,
         })
     }
@@ -3558,8 +3560,32 @@ impl Gui {
     }
     pub fn set_image(&mut self, h: i64, tex: i64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_IMAGE")?;
-        if w.kind != Kind::Image { return Err("GUI_SET_IMAGE: Widget ist kein image".into()); }
+        if !matches!(w.kind, Kind::Image | Kind::Card) { return Err("GUI_SET_IMAGE: Widget ist kein image und keine Kachel".into()); }
         w.sel = tex as i32; Ok(())
+    }
+    /// Kachel (GUI_CARD): Bild oben, Titel, Beschreibung darunter -- und das
+    /// GANZE ist der Knopf. Vorher baute man das aus Bild, Knopf und
+    /// Beschriftung zusammen, und nur der schmale Knopf nahm den Klick an.
+    /// Bild-Handle im sel-Feld wie beim Bild, Titel im text, die
+    /// Beschreibung im placeholder-Feld (das eine Kachel sonst nicht braucht
+    /// und das die .dhform schon schreibt).
+    #[allow(clippy::too_many_arguments)]
+    pub fn card(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, tex: i64,
+                titel: String, text: String) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Card, x, y, w, h);
+        wd.sel = tex as i32; wd.text = titel; wd.placeholder = text;
+        wd.bildmodus = 2;   // fuellen: ein Bildschirmfoto soll die Flaeche decken
+        self.add_widget(win, "GUI_CARD", wd)
+    }
+    pub fn card_set_text(&mut self, h: i64, text: String) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_CARD_SET_TEXT")?;
+        if w.kind != Kind::Card { return Err("GUI_CARD_SET_TEXT: Widget ist keine Kachel (GUI_CARD)".into()); }
+        w.placeholder = text; Ok(())
+    }
+    pub fn card_text(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_CARD_TEXT$")?;
+        if w.kind != Kind::Card { return Err("GUI_CARD_TEXT$: Widget ist keine Kachel (GUI_CARD)".into()); }
+        Ok(w.placeholder.clone())
     }
     /// Button mit Icon (Textur-Handle aus LOADIMAGE/GENTEX im sel-Feld). Mit Text
     /// = Icon links + Text rechts; ohne Text = flacher, mittiger Icon-Button (fuer
@@ -7682,6 +7708,20 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
     /// Oberstes lebendes+sichtbares Widget am Bildschirmpunkt (Z-Order), oder -1.
     /// Liefert ein Widget-Handle (fuer Selektion im WYSIWYG-Editor).
+    /// Das oberste sichtbare Fenster an einem Bildschirmpunkt, -1 = keins.
+    /// Fuer Programme, die das Mausrad selbst auswerten: liegt ein anderes
+    /// Fenster ueber ihrer Flaeche, gehoert das Rad diesem -- sonst rollte
+    /// beides zugleich (die IDE blaetterte ihre Kacheln unter dem offenen
+    /// Handbuch weiter).
+    pub fn window_at(&self, mx: i32, my: i32) -> i64 {
+        for &wi in self.z_order.iter().rev() {
+            let win = &self.windows[wi];
+            if !win.alive || !win.visible { continue; }
+            if Self::in_rect(mx, my, (win.x, win.y, win.w, win.h)) { return wi as i64; }
+        }
+        -1
+    }
+
     pub fn hit_test(&self, mx: i32, my: i32) -> i64 {
         for &wi in self.z_order.iter().rev() {
             let win = &self.windows[wi];
@@ -8135,6 +8175,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let bw = zeilen.iter().map(|z| self.wtext_width(g, w, z)).max().unwrap_or(0);
                 (bw.max(1), (zeilen.len().max(1) as i32) * (sz + self.sk(4)))
             }
+            Kind::Card => (self.sk(200), self.sk(190)),
             Kind::Button => {
                 let icon = if w.sel >= 0 { self.sk(22) } else { 0 };
                 ((tw + icon + self.sk(24)).max(self.sk(28)), (sz + self.sk(12)).max(self.sk(26)))
@@ -9995,7 +10036,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if let Some((wi, i)) = self.press_origin {
                 let r = { let w = &self.windows[wi].widgets[i]; self.abs_rect(wi, w) };
                 let w = &mut self.windows[wi].widgets[i];
-                let fire = if w.kind == Kind::Button && Self::in_rect(mx, my, r) {
+                let fire = if matches!(w.kind, Kind::Button | Kind::Card) && Self::in_rect(mx, my, r) {
                     w.clicked = true; w.on_click.clone()
                 } else { None };
                 if let Some(f) = fire { self.pending.push(f); }
@@ -11902,7 +11943,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
         let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
         match kind {
-            Kind::Button => {
+            Kind::Button | Kind::Card => {
                 if ausloesen {
                     let w = &mut self.windows[wi].widgets[i];
                     w.clicked = true;
@@ -12339,7 +12380,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let kind = self.windows[win].widgets[i].kind;
         self.focus_widget = if kind.fokussierbar() { Some((win, i)) } else { None };
         match kind {
-            Kind::Button => self.press_origin = Some((win, i)),
+            Kind::Button | Kind::Card => self.press_origin = Some((win, i)),
             Kind::StatusBar => {
                 let k = self.sb_treffer(win, i, mx);
                 let w = &mut self.windows[win].widgets[i];
@@ -12904,7 +12945,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let m = bildmodus_parsen(modus).ok_or_else(|| format!(
             "GUI_IMAGE_MODE: '{}' ist kein Modus -- strecken, einpassen, fuellen, mitte oder kacheln", modus))?;
         let w = self.wdg_mut(h, "GUI_IMAGE_MODE")?;
-        if w.kind != Kind::Image { return Err("GUI_IMAGE_MODE: Widget ist kein image".into()); }
+        if !matches!(w.kind, Kind::Image | Kind::Card) { return Err("GUI_IMAGE_MODE: Widget ist kein image und keine Kachel".into()); }
         w.bildmodus = m;
         Ok(())
     }
@@ -12936,7 +12977,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if !w.hovered { continue; }
                     form = match w.kind {
                         Kind::TextInput | Kind::TextArea => Some("ibeam"),
-                        Kind::Button | Kind::Checkbox | Kind::Radio | Kind::Toggle => Some("hand"),
+                        Kind::Button | Kind::Card | Kind::Checkbox | Kind::Radio | Kind::Toggle => Some("hand"),
                         Kind::Splitter => Some(if w.group == "v" { "resize_ew" } else { "resize_ns" }),
                         _ => None,
                     };
@@ -13801,6 +13842,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 n.add_action(Action::Click);
                 n
             }
+            Kind::Card => {
+                // Ein Knopf, dessen Beschreibung der Bildschirmleser nach dem
+                // Titel vorliest.
+                let mut n = Node::new(Role::Button);
+                n.set_label(w.text.clone());
+                if !w.placeholder.is_empty() { n.set_description(w.placeholder.clone()); }
+                n.add_action(Action::Click);
+                n
+            }
             Kind::Label => { let mut n = Node::new(Role::Label); n.set_label(w.text.clone()); n.set_value(w.text.clone()); n }
             Kind::Checkbox | Kind::Toggle | Kind::Radio => {
                 let mut n = Node::new(match w.kind { Kind::Checkbox => Role::CheckBox, Kind::Toggle => Role::Switch, _ => Role::RadioButton });
@@ -14197,7 +14247,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Leertaste (`widget_keys`), damit `clicked` und die Rueckrufe stimmen.
     fn a11y_klick(&mut self, wi: usize, i: usize, kind: Kind) {
         match kind {
-            Kind::Button => {
+            Kind::Button | Kind::Card => {
                 let w = &mut self.windows[wi].widgets[i];
                 w.clicked = true;
                 let f = w.on_click.clone();
@@ -15362,6 +15412,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::Image => {
                 if wdg.sel >= 0 { self.draw_bild(g, wdg, ax, ay, w, h); }
             }
+            Kind::Card => self.draw_karte(g, wi, idx, ax, ay, w, h),
             Kind::Canvas => {
                 // Platzhalter-Flaeche; der User malt nach GUI_DRAW mit normalen
                 // Befehlen in den per GUI_CANVAS_X/Y/W/H gelieferten Bereich.
@@ -15923,6 +15974,81 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Bild nach Modus: strecken (wie bisher), einpassen/fuellen mit
     /// Seitenverhaeltnis, mitte in Originalgroesse, kacheln.
+/// Eine Kachel: Flaeche, Bild oben (mit Innenabstand), Titel kraeftig,
+    /// Beschreibung umbrochen in der Schrift des Widgets -- nicht kleiner,
+    /// sonst ist sie unter einem Bild in 190 Punkten Breite nicht zu lesen.
+    /// Passt sie nicht, endet die letzte Zeile mit "...", und der Tooltip
+    /// (falls gesetzt) sagt den Rest. Unter der Maus hebt sich die ganze
+    /// Kachel und bekommt einen Akzentrahmen; gedrueckt sinkt sie.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_karte(&self, g: &mut Graphics, wi: usize, idx: usize, ax: i32, ay: i32, w: i32, h: i32) {
+        let wdg = &self.windows[wi].widgets[idx];
+        let gedrueckt = self.press_origin == Some((wi, idx)) && wdg.enabled;
+        let ueber = wdg.hovered && wdg.enabled;
+        let grund = self.wcol(wdg, "bg", "widget_bg");
+        let bg = if gedrueckt { shade(grund, -14) } else if ueber { shade(grund, 18) } else { grund };
+        let rahmen = if ueber || gedrueckt { self.acc_col(wdg) } else { self.wcol(wdg, "border", "widget_border") };
+        self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bg, rahmen);
+        if ueber {
+            let rad = self.m("corner_radius");
+            g.round_rect(ax + 1, ay + 1, ax + w - 2, ay + h - 2, (rad - 1).max(0), rahmen, false);
+        }
+        let pad = self.sk(6);
+        let sz = self.wsize(g, wdg);
+        let font = self.wfont(g, wdg);
+        let titel_sz = sz + self.sk(1);
+        let zeile_h = sz + self.sk(3);
+        let innen_w = (w - 2 * pad).max(1);
+        // Bild: 16:10 der Innenbreite, aber nie so hoch, dass fuer Titel und
+        // eine Zeile Beschreibung kein Platz bleibt.
+        let rest_mind = titel_sz + self.sk(8) + if wdg.placeholder.is_empty() { 0 } else { zeile_h };
+        let bild_h = if wdg.sel >= 0 { (innen_w * 10 / 16).min(h - 2 * pad - rest_mind).max(0) } else { 0 };
+        if bild_h > 0 {
+            self.draw_bild(g, wdg, ax + pad, ay + pad, innen_w, bild_h);
+            g.rect(ax + pad, ay + pad, ax + pad + innen_w - 1, ay + pad + bild_h - 1, shade(rahmen, -20));
+        }
+        let mut y = ay + pad + bild_h + if bild_h > 0 { self.sk(6) } else { 0 };
+        let tfarbe = if ueber { self.acc_col(wdg) } else { self.txt_col(wdg) };
+        g.push_clip(ax + pad, ay, innen_w, h);
+        if !wdg.text.is_empty() {
+            // Kraeftig: zweimal, um einen Punkt versetzt -- aus einer Schrift
+            // laesst sich keine Strichstaerke rechnen (wie beim gesetzten Text).
+            let mut titel = wdg.text.clone();
+            while titel.chars().count() > 1 && g.text_width_in(&titel, titel_sz, font) > innen_w {
+                titel.pop();
+            }
+            if titel != wdg.text { titel = format!("{}...", titel.trim_end().trim_end_matches('.')); }
+            g.text_styled(ax + pad, y, titel.clone(), tfarbe, font, titel_sz);
+            g.text_styled(ax + pad + 1, y, titel, tfarbe, font, titel_sz);
+            y += titel_sz + self.sk(4);
+        }
+        if !wdg.placeholder.is_empty() {
+            let unten = ay + h - pad;
+            let platz = ((unten - y) / zeile_h).max(0) as usize;
+            let mut zeilen = self.umbrechen(g, wdg, &wdg.placeholder, innen_w);
+            if zeilen.len() > platz && platz > 0 {
+                // Der Rest rueckt in die letzte sichtbare Zeile nach und wird
+                // erst dort abgeschnitten -- sonst endete ein Text, dessen
+                // zweites Wort nicht mehr passte, schon nach dem ersten.
+                let rest = zeilen[platz - 1..].join(" ");
+                zeilen.truncate(platz);
+                zeilen[platz - 1] = rest;
+                if let Some(l) = zeilen.last_mut() {
+                    while !l.is_empty() && self.wtext_width(g, wdg, &format!("{}...", l)) > innen_w { l.pop(); }
+                    *l = format!("{}...", l.trim_end());
+                }
+            } else if platz == 0 {
+                zeilen.clear();
+            }
+            let farbe = mischen(self.txt_col(wdg), self.th("muted_fg"), 0.45);
+            for z in zeilen {
+                self.wtext(g, wdg, ax + pad, y, z, farbe);
+                y += zeile_h;
+            }
+        }
+        g.pop_clip();
+    }
+
     fn draw_bild(&self, g: &mut Graphics, wdg: &Widget, ax: i32, ay: i32, w: i32, h: i32) {
         let tex = wdg.sel as i64;
         if wdg.bildmodus == 0 { g.draw_image_rect(tex, ax, ay, w, h); return; }
