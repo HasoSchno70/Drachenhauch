@@ -3908,6 +3908,15 @@ Qt-Gegenstueck -- `bauen.dh` schreibt sie vor jedem Verpacken neu. Tests
 Attrappe statt cargo; Gegenprobe ohne Kleinschreibung beim Sortieren faellt).
 **Falle:** es gibt keinen Befehl fuer den Namen des Betriebssystems -- `bauen.dh`
 sucht darum einfach beide Dateinamen (`dhrt.exe`, `dhrt`).
+**Seit 2026-09-21 hat er alles, was nur der Qt-Installer hatte:** die Buecher
+(`.docx`/`.epub` nach `{app}\buecher`, wenn gebaut), die ESP32-Sketche, das
+Aufraeumen von GameBasic (Ordner, Verknuepfungen, ProgID, `.gb` nur wenn es noch
+auf uns zeigt) und das Signieren ueber `GB_SIGN_CERT`/`_PASS`/`_TS`. Signiert
+wird eine KOPIE der Laufzeit (`<ausgabe>/stufe/dhrt.exe`, an ISCC als
+`/DDhrtQuelle`) -- die gebaute laeuft womoeglich gerade als `bauen.dh` --, dann
+der Installer; ein Fehlschlag bricht VOR ISCC ab statt nur zu warnen. Tests mit
+Attrappen fuer ISCC/signtool (`.cmd`, die `PROCESS_START` direkt startet) in
+`tests/pruef/werkzeug_installer.dhtest`; vier Verfaelschungen fallen.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in

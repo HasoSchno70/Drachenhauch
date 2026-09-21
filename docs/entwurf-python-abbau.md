@@ -443,14 +443,15 @@ und fallen mit ihnen.
    GB-Code des SFX-Generators~~ -- alles drei am 17.09. erledigt.
 2. **Umzüge, die Python nicht stören:** ~~die drei `builtin_*.json` aus
    `drachenhauch/` heraus~~ (am 17.09. nach `daten/`, siehe 7.2);
-   `dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`; ~~`test_midi_module` als
+   ~~`dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`~~ (am 21.09.); ~~`test_midi_module` als
    Sammlung~~ (am 20.09., zusammen mit den drei anderen aus 7.6).
 3. **Lücken schließen, die man vermissen würde** -- entschieden in (a):
    zuerst die acht Punkte der Stufe A (Liste unten), der Rest bei Bedarf.
    ~~Für Qt-`.dhsprite`-Dateien ein einmaliger Import~~ -- entfällt,
    siehe (d).
-4. **Verteilung:** der Python-freie Installer übernimmt Bücher,
-   ESP32-Sketche, Signierung und das Aufräumen der alten Installation;
+4. **Verteilung:** ~~der Python-freie Installer übernimmt Bücher,
+   ESP32-Sketche, Signierung und das Aufräumen der alten Installation~~ --
+   am 21.09. (`installer/README.md`, `tests/pruef/werkzeug_installer.dhtest`);
    ~~macOS und Linux brauchen einen eigenen Weg oder bleiben vorerst ohne
    Paket~~ -- entschieden in (b), gebaut am 19.09.
 5. **Bau:** ~~`build_runtime.py` und `build_wasm.py` durch etwas ohne

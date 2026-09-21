@@ -1,7 +1,9 @@
 ; Inno-Setup-Skript fuer Drachenhauch OHNE Python (Weg C, Stufe 3):
 ; die Runtime dhrt.exe, die IDE in Drachenhauch (ide\ide.dh), das Handbuch
 ; (docs\*.md), die Beispiele samt Begleit-Editoren -- kein PyInstaller, kein
-; Qt, keine Python-Laufzeit. Gemessen 33 MB statt 92 (davon 20 MB dhrt.exe).
+; Qt, keine Python-Laufzeit. Seit 2026-09-21 auch die Buecher, die
+; ESP32-Sketche, das Aufraeumen von GameBasic und (ueber bauen.dh) die
+; Signierung -- alles, was bis dahin nur Drachenhauch.iss mitbrachte.
 ;
 ;   ISCC.exe /DAppVersion=2026.14 installer\Drachenhauch-IDE.iss
 ;
@@ -12,6 +14,12 @@
 
 #ifndef AppVersion
   #define AppVersion "0.0"
+#endif
+; Welche dhrt.exe hineinkommt. bauen.dh gibt eine KOPIE an -- dort ist sie
+; schon signiert, und die gebaute Datei bleibt unberuehrt (eine laufende
+; .exe laesst sich unter Windows ohnehin nicht signieren).
+#ifndef DhrtQuelle
+  #define DhrtQuelle "..\rust\drachenhauch_runtime\target\release\dhrt.exe"
 #endif
 #define AppName "Drachenhauch IDE"
 #define AppPublisher "Hans Schnorrenberger"
@@ -45,8 +53,21 @@ Name: "desktopicon"; Description: "Desktop-Verknuepfung anlegen"; GroupDescripti
 Name: "addtopath"; Description: "Installationsordner zum PATH hinzufuegen (dhrt im Terminal nutzbar)"; GroupDescription: "Optionen:"
 Name: "assocdh"; Description: ".dh-Dateien mit der Drachenhauch IDE verknuepfen"; GroupDescription: "Optionen:"
 
+[InstallDelete]
+; --- Reste der GameBasic-Installation --- (dieselben wie in Drachenhauch.iss:
+; wer von GameBasic gleich auf die Fassung ohne Python wechselt, soll nicht
+; rund 80 MB und 225 verwaiste Beispieldateien behalten)
+Type: filesandordirs; Name: "{autopf}\GameBasic"
+Type: filesandordirs; Name: "{commondocs}\GameBasic"
+Type: filesandordirs; Name: "{autoprograms}\GameBasic"
+Type: files; Name: "{autodesktop}\GameBasic.lnk"
+; Vorschaubilder der eigenen Beispiele: reine Erzeugung, dort legt niemand
+; etwas ab -- ohne das blieben umbenannte Bilder fuer immer liegen. Nur
+; dieser Unterordner; der Beispielordner selbst ist `uninsneveruninstall`.
+Type: filesandordirs; Name: "{commondocs}\Drachenhauch\examples\screenshots"
+
 [Files]
-Source: "..\rust\drachenhauch_runtime\target\release\dhrt.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#DhrtQuelle}"; DestDir: "{app}"; DestName: "dhrt.exe"; Flags: ignoreversion
 ; Die IDE selbst -- Quelltext, den der Nutzer lesen und aendern kann.
 Source: "..\ide\*.dh"; DestDir: "{app}\ide"; Flags: ignoreversion
 ; Das Handbuch: die IDE liest docs\ neben ide\ (F1 schlaegt dort nach).
@@ -56,6 +77,18 @@ Source: "..\docs\*.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 ; keine liegen. `uninsneveruninstall`: bearbeitete Beispiele ueberleben.
 Source: "..\examples\*"; DestDir: "{commondocs}\Drachenhauch\examples"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall
+; Sketch-Grundgeruest fuer ESP32/ESP8266 -- neben die Beispiele, weil
+; examples\159_esp32_bruecke.dh im Kopfkommentar darauf verweist.
+Source: "..\esp32\*"; DestDir: "{commondocs}\Drachenhauch\esp32"; \
+    Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
+; Die Buecher, falls gebaut (tools/buch_bauen.dh) -- .docx zum Drucken,
+; .epub zum Lesen am Geraet; der Einstieg ist der Band fuer Anfaenger.
+Source: "..\buch-referenz\buch\Drachenhauch-Lehrbuch.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buch-referenz\buch\Drachenhauch-Lehrbuch.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buch-referenz\buch\Drachenhauch-Handbook.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buch-referenz\buch\Drachenhauch-Handbook.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buch-einstieg\buch\Drachenhauch-Einstieg.docx"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\buch-einstieg\buch\Drachenhauch-Einstieg.epub"; DestDir: "{app}\buecher"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "EULA.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "THIRD-PARTY-NOTICES-IDE.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
@@ -73,6 +106,10 @@ Name: "{group}\Anim-FSM-Editor"; Filename: "{app}\dhrt.exe"; Parameters: "run ""
 Name: "{group}\Notenblatt"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{commondocs}\Drachenhauch\examples\199_notenblatt.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Beispiele"; Filename: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Handbuch (Markdown)"; Filename: "{app}\docs"
+Name: "{group}\Einstieg (fuer Anfaenger)"; Filename: "{app}\buecher\Drachenhauch-Einstieg.docx"; Flags: createonlyiffileexists
+Name: "{group}\Lehrbuch"; Filename: "{app}\buecher\Drachenhauch-Lehrbuch.docx"; Flags: createonlyiffileexists
+Name: "{group}\Handbook (English)"; Filename: "{app}\buecher\Drachenhauch-Handbook.docx"; Flags: createonlyiffileexists
+Name: "{group}\ESP32-Sketche"; Filename: "{commondocs}\Drachenhauch\esp32"
 Name: "{group}\Lizenzen\Lizenzvertrag (EULA)"; Filename: "{app}\EULA.txt"
 Name: "{group}\Lizenzen\Drittanbieter-Lizenzen"; Filename: "{app}\THIRD-PARTY-NOTICES-IDE.txt"; Flags: createonlyiffileexists
 Name: "{group}\{cm:UninstallProgram,Drachenhauch IDE}"; Filename: "{uninstallexe}"
@@ -88,6 +125,20 @@ Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\shell\run"; ValueTyp
 Root: HKA; Subkey: "Software\Classes\DrachenhauchIDE.Source\shell\run\command"; ValueType: string; ValueName: ""; ValueData: """{app}\dhrt.exe"" run ""%1"""; Tasks: assocdh
 
 [Code]
+// --- Registry-Reste der GameBasic-Installation --- (wie in Drachenhauch.iss)
+// Die ProgID `GameBasic.Source` gehoert uns. `.gb` NUR, wenn es noch auf uns
+// zeigt: `.gb` ist auch die Endung fuer Game-Boy-ROMs, und ein Emulator, der
+// sie inzwischen haelt, geht uns nichts an.
+procedure LoescheAlteVerknuepfung(Wurzel: Integer);
+var
+  Wert: string;
+begin
+  if RegQueryStringValue(Wurzel, 'Software\Classes\.gb', '', Wert)
+     and (Wert = 'GameBasic.Source') then
+    RegDeleteKeyIncludingSubkeys(Wurzel, 'Software\Classes\.gb');
+  RegDeleteKeyIncludingSubkeys(Wurzel, 'Software\Classes\GameBasic.Source');
+end;
+
 // PATH-Eintrag fuer den Installationsordner (optionaler Task) -- wie in
 // Drachenhauch.iss.
 function NeedsAddPath(Param: string): boolean;
@@ -108,6 +159,13 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   OrigPath: string;
 begin
+  if CurStep = ssPostInstall then
+  begin
+    // Beide Wurzeln -- ob GameBasic fuer alle oder nur fuer den Nutzer
+    // installiert war, weiss hier niemand mehr.
+    LoescheAlteVerknuepfung(HKEY_LOCAL_MACHINE);
+    LoescheAlteVerknuepfung(HKEY_CURRENT_USER);
+  end;
   if (CurStep = ssPostInstall) and WizardIsTaskSelected('addtopath') then
   begin
     if NeedsAddPath(ExpandConstant('{app}')) then

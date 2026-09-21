@@ -52,7 +52,38 @@ an allen 370 Crates); Tests: `tests/pruef/werkzeug_installer.dhtest`.
 
 Die Verknuepfungen starten `dhrt.exe run "{app}\ide\ide.dh"` mit dem
 Beispielordner als Arbeitsverzeichnis; `.dh`-Dateien oeffnen sich in der
-IDE (`-- "%1"`). Kein Signieren.
+IDE (`-- "%1"`).
+
+**Seit 2026-09-21 liefert er alles, was vorher nur der Qt-Installer hatte**
+(`docs/entwurf-python-abbau.md`, 7.7 Punkt 4):
+
+* **die Buecher** -- Lehrbuch, Handbook und Einstieg als `.docx` und
+  `.epub` nach `{app}\buecher`, samt Startmenue-Eintraegen; wie im
+  Qt-Installer nur, wenn sie gebaut sind (`tools/buch_bauen.dh`), fehlende
+  werden uebergangen;
+* **die ESP32-Sketche** neben die Beispiele (`...\Drachenhauch\esp32`, auf
+  den `examples/159_esp32_bruecke.dh` verweist);
+* **das Aufraeumen einer alten GameBasic-Installation**: Programm- und
+  Beispielordner, Startmenue, Desktop-Verknuepfung, die ProgID
+  `GameBasic.Source` und `.gb` -- dieses nur, wenn es noch auf uns zeigt
+  (`.gb` ist auch die Endung fuer Game-Boy-ROMs); dazu die veralteten
+  Vorschaubilder unter `examples\screenshots`;
+* **das Signieren**, mit denselben Variablen wie unten (`GB_SIGN_CERT`,
+  `GB_SIGN_PASS`, `GB_SIGN_TS`, `SIGNTOOL`). `bauen.dh` packt dafuer eine
+  KOPIE der Laufzeit (`<ausgabe>\stufe\dhrt.exe`, an ISCC ueber
+  `/DDhrtQuelle`): signiert wird die Kopie vor dem Einpacken, danach der
+  fertige Installer. Die gebaute `dhrt.exe` bleibt unberuehrt -- sie laeuft
+  womoeglich gerade als `bauen.dh`. **Ein Fehlschlag ist ein Abbruch**, nicht
+  eine Warnung wie in `build_installer.py`: ein Installer, der signiert sein
+  sollte und es nicht ist, fiele erst beim Nutzer auf. Ohne `GB_SIGN_CERT`
+  sagt der Bau am Ende "Nicht signiert".
+
+Geprueft in `tests/pruef/werkzeug_installer.dhtest` mit Attrappen fuer ISCC
+und signtool (welche Datei, in welcher Reihenfolge, Fingerabdruck gegen
+`.pfx`, Abbruch vor ISCC); ein echter Bau mit Inno Setup packt die sechs
+Buecher und den Sketch nachweislich ein. Die AppId bleibt die eigene: die
+Qt-Fassung wird NICHT ersetzt, beide lassen sich nebeneinander
+installieren.
 
 ### macOS und Linux (seit 2026-09-19)
 
@@ -260,6 +291,10 @@ set GB_SIGN_PASS=geheim                    REM nur bei .pfx
 set GB_SIGN_TS=http://timestamp.digicert.com   REM optional (Default gesetzt)
 .venv\Scripts\python.exe installer\build_installer.py
 ```
+
+Dieselben Variablen gelten fuer den Installer ohne Python
+(`dhrt run installer\bauen.dh`, siehe oben) -- dort signiert der Bau die
+Kopie der `dhrt.exe` und den Installer, und ein Fehlschlag bricht ab.
 
 - Braucht **`signtool.exe`** (Windows SDK; wird automatisch unter
   `Windows Kits\10\bin\*\x64\` gesucht, oder via `SIGNTOOL`/PATH).

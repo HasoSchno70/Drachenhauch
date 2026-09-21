@@ -176,6 +176,70 @@ FUNCTION isccFinden$() AS STRING
     RETURN ""
 END FUNCTION
 
+' --- Signieren (Windows, nur wenn GB_SIGN_CERT gesetzt ist) -------------
+' Dieselben drei Variablen wie in build_installer.py: GB_SIGN_CERT ist der
+' Pfad einer .pfx ODER der SHA1-Fingerabdruck eines Zertifikats im
+' Windows-Speicher, GB_SIGN_PASS das Passwort der .pfx, GB_SIGN_TS die
+' Zeitstempel-Adresse. Die Werte gehen nur an signtool und werden nirgends
+' ausgegeben. Anders als dort ist ein Fehlschlag hier ein ABBRUCH: ein
+' Installer, der als signiert gedacht war und es nicht ist, faellt erst beim
+' Nutzer auf (SmartScreen), und dann ist er schon verteilt.
+FUNCTION signtoolFinden$() AS STRING
+    IF GETENV$("SIGNTOOL") <> "" AND FILEEXISTS(GETENV$("SIGNTOOL")) THEN RETURN GETENV$("SIGNTOOL")
+    DIM basis AS STRING : basis = "C:/Program Files (x86)/Windows Kits/10/bin"
+    IF NOT FILEEXISTS(basis) THEN RETURN ""
+    ' Die neueste SDK-Fassung zuerst: die Ordner heissen 10.0.<nummer>.0.
+    DIM ordner AS ARRAY OF STRING : ordner = DIRLIST(basis)
+    SORT(ordner)
+    DIM i AS INTEGER
+    FOR i = LEN(ordner) - 1 TO 0 STEP -1
+        DIM st AS STRING : st = basis + "/" + ordner[i] + "/x64/signtool.exe"
+        IF FILEEXISTS(st) THEN RETURN st
+    NEXT
+    RETURN ""
+END FUNCTION
+
+FUNCTION signieren(datei AS STRING) AS BOOLEAN
+    DIM zert AS STRING : zert = GETENV$("GB_SIGN_CERT")
+    IF zert = "" THEN RETURN TRUE
+    DIM st AS STRING : st = signtoolFinden$()
+    IF st = "" THEN
+        PRINT "GB_SIGN_CERT ist gesetzt, aber signtool.exe fehlt (Windows SDK, oder SIGNTOOL setzen)."
+        RETURN FALSE
+    END IF
+    DIM ts AS STRING : ts = GETENV$("GB_SIGN_TS")
+    IF ts = "" THEN ts = "http://timestamp.digicert.com"
+    PRINT "Signiere "; BASENAME(datei)
+    ' signtool bekommt den Pfad in Windows-Schreibweise.
+    DIM dw AS STRING : dw = REPLACE$(datei, "/", CHR$(92))
+    DIM p AS INTEGER
+    IF FILEEXISTS(zert) THEN
+        IF GETENV$("GB_SIGN_PASS") <> "" THEN
+            p = PROCESS_START(st, "sign", "/fd", "SHA256", "/tr", ts, "/td", "SHA256", "/f", zert, "/p", GETENV$("GB_SIGN_PASS"), dw)
+        ELSE
+            p = PROCESS_START(st, "sign", "/fd", "SHA256", "/tr", ts, "/td", "SHA256", "/f", zert, dw)
+        END IF
+    ELSE
+        p = PROCESS_START(st, "sign", "/fd", "SHA256", "/tr", ts, "/td", "SHA256", "/sha1", zert, dw)
+    END IF
+    IF lauf(p, TRUE) <> 0 THEN
+        PRINT "signtool ist fehlgeschlagen: "; datei
+        RETURN FALSE
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+' Gepackt wird eine KOPIE der Laufzeit: signiert wird die Kopie, und die
+' gebaute dhrt.exe bleibt, wie sie ist -- sie laeuft womoeglich gerade (als
+' dieses Programm), und eine laufende .exe laesst sich nicht beschreiben.
+DIM stufe AS STRING : stufe = ausgabeOrdner + "/stufe"
+MKDIR(ausgabeOrdner)
+MKDIR(stufe)
+DIM dhrtKopie AS STRING : dhrtKopie = stufe + "/dhrt.exe"
+IF FILEEXISTS(dhrtKopie) THEN DELETEFILE(dhrtKopie)
+COPYFILE(runtime, dhrtKopie)
+IF NOT signieren(dhrtKopie) THEN EXIT(1)
+
 DIM iscc AS STRING : iscc = isccFinden$()
 IF iscc = "" THEN
     PRINT "Inno Setup (ISCC.exe) nicht gefunden -- die Lizenzdatei ist trotzdem fertig."
@@ -184,15 +248,17 @@ IF iscc = "" THEN
 END IF
 PRINT "Inno Setup: "; iscc
 CHDIR(installer)
-DIM ic AS INTEGER : ic = PROCESS_START(iscc, "/DAppVersion=" + fassung, installer + "/Drachenhauch-IDE.iss")
+DIM ic AS INTEGER
+ic = PROCESS_START(iscc, "/DAppVersion=" + fassung, "/DDhrtQuelle=" + REPLACE$(dhrtKopie, "/", CHR$(92)), "/O" + REPLACE$(ausgabeOrdner, "/", CHR$(92)), installer + "/Drachenhauch-IDE.iss")
 IF lauf(ic, FALSE) <> 0 THEN
     PRINT "ISCC ist fehlgeschlagen."
     EXIT(1)
 END IF
-DIM ergebnis AS STRING : ergebnis = installer + "/output/Drachenhauch-IDE-Setup-" + fassung + ".exe"
-IF FILEEXISTS(ergebnis) THEN
-    PRINT "FERTIG -> "; ergebnis; " ("; FILESIZE(ergebnis) \ 1048576; " MB)"
-ELSE
+DIM ergebnis AS STRING : ergebnis = ausgabeOrdner + "/Drachenhauch-IDE-Setup-" + fassung + ".exe"
+IF NOT FILEEXISTS(ergebnis) THEN
     PRINT "ISCC meldete Erfolg, aber "; ergebnis; " fehlt."
     EXIT(1)
 END IF
+IF NOT signieren(ergebnis) THEN EXIT(1)
+PRINT "FERTIG -> "; ergebnis; " ("; FILESIZE(ergebnis) \ 1048576; " MB)"
+IF GETENV$("GB_SIGN_CERT") = "" THEN PRINT "Nicht signiert (GB_SIGN_CERT ist nicht gesetzt)."
