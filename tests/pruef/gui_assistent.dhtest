@@ -242,3 +242,36 @@ PRINT "texte "; (INSTR(oj, CHR$(34) + "Done" + CHR$(34)) >= 0)
 --- erwartet
 leer weiter FALSE 0
 texte TRUE
+
+=== ein schmaler assistent laesst seine knoepfe nicht ueberlappen
+' Breite 298: die Knoepfe schrumpfen auf (298 - 20 - 16) / 3 = 87 Punkte.
+' Zurueck liegt dann bei x 116..203 -- mit den festen 112 Punkten lag dort
+' schon Weiter (186..298), und Abbrechen (20..132) deckte Zurueck halb zu.
+IMPORT "gui"
+SCREEN(440, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 440, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(w, 10, 10, 298, 250)
+GUI_WIZARD_ADD(wz, "Eins")
+GUI_WIZARD_ADD(wz, "Zwei")
+GUI_WIZARD_SET_STEP(wz, 1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_WIZARD_CHANGED(wz) THEN PRINT "schritt "; GUI_WIZARD_STEP(wz)
+    IF GUI_WIZARD_FINISHED(wz) THEN PRINT "fertig"
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 1 7 190 236 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=10
+--- erwartet
+schritt 0
