@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1864,
+ "count": 1866,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1413,10 +1413,12 @@
   "ROUND": "INT-Konvertierung",
   "ROUND_HALF_UP": "kaufmännisch runden: von der Null weg",
   "RTRIM$": "Whitespace nur links / nur rechts entfernen",
+  "SAMPLE_FROM_BUFFER": "Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono)",
   "SAMPLE_LEN": "Laenge in Sekunden bei Originaltonhoehe",
   "SAMPLE_LOAD": "WAV/OGG/QOA laden, auf Mono normalisiert",
+  "SAMPLE_NOTE": "eine Note als Klang bauen (nicht abspielen), Huellkurve wie AUDIO_NOTE",
   "SAMPLE_PLAY": "bei relativer Tonhoehe abspielen",
-  "SAMPLE_SET_LOOP": "Loop-Region in Frames (fuer gehaltene Noten)",
+  "SAMPLE_SET_LOOP": "Loop-Region in Frames (fuer gehaltene Noten), art$ = vorwaerts (Vorgabe) oder pingpong",
   "SAVESCREENSHOT": "Speichert den aktuellen Bildschirminhalt als PNG.",
   "SAVE_CLEAR": "alle Keys weg, Version bleibt",
   "SAVE_DELETE": "idempotent",

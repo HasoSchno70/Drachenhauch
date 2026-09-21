@@ -1,0 +1,250 @@
+' SAMPLE_FROM_BUFFER, SAMPLE_NOTE und die Loop-Arten von SAMPLE_SET_LOOP --
+' was der Tracker braucht, um Sample- und Keymap-Instrumente zu spielen.
+' Jeder Fall baut sein Sample selbst: ein Sinus mit 441 Hz bei 22050 Hz
+' Abtastrate hat eine Periode von genau 50 Werten, eine Loop-Region auf
+' Vielfachen davon ist also nahtlos. Gemessen wird am WAV (`--- ton` bzw. die
+' Nulldurchgaenge in einem `--- nachher`).
+
+=== ein sample aus einem puffer
+' 22050 Werte bei 22050 Hz sind eine Sekunde.
+IMPORT "audio"
+DIM b AS BUFFER : b = BUFFER_NEW(44100)
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(b, 22050)
+PRINT SAMPLE_LEN(s)
+--- erwartet
+1.0
+
+=== die werte sind 16 bit little endian mit vorzeichen
+' Ein Wert -16384 ist -0.5; als SAMPLE_NOTE in Originalhoehe und
+' Originalrate (44100) kommt er unveraendert in die WAV, Werte in der Mitte
+' (die Flanken am Anfang und Ende blenden ein und aus).
+IMPORT "audio"
+DIM b AS BUFFER : b = BUFFER_NEW(8820)
+DIM i AS INTEGER
+FOR i = 0 TO 4409
+    BUFFER_SET_I16(b, i * 2, -16384)
+NEXT
+AUDIO_SAVE_WAV(SAMPLE_NOTE(SAMPLE_FROM_BUFFER(b, 44100), 0, 100, 0, 0, 1.0, 0, 1.0), "n.wav")
+--- nachher
+DIM w AS BUFFER : w = READALL_BYTES("n.wav")
+DIM d AS INTEGER : d = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data")) + 8
+PRINT "um -16384 "; ABS(BUFFER_GET_I16(w, d + 2000 * 2) + 16384) <= 1
+--- erwartet
+um -16384 TRUE
+
+=== ungerade laenge ist ein fehler
+IMPORT "audio"
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(BUFFER_NEW(5), 22050)
+--- fehler
+ungerade Laenge
+
+=== leerer puffer ist ein fehler
+IMPORT "audio"
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(BUFFER_NEW(0), 22050)
+--- fehler
+der Puffer ist leer
+
+=== abtastrate ausserhalb ist ein fehler
+IMPORT "audio"
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(BUFFER_NEW(4), 10)
+--- fehler
+abtastrate muss 1000..384000 sein
+
+=== unbekannte loop-art ist ein fehler
+IMPORT "audio"
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(BUFFER_NEW(400), 22050)
+SAMPLE_SET_LOOP(s, 10, 100, "rueckwaerts")
+--- fehler
+unbekannte Loop-Art 'rueckwaerts'
+
+=== halbtoene und abtastrate ergeben die tonhoehe
+' Das Sample (441 Hz bei 22050) klingt in der WAV (44100) mit 441 Hz, eine
+' Oktave hoeher mit 882 -- rechnete SAMPLE_NOTE die Abtastrate nicht mit,
+' kaemen 220,5 und 441 heraus.
+IMPORT "audio"
+FUNCTION sinus(n AS INTEGER) AS BUFFER
+    DIM b AS BUFFER : b = BUFFER_NEW(n * 2)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        BUFFER_SET_I16(b, i * 2, INT(SIN(2.0 * PI * 441.0 * i / 22050.0) * 32000.0))
+    NEXT
+    RETURN b
+END FUNCTION
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(sinus(22050), 22050)
+AUDIO_SAVE_WAV(SAMPLE_NOTE(s, 0, 500, 0, 0, 1.0, 0, 1.0), "grund.wav")
+AUDIO_SAVE_WAV(SAMPLE_NOTE(s, 12, 500, 0, 0, 1.0, 0, 1.0), "oktave.wav")
+--- nachher
+FUNCTION hz(datei AS STRING, von AS INTEGER, bis AS INTEGER) AS FLOAT
+    DIM w AS BUFFER : w = READALL_BYTES(datei)
+    DIM f AS INTEGER : f = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("fmt "))
+    DIM kan AS INTEGER : kan = BUFFER_GET_U16(w, f + 10)
+    DIM sr AS INTEGER : sr = BUFFER_GET_U32(w, f + 12)
+    DIM d AS INTEGER : d = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data")) + 8
+    DIM a AS INTEGER : a = sr * von \ 1000
+    DIM e AS INTEGER : e = sr * bis \ 1000
+    DIM kreuz AS INTEGER : kreuz = 0
+    DIM vorher AS BOOLEAN : vorher = BUFFER_GET_I16(w, d + a * 2 * kan) < 0
+    DIM i AS INTEGER
+    FOR i = a + 1 TO e - 1
+        DIM neg AS BOOLEAN : neg = BUFFER_GET_I16(w, d + i * 2 * kan) < 0
+        IF neg <> vorher THEN kreuz = kreuz + 1
+        vorher = neg
+    NEXT
+    RETURN kreuz / 2.0 / ((bis - von) / 1000.0)
+END FUNCTION
+DIM g AS FLOAT : g = hz("grund.wav", 50, 450)
+DIM o AS FLOAT : o = hz("oktave.wav", 50, 450)
+PRINT "grund um 441 hz "; g > 430 AND g < 452
+PRINT "oktave um 882 hz "; o > 860 AND o < 904
+--- erwartet
+grund um 441 hz TRUE
+oktave um 882 hz TRUE
+
+=== ohne loop endet das sample
+' 200 ms Sample, 800 ms Note: danach Stille, die Laenge bleibt 800 ms.
+IMPORT "audio"
+FUNCTION sinus(n AS INTEGER) AS BUFFER
+    DIM b AS BUFFER : b = BUFFER_NEW(n * 2)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        BUFFER_SET_I16(b, i * 2, INT(SIN(2.0 * PI * 441.0 * i / 22050.0) * 32000.0))
+    NEXT
+    RETURN b
+END FUNCTION
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(sinus(4410), 22050)
+AUDIO_SAVE_WAV(SAMPLE_NOTE(s, 0, 800, 0, 0, 1.0, 0, 1.0), "n.wav")
+--- ton n.wav
+dauer 0.8 +-0.005
+pegel 50 150 > 0.8
+pegel 250 790 < 0.01
+
+=== ein vorwaerts-loop haelt den ton
+' Dasselbe Sample mit Loop 1100..2200 (ohne Art = vorwaerts): der Ton steht
+' bis zum Ende der Note.
+IMPORT "audio"
+FUNCTION sinus(n AS INTEGER) AS BUFFER
+    DIM b AS BUFFER : b = BUFFER_NEW(n * 2)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        BUFFER_SET_I16(b, i * 2, INT(SIN(2.0 * PI * 441.0 * i / 22050.0) * 32000.0))
+    NEXT
+    RETURN b
+END FUNCTION
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(sinus(4410), 22050)
+SAMPLE_SET_LOOP(s, 1100, 2200)
+AUDIO_SAVE_WAV(SAMPLE_NOTE(s, 0, 800, 0, 0, 1.0, 0, 1.0), "n.wav")
+--- ton n.wav
+pegel 300 400 > 0.8
+pegel 700 780 > 0.8
+
+=== ein pingpong-loop haelt den ton auch
+IMPORT "audio"
+FUNCTION sinus(n AS INTEGER) AS BUFFER
+    DIM b AS BUFFER : b = BUFFER_NEW(n * 2)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        BUFFER_SET_I16(b, i * 2, INT(SIN(2.0 * PI * 441.0 * i / 22050.0) * 32000.0))
+    NEXT
+    RETURN b
+END FUNCTION
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(sinus(4410), 22050)
+SAMPLE_SET_LOOP(s, 1100, 2200, "pingpong")
+AUDIO_SAVE_WAV(SAMPLE_NOTE(s, 0, 800, 0, 0, 1.0, 0, 1.0), "n.wav")
+--- ton n.wav
+pegel 300 400 > 0.8
+pegel 700 780 > 0.8
+
+=== pingpong laeuft rueckwaerts, vorwaerts nicht
+' Eine Rampe (Wert = Stelle * 32) ueber 1000 Werte, Loop 500..1000,
+' Originalhoehe und -rate, also ein Wert der WAV je Wert des Samples. Hinter
+' dem Ende springt vorwaerts auf 500 und steigt wieder, pingpong faellt von
+' 1000 zurueck: Stelle 1200 ist 700 gegen 800, Stelle 1300 800 gegen 700.
+IMPORT "audio"
+DIM b AS BUFFER : b = BUFFER_NEW(2000)
+DIM i AS INTEGER
+FOR i = 0 TO 999
+    BUFFER_SET_I16(b, i * 2, i * 32)
+NEXT
+DIM v AS SAMPLE : v = SAMPLE_FROM_BUFFER(b, 44100)
+SAMPLE_SET_LOOP(v, 500, 1000)
+DIM p AS SAMPLE : p = SAMPLE_FROM_BUFFER(b, 44100)
+SAMPLE_SET_LOOP(p, 500, 1000, "pingpong")
+AUDIO_SAVE_WAV(SAMPLE_NOTE(v, 0, 100, 0, 0, 1.0, 0, 1.0), "v.wav")
+AUDIO_SAVE_WAV(SAMPLE_NOTE(p, 0, 100, 0, 0, 1.0, 0, 1.0), "p.wav")
+--- nachher
+' Die WAV rundet beim Zurueckschreiben um einen Wert -- darum gerundet geteilt.
+FUNCTION wert(datei AS STRING, k AS INTEGER) AS INTEGER
+    DIM w AS BUFFER : w = READALL_BYTES(datei)
+    DIM d AS INTEGER : d = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data")) + 8
+    RETURN INT(BUFFER_GET_I16(w, d + k * 2) / 32.0 + 0.5)
+END FUNCTION
+PRINT "vorwaerts "; wert("v.wav", 1200)
+PRINT "pingpong "; wert("p.wav", 1200)
+PRINT "vorwaerts "; wert("v.wav", 1300)
+PRINT "pingpong "; wert("p.wav", 1300)
+--- erwartet
+vorwaerts 700
+pingpong 800
+vorwaerts 800
+pingpong 700
+
+=== die huellkurve ist die von audio_note
+' Decay auf halben Pegel, 300 ms Ausklingen hinten angehaengt.
+IMPORT "audio"
+DIM b AS BUFFER : b = BUFFER_NEW(88200)
+DIM i AS INTEGER
+FOR i = 0 TO 44099
+    BUFFER_SET_I16(b, i * 2, IIF(i MOD 100 < 50, 32767, -32767))
+NEXT
+AUDIO_SAVE_WAV(SAMPLE_NOTE(SAMPLE_FROM_BUFFER(b, 44100), 0, 500, 0, 100, 0.5, 300, 1.0), "n.wav")
+--- ton n.wav
+dauer 0.8 +-0.005
+pegel 300 310 0.5 +-0.03
+pegel 640 660 0.25 +-0.03
+pegel 790 800 < 0.03
+
+=== ein slide gleitet zur zieltonhoehe
+' Eine Oktave aufwaerts ueber die gehaltene Zeit: am Ende doppelt so schnell.
+IMPORT "audio"
+FUNCTION sinus(n AS INTEGER) AS BUFFER
+    DIM b AS BUFFER : b = BUFFER_NEW(n * 2)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        BUFFER_SET_I16(b, i * 2, INT(SIN(2.0 * PI * 441.0 * i / 22050.0) * 32000.0))
+    NEXT
+    RETURN b
+END FUNCTION
+DIM s AS SAMPLE : s = SAMPLE_FROM_BUFFER(sinus(4410), 22050)
+SAMPLE_SET_LOOP(s, 1100, 2200)
+AUDIO_SAVE_WAV(SAMPLE_NOTE(s, 0, 1000, 0, 0, 1.0, 0, 1.0, 12), "n.wav")
+--- nachher
+FUNCTION hz(datei AS STRING, von AS INTEGER, bis AS INTEGER) AS FLOAT
+    DIM w AS BUFFER : w = READALL_BYTES(datei)
+    DIM d AS INTEGER : d = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data")) + 8
+    DIM a AS INTEGER : a = 44100 * von \ 1000
+    DIM e AS INTEGER : e = 44100 * bis \ 1000
+    DIM kreuz AS INTEGER : kreuz = 0
+    DIM vorher AS BOOLEAN : vorher = BUFFER_GET_I16(w, d + a * 2) < 0
+    DIM i AS INTEGER
+    FOR i = a + 1 TO e - 1
+        DIM neg AS BOOLEAN : neg = BUFFER_GET_I16(w, d + i * 2) < 0
+        IF neg <> vorher THEN kreuz = kreuz + 1
+        vorher = neg
+    NEXT
+    RETURN kreuz / 2.0 / ((bis - von) / 1000.0)
+END FUNCTION
+DIM anfang AS FLOAT : anfang = hz("n.wav", 20, 120)
+DIM ende AS FLOAT : ende = hz("n.wav", 880, 980)
+PRINT "anfang um 441 hz "; anfang > 420 AND anfang < 490
+PRINT "ende um 882 hz "; ende > 820 AND ende < 900
+--- erwartet
+anfang um 441 hz TRUE
+ende um 882 hz TRUE
+
+=== sample_note spielt nichts ab
+' Es liefert einen Klang zum Planen oder Mischen; SAMPLE_PLAY spielt sofort.
+' Ein falsches Handle ist ein Fehler im Klartext.
+IMPORT "audio"
+DIM k AS SOUND : k = SAMPLE_NOTE(99, 0, 100, 0, 0, 1.0, 0, 1.0)
+--- fehler
+SAMPLE_NOTE: ungueltiges SAMPLE-Handle 99

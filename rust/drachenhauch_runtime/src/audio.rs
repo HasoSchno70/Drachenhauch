@@ -625,6 +625,24 @@ struct Sample {
     sr: u32,
     loop_start: usize,
     loop_end: usize,
+    /// Wie die Loop-Region laeuft (nur wenn `loop_end > loop_start`).
+    loop_mode: LoopArt,
+}
+
+/// Loop-Art eines Samples: vorwaerts springt am Ende auf den Anfang der
+/// Region, pingpong laeuft sie rueckwaerts wieder hinunter (Dreieck) --
+/// die zwei Arten, die das Tracker-Format der Qt-Fassung kennt.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum LoopArt { Vorwaerts, Pingpong }
+
+impl LoopArt {
+    fn parse(s: &str, befehl: &str) -> Result<Self, String> {
+        match s.to_lowercase().as_str() {
+            "vorwaerts" | "forward" => Ok(LoopArt::Vorwaerts),
+            "pingpong" => Ok(LoopArt::Pingpong),
+            _ => Err(format!("{}: unbekannte Loop-Art '{}' (erlaubt: vorwaerts, pingpong)", befehl, s)),
+        }
+    }
 }
 
 /// AUTOPAN-Pendel (per-Frame in update() geschrieben).
@@ -1908,11 +1926,34 @@ resonance/reverb/distortion", other)),
         let sr = data.sample_rate;
         let mono: Vec<f32> = data.frames.iter().map(|f| (f.left + f.right) * 0.5).collect();
         if mono.is_empty() { return Err("SAMPLE_LOAD: Sample ist leer".into()); }
-        self.samples.push(Sample { data: mono, sr, loop_start: 0, loop_end: 0 });
+        self.samples.push(Sample { data: mono, sr, loop_start: 0, loop_end: 0,
+                                   loop_mode: LoopArt::Vorwaerts });
         Ok((self.samples.len() - 1) as i64)
     }
 
-    pub fn sample_set_loop(&mut self, idx: i64, start: i64, end: i64) -> Result<(), String> {
+    /// SAMPLE_FROM_BUFFER(puffer, abtastrate) -- ein Sample aus rohem
+    /// 16-Bit-PCM (vorzeichenbehaftet, little endian, mono). So liegen die
+    /// Samples im Tracker-Format (Base64 in der JSON) -- mit
+    /// BUFFER_FROM_BASE64 davor wird daraus ohne Umweg ueber eine Datei ein
+    /// spielbares Instrument.
+    pub fn sample_from_pcm16(&mut self, bytes: &[u8], sr: i64) -> Result<i64, String> {
+        if !(1000..=384_000).contains(&sr) {
+            return Err("SAMPLE_FROM_BUFFER: abtastrate muss 1000..384000 sein".into());
+        }
+        if bytes.is_empty() { return Err("SAMPLE_FROM_BUFFER: der Puffer ist leer".into()); }
+        if bytes.len() % 2 != 0 {
+            return Err(format!(
+                "SAMPLE_FROM_BUFFER: ungerade Laenge {} -- 16-Bit-PCM hat zwei Bytes je Wert", bytes.len()));
+        }
+        let data = pcm16_zu_float(bytes);
+        self.samples.push(Sample { data, sr: sr as u32, loop_start: 0, loop_end: 0,
+                                   loop_mode: LoopArt::Vorwaerts });
+        Ok((self.samples.len() - 1) as i64)
+    }
+
+    pub fn sample_set_loop(&mut self, idx: i64, start: i64, end: i64,
+                           art: Option<&str>) -> Result<(), String> {
+        let modus = match art { Some(a) => Some(LoopArt::parse(a, "SAMPLE_SET_LOOP")?), None => None };
         let s = self.samples.get_mut(idx as usize)
             .ok_or_else(|| format!("SAMPLE_SET_LOOP: ungueltiges SAMPLE-Handle {}", idx))?;
         let n = s.data.len();
@@ -1920,8 +1961,50 @@ resonance/reverb/distortion", other)),
         let end = (end.max(0) as usize).min(n);
         if end <= start { return Err("SAMPLE_SET_LOOP: end muss > start sein".into()); }
         s.loop_start = start; s.loop_end = end;
+        s.loop_mode = modus.unwrap_or(LoopArt::Vorwaerts);
         self.sample_cache.retain(|k, _| k.0 != idx as usize);
         Ok(())
+    }
+
+    /// SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack, decay, sustain,
+    /// release, vol[, slide_halbtoene]) -> SOUND. Das Gegenstueck zu
+    /// AUDIO_NOTE fuer ein Sample: dieselbe Huellkurve (Release haengt
+    /// HINTEN an, Laenge = dauer + release), die Loop-Region haelt den Ton,
+    /// solange er klingen soll. Anders als SAMPLE_PLAY spielt es nichts ab
+    /// -- es liefert einen Klang, den man planen (AUDIO_PLAY_AT) oder
+    /// mischen (AUDIO_SOUND_MIX) kann; genau das braucht ein Tracker.
+    #[allow(clippy::too_many_arguments)]
+    pub fn sample_note(&mut self, sidx: i64, halbtoene: f64, dauer_ms: i64,
+                       attack_ms: i64, decay_ms: i64, sustain: f64, release_ms: i64,
+                       volume: f64, slide_halbtoene: f64) -> Result<i64, String> {
+        let s = self.samples.get(sidx as usize)
+            .ok_or_else(|| format!("SAMPLE_NOTE: ungueltiges SAMPLE-Handle {}", sidx))?;
+        if !(-120.0..=120.0).contains(&halbtoene) || !halbtoene.is_finite() {
+            return Err("SAMPLE_NOTE: halbtoene muss -120..120 sein".into());
+        }
+        if !(1..=600_000).contains(&dauer_ms) {
+            return Err("SAMPLE_NOTE: dauer_ms muss 1..600000 sein".into());
+        }
+        if attack_ms < 0 || decay_ms < 0 || release_ms < 0 {
+            return Err("SAMPLE_NOTE: attack/decay/release muessen >= 0 sein".into());
+        }
+        if release_ms > 60_000 {
+            return Err("SAMPLE_NOTE: release_ms muss <= 60000 sein".into());
+        }
+        if !(-120.0..=120.0).contains(&slide_halbtoene) || !slide_halbtoene.is_finite() {
+            return Err("SAMPLE_NOTE: slide_halbtoene muss -120..120 sein".into());
+        }
+        let sr: u32 = 44100;
+        let n_hold = ((sr as f64 * dauer_ms as f64 / 1000.0) as usize).max(1);
+        let nr = (sr as f64 * release_ms as f64 / 1000.0) as usize;
+        let schritt = s.sr as f64 / sr as f64 * 2f64.powf(halbtoene / 12.0);
+        let schleife = if s.loop_end > s.loop_start {
+            Some((s.loop_start, s.loop_end, s.loop_mode))
+        } else { None };
+        let mut buf = sample_stimme(&s.data, schritt, n_hold, n_hold + nr, slide_halbtoene, schleife);
+        huellkurve(&mut buf, n_hold, attack_ms, decay_ms, sustain, sr);
+        let data = self.make_data_mono(&buf, volume, sr);
+        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
     }
 
     pub fn sample_len(&self, idx: i64) -> Result<f64, String> {
@@ -1947,7 +2030,7 @@ resonance/reverb/distortion", other)),
         }
         let sr = self.samples[si].sr;
         let s = &self.samples[si];
-        let buf = resample(&s.data, s.sr, ratio, dur_ms, s.loop_start, s.loop_end);
+        let buf = resample(&s.data, s.sr, ratio, dur_ms, s.loop_start, s.loop_end, s.loop_mode);
         if buf.is_empty() { return Err("SAMPLE_PLAY: leeres Sample".into()); }
         // Volume nicht in den Cache backen -> bei vol=1.0 bauen, per Slot setzen.
         let data = self.make_data_mono(&buf, 1.0, sr);
@@ -2448,7 +2531,23 @@ fn build_note_buffer(wf: &str, freq: f64, dauer_ms: i64, attack_ms: i64, decay_m
             *out = v / layers as f64;
         }
     }
-    // Huellkurve
+    huellkurve_n(&mut buf, n_hold, na, nd, sustain);
+    buf
+}
+
+/// Die Huellkurve von AUDIO_NOTE und SAMPLE_NOTE: Attack, Decay auf den
+/// Sustain-Pegel innerhalb der gehaltenen `n_hold` Werte, danach faellt
+/// der Rest des Puffers (das Release) vom erreichten Pegel auf null.
+fn huellkurve(buf: &mut [f64], n_hold: usize, attack_ms: i64, decay_ms: i64,
+              sustain: f64, sr: u32) {
+    let srf = sr as f64;
+    let n_hold = n_hold.min(buf.len());
+    let na = ((srf * attack_ms as f64 / 1000.0) as usize).min(n_hold);
+    let nd = ((srf * decay_ms as f64 / 1000.0) as usize).min(n_hold - na);
+    huellkurve_n(buf, n_hold, na, nd, sustain.clamp(0.0, 1.0));
+}
+
+fn huellkurve_n(buf: &mut [f64], n_hold: usize, na: usize, nd: usize, sustain: f64) {
     let mut pegel_am_ende = sustain;
     for (i, b) in buf.iter_mut().enumerate().take(n_hold) {
         let env = if i < na {
@@ -2459,10 +2558,68 @@ fn build_note_buffer(wf: &str, freq: f64, dauer_ms: i64, attack_ms: i64, decay_m
         pegel_am_ende = env;
         *b *= env;
     }
+    let nr = buf.len().saturating_sub(n_hold);
     for i in 0..nr {
         buf[n_hold + i] *= pegel_am_ende * (1.0 - i as f64 / nr as f64);
     }
-    buf
+}
+
+/// 16-Bit-PCM (little endian, vorzeichenbehaftet) -> -1..1, geteilt durch
+/// 32768 wie der Leser der Qt-Fassung.
+fn pcm16_zu_float(bytes: &[u8]) -> Vec<f32> {
+    bytes.chunks_exact(2)
+        .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0)
+        .collect()
+}
+
+/// Wohin eine fortlaufende Lesestelle `pos` in einer Loop-Region faellt.
+/// Vor dem Ende der Region bleibt sie, wie sie ist.
+fn loop_falten(pos: f64, ls: f64, le: f64, art: LoopArt) -> f64 {
+    if pos < le { return pos; }
+    let span = le - ls;
+    let rel = pos - le;
+    match art {
+        LoopArt::Vorwaerts => ls + rel % span,
+        LoopArt::Pingpong => {
+            let tri = rel % (2.0 * span);
+            if tri <= span { le - tri } else { ls + (tri - span) }
+        }
+    }
+}
+
+/// Eine Stimme aus einem Sample: `n` Werte, Schrittweite `schritt` durch
+/// die Quelle (Tonhoehe und Abtastrate darin), linear interpoliert. Ein
+/// `slide` gleitet exponentiell ueber die gehaltenen `n_hold` Werte zum
+/// Ziel und bleibt dann dort (wie bei AUDIO_NOTE). Ohne Loop folgt nach dem
+/// Ende der Quelle Stille; mit Loop haelt die Region den Ton.
+fn sample_stimme(data: &[f32], schritt: f64, n_hold: usize, n: usize, slide: f64,
+                 schleife: Option<(usize, usize, LoopArt)>) -> Vec<f64> {
+    let len = data.len();
+    let mut out = vec![0.0f64; n];
+    if len == 0 || !(schritt > 0.0) { return out; }
+    let lerp = |p: f64| -> f64 {
+        let i = p.floor() as usize;
+        if i + 1 >= len { return data[i.min(len - 1)] as f64; }
+        let f = p - i as f64;
+        data[i] as f64 * (1.0 - f) + data[i + 1] as f64 * f
+    };
+    let ziel = 2f64.powf(slide / 12.0);
+    let mut pos = 0.0f64;
+    for (i, o) in out.iter_mut().enumerate() {
+        let p = match schleife {
+            Some((ls, le, art)) => loop_falten(pos, ls as f64, le as f64, art),
+            None => {
+                if pos > (len - 1) as f64 { break; }
+                pos
+            }
+        };
+        *o = lerp(p);
+        let glide = if slide != 0.0 {
+            ziel.powf((i.min(n_hold) as f64 / n_hold.max(1) as f64).min(1.0))
+        } else { 1.0 };
+        pos += schritt * glide;
+    }
+    out
 }
 
 fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
@@ -2509,7 +2666,7 @@ fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
 }
 
 fn resample(data: &[f32], sr: u32, ratio: f64, dur_ms: i64,
-            loop_start: usize, loop_end: usize) -> Vec<f64> {
+            loop_start: usize, loop_end: usize, art: LoopArt) -> Vec<f64> {
     let n = data.len();
     if n == 0 { return Vec::new(); }
     let lerp = |pos: f64| -> f64 {
@@ -2531,14 +2688,13 @@ fn resample(data: &[f32], sr: u32, ratio: f64, dur_ms: i64,
         let mut out = Vec::with_capacity(out_len);
         let mut pos = 0.0;
         for _ in 0..out_len {
-            if loop_on && pos >= le {
-                let span = le - ls;
-                pos = ls + ((pos - ls) % span);
-            } else if !loop_on && pos >= n as f64 {
+            if loop_on {
+                out.push(lerp(loop_falten(pos, ls, le, art)));
+            } else if pos >= n as f64 {
                 out.push(0.0);
-                continue;
+            } else {
+                out.push(lerp(pos));
             }
-            out.push(lerp(pos));
             pos += ratio;
         }
         out
@@ -2568,20 +2724,82 @@ fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
 #[cfg(test)]
 mod tests {
     use super::{build_note_buffer, build_sfx_buffer, db, lofi_chain, pendulum_pos, resample,
-                svf_lowpass, Decibels, FadeCurve, SidFx, yaw_quat};
+                svf_lowpass, Decibels, FadeCurve, SidFx, yaw_quat,
+                LoopArt, loop_falten, sample_stimme, pcm16_zu_float, huellkurve};
     use kira::Tweenable;
+
+    #[test]
+    fn pcm16_wie_der_qt_leser() {
+        // 0, 16384, -32768, 32767 little endian
+        let b = [0u8, 0, 0, 0x40, 0, 0x80, 0xff, 0x7f];
+        let f = pcm16_zu_float(&b);
+        assert_eq!(f, vec![0.0, 0.5, -1.0, 32767.0 / 32768.0]);
+    }
+
+    #[test]
+    fn loop_falten_vorwaerts_und_pingpong() {
+        // Region 2..6 (Laenge 4): vor dem Ende unveraendert
+        assert_eq!(loop_falten(5.0, 2.0, 6.0, LoopArt::Pingpong), 5.0);
+        // vorwaerts: 6 -> 2, 7 -> 3, 10 -> 2
+        assert_eq!(loop_falten(6.0, 2.0, 6.0, LoopArt::Vorwaerts), 2.0);
+        assert_eq!(loop_falten(7.0, 2.0, 6.0, LoopArt::Vorwaerts), 3.0);
+        assert_eq!(loop_falten(10.0, 2.0, 6.0, LoopArt::Vorwaerts), 2.0);
+        // pingpong (wie die Qt-Fassung): 7 -> 5, 10 -> 2, 11 -> 3, 14 -> 6
+        assert_eq!(loop_falten(7.0, 2.0, 6.0, LoopArt::Pingpong), 5.0);
+        assert_eq!(loop_falten(10.0, 2.0, 6.0, LoopArt::Pingpong), 2.0);
+        assert_eq!(loop_falten(11.0, 2.0, 6.0, LoopArt::Pingpong), 3.0);
+        assert_eq!(loop_falten(14.0, 2.0, 6.0, LoopArt::Pingpong), 6.0);
+    }
+
+    #[test]
+    fn stimme_ohne_loop_endet_mit_stille() {
+        let data = [1.0f32, 1.0, 1.0, 1.0];
+        let out = sample_stimme(&data, 1.0, 10, 10, 0.0, None);
+        assert_eq!(&out[..4], &[1.0, 1.0, 1.0, 1.0]);
+        assert!(out[4..].iter().all(|&v| v == 0.0));
+    }
+
+    #[test]
+    fn stimme_mit_loop_haelt_und_oktave_verdoppelt_den_schritt() {
+        let data: Vec<f32> = (0..8).map(|i| i as f32).collect();
+        // Schritt 2 = eine Oktave hoeher: 0, 2, 4, 6, dann im Loop 4..8
+        let out = sample_stimme(&data, 2.0, 12, 12, 0.0, Some((4, 8, LoopArt::Vorwaerts)));
+        assert_eq!(&out[..6], &[0.0, 2.0, 4.0, 6.0, 4.0, 6.0]);
+        let pp = sample_stimme(&data, 1.0, 12, 12, 0.0, Some((4, 8, LoopArt::Pingpong)));
+        assert_eq!(&pp[..12], &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 7.0, 7.0, 6.0, 5.0]);
+    }
+
+    #[test]
+    fn stimme_mit_slide_wird_schneller() {
+        let data: Vec<f32> = (0..10000).map(|i| i as f32).collect();
+        let ohne = sample_stimme(&data, 1.0, 100, 100, 0.0, None);
+        let mit = sample_stimme(&data, 1.0, 100, 100, 12.0, None);
+        assert!((ohne[99] - 99.0).abs() < 1e-9);
+        assert!(mit[99] > 130.0 && mit[99] < 150.0, "{}", mit[99]);
+    }
+
+    #[test]
+    fn huellkurve_haelt_sustain_und_klingt_aus() {
+        let mut b = vec![1.0f64; 2000];
+        huellkurve(&mut b, 1000, 0, 100, 0.5, 1000);
+        assert!((b[0] - 1.0).abs() < 1e-9);
+        assert!((b[500] - 0.5).abs() < 1e-9);
+        assert!((b[1000] - 0.5).abs() < 1e-9);
+        assert!((b[1500] - 0.25).abs() < 1e-9);
+        assert!(b[1999] < 0.001);
+    }
 
     #[test]
     fn resample_octave_up_halves_length() {
         let data: Vec<f32> = (0..100).map(|i| i as f32 / 100.0).collect();
-        let out = resample(&data, 44100, 2.0, 0, 0, 0);
+        let out = resample(&data, 44100, 2.0, 0, 0, 0, LoopArt::Vorwaerts);
         assert_eq!(out.len(), 50);
         assert!((out[10] - 0.20).abs() < 1e-6);
     }
     #[test]
     fn resample_duration_with_loop_repeats_region() {
         let data: Vec<f32> = vec![10.0, 20.0, 30.0, 40.0];
-        let out = resample(&data, 1000, 1.0, 10, 1, 3);
+        let out = resample(&data, 1000, 1.0, 10, 1, 3, LoopArt::Vorwaerts);
         assert_eq!(out.len(), 10);
         assert!((out[3] - 20.0).abs() < 1e-6);
         assert!((out[4] - 30.0).abs() < 1e-6);

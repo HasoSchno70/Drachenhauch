@@ -7767,12 +7767,44 @@ impl<'p> Vm<'p> {
                 Value::Int(self.audio_mut()?.sample_load(&path)?)
             }
             "sample_set_loop" => {
-                // SAMPLE_SET_LOOP(sample, start, end) -- Loop-Region in Frames
+                // SAMPLE_SET_LOOP(sample, start, end[, art$]) -- Loop-Region in
+                // Frames; art$ = "vorwaerts" (Vorgabe) oder "pingpong".
                 let idx = gi(a, 0, "SAMPLE_SET_LOOP")?;
                 let start = gi(a, 1, "SAMPLE_SET_LOOP")?;
                 let end = gi(a, 2, "SAMPLE_SET_LOOP")?;
-                self.audio_mut()?.sample_set_loop(idx, start, end)?;
+                let art = if a.len() >= 4 { Some(gs(a, 3, "SAMPLE_SET_LOOP")?.to_string()) } else { None };
+                self.audio_mut()?.sample_set_loop(idx, start, end, art.as_deref())?;
                 Value::Nil
+            }
+            "sample_from_buffer" => {
+                // SAMPLE_FROM_BUFFER(puffer, abtastrate) -> SAMPLE (16-Bit-PCM,
+                // little endian, mono -- so liegen die Samples im Tracker-Format)
+                let bytes = match a.first() {
+                    Some(Value::Buffer(b)) => b.borrow().clone(),
+                    Some(v) => return Err(format!(
+                        "SAMPLE_FROM_BUFFER: erwartet BUFFER, erhalten {}", v.type_name())),
+                    None => return Err("SAMPLE_FROM_BUFFER: erwartet (puffer, abtastrate)".into()),
+                };
+                let sr = gi(a, 1, "SAMPLE_FROM_BUFFER")?;
+                Value::Int(self.audio_mut()?.sample_from_pcm16(&bytes, sr)?)
+            }
+            "sample_note" => {
+                // SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack, decay, sustain,
+                //   release, vol[, slide_halbtoene]) -> SOUND
+                let f = "SAMPLE_NOTE";
+                if a.len() < 8 || a.len() > 9 {
+                    return Err("SAMPLE_NOTE: erwartet (sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])".into());
+                }
+                let idx = gi(a, 0, f)?;
+                let semis = need_f(a, 1, f)?;
+                let dauer = gi(a, 2, f)?;
+                let atk = gi(a, 3, f)?;
+                let dec = gi(a, 4, f)?;
+                let sus = need_f(a, 5, f)?;
+                let rel = gi(a, 6, f)?;
+                let vol = need_f(a, 7, f)?;
+                let sl = if a.len() >= 9 { need_f(a, 8, f)? } else { 0.0 };
+                Value::Int(self.audio_mut()?.sample_note(idx, semis, dauer, atk, dec, sus, rel, vol, sl)?)
             }
             "sample_len" => {
                 // SAMPLE_LEN(sample) -> Sekunden bei Originaltonhoehe
