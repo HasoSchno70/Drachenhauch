@@ -142,6 +142,7 @@ schlimmer als eine schlichte Form.
 | Abspielen | Leertaste oder F5: alle Noten auf einer Audio-Uhr (`AUDIO_CLOCK` + `AUDIO_PLAY_AT`, eine Sechzehntel je Tick), samplegenau statt bildgetrieben; Staccato halbiert wie beim Export |
 | Rollen | Mausrad = Zeit, Umschalt+Rad = Spuren (bis zu 8) |
 | In Tracker öffnen | Strg+T: schreibt `<name>_tracker.json` neben das Stück und startet den Tracker-Piloten (190, der seither ein Dateiargument nimmt) damit. Geht dabei etwas verloren (Akkord auf eine Note reduziert, Beginn zwischen zwei Tracker-Zeilen, Note an der Pattern-Grenze gekürzt oder hinter dem Song-Ende), nennt ein Kasten es VORHER, mit denselben Sätzen wie die Qt-Fassung; „Abbrechen“ (ESC) schreibt nichts |
+| Neu / Öffnen / Beenden | Strg+N, Strg+O, Strg+Q oder das Fensterkreuz: mit ungesicherten Änderungen fragt ein Kasten „Sichern · Verwerfen · Abbrechen“ (Enter = Sichern, ESC = Abbrechen); beim Öffnen kommt der Datei-Dialog erst nach der Antwort. Ohne Änderungen wird sofort ersetzt bzw. beendet |
 
 **Der Tracker-Export rechnet mit denselben Regeln wie `score/convert.py`**
 (4 Zeilen je Beat, Patterns zu 64 Zeilen, Akkord → höchste Note, Staccato
@@ -153,6 +154,11 @@ leer) — und der Test hält ihn daran fest:
 64-Zeilen-Grenze, zwei Spuren) und vergleicht das Gitter Zelle für Zelle mit
 einem festen Stand, den `to_tracker_song` einmal geliefert hat. Stück-Datei
 und Tracker-Projekt liest danach ein Drachenhauch-Programm (`JSON_*`).
+
+Bis 2026-09-21 fragte nur das Schließen nach; `Neu` und `Öffnen` warfen
+ungesicherte Noten wortlos weg. Die Fälle „neu mit ungesicherten noten …“
+in `tests/pruef/werkzeug_notenblatt.dhtest` halten die Rückfrage fest (ESC
+behält die Noten, Verwerfen leert das Blatt, ohne Änderung keine Frage).
 
 Noch nicht: der Transponier-Dialog beim Schlüsselwechsel (es wird
 verschoben und gesagt), mehr als acht Spuren, ein Klick auf eine Note eines

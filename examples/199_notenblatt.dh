@@ -933,6 +933,7 @@ SUB neuesStueck()
     pfad = ""
     nachLaden()
     GUI_SET_TEXT(lblStatus, "Neues Stueck.")
+    protokoll("neues stueck")
 END SUB
 
 SUB laden(p AS STRING)
@@ -1404,6 +1405,34 @@ SUB endeAnfragen()
     IF geaendert THEN dlgSchliessen = GUI_DIALOG("Beenden", "Das Stueck ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen") ELSE beenden = TRUE
 END SUB
 
+' [Neu] und [Oeffnen] ersetzen das Stueck -- mit ungesicherten Aenderungen
+' fragen sie vorher wie das Kreuz (bis 2026-09-21 warfen sie sie wortlos
+' weg). Die Antwort kommt ein Bild spaeter; `ersetzenMit` merkt sich bis
+' dahin, was danach geschehen soll. Beim Oeffnen kommt der Datei-Dialog
+' erst NACH der Antwort -- wer abbricht, soll keinen sehen.
+DIM dlgErsetzen AS GUI_WINDOW : dlgErsetzen = 0
+DIM ersetzenMit AS STRING : ersetzenMit = ""
+
+SUB ersetzenAusfuehren(was AS STRING)
+    IF was = "neu" THEN
+        neuesStueck()
+    ELSE
+        DIM p AS STRING : p = FILE_OPEN_DIALOG("Stueck oeffnen", "json")
+        IF p <> "" THEN laden(p)
+    END IF
+END SUB
+
+SUB ersetzenAnfragen(was AS STRING)
+    IF dlgErsetzen <> 0 OR dlgSchliessen <> 0 OR GUI_MODAL() THEN RETURN
+    IF NOT geaendert THEN
+        ersetzenAusfuehren(was)
+        RETURN
+    END IF
+    ersetzenMit = was
+    dlgErsetzen = GUI_DIALOG(IIF(was = "neu", "Neues Stueck", "Oeffnen"), "Das Stueck ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
+    protokoll("frage " + was)
+END SUB
+
 WHILE NOT beenden
     ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
     ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
@@ -1422,11 +1451,8 @@ WHILE NOT beenden
     END IF
 
     ' Menue und Knoepfe
-    IF GUI_CLICKED(miNeu) THEN neuesStueck()
-    IF GUI_CLICKED(miOeffnen) THEN
-        DIM p AS STRING : p = FILE_OPEN_DIALOG("Stueck oeffnen", "json")
-        IF p <> "" THEN laden(p)
-    END IF
+    IF GUI_CLICKED(miNeu) THEN ersetzenAnfragen("neu")
+    IF GUI_CLICKED(miOeffnen) THEN ersetzenAnfragen("oeffnen")
     IF GUI_CLICKED(miSichern) THEN sichern(FALSE)
     IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
     IF GUI_CLICKED(miTracker) OR GUI_CLICKED(btnTracker) THEN inTrackerOeffnen()
@@ -1445,6 +1471,19 @@ WHILE NOT beenden
         ELSEIF at = 2 THEN
             dlgTracker = 0 : protokoll("tracker abgebrochen")
             GUI_SET_TEXT(lblStatus, "Nicht umgerechnet.")
+        END IF
+    END IF
+    IF dlgErsetzen <> 0 THEN
+        DIM ae AS INTEGER : ae = GUI_ANSWER(dlgErsetzen)
+        IF ae = 1 THEN
+            dlgErsetzen = 0
+            IF sichern(FALSE) THEN ersetzenAusfuehren(ersetzenMit)
+        ELSEIF ae = 2 THEN
+            dlgErsetzen = 0 : protokoll("frage verworfen")
+            ersetzenAusfuehren(ersetzenMit)
+        ELSEIF ae = 3 THEN
+            dlgErsetzen = 0 : protokoll("frage abgebrochen")
+            GUI_SET_TEXT(lblStatus, "Nichts ersetzt.")
         END IF
     END IF
     IF dlgSchliessen <> 0 THEN
@@ -1533,4 +1572,5 @@ WEND
 
 IF spielt THEN stopp()
 IF trackerProzess >= 0 THEN PROCESS_CLOSE(trackerProzess)
+protokoll("noten " + STR$(notenGesamt()))
 protokoll("ende")
