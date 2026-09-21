@@ -59,3 +59,25 @@ DH_IDE_KONFIG=ide.json
 schriftzug geladen FALSE
 titel als text sichtbar TRUE
 satz unter dem titel TRUE
+
+=== die bereiche tragen ihre farbe in beiden themen
+' Die Ausgabe ist gruenlich: 20 % Gruen in die Widget-Farbe des dunklen
+' Themas, 16 % in die des hellen. Der Wechsel des Themas mischt neu --
+' sonst trueg das helle Thema die dunklen Toene.
+befehl("thema")
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 14) = "bereichsfarben" THEN PRINT L[i]
+NEXT
+--- erwartet
+bereichsfarben #375453
+bereichsfarben #DAEDE5

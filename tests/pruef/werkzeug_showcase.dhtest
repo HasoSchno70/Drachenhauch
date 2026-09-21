@@ -257,3 +257,67 @@ PRINT "reihe 1 "; hat("kacheln reihe 1")
 --- erwartet
 kacheln 32 TRUE
 reihe 1 TRUE
+
+=== unter dem offenen handbuch blaettert das rad die kacheln nicht
+' Derselbe Radschritt an derselben Stelle wie im Fall davor -- aber das
+' Handbuch-Fenster liegt darueber. Das Rad gehoert ihm; bis 2026-09-21
+' blaetterten die Kacheln darunter trotzdem mit.
+' 32 Kacheln sind acht Reihen; so viele passen unter die Begruessung nicht.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach protokoll("bereit")
+handbuch()
+protokoll("handbuch offen " + STR$(GUI_WINDOW_AT(350, 440) = winHandbuch))
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}/wurzel
+DH_IDE_KONFIG=ide.json
+--- datei wurzel/examples/showcase.json
+[
+ {"file": "a1.dh", "title": "A1", "desc": "x"}, {"file": "a2.dh", "title": "A2", "desc": "x"},
+ {"file": "a3.dh", "title": "A3", "desc": "x"}, {"file": "a4.dh", "title": "A4", "desc": "x"},
+ {"file": "a5.dh", "title": "A5", "desc": "x"}, {"file": "a6.dh", "title": "A6", "desc": "x"},
+ {"file": "a7.dh", "title": "A7", "desc": "x"}, {"file": "a8.dh", "title": "A8", "desc": "x"},
+ {"file": "b1.dh", "title": "B1", "desc": "x"}, {"file": "b2.dh", "title": "B2", "desc": "x"},
+ {"file": "b3.dh", "title": "B3", "desc": "x"}, {"file": "b4.dh", "title": "B4", "desc": "x"},
+ {"file": "b5.dh", "title": "B5", "desc": "x"}, {"file": "b6.dh", "title": "B6", "desc": "x"},
+ {"file": "b7.dh", "title": "B7", "desc": "x"}, {"file": "b8.dh", "title": "B8", "desc": "x"},
+ {"file": "c1.dh", "title": "C1", "desc": "x"}, {"file": "c2.dh", "title": "C2", "desc": "x"},
+ {"file": "c3.dh", "title": "C3", "desc": "x"}, {"file": "c4.dh", "title": "C4", "desc": "x"},
+ {"file": "c5.dh", "title": "C5", "desc": "x"}, {"file": "c6.dh", "title": "C6", "desc": "x"},
+ {"file": "c7.dh", "title": "C7", "desc": "x"}, {"file": "c8.dh", "title": "C8", "desc": "x"},
+ {"file": "d1.dh", "title": "D1", "desc": "x"}, {"file": "d2.dh", "title": "D2", "desc": "x"},
+ {"file": "d3.dh", "title": "D3", "desc": "x"}, {"file": "d4.dh", "title": "D4", "desc": "x"},
+ {"file": "d5.dh", "title": "D5", "desc": "x"}, {"file": "d6.dh", "title": "D6", "desc": "x"},
+ {"file": "d7.dh", "title": "D7", "desc": "x"}, {"file": "d8.dh", "title": "D8", "desc": "x"}
+]
+--- datei wurzel/examples/183_sfx_generator.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 3
+e 120 7 350 440 0 0
+e 121 7 350 440 0 0
+e 122 8 0 -1 0 0
+
+--- datei wurzel/docs/README.md
+# Handbuch
+
+Ein Absatz.
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "kacheln 32 "; hat("kacheln 32")
+PRINT "handbuch oben "; hat("handbuch offen TRUE")
+PRINT "reihe 1 "; hat("kacheln reihe 1")
+--- erwartet
+kacheln 32 TRUE
+handbuch oben TRUE
+reihe 1 FALSE
