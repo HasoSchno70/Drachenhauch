@@ -66,7 +66,7 @@ IMPORT "helfer.dh"
 IMPORT "json"
 DIM d AS JSON_HANDLE : d = dlCheck(!"IMPORT \"wifi\"\nPRINT 1\n")
 IF JSON_LEN(d, "d") = 0 THEN
-    PRINT "hardware-bau: keine meldung"
+    PRINT "UEBERSPRINGEN: Hardware-Bau, das Modul ist dabei -- keine Meldung zu pruefen"
 ELSE
     PRINT "anzahl "; JSON_LEN(d, "d")
     PRINT "art "; JSON_GET_STRING(d, "d.0.severity"); " Zeile "; JSON_GET_INT(d, "d.0.line")
