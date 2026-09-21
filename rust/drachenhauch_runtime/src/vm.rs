@@ -5987,6 +5987,8 @@ impl<'p> Vm<'p> {
             "gui_set_enabled" => { self.gui.set_enabled(gi(a,0,"GUI_SET_ENABLED")?, gbool(a,1,"GUI_SET_ENABLED")?)?; Value::Nil }
             "gui_enabled" => Value::Bool(self.gui.enabled(gi(a,0,"GUI_ENABLED")?)?),
             "gui_set_font" => { self.gui.set_font(gi(a,0,"GUI_SET_FONT")?, gi(a,1,"GUI_SET_FONT")?)?; Value::Nil }
+            "gui_set_font_style" => { self.gui.set_font_style(gi(a,0,"GUI_SET_FONT_STYLE")?, &gs(a,1,"GUI_SET_FONT_STYLE")?)?; Value::Nil }
+            "gui_get_font_style$" | "gui_get_font_style" => Value::Str(self.gui.font_style(gi(a,0,"GUI_GET_FONT_STYLE$")?)?.into()),
             "gui_set_font_size" => { self.gui.set_font_size(gi(a,0,"GUI_SET_FONT_SIZE")?, gi(a,1,"GUI_SET_FONT_SIZE")?)?; Value::Nil }
             "gui_set_anchor" => { self.gui.set_anchor(gi(a,0,"GUI_SET_ANCHOR")?, &gs(a,1,"GUI_SET_ANCHOR")?)?; Value::Nil }
             "gui_style_set" => { self.gui.style_set(gs(a,0,"GUI_STYLE_SET")?, gs(a,1,"GUI_STYLE_SET")?, gi(a,2,"GUI_STYLE_SET")?)?; Value::Nil }
@@ -7143,6 +7145,18 @@ impl<'p> Vm<'p> {
             "text_size" => { g!().set_text_size(gi(a,0,"TEXT_SIZE")? as i32); Value::Nil }
             "text_width" => Value::Int(g!().text_width(gs(a,0,"TEXT_WIDTH")?) as i64),
             "text_height" => Value::Int(g!().text_height() as i64),
+            "text_style" => {
+                let bits = crate::schnitt::stil_parsen(&gs(a,0,"TEXT_STYLE")?).map_err(|e| format!("TEXT_STYLE: {}", e))?;
+                g!().set_text_stil(bits); Value::Nil
+            }
+            "text_get_style$" | "text_get_style" => Value::Str(crate::schnitt::stil_text(g!().text_stil()).into()),
+            "font_style" | "font_has_style" => {
+                let f = if name == "font_style" { "FONT_STYLE" } else { "FONT_HAS_STYLE" };
+                if a.len() != 2 { return Err(format!("{}: erwartet (font, stil$)", f)); }
+                let bits = crate::schnitt::stil_parsen(&gs(a,1,f)?).map_err(|e| format!("{}: {}", f, e))?;
+                let (h, echt) = g!().font_schnitt(gi(a,0,f)?, bits)?;
+                if name == "font_style" { Value::Int(h) } else { Value::Bool(echt) }
+            }
             "loadfont" => {
                 if a.len() > 3 { return Err("LOADFONT: erwartet (pfad$, groesse[, zeichen$])".into()); }
                 if a.len() == 3 {
@@ -7268,9 +7282,16 @@ impl<'p> Vm<'p> {
             "window_dpi_y" => Value::Float(g!().window_dpi_y()),
             "screenwidth" => Value::Int(self.gfx.as_ref().map(|g| g.screen_width()).unwrap_or(0)),
             "screenheight" => Value::Int(self.gfx.as_ref().map(|g| g.screen_height()).unwrap_or(0)),
-            // raylib-Default-Font hat keine Bold/Italic-Variante -> No-Op
-            // (visuelle Abweichung, Programm laeuft). Arg wird ignoriert.
-            "text_bold" | "text_italic" => Value::Nil,
+            // Ein Bit von TEXT_STYLE an- oder ausschalten -- die aelteren
+            // Namen, bis 2026-09-21 wirkungslos (raylib hat keine Schnitte;
+            // jetzt sucht die Laufzeit sie als Datei oder bildet sie nach).
+            "text_bold" | "text_italic" => {
+                let bit = if name == "text_bold" { crate::schnitt::FETT } else { crate::schnitt::KURSIV };
+                let an = gb(a, 0);
+                let st = g!().text_stil();
+                g!().set_text_stil(if an { st | bit } else { st & !bit });
+                Value::Nil
+            }
             "set_fullscreen" => { g!().set_fullscreen(gb(a, 0)); Value::Nil }
             "mouse_visible" => { g!().mouse_visible(gb(a, 0)); Value::Nil }
             "mouse_lock" => { g!().mouse_lock(gb(a, 0)); Value::Nil }

@@ -304,6 +304,8 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_ENABLED(wdg)` | BOOLEAN | ist es bedienbar? |
 | `GUI_SET_FONT(wdg, font)` | — | eigene Schrift fuer dieses Widget |
 | `GUI_SET_FONT_SIZE(wdg, px)` | — | eigene Schriftgroesse fuer dieses Widget |
+| `GUI_SET_FONT_STYLE(wdg, stil$)` | — | Schriftstil fuer dieses Widget: `fett`, `kursiv`, `unterstrichen`, `durchgestrichen`, verbunden mit `+`; `"normal"` nimmt ihn weg. Echte Schnitte, wo es sie als Datei gibt, sonst nachgebildet |
+| `GUI_GET_FONT_STYLE$(wdg)` | STRING | der Stil des Widgets, z. B. `"fett+unterstrichen"` |
 | `GUI_STYLE_SET(name$, prop$, wert)` | — | benannten Stil festlegen (`bg`, `fg`, `border`, `accent`, `font`, `font_size`) |
 | `GUI_APPLY_STYLE(widget, name$)` | — | einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen |
 | `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | Lage und Groesse des Widgets im Fenster (Gegenstueck zu `GUI_SET_BOUNDS`) |
@@ -1551,7 +1553,8 @@ IF GUI_RICHTEXT_LINK$(rt) <> "" THEN oeffne(GUI_RICHTEXT_LINK$(rt))
 Verstanden wird ein Ausschnitt von Markdown: `#`, `##`, `###`, Absätze,
 `- ` und `1. ` (auch verschachtelt, je zwei Leerzeichen eine Stufe),
 ` ``` `-Blöcke, `| Tabellen |`, `> Zitate`, `---`, dazu `**fett**`,
-`*kursiv*`, `` `code` `` und Verweise in eckigen Klammern mit dem Ziel in
+`*kursiv*`, `***beides***`, `~~durchgestrichen~~`, `<u>unterstrichen</u>`,
+`` `code` `` und Verweise in eckigen Klammern mit dem Ziel in
 runden dahinter. **Was er nicht kennt, steht als
 Text da** -- ein Dokument darf an einer unbekannten Zeile nicht
 verschwinden.
@@ -1568,11 +1571,12 @@ gesetzt wird, wenn sich Quelle, Breite, Schriftgröße oder Maßstab ändern --
 eine Größenänderung des Fensters bricht also neu um, ein Bild ohne
 Änderung kostet nichts.
 
-**Fett ist ein zweiter Zug um einen Punkt versetzt, kursiv ist gedämpft.**
-Aus einer Schrift lässt sich keine zweite Strichstärke rechnen, und eine
-fette Schriftdatei mitzuliefern ist nicht Sache der Laufzeit. Eine
+**Fett und kursiv sind echte Schnitte, wo es sie gibt.** Ist die Schrift
+per `LOADFONT` geladen und liegt ihr fetter oder kursiver Schnitt daneben
+(Segoe UI, Arial, Consolas, Noto, DejaVu ...), setzt der Text damit. Sonst
+zeichnet die Laufzeit Fett als zweiten Zug und Kursiv geneigt -- eine
 Auszeichnung, die man nicht sieht, wäre schlimmer als eine, die anders
-aussieht als erwartet.
+aussieht als erwartet. Ein Verweis ist unterstrichen wie `<u>`.
 
 Eine **Tabellenspalte** wird nie unter ihr breitestes WORT gestaucht: ein
 Wort bricht nicht um, es liefe sonst in die Nachbarspalte hinein und klebte
@@ -3088,6 +3092,7 @@ Feiner steuerbar:
 | `SETFONT(font)` | die aktive Schrift — gilt für die ganze Oberfläche |
 | `GUI_SET_FONT(wdg, font)` | eigene Schrift nur für dieses Widget |
 | `GUI_SET_FONT_SIZE(wdg, px)` | eigene Größe nur für dieses Widget |
+| `GUI_SET_FONT_STYLE(wdg, stil$)` | fett, kursiv, unterstrichen, durchgestrichen nur für dieses Widget (steht auch in der `.dhform` als `font_style`) |
 | `GUI_STYLE_SET(name$, "font", font)` + `GUI_APPLY_STYLE(wdg, name$)` | eine Schrift für eine ganze Gruppe |
 
 Für **Pixel-Schrift** aus einem PNG gibt es `LOADFONT_IMAGE(bild, trennfarbe,

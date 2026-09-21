@@ -41,6 +41,10 @@ enum Cmd {
     FillPoly(Vec<(i32, i32)>, Color),
     // x, y, text, size, color, font_idx (-1 = Default), spacing
     Text(i32, i32, String, i32, Color, i64, f32),
+    /// Text mit Stil, der nachgebildet werden muss: Bits aus `schnitt`
+    /// (fett = zweiter Zug, kursiv = geneigte Glyphen, Linien darunter
+    /// bzw. hindurch). Ein echter Schnitt steckt schon im Font-Handle.
+    TextStil(i32, i32, String, i32, Color, i64, f32, u8),
     // TEXTROT: (cx, cy, text, groesse, farbe, font, spacing, winkel_grad, skala)
     TextRot(i32, i32, String, i32, Color, i64, f32, f32, f32),
     // Review-Fund: Texture/TexturePart/TextureFlipped/AtlasDraw hatten keine
@@ -849,7 +853,7 @@ struct GfxState {
     cam3d: Camera3D,
     cam3d_view: Option<[f32; 16]>,
     cam3d_proj: Option<[f32; 16]>,
-    text: (i32, i64, f32),
+    text: (i32, i64, f32, u8),
     post_shader_idx: Option<usize>,
 }
 
@@ -1027,6 +1031,17 @@ pub struct Graphics {
     // Default): NICHT auto-anwenden, damit der hoch gebackene Default bei der
     // programmweiten text_size bleibt.
     font_sizes: Vec<i32>,
+    /// Je Font: Datei, gebackene Zeichen und Groesse, mit denen er geladen
+    /// wurde -- noetig, um seinen fetten oder kursiven Schnitt in derselben
+    /// Groesse mit denselben Zeichen nachzuladen. Leerer Pfad = kein Schnitt
+    /// moeglich (Bitmap-Schrift aus einem Bild).
+    font_herkunft: Vec<(String, String, i32)>,
+    /// (Font, Schnitt-Bits) -> (Handle des Schnitts, nachzubildende Bits).
+    /// Einmal gesucht, auch erfolglos -- sonst stuende jedes Bild am
+    /// Dateisystem an.
+    schnitte: HashMap<(i64, u8), (i64, u8)>,
+    /// TEXT_STYLE: Stil fuer TEXT (Bits aus `schnitt`).
+    text_stil: u8,
     active_font: i64,
     /// Ausweich-Font fuer Text mit Umlauten, solange kein eigener Font gesetzt
     /// ist: die eingebaute raylib-Schrift kennt nur ASCII und zeichnet sonst
@@ -1648,6 +1663,7 @@ impl Graphics {
             text_size: 20,
             fonts: Vec::new(),
             font_sizes: Vec::new(),
+            font_herkunft: Vec::new(), schnitte: HashMap::new(), text_stil: 0,
             active_font: -1,
             ausweich: Vec::new(), font_glyphs: Vec::new(),
             glyphen_fehlend: std::cell::RefCell::new(std::collections::HashSet::new()),
@@ -3274,10 +3290,99 @@ impl Graphics {
         let sz = self.text_size;
         let font = self.font_fuer(&s);
         let spacing = self.text_spacing;
-        self.glyphen_pruefen(font, &s);
-        self.emit(Cmd::Text(x, y, s, sz, col(c), font, spacing));
+        let stil = self.text_stil;
+        self.text_emit(x, y, s, sz, c, font, spacing, stil);
     }
     pub fn set_text_size(&mut self, sz: i32) { self.text_size = sz.max(1); }
+
+    /// TEXT_STYLE(stil$): Stil fuer die folgenden TEXT-Aufrufe.
+    pub fn set_text_stil(&mut self, bits: u8) { self.text_stil = bits; }
+    pub fn text_stil(&self) -> u8 { self.text_stil }
+
+    /// EIN Weg fuer jeden Text mit Stil: echten Schnitt suchen, was dann
+    /// noch fehlt nachbilden. Ohne Stil bleibt es der schlichte Befehl --
+    /// so zeichnet jedes bestehende Programm wie zuvor.
+    #[allow(clippy::too_many_arguments)]
+    fn text_emit(&mut self, x: i32, y: i32, s: String, sz: i32, c: i64, font: i64, spacing: f32, stil: u8) {
+        let (h, emu) = self.schnitt(font, stil);
+        let emu = emu | (stil & (crate::schnitt::UNTER | crate::schnitt::DURCH));
+        self.glyphen_pruefen(h, &s);
+        if emu == 0 { self.emit(Cmd::Text(x, y, s, sz, col(c), h, spacing)); }
+        else { self.emit(Cmd::TextStil(x, y, s, sz, col(c), h, spacing, emu)); }
+    }
+
+    /// Den fetten/kursiven Schnitt zu Font `basis` laden (einmal, dann aus
+    /// dem Vorrat) -> (Handle, Bits, die nachgebildet werden muessen).
+    /// Fehlt fett+kursiv als Datei, wird der fette genommen und nur die
+    /// Neigung nachgebildet -- ein echter fetter Schnitt schraeg gestellt
+    /// sieht naeher am Ziel aus als ein doppelt gezeichneter.
+    pub fn schnitt(&mut self, basis: i64, stil: u8) -> (i64, u8) {
+        use crate::schnitt::{FETT, KURSIV, SCHNITT};
+        let s = stil & SCHNITT;
+        if s == 0 { return (basis, 0); }
+        if let Some(&v) = self.schnitte.get(&(basis, s)) { return v; }
+        let mut ergebnis = (basis, s);
+        let herkunft = if basis >= 0 { self.font_herkunft.get(basis as usize).cloned() } else { None };
+        if let Some((pfad, zeichen, groesse)) = herkunft {
+            if !pfad.is_empty() {
+                let versuche: Vec<u8> = if s == FETT | KURSIV { vec![FETT | KURSIV, FETT, KURSIV] } else { vec![s] };
+                'suche: for v in versuche {
+                    for kand in crate::schnitt::schnitt_kandidaten(&pfad, v) {
+                        if !std::path::Path::new(&kand).exists() { continue; }
+                        let rl = &mut self.rl;
+                        let thread = &self.thread;
+                        if let Ok(f) = schrift_laden(rl, thread, &kand, groesse, &zeichen) {
+                            unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
+                            self.font_glyphs.push(glyph_menge(&f));
+                            self.fonts.push(f);
+                            let fs = self.font_sizes.get(basis as usize).copied().unwrap_or(groesse);
+                            self.font_sizes.push(fs);
+                            self.font_herkunft.push((kand.clone(), zeichen.clone(), groesse));
+                            ergebnis = ((self.fonts.len() - 1) as i64, s & !v);
+                            break 'suche;
+                        }
+                    }
+                }
+            }
+        }
+        self.schnitte.insert((basis, s), ergebnis);
+        ergebnis
+    }
+
+    /// Wie `schnitt`, aber ohne zu laden -- fuer das Messen (`&self`). Ist
+    /// der Schnitt noch nicht gesucht, misst es wie der Ersatz; das naechste
+    /// Bild zeichnet dann ohnehin mit dem geladenen.
+    /// Handle des geladenen Schnitts (oder `basis`) -- fuer die gui, die mit
+    /// dem Handle misst.
+    pub fn schnitt_von(&self, basis: i64, stil: u8) -> i64 { self.schnitt_da(basis, stil).0 }
+
+    fn schnitt_da(&self, basis: i64, stil: u8) -> (i64, u8) {
+        let s = stil & crate::schnitt::SCHNITT;
+        if s == 0 { return (basis, 0); }
+        self.schnitte.get(&(basis, s)).copied().unwrap_or((basis, s))
+    }
+
+    /// FONT_STYLE(font, stil$) -> Handle des echten Schnitts, oder `font`
+    /// selbst, wenn es keinen gibt. Fuer SETFONT/GUI_SET_FONT.
+    pub fn font_schnitt(&mut self, basis: i64, stil: u8) -> Result<(i64, bool), String> {
+        if basis < -1 || basis >= self.fonts.len() as i64 {
+            return Err(format!("FONT_STYLE: ungueltiges FONT-Handle {}", basis));
+        }
+        let (h, emu) = self.schnitt(basis, stil);
+        Ok((h, emu == 0))
+    }
+
+    /// Breite mit Stil: der echte Schnitt, wenn geladen, sonst die Grundschrift
+    /// plus der Versatz des Ersatz-Fetts. Kursiv und Linien aendern die
+    /// Breite nicht.
+    pub fn text_width_stil(&self, s: &str, size: i32, font: i64, stil: u8) -> i32 {
+        let size = size.max(1);
+        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() { FONT_AUSWEICH } else { font };
+        let (h, emu) = self.schnitt_da(font, stil);
+        let mut b = self.breite_mit(h, s, size as f32);
+        if emu & crate::schnitt::FETT != 0 && !s.is_empty() { b += crate::schnitt::fett_versatz(size as f32); }
+        b.ceil() as i32
+    }
 
     /// TEXTROT(x, y, s$, winkel[, skala[, farbe]]) -- Text ZENTRIERT auf
     /// (x, y), um das Zentrum gedreht (Grad, Konvention wie DRAWIMAGEROT)
@@ -3316,6 +3421,16 @@ impl Graphics {
         self.emit(Cmd::Text(x, y, s, size.max(1), col(c), font, self.text_spacing));
     }
 
+    /// `text_styled` mit Stil (Bits aus `schnitt`) -- fuer die gui.
+    #[allow(clippy::too_many_arguments)]
+    pub fn text_styled_stil(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
+        if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
+        let (x, y) = self.w2s(x, y);
+        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() { FONT_AUSWEICH } else { font };
+        let sp = self.text_spacing;
+        self.text_emit(x, y, s, size.max(1), c, font, sp, stil);
+    }
+
     /// Laedt einen TTF/OTF-Font in der gegebenen Basis-Groesse -> FONT-Handle.
     ///
     /// Mit erweitertem Zeichensatz: raylib backt sonst nur die 95 ASCII-
@@ -3335,6 +3450,7 @@ impl Graphics {
         self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
         self.font_sizes.push(size.max(4));   // SETFONT uebernimmt diese Groesse
+        self.font_herkunft.push((path.to_string(), chars, size.max(4)));
         Ok((self.fonts.len() - 1) as i64)
     }
 
@@ -3355,6 +3471,7 @@ impl Graphics {
         self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
         self.font_sizes.push(size.max(4));
+        self.font_herkunft.push((path.to_string(), chars, size.max(4)));
         Ok((self.fonts.len() - 1) as i64)
     }
 
@@ -3421,6 +3538,7 @@ impl Graphics {
         self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
         self.font_sizes.push(0);   // Sentinel: Default-Font wendet seine Groesse NICHT an
+        self.font_herkunft.push((path.to_string(), chars, size.max(4)));
         Ok((self.fonts.len() - 1) as i64)
     }
     /// Aktiven Font setzen (-1 = Default). Ungueltige Handles -> Fehler.
@@ -3444,6 +3562,9 @@ impl Graphics {
     pub fn text_width(&self, s: &str) -> i32 {
         // font_fuer: dieselbe Wahl wie beim Zeichnen, sonst misst ein Layout
         // die Standardschrift und bekommt am Ende den Ausweich-Font zu sehen.
+        if self.text_stil & crate::schnitt::SCHNITT != 0 {
+            return self.text_width_stil(s, self.text_size, self.active_font, self.text_stil);
+        }
         self.breite_mit(self.font_fuer(s), s, self.text_size as f32) as i32
     }
     pub fn text_height(&self) -> i32 { self.text_size }
@@ -3507,6 +3628,7 @@ impl Graphics {
         // LOADFONT, wo bilinear die skalierte TTF-Schrift glaettet).
         let size = f.baseSize.max(4);
         self.fonts.push(f);
+        self.font_herkunft.push((String::new(), String::new(), 0));
         self.font_sizes.push(size);
         Ok((self.fonts.len() - 1) as i64)
     }
@@ -4936,7 +5058,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             cam3d: self.cam3d,
             cam3d_view: self.cam3d_view,
             cam3d_proj: self.cam3d_proj,
-            text: (self.text_size, self.active_font, self.text_spacing),
+            text: (self.text_size, self.active_font, self.text_spacing, self.text_stil),
             post_shader_idx: self.post_shader_idx,
         };
         self.gfx_stack.push(st);
@@ -4978,8 +5100,8 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         self.cam3d = st.cam3d;
         self.cam3d_view = st.cam3d_view;
         self.cam3d_proj = st.cam3d_proj;
-        let (ts, af, tsp) = st.text;
-        self.text_size = ts; self.text_spacing = tsp;
+        let (ts, af, tsp, tst) = st.text;
+        self.text_size = ts; self.text_spacing = tsp; self.text_stil = tst;
         // Schrift nur setzen, wenn sie noch existiert (Fonts werden nie
         // entladen, aber ein Handle aus einem anderen Lauf waere ungueltig).
         if af < 0 || (af as usize) < self.fonts.len() { self.active_font = af; }
@@ -5830,6 +5952,144 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
     }
 }
 
+/// Glyphen eines Laufs GENEIGT zeichnen -- raylibs `DrawTextCodepoint`
+/// nachgebaut, nur dass die Ecken jedes Glyphenvierecks gegeneinander
+/// versetzt werden (oben weiter rechts als unten). raylib kann Text drehen,
+/// aber nicht scheren; dafuer geht es hier ueber rlgl direkt.
+/// Liefert die Vorschubbreite wie `MeasureTextEx`.
+fn zeichne_schraeg(f: &raylib::ffi::Font, txt: &str, x: f32, y: f32, size: f32, spacing: f32,
+                   col: Color, grundlinie: f32) -> f32 {
+    use raylib::ffi;
+    if f.baseSize <= 0 || f.glyphs.is_null() || f.recs.is_null() { return 0.0; }
+    let skala = size / f.baseSize as f32;
+    let pad = f.glyphPadding as f32;
+    let (tw, th) = (f.texture.width.max(1) as f32, f.texture.height.max(1) as f32);
+    let mut cx = x;
+    let mut erster = true;
+    for ch in txt.chars() {
+        if !erster { cx += spacing; }
+        erster = false;
+        let idx = unsafe { ffi::GetGlyphIndex(*f, ch as i32) }.max(0) as usize;
+        let (g, rec) = unsafe { (&*f.glyphs.add(idx), &*f.recs.add(idx)) };
+        if ch != ' ' && ch != '\t' {
+            let dx = cx + g.offsetX as f32 * skala - pad * skala;
+            let dy = y + g.offsetY as f32 * skala - pad * skala;
+            let dw = (rec.width + 2.0 * pad) * skala;
+            let dh = (rec.height + 2.0 * pad) * skala;
+            let (sx, sy, sw, sh) = (rec.x - pad, rec.y - pad, rec.width + 2.0 * pad, rec.height + 2.0 * pad);
+            // Versatz je Hoehe: an der Grundlinie null, darueber nach rechts.
+            let v = |yy: f32| (grundlinie - yy) * crate::schnitt::NEIGUNG;
+            unsafe {
+                ffi::rlCheckRenderBatchLimit(4);
+                ffi::rlSetTexture(f.texture.id);
+                ffi::rlBegin(ffi::RL_QUADS as i32);
+                ffi::rlColor4ub(col.r, col.g, col.b, col.a);
+                ffi::rlNormal3f(0.0, 0.0, 1.0);
+                ffi::rlTexCoord2f(sx / tw, sy / th);
+                ffi::rlVertex2f(dx + v(dy), dy);
+                ffi::rlTexCoord2f(sx / tw, (sy + sh) / th);
+                ffi::rlVertex2f(dx + v(dy + dh), dy + dh);
+                ffi::rlTexCoord2f((sx + sw) / tw, (sy + sh) / th);
+                ffi::rlVertex2f(dx + dw + v(dy + dh), dy + dh);
+                ffi::rlTexCoord2f((sx + sw) / tw, sy / th);
+                ffi::rlVertex2f(dx + dw + v(dy), dy);
+                ffi::rlEnd();
+                ffi::rlSetTexture(0);
+            }
+        }
+        cx += if g.advanceX == 0 { rec.width * skala } else { g.advanceX as f32 * skala };
+    }
+    cx - x
+}
+
+/// Breite eines Textes so, wie `zeichne_text` ihn setzt -- fuer die Linien
+/// unter bzw. durch den Text, die im Abspielen gemessen werden muessen.
+#[allow(clippy::too_many_arguments)]
+fn miss_text(h: i64, txt: &str, size: f32, spacing: f32, fonts: &[Font],
+             font_glyphs: &[std::collections::HashSet<u32>], ausweich: &[Ausweich]) -> f32 {
+    let basis = match font_zu_handle(h, fonts, ausweich) {
+        Some(f) => f,
+        None => {
+            let c = std::ffi::CString::new(txt).unwrap_or_default();
+            return unsafe { raylib::ffi::MeasureText(c.as_ptr(), size as i32) as f32 };
+        }
+    };
+    if txt.is_ascii() || ausweich.is_empty() { return basis.measure_text(txt, size, spacing).x; }
+    let basis_hat = |c: u32| -> bool {
+        if h == FONT_AUSWEICH { ausweich.first().map_or(false, |a| a.hat.contains(&c)) }
+        else { font_glyphs.get(h as usize).map_or(false, |m| m.contains(&c)) }
+    };
+    let mut b = 0.0f32;
+    let mut erster = true;
+    for (fi, lauf) in text_laeufe(h, txt, basis_hat, ausweich) {
+        let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
+        if !erster { b += spacing; }
+        erster = false;
+        b += f.measure_text(&lauf, size, spacing).x;
+    }
+    b
+}
+
+/// Text mit nachgebildetem Stil: geneigt, doppelt gezogen, mit Linien.
+/// Dieselbe Aufteilung in Laeufe wie `zeichne_text`.
+#[allow(clippy::too_many_arguments)]
+fn zeichne_text_stil<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, size: f32, spacing: f32,
+                                    col: Color, emu: u8, fonts: &[Font],
+                                    font_glyphs: &[std::collections::HashSet<u32>], ausweich: &[Ausweich]) {
+    use crate::schnitt::{DURCH, FETT, KURSIV, UNTER};
+    let versatz = if emu & FETT != 0 { crate::schnitt::fett_versatz(size) } else { 0.0 };
+    let zuege: &[f32] = if versatz > 0.0 { &[0.0, 1.0] } else { &[0.0] };
+    if emu & KURSIV != 0 {
+        // Grundlinie: dort, wo raylib die Unterkante der Grossbuchstaben
+        // hinsetzt -- gut vier Fuenftel der Zeilenhoehe.
+        let grund = y + size * 0.8;
+        let std_font = unsafe { raylib::ffi::GetFontDefault() };
+        for &z in zuege {
+            let x0 = x + z * versatz;
+            match font_zu_handle(h, fonts, ausweich) {
+                None => {
+                    // Die eingebaute Schrift zeichnet raylib mit Abstand size/10.
+                    let sz = size.max(10.0);
+                    zeichne_schraeg(&std_font, txt, x0, y, sz, sz / 10.0, col, grund);
+                }
+                Some(basis) => {
+                    if txt.is_ascii() || ausweich.is_empty() {
+                        zeichne_schraeg(basis, txt, x0, y, size, spacing, col, grund);
+                    } else {
+                        let basis_hat = |c: u32| -> bool {
+                            if h == FONT_AUSWEICH { ausweich.first().map_or(false, |a| a.hat.contains(&c)) }
+                            else { font_glyphs.get(h as usize).map_or(false, |m| m.contains(&c)) }
+                        };
+                        let mut cx = x0;
+                        let mut erster = true;
+                        for (fi, lauf) in text_laeufe(h, txt, basis_hat, ausweich) {
+                            let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
+                            if !erster { cx += spacing; }
+                            erster = false;
+                            cx += zeichne_schraeg(f, &lauf, cx, y, size, spacing, col, grund);
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        for &z in zuege {
+            zeichne_text(d, h, txt, x + z * versatz, y, size, spacing, col, fonts, font_glyphs, ausweich);
+        }
+    }
+    if emu & (UNTER | DURCH) != 0 {
+        let b = miss_text(h, txt, size, spacing, fonts, font_glyphs, ausweich) + versatz;
+        if emu & UNTER != 0 {
+            let (dy, dicke) = crate::schnitt::linie_unter(size);
+            d.draw_rectangle_rec(raylib::math::Rectangle::new(x, y + dy, b, dicke), col);
+        }
+        if emu & DURCH != 0 {
+            let (dy, dicke) = crate::schnitt::linie_durch(size);
+            d.draw_rectangle_rec(raylib::math::Rectangle::new(x, y + dy, b, dicke), col);
+        }
+    }
+}
+
 fn render_scene<D: RaylibDraw>(
     d: &mut D, s: i32, clear: Option<Color>,
     layers: &[Layer], order: &[usize], textures: &[Tex], fonts: &[Font],
@@ -6125,6 +6385,11 @@ fn render_scene<D: RaylibDraw>(
                     Cmd::Text(x, y, txt, sz, col, font, spacing) => {
                         zeichne_text(d, *font, txt, (x * s) as f32, (y * s) as f32,
                                      (sz * s) as f32, spacing * s as f32, *col, fonts, font_glyphs, ausweich);
+                    }
+                    Cmd::TextStil(x, y, txt, sz, col, font, spacing, emu) => {
+                        zeichne_text_stil(d, *font, txt, (x * s) as f32, (y * s) as f32,
+                                          (sz * s) as f32, spacing * s as f32, *col, *emu,
+                                          fonts, font_glyphs, ausweich);
                     }
                     Cmd::TextRot(cx, cy, txt, sz, col, font, spacing, ang, scl) => {
                         // Zentriert auf (cx,cy), Rotation um das Text-Zentrum

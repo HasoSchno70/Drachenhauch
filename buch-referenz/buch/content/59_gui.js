@@ -593,6 +593,12 @@ module.exports = (H) => [
       'GUI_SET_COLOR(start, "accent", RGB(255, 120, 60))',
       'GUI_SET_FONT_SIZE(titel, 24)',
     ]),
+  H.cmd("GUI_SET_FONT_STYLE · GUI_GET_FONT_STYLE$", 'GUI_SET_FONT_STYLE(widget, stil$)   GUI_GET_FONT_STYLE$(widget)',
+    "Schriftstil für EIN Widget: fett, kursiv, unterstrichen, durchgestrichen – verbunden mit +; \"normal\" nimmt ihn weg. Echte Schnitte, wo die Schrift sie als Datei hat, sonst nachgebildet. Der Stil steht auch in der .dhform (font_style), der Form-Designer hat dafür ein Feld.",
+    [
+      'GUI_SET_FONT_STYLE(titel, "fett+unterstrichen")',
+      'PRINT GUI_GET_FONT_STYLE$(titel)     \' fett+unterstrichen',
+    ]),
   H.cmd("GUI_SET_ANCHOR", 'GUI_SET_ANCHOR(widget, kanten$)',
     "Bindet ein Widget an Fensterkanten, damit es beim Vergrößern mitwandert oder mitwächst. kanten$ ist eine Kombination aus \"l\", \"r\", \"t\", \"b\" – zwei gegenüberliegende Kanten (\"lr\") dehnen das Widget, eine einzelne (\"r\") klebt es an dieser Kante.",
     [

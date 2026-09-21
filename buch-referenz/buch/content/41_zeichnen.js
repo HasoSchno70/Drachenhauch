@@ -144,11 +144,26 @@ module.exports = (H) => [
       'TEXT_SPACING(2.0)              \' luftige Ueberschrift',
       'TEXT_LINE_SPACING(24)',
     ]),
+  H.cmd("TEXT_STYLE · TEXT_GET_STYLE$", 'TEXT_STYLE(stil$)   TEXT_GET_STYLE$()',
+    "Stil für die folgenden TEXT-Aufrufe: fett, kursiv, unterstrichen, durchgestrichen – verbunden mit + (\"fett+unterstrichen\"); \"normal\" schaltet zurück. Fett und kursiv nehmen den echten Schnitt der geladenen Schrift, wenn seine Datei daneben liegt (segoeuib.ttf zu segoeui.ttf, NotoSans-Bold.ttf zu NotoSans-Regular.ttf); sonst zeichnet die Laufzeit Fett doppelt und Kursiv geneigt. Die Linien gehen mit jeder Schrift. TEXT_WIDTH misst mit dem Stil, GFX_PUSH/GFX_POP heben ihn mit auf.",
+    [
+      'TEXT_STYLE("fett")',
+      'TEXT(20, 20, "Überschrift", WHITE)',
+      'TEXT_STYLE("kursiv+unterstrichen")',
+      'TEXT(20, 60, "Hervorgehoben", YELLOW)',
+      'TEXT_STYLE("normal")',
+    ]),
   H.cmd("TEXT_BOLD · TEXT_ITALIC", 'TEXT_BOLD(an)   TEXT_ITALIC(an)',
-    "Schalten Fett und Kursiv für die folgenden TEXT-Aufrufe ein oder aus. Beides wird künstlich erzeugt (mehrfach versetzt bzw. geschert) – eine eigens geladene Fett-Schrift sieht besser aus, aber für ein Hervorheben im Spiel reicht es.",
+    "Schalten nur Fett bzw. nur Kursiv ein oder aus – der Rest des Stils aus TEXT_STYLE bleibt, wie er ist.",
     [
       'TEXT_BOLD(TRUE)',
       'TEXT(20, 60, "WARNUNG", RGB(255, 200, 60))',
       'TEXT_BOLD(FALSE)',
+    ]),
+  H.cmd("FONT_STYLE · FONT_HAS_STYLE", 'FONT_STYLE(font, stil$)   FONT_HAS_STYLE(font, stil$)',
+    "FONT_STYLE liefert das Handle des echten fetten oder kursiven Schnitts einer per LOADFONT geladenen Schrift – für SETFONT oder GUI_SET_FONT. Gibt es keinen, kommt font selbst zurück. FONT_HAS_STYLE sagt vorher, ob es ihn als Datei gibt.",
+    [
+      'DIM f AS INTEGER : f = LOADFONT("C:/Windows/Fonts/segoeui.ttf", 32)',
+      'IF FONT_HAS_STYLE(f, "fett") THEN SETFONT(FONT_STYLE(f, "fett"))',
     ]),
 ];
