@@ -26,7 +26,7 @@ Formular, das beim ersten Sichern dorthin geschrieben wird.
 
 ## Aufbau
 
-- **Links — Menü und Palette.** Die Palette listet **alle 30 Widget-Arten der
+- **Links — Menü und Palette.** Die Palette listet **alle 32 Widget-Arten der
   Laufzeit** und dazu das **Gitter** (eine Tabelle im Zellmodus, alle Spalten
   bearbeitbar). Eintrag anklicken („scharf"), dann auf die Form klicken =
   ablegen, am 8-px-Raster. Unter der Palette steht die Statuszeile.
