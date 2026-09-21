@@ -1,6 +1,9 @@
 # Sucht ein Fenster ueber seinen Titel und schickt ihm eine echte Nachricht:
 # "esc" = WM_KEYDOWN + WM_KEYUP mit VK_ESCAPE, "kreuz" = WM_CLOSE (was das
-# Kreuz der Titelleiste und Alt+F4 ausloesen). Aufrufer: fenstersender.dh.
+# Kreuz der Titelleiste und Alt+F4 ausloesen), "mausweg" = WM_MOUSEMOVE auf
+# (200,150), zweieinhalb Sekunden lang alle 15 ms -- genau das schickt Windows
+# von selbst, wenn ein Fenster unter dem Zeiger auftaucht oder verschwindet.
+# Der Zeiger des Nutzers wird dabei NICHT bewegt. Aufrufer: fenstersender.dh.
 param([string]$Titel, [string]$Nachricht)
 Add-Type @"
 using System;
@@ -24,5 +27,13 @@ if ($Nachricht -eq "esc") {
     [FensterSender]::PostMessage($h, 0x101, [IntPtr]0x1B, [IntPtr]0xC0010001) | Out-Null
 } elseif ($Nachricht -eq "kreuz") {
     [FensterSender]::PostMessage($h, 0x10, [IntPtr]0, [IntPtr]0) | Out-Null
+} elseif ($Nachricht -eq "mausweg") {
+    # lParam = (y << 16) | x, in Fensterkoordinaten.
+    $l = [IntPtr]((150 -shl 16) -bor 200)
+    $ende = (Get-Date).AddMilliseconds(2500)
+    while ((Get-Date) -lt $ende) {
+        [FensterSender]::PostMessage($h, 0x200, [IntPtr]0, $l) | Out-Null
+        Start-Sleep -Milliseconds 15
+    }
 } else { "unbekannte Nachricht $Nachricht"; exit 3 }
 "gesendet"
