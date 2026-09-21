@@ -5,8 +5,8 @@
 > Python-Pfaden" (Tree-Walker / Python-VM / Cython-VM) und auf
 > `interpreter.py`/`vm.py`/`serialize.py`. Diese Python-Pfade und -Dateien sind
 > **alle entfernt** — `dhrt` ist heute die **einzige** Runtime und kompiliert den
-> Quelltext selbst. Korrektheit sichern jetzt **run_gb-Golden-Tests** + Rust-
-> `#[test]`s. Die „bit-identisch"-Stellen unten sind also historische
+> Quelltext selbst. Korrektheit sichern jetzt die **Pruefsammlungen**
+> (`tests/pruef/*.dhtest`, `dhrt test tests/pruef`) + Rust-`#[test]`s. Die „bit-identisch"-Stellen unten sind also historische
 > Port-Verifikations-Notizen, kein aktueller Mehr-Pfad-Zustand.
 
 Das Ziel war zunächst bescheiden: ein **vierter** Ausführungspfad neben
@@ -31,9 +31,9 @@ den vier Pfaden genau einer übrig, und der bringt sein Frontend selbst mit.
 7. Editor: „Export → native Exe bundeln". ✅ *erledigt (Bytecode + Assets in
    eine standalone `.exe` gebündelt — siehe unten)*
 
-**Dev-Run-Loop** (quer zu den Schritten): `dhrun.py --native <datei.dh>` —
-ein Befehl kompiliert (Python) → `.dhc` → startet `dhrt`. ✅ *erledigt* (siehe
-unten).
+**Dev-Run-Loop** (quer zu den Schritten): `dhrt run <datei.dh>` — ein
+Befehl, der die Quelle selbst uebersetzt und ausfuehrt. ✅ *erledigt* (siehe
+unten; bis 2026-09-21 gab es davor noch den Python-Starter `dhrun.py`).
 
 ## Offen / nächste Schritte (Stand 2026-06-01)
 
@@ -171,7 +171,8 @@ Beide blockieren nicht (`severity:"warning"`), beide zeigen im Editor als Marker
   `tests/pruef/dhrt_check.dhtest`.
 
 **Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 12 zuvor Python-only-
-Module laufen jetzt nativ in dhrt. Nur die Editoren brauchen noch Python.
+Module laufen jetzt nativ in dhrt. Nur die Editoren brauchten damals noch
+Python (seit 2026-09-21 auch sie nicht mehr).
 
 ### Echtes HDR-Cubemap-IBL (`LIGHT_ENV_HDR`) — erledigt
 
@@ -230,77 +231,64 @@ kloofendal_43d_clear) als `examples/assets/ibl_env.hdr` (gitignored). Per
 Screenshot verifiziert (Spiegel→diffus über die Roughness-Reihe). Bit-Identität
 entfällt (GPU/3D); analytisches `96_ibl` bleibt unverändert.
 
-## Dev-Run-Loop: `dhrun.py --native`
+## Dev-Run-Loop: `dhrt run`
 
-Für schnelles Iterieren beim Coden gibt es einen One-Command-Pfad:
+Für schnelles Iterieren beim Coden reicht ein Befehl:
 
 ```
-.venv\Scripts\python.exe dhrun.py --native examples\30_shapes.dh
+dhrt run examples\30_shapes.dh
 ```
 
-Das startet `dhrt run` auf der `.dh`-Datei — **kein Python-Compile, keine
-`.dhc`**: `dhrt` bringt sein eigenes Frontend mit (preprocess → lex → parse →
-compile → VM, alles in Rust), und genau darum laufen hier auch Builtins, die
-der Python-Compiler gar nicht kennt. Gestartet wird im Verzeichnis der
-Quelldatei (damit relative Asset-Pfade wie `LOADIMAGE("assets/…")` stimmen);
-stdout/stderr und ein etwaiges Grafik-Fenster werden direkt durchgereicht, der
-Exit-Code von `dhrt` wird weitergegeben (`3`, wenn das Binary fehlt). Fehlt es,
-verweist die Meldung auf `rust\build_runtime.py`.
+`dhrt` bringt sein eigenes Frontend mit (preprocess → lex → parse → compile →
+VM, alles in Rust) — **kein Python, keine `.dhc` auf der Platte**. Gestartet
+wird im Verzeichnis der Quelldatei (damit relative Asset-Pfade wie
+`LOADIMAGE("assets/…")` stimmen); den Ort des Aufrufers hinterlegt `dhrt` als
+`DHRT_START_DIR`. Argumente fürs Programm stehen hinter `--`
+(`dhrt run spiel.dh -- level2`); `dhrt run --bilder N datei.dh` beendet das
+Programm nach N Bildern von selbst. `dhrt datei.dh` ohne `run` tut dasselbe.
 
-Python ist damit weder Toolchain noch Runtime — nur noch Editor und Werkzeug.
+Bis 2026-09-21 gab es davor den Python-Starter `dhrun.py` (`--native`); er ist
+mit der Python-Werkzeugkette entfernt.
 
-**Im Editor:** Der **Run**-Button (F5) ist der einzige Run-Knopf und ruft
-ebenfalls `dhrt run` — primär direkt als `QProcess` (so beendet der
-`Stop`-Button auch den nativen Prozess, kein verwaister dhrt), bei
-Startproblemen über den `dhrun.py`-Launcher, der dasselbe Binary startet.
-Einen Rückfall auf den Tree-Walker gibt es nicht — den Tree-Walker selbst
-gibt es nicht mehr.
-Output und Laufzeitfehler (`datei.dh:Zeile`, klickbar) landen in derselben
-Konsole.
+**In der IDE** (`dhrt run ide/ide.dh`, siehe [ide.md](ide.md)): F5 startet
+das Programm als eigenen `dhrt run`-Prozess; Output und Laufzeitfehler
+(`datei.dh:Zeile`) landen in der Ausgabe, ein Doppelklick auf eine solche
+Zeile springt an die Stelle.
 
 ### Laufzeitfehler mit Zeilennummer
 
-Der Compiler stempelt pro Bytecode-Instruktion die **Quell-Zeile** (`stmt.line`
-vom Parser) in ein zu `code` paralleles `lines`-Array (`CompiledFunction.lines`,
-serialisiert als `"lines"` in der `.dhc`). Die Rust-VM merkt sich die Zeile der
-zuletzt ausgeführten Instruktion (`Vm.cur_line`); bei einem propagierenden
-Fehler bleibt die **innerste** fehlschlagende Zeile stehen. `dhrun.py --native`
-reicht den Quell-Dateinamen als 2. Arg an `dhrt` durch, sodass die Meldung lautet:
+Der Compiler stempelt pro Bytecode-Instruktion die **Quell-Zeile** in ein zu
+`code` paralleles `lines`-Array (in der `.dhc` als `"lines"`). Die Rust-VM
+merkt sich die Zeile der zuletzt ausgeführten Instruktion (`Vm.cur_line`); bei
+einem propagierenden Fehler bleibt die **innerste** fehlschlagende Zeile
+stehen. `dhrt run` kennt den Quell-Dateinamen, sodass die Meldung lautet:
 
 ```
 Laufzeitfehler in spiel.dh:42: Index 10 ausserhalb [0..2] in Dimension 0
 ```
 
-Die Python/Cython-VMs ignorieren `lines` (additives Feld, kein Recompile nötig);
 `dhrt <datei.dhc>` ohne Label nutzt den `.dhc`-Pfad. Zeile `0` (untracked) →
 Meldung ohne Zeilenangabe.
 
-**Compile-Fehler** (vor der Ausführung, in Python) tragen ebenfalls eine Zeile:
-Parser-Fehler ohnehin, und `CompileError` wird zentral mit der Statement- bzw.
-Deklarations-Zeile angereichert (`Compiler._at` + `_stmt`, via
-`DrachenhauchError.set_line`). So zeigt der `--native`/F6-Pfad z. B.
-`[Zeile 4] CompileError: SUB 'foo' bereits deklariert` — im Editor als
-klickbarer Link in die Quelldatei.
+**Compile-Fehler** (vor der Ausführung) tragen ebenfalls die Zeile, in der sie
+entstehen — Parser-Fehler wie Übersetzungsfehler (z. B. eine doppelt
+deklarierte SUB). `dhrt --check datei.dh` meldet sie als JSON, ohne das
+Programm zu starten.
 
 ## Schritt 1: `.dhc`-Serialisierung
 
-`drachenhauch/serialize.py` wandelt ein vom
-`Compiler` erzeugtes `Module` (`bytecode.py`) in eine
-selbstbeschreibende JSON-Datei. JSON ist für den Spike bewusst gewählt
-(debuggbar); ein kompaktes Binärformat ist später drop-in möglich.
+Ein übersetztes Programm ist eine selbstbeschreibende JSON-Datei (`.dhc`).
+JSON ist für den Spike bewusst gewählt (debuggbar); ein kompaktes Binärformat
+ist später drop-in möglich. Anfangs schrieb sie die Python-Toolchain
+(`drachenhauch/serialize.py`); heute erzeugt `dhrt` sie selbst — ansehen lässt
+sie sich mit
 
-**CLI:**
 ```
-.venv\Scripts\python.exe -m drachenhauch.serialize [--pretty] <datei.dh> [out.dhc]
+dhrt --dumpbc <datei.dh>
 ```
 
-> **Wichtig:** `serialize.py` importiert `interpreter.py`, bevor es kompiliert.
-> Der Compiler entscheidet anhand der `BUILTINS`-Registry (von den `@builtin`-
-> Decorators in `interpreter.py` gefüllt), ob ein Identifier-Call wie `LEN(a)`
-> zu `CALL_BUILTIN` wird. Ohne diesen Import sähe der Compiler die Registry
-> nicht und erzeugte für `LEN`/`INT`/… kaputten `LOAD_NAME + CALL_VALUE`-
-> Bytecode. `dhrun.py` importiert `interpreter` am Modulanfang — dieselbe
-> Umgebung wird hier hergestellt.
+(eingerücktes JSON auf stdout). Ausführen: `dhrt <datei.dhc>`; `dhrt --export`
+hängt dieselbe `.dhc` an eine Kopie der Exe.
 
 **Wert-Encoding** (eindeutig dekodierbar — INT/FLOAT/BOOL müssen unterscheidbar
 bleiben, da `bool` in Python ein `int`-Subtyp ist und `1` ≠ `1.0` in GB):
@@ -410,8 +398,8 @@ raylib kompiliert seine C-Quellen via **cmake** und braucht **libclang** für
 die FFI-Bindings (bindgen). Der Helfer setzt die Umgebung:
 
 ```
-.venv\Scripts\python.exe rust\build_runtime.py            # release, mit Grafik
-.venv\Scripts\python.exe rust\build_runtime.py --no-graphics
+python rust\build_runtime.py            # release, mit Grafik
+python rust\build_runtime.py --no-graphics
 ```
 
 Voraussetzungen (Windows): VS C++ Build Tools (liefern `cl.exe` + gebündeltes
@@ -910,7 +898,7 @@ Glow-Funken auf dem Kick und ein 2D-FFT-Spektrum. Alles **echt FFT-reaktiv**
 (`AUDIO_FFT`) zu einem Stereo-Techno-Track. `SET_FULLSCREEN(TRUE)`, Kamera kreist
 mit Bass-Punch. Musik: „Technological Messup" von **josepharaoh99**, **CC0** —
 einmalig holen mit `dhrt run examples/assets/download_techno.dh` (läuft auch ohne, stumm
-via `FILEEXISTS`-Guard). Nur nativ: `dhrun.py --native examples\97_pbr_reactor.dh`.
+via `FILEEXISTS`-Guard). Start: `dhrt run examples/97_pbr_reactor.dh`.
 
 [examples/85_cybermatic_demo.dh](../examples/85_cybermatic_demo.dh) bündelt in
 einem 1280×720-Frame, was die native Runtime kann — **audio-reaktiv** (echte
@@ -919,15 +907,15 @@ Takte**: `TUNNEL` (zufliegende Wireframe-Ringe) → `RING` (Doppelring + Bass-
 Kugel + Säule, Kamera-Punch/Shake) → `PLASMA` (audio-reaktives Würfel-Terrain).
 Dazu durchgehend ein 2D-Overlay: FFT-Spektrum (`BOXES`-Bulk, oben+unten),
 Glow-Funken + Cyber-Regen (zwei Partikelsysteme), pulsierender Titel,
-Laufschrift, dezenter Beat-Flash. Nur nativ:
-`dhrun.py --native examples\85_cybermatic_demo.dh` (oder F6).
+Laufschrift, dezenter Beat-Flash. Start:
+`dhrt run examples/85_cybermatic_demo.dh` (oder F5 in der IDE).
 
 Das Musik-Asset (~15 MB, „Cybermatic pulse" von **Alexandr Zhelanov**,
 CC-BY 4.0) liegt **nicht** im Repo (zu groß) — einmalig holen mit
 `dhrt run examples/assets/download_cybermatic.dh`. Die Demo läuft auch ohne (stumm,
 via `FILEEXISTS`-Guard). Provenienz/Lizenz: `examples/assets/CREDITS_cybermatic.txt`.
 
-## Schritt 7: Standalone-Export (`dhrun.py --export` / Editor)
+## Schritt 7: Standalone-Export (`dhrt --export` / IDE)
 
 Ein Drachenhauch-Programm zu einer eigenständigen `.exe` bündeln, die **ohne
 Python** läuft — Spiele ausliefern ohne Toolchain beim Endnutzer.
@@ -968,24 +956,24 @@ extrahiert den Bytecode.
 eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`dhrt datei.dhc`).
 Beide Pfade teilen sich `run_gbc_text(text, label)`.
 
-**Export-Seite** (`drachenhauch/export.py`):
-`export_standalone(src_gb, dhrt_path, out_dir)` kompiliert in-memory zu `.dhc`,
-hängt `<gbc><len><magic>` an die Runtime-Bytes und schreibt `<out>/<name>.exe`.
-Der `assets/`-Ordner neben der Quelle wird mitkopiert (Konvention für
-`LOADIMAGE("assets/…")` & Co.).
+**Export-Seite** (`export_main` in [main.rs](../rust/drachenhauch_runtime/src/main.rs)):
+`dhrt` übersetzt die Quelle zu `.dhc`, hängt `<gbc><len><magic>` an eine Kopie
+der **eigenen** Exe und schreibt `<out>/<name>.exe`. Der `assets/`-Ordner neben
+der Quelle wird mitkopiert (Konvention für `LOADIMAGE("assets/…")` & Co.).
+Bis 2026-09-21 gab es daneben die Python-Fassung `drachenhauch/export.py`
+(`dhrun.py --export`); sie ist entfernt.
 
 **Aufruf:**
 ```
-.venv\Scripts\python.exe dhrun.py --export examples\89_heightmap.dh [ausgabe-ordner]
+dhrt --export examples/89_heightmap.dh [ausgabe-ordner]
 ```
-Default-Ausgabe: `<quelle>_dist/`. Im **Editor**: Menü *Ausführen → Export →
-standalone .exe* bzw. **Ctrl+F6** (Toolbar-Button neben Run/Bench) — bündelt die
-aktive Datei und öffnet den Ausgabeordner.
+Default-Ausgabe: `<quelle>_dist/`. In der **IDE** (`dhrt run ide/ide.dh`):
+**Strg+F6** bündelt die aktive Datei nach `<name>_dist/` neben der Quelle; die
+Ausgabe des Exports läuft unten links mit (siehe [ide.md](ide.md)).
 
 Verifiziert: `89_heightmap.dh` exportiert (~3.7 MB Exe), die Exe **ohne
 Argumente aus fremdem Verzeichnis** gestartet, lädt das mitkopierte
-`assets/heightmap.png` und rendert das Terrain (Screenshot). Dev-Modus
-(`--native`, Konsolen-Programme bit-identisch) bleibt unverändert.
+`assets/heightmap.png` und rendert das Terrain (Screenshot).
 
 **Asset-Bündelung:** Der Export kopiert (a) einen `assets/`-Ordner neben der
 Quelle wie gehabt UND (b) **jede im Quelltext als String-Literal referenzierte

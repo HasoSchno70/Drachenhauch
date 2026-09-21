@@ -8,10 +8,13 @@ Klassisches „raw USB" über `pyusb` / `libusb` wird **nicht** unterstützt —
 IMPORT "usb"
 ```
 
-## Externe Dependency
+## Voraussetzung
+
+`usb` steckt nur in einem `dhrt`, der mit den Hardware-Features gebaut ist
+(Crate `hidapi`, keine Python-Pakete):
 
 ```
-.venv\Scripts\python.exe -m pip install hidapi
+python rust/build_runtime.py --hardware
 ```
 
 ## Übersicht
@@ -116,4 +119,4 @@ Siehe [examples/37_usb.dh](../examples/37_usb.dh).
 
 ## In der nativen Runtime (dhrt)
 
-`usb` laeuft nativ mit dem Cargo-Feature `usb` (Crate `hidapi`). Bytes ↔ STRING per latin-1 wie im Python-Pfad. Bauen: `python rust/build_runtime.py --hardware` (oder `--full`).
+`usb` laeuft nativ mit dem Cargo-Feature `usb` (Crate `hidapi`). Bytes ↔ STRING per latin-1. Bauen: `python rust/build_runtime.py --hardware` (oder `--full`).

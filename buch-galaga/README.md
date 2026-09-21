@@ -17,7 +17,7 @@ Das fertige Spiel liegt als ein laufender Stand in
 Reise geht:
 
 ```
-.venv\Scripts\python.exe dhrun.py buch-galaga\code\galaga.dh
+dhrt run buch-galaga\code\galaga.dh
 ```
 
 Steuerung: **←/→** (oder **A/D**) bewegen, **Leertaste** schießen.

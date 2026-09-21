@@ -55,7 +55,7 @@ Updates unterliegen diesem Vertrag, sofern sie nicht mit eigenen Bedingungen
 ausgeliefert werden.
 
 8. DRITTKOMPONENTEN / OPEN SOURCE
-Drachenhauch enthaelt Open-Source-Software (u.a. Qt/PySide6 unter LGPLv3, raylib,
+Drachenhauch enthaelt Open-Source-Software (u.a. raylib,
 NumPy, Pillow sowie zahlreiche Rust-Crates unter MIT/BSD/Apache-2.0/Zlib/MPL-2.0).
 Diese Bestandteile unterliegen AUSSCHLIESSLICH ihren eigenen Lizenzen; soweit diese
 mit dem vorliegenden Vertrag kollidieren, gehen die jeweiligen Open-Source-Lizenzen

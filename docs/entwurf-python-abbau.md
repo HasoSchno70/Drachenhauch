@@ -286,7 +286,7 @@ schwersten Befunde sind im Quelltext nachgesehen (unten mit ✔ markiert).
 | Tests zu Qt | 67 | 14 110 | den Editoren und der IDE |
 | Tests zu Python-Modellen | 20 | 4 150 | den Modellen |
 | übrige pytest-Dateien und `conftest.py` | 9 | 1 310 | siehe 7.6 |
-| `dhrun.py`, `installer/*.py`, `rust/build_*.py`, `tools/qt_tests_einzeln.py` | 6 | 1 830 | siehe 7.5 |
+| `dhrun.py`, `installer/*.py`, `rust/build_*.py`, tools/qt_tests_einzeln.py | 6 | 1 830 | siehe 7.5 |
 | **gesamt** | **197** | **~62 500** | |
 
 Am 06.09. waren es rund 110 000 Zeilen. Die Prüfsammlungen stehen bei 235
@@ -320,7 +320,7 @@ müssen **vorher** umziehen:
 * **`graphics.py`** (`KEYS`/`COLORS`) hält `test_constants_sync.py` gegen
   `vm.rs` -- ein Drift-Schutz zwischen zwei Pflegestellen, der mit der
   zweiten Stelle überflüssig wird.
-* **`modules/__init__.py`** muss laut Anleitung synchron zu
+* **modules/__init__.py** muss laut Anleitung synchron zu
   `preprocess.rs` bleiben -- das fällt ersatzlos, sobald der
   Python-Preprocess fällt.
 

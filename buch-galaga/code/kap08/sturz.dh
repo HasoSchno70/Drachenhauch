@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 8 - Sturzangriffe (ENUM + Zustands-Maschine)
-'  Start:  dhrun.py buch-galaga/code/kap08/sturz.dh
+'  Start:  dhrt run buch-galaga/code/kap08/sturz.dh
 ' ============================================================
 IMPORT "curves"
 

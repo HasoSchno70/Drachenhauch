@@ -17,7 +17,7 @@
 '  make_demo_levels.dh; echte Fansite-Sets (.dat/.ccl) wandelt
 '  convert_dat.dh um. Tile-Codes 0x00..0x6F = Zellen in assets/tiles.png.
 '
-'  Start:  dhrun.py circuitrunner\circuitrunner.dh       (oder im Editor F5)
+'  Start:  dhrt run circuitrunner\circuitrunner.dh       (oder F5 in der IDE)
 ' =====================================================================
 IMPORT "json"
 IMPORT "imgfx"

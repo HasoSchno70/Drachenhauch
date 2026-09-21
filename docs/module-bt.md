@@ -8,10 +8,13 @@ BLE-Geräte scannen, verbinden, GATT-Charakteristiken lesen und schreiben. Typis
 IMPORT "bt"
 ```
 
-## Externe Dependency
+## Voraussetzung
+
+`bt` steckt nur in einem `dhrt`, der mit den Hardware-Features gebaut ist
+(Crate `btleplug`, keine Python-Pakete):
 
 ```
-.venv\Scripts\python.exe -m pip install bleak
+python rust/build_runtime.py --hardware
 ```
 
 Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10 — Bluetooth-Adapter muss aktiv sein.
@@ -31,7 +34,7 @@ Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10 — Bluetoot
 
 ## Async/Sync
 
-`bleak` ist asyncio-basiert. Dieses Modul betreibt im Hintergrund einen dedizierten Event-Loop in einem Daemon-Thread und reicht jeden Aufruf synchron durch — der Drachenhauch-VM blockiert pro Aufruf bis zur Antwort. Du musst dich nicht um Coroutinen oder `await` kümmern.
+`btleplug` ist asynchron. Das Modul treibt es ueber eine interne tokio-Runtime und reicht jeden Aufruf synchron durch — der Drachenhauch-VM blockiert pro Aufruf bis zur Antwort. Du musst dich nicht um Coroutinen oder `await` kümmern.
 
 Alle Calls ausser `BT_SCAN` (das sein eigenes, von dir gewähltes Zeitfenster hat) haben ein internes 10-Sekunden-Timeout — ist ein Gerät ausser Reichweite oder antwortet nicht, scheitert `BT_CONNECT`/`BT_READ`/`BT_WRITE`/`BT_SERVICES`/`BT_CHARACTERISTICS` nach spätestens 10s mit einer fangbaren Fehlermeldung, statt den Game-Loop unbegrenzt einzufrieren.
 
@@ -125,4 +128,4 @@ Siehe [examples/38_bt.dh](../examples/38_bt.dh).
 
 ## In der nativen Runtime (dhrt)
 
-`bt` laeuft nativ mit dem Cargo-Feature `bt` (Crate `btleplug` statt `bleak`; async wird ueber eine interne tokio-Runtime synchron getrieben). Scan/Connect/Services/Characteristics/Read/Write wie im Python-Pfad; Bytes ↔ STRING per latin-1. **Hinweis:** `BT_CONNECT(addr$)` braucht eine vorher per `BT_SCAN` gesehene Adresse. `BT_SCAN` validiert `timeout_sek` streng (endliche Zahl 0..300) — ein NaN/Infinity-Wert (z.B. aus einer Rechenkette wie `POW(10,1000)`) wirft einen sauberen Fehler statt die Runtime abstuerzen zu lassen. Bauen: `python rust/build_runtime.py --hardware`. Zieht schwere Abhaengigkeiten (tokio/btleplug/windows) — daher nicht im Standard-Dev-Build.
+`bt` laeuft nativ mit dem Cargo-Feature `bt` (Crate `btleplug`; async wird ueber eine interne tokio-Runtime synchron getrieben). Bytes ↔ STRING per latin-1. **Hinweis:** `BT_CONNECT(addr$)` braucht eine vorher per `BT_SCAN` gesehene Adresse. `BT_SCAN` validiert `timeout_sek` streng (endliche Zahl 0..300) — ein NaN/Infinity-Wert (z.B. aus einer Rechenkette wie `POW(10,1000)`) wirft einen sauberen Fehler statt die Runtime abstuerzen zu lassen. Bauen: `python rust/build_runtime.py --hardware`. Zieht schwere Abhaengigkeiten (tokio/btleplug/windows) — daher nicht im Standard-Dev-Build.

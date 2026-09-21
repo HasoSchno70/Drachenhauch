@@ -88,16 +88,15 @@ entworfen, empfohlen; entschieden ist nichts davon.
 
 ### Werkzeug
 
-- **[Die Werkzeuge um die Sprache](werkzeuge.md)** — `dhrt --version`, `dhrt test` (Prüfprogramme laufen lassen), `dhrt fmt` (einheitlich schreiben), `dhrt --check`, `dhrun.py --doku` (Referenz aus dem Quelltext)
-- **[Die IDE in Drachenhauch (`ide/ide.dh`)](ide.md)** — die Entwicklungsumgebung, geschrieben in der Sprache, die sie bedient (Stand 1: Reiter, Pruefung, Hilfe, Vervollstaendigung, Suchen, Starten mit laufender Ausgabe)
-- **[Code-Editor](editor.md)** — Tastenkürzel, Snippets, Sidebar, Run/Debug/Profile, Find in Project
-- **[Sprite-Editor (`dhsprites`)](sprite-editor.md)** — Pixel-Art-Editor mit Multi-Frame, Animation, Onion-Skin, Sheet/Atlas/GIF-Export, Palette-Tools
-- **[Tilemap-Editor (`dhtilemap`)](tilemap-editor.md)** — Level bauen, Tiled-JSON lesen und schreiben
-- **[Form-Designer (`dhform`)](form-designer.md)** — Oberflächen zusammenklicken, Xojo-Stil, F5 startet sie
-- **[Partikel-Editor (`dhparticles`)](particle-editor.md)** — Effekte live einstellen, mit Preset-Bibliothek
-- **[Animations-Editor (`dhanim`)](anim-editor.md)** — Zustandsautomat für Sprite-Animationen
-- **[Notenblatt-Editor (`dhscore`)](score-editor.md)** — Noten setzen statt Tracker-Zeilen füllen
-- **[Tracker](tracker.md)** und **[SFX-Generator](sfx-generator.md)** — Musik und Geräusche (beide im Audio Studio)
+- **[Die Werkzeuge um die Sprache](werkzeuge.md)** — `dhrt --version`, `dhrt test` (Prüfprogramme laufen lassen), `dhrt fmt` (einheitlich schreiben), `dhrt --check`, `dhrt doku referenz` (Referenz aus dem Quelltext)
+- **[IDE](ide.md)** — die Entwicklungsumgebung, geschrieben in Drachenhauch: Reiter, Projektbaum, Debugger, Profil, Suche im Projekt, Umbauten
+- **[Sprite-Editor](sprite-editor.md)** (`examples/189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Auswahlmaske, GIF, Atlas-Export
+- **[Tilemap-Editor](tilemap-editor.md)** (`examples/187_tilemap_editor.dh`) — Level bauen, Tiled-JSON lesen und schreiben
+- **[Form-Designer](form-designer.md)** (`examples/197_form_designer.dh`) — Oberflächen zusammenklicken, Xojo-Stil, F5 startet sie
+- **[Partikel-Editor](particle-editor.md)** (`examples/185_partikel_editor.dh`) — Effekte live einstellen
+- **[Animations-Editor](anim-editor.md)** (`examples/198_anim_fsm_editor.dh`) — Zustandsautomat für Sprite-Animationen
+- **[Notenblatt](score-editor.md)** (`examples/199_notenblatt.dh`) — Noten setzen statt Tracker-Zeilen füllen
+- **[Tracker](tracker.md)** (`examples/190_tracker.dh`) und **[SFX-Generator](sfx-generator.md)** (`examples/183_sfx_generator.dh`) — Musik und Geräusche
 - **[Sprachserver + VS Code](lsp.md)** — `dhrt lsp`: dieselbe Diagnose in fremden Editoren, ohne Python
 - **[Eingabe aufzeichnen](automation.md)** — Demo-Modus, nachspielbare Fehlerberichte, automatische Spieltests
 - **[Web-Playground](web-playground.md)** — dhrt als WebAssembly, ein Link genügt
@@ -143,12 +142,13 @@ PRINT "Schoen dich zu sehen, ", name
 Speichern als `hallo.dh`, dann:
 
 ```
-.venv\Scripts\python.exe dhrun.py hallo.dh
+dhrt run hallo.dh
 ```
 
-Das venv muss dafür stehen — wie es entsteht, steht im
-[README](../README.md#aus-dem-quelltext-arbeiten). Wer stattdessen das
-System-Python nimmt, bekommt Fehler über fehlende Pakete.
+oder in der IDE öffnen und F5 drücken. `dhrt` bringt der Installer mit (mit
+der Option „zum PATH hinzufügen“ auch im Terminal); wer aus dem Quelltext
+arbeitet, baut es einmal selbst — wie, steht im
+[README](../README.md#aus-dem-quelltext-arbeiten).
 
 ## Erstes Spiel
 

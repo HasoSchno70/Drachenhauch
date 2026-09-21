@@ -8,9 +8,9 @@
 ;   ISCC.exe /DAppVersion=2026.14 installer\Drachenhauch-IDE.iss
 ;
 ; Voraussetzung: rust\build_runtime.py --hardware hat dhrt.exe gebaut.
-; Eigene AppId und eigener Ordner: das hier ersetzt die Qt-Fassung NICHT,
-; beide lassen sich nebeneinander installieren, solange die Qt-IDE die
-; Referenz bleibt (docs/entwurf-python-abbau.md, Weg C).
+; Eigene AppId und eigener Ordner, nicht die der frueheren Qt-Fassung
+; (Drachenhauch.iss, 2026-09-21 geloescht): eine noch installierte
+; Qt-Fassung bleibt stehen, bis man sie ueber "Programme entfernen" loescht.
 
 #ifndef AppVersion
   #define AppVersion "0.0"

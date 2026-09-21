@@ -27,7 +27,7 @@ Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
   Dateiname-Sortierung. **Neue Kapitel: einfach content/NN_*.js anlegen.**
 - `cmd(name, syntax, desc, codeLines, {out, fig, caption})` = Standard-Befehlseintrag.
 - Quellen fürs Befehlswissen: `daten/builtin_index.json` (Signaturen),
-  `drachenhauch/editor_qt/builtin_docs.py` (Kurzbeschreibungen), `docs/*.md` (Prosa),
+  `daten/builtin_docs.json` (Kurzbeschreibungen), `docs/*.md` (Prosa),
   `examples/*.dh`. Beispiele möglichst mit `dhrt run` verifizieren (Konsolen-Ausgabe).
 - Screenshots für Grafik: `DHRT_FRAMES=N DHRT_SCREENSHOT=images/x.png dhrt run datei.dh`,
   PNG nach `buch-referenz/buch/images/`.

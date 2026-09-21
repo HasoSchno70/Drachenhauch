@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 4 - Der Spielplan im Fenster
-'  Start:  dhrun.py buch-tippspiel/code/kap04/spielplan.dh
+'  Start:  dhrt run buch-tippspiel/code/kap04/spielplan.dh
 ' ============================================================
 '  Jetzt kommt das Fenster aus Kapitel 1 mit der Datenbank aus
 '  Kapitel 2 zusammen: eine Tabelle, die zeigt, was in der

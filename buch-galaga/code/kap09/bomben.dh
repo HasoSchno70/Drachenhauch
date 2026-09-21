@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 9 - Bomben & Ausweichen
-'  Start:  dhrun.py buch-galaga/code/kap09/bomben.dh
+'  Start:  dhrt run buch-galaga/code/kap09/bomben.dh
 ' ============================================================
 IMPORT "curves"
 

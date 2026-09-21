@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 3 - Die Regel
-'  Start:  dhrun.py buch-tippspiel/code/kap03/regel.dh
+'  Start:  dhrt run buch-tippspiel/code/kap03/regel.dh
 ' ============================================================
 '  Ein Tippspiel ist im Kern eine einzige Frage: wie viele Punkte
 '  gibt ein Tipp? Diese Frage beantwortet EINE Funktion -- und

@@ -18,9 +18,9 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-/// Built-in-Modul-Namen (= `drachenhauch/modules/*.py`, ohne `__init__`).
-/// Muss mit `modules.discover_modules()` synchron bleiben. dhrt implementiert
-/// diese Module nativ; ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
+/// Built-in-Modul-Namen -- die EINZIGE Liste (bis 2026-09-21 gab es daneben
+/// `KNOWN_MODULES` im Python-Paket). dhrt implementiert diese Module nativ;
+/// ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
     "animfsm", "astar", "audio", "bt", "camera", "chart", "cloud", "controller", "curves", "db", "ecs",
     "firmata", "g3d", "gui", "html", "httpd", "imgfx", "ini", "input", "json", "m3d", "midi", "mqtt", "net", "particles",

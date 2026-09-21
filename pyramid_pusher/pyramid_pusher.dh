@@ -15,7 +15,7 @@
 '  Level liegen als Standard-.xsb/.sok-Dateien in  levels/ . Eigene oder
 '  klassische Saetze (z.B. Microban, frei verteilbar) einfach dort ablegen.
 '
-'  Start:  dhrun.py pyramid_pusher\pyramid_pusher.dh       (oder im Editor F5)
+'  Start:  dhrt run pyramid_pusher\pyramid_pusher.dh       (oder F5 in der IDE)
 ' =====================================================================
 
 IMPORT "input"

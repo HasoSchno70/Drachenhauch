@@ -1,279 +1,278 @@
-# Sprite-Editor (`dhsprites`)
+# Sprite-Editor (`examples/189_sprite_editor.dh`)
 
-Ein vollwertiger Pixel-Art-Editor fuer Drachenhauch. Built mit PySide6, exportiert PNG-Sheets, Animated GIFs, einzelne PNG-Frames und **Sprite-Atlas-Manifeste** -- alle direkt im Spiel via `LOADIMAGE`, `SPRITE_NEW` oder `ATLAS_LOAD` ladbar.
+Ein Pixel-Art-Editor, geschrieben in Drachenhauch selbst: mehrere
+Einzelbilder, Ebenen, eine echte Auswahl-Maske, Rückgängig, Paletten im
+GIMP-Format und Ausgaben, die das Spiel direkt lädt — Streifen-PNG mit
+Atlas-JSON für `ATLAS_LOAD`, ein lauffähiges Programm für `SPRITE_NEW`, eine
+Zustandsmaschine für `ANIM_FSM_LOAD` und ein bewegtes GIF.
+
+Er ersetzt den früheren Qt-Editor `dhsprites`. Was der zusätzlich konnte,
+steht am Ende.
 
 ## Starten
 
+In der IDE ([`ide/ide.dh`](ide.md)) über das Menü **Werkzeuge → Sprite-Editor**
+— er läuft dort als eigener Prozess. Ohne IDE:
+
 ```
-dhsprites                        ' leerer Editor (32x32 Default)
-dhsprites assets\hero.png        ' bestehende Datei oeffnen
+dhrt run examples/189_sprite_editor.dh
 ```
 
-Auf Windows ueber `dhsprites.cmd`. Aus dem Code-Editor heraus: Werkzeuge → Sprite-Editor.
+Der Editor startet im Vollbild mit einem leeren Sprite von 32×32 Punkten.
+Eine Datei nimmt er nicht auf der Kommandozeile, sondern über **[Oeffnen]**.
 
-## Tools
+## Bedienung
 
-| Taste | Tool | Wirkung |
+| Eingabe | Wirkung |
+|---|---|
+| Maus links | zeichnen mit dem gewählten Werkzeug |
+| Maus rechts (ziehen) | Ansicht verschieben |
+| Mausrad über der Fläche | Zoom (1 bis 32) |
+| `P` `E` `F` `L` `R` `O` `Y` `I` `S` `Q` `Z` `V` | Werkzeug wählen (siehe unten) |
+| `T` | Kachel-Ansicht 3×3 an/aus |
+| `1`..`6` | Palettenfarbe 1 bis 6 |
+| `+` / `-` | Pinsel größer / kleiner (1 bis 6 Punkte) |
+| `Strg+Z` / `Strg+Y` | zurück / vor (24 Schritte) |
+| `Strg+C` / `Strg+X` / `Strg+V` | Auswahl kopieren / ausschneiden / einsetzen |
+| `Strg+D` | Auswahl aufheben |
+| `Entf` | Auswahl leeren |
+| `ESC` oder das Fensterkreuz | beenden |
+
+Ist das Sprite seit dem letzten Sichern als `.dhsprite` verändert worden,
+fragen ESC und das Kreuz vorher nach (**Sichern | Verwerfen | Abbrechen**).
+Ein Export als Streifen oder PNG zählt dabei nicht als gesichert — dort sind
+die Ebenen weg.
+
+## Werkzeuge
+
+Die Werkzeugleiste oben trägt alle zwölf als Knöpfe, daneben
+**[Zurueck]**/**[Vor]** und die Schalter **gefuellt**, **Spiegel X**,
+**Spiegel Y**, **Zwiebelhaut** und **Raster**.
+
+| Taste | Werkzeug | Wirkung |
 |---|---|---|
-| **B** | Pencil | Pixel setzen (Linke Maustaste = FG, Rechte = BG) |
-| **E** | Eraser | Pixel transparent setzen |
-| **G** | Bucket | Flood-Fill |
-| **L** | Line | Linie ziehen |
-| **R** | Rect | Rechteck (gefuellt mit FG) |
-| **O** | Ellipse | Ellipse (gefuellt) |
-| **I** | Eyedropper | Farbe vom Pixel pickern |
-| **M** | Select | Rechteck-Auswahl (Cut/Copy/Paste). **In die Auswahl klicken + ziehen verschiebt den Auswahl-Inhalt** (Live-Vorschau, ein Undo-Schritt; Quelle wird transparent) |
-| **Shift+M** | Lasso | **Freiform-Auswahl mit echter Pixel-Maske**: Bereich umfahren (Live-Pfad), Loslassen schliesst das Polygon. Cut/Copy/Fuellen/Spiegeln/Loeschen wirken nur auf die maskierten Pixel; Klick in die Auswahl verschiebt nur diese (Maske wandert mit) |
-| **V** | Move | Auswahl oder ganzes Frame verschieben |
-| **W** | Magic Wand | Auswahl per Flood (zusammenhaengende Pixel mit gleicher Farbe) |
-| **Y** | Spray | Pixel-Spray (zufaellige Verteilung im Brush-Radius) |
+| `P` | Stift | Punkte setzen, Pinselgröße 1..6 |
+| `E` | Radierer | Punkte durchsichtig machen |
+| `F` | Füllen | zusammenhängende Fläche gleicher Farbe und Deckkraft füllen |
+| `L` | Linie | Linie ziehen |
+| `R` | Rechteck | Rechteck — Umriss, mit **gefuellt** gefüllt |
+| `O` | Ellipse | Ellipse — Umriss, mit **gefuellt** gefüllt |
+| `Y` | Sprühen | zufällige Punkte im Pinselradius |
+| `I` | Pipette | Farbe aus dem Bild übernehmen |
+| `S` | Auswahl | Rechteck-Auswahl (ein Klick ohne Zug hebt sie auf) |
+| `Q` | Lasso | Freiform-Auswahl: den Bereich umfahren, Loslassen schließt ihn |
+| `Z` | Zauberstab | alle zusammenhängenden Punkte gleicher Farbe wählen |
+| `V` | Verschieben | die Auswahl abheben und woanders absetzen — ohne Auswahl die ganze Ebene |
 
-Brush-Groesse mit Tasten **1**, **2**, **3**, **4**. **X** tauscht FG/BG-Farbe.
+**Spiegel X/Y** malen beim Zeichnen gespiegelt mit (für Figuren, Symbole,
+Logos). **Zwiebelhaut** legt das vorige Einzelbild blass unter das aktuelle.
 
-## Datei-Operationen
+### Die Auswahl ist eine Maske
 
-| Shortcut | Aktion |
+Rechteck, Lasso und Zauberstab schreiben alle in dieselbe **Punkt-Maske**,
+nicht in einen Rahmen — und alles, was zeichnet, fragt sie. Solange eine
+Auswahl steht, trifft kein Strich daneben. Kopieren, Ausschneiden und Entf
+wirken nur auf die gewählten Punkte; beim Verschieben wird der Inhalt
+abgehoben (an der alten Stelle bleibt ein Loch, keine Kopie) und die Maske
+wandert mit. Halbdurchsichtige Punkte behalten dabei ihre Deckkraft.
+
+## Linke Spalte: Farbe, Palette, Leinwand
+
+- **Farbe** — ein Farbwähler, darunter die **Palette** mit 16 Plätzen.
+- **[Palette laden]** / **[Palette sichern]** — GIMP-Paletten (`.gpl`), das
+  Format, das GIMP, Aseprite, Krita und die Palettensammlungen im Netz
+  sprechen. Beim Laden werden krumme Zeilen übergangen statt gemeldet (die
+  Dateien werden von Hand bearbeitet); hat die Datei mehr als 16 Farben,
+  sagt die Statuszeile, wie viele nicht passten.
+- **Pinsel** — Größe 1 bis 6.
+- **Kachel-Ansicht 3×3** (`T`) — zeigt das Bild acht Mal ringsum. Eine Naht
+  sieht man erst neben ihrer Wiederholung; der Zoom passt sich dafür neu ein.
+- **[Statistik]** — Punkte, Farben und häufigste Farbe, gesamt und je Bild.
+- **[Zuschneiden]** — auf den Inhalt, gemessen über **alle** Ebenen, auch
+  ausgeblendete (sonst verschwände Inhalt, den man gerade nicht sieht).
+- **[Groesse aendern]** — neue Breite und Höhe; dazukommender Rand ist
+  durchsichtig.
+- **[Spiegeln |]**, **[Spiegeln --]**, **[90 >]**, **[< 90]** — spiegeln und
+  vierteldrehen. Alle vier gelten für das **ganze** Sprite (alle Bilder,
+  alle Ebenen); eine Drehung tauscht Breite und Höhe. Sie stehen **nicht** im
+  Verlauf — der zeichnet je Schritt eine Ebene auf, ein Rückgängig danach
+  drehte nur eine zurück. Der Verlauf wird deshalb geleert; die
+  Gegenrichtung nimmt eine Wandlung zurück.
+- **[GB-Code]** und **[dhanim]** — siehe Ausgaben.
+
+## Rechte Spalte: Bilder, Ebenen, Vorschau, Bereiche
+
+### Einzelbilder
+
+**[Neu]** hängt ein leeres Bild an, **[Kopie]** eine Kopie des aktuellen,
+**[Weg]** entfernt es. **[Name]** gibt dem Bild einen Namen — er wird sein
+Schlüssel im Atlas (`ATLAS_DRAW(atlas, "kopf", ...)` statt `"bild_0"`).
+Namen sind Kennungen: erlaubt sind Buchstaben, Ziffern, `_` und `-`, alles
+andere wird zum Unterstrich. Ein Punkt ginge nicht, weil das json-Modul einen
+Schlüssel mit Punkt als Pfad liest.
+
+**Dauer** stellt je Bild eine eigene Zeit in Millisekunden ein; **0 heißt
+„der Tempo-Regler gilt"**. So wird eine Pose gehalten und der Lauf dazwischen
+nicht. Die Zeit steht in der Bildliste, wandert beim Kopieren mit (der Name
+nicht — er ist eine Kennung) und gilt für Vorschau und GIF gleichermaßen.
+
+### Ebenen
+
+Ebenen gelten für **alle** Einzelbilder, wie in Aseprite: eine Ebene
+ausblenden blendet sie überall aus. **[Neu]**, **[Weg]** und **sichtbar**.
+Gezeichnet wird auf der gewählten Ebene; Anzeige und alle Ausgaben außer der
+`.dhsprite` zeigen die sichtbaren Ebenen zusammengerechnet.
+
+### Vorschau und Bereiche
+
+Die **Vorschau** spielt laufend ab, das Tempo kommt vom Regler (1 bis 24
+Bilder je Sekunde), Bilder mit eigener Dauer halten ihre Zeit.
+
+**Bereiche** sind benannte Animationen — Name, von, bis, fps, genau das, was
+`SPRITE_ADD_ANIM` braucht. **[Hinzu]**, **[Aendern]**, **[Weg]**; die
+Vorschau spielt den gewählten. Wird ein Bild gelöscht, wandern die Bereiche
+mit, sonst spielte die Vorschau danach etwas anderes.
+
+## Grenzen
+
+| | |
 |---|---|
-| `Ctrl+N` | Neu (Dialog: Groesse + Anzahl Frames) |
-| `Ctrl+O` | Oeffnen (.png, .dhsprite) |
-| `Ctrl+S` / `Ctrl+Shift+S` | Speichern / Speichern unter |
-| `F5` | Von Disk neu laden (z.B. wenn Datei extern geaendert wurde) |
-| `Ctrl+W` | Schliessen |
+| Kantenlänge | 4 bis 256 Punkte |
+| Einzelbilder | 64 |
+| Ebenen | 8 |
+| Bereiche | 8 |
+| Rückgängig | 24 Schritte |
 
-**Datei-Formate:**
+Ein Bild einer Ebene entsteht erst, wenn es gebraucht wird — ein Sprite mit
+einem Bild belegt auch nur eines. Fest angelegt sind nur die Plätze des
+Verlaufs in Sprite-Größe; daran hängt die Grenze von 256 Punkten.
 
-- **`.png`** — Standard. Bei Multi-Frame wird ein horizontaler Sheet geschrieben.
-- **`.dhsprite`** — natives Format (JSON + base64-RGBA pro Frame). Erhaelt Frame-Dauern, Animation-Daten und **Ebenen** (Format-Version 5; pro Frame steht zusaetzlich immer das geflattete Composite als `data`, damit aeltere Leser weiterhin ein korrektes Bild sehen). Empfohlen fuer Work-in-Progress.
+## Dateien
 
-## Export-Optionen
+### `.dhsprite` — das eigene Format
 
-Vier Export-Pfade, je nach Use-Case. Alle Bild-Exporte (Sheet, Atlas, GIF,
-Einzel-Frame) fragen eine **Export-Skalierung** ab (1x/2x/4x/8x,
-Nearest-Neighbor — pixelart-treu ohne Weichzeichnen). Beim Atlas werden
-die Manifest-Rects mitskaliert, `ATLAS_LOAD` passt also weiterhin.
+**[Sichern]** schreibt zwei Dateien: die Beschreibung `name.dhsprite` (JSON)
+und daneben das Raster `name.dhsprite.png` — Spalten sind die Einzelbilder,
+Zeilen die Ebenen. Das PNG öffnet jeder Bildbetrachter; die JSON trägt
+Maße, Ebenennamen und Sichtbarkeit und, falls vorhanden, Bildnamen,
+Einzeldauern und Bereiche:
 
-### Sheet-PNG (`Ctrl+E`)
-
-Schreibt alle Frames als horizontaler Sheet in ein einziges PNG. Klassisch fuer `SPRITE_NEW`:
-
-```basic
-DIM hero AS IMAGE
-hero = LOADIMAGE("hero_sheet.png")
-DIM sp AS SPRITE
-sp = SPRITE_NEW(hero, 16, 16)          ' Frame-Groesse
-SPRITE_ADD_ANIM(sp, "idle", 0, 3, 8)   ' Frames 0..3 mit 8 fps
-SPRITE_PLAY(sp, "idle")
+```json
+{
+  "format": "dhsprite-gitter-1",
+  "bild": "held.dhsprite.png",
+  "breite": 16, "hoehe": 16, "bilder": 4,
+  "ebenen": [ { "name": "Ebene 1", "sichtbar": true } ],
+  "bildnamen": [ "stand", "", "", "" ],
+  "bilddauern": [ 400, 0, 0, 0 ],
+  "bereiche": [ { "name": "lauf", "von": 1, "bis": 3, "fps": 8 } ]
+}
 ```
 
-### Sprite-Atlas (`Ctrl+Shift+E`) — neu
+Die drei letzten Blöcke sind optional. Gesucht wird das Raster beim Laden
+**neben** der Beschreibung, nicht unter dem eingetragenen Namen — so bleibt
+ein verschobenes Paar zusammen.
 
-Schreibt **PNG + JSON-Manifest** gemeinsam. Das JSON beschreibt jedes Frame mit Namen + Rect. Sprite-Namen sind standardmaessig `<dateiname>_<index>` (also bei `tiles.png`: `tiles_0`, `tiles_1`, ...).
+Dateien der früheren Qt-Fassung (JSON mit base64-Pixeln) öffnet dieser Editor
+nicht.
 
-**Frame-Namen:** Rechtsklick auf ein Frame in der Frame-Liste → **Umbenennen...** vergibt einen eigenen Namen. Benannte Frames nutzen diesen Namen direkt als Sprite-ID im Atlas (statt `<dateiname>_<index>`) — `ATLAS_DRAW(atlas, "idle", x, y)` statt `"hero_0"`. Doppelte Namen werden beim Export eindeutig gemacht (Suffix `_<index>`). Der Name wird in `.dhsprite`-Dateien mitgespeichert (Format-Version 3; aeltere Dateien laden mit leerem Namen).
+### Öffnen
 
-In Drachenhauch dann:
+**[Oeffnen]** nimmt zweierlei, die Endung entscheidet: eine `.dhsprite` mit
+allen Ebenen, oder ein Streifen-PNG, neben dem seine Atlas-JSON liegt. Beim
+Streifen kommen die Bilder auf einer Ebene zurück — er **ist** das
+zusammengerechnete Bild; die Bildnamen kommen über die Atlas-Schlüssel mit.
+
+## Ausgaben
+
+| Knopf | Ergebnis |
+|---|---|
+| **[PNG]** | das aktuelle Einzelbild (sichtbare Ebenen) als PNG |
+| **[Streifen]** | alle Bilder nebeneinander als PNG, dazu die Atlas-JSON gleichen Namens |
+| **[GIF]** | bewegtes GIF mit Durchsichtigkeit; Bilder mit eigener Dauer behalten sie |
+| **[GB-Code]** | ein lauffähiges Programm `name.dh` samt Blatt `name.png` |
+| **[dhanim]** | die Bereiche als Zustandsmaschine `.dhanim` |
+
+### Streifen + Atlas
+
+Die JSON hat genau die Form, die `ATLAS_LOAD` liest — Schlüssel ist der
+Bildname, sonst `bild_<n>`; ein doppelter Name bekommt `_<n>` angehängt:
+
+```json
+{
+  "image": "held.png",
+  "sprites": {
+    "stand":  [0,  0, 16, 16],
+    "bild_1": [16, 0, 16, 16]
+  }
+}
+```
+
+Im Spiel:
 
 ```basic
+SCREEN(320, 200, "Atlas", 1)
 DIM atlas AS SPRITE_ATLAS
-atlas = ATLAS_LOAD("tiles.json")
-ATLAS_DRAW(atlas, "tiles_0", x, y)
-
-' Oder fuer viele Tiles -- BATCH_DRAW ist nur ein Zweitname fuer ATLAS_DRAW:
-ATLAS_DRAW(atlas, "tiles_3", x, y)
+atlas = ATLAS_LOAD("held.json")
+WHILE NOT QUITREQUESTED()
+    CLS(BLACK)
+    ATLAS_DRAW(atlas, "stand", 40, 40)
+    ATLAS_DRAW(atlas, "bild_1", 60, 40)
+    FLIP()
+WEND
 ```
 
-Vorteil ggue Sheet-PNG: **benannte Sub-Sprites** statt Index-Rechnerei -- `ATLAS_DRAW(atlas, "name", x, y)` statt selbst ausgerechneter Rechtecke. Workflow-Loop ist geschlossen — der Editor schreibt, was die Engine direkt lesen kann.
+### GB-Code
 
-### Benannte Animations-Bereiche (Panel „Animationen")
+**[GB-Code]** schreibt Programm und Blatt in einem Zug und unter demselben
+Namen — wer nur den Code hätte, hätte einen Verweis ins Leere. Das Programm
+lädt das Blatt mit `SPRITE_NEW`, legt je Bereich eine
+`SPRITE_ADD_ANIM`-Zeile an (ohne Bereiche eine `"idle"` über alle Bilder mit
+dem Tempo des Reglers) und spielt die erste.
 
-Im Dock **Animationen** (rechts, unter den Frames) definierst du benannte
-Frame-Bereiche — das Editor-Pendant zu `SPRITE_ADD_ANIM(name, first, last, fps)`:
+### dhanim
 
-- **+** legt einen Bereich an (vorausgefuellt mit dem aktuellen Frame),
-  **✎**/Doppelklick bearbeitet, **−** loescht. Der FPS-Wert laesst sich per
-  **„aus Frame-Dauern"** aus den echten Dauern des Bereichs vorschlagen.
-- Bereiche wandern beim Einfuegen/Loeschen von Frames automatisch mit
-  (leerlaufende Bereiche werden entfernt) und werden in `.dhsprite`
-  mitgespeichert (Format-Version 4, aeltere Dateien laden ohne Bereiche).
+**[dhanim]** schreibt je Bereich einen Zustand, der erste ist der
+Startzustand (ohne Bereiche einer `"idle"` über alles). Übergänge und
+Parameter bleiben leer — wann welcher Zustand in welchen wechselt, ist eine
+Aussage über das Spiel. Die Datei lädt `ANIM_FSM_LOAD` so, wie sie ist; die
+Übergänge ergänzt man im [Anim-FSM-Editor](anim-editor.md).
 
-Die Bereiche speisen drei Exporte:
+## Typische Wege
 
-1. **GB-Code kopieren**: erzeugt eine `SPRITE_ADD_ANIM`-Zeile **pro Bereich**
-   mit den echten FPS (ohne Bereiche: ein `"idle"` ueber alles, FPS aus den
-   Frame-Dauern statt einem hardcodierten Default).
-2. **Datei → Animations-FSM exportieren (.dhanim)**: schreibt eine direkt
-   `ANIM_FSM_LOAD`-ladbare Vorlage — ein State pro Bereich (`first`/`last`/
-   `fps`, erster Bereich = `default`). Transitions/Parameter ergaenzt du im
-   [dhanim-Editor](anim-editor.md).
-3. **Sprite-Test**: das Testprogramm spielt den ersten definierten Bereich.
+### Lauf-Zyklus mit gehaltener Pose
 
-### Animation-GIF (`Ctrl+G`)
+1. **[Neu]** in der Werkzeugleiste, 16×16.
+2. Bild 1 zeichnen, rechts dreimal **[Kopie]** und abwandeln; mit
+   **Zwiebelhaut** sieht man das vorige Bild darunter.
+3. Bild 1 eine **Dauer** von 400 ms geben, die übrigen folgen dem Tempo.
+4. Einen Bereich `lauf` von 2 bis 4 anlegen.
+5. **[Sichern]** als `.dhsprite` (Arbeitsstand), **[GB-Code]** für ein
+   Programm, das sofort läuft.
 
-Schreibt alle Frames als animiertes GIF mit transparentem Hintergrund. Fuer Vorschau, Doku, Itch-Page-Screenshots.
+### Kachelsatz
 
-Bei unterschiedlich langen Frames fragt der Dialog, ob die individuellen Dauern verwendet werden sollen oder eine einheitliche FPS gilt.
+1. 16×16, je Einzelbild eine Kachel, jede mit **[Name]** benannt.
+2. `T` für die Kachel-Ansicht — kachelt es ohne Naht?
+3. **[Streifen]** schreibt PNG und Atlas; im Spiel
+   `ATLAS_DRAW(atlas, "gras", x, y)`.
 
-### Frame als PNG
+## Was die frühere Qt-Fassung zusätzlich konnte
 
-Nur das aktuelle Frame als einzelnes PNG. Praktisch fuer Icons, einzelne Charakter-Sprites, Logos.
+- Export-Skalierung (1×–8×) für alle Bild-Ausgaben.
+- Sheet-Import eines beliebigen PNG mit Angabe der Bildgröße, Einsetzen eines
+  Bildes aus der System-Zwischenablage als neues Einzelbild.
+- Ebenen je Einzelbild mit Deckkraft, Umordnen und Zusammenführen.
+- Bild-Operationen auf der Bildliste: umkehren, Ping-Pong anhängen, auf das
+  aktuelle Bild reduzieren.
+- Farbe ersetzen, Palette aus dem Sprite übernehmen, einstellbare
+  Zwiebelhaut (Deckkraft, bis zu drei Bilder je Richtung), Dateibrowser.
 
-## Multi-Frame und Animation
+## Prüfung
 
-Der Editor unterstuetzt von Anfang an Multi-Frame-Animationen. Frames-Panel rechts zeigt alle Frames als Thumbnails; Klick wechselt.
-
-| Aktion | Wirkung |
-|---|---|
-| Neues Frame | leeres Frame nach dem aktuellen |
-| Frame duplizieren | Kopie nach dem aktuellen (Basis fuer Tweens) |
-| Als neues Frame einfuegen (`Ctrl+Shift+V`) | Zwischenablage-Inhalt als neues Frame nach dem aktuellen — interne Auswahl (`Ctrl+C`) bevorzugt, sonst ein Bild aus dem System-Clipboard (Aseprite/Browser/...). Auf Dokumentgroesse eingepasst |
-| Frame loeschen | aktuelles Frame raus (mind. 1 Frame bleibt) |
-| `F2`..`F9` | Frame N direkt anspringen |
-| `Ctrl+P` | Animation-Preview-Fenster (Live-Loop) |
-| Frames umkehren | Reihenfolge invertieren |
-| Ping-Pong (anfuegen) | aus `0,1,2,3` wird `0,1,2,3,2,1` (typisch fuer Walk-Cycles) |
-| Auf aktuelles Frame reduzieren | alle anderen Frames verwerfen |
-| Frames zusammenfuegen (Composite) | alle Frames uebereinander stempeln (Sandbox fuer Pixel-Art) |
-
-**Frame-Dauer** pro Frame einstellbar (Statusbar links). Fuer die Animation-Preview und den GIF-Export wird sie verwendet.
-
-## Ebenen (Layers)
-
-Jedes Frame hat einen **Ebenen-Stapel** (Dock "Ebenen", oben = oberste Ebene).
-Gezeichnet wird immer auf der **aktiven** Ebene; Canvas, Thumbnails und alle
-Exporte zeigen das **Composite** der sichtbaren Ebenen (unten → oben).
-
-- **+** neue leere Ebene ueber der aktiven, **⧉** duplizieren, **−** loeschen
-  (letzte Ebene bleibt), **▲/▼** verschieben, **⤓** Merge Down (aktive Ebene
-  mit ihrer Deckkraft auf die darunterliegende stempeln).
-- **Checkbox** = Sichtbarkeit, **Deckkraft-Slider** (0–100 %) wirkt auf die
-  aktive Ebene, **Doppelklick** = umbenennen.
-- Pixel-Undo (Strg+Z) trifft die Ebene, auf der gezeichnet wurde — auch nach
-  einem Ebenen-Wechsel. Ebenen-Struktur-Aenderungen (Neu/Loeschen/Verschieben/
-  Merge/Umbenennen) laufen ueber das Struktur-Undo.
-- Frame-weite Transformationen (Spiegeln, Rotieren, Crop, Resize) wirken auf
-  **alle** Ebenen; Auswahl-Operationen und Mal-Tools nur auf die aktive.
-- Ebenen persistieren in `.dhsprite` (v5). PNG/Sheet/GIF/Atlas exportieren
-  das geflattete Composite.
-
-## Onion-Skinning
-
-Toggle ueber Aktion "Onion-Skin". Im aktiven Zustand sind vorherige Frames blau, naechste rot durchscheinend hinter dem aktuellen — klassisches Pattern fuer Animation-Konsistenz (z.B. Walk-Cycle).
-
-**Einstellungen** (⚙ neben der Checkbox im Frames-Panel oder Menue Frame →
-"Onion-Skin-Einstellungen..."): **Deckkraft** (5–95 %) und **Frames je
-Richtung** (1–3; weiter entfernte Frames werden automatisch blasser).
-Aenderungen wirken live, Abbrechen stellt die alten Werte wieder her.
-
-## Symmetrie-Modus
-
-| Shortcut | Wirkung |
-|---|---|
-| `Ctrl+Shift+X` | X-Symmetrie (alles links wird auch rechts gemalt) |
-| `Ctrl+Shift+Y` | Y-Symmetrie (oben/unten gespiegelt) |
-
-Ideal fuer Charakter-Sprites, Symbole, Logos.
-
-## Tile-Preview
-
-**Taste T**: 3×3-Tiling-Preview daneben einblenden. Wichtig fuer Tilemap-Sprites — sieht das Tile gekachelt gut aus oder zeigt sich eine sichtbare Naht?
-
-## Palette
-
-| Aktion | Wirkung |
-|---|---|
-| Palette aus Sprite extrahieren | sammelt alle verwendeten Farben des Sprites in die Palette |
-| Palette laden (`.gpl`) | GIMP-kompatible Palette importieren (NES-/Gameboy-/PICO-8-Sets etc.) |
-| Palette speichern (`.gpl`) | aktuelle Palette als GPL exportieren |
-| Farbe ersetzen... | alle Pixel einer Farbe gegen eine andere tauschen (dialog) |
-
-## Canvas + Zoom
-
-| Aktion | Shortcut |
-|---|---|
-| Zoom + | `Ctrl++` |
-| Zoom - | `Ctrl+-` |
-| Zoom 100% | `Ctrl+0` |
-| Canvas-Groesse aendern... | Dialog mit Anker-Position |
-| Auf Inhalt zuschneiden | Crop auf Bounding-Box des sichtbaren Pixels |
-| Grid umschalten | Pixel-Grid an/aus |
-
-## Editier-Operationen
-
-| Aktion | Shortcut |
-|---|---|
-| Undo / Redo | `Ctrl+Z` / `Ctrl+Y` (oder `Ctrl+Shift+Z`) |
-| Ausschneiden / Kopieren / Einfuegen | `Ctrl+X` / `Ctrl+C` / `Ctrl+V` |
-| Als neues Frame einfuegen | `Ctrl+Shift+V` |
-| Auswahl loeschen | `Delete` |
-| Auswahl aufheben | `Escape` |
-| Horizontal spiegeln | `Ctrl+H` |
-| Vertikal spiegeln | `Ctrl+J` |
-| 90° rechts | `Ctrl+.` |
-| 90° links | `Ctrl+,` |
-| Frame leeren | — (Menue) |
-
-## Asset-Browser
-
-Linker Panel-Bereich. Zeigt alle Bilder/Sprites im Projekt-Verzeichnis. Doppelklick lädt eine Datei. Hilfreich fuer Sets von zusammenhaengenden Sprites (Player-Frames, Enemy-Pack).
-
-## Sheet-Import
-
-Datei → Oeffnen mit einem PNG, das ein bestehender Sheet ist: der Editor fragt nach Frame-Groesse (z.B. 16×16) und zerlegt es in Einzel-Frames. Praktisch fuer Sprites aus anderen Editors importieren (Aseprite, Piskel).
-
-## Test-Sprite
-
-Aktion "Test-Sprite" im Datei-Menue: oeffnet ein kleines natives dhrt-Fenster, das die Animation rendert (mit aktuellen Frame-Dauern). Schneller Sanity-Check, ob das Timing stimmt.
-
-## Code-Export
-
-Aktion "Code kopieren" liefert die `SPRITE_NEW`/`ADD_ANIM`/`PLAY`-Sequenz fuer den aktuellen Sprite in die Zwischenablage. Spart manuelle Tipparbeit beim Wechsel zum Code-Editor.
-
-## Typische Workflows
-
-### Charakter-Animation (4-Frame-Walk-Cycle)
-
-1. `Ctrl+N` neu, 16×16 mit 4 Frames
-2. Frame 0 zeichnen (idle), Frame 1 (step left), Frame 2 (idle), Frame 3 (step right)
-3. `Ctrl+P` zum Preview ansehen
-4. `Ctrl+E` als Sheet-PNG exportieren
-5. Im Spiel: `SPRITE_NEW(LOADIMAGE("hero.png"), 16, 16); SPRITE_ADD_ANIM(sp, "walk", 0, 3, 8)`
-
-### Tile-Set fuer Platformer
-
-1. `Ctrl+N` neu, 16×16 mit z.B. 8 Frames (= 8 verschiedene Tiles)
-2. Jedes Frame = ein Tile-Typ (Gras, Wasser, Stein, ...)
-3. `T` einschalten fuer Tile-Preview — sicherstellen dass die Tiles gut kacheln
-4. **`Ctrl+Shift+E` als Sprite-Atlas exportieren** (PNG + JSON)
-5. Im Spiel: `atlas = ATLAS_LOAD("tiles.json")` + `ATLAS_DRAW(atlas, "tiles_0", x, y)` fuer jedes Tile
-
-### Particle / Explosion-Sprite-Sheet
-
-1. 8 Frames mit explodierendem Effekt
-2. Onion-Skin einschalten, um sichtbare Vorlaeufer/Nachfolger zu sehen
-3. Frame-Dauer pro Frame anpassen (Beginn schnell, Ende langsam)
-4. `Ctrl+G` als GIF fuer Vorschau
-5. `Ctrl+E` als Sheet-PNG fuer Spiel
-
-### Schnelle Variationen via Color-Replace
-
-1. Basis-Sprite zeichnen
-2. `Ctrl+S` speichern (als `.dhsprite`)
-3. `Ctrl+Shift+S` als `enemy_blue.png`
-4. "Farbe ersetzen..." — rot durch blau ersetzen
-5. Wiederholen fuer gruen, gelb, ...
-
-## Eigene Klassen-Architektur (fuer Tests + Erweiterung)
-
-Falls du den Editor erweitern willst:
-
-| Datei | Inhalt |
-|---|---|
-| [`drachenhauch/spriteeditor_qt.py`](../drachenhauch/spriteeditor_qt.py) | UI-Schicht: SpriteEditorWindow, ColorPanel, FramesPanel, Canvas, Dialogs |
-| [`drachenhauch/spriteeditor/document.py`](../drachenhauch/spriteeditor/document.py) | Datenmodell: `SpriteDoc`, `Frame`. Save/Load (PNG, .dhsprite, GIF, Atlas) |
-| [`drachenhauch/spriteeditor/tools.py`](../drachenhauch/spriteeditor/tools.py) | Pixel-Tools (Pencil, Eraser, Bucket, Line, ...) |
-| [`drachenhauch/spriteeditor/tool_context.py`](../drachenhauch/spriteeditor/tool_context.py) | `ToolHost`-Protocol (welche app-Attribute die Tools brauchen) |
-| [`drachenhauch/spriteeditor/icons.py`](../drachenhauch/spriteeditor/icons.py) | Programmatisch gerenderte Toolbar-Icons (kein PNG-Asset noetig) |
-
-Tools-API ist klar dokumentiert (siehe `tools.py`-Header). Neue Tools: subclass von `Tool`, `name` setzen, `begin/move/end` implementieren, in `SpriteEditorWindow._setup_tools()` registrieren.
-
-Tests: [`tests/test_spriteeditor_document.py`](../tests/test_spriteeditor_document.py), [`tests/test_spriteeditor_tools.py`](../tests/test_spriteeditor_tools.py), [`tests/test_spriteeditor_tool_context.py`](../tests/test_spriteeditor_tool_context.py).
+Die Zusagen dieser Seite prüft [`tests/pruef/werkzeug_sprite.dhtest`](../tests/pruef/werkzeug_sprite.dhtest)
+mit echten Mauswegen über die Aufnahme-Wiedergabe: Auswahl, Lasso und
+Zauberstab, Verschieben, Paletten gegen einen fremden Leser, Statistik,
+Zuschneiden, Bereiche, GB-Code und `.dhanim` (gestartet bzw. von der Laufzeit
+geladen), Atlas-Schlüssel, Drehen und Spiegeln, Einzeldauern im GIF und die
+Grenzen von 64 Bildern und 8 Ebenen.

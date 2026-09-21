@@ -21,7 +21,7 @@ absichern.
       eingetragen ist.
 - [ ] Golden-Test in `tests/` ueber die `run_gb`-Fixture (kein Parity-Test
       mehr — es gibt nur noch einen Pfad, gegen den man vergleichen koennte).
-- [ ] Doku: `drachenhauch/editor_qt/builtin_docs.py` (Hover) +
+- [ ] Doku: drachenhauch/editor_qt/builtin_docs.py (Hover) +
       die VS-Code-Grammatik neu erzeugen (`dhrt doku grammatik`); `docs/` und
       README-Tabelle bei Bedarf.
 

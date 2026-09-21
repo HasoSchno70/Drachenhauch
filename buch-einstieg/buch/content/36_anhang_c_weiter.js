@@ -66,13 +66,13 @@ module.exports = (H) => {
   H.p("Zu Drachenhauch gehören ein paar Programme, die dieses Buch nicht gebraucht hat, weil es bei den Grundlagen blieb. Für das nächste Vorhaben lohnt sich ein Blick:"),
 
   H.table([
-    [{ text: "dhrun.py --editor", mono: true }, "die IDE: Farben im Quelltext, Vervollständigung, klickbare Fehlermeldungen"],
-    [{ text: "dhsprites", mono: true }, "Pixel-Editor für Sprites, exportiert PNG-Sheets und Animationen"],
+    [{ text: "Drachenhauch IDE", mono: true }, "die IDE: Farben im Quelltext, Vervollständigung, klickbare Fehlermeldungen"],
+    [{ text: "Werkzeuge → Sprite-Editor", mono: true }, "Pixel-Editor für Sprites, exportiert PNG-Sheets und Animationen"],
     [{ text: "dhrt --export", mono: true }, "aus einem Programm eine eigenständige Datei machen"],
     [{ text: "dhrt --check", mono: true }, "ein Programm prüfen, ohne es zu starten"],
   ], { headers: ["Werkzeug", "Wofür"], widths: [2600, 6426], mono: [0] }),
 
-  H.pmix(["Es gibt außerdem Editoren für Animationen, Partikel, Kachelkarten und Oberflächen. Sie stehen alle in der Dokumentation unter ", ["docs/", true], " — und keiner davon ist nötig, um ein Programm zu schreiben. Sie nehmen einem nur Fleißarbeit ab."]),
+  H.pmix(["Im selben Menü ", ["Werkzeuge", true], " der IDE findest du außerdem Editoren für Kachelkarten, Musik, Klangeffekte, Partikel, Animationen und Oberflächen. Beschrieben sind sie in der Dokumentation unter ", ["docs/", true], " — und keiner davon ist nötig, um ein Programm zu schreiben. Sie nehmen einem nur Fleißarbeit ab."]),
 
   H.h2("Der wichtigste Schritt"),
 

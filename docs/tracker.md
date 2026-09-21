@@ -1,116 +1,241 @@
-# Tracker (Musik-Editor)
+# Tracker (Musik-Editor, `examples/190_tracker.dh`)
 
-Mehrspuriger Tracker zum Komponieren von Melodien/Musik — **einstellbare Kanalzahl** (4–32 über die `Kanäle:`-Spinbox, je eigene Wellenform **oder Sample-Instrument**; der LETZTE Kanal ist immer der Noise-/Drum-Kanal), mit **mehreren Patterns einstellbarer Länge** und **Song-Arrangement**. Über die reinen Chiptune-Wellenformen hinaus lassen sich **gesampelte Instrumente** (WAV/OGG) laden und über die Klaviatur spielen (Resampling). Komplementär zum [SFX-Generator](sfx-generator.md) (der einzelne Effekte macht).
+Ein mehrspuriger Tracker zum Komponieren von Musik — geschrieben in
+Drachenhauch selbst, auf dem `gui`-Modul. Er ist das Gegenstück zum
+früheren Qt-Werkzeug `dhtracker`, das mit dem Python-Teil des Projekts
+entfallen ist, und liest und schreibt **dasselbe Song-JSON** wie dieses
+(unten). Komplementär dazu macht der [SFX-Generator](sfx-generator.md)
+einzelne Geräusche.
 
-Der Tracker ist ein **Tab im [Audio Studio](#audio-studio)** (`dhsound`), das ihn mit dem SFX-Generator unter einem fullscreen Fenster vereint.
+Er hat Patterns (1–64 Reihen) über 4–32 Kanäle, der **letzte Kanal ist
+immer der Schlagzeugkanal**; eine Reihenfolge (Order) daraus; 18 fertige
+Instrumente mit Hüllkurve, Vibrato und Detune, alle änderbar; je Note
+Lautstärke, Portamento, Effekt und ein eigenes Instrument; Blockauswahl mit
+Kopieren, Transponieren und Interpolieren; Stumm/Solo und Mixer-Regler je
+Kanal; Rückgängig über den ganzen Song; die Ausgabe als WAV und als GB-Code.
 
 ## Starten
 
-Am bequemsten als Tab im **Audio Studio**: `dhsound` (oder `dhrun.py --audio`) — fullscreen, Tracker + SFX-Generator zusammen.
+In der IDE (`ide/ide.dh`) unter **Werkzeuge → Tracker** (auch über die
+Befehlspalette, „Werkzeug: Tracker"). Das startet ihn als eigenes Programm.
 
-Auch einzeln: aus dem **Code-Editor** Toolbar-Button (Noten-Symbol) oder `Datei → Tracker (Musik) öffnen ...` (`Strg+Shift+L`); standalone `dhtracker` oder `dhrun.py --tracker` (öffnen jetzt ebenfalls das Audio Studio auf dem Tracker-Tab). Braucht `PySide6` + `numpy`.
+Von der Kommandozeile:
+
+```
+dhrt run examples/190_tracker.dh                   # leerer Song
+dhrt run examples/190_tracker.dh -- song.json      # gleich mit einer Datei
+```
+
+Ein relativer Dateiname meint den Ordner, in dem man beim Aufruf stand
+(`DHRT_START_DIR`), nicht den der Quelle. So öffnet auch das
+[Notenblatt](score-editor.md) über **[In Tracker öffnen]** den Tracker mit
+dem eben umgerechneten Stück.
+
+## Das Fenster
+
+Oben zwei Werkzeugleisten, links die Spalte für den Kanal unter dem Cursor,
+das Instrument dieses Kanals und die Reihenfolge, rechts das **Gitter**
+(Reihen von oben nach unten, je Kanal eine Spalte in eigener Farbe), unten
+die **Klaviatur**, ganz unten die Statuszeile (ein `*` heißt: ungesichert).
+
+| Bereich | Was es gibt |
+|---|---|
+| Leiste 1 | [Neu], [Oeffnen], [Sichern], [Sichern als], **BPM**, **Kanäle** (4–32), [> Pattern], [> Song], [Stopp], [Zurueck], [Vor], [WAV ...] mit den Kästchen **Stereo** und **Amiga**, [GB-Code] |
+| Leiste 2 | Pattern-Auswahl, **Reihen** (1–64), [+] neues Pattern, [Dup] kopieren, [Loesch], [Leeren], **Oktave** der Tastatur, dann die Felder der Zelle unter dem Cursor: **Vol** (1–15, 0 = Standard), **Slide** (−12…+12 Halbtöne), **FX** mit Parameter (0–255), **Instrument** der Note, [Note aus] |
+| Kanal | Standard-Instrument des Kanals (oder nackte Wellenform `square`/`saw`/`sine`/`triangle`), **M** stumm, **S** solo, Mixer-Regler 0–100 % |
+| Instrument | Wellenform (dazu `noise`), Lautstärke 1–15, Attack/Decay/Sustain/Release, Vibrato (Tiefe %, Hz), Detune in Cent, Pan; [+ Instrument] legt eine Kopie des gezeigten an, [Entfernen] entfernt es — Kanäle und Noten, die auf die Instrumente dahinter zeigen, rücken mit |
+| Song (Reihenfolge) | Liste der Patterns in Abspielfolge; ein Klick zeigt das Pattern im Gitter. [+ akt.] hängt das gezeigte an, [entf.] entfernt, [<]/[>] verschieben |
+
+Ein Pattern trägt seinen Namen aus der Datei (neue heißen `P1`, `P2` …);
+umbenennen lässt es sich hier nicht.
 
 ## Bedienung
 
-Das Fenster ist im **Renoise-Stil** aufgeteilt: links ein **Instrument-Panel** (Spur-Sounds + Bibliothek), rechts die Pattern-Steuerung über dem **Gitter**, unten Song-Arrangement + Klaviatur.
+Ein Klick ins Gitter setzt den Cursor, Ziehen oder Umschalt+Klick wählt
+einen Block; das Mausrad rollt die Reihen, mit Umschalt die Kanäle. Solange
+kein Bedienelement den Fokus hat, gehören die Tasten dem Gitter:
 
-- **Kanäle** — die `Kanäle:`-Spinbox neben dem BPM-Feld ändert die Kanalzahl des ganzen Songs (4–32). Bestehende Noten/Zuweisungen bleiben beim Vergrößern erhalten, neue Kanäle kommen leer dazu; der **letzte** Kanal bleibt immer Drum/Noise, unabhängig von der Gesamtzahl.
-- **Pattern-Gitter** — Reihen `00`…`N` (Zeit, von oben nach unten) × `Ch1`…`Ch(n-1)` (Töne) + `Drum` (Noise, letzte Spalte). **Jeder Kanal hat seine eigene Akzentfarbe** (Spalten-Header, Notentext, Lautstärke-Regler, VU-Meter — zyklisch aus der Theme-Palette), damit sich viele Kanäle auf einen Blick unterscheiden lassen. Drum-Hits bleiben immer magenta, Note-Off gedämpft-grau; Lautstärke-Suffix `v…` mint, Slide `s…` amber, Effekt (`Arp…` etc.) magenta. Jede 4. Reihe ist leicht, jede 16. stärker hinterlegt (Beat-Raster), die laufende Wiedergabe-Reihe wird betont.
-- **Note setzen:** Zelle anklicken (auswählen), dann auf der **Klaviatur** unten eine Taste klicken → die Note (z. B. `C4`) landet in der Zelle, der Cursor springt eine Reihe weiter. `Entf`/`Rücktaste` löscht die Zelle (bei markiertem Block: alle markierten Zellen). Die Klaviatur spielt auch einzelne Töne zum Vorhören; **Oktave** wählt den Bereich.
-- **Block-Auswahl** (Shift-Klick/Ziehen über mehrere Zellen) für Mehrfach-Operationen:
-  - **`Strg+C`/`Strg+X`/`Strg+V`** — Kopieren/Ausschneiden/Einfügen eines rechteckigen Zellen-Blocks (Note+Lautstärke+Slide+Effekt), Einfügen an der aktuellen Auswahlposition (am Pattern-Rand geclippt).
-  - **`Strg+Pfeil hoch/runter`** (+ `Shift` = Oktave) — transponiert alle Noten im markierten Block um ±1 (bzw. ±12) Halbtöne; der Drum-Kanal bleibt dabei unangetastet.
-  - **`Strg+I`** — interpoliert je Kanal linear zwischen der ersten und letzten gesetzten Note im markierten Bereich (klassisches Tracker-Werkzeug für Glissandi/Tonhöhen-Übergänge, z. B. für ein Portamento über mehrere Reihen).
-- **Mute / Solo** — jede Kanalzeile im linken Panel hat einen **`M`**- (stumm) und **`S`**-Knopf (solo). Solo lässt nur die Solo-Spuren klingen, `M` schlägt Solo. Wirkt beim **Vorhören/Playback** (der WAV-Render mischt weiterhin alle Spuren) — praktisch, um beim Komponieren einzelne Spuren isoliert zu hören.
-- **Kanal-Lautstärke (Mixer-Fader)** — unter jeder Kanalzeile ein echter **Schieberegler** (0–100 %, in der Kanalfarbe), wie der Lautstärke-Fader in Renoise/FastTracker/OpenMPT. Separat von der Noten-Lautstärke (`Vol`-Spalte) und vom Instrument-Volume — wirkt als Mixer-Multiplikator im Vorhören, im **WAV-Render** UND im **GB-Code-Export**. Bleibt er auf 100 %, wird nichts in die Projektdatei geschrieben (abwärtskompatibel).
-- **VU-Meter** — unter jeder Kanalzeile leuchtet während der Wiedergabe ein dünner Pegel-Balken auf (Peak der gespielten Note, klingt sanft ab) — du siehst auf einen Blick, welche Spur gerade spielt.
-- **Spur-Sounds (Standard-Klang pro Spur)** — der Abschnitt **`Spur-Sounds`** im linken Panel hat für jeden Kanal (`Ch1`…`Ch(n-1)`/`Drum`, scrollbar bei vielen Kanälen) ein **Dropdown mit fertigen Instrumenten**: Flügel, E-Piano, Orgel, Streicher, Synth-Pad, Bass, Lead, Glocke, Marimba, Chip-Sounds … und Drum-Sounds (Kick/Snare/HiHat/Tom). Einfach pro Spur einen Sound wählen — kein WAV-Suchen nötig. Out of the box ist schon je Kanal ein sinnvoller Klang gesetzt (Flügel / Streicher / Bass / Kick, weitere Kanäle: Standard-Wellenform). Das ist der **Standard**, wenn eine Note nichts anderes sagt — siehe „Instrument pro Note" unten für das Überschreiben einzelner Noten.
-- **Instrument pro Note** (`Instr:`-Dropdown in der Werkzeugleiste) — wie bei echten Trackern (ProTracker/FastTracker/Impulse Tracker/Renoise) ist ein Kanal nur ein Stimmen-Slot: **jede einzelne Note kann ihr eigenes Instrument tragen**, unabhängig vom Spur-Standard. Zelle mit Note auswählen, im `Instr:`-Dropdown ein Instrument wählen — die Zelle zeigt dann ein `i2`-Tag (Instrument-Index). `—` setzt die Note zurück auf den Spur-Standard. Praktisch für z. B. ein Fill mit einem anderen Drum-Sample auf demselben Kanal, ohne die ganze Spur umzustellen. Wirkt im Vorhören und im **WAV-Render** (inkl. Pan pro Note); der **Live-GB-Code-Export** ignoriert das Überschreiben (er kennt pro Kanal nur eine feste Synth-Wellenform, wie bei Sample-Kanälen) — für Multi-Instrument-Songs also den Audio-Export nehmen.
-- **Notenlänge:** Eine Note klingt so lange, **bis die nächste Note derselben Spur kommt** (bzw. bis zum Pattern-Ende). Haltende Instrumente (Orgel/Streicher) klingen durch, perkussive (Piano/Glocke) klingen natürlich aus — du steuerst die Länge über den Abstand der Noten im Gitter.
-- **Note-Off** (Taste `0` oder Button „◼ Note Aus") — schneidet eine klingende Note **gezielt vor** der nächsten Note ab, statt sie automatisch bis dahin durchklingen zu lassen (klassisches Tracker-Konzept, „Key Off" bei XM/IT). Zelle in der Zeile zeigt `OFF`. Wirkt im **WAV-Render** als echte Sustain-Grenze; im Live-GB-Export (der ohnehin kein Sustain über Reihen hinweg kennt) wie eine leere Zelle.
-- **Eigene Instrumente** (Abschnitt **`Bibliothek`** im linken Panel) — über die Presets hinaus kannst du **eigene Samples** laden (`+ Sample (WAV)...` — WAV/OGG wird über die Klaviatur resampelt, MOD/XM/IT-Stil) oder ein **Keymap** bauen (`+ Keymap...`). Geladene Instrumente erscheinen in den Spur-Sound-Dropdowns und werden im Projekt (`.json`) eingebettet (self-contained).
-- **SoundFont laden** (`+ SoundFont (.sf2)...`) — **echte Instrumente aus SoundFont-Dateien** (General MIDI oder Hersteller-Sounds): wähle eine `.sf2`-Datei, dann im Such-Dialog ein Preset (z. B. „Acoustic Grand Piano", „Strings", „Bass"). Der SoundFont-Reader baut daraus ein **Keymap-Instrument** (Multisample mit Tasten-Zonen, Grundton und Loop genau wie im SoundFont) — sofort über die ganze Tastatur spielbar und im WAV-Render dabei. So bekommst du Hunderte realistische Klänge ohne eigenes Sampling. (Pure-Python-Reader, keine externe Abhängigkeit; Velocity-Layer/Modulatoren werden vereinfacht, Stereo-Samples als Mono.)
-- **Keymap-Instrument** (`+ Keymap...`) — **verschiedene Samples über die Klaviatur verteilen** (Multisampling / Drumkit). Im Dialog fügst du per `Sample hinzufügen...` mehrere WAVs hinzu; jedes bildet eine **Zone** mit einem Tastenbereich (`Lo`–`Hi`) und einem **Root** (die Taste, bei der es unverschoben klingt). Spielst du eine Note, wählt das Instrument die passende Zone und resampelt ihr Sample relativ zum Root.
-  - **Multisample:** ein Instrument an mehreren Tönen aufgenommen (z. B. Klavier-C2/C3/C4), jede Aufnahme deckt einen Bereich ab → weniger Resampling-Artefakte, realistischer.
-  - **Drumkit:** `Auto-Drumkit (ab C2)` legt jedem Sample **genau eine Taste** zu (Root == diese Taste → kein Pitch-Shift) — Kick, Snare, HiHat … je eine Note. So spielst du ein Schlagzeug aus dem Pattern-Gitter.
-  - Keymap-Instrumente erscheinen mit `▦` in der Liste, werden wie andere Instrumente einem Kanal zugewiesen und sind im Vorhören, Pattern-Playback und **WAV-Render** voll dabei. `Bearbeiten...` (siehe unten) setzt ADSR auch für Keymaps.
-- **Instrument bearbeiten** (`Bearbeiten...`) — Dialog für das gewählte Sample-Instrument:
-  - **Grundton** (MIDI) — die Note, bei der das Sample 1:1 (unverschoben) klingt. Stimmt das Sample richtig ein.
-  - **Loop** (`none`/`forward`/`pingpong` + Start/Ende in Samples) — lässt ein kurzes Sample **endlos sustainen**: beim Erreichen des Loop-Endes springt die Wiedergabe zum Loop-Start zurück (`forward`) bzw. läuft im Zickzack (`pingpong`). Ohne Loop verstummt das Sample nach einmaligem Durchlauf. Eine **Wellenform-Ansicht** zeigt das Sample mit zwei ziehbaren Markern (grün = Start, rot = Ende) — per Maus direkt auf der Wellenform setzen, bidirektional mit den Start-/Ende-Spinboxen synchron.
-  - **ADSR-Hüllkurve** (Attack/Decay/Sustain/Release) — formt die Lautstärke über die Notendauer (weiches Ein-/Ausblenden, Sustain-Pegel). Ein kurzer Anti-Click-Fade am Ende ist immer aktiv.
-  - **Pan** (Schieberegler L … Mitte … R) — Stereo-Position des Instruments für den WAV-Render; Label zeigt „L 40 %"/„Mitte"/„R 70 %" live an.
-- **Audio rendern** (`Audio (WAV)...`) — **der Weg, Sample-Songs ins Spiel zu bringen:** der ganze Song wird offline zu einer WAV gemischt (alle Kanäle gleichzeitig, mit Resampling, Loop, ADSR, Noten-Lautstärke, **Pitch-Slide und Effekt-Spalte**). Eine Note klingt bis zur nächsten Note desselben Kanals (Sustain über leere Reihen). Vor dem Render fragt ein Dialog **Stereo** (wertet den Instrument-Pan aus) und **Amiga-Hard-Panning** (Kanal 1+4 links, 2+3 rechts — der klassische Paula-Stereoeindruck; bei mehr als 4 Kanälen wiederholt sich das Muster) ab. Im Spiel dann einfach `PLAYMUSIC("song.wav")` — völlig unabhängig von den Engine-Audio-Grenzen (das Mischen passiert im Editor in numpy). Ideal für fertige Spielmusik mit echten Samples.
-  - *Hinweis:* Der `GB-Code`-Export erzeugt weiterhin den **Live-Synth-Player** (Chiptune, zur Laufzeit, inkl. Lautstärke + Slide via `AUDIO_SFX`) und kann Sample-Kanäle und die Effekt-Spalte (Arp/Vib/Ret/Off) nicht direkt; für Sample-Songs und Effekte nimmt man den **Audio-Export**.
-- **Effekt-Spalten pro Note:** Zelle mit Note auswählen, dann:
-  - **`Vol`** (1–15, `–` = Standard) — Lautstärke; Suffix `v9` in der Zelle, wirkt auf Amplitude (Vorhören + Player).
-  - **`Slide`** (−12…+12 Halbtöne, 0 = kein Slide; nur Ton-Kanäle) — **Pitch-Slide/Portamento**: die Note gleitet über die Reihen-Dauer um die angegebenen Halbtöne nach oben/unten. Suffix `s+2`/`s-3` in der Zelle. Im WAV-Render gilt der Slide für **alle** Instrumente (Synth + Sample/Keymap); im GB-Code-Export werden Slide-Noten als `AUDIO_SFX` (vorberechneter Hz/s-Bend) gerendert, ohne Slide bleibt `AUDIO_TONE`.
-  - **`FX`** + **Parameter** — klassische Tracker-Effekte (wirken im **WAV-Render**, instrument-unabhängig):
-    - **`Arp`** (Arpeggio) — Parameter als zwei Hex-Nibbles `xy`: die Note springt im Tick-Takt zwischen Grundton, +`x` und +`y` Halbtönen (z. B. `71` = `0x47` → Dur-Akkord +4/+7). Der typische C64-Akkord aus einem Kanal.
-    - **`Vib`** (Vibrato) — `xy`: Speed `x` (Hz), Tiefe `y` (·0,125 Halbtöne); die Tonhöhe pendelt sinusförmig.
-    - **`Ret`** (Retrigger) — schlägt den Notenkopf alle *Parameter* Ticks neu an (Stotter-/Roll-Effekt).
-    - **`Off`** (Sample-Offset) — startet das Sample `Parameter`·512 Frames später.
-    - Anzeige in der Zelle als Suffix, z. B. `Arp47`.
-  - Eine Note zu löschen entfernt auch ihre Effekte.
-- **BPM** stellt das Tempo (16tel-Schritte).
-- **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Änderungen rückgängig bzw. wieder her — Noten, Pattern-/Order-Operationen, BPM, Wellenform. `Neu`/`Öffnen` verwerfen die Historie.
+| Taste | Wirkung |
+|---|---|
+| Pfeile, Bild auf/ab, Pos1/Ende | Cursor bewegen (Bild: 16 Reihen); mit Umschalt einen Block wählen |
+| `Z S X D C V G B H N J M` | Noten der unteren Oktave (die Lage der US-Tastatur — auf einer deutschen liegt das Z auf dem Y) |
+| `Q 2 W 3 E R 5 T 6 Y 7 U` | Noten der Oktave darüber |
+| `0` | Note aus (Key Off, `OFF` in der Zelle) |
+| Entf, Rücktaste | Zelle bzw. markierten Block löschen — samt ihren Effekten |
+| Strg+C / Strg+X / Strg+V | Block kopieren / ausschneiden / an der Cursorstelle einfügen |
+| Strg+Pfeil hoch/runter | Block um einen Halbton transponieren, mit Umschalt um eine Oktave; der Schlagzeugkanal bleibt |
+| Strg+I | je Kanal zwischen erster und letzter Note des Blocks interpolieren |
+| Strg+Z / Strg+Y | zurück / vor |
+| Strg+S / Strg+O | sichern / öffnen |
+| Leertaste | das Pattern abspielen, noch einmal: anhalten |
+| ESC | beenden |
 
-### Patterns
+Eine gesetzte Note klingt kurz zum Vorhören an, und der Cursor rückt eine
+Reihe weiter — so tippt man eine Melodie ohne Pfeiltaste. Die Klaviatur
+unten setzt Noten auch mit der Maus.
 
-- **Pattern**-Auswahl (Combo) wechselt das angezeigte Pattern. **Reihen** stellt die Länge des aktuellen Patterns ein (1–64; bestehende Noten oben bleiben erhalten).
-- **+ Pattern** legt ein neues an, **Duplizieren** kopiert das aktuelle, **Löschen** entfernt es (mind. eines bleibt). **Leeren** setzt nur das aktuelle Pattern zurück.
+Eine Note klingt, **bis auf ihrem Kanal die nächste Note oder ein `OFF`
+kommt**; im Song-Modus auch über das Pattern-Ende hinweg ins nächste
+Pattern der Reihenfolge. Die Länge steuert man also über den Abstand im
+Gitter.
 
-### Song-Arrangement (Order)
+Die Felder der Zelle (Vol, Slide, FX, Instrument) wirken nur, wo eine Note
+steht; Slide nicht auf dem Schlagzeugkanal. Die Effekte:
 
-Die **Song**-Leiste unten ist die Abspiel-Reihenfolge der Patterns — ein Pattern darf mehrfach vorkommen (z. B. `Intro → Vers → Vers → Refrain`).
+| FX | Parameter | Wirkung |
+|---|---|---|
+| `Arp` | zwei Hex-Stellen `xy` | Grundton, +x und +y Halbtöne im Tick-Takt (der C64-Akkord) |
+| `Vib` | `xy` | Vibrato mit x Hz und y Achtel-Halbtönen Tiefe |
+| `Ret` | Ticks | schlägt die Note alle n Ticks neu an |
+| `Off` | — | wird gelesen und gesichert, spielt hier aber nichts (Sample-Offset braucht Samples) |
 
-- **+ akt.** hängt das aktuelle Pattern hinten an, **entf.** entfernt den ausgewählten Eintrag, **◀**/**▶** verschieben ihn. **Doppelklick** auf einen Eintrag öffnet dessen Pattern im Gitter.
+**Rückgängig** merkt sich den ganzen Song als Text, 32 Stände — Noten,
+Patterns, Reihenfolge, Tempo und Instrumente, ohne eigene Buchführung je
+Änderungsart. Ein Zug an einem Regler ist dabei EIN Schritt, nicht einer je
+Bild; der Cursor bleibt beim Zurücknehmen stehen.
 
-### Abspielen
+**Stumm und Solo** wirken beim Abspielen und Vorhören; die WAV mischt immer
+alle Kanäle.
 
-- **▶ Pattern** spielt das aktuelle Pattern in Schleife.
-- **▶ Song** spielt die ganze Order ab; das Gitter folgt automatisch dem laufenden Pattern, die aktuelle Reihe ist markiert.
+## Wiedergabe
 
-### Speichern / Laden
+[> Pattern] spielt das gezeigte Pattern in Schleife, [> Song] die
+Reihenfolge; im Song-Modus folgt das Gitter dem laufenden Pattern, die
+klingende Reihe ist markiert.
 
-**Neu** / **Öffnen** / **Speichern** verwalten das Projekt als `.json` (Tempo, Wellenformen, alle Patterns, Order). Eigenes Editor-Format — nicht zu verwechseln mit dem GB-Code-Export.
+Die Noten laufen auf einer **Audio-Uhr** (`AUDIO_CLOCK_NEW` +
+`AUDIO_PLAY_AT`), zwei Reihen voraus geplant — samplegenau vom
+Audio-Faden gestartet, nicht bildgetrieben: ein Bild sind 16 ms, und das
+hörte man bei Sechzehnteln. Eine Reihe hat 6 Ticks (das Raster für
+Arpeggio und Retrigger). Gestoppt wird, indem die Uhr **entfernt** wird,
+nicht angehalten: ein Klang, der auf eine Uhr wartet, die es nicht mehr
+gibt, startet nie — angehalten käme er beim nächsten Start als Geisternote
+an anderer Stelle wieder. Ein Tempowechsel während der Wiedergabe stellt
+die Uhr sofort um.
 
-## Export (GB-Code)
+Gespielt wird jede Note als `AUDIO_NOTE` (Hüllkurve mit Sustain-Pegel,
+Release hängt hinten an, Detune, Portamento); ohne Instrument klingt die
+nackte Wellenform des Kanals, auf dem Schlagzeugkanal ein kurzes Rauschen.
 
-`GB-Code` erzeugt einen **frame-basierten Player**. Die Order wird zu einer flachen Timeline expandiert (wiederholte Patterns werden dupliziert), die Noten landen als `INTEGER`-Arrays pro Kanal, plus zwei SUBs (`TRACKER_PLAY_ROW`, `TRACKER_UPDATE`). Hat ein Kanal Noten mit gesetzter **Lautstärke**, kommt eine `trkV<n>`-Spur + ein `TRACKER_AMP`-Helfer dazu (Amplitude in Prozent, 0 = Standard 0.5); mit **Slide** kommt eine `trkSl<n>`-Spur dazu (Hz/s, der Player nutzt dann `AUDIO_SFX` statt `AUDIO_TONE`). Ohne Effekte bleibt der Player unverändert schlank. Im Game-Loop rufst du:
+## WAV
 
-```basic
+[WAV ...] mischt den ganzen Song offline zu einer Datei — über **dieselbe
+Routine** wie die Wiedergabe, nur ist das Ziel ein Misch-Puffer
+(`AUDIO_SOUND_NEW` + `AUDIO_SOUND_MIX`) statt der Uhr; sonst klänge die
+Datei anders als das, was man hört. Danach wird normalisiert
+(`AUDIO_SOUND_NORMALIZE`, die Statuszeile nennt den Faktor) und mit
+`AUDIO_SAVE_WAV` geschrieben.
+
+- **Stereo** wertet den Pan der Instrumente aus; ohne das Kästchen bleibt
+  die WAV einkanalig.
+- **Amiga** legt dazu die Kanäle wie Paula: 1 und 4 links, 2 und 3 rechts
+  (bei mehr Kanälen wiederholt sich das Muster), nicht ganz hart.
+
+Im Spiel dann `PLAYMUSIC("song.wav")`.
+
+## GB-Code
+
+[GB-Code] schreibt einen **bildgetriebenen Live-Player** als `.dh`-Datei,
+wie der Export der Qt-Fassung: die Reihenfolge wird zu einer Zeitachse
+(wiederholte Patterns werden dupliziert), je Kanal ein Feld `trk<n>` mit den
+Frequenzen, dazu `TRACKER_PLAY_ROW` und `TRACKER_UPDATE`. Hat ein Kanal
+Noten mit Lautstärke, kommt eine Spur `trkV<n>` und der Helfer
+`TRACKER_AMP` dazu; mit Slide eine Spur `trkSl<n>` (Hz/s), die Note spielt
+dann über `AUDIO_SFX` statt `AUDIO_TONE`. Der Mixer-Regler eines Kanals geht
+mit in die Lautstärke, der Schlagzeugkanal spielt `AUDIO_NOISE`.
+
+Die Datei importiert sich selbst `audio`; im eigenen Programm bindet man
+sie mit `IMPORT "song.dh"` ein und ruft im Game-Loop:
+
+```
 TRACKER_UPDATE(DELTA() * 1000.0)
 ```
 
-Das spielt den Song non-blocking ab (advanced über die Zeit, nutzt `AUDIO_TONE`/`AUDIO_NOISE` + `PLAYSOUND`). Läuft über die native Runtime `dhrt`.
+Der Player kennt je Kanal **eine** Wellenform (die des Kanal-Instruments)
+und spielt jede Note genau eine Reihe lang. Hüllkurven, Instrumente je
+Note und die FX-Spalte kann er nicht — für fertige Musik ist die WAV der
+Weg.
 
-Das Datenmodell + I/O + Export liegen Qt-frei in `drachenhauch/tracker/song.py`, die **Sample-Instrumente** (Laden/Resampling/Serialisierung) in `drachenhauch/tracker/instrument.py`, der **Mixer/Render** in `drachenhauch/tracker/mixer.py` (headless getestet: `tests/test_tracker_song.py`, `tests/test_tracker_instrument.py`, `tests/test_tracker_mixer.py`).
+## Dateiformat
 
-## Der Tracker in Drachenhauch selbst
+Ein Song ist eine JSON-Datei (`format: "dhtracker-song"`), dieselbe wie die
+der Qt-Fassung, in beide Richtungen. Der Tracker schreibt sie eingerückt
+mit `JSON_PRETTY`.
 
-Denselben Tracker gibt es ein zweites Mal — als Drachenhauch-Programm
-[`examples/190_tracker.dh`](../examples/190_tracker.dh), auf dem `gui`-Modul
-geschrieben (in der IDE unter `Datei → Werkzeuge in Drachenhauch`). Er liest
-und schreibt **dasselbe `dhtracker-song`-JSON** wie dieses Werkzeug, in beide
-Richtungen: eine hier gebaute Datei öffnet dort, und umgekehrt. Er hat
-Patterns und Reihenfolge, 4..32 Kanäle, die 18 Instrument-Presets (dort im
-Kasten änderbar), Lautstärke/Slide/Effekt/Instrument je Note, Blockauswahl
-mit Kopieren/Transponieren/Interpolieren, Stumm/Solo, Rückgängig über den
-ganzen Song, die WAV-Mischung (Stereo/Amiga-Pan) und den GB-Code-Export.
-Anders als hier läuft die Wiedergabe auf einer **Audio-Uhr** (`AUDIO_CLOCK`)
-samplegenau statt über einen Timer. **Nicht** dabei: Sample-Instrumente,
-Keymaps und SoundFonts (alles, was eingebettete PCM-Daten braucht), VU-Meter,
-Pattern-Namen, der Sample-Offset-Effekt. Ein Sample- oder Keymap-Instrument
-aus einer Datei dieses Werkzeugs bleibt dort als **stummer Platzhalter**
-stehen (die Liste sagt „hier stumm") und wird beim Sichern **unverändert
-zurückgeschrieben** -- nur Name, Lautstärke, Pan und Hüllkurve lassen sich
-daran ändern. Bis 2026-09-17 schrieb er es als Synth-Instrument zurück, und
-die eingebetteten Samples waren nach einem Sichern weg.
+| Schlüssel | Inhalt |
+|---|---|
+| `format`, `version` | `"dhtracker-song"`, `1` |
+| `bpm` | Tempo (gelesen wird 40–300) |
+| `channels` | Kanalzahl, der letzte ist das Schlagzeug |
+| `waves` | Wellenform je Tonkanal (ohne den Schlagzeugkanal) |
+| `patterns` | Liste; je Pattern `name`, `rows`, `channels` und die Gitter `data`, `vol`, `slide`, `fx`, `fxp`, `inst` — je Kanal eine Liste mit einem Wert je Reihe, `null` = leer |
+| `order` | Pattern-Nummern in Abspielfolge |
+| `channel_vol` | Mixer-Regler 0.0–1.0 je Kanal; nur, wenn einer nicht auf 1.0 steht |
+| `instruments` | Liste; ein Synth-Instrument mit `name`, `kind: "synth"`, `default_vol`, `pan`, `waveform`, `env_attack_ms`/`env_decay_ms`/`env_sustain`/`env_release_ms`, `vib_depth`, `vib_speed`, `detune_cents` (dazu `loop_mode`/`loop_start`/`loop_end` für die Qt-Fassung) |
+| `channel_inst` | Standard-Instrument je Kanal, `null` = nackte Wellenform |
+
+Die Werte in `data` sind MIDI-Noten (0–127), `-1` ist Note aus. `vol` ist
+1–15, `slide` −12…12, `fx` 1 = Arp, 2 = Vib, 3 = Ret, 4 = Off, `fxp` 0–255,
+`inst` die Nummer in `instruments`. Die Gitter `vol`, `slide`, `fx`/`fxp`
+und `inst` stehen nur in der Datei, wenn das Pattern dort etwas hat.
+Beim Lesen fehlt nichts, was fehlen darf: ein unbekannter Wert wird
+übergangen, eine Instrument-Nummer ohne Instrument dahinter zurückgesetzt.
+
+**Sample-, Keymap- und SoundFont-Instrumente** der Qt-Fassung (eine
+SoundFont wurde dort zu einem Keymap-Instrument) kann dieser Tracker nicht
+spielen. Sie bleiben als **stummer Platzhalter** stehen — die Listen sagen
+„hier stumm", damit die Nummern der übrigen stimmen —, und ihr JSON wird
+beim Sichern **unverändert zurückgeschrieben**; nur Name, Lautstärke, Pan
+und Hüllkurve lassen sich daran ändern. Kopieren und Entfernen tragen es
+mit. Bis 2026-09-17 schrieb der Tracker ein solches Instrument als Synth
+zurück, und die eingebetteten Samples waren nach einem Sichern weg — ohne
+dass es jemand sah; und es klang als Rechteck, obwohl „stumm" dastand.
+
+## Beenden
+
+ESC, das Kreuz des Fensters oder Alt+F4 beenden sofort, wenn alles
+gesichert ist. Sonst kommt die Frage **Sichern | Verwerfen | Abbrechen**.
+[Neu] fragt bei ungesicherten Änderungen, ob sie verworfen werden sollen.
+
+## Was die Qt-Fassung hatte und hier fehlt
+
+- **Sample-, Keymap- und SoundFont-Instrumente abspielen** — alles, was
+  eingebettete PCM-Daten braucht; samt Laden von WAV/OGG/SF2, dem
+  Keymap-Dialog und dem Instrument-Editor mit Wellenform und Loop-Markern.
+  Solche Instrumente bleiben erhalten, klingen aber nicht (oben).
+- **VU-Meter** je Kanal.
+- **Pattern umbenennen** — die Namen aus der Datei bleiben, neue lassen
+  sich nicht vergeben.
+- **Der Sample-Offset-Effekt** (`Off`) — er wird mitgeführt, wirkt aber
+  nicht, weil er Samples braucht.
+
+## Was dieser Pilot in der Laufzeit freigelegt hat
+
+Er war der erste Editor mit einer **Zeitachse** (siehe CLAUDE.md, fünfter
+Pilot) und brauchte drei Bausteine, die es vorher nicht gab:
+`AUDIO_NOTE` (eine gehaltene Note mit Sustain-**Pegel** und Ausklingen —
+`AUDIO_SFX` kennt nur drei Zeiten, Orgel und Klavier waren nicht zu
+unterscheiden), `AUDIO_SOUND_NEW`/`AUDIO_SOUND_MIX`/`AUDIO_SOUND_NORMALIZE`
+(ohne Mischen keine WAV) und `JSON_APPEND_NULL` (eine Liste mit leeren
+Plätzen ließ sich nicht schreiben, und genau so notiert das Format eine
+Reihe ohne Note). Siehe [Audio](module-audio.md) und [JSON](module-json.md).
+
+## Geprüft
+
+`tests/pruef/werkzeug_tracker.dhtest` bedient den Tracker wie von Hand
+(Aufnahme über `AUTOMATION_PLAY`) und prüft an drei Ergebnissen, die
+Drachenhauch selbst liest: die **Datei** (json-Modul, mit den Schlüsseln,
+die die Qt-Fassung las; dazu zwei Dateien, die die Qt-Fassung geschrieben
+hat), die **WAV** (Länge, Noten, Stereo- und Amiga-Pan) und den
+**GB-Code** (`dhrt --check` und ein Start). Dazu Tastatur, Rückgängig,
+Blockbefehle, Transponieren ohne das Schlagzeug, die Uhr per Leertaste,
+das Mitlaufen im Song-Modus, die Lage aller Bedienelemente und die stummen
+Sample-/Keymap-Instrumente.
 
 ## Audio Studio
 
-Tracker und [SFX-Generator](sfx-generator.md) leben zusammen im **Audio Studio** — einem fullscreen Fenster mit zwei Reitern (`🎹 Tracker / Song` und `💥 SFX-Generator`). Start: `dhsound` / `dhrun.py --audio`, oder im Code-Editor die jeweiligen Menüpunkte (sie öffnen dasselbe Studio auf dem passenden Tab). `F11` schaltet echtes Vollbild, `Strg+1`/`Strg+2` wechseln die Tabs. Jeder Tab behält seinen eigenen Undo-Verlauf (`Strg+Z`/`Strg+Y` wirken auf den fokussierten Tab).
-
-> **Sampler-Ausbau (laufend):** Der Tracker wird schrittweise vom Chiptune-Synth zum vollwertigen Sampler ausgebaut. **Stufe 1 (fertig):** Sample-Instrumente laden + über die Klaviatur resampeln + vorhören. **Stufe 2 (fertig):** Grundton, Loop-Punkte (forward/pingpong), ADSR-Hüllkurve. **Stufe 4+5 (fertig):** numpy-Software-Mixer (`tracker/mixer.py`) + **Render-to-File** (`Audio (WAV)...` → Song als WAV für `PLAYMUSIC`), inkl. **Stereo + Amiga-Hard-Panning** und **Pitch-Slide für alle Instrumente**. **Stufe „Keymap" (fertig):** Multisample/Drumkit — Samples über Tasten-Zonen (`Keymap...`). **Effekt-Spalte (fertig):** Arpeggio/Vibrato/Retrigger/Sample-Offset im Render. **Kanäle/Komfort (fertig):** einstellbare Kanalzahl (4–32), Block-Copy/Transpose/Interpolate, grafischer Instrument-Editor (Wellenform+Loop-Marker), Note-Off, Kanal-Mixer-Fader + Kanalfarben, Pan als Schieberegler. **Instrument pro Note (fertig):** Architektur-Wechsel wie bei echten Trackern — Instrument-Zuweisung optional pro Note statt fest pro Kanal (`Instr:`-Dropdown, überschreibt den Spur-Standard). **Geplant:** Live-Sampler-Export (`SAMPLE_PLAY`-basierter GB-Code).
-
-> **Effekt-Spalten:** **Lautstärke** (`Vol`), **Pitch-Slide/Portamento** (`Slide`) und die **Effekt-Spalte** (`FX`: Arp/Vib/Ret/Off) pro Note. Vol + Slide gehen in den GB-Code-Live-Player (Slide via `AUDIO_SFX`-Hz/s-Bend); die `FX`-Effekte wirken im **WAV-Render** (als instrument-unabhängiges Post-Processing der gerenderten Note in `mixer.apply_effect`).
+Das Audio Studio (`dhsound`), das Tracker und SFX-Generator der Qt-Fassung
+in einem Vollbildfenster mit Reitern vereinte, gibt es nicht mehr. Beide
+Werkzeuge sind eigene Drachenhauch-Programme und liegen in der IDE unter
+**Werkzeuge**: der Tracker hier, der SFX-Generator in
+`examples/183_sfx_generator.dh` ([SFX-Generator](sfx-generator.md)).
