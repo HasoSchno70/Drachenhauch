@@ -167,3 +167,248 @@ gemeldet: Laufzeit gefunden
 Attrappe statt cargo
 Fertig (ohne Installer).
 attrappe lief TRUE
+
+=== der installer wird aus einer kopie der laufzeit gebaut
+' Gepackt wird eine KOPIE der Laufzeit (sie laesst sich signieren, auch
+' wenn die gebaute gerade laeuft), und ohne GB_SIGN_CERT wird nichts
+' signiert -- das sagt der Bau dann auch.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+FUNCTION win$(s AS STRING) AS STRING
+    RETURN REPLACE$(s, "/", CHR$(92))
+END FUNCTION
+DIM aus AS STRING : aus = CWD$() + "/aus"
+SETENV("ISCC", CWD$() + "/iscc.cmd")
+SETENV("SIGNTOOL", CWD$() + "/signtool.cmd")
+SETENV("ATTRAPPE_ZIEL", win$(aus + "/Drachenhauch-IDE-Setup-" + VERSION$() + ".exe"))
+SETENV("GB_SIGN_CERT", "")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
+    "--ohne-lizenzen", "--wurzel", CWD$() + "/wurzel", "--ausgabe", aus)
+DIM text AS STRING : text = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM iscc AS STRING : iscc = READLINES("iscc.txt")[0]
+PRINT "iscc bekam die kopie "; INSTR(iscc, "/DDhrtQuelle=" + win$(aus + "/stufe/dhrt.exe")) >= 0
+PRINT "iscc schreibt nach aus "; INSTR(iscc, "/O" + win$(aus)) >= 0
+PRINT "kopie da "; READLINES(aus + "/stufe/dhrt.exe")[0]
+PRINT "signtool lief "; FILEEXISTS("sign.txt")
+PRINT "fertig gemeldet "; INSTR(text, "FERTIG -> ") >= 0
+PRINT "nicht signiert gesagt "; INSTR(text, "Nicht signiert (GB_SIGN_CERT ist nicht gesetzt).") >= 0
+--- system windows
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- datei wurzel/rust/drachenhauch_runtime/target/release/dhrt.exe
+keine echte Laufzeit
+--- datei wurzel/installer/platzhalter.txt
+damit es den Ordner gibt
+--- datei iscc.cmd
+@echo off
+echo %* >> "%~dp0iscc.txt"
+echo setup> "%ATTRAPPE_ZIEL%"
+
+--- datei signtool.cmd
+@echo off
+echo %* >> "%~dp0sign.txt"
+if defined ATTRAPPE_SIGN_FEHLT exit /b 5
+
+--- erwartet
+rueckgabe 0
+iscc bekam die kopie TRUE
+iscc schreibt nach aus TRUE
+kopie da keine echte Laufzeit
+signtool lief FALSE
+fertig gemeldet TRUE
+nicht signiert gesagt TRUE
+
+=== mit fingerabdruck werden laufzeit und installer signiert
+' Erst die Kopie der Laufzeit (VOR dem Einpacken, sonst steckte eine
+' unsignierte im Installer), dann der fertige Installer.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+FUNCTION win$(s AS STRING) AS STRING
+    RETURN REPLACE$(s, "/", CHR$(92))
+END FUNCTION
+DIM aus AS STRING : aus = CWD$() + "/aus"
+SETENV("ISCC", CWD$() + "/iscc.cmd")
+SETENV("SIGNTOOL", CWD$() + "/signtool.cmd")
+SETENV("ATTRAPPE_ZIEL", win$(aus + "/Drachenhauch-IDE-Setup-" + VERSION$() + ".exe"))
+SETENV("GB_SIGN_CERT", "ABC123")
+SETENV("GB_SIGN_PASS", "")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
+    "--ohne-lizenzen", "--wurzel", CWD$() + "/wurzel", "--ausgabe", aus)
+DIM text AS STRING : text = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM z AS ARRAY OF STRING : z = READLINES("sign.txt")
+PRINT "aufrufe "; LEN(z)
+PRINT "1 fingerabdruck "; INSTR(z[0], "/sha1 ABC123") >= 0; ", zeitstempel "; INSTR(z[0], "/tr http://timestamp.digicert.com") >= 0
+' Ein Pfad mit Leerzeichen kommt in Anfuehrungszeichen an -- die zaehlen nicht.
+PRINT "1 ist die kopie "; RIGHT$(REPLACE$(TRIM$(z[0]), CHR$(34), ""), LEN(win$(aus + "/stufe/dhrt.exe"))) = win$(aus + "/stufe/dhrt.exe")
+PRINT "2 ist der installer "; RIGHT$(REPLACE$(TRIM$(z[1]), CHR$(34), ""), 4) = ".exe" AND INSTR(z[1], "Drachenhauch-IDE-Setup-") >= 0
+PRINT "kein signiert-hinweis "; INSTR(text, "Nicht signiert") < 0
+--- system windows
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- datei wurzel/rust/drachenhauch_runtime/target/release/dhrt.exe
+keine echte Laufzeit
+--- datei wurzel/installer/platzhalter.txt
+damit es den Ordner gibt
+--- datei iscc.cmd
+@echo off
+echo %* >> "%~dp0iscc.txt"
+echo setup> "%ATTRAPPE_ZIEL%"
+
+--- datei signtool.cmd
+@echo off
+echo %* >> "%~dp0sign.txt"
+if defined ATTRAPPE_SIGN_FEHLT exit /b 5
+
+--- erwartet
+rueckgabe 0
+aufrufe 2
+1 fingerabdruck TRUE, zeitstempel TRUE
+1 ist die kopie TRUE
+2 ist der installer TRUE
+kein signiert-hinweis TRUE
+
+=== mit pfx-datei gehen datei und passwort an signtool
+' GB_SIGN_CERT als Pfad einer Datei = .pfx, GB_SIGN_PASS ihr Passwort.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+FUNCTION win$(s AS STRING) AS STRING
+    RETURN REPLACE$(s, "/", CHR$(92))
+END FUNCTION
+DIM aus AS STRING : aus = CWD$() + "/aus"
+SETENV("ISCC", CWD$() + "/iscc.cmd")
+SETENV("SIGNTOOL", CWD$() + "/signtool.cmd")
+SETENV("ATTRAPPE_ZIEL", win$(aus + "/Drachenhauch-IDE-Setup-" + VERSION$() + ".exe"))
+WRITEALL("zert.pfx", "kein echtes Zertifikat")
+SETENV("GB_SIGN_CERT", CWD$() + "/zert.pfx")
+SETENV("GB_SIGN_PASS", "geheim")
+SETENV("GB_SIGN_TS", "http://zeit.example")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
+    "--ohne-lizenzen", "--wurzel", CWD$() + "/wurzel", "--ausgabe", aus)
+DIM text AS STRING : text = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM z AS ARRAY OF STRING : z = READLINES("sign.txt")
+PRINT "aufrufe "; LEN(z)
+PRINT "datei "; INSTR(z[0], "/f ") >= 0; ", passwort "; INSTR(z[0], "/p geheim") >= 0; ", kein fingerabdruck "; INSTR(z[0], "/sha1") < 0
+PRINT "eigener zeitstempel "; INSTR(z[0], "/tr http://zeit.example") >= 0
+--- system windows
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- datei wurzel/rust/drachenhauch_runtime/target/release/dhrt.exe
+keine echte Laufzeit
+--- datei wurzel/installer/platzhalter.txt
+damit es den Ordner gibt
+--- datei iscc.cmd
+@echo off
+echo %* >> "%~dp0iscc.txt"
+echo setup> "%ATTRAPPE_ZIEL%"
+
+--- datei signtool.cmd
+@echo off
+echo %* >> "%~dp0sign.txt"
+if defined ATTRAPPE_SIGN_FEHLT exit /b 5
+
+--- erwartet
+rueckgabe 0
+aufrufe 2
+datei TRUE, passwort TRUE, kein fingerabdruck TRUE
+eigener zeitstempel TRUE
+
+=== scheitert signtool, wird nicht verpackt
+' Ein Installer, der signiert sein sollte und es nicht ist, fiele erst beim
+' Nutzer auf -- darum bricht der Bau ab, bevor ISCC ueberhaupt laeuft.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+FUNCTION win$(s AS STRING) AS STRING
+    RETURN REPLACE$(s, "/", CHR$(92))
+END FUNCTION
+DIM aus AS STRING : aus = CWD$() + "/aus"
+SETENV("ISCC", CWD$() + "/iscc.cmd")
+SETENV("SIGNTOOL", CWD$() + "/signtool.cmd")
+SETENV("ATTRAPPE_ZIEL", win$(aus + "/Drachenhauch-IDE-Setup-" + VERSION$() + ".exe"))
+SETENV("GB_SIGN_CERT", "ABC123")
+SETENV("ATTRAPPE_SIGN_FEHLT", "1")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
+    "--ohne-lizenzen", "--wurzel", CWD$() + "/wurzel", "--ausgabe", aus)
+DIM text AS STRING : text = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+PRINT "iscc lief "; FILEEXISTS("iscc.txt")
+PRINT "gemeldet "; INSTR(text, "signtool ist fehlgeschlagen") >= 0
+--- system windows
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- datei wurzel/rust/drachenhauch_runtime/target/release/dhrt.exe
+keine echte Laufzeit
+--- datei wurzel/installer/platzhalter.txt
+damit es den Ordner gibt
+--- datei iscc.cmd
+@echo off
+echo %* >> "%~dp0iscc.txt"
+echo setup> "%ATTRAPPE_ZIEL%"
+
+--- datei signtool.cmd
+@echo off
+echo %* >> "%~dp0sign.txt"
+if defined ATTRAPPE_SIGN_FEHLT exit /b 5
+
+--- erwartet
+rueckgabe 1
+iscc lief FALSE
+gemeldet TRUE

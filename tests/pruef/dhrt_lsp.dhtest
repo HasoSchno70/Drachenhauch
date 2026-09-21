@@ -229,8 +229,10 @@ pl: player TRUE
 pri: print TRUE, private TRUE
 
 === die vervollstaendigung kennt alle schluesselwoerter des editors
-' Die Liste in lexer.rs gegen die in drachenhauch/tokens.py, die der
-' Qt-Editor benutzt -- zwei Tabellen, die auseinanderlaufen koennten.
+' Die Vervollstaendigung gegen die Liste, die der Lexer selbst fuehrt
+' (`lexer::KEYWORDS` in lexer.rs; ein Rust-Test haelt sie an `keyword()`
+' fest). Bis 2026-09-21 las der Fall stattdessen drachenhauch/tokens.py, die
+' Tabelle des Qt-Editors -- die faellt mit Python weg.
 IMPORT "helfer.dh"
 lsStart()
 DIM i AS INTEGER : i = lsFragen("initialize", "{}")
@@ -243,23 +245,27 @@ DIM k AS INTEGER
 FOR k = 0 TO JSON_LEN(h, "result") - 1
     MAPPUT(labels, JSON_GET_STRING(h, "result." + STR$(k) + ".label"), TRUE)
 NEXT
-' Die Schluessel der KEYWORDS-Tabelle in tokens.py: Zeilen `    "wort": ...`
-' zwischen `KEYWORDS = {` und der schliessenden Klammer.
-DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(ARG$(0) + "/drachenhauch/tokens.py")
+' Die Woerter zwischen `const KEYWORDS` und `];` -- mehrere je Zeile, jedes
+' in Anfuehrungszeichen.
+DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(ARG$(0) + "/rust/drachenhauch_runtime/src/lexer.rs")
 DIM drin AS BOOLEAN : drin = FALSE
 DIM gesehen AS INTEGER : gesehen = 0
 FOR k = 0 TO LEN(zeilen) - 1
     DIM t AS STRING : t = TRIM$(zeilen[k])
-    IF LEFT$(t, 10) = "KEYWORDS =" THEN
+    IF INSTR(t, "const KEYWORDS") >= 0 THEN
         drin = TRUE
         CONTINUE
     END IF
-    IF drin AND LEFT$(t, 1) = "}" THEN BREAK
-    IF drin AND LEFT$(t, 1) = CHR$(34) THEN
-        DIM wort AS STRING : wort = UPPER$(MID$(t, 1, INSTR(MID$(t, 1), CHR$(34))))
+    IF NOT drin THEN CONTINUE
+    IF LEFT$(t, 2) = "];" THEN BREAK
+    DIM rest AS STRING : rest = t
+    WHILE INSTR(rest, CHR$(34)) >= 0
+        rest = MID$(rest, INSTR(rest, CHR$(34)) + 1)
+        DIM wort AS STRING : wort = UPPER$(LEFT$(rest, INSTR(rest, CHR$(34))))
+        rest = MID$(rest, INSTR(rest, CHR$(34)) + 1)
         gesehen = gesehen + 1
         IF NOT MAPHAS(labels, wort) THEN PRINT "fehlt: "; wort
-    END IF
+    WEND
 NEXT
 PRINT "schluesselwoerter gelesen "; (gesehen > 50)
 PRINT "tasten, farben, konstanten "; MAPHAS(labels, "KEY_SPACE"); " "; MAPHAS(labels, "RED"); " "; MAPHAS(labels, "PI")
