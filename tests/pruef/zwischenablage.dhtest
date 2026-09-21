@@ -48,6 +48,7 @@ ELSE
     PRINT "NICHT angekommen, drin steht: " + CLIPBOARD_GET()
 END IF
 PROCESS_CLOSE(p)
+--- system windows
 --- argumente
 {sammlung}/_hilfen/zwischenablage_blocker.ps1
 --- erwartet
@@ -74,6 +75,7 @@ IF NOT FILEEXISTS("m.auf") THEN
 END IF
 CLIPBOARD_SET("kommt nicht an")
 PRINT "haette nicht laufen duerfen"
+--- system windows
 --- argumente
 {sammlung}/_hilfen/zwischenablage_blocker.ps1
 --- fehler
@@ -102,6 +104,7 @@ END IF
 ' Leer ist die richtige Antwort -- es gibt gerade nichts zu lesen.
 PRINT "gelesen: [" + CLIPBOARD_GET() + "]"
 PRINT "und das Programm laeuft weiter"
+--- system windows
 --- argumente
 {sammlung}/_hilfen/zwischenablage_blocker.ps1
 --- erwartet
