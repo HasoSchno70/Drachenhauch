@@ -1,0 +1,140 @@
+' Das WASM-Geruest: rust/build_wasm.py, der Web-Harness in web/ und der
+' emscripten-Einstieg in main.rs. Bis 2026-09-21 tests/test_build_wasm.py
+' (pytest) -- die Datei faellt mit dem Python-Teil weg, das Bauskript aber
+' NICHT (Entscheidung (c) in docs/entwurf-python-abbau.md: es bleibt Python,
+' nur mit der Standardbibliothek). Darum prueft ein Python-Kind seine Logik:
+' dasselbe nackte Python 3, das der Bau ohnehin braucht, ohne pytest.
+'
+' Der eigentliche emscripten-Bau ist hier nicht ausfuehrbar.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== der web-harness hat seine haken
+' raylib/emscripten zeichnet ins Canvas, der Live-Editor schreibt die
+' Quelle nach /program.dh und laedt zum Lauf frisch.
+DIM w AS STRING : w = ARG$(0) + "/web/"
+DIM html AS STRING : html = JOIN$(READLINES(w + "index.html"), CHR$(10))
+PRINT "canvas "; INSTR(html, "id=" + CHR$(34) + "canvas" + CHR$(34)) >= 0
+PRINT "editor "; INSTR(html, "id=" + CHR$(34) + "src" + CHR$(34)) >= 0
+PRINT "laedt dhrt.js "; INSTR(html, "dhrt.js") >= 0
+DIM js AS STRING : js = JOIN$(READLINES(w + "playground.js"), CHR$(10))
+PRINT "schreibt program.dh "; INSTR(js, "/program.dh") >= 0
+PRINT "laedt neu "; INSTR(js, "location.reload") >= 0
+--- argumente
+{sammlung}/../..
+--- erwartet
+canvas TRUE
+editor TRUE
+laedt dhrt.js TRUE
+schreibt program.dh TRUE
+laedt neu TRUE
+
+=== main.rs hat den emscripten-einstieg
+' Kompiliert im Browser /program.dh (Quelle, Vorrang) und faellt auf
+' /program.dhc zurueck.
+DIM src AS STRING : src = JOIN$(READLINES(ARG$(0) + "/rust/drachenhauch_runtime/src/main.rs"), CHR$(10))
+PRINT "cfg "; INSTR(src, "target_os = " + CHR$(34) + "emscripten" + CHR$(34)) >= 0
+PRINT "quelle "; INSTR(src, "/program.dh" + CHR$(34)) >= 0
+PRINT "rueckfall "; INSTR(src, "/program.dhc") >= 0
+--- argumente
+{sammlung}/../..
+--- erwartet
+cfg TRUE
+quelle TRUE
+rueckfall TRUE
+
+=== build_wasm.py rechnet richtig
+' Toolchain-Pruefung liefert Wahrheitswerte, die Quelle wird eingebettet,
+' ohne Toolchain endet der Bau sauber, und eine Aenderung der Linker-Flags
+' raeumt die alte Ausgabe weg (cargo verfolgt EMCC_CFLAGS nicht -- sonst
+' bliebe die ALTE .wasm liegen und der Bau meldete trotzdem Erfolg).
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+' Probiert der Reihe nach, bis einer die Probe wirklich durchlaeuft:
+' "python3"/"python" koennen unter Windows Platzhalter aus WindowsApps sein,
+' die sich gar nicht starten lassen (os error 3); dann bleibt der Launcher.
+DIM p AS INTEGER : p = -1
+DIM aus AS STRING : aus = ""
+DIM namen AS ARRAY OF STRING : namen = ["python3", "python", "py"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    TRY
+        p = PROCESS_START(namen[i], "probe.py", ARG$(0))
+        aus = lauf$(p)
+    CATCH e
+        p = -1
+    END TRY
+    IF p >= 0 AND INSTR(aus, "ergebnis") >= 0 THEN BREAK
+    p = -1
+NEXT
+IF p < 0 THEN
+    PRINT "UEBERSPRINGEN: kein Python 3 gefunden"
+    EXIT(0)
+END IF
+PRINT TRIM$(aus)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+--- argumente
+{sammlung}/../..
+--- datei probe.py
+import contextlib, importlib.util, io, sys, tempfile
+from pathlib import Path
+
+ROOT = Path(sys.argv[1]).resolve()
+spec = importlib.util.spec_from_file_location("build_wasm", ROOT / "rust" / "build_wasm.py")
+bw = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(bw)
+
+info = bw.check_toolchain()
+print("toolchain", sorted(info) == ["cargo", "emcc", "wasm_target"] and all(isinstance(v, bool) for v in info.values()))
+
+with tempfile.TemporaryDirectory() as t:
+    t = Path(t)
+    gb = t / "hi.dh"
+    gb.write_text('PRINT "x"\n', encoding="utf-8")
+    out = bw.copy_source(gb, t)
+    print("eingebettet", out.name == "program.dh" and out.read_text(encoding="utf-8") == gb.read_text(encoding="utf-8"))
+
+with tempfile.TemporaryDirectory() as t:
+    t = Path(t)
+    gb = t / "hi.dh"
+    gb.write_text("PRINT 1\n", encoding="utf-8")
+    bw.check_toolchain = lambda: {"emcc": False, "cargo": False, "wasm_target": False}
+    # build() meldet, was es tut (mit Pfaden) -- das gehoert nicht in den Vergleich.
+    with contextlib.redirect_stdout(io.StringIO()):
+        rc = bw.build(gb, t)
+    print("ohne toolchain", rc == 0 and (t / "program.dh").exists())
+
+with tempfile.TemporaryDirectory() as t:
+    t = Path(t)
+    rel = t / "target" / bw.TARGET / "release"
+    rel.mkdir(parents=True)
+    bw.CRATE = t
+    def anlegen():
+        for n in ("dhrt.js", "dhrt.wasm", "dhrt.data"):
+            (rel / n).write_bytes(b"alt")
+    anlegen()
+    erst = bw.erzwinge_relink("-s A=1") is True and not (rel / "dhrt.wasm").exists()
+    anlegen()
+    gleich = bw.erzwinge_relink("-s A=1") is False and (rel / "dhrt.wasm").read_bytes() == b"alt"
+    neu = bw.erzwinge_relink("-s A=2") is True and not (rel / "dhrt.wasm").exists() and not (rel / "dhrt.data").exists()
+    print("relink", erst, gleich, neu)
+print("ergebnis fertig")
+--- erwartet
+toolchain True
+eingebettet True
+ohne toolchain True
+relink True True True
+ergebnis fertig
+rueckgabe 0
