@@ -5515,6 +5515,30 @@ impl<'p> Vm<'p> {
             "gui_listbox_set_data" => { self.gui.list_set_data(gi(a,0,"GUI_LISTBOX_SET_DATA")?, gi(a,1,"GUI_LISTBOX_SET_DATA")?, gs(a,2,"GUI_LISTBOX_SET_DATA")?)?; Value::Nil }
             "gui_listbox_data$" | "gui_listbox_data" => Value::str_rc(&self.gui.list_data(gi(a,0,"GUI_LISTBOX_DATA")?, gi(a,1,"GUI_LISTBOX_DATA")?)?),
             "gui_listbox_find_data" => Value::Int(self.gui.list_find_data(gi(a,0,"GUI_LISTBOX_FIND_DATA")?, &gs(a,1,"GUI_LISTBOX_FIND_DATA")?)?),
+            "gui_listbox_spans" => {
+                // GUI_LISTBOX_SPANS(lb, eintrag, starts, laengen, farben)
+                fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
+                    match v {
+                        Value::Array(a) => {
+                            let a = a.borrow();
+                            let mut o = Vec::with_capacity(a.cells.len());
+                            for x in a.cells.iter() {
+                                match x {
+                                    Value::Int(i) => o.push(i),
+                                    Value::Float(f) => o.push(f as i64),
+                                    _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+                                }
+                            }
+                            Ok(o)
+                        }
+                        _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+                    }
+                }
+                let n = "GUI_LISTBOX_SPANS";
+                if a.len() != 5 { return Err(format!("{}: erwartet (lb, eintrag, starts, laengen, farben)", n)); }
+                self.gui.list_spans(gi(a, 0, n)?, gi(a, 1, n)?, ganze(&a[2], n)?, ganze(&a[3], n)?, ganze(&a[4], n)?)?;
+                Value::Nil
+            }
             "gui_listbox_detail" => { self.gui.list_detail(gi(a,0,"GUI_LISTBOX_DETAIL")?, gi(a,1,"GUI_LISTBOX_DETAIL")?, gs(a,2,"GUI_LISTBOX_DETAIL")?)?; Value::Nil }
             "gui_listbox_tip" => { self.gui.list_tip(gi(a,0,"GUI_LISTBOX_TIP")?, gi(a,1,"GUI_LISTBOX_TIP")?, gs(a,2,"GUI_LISTBOX_TIP")?)?; Value::Nil }
             "gui_listbox_enable" => { self.gui.list_enable(gi(a,0,"GUI_LISTBOX_ENABLE")?, gi(a,1,"GUI_LISTBOX_ENABLE")?, gbool(a,2,"GUI_LISTBOX_ENABLE")?)?; Value::Nil }

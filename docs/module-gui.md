@@ -287,6 +287,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_VIEW_COUNT(lb)` | INTEGER | Zahl der sichtbaren Zeilen |
 | `GUI_LISTBOX_VIEW_ROW(lb, k)` | INTEGER | die k-te sichtbare Zeile als Eintragsnummer, -1 = keine |
 | `GUI_LISTBOX_PLACEHOLDER(lb, text$)` | — | Hinweis, der erscheint, wenn nichts zu sehen ist |
+| `GUI_LISTBOX_SPANS(lb, eintrag, starts, laengen, farben)` | — | Abschnitte eines Eintrags einfärben (Zeichen ab 0, drei gleich lange ARRAY OF INTEGER; leer nimmt sie weg) -- etwa das Schlüsselwort in einer, den Namen in einer anderen Farbe. Auf der Auswahl und gesperrt gilt eine Farbe. Die Zeilenhöhe einer Liste folgt ihrer Schrift (`GUI_SET_FONT_SIZE`) |
 | `GUI_LISTBOX_SORT(lb[, absteigend])` | — | natürlich sortieren („Datei 9“ vor „Datei 10“), innerhalb der Gruppen |
 | `GUI_LISTBOX_FIND(lb, text$[, ab])` | INTEGER | nächster Eintrag ab `ab`, der den Teiltext enthält, -1 = keiner |
 | `GUI_LISTBOX_SCROLL_TO(lb, i)` | — | so rollen, dass der Eintrag zu sehen ist |

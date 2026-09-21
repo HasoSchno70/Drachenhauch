@@ -46,7 +46,7 @@ DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
 DIM i AS INTEGER
 DIM r AS STRING : r = ""
 FOR i = 0 TO LEN(L) - 1
-    IF LEFT$(L[i], 7) = "schrift" THEN r = r + " " + MID$(L[i], 8)
+    IF LEFT$(L[i], 8) = "schrift " THEN r = r + " " + MID$(L[i], 8)
 NEXT
 PRINT "folge"; r
 IMPORT "json"

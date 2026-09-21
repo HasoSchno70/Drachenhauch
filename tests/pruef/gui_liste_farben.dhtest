@@ -1,0 +1,137 @@
+' GUI_LISTBOX_SPANS -- Abschnitte eines Listeneintrags einfaerben -- und die
+' Zeilenhoehe, die einer groesseren Schrift folgt. Format: docs/werkzeuge.md.
+
+=== zwei farben in einem eintrag
+' Links fuenf Zeichen rot, rechts vier gruen. Gezaehlt wird im Bild: es muss
+' rote UND gruene Punkte geben, und alle roten liegen links der gruenen.
+IMPORT "gui"
+SCREEN(360, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 10, 10, 340, 220)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 10, 300, 150, [])
+GUI_SET_FONT_SIZE(lb, 28)
+DIM k AS INTEGER : k = GUI_LISTBOX_ADD(lb, "MMMM MMMM")
+GUI_LISTBOX_ADD(lb, "zweite")
+GUI_LISTBOX_SPANS(lb, k, [0, 5], [4, 4], [&HFF0000, &H00FF00])
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+DIM rot AS INTEGER : rot = 0
+DIM gruen AS INTEGER : gruen = 0
+DIM rotMax AS INTEGER : rotMax = -1
+DIM gruenMin AS INTEGER : gruenMin = 100000
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 239
+    FOR x = 0 TO 359
+        DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+        DIM r AS INTEGER : r = (c SHR 16) BAND 255
+        DIM g AS INTEGER : g = (c SHR 8) BAND 255
+        DIM bl AS INTEGER : bl = c BAND 255
+        IF r > 180 AND g < 90 AND bl < 90 THEN rot = rot + 1 : rotMax = MAX(rotMax, x)
+        IF g > 180 AND r < 90 AND bl < 90 THEN gruen = gruen + 1 : gruenMin = MIN(gruenMin, x)
+    NEXT
+NEXT
+PRINT "rot "; (rot > 20)
+PRINT "gruen "; (gruen > 20)
+PRINT "rot links "; (rotMax < gruenMin)
+--- erwartet
+rot TRUE
+gruen TRUE
+rot links TRUE
+
+=== ohne abschnitte kein rot und kein gruen
+' Die Gegenprobe zum Fall davor: derselbe Eintrag ohne GUI_LISTBOX_SPANS.
+IMPORT "gui"
+SCREEN(360, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 10, 10, 340, 220)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 10, 300, 150, [])
+GUI_SET_FONT_SIZE(lb, 28)
+DIM k AS INTEGER : k = GUI_LISTBOX_ADD(lb, "MMMM MMMM")
+GUI_LISTBOX_ADD(lb, "zweite")
+' leere Felder nehmen die Abschnitte wieder weg
+GUI_LISTBOX_SPANS(lb, k, [0, 5], [4, 4], [&HFF0000, &H00FF00])
+DIM leer AS ARRAY OF INTEGER : leer = []
+GUI_LISTBOX_SPANS(lb, k, leer, leer, leer)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+DIM farbig AS INTEGER : farbig = 0
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 239
+    FOR x = 0 TO 359
+        DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+        DIM r AS INTEGER : r = (c SHR 16) BAND 255
+        DIM g AS INTEGER : g = (c SHR 8) BAND 255
+        DIM bl AS INTEGER : bl = c BAND 255
+        IF r > 180 AND g < 90 AND bl < 90 THEN farbig = farbig + 1
+        IF g > 180 AND r < 90 AND bl < 90 THEN farbig = farbig + 1
+    NEXT
+NEXT
+PRINT "farbig "; farbig
+--- erwartet
+farbig 0
+
+=== falsche abschnitte sind ein fehler
+IMPORT "gui"
+SCREEN(200, 120, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 10, 10, 180, 100)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 10, 150, 60, ["eins"])
+GUI_LISTBOX_SPANS(lb, 0, [0, 1], [1], [&HFF0000])
+--- fehler
+GUI_LISTBOX_SPANS
+
+=== die zeilenhoehe folgt der schrift
+' Bild ab rueckt eine Seite weiter, und die Seite haengt an der Zeilenhoehe.
+' Mit Schrift 30 ist eine Zeile 36 hoch: Pfeil runter waehlt 0, Bild ab
+' landet auf 4. Mit der Vorgabe (22) landete es auf 7.
+IMPORT "gui"
+SCREEN(320, 280, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Kasten", 10, 10, 300, 260)
+DIM namen AS ARRAY OF STRING : namen = []
+DIM i AS INTEGER
+FOR i = 0 TO 19
+    ARRAY_PUSH(namen, "Eintrag " + STR$(i))
+NEXT
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 10, 260, 180, namen)
+GUI_SET_FONT_SIZE(lb, 30)
+GUI_FOCUS(lb)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "gewaehlt "; GUI_LISTBOX_SELECTED(lb)
+--- datei ev.txt
+c 4
+e 2 2 264 0 0 0
+e 3 1 264 0 0 0
+e 5 2 267 0 0 0
+e 6 1 267 0 0 0
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+gewaehlt 4

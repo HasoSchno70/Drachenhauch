@@ -3732,6 +3732,36 @@ Themawechsel neu. Tests `tests/pruef/gui_kachel.dhtest` (6), ein Fall in
 faellt er) und einer in `werkzeug_ide_schriftzug.dhtest` (Farbwert beider
 Themen).
 
+**Lesbarkeit der IDE (2026-09-21, Hinweise des Nutzers):** (1) **Umlaute in
+der Oberflaeche** -- 174 Anzeigetexte (Menue, Knoepfe, Tooltips, Statuszeile,
+Palette) schreiben jetzt ä/ö/ü/ß; Kennungen, `protokoll`-Zeilen, `CASE`-Namen
+und Konfig-Schluessel bleiben ASCII (die Tests lesen sie). Die Suche in
+Palette und Waehlern vergleicht ueber `ohneUmlaute$` -- wer `oeffnen` tippt,
+findet "Öffnen". (2) **Codefarben je Thema**: die `F_*` sind keine CONST mehr,
+`codeFarben(hell)` setzt sie nach dem Laden und bei jedem Themawechsel (und
+leert `faerbSchluessel`/`gliederungSchluessel`, sonst bliebe das Alte stehen)
+-- vorher standen die hellen Toene des dunklen Themas auch auf Weiss. (3) **Die
+Gliederung ist zweifarbig**: neu in der Laufzeit **`GUI_LISTBOX_SPANS(lb,
+eintrag, starts, laengen, farben)`** (`ListState.spans`, in allen
+Umordnungen mitgefuehrt; gezeichnet werden Laeufe ueber die Breite des
+Vorspanns wie im Textbereich; auf Auswahl und gesperrt gilt eine Farbe). (4)
+**Die Zeilenhoehe einer Liste folgt ihrer Schrift** (`list_zeile_h`:
+max(22, Schrift + 6), EINE Quelle fuer Zeichnen, Klick, Rad, Bild auf/ab,
+a11y) -- vorher lief eine groessere Schrift in die naechste Zeile. (5)
+**Gedaempfter Text ist lesbar**: `Gui::leise(bg)` mischt `muted_fg` gegen
+`text_fg`, bis der Kontrast nach WCAG 4,5:1 erreicht (Platzhalter,
+Zusatztext der Liste, Kachelbeschreibung) -- auf den getoenten Bereichen fiel
+das Grau des dunklen Themas auf 3,2:1. (6) **Schriftgroessen** in den
+Einstellungen: Listen (Gliederung, Ausgabe, Probleme; Vorgabe 18) und
+Handbuch (16), in der ide.json `listen_schrift`/`handbuch_schrift`. (7)
+**Info-Fenster mit Bild**: ein eigenes Fenster (`winUeber`) statt
+`GUI_DIALOG` -- Symbol, Schriftzug, Text, OK (Enter/ESC). Tests
+`tests/pruef/gui_liste_farben.dhtest` (4, Farben im Bild, Gegenprobe ohne
+Abschnitte, Zeilenhoehe ueber Bild ab), `tests/pruef/werkzeug_ide_lesbarkeit.dhtest`
+(8; die Gliederungsprobe sucht das Rechteck der Liste per `GUI_HIT_TEST`,
+weil sonst die Schluesselwort-Farbe der Werkzeugleiste mitzaehlte), Rust-Test
+`kontrast_nach_wcag`; sechs Verfaelschungen der IDE fallen je in ihrem Fall.
+
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
 `tests/pruef/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei

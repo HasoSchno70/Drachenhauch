@@ -1,0 +1,204 @@
+' Lesbarkeit der IDE: Codefarben je Thema, die zweifarbige Gliederung,
+' Schriftgroessen fuer Listen und Handbuch in den Einstellungen, Umlaute in
+' der Oberflaeche (die Suche in Listen nimmt "oe" fuer "ö") und das
+' Info-Fenster mit Symbol und Schriftzug. Der Einschub steht hinter dem
+' letzten Schritt des Starts.
+
+=== die codefarben wechseln mit dem thema
+PRINT "dunkel "; COLOR_HEX$(F_SCHLUESSEL); " "; COLOR_HEX$(F_TEXT)
+befehl("thema")
+PRINT "hell "; COLOR_HEX$(F_SCHLUESSEL); " "; COLOR_HEX$(F_TEXT)
+befehl("thema")
+PRINT "wieder dunkel "; COLOR_HEX$(F_SCHLUESSEL)
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+dunkel #2BC4E8 #E0A060
+hell #0B63A8 #A5570A
+wieder dunkel #2BC4E8
+
+=== das helle thema aus der einstellung bringt die hellen codefarben mit
+PRINT "hell "; hell; " "; COLOR_HEX$(F_SCHLUESSEL)
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- datei _programm/ide.json
+{"hell": true}
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+hell TRUE #0B63A8
+
+=== die gliederung zeigt die art in der farbe der schluesselwoerter
+' Im Bild: in der Gliederung stehen Punkte in der Schluesselwort-Farbe
+' (#2BC4E8, dunkles Thema). Gesucht wird nur im Rechteck der Liste; das
+' findet GUI_HIT_TEST, weil die Lage erst zur Laufzeit feststeht.
+gliederungFuellen("SUB malen()" + NL + "END SUB" + NL + "FUNCTION rechne() AS INTEGER" + NL + "END FUNCTION" + NL)
+layout()
+GUI_UPDATE()
+DIM prX1 AS INTEGER : prX1 = 100000
+DIM prY1 AS INTEGER : prY1 = 100000
+DIM prX2 AS INTEGER : prX2 = -1
+DIM prY2 AS INTEGER : prY2 = -1
+DIM prX AS INTEGER
+DIM prY AS INTEGER
+FOR prY = 0 TO SCREENHEIGHT() - 1 STEP 4
+    FOR prX = 0 TO 600 STEP 4
+        IF GUI_HIT_TEST(prX, prY) = lstGliederung THEN
+            prX1 = MIN(prX1, prX) : prY1 = MIN(prY1, prY)
+            prX2 = MAX(prX2, prX) : prY2 = MAX(prY2, prY)
+        END IF
+    NEXT
+NEXT
+WRITEALL("rechteck.txt", STR$(prX1) + " " + STR$(prY1) + " " + STR$(prX2) + " " + STR$(prY2))
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=30
+DHRT_SCREENSHOT={fall}/bild.png
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+DIM teile AS ARRAY OF STRING : teile = SPLIT(TRIM$(READLINES("_programm/rechteck.txt")[0]), " ")
+PRINT "rechteck gefunden "; (VAL(teile[2]) > VAL(teile[0]))
+DIM treffer AS INTEGER : treffer = 0
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = VAL(teile[1]) TO VAL(teile[3])
+    FOR x = VAL(teile[0]) TO VAL(teile[2])
+        DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+        DIM r AS INTEGER : r = (c SHR 16) BAND 255
+        DIM g AS INTEGER : g = (c SHR 8) BAND 255
+        DIM bl AS INTEGER : bl = c BAND 255
+        IF ABS(r - &H2B) < 40 AND ABS(g - &HC4) < 40 AND ABS(bl - &HE8) < 40 THEN treffer = treffer + 1
+    NEXT
+NEXT
+PRINT "schluesselfarbe "; (treffer > 15)
+--- erwartet
+rechteck gefunden TRUE
+schluesselfarbe TRUE
+
+=== die schriftgroessen stehen in den einstellungen
+PRINT "vorgabe "; listenGroesse; " "; handbuchGroesse
+einstellungenZeigen()
+GUI_SET_VALUE(spListen, 22)
+GUI_SET_VALUE(spHbGr, 20)
+einstellungenNachziehen()
+PRINT "jetzt "; listenGroesse; " "; handbuchGroesse
+' Nichts ueberlappt, und der Knopf liegt im Fenster.
+PRINT "listen unter code "; (GUI_GET_Y(spListen) >= GUI_GET_Y(spSchrift) + GUI_GET_H(spSchrift))
+PRINT "handbuch unter listen "; (GUI_GET_Y(spHbGr) >= GUI_GET_Y(spListen) + GUI_GET_H(spListen))
+PRINT "sichern unter handbuch "; (GUI_GET_Y(spAuto) >= GUI_GET_Y(spHbGr) + GUI_GET_H(spHbGr))
+PRINT "knopf unter sichern "; (GUI_GET_Y(btnEinstZu) >= GUI_GET_Y(spAuto) + GUI_GET_H(spAuto))
+PRINT "knopf im fenster "; (GUI_GET_Y(btnEinstZu) + GUI_GET_H(btnEinstZu) + 30 <= GUI_WINDOW_GET_H(winEinst))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- nachher
+IMPORT "json"
+DIM j AS JSON_HANDLE : j = JSON_LOAD("_programm/ide.json")
+PRINT "gesichert "; JSON_GET_INT(j, "listen_schrift"); " "; JSON_GET_INT(j, "handbuch_schrift")
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 14) = "listenschrift " OR LEFT$(L[i], 16) = "handbuchschrift " THEN PRINT L[i]
+NEXT
+--- erwartet
+gesichert 22 20
+listenschrift 18
+handbuchschrift 16
+listenschrift 22
+handbuchschrift 20
+
+=== eine gesicherte schriftgroesse gilt beim naechsten start
+PRINT "listen "; listenGroesse; " handbuch "; handbuchGroesse
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- datei _programm/ide.json
+{"listen_schrift": 12, "handbuch_schrift": 24}
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+listen 12 handbuch 24
+
+=== umlaute in der oberflaeche, die suche nimmt beide schreibweisen
+PRINT "knopf "; GUI_TEXT(btnWkOeffnen)
+PRINT "oe trifft "; passtUnscharf("Datei öffnen", "oeffnen")
+PRINT "ö trifft "; passtUnscharf("Datei oeffnen", "öffnen")
+PRINT "ss trifft "; passtUnscharf("Schrift größer", "groesser")
+PRINT "daneben "; passtUnscharf("Schrift kleiner", "groesser")
+paletteOeffnen()
+paletteFuellen("oeffnen")
+PRINT "palette "; (GUI_LISTBOX_COUNT(lstPalette) > 0); " "; GUI_LISTBOX_ITEM(lstPalette, 0)
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- erwartet
+knopf Datei öffnen ...
+oe trifft TRUE
+ö trifft TRUE
+ss trifft TRUE
+daneben FALSE
+palette TRUE Öffnen ...
+
+=== das info-fenster zeigt symbol und schriftzug, enter schliesst
+befehl("ueber")
+protokoll("probe offen " + STR$(GUI_WINDOW_SHOWN(winUeber)))
+protokoll("probe text " + LEFT$(GUI_TEXT(lblUeber), 16))
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- datei _programm/ev.txt
+c 2
+e 10 2 257 0 0 0
+e 11 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 13) = "ueber bilder " OR L[i] = "ueber zu" OR LEFT$(L[i], 6) = "probe " THEN PRINT L[i]
+NEXT
+--- erwartet
+ueber bilder 2
+probe offen TRUE
+probe text Drachenhauch-IDE
+ueber zu
+
+=== ohne bilder bleibt das info-fenster beim text
+befehl("ueber")
+protokoll("probe offen " + STR$(GUI_WINDOW_SHOWN(winUeber)))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 13) = "ueber bilder " OR LEFT$(L[i], 6) = "probe " THEN PRINT L[i]
+NEXT
+--- erwartet
+ueber bilder 0
+probe offen TRUE

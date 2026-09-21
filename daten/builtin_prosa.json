@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1870,
+ "count": 1871,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -610,6 +610,7 @@
   "GUI_LISTBOX_SET_ITEM": "zählen, lesen, umbeschriften, verschieben",
   "GUI_LISTBOX_SET_SELECTED": "Auswahl vom Programm aus setzen",
   "GUI_LISTBOX_SORT": "natürlich sortieren („Datei 9“ vor „Datei 10“), innerhalb der Gruppen",
+  "GUI_LISTBOX_SPANS": "Abschnitte eines Eintrags einfärben (Zeichen ab 0, drei gleich lange ARRAY OF INTEGER; leer nimmt sie weg) -- etwa das Schlüsselwort in einer, den Namen in einer anderen Farbe. Auf der Auswahl und gesperrt gilt eine Farbe. Die Zeilenhöhe einer Liste folgt ihrer Schrift (GUI_SET_FONT_SIZE)",
   "GUI_LISTBOX_TEXT": "STRING — Text der Auswahl",
   "GUI_LISTBOX_TIP": "Tooltip je Eintrag",
   "GUI_LISTBOX_VIEW_COUNT": "INTEGER — Zahl der sichtbaren Zeilen",
