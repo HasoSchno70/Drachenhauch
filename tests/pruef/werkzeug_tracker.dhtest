@@ -948,10 +948,10 @@ DHRT_FRAMES=120
 
 === sample- und keymap-instrumente ueberleben das sichern
 ' Die Beilage hat `Song.save_json` der Qt-Fassung geschrieben: Orgel (synth),
-' ein Sample- und ein Keymap-Instrument. Dieser Pilot spielt die beiden letzten
-' nicht -- bis 2026-09-17 schrieb er sie beim Sichern als synth zurueck, und die
-' Samples waren weg. Jetzt kommen sie Byte fuer Byte wieder heraus; die Anzeige
-' sagt, dass sie hier stumm sind, der Name in der Datei nicht.
+' ein Sample- und ein Keymap-Instrument. Bis 2026-09-17 schrieb der Pilot die
+' beiden letzten beim Sichern als synth zurueck, und die Samples waren weg.
+' Jetzt kommen sie Byte fuer Byte wieder heraus; die Anzeige nennt ihre Art,
+' der Name in der Datei nicht.
 SET_WINDOW_POS(-3000, -3000)
 --- programm ../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach bildNr = bildNr + 1
@@ -983,30 +983,185 @@ instrumente 3
 sample unveraendert TRUE
 keymap unveraendert TRUE
 Orgel
-Klavier-Sample [sample, hier stumm]
-Harfe-Keymap [keymap, hier stumm]
+Klavier-Sample [sample]
+Harfe-Keymap [keymap]
 
-=== ein nicht spielbares instrument bleibt wirklich stumm
-' Kanal 0 spielt in Reihe 0 mit dem Sample-Instrument, Kanal 1 in Reihe 8 mit
-' der Orgel. Bis 2026-09-17 klang das Sample als Rechteck -- es traegt keine
-' Wellenform, und "square" ist die Vorgabe -- obwohl sein Name "hier stumm"
-' sagte. In der WAV ist Reihe 0 jetzt still, Reihe 8 (1000 ms) klingt.
+=== ein instrument unbekannter art bleibt wirklich stumm
+' Kanal 0 spielt in Reihe 0 mit einem Instrument, dessen Art der Pilot nicht
+' kennt ("granular" -- die Beilage ist die Qt-Datei mit umbenannter Art),
+' Kanal 1 in Reihe 8 mit der Orgel. Bis 2026-09-17 klang so etwas als
+' Rechteck -- es traegt keine Wellenform, und "square" ist die Vorgabe. In der
+' WAV ist Reihe 0 still, Reihe 8 (1000 ms) klingt, und die Anzeige sagt es.
 SET_WINDOW_POS(-3000, -3000)
 --- programm ../../examples/190_tracker.dh nach SETFPS(60)
 --- einschub nach bildNr = bildNr + 1
 IF bildNr = 3 THEN
     ladeDatei("qt.json")
+    WRITEALL("anzeige.txt", instName$(1) + CHR$(10))
     wavRendern("out.wav")
 END IF
 
 --- umgebung
 DHRT_FRAMES=6
 --- datei _programm/qt.json
-{"format":"dhtracker-song","version":1,"bpm":120,"channels":4,"waves":["square","saw","triangle"],"patterns":[{"name":"P1","rows":16,"channels":4,"data":[[60,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,67,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]]}],"order":[0],"instruments":[{"name":"Orgel","kind":"synth","default_vol":15,"pan":0.0,"waveform":"square","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Klavier-Sample","kind":"sample","default_vol":12,"pan":-0.25,"sample_rate":22050,"base_note":60,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa260oUrjkEVtdk1GMjU2Q1Qg+85i3CU6dmmm+d8q8Iz871Lh7RQR5bHGYQYcZMbSwaBfvcW7qroqOZr6CztjrYAAA=","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":90},{"name":"Harfe-Keymap","kind":"keymap","default_vol":15,"pan":0.0,"zones":[{"name":"tief","sample_rate":22050,"root_note":48,"lo_key":0,"hi_key":127,"loop_mode":"forward","loop_start":4,"loop_end":30,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa26w=="}],"loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0}],"channel_inst":[1,0,null,null]}
+{"format":"dhtracker-song","version":1,"bpm":120,"channels":4,"waves":["square","saw","triangle"],"patterns":[{"name":"P1","rows":16,"channels":4,"data":[[60,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,67,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]]}],"order":[0],"instruments":[{"name":"Orgel","kind":"synth","default_vol":15,"pan":0.0,"waveform":"square","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Klavier-Sample","kind":"granular","default_vol":12,"pan":-0.25,"sample_rate":22050,"base_note":60,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa260oUrjkEVtdk1GMjU2Q1Qg+85i3CU6dmmm+d8q8Iz871Lh7RQR5bHGYQYcZMbSwaBfvcW7qroqOZr6CztjrYAAA=","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":90},{"name":"Harfe-Keymap","kind":"keymap","default_vol":15,"pan":0.0,"zones":[{"name":"tief","sample_rate":22050,"root_note":48,"lo_key":0,"hi_key":127,"loop_mode":"forward","loop_start":4,"loop_end":30,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa26w=="}],"loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0}],"channel_inst":[1,0,null,null]}
 
 --- ton _programm/out.wav
 pegel 20 40 < 0.05
 pegel 1020 1040 > 0.3
+--- inhalt _programm/anzeige.txt
+Klavier-Sample [granular, hier stumm]
+
+=== sample- und keymap-instrumente klingen
+' Das Lied baut der Fall selbst: ein Sample-Instrument (Sinus 441 Hz bei
+' 22050, Grundtaste 69, 0,3 s ohne Loop) auf Kanal 0 in Reihe 0 mit Taste 81,
+' also eine Oktave hoeher; ein Keymap-Instrument auf Kanal 1 in Reihe 8 mit
+' zwei Zonen -- die untere (bis Taste 59) ist Stille, die obere ab 60 derselbe
+' Sinus, Grundtaste 60, mit Loop 1100..2200. Taste 60 muss die obere treffen.
+' Die WAV zeigt: Reihe 0 klingt mit 882 Hz und endet mit dem Sample (0,15 s
+' bei doppelter Geschwindigkeit), Reihe 8 (1000 ms) klingt mit 441 Hz und
+' haelt bis zum Ende des Patterns (2000 ms) -- nur der Loop kann das, das
+' Sample allein ist nach 0,3 s aus.
+SET_WINDOW_POS(-3000, -3000)
+--- vorher
+IMPORT "json"
+FUNCTION sinus$(n AS INTEGER) AS STRING
+    DIM b AS BUFFER : b = BUFFER_NEW(n * 2)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        BUFFER_SET_I16(b, i * 2, INT(SIN(2.0 * PI * 441.0 * i / 22050.0) * 32000.0))
+    NEXT
+    RETURN BUFFER_TO_BASE64$(b)
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+JSON_SET_STRING(h, "format", "dhtracker-song")
+JSON_SET_INT(h, "version", 1)
+JSON_SET_INT(h, "bpm", 120)
+JSON_SET_INT(h, "channels", 4)
+DIM ins AS JSON_HANDLE : ins = JSON_NEW_ARRAY()
+DIM s AS JSON_HANDLE : s = JSON_NEW_OBJECT()
+JSON_SET_STRING(s, "name", "Sinus")
+JSON_SET_STRING(s, "kind", "sample")
+JSON_SET_INT(s, "default_vol", 15)
+JSON_SET_INT(s, "sample_rate", 22050)
+JSON_SET_INT(s, "base_note", 69)
+JSON_SET_STRING(s, "samples", sinus$(6615))
+JSON_SET_STRING(s, "loop_mode", "none")
+JSON_APPEND_JSON(ins, "", s)
+DIM k AS JSON_HANDLE : k = JSON_NEW_OBJECT()
+JSON_SET_STRING(k, "name", "Zonen")
+JSON_SET_STRING(k, "kind", "keymap")
+JSON_SET_INT(k, "default_vol", 15)
+DIM zs AS JSON_HANDLE : zs = JSON_NEW_ARRAY()
+DIM z AS JSON_HANDLE : z = JSON_NEW_OBJECT()
+JSON_SET_STRING(z, "name", "leer")
+JSON_SET_INT(z, "sample_rate", 22050)
+JSON_SET_INT(z, "root_note", 48)
+JSON_SET_INT(z, "lo_key", 0)
+JSON_SET_INT(z, "hi_key", 59)
+JSON_SET_STRING(z, "samples", BUFFER_TO_BASE64$(BUFFER_NEW(2000)))
+JSON_APPEND_JSON(zs, "", z)
+z = JSON_NEW_OBJECT()
+JSON_SET_STRING(z, "name", "sinus")
+JSON_SET_INT(z, "sample_rate", 22050)
+JSON_SET_INT(z, "root_note", 60)
+JSON_SET_INT(z, "lo_key", 60)
+JSON_SET_INT(z, "hi_key", 127)
+JSON_SET_STRING(z, "loop_mode", "forward")
+JSON_SET_INT(z, "loop_start", 1100)
+JSON_SET_INT(z, "loop_end", 2200)
+JSON_SET_STRING(z, "samples", sinus$(6615))
+JSON_APPEND_JSON(zs, "", z)
+JSON_SET_JSON(k, "zones", zs)
+JSON_APPEND_JSON(ins, "", k)
+JSON_SET_JSON(h, "instruments", ins)
+DIM ci AS JSON_HANDLE : ci = JSON_NEW_ARRAY()
+JSON_APPEND_INT(ci, "", 0) : JSON_APPEND_INT(ci, "", 1)
+JSON_APPEND_INT(ci, "", -1) : JSON_APPEND_INT(ci, "", -1)
+JSON_SET_JSON(h, "channel_inst", ci)
+DIM pat AS JSON_HANDLE : pat = JSON_NEW_OBJECT()
+JSON_SET_STRING(pat, "name", "P1")
+JSON_SET_INT(pat, "rows", 16)
+JSON_SET_INT(pat, "channels", 4)
+DIM daten AS JSON_HANDLE : daten = JSON_NEW_ARRAY()
+DIM c AS INTEGER
+DIM r AS INTEGER
+FOR c = 0 TO 3
+    DIM spur AS JSON_HANDLE : spur = JSON_NEW_ARRAY()
+    FOR r = 0 TO 15
+        IF c = 0 AND r = 0 THEN
+            JSON_APPEND_INT(spur, "", 81)
+        ELSEIF c = 1 AND r = 8 THEN
+            JSON_APPEND_INT(spur, "", 60)
+        ELSE
+            JSON_APPEND_NULL(spur, "")
+        END IF
+    NEXT
+    JSON_APPEND_JSON(daten, "", spur)
+NEXT
+JSON_SET_JSON(pat, "data", daten)
+DIM pats AS JSON_HANDLE : pats = JSON_NEW_ARRAY()
+JSON_APPEND_JSON(pats, "", pat)
+JSON_SET_JSON(h, "patterns", pats)
+DIM ord AS JSON_HANDLE : ord = JSON_NEW_ARRAY()
+JSON_APPEND_INT(ord, "", 0)
+JSON_SET_JSON(h, "order", ord)
+WRITEALL("_programm/lied.json", JSON_STRINGIFY(h))
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN
+    ladeDatei("lied.json")
+    WRITEALL("anzeige.txt", instName$(0) + CHR$(10) + instName$(1) + CHR$(10))
+    wavRendern("out.wav")
+END IF
+
+--- umgebung
+DHRT_FRAMES=6
+--- nachher
+FUNCTION hz(w AS BUFFER, d AS INTEGER, von AS INTEGER, bis AS INTEGER) AS FLOAT
+    DIM a AS INTEGER : a = 44100 * von \ 1000
+    DIM e AS INTEGER : e = 44100 * bis \ 1000
+    DIM kreuz AS INTEGER : kreuz = 0
+    DIM vorher AS BOOLEAN : vorher = BUFFER_GET_I16(w, d + a * 2) < 0
+    DIM i AS INTEGER
+    FOR i = a + 1 TO e - 1
+        DIM neg AS BOOLEAN : neg = BUFFER_GET_I16(w, d + i * 2) < 0
+        IF neg <> vorher THEN kreuz = kreuz + 1
+        vorher = neg
+    NEXT
+    RETURN kreuz / 2.0 / ((bis - von) / 1000.0)
+END FUNCTION
+FUNCTION spitze(w AS BUFFER, d AS INTEGER, von AS INTEGER, bis AS INTEGER) AS FLOAT
+    DIM m AS INTEGER : m = 0
+    DIM i AS INTEGER
+    FOR i = 44100 * von \ 1000 TO 44100 * bis \ 1000
+        m = MAX(m, ABS(BUFFER_GET_I16(w, d + i * 2)))
+    NEXT
+    RETURN m / 32768.0
+END FUNCTION
+DIM w AS BUFFER : w = READALL_BYTES("_programm/out.wav")
+DIM d AS INTEGER : d = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data")) + 8
+DIM f AS FLOAT
+PRINT "reihe 0 klingt "; spitze(w, d, 20, 120) > 0.3
+f = hz(w, d, 20, 120)
+PRINT "reihe 0 um 882 hz "; f > 850 AND f < 915
+PRINT "sample aus nach 150 ms "; spitze(w, d, 250, 950) < 0.02
+PRINT "reihe 8 klingt "; spitze(w, d, 1020, 1120) > 0.3
+f = hz(w, d, 1100, 1900)
+PRINT "reihe 8 um 441 hz "; f > 430 AND f < 452
+PRINT "der loop haelt bis 2000 ms "; spitze(w, d, 1900, 1980) > 0.3
+DIM a AS ARRAY OF STRING : a = READLINES("_programm/anzeige.txt")
+PRINT a[0]
+PRINT a[1]
+--- erwartet
+reihe 0 klingt TRUE
+reihe 0 um 882 hz TRUE
+sample aus nach 150 ms TRUE
+reihe 8 klingt TRUE
+reihe 8 um 441 hz TRUE
+der loop haelt bis 2000 ms TRUE
+Sinus [sample]
+Zonen [keymap]
 
 === entfernen und kopieren tragen das instrument mit
 ' Die Orgel (Nummer 0) weg: das Sample rueckt auf Platz 0 und bleibt ein

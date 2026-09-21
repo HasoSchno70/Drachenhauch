@@ -365,8 +365,10 @@ Drum-Sample wird so ein ganzes Instrument.
 | Funktion | Wirkung |
 |---|---|
 | `SAMPLE_LOAD(pfad$)` → SAMPLE | WAV/OGG/QOA laden, auf Mono normalisiert |
+| `SAMPLE_FROM_BUFFER(puffer, abtastrate)` → SAMPLE | Sample aus rohem 16-Bit-PCM (little endian, vorzeichenbehaftet, mono) |
 | `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
-| `SAMPLE_SET_LOOP(sample, start, end)` | Loop-Region in Frames (fuer gehaltene Noten) |
+| `SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])` → SOUND | eine Note als Klang bauen (nicht abspielen), Huellkurve wie `AUDIO_NOTE` |
+| `SAMPLE_SET_LOOP(sample, start, end[, art$])` | Loop-Region in Frames (fuer gehaltene Noten), `art$` = `vorwaerts` (Vorgabe) oder `pingpong` |
 | `SAMPLE_LEN(sample)` → FLOAT | Laenge in Sekunden bei Originaltonhoehe |
 
 `halbtoene` ist relativ zur Originaltonhoehe des Samples: `0` = wie aufgenommen,
@@ -393,6 +395,32 @@ SAMPLE_PLAY(pluck, -5, 0.6)                 ' eine Quarte tiefer
 ' Gehaltener Ton mit Loop (z.B. Frames 2000..8000 der Quelle):
 SAMPLE_SET_LOOP(pluck, 2000, 8000)
 SAMPLE_PLAY(pluck, 0, 0.7, 1000)            ' 1 s, Loop-Region gehalten
+```
+
+**`SAMPLE_NOTE` statt `SAMPLE_PLAY`**, wenn der Klang nicht sofort laufen
+soll: es liefert einen `SOUND`, den man mit `AUDIO_PLAY_AT` auf eine
+Audio-Uhr legt oder mit `AUDIO_SOUND_MIX` in einen anderen mischt — so
+spielt der Tracker seine Sample-Instrumente. Die Huellkurve ist die von
+`AUDIO_NOTE`: Attack, Decay auf den Sustain-Pegel, das Ausklingen haengt
+HINTEN an (Laenge = `dauer_ms + release_ms`); die Loop-Region haelt den Ton,
+ohne Loop verstummt die Note, wenn das Sample zu Ende ist. `slide_halbtoene`
+gleitet ueber die gehaltene Zeit zur Zieltonhoehe. Der Klang hat 44100 Hz,
+die Abtastrate des Samples ist in der Tonhoehe schon verrechnet.
+
+`SAMPLE_FROM_BUFFER` nimmt Samples, die nicht als Datei vorliegen — etwa
+Base64 in einer JSON (`BUFFER_FROM_BASE64` davor). Ein Wert −32768..32767
+wird durch 32768 geteilt; eine ungerade Laenge ist ein Fehler.
+**Pingpong** laeuft die Loop-Region am Ende rueckwaerts wieder hinunter
+statt an ihren Anfang zu springen — ein Sample, dessen Enden nicht
+zusammenpassen, knackt so nicht.
+
+```basic
+DIM s AS SAMPLE
+s = SAMPLE_FROM_BUFFER(BUFFER_FROM_BASE64(daten$), 22050)
+SAMPLE_SET_LOOP(s, 1100, 2200, "pingpong")
+DIM ton AS SOUND
+ton = SAMPLE_NOTE(s, 7, 500, 5, 100, 0.6, 200, 0.8)   ' Quinte hoeher
+AUDIO_PLAY_AT(ton, uhr, 16)
 ```
 
 Demo: [examples/116_sampler.dh](../examples/116_sampler.dh) — ein Zupf-Sample

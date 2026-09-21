@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1911,
+ "count": 1913,
  "builtins": [
   {
    "name": "ABS",
@@ -8679,6 +8679,18 @@
    "module": "dhrt"
   },
   {
+   "name": "SAMPLE_FROM_BUFFER",
+   "kind": "core",
+   "signature": "SAMPLE_FROM_BUFFER(puffer, abtastrate)",
+   "module": "audio"
+  },
+  {
+   "name": "SAMPLE_NOTE",
+   "kind": "core",
+   "signature": "SAMPLE_NOTE(sample, halbtoene, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, slide_halbtoene])",
+   "module": "audio"
+  },
+  {
    "name": "SAMPLE_LEN",
    "kind": "core",
    "signature": "SAMPLE_LEN(sample)",
@@ -8699,7 +8711,7 @@
   {
    "name": "SAMPLE_SET_LOOP",
    "kind": "core",
-   "signature": "SAMPLE_SET_LOOP(sample, start, end)",
+   "signature": "SAMPLE_SET_LOOP(sample, start, end[, art$])",
    "module": "audio"
   },
   {
