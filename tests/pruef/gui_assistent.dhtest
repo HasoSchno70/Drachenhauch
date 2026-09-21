@@ -1,0 +1,244 @@
+' GUI_WIZARD -- Schritte mit Schrittanzeige und Zurueck/Weiter/Fertig/
+' Abbrechen. Randloses Fenster bei (0,0); der Assistent liegt bei (10,10)
+' mit 400x250: die Knopfreihe beginnt bei y 212, die Knoepfe sind 112x30
+' bei y 221 -- Weiter ab x 288, Zurueck ab x 168, Abbrechen ab x 20.
+' Format: docs/werkzeuge.md.
+
+=== schritte zaehlen setzen und fehler
+IMPORT "gui"
+SCREEN(440, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 440, 300)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(w, 10, 10, 400, 250)
+GUI_WIZARD_ADD(wz, "Konto")
+GUI_WIZARD_ADD(wz, "Adresse")
+GUI_WIZARD_ADD(wz, "Fertig")
+PRINT GUI_WIZARD_COUNT(wz); " "; GUI_WIZARD_STEP(wz)
+GUI_WIZARD_SET_STEP(wz, 2)
+PRINT GUI_WIZARD_STEP(wz)
+PRINT "zurueck "; GUI_WIZARD_BACK(wz); " "; GUI_WIZARD_STEP(wz)
+PRINT "weiter "; GUI_WIZARD_NEXT(wz); " "; GUI_WIZARD_STEP(wz)
+PRINT "am ende "; GUI_WIZARD_NEXT(wz); " "; GUI_WIZARD_STEP(wz)
+GUI_WIZARD_SET_STEP(wz, 0)
+PRINT "am anfang zurueck "; GUI_WIZARD_BACK(wz)
+GUI_WIZARD_ENABLE_NEXT(wz, FALSE)
+PRINT "gesperrt "; GUI_WIZARD_NEXT(wz); " "; GUI_WIZARD_STEP(wz)
+TRY
+    GUI_WIZARD_SET_STEP(wz, 7)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_WIZARD_SET(wz, "schnell", 1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+3 0
+2
+zurueck TRUE 1
+weiter TRUE 2
+am ende TRUE 2
+am anfang zurueck FALSE
+gesperrt FALSE 0
+GUI_WIZARD_SET_STEP: Schritt 7 gibt es nicht
+GUI_WIZARD_SET: unbekannter Schluessel 'schnell' (erlaubt: pruefen)
+
+=== die knoepfe blaettern und melden je ein bild
+IMPORT "gui"
+SCREEN(440, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 440, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(w, 10, 10, 400, 250)
+GUI_WIZARD_ADD(wz, "Eins")
+GUI_WIZARD_ADD(wz, "Zwei")
+DIM bild AS INTEGER : bild = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_WIZARD_CHANGED(wz) THEN PRINT "bild "; bild; " schritt "; GUI_WIZARD_STEP(wz)
+    IF GUI_WIZARD_FINISHED(wz) THEN PRINT "bild "; bild; " fertig"
+    IF GUI_WIZARD_CANCELLED(wz) THEN PRINT "bild "; bild; " abgebrochen"
+    bild = bild + 1
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 12
+e 1 7 344 236 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 5 7 224 236 0 0
+e 6 6 0 0 0 0
+e 7 5 0 0 0 0
+e 9 7 344 236 0 0
+e 10 6 0 0 0 0
+e 11 5 0 0 0 0
+e 13 6 0 0 0 0
+e 14 5 0 0 0 0
+e 16 7 76 236 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+bild 2 schritt 1
+bild 6 schritt 0
+bild 10 schritt 1
+bild 13 fertig
+
+=== abbrechen meldet sich
+IMPORT "gui"
+SCREEN(440, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 440, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(w, 10, 10, 400, 250)
+GUI_WIZARD_ADD(wz, "Eins")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_WIZARD_CANCELLED(wz) THEN PRINT "abgebrochen"
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 1 7 76 236 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+abgebrochen
+
+=== ein pflichtfeld haelt den assistenten an
+' Mit "pruefen" geht Weiter erst, wenn die Felder DIESES Schritts ihre
+' Regeln erfuellen; das falsche Feld bekommt den Fokus. Ein Feld auf dem
+' naechsten Schritt zaehlt noch nicht.
+IMPORT "gui"
+SCREEN(440, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 440, 300)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(w, 10, 10, 400, 250)
+GUI_WIZARD_ADD(wz, "Name")
+GUI_WIZARD_ADD(wz, "Ort")
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 30, 90, 200, 26, "")
+DIM ort AS GUI_WIDGET : ort = GUI_TEXTINPUT(w, 30, 90, 200, 26, "")
+GUI_WIZARD_ADD_WIDGET(wz, name, 0)
+GUI_WIZARD_ADD_WIDGET(wz, ort, 1)
+GUI_RULE(name, "pflicht")
+GUI_RULE(ort, "pflicht")
+GUI_WIZARD_SET(wz, "pruefen", 1)
+GUI_UPDATE()
+PRINT "leer "; GUI_WIZARD_NEXT(wz); " "; GUI_WIZARD_STEP(wz); " fokus "; (GUI_FOCUSED() = name)
+GUI_SET_TEXT(name, "Anna")
+PRINT "gefuellt "; GUI_WIZARD_NEXT(wz); " "; GUI_WIZARD_STEP(wz)
+GUI_UPDATE()
+PRINT "ort leer "; GUI_WIZARD_NEXT(wz); " "; GUI_WIZARD_STEP(wz)
+GUI_WIZARD_SET(wz, "pruefen", 0)
+PRINT "ohne pruefen "; GUI_WIZARD_NEXT(wz)
+--- erwartet
+leer FALSE 0 fokus TRUE
+gefuellt TRUE 1
+ort leer FALSE 1
+ohne pruefen TRUE
+
+=== nur der aktuelle schritt ist zu sehen
+' Zwei Felder an derselben Stelle auf zwei Schritten: der Treffertest
+' findet immer das des aktuellen Schritts.
+IMPORT "gui"
+SCREEN(440, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 440, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(w, 10, 10, 400, 250)
+GUI_WIZARD_ADD(wz, "Eins")
+GUI_WIZARD_ADD(wz, "Zwei")
+DIM a AS GUI_WIDGET : a = GUI_TEXTINPUT(w, 30, 90, 200, 26, "")
+DIM b AS GUI_WIDGET : b = GUI_TEXTINPUT(w, 30, 90, 200, 26, "")
+GUI_WIZARD_ADD_WIDGET(wz, a, 0)
+GUI_WIZARD_ADD_WIDGET(wz, b, 1)
+GUI_UPDATE()
+PRINT "schritt 0 trifft a "; (GUI_HIT_TEST(100, 100) = a)
+GUI_WIZARD_SET_STEP(wz, 1)
+GUI_UPDATE()
+PRINT "schritt 1 trifft b "; (GUI_HIT_TEST(100, 100) = b)
+' Mitten in der Flaeche ohne Feld ist es der Assistent selbst (so waehlt
+' ein Form-Designer ihn an) -- einen KLICK dort nimmt er aber nicht an.
+PRINT "flaeche ist der assistent "; (GUI_HIT_TEST(300, 150) = wz)
+--- erwartet
+schritt 0 trifft a TRUE
+schritt 1 trifft b TRUE
+flaeche ist der assistent TRUE
+
+=== enter ist weiter und die form behaelt alles
+IMPORT "gui"
+SCREEN(440, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 440, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(w, 10, 10, 400, 250)
+GUI_WIZARD_ADD(wz, "Eins")
+GUI_WIZARD_ADD(wz, "Zwei")
+GUI_WIZARD_SET(wz, "pruefen", 1)
+GUI_WIZARD_LABELS(wz, "Back", "Next", "Done", "Cancel")
+GUI_FOCUS(wz)
+DIM gezeigt AS BOOLEAN : gezeigt = FALSE
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_WIZARD_CHANGED(wz) THEN PRINT "enter "; GUI_WIZARD_STEP(wz)
+    IF NOT gezeigt THEN
+        gezeigt = TRUE
+        DIM j AS STRING : j = GUI_TO_JSON(w)
+        DIM oj AS STRING : oj = REPLACE$(j, " ", "")
+        PRINT "form "; (INSTR(oj, CHR$(34) + "pruefen" + CHR$(34) + ":true") >= 0); " "; (INSTR(oj, CHR$(34) + "Done" + CHR$(34)) >= 0)
+        DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+        GUI_WINDOW_VISIBLE(w2, FALSE)
+        PRINT GUI_KIND(GUI_WINDOW_WIDGET(w2, 0)); " "; GUI_WIZARD_COUNT(GUI_WINDOW_WIDGET(w2, 0))
+    END IF
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 2 2 257 0 0 0
+e 3 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+form TRUE TRUE
+wizard 2
+enter 1
+
+=== der geladene assistent behaelt pruefung und knopftexte
+' Gegenprobe zum Lesen: geschrieben wird beides schon oben; hier muss es
+' nach GUI_FROM_JSON noch wirken bzw. beim erneuten Schreiben wieder dastehen.
+IMPORT "gui"
+SCREEN(440, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 440, 300)
+DIM wz AS GUI_WIDGET : wz = GUI_WIZARD(w, 10, 10, 400, 250)
+GUI_WIZARD_ADD(wz, "Name")
+GUI_WIZARD_ADD(wz, "Ort")
+DIM nm AS GUI_WIDGET : nm = GUI_TEXTINPUT(w, 30, 90, 200, 26, "")
+GUI_WIZARD_ADD_WIDGET(wz, nm, 0)
+GUI_RULE(nm, "pflicht")
+GUI_WIZARD_SET(wz, "pruefen", 1)
+GUI_WIZARD_LABELS(wz, "Back", "Next", "Done", "Cancel")
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(GUI_TO_JSON(w))
+GUI_WINDOW_VISIBLE(w, FALSE)
+GUI_UPDATE()
+DIM z2 AS GUI_WIDGET : z2 = GUI_WINDOW_WIDGET(w2, 0)
+PRINT "leer weiter "; GUI_WIZARD_NEXT(z2); " "; GUI_WIZARD_STEP(z2)
+DIM oj AS STRING : oj = REPLACE$(GUI_TO_JSON(w2), " ", "")
+PRINT "texte "; (INSTR(oj, CHR$(34) + "Done" + CHR$(34)) >= 0)
+--- erwartet
+leer weiter FALSE 0
+texte TRUE

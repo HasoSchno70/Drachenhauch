@@ -6164,6 +6164,53 @@ impl<'p> Vm<'p> {
             "gui_tabcontrol_set_title" => { self.gui.tabcontrol_set_title(gi(a,0,"GUI_TABCONTROL_SET_TITLE")?, gi(a,1,"GUI_TABCONTROL_SET_TITLE")?, gs(a,2,"GUI_TABCONTROL_SET_TITLE")?)?; Value::Nil }
             "gui_tabcontrol_add_widget" => { self.gui.tabcontrol_add_widget(gi(a,0,"GUI_TABCONTROL_ADD_WIDGET")?, gi(a,1,"GUI_TABCONTROL_ADD_WIDGET")?, gi(a,2,"GUI_TABCONTROL_ADD_WIDGET")?)?; Value::Nil }
             "gui_tabcontrol_remove" => { self.gui.tabcontrol_remove(gi(a,0,"GUI_TABCONTROL_REMOVE")?, gi(a,1,"GUI_TABCONTROL_REMOVE")?)?; Value::Nil }
+            // --- Akkordeon ---
+            "gui_accordion" => Value::Int(self.gui.accordion(gi(a,0,"GUI_ACCORDION")?, gi(a,1,"GUI_ACCORDION")? as i32,
+                gi(a,2,"GUI_ACCORDION")? as i32, gi(a,3,"GUI_ACCORDION")? as i32, gi(a,4,"GUI_ACCORDION")? as i32)?),
+            "gui_accordion_add" => Value::Int(self.gui.accordion_add(gi(a,0,"GUI_ACCORDION_ADD")?, gs(a,1,"GUI_ACCORDION_ADD")?)?),
+            "gui_accordion_add_widget" => { self.gui.accordion_add_widget(gi(a,0,"GUI_ACCORDION_ADD_WIDGET")?, gi(a,1,"GUI_ACCORDION_ADD_WIDGET")?, gi(a,2,"GUI_ACCORDION_ADD_WIDGET")?)?; Value::Nil }
+            "gui_accordion_open" => { self.gui.accordion_open(gi(a,0,"GUI_ACCORDION_OPEN")?, gi(a,1,"GUI_ACCORDION_OPEN")?, gbool(a,2,"GUI_ACCORDION_OPEN")?)?; Value::Nil }
+            "gui_accordion_is_open" => Value::Bool(self.gui.accordion_is_open(gi(a,0,"GUI_ACCORDION_IS_OPEN")?, gi(a,1,"GUI_ACCORDION_IS_OPEN")?)?),
+            "gui_accordion_count" => Value::Int(self.gui.accordion_count(gi(a,0,"GUI_ACCORDION_COUNT")?)?),
+            "gui_accordion_title$" | "gui_accordion_title" => Value::str_rc(&self.gui.accordion_title(gi(a,0,"GUI_ACCORDION_TITLE$")?, gi(a,1,"GUI_ACCORDION_TITLE$")?)?),
+            "gui_accordion_set_title" => { self.gui.accordion_set_title(gi(a,0,"GUI_ACCORDION_SET_TITLE")?, gi(a,1,"GUI_ACCORDION_SET_TITLE")?, gs(a,2,"GUI_ACCORDION_SET_TITLE")?)?; Value::Nil }
+            "gui_accordion_toggled" => Value::Int(self.gui.accordion_toggled(gi(a,0,"GUI_ACCORDION_TOGGLED")?)?),
+            "gui_accordion_set" => { self.gui.accordion_set(gi(a,0,"GUI_ACCORDION_SET")?, &gs(a,1,"GUI_ACCORDION_SET")?, gi(a,2,"GUI_ACCORDION_SET")?)?; Value::Nil }
+            "gui_accordion_set_height" => { self.gui.accordion_set_height(gi(a,0,"GUI_ACCORDION_SET_HEIGHT")?, gi(a,1,"GUI_ACCORDION_SET_HEIGHT")?, gi(a,2,"GUI_ACCORDION_SET_HEIGHT")?)?; Value::Nil }
+            // --- Assistent ---
+            "gui_wizard" => Value::Int(self.gui.wizard(gi(a,0,"GUI_WIZARD")?, gi(a,1,"GUI_WIZARD")? as i32,
+                gi(a,2,"GUI_WIZARD")? as i32, gi(a,3,"GUI_WIZARD")? as i32, gi(a,4,"GUI_WIZARD")? as i32)?),
+            "gui_wizard_add" => Value::Int(self.gui.wizard_add(gi(a,0,"GUI_WIZARD_ADD")?, gs(a,1,"GUI_WIZARD_ADD")?)?),
+            "gui_wizard_add_widget" => { self.gui.wizard_add_widget(gi(a,0,"GUI_WIZARD_ADD_WIDGET")?, gi(a,1,"GUI_WIZARD_ADD_WIDGET")?, gi(a,2,"GUI_WIZARD_ADD_WIDGET")?)?; Value::Nil }
+            "gui_wizard_count" => Value::Int(self.gui.wizard_count(gi(a,0,"GUI_WIZARD_COUNT")?)?),
+            "gui_wizard_step" => Value::Int(self.gui.wizard_step(gi(a,0,"GUI_WIZARD_STEP")?)?),
+            "gui_wizard_set_step" => { self.gui.wizard_set_step(gi(a,0,"GUI_WIZARD_SET_STEP")?, gi(a,1,"GUI_WIZARD_SET_STEP")?)?; Value::Nil }
+            "gui_wizard_changed" => Value::Bool(self.gui.wizard_changed(gi(a,0,"GUI_WIZARD_CHANGED")?)?),
+            "gui_wizard_finished" => Value::Bool(self.gui.wizard_finished(gi(a,0,"GUI_WIZARD_FINISHED")?)?),
+            "gui_wizard_cancelled" => Value::Bool(self.gui.wizard_cancelled(gi(a,0,"GUI_WIZARD_CANCELLED")?)?),
+            "gui_wizard_enable_next" => { self.gui.wizard_enable_next(gi(a,0,"GUI_WIZARD_ENABLE_NEXT")?, gbool(a,1,"GUI_WIZARD_ENABLE_NEXT")?)?; Value::Nil }
+            "gui_wizard_set" => { self.gui.wizard_set(gi(a,0,"GUI_WIZARD_SET")?, &gs(a,1,"GUI_WIZARD_SET")?, gi(a,2,"GUI_WIZARD_SET")?)?; Value::Nil }
+            "gui_wizard_labels" => {
+                let f = "GUI_WIZARD_LABELS";
+                if a.len() != 5 { return Err(format!("{}: erwartet (wz, zurueck$, weiter$, fertig$, abbrechen$)", f)); }
+                self.gui.wizard_labels(gi(a,0,f)?, [gs(a,1,f)?, gs(a,2,f)?, gs(a,3,f)?, gs(a,4,f)?])?; Value::Nil
+            }
+            "gui_wizard_next" => Value::Bool(self.gui.wizard_next(gi(a,0,"GUI_WIZARD_NEXT")?)?),
+            "gui_wizard_back" => Value::Bool(self.gui.wizard_back(gi(a,0,"GUI_WIZARD_BACK")?)?),
+            // --- Baum mit Spalten ---
+            "gui_treetable" => {
+                let f = "GUI_TREETABLE";
+                let h = self.gui.treetable(gi(a,0,f)?, gi(a,1,f)? as i32, gi(a,2,f)? as i32, gi(a,3,f)? as i32, gi(a,4,f)? as i32)?;
+                if a.len() > 5 { self.gui.table_set_headers(h, gstrs(a,5,f)?)?; }
+                Value::Int(h)
+            }
+            "gui_treetable_add" => Value::Int(self.gui.treetable_add(gi(a,0,"GUI_TREETABLE_ADD")?, gi(a,1,"GUI_TREETABLE_ADD")?, gstrs(a,2,"GUI_TREETABLE_ADD")?)?),
+            "gui_treetable_expand" => { self.gui.treetable_expand(gi(a,0,"GUI_TREETABLE_EXPAND")?, gi(a,1,"GUI_TREETABLE_EXPAND")?, gbool(a,2,"GUI_TREETABLE_EXPAND")?)?; Value::Nil }
+            "gui_treetable_expand_all" => { self.gui.treetable_expand_all(gi(a,0,"GUI_TREETABLE_EXPAND_ALL")?, gbool(a,1,"GUI_TREETABLE_EXPAND_ALL")?)?; Value::Nil }
+            "gui_treetable_expanded" => Value::Bool(self.gui.treetable_expanded(gi(a,0,"GUI_TREETABLE_EXPANDED")?, gi(a,1,"GUI_TREETABLE_EXPANDED")?)?),
+            "gui_treetable_parent" => Value::Int(self.gui.treetable_parent(gi(a,0,"GUI_TREETABLE_PARENT")?, gi(a,1,"GUI_TREETABLE_PARENT")?)?),
+            "gui_treetable_level" => Value::Int(self.gui.treetable_level(gi(a,0,"GUI_TREETABLE_LEVEL")?, gi(a,1,"GUI_TREETABLE_LEVEL")?)?),
+            "gui_treetable_set_parent" => { self.gui.treetable_set_parent(gi(a,0,"GUI_TREETABLE_SET_PARENT")?, gi(a,1,"GUI_TREETABLE_SET_PARENT")?, gi(a,2,"GUI_TREETABLE_SET_PARENT")?)?; Value::Nil }
             "gui_filetree_icons" => { self.gui.filetree_icons(gi(a,0,"GUI_FILETREE_ICONS")?, gi(a,1,"GUI_FILETREE_ICONS")?, gi(a,2,"GUI_FILETREE_ICONS")?)?; Value::Nil }
             "gui_update" => {
                 {

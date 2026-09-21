@@ -3798,6 +3798,41 @@ zwei Faelle in `werkzeug_formdesigner.dhtest`, Rust-Tests in `schnitt.rs` und
 `auszeichnungen_als_stil`; sieben Verfaelschungen der Laufzeit fallen je in
 ihrem Fall.
 
+**Akkordeon, Assistent, Baumtabelle (2026-09-21, Frage des Nutzers nach
+fehlenden Widgets):** die letzten drei Punkte der Lueckenliste in
+`docs/module-gui.md` -- sie steht jetzt leer. **`GUI_ACCORDION`**
+(`Kind::Accordion`, `AkkState`: offen/hoehen/mehrere/lage/scroll) und
+**`GUI_WIZARD`** (`Kind::Wizard`, `WzState`, Geometrie aus EINER Quelle
+`wz_geom`) benutzen die Buchfuehrung des Reiterwerks (`tabctl.kinder`,
+`tc_von`/`tc_seite`, `widget_shown`) statt einer eigenen. Beim Akkordeon
+merkt `lage` die Lage eines Kindes RELATIV zu seinem Abschnitt, und
+`akk_pass` (in GUI_UPDATE vor `layout_pass`) setzt die Fensterlage je Bild
+neu -- klappt ein Abschnitt darueber auf, wandern die Kinder mit. **Beide
+sind Luft fuer Klicks ihrer Kinder** (`luft_fuer_kinder` in `handle_press`):
+der erste Treffer gewinnt, und der Behaelter liegt VOR seinen Kindern; ohne
+die Ausnahme schluckte er den Klick. `GUI_HIT_TEST` liefert auf freier
+Flaeche weiter den Behaelter (so waehlt ihn ein Designer an). Der Assistent
+prueft mit `pruefen` nur die Felder DES Schritts (`wz_weiter` ->
+`widget_pruefen`), das erste falsche bekommt den Fokus; Ereignisse
+(`CHANGED/FINISHED/CANCELLED`) gelten ein Bild lang. **Die Baumtabelle ist
+eine Tabelle mit Schalter `baum`** (`GUI_TREETABLE`, `TableState`
+eltern/offen/ebene/hat_kinder, `rebuild_baum`), damit Sortieren, Filter,
+Zellarten und Auswahl nicht doppelt entstehen: sortiert wird unter
+Geschwistern, ein Filter zeigt Vorfahren eines Treffers mit, `remove_row`
+haengt Kinder an die Eltern der entfernten Zeile, ein Kreis bei
+`SET_PARENT` ist ein Fehler. Dreieck-Klick klappt ohne zu waehlen,
+Rechts/Links klappen bzw. springen. **Der Fund dabei ist aelter:** eine
+Tabelle aus `GUI_FROM_JSON`/`GUI_LOAD` zeigte KEINE Zeile, bis etwas
+Sortieren oder Filtern anstiess -- der Lader baute `view` nie
+(`ts.rebuild_view()` fehlte); Fall "eine geladene flache tabelle zeigt ihre
+zeilen". Form-Designer: drei Palettenarten (Baumtabelle als `table` mit
+`baum`), Abschnitte/Schritte im Feld "Eintraege", GB-Code. Tests
+`tests/pruef/gui_akkordeon.dhtest` (6), `gui_assistent.dhtest` (7, einer davon liest den geladenen Assistenten -- der erste Satz Faelle pruefte nur das Schreiben, und die Verfaelschung des Lesers blieb gruen),
+`gui_baumtabelle.dhtest` (7); zehn Verfaelschungen der Laufzeit (ohne
+Kinder-Ausnahme, ohne Mitwandern, ohne Pruefung, ohne Vorfahren im Filter,
+Kinder beim Entfernen nach oben, ohne Dreieck, drei .dhform-Schluessel,
+ohne `rebuild_view` beim Laden) fallen je in ihrem Fall.
+
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
 `tests/pruef/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei

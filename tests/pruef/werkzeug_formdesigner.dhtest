@@ -197,7 +197,7 @@ EXIT(0)
 --- argumente
 alles.dhform
 --- datei alles.dhform
-{"title": "Alles", "x": 0, "y": 0, "w": 480, "h": 400, "code": {"klick": "PRINT \"geklickt\""}, "widgets": [
+{"title": "Alles", "x": 0, "y": 0, "w": 480, "h": 460, "code": {"klick": "PRINT \"geklickt\""}, "widgets": [
  {"kind": "button", "name": "button1", "x": 8, "y": 8, "w": 80, "h": 50, "text": "Los", "on_click": "klick", "tooltip": "sagt \"hallo\"", "font_style": "fett+unterstrichen"},
  {"kind": "label", "name": "label1", "x": 98, "y": 8, "w": 80, "h": 50},
  {"kind": "checkbox", "name": "checkbox1", "x": 188, "y": 8, "w": 80, "h": 50},
@@ -227,7 +227,11 @@ alles.dhform
  {"kind": "richtext", "name": "richtext1", "x": 98, "y": 308, "w": 80, "h": 50, "text": "# Titel\n\nZeile"},
  {"kind": "timepicker", "name": "timepicker1", "x": 188, "y": 308, "w": 80, "h": 50},
  {"kind": "statusbar", "name": "statusbar1", "x": 278, "y": 308, "w": 80, "h": 50},
- {"kind": "breadcrumb", "name": "breadcrumb1", "x": 368, "y": 308, "w": 80, "h": 50}
+ {"kind": "breadcrumb", "name": "breadcrumb1", "x": 368, "y": 308, "w": 80, "h": 50},
+ {"kind": "card", "name": "card1", "x": 8, "y": 368, "w": 80, "h": 50, "text": "Karte"},
+ {"kind": "accordion", "name": "accordion1", "x": 98, "y": 368, "w": 80, "h": 50, "items": ["Oben", "Unten"]},
+ {"kind": "wizard", "name": "wizard1", "x": 188, "y": 368, "w": 80, "h": 50, "items": ["Eins", "Zwei"]},
+ {"kind": "table", "name": "baumtabelle1", "x": 278, "y": 368, "w": 80, "h": 50, "table": {"headers": ["Name"], "baum": true}}
 ]}
 --- enthaelt
 check []
@@ -240,6 +244,9 @@ GUI_SET_FONT_STYLE(button1, "fett+unterstrichen")
 PRINT "geklickt"
 image1' uebersprungen
 GUI_RICHTEXT(frm, 98, 308, 80, 50, !"# Titel\n\nZeile")
+GUI_ACCORDION_ADD(accordion1, "Unten")
+GUI_WIZARD_ADD(wizard1, "Zwei")
+baumtabelle1 = GUI_TREETABLE(frm, 278, 368, 80, 50)
 --- ohne _programm/code.dh
 GUI_LOAD(
 
@@ -343,7 +350,7 @@ PRINT "gitter " + STR$(ARRAY_INDEXOF(palette, "grid") >= 0)
 {sammlung}/../../rust/drachenhauch_runtime/src/gui.rs
 {sammlung}/../../examples/197_form_designer.dh
 --- erwartet
-arten 31
+arten 33
 fehlen[]
 gitter TRUE
 

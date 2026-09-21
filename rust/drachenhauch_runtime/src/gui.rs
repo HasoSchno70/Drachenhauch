@@ -231,7 +231,7 @@ pub enum Kind {
     Toggle, Knob,
     Toolbar, Tree,
     ColorPicker, DatePicker,
-    Layout, TabControl, RichText, TimePicker,
+    Layout, TabControl, RichText, TimePicker, Accordion, Wizard,
     StatusBar, Breadcrumb, Card,
 }
 
@@ -248,6 +248,7 @@ impl Kind {
             Kind::Toggle => "toggle", Kind::Knob => "knob",
             Kind::ColorPicker => "colorpicker", Kind::DatePicker => "datepicker",
             Kind::Layout => "layout", Kind::TabControl => "tabcontrol",
+            Kind::Accordion => "accordion", Kind::Wizard => "wizard",
             Kind::RichText => "richtext", Kind::TimePicker => "timepicker",
             Kind::StatusBar => "statusbar", Kind::Breadcrumb => "breadcrumb",
             Kind::Card => "card",
@@ -265,6 +266,7 @@ impl Kind {
             "toggle" => Kind::Toggle, "knob" => Kind::Knob,
             "colorpicker" => Kind::ColorPicker, "datepicker" => Kind::DatePicker,
             "layout" => Kind::Layout, "tabcontrol" => Kind::TabControl,
+            "accordion" => Kind::Accordion, "wizard" => Kind::Wizard,
             "richtext" => Kind::RichText, "timepicker" => Kind::TimePicker,
             "statusbar" => Kind::StatusBar, "breadcrumb" => Kind::Breadcrumb,
             "card" => Kind::Card,
@@ -293,6 +295,9 @@ impl Kind {
 
 const DROPDOWN_ITEM_H: i32 = 22;
 const TC_KOPF_H: i32 = 26;        // Hoehe der Reiterkoepfe im Fenster
+const AKK_KOPF_H: i32 = 30;       // Hoehe eines Akkordeon-Kopfes
+const WZ_KOPF_H: i32 = 52;        // Schrittanzeige des Assistenten
+const WZ_FUSS_H: i32 = 48;        // Knopfreihe des Assistenten
 const TREE_ROW_H: i32 = 22;       // Hoehe einer Baum-Zeile
 const TREE_INDENT: i32 = 16;      // Einrueckung pro Ebene
 const TREE_TOGGLE_W: i32 = 16;    // Breite der Auf-/Zuklapp-Flaeche
@@ -515,6 +520,19 @@ pub struct TableState {
     /// Die aktuelle Zelle soll beim naechsten Durchgang ins Bild gerollt
     /// werden (gesetzt von Stellen, an denen die Geometrie nicht greifbar ist).
     sicht_holen: bool,
+
+    // --- Baum mit Spalten -----------------------------------------------------
+    /// Die Zeilen bilden einen Baum: je Datenzeile ihre Elternzeile (-1 =
+    /// oben) und ob sie aufgeklappt ist. Die Daten bleiben eine flache Liste
+    /// -- alle Nummern nach aussen sind weiter DATENzeilen, der Baum steckt
+    /// nur in `view`, wie Sortieren und Filtern auch.
+    baum: bool,
+    eltern: Vec<i32>,
+    offen: Vec<bool>,
+    /// Je Datenzeile, bei jedem `rebuild_view` gerechnet: Tiefe und ob sie
+    /// Kinder hat -- fuer Einzug, Dreieck und Treffertest.
+    ebene: Vec<i32>,
+    hat_kinder: Vec<bool>,
 }
 
 impl Default for TableState {
@@ -538,6 +556,7 @@ impl Default for TableState {
             zellmodus: false, cur_r: -1, cur_c: -1, ber_r: -1, ber_c: -1, zell_zug: false,
             zeilen_anhaengen: false, col_typ: vec![], col_wahl: vec![], wahl_pos: -1,
             sicht_holen: false,
+            baum: false, eltern: vec![], offen: vec![], ebene: vec![], hat_kinder: vec![],
         }
     }
 }
@@ -593,6 +612,7 @@ impl TableState {
     /// sonst textweise. Ohne das stuende "10" vor "9" -- in einer
     /// Punktespalte die haeufigste Enttaeuschung an einer Tabelle.
     fn rebuild_view(&mut self) {
+        if self.baum { return self.rebuild_baum(); }
         let mut v: Vec<usize> = (0..self.rows.len()).filter(|&r| self.passt(r)).collect();
         if self.sort_col >= 0 {
             let c = self.sort_col as usize;
@@ -610,6 +630,85 @@ impl TableState {
                 if desc { ord.reverse() } else { ord }
             });
         }
+        self.view = v;
+    }
+
+    /// Vergleich zweier Datenzeilen nach der Sortierspalte -- dieselbe Regel
+    /// wie in `rebuild_view` (Zahlen als Zahlen), hier fuer Geschwister im Baum.
+    fn vergleiche(&self, a: usize, b: usize) -> std::cmp::Ordering {
+        let c = self.sort_col.max(0) as usize;
+        let txt = |r: usize| -> &str {
+            self.rows.get(r).and_then(|row| row.get(c)).map(|x| x.text.as_str()).unwrap_or("")
+        };
+        let (sa, sb) = (txt(a), txt(b));
+        let ord = match (sa.trim().parse::<f64>(), sb.trim().parse::<f64>()) {
+            (Ok(x), Ok(y)) => x.partial_cmp(&y).unwrap_or(std::cmp::Ordering::Equal),
+            _ => sa.to_lowercase().cmp(&sb.to_lowercase()),
+        };
+        if self.sort_desc { ord.reverse() } else { ord }
+    }
+
+    /// Baumzustand so lang wie die Daten halten. Neue Zeilen haengen oben
+    /// und sind zu; eine Elternangabe, die ins Leere zeigt, gilt als oben.
+    fn baum_sync(&mut self) {
+        let n = self.rows.len();
+        self.eltern.resize(n, -1);
+        self.offen.resize(n, false);
+        for r in 0..n {
+            let e = self.eltern[r];
+            if e >= n as i32 || e == r as i32 { self.eltern[r] = -1; }
+        }
+    }
+
+    /// `view` als Baum: Tiefensuche von den Wurzeln, Kinder nur unter
+    /// aufgeklappten Eltern. Mit Filter zaehlt eine Zeile, wenn sie selbst
+    /// oder einer ihrer Nachkommen passt -- und dann ist der Weg dorthin
+    /// offen, sonst saehe man den Treffer nicht. Sortiert werden Geschwister
+    /// untereinander; ein Kind verliesse sonst seinen Elternteil.
+    fn rebuild_baum(&mut self) {
+        self.baum_sync();
+        let n = self.rows.len();
+        let mut kinder: Vec<Vec<usize>> = vec![Vec::new(); n];
+        let mut wurzeln: Vec<usize> = Vec::new();
+        for r in 0..n {
+            match self.eltern[r] { e if e >= 0 => kinder[e as usize].push(r), _ => wurzeln.push(r) }
+        }
+        if self.sort_col >= 0 {
+            wurzeln.sort_by(|&a, &b| self.vergleiche(a, b));
+            for k in kinder.iter_mut() { let mut kk = std::mem::take(k); kk.sort_by(|&a, &b| self.vergleiche(a, b)); *k = kk; }
+        }
+        let filter = self.filters.iter().any(|f| !f.is_empty());
+        // Treffer von unten nach oben: eine Zeile zaehlt, wenn sie passt oder
+        // ein Nachkomme. Ein Kreis in den Elternangaben endet an `besucht`.
+        let mut zaehlt = vec![false; n];
+        if filter {
+            fn tief(r: usize, kinder: &[Vec<usize>], t: &TableState, zaehlt: &mut [bool], besucht: &mut [bool]) -> bool {
+                if besucht[r] { return zaehlt[r]; }
+                besucht[r] = true;
+                let mut ja = t.passt(r);
+                for &k in &kinder[r] { if tief(k, kinder, t, zaehlt, besucht) { ja = true; } }
+                zaehlt[r] = ja;
+                ja
+            }
+            let mut besucht = vec![false; n];
+            for r in 0..n { tief(r, &kinder, self, &mut zaehlt, &mut besucht); }
+        }
+        let mut ebene = vec![0i32; n];
+        let mut v: Vec<usize> = Vec::new();
+        let mut gesehen = vec![false; n];
+        let mut stapel: Vec<(usize, i32)> = wurzeln.iter().rev().map(|&r| (r, 0)).collect();
+        while let Some((r, e)) = stapel.pop() {
+            if gesehen[r] { continue; }
+            gesehen[r] = true;
+            if filter && !zaehlt[r] { continue; }
+            ebene[r] = e;
+            v.push(r);
+            if self.offen[r] || filter {
+                for &k in kinder[r].iter().rev() { stapel.push((k, e + 1)); }
+            }
+        }
+        self.hat_kinder = kinder.iter().map(|k| !k.is_empty()).collect();
+        self.ebene = ebene;
         self.view = v;
     }
 
@@ -1124,6 +1223,65 @@ struct PanelState {
 #[derive(Default)]
 struct TabCtlState {
     kinder: Vec<(usize, i32)>,   // (Widget-Index, Seite)
+}
+
+/// Akkordeon (Kind::Accordion): Abschnitte untereinander, jeder mit einem
+/// Kopf, der ihn auf- und zuklappt. Die Titel stehen in `Widget::items`,
+/// welches Kind in welchem Abschnitt liegt in `Widget::tabctl` -- dieselbe
+/// Buchfuehrung wie beim Reiterwerk.
+///
+/// Anders als dort WANDERN die Kinder: klappt ein Abschnitt oben auf, rutscht
+/// alles darunter nach unten. Darum steht hier je Kind seine Lage IM
+/// Abschnitt (`lage`), und `akk_pass` setzt die Fensterlage je Bild daraus.
+#[derive(Default)]
+struct AkkState {
+    offen: Vec<bool>,
+    /// (Widget-Index, x, y im Abschnitt) -- die Lage beim Hineinlegen.
+    lage: Vec<(usize, i32, i32)>,
+    /// Eigene Inhaltshoehe je Abschnitt, 0 = nach den Kindern.
+    hoehen: Vec<i32>,
+    /// Mehrere Abschnitte zugleich offen (sonst schliesst Oeffnen die anderen).
+    mehrere: bool,
+    scroll: i32,
+    /// Je Bild gerechnet: (Kopf-y ohne Scroll, Inhaltshoehe) je Abschnitt.
+    koepfe: Vec<(i32, i32)>,
+    inhalt_h: i32,
+    /// Kopf mit Tastaturfokus.
+    fokus: i32,
+    /// Ereignis dieses Bildes: der umgeschaltete Abschnitt (-1 = keiner).
+    umgeschaltet: i32,
+}
+
+/// Assistent (Kind::Wizard): Schritte nacheinander, oben die Schrittanzeige,
+/// unten Zurueck/Weiter/Fertig und Abbrechen. Titel in `Widget::items`, der
+/// aktuelle Schritt in `Widget::sel`, die Kinder je Schritt in
+/// `Widget::tabctl` -- wie beim Reiterwerk behalten sie ihre Lage.
+struct WzState {
+    /// Vor Weiter/Fertig die Regeln (GUI_RULE) der Felder dieses Schritts
+    /// pruefen -- ein falsches Feld haelt den Assistenten an.
+    pruefen: bool,
+    /// Weiter gesperrt (vom Programm, etwa bis eine Auswahl getroffen ist).
+    weiter_aus: bool,
+    /// Beschriftungen: Zurueck, Weiter, Fertig, Abbrechen.
+    texte: [String; 4],
+    /// Ereignis dieses Bildes: 1 Schritt gewechselt, 2 fertig, 3 abgebrochen.
+    ereignis: u8,
+}
+impl Default for WzState {
+    fn default() -> Self {
+        WzState { pruefen: false, weiter_aus: false, ereignis: 0,
+                  texte: ["Zurück".into(), "Weiter".into(), "Fertig".into(), "Abbrechen".into()] }
+    }
+}
+
+/// Lage der Teile eines Assistenten, EINE Quelle fuer Zeichnen, Klick und
+/// Bildschirmleser. Knoepfe als (x, y, b, h), absolut.
+struct WzGeom {
+    kopf_h: i32,
+    fuss_y: i32,
+    zurueck: (i32, i32, i32, i32),
+    weiter: (i32, i32, i32, i32),
+    abbrechen: (i32, i32, i32, i32),
 }
 
 /// Ein Eintrag der Werkzeugleiste (Kind::Toolbar).
@@ -1835,6 +1993,9 @@ pub struct Widget {
     tabctl: Option<Box<TabCtlState>>,
     tc_von: i32,
     tc_seite: i32,
+    /// Nur Kind::Accordion bzw. Kind::Wizard.
+    akk: Option<Box<AkkState>>,
+    wz: Option<Box<WzState>>,
     /// Werkzeugleiste mit eigenen Eintraegen (Kind::Toolbar).
     leiste: Option<Box<LeisteState>>,
     /// Statusleiste (Kind::StatusBar) und Pfadleiste (Kind::Breadcrumb).
@@ -3286,7 +3447,7 @@ impl Gui {
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
-            panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1,
+            panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1, akk: None, wz: None,
             leiste: None, status: None, pfad: None, sinnbild: String::new(),
             rich: None, vert: false, unbestimmt: false, bildmodus: 0,
             ziehbar: false, ablage: false, abgelegt: false,
@@ -4732,6 +4893,18 @@ impl Gui {
                                r, t.rows.len().saturating_sub(1)));
         }
         let r = r as usize;
+        if t.baum {
+            // Die Kinder der entfernten Zeile ruecken zu deren Eltern auf,
+            // alle Nummern dahinter um eins nach vorn.
+            t.baum_sync();
+            let neu_e = t.eltern[r];
+            t.eltern.remove(r);
+            t.offen.remove(r);
+            for e in t.eltern.iter_mut() {
+                if *e == r as i32 { *e = if neu_e > r as i32 { neu_e - 1 } else { neu_e }; }
+                else if *e > r as i32 { *e -= 1; }
+            }
+        }
         t.rows.remove(r);
         if r < t.row_fg.len() { t.row_fg.remove(r); }
         if r < t.row_bg.len() { t.row_bg.remove(r); }
@@ -4749,6 +4922,7 @@ impl Gui {
     pub fn table_clear(&mut self, h: i64) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_CLEAR")?;
         t.rows.clear();
+        t.eltern.clear(); t.offen.clear();
         t.row_fg.clear();
         t.row_bg.clear();
         t.sel_rows.clear();
@@ -4784,6 +4958,7 @@ impl Gui {
             "spalten_ziehbar" | "resizable_cols" => t.resizable_cols = n != 0,
             "feste_spalten" | "frozen" => t.frozen = n.max(0),
             "spalten_verschiebbar" | "reorderable" => t.reorderable = n != 0,
+            "baum" | "tree" => { t.baum = n != 0; t.rebuild_view(); }
             "zellmodus" | "cells" => {
                 t.zellmodus = n != 0;
                 if !t.zellmodus { t.ber_r = -1; t.ber_c = -1; }
@@ -4958,6 +5133,7 @@ zellmodus, zeilen_anhaengen", key)),
             "spalten_verschiebbar" | "reorderable" => if t.reorderable { 1.0 } else { 0.0 },
             "mehrfachauswahl" | "multi_select" => if t.multi { 1.0 } else { 0.0 },
             "zellmodus" | "cells" => if t.zellmodus { 1.0 } else { 0.0 },
+            "baum" | "tree" => if t.baum { 1.0 } else { 0.0 },
             "zeilen_anhaengen" | "append_rows" => if t.zeilen_anhaengen { 1.0 } else { 0.0 },
             "spalten" | "columns" => t.n_cols() as f64,
             _ => return Err(format!(
@@ -5581,6 +5757,450 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let n = w.items.len() as i32;
         w.sel = w.sel.min(n - 1).max(if n > 0 { 0 } else { -1 });
         Ok(())
+    }
+
+    // --- Akkordeon (GUI_ACCORDION) --------------------------------------------
+    pub fn accordion(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Accordion, x, y, w, h);
+        wd.tabctl = Some(Box::new(TabCtlState::default()));
+        wd.akk = Some(Box::new(AkkState { fokus: 0, umgeschaltet: -1, ..Default::default() }));
+        self.add_widget(win, "GUI_ACCORDION", wd)
+    }
+    fn akk_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::Accordion { return Err(format!("{}: Widget ist kein Akkordeon (GUI_ACCORDION)", fn_)); }
+        Ok(w)
+    }
+    fn akk_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::Accordion { return Err(format!("{}: Widget ist kein Akkordeon (GUI_ACCORDION)", fn_)); }
+        Ok(w)
+    }
+    fn akk_nr(w: &Widget, i: i64, fn_: &str) -> Result<usize, String> {
+        if i < 0 || i >= w.items.len() as i64 {
+            return Err(format!("{}: Abschnitt {} gibt es nicht (erst GUI_ACCORDION_ADD)", fn_, i));
+        }
+        Ok(i as usize)
+    }
+    pub fn accordion_add(&mut self, h: i64, titel: String) -> Result<i64, String> {
+        let w = self.akk_mut(h, "GUI_ACCORDION_ADD")?;
+        w.items.push(titel);
+        let a = w.akk.get_or_insert_with(Default::default);
+        a.offen.push(false);
+        a.hoehen.push(0);
+        Ok((w.items.len() - 1) as i64)
+    }
+    pub fn accordion_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.akk_ref(h, "GUI_ACCORDION_COUNT")?.items.len() as i64)
+    }
+    pub fn accordion_title(&self, h: i64, i: i64) -> Result<String, String> {
+        let w = self.akk_ref(h, "GUI_ACCORDION_TITLE$")?;
+        Ok(w.items[Self::akk_nr(w, i, "GUI_ACCORDION_TITLE$")?].clone())
+    }
+    pub fn accordion_set_title(&mut self, h: i64, i: i64, titel: String) -> Result<(), String> {
+        let w = self.akk_mut(h, "GUI_ACCORDION_SET_TITLE")?;
+        let k = Self::akk_nr(w, i, "GUI_ACCORDION_SET_TITLE")?;
+        w.items[k] = titel; Ok(())
+    }
+    /// Ein Widget in einen Abschnitt legen. Seine Lage zaehlt ab da als Lage
+    /// IM Abschnitt -- (10, 8) heisst 10 rechts, 8 unter dem Kopf.
+    pub fn accordion_add_widget(&mut self, h: i64, kind: i64, nr: i64) -> Result<(), String> {
+        let f = "GUI_ACCORDION_ADD_WIDGET";
+        let (tw, ti) = Self::dec_widget(h);
+        let (kw, ki) = Self::dec_widget(kind);
+        let (kx, ky) = { let k = self.wdg(kind, f)?; (k.x, k.y) };
+        { let w = self.akk_ref(h, f)?; Self::akk_nr(w, nr, f)?; }
+        if tw != kw { return Err(format!("{}: Widget gehoert in ein anderes Fenster", f)); }
+        if ti == ki { return Err(format!("{}: das Akkordeon kann nicht sein eigenes Kind sein", f)); }
+        if ki < ti { return Err(format!("{}: das Kind muss NACH dem Akkordeon angelegt sein, sonst zeichnet es darunter", f)); }
+        let w = self.akk_mut(h, f)?;
+        let st = w.tabctl.get_or_insert_with(Default::default);
+        st.kinder.retain(|&(k, _)| k != ki);
+        st.kinder.push((ki, nr as i32));
+        let a = w.akk.get_or_insert_with(Default::default);
+        a.lage.retain(|&(k, _, _)| k != ki);
+        a.lage.push((ki, kx, ky));
+        Ok(())
+    }
+    /// Auf- oder zuklappen. Ohne `mehrere` schliesst Oeffnen die anderen.
+    pub fn accordion_open(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
+        let w = self.akk_mut(h, "GUI_ACCORDION_OPEN")?;
+        let k = Self::akk_nr(w, i, "GUI_ACCORDION_OPEN")?;
+        Self::akk_setzen(w, k, an);
+        Ok(())
+    }
+    fn akk_setzen(w: &mut Widget, k: usize, an: bool) {
+        let n = w.items.len();
+        let a = w.akk.get_or_insert_with(Default::default);
+        a.offen.resize(n, false);
+        if an && !a.mehrere { for o in a.offen.iter_mut() { *o = false; } }
+        if k < n { a.offen[k] = an; }
+    }
+    pub fn accordion_is_open(&self, h: i64, i: i64) -> Result<bool, String> {
+        let w = self.akk_ref(h, "GUI_ACCORDION_IS_OPEN")?;
+        let k = Self::akk_nr(w, i, "GUI_ACCORDION_IS_OPEN")?;
+        Ok(w.akk.as_ref().and_then(|a| a.offen.get(k).copied()).unwrap_or(false))
+    }
+    pub fn accordion_toggled(&self, h: i64) -> Result<i64, String> {
+        Ok(self.akk_ref(h, "GUI_ACCORDION_TOGGLED")?.akk.as_ref().map(|a| a.umgeschaltet as i64).unwrap_or(-1))
+    }
+    pub fn accordion_set(&mut self, h: i64, key: &str, v: i64) -> Result<(), String> {
+        let w = self.akk_mut(h, "GUI_ACCORDION_SET")?;
+        let a = w.akk.get_or_insert_with(Default::default);
+        match key {
+            "mehrere" | "multiple" => {
+                a.mehrere = v != 0;
+                // Aus "mehrere" zurueck zu einem: nur der erste offene bleibt.
+                if !a.mehrere {
+                    let mut gesehen = false;
+                    for o in a.offen.iter_mut() { if *o { if gesehen { *o = false; } gesehen = true; } }
+                }
+            }
+            _ => return Err(format!("GUI_ACCORDION_SET: unbekannter Schluessel '{}' (erlaubt: mehrere)", key)),
+        }
+        Ok(())
+    }
+    /// Eigene Inhaltshoehe eines Abschnitts; 0 = nach den Kindern.
+    pub fn accordion_set_height(&mut self, h: i64, i: i64, px: i64) -> Result<(), String> {
+        let f = "GUI_ACCORDION_SET_HEIGHT";
+        if px < 0 { return Err(format!("{}: Hoehe muss >= 0 sein", f)); }
+        let s = self.sk(px as i32);
+        let w = self.akk_mut(h, f)?;
+        let k = Self::akk_nr(w, i, f)?;
+        let n = w.items.len();
+        let a = w.akk.get_or_insert_with(Default::default);
+        a.hoehen.resize(n, 0);
+        a.hoehen[k] = s;
+        Ok(())
+    }
+    /// Umschalten wie ein Klick auf den Kopf: mit Ereignis und on_change.
+    fn akk_umschalten(&mut self, wi: usize, i: usize, k: usize) {
+        let w = &mut self.windows[wi].widgets[i];
+        let an = !w.akk.as_ref().and_then(|a| a.offen.get(k).copied()).unwrap_or(false);
+        Self::akk_setzen(w, k, an);
+        if let Some(a) = w.akk.as_mut() { a.umgeschaltet = k as i32; a.fokus = k as i32; }
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+
+    /// Je Bild, VOR dem Layout: Koepfe verorten, die Kinder an ihre Stelle im
+    /// Abschnitt setzen. Ein Behaelter unter den Kindern verteilt danach
+    /// seine eigenen -- darum vor `layout_pass`.
+    fn akk_pass(&mut self) {
+        let kopf = self.sk(AKK_KOPF_H);
+        let rand = self.sk(8);
+        for wi in 0..self.windows.len() {
+            for p in 0..self.windows[wi].widgets.len() {
+                if self.windows[wi].widgets[p].kind != Kind::Accordion { continue; }
+                let (ax, ay, ah, n) = { let w = &self.windows[wi].widgets[p]; (w.x, w.y, w.h, w.items.len()) };
+                let (lage, kinder, offen, hoehen, scroll) = {
+                    let w = &self.windows[wi].widgets[p];
+                    let a = match w.akk.as_ref() { Some(a) => a, None => continue };
+                    (a.lage.clone(), w.tabctl.as_ref().map(|s| s.kinder.clone()).unwrap_or_default(),
+                     a.offen.clone(), a.hoehen.clone(), a.scroll)
+                };
+                let seite_von = |k: usize| kinder.iter().find(|&&(c, _)| c == k).map(|&(_, s)| s).unwrap_or(-1);
+                let mut koepfe = Vec::with_capacity(n);
+                let mut y = 0;
+                for s in 0..n {
+                    let kopf_y = y;
+                    y += kopf;
+                    let auf = offen.get(s).copied().unwrap_or(false);
+                    let eigen = hoehen.get(s).copied().unwrap_or(0);
+                    let mut inhalt = 0;
+                    for &(k, dx, dy) in &lage {
+                        if seite_von(k) != s as i32 { continue; }
+                        let kh = self.windows[wi].widgets.get(k).map(|c| c.h).unwrap_or(0);
+                        if auf { inhalt = inhalt.max(dy + kh + rand); }
+                        if let Some(c) = self.windows[wi].widgets.get_mut(k) {
+                            c.x = ax + dx;
+                            c.y = ay + y + dy - scroll;
+                        }
+                    }
+                    let inhalt = if !auf { 0 } else if eigen > 0 { eigen } else { inhalt };
+                    koepfe.push((kopf_y, inhalt));
+                    y += inhalt;
+                }
+                let a = self.windows[wi].widgets[p].akk.as_mut().unwrap();
+                a.koepfe = koepfe;
+                a.inhalt_h = y;
+                a.scroll = a.scroll.clamp(0, (y - ah).max(0));
+            }
+        }
+    }
+    /// Welcher Kopf liegt unter y (absolut)? Dieselbe Rechnung wie das Zeichnen.
+    fn akk_kopf_unter(&self, w: &Widget, ay: i32, my: i32) -> i32 {
+        let a = match w.akk.as_ref() { Some(a) => a, None => return -1 };
+        let kopf = self.sk(AKK_KOPF_H);
+        for (s, &(ky, _)) in a.koepfe.iter().enumerate() {
+            let y0 = ay + ky - a.scroll;
+            if my >= y0 && my < y0 + kopf && my >= ay && my < ay + w.h { return s as i32; }
+        }
+        -1
+    }
+
+    // --- Assistent (GUI_WIZARD) -----------------------------------------------
+    pub fn wizard(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Wizard, x, y, w, h);
+        wd.tabctl = Some(Box::new(TabCtlState::default()));
+        wd.wz = Some(Box::new(WzState::default()));
+        wd.sel = 0;
+        self.add_widget(win, "GUI_WIZARD", wd)
+    }
+    fn wz_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::Wizard { return Err(format!("{}: Widget ist kein Assistent (GUI_WIZARD)", fn_)); }
+        Ok(w)
+    }
+    fn wz_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::Wizard { return Err(format!("{}: Widget ist kein Assistent (GUI_WIZARD)", fn_)); }
+        Ok(w)
+    }
+    pub fn wizard_add(&mut self, h: i64, titel: String) -> Result<i64, String> {
+        let w = self.wz_mut(h, "GUI_WIZARD_ADD")?;
+        w.items.push(titel);
+        if w.sel < 0 { w.sel = 0; }
+        Ok((w.items.len() - 1) as i64)
+    }
+    pub fn wizard_count(&self, h: i64) -> Result<i64, String> { Ok(self.wz_ref(h, "GUI_WIZARD_COUNT")?.items.len() as i64) }
+    pub fn wizard_step(&self, h: i64) -> Result<i64, String> { Ok(self.wz_ref(h, "GUI_WIZARD_STEP")?.sel as i64) }
+    pub fn wizard_set_step(&mut self, h: i64, k: i64) -> Result<(), String> {
+        let w = self.wz_mut(h, "GUI_WIZARD_SET_STEP")?;
+        if k < 0 || k >= w.items.len() as i64 {
+            return Err(format!("GUI_WIZARD_SET_STEP: Schritt {} gibt es nicht", k));
+        }
+        w.sel = k as i32; Ok(())
+    }
+    /// Ein Widget auf einen Schritt legen. Es behaelt seine Lage im Fenster --
+    /// gezeigt wird es, solange sein Schritt dran ist (wie beim Reiterwerk).
+    pub fn wizard_add_widget(&mut self, h: i64, kind: i64, schritt: i64) -> Result<(), String> {
+        let f = "GUI_WIZARD_ADD_WIDGET";
+        let (tw, ti) = Self::dec_widget(h);
+        let (kw, ki) = Self::dec_widget(kind);
+        self.wdg(kind, f)?;
+        let n = self.wz_ref(h, f)?.items.len() as i64;
+        if tw != kw { return Err(format!("{}: Widget gehoert in ein anderes Fenster", f)); }
+        if ti == ki { return Err(format!("{}: der Assistent kann nicht sein eigenes Kind sein", f)); }
+        if schritt < 0 || schritt >= n { return Err(format!("{}: Schritt {} gibt es nicht (erst GUI_WIZARD_ADD)", f, schritt)); }
+        let w = self.wz_mut(h, f)?;
+        let st = w.tabctl.get_or_insert_with(Default::default);
+        st.kinder.retain(|&(k, _)| k != ki);
+        st.kinder.push((ki, schritt as i32));
+        Ok(())
+    }
+    fn wz_ereignis(&self, h: i64, fn_: &str) -> Result<u8, String> {
+        Ok(self.wz_ref(h, fn_)?.wz.as_ref().map(|z| z.ereignis).unwrap_or(0))
+    }
+    pub fn wizard_changed(&self, h: i64) -> Result<bool, String> { Ok(self.wz_ereignis(h, "GUI_WIZARD_CHANGED")? == 1) }
+    pub fn wizard_finished(&self, h: i64) -> Result<bool, String> { Ok(self.wz_ereignis(h, "GUI_WIZARD_FINISHED")? == 2) }
+    pub fn wizard_cancelled(&self, h: i64) -> Result<bool, String> { Ok(self.wz_ereignis(h, "GUI_WIZARD_CANCELLED")? == 3) }
+    pub fn wizard_enable_next(&mut self, h: i64, an: bool) -> Result<(), String> {
+        let w = self.wz_mut(h, "GUI_WIZARD_ENABLE_NEXT")?;
+        w.wz.get_or_insert_with(Default::default).weiter_aus = !an; Ok(())
+    }
+    pub fn wizard_set(&mut self, h: i64, key: &str, v: i64) -> Result<(), String> {
+        let w = self.wz_mut(h, "GUI_WIZARD_SET")?;
+        let z = w.wz.get_or_insert_with(Default::default);
+        match key {
+            "pruefen" | "validate" => z.pruefen = v != 0,
+            _ => return Err(format!("GUI_WIZARD_SET: unbekannter Schluessel '{}' (erlaubt: pruefen)", key)),
+        }
+        Ok(())
+    }
+    pub fn wizard_labels(&mut self, h: i64, t: [String; 4]) -> Result<(), String> {
+        let w = self.wz_mut(h, "GUI_WIZARD_LABELS")?;
+        w.wz.get_or_insert_with(Default::default).texte = t; Ok(())
+    }
+    /// Weiter wie der Knopf: mit Pruefung der Felder, am letzten Schritt
+    /// "fertig". Liefert, ob es weiterging.
+    pub fn wizard_next(&mut self, h: i64) -> Result<bool, String> {
+        self.wz_ref(h, "GUI_WIZARD_NEXT")?;
+        let (wi, i) = Self::dec_widget(h);
+        Ok(self.wz_weiter(wi, i))
+    }
+    pub fn wizard_back(&mut self, h: i64) -> Result<bool, String> {
+        self.wz_ref(h, "GUI_WIZARD_BACK")?;
+        let (wi, i) = Self::dec_widget(h);
+        Ok(self.wz_zurueck(wi, i))
+    }
+    fn wz_geom(&self, w: &Widget, ax: i32, ay: i32) -> WzGeom {
+        let kopf_h = self.sk(WZ_KOPF_H);
+        let fuss_h = self.sk(WZ_FUSS_H);
+        let fuss_y = ay + w.h - fuss_h;
+        let (kb, kh) = (self.sk(112), self.sk(30));
+        let ky = fuss_y + (fuss_h - kh) / 2;
+        let rand = self.sk(10);
+        let weiter = (ax + w.w - rand - kb, ky, kb, kh);
+        let zurueck = (weiter.0 - self.sk(8) - kb, ky, kb, kh);
+        let abbrechen = (ax + rand, ky, kb, kh);
+        WzGeom { kopf_h, fuss_y, zurueck, weiter, abbrechen }
+    }
+    fn wz_weiter(&mut self, wi: usize, i: usize) -> bool {
+        let (sel, n, pruefen, aus) = {
+            let w = &self.windows[wi].widgets[i];
+            let z = w.wz.as_ref();
+            (w.sel, w.items.len() as i32, z.map(|z| z.pruefen).unwrap_or(false), z.map(|z| z.weiter_aus).unwrap_or(false))
+        };
+        if aus || n == 0 { return false; }
+        if pruefen {
+            // Nur die Felder DIESES Schritts -- ein Fehler auf einem spaeteren
+            // haette hier noch keinen Ausweg.
+            let mut erstes: Option<usize> = None;
+            for k in 0..self.windows[wi].widgets.len() {
+                let (gehoert, pruefbar) = {
+                    let c = &self.windows[wi].widgets[k];
+                    (c.tc_von == i as i32 && c.tc_seite == sel, !c.regeln.is_empty() && c.alive && c.visible && c.enabled)
+                };
+                if !gehoert || !pruefbar { continue; }
+                if !self.widget_pruefen(wi, k).is_empty() && erstes.is_none() { erstes = Some(k); }
+            }
+            if let Some(k) = erstes {
+                if self.windows[wi].widgets[k].kind.fokussierbar() {
+                    self.focus_widget = Some((wi, k)); self.focus_window = Some(wi);
+                }
+                return false;
+            }
+        }
+        let w = &mut self.windows[wi].widgets[i];
+        if sel + 1 >= n {
+            if let Some(z) = w.wz.as_mut() { z.ereignis = 2; }
+            let f = w.on_click.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        } else {
+            w.sel = sel + 1;
+            if let Some(z) = w.wz.as_mut() { z.ereignis = 1; }
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+        true
+    }
+    fn wz_zurueck(&mut self, wi: usize, i: usize) -> bool {
+        let w = &mut self.windows[wi].widgets[i];
+        if w.sel <= 0 { return false; }
+        w.sel -= 1;
+        if let Some(z) = w.wz.as_mut() { z.ereignis = 1; }
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+        true
+    }
+    fn wz_abbrechen(&mut self, wi: usize, i: usize) {
+        if let Some(z) = self.windows[wi].widgets[i].wz.as_mut() { z.ereignis = 3; }
+    }
+    /// Knopf k (0 zurueck, 1 weiter/fertig, 2 abbrechen) -- fuer Klick und
+    /// Bildschirmleser derselbe Weg.
+    fn wz_knopf(&mut self, wi: usize, i: usize, k: usize) {
+        match k { 0 => { self.wz_zurueck(wi, i); } 1 => { self.wz_weiter(wi, i); } _ => self.wz_abbrechen(wi, i) }
+    }
+
+    // --- Baum mit Spalten (GUI_TREETABLE) ----------------------------------------
+    pub fn treetable(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let hd = self.table(win, x, y, w, h)?;
+        let t = self.tbl_mut(hd, "GUI_TREETABLE")?;
+        t.baum = true;
+        t.rebuild_view();
+        Ok(hd)
+    }
+    fn tt_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TableState, String> {
+        let t = self.tbl_mut(h, fn_)?;
+        if !t.baum { return Err(format!("{}: Tabelle ist kein Baum (GUI_TREETABLE oder GUI_TABLE_SET(t, \"baum\", 1))", fn_)); }
+        t.baum_sync();
+        Ok(t)
+    }
+    fn tt_zeile(t: &TableState, r: i64, fn_: &str) -> Result<usize, String> {
+        if r < 0 || r >= t.rows.len() as i64 { return Err(format!("{}: Zeile {} gibt es nicht", fn_, r)); }
+        Ok(r as usize)
+    }
+    /// Eine Zeile unter `eltern` anhaengen (-1 = oben) -> ihre Datenzeile.
+    pub fn treetable_add(&mut self, h: i64, eltern: i64, zellen: Vec<String>) -> Result<i64, String> {
+        let f = "GUI_TREETABLE_ADD";
+        let t = self.tt_mut(h, f)?;
+        if eltern >= 0 { Self::tt_zeile(t, eltern, f)?; }
+        t.rows.push(zellen.into_iter().map(Cell::text).collect());
+        t.eltern.push(if eltern >= 0 { eltern as i32 } else { -1 });
+        t.offen.push(false);
+        t.row_fg.push(-1);
+        t.row_bg.push(-1);
+        t.rebuild_view();
+        Ok((t.rows.len() - 1) as i64)
+    }
+    pub fn treetable_expand(&mut self, h: i64, r: i64, an: bool) -> Result<(), String> {
+        let f = "GUI_TREETABLE_EXPAND";
+        let t = self.tt_mut(h, f)?;
+        let r = Self::tt_zeile(t, r, f)?;
+        t.offen[r] = an;
+        t.rebuild_view();
+        Ok(())
+    }
+    pub fn treetable_expand_all(&mut self, h: i64, an: bool) -> Result<(), String> {
+        let t = self.tt_mut(h, "GUI_TREETABLE_EXPAND_ALL")?;
+        for o in t.offen.iter_mut() { *o = an; }
+        t.rebuild_view();
+        Ok(())
+    }
+    pub fn treetable_expanded(&mut self, h: i64, r: i64) -> Result<bool, String> {
+        let f = "GUI_TREETABLE_EXPANDED";
+        let t = self.tt_mut(h, f)?;
+        Ok(t.offen[Self::tt_zeile(t, r, f)?])
+    }
+    pub fn treetable_parent(&mut self, h: i64, r: i64) -> Result<i64, String> {
+        let f = "GUI_TREETABLE_PARENT";
+        let t = self.tt_mut(h, f)?;
+        Ok(t.eltern[Self::tt_zeile(t, r, f)?] as i64)
+    }
+    pub fn treetable_level(&mut self, h: i64, r: i64) -> Result<i64, String> {
+        let f = "GUI_TREETABLE_LEVEL";
+        let t = self.tt_mut(h, f)?;
+        let mut r = Self::tt_zeile(t, r, f)?;
+        let mut n = 0;
+        while t.eltern[r] >= 0 && n <= t.rows.len() { r = t.eltern[r] as usize; n += 1; }
+        Ok(n as i64)
+    }
+    /// Eine Zeile unter andere Eltern haengen -- ein Kreis ist ein Fehler.
+    pub fn treetable_set_parent(&mut self, h: i64, r: i64, eltern: i64) -> Result<(), String> {
+        let f = "GUI_TREETABLE_SET_PARENT";
+        let t = self.tt_mut(h, f)?;
+        let r = Self::tt_zeile(t, r, f)?;
+        if eltern >= 0 {
+            let mut e = Self::tt_zeile(t, eltern, f)?;
+            let mut n = 0;
+            loop {
+                if e == r { return Err(format!("{}: Zeile {} kann nicht unter sich selbst oder ihren Nachkommen haengen", f, r)); }
+                if t.eltern[e] < 0 || n > t.rows.len() { break; }
+                e = t.eltern[e] as usize; n += 1;
+            }
+        }
+        t.eltern[r] = if eltern >= 0 { eltern as i32 } else { -1 };
+        t.rebuild_view();
+        Ok(())
+    }
+    /// Einzug der ersten sichtbaren Spalte einer Baumzeile: Tiefe plus Platz
+    /// fuer das Dreieck. EINE Stelle fuer Zeichnen und Treffertest.
+    fn tt_einzug(&self, t: &TableState, r: usize) -> (i32, i32) {
+        let stufe = self.sk(16);
+        let e = t.ebene.get(r).copied().unwrap_or(0);
+        (e * stufe, e * stufe + stufe)
+    }
+
+    /// Liegt (mx, my) auf einer Flaeche, die den KINDERN gehoert? Akkordeon
+    /// und Assistent liegen vor ihren Kindern, und der erste Treffer gewinnt
+    /// -- ohne diese Ausnahme schluckten sie jeden Klick in ein Feld darin.
+    /// Sie nehmen nur auf ihren eigenen Teilen an: Koepfe und Rollbalken
+    /// bzw. Schrittanzeige und Knopfreihe.
+    fn luft_fuer_kinder(&self, win: usize, i: usize, mx: i32, my: i32) -> bool {
+        let w = &self.windows[win].widgets[i];
+        let (ax, ay, aw, _) = self.abs_rect(win, w);
+        match w.kind {
+            Kind::Accordion => {
+                let balken = w.akk.as_ref().map(|a| a.inhalt_h > w.h).unwrap_or(false) && mx >= ax + aw - self.sk(8);
+                !balken && self.akk_kopf_unter(w, ay, my) < 0
+            }
+            Kind::Wizard => {
+                let gm = self.wz_geom(w, ax, ay);
+                my >= ay + gm.kopf_h && my < gm.fuss_y
+            }
+            _ => false,
+        }
     }
 
     /// Die Koepfe eines Reiterwerks: (Seite, x links, x rechts), absolut.
@@ -6652,6 +7272,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         let hr = self.windows[wi].widgets[idx].tbl.as_ref().unwrap().hover_row;
         if hr >= 0 {
+            // Baum: ein Klick auf das Dreieck (oder den Einzug davor) klappt
+            // die Zeile um, statt sie zu waehlen.
+            let umklappen = {
+                let t = self.windows[wi].widgets[idx].tbl.as_ref().unwrap();
+                if t.baum && t.hat_kinder.get(hr as usize).copied().unwrap_or(false) && Self::pos_at(&gm, mx) == 0 {
+                    let (_, o) = self.tt_einzug(t, hr as usize);
+                    mx < Self::col_x(&gm, 0) + o
+                } else { false }
+            };
+            if umklappen {
+                let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+                t.offen[hr as usize] = !t.offen[hr as usize];
+                t.rebuild_view();
+                return;
+            }
             // Spalte aus der x-Lage bestimmen -- ohne sie liesse sich ein
             // Knopf in Spalte 3 nicht von einem Haken in Spalte 1 trennen.
             let hc = Self::col_at(&gm, mx);
@@ -6869,6 +7504,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 else if g.key_repeat(KEY_PAGEUP) { (vi - seite).max(0) }
                 else if g.key_pressed(KEY_HOME) { 0 }
                 else if g.key_pressed(KEY_END) { nv - 1 }
+                else if t.baum && t.selected >= 0 && (g.key_pressed(KEY_RIGHT) || g.key_pressed(KEY_LEFT)) {
+                    // Rechts klappt auf bzw. geht zum ersten Kind, links klappt
+                    // zu bzw. geht zu den Eltern -- wie in jedem Dateibaum.
+                    let r = t.selected as usize;
+                    let rechts = g.key_pressed(KEY_RIGHT);
+                    let kinder = t.hat_kinder.get(r).copied().unwrap_or(false);
+                    let auf = t.offen.get(r).copied().unwrap_or(false);
+                    if kinder && rechts != auf {
+                        t.offen[r] = rechts;
+                        t.rebuild_view();
+                        return;
+                    }
+                    if rechts && kinder { vi + 1 }
+                    else if !rechts && t.eltern.get(r).copied().unwrap_or(-1) >= 0 { t.view_of(t.eltern[r]) }
+                    else { return }
+                }
                 else { return };
             let neu = neu.clamp(0, nv - 1);
             if neu == vi { return; }
@@ -7603,7 +8254,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
     pub fn on_change(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree | Kind::TabControl | Kind::RichText | Kind::TimePicker) {
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree | Kind::TabControl | Kind::RichText | Kind::TimePicker | Kind::Accordion | Kind::Wizard) {
             return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree".into());
         }
         w.on_change = func; Ok(())
@@ -8688,6 +9339,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if t.multi { tj["multi"] = serde_json::json!(true); }
             if t.col_edit.iter().any(|&x| x) { tj["col_edit"] = serde_json::json!(t.col_edit); }
             if t.zellmodus { tj["zellmodus"] = serde_json::json!(true); }
+            if t.baum {
+                tj["baum"] = serde_json::json!(true);
+                if t.eltern.iter().any(|&e| e >= 0) { tj["eltern"] = serde_json::json!(t.eltern); }
+                if t.offen.iter().any(|&o| o) { tj["offen"] = serde_json::json!(t.offen); }
+            }
             if t.zeilen_anhaengen { tj["zeilen_anhaengen"] = serde_json::json!(true); }
             if t.col_typ.iter().any(|&x| x != 0) {
                 let namen: Vec<&str> = t.col_typ.iter()
@@ -8764,6 +9420,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 "beschriftung": l.mit_text,
                 "symbolgroesse": l.symbol,
             });
+        }
+        if let Some(a) = &w.akk {
+            o["akkordeon"] = serde_json::json!({
+                "offen": a.offen, "hoehen": a.hoehen, "mehrere": a.mehrere,
+                "lage": a.lage.iter().map(|&(k, x, y)| serde_json::json!([k, x, y])).collect::<Vec<_>>(),
+            });
+        }
+        if let Some(z) = &w.wz {
+            o["assistent"] = serde_json::json!({ "pruefen": z.pruefen, "texte": z.texte });
         }
         if let Some(st) = &w.tabctl {
             o["tabctl"] = serde_json::json!({
@@ -8981,6 +9646,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     ts.col_edit = a.iter().map(|x| x.as_bool().unwrap_or(false)).collect();
                 }
                 if let Some(v) = tj["zellmodus"].as_bool() { ts.zellmodus = v; }
+                if let Some(v) = tj["baum"].as_bool() { ts.baum = v; }
+                if let Some(a) = tj["eltern"].as_array() { ts.eltern = a.iter().map(|x| x.as_i64().unwrap_or(-1) as i32).collect(); }
+                if let Some(a) = tj["offen"].as_array() { ts.offen = a.iter().map(|x| x.as_bool().unwrap_or(false)).collect(); }
                 if let Some(v) = tj["zeilen_anhaengen"].as_bool() { ts.zeilen_anhaengen = v; }
                 if let Some(a) = tj["col_type"].as_array() {
                     ts.col_typ = a.iter().map(|x| match x.as_str().unwrap_or("") {
@@ -9006,6 +9674,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 ts.selected = tj["selected"].as_i64().unwrap_or(-1) as i32;
             }
             ts.hover_row = -1; ts.clicked_row = -1;
+            // Die Ansicht aus den geladenen Zeilen bauen. Fehlte bis
+            // 2026-09-21: eine Tabelle aus einer .dhform zeigte KEINE Zeile,
+            // bis irgendetwas Sortieren oder Filtern anstiess.
+            ts.rebuild_view();
             w.tbl = Some(Box::new(ts));
         }
         if kind == Kind::Tree {
@@ -9116,7 +9788,35 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 w.leiste = Some(Box::new(l));
             }
         }
-        if kind == Kind::TabControl {
+        if kind == Kind::Accordion {
+            let mut a = AkkState { umgeschaltet: -1, ..Default::default() };
+            if let Some(aj) = wj.get("akkordeon") {
+                if let Some(o) = aj["offen"].as_array() { a.offen = o.iter().map(|x| x.as_bool().unwrap_or(false)).collect(); }
+                if let Some(o) = aj["hoehen"].as_array() { a.hoehen = o.iter().map(|x| x.as_i64().unwrap_or(0) as i32).collect(); }
+                a.mehrere = aj["mehrere"].as_bool().unwrap_or(false);
+                if let Some(l) = aj["lage"].as_array() {
+                    a.lage = l.iter().filter_map(|e| {
+                        let e = e.as_array()?;
+                        Some((e.first()?.as_i64()? as usize, e.get(1)?.as_i64()? as i32, e.get(2)?.as_i64()? as i32))
+                    }).collect();
+                }
+            }
+            let n = w.items.len();
+            a.offen.resize(n, false);
+            a.hoehen.resize(n, 0);
+            w.akk = Some(Box::new(a));
+        }
+        if kind == Kind::Wizard {
+            let mut z = WzState::default();
+            if let Some(zj) = wj.get("assistent") {
+                z.pruefen = zj["pruefen"].as_bool().unwrap_or(false);
+                if let Some(tx) = zj["texte"].as_array() {
+                    for (k, s) in tx.iter().take(4).enumerate() { if let Some(s) = s.as_str() { z.texte[k] = s.to_string(); } }
+                }
+            }
+            w.wz = Some(Box::new(z));
+        }
+        if matches!(kind, Kind::TabControl | Kind::Accordion | Kind::Wizard) {
             let mut st = TabCtlState::default();
             if let Some(tj) = wj.get("tabctl") {
                 if let Some(ks) = tj["kinder"].as_array() {
@@ -9304,6 +10004,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Zeichnen wie fuer jeden Treffertest, die beide hier fragen.
         if w.tc_von >= 0 {
             match self.windows[win].widgets.get(w.tc_von as usize) {
+                // Akkordeon: der Abschnitt muss offen sein, und das Kind muss
+                // ganz im sichtbaren Teil liegen -- halb herausgerollt waere es
+                // halb ueber dem Nachbarn oder dem Rand.
+                Some(tc) if tc.kind == Kind::Accordion => {
+                    let auf = tc.akk.as_ref().and_then(|a| a.offen.get(w.tc_seite.max(0) as usize).copied()).unwrap_or(false);
+                    return auf && tc.alive && tc.visible && w.y >= tc.y && w.y + w.h <= tc.y + tc.h;
+                }
                 Some(tc) => return tc.sel == w.tc_seite && tc.alive && tc.visible,
                 None => return true,
             }
@@ -9776,6 +10483,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if let Some(d) = t.datei.as_mut() { d.aktiviert.clear(); }
                 }
                 if let Some(r) = wdg.rich.as_mut() { r.geklickt.clear(); }
+                if let Some(a) = wdg.akk.as_mut() { a.umgeschaltet = -1; }
+                if let Some(z) = wdg.wz.as_mut() { z.ereignis = 0; }
             }
             for m in win.menus.iter_mut() {
                 for it in m.items.iter_mut() { it.clicked = false; }
@@ -9786,6 +10495,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.schnitte_laden(g);
         self.rt_pass(g);
         self.umbruch_layout(g);
+        self.akk_pass();
         self.layout_pass(g);
         self.panel_pass();
         self.tabctl_pass();
@@ -9935,6 +10645,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if rollt && Self::in_rect(mx, my, r) {
                     let wheel = Self::rad(g);
                     if wheel != 0 { self.panel_scroll_um(top, i, -(wheel as i32) * 40); }
+                }
+                let akk = { let w = &self.windows[top].widgets[i]; w.akk.is_some() && self.widget_shown(top, w) };
+                if akk && Self::in_rect(mx, my, r) {
+                    let wheel = Self::rad(g);
+                    if wheel != 0 {
+                        let schritt = self.sk(40);
+                        let (hh, a) = { let w = &mut self.windows[top].widgets[i]; (w.h, w.akk.as_mut().unwrap()) };
+                        a.scroll = (a.scroll - wheel as i32 * schritt).clamp(0, (a.inhalt_h - hh).max(0));
+                    }
                 }
             }
         }
@@ -12238,6 +12957,30 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if !t.is_empty() { g.clipboard_set(&t); }
                 }
             }
+            Kind::Accordion => {
+                // Hoch/runter waehlt den Kopf, Enter/Leertaste klappt ihn um.
+                let n = self.windows[wi].widgets[i].items.len() as i32;
+                if n == 0 { return; }
+                let f = self.windows[wi].widgets[i].akk.as_ref().map(|a| a.fokus).unwrap_or(0).clamp(0, n - 1);
+                let neu = if ab { f + 1 } else if auf { f - 1 } else { f }.clamp(0, n - 1);
+                let kopf_akk = self.sk(AKK_KOPF_H);
+                if let Some(a) = self.windows[wi].widgets[i].akk.as_mut() {
+                    a.fokus = neu;
+                    // Den Kopf mit Fokus ins Bild holen.
+                    if let Some(&(ky, _)) = a.koepfe.get(neu as usize) {
+                        let kopf = kopf_akk;
+                        let hh = self.windows[wi].widgets[i].h;
+                        let a = self.windows[wi].widgets[i].akk.as_mut().unwrap();
+                        if ky < a.scroll { a.scroll = ky; }
+                        if ky + kopf > a.scroll + hh { a.scroll = ky + kopf - hh; }
+                    }
+                }
+                if ausloesen { self.akk_umschalten(wi, i, neu as usize); }
+            }
+            Kind::Wizard => {
+                // Enter ist Weiter (am Ende Fertig) -- der naheliegende Knopf.
+                if enter { self.wz_knopf(wi, i, 1); }
+            }
             Kind::TabControl => {
                 // Links/rechts blaettert -- wie in jedem Karteikasten.
                 let d = rechts as i32 - links as i32;
@@ -12485,7 +13228,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             // Ein rollendes Panel ebenso -- der erste Treffer gewinnt hier,
             // und das Panel liegt vor seinen Kindern.
             let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), self.widget_shown(win, w) && w.enabled && w.kind != Kind::Layout && w.panel.is_none() && self.im_panel_sichtbar(win, w, mx, my)) };
-            if active && Self::in_rect(mx, my, r) { hit = Some(i); break; }
+            if active && Self::in_rect(mx, my, r) && !self.luft_fuer_kinder(win, i, mx, my) { hit = Some(i); break; }
         }
         let i = match hit { Some(i) => i, None => { self.focus_widget = None; return; } };
         // Ziehen beginnt mit dem Druck -- ob es eines wird, entscheidet die
@@ -12600,6 +13343,26 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let f = self.windows[win].widgets[i].on_click.clone();
                     if let Some(f) = f { self.pending.push(f); }
                 }
+            }
+            Kind::Accordion => {
+                let (ax, ay, aw, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let k = self.akk_kopf_unter(&self.windows[win].widgets[i], ay, my);
+                if k >= 0 {
+                    self.akk_umschalten(win, i, k as usize);
+                } else if mx >= ax + aw - self.sk(8) {
+                    // Klick in den Rollbalken: an die Stelle springen.
+                    let w = &mut self.windows[win].widgets[i];
+                    let (hh, a) = (w.h, w.akk.as_mut().unwrap());
+                    let rel = ((my - ay) as f32 / hh.max(1) as f32).clamp(0.0, 1.0);
+                    a.scroll = ((a.inhalt_h - hh).max(0) as f32 * rel) as i32;
+                }
+            }
+            Kind::Wizard => {
+                let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let gm = self.wz_geom(&self.windows[win].widgets[i], ax, ay);
+                if Self::in_rect(mx, my, gm.weiter) { self.wz_knopf(win, i, 1); }
+                else if Self::in_rect(mx, my, gm.zurueck) { self.wz_knopf(win, i, 0); }
+                else if Self::in_rect(mx, my, gm.abbrechen) { self.wz_knopf(win, i, 2); }
             }
             Kind::TabControl => {
                 let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
@@ -14134,6 +14897,44 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 n.set_value(format!("{:04}-{:02}-{:02}", w.datum[0], w.datum[1], w.datum[2]));
                 n
             }
+            Kind::Accordion => {
+                let n = Node::new(Role::Group);
+                let kopf = self.sk(AKK_KOPF_H);
+                if let Some(a) = w.akk.as_ref() {
+                    for (k, &(ky, _)) in a.koepfe.iter().enumerate() {
+                        let mut t = Node::new(Role::Button);
+                        t.set_label(w.items[k].clone());
+                        t.set_expanded(a.offen.get(k).copied().unwrap_or(false));
+                        t.set_bounds(Self::a11y_rect(x, y + ky - a.scroll, w.w, kopf));
+                        t.add_action(Action::Click);
+                        let id2 = NodeId(ids::teil(wi, i, k));
+                        nodes.push((id2, t));
+                        kinder.push(id2);
+                    }
+                }
+                n
+            }
+            Kind::Wizard => {
+                let mut n = Node::new(Role::Group);
+                if let Some(t) = w.items.get(w.sel.max(0) as usize) {
+                    n.set_label(format!("Schritt {} von {}: {}", w.sel + 1, w.items.len(), t));
+                }
+                let gm = self.wz_geom(w, x, y);
+                let texte = w.wz.as_ref().map(|z| z.texte.clone()).unwrap_or_else(|| WzState::default().texte);
+                let letzter = w.sel + 1 >= w.items.len() as i32;
+                for (k, (r, text)) in [(gm.zurueck, texte[0].clone()),
+                                       (gm.weiter, if letzter { texte[2].clone() } else { texte[1].clone() }),
+                                       (gm.abbrechen, texte[3].clone())].into_iter().enumerate() {
+                    let mut t = Node::new(Role::Button);
+                    t.set_label(text);
+                    t.set_bounds(Self::a11y_rect(r.0, r.1, r.2, r.3));
+                    t.add_action(Action::Click);
+                    let id2 = NodeId(ids::teil(wi, i, k));
+                    nodes.push((id2, t));
+                    kinder.push(id2);
+                }
+                n
+            }
             Kind::TabControl => {
                 let n = Node::new(Role::TabList);
                 let kopf = self.sk(TC_KOPF_H);
@@ -14298,6 +15099,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if !shown || !enabled { return; }
                 match (kind, req.action) {
                     (Kind::Toolbar, Action::Click) => self.tb_klick(wi, i, k as i32),
+                    (Kind::Accordion, Action::Click) => {
+                        if k < self.windows[wi].widgets[i].items.len() { self.akk_umschalten(wi, i, k); }
+                    }
+                    (Kind::Wizard, Action::Click) => self.wz_knopf(wi, i, k),
                     (Kind::Breadcrumb, Action::Click) => self.pf_klick(wi, i, k as i32),
                     (Kind::StatusBar, Action::Click) => {
                         let w = &mut self.windows[wi].widgets[i];
@@ -15659,6 +16464,122 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     self.wtext(g, wdg, ax + 12, ay + 1, wdg.text.clone(), self.th("title_fg"));
                 }
             }
+            Kind::Accordion => {
+                let kopf = self.sk(AKK_KOPF_H);
+                let border = self.wcol(wdg, "border", "widget_border");
+                let grund = self.wcol(wdg, "bg", "win_bg");
+                let kopf_bg = self.wcol(wdg, "bg", "widget_bg");
+                self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, grund, border);
+                let acc = self.acc_col(wdg);
+                let fg = self.txt_col(wdg);
+                let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+                let fokus_hier = self.focus_widget == Some((wi, idx));
+                g.push_clip(ax + 1, ay + 1, (w - 2).max(1), (h - 2).max(1));
+                if let Some(a) = wdg.akk.as_deref() {
+                    for (s, &(ky, inh)) in a.koepfe.iter().enumerate() {
+                        let y0 = ay + ky - a.scroll;
+                        if y0 > ay + h || y0 + kopf + inh < ay { continue; }
+                        let offen = a.offen.get(s).copied().unwrap_or(false);
+                        if offen && inh > 0 {
+                            g.box_fill(ax + 1, y0 + kopf, ax + w - 2, y0 + kopf + inh - 1, shade(grund, -6));
+                        }
+                        let ueber = mx >= ax && mx < ax + w && my >= y0.max(ay) && my < (y0 + kopf).min(ay + h);
+                        let bg = if ueber { shade(kopf_bg, 14) } else { kopf_bg };
+                        self.fbox(g, ax + 1, y0, ax + w - 2, y0 + kopf - 1, bg, border);
+                        // Dreieck: zu zeigt nach rechts, offen nach unten.
+                        let (tx, ty, d) = (ax + self.sk(14), y0 + kopf / 2, self.sk(5));
+                        if offen { g.triangle(tx - d, ty - d / 2, tx + d, ty - d / 2, tx, ty + d, acc); }
+                        else { g.triangle(tx - d / 2, ty - d, tx - d / 2, ty + d, tx + d, ty, fg); }
+                        let th = self.wsize(g, wdg);
+                        self.wtext(g, wdg, ax + self.sk(28), y0 + (kopf - th).max(0) / 2, wdg.items[s].clone(), fg);
+                        if fokus_hier && a.fokus == s as i32 {
+                            g.rect(ax + 3, y0 + 2, ax + w - 4, y0 + kopf - 3, acc);
+                        }
+                    }
+                    if a.inhalt_h > h {
+                        let sw = self.sk(4);
+                        let anteil = (h as f64 / a.inhalt_h as f64).min(1.0);
+                        let griff = ((h - 4) as f64 * anteil) as i32;
+                        let oben = ((h - 4 - griff) as f64 * (a.scroll as f64 / (a.inhalt_h - h) as f64).clamp(0.0, 1.0)) as i32;
+                        g.box_fill(ax + w - sw - 2, ay + 2 + oben, ax + w - 3, ay + 2 + oben + griff, shade(fg, -60));
+                    }
+                }
+                g.pop_clip();
+            }
+            Kind::Wizard => {
+                let gm = self.wz_geom(wdg, ax, ay);
+                let border = self.wcol(wdg, "border", "widget_border");
+                let grund = self.wcol(wdg, "bg", "win_bg");
+                let kbg = self.wcol(wdg, "bg", "widget_bg");
+                self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, grund, border);
+                let acc = self.acc_col(wdg);
+                let fg = self.txt_col(wdg);
+                let leise = self.leise(grund);
+                let n = wdg.items.len() as i32;
+                let sel = wdg.sel;
+                let rand = self.sk(10);
+                let rk = self.sk(11);
+                let cy = ay + self.sk(18);
+                let klein = (self.wsize(g, wdg) - self.sk(2)).max(8);
+                let font = self.wfont(g, wdg);
+                if n > 0 {
+                    let slot = ((w - 2 * rand) / n).max(1);
+                    let mitte = |k: i32| ax + rand + slot * k + slot / 2;
+                    for k in 1..n {
+                        let c = if k <= sel { acc } else { border };
+                        g.line(mitte(k - 1) + rk + 2, cy, mitte(k) - rk - 2, cy, c);
+                    }
+                    for k in 0..n {
+                        let cx = mitte(k);
+                        if k < sel {
+                            g.circle(cx, cy, rk, acc);
+                            // Haken fuer erledigte Schritte.
+                            let d = rk / 2;
+                            g.line(cx - d, cy, cx - d / 3, cy + d / 2 + 1, lesbar_auf(acc));
+                            g.line(cx - d / 3, cy + d / 2 + 1, cx + d, cy - d / 2, lesbar_auf(acc));
+                        } else if k == sel {
+                            g.circle(cx, cy, rk, acc);
+                            let z = (k + 1).to_string();
+                            let zb = g.text_width_in(&z, klein, font);
+                            g.text_styled_stil(cx - zb / 2, cy - klein / 2, z, lesbar_auf(acc), font, klein, crate::schnitt::FETT);
+                        } else {
+                            g.circle(cx, cy, rk, kbg);
+                            g.circle_outline(cx, cy, rk, border);
+                            let z = (k + 1).to_string();
+                            let zb = g.text_width_in(&z, klein, font);
+                            g.text_styled(cx - zb / 2, cy - klein / 2, z, leise, font, klein);
+                        }
+                        // Titel darunter, auf die Breite seines Platzes gekuerzt.
+                        let mut titel = wdg.items[k as usize].clone();
+                        while titel.chars().count() > 1 && g.text_width_in(&titel, klein, font) > slot - self.sk(6) {
+                            titel.pop();
+                        }
+                        let tb = g.text_width_in(&titel, klein, font);
+                        let stil = if k == sel { crate::schnitt::FETT } else { 0 };
+                        g.text_styled_stil(cx - tb / 2, cy + rk + self.sk(3), titel, if k == sel { fg } else { leise }, font, klein, stil);
+                    }
+                }
+                g.line(ax + 1, ay + gm.kopf_h, ax + w - 2, ay + gm.kopf_h, border);
+                g.line(ax + 1, gm.fuss_y, ax + w - 2, gm.fuss_y, border);
+                // Knoepfe: Weiter bzw. Fertig im Akzent, gesperrte gedaempft.
+                let z = wdg.wz.as_deref();
+                let texte = z.map(|z| z.texte.clone()).unwrap_or_else(|| WzState::default().texte);
+                let weiter_aus = z.map(|z| z.weiter_aus).unwrap_or(false) || n == 0;
+                let letzter = sel + 1 >= n;
+                let knoepfe = [
+                    (gm.zurueck, texte[0].clone(), false, sel <= 0),
+                    (gm.weiter, if letzter { texte[2].clone() } else { texte[1].clone() }, true, weiter_aus),
+                    (gm.abbrechen, texte[3].clone(), false, false),
+                ];
+                for ((kx, ky, kb, kh), text, primaer, aus) in knoepfe {
+                    let bg = if primaer && !aus { acc } else { kbg };
+                    self.fbox(g, kx, ky, kx + kb - 1, ky + kh - 1, bg, if primaer && !aus { acc } else { border });
+                    let tfg = if aus { self.leise(bg) } else if primaer { lesbar_auf(acc) } else { fg };
+                    let tb = self.wtext_width(g, wdg, &text);
+                    let th = self.wsize(g, wdg);
+                    self.wtext(g, wdg, kx + (kb - tb) / 2, ky + (kh - th).max(0) / 2, text, tfg);
+                }
+            }
             Kind::TabControl => {
                 // Koepfe oben, darunter die Flaeche -- die Kinder zeichnet die
                 // Schleife danach ganz normal, sie liegen nur auf einer Seite.
@@ -16459,7 +17380,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let clip_w = (cw - 2).min((kx + kw) - clip_x);
                 if clip_w > 0 {
                     g.push_clip(clip_x, row_y, clip_w, gm.row_h);
-                    self.draw_cell(g, wdg, t, ri, c, cx, row_y, cw, gm.row_h, fg, accent, border);
+                    // Baum: die erste sichtbare Spalte rueckt nach der Tiefe
+                    // ein und traegt das Dreieck der Zeile.
+                    let (dx, dw) = if t.baum && p == 0 {
+                        let (e, o) = self.tt_einzug(t, ri);
+                        if t.hat_kinder.get(ri).copied().unwrap_or(false) {
+                            let (tx, ty, d) = (cx + e + self.sk(7), row_y + gm.row_h / 2, self.sk(4));
+                            if t.offen.get(ri).copied().unwrap_or(false) {
+                                g.triangle(tx - d, ty - d / 2, tx + d, ty - d / 2, tx, ty + d, fg);
+                            } else {
+                                g.triangle(tx - d / 2, ty - d, tx - d / 2, ty + d, tx + d, ty, fg);
+                            }
+                        }
+                        (cx + o, (cw - o).max(1))
+                    } else { (cx, cw) };
+                    self.draw_cell(g, wdg, t, ri, c, dx, row_y, dw, gm.row_h, fg, accent, border);
                     g.pop_clip();
                 }
                 if t.grid && p < gm.n_cols - 1 && cx + cw > kx && cx + cw < kx + kw {

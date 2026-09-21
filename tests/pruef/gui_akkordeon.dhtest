@@ -1,0 +1,191 @@
+' GUI_ACCORDION -- Abschnitte mit Kopf, die auf- und zuklappen; die Kinder
+' wandern mit. Das Fenster ist randlos bei (0,0), damit Fenster- und
+' Bildschirmlage gleich sind. Format: docs/werkzeuge.md.
+
+=== abschnitte oeffnen einer oder mehrere
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 400)
+DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(w, 10, 10, 300, 300)
+DIM s0 AS INTEGER : s0 = GUI_ACCORDION_ADD(acc, "Allgemein")
+DIM s1 AS INTEGER : s1 = GUI_ACCORDION_ADD(acc, "Grafik")
+DIM s2 AS INTEGER : s2 = GUI_ACCORDION_ADD(acc, "Ton")
+PRINT GUI_ACCORDION_COUNT(acc); " "; GUI_ACCORDION_TITLE$(acc, 1)
+GUI_ACCORDION_SET_TITLE(acc, 1, "Bild")
+PRINT GUI_ACCORDION_TITLE$(acc, 1)
+GUI_ACCORDION_OPEN(acc, 0, TRUE)
+GUI_ACCORDION_OPEN(acc, 1, TRUE)
+PRINT "einer "; GUI_ACCORDION_IS_OPEN(acc, 0); " "; GUI_ACCORDION_IS_OPEN(acc, 1)
+GUI_ACCORDION_SET(acc, "mehrere", 1)
+GUI_ACCORDION_OPEN(acc, 0, TRUE)
+PRINT "mehrere "; GUI_ACCORDION_IS_OPEN(acc, 0); " "; GUI_ACCORDION_IS_OPEN(acc, 1)
+GUI_ACCORDION_SET(acc, "mehrere", 0)
+PRINT "zurueck zu einem "; GUI_ACCORDION_IS_OPEN(acc, 0); " "; GUI_ACCORDION_IS_OPEN(acc, 1)
+GUI_ACCORDION_OPEN(acc, 0, FALSE)
+PRINT "zu "; GUI_ACCORDION_IS_OPEN(acc, 0)
+TRY
+    GUI_ACCORDION_OPEN(acc, 5, TRUE)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_ACCORDION_SET(acc, "breit", 1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+3 Grafik
+Bild
+einer FALSE TRUE
+mehrere TRUE TRUE
+zurueck zu einem TRUE FALSE
+zu FALSE
+GUI_ACCORDION_OPEN: Abschnitt 5 gibt es nicht (erst GUI_ACCORDION_ADD)
+GUI_ACCORDION_SET: unbekannter Schluessel 'breit' (erlaubt: mehrere)
+
+=== ein kind vor dem akkordeon ist ein fehler
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 400)
+DIM frueh AS GUI_WIDGET : frueh = GUI_LABEL(w, "vorher", 10, 10)
+DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(w, 10, 10, 300, 300)
+GUI_ACCORDION_ADD(acc, "A")
+GUI_ACCORDION_ADD_WIDGET(acc, frueh, 0)
+--- fehler
+das Kind muss NACH dem Akkordeon angelegt sein
+
+=== die kinder wandern mit dem abschnitt darueber
+' Ein Kind liegt bei (12, 8) IM Abschnitt. Zu: Abschnitt 1 beginnt unter
+' zwei Koepfen (10 + 30 + 30). Offen: dazu die Hoehe von Abschnitt 0 --
+' sein Kind (8 + Hoehe) plus 8 Rand.
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 400)
+DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(w, 10, 10, 300, 300)
+GUI_ACCORDION_SET(acc, "mehrere", 1)
+GUI_ACCORDION_ADD(acc, "Oben")
+GUI_ACCORDION_ADD(acc, "Unten")
+DIM a AS GUI_WIDGET : a = GUI_TEXTINPUT(w, 12, 8, 200, 26, "")
+DIM b AS GUI_WIDGET : b = GUI_TEXTINPUT(w, 12, 8, 200, 26, "")
+GUI_ACCORDION_ADD_WIDGET(acc, a, 0)
+GUI_ACCORDION_ADD_WIDGET(acc, b, 1)
+GUI_ACCORDION_OPEN(acc, 1, TRUE)
+GUI_UPDATE()
+PRINT "x "; GUI_GET_X(b); " y "; GUI_GET_Y(b)
+GUI_ACCORDION_OPEN(acc, 0, TRUE)
+GUI_UPDATE()
+PRINT "y "; GUI_GET_Y(b); " a "; GUI_GET_Y(a)
+GUI_ACCORDION_SET_HEIGHT(acc, 0, 100)
+GUI_UPDATE()
+PRINT "eigene hoehe "; GUI_GET_Y(b)
+--- erwartet
+x 22 y 78
+y 120 a 48
+eigene hoehe 178
+
+=== ein klick auf den kopf klappt um, ein klick ins kind trifft das kind
+' Kopf "Unten" liegt bei y 40..70 (Oben ist zu), das Kaestchen danach bei
+' (22, 78). Ohne die Ausnahme fuer Kinder schluckte das Akkordeon den Klick.
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(w, 10, 10, 300, 300)
+GUI_ACCORDION_ADD(acc, "Oben")
+GUI_ACCORDION_ADD(acc, "Unten")
+DIM k AS GUI_WIDGET : k = GUI_CHECKBOX(w, "Haken", 12, 8, FALSE)
+GUI_ACCORDION_ADD_WIDGET(acc, k, 1)
+DIM bild AS INTEGER : bild = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_ACCORDION_TOGGLED(acc) >= 0 THEN PRINT "umgeschaltet "; GUI_ACCORDION_TOGGLED(acc); " offen "; GUI_ACCORDION_IS_OPEN(acc, 1)
+    IF GUI_CLICKED(k) THEN PRINT "haken "; GUI_CHECKED(k)
+    bild = bild + 1
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 6
+e 1 7 100 55 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 5 7 28 86 0 0
+e 6 6 0 0 0 0
+e 7 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+umgeschaltet 1 offen TRUE
+haken TRUE
+
+=== tastatur waehlt den kopf und klappt um
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(w, 10, 10, 300, 300)
+GUI_ACCORDION_ADD(acc, "A")
+GUI_ACCORDION_ADD(acc, "B")
+GUI_ACCORDION_ADD(acc, "C")
+GUI_FOCUS(acc)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_ACCORDION_TOGGLED(acc) >= 0 THEN PRINT "offen "; GUI_ACCORDION_IS_OPEN(acc, 0); GUI_ACCORDION_IS_OPEN(acc, 1); GUI_ACCORDION_IS_OPEN(acc, 2)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 8
+e 1 2 264 0 0 0
+e 2 1 264 0 0 0
+e 4 2 257 0 0 0
+e 5 1 257 0 0 0
+e 7 2 264 0 0 0
+e 8 1 264 0 0 0
+e 10 2 32 0 0 0
+e 11 1 32 0 0 0
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+offen FALSETRUEFALSE
+offen FALSEFALSETRUE
+
+=== das akkordeon steht vollstaendig in der form
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 400)
+DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(w, 10, 10, 300, 300)
+GUI_ACCORDION_SET(acc, "mehrere", 1)
+GUI_ACCORDION_ADD(acc, "Oben")
+GUI_ACCORDION_ADD(acc, "Unten")
+DIM b AS GUI_WIDGET : b = GUI_TEXTINPUT(w, 12, 8, 200, 26, "")
+GUI_ACCORDION_ADD_WIDGET(acc, b, 1)
+GUI_ACCORDION_OPEN(acc, 0, TRUE)
+GUI_ACCORDION_OPEN(acc, 1, TRUE)
+GUI_ACCORDION_SET_HEIGHT(acc, 0, 50)
+GUI_UPDATE()
+DIM y1 AS INTEGER : y1 = GUI_GET_Y(b)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(GUI_TO_JSON(w))
+GUI_WINDOW_VISIBLE(w, FALSE)
+GUI_UPDATE()
+DIM a2 AS GUI_WIDGET : a2 = GUI_WINDOW_WIDGET(w2, 0)
+DIM b2 AS GUI_WIDGET : b2 = GUI_WINDOW_WIDGET(w2, 1)
+PRINT GUI_KIND(a2); " "; GUI_ACCORDION_COUNT(a2); " "; GUI_ACCORDION_TITLE$(a2, 1)
+PRINT "offen "; GUI_ACCORDION_IS_OPEN(a2, 0); " "; GUI_ACCORDION_IS_OPEN(a2, 1)
+PRINT "gleiche lage "; (GUI_GET_Y(b2) = y1)
+--- erwartet
+accordion 2 Unten
+offen TRUE TRUE
+gleiche lage TRUE

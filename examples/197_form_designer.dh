@@ -102,6 +102,9 @@ palette("tabcontrol", "Reiterwerk", 280, 180, FALSE)
 palette("statusbar", "Statusleiste", 320, 24, TRUE)
 palette("breadcrumb", "Pfadleiste", 280, 24, FALSE)
 palette("card", "Kachel", 200, 190, TRUE)       ' Bild, Titel, Beschreibung -- ganz ein Knopf
+palette("accordion", "Akkordeon", 260, 240, FALSE)
+palette("wizard", "Assistent", 420, 300, FALSE)
+palette("treetable", "Baumtabelle", 320, 160, FALSE)   ' eine Tabelle, deren Zeilen einen Baum bilden
 
 ' --- Modell -----------------------------------------------------------------
 DIM doc AS JSON_HANDLE
@@ -272,7 +275,7 @@ FUNCTION artFeld(schluessel AS STRING, titel AS STRING, arten AS STRING, zeile A
     RETURN f
 END FUNCTION
 
-DIM aEintraege AS GUI_WIDGET : aEintraege = artFeld("items", "Eintraege", ",dropdown,listbox,", 12, "Rot; Gruen; Blau")
+DIM aEintraege AS GUI_WIDGET : aEintraege = artFeld("items", "Eintraege", ",dropdown,listbox,accordion,wizard,", 12, "Rot; Gruen; Blau")
 DIM aSpalten AS GUI_WIDGET : aSpalten = artFeld("spalten", "Spalten", ",table,", 12, "Name; Menge; Farbe")
 DIM aBreiten AS GUI_WIDGET : aBreiten = artFeld("breiten", "Breiten", ",table,", 13, "120; 60; 80")
 DIM aBearb AS GUI_WIDGET : aBearb = artFeld("bearbeitbar", "Bearbeitbar", ",table,", 14, "0; 2  oder  alle")
@@ -393,7 +396,7 @@ END SUB
 SUB artUebernehmen(i AS INTEGER)
     DIM art AS STRING : art = feldText$(i, "kind")
     DIM t AS STRING
-    IF art = "dropdown" OR art = "listbox" THEN listeSetzen(wz$(i, "items"), GUI_TEXT(aEintraege), FALSE)
+    IF art = "dropdown" OR art = "listbox" OR art = "accordion" OR art = "wizard" THEN listeSetzen(wz$(i, "items"), GUI_TEXT(aEintraege), FALSE)
     IF art = "slider" OR art = "progress" OR art = "spinner" OR art = "knob" THEN
         IF TRIM$(GUI_TEXT(aMin)) <> "" THEN JSON_SET_FLOAT(doc, wz$(i, "min"), VAL(GUI_TEXT(aMin)))
         IF TRIM$(GUI_TEXT(aMax)) <> "" THEN JSON_SET_FLOAT(doc, wz$(i, "max"), VAL(GUI_TEXT(aMax)))
@@ -599,13 +602,23 @@ END FUNCTION
 
 SUB controlAnlegen(p AS INTEGER, x AS INTEGER, y AS INTEGER)
     DIM w AS JSON_HANDLE : w = JSON_NEW_OBJECT()
-    ' Das Gitter ist keine eigene Art, sondern eine Tabelle im Zellmodus.
+    ' Gitter und Baumtabelle sind keine eigenen Arten, sondern Tabellen im
+    ' Zellmodus bzw. mit Baum.
     DIM kind AS STRING : kind = palArt[p]
-    IF kind = "grid" THEN kind = "table"
+    IF kind = "grid" OR kind = "treetable" THEN kind = "table"
     JSON_SET_STRING(w, "kind", kind)
-    IF palArt[p] = "grid" THEN JSON_SET_STRING(w, "name", eindeutigerName$("gitter")) ELSE JSON_SET_STRING(w, "name", eindeutigerName$(kind))
+    IF palArt[p] = "grid" THEN
+        JSON_SET_STRING(w, "name", eindeutigerName$("gitter"))
+    ELSEIF palArt[p] = "treetable" THEN
+        JSON_SET_STRING(w, "name", eindeutigerName$("baumtabelle"))
+    ELSE
+        JSON_SET_STRING(w, "name", eindeutigerName$(kind))
+    END IF
     IF palArt[p] = "table" THEN JSON_SET_JSON(w, "table", JSON_PARSE(REPLACE$("{'headers':['Name','Wert']}", "'", CHR$(34))))
     IF palArt[p] = "grid" THEN JSON_SET_JSON(w, "table", JSON_PARSE(REPLACE$("{'headers':['A','B','C'],'zellmodus':true,'col_edit':[true,true,true]}", "'", CHR$(34))))
+    IF palArt[p] = "treetable" THEN JSON_SET_JSON(w, "table", JSON_PARSE(REPLACE$("{'headers':['Name','Wert'],'baum':true}", "'", CHR$(34))))
+    IF palArt[p] = "accordion" THEN JSON_SET_JSON(w, "items", JSON_PARSE(REPLACE$("['Abschnitt 1','Abschnitt 2']", "'", CHR$(34))))
+    IF palArt[p] = "wizard" THEN JSON_SET_JSON(w, "items", JSON_PARSE(REPLACE$("['Schritt 1','Schritt 2']", "'", CHR$(34))))
     JSON_SET_INT(w, "x", amRaster(x)) : JSON_SET_INT(w, "y", amRaster(y))
     JSON_SET_INT(w, "w", palB[p]) : JSON_SET_INT(w, "h", palH[p])
     IF palText[p] THEN JSON_SET_STRING(w, "text", palName[p])
@@ -918,7 +931,8 @@ SUB gbControl(i AS INTEGER)
         CASE "dropdown" : ctor = "GUI_DROPDOWN(frm, " + rahmen + ", " + gbListe$(wz$(i, "items")) + ")"
         CASE "listbox" : ctor = "GUI_LISTBOX(frm, " + rahmen + ", " + gbListe$(wz$(i, "items")) + ")"
         CASE "progress" : ctor = "GUI_PROGRESS(frm, " + rahmen + ")"
-        CASE "table" : ctor = "GUI_TABLE(frm, " + rahmen + ")"
+        CASE "table"
+            IF gbSchalter(wz$(i, "table") + ".baum") THEN ctor = "GUI_TREETABLE(frm, " + rahmen + ")" ELSE ctor = "GUI_TABLE(frm, " + rahmen + ")"
         CASE "canvas" : ctor = "GUI_CANVAS(frm, " + rahmen + ")"
         CASE "panel" : ctor = "GUI_PANEL(frm, " + rahmen + ", " + t + ")"
         CASE "groupbox" : ctor = "GUI_GROUPBOX(frm, " + rahmen + ", " + t + ")"
@@ -948,6 +962,8 @@ SUB gbControl(i AS INTEGER)
         CASE "statusbar" : ctor = "GUI_STATUSBAR(frm, " + rahmen + ", " + t + ")"
         CASE "breadcrumb" : ctor = "GUI_BREADCRUMB(frm, " + rahmen + ")"
         CASE "card" : ctor = "GUI_CARD(frm, " + rahmen + ", -1, " + t + ", " + gbText$(feldText$(i, "placeholder")) + ")"
+        CASE "accordion" : ctor = "GUI_ACCORDION(frm, " + rahmen + ")"
+        CASE "wizard" : ctor = "GUI_WIZARD(frm, " + rahmen + ")"
     END SELECT
     IF ctor = "" THEN
         ' Ein Bild braucht eine Quelle (LOADIMAGE), die die .dhform nicht kennt.
@@ -987,7 +1003,23 @@ SUB gbControl(i AS INTEGER)
                 IF JSON_LEN(doc, cp) > 0 THEN gb("GUI_TABLE_COL_CHOICES(" + v + ", " + STR$(s) + ", " + gbListe$(cp) + ")")
             NEXT
         END IF
-        gb("' " + v + ": Zeilen zur Laufzeit fuellen -- GUI_TABLE_ADD_ROW / GUI_TABLE_ROWS")
+        IF gbSchalter(tp + ".baum") THEN
+            gb("' " + v + ": Zeilen zur Laufzeit fuellen -- GUI_TREETABLE_ADD(" + v + ", eltern, zellen)")
+        ELSE
+            gb("' " + v + ": Zeilen zur Laufzeit fuellen -- GUI_TABLE_ADD_ROW / GUI_TABLE_ROWS")
+        END IF
+    END IF
+    IF (k = "accordion" OR k = "wizard") AND JSON_HAS(doc, wz$(i, "items")) THEN
+        DIM ab AS INTEGER
+        FOR ab = 0 TO JSON_LEN(doc, wz$(i, "items")) - 1
+            IF k = "accordion" THEN
+                gb("GUI_ACCORDION_ADD(" + v + ", " + gbText$(JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(ab))) + ")")
+            ELSE
+                gb("GUI_WIZARD_ADD(" + v + ", " + gbText$(JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(ab))) + ")")
+            END IF
+        NEXT
+        IF k = "accordion" THEN gb("' " + v + ": Controls je Abschnitt -- GUI_ACCORDION_ADD_WIDGET(" + v + ", wdg, abschnitt)")
+        IF k = "wizard" THEN gb("' " + v + ": Controls je Schritt -- GUI_WIZARD_ADD_WIDGET(" + v + ", wdg, schritt)")
     END IF
     IF k = "datepicker" AND feldText$(i, "date") <> "" THEN gb("GUI_SET_DATE(" + v + ", " + gbText$(feldText$(i, "date")) + ")")
     IF k = "timepicker" AND feldText$(i, "time") <> "" THEN gb("GUI_SET_TIME(" + v + ", " + gbText$(feldText$(i, "time")) + ")")
