@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1918,
+ "count": 1924,
  "builtins": [
   {
    "name": "ABS",
@@ -2667,6 +2667,18 @@
    "module": "core"
   },
   {
+   "name": "FONT_HAS_STYLE",
+   "kind": "graphics",
+   "signature": "FONT_HAS_STYLE(font, stil$)",
+   "module": "core"
+  },
+  {
+   "name": "FONT_STYLE",
+   "kind": "graphics",
+   "signature": "FONT_STYLE(font, stil$)",
+   "module": "core"
+  },
+  {
    "name": "FORMAT$",
    "kind": "core",
    "signature": "FORMAT$(value, mask)",
@@ -3453,6 +3465,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GET_FONT_STYLE$",
+   "kind": "core",
+   "signature": "GUI_GET_FONT_STYLE$(wdg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_GET_H",
    "kind": "core",
    "signature": "GUI_GET_H(wdg)",
@@ -4206,6 +4224,12 @@
    "name": "GUI_SET_FONT_SIZE",
    "kind": "core",
    "signature": "GUI_SET_FONT_SIZE(wdg, px)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_FONT_STYLE",
+   "kind": "core",
+   "signature": "GUI_SET_FONT_STYLE(wdg, stil$)",
    "module": "gui"
   },
   {
@@ -8394,6 +8418,18 @@
    "name": "QUITREQUESTED",
    "kind": "graphics",
    "signature": "QUITREQUESTED()",
+   "module": "core"
+  },
+  {
+   "name": "TEXT_GET_STYLE$",
+   "kind": "graphics",
+   "signature": "TEXT_GET_STYLE$()",
+   "module": "core"
+  },
+  {
+   "name": "TEXT_STYLE",
+   "kind": "graphics",
+   "signature": "TEXT_STYLE(stil$)",
    "module": "core"
   },
   {

@@ -1448,7 +1448,8 @@ struct RtLauf {
     text: String,
     groesse: i32,
     rolle: u8,
-    fett: bool,
+    /// Bits aus `schnitt`.
+    stil: u8,
     code: bool,
     link: i32,
 }
@@ -1458,7 +1459,8 @@ struct RtLauf {
 #[derive(Clone)]
 struct RtWort {
     text: String,
-    fett: bool,
+    /// Bits aus `schnitt`.
+    stil: u8,
     code: bool,
     rolle: u8,
     link: i32,
@@ -1468,18 +1470,17 @@ struct RtWort {
 }
 
 /// Eine Zeile Markdown in Woerter mit Gestalt zerlegen: `**fett**`,
-/// `*kursiv*`, `` `code` `` und `[Text](Ziel)`.
+/// `*kursiv*`, `~~durchgestrichen~~`, `<u>unterstrichen</u>`,
+/// `` `code` `` und `[Text](Ziel)`.
 ///
-/// **Kursiv wird gedaempft, nicht geneigt**, und fett zeichnet die
-/// Zeichenroutine zweimal um einen Punkt versetzt: raylib kann aus einer
-/// Schrift keine zweite Strichstaerke rechnen, und eine fette Schriftdatei
-/// mitzuliefern ist nicht Sache der Laufzeit. Das steht so auch in der Doku
-/// -- eine Auszeichnung, die man nicht sieht, waere schlimmer als eine, die
-/// anders aussieht als erwartet.
+/// Fett und kursiv nehmen den echten Schnitt der Schrift, wenn es ihn als
+/// Datei gibt (`Graphics::schnitt`), sonst zeichnet die Laufzeit Fett
+/// doppelt und Kursiv geneigt -- sichtbar ist die Auszeichnung in jedem Fall.
 fn rt_inline(z: &str, grund_rolle: u8, ziele: &mut Vec<String>) -> Vec<RtWort> {
     let zeichen: Vec<char> = z.chars().collect();
     let mut raus: Vec<RtWort> = Vec::new();
     let (mut fett, mut kursiv, mut code) = (false, false, false);
+    let (mut unter, mut durch) = (false, false);
     let mut link = -1i32;
     let mut puffer = String::new();
     // Ob der zuletzt verarbeitete Text mit einer Luecke endete. Das
@@ -1492,13 +1493,17 @@ fn rt_inline(z: &str, grund_rolle: u8, ziele: &mut Vec<String>) -> Vec<RtWort> {
     macro_rules! spuelen {
         ($raus:expr, $puffer:expr) => {
             if !$puffer.is_empty() {
-                let rolle = if link >= 0 { 2 } else if code { 3 } else if kursiv { 1 } else { grund_rolle };
+                let rolle = if link >= 0 { 2 } else if code { 3 } else { grund_rolle };
+                let stil = (if fett { crate::schnitt::FETT } else { 0 })
+                    | (if kursiv { crate::schnitt::KURSIV } else { 0 })
+                    | (if unter { crate::schnitt::UNTER } else { 0 })
+                    | (if durch { crate::schnitt::DURCH } else { 0 });
                 let anhaengen = !$puffer.starts_with(' ') && !$raus.is_empty() && !letzte_luecke;
                 letzte_luecke = $puffer.ends_with(' ');
                 let mut erstes = true;
                 for w in $puffer.split(' ') {
                     if w.is_empty() { continue; }
-                    $raus.push(RtWort { text: w.to_string(), fett, code, rolle, link,
+                    $raus.push(RtWort { text: w.to_string(), stil, code, rolle, link,
                                         kleben: erstes && anhaengen });
                     erstes = false;
                 }
@@ -1511,10 +1516,19 @@ fn rt_inline(z: &str, grund_rolle: u8, ziele: &mut Vec<String>) -> Vec<RtWort> {
         if rest.starts_with("**") && !code {
             spuelen!(raus, puffer); fett = !fett; i += 2; continue;
         }
+        if rest.starts_with("~~") && !code {
+            spuelen!(raus, puffer); durch = !durch; i += 2; continue;
+        }
+        if !code && (rest.starts_with("<u>") || rest.starts_with("<U>")) {
+            spuelen!(raus, puffer); unter = true; i += 3; continue;
+        }
+        if !code && (rest.starts_with("</u>") || rest.starts_with("</U>")) {
+            spuelen!(raus, puffer); unter = false; i += 4; continue;
+        }
         if (zeichen[i] == '*' || zeichen[i] == '_') && !code {
             // Ein `_` MITTEN im Wort ist ein Namensteil (`gui_update`), keine
             // Auszeichnung -- sonst faerbte jeder Bezeichner den halben Absatz.
-            let am_rand = i == 0 || zeichen[i - 1] == ' ' || zeichen[i - 1] == '(';
+            let am_rand = i == 0 || zeichen[i - 1] == ' ' || zeichen[i - 1] == '(' || zeichen[i - 1] == '*';
             let schliesst = kursiv;
             if am_rand || schliesst {
                 spuelen!(raus, puffer); kursiv = !kursiv; i += 1; continue;
@@ -1878,6 +1892,9 @@ pub struct Widget {
     enabled: bool,
     font: i64,
     font_size: i32,
+    /// Schriftstil (Bits aus `schnitt`): fett/kursiv waehlen den Schnitt
+    /// der Schrift, unterstrichen/durchgestrichen sind Linien.
+    stil: u8,
     // Anchoring (Reflow beim Fenster-Resize): Bitmaske L=1,R=2,T=4,B=8
     // (Default L|T = 5 = oben-links fixiert). `bx/by/bw/bh` = Basis-Rechteck,
     // gegen das relativ zur Basis-Fenstergroesse neu gelayoutet wird.
@@ -3279,7 +3296,7 @@ impl Gui {
             was_hovered: false, was_focused: false,
             alive: true, visible: true, rund: false, variante: 0,
             group: String::new(), items: Vec::new(), sel: -1,
-            enabled: true, font: -1, font_size: 0,
+            enabled: true, font: -1, font_size: 0, stil: 0,
             anchor: 5, bx: x, by: y, bw: w, bh: h,         // Default: oben-links (L|T)
             caret: 0, sel_anchor: 0, scroll: 0,
             tab_page: -1,
@@ -6068,7 +6085,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let zeichen: Vec<char> = l.text.chars().collect();
                 let mut vorher = 0;
                 for c in 1..=zeichen.len() {
-                    let b = g.text_width_in(&zeichen[..c].iter().collect::<String>(), l.groesse, f);
+                    let b = g.text_width_stil(&zeichen[..c].iter().collect::<String>(), l.groesse, f, l.stil);
                     if x - l.x < (vorher + b) / 2 { return (zi, starts[k] + c - 1); }
                     vorher = b;
                 }
@@ -6121,6 +6138,24 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Je Bild: jeden gesetzten Text neu setzen, dessen Quelle, Breite oder
     /// Schriftgroesse sich geaendert hat. Alles andere bleibt stehen.
+    /// Die Schnitte, die gleich gemessen werden, einmal laden: das Messen
+    /// laeuft mit `&Graphics` und kann selbst nichts nachladen. Nach dem
+    /// ersten Mal ist das ein Blick in den Vorrat.
+    fn schnitte_laden(&self, g: &mut Graphics) {
+        use crate::schnitt::{FETT, KURSIV};
+        let aktiv = g.active_font();
+        for win in &self.windows {
+            for w in &win.widgets {
+                if !w.alive { continue; }
+                let basis = font_wahl(w.font, aktiv);
+                if w.stil != 0 { g.schnitt(basis, w.stil); }
+                if w.kind == Kind::RichText {
+                    for s in [FETT, KURSIV, FETT | KURSIV] { g.schnitt(basis, s); }
+                }
+            }
+        }
+    }
+
     fn rt_pass(&mut self, g: &Graphics) {
         for wi in 0..self.windows.len() {
             for i in 0..self.windows[wi].widgets.len() {
@@ -6159,19 +6194,19 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let mut ziele: Vec<String> = Vec::new();
         let mut y = rand;
         let (h1, h2, h3) = (basis + self.sk(12), basis + self.sk(7), basis + self.sk(3));
-        let breite_von = |s: &str, gr: i32, code: bool| {
-            g.text_width_in(s, gr, if code && code_font >= 0 { code_font } else { font })
+        let breite_von = |s: &str, gr: i32, code: bool, stil: u8| {
+            g.text_width_stil(s, gr, if code && code_font >= 0 { code_font } else { font }, stil)
         };
         // Woerter zu Zeilen flechten -- die eine Stelle, an der umgebrochen
         // wird; Absatz, Aufzaehlung und Zitat gehen alle hier durch.
         let absatz = |woerter: &[RtWort], x0: i32, gr: i32, weite: i32,
                           y: &mut i32, zeilen: &mut Vec<RtZeile>, balken: i32| {
             let zh = gr + self.sk(6);
-            let leer = breite_von(" ", gr, false);
+            let leer = breite_von(" ", gr, false, 0);
             let mut zeile = RtZeile { y: *y, h: zh, grund: false, linie: false, balken, laeufe: Vec::new() };
             let mut x = x0;
             for w in woerter {
-                let bw = breite_von(&w.text, gr, w.code);
+                let bw = breite_von(&w.text, gr, w.code, w.stil);
                 let luecke = if zeile.laeufe.is_empty() || w.kleben { 0 } else { leer };
                 if x + luecke + bw > x0 + weite && !zeile.laeufe.is_empty() {
                     zeilen.push(zeile.clone());
@@ -6181,7 +6216,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
                 let lx = x + if zeile.laeufe.is_empty() { 0 } else { luecke };
                 zeile.laeufe.push(RtLauf { x: lx, breite: bw, text: w.text.clone(), groesse: gr,
-                                           rolle: w.rolle, fett: w.fett, code: w.code, link: w.link });
+                                           rolle: w.rolle, stil: w.stil, code: w.code, link: w.link });
                 x = lx + bw;
             }
             if !zeile.laeufe.is_empty() { zeilen.push(zeile); *y += zh; }
@@ -6202,8 +6237,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let gr = (basis - 1).max(8);
                 let zh = gr + self.sk(7);
                 zeilen.push(RtZeile { y, h: zh, grund: true, linie: false, balken: -1,
-                    laeufe: vec![RtLauf { x: rand + self.sk(6), breite: breite_von(z, gr, true),
-                        text: z.to_string(), groesse: gr, rolle: 3, fett: false, code: true, link: -1 }] });
+                    laeufe: vec![RtLauf { x: rand + self.sk(6), breite: breite_von(z, gr, true, 0),
+                        text: z.to_string(), groesse: gr, rolle: 3, stil: 0, code: true, link: -1 }] });
                 y += zh;
                 i += 1;
                 continue;
@@ -6218,7 +6253,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let gr = match stufe { 1 => h1, 2 => h2, _ => h3 };
                 y += self.sk(if stufe == 1 { 10 } else { 8 });
                 let mut w = rt_inline(rest, 2, &mut ziele);
-                for x in w.iter_mut() { x.fett = true; x.rolle = 2; }
+                for x in w.iter_mut() { x.stil |= crate::schnitt::FETT; x.rolle = 2; }
                 absatz(&w, rand, gr, innen, &mut y, &mut zeilen, -1);
                 // Ein Strich unter der zweiten Ebene -- er gliedert lange
                 // Dokumente, ohne dass man die Ueberschrift lesen muss.
@@ -6270,7 +6305,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let (marke, rest) = if punkt { ("\u{2022}".to_string(), &t[2..]) }
                                     else { let (a, b) = t.split_once(". ").unwrap(); (format!("{}.", a), b) };
                 let ein = rand + tiefe * self.sk(16);
-                let mw = breite_von(&marke, basis, false);
+                let mw = breite_von(&marke, basis, false, 0);
                 let zh = basis + self.sk(6);
                 let start = zeilen.len();
                 let w = rt_inline(rest, 0, &mut ziele);
@@ -6279,11 +6314,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // rueckt darunter ein, sonst laeuft der Text um die Marke herum.
                 if let Some(erste) = zeilen.get_mut(start) {
                     erste.laeufe.insert(0, RtLauf { x: ein, breite: mw, text: marke, groesse: basis,
-                                                    rolle: 1, fett: false, code: false, link: -1 });
+                                                    rolle: 1, stil: 0, code: false, link: -1 });
                 } else {
                     zeilen.push(RtZeile { y, h: zh, grund: false, linie: false, balken: -1,
                         laeufe: vec![RtLauf { x: ein, breite: mw, text: marke, groesse: basis,
-                            rolle: 1, fett: false, code: false, link: -1 }] });
+                            rolle: 1, stil: 0, code: false, link: -1 }] });
                     y += zh;
                 }
                 i += 1;
@@ -6335,7 +6370,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     #[allow(clippy::too_many_arguments)]
     fn rt_tabelle(&self, roh: &[Vec<String>], x0: i32, basis: i32, innen: i32, y0: i32,
                   zeilen: &mut Vec<RtZeile>, ziele: &mut Vec<String>,
-                  breite_von: &dyn Fn(&str, i32, bool) -> i32) -> i32 {
+                  breite_von: &dyn Fn(&str, i32, bool, u8) -> i32) -> i32 {
         if roh.is_empty() { return 0; }
         let spalten = roh.iter().map(|z| z.len()).max().unwrap_or(0);
         if spalten == 0 { return 0; }
@@ -6344,7 +6379,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         for z in roh {
             for (c, zelle) in z.iter().enumerate() {
                 let roh_text = zelle.replace("**", "").replace('`', "");
-                breiten[c] = breiten[c].max(breite_von(&roh_text, basis, false).min(innen / 2));
+                breiten[c] = breiten[c].max(breite_von(&roh_text, basis, false, 0).min(innen / 2));
             }
         }
         // Unter das BREITESTE WORT darf keine Spalte gestaucht werden -- ein
@@ -6355,7 +6390,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         for z in roh {
             for (c, zelle) in z.iter().enumerate() {
                 for wort in zelle.replace("**", "").replace('`', "").split(' ') {
-                    mindest[c] = mindest[c].max(breite_von(wort, basis, false).min(innen / 3));
+                    mindest[c] = mindest[c].max(breite_von(wort, basis, false, 0).min(innen / 3));
                 }
             }
         }
@@ -6372,13 +6407,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             for (c, zelle) in z.iter().enumerate() {
                 let mut yz = y;
                 let mut w = rt_inline(zelle, 0, ziele);
-                if ri == 0 { for x2 in w.iter_mut() { x2.fett = true; } }
+                if ri == 0 { for x2 in w.iter_mut() { x2.stil |= crate::schnitt::FETT; } }
                 let zh = basis + self.sk(6);
                 let mut zeile = RtZeile { y: yz, h: zh, grund: false, linie: false, balken: -1, laeufe: Vec::new() };
                 let mut cx = x;
-                let leer = breite_von(" ", basis, false);
+                let leer = breite_von(" ", basis, false, 0);
                 for wort in &w {
-                    let bw = breite_von(&wort.text, basis, wort.code);
+                    let bw = breite_von(&wort.text, basis, wort.code, wort.stil);
                     let l = if zeile.laeufe.is_empty() || wort.kleben { 0 } else { leer };
                     if cx + l + bw > x + breiten[c] && !zeile.laeufe.is_empty() {
                         zeilen.push(zeile.clone());
@@ -6388,7 +6423,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     }
                     let lx = cx + if zeile.laeufe.is_empty() { 0 } else { l };
                     zeile.laeufe.push(RtLauf { x: lx, breite: bw, text: wort.text.clone(), groesse: basis,
-                                               rolle: wort.rolle, fett: wort.fett, code: wort.code, link: wort.link });
+                                               rolle: wort.rolle, stil: wort.stil, code: wort.code, link: wort.link });
                     cx = lx + bw;
                 }
                 if !zeile.laeufe.is_empty() { zeilen.push(zeile); yz += zh; }
@@ -7634,6 +7669,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     pub fn set_font(&mut self, h: i64, font: i64) -> Result<(), String> {
         self.wdg_mut(h, "GUI_SET_FONT")?.font = font; Ok(())
     }
+    /// GUI_SET_FONT_STYLE(wdg, stil$): fett, kursiv, unterstrichen,
+    /// durchgestrichen -- verbunden mit `+`. Gilt fuer den Text des Widgets.
+    pub fn set_font_style(&mut self, h: i64, stil: &str) -> Result<(), String> {
+        let bits = crate::schnitt::stil_parsen(stil).map_err(|e| format!("GUI_SET_FONT_STYLE: {}", e))?;
+        self.wdg_mut(h, "GUI_SET_FONT_STYLE")?.stil = bits; Ok(())
+    }
+    pub fn font_style(&self, h: i64) -> Result<String, String> {
+        Ok(crate::schnitt::stil_text(self.wdg(h, "GUI_GET_FONT_STYLE$")?.stil))
+    }
     pub fn set_font_size(&mut self, h: i64, sz: i64) -> Result<(), String> {
         if sz < 0 { return Err("GUI_SET_FONT_SIZE: Groesse muss >= 0 sein".into()); }
         self.wdg_mut(h, "GUI_SET_FONT_SIZE")?.font_size = sz as i32; Ok(())
@@ -8513,6 +8557,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if !w.enabled { o["enabled"] = serde_json::json!(false); }
         if w.font != -1 { o["font"] = serde_json::json!(w.font); }
         if w.font_size != 0 { o["font_size"] = serde_json::json!(w.font_size); }
+        if w.stil != 0 { o["font_style"] = serde_json::json!(crate::schnitt::stil_text(w.stil)); }
         if w.kind == Kind::ColorPicker {
             o["color_value"] = serde_json::json!(
                 std::format!("#{:06X}", crate::farbraum::hsv_zu_rgb(w.hsv[0], w.hsv[1], w.hsv[2])));
@@ -8766,6 +8811,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         w.enabled = wj["enabled"].as_bool().unwrap_or(true);
         w.font = wj["font"].as_i64().unwrap_or(-1);
         w.font_size = wj["font_size"].as_i64().unwrap_or(0) as i32;
+        // Ein krummer Stil in einer Datei bricht das Laden nicht ab.
+        w.stil = wj["font_style"].as_str().and_then(|s| crate::schnitt::stil_parsen(s).ok()).unwrap_or(0);
         if let Some(a) = wj["align"].as_str() { if let Some(v) = parse_align(a) { w.align = v; } }
         w.wrap = wj["wrap"].as_bool().unwrap_or(false);
         w.passwort = wj["passwort"].as_bool().unwrap_or(false);
@@ -9459,6 +9506,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Weicht das Messen davon ab, sitzt zentrierter Text schief und der
     /// Beschnitt greift an der falschen Stelle.
     fn wtext_width(&self, g: &Graphics, w: &Widget, s: &str) -> i32 {
+        if w.stil != 0 {
+            let basis = font_wahl(w.font, g.active_font());
+            return g.text_width_stil(s, self.wsize(g, w), basis, w.stil);
+        }
         if w.font == -1 && w.font_size == 0 && self.scale == 1.0 {
             g.text_width(s)
         } else {
@@ -9474,7 +9525,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Handle -1 lief. Wer eine GROESSE setzt, meint aber die Groesse, nicht
     /// eine andere Schrift.
     fn wfont(&self, g: &Graphics, w: &Widget) -> i64 {
-        font_wahl(w.font, g.active_font())
+        // Mit Stil der geladene Schnitt -- so messen auch die Editier-Helfer
+        // (Schreibmarke, Auswahl) mit der Schrift, die dasteht.
+        g.schnitt_von(font_wahl(w.font, g.active_font()), w.stil)
     }
 
     /// Text der Fenster-Chrome: Titel, Menueleiste, Reiter, Popup-Eintrag,
@@ -9507,6 +9560,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
 
     fn wtext(&self, g: &mut Graphics, w: &Widget, x: i32, y: i32, s: String, c: i64) {
+        if w.stil != 0 {
+            let (sz, basis) = (self.wsize(g, w), font_wahl(w.font, g.active_font()));
+            g.text_styled_stil(x, y, s, c, basis, sz, w.stil);
+            return;
+        }
         if w.font == -1 && w.font_size == 0 && self.scale == 1.0 {
             g.text(x, y, s, c);
         } else {
@@ -9725,6 +9783,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         self.drop = None;
         self.dateibaeume_auffrischen(g.get_time());
+        self.schnitte_laden(g);
         self.rt_pass(g);
         self.umbruch_layout(g);
         self.layout_pass(g);
@@ -15933,8 +15992,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         if a >= b { continue; }
                         let f = if l.code { cfont } else { font };
                         let zeichen: Vec<char> = l.text.chars().collect();
-                        let x0 = g.text_width_in(&zeichen[..a - s].iter().collect::<String>(), l.groesse, f);
-                        let x1 = g.text_width_in(&zeichen[..b - s].iter().collect::<String>(), l.groesse, f);
+                        let x0 = g.text_width_stil(&zeichen[..a - s].iter().collect::<String>(), l.groesse, f, l.stil);
+                        let x1 = g.text_width_stil(&zeichen[..b - s].iter().collect::<String>(), l.groesse, f, l.stil);
                         g.box_fill(ax + l.x + x0, zy, ax + l.x + x1.max(x0 + 1), zy + z.h - 2, farbe);
                     }
                     // Das Leerzeichen zwischen zwei Laeufen gehoert mit dazu --
@@ -15951,15 +16010,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             for l in z.laeufe.iter() {
                 let farbe = match l.rolle { 1 => leise, 2 => acc, 3 => shade(acc, 40), _ => fg };
                 let f = if l.code { cfont } else { font };
-                g.text_styled(ax + l.x, zy, l.text.clone(), farbe, f, l.groesse);
-                // Fett gibt es nur als ZWEITER Zug um einen Punkt versetzt --
-                // aus einer Schrift laesst sich keine zweite Strichstaerke
-                // rechnen, und eine fette Datei mitzuliefern ist nicht Sache
-                // der Laufzeit.
-                if l.fett { g.text_styled(ax + l.x + 1, zy, l.text.clone(), farbe, f, l.groesse); }
-                if l.link >= 0 {
-                    g.line(ax + l.x, zy + l.groesse + 2, ax + l.x + l.breite, zy + l.groesse + 2, acc);
-                }
+                // Ein Verweis traegt die Linie darunter -- dieselbe Linie wie
+                // `<u>`, nur in der Akzentfarbe des Verweises.
+                let stil = l.stil | if l.link >= 0 { crate::schnitt::UNTER } else { 0 };
+                g.text_styled_stil(ax + l.x, zy, l.text.clone(), farbe, f, l.groesse, stil);
             }
         }
         g.pop_clip();
@@ -16724,6 +16778,27 @@ mod gloss_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn auszeichnungen_als_stil() {
+        use crate::schnitt::{DURCH, FETT, KURSIV, UNTER};
+        let mut ziele = Vec::new();
+        let w = rt_inline("a ***b*** c ~~d~~ <u>e</u> *f* **g**", 0, &mut ziele);
+        let stil = |t: &str| w.iter().find(|x| x.text == t).map(|x| x.stil).unwrap();
+        assert_eq!(stil("a"), 0);
+        assert_eq!(stil("b"), FETT | KURSIV);
+        assert_eq!(stil("c"), 0);
+        assert_eq!(stil("d"), DURCH);
+        assert_eq!(stil("e"), UNTER);
+        assert_eq!(stil("f"), KURSIV);
+        assert_eq!(stil("g"), FETT);
+        // Kursiv ist nicht mehr gedaempft: dieselbe Rolle wie der Grund.
+        assert!(w.iter().all(|x| x.rolle == 0));
+        // `~~` und `<u>` im Code bleiben Text.
+        let c = rt_inline("`~~x~~ <u>`", 0, &mut ziele);
+        assert!(c.iter().all(|x| x.stil == 0 && x.code));
+        assert_eq!(c.iter().map(|x| x.text.clone()).collect::<Vec<_>>().join(" "), "~~x~~ <u>");
+    }
 
     #[test]
     fn kontrast_nach_wcag() {

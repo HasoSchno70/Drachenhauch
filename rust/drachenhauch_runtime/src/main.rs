@@ -39,6 +39,7 @@ mod xlsx;
 mod gifschreiber;
 #[allow(dead_code)]
 mod leinwand;
+mod schnitt;
 mod geld;
 mod httpd;
 #[cfg(feature = "smtp")]

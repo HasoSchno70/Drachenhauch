@@ -198,7 +198,7 @@ EXIT(0)
 alles.dhform
 --- datei alles.dhform
 {"title": "Alles", "x": 0, "y": 0, "w": 480, "h": 400, "code": {"klick": "PRINT \"geklickt\""}, "widgets": [
- {"kind": "button", "name": "button1", "x": 8, "y": 8, "w": 80, "h": 50, "text": "Los", "on_click": "klick", "tooltip": "sagt \"hallo\""},
+ {"kind": "button", "name": "button1", "x": 8, "y": 8, "w": 80, "h": 50, "text": "Los", "on_click": "klick", "tooltip": "sagt \"hallo\"", "font_style": "fett+unterstrichen"},
  {"kind": "label", "name": "label1", "x": 98, "y": 8, "w": 80, "h": 50},
  {"kind": "checkbox", "name": "checkbox1", "x": 188, "y": 8, "w": 80, "h": 50},
  {"kind": "slider", "name": "slider1", "x": 278, "y": 8, "w": 80, "h": 50},
@@ -236,6 +236,7 @@ lauf 0 TRUE
 GUI_TABLE_SET(table1, "zellmodus", 1)
 GUI_TABLE_COL_CHOICES(table1, 2, ["Rot", "Gruen"])
 GUI_ON_CLICK(button1, klick)
+GUI_SET_FONT_STYLE(button1, "fett+unterstrichen")
 PRINT "geklickt"
 image1' uebersprungen
 GUI_RICHTEXT(frm, 98, 308, 80, 50, !"# Titel\n\nZeile")
@@ -258,6 +259,29 @@ t.dhform
 --- enthaelt
 "headers":["Name","Menge","Farbe"]
 "zellmodus":true
+
+=== inspektor schreibt den schriftstil
+' Das Feld geht als Text in die .dhform, die Ansicht zeigt ihn gleich; leer
+' nimmt ihn wieder heraus.
+auswahl = 0
+inspektorFuellen()
+GUI_SET_TEXT(fStil, "kursiv+fett")
+inspektorUebernehmen()
+PRINT "form " + feldText$(0, "font_style")
+PRINT "ansicht " + GUI_GET_FONT_STYLE$(GUI_WINDOW_WIDGET(frm, 0))
+GUI_SET_TEXT(fStil, "")
+inspektorUebernehmen()
+PRINT "weg " + STR$(JSON_HAS(doc, wz$(0, "font_style")))
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+t.dhform
+--- datei t.dhform
+{"title": "T", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [{"kind": "label", "name": "label1", "x": 16, "y": 16, "w": 120, "h": 24, "text": "Hallo"}]}
+--- erwartet
+form kursiv+fett
+ansicht fett+kursiv
+weg FALSE
 
 === inspektor laesst die gittereinstellungen stehen
 ' Waehlen und Uebernehmen ohne Aenderung: alles laeuft durch die Felder und

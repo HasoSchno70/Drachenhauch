@@ -315,7 +315,11 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `TEXT_SIZE(px)` | Schriftgröße für folgende `TEXT`-Aufrufe (4–400) |
 | `TEXT_WIDTH(s$)` | Pixelbreite von `s$` in der aktiven Schrift/Größe |
 | `TEXT_HEIGHT()` | Zeilenhöhe der aktiven Schrift |
-| `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | Fett/Kursiv (nativ No-Op — raylib ohne Fett/Kursiv) |
+| `TEXT_STYLE(stil$)` | Stil für folgende `TEXT`-Aufrufe: `fett`, `kursiv`, `unterstrichen`, `durchgestrichen`, verbunden mit `+` (`"fett+unterstrichen"`); `"normal"` schaltet zurück |
+| `TEXT_GET_STYLE$()` | der gesetzte Stil als Text, z. B. `"fett+kursiv"` |
+| `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | nur Fett bzw. Kursiv an- oder ausschalten, der Rest des Stils bleibt |
+| `FONT_STYLE(font, stil$)` → FONT | der echte fette/kursive Schnitt einer geladenen Schrift (sucht die Datei daneben, z. B. `segoeuib.ttf` zu `segoeui.ttf`); gibt es keinen, kommt `font` selbst zurück |
+| `FONT_HAS_STYLE(font, stil$)` | TRUE, wenn es diesen Schnitt als Datei gibt -- sonst bildet die Laufzeit ihn nach |
 | `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `zeichen$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen |
 | `SETFONT(font)` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font |
 | `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
@@ -325,6 +329,29 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 anschließend frei. `TEXT_WIDTH` misst in der **aktiven** Schrift — damit lässt
 sich zentrieren/rechtsbündig setzen. Echte Glyphen rendert die native Runtime
 (raylib `LoadFontEx`/`DrawTextEx`).
+
+**Fett und kursiv nehmen den echten Schnitt, wenn es ihn gibt.** Zu einer
+per `LOADFONT` geladenen Schrift sucht die Laufzeit die Datei des Schnitts
+im selben Ordner -- bei Windows-Schriften nach ihren festen Namen
+(`segoeui` → `segoeuib`/`segoeuii`/`segoeuiz`, `arial` → `arialbd` …),
+sonst nach `-Bold`/`-Italic`/`-BoldItalic` (`NotoSans-Regular.ttf` →
+`NotoSans-Bold.ttf`). Geladen wird einmal, in derselben Größe und mit
+denselben Zeichen. **Gibt es keinen Schnitt** (die eingebaute Schrift,
+eine Bitmap-Schrift, eine Schrift ohne Geschwister), zeichnet die Laufzeit
+Fett als zweiten Zug um einen Punkt versetzt und Kursiv mit geneigten
+Glyphen -- sichtbar ist der Stil in jedem Fall. Unterstrichen und
+durchgestrichen sind Linien in der Textfarbe und gehen mit jeder Schrift.
+`TEXT_WIDTH` misst mit dem Stil; `TEXTROT` kennt ihn nicht.
+
+```basic
+DIM f AS INTEGER : f = LOADFONT("C:/Windows/Fonts/segoeui.ttf", 32)
+SETFONT(f)
+TEXT_STYLE("fett")
+TEXT(20, 20, "Überschrift", WHITE)
+TEXT_STYLE("kursiv+unterstrichen")
+TEXT(20, 60, "Hervorgehoben", YELLOW)
+TEXT_STYLE("normal")
+```
 
 ```basic
 DIM titlefont AS INTEGER
