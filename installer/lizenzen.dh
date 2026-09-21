@@ -14,7 +14,12 @@
 ' stehen nicht mehr darin -- in dieser Distribution steckt keins von beidem).
 IMPORT "json"
 
-CONST FEATURES = "graphics db net http"
+' ALLE Features, die ein ausgelieferter Bau haben kann -- nicht nur die des
+' Standardbaus. Bis 2026-09-21 stand hier "graphics db net http" (wie in
+' gen_notices.py), ausgeliefert wurde aber mit --hardware (dazu dialogs, smtp,
+' serial, usb, bt, wifi, midi): deren Lizenztexte fehlten in der Beilage. Ein
+' Text zu viel schadet nicht, einer zu wenig verletzt MIT/BSD/Apache.
+CONST FEATURES = "graphics dialogs db net http smtp serial usb bt wifi midi"
 DIM SEP AS STRING : SEP = "=============================================================================="
 
 DIM leerraum AS STRING : leerraum = " " + CHR$(9) + CHR$(10) + CHR$(13) + CHR$(11) + CHR$(12)
