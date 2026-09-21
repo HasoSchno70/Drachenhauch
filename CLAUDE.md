@@ -831,8 +831,16 @@ Baut `rust/drachenhauch_runtime/` → `dhrt`. Nötig für Run/Export/Editor-Run 
 .venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
+> **Seit 2026-09-21 faehrt die CI KEIN pytest mehr** -- nur noch
+> `dhrt test tests/pruef` (`.github/workflows/ci.yml`). Was hier ueber pytest
+> steht, gilt nur noch fuer die Python-Reste (Qt-Editoren), die bis zum
+> Loeschschritt ungeprueft sind. Der eigentliche Pruefbefehl ist:
+> ```
+> rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
+> ```
+
 Das ist der serielle Weg (~10:40). **Schneller in DREI Durchgängen — genau
-die, die auch die CI fährt** (zusammen ~3 min); die Suite wartet fast nur auf
+die, die die CI bis 2026-09-20 fuhr** (zusammen ~3 min); die Suite wartet fast nur auf
 `dhrt`-Prozesse, deshalb skaliert der erste fast linear:
 ```
 .venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
@@ -5319,8 +5327,8 @@ Compiler ist **nicht** Python geblieben: seit dem Rust-Frontend kompiliert der
 Playground die Quelle selbst, **Pyodide braucht es nicht**.
 
 Doku/Grenzen: [docs/web-playground.md](docs/web-playground.md).
-Tests [`tests/test_build_wasm.py`](tests/test_build_wasm.py) (Geruest/Harness,
-nicht der emscripten-Build).
+Tests [`tests/pruef/build_wasm.dhtest`](tests/pruef/build_wasm.dhtest) (Geruest/Harness,
+nicht der emscripten-Build; bis 2026-09-21 pytest).
 
 ## Build und Test
 
@@ -5329,7 +5337,7 @@ py -3.12 -m venv .venv                                # einmalig: venv anlegen
 .venv\Scripts\python.exe -m pip install -r requirements.txt   # einmalig: Werkzeuge
 .venv\Scripts\python.exe rust\build_runtime.py        # Runtime dhrt (Rust)
 .venv\Scripts\python.exe -m pytest tests/ -v          # run_gb-Golden gegen dhrt (seriell)
-# ... oder die drei Durchgänge der CI (siehe oben, "Build und Test"):
+# ... oder die drei pytest-Durchgaenge (die CI faehrt seit 2026-09-21 nur noch dhrt test):
 .venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
 .venv\Scripts\python.exe tools\qt_tests_einzeln.py     # je Qt-Datei ein Prozess
 .venv\Scripts\python.exe -m pytest tests/ -q -m seriell   # exklusive Betriebsmittel
