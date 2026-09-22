@@ -85,6 +85,10 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `PUBLIC x AS INTEGER` in einer Klasse | `DIM x AS INTEGER` — alles in einer Klasse ist von außen erreichbar |
 | ein Ausdruck über zwei Zeilen | die Zeile mit ` _` beenden |
 | `TAB`, `SPC` | `PADR$(text, n)`, `SPACE$(3)` |
+| `x = meineSub()` | eine SUB liefert keinen Wert — `FUNCTION ... AS <Typ>` mit `RETURN` |
+| `TRUNC` | `INT` rundet ab; zur Null hin `IIF(x < 0, -INT(-x), INT(x))` |
+| `ZEIT_JAHR` | `ZEIT_TEIL(t, "jahr")` |
+| `GUI_WINDOW_NEW` | `GUI_WINDOW(titel$, x, y, breite, höhe)` |
 | `ARRAY_REMOVE` | `ARRAY_REMOVE_AT(a, i)` |
 
 ## Aus Python, C und JavaScript
@@ -97,7 +101,7 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `None`, `null` | `NIL` |
 | `double`, `long`, `bool`, `str` | `FLOAT`, `INTEGER`, `BOOLEAN`, `STRING` |
 | `list`, `dict` | `ARRAY OF T`, `MAP OF T` |
-| `"a\nb"` | `!"a\nb"` — Escape-Folgen nur mit `!` davor |
+| `"a\nb"`, `"{\"a\": 1}"` | `!"a\nb"`, `!"{\"a\": 1}"` — Escape-Folgen und Anführungszeichen im Text nur mit `!` davor |
 | `x++`, `x += 1` | geht beides |
 
 ## Drei Unterschiede, die keine Meldung bekommen

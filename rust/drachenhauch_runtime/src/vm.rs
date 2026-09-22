@@ -9449,6 +9449,30 @@ pub(crate) const DEFAULT_KEYS: &[(&str, i64)] = &[
 // Helfer
 // ===========================================================================
 
+/// Haengt an eine Laufzeitmeldung ueber ARGUMENTE die Signatur des Befehls.
+///
+/// "AUDIO_TONE: Argument 1 muss Zahl sein" sagt nicht, was an Platz 1 gehoert.
+/// Der Name steht am Anfang jeder solchen Meldung, und das Befehlsverzeichnis
+/// kennt die Form -- also wird sie angehaengt. Nur bei Meldungen, in denen es
+/// erkennbar um Argumente geht: "Datei nicht gefunden" braucht sie nicht.
+pub(crate) fn mit_signatur(msg: &str) -> String {
+    let Some((kopf, rest)) = msg.split_once(':') else { return msg.to_string() };
+    if kopf.is_empty() || kopf.len() > 40
+        || !kopf.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_' || c == '$') {
+        return msg.to_string();
+    }
+    let ueber_argumente = ["Argument", "erwartet", "Erwartet", "muss", "erhalten"]
+        .iter().any(|w| rest.contains(w));
+    if !ueber_argumente { return msg.to_string(); }
+    let low = kopf.to_lowercase();
+    for (n, sig, _) in crate::compiler::builtin_eintraege() {
+        if n.to_lowercase() == low && !sig.is_empty() && !sig.contains("Argumente") {
+            return format!("{} -- Aufruf: {}", msg, sig);
+        }
+    }
+    msg.to_string()
+}
+
 fn unknown_builtin_msg(name: &str) -> String {
     // Hardware-/IoT-Module sind hinter Cargo-Features (serial/usb/bt/wifi) und im
     // Default-Build NICHT enthalten -- der Dispatch faellt dann hierher durch. Das

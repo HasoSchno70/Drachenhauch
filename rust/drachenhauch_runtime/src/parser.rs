@@ -223,6 +223,18 @@ impl Parser {
             }
             k += 1;
         }
+        // `"{\"a\": 1}"` -- in einer normalen Zeichenkette bleibt der
+        // Rueckstrich woertlich, die Zeichenkette endet also am `"` dahinter.
+        // Typisch bei JSON von Hand.
+        let mut k = start;
+        while let Some(t) = self.toks.get(k) {
+            if t.tt == Tt::Newline || t.tt == Tt::Eof { break; }
+            if t.tt == Tt::Str && sval(t).ends_with('\\') {
+                return Some("Ein Anfuehrungszeichen IN einer Zeichenkette braucht ein ! davor: !\"{\\\"a\\\": 1}\" -- \
+                             sonst endet die Zeichenkette am \\\" (der Rueckstrich bleibt woertlich)".to_string());
+            }
+            k += 1;
+        }
         if tt(0) == Tt::Number && meldung == "Erwartet Zeilenende" {
             return Some("Zeilennummern gibt es in Drachenhauch nicht -- die Zeile beginnt direkt mit dem Befehl".into());
         }

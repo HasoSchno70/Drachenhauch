@@ -449,3 +449,27 @@ abs in beiden TRUE
 hover zeigt die tabelle TRUE
 texte verschieden TRUE
 abdeckung ueber 45 % TRUE
+
+=== signaturen nennen ihre parameter
+' Bis 2026-09-22 stand bei 62 Befehlen nur "N..M Argumente" -- so zeigte es
+' auch der Hover der IDE und jede Fehlermeldung. Nur GUI_RULE bleibt so: dort
+' haengt die Argumentzahl an der Art der Regel.
+IMPORT "json"
+CHDIR(ARG$(0))
+DIM j AS JSON_HANDLE
+j = JSON_LOAD("daten/builtin_index.json")
+DIM n AS INTEGER : n = JSON_LEN(j, "builtins")
+DIM i AS INTEGER
+DIM ohne AS STRING
+FOR i = 0 TO n - 1
+    DIM sig AS STRING
+    sig = JSON_GET_STRING(j, "builtins." + STR$(i) + ".signature")
+    IF INSTR(sig, "Argumente") >= 0 THEN
+        ohne = ohne + JSON_GET_STRING(j, "builtins." + STR$(i) + ".name") + " "
+    END IF
+NEXT
+PRINT "ohne parameternamen: "; TRIM$(ohne)
+--- argumente
+{sammlung}/../..
+--- erwartet
+ohne parameternamen: GUI_RULE

@@ -107,7 +107,7 @@
   {
    "name": "ARC",
    "kind": "graphics",
-   "signature": "ARC(6..8 Argumente)",
+   "signature": "ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])",
    "module": "core"
   },
   {
@@ -353,7 +353,7 @@
   {
    "name": "ATLAS_DRAW_FLIPPED",
    "kind": "graphics",
-   "signature": "ATLAS_DRAW_FLIPPED(4..6 Argumente)",
+   "signature": "ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flip_x[, flip_y[, tint]]])",
    "module": "core"
   },
   {
@@ -509,7 +509,7 @@
   {
    "name": "AUDIO_INIT",
    "kind": "core",
-   "signature": "AUDIO_INIT(0..3 Argumente)",
+   "signature": "AUDIO_INIT([frequenz[, kanaele[, puffer]]])",
    "module": "audio"
   },
   {
@@ -665,7 +665,7 @@
   {
    "name": "AUDIO_NOISE",
    "kind": "core",
-   "signature": "AUDIO_NOISE(1..2 Argumente)",
+   "signature": "AUDIO_NOISE(dauer_ms[, vol])",
    "module": "audio"
   },
   {
@@ -833,7 +833,7 @@
   {
    "name": "AUDIO_TONE",
    "kind": "core",
-   "signature": "AUDIO_TONE(2..4 Argumente)",
+   "signature": "AUDIO_TONE(freq_hz, dauer_ms[, waveform$[, vol]])",
    "module": "audio"
   },
   {
@@ -953,7 +953,7 @@
   {
    "name": "BOX",
    "kind": "graphics",
-   "signature": "BOX(4..5 Argumente)",
+   "signature": "BOX(x1, y1, x2, y2[, color])",
    "module": "core"
   },
   {
@@ -965,7 +965,7 @@
   {
    "name": "BOXROUND",
    "kind": "graphics",
-   "signature": "BOXROUND(5..6 Argumente)",
+   "signature": "BOXROUND(x1, y1, x2, y2, radius[, color])",
    "module": "core"
   },
   {
@@ -1697,7 +1697,7 @@
   {
    "name": "CIRCLE",
    "kind": "graphics",
-   "signature": "CIRCLE(3..4 Argumente)",
+   "signature": "CIRCLE(x, y, r[, color])",
    "module": "core"
   },
   {
@@ -1769,7 +1769,7 @@
   {
    "name": "CLS",
    "kind": "graphics",
-   "signature": "CLS(0..1 Argumente)",
+   "signature": "CLS([color])",
    "module": "core"
   },
   {
@@ -2237,7 +2237,7 @@
   {
    "name": "DRAWIMAGEFLIPPED",
    "kind": "graphics",
-   "signature": "DRAWIMAGEFLIPPED(3..5 Argumente)",
+   "signature": "DRAWIMAGEFLIPPED(img, x, y[, flipX[, flipY]])",
    "module": "core"
   },
   {
@@ -2459,13 +2459,13 @@
   {
    "name": "ELLIPSE",
    "kind": "graphics",
-   "signature": "ELLIPSE(4..5 Argumente)",
+   "signature": "ELLIPSE(x1, y1, x2, y2[, color])",
    "module": "core"
   },
   {
    "name": "ELLIPSEOUTLINE",
    "kind": "graphics",
-   "signature": "ELLIPSEOUTLINE(4..6 Argumente)",
+   "signature": "ELLIPSEOUTLINE(x1, y1, x2, y2[, color[, width]])",
    "module": "core"
   },
   {
@@ -3137,7 +3137,7 @@
   {
    "name": "GUI_CHECKBOX",
    "kind": "core",
-   "signature": "GUI_CHECKBOX(4..5 Argumente)",
+   "signature": "GUI_CHECKBOX(win, label$, x, y[, default])",
    "module": "gui"
   },
   {
@@ -3593,7 +3593,7 @@
   {
    "name": "GUI_ICON_BUTTON",
    "kind": "core",
-   "signature": "GUI_ICON_BUTTON(6..7 Argumente)",
+   "signature": "GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$])",
    "module": "gui"
   },
   {
@@ -3629,7 +3629,7 @@
   {
    "name": "GUI_LABEL",
    "kind": "core",
-   "signature": "GUI_LABEL(4..5 Argumente)",
+   "signature": "GUI_LABEL(win, text$, x, y[, farbe])",
    "module": "gui"
   },
   {
@@ -4031,7 +4031,7 @@
   {
    "name": "GUI_PANEL",
    "kind": "core",
-   "signature": "GUI_PANEL(5..6 Argumente)",
+   "signature": "GUI_PANEL(win, x, y, w, h[, titel$])",
    "module": "gui"
   },
   {
@@ -4391,19 +4391,19 @@
   {
    "name": "GUI_SLIDER",
    "kind": "core",
-   "signature": "GUI_SLIDER(6..7 Argumente)",
+   "signature": "GUI_SLIDER(win, x, y, w, min, max[, default])",
    "module": "gui"
   },
   {
    "name": "GUI_SPINNER",
    "kind": "core",
-   "signature": "GUI_SPINNER(6..8 Argumente)",
+   "signature": "GUI_SPINNER(win, x, y, w, min, max[, default[, step]])",
    "module": "gui"
   },
   {
    "name": "GUI_SPLITTER",
    "kind": "core",
-   "signature": "GUI_SPLITTER(7 Argumente)",
+   "signature": "GUI_SPLITTER(win, x, y, length, orient$, min, max)",
    "module": "gui"
   },
   {
@@ -4535,7 +4535,7 @@
   {
    "name": "GUI_TABLE",
    "kind": "core",
-   "signature": "GUI_TABLE(5..7 Argumente)",
+   "signature": "GUI_TABLE(win, x, y, w, h[, headers, cells])",
    "module": "gui"
   },
   {
@@ -5051,7 +5051,7 @@
   {
    "name": "GUI_TEXTINPUT",
    "kind": "core",
-   "signature": "GUI_TEXTINPUT(5..6 Argumente)",
+   "signature": "GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])",
    "module": "gui"
   },
   {
@@ -6251,7 +6251,7 @@
   {
    "name": "INSTR",
    "kind": "core",
-   "signature": "INSTR(2..3 Argumente)",
+   "signature": "INSTR(s, sub[, start])",
    "module": "core"
   },
   {
@@ -6671,7 +6671,7 @@
   {
    "name": "LIGHT_ENV_HDR",
    "kind": "graphics",
-   "signature": "LIGHT_ENV_HDR(1..2 Argumente)",
+   "signature": "LIGHT_ENV_HDR(pfad$ [, intensitaet])",
    "module": "g3d"
   },
   {
@@ -6707,7 +6707,7 @@
   {
    "name": "LINE",
    "kind": "graphics",
-   "signature": "LINE(4..5 Argumente)",
+   "signature": "LINE(x1, y1, x2, y2[, color])",
    "module": "core"
   },
   {
@@ -6725,7 +6725,7 @@
   {
    "name": "LINEW",
    "kind": "graphics",
-   "signature": "LINEW(5..6 Argumente)",
+   "signature": "LINEW(x1, y1, x2, y2, breite[, color])",
    "module": "core"
   },
   {
@@ -6767,7 +6767,7 @@
   {
    "name": "LOG",
    "kind": "core",
-   "signature": "LOG(1..2 Argumente)",
+   "signature": "LOG(x[, base])",
    "module": "core"
   },
   {
@@ -7049,13 +7049,13 @@
   {
    "name": "MID",
    "kind": "core",
-   "signature": "MID$(2..3 Argumente)",
+   "signature": "MID$(s, start[, n])",
    "module": "core"
   },
   {
    "name": "MID$",
    "kind": "core",
-   "signature": "MID$(2..3 Argumente)",
+   "signature": "MID$(s, start[, n])",
    "module": "core"
   },
   {
@@ -7727,25 +7727,25 @@
   {
    "name": "PADL",
    "kind": "core",
-   "signature": "PADL$(2..3 Argumente)",
+   "signature": "PADL$(s, breite[, fill])",
    "module": "core"
   },
   {
    "name": "PADL$",
    "kind": "core",
-   "signature": "PADL$(2..3 Argumente)",
+   "signature": "PADL$(s, breite[, fill])",
    "module": "core"
   },
   {
    "name": "PADR",
    "kind": "core",
-   "signature": "PADR$(2..3 Argumente)",
+   "signature": "PADR$(s, breite[, fill])",
    "module": "core"
   },
   {
    "name": "PADR$",
    "kind": "core",
-   "signature": "PADR$(2..3 Argumente)",
+   "signature": "PADR$(s, breite[, fill])",
    "module": "core"
   },
   {
@@ -8417,19 +8417,19 @@
   {
    "name": "PLAYMUSIC",
    "kind": "graphics",
-   "signature": "PLAYMUSIC(1..3 Argumente)",
+   "signature": "PLAYMUSIC(path$[, loops[, volume]])",
    "module": "core"
   },
   {
    "name": "PLAYSOUND",
    "kind": "graphics",
-   "signature": "PLAYSOUND(1..3 Argumente)",
+   "signature": "PLAYSOUND(s[, loops[, volume]])",
    "module": "core"
   },
   {
    "name": "PLOT",
    "kind": "graphics",
-   "signature": "PLOT(2..3 Argumente)",
+   "signature": "PLOT(x, y[, color])",
    "module": "core"
   },
   {
@@ -8447,13 +8447,13 @@
   {
    "name": "POLYGON",
    "kind": "graphics",
-   "signature": "POLYGON(1..2 Argumente)",
+   "signature": "POLYGON(points[, color])",
    "module": "core"
   },
   {
    "name": "POLYGONOUTLINE",
    "kind": "graphics",
-   "signature": "POLYGONOUTLINE(1..3 Argumente)",
+   "signature": "POLYGONOUTLINE(points[, color[, width]])",
    "module": "core"
   },
   {
@@ -8663,7 +8663,7 @@
   {
    "name": "RANDOMIZE",
    "kind": "core",
-   "signature": "RANDOMIZE(0..1 Argumente)",
+   "signature": "RANDOMIZE([seed])",
    "module": "core"
   },
   {
@@ -8675,7 +8675,7 @@
   {
    "name": "RANGE",
    "kind": "core",
-   "signature": "RANGE(1..3 Argumente)",
+   "signature": "RANGE(a[, b[, schritt]])",
    "module": "core"
   },
   {
@@ -8747,13 +8747,13 @@
   {
    "name": "RECT",
    "kind": "graphics",
-   "signature": "RECT(4..5 Argumente)",
+   "signature": "RECT(x1, y1, x2, y2[, color])",
    "module": "core"
   },
   {
    "name": "RECTROUND",
    "kind": "graphics",
-   "signature": "RECTROUND(5..6 Argumente)",
+   "signature": "RECTROUND(x1, y1, x2, y2, radius[, color])",
    "module": "core"
   },
   {
@@ -8927,13 +8927,13 @@
   {
    "name": "RND",
    "kind": "core",
-   "signature": "RND(0..1 Argumente)",
+   "signature": "RND([n])",
    "module": "core"
   },
   {
    "name": "ROUND",
    "kind": "core",
-   "signature": "ROUND(1..2 Argumente)",
+   "signature": "ROUND(x[, stellen])",
    "module": "core"
   },
   {
@@ -9281,7 +9281,7 @@
   {
    "name": "SCREEN",
    "kind": "graphics",
-   "signature": "SCREEN(2..4 Argumente)",
+   "signature": "SCREEN(w, h[, titel$[, scale]])",
    "module": "core"
   },
   {
@@ -9563,7 +9563,7 @@
   {
    "name": "SHADOW_ENABLE",
    "kind": "graphics",
-   "signature": "SHADOW_ENABLE(0..1 Argumente)",
+   "signature": "SHADOW_ENABLE([aufloesung])",
    "module": "g3d"
   },
   {
@@ -9833,7 +9833,7 @@
   {
    "name": "SPLINE",
    "kind": "graphics",
-   "signature": "SPLINE(2..4 Argumente)",
+   "signature": "SPLINE(xs, ys[, color[, breite]])",
    "module": "core"
   },
   {
@@ -10103,7 +10103,7 @@
   {
    "name": "TEXT",
    "kind": "graphics",
-   "signature": "TEXT(3..4 Argumente)",
+   "signature": "TEXT(x, y, s$[, color])",
    "module": "core"
   },
   {
@@ -10619,13 +10619,13 @@
   {
    "name": "TRIANGLE",
    "kind": "graphics",
-   "signature": "TRIANGLE(6..7 Argumente)",
+   "signature": "TRIANGLE(x1, y1, x2, y2, x3, y3[, color])",
    "module": "core"
   },
   {
    "name": "TRIANGLEOUTLINE",
    "kind": "graphics",
-   "signature": "TRIANGLEOUTLINE(6..8 Argumente)",
+   "signature": "TRIANGLEOUTLINE(x1, y1, x2, y2, x3, y3[, color[, width]])",
    "module": "core"
   },
   {
@@ -10661,19 +10661,19 @@
   {
    "name": "TWEEN_NEW",
    "kind": "core",
-   "signature": "TWEEN_NEW(3..4 Argumente)",
+   "signature": "TWEEN_NEW(start, end, dauer_ms[, easing$])",
    "module": "tween"
   },
   {
    "name": "TWEEN_NEW_LOOP",
    "kind": "core",
-   "signature": "TWEEN_NEW_LOOP(3..4 Argumente)",
+   "signature": "TWEEN_NEW_LOOP(start, end, dauer_ms[, easing$])",
    "module": "tween"
   },
   {
    "name": "TWEEN_NEW_PINGPONG",
    "kind": "core",
-   "signature": "TWEEN_NEW_PINGPONG(3..4 Argumente)",
+   "signature": "TWEEN_NEW_PINGPONG(start, end, dauer_ms[, easing$])",
    "module": "tween"
   },
   {
@@ -10721,13 +10721,13 @@
   {
    "name": "UI_BUTTON",
    "kind": "graphics",
-   "signature": "UI_BUTTON(6..8 Argumente)",
+   "signature": "UI_BUTTON(id$, x, y, w, h, text$[, bg, fg])",
    "module": "ui"
   },
   {
    "name": "UI_CHECKBOX",
    "kind": "graphics",
-   "signature": "UI_CHECKBOX(4..5 Argumente)",
+   "signature": "UI_CHECKBOX(id$, x, y, label$[, default])",
    "module": "ui"
   },
   {
@@ -10739,7 +10739,7 @@
   {
    "name": "UI_LABEL",
    "kind": "graphics",
-   "signature": "UI_LABEL(3..4 Argumente)",
+   "signature": "UI_LABEL(x, y, text$[, color])",
    "module": "ui"
   },
   {
@@ -10757,19 +10757,19 @@
   {
    "name": "UI_PANEL",
    "kind": "graphics",
-   "signature": "UI_PANEL(4..6 Argumente)",
+   "signature": "UI_PANEL(x, y, w, h[, title$[, bg]])",
    "module": "ui"
   },
   {
    "name": "UI_PROGRESS",
    "kind": "graphics",
-   "signature": "UI_PROGRESS(6..8 Argumente)",
+   "signature": "UI_PROGRESS(x, y, w, h, value, max[, fg, bg])",
    "module": "ui"
   },
   {
    "name": "UI_RADIO",
    "kind": "graphics",
-   "signature": "UI_RADIO(4..5 Argumente)",
+   "signature": "UI_RADIO(id$, x, y, options[, default_idx])",
    "module": "ui"
   },
   {
@@ -10781,13 +10781,13 @@
   {
    "name": "UI_SLIDER",
    "kind": "graphics",
-   "signature": "UI_SLIDER(6..7 Argumente)",
+   "signature": "UI_SLIDER(id$, x, y, w, min, max[, default])",
    "module": "ui"
   },
   {
    "name": "UI_TABLE",
    "kind": "graphics",
-   "signature": "UI_TABLE(7..10 Argumente)",
+   "signature": "UI_TABLE(id$, x, y, w, h, headers, cells[, cell_colors[, col_widths[, cell_bg_colors]]])",
    "module": "ui"
   },
   {
@@ -10811,7 +10811,7 @@
   {
    "name": "UI_TEXTFIELD",
    "kind": "graphics",
-   "signature": "UI_TEXTFIELD(5..6 Argumente)",
+   "signature": "UI_TEXTFIELD(id$, x, y, w, h[, placeholder$])",
    "module": "ui"
   },
   {

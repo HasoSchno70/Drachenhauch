@@ -868,6 +868,13 @@ Details: docs/rust-runtime.md.
   `Parser::umsteiger_hinweis`). `swap`/`let`/`exit`/`do` sind KONTEXTUELL,
   keine Schluesselwoerter. Uebersicht `docs/umstieg.md`, Details
   `docs/stolpersteine.md` I, Tests `tests/pruef/umstieg.dhtest`.
+  Dritte/vierte Runde (2026-09-22): eine METHODE ohne Klammern
+  (`spieler.springen`) tat still nichts; `JSON_PARSE("{\"a\": 1}")` meldete
+  nur "Erwartet Rparen" (jetzt Hinweis auf `!"..."`); 61 der 62 Signaturen im
+  `builtin_index.json` tragen jetzt Parameternamen statt "N..M Argumente"
+  (Wache in `doku_pruefungen.dhtest`; dabei fiel auf, dass
+  `ATLAS_DRAW_FLIPPED` mit 7 statt 6 Argumenten laeuft), und eine
+  Argument-Fehlermeldung nennt die Form des Befehls (`vm::mit_signatur`).
   Zweite Runde (2026-09-22): `STEP 0` stuerzte dhrt ab (jetzt Fehler),
   `EOF(f)` neu (READLINE liefert am Ende `""` wie eine leere Zeile),
   `"5" = 5`/`TRUE = 1` warnen, `READALL$(pfad)`, `CALL`, `BYVAL`.
