@@ -2,6 +2,8 @@
 
 Drachenhauch ist BASIC mit Pascal-strikter Typisierung. Wer schon mal QBasic, GW-BASIC oder Visual Basic geschrieben hat, fühlt sich sofort zuhause.
 
+Wer aus einem anderen BASIC oder aus Python kommt: [Umstieg](umstieg.md) listet, was dort anders heißt.
+
 ## Inhalt
 
 - [Variablen und Konstanten](#variablen-und-konstanten)
@@ -57,6 +59,17 @@ DIM grid[10, 10], score, lives[3] AS INTEGER
 ```
 
 Alle Variablen einer Multi-DIM bekommen denselben Typ und ihren Typ-Default als Anfangswert.
+
+Einen ersten Wert kann man gleich mitgeben — das ist dasselbe wie `DIM` und
+eine Zuweisung darunter, die Typprüfung gilt also genauso:
+
+```basic
+DIM leben AS INTEGER = 3
+DIM spieler AS STRING = "Anna"
+```
+
+Das geht je Zeile für eine Variable; in einer CLASS setzt `SUB Init()` die
+Startwerte der Felder.
 
 > **Reservierte Wörter nicht als Variablennamen.** Manche kurze Namen sind
 > Schlüsselwörter und können nicht als Bezeichner dienen — neben den
@@ -959,6 +972,18 @@ Drei Fälle bleiben ausdrücklich erlaubt:
   zeigt ja weiter auf dieselben Zellen, und die können nicht zugleich INTEGER
   und FLOAT sein. Wer die Werte als FLOAT braucht, kopiert sie.
 
+**Ohne Größe ist ein Feld leer und wächst.** `DIM a AS ARRAY OF INTEGER`
+ergibt ein Feld mit 0 Elementen (bis 2026-09-21 war es NIL, und das erste
+`ARRAY_PUSH` meldete „erwartet ARRAY"). Zwei Felder verbindet `+` zu einem
+neuen — mit gleichem Elementtyp, oder INTEGER mit FLOAT:
+
+```basic
+DIM teile AS ARRAY OF STRING
+ARRAY_PUSH(teile, "Kopf")
+teile = teile + ["Arm", "Bein"]
+PRINT LEN(teile)                  ' 3
+```
+
 ## Maps
 
 Schlüssel sind immer STRINGs, Werte können beliebigen Typ haben.
@@ -1008,6 +1033,16 @@ IF MAPHAS(punkte, "Anna") THEN
 END IF
 
 PRINT MAPSIZE(punkte)                  ' 1
+```
+
+Kürzer mit eckigen Klammern — gleichwertig zu `MAPPUT`/`MAPGET`, samt
+derselben Typprüfung; ein fehlender Schlüssel ist beim Lesen ein Fehler
+(`MAPGETOR` liefert stattdessen einen Vorgabewert):
+
+```basic
+punkte["Eve"] = 60
+punkte["Eve"] += 5
+PRINT punkte["Eve"]; LEN(punkte)       ' LEN zählt die Einträge
 ```
 
 Mehr unter [Standard-Built-ins → Maps](builtins-core.md#maps).

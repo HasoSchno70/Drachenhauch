@@ -8,6 +8,7 @@ Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausg
 
 ### Die Sprache
 
+- **[Umstieg](umstieg.md)** — aus QBasic, VB, Blitz oder Python: was hier anders heißt
 - **[Sprachreferenz](sprache.md)** — Variablen, Typen, Operatoren, Kontrollfluss (IF, SELECT CASE, WHILE, FOR), Funktionen, Klassen, Try/Catch, Imports
 - **[Variablen-Scope](scope.md)** — wo eine Variable gilt: global, in Funktionen, in Methoden — und warum es kein Block-Scoping gibt
 

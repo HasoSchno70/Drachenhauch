@@ -79,7 +79,7 @@ PRINT ISNAN(PHYSICS_LINES_X(0.0,0.0, 1.0,1.0, 9.0,10.0, 10.0,9.0))
 --- umgebung
 DHRT_FRAMES=1
 --- fehler
-Builtin 'ISNAN' im Rust-Kern noch nicht verfuegbar
+Unbekannter Befehl 'ISNAN'
 
 === intersection point is nan without a hit (2)
 IMPORT "physics"

@@ -1285,6 +1285,11 @@ impl<'p> Vm<'p> {
             // scheitert an NIL), und ein `DIM mats[N] AS MAT4` laesst sich
             // nicht schrittweise fuellen. Eine Quelle fuer alle drei Wege
             // (global, lokal, Array-Element): model::neutrales_element.
+            // `DIM a AS ARRAY OF INTEGER` ohne Groesse: ein LEERES Feld, das
+            // mit ARRAY_PUSH waechst -- nicht NIL. Vorher meldete das erste
+            // ARRAY_PUSH "erwartet ARRAY", und man musste wissen, dass erst
+            // `a = []` kommen muss.
+            other if other.starts_with("array:") => leeres_feld(other),
             other => crate::model::neutrales_element(other).unwrap_or(Value::Nil),
         }
     }
@@ -1942,7 +1947,7 @@ impl<'p> Vm<'p> {
                             locals[slot] = Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))));
                         }
                     } else if matches!(locals[slot], Value::Nil) {
-                        locals[slot] = arg_value(&l[2]);
+                        locals[slot] = if ty.starts_with("array:") { leeres_feld(ty) } else { arg_value(&l[2]) };
                     }
                 }
 
@@ -2089,13 +2094,13 @@ impl<'p> Vm<'p> {
                 op::LOAD_NAME => {
                     let name = constants[arg.as_usize()].fmt();
                     let s = self.globals.get(&name)
-                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?)", name))?;
+                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?){}", name, crate::umstieg::name_hinweis(&name)))?;
                     stack.push(s.borrow().value.clone());
                 }
                 op::STORE_NAME => {
                     let name = constants[arg.as_usize()].fmt();
                     let slot = self.globals.get(&name)
-                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?)", name))?.clone();
+                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?){}", name, crate::umstieg::name_hinweis(&name)))?.clone();
                     if slot.borrow().is_const {
                         return Err(format!("CONST '{}' kann nicht ueberschrieben werden", name));
                     }
@@ -2109,6 +2114,8 @@ impl<'p> Vm<'p> {
                     let ty = constants[l[1].as_usize()].fmt();
                     let default = if let Some(vt) = ty.strip_prefix("map:") {
                         Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))))
+                    } else if ty.starts_with("array:") {
+                        leeres_feld(&ty)
                     } else {
                         constants[l[2].as_usize()].clone()
                     };
@@ -2156,6 +2163,8 @@ impl<'p> Vm<'p> {
                             else if let Some(r) = self.user_op("__op_add__", &a, &b, true)? { stack.push(r); }
                             else if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
                                 stack.push(Value::str_rc(&format!("{}{}", a.fmt(), b.fmt())));
+                            } else if let (Value::Array(x), Value::Array(y)) = (&a, &b) {
+                                stack.push(felder_verbinden(x, y)?);
                             } else { require_number(&a, &b, "+")?; stack.push(nn_add(a, b)?); }
                         }
                     }
@@ -2875,7 +2884,7 @@ impl<'p> Vm<'p> {
                     self.flush_and_prompt(&prompt);
                     let raw = self.read_input_line();
                     let slot = self.globals.get(&name)
-                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?)", name))?
+                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?){}", name, crate::umstieg::name_hinweis(&name)))?
                         .clone();
                     if slot.borrow().is_const {
                         return Err(format!("CONST '{}' kann nicht ueberschrieben werden", name));
@@ -9451,6 +9460,14 @@ fn unknown_builtin_msg(name: &str) -> String {
              fehlt. Neu bauen mit: python rust\\build_runtime.py --hardware",
             name.to_uppercase(), feat);
     }
+    // Ein Name, den das Befehlsverzeichnis gar nicht kennt, ist kein
+    // "noch nicht verfuegbar" (so klingen nur die Bauten ohne Grafik/Ton, und
+    // daran erkennen die Pruefsammlungen einen Bau ohne Fenster), sondern ein
+    // unbekannter Befehl -- oft einer aus einem anderen BASIC.
+    if !crate::compiler::is_known_builtin(name) {
+        return format!("Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler?){}",
+                       name.to_uppercase(), crate::umstieg::befehl_hinweis(name));
+    }
     if builtins::is_graphics_builtin(name) {
         format!("Grafik-Builtin '{}' im Rust-Kern noch nicht verfuegbar (Schritt 4)", name.to_uppercase())
     } else {
@@ -9538,6 +9555,19 @@ fn load_index(arr: &Value, idx_vals: &[Value]) -> R<Value> {
             }
             Ok(t[ix as usize].clone())
         }
+        // `m["name"]` -- die Schreibweise, die man aus jeder anderen Sprache
+        // kennt. Gleichwertig zu MAPGET, samt derselben Meldung.
+        Value::Map(m) => {
+            if idx_vals.len() != 1 { return Err("MAP-Zugriff braucht genau einen Schluessel: m[\"name\"]".into()); }
+            let k = match &idx_vals[0] {
+                Value::Str(k) => k.to_string(),
+                v => return Err(format!("MAP-Schluessel muss STRING sein, erhalten {}", v.type_name())),
+            };
+            let m = m.borrow();
+            m.get(&k).cloned().ok_or_else(|| format!(
+                "Schluessel '{}' nicht in der MAP -- vorher mit MAPHAS(m, \"{}\") fragen oder MAPGETOR(m, \"{}\", vorgabe) nehmen",
+                k, k, k))
+        }
         Value::Nil => Err("Index-Zugriff auf NIL".into()),
         v => Err(format!("Index-Zugriff auf Nicht-Array ({})", v.type_name())),
     }
@@ -9554,6 +9584,18 @@ fn store_index(arr: &Value, idx_vals: &[Value], v: Value) -> R<()> {
             let flat = a.flat_index(&ints)?;
             let cv = coerce(v, &a.element_type, "Array-Element")?;
             a.cells.set(flat, cv);
+            Ok(())
+        }
+        // `m["name"] = wert` -- gleichwertig zu MAPPUT.
+        Value::Map(m) => {
+            if idx_vals.len() != 1 { return Err("MAP-Zuweisung braucht genau einen Schluessel: m[\"name\"] = wert".into()); }
+            let k = match &idx_vals[0] {
+                Value::Str(k) => k.to_string(),
+                x => return Err(format!("MAP-Schluessel muss STRING sein, erhalten {}", x.type_name())),
+            };
+            let vt = m.borrow().value_type.clone();
+            let cv = crate::builtins::coerce_map_value(&v, &vt)?;
+            m.borrow_mut().put(k, cv);
             Ok(())
         }
         Value::Nil => Err("Index-Zuweisung an NIL".into()),
@@ -9831,6 +9873,45 @@ fn round_audio(f: f64) -> f64 { (f * 1_000_000.0).round() / 1_000_000.0 }
 /// nur Ganzzahlen -> integer; Zahlen mit mind. einem Float -> float (Ints
 /// werden hochgezogen); nur Strings -> string; nur Wahrheitswerte -> boolean;
 /// gemischt -> any (generisches Value-Backing).
+/// Ein leeres, eindimensionales Feld zum Typ `array:T` -- der Startwert von
+/// `DIM a AS ARRAY OF T` ohne Groesse.
+fn leeres_feld(ty: &str) -> Value {
+    let elem = ty.strip_prefix("array:").unwrap_or("any").to_string();
+    Value::Array(Rc::new(RefCell::new(GbArray::new(elem, vec![0], || Value::Nil))))
+}
+
+/// `a + b` fuer zwei Felder: ein NEUES Feld mit den Elementen beider
+/// (`a = a + [x]` haengt an). Nur eindimensional; der Elementtyp bleibt,
+/// wenn beide denselben haben, sonst bestimmen ihn die Werte.
+fn felder_verbinden(x: &Rc<RefCell<GbArray>>, y: &Rc<RefCell<GbArray>>) -> R<Value> {
+    let (a, b) = (x.borrow(), y.borrow());
+    if a.dims.len() != 1 || b.dims.len() != 1 {
+        return Err("'+' verbindet nur eindimensionale Felder".into());
+    }
+    let (na, nb) = (a.dims[0] as usize, b.dims[0] as usize);
+    let mut vals = Vec::with_capacity(na + nb);
+    for i in 0..na { vals.push(a.cells.get(i)); }
+    for i in 0..nb { vals.push(b.cells.get(i)); }
+    let et = if a.element_type == b.element_type { a.element_type.clone() }
+        else if na == 0 { b.element_type.clone() }
+        else if nb == 0 { a.element_type.clone() }
+        else {
+            let zahl = |t: &str| t == "integer" || t == "float";
+            if zahl(&a.element_type) && zahl(&b.element_type) { "float".to_string() }
+            else if a.element_type == "any" || b.element_type == "any" { String::new() }
+            else {
+                return Err(format!("'+' verbindet nur Felder mit gleichem Elementtyp -- hier ARRAY OF {} und ARRAY OF {}",
+                                   typ_lesbar(&a.element_type), typ_lesbar(&b.element_type)));
+            }
+        };
+    if et.is_empty() || et == "any" { return Ok(array_literal(vals)); }
+    let mut neu = GbArray::new(et.clone(), vec![vals.len() as i64], || Value::Nil);
+    for (i, v) in vals.into_iter().enumerate() {
+        neu.cells.set(i, coerce(v, &et, "Feld verbinden")?);
+    }
+    Ok(Value::Array(Rc::new(RefCell::new(neu))))
+}
+
 fn array_literal(vals: Vec<Value>) -> Value {
     let n = vals.len() as i64;
     let all_int = vals.iter().all(|v| matches!(v, Value::Int(_)));
