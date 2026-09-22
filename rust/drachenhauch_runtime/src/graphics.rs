@@ -3641,6 +3641,12 @@ impl Graphics {
         let resolved = crate::builtins::resolve_asset_path(path);
         let path = resolved.as_str();
         if let Some(&h) = self.image_cache.get(path) { return Ok(h); }
+        // Vorher pruefen: raylib sagt sonst nur "image data is null, either
+        // the file doesnt exist or the image type is unsupported".
+        if !std::path::Path::new(path).is_file() {
+            let ort = std::env::current_dir().map(|d| d.display().to_string()).unwrap_or_default();
+            return Err(format!("LOADIMAGE: Datei '{}' nicht gefunden (gesucht relativ zu {})", path, ort));
+        }
         // CPU-Image laden (fuer imgfx) + GPU-Textur daraus.
         let img = Image::load_image(path).map_err(|e| format!("LOADIMAGE: {}", e))?;
         let tex = self.rl.load_texture_from_image(&self.thread, &img).map_err(|e| format!("LOADIMAGE: {}", e))?;

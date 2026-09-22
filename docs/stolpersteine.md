@@ -400,6 +400,22 @@ Reflexionen/Mirror-Effekte.
 >   `CATCH e AS`, `s[0] = "x"`, `TAB`/`SPC`/`ARRAY_REMOVE`.
 > - Gemessen: keine der neuen Warnungen trifft eine der 447 `.dh`-Dateien des
 >   Repos.
+>
+> **Dritte Runde (2026-09-22), 60 Proben (Grafik, Spielschleife, Klassen,
+> Module):**
+> - **`spieler.springen` ohne Klammern tat still nichts** -- dieselbe Falle wie
+>   der Name allein bei einer SUB, nur bei Methoden (es entstand eine gebundene
+>   Methode, die niemand rief). Jetzt ein Aufruf, wenn der Typ statisch bekannt
+>   ist und der Name eine Methode (kein Feld, keine PROPERTY) ist.
+> - `LOADIMAGE` einer fehlenden Datei meldete raylibs "image data is null,
+>   either the file doesnt exist or the image type is unsupported" -- jetzt
+>   Dateiname und Ordner. Ein NIL als Bild/Handle heisst nicht mehr "erwartet
+>   Zahl, erhalten NIL", sondern nennt die Ursache; die Grafik-Meldung "erwartet
+>   Zahl" nennt die Argumentnummer.
+> - Hinweise fuer `SCREEN 12`, `LINE (x,y)-(x,y)`, `CIRCLE (x,y),r`, `PSET`,
+>   `COLOR`, `KEYDOWN`, `IMPORT json` ohne Anfuehrungszeichen, `INHERITS`,
+>   `PUBLIC`/`PRIVATE`/Feld ohne DIM in einer Klasse, offene Zeichenkette,
+>   Ausdruck, der am Zeilenende abbricht.
 
 ## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
 

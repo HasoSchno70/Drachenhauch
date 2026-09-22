@@ -40,6 +40,10 @@ pub fn befehl(name: &str) -> Option<&'static str> {
         "tab" => "gibt es als Befehl nicht -- Tabulator: CHR$(9), feste Breite: PADR$(text, n)",
         "spc" => "heisst in Drachenhauch SPACE$(anzahl)",
         "array_remove" | "array_delete" | "remove" => "heisst in Drachenhauch ARRAY_REMOVE_AT(feld, index)",
+        "pset" => "heisst in Drachenhauch PLOT(x, y, farbe)",
+        "color" => "eine Farbe ist ein Argument jedes Zeichenbefehls: BOX(x1, y1, x2, y2, RED), TEXT(x, y, text$, YELLOW)",
+        "keydown" | "keyisdown" | "iskeydown" => "gehalten: KEYPRESSED(KEY_A), gerade gedrueckt: KEYHIT(KEY_A)",
+        "locate" => "Text an eine Stelle: TEXT(x, y, text$) im Fenster",
         "stop" | "system" | "quit" => "das Programm beenden: END (allein auf der Zeile) oder EXIT(0)",
         _ => return None,
     })

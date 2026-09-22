@@ -324,7 +324,7 @@ impl Lexer {
             let c = self.peek(0);
             if c == '\0' { return Err(self.err("Unterminierter String", line, col)); }
             if c == '\n' {
-                return Err(self.err("Zeilenumbruch im String nicht erlaubt", line, col));
+                return Err(self.err("Zeilenumbruch im String nicht erlaubt -- das Anfuehrungszeichen am Ende fehlt; mehrere Zeilen: !\"a\\nb\" oder \"a\" + CHR$(10) + \"b\"", line, col));
             }
             if c == '"' {
                 if self.peek(1) == '"' {
