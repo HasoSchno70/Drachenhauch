@@ -1,0 +1,500 @@
+' Umstieg aus QBasic, FreeBASIC, VB und Python (2026-09-21). Was man von dort
+' mitbringt, geht entweder (EXIT FOR, SWAP, LET, END, DIM x AS T = wert,
+' INPUT "..."; x, m["k"], LEN(map), a + [x], VAL("&HFF") ...) oder bekommt
+' eine Meldung, die sagt, wie es hier heisst -- statt "Erwartet Zeilenende".
+' Format: docs/werkzeuge.md.
+
+
+=== dim mit startwert
+DIM a AS INTEGER = 5
+DIM s AS STRING = "Hallo"
+DIM f AS ARRAY OF INTEGER = [1, 2, 3]
+PRINT a; " "; s; " "; LEN(f)
+--- erwartet
+5 Hallo 3
+
+=== dim mit startwert in einer sub laeuft bei jedem aufruf
+SUB s()
+    DIM t AS INTEGER = 1
+    t = t + 1
+    PRINT t
+END SUB
+s()
+s()
+--- erwartet
+2
+2
+
+=== der startwert laeuft durch die typpruefung
+DIM i AS INTEGER = "fuenf"
+--- fehler
+Erwartet INTEGER, erhalten STRING
+
+=== ein startwert gilt fuer eine variable
+DIM a, b AS INTEGER = 3
+--- fehler
+Ein Startwert gilt fuer genau eine Variable
+
+=== ein feld bekommt keinen startwert in der dim-zeile
+CLASS K
+    DIM hp AS INTEGER = 100
+END CLASS
+--- fehler
+SUB Init()
+
+=== exit for do while und sub
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    IF i = 3 THEN EXIT FOR
+NEXT
+PRINT i
+DIM n AS INTEGER
+DO
+    n = n + 1
+    IF n = 4 THEN EXIT DO
+LOOP
+PRINT n
+WHILE TRUE
+    n = n + 1
+    EXIT WHILE
+WEND
+PRINT n
+SUB s()
+    PRINT "a"
+    EXIT SUB
+    PRINT "b"
+END SUB
+s()
+--- erwartet
+3
+4
+5
+a
+
+=== exit verlaesst nur die passende schleife
+DIM i AS INTEGER
+DIM j AS INTEGER
+FOR i = 1 TO 3
+    WHILE j < 5
+        EXIT FOR
+    WEND
+NEXT
+--- fehler
+die innerste Schleife ist aber eine WHILE-Schleife
+
+=== exit sub ausserhalb
+EXIT SUB
+--- fehler
+EXIT SUB steht in keinem Unterprogramm
+
+=== exit function sagt return
+FUNCTION f() AS INTEGER
+    EXIT FUNCTION
+END FUNCTION
+--- fehler
+RETURN wert
+
+=== exit als befehl bleibt exit
+PRINT "a"
+EXIT(0)
+PRINT "b"
+--- erwartet
+a
+
+=== end allein beendet das programm
+DIM x AS INTEGER = 1
+IF x = 1 THEN
+    PRINT "vor"
+    END
+END IF
+PRINT "nach"
+--- erwartet
+vor
+
+=== end im einzeiler
+IF TRUE THEN PRINT "a" : END
+PRINT "nie"
+--- erwartet
+a
+
+=== end while wie wend
+DIM i AS INTEGER
+WHILE i < 3
+    i = i + 1
+END WHILE
+PRINT i
+--- erwartet
+3
+
+=== swap
+DIM a AS INTEGER = 1
+DIM b AS INTEGER = 2
+SWAP a, b
+PRINT a; b
+DIM f AS ARRAY OF STRING = ["x", "y", "z"]
+SWAP f[0], f[2]
+PRINT f[0]; f[2]
+--- erwartet
+21
+zx
+
+=== swap und let bleiben namen
+DIM swap AS INTEGER = 4
+DIM let AS INTEGER
+let = swap + 1
+PRINT let
+--- erwartet
+5
+
+=== let wird uebergangen
+DIM x AS INTEGER
+LET x = 5
+LET x += 1
+PRINT x
+--- erwartet
+6
+
+=== fragezeichen ist print
+? "hallo"; 1 + 1
+--- erwartet
+hallo2
+
+=== input mit semikolon haengt ein fragezeichen an
+DIM n AS STRING
+INPUT "Name"; n
+PRINT "[" + n + "]"
+--- eingabe
+Anna
+--- erwartet
+Name? [Anna]
+
+=== ein name allein ruft die sub
+SUB hallo()
+    PRINT "hallo"
+END SUB
+hallo
+CLS
+--- erwartet
+hallo
+
+=== ein name allein bleibt bei einer variablen stumm
+DIM x AS INTEGER
+x
+PRINT "ok"
+--- erwartet
+ok
+
+=== map mit eckigen klammern
+DIM m AS MAP OF INTEGER
+m["a"] = 1
+m["b"] = 2
+m["a"] += 5
+PRINT m["a"]; " "; m["b"]; " "; LEN(m)
+--- erwartet
+6 2 2
+
+=== map mit eckigen klammern prueft den werttyp
+DIM m AS MAP OF INTEGER
+m["a"] = "x"
+--- fehler
+Erwartet INTEGER, erhalten STRING
+
+=== fehlender map-schluessel nennt maphas
+DIM m AS MAP OF INTEGER
+PRINT m["weg"]
+--- fehler
+Schluessel 'weg' nicht in der MAP -- vorher mit MAPHAS
+
+=== ein feld ohne groesse ist leer statt nil
+DIM a AS ARRAY OF INTEGER
+PRINT LEN(a)
+ARRAY_PUSH(a, 7)
+PRINT a[0]; LEN(a)
+SUB s()
+    DIM b AS ARRAY OF STRING
+    ARRAY_PUSH(b, "x")
+    PRINT LEN(b)
+END SUB
+s()
+s()
+CLASS K
+    DIM teile AS ARRAY OF STRING
+END CLASS
+DIM k AS K
+k = NEW K()
+ARRAY_PUSH(k.teile, "y")
+PRINT LEN(k.teile)
+--- erwartet
+0
+71
+1
+1
+1
+
+=== felder mit plus verbinden
+DIM a AS ARRAY OF INTEGER = [1, 2]
+a = a + [3]
+PRINT LEN(a); a[2]
+DIM f AS ARRAY OF FLOAT = [1.5]
+f = f + [2]
+PRINT f[1]
+--- erwartet
+33
+2.0
+
+=== felder verschiedener art verbinden ist ein fehler
+DIM a AS ARRAY OF INTEGER = [1]
+a = a + ["x"]
+--- fehler
+'+' verbindet nur Felder mit gleichem Elementtyp -- hier ARRAY OF INTEGER und ARRAY OF STRING
+
+=== val liest die zahl am anfang
+PRINT VAL("12abc"); " "; VAL("3 Aepfel"); " "; VAL("1e3"); " "; VAL("-4"); " "; VAL(" .5"); " "; VAL("abc"); " "; VAL("3e")
+--- erwartet
+12 3 1000.0 -4 0.5 0 3
+
+=== val liest hex oktal und binaer
+PRINT VAL("&HFF"); " "; VAL("&hff"); " "; VAL("0x10"); " "; VAL("&B101"); " "; VAL("0b11"); " "; VAL("&O17"); " "; VAL("-&H10"); " "; VAL("0b")
+--- erwartet
+255 255 16 5 3 15 -16 0
+
+=== randomize nimmt eine kommazahl
+RANDOMIZE(TIMER())
+RANDOMIZE(12.5)
+PRINT "ok"
+--- erwartet
+ok
+
+=== instr mit start vorne sagt wo er steht
+PRINT INSTR(3, "Hallo", "l")
+--- fehler
+die Startstelle steht in Drachenhauch HINTEN
+
+=== len auf einer zahl
+PRINT LEN(12345)
+--- fehler
+LEN(STR$(zahl))
+
+
+=== goto
+DIM i AS INTEGER
+oben:
+i = i + 1
+IF i < 3 THEN GOTO oben
+--- fehler
+GOTO und GOSUB gibt es in Drachenhauch nicht
+
+=== gosub
+GOSUB unterprogramm
+--- fehler
+SUB name() ... END SUB
+
+=== zeilennummern
+10 PRINT "a"
+--- fehler
+Zeilennummern gibt es in Drachenhauch nicht
+
+=== befehl ohne klammern
+LOCATE 1, 1
+--- fehler
+Befehle und SUBs bekommen ihre Werte in Klammern: LOCATE(...)
+
+=== redim
+DIM a[5] AS INTEGER
+REDIM a[10]
+--- fehler
+REDIM gibt es nicht
+
+=== type
+TYPE Punkt
+    x AS INTEGER
+END TYPE
+--- fehler
+STRUCT ... END STRUCT
+
+=== def fn
+DEF FN q(x) = x * x
+--- fehler
+DEF FN gibt es nicht
+
+=== on error
+ON ERROR GOTO fehler
+--- fehler
+TRY ... CATCH
+
+=== line input
+DIM s AS STRING
+LINE INPUT s
+--- fehler
+LINE INPUT gibt es nicht
+
+=== print using
+PRINT USING "##.##"; 3.14159
+--- fehler
+PRINT USING gibt es nicht
+
+=== open mit dateinummer
+OPEN "t.txt" FOR OUTPUT AS #1
+--- fehler
+OPENFILE
+
+=== else if in zwei woertern
+DIM x AS INTEGER
+IF x = 1 THEN
+    PRINT "1"
+ELSE IF x = 0 THEN
+    PRINT "0"
+END IF
+--- fehler
+ELSEIF bedingung THEN
+
+=== elseif im einzeiler
+DIM x AS INTEGER
+IF x = 1 THEN PRINT "1" ELSEIF x = 0 THEN PRINT "0"
+--- fehler
+ELSEIF geht nur im mehrzeiligen IF
+
+=== endif in einem wort
+DIM x AS INTEGER
+IF x = 0 THEN
+    PRINT 1
+ENDIF
+--- fehler
+END IF schreibt man in zwei Woertern
+
+=== mid als zuweisung
+DIM s AS STRING = "Hallo"
+MID$(s, 1, 1) = "e"
+--- fehler
+2: Parse-Fehler (1): MID$ kann nichts ersetzen
+
+=== gleichheitszeichen als anweisung zeigt auf die eigene zeile
+DIM a AS INTEGER
+a + 1 = 2
+PRINT a
+--- fehler
+2: Parse-Fehler (1): '=' als Anweisung
+
+=== dim shared
+DIM SHARED g AS INTEGER
+--- fehler
+DIM SHARED gibt es in Drachenhauch nicht
+
+=== dim mit runden klammern
+DIM a(10) AS INTEGER
+--- fehler
+DIM a[10] AS INTEGER
+
+=== dim ohne typ
+DIM name$
+--- fehler
+DIM name$ AS STRING
+
+=== string mit fester laenge
+DIM s AS STRING * 10
+--- fehler
+Texte haben in Drachenhauch keine feste Laenge
+
+=== typzeichen
+DIM x AS INTEGER
+x% = 3
+--- fehler
+Typ-Zeichen wie '%' hinter einem Namen gibt es nicht
+
+=== prozent als rest
+PRINT 7 % 3
+--- fehler
+Den Rest einer Division liefert MOD
+
+=== ungleich mit ausrufezeichen
+PRINT 1 != 2
+--- fehler
+Ungleich schreibt man in Drachenhauch <>
+
+=== doppeltes gleichheitszeichen
+PRINT 1 == 1
+--- fehler
+Verglichen wird mit EINEM =
+
+=== raute als kommentar
+PRINT 1 # kommentar
+--- fehler
+Kommentare beginnen mit ' (Hochkomma)
+
+=== doppelschraegstrich als kommentar
+PRINT 1 // kommentar
+--- fehler
+nicht mit //
+
+=== und-zeichen verbindet keine texte
+PRINT "a" & "b"
+--- fehler
+'&' verbindet hier keine Texte -- das macht +
+
+=== xor
+PRINT TRUE XOR FALSE
+--- fehler
+XOR gibt es nicht -- fuer Bits BXOR
+
+=== funktionsname als rueckgabe
+FUNCTION doppelt(x AS INTEGER) AS INTEGER
+    doppelt = x * 2
+END FUNCTION
+PRINT doppelt(3)
+--- fehler
+liefert eine FUNCTION ihren Wert mit RETURN
+
+=== sub in einer sub
+SUB aussen()
+    SUB innen()
+    END SUB
+END SUB
+--- fehler
+Eine SUB darf nicht innerhalb eines Unterprogramms oder Blocks stehen
+
+=== typnamen anderer sprachen
+DIM d AS DOUBLE
+--- fehler
+Unbekannter Typ 'DOUBLE' -- Kommazahlen heissen in Drachenhauch FLOAT
+
+=== long
+DIM d AS LONG
+--- fehler
+ganze Zahlen heissen in Drachenhauch INTEGER
+
+=== feld von feldern
+DIM a[3] AS ARRAY OF INTEGER
+--- fehler
+Felder von Feldern gibt es nicht -- zweidimensional: DIM g[3, 4] AS INTEGER
+
+=== befehl ohne klammern als wert
+DIM r AS FLOAT
+r = RND
+--- fehler
+RND ist ein Befehl -- aufgerufen wird er mit Klammern: RND()
+
+=== befehle anderer basics beim laufen
+PRINT UCASE$("abc")
+--- fehler
+Unbekannter Befehl 'UCASE$' -- dhrt kennt ihn nicht (Tippfehler?) -- heisst in Drachenhauch UPPER$(text)
+
+=== befehle anderer basics beim uebersetzen
+PRINT "vorher"
+PRINT UBOUND(3)
+--- stderr
+UBOUND: der letzte Index ist LEN(feld) - 1
+--- fehler
+Unbekannter Befehl 'UBOUND'
+
+=== and auf zwei ganzzahlen warnt
+DIM a AS INTEGER = 6
+DIM b AS INTEGER = 3
+PRINT a AND b
+PRINT a BAND b
+PRINT a > 1 AND b > 1
+--- stderr
+AND verknuepft hier zwei Ganzzahlen
+--- erwartet
+3
+2
+TRUE

@@ -86,13 +86,13 @@ FUNCTION F() AS INTEGER
 END FUNCTION
 
 --- fehler
-Builtin 'GIBTESNICHT' im Rust-Kern noch nicht verfuegbar
+Unbekannter Befehl 'GIBTESNICHT'
 
 === ohne import bleibt die zeile wie gehabt
 PRINT "a"
 PRINT GIBTESNICHT(1)
 --- fehler
-Builtin 'GIBTESNICHT' im Rust-Kern noch nicht verfuegbar
+Unbekannter Befehl 'GIBTESNICHT'
 
 === mehrere module werden richtig zugeordnet
 ' Drei Dateien, drei Warnungen -- jede muss in ihrer eigenen landen.
@@ -107,7 +107,7 @@ PRINT 0
 PRINT WEGB(1)
 
 --- fehler
-Builtin 'WEGA' im Rust-Kern noch nicht verfuegbar
+Unbekannter Befehl 'WEGA'
 
 === bom in einer importierten datei stoert nicht
 ' Auch das Modul darf eins haben -- sonst faellt es beim Zusammenfuegen

@@ -578,7 +578,7 @@ fn arity_text(min: usize, max: usize) -> String {
 /// Ist `name` ein dhrt-Builtin? Interne `__`-Builtins (compiler-emittiert) und
 /// der Fall „Index konnte nicht geladen werden" (leeres Set) gelten als bekannt,
 /// damit nie faelschlich gewarnt wird.
-fn is_known_builtin(name: &str) -> bool {
+pub(crate) fn is_known_builtin(name: &str) -> bool {
     if name.starts_with("__") { return true; }
     let set = known_builtins();
     set.is_empty() || set.contains(&name.to_lowercase())
@@ -863,6 +863,25 @@ impl Compiler {
                 Ok(())
             }
             Node::ExprStmt { expr } => {
+                // Ein Name ALLEIN als Anweisung (`CLS`, `FLIP`, `meineSub`): in
+                // anderen BASICs ein Aufruf. Hier wurde daraus bisher still ein
+                // geladener und weggeworfener Wert -- die SUB lief einfach nicht.
+                // Ist der Name keine Variable, aber eine SUB/FUNCTION oder ein
+                // Befehl, wird er aufgerufen.
+                if let Node::Identifier(n) = &**expr {
+                    let low = n.to_lowercase();
+                    let ist_variable = self.ctx.local_slots.contains_key(n)
+                        || self.is_field(n)
+                        || self.global_vars.iter().any(|g| g.to_lowercase() == low);
+                    if !ist_variable && low != "self"
+                        && (self.fn_sigs.contains_key(&low)
+                            || (!crate::vm::ist_vorbelegter_name(&low) && is_known_builtin(&low)
+                                && !known_builtins().is_empty())) {
+                        self.expr_call(expr, &[])?;
+                        self.ctx.emit(oc::POP, Value::Null);
+                        return Ok(());
+                    }
+                }
                 self.expr(expr)?;
                 self.ctx.emit(oc::POP, Value::Null);
                 Ok(())
@@ -953,6 +972,11 @@ impl Compiler {
             }
             Node::With { var_name, target, body } => self.stmt_with(var_name, target, body),
             Node::TupleAssign { targets, value } => self.stmt_tuple_assign(targets, value),
+            Node::FunctionDecl { .. } | Node::SubDecl { .. } | Node::ClassDecl { .. }
+            | Node::EnumDecl { .. } => Err(format!(
+                "{} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- \
+                 SUB, FUNCTION, CLASS, STRUCT und ENUM gehoeren auf die oberste Ebene des Programms",
+                other_name(s))),
             other => Err(format!("Stufe 3e: Statement {} noch nicht unterstuetzt",
                                  node_name(other))),
         }
@@ -2074,9 +2098,20 @@ impl Compiler {
                 .chain(self.lokale_namen[bereich].iter()).cloned().collect();
             kandidaten.sort();
             kandidaten.dedup();
-            let hinweis = match Self::naechster_name(&low, &kandidaten) {
-                Some(v) => format!(" Meintest du '{}'?", v),
-                None => String::new(),
+            let umstieg = crate::umstieg::name_hinweis(&low);
+            let hinweis = if !umstieg.is_empty() {
+                // "-- RND ist ein Befehl ..." als eigener Satz.
+                let satz = umstieg.trim_start_matches(" -- ");
+                let mut z = satz.chars();
+                match z.next() {
+                    Some(c) => format!(" {}{}.", c.to_uppercase(), z.as_str()),
+                    None => String::new(),
+                }
+            } else {
+                match Self::naechster_name(&low, &kandidaten) {
+                    Some(v) => format!(" Meintest du '{}'?", v),
+                    None => String::new(),
+                }
             };
             self.warnings.push((zeile, format!(
                 "'{}' wird hier {}, aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab (\"Variable '{}' nicht deklariert\").{}",
@@ -2224,6 +2259,18 @@ impl Compiler {
     }
 
     fn expr_binary(&mut self, op: &str, left: &Node, right: &Node) -> CR {
+        if op == "and" || op == "or" {
+            // In anderen BASICs sind AND/OR auf Zahlen bitweise (6 AND 3 = 2).
+            // Hier sind sie logisch und liefern einen der beiden Werte
+            // (6 AND 3 = 3, 6 OR 1 = 6) -- still etwas anderes.
+            if self.statischer_typ(left).as_deref() == Some("integer")
+                && self.statischer_typ(right).as_deref() == Some("integer") {
+                let (w, b, bsp) = if op == "and" { ("AND", "BAND", "6 AND 3 ergibt 3, nicht 2") }
+                                  else { ("OR", "BOR", "6 OR 1 ergibt 6, nicht 7") };
+                self.warnings.push((self.ctx.cur_line, format!(
+                    "{} verknuepft hier zwei Ganzzahlen. In Drachenhauch ist {} logisch und liefert einen der beiden Werte ({}) -- fuer Bits {} nehmen, fuer Wahrheitswerte vergleichen (x <> 0).", w, w, bsp, b)));
+            }
+        }
         if op == "and" {
             self.expr(left)?;
             self.ctx.emit(oc::DUP, Value::Null);
@@ -2431,7 +2478,11 @@ impl Compiler {
                 self.warnings.push((self.ctx.cur_line, format!(
                     "Unbekanntes Builtin '{}' -- dhrt kennt es nicht (Tippfehler? \
                      oder veraltet/entfernt). Der Aufruf schlaegt sonst \
-                     erst zur Laufzeit fehl.", bname.to_uppercase())));
+                     erst zur Laufzeit fehl.{}", bname.to_uppercase(),
+                    match crate::umstieg::befehl(&bname.to_lowercase()) {
+                        Some(h) => format!(" {}: {}.", bname.to_uppercase(), h),
+                        None => String::new(),
+                    })));
             }
             // Passt die Argumentzahl? Zu WENIGE meldet die Laufzeit selbst.
             // Zu VIELE geht je nach Builtin unterschiedlich aus, und der
@@ -3245,6 +3296,20 @@ impl Compiler {
         ctx.return_type = if is_sub { String::new() } else { rt.to_string() };
         if !is_sub {
             let zeile = self.fn_lines.get(name).copied().unwrap_or(0);
+            // QBasic/VB-Gewohnheit: `f = x * 2` im Rumpf von FUNCTION f als
+            // Rueckgabe. Hier ist das eine Zuweisung an eine Variable, die es
+            // nicht gibt -- ein sicherer Abbruch zur Laufzeit, also gleich
+            // hier mit dem richtigen Satz.
+            let low = name.to_lowercase();
+            let ist_eigene_var = params.iter().any(|p| p.name.to_lowercase() == low)
+                || any_stmt(body, &|n| matches!(n, Node::Dim { name: d, .. } if d.to_lowercase() == low));
+            if !ist_eigene_var && !self.global_vars.iter().any(|g| g.to_lowercase() == low)
+                && any_stmt(body, &|n| matches!(n, Node::Assign { name: z, .. } if z.to_lowercase() == low)) {
+                if self.err_line == 0 { self.err_line = zeile; }
+                return Err(format!(
+                    "In FUNCTION {} steht eine Zuweisung an '{}' -- in Drachenhauch liefert eine FUNCTION \
+                     ihren Wert mit RETURN: RETURN ergebnis (statt {} = ergebnis)", name, name, name));
+            }
             self.warn_fehlendes_return(name, rt, body, zeile);
         }
         for p in params {
@@ -3644,9 +3709,28 @@ fn is_value_type(t: &str) -> bool {
 /// Gehoert der Name zu einem Built-in-Modul (z.B. `vec2`, `json_handle`), fehlt
 /// in aller Regel nur das `IMPORT` -- darauf weist die Meldung gezielt hin
 /// (statt des frueheren, irrefuehrenden „Stufe 3e: ... noch nicht unterstuetzt").
+/// Wie der Nutzer eine Deklaration nennt (fuer Meldungen).
+fn other_name(n: &Node) -> &'static str {
+    match n {
+        Node::FunctionDecl { .. } => "Eine FUNCTION",
+        Node::SubDecl { .. } => "Eine SUB",
+        Node::ClassDecl { is_struct: true, .. } => "Ein STRUCT",
+        Node::ClassDecl { .. } => "Eine CLASS",
+        Node::EnumDecl { .. } => "Ein ENUM",
+        _ => "Diese Deklaration",
+    }
+}
+
 fn unknown_dim_type_msg(type_name: &str) -> String {
     let mods = crate::preprocess::modules_for_type(type_name);
     if mods.is_empty() {
+        if let Some(h) = crate::umstieg::typ(type_name) {
+            let lesbar = match type_name.strip_prefix("array:") {
+                Some(e) => format!("ARRAY OF ARRAY OF {}", e.to_uppercase()),
+                None => type_name.to_uppercase(),
+            };
+            return format!("Unbekannter Typ '{}' -- {}", lesbar, h);
+        }
         format!("Unbekannter Typ '{}' (keine Klasse, kein Werttyp, kein importiertes Modul)",
                 type_name)
     } else if mods.len() == 1 {

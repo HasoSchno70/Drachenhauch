@@ -253,22 +253,22 @@ PRINT VAL("xyz")
 === old bitwise builtins are gone (1)
 PRINT BITAND(0, 0)
 --- fehler
-Builtin 'BITAND' im Rust-Kern noch nicht verfuegbar
+Unbekannter Befehl 'BITAND' -- dhrt kennt ihn nicht (Tippfehler?) -- ist in Drachenhauch der Operator BAND
 
 === old bitwise builtins are gone (2)
 PRINT BITOR(0, 0)
 --- fehler
-Builtin 'BITOR' im Rust-Kern noch nicht verfuegbar
+Unbekannter Befehl 'BITOR' -- dhrt kennt ihn nicht (Tippfehler?) -- ist in Drachenhauch der Operator BOR
 
 === old bitwise builtins are gone (3)
 PRINT BITXOR(0, 0)
 --- fehler
-Builtin 'BITXOR' im Rust-Kern noch nicht verfuegbar
+Unbekannter Befehl 'BITXOR' -- dhrt kennt ihn nicht (Tippfehler?) -- ist in Drachenhauch der Operator BXOR
 
 === old bitwise builtins are gone (4)
 PRINT BITNOT(0, 0)
 --- fehler
-Builtin 'BITNOT' im Rust-Kern noch nicht verfuegbar
+Unbekannter Befehl 'BITNOT' -- dhrt kennt ihn nicht (Tippfehler?) -- ist in Drachenhauch der Operator BNOT
 
 === old bitwise builtins are gone (5)
 PRINT SHL(0, 0)

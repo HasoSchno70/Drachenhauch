@@ -60,12 +60,18 @@ pub struct Parser {
     /// WP I.1: Namen, die mit `PRIVATE` deklariert wurden (Zeile, lowercase).
     /// Steht neben dem Baum statt darin -- siehe `private_decl`.
     privat: Vec<(u32, String)>,
+    /// Offene Schleifen und Unterprogramme, innerstes zuletzt -- fuer
+    /// `EXIT FOR/DO/WHILE/SUB` (Umstieg aus anderen BASICs). Ein EXIT, das
+    /// nicht zur INNERSTEN Schleife passt, ist ein Fehler statt still das
+    /// Falsche zu verlassen.
+    bloecke: Vec<&'static str>,
 }
 
 impl Parser {
     pub fn new(toks: Vec<Token>) -> Self {
         Parser { toks, pos: 0, enum_names: HashSet::new(),
-                 with_counter: 0, with_stack: Vec::new(), privat: Vec::new() }
+                 with_counter: 0, with_stack: Vec::new(), privat: Vec::new(),
+                 bloecke: Vec::new() }
     }
 
     /// Die `PRIVATE`-Namen dieses Laufs. Erst nach `parse()` gefuellt.
@@ -133,8 +139,100 @@ impl Parser {
         // Quell-Zeile des ersten Tokens merken und das Statement damit umhuellen
         // (Stufe B: fuer lines[] -> Profiler/Debugger/Laufzeitfehler-Zeilen).
         let line = self.peek(0).line as u32;
-        let body = self.statement_inner()?;
+        let start = self.pos;
+        let body = match self.statement_inner() {
+            Ok(b) => b,
+            Err(e) => {
+                // Nur wenn der Fehler in DERSELBEN Zeile sitzt -- sonst kam er
+                // aus einem inneren Block und hat dort schon seinen Hinweis.
+                let zeile = self.toks[start.min(self.toks.len() - 1)].line;
+                if e.line == zeile {
+                    // Die Anweisung selbst, dann jede hinter THEN/ELSE/`:` in
+                    // derselben Zeile (`IF i < 3 THEN GOTO oben`).
+                    let mut stellen = vec![start];
+                    let mut k = start;
+                    while k < self.toks.len() && self.toks[k].line == zeile && k <= self.pos {
+                        if matches!(self.toks[k].tt, Tt::Then | Tt::Else | Tt::Colon) { stellen.push(k + 1); }
+                        k += 1;
+                    }
+                    for s in stellen {
+                        if let Some(h) = self.umsteiger_hinweis(s, &e.msg) {
+                            return Err(ParseError { msg: h, line: e.line, col: e.col });
+                        }
+                    }
+                }
+                return Err(e);
+            }
+        };
         Ok(Node::Stmt { line, body: Box::new(body) })
+    }
+
+    /// Ein Satz fuer Anweisungen, die man aus QBasic, VB oder Blitz kennt und
+    /// die es in Drachenhauch nicht (so) gibt. Ohne ihn bleibt es bei
+    /// "Erwartet Zeilenende" -- was genau NICHTS darueber sagt, was zu tun ist.
+    fn umsteiger_hinweis(&self, start: usize, meldung: &str) -> Option<String> {
+        let tok = |i: usize| self.toks.get(start + i);
+        let tt = |i: usize| tok(i).map(|t| t.tt).unwrap_or(Tt::Eof);
+        let wort = |i: usize| tok(i).map(|t| if t.tt == Tt::Ident { sval(t) } else { String::new() })
+            .unwrap_or_default();
+        let w0 = wort(0);
+        let h: &str = match w0.as_str() {
+            "goto" | "gosub" =>
+                "GOTO und GOSUB gibt es in Drachenhauch nicht. Wiederholen: WHILE, DO ... LOOP oder FOR; \
+                 ein benanntes Stueck Code: SUB name() ... END SUB, aufgerufen mit name()",
+            "redim" =>
+                "REDIM gibt es nicht. Ein Feld ohne feste Groesse (DIM a AS ARRAY OF INTEGER) waechst mit \
+                 ARRAY_PUSH(a, wert); fuer eine neue Groesse: DIM a[n] AS INTEGER noch einmal",
+            "type" if tt(1) == Tt::Ident =>
+                "TYPE ... END TYPE heisst in Drachenhauch STRUCT ... END STRUCT, die Felder mit DIM: \
+                 STRUCT Punkt / DIM x AS INTEGER / END STRUCT",
+            "def" =>
+                "DEF FN gibt es nicht -- FUNCTION name(x AS INTEGER) AS INTEGER ... RETURN wert ... END FUNCTION",
+            "on" =>
+                "ON ERROR / ON ... GOTO gibt es nicht. Fehler faengt TRY ... CATCH meldung ... END TRY, \
+                 Verzweigen nach einer Zahl SELECT CASE",
+            "line" if tt(1) == Tt::Input =>
+                "LINE INPUT gibt es nicht -- INPUT liest schon die ganze Zeile, wenn die Variable ein STRING ist",
+            "open" if tt(1) == Tt::Str =>
+                "OPEN ... AS #1 gibt es nicht. Dateien: f = OPENFILE(\"name.txt\", \"w\") (r/w/a), \
+                 WRITELINE(f, text), READLINE(f), CLOSEFILE(f) -- oder alles auf einmal mit WRITEALL/READLINES",
+            "endif" => "END IF schreibt man in zwei Woertern",
+            "endwhile" => "END WHILE (oder WEND) schreibt man in zwei Woertern",
+            "endsub" => "END SUB schreibt man in zwei Woertern",
+            "endfunction" => "END FUNCTION schreibt man in zwei Woertern",
+            "endselect" => "END SELECT schreibt man in zwei Woertern",
+            "mid$" if meldung.starts_with("'='") =>
+                "MID$ kann nichts ersetzen, nur lesen. Stattdessen den Text neu zusammensetzen: \
+                 s = LEFT$(s, i) + neu + MID$(s, i + LEN(neu)) (MID$ zaehlt ab 0)",
+            _ => "",
+        };
+        if !h.is_empty() { return Some(h.to_string()); }
+        // XOR/EQV/IMP irgendwo in der Zeile.
+        let mut k = start;
+        while let Some(t) = self.toks.get(k) {
+            if t.tt == Tt::Newline || t.tt == Tt::Eof { break; }
+            if t.tt == Tt::Ident && matches!(sval(t).as_str(), "xor" | "eqv" | "imp") {
+                return Some(format!("{} gibt es nicht -- fuer Bits BXOR, fuer Wahrheitswerte a <> b (entweder-oder)",
+                                    sval(t).to_uppercase()));
+            }
+            k += 1;
+        }
+        if tt(0) == Tt::Number && meldung == "Erwartet Zeilenende" {
+            return Some("Zeilennummern gibt es in Drachenhauch nicht -- die Zeile beginnt direkt mit dem Befehl".into());
+        }
+        if tt(0) == Tt::Print && wort(1) == "using" {
+            return Some("PRINT USING gibt es nicht -- PRINT FORMAT$(wert, \"%6.2f\") oder f\"{wert:.2f}\"".into());
+        }
+        // `LOCATE 1, 1`, `COLOR 14`, `SLEEP 100`, `meineSub 5`: ein Name,
+        // dahinter gleich ein Wert. In Drachenhauch stehen Argumente IMMER in
+        // Klammern.
+        if tt(0) == Tt::Ident && meldung == "Erwartet Zeilenende"
+            && matches!(tt(1), Tt::Number | Tt::Str | Tt::Ident | Tt::Minus | Tt::True | Tt::False) {
+            return Some(format!(
+                "Befehle und SUBs bekommen ihre Werte in Klammern: {}(...) -- ohne Klammern ist '{}' nur ein Name",
+                w0.to_uppercase(), w0));
+        }
+        None
     }
 
     /// `PRIVATE` VOR einer Deklaration: der Name wird nur im Namensraum
@@ -168,7 +266,105 @@ impl Parser {
         Ok(knoten)
     }
 
+    /// Steht hier ein `END` allein auf seiner Zeile?
+    fn ist_programm_ende(&self) -> bool {
+        self.tt(0) == Tt::End && matches!(self.tt(1), Tt::Newline | Tt::Colon | Tt::Eof)
+    }
+
+    /// `EXIT FOR` / `EXIT DO` / `EXIT WHILE` / `EXIT SUB` -- aus anderen
+    /// BASICs gewohnt. Wird zu BREAK bzw. RETURN, aber nur, wenn die Art zur
+    /// INNERSTEN Schleife passt: `EXIT FOR` in einer WHILE innerhalb einer
+    /// FOR verliesse sonst still die falsche. Ohne Zeilenabschluss (den
+    /// verbraucht der Aufrufer, wie bei den anderen Einzeiler-Kernen).
+    fn ist_exit(&self) -> bool {
+        self.check(Tt::Ident) && sval(self.peek(0)) == "exit"
+            && (matches!(self.tt(1), Tt::For | Tt::While | Tt::Repeat | Tt::Sub | Tt::Function)
+                || (self.tt(1) == Tt::Ident && sval(self.peek(1)) == "do"))
+    }
+
+    fn exit_kern(&mut self) -> R<Node> {
+        self.pos += 1;   // 'exit'
+        let art: &'static str = match self.tt(0) {
+            Tt::For => "for", Tt::While => "while", Tt::Repeat => "repeat",
+            Tt::Sub => "sub", Tt::Function => "function",
+            _ => "do",
+        };
+        let wort = art.to_uppercase();
+        let ist_schleife = |b: &str| matches!(b, "for" | "while" | "repeat" | "do");
+        if art == "sub" || art == "function" {
+            let innen = self.bloecke.iter().rev().find(|b| !ist_schleife(b)).copied();
+            return match innen {
+                None => self.err(&format!("EXIT {} steht in keinem Unterprogramm", wort)),
+                Some("sub") if art == "sub" => { self.pos += 1; Ok(Node::Return(None)) }
+                Some("function") if art == "function" => self.err(
+                    "EXIT FUNCTION gibt es in Drachenhauch nicht -- eine FUNCTION liefert ihren Wert mit RETURN wert"),
+                Some(b) => self.err(&format!("EXIT {} steht in einer {} -- das passt nicht zusammen",
+                                             wort, b.to_uppercase())),
+            };
+        }
+        match self.bloecke.last().copied() {
+            Some(b) if b == art => { self.pos += 1; Ok(Node::Break) }
+            Some(b) if ist_schleife(b) => self.err(&format!(
+                "EXIT {} -- die innerste Schleife ist aber eine {}-Schleife. BREAK verlaesst immer die innerste",
+                wort, b.to_uppercase())),
+            _ => self.err(&format!("EXIT {} steht in keiner {}-Schleife", wort, wort)),
+        }
+    }
+
+    /// `SWAP a, b` -> `(a, b) = (b, a)`. `swap` bleibt ein gewoehnlicher
+    /// Bezeichner; als Anweisung zaehlt es nur, wenn danach ein Name steht,
+    /// der kein Aufruf und keine Zuweisung ist.
+    fn ist_swap(&self) -> bool {
+        self.check(Tt::Ident) && sval(self.peek(0)) == "swap" && self.tt(1) == Tt::Ident
+    }
+
+    fn swap_kern(&mut self) -> R<Node> {
+        self.pos += 1;   // 'swap'
+        let a = self.tuple_assign_target()?;
+        self.expect(Tt::Comma, "SWAP a, b: erwartet ',' zwischen den beiden Variablen")?;
+        let b = self.tuple_assign_target()?;
+        let wert = Node::TupleLit { elements: vec![b.clone(), a.clone()] };
+        Ok(Node::TupleAssign { targets: vec![a, b], value: Box::new(wert) })
+    }
+
+    /// `LET x = 5` -- das LET ist in Drachenhauch ueberfluessig und wird
+    /// uebergangen. Nur vor einer Zuweisung; `let` bleibt sonst ein Name.
+    fn ist_let(&self) -> bool {
+        if !(self.check(Tt::Ident) && sval(self.peek(0)) == "let" && self.tt(1) == Tt::Ident) {
+            return false;
+        }
+        matches!(self.tt(2), Tt::Eq | Tt::PlusEq | Tt::MinusEq | Tt::StarEq | Tt::SlashEq
+                             | Tt::Dot | Tt::Lbracket)
+    }
+
+    /// `END` allein -> das Programm endet (wie `EXIT(0)`).
+    fn programm_ende(&mut self) -> Node {
+        self.pos += 1;
+        Node::ExprStmt { expr: Box::new(Node::Call {
+            callee: Box::new(Node::Identifier("exit".into())),
+            args: vec![Node::NumberLit(NumV::Int(0))] }) }
+    }
+
     fn statement_inner(&mut self) -> R<Node> {
+        if self.ist_programm_ende() {
+            let n = self.programm_ende();
+            self.consume_terminator()?;
+            return Ok(n);
+        }
+        if self.ist_exit() {
+            let n = self.exit_kern()?;
+            self.consume_terminator()?;
+            return Ok(n);
+        }
+        if self.ist_swap() {
+            let n = self.swap_kern()?;
+            self.consume_terminator()?;
+            return Ok(n);
+        }
+        if self.ist_let() {
+            self.pos += 1;
+            return self.statement_inner();
+        }
         match self.tt(0) {
             Tt::Private => self.private_decl(),
             Tt::Dim => self.dim(),
@@ -198,16 +394,27 @@ impl Parser {
             Tt::Ident if self.ist_do_schleife() => self.do_loop(),
             Tt::Ident if self.is_assignment_lookahead() => self.assign(),
             Tt::Lparen if self.is_tuple_assign_lookahead() => self.tuple_assign(),
+            Tt::Ident if matches!(sval(self.peek(0)).as_str(),
+                    "endif" | "endwhile" | "endsub" | "endfunction" | "endselect")
+                && matches!(self.tt(1), Tt::Newline | Tt::Colon | Tt::Eof) => {
+                let w = sval(self.peek(0));
+                let rest = w.trim_start_matches("end").to_uppercase();
+                self.err(&format!("END {} schreibt man in zwei Woertern", rest))
+            }
             _ => {
+                let (z0, s0) = (self.peek(0).line, self.peek(0).col);
                 let expr = self.expression()?;
                 self.consume_terminator()?;
                 // Review-Fund (Sicherheitsnetz, siehe inline_statement): kein
                 // gueltiges GB-Programm berechnet einen Top-Level-Vergleich
                 // und verwirft ihn -- jede Lvalue-Form, die trotz der obigen
                 // Zweige noch durchrutscht, bricht hier klar statt lautlos.
+                // Die Stelle der ANWEISUNG, nicht die hinter dem Zeilenende --
+                // sonst zeigte die Meldung auf die naechste Zeile.
                 if let Node::BinaryOp { op, .. } = &expr {
                     if op.as_str() == "=" {
-                        return self.err("'=' als Anweisung -- meintest du eine Zuweisung?");
+                        return Err(ParseError { line: z0, col: s0,
+                            msg: "'=' als Anweisung -- meintest du eine Zuweisung?".into() });
                     }
                 }
                 Ok(Node::ExprStmt { expr: Box::new(expr) })
@@ -338,7 +545,14 @@ impl Parser {
                 return self.err(&format!(
                     "'{}' ist ein reserviertes Wort und kann kein Variablenname sein - waehle einen anderen Namen", kw));
             }
+            if self.check(Tt::Ident) && sval(self.peek(0)) == "shared" && self.tt(1) == Tt::Ident {
+                return self.err("DIM SHARED gibt es in Drachenhauch nicht -- was oben im Programm mit DIM angelegt ist, sehen alle SUBs und FUNCTIONs ohnehin");
+            }
             let name = sval(&self.expect(Tt::Ident, "Erwartet Variablenname nach DIM")?);
+            if self.check(Tt::Lparen) {
+                return self.err(&format!(
+                    "Felder werden mit eckigen Klammern angelegt: DIM {}[10] AS INTEGER (Index 0 bis 9)", name));
+            }
             let mut array_dims = None;
             if self.matches(Tt::Lbracket) {
                 let mut dims = vec![self.expression()?];
@@ -349,18 +563,56 @@ impl Parser {
             decls.push((name, array_dims));
             if !self.matches(Tt::Comma) { break; }
         }
+        if !self.check(Tt::As) {
+            let name = &decls.last().unwrap().0;
+            let (typ, sonst) = if name.ends_with('$') { ("STRING", "") } else { ("INTEGER", " (oder FLOAT, STRING, BOOLEAN)") };
+            return self.err(&format!(
+                "Erwartet AS nach Variablenname -- jede Variable braucht einen Typ: DIM {} AS {}{}",
+                name, typ, sonst));
+        }
         self.expect(Tt::As, "Erwartet AS nach Variablenname")?;
         let type_name = self.parse_type()?;
+        if type_name == "string" && self.check(Tt::StarT) {
+            return self.err("Texte haben in Drachenhauch keine feste Laenge -- DIM s AS STRING; auf eine Breite bringen mit LEFT$(s, n) oder PADR$(s, n)");
+        }
+        // `DIM x AS INTEGER = 5` -- Anlegen und erster Wert in einer Zeile.
+        // Wird zu DIM + Zuweisung; der Wert laeuft also durch dieselbe
+        // Typpruefung wie jede andere Zuweisung.
+        let startwert = if self.matches(Tt::Eq) {
+            if decls.len() > 1 {
+                return self.err("Ein Startwert gilt fuer genau eine Variable -- DIM a AS INTEGER = 1 je Zeile");
+            }
+            Some(self.expression()?)
+        } else { None };
         self.consume_terminator()?;
         if decls.len() == 1 {
             let (name, dims) = decls.pop().unwrap();
-            Ok(Node::Dim { name, type_name, array_dims: dims })
+            let dim = Node::Dim { name: name.clone(), type_name, array_dims: dims };
+            match startwert {
+                None => Ok(dim),
+                Some(v) => Ok(Node::MultiDim { dims: vec![dim, Node::Assign { name, value: Box::new(v) }] }),
+            }
         } else {
             let dims: Vec<Node> = decls.into_iter()
                 .map(|(name, d)| Node::Dim { name, type_name: type_name.clone(), array_dims: d })
                 .collect();
             Ok(Node::MultiDim { dims })
         }
+    }
+
+    /// DIM als FELD einer CLASS/STRUCT: dort gibt es keinen Startwert (der
+    /// gehoert in `SUB Init()`), sonst sagte die Zeile etwas, das beim
+    /// Anlegen jeder Instanz nicht passiert.
+    fn feld_dim(&mut self) -> R<Node> {
+        let (zeile, spalte) = (self.peek(0).line, self.peek(0).col);
+        let n = self.dim()?;
+        if let Node::MultiDim { dims } = &n {
+            if dims.iter().any(|d| matches!(d, Node::Assign { .. })) {
+                return Err(ParseError { line: zeile, col: spalte, msg:
+                    "Ein Feld bekommt keinen Startwert in der DIM-Zeile -- setze ihn in SUB Init(), z.B. Self.hp = 100".into() });
+            }
+        }
+        Ok(n)
     }
 
     fn const_stmt(&mut self) -> R<Node> {
@@ -728,9 +980,15 @@ impl Parser {
         self.expect(Tt::Input, "")?;
         let mut prompt = None;
         if self.check(Tt::Str) {
-            prompt = Some(Box::new(Node::StringLit(sval(self.peek(0)))));
+            let mut text = sval(self.peek(0));
             self.pos += 1;
-            self.expect(Tt::Comma, "Nach Prompt-String erwartet ',' und Variable")?;
+            // `INPUT "Name"; n` haengt wie in QBasic ein "? " an, `,` nicht.
+            if self.matches(Tt::Semicolon) {
+                text.push_str("? ");
+            } else {
+                self.expect(Tt::Comma, "Nach Prompt-String erwartet ',' (oder ';') und Variable")?;
+            }
+            prompt = Some(Box::new(Node::StringLit(text)));
         }
         let name = sval(&self.expect(Tt::Ident, "Erwartet Variable nach INPUT")?);
         self.consume_terminator()?;
@@ -750,6 +1008,9 @@ impl Parser {
             while self.matches(Tt::Colon) {
                 if self.checks(&[Tt::Newline, Tt::Else]) || self.at_end() { break; }
                 then_block.push(self.inline_statement()?);
+            }
+            if self.check(Tt::Elseif) {
+                return self.err("ELSEIF geht nur im mehrzeiligen IF -- IF ... THEN, dann jeder Zweig auf eigenen Zeilen, am Ende END IF");
             }
             let mut else_block = Vec::new();
             if self.matches(Tt::Else) {
@@ -776,6 +1037,9 @@ impl Parser {
         }
         let mut else_block = Vec::new();
         if self.matches(Tt::Else) {
+            if self.check(Tt::If) {
+                return self.err("ELSE IF: in Drachenhauch in EINEM Wort -- ELSEIF bedingung THEN");
+            }
             self.consume_terminator()?;
             else_block = self.block_until(&[Tt::End], "END IF erwartet, Programmende erreicht")?;
         }
@@ -843,7 +1107,25 @@ impl Parser {
         Ok(CaseMatch { kind: "value".into(), values: vec![CaseVal::Expr(first)] })
     }
 
+    /// Einzeiler-Anweisung nach THEN/ELSE -- mit denselben Umsteiger-Hinweisen
+    /// wie eine ganze Zeile (`IF x THEN GOTO 10`).
     fn inline_statement(&mut self) -> R<Node> {
+        let start = self.pos;
+        self.inline_statement_kern().map_err(|e| {
+            match self.umsteiger_hinweis(start, &e.msg) {
+                Some(h) => ParseError { msg: h, line: e.line, col: e.col },
+                None => e,
+            }
+        })
+    }
+
+    fn inline_statement_kern(&mut self) -> R<Node> {
+        // Die Einzeiler-Formen der Umsteiger-Anweisungen (`IF x THEN EXIT FOR`).
+        if self.ist_programm_ende() { return Ok(self.programm_ende()); }
+        if self.tt(0) == Tt::End && self.tt(1) == Tt::Else { return Ok(self.programm_ende()); }
+        if self.ist_exit() { return self.exit_kern(); }
+        if self.ist_swap() { return self.swap_kern(); }
+        if self.ist_let() { self.pos += 1; return self.inline_statement_kern(); }
         match self.tt(0) {
             Tt::Print => {
                 self.pos += 1;
@@ -917,8 +1199,17 @@ impl Parser {
         self.expect(Tt::While, "")?;
         let cond = self.expression()?;
         self.consume_terminator()?;
-        let body = self.block_until(&[Tt::Wend], "WEND erwartet, Programmende erreicht")?;
-        self.expect(Tt::Wend, "")?;
+        // `END WHILE` (VB) schliesst genauso wie WEND. Ein anderes END auf
+        // dieser Ebene (END SUB, END IF ...) ist ein Fehler an der Stelle --
+        // `block_until` haelt an jedem END, das nicht selbst beendet.
+        let body = self.block_in("while", &[Tt::Wend, Tt::End], "WEND erwartet, Programmende erreicht")?;
+        if self.matches(Tt::End) {
+            if !self.matches(Tt::While) {
+                return self.err("WEND (oder END WHILE) erwartet -- hier endet noch die WHILE-Schleife");
+            }
+        } else {
+            self.expect(Tt::Wend, "")?;
+        }
         self.consume_terminator()?;
         Ok(Node::While { condition: Box::new(cond), body })
     }
@@ -926,7 +1217,7 @@ impl Parser {
     fn repeat(&mut self) -> R<Node> {
         self.expect(Tt::Repeat, "")?;
         self.consume_terminator()?;
-        let body = self.block_until(&[Tt::Until], "UNTIL erwartet, Programmende erreicht")?;
+        let body = self.block_in("repeat", &[Tt::Until], "UNTIL erwartet, Programmende erreicht")?;
         self.expect(Tt::Until, "")?;
         let cond = self.expression()?;
         self.consume_terminator()?;
@@ -964,10 +1255,12 @@ impl Parser {
         };
         self.consume_terminator()?;
         let mut body = Vec::new();
+        self.bloecke.push("do");
         while !self.ist_loop() {
             if self.at_end() { return self.err("LOOP erwartet, Programmende erreicht"); }
             body.push(self.statement()?);
         }
+        self.bloecke.pop();
         self.pos += 1;   // 'loop'
         let fuss = match self.tt(0) {
             Tt::While => { self.pos += 1; Some((false, self.expression()?)) }
@@ -1051,7 +1344,7 @@ impl Parser {
             self.expect(Tt::In, "Erwartet IN nach FOR EACH <var>")?;
             let iterable = self.expression()?;
             self.consume_terminator()?;
-            let body = self.block_until(&[Tt::Next], "NEXT erwartet, Programmende erreicht")?;
+            let body = self.block_in("for", &[Tt::Next], "NEXT erwartet, Programmende erreicht")?;
             self.expect(Tt::Next, "")?;
             if self.check(Tt::Ident) { self.pos += 1; }
             self.consume_terminator()?;
@@ -1064,7 +1357,7 @@ impl Parser {
         let end = self.expression()?;
         let step = if self.matches(Tt::Step) { Some(Box::new(self.expression()?)) } else { None };
         self.consume_terminator()?;
-        let body = self.block_until(&[Tt::Next], "NEXT erwartet, Programmende erreicht")?;
+        let body = self.block_in("for", &[Tt::Next], "NEXT erwartet, Programmende erreicht")?;
         self.expect(Tt::Next, "")?;
         if self.check(Tt::Ident) { self.pos += 1; }
         self.consume_terminator()?;
@@ -1123,7 +1416,9 @@ impl Parser {
     /// der Aufrufer prueft/erwartet ihn danach.
     fn block_until(&mut self, terminators: &[Tt], what: &str) -> R<Vec<Node>> {
         let mut body = Vec::new();
-        while !self.checks(terminators) {
+        // Ein `END` allein auf der Zeile beendet das Programm (klassisches
+        // BASIC) und schliesst keinen Block -- sonst haelt jeder Block daran.
+        while !self.checks(terminators) || self.ist_programm_ende() {
             if self.at_end() { return self.err(what); }
             body.push(self.statement()?);
         }
@@ -1133,12 +1428,20 @@ impl Parser {
         self.block_until(&[Tt::End], what)
     }
 
+    /// `block_until`, waehrend `art` als offener Block gilt (fuer EXIT).
+    fn block_in(&mut self, art: &'static str, terminators: &[Tt], what: &str) -> R<Vec<Node>> {
+        self.bloecke.push(art);
+        let r = self.block_until(terminators, what);
+        self.bloecke.pop();
+        r
+    }
+
     fn sub_decl(&mut self) -> R<Node> {
         self.expect(Tt::Sub, "")?;
         let name = sval(&self.expect(Tt::Ident, "Erwartet SUB-Name")?);
         let params = self.params()?;
         self.consume_terminator()?;
-        let body = self.block_until_end("END SUB erwartet, Programmende erreicht")?;
+        let body = self.block_in("sub", &[Tt::End], "END SUB erwartet, Programmende erreicht")?;
         self.expect(Tt::End, "")?;
         self.expect(Tt::Sub, "Erwartet SUB nach END")?;
         self.consume_terminator()?;
@@ -1152,7 +1455,7 @@ impl Parser {
         self.expect(Tt::As, "Erwartet AS <Rueckgabetyp> nach Parameterliste")?;
         let return_type = self.parse_type()?;
         self.consume_terminator()?;
-        let body = self.block_until_end("END FUNCTION erwartet, Programmende erreicht")?;
+        let body = self.block_in("function", &[Tt::End], "END FUNCTION erwartet, Programmende erreicht")?;
         self.expect(Tt::End, "")?;
         self.expect(Tt::Function, "Erwartet FUNCTION nach END")?;
         self.consume_terminator()?;
@@ -1173,7 +1476,7 @@ impl Parser {
         self.expect(Tt::As, "Erwartet AS <Rueckgabetyp> nach OPERATOR-Parameter")?;
         let return_type = self.parse_type()?;
         self.consume_terminator()?;
-        let body = self.block_until_end("END OPERATOR erwartet, Programmende erreicht")?;
+        let body = self.block_in("function", &[Tt::End], "END OPERATOR erwartet, Programmende erreicht")?;
         self.expect(Tt::End, "")?;
         self.expect(Tt::Operator, "Erwartet OPERATOR nach END")?;
         self.consume_terminator()?;
@@ -1209,7 +1512,7 @@ impl Parser {
             self.expect(Tt::As, "Erwartet AS <Rueckgabetyp> nach PROPERTY GET-Parametern")?;
             let return_type = self.parse_type()?;
             self.consume_terminator()?;
-            let body = self.block_until_end("END PROPERTY erwartet, Programmende erreicht")?;
+            let body = self.block_in("function", &[Tt::End], "END PROPERTY erwartet, Programmende erreicht")?;
             self.expect(Tt::End, "")?;
             self.expect(Tt::Property, "Erwartet PROPERTY nach END")?;
             self.consume_terminator()?;
@@ -1217,7 +1520,7 @@ impl Parser {
             Node::FunctionDecl { name: internal, params, return_type, body }
         } else {
             self.consume_terminator()?;
-            let body = self.block_until_end("END PROPERTY erwartet, Programmende erreicht")?;
+            let body = self.block_in("sub", &[Tt::End], "END PROPERTY erwartet, Programmende erreicht")?;
             self.expect(Tt::End, "")?;
             self.expect(Tt::Property, "Erwartet PROPERTY nach END")?;
             self.consume_terminator()?;
@@ -1264,7 +1567,7 @@ impl Parser {
                 properties.push(pd);
                 methods.push(internal);
             } else if self.check(Tt::Dim) {
-                fields.push(self.dim()?);
+                fields.push(self.feld_dim()?);
             } else if self.check(Tt::Sub) {
                 methods.push(self.sub_decl()?);
             } else if self.check(Tt::Function) {
@@ -1313,7 +1616,7 @@ impl Parser {
         while !self.check(Tt::End) {
             if self.at_end() { return self.err("END STRUCT erwartet, Programmende erreicht"); }
             if self.check(Tt::Newline) { self.pos += 1; continue; }
-            if self.check(Tt::Dim) { fields.push(self.dim()?); }
+            if self.check(Tt::Dim) { fields.push(self.feld_dim()?); }
             else { return self.err("Im STRUCT-Body sind nur DIM-Felder erlaubt"); }
         }
         self.expect(Tt::End, "")?;

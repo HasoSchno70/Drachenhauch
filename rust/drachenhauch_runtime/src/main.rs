@@ -121,6 +121,7 @@ mod timer;
 mod value;
 mod vm;
 mod zeit;
+mod umstieg;
 
 use std::io::Write;
 use std::process::ExitCode;

@@ -924,12 +924,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "str$" | "str" => { arity!(1); Ok(Value::str_rc(&str_of(&a[0]))) }
         "val" => {
             arity!(1);
-            let s = need_str(&a[0], "VAL")?.trim().to_string();
-            if s.contains('.') {
-                Ok(Value::Float(s.parse::<f64>().unwrap_or(0.0)))
-            } else {
-                Ok(Value::Int(s.parse::<i64>().unwrap_or(0)))
-            }
+            Ok(val_lesen(need_str(&a[0], "VAL")?))
         }
         "int" => {
             arity!(1);
@@ -979,7 +974,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "randomize" => {
-            let seed = if a.is_empty() { seed_from_time() } else { need_int(&a[0], "RANDOMIZE")? as u64 | 1 };
+            // `RANDOMIZE(TIMER())` -- das klassische Idiom -- reicht eine
+            // Kommazahl herein. Deren Bits sind ein ebenso guter Startwert.
+            let seed = if a.is_empty() { seed_from_time() }
+                else if let Value::Float(f) = &a[0] { f.to_bits() | 1 }
+                else { need_int(&a[0], "RANDOMIZE")? as u64 | 1 };
             RNG.with(|s| s.set(if seed == 0 { 1 } else { seed }));
             Ok(Value::Nil)
         }
@@ -1159,7 +1158,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     let arr = arr.borrow();
                     Ok(Value::Int(if arr.dims.is_empty() { 0 } else { arr.dims[0] }))
                 }
-                _ => err("LEN erwartet STRING, TUPLE oder ARRAY".to_string()),
+                // Die Zahl der Eintraege, wie MAPSIZE -- LEN(m) schreibt jeder zuerst.
+                Value::Map(m) => Ok(Value::Int(m.borrow().len() as i64)),
+                Value::Int(_) | Value::Float(_) => err(
+                    "LEN erwartet STRING, TUPLE, ARRAY oder MAP -- die Stellen einer Zahl: LEN(STR$(zahl))".to_string()),
+                Value::Nil => err("LEN auf NIL -- die Variable hat noch keinen Wert".to_string()),
+                _ => err("LEN erwartet STRING, TUPLE, ARRAY oder MAP".to_string()),
             }
         }
         "dimsize" => {
@@ -1975,6 +1979,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "instr" => {
             if a.len() < 2 || a.len() > 3 { return err(format!("INSTR: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            if a.len() == 3 && matches!(a[0], Value::Int(_)) && matches!(a[1], Value::Str(_)) {
+                return err("INSTR: die Startstelle steht in Drachenhauch HINTEN -- INSTR(text, suche, start), und gezaehlt wird ab 0 (nicht gefunden = -1)".to_string());
+            }
             let hay = need_str(&a[0], "INSTR")?;
             let needle = need_str(&a[1], "INSTR")?;
             let start = if a.len() == 3 { need_int(&a[2], "INSTR")?.max(0) as usize } else { 0 };
@@ -6061,7 +6068,82 @@ fn ray_circle(rx: f64, ry: f64, dx: f64, dy: f64, cx: f64, cy: f64, cr: f64) -> 
 }
 
 /// Map-Wert-Coercion (`_coerce_map_value`).
-fn coerce_map_value(v: &Value, vt: &str) -> R {
+/// `VAL(text)` wie in klassischem BASIC: die Zahl AM ANFANG des Textes
+/// (`VAL("3 Aepfel")` = 3, `VAL("1e3")` = 1000.0), `&H`/`&O`/`&B` und
+/// `0x`/`0b` als Hex-/Oktal-/Binaerzahl, sonst 0. Fuehrender Leerraum zaehlt
+/// nicht. Mit Punkt oder Exponent eine Kommazahl, sonst eine ganze Zahl.
+///
+/// Vorher las VAL nur Texte, die GANZ eine Zahl sind -- "3 0 R" war 0, "1e3"
+/// ebenfalls, und `VAL("&HFF")` auch: Hex-Text liess sich gar nicht wandeln.
+pub(crate) fn val_lesen(text: &str) -> Value {
+    let t: Vec<char> = text.trim_start().chars().collect();
+    let mut i = 0;
+    let mut neg = false;
+    if i < t.len() && (t[i] == '+' || t[i] == '-') { neg = t[i] == '-'; i += 1; }
+    // Basis-Vorsatz
+    let basis = if i + 1 < t.len() && (t[i] == '&' || t[i] == '0') {
+        match (t[i], t[i + 1].to_ascii_lowercase()) {
+            ('&', 'h') | ('0', 'x') => Some(16),
+            ('&', 'o') => Some(8),
+            ('&', 'b') | ('0', 'b') => Some(2),
+            _ => None,
+        }
+    } else { None };
+    if let Some(b) = basis {
+        let mut n: i64 = 0;
+        let mut j = i + 2;
+        let mut stellen = 0;
+        while j < t.len() {
+            match t[j].to_digit(b) {
+                Some(d) => {
+                    n = match n.checked_mul(b as i64).and_then(|x| x.checked_add(d as i64)) {
+                        Some(x) => x,
+                        None => break,
+                    };
+                    stellen += 1;
+                }
+                None if t[j] == '_' => {}
+                None => break,
+            }
+            j += 1;
+        }
+        if stellen > 0 { return Value::Int(if neg { -n } else { n }); }
+        // "0b" ohne Ziffern dahinter: dann ist es die Zahl 0 mit Rest.
+    }
+    let anfang = i;
+    while i < t.len() && t[i].is_ascii_digit() { i += 1; }
+    let mut komma = false;
+    if i < t.len() && t[i] == '.' {
+        let mut j = i + 1;
+        while j < t.len() && t[j].is_ascii_digit() { j += 1; }
+        if j > i + 1 || i > anfang { komma = true; i = j; }
+    }
+    if i == anfang { return Value::Int(0); }
+    // Exponent nur, wenn wirklich Ziffern folgen ("3e" bleibt 3).
+    if i < t.len() && (t[i] == 'e' || t[i] == 'E') {
+        let mut j = i + 1;
+        if j < t.len() && (t[j] == '+' || t[j] == '-') { j += 1; }
+        let z = j;
+        while j < t.len() && t[j].is_ascii_digit() { j += 1; }
+        if j > z { komma = true; i = j; }
+    }
+    let zahl: String = t[anfang..i].iter().collect();
+    if komma {
+        let f = zahl.parse::<f64>().unwrap_or(0.0);
+        Value::Float(if neg { -f } else { f })
+    } else {
+        match zahl.parse::<i64>() {
+            Ok(n) => Value::Int(if neg { -n } else { n }),
+            // Zu gross fuer INTEGER: als Kommazahl statt still 0.
+            Err(_) => {
+                let f = zahl.parse::<f64>().unwrap_or(0.0);
+                Value::Float(if neg { -f } else { f })
+            }
+        }
+    }
+}
+
+pub(crate) fn coerce_map_value(v: &Value, vt: &str) -> R {
     match vt {
         "integer" => match v {
             Value::Int(_) => Ok(v.clone()),

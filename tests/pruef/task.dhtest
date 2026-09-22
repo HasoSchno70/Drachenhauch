@@ -187,7 +187,7 @@ DIM feld AS ARRAY OF INTEGER
 DIM a AS INTEGER
 a = TASK_START(Langsam, feld)
 --- fehler
-TASK_START: Argument 1 geht ueber eine Prozessgrenze und muss eine Zahl, ein Text oder BOOLEAN sein, nicht NIL. Fuer alles andere reich JSON durch.
+TASK_START: Argument 1 geht ueber eine Prozessgrenze und muss eine Zahl, ein Text oder BOOLEAN sein, nicht ARRAY. Fuer alles andere reich JSON durch.
 
 === mehrere auftraege nebeneinander
 FUNCTION Langsam(x AS INTEGER) AS INTEGER
@@ -313,5 +313,5 @@ DIM feld AS ARRAY OF INTEGER
 DIM a AS INTEGER
 a = TASK_START(Summe, 1, feld, 3)
 --- fehler
-TASK_START: Argument 2 geht ueber eine Prozessgrenze und muss eine Zahl, ein Text oder BOOLEAN sein, nicht NIL. Fuer alles andere reich JSON durch.
+TASK_START: Argument 2 geht ueber eine Prozessgrenze und muss eine Zahl, ein Text oder BOOLEAN sein, nicht ARRAY. Fuer alles andere reich JSON durch.
 

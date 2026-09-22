@@ -263,6 +263,11 @@ impl Lexer {
             if matches!(nxt, 'H' | 'h' | 'B' | 'b') {
                 return self.scan_hex_or_binary(line, col);
             }
+            if matches!(nxt, ' ' | '\t' | '"') {
+                return Err(self.err(
+                    "'&' verbindet hier keine Texte -- das macht +: \"a\" + \"b\" (&H/&B leiten Hex-/Binaerzahlen ein)",
+                    line, col));
+            }
             return Err(self.err(
                 "Erwartet H oder B nach '&' (Hex-/Binaer-Literal)", line, col));
         }
@@ -557,7 +562,10 @@ impl Lexer {
             '+' => if self.peek(0) == '=' { self.advance(); one!(Tt::PlusEq, "+="); } else { one!(Tt::Plus, "+"); },
             '-' => if self.peek(0) == '=' { self.advance(); one!(Tt::MinusEq, "-="); } else { one!(Tt::Minus, "-"); },
             '*' => if self.peek(0) == '=' { self.advance(); one!(Tt::StarEq, "*="); } else { one!(Tt::StarT, "*"); },
-            '/' => if self.peek(0) == '=' { self.advance(); one!(Tt::SlashEq, "/="); } else { one!(Tt::Slash, "/"); },
+            '/' => if self.peek(0) == '=' { self.advance(); one!(Tt::SlashEq, "/="); }
+                   else if self.peek(0) == '/' {
+                       return Err(self.err("Kommentare beginnen in Drachenhauch mit ' (Hochkomma) oder REM, nicht mit //", line, col));
+                   } else { one!(Tt::Slash, "/"); },
             '\\' => one!(Tt::Intdiv, "\\"),
             '^' => one!(Tt::Caret, "^"),
             '(' => { self.paren_depth += 1; one!(Tt::Lparen, "("); },
@@ -572,12 +580,30 @@ impl Lexer {
             } else { one!(Tt::Dot, "."); },
             ';' => one!(Tt::Semicolon, ";"),
             ':' => one!(Tt::Colon, ":"),
-            '=' => one!(Tt::Eq, "="),
+            '=' => if self.peek(0) == '=' {
+                       return Err(self.err("Verglichen wird mit EINEM =: IF a = b THEN (== gibt es nicht)", line, col));
+                   } else { one!(Tt::Eq, "="); },
+            // `? "x"` -- die alte Kurzform fuer PRINT.
+            '?' => one!(Tt::Print, "print"),
             '<' => if self.peek(0) == '=' { self.advance(); one!(Tt::Leq, "<="); }
                    else if self.peek(0) == '>' { self.advance(); one!(Tt::Neq, "<>"); }
                    else { one!(Tt::Lt, "<"); },
             '>' => if self.peek(0) == '=' { self.advance(); one!(Tt::Geq, ">="); }
                    else { one!(Tt::Gt, ">"); },
+            '!' if self.peek(0) == '=' => return Err(self.err(
+                "Ungleich schreibt man in Drachenhauch <> -- IF a <> b THEN", line, col)),
+            // Direkt hinter einem Namen (`x%`, `wert!`, `d#`): QBasic-Typzeichen.
+            '%' | '!' | '#' if self.pos >= 2 && {
+                    let vor = self.src[self.pos - 2];
+                    vor.is_alphanumeric() || vor == '_'
+                } => return Err(self.err(&format!(
+                "Typ-Zeichen wie {:?} hinter einem Namen gibt es nicht -- den Typ sagt DIM: DIM x AS INTEGER (oder FLOAT, STRING)",
+                ch), line, col)),
+            '%' => return Err(self.err(
+                "Den Rest einer Division liefert MOD: 7 MOD 3 (ein %-Zeichen gibt es nicht)", line, col)),
+            '#' => return Err(self.err(
+                "'#' kommt in Drachenhauch nicht vor -- Kommentare beginnen mit ' (Hochkomma), und Dateien haben keine Nummern (f = OPENFILE(\"name.txt\", \"w\"))",
+                line, col)),
             _ => return Err(self.err(&format!("Unbekanntes Zeichen: {:?}", ch), line, col)),
         }
         Ok(())
