@@ -324,6 +324,62 @@ Reflexionen/Mirror-Effekte.
 > nicht über diesen Weg und verdeckt nicht. Tests
 > `tests/pruef/variable_wie_builtin.dhtest`.
 
+## I — Umstieg aus anderen BASICs und aus Python (2026-09-21) — ✅ BEHOBEN
+
+> Gemessen, nicht geschätzt: rund 150 kleine Programme so geschrieben, wie man
+> sie aus QBasic, FreeBASIC, VB, Blitz oder Python mitbringt, jedes gegen
+> `dhrt run`. Etwa dreißig davon scheiterten mit einer Meldung, die nichts
+> sagte — meist „Erwartet Zeilenende" (`GOTO oben`, `LOCATE 1, 1`,
+> `EXIT FOR`, `SWAP a, b`, `DIM a AS INTEGER = 5`) — oder liefen still falsch.
+> Übersicht für Nutzer: [umstieg.md](umstieg.md); Tests
+> `tests/pruef/umstieg.dhtest` (68 Fälle).
+>
+> **Still falsch, jetzt behoben:**
+> - **Ein Name allein als Anweisung tat nichts.** `meineSub` (ohne Klammern)
+>   lud die SUB als FUNCREF und warf sie weg — kein Aufruf, keine Meldung.
+>   Jetzt ruft ein Name, der keine Variable, aber eine SUB/FUNCTION oder ein
+>   Befehl ist, auf (`CLS`, `FLIP`, `meineSub`).
+> - **`AND`/`OR` auf zwei Ganzzahlen** sind logisch und liefern einen der
+>   Werte (`6 AND 3` = 3, `6 OR 1` = 6); in anderen BASICs bitweise. Das
+>   bleibt so, aber `--check` warnt jetzt, wenn beide Seiten statisch INTEGER
+>   sind, und nennt `BAND`/`BOR`.
+> - **`DIM a AS ARRAY OF T` ohne Größe war NIL** — das erste `ARRAY_PUSH`
+>   meldete „erwartet ARRAY". Jetzt ein leeres Feld (global, lokal, Klassenfeld).
+> - **`VAL` las nur Texte, die GANZ eine Zahl sind**: `VAL("3 Äpfel")`,
+>   `VAL("1e3")` und `VAL("&HFF")` waren 0 (die PDF-Leser mussten deshalb
+>   „3 0 R" selbst zerlegen). Jetzt die Zahl am Anfang, mit `&H`/`&O`/`&B`,
+>   `0x`/`0b` und Exponent.
+> - **Die Meldung „'=' als Anweisung" zeigte auf die NÄCHSTE Zeile** (sie
+>   entstand nach dem Zeilenende).
+>
+> **Geht jetzt:** `DIM x AS T = wert` (wird zu DIM + Zuweisung, gleiche
+> Typprüfung; nicht bei Klassenfeldern), `EXIT FOR/DO/WHILE/REPEAT/SUB` (nur
+> wenn es zur INNERSTEN Schleife passt, sonst Fehler; `EXIT FUNCTION` nennt
+> `RETURN`), `END` allein (= `EXIT(0)`, auch in Blöcken — `block_until` hält
+> an einem `END` mit Zeilenende nicht an), `END WHILE`, `SWAP a, b`, `LET`,
+> `?` als `PRINT`, `INPUT "Frage"; x`, `m["k"]` lesen/schreiben, `LEN(map)`,
+> Felder mit `+` verbinden, `RANDOMIZE(TIMER())`. `swap`, `let`, `exit` und
+> `do` bleiben gewöhnliche Namen (kontextuell, keine Schlüsselwörter).
+>
+> **Meldungen, die sagen, wie es hier heißt:** GOTO/GOSUB, Zeilennummern,
+> REDIM, TYPE, DEF FN, ON ERROR, LINE INPUT, PRINT USING, OPEN … AS #1,
+> ELSE IF/ENDIF, MID$ als Zuweisung, DIM SHARED, `DIM a(10)`, DIM ohne AS,
+> `STRING * 10`, Typzeichen `x%`, `%` als Rest, `!=`, `==`, `#`/`//` als
+> Kommentar, `&` als Verbinder, XOR, `f = wert` in FUNCTION f, verschachtelte
+> SUB (vorher „Stufe 3e: … noch nicht unterstuetzt"), fremde Typnamen
+> (DOUBLE, LONG, BOOL …), Feld von Feldern, `RND`/`TIMER` ohne Klammern, ein
+> Name mit Wert dahinter (`LOCATE 1, 1` → „in Klammern"), `INSTR(start, …)`,
+> fremde Befehlsnamen (UCASE$, UBOUND, FIX, CINT …). Ein unbekannter Befehl
+> heißt beim Laufen jetzt „Unbekannter Befehl" statt „im Rust-Kern noch nicht
+> verfuegbar" — diese Wendung bleibt den Bauten ohne Grafik/Ton vorbehalten,
+> an ihr erkennen die Prüfsammlungen einen solchen Bau. Die Tabellen liegen in
+> `umstieg.rs` (rein, mit Rust-Tests), die Anweisungs-Hinweise in
+> `Parser::umsteiger_hinweis` — gefragt wird für die Anweisung selbst und für
+> jede Stelle hinter THEN/ELSE/`:` derselben Zeile.
+>
+> **Bewusst NICHT geändert** (sie brechen bestehenden Code): `MID$`/`INSTR`
+> ab 0, `AND`/`OR` logisch, Befehle nur mit Klammern.
+
 ## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
 
 ### F1. `physics3d` war komplett undokumentiert + toter Link — ✅ BEHOBEN

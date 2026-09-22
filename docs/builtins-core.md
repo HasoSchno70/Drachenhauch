@@ -43,7 +43,7 @@ PRINT x                 ' schließt an
 | Funktion | Zweck |
 |---|---|
 | `STR$(v)` → STRING | Wert nach String. Bools werden zu `"TRUE"`/`"FALSE"`, Floats wie `3.0` zu `"3.0"`. |
-| `VAL(s$)` → INTEGER/FLOAT | String zu Zahl. Mit `.` → FLOAT, sonst INT. Ungültiges → `0`. |
+| `VAL(s$)` → INTEGER/FLOAT | Die Zahl am Anfang des Textes (`VAL("3 Äpfel")` = 3), auch `&HFF`/`&O17`/`&B101`/`0x1F`/`0b11`. Mit `.` oder Exponent → FLOAT, sonst INT. Keine Zahl am Anfang → `0`. |
 | `INT(v)` → INTEGER | Zahl zu INT (`floor`). `INT(3.7)` = 3, `INT(-1.5)` = -2. |
 | `ABS(v)` | Absolutbetrag. |
 | `CHR$(n)` → STRING | Unicode-Codepoint zu 1-Zeichen-String. `CHR$(65)` = `"A"`. |
@@ -286,7 +286,7 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 
 | Funktion | Zweck |
 |---|---|
-| `LEN(s)` → INTEGER | Länge (auch für Arrays) |
+| `LEN(s)` → INTEGER | Länge (auch für Arrays; bei einer MAP die Zahl der Einträge) |
 | `UPPER$(s)`, `LOWER$(s)` | Groß-/Kleinschreibung |
 | `LEFT$(s, n)`, `RIGHT$(s, n)` | erste/letzte n Zeichen |
 | `MID$(s, start[, n])` | Teilstring ab Position start (0-basiert), n Zeichen oder bis Ende |
@@ -1415,7 +1415,7 @@ DH_LOG=debug dhrt run werkzeug.dh
 | `CHOICE(array)` → T | zufälliges Element eines 1D-Arrays |
 | `WEIGHTED_CHOICE(werte, gewichte)` → T | Element aus `werte`, gewählt proportional zu `gewichte` (1D-Arrays gleicher Länge, Gewichte ≥ 0). Loot-Tabellen. |
 | `SHUFFLE(array)` | mischt ein 1D-Array IN PLACE (Fisher-Yates) |
-| `RANDOMIZE([seed])` | Zufalls-Seed setzen (ohne Arg: System-Seed) |
+| `RANDOMIZE([seed])` | Zufalls-Seed setzen (ohne Arg: System-Seed; eine Kommazahl wie `TIMER()` geht auch) |
 
 ```basic
 PRINT TIME$(), " - ", DATE$()

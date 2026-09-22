@@ -859,6 +859,15 @@ Details: docs/rust-runtime.md.
   VS-Code-Grammatik kennen es; Paritaets-Schnipsel in
   tests/test_rust_lexer_parity.py, Sammlung `tests/pruef/zeichenketten_escape.dhtest`,
   Doku `docs/sprache.md` (Strings).
+- **Umstieg aus anderen BASICs** (seit 2026-09-21): `DIM x AS T = wert`,
+  `EXIT FOR/DO/WHILE/SUB`, `END` allein, `END WHILE`, `SWAP`, `LET`, `?`,
+  `INPUT "x"; v`, `m["k"]`, `LEN(map)`, Feld `+` Feld, ein Name allein ruft
+  die SUB auf, `DIM a AS ARRAY OF T` ist LEER statt NIL, `VAL` liest die Zahl
+  am Anfang samt `&HFF`. Fuer GOTO/REDIM/TYPE/`x%`/`!=`/UCASE$/DOUBLE ...
+  sagt die Meldung, wie es hier heisst (`umstieg.rs`,
+  `Parser::umsteiger_hinweis`). `swap`/`let`/`exit`/`do` sind KONTEXTUELL,
+  keine Schluesselwoerter. Uebersicht `docs/umstieg.md`, Details
+  `docs/stolpersteine.md` I, Tests `tests/pruef/umstieg.dhtest`.
 - **`step` ist Schlüsselwort** (FOR…STEP). Variablen entsprechend benennen
   (`i`, `iter`, `tick` statt `step`).
 - **Vorbelegte Namen als Variable gehen ueberall** (seit 2026-08-31). `DIM red`,
