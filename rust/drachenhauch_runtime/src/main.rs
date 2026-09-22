@@ -2031,6 +2031,7 @@ fn run_program_value(json: serde_json::Value, source_label: &str) -> ExitCode {
             if let Some(code) = exit {
                 return ExitCode::from(code as u8);
             }
+            let e = crate::vm::mit_signatur(&e);
             if line != 0 {
                 eprintln!("Laufzeitfehler in {}:{}: {}", source_label, line, e);
             } else {

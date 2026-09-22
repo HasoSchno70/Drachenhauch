@@ -721,3 +721,53 @@ DIM b AS IMAGE
 b = LOADIMAGE("gibtsnicht.png")
 --- fehler
 LOADIMAGE: Datei 'gibtsnicht.png' nicht gefunden
+
+=== anfuehrungszeichen in einer zeichenkette
+' Typisch bei JSON von Hand: die Zeichenkette endet am \" -- der Rueckstrich
+' bleibt in einer normalen Zeichenkette woertlich.
+IMPORT "json"
+DIM j AS JSON_HANDLE
+j = JSON_PARSE("{\"a\": 1}")
+--- fehler
+Ein Anfuehrungszeichen IN einer Zeichenkette braucht ein ! davor
+
+=== mit ausrufezeichen geht dieselbe zeile
+IMPORT "json"
+DIM j AS JSON_HANDLE
+j = JSON_PARSE(!"{\"a\": 1}")
+PRINT JSON_GET_INT(j, "a")
+--- erwartet
+1
+
+=== eine sub liefert keinen wert
+SUB s()
+END SUB
+DIM x AS INTEGER
+x = s()
+--- fehler
+'s' ist eine SUB und liefert keinen Wert
+
+=== die meldung nennt die form des befehls
+IMPORT "json"
+DIM j AS JSON_HANDLE
+j = JSON_PARSE("[1]")
+PRINT JSON_GET_INT(j)
+--- fehler
+Aufruf: JSON_GET_INT(h: ?, path: STRING)
+
+=== zeit-teile und andere namen
+IMPORT "zeit"
+PRINT ZEIT_JAHR(ZEIT_JETZT())
+--- fehler
+ZEIT_TEIL(zeit, "jahr")
+
+=== eine sub mit yield ist eine coroutine und liefert ein handle
+SUB ticker()
+    YIELD 1
+    YIELD 2
+END SUB
+DIM c AS COROUTINE
+c = ticker()
+PRINT CORO_RESUME(c); CORO_RESUME(c)
+--- erwartet
+12

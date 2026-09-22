@@ -848,6 +848,9 @@ impl Compiler {
             Node::Const { name, type_name, value } =>
                 self.stmt_const(name, type_name.as_deref(), value),
             Node::Assign { name, value } => {
+                if let Node::Call { callee, .. } = &**value {
+                    if let Node::Identifier(n) = &**callee { self.pruefe_sub_als_wert(n)?; }
+                }
                 self.pruefe_zuweisung(name, value);
                 self.expr(value)?;
                 self.store_var(name);
@@ -2360,6 +2363,22 @@ impl Compiler {
             _ => return Err(format!("Unbekannter Operator: {}", op)),
         };
         self.ctx.emit(code, Value::Null);
+        Ok(())
+    }
+
+    /// Eine SUB liefert keinen Wert -- `x = meineSub()` bricht sonst erst zur
+    /// Laufzeit ab ("Erwartet INTEGER, erhalten NIL"), und zwar an der
+    /// ZUWEISUNG, nicht am Aufruf.
+    fn pruefe_sub_als_wert(&self, name: &str) -> Result<(), String> {
+        if let Some(sig) = self.fn_sigs.get(&name.to_lowercase()) {
+            // Eine SUB mit YIELD ist eine Coroutine -- ihr Aufruf liefert das
+            // COROUTINE-Handle, nicht NIL.
+            if sig.return_type.is_empty() && !sig.is_coroutine {
+                return Err(format!(
+                    "'{}' ist eine SUB und liefert keinen Wert -- fuer ein Ergebnis FUNCTION {}(...) AS <Typ> mit RETURN",
+                    name, name));
+            }
+        }
         Ok(())
     }
 

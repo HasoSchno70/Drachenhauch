@@ -44,6 +44,10 @@ pub fn befehl(name: &str) -> Option<&'static str> {
         "color" => "eine Farbe ist ein Argument jedes Zeichenbefehls: BOX(x1, y1, x2, y2, RED), TEXT(x, y, text$, YELLOW)",
         "keydown" | "keyisdown" | "iskeydown" => "gehalten: KEYPRESSED(KEY_A), gerade gedrueckt: KEYHIT(KEY_A)",
         "locate" => "Text an eine Stelle: TEXT(x, y, text$) im Fenster",
+        "trunc" | "cint2" => "INT(x) rundet ab; Richtung 0: IIF(x < 0, -INT(-x), INT(x))",
+        "zeit_jahr" | "zeit_monat" | "zeit_tag" | "zeit_stunde" | "zeit_minute" | "zeit_sekunde" =>
+            "ein Teil einer Zeit kommt aus ZEIT_TEIL(zeit, \"jahr\") -- oder ZEIT_FORMAT$(zeit, muster$)",
+        "gui_window_new" | "gui_new_window" => "heisst GUI_WINDOW(titel$, x, y, breite, hoehe)",
         "stop" | "system" | "quit" => "das Programm beenden: END (allein auf der Zeile) oder EXIT(0)",
         _ => return None,
     })

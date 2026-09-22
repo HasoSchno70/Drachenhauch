@@ -44,8 +44,8 @@ module.exports = (H) => [
       'ATLAS_DRAW(atlas, "stand", 100, 80)',
       'FLIP()',
     ]),
-  H.cmd("ATLAS_DRAW_FLIPPED", 'ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flipX[, flipY]])',
-    "Zeichnet ein Sub-Sprite gespiegelt: flipX waagerecht, flipY senkrecht (jeweils TRUE/FALSE). Klassisch für Lauf-Animationen – nur die nach rechts blickende Variante liegt im Atlas, nach links wird per flipX abgeleitet.",
+  H.cmd("ATLAS_DRAW_FLIPPED", 'ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flipX[, flipY[, tint]]])',
+    "Zeichnet ein Sub-Sprite gespiegelt: flipX waagerecht, flipY senkrecht (jeweils TRUE/FALSE). Als siebtes Argument färbt tint das Sprite ein. Klassisch für Lauf-Animationen – nur die nach rechts blickende Variante liegt im Atlas, nach links wird per flipX abgeleitet.",
     [
       'DIM blicktLinks AS BOOLEAN',
       'blicktLinks = TRUE',

@@ -416,6 +416,30 @@ Reflexionen/Mirror-Effekte.
 >   `COLOR`, `KEYDOWN`, `IMPORT json` ohne Anfuehrungszeichen, `INHERITS`,
 >   `PUBLIC`/`PRIVATE`/Feld ohne DIM in einer Klasse, offene Zeichenkette,
 >   Ausdruck, der am Zeilenende abbricht.
+>
+> **Vierte Runde (2026-09-22), 60 Proben (Module json/db/regex, Mathematik,
+> Zeit, gui, Ton, Aufrufe, Sichtbarkeit):**
+> - **`JSON_PARSE("{\"a\": 1}")` meldete "Erwartet Rparen".** In einer
+>   normalen Zeichenkette bleibt der Rueckstrich woertlich, die Zeichenkette
+>   endet also am `\"` -- und die Folgefehler sagten nichts darueber. Jetzt ein
+>   Satz, der auf `!"..."` zeigt (gesucht wird eine Zeichenkette, die auf einen
+>   Rueckstrich endet).
+> - **62 Befehle hatten als Signatur nur "N..M Argumente"** -- `BOX`, `CIRCLE`,
+>   `LINE`, `PLOT`, `TEXT`, `MID$`, `INSTR`, die gui- und ui-Widgets. Das stand
+>   so im Hover der IDE, in der Vervollstaendigung und jetzt auch in den
+>   Fehlermeldungen. 61 davon tragen ihre Parameternamen (52 aus den
+>   `docs/`-Tabellen uebernommen, wenn die Argumentzahl EXAKT passte, neun von
+>   Hand); nur `GUI_RULE` bleibt, dort haengt die Zahl an der Art der Regel.
+>   **Dabei fiel ein echter Fehler auf:** `ATLAS_DRAW_FLIPPED` stand mit 4..6
+>   Argumenten im Index und im Buch, nimmt aber 7 (`tint`) -- ein richtiger
+>   Aufruf haette eine Warnung bekommen. Index und Buchkapitel korrigiert.
+>   Eine Wache haelt das fest (`doku_pruefungen.dhtest`).
+> - **Fehlermeldungen ueber Argumente nennen jetzt die Form des Befehls**
+>   (`vm::mit_signatur`, EINE Stelle in main.rs): "JSON_GET_INT: erwartet 2
+>   Argument(e), erhalten 1 -- Aufruf: JSON_GET_INT(h: ?, path: STRING)".
+> - **`x = meineSub()`** brach erst zur Laufzeit ab, und zwar an der ZUWEISUNG
+>   ("Erwartet INTEGER, erhalten NIL"). Jetzt ein Uebersetzungsfehler am Aufruf.
+> - Hinweise: `TRUNC`, `ZEIT_JAHR` und Geschwister, `GUI_WINDOW_NEW`.
 
 ## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
 
