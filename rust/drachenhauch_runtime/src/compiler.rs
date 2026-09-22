@@ -868,6 +868,20 @@ impl Compiler {
                 // geladener und weggeworfener Wert -- die SUB lief einfach nicht.
                 // Ist der Name keine Variable, aber eine SUB/FUNCTION oder ein
                 // Befehl, wird er aufgerufen.
+                // Dasselbe fuer eine METHODE ohne Klammern (`spieler.springen`):
+                // sonst entsteht eine gebundene Methode, die niemand ruft.
+                if let Node::MemberAccess { target, name } = &**expr {
+                    if let Some(klasse) = self.statischer_typ(target) {
+                        let ist_methode = self.find_method_sig(&klasse, name).is_some()
+                            && self.feld_typ(&klasse, name).is_none()
+                            && !self.ist_property(&klasse, name);
+                        if ist_methode {
+                            self.expr_call(expr, &[])?;
+                            self.ctx.emit(oc::POP, Value::Null);
+                            return Ok(());
+                        }
+                    }
+                }
                 if let Node::Identifier(n) = &**expr {
                     let low = n.to_lowercase();
                     let ist_variable = self.ctx.local_slots.contains_key(n)

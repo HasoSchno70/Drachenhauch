@@ -24,7 +24,7 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `LET x = 5` | das `LET` wird übergangen |
 | `? "Hallo"` | Kurzform für `PRINT` |
 | `INPUT "Name"; n` | wie in QBasic mit `? ` hinter der Frage; mit `,` ohne |
-| `CLS`, `meineSub` | ein Name allein ruft die SUB oder den Befehl auf |
+| `CLS`, `meineSub`, `spieler.springen` | ein Name allein ruft die SUB, den Befehl oder die Methode auf |
 | `m["name"] = 5`, `PRINT m["name"]` | MAPs mit eckigen Klammern, gleichwertig zu `MAPPUT`/`MAPGET` |
 | `LEN(m)` | Zahl der Einträge einer MAP |
 | `a = a + [x]` | zwei Felder zu einem neuen verbinden (gleicher Elementtyp) |
@@ -76,6 +76,14 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `OPTIONAL x AS INTEGER` | `x AS INTEGER = 0` (Vorgabewert) |
 | `CATCH e AS STRING` | `CATCH e` — die Meldung ist immer ein STRING |
 | `s[0] = "x"` | Texte ändert man nicht stellenweise: `s = "x" + MID$(s, 1)` |
+| `SCREEN 12` | `SCREEN(640, 480, "Titel")` — Bildschirmmodi gibt es nicht |
+| `LINE (x1, y1)-(x2, y2), farbe` | `LINE(x1, y1, x2, y2, farbe)`; `CIRCLE(x, y, r, farbe)` |
+| `PSET`, `COLOR 14` | `PLOT(x, y, farbe)`; die Farbe ist ein Argument jedes Zeichenbefehls |
+| `KEYDOWN` | `KEYPRESSED(KEY_A)` (gehalten) bzw. `KEYHIT(KEY_A)` (gerade gedrückt) |
+| `IMPORT math` | `IMPORT "json"` in Anführungszeichen, eigene Dateien mit Endung: `IMPORT "helfer.dh"` |
+| `CLASS B INHERITS A` | `CLASS B EXTENDS A` |
+| `PUBLIC x AS INTEGER` in einer Klasse | `DIM x AS INTEGER` — alles in einer Klasse ist von außen erreichbar |
+| ein Ausdruck über zwei Zeilen | die Zeile mit ` _` beenden |
 | `TAB`, `SPC` | `PADR$(text, n)`, `SPACE$(3)` |
 | `ARRAY_REMOVE` | `ARRAY_REMOVE_AT(a, i)` |
 

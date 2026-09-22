@@ -6797,7 +6797,12 @@ impl<'p> Vm<'p> {
             match a.get(i) {
                 Some(Value::Int(n)) => Ok(*n),
                 Some(Value::Float(f)) => Ok(*f as i64),
-                Some(v) => Err(format!("{}: erwartet Zahl, erhalten {}", fn_, v.type_name())),
+                // NIL ist hier fast immer ein Bild/Klang/Handle, das nie
+                // geladen wurde -- "erwartet Zahl" fuehrte in die Irre.
+                Some(Value::Nil) => Err(format!(
+                    "{}: Argument {} ist NIL -- die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE(\"bild.png\"))",
+                    fn_, i + 1)),
+                Some(v) => Err(format!("{}: erwartet Zahl, erhalten {} (Argument {})", fn_, v.type_name(), i + 1)),
                 None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
             }
         }

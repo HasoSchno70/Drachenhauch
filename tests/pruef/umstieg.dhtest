@@ -628,3 +628,96 @@ FALSE
 PRINT SPC(3)
 --- fehler
 heisst in Drachenhauch SPACE$(anzahl)
+
+=== methode ohne klammern ruft auf
+' Bis 2026-09-22 entstand hier still eine gebundene Methode, die niemand rief.
+CLASS A
+    DIM n AS INTEGER
+    SUB zaehle()
+        n = n + 1
+    END SUB
+END CLASS
+DIM a AS A
+a = NEW A()
+a.zaehle
+a.zaehle()
+PRINT a.n
+--- erwartet
+2
+
+=== feld ohne klammern bleibt ein feld
+CLASS A
+    DIM n AS INTEGER
+END CLASS
+DIM a AS A
+a = NEW A()
+a.n
+PRINT "ok"
+--- erwartet
+ok
+
+=== screen mit modusnummer
+SCREEN 12
+--- fehler
+SCREEN(breite, hoehe, "Titel")
+
+=== line in qbasic-schreibweise
+LINE (0, 0)-(10, 10), RED
+--- fehler
+LINE(x1, y1, x2, y2, farbe)
+
+=== circle in qbasic-schreibweise
+CIRCLE (50, 50), 10, RED
+--- fehler
+CIRCLE(x, y, radius, farbe)
+
+=== pset color und keydown
+PRINT KEYDOWN(1)
+--- fehler
+gehalten: KEYPRESSED(KEY_A)
+
+=== import ohne anfuehrungszeichen
+IMPORT json
+--- fehler
+IMPORT braucht Anfuehrungszeichen: IMPORT "json"
+
+=== inherits
+CLASS A
+END CLASS
+CLASS B INHERITS A
+END CLASS
+--- fehler
+CLASS Hund EXTENDS Tier
+
+=== public im klassenkoerper
+CLASS A
+    PUBLIC x AS INTEGER
+END CLASS
+--- fehler
+PUBLIC gibt es nicht
+
+=== feld ohne dim
+CLASS A
+    x AS INTEGER
+END CLASS
+--- fehler
+Felder werden mit DIM angelegt: DIM x AS
+
+=== zeichenkette ueber zwei zeilen
+DIM s AS STRING = "a
+b"
+--- fehler
+das Anfuehrungszeichen am Ende fehlt
+
+=== ausdruck endet am zeilenende
+DIM x AS INTEGER = 1
+IF x = 1 AND
+    x < 3 THEN PRINT "ok"
+--- fehler
+die Zeile mit _ beenden
+
+=== fehlendes bild nennt datei und ordner
+DIM b AS IMAGE
+b = LOADIMAGE("gibtsnicht.png")
+--- fehler
+LOADIMAGE: Datei 'gibtsnicht.png' nicht gefunden

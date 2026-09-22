@@ -197,6 +197,12 @@ impl Parser {
                 "OPEN ... AS #1 gibt es nicht. Dateien: f = OPENFILE(\"name.txt\", \"w\") (r/w/a), \
                  WRITELINE(f, text), READLINE(f), CLOSEFILE(f) -- oder alles auf einmal mit WRITEALL/READLINES",
             "endif" => "END IF schreibt man in zwei Woertern",
+            "screen" if tt(1) == Tt::Number =>
+                "Bildschirmmodi wie SCREEN 12 gibt es nicht -- ein Fenster oeffnet SCREEN(breite, hoehe, \"Titel\")",
+            "line" if tt(1) == Tt::Lparen && meldung == "Erwartet Zeilenende" =>
+                "LINE (x1, y1)-(x2, y2) heisst hier LINE(x1, y1, x2, y2, farbe); ein Rechteck: RECT(...) bzw. gefuellt BOX(...)",
+            "circle" | "pset" | "paint" if tt(1) == Tt::Lparen && meldung == "Erwartet Zeilenende" =>
+                "Die Koordinaten stehen mit in der Klammer: CIRCLE(x, y, radius, farbe), PLOT(x, y, farbe)",
             "endwhile" => "END WHILE (oder WEND) schreibt man in zwei Woertern",
             "endsub" => "END SUB schreibt man in zwei Woertern",
             "endfunction" => "END FUNCTION schreibt man in zwei Woertern",
@@ -372,6 +378,12 @@ impl Parser {
             return self.statement_inner();
         }
         match self.tt(0) {
+            Tt::Import => {
+                let w = sval(self.peek(1));
+                self.err(&format!("IMPORT braucht Anfuehrungszeichen: IMPORT \"{}\" (eigene Datei mit Endung: IMPORT \"{}.dh\")",
+                                  if w.is_empty() { "modul".to_string() } else { w.clone() },
+                                  if w.is_empty() { "datei".to_string() } else { w }))
+            }
             Tt::Private => self.private_decl(),
             Tt::Dim => self.dim(),
             Tt::Print => self.print_stmt(),
@@ -1559,6 +1571,10 @@ impl Parser {
         if self.matches(Tt::Extends) {
             parent = Some(sval(&self.expect(Tt::Ident, "Erwartet Elternklassen-Name nach EXTENDS")?));
         }
+        if (self.check(Tt::Ident) && matches!(sval(self.peek(0)).as_str(), "inherits" | "implements"))
+            || self.check(Tt::Colon) && self.tt(1) == Tt::Ident && self.tt(2) == Tt::Newline {
+            return self.err("Eine Klasse erbt mit EXTENDS: CLASS Hund EXTENDS Tier");
+        }
         self.consume_terminator()?;
         let mut fields = Vec::new();
         let mut methods = Vec::new();
@@ -1594,6 +1610,17 @@ impl Parser {
             } else if self.check(Tt::Operator) {
                 methods.push(self.operator_decl()?);
             } else {
+                let w = sval(self.peek(0));
+                if self.check(Tt::Ident) && matches!(w.as_str(), "public" | "protected" | "friend") {
+                    return self.err(&format!("{} gibt es nicht -- alle Felder und Methoden einer Klasse sind von aussen erreichbar; das Wort einfach weglassen",
+                                             w.to_uppercase()));
+                }
+                if self.check(Tt::Private) {
+                    return self.err("PRIVATE gibt es in einer Klasse nicht -- nur vor SUB/FUNCTION/DIM/CONST auf oberster Ebene einer Datei");
+                }
+                if self.check(Tt::Ident) && self.tt(1) == Tt::As {
+                    return self.err(&format!("Felder werden mit DIM angelegt: DIM {} AS ...", w));
+                }
                 return self.err("Unerwartet im CLASS-Body (erlaubt: DIM, SUB, FUNCTION, OPERATOR, STATIC CONST, PROPERTY)");
             }
         }
@@ -1990,6 +2017,14 @@ impl Parser {
                 }
                 self.expect(Tt::Rparen, "")?;
                 Ok(e)
+            }
+            Tt::Newline => {
+                // `j = i++`: `++`/`--` gibt es nur als eigene Anweisung.
+                let davor = |k: usize| if self.pos >= k { self.toks[self.pos - k].tt } else { Tt::Eof };
+                if (davor(1) == Tt::Plus && davor(2) == Tt::Plus) || (davor(1) == Tt::Minus && davor(2) == Tt::Minus) {
+                    return self.err("Unerwartetes Token NEWLINE -- i++ und i-- gehen nur als eigene Anweisung, nicht in einem Ausdruck: erst i++, dann j = i");
+                }
+                self.err("Der Ausdruck endet mitten drin -- geht er in der naechsten Zeile weiter, die Zeile mit _ beenden")
             }
             _ => self.err(&format!("Unerwartetes Token {}", t.name())),
         }
