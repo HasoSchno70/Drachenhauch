@@ -879,7 +879,8 @@ Entscheidung, kein Nachtrag zu dieser.
 |---|---|
 | `OPENFILE(pfad$, modus$[, kodierung$])` → FILE | Modi: `"r"` lesen, `"w"` neu schreiben, `"a"` anhängen |
 | `CLOSEFILE(f)` | schließt |
-| `READLINE(f)` → STRING | nächste Zeile (ohne `\n`) |
+| `READLINE(f)` → STRING | nächste Zeile (ohne `\n`); am Dateiende `""` wie eine leere Zeile, darum `EOF(f)` fragen |
+| `EOF(f)` → BOOLEAN | TRUE, wenn aus der Datei nichts mehr zu lesen ist: `WHILE NOT EOF(f) : PRINT READLINE(f) : WEND` |
 | `READALL$(f)` → STRING | Rest komplett lesen |
 | `ENDOFFILE(f)` → BOOLEAN | beim Ende? |
 | `WRITELINE(f, text$)` | schreibt + `\n` |

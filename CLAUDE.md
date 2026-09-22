@@ -868,6 +868,9 @@ Details: docs/rust-runtime.md.
   `Parser::umsteiger_hinweis`). `swap`/`let`/`exit`/`do` sind KONTEXTUELL,
   keine Schluesselwoerter. Uebersicht `docs/umstieg.md`, Details
   `docs/stolpersteine.md` I, Tests `tests/pruef/umstieg.dhtest`.
+  Zweite Runde (2026-09-22): `STEP 0` stuerzte dhrt ab (jetzt Fehler),
+  `EOF(f)` neu (READLINE liefert am Ende `""` wie eine leere Zeile),
+  `"5" = 5`/`TRUE = 1` warnen, `READALL$(pfad)`, `CALL`, `BYVAL`.
 - **`step` ist Schlüsselwort** (FOR…STEP). Variablen entsprechend benennen
   (`i`, `iter`, `tick` statt `step`).
 - **Vorbelegte Namen als Variable gehen ueberall** (seit 2026-08-31). `DIM red`,
