@@ -9599,6 +9599,8 @@ fn store_index(arr: &Value, idx_vals: &[Value], v: Value) -> R<()> {
             Ok(())
         }
         Value::Nil => Err("Index-Zuweisung an NIL".into()),
+        Value::Str(_) => Err("Index-Zuweisung an einen Text: Texte lassen sich nicht stellenweise aendern -- \
+                              neu zusammensetzen, z.B. s = LEFT$(s, i) + \"x\" + MID$(s, i + 1)".into()),
         v => Err(format!("Index-Zuweisung an Nicht-Array ({})", v.type_name())),
     }
 }
@@ -9678,6 +9680,13 @@ fn infer_type(v: &Value) -> &'static str {
 }
 
 fn require_number(a: &Value, b: &Value, op: &str) -> R<()> {
+    // Eine FUNCTION ohne Klammern ist nur ihr Name (`zwei + 1` statt
+    // `zwei() + 1`) -- in anderen BASICs ruft der Name allein sie auf.
+    if let Some(Value::FuncRef(n)) = [a, b].into_iter().find(|v| matches!(v, Value::FuncRef(_))) {
+        return Err(format!(
+            "Operator '{}': '{}' ist eine FUNCTION ohne Klammern, also nur ihr Name -- aufrufen mit {}()",
+            op, n, n));
+    }
     if !is_num(a) || !is_num(b) {
         return Err(format!("Operator '{}' erwartet Zahlen, erhalten {} / {}", op, a.type_name(), b.type_name()));
     }

@@ -31,6 +31,9 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `DIM a AS ARRAY OF INTEGER` + `ARRAY_PUSH(a, 7)` | ein Feld ohne Größe ist leer und wächst sofort |
 | `VAL("3 Äpfel")`, `VAL("&HFF")`, `VAL("1e3")` | die Zahl am **Anfang** des Textes; `&H`/`&O`/`&B` und `0x`/`0b` gehen |
 | `RANDOMIZE(TIMER())` | Startwert aus der Uhr |
+| `CALL meineSub(1)`, `SUB s(BYVAL x AS INTEGER)` | `CALL` und `BYVAL` werden übergangen (übergeben wird ohnehin als Wert) |
+| `WHILE NOT EOF(f)` | `EOF(f)` sagt, ob die Datei zu Ende ist — `READLINE` liefert dort `""` wie bei einer leeren Zeile |
+| `READALL$("datei.txt")` | die ganze Datei auf einmal, ohne sie vorher zu öffnen |
 
 ## Was anders heißt
 
@@ -65,6 +68,16 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `"a" & "b"` | `"a" + "b"` |
 | `a XOR b` | `a BXOR b` (Bits) oder `a <> b` (Wahrheitswerte) |
 | `6 AND 3` als Bits | `6 BAND 3` — `AND`/`OR` sind hier logisch (Warnung beim Übersetzen) |
+| `IF s = 5` mit `s` als Text, `IF b = 1` mit `b` als BOOLEAN | verschiedene Arten sind nie gleich: `VAL(s) = 5`, `IF b THEN` (Warnung beim Übersetzen) |
+| `FOR i = 0 TO 1 STEP 0.5` mit INTEGER `i` | `DIM i AS FLOAT` — eine Kommazahl als Schritt braucht eine FLOAT-Laufvariable; `STEP 0` ist ein Fehler |
+| `x = zwei + 1` mit `FUNCTION zwei()` | `zwei() + 1` — ohne Klammern ist eine FUNCTION nur ihr Name |
+| `Me.x`, `this.x` | `Self.x` |
+| `SUB New()` als Konstruktor | `SUB Init()` |
+| `OPTIONAL x AS INTEGER` | `x AS INTEGER = 0` (Vorgabewert) |
+| `CATCH e AS STRING` | `CATCH e` — die Meldung ist immer ein STRING |
+| `s[0] = "x"` | Texte ändert man nicht stellenweise: `s = "x" + MID$(s, 1)` |
+| `TAB`, `SPC` | `PADR$(text, n)`, `SPACE$(3)` |
+| `ARRAY_REMOVE` | `ARRAY_REMOVE_AT(a, i)` |
 
 ## Aus Python, C und JavaScript
 

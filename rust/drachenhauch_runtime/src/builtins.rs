@@ -2774,6 +2774,20 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             f.borrow_mut().h = FileH::Closed;
             Ok(Value::Nil)
         }
+        "eof" => {
+            // Am Ende der Datei? READLINE liefert dort "", genau wie bei einer
+            // leeren Zeile -- ohne EOF liess sich beides nicht unterscheiden.
+            arity!(1);
+            let f = file_h(&a[0], "EOF")?;
+            let mut f = f.borrow_mut();
+            match f.leser() {
+                Some(r) => {
+                    let leer = r.fill_buf().map_err(|e| format!("EOF: {}", e))?.is_empty();
+                    Ok(Value::Bool(leer))
+                }
+                None => err("EOF: Datei wurde nicht im Lese-Modus geoeffnet"),
+            }
+        }
         "readline" => {
             arity!(1);
             let f = file_h(&a[0], "READLINE")?;
@@ -2801,6 +2815,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "readall$" | "readall" => {
             arity!(1);
+            // Mit einem PFAD statt eines FILE-Handles: die ganze Datei auf
+            // einmal -- so schreibt es jeder zuerst, und vorher war es ein
+            // Fehler ("READALL$ erwartet FILE").
+            if let Value::Str(pfad) = &a[0] {
+                return Ok(Value::str_rc(&text_lesen(pfad, None, "READALL$")?));
+            }
             let f = file_h(&a[0], "READALL$")?;
             let mut f = f.borrow_mut();
             let (kod, anfang, pfad) = (f.kod, f.am_anfang, f.path.clone());

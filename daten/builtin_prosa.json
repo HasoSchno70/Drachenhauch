@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1910,
+ "count": 1911,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -397,6 +397,7 @@
   "ENDOFFILE": "beim Ende?",
   "ENDSWITH": "Anfang/Ende prüfen",
   "ENUM_NAME": "zu einem ENUM-Wert seinen Namen zurückgeben — für Anzeige und Fehlersuche",
+  "EOF": "TRUE, wenn aus der Datei nichts mehr zu lesen ist: WHILE NOT EOF(f) : PRINT READLINE(f) : WEND",
   "EPRINT": "Zeile nach stderr statt stdout",
   "EURO$": "STRING — Cent-Betrag in deutscher Schreibweise anzeigen (1999 wird zu 19,99 €)",
   "EXEPATH$": "Pfad der laufenden Programmdatei",
@@ -1419,7 +1420,7 @@
   "RAY_HIT_TRI": "FLOAT — eigener Strahl gegen ein Dreieck",
   "READALL$": "Rest komplett lesen",
   "READALL_BYTES": "ganze Datei als Bytes",
-  "READLINE": "nächste Zeile (ohne \\n)",
+  "READLINE": "nächste Zeile (ohne \\n); am Dateiende \"\" wie eine leere Zeile, darum EOF(f) fragen",
   "READLINES": "Datei als Zeilen-Array lesen",
   "READ_BYTES": "bis zu anzahl Bytes vom Handle",
   "RECT": "Rechteck-Rahmen (1px)",

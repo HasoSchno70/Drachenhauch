@@ -498,3 +498,133 @@ AND verknuepft hier zwei Ganzzahlen
 3
 2
 TRUE
+
+=== step 0 ist ein fehler statt eines absturzes
+' Bis 2026-09-22 stuerzte dhrt hier mit einem Rust-Panic ab.
+DIM i AS INTEGER
+FOR i = 1 TO 3 STEP 0
+NEXT
+--- fehler
+STEP 0 kommt nie ans Ende
+
+=== step als kommazahl braucht eine float-laufvariable
+DIM i AS INTEGER
+FOR i = 0 TO 1 STEP 0.5
+NEXT
+--- fehler
+DIM i AS FLOAT vor der Schleife
+
+=== step als kommazahl mit float-laufvariable laeuft
+DIM f AS FLOAT
+FOR f = 0 TO 1 STEP 0.5
+    PRINT f
+NEXT
+--- erwartet
+0.0
+0.5
+1.0
+
+=== eof am dateiende
+WRITEALL("t.txt", "a" + CHR$(10) + CHR$(10) + "c")
+DIM f AS FILE
+f = OPENFILE("t.txt", "r")
+WHILE NOT EOF(f)
+    PRINT "[" + READLINE(f) + "]"
+WEND
+CLOSEFILE(f)
+--- erwartet
+[a]
+[]
+[c]
+
+=== readall mit pfad
+WRITEALL("t.txt", "eins" + CHR$(10) + "zwei")
+PRINT READALL$("t.txt")
+--- erwartet
+eins
+zwei
+
+=== call und byval werden uebergangen
+SUB s(BYVAL x AS INTEGER)
+    x = x + 1
+    PRINT x
+END SUB
+DIM a AS INTEGER = 1
+CALL s(a)
+PRINT a
+--- erwartet
+2
+1
+
+=== optional sagt vorgabewert
+SUB s(OPTIONAL x AS INTEGER)
+END SUB
+--- fehler
+x AS INTEGER = 0
+
+=== sub new sagt init
+CLASS K
+    SUB New()
+    END SUB
+END CLASS
+--- fehler
+SUB Init(...)
+
+=== me sagt self
+CLASS K
+    DIM x AS INTEGER
+    SUB setze()
+        Me.x = 3
+    END SUB
+END CLASS
+DIM k AS K
+k = NEW K()
+k.setze()
+--- fehler
+die eigene Instanz heisst in Drachenhauch Self
+
+=== catch mit as
+TRY
+    THROW "x"
+CATCH e AS STRING
+END TRY
+--- fehler
+CATCH meldung -- ohne AS
+
+=== funktion ohne klammern in einer rechnung
+FUNCTION zwei() AS INTEGER
+    RETURN 2
+END FUNCTION
+PRINT zwei + 1
+--- fehler
+'zwei' ist eine FUNCTION ohne Klammern, also nur ihr Name -- aufrufen mit zwei()
+
+=== text stellenweise aendern
+DIM s AS STRING = "abc"
+s[0] = "x"
+--- fehler
+Texte lassen sich nicht stellenweise aendern
+
+=== text gegen zahl warnt
+DIM s AS STRING = "5"
+DIM n AS INTEGER = 5
+PRINT s = n
+PRINT VAL(s) = n
+--- stderr
+'=' vergleicht Text mit Zahl -- das ist immer FALSE
+--- erwartet
+FALSE
+TRUE
+
+=== wahrheitswert gegen zahl warnt
+DIM b AS BOOLEAN = TRUE
+PRINT b = 1
+--- stderr
+'=' vergleicht Wahrheitswert mit Zahl
+--- erwartet
+FALSE
+
+=== tab und spc
+PRINT SPC(3)
+--- fehler
+heisst in Drachenhauch SPACE$(anzahl)

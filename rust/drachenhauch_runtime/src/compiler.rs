@@ -1750,6 +1750,30 @@ impl Compiler {
             Some(Node::NumberLit(NumV::Float(f))) => Some(*f),
             _ => None,
         };
+        // `STEP 0` als feste Zahl kommt nie ans Ende. Bis 2026-09-22 griff der
+        // Code darunter dann auf einen Platz zu, den es nicht gibt (-1), und
+        // dhrt stuerzte mit einem Rust-Panic ab.
+        if step_num == Some(0.0) {
+            return Err(format!(
+                "FOR {} ... STEP 0 kommt nie ans Ende -- die Schrittweite muss groesser oder kleiner als 0 sein",
+                var));
+        }
+        // Eine Kommazahl als Schritt braucht eine FLOAT-Laufvariable, sonst
+        // bricht schon der erste Schritt ab ("passt nicht verlustfrei in
+        // INTEGER") -- mit einer Meldung, die von Division redet.
+        if let Some(n) = step_num {
+            if n.fract() != 0.0 {
+                let typ = self.angesagter_typ(var);
+                // Nur bei SICHER ganzzahliger Laufvariable: ist der Typ unklar
+                // (DIM f AS FLOAT oben, dazu die FOR-Vorgabe INTEGER), bleibt es
+                // der Laufzeit ueberlassen.
+                if typ.as_deref() == Some("integer") {
+                    return Err(format!(
+                        "FOR {} ... STEP {}: eine Kommazahl als Schritt braucht eine FLOAT-Laufvariable -- \
+                         DIM {} AS FLOAT vor der Schleife", var, n, var));
+                }
+            }
+        }
         let const_pos = step_num.map(|n| n > 0.0).unwrap_or(false);
         let const_neg = step_num.map(|n| n < 0.0).unwrap_or(false);
         // var = start
@@ -2259,6 +2283,27 @@ impl Compiler {
     }
 
     fn expr_binary(&mut self, op: &str, left: &Node, right: &Node) -> CR {
+        if op == "=" || op == "<>" {
+            // `"5" = 5` und `TRUE = 1` sind in Drachenhauch immer FALSE (bzw.
+            // `<>` immer TRUE): verschiedene Arten sind nie gleich, und
+            // umgewandelt wird nicht. Das ist fast nie gemeint.
+            let (l, r) = (self.statischer_typ(left), self.statischer_typ(right));
+            if let (Some(l), Some(r)) = (l.as_deref(), r.as_deref()) {
+                let zahl = |t: &str| t == "integer" || t == "float";
+                let art = |t: &str| if zahl(t) { "Zahl" } else if t == "string" { "Text" } else if t == "boolean" { "Wahrheitswert" } else { "" };
+                let (al, ar) = (art(l), art(r));
+                if !al.is_empty() && !ar.is_empty() && al != ar {
+                    let rat = if (al == "Text") != (ar == "Text") {
+                        "VAL(text) oder STR$(zahl) macht beide gleich"
+                    } else {
+                        "ein Wahrheitswert ist keine Zahl -- direkt fragen: IF fertig THEN"
+                    };
+                    self.warnings.push((self.ctx.cur_line, format!(
+                        "'{}' vergleicht {} mit {} -- das ist immer {}, weil nichts umgewandelt wird: {}.",
+                        op, al, ar, if op == "=" { "FALSE" } else { "TRUE" }, rat)));
+                }
+            }
+        }
         if op == "and" || op == "or" {
             // In anderen BASICs sind AND/OR auf Zahlen bitweise (6 AND 3 = 2).
             // Hier sind sie logisch und liefern einen der beiden Werte

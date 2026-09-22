@@ -37,6 +37,9 @@ pub fn befehl(name: &str) -> Option<&'static str> {
         "bitor" => "ist in Drachenhauch der Operator BOR: a BOR b",
         "bitxor" => "ist in Drachenhauch der Operator BXOR: a BXOR b",
         "bitnot" => "ist in Drachenhauch der Operator BNOT: BNOT a",
+        "tab" => "gibt es als Befehl nicht -- Tabulator: CHR$(9), feste Breite: PADR$(text, n)",
+        "spc" => "heisst in Drachenhauch SPACE$(anzahl)",
+        "array_remove" | "array_delete" | "remove" => "heisst in Drachenhauch ARRAY_REMOVE_AT(feld, index)",
         "stop" | "system" | "quit" => "das Programm beenden: END (allein auf der Zeile) oder EXIT(0)",
         _ => return None,
     })
@@ -84,6 +87,7 @@ pub fn name_hinweis(name: &str) -> String {
     match n.as_str() {
         "true" | "false" | "nil" => String::new(),
         "none" | "null" | "nothing" => " -- 'kein Wert' heisst in Drachenhauch NIL".into(),
+        "me" | "this" => " -- die eigene Instanz heisst in Drachenhauch Self (Self.x = 3)".into(),
         _ => String::new(),
     }
 }

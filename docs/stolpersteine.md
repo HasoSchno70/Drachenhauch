@@ -379,6 +379,27 @@ Reflexionen/Mirror-Effekte.
 >
 > **Bewusst NICHT geändert** (sie brechen bestehenden Code): `MID$`/`INSTR`
 > ab 0, `AND`/`OR` logisch, Befehle nur mit Klammern.
+>
+> **Zweite Runde (2026-09-22), 90 weitere Proben (Klassen, Texte, Felder,
+> Dateien, Fehler, Schleifen):**
+> - **`FOR i = 1 TO 3 STEP 0` brachte dhrt zum ABSTURZ** (Rust-Panic, index
+>   out of bounds): bei fester Schrittweite ist die Richtung zur
+>   Uebersetzungszeit bekannt, nur bei 0 war sie weder vor noch zurueck, und
+>   der Zweig fuer die Laufzeit-Richtung las einen Schritt-Platz, den es nicht
+>   gab (-1). Jetzt ein Uebersetzungsfehler. Ebenso `STEP 0.5` mit sicher
+>   ganzzahliger Laufvariable (vorher: Abbruch im ersten Schritt mit einer
+>   Meldung ueber Division).
+> - **`READLINE` liefert am Dateiende `""`** -- genau wie bei einer leeren
+>   Zeile, und es gab keinen Weg, beides zu unterscheiden. Neu `EOF(f)`.
+> - **`"5" = 5` und `TRUE = 1` sind immer FALSE** (nichts wird umgewandelt).
+>   Bleibt so, aber `--check` warnt, wenn beide Seiten statisch bekannt und von
+>   verschiedener Art sind.
+> - Geht jetzt: `READALL$(pfad)`, `CALL`, `BYVAL`.
+> - Meldungen: FUNCTION ohne Klammern in einer Rechnung (vorher "erwartet
+>   Zahlen, erhalten FUNCREF"), `Me`/`this`, `SUB New`, `OPTIONAL`,
+>   `CATCH e AS`, `s[0] = "x"`, `TAB`/`SPC`/`ARRAY_REMOVE`.
+> - Gemessen: keine der neuen Warnungen trifft eine der 447 `.dh`-Dateien des
+>   Repos.
 
 ## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
 

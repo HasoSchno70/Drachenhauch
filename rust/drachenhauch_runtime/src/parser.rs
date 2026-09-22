@@ -337,6 +337,12 @@ impl Parser {
                              | Tt::Dot | Tt::Lbracket)
     }
 
+    /// `CALL name(...)` -- das CALL ist ueberfluessig und wird uebergangen.
+    fn ist_call(&self) -> bool {
+        self.check(Tt::Ident) && sval(self.peek(0)) == "call" && self.tt(1) == Tt::Ident
+            && matches!(self.tt(2), Tt::Lparen | Tt::Newline | Tt::Colon | Tt::Eof | Tt::Dot)
+    }
+
     /// `END` allein -> das Programm endet (wie `EXIT(0)`).
     fn programm_ende(&mut self) -> Node {
         self.pos += 1;
@@ -361,7 +367,7 @@ impl Parser {
             self.consume_terminator()?;
             return Ok(n);
         }
-        if self.ist_let() {
+        if self.ist_let() || self.ist_call() {
             self.pos += 1;
             return self.statement_inner();
         }
@@ -784,6 +790,9 @@ impl Parser {
         let has_catch = self.matches(Tt::Catch);
         if has_catch {
             if self.check(Tt::Ident) { catch_var = sval(self.peek(0)); self.pos += 1; }
+            if self.check(Tt::As) {
+                return self.err("CATCH meldung -- ohne AS: die Meldung ist immer ein STRING, und es gibt nur EIN CATCH je TRY");
+            }
             self.consume_terminator()?;
             catch_block = self.block_until(&[Tt::Finally, Tt::End],
                                            "FINALLY oder END TRY erwartet")?;
@@ -1125,7 +1134,7 @@ impl Parser {
         if self.tt(0) == Tt::End && self.tt(1) == Tt::Else { return Ok(self.programm_ende()); }
         if self.ist_exit() { return self.exit_kern(); }
         if self.ist_swap() { return self.swap_kern(); }
-        if self.ist_let() { self.pos += 1; return self.inline_statement_kern(); }
+        if self.ist_let() || self.ist_call() { self.pos += 1; return self.inline_statement_kern(); }
         match self.tt(0) {
             Tt::Print => {
                 self.pos += 1;
@@ -1397,6 +1406,13 @@ impl Parser {
                               by_ref: false, is_variadic: true });
         }
         let by_ref = self.matches(Tt::Byref);
+        // `BYVAL` ist hier die Vorgabe -- das Wort wird uebergangen.
+        if !by_ref && self.check(Tt::Ident) && sval(self.peek(0)) == "byval" && self.tt(1) == Tt::Ident {
+            self.pos += 1;
+        }
+        if self.check(Tt::Ident) && sval(self.peek(0)) == "optional" && self.tt(1) == Tt::Ident {
+            return self.err("OPTIONAL gibt es nicht -- ein Parameter mit Vorgabewert ist optional: x AS INTEGER = 0");
+        }
         let name = sval(&self.expect(Tt::Ident, "Erwartet Parametername")?);
         self.expect(Tt::As, "Erwartet AS nach Parametername")?;
         let type_name = self.parse_type()?;
@@ -1438,6 +1454,9 @@ impl Parser {
 
     fn sub_decl(&mut self) -> R<Node> {
         self.expect(Tt::Sub, "")?;
+        if self.check(Tt::New) {
+            return self.err("SUB New gibt es nicht -- der Konstruktor einer Klasse heisst SUB Init(...), NEW Klasse(...) ruft ihn");
+        }
         let name = sval(&self.expect(Tt::Ident, "Erwartet SUB-Name")?);
         let params = self.params()?;
         self.consume_terminator()?;
