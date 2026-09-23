@@ -1552,7 +1552,7 @@ während des Löschens verschieben sich die Zeilennummern der Tabelle.
 > nur gelesen. Eine Demo, die den Spielstand des Nutzers ändert, wäre eine
 > schlechte Demo.
 
-**Nicht umgesetzt** (bewusst): Zeilengruppen/Baum in der Tabelle.
+Zeilengruppen stehen in der **Baumtabelle** (`GUI_TREETABLE`, weiter unten) -- sie ist dieselbe Tabelle mit dem Schalter `baum`.
 - Optionaler `GUI_ON_CHANGE(tbl, funcref)`-Callback feuert bei Selektionswechsel.
 - Farben folgen dem Theme (`GUI_SET_COLOR(tbl, ...)` überschreibt pro Widget: bg/fg/border/accent).
 
