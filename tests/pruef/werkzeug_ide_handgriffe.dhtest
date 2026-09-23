@@ -314,3 +314,66 @@ ohne seite weiter links und breiter TRUE
 ohne unten hoeher TRUE
 start holt unten zurueck, gleiche hoehe wie am anfang TRUE
 gemerkt TRUE TRUE
+
+=== das profil nach funktionen
+' Die Messung ist erfunden (drei Zeilen in held.lauf, eine in zeige, eine
+' im Hauptprogramm), gezaehlt wird, was die Tabelle daraus macht.
+profQuelle = SPLIT$(READLINES_JOIN$(), NL)
+profRohZ = [3, 4, 9, 8, 1]
+profRohA = [10, 10, 5, 5, 1]
+profRohT = [0.004, 0.003, 0.002, 0.001, 0.0005]
+profGesamt = 0.0105
+GUI_SET_CHECKED(cbProfilFunk, TRUE)
+profilTabelleFuellen()
+PRINT "sprung " ; profilZeilen[0] ; " " ; profilZeilen[1]
+GUI_SET_CHECKED(cbProfilFunk, FALSE)
+profilTabelleFuellen()
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/profilquelle.dh
+FUNCTION READLINES_JOIN$() AS STRING
+    RETURN JOIN$(["DIM x AS INTEGER", "CLASS Held", "    SUB lauf()", "        x = x + 1", "    END SUB", "END CLASS", "SUB zeige()", "    PRINT x", "    PRINT x", "END SUB"], CHR$(10))
+END FUNCTION
+--- ersetzen protokoll("bereit")
+IMPORT "profilquelle.dh"
+protokoll("bereit")
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 13) = "profiltabelle" THEN PRINT P[i]
+NEXT
+--- erwartet
+profiltabelle funktion Held.lauf 2
+profiltabelle funktion zeige 2
+profiltabelle funktion (Hauptprogramm) 1
+profiltabelle funktionen 3
+profiltabelle zeilen 5
+
+=== ausgabe leeren
+ausgabe("eins")
+ausgabe("zwei")
+PRINT "vorher " ; GUI_LISTBOX_COUNT(lstAusgabe)
+befehl("ausgabe_leeren")
+PRINT "nachher " ; GUI_LISTBOX_COUNT(lstAusgabe)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- enthaelt
+vorher 2
+nachher 0

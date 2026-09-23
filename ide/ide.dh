@@ -347,6 +347,16 @@ DIM sucheZeilen AS ARRAY OF INTEGER : sucheZeilen = []
 
 ' Profil
 DIM profilZeilen AS ARRAY OF INTEGER : profilZeilen = []
+' Die Messung selbst, nach Zeit absteigend -- die Tabelle zeigt sie je
+' Zeile oder je Funktion, ohne neu zu messen.
+DIM profRohZ AS ARRAY OF INTEGER : profRohZ = []
+DIM profRohA AS ARRAY OF INTEGER : profRohA = []
+DIM profRohT AS ARRAY OF FLOAT : profRohT = []
+DIM profGesamt AS FLOAT : profGesamt = 0.0
+DIM profQuelle AS ARRAY OF STRING : profQuelle = []
+DIM profBerName AS ARRAY OF STRING : profBerName = []
+DIM profBerVon AS ARRAY OF INTEGER : profBerVon = []
+DIM profBerBis AS ARRAY OF INTEGER : profBerBis = []
 
 ' Wo Handbuch und Beispiele liegen: neben ide/ (dhrt hat nach ide/ gewechselt).
 DIM wurzel AS STRING : wurzel = GETENV$("DH_IDE_WURZEL")
@@ -616,6 +626,7 @@ DIM miHinein AS INTEGER : miHinein = GUI_MENU_ITEM(mLauf, "Schritt hinein", "F11
 DIM miHeraus AS INTEGER : miHeraus = GUI_MENU_ITEM(mLauf, "Schritt heraus", "Umschalt+F11")
 GUI_MENU_SEPARATOR(mLauf)
 DIM miProfil AS INTEGER : miProfil = GUI_MENU_ITEM(mLauf, "Profil aufnehmen", "Strg+Umschalt+Y")
+DIM miAusgabeLeer AS INTEGER : miAusgabeLeer = GUI_MENU_ITEM(mLauf, "Ausgabe leeren")
 GUI_MENU_SEPARATOR(mLauf)
 DIM miExport AS INTEGER : miExport = GUI_MENU_ITEM(mLauf, "Als eigenständiges Programm exportieren", "Strg+F6")
 
@@ -885,6 +896,8 @@ GUI_TABLE_SET(tblProfil, "sortierbar", 1)
 ' Tabulator-Text -- das Profil laesst sich so in eine Tabellenkalkulation holen.
 ' Bearbeitbar ist keine Spalte, Tippen tut also nichts.
 GUI_TABLE_SET(tblProfil, "zellmodus", 1)
+' Je Zeile oder je Funktion: dieselbe Messung, anders zusammengezaehlt.
+DIM cbProfilFunk AS GUI_WIDGET : cbProfilFunk = GUI_CHECKBOX(winProfil, "Nach Funktionen", 480, 4, FALSE)
 GUI_WINDOW_VISIBLE(winProfil, FALSE)
 
 ' Handbuch: Klappliste der Dokumente, Suche im Dokument, Text mit Umbruch.
@@ -7532,20 +7545,26 @@ SUB profilAnzeigen(zeile AS STRING)
             DIM t2 AS FLOAT : t2 = zt[i] : zt[i] = zt[best] : zt[best] = t2
         END IF
     NEXT
+    ' Die Quelle zur Messung: der offene Reiter, sonst die Datei -- ohne sie
+    ' gaebe es weder den Quelltext je Zeile noch die Funktionen.
     DIM quelle AS ARRAY OF STRING : quelle = []
-    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-    IF ta >= 0 AND tabPfade[aktiverTab] = prozessDatei THEN quelle = SPLIT$(GUI_TEXT(ta), NL)
-    GUI_TABLE_CLEAR(tblProfil)
-    DIM pz AS ARRAY OF INTEGER : pz = []
-    FOR i = 0 TO MIN(n, 300) - 1
-        DIM anteil AS STRING : anteil = "-"
-        IF gesamt > 0.0 THEN anteil = FORMAT$(zt[i] / gesamt * 100.0, "%.1f") + " %"
-        DIM q AS STRING : q = ""
-        IF zl[i] >= 1 AND zl[i] <= LEN(quelle) THEN q = TRIM$(quelle[zl[i] - 1])
-        GUI_TABLE_ADD_ROW(tblProfil, [STR$(zl[i]), STR$(za[i]), FORMAT$(zt[i] * 1000.0, "%.2f"), anteil, q])
-        ARRAY_PUSH(pz, zl[i])
+    DIM tq AS INTEGER : tq = tabMitPfad(prozessDatei)
+    IF tq >= 0 THEN
+        quelle = SPLIT$(GUI_TEXT(tabFelder[tq]), NL)
+    ELSE
+        TRY
+            quelle = SPLIT$(dateiLesen(prozessDatei), NL)
+        CATCH e
+            quelle = []
+        END TRY
+    END IF
+    profRohZ = [] : profRohA = [] : profRohT = []
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(profRohZ, zl[i]) : ARRAY_PUSH(profRohA, za[i]) : ARRAY_PUSH(profRohT, zt[i])
     NEXT
-    profilZeilen = pz
+    profGesamt = gesamt
+    profQuelle = quelle
+    profilTabelleFuellen()
     ' Fuer die Aufrufer-Liste aufheben: WIE OFT eine Zeile gelaufen ist.
     ' Wer wissen will, welcher Weg der heisse ist, sieht es dann im Baum,
     ' statt Aufrufstellen und Profil im Kopf zusammenzubringen.
@@ -7559,6 +7578,105 @@ SUB profilAnzeigen(zeile AS STRING)
     GUI_WINDOW_VISIBLE(winProfil, TRUE)
     GUI_FOCUS(tblProfil)          ' holt das Fenster vor das Hauptfenster
     protokoll("profil " + STR$(n))
+END SUB
+
+' Die Tabelle aus der Messung: je Zeile (die teuersten 300) oder je
+' Funktion. Eine Zeile gehoert zur INNERSTEN Funktion, die sie umschliesst
+' (eine Methode zu ihrer Klasse als `Klasse.methode`), alles ausserhalb zum
+' Hauptprogramm. Ein Klick springt zur Zeile bzw. zum Kopf der Funktion.
+SUB profilTabelleFuellen()
+    GUI_TABLE_CLEAR(tblProfil)
+    DIM pz AS ARRAY OF INTEGER : pz = []
+    DIM n AS INTEGER : n = LEN(profRohZ)
+    DIM i AS INTEGER
+    IF NOT GUI_CHECKED(cbProfilFunk) THEN
+        GUI_TABLE_HEADERS(tblProfil, ["Zeile", "Anzahl", "ms", "Anteil", "Quelltext"])
+        GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
+        FOR i = 0 TO MIN(n, 300) - 1
+            DIM anteil AS STRING : anteil = "-"
+            IF profGesamt > 0.0 THEN anteil = FORMAT$(profRohT[i] / profGesamt * 100.0, "%.1f") + " %"
+            DIM q AS STRING : q = ""
+            IF profRohZ[i] >= 1 AND profRohZ[i] <= LEN(profQuelle) THEN q = TRIM$(profQuelle[profRohZ[i] - 1])
+            GUI_TABLE_ADD_ROW(tblProfil, [STR$(profRohZ[i]), STR$(profRohA[i]), FORMAT$(profRohT[i] * 1000.0, "%.2f"), anteil, q])
+            ARRAY_PUSH(pz, profRohZ[i])
+        NEXT
+        profilZeilen = pz
+        protokoll("profiltabelle zeilen " + STR$(LEN(pz)))
+        RETURN
+    END IF
+    profBerName = [] : profBerVon = [] : profBerBis = []
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "s" + CHR$(34) + ": " + CODE_SYMBOLS$(JOIN$(profQuelle, NL)) + "}")
+    profilBereiche(j, "s", "")
+    DIM gName AS ARRAY OF STRING : gName = []
+    DIM gVon AS ARRAY OF INTEGER : gVon = []
+    DIM gZeilen AS ARRAY OF INTEGER : gZeilen = []
+    DIM gZeit AS ARRAY OF FLOAT : gZeit = []
+    FOR i = 0 TO n - 1
+        DIM z AS INTEGER : z = profRohZ[i]
+        DIM name AS STRING : name = "(Hauptprogramm)"
+        DIM von AS INTEGER : von = 1
+        DIM spanne AS INTEGER : spanne = 2000000000
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(profBerName) - 1
+            IF z >= profBerVon[k] AND z <= profBerBis[k] AND profBerBis[k] - profBerVon[k] < spanne THEN
+                spanne = profBerBis[k] - profBerVon[k]
+                name = profBerName[k] : von = profBerVon[k]
+            END IF
+        NEXT
+        DIM g AS INTEGER : g = ARRAY_INDEXOF(gName, name)
+        IF g < 0 THEN
+            ARRAY_PUSH(gName, name) : ARRAY_PUSH(gVon, von) : ARRAY_PUSH(gZeilen, 0) : ARRAY_PUSH(gZeit, 0.0)
+            g = LEN(gName) - 1
+        END IF
+        gZeilen[g] = gZeilen[g] + 1
+        gZeit[g] = gZeit[g] + profRohT[i]
+    NEXT
+    ' Nach Zeit absteigend.
+    DIM m AS INTEGER : m = LEN(gName)
+    DIM a AS INTEGER
+    FOR a = 0 TO m - 2
+        DIM best AS INTEGER : best = a
+        FOR k = a + 1 TO m - 1
+            IF gZeit[k] > gZeit[best] THEN best = k
+        NEXT
+        IF best <> a THEN
+            DIM t0 AS STRING : t0 = gName[a] : gName[a] = gName[best] : gName[best] = t0
+            DIM t1 AS INTEGER : t1 = gVon[a] : gVon[a] = gVon[best] : gVon[best] = t1
+            t1 = gZeilen[a] : gZeilen[a] = gZeilen[best] : gZeilen[best] = t1
+            DIM t2 AS FLOAT : t2 = gZeit[a] : gZeit[a] = gZeit[best] : gZeit[best] = t2
+        END IF
+    NEXT
+    GUI_TABLE_HEADERS(tblProfil, ["Funktion", "ab Zeile", "Zeilen", "ms", "Anteil"])
+    GUI_TABLE_COL_WIDTHS(tblProfil, [240, 80, 70, 90, 80])
+    FOR a = 0 TO m - 1
+        DIM ant AS STRING : ant = "-"
+        IF profGesamt > 0.0 THEN ant = FORMAT$(gZeit[a] / profGesamt * 100.0, "%.1f") + " %"
+        GUI_TABLE_ADD_ROW(tblProfil, [gName[a], STR$(gVon[a]), STR$(gZeilen[a]), FORMAT$(gZeit[a] * 1000.0, "%.2f"), ant])
+        ARRAY_PUSH(pz, gVon[a])
+        protokoll("profiltabelle funktion " + gName[a] + " " + STR$(gZeilen[a]))
+    NEXT
+    profilZeilen = pz
+    protokoll("profiltabelle funktionen " + STR$(m))
+END SUB
+
+' Die Funktionsbereiche aus CODE_SYMBOLS$ einsammeln, Methoden als
+' `Klasse.methode`.
+SUB profilBereiche(j AS JSON_HANDLE, pfad AS STRING, vor AS STRING)
+    DIM n AS INTEGER : n = JSON_LEN(j, pfad)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = pfad + "." + STR$(i)
+        DIM art AS STRING : art = JSON_GET_STRING(j, p + ".art")
+        DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+        IF art = "function" THEN
+            ARRAY_PUSH(profBerName, vor + name)
+            ARRAY_PUSH(profBerVon, JSON_GET_INT(j, p + ".von"))
+            ARRAY_PUSH(profBerBis, JSON_GET_INT(j, p + ".bis"))
+        END IF
+        IF JSON_LEN(j, p + ".kinder") > 0 THEN
+            profilBereiche(j, p + ".kinder", IIF(art = "class", vor + name + ".", vor))
+        END IF
+    NEXT
 END SUB
 
 SUB profilAnspringen()
@@ -8100,6 +8218,7 @@ paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Al
 paletteEintrag("Geteilte Ansicht", "geteilt", "Alt+G") : paletteEintrag("Übersichtskarte", "minimap", "")
 paletteEintrag("Dieselbe Datei nebeneinander", "spiegel", "Alt+Umschalt+G")
 paletteEintrag("Seitenleiste ein/aus", "seitenleiste", "Alt+1")
+paletteEintrag("Ausgabe leeren", "ausgabe_leeren", "")
 paletteEintrag("Untere Leiste ein/aus", "untere_leiste", "Alt+2")
 paletteEintrag("Zeilenumbruch", "umbruch", "Alt+Z")
 paletteEintrag("Helles Thema", "thema", "") : paletteEintrag("Vollbild", "vollbild", "Alt+Enter")
@@ -8602,6 +8721,13 @@ SUB befehl(k AS STRING)
         CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
         CASE "geteilt" : geteiltSetzen(NOT geteilt)
         CASE "spiegel" : spiegelSetzen(NOT spiegelAn)
+        CASE "ausgabe_leeren"
+            ' Eine halbe Zeile, die noch auf ihren Umbruch wartet, geht mit --
+            ' sonst stuende ihr Rest nachher allein am Anfang.
+            GUI_LISTBOX_CLEAR(lstAusgabe)
+            ausgabeRest = ""
+            GUI_SET_TEXT(lblStatus, "Ausgabe geleert.")
+            protokoll("ausgabe geleert")
         CASE "seitenleiste" : leistenSetzen(NOT seitenAn, untenAn)
         CASE "untere_leiste" : leistenSetzen(seitenAn, NOT untenAn)
         CASE "minimap" : minimapSetzen(NOT minimapAn)
@@ -8882,6 +9008,8 @@ WHILE NOT beenden
     IF GUI_CLICKED(miHeraus) OR GUI_CLICKED(btnHeraus) THEN befehl("heraus")
     IF GUI_CLICKED(btnStoppD) THEN befehl("stopp")
     IF GUI_CLICKED(miProfil) THEN befehl("profil")
+    IF GUI_CLICKED(miAusgabeLeer) THEN befehl("ausgabe_leeren")
+    IF GUI_CLICKED(cbProfilFunk) THEN profilTabelleFuellen()
     IF GUI_CLICKED(miThema) THEN befehl("thema")
     IF GUI_CLICKED(miVollbild) THEN befehl("vollbild")
     IF GUI_CLICKED(miUmbruch) THEN befehl("umbruch")
