@@ -223,3 +223,44 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 fundstellen punkte 4 2
+
+=== dieselbe datei nebeneinander
+' Die zweite Ansicht liegt links, der Reiter rechts; was in der Ansicht
+' geschrieben wird, sichert der Reiter. Danach schaltet die geteilte Ansicht
+' sie wieder ab -- es gibt nur eine zweite Haelfte.
+befehl("spiegel")
+GUI_TEXTAREA_GOTO(taSpiegel, 1, 1)
+GUI_TEXTAREA_INSERT(taSpiegel, "' neu" + NL)
+GUI_UPDATE()
+befehl("sichern")
+PRINT "fokus-feld ist die ansicht " ; aktivesFeld() = taSpiegel
+befehl("spiegel")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+PRINT "|" + L[0] + "|"
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 11) = "spiegel an " THEN
+        ' "spiegel an x LX+LW RX+RW": die Ansicht links, der Reiter rechts davon
+        DIM t AS ARRAY OF STRING : t = SPLIT$(P[i], " ")
+        DIM l AS ARRAY OF STRING : l = SPLIT$(t[3], "+")
+        DIM r AS ARRAY OF STRING : r = SPLIT$(t[4], "+")
+        PRINT "nebeneinander " ; VAL(l[0]) + VAL(l[1]) <= VAL(r[0])
+    END IF
+    IF P[i] = "spiegel aus" THEN PRINT P[i]
+NEXT
+--- erwartet
+|' neu|
+nebeneinander TRUE
+spiegel aus

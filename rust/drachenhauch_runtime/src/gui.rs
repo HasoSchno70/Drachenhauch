@@ -2424,6 +2424,12 @@ pub struct Widget {
     /// Klammerpaare, die das Feld beim Tippen selbst schliesst
     /// (GUI_TEXTAREA_PAIRS) -- leer = aus.
     paare: Vec<(char, char)>,
+    /// Zweite Ansicht auf einen anderen Textbereich (GUI_TEXTAREA_SHARE):
+    /// dessen Nummer im selben Fenster und der zuletzt abgeglichene Text.
+    /// Der Verlauf liegt nur beim Besitzer -- Strg+Z in der Ansicht nimmt
+    /// dort zurueck, sonst haette jede Seite ihre eigene Geschichte.
+    teil_von: Option<usize>,
+    teil_stand: String,
     stile: Vec<u8>,
     stile_text: String,
     tipp_stil: Option<u8>,
@@ -3788,7 +3794,7 @@ impl Gui {
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
             farbfelder: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
-            formatiert: false, paare: Vec::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
+            formatiert: false, paare: Vec::new(), teil_von: None, teil_stand: String::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
@@ -11969,6 +11975,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 k => self.widget_keys(wi, i, k, g),
             }
         }
+        // Geteilte Textbereiche gleich nach dem Tippen abgleichen -- wer nach
+        // GUI_UPDATE den Text des Besitzers liest (Sichern!), bekommt so den
+        // Stand dieses Bildes, nicht den des vorigen.
+        self.teil_pass(g.get_time());
         // Tastatur-Navigation: Tab / Shift+Tab wechselt den Fokus zwischen ALLEN
         // bedienbaren Widgets des aktiven Fensters (Anlege-Reihenfolge, nur
         // sichtbare + eingeschaltete). Frueher liefen nur die Textfelder mit --
@@ -13092,7 +13102,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         zusatz.retain(|&(c, a)| c >= 0 && (c as usize) <= chars.len() && a >= 0);
         if g.key_pressed(KEY_ESC) { zusatz.clear(); }
         if ctrl && !kuerzel_weg && (g.key_pressed(K_Z) || g.key_pressed(K_Y)) {
-            self.text_undo(wi, i, g.key_pressed(K_Y) || shift);
+            let ziel = self.windows[wi].widgets[i].teil_von.unwrap_or(i);
+            self.text_undo(wi, ziel, g.key_pressed(K_Y) || shift);
+            self.teil_pass(g.get_time());
             return;
         }
         // Inline-Formate: Strg+B fett, Strg+I kursiv, Strg+U unterstrichen --
@@ -13717,6 +13729,110 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             chars.splice(lo..hi, [ch]);
             marken[i] = ((lo + 1) as i32, (lo + 1) as i32);
+        }
+    }
+
+    /// GUI_TEXTAREA_SHARE(ansicht, von): `ansicht` zeigt ab jetzt denselben
+    /// Text wie `von` (beide Textbereiche im selben Fenster); -1 loest die
+    /// Verbindung. Jede Seite behaelt ihre Marke, ihren Ausschnitt und ihre
+    /// Faltung -- geteilt wird nur der Text und der Verlauf.
+    pub fn textarea_share(&mut self, h: i64, von: i64) -> Result<(), String> {
+        self.ta_wdg(h, "GUI_TEXTAREA_SHARE")?;
+        let (wi, i) = Self::dec_widget(h);
+        if von < 0 {
+            let w = self.wdg_mut(h, "GUI_TEXTAREA_SHARE")?;
+            w.teil_von = None;
+            w.teil_stand.clear();
+            return Ok(());
+        }
+        self.ta_wdg(von, "GUI_TEXTAREA_SHARE")?;
+        let (wv, iv) = Self::dec_widget(von);
+        if wv != wi {
+            return Err("GUI_TEXTAREA_SHARE: beide Textbereiche muessen im selben Fenster liegen".into());
+        }
+        if iv == i {
+            return Err("GUI_TEXTAREA_SHARE: ein Textbereich kann keine Ansicht auf sich selbst sein".into());
+        }
+        if self.windows[wi].widgets[iv].teil_von.is_some() {
+            return Err("GUI_TEXTAREA_SHARE: `von` ist selbst eine Ansicht -- nimm dessen Besitzer".into());
+        }
+        let (text, caret) = {
+            let a = &self.windows[wi].widgets[iv];
+            (a.text.clone(), a.caret)
+        };
+        let w = &mut self.windows[wi].widgets[i];
+        w.teil_von = Some(iv);
+        w.teil_stand = text.clone();
+        w.text = text;
+        w.caret = caret.clamp(0, w.text.chars().count() as i32);
+        w.sel_anchor = w.caret;
+        w.undo.clear();
+        w.redo.clear();
+        w.spans.clear();
+        w.gefaltet.clear();
+        w.faltbar.clear();
+        Ok(())
+    }
+
+    /// Eine Marke hinter eine Aenderung nachziehen: vor dem geaenderten
+    /// Stueck bleibt sie, dahinter rueckt sie um die Laengendifferenz, mitten
+    /// darin landet sie an seinem Ende.
+    fn marke_nachziehen(alt: &[char], neu: &[char], m: i32) -> i32 {
+        let mut a = 0;
+        while a < alt.len() && a < neu.len() && alt[a] == neu[a] { a += 1; }
+        let mut e = 0;
+        while e < alt.len() - a && e < neu.len() - a && alt[alt.len() - 1 - e] == neu[neu.len() - 1 - e] { e += 1; }
+        let m = m.clamp(0, alt.len() as i32) as usize;
+        let r = if m <= a { m } else if m >= alt.len() - e { m + neu.len() - alt.len() }
+                else { neu.len() - e };
+        r as i32
+    }
+
+    /// Geteilte Textbereiche abgleichen: hat die Ansicht sich seit dem
+    /// letzten Abgleich geaendert, geht ihr Text an den Besitzer (samt
+    /// Verlaufsschritt dort); sonst, wenn der Besitzer sich geaendert hat
+    /// (Tippen, GUI_SET_TEXT, Rueckgaengig), an die Ansicht.
+    fn teil_pass(&mut self, jetzt: f64) {
+        for wi in 0..self.windows.len() {
+            for i in 0..self.windows[wi].widgets.len() {
+                let Some(iv) = self.windows[wi].widgets[i].teil_von else { continue; };
+                if iv >= self.windows[wi].widgets.len() || self.windows[wi].widgets[iv].kind != Kind::TextArea {
+                    self.windows[wi].widgets[i].teil_von = None;
+                    continue;
+                }
+                let stand = self.windows[wi].widgets[i].teil_stand.clone();
+                let eigen = self.windows[wi].widgets[i].text.clone();
+                let besitzer = self.windows[wi].widgets[iv].text.clone();
+                if eigen != stand {
+                    let alt: Vec<char> = besitzer.chars().collect();
+                    let neu: Vec<char> = eigen.chars().collect();
+                    let a = &mut self.windows[wi].widgets[iv];
+                    let c = Self::marke_nachziehen(&alt, &neu, a.caret);
+                    let s = Self::marke_nachziehen(&alt, &neu, a.sel_anchor);
+                    let ac = a.caret;
+                    Self::undo_merken(a, &besitzer, ac, jetzt);
+                    a.text = eigen.clone();
+                    a.caret = c;
+                    a.sel_anchor = s;
+                    if a.formatiert { stile_abgleichen(a); }
+                    let f = a.on_change.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.teil_stand = eigen;
+                    w.undo.clear();
+                    w.redo.clear();
+                } else if besitzer != stand {
+                    let alt: Vec<char> = eigen.chars().collect();
+                    let neu: Vec<char> = besitzer.chars().collect();
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.caret = Self::marke_nachziehen(&alt, &neu, w.caret);
+                    w.sel_anchor = Self::marke_nachziehen(&alt, &neu, w.sel_anchor);
+                    w.text = besitzer.clone();
+                    w.teil_stand = besitzer;
+                    w.marken_zusatz.clear();
+                    if w.formatiert { stile_abgleichen(w); }
+                }
+            }
         }
     }
 

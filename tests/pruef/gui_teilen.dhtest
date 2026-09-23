@@ -1,0 +1,136 @@
+' Zwei Textbereiche, ein Text (GUI_TEXTAREA_SHARE, 2026-09-23).
+' Die Ansicht zeigt den Text ihres Besitzers; was in einer der beiden
+' geaendert wird, steht nach GUI_UPDATE in der anderen. Jede behaelt ihre
+' Marke (sie rueckt hinter einer Aenderung davor mit), der Verlauf liegt
+' beim Besitzer. Format: docs/werkzeuge.md, dhrt test.
+
+=== die ansicht zeigt den text und gibt ihre aenderung zurueck
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 300)
+DIM a AS GUI_WIDGET : a = GUI_TEXTAREA(w, 10, 10, 180, 200)
+DIM b AS GUI_WIDGET : b = GUI_TEXTAREA(w, 200, 10, 180, 200)
+GUI_SET_TEXT(a, "eins")
+GUI_TEXTAREA_SHARE(b, a)
+PRINT "[" + GUI_TEXT(b) + "]"
+GUI_TEXTAREA_GOTO(b, 1, 5)
+GUI_TEXTAREA_INSERT(b, " zwei")
+PRINT "vor dem abgleich [" + GUI_TEXT(a) + "]"
+GUI_UPDATE()
+PRINT "[" + GUI_TEXT(a) + "]"
+GUI_SET_TEXT(a, "neu")
+GUI_UPDATE()
+PRINT "[" + GUI_TEXT(b) + "]"
+--- erwartet
+[eins]
+vor dem abgleich [eins]
+[eins zwei]
+[neu]
+
+=== die marke der anderen seite rueckt mit
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 300)
+DIM a AS GUI_WIDGET : a = GUI_TEXTAREA(w, 10, 10, 180, 200)
+DIM b AS GUI_WIDGET : b = GUI_TEXTAREA(w, 200, 10, 180, 200)
+GUI_SET_TEXT(a, "abc" + CHR$(10) + "def")
+GUI_TEXTAREA_SHARE(b, a)
+GUI_TEXTAREA_GOTO(b, 2, 2)
+GUI_TEXTAREA_GOTO(a, 1, 1)
+GUI_TEXTAREA_INSERT(a, "X" + CHR$(10))
+GUI_UPDATE()
+DIM z AS INTEGER
+DIM s AS INTEGER
+(z, s) = GUI_TEXTAREA_CURSOR(b)
+PRINT z ; " " ; s
+' Hinter der Marke geaendert: sie bleibt.
+GUI_TEXTAREA_GOTO(a, 3, 4)
+GUI_TEXTAREA_INSERT(a, "!")
+GUI_UPDATE()
+(z, s) = GUI_TEXTAREA_CURSOR(b)
+PRINT z ; " " ; s
+PRINT REPLACE$(GUI_TEXT(b), CHR$(10), "|")
+--- erwartet
+3 2
+3 2
+X|abc|def!
+
+=== strg z in der ansicht nimmt beim besitzer zurueck
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 300)
+DIM a AS GUI_WIDGET : a = GUI_TEXTAREA(w, 10, 10, 180, 200)
+DIM b AS GUI_WIDGET : b = GUI_TEXTAREA(w, 200, 10, 180, 200)
+GUI_SET_TEXT(a, "eins")
+GUI_TEXTAREA_SHARE(b, a)
+GUI_TEXTAREA_GOTO(b, 1, 5)
+GUI_TEXTAREA_INSERT(b, " zwei")
+GUI_FOCUS(b)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN PRINT "[" + GUI_TEXT(a) + "]" : AUTOMATION_PLAY("ev.txt")
+    IF bild = 12 THEN PRINT "[" + GUI_TEXT(a) + "] [" + GUI_TEXT(b) + "]"
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 0 2 341 0 0 0
+e 1 2 90 0 0 0
+e 2 1 90 0 0 0
+e 3 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+[eins zwei]
+[eins] [eins]
+
+=== aufheben trennt die beiden
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 300)
+DIM a AS GUI_WIDGET : a = GUI_TEXTAREA(w, 10, 10, 180, 200)
+DIM b AS GUI_WIDGET : b = GUI_TEXTAREA(w, 200, 10, 180, 200)
+GUI_SET_TEXT(a, "eins")
+GUI_TEXTAREA_SHARE(b, a)
+GUI_TEXTAREA_SHARE(b, -1)
+GUI_SET_TEXT(a, "anders")
+GUI_UPDATE()
+PRINT "[" + GUI_TEXT(b) + "]"
+--- erwartet
+[eins]
+
+=== fehler: fremdes fenster, sich selbst, ansicht einer ansicht
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 300)
+DIM w2 AS GUI_WINDOW : w2 = GUI_WINDOW("B", 0, 0, 400, 300)
+DIM a AS GUI_WIDGET : a = GUI_TEXTAREA(w, 10, 10, 180, 200)
+DIM b AS GUI_WIDGET : b = GUI_TEXTAREA(w, 200, 10, 180, 200)
+DIM c AS GUI_WIDGET : c = GUI_TEXTAREA(w, 10, 220, 180, 60)
+DIM d AS GUI_WIDGET : d = GUI_TEXTAREA(w2, 10, 10, 180, 200)
+TRY
+    GUI_TEXTAREA_SHARE(d, a)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_TEXTAREA_SHARE(a, a)
+CATCH e
+    PRINT e
+END TRY
+GUI_TEXTAREA_SHARE(b, a)
+TRY
+    GUI_TEXTAREA_SHARE(c, b)
+CATCH e
+    PRINT e
+END TRY
+--- enthaelt
+beide Textbereiche muessen im selben Fenster liegen
+keine Ansicht auf sich selbst
+ist selbst eine Ansicht

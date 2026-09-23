@@ -6358,6 +6358,10 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_insert(gi(a, 0, "GUI_TEXTAREA_INSERT")?, &gs(a, 1, "GUI_TEXTAREA_INSERT")?, jetzt)?;
                 Value::Nil
             }
+            "gui_textarea_share" => {
+                self.gui.textarea_share(gi(a, 0, "GUI_TEXTAREA_SHARE")?, gi(a, 1, "GUI_TEXTAREA_SHARE")?)?;
+                Value::Nil
+            }
             "gui_textarea_pairs" => {
                 self.gui.textarea_pairs(gi(a, 0, "GUI_TEXTAREA_PAIRS")?, &gs(a, 1, "GUI_TEXTAREA_PAIRS")?)?;
                 Value::Nil

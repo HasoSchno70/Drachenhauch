@@ -5007,6 +5007,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_SHARE",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SHARE(ansicht, von)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_PAIRS",
    "kind": "core",
    "signature": "GUI_TEXTAREA_PAIRS(ta, paare$)",

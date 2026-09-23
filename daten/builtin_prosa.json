@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1925,
+ "count": 1926,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -825,6 +825,7 @@
   "GUI_TEXTAREA_SELECT_COLUMNS": "Spaltenauswahl: ein RECHTECK statt eines Laufs. Jede Zeile bekommt ihre eigene Marke samt Auswahl, getippt wird in allen zugleich; eine zu kurze Zeile bekommt ihre Marke am Ende, statt herauszufallen. Mit der Maus: Alt gedrückt halten und ziehen. Liefert die Zahl der Marken",
   "GUI_TEXTAREA_SET": "Textbereich bricht an Wortgrenzen um (Notizen, Briefe)",
   "GUI_TEXTAREA_SET_MARKDOWN": "Text aus Markdown setzen (schaltet die Formate ein)",
+  "GUI_TEXTAREA_SHARE": "zweite Ansicht auf denselben Text: ansicht zeigt, was in von steht (beide im selben Fenster), und was in einer der beiden geändert wird, steht nach GUI_UPDATE in der anderen. Jede behält Marke, Ausschnitt und Faltung; eine Marke hinter einer Änderung rückt mit. Der Verlauf liegt beim Besitzer — Strg+Z in der Ansicht nimmt dort zurück. -1 hebt die Verbindung auf",
   "GUI_TEXTAREA_SPANS": "Zeichen start … start+laenge in farbe zeichnen",
   "GUI_TEXTAREA_STYLE": "Stil auf die Auswahl setzen (an = TRUE, Vorgabe) oder wegnehmen; ohne Auswahl gilt er für das nächste Getippte",
   "GUI_TEXTAREA_SWATCHES": "Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht &H-Literale",

@@ -277,6 +277,13 @@ DIM umbruchAn AS BOOLEAN : umbruchAn = FALSE
 ' Geteilte Ansicht: links ein ZWEITER Reiter, rechts der aktive. Beide sind
 ' echte Code-Felder -- nichts wird gespiegelt, es gibt nichts abzugleichen.
 DIM geteilt AS BOOLEAN : geteilt = FALSE
+' Dieselbe Datei zweimal nebeneinander: links ein zweites Feld, das den Text
+' des aktiven Reiters TEILT (GUI_TEXTAREA_SHARE) -- mit eigener Marke und
+' eigenem Ausschnitt, aber einem Text und einem Verlauf.
+DIM spiegelAn AS BOOLEAN : spiegelAn = FALSE
+DIM taSpiegel AS GUI_WIDGET : taSpiegel = -1
+DIM spiegelBesitzer AS GUI_WIDGET : spiegelBesitzer = -1
+DIM spiegelFaerbSchl AS STRING : spiegelFaerbSchl = ""
 DIM linkerTab AS INTEGER : linkerTab = -1
 DIM minimapAn AS BOOLEAN : minimapAn = FALSE
 ' Geaenderte Zeilen am Rand (git diff -U0), per Vorgabe an.
@@ -623,6 +630,7 @@ GUI_MENU_CHECK(miThema, hell)
 DIM miVollbild AS INTEGER : miVollbild = GUI_MENU_ITEM(mAnsicht, "Vollbild", "Alt+Enter")
 GUI_MENU_SEPARATOR(mAnsicht)
 DIM miGeteilt AS INTEGER : miGeteilt = GUI_MENU_ITEM(mAnsicht, "Geteilte Ansicht", "Alt+G")
+DIM miSpiegel AS INTEGER : miSpiegel = GUI_MENU_ITEM(mAnsicht, "Dieselbe Datei nebeneinander", "Alt+Umschalt+G")
 GUI_MENU_CHECK(miGeteilt, FALSE)
 DIM miMinimap AS INTEGER : miMinimap = GUI_MENU_ITEM(mAnsicht, "Übersichtskarte")
 GUI_MENU_CHECK(miMinimap, FALSE)
@@ -1423,9 +1431,12 @@ SUB layout()
     ' rechte -- so hat jede Haelfte ein ECHTES Feld, keine Spiegelung.
     DIM halbeB AS INTEGER : halbeB = (ew - 6) \ 2
     DIM i AS INTEGER
+    IF spiegelAn AND taSpiegel >= 0 THEN GUI_SET_BOUNDS(taSpiegel, ex, oben, halbeB, mitteH)
     FOR i = 0 TO tabAnzahl - 1
         IF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl AND i = linkerTab THEN
             GUI_SET_BOUNDS(tabFelder[i], ex, oben, halbeB, mitteH)
+        ELSEIF spiegelAn THEN
+            GUI_SET_BOUNDS(tabFelder[i], ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
         ELSEIF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl THEN
             GUI_SET_BOUNDS(tabFelder[i], ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
         ELSE
@@ -1901,6 +1912,7 @@ END SUB
 ' Anschlag fuehren muesste -- und GUI_SET_TEXT leerte dabei jedes Mal den
 ' Verlauf und schoebe die Marke ans Ende.
 SUB geteiltSetzen(an AS BOOLEAN)
+    IF an AND spiegelAn THEN spiegelSetzen(FALSE)
     IF an AND tabAnzahl < 2 THEN
         GUI_SET_TEXT(lblStatus, "Geteilte Ansicht: dafür braucht es zwei offene Dateien.")
         RETURN
@@ -1944,6 +1956,61 @@ SUB geteiltNachziehen(vorher AS INTEGER)
     linkerTab = vorher
     GUI_SET_TAB(tabFelder[linkerTab], -1)
     layout()
+END SUB
+
+' --- Dieselbe Datei nebeneinander ---------------------------------------
+' Die geteilte Ansicht zeigt zwei REITER. Hier ist es EINE Datei: das
+' zweite Feld ist eine Ansicht auf das Feld des aktiven Reiters, und die
+' Laufzeit gleicht den Text ab (GUI_TEXTAREA_SHARE) -- ohne GUI_SET_TEXT,
+' also ohne den Verlauf zu leeren oder die Marke ans Ende zu schieben.
+SUB spiegelSetzen(an AS BOOLEAN)
+    IF an AND aktiverTab < 0 THEN
+        GUI_SET_TEXT(lblStatus, "Dieselbe Datei nebeneinander: dafür braucht es eine offene Datei.")
+        RETURN
+    END IF
+    IF an AND geteilt THEN geteiltSetzen(FALSE)
+    spiegelAn = an
+    IF an THEN
+        IF taSpiegel < 0 THEN taSpiegel = GUI_TEXTAREA(win, 0, 0, 10, 10)
+        ' Bei JEDEM Einschalten: Schrift, Umbruch, Linien und Paare stehen
+        ' seit dem letzten Mal womoeglich anders.
+        feldEinrichten(taSpiegel)
+        GUI_SET_TAB(taSpiegel, -1)
+        GUI_SET_VISIBLE(taSpiegel, TRUE)
+        spiegelBesitzer = tabFelder[aktiverTab]
+        GUI_TEXTAREA_SHARE(taSpiegel, spiegelBesitzer)
+        spiegelFaerbSchl = ""
+    ELSEIF taSpiegel >= 0 THEN
+        GUI_TEXTAREA_SHARE(taSpiegel, -1)
+        GUI_SET_VISIBLE(taSpiegel, FALSE)
+        spiegelBesitzer = -1
+        IF aktiverTab >= 0 THEN GUI_FOCUS(tabFelder[aktiverTab])
+    END IF
+    GUI_MENU_CHECK(miSpiegel, spiegelAn)
+    layout()
+    IF spiegelAn THEN
+        GUI_SET_TEXT(lblStatus, "Dieselbe Datei nebeneinander: " + BASENAME(tabPfade[aktiverTab]))
+        protokoll("spiegel an x " + STR$(GUI_GET_X(taSpiegel)) + "+" + STR$(GUI_GET_W(taSpiegel)) + " " + STR$(GUI_GET_X(tabFelder[aktiverTab])) + "+" + STR$(GUI_GET_W(tabFelder[aktiverTab])))
+    ELSE
+        GUI_SET_TEXT(lblStatus, "Zweite Ansicht aus.")
+        protokoll("spiegel aus")
+    END IF
+END SUB
+
+' Je Bild: folgt die zweite Ansicht noch dem aktiven Reiter? Nach einem
+' Reiterwechsel zeigt sie die neue Datei, ohne offenen Reiter geht sie aus.
+SUB spiegelNachziehen()
+    IF NOT spiegelAn THEN RETURN
+    IF aktiverTab < 0 OR aktiverTab >= tabAnzahl THEN
+        spiegelSetzen(FALSE)
+        RETURN
+    END IF
+    IF tabFelder[aktiverTab] = spiegelBesitzer THEN RETURN
+    spiegelBesitzer = tabFelder[aktiverTab]
+    GUI_TEXTAREA_SHARE(taSpiegel, spiegelBesitzer)
+    spiegelFaerbSchl = ""
+    layout()
+    protokoll("spiegel folgt " + STR$(aktiverTab))
 END SUB
 
 ' --- Uebersichtskarte --------------------------------------------------
@@ -2133,6 +2200,11 @@ END SUB
 
 FUNCTION aktivesFeld() AS GUI_WIDGET
     IF aktiverTab < 0 THEN RETURN -1
+    ' Steht die Marke in der zweiten Ansicht derselben Datei, meint jeder
+    ' Befehl sie -- ihre Marke ist die, die man gerade sieht. Der Text ist
+    ' derselbe, geschrieben wird ueber GUI_TEXTAREA_INSERT und die Laufzeit
+    ' gleicht ab.
+    IF spiegelAn AND taSpiegel >= 0 AND GUI_FOCUSED() = taSpiegel THEN RETURN taSpiegel
     RETURN tabFelder[aktiverTab]
 END FUNCTION
 
@@ -7983,6 +8055,7 @@ paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
 paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
 paletteEintrag("Geteilte Ansicht", "geteilt", "Alt+G") : paletteEintrag("Übersichtskarte", "minimap", "")
+paletteEintrag("Dieselbe Datei nebeneinander", "spiegel", "Alt+Umschalt+G")
 paletteEintrag("Zeilenumbruch", "umbruch", "Alt+Z")
 paletteEintrag("Helles Thema", "thema", "") : paletteEintrag("Vollbild", "vollbild", "Alt+Enter")
 paletteEintrag("Schrift größer", "groesser", "Strg+Plus") : paletteEintrag("Schrift kleiner", "kleiner", "Strg+Minus")
@@ -8483,6 +8556,7 @@ SUB befehl(k AS STRING)
         CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
         CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
         CASE "geteilt" : geteiltSetzen(NOT geteilt)
+        CASE "spiegel" : spiegelSetzen(NOT spiegelAn)
         CASE "minimap" : minimapSetzen(NOT minimapAn)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
@@ -8765,6 +8839,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miVollbild) THEN befehl("vollbild")
     IF GUI_CLICKED(miUmbruch) THEN befehl("umbruch")
     IF GUI_CLICKED(miGeteilt) THEN befehl("geteilt")
+    IF GUI_CLICKED(miSpiegel) THEN befehl("spiegel")
     IF GUI_CLICKED(miMinimap) THEN befehl("minimap")
     IF GUI_CLICKED(miFalten) THEN befehl("falten")
     IF GUI_CLICKED(miFaltenAlle) THEN befehl("falten_alle")
@@ -9119,6 +9194,7 @@ WHILE NOT beenden
     IF GUI_DOUBLE_CLICKED(lstAusgabe) THEN ausgabeAnspringen()
     IF GUI_CLICKED(btnEingabe) OR GUI_ENTERED(tfEingabe) THEN eingabeSenden()
 
+    spiegelNachziehen()
     ' --- Aenderungen im aktiven Feld: einfaerben, Pruefung vormerken ---
     IF aktiverTab >= 0 THEN
         DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]
@@ -9142,6 +9218,17 @@ WHILE NOT beenden
             END IF
         END IF
         faerben(tf)
+        ' Die zweite Ansicht hat ihren eigenen Ausschnitt, also ihre eigene
+        ' Einfaerbung -- mit eigenem Riegel, sonst rechneten beide Felder in
+        ' jedem Bild neu, weil sie sich den Schluessel gegenseitig
+        ' ueberschrieben.
+        IF spiegelAn AND taSpiegel >= 0 THEN
+            DIM hauptSchl AS STRING : hauptSchl = faerbSchluessel
+            faerbSchluessel = spiegelFaerbSchl
+            faerben(taSpiegel)
+            spiegelFaerbSchl = faerbSchluessel
+            faerbSchluessel = hauptSchl
+        END IF
         markenNachziehen()
         hilfeNachziehen()
         vervollNachziehen()
