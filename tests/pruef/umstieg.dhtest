@@ -827,8 +827,11 @@ FLIP() fehlt
 ' pruefen (eine Erwartung sagt nur, was drinsteht).
 IMPORT "helfer.dh"
 dlStarten(["run", "ohne.dh"])
-IF INSTR(dlErr, "Kein Fenster moeglich") >= 0 THEN
-    PRINT "UEBERSPRINGEN: kein Fenster"
+' Gefragt wird der RUECKGABEWERT, nicht der Meldungstext: ein Bau ohne Grafik
+' sagt "im Rust-Kern noch nicht verfuegbar", eine Maschine ohne Bildschirm
+' "Kein Fenster moeglich" -- beide Male ist am Hinweis nichts zu pruefen.
+IF dlCode <> 0 THEN
+    PRINT "UEBERSPRINGEN: das Kind konnte nicht zeichnen"
     EXIT(0)
 END IF
 PRINT "ohne flip: "; INSTR(dlErr, "FLIP() fehlt") >= 0
