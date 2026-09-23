@@ -557,3 +557,101 @@ umbau zurueck 1
 umbau wieder 1
 umbau wieder 0
 datei PRINT "neu"
+
+=== jedes beispiel steht genau einmal in einem thema
+' examples/kategorien.json ist von Hand gepflegt -- ein neues Beispiel
+' faellt sonst still aus der Themenliste heraus, und ein umbenanntes
+' laesst einen Eintrag stehen, der auf nichts zeigt.
+IMPORT "json"
+DIM ord AS STRING : ord = PATHJOIN(ARG$(0), "../../examples")
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "t" + CHR$(34) + ":" + JOIN$(READLINES(PATHJOIN(ord, "kategorien.json")), CHR$(10)) + "}")
+DIM gesehen AS MAP OF INTEGER
+DIM t AS INTEGER
+DIM k AS INTEGER
+DIM doppelt AS INTEGER : doppelt = 0
+DIM fehlt AS INTEGER : fehlt = 0
+FOR t = 0 TO JSON_LEN(h, "t") - 1
+    FOR k = 0 TO JSON_LEN(h, "t." + STR$(t) + ".dateien") - 1
+        DIM d AS STRING : d = JSON_GET_STRING(h, "t." + STR$(t) + ".dateien." + STR$(k))
+        IF MAPHAS(gesehen, d) THEN
+            doppelt = doppelt + 1 : PRINT "doppelt " ; d
+        END IF
+        MAPPUT(gesehen, d, 1)
+        IF NOT FILEEXISTS(PATHJOIN(ord, d)) THEN
+            fehlt = fehlt + 1 : PRINT "fehlt " ; d
+        END IF
+    NEXT
+NEXT
+DIM ohne AS INTEGER : ohne = 0
+DIM f AS STRING
+FOR EACH f IN DIRLIST(ord, "*.dh")
+    IF LEFT$(f, 1) = "_" OR LEFT$(f, 6) = "bench_" THEN CONTINUE
+    IF NOT MAPHAS(gesehen, f) THEN
+        ohne = ohne + 1 : PRINT "ohne thema " ; f
+    END IF
+NEXT
+PRINT "themen " ; JSON_LEN(h, "t") ; " doppelt " ; doppelt ; " fehlt " ; fehlt ; " ohne " ; ohne
+--- argumente
+{sammlung}
+--- erwartet
+themen 16 doppelt 0 fehlt 0 ohne 0
+
+=== beispiele nach themen: liste, filter, oeffnen
+themenZeigen()
+GUI_SET_TEXT(tfThemenFilter, "tracker")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 7) = "themen " THEN PRINT P[i]
+NEXT
+--- erwartet
+themen 16 beispiele 203
+themen filter [tracker] 2
+
+=== ein beispiel aus der themenliste oeffnen
+themenZeigen()
+GUI_SET_TEXT(tfThemenFilter, "tracker")
+themenNachziehen()
+GUI_LISTBOX_SET_SELECTED(lstThemen, GUI_LISTBOX_VIEW_ROW(lstThemen, 1))
+themenOeffnen(FALSE)
+PRINT "sichtbar " ; GUI_WINDOW_SHOWN(winThemen)
+PRINT "reiter " ; BASENAME(tabPfade[aktiverTab])
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- enthaelt
+sichtbar FALSE
+reiter 190_tracker.dh
+
+=== die beschreibung kommt aus dem kopfkommentar
+' Zierlinien, der Dateiname vorn und interne Vermerke fallen weg; eine
+' Zeile, die mitten im Satz endet, holt die naechste; eine Abkuerzung wie
+' "z.B." ist kein Satzende.
+DIM ord AS STRING : ord = PATHJOIN(wurzel, "examples")
+DIM d AS STRING
+FOR EACH d IN ["14_strings.dh", "35_serial.dh", "32_coinquest.dh", "47_collision_easing.dh"]
+    PRINT beispielBeschreibung$(PATHJOIN(ord, d), d)
+NEXT
+PRINT beispielBeschreibung$(PATHJOIN(ord, "gibtsnicht.dh"), "gibtsnicht.dh")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- enthaelt
+String-Funktionen: LEFT$, RIGHT$, MID$, INSTR, SPLIT$, JOIN$, REPLACE$, TRIM$
+Serielle Kommunikation - z.B. mit Arduino oder ESP32
+Coin Quest
+Sprite-Collision + Easing-Demo: ein Spieler-Sprite weicht Hindernis-Boxen aus
+gibtsnicht.dh

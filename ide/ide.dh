@@ -663,6 +663,7 @@ DIM miWzAnim AS INTEGER : miWzAnim = GUI_MENU_ITEM(mWerkzeuge, "Anim-FSM-Editor"
 DIM miWzNoten AS INTEGER : miWzNoten = GUI_MENU_ITEM(mWerkzeuge, "Notenblatt")
 GUI_MENU_SEPARATOR(mWerkzeuge)
 DIM miBeispiele AS INTEGER : miBeispiele = GUI_MENU_ITEM(mWerkzeuge, "Beispiele als Projekt öffnen")
+DIM miThemen AS INTEGER : miThemen = GUI_MENU_ITEM(mWerkzeuge, "Beispiele nach Themen ...")
 DIM miAusdruck AS INTEGER : miAusdruck = GUI_MENU_ITEM(mWerkzeuge, "Ausdruck im Debugger auswerten", "Strg+E")
 
 DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, "Ansicht")
@@ -842,6 +843,7 @@ DIM btnWkNeu AS GUI_WIDGET : btnWkNeu = GUI_BUTTON(win, "Neue Datei", 0, 0, 130,
 GUI_BUTTON_VARIANT(btnWkNeu, "primaer")
 DIM btnWkOeffnen AS GUI_WIDGET : btnWkOeffnen = GUI_BUTTON(win, "Datei öffnen ...", 0, 0, 150, 30)
 DIM btnWkBeispiele AS GUI_WIDGET : btnWkBeispiele = GUI_BUTTON(win, "Beispiele als Projekt", 0, 0, 180, 30)
+DIM btnWkThemen AS GUI_WIDGET : btnWkThemen = GUI_BUTTON(win, "Beispiele nach Themen", 0, 0, 190, 30)
 DIM lblWkZuletzt AS GUI_WIDGET : lblWkZuletzt = GUI_LABEL(win, "Zuletzt geöffnet -- Doppelklick öffnet", 0, 0)
 DIM lstWkZuletzt AS GUI_WIDGET : lstWkZuletzt = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 DIM lblWkKuerzel AS GUI_WIDGET : lblWkKuerzel = GUI_LABEL(win, "F5 startet das Programm, F7 debuggt es, Umschalt+F7 prüft. F1 schlägt das Wort unter der Marke im Handbuch nach, Strg+Umschalt+P öffnet die Befehlspalette, Strg+Umschalt+O eine Datei des Projekts. Alle Kürzel: Hilfe -> Tastenkürzel (Strg+F1).", 0, 0)
@@ -980,6 +982,27 @@ DIM lblAuto AS GUI_WIDGET : lblAuto = GUI_LABEL(winEinst, "Sichern nach ... s Ru
 DIM spAuto AS GUI_WIDGET : spAuto = GUI_SPINNER(winEinst, 260, 394, 90, 0, 120, 0)
 DIM btnEinstZu AS GUI_WIDGET : btnEinstZu = GUI_BUTTON(winEinst, "Schließen", 16, 452, 120, 30)
 DIM einstOffen AS BOOLEAN : einstOffen = FALSE
+
+' --- Beispiele nach Themen ---------------------------------------------
+' Zweihundert Beispiele, nach Nummer sortiert, sagen nicht, wo man
+' anfangen soll. Die Themen stehen in examples/kategorien.json (jedes
+' Beispiel genau einmal -- tests/pruef/werkzeug_ide_handgriffe.dhtest
+' prueft das), die Beschreibung ist die erste Kommentarzeile des Beispiels.
+' EINE Liste mit Gruppenkoepfen: der Filter sucht so ueber alle Themen,
+' und ein Thema bleibt sichtbar, solange darin etwas passt.
+DIM winThemen AS GUI_WINDOW : winThemen = GUI_WINDOW("Beispiele nach Themen", 320, 80, 760, 620)
+GUI_WINDOW_CLOSABLE(winThemen, TRUE)
+DIM tfThemenFilter AS GUI_WIDGET : tfThemenFilter = GUI_TEXTINPUT(winThemen, 8, 8, 360, 26, "Filter: Wort aus der Beschreibung ...")
+DIM lblThemen AS GUI_WIDGET : lblThemen = GUI_LABEL(winThemen, "", 380, 12)
+DIM lstThemen AS GUI_WIDGET : lstThemen = GUI_LISTBOX(winThemen, 8, 42, 744, 500, [])
+GUI_LISTBOX_PLACEHOLDER(lstThemen, "Kein Beispiel passt.")
+DIM btnThemenOeffnen AS GUI_WIDGET : btnThemenOeffnen = GUI_BUTTON(winThemen, "Öffnen", 8, 552, 120, 30)
+GUI_BUTTON_VARIANT(btnThemenOeffnen, "primaer")
+DIM btnThemenStart AS GUI_WIDGET : btnThemenStart = GUI_BUTTON(winThemen, "Öffnen und starten", 136, 552, 170, 30)
+DIM btnThemenZu AS GUI_WIDGET : btnThemenZu = GUI_BUTTON(winThemen, "Schließen", 632, 552, 120, 30)
+GUI_WINDOW_CANCEL(winThemen, btnThemenZu)
+GUI_WINDOW_VISIBLE(winThemen, FALSE)
+DIM themenFilterZuletzt AS STRING : themenFilterZuletzt = ""
 
 ' --- Eingebaute Befehle nachschlagen ----------------------------------
 DIM winBefehle AS GUI_WINDOW : winBefehle = GUI_WINDOW("Eingebaute Befehle", 300, 90, 860, 600)
@@ -1299,6 +1322,7 @@ SUB willkommenZeigen(an AS BOOLEAN)
     END IF
     GUI_SET_VISIBLE(lblWkUnter, an)
     GUI_SET_VISIBLE(btnWkNeu, an) : GUI_SET_VISIBLE(btnWkOeffnen, an) : GUI_SET_VISIBLE(btnWkBeispiele, an)
+    GUI_SET_VISIBLE(btnWkThemen, an)
     GUI_SET_VISIBLE(lblWkZuletzt, an) : GUI_SET_VISIBLE(lstWkZuletzt, an) : GUI_SET_VISIBLE(lblWkKuerzel, an)
     IF NOT an THEN
         GUI_SET_VISIBLE(lblKacheln, FALSE)
@@ -1570,6 +1594,7 @@ SUB layout()
     GUI_SET_BOUNDS(btnWkNeu, wx, oben + 130, 130, 30)
     GUI_SET_BOUNDS(btnWkOeffnen, wx + 140, oben + 130, 150, 30)
     GUI_SET_BOUNDS(btnWkBeispiele, wx + 300, oben + 130, 180, 30)
+    GUI_SET_BOUNDS(btnWkThemen, wx + 490, oben + 130, 190, 30)
     ' Die Kacheln: vier nebeneinander, so viele Reihen wie Platz ist; was
     ' nicht passt, blaettert das Mausrad heran (kachelVersatz).
     GUI_SET_BOUNDS(lblKacheln, wx, oben + 176, ew - 80, 18)
@@ -8403,6 +8428,180 @@ SUB werkzeugeAufraeumen()
     WEND
 END SUB
 
+' Die Beschreibung eines Beispiels aus seinem Kopfkommentar: die erste
+' Kommentarzeile mit Buchstaben in den ersten acht Zeilen -- ohne Zierlinien
+' (`' =====`), ohne `=== ... ===`, ohne ein vorangestelltes `DRACHENHAUCH --`,
+' den Dateinamen oder die Nummer. Bricht sie mitten im Satz ab, kommt die
+' naechste Kommentarzeile dazu (hoechstens zwei); was ueber 100 Zeichen
+' geht, endet am letzten Satz- oder Kommaende davor. Interne Vermerke wie
+' `(WP H)`, `(Batch 1)` oder `(Weg B, ...)` sagen einem Leser nichts.
+FUNCTION kopfZeile$(zeile AS STRING) AS STRING
+    DIM z AS STRING : z = TRIM$(zeile)
+    IF LEFT$(z, 1) <> "'" THEN RETURN ""
+    z = TRIM$(MID$(z, 1, LEN(z)))
+    z = REGEX_REPLACE(z, "\s+", " ")
+    WHILE LEFT$(z, 1) = "=" OR LEFT$(z, 1) = "-" : z = TRIM$(MID$(z, 1, LEN(z))) : WEND
+    WHILE RIGHT$(z, 1) = "=" : z = TRIM$(LEFT$(z, LEN(z) - 1)) : WEND
+    IF NOT REGEX_TEST(z, "[A-Za-zÄÖÜäöüß]") THEN RETURN ""
+    RETURN z
+END FUNCTION
+
+FUNCTION beispielBeschreibung$(pfad AS STRING, datei AS STRING) AS STRING
+    DIM zeilen AS ARRAY OF STRING
+    TRY
+        zeilen = READLINES(pfad)
+    CATCH e
+        RETURN datei
+    END TRY
+    DIM stamm AS STRING : stamm = LEFT$(datei, LEN(datei) - 3)
+    DIM nummer AS STRING : nummer = LEFT$(stamm, MAX(0, INSTR(stamm, "_")))
+    DIM i AS INTEGER
+    FOR i = 0 TO MIN(LEN(zeilen), 8) - 1
+        DIM z AS STRING : z = kopfZeile$(zeilen[i])
+        IF z = "" THEN CONTINUE
+        IF UPPER$(LEFT$(z, 16)) = "DRACHENHAUCH -- " THEN z = TRIM$(MID$(z, 16, LEN(z)))
+        DIM vor AS STRING
+        FOR EACH vor IN [datei + " -- ", datei + " - ", nummer + " -- ", nummer + " - "]
+            IF vor <> " -- " AND vor <> " - " AND LEFT$(z, LEN(vor)) = vor THEN z = TRIM$(MID$(z, LEN(vor), LEN(z)))
+        NEXT
+        IF z = datei OR z = "" THEN CONTINUE
+        ' Fortsetzung: nur eine Kommentarzeile mit Text gleich dahinter (ein
+        ' eingerueckter Block wie eine Befehlsliste zaehlt nicht).
+        DIM dazu AS INTEGER : dazu = 0
+        WHILE dazu < 2 AND i + 1 + dazu < LEN(zeilen) AND NOT REGEX_TEST(z, "[.:!?)" + CHR$(34) + "]$")
+            DIM roh AS STRING : roh = zeilen[i + 1 + dazu]
+            IF LEFT$(roh, 2) <> "' " OR MID$(roh, 2, 1) = " " THEN EXIT WHILE
+            DIM weiter AS STRING : weiter = kopfZeile$(roh)
+            IF weiter = "" THEN EXIT WHILE
+            ' Nur, wo der Satz sichtlich weitergeht -- ein Titel ohne Punkt
+            ' ("Coin Quest") nimmt sonst die naechste Zeile mit, die etwas
+            ' ganz anderes sagt.
+            DIM offen AS BOOLEAN : offen = LEN(z) - LEN(REPLACE$(z, "(", "")) > LEN(z) - LEN(REPLACE$(z, ")", ""))
+            IF NOT (RIGHT$(z, 1) = "-" OR RIGHT$(z, 1) = "," OR offen OR REGEX_TEST(weiter, "^[a-zäöü]")) THEN EXIT WHILE
+            ' Am Zeilenende getrenntes Wort (`Hindernis-` / `Boxen`) ohne Leerzeichen.
+            IF REGEX_TEST(z, "[A-Za-zÄÖÜäöüß]-$") THEN z = z + weiter ELSE z = z + " " + weiter
+            dazu = dazu + 1
+        WEND
+        z = REGEX_REPLACE(z, "\s*\((WP [A-Z][^)]*|Batch [^)]*|Weg B[^)]*|[a-z]+ter Editor-Pilot|sechster Pilot)\)", "")
+        IF LEN(z) > 100 THEN
+            DIM satz AS INTEGER : satz = -1
+            DIM komma AS INTEGER : komma = -1
+            DIM k AS INTEGER
+            FOR k = 20 TO 99
+                ' Ein Satzende, keine Abkuerzung: vor dem Punkt zwei Buchstaben
+                ' (`z.B.` endet nichts).
+                IF MID$(z, k, 2) = ". " AND REGEX_TEST(MID$(z, k - 2, 2), "^[A-Za-zÄÖÜäöüß]{2}$") THEN satz = k
+                IF MID$(z, k, 2) = ", " THEN komma = k
+            NEXT
+            IF satz > 0 THEN
+                z = LEFT$(z, satz + 1)
+            ELSEIF komma > 0 THEN
+                z = LEFT$(z, komma)
+            ELSE
+                z = LEFT$(z, 97) + "..."
+            END IF
+        END IF
+        WHILE RIGHT$(z, 1) = "," OR RIGHT$(z, 1) = ";" : z = TRIM$(LEFT$(z, LEN(z) - 1)) : WEND
+        ' Eine offene Klammer am Ende (die Fortsetzung kam nicht mit): weg damit.
+        DIM auf AS INTEGER : auf = LEN(z) - LEN(REPLACE$(z, "(", ""))
+        DIM zu AS INTEGER : zu = LEN(z) - LEN(REPLACE$(z, ")", ""))
+        IF auf > zu THEN
+            DIM ab AS INTEGER : ab = -1
+            DIM q AS INTEGER
+            FOR q = 0 TO LEN(z) - 2
+                IF MID$(z, q, 2) = " (" THEN ab = q
+            NEXT
+            IF ab > 0 THEN z = TRIM$(LEFT$(z, ab))
+        END IF
+        RETURN TRIM$(z)
+    NEXT
+    RETURN stamm
+END FUNCTION
+
+SUB themenZeigen()
+    DIM k AS JSON_HANDLE
+    DIM gut AS BOOLEAN : gut = TRUE
+    TRY
+        k = JSON_PARSE("{" + CHR$(34) + "t" + CHR$(34) + ": " + JOIN$(READLINES(PATHJOIN(beispielOrdner, "kategorien.json")), NL) + "}")
+    CATCH e
+        gut = FALSE
+    END TRY
+    IF NOT gut THEN
+        GUI_SET_TEXT(lblStatus, "Keine Themenliste: " + PATHJOIN(beispielOrdner, "kategorien.json") + " fehlt.")
+        protokoll("themen fehlen")
+        RETURN
+    END IF
+    GUI_LISTBOX_CLEAR(lstThemen)
+    DIM themen AS INTEGER : themen = JSON_LEN(k, "t")
+    DIM zahl AS INTEGER : zahl = 0
+    DIM t AS INTEGER
+    FOR t = 0 TO themen - 1
+        DIM pt AS STRING : pt = "t." + STR$(t)
+        DIM n AS INTEGER : n = JSON_LEN(k, pt + ".dateien")
+        DIM kopf AS INTEGER : kopf = GUI_LISTBOX_ADD(lstThemen, JSON_GET_STRING(k, pt + ".name"))
+        GUI_LISTBOX_HEADER(lstThemen, kopf, TRUE)
+        DIM d AS INTEGER
+        FOR d = 0 TO n - 1
+            DIM datei AS STRING : datei = JSON_GET_STRING(k, pt + ".dateien." + STR$(d))
+            DIM pfad AS STRING : pfad = PATHJOIN(beispielOrdner, datei)
+            ' Eine Liste, die auf fehlende Dateien zeigt, wird nicht zur Falle:
+            ' was es nicht gibt, steht nicht da.
+            IF NOT FILEEXISTS(pfad) THEN CONTINUE
+            DIM ix AS INTEGER : ix = GUI_LISTBOX_ADD(lstThemen, beispielBeschreibung$(pfad, datei))
+            GUI_LISTBOX_DETAIL(lstThemen, ix, LEFT$(datei, LEN(datei) - 3))
+            GUI_LISTBOX_SET_DATA(lstThemen, ix, datei)
+            GUI_LISTBOX_TIP(lstThemen, ix, datei)
+            zahl = zahl + 1
+        NEXT
+        GUI_LISTBOX_DETAIL(lstThemen, kopf, STR$(n))
+    NEXT
+    GUI_SET_TEXT(tfThemenFilter, "")
+    themenFilterZuletzt = ""
+    GUI_LISTBOX_FILTER(lstThemen, "")
+    GUI_SET_TEXT(lblThemen, STR$(zahl) + " Beispiele in " + STR$(themen) + " Themen")
+    GUI_WINDOW_SET_BOUNDS(winThemen, MAX(0, (SCREENWIDTH() - 760) \ 2), 80, 760, 620)
+    GUI_WINDOW_VISIBLE(winThemen, TRUE)
+    GUI_FOCUS(tfThemenFilter)          ' holt das Fenster nach vorn
+    protokoll("themen " + STR$(themen) + " beispiele " + STR$(zahl))
+END SUB
+
+' Je Bild, solange das Fenster offen ist: Filter, Oeffnen, Starten.
+SUB themenNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winThemen) THEN RETURN
+    DIM f AS STRING : f = TRIM$(GUI_TEXT(tfThemenFilter))
+    IF f <> themenFilterZuletzt THEN
+        themenFilterZuletzt = f
+        GUI_LISTBOX_FILTER(lstThemen, f)
+        protokoll("themen filter [" + f + "] " + STR$(GUI_LISTBOX_VIEW_COUNT(lstThemen)))
+    END IF
+    ' Enter im Filterfeld nimmt den ersten Treffer.
+    IF GUI_ENTERED(tfThemenFilter) THEN
+        DIM v AS INTEGER
+        FOR v = 0 TO GUI_LISTBOX_VIEW_COUNT(lstThemen) - 1
+            DIM zeile AS INTEGER : zeile = GUI_LISTBOX_VIEW_ROW(lstThemen, v)
+            IF GUI_LISTBOX_DATA$(lstThemen, zeile) <> "" THEN
+                GUI_LISTBOX_SET_SELECTED(lstThemen, zeile)
+                themenOeffnen(FALSE)
+                RETURN
+            END IF
+        NEXT
+    END IF
+    IF GUI_DOUBLE_CLICKED(lstThemen) OR GUI_CLICKED(btnThemenOeffnen) THEN themenOeffnen(FALSE)
+    IF GUI_CLICKED(btnThemenStart) THEN themenOeffnen(TRUE)
+    IF GUI_CLICKED(btnThemenZu) THEN GUI_WINDOW_VISIBLE(winThemen, FALSE)
+END SUB
+
+SUB themenOeffnen(starten AS BOOLEAN)
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstThemen)
+    IF sel < 0 THEN RETURN
+    DIM datei AS STRING : datei = GUI_LISTBOX_DATA$(lstThemen, sel)
+    IF datei = "" THEN RETURN          ' ein Themenkopf
+    GUI_WINDOW_VISIBLE(winThemen, FALSE)
+    dateiOeffnen(PATHJOIN(beispielOrdner, datei))
+    protokoll("themen offen " + datei)
+    IF starten THEN befehl("start")
+END SUB
+
 SUB beispieleOeffnen()
     IF NOT FILEEXISTS(PATHJOIN(beispielOrdner, "01_hello.dh")) THEN
         GUI_SET_TEXT(lblStatus, "Keine Beispiele in " + beispielOrdner)
@@ -8511,7 +8710,7 @@ paletteEintrag("Listing drucken ...", "drucken", "Strg+P")
 paletteEintrag("Listing als PDF neben die Quelle", "pdf", "")
 paletteEintrag("Werkzeug: SFX-Generator", "wz_sfx", "") : paletteEintrag("Werkzeug: Partikel-Editor", "wz_partikel", "")
 paletteEintrag("Werkzeug: Tilemap-Editor", "wz_tilemap", "") : paletteEintrag("Werkzeug: Sprite-Editor", "wz_sprite", "")
-paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "")
+paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "") : paletteEintrag("Beispiele nach Themen ...", "beispiele_themen", "")
 paletteEintrag("Ausdruck im Debugger auswerten", "ausdruck", "Strg+E")
 
 ' Unscharfer Filter: der Text als Teil ODER seine Zeichen der Reihe nach
@@ -9029,6 +9228,7 @@ SUB befehl(k AS STRING)
         CASE "wz_anim" : werkzeugStarten("198_anim_fsm_editor.dh")
         CASE "wz_noten" : werkzeugStarten("199_notenblatt.dh")
         CASE "beispiele" : beispieleOeffnen()
+        CASE "beispiele_themen" : themenZeigen()
         CASE "ausdruck"
             IF prozessArt = "debug" AND debugPause THEN GUI_FOCUS(tfEingabe) ELSE GUI_SET_TEXT(lblStatus, "Der Debugger steht gerade nicht -- erst F7 und ein Halt.")
     END SELECT
@@ -9315,6 +9515,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miWzAnim) THEN befehl("wz_anim")
     IF GUI_CLICKED(miWzNoten) THEN befehl("wz_noten")
     IF GUI_CLICKED(miBeispiele) THEN befehl("beispiele")
+    IF GUI_CLICKED(miThemen) THEN befehl("beispiele_themen")
     IF GUI_CLICKED(miAusdruck) THEN befehl("ausdruck")
     IF GUI_CLICKED(miSchnell) THEN befehl("schnell")
     IF GUI_CLICKED(miTodo) THEN befehl("todo")
@@ -9352,6 +9553,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(btnWkNeu) THEN befehl("neu")
     IF GUI_CLICKED(btnWkOeffnen) THEN befehl("oeffnen")
     IF GUI_CLICKED(btnWkBeispiele) THEN befehl("beispiele")
+    IF GUI_CLICKED(btnWkThemen) THEN befehl("beispiele_themen")
     IF GUI_DOUBLE_CLICKED(lstWkZuletzt) AND GUI_LISTBOX_SELECTED(lstWkZuletzt) >= 0 AND GUI_LISTBOX_SELECTED(lstWkZuletzt) < LEN(zuletzt) THEN dateiOeffnen(zuletzt[GUI_LISTBOX_SELECTED(lstWkZuletzt)])
     IF GUI_DOUBLE_CLICKED(lstGliederung) THEN gliederungAnspringen()
     ' Druckdialog
@@ -9376,6 +9578,7 @@ WHILE NOT beenden
     farbfeldNachziehen()
     einstellungenNachziehen()
     befehleNachziehen()
+    themenNachziehen()
     IF GUI_CLICKED(btnEinstZu) THEN GUI_WINDOW_VISIBLE(winEinst, FALSE) : einstOffen = FALSE : GUI_FOCUS(aktivesFeld())
     IF GUI_CLICKED(btnBefehlEin) OR GUI_DOUBLE_CLICKED(lstBefehle) THEN befehlEinfuegen()
     IF GUI_CLICKED(btnPeekZu) THEN GUI_WINDOW_VISIBLE(winPeek, FALSE) : GUI_FOCUS(aktivesFeld())

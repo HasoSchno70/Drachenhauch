@@ -3987,6 +3987,18 @@ der Willkommensseite statt des Titels als Text (vorab auf 240x112 skaliert,
 der Satz rechts daneben, alles ab den Knoepfen bleibt an seiner Stelle); ohne
 die Dateien bleibt es beim Text. Tests `tests/pruef/werkzeug_ide_schriftzug.dhtest`
 (3) und zwei Zeilen in `werkzeug_paket.dhtest`.
+**Beispiele nach Themen (2026-09-23):** `examples/kategorien.json` ordnet alle
+203 Beispiele (ohne `_*`/`bench_*`) 16 Themen zu; die IDE zeigt sie in einem
+Fenster (`themenZeigen`, Werkzeuge-Menue, Willkommensseite, Palette) als Liste
+mit Gruppenkoepfen, Filter und [Oeffnen und starten]. Die Beschreibung liest
+`beispielBeschreibung$` aus dem Kopfkommentar: angehaengt wird die naechste
+Zeile NUR, wenn der Satz sichtlich weitergeht (Bindestrich, Komma, offene
+Klammer, Kleinbuchstabe) -- sonst holte ein Titel ohne Punkt ("Coin Quest")
+die naechste Zeile mit; ein Satzende braucht zwei Buchstaben vor dem Punkt
+(`z.B.` endet nichts). Tests vier Faelle in
+`tests/pruef/werkzeug_ide_handgriffe.dhtest`, darunter die Vollstaendigkeit
+der JSON gegen `DIRLIST`.
+
 **Kachel als Widget, Mausrad, Bereichsfarben (2026-09-21, Hinweise des
 Nutzers):** (1) **`GUI_CARD(win, x, y, w, h, bild[, titel$[, text$]])`** --
 Bild oben (16:10 der Innenbreite, `fuellen`), Titel kraeftig, Beschreibung in
