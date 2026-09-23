@@ -173,7 +173,9 @@ SUB hallo()
     PRINT "hallo"
 END SUB
 hallo
-CLS
+' MILLIS statt CLS: derselbe Beweis (ein Name allein ruft den Befehl), aber
+' ohne Fenster -- CLS zeichnet und verlangt seit der fuenften Runde ein SCREEN.
+MILLIS
 --- erwartet
 hallo
 
@@ -771,3 +773,191 @@ c = ticker()
 PRINT CORO_RESUME(c); CORO_RESUME(c)
 --- erwartet
 12
+
+=== zeichnen ohne fenster
+' Ohne SCREEN legt ein Bildbefehl ein VERSTECKTES Fenster an (fuer den
+' GL-Kontext). Wer darin auf den Schirm zeichnet, sah nie ein Bild -- und
+' bekam kein Wort dazu.
+BOX(0, 0, 10, 10, RED)
+--- fehler
+BOX: es gibt noch kein Fenster -- vor dem ersten Zeichenbefehl SCREEN(breite, hoehe, "Titel") aufrufen
+
+=== flip ohne fenster
+FLIP()
+--- fehler
+FLIP: es gibt noch kein Fenster
+
+=== cls ohne fenster
+CLS()
+--- fehler
+CLS: es gibt noch kein Fenster
+
+=== mit screen zeichnet dieselbe zeile
+SCREEN(40, 30, "Probe")
+CLS(BLUE)
+BOX(0, 0, 10, 10, RED)
+FLIP()
+PRINT "gezeichnet"
+--- erwartet
+gezeichnet
+
+=== ein bild entsteht auch ohne fenster
+' Die Gegenprobe zur Fenster-Pflicht: IMAGE_*/imgfx brauchen keinen Schirm,
+' sie zeichnen in ein Bild. Das darf die Pruefung nicht mitnehmen.
+IMPORT "imgfx"
+DIM b AS IMAGE
+b = IMAGE_NEW(8, 8, RED)
+IMAGE_FILL_RECT(b, 0, 0, 4, 4, GREEN)
+PRINT GETPIXEL(b, 1, 1) = GREEN
+--- erwartet
+TRUE
+
+=== gezeichnet aber nie gezeigt
+SCREEN(40, 30, "Probe")
+BOX(0, 0, 10, 10, RED)
+PRINT "fertig"
+--- erwartet
+fertig
+--- stderr
+FLIP() fehlt
+
+=== der hinweis kommt nur ohne flip
+' Gegenprobe im Fall: dasselbe Programm einmal mit und einmal ohne FLIP,
+' beide als Kind gestartet -- anders ist "der Satz steht NICHT da" nicht zu
+' pruefen (eine Erwartung sagt nur, was drinsteht).
+IMPORT "helfer.dh"
+dlStarten(["run", "ohne.dh"])
+IF INSTR(dlErr, "Kein Fenster moeglich") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein Fenster"
+    EXIT(0)
+END IF
+PRINT "ohne flip: "; INSTR(dlErr, "FLIP() fehlt") >= 0
+dlStarten(["run", "mit.dh"])
+PRINT "mit flip:  "; INSTR(dlErr, "FLIP() fehlt") >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- datei ohne.dh
+SCREEN(40, 30, "Probe")
+BOX(0, 0, 10, 10, RED)
+PRINT "fertig"
+--- datei mit.dh
+SCREEN(40, 30, "Probe")
+BOX(0, 0, 10, 10, RED)
+FLIP()
+PRINT "fertig"
+--- erwartet
+ohne flip: TRUE
+mit flip:  FALSE
+
+=== vertipptes builtin schlaegt den echten namen vor
+CIRLCE(1, 1, 1, RED)
+--- fehler
+Meintest du CIRCLE?
+
+=== ausgelassenes wort im befehlsnamen
+IMPORT "particles"
+DIM p AS PARTICLE_SYSTEM
+p = PARTICLE_NEW(10, 10)
+--- fehler
+Meintest du PARTICLE_SYSTEM_NEW
+
+=== anderer name aus einem anderen basic
+PRINT MAKEDIR("neu")
+--- fehler
+Meintest du MKDIR?
+
+=== kein vorschlag wenn nichts passt
+PRINT GLIBBERWURST(1)
+--- fehler
+Unbekannter Befehl 'GLIBBERWURST'
+
+=== dateiname statt geladenem klang
+PLAYSOUND("sprung.wav")
+--- fehler
+ein Dateiname ist noch kein Klang: erst `x = LOADSOUND("sprung.wav")`, dann `PLAYSOUND(x, ...)`
+
+=== dateiname statt geladenem bild
+SCREEN(40, 30, "Probe")
+DRAWIMAGE("held.png", 0, 0)
+--- fehler
+ein Dateiname ist noch kein Bild: erst `x = LOADIMAGE("held.png")`
+
+=== fehlender klang nennt datei und ordner
+DIM s AS SOUND
+s = LOADSOUND("gibtsnicht.wav")
+--- fehler
+LOADSOUND: Datei 'gibtsnicht.wav' nicht gefunden (gesucht relativ zu
+
+=== fehlende musik nennt datei und ordner
+PLAYMUSIC("gibtsnicht.ogg")
+--- fehler
+AUDIO_MUSIC_LOAD: Datei 'gibtsnicht.ogg' nicht gefunden (gesucht relativ zu
+
+=== eine klasse braucht NEW
+CLASS Spieler
+    DIM hp AS INTEGER
+END CLASS
+DIM p AS Spieler
+p.hp = 100
+--- fehler
+eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+
+=== ein struct nicht
+STRUCT Punkt
+    DIM x AS INTEGER
+END STRUCT
+DIM p AS Punkt
+p.x = 3
+PRINT p.x
+--- erwartet
+3
+
+=== eine datei ohne OPENFILE
+DIM f AS FILE
+WRITELINE(f, "x")
+--- fehler
+WRITELINE: die Datei ist nicht geoeffnet -- f = OPENFILE("name.txt", "w")
+
+=== ein feld zaehlt ab null
+DIM a[3] AS INTEGER
+PRINT a[3]
+--- fehler
+Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+
+=== weit daneben ohne den zaehl-hinweis
+DIM a[3] AS INTEGER
+PRINT a[99]
+--- fehler
+Index 99 ausserhalb [0..2] in Dimension 0
+
+=== eine taste ist eine zahl
+SCREEN(40, 30, "Probe")
+PRINT KEYHIT("a")
+--- fehler
+eine Taste ist eine ZAHL: KEYHIT(ASC("a")) oder die Konstante KEY_A
+
+=== eine farbe aus hex-text
+PRINT RGB("FF0000")
+--- fehler
+eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX("FF0000"); im Quelltext geht auch &HFF0000
+
+=== dateiname statt geladenem blatt
+IMPORT "sprite"
+DIM s AS SPRITE
+s = SPRITE_NEW("held.png", 16, 16)
+--- fehler
+ein Dateiname ist noch kein Bild: erst `x = LOADIMAGE("held.png")`, dann `SPRITE_NEW(x, ...)`
+
+=== eine zuweisung kopiert kein feld
+' Kein Fehler, sondern eine Eigenschaft -- aber eine, die man kennen muss:
+' `b = a` gibt demselben Feld einen zweiten Namen. Die Kopie ist `a[:]`.
+DIM a AS ARRAY OF INTEGER = [1, 2]
+DIM b AS ARRAY OF INTEGER
+b = a
+b[0] = 9
+DIM c AS ARRAY OF INTEGER
+c = a[:]
+c[0] = 7
+PRINT a[0]; " "; b[0]; " "; c[0]
+--- erwartet
+9 9 7
