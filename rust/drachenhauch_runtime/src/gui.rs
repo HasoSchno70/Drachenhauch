@@ -16174,7 +16174,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if alt && self.alt_allein && g.key_any_pressed_except_alt() { self.alt_allein = false; }
         let alt_los = !alt && self.alt_allein && (g.key_released_edge(K_LALT) || g.key_released_edge(K_RALT));
         if !alt { self.alt_allein = false; }
-        let oeffnen = g.key_pressed(K_F10) || alt_los;
+        // F10 ist die Menue-Taste nur, wenn sie nichts anderes ist: mit Strg
+        // gehoert sie einem Kuerzel ("bis zur Marke"), und hat ein Menue-
+        // Kuerzel sie genommen (die IDE: F10 = Schritt drueber), klappte sonst
+        // nebenbei die Menueleiste auf.
+        let f10 = g.key_pressed(K_F10) && !g.key_ctrl() && !g.key_shift() && !self.kuerzel_gefeuert;
+        let oeffnen = f10 || alt_los;
         let kontext = self.context_open.is_some();
         if self.open_menu.is_none() && !kontext {
             if oeffnen {

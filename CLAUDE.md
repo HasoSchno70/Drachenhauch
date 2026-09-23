@@ -849,6 +849,28 @@ vorher schrieb es die alten Texte blind zurueck. Die Reiternummer eines
 Umbaus zaehlt nur noch ohne Weg (`umbauReiter`). Beispiele nach Themen
 kamen danach (siehe unten).
 
+**Debugger: Aufrufstapel, Ueberwachen, bis zur Marke, Wert setzen**
+(2026-09-23): `dhrt debug` fuehrt je laufender Funktion (Name, Zeile des
+AUFRUFS) in `DebugState::stapel` -- geschoben in `exec`/`exec_byref`, nur
+wenn der Debugger laeuft; `paused` traegt `stack` (innen zuerst) und
+`watches`. Neue Kommandos `set-watches` (antwortet gleich mit einem
+`watches`-Ereignis, im Halt will man den Wert jetzt sehen), `run-to` (ein
+Haltepunkt, der beim NAECHSTEN Halt vergeht -- auch wenn ein anderer
+Haltepunkt zuerst trifft, sonst hielte es spaeter unerwartet) und `set`
+(Ausdruck, gewandelt mit `coerce` wie eine Zuweisung; erst lokal, dann
+global; `debug_on_line` bekommt dafuer die Locals veraenderlich). Eine
+`CONST` ist fuer den Debugger nicht da (eingesetzt), `set` meldet "nicht
+gefunden". Die IDE: Stapel und Ueberwachen rechts neben den Variablen,
+Doppelklick auf eine Variable = `GUI_PROMPT` -> `debugSetzen`, Strg+F10 =
+`bisZurMarke` (ohne laufenden Debugger startet er ihn, `debugBis` wird beim
+ersten Halt eingeloest). **Nebenfund in der gui:** F10 oeffnete die
+Menueleiste auch, wenn ein Menue-Kuerzel die Taste schon genommen hatte (die
+IDE: F10 = Schritt drueber) und mit Strg -- jetzt nur ohne Strg/Umschalt und
+ohne gefeuertes Kuerzel. Tests zwei Faelle in `tests/pruef/dhrt_debug.dhtest`
+(Protokoll), drei in `werkzeug_ide_handgriffe.dhtest`; drei Verfaelschungen
+der IDE (ohne Stapel, `debugBis` uebergangen, Setzen ohne Wirkung) fallen je
+in ihrem Fall.
+
 **Bearbeitbare Klappliste** (2026-09-23): `GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)`
 -- eine Combobox: getippt wird ueber `edit_textinput` (dieselbe Routine wie
 das Textfeld), der Text steht in `w.text`, `sel` folgt ihm

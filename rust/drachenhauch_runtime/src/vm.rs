@@ -542,6 +542,15 @@ struct DebugState {
     step: StepMode,
     step_depth: u32,
     out_sent: usize,   // wie viel von vm.out schon als output-Event gesendet wurde
+    // Aufrufstapel: je laufender Funktion ihr Name und die Zeile, in der sie
+    // GERUFEN wurde (die aktuelle Zeile der innersten steht in cur_line).
+    // Aussen zuerst; der erste Eintrag ist das Hauptprogramm.
+    stapel: Vec<(String, u32)>,
+    // Ueberwachte Ausdruecke: bei jedem Halt ausgewertet (Quelltext + die
+    // geparste Form; None = liess sich nicht lesen).
+    watches: Vec<(String, Option<crate::ast::Node>)>,
+    // "Bis hier laufen": ein Haltepunkt, der nach dem ersten Treffer vergeht.
+    run_to: Option<u32>,
 }
 
 impl DebugState {
@@ -549,7 +558,8 @@ impl DebugState {
         // Beim Start an der ersten Zeile anhalten -> der Editor setzt dann
         // Breakpoints und schickt `continue`.
         DebugState { breakpoints: HashMap::new(), step: StepMode::Into,
-                     step_depth: 0, out_sent: 0 }
+                     step_depth: 0, out_sent: 0, stapel: Vec::new(),
+                     watches: Vec::new(), run_to: None }
     }
 }
 
@@ -1391,14 +1401,14 @@ impl<'p> Vm<'p> {
 
     /// Per-Zeile-Hook fuer den Debugger. take/restore von self.dbg vermeidet
     /// Borrow-Konflikte mit self.globals/out beim Snapshot/eval.
-    fn debug_on_line(&mut self, fn_: &Func, locals: &[Value]) -> R<()> {
+    fn debug_on_line(&mut self, fn_: &Func, locals: &mut [Value]) -> R<()> {
         let mut dbg = match self.dbg.take() { Some(d) => d, None => return Ok(()) };
         let r = self.debug_cycle(&mut dbg, fn_, locals);
         self.dbg = Some(dbg);
         r
     }
 
-    fn debug_cycle(&mut self, dbg: &mut DebugState, fn_: &Func, locals: &[Value]) -> R<()> {
+    fn debug_cycle(&mut self, dbg: &mut DebugState, fn_: &Func, locals: &mut [Value]) -> R<()> {
         let line = self.cur_line;
         let depth = self.depth;
         // Neue Ausgabe live nachschieben.
@@ -1414,6 +1424,7 @@ impl<'p> Vm<'p> {
             StepMode::Out  => depth <  dbg.step_depth,
             StepMode::Run  => false,
         };
+        if dbg.run_to == Some(line) { pause = true; }
         if !pause {
             if let Some(cond) = dbg.breakpoints.get(&line) {
                 pause = match cond {
@@ -1425,10 +1436,15 @@ impl<'p> Vm<'p> {
             }
         }
         if !pause { return Ok(()); }
+        // Jeder Halt verbraucht "bis hier" -- auch einer an einem Haltepunkt
+        // davor, sonst hielte das Programm spaeter unerwartet noch einmal.
+        dbg.run_to = None;
         dbg_emit(&serde_json::json!({
             "event": "paused", "line": line, "depth": depth,
             "locals": self.dbg_locals_json(fn_, locals),
             "globals": self.dbg_globals_json(),
+            "stack": Self::dbg_stack_json(dbg, line),
+            "watches": self.dbg_watches_json(dbg, fn_, locals),
         }));
         // Kommandos lesen bis continue/step/stop/EOF.
         loop {
@@ -1443,6 +1459,36 @@ impl<'p> Vm<'p> {
                 "step-out"  => { dbg.step = StepMode::Out; dbg.step_depth = depth; return Ok(()); }
                 "stop"      => { self.debug_stop_flag = true; return Err("__DEBUG_STOP__".into()); }
                 "set-breakpoints" => self.dbg_set_breakpoints(dbg, &cmd),
+                "run-to" => {
+                    if let Some(ln) = cmd.get("line").and_then(|v| v.as_u64()) {
+                        dbg.run_to = Some(ln as u32);
+                        dbg.step = StepMode::Run;
+                        return Ok(());
+                    }
+                }
+                "set-watches" => {
+                    dbg.watches = cmd.get("exprs").and_then(|v| v.as_array()).map(|a| a.iter()
+                        .filter_map(|e| e.as_str())
+                        .map(|src| (src.to_string(), crate::parser::parse_expression(src).ok()))
+                        .collect()).unwrap_or_default();
+                    // Gleich beantworten -- wer im Halt einen Ausdruck
+                    // dazunimmt, will seinen Wert jetzt sehen, nicht erst beim
+                    // naechsten Halt.
+                    dbg_emit(&serde_json::json!({"event":"watches",
+                        "watches": self.dbg_watches_json(dbg, fn_, locals)}));
+                }
+                "set" => {
+                    let name = cmd.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let src = cmd.get("value").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    match self.dbg_setzen(fn_, locals, &name, &src) {
+                        Ok(v) => dbg_emit(&serde_json::json!({"event":"set-result","name":name,
+                            "value":dbg_short(&v),"type":v.type_name(),
+                            "locals": self.dbg_locals_json(fn_, locals),
+                            "globals": self.dbg_globals_json(),
+                            "watches": self.dbg_watches_json(dbg, fn_, locals)})),
+                        Err(e) => dbg_emit(&serde_json::json!({"event":"set-error","name":name,"message":e})),
+                    }
+                }
                 "eval" => {
                     let src = cmd.get("expr").and_then(|v| v.as_str()).unwrap_or("");
                     match crate::parser::parse_expression(src)
@@ -1455,6 +1501,62 @@ impl<'p> Vm<'p> {
                 _ => {}
             }
         }
+    }
+
+    /// Der Aufrufstapel fuer das paused-Ereignis: INNEN zuerst, je Eintrag
+    /// Name und Zeile -- die innerste steht in `line`, jede aeussere in der
+    /// Zeile, in der sie die naechst innere rief.
+    fn dbg_stack_json(dbg: &DebugState, line: u32) -> serde_json::Value {
+        let n = dbg.stapel.len();
+        let mut out = Vec::new();
+        for k in (0..n).rev() {
+            let zeile = if k + 1 == n { line } else { dbg.stapel[k + 1].1 };
+            out.push(serde_json::json!({"name": dbg.stapel[k].0, "line": zeile}));
+        }
+        serde_json::Value::Array(out)
+    }
+
+    /// Die ueberwachten Ausdruecke, jeder fuer sich ausgewertet: ein Fehler
+    /// in einem nimmt den anderen nichts.
+    fn dbg_watches_json(&self, dbg: &DebugState, fn_: &Func, locals: &[Value]) -> serde_json::Value {
+        let mut out = Vec::new();
+        for (src, node) in &dbg.watches {
+            let r = match node {
+                Some(n) => self.eval_node(n, fn_, locals),
+                None => Err("laesst sich nicht lesen".into()),
+            };
+            out.push(match r {
+                Ok(v) => serde_json::json!({"expr": src, "value": dbg_short(&v), "type": v.type_name()}),
+                Err(e) => serde_json::json!({"expr": src, "error": e}),
+            });
+        }
+        serde_json::Value::Array(out)
+    }
+
+    /// Eine Variable im Halt setzen: erst die lokale des aktuellen Rahmens,
+    /// sonst die globale. Der neue Wert geht durch dieselbe Umwandlung wie
+    /// eine Zuweisung -- aus "5" wird in einer INTEGER-Variable kein Text.
+    fn dbg_setzen(&self, fn_: &Func, locals: &mut [Value], name: &str, src: &str) -> R<Value> {
+        let key = name.trim().to_lowercase();
+        if key.is_empty() { return Err("set: kein Name".into()); }
+        let node = crate::parser::parse_expression(src)?;
+        let v = self.eval_node(&node, fn_, locals)?;
+        if let Some(i) = fn_.local_names.iter().position(|n| *n == key) {
+            if i < locals.len() {
+                let ty = fn_.local_types.get(i).cloned().unwrap_or_default();
+                let neu = if ty.is_empty() { v } else { coerce(v, &ty, name)? };
+                locals[i] = neu.clone();
+                return Ok(neu);
+            }
+        }
+        if let Some(slot) = self.globals.get(&key) {
+            let mut s = slot.borrow_mut();
+            if s.is_const { return Err(format!("set: '{}' ist eine Konstante", name)); }
+            let neu = if s.ty.is_empty() { v } else { coerce(v, &s.ty, name)? };
+            s.value = neu.clone();
+            return Ok(neu);
+        }
+        Err(format!("set: '{}' nicht gefunden", name))
     }
 
     fn dbg_set_breakpoints(&self, dbg: &mut DebugState, cmd: &serde_json::Value) {
@@ -1550,7 +1652,10 @@ impl<'p> Vm<'p> {
             self.depth -= 1;
             return Err(format!("Maximale Aufruftiefe ({}) ueberschritten -- unendliche Rekursion?", MAX_CALL_DEPTH));
         }
+        let line = self.cur_line;
+        if let Some(d) = self.dbg.as_mut() { d.stapel.push((fn_.name.clone(), line)); }
         let r = self.exec_inner(fn_, args, self_obj);
+        if let Some(d) = self.dbg.as_mut() { d.stapel.pop(); }
         self.depth -= 1;
         r
     }
@@ -1584,7 +1689,10 @@ impl<'p> Vm<'p> {
             self.depth -= 1;
             return Err(format!("Maximale Aufruftiefe ({}) ueberschritten -- unendliche Rekursion?", MAX_CALL_DEPTH));
         }
+        let line = self.cur_line;
+        if let Some(d) = self.dbg.as_mut() { d.stapel.push((fn_.name.clone(), line)); }
         let r = self.exec_byref_inner(fn_, args, self_obj);
+        if let Some(d) = self.dbg.as_mut() { d.stapel.pop(); }
         self.depth -= 1;
         r
     }
