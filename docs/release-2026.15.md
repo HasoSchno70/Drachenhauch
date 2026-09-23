@@ -98,7 +98,8 @@ eine falsche Argumentzahl nennt die Form des Befehls. Die Übersicht steht in
 **Zahlen.** Die Befehlsreferenz von 1911 auf **1993** Einträge, die
 Modulliste von 47 auf **48** (`video`), die Beispiele von 215 auf **216**.
 **3981 Fälle in 283 Prüfsammlungen** (vorher 3602 in 257) und **431
-Rust-Testfunktionen** (vorher 404).
+Rust-Testfunktionen** (vorher 404). Der Windows-Installer wächst von 43 auf
+**54 MB** — der Vorspann bringt 8 MB mit, der Video-Decoder den Rest.
 
 ## Was offen bleibt
 
