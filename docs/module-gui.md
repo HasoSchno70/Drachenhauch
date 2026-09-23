@@ -314,6 +314,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_DROPDOWN_SET_SELECTED(dd, i)` | — | Auswahl vom Programm aus setzen |
 | `GUI_SET_DROPDOWN(dd, items)` | — | Eintraege ersetzen |
 | `GUI_DROPDOWN_PLACEHOLDER(dd, text$)` | — | Hinweis in der Box, solange nichts gewählt ist („Bitte wählen“) |
+| `GUI_DROPDOWN_SET(dd, key$, wert)` | — | Einstellung der Klappliste; `bearbeitbar` = in das Feld darf getippt werden, auch was nicht in der Liste steht (Combobox) |
 | `GUI_LISTBOX(win, x, y, w, h, items)` | GUI_WIDGET | scrollbare Auswahlliste (Mausrad scrollt; mit gedrückter Strg-Taste rollt kein Widget, siehe Abschnitt „Strg+Rad gehört dem Programm“) |
 | `GUI_LISTBOX_SELECTED(lb)` | INTEGER | Index der Auswahl (`-1` = keine) |
 | `GUI_LISTBOX_TEXT(lb)` | STRING | Text der Auswahl |
@@ -724,6 +725,28 @@ dd = GUI_DROPDOWN(win, 20, 130, 160, 24, farben)   ' Klick klappt die Liste auf
 - **Platzhalter**: `GUI_DROPDOWN_PLACEHOLDER(dd, "Bitte wählen")` steht gedämpft
   in der Box, solange nichts gewählt ist (`GUI_DROPDOWN_SET_SELECTED(dd, -1)`);
   er steht in der `.dhform` (`placeholder`).
+- **Bearbeitbar** (Combobox): `GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)` macht
+  aus der Box ein Textfeld mit Pfeil. Getippt wird wie in einem Textfeld
+  (Markieren, Strg+Z, Einfügen); die Liste **schlägt vor** -- sie klappt auf
+  und markiert den ersten Eintrag, der so anfängt. **Übernommen wird der
+  Vorschlag nur mit den Pfeilen**: Enter nimmt den mit Pfeil ab/auf gewählten
+  Eintrag, sonst bleibt, was getippt ist (ein Vorschlag, der von selbst
+  gewönne, ersetzte „Rotwein“ durch „Rot“). Ein Klick ins Feld setzt die
+  Schreibmarke, nur der Pfeil klappt auf; Pfeil ab öffnet, ESC klappt zu.
+  `GUI_DROPDOWN_TEXT` und `GUI_TEXT` liefern den **Text**, `GUI_DROPDOWN_SELECTED`
+  den Eintrag, der genau so heißt (Groß/klein egal) -- sonst `-1`.
+  `GUI_SET_TEXT` setzt den Text, `GUI_DROPDOWN_SET_SELECTED` schreibt den
+  Eintrag ins Feld. Enter aus dem Feld schickt das Formular ab wie aus einem
+  Textfeld (`GUI_ENTERED`, Standard-Knopf). In der `.dhform` steht
+  `bearbeitbar`.
+
+```basic
+DIM stadt AS GUI_WIDGET
+stadt = GUI_DROPDOWN(win, 20, 20, 220, 28, ["Berlin", "Bremen", "Hamburg", "München"])
+GUI_DROPDOWN_SET(stadt, "bearbeitbar", 1)
+' ... nach GUI_UPDATE:
+IF GUI_ENTERED(stadt) THEN PRINT GUI_DROPDOWN_TEXT(stadt); GUI_DROPDOWN_SELECTED(stadt)
+```
 
 ### ProgressBar
 

@@ -5582,6 +5582,7 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.list_find(gi(a,0,"GUI_LISTBOX_FIND")?, &gs(a,1,"GUI_LISTBOX_FIND")?, ab)?)
             }
             "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
+            "gui_dropdown_set" => { self.gui.dropdown_set(gi(a,0,"GUI_DROPDOWN_SET")?, &gs(a,1,"GUI_DROPDOWN_SET")?, gnum(a,2,"GUI_DROPDOWN_SET")?)?; Value::Nil }
             "gui_dropdown_placeholder" => { self.gui.dropdown_placeholder(gi(a,0,"GUI_DROPDOWN_PLACEHOLDER")?, gs(a,1,"GUI_DROPDOWN_PLACEHOLDER")?.to_string())?; Value::Nil }
             "gui_tree_edit" => { self.gui.tree_edit(gi(a,0,"GUI_TREE_EDIT")?, gi(a,1,"GUI_TREE_EDIT")?)?; Value::Nil }
             "gui_tree_edited" => Value::Int(self.gui.tree_edited(gi(a,0,"GUI_TREE_EDITED")?)?),

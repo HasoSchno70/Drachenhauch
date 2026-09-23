@@ -1,0 +1,397 @@
+' Bearbeitbare Klappliste (GUI_DROPDOWN_SET "bearbeitbar", 2026-09-23).
+' Getippt wird mit ECHTEN Fensternachrichten (fenstersender.ps1: WM_CHAR fuer
+' Zeichen, Pfeile/Enter/ESC als Tasten) -- eine Aufnahme fuellt raylibs
+' Zeichenwarteschlange nicht. Das Kind (feld.dh) legt eine Klappliste mit
+' vier Staedten an, einen Standard- und einen Abbrechen-Knopf, und gibt am
+' Ende Text, Auswahl und die gezaehlten Ereignisse aus. ARG$(1) sagt, ob die
+' Liste bearbeitbar ist ("frei") oder fest ("fest").
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== frei getippter text bleibt und enter schickt ab
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:Rotwein|enter", "frei")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(320, 240, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg", "Muenchen"])
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 190, 80, 28)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 100, 190, 100, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_DROPDOWN_SET_SELECTED(dd, -1)
+IF ARG$(1) = "frei" THEN GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+GUI_FOCUS(dd)
+DIM nOk AS INTEGER
+DIM nAb AS INTEGER
+DIM nEnter AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+    IF GUI_ENTERED(dd) THEN nEnter = nEnter + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "[" + GUI_DROPDOWN_TEXT(dd) + "] " + STR$(GUI_DROPDOWN_SELECTED(dd)) + " ok " + STR$(nOk) + " abbrechen " + STR$(nAb) + " enter " + STR$(nEnter)
+--- system windows
+--- erwartet
+gesendet
+[Rotwein] -1 ok 1 abbrechen 0 enter 1
+
+=== ein vorschlag wird nicht von selbst uebernommen
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:Br|enter", "frei")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(320, 240, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg", "Muenchen"])
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 190, 80, 28)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 100, 190, 100, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_DROPDOWN_SET_SELECTED(dd, -1)
+IF ARG$(1) = "frei" THEN GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+GUI_FOCUS(dd)
+DIM nOk AS INTEGER
+DIM nAb AS INTEGER
+DIM nEnter AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+    IF GUI_ENTERED(dd) THEN nEnter = nEnter + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "[" + GUI_DROPDOWN_TEXT(dd) + "] " + STR$(GUI_DROPDOWN_SELECTED(dd)) + " ok " + STR$(nOk) + " abbrechen " + STR$(nAb) + " enter " + STR$(nEnter)
+--- system windows
+--- erwartet
+gesendet
+[Br] -1 ok 0 abbrechen 0 enter 1
+
+=== mit dem pfeil gewaehlt nimmt enter den eintrag
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:B|ab|enter", "frei")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(320, 240, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg", "Muenchen"])
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 190, 80, 28)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 100, 190, 100, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_DROPDOWN_SET_SELECTED(dd, -1)
+IF ARG$(1) = "frei" THEN GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+GUI_FOCUS(dd)
+DIM nOk AS INTEGER
+DIM nAb AS INTEGER
+DIM nEnter AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+    IF GUI_ENTERED(dd) THEN nEnter = nEnter + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "[" + GUI_DROPDOWN_TEXT(dd) + "] " + STR$(GUI_DROPDOWN_SELECTED(dd)) + " ok " + STR$(nOk) + " abbrechen " + STR$(nAb) + " enter " + STR$(nEnter)
+--- system windows
+--- erwartet
+gesendet
+[Bremen] 1 ok 0 abbrechen 0 enter 0
+
+=== die auswahl folgt dem text in jeder schreibweise
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:hamburg", "frei")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(320, 240, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg", "Muenchen"])
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 190, 80, 28)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 100, 190, 100, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_DROPDOWN_SET_SELECTED(dd, -1)
+IF ARG$(1) = "frei" THEN GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+GUI_FOCUS(dd)
+DIM nOk AS INTEGER
+DIM nAb AS INTEGER
+DIM nEnter AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+    IF GUI_ENTERED(dd) THEN nEnter = nEnter + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "[" + GUI_DROPDOWN_TEXT(dd) + "] " + STR$(GUI_DROPDOWN_SELECTED(dd)) + " ok " + STR$(nOk) + " abbrechen " + STR$(nAb) + " enter " + STR$(nEnter)
+--- system windows
+--- erwartet
+gesendet
+[hamburg] 2 ok 0 abbrechen 0 enter 0
+
+=== pfeil ab oeffnet, pfeil waehlt
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "ab|ab|enter", "frei")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(320, 240, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg", "Muenchen"])
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 190, 80, 28)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 100, 190, 100, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_DROPDOWN_SET_SELECTED(dd, -1)
+IF ARG$(1) = "frei" THEN GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+GUI_FOCUS(dd)
+DIM nOk AS INTEGER
+DIM nAb AS INTEGER
+DIM nEnter AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+    IF GUI_ENTERED(dd) THEN nEnter = nEnter + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "[" + GUI_DROPDOWN_TEXT(dd) + "] " + STR$(GUI_DROPDOWN_SELECTED(dd)) + " ok " + STR$(nOk) + " abbrechen " + STR$(nAb) + " enter " + STR$(nEnter)
+--- system windows
+--- erwartet
+gesendet
+[Berlin] 0 ok 0 abbrechen 0 enter 0
+
+=== esc klappt erst zu und bricht dann ab
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:B|escape|escape", "frei")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(320, 240, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg", "Muenchen"])
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 190, 80, 28)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 100, 190, 100, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_DROPDOWN_SET_SELECTED(dd, -1)
+IF ARG$(1) = "frei" THEN GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+GUI_FOCUS(dd)
+DIM nOk AS INTEGER
+DIM nAb AS INTEGER
+DIM nEnter AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+    IF GUI_ENTERED(dd) THEN nEnter = nEnter + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "[" + GUI_DROPDOWN_TEXT(dd) + "] " + STR$(GUI_DROPDOWN_SELECTED(dd)) + " ok " + STR$(nOk) + " abbrechen " + STR$(nAb) + " enter " + STR$(nEnter)
+--- system windows
+--- erwartet
+gesendet
+[B] -1 ok 0 abbrechen 1 enter 0
+
+=== zurueck geht wie im textfeld
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:Berlinx|rueck", "frei")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(320, 240, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg", "Muenchen"])
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 190, 80, 28)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 100, 190, 100, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_DROPDOWN_SET_SELECTED(dd, -1)
+IF ARG$(1) = "frei" THEN GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+GUI_FOCUS(dd)
+DIM nOk AS INTEGER
+DIM nAb AS INTEGER
+DIM nEnter AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+    IF GUI_ENTERED(dd) THEN nEnter = nEnter + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "[" + GUI_DROPDOWN_TEXT(dd) + "] " + STR$(GUI_DROPDOWN_SELECTED(dd)) + " ok " + STR$(nOk) + " abbrechen " + STR$(nAb) + " enter " + STR$(nEnter)
+--- system windows
+--- erwartet
+gesendet
+[Berlin] 0 ok 0 abbrechen 0 enter 0
+
+=== die feste klappliste nimmt kein freies wort
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:Rotwein", "fest")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(320, 240, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg", "Muenchen"])
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 190, 80, 28)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 100, 190, 100, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_DROPDOWN_SET_SELECTED(dd, -1)
+IF ARG$(1) = "frei" THEN GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+GUI_FOCUS(dd)
+DIM nOk AS INTEGER
+DIM nAb AS INTEGER
+DIM nEnter AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+    IF GUI_ENTERED(dd) THEN nEnter = nEnter + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "[" + GUI_DROPDOWN_TEXT(dd) + "] " + STR$(GUI_DROPDOWN_SELECTED(dd)) + " ok " + STR$(nOk) + " abbrechen " + STR$(nAb) + " enter " + STR$(nEnter)
+--- system windows
+--- erwartet
+gesendet
+[] -1 ok 0 abbrechen 0 enter 0
+
+=== esc in der offenen festen klappliste bricht nicht ab
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "ab|escape", "fest")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(320, 240, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg", "Muenchen"])
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 10, 190, 80, 28)
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 100, 190, 100, 28)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_DROPDOWN_SET_SELECTED(dd, -1)
+IF ARG$(1) = "frei" THEN GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+GUI_FOCUS(dd)
+DIM nOk AS INTEGER
+DIM nAb AS INTEGER
+DIM nEnter AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN nOk = nOk + 1
+    IF GUI_CLICKED(ab) THEN nAb = nAb + 1
+    IF GUI_ENTERED(dd) THEN nEnter = nEnter + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "[" + GUI_DROPDOWN_TEXT(dd) + "] " + STR$(GUI_DROPDOWN_SELECTED(dd)) + " ok " + STR$(nOk) + " abbrechen " + STR$(nAb) + " enter " + STR$(nEnter)
+--- system windows
+--- erwartet
+gesendet
+[] -1 ok 0 abbrechen 0 enter 0
+
+=== text, auswahl und formular ohne tippen
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 320, 240)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 220, 28, ["Berlin", "Bremen", "Hamburg"])
+PRINT "fest " + GUI_DROPDOWN_TEXT(dd) + " " + STR$(GUI_DROPDOWN_SELECTED(dd))
+GUI_DROPDOWN_SET(dd, "bearbeitbar", 1)
+PRINT "an " + GUI_DROPDOWN_TEXT(dd) + " " + STR$(GUI_DROPDOWN_SELECTED(dd))
+GUI_SET_TEXT(dd, "bremen")
+PRINT "gesetzt " + GUI_DROPDOWN_TEXT(dd) + " " + STR$(GUI_DROPDOWN_SELECTED(dd))
+GUI_SET_TEXT(dd, "Kiel")
+PRINT "frei " + GUI_TEXT(dd) + " " + STR$(GUI_DROPDOWN_SELECTED(dd))
+GUI_SET_DROPDOWN(dd, ["Kiel", "Luebeck"])
+PRINT "neue liste " + GUI_TEXT(dd) + " " + STR$(GUI_DROPDOWN_SELECTED(dd))
+GUI_DROPDOWN_SET_SELECTED(dd, 1)
+PRINT "gewaehlt " + GUI_DROPDOWN_TEXT(dd) + " " + STR$(GUI_DROPDOWN_SELECTED(dd))
+DIM j AS STRING : j = GUI_TO_JSON(w)
+PRINT "in der datei " ; INSTR(j, CHR$(34) + "bearbeitbar" + CHR$(34)) >= 0
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+DIM d2 AS GUI_WIDGET : d2 = GUI_WINDOW_WIDGET(w2, 0)
+GUI_SET_TEXT(d2, "Irgendwo")
+PRINT "geladen " + GUI_DROPDOWN_TEXT(d2) + " " + STR$(GUI_DROPDOWN_SELECTED(d2))
+TRY
+    GUI_DROPDOWN_SET(dd, "gibtsnicht", 1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+fest Berlin 0
+an Berlin 0
+gesetzt bremen 1
+frei Kiel -1
+neue liste Kiel 0
+gewaehlt Luebeck 1
+in der datei TRUE
+geladen Irgendwo -1
+GUI_DROPDOWN_SET: unbekannter Schluessel 'gibtsnicht' (bekannt: bearbeitbar)

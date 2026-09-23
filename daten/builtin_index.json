@@ -3285,6 +3285,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DROPDOWN_SET",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_SET(dd, key$, wert)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DROPDOWN_SELECTED",
    "kind": "core",
    "signature": "GUI_DROPDOWN_SELECTED(dd)",

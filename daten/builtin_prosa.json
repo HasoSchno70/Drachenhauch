@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1926,
+ "count": 1927,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -528,6 +528,7 @@
   "GUI_DROPDOWN": "GUI_WIDGET — aufklappende Auswahlliste; das Popup wird ueber allen anderen Widgets gezeichnet",
   "GUI_DROPDOWN_PLACEHOLDER": "Hinweis in der Box, solange nichts gewählt ist („Bitte wählen“)",
   "GUI_DROPDOWN_SELECTED": "INTEGER — Index der Auswahl (-1 = keine)",
+  "GUI_DROPDOWN_SET": "Einstellung der Klappliste; bearbeitbar = in das Feld darf getippt werden, auch was nicht in der Liste steht (Combobox)",
   "GUI_DROPDOWN_SET_SELECTED": "Auswahl vom Programm aus setzen",
   "GUI_DROPDOWN_TEXT": "STRING — Text der Auswahl",
   "GUI_DROPPED": "GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile",
