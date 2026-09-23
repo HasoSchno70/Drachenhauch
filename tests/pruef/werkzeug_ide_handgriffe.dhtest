@@ -417,3 +417,52 @@ NEXT
 gemerkt 2
 datei spiel.dh
 falten wieder 1
+
+=== druckoptionen: schrift, rand, zeilennummern, auswahl
+' Mit den Vorgaben ist es das Listing von vorher (66 Zeilen je Seite); mit
+' 12 pt, 30 mm und ohne Nummern passen weniger Zeilen auf eine Seite, und
+' "Nur die Auswahl" nimmt die ganzen Zeilen 2 bis 3.
+DIM p AS PDF : p = listingPdf(FALSE)
+PDF_CLOSE(p)
+GUI_SET_VALUE(spDruckGr, 12)
+GUI_SET_VALUE(spDruckRand, 30)
+GUI_SET_CHECKED(cbDruckNr, FALSE)
+druckOptionenLesen()
+GUI_TEXTAREA_SELECT(tabFelder[0], 2, 3, 3, 2)
+p = listingPdf(TRUE)
+PDF_SAVE(p, "auswahl.pdf")
+PDF_CLOSE(p)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+--- datei _programm/lesen.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- nachher
+IMPORT "json"
+IMPORT "_programm/lesen.dh"
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 8) = "listing " THEN PRINT P[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt " ; JSON_GET_INT(k, "druck_groesse") ; " " ; JSON_GET_INT(k, "druck_rand") ; " " ; JSON_GET_BOOL(k, "druck_nummern")
+DIM texte AS ARRAY OF STRING : texte = pdfSeiten("_programm/auswahl.pdf")
+PRINT "zeile 2 ohne nummer " ; INSTR(texte[0], "PRINT 2") >= 0 AND INSTR(texte[0], "    2  PRINT 2") < 0
+PRINT "zeile 4 fehlt " ; INSTR(texte[0], "PRINT 4") < 0
+--- erwartet
+listing 4 zeilen 1 seiten je 66 breite 81
+listing 2 zeilen 1 seiten je 46 breite 58
+gemerkt 12 30 FALSE
+zeile 2 ohne nummer TRUE
+zeile 4 fehlt TRUE

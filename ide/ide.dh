@@ -333,6 +333,10 @@ DIM leisteAn AS BOOLEAN : leisteAn = TRUE
 ' kommt von selbst zurueck, sobald ein Programm startet: seine Ausgabe
 ' nicht zu sehen, waere schlimmer als die verlorenen Zeilen.
 DIM seitenAn AS BOOLEAN : seitenAn = TRUE
+' Druckoptionen fuer das Listing (auch fuer die PDF daneben), gemerkt.
+DIM druckGroesse AS INTEGER : druckGroesse = 9
+DIM druckRand AS INTEGER : druckRand = 20
+DIM druckNummern AS BOOLEAN : druckNummern = TRUE
 DIM untenAn AS BOOLEAN : untenAn = TRUE
 ' Automatisch sichern: Sekunden ohne Anschlag, 0 = aus.
 DIM autoSichern AS INTEGER : autoSichern = 0
@@ -474,6 +478,9 @@ IF JSON_HAS(konfig, "umbau_vorschau") THEN vorschauAn = JSON_GET_BOOL(konfig, "u
 IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
 IF JSON_HAS(konfig, "seitenleiste") THEN seitenAn = JSON_GET_BOOL(konfig, "seitenleiste")
 IF JSON_HAS(konfig, "untere_leiste") THEN untenAn = JSON_GET_BOOL(konfig, "untere_leiste")
+IF JSON_HAS(konfig, "druck_groesse") THEN druckGroesse = MAX(6, MIN(16, JSON_GET_INT(konfig, "druck_groesse")))
+IF JSON_HAS(konfig, "druck_rand") THEN druckRand = MAX(10, MIN(40, JSON_GET_INT(konfig, "druck_rand")))
+IF JSON_HAS(konfig, "druck_nummern") THEN druckNummern = JSON_GET_BOOL(konfig, "druck_nummern")
 IF JSON_HAS(konfig, "falten_pfade") AND JSON_HAS(konfig, "falten_zeilen") THEN
     DIM fk AS INTEGER
     FOR fk = 0 TO MIN(JSON_LEN(konfig, "falten_pfade"), JSON_LEN(konfig, "falten_zeilen")) - 1
@@ -1149,16 +1156,22 @@ DIM sucheAnkerS AS INTEGER : sucheAnkerS = 1
 DIM sucheZahlAlt AS STRING : sucheZahlAlt = "-"
 
 ' Druckdialog: Drucker waehlen, Kopien, oder doch als PDF.
-DIM winDruck AS GUI_WINDOW : winDruck = GUI_WINDOW("Listing drucken", 440, 240, 400, 170)
+DIM winDruck AS GUI_WINDOW : winDruck = GUI_WINDOW("Listing drucken", 440, 240, 400, 270)
 GUI_WINDOW_CLOSABLE(winDruck, TRUE)
 DIM lblDrucker AS GUI_WIDGET : lblDrucker = GUI_LABEL(winDruck, "Drucker", 12, 14)
 DIM ddDrucker AS GUI_WIDGET : ddDrucker = GUI_DROPDOWN(winDruck, 90, 10, 296, 26, [])
 DIM lblKopien AS GUI_WIDGET : lblKopien = GUI_LABEL(winDruck, "Kopien", 12, 50)
 DIM spKopien AS GUI_WIDGET : spKopien = GUI_SPINNER(winDruck, 90, 46, 90, 1, 9, 1)
-DIM btnDruckOk AS GUI_WIDGET : btnDruckOk = GUI_BUTTON(winDruck, "Drucken", 12, 96, 110, 28)
+DIM lblDruckGr AS GUI_WIDGET : lblDruckGr = GUI_LABEL(winDruck, "Schrift (pt)", 12, 86)
+DIM spDruckGr AS GUI_WIDGET : spDruckGr = GUI_SPINNER(winDruck, 130, 82, 90, 6, 16, druckGroesse)
+DIM lblDruckRand AS GUI_WIDGET : lblDruckRand = GUI_LABEL(winDruck, "Rand (mm)", 12, 122)
+DIM spDruckRand AS GUI_WIDGET : spDruckRand = GUI_SPINNER(winDruck, 130, 118, 90, 10, 40, druckRand)
+DIM cbDruckNr AS GUI_WIDGET : cbDruckNr = GUI_CHECKBOX(winDruck, "Zeilennummern", 12, 156, druckNummern)
+DIM cbDruckAuswahl AS GUI_WIDGET : cbDruckAuswahl = GUI_CHECKBOX(winDruck, "Nur die Auswahl", 200, 156, FALSE)
+DIM btnDruckOk AS GUI_WIDGET : btnDruckOk = GUI_BUTTON(winDruck, "Drucken", 12, 196, 110, 28)
 GUI_BUTTON_VARIANT(btnDruckOk, "primaer")
-DIM btnDruckPdf AS GUI_WIDGET : btnDruckPdf = GUI_BUTTON(winDruck, "Als PDF neben die Quelle", 130, 96, 180, 28)
-DIM btnDruckWeg AS GUI_WIDGET : btnDruckWeg = GUI_BUTTON(winDruck, "Abbrechen", 318, 96, 70, 28)
+DIM btnDruckPdf AS GUI_WIDGET : btnDruckPdf = GUI_BUTTON(winDruck, "Als PDF neben die Quelle", 130, 196, 180, 28)
+DIM btnDruckWeg AS GUI_WIDGET : btnDruckWeg = GUI_BUTTON(winDruck, "Abbrechen", 318, 196, 70, 28)
 GUI_WINDOW_DEFAULT(winDruck, btnDruckOk)
 GUI_WINDOW_CANCEL(winDruck, btnDruckWeg)
 GUI_WINDOW_VISIBLE(winDruck, FALSE)
@@ -1298,6 +1311,9 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "leiste", leisteAn)
     JSON_SET_BOOL(konfig, "seitenleiste", seitenAn)
     JSON_SET_BOOL(konfig, "untere_leiste", untenAn)
+    JSON_SET_INT(konfig, "druck_groesse", druckGroesse)
+    JSON_SET_INT(konfig, "druck_rand", druckRand)
+    JSON_SET_BOOL(konfig, "druck_nummern", druckNummern)
     JSON_SET_INT(konfig, "autosichern", autoSichern)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
@@ -8053,48 +8069,81 @@ SUB handbuchSuchen(vorwaerts AS BOOLEAN)
 END SUB
 
 ' --- Listing drucken / als PDF (pdf-Modul) -----------------------------
-FUNCTION listingPdf() AS PDF
+' Die Optionen aus dem Druckdialog uebernehmen und merken -- auch die PDF
+' daneben nimmt sie, ob der Dialog offen war oder nicht.
+SUB druckOptionenLesen()
+    druckGroesse = MAX(6, MIN(16, INT(GUI_VALUE(spDruckGr))))
+    druckRand = MAX(10, MIN(40, INT(GUI_VALUE(spDruckRand))))
+    druckNummern = GUI_CHECKED(cbDruckNr)
+    konfigSichern()
+END SUB
+
+' Das Listing als PDF. Schrift, Rand und Zeilennummern aus den
+' Druckoptionen; `nurAuswahl` nimmt die ganzen Zeilen der Auswahl (mit
+' ihren echten Nummern). Mit den Vorgaben (9 pt, 20 mm) ist es genau das
+' Listing von vorher: 66 Zeilen je Seite, 3,9 mm Abstand.
+FUNCTION listingPdf(nurAuswahl AS BOOLEAN) AS PDF
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     DIM name AS STRING : name = "Unbenannt"
     IF tabPfade[aktiverTab] <> "" THEN name = BASENAME(tabPfade[aktiverTab])
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM von AS INTEGER : von = 0
+    DIM bis AS INTEGER : bis = LEN(zeilen) - 1
+    IF nurAuswahl AND GUI_TEXTAREA_SELECTION$(ta) <> "" THEN
+        DIM z1 AS INTEGER
+        DIM s1 AS INTEGER
+        DIM z2 AS INTEGER
+        DIM s2 AS INTEGER
+        (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+        ' Endet die Auswahl in Spalte 1 einer Zeile, gehoert die nicht dazu.
+        IF s2 = 1 AND z2 > z1 THEN z2 = z2 - 1
+        von = z1 - 1 : bis = z2 - 1
+        name = name + " (Zeilen " + STR$(z1) + "-" + STR$(z2) + ")"
+    END IF
     DIM p AS PDF : p = PDF_NEW()
     PDF_TITLE(p, name)
-    CONST BREITE = 92                   ' Zeichen je Zeile in Courier 9 pt auf A4
-    CONST JE_SEITE = 66
-    DIM reihe AS INTEGER : reihe = JE_SEITE
+    DIM rand AS FLOAT : rand = druckRand
+    DIM zeilenH AS FLOAT : zeilenH = druckGroesse * 3.9 / 9.0
+    PDF_FONT(p, "courier", druckGroesse)
+    ' Eine Monospace-Schrift: ein Zeichen misst so viel wie jedes andere.
+    DIM zeichenB AS FLOAT : zeichenB = PDF_TEXT_WIDTH(p, "M")
+    DIM vorB AS INTEGER : vorB = IIF(druckNummern, 7, 0)
+    DIM breite AS INTEGER : breite = MAX(20, INT((210.0 - 2.0 * rand) / zeichenB) - vorB)
+    DIM jeSeite AS INTEGER : jeSeite = MAX(10, INT((297.0 - 2.0 * rand) / zeilenH) + 1)
+    DIM reihe AS INTEGER : reihe = jeSeite
     DIM seite AS INTEGER : seite = 0
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(zeilen) - 1
+    FOR i = von TO bis
         DIM rest AS STRING : rest = REPLACE$(zeilen[i], CHR$(9), "    ")
         DIM nummer AS STRING : nummer = RIGHT$("     " + STR$(i + 1), 5)
         DIM ersteHaelfte AS BOOLEAN : ersteHaelfte = TRUE
         REPEAT
-            IF reihe >= JE_SEITE THEN
+            IF reihe >= jeSeite THEN
                 ' PDF_NEW bringt die erste Seite schon mit -- ein PDF_PAGE davor
                 ' liesse ein leeres Blatt vorn (so war es zuerst).
                 IF seite > 0 THEN PDF_PAGE(p)
                 seite = seite + 1
                 PDF_FONT(p, "helvetica", 9)
-                PDF_TEXT(p, 20, 12, name + "   Seite " + STR$(seite))
-                PDF_LINE(p, 20, 15, 190, 15)
-                PDF_FONT(p, "courier", 9)
+                PDF_TEXT(p, rand, rand - 8.0, name + "   Seite " + STR$(seite))
+                PDF_LINE(p, rand, rand - 5.0, 210.0 - rand, rand - 5.0)
+                PDF_FONT(p, "courier", druckGroesse)
                 reihe = 0
             END IF
-            DIM stueck AS STRING : stueck = LEFT$(rest, BREITE)
+            DIM stueck AS STRING : stueck = LEFT$(rest, breite)
             rest = MID$(rest, LEN(stueck))
-            DIM vorspann AS STRING : vorspann = nummer + "  "
-            IF NOT ersteHaelfte THEN vorspann = "       "
+            DIM vorspann AS STRING : vorspann = ""
+            IF druckNummern THEN vorspann = IIF(ersteHaelfte, nummer + "  ", "       ")
             TRY
-                PDF_TEXT(p, 20, 22 + reihe * 3.9, vorspann + stueck)
+                PDF_TEXT(p, rand, rand + 2.0 + reihe * zeilenH, vorspann + stueck)
             CATCH e
-                ' Ein Zeichen ausserhalb von cp1252 -- die Zeile kommt gekennzeichnet.
-                PDF_TEXT(p, 20, 22 + reihe * 3.9, vorspann + "[Zeile mit Zeichen außerhalb von cp1252]")
+                ' Ein Zeichen, das die Schrift nicht hat -- die Zeile kommt gekennzeichnet.
+                PDF_TEXT(p, rand, rand + 2.0 + reihe * zeilenH, vorspann + "[Zeile mit einem Zeichen, das die Schrift nicht hat]")
             END TRY
             reihe = reihe + 1
             ersteHaelfte = FALSE
         UNTIL rest = ""
     NEXT
+    protokoll("listing " + STR$(bis - von + 1) + " zeilen " + STR$(seite) + " seiten je " + STR$(jeSeite) + " breite " + STR$(breite))
     RETURN p
 END FUNCTION
 
@@ -8105,7 +8154,7 @@ SUB listingAlsPdf()
     DIM ziel AS STRING : ziel = pfad
     IF LOWER$(RIGHT$(ziel, 3)) = ".dh" THEN ziel = LEFT$(ziel, LEN(ziel) - 3)
     ziel = ziel + ".pdf"
-    DIM p AS PDF : p = listingPdf()
+    DIM p AS PDF : p = listingPdf(FALSE)
     PDF_SAVE(p, ziel)
     GUI_SET_TEXT(lblStatus, "PDF geschrieben: " + ziel + " (" + STR$(PDF_PAGE_COUNT(p)) + " Seiten)")
     PDF_CLOSE(p)
@@ -8121,7 +8170,11 @@ SUB listingDrucken()
     GUI_SET_DROPDOWN(ddDrucker, druckerNamen)
     DIM k AS INTEGER : k = ARRAY_INDEXOF(druckerNamen, PRINTER_DEFAULT$())
     GUI_DROPDOWN_SET_SELECTED(ddDrucker, MAX(k, 0))
-    GUI_WINDOW_SET_BOUNDS(winDruck, (SCREENWIDTH() - 400) \ 2, (SCREENHEIGHT() - 170) \ 2, 400, 170)
+    ' "Nur die Auswahl" gibt es nur, wenn etwas ausgewaehlt ist.
+    DIM hatAuswahl AS BOOLEAN : hatAuswahl = GUI_TEXTAREA_SELECTION$(aktivesFeld()) <> ""
+    GUI_SET_ENABLED(cbDruckAuswahl, hatAuswahl)
+    GUI_SET_CHECKED(cbDruckAuswahl, hatAuswahl AND GUI_CHECKED(cbDruckAuswahl))
+    GUI_WINDOW_SET_BOUNDS(winDruck, (SCREENWIDTH() - 400) \ 2, (SCREENHEIGHT() - 270) \ 2, 400, 270)
     GUI_WINDOW_VISIBLE(winDruck, TRUE)
     GUI_FOCUS(btnDruckOk)              ' holt das Fenster nach vorn
 END SUB
@@ -8133,7 +8186,8 @@ SUB druckenAusfuehren()
     IF sel < 0 OR sel >= LEN(druckerNamen) THEN RETURN
     DIM drucker AS STRING : drucker = druckerNamen[sel]
     DIM kopien AS INTEGER : kopien = MAX(1, INT(GUI_VALUE(spKopien)))
-    DIM p AS PDF : p = listingPdf()
+    druckOptionenLesen()
+    DIM p AS PDF : p = listingPdf(GUI_CHECKED(cbDruckAuswahl))
     TRY
         PDF_PRINT(p, drucker, kopien)
         GUI_SET_TEXT(lblStatus, "Gedruckt auf " + drucker + " (" + STR$(PDF_PAGE_COUNT(p)) + " Seiten, " + STR$(kopien) + "x)")
@@ -9158,7 +9212,7 @@ WHILE NOT beenden
     IF GUI_DOUBLE_CLICKED(lstGliederung) THEN gliederungAnspringen()
     ' Druckdialog
     IF GUI_CLICKED(btnDruckOk) THEN druckenAusfuehren()
-    IF GUI_CLICKED(btnDruckPdf) THEN GUI_WINDOW_VISIBLE(winDruck, FALSE) : listingAlsPdf()
+    IF GUI_CLICKED(btnDruckPdf) THEN GUI_WINDOW_VISIBLE(winDruck, FALSE) : druckOptionenLesen() : listingAlsPdf()
     IF GUI_CLICKED(btnDruckWeg) THEN GUI_WINDOW_VISIBLE(winDruck, FALSE) : GUI_FOCUS(aktivesFeld())
     ' Handbuch: Klappliste wechselt das Dokument, Enter/Knopf sucht darin.
     IF GUI_DROPDOWN_SELECTED(ddDoku) <> docLetzteWahl AND GUI_DROPDOWN_SELECTED(ddDoku) >= 0 THEN
