@@ -73,7 +73,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 43 MB, aktuell Fassung 2026.14.
+**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 54 MB, aktuell Fassung 2026.15.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 216 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
@@ -96,8 +96,8 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # alle Pr
 
 | Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
 |---|---|---|
-| **Deutsch** — 519 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
-| **English** — 512 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 525 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 518 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
 
 Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): die Renderer bekommen ein `H`, das jede Zeichenkette vorher durch den Katalog `i18n/en.json` schickt. Ein zweiter Satz englischer Kapiteldateien wäre binnen eines Monats vom deutschen abgedriftet — so kann er es nicht. Fehlt ein Eintrag, bleibt der deutsche Satz stehen und das Buch baut trotzdem; `node fehlend.js en` zählt, wo noch welche fehlen.
 
@@ -171,6 +171,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | `g3d` | 3D: Kamera, Modelle (OBJ/GLTF), Skelett-Animation, PBR, HDR-IBL, Schatten, Normal-Maps, Picking — siehe [Grafik-Built-ins](docs/builtins-grafik.md) |
 | [`particles`](docs/module-particles.md) | Partikel-Emitter mit Schwerkraft, Farbverlauf über die Lebenszeit, fünf Zeichenarten |
 | [`imgfx`](docs/module-imgfx.md) | Bilder skalieren, drehen, spiegeln, einfärben — auch kantentreu für Pixelgrafik |
+| [`g3d`](docs/module-g3d.md) | 3D: Kamera, Grundkörper, Modelle, Skelett-Animation, Licht, Schatten, PBR |
 | [`audio`](docs/module-audio.md) | auf **Kira**: Kanäle, Busse, Echtzeit-Effekte (Filter/Hall/Echo/Verzerrer/Kompressor/EQ), Synthese, Sampler, `.mod`/`.xm`-Wiedergabe, Musik anspringen (`AUDIO_MUSIC_SEEK`), räumliches Audio, taktgenaue Uhr. [Modulatoren](docs/module-audio-modulatoren.md) laufen auf dem Audio-Thread weiter, auch wenn die Bildrate einbricht Einen Klang **anschauen und sichern**: `AUDIO_SOUND_WAVE` (Kurve zum Zeichnen) und `AUDIO_SAVE_WAV`. **Sprechen**: `SPEAK` lässt die Systemstimme jeden Text sagen — als Klang auf dem Bus `speech`, mit Warteschlange, `SPEAK_SOUND` für räumliche Stimmen und WAV; läuft ein Bildschirmleser, spricht der. |
 
 **Oberfläche**
@@ -194,12 +195,13 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`ini`](docs/module-ini.md) | Einstellungsdateien, die ein Mensch bearbeiten kann — gelesen wird eine `MAP` |
 | [`xml`](docs/module-xml.md) | XML aus fremden Systemen lesen, mit Pfad-Navigation |
 | [`geld`](docs/module-geld.md) | ein Betrag als eigener Wert: exakt, nicht mit Zahlen vermischbar, teilt ohne Cent-Schwund |
+| [`zeit`](docs/module-zeit.md) | Rechnen mit Datum und Uhrzeit: Abstände, Wochentage, Formate |
 
 **Etwas abgeben**
 
 | Modul | Wofür |
 |---|---|
-| [`pdf`](docs/module-pdf.md) | druckfertige Seiten: Rechnung, Lieferschein, Bericht, Etikett — in Millimeter gesetzt, ohne eingebettete Schriften |
+| [`pdf`](docs/module-pdf.md) | druckfertige Seiten: Rechnung, Lieferschein, Bericht, Etikett — in Millimeter gesetzt, Schriften eingebettet, Unicode |
 | [`xlsx`](docs/module-xlsx.md) | Auswertungen als Excel-Mappe: mehrere Blätter, fette Kopfzeile, Zahlen- und Datumsformate |
 | [`smtp`](docs/module-smtp.md) | die Auswertung per E-Mail rausschicken: Text und HTML, Anhänge, STARTTLS/TLS |
 
