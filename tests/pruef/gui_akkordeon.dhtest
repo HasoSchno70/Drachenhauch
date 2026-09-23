@@ -59,10 +59,13 @@ das Kind muss NACH dem Akkordeon angelegt sein
 === die kinder wandern mit dem abschnitt darueber
 ' Ein Kind liegt bei (12, 8) IM Abschnitt. Zu: Abschnitt 1 beginnt unter
 ' zwei Koepfen (10 + 30 + 30). Offen: dazu die Hoehe von Abschnitt 0 --
-' sein Kind (8 + Hoehe) plus 8 Rand.
+' sein Kind (8 + Hoehe) plus 8 Rand. Ohne Uebergang, damit ein einziges
+' GUI_UPDATE schon den Endstand zeigt (das Aufklappen ueber die Zeit prueft
+' der naechste Fall).
 IMPORT "gui"
 SCREEN(400, 400, "T", 1)
 SET_WINDOW_POS(-3000, -3000)
+GUI_METRIC_SET("uebergang", 0)
 DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 400)
 DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(w, 10, 10, 300, 300)
 GUI_ACCORDION_SET(acc, "mehrere", 1)
@@ -85,6 +88,46 @@ PRINT "eigene hoehe "; GUI_GET_Y(b)
 x 22 y 78
 y 120 a 48
 eigene hoehe 178
+
+=== das aufklappen waechst ueber die zeit und steht dann
+' Derselbe Aufbau mit Uebergang: nach dem Oeffnen von Abschnitt 0 rueckt
+' das Kind in Abschnitt 1 Bild fuer Bild tiefer, nie zurueck, und steht nach
+' der Dauer bei 120. Ein beim Aufbau geoeffneter Abschnitt steht sofort da.
+IMPORT "gui"
+SCREEN(400, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 400, 400)
+DIM acc AS GUI_WIDGET : acc = GUI_ACCORDION(w, 10, 10, 300, 300)
+GUI_ACCORDION_SET(acc, "mehrere", 1)
+GUI_ACCORDION_ADD(acc, "Oben")
+GUI_ACCORDION_ADD(acc, "Unten")
+DIM a AS GUI_WIDGET : a = GUI_TEXTINPUT(w, 12, 8, 200, 26, "")
+DIM b AS GUI_WIDGET : b = GUI_TEXTINPUT(w, 12, 8, 200, 26, "")
+GUI_ACCORDION_ADD_WIDGET(acc, a, 0)
+GUI_ACCORDION_ADD_WIDGET(acc, b, 1)
+GUI_ACCORDION_OPEN(acc, 1, TRUE)
+DIM bild AS INTEGER
+DIM vorher AS INTEGER : vorher = -1
+DIM zwischen AS BOOLEAN
+DIM rueckwaerts AS BOOLEAN
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 3 THEN GUI_ACCORDION_OPEN(acc, 0, TRUE)
+    GUI_UPDATE()
+    IF bild = 1 THEN PRINT "start "; GUI_GET_Y(b); " sichtbar "; GUI_VISIBLE(b)
+    IF GUI_GET_Y(b) > 78 AND GUI_GET_Y(b) < 120 THEN zwischen = TRUE
+    IF GUI_GET_Y(b) < vorher THEN rueckwaerts = TRUE
+    vorher = GUI_GET_Y(b)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "ende "; GUI_GET_Y(b); " zwischen "; zwischen; " rueckwaerts "; rueckwaerts
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+start 78 sichtbar TRUE
+ende 120 zwischen TRUE rueckwaerts FALSE
 
 === ein klick auf den kopf klappt um, ein klick ins kind trifft das kind
 ' Kopf "Unten" liegt bei y 40..70 (Oben ist zu), das Kaestchen danach bei
@@ -115,12 +158,12 @@ c 6
 e 1 7 100 55 0 0
 e 2 6 0 0 0 0
 e 3 5 0 0 0 0
-e 5 7 28 86 0 0
-e 6 6 0 0 0 0
-e 7 5 0 0 0 0
+e 15 7 28 86 0 0
+e 16 6 0 0 0 0
+e 17 5 0 0 0 0
 
 --- umgebung
-DHRT_FRAMES=14
+DHRT_FRAMES=24
 --- erwartet
 umgeschaltet 1 offen TRUE
 haken TRUE

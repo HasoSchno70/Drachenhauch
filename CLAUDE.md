@@ -610,6 +610,245 @@ angeklickt", und beides meldet genau ein Bild lang. Der Zustand kommt weiter aus
 `GUI_CHECKED`. Tests `tests/pruef/gui_clicked_schalter.dhtest` (mit Gegenprobe:
 danebengeklickt meldet nichts).
 
+**Uebergaenge** (2026-09-23, erster Punkt der Feinschliff-Liste): Metrik
+`uebergang` (ms, Vorgabe 120, 0 = springen wie frueher). Je Widget
+`ueber_t`/`druck_t`/`fokus_t` (0..1), dazu `LeisteState::hover_t` je
+Eintrag, nachgefuehrt in `Gui::uebergaenge` (in `update`, mit `g.delta()` --
+headless fest 1/60, also reproduzierbar); gezeichnet ueber `weich()`
+(smoothstep) und `deckkraft()` (Alpha 0 = DECKEND, darum 1 statt 0 fuer
+"weg"). **Nur das Ueberfahren blendet hinein**, Druecken und Fokus
+erscheinen im selben Bild und blenden nur aus. Die Flags `hovered`/
+`press_origin`/`focus_widget` bleiben die Wahrheit fuer alles, was
+entscheidet. Erfasst: Knopf (alle Arten), Kachel, Kaestchen, Radio,
+Klappliste, Werkzeugleiste, Fokusring, Kippschalter (vorher je Bild * 0,28,
+also bildratenabhaengig). `mischen` gibt an den Enden die Farbe samt Alpha
+unveraendert zurueck -- sonst machte ein ruhender Uebergang eine
+halbdurchsichtige Farbe deckend. **Akkordeon** (selber Tag): `AkkState::auf_t`
+je Abschnitt, weitergefuehrt in `akk_pass` (nicht in `uebergaenge` -- sonst
+stuende die Lage ein Bild hinter dem Zustand, und mit `uebergang` 0 zeigte
+ein GUI_UPDATE nach GUI_ACCORDION_OPEN noch den alten Stand); gemessen wird
+immer die VOLLE Inhaltshoehe, sichtbar ist `voll * weich(t)`. Fehlt ein
+Eintrag, gilt der Zustand -- ein beim Aufbau geoeffneter Abschnitt klappt
+nicht beim ersten Bild auf. Kinder werden beim Zeichnen auf den sichtbaren
+Teil beschnitten (`akk_ausschnitt`, eine Quelle mit `widget_shown`),
+bedienbar sind sie erst ganz sichtbar. Das Dreieck dreht sich um seinen
+Schwerpunkt; im Standbild sieht es bei 35 Grad wie ein Pfeil nach oben aus
+(fast gleichseitig), in Bewegung nicht. **Baum** (selber Tag):
+`TreeState::auf_t` je Knoten, gezeichnet ueber `tree_zeilen_weich` --
+(Knoten, Hoehenanteil = Produkt der Oeffnungsgrade aller Vorfahren), jede
+Zeile mit Anteil < 1 auf ihre Hoehe beschnitten; Treffertest/Tastatur/Rollen
+bleiben bei `tree_visible`. `GUI_TREE_CLEAR` leert `auf_t` (sonst erbten neue
+Knoten die Werte alter Nummern), der Dateibaum fuehrt es beim Neuaufbau am
+WEG mit (`dateibaum_neu`) -- zu geht er sofort, seine Kinder sind dann nicht
+mehr gelesen. **Klappliste**: `Gui::dd_auf_t`/`dd_auf_von`, nur AUF weich
+(von oben herab, eingeblendet), zu sofort; im Bild des Klicks gilt "noch zu"
+(`uebergaenge` lief vor dem Druck) -- mit "ganz offen" blitzte die volle
+Liste einmal auf, gesehen nur im Kontaktbogen. **Zeilen und Menues**
+(selber Tag): `Blende` (zwei Plaetze: die Zeile unter der Maus blendet ein,
+die verlassene aus; zurueck auf die ausblendende = dort weiter) als
+`Widget::zeile_b` fuer Liste/Tabelle/Baum/Klappliste und `Menu::b` je Popup,
+dazu `Menu::auf_t` (Aufrollen, auch Untermenues; zu = sofort, zuruecksetzen).
+Die Liste traegt ihre Maus-Zeile in `Widget::zeile_jetzt` -- eine schlichte
+Liste hat keinen ListState, der sie halten koennte, und haette ihr
+Ueberfahren sonst verloren. Tests `tests/pruef/gui_liste_bedienung.dhtest`.
+Tests `tests/pruef/gui_uebergaenge.dhtest` (15,
+Bildproben; Gegenprobe mit `uebergang` 0 bzw. dem Bau davor) und in
+`tests/pruef/gui_akkordeon.dhtest` "das aufklappen waechst ueber die zeit"
+(Gegenprobe faellt); zwei alte Faelle dort brauchen seither `uebergang` 0
+bzw. klicken spaeter ins Kind.
+
+**Listen bequemer** (2026-09-23, mit den Uebergaengen): (1) **Rollbalken**
+(`list_bar_geom` = EINE Quelle fuer Zeichnen, Klick, Ziehen; Griff ziehen,
+Klick in die Rinne setzt ihn unter die Maus und zieht weiter,
+`Gui::listbar_zug`; die Zeilen enden davor) -- vorher hatte eine Liste GAR
+KEINEN, man sah nicht, wo man stand. (2) **Weiches Rollen** am Rad
+(`Widget::rad_ziel`/`rad_letzt`: Radschritte addieren sich aufs Ziel; steht
+der Stand nicht mehr da, wo das Rollen ihn hinschrieb, hat jemand anderes
+gerollt, und das Rad gibt nach). (3) **Rechtsklick waehlt** die Zeile
+(`liste_rechtsklick`; eine Mehrfachauswahl bleibt, wenn die Zeile
+dazugehoert). (4) **Umbenennen**: `GUI_LISTBOX_SET(lb, "bearbeitbar", 1)` +
+F2, `GUI_LISTBOX_EDIT/EDITED/EDITING`; Arbeitskopie `ListEdit`, dieselbe
+Tastenroutine wie Textfeld und Zelle (`einzeiler_tasten`), Enter/Klick
+daneben/Fokus weg uebernimmt, ESC verwirft, unveraendert ist kein Ereignis;
+`.dhform` `bearbeitbar`. **Der Fund dabei:** ESC beendete das Umbenennen UND
+drueckte den Abbrechen-Knopf des Fensters -- die Liste war im selben Bild
+danach nicht mehr "am Bearbeiten", und die Fensterregel griff trotzdem;
+`Gui::liste_taste` merkt sich, dass die Taste schon verbraucht ist (vom Test
+gefunden). F2 gilt nur, wenn kein Menue-Kuerzel die Taste genommen hat (die
+IDE legt F2 auf die Lesezeichen). Tests `tests/pruef/gui_liste_bedienung.dhtest`
+(20; gegen den Bau davor fallen alle 12, die Neues pruefen).
+
+**Tabelle bequem wie die Liste** (selber Tag, Zeilenmodus): Doppelklick und
+Enter setzen `TableState::doppel`, und `GUI_DOUBLE_CLICKED` gilt jetzt auch
+fuer Tabellen (vorher ein Fehler "bisher nur fuer Listen") -- ein
+Doppelklick auf eine BEARBEITBARE Textzelle bearbeitet weiter und meldet
+nicht. F2 bearbeitet die erste freigegebene Textspalte der gewaehlten Zeile
+(Zellmodus: wie bisher die aktuelle Zelle). Tippen springt
+(`tabelle_tippen`, Regel wie `liste_tippen`) in der Sortierspalte, ohne
+Sortierung in der ersten sichtbaren. Rechtsklick waehlt
+(`tabelle_rechtsklick`). Das Rad rollt weich ueber dieselben
+`Widget::rad_ziel`/`rad_letzt` wie die Liste -- der laufende Stand liegt in
+`rad_letzt` als Kommazahl, weil `scroll_y` ganzzahlig ist (sonst bliebe die
+Tabelle einen Punkt vor dem Ziel stehen). Neu `GUI_TABLE_PLACEHOLDER(tbl,
+text$)` (Leer-Hinweis, `.dhform` `leer_text`). Rollbalken zum Ziehen hatte
+die Tabelle schon. **Testfalle:** das Tippen fasst Tasten innerhalb einer
+Sekunde ECHTER Zeit zu einem Wort -- ohne Fenster laufen 30 Bilder in
+Bruchteilen davon, "b, b, k" wurde "bbk"; getrennte Woerter brauchen eigene
+Faelle. Tests `tests/pruef/gui_tabelle_bedienung.dhtest` (13; gegen den Bau
+davor fallen die 10, die Neues pruefen). Im **Form-Designer** (197): Kaestchen "Umbenennen mit
+F2" bei der Liste (`list.bearbeitbar`, abgewaehlt wird der Schluessel
+ENTFERNT) und Feld "Leer-Hinweis" bei der Tabelle (`table.leer_text`), beides
+im GB-Code (`GUI_LISTBOX_SET ... "bearbeitbar"`, `GUI_TABLE_PLACEHOLDER`);
+Uebernehmen/Aktiviert/Hinweis ruecken dafuer eine Zeile tiefer. Tests in
+`tests/pruef/werkzeug_formdesigner.dhtest` (Inspektor-Fall + der
+GB-Code-Fall mit allen Arten; gegen den alten Designer fallen beide).
+
+**Baum bequem wie die Liste** (selber Tag): Rollbalken (derselbe
+`list_bar_geom`, jetzt fuer Liste UND Baum -- der Rollstand liegt in `value`
+bzw. `tree.scroll`, `roll_ist`/`roll_setze`), weiches Rad, Pos1/Ende/Bild,
+Tippen springt (`baum_tippen`, sichtbare Knoten), Rechtsklick waehlt,
+`GUI_DOUBLE_CLICKED` auch fuer Baeume (Doppelklick auf jeden Knoten, ein Ast
+klappt dabei zusaetzlich um; Enter nur auf Blaettern -- auf einem Ast klappt
+Enter), Umbenennen mit `GUI_TREE_SET "bearbeitbar"` + F2 bzw.
+`GUI_TREE_EDIT/EDITED/EDITING` (dieselbe `ListEdit`-Arbeitskopie;
+`edit_rect_any`/`edit_ende_any`/`wird_umbenannt` fassen Liste und Baum fuer
+Klick-daneben, Fokus-weg und die Enter/ESC-Sperre zusammen) und
+`GUI_TREE_PLACEHOLDER`. **Nicht beim Dateibaum**: sein Name ist ein
+Dateiname, `GUI_TREE_EDIT` ist dort ein Fehler mit Hinweis auf `RENAME`.
+Form-Designer: Kaestchen und Feld auch fuer den Baum (`tree.bearbeitbar`,
+`tree.leer_text`). Tests `tests/pruef/gui_baum_bedienung.dhtest` (14; gegen den
+Bau davor fallen 13, der Endstand-Fall nicht) und ein Baum-Fall in
+`werkzeug_formdesigner.dhtest`.
+
+**Klappliste bequem wie die Liste** (selber Tag): das Popup zeigt hoechstens
+`DD_MAX_ZEILEN` = 10 Eintraege (vorher so hoch wie die Liste lang -- hundert
+Eintraege ragten ueber den Bildschirm), rollt mit dem Rad (vor allem anderen
+abgefragt, weil es ueber allem liegt) und hat einen Rollbalken; ist unten kein
+Platz, aber oben, klappt es NACH OBEN auf (`dropdown_popup_rect` = EINE Quelle,
+kennt die Bildschirmhoehe ueber `Gui::schirm_h` aus GUI_UPDATE) und rollt dann
+von unten herauf. Offen bewegen Pfeile/Bild/Pos1/Ende/Tippen nur `dd_mark`,
+Enter/Leertaste uebernimmt, **ESC verwirft** -- vorher setzte jeder Pfeil die
+Auswahl sofort und feuerte on_change. Beim Oeffnen steht die Auswahl markiert
+in der MITTE. Zu waehlt Tippen gleich (`dd_tippen`). Neu
+`GUI_DROPDOWN_PLACEHOLDER` (gedaempft, solange `sel` < 0; `.dhform`
+`placeholder`), im Form-Designer ein Feld "Platzhalter". Tests
+`tests/pruef/gui_klappliste_bedienung.dhtest` (10; gegen den Bau davor fallen 8,
+die zwei uebrigen pruefen, was gleich bleiben soll). Folge: ein Test, der einen Eintrag
+jenseits der zehnten Zeile an fester Lage anklickte (Notenblatt, Instrument
+"Glocke" = Eintrag 10), rollt jetzt erst einen Radschritt.
+
+**Menues bequem wie die Liste** (selber Tag): **Kontextmenues per Tastatur**
+-- `menue_tasten` fragte nur Leistenmenues (`tiefstes_popup` = Kontext ODER
+Leiste), und ESC im offenen Kontextmenue drueckte den ABBRECHEN-Knopf des
+Fensters, weil das Menue die Taste nicht nahm (gegen den alten Bau belegt).
+Pos1/Ende, Tippen springt (Anfangsbuchstabe; eindeutig = gleich ausloesen
+ueber `menue_ausloesen`, sonst zum naechsten Treffer). Am Rand weichen Popups
+aus: in `popup_chain` (Kontextmenue links/ueber der Maus, Untermenue links vom
+Eltern, Leistenmenue nach links; `Gui::schirm_b/schirm_h`). **Die Falle:**
+gezeichnet wurde mit den ROHEN Lagen (`context_open`, `sub_chain`), nur der
+Treffertest ging ueber `popup_chain` -- beide Zeichenstellen gehen jetzt
+darueber. Tests `tests/pruef/gui_menue_bedienung.dhtest` (8; gegen den Bau
+davor fallen alle 8).
+
+**Code-Feld bequem wie die Liste** (selber Tag, Textbereich): **Doppelklick
+waehlt das Wort, Dreifachklick die Zeile** -- das gab es gar nicht
+(`Widget::klick_n/klick_zeit/klick_idx`, 0,4 s an derselben Stelle;
+`wort_um` nimmt `_` und `$` mit; `wort_zug` sperrt das Zusammenziehen beim
+Halten). **Rechtsklick setzt die Schreibmarke** (`ta_rechtsklick` ueber
+`ta_index_at`, dieselbe Rechnung wie der Klick; in der Auswahl bleibt sie,
+die Nummernspalte bleibt dem Haltepunkt). **Rollbalken** im rechten
+Innenabstand (`ta_bar_geom`, 5 px, ueber keinem Zeichen -- die Umbruchbreite
+bleibt unveraendert), gegriffen im Hover-Durchlauf VOR dem Editieren
+(`farbfeld_zug` sperrt den Druck fuer die Schreibmarke), gezogen ueber
+`Gui::tabar_zug`; `rad_stand` haelt die Ansicht gegen die Schreibmarke.
+**Weiches Rad** in Zeilenschritten (`roll_ist/roll_setze` kennen `scroll` des
+Textbereichs). Tests `tests/pruef/gui_codefeld_bedienung.dhtest` (9; die
+Klicklagen sucht die Beilage `stelle.dh` zur Laufzeit mit
+`GUI_TEXTAREA_POS_AT` -- `GUI_TEXTAREA_VIEW` zaehlt die erste Zeile ab 0).
+
+**Textfeld bequem, Textbereich mit Inline-Formaten** (selber Tag): das
+Textfeld nimmt Doppelklick (Wort), Dreifachklick (alles; im Passwortfeld
+schon der Doppelklick -- Wortgrenzen verrieten die Leerzeichen) und
+Rechtsklick (`ti_rechtsklick`, in der Auswahl bleibt sie) mit denselben
+Feldern wie der Textbereich. **Inline-Formate:** `GUI_TEXTAREA_SET(ta,
+"formatiert", 1)`, je Zeichen Stil-Bits aus `schnitt` (`Widget::stile`),
+Strg+B/I/U auf die Auswahl (alle haben es -> weg, sonst dran) oder als
+`tipp_stil` fuer das naechste Getippte (verfaellt, sobald getippt oder die
+Marke bewegt ist), `GUI_TEXTAREA_STYLE/GET_STYLE$/MARKDOWN$/SET_MARKDOWN`,
+`.dhform` `formatiert` + `markdown`. **Keiner der Textwege kennt die Bits**
+-- `stile_text` merkt, zu welchem Text sie gehoeren, und `stile_abgleichen`
+zieht sie ueber gemeinsamen Anfang/Ende nach (in `edit_textarea`,
+`textarea_insert`, `text_undo` und je Bild in `uebergaenge`); das Neue
+bekommt den Tippstil oder den Stil davor. Der Verlauf traegt die Stile mit
+(`undo: Vec<(String, i32, Vec<u8>)>`), eine Formataenderung ist ein eigener
+Schritt. **Gezeichnet nachgebildet** (`Graphics::text_nachgebildet` ->
+`Cmd::TextStil` auf der Grundschrift): ein echter fetter Schnitt waere
+breiter, und Marke, Auswahl, Klick messen am ungeformten Text. Markdown
+(`markdown_aus`/`markdown_ein`): Marken SCHALTEN um, geschrieben werden nur
+Wechsel, fett+kursiv in einem Zug (`**` gefolgt von `*` liest sich als `***`
+= beide kippen -- mit Umschalten stimmt das trotzdem), `\` fuer `* ~ \ <u>`.
+Tests `tests/pruef/gui_textfeld_formate.dhtest` (12; Gegenprobe ohne
+Klickzaehlung, ohne Rechtsklick, mit Tippstil, der nie verfaellt: genau die
+5 betroffenen fallen), Rust-Tests `formate_tests`. Getter des Texts ist
+`GUI_TEXT`, nicht `GUI_GET_TEXT`.
+
+**Klammern schliessen** (selber Tag, erster Punkt der Editor-Liste aus der
+Uebersicht): `GUI_TEXTAREA_PAIRS(ta, paare$)` (je zwei Zeichen ein Paar,
+leer = aus; `Widget::paare`, `Gui::paar_tippen` statt `an_marken` fuer
+GETIPPTE Zeichen -- Einfuegen geht absichtlich vorbei). Oeffnend setzt das
+schliessende dahinter, gleich schliessend tritt darueber, eine Auswahl wird
+umschlossen, die Ruecktaste zwischen einem leeren Paar nimmt beide; gepaart
+wird nur vor Leerraum/Zeilenende/Satzzeichen/schliessendem Zeichen,
+Anfuehrungszeichen nicht hinter einem Wortzeichen und nicht bei ungerader
+Zahl davor in der Zeile. Die IDE: `klammernAn` (ide.json `klammern`,
+Vorgabe an, `'` fehlt -- Kommentar), Kaestchen in einer ZWEITEN Spalte der
+Einstellungen (das Fenster waechst nach rechts, die linke Kante bleibt --
+sonst saessen alle bisherigen Klicklagen daneben), Palette. **Getippt wird
+im Test mit echten WM_CHAR-Nachrichten** (`fenstersender.ps1` kennt jetzt
+Folgen `tippe:...|anf|rueck|links|rechts`; GLFW nimmt die Taste aus dem
+SCANCODE im lParam) -- eine Aufnahme fuellt die Zeichenwarteschlange nicht.
+Tests `tests/pruef/gui_klammern.dhtest` (10; jeder Fall kann nur MIT Paaren
+bestehen -- die erste Fassung tippte `f(x)` ganz aus und waere ohne sie
+genauso gruen gewesen), `tests/pruef/werkzeug_ide_handgriffe.dhtest`.
+
+**Dieselbe Datei nebeneinander** (selber Tag, vierter Punkt; zweiter und
+dritter: Formatieren beim Sichern -- aus per Vorgabe, nie beim
+automatischen Sichern, `CODE_FORMAT$` verweigert nur Unlesbares wie eine
+offene Zeichenkette, eine halbe Anweisung rueckt es ein -- und Alle
+Fundstellen, Strg+Umschalt+F12, `benutztWort` in jeder Schreibweise):
+`GUI_TEXTAREA_SHARE(ansicht, von)` (`Widget::teil_von/teil_stand`,
+`Gui::teil_pass` gleich nach dem Editieren in `update` -- wer danach den
+Besitzer liest, sieht den Stand DIESES Bildes). Geaenderte Seite gewinnt:
+die Ansicht schreibt samt Verlaufsschritt an den Besitzer, sonst zieht sie
+nach; die Marke der anderen Seite rueckt ueber gemeinsamen Anfang/Ende
+(`marke_nachziehen`). **Der Verlauf liegt nur beim Besitzer**, Strg+Z in
+der Ansicht geht dorthin -- mit zwei Verlaeufen haette jede Seite eine
+eigene Geschichte und nahm die Aenderung der anderen nicht zurueck. Die
+IDE: `taSpiegel` links, bei jedem Einschalten `feldEinrichten`, folgt dem
+Reiter (`spiegelNachziehen` je Bild), eigener Faerbe-Riegel
+(`spiegelFaerbSchl`), `aktivesFeld()` meint die Ansicht, wenn sie den Fokus
+hat. Tests `tests/pruef/gui_teilen.dhtest` (5; der Strg+Z-Fall besteht nur
+mit der Umleitung) und in `werkzeug_ide_handgriffe.dhtest`.
+Die uebrigen Punkte derselben Liste, alle in der IDE und in
+`werkzeug_ide_handgriffe.dhtest`: **Seitenleiste/untere Leiste** (Alt+1/2,
+`leistenSetzen`; die untere kommt bei jedem `prozessStarten` zurueck),
+**Profil nach Funktionen** (Kaestchen im Profilfenster, innerster Block aus
+`CODE_SYMBOLS$`; Protokollzeilen heissen `profiltabelle ...`, weil alte
+Tests die erste Zeile mit `profil ` lesen) und **Ausgabe leeren**,
+**Faltung je Datei** (ide.json `falten_pfade`/`falten_zeilen`, zurueck in
+`faltenZurueck` nach GUI_TEXTAREA_FOLDABLE -- Falle: `GUI_TEXTAREA_FOLDED`
+fragt, ob eine Zeile VERBORGEN ist, die Kopfzeile ist es nie; ob gefaltet
+wurde, sagt der Rueckgabewert von `GUI_TEXTAREA_FOLD`), **Druckoptionen**
+(Schrift, Rand, Nummern, nur die Auswahl; mit den Vorgaben dasselbe Listing,
+die Breite wird jetzt mit PDF_TEXT_WIDTH gemessen -- 92 feste Zeichen liefen
+ueber den Rand), **Filter ueber dem Projektbaum** (in der Zeile des
+Projektnamens, damit die Klicklagen des Baums bleiben) und **Umbau
+wiederholen samt Probe**: das Zuruecknehmen verweigert sich, wenn eine
+Datei seit dem Umbau geaendert wurde (`zurNachher`, `umbauGeaendert$`) --
+vorher schrieb es die alten Texte blind zurueck. Die Reiternummer eines
+Umbaus zaehlt nur noch ohne Weg (`umbauReiter`). Beispiele nach Themen
+kamen danach (siehe unten).
+
 **Text und Formular** (2026-09-04, Punkt 1 des gui-Ausbaus -- Ziel: dass Drachenhauch genannt wird, wenn jemand fragt, womit er eine Anwendung schreiben soll): `GUI_SET_ALIGN(wdg, links|mitte|rechts)` fuer Beschriftung/Knopf/Textfeld; `GUI_SET_WRAP(label, breite)` bricht an Wortgrenzen um, die HOEHE folgt dem Text -- gemessen in `umbruch_layout` (in GUI_UPDATE, weil nur dort Graphics und Schreibzugriff zusammenkommen; das Zeichnen ist `&self`); `GUI_TEXTINPUT_SET(tf, key$, wert)` mit `passwort` (Punkte statt Zeichen -- Treffertest und Rollen messen an den PUNKTEN, sonst sitzt die Schreibmarke neben dem Text), `nur_lesen`, `maxlaenge` (schneidet ab, auch beim Einfuegen), `zahlen` (1 ganz, 2 Komma; Zwischenstand `-` erlaubt, sonst liesse sich keine negative Zahl tippen); `GUI_ENTERED`/`GUI_ON_ENTER`; **Strg+Z/Y in Textfeld und Textbereich** (Anschlaege innerhalb 0,8 s = EIN Schritt; `GUI_SET_TEXT` leert den Verlauf); `GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` (Enter/ESC druecken den Knopf -- aber die Taste gehoert zuerst dem Widget mit Fokus: Knopf/Kaestchen nehmen Enter selbst, Textbereich macht einen Umbruch, Zelle in Bearbeitung ihr Ende; aus einem TEXTFELD heraus ist Enter das Abschicken; der Standard-Knopf traegt den Akzent als Rahmen). Alles in der `.dhform` (auch der Tooltip -- der fehlte dort bisher) und im Form-Designer (Inspector + Codegen). **Testfalle:** raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber KEINE Zeichen in die Zeichenwarteschlange -- Tests tippen ueber die Zwischenablage mit Strg+V, das laeuft durch dieselben Filter. Tests `tests/pruef/gui_text_formular.dhtest`, Doku `docs/module-gui.md`.
 
 **Menues** (2026-09-04, Punkt 2 des gui-Ausbaus): `GUI_MENU_ITEM(menu, label$[, kuerzel$])` / `GUI_MENU_SHORTCUT` -- Kuerzel werden als Text geschrieben (`Strg+S`, `Alt+Enter`, `F5`, `Entf`, deutsch oder englisch; `kuerzel_parsen` in gui.rs mit Rust-Tests, unbekannte Taste = Fehler beim Anlegen statt eines still stummen Kuerzels) und jedes Bild geprueft (`kuerzel_pruefen`), auch bei geschlossenem Menue -- **seit 2026-09-07 in ALLEN sichtbaren Fenstern**: zuerst im Fokus-Fenster, dann in den uebrigen von oben nach unten (Form-Designer, Anim-FSM und Notenblatt mussten sich vorher nach jedem Knopf im Nebenfenster den Fokus zurueckholen, sonst war Strg+S stumm -- dreimal derselbe Fund, dreimal zuerst vom Test gesehen); das Fokus-Fenster gewinnt bei gleichem Kuerzel, ein modales laesst nur seine eigenen zu, ein Entwurfsfenster (`GUI_WINDOW_DESIGN`) zaehlt nicht; die Modifier muessen GENAU passen, und **ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus** (ein `Entf`-Kuerzel loescht dort ein Zeichen) -- AUSSER F1..F12 (`ist_funktionstaste`, seit 2026-09-06: die IDE in Drachenhauch startete per F5 nie, weil das Code-Feld den Fokus hatte). `GUI_SUBMENU` (beliebig tief; `sub_chain` = offene Untermenues, `untermenues_folgen` oeffnet beim Ueberfahren und schliesst NICHT, wenn die Maus neben allen Popups ist -- sonst klappt es beim schraegen Hinueberfahren zu; ein Untermenue ist nie Kontextmenue, `Menu::unter`), `GUI_MENU_CHECK`/`GUI_MENU_CHECKED` (Klick oder Kuerzel kippt), `GUI_MENU_ENABLE` (gesperrt = kein Klick, kein Kuerzel), `GUI_MENU_ICON`, `GUI_MENU_TEXT`. Popup-Layout aus EINER Quelle `popup_layout` (Treffertest + Zeichnen). In der `.dhform` verschachtelt (`items` am Eintrag, `shortcut`, `checkable`/`checked`); der Form-Designer bearbeitet Menues nicht, schreibt sie aber jetzt in den GB-Code (`_gb_menus`). **Testfalle:** raylib meldet beim Lesen mancher Aufnahmedateien "Issue reading line to buffer" auf stdout, die Ereignisse kommen trotzdem an -- Tests filtern `WARNING:`-Zeilen. Tests `tests/pruef/gui_menu_ausbau.dhtest`, Beispiel `examples/129_gui_menu.dh`.
@@ -3748,6 +3987,18 @@ der Willkommensseite statt des Titels als Text (vorab auf 240x112 skaliert,
 der Satz rechts daneben, alles ab den Knoepfen bleibt an seiner Stelle); ohne
 die Dateien bleibt es beim Text. Tests `tests/pruef/werkzeug_ide_schriftzug.dhtest`
 (3) und zwei Zeilen in `werkzeug_paket.dhtest`.
+**Beispiele nach Themen (2026-09-23):** `examples/kategorien.json` ordnet alle
+203 Beispiele (ohne `_*`/`bench_*`) 16 Themen zu; die IDE zeigt sie in einem
+Fenster (`themenZeigen`, Werkzeuge-Menue, Willkommensseite, Palette) als Liste
+mit Gruppenkoepfen, Filter und [Oeffnen und starten]. Die Beschreibung liest
+`beispielBeschreibung$` aus dem Kopfkommentar: angehaengt wird die naechste
+Zeile NUR, wenn der Satz sichtlich weitergeht (Bindestrich, Komma, offene
+Klammer, Kleinbuchstabe) -- sonst holte ein Titel ohne Punkt ("Coin Quest")
+die naechste Zeile mit; ein Satzende braucht zwei Buchstaben vor dem Punkt
+(`z.B.` endet nichts). Tests vier Faelle in
+`tests/pruef/werkzeug_ide_handgriffe.dhtest`, darunter die Vollstaendigkeit
+der JSON gegen `DIRLIST`.
+
 **Kachel als Widget, Mausrad, Bereichsfarben (2026-09-21, Hinweise des
 Nutzers):** (1) **`GUI_CARD(win, x, y, w, h, bild[, titel$[, text$]])`** --
 Bild oben (16:10 der Innenbreite, `fuellen`), Titel kraeftig, Beschreibung in

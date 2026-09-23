@@ -224,6 +224,13 @@ DIM tabPfade[MAX_TABS] AS STRING
 DIM tabFelder[MAX_TABS] AS GUI_WIDGET
 DIM tabGesichert[MAX_TABS] AS STRING
 DIM tabLetzterText[MAX_TABS] AS STRING
+' Gefaltete Zeilen, die beim Oeffnen wieder zugeklappt werden sollen ("3,17")
+' -- erst, wenn der Reiter seine faltbaren Bloecke kennt.
+DIM tabFaltenOffen[MAX_TABS] AS STRING
+' Gemerkte Faltungen je Datei (ide.json `falten_pfade`/`falten_zeilen`),
+' die zuletzt benutzte zuerst.
+DIM faltPfade AS ARRAY OF STRING : faltPfade = []
+DIM faltListe AS ARRAY OF STRING : faltListe = []
 DIM tabAnzahl AS INTEGER : tabAnzahl = 0
 DIM aktiverTab AS INTEGER : aktiverTab = -1
 
@@ -277,6 +284,13 @@ DIM umbruchAn AS BOOLEAN : umbruchAn = FALSE
 ' Geteilte Ansicht: links ein ZWEITER Reiter, rechts der aktive. Beide sind
 ' echte Code-Felder -- nichts wird gespiegelt, es gibt nichts abzugleichen.
 DIM geteilt AS BOOLEAN : geteilt = FALSE
+' Dieselbe Datei zweimal nebeneinander: links ein zweites Feld, das den Text
+' des aktiven Reiters TEILT (GUI_TEXTAREA_SHARE) -- mit eigener Marke und
+' eigenem Ausschnitt, aber einem Text und einem Verlauf.
+DIM spiegelAn AS BOOLEAN : spiegelAn = FALSE
+DIM taSpiegel AS GUI_WIDGET : taSpiegel = -1
+DIM spiegelBesitzer AS GUI_WIDGET : spiegelBesitzer = -1
+DIM spiegelFaerbSchl AS STRING : spiegelFaerbSchl = ""
 DIM linkerTab AS INTEGER : linkerTab = -1
 DIM minimapAn AS BOOLEAN : minimapAn = FALSE
 ' Geaenderte Zeilen am Rand (git diff -U0), per Vorgabe an.
@@ -300,11 +314,30 @@ DIM linienAn AS BOOLEAN : linienAn = TRUE
 ' Das Geruest, das beim Tippen mitwaechst: `IF ... THEN` und Enter setzen
 ' das `END IF` gleich mit (GUI_TEXTAREA_CLOSE_WORDS).
 DIM geruestAn AS BOOLEAN : geruestAn = TRUE
+' Klammern und Anfuehrungszeichen schliesst das Code-Feld beim Tippen
+' selbst (GUI_TEXTAREA_PAIRS). `'` fehlt mit Absicht: es beginnt einen
+' Kommentar, und ein zweites dahinter waere Unsinn.
+DIM klammernAn AS BOOLEAN : klammernAn = TRUE
+' Beim Sichern formatieren (CODE_FORMAT$). Aus per Vorgabe: es aendert den
+' Text, ohne dass man darum gebeten hat. Das automatische Sichern formatiert
+' NIE -- mitten im Tippen rueckte sonst die Zeile unter der Marke weg.
+DIM formatSichernAn AS BOOLEAN : formatSichernAn = FALSE
+DIM sichernOhneFormat AS BOOLEAN : sichernOhneFormat = FALSE
 ' Vorschau vor dem Umbau: Umbenennen, Herausloesen und Parameter-Umsortieren
 ' zeigen erst den Unterschied und fragen, statt gleich zu schreiben.
 DIM vorschauAn AS BOOLEAN : vorschauAn = TRUE
 ' Werkzeugleiste mit Sinnbildern unter der Menueleiste.
 DIM leisteAn AS BOOLEAN : leisteAn = TRUE
+' Seitenleiste (Projekt + Gliederung) und untere Leiste (Ausgabe, Probleme,
+' Debugger) ein- und ausblenden -- mehr Platz fuer den Code. Die untere
+' kommt von selbst zurueck, sobald ein Programm startet: seine Ausgabe
+' nicht zu sehen, waere schlimmer als die verlorenen Zeilen.
+DIM seitenAn AS BOOLEAN : seitenAn = TRUE
+' Druckoptionen fuer das Listing (auch fuer die PDF daneben), gemerkt.
+DIM druckGroesse AS INTEGER : druckGroesse = 9
+DIM druckRand AS INTEGER : druckRand = 20
+DIM druckNummern AS BOOLEAN : druckNummern = TRUE
+DIM untenAn AS BOOLEAN : untenAn = TRUE
 ' Automatisch sichern: Sekunden ohne Anschlag, 0 = aus.
 DIM autoSichern AS INTEGER : autoSichern = 0
 DIM autoFaellig AS FLOAT : autoFaellig = -1.0
@@ -325,6 +358,16 @@ DIM sucheZeilen AS ARRAY OF INTEGER : sucheZeilen = []
 
 ' Profil
 DIM profilZeilen AS ARRAY OF INTEGER : profilZeilen = []
+' Die Messung selbst, nach Zeit absteigend -- die Tabelle zeigt sie je
+' Zeile oder je Funktion, ohne neu zu messen.
+DIM profRohZ AS ARRAY OF INTEGER : profRohZ = []
+DIM profRohA AS ARRAY OF INTEGER : profRohA = []
+DIM profRohT AS ARRAY OF FLOAT : profRohT = []
+DIM profGesamt AS FLOAT : profGesamt = 0.0
+DIM profQuelle AS ARRAY OF STRING : profQuelle = []
+DIM profBerName AS ARRAY OF STRING : profBerName = []
+DIM profBerVon AS ARRAY OF INTEGER : profBerVon = []
+DIM profBerBis AS ARRAY OF INTEGER : profBerBis = []
 
 ' Wo Handbuch und Beispiele liegen: neben ide/ (dhrt hat nach ide/ gewechselt).
 DIM wurzel AS STRING : wurzel = GETENV$("DH_IDE_WURZEL")
@@ -429,8 +472,22 @@ IF JSON_HAS(konfig, "ganzes_wort") THEN ganzesWort = JSON_GET_BOOL(konfig, "ganz
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
 IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
+IF JSON_HAS(konfig, "klammern") THEN klammernAn = JSON_GET_BOOL(konfig, "klammern")
+IF JSON_HAS(konfig, "format_sichern") THEN formatSichernAn = JSON_GET_BOOL(konfig, "format_sichern")
 IF JSON_HAS(konfig, "umbau_vorschau") THEN vorschauAn = JSON_GET_BOOL(konfig, "umbau_vorschau")
 IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
+IF JSON_HAS(konfig, "seitenleiste") THEN seitenAn = JSON_GET_BOOL(konfig, "seitenleiste")
+IF JSON_HAS(konfig, "untere_leiste") THEN untenAn = JSON_GET_BOOL(konfig, "untere_leiste")
+IF JSON_HAS(konfig, "druck_groesse") THEN druckGroesse = MAX(6, MIN(16, JSON_GET_INT(konfig, "druck_groesse")))
+IF JSON_HAS(konfig, "druck_rand") THEN druckRand = MAX(10, MIN(40, JSON_GET_INT(konfig, "druck_rand")))
+IF JSON_HAS(konfig, "druck_nummern") THEN druckNummern = JSON_GET_BOOL(konfig, "druck_nummern")
+IF JSON_HAS(konfig, "falten_pfade") AND JSON_HAS(konfig, "falten_zeilen") THEN
+    DIM fk AS INTEGER
+    FOR fk = 0 TO MIN(JSON_LEN(konfig, "falten_pfade"), JSON_LEN(konfig, "falten_zeilen")) - 1
+        ARRAY_PUSH(faltPfade, JSON_GET_STRING(konfig, "falten_pfade." + STR$(fk)))
+        ARRAY_PUSH(faltListe, JSON_GET_STRING(konfig, "falten_zeilen." + STR$(fk)))
+    NEXT
+END IF
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
 IF hell THEN GUI_THEME_PRESET("glas_hell") : themaFeinschliff()
 codeFarben(hell)
@@ -533,8 +590,10 @@ DIM miVerkleinern AS INTEGER : miVerkleinern = GUI_MENU_ITEM(mBearb, "Auswahl ve
 DIM miUmbProjekt AS INTEGER : miUmbProjekt = GUI_MENU_ITEM(mBearb, "Im ganzen Projekt umbenennen ...", "Strg+Umschalt+F6")
 DIM miParameter AS INTEGER : miParameter = GUI_MENU_ITEM(mBearb, "Parameter umsortieren ...", "Strg+Umschalt+U")
 DIM miAufrufer AS INTEGER : miAufrufer = GUI_MENU_ITEM(mBearb, "Wer ruft das auf?", "Umschalt+F12")
+DIM miFundstellen AS INTEGER : miFundstellen = GUI_MENU_ITEM(mBearb, "Alle Fundstellen im Projekt", "Strg+Umschalt+F12")
 DIM miVerschieben AS INTEGER : miVerschieben = GUI_MENU_ITEM(mBearb, "Unterprogramm verschieben ...", "Strg+Umschalt+V")
 DIM miUmbauZur AS INTEGER : miUmbauZur = GUI_MENU_ITEM(mBearb, "Letzten Umbau zurücknehmen", "Strg+Umschalt+Z")
+DIM miUmbauWdh AS INTEGER : miUmbauWdh = GUI_MENU_ITEM(mBearb, "Zurückgenommenen Umbau wiederholen")
 DIM miUmbauNach AS INTEGER : miUmbauNach = GUI_MENU_ITEM(mBearb, "Letzten Umbau nachbessern", "Strg+Umschalt+G")
 DIM mZeilenWz AS INTEGER : mZeilenWz = GUI_SUBMENU(mBearb, "Zeilen")
 DIM miZlSort AS INTEGER : miZlSort = GUI_MENU_ITEM(mZeilenWz, "Sortieren")
@@ -589,6 +648,7 @@ DIM miHinein AS INTEGER : miHinein = GUI_MENU_ITEM(mLauf, "Schritt hinein", "F11
 DIM miHeraus AS INTEGER : miHeraus = GUI_MENU_ITEM(mLauf, "Schritt heraus", "Umschalt+F11")
 GUI_MENU_SEPARATOR(mLauf)
 DIM miProfil AS INTEGER : miProfil = GUI_MENU_ITEM(mLauf, "Profil aufnehmen", "Strg+Umschalt+Y")
+DIM miAusgabeLeer AS INTEGER : miAusgabeLeer = GUI_MENU_ITEM(mLauf, "Ausgabe leeren")
 GUI_MENU_SEPARATOR(mLauf)
 DIM miExport AS INTEGER : miExport = GUI_MENU_ITEM(mLauf, "Als eigenständiges Programm exportieren", "Strg+F6")
 
@@ -603,6 +663,7 @@ DIM miWzAnim AS INTEGER : miWzAnim = GUI_MENU_ITEM(mWerkzeuge, "Anim-FSM-Editor"
 DIM miWzNoten AS INTEGER : miWzNoten = GUI_MENU_ITEM(mWerkzeuge, "Notenblatt")
 GUI_MENU_SEPARATOR(mWerkzeuge)
 DIM miBeispiele AS INTEGER : miBeispiele = GUI_MENU_ITEM(mWerkzeuge, "Beispiele als Projekt öffnen")
+DIM miThemen AS INTEGER : miThemen = GUI_MENU_ITEM(mWerkzeuge, "Beispiele nach Themen ...")
 DIM miAusdruck AS INTEGER : miAusdruck = GUI_MENU_ITEM(mWerkzeuge, "Ausdruck im Debugger auswerten", "Strg+E")
 
 DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, "Ansicht")
@@ -611,6 +672,7 @@ GUI_MENU_CHECK(miThema, hell)
 DIM miVollbild AS INTEGER : miVollbild = GUI_MENU_ITEM(mAnsicht, "Vollbild", "Alt+Enter")
 GUI_MENU_SEPARATOR(mAnsicht)
 DIM miGeteilt AS INTEGER : miGeteilt = GUI_MENU_ITEM(mAnsicht, "Geteilte Ansicht", "Alt+G")
+DIM miSpiegel AS INTEGER : miSpiegel = GUI_MENU_ITEM(mAnsicht, "Dieselbe Datei nebeneinander", "Alt+Umschalt+G")
 GUI_MENU_CHECK(miGeteilt, FALSE)
 DIM miMinimap AS INTEGER : miMinimap = GUI_MENU_ITEM(mAnsicht, "Übersichtskarte")
 GUI_MENU_CHECK(miMinimap, FALSE)
@@ -621,6 +683,10 @@ GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, "Einrückungslinien")
 GUI_MENU_CHECK(miLinien, linienAn)
 DIM miLeiste AS INTEGER : miLeiste = GUI_MENU_ITEM(mAnsicht, "Werkzeugleiste")
+DIM miSeiten AS INTEGER : miSeiten = GUI_MENU_ITEM(mAnsicht, "Seitenleiste", "Alt+1")
+DIM miUnten AS INTEGER : miUnten = GUI_MENU_ITEM(mAnsicht, "Untere Leiste", "Alt+2")
+GUI_MENU_CHECK(miSeiten, seitenAn)
+GUI_MENU_CHECK(miUnten, untenAn)
 GUI_MENU_CHECK(miLeiste, leisteAn)
 DIM miFalten AS INTEGER : miFalten = GUI_MENU_ITEM(mAnsicht, "Block zuklappen/aufklappen", "F4")
 DIM miFaltenAlle AS INTEGER : miFaltenAlle = GUI_MENU_ITEM(mAnsicht, "Alles zuklappen", "Strg+F4")
@@ -746,6 +812,12 @@ DIM baum AS GUI_WIDGET : baum = GUI_FILETREE(win, 0, 0, 10, 10, ".")
 ' auf einmal oeffnen lassen (Datei -> Gewaehlte Dateien oeffnen).
 GUI_FILETREE_SET(baum, "mehrfachauswahl", 1)
 DIM lblProjekt AS GUI_WIDGET : lblProjekt = GUI_LABEL(win, "Projekt", 0, 0)
+' Filter ueber dem Baum, in der Zeile des Projektnamens -- der Baum bleibt,
+' wo er war. Ein Teil des Dateinamens, Gross/klein egal; Ordner bleiben
+' stehen (ihr Inhalt wird beim Aufklappen gefiltert).
+DIM tfBaumFilter AS GUI_WIDGET : tfBaumFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, "Filter ...")
+GUI_TOOLTIP(tfBaumFilter, "Nur Dateien, deren Name das enthält")
+DIM baumFilterZuletzt AS STRING : baumFilterZuletzt = ""
 DIM lblGliederung AS GUI_WIDGET : lblGliederung = GUI_LABEL(win, "Gliederung", 0, 0)
 DIM lstGliederung AS GUI_WIDGET : lstGliederung = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 ' Willkommensseite -- sie steht dort, wo sonst die Code-Felder liegen, und
@@ -771,6 +843,7 @@ DIM btnWkNeu AS GUI_WIDGET : btnWkNeu = GUI_BUTTON(win, "Neue Datei", 0, 0, 130,
 GUI_BUTTON_VARIANT(btnWkNeu, "primaer")
 DIM btnWkOeffnen AS GUI_WIDGET : btnWkOeffnen = GUI_BUTTON(win, "Datei öffnen ...", 0, 0, 150, 30)
 DIM btnWkBeispiele AS GUI_WIDGET : btnWkBeispiele = GUI_BUTTON(win, "Beispiele als Projekt", 0, 0, 180, 30)
+DIM btnWkThemen AS GUI_WIDGET : btnWkThemen = GUI_BUTTON(win, "Beispiele nach Themen", 0, 0, 190, 30)
 DIM lblWkZuletzt AS GUI_WIDGET : lblWkZuletzt = GUI_LABEL(win, "Zuletzt geöffnet -- Doppelklick öffnet", 0, 0)
 DIM lstWkZuletzt AS GUI_WIDGET : lstWkZuletzt = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 DIM lblWkKuerzel AS GUI_WIDGET : lblWkKuerzel = GUI_LABEL(win, "F5 startet das Programm, F7 debuggt es, Umschalt+F7 prüft. F1 schlägt das Wort unter der Marke im Handbuch nach, Strg+Umschalt+P öffnet die Befehlspalette, Strg+Umschalt+O eine Datei des Projekts. Alle Kürzel: Hilfe -> Tastenkürzel (Strg+F1).", 0, 0)
@@ -853,6 +926,8 @@ GUI_TABLE_SET(tblProfil, "sortierbar", 1)
 ' Tabulator-Text -- das Profil laesst sich so in eine Tabellenkalkulation holen.
 ' Bearbeitbar ist keine Spalte, Tippen tut also nichts.
 GUI_TABLE_SET(tblProfil, "zellmodus", 1)
+' Je Zeile oder je Funktion: dieselbe Messung, anders zusammengezaehlt.
+DIM cbProfilFunk AS GUI_WIDGET : cbProfilFunk = GUI_CHECKBOX(winProfil, "Nach Funktionen", 480, 4, FALSE)
 GUI_WINDOW_VISIBLE(winProfil, FALSE)
 
 ' Handbuch: Klappliste der Dokumente, Suche im Dokument, Text mit Umbruch.
@@ -882,7 +957,7 @@ GUI_WINDOW_CLOSABLE(winProfil, TRUE)
 ' Alle Schalter an EINER Stelle. Sie stehen weiter auch im Menue -- wer
 ' den Umbruch sucht, sucht ihn unter Ansicht; wer alles auf einmal sehen
 ' will, oeffnet dies hier.
-DIM winEinst AS GUI_WINDOW : winEinst = GUI_WINDOW("Einstellungen", 400, 150, 420, 530)
+DIM winEinst AS GUI_WINDOW : winEinst = GUI_WINDOW("Einstellungen", 400, 150, 720, 530)
 GUI_WINDOW_VISIBLE(winEinst, FALSE)
 DIM cbHell AS GUI_WIDGET : cbHell = GUI_CHECKBOX(winEinst, "Helles Thema", 16, 14, FALSE)
 DIM cbUmbruch AS GUI_WIDGET : cbUmbruch = GUI_CHECKBOX(winEinst, "Zeilenumbruch", 16, 44, FALSE)
@@ -893,6 +968,10 @@ DIM cbVorschlag AS GUI_WIDGET : cbVorschlag = GUI_CHECKBOX(winEinst, "Vorschlags
 DIM cbLinien AS GUI_WIDGET : cbLinien = GUI_CHECKBOX(winEinst, "Einrückungslinien", 16, 194, TRUE)
 DIM cbGeruest AS GUI_WIDGET : cbGeruest = GUI_CHECKBOX(winEinst, "Gerüst beim Tippen (END IF, NEXT ...)", 16, 224, TRUE)
 DIM cbVorschau AS GUI_WIDGET : cbVorschau = GUI_CHECKBOX(winEinst, "Vorschau vor dem Umbau", 16, 254, TRUE)
+' Zweite Spalte: was nach Stand 25 dazukam. Rechts daneben, damit alles
+' Bisherige an seiner Stelle bleibt.
+DIM cbKlammern AS GUI_WIDGET : cbKlammern = GUI_CHECKBOX(winEinst, "Klammern und Anführungszeichen schließen", 400, 14, TRUE)
+DIM cbFormatSichern AS GUI_WIDGET : cbFormatSichern = GUI_CHECKBOX(winEinst, "Beim Sichern formatieren", 400, 44, FALSE)
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgröße", 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
 DIM lblListen AS GUI_WIDGET : lblListen = GUI_LABEL(winEinst, "Schrift der Listen", 16, 326)
@@ -903,6 +982,27 @@ DIM lblAuto AS GUI_WIDGET : lblAuto = GUI_LABEL(winEinst, "Sichern nach ... s Ru
 DIM spAuto AS GUI_WIDGET : spAuto = GUI_SPINNER(winEinst, 260, 394, 90, 0, 120, 0)
 DIM btnEinstZu AS GUI_WIDGET : btnEinstZu = GUI_BUTTON(winEinst, "Schließen", 16, 452, 120, 30)
 DIM einstOffen AS BOOLEAN : einstOffen = FALSE
+
+' --- Beispiele nach Themen ---------------------------------------------
+' Zweihundert Beispiele, nach Nummer sortiert, sagen nicht, wo man
+' anfangen soll. Die Themen stehen in examples/kategorien.json (jedes
+' Beispiel genau einmal -- tests/pruef/werkzeug_ide_handgriffe.dhtest
+' prueft das), die Beschreibung ist die erste Kommentarzeile des Beispiels.
+' EINE Liste mit Gruppenkoepfen: der Filter sucht so ueber alle Themen,
+' und ein Thema bleibt sichtbar, solange darin etwas passt.
+DIM winThemen AS GUI_WINDOW : winThemen = GUI_WINDOW("Beispiele nach Themen", 320, 80, 760, 620)
+GUI_WINDOW_CLOSABLE(winThemen, TRUE)
+DIM tfThemenFilter AS GUI_WIDGET : tfThemenFilter = GUI_TEXTINPUT(winThemen, 8, 8, 360, 26, "Filter: Wort aus der Beschreibung ...")
+DIM lblThemen AS GUI_WIDGET : lblThemen = GUI_LABEL(winThemen, "", 380, 12)
+DIM lstThemen AS GUI_WIDGET : lstThemen = GUI_LISTBOX(winThemen, 8, 42, 744, 500, [])
+GUI_LISTBOX_PLACEHOLDER(lstThemen, "Kein Beispiel passt.")
+DIM btnThemenOeffnen AS GUI_WIDGET : btnThemenOeffnen = GUI_BUTTON(winThemen, "Öffnen", 8, 552, 120, 30)
+GUI_BUTTON_VARIANT(btnThemenOeffnen, "primaer")
+DIM btnThemenStart AS GUI_WIDGET : btnThemenStart = GUI_BUTTON(winThemen, "Öffnen und starten", 136, 552, 170, 30)
+DIM btnThemenZu AS GUI_WIDGET : btnThemenZu = GUI_BUTTON(winThemen, "Schließen", 632, 552, 120, 30)
+GUI_WINDOW_CANCEL(winThemen, btnThemenZu)
+GUI_WINDOW_VISIBLE(winThemen, FALSE)
+DIM themenFilterZuletzt AS STRING : themenFilterZuletzt = ""
 
 ' --- Eingebaute Befehle nachschlagen ----------------------------------
 DIM winBefehle AS GUI_WINDOW : winBefehle = GUI_WINDOW("Eingebaute Befehle", 300, 90, 860, 600)
@@ -1024,8 +1124,20 @@ CONST ZUR_MAX = 10
 DIM zurTabs AS ARRAY OF INTEGER : zurTabs = []
 DIM zurPfade AS ARRAY OF STRING : zurPfade = []
 DIM zurTexte AS ARRAY OF STRING : zurTexte = []
+' Was der Umbau GESCHRIEBEN hat: steht in einer Datei inzwischen etwas
+' anderes, wurde sie danach geaendert -- dann nimmt das Zuruecknehmen
+' nichts zurueck, sonst waere die spaetere Arbeit wortlos weg.
+DIM zurNachher AS ARRAY OF STRING : zurNachher = []
 DIM zurAnzahl AS ARRAY OF INTEGER : zurAnzahl = []
 DIM zurNamen AS ARRAY OF STRING : zurNamen = []
+' Zurueckgenommene Umbauten, zum Wiederholen -- dieselben Felder. Ein neuer
+' Umbau leert sie.
+DIM wdhTabs AS ARRAY OF INTEGER : wdhTabs = []
+DIM wdhPfade AS ARRAY OF STRING : wdhPfade = []
+DIM wdhVorher AS ARRAY OF STRING : wdhVorher = []
+DIM wdhNachher AS ARRAY OF STRING : wdhNachher = []
+DIM wdhAnzahl AS ARRAY OF INTEGER : wdhAnzahl = []
+DIM wdhNamen AS ARRAY OF STRING : wdhNamen = []
 ' Der zuletzt UEBERNOMMENE Umbau, damit er sich nachbessern laesst: die
 ' Schritte (`op*`) stehen ohnehin noch, hier die Dateien dazu.
 DIM umbauNachTabs AS ARRAY OF INTEGER : umbauNachTabs = []
@@ -1086,16 +1198,22 @@ DIM sucheAnkerS AS INTEGER : sucheAnkerS = 1
 DIM sucheZahlAlt AS STRING : sucheZahlAlt = "-"
 
 ' Druckdialog: Drucker waehlen, Kopien, oder doch als PDF.
-DIM winDruck AS GUI_WINDOW : winDruck = GUI_WINDOW("Listing drucken", 440, 240, 400, 170)
+DIM winDruck AS GUI_WINDOW : winDruck = GUI_WINDOW("Listing drucken", 440, 240, 400, 270)
 GUI_WINDOW_CLOSABLE(winDruck, TRUE)
 DIM lblDrucker AS GUI_WIDGET : lblDrucker = GUI_LABEL(winDruck, "Drucker", 12, 14)
 DIM ddDrucker AS GUI_WIDGET : ddDrucker = GUI_DROPDOWN(winDruck, 90, 10, 296, 26, [])
 DIM lblKopien AS GUI_WIDGET : lblKopien = GUI_LABEL(winDruck, "Kopien", 12, 50)
 DIM spKopien AS GUI_WIDGET : spKopien = GUI_SPINNER(winDruck, 90, 46, 90, 1, 9, 1)
-DIM btnDruckOk AS GUI_WIDGET : btnDruckOk = GUI_BUTTON(winDruck, "Drucken", 12, 96, 110, 28)
+DIM lblDruckGr AS GUI_WIDGET : lblDruckGr = GUI_LABEL(winDruck, "Schrift (pt)", 12, 86)
+DIM spDruckGr AS GUI_WIDGET : spDruckGr = GUI_SPINNER(winDruck, 130, 82, 90, 6, 16, druckGroesse)
+DIM lblDruckRand AS GUI_WIDGET : lblDruckRand = GUI_LABEL(winDruck, "Rand (mm)", 12, 122)
+DIM spDruckRand AS GUI_WIDGET : spDruckRand = GUI_SPINNER(winDruck, 130, 118, 90, 10, 40, druckRand)
+DIM cbDruckNr AS GUI_WIDGET : cbDruckNr = GUI_CHECKBOX(winDruck, "Zeilennummern", 12, 156, druckNummern)
+DIM cbDruckAuswahl AS GUI_WIDGET : cbDruckAuswahl = GUI_CHECKBOX(winDruck, "Nur die Auswahl", 200, 156, FALSE)
+DIM btnDruckOk AS GUI_WIDGET : btnDruckOk = GUI_BUTTON(winDruck, "Drucken", 12, 196, 110, 28)
 GUI_BUTTON_VARIANT(btnDruckOk, "primaer")
-DIM btnDruckPdf AS GUI_WIDGET : btnDruckPdf = GUI_BUTTON(winDruck, "Als PDF neben die Quelle", 130, 96, 180, 28)
-DIM btnDruckWeg AS GUI_WIDGET : btnDruckWeg = GUI_BUTTON(winDruck, "Abbrechen", 318, 96, 70, 28)
+DIM btnDruckPdf AS GUI_WIDGET : btnDruckPdf = GUI_BUTTON(winDruck, "Als PDF neben die Quelle", 130, 196, 180, 28)
+DIM btnDruckWeg AS GUI_WIDGET : btnDruckWeg = GUI_BUTTON(winDruck, "Abbrechen", 318, 196, 70, 28)
 GUI_WINDOW_DEFAULT(winDruck, btnDruckOk)
 GUI_WINDOW_CANCEL(winDruck, btnDruckWeg)
 GUI_WINDOW_VISIBLE(winDruck, FALSE)
@@ -1204,6 +1322,7 @@ SUB willkommenZeigen(an AS BOOLEAN)
     END IF
     GUI_SET_VISIBLE(lblWkUnter, an)
     GUI_SET_VISIBLE(btnWkNeu, an) : GUI_SET_VISIBLE(btnWkOeffnen, an) : GUI_SET_VISIBLE(btnWkBeispiele, an)
+    GUI_SET_VISIBLE(btnWkThemen, an)
     GUI_SET_VISIBLE(lblWkZuletzt, an) : GUI_SET_VISIBLE(lstWkZuletzt, an) : GUI_SET_VISIBLE(lblWkKuerzel, an)
     IF NOT an THEN
         GUI_SET_VISIBLE(lblKacheln, FALSE)
@@ -1229,8 +1348,15 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
     JSON_SET_BOOL(konfig, "linien", linienAn)
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
+    JSON_SET_BOOL(konfig, "klammern", klammernAn)
+    JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
     JSON_SET_BOOL(konfig, "leiste", leisteAn)
+    JSON_SET_BOOL(konfig, "seitenleiste", seitenAn)
+    JSON_SET_BOOL(konfig, "untere_leiste", untenAn)
+    JSON_SET_INT(konfig, "druck_groesse", druckGroesse)
+    JSON_SET_INT(konfig, "druck_rand", druckRand)
+    JSON_SET_BOOL(konfig, "druck_nummern", druckNummern)
     JSON_SET_INT(konfig, "autosichern", autoSichern)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
@@ -1241,6 +1367,14 @@ SUB konfigSichern()
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
         IF tabPfade[i] <> "" THEN JSON_APPEND_STRING(konfig, "sitzung", tabPfade[i])
+        faltenMerken(i)
+    NEXT
+    JSON_SET_JSON(konfig, "falten_pfade", JSON_PARSE("[]"))
+    JSON_SET_JSON(konfig, "falten_zeilen", JSON_PARSE("[]"))
+    DIM fi AS INTEGER
+    FOR fi = 0 TO LEN(faltPfade) - 1
+        JSON_APPEND_STRING(konfig, "falten_pfade", faltPfade[fi])
+        JSON_APPEND_STRING(konfig, "falten_zeilen", faltListe[fi])
     NEXT
     JSON_SET_INT(konfig, "aktiv", aktiverTab)
     ' Dieselbe Sitzung noch einmal unter dem PROJEKTordner: wer an zwei
@@ -1356,11 +1490,32 @@ END SUB
 
 SUB debugPanelZeigen(an AS BOOLEAN)
     debugSichtbar = an
-    GUI_SET_VISIBLE(lblProbleme, NOT an) : GUI_SET_VISIBLE(lstProbleme, NOT an) : GUI_SET_VISIBLE(lblHilfe, NOT an)
-    GUI_SET_VISIBLE(lblDebug, an) : GUI_SET_VISIBLE(tblVars, an)
-    GUI_SET_VISIBLE(btnWeiter, an) : GUI_SET_VISIBLE(btnDrueber, an) : GUI_SET_VISIBLE(btnHinein, an)
-    GUI_SET_VISIBLE(btnHeraus, an) : GUI_SET_VISIBLE(btnStoppD, an)
+    ' Bei ausgeblendeter unterer Leiste ist keins von beiden zu sehen --
+    ' `debugSichtbar` merkt sich trotzdem, welches dran waere.
+    DIM p AS BOOLEAN : p = (NOT an) AND untenAn
+    DIM d AS BOOLEAN : d = an AND untenAn
+    GUI_SET_VISIBLE(lblProbleme, p) : GUI_SET_VISIBLE(lstProbleme, p) : GUI_SET_VISIBLE(lblHilfe, p)
+    GUI_SET_VISIBLE(lblDebug, d) : GUI_SET_VISIBLE(tblVars, d)
+    GUI_SET_VISIBLE(btnWeiter, d) : GUI_SET_VISIBLE(btnDrueber, d) : GUI_SET_VISIBLE(btnHinein, d)
+    GUI_SET_VISIBLE(btnHeraus, d) : GUI_SET_VISIBLE(btnStoppD, d)
 END SUB
+
+SUB leistenSetzen(seiten AS BOOLEAN, unten AS BOOLEAN)
+    seitenAn = seiten
+    untenAn = unten
+    GUI_MENU_CHECK(miSeiten, seitenAn)
+    GUI_MENU_CHECK(miUnten, untenAn)
+    layout()
+    konfigSichern()
+    protokoll("leisten seite " + IIF(seitenAn, "an", "aus") + " unten " + IIF(untenAn, "an", "aus") + " code " + STR$(GUI_GET_X(aktivesFeldOderWk())) + "+" + STR$(GUI_GET_W(aktivesFeldOderWk())) + " hoch " + STR$(GUI_GET_H(aktivesFeldOderWk())))
+END SUB
+
+' Fuers Protokoll: das Code-Feld, oder ohne Reiter die Willkommensseite --
+' beide stehen auf derselben Flaeche.
+FUNCTION aktivesFeldOderWk() AS GUI_WIDGET
+    IF aktiverTab >= 0 THEN RETURN tabFelder[aktiverTab]
+    RETURN lblWkTitel
+END FUNCTION
 
 SUB layout()
     DIM w AS INTEGER : w = SCREENWIDTH()
@@ -1379,16 +1534,22 @@ SUB layout()
     IF leisteAn THEN GUI_SET_BOUNDS(leiste, 0, oben - 4, w, 36)
     DIM statusH AS INTEGER : statusH = 24
     DIM eingabeH AS INTEGER : eingabeH = 30
-    DIM mitteH AS INTEGER : mitteH = hi - oben - hoeheUnten - statusH - eingabeH - 12 - leisteH
+    DIM untenH AS INTEGER : untenH = IIF(untenAn, hoeheUnten, -4)
+    DIM mitteH AS INTEGER : mitteH = hi - oben - untenH - statusH - eingabeH - 12 - leisteH
     oben = oben + leisteH
     ' links: Projektbaum oben, Gliederung darunter
     DIM baumH AS INTEGER : baumH = (mitteH - 22) * 3 \ 5
-    GUI_SET_BOUNDS(lblProjekt, 8, oben, breiteLinks - 16, 18)
+    GUI_SET_VISIBLE(lblProjekt, seitenAn) : GUI_SET_VISIBLE(baum, seitenAn)
+    GUI_SET_VISIBLE(tfBaumFilter, seitenAn)
+    GUI_SET_VISIBLE(lblGliederung, seitenAn) : GUI_SET_VISIBLE(lstGliederung, seitenAn)
+    GUI_SET_BOUNDS(lblProjekt, 8, oben, (breiteLinks - 16) \ 2 - 4, 18)
+    GUI_SET_BOUNDS(tfBaumFilter, 8 + (breiteLinks - 16) \ 2, oben - 2, (breiteLinks - 16) \ 2, 22)
     GUI_SET_BOUNDS(baum, 8, oben + 22, breiteLinks - 16, baumH)
     GUI_SET_BOUNDS(lblGliederung, 8, oben + 30 + baumH, breiteLinks - 16, 18)
     GUI_SET_BOUNDS(lstGliederung, 8, oben + 52 + baumH, breiteLinks - 16, mitteH - baumH - 52)
-    DIM ex AS INTEGER : ex = breiteLinks
-    DIM ew AS INTEGER : ew = w - breiteLinks - 8
+    DIM links AS INTEGER : links = IIF(seitenAn, breiteLinks, 8)
+    DIM ex AS INTEGER : ex = links
+    DIM ew AS INTEGER : ew = w - links - 8
     ' Die Spur steht ueber dem Code und nimmt sich 20 Punkte von seiner Hoehe.
     DIM spurH AS INTEGER : spurH = 20
     GUI_SET_BOUNDS(lblSpur, ex, oben - 1, ew, 20)
@@ -1405,9 +1566,12 @@ SUB layout()
     ' rechte -- so hat jede Haelfte ein ECHTES Feld, keine Spiegelung.
     DIM halbeB AS INTEGER : halbeB = (ew - 6) \ 2
     DIM i AS INTEGER
+    IF spiegelAn AND taSpiegel >= 0 THEN GUI_SET_BOUNDS(taSpiegel, ex, oben, halbeB, mitteH)
     FOR i = 0 TO tabAnzahl - 1
         IF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl AND i = linkerTab THEN
             GUI_SET_BOUNDS(tabFelder[i], ex, oben, halbeB, mitteH)
+        ELSEIF spiegelAn THEN
+            GUI_SET_BOUNDS(tabFelder[i], ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
         ELSEIF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl THEN
             GUI_SET_BOUNDS(tabFelder[i], ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
         ELSE
@@ -1430,6 +1594,7 @@ SUB layout()
     GUI_SET_BOUNDS(btnWkNeu, wx, oben + 130, 130, 30)
     GUI_SET_BOUNDS(btnWkOeffnen, wx + 140, oben + 130, 150, 30)
     GUI_SET_BOUNDS(btnWkBeispiele, wx + 300, oben + 130, 180, 30)
+    GUI_SET_BOUNDS(btnWkThemen, wx + 490, oben + 130, 190, 30)
     ' Die Kacheln: vier nebeneinander, so viele Reihen wie Platz ist; was
     ' nicht passt, blaettert das Mausrad heran (kachelVersatz).
     GUI_SET_BOUNDS(lblKacheln, wx, oben + 176, ew - 80, 18)
@@ -1476,6 +1641,7 @@ SUB layout()
     willkommenZeigen(tabAnzahl = 0)
     DIM uy AS INTEGER : uy = oben + mitteH + 4
     DIM halb AS INTEGER : halb = (w - 24) \ 2
+    GUI_SET_VISIBLE(lblAusgabe, untenAn) : GUI_SET_VISIBLE(lstAusgabe, untenAn)
     GUI_SET_BOUNDS(lblAusgabe, 8, uy, 200, 18)
     GUI_SET_BOUNDS(lstAusgabe, 8, uy + 20, halb, hoeheUnten - 20)
     GUI_SET_BOUNDS(lblProbleme, 16 + halb, uy, halb, 18)
@@ -1540,6 +1706,22 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
         ["END", "NEXT", "WEND", "UNTIL", "LOOP", "ELSE", "ELSEIF", "ELIF", _
          "CATCH", "FINALLY", "CASE"])
     geruestSetzenAn(ta)
+    klammernSetzenAn(ta)
+END SUB
+
+SUB klammernSetzenAn(ta AS GUI_WIDGET)
+    GUI_TEXTAREA_PAIRS(ta, IIF(klammernAn, "()[]{}" + CHR$(34) + CHR$(34), ""))
+END SUB
+
+SUB klammernSetzen(an AS BOOLEAN)
+    klammernAn = an
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        klammernSetzenAn(tabFelder[i])
+    NEXT
+    konfigSichern()
+    GUI_SET_TEXT(lblStatus, IIF(an, "Klammern schließen an.", "Klammern schließen aus."))
+    protokoll("klammern " + IIF(an, "an", "aus"))
 END SUB
 
 ' Das Geruest, das mitwaechst: wer `IF x > 0 THEN` schreibt und Enter
@@ -1659,11 +1841,14 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbLinien, linienAn)
     GUI_SET_CHECKED(cbGeruest, geruestAn)
     GUI_SET_CHECKED(cbVorschau, vorschauAn)
+    GUI_SET_CHECKED(cbKlammern, klammernAn)
+    GUI_SET_CHECKED(cbFormatSichern, formatSichernAn)
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spListen, listenGroesse)
     GUI_SET_VALUE(spHbGr, handbuchGroesse)
     GUI_SET_VALUE(spAuto, autoSichern)
-    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 420, 530)
+    ' Die linke Kante bleibt, wo sie war: die zweite Spalte waechst nach rechts.
+    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 720, 530)
     GUI_WINDOW_VISIBLE(winEinst, TRUE)
     einstOffen = TRUE
     GUI_FOCUS(cbHell)
@@ -1686,6 +1871,8 @@ SUB einstellungenNachziehen()
     END IF
     IF GUI_CHECKED(cbLinien) <> linienAn THEN linienSetzen(GUI_CHECKED(cbLinien))
     IF GUI_CHECKED(cbGeruest) <> geruestAn THEN geruestSetzen(GUI_CHECKED(cbGeruest))
+    IF GUI_CHECKED(cbKlammern) <> klammernAn THEN klammernSetzen(GUI_CHECKED(cbKlammern))
+    IF GUI_CHECKED(cbFormatSichern) <> formatSichernAn THEN befehl("format_sichern")
     IF GUI_CHECKED(cbVorschau) <> vorschauAn THEN
         vorschauAn = GUI_CHECKED(cbVorschau)
         konfigSichern()
@@ -1862,6 +2049,7 @@ END SUB
 ' Anschlag fuehren muesste -- und GUI_SET_TEXT leerte dabei jedes Mal den
 ' Verlauf und schoebe die Marke ans Ende.
 SUB geteiltSetzen(an AS BOOLEAN)
+    IF an AND spiegelAn THEN spiegelSetzen(FALSE)
     IF an AND tabAnzahl < 2 THEN
         GUI_SET_TEXT(lblStatus, "Geteilte Ansicht: dafür braucht es zwei offene Dateien.")
         RETURN
@@ -1905,6 +2093,61 @@ SUB geteiltNachziehen(vorher AS INTEGER)
     linkerTab = vorher
     GUI_SET_TAB(tabFelder[linkerTab], -1)
     layout()
+END SUB
+
+' --- Dieselbe Datei nebeneinander ---------------------------------------
+' Die geteilte Ansicht zeigt zwei REITER. Hier ist es EINE Datei: das
+' zweite Feld ist eine Ansicht auf das Feld des aktiven Reiters, und die
+' Laufzeit gleicht den Text ab (GUI_TEXTAREA_SHARE) -- ohne GUI_SET_TEXT,
+' also ohne den Verlauf zu leeren oder die Marke ans Ende zu schieben.
+SUB spiegelSetzen(an AS BOOLEAN)
+    IF an AND aktiverTab < 0 THEN
+        GUI_SET_TEXT(lblStatus, "Dieselbe Datei nebeneinander: dafür braucht es eine offene Datei.")
+        RETURN
+    END IF
+    IF an AND geteilt THEN geteiltSetzen(FALSE)
+    spiegelAn = an
+    IF an THEN
+        IF taSpiegel < 0 THEN taSpiegel = GUI_TEXTAREA(win, 0, 0, 10, 10)
+        ' Bei JEDEM Einschalten: Schrift, Umbruch, Linien und Paare stehen
+        ' seit dem letzten Mal womoeglich anders.
+        feldEinrichten(taSpiegel)
+        GUI_SET_TAB(taSpiegel, -1)
+        GUI_SET_VISIBLE(taSpiegel, TRUE)
+        spiegelBesitzer = tabFelder[aktiverTab]
+        GUI_TEXTAREA_SHARE(taSpiegel, spiegelBesitzer)
+        spiegelFaerbSchl = ""
+    ELSEIF taSpiegel >= 0 THEN
+        GUI_TEXTAREA_SHARE(taSpiegel, -1)
+        GUI_SET_VISIBLE(taSpiegel, FALSE)
+        spiegelBesitzer = -1
+        IF aktiverTab >= 0 THEN GUI_FOCUS(tabFelder[aktiverTab])
+    END IF
+    GUI_MENU_CHECK(miSpiegel, spiegelAn)
+    layout()
+    IF spiegelAn THEN
+        GUI_SET_TEXT(lblStatus, "Dieselbe Datei nebeneinander: " + BASENAME(tabPfade[aktiverTab]))
+        protokoll("spiegel an x " + STR$(GUI_GET_X(taSpiegel)) + "+" + STR$(GUI_GET_W(taSpiegel)) + " " + STR$(GUI_GET_X(tabFelder[aktiverTab])) + "+" + STR$(GUI_GET_W(tabFelder[aktiverTab])))
+    ELSE
+        GUI_SET_TEXT(lblStatus, "Zweite Ansicht aus.")
+        protokoll("spiegel aus")
+    END IF
+END SUB
+
+' Je Bild: folgt die zweite Ansicht noch dem aktiven Reiter? Nach einem
+' Reiterwechsel zeigt sie die neue Datei, ohne offenen Reiter geht sie aus.
+SUB spiegelNachziehen()
+    IF NOT spiegelAn THEN RETURN
+    IF aktiverTab < 0 OR aktiverTab >= tabAnzahl THEN
+        spiegelSetzen(FALSE)
+        RETURN
+    END IF
+    IF tabFelder[aktiverTab] = spiegelBesitzer THEN RETURN
+    spiegelBesitzer = tabFelder[aktiverTab]
+    GUI_TEXTAREA_SHARE(taSpiegel, spiegelBesitzer)
+    spiegelFaerbSchl = ""
+    layout()
+    protokoll("spiegel folgt " + STR$(aktiverTab))
 END SUB
 
 ' --- Uebersichtskarte --------------------------------------------------
@@ -2015,6 +2258,63 @@ FUNCTION wegGleich$(pfad AS STRING) AS STRING
     RETURN REPLACE$(pfad, CHR$(92), "/")
 END FUNCTION
 
+' Die Faltung eines Reiters merken -- unter dem Weg der Datei, ein Reiter
+' ohne Weg hat nichts, woran sie sich wiederfinden liesse. Nichts gefaltet
+' heisst: der Eintrag faellt weg. Hoechstens 100 Dateien, die zuletzt
+' gemerkte zuerst.
+SUB faltenMerken(i AS INTEGER)
+    IF i < 0 OR i >= tabAnzahl THEN RETURN
+    IF tabPfade[i] = "" THEN RETURN
+    ' Noch nicht zurueckgeholt (der Reiter war nie vorn): die gemerkte
+    ' Faltung gilt weiter -- das Feld selbst hat ja noch keine.
+    IF tabFaltenOffen[i] <> "" THEN RETURN
+    DIM z AS ARRAY OF INTEGER : z = GUI_TEXTAREA_FOLDS(tabFelder[i])
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(z) - 1
+        ARRAY_PUSH(teile, STR$(z[k]))
+    NEXT
+    DIM weg AS STRING : weg = wegGleich$(tabPfade[i])
+    DIM neuP AS ARRAY OF STRING : neuP = []
+    DIM neuL AS ARRAY OF STRING : neuL = []
+    IF LEN(teile) > 0 THEN
+        ARRAY_PUSH(neuP, weg) : ARRAY_PUSH(neuL, JOIN$(teile, ","))
+    END IF
+    FOR k = 0 TO LEN(faltPfade) - 1
+        IF faltPfade[k] <> weg AND LEN(neuP) < 100 THEN
+            ARRAY_PUSH(neuP, faltPfade[k]) : ARRAY_PUSH(neuL, faltListe[k])
+        END IF
+    NEXT
+    faltPfade = neuP
+    faltListe = neuL
+END SUB
+
+FUNCTION gemerkteFalten$(pfad AS STRING) AS STRING
+    IF pfad = "" THEN RETURN ""
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(faltPfade, wegGleich$(pfad))
+    IF k < 0 THEN RETURN ""
+    RETURN faltListe[k]
+END FUNCTION
+
+' Nachdem der aktive Reiter seine faltbaren Bloecke bekommen hat: die
+' gemerkte Faltung wieder zuklappen. Eine Zeile, die inzwischen keinen
+' Block mehr anfaengt (die Datei wurde woanders geaendert), bleibt offen.
+SUB faltenZurueck(ta AS GUI_WIDGET)
+    IF aktiverTab < 0 OR ta <> tabFelder[aktiverTab] THEN RETURN
+    IF tabFaltenOffen[aktiverTab] = "" THEN RETURN
+    DIM zs AS STRING
+    DIM n AS INTEGER : n = 0
+    FOR EACH zs IN SPLIT$(tabFaltenOffen[aktiverTab], ",")
+        TRY
+            ' FOLD liefert, ob die Zeile jetzt zu ist (FALSE: kein Block dort).
+            IF GUI_TEXTAREA_FOLD(ta, INT(VAL(zs)), TRUE) THEN n = n + 1
+        CATCH e
+        END TRY
+    NEXT
+    tabFaltenOffen[aktiverTab] = ""
+    protokoll("falten wieder " + STR$(n))
+END SUB
+
 SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     IF tabAnzahl >= MAX_TABS THEN
         GUI_SET_TEXT(lblStatus, "Höchstens " + STR$(MAX_TABS) + " Reiter -- erst einen schließen.")
@@ -2041,6 +2341,7 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     tabFelder[tabAnzahl] = ta
     tabGesichert[tabAnzahl] = inhalt
     tabLetzterText[tabAnzahl] = ""
+    tabFaltenOffen[tabAnzahl] = gemerkteFalten$(pfad)
     aktiverTab = tabAnzahl
     tabAnzahl = tabAnzahl + 1
     reiterNeuSetzen()
@@ -2094,6 +2395,11 @@ END SUB
 
 FUNCTION aktivesFeld() AS GUI_WIDGET
     IF aktiverTab < 0 THEN RETURN -1
+    ' Steht die Marke in der zweiten Ansicht derselben Datei, meint jeder
+    ' Befehl sie -- ihre Marke ist die, die man gerade sieht. Der Text ist
+    ' derselbe, geschrieben wird ueber GUI_TEXTAREA_INSERT und die Laufzeit
+    ' gleicht ab.
+    IF spiegelAn AND taSpiegel >= 0 AND GUI_FOCUSED() = taSpiegel THEN RETURN taSpiegel
     RETURN tabFelder[aktiverTab]
 END FUNCTION
 
@@ -2106,6 +2412,22 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
         tabPfade[i] = pfad
     END IF
     DIM text AS STRING : text = GUI_TEXT(tabFelder[i])
+    ' Formatieren beim Sichern: nur Drachenhauch-Quelltext, nie beim
+    ' automatischen Sichern. Der Formatierer arbeitet auf Tokens: eine halbe
+    ' Anweisung rueckt er ein wie jede andere, nur was sich gar nicht lesen
+    ' laesst (eine offene Zeichenkette) laesst er stehen -- dann wird
+    ' gesichert, was dasteht.
+    IF formatSichernAn AND NOT sichernOhneFormat AND LOWER$(RIGHT$(pfad, 3)) = ".dh" THEN
+        DIM geformt AS STRING : geformt = CODE_FORMAT$(text)
+        IF geformt <> "" THEN
+            IF RIGHT$(text, 1) = NL THEN geformt = geformt + NL
+            IF geformt <> text THEN
+                feldAustauschen(tabFelder[i], text, geformt)
+                text = geformt
+                protokoll("beim sichern formatiert")
+            END IF
+        END IF
+    END IF
     tabGesichert[i] = text
     ' Die Datei endet mit einem Umbruch (dateiLesen laesst ihn weg, das Feld
     ' kennt ihn nicht) -- sonst verloere jede gesicherte Datei ihre letzte
@@ -2164,6 +2486,7 @@ SUB tabSchliessen(i AS INTEGER)
     ' Die Reiter ruecken auf, der linke der geteilten Ansicht zeigte danach
     ' auf eine andere Datei -- lieber ganz aus als still auf die falsche.
     IF geteilt THEN geteiltSetzen(FALSE)
+    faltenMerken(i)
     GUI_DESTROY(tabFelder[i])
     DIM k AS INTEGER
     FOR k = i TO tabAnzahl - 2
@@ -2171,6 +2494,7 @@ SUB tabSchliessen(i AS INTEGER)
         tabFelder[k] = tabFelder[k + 1]
         tabGesichert[k] = tabGesichert[k + 1]
         tabLetzterText[k] = tabLetzterText[k + 1]
+        tabFaltenOffen[k] = tabFaltenOffen[k + 1]
         GUI_SET_TAB(tabFelder[k], k)
     NEXT
     tabAnzahl = tabAnzahl - 1
@@ -2245,6 +2569,30 @@ CONST BAUM_MUSTER = "*.dh;*.dhform;*.dhsprite;*.dhanim;*.dhtest;*.json;*.md;*.tx
 ' weg (Einstellung `verborgene`).
 CONST BAUM_AUSNAHMEN = "target;__pycache__;_*"
 GUI_FILETREE_FILTER(baum, BAUM_MUSTER)
+
+' Der Filtertext wird in jedes Endungsmuster gesetzt: aus `*.dh` wird
+' `*held*.dh` -- so bleibt es bei den Dateiarten, die der Baum zeigt.
+SUB baumFilterNachziehen()
+    DIM t AS STRING : t = TRIM$(GUI_TEXT(tfBaumFilter))
+    IF t = baumFilterZuletzt THEN RETURN
+    baumFilterZuletzt = t
+    IF t = "" THEN
+        GUI_FILETREE_FILTER(baum, BAUM_MUSTER)
+    ELSE
+        DIM teile AS ARRAY OF STRING : teile = []
+        DIM m AS STRING
+        FOR EACH m IN SPLIT$(BAUM_MUSTER, ";")
+            ARRAY_PUSH(teile, "*" + t + "*" + MID$(m, 1, LEN(m)))
+        NEXT
+        GUI_FILETREE_FILTER(baum, JOIN$(teile, ";"))
+    END IF
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_FILETREE_COUNT(baum) - 1
+        IF NOT GUI_FILETREE_IS_DIR(baum, GUI_FILETREE_PATH$(baum, i)) THEN n = n + 1
+    NEXT
+    protokoll("baumfilter [" + t + "] " + STR$(n))
+END SUB
 GUI_FILETREE_SKIP(baum, BAUM_AUSNAHMEN)
 ' Alle zwei Sekunden nachsehen: eine Datei, die ein anderes Programm
 ' anlegt (oder der Export), steht damit von selbst im Baum. Bis Stand 23
@@ -2665,6 +3013,7 @@ SUB gliederungFuellen(quelle AS STRING)
         NEXT
         einzugBloecke(quelle, fv, fb)
         GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
+        faltenZurueck(ta)
         blockVon = fv
         blockBis = fb
     END IF
@@ -2915,6 +3264,65 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     IF zweitens <> "" THEN was = gesucht + "/" + zweitens
     GUI_SET_TEXT(lblProbleme, "Suche '" + was + "': " + STR$(treffer) + " Treffer in " + STR$(inDateien) + " Dateien -- Umschalt+F7 zeigt wieder die Probleme")
     protokoll("suche " + STR$(treffer))
+END SUB
+
+' --- Alle Fundstellen eines Namens ------------------------------------
+' "Wer ruft das auf?" kennt nur Unterprogramme. Hier jeder Name: eine
+' Variable, eine Konstante, ein Feld. Gezaehlt wird jede Zeile, in der er
+' als GANZES Wort steht, ausserhalb von Zeichenketten und Kommentaren
+' (`benutztWort`) -- dieselbe Frage, die das Verschieben fuer den IMPORT
+' stellt. Offene Reiter zaehlen mit dem Stand im Editor. Das ist Text,
+' keine Namensaufloesung: eine lokale `i` in zwei Unterprogrammen sind
+' zwei Namen, hier aber eine Liste -- die Datei und die Zeile stehen dabei.
+SUB fundstellenZeigen()
+    DIM name AS STRING : name = wortUnterMarke$()
+    IF name = "" THEN
+        GUI_SET_TEXT(lblStatus, "Fundstellen: unter der Marke steht kein Name.")
+        protokoll("fundstellen 0")
+        RETURN
+    END IF
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
+    DIM sd AS ARRAY OF STRING : sd = []
+    DIM sz AS ARRAY OF INTEGER : sz = []
+    DIM treffer AS INTEGER : treffer = 0
+    DIM inDateien AS INTEGER : inDateien = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM t AS INTEGER : t = tabMitPfad(pfad)
+        DIM quelle AS STRING : quelle = ""
+        IF t >= 0 THEN
+            quelle = GUI_TEXT(tabFelder[t])
+        ELSE
+            TRY
+                quelle = dateiLesen(pfad)
+            CATCH e
+                CONTINUE
+            END TRY
+        END IF
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+        DIM vorher AS INTEGER : vorher = treffer
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            IF treffer >= 500 THEN BREAK
+            ' Namen sind schreibungsunabhaengig: `Punkte` und `punkte` sind
+            ' dieselbe Variable.
+            IF benutztWort(LOWER$(zeilen[i]), LOWER$(name)) THEN
+                ARRAY_PUSH(sd, d)
+                ARRAY_PUSH(sz, i + 1)
+                GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
+                treffer = treffer + 1
+            END IF
+        NEXT
+        IF treffer > vorher THEN inDateien = inDateien + 1
+    NEXT
+    sucheDateien = sd
+    sucheZeilen = sz
+    problemModus = 1
+    GUI_SET_TEXT(lblProbleme, "Fundstellen von '" + name + "': " + STR$(treffer) + " in " + STR$(inDateien) + " Dateien -- Umschalt+F7 zeigt wieder die Probleme")
+    GUI_SET_TEXT(lblStatus, STR$(treffer) + " Fundstelle(n) von '" + name + "'.")
+    protokoll("fundstellen " + name + " " + STR$(treffer) + " " + STR$(inDateien))
 END SUB
 
 ' --- Haltepunkte und Marken in der Nummernspalte ---------------------
@@ -6384,13 +6792,72 @@ END SUB
 ' Reiter ueber Auswahl + INSERT (ein Undo-Schritt), sonst auf die Platte.
 ' Danach ist der Vorrat leer -- zweimal zurueck gaebe es nur mit einem
 ' Stapel, und einer reicht fuer das, was hier schiefgeht.
+' Ein Stand eines Umbaus: welcher Reiter, welche Datei. Hat die Datei einen
+' Weg, entscheidet der -- die Reiternummer von damals kann nach einem
+' Schliessen auf eine andere Datei zeigen.
+FUNCTION umbauReiter(tab AS INTEGER, pfad AS STRING) AS INTEGER
+    IF pfad <> "" THEN RETURN tabMitPfad(pfad)
+    IF tab >= 0 AND tab < tabAnzahl THEN RETURN tab
+    RETURN -1
+END FUNCTION
+
+' Der Text, der JETZT dort steht -- im Reiter, sonst in der Datei.
+' CHR$(0), wenn es ihn nicht mehr gibt.
+FUNCTION umbauJetzt$(tab AS INTEGER, pfad AS STRING) AS STRING
+    DIM t AS INTEGER : t = umbauReiter(tab, pfad)
+    IF t >= 0 THEN RETURN GUI_TEXT(tabFelder[t])
+    IF pfad = "" THEN RETURN CHR$(0)
+    TRY
+        RETURN dateiLesen(pfad)
+    CATCH e
+        RETURN CHR$(0)
+    END TRY
+END FUNCTION
+
+' Gleich bis auf Umbrueche am Ende -- die Datei traegt einen, der Reiter nicht.
+FUNCTION gleichesEnde(a AS STRING, b AS STRING) AS BOOLEAN
+    WHILE RIGHT$(a, 1) = NL : a = LEFT$(a, LEN(a) - 1) : WEND
+    WHILE RIGHT$(b, 1) = NL : b = LEFT$(b, LEN(b) - 1) : WEND
+    RETURN a = b
+END FUNCTION
+
+SUB umbauStandSetzen(tab AS INTEGER, pfad AS STRING, text AS STRING)
+    DIM t AS INTEGER : t = umbauReiter(tab, pfad)
+    IF t >= 0 THEN
+        ' Offen: in den Reiter, Auswahl ueber alles + INSERT -- ein
+        ' Undo-Schritt dort, gesichert wird wie immer mit Strg+S.
+        DIM ta AS GUI_WIDGET : ta = tabFelder[t]
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        DIM letzte AS INTEGER : letzte = LEN(zeilen)
+        GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
+        GUI_TEXTAREA_INSERT(ta, text)
+        RETURN
+    END IF
+    IF pfad = "" THEN RETURN
+    WRITEALL(pfad, text + NL)
+END SUB
+
+' Die Dateien einer Gruppe (ab `ab`, `n` Stueck), die seit dem Stand
+' `erwartet` geaendert wurden -- "" wenn keine.
+FUNCTION umbauGeaendert$(tabs AS ARRAY OF INTEGER, pfade AS ARRAY OF STRING, _
+                         erwartet AS ARRAY OF STRING, ab AS INTEGER, n AS INTEGER) AS STRING
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM k AS INTEGER
+    FOR k = ab TO ab + n - 1
+        IF NOT gleichesEnde(umbauJetzt$(tabs[k], pfade[k]), erwartet[k]) THEN
+            ARRAY_PUSH(raus, IIF(pfade[k] = "", "Unbenannt", BASENAME(pfade[k])))
+        END IF
+    NEXT
+    RETURN JOIN$(raus, ", ")
+END FUNCTION
+
 SUB umbauZurueck()
     IF LEN(zurAnzahl) = 0 THEN
         GUI_SET_TEXT(lblStatus, "Kein Umbau zum Zurücknehmen.")
         protokoll("umbau zurueck 0")
         RETURN
     END IF
-    ' Der LETZTE Umbau: seine Eintraege stehen am Ende der drei Felder.
+    ' Der LETZTE Umbau: seine Eintraege stehen am Ende der Felder.
     DIM mz AS INTEGER : mz = 0
     DIM ms AS INTEGER : ms = 1
     IF aktivesFeld() >= 0 THEN (mz, ms) = GUI_TEXTAREA_CURSOR(aktivesFeld())
@@ -6398,26 +6865,23 @@ SUB umbauZurueck()
     DIM n AS INTEGER : n = zurAnzahl[letzt]
     DIM ab AS INTEGER : ab = LEN(zurTexte) - n
     DIM zurWas AS STRING : zurWas = zurNamen[letzt]
+    ' Seit dem Umbau geaendert? Dann GAR NICHTS zuruecknehmen -- halb
+    ' zurueckgenommen waere schlimmer als gar nicht.
+    DIM geaendert AS STRING : geaendert = umbauGeaendert$(zurTabs, zurPfade, zurNachher, ab, n)
+    IF geaendert <> "" THEN
+        GUI_SET_TEXT(lblStatus, "Nicht zurückgenommen: seit dem Umbau geändert -- " + geaendert + ". Strg+Z im Reiter nimmt die eigenen Änderungen zurück.")
+        protokoll("umbau zurueck geaendert " + geaendert)
+        RETURN
+    END IF
     DIM k AS INTEGER
     FOR k = ab TO ab + n - 1
-        IF zurTabs[k] >= 0 AND zurTabs[k] < tabAnzahl THEN
-            DIM ta AS GUI_WIDGET : ta = tabFelder[zurTabs[k]]
-            DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-            DIM letzte AS INTEGER : letzte = LEN(zeilen)
-            GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
-            GUI_TEXTAREA_INSERT(ta, zurTexte[k])
-        ELSEIF zurPfade[k] <> "" THEN
-            WRITEALL(zurPfade[k], zurTexte[k] + NL)
-            DIM t AS INTEGER : t = tabMitPfad(zurPfade[k])
-            IF t >= 0 THEN
-                GUI_SET_TEXT(tabFelder[t], zurTexte[k])
-                tabGesichert[t] = zurTexte[k]
-                tabLetzterText[t] = ""
-            END IF
-        END IF
+        umbauStandSetzen(zurTabs[k], zurPfade[k], zurTexte[k])
+        ARRAY_PUSH(wdhTabs, zurTabs[k]) : ARRAY_PUSH(wdhPfade, zurPfade[k])
+        ARRAY_PUSH(wdhVorher, zurTexte[k]) : ARRAY_PUSH(wdhNachher, zurNachher[k])
     NEXT
+    ARRAY_PUSH(wdhAnzahl, n) : ARRAY_PUSH(wdhNamen, zurWas)
     FOR k = 1 TO n
-        ARRAY_POP(zurTabs) : ARRAY_POP(zurPfade) : ARRAY_POP(zurTexte)
+        ARRAY_POP(zurTabs) : ARRAY_POP(zurPfade) : ARRAY_POP(zurTexte) : ARRAY_POP(zurNachher)
     NEXT
     ARRAY_POP(zurAnzahl) : ARRAY_POP(zurNamen)
     reiterNeuSetzen()
@@ -6429,6 +6893,42 @@ SUB umbauZurueck()
         IF mz > 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), mz, ms)
         GUI_FOCUS(aktivesFeld())
     END IF
+END SUB
+
+' Einen zurueckgenommenen Umbau wieder anwenden -- mit derselben Probe in
+' der Gegenrichtung: steht nicht mehr der Stand von vor dem Umbau da, bleibt
+' alles, wie es ist.
+SUB umbauWiederholen()
+    IF LEN(wdhAnzahl) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Kein zurückgenommener Umbau zum Wiederholen.")
+        protokoll("umbau wieder 0")
+        RETURN
+    END IF
+    DIM letzt AS INTEGER : letzt = LEN(wdhAnzahl) - 1
+    DIM n AS INTEGER : n = wdhAnzahl[letzt]
+    DIM ab AS INTEGER : ab = LEN(wdhVorher) - n
+    DIM was AS STRING : was = wdhNamen[letzt]
+    DIM geaendert AS STRING : geaendert = umbauGeaendert$(wdhTabs, wdhPfade, wdhVorher, ab, n)
+    IF geaendert <> "" THEN
+        GUI_SET_TEXT(lblStatus, "Nicht wiederholt: seit dem Zurücknehmen geändert -- " + geaendert + ".")
+        protokoll("umbau wieder geaendert " + geaendert)
+        RETURN
+    END IF
+    DIM k AS INTEGER
+    FOR k = ab TO ab + n - 1
+        umbauStandSetzen(wdhTabs[k], wdhPfade[k], wdhNachher[k])
+        ARRAY_PUSH(zurTabs, wdhTabs[k]) : ARRAY_PUSH(zurPfade, wdhPfade[k])
+        ARRAY_PUSH(zurTexte, wdhVorher[k]) : ARRAY_PUSH(zurNachher, wdhNachher[k])
+    NEXT
+    ARRAY_PUSH(zurAnzahl, n) : ARRAY_PUSH(zurNamen, was)
+    FOR k = 1 TO n
+        ARRAY_POP(wdhTabs) : ARRAY_POP(wdhPfade) : ARRAY_POP(wdhVorher) : ARRAY_POP(wdhNachher)
+    NEXT
+    ARRAY_POP(wdhAnzahl) : ARRAY_POP(wdhNamen)
+    reiterNeuSetzen()
+    symSchluessel = "-"
+    GUI_SET_TEXT(lblStatus, "Wiederholt: " + was + " (" + STR$(n) + " Datei(en))")
+    protokoll("umbau wieder " + STR$(n))
 END SUB
 
 ' Den zuletzt uebernommenen Umbau noch einmal vorlegen.
@@ -6582,9 +7082,12 @@ SUB umbauSchreiben()
         ARRAY_PUSH(zurTabs, umbauTabs[v])
         ARRAY_PUSH(zurPfade, umbauPfade[v])
         ARRAY_PUSH(zurTexte, umbauAlt$(v))
+        ARRAY_PUSH(zurNachher, umbauTexte[v])
     NEXT
     ARRAY_PUSH(zurAnzahl, LEN(umbauTexte))
     ARRAY_PUSH(zurNamen, umbauMeldung)
+    wdhTabs = [] : wdhPfade = [] : wdhVorher = [] : wdhNachher = []
+    wdhAnzahl = [] : wdhNamen = []
     ' Der aelteste faellt heraus -- ein Vorrat, der mit jedem Umbau waechst,
     ' haelt irgendwann das ganze Projekt in mehreren Fassungen.
     WHILE LEN(zurAnzahl) > ZUR_MAX
@@ -6592,6 +7095,7 @@ SUB umbauSchreiben()
         DIM k2 AS INTEGER
         FOR k2 = 1 TO weg
             ARRAY_REMOVE_AT(zurTabs, 0) : ARRAY_REMOVE_AT(zurPfade, 0) : ARRAY_REMOVE_AT(zurTexte, 0)
+            ARRAY_REMOVE_AT(zurNachher, 0)
         NEXT
         ARRAY_REMOVE_AT(zurAnzahl, 0) : ARRAY_REMOVE_AT(zurNamen, 0)
     WEND
@@ -7044,14 +7548,21 @@ SUB formatieren()
     END IF
     IF RIGHT$(text, 1) = NL THEN neu = neu + NL
     IF neu = text THEN GUI_SET_TEXT(lblStatus, "Schon formatiert.") : RETURN
+    feldAustauschen(ta, text, neu)
+    GUI_SET_TEXT(lblStatus, "Formatiert.")
+    protokoll("formatiert")
+END SUB
+
+' Den ganzen Text eines Feldes ersetzen -- als EIN Undo-Schritt (Auswahl
+' ueber alles + INSERT; GUI_SET_TEXT leerte den Verlauf), die Marke bleibt
+' auf ihrer Zeile und Spalte.
+SUB feldAustauschen(ta AS GUI_WIDGET, alt AS STRING, neu AS STRING)
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
-    GUI_TEXTAREA_SELECT(ta, 1, 1, LEN(SPLIT$(text, NL)), SPALTE_ENDE)
+    GUI_TEXTAREA_SELECT(ta, 1, 1, LEN(SPLIT$(alt, NL)), SPALTE_ENDE)
     GUI_TEXTAREA_INSERT(ta, neu)
     GUI_TEXTAREA_GOTO(ta, z, s)
-    GUI_SET_TEXT(lblStatus, "Formatiert.")
-    protokoll("formatiert")
 END SUB
 
 ' --- Export als eigenstaendiges Programm (dhrt --export) ----------------
@@ -7131,6 +7642,9 @@ FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
         IF NOT sichern(aktiverTab, FALSE) THEN RETURN FALSE
     END IF
     GUI_LISTBOX_CLEAR(lstAusgabe)
+    ' Wer startet, will die Ausgabe sehen -- eine ausgeblendete untere
+    ' Leiste kommt zurueck.
+    IF NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
     ausgabeRest = "" : prozessRest = ""
     prozessDatei = tabPfade[aktiverTab]
     prozessArt = art
@@ -7296,20 +7810,26 @@ SUB profilAnzeigen(zeile AS STRING)
             DIM t2 AS FLOAT : t2 = zt[i] : zt[i] = zt[best] : zt[best] = t2
         END IF
     NEXT
+    ' Die Quelle zur Messung: der offene Reiter, sonst die Datei -- ohne sie
+    ' gaebe es weder den Quelltext je Zeile noch die Funktionen.
     DIM quelle AS ARRAY OF STRING : quelle = []
-    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-    IF ta >= 0 AND tabPfade[aktiverTab] = prozessDatei THEN quelle = SPLIT$(GUI_TEXT(ta), NL)
-    GUI_TABLE_CLEAR(tblProfil)
-    DIM pz AS ARRAY OF INTEGER : pz = []
-    FOR i = 0 TO MIN(n, 300) - 1
-        DIM anteil AS STRING : anteil = "-"
-        IF gesamt > 0.0 THEN anteil = FORMAT$(zt[i] / gesamt * 100.0, "%.1f") + " %"
-        DIM q AS STRING : q = ""
-        IF zl[i] >= 1 AND zl[i] <= LEN(quelle) THEN q = TRIM$(quelle[zl[i] - 1])
-        GUI_TABLE_ADD_ROW(tblProfil, [STR$(zl[i]), STR$(za[i]), FORMAT$(zt[i] * 1000.0, "%.2f"), anteil, q])
-        ARRAY_PUSH(pz, zl[i])
+    DIM tq AS INTEGER : tq = tabMitPfad(prozessDatei)
+    IF tq >= 0 THEN
+        quelle = SPLIT$(GUI_TEXT(tabFelder[tq]), NL)
+    ELSE
+        TRY
+            quelle = SPLIT$(dateiLesen(prozessDatei), NL)
+        CATCH e
+            quelle = []
+        END TRY
+    END IF
+    profRohZ = [] : profRohA = [] : profRohT = []
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(profRohZ, zl[i]) : ARRAY_PUSH(profRohA, za[i]) : ARRAY_PUSH(profRohT, zt[i])
     NEXT
-    profilZeilen = pz
+    profGesamt = gesamt
+    profQuelle = quelle
+    profilTabelleFuellen()
     ' Fuer die Aufrufer-Liste aufheben: WIE OFT eine Zeile gelaufen ist.
     ' Wer wissen will, welcher Weg der heisse ist, sieht es dann im Baum,
     ' statt Aufrufstellen und Profil im Kopf zusammenzubringen.
@@ -7323,6 +7843,105 @@ SUB profilAnzeigen(zeile AS STRING)
     GUI_WINDOW_VISIBLE(winProfil, TRUE)
     GUI_FOCUS(tblProfil)          ' holt das Fenster vor das Hauptfenster
     protokoll("profil " + STR$(n))
+END SUB
+
+' Die Tabelle aus der Messung: je Zeile (die teuersten 300) oder je
+' Funktion. Eine Zeile gehoert zur INNERSTEN Funktion, die sie umschliesst
+' (eine Methode zu ihrer Klasse als `Klasse.methode`), alles ausserhalb zum
+' Hauptprogramm. Ein Klick springt zur Zeile bzw. zum Kopf der Funktion.
+SUB profilTabelleFuellen()
+    GUI_TABLE_CLEAR(tblProfil)
+    DIM pz AS ARRAY OF INTEGER : pz = []
+    DIM n AS INTEGER : n = LEN(profRohZ)
+    DIM i AS INTEGER
+    IF NOT GUI_CHECKED(cbProfilFunk) THEN
+        GUI_TABLE_HEADERS(tblProfil, ["Zeile", "Anzahl", "ms", "Anteil", "Quelltext"])
+        GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
+        FOR i = 0 TO MIN(n, 300) - 1
+            DIM anteil AS STRING : anteil = "-"
+            IF profGesamt > 0.0 THEN anteil = FORMAT$(profRohT[i] / profGesamt * 100.0, "%.1f") + " %"
+            DIM q AS STRING : q = ""
+            IF profRohZ[i] >= 1 AND profRohZ[i] <= LEN(profQuelle) THEN q = TRIM$(profQuelle[profRohZ[i] - 1])
+            GUI_TABLE_ADD_ROW(tblProfil, [STR$(profRohZ[i]), STR$(profRohA[i]), FORMAT$(profRohT[i] * 1000.0, "%.2f"), anteil, q])
+            ARRAY_PUSH(pz, profRohZ[i])
+        NEXT
+        profilZeilen = pz
+        protokoll("profiltabelle zeilen " + STR$(LEN(pz)))
+        RETURN
+    END IF
+    profBerName = [] : profBerVon = [] : profBerBis = []
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "s" + CHR$(34) + ": " + CODE_SYMBOLS$(JOIN$(profQuelle, NL)) + "}")
+    profilBereiche(j, "s", "")
+    DIM gName AS ARRAY OF STRING : gName = []
+    DIM gVon AS ARRAY OF INTEGER : gVon = []
+    DIM gZeilen AS ARRAY OF INTEGER : gZeilen = []
+    DIM gZeit AS ARRAY OF FLOAT : gZeit = []
+    FOR i = 0 TO n - 1
+        DIM z AS INTEGER : z = profRohZ[i]
+        DIM name AS STRING : name = "(Hauptprogramm)"
+        DIM von AS INTEGER : von = 1
+        DIM spanne AS INTEGER : spanne = 2000000000
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(profBerName) - 1
+            IF z >= profBerVon[k] AND z <= profBerBis[k] AND profBerBis[k] - profBerVon[k] < spanne THEN
+                spanne = profBerBis[k] - profBerVon[k]
+                name = profBerName[k] : von = profBerVon[k]
+            END IF
+        NEXT
+        DIM g AS INTEGER : g = ARRAY_INDEXOF(gName, name)
+        IF g < 0 THEN
+            ARRAY_PUSH(gName, name) : ARRAY_PUSH(gVon, von) : ARRAY_PUSH(gZeilen, 0) : ARRAY_PUSH(gZeit, 0.0)
+            g = LEN(gName) - 1
+        END IF
+        gZeilen[g] = gZeilen[g] + 1
+        gZeit[g] = gZeit[g] + profRohT[i]
+    NEXT
+    ' Nach Zeit absteigend.
+    DIM m AS INTEGER : m = LEN(gName)
+    DIM a AS INTEGER
+    FOR a = 0 TO m - 2
+        DIM best AS INTEGER : best = a
+        FOR k = a + 1 TO m - 1
+            IF gZeit[k] > gZeit[best] THEN best = k
+        NEXT
+        IF best <> a THEN
+            DIM t0 AS STRING : t0 = gName[a] : gName[a] = gName[best] : gName[best] = t0
+            DIM t1 AS INTEGER : t1 = gVon[a] : gVon[a] = gVon[best] : gVon[best] = t1
+            t1 = gZeilen[a] : gZeilen[a] = gZeilen[best] : gZeilen[best] = t1
+            DIM t2 AS FLOAT : t2 = gZeit[a] : gZeit[a] = gZeit[best] : gZeit[best] = t2
+        END IF
+    NEXT
+    GUI_TABLE_HEADERS(tblProfil, ["Funktion", "ab Zeile", "Zeilen", "ms", "Anteil"])
+    GUI_TABLE_COL_WIDTHS(tblProfil, [240, 80, 70, 90, 80])
+    FOR a = 0 TO m - 1
+        DIM ant AS STRING : ant = "-"
+        IF profGesamt > 0.0 THEN ant = FORMAT$(gZeit[a] / profGesamt * 100.0, "%.1f") + " %"
+        GUI_TABLE_ADD_ROW(tblProfil, [gName[a], STR$(gVon[a]), STR$(gZeilen[a]), FORMAT$(gZeit[a] * 1000.0, "%.2f"), ant])
+        ARRAY_PUSH(pz, gVon[a])
+        protokoll("profiltabelle funktion " + gName[a] + " " + STR$(gZeilen[a]))
+    NEXT
+    profilZeilen = pz
+    protokoll("profiltabelle funktionen " + STR$(m))
+END SUB
+
+' Die Funktionsbereiche aus CODE_SYMBOLS$ einsammeln, Methoden als
+' `Klasse.methode`.
+SUB profilBereiche(j AS JSON_HANDLE, pfad AS STRING, vor AS STRING)
+    DIM n AS INTEGER : n = JSON_LEN(j, pfad)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = pfad + "." + STR$(i)
+        DIM art AS STRING : art = JSON_GET_STRING(j, p + ".art")
+        DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+        IF art = "function" THEN
+            ARRAY_PUSH(profBerName, vor + name)
+            ARRAY_PUSH(profBerVon, JSON_GET_INT(j, p + ".von"))
+            ARRAY_PUSH(profBerBis, JSON_GET_INT(j, p + ".bis"))
+        END IF
+        IF JSON_LEN(j, p + ".kinder") > 0 THEN
+            profilBereiche(j, p + ".kinder", IIF(art = "class", vor + name + ".", vor))
+        END IF
+    NEXT
 END SUB
 
 SUB profilAnspringen()
@@ -7616,48 +8235,81 @@ SUB handbuchSuchen(vorwaerts AS BOOLEAN)
 END SUB
 
 ' --- Listing drucken / als PDF (pdf-Modul) -----------------------------
-FUNCTION listingPdf() AS PDF
+' Die Optionen aus dem Druckdialog uebernehmen und merken -- auch die PDF
+' daneben nimmt sie, ob der Dialog offen war oder nicht.
+SUB druckOptionenLesen()
+    druckGroesse = MAX(6, MIN(16, INT(GUI_VALUE(spDruckGr))))
+    druckRand = MAX(10, MIN(40, INT(GUI_VALUE(spDruckRand))))
+    druckNummern = GUI_CHECKED(cbDruckNr)
+    konfigSichern()
+END SUB
+
+' Das Listing als PDF. Schrift, Rand und Zeilennummern aus den
+' Druckoptionen; `nurAuswahl` nimmt die ganzen Zeilen der Auswahl (mit
+' ihren echten Nummern). Mit den Vorgaben (9 pt, 20 mm) ist es genau das
+' Listing von vorher: 66 Zeilen je Seite, 3,9 mm Abstand.
+FUNCTION listingPdf(nurAuswahl AS BOOLEAN) AS PDF
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     DIM name AS STRING : name = "Unbenannt"
     IF tabPfade[aktiverTab] <> "" THEN name = BASENAME(tabPfade[aktiverTab])
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM von AS INTEGER : von = 0
+    DIM bis AS INTEGER : bis = LEN(zeilen) - 1
+    IF nurAuswahl AND GUI_TEXTAREA_SELECTION$(ta) <> "" THEN
+        DIM z1 AS INTEGER
+        DIM s1 AS INTEGER
+        DIM z2 AS INTEGER
+        DIM s2 AS INTEGER
+        (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+        ' Endet die Auswahl in Spalte 1 einer Zeile, gehoert die nicht dazu.
+        IF s2 = 1 AND z2 > z1 THEN z2 = z2 - 1
+        von = z1 - 1 : bis = z2 - 1
+        name = name + " (Zeilen " + STR$(z1) + "-" + STR$(z2) + ")"
+    END IF
     DIM p AS PDF : p = PDF_NEW()
     PDF_TITLE(p, name)
-    CONST BREITE = 92                   ' Zeichen je Zeile in Courier 9 pt auf A4
-    CONST JE_SEITE = 66
-    DIM reihe AS INTEGER : reihe = JE_SEITE
+    DIM rand AS FLOAT : rand = druckRand
+    DIM zeilenH AS FLOAT : zeilenH = druckGroesse * 3.9 / 9.0
+    PDF_FONT(p, "courier", druckGroesse)
+    ' Eine Monospace-Schrift: ein Zeichen misst so viel wie jedes andere.
+    DIM zeichenB AS FLOAT : zeichenB = PDF_TEXT_WIDTH(p, "M")
+    DIM vorB AS INTEGER : vorB = IIF(druckNummern, 7, 0)
+    DIM breite AS INTEGER : breite = MAX(20, INT((210.0 - 2.0 * rand) / zeichenB) - vorB)
+    DIM jeSeite AS INTEGER : jeSeite = MAX(10, INT((297.0 - 2.0 * rand) / zeilenH) + 1)
+    DIM reihe AS INTEGER : reihe = jeSeite
     DIM seite AS INTEGER : seite = 0
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(zeilen) - 1
+    FOR i = von TO bis
         DIM rest AS STRING : rest = REPLACE$(zeilen[i], CHR$(9), "    ")
         DIM nummer AS STRING : nummer = RIGHT$("     " + STR$(i + 1), 5)
         DIM ersteHaelfte AS BOOLEAN : ersteHaelfte = TRUE
         REPEAT
-            IF reihe >= JE_SEITE THEN
+            IF reihe >= jeSeite THEN
                 ' PDF_NEW bringt die erste Seite schon mit -- ein PDF_PAGE davor
                 ' liesse ein leeres Blatt vorn (so war es zuerst).
                 IF seite > 0 THEN PDF_PAGE(p)
                 seite = seite + 1
                 PDF_FONT(p, "helvetica", 9)
-                PDF_TEXT(p, 20, 12, name + "   Seite " + STR$(seite))
-                PDF_LINE(p, 20, 15, 190, 15)
-                PDF_FONT(p, "courier", 9)
+                PDF_TEXT(p, rand, rand - 8.0, name + "   Seite " + STR$(seite))
+                PDF_LINE(p, rand, rand - 5.0, 210.0 - rand, rand - 5.0)
+                PDF_FONT(p, "courier", druckGroesse)
                 reihe = 0
             END IF
-            DIM stueck AS STRING : stueck = LEFT$(rest, BREITE)
+            DIM stueck AS STRING : stueck = LEFT$(rest, breite)
             rest = MID$(rest, LEN(stueck))
-            DIM vorspann AS STRING : vorspann = nummer + "  "
-            IF NOT ersteHaelfte THEN vorspann = "       "
+            DIM vorspann AS STRING : vorspann = ""
+            IF druckNummern THEN vorspann = IIF(ersteHaelfte, nummer + "  ", "       ")
             TRY
-                PDF_TEXT(p, 20, 22 + reihe * 3.9, vorspann + stueck)
+                PDF_TEXT(p, rand, rand + 2.0 + reihe * zeilenH, vorspann + stueck)
             CATCH e
-                ' Ein Zeichen ausserhalb von cp1252 -- die Zeile kommt gekennzeichnet.
-                PDF_TEXT(p, 20, 22 + reihe * 3.9, vorspann + "[Zeile mit Zeichen außerhalb von cp1252]")
+                ' Ein Zeichen, das die Schrift nicht hat -- die Zeile kommt gekennzeichnet.
+                PDF_TEXT(p, rand, rand + 2.0 + reihe * zeilenH, vorspann + "[Zeile mit einem Zeichen, das die Schrift nicht hat]")
             END TRY
             reihe = reihe + 1
             ersteHaelfte = FALSE
         UNTIL rest = ""
     NEXT
+    protokoll("listing " + STR$(bis - von + 1) + " zeilen " + STR$(seite) + " seiten je " + STR$(jeSeite) + " breite " + STR$(breite))
     RETURN p
 END FUNCTION
 
@@ -7668,7 +8320,7 @@ SUB listingAlsPdf()
     DIM ziel AS STRING : ziel = pfad
     IF LOWER$(RIGHT$(ziel, 3)) = ".dh" THEN ziel = LEFT$(ziel, LEN(ziel) - 3)
     ziel = ziel + ".pdf"
-    DIM p AS PDF : p = listingPdf()
+    DIM p AS PDF : p = listingPdf(FALSE)
     PDF_SAVE(p, ziel)
     GUI_SET_TEXT(lblStatus, "PDF geschrieben: " + ziel + " (" + STR$(PDF_PAGE_COUNT(p)) + " Seiten)")
     PDF_CLOSE(p)
@@ -7684,7 +8336,11 @@ SUB listingDrucken()
     GUI_SET_DROPDOWN(ddDrucker, druckerNamen)
     DIM k AS INTEGER : k = ARRAY_INDEXOF(druckerNamen, PRINTER_DEFAULT$())
     GUI_DROPDOWN_SET_SELECTED(ddDrucker, MAX(k, 0))
-    GUI_WINDOW_SET_BOUNDS(winDruck, (SCREENWIDTH() - 400) \ 2, (SCREENHEIGHT() - 170) \ 2, 400, 170)
+    ' "Nur die Auswahl" gibt es nur, wenn etwas ausgewaehlt ist.
+    DIM hatAuswahl AS BOOLEAN : hatAuswahl = GUI_TEXTAREA_SELECTION$(aktivesFeld()) <> ""
+    GUI_SET_ENABLED(cbDruckAuswahl, hatAuswahl)
+    GUI_SET_CHECKED(cbDruckAuswahl, hatAuswahl AND GUI_CHECKED(cbDruckAuswahl))
+    GUI_WINDOW_SET_BOUNDS(winDruck, (SCREENWIDTH() - 400) \ 2, (SCREENHEIGHT() - 270) \ 2, 400, 270)
     GUI_WINDOW_VISIBLE(winDruck, TRUE)
     GUI_FOCUS(btnDruckOk)              ' holt das Fenster nach vorn
 END SUB
@@ -7696,7 +8352,8 @@ SUB druckenAusfuehren()
     IF sel < 0 OR sel >= LEN(druckerNamen) THEN RETURN
     DIM drucker AS STRING : drucker = druckerNamen[sel]
     DIM kopien AS INTEGER : kopien = MAX(1, INT(GUI_VALUE(spKopien)))
-    DIM p AS PDF : p = listingPdf()
+    druckOptionenLesen()
+    DIM p AS PDF : p = listingPdf(GUI_CHECKED(cbDruckAuswahl))
     TRY
         PDF_PRINT(p, drucker, kopien)
         GUI_SET_TEXT(lblStatus, "Gedruckt auf " + drucker + " (" + STR$(PDF_PAGE_COUNT(p)) + " Seiten, " + STR$(kopien) + "x)")
@@ -7771,6 +8428,180 @@ SUB werkzeugeAufraeumen()
     WEND
 END SUB
 
+' Die Beschreibung eines Beispiels aus seinem Kopfkommentar: die erste
+' Kommentarzeile mit Buchstaben in den ersten acht Zeilen -- ohne Zierlinien
+' (`' =====`), ohne `=== ... ===`, ohne ein vorangestelltes `DRACHENHAUCH --`,
+' den Dateinamen oder die Nummer. Bricht sie mitten im Satz ab, kommt die
+' naechste Kommentarzeile dazu (hoechstens zwei); was ueber 100 Zeichen
+' geht, endet am letzten Satz- oder Kommaende davor. Interne Vermerke wie
+' `(WP H)`, `(Batch 1)` oder `(Weg B, ...)` sagen einem Leser nichts.
+FUNCTION kopfZeile$(zeile AS STRING) AS STRING
+    DIM z AS STRING : z = TRIM$(zeile)
+    IF LEFT$(z, 1) <> "'" THEN RETURN ""
+    z = TRIM$(MID$(z, 1, LEN(z)))
+    z = REGEX_REPLACE(z, "\s+", " ")
+    WHILE LEFT$(z, 1) = "=" OR LEFT$(z, 1) = "-" : z = TRIM$(MID$(z, 1, LEN(z))) : WEND
+    WHILE RIGHT$(z, 1) = "=" : z = TRIM$(LEFT$(z, LEN(z) - 1)) : WEND
+    IF NOT REGEX_TEST(z, "[A-Za-zÄÖÜäöüß]") THEN RETURN ""
+    RETURN z
+END FUNCTION
+
+FUNCTION beispielBeschreibung$(pfad AS STRING, datei AS STRING) AS STRING
+    DIM zeilen AS ARRAY OF STRING
+    TRY
+        zeilen = READLINES(pfad)
+    CATCH e
+        RETURN datei
+    END TRY
+    DIM stamm AS STRING : stamm = LEFT$(datei, LEN(datei) - 3)
+    DIM nummer AS STRING : nummer = LEFT$(stamm, MAX(0, INSTR(stamm, "_")))
+    DIM i AS INTEGER
+    FOR i = 0 TO MIN(LEN(zeilen), 8) - 1
+        DIM z AS STRING : z = kopfZeile$(zeilen[i])
+        IF z = "" THEN CONTINUE
+        IF UPPER$(LEFT$(z, 16)) = "DRACHENHAUCH -- " THEN z = TRIM$(MID$(z, 16, LEN(z)))
+        DIM vor AS STRING
+        FOR EACH vor IN [datei + " -- ", datei + " - ", nummer + " -- ", nummer + " - "]
+            IF vor <> " -- " AND vor <> " - " AND LEFT$(z, LEN(vor)) = vor THEN z = TRIM$(MID$(z, LEN(vor), LEN(z)))
+        NEXT
+        IF z = datei OR z = "" THEN CONTINUE
+        ' Fortsetzung: nur eine Kommentarzeile mit Text gleich dahinter (ein
+        ' eingerueckter Block wie eine Befehlsliste zaehlt nicht).
+        DIM dazu AS INTEGER : dazu = 0
+        WHILE dazu < 2 AND i + 1 + dazu < LEN(zeilen) AND NOT REGEX_TEST(z, "[.:!?)" + CHR$(34) + "]$")
+            DIM roh AS STRING : roh = zeilen[i + 1 + dazu]
+            IF LEFT$(roh, 2) <> "' " OR MID$(roh, 2, 1) = " " THEN EXIT WHILE
+            DIM weiter AS STRING : weiter = kopfZeile$(roh)
+            IF weiter = "" THEN EXIT WHILE
+            ' Nur, wo der Satz sichtlich weitergeht -- ein Titel ohne Punkt
+            ' ("Coin Quest") nimmt sonst die naechste Zeile mit, die etwas
+            ' ganz anderes sagt.
+            DIM offen AS BOOLEAN : offen = LEN(z) - LEN(REPLACE$(z, "(", "")) > LEN(z) - LEN(REPLACE$(z, ")", ""))
+            IF NOT (RIGHT$(z, 1) = "-" OR RIGHT$(z, 1) = "," OR offen OR REGEX_TEST(weiter, "^[a-zäöü]")) THEN EXIT WHILE
+            ' Am Zeilenende getrenntes Wort (`Hindernis-` / `Boxen`) ohne Leerzeichen.
+            IF REGEX_TEST(z, "[A-Za-zÄÖÜäöüß]-$") THEN z = z + weiter ELSE z = z + " " + weiter
+            dazu = dazu + 1
+        WEND
+        z = REGEX_REPLACE(z, "\s*\((WP [A-Z][^)]*|Batch [^)]*|Weg B[^)]*|[a-z]+ter Editor-Pilot|sechster Pilot)\)", "")
+        IF LEN(z) > 100 THEN
+            DIM satz AS INTEGER : satz = -1
+            DIM komma AS INTEGER : komma = -1
+            DIM k AS INTEGER
+            FOR k = 20 TO 99
+                ' Ein Satzende, keine Abkuerzung: vor dem Punkt zwei Buchstaben
+                ' (`z.B.` endet nichts).
+                IF MID$(z, k, 2) = ". " AND REGEX_TEST(MID$(z, k - 2, 2), "^[A-Za-zÄÖÜäöüß]{2}$") THEN satz = k
+                IF MID$(z, k, 2) = ", " THEN komma = k
+            NEXT
+            IF satz > 0 THEN
+                z = LEFT$(z, satz + 1)
+            ELSEIF komma > 0 THEN
+                z = LEFT$(z, komma)
+            ELSE
+                z = LEFT$(z, 97) + "..."
+            END IF
+        END IF
+        WHILE RIGHT$(z, 1) = "," OR RIGHT$(z, 1) = ";" : z = TRIM$(LEFT$(z, LEN(z) - 1)) : WEND
+        ' Eine offene Klammer am Ende (die Fortsetzung kam nicht mit): weg damit.
+        DIM auf AS INTEGER : auf = LEN(z) - LEN(REPLACE$(z, "(", ""))
+        DIM zu AS INTEGER : zu = LEN(z) - LEN(REPLACE$(z, ")", ""))
+        IF auf > zu THEN
+            DIM ab AS INTEGER : ab = -1
+            DIM q AS INTEGER
+            FOR q = 0 TO LEN(z) - 2
+                IF MID$(z, q, 2) = " (" THEN ab = q
+            NEXT
+            IF ab > 0 THEN z = TRIM$(LEFT$(z, ab))
+        END IF
+        RETURN TRIM$(z)
+    NEXT
+    RETURN stamm
+END FUNCTION
+
+SUB themenZeigen()
+    DIM k AS JSON_HANDLE
+    DIM gut AS BOOLEAN : gut = TRUE
+    TRY
+        k = JSON_PARSE("{" + CHR$(34) + "t" + CHR$(34) + ": " + JOIN$(READLINES(PATHJOIN(beispielOrdner, "kategorien.json")), NL) + "}")
+    CATCH e
+        gut = FALSE
+    END TRY
+    IF NOT gut THEN
+        GUI_SET_TEXT(lblStatus, "Keine Themenliste: " + PATHJOIN(beispielOrdner, "kategorien.json") + " fehlt.")
+        protokoll("themen fehlen")
+        RETURN
+    END IF
+    GUI_LISTBOX_CLEAR(lstThemen)
+    DIM themen AS INTEGER : themen = JSON_LEN(k, "t")
+    DIM zahl AS INTEGER : zahl = 0
+    DIM t AS INTEGER
+    FOR t = 0 TO themen - 1
+        DIM pt AS STRING : pt = "t." + STR$(t)
+        DIM n AS INTEGER : n = JSON_LEN(k, pt + ".dateien")
+        DIM kopf AS INTEGER : kopf = GUI_LISTBOX_ADD(lstThemen, JSON_GET_STRING(k, pt + ".name"))
+        GUI_LISTBOX_HEADER(lstThemen, kopf, TRUE)
+        DIM d AS INTEGER
+        FOR d = 0 TO n - 1
+            DIM datei AS STRING : datei = JSON_GET_STRING(k, pt + ".dateien." + STR$(d))
+            DIM pfad AS STRING : pfad = PATHJOIN(beispielOrdner, datei)
+            ' Eine Liste, die auf fehlende Dateien zeigt, wird nicht zur Falle:
+            ' was es nicht gibt, steht nicht da.
+            IF NOT FILEEXISTS(pfad) THEN CONTINUE
+            DIM ix AS INTEGER : ix = GUI_LISTBOX_ADD(lstThemen, beispielBeschreibung$(pfad, datei))
+            GUI_LISTBOX_DETAIL(lstThemen, ix, LEFT$(datei, LEN(datei) - 3))
+            GUI_LISTBOX_SET_DATA(lstThemen, ix, datei)
+            GUI_LISTBOX_TIP(lstThemen, ix, datei)
+            zahl = zahl + 1
+        NEXT
+        GUI_LISTBOX_DETAIL(lstThemen, kopf, STR$(n))
+    NEXT
+    GUI_SET_TEXT(tfThemenFilter, "")
+    themenFilterZuletzt = ""
+    GUI_LISTBOX_FILTER(lstThemen, "")
+    GUI_SET_TEXT(lblThemen, STR$(zahl) + " Beispiele in " + STR$(themen) + " Themen")
+    GUI_WINDOW_SET_BOUNDS(winThemen, MAX(0, (SCREENWIDTH() - 760) \ 2), 80, 760, 620)
+    GUI_WINDOW_VISIBLE(winThemen, TRUE)
+    GUI_FOCUS(tfThemenFilter)          ' holt das Fenster nach vorn
+    protokoll("themen " + STR$(themen) + " beispiele " + STR$(zahl))
+END SUB
+
+' Je Bild, solange das Fenster offen ist: Filter, Oeffnen, Starten.
+SUB themenNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winThemen) THEN RETURN
+    DIM f AS STRING : f = TRIM$(GUI_TEXT(tfThemenFilter))
+    IF f <> themenFilterZuletzt THEN
+        themenFilterZuletzt = f
+        GUI_LISTBOX_FILTER(lstThemen, f)
+        protokoll("themen filter [" + f + "] " + STR$(GUI_LISTBOX_VIEW_COUNT(lstThemen)))
+    END IF
+    ' Enter im Filterfeld nimmt den ersten Treffer.
+    IF GUI_ENTERED(tfThemenFilter) THEN
+        DIM v AS INTEGER
+        FOR v = 0 TO GUI_LISTBOX_VIEW_COUNT(lstThemen) - 1
+            DIM zeile AS INTEGER : zeile = GUI_LISTBOX_VIEW_ROW(lstThemen, v)
+            IF GUI_LISTBOX_DATA$(lstThemen, zeile) <> "" THEN
+                GUI_LISTBOX_SET_SELECTED(lstThemen, zeile)
+                themenOeffnen(FALSE)
+                RETURN
+            END IF
+        NEXT
+    END IF
+    IF GUI_DOUBLE_CLICKED(lstThemen) OR GUI_CLICKED(btnThemenOeffnen) THEN themenOeffnen(FALSE)
+    IF GUI_CLICKED(btnThemenStart) THEN themenOeffnen(TRUE)
+    IF GUI_CLICKED(btnThemenZu) THEN GUI_WINDOW_VISIBLE(winThemen, FALSE)
+END SUB
+
+SUB themenOeffnen(starten AS BOOLEAN)
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstThemen)
+    IF sel < 0 THEN RETURN
+    DIM datei AS STRING : datei = GUI_LISTBOX_DATA$(lstThemen, sel)
+    IF datei = "" THEN RETURN          ' ein Themenkopf
+    GUI_WINDOW_VISIBLE(winThemen, FALSE)
+    dateiOeffnen(PATHJOIN(beispielOrdner, datei))
+    protokoll("themen offen " + datei)
+    IF starten THEN befehl("start")
+END SUB
+
 SUB beispieleOeffnen()
     IF NOT FILEEXISTS(PATHJOIN(beispielOrdner, "01_hello.dh")) THEN
         GUI_SET_TEXT(lblStatus, "Keine Beispiele in " + beispielOrdner)
@@ -7840,10 +8671,14 @@ paletteEintrag("Auswahl verkleinern", "verkleinern", "Strg+Umschalt+Runter")
 paletteEintrag("Im ganzen Projekt umbenennen ...", "umb_projekt", "Strg+Umschalt+F6")
 paletteEintrag("Parameter umsortieren ...", "parameter", "Strg+Umschalt+U")
 paletteEintrag("Wer ruft das auf?", "aufrufer", "Umschalt+F12")
+paletteEintrag("Alle Fundstellen im Projekt", "fundstellen", "Strg+Umschalt+F12")
 paletteEintrag("Unterprogramm verschieben ...", "verschieben", "Strg+Umschalt+V")
 paletteEintrag("Letzten Umbau zurücknehmen", "umbau_zurueck", "Strg+Umschalt+Z")
+paletteEintrag("Zurückgenommenen Umbau wiederholen", "umbau_wieder", "")
 paletteEintrag("Letzten Umbau nachbessern", "umbau_nach", "Strg+Umschalt+G")
 paletteEintrag("Gerüst beim Tippen", "geruest", "")
+paletteEintrag("Klammern automatisch schließen", "klammern", "")
+paletteEintrag("Beim Sichern formatieren", "format_sichern", "")
 paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
 paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
 paletteEintrag("Zeilen sortieren", "zl_sortieren", "")
@@ -7859,6 +8694,10 @@ paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
 paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
 paletteEintrag("Geteilte Ansicht", "geteilt", "Alt+G") : paletteEintrag("Übersichtskarte", "minimap", "")
+paletteEintrag("Dieselbe Datei nebeneinander", "spiegel", "Alt+Umschalt+G")
+paletteEintrag("Seitenleiste ein/aus", "seitenleiste", "Alt+1")
+paletteEintrag("Ausgabe leeren", "ausgabe_leeren", "")
+paletteEintrag("Untere Leiste ein/aus", "untere_leiste", "Alt+2")
 paletteEintrag("Zeilenumbruch", "umbruch", "Alt+Z")
 paletteEintrag("Helles Thema", "thema", "") : paletteEintrag("Vollbild", "vollbild", "Alt+Enter")
 paletteEintrag("Schrift größer", "groesser", "Strg+Plus") : paletteEintrag("Schrift kleiner", "kleiner", "Strg+Minus")
@@ -7871,7 +8710,7 @@ paletteEintrag("Listing drucken ...", "drucken", "Strg+P")
 paletteEintrag("Listing als PDF neben die Quelle", "pdf", "")
 paletteEintrag("Werkzeug: SFX-Generator", "wz_sfx", "") : paletteEintrag("Werkzeug: Partikel-Editor", "wz_partikel", "")
 paletteEintrag("Werkzeug: Tilemap-Editor", "wz_tilemap", "") : paletteEintrag("Werkzeug: Sprite-Editor", "wz_sprite", "")
-paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "")
+paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "") : paletteEintrag("Beispiele nach Themen ...", "beispiele_themen", "")
 paletteEintrag("Ausdruck im Debugger auswerten", "ausdruck", "Strg+E")
 
 ' Unscharfer Filter: der Text als Teil ODER seine Zeichen der Reihe nach
@@ -8298,10 +9137,18 @@ SUB befehl(k AS STRING)
             END IF
         CASE "parameter" : parameterFragen()
         CASE "aufrufer" : aufruferZeigen()
+        CASE "fundstellen" : fundstellenZeigen()
         CASE "verschieben" : verschiebenFragen()
         CASE "umbau_zurueck" : umbauZurueck()
+        CASE "umbau_wieder" : umbauWiederholen()
         CASE "umbau_nach" : umbauNachbessern()
         CASE "geruest" : geruestSetzen(NOT geruestAn)
+        CASE "klammern" : klammernSetzen(NOT klammernAn)
+        CASE "format_sichern"
+            formatSichernAn = NOT formatSichernAn
+            konfigSichern()
+            GUI_SET_TEXT(lblStatus, IIF(formatSichernAn, "Beim Sichern formatieren an.", "Beim Sichern formatieren aus."))
+            protokoll("format sichern " + IIF(formatSichernAn, "an", "aus"))
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
         CASE "leiste"
@@ -8352,6 +9199,16 @@ SUB befehl(k AS STRING)
         CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
         CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
         CASE "geteilt" : geteiltSetzen(NOT geteilt)
+        CASE "spiegel" : spiegelSetzen(NOT spiegelAn)
+        CASE "ausgabe_leeren"
+            ' Eine halbe Zeile, die noch auf ihren Umbruch wartet, geht mit --
+            ' sonst stuende ihr Rest nachher allein am Anfang.
+            GUI_LISTBOX_CLEAR(lstAusgabe)
+            ausgabeRest = ""
+            GUI_SET_TEXT(lblStatus, "Ausgabe geleert.")
+            protokoll("ausgabe geleert")
+        CASE "seitenleiste" : leistenSetzen(NOT seitenAn, untenAn)
+        CASE "untere_leiste" : leistenSetzen(seitenAn, NOT untenAn)
         CASE "minimap" : minimapSetzen(NOT minimapAn)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
@@ -8371,6 +9228,7 @@ SUB befehl(k AS STRING)
         CASE "wz_anim" : werkzeugStarten("198_anim_fsm_editor.dh")
         CASE "wz_noten" : werkzeugStarten("199_notenblatt.dh")
         CASE "beispiele" : beispieleOeffnen()
+        CASE "beispiele_themen" : themenZeigen()
         CASE "ausdruck"
             IF prozessArt = "debug" AND debugPause THEN GUI_FOCUS(tfEingabe) ELSE GUI_SET_TEXT(lblStatus, "Der Debugger steht gerade nicht -- erst F7 und ein Halt.")
     END SELECT
@@ -8555,8 +9413,10 @@ WHILE NOT beenden
     IF GUI_CLICKED(miUmbProjekt) THEN befehl("umb_projekt")
     IF GUI_CLICKED(miParameter) THEN befehl("parameter")
     IF GUI_CLICKED(miAufrufer) THEN befehl("aufrufer")
+    IF GUI_CLICKED(miFundstellen) THEN befehl("fundstellen")
     IF GUI_CLICKED(miVerschieben) THEN befehl("verschieben")
     IF GUI_CLICKED(miUmbauZur) THEN befehl("umbau_zurueck")
+    IF GUI_CLICKED(miUmbauWdh) THEN befehl("umbau_wieder")
     IF GUI_CLICKED(miUmbauNach) THEN befehl("umbau_nach")
     IF GUI_CLICKED(miVergleich) THEN befehl("vergleichen")
     IF GUI_CLICKED(miReiterVgl) THEN befehl("reiter_vergleich")
@@ -8629,10 +9489,15 @@ WHILE NOT beenden
     IF GUI_CLICKED(miHeraus) OR GUI_CLICKED(btnHeraus) THEN befehl("heraus")
     IF GUI_CLICKED(btnStoppD) THEN befehl("stopp")
     IF GUI_CLICKED(miProfil) THEN befehl("profil")
+    IF GUI_CLICKED(miAusgabeLeer) THEN befehl("ausgabe_leeren")
+    IF GUI_CLICKED(cbProfilFunk) THEN profilTabelleFuellen()
     IF GUI_CLICKED(miThema) THEN befehl("thema")
     IF GUI_CLICKED(miVollbild) THEN befehl("vollbild")
     IF GUI_CLICKED(miUmbruch) THEN befehl("umbruch")
     IF GUI_CLICKED(miGeteilt) THEN befehl("geteilt")
+    IF GUI_CLICKED(miSpiegel) THEN befehl("spiegel")
+    IF GUI_CLICKED(miSeiten) THEN befehl("seitenleiste")
+    IF GUI_CLICKED(miUnten) THEN befehl("untere_leiste")
     IF GUI_CLICKED(miMinimap) THEN befehl("minimap")
     IF GUI_CLICKED(miFalten) THEN befehl("falten")
     IF GUI_CLICKED(miFaltenAlle) THEN befehl("falten_alle")
@@ -8650,6 +9515,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miWzAnim) THEN befehl("wz_anim")
     IF GUI_CLICKED(miWzNoten) THEN befehl("wz_noten")
     IF GUI_CLICKED(miBeispiele) THEN befehl("beispiele")
+    IF GUI_CLICKED(miThemen) THEN befehl("beispiele_themen")
     IF GUI_CLICKED(miAusdruck) THEN befehl("ausdruck")
     IF GUI_CLICKED(miSchnell) THEN befehl("schnell")
     IF GUI_CLICKED(miTodo) THEN befehl("todo")
@@ -8687,11 +9553,12 @@ WHILE NOT beenden
     IF GUI_CLICKED(btnWkNeu) THEN befehl("neu")
     IF GUI_CLICKED(btnWkOeffnen) THEN befehl("oeffnen")
     IF GUI_CLICKED(btnWkBeispiele) THEN befehl("beispiele")
+    IF GUI_CLICKED(btnWkThemen) THEN befehl("beispiele_themen")
     IF GUI_DOUBLE_CLICKED(lstWkZuletzt) AND GUI_LISTBOX_SELECTED(lstWkZuletzt) >= 0 AND GUI_LISTBOX_SELECTED(lstWkZuletzt) < LEN(zuletzt) THEN dateiOeffnen(zuletzt[GUI_LISTBOX_SELECTED(lstWkZuletzt)])
     IF GUI_DOUBLE_CLICKED(lstGliederung) THEN gliederungAnspringen()
     ' Druckdialog
     IF GUI_CLICKED(btnDruckOk) THEN druckenAusfuehren()
-    IF GUI_CLICKED(btnDruckPdf) THEN GUI_WINDOW_VISIBLE(winDruck, FALSE) : listingAlsPdf()
+    IF GUI_CLICKED(btnDruckPdf) THEN GUI_WINDOW_VISIBLE(winDruck, FALSE) : druckOptionenLesen() : listingAlsPdf()
     IF GUI_CLICKED(btnDruckWeg) THEN GUI_WINDOW_VISIBLE(winDruck, FALSE) : GUI_FOCUS(aktivesFeld())
     ' Handbuch: Klappliste wechselt das Dokument, Enter/Knopf sucht darin.
     IF GUI_DROPDOWN_SELECTED(ddDoku) <> docLetzteWahl AND GUI_DROPDOWN_SELECTED(ddDoku) >= 0 THEN
@@ -8711,6 +9578,7 @@ WHILE NOT beenden
     farbfeldNachziehen()
     einstellungenNachziehen()
     befehleNachziehen()
+    themenNachziehen()
     IF GUI_CLICKED(btnEinstZu) THEN GUI_WINDOW_VISIBLE(winEinst, FALSE) : einstOffen = FALSE : GUI_FOCUS(aktivesFeld())
     IF GUI_CLICKED(btnBefehlEin) OR GUI_DOUBLE_CLICKED(lstBefehle) THEN befehlEinfuegen()
     IF GUI_CLICKED(btnPeekZu) THEN GUI_WINDOW_VISIBLE(winPeek, FALSE) : GUI_FOCUS(aktivesFeld())
@@ -8987,6 +9855,8 @@ WHILE NOT beenden
     IF GUI_DOUBLE_CLICKED(lstAusgabe) THEN ausgabeAnspringen()
     IF GUI_CLICKED(btnEingabe) OR GUI_ENTERED(tfEingabe) THEN eingabeSenden()
 
+    spiegelNachziehen()
+    baumFilterNachziehen()
     ' --- Aenderungen im aktiven Feld: einfaerben, Pruefung vormerken ---
     IF aktiverTab >= 0 THEN
         DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]
@@ -9003,11 +9873,24 @@ WHILE NOT beenden
         IF autoSichern > 0 AND autoFaellig >= 0.0 AND GET_TIME() >= autoFaellig THEN
             autoFaellig = -1.0
             IF tabPfade[aktiverTab] <> "" AND jetzt <> tabGesichert[aktiverTab] THEN
+                sichernOhneFormat = TRUE
                 sichern(aktiverTab, FALSE)
+                sichernOhneFormat = FALSE
                 protokoll("auto gesichert")
             END IF
         END IF
         faerben(tf)
+        ' Die zweite Ansicht hat ihren eigenen Ausschnitt, also ihre eigene
+        ' Einfaerbung -- mit eigenem Riegel, sonst rechneten beide Felder in
+        ' jedem Bild neu, weil sie sich den Schluessel gegenseitig
+        ' ueberschrieben.
+        IF spiegelAn AND taSpiegel >= 0 THEN
+            DIM hauptSchl AS STRING : hauptSchl = faerbSchluessel
+            faerbSchluessel = spiegelFaerbSchl
+            faerben(taSpiegel)
+            spiegelFaerbSchl = faerbSchluessel
+            faerbSchluessel = hauptSchl
+        END IF
         markenNachziehen()
         hilfeNachziehen()
         vervollNachziehen()

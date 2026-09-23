@@ -79,8 +79,9 @@ weil ein Komma zu oft in einem Eintrag selbst steht.
 
 | Art | Felder |
 |---|---|
-| Klappliste, Liste | Einträge (`Rot; Grün; Blau`) |
-| Tabelle, Gitter | Spalten, Breiten, Bearbeitbar (`0; 2` oder `alle`), Spaltenarten (`text; ganz; zahl; auswahl`), Auswahl (`2 = Rot\|Grün`), Kästchen *Zellmodus* |
+| Klappliste, Liste | Einträge (`Rot; Grün; Blau`); bei der Klappliste der Platzhalter (`Bitte wählen`), bei der Liste das Kästchen *Umbenennen mit F2* (`GUI_LISTBOX_SET … "bearbeitbar"`) |
+| Tabelle, Gitter | Spalten, Breiten, Bearbeitbar (`0; 2` oder `alle`), Spaltenarten (`text; ganz; zahl; auswahl`), Auswahl (`2 = Rot\|Grün`), Leer-Hinweis (`Keine Treffer`, zeigt die Tabelle, wenn keine Zeile da ist), Kästchen *Zellmodus* |
+| Baum | Kästchen *Umbenennen mit F2*, Leer-Hinweis |
 | Regler, Fortschritt, Zahlenfeld, Drehknopf | Min, Max, Wert |
 
 Eine Spalte mit Auswahlliste wird dabei **zur Auswahlspalte**, auch wenn es
@@ -125,7 +126,9 @@ WEND
    meldet die Statuszeile.
 3. **GB-Code (Strg+G):** `<name>_code.dh` baut das Formular **Aufruf für
    Aufruf** — Konstruktor je Control, bei der Tabelle Kopf, Breiten,
-   Zellmodus, bearbeitbare Spalten, Spaltenarten und Auswahllisten, dazu
+   Zellmodus, bearbeitbare Spalten, Spaltenarten, Auswahllisten und
+   Leer-Hinweis, bei Liste und Baum das Umbenennen, beim Baum den
+   Leer-Hinweis, dazu
    Datum und Uhrzeit, gesperrt, Anker, Tooltip, Schriftstil und die Handler samt Rümpfen
    aus `code`; ohne `GUI_LOAD` und ohne die `.dhform` zur Laufzeit, lesbar
    und von Hand weiterzuschreiben. Die Konstruktoren, die sich selbst messen

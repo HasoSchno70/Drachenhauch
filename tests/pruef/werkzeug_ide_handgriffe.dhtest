@@ -1,0 +1,657 @@
+' Die IDE in Drachenhauch (ide/ide.dh): Handgriffe aus der Uebersicht vom
+' 2026-09-23 -- Klammern schliessen und was danach kam.
+'
+' Aufbau wie tests/pruef/werkzeug_ide.dhtest: die IDE als Kopie in _programm/,
+' der Einschub steht hinter `protokoll("bereit")` (dort ist alles angelegt
+' und `befehl` rufbar), gelesen wird mit `--- nachher` aus Protokoll und
+' ide.json. Das Tippen selbst prueft tests/pruef/gui_klammern.dhtest an der
+' Laufzeit -- hier geht es um die Einstellung.
+--- seriell
+
+=== klammern schliessen ist an und laesst sich abschalten
+PRINT "vorher " ; klammernAn
+befehl("klammern")
+PRINT "nachher " ; klammernAn
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM gefunden AS BOOLEAN
+FOR i = 0 TO LEN(L) - 1
+    IF L[i] = "klammern aus" THEN gefunden = TRUE
+NEXT
+PRINT "protokoll " ; gefunden
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt " ; JSON_GET_BOOL(k, "klammern")
+--- erwartet
+protokoll TRUE
+gemerkt FALSE
+
+=== die gemerkte einstellung gilt beim naechsten start
+PRINT "an " ; klammernAn
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ide.json
+{"klammern": false}
+--- enthaelt
+an FALSE
+
+=== beim sichern formatieren
+befehl("sichern")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+FOR i = 1 TO 2
+PRINT i
+NEXT
+--- datei _programm/ide.json
+{"format_sichern": true}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    PRINT "|" + L[i] + "|"
+NEXT
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM n AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF P[i] = "beim sichern formatiert" THEN n = n + 1
+NEXT
+PRINT "formatiert " ; n
+--- erwartet
+|FOR i = 1 TO 2|
+|    PRINT i|
+|NEXT|
+formatiert 1
+
+=== ohne die einstellung bleibt der text wie er ist
+befehl("sichern")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+FOR i = 1 TO 2
+PRINT i
+NEXT
+--- datei _programm/ide.json
+{}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    PRINT "|" + L[i] + "|"
+NEXT
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM n AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF P[i] = "beim sichern formatiert" THEN n = n + 1
+NEXT
+PRINT "formatiert " ; n
+--- erwartet
+|FOR i = 1 TO 2|
+|PRINT i|
+|NEXT|
+formatiert 0
+
+=== das automatische sichern formatiert nicht
+sichernOhneFormat = TRUE
+befehl("sichern")
+sichernOhneFormat = FALSE
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+FOR i = 1 TO 2
+PRINT i
+NEXT
+--- datei _programm/ide.json
+{"format_sichern": true}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    PRINT "|" + L[i] + "|"
+NEXT
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM n AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF P[i] = "beim sichern formatiert" THEN n = n + 1
+NEXT
+PRINT "formatiert " ; n
+--- erwartet
+|FOR i = 1 TO 2|
+|PRINT i|
+|NEXT|
+formatiert 0
+
+=== was sich nicht lesen laesst wird gesichert wie es dasteht
+befehl("sichern")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+FOR i = 1 TO 2
+PRINT "ab
+NEXT
+--- datei _programm/ide.json
+{"format_sichern": true}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    PRINT "|" + L[i] + "|"
+NEXT
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM n AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF P[i] = "beim sichern formatiert" THEN n = n + 1
+NEXT
+PRINT "formatiert " ; n
+--- erwartet
+|FOR i = 1 TO 2|
+|PRINT "ab|
+|NEXT|
+formatiert 0
+
+=== alle fundstellen eines namens im projekt
+' Die Marke steht auf `punkte` in spiel.dh. Gezaehlt wird das ganze Wort in
+' jeder Schreibweise, nicht in Zeichenketten, Kommentaren oder `punktestand`.
+GUI_TEXTAREA_GOTO(aktivesFeld(), 2, 3)
+befehl("fundstellen")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM punkte AS INTEGER
+punkte = 3
+PRINT "punkte" ' punkte im Kommentar
+DIM punktestand AS INTEGER
+Punkte = Punkte + 1
+--- datei lib.dh
+SUB zeige()
+    PRINT punkte
+END SUB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 12) = "fundstellen " THEN PRINT L[i]
+NEXT
+--- erwartet
+fundstellen punkte 4 2
+
+=== dieselbe datei nebeneinander
+' Die zweite Ansicht liegt links, der Reiter rechts; was in der Ansicht
+' geschrieben wird, sichert der Reiter. Danach schaltet die geteilte Ansicht
+' sie wieder ab -- es gibt nur eine zweite Haelfte.
+befehl("spiegel")
+GUI_TEXTAREA_GOTO(taSpiegel, 1, 1)
+GUI_TEXTAREA_INSERT(taSpiegel, "' neu" + NL)
+GUI_UPDATE()
+befehl("sichern")
+PRINT "fokus-feld ist die ansicht " ; aktivesFeld() = taSpiegel
+befehl("spiegel")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+PRINT "|" + L[0] + "|"
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 11) = "spiegel an " THEN
+        ' "spiegel an x LX+LW RX+RW": die Ansicht links, der Reiter rechts davon
+        DIM t AS ARRAY OF STRING : t = SPLIT$(P[i], " ")
+        DIM l AS ARRAY OF STRING : l = SPLIT$(t[3], "+")
+        DIM r AS ARRAY OF STRING : r = SPLIT$(t[4], "+")
+        PRINT "nebeneinander " ; VAL(l[0]) + VAL(l[1]) <= VAL(r[0])
+    END IF
+    IF P[i] = "spiegel aus" THEN PRINT P[i]
+NEXT
+--- erwartet
+|' neu|
+nebeneinander TRUE
+spiegel aus
+
+=== seitenleiste und untere leiste ein- und ausblenden
+' Der Code bekommt die frei gewordene Flaeche: erst die Breite der
+' Seitenleiste, dann die Hoehe der unteren. Ein Start holt die untere zurueck.
+befehl("seitenleiste")
+befehl("untere_leiste")
+PRINT "baum sichtbar " ; GUI_VISIBLE(baum)
+PRINT "ausgabe sichtbar " ; GUI_VISIBLE(lstAusgabe)
+befehl("start")
+PRINT "nach dem start " ; GUI_VISIBLE(lstAusgabe)
+befehl("seitenleiste")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+IMPORT "json"
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM x AS ARRAY OF INTEGER : x = []
+DIM b AS ARRAY OF INTEGER : b = []
+DIM hh AS ARRAY OF INTEGER : hh = []
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 8) = "leisten " THEN
+        DIM t AS ARRAY OF STRING : t = SPLIT$(P[i], " ")
+        DIM xb AS ARRAY OF STRING : xb = SPLIT$(t[6], "+")
+        ARRAY_PUSH(x, INT(VAL(xb[0]))) : ARRAY_PUSH(b, INT(VAL(xb[1]))) : ARRAY_PUSH(hh, INT(VAL(t[8])))
+        PRINT t[0] ; " " ; t[1] ; " " ; t[2] ; " " ; t[3] ; " " ; t[4]
+    END IF
+NEXT
+PRINT "ohne seite weiter links und breiter " ; x[0] < x[3] AND b[0] > b[3]
+PRINT "ohne unten hoeher " ; hh[1] > hh[0]
+PRINT "start holt unten zurueck, gleiche hoehe wie am anfang " ; hh[2] = hh[0]
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt " ; JSON_GET_BOOL(k, "seitenleiste") ; " " ; JSON_GET_BOOL(k, "untere_leiste")
+--- erwartet
+leisten seite aus unten an
+leisten seite aus unten aus
+leisten seite aus unten an
+leisten seite an unten an
+ohne seite weiter links und breiter TRUE
+ohne unten hoeher TRUE
+start holt unten zurueck, gleiche hoehe wie am anfang TRUE
+gemerkt TRUE TRUE
+
+=== das profil nach funktionen
+' Die Messung ist erfunden (drei Zeilen in held.lauf, eine in zeige, eine
+' im Hauptprogramm), gezaehlt wird, was die Tabelle daraus macht.
+profQuelle = SPLIT$(READLINES_JOIN$(), NL)
+profRohZ = [3, 4, 9, 8, 1]
+profRohA = [10, 10, 5, 5, 1]
+profRohT = [0.004, 0.003, 0.002, 0.001, 0.0005]
+profGesamt = 0.0105
+GUI_SET_CHECKED(cbProfilFunk, TRUE)
+profilTabelleFuellen()
+PRINT "sprung " ; profilZeilen[0] ; " " ; profilZeilen[1]
+GUI_SET_CHECKED(cbProfilFunk, FALSE)
+profilTabelleFuellen()
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/profilquelle.dh
+FUNCTION READLINES_JOIN$() AS STRING
+    RETURN JOIN$(["DIM x AS INTEGER", "CLASS Held", "    SUB lauf()", "        x = x + 1", "    END SUB", "END CLASS", "SUB zeige()", "    PRINT x", "    PRINT x", "END SUB"], CHR$(10))
+END FUNCTION
+--- ersetzen protokoll("bereit")
+IMPORT "profilquelle.dh"
+protokoll("bereit")
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 13) = "profiltabelle" THEN PRINT P[i]
+NEXT
+--- erwartet
+profiltabelle funktion Held.lauf 2
+profiltabelle funktion zeige 2
+profiltabelle funktion (Hauptprogramm) 1
+profiltabelle funktionen 3
+profiltabelle zeilen 5
+
+=== ausgabe leeren
+ausgabe("eins")
+ausgabe("zwei")
+PRINT "vorher " ; GUI_LISTBOX_COUNT(lstAusgabe)
+befehl("ausgabe_leeren")
+PRINT "nachher " ; GUI_LISTBOX_COUNT(lstAusgabe)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- enthaelt
+vorher 2
+nachher 0
+
+=== gefaltete bloecke bleiben ueber einen neustart gefaltet
+' Erster Lauf: den Block ab Zeile 2 zuklappen und die Sitzung sichern.
+' Zweiter Lauf (dieselbe Beilage, darum die Marke "lauf1"): die IDE klappt
+' ihn selbst wieder zu, sobald die Gliederung die Bloecke kennt.
+IF NOT FILEEXISTS("lauf1") THEN
+    WRITEALL("lauf1", "x")
+    GUI_TEXTAREA_FOLDABLE(tabFelder[0], [2], [4])
+    GUI_TEXTAREA_FOLD(tabFelder[0], 2, TRUE)
+    konfigSichern()
+END IF
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+SUB zwei()
+    PRINT 2
+END SUB
+--- nochmal
+spiel.dh
+--- nachher
+IMPORT "json"
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt " ; JSON_GET_STRING(k, "falten_zeilen.0")
+PRINT "datei " ; RIGHT$(JSON_GET_STRING(k, "falten_pfade.0"), 8)
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 13) = "falten wieder" THEN PRINT P[i]
+NEXT
+--- erwartet
+gemerkt 2
+datei spiel.dh
+falten wieder 1
+
+=== druckoptionen: schrift, rand, zeilennummern, auswahl
+' Mit den Vorgaben ist es das Listing von vorher (66 Zeilen je Seite); mit
+' 12 pt, 30 mm und ohne Nummern passen weniger Zeilen auf eine Seite, und
+' "Nur die Auswahl" nimmt die ganzen Zeilen 2 bis 3.
+DIM p AS PDF : p = listingPdf(FALSE)
+PDF_CLOSE(p)
+GUI_SET_VALUE(spDruckGr, 12)
+GUI_SET_VALUE(spDruckRand, 30)
+GUI_SET_CHECKED(cbDruckNr, FALSE)
+druckOptionenLesen()
+GUI_TEXTAREA_SELECT(tabFelder[0], 2, 3, 3, 2)
+p = listingPdf(TRUE)
+PDF_SAVE(p, "auswahl.pdf")
+PDF_CLOSE(p)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+--- datei _programm/lesen.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- nachher
+IMPORT "json"
+IMPORT "_programm/lesen.dh"
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 8) = "listing " THEN PRINT P[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt " ; JSON_GET_INT(k, "druck_groesse") ; " " ; JSON_GET_INT(k, "druck_rand") ; " " ; JSON_GET_BOOL(k, "druck_nummern")
+DIM texte AS ARRAY OF STRING : texte = pdfSeiten("_programm/auswahl.pdf")
+PRINT "zeile 2 ohne nummer " ; INSTR(texte[0], "PRINT 2") >= 0 AND INSTR(texte[0], "    2  PRINT 2") < 0
+PRINT "zeile 4 fehlt " ; INSTR(texte[0], "PRINT 4") < 0
+--- erwartet
+listing 4 zeilen 1 seiten je 66 breite 81
+listing 2 zeilen 1 seiten je 46 breite 58
+gemerkt 12 30 FALSE
+zeile 2 ohne nummer TRUE
+zeile 4 fehlt TRUE
+
+=== filter ueber dem projektbaum
+' Die Zeilen des Baums bleiben, wo sie waren (Klicklagen der anderen
+' Faelle); gezaehlt werden die sichtbaren Dateien.
+GUI_SET_TEXT(tfBaumFilter, "HELD")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei held.dh
+PRINT 2
+--- datei held_bild.png
+x
+--- datei gegner.dh
+PRINT 3
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 10) = "baumfilter" THEN PRINT P[i]
+NEXT
+--- erwartet
+baumfilter [HELD] 2
+
+=== ein umbau wird nicht zurueckgenommen, wenn die datei danach geaendert wurde
+' Ein Umbau schreibt b.dh (sie ist nicht offen), danach aendert jemand die
+' Datei noch einmal. Zuruecknehmen schriebe die spaetere Arbeit weg.
+umbauTabs = [-1] : umbauPfade = [PATHJOIN(projektOrdner, "b.dh")] : umbauTexte = ["PRINT " + CHR$(34) + "neu" + CHR$(34)]
+umbauSchreiben()
+WRITEALL(PATHJOIN(projektOrdner, "b.dh"), "PRINT " + CHR$(34) + "spaeter" + CHR$(34) + NL)
+umbauZurueck()
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei b.dh
+PRINT "alt"
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 6) = "umbau " THEN PRINT P[i]
+NEXT
+PRINT "datei " ; READLINES("b.dh")[0]
+--- erwartet
+umbau zurueck geaendert b.dh
+datei PRINT "spaeter"
+
+=== zurueckgenommen und wiederholt
+umbauTabs = [-1] : umbauPfade = [PATHJOIN(projektOrdner, "b.dh")] : umbauTexte = ["PRINT " + CHR$(34) + "neu" + CHR$(34)]
+umbauSchreiben()
+umbauZurueck()
+PRINT "nach dem zuruecknehmen " ; READLINES(PATHJOIN(projektOrdner, "b.dh"))[0]
+umbauWiederholen()
+umbauWiederholen()
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei b.dh
+PRINT "alt"
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 6) = "umbau " THEN PRINT P[i]
+NEXT
+PRINT "datei " ; READLINES("b.dh")[0]
+--- erwartet
+umbau zurueck 1
+umbau wieder 1
+umbau wieder 0
+datei PRINT "neu"
+
+=== jedes beispiel steht genau einmal in einem thema
+' examples/kategorien.json ist von Hand gepflegt -- ein neues Beispiel
+' faellt sonst still aus der Themenliste heraus, und ein umbenanntes
+' laesst einen Eintrag stehen, der auf nichts zeigt.
+IMPORT "json"
+DIM ord AS STRING : ord = PATHJOIN(ARG$(0), "../../examples")
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "t" + CHR$(34) + ":" + JOIN$(READLINES(PATHJOIN(ord, "kategorien.json")), CHR$(10)) + "}")
+DIM gesehen AS MAP OF INTEGER
+DIM t AS INTEGER
+DIM k AS INTEGER
+DIM doppelt AS INTEGER : doppelt = 0
+DIM fehlt AS INTEGER : fehlt = 0
+FOR t = 0 TO JSON_LEN(h, "t") - 1
+    FOR k = 0 TO JSON_LEN(h, "t." + STR$(t) + ".dateien") - 1
+        DIM d AS STRING : d = JSON_GET_STRING(h, "t." + STR$(t) + ".dateien." + STR$(k))
+        IF MAPHAS(gesehen, d) THEN
+            doppelt = doppelt + 1 : PRINT "doppelt " ; d
+        END IF
+        MAPPUT(gesehen, d, 1)
+        IF NOT FILEEXISTS(PATHJOIN(ord, d)) THEN
+            fehlt = fehlt + 1 : PRINT "fehlt " ; d
+        END IF
+    NEXT
+NEXT
+DIM ohne AS INTEGER : ohne = 0
+DIM f AS STRING
+FOR EACH f IN DIRLIST(ord, "*.dh")
+    IF LEFT$(f, 1) = "_" OR LEFT$(f, 6) = "bench_" THEN CONTINUE
+    IF NOT MAPHAS(gesehen, f) THEN
+        ohne = ohne + 1 : PRINT "ohne thema " ; f
+    END IF
+NEXT
+PRINT "themen " ; JSON_LEN(h, "t") ; " doppelt " ; doppelt ; " fehlt " ; fehlt ; " ohne " ; ohne
+--- argumente
+{sammlung}
+--- erwartet
+themen 16 doppelt 0 fehlt 0 ohne 0
+
+=== beispiele nach themen: liste, filter, oeffnen
+themenZeigen()
+GUI_SET_TEXT(tfThemenFilter, "tracker")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 7) = "themen " THEN PRINT P[i]
+NEXT
+--- erwartet
+themen 16 beispiele 203
+themen filter [tracker] 2
+
+=== ein beispiel aus der themenliste oeffnen
+themenZeigen()
+GUI_SET_TEXT(tfThemenFilter, "tracker")
+themenNachziehen()
+GUI_LISTBOX_SET_SELECTED(lstThemen, GUI_LISTBOX_VIEW_ROW(lstThemen, 1))
+themenOeffnen(FALSE)
+PRINT "sichtbar " ; GUI_WINDOW_SHOWN(winThemen)
+PRINT "reiter " ; BASENAME(tabPfade[aktiverTab])
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- enthaelt
+sichtbar FALSE
+reiter 190_tracker.dh
+
+=== die beschreibung kommt aus dem kopfkommentar
+' Zierlinien, der Dateiname vorn und interne Vermerke fallen weg; eine
+' Zeile, die mitten im Satz endet, holt die naechste; eine Abkuerzung wie
+' "z.B." ist kein Satzende.
+DIM ord AS STRING : ord = PATHJOIN(wurzel, "examples")
+DIM d AS STRING
+FOR EACH d IN ["14_strings.dh", "35_serial.dh", "32_coinquest.dh", "47_collision_easing.dh"]
+    PRINT beispielBeschreibung$(PATHJOIN(ord, d), d)
+NEXT
+PRINT beispielBeschreibung$(PATHJOIN(ord, "gibtsnicht.dh"), "gibtsnicht.dh")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- enthaelt
+String-Funktionen: LEFT$, RIGHT$, MID$, INSTR, SPLIT$, JOIN$, REPLACE$, TRIM$
+Serielle Kommunikation - z.B. mit Arduino oder ESP32
+Coin Quest
+Sprite-Collision + Easing-Demo: ein Spieler-Sprite weicht Hindernis-Boxen aus
+gibtsnicht.dh

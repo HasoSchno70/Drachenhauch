@@ -1,0 +1,482 @@
+' Baum bedienen wie eine Liste (2026-09-23): Doppelklick und Enter melden
+' GUI_DOUBLE_CLICKED, F2 benennt um, Tippen springt, Pos1/Ende/Bild,
+' Rechtsklick waehlt, Rollbalken, weiches Rad, Leer-Hinweis.
+' Baum bei (10, 10, 280, 200), Zeilen 22 hoch: Zeile r liegt bei
+' y 11 + 22 r .. + 21. Getippt wird ueber die Zwischenablage (die Wiedergabe
+' speist keine Zeichen ein) -- darum seriell.
+' Tasten: F2 291, Enter 257, ESC 256, Strg 341, V 86, B 66, Pos1 268, Ende 269.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ein doppelklick auf ein blatt meldet und waehlt
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+DIM r AS INTEGER : r = GUI_TREE_ADD(t, -1, "Obst")
+GUI_TREE_ADD(t, r, "Apfel") : GUI_TREE_ADD(t, r, "Birne")
+GUI_TREE_EXPAND(t, r, TRUE)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOUBLE_CLICKED(t) THEN PRINT "doppel "; GUI_TREE_LABEL(t, GUI_TREE_SELECTED(t))
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 6
+e 0 7 5 215 0 0
+e 1 7 120 44 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=10
+--- erwartet
+doppel Apfel
+
+=== enter auf einem blatt meldet, auf einem ast klappt es
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+DIM r AS INTEGER : r = GUI_TREE_ADD(t, -1, "Obst")
+DIM a AS INTEGER : a = GUI_TREE_ADD(t, r, "Apfel")
+GUI_TREE_EXPAND(t, r, TRUE)
+GUI_TREE_SET_SELECTED(t, r)
+GUI_FOCUS(t)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 6 THEN GUI_TREE_SET_SELECTED(t, a)
+    GUI_UPDATE()
+    IF GUI_DOUBLE_CLICKED(t) THEN PRINT "doppel "; GUI_TREE_LABEL(t, GUI_TREE_SELECTED(t))
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 5 215 0 0
+e 2 2 257 0 0 0
+e 3 1 257 0 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+doppel Apfel
+
+=== f2 benennt einen knoten um, enter uebernimmt
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+DIM r AS INTEGER : r = GUI_TREE_ADD(t, -1, "Obst")
+DIM a AS INTEGER : a = GUI_TREE_ADD(t, r, "Apfel")
+GUI_TREE_EXPAND(t, r, TRUE)
+GUI_TREE_SET(t, "bearbeitbar", 1)
+GUI_TREE_SET_SELECTED(t, a)
+GUI_FOCUS(t)
+CLIPBOARD_SET("Quitte")
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 6 THEN PRINT "bearbeitet gerade "; GUI_TREE_EDITING(t)
+    IF GUI_TREE_EDITED(t) >= 0 THEN PRINT "umbenannt "; GUI_TREE_EDITED(t); " "; GUI_TREE_LABEL(t, a)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "danach "; GUI_TREE_EDITING(t)
+--- datei ev.txt
+c 8
+e 0 7 5 215 0 0
+e 2 2 291 0 0 0
+e 3 1 291 0 0 0
+e 8 2 341 0 0 0
+e 9 2 86 0 0 0
+e 10 1 86 0 0 0
+e 11 1 341 0 0 0
+e 13 2 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+bearbeitet gerade 1
+umbenannt 1 Quitte
+danach -1
+
+=== esc nimmt zurueck und drueckt nicht den abbrechen-knopf
+IMPORT "gui"
+SCREEN(300, 260, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 260)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+DIM a AS INTEGER : a = GUI_TREE_ADD(t, -1, "Apfel")
+DIM ab AS GUI_WIDGET : ab = GUI_BUTTON(w, "Abbrechen", 10, 220, 100, 28)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_TREE_SET(t, "bearbeitbar", 1)
+GUI_TREE_EDIT(t, a)
+GUI_FOCUS(t)
+CLIPBOARD_SET("anders")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(ab) THEN PRINT "abbrechen gedrueckt"
+    IF GUI_TREE_EDITED(t) >= 0 THEN PRINT "umbenannt"
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT GUI_TREE_EDITING(t); " "; GUI_TREE_LABEL(t, a)
+--- datei ev.txt
+c 6
+e 0 7 5 255 0 0
+e 3 2 341 0 0 0
+e 4 2 86 0 0 0
+e 5 1 86 0 0 0
+e 6 1 341 0 0 0
+e 8 2 256 0 0 0
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+-1 Apfel
+
+=== ein klick daneben uebernimmt
+IMPORT "gui"
+SCREEN(300, 260, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 260)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+DIM a AS INTEGER : a = GUI_TREE_ADD(t, -1, "Apfel")
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Weiter", 10, 220, 100, 28)
+GUI_TREE_EDIT(t, a)
+GUI_FOCUS(t)
+CLIPBOARD_SET("Birne")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TREE_EDITED(t) >= 0 THEN PRINT "umbenannt "; GUI_TREE_LABEL(t, a)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 8
+e 0 7 5 255 0 0
+e 2 2 341 0 0 0
+e 3 2 86 0 0 0
+e 4 1 86 0 0 0
+e 5 1 341 0 0 0
+e 7 7 50 234 0 0
+e 8 6 0 0 0 0
+e 9 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+umbenannt Birne
+
+=== ohne den schalter tut f2 nichts, und ein dateibaum benennt nicht um
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 90)
+DIM a AS INTEGER : a = GUI_TREE_ADD(t, -1, "Apfel")
+GUI_TREE_SET_SELECTED(t, a)
+GUI_FOCUS(t)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 10, 110, 280, 90, ".")
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 6 THEN PRINT "nach f2 "; GUI_TREE_EDITING(t)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+TRY
+    GUI_TREE_EDIT(ft, 0)
+CATCH e
+    PRINT e
+END TRY
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 2 2 291 0 0 0
+e 3 1 291 0 0 0
+
+--- datei ding.txt
+x
+
+--- umgebung
+DHRT_FRAMES=8
+--- enthaelt
+nach f2 -1
+ein Dateibaum benennt keine Dateien um
+
+=== tippen springt zum passenden knoten
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+GUI_TREE_ADD(t, -1, "Apfel") : GUI_TREE_ADD(t, -1, "Birne") : GUI_TREE_ADD(t, -1, "Banane")
+GUI_FOCUS(t)
+DIM zuletzt AS INTEGER : zuletzt = -1
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TREE_SELECTED(t) <> zuletzt THEN zuletzt = GUI_TREE_SELECTED(t) : PRINT GUI_TREE_LABEL(t, zuletzt)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 5 215 0 0
+e 2 2 66 0 0 0
+e 3 1 66 0 0 0
+e 5 2 66 0 0 0
+e 6 1 66 0 0 0
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+Birne
+Banane
+
+=== ende und pos1 springen
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+GUI_TREE_ADD(t, -1, "eins") : GUI_TREE_ADD(t, -1, "zwei") : GUI_TREE_ADD(t, -1, "drei")
+GUI_TREE_SET_SELECTED(t, 1)
+GUI_FOCUS(t)
+DIM zuletzt AS INTEGER : zuletzt = 1
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TREE_SELECTED(t) <> zuletzt THEN zuletzt = GUI_TREE_SELECTED(t) : PRINT GUI_TREE_LABEL(t, zuletzt)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 5 215 0 0
+e 2 2 269 0 0 0
+e 3 1 269 0 0 0
+e 5 2 268 0 0 0
+e 6 1 268 0 0 0
+
+--- umgebung
+DHRT_FRAMES=10
+--- erwartet
+drei
+eins
+
+=== rechtsklick waehlt den knoten
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+GUI_TREE_ADD(t, -1, "eins") : GUI_TREE_ADD(t, -1, "zwei") : GUI_TREE_ADD(t, -1, "drei")
+GUI_TREE_SET_SELECTED(t, 0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "gewaehlt "; GUI_TREE_LABEL(t, GUI_TREE_SELECTED(t))
+--- datei ev.txt
+c 4
+e 0 7 5 215 0 0
+e 1 7 120 66 0 0
+e 2 6 1 0 0 0
+e 3 5 1 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+gewaehlt drei
+
+=== der rollbalken laesst sich ziehen
+' 30 Knoten: rollen kann der Baum 30 * 22 - 198 = 462. Griff bei x 281..288;
+' nach unten gezogen trifft ein Klick in die erste Zeile (y 12) Knoten
+' (1 + 462) / 22 = 21.
+IMPORT "gui"
+SCREEN(300, 450, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 450)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+DIM k AS INTEGER
+FOR k = 0 TO 29
+    GUI_TREE_ADD(t, -1, "Knoten " + STR$(k))
+NEXT
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "gewaehlt "; GUI_TREE_LABEL(t, GUI_TREE_SELECTED(t))
+--- datei ev.txt
+c 8
+e 0 7 5 440 0 0
+e 1 7 285 20 0 0
+e 2 6 0 0 0 0
+e 4 7 285 420 0 0
+e 6 5 0 0 0 0
+e 8 7 60 12 0 0
+e 9 6 0 0 0 0
+e 10 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+gewaehlt Knoten 21
+
+=== das mausrad rollt den baum weich
+' Knoten 5 hat ein gruenes Sinnbild bei x 32..49, y 11 + 110 + 2. Drei
+' Radschritte rollen um 66: dann steht es bei y 57..74.
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+DIM gruen AS IMAGE : gruen = IMAGE_NEW(16, 16, &H00FF00)
+DIM k AS INTEGER
+FOR k = 0 TO 29
+    DIM n AS INTEGER : n = GUI_TREE_ADD(t, -1, "Knoten " + STR$(k))
+    IF k = 5 THEN GUI_TREE_ICON(t, n, gruen)
+NEXT
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 1 7 150 100 0 0
+e 2 8 0 -3 0 0
+
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+40 66 nicht #00FF00 +-40
+
+=== nach der dauer ist der baum gerollt
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+DIM gruen AS IMAGE : gruen = IMAGE_NEW(16, 16, &H00FF00)
+DIM k AS INTEGER
+FOR k = 0 TO 29
+    DIM n AS INTEGER : n = GUI_TREE_ADD(t, -1, "Knoten " + STR$(k))
+    IF k = 5 THEN GUI_TREE_ICON(t, n, gruen)
+NEXT
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 1 7 150 100 0 0
+e 2 8 0 -3 0 0
+
+--- umgebung
+DHRT_FRAMES=25
+--- bild
+40 66 #00FF00 +-40
+
+=== der leer-hinweis steht da, wenn der baum leer ist
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM mit AS GUI_WIDGET : mit = GUI_TREE(w, 10, 10, 280, 90)
+GUI_TREE_PLACEHOLDER(mit, "Noch keine Dateien")
+DIM ohne AS GUI_WIDGET : ohne = GUI_TREE(w, 10, 110, 280, 90)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+    IF bild = 3 THEN SAVESCREENSHOT("t.png")
+WEND
+DIM b AS IMAGE : b = LOADIMAGE("t.png")
+FUNCTION punkte(y0 AS INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = y0 TO y0 + 20
+        FOR x = 20 TO 280
+            IF GETPIXEL(b, x, y) <> GETPIXEL(b, 150, y0 + 50) THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "mit "; punkte(16) > 20; " ohne "; punkte(116) > 20
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+mit TRUE ohne FALSE
+
+=== umbenennen und leer-hinweis stehen in der dhform
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 280, 200)
+GUI_TREE_SET(t, "bearbeitbar", 1)
+GUI_TREE_PLACEHOLDER(t, "Noch nichts")
+DIM j AS STRING : j = GUI_TO_JSON(w)
+GUI_WINDOW_DESTROY(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+DIM j2 AS STRING : j2 = GUI_TO_JSON(w2)
+PRINT INSTR(j2, CHR$(34) + "bearbeitbar" + CHR$(34)) >= 0; " "; INSTR(j2, "Noch nichts") >= 0
+--- erwartet
+TRUE TRUE

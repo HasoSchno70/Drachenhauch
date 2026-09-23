@@ -1,0 +1,416 @@
+' Tabelle bedienen wie eine Liste (2026-09-23): Doppelklick und Enter melden
+' GUI_DOUBLE_CLICKED, F2 bearbeitet im Zeilenmodus, Tippen springt,
+' Rechtsklick waehlt, das Rad rollt weich, ein Leer-Hinweis.
+' Tabelle bei (10, 10, 280, 200), Kopf 22 hoch, Zeilen 20: Zeile r liegt bei
+' y 32 + 20 r .. + 19. Tasten: F2 291, Enter 257, B 66, 4 52.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein doppelklick meldet und waehlt die zeile
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Preis"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "2"]) : GUI_TABLE_ADD_ROW(tb, ["Kirsche", "3"])
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOUBLE_CLICKED(tb) THEN PRINT "doppel "; GUI_TABLE_SELECTED(tb)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 6
+e 0 7 5 215 0 0
+e 1 7 60 82 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=10
+--- erwartet
+doppel 2
+
+=== enter meldet die gewaehlte zeile
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Preis"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "2"]) : GUI_TABLE_ADD_ROW(tb, ["Kirsche", "3"])
+GUI_TABLE_SET_SELECTED(tb, 1)
+GUI_FOCUS(tb)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOUBLE_CLICKED(tb) THEN PRINT "doppel "; GUI_TABLE_SELECTED(tb)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 2 2 257 0 0 0
+e 3 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+doppel 1
+
+=== ein doppelklick auf eine bearbeitbare zelle bearbeitet statt zu melden
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Preis"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "2"]) : GUI_TABLE_ADD_ROW(tb, ["Kirsche", "3"])
+GUI_TABLE_COL_EDIT(tb, 0, TRUE)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DOUBLE_CLICKED(tb) THEN PRINT "doppel"
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "bearbeitet "; GUI_TABLE_EDITING_ROW(tb); " "; GUI_TABLE_EDITING_COL(tb)
+--- datei ev.txt
+c 6
+e 0 7 5 215 0 0
+e 1 7 60 82 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=10
+--- erwartet
+bearbeitet 2 0
+
+=== f2 bearbeitet im zeilenmodus die erste freigegebene spalte
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Preis"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "2"]) : GUI_TABLE_ADD_ROW(tb, ["Kirsche", "3"])
+GUI_TABLE_COL_EDIT(tb, 1, TRUE)
+GUI_TABLE_SET_SELECTED(tb, 1)
+GUI_FOCUS(tb)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN PRINT "vorher "; GUI_TABLE_EDITING_ROW(tb)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "bearbeitet "; GUI_TABLE_EDITING_ROW(tb); " "; GUI_TABLE_EDITING_COL(tb)
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 2 2 291 0 0 0
+e 3 1 291 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+vorher -1
+bearbeitet 1 1
+
+=== ohne freigegebene spalte tut f2 nichts
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Preis"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "2"])
+GUI_TABLE_SET_SELECTED(tb, 1)
+GUI_FOCUS(tb)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "bearbeitet "; GUI_TABLE_EDITING_ROW(tb)
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 2 2 291 0 0 0
+e 3 1 291 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+bearbeitet -1
+
+=== tippen springt zur passenden zeile
+' "b" waehlt Birne, ein zweites "b" Banane (dieselbe Taste laeuft durch).
+' Gesucht wird in der ersten Spalte, weil nicht sortiert ist. Was innerhalb
+' einer Sekunde ECHTER Zeit getippt wird, ist ein Wort -- ohne Fenster
+' laufen die Bilder in Bruchteilen davon, darum steht "k" in einem eigenen
+' Fall (sonst suchte er "bbk").
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Preis"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "2"])
+GUI_TABLE_ADD_ROW(tb, ["Banane", "3"]) : GUI_TABLE_ADD_ROW(tb, ["Kirsche", "4"])
+GUI_FOCUS(tb)
+DIM zuletzt AS INTEGER : zuletzt = -1
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TABLE_SELECTED(tb) <> zuletzt THEN zuletzt = GUI_TABLE_SELECTED(tb) : PRINT GUI_TABLE_GET_CELL(tb, zuletzt, 0)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 5
+e 0 7 5 215 0 0
+e 2 2 66 0 0 0
+e 3 1 66 0 0 0
+e 5 2 66 0 0 0
+e 6 1 66 0 0 0
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+Birne
+Banane
+
+=== tippen springt in der sortierspalte
+' Nach Preis sortiert: "4" waehlt die Zeile mit Preis 4 (Kirsche), obwohl
+' in der ersten Spalte nichts mit 4 anfaengt.
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Preis"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "2"])
+GUI_TABLE_ADD_ROW(tb, ["Banane", "3"]) : GUI_TABLE_ADD_ROW(tb, ["Kirsche", "4"])
+GUI_TABLE_SORT(tb, 1, FALSE)
+GUI_FOCUS(tb)
+DIM zuletzt AS INTEGER : zuletzt = -1
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TABLE_SELECTED(tb) <> zuletzt THEN zuletzt = GUI_TABLE_SELECTED(tb) : PRINT GUI_TABLE_GET_CELL(tb, zuletzt, 0)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 2 2 52 0 0 0
+e 3 1 52 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+Kirsche
+
+=== rechtsklick waehlt die zeile
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name", "Preis"])
+GUI_TABLE_ADD_ROW(tb, ["Apfel", "1"]) : GUI_TABLE_ADD_ROW(tb, ["Birne", "2"]) : GUI_TABLE_ADD_ROW(tb, ["Kirsche", "3"])
+GUI_TABLE_SET_SELECTED(tb, 0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "gewaehlt "; GUI_TABLE_SELECTED(tb)
+--- datei ev.txt
+c 4
+e 0 7 5 215 0 0
+e 1 7 60 82 0 0
+e 2 6 1 0 0 0
+e 3 5 1 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+gewaehlt 2
+
+=== der leer-hinweis steht da, wenn keine zeile zu sehen ist
+' Gezaehlt werden Punkte, die nicht die Tabellenflaeche sind, im Band, in
+' dem der Hinweis steht -- einmal mit, einmal ohne Hinweis.
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM mit AS GUI_WIDGET : mit = GUI_TABLE(w, 10, 10, 280, 90)
+GUI_TABLE_HEADERS(mit, ["Name"])
+GUI_TABLE_PLACEHOLDER(mit, "Keine Treffer")
+DIM ohne AS GUI_WIDGET : ohne = GUI_TABLE(w, 10, 110, 280, 90)
+GUI_TABLE_HEADERS(ohne, ["Name"])
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+    IF bild = 3 THEN SAVESCREENSHOT("t.png")
+WEND
+DIM b AS IMAGE : b = LOADIMAGE("t.png")
+FUNCTION punkte(y0 AS INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = y0 TO y0 + 20
+        FOR x = 20 TO 280
+            IF GETPIXEL(b, x, y) <> GETPIXEL(b, 150, y0 + 40) THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "mit "; punkte(38) > 20; " ohne "; punkte(138) > 20
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+mit TRUE ohne FALSE
+
+=== der leer-hinweis steht in der dhform
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_PLACEHOLDER(tb, "Keine Treffer")
+DIM j AS STRING : j = GUI_TO_JSON(w)
+GUI_WINDOW_DESTROY(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT INSTR(GUI_TO_JSON(w2), "Keine Treffer") >= 0
+--- erwartet
+TRUE
+
+=== das mausrad rollt die tabelle weich
+' Zeile 5 ist gruen und liegt bei y 132..151. Drei Radschritte rollen um 60:
+' dann steht sie bei y 72..91. Zwei Bilder nach dem Rad ist sie unterwegs.
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name"])
+DIM k AS INTEGER
+FOR k = 0 TO 39
+    GUI_TABLE_ADD_ROW(tb, ["Zeile " + STR$(k)])
+NEXT
+GUI_TABLE_CELL_COLOR(tb, 5, 0, -1, &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 1 7 150 100 0 0
+e 2 8 0 -3 0 0
+
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+200 81 nicht #00FF00 +-60
+
+=== nach der dauer ist die tabelle gerollt
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name"])
+DIM k AS INTEGER
+FOR k = 0 TO 39
+    GUI_TABLE_ADD_ROW(tb, ["Zeile " + STR$(k)])
+NEXT
+GUI_TABLE_CELL_COLOR(tb, 5, 0, -1, &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 1 7 150 100 0 0
+e 2 8 0 -3 0 0
+
+--- umgebung
+DHRT_FRAMES=25
+--- bild
+200 81 #00FF00 +-60
+
+=== ohne uebergang springt das rad in der tabelle
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_METRIC_SET("uebergang", 0)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 280, 200)
+GUI_TABLE_HEADERS(tb, ["Name"])
+DIM k AS INTEGER
+FOR k = 0 TO 39
+    GUI_TABLE_ADD_ROW(tb, ["Zeile " + STR$(k)])
+NEXT
+GUI_TABLE_CELL_COLOR(tb, 5, 0, -1, &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 1 7 150 100 0 0
+e 2 8 0 -3 0 0
+
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+200 81 #00FF00 +-60

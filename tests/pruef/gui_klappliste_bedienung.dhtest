@@ -1,0 +1,352 @@
+' Klappliste bedienen wie eine Liste (2026-09-23): offen bewegen Pfeile,
+' Pos1/Ende und Tippen nur die MARKIERUNG, Enter uebernimmt, ESC verwirft;
+' hoechstens 10 Zeilen mit Rad und Rollbalken, nach oben, wenn unten kein
+' Platz ist; Tippen waehlt auch bei geschlossener Liste; ein Platzhalter.
+' Klappliste bei (10, 10, 190, 28), das Popup darunter ab y 38, Zeilen 22
+' hoch. Tasten: Enter 257, ESC 256, ab 264, Ende 269, B 66, K 75.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== pfeile markieren nur, esc verwirft
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 190, 28, ["Apfel", "Birne", "Kirsche"])
+GUI_FOCUS(dd)
+DIM aenderungen AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DROPDOWN_SELECTED(dd) <> 0 THEN aenderungen = aenderungen + 1
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT GUI_DROPDOWN_TEXT(dd); " zwischendurch anders: "; aenderungen
+--- datei ev.txt
+c 9
+e 0 7 5 295 0 0
+e 2 2 257 0 0 0
+e 3 1 257 0 0 0
+e 5 2 264 0 0 0
+e 6 1 264 0 0 0
+e 8 2 264 0 0 0
+e 9 1 264 0 0 0
+e 11 2 256 0 0 0
+e 12 1 256 0 0 0
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+Apfel zwischendurch anders: 0
+
+=== enter uebernimmt die markierung
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 190, 28, ["Apfel", "Birne", "Kirsche"])
+GUI_FOCUS(dd)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT GUI_DROPDOWN_TEXT(dd)
+--- datei ev.txt
+c 9
+e 0 7 5 295 0 0
+e 2 2 257 0 0 0
+e 3 1 257 0 0 0
+e 5 2 264 0 0 0
+e 6 1 264 0 0 0
+e 8 2 264 0 0 0
+e 9 1 264 0 0 0
+e 11 2 257 0 0 0
+e 12 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+Kirsche
+
+=== ende springt ans ende der liste
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM namen AS ARRAY OF STRING : namen = []
+DIM k AS INTEGER
+FOR k = 1 TO 30
+    ARRAY_PUSH(namen, "Stadt " + STR$(k))
+NEXT
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 190, 28, namen)
+GUI_FOCUS(dd)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT GUI_DROPDOWN_TEXT(dd)
+--- datei ev.txt
+c 7
+e 0 7 5 295 0 0
+e 2 2 257 0 0 0
+e 3 1 257 0 0 0
+e 5 2 269 0 0 0
+e 6 1 269 0 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+Stadt 30
+
+=== tippen waehlt bei geschlossener liste
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 190, 28, ["Apfel", "Birne", "Kirsche"])
+GUI_FOCUS(dd)
+DIM zuletzt AS STRING : zuletzt = ""
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_DROPDOWN_TEXT(dd) <> zuletzt THEN zuletzt = GUI_DROPDOWN_TEXT(dd) : PRINT zuletzt
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 295 0 0
+e 2 2 75 0 0 0
+e 3 1 75 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+Apfel
+Kirsche
+
+=== tippen markiert bei offener liste, enter uebernimmt
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 190, 28, ["Apfel", "Birne", "Kirsche"])
+GUI_FOCUS(dd)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 8 THEN PRINT "offen noch "; GUI_DROPDOWN_TEXT(dd)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "danach "; GUI_DROPDOWN_TEXT(dd)
+--- datei ev.txt
+c 7
+e 0 7 5 295 0 0
+e 2 2 257 0 0 0
+e 3 1 257 0 0 0
+e 5 2 66 0 0 0
+e 6 1 66 0 0 0
+e 9 2 257 0 0 0
+e 10 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+offen noch Apfel
+danach Birne
+
+=== das popup zeigt hoechstens zehn zeilen
+' 30 Eintraege, blaue Liste: die zehnte Zeile (y 236..257) ist blau,
+' darunter (y 300) nicht mehr -- vorher reichte das Popup bis y 698.
+IMPORT "gui"
+SCREEN(300, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM namen AS ARRAY OF STRING : namen = []
+DIM k AS INTEGER
+FOR k = 1 TO 30
+    ARRAY_PUSH(namen, "Stadt " + STR$(k))
+NEXT
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 190, 28, namen)
+GUI_SET_COLOR(dd, "bg", &H0000FF)
+GUI_METRIC_SET("uebergang", 0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 0 7 5 395 0 0
+e 1 7 100 24 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- bild
+150 250 #0000FF +-2
+150 300 nicht #0000FF +-40
+
+=== das rad rollt das offene popup
+' Fuenf Radschritte nach unten: die erste sichtbare Zeile ist Stadt 6, und ein
+' Klick darauf (y 49) waehlt sie.
+IMPORT "gui"
+SCREEN(300, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM namen AS ARRAY OF STRING : namen = []
+DIM k AS INTEGER
+FOR k = 1 TO 30
+    ARRAY_PUSH(namen, "Stadt " + STR$(k))
+NEXT
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 190, 28, namen)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT GUI_DROPDOWN_TEXT(dd)
+--- datei ev.txt
+c 8
+e 0 7 5 395 0 0
+e 1 7 100 24 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+e 6 7 60 49 0 0
+e 8 8 0 -5 0 0
+e 12 6 0 0 0 0
+e 13 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=18
+--- erwartet
+Stadt 6
+
+=== unten am rand klappt die liste nach oben auf
+' Klappliste bei y 360 in einem 400 hohen Fenster: darunter ist kein Platz,
+' die Liste steht ueber der Box (y 340 ist blau).
+IMPORT "gui"
+SCREEN(300, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 360, 190, 28, ["Apfel", "Birne", "Kirsche", "Dattel", "Feige"])
+GUI_SET_COLOR(dd, "bg", &H0000FF)
+GUI_METRIC_SET("uebergang", 0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 0 7 5 395 0 0
+e 1 7 100 374 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=8
+--- bild
+150 340 #0000FF +-2
+
+=== beim oeffnen steht die auswahl markiert, enter laesst sie
+IMPORT "gui"
+SCREEN(300, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM namen AS ARRAY OF STRING : namen = []
+DIM k AS INTEGER
+FOR k = 1 TO 30
+    ARRAY_PUSH(namen, "Stadt " + STR$(k))
+NEXT
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 190, 28, namen)
+GUI_DROPDOWN_SET_SELECTED(dd, 17)
+GUI_FOCUS(dd)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT GUI_DROPDOWN_TEXT(dd)
+--- datei ev.txt
+c 5
+e 0 7 5 395 0 0
+e 2 2 257 0 0 0
+e 3 1 257 0 0 0
+e 6 2 257 0 0 0
+e 7 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+Stadt 18
+
+=== der platzhalter steht da, solange nichts gewaehlt ist
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM mit AS GUI_WIDGET : mit = GUI_DROPDOWN(w, 10, 10, 190, 28, ["a", "b"])
+GUI_DROPDOWN_SET_SELECTED(mit, -1)
+GUI_DROPDOWN_PLACEHOLDER(mit, "Bitte waehlen")
+DIM ohne AS GUI_WIDGET : ohne = GUI_DROPDOWN(w, 10, 60, 190, 28, ["a", "b"])
+GUI_DROPDOWN_SET_SELECTED(ohne, -1)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+    IF bild = 3 THEN SAVESCREENSHOT("t.png")
+WEND
+DIM b AS IMAGE : b = LOADIMAGE("t.png")
+FUNCTION punkte(y0 AS INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = y0 + 6 TO y0 + 22
+        FOR x = 20 TO 150
+            IF GETPIXEL(b, x, y) <> GETPIXEL(b, 160, y0 + 14) THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "mit "; punkte(10) > 20; " ohne "; punkte(60) > 20
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+mit TRUE ohne FALSE

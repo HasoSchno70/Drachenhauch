@@ -256,7 +256,7 @@ DIM fEnter AS GUI_WIDGET : fEnter = inspFeld("on_enter", "on_enter", 10)
 ' Schriftstil als Text: fett, kursiv, unterstrichen, durchgestrichen mit +.
 DIM fStil AS GUI_WIDGET : fStil = inspFeld("font_style", "Schriftstil", 11)
 GUI_TOOLTIP(fStil, "fett, kursiv, unterstrichen, durchgestrichen -- verbunden mit +, z. B. fett+unterstrichen")
-DIM cbAktiv AS GUI_WIDGET : cbAktiv = GUI_CHECKBOX(winInsp, "Aktiviert", 250, 36 + 18 * 34 + 4)
+DIM cbAktiv AS GUI_WIDGET : cbAktiv = GUI_CHECKBOX(winInsp, "Aktiviert", 250, 36 + 19 * 34 + 4)
 
 ' Felder je Art (seit Stand 31): sichtbar nur bei den Arten, die in ihrer
 ' Liste stehen. Listen werden mit Semikolon getrennt -- ein Komma steht zu
@@ -286,9 +286,15 @@ DIM aMax AS GUI_WIDGET : aMax = artFeld("max", "Max", ",slider,progress,spinner,
 DIM aWert AS GUI_WIDGET : aWert = artFeld("value", "Wert", ",slider,progress,spinner,knob,", 14, "50")
 ' Die Beschreibung einer Kachel steht in der .dhform unter "placeholder".
 DIM aBeschr AS GUI_WIDGET : aBeschr = artFeld("placeholder", "Beschreibung", ",card,", 12, "Was die Kachel oeffnet")
-DIM cbZellen AS GUI_WIDGET : cbZellen = GUI_CHECKBOX(winInsp, "Zellmodus (Gitter)", 100, 36 + 17 * 34)
+' Der Platzhalter einer Klappliste liegt im selben Feld der .dhform.
+DIM aPlatzhalter AS GUI_WIDGET : aPlatzhalter = artFeld("placeholder", "Platzhalter", ",dropdown,", 13, "Bitte waehlen")
+' Hinweis, wenn eine Tabelle keine Zeile zeigt (GUI_TABLE_PLACEHOLDER).
+DIM aLeer AS GUI_WIDGET : aLeer = artFeld("leer_text", "Leer-Hinweis", ",table,tree,", 17, "Keine Treffer")
+DIM cbZellen AS GUI_WIDGET : cbZellen = GUI_CHECKBOX(winInsp, "Zellmodus (Gitter)", 100, 36 + 18 * 34)
+' Eine Liste bzw. ein Baum, deren Eintraege sich mit F2 umbenennen lassen.
+DIM cbUmbenennen AS GUI_WIDGET : cbUmbenennen = GUI_CHECKBOX(winInsp, "Umbenennen mit F2", 100, 36 + 13 * 34)
 
-DIM btnUebernehmen AS GUI_WIDGET : btnUebernehmen = GUI_BUTTON(winInsp, "Uebernehmen", 100, 36 + 18 * 34, 140, 28)
+DIM btnUebernehmen AS GUI_WIDGET : btnUebernehmen = GUI_BUTTON(winInsp, "Uebernehmen", 100, 36 + 19 * 34, 140, 28)
 ' Formular-Felder (wenn nichts ausgewaehlt ist)
 DIM fTitel AS GUI_WIDGET : fTitel = GUI_TEXTINPUT(winInsp, 100, 36, INSP_B - 110, 26, "")
 DIM lTitel AS GUI_WIDGET : lTitel = GUI_LABEL(winInsp, "Titel", 8, 40)
@@ -299,7 +305,7 @@ DIM lFormH AS GUI_WIDGET : lFormH = GUI_LABEL(winInsp, "Hoehe", 8, 108)
 DIM cbResizable AS GUI_WIDGET : cbResizable = GUI_CHECKBOX(winInsp, "Groessenveraenderbar", 100, 138)
 DIM lThema AS GUI_WIDGET : lThema = GUI_LABEL(winInsp, "Thema", 8, 176)
 DIM ddThema AS GUI_WIDGET : ddThema = GUI_DROPDOWN(winInsp, 100, 172, INSP_B - 110, 24, ["(keines)", "glas_dunkel", "glas_hell", "dark", "light"])
-DIM lblHinweis AS GUI_WIDGET : lblHinweis = GUI_LABEL(winInsp, "", 8, 36 + 19 * 34 + 10)
+DIM lblHinweis AS GUI_WIDGET : lblHinweis = GUI_LABEL(winInsp, "", 8, 36 + 20 * 34 + 10)
 GUI_SET_WRAP(lblHinweis, INSP_B - 16)
 
 DIM inspStumm AS BOOLEAN : inspStumm = FALSE     ' beim Fuellen nicht als Eingabe werten
@@ -312,6 +318,7 @@ SUB artSichtbar(art AS STRING)
         GUI_SET_VISIBLE(artFelder[i], an) : GUI_SET_VISIBLE(artLabels[i], an)
     NEXT
     GUI_SET_VISIBLE(cbZellen, art = "table")
+    GUI_SET_VISIBLE(cbUmbenennen, art = "listbox" OR art = "tree")
 END SUB
 
 FUNCTION zahlText$(f AS FLOAT) AS STRING
@@ -367,6 +374,7 @@ SUB artFuellen(i AS INTEGER)
     GUI_SET_TEXT(aMax, feldZahlText$(i, "max"))
     GUI_SET_TEXT(aWert, feldZahlText$(i, "value"))
     GUI_SET_TEXT(aBeschr, feldText$(i, "placeholder"))
+    GUI_SET_TEXT(aPlatzhalter, feldText$(i, "placeholder"))
     DIM tp AS STRING : tp = wz$(i, "table")
     GUI_SET_TEXT(aSpalten, listeText$(tp + ".headers"))
     GUI_SET_TEXT(aBreiten, listeText$(tp + ".col_widths"))
@@ -390,6 +398,15 @@ SUB artFuellen(i AS INTEGER)
     DIM zm AS BOOLEAN : zm = FALSE
     IF JSON_HAS(doc, tp + ".zellmodus") THEN zm = JSON_GET_BOOL(doc, tp + ".zellmodus")
     GUI_SET_CHECKED(cbZellen, zm)
+    DIM hp AS STRING : hp = tp
+    IF art = "tree" THEN hp = wz$(i, "tree")
+    GUI_SET_TEXT(aLeer, "")
+    IF JSON_HAS(doc, hp + ".leer_text") THEN GUI_SET_TEXT(aLeer, JSON_GET_STRING(doc, hp + ".leer_text"))
+    DIM up AS STRING : up = wz$(i, "list")
+    IF art = "tree" THEN up = wz$(i, "tree")
+    DIM umb AS BOOLEAN : umb = FALSE
+    IF JSON_HAS(doc, up + ".bearbeitbar") THEN umb = JSON_GET_BOOL(doc, up + ".bearbeitbar")
+    GUI_SET_CHECKED(cbUmbenennen, umb)
 END SUB
 
 ' Felder je Art -> Modell.
@@ -403,6 +420,28 @@ SUB artUebernehmen(i AS INTEGER)
         IF TRIM$(GUI_TEXT(aWert)) <> "" THEN JSON_SET_FLOAT(doc, wz$(i, "value"), VAL(GUI_TEXT(aWert)))
     END IF
     IF art = "card" THEN JSON_SET_STRING(doc, wz$(i, "placeholder"), GUI_TEXT(aBeschr))
+    IF art = "dropdown" THEN JSON_SET_STRING(doc, wz$(i, "placeholder"), GUI_TEXT(aPlatzhalter))
+    IF art = "listbox" OR art = "tree" THEN
+        ' Abgewaehlt wird der Schluessel ENTFERNT, nicht auf FALSE gesetzt --
+        ' die Laufzeit schreibt ihn auch nur, wenn er an ist.
+        DIM lp AS STRING : lp = wz$(i, "list")
+        IF art = "tree" THEN lp = wz$(i, "tree")
+        IF GUI_CHECKED(cbUmbenennen) THEN
+            IF NOT JSON_HAS(doc, lp) THEN JSON_SET_JSON(doc, lp, JSON_NEW_OBJECT())
+            JSON_SET_BOOL(doc, lp + ".bearbeitbar", TRUE)
+        ELSEIF JSON_HAS(doc, lp + ".bearbeitbar") THEN
+            JSON_REMOVE(doc, lp + ".bearbeitbar")
+        END IF
+    END IF
+    IF art = "tree" THEN
+        DIM bp AS STRING : bp = wz$(i, "tree")
+        IF TRIM$(GUI_TEXT(aLeer)) <> "" THEN
+            IF NOT JSON_HAS(doc, bp) THEN JSON_SET_JSON(doc, bp, JSON_NEW_OBJECT())
+            JSON_SET_STRING(doc, bp + ".leer_text", TRIM$(GUI_TEXT(aLeer)))
+        ELSEIF JSON_HAS(doc, bp + ".leer_text") THEN
+            JSON_REMOVE(doc, bp + ".leer_text")
+        END IF
+    END IF
     IF art <> "table" THEN RETURN
     DIM tp AS STRING : tp = wz$(i, "table")
     IF NOT JSON_HAS(doc, tp) THEN JSON_SET_JSON(doc, tp, JSON_NEW_OBJECT())
@@ -482,6 +521,11 @@ SUB artUebernehmen(i AS INTEGER)
         JSON_SET_BOOL(doc, tp + ".zellmodus", TRUE)
     ELSEIF JSON_HAS(doc, tp + ".zellmodus") THEN
         JSON_REMOVE(doc, tp + ".zellmodus")
+    END IF
+    IF TRIM$(GUI_TEXT(aLeer)) <> "" THEN
+        JSON_SET_STRING(doc, tp + ".leer_text", TRIM$(GUI_TEXT(aLeer)))
+    ELSEIF JSON_HAS(doc, tp + ".leer_text") THEN
+        JSON_REMOVE(doc, tp + ".leer_text")
     END IF
 END SUB
 
@@ -985,6 +1029,7 @@ SUB gbControl(i AS INTEGER)
         IF gbSchalter(tp + ".zebra") THEN gb("GUI_TABLE_SET(" + v + ", " + dhString$("zebra") + ", 1)")
         IF gbSchalter(tp + ".filter_row") THEN gb("GUI_TABLE_SET(" + v + ", " + dhString$("filterzeile") + ", 1)")
         IF gbSchalter(tp + ".multi") THEN gb("GUI_TABLE_SET(" + v + ", " + dhString$("mehrfachauswahl") + ", 1)")
+        IF JSON_HAS(doc, tp + ".leer_text") THEN gb("GUI_TABLE_PLACEHOLDER(" + v + ", " + gbText$(JSON_GET_STRING(doc, tp + ".leer_text")) + ")")
         DIM s AS INTEGER
         IF JSON_HAS(doc, tp + ".col_edit") THEN
             FOR s = 0 TO JSON_LEN(doc, tp + ".col_edit") - 1
@@ -1009,6 +1054,10 @@ SUB gbControl(i AS INTEGER)
             gb("' " + v + ": Zeilen zur Laufzeit fuellen -- GUI_TABLE_ADD_ROW / GUI_TABLE_ROWS")
         END IF
     END IF
+    IF k = "dropdown" AND feldText$(i, "placeholder") <> "" THEN gb("GUI_DROPDOWN_PLACEHOLDER(" + v + ", " + gbText$(feldText$(i, "placeholder")) + ")")
+    IF k = "listbox" AND gbSchalter(wz$(i, "list") + ".bearbeitbar") THEN gb("GUI_LISTBOX_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
+    IF k = "tree" AND gbSchalter(wz$(i, "tree") + ".bearbeitbar") THEN gb("GUI_TREE_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
+    IF k = "tree" AND JSON_HAS(doc, wz$(i, "tree") + ".leer_text") THEN gb("GUI_TREE_PLACEHOLDER(" + v + ", " + gbText$(JSON_GET_STRING(doc, wz$(i, "tree") + ".leer_text")) + ")")
     IF (k = "accordion" OR k = "wizard") AND JSON_HAS(doc, wz$(i, "items")) THEN
         DIM ab AS INTEGER
         FOR ab = 0 TO JSON_LEN(doc, wz$(i, "items")) - 1

@@ -1,0 +1,417 @@
+' Code-Feld bedienen wie eine Liste (2026-09-23): Doppelklick waehlt das
+' Wort, Dreifachklick die Zeile, Rechtsklick setzt die Schreibmarke (und
+' laesst eine getroffene Auswahl stehen), ein Rollbalken zum Ziehen, und das
+' Rad rollt weich. Wo ein Zeichen auf dem Schirm steht, sucht die Beilage
+' `stelle.dh` mit GUI_TEXTAREA_POS_AT -- so haengen die Klicks nicht an der
+' Schriftbreite. Die Aufnahme schreibt jeder Fall selbst und spielt sie ab.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein doppelklick waehlt das wort
+IMPORT "gui"
+IMPORT "stelle.dh"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 200)
+GUI_SET_TEXT(ta, "aaaaaaa bbbbbbb ccccccc" + CHR$(10) + "zweite zeile")
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN klicks(ta, 1, 11, 2, 0)
+    IF bild = 16 THEN PRINT "[" + GUI_TEXTAREA_SELECTION$(ta) + "]"
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei stelle.dh
+' Bildschirmlage von Zeile z, Spalte s (ab 1) -- als x * 10000 + y.
+FUNCTION stelle(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM p AS TUPLE
+    FOR y = 12 TO 208 STEP 2
+        FOR x = 12 TO 280
+            p = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF p[0] = z AND p[1] = s THEN RETURN x * 10000 + y
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+' n Klicks mit Knopf k an Zeile z, Spalte s -- als Aufnahme, gleich abgespielt.
+SUB klicks(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER, n AS INTEGER, k AS INTEGER)
+    DIM p AS INTEGER : p = stelle(ta, z, s)
+    DIM x AS INTEGER : x = p \ 10000
+    DIM y AS INTEGER : y = p MOD 10000
+    DIM a AS STRING : a = "e 0 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        a = a + "e " + STR$(1 + 2 * i) + " 6 " + STR$(k) + " 0 0 0" + CHR$(10)
+        a = a + "e " + STR$(2 + 2 * i) + " 5 " + STR$(k) + " 0 0 0" + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", "c " + STR$(1 + 2 * n) + CHR$(10) + a)
+    AUTOMATION_PLAY("ev.txt")
+END SUB
+
+--- umgebung
+DHRT_FRAMES=18
+--- erwartet
+[bbbbbbb]
+
+=== ein dreifachklick waehlt die zeile samt umbruch
+IMPORT "gui"
+IMPORT "stelle.dh"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 200)
+GUI_SET_TEXT(ta, "aaaaaaa bbbbbbb ccccccc" + CHR$(10) + "zweite zeile")
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN klicks(ta, 1, 11, 3, 0)
+    IF bild = 18 THEN PRINT "[" + REPLACE$(GUI_TEXTAREA_SELECTION$(ta), CHR$(10), "|") + "]"
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei stelle.dh
+FUNCTION stelle(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM p AS TUPLE
+    FOR y = 12 TO 208 STEP 2
+        FOR x = 12 TO 280
+            p = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF p[0] = z AND p[1] = s THEN RETURN x * 10000 + y
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+SUB klicks(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER, n AS INTEGER, k AS INTEGER)
+    DIM p AS INTEGER : p = stelle(ta, z, s)
+    DIM x AS INTEGER : x = p \ 10000
+    DIM y AS INTEGER : y = p MOD 10000
+    DIM a AS STRING : a = "e 0 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        a = a + "e " + STR$(1 + 2 * i) + " 6 " + STR$(k) + " 0 0 0" + CHR$(10)
+        a = a + "e " + STR$(2 + 2 * i) + " 5 " + STR$(k) + " 0 0 0" + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", "c " + STR$(1 + 2 * n) + CHR$(10) + a)
+    AUTOMATION_PLAY("ev.txt")
+END SUB
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+[aaaaaaa bbbbbbb ccccccc|]
+
+=== ein einfacher klick waehlt nichts
+IMPORT "gui"
+IMPORT "stelle.dh"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 200)
+GUI_SET_TEXT(ta, "aaaaaaa bbbbbbb ccccccc")
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN klicks(ta, 1, 11, 1, 0)
+    IF bild = 14 THEN PRINT "[" + GUI_TEXTAREA_SELECTION$(ta) + "]"
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei stelle.dh
+FUNCTION stelle(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM p AS TUPLE
+    FOR y = 12 TO 208 STEP 2
+        FOR x = 12 TO 280
+            p = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF p[0] = z AND p[1] = s THEN RETURN x * 10000 + y
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+SUB klicks(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER, n AS INTEGER, k AS INTEGER)
+    DIM p AS INTEGER : p = stelle(ta, z, s)
+    DIM x AS INTEGER : x = p \ 10000
+    DIM y AS INTEGER : y = p MOD 10000
+    DIM a AS STRING : a = "e 0 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        a = a + "e " + STR$(1 + 2 * i) + " 6 " + STR$(k) + " 0 0 0" + CHR$(10)
+        a = a + "e " + STR$(2 + 2 * i) + " 5 " + STR$(k) + " 0 0 0" + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", "c " + STR$(1 + 2 * n) + CHR$(10) + a)
+    AUTOMATION_PLAY("ev.txt")
+END SUB
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+[]
+
+=== ein rechtsklick setzt die schreibmarke
+IMPORT "gui"
+IMPORT "stelle.dh"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 200)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei und mehr")
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN klicks(ta, 3, 6, 1, 1)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+DIM c AS TUPLE : c = GUI_TEXTAREA_CURSOR(ta)
+PRINT "marke "; c[0]; " "; c[1]
+--- datei stelle.dh
+FUNCTION stelle(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM p AS TUPLE
+    FOR y = 12 TO 208 STEP 2
+        FOR x = 12 TO 280
+            p = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF p[0] = z AND p[1] = s THEN RETURN x * 10000 + y
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+SUB klicks(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER, n AS INTEGER, k AS INTEGER)
+    DIM p AS INTEGER : p = stelle(ta, z, s)
+    DIM x AS INTEGER : x = p \ 10000
+    DIM y AS INTEGER : y = p MOD 10000
+    DIM a AS STRING : a = "e 0 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        a = a + "e " + STR$(1 + 2 * i) + " 6 " + STR$(k) + " 0 0 0" + CHR$(10)
+        a = a + "e " + STR$(2 + 2 * i) + " 5 " + STR$(k) + " 0 0 0" + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", "c " + STR$(1 + 2 * n) + CHR$(10) + a)
+    AUTOMATION_PLAY("ev.txt")
+END SUB
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+marke 3 6
+
+=== ein rechtsklick in die auswahl laesst sie stehen
+IMPORT "gui"
+IMPORT "stelle.dh"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 200)
+GUI_SET_TEXT(ta, "aaaaaaa bbbbbbb ccccccc")
+GUI_TEXTAREA_SELECT(ta, 1, 9, 1, 16)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN klicks(ta, 1, 11, 1, 1)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "[" + GUI_TEXTAREA_SELECTION$(ta) + "]"
+--- datei stelle.dh
+FUNCTION stelle(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM p AS TUPLE
+    FOR y = 12 TO 208 STEP 2
+        FOR x = 12 TO 280
+            p = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF p[0] = z AND p[1] = s THEN RETURN x * 10000 + y
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+SUB klicks(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER, n AS INTEGER, k AS INTEGER)
+    DIM p AS INTEGER : p = stelle(ta, z, s)
+    DIM x AS INTEGER : x = p \ 10000
+    DIM y AS INTEGER : y = p MOD 10000
+    DIM a AS STRING : a = "e 0 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        a = a + "e " + STR$(1 + 2 * i) + " 6 " + STR$(k) + " 0 0 0" + CHR$(10)
+        a = a + "e " + STR$(2 + 2 * i) + " 5 " + STR$(k) + " 0 0 0" + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", "c " + STR$(1 + 2 * n) + CHR$(10) + a)
+    AUTOMATION_PLAY("ev.txt")
+END SUB
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+[bbbbbbb]
+
+=== der rollbalken laesst sich ziehen
+' 100 Zeilen; der Balken liegt im rechten Innenabstand (x 283..287). Nach
+' unten gezogen zeigt das Feld das Ende.
+IMPORT "gui"
+SCREEN(300, 450, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 450)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 200)
+DIM t AS STRING : t = "zeile 1"
+DIM k AS INTEGER
+FOR k = 2 TO 100
+    t = t + CHR$(10) + "zeile " + STR$(k)
+NEXT
+GUI_SET_TEXT(ta, t)
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+DIM v AS TUPLE : v = GUI_TEXTAREA_VIEW(ta)
+DIM c AS TUPLE : c = GUI_TEXTAREA_CURSOR(ta)
+PRINT "am ende "; v[0] + v[1] >= 100; " marke bleibt "; c[0]
+--- datei ev.txt
+c 5
+e 0 7 5 440 0 0
+e 1 7 285 20 0 0
+e 2 6 0 0 0 0
+e 4 7 285 430 0 0
+e 6 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+am ende TRUE marke bleibt 1
+
+=== das mausrad rollt weich
+' Ein Radschritt sind drei Zeilen; drei Schritte rollen neun. Weich heisst:
+' dazwischen stehen Zwischenstaende, und am Ende steht die Ansicht bei 9
+' (GUI_TEXTAREA_VIEW zaehlt die erste Zeile ab 0).
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 200)
+DIM t AS STRING : t = "zeile 1"
+DIM k AS INTEGER
+FOR k = 2 TO 100
+    t = t + CHR$(10) + "zeile " + STR$(k)
+NEXT
+GUI_SET_TEXT(ta, t)
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+DIM zwischen AS BOOLEAN
+DIM v AS TUPLE
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    v = GUI_TEXTAREA_VIEW(ta)
+    IF v[0] > 0 AND v[0] < 9 THEN zwischen = TRUE
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "erste "; v[0]; " zwischen "; zwischen
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 1 7 150 100 0 0
+e 2 8 0 -3 0 0
+
+--- umgebung
+DHRT_FRAMES=25
+--- erwartet
+erste 9 zwischen TRUE
+
+=== ohne uebergang springt das rad
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_METRIC_SET("uebergang", 0)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 200)
+DIM t AS STRING : t = "zeile 1"
+DIM k AS INTEGER
+FOR k = 2 TO 100
+    t = t + CHR$(10) + "zeile " + STR$(k)
+NEXT
+GUI_SET_TEXT(ta, t)
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+DIM zwischen AS BOOLEAN
+DIM v AS TUPLE
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    v = GUI_TEXTAREA_VIEW(ta)
+    IF v[0] > 0 AND v[0] < 9 THEN zwischen = TRUE
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "erste "; v[0]; " zwischen "; zwischen
+--- datei ev.txt
+c 3
+e 0 7 5 215 0 0
+e 1 7 150 100 0 0
+e 2 8 0 -3 0 0
+
+--- umgebung
+DHRT_FRAMES=25
+--- erwartet
+erste 9 zwischen FALSE
+
+=== bei kurzem text gibt es keinen rollbalken
+IMPORT "gui"
+SCREEN(300, 220, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 220)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM kurz AS GUI_WIDGET : kurz = GUI_TEXTAREA(w, 10, 10, 135, 200)
+GUI_SET_TEXT(kurz, "eins")
+DIM lang AS GUI_WIDGET : lang = GUI_TEXTAREA(w, 155, 10, 135, 200)
+DIM t AS STRING : t = "zeile 1"
+DIM k AS INTEGER
+FOR k = 2 TO 100
+    t = t + CHR$(10) + "zeile " + STR$(k)
+NEXT
+GUI_SET_TEXT(lang, t)
+GUI_TEXTAREA_GOTO(lang, 1, 1)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+    IF bild = 3 THEN SAVESCREENSHOT("t.png")
+WEND
+' Der Griff steht oben rechts im Innenabstand: Spalte x = rechter Rand - 4.
+DIM b AS IMAGE : b = LOADIMAGE("t.png")
+PRINT "kurz "; GETPIXEL(b, 141, 30) <> GETPIXEL(b, 100, 30); " lang "; GETPIXEL(b, 286, 30) <> GETPIXEL(b, 250, 30)
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+kurz FALSE lang TRUE

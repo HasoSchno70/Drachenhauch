@@ -3279,6 +3279,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DROPDOWN_PLACEHOLDER",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_PLACEHOLDER(dd, text$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DROPDOWN_SELECTED",
    "kind": "core",
    "signature": "GUI_DROPDOWN_SELECTED(dd)",
@@ -3726,6 +3732,24 @@
    "name": "GUI_LISTBOX_DETAIL",
    "kind": "core",
    "signature": "GUI_LISTBOX_DETAIL(lb, i, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_EDIT",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_EDIT(lb, i)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_EDITED",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_EDITED(lb)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_EDITING",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_EDITING(lb)",
    "module": "gui"
   },
   {
@@ -4737,6 +4761,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_PLACEHOLDER",
+   "kind": "core",
+   "signature": "GUI_TABLE_PLACEHOLDER(t, text$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_RESET_COLS",
    "kind": "module",
    "signature": "GUI_TABLE_RESET_COLS(tbl)",
@@ -4974,6 +5004,42 @@
    "name": "GUI_TEXTAREA_INSERT",
    "kind": "core",
    "signature": "GUI_TEXTAREA_INSERT(ta, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_SHARE",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SHARE(ansicht, von)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_PAIRS",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_PAIRS(ta, paare$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_STYLE",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_STYLE(ta, stil$[, an])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_GET_STYLE$",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_GET_STYLE$(ta)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_MARKDOWN$",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_MARKDOWN$(ta)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_SET_MARKDOWN",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SET_MARKDOWN(ta, md$)",
    "module": "gui"
   },
   {
@@ -5319,6 +5385,24 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TREE_EDIT",
+   "kind": "core",
+   "signature": "GUI_TREE_EDIT(tree, node)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_EDITED",
+   "kind": "core",
+   "signature": "GUI_TREE_EDITED(tree)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_EDITING",
+   "kind": "core",
+   "signature": "GUI_TREE_EDITING(tree)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_EXPAND",
    "kind": "core",
    "signature": "GUI_TREE_EXPAND(tree, node, flag)",
@@ -5340,6 +5424,12 @@
    "name": "GUI_TREE_LABEL",
    "kind": "core",
    "signature": "GUI_TREE_LABEL(tree, node)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_PLACEHOLDER",
+   "kind": "core",
+   "signature": "GUI_TREE_PLACEHOLDER(tree, text$)",
    "module": "gui"
   },
   {

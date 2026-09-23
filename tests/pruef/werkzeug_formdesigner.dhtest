@@ -204,11 +204,11 @@ alles.dhform
  {"kind": "slider", "name": "slider1", "x": 278, "y": 8, "w": 80, "h": 50},
  {"kind": "textinput", "name": "textinput1", "x": 368, "y": 8, "w": 80, "h": 50},
  {"kind": "panel", "name": "panel1", "x": 8, "y": 68, "w": 80, "h": 50},
- {"kind": "table", "name": "table1", "x": 98, "y": 68, "w": 80, "h": 50, "table": {"headers": ["A", "B", "C"], "col_widths": [30, 30, 30], "zellmodus": true, "col_edit": [true, false, true], "col_type": ["text", "ganz", "auswahl"], "col_choices": [[], [], ["Rot", "Gruen"]]}},
+ {"kind": "table", "name": "table1", "x": 98, "y": 68, "w": 80, "h": 50, "table": {"headers": ["A", "B", "C"], "col_widths": [30, 30, 30], "zellmodus": true, "col_edit": [true, false, true], "col_type": ["text", "ganz", "auswahl"], "col_choices": [[], [], ["Rot", "Gruen"]], "leer_text": "Keine Treffer"}},
  {"kind": "radio", "name": "radio1", "x": 188, "y": 68, "w": 80, "h": 50},
- {"kind": "dropdown", "name": "dropdown1", "x": 278, "y": 68, "w": 80, "h": 50, "items": ["eins", "zwei"]},
+ {"kind": "dropdown", "name": "dropdown1", "x": 278, "y": 68, "w": 80, "h": 50, "items": ["eins", "zwei"], "placeholder": "Bitte waehlen"},
  {"kind": "progress", "name": "progress1", "x": 368, "y": 68, "w": 80, "h": 50},
- {"kind": "listbox", "name": "listbox1", "x": 8, "y": 128, "w": 80, "h": 50, "items": ["eins", "zwei"]},
+ {"kind": "listbox", "name": "listbox1", "x": 8, "y": 128, "w": 80, "h": 50, "items": ["eins", "zwei"], "list": {"bearbeitbar": true}},
  {"kind": "image", "name": "image1", "x": 98, "y": 128, "w": 80, "h": 50},
  {"kind": "canvas", "name": "canvas1", "x": 188, "y": 128, "w": 80, "h": 50},
  {"kind": "separator", "name": "separator1", "x": 278, "y": 128, "w": 80, "h": 50},
@@ -217,7 +217,7 @@ alles.dhform
  {"kind": "spinner", "name": "spinner1", "x": 98, "y": 188, "w": 80, "h": 50},
  {"kind": "splitter", "name": "splitter1", "x": 188, "y": 188, "w": 80, "h": 50},
  {"kind": "toolbar", "name": "toolbar1", "x": 278, "y": 188, "w": 80, "h": 50},
- {"kind": "tree", "name": "tree1", "x": 368, "y": 188, "w": 80, "h": 50},
+ {"kind": "tree", "name": "tree1", "x": 368, "y": 188, "w": 80, "h": 50, "tree": {"bearbeitbar": true, "leer_text": "Noch nichts"}},
  {"kind": "toggle", "name": "toggle1", "x": 8, "y": 248, "w": 80, "h": 50},
  {"kind": "knob", "name": "knob1", "x": 98, "y": 248, "w": 80, "h": 50},
  {"kind": "colorpicker", "name": "colorpicker1", "x": 188, "y": 248, "w": 80, "h": 50},
@@ -238,6 +238,11 @@ check []
 lauf 0 TRUE
 --- inhalt _programm/code.dh
 GUI_TABLE_SET(table1, "zellmodus", 1)
+GUI_TABLE_PLACEHOLDER(table1, "Keine Treffer")
+GUI_LISTBOX_SET(listbox1, "bearbeitbar", 1)
+GUI_TREE_SET(tree1, "bearbeitbar", 1)
+GUI_TREE_PLACEHOLDER(tree1, "Noch nichts")
+GUI_DROPDOWN_PLACEHOLDER(dropdown1, "Bitte waehlen")
 GUI_TABLE_COL_CHOICES(table1, 2, ["Rot", "Gruen"])
 GUI_ON_CLICK(button1, klick)
 GUI_SET_FONT_STYLE(button1, "fett+unterstrichen")
@@ -266,6 +271,76 @@ t.dhform
 --- enthaelt
 "headers":["Name","Menge","Farbe"]
 "zellmodus":true
+
+=== inspektor schreibt umbenennen und leer-hinweis
+' Liste: das Kaestchen "Umbenennen mit F2" setzt list.bearbeitbar und nimmt
+' es beim Abwaehlen wieder HERAUS. Tabelle: das Feld "Leer-Hinweis" setzt
+' table.leer_text, leer entfernt es. Dazwischen liest der Inspektor den
+' Stand zurueck (Kaestchen gesetzt, Feld gefuellt).
+auswahl = 0
+inspektorFuellen()
+PRINT "liste sichtbar "; GUI_VISIBLE(cbUmbenennen); " leer sichtbar "; GUI_VISIBLE(aLeer)
+GUI_SET_CHECKED(cbUmbenennen, TRUE)
+inspektorUebernehmen()
+PRINT JSON_STRINGIFY(teilbaum(doc, "widgets.0.list"))
+inspektorFuellen()
+PRINT "zurueck "; GUI_CHECKED(cbUmbenennen)
+GUI_SET_CHECKED(cbUmbenennen, FALSE)
+inspektorUebernehmen()
+PRINT "ab "; JSON_HAS(doc, "widgets.0.list.bearbeitbar")
+auswahl = 1
+inspektorFuellen()
+PRINT "tabelle sichtbar "; GUI_VISIBLE(aLeer); " liste sichtbar "; GUI_VISIBLE(cbUmbenennen)
+GUI_SET_TEXT(aLeer, "Keine Treffer")
+inspektorUebernehmen()
+PRINT JSON_GET_STRING(doc, "widgets.1.table.leer_text")
+inspektorFuellen()
+PRINT "feld "; GUI_TEXT(aLeer)
+GUI_SET_TEXT(aLeer, "")
+inspektorUebernehmen()
+PRINT "leer "; JSON_HAS(doc, "widgets.1.table.leer_text")
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+t.dhform
+--- datei t.dhform
+{"title": "T", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [{"kind": "listbox", "name": "listbox1", "x": 16, "y": 16, "w": 160, "h": 96, "items": ["a", "b"]}, {"kind": "table", "name": "table1", "x": 16, "y": 130, "w": 320, "h": 140, "table": {"headers": ["Name"]}}]}
+--- erwartet
+liste sichtbar TRUE leer sichtbar FALSE
+{"bearbeitbar":true}
+zurueck TRUE
+ab FALSE
+tabelle sichtbar TRUE liste sichtbar FALSE
+Keine Treffer
+feld Keine Treffer
+leer FALSE
+
+=== inspektor schreibt umbenennen und leer-hinweis beim baum
+' Dasselbe Kaestchen und Feld wie bei Liste und Tabelle, aber unter "tree".
+auswahl = 0
+inspektorFuellen()
+PRINT "sichtbar "; GUI_VISIBLE(cbUmbenennen); " "; GUI_VISIBLE(aLeer)
+GUI_SET_CHECKED(cbUmbenennen, TRUE)
+GUI_SET_TEXT(aLeer, "Noch nichts")
+inspektorUebernehmen()
+PRINT JSON_GET_BOOL(doc, "widgets.0.tree.bearbeitbar"); " "; JSON_GET_STRING(doc, "widgets.0.tree.leer_text")
+inspektorFuellen()
+PRINT "zurueck "; GUI_CHECKED(cbUmbenennen); " "; GUI_TEXT(aLeer)
+GUI_SET_CHECKED(cbUmbenennen, FALSE)
+GUI_SET_TEXT(aLeer, "")
+inspektorUebernehmen()
+PRINT "ab "; JSON_HAS(doc, "widgets.0.tree.bearbeitbar"); " "; JSON_HAS(doc, "widgets.0.tree.leer_text")
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+t.dhform
+--- datei t.dhform
+{"title": "T", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [{"kind": "tree", "name": "tree1", "x": 16, "y": 16, "w": 200, "h": 160}]}
+--- erwartet
+sichtbar TRUE TRUE
+TRUE Noch nichts
+zurueck TRUE Noch nichts
+ab FALSE FALSE
 
 === inspektor schreibt den schriftstil
 ' Das Feld geht als Text in die .dhform, die Ansicht zeigt ihn gleich; leer

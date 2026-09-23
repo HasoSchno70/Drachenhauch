@@ -1,0 +1,406 @@
+' Uebergaenge (Metrik `uebergang`, 2026-09-23): Ueberfahren blendet ueber
+' die Dauer ein und aus, Druecken und Fokus erscheinen SOFORT und blenden nur
+' aus. Geprueft am BILD: ein Knopf mit eigenen Farben fuer Grund (dunkelblau),
+' Ueberfahren (hellgrau) und Druecken (gruen), die Maus kommt ueber eine
+' Aufnahme. Headless ist DELTA fest 1/60 -- jedes Bild ist dieselbe Stufe.
+' Die Faelle mit `uebergang` 0 sind die Gegenprobe: dort springt es wie vor
+' der Aenderung.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die metrik ist da und hat eine vorgabe
+IMPORT "gui"
+PRINT GUI_METRIC_GET("uebergang")
+GUI_METRIC_SET("uebergang", 0)
+PRINT GUI_METRIC_GET("uebergang")
+--- erwartet
+120
+0
+
+=== ueberfahren blendet ein
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+GUI_SET_COLOR(b, "pressed", &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+100 60 nicht #204080 +-20
+100 60 nicht #E0E0E0 +-20
+
+=== nach der dauer steht die farbe des ueberfahrens
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- bild
+100 60 #E0E0E0 +-2
+
+=== ohne uebergang springt das ueberfahren wie frueher
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_METRIC_SET("uebergang", 0)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+100 60 #E0E0E0 +-2
+
+=== druecken erscheint im selben bild
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+GUI_SET_COLOR(b, "pressed", &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+e 2 6 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=6
+--- bild
+100 60 #00FF00 +-2
+
+=== losgelassen blendet das druecken aus
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+GUI_SET_COLOR(b, "pressed", &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+e 2 6 0 0 0 0
+e 12 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=19
+--- bild
+100 60 nicht #00FF00 +-20
+100 60 nicht #E0E0E0 +-20
+
+=== verlassen blendet aus
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+e 16 7 250 180 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- bild
+100 60 nicht #204080 +-20
+100 60 nicht #E0E0E0 +-20
+
+=== der fokusring erscheint sofort und blendet beim wechsel aus
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_THEME_SET("accent", &HFF0000)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "", 50, 50, 60, 30)
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "", 170, 50, 60, 30)
+DIM bild AS INTEGER
+GUI_FOCUS(b1)
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 10 THEN GUI_FOCUS(b2)
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=12
+--- bild
+167 60 #FF0000 +-2
+47 60 nicht #FF0000 +-20
+47 60 nicht #18222E +-20
+
+=== ein baum klappt ueber die dauer auf
+' Drei Kinder mit gruenem Sinnbild. Das dritte steht nach dem Aufklappen bei
+' y 77..99 (Zeile 3), sein Sinnbild bei x 48. Zwei Bilder nach dem
+' Aufklappen wachsen die Zeilen noch aus der Wurzel heraus, dort ist noch
+' Grund -- nach der Dauer steht das Sinnbild da.
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 200, 180)
+DIM gruen AS IMAGE : gruen = IMAGE_NEW(16, 16, &H00FF00)
+DIM r AS INTEGER : r = GUI_TREE_ADD(t, -1, "Wurzel")
+DIM k AS INTEGER
+FOR k = 1 TO 3
+    GUI_TREE_ICON(t, GUI_TREE_ADD(t, r, "Kind"), gruen)
+NEXT
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 3 THEN GUI_TREE_EXPAND(t, r, TRUE)
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+57 88 nicht #00FF00 +-40
+
+=== der aufgeklappte baum steht nach der dauer
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 200, 180)
+DIM gruen AS IMAGE : gruen = IMAGE_NEW(16, 16, &H00FF00)
+DIM r AS INTEGER : r = GUI_TREE_ADD(t, -1, "Wurzel")
+DIM k AS INTEGER
+FOR k = 1 TO 3
+    GUI_TREE_ICON(t, GUI_TREE_ADD(t, r, "Kind"), gruen)
+NEXT
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 3 THEN GUI_TREE_EXPAND(t, r, TRUE)
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=20
+--- bild
+57 88 #00FF00 +-40
+
+=== ohne uebergang ist der baum sofort offen
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_METRIC_SET("uebergang", 0)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 200, 180)
+DIM gruen AS IMAGE : gruen = IMAGE_NEW(16, 16, &H00FF00)
+DIM r AS INTEGER : r = GUI_TREE_ADD(t, -1, "Wurzel")
+DIM k AS INTEGER
+FOR k = 1 TO 3
+    GUI_TREE_ICON(t, GUI_TREE_ADD(t, r, "Kind"), gruen)
+NEXT
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 3 THEN GUI_TREE_EXPAND(t, r, TRUE)
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+57 88 #00FF00 +-40
+
+=== ein beim aufbau geoeffneter baum klappt nicht erst auf
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 10, 200, 180)
+DIM gruen AS IMAGE : gruen = IMAGE_NEW(16, 16, &H00FF00)
+DIM r AS INTEGER : r = GUI_TREE_ADD(t, -1, "Wurzel")
+DIM k AS INTEGER
+FOR k = 1 TO 3
+    GUI_TREE_ICON(t, GUI_TREE_ADD(t, r, "Kind"), gruen)
+NEXT
+GUI_TREE_EXPAND(t, r, TRUE)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=2
+--- bild
+57 88 #00FF00 +-40
+
+=== die klappliste rollt herab
+' Die Liste unter der Klappliste (220, 10, 180, 28) reicht mit vier
+' Eintraegen von y 38 bis 125; der letzte Eintrag liegt bei y 104..125.
+' Kurz nach dem Klick ist dort noch nichts, nach der Dauer die Farbe der Liste.
+IMPORT "gui"
+SCREEN(420, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 420, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 220, 10, 180, 28, ["a", "b", "c", "d"])
+GUI_SET_COLOR(dd, "bg", &H0000FF)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 0 7 5 190 0 0
+e 1 7 300 24 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+390 115 nicht #0000FF +-40
+
+=== die klappliste steht nach der dauer offen
+IMPORT "gui"
+SCREEN(420, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 420, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 220, 10, 180, 28, ["a", "b", "c", "d"])
+GUI_SET_COLOR(dd, "bg", &H0000FF)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 0 7 5 190 0 0
+e 1 7 300 24 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- bild
+390 115 #0000FF +-2
+
+=== ohne uebergang ist die klappliste sofort offen
+IMPORT "gui"
+SCREEN(420, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_METRIC_SET("uebergang", 0)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 420, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 220, 10, 180, 28, ["a", "b", "c", "d"])
+GUI_SET_COLOR(dd, "bg", &H0000FF)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 0 7 5 190 0 0
+e 1 7 300 24 0 0
+e 2 6 0 0 0 0
+e 3 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=6
+--- bild
+390 115 #0000FF +-2
