@@ -267,6 +267,10 @@ note 4 1 pause
 boegen 1 0 2
 
 === zweite spur und instrument
+' Die Instrument-Klappliste hat 18 Eintraege, das Popup zeigt seit
+' 2026-09-23 hoechstens zehn (ab y 210, Zeilen 22 hoch). "Glocke" ist
+' Eintrag 10: ein Radschritt ueber dem Popup, dann steht er in der letzten
+' Zeile (y 419).
 AUTOMATION_PLAY("ev.txt")
 --- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
 --- streichen WINDOW_MAXIMIZE()
@@ -276,7 +280,7 @@ neu.json
 DHRT_FRAMES=140
 DH_SCORE_LOG=score.log
 --- datei _programm/ev.txt
-c 20
+c 22
 e 20 7 895 46 0 0
 e 21 7 895 46 0 0
 e 21 6 0 0 0 0
@@ -289,8 +293,10 @@ e 60 7 125 198 0 0
 e 61 7 125 198 0 0
 e 61 6 0 0 0 0
 e 63 5 0 0 0 0
-e 70 7 125 441 0 0
-e 71 7 125 441 0 0
+e 66 7 125 300 0 0
+e 67 8 0 -1 0 0
+e 70 7 125 419 0 0
+e 71 7 125 419 0 0
 e 71 6 0 0 0 0
 e 73 5 0 0 0 0
 e 100 2 341 0 0 0

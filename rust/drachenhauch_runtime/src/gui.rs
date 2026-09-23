@@ -188,6 +188,37 @@ fn naeher(t: &mut f32, ziel: f32, schritt: f32) {
     if *t < ziel { *t = (*t + schritt).min(ziel); } else { *t = (*t - schritt).max(ziel); }
 }
 
+/// Ein Zeilen-Uebergang: die Zeile unter der Maus blendet ein, die vorige
+/// gleichzeitig aus. Zwei Plaetze reichen -- faehrt die Maus schnell ueber
+/// viele Zeilen, blendet jeweils nur die zuletzt verlassene aus; das sieht man
+/// nicht, und eine Liste mit tausend Zeilen braucht keine tausend Werte.
+#[derive(Clone, Copy)]
+struct Blende { akt: i32, akt_t: f32, alt: i32, alt_t: f32 }
+impl Default for Blende {
+    fn default() -> Self { Blende { akt: -1, akt_t: 0.0, alt: -1, alt_t: 0.0 } }
+}
+impl Blende {
+    fn schritt(&mut self, jetzt: i32, s: f32) {
+        if jetzt != self.akt {
+            let (a, at) = (self.akt, self.akt_t);
+            // Zurueck auf die Zeile, die gerade ausblendet: dort weiter,
+            // statt bei 0 -- sonst flackert sie beim Hin und Her.
+            self.akt_t = if jetzt >= 0 && jetzt == self.alt { self.alt_t } else { 0.0 };
+            self.akt = jetzt;
+            self.alt = a; self.alt_t = at;
+        }
+        if self.akt >= 0 { self.akt_t = (self.akt_t + s).min(1.0); }
+        if self.alt >= 0 {
+            self.alt_t = (self.alt_t - s).max(0.0);
+            if self.alt_t <= 0.0 { self.alt = -1; }
+        }
+    }
+    fn anteil(&self, k: i32) -> f64 {
+        if k < 0 { return 0.0; }
+        if k == self.akt { weich(self.akt_t) } else if k == self.alt { weich(self.alt_t) } else { 0.0 }
+    }
+}
+
 /// Eine Farbe mit anteiliger Deckkraft (1 = wie sie ist, 0 = weg).
 ///
 /// Alpha 0 heisst in dhrt DECKEND -- darum wird eine Farbe ohne Alpha als 255
@@ -326,6 +357,10 @@ impl Kind {
 }
 
 const DROPDOWN_ITEM_H: i32 = 22;
+/// Hoechstens so viele Eintraege zeigt eine offene Klappliste auf einmal; der
+/// Rest rollt. Vorher war das Popup so hoch wie die Liste lang -- hundert
+/// Eintraege ragten weit ueber den Bildschirm hinaus.
+const DD_MAX_ZEILEN: i32 = 10;
 const TC_KOPF_H: i32 = 26;        // Hoehe der Reiterkoepfe im Fenster
 const AKK_KOPF_H: i32 = 30;       // Hoehe eines Akkordeon-Kopfes
 const WZ_KOPF_H: i32 = 52;        // Schrittanzeige des Assistenten
@@ -440,6 +475,14 @@ pub struct TableState {
     scroll_x: i32, scroll_y: i32,
     drag_v: bool, drag_h: bool, drag_off: i32,
     selected: i32, hover_row: i32, clicked_row: i32,
+    /// Doppelklick (oder Enter im Zeilenmodus) in DIESEM Bild -- "oeffnen",
+    /// wie bei der Liste; GUI_DOUBLE_CLICKED fragt es.
+    doppel: bool,
+    /// Hinweis, wenn keine Zeile zu sehen ist ("Keine Treffer").
+    leer_text: String,
+    /// Tipp-Puffer fuer "tippen springt" (Zeilenmodus).
+    tipp: String,
+    tipp_zeit: f64,
     /// Spalte unter der Maus beim Druecken.
     hover_col: i32,
     /// Spalte des letzten Klicks (-1 = keine) -- fuer Knopf-Zellen.
@@ -576,6 +619,7 @@ impl Default for TableState {
             zebra: false, grid: true,
             scroll_x: 0, scroll_y: 0, drag_v: false, drag_h: false, drag_off: 0,
             selected: -1, hover_row: -1, clicked_row: -1, hover_col: -1, clicked_col: -1,
+            doppel: false, leer_text: String::new(), tipp: String::new(), tipp_zeit: 0.0,
             frozen: 0, col_order: vec![], reorderable: false, head_drag: None,
             multi: false, sel_rows: vec![], sel_anchor: -1,
             edit_row: -1, edit_col: -1, edit_text: String::new(), edit_caret: 0,
@@ -994,6 +1038,19 @@ pub struct TreeState {
     /// fuers ZEICHNEN -- Treffertest, Tastatur und Rollen rechnen mit
     /// `expanded`. Fehlt ein Eintrag, gilt der Zustand selbst.
     auf_t: Vec<f32>,
+    /// Knoten lassen sich mit F2 umbenennen (GUI_TREE_SET "bearbeitbar") --
+    /// nicht beim Dateibaum: dort ist der Name der Name einer Datei.
+    bearbeitbar: bool,
+    /// Der Knoten, der gerade umbenannt wird (Arbeitskopie wie bei der Liste).
+    edit: Option<ListEdit>,
+    /// Ereignisse dieses Bildes: umbenannter Knoten, Doppelklick/Enter.
+    bearbeitet: Option<usize>,
+    doppel: bool,
+    /// Hinweis, wenn der Baum leer ist.
+    leer_text: String,
+    /// Tipp-Puffer fuer "tippen springt".
+    tipp: String,
+    tipp_zeit: f64,
 }
 
 impl TreeState {
@@ -1841,6 +1898,21 @@ struct ListState {
     kaestchen: bool,
     anker: i32,           // Anker fuer Umschalt+Klick
     doppel: bool,         // Doppelklick in DIESEM Bild (wie `clicked`)
+    /// Eintraege lassen sich mit F2 umbenennen (GUI_LISTBOX_SET "bearbeitbar").
+    bearbeitbar: bool,
+    /// Der Eintrag, der gerade umbenannt wird -- die Arbeitskopie; die Liste
+    /// bekommt den Text erst beim Uebernehmen (ESC nimmt ihn so zurueck).
+    edit: Option<ListEdit>,
+    /// Ereignis dieses Bildes: umbenannter Eintrag (GUI_LISTBOX_EDITED).
+    bearbeitet: Option<usize>,
+}
+
+/// Arbeitskopie beim Umbenennen eines Listeneintrags.
+struct ListEdit {
+    k: usize,
+    text: Vec<char>,
+    caret: i32,
+    anker: i32,
 }
 
 impl ListState {
@@ -1905,7 +1977,7 @@ impl ListState {
             && self.daten.iter().all(|s| s.is_empty()) && self.details.iter().all(|s| s.is_empty())
             && self.tips.iter().all(|s| s.is_empty()) && !self.aus.iter().any(|&x| x)
             && !self.kopf.iter().any(|&x| x) && self.leer_text.is_empty()
-            && self.spans.iter().all(|s| s.is_empty())
+            && self.spans.iter().all(|s| s.is_empty()) && !self.bearbeitbar
     }
 }
 
@@ -2034,6 +2106,17 @@ pub struct Widget {
     ueber_t: f32,
     druck_t: f32,
     fokus_t: f32,
+    /// Die ZEILE unter der Maus, weich: Liste, Tabelle, Baum und die offene
+    /// Klappliste (dort ihr Eintrag).
+    zeile_b: Blende,
+    /// Zeile unter der Maus fuer die Blende, je Bild neu (eine schlichte
+    /// Liste hat keinen ListState, der sie tragen koennte).
+    zeile_jetzt: i32,
+    /// Weiches Rollen mit dem Rad: das Ziel, und der Stand, den das Rollen
+    /// zuletzt selbst geschrieben hat -- steht dort etwas anderes, hat jemand
+    /// anderes gerollt (Pfeiltaste, SCROLL_TO), und das Rad gibt nach.
+    rad_ziel: Option<f64>,
+    rad_letzt: f64,
     ov: HashMap<String, i64>,
     tbl: Option<Box<TableState>>,   // nur fuer Kind::Table
     tree: Option<Box<TreeState>>,   // nur fuer Kind::Tree
@@ -2335,6 +2418,10 @@ struct Menu {
     // Untermenue eines anderen Menues: nie Kontextmenue, nie in der Leiste.
     unter: bool,
     items: Vec<MenuItem>,
+    /// Aufrollen (0..1) und der Eintrag unter der Maus, weich -- nur solange
+    /// das Popup offen ist; zu setzt beides zurueck.
+    auf_t: f32,
+    b: Blende,
 }
 
 struct MenuItem {
@@ -2520,6 +2607,23 @@ pub struct Gui {
     /// welche -- wechselt die Liste, faengt es bei 0 an.
     dd_auf_t: f32,
     dd_auf_von: Option<(usize, usize)>,
+    /// Offene Klappliste: der Eintrag, den die Tastatur markiert (Enter
+    /// uebernimmt ihn, ESC verwirft), die erste sichtbare Zeile, und der
+    /// Tipp-Puffer fuer "tippen springt".
+    dd_mark: i32,
+    dd_scroll: i32,
+    dd_tipp: String,
+    dd_tipp_zeit: f64,
+    /// Bildschirmhoehe aus dem letzten GUI_UPDATE -- ob eine Klappliste nach
+    /// unten Platz hat, fragt ihre Geometrie, und die kennt kein `g`.
+    schirm_h: i32,
+    schirm_b: i32,
+    /// Rollbalken einer Liste wird gezogen: (Fenster, Liste, Griff-Versatz).
+    listbar_zug: Option<(usize, usize, i32)>,
+    /// Enter oder ESC hat in DIESEM Bild ein Umbenennen beendet -- dann
+    /// gehoert die Taste nicht mehr dem Standard-/Abbrechen-Knopf, obwohl
+    /// die Liste danach nicht mehr bearbeitet wird.
+    liste_taste: bool,
     open_menu: Option<(usize, usize)>,       // offenes Menueleisten-Dropdown (win, menu)
     context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
     // Strg/Umschalt zum Zeitpunkt des Drucks -- handle_press hat kein `g`.
@@ -2641,7 +2745,7 @@ impl Gui {
             skins: HashMap::new(),
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
-            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, active_table: None, table_press: None, press_origin: None,
+            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, liste_taste: false, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true, cursor_form: None,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false),
@@ -3517,7 +3621,7 @@ impl Gui {
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
-            ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0,
+            ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0, zeile_b: Blende::default(), zeile_jetzt: -1, rad_ziel: None, rad_letzt: 0.0,
             alive: true, visible: true, rund: false, variante: 0,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0, stil: 0,
@@ -4482,7 +4586,8 @@ impl Gui {
         match key.to_lowercase().as_str() {
             "mehrfachauswahl" | "multi_select" | "multi" => { l.multi = wert != 0.0; if !l.multi { for x in l.sel.iter_mut() { *x = false; } } }
             "kaestchen" | "checkboxes" => l.kaestchen = wert != 0.0,
-            _ => return Err(format!("GUI_LISTBOX_SET: unbekannter Schluessel '{}' -- mehrfachauswahl, kaestchen", key)),
+            "bearbeitbar" | "editable" => { l.bearbeitbar = wert != 0.0; if !l.bearbeitbar { l.edit = None; } }
+            _ => return Err(format!("GUI_LISTBOX_SET: unbekannter Schluessel '{}' -- mehrfachauswahl, kaestchen, bearbeitbar", key)),
         }
         Ok(())
     }
@@ -4553,8 +4658,12 @@ impl Gui {
     /// GUI_DOUBLE_CLICKED(lb) -- ein Bild lang, wie GUI_CLICKED.
     pub fn double_clicked(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_DOUBLE_CLICKED")?;
-        if w.kind != Kind::ListBox { return Err("GUI_DOUBLE_CLICKED: bisher nur fuer Listen (GUI_LISTBOX)".into()); }
-        Ok(w.list.as_ref().map(|l| l.doppel).unwrap_or(false))
+        match w.kind {
+            Kind::ListBox => Ok(w.list.as_ref().map(|l| l.doppel).unwrap_or(false)),
+            Kind::Table => Ok(w.tbl.as_ref().map(|t| t.doppel).unwrap_or(false)),
+            Kind::Tree => Ok(w.tree.as_ref().map(|t| t.doppel).unwrap_or(false)),
+            _ => Err("GUI_DOUBLE_CLICKED: nur fuer Listen, Tabellen und Baeume (GUI_LISTBOX, GUI_TABLE, GUI_TREE)".into()),
+        }
     }
     /// Zeilenhoehe einer Liste: 22 Punkte, mit eigener Schriftgroesse
     /// (GUI_SET_FONT_SIZE) mindestens Schrift + 6 -- sonst stiessen groessere
@@ -4715,6 +4824,280 @@ impl Gui {
         self.liste_rollen_zu(wi, idx, p);
         Ok(())
     }
+    /// Wie weit eine Liste bzw. ein Baum rollen kann (0 = alles passt) --
+    /// dieselbe Rechnung wie ihr Rad.
+    fn list_max_scroll(&self, wi: usize, i: usize) -> i32 {
+        let w = &self.windows[wi].widgets[i];
+        if w.kind == Kind::Tree {
+            let n = w.tree.as_ref().map(|t| Self::tree_visible(t).len()).unwrap_or(0) as i32;
+            return (n * self.sk(TREE_ROW_H) - (w.h - 2)).max(0);
+        }
+        let n = liste_ansicht(&w.items, w.list.as_deref()).len() as i32;
+        (n * self.list_zeile_h(w) - w.h).max(0)
+    }
+    /// Rollstand: die Liste fuehrt ihn in `value`, der Baum in `tree.scroll`.
+    fn roll_ist(w: &Widget) -> f64 {
+        match w.tree.as_ref() { Some(t) if w.kind == Kind::Tree => t.scroll as f64, _ => w.value }
+    }
+    fn roll_setze(w: &mut Widget, v: f64) {
+        if w.kind == Kind::Tree {
+            if let Some(t) = w.tree.as_mut() { t.scroll = v.round() as i32; }
+        } else {
+            w.value = v;
+        }
+    }
+    /// Rollbalken einer Liste: (x, y, Breite, Hoehe der Rinne, Griff-y,
+    /// Griff-Hoehe) -- nur, wenn mehr Eintraege da sind, als hineinpassen.
+    /// EINE Quelle fuer Zeichnen, Klick und Ziehen, wie beim Panel.
+    fn list_bar_geom(&self, wi: usize, i: usize) -> Option<(i32, i32, i32, i32, i32, i32)> {
+        let w = &self.windows[wi].widgets[i];
+        if !matches!(w.kind, Kind::ListBox | Kind::Tree) || !self.widget_shown(wi, w) { return None; }
+        let max = self.list_max_scroll(wi, i);
+        if max <= 0 { return None; }
+        let (ax, ay, aw, ah) = self.abs_rect(wi, w);
+        let bw = self.sk(8);
+        let (tx, ty, th) = (ax + aw - 1 - bw, ay + 1, (ah - 2).max(1));
+        let inhalt = max + w.h;
+        let thh = ((th as i64 * w.h as i64 / inhalt.max(1) as i64) as i32).clamp(self.sk(16).min(th), th);
+        let thy = ty + ((th - thh) as f64 * (Self::roll_ist(w) / max as f64).clamp(0.0, 1.0)) as i32;
+        Some((tx, ty, bw, th, thy, thh))
+    }
+    fn list_bar_at(&self, wi: usize, i: usize, mx: i32, my: i32) -> bool {
+        self.list_bar_geom(wi, i).map(|(tx, ty, bw, th, _, _)| Self::in_rect(mx, my, (tx, ty, bw, th))).unwrap_or(false)
+    }
+    /// Rechtsklick auf eine Zeile waehlt sie -- ein Kontextmenue soll sich auf
+    /// das beziehen, worauf man zeigt. In einer Mehrfachauswahl bleibt eine
+    /// bestehende Auswahl stehen, wenn die Zeile dazugehoert (so wirkt
+    /// "Loeschen" im Kontextmenue auf alle gewaehlten).
+    fn liste_rechtsklick(&mut self, wi: usize, i: usize, k: i32) {
+        if k < 0 { return; }
+        let w = &mut self.windows[wi].widgets[i];
+        if !w.enabled { return; }
+        let n = w.items.len();
+        if k as usize >= n { return; }
+        if w.list.as_ref().map(|l| !l.waehlbar(k as usize)).unwrap_or(false) { return; }
+        let multi = w.list.as_ref().map(|l| l.multi).unwrap_or(false);
+        let mut geaendert = false;
+        if multi {
+            let l = w.list.as_mut().unwrap();
+            l.sync(n);
+            if !l.sel[k as usize] {
+                for x in l.sel.iter_mut() { *x = false; }
+                l.sel[k as usize] = true;
+                l.anker = k;
+                geaendert = true;
+            }
+            if w.sel != k { w.sel = k; }
+        } else if w.sel != k {
+            w.sel = k;
+            geaendert = true;
+        }
+        if geaendert {
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+    /// Rechtsklick auf eine Tabellenzeile waehlt sie -- wie bei der Liste; eine
+    /// Mehrfachauswahl bleibt, wenn die Zeile dazugehoert.
+    fn tabelle_rechtsklick(&mut self, wi: usize, i: usize) {
+        let w = &mut self.windows[wi].widgets[i];
+        if !w.enabled { return; }
+        let t = match w.tbl.as_mut() { Some(t) => t, None => return };
+        let r = t.hover_row;
+        if r < 0 || t.ist_gewaehlt(r) { return; }
+        t.auswahl_setzen(r);
+        t.cur_r = r;
+        if t.zellmodus && t.hover_col >= 0 { t.cur_c = t.hover_col; t.ber_r = r; t.ber_c = t.cur_c; }
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+    /// Umbenennen beginnen: der ganze Text ist markiert, das erste Tippen
+    /// ersetzt ihn -- wie im Dateimanager.
+    fn liste_edit_start(&mut self, wi: usize, i: usize, k: usize) {
+        self.liste_rollen_zu(wi, i, k as i32);
+        let w = &mut self.windows[wi].widgets[i];
+        if k >= w.items.len() { return; }
+        let text: Vec<char> = w.items[k].chars().collect();
+        let n = w.items.len();
+        let l = w.list.get_or_insert_with(|| Box::new(ListState { anker: -1, ..Default::default() }));
+        l.sync(n);
+        let len = text.len() as i32;
+        l.edit = Some(ListEdit { k, text, caret: len, anker: 0 });
+    }
+    /// Umbenennen beenden: uebernehmen (Enter, Klick woanders, Fokus weg)
+    /// oder verwerfen (ESC). Ein unveraenderter Text ist kein Ereignis.
+    fn liste_edit_ende(&mut self, wi: usize, i: usize, uebernehmen: bool) {
+        let w = &mut self.windows[wi].widgets[i];
+        let e = match w.list.as_mut().and_then(|l| l.edit.take()) { Some(e) => e, None => return };
+        if !uebernehmen || e.k >= w.items.len() { return; }
+        let neu: String = e.text.iter().collect();
+        if neu == w.items[e.k] { return; }
+        w.items[e.k] = neu;
+        if let Some(l) = w.list.as_mut() { l.bearbeitet = Some(e.k); }
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+    /// Wo das Eingabefeld beim Umbenennen steht (Bildschirm) -- aus der Lage
+    /// der Zeile in der ANSICHT, wie Zeichnen und Klick sie rechnen.
+    fn list_edit_rect(&self, wi: usize, i: usize) -> Option<(i32, i32, i32, i32)> {
+        let w = &self.windows[wi].widgets[i];
+        let e = w.list.as_ref()?.edit.as_ref()?;
+        let pos = liste_ansicht(&w.items, w.list.as_deref()).iter().position(|&x| x == e.k)? as i32;
+        let (ax, ay, aw, _) = self.abs_rect(wi, w);
+        let ih = self.list_zeile_h(w);
+        let bar = if self.list_bar_geom(wi, i).is_some() { self.sk(8) + 2 } else { 0 };
+        // Das Feld deckt die Zeile (bei Kaestchen erst dahinter); der Text
+        // darin steht, wo der Zeilentext stand (`list_text_x`), damit er
+        // beim Oeffnen nicht springt.
+        let box_w = self.list_box_w(w);
+        let x0 = if box_w > 0 { ax + box_w - self.sk(3) } else { ax + 1 };
+        Some((x0, ay + pos * ih - w.value as i32, (ax + aw - 2 - bar - x0).max(8), ih))
+    }
+    /// Wo der Text einer Listenzeile beginnt: hinter Kaestchen und Sinnbild.
+    fn list_text_x(&self, w: &Widget, ax: i32) -> i32 {
+        let box_w = self.list_box_w(w);
+        let ih = self.list_zeile_h(w);
+        let hat_icon = w.list.as_ref().map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
+        let mut tx = if box_w > 0 { ax + box_w } else { ax + self.m("pad") };
+        if hat_icon { tx += ih + 2; }
+        tx
+    }
+    /// Rechtsklick auf einen Knoten waehlt ihn -- wie bei Liste und Tabelle;
+    /// eine Mehrfachauswahl bleibt, wenn der Knoten dazugehoert.
+    fn baum_rechtsklick(&mut self, wi: usize, i: usize) {
+        let (k, behalten) = match self.windows[wi].widgets[i].tree.as_ref() {
+            Some(t) if self.windows[wi].widgets[i].enabled => {
+                let k = t.hover;
+                (k, k >= 0 && t.multi && t.sel.get(k as usize).copied().unwrap_or(false))
+            }
+            _ => return,
+        };
+        if k < 0 || behalten { return; }
+        self.tree_setze_auswahl(wi, i, k);
+    }
+    /// Knoten umbenennen: dieselbe Arbeitskopie wie bei der Liste.
+    fn baum_edit_start(&mut self, wi: usize, i: usize, k: usize) {
+        let t = match self.windows[wi].widgets[i].tree.as_mut() { Some(t) => t, None => return };
+        if k >= t.nodes.len() || t.datei.is_some() { return; }
+        // Nur ein SICHTBARER Knoten laesst sich bearbeiten -- er ist vorher
+        // gewaehlt worden oder wird es jetzt.
+        if !Self::tree_visible(t).contains(&k) { return; }
+        let text: Vec<char> = t.nodes[k].label.chars().collect();
+        let len = text.len() as i32;
+        t.edit = Some(ListEdit { k, text, caret: len, anker: 0 });
+        t.selected = k as i32;
+        self.tree_sichtbar(wi, i);
+    }
+    fn baum_edit_ende(&mut self, wi: usize, i: usize, uebernehmen: bool) {
+        let w = &mut self.windows[wi].widgets[i];
+        let t = match w.tree.as_mut() { Some(t) => t, None => return };
+        let e = match t.edit.take() { Some(e) => e, None => return };
+        if !uebernehmen || e.k >= t.nodes.len() { return; }
+        let neu: String = e.text.iter().collect();
+        if neu == t.nodes[e.k].label { return; }
+        t.nodes[e.k].label = neu;
+        t.bearbeitet = Some(e.k);
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+    /// Wo der Name eines Knotens beginnt: hinter Kaestchen, Einzug, Dreieck
+    /// und Sinnbild -- dieselbe Rechnung wie das Zeichnen.
+    fn baum_text_x(&self, t: &TreeState, ax: i32, k: usize) -> i32 {
+        let level = t.nodes[k].level;
+        let mut x = ax + 4 + self.tree_kast_w(t) + level * self.sk(TREE_INDENT) + self.sk(TREE_TOGGLE_W) + 2;
+        if t.nodes.iter().any(|n| n.icon >= 0) { x += self.sk(TREE_ROW_H) - 4 + 3; }
+        x
+    }
+    fn baum_edit_rect(&self, wi: usize, i: usize) -> Option<(i32, i32, i32, i32)> {
+        let w = &self.windows[wi].widgets[i];
+        let t = w.tree.as_ref()?;
+        let e = t.edit.as_ref()?;
+        let pos = Self::tree_visible(t).iter().position(|&x| x == e.k)? as i32;
+        let (ax, ay, aw, _) = self.abs_rect(wi, w);
+        let rh = self.sk(TREE_ROW_H);
+        let bar = if self.list_bar_geom(wi, i).is_some() { self.sk(8) + 2 } else { 0 };
+        let x0 = self.baum_text_x(t, ax, e.k) - self.sk(3);
+        Some((x0, ay + 1 + pos * rh - t.scroll, (ax + aw - 2 - bar - x0).max(8), rh))
+    }
+    /// Umbenennen-Feld von Liste ODER Baum -- fuer die Stellen, die beides
+    /// gleich behandeln (Klick daneben, Fokus weg).
+    fn edit_rect_any(&self, wi: usize, i: usize) -> Option<(i32, i32, i32, i32)> {
+        self.list_edit_rect(wi, i).or_else(|| self.baum_edit_rect(wi, i))
+    }
+    fn edit_ende_any(&mut self, wi: usize, i: usize, uebernehmen: bool) {
+        self.liste_edit_ende(wi, i, uebernehmen);
+        self.baum_edit_ende(wi, i, uebernehmen);
+    }
+    fn wird_umbenannt(w: &Widget) -> bool {
+        w.list.as_ref().map(|l| l.edit.is_some()).unwrap_or(false)
+            || w.tree.as_ref().map(|t| t.edit.is_some()).unwrap_or(false)
+    }
+    /// Tippen springt (Baum): wie bei der Liste, ueber die SICHTBAREN Knoten.
+    fn baum_tippen(&mut self, wi: usize, i: usize, vis: &[usize], g: &mut Graphics) -> bool {
+        let mut s = g.pop_text_input();
+        s.retain(|c| !c.is_control() && c != ' ');
+        if s.is_empty() && !g.key_ctrl() {
+            for c in (b'a'..=b'z').chain(b'0'..=b'9') {
+                if g.key_pressed(c as i64) { s.push(c as char); }
+            }
+        }
+        if s.is_empty() || vis.is_empty() { return false; }
+        let jetzt = g.get_time();
+        let ziel = {
+            let t = self.windows[wi].widgets[i].tree.as_mut().unwrap();
+            if jetzt - t.tipp_zeit > 1.0 { t.tipp.clear(); }
+            t.tipp_zeit = jetzt;
+            t.tipp.push_str(&s.to_lowercase());
+            let tipp = t.tipp.clone();
+            let erster = tipp.chars().next().unwrap();
+            let wiederholt = tipp.chars().all(|c| c == erster);
+            let such: String = if wiederholt { erster.to_string() } else { tipp };
+            let sel = t.selected;
+            let pos = vis.iter().position(|&k| k as i32 == sel);
+            let start = match pos { Some(p) if wiederholt => p + 1, Some(p) => p, None => 0 };
+            (0..vis.len()).map(|d| vis[(start + d) % vis.len()])
+                .find(|&k| t.nodes[k].label.to_lowercase().starts_with(&such))
+        };
+        if let Some(k) = ziel { self.tree_setze_auswahl(wi, i, k as i32); }
+        true
+    }
+    // --- GUI_TREE_EDIT / EDITED / EDITING / PLACEHOLDER ---
+    pub fn tree_edit(&mut self, h: i64, node: i64) -> Result<(), String> {
+        let f = "GUI_TREE_EDIT";
+        let (wi, idx) = Self::dec_widget(h);
+        let t = self.tree_ref(h, f)?;
+        if t.datei.is_some() { return Err(format!("{}: ein Dateibaum benennt keine Dateien um -- das Programm tut es (RENAME) und der Baum zeigt es", f)); }
+        if node < 0 || node as usize >= t.nodes.len() { return Err(format!("{}: Knoten {} gibt es nicht", f, node)); }
+        if !Self::tree_visible(t).contains(&(node as usize)) { return Err(format!("{}: Knoten {} ist zugeklappt -- erst GUI_TREE_EXPAND auf seine Eltern", f, node)); }
+        self.baum_edit_start(wi, idx, node as usize);
+        Ok(())
+    }
+    pub fn tree_edited(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tree_ref(h, "GUI_TREE_EDITED")?.bearbeitet.map(|k| k as i64).unwrap_or(-1))
+    }
+    pub fn tree_editing(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tree_ref(h, "GUI_TREE_EDITING")?.edit.as_ref().map(|e| e.k as i64).unwrap_or(-1))
+    }
+    pub fn tree_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
+        self.tree_mut(h, "GUI_TREE_PLACEHOLDER")?.leer_text = text;
+        Ok(())
+    }
+    // --- GUI_LISTBOX_EDIT / EDITED / EDITING ---
+    pub fn list_edit(&mut self, h: i64, i: i64) -> Result<(), String> {
+        let (wi, idx) = Self::dec_widget(h);
+        let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_EDIT")?, i, "GUI_LISTBOX_EDIT")?;
+        self.liste_edit_start(wi, idx, p);
+        Ok(())
+    }
+    pub fn list_edited(&self, h: i64) -> Result<i64, String> {
+        let w = self.list_ref(h, "GUI_LISTBOX_EDITED")?;
+        Ok(w.list.as_ref().and_then(|l| l.bearbeitet).map(|k| k as i64).unwrap_or(-1))
+    }
+    pub fn list_editing(&self, h: i64) -> Result<i64, String> {
+        let w = self.list_ref(h, "GUI_LISTBOX_EDITING")?;
+        Ok(w.list.as_ref().and_then(|l| l.edit.as_ref()).map(|e| e.k as i64).unwrap_or(-1))
+    }
+
     /// Welche Datenzeile liegt auf Hoehe `my`? -1 = keine.
     fn liste_zeile(&self, wi: usize, i: usize, my: i32) -> i32 {
         let w = &self.windows[wi].widgets[i];
@@ -5308,6 +5691,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Ok(self.tbl_ref(h, "GUI_TABLE_SORT_DESC")?.sort_desc)
     }
     /// Filter je Spalte setzen (leerer Text = kein Filter).
+    pub fn table_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
+        self.tbl_mut(h, "GUI_TABLE_PLACEHOLDER")?.leer_text = text;
+        Ok(())
+    }
     pub fn table_filter(&mut self, h: i64, col: i64, text: String) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_FILTER")?;
         if col < 0 { return Err("GUI_TABLE_FILTER: Spalte darf nicht negativ sein".into()); }
@@ -5422,8 +5809,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             "kaestchen" | "checkboxes" => { t.kaestchen = wert != 0.0; t.sync(); }
+            "bearbeitbar" | "editable" => { t.bearbeitbar = wert != 0.0; if !t.bearbeitbar { t.edit = None; } }
             _ => return Err(format!(
-                "GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl, kaestchen)", key)),
+                "GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl, kaestchen, bearbeitbar)", key)),
         }
         Ok(())
     }
@@ -6426,9 +6814,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let zeile_h = self.sk(TREE_ROW_H);   // vor dem mut-Zugriff auf den Baum
         let max_scroll = (vis.len() as i32 * zeile_h - (h - 2)).max(0);
         let wheel = Self::rad(g);
-        let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
+        let weich_an = self.m("uebergang") > 0;
+        let w = &mut self.windows[wi].widgets[idx];
+        let t = w.tree.as_mut().unwrap();
         t.scroll = t.scroll.clamp(0, max_scroll);
-        if wheel != 0 { t.scroll = (t.scroll - wheel as i32 * zeile_h).clamp(0, max_scroll); }
+        if wheel != 0 {
+            // Weich wie bei Liste und Tabelle: Radschritte addieren sich aufs Ziel.
+            let basis = w.rad_ziel.unwrap_or(t.scroll as f64);
+            let ziel = (basis as i32 - wheel as i32 * zeile_h).clamp(0, max_scroll);
+            if weich_an { w.rad_ziel = Some(ziel as f64); w.rad_letzt = t.scroll as f64; }
+            else { t.scroll = ziel; }
+        }
         let row = (my - (ay + 1) + t.scroll) / zeile_h;
         t.hover = if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 };
     }
@@ -6464,6 +6860,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let klick_klappt = t.datei.as_ref().map(|d| d.klick_klappt).unwrap_or(false);
         if on_toggle || (has_children && (dbl || klick_klappt)) {
             let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
+            // Ein Doppelklick klappt einen Ast um UND meldet sich -- ein
+            // Programm, das Aeste "oeffnet", soll es erfahren.
+            if dbl && !on_toggle { t.doppel = true; }
             let e = t.nodes[ni].expanded; t.nodes[ni].expanded = !e;
             // Beim Dateibaum entscheidet der WEG, was offen ist -- die Nummern
             // gelten nur bis zum naechsten Neuaufbau, und der kommt sofort.
@@ -6510,6 +6909,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             // Zustand: es steht ein Bild lang und wird dann zurueckgesetzt.
             if dbl {
                 let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
+                t.doppel = true;
                 if let Some(d) = t.datei.as_mut() {
                     if let Some(w) = d.pfade.get(ni).cloned() { d.aktiviert = w; }
                 }
@@ -7284,12 +7684,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let gm = self.table_geom(wi, idx);
         let wheel = Self::rad(g);
         let over = Self::in_rect(mx, my, (gm.body_x, gm.body_y, gm.body_w, gm.body_h));
-        let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
-        t.scroll_y = t.scroll_y.clamp(0, gm.max_scroll_y);
-        t.scroll_x = t.scroll_x.clamp(0, gm.max_scroll_x);
-        if wheel != 0 && over {
-            t.scroll_y = (t.scroll_y - wheel as i32 * gm.row_h).clamp(0, gm.max_scroll_y);
+        let weich_an = self.m("uebergang") > 0;
+        {
+            // Weiches Rollen wie bei der Liste: Radschritte addieren sich aufs
+            // Ziel, `uebergaenge` zieht nach.
+            let w = &mut self.windows[wi].widgets[idx];
+            let t = w.tbl.as_mut().unwrap();
+            t.scroll_y = t.scroll_y.clamp(0, gm.max_scroll_y);
+            t.scroll_x = t.scroll_x.clamp(0, gm.max_scroll_x);
+            if wheel != 0 && over {
+                let basis = w.rad_ziel.unwrap_or(t.scroll_y as f64);
+                let ziel = (basis as i32 - wheel as i32 * gm.row_h).clamp(0, gm.max_scroll_y);
+                if weich_an { w.rad_ziel = Some(ziel as f64); w.rad_letzt = t.scroll_y as f64; }
+                else { t.scroll_y = ziel; }
+            }
         }
+        let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
         if !t.drag_v && !t.drag_h && over {
             let hv = (my - gm.body_y + t.scroll_y) / gm.row_h;
             // Nach aussen ist die Datenzeile gemeint -- eine sortierte Tabelle
@@ -7432,9 +7842,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
             // Doppelklick auf eine bearbeitbare Textzelle -> Bearbeiten.
+            // Sonst ist er "oeffnen" wie bei der Liste: die Zeile wird
+            // gewaehlt, und GUI_DOUBLE_CLICKED meldet es ein Bild lang.
             if self.dbl_click && hc >= 0 {
                 self.table_begin_edit(wi, idx, hr, hc);
-                return;
+                let bearbeitet = self.windows[wi].widgets[idx].tbl.as_ref().map(|t| t.edit_row >= 0).unwrap_or(false);
+                if bearbeitet { return; }
+                self.windows[wi].widgets[idx].tbl.as_mut().unwrap().doppel = true;
             }
             self.table_press = Some((wi, idx, hr));
         }
@@ -7614,6 +8028,51 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Tastatur der Tabelle, wenn nichts bearbeitet wird. Ohne Zellmodus
     /// bewegen Pfeile, Bild und Pos1/Ende die gewaehlte Zeile -- das fehlte
     /// bis Stufe 30 ganz: eine Tabelle mit Fokus nahm keine Taste an.
+    /// Tippen springt (Zeilenmodus): Buchstaben waehlen die naechste Zeile,
+    /// deren Text in der SORTIERspalte so anfaengt -- ohne Sortierung in der
+    /// ersten sichtbaren Spalte. Dieselbe Regel wie bei der Liste: was
+    /// innerhalb einer Sekunde getippt wird, ist ein Wort, dieselbe Taste
+    /// mehrmals laeuft durch alle mit diesem Anfang. TRUE = eine Taste kam an.
+    fn tabelle_tippen(&mut self, wi: usize, i: usize, gm: &TGeom, g: &mut Graphics) -> bool {
+        let mut s = g.pop_text_input();
+        s.retain(|c| !c.is_control() && c != ' ');
+        if s.is_empty() && !g.key_ctrl() {
+            for c in (b'a'..=b'z').chain(b'0'..=b'9') {
+                if g.key_pressed(c as i64) { s.push(c as char); }
+            }
+        }
+        if s.is_empty() || gm.order.is_empty() { return false; }
+        let jetzt = g.get_time();
+        let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
+        if jetzt - t.tipp_zeit > 1.0 { t.tipp.clear(); }
+        t.tipp_zeit = jetzt;
+        t.tipp.push_str(&s.to_lowercase());
+        let tipp = t.tipp.clone();
+        let erster = tipp.chars().next().unwrap();
+        let wiederholt = tipp.chars().all(|c| c == erster);
+        let such: String = if wiederholt { erster.to_string() } else { tipp };
+        let spalte = if t.sort_col >= 0 { t.sort_col as usize } else { gm.order[0] };
+        let n = t.view.len();
+        if n == 0 { return true; }
+        let pos = t.view_of(t.selected);
+        let start = match pos { p if p >= 0 && wiederholt => p as usize + 1, p if p >= 0 => p as usize, _ => 0 };
+        let treffer = (0..n).map(|d| (start + d) % n).find(|&v| {
+            let r = t.view[v];
+            t.cell(r, spalte).map(|c| c.text.to_lowercase().starts_with(&such)).unwrap_or(false)
+        });
+        if let Some(v) = treffer {
+            let r = t.view[v] as i32;
+            if r != t.selected {
+                t.auswahl_setzen(r);
+                t.cur_r = r;
+                self.tabelle_zeigen(wi, i);
+                let f = self.windows[wi].widgets[i].on_change.clone();
+                if let Some(f) = f { self.pending.push(f); }
+            }
+        }
+        true
+    }
+
     fn table_nav_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
         if self.kuerzel_gefeuert { return; }
         let gm = self.table_geom(wi, i);
@@ -7624,6 +8083,28 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
         if !zm {
             if nv == 0 { return; }
+            // Enter "oeffnet" die gewaehlte Zeile -- der Doppelklick der
+            // Tastatur, wie bei der Liste.
+            let gewaehlt = self.windows[wi].widgets[i].tbl.as_ref().map(|t| t.view_of(t.selected) >= 0).unwrap_or(false);
+            if g.key_pressed(KEY_ENTER) && gewaehlt {
+                self.windows[wi].widgets[i].tbl.as_mut().unwrap().doppel = true;
+                return;
+            }
+            // F2 bearbeitet die erste freigegebene Textspalte der gewaehlten
+            // Zeile (in Anzeige-Reihenfolge) -- ohne Doppelklick, ohne Maus.
+            if g.key_pressed(KEY_F2) && gewaehlt {
+                let (r, spalte) = {
+                    let t = self.windows[wi].widgets[i].tbl.as_ref().unwrap();
+                    let r = t.selected;
+                    let c = gm.order.iter().copied().find(|&c| t.col_editable(c)
+                        && t.col_typ_of(c) != 3
+                        && t.cell(r as usize, c).map(|x| x.kind).unwrap_or(CellKind::Text) == CellKind::Text);
+                    (r, c)
+                };
+                if let Some(c) = spalte { self.table_begin_edit(wi, i, r, c as i32); self.tabelle_zeigen(wi, i); }
+                return;
+            }
+            if self.tabelle_tippen(wi, i, &gm, g) { return; }
             let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
             let vi = t.view_of(t.selected);
             let neu = if g.key_repeat(KEY_DOWN) { vi + 1 }
@@ -8086,7 +8567,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let wi = win as usize;
         let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: erwartet GUI_WINDOW", fn_))?;
         let mi = w.menus.len();
-        w.menus.push(Menu { label, in_bar, unter: false, items: Vec::new() });
+        w.menus.push(Menu { label, in_bar, unter: false, items: Vec::new(), auf_t: 0.0, b: Blende::default() });
         Ok(enc_menu(wi, mi))
     }
     /// Top-Level-Menue in der Menueleiste (z.B. "Datei").
@@ -8128,7 +8609,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.menu_mut(menu, "GUI_SUBMENU")?;
         let w = &mut self.windows[wi];
         let smi = w.menus.len();
-        w.menus.push(Menu { label: label.clone(), in_bar: false, unter: true, items: Vec::new() });
+        w.menus.push(Menu { label: label.clone(), in_bar: false, unter: true, items: Vec::new(), auf_t: 0.0, b: Blende::default() });
         let mut it = MenuItem::neu(label, false);
         it.sub = smi as i32;
         w.menus[mi].items.push(it);
@@ -8244,17 +8725,41 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn popup_chain(&self, g: &Graphics) -> Vec<(usize, usize, i32, i32)> {
         let mut out = Vec::new();
         if let Some((wi, mi, cx, cy)) = self.context_open {
-            out.push((wi, mi, cx, cy));
+            // Ein Kontextmenue am Rand weicht aus: ueber der Maus statt
+            // darunter, links von ihr statt rechts -- sonst lief es aus dem
+            // Bild, und die unteren Eintraege waren nicht zu erreichen.
+            let (w, h) = self.popup_size(g, wi, mi);
+            let (sb, sh) = self.schirm();
+            let px = if cx + w > sb && cx - w >= 0 { cx - w } else { cx.min(sb - w).max(0) };
+            let py = if cy + h > sh && cy - h >= 0 { cy - h } else { cy.min(sh - h).max(0) };
+            out.push((wi, mi, px, py));
         } else if let Some((wi, mi)) = self.open_menu {
             let toff = (if self.windows[wi].chrome { self.m("title_h") } else { 0 }) + self.sk(MENUBAR_H);
             if let Some((_, x0, _)) = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi) {
-                out.push((wi, mi, x0, self.windows[wi].y + toff));
+                let (w, _) = self.popup_size(g, wi, mi);
+                let (sb, _) = self.schirm();
+                out.push((wi, mi, x0.min(sb - w).max(0), self.windows[wi].y + toff));
             }
         }
         if let Some(&(wi, _, _, _)) = out.first() {
-            for &(smi, px, py) in &self.sub_chain { out.push((wi, smi, px, py)); }
+            for &(smi, px, py) in &self.sub_chain {
+                // Ein Untermenue, das rechts nicht passt, klappt LINKS vom
+                // Elternmenue auf; unten schiebt es sich hoch.
+                let (w, h) = self.popup_size(g, wi, smi);
+                let (sb, sh) = self.schirm();
+                let eltern_x = out.last().map(|e| e.2).unwrap_or(px);
+                let px = if px + w > sb { (eltern_x - w + 4).max(0) } else { px };
+                let py = py.min(sh - h).max(0);
+                out.push((wi, smi, px, py));
+            }
         }
         out
+    }
+    /// Bildschirmmasse aus dem letzten GUI_UPDATE (vorher: unbegrenzt).
+    fn schirm(&self) -> (i32, i32) {
+        let b = if self.schirm_b > 0 { self.schirm_b } else { i32::MAX / 4 };
+        let h = if self.schirm_h > 0 { self.schirm_h } else { i32::MAX / 4 };
+        (b, h)
     }
 
     /// Untermenues folgen der Maus: ueber einem Eintrag mit Untermenue geht
@@ -8933,7 +9438,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             if let Some(sub) = itj["items"].as_array() {
                 let smi = win.menus.len();
-                win.menus.push(Menu { label: it.label.clone(), in_bar: false, unter: true, items: Vec::new() });
+                win.menus.push(Menu { label: it.label.clone(), in_bar: false, unter: true, items: Vec::new(), auf_t: 0.0, b: Blende::default() });
                 let sub_items = Self::menu_items_aus_json(win, sub);
                 win.menus[smi].items = sub_items;
                 it.sub = smi as i32;
@@ -9351,6 +9856,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let mut lo = serde_json::Map::new();
                 if l.multi { lo.insert("multi".into(), serde_json::json!(true)); }
                 if l.kaestchen { lo.insert("kaestchen".into(), serde_json::json!(true)); }
+                if l.bearbeitbar { lo.insert("bearbeitbar".into(), serde_json::json!(true)); }
                 if l.checks.iter().any(|&c| c) { lo.insert("checked".into(), serde_json::json!(l.checks)); }
                 if l.colors.iter().any(|&c| c >= 0) { lo.insert("colors".into(), serde_json::json!(l.colors)); }
                 if l.multi && l.sel.iter().any(|&x| x) { lo.insert("selected".into(), serde_json::json!(l.sel)); }
@@ -9467,6 +9973,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if t.multi { tj["multi"] = serde_json::json!(true); }
             if t.col_edit.iter().any(|&x| x) { tj["col_edit"] = serde_json::json!(t.col_edit); }
             if t.zellmodus { tj["zellmodus"] = serde_json::json!(true); }
+            if !t.leer_text.is_empty() { tj["leer_text"] = serde_json::json!(t.leer_text); }
             if t.baum {
                 tj["baum"] = serde_json::json!(true);
                 if t.eltern.iter().any(|&e| e >= 0) { tj["eltern"] = serde_json::json!(t.eltern); }
@@ -9493,6 +10000,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 "multi": t.multi,
             });
             if t.kaestchen { o["tree"]["kaestchen"] = serde_json::json!(true); }
+            if t.bearbeitbar { o["tree"]["bearbeitbar"] = serde_json::json!(true); }
+            if !t.leer_text.is_empty() { o["tree"]["leer_text"] = serde_json::json!(t.leer_text); }
             // Ein Dateibaum speichert seine EINSTELLUNGEN, nicht seine Knoten:
             // die stehen auf der Platte, und wer die Datei woanders oeffnet,
             // haette sonst eine Liste von Namen, die es dort nicht gibt.
@@ -9669,6 +10178,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             l.sync(n);
             l.multi = lj.get("multi").and_then(|v| v.as_bool()).unwrap_or(false);
             l.kaestchen = lj.get("kaestchen").and_then(|v| v.as_bool()).unwrap_or(false);
+            l.bearbeitbar = lj.get("bearbeitbar").and_then(|v| v.as_bool()).unwrap_or(false);
             if let Some(a) = lj.get("checked").and_then(|v| v.as_array()) {
                 for (k, v) in a.iter().enumerate().take(n) { l.checks[k] = v.as_bool().unwrap_or(false); }
             }
@@ -9774,6 +10284,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     ts.col_edit = a.iter().map(|x| x.as_bool().unwrap_or(false)).collect();
                 }
                 if let Some(v) = tj["zellmodus"].as_bool() { ts.zellmodus = v; }
+                if let Some(v) = tj["leer_text"].as_str() { ts.leer_text = v.to_string(); }
                 if let Some(v) = tj["baum"].as_bool() { ts.baum = v; }
                 if let Some(a) = tj["eltern"].as_array() { ts.eltern = a.iter().map(|x| x.as_i64().unwrap_or(-1) as i32).collect(); }
                 if let Some(a) = tj["offen"].as_array() { ts.offen = a.iter().map(|x| x.as_bool().unwrap_or(false)).collect(); }
@@ -9825,6 +10336,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 ts.selected = tj["selected"].as_i64().unwrap_or(-1) as i32;
                 ts.multi = tj["multi"].as_bool().unwrap_or(false);
                 ts.kaestchen = tj["kaestchen"].as_bool().unwrap_or(false);
+                ts.bearbeitbar = tj["bearbeitbar"].as_bool().unwrap_or(false);
+                ts.leer_text = tj["leer_text"].as_str().unwrap_or("").to_string();
             }
             if let Some(fj) = wj.get("filetree") {
                 let liste = |k: &str| fj[k].as_array().map(|a| a.iter()
@@ -10030,7 +10543,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 self.windows[wi].menus.push(Menu {
                     label: mj["label"].as_str().unwrap_or("").to_string(),
                     in_bar: mj["in_bar"].as_bool().unwrap_or(true),
-                    unter: false, items: Vec::new(),
+                    unter: false, items: Vec::new(), auf_t: 0.0, b: Blende::default(),
                 });
                 let items = match mj["items"].as_array() {
                     Some(its) => Self::menu_items_aus_json(&mut self.windows[wi], its),
@@ -10595,7 +11108,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// **Hinein geht es nur beim Ueberfahren weich.** Druecken und Fokus
     /// erscheinen SOFORT und blenden nur aus: wer klickt oder mit Tab
     /// weitergeht, will die Antwort in diesem Bild sehen, nicht in dreien.
-    fn uebergaenge(&mut self, dt: f64) {
+    fn uebergaenge(&mut self, g: &Graphics) {
+        // Verliert eine Liste beim Umbenennen den Fokus (Tab, GUI_FOCUS),
+        // gilt das wie ein Klick woanders: uebernehmen.
+        let fokus_jetzt = self.focus_widget;
+        let mut offen_edit = Vec::new();
+        for (wi, win) in self.windows.iter().enumerate() {
+            for (i, wdg) in win.widgets.iter().enumerate() {
+                if Self::wird_umbenannt(wdg) && fokus_jetzt != Some((wi, i)) {
+                    offen_edit.push((wi, i));
+                }
+            }
+        }
+        for (wi, i) in offen_edit { self.edit_ende_any(wi, i, true); }
+        let dt = g.delta();
+        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let dauer = self.m("uebergang").max(0) as f32;
         let schritt = if dauer > 0.0 { (dt as f32 * 1000.0 / dauer).clamp(0.0, 1.0) } else { 1.0 };
         let (druck, fokus) = (self.press_origin, self.focus_widget);
@@ -10603,8 +11130,38 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if self.open_dropdown.is_none() || self.open_dropdown != self.dd_auf_von {
             self.dd_auf_t = 0.0;
             self.dd_auf_von = self.open_dropdown;
+            // Frisch geoeffnet: die Markierung steht auf der Auswahl, und die
+            // Auswahl steht in der MITTE -- man sieht ihre Nachbarn nach oben
+            // und unten, statt sie am Rand zu suchen.
+            if let Some((wi, i)) = self.open_dropdown {
+                self.dd_mark = self.windows[wi].widgets[i].sel;
+                let rows = self.dd_zeilen(wi, i);
+                let n = self.windows[wi].widgets[i].items.len() as i32;
+                self.dd_scroll = (self.dd_mark - rows / 2).clamp(0, (n - rows).max(0));
+            }
         }
         if self.open_dropdown.is_some() { naeher(&mut self.dd_auf_t, 1.0, schritt); }
+        // Welcher Eintrag der offenen Klappliste liegt unter der Maus?
+        let dd_hover: Option<(usize, usize, i32)> = self.open_dropdown.map(|(wi, i)| {
+            let (px, py, pw, ph) = self.dropdown_popup_rect(wi, i);
+            let k = if mx >= px && mx < px + pw && my >= py && my < py + ph {
+                self.dd_scroll + (my - py) / self.sk(DROPDOWN_ITEM_H)
+            } else { -1 };
+            (wi, i, k)
+        });
+        // Offene Menue-Popups (Wurzel und Untermenues) und ihr Eintrag unter
+        // der Maus. Gerechnet vor der Schleife, die die Menues veraendert.
+        let offen: Vec<(usize, usize, i32)> = self.popup_chain(g).into_iter()
+            .map(|(wi, mi, px, py)| (wi, mi, self.popup_item_at(g, wi, mi, px, py, mx, my).map(|k| k as i32).unwrap_or(-1)))
+            .collect();
+        for (wi, win) in self.windows.iter_mut().enumerate() {
+            for (mi, m) in win.menus.iter_mut().enumerate() {
+                match offen.iter().find(|&&(w, i, _)| w == wi && i == mi) {
+                    Some(&(_, _, k)) => { naeher(&mut m.auf_t, 1.0, schritt); m.b.schritt(k, schritt); }
+                    None => { m.auf_t = 0.0; m.b = Blende::default(); }
+                }
+            }
+        }
         for (wi, win) in self.windows.iter_mut().enumerate() {
             for (i, wdg) in win.widgets.iter_mut().enumerate() {
                 naeher(&mut wdg.ueber_t, if wdg.hovered && wdg.enabled { 1.0 } else { 0.0 }, schritt);
@@ -10617,6 +11174,34 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let mut v = wdg.value as f32;
                     naeher(&mut v, ziel, schritt);
                     wdg.value = v as f64;
+                }
+                // Die Zeile unter der Maus, je Art aus ihrer eigenen Quelle.
+                let zeile = match wdg.kind {
+                    Kind::ListBox => wdg.zeile_jetzt,
+                    Kind::Table => wdg.tbl.as_ref().filter(|t| !t.zellmodus).map(|t| t.hover_row).unwrap_or(-1),
+                    Kind::Tree => wdg.tree.as_ref().map(|t| t.hover).unwrap_or(-1),
+                    Kind::Dropdown => match dd_hover { Some((w, j, k)) if w == wi && j == i => k, _ => -1 },
+                    _ => -1,
+                };
+                let zeile = if wdg.enabled { zeile } else { -1 };
+                wdg.zeile_b.schritt(zeile, schritt);
+                // Weiches Rollen: dem Ziel nachziehen, schnell los und
+                // weich aus. Hat jemand anderes gerollt, gibt das Rad nach.
+                if let Some(z) = wdg.rad_ziel {
+                    // Der Rollstand liegt je Art woanders: Liste in `value`,
+                    // Tabelle in `scroll_y` (ganze Punkte -- der Rest wird
+                    // in `rad_letzt` mitgefuehrt, sonst bliebe sie am Ende
+                    // einen Punkt vor dem Ziel stehen).
+                    let ist = match wdg.tbl.as_ref() { Some(t) => t.scroll_y as f64, None => Self::roll_ist(wdg) };
+                    if (ist - wdg.rad_letzt.round()).abs() > 0.5 && (ist - wdg.rad_letzt).abs() > 0.5 {
+                        wdg.rad_ziel = None;
+                    } else {
+                        let k = (schritt as f64 * 3.0).min(1.0);
+                        let mut neu = wdg.rad_letzt + (z - wdg.rad_letzt) * k;
+                        if (z - neu).abs() < 0.5 { neu = z; wdg.rad_ziel = None; }
+                        wdg.rad_letzt = neu;
+                        match wdg.tbl.as_mut() { Some(t) => t.scroll_y = neu.round() as i32, None => Self::roll_setze(wdg, neu) }
+                    }
                 }
                 if let Some(t) = wdg.tree.as_mut() {
                     let n = t.nodes.len();
@@ -10658,14 +11243,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
                 if let Some(l) = wdg.leiste.as_mut() { l.hover = -1; l.geklickt = -1; }
-                if let Some(l) = wdg.list.as_mut() { l.hover = -1; }
+                if let Some(l) = wdg.list.as_mut() { l.hover = -1; l.bearbeitet = None; }
+                wdg.zeile_jetzt = -1;
                 if let Some(s) = wdg.status.as_mut() { s.hover = -1; s.geklickt = -1; }
                 if let Some(p) = wdg.pfad.as_mut() { p.hover = -1; p.geklickt = -1; }
                 wdg.farbfeld_klick = -1; wdg.rand_klick = (0, -1); wdg.abk_treffer = -1; wdg.tab_treffer = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
-                if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
+                if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; t.doppel = false; }
                 if let Some(t) = wdg.tree.as_mut() {
-                    t.hover = -1;
+                    t.hover = -1; t.doppel = false; t.bearbeitet = None;
                     if let Some(d) = t.datei.as_mut() { d.aktiviert.clear(); }
                 }
                 if let Some(r) = wdg.rich.as_mut() { r.geklickt.clear(); }
@@ -10677,6 +11263,24 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         self.drop = None;
+        self.liste_taste = false;
+        self.schirm_h = g.screen_height() as i32;
+        self.schirm_b = g.screen_width() as i32;
+        // Rad ueber der offenen Klappliste rollt SIE -- vor allem anderen, denn
+        // sie liegt ueber allem, und das Rad gibt es nur einmal.
+        if let Some((dw, di)) = self.open_dropdown {
+            if dw < self.windows.len() && di < self.windows[dw].widgets.len() {
+                let (px, py, pw, ph) = self.dropdown_popup_rect(dw, di);
+                if Self::in_rect(mx, my, (px, py, pw, ph)) {
+                    let rad = Self::rad(g);
+                    if rad != 0 {
+                        let n = self.windows[dw].widgets[di].items.len() as i32;
+                        let rows = self.dd_zeilen(dw, di);
+                        self.dd_scroll = (self.dd_scroll - rad as i32).clamp(0, (n - rows).max(0));
+                    }
+                }
+            }
+        }
         self.dateibaeume_auffrischen(g.get_time());
         self.schnitte_laden(g);
         self.rt_pass(g);
@@ -10787,11 +11391,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 };
                 if active && Self::in_rect(mx, my, r) {
                     self.windows[top].widgets[i].hovered = true;
-                    if kind == Kind::Table { self.table_hover(top, i, mx, my, g); }
+                    if kind == Kind::Table {
+                        self.table_hover(top, i, mx, my, g);
+                        if right_just { self.tabelle_rechtsklick(top, i); }
+                    }
                     if kind == Kind::ListBox {
                         self.listbox_wheel(top, i, r.3, g);
-                        let k = self.liste_zeile(top, i, my);
+                        // Ueber dem Rollbalken liegt keine Zeile.
+                        let k = if self.list_bar_at(top, i, mx, my) { -1 } else { self.liste_zeile(top, i, my) };
                         if let Some(l) = self.windows[top].widgets[i].list.as_mut() { l.hover = k; }
+                        self.windows[top].widgets[i].zeile_jetzt = k;
+                        if right_just { self.liste_rechtsklick(top, i, k); }
                     }
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
                     if kind == Kind::TextArea {
@@ -10805,7 +11415,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         }
                     }
                     if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
-                    if kind == Kind::Tree { self.tree_hover(top, i, my, g); }
+                    if kind == Kind::Tree {
+                        self.tree_hover(top, i, my, g);
+                        if self.list_bar_at(top, i, mx, my) {
+                            if let Some(t) = self.windows[top].widgets[i].tree.as_mut() { t.hover = -1; }
+                        }
+                        if right_just { self.baum_rechtsklick(top, i); }
+                    }
                     if kind == Kind::StatusBar {
                         let k = self.sb_treffer(top, i, mx);
                         if let Some(s) = self.windows[top].widgets[i].status.as_mut() { s.hover = k; }
@@ -10981,7 +11597,20 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 self.active_knob = None;
             }
         }
-        self.uebergaenge(g.delta());
+        self.uebergaenge(g);
+        // Rollbalken einer Liste ziehen -- auch wenn die Maus die Rinne
+        // verlaesst, wie bei jedem Rollbalken.
+        if let Some((wi, i, griff)) = self.listbar_zug {
+            if is_down {
+                if let Some((_, ty, _, th, _, thh)) = self.list_bar_geom(wi, i) {
+                    let max = self.list_max_scroll(wi, i);
+                    let rel = ((my - griff - ty) as f64 / (th - thh).max(1) as f64).clamp(0.0, 1.0);
+                    let w = &mut self.windows[wi].widgets[i];
+                    Self::roll_setze(w, (rel * max as f64).round());
+                    w.rad_ziel = None;
+                }
+            } else { self.listbar_zug = None; }
+        }
         // Laufendes Splitter-Drag.
         if let Some((wi, i)) = self.active_split {
             if is_down { self.drag_split(wi, i, mx, my); } else { self.active_split = None; }
@@ -11164,11 +11793,18 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let fok = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i).map(|w| w.kind));
                 let enter_frei = matches!(fok, None | Some(Kind::TextInput));
+                // Beim Umbenennen in einer Liste gehoeren Enter und ESC dem Feld.
+                let liste_edit = self.focus_widget.filter(|(w, _)| *w == top)
+                    .and_then(|(_, i)| self.windows[top].widgets.get(i))
+                    .map(Self::wird_umbenannt)
+                    .unwrap_or(false);
+                let liste_edit = liste_edit || self.liste_taste;
+                let enter_frei = enter_frei && !liste_edit;
                 if enter_frei && g.key_pressed(KEY_ENTER) {
                     let k = self.windows[top].default_btn;
                     self.knopf_ausloesen(top, k);
                 }
-                if g.key_pressed(KEY_ESC) && self.open_dropdown.is_none() {
+                if g.key_pressed(KEY_ESC) && self.open_dropdown.is_none() && !liste_edit {
                     let k = self.windows[top].cancel_btn;
                     self.knopf_ausloesen(top, k);
                 }
@@ -11324,6 +11960,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if let Some(wi) = self.topmost_at(mx, my) {
                 if let Some(mi) = self.windows[wi].menus.iter().position(|m| !m.in_bar && !m.unter) {
                     self.context_open = Some((wi, mi, mx, my));
+                    self.menu_cursor = None;
                     return true;
                 }
             }
@@ -12610,11 +13247,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let wheel = Self::rad(g);
         if wheel == 0 { return; }
         let zeile_h = self.list_zeile_h(&self.windows[wi].widgets[i]);   // vor dem mut-Zugriff
+        let weich_an = self.m("uebergang") > 0;
         let w = &mut self.windows[wi].widgets[i];
         let zeilen = liste_ansicht(&w.items, w.list.as_deref()).len() as i32;
         let max_scroll = (zeilen * zeile_h - h).max(0);
-        let nv = (w.value as i32 - wheel as i32 * zeile_h).clamp(0, max_scroll);
-        w.value = nv as f64;
+        // Mehrere Raeder hintereinander addieren sich auf das ZIEL, nicht
+        // auf den halb gerollten Stand -- sonst verschluckte schnelles Drehen
+        // Zeilen.
+        let basis = w.rad_ziel.unwrap_or(w.value);
+        let nv = (basis as i32 - wheel as i32 * zeile_h).clamp(0, max_scroll) as f64;
+        if weich_an {
+            w.rad_ziel = Some(nv);
+            w.rad_letzt = w.value;
+        } else {
+            w.value = nv;
+        }
     }
 
     /// Mausrad ueber gesetztem Text.
@@ -13022,17 +13669,63 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::Dropdown => {
                 // Zu: Leertaste/Enter/Ab klappt auf. Offen: Pfeile waehlen,
                 // Leertaste/Enter uebernimmt, ESC schliesst.
+                // Offen bewegen Pfeile, Bild auf/ab, Pos1/Ende und Tippen nur die
+                // MARKIERUNG; Enter/Leertaste uebernimmt sie, ESC schliesst ohne
+                // Aenderung -- so wie jede Auswahlliste, und ein Irrtum beim
+                // Blaettern feuert kein on_change.
                 if self.open_dropdown == Some((wi, i)) {
-                    if ausloesen || g.key_pressed(KEY_ESC) { self.open_dropdown = None; }
-                    else {
-                        let d = ab as i32 - auf as i32;
-                        if d != 0 { self.liste_bewegen(wi, i, d); }
+                    if g.key_pressed(KEY_ESC) { self.open_dropdown = None; return; }
+                    if ausloesen {
+                        let k = self.dd_mark;
+                        self.open_dropdown = None;
+                        self.dd_waehle(wi, i, k);
+                        return;
+                    }
+                    let n = self.windows[wi].widgets[i].items.len() as i32;
+                    if n == 0 { return; }
+                    let rows = self.dd_zeilen(wi, i);
+                    let m = self.dd_mark.max(-1);
+                    let neu = if ab { Some(m + 1) }
+                        else if auf { Some(if m < 0 { 0 } else { m - 1 }) }
+                        else if g.key_pressed(KEY_PAGEDOWN) { Some(m + rows) }
+                        else if g.key_pressed(KEY_PAGEUP) { Some(m - rows) }
+                        else if g.key_pressed(KEY_HOME) { Some(0) }
+                        else if g.key_pressed(KEY_END) { Some(n - 1) }
+                        else { None };
+                    if let Some(k) = neu {
+                        self.dd_mark = k.clamp(0, n - 1);
+                        self.dd_mark_zeigen(wi, i);
+                    } else {
+                        self.dd_tippen(wi, i, true, g);
                     }
                 } else if ausloesen || ab {
                     self.open_dropdown = Some((wi, i));
+                } else {
+                    // Zu: Tippen waehlt gleich den passenden Eintrag.
+                    self.dd_tippen(wi, i, false, g);
+                }
+            }
+            Kind::ListBox if self.windows[wi].widgets[i].list.as_ref().map(|l| l.edit.is_some()).unwrap_or(false) => {
+                // Umbenennen: die Tasten gehoeren dem Feld -- dieselbe Routine
+                // wie Textfeld und Tabellenzelle (Markieren, Strg+A/C/V/X).
+                if enter { self.liste_taste = true; self.liste_edit_ende(wi, i, true); return; }
+                if g.key_pressed(KEY_ESC) { self.liste_taste = true; self.liste_edit_ende(wi, i, false); return; }
+                let (ctrl, shift) = (g.key_ctrl(), g.key_shift());
+                let kw = self.kuerzel_gefeuert;
+                if let Some(e) = self.windows[wi].widgets[i].list.as_mut().and_then(|l| l.edit.as_mut()) {
+                    Self::einzeiler_tasten(g, &mut e.text, &mut e.caret, &mut e.anker, ctrl, shift, kw);
                 }
             }
             Kind::ListBox => {
+                // F2 benennt den gewaehlten Eintrag um (wenn die Liste es erlaubt)
+                // -- es sei denn, ein Menue-Kuerzel hat die Taste schon genommen
+                // (die IDE legt F2 auf die Lesezeichen); eine Taste tut EINES.
+                if g.key_pressed(KEY_F2) && !self.kuerzel_gefeuert {
+                    let w = &self.windows[wi].widgets[i];
+                    let k = w.sel;
+                    let darf = w.list.as_ref().map(|l| l.bearbeitbar && k >= 0 && l.waehlbar(k as usize)).unwrap_or(false);
+                    if darf && (k as usize) < w.items.len() { self.liste_edit_start(wi, i, k as usize); return; }
+                }
                 let seite = (self.windows[wi].widgets[i].h / self.list_zeile_h(&self.windows[wi].widgets[i])).max(1) - 1;
                 let mut d = ab as i32 - auf as i32;
                 if g.key_pressed(KEY_PAGEDOWN) { d += seite.max(1); }
@@ -13173,6 +13866,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     }
                 }
             }
+            Kind::Tree if self.windows[wi].widgets[i].tree.as_ref().map(|t| t.edit.is_some()).unwrap_or(false) => {
+                if enter { self.liste_taste = true; self.baum_edit_ende(wi, i, true); return; }
+                if g.key_pressed(KEY_ESC) { self.liste_taste = true; self.baum_edit_ende(wi, i, false); return; }
+                let (ctrl, shift) = (g.key_ctrl(), g.key_shift());
+                let kw = self.kuerzel_gefeuert;
+                if let Some(e) = self.windows[wi].widgets[i].tree.as_mut().and_then(|t| t.edit.as_mut()) {
+                    Self::einzeiler_tasten(g, &mut e.text, &mut e.caret, &mut e.anker, ctrl, shift, kw);
+                }
+            }
             Kind::Tree => {
                 let (vis, sel, hat_kinder, offen, eltern) = {
                     let t = match self.windows[wi].widgets[i].tree.as_ref() {
@@ -13187,6 +13889,26 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 };
                 if vis.is_empty() { return; }
                 let pos = vis.iter().position(|&n| n as i32 == sel);
+                // F2 benennt um (wenn der Baum es erlaubt und kein Menue-Kuerzel
+                // die Taste schon genommen hat).
+                if g.key_pressed(KEY_F2) && !self.kuerzel_gefeuert && sel >= 0 {
+                    let darf = self.windows[wi].widgets[i].tree.as_ref().map(|t| t.bearbeitbar && t.datei.is_none()).unwrap_or(false);
+                    if darf { self.baum_edit_start(wi, i, sel as usize); return; }
+                }
+                // Pos1/Ende und Bild auf/ab -- wie bei Liste und Tabelle.
+                let seite = (self.windows[wi].widgets[i].h / self.sk(TREE_ROW_H)).max(2) - 1;
+                let p0 = pos.map(|p| p as i32).unwrap_or(0);
+                let spring = if g.key_pressed(KEY_HOME) { Some(0) }
+                    else if g.key_pressed(KEY_END) { Some(vis.len() as i32 - 1) }
+                    else if g.key_pressed(KEY_PAGEDOWN) { Some(p0 + seite) }
+                    else if g.key_pressed(KEY_PAGEUP) { Some(p0 - seite) }
+                    else { None };
+                if let Some(p) = spring {
+                    let p = p.clamp(0, vis.len() as i32 - 1) as usize;
+                    self.tree_setze_auswahl(wi, i, vis[p] as i32);
+                    return;
+                }
+                if self.baum_tippen(wi, i, &vis, g) { return; }
                 let mut ziel: Option<i32> = None;
                 let d = ab as i32 - auf as i32;
                 if d != 0 {
@@ -13217,8 +13939,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 } else if ausloesen && hat_kinder {
                     self.tree_setze_offen(wi, i, sel, !offen);
                 } else if enter && sel >= 0 {
-                    // Enter auf einer Datei ist das Oeffnen (GUI_FILETREE_ACTIVATED$).
+                    // Enter auf einer Datei ist das Oeffnen (GUI_FILETREE_ACTIVATED$),
+                    // auf einem Blatt der Doppelklick der Tastatur (GUI_DOUBLE_CLICKED).
                     if let Some(t) = self.windows[wi].widgets[i].tree.as_mut() {
+                        t.doppel = true;
                         if let Some(d) = t.datei.as_mut() {
                             if let Some(w) = d.pfade.get(sel as usize).cloned() { d.aktiviert = w; }
                         }
@@ -13254,10 +13978,80 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
     }
 
+    /// Das Popup einer Klappliste: hoechstens DD_MAX_ZEILEN Eintraege, unter
+    /// der Box -- oder darueber, wenn unten kein Platz ist und oben mehr. EINE
+    /// Quelle fuer Zeichnen, Klick, Maus-Zeile und Rollen.
     fn dropdown_popup_rect(&self, wi: usize, idx: usize) -> (i32, i32, i32, i32) {
         let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
         let n = self.windows[wi].widgets[idx].items.len() as i32;
-        (ax, ay + h, w, n * self.sk(DROPDOWN_ITEM_H))
+        let ih = self.sk(DROPDOWN_ITEM_H);
+        let rows = n.min(DD_MAX_ZEILEN).max(1);
+        let schirm = if self.schirm_h > 0 { self.schirm_h } else { i32::MAX / 4 };
+        let (unten, oben) = (schirm - (ay + h), ay);
+        if rows * ih > unten && oben > unten {
+            let r = rows.min((oben / ih).max(1));
+            (ax, ay - r * ih, w, r * ih)
+        } else {
+            let r = rows.min((unten / ih).max(1));
+            (ax, ay + h, w, r * ih)
+        }
+    }
+    /// Wie viele Zeilen das Popup zeigt.
+    fn dd_zeilen(&self, wi: usize, idx: usize) -> i32 {
+        (self.dropdown_popup_rect(wi, idx).3 / self.sk(DROPDOWN_ITEM_H)).max(1)
+    }
+    /// Die Markierung ins Bild rollen.
+    fn dd_mark_zeigen(&mut self, wi: usize, idx: usize) {
+        let rows = self.dd_zeilen(wi, idx);
+        let n = self.windows[wi].widgets[idx].items.len() as i32;
+        if self.dd_mark < self.dd_scroll { self.dd_scroll = self.dd_mark; }
+        if self.dd_mark >= self.dd_scroll + rows { self.dd_scroll = self.dd_mark - rows + 1; }
+        self.dd_scroll = self.dd_scroll.clamp(0, (n - rows).max(0));
+    }
+    /// Uebernehmen: den Eintrag waehlen (mit on_change, wenn es ein anderer ist).
+    fn dd_waehle(&mut self, wi: usize, idx: usize, k: i32) {
+        let w = &mut self.windows[wi].widgets[idx];
+        if k < 0 || k as usize >= w.items.len() || w.sel == k { return; }
+        w.sel = k;
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+    /// Tippen springt: der naechste Eintrag, der so anfaengt -- dieselbe Regel
+    /// wie bei der Liste. Offen bewegt es die Markierung, zu waehlt es gleich.
+    fn dd_tippen(&mut self, wi: usize, idx: usize, offen: bool, g: &mut Graphics) -> bool {
+        let mut s = g.pop_text_input();
+        s.retain(|c| !c.is_control() && c != ' ');
+        if s.is_empty() && !g.key_ctrl() {
+            for c in (b'a'..=b'z').chain(b'0'..=b'9') {
+                if g.key_pressed(c as i64) { s.push(c as char); }
+            }
+        }
+        if s.is_empty() { return false; }
+        let jetzt = g.get_time();
+        if jetzt - self.dd_tipp_zeit > 1.0 { self.dd_tipp.clear(); }
+        self.dd_tipp_zeit = jetzt;
+        self.dd_tipp.push_str(&s.to_lowercase());
+        let tipp = self.dd_tipp.clone();
+        let erster = tipp.chars().next().unwrap();
+        let wiederholt = tipp.chars().all(|c| c == erster);
+        let such: String = if wiederholt { erster.to_string() } else { tipp };
+        let items = &self.windows[wi].widgets[idx].items;
+        let n = items.len();
+        if n == 0 { return true; }
+        let von = if offen { self.dd_mark } else { self.windows[wi].widgets[idx].sel };
+        let start = if von >= 0 { if wiederholt { von as usize + 1 } else { von as usize } } else { 0 };
+        let treffer = (0..n).map(|d| (start + d) % n).find(|&k| items[k].to_lowercase().starts_with(&such));
+        if let Some(k) = treffer {
+            if offen { self.dd_mark = k as i32; self.dd_mark_zeigen(wi, idx); }
+            else { self.dd_waehle(wi, idx, k as i32); }
+        }
+        true
+    }
+    pub fn dropdown_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_DROPDOWN_PLACEHOLDER")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_PLACEHOLDER: Widget ist keine Klappliste (GUI_DROPDOWN)".into()); }
+        w.placeholder = text;
+        Ok(())
     }
 
     fn handle_press(&mut self, mx: i32, my: i32) {
@@ -13316,8 +14110,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let (px, py, pw, ph) = self.dropdown_popup_rect(dw, di);
                 let (bx, by, bw, bh) = self.abs_rect(dw, &self.windows[dw].widgets[di]);
                 if Self::in_rect(mx, my, (px, py, pw, ph)) {
-                    let item = (my - py) / self.sk(DROPDOWN_ITEM_H);
                     let n = self.windows[dw].widgets[di].items.len() as i32;
+                    let rows = ph / self.sk(DROPDOWN_ITEM_H).max(1);
+                    // Klick in den Rollbalken: rollen, nicht waehlen -- und offen bleiben.
+                    let bw = self.sk(8);
+                    if n > rows && mx >= px + pw - 1 - bw {
+                        let rel = ((my - py) as f64 / ph.max(1) as f64).clamp(0.0, 1.0);
+                        self.dd_scroll = ((rel * n as f64) as i32 - rows / 2).clamp(0, (n - rows).max(0));
+                        return;
+                    }
+                    let item = self.dd_scroll + (my - py) / self.sk(DROPDOWN_ITEM_H);
                     if item >= 0 && item < n {
                         let changed = self.windows[dw].widgets[di].sel != item;
                         self.windows[dw].widgets[di].sel = item;
@@ -13384,8 +14186,33 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             return;
         }
-        // Rollbalken eines Panels: ein Klick springt an die Stelle.
+        // Ein Klick neben das Umbenennen-Feld einer Liste uebernimmt es --
+        // wie bei der Tabellenzelle. Ein Klick hinein laesst es offen.
         let n = self.windows[win].widgets.len();
+        for i in 0..n {
+            if let Some(r) = self.edit_rect_any(win, i) {
+                if !Self::in_rect(mx, my, r) { self.edit_ende_any(win, i, true); } else { return; }
+            }
+        }
+        // Rollbalken einer Liste: auf dem Griff ziehen, in der Rinne springt
+        // der Griff unter die Maus (und laesst sich gleich weiterziehen).
+        for i in 0..n {
+            if let Some((tx, ty, bw, th, thy, thh)) = self.list_bar_geom(win, i) {
+                if Self::in_rect(mx, my, (tx, ty, bw, th)) {
+                    let griff = if my >= thy && my < thy + thh { my - thy } else {
+                        let max = self.list_max_scroll(win, i);
+                        let rel = ((my - ty - thh / 2) as f64 / (th - thh).max(1) as f64).clamp(0.0, 1.0);
+                        let w = &mut self.windows[win].widgets[i];
+                        Self::roll_setze(w, (rel * max as f64).round());
+                        w.rad_ziel = None;
+                        thh / 2
+                    };
+                    self.listbar_zug = Some((win, i, griff));
+                    return;
+                }
+            }
+        }
+        // Rollbalken eines Panels: ein Klick springt an die Stelle.
         for i in 0..n {
             if let Some((tx, ty, bw, th, _thy, thh)) = self.panel_bar_geom(win, i) {
                 if Self::in_rect(mx, my, (tx, ty, bw, th)) {
@@ -14265,10 +15092,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Tooltip (GUI_DRAW_TOP).
     pub fn draw_top(&self, g: &mut Graphics) {
         // Kontextmenue ueber ALLEM (nach allen Fenstern).
-        if let Some((wi, mi, cx, cy)) = self.context_open {
+        // Die Lagen kommen aus `popup_chain` -- derselben Quelle wie der
+        // Treffertest, dort weicht ein Popup am Bildschirmrand aus.
+        if let Some((wi, _, _, _)) = self.context_open {
             if self.windows.get(wi).map(|w| w.alive).unwrap_or(false) {
-                self.draw_items_popup(g, wi, mi, cx, cy);
-                for &(smi, spx, spy) in &self.sub_chain { self.draw_items_popup(g, wi, smi, spx, spy); }
+                for (pw, pm, px, py) in self.popup_chain(g) { self.draw_items_popup(g, pw, pm, px, py); }
             }
         }
         // Laufender Zug: die Ablage darunter bekommt einen Rahmen, der Text
@@ -14449,6 +15277,26 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Ok(())
     }
 
+    /// Das tiefste offene Popup, Leisten- ODER Kontextmenue: dort gelten die
+    /// Tasten. Bis 2026-09-23 kannte die Tastatur nur Leistenmenues -- ein
+    /// Kontextmenue liess sich nur mit der Maus bedienen.
+    fn tiefstes_popup(&self) -> Option<(usize, usize)> {
+        if let Some((wi, mi, _, _)) = self.context_open {
+            return Some((wi, self.sub_chain.last().map(|s| s.0).unwrap_or(mi)));
+        }
+        self.tiefstes_menue()
+    }
+    /// Alle Popups schliessen (Leiste, Kontext, Untermenues).
+    fn menues_zu(&mut self) {
+        self.open_menu = None; self.context_open = None; self.sub_chain.clear(); self.menu_cursor = None;
+    }
+    /// Einen Eintrag per Tastatur ausloesen: Untermenue oeffnen oder feuern.
+    fn menue_ausloesen(&mut self, g: &Graphics, wi: usize, mi: usize, ii: usize) {
+        let sub = self.windows[wi].menus[mi].items.get(ii).map_or(false, |it| it.sub >= 0);
+        if sub { self.untermenue_per_taste(g, ii); return; }
+        self.menues_zu();
+        self.fire_menu_item(wi, mi, ii);
+    }
     /// Das tiefste offene Leistenmenue: (Fenster, Menue) -- das letzte
     /// Untermenue der Kette oder das Wurzelmenue.
     fn tiefstes_menue(&self) -> Option<(usize, usize)> {
@@ -14514,7 +15362,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Tasten fuers Leistenmenue. Liefert true, wenn die Tasten dem Menue
     /// gehoeren (es ist offen oder wurde eben geoeffnet) -- dann bekommen
     /// die Widgets sie nicht.
-    fn menue_tasten(&mut self, g: &Graphics) -> bool {
+    fn menue_tasten(&mut self, g: &mut Graphics) -> bool {
         // Alt allein: gedrueckt merken, jede andere Taste loescht, das
         // Loslassen oeffnet. F10 oeffnet sofort.
         const K_LALT: i64 = 1073742050;
@@ -14526,55 +15374,82 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let alt_los = !alt && self.alt_allein && (g.key_released_edge(K_LALT) || g.key_released_edge(K_RALT));
         if !alt { self.alt_allein = false; }
         let oeffnen = g.key_pressed(K_F10) || alt_los;
-        if self.open_menu.is_none() || self.context_open.is_some() {
-            if oeffnen && self.context_open.is_none() {
+        let kontext = self.context_open.is_some();
+        if self.open_menu.is_none() && !kontext {
+            if oeffnen {
                 self.menue_oeffnen_per_taste();
                 return self.open_menu.is_some();
             }
             return false;
         }
         if oeffnen {   // F10/Alt bei offenem Menue: schliessen
-            self.open_menu = None; self.sub_chain.clear(); self.menu_cursor = None;
+            self.menues_zu();
             return true;
         }
-        let (wi, mi) = match self.tiefstes_menue() { Some(x) => x, None => return false };
+        let (wi, mi) = match self.tiefstes_popup() { Some(x) => x, None => return false };
         let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
         let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
         let waehlen = g.key_pressed(KEY_ENTER) || g.key_pressed(KEY_SPACE);
         if ab { self.menu_cursor = self.menue_schritt(wi, mi, self.menu_cursor, 1); }
         if auf { self.menu_cursor = self.menue_schritt(wi, mi, self.menu_cursor, -1); }
+        // Pos1/Ende: erster und letzter bedienbarer Eintrag -- wie in der Liste.
+        if g.key_pressed(KEY_HOME) { self.menu_cursor = self.menue_schritt(wi, mi, None, 1); }
+        if g.key_pressed(KEY_END) { self.menu_cursor = self.menue_schritt(wi, mi, None, -1); }
         let hat_sub = |gui: &Gui, ii: usize| gui.windows[wi].menus[mi].items.get(ii).map_or(false, |it| it.sub >= 0);
         if rechts {
             match self.menu_cursor {
                 Some(ii) if hat_sub(self, ii) => self.untermenue_per_taste(g, ii),
-                _ => self.menue_seitwaerts(1),
+                // Seitwaerts zum naechsten Leistenmenue -- ein Kontextmenue hat keine Nachbarn.
+                _ => if !kontext { self.menue_seitwaerts(1) },
             }
         }
         if links {
             if let Some((sub, _, _)) = self.sub_chain.pop() {
                 // Zurueck auf den Eintrag, dessen Untermenue das war.
-                let (_, eltern) = self.tiefstes_menue().unwrap_or((wi, mi));
+                let (_, eltern) = self.tiefstes_popup().unwrap_or((wi, mi));
                 self.menu_cursor = self.windows[wi].menus[eltern].items.iter().position(|it| it.sub == sub as i32);
-            } else {
+            } else if !kontext {
                 self.menue_seitwaerts(-1);
             }
         }
         if waehlen {
             match self.menu_cursor {
-                Some(ii) if hat_sub(self, ii) => self.untermenue_per_taste(g, ii),
-                Some(ii) => {
-                    self.open_menu = None; self.sub_chain.clear(); self.menu_cursor = None;
-                    self.fire_menu_item(wi, mi, ii);
-                }
+                Some(ii) => self.menue_ausloesen(g, wi, mi, ii),
                 None => { self.menu_cursor = self.menue_schritt(wi, mi, None, 1); }
             }
         }
         if g.key_pressed(KEY_ESC) {
             if let Some((sub, _, _)) = self.sub_chain.pop() {
-                let (_, eltern) = self.tiefstes_menue().unwrap_or((wi, mi));
+                let (_, eltern) = self.tiefstes_popup().unwrap_or((wi, mi));
                 self.menu_cursor = self.windows[wi].menus[eltern].items.iter().position(|it| it.sub == sub as i32);
             } else {
-                self.open_menu = None; self.menu_cursor = None;
+                self.menues_zu();
+            }
+        }
+        // Tippen springt: der Anfangsbuchstabe markiert den naechsten Eintrag,
+        // der so anfaengt; ist er EINDEUTIG, wird der Eintrag gleich
+        // ausgeloest -- so kennt man es aus jedem Menue ohne Unterstreichung.
+        if !g.key_ctrl() && !g.key_alt() && (self.open_menu.is_some() || self.context_open.is_some()) {
+            let mut s = g.pop_text_input();
+            s.retain(|c| !c.is_control() && c != ' ');
+            if s.is_empty() {
+                for c in (b'a'..=b'z').chain(b'0'..=b'9') {
+                    if g.key_pressed(c as i64) { s.push(c as char); }
+                }
+            }
+            if let Some(c) = s.to_lowercase().chars().next() {
+                let (wi, mi) = self.tiefstes_popup().unwrap_or((wi, mi));
+                let treffer: Vec<usize> = self.windows[wi].menus[mi].items.iter().enumerate()
+                    .filter(|(_, it)| !it.separator && it.enabled && it.label.to_lowercase().starts_with(c))
+                    .map(|(k, _)| k).collect();
+                if treffer.len() == 1 {
+                    self.menu_cursor = Some(treffer[0]);
+                    self.menue_ausloesen(g, wi, mi, treffer[0]);
+                } else if !treffer.is_empty() {
+                    let ab_hier = self.menu_cursor.map(|k| k as i32).unwrap_or(-1);
+                    let naechster = treffer.iter().copied().find(|&k| k as i32 > ab_hier).unwrap_or(treffer[0]);
+                    self.menu_cursor = Some(naechster);
+                }
             }
         }
         true
@@ -15445,30 +16320,39 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let pad = self.m("pad");
         let (wmax, links, _wk) = self.popup_layout(g, wi, mi);
         let ih = self.sk(MENU_ITEM_H);
-        let h = m.items.len() as i32 * ih + 4;
+        let h_voll = m.items.len() as i32 * ih + 4;
+        // Aufrollen wie die Klappliste: von oben herab, dabei einblenden.
+        // Die Eintraege stehen schon an ihrer Stelle, zu sehen ist der obere
+        // Teil. Ohne Uebergang (0) steht es sofort ganz da.
+        let t = if self.m("uebergang") > 0 { weich(m.auf_t) } else { 1.0 };
+        let h = ((h_voll as f64 * t).round() as i32).max(1);
         let rad = self.m("corner_radius").min(6);
+        g.push_clip(px, py, wmax + 8, h + 8);
         // Schatten + Hintergrund + Rahmen.
-        g.round_rect(px + 3, py + 4, px + wmax - 1 + 3, py + h - 1 + 4, rad.max(2), (0x44i64 << 24) as i64, true);
-        g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, self.th("widget_bg"), true);
+        let schatten = ((0x44 as f64) * t).round().max(1.0) as i64;
+        g.round_rect(px + 3, py + 4, px + wmax - 1 + 3, py + h - 1 + 4, rad.max(2), schatten << 24, true);
+        g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, deckkraft(self.th("widget_bg"), 0.35 + 0.65 * t), true);
         g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, self.th("win_border"), false);
-        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+        g.push_clip(px, py, wmax, h);
         // Der Eintrag, dessen Untermenue offen ist, bleibt hervorgehoben --
         // sonst verliert man beim Hinueberfahren den Faden.
         let offen_sub: Option<i32> = self.sub_chain.iter()
             .find(|(smi, _, _)| m.items.iter().any(|it| it.sub == *smi as i32))
             .map(|(smi, _, _)| *smi as i32);
         // Der Tastatur-Cursor gilt nur im TIEFSTEN offenen Leistenmenue.
-        let cursor_hier = self.menu_cursor.filter(|_| self.context_open.is_none() && self.tiefstes_menue() == Some((wi, mi)));
+        let cursor_hier = self.menu_cursor.filter(|_| self.tiefstes_popup() == Some((wi, mi)));
         for (ii, it) in m.items.iter().enumerate() {
             let iy = py + 2 + ii as i32 * ih;
             if it.separator {
                 g.line(px + 6, iy + ih / 2, px + wmax - 7, iy + ih / 2, self.th("win_border"));
                 continue;
             }
-            let hov = it.enabled && mx >= px && mx < px + wmax && my >= iy && my < iy + ih;
+            // Die Maus blendet weich; Tastatur-Cursor und offenes
+            // Untermenue stehen sofort ganz da.
             let per_taste = cursor_hier == Some(ii);
-            let aktiv = hov || per_taste || (it.sub >= 0 && offen_sub == Some(it.sub));
-            if aktiv { g.box_fill(px + 2, iy, px + wmax - 3, iy + ih - 1, self.th("title_bg_focus")); }
+            let fest = per_taste || (it.sub >= 0 && offen_sub == Some(it.sub));
+            let a = if fest { 1.0 } else if it.enabled { m.b.anteil(ii as i32) } else { 0.0 };
+            if a > 0.0 { g.box_fill(px + 2, iy, px + wmax - 3, iy + ih - 1, deckkraft(self.th("title_bg_focus"), a)); }
             let fg = if it.enabled { self.th("text_fg") } else { self.th("muted_fg") };
             let th14 = self.ctext_height(g);
             let ty = iy + (ih - th14) / 2;
@@ -15501,6 +16385,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 for d in 0..4 { g.line(ax + d, ay - 4 + d, ax + d, ay + 4 - d, fg); }
             }
         }
+        g.pop_clip();
+        g.pop_clip();
     }
 
     fn draw_window(&self, g: &mut Graphics, wi: usize) {
@@ -15634,11 +16520,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Aufgeklapptes Menueleisten-Dropdown ueber den Widgets.
         if let Some((mw, mi)) = self.open_menu {
             if mw == wi {
-                let slot = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi);
-                if let Some((_, x0, _)) = slot {
-                    self.draw_items_popup(g, wi, mi, x0, y + toff + mboff);
-                    for &(smi, spx, spy) in &self.sub_chain { self.draw_items_popup(g, wi, smi, spx, spy); }
-                }
+                let _ = (mi, y, toff, mboff);
+                for (pw, pm, px, py) in self.popup_chain(g) { self.draw_items_popup(g, pw, pm, px, py); }
             }
         }
         // Aufgeklapptes Dropdown-Popup ueber allen Widgets dieses Fensters.
@@ -16432,10 +17315,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let b = mischen(bg, shade(bg, 18), weich(wdg.ueber_t));
                 self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, b, self.wcol(wdg, "border", "widget_border"));
                 let fg = self.txt_col(wdg);
-                let txt = if wdg.sel >= 0 && (wdg.sel as usize) < wdg.items.len() {
-                    wdg.items[wdg.sel as usize].clone()
-                } else { String::new() };
-                self.wtext(g, wdg, ax + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, txt, fg);
+                let gewaehlt = wdg.sel >= 0 && (wdg.sel as usize) < wdg.items.len();
+                // Nichts gewaehlt: der Platzhalter, gedaempft ("Bitte waehlen").
+                let (txt, farbe) = if gewaehlt { (wdg.items[wdg.sel as usize].clone(), fg) }
+                                   else { (wdg.placeholder.clone(), self.leise(bg)) };
+                self.wtext(g, wdg, ax + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, txt, farbe);
                 let (axr, cy) = (ax + w - 14, ay + h / 2);   // ▼
                 g.line(axr, cy - 2, axr + 4, cy + 2, fg);
                 g.line(axr + 4, cy + 2, axr + 8, cy - 2, fg);
@@ -16447,13 +17331,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let acc = self.acc_col(wdg);
                 let muted = self.leise(self.wcol(wdg, "bg", "widget_bg"));
                 let scroll = wdg.value as i32;
-                let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
                 let ih = self.list_zeile_h(wdg);
                 let box_w = self.list_box_w(wdg);
                 let l = wdg.list.as_deref();
                 let hat_icon = l.map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
                 let icon_w = if hat_icon { ih } else { 0 };
                 let ansicht = liste_ansicht(&wdg.items, l);
+                // Mit Rollbalken enden die Zeilen vor ihm -- sonst laege der
+                // Zusatztext rechts unter dem Griff.
+                let bar = self.list_bar_geom(wi, idx);
+                let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+                let wz = if bar.is_some() { w - self.sk(8) - 2 } else { w };
                 g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
                 if ansicht.is_empty() {
                     // Leer ist eine Aussage: "keine Treffer" statt einer Flaeche,
@@ -16485,9 +17373,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         _ => k as i32 == wdg.sel,
                     };
                     if gewaehlt {
-                        g.box_fill(ax + 1, iy, ax + w - 2, iy + ih - 1, shade(acc, -110));
-                    } else if wdg.enabled && !aus && mx >= ax && mx < ax + w && my >= iy && my < iy + ih {
-                        g.box_fill(ax + 1, iy, ax + w - 2, iy + ih - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 22));
+                        g.box_fill(ax + 1, iy, ax + wz - 2, iy + ih - 1, shade(acc, -110));
+                    } else if !aus && wdg.zeile_b.anteil(k as i32) > 0.0 {
+                        let a = wdg.zeile_b.anteil(k as i32);
+                        g.box_fill(ax + 1, iy, ax + wz - 2, iy + ih - 1, deckkraft(shade(self.wcol(wdg, "bg", "widget_bg"), 22), a));
                     }
                     let mut tx = ax + pad;
                     if box_w > 0 {
@@ -16519,11 +17408,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let rechts = match detail {
                         Some(d) => {
                             let dw = self.wtext_width(g, wdg, d);
-                            let dx = ax + w - pad - dw;
+                            let dx = ax + wz - pad - dw;
                             self.wtext(g, wdg, dx, ty, d.clone(), if gewaehlt { mischen(fg, muted, 0.4) } else { muted });
                             dx - self.sk(10)
                         }
-                        None => ax + w - 2,
+                        None => ax + wz - 2,
                     };
                     g.push_clip(tx, iy, (rechts - tx).max(0), ih);
                     let spans = l.and_then(|l| l.spans.get(k)).filter(|s| !s.is_empty());
@@ -16556,6 +17445,40 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         }
                         _ => self.wtext(g, wdg, tx, ty, it.clone(), farbe),
                     }
+                    g.pop_clip();
+                }
+                // Rollbalken: Rinne und Griff, der Griff hebt sich unter der
+                // Maus und beim Ziehen -- er ist ein Bedienelement, kein Zierrat.
+                if let Some((tx, ty, bw, th, thy, thh)) = bar {
+                    let grund = self.wcol(wdg, "bg", "widget_bg");
+                    g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(grund, -10));
+                    let aktiv = self.listbar_zug.map(|(a, b, _)| (a, b) == (wi, idx)).unwrap_or(false)
+                        || (mx >= tx && mx < tx + bw && my >= thy && my < thy + thh);
+                    let gc = if aktiv { mischen(self.wcol(wdg, "border", "widget_border"), acc, 0.5) }
+                             else { self.wcol(wdg, "border", "widget_border") };
+                    g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 3, gc, true);
+                }
+                // Umbenennen: ein Eingabefeld ueber der Zeile, mit Auswahl und
+                // Schreibmarke -- gezeichnet wie ein Textfeld mit Fokus.
+                if let (Some(e), Some((ex, ey, ew, eh))) = (l.and_then(|l| l.edit.as_ref()), self.list_edit_rect(wi, idx)) {
+                    let bg = shade(self.wcol(wdg, "bg", "widget_bg"), 12);
+                    g.box_fill(ex, ey, ex + ew - 1, ey + eh - 1, bg);
+                    g.rect(ex, ey, ex + ew - 1, ey + eh - 1, acc);
+                    let text: String = e.text.iter().collect();
+                    let tx = self.list_text_x(wdg, ax);
+                    let ty = ey + (eh - self.wsize(g, wdg)).max(0) / 2;
+                    let x_bei = |g: &mut Graphics, n: i32| -> i32 {
+                        let vor: String = e.text.iter().take(n.max(0) as usize).collect();
+                        tx + self.wtext_width(g, wdg, &vor)
+                    };
+                    let (xa, xb) = (x_bei(g, e.anker.min(e.caret)), x_bei(g, e.anker.max(e.caret)));
+                    let cx = x_bei(g, e.caret);
+                    g.push_clip(ex + 1, ey + 1, (ew - 2).max(0), (eh - 2).max(0));
+                    if e.anker != e.caret {
+                        g.box_fill(xa, ey + 3, xb, ey + eh - 4, deckkraft(acc, 0.45));
+                    }
+                    self.wtext(g, wdg, tx, ty, text, fg);
+                    g.line(cx, ey + 4, cx, ey + eh - 5, fg);
                     g.pop_clip();
                 }
                 g.pop_clip();
@@ -17167,7 +18090,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let scroll = t.scroll;
         let hat_icon = t.nodes.iter().any(|n| n.icon >= 0);
         let isz = self.sk(TREE_ROW_H) - 4;
+        // Mit Rollbalken enden die Zeilen vor ihm.
+        let bar = self.list_bar_geom(wi, idx);
+        let wz = if bar.is_some() { w - self.sk(8) - 2 } else { w };
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
+        if zeilen.is_empty() && !t.leer_text.is_empty() {
+            let tw = self.wtext_width(g, wdg, &t.leer_text);
+            let muted = self.leise(self.wcol(wdg, "bg", "widget_bg"));
+            self.wtext(g, wdg, ax + ((w - tw) / 2).max(self.sk(6)), ay + self.sk(10), t.leer_text.clone(), muted);
+        }
         let rh = self.sk(TREE_ROW_H);
         let mut summe = 0.0f64;
         for &(ni, anteil) in &zeilen {
@@ -17184,9 +18115,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let markiert = if t.multi { t.sel.get(ni).copied().unwrap_or(false) }
                            else { ni as i32 == t.selected };
             if markiert {
-                g.box_fill(ax + 1, ry, ax + w - 2, ry + self.sk(TREE_ROW_H) - 1, shade(acc, -110));
-            } else if ni as i32 == t.hover {
-                g.box_fill(ax + 1, ry, ax + w - 2, ry + self.sk(TREE_ROW_H) - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 18));
+                g.box_fill(ax + 1, ry, ax + wz - 2, ry + self.sk(TREE_ROW_H) - 1, shade(acc, -110));
+            } else if wdg.zeile_b.anteil(ni as i32) > 0.0 {
+                let a = wdg.zeile_b.anteil(ni as i32);
+                g.box_fill(ax + 1, ry, ax + wz - 2, ry + self.sk(TREE_ROW_H) - 1, deckkraft(shade(self.wcol(wdg, "bg", "widget_bg"), 18), a));
             }
             // Auf-/Zuklapp-Dreieck (nur bei Kindknoten), hinter der
             // Kaestchen-Spalte.
@@ -17225,6 +18157,34 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let farbe = if node.color >= 0 { node.color } else { fg };
             self.wtext(g, wdg, lx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), farbe);
             if teil { g.pop_clip(); }
+        }
+        // Rollbalken wie bei der Liste.
+        if let Some((tx, ty, bw, th, thy, thh)) = bar {
+            let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+            g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(self.wcol(wdg, "bg", "widget_bg"), -10));
+            let aktiv = self.listbar_zug.map(|(a, b, _)| (a, b) == (wi, idx)).unwrap_or(false)
+                || (mx >= tx && mx < tx + bw && my >= thy && my < thy + thh);
+            let rc = self.wcol(wdg, "border", "widget_border");
+            g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 3, if aktiv { mischen(rc, acc, 0.5) } else { rc }, true);
+        }
+        // Umbenennen: Eingabefeld ueber dem Namen, wie bei der Liste.
+        if let (Some(e), Some((ex, ey, ew, eh))) = (t.edit.as_ref(), self.baum_edit_rect(wi, idx)) {
+            g.box_fill(ex, ey, ex + ew - 1, ey + eh - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 12));
+            g.rect(ex, ey, ex + ew - 1, ey + eh - 1, acc);
+            let text: String = e.text.iter().collect();
+            let tx = self.baum_text_x(t, ax, e.k);
+            let ty = ey + (eh - self.wsize(g, wdg)).max(0) / 2;
+            let x_bei = |g: &mut Graphics, n: i32| -> i32 {
+                let vor: String = e.text.iter().take(n.max(0) as usize).collect();
+                tx + self.wtext_width(g, wdg, &vor)
+            };
+            let (xa, xb) = (x_bei(g, e.anker.min(e.caret)), x_bei(g, e.anker.max(e.caret)));
+            let cx = x_bei(g, e.caret);
+            g.push_clip(ex + 1, ey + 1, (ew - 2).max(0), (eh - 2).max(0));
+            if e.anker != e.caret { g.box_fill(xa, ey + 3, xb, ey + eh - 4, deckkraft(acc, 0.45)); }
+            self.wtext(g, wdg, tx, ty, text, fg);
+            g.line(cx, ey + 4, cx, ey + eh - 5, fg);
+            g.pop_clip();
         }
         g.pop_clip();
     }
@@ -17370,25 +18330,50 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let t = if self.dd_auf_von == Some((wi, idx)) { weich(self.dd_auf_t) }
                 else if self.m("uebergang") > 0 { 0.0 } else { 1.0 };
         let ph = ((ph_voll as f64 * t).round() as i32).max(1);
+        // Klappt die Liste nach OBEN auf, rollt sie von unten herauf.
+        let (_, box_y, _, _) = self.abs_rect(wi, wdg);
+        let nach_oben = py < box_y;
+        let clip_y = if nach_oben { py + ph_voll - ph } else { py };
         let bg = deckkraft(self.wcol(wdg, "bg", "widget_bg"), 0.35 + 0.65 * t);
         let border = self.wcol(wdg, "border", "widget_border");
         let fg = self.wcol(wdg, "fg", "text_fg");
         let acc = self.wcol(wdg, "accent", "accent");
         let pad = self.m("pad");
-        g.push_clip(px, py, pw, ph);
-        g.box_fill(px, py, px + pw - 1, py + ph - 1, bg);
-        g.rect(px, py, px + pw - 1, py + ph - 1, border);
-        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
-        for (k, it) in wdg.items.iter().enumerate() {
-            let iy = py + k as i32 * self.sk(DROPDOWN_ITEM_H);
-            let hovered = mx >= px && mx < px + pw && my >= iy && my < iy + self.sk(DROPDOWN_ITEM_H);
-            if k as i32 == wdg.sel {
-                g.box_fill(px + 1, iy, px + pw - 2, iy + self.sk(DROPDOWN_ITEM_H) - 1, shade(acc, -110));
-            } else if hovered {
-                g.box_fill(px + 1, iy, px + pw - 2, iy + self.sk(DROPDOWN_ITEM_H) - 1, shade(bg, 22));
+        let ih = self.sk(DROPDOWN_ITEM_H);
+        let n = wdg.items.len() as i32;
+        let rows = (ph_voll / ih).max(1);
+        let scroll = if self.dd_auf_von == Some((wi, idx)) { self.dd_scroll } else { 0 };
+        let bar = n > rows;
+        let bw = self.sk(8);
+        let pz = if bar { pw - bw - 2 } else { pw };
+        g.push_clip(px, clip_y, pw, ph);
+        g.box_fill(px, py, px + pw - 1, py + ph_voll - 1, bg);
+        g.rect(px, py, px + pw - 1, py + ph_voll - 1, border);
+        let mark = if self.dd_auf_von == Some((wi, idx)) { self.dd_mark } else { -1 };
+        for k in scroll..(scroll + rows).min(n) {
+            let it = &wdg.items[k as usize];
+            let iy = py + (k - scroll) * ih;
+            let a = wdg.zeile_b.anteil(k);
+            if k == wdg.sel {
+                g.box_fill(px + 1, iy, px + pz - 2, iy + ih - 1, shade(acc, -110));
+            } else if k == mark {
+                g.box_fill(px + 1, iy, px + pz - 2, iy + ih - 1, shade(bg, 22));
+            } else if a > 0.0 {
+                g.box_fill(px + 1, iy, px + pz - 2, iy + ih - 1, deckkraft(shade(bg, 22), a));
             }
+            // Die Tastatur-Markierung auf der gewaehlten Zeile: ein Rahmen,
+            // sonst saehe man sie dort nicht.
+            if k == mark { g.rect(px + 1, iy, px + pz - 2, iy + ih - 1, acc); }
             let th14 = self.ctext_height(g);
-            self.ctext(g, px + pad, iy + (self.sk(DROPDOWN_ITEM_H) - th14) / 2, it.clone(), fg);
+            self.ctext(g, px + pad, iy + (ih - th14) / 2, it.clone(), fg);
+        }
+        // Rollbalken, wenn nicht alles hineinpasst.
+        if bar {
+            let (tx, ty, th) = (px + pw - 1 - bw, py + 1, (ph_voll - 2).max(1));
+            let thh = ((th as i64 * rows as i64 / n.max(1) as i64) as i32).clamp(self.sk(12).min(th), th);
+            let thy = ty + ((th - thh) as f64 * (scroll as f64 / (n - rows).max(1) as f64)) as i32;
+            g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(bg, -10));
+            g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 3, border, true);
         }
         g.pop_clip();
     }
@@ -17593,9 +18578,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if !t.zellmodus && t.ist_gewaehlt(ri as i32) {
                 g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1,
                            (150i64 << 24) | (sel_bg & 0xFFFFFF));
-            } else if ri as i32 == t.hover_row && !t.zellmodus {
+            } else if !t.zellmodus && wdg.zeile_b.anteil(ri as i32) > 0.0 {
+                let a = (110.0 * wdg.zeile_b.anteil(ri as i32)).round().max(1.0) as i64;
                 g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1,
-                           (110i64 << 24) | (hover_bg & 0xFFFFFF));
+                           (a << 24) | (hover_bg & 0xFFFFFF));
             }
 
             // Inhalte.
@@ -17650,6 +18636,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if gm.frozen > 0 && t.scroll_x > 0 {
             let fx = body_x + gm.frozen_w;
             g.line(fx, body_y, fx, body_y + body_h - 1, shade(border, 40));
+        }
+        // Leer ist eine Aussage: "Keine Treffer" statt einer Flaeche, die
+        // aussieht, als sei die Tabelle kaputt (wie bei der Liste).
+        if t.view.is_empty() && !t.leer_text.is_empty() {
+            let tw = self.wtext_width(g, wdg, &t.leer_text);
+            let muted = self.leise(bg);
+            self.wtext(g, wdg, body_x + ((body_w - tw) / 2).max(self.sk(6)), body_y + self.sk(10), t.leer_text.clone(), muted);
         }
         g.pop_clip();
 

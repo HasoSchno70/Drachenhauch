@@ -643,12 +643,112 @@ WEG mit (`dateibaum_neu`) -- zu geht er sofort, seine Kinder sind dann nicht
 mehr gelesen. **Klappliste**: `Gui::dd_auf_t`/`dd_auf_von`, nur AUF weich
 (von oben herab, eingeblendet), zu sofort; im Bild des Klicks gilt "noch zu"
 (`uebergaenge` lief vor dem Druck) -- mit "ganz offen" blitzte die volle
-Liste einmal auf, gesehen nur im Kontaktbogen. Noch nicht: Zeilen in
-Listen/Tabellen, Menues. Tests `tests/pruef/gui_uebergaenge.dhtest` (15,
+Liste einmal auf, gesehen nur im Kontaktbogen. **Zeilen und Menues**
+(selber Tag): `Blende` (zwei Plaetze: die Zeile unter der Maus blendet ein,
+die verlassene aus; zurueck auf die ausblendende = dort weiter) als
+`Widget::zeile_b` fuer Liste/Tabelle/Baum/Klappliste und `Menu::b` je Popup,
+dazu `Menu::auf_t` (Aufrollen, auch Untermenues; zu = sofort, zuruecksetzen).
+Die Liste traegt ihre Maus-Zeile in `Widget::zeile_jetzt` -- eine schlichte
+Liste hat keinen ListState, der sie halten koennte, und haette ihr
+Ueberfahren sonst verloren. Tests `tests/pruef/gui_liste_bedienung.dhtest`.
+Tests `tests/pruef/gui_uebergaenge.dhtest` (15,
 Bildproben; Gegenprobe mit `uebergang` 0 bzw. dem Bau davor) und in
 `tests/pruef/gui_akkordeon.dhtest` "das aufklappen waechst ueber die zeit"
 (Gegenprobe faellt); zwei alte Faelle dort brauchen seither `uebergang` 0
 bzw. klicken spaeter ins Kind.
+
+**Listen bequemer** (2026-09-23, mit den Uebergaengen): (1) **Rollbalken**
+(`list_bar_geom` = EINE Quelle fuer Zeichnen, Klick, Ziehen; Griff ziehen,
+Klick in die Rinne setzt ihn unter die Maus und zieht weiter,
+`Gui::listbar_zug`; die Zeilen enden davor) -- vorher hatte eine Liste GAR
+KEINEN, man sah nicht, wo man stand. (2) **Weiches Rollen** am Rad
+(`Widget::rad_ziel`/`rad_letzt`: Radschritte addieren sich aufs Ziel; steht
+der Stand nicht mehr da, wo das Rollen ihn hinschrieb, hat jemand anderes
+gerollt, und das Rad gibt nach). (3) **Rechtsklick waehlt** die Zeile
+(`liste_rechtsklick`; eine Mehrfachauswahl bleibt, wenn die Zeile
+dazugehoert). (4) **Umbenennen**: `GUI_LISTBOX_SET(lb, "bearbeitbar", 1)` +
+F2, `GUI_LISTBOX_EDIT/EDITED/EDITING`; Arbeitskopie `ListEdit`, dieselbe
+Tastenroutine wie Textfeld und Zelle (`einzeiler_tasten`), Enter/Klick
+daneben/Fokus weg uebernimmt, ESC verwirft, unveraendert ist kein Ereignis;
+`.dhform` `bearbeitbar`. **Der Fund dabei:** ESC beendete das Umbenennen UND
+drueckte den Abbrechen-Knopf des Fensters -- die Liste war im selben Bild
+danach nicht mehr "am Bearbeiten", und die Fensterregel griff trotzdem;
+`Gui::liste_taste` merkt sich, dass die Taste schon verbraucht ist (vom Test
+gefunden). F2 gilt nur, wenn kein Menue-Kuerzel die Taste genommen hat (die
+IDE legt F2 auf die Lesezeichen). Tests `tests/pruef/gui_liste_bedienung.dhtest`
+(20; gegen den Bau davor fallen alle 12, die Neues pruefen).
+
+**Tabelle bequem wie die Liste** (selber Tag, Zeilenmodus): Doppelklick und
+Enter setzen `TableState::doppel`, und `GUI_DOUBLE_CLICKED` gilt jetzt auch
+fuer Tabellen (vorher ein Fehler "bisher nur fuer Listen") -- ein
+Doppelklick auf eine BEARBEITBARE Textzelle bearbeitet weiter und meldet
+nicht. F2 bearbeitet die erste freigegebene Textspalte der gewaehlten Zeile
+(Zellmodus: wie bisher die aktuelle Zelle). Tippen springt
+(`tabelle_tippen`, Regel wie `liste_tippen`) in der Sortierspalte, ohne
+Sortierung in der ersten sichtbaren. Rechtsklick waehlt
+(`tabelle_rechtsklick`). Das Rad rollt weich ueber dieselben
+`Widget::rad_ziel`/`rad_letzt` wie die Liste -- der laufende Stand liegt in
+`rad_letzt` als Kommazahl, weil `scroll_y` ganzzahlig ist (sonst bliebe die
+Tabelle einen Punkt vor dem Ziel stehen). Neu `GUI_TABLE_PLACEHOLDER(tbl,
+text$)` (Leer-Hinweis, `.dhform` `leer_text`). Rollbalken zum Ziehen hatte
+die Tabelle schon. **Testfalle:** das Tippen fasst Tasten innerhalb einer
+Sekunde ECHTER Zeit zu einem Wort -- ohne Fenster laufen 30 Bilder in
+Bruchteilen davon, "b, b, k" wurde "bbk"; getrennte Woerter brauchen eigene
+Faelle. Tests `tests/pruef/gui_tabelle_bedienung.dhtest` (13; gegen den Bau
+davor fallen die 10, die Neues pruefen). Im **Form-Designer** (197): Kaestchen "Umbenennen mit
+F2" bei der Liste (`list.bearbeitbar`, abgewaehlt wird der Schluessel
+ENTFERNT) und Feld "Leer-Hinweis" bei der Tabelle (`table.leer_text`), beides
+im GB-Code (`GUI_LISTBOX_SET ... "bearbeitbar"`, `GUI_TABLE_PLACEHOLDER`);
+Uebernehmen/Aktiviert/Hinweis ruecken dafuer eine Zeile tiefer. Tests in
+`tests/pruef/werkzeug_formdesigner.dhtest` (Inspektor-Fall + der
+GB-Code-Fall mit allen Arten; gegen den alten Designer fallen beide).
+
+**Baum bequem wie die Liste** (selber Tag): Rollbalken (derselbe
+`list_bar_geom`, jetzt fuer Liste UND Baum -- der Rollstand liegt in `value`
+bzw. `tree.scroll`, `roll_ist`/`roll_setze`), weiches Rad, Pos1/Ende/Bild,
+Tippen springt (`baum_tippen`, sichtbare Knoten), Rechtsklick waehlt,
+`GUI_DOUBLE_CLICKED` auch fuer Baeume (Doppelklick auf jeden Knoten, ein Ast
+klappt dabei zusaetzlich um; Enter nur auf Blaettern -- auf einem Ast klappt
+Enter), Umbenennen mit `GUI_TREE_SET "bearbeitbar"` + F2 bzw.
+`GUI_TREE_EDIT/EDITED/EDITING` (dieselbe `ListEdit`-Arbeitskopie;
+`edit_rect_any`/`edit_ende_any`/`wird_umbenannt` fassen Liste und Baum fuer
+Klick-daneben, Fokus-weg und die Enter/ESC-Sperre zusammen) und
+`GUI_TREE_PLACEHOLDER`. **Nicht beim Dateibaum**: sein Name ist ein
+Dateiname, `GUI_TREE_EDIT` ist dort ein Fehler mit Hinweis auf `RENAME`.
+Form-Designer: Kaestchen und Feld auch fuer den Baum (`tree.bearbeitbar`,
+`tree.leer_text`). Tests `tests/pruef/gui_baum_bedienung.dhtest` (14; gegen den
+Bau davor fallen 13, der Endstand-Fall nicht) und ein Baum-Fall in
+`werkzeug_formdesigner.dhtest`.
+
+**Klappliste bequem wie die Liste** (selber Tag): das Popup zeigt hoechstens
+`DD_MAX_ZEILEN` = 10 Eintraege (vorher so hoch wie die Liste lang -- hundert
+Eintraege ragten ueber den Bildschirm), rollt mit dem Rad (vor allem anderen
+abgefragt, weil es ueber allem liegt) und hat einen Rollbalken; ist unten kein
+Platz, aber oben, klappt es NACH OBEN auf (`dropdown_popup_rect` = EINE Quelle,
+kennt die Bildschirmhoehe ueber `Gui::schirm_h` aus GUI_UPDATE) und rollt dann
+von unten herauf. Offen bewegen Pfeile/Bild/Pos1/Ende/Tippen nur `dd_mark`,
+Enter/Leertaste uebernimmt, **ESC verwirft** -- vorher setzte jeder Pfeil die
+Auswahl sofort und feuerte on_change. Beim Oeffnen steht die Auswahl markiert
+in der MITTE. Zu waehlt Tippen gleich (`dd_tippen`). Neu
+`GUI_DROPDOWN_PLACEHOLDER` (gedaempft, solange `sel` < 0; `.dhform`
+`placeholder`), im Form-Designer ein Feld "Platzhalter". Tests
+`tests/pruef/gui_klappliste_bedienung.dhtest` (10; gegen den Bau davor fallen 8,
+die zwei uebrigen pruefen, was gleich bleiben soll). Folge: ein Test, der einen Eintrag
+jenseits der zehnten Zeile an fester Lage anklickte (Notenblatt, Instrument
+"Glocke" = Eintrag 10), rollt jetzt erst einen Radschritt.
+
+**Menues bequem wie die Liste** (selber Tag): **Kontextmenues per Tastatur**
+-- `menue_tasten` fragte nur Leistenmenues (`tiefstes_popup` = Kontext ODER
+Leiste), und ESC im offenen Kontextmenue drueckte den ABBRECHEN-Knopf des
+Fensters, weil das Menue die Taste nicht nahm (gegen den alten Bau belegt).
+Pos1/Ende, Tippen springt (Anfangsbuchstabe; eindeutig = gleich ausloesen
+ueber `menue_ausloesen`, sonst zum naechsten Treffer). Am Rand weichen Popups
+aus: in `popup_chain` (Kontextmenue links/ueber der Maus, Untermenue links vom
+Eltern, Leistenmenue nach links; `Gui::schirm_b/schirm_h`). **Die Falle:**
+gezeichnet wurde mit den ROHEN Lagen (`context_open`, `sub_chain`), nur der
+Treffertest ging ueber `popup_chain` -- beide Zeichenstellen gehen jetzt
+darueber. Tests `tests/pruef/gui_menue_bedienung.dhtest` (8; gegen den Bau
+davor fallen alle 8).
 
 **Text und Formular** (2026-09-04, Punkt 1 des gui-Ausbaus -- Ziel: dass Drachenhauch genannt wird, wenn jemand fragt, womit er eine Anwendung schreiben soll): `GUI_SET_ALIGN(wdg, links|mitte|rechts)` fuer Beschriftung/Knopf/Textfeld; `GUI_SET_WRAP(label, breite)` bricht an Wortgrenzen um, die HOEHE folgt dem Text -- gemessen in `umbruch_layout` (in GUI_UPDATE, weil nur dort Graphics und Schreibzugriff zusammenkommen; das Zeichnen ist `&self`); `GUI_TEXTINPUT_SET(tf, key$, wert)` mit `passwort` (Punkte statt Zeichen -- Treffertest und Rollen messen an den PUNKTEN, sonst sitzt die Schreibmarke neben dem Text), `nur_lesen`, `maxlaenge` (schneidet ab, auch beim Einfuegen), `zahlen` (1 ganz, 2 Komma; Zwischenstand `-` erlaubt, sonst liesse sich keine negative Zahl tippen); `GUI_ENTERED`/`GUI_ON_ENTER`; **Strg+Z/Y in Textfeld und Textbereich** (Anschlaege innerhalb 0,8 s = EIN Schritt; `GUI_SET_TEXT` leert den Verlauf); `GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` (Enter/ESC druecken den Knopf -- aber die Taste gehoert zuerst dem Widget mit Fokus: Knopf/Kaestchen nehmen Enter selbst, Textbereich macht einen Umbruch, Zelle in Bearbeitung ihr Ende; aus einem TEXTFELD heraus ist Enter das Abschicken; der Standard-Knopf traegt den Akzent als Rahmen). Alles in der `.dhform` (auch der Tooltip -- der fehlte dort bisher) und im Form-Designer (Inspector + Codegen). **Testfalle:** raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber KEINE Zeichen in die Zeichenwarteschlange -- Tests tippen ueber die Zwischenablage mit Strg+V, das laeuft durch dieselben Filter. Tests `tests/pruef/gui_text_formular.dhtest`, Doku `docs/module-gui.md`.
 

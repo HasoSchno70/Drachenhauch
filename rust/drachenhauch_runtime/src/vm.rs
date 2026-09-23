@@ -5582,6 +5582,14 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.list_find(gi(a,0,"GUI_LISTBOX_FIND")?, &gs(a,1,"GUI_LISTBOX_FIND")?, ab)?)
             }
             "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
+            "gui_dropdown_placeholder" => { self.gui.dropdown_placeholder(gi(a,0,"GUI_DROPDOWN_PLACEHOLDER")?, gs(a,1,"GUI_DROPDOWN_PLACEHOLDER")?.to_string())?; Value::Nil }
+            "gui_tree_edit" => { self.gui.tree_edit(gi(a,0,"GUI_TREE_EDIT")?, gi(a,1,"GUI_TREE_EDIT")?)?; Value::Nil }
+            "gui_tree_edited" => Value::Int(self.gui.tree_edited(gi(a,0,"GUI_TREE_EDITED")?)?),
+            "gui_tree_editing" => Value::Int(self.gui.tree_editing(gi(a,0,"GUI_TREE_EDITING")?)?),
+            "gui_tree_placeholder" => { self.gui.tree_placeholder(gi(a,0,"GUI_TREE_PLACEHOLDER")?, gs(a,1,"GUI_TREE_PLACEHOLDER")?.to_string())?; Value::Nil }
+            "gui_listbox_edit" => { self.gui.list_edit(gi(a,0,"GUI_LISTBOX_EDIT")?, gi(a,1,"GUI_LISTBOX_EDIT")?)?; Value::Nil }
+            "gui_listbox_edited" => Value::Int(self.gui.list_edited(gi(a,0,"GUI_LISTBOX_EDITED")?)?),
+            "gui_listbox_editing" => Value::Int(self.gui.list_editing(gi(a,0,"GUI_LISTBOX_EDITING")?)?),
             // --- Stufe 29: gesetzter Text -- Auswahl und Suche ---
             "gui_richtext_selection$" | "gui_richtext_selection" => Value::str_rc(&self.gui.richtext_selection(gi(a,0,"GUI_RICHTEXT_SELECTION")?)?),
             "gui_richtext_select_all" => { self.gui.richtext_select_all(gi(a,0,"GUI_RICHTEXT_SELECT_ALL")?)?; Value::Nil }
@@ -6112,6 +6120,7 @@ impl<'p> Vm<'p> {
             "gui_table_sort" => { self.gui.table_sort(gi(a,0,"GUI_TABLE_SORT")?, gi(a,1,"GUI_TABLE_SORT")?, gbool(a,2,"GUI_TABLE_SORT")?)?; Value::Nil }
             "gui_table_sort_col" => Value::Int(self.gui.table_sort_col(gi(a,0,"GUI_TABLE_SORT_COL")?)?),
             "gui_table_sort_desc" => Value::Bool(self.gui.table_sort_desc(gi(a,0,"GUI_TABLE_SORT_DESC")?)?),
+            "gui_table_placeholder" => { self.gui.table_placeholder(gi(a,0,"GUI_TABLE_PLACEHOLDER")?, gs(a,1,"GUI_TABLE_PLACEHOLDER")?.to_string())?; Value::Nil }
             "gui_table_filter" => { self.gui.table_filter(gi(a,0,"GUI_TABLE_FILTER")?, gi(a,1,"GUI_TABLE_FILTER")?, gs(a,2,"GUI_TABLE_FILTER")?.to_string())?; Value::Nil }
             "gui_table_get_filter" => Value::str_rc(&self.gui.table_get_filter(gi(a,0,"GUI_TABLE_GET_FILTER")?, gi(a,1,"GUI_TABLE_GET_FILTER")?)?),
             "gui_table_view_count" => Value::Int(self.gui.table_view_count(gi(a,0,"GUI_TABLE_VIEW_COUNT")?)?),

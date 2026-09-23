@@ -77,7 +77,7 @@ END TRY
 DHRT_FRAMES=1
 --- erwartet
 GUI_LISTBOX_ITEM: Eintrag 4 gibt es nicht (die Liste hat 4)
-GUI_LISTBOX_SET: unbekannter Schluessel 'farbe' -- mehrfachauswahl, kaestchen
+GUI_LISTBOX_SET: unbekannter Schluessel 'farbe' -- mehrfachauswahl, kaestchen, bearbeitbar
 
 === strg klick sammelt umschalt klick spannt (1)
 IMPORT "gui"
@@ -416,7 +416,7 @@ DHRT_FRAMES=16
 --- erwartet
 doppel 1
 
-=== doppelklick nur fuer listen
+=== doppelklick nur fuer listen, tabellen und baeume
 IMPORT "gui"
 SCREEN(400, 300, "T", 1)
 SET_WINDOW_POS(-3000, -3000)
@@ -434,7 +434,7 @@ END TRY
 --- umgebung
 DHRT_FRAMES=1
 --- erwartet
-GUI_DOUBLE_CLICKED: bisher nur fuer Listen (GUI_LISTBOX)
+GUI_DOUBLE_CLICKED: nur fuer Listen, Tabellen und Baeume (GUI_LISTBOX, GUI_TABLE, GUI_TREE)
 
 === zusatz ueberlebt die datei und fehlt ohne zusatz
 IMPORT "gui"

@@ -125,7 +125,11 @@ IMPORT "gui"
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | gewählten Knoten lesen/setzen (-1 = keiner) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | Text eines Knotens |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | Knoten auf-/zuklappen |
-| `GUI_TREE_SET(tree, key$, wert)` | — | Einstellung am Baum: `mehrfachauswahl`, `kaestchen` |
+| `GUI_TREE_SET(tree, key$, wert)` | — | Einstellung am Baum: `mehrfachauswahl`, `kaestchen`, `bearbeitbar` (F2 benennt um) |
+| `GUI_TREE_EDIT(tree, node)` | — | Knoten umbenennen: Eingabefeld über dem Namen, alles markiert (nicht beim Dateibaum) |
+| `GUI_TREE_EDITED(tree)` | INTEGER | in diesem Bild umbenannter Knoten, -1 = keiner |
+| `GUI_TREE_EDITING(tree)` | INTEGER | Knoten, der gerade umbenannt wird, -1 = keiner |
+| `GUI_TREE_PLACEHOLDER(tree, text$)` | — | Hinweis, wenn der Baum leer ist |
 | `GUI_TREE_SEL_COUNT(tree)` | INTEGER | wie viele Knoten ausgewählt sind |
 | `GUI_TREE_SEL_NODE(tree, i)` | INTEGER | die i-te ausgewählte Knoten-id (-1 = keine mehr) |
 | `GUI_TREE_IS_SELECTED(tree, node)` | BOOLEAN | ist dieser Knoten ausgewählt? |
@@ -253,6 +257,21 @@ IMPORT "gui"
 
 Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schiebt den Fensterinhalt automatisch nach unten; Klick auf ein Menü öffnet das Dropdown, Klick daneben schließt es. Komplettes Beispiel: [`examples/129_gui_menu.dh`](../examples/129_gui_menu.dh).
 
+**Bedienung wie bei der Liste** (seit 2026-09-23):
+
+* **Kontextmenüs** lassen sich per Tastatur bedienen wie die Menüleiste:
+  `↑`/`↓` laufen, `→` öffnet ein Untermenü, `←` schließt es, `ENTER`
+  wählt, `ESC` schließt — ohne den Abbrechen-Knopf des Fensters zu drücken.
+  Solange ein Menü offen ist, gehören ihm die Tasten.
+* **`POS1`/`ENDE`** springen auf den ersten bzw. letzten bedienbaren Eintrag.
+* **Tippen springt**: der Anfangsbuchstabe markiert den nächsten Eintrag,
+  der so anfängt. Ist er **eindeutig**, wird der Eintrag gleich ausgelöst
+  (bzw. sein Untermenü geöffnet) — wie in jedem Menü ohne unterstrichene
+  Buchstaben.
+* **Am Bildschirmrand** weicht ein Popup aus: ein Kontextmenü steht dann
+  links bzw. über der Maus statt aus dem Bild zu laufen, ein Untermenü klappt
+  links vom Elternmenü auf, ein Leistenmenü rückt nach links.
+
 **Tastenkürzel** stehen rechts im Eintrag und werden jedes Bild geprüft — auch bei geschlossenem Menü, und **in allen sichtbaren Fenstern des Programms**: zuerst im Fenster mit Fokus, dann in den übrigen von oben nach unten. Ein Programm mit Werkzeugleiste links und Inspektor rechts hat ein Menü, und `Strg+S` sichert auch dann, wenn der letzte Klick in den Inspektor ging (bis 2026-09-07 galt ein Kürzel nur im Fenster mit Fokus — drei Editoren mussten sich nach jedem Knopf den Fokus zurückholen). Hat das Fokus-Fenster dasselbe Kürzel selbst, gewinnt es. Ein modales Fenster lässt nur seine eigenen Kürzel zu; ein Fenster im Entwurfsmodus (`GUI_WINDOW_DESIGN`) zählt nicht, seine Menüs sind Ansicht. Geschrieben werden sie, wie man sie liest: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; englische Namen (`Ctrl`, `Shift`, `Delete`, `PageDown`) gehen auch. **`Plus` und `Minus`** (auch `Strg++` und `Strg+-`) sind keine einzelne Taste: raylib benennt Tasten nach ihrer Lage im US-Layout, und das „+“ einer deutschen Tastatur liegt dort, wo die US-Tastatur „]“ hat, ihr „-“ auf „/“ -- ein solches Kürzel trifft darum die Taste beider Belegungen und den Ziffernblock (`Strg+Plus`, `Strg+Minus`, `Strg+0` für den Zoom). Die Modifier müssen **genau** passen: ein bloßes S ist kein Strg+S. **Ohne Strg oder Alt gehört eine Taste dem Textfeld mit Fokus** — ein `Entf`-Kürzel löscht dort ein Zeichen, statt den Menüpunkt auszulösen; ohne Textfokus löst es aus. **Ausgenommen sind F1 bis F12**: sie erzeugen nie Text und lösen auch aus dem Textfeld heraus aus (F5 startet in einer IDE aus dem Code-Feld). Ein gesperrter Eintrag hat kein Kürzel. Ein unbekannter Tastenname ist ein Fehler beim Anlegen, nicht ein Kürzel, das still nie feuert. **Ein Kürzel, das gefeuert hat, nimmt dem Textbereich die Taste weg** — sonst täte `Strg+Umschalt+Hoch` zwei Dinge: den Eintrag auslösen und die Auswahl eine Zeile hochschieben, und ein Befehl, der danach die Auswahl liest, sähe eine andere als die markierte.
 
 ### Strg+Rad gehört dem Programm
@@ -294,6 +313,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_DROPDOWN_TEXT(dd)` | STRING | Text der Auswahl |
 | `GUI_DROPDOWN_SET_SELECTED(dd, i)` | — | Auswahl vom Programm aus setzen |
 | `GUI_SET_DROPDOWN(dd, items)` | — | Eintraege ersetzen |
+| `GUI_DROPDOWN_PLACEHOLDER(dd, text$)` | — | Hinweis in der Box, solange nichts gewählt ist („Bitte wählen“) |
 | `GUI_LISTBOX(win, x, y, w, h, items)` | GUI_WIDGET | scrollbare Auswahlliste (Mausrad scrollt; mit gedrückter Strg-Taste rollt kein Widget, siehe Abschnitt „Strg+Rad gehört dem Programm“) |
 | `GUI_LISTBOX_SELECTED(lb)` | INTEGER | Index der Auswahl (`-1` = keine) |
 | `GUI_LISTBOX_TEXT(lb)` | STRING | Text der Auswahl |
@@ -301,7 +321,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_SET_LISTBOX(lb, items)` | — | Eintraege ersetzen |
 | `GUI_LISTBOX_ADD(lb, text$[, pos])` / `GUI_LISTBOX_REMOVE(lb, i)` / `GUI_LISTBOX_CLEAR(lb)` | INTEGER / — / — | Einträge einzeln (auch bei Klapplisten); `pos` weglassen = hinten anhängen |
 | `GUI_LISTBOX_COUNT(lb)` / `GUI_LISTBOX_ITEM(lb, i)` / `GUI_LISTBOX_SET_ITEM(lb, i, text$)` / `GUI_LISTBOX_MOVE(lb, von, nach)` | — | zählen, lesen, umbeschriften, verschieben |
-| `GUI_LISTBOX_SET(lb, key$, wert)` | — | `mehrfachauswahl`, `kaestchen` |
+| `GUI_LISTBOX_SET(lb, key$, wert)` | — | `mehrfachauswahl`, `kaestchen`, `bearbeitbar` (F2 benennt um) |
 | `GUI_LISTBOX_ICON(lb, i, bild)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | Sinnbild und Textfarbe je Eintrag (-1 = keins / Thema) |
 | `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | Haken je Eintrag (mit `kaestchen`) |
 | `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | Mehrfachauswahl wie bei der Tabelle |
@@ -322,7 +342,10 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_SORT(lb[, absteigend])` | — | natürlich sortieren („Datei 9“ vor „Datei 10“), innerhalb der Gruppen |
 | `GUI_LISTBOX_FIND(lb, text$[, ab])` | INTEGER | nächster Eintrag ab `ab`, der den Teiltext enthält, -1 = keiner |
 | `GUI_LISTBOX_SCROLL_TO(lb, i)` | — | so rollen, dass der Eintrag zu sehen ist |
-| `GUI_DOUBLE_CLICKED(lb)` | BOOLEAN | Doppelklick auf einen Eintrag, ein Bild lang |
+| `GUI_LISTBOX_EDIT(lb, i)` | — | Eintrag i umbenennen: Eingabefeld über der Zeile, alles markiert |
+| `GUI_LISTBOX_EDITED(lb)` | INTEGER | in diesem Bild umbenannter Eintrag, -1 = keiner |
+| `GUI_LISTBOX_EDITING(lb)` | INTEGER | Eintrag, der gerade umbenannt wird, -1 = keiner |
+| `GUI_DOUBLE_CLICKED(lb)` | BOOLEAN | Doppelklick (oder Enter) auf einen Eintrag, ein Bild lang; auch für Tabellen und Bäume |
 | `GUI_IMAGE(win, x, y, w, h, image)` | GUI_WIDGET | Bild oder Symbol im Fenster |
 | `GUI_SET_IMAGE(widget, image)` | — | Bild austauschen (auch das einer Kachel) |
 | `GUI_CARD(win, x, y, w, h, bild[, titel$[, text$]])` | GUI_WIDGET | Kachel: Bild oben, Titel, Beschreibung -- das Ganze ist ein Knopf (`GUI_CLICKED`, Enter/Leertaste); `bild` -1 = ohne |
@@ -688,6 +711,19 @@ dd = GUI_DROPDOWN(win, 20, 130, 160, 24, farben)   ' Klick klappt die Liste auf
 - `GUI_DROPDOWN_SET_SELECTED(dd, i)` setzt die Auswahl, `GUI_SET_DROPDOWN(dd, items)` ersetzt die Liste.
 - `GUI_ON_CHANGE(dd, handler)` feuert bei Auswahländerung. Das aufgeklappte Popup
   wird über allen anderen Widgets gezeichnet; Klick daneben schliesst es.
+- **Lange Listen**: das Popup zeigt höchstens zehn Einträge auf einmal, der Rest
+  rollt (Mausrad über dem Popup, Rollbalken rechts, Klick in den Balken rollt
+  dorthin). Beim Öffnen steht die Auswahl in der Mitte. Ist unter der Box kein
+  Platz, aber darüber, klappt die Liste **nach oben** auf.
+- **Tastatur**: zu öffnen Leertaste, Enter oder Pfeil ab. Offen bewegen Pfeile,
+  Bild auf/ab, Pos1/Ende und Tippen nur eine **Markierung**; Enter oder
+  Leertaste übernimmt sie, **ESC schließt ohne Änderung**. So feuert Blättern
+  kein `on_change`, und ein Irrtum lässt sich zurücknehmen.
+- **Tippen springt** wie in der Liste: bei geschlossener Klappliste wählt es
+  gleich den nächsten passenden Eintrag, bei offener markiert es ihn.
+- **Platzhalter**: `GUI_DROPDOWN_PLACEHOLDER(dd, "Bitte wählen")` steht gedämpft
+  in der Box, solange nichts gewählt ist (`GUI_DROPDOWN_SET_SELECTED(dd, -1)`);
+  er steht in der `.dhform` (`placeholder`).
 
 ### ProgressBar
 
@@ -945,6 +981,26 @@ Was eine Liste im Alltag braucht, kann sie seit Stand 27 selbst:
   Wort („ki“ → „Kirsche“), dieselbe Taste mehrmals läuft durch alle mit
   diesem Anfang.
 * **Suchen** (`FIND`) und **hinrollen** (`SCROLL_TO`) vom Programm aus.
+* **Rollbalken**: passen nicht alle Einträge hinein, steht rechts ein Balken.
+  Den Griff zieht man, ein Klick in die Rinne setzt ihn unter die Maus (und
+  man kann gleich weiterziehen). Die Zeilen enden vor dem Balken.
+* **Weiches Rollen**: das Mausrad rollt über die Dauer der Übergänge
+  (`uebergang`, siehe [Übergänge](#übergänge)) statt zu springen; mehrere
+  Radschritte hintereinander addieren sich. Rollt etwas anderes (Pfeiltaste,
+  `SCROLL_TO`), gibt das Rad nach.
+* **Rechtsklick wählt**: ein Kontextmenü bezieht sich auf die Zeile, auf die
+  man zeigt. In einer Mehrfachauswahl bleibt die Auswahl stehen, wenn die
+  Zeile dazugehört — so wirkt „Löschen“ auf alle gewählten.
+* **Umbenennen** mit `GUI_LISTBOX_SET(lb, "bearbeitbar", 1)`: **F2** öffnet
+  über dem gewählten Eintrag ein Eingabefeld, der Text ist markiert. Enter
+  oder ein Klick daneben übernimmt, ESC nimmt zurück; Tab oder ein anderer
+  Fokus übernimmt ebenfalls. Markieren, Strg+A/C/V/X gehen wie im Textfeld.
+  `GUI_LISTBOX_EDIT(lb, i)` beginnt es vom Programm aus (etwa aus einem
+  Kontextmenü „Umbenennen“ — das geht auch ohne den Schalter),
+  `GUI_LISTBOX_EDITED(lb)` meldet ein Bild lang, welcher Eintrag einen neuen
+  Namen hat (ein unveränderter Text zählt nicht), `on_change` feuert.
+  **ESC-Falle** wie bei der Tabelle: wer ESC selbst abfragt (etwa zum
+  Beenden), prüft vorher `GUI_LISTBOX_EDITING(lb) < 0`.
 
 Ein Bildschirmleser sieht nur die sichtbaren Einträge, gesperrte als
 gesperrt, und den Zusatztext als Teil des Namens. Werte, Zusatztexte,
@@ -1177,6 +1233,32 @@ beendet die Eingabe. Mehrere Spalten wirken zusammen (UND).
 |---|---|
 | `GUI_TABLE_FILTER(tbl, spalte, text$)` | Filter setzen (leerer Text = kein Filter) |
 | `GUI_TABLE_GET_FILTER(tbl, spalte)` | gesetzten Filter lesen |
+
+### Bedienung wie bei der Liste
+
+Was eine Liste bequem macht, kann die Tabelle im **Zeilenmodus** genauso:
+
+* **Doppelklick oder Enter** auf eine Zeile meldet `GUI_DOUBLE_CLICKED(tbl)`
+  ein Bild lang — „öffnen“ ohne eigene Doppelklick-Erkennung. Ein Doppelklick
+  auf eine bearbeitbare Textzelle bearbeitet sie weiterhin, statt zu melden.
+* **F2** bearbeitet die erste freigegebene Textspalte der gewählten Zeile
+  (`GUI_TABLE_COL_EDIT`, in Anzeige-Reihenfolge). Im Zellmodus bearbeitet F2
+  wie bisher die aktuelle Zelle.
+* **Tippen springt** zur nächsten Zeile, deren Text in der Sortierspalte (ohne
+  Sortierung: in der ersten sichtbaren Spalte) so anfängt; innerhalb einer
+  Sekunde Getipptes ist ein Wort, dieselbe Taste mehrmals läuft durch alle
+  Treffer.
+* **Rechtsklick wählt** die Zeile unter der Maus, damit ein Kontextmenü sich
+  auf sie bezieht; eine Mehrfachauswahl bleibt stehen, wenn die Zeile
+  dazugehört.
+* Das **Mausrad** rollt weich (siehe [Übergänge](#übergänge)), die
+  **Zeile unter der Maus** blendet ein.
+* **Leer-Hinweis**: steht keine Zeile da (keine Daten oder kein Treffer im
+  Filter), zeigt die Tabelle den Text aus `GUI_TABLE_PLACEHOLDER`.
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_PLACEHOLDER(tbl, text$)` | Hinweis, wenn keine Zeile zu sehen ist („Keine Treffer“); steht in der `.dhform` |
 
 ### Feste Spalten
 
@@ -1539,6 +1621,29 @@ Ein Haken an einem Ordner gilt **nur für ihn** — er färbt seine Kinder nicht
 mit. Wer „alles darunter" braucht, läuft die Kinder selbst ab: ob ein
 zugeklappter Ordner seine ungesehenen Dateien mitnimmt, ist eine Frage, die
 das Programm beantworten muss, nicht die Laufzeit.
+
+## Baum bedienen wie eine Liste
+
+Was die Liste bequem macht, kann der Baum genauso:
+
+* **Doppelklick** auf einen Knoten meldet `GUI_DOUBLE_CLICKED(tree)` ein Bild
+  lang (ein Ast klappt dabei zusätzlich um), **Enter** auf einem Blatt
+  ebenso; Enter auf einem Ast klappt ihn wie bisher.
+* **F2** benennt den gewählten Knoten um, wenn `GUI_TREE_SET(tree,
+  "bearbeitbar", 1)` gesetzt ist — dieselbe Bedienung wie bei der Liste
+  (Enter oder Klick daneben übernimmt, ESC nimmt zurück, `GUI_TREE_EDITED`
+  meldet es, `GUI_TREE_EDIT` beginnt es vom Programm aus). Beim **Dateibaum**
+  nicht: sein Name ist der Name einer Datei, umbenennen muss das Programm
+  selbst (`RENAME`), der Baum zeigt es danach.
+* **Tippen springt** zum nächsten sichtbaren Knoten, der so anfängt;
+  **Pos1/Ende** und **Bild auf/ab** springen wie in der Liste.
+* **Rechtsklick wählt** den Knoten unter der Maus; eine Mehrfachauswahl
+  bleibt stehen, wenn er dazugehört.
+* **Rollbalken** rechts, sobald nicht alles hineinpasst (Griff ziehen, Klick
+  in die Rinne), und das **Mausrad** rollt weich.
+* **Leer-Hinweis** über `GUI_TREE_PLACEHOLDER`.
+
+`bearbeitbar` und der Hinweis stehen in der `.dhform`.
 
 ## Reiter im Fenster
 
@@ -2203,6 +2308,12 @@ Zu geht sie sofort — wer gewählt hat, will die Liste nicht mehr sehen. Ein
 Klick in der Zeit des Aufrollens trifft trotzdem den Eintrag, auf den er
 zeigt.
 
+**Menüs** rollen genauso auf, auch Untermenüs. Die **Zeile unter der
+Maus** blendet in Listen, Tabellen, Bäumen, der offenen Klappliste und in
+Menüs weich ein, die verlassene gleichzeitig aus. Tastatur-Cursor und
+offene Untermenüs stehen sofort ganz da. Das **Mausrad** rollt eine Liste
+weich (siehe *Listen komfortabel*).
+
 | Metrik | Bedeutung |
 |---|---|
 | `uebergang` | Dauer in Millisekunden, Vorgabe 120; 0 = springen wie früher |
@@ -2811,7 +2922,7 @@ Akzentfarbe**; ohne sichtbaren Fokus wäre die Navigation wertlos.
 | `POS1` / `ENDE` | Regler/Drehknopf auf Minimum / Maximum |
 | `→` / `←` im Baum | aufklappen bzw. ins Kind / zuklappen bzw. zum Elternknoten |
 | `ESC` | offene Klappliste schließen |
-| `F10` oder `ALT` allein | Menüleiste öffnen (erster Eintrag markiert); `←`/`→` wechseln das Menü oder öffnen ein Untermenü, `↑`/`↓` laufen, `ENTER` wählt, `ESC` schließt eine Ebene |
+| `F10` oder `ALT` allein | Menüleiste öffnen (erster Eintrag markiert); `←`/`→` wechseln das Menü oder öffnen ein Untermenü, `↑`/`↓` laufen, `POS1`/`ENDE` springen, ein Buchstabe springt zum passenden Eintrag, `ENTER` wählt, `ESC` schließt eine Ebene — dasselbe in einem offenen Kontextmenü |
 
 Die **Tab-Reihenfolge** ist die des Anlegens. Wer sie anders will — etwa
 weil ein Feld nachträglich dazukam —, setzt `GUI_SET_TAB_INDEX(wdg, n)`:
