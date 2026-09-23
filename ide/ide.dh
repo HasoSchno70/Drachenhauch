@@ -544,6 +544,7 @@ DIM miVerkleinern AS INTEGER : miVerkleinern = GUI_MENU_ITEM(mBearb, "Auswahl ve
 DIM miUmbProjekt AS INTEGER : miUmbProjekt = GUI_MENU_ITEM(mBearb, "Im ganzen Projekt umbenennen ...", "Strg+Umschalt+F6")
 DIM miParameter AS INTEGER : miParameter = GUI_MENU_ITEM(mBearb, "Parameter umsortieren ...", "Strg+Umschalt+U")
 DIM miAufrufer AS INTEGER : miAufrufer = GUI_MENU_ITEM(mBearb, "Wer ruft das auf?", "Umschalt+F12")
+DIM miFundstellen AS INTEGER : miFundstellen = GUI_MENU_ITEM(mBearb, "Alle Fundstellen im Projekt", "Strg+Umschalt+F12")
 DIM miVerschieben AS INTEGER : miVerschieben = GUI_MENU_ITEM(mBearb, "Unterprogramm verschieben ...", "Strg+Umschalt+V")
 DIM miUmbauZur AS INTEGER : miUmbauZur = GUI_MENU_ITEM(mBearb, "Letzten Umbau zurücknehmen", "Strg+Umschalt+Z")
 DIM miUmbauNach AS INTEGER : miUmbauNach = GUI_MENU_ITEM(mBearb, "Letzten Umbau nachbessern", "Strg+Umschalt+G")
@@ -2969,6 +2970,65 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     IF zweitens <> "" THEN was = gesucht + "/" + zweitens
     GUI_SET_TEXT(lblProbleme, "Suche '" + was + "': " + STR$(treffer) + " Treffer in " + STR$(inDateien) + " Dateien -- Umschalt+F7 zeigt wieder die Probleme")
     protokoll("suche " + STR$(treffer))
+END SUB
+
+' --- Alle Fundstellen eines Namens ------------------------------------
+' "Wer ruft das auf?" kennt nur Unterprogramme. Hier jeder Name: eine
+' Variable, eine Konstante, ein Feld. Gezaehlt wird jede Zeile, in der er
+' als GANZES Wort steht, ausserhalb von Zeichenketten und Kommentaren
+' (`benutztWort`) -- dieselbe Frage, die das Verschieben fuer den IMPORT
+' stellt. Offene Reiter zaehlen mit dem Stand im Editor. Das ist Text,
+' keine Namensaufloesung: eine lokale `i` in zwei Unterprogrammen sind
+' zwei Namen, hier aber eine Liste -- die Datei und die Zeile stehen dabei.
+SUB fundstellenZeigen()
+    DIM name AS STRING : name = wortUnterMarke$()
+    IF name = "" THEN
+        GUI_SET_TEXT(lblStatus, "Fundstellen: unter der Marke steht kein Name.")
+        protokoll("fundstellen 0")
+        RETURN
+    END IF
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
+    DIM sd AS ARRAY OF STRING : sd = []
+    DIM sz AS ARRAY OF INTEGER : sz = []
+    DIM treffer AS INTEGER : treffer = 0
+    DIM inDateien AS INTEGER : inDateien = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM t AS INTEGER : t = tabMitPfad(pfad)
+        DIM quelle AS STRING : quelle = ""
+        IF t >= 0 THEN
+            quelle = GUI_TEXT(tabFelder[t])
+        ELSE
+            TRY
+                quelle = dateiLesen(pfad)
+            CATCH e
+                CONTINUE
+            END TRY
+        END IF
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+        DIM vorher AS INTEGER : vorher = treffer
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            IF treffer >= 500 THEN BREAK
+            ' Namen sind schreibungsunabhaengig: `Punkte` und `punkte` sind
+            ' dieselbe Variable.
+            IF benutztWort(LOWER$(zeilen[i]), LOWER$(name)) THEN
+                ARRAY_PUSH(sd, d)
+                ARRAY_PUSH(sz, i + 1)
+                GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
+                treffer = treffer + 1
+            END IF
+        NEXT
+        IF treffer > vorher THEN inDateien = inDateien + 1
+    NEXT
+    sucheDateien = sd
+    sucheZeilen = sz
+    problemModus = 1
+    GUI_SET_TEXT(lblProbleme, "Fundstellen von '" + name + "': " + STR$(treffer) + " in " + STR$(inDateien) + " Dateien -- Umschalt+F7 zeigt wieder die Probleme")
+    GUI_SET_TEXT(lblStatus, STR$(treffer) + " Fundstelle(n) von '" + name + "'.")
+    protokoll("fundstellen " + name + " " + STR$(treffer) + " " + STR$(inDateien))
 END SUB
 
 ' --- Haltepunkte und Marken in der Nummernspalte ---------------------
@@ -7901,6 +7961,7 @@ paletteEintrag("Auswahl verkleinern", "verkleinern", "Strg+Umschalt+Runter")
 paletteEintrag("Im ganzen Projekt umbenennen ...", "umb_projekt", "Strg+Umschalt+F6")
 paletteEintrag("Parameter umsortieren ...", "parameter", "Strg+Umschalt+U")
 paletteEintrag("Wer ruft das auf?", "aufrufer", "Umschalt+F12")
+paletteEintrag("Alle Fundstellen im Projekt", "fundstellen", "Strg+Umschalt+F12")
 paletteEintrag("Unterprogramm verschieben ...", "verschieben", "Strg+Umschalt+V")
 paletteEintrag("Letzten Umbau zurücknehmen", "umbau_zurueck", "Strg+Umschalt+Z")
 paletteEintrag("Letzten Umbau nachbessern", "umbau_nach", "Strg+Umschalt+G")
@@ -8361,6 +8422,7 @@ SUB befehl(k AS STRING)
             END IF
         CASE "parameter" : parameterFragen()
         CASE "aufrufer" : aufruferZeigen()
+        CASE "fundstellen" : fundstellenZeigen()
         CASE "verschieben" : verschiebenFragen()
         CASE "umbau_zurueck" : umbauZurueck()
         CASE "umbau_nach" : umbauNachbessern()
@@ -8624,6 +8686,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miUmbProjekt) THEN befehl("umb_projekt")
     IF GUI_CLICKED(miParameter) THEN befehl("parameter")
     IF GUI_CLICKED(miAufrufer) THEN befehl("aufrufer")
+    IF GUI_CLICKED(miFundstellen) THEN befehl("fundstellen")
     IF GUI_CLICKED(miVerschieben) THEN befehl("verschieben")
     IF GUI_CLICKED(miUmbauZur) THEN befehl("umbau_zurueck")
     IF GUI_CLICKED(miUmbauNach) THEN befehl("umbau_nach")

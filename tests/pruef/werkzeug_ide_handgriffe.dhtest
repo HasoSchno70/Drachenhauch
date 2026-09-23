@@ -191,3 +191,35 @@ PRINT "formatiert " ; n
 |PRINT "ab|
 |NEXT|
 formatiert 0
+
+=== alle fundstellen eines namens im projekt
+' Die Marke steht auf `punkte` in spiel.dh. Gezaehlt wird das ganze Wort in
+' jeder Schreibweise, nicht in Zeichenketten, Kommentaren oder `punktestand`.
+GUI_TEXTAREA_GOTO(aktivesFeld(), 2, 3)
+befehl("fundstellen")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM punkte AS INTEGER
+punkte = 3
+PRINT "punkte" ' punkte im Kommentar
+DIM punktestand AS INTEGER
+Punkte = Punkte + 1
+--- datei lib.dh
+SUB zeige()
+    PRINT punkte
+END SUB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 12) = "fundstellen " THEN PRINT L[i]
+NEXT
+--- erwartet
+fundstellen punkte 4 2
