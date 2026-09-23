@@ -224,6 +224,13 @@ DIM tabPfade[MAX_TABS] AS STRING
 DIM tabFelder[MAX_TABS] AS GUI_WIDGET
 DIM tabGesichert[MAX_TABS] AS STRING
 DIM tabLetzterText[MAX_TABS] AS STRING
+' Gefaltete Zeilen, die beim Oeffnen wieder zugeklappt werden sollen ("3,17")
+' -- erst, wenn der Reiter seine faltbaren Bloecke kennt.
+DIM tabFaltenOffen[MAX_TABS] AS STRING
+' Gemerkte Faltungen je Datei (ide.json `falten_pfade`/`falten_zeilen`),
+' die zuletzt benutzte zuerst.
+DIM faltPfade AS ARRAY OF STRING : faltPfade = []
+DIM faltListe AS ARRAY OF STRING : faltListe = []
 DIM tabAnzahl AS INTEGER : tabAnzahl = 0
 DIM aktiverTab AS INTEGER : aktiverTab = -1
 
@@ -467,6 +474,13 @@ IF JSON_HAS(konfig, "umbau_vorschau") THEN vorschauAn = JSON_GET_BOOL(konfig, "u
 IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
 IF JSON_HAS(konfig, "seitenleiste") THEN seitenAn = JSON_GET_BOOL(konfig, "seitenleiste")
 IF JSON_HAS(konfig, "untere_leiste") THEN untenAn = JSON_GET_BOOL(konfig, "untere_leiste")
+IF JSON_HAS(konfig, "falten_pfade") AND JSON_HAS(konfig, "falten_zeilen") THEN
+    DIM fk AS INTEGER
+    FOR fk = 0 TO MIN(JSON_LEN(konfig, "falten_pfade"), JSON_LEN(konfig, "falten_zeilen")) - 1
+        ARRAY_PUSH(faltPfade, JSON_GET_STRING(konfig, "falten_pfade." + STR$(fk)))
+        ARRAY_PUSH(faltListe, JSON_GET_STRING(konfig, "falten_zeilen." + STR$(fk)))
+    NEXT
+END IF
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
 IF hell THEN GUI_THEME_PRESET("glas_hell") : themaFeinschliff()
 codeFarben(hell)
@@ -1294,6 +1308,14 @@ SUB konfigSichern()
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
         IF tabPfade[i] <> "" THEN JSON_APPEND_STRING(konfig, "sitzung", tabPfade[i])
+        faltenMerken(i)
+    NEXT
+    JSON_SET_JSON(konfig, "falten_pfade", JSON_PARSE("[]"))
+    JSON_SET_JSON(konfig, "falten_zeilen", JSON_PARSE("[]"))
+    DIM fi AS INTEGER
+    FOR fi = 0 TO LEN(faltPfade) - 1
+        JSON_APPEND_STRING(konfig, "falten_pfade", faltPfade[fi])
+        JSON_APPEND_STRING(konfig, "falten_zeilen", faltListe[fi])
     NEXT
     JSON_SET_INT(konfig, "aktiv", aktiverTab)
     ' Dieselbe Sitzung noch einmal unter dem PROJEKTordner: wer an zwei
@@ -2174,6 +2196,63 @@ FUNCTION wegGleich$(pfad AS STRING) AS STRING
     RETURN REPLACE$(pfad, CHR$(92), "/")
 END FUNCTION
 
+' Die Faltung eines Reiters merken -- unter dem Weg der Datei, ein Reiter
+' ohne Weg hat nichts, woran sie sich wiederfinden liesse. Nichts gefaltet
+' heisst: der Eintrag faellt weg. Hoechstens 100 Dateien, die zuletzt
+' gemerkte zuerst.
+SUB faltenMerken(i AS INTEGER)
+    IF i < 0 OR i >= tabAnzahl THEN RETURN
+    IF tabPfade[i] = "" THEN RETURN
+    ' Noch nicht zurueckgeholt (der Reiter war nie vorn): die gemerkte
+    ' Faltung gilt weiter -- das Feld selbst hat ja noch keine.
+    IF tabFaltenOffen[i] <> "" THEN RETURN
+    DIM z AS ARRAY OF INTEGER : z = GUI_TEXTAREA_FOLDS(tabFelder[i])
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(z) - 1
+        ARRAY_PUSH(teile, STR$(z[k]))
+    NEXT
+    DIM weg AS STRING : weg = wegGleich$(tabPfade[i])
+    DIM neuP AS ARRAY OF STRING : neuP = []
+    DIM neuL AS ARRAY OF STRING : neuL = []
+    IF LEN(teile) > 0 THEN
+        ARRAY_PUSH(neuP, weg) : ARRAY_PUSH(neuL, JOIN$(teile, ","))
+    END IF
+    FOR k = 0 TO LEN(faltPfade) - 1
+        IF faltPfade[k] <> weg AND LEN(neuP) < 100 THEN
+            ARRAY_PUSH(neuP, faltPfade[k]) : ARRAY_PUSH(neuL, faltListe[k])
+        END IF
+    NEXT
+    faltPfade = neuP
+    faltListe = neuL
+END SUB
+
+FUNCTION gemerkteFalten$(pfad AS STRING) AS STRING
+    IF pfad = "" THEN RETURN ""
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(faltPfade, wegGleich$(pfad))
+    IF k < 0 THEN RETURN ""
+    RETURN faltListe[k]
+END FUNCTION
+
+' Nachdem der aktive Reiter seine faltbaren Bloecke bekommen hat: die
+' gemerkte Faltung wieder zuklappen. Eine Zeile, die inzwischen keinen
+' Block mehr anfaengt (die Datei wurde woanders geaendert), bleibt offen.
+SUB faltenZurueck(ta AS GUI_WIDGET)
+    IF aktiverTab < 0 OR ta <> tabFelder[aktiverTab] THEN RETURN
+    IF tabFaltenOffen[aktiverTab] = "" THEN RETURN
+    DIM zs AS STRING
+    DIM n AS INTEGER : n = 0
+    FOR EACH zs IN SPLIT$(tabFaltenOffen[aktiverTab], ",")
+        TRY
+            ' FOLD liefert, ob die Zeile jetzt zu ist (FALSE: kein Block dort).
+            IF GUI_TEXTAREA_FOLD(ta, INT(VAL(zs)), TRUE) THEN n = n + 1
+        CATCH e
+        END TRY
+    NEXT
+    tabFaltenOffen[aktiverTab] = ""
+    protokoll("falten wieder " + STR$(n))
+END SUB
+
 SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     IF tabAnzahl >= MAX_TABS THEN
         GUI_SET_TEXT(lblStatus, "Höchstens " + STR$(MAX_TABS) + " Reiter -- erst einen schließen.")
@@ -2200,6 +2279,7 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     tabFelder[tabAnzahl] = ta
     tabGesichert[tabAnzahl] = inhalt
     tabLetzterText[tabAnzahl] = ""
+    tabFaltenOffen[tabAnzahl] = gemerkteFalten$(pfad)
     aktiverTab = tabAnzahl
     tabAnzahl = tabAnzahl + 1
     reiterNeuSetzen()
@@ -2344,6 +2424,7 @@ SUB tabSchliessen(i AS INTEGER)
     ' Die Reiter ruecken auf, der linke der geteilten Ansicht zeigte danach
     ' auf eine andere Datei -- lieber ganz aus als still auf die falsche.
     IF geteilt THEN geteiltSetzen(FALSE)
+    faltenMerken(i)
     GUI_DESTROY(tabFelder[i])
     DIM k AS INTEGER
     FOR k = i TO tabAnzahl - 2
@@ -2351,6 +2432,7 @@ SUB tabSchliessen(i AS INTEGER)
         tabFelder[k] = tabFelder[k + 1]
         tabGesichert[k] = tabGesichert[k + 1]
         tabLetzterText[k] = tabLetzterText[k + 1]
+        tabFaltenOffen[k] = tabFaltenOffen[k + 1]
         GUI_SET_TAB(tabFelder[k], k)
     NEXT
     tabAnzahl = tabAnzahl - 1
@@ -2845,6 +2927,7 @@ SUB gliederungFuellen(quelle AS STRING)
         NEXT
         einzugBloecke(quelle, fv, fb)
         GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
+        faltenZurueck(ta)
         blockVon = fv
         blockBis = fb
     END IF
