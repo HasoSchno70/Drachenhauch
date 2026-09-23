@@ -885,6 +885,16 @@ pub struct Graphics {
     /// und der Fenstertitel als Name des Wurzelknotens.
     a11y: Option<crate::a11y::A11y>,
     a11y_versorgt: bool,
+    /// Gibt es ein Fenster, das der Nutzer auch SIEHT? Ein Bildbefehl
+    /// (LOADIMAGE, IMAGE_NEW, imgfx) legt bei Bedarf ein VERSTECKTES an -- nur
+    /// fuer den GL-Kontext. Wer ohne SCREEN auf den Schirm zeichnet, malt in
+    /// genau dieses versteckte Fenster: kein Fehler, kein Bild, kein Wort.
+    /// `vm::try_graphics` fragt das Flag, bevor ein Schirmbefehl laeuft.
+    pub sichtbar: bool,
+    /// Hat FLIP je gezeichnet? Ein Programm mit SCREEN und Zeichenbefehlen,
+    /// aber ohne FLIP, zeigt ebenfalls ein leeres Fenster (dhrt sammelt die
+    /// Befehle und spielt sie erst beim FLIP ab) -- am Programmende ein Satz.
+    pub flips: u64,
     titel: String,
     /// Hat das Programm `WINDOW_ESC_QUIT` selbst aufgerufen? Dann bleibt die
     /// ESC-Taste, wie es sie gesetzt hat -- auch wenn es die gui benutzt
@@ -1581,7 +1591,8 @@ impl Graphics {
         let scene_rt = rl.load_render_texture(&thread, win_w as u32, win_h as u32).ok();
         let mut g = Graphics {
             rl, thread, width, height, scale,
-            a11y, a11y_versorgt: false, titel: title.to_string(), esc_ausdruecklich: false,
+            a11y, a11y_versorgt: false, sichtbar: !hidden, flips: 0,
+            titel: title.to_string(), esc_ausdruecklich: false,
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), shader_textures: HashMap::new(),
@@ -1850,6 +1861,7 @@ impl Graphics {
     /// Wie `reconfigure`, aber `scale` wird direkt uebernommen (kein DHRT_SCALE-
     /// Override). Gemeinsame Basis fuer SCREEN und SCREEN_NATIVE.
     fn reconfigure_raw(&mut self, width: i32, height: i32, title: &str, scale: i32) {
+        self.sichtbar = true;
         self.width = width;
         self.height = height;
         self.scale = scale;
@@ -3441,6 +3453,7 @@ impl Graphics {
         let chars = zeichensatz();
         let rl = &mut self.rl;
         let thread = &self.thread;
+        crate::builtins::datei_da(path, "LOADFONT")?;
         let f = schrift_laden(rl, thread, path, size, &chars)
             .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
         Self::keine_ersatzschrift(&f, path)?;
@@ -3464,6 +3477,7 @@ impl Graphics {
         let path = resolved.as_str();
         let rl = &mut self.rl;
         let thread = &self.thread;
+        crate::builtins::datei_da(path, "LOADFONT")?;
         let f = schrift_laden(rl, thread, path, size, &chars)
             .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
         Self::keine_ersatzschrift(&f, path)?;
@@ -3643,10 +3657,7 @@ impl Graphics {
         if let Some(&h) = self.image_cache.get(path) { return Ok(h); }
         // Vorher pruefen: raylib sagt sonst nur "image data is null, either
         // the file doesnt exist or the image type is unsupported".
-        if !std::path::Path::new(path).is_file() {
-            let ort = std::env::current_dir().map(|d| d.display().to_string()).unwrap_or_default();
-            return Err(format!("LOADIMAGE: Datei '{}' nicht gefunden (gesucht relativ zu {})", path, ort));
-        }
+        crate::builtins::datei_da(path, "LOADIMAGE")?;
         // CPU-Image laden (fuer imgfx) + GPU-Textur daraus.
         let img = Image::load_image(path).map_err(|e| format!("LOADIMAGE: {}", e))?;
         let tex = self.rl.load_texture_from_image(&self.thread, &img).map_err(|e| format!("LOADIMAGE: {}", e))?;
@@ -5700,7 +5711,22 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         self.a11y_versorgt = false;
     }
 
+    /// Darf ein Schirmbefehl laufen? Ein sichtbares Fenster (SCREEN) -- oder
+    /// ein aktives Render-Ziel, in das absichtlich neben den Schirm gezeichnet
+    /// wird.
+    pub fn schirm_bereit(&self) -> bool { self.sichtbar || self.active_rt.is_some() }
+
+    /// Wurde gezeichnet, aber nie gezeigt? dhrt ZEICHNET nicht sofort, es
+    /// sammelt die Befehle und spielt sie beim FLIP ab (Layer in z-Reihen-
+    /// folge). Ein Programm mit SCREEN und Zeichenbefehlen, aber ohne FLIP,
+    /// zeigt darum ein leeres Fenster -- in QBasic oder Blitz waere dasselbe
+    /// Programm richtig. Am Programmende einen Satz wert.
+    pub fn nie_gezeigt(&self) -> bool {
+        self.sichtbar && self.flips == 0 && self.layers.iter().any(|l| !l.cmds.is_empty())
+    }
+
     pub fn flip(&mut self) {
+        self.flips += 1;
         // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
         // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.
         self.ausweich_nachladen();

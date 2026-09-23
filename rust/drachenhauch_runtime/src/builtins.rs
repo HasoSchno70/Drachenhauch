@@ -41,6 +41,20 @@ pub fn resolve_asset_path(p: &str) -> String {
     p.to_string()
 }
 
+/// Gibt es die Datei? Sonst eine Meldung, die den ORT nennt.
+///
+/// Ein Programm laeuft im Verzeichnis seiner Quelle (dhrt wechselt dorthin),
+/// und genau da sucht jeder relative Pfad -- wer aus einem anderen Ordner
+/// startet, sucht den Fehler sonst in der Datei statt im Pfad. Die Lader von
+/// Bild, Klang, Sample und Musik teilen sich den Satz: die Bibliotheken
+/// darunter melden sonst jede etwas anderes, von "os error 2" bis
+/// `IoError(Os { .. })`.
+pub fn datei_da(pfad: &str, befehl: &str) -> Result<(), String> {
+    if std::path::Path::new(pfad).is_file() { return Ok(()); }
+    let ort = std::env::current_dir().map(|d| d.display().to_string()).unwrap_or_default();
+    Err(format!("{}: Datei '{}' nicht gefunden (gesucht relativ zu {})", befehl, pfad, ort))
+}
+
 // --- PRNG fuer RND/RANDOMIZE: xorshift64, ohne RANDOMIZE(seed) zeitbasiert
 // geseedet -- Laeufe sind dann bewusst nicht reproduzierbar.
 thread_local! {
@@ -164,6 +178,10 @@ fn need_str<'a>(v: &'a Value, fn_: &str) -> Result<&'a str, String> {
 fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
     match v {
         Value::Int(i) => Ok(*i),
+        // Ein Text, wo eine Zahl steht, ist fast immer einer von drei Faellen
+        // (Dateiname, Taste, Hex-Farbe) -- der Satz dazu steht in umstieg.rs.
+        Value::Str(s) => Err(format!("{} erwartet INTEGER, erhalten STRING{}",
+                                     fn_, crate::umstieg::text_statt_zahl(fn_, s))),
         _ => Err(format!("{} erwartet INTEGER, erhalten {}", fn_, v.type_name())),
     }
 }
@@ -1210,6 +1228,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // Verlauf; eine Division liefert IMMER FLOAT). `dhrt --check` kann
             // davor nicht warnen, weil der Fehler am WERT haengt, nicht am
             // Text -- im Einsteigerbuch fiel er deshalb fuenfmal an.
+            //
+            // Ein einzelner Text ist eine Hex-Farbe (`RGB("FF0000")`): die
+            // Argumentzahl stimmt dann nicht, und die Meldung darueber sagt
+            // nichts ueber den eigentlichen Wunsch.
+            if a.len() == 1 {
+                if let Value::Str(s) = &a[0] {
+                    return err(format!("RGB: erwartet 3 Zahlen (r, g, b){}",
+                                       crate::umstieg::text_statt_zahl("rgb", s)));
+                }
+            }
             arity!(3);
             let (r, g, b) = (need_int_gerundet(&a[0], "RGB")?, need_int_gerundet(&a[1], "RGB")?,
                              need_int_gerundet(&a[2], "RGB")?);
@@ -2852,8 +2880,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "writeline" | "write" => {
             arity!(2);
-            let text = need_str(&a[1], "WRITE")?.to_string();
-            let f = file_h(&a[0], "WRITE")?;
+            let ruf = name.to_uppercase();
+            let text = need_str(&a[1], &ruf)?.to_string();
+            let f = file_h(&a[0], &ruf)?;
             let mut f = f.borrow_mut();
             let kod = f.kod;
             match &mut f.h {
@@ -5550,7 +5579,16 @@ fn json_haenge_an(h: &Value, path: &str, wert: serde_json::Value, fn_: &str) -> 
 }
 
 fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<GbFile>>, String> {
-    match v { Value::File(f) => Ok(f), _ => Err(format!("{} erwartet FILE", fn_)) }
+    match v {
+        Value::File(f) => Ok(f),
+        // `DIM f AS FILE` legt kein Handle an -- die Variable ist NIL, bis
+        // OPENFILE eins liefert. Ohne diesen Zweig stand da "WRITE erwartet
+        // FILE", und die Datei war ja als FILE deklariert.
+        Value::Nil => Err(format!(
+            concat!("{}: die Datei ist nicht geoeffnet -- f = OPENFILE(\"name.txt\", \"w\") ",
+                    "(\"r\" zum Lesen, \"a\" zum Anhaengen) muss davor stehen"), fn_)),
+        v => Err(format!("{}: erwartet eine Datei aus OPENFILE, erhalten {}", fn_, v.type_name())),
+    }
 }
 
 // ===== BUFFER-Helfer (WP B) =====

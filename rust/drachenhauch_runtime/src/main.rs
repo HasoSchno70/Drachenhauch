@@ -12,6 +12,7 @@
 //! Meldungen genutzt (`Laufzeitfehler in spiel.dh:Zeile: ...`). `dhrun.py
 //! --native` reicht den Namen der `.dh`-Quelldatei durch.
 
+mod aehnlich;
 mod animfsm;
 // dhrt als Hauptprogramm eines .app-Bundles (Notarisierung braucht ein echtes
 // Programm statt eines Shell-Starters).
@@ -2005,6 +2006,7 @@ fn run_program_value(json: serde_json::Value, source_label: &str) -> ExitCode {
     let mut machine = vm::Vm::new(&prog);
     match machine.run() {
         Ok(()) => {
+            if let Some(h) = machine.hinweis_ohne_flip() { eprintln!("{}", h); }
             let out = machine.take_output();
             // stdout schreiben (Output wird gepuffert, damit es genau einmal
             // und ohne Zwischen-Flush-Artefakte erscheint).

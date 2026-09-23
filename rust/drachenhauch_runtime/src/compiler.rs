@@ -584,6 +584,17 @@ pub(crate) fn is_known_builtin(name: &str) -> bool {
     set.is_empty() || set.contains(&name.to_lowercase())
 }
 
+/// "Meintest du ...?" zu einem Namen, den das Befehlsverzeichnis nicht kennt.
+/// Leer, wenn nichts nahe genug liegt (die Regeln stehen in `aehnlich.rs`).
+///
+/// Die Kandidaten kommen aus dem Verzeichnis, nicht aus `known_builtins()`:
+/// dort stehen sie klein, und in einer Meldung soll der Name so stehen, wie
+/// man ihn schreibt.
+pub(crate) fn aehnliche_builtins(name: &str) -> String {
+    crate::aehnlich::hinweis(
+        name, builtin_eintraege().iter().map(|(n, _, _)| n.as_str()))
+}
+
 impl Compiler {
     fn new(external_types: std::collections::HashSet<String>,
            builtin_aliases: Vec<(String, String)>,
@@ -1301,39 +1312,13 @@ impl Compiler {
     }
 
     /// Der aehnlichste aus `kandidaten` -- oder None, wenn keiner nah genug
-    /// ist. Ein Vorschlag, der danebenliegt, ist schlimmer als keiner, deshalb
-    /// waechst die Schwelle mit der Namenslaenge. Ab vier Zeichen sind es
-    /// zwei: der haeufigste Tippfehler ist ein Dreher (`scroe` statt `score`),
-    /// und der kostet in dieser Rechnung bereits zwei Schritte.
+    /// ist. Ein Vorschlag, der danebenliegt, ist schlimmer als keiner; die
+    /// Regeln dafuer stehen in `aehnlich.rs` und gelten auch fuer unbekannte
+    /// BEFEHLE (eine Quelle, sonst schlaegt derselbe Dreher hier und dort
+    /// verschieden an).
     fn naechster_name(gesucht: &str, kandidaten: &[String]) -> Option<String> {
-        let schwelle = match gesucht.chars().count() {
-            0..=3 => 1,
-            4..=8 => 2,
-            _ => 3,
-        };
-        kandidaten.iter()
-            .map(|k| (Self::abstand(gesucht, k), k))
-            .filter(|(d, _)| *d <= schwelle)
-            .min_by_key(|(d, _)| *d)
-            .map(|(_, k)| k.clone())
-    }
-
-    /// Levenshtein-Abstand (Zeichen, nicht Bytes -- Umlaute in Namen sind
-    /// erlaubt).
-    fn abstand(a: &str, b: &str) -> usize {
-        let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
-        let mut zeile: Vec<usize> = (0..=b.len()).collect();
-        for (i, ca) in a.iter().enumerate() {
-            let mut vorher = zeile[0];
-            zeile[0] = i + 1;
-            for (j, cb) in b.iter().enumerate() {
-                let kosten = if ca == cb { 0 } else { 1 };
-                let neu = (zeile[j] + 1).min(zeile[j + 1] + 1).min(vorher + kosten);
-                vorher = zeile[j + 1];
-                zeile[j + 1] = neu;
-            }
-        }
-        zeile[b.len()]
+        crate::aehnlich::vorschlaege(gesucht, kandidaten.iter().map(|k| k.as_str()))
+            .into_iter().next()
     }
 
     /// Warnt, wenn ein `RETURN` einen Typ liefert, den der angesagte
@@ -2556,11 +2541,12 @@ impl Compiler {
                 self.warnings.push((self.ctx.cur_line, format!(
                     "Unbekanntes Builtin '{}' -- dhrt kennt es nicht (Tippfehler? \
                      oder veraltet/entfernt). Der Aufruf schlaegt sonst \
-                     erst zur Laufzeit fehl.{}", bname.to_uppercase(),
+                     erst zur Laufzeit fehl.{}{}", bname.to_uppercase(),
                     match crate::umstieg::befehl(&bname.to_lowercase()) {
                         Some(h) => format!(" {}: {}.", bname.to_uppercase(), h),
                         None => String::new(),
-                    })));
+                    },
+                    aehnliche_builtins(&bname))));
             }
             // Passt die Argumentzahl? Zu WENIGE meldet die Laufzeit selbst.
             // Zu VIELE geht je nach Builtin unterschiedlich aus, und der

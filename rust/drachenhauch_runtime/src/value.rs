@@ -512,9 +512,16 @@ impl GbArray {
         let mut flat = 0i64;
         for (k, &idx) in indices.iter().enumerate() {
             if idx < 0 || idx >= self.dims[k] {
+                // Genau EINS zu weit ist fast immer die Zaehlung von 1 aus
+                // (oder `FOR i = 1 TO LEN(a)`). Der Satz steht nur dann da --
+                // bei Index 99 in einem Feld mit 3 Plaetzen hilft er nicht.
+                let ab_null = if idx == self.dims[k] {
+                    format!(" -- Felder zaehlen ab 0: DIM a[{}] hat a[0] bis a[{}]",
+                            self.dims[k], self.dims[k] - 1)
+                } else { String::new() };
                 return Err(format!(
-                    "Index {} ausserhalb [0..{}] in Dimension {}",
-                    idx, self.dims[k] - 1, k
+                    "Index {} ausserhalb [0..{}] in Dimension {}{}",
+                    idx, self.dims[k] - 1, k, ab_null
                 ));
             }
             flat += idx * self.strides[k];

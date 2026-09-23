@@ -1595,6 +1595,7 @@ resonance/reverb/distortion", other)),
     // ================= Core SFX =================
     pub fn load_sound(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
+        crate::builtins::datei_da(&resolved, "LOADSOUND")?;
         let data = static_von_pfad(&resolved)
             .map_err(|e| format!("LOADSOUND: {:?}", e))?;
         Ok(self.push_slot(data, 1.0))
@@ -1932,6 +1933,7 @@ resonance/reverb/distortion", other)),
     // ================= Sampler (SAMPLE_*) =================
     pub fn sample_load(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
+        crate::builtins::datei_da(&resolved, "SAMPLE_LOAD")?;
         // Kira dekodiert die Datei; wir lesen die Frames als mono f32.
         let data = static_von_pfad(&resolved)
             .map_err(|e| format!("SAMPLE_LOAD: {:?}", e))?;
@@ -2165,6 +2167,7 @@ resonance/reverb/distortion", other)),
 
     pub fn music_load(&mut self, path: &str) -> Result<(), String> {
         let resolved = crate::builtins::resolve_asset_path(path);
+        crate::builtins::datei_da(&resolved, "AUDIO_MUSIC_LOAD")?;
         let source = if is_module_path(&resolved) {
             let bytes = std::fs::read(&resolved)
                 .map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
