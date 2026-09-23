@@ -1802,7 +1802,8 @@ Schlüssel: `title_h` (Titelleisten-Höhe), `slider_h`, `check_size`,
 `slider_handle_w`, `caret_period` (Cursor-Blink), `pad` (Text-Innenabstand),
 `corner_radius` (runde Ecken für Fenster/Titelleiste/Buttons/TextInput/Dropdown/
 Progress/Panel + Häkchen-Checkbox; 0 = eckig/flach), `shadow` (weicher
-Fenster-Schatten in Pixeln; 0 = aus). **Hinweis:** Größen, die in die Widget-Maße
+Fenster-Schatten in Pixeln; 0 = aus), `uebergang` (Dauer der Übergänge in
+Millisekunden, Vorgabe 120; 0 = springen, siehe [Übergänge](#übergänge)). **Hinweis:** Größen, die in die Widget-Maße
 einfließen (`check_size`, `slider_h`), wirken nur auf **neu angelegte** Widgets —
 am besten vor dem UI-Aufbau setzen. `title_h`/`pad`/`caret_period`/`corner_radius`/
 `shadow` wirken sofort.
@@ -2174,6 +2175,41 @@ Glanzkante liegt ein Schatten unter dem oberen Rand. Ohne diesen Unterschied
 sieht ein Eingabefeld aus wie ein Knopf, und die Oberfläche verliert ihre
 Aussage darüber, was man anklickt und was man ausfüllt.
 
+## Übergänge
+
+Unter der Maus blendet ein Knopf in seine Hover-Farbe über, statt zu
+springen, und beim Verlassen wieder zurück. Dasselbe gilt für Kacheln,
+Kästchen, Radioknöpfe, Klapplisten, die Einträge der Werkzeugleiste, den
+Fokusring und den Kippschalter, dessen Knopf anfährt und abbremst.
+
+Ein **Akkordeon** klappt über dieselbe Dauer auf und zu: der Abschnitt
+wächst, die Köpfe darunter rücken mit, das Dreieck dreht sich, und die
+Inhalte gleiten hinein (sie werden auf den schon sichtbaren Teil
+beschnitten). **Anklickbar ist ein Kind erst, wenn es ganz zu sehen ist.**
+Ein Abschnitt, der beim Aufbau geöffnet wird (vor dem ersten `GUI_UPDATE`),
+steht sofort offen da. Wer direkt nach `GUI_ACCORDION_OPEN` mit
+`GUI_GET_Y` die Endlage eines Kindes braucht, setzt `uebergang` auf 0 oder
+wartet die Dauer ab.
+
+| Metrik | Bedeutung |
+|---|---|
+| `uebergang` | Dauer in Millisekunden, Vorgabe 120; 0 = springen wie früher |
+
+```basic
+GUI_METRIC_SET("uebergang", 200)   ' gemächlicher
+GUI_METRIC_SET("uebergang", 0)     ' aus
+```
+
+**Nur das Überfahren blendet hinein.** Drücken und Fokus erscheinen im
+selben Bild und blenden nur *aus*: wer klickt oder mit Tab weitergeht, will
+die Antwort sofort sehen, nicht drei Bilder später. Das Endbild ist in jedem
+Fall dasselbe wie ohne Übergang, nur der Weg dorthin ändert sich. Was ein
+Programm abfragt (`GUI_HOVERED`, `GUI_CLICKED`, `GUI_FOCUSED`), gilt
+weiterhin ab dem ersten Bild. Die Übergänge betreffen nur das, was man sieht.
+
+Gerechnet wird mit der echten Bildzeit (`DELTA()`), nicht mit Bildern: bei
+144 Hz ist ein Übergang genauso lang wie bei 60. Ohne Fenster (`DHRT_FRAMES`)
+ist `DELTA()` fest 1/60 s, jede Aufnahme zeigt also dieselbe Stufe.
 
 ## Kacheln
 

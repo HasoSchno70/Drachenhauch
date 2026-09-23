@@ -76,6 +76,10 @@ fn default_metrics() -> HashMap<String, i32> {
         // bekommt mit derselben Staerke einen Schlagschatten ueber die halbe
         // Flaeche -- dieselbe Zahl sieht auf zwei Groessen verschieden aus.
         ("verlauf_hoehe", 0),
+        // uebergang: Dauer in ms, mit der Ueberfahren, Druecken, Fokus und
+        // Kippschalter weich nachlaufen (0 = springen). Das Endbild ist
+        // dasselbe -- nur der Weg dorthin blendet.
+        ("uebergang", 120),
     ].iter().map(|(k, v)| (k.to_string(), *v as i32)).collect()
 }
 
@@ -172,11 +176,39 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
     }
 }
 
+/// Ein Uebergangswert 0..1 als weiche Kurve (smoothstep): langsam los, langsam
+/// an. Linear gezeichnet wirkt ein Einblenden mechanisch -- der Anfang springt.
+fn weich(t: f32) -> f64 {
+    let t = t.clamp(0.0, 1.0) as f64;
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// Einen Uebergangswert um einen Schritt an sein Ziel heranfuehren.
+fn naeher(t: &mut f32, ziel: f32, schritt: f32) {
+    if *t < ziel { *t = (*t + schritt).min(ziel); } else { *t = (*t - schritt).max(ziel); }
+}
+
+/// Eine Farbe mit anteiliger Deckkraft (1 = wie sie ist, 0 = weg).
+///
+/// Alpha 0 heisst in dhrt DECKEND -- darum wird eine Farbe ohne Alpha als 255
+/// gelesen, und ganz ausgeblendet wird 1 statt 0 geschrieben (sonst stuende
+/// genau die unsichtbare Stufe als volle Farbe da).
+fn deckkraft(c: i64, anteil: f64) -> i64 {
+    let a0 = ((c >> 24) & 0xFF) as f64;
+    let a0 = if a0 == 0.0 { 255.0 } else { a0 };
+    let a = (a0 * anteil.clamp(0.0, 1.0)).round();
+    if a >= 255.0 { return c & 0xFF_FFFF; }
+    ((a.max(1.0) as i64) << 24) | (c & 0xFF_FFFF)
+}
+
 /// Zwei Farben mischen (`t` = 0 ganz `a`, 1 ganz `b`). Fuer Uebergaenge, die
 /// einem Wert folgen -- etwa die Rinne des Kippschalters, die sich beim
 /// Umlegen einfaerbt.
 fn mischen(a: i64, b: i64, t: f64) -> i64 {
-    let t = t.clamp(0.0, 1.0);
+    // An den Enden unveraendert (samt Deckkraft): ein Uebergang, der gerade
+    // ruht, darf eine halbdurchsichtige Farbe nicht deckend machen.
+    if t <= 0.0 { return a; }
+    if t >= 1.0 { return b; }
     let ch = |sh: u32| -> i64 {
         let (ca, cb) = (((a >> sh) & 0xFF) as f64, ((b >> sh) & 0xFF) as f64);
         ((ca + (cb - ca) * t).round() as i64).clamp(0, 255)
@@ -1250,6 +1282,11 @@ struct AkkState {
     fokus: i32,
     /// Ereignis dieses Bildes: der umgeschaltete Abschnitt (-1 = keiner).
     umgeschaltet: i32,
+    /// Wie weit jeder Abschnitt offen ist (0..1), weich nachlaufend
+    /// (`uebergaenge`). Fehlt ein Eintrag, gilt der Zustand selbst -- so
+    /// steht ein beim Aufbau geoeffneter Abschnitt sofort offen da, statt
+    /// beim ersten Bild aufzuklappen.
+    auf_t: Vec<f32>,
 }
 
 /// Assistent (Kind::Wizard): Schritte nacheinander, oben die Schrittanzeige,
@@ -1316,6 +1353,8 @@ struct LeisteState {
     geklickt: i32,    // Eintrag, der in DIESEM Bild geklickt wurde (transient)
     mit_text: bool,   // Beschriftung neben dem Sinnbild
     symbol: i32,      // Sinnbildgroesse in Punkten, 0 = aus der Hoehe
+    /// Ueberfahren je Eintrag, weich nachlaufend (siehe `uebergaenge`).
+    hover_t: Vec<f32>,
 }
 
 /// Ein Feld der Statusleiste.
@@ -1359,7 +1398,7 @@ impl Default for PfadState {
 
 impl Default for LeisteState {
     fn default() -> Self {
-        LeisteState { eintraege: Vec::new(), hover: -1, gedrueckt: -1, geklickt: -1, mit_text: false, symbol: 0 }
+        LeisteState { eintraege: Vec::new(), hover: -1, gedrueckt: -1, geklickt: -1, mit_text: false, symbol: 0, hover_t: Vec::new() }
     }
 }
 
@@ -1976,6 +2015,13 @@ pub struct Widget {
     /// stehenbleibt.
     was_hovered: bool,
     was_focused: bool,
+    /// Uebergaenge 0..1, je Bild in `update` nachgefuehrt: Ueberfahren,
+    /// Druecken, Fokus. Gezeichnet wird ueber `weich()` -- die Flags
+    /// `hovered`/`press_origin`/`focus_widget` bleiben die Wahrheit fuer
+    /// alles, was ENTSCHEIDET; diese drei nur fuer das, was man sieht.
+    ueber_t: f32,
+    druck_t: f32,
+    fokus_t: f32,
     ov: HashMap<String, i64>,
     tbl: Option<Box<TableState>>,   // nur fuer Kind::Table
     tree: Option<Box<TreeState>>,   // nur fuer Kind::Tree
@@ -3455,6 +3501,7 @@ impl Gui {
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
+            ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0,
             alive: true, visible: true, rund: false, variante: 0,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0, stil: 0,
@@ -5886,18 +5933,37 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Je Bild, VOR dem Layout: Koepfe verorten, die Kinder an ihre Stelle im
     /// Abschnitt setzen. Ein Behaelter unter den Kindern verteilt danach
     /// seine eigenen -- darum vor `layout_pass`.
-    fn akk_pass(&mut self) {
+    ///
+    /// Hier laeuft auch der Oeffnungsgrad (`auf_t`) weiter, nicht erst in
+    /// `uebergaenge` -- sonst stuende die Lage ein Bild hinter dem Zustand,
+    /// und mit `uebergang` 0 zeigte ein GUI_UPDATE nach GUI_ACCORDION_OPEN
+    /// noch den alten Stand.
+    fn akk_pass(&mut self, dt: f64) {
         let kopf = self.sk(AKK_KOPF_H);
         let rand = self.sk(8);
+        let dauer = self.m("uebergang").max(0) as f32;
+        let schritt = if dauer > 0.0 { (dt as f32 * 1000.0 / dauer).clamp(0.0, 1.0) } else { 1.0 };
+        for win in self.windows.iter_mut() {
+            for wdg in win.widgets.iter_mut() {
+                if let Some(a) = wdg.akk.as_mut() {
+                    let n = a.offen.len();
+                    for s in 0..n {
+                        let ziel = if a.offen[s] { 1.0 } else { 0.0 };
+                        if s >= a.auf_t.len() { a.auf_t.push(ziel); } else { naeher(&mut a.auf_t[s], ziel, schritt); }
+                    }
+                    a.auf_t.truncate(n);
+                }
+            }
+        }
         for wi in 0..self.windows.len() {
             for p in 0..self.windows[wi].widgets.len() {
                 if self.windows[wi].widgets[p].kind != Kind::Accordion { continue; }
                 let (ax, ay, ah, n) = { let w = &self.windows[wi].widgets[p]; (w.x, w.y, w.h, w.items.len()) };
-                let (lage, kinder, offen, hoehen, scroll) = {
+                let (lage, kinder, offen, hoehen, scroll, auf_t) = {
                     let w = &self.windows[wi].widgets[p];
                     let a = match w.akk.as_ref() { Some(a) => a, None => continue };
                     (a.lage.clone(), w.tabctl.as_ref().map(|s| s.kinder.clone()).unwrap_or_default(),
-                     a.offen.clone(), a.hoehen.clone(), a.scroll)
+                     a.offen.clone(), a.hoehen.clone(), a.scroll, a.auf_t.clone())
                 };
                 let seite_von = |k: usize| kinder.iter().find(|&&(c, _)| c == k).map(|&(_, s)| s).unwrap_or(-1);
                 let mut koepfe = Vec::with_capacity(n);
@@ -5907,17 +5973,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     y += kopf;
                     let auf = offen.get(s).copied().unwrap_or(false);
                     let eigen = hoehen.get(s).copied().unwrap_or(0);
+                    // Gemessen wird IMMER die volle Hoehe -- auch beim
+                    // Zuklappen muss die Flaeche wissen, wovon sie schrumpft.
                     let mut inhalt = 0;
                     for &(k, dx, dy) in &lage {
                         if seite_von(k) != s as i32 { continue; }
                         let kh = self.windows[wi].widgets.get(k).map(|c| c.h).unwrap_or(0);
-                        if auf { inhalt = inhalt.max(dy + kh + rand); }
+                        inhalt = inhalt.max(dy + kh + rand);
                         if let Some(c) = self.windows[wi].widgets.get_mut(k) {
                             c.x = ax + dx;
                             c.y = ay + y + dy - scroll;
                         }
                     }
-                    let inhalt = if !auf { 0 } else if eigen > 0 { eigen } else { inhalt };
+                    let voll = if eigen > 0 { eigen } else { inhalt };
+                    let t = auf_t.get(s).copied().unwrap_or(if auf { 1.0 } else { 0.0 });
+                    let inhalt = (voll as f64 * weich(t)).round() as i32;
                     koepfe.push((kopf_y, inhalt));
                     y += inhalt;
                 }
@@ -5927,6 +5997,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 a.scroll = a.scroll.clamp(0, (y - ah).max(0));
             }
         }
+    }
+    /// Der sichtbare Teil des Abschnitts, in dem ein Akkordeon-Kind liegt,
+    /// als Bildschirm-Rechteck (x, y, b, h) -- `None`, wenn das Widget kein
+    /// Kind eines Akkordeons ist. Hoehe 0 = der Abschnitt ist zu. Eine
+    /// Quelle fuer das Beschneiden beim Zeichnen; `widget_shown` rechnet
+    /// dieselbe Unterkante fuer die Frage "ganz zu sehen?".
+    fn akk_ausschnitt(&self, wi: usize, w: &Widget) -> Option<(i32, i32, i32, i32)> {
+        if w.tc_von < 0 || !(w.alive && w.visible) { return None; }
+        let tc = self.windows[wi].widgets.get(w.tc_von as usize)?;
+        if tc.kind != Kind::Accordion { return None; }
+        let a = tc.akk.as_ref()?;
+        if !self.widget_shown(wi, tc) { return Some((0, 0, 0, 0)); }
+        let (ax, ay, aw, ah) = self.abs_rect(wi, tc);
+        let (ky, inh) = a.koepfe.get(w.tc_seite.max(0) as usize).copied().unwrap_or((0, 0));
+        let oben = (ay + ky + self.sk(AKK_KOPF_H) - a.scroll).max(ay + 1);
+        let unten = (ay + ky + self.sk(AKK_KOPF_H) + inh - a.scroll).min(ay + ah - 1);
+        Some((ax + 1, oben, (aw - 2).max(0), (unten - oben).max(0)))
     }
     /// Welcher Kopf liegt unter y (absolut)? Dieselbe Rechnung wie das Zeichnen.
     fn akk_kopf_unter(&self, w: &Widget, ay: i32, my: i32) -> i32 {
@@ -10010,9 +10097,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // Akkordeon: der Abschnitt muss offen sein, und das Kind muss
                 // ganz im sichtbaren Teil liegen -- halb herausgerollt waere es
                 // halb ueber dem Nachbarn oder dem Rand.
+                // Waehrend des Auf- und Zuklappens zaehlt der Teil des
+                // Abschnitts, der schon (noch) zu sehen ist: ein Kind
+                // erscheint, sobald es ganz hineinpasst.
                 Some(tc) if tc.kind == Kind::Accordion => {
-                    let auf = tc.akk.as_ref().and_then(|a| a.offen.get(w.tc_seite.max(0) as usize).copied()).unwrap_or(false);
-                    return auf && tc.alive && tc.visible && w.y >= tc.y && w.y + w.h <= tc.y + tc.h;
+                    let s = w.tc_seite.max(0) as usize;
+                    let unten = match tc.akk.as_ref().and_then(|a| a.koepfe.get(s).map(|&(ky, inh)| (ky, inh, a.scroll))) {
+                        Some((ky, inh, sc)) if inh > 0 => tc.y + ky + self.sk(AKK_KOPF_H) + inh - sc,
+                        _ => return false,
+                    };
+                    return tc.alive && tc.visible && w.y >= tc.y && w.y + w.h <= (tc.y + tc.h).min(unten);
                 }
                 Some(tc) => return tc.sel == w.tc_seite && tc.alive && tc.visible,
                 None => return true,
@@ -10454,6 +10548,43 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         g.line(x1 + ein, y2 - 1, x2 - ein, y2 - 1, unten);
     }
 
+    /// Die Uebergaenge eines Bildes nachfuehren (Metrik `uebergang` in ms).
+    ///
+    /// Gerechnet wird mit `delta()` statt mit Bildern: bei 144 Hz liefe eine
+    /// Bildzahl mehr als doppelt so schnell. Headless ist `delta` fest 1/60,
+    /// ein Test sieht also bei jedem Lauf dieselbe Stufe.
+    ///
+    /// **Hinein geht es nur beim Ueberfahren weich.** Druecken und Fokus
+    /// erscheinen SOFORT und blenden nur aus: wer klickt oder mit Tab
+    /// weitergeht, will die Antwort in diesem Bild sehen, nicht in dreien.
+    fn uebergaenge(&mut self, dt: f64) {
+        let dauer = self.m("uebergang").max(0) as f32;
+        let schritt = if dauer > 0.0 { (dt as f32 * 1000.0 / dauer).clamp(0.0, 1.0) } else { 1.0 };
+        let (druck, fokus) = (self.press_origin, self.focus_widget);
+        for (wi, win) in self.windows.iter_mut().enumerate() {
+            for (i, wdg) in win.widgets.iter_mut().enumerate() {
+                naeher(&mut wdg.ueber_t, if wdg.hovered && wdg.enabled { 1.0 } else { 0.0 }, schritt);
+                if druck == Some((wi, i)) { wdg.druck_t = 1.0; } else { naeher(&mut wdg.druck_t, 0.0, schritt); }
+                if fokus == Some((wi, i)) { wdg.fokus_t = 1.0; } else { naeher(&mut wdg.fokus_t, 0.0, schritt); }
+                // Kippschalter: `value` gleitet dem Zustand nach, gezeichnet
+                // ueber `weich()`, damit der Knopf anfaehrt und abbremst.
+                if wdg.kind == Kind::Toggle {
+                    let ziel = if wdg.checked { 1.0 } else { 0.0 };
+                    let mut v = wdg.value as f32;
+                    naeher(&mut v, ziel, schritt);
+                    wdg.value = v as f64;
+                }
+                if let Some(l) = wdg.leiste.as_mut() {
+                    l.hover_t.resize(l.eintraege.len(), 0.0);
+                    for (k, t) in l.hover_t.iter_mut().enumerate() {
+                        let ziel = if l.hover == k as i32 && !l.eintraege[k].aus { 1.0 } else { 0.0 };
+                        naeher(t, ziel, schritt);
+                    }
+                }
+            }
+        }
+    }
+
     // --- Update (ein Frame) ---
     pub fn update(&mut self, g: &mut Graphics) {
         let mx = g.mouse_x() as i32;
@@ -10498,7 +10629,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.schnitte_laden(g);
         self.rt_pass(g);
         self.umbruch_layout(g);
-        self.akk_pass();
+        self.akk_pass(g.delta());
         self.layout_pass(g);
         self.panel_pass();
         self.tabctl_pass();
@@ -10798,17 +10929,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 self.active_knob = None;
             }
         }
-        // Kippschalter: `value` zieht dem Zustand weich nach, damit der Knopf
-        // hinuebergleitet statt zu springen.
-        for win in self.windows.iter_mut() {
-            for wdg in win.widgets.iter_mut() {
-                if wdg.kind == Kind::Toggle {
-                    let ziel = if wdg.checked { 1.0 } else { 0.0 };
-                    wdg.value += (ziel - wdg.value) * 0.28;
-                    if (ziel - wdg.value).abs() < 0.005 { wdg.value = ziel; }
-                }
-            }
-        }
+        self.uebergaenge(g.delta());
         // Laufendes Splitter-Drag.
         if let Some((wi, i)) = self.active_split {
             if is_down { self.drag_split(wi, i, mx, my); } else { self.active_split = None; }
@@ -15427,6 +15548,18 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // gezogen, ragt nichts ueber den Rand/die Titelleiste/Menueleiste hinaus.
         g.push_clip(x + 1, y + coff, (w - 2).max(0), (h - coff - 1).max(0));
         for (i, wdg) in win.widgets.iter().enumerate() {
+            // Kind eines Akkordeons, dessen Abschnitt gerade auf- oder
+            // zugeht: auf den sichtbaren Teil beschnitten gezeichnet, damit
+            // es hineingleitet statt aufzutauchen. Bedienbar (widget_shown)
+            // ist es erst, wenn es ganz zu sehen ist.
+            if let Some((cx, cy, cw, ch)) = self.akk_ausschnitt(wi, wdg) {
+                if ch > 0 && (wdg.tab_page < 0 || wdg.tab_page == win.active_tab) {
+                    g.push_clip(cx, cy, cw, ch);
+                    self.draw_widget(g, wi, i, wdg);
+                    g.pop_clip();
+                }
+                continue;
+            }
             if !self.widget_shown(wi, wdg) { continue; }
             if wdg.panel_von >= 0 {
                 // Kind eines rollenden Panels: auf dessen Innenflaeche beschnitten.
@@ -15492,6 +15625,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let (bx1, by1, bx2, by2) = (x0, iy, x1 - 1, iy + ih - 1);
                     let hover = l.hover == k as i32 && !e.aus;
                     let druck = gedrueckt == k as i32 && hover;
+                    let ht = if e.aus { 0.0 } else { weich(l.hover_t.get(k).copied().unwrap_or(if hover { 1.0 } else { 0.0 })) };
                     if druck {
                         let f = shade(self.th("widget_bg"), -14);
                         g.round_gradient(bx1, by1, bx2, by2, rad, shade(f, -6), shade(f, 4));
@@ -15500,14 +15634,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         // Eingeschaltet: ein Hauch Akzent statt einer Flaeche --
                         // zwei eingeschaltete Knoepfe nebeneinander sollen noch
                         // wie Knoepfe aussehen, nicht wie ein Balken.
-                        let a = if hover { 0x60 } else { 0x40 };
+                        let a = (0x40 as f64 + 0x20 as f64 * ht).round() as i64;
                         g.round_rect(bx1, by1, bx2, by2, rad, (a << 24) | (acc & 0xFF_FFFF), true);
                         g.round_rect(bx1, by1, bx2, by2, rad, mischen(acc, bg, 0.35), false);
-                    } else if hover {
+                    } else if ht > 0.0 {
+                        // Blendet ein und wieder aus: faehrt man ueber die
+                        // Leiste, zieht die Flaeche weich hinter der Maus her.
                         let f = shade(self.th("widget_bg"), 8);
-                        g.round_gradient(bx1, by1, bx2, by2, rad, shade(f, 10), shade(f, -6));
-                        self.gloss(g, bx1, by1, bx2, by2, rad, 0.6);
-                        g.round_rect(bx1, by1, bx2, by2, rad, self.th("widget_border"), false);
+                        g.round_gradient(bx1, by1, bx2, by2, rad, deckkraft(shade(f, 10), ht), deckkraft(shade(f, -6), ht));
+                        self.gloss(g, bx1, by1, bx2, by2, rad, 0.6 * ht);
+                        g.round_rect(bx1, by1, bx2, by2, rad, deckkraft(self.th("widget_border"), ht), false);
                     }
                     let c = if e.aus { self.th("muted_fg") } else if e.an { acc } else { ruhig };
                     let hat_bild = !e.symbol.is_empty() || e.bild >= 0;
@@ -15637,20 +15773,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let has_icon = wdg.sel >= 0 || !wdg.sinnbild.is_empty();
                 let icon_only = has_icon && wdg.text.is_empty();
                 let pressed = self.press_origin == Some((wi, idx));
+                // Uebergaenge: eh = ueberfahren, ed = gedrueckt (beide 0..1).
+                let (eh, ed) = if wdg.enabled { (weich(wdg.ueber_t), weich(wdg.druck_t)) } else { (0.0, 0.0) };
                 if icon_only {
-                    // Flacher Toolbar-Look: Flaeche nur bei Hover/Press.
+                    // Flacher Toolbar-Look: Flaeche nur bei Hover/Press --
+                    // sie blendet ein, statt aufzutauchen.
                     let bgc = self.wcol(wdg, "bg", "widget_bg");
-                    let hl = if pressed { Some(shade(bgc, -20)) }
-                             else if wdg.hovered { Some(shade(bgc, 24)) } else { None };
-                    if let Some(c) = hl {
+                    let anteil = eh.max(ed);
+                    if anteil > 0.0 {
+                        let c = mischen(shade(bgc, 24), shade(bgc, -20), ed);
                         let rad = if wdg.rund { (w.min(h) / 2).max(2) } else { self.m("corner_radius").min(6) };
-                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, c, true);
+                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, deckkraft(c, anteil), true);
                     }
                 } else if wdg.rund {
                     // Runder Knopf: der Eckenradius ist die halbe kurze Seite,
                     // damit aus dem Rechteck eine Kapsel bzw. ein Kreis wird.
-                    let mut bg = self.wcol(wdg, "bg", "widget_bg");
-                    if pressed { bg = shade(bg, -30); } else if wdg.hovered { bg = shade(bg, 30); }
+                    let grund = self.wcol(wdg, "bg", "widget_bg");
+                    let bg = mischen(mischen(grund, shade(grund, 30), eh), shade(grund, -30), ed);
                     let r = (w.min(h) / 2).max(2);
                     let gr = self.m("gradient");
                     if gr > 0 {
@@ -15666,22 +15805,24 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     // sie tritt hervor, wenn man ihn beruehrt.
                     let acc = self.wcol(wdg, "accent", "accent");
                     let rad = self.m("corner_radius").min(self.sk(6));
-                    let aktiv = (pressed || wdg.hovered) && wdg.enabled;
+                    let anteil = eh.max(ed);
                     match wdg.variante {
                         5 => {
-                            if aktiv {
-                                let a: i64 = if pressed { 0x50 } else { 0x2C };
-                                g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, (a << 24) | (acc & 0xFF_FFFF), true);
+                            if anteil > 0.0 {
+                                let a = (0x2C as f64 * eh + (0x50 as f64 - 0x2C as f64 * eh) * ed).round() as i64;
+                                if a >= 1 {
+                                    g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, (a.min(255) << 24) | (acc & 0xFF_FFFF), true);
+                                }
                             }
                             let rc = if wdg.enabled { self.wcol(wdg, "border", "accent") } else { self.th("widget_border") };
                             g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, rc, false);
                             g.round_rect(ax + 1, ay + 1, ax + w - 2, ay + h - 2, (rad - 1).max(0), rc, false);
                         }
                         6 => {
-                            if aktiv {
+                            if anteil > 0.0 {
                                 let bg = self.wcol(wdg, "bg", "widget_bg");
-                                let f = if pressed { shade(bg, -12) } else { shade(bg, 16) };
-                                g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, f, true);
+                                let f = mischen(shade(bg, 16), shade(bg, -12), ed);
+                                g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, deckkraft(f, anteil), true);
                             }
                         }
                         _ => {}
@@ -15693,11 +15834,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let grund = self.knopf_grund(wdg);
                     let mut bg = grund.unwrap_or_else(|| self.th("widget_bg"));
                     if !wdg.enabled && grund.is_some() { bg = mischen(bg, self.th("widget_bg"), 0.65); }
-                    if pressed && wdg.enabled {
-                        bg = wdg.ov.get("pressed").copied().unwrap_or(shade(bg, -30));
-                    } else if wdg.hovered && wdg.enabled {
-                        bg = wdg.ov.get("hover").copied().unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
-                    }
+                    let bg_h = wdg.ov.get("hover").copied().unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
+                    let bg_d = wdg.ov.get("pressed").copied().unwrap_or(shade(bg, -30));
+                    bg = mischen(mischen(bg, bg_h, eh), bg_d, ed);
                     // Der Standard-Knopf traegt den Akzent als Rahmen -- man
                     // soll sehen, was Enter tun wird.
                     let rahmen = if self.windows[wi].default_btn == idx as i32 && wdg.variante != 1 {
@@ -15781,11 +15920,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         // hineingehoert.
                         self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
                                        self.wcol(wdg, "bg", "widget_bg"),
-                                       if wdg.hovered { acc } else { bordc });
+                                       mischen(bordc, acc, if wdg.enabled { weich(wdg.ueber_t) } else { 0.0 }));
                     }
                 } else {
                     g.rect(ax, ay, ax + w - 1, ay + h - 1, bordc);
-                    if wdg.hovered { g.rect(ax - 1, ay - 1, ax + w, ay + h, acc); }
+                    if wdg.ueber_t > 0.0 { g.rect(ax - 1, ay - 1, ax + w, ay + h, deckkraft(acc, weich(wdg.ueber_t))); }
                     if wdg.checked { g.box_fill(ax + 3, ay + 3, ax + w - 4, ay + h - 4, acc); }
                 }
                 self.wtext(g, wdg, ax + w + pad, ay, wdg.text.clone(), self.txt_col(wdg));
@@ -15828,7 +15967,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let r = h / 2;
                 // Die Rinne faerbt sich mit dem Zustand ein -- ueber `value`,
                 // also gleitend statt springend.
-                let mix = wdg.value.clamp(0.0, 1.0);
+                let mix = weich(wdg.value as f32);
                 let bahn = mischen(aus, acc, mix);
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bahn,
                                self.wcol(wdg, "border", "widget_border"));
@@ -16206,7 +16345,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let (cx, cy, r) = (ax + w / 2, ay + h / 2, (w / 2).max(2));
                 g.circle(cx, cy, r, self.wcol(wdg, "border", "widget_border"));   // Ring
                 g.circle(cx, cy, (r - 1).max(1), self.th("win_bg"));
-                if wdg.hovered { g.circle(cx, cy, r, acc); g.circle(cx, cy, (r - 1).max(1), self.th("win_bg")); }
+                if wdg.ueber_t > 0.0 {
+                    g.circle(cx, cy, r, mischen(self.wcol(wdg, "border", "widget_border"), acc, weich(wdg.ueber_t)));
+                    g.circle(cx, cy, (r - 1).max(1), self.th("win_bg"));
+                }
                 if wdg.checked { g.circle(cx, cy, (r - 4).max(1), acc); }   // Punkt
                 self.wtext(g, wdg, ax + w + pad, ay, wdg.text.clone(), self.txt_col(wdg));
             }
@@ -16235,7 +16377,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             Kind::Dropdown => {
                 let bg = self.wcol(wdg, "bg", "widget_bg");
-                let b = if wdg.hovered { shade(bg, 18) } else { bg };
+                let b = mischen(bg, shade(bg, 18), weich(wdg.ueber_t));
                 self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, b, self.wcol(wdg, "border", "widget_border"));
                 let fg = self.txt_col(wdg);
                 let txt = if wdg.sel >= 0 && (wdg.sel as usize) < wdg.items.len() {
@@ -16483,7 +16625,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         let y0 = ay + ky - a.scroll;
                         if y0 > ay + h || y0 + kopf + inh < ay { continue; }
                         let offen = a.offen.get(s).copied().unwrap_or(false);
-                        if offen && inh > 0 {
+                        if inh > 0 {
                             g.box_fill(ax + 1, y0 + kopf, ax + w - 2, y0 + kopf + inh - 1, shade(grund, -6));
                         }
                         let ueber = mx >= ax && mx < ax + w && my >= y0.max(ay) && my < (y0 + kopf).min(ay + h);
@@ -16491,8 +16633,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         self.fbox(g, ax + 1, y0, ax + w - 2, y0 + kopf - 1, bg, border);
                         // Dreieck: zu zeigt nach rechts, offen nach unten.
                         let (tx, ty, d) = (ax + self.sk(14), y0 + kopf / 2, self.sk(5));
-                        if offen { g.triangle(tx - d, ty - d / 2, tx + d, ty - d / 2, tx, ty + d, acc); }
-                        else { g.triangle(tx - d / 2, ty - d, tx - d / 2, ty + d, tx + d, ty, fg); }
+                        // Das Dreieck dreht sich mit dem Aufklappen: von
+                        // rechts (zu) um 90 Grad nach unten (offen).
+                        let t = weich(a.auf_t.get(s).copied().unwrap_or(if offen { 1.0 } else { 0.0 }));
+                        let (sn, cs) = (t * std::f64::consts::FRAC_PI_2).sin_cos();
+                        let dreh = |dx: i32, dy: i32| -> (i32, i32) {
+                            let (dx, dy) = (dx as f64, dy as f64);
+                            (tx + (dx * cs - dy * sn).round() as i32, ty + (dx * sn + dy * cs).round() as i32)
+                        };
+                        let (p1, p2, p3) = (dreh(-d / 2, -d), dreh(-d / 2, d), dreh(d, 0));
+                        g.triangle(p1.0, p1.1, p2.0, p2.1, p3.0, p3.1, mischen(fg, acc, t));
                         let th = self.wsize(g, wdg);
                         self.wtext(g, wdg, ax + self.sk(28), y0 + (kopf - th).max(0) / 2, wdg.items[s].clone(), fg);
                         if fokus_hier && a.fokus == s as i32 {
@@ -16645,8 +16795,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // verdeckte er Inhalt -- ein Kaestchen ist nur check_size gross, ein
         // Ring darin waere kaum zu sehen. Ohne sichtbaren Fokus waere die
         // Tab-Navigation wertlos: man wuesste nie, wo man gerade ist.
-        if self.focus_widget == Some((wi, idx)) && wdg.kind.fokussierbar() {
-            g.rect(ax - 3, ay - 3, ax + w + 2, ay + h + 2, self.th("accent"));
+        if wdg.fokus_t > 0.0 && wdg.kind.fokussierbar() {
+            g.rect(ax - 3, ay - 3, ax + w + 2, ay + h + 2, deckkraft(self.th("accent"), weich(wdg.fokus_t)));
         }
         // Fehlerrahmen der Formularpruefung: zwei Linien in Rot, direkt am
         // Rand -- der Fokusring liegt weiter aussen, beide bleiben sichtbar.
@@ -17051,15 +17201,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     #[allow(clippy::too_many_arguments)]
     fn draw_karte(&self, g: &mut Graphics, wi: usize, idx: usize, ax: i32, ay: i32, w: i32, h: i32) {
         let wdg = &self.windows[wi].widgets[idx];
-        let gedrueckt = self.press_origin == Some((wi, idx)) && wdg.enabled;
-        let ueber = wdg.hovered && wdg.enabled;
+        let (eh, ed) = if wdg.enabled { (weich(wdg.ueber_t), weich(wdg.druck_t)) } else { (0.0, 0.0) };
         let grund = self.wcol(wdg, "bg", "widget_bg");
-        let bg = if gedrueckt { shade(grund, -14) } else if ueber { shade(grund, 18) } else { grund };
-        let rahmen = if ueber || gedrueckt { self.acc_col(wdg) } else { self.wcol(wdg, "border", "widget_border") };
+        let bg = mischen(mischen(grund, shade(grund, 18), eh), shade(grund, -14), ed);
+        let rahmen = mischen(self.wcol(wdg, "border", "widget_border"), self.acc_col(wdg), eh.max(ed));
         self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bg, rahmen);
-        if ueber {
+        if eh > 0.0 {
             let rad = self.m("corner_radius");
-            g.round_rect(ax + 1, ay + 1, ax + w - 2, ay + h - 2, (rad - 1).max(0), rahmen, false);
+            g.round_rect(ax + 1, ay + 1, ax + w - 2, ay + h - 2, (rad - 1).max(0), deckkraft(self.acc_col(wdg), eh), false);
         }
         let pad = self.sk(6);
         let sz = self.wsize(g, wdg);
@@ -17076,7 +17225,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             g.rect(ax + pad, ay + pad, ax + pad + innen_w - 1, ay + pad + bild_h - 1, shade(rahmen, -20));
         }
         let mut y = ay + pad + bild_h + if bild_h > 0 { self.sk(6) } else { 0 };
-        let tfarbe = if ueber { self.acc_col(wdg) } else { self.txt_col(wdg) };
+        let tfarbe = mischen(self.txt_col(wdg), self.acc_col(wdg), eh);
         g.push_clip(ax + pad, ay, innen_w, h);
         if !wdg.text.is_empty() {
             // Kraeftig: zweimal, um einen Punkt versetzt -- aus einer Schrift

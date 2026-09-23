@@ -1,0 +1,210 @@
+' Uebergaenge (Metrik `uebergang`, 2026-09-23): Ueberfahren blendet ueber
+' die Dauer ein und aus, Druecken und Fokus erscheinen SOFORT und blenden nur
+' aus. Geprueft am BILD: ein Knopf mit eigenen Farben fuer Grund (dunkelblau),
+' Ueberfahren (hellgrau) und Druecken (gruen), die Maus kommt ueber eine
+' Aufnahme. Headless ist DELTA fest 1/60 -- jedes Bild ist dieselbe Stufe.
+' Die Faelle mit `uebergang` 0 sind die Gegenprobe: dort springt es wie vor
+' der Aenderung.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die metrik ist da und hat eine vorgabe
+IMPORT "gui"
+PRINT GUI_METRIC_GET("uebergang")
+GUI_METRIC_SET("uebergang", 0)
+PRINT GUI_METRIC_GET("uebergang")
+--- erwartet
+120
+0
+
+=== ueberfahren blendet ein
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+GUI_SET_COLOR(b, "pressed", &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+100 60 nicht #204080 +-20
+100 60 nicht #E0E0E0 +-20
+
+=== nach der dauer steht die farbe des ueberfahrens
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- bild
+100 60 #E0E0E0 +-2
+
+=== ohne uebergang springt das ueberfahren wie frueher
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_METRIC_SET("uebergang", 0)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 2
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+
+--- umgebung
+DHRT_FRAMES=5
+--- bild
+100 60 #E0E0E0 +-2
+
+=== druecken erscheint im selben bild
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+GUI_SET_COLOR(b, "pressed", &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+e 2 6 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=6
+--- bild
+100 60 #00FF00 +-2
+
+=== losgelassen blendet das druecken aus
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+GUI_SET_COLOR(b, "pressed", &H00FF00)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 4
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+e 2 6 0 0 0 0
+e 12 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=19
+--- bild
+100 60 nicht #00FF00 +-20
+100 60 nicht #E0E0E0 +-20
+
+=== verlassen blendet aus
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "", 50, 50, 100, 40)
+GUI_SET_COLOR(b, "bg", &H204080)
+GUI_SET_COLOR(b, "hover", &HE0E0E0)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 3
+e 0 7 5 5 0 0
+e 1 7 100 70 0 0
+e 16 7 250 180 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- bild
+100 60 nicht #204080 +-20
+100 60 nicht #E0E0E0 +-20
+
+=== der fokusring erscheint sofort und blendet beim wechsel aus
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+GUI_THEME_SET("accent", &HFF0000)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "", 50, 50, 60, 30)
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "", 170, 50, 60, 30)
+DIM bild AS INTEGER
+GUI_FOCUS(b1)
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 10 THEN GUI_FOCUS(b2)
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=12
+--- bild
+167 60 #FF0000 +-2
+47 60 nicht #FF0000 +-20
+47 60 nicht #18222E +-20

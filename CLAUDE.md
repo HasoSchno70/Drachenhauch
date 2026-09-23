@@ -610,6 +610,36 @@ angeklickt", und beides meldet genau ein Bild lang. Der Zustand kommt weiter aus
 `GUI_CHECKED`. Tests `tests/pruef/gui_clicked_schalter.dhtest` (mit Gegenprobe:
 danebengeklickt meldet nichts).
 
+**Uebergaenge** (2026-09-23, erster Punkt der Feinschliff-Liste): Metrik
+`uebergang` (ms, Vorgabe 120, 0 = springen wie frueher). Je Widget
+`ueber_t`/`druck_t`/`fokus_t` (0..1), dazu `LeisteState::hover_t` je
+Eintrag, nachgefuehrt in `Gui::uebergaenge` (in `update`, mit `g.delta()` --
+headless fest 1/60, also reproduzierbar); gezeichnet ueber `weich()`
+(smoothstep) und `deckkraft()` (Alpha 0 = DECKEND, darum 1 statt 0 fuer
+"weg"). **Nur das Ueberfahren blendet hinein**, Druecken und Fokus
+erscheinen im selben Bild und blenden nur aus. Die Flags `hovered`/
+`press_origin`/`focus_widget` bleiben die Wahrheit fuer alles, was
+entscheidet. Erfasst: Knopf (alle Arten), Kachel, Kaestchen, Radio,
+Klappliste, Werkzeugleiste, Fokusring, Kippschalter (vorher je Bild * 0,28,
+also bildratenabhaengig). `mischen` gibt an den Enden die Farbe samt Alpha
+unveraendert zurueck -- sonst machte ein ruhender Uebergang eine
+halbdurchsichtige Farbe deckend. **Akkordeon** (selber Tag): `AkkState::auf_t`
+je Abschnitt, weitergefuehrt in `akk_pass` (nicht in `uebergaenge` -- sonst
+stuende die Lage ein Bild hinter dem Zustand, und mit `uebergang` 0 zeigte
+ein GUI_UPDATE nach GUI_ACCORDION_OPEN noch den alten Stand); gemessen wird
+immer die VOLLE Inhaltshoehe, sichtbar ist `voll * weich(t)`. Fehlt ein
+Eintrag, gilt der Zustand -- ein beim Aufbau geoeffneter Abschnitt klappt
+nicht beim ersten Bild auf. Kinder werden beim Zeichnen auf den sichtbaren
+Teil beschnitten (`akk_ausschnitt`, eine Quelle mit `widget_shown`),
+bedienbar sind sie erst ganz sichtbar. Das Dreieck dreht sich um seinen
+Schwerpunkt; im Standbild sieht es bei 35 Grad wie ein Pfeil nach oben aus
+(fast gleichseitig), in Bewegung nicht. Noch nicht: Klappliste, Baum, Zeilen
+in Listen/Tabellen. Tests `tests/pruef/gui_uebergaenge.dhtest` (8,
+Bildproben; Gegenprobe mit `uebergang` 0: 4 fallen) und in
+`tests/pruef/gui_akkordeon.dhtest` "das aufklappen waechst ueber die zeit"
+(Gegenprobe faellt); zwei alte Faelle dort brauchen seither `uebergang` 0
+bzw. klicken spaeter ins Kind.
+
 **Text und Formular** (2026-09-04, Punkt 1 des gui-Ausbaus -- Ziel: dass Drachenhauch genannt wird, wenn jemand fragt, womit er eine Anwendung schreiben soll): `GUI_SET_ALIGN(wdg, links|mitte|rechts)` fuer Beschriftung/Knopf/Textfeld; `GUI_SET_WRAP(label, breite)` bricht an Wortgrenzen um, die HOEHE folgt dem Text -- gemessen in `umbruch_layout` (in GUI_UPDATE, weil nur dort Graphics und Schreibzugriff zusammenkommen; das Zeichnen ist `&self`); `GUI_TEXTINPUT_SET(tf, key$, wert)` mit `passwort` (Punkte statt Zeichen -- Treffertest und Rollen messen an den PUNKTEN, sonst sitzt die Schreibmarke neben dem Text), `nur_lesen`, `maxlaenge` (schneidet ab, auch beim Einfuegen), `zahlen` (1 ganz, 2 Komma; Zwischenstand `-` erlaubt, sonst liesse sich keine negative Zahl tippen); `GUI_ENTERED`/`GUI_ON_ENTER`; **Strg+Z/Y in Textfeld und Textbereich** (Anschlaege innerhalb 0,8 s = EIN Schritt; `GUI_SET_TEXT` leert den Verlauf); `GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` (Enter/ESC druecken den Knopf -- aber die Taste gehoert zuerst dem Widget mit Fokus: Knopf/Kaestchen nehmen Enter selbst, Textbereich macht einen Umbruch, Zelle in Bearbeitung ihr Ende; aus einem TEXTFELD heraus ist Enter das Abschicken; der Standard-Knopf traegt den Akzent als Rahmen). Alles in der `.dhform` (auch der Tooltip -- der fehlte dort bisher) und im Form-Designer (Inspector + Codegen). **Testfalle:** raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber KEINE Zeichen in die Zeichenwarteschlange -- Tests tippen ueber die Zwischenablage mit Strg+V, das laeuft durch dieselben Filter. Tests `tests/pruef/gui_text_formular.dhtest`, Doku `docs/module-gui.md`.
 
 **Menues** (2026-09-04, Punkt 2 des gui-Ausbaus): `GUI_MENU_ITEM(menu, label$[, kuerzel$])` / `GUI_MENU_SHORTCUT` -- Kuerzel werden als Text geschrieben (`Strg+S`, `Alt+Enter`, `F5`, `Entf`, deutsch oder englisch; `kuerzel_parsen` in gui.rs mit Rust-Tests, unbekannte Taste = Fehler beim Anlegen statt eines still stummen Kuerzels) und jedes Bild geprueft (`kuerzel_pruefen`), auch bei geschlossenem Menue -- **seit 2026-09-07 in ALLEN sichtbaren Fenstern**: zuerst im Fokus-Fenster, dann in den uebrigen von oben nach unten (Form-Designer, Anim-FSM und Notenblatt mussten sich vorher nach jedem Knopf im Nebenfenster den Fokus zurueckholen, sonst war Strg+S stumm -- dreimal derselbe Fund, dreimal zuerst vom Test gesehen); das Fokus-Fenster gewinnt bei gleichem Kuerzel, ein modales laesst nur seine eigenen zu, ein Entwurfsfenster (`GUI_WINDOW_DESIGN`) zaehlt nicht; die Modifier muessen GENAU passen, und **ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus** (ein `Entf`-Kuerzel loescht dort ein Zeichen) -- AUSSER F1..F12 (`ist_funktionstaste`, seit 2026-09-06: die IDE in Drachenhauch startete per F5 nie, weil das Code-Feld den Fokus hatte). `GUI_SUBMENU` (beliebig tief; `sub_chain` = offene Untermenues, `untermenues_folgen` oeffnet beim Ueberfahren und schliesst NICHT, wenn die Maus neben allen Popups ist -- sonst klappt es beim schraegen Hinueberfahren zu; ein Untermenue ist nie Kontextmenue, `Menu::unter`), `GUI_MENU_CHECK`/`GUI_MENU_CHECKED` (Klick oder Kuerzel kippt), `GUI_MENU_ENABLE` (gesperrt = kein Klick, kein Kuerzel), `GUI_MENU_ICON`, `GUI_MENU_TEXT`. Popup-Layout aus EINER Quelle `popup_layout` (Treffertest + Zeichnen). In der `.dhform` verschachtelt (`items` am Eintrag, `shortcut`, `checkable`/`checked`); der Form-Designer bearbeitet Menues nicht, schreibt sie aber jetzt in den GB-Code (`_gb_menus`). **Testfalle:** raylib meldet beim Lesen mancher Aufnahmedateien "Issue reading line to buffer" auf stdout, die Ereignisse kommen trotzdem an -- Tests filtern `WARNING:`-Zeilen. Tests `tests/pruef/gui_menu_ausbau.dhtest`, Beispiel `examples/129_gui_menu.dh`.
