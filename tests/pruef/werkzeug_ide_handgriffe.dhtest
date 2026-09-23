@@ -466,3 +466,32 @@ listing 2 zeilen 1 seiten je 46 breite 58
 gemerkt 12 30 FALSE
 zeile 2 ohne nummer TRUE
 zeile 4 fehlt TRUE
+
+=== filter ueber dem projektbaum
+' Die Zeilen des Baums bleiben, wo sie waren (Klicklagen der anderen
+' Faelle); gezaehlt werden die sichtbaren Dateien.
+GUI_SET_TEXT(tfBaumFilter, "HELD")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei held.dh
+PRINT 2
+--- datei held_bild.png
+x
+--- datei gegner.dh
+PRINT 3
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 10) = "baumfilter" THEN PRINT P[i]
+NEXT
+--- erwartet
+baumfilter [HELD] 2

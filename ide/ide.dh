@@ -810,6 +810,12 @@ DIM baum AS GUI_WIDGET : baum = GUI_FILETREE(win, 0, 0, 10, 10, ".")
 ' auf einmal oeffnen lassen (Datei -> Gewaehlte Dateien oeffnen).
 GUI_FILETREE_SET(baum, "mehrfachauswahl", 1)
 DIM lblProjekt AS GUI_WIDGET : lblProjekt = GUI_LABEL(win, "Projekt", 0, 0)
+' Filter ueber dem Baum, in der Zeile des Projektnamens -- der Baum bleibt,
+' wo er war. Ein Teil des Dateinamens, Gross/klein egal; Ordner bleiben
+' stehen (ihr Inhalt wird beim Aufklappen gefiltert).
+DIM tfBaumFilter AS GUI_WIDGET : tfBaumFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, "Filter ...")
+GUI_TOOLTIP(tfBaumFilter, "Nur Dateien, deren Name das enthält")
+DIM baumFilterZuletzt AS STRING : baumFilterZuletzt = ""
 DIM lblGliederung AS GUI_WIDGET : lblGliederung = GUI_LABEL(win, "Gliederung", 0, 0)
 DIM lstGliederung AS GUI_WIDGET : lstGliederung = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 ' Willkommensseite -- sie steht dort, wo sonst die Code-Felder liegen, und
@@ -1497,8 +1503,10 @@ SUB layout()
     ' links: Projektbaum oben, Gliederung darunter
     DIM baumH AS INTEGER : baumH = (mitteH - 22) * 3 \ 5
     GUI_SET_VISIBLE(lblProjekt, seitenAn) : GUI_SET_VISIBLE(baum, seitenAn)
+    GUI_SET_VISIBLE(tfBaumFilter, seitenAn)
     GUI_SET_VISIBLE(lblGliederung, seitenAn) : GUI_SET_VISIBLE(lstGliederung, seitenAn)
-    GUI_SET_BOUNDS(lblProjekt, 8, oben, breiteLinks - 16, 18)
+    GUI_SET_BOUNDS(lblProjekt, 8, oben, (breiteLinks - 16) \ 2 - 4, 18)
+    GUI_SET_BOUNDS(tfBaumFilter, 8 + (breiteLinks - 16) \ 2, oben - 2, (breiteLinks - 16) \ 2, 22)
     GUI_SET_BOUNDS(baum, 8, oben + 22, breiteLinks - 16, baumH)
     GUI_SET_BOUNDS(lblGliederung, 8, oben + 30 + baumH, breiteLinks - 16, 18)
     GUI_SET_BOUNDS(lstGliederung, 8, oben + 52 + baumH, breiteLinks - 16, mitteH - baumH - 52)
@@ -2523,6 +2531,30 @@ CONST BAUM_MUSTER = "*.dh;*.dhform;*.dhsprite;*.dhanim;*.dhtest;*.json;*.md;*.tx
 ' weg (Einstellung `verborgene`).
 CONST BAUM_AUSNAHMEN = "target;__pycache__;_*"
 GUI_FILETREE_FILTER(baum, BAUM_MUSTER)
+
+' Der Filtertext wird in jedes Endungsmuster gesetzt: aus `*.dh` wird
+' `*held*.dh` -- so bleibt es bei den Dateiarten, die der Baum zeigt.
+SUB baumFilterNachziehen()
+    DIM t AS STRING : t = TRIM$(GUI_TEXT(tfBaumFilter))
+    IF t = baumFilterZuletzt THEN RETURN
+    baumFilterZuletzt = t
+    IF t = "" THEN
+        GUI_FILETREE_FILTER(baum, BAUM_MUSTER)
+    ELSE
+        DIM teile AS ARRAY OF STRING : teile = []
+        DIM m AS STRING
+        FOR EACH m IN SPLIT$(BAUM_MUSTER, ";")
+            ARRAY_PUSH(teile, "*" + t + "*" + MID$(m, 1, LEN(m)))
+        NEXT
+        GUI_FILETREE_FILTER(baum, JOIN$(teile, ";"))
+    END IF
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_FILETREE_COUNT(baum) - 1
+        IF NOT GUI_FILETREE_IS_DIR(baum, GUI_FILETREE_PATH$(baum, i)) THEN n = n + 1
+    NEXT
+    protokoll("baumfilter [" + t + "] " + STR$(n))
+END SUB
 GUI_FILETREE_SKIP(baum, BAUM_AUSNAHMEN)
 ' Alle zwei Sekunden nachsehen: eine Datei, die ein anderes Programm
 ' anlegt (oder der Export), steht damit von selbst im Baum. Bis Stand 23
@@ -9509,6 +9541,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(btnEingabe) OR GUI_ENTERED(tfEingabe) THEN eingabeSenden()
 
     spiegelNachziehen()
+    baumFilterNachziehen()
     ' --- Aenderungen im aktiven Feld: einfaerben, Pruefung vormerken ---
     IF aktiverTab >= 0 THEN
         DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]

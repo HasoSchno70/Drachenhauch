@@ -16,6 +16,10 @@ relativer Dateiname meint eine Datei dort. Das ist nicht selbstverständlich:
 Damit ein Programm den Ort des Aufrufers trotzdem kennt, hinterlegt `dhrt`
 ihn vorher in der Umgebungsvariable `DHRT_START_DIR`.
 
+Über dem Baum, neben dem Projektnamen, steht ein **Filter**: ein Teil des
+Dateinamens (Groß/klein egal) lässt nur die passenden Dateien stehen, die
+Ordner bleiben und werden beim Aufklappen genauso gefiltert.
+
 ## Die Stände im Überblick
 
 Gewachsen ist sie in Ständen, einer je Runde. Die Tabelle sagt, was in
