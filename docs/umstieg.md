@@ -90,6 +90,34 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `ZEIT_JAHR` | `ZEIT_TEIL(t, "jahr")` |
 | `GUI_WINDOW_NEW` | `GUI_WINDOW(titel$, x, y, breite, höhe)` |
 | `ARRAY_REMOVE` | `ARRAY_REMOVE_AT(a, i)` |
+| `MAKEDIR` | `MKDIR(pfad$)` — bei jedem unbekannten Befehl schlägt die Meldung den echten Namen vor |
+| `MouseDown(1)` für links | `MOUSEBUTTON(0)` — 0 links, 1 rechts, 2 Mitte |
+| `KEYHIT("a")` | `KEYHIT(ASC("a"))` oder `KEYHIT(KEY_A)` — eine Taste ist eine Zahl |
+| `RGB("FF0000")` | `COLOR_FROM_HEX("#FF0000")`, im Quelltext `&HFF0000` |
+| `PLAYSOUND("sprung.wav")` | erst laden: `s = LOADSOUND("sprung.wav")`, dann `PLAYSOUND(s)` (ebenso `DRAWIMAGE`, `SPRITE_NEW` mit `LOADIMAGE`) |
+
+## Das erste Programm mit Grafik
+
+Vier Zeilen, die in QBasic oder Blitz fehlen dürfen und hier nicht:
+
+```basic
+SCREEN(320, 200, "Mein Spiel")        ' 1. zuerst das Fenster
+WHILE NOT QUITREQUESTED()
+    CLS(BLACK)
+    CIRCLE(160, 100, 20, YELLOW)
+    FLIP()                            ' 2. zeigt, was gezeichnet wurde
+WEND
+```
+
+- **`SCREEN` kommt vor dem ersten Zeichenbefehl.** Ohne Fenster ist `BOX` ein
+  Fehler mit genau diesem Satz — vorher zeichnete es unsichtbar weiter.
+- **`FLIP()` zeigt das Bild.** Drachenhauch sammelt die Zeichenbefehle und
+  spielt sie beim `FLIP` ab; ohne `FLIP` bleibt das Fenster leer (das Programm
+  sagt es am Ende).
+- **`WHILE NOT QUITREQUESTED()`** — ohne die Schleife ist das Programm nach dem
+  ersten Bild zu Ende und das Fenster schließt sich sofort.
+- **Bilder und Klänge werden geladen, nicht benannt:** `b = LOADIMAGE("held.png")`
+  und dann `DRAWIMAGE(b, x, y)`.
 
 ## Aus Python, C und JavaScript
 
@@ -113,3 +141,9 @@ Sie sind Absicht und laufen darum ohne Warnung — man muss sie kennen:
 - **Felder beginnen bei 0.** `DIM a[3] AS INTEGER` hat `a[0]` bis `a[2]`.
 - **`/` kann eine Kommazahl liefern.** `7 / 2` ist `3.5`; für die
   ganzzahlige Division gibt es `\` (`7 \ 2` ist `3`).
+- **`=` auf Feldern und MAPs fragt nach DEMSELBEN Behälter**, nicht nach
+  gleichem Inhalt: zwei Felder mit denselben Zahlen sind `<>`. Inhalte
+  vergleicht man Platz für Platz.
+- **`b = a` kopiert ein Feld nicht**, es gibt ihm einen zweiten Namen — wer
+  danach `b[0]` schreibt, ändert `a[0]` mit. Dasselbe gilt für MAPs und
+  Objekte. Eine echte Kopie liefert `b = a[:]`.

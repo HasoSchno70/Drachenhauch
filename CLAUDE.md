@@ -868,6 +868,15 @@ Details: docs/rust-runtime.md.
   `Parser::umsteiger_hinweis`). `swap`/`let`/`exit`/`do` sind KONTEXTUELL,
   keine Schluesselwoerter. Uebersicht `docs/umstieg.md`, Details
   `docs/stolpersteine.md` I, Tests `tests/pruef/umstieg.dhtest`.
+  Fuenfte Runde (2026-09-23): **Zeichnen ohne SCREEN tat still nichts**
+  (jetzt ein Fehler, `vm::ist_schirmbefehl`), **gezeichnet ohne FLIP** sagt am
+  Programmende einen Satz, ein **unbekannter Befehl schlaegt den echten Namen
+  vor** (`aehnlich.rs` -- Abstand UND Wortteile, eine Quelle auch fuer
+  Variablen- und Mitglieds-Vorschlaege), ein **Dateiname statt eines
+  geladenen Bildes/Klangs** nennt den Lader (`umstieg::text_statt_zahl`, dazu
+  `KEYHIT("a")` und `RGB("FF0000")`), die Lader melden eine fehlende Datei
+  gleich (`builtins::datei_da`), `DIM p AS Klasse` ohne NEW und `DIM f AS
+  FILE` ohne OPENFILE sagen, was fehlt.
   Dritte/vierte Runde (2026-09-22): eine METHODE ohne Klammern
   (`spieler.springen`) tat still nichts; `JSON_PARSE("{\"a\": 1}")` meldete
   nur "Erwartet Rparen" (jetzt Hinweis auf `!"..."`); 61 der 62 Signaturen im
