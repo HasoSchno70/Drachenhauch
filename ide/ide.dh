@@ -321,6 +321,12 @@ DIM sichernOhneFormat AS BOOLEAN : sichernOhneFormat = FALSE
 DIM vorschauAn AS BOOLEAN : vorschauAn = TRUE
 ' Werkzeugleiste mit Sinnbildern unter der Menueleiste.
 DIM leisteAn AS BOOLEAN : leisteAn = TRUE
+' Seitenleiste (Projekt + Gliederung) und untere Leiste (Ausgabe, Probleme,
+' Debugger) ein- und ausblenden -- mehr Platz fuer den Code. Die untere
+' kommt von selbst zurueck, sobald ein Programm startet: seine Ausgabe
+' nicht zu sehen, waere schlimmer als die verlorenen Zeilen.
+DIM seitenAn AS BOOLEAN : seitenAn = TRUE
+DIM untenAn AS BOOLEAN : untenAn = TRUE
 ' Automatisch sichern: Sekunden ohne Anschlag, 0 = aus.
 DIM autoSichern AS INTEGER : autoSichern = 0
 DIM autoFaellig AS FLOAT : autoFaellig = -1.0
@@ -449,6 +455,8 @@ IF JSON_HAS(konfig, "klammern") THEN klammernAn = JSON_GET_BOOL(konfig, "klammer
 IF JSON_HAS(konfig, "format_sichern") THEN formatSichernAn = JSON_GET_BOOL(konfig, "format_sichern")
 IF JSON_HAS(konfig, "umbau_vorschau") THEN vorschauAn = JSON_GET_BOOL(konfig, "umbau_vorschau")
 IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
+IF JSON_HAS(konfig, "seitenleiste") THEN seitenAn = JSON_GET_BOOL(konfig, "seitenleiste")
+IF JSON_HAS(konfig, "untere_leiste") THEN untenAn = JSON_GET_BOOL(konfig, "untere_leiste")
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
 IF hell THEN GUI_THEME_PRESET("glas_hell") : themaFeinschliff()
 codeFarben(hell)
@@ -641,6 +649,10 @@ GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, "Einrückungslinien")
 GUI_MENU_CHECK(miLinien, linienAn)
 DIM miLeiste AS INTEGER : miLeiste = GUI_MENU_ITEM(mAnsicht, "Werkzeugleiste")
+DIM miSeiten AS INTEGER : miSeiten = GUI_MENU_ITEM(mAnsicht, "Seitenleiste", "Alt+1")
+DIM miUnten AS INTEGER : miUnten = GUI_MENU_ITEM(mAnsicht, "Untere Leiste", "Alt+2")
+GUI_MENU_CHECK(miSeiten, seitenAn)
+GUI_MENU_CHECK(miUnten, untenAn)
 GUI_MENU_CHECK(miLeiste, leisteAn)
 DIM miFalten AS INTEGER : miFalten = GUI_MENU_ITEM(mAnsicht, "Block zuklappen/aufklappen", "F4")
 DIM miFaltenAlle AS INTEGER : miFaltenAlle = GUI_MENU_ITEM(mAnsicht, "Alles zuklappen", "Strg+F4")
@@ -1257,6 +1269,8 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
     JSON_SET_BOOL(konfig, "leiste", leisteAn)
+    JSON_SET_BOOL(konfig, "seitenleiste", seitenAn)
+    JSON_SET_BOOL(konfig, "untere_leiste", untenAn)
     JSON_SET_INT(konfig, "autosichern", autoSichern)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
@@ -1382,11 +1396,32 @@ END SUB
 
 SUB debugPanelZeigen(an AS BOOLEAN)
     debugSichtbar = an
-    GUI_SET_VISIBLE(lblProbleme, NOT an) : GUI_SET_VISIBLE(lstProbleme, NOT an) : GUI_SET_VISIBLE(lblHilfe, NOT an)
-    GUI_SET_VISIBLE(lblDebug, an) : GUI_SET_VISIBLE(tblVars, an)
-    GUI_SET_VISIBLE(btnWeiter, an) : GUI_SET_VISIBLE(btnDrueber, an) : GUI_SET_VISIBLE(btnHinein, an)
-    GUI_SET_VISIBLE(btnHeraus, an) : GUI_SET_VISIBLE(btnStoppD, an)
+    ' Bei ausgeblendeter unterer Leiste ist keins von beiden zu sehen --
+    ' `debugSichtbar` merkt sich trotzdem, welches dran waere.
+    DIM p AS BOOLEAN : p = (NOT an) AND untenAn
+    DIM d AS BOOLEAN : d = an AND untenAn
+    GUI_SET_VISIBLE(lblProbleme, p) : GUI_SET_VISIBLE(lstProbleme, p) : GUI_SET_VISIBLE(lblHilfe, p)
+    GUI_SET_VISIBLE(lblDebug, d) : GUI_SET_VISIBLE(tblVars, d)
+    GUI_SET_VISIBLE(btnWeiter, d) : GUI_SET_VISIBLE(btnDrueber, d) : GUI_SET_VISIBLE(btnHinein, d)
+    GUI_SET_VISIBLE(btnHeraus, d) : GUI_SET_VISIBLE(btnStoppD, d)
 END SUB
+
+SUB leistenSetzen(seiten AS BOOLEAN, unten AS BOOLEAN)
+    seitenAn = seiten
+    untenAn = unten
+    GUI_MENU_CHECK(miSeiten, seitenAn)
+    GUI_MENU_CHECK(miUnten, untenAn)
+    layout()
+    konfigSichern()
+    protokoll("leisten seite " + IIF(seitenAn, "an", "aus") + " unten " + IIF(untenAn, "an", "aus") + " code " + STR$(GUI_GET_X(aktivesFeldOderWk())) + "+" + STR$(GUI_GET_W(aktivesFeldOderWk())) + " hoch " + STR$(GUI_GET_H(aktivesFeldOderWk())))
+END SUB
+
+' Fuers Protokoll: das Code-Feld, oder ohne Reiter die Willkommensseite --
+' beide stehen auf derselben Flaeche.
+FUNCTION aktivesFeldOderWk() AS GUI_WIDGET
+    IF aktiverTab >= 0 THEN RETURN tabFelder[aktiverTab]
+    RETURN lblWkTitel
+END FUNCTION
 
 SUB layout()
     DIM w AS INTEGER : w = SCREENWIDTH()
@@ -1405,16 +1440,20 @@ SUB layout()
     IF leisteAn THEN GUI_SET_BOUNDS(leiste, 0, oben - 4, w, 36)
     DIM statusH AS INTEGER : statusH = 24
     DIM eingabeH AS INTEGER : eingabeH = 30
-    DIM mitteH AS INTEGER : mitteH = hi - oben - hoeheUnten - statusH - eingabeH - 12 - leisteH
+    DIM untenH AS INTEGER : untenH = IIF(untenAn, hoeheUnten, -4)
+    DIM mitteH AS INTEGER : mitteH = hi - oben - untenH - statusH - eingabeH - 12 - leisteH
     oben = oben + leisteH
     ' links: Projektbaum oben, Gliederung darunter
     DIM baumH AS INTEGER : baumH = (mitteH - 22) * 3 \ 5
+    GUI_SET_VISIBLE(lblProjekt, seitenAn) : GUI_SET_VISIBLE(baum, seitenAn)
+    GUI_SET_VISIBLE(lblGliederung, seitenAn) : GUI_SET_VISIBLE(lstGliederung, seitenAn)
     GUI_SET_BOUNDS(lblProjekt, 8, oben, breiteLinks - 16, 18)
     GUI_SET_BOUNDS(baum, 8, oben + 22, breiteLinks - 16, baumH)
     GUI_SET_BOUNDS(lblGliederung, 8, oben + 30 + baumH, breiteLinks - 16, 18)
     GUI_SET_BOUNDS(lstGliederung, 8, oben + 52 + baumH, breiteLinks - 16, mitteH - baumH - 52)
-    DIM ex AS INTEGER : ex = breiteLinks
-    DIM ew AS INTEGER : ew = w - breiteLinks - 8
+    DIM links AS INTEGER : links = IIF(seitenAn, breiteLinks, 8)
+    DIM ex AS INTEGER : ex = links
+    DIM ew AS INTEGER : ew = w - links - 8
     ' Die Spur steht ueber dem Code und nimmt sich 20 Punkte von seiner Hoehe.
     DIM spurH AS INTEGER : spurH = 20
     GUI_SET_BOUNDS(lblSpur, ex, oben - 1, ew, 20)
@@ -1505,6 +1544,7 @@ SUB layout()
     willkommenZeigen(tabAnzahl = 0)
     DIM uy AS INTEGER : uy = oben + mitteH + 4
     DIM halb AS INTEGER : halb = (w - 24) \ 2
+    GUI_SET_VISIBLE(lblAusgabe, untenAn) : GUI_SET_VISIBLE(lstAusgabe, untenAn)
     GUI_SET_BOUNDS(lblAusgabe, 8, uy, 200, 18)
     GUI_SET_BOUNDS(lstAusgabe, 8, uy + 20, halb, hoeheUnten - 20)
     GUI_SET_BOUNDS(lblProbleme, 16 + halb, uy, halb, 18)
@@ -7324,6 +7364,9 @@ FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
         IF NOT sichern(aktiverTab, FALSE) THEN RETURN FALSE
     END IF
     GUI_LISTBOX_CLEAR(lstAusgabe)
+    ' Wer startet, will die Ausgabe sehen -- eine ausgeblendete untere
+    ' Leiste kommt zurueck.
+    IF NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
     ausgabeRest = "" : prozessRest = ""
     prozessDatei = tabPfade[aktiverTab]
     prozessArt = art
@@ -8056,6 +8099,8 @@ paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
 paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
 paletteEintrag("Geteilte Ansicht", "geteilt", "Alt+G") : paletteEintrag("Übersichtskarte", "minimap", "")
 paletteEintrag("Dieselbe Datei nebeneinander", "spiegel", "Alt+Umschalt+G")
+paletteEintrag("Seitenleiste ein/aus", "seitenleiste", "Alt+1")
+paletteEintrag("Untere Leiste ein/aus", "untere_leiste", "Alt+2")
 paletteEintrag("Zeilenumbruch", "umbruch", "Alt+Z")
 paletteEintrag("Helles Thema", "thema", "") : paletteEintrag("Vollbild", "vollbild", "Alt+Enter")
 paletteEintrag("Schrift größer", "groesser", "Strg+Plus") : paletteEintrag("Schrift kleiner", "kleiner", "Strg+Minus")
@@ -8557,6 +8602,8 @@ SUB befehl(k AS STRING)
         CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
         CASE "geteilt" : geteiltSetzen(NOT geteilt)
         CASE "spiegel" : spiegelSetzen(NOT spiegelAn)
+        CASE "seitenleiste" : leistenSetzen(NOT seitenAn, untenAn)
+        CASE "untere_leiste" : leistenSetzen(seitenAn, NOT untenAn)
         CASE "minimap" : minimapSetzen(NOT minimapAn)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
@@ -8840,6 +8887,8 @@ WHILE NOT beenden
     IF GUI_CLICKED(miUmbruch) THEN befehl("umbruch")
     IF GUI_CLICKED(miGeteilt) THEN befehl("geteilt")
     IF GUI_CLICKED(miSpiegel) THEN befehl("spiegel")
+    IF GUI_CLICKED(miSeiten) THEN befehl("seitenleiste")
+    IF GUI_CLICKED(miUnten) THEN befehl("untere_leiste")
     IF GUI_CLICKED(miMinimap) THEN befehl("minimap")
     IF GUI_CLICKED(miFalten) THEN befehl("falten")
     IF GUI_CLICKED(miFaltenAlle) THEN befehl("falten_alle")

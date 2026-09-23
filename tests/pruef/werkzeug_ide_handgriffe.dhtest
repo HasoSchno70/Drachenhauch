@@ -264,3 +264,53 @@ NEXT
 |' neu|
 nebeneinander TRUE
 spiegel aus
+
+=== seitenleiste und untere leiste ein- und ausblenden
+' Der Code bekommt die frei gewordene Flaeche: erst die Breite der
+' Seitenleiste, dann die Hoehe der unteren. Ein Start holt die untere zurueck.
+befehl("seitenleiste")
+befehl("untere_leiste")
+PRINT "baum sichtbar " ; GUI_VISIBLE(baum)
+PRINT "ausgabe sichtbar " ; GUI_VISIBLE(lstAusgabe)
+befehl("start")
+PRINT "nach dem start " ; GUI_VISIBLE(lstAusgabe)
+befehl("seitenleiste")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+IMPORT "json"
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM x AS ARRAY OF INTEGER : x = []
+DIM b AS ARRAY OF INTEGER : b = []
+DIM hh AS ARRAY OF INTEGER : hh = []
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 8) = "leisten " THEN
+        DIM t AS ARRAY OF STRING : t = SPLIT$(P[i], " ")
+        DIM xb AS ARRAY OF STRING : xb = SPLIT$(t[6], "+")
+        ARRAY_PUSH(x, INT(VAL(xb[0]))) : ARRAY_PUSH(b, INT(VAL(xb[1]))) : ARRAY_PUSH(hh, INT(VAL(t[8])))
+        PRINT t[0] ; " " ; t[1] ; " " ; t[2] ; " " ; t[3] ; " " ; t[4]
+    END IF
+NEXT
+PRINT "ohne seite weiter links und breiter " ; x[0] < x[3] AND b[0] > b[3]
+PRINT "ohne unten hoeher " ; hh[1] > hh[0]
+PRINT "start holt unten zurueck, gleiche hoehe wie am anfang " ; hh[2] = hh[0]
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt " ; JSON_GET_BOOL(k, "seitenleiste") ; " " ; JSON_GET_BOOL(k, "untere_leiste")
+--- erwartet
+leisten seite aus unten an
+leisten seite aus unten aus
+leisten seite aus unten an
+leisten seite an unten an
+ohne seite weiter links und breiter TRUE
+ohne unten hoeher TRUE
+start holt unten zurueck, gleiche hoehe wie am anfang TRUE
+gemerkt TRUE TRUE
