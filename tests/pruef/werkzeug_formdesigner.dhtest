@@ -488,3 +488,252 @@ e 5 5 0 0 0 0
 DHRT_FRAMES=10
 --- erwartet
 TRUE TRUE
+
+=== anordnen richtet am zuletzt angeklickten aus
+' Drei Knoepfe, Bezug ist der mittlere (zuletzt angeklickt). Jede Anordnung
+' beginnt beim selben Stand; Verteilen laesst den ersten und letzten stehen.
+DIM orig AS STRING : orig = JSON_STRINGIFY(doc)
+SUB frisch()
+    doc = JSON_PARSE(orig)
+    ansichtBauen()
+    gewaehlt = [0, 1, 2]
+    auswahl = 1
+END SUB
+SUB zeige(was AS STRING)
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        ARRAY_PUSH(teile, STR$(feldZahl(i, "x")) + "," + STR$(feldZahl(i, "y")) + "," + STR$(feldZahl(i, "w")) + "," + STR$(feldZahl(i, "h")))
+    NEXT
+    PRINT was; " "; JOIN$(teile, " | ")
+END SUB
+DIM w AS STRING
+FOR EACH w IN ("links", "rechts", "mitte_w", "oben", "unten", "mitte_s", "breite", "hoehe", "groesse", "vert_w", "vert_s")
+    frisch()
+    anordnen(w)
+    zeige(w)
+NEXT
+' Zu wenige gewaehlt: nichts geschieht, die Statuszeile sagt es.
+frisch()
+gewaehlt = [1]
+anordnen("links")
+zeige("einer")
+PRINT GUI_TEXT(lblStatus)
+frisch()
+gewaehlt = [0, 1]
+anordnen("vert_w")
+zeige("zwei")
+PRINT GUI_TEXT(lblStatus)
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+a.dhform
+--- datei a.dhform
+{"title": "A", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [
+ {"kind": "button", "name": "b0", "x": 8, "y": 8, "w": 80, "h": 28, "text": "A"},
+ {"kind": "button", "name": "b1", "x": 100, "y": 40, "w": 120, "h": 30, "text": "B"},
+ {"kind": "button", "name": "b2", "x": 300, "y": 100, "w": 60, "h": 20, "text": "C"}]}
+--- erwartet
+links 100,8,80,28 | 100,40,120,30 | 100,100,60,20
+rechts 140,8,80,28 | 100,40,120,30 | 160,100,60,20
+mitte_w 120,8,80,28 | 100,40,120,30 | 130,100,60,20
+oben 8,40,80,28 | 100,40,120,30 | 300,40,60,20
+unten 8,42,80,28 | 100,40,120,30 | 300,50,60,20
+mitte_s 8,41,80,28 | 100,40,120,30 | 300,45,60,20
+breite 8,8,120,28 | 100,40,120,30 | 300,100,120,20
+hoehe 8,8,80,30 | 100,40,120,30 | 300,100,60,30
+groesse 8,8,120,30 | 100,40,120,30 | 300,100,120,30
+vert_w 8,8,80,28 | 134,40,120,30 | 300,100,60,20
+vert_s 8,8,80,28 | 100,53,120,30 | 300,100,60,20
+einer 8,8,80,28 | 100,40,120,30 | 300,100,60,20
+Anordnen braucht mindestens zwei gewaehlte Controls (Umschalt+Klick oder ein Rahmen).
+zwei 8,8,80,28 | 100,40,120,30 | 300,100,60,20
+Verteilen braucht mindestens drei gewaehlte Controls.
+
+=== umschalt klick und rahmen waehlen mehrere und die pfeile schieben alle
+' Klick auf den ersten, Umschalt+Klick auf den zweiten, dann ein Rahmen ueber
+' leere Flaeche, der alle drei fasst; Pfeil rechts schiebt alle um ein
+' Raster, Strg+S sichert.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- argumente
+m.dhform
+--- umgebung
+DHRT_FRAMES=160
+DH_FORM_LOG=fd.log
+--- datei m.dhform
+{"title": "M", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [
+ {"kind": "button", "name": "b0", "x": 16, "y": 16, "w": 80, "h": 28, "text": "A"},
+ {"kind": "button", "name": "b1", "x": 120, "y": 16, "w": 80, "h": 28, "text": "B"},
+ {"kind": "button", "name": "b2", "x": 16, "y": 80, "w": 80, "h": 28, "text": "C"}]}
+--- datei _programm/ev.txt
+c 25
+e 20 7 300 90 0 0
+e 21 7 300 90 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 2 340 0 0 0
+e 42 7 400 90 0 0
+e 43 7 400 90 0 0
+e 43 6 0 0 0 0
+e 45 5 0 0 0 0
+e 47 1 340 0 0 0
+e 60 7 560 250 0 0
+e 61 7 560 250 0 0
+e 61 6 0 0 0 0
+e 62 7 500 200 0 0
+e 63 7 400 150 0 0
+e 64 7 300 100 0 0
+e 65 7 275 65 0 0
+e 66 7 275 65 0 0
+e 67 5 0 0 0 0
+e 80 2 262 0 0 0
+e 82 1 262 0 0 0
+e 100 2 341 0 0 0
+e 100 2 83 0 0 0
+e 102 1 83 0 0 0
+e 102 1 341 0 0 0
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/fd.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 9) = "gewaehlt " OR LEFT$(L[i], 7) = "rahmen " THEN PRINT L[i]
+NEXT
+DIM d AS JSON_HANDLE : d = JSON_LOAD("m.dhform")
+FOR i = 0 TO 2
+    PRINT JSON_GET_STRING(d, "widgets." + STR$(i) + ".name"); " "; JSON_GET_INT(d, "widgets." + STR$(i) + ".x"); ","; JSON_GET_INT(d, "widgets." + STR$(i) + ".y")
+NEXT
+--- erwartet
+gewaehlt 2
+rahmen 3
+b0 24,16
+b1 128,16
+b2 24,80
+
+=== reiterseiten werden zu den kindern des reiterwerks
+' Das Feld "reiter" nennt das Reiterwerk beim Namen; die Nummern in
+' tabctl.kinder rechnet der Designer bei jeder Ansicht neu -- auch nach dem
+' Loeschen, und ein umbenanntes Reiterwerk nimmt seine Kinder mit.
+PRINT "kinder "; JSON_STRINGIFY(teilbaum(doc, "widgets.0.tabctl.kinder"))
+auswahlSetzen(0)
+inspektorFuellen()
+PRINT "seiten sichtbar "; GUI_VISIBLE(aEintraege); " "; GUI_TEXT(aEintraege); " gezeigt "; GUI_TEXT(aSeite)
+GUI_SET_TEXT(fName, "seiten")
+GUI_SET_TEXT(aSeite, "2")
+inspektorUebernehmen()
+PRINT "umbenannt "; feldText$(1, "reiter"); " "; feldText$(2, "reiter"); " seite "; JSON_GET_INT(doc, "widgets.0.tabctl.seite")
+PRINT "kinder "; JSON_STRINGIFY(teilbaum(doc, "widgets.0.tabctl.kinder"))
+auswahlSetzen(1)
+controlLoeschen()
+PRINT "nach loeschen "; JSON_STRINGIFY(teilbaum(doc, "widgets.0.tabctl.kinder"))
+' Der Code legt die Seiten an und ordnet zu -- und laeuft.
+WRITEALL("code.dh", gbCode$())
+DIM zeilen AS ARRAY OF STRING : zeilen = READLINES("code.dh")
+DIM z AS STRING
+FOR EACH z IN zeilen
+    IF INSTR(z, "GUI_TABCONTROL_ADD") >= 0 THEN PRINT z
+NEXT
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "code.dh")
+DIM bis AS INTEGER : bis = MILLIS() + 60000
+DIM befund AS STRING : befund = ""
+DIM stille AS INTEGER : stille = 0
+WHILE MILLIS() < bis AND stille < 5
+    DIM t AS STRING : t = PROCESS_READ$(pc)
+    IF t <> "" THEN befund = befund + t : stille = 0
+    IF t = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+WEND
+PRINT "check " + TRIM$(befund)
+DIM pb AS INTEGER : pb = PROCESS_START("dhrt", "bild", "code.dh", "code.png", "3")
+bis = MILLIS() + 60000
+WHILE PROCESS_RUNNING(pb) AND MILLIS() < bis
+WEND
+PRINT "lauf " + STR$(PROCESS_CODE(pb))
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+r.dhform
+--- datei r.dhform
+{"title": "R", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [
+ {"kind": "tabcontrol", "name": "reiter", "x": 8, "y": 8, "w": 300, "h": 200, "items": ["A", "B"]},
+ {"kind": "button", "name": "knopf", "x": 20, "y": 60, "w": 80, "h": 28, "text": "K", "reiter": "reiter:2"},
+ {"kind": "label", "name": "schild", "x": 20, "y": 100, "w": 80, "h": 20, "text": "S", "reiter": "Reiter:1"},
+ {"kind": "button", "name": "fremd", "x": 320, "y": 60, "w": 80, "h": 28, "text": "F", "reiter": "gibtsnicht:1"}]}
+--- erwartet
+kinder [[1,1],[2,0]]
+seiten sichtbar TRUE A; B gezeigt 1
+umbenannt seiten:2 seiten:1 seite 1
+kinder [[1,1],[2,0]]
+nach loeschen [[1,0]]
+GUI_TABCONTROL_ADD(seiten, "A")
+GUI_TABCONTROL_ADD(seiten, "B")
+GUI_TABCONTROL_ADD_WIDGET(seiten, schild, 0)
+check []
+lauf 0
+
+=== eine datei mit nummern bekommt beim laden namen
+' GUI_SAVE schreibt nur tabctl.kinder; wer keinen Namen hat, bekommt einen,
+' und das Kind fuehrt ab da seinen Behaelter beim Namen.
+PRINT feldText$(0, "name"); " | "; feldText$(1, "name"); " "; feldText$(1, "reiter"); " | ["; feldText$(2, "reiter"); "]"
+PRINT JSON_STRINGIFY(teilbaum(doc, "widgets.0.tabctl.kinder"))
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+g.dhform
+--- datei g.dhform
+{"title": "G", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [
+ {"kind": "wizard", "x": 8, "y": 8, "w": 300, "h": 200, "items": ["Eins", "Zwei"], "tabctl": {"kinder": [[1, 1]], "seite": 0}},
+ {"kind": "button", "x": 20, "y": 60, "w": 80, "h": 28, "text": "K"},
+ {"kind": "label", "name": "frei", "x": 20, "y": 100, "w": 80, "h": 20, "text": "S"}]}
+--- erwartet
+wizard1 | button1 wizard1:2 | []
+[[1,1]]
+
+=== die klappliste wird mit dem kaestchen bearbeitbar
+auswahlSetzen(0)
+inspektorFuellen()
+PRINT "sichtbar "; GUI_VISIBLE(cbFrei)
+GUI_SET_CHECKED(cbFrei, TRUE)
+inspektorUebernehmen()
+PRINT "an "; JSON_GET_BOOL(doc, "widgets.0.bearbeitbar")
+PRINT "code "; INSTR(gbCode$(), "GUI_DROPDOWN_SET(stadt, " + CHR$(34) + "bearbeitbar" + CHR$(34) + ", 1)") >= 0
+GUI_SET_CHECKED(cbFrei, FALSE)
+inspektorUebernehmen()
+PRINT "ab "; JSON_HAS(doc, "widgets.0.bearbeitbar")
+auswahlSetzen(1)
+inspektorFuellen()
+PRINT "beim knopf "; GUI_VISIBLE(cbFrei)
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+k.dhform
+--- datei k.dhform
+{"title": "K", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [
+ {"kind": "dropdown", "name": "stadt", "x": 8, "y": 8, "w": 160, "h": 24, "items": ["Berlin", "Bremen"]},
+ {"kind": "button", "name": "b", "x": 8, "y": 60, "w": 80, "h": 28, "text": "B"}]}
+--- erwartet
+sichtbar TRUE
+an TRUE
+code TRUE
+ab FALSE
+beim knopf FALSE
+
+=== neu fragt bei ungesicherten aenderungen nach
+controlAnlegen(0, 40, 40)
+ersetzenAnfragen("neu")
+PRINT "frage "; dlgErsetzen <> 0; " controls "; anzahl()
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach DIM ersetzenMit AS STRING : ersetzenMit = ""
+--- erwartet
+frage TRUE controls 1
+
+=== neu ohne aenderungen fragt nicht
+controlAnlegen(0, 40, 40)
+geaendert = FALSE
+ersetzenAnfragen("neu")
+PRINT "frage "; dlgErsetzen <> 0; " controls "; anzahl()
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach DIM ersetzenMit AS STRING : ersetzenMit = ""
+--- erwartet
+frage FALSE controls 0

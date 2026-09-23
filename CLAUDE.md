@@ -849,6 +849,28 @@ vorher schrieb es die alten Texte blind zurueck. Die Reiternummer eines
 Umbaus zaehlt nur noch ohne Weg (`umbauReiter`). Beispiele nach Themen
 kamen danach (siehe unten).
 
+**Form-Designer: Mehrfachauswahl, Anordnen, Reiterseiten** (2026-09-23):
+`gewaehlt` (alle Indizes) neben `auswahl` (Bezug = zuletzt angeklickt); jede
+Stelle, die frueher `auswahl = i` schrieb, geht ueber `auswahlSetzen`,
+nach Rueckgaengig raeumt `auswahlBereinigen`. Umschalt/Strg+Klick schaltet,
+ein Zug ueber leere Flaeche ist ein Auswahlrahmen (modus 3; ein Control auf
+einer verborgenen Reiterseite liegt nicht darin), Strg+A NICHT am Menue --
+ein Strg-Kuerzel gewaenne auch im Inspektor-Feld. Ziehen/Pfeile/Entf/Strg+D
+fuer alle (Loeschen von hinten nach vorn), Griffe nur bei einem. Menue
+**Anordnen** (`anordnen`): ausrichten/gleiche Masse am Bezug, Verteilen ab
+drei mit gleichen Luecken (erstes und letztes stehen). **Reiterseiten:**
+Feld `reiter` = `NAME:SEITE` (ab 1) je Control, `reiterNachziehen` (am Anfang
+von `ansichtBauen`) baut daraus `tabctl.kinder` fuer Reiterwerk UND
+Assistent -- die Laufzeit fuehrt Nummern, die sich bei jedem Loeschen
+verschieben, der Designer Namen; `reiterAusDatei` beim Laden umgekehrt
+(Namenlose bekommen einen), ein umbenanntes Reiterwerk nimmt seine Kinder
+mit. GB-Code: `GUI_TABCONTROL_ADD` je Seite, die Zuordnungen NACH allen
+Controls (`gbVarNamen`). Dazu Kaestchen *Tippen erlaubt* (Combobox) und
+**[Neu]/[Oeffnen] fragen bei Ungesichertem** (`ersetzenAnfragen`, wie im
+Notenblatt; bis dahin warfen sie es wortlos weg). Tests sieben Faelle in
+`tests/pruef/werkzeug_formdesigner.dhtest`; fuenf Verfaelschungen fallen je in
+ihrem Fall.
+
 **Debugger: Aufrufstapel, Ueberwachen, bis zur Marke, Wert setzen**
 (2026-09-23): `dhrt debug` fuehrt je laufender Funktion (Name, Zeile des
 AUFRUFS) in `DebugState::stapel` -- geschoben in `exec`/`exec_byref`, nur

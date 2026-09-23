@@ -18,7 +18,10 @@
 '  Spalten und Gitter der Tabelle, Min/Max/Wert). Palette anklicken, dann
 '  auf die Form klicken = ablegen; ziehen = verschieben; an den acht Griffen
 '  = Groesse; Entf = loeschen; Strg+Z/Y = Rueckgaengig/Wiederholen; Strg+D =
-'  verdoppeln; Pfeile = um ein Raster schieben; F5 = Formular laufen lassen
+'  verdoppeln; Pfeile = um ein Raster schieben; Umschalt/Strg+Klick oder ein
+'  Rahmen ueber leere Flaeche waehlt mehrere (Strg+A alle), das Menue
+'  "Anordnen" richtet sie am zuletzt angeklickten aus; "Reiterseite" legt
+'  ein Control auf eine Seite eines Reiterwerks; F5 = Formular laufen lassen
 '  (erzeugt <name>_lauf.dh mit Handler-Ruempfen neben der .dhform);
 '  Strg+G = GB-Code: <name>_code.dh baut das Formular Aufruf fuer Aufruf,
 '  ohne GUI_LOAD und ohne .dhform zur Laufzeit.
@@ -111,6 +114,9 @@ DIM doc AS JSON_HANDLE
 DIM frm AS GUI_WINDOW : frm = -1
 DIM formPfad AS STRING : formPfad = ""
 DIM auswahl AS INTEGER : auswahl = -1           ' Index in doc.widgets
+' Mehrfachauswahl: alle gewaehlten Indizes; `auswahl` ist darunter das
+' zuletzt angeklickte -- der Inspektor zeigt es, "Anordnen" richtet an ihm aus.
+DIM gewaehlt AS ARRAY OF INTEGER : gewaehlt = []
 DIM geaendert AS BOOLEAN : geaendert = FALSE
 DIM formX AS INTEGER : formX = PAL_B + 40        ' wo die Form auf dem Schirm liegt
 DIM formY AS INTEGER : formY = 60
@@ -142,8 +148,141 @@ FUNCTION feldZahl(i AS INTEGER, feld AS STRING) AS INTEGER
     RETURN JSON_GET_INT(doc, wz$(i, feld))
 END FUNCTION
 
+' --- Auswahl ------------------------------------------------------------------
+SUB auswahlSetzen(i AS INTEGER)
+    auswahl = i
+    IF i >= 0 THEN gewaehlt = [i] ELSE gewaehlt = []
+END SUB
+
+FUNCTION istGewaehlt(i AS INTEGER) AS BOOLEAN
+    RETURN ARRAY_INDEXOF(gewaehlt, i) >= 0
+END FUNCTION
+
+' Umschalt/Strg+Klick: dazu oder wieder weg.
+SUB auswahlUmschalten(i AS INTEGER)
+    IF istGewaehlt(i) THEN
+        DIM rest AS ARRAY OF INTEGER : rest = []
+        DIM j AS INTEGER
+        FOR EACH j IN gewaehlt
+            IF j <> i THEN ARRAY_PUSH(rest, j)
+        NEXT
+        gewaehlt = rest
+        IF LEN(gewaehlt) > 0 THEN auswahl = gewaehlt[LEN(gewaehlt) - 1] ELSE auswahl = -1
+    ELSE
+        ARRAY_PUSH(gewaehlt, i)
+        auswahl = i
+    END IF
+END SUB
+
+' Nach Rueckgaengig oder Loeschen: was es nicht mehr gibt, faellt heraus.
+SUB auswahlBereinigen()
+    DIM rest AS ARRAY OF INTEGER : rest = []
+    DIM j AS INTEGER
+    FOR EACH j IN gewaehlt
+        IF j >= 0 AND j < anzahl() THEN ARRAY_PUSH(rest, j)
+    NEXT
+    gewaehlt = rest
+    IF auswahl >= anzahl() OR NOT istGewaehlt(auswahl) THEN
+        IF LEN(gewaehlt) > 0 THEN auswahl = gewaehlt[LEN(gewaehlt) - 1] ELSE auswahl = -1
+    END IF
+END SUB
+
+SUB allesWaehlen()
+    gewaehlt = []
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl() - 1
+        ARRAY_PUSH(gewaehlt, i)
+    NEXT
+    IF anzahl() > 0 THEN auswahl = anzahl() - 1 ELSE auswahl = -1
+    inspektorFuellen()
+    protokoll("alle " + STR$(LEN(gewaehlt)))
+END SUB
+
+' --- Reiterseiten -------------------------------------------------------------
+' Ein Control gehoert zu einer Seite eines Reiterwerks (oder einem Schritt
+' eines Assistenten), wenn sein Feld "reiter" NAME:SEITE sagt (Seite ab 1).
+' Die Laufzeit fuehrt die Kinder als Widget-NUMMERN (`tabctl.kinder`) -- die
+' verschieben sich bei jedem Loeschen und Umordnen. Deshalb fuehrt der
+' Designer sie am NAMEN und rechnet die Nummern vor jeder Ansicht neu aus;
+' beim Laden geht es einmal umgekehrt.
+FUNCTION istBehaelter(i AS INTEGER) AS BOOLEAN
+    DIM k AS STRING : k = feldText$(i, "kind")
+    RETURN k = "tabcontrol" OR k = "wizard"
+END FUNCTION
+
+FUNCTION seitenZahl(i AS INTEGER) AS INTEGER
+    IF NOT JSON_HAS(doc, wz$(i, "items")) THEN RETURN 0
+    RETURN JSON_LEN(doc, wz$(i, "items"))
+END FUNCTION
+
+' Welcher Behaelter, welche Seite (ab 1)? -1 / 0, wenn keine gilt.
+FUNCTION reiterVon(c AS INTEGER) AS INTEGER
+    DIM r AS STRING : r = feldText$(c, "reiter")
+    DIM dp AS INTEGER : dp = INSTR(r, ":")
+    IF dp <= 0 THEN RETURN -1
+    DIM pn AS STRING : pn = LOWER$(TRIM$(LEFT$(r, dp)))
+    DIM p AS INTEGER
+    FOR p = 0 TO anzahl() - 1
+        IF p <> c AND istBehaelter(p) AND LOWER$(feldText$(p, "name")) = pn THEN RETURN p
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION reiterSeite(c AS INTEGER) AS INTEGER
+    DIM r AS STRING : r = feldText$(c, "reiter")
+    DIM dp AS INTEGER : dp = INSTR(r, ":")
+    IF dp <= 0 THEN RETURN 0
+    RETURN INT(VAL(TRIM$(MID$(r, dp + 1, LEN(r)))))
+END FUNCTION
+
+SUB reiterNachziehen()
+    DIM n AS INTEGER : n = anzahl()
+    DIM p AS INTEGER
+    DIM c AS INTEGER
+    FOR p = 0 TO n - 1
+        IF NOT istBehaelter(p) THEN CONTINUE
+        DIM kinder AS JSON_HANDLE : kinder = JSON_NEW_ARRAY()
+        FOR c = 0 TO n - 1
+            IF reiterVon(c) <> p THEN CONTINUE
+            DIM s AS INTEGER : s = reiterSeite(c)
+            IF s < 1 OR s > seitenZahl(p) THEN CONTINUE
+            DIM paar AS JSON_HANDLE : paar = JSON_NEW_ARRAY()
+            JSON_APPEND_INT(paar, "", c)
+            JSON_APPEND_INT(paar, "", s - 1)
+            JSON_APPEND_JSON(kinder, "", paar)
+        NEXT
+        DIM seite AS INTEGER : seite = 0
+        IF JSON_HAS(doc, wz$(p, "tabctl.seite")) THEN seite = JSON_GET_INT(doc, wz$(p, "tabctl.seite"))
+        DIM tc AS JSON_HANDLE : tc = JSON_NEW_OBJECT()
+        JSON_SET_JSON(tc, "kinder", kinder)
+        JSON_SET_INT(tc, "seite", seite)
+        JSON_SET_JSON(doc, wz$(p, "tabctl"), tc)
+    NEXT
+END SUB
+
+' Eine Datei, die ein Programm mit GUI_SAVE geschrieben hat, kennt nur die
+' Nummern: daraus einmal die Namen machen (wer keinen Namen hat, bekommt
+' einen).
+SUB reiterAusDatei()
+    DIM p AS INTEGER
+    FOR p = 0 TO anzahl() - 1
+        IF NOT istBehaelter(p) OR NOT JSON_HAS(doc, wz$(p, "tabctl.kinder")) THEN CONTINUE
+        IF feldText$(p, "name") = "" THEN JSON_SET_STRING(doc, wz$(p, "name"), eindeutigerName$(feldText$(p, "kind")))
+        DIM kp AS STRING : kp = wz$(p, "tabctl.kinder")
+        DIM e AS INTEGER
+        FOR e = 0 TO JSON_LEN(doc, kp) - 1
+            DIM c AS INTEGER : c = JSON_GET_INT(doc, kp + "." + STR$(e) + ".0")
+            DIM s AS INTEGER : s = JSON_GET_INT(doc, kp + "." + STR$(e) + ".1")
+            IF c < 0 OR c >= anzahl() OR c = p OR feldText$(c, "reiter") <> "" THEN CONTINUE
+            IF feldText$(c, "name") = "" THEN JSON_SET_STRING(doc, wz$(c, "name"), eindeutigerName$(feldText$(c, "kind")))
+            JSON_SET_STRING(doc, wz$(c, "reiter"), feldText$(p, "name") + ":" + STR$(s + 1))
+        NEXT
+    NEXT
+END SUB
+
 ' --- Ansicht: das Formular als echtes Fenster im Entwurfsmodus ---------------
 SUB ansichtBauen()
+    reiterNachziehen()
     ' Ein neues Fenster nimmt den Fokus -- und Kuerzel gelten im Fenster mit
     ' Fokus. Also merken und zurueckgeben, sonst waeren Strg+S und F5 nach
     ' dem ersten Ablegen tot.
@@ -174,7 +313,7 @@ END SUB
 
 SUB standHolen()
     doc = JSON_PARSE(staende[standPos])
-    IF auswahl >= anzahl() THEN auswahl = -1
+    auswahlBereinigen()
     ansichtBauen()
     inspektorFuellen()
 END SUB
@@ -214,6 +353,24 @@ DIM miDoppel AS INTEGER : miDoppel = GUI_MENU_ITEM(mBearb, "Verdoppeln", "Strg+D
 DIM miLoeschen AS INTEGER : miLoeschen = GUI_MENU_ITEM(mBearb, "Loeschen")
 DIM miVorn AS INTEGER : miVorn = GUI_MENU_ITEM(mBearb, "Nach vorn")
 DIM miHinten AS INTEGER : miHinten = GUI_MENU_ITEM(mBearb, "Nach hinten")
+' Strg+A liegt nicht am Menue: ein Kuerzel mit Strg gewaenne auch in einem
+' Inspektor-Feld, und dort heisst Strg+A "den Text markieren".
+DIM miAlle AS INTEGER : miAlle = GUI_MENU_ITEM(mBearb, "Alles auswaehlen (Strg+A)")
+' Anordnen: Bezug ist das zuletzt angeklickte Control.
+DIM mAnord AS INTEGER : mAnord = GUI_MENU(winPal, "Anordnen")
+DIM miLinks AS INTEGER : miLinks = GUI_MENU_ITEM(mAnord, "Links ausrichten")
+DIM miRechts AS INTEGER : miRechts = GUI_MENU_ITEM(mAnord, "Rechts ausrichten")
+DIM miOben AS INTEGER : miOben = GUI_MENU_ITEM(mAnord, "Oben ausrichten")
+DIM miUnten AS INTEGER : miUnten = GUI_MENU_ITEM(mAnord, "Unten ausrichten")
+DIM miMitteW AS INTEGER : miMitteW = GUI_MENU_ITEM(mAnord, "Waagerecht mittig")
+DIM miMitteS AS INTEGER : miMitteS = GUI_MENU_ITEM(mAnord, "Senkrecht mittig")
+GUI_MENU_SEPARATOR(mAnord)
+DIM miGleichB AS INTEGER : miGleichB = GUI_MENU_ITEM(mAnord, "Gleiche Breite")
+DIM miGleichH AS INTEGER : miGleichH = GUI_MENU_ITEM(mAnord, "Gleiche Hoehe")
+DIM miGleichG AS INTEGER : miGleichG = GUI_MENU_ITEM(mAnord, "Gleiche Groesse")
+GUI_MENU_SEPARATOR(mAnord)
+DIM miVertW AS INTEGER : miVertW = GUI_MENU_ITEM(mAnord, "Waagerecht verteilen")
+DIM miVertS AS INTEGER : miVertS = GUI_MENU_ITEM(mAnord, "Senkrecht verteilen")
 
 DIM lblPalette AS GUI_WIDGET : lblPalette = GUI_LABEL(winPal, "Palette -- anklicken, dann auf die Form", 8, 34)
 ' Die Liste laesst unten Platz fuer zwei Zeilen Status -- eine Meldung mit
@@ -257,6 +414,9 @@ DIM fEnter AS GUI_WIDGET : fEnter = inspFeld("on_enter", "on_enter", 10)
 DIM fStil AS GUI_WIDGET : fStil = inspFeld("font_style", "Schriftstil", 11)
 GUI_TOOLTIP(fStil, "fett, kursiv, unterstrichen, durchgestrichen -- verbunden mit +, z. B. fett+unterstrichen")
 DIM cbAktiv AS GUI_WIDGET : cbAktiv = GUI_CHECKBOX(winInsp, "Aktiviert", 250, 36 + 19 * 34 + 4)
+' Unter den Knoepfen, damit keine bisherige Zeile rueckt.
+DIM fReiter AS GUI_WIDGET : fReiter = inspFeld("reiter", "Reiterseite", 20)
+GUI_TOOLTIP(fReiter, "Name eines Reiterwerks (oder Assistenten) und die Seite ab 1, z. B. reiterwerk1:2 -- das Control steht dann nur auf dieser Seite")
 
 ' Felder je Art (seit Stand 31): sichtbar nur bei den Arten, die in ihrer
 ' Liste stehen. Listen werden mit Semikolon getrennt -- ein Komma steht zu
@@ -275,7 +435,10 @@ FUNCTION artFeld(schluessel AS STRING, titel AS STRING, arten AS STRING, zeile A
     RETURN f
 END FUNCTION
 
-DIM aEintraege AS GUI_WIDGET : aEintraege = artFeld("items", "Eintraege", ",dropdown,listbox,accordion,wizard,", 12, "Rot; Gruen; Blau")
+DIM aEintraege AS GUI_WIDGET : aEintraege = artFeld("items", "Eintraege", ",dropdown,listbox,accordion,wizard,tabcontrol,", 12, "Rot; Gruen; Blau")
+' Welche Seite das Reiterwerk im Entwurf zeigt -- die Controls der anderen
+' sind dort verborgen, wie spaeter im Programm.
+DIM aSeite AS GUI_WIDGET : aSeite = artFeld("seite", "Gezeigte Seite", ",tabcontrol,wizard,", 13, "1")
 DIM aSpalten AS GUI_WIDGET : aSpalten = artFeld("spalten", "Spalten", ",table,", 12, "Name; Menge; Farbe")
 DIM aBreiten AS GUI_WIDGET : aBreiten = artFeld("breiten", "Breiten", ",table,", 13, "120; 60; 80")
 DIM aBearb AS GUI_WIDGET : aBearb = artFeld("bearbeitbar", "Bearbeitbar", ",table,", 14, "0; 2  oder  alle")
@@ -293,6 +456,8 @@ DIM aLeer AS GUI_WIDGET : aLeer = artFeld("leer_text", "Leer-Hinweis", ",table,t
 DIM cbZellen AS GUI_WIDGET : cbZellen = GUI_CHECKBOX(winInsp, "Zellmodus (Gitter)", 100, 36 + 18 * 34)
 ' Eine Liste bzw. ein Baum, deren Eintraege sich mit F2 umbenennen lassen.
 DIM cbUmbenennen AS GUI_WIDGET : cbUmbenennen = GUI_CHECKBOX(winInsp, "Umbenennen mit F2", 100, 36 + 13 * 34)
+' Eine Klappliste, in die man auch tippen darf (Combobox).
+DIM cbFrei AS GUI_WIDGET : cbFrei = GUI_CHECKBOX(winInsp, "Tippen erlaubt (Combobox)", 100, 36 + 14 * 34)
 
 DIM btnUebernehmen AS GUI_WIDGET : btnUebernehmen = GUI_BUTTON(winInsp, "Uebernehmen", 100, 36 + 19 * 34, 140, 28)
 ' Formular-Felder (wenn nichts ausgewaehlt ist)
@@ -305,7 +470,7 @@ DIM lFormH AS GUI_WIDGET : lFormH = GUI_LABEL(winInsp, "Hoehe", 8, 108)
 DIM cbResizable AS GUI_WIDGET : cbResizable = GUI_CHECKBOX(winInsp, "Groessenveraenderbar", 100, 138)
 DIM lThema AS GUI_WIDGET : lThema = GUI_LABEL(winInsp, "Thema", 8, 176)
 DIM ddThema AS GUI_WIDGET : ddThema = GUI_DROPDOWN(winInsp, 100, 172, INSP_B - 110, 24, ["(keines)", "glas_dunkel", "glas_hell", "dark", "light"])
-DIM lblHinweis AS GUI_WIDGET : lblHinweis = GUI_LABEL(winInsp, "", 8, 36 + 20 * 34 + 10)
+DIM lblHinweis AS GUI_WIDGET : lblHinweis = GUI_LABEL(winInsp, "", 8, 36 + 21 * 34 + 10)
 GUI_SET_WRAP(lblHinweis, INSP_B - 16)
 
 DIM inspStumm AS BOOLEAN : inspStumm = FALSE     ' beim Fuellen nicht als Eingabe werten
@@ -319,6 +484,7 @@ SUB artSichtbar(art AS STRING)
     NEXT
     GUI_SET_VISIBLE(cbZellen, art = "table")
     GUI_SET_VISIBLE(cbUmbenennen, art = "listbox" OR art = "tree")
+    GUI_SET_VISIBLE(cbFrei, art = "dropdown")
 END SUB
 
 FUNCTION zahlText$(f AS FLOAT) AS STRING
@@ -407,13 +573,33 @@ SUB artFuellen(i AS INTEGER)
     DIM umb AS BOOLEAN : umb = FALSE
     IF JSON_HAS(doc, up + ".bearbeitbar") THEN umb = JSON_GET_BOOL(doc, up + ".bearbeitbar")
     GUI_SET_CHECKED(cbUmbenennen, umb)
+    DIM seite AS INTEGER : seite = 0
+    IF JSON_HAS(doc, wz$(i, "tabctl.seite")) THEN seite = JSON_GET_INT(doc, wz$(i, "tabctl.seite"))
+    GUI_SET_TEXT(aSeite, STR$(seite + 1))
+    DIM frei AS BOOLEAN : frei = FALSE
+    IF JSON_HAS(doc, wz$(i, "bearbeitbar")) THEN frei = JSON_GET_BOOL(doc, wz$(i, "bearbeitbar"))
+    GUI_SET_CHECKED(cbFrei, frei)
 END SUB
 
 ' Felder je Art -> Modell.
 SUB artUebernehmen(i AS INTEGER)
     DIM art AS STRING : art = feldText$(i, "kind")
     DIM t AS STRING
-    IF art = "dropdown" OR art = "listbox" OR art = "accordion" OR art = "wizard" THEN listeSetzen(wz$(i, "items"), GUI_TEXT(aEintraege), FALSE)
+    IF art = "dropdown" OR art = "listbox" OR art = "accordion" OR art = "wizard" OR art = "tabcontrol" THEN listeSetzen(wz$(i, "items"), GUI_TEXT(aEintraege), FALSE)
+    IF art = "tabcontrol" OR art = "wizard" THEN
+        IF NOT JSON_HAS(doc, wz$(i, "tabctl")) THEN JSON_SET_JSON(doc, wz$(i, "tabctl"), JSON_NEW_OBJECT())
+        DIM sz AS INTEGER : sz = MAX(1, seitenZahl(i))
+        JSON_SET_INT(doc, wz$(i, "tabctl.seite"), MAX(0, MIN(sz - 1, INT(VAL(GUI_TEXT(aSeite))) - 1)))
+    END IF
+    IF art = "dropdown" THEN
+        ' Abgewaehlt wird der Schluessel ENTFERNT -- die Laufzeit schreibt
+        ' ihn nur, wenn er an ist.
+        IF GUI_CHECKED(cbFrei) THEN
+            JSON_SET_BOOL(doc, wz$(i, "bearbeitbar"), TRUE)
+        ELSEIF JSON_HAS(doc, wz$(i, "bearbeitbar")) THEN
+            JSON_REMOVE(doc, wz$(i, "bearbeitbar"))
+        END IF
+    END IF
     IF art = "slider" OR art = "progress" OR art = "spinner" OR art = "knob" THEN
         IF TRIM$(GUI_TEXT(aMin)) <> "" THEN JSON_SET_FLOAT(doc, wz$(i, "min"), VAL(GUI_TEXT(aMin)))
         IF TRIM$(GUI_TEXT(aMax)) <> "" THEN JSON_SET_FLOAT(doc, wz$(i, "max"), VAL(GUI_TEXT(aMax)))
@@ -546,7 +732,11 @@ SUB inspektorFuellen()
     inspStumm = TRUE
     IF auswahl >= 0 AND auswahl < anzahl() THEN
         inspektorSichtbar(TRUE)
-        GUI_SET_TEXT(lblInsp, feldText$(auswahl, "kind") + "  #" + STR$(auswahl))
+        IF LEN(gewaehlt) > 1 THEN
+            GUI_SET_TEXT(lblInsp, feldText$(auswahl, "kind") + "  #" + STR$(auswahl) + "  (+" + STR$(LEN(gewaehlt) - 1) + " weitere)")
+        ELSE
+            GUI_SET_TEXT(lblInsp, feldText$(auswahl, "kind") + "  #" + STR$(auswahl))
+        END IF
         DIM i AS INTEGER
         FOR i = 0 TO LEN(inspFelder) - 1
             DIM k AS STRING : k = inspNamen[i]
@@ -560,7 +750,11 @@ SUB inspektorFuellen()
         IF JSON_HAS(doc, wz$(auswahl, "enabled")) THEN an = JSON_GET_BOOL(doc, wz$(auswahl, "enabled"))
         GUI_SET_CHECKED(cbAktiv, an)
         artFuellen(auswahl)
-        GUI_SET_TEXT(lblHinweis, "Enter in einem Feld oder [Uebernehmen] schreibt die Werte. Entf loescht, Strg+D verdoppelt, Pfeile schieben.")
+        IF LEN(gewaehlt) > 1 THEN
+            GUI_SET_TEXT(lblHinweis, STR$(LEN(gewaehlt)) + " Controls gewaehlt -- das Menue Anordnen richtet sie am hier gezeigten aus. Entf, Strg+D und die Pfeile gelten fuer alle.")
+        ELSE
+            GUI_SET_TEXT(lblHinweis, "Enter in einem Feld oder [Uebernehmen] schreibt die Werte. Entf loescht, Strg+D verdoppelt, Pfeile schieben.")
+        END IF
     ELSE
         inspektorSichtbar(FALSE)
         GUI_SET_TEXT(lblInsp, "Formular")
@@ -586,6 +780,7 @@ END SUB
 ' Inspektor -> Modell
 SUB inspektorUebernehmen()
     IF auswahl >= 0 AND auswahl < anzahl() THEN
+        DIM alterName AS STRING : alterName = feldText$(auswahl, "name")
         DIM i AS INTEGER
         FOR i = 0 TO LEN(inspFelder) - 1
             DIM k AS STRING : k = inspNamen[i]
@@ -606,6 +801,18 @@ SUB inspektorUebernehmen()
             JSON_SET_BOOL(doc, wz$(auswahl, "enabled"), FALSE)
         END IF
         artUebernehmen(auswahl)
+        ' Ein umbenanntes Reiterwerk nimmt seine Kinder mit -- sie fuehren es
+        ' am Namen und staenden sonst auf keiner Seite mehr.
+        DIM neuerName AS STRING : neuerName = feldText$(auswahl, "name")
+        IF istBehaelter(auswahl) AND alterName <> "" AND LOWER$(neuerName) <> LOWER$(alterName) THEN
+            DIM c AS INTEGER
+            FOR c = 0 TO anzahl() - 1
+                DIM r AS STRING : r = feldText$(c, "reiter")
+                IF LOWER$(LEFT$(r, LEN(alterName) + 1)) = LOWER$(alterName) + ":" THEN
+                    JSON_SET_STRING(doc, wz$(c, "reiter"), neuerName + MID$(r, LEN(alterName), LEN(r)))
+                END IF
+            NEXT
+        END IF
     ELSE
         JSON_SET_STRING(doc, "title", GUI_TEXT(fTitel))
         JSON_SET_INT(doc, "w", MAX(INT(VAL(GUI_TEXT(fFormB))), 80))
@@ -663,6 +870,7 @@ SUB controlAnlegen(p AS INTEGER, x AS INTEGER, y AS INTEGER)
     IF palArt[p] = "treetable" THEN JSON_SET_JSON(w, "table", JSON_PARSE(REPLACE$("{'headers':['Name','Wert'],'baum':true}", "'", CHR$(34))))
     IF palArt[p] = "accordion" THEN JSON_SET_JSON(w, "items", JSON_PARSE(REPLACE$("['Abschnitt 1','Abschnitt 2']", "'", CHR$(34))))
     IF palArt[p] = "wizard" THEN JSON_SET_JSON(w, "items", JSON_PARSE(REPLACE$("['Schritt 1','Schritt 2']", "'", CHR$(34))))
+    IF palArt[p] = "tabcontrol" THEN JSON_SET_JSON(w, "items", JSON_PARSE(REPLACE$("['Seite 1','Seite 2']", "'", CHR$(34))))
     JSON_SET_INT(w, "x", amRaster(x)) : JSON_SET_INT(w, "y", amRaster(y))
     JSON_SET_INT(w, "w", palB[p]) : JSON_SET_INT(w, "h", palH[p])
     IF palText[p] THEN JSON_SET_STRING(w, "text", palName[p])
@@ -671,7 +879,7 @@ SUB controlAnlegen(p AS INTEGER, x AS INTEGER, y AS INTEGER)
     END IF
     IF palArt[p] = "slider" OR palArt[p] = "progress" THEN JSON_SET_FLOAT(w, "min", 0.0) : JSON_SET_FLOAT(w, "max", 100.0) : JSON_SET_FLOAT(w, "value", 50.0)
     JSON_APPEND_JSON(doc, "widgets", w)
-    auswahl = anzahl() - 1
+    auswahlSetzen(anzahl() - 1)
     ansichtBauen()
     merken()
     inspektorFuellen()
@@ -681,9 +889,15 @@ END SUB
 
 SUB controlLoeschen()
     IF auswahl < 0 THEN RETURN
-    JSON_REMOVE(doc, "widgets." + STR$(auswahl))
-    protokoll("geloescht " + STR$(auswahl))
-    auswahl = -1
+    ' Von hinten nach vorn -- sonst rueckten die Nummern der uebrigen auf.
+    DIM weg AS ARRAY OF INTEGER : weg = gewaehlt
+    SORT(weg)
+    DIM k AS INTEGER
+    FOR k = LEN(weg) - 1 TO 0 STEP -1
+        JSON_REMOVE(doc, "widgets." + STR$(weg[k]))
+    NEXT
+    IF LEN(weg) = 1 THEN protokoll("geloescht " + STR$(weg[0])) ELSE protokoll("geloescht " + STR$(LEN(weg)) + " controls")
+    auswahlSetzen(-1)
     ansichtBauen()
     merken()
     inspektorFuellen()
@@ -691,13 +905,25 @@ END SUB
 
 SUB controlVerdoppeln()
     IF auswahl < 0 THEN RETURN
-    ' Das Widget als eigenes Handle (JSON_SET_JSON/APPEND_JSON brauchen eins).
-    DIM neu AS JSON_HANDLE : neu = teilbaum(doc, "widgets." + STR$(auswahl))
-    JSON_SET_INT(neu, "x", feldZahl(auswahl, "x") + RASTER)
-    JSON_SET_INT(neu, "y", feldZahl(auswahl, "y") + RASTER)
-    JSON_SET_STRING(neu, "name", eindeutigerName$(feldText$(auswahl, "kind")))
-    JSON_APPEND_JSON(doc, "widgets", neu)
-    auswahl = anzahl() - 1
+    ' Alle gewaehlten; danach sind die Kopien gewaehlt (das Kopierte des
+    ' zuletzt angeklickten vorn im Inspektor).
+    DIM quellen AS ARRAY OF INTEGER : quellen = gewaehlt
+    DIM haupt AS INTEGER : haupt = auswahl
+    DIM neue AS ARRAY OF INTEGER : neue = []
+    DIM neuHaupt AS INTEGER : neuHaupt = -1
+    DIM q AS INTEGER
+    FOR EACH q IN quellen
+        ' Das Widget als eigenes Handle (JSON_SET_JSON/APPEND_JSON brauchen eins).
+        DIM neu AS JSON_HANDLE : neu = teilbaum(doc, "widgets." + STR$(q))
+        JSON_SET_INT(neu, "x", feldZahl(q, "x") + RASTER)
+        JSON_SET_INT(neu, "y", feldZahl(q, "y") + RASTER)
+        JSON_SET_STRING(neu, "name", eindeutigerName$(feldText$(q, "kind")))
+        JSON_APPEND_JSON(doc, "widgets", neu)
+        ARRAY_PUSH(neue, anzahl() - 1)
+        IF q = haupt THEN neuHaupt = anzahl() - 1
+    NEXT
+    gewaehlt = neue
+    auswahl = neuHaupt
     ansichtBauen()
     merken()
     inspektorFuellen()
@@ -755,7 +981,7 @@ SUB controlOrdnen(nachVorn AS BOOLEAN)
     JSON_REMOVE(doc, "widgets." + STR$(auswahl))
     IF nachVorn THEN
         JSON_APPEND_JSON(doc, "widgets", kopie)
-        auswahl = n - 1
+        auswahlSetzen(n - 1)
     ELSE
         ' vorn einfuegen: alle anderen hinten anhaengen, dann die Liste tauschen
         DIM neu AS JSON_HANDLE : neu = JSON_NEW_ARRAY()
@@ -765,7 +991,7 @@ SUB controlOrdnen(nachVorn AS BOOLEAN)
             JSON_APPEND_JSON(neu, "", teilbaum(doc, "widgets." + STR$(i)))
         NEXT
         JSON_SET_JSON(doc, "widgets", neu)
-        auswahl = 0
+        auswahlSetzen(0)
     END IF
     ansichtBauen()
     merken()
@@ -776,7 +1002,7 @@ END SUB
 SUB neuesFormular()
     doc = JSON_PARSE(leeresFormular$())
     formPfad = ""
-    auswahl = -1
+    auswahlSetzen(-1)
     staende = [] : standPos = -1
     ansichtBauen()
     merken()
@@ -797,7 +1023,8 @@ SUB formularLaden(pfad AS STRING)
     doc = JSON_LOAD(pfad)
     IF NOT JSON_HAS(doc, "widgets") THEN JSON_SET_JSON(doc, "widgets", JSON_NEW_ARRAY())
     formPfad = pfad
-    auswahl = -1
+    auswahlSetzen(-1)
+    reiterAusDatei()
     staende = [] : standPos = -1
     ansichtBauen()
     merken()
@@ -933,6 +1160,11 @@ FUNCTION gbSchalter(pfad AS STRING) AS BOOLEAN
     RETURN JSON_GET_BOOL(doc, pfad)
 END FUNCTION
 
+' Je Control der Variablenname im GB-Code (Index wie in doc.widgets) --
+' die Zuordnung zu Reiterseiten kommt NACH allen Controls, dann gibt es
+' Behaelter und Kind beide schon.
+DIM gbVarNamen AS ARRAY OF STRING : gbVarNamen = []
+
 SUB gb(zeile AS STRING)
     ARRAY_PUSH(gbZeilen, zeile)
 END SUB
@@ -949,6 +1181,7 @@ SUB gbControl(i AS INTEGER)
         nr = nr + 1
     WEND
     ARRAY_PUSH(gbBenutzt, LOWER$(v))
+    ARRAY_PUSH(gbVarNamen, v)
     DIM w AS INTEGER : w = feldZahl(i, "w")
     DIM h AS INTEGER : h = feldZahl(i, "h")
     DIM lage AS STRING : lage = STR$(feldZahl(i, "x")) + ", " + STR$(feldZahl(i, "y"))
@@ -1055,6 +1288,13 @@ SUB gbControl(i AS INTEGER)
         END IF
     END IF
     IF k = "dropdown" AND feldText$(i, "placeholder") <> "" THEN gb("GUI_DROPDOWN_PLACEHOLDER(" + v + ", " + gbText$(feldText$(i, "placeholder")) + ")")
+    IF k = "dropdown" AND gbSchalter(wz$(i, "bearbeitbar")) THEN gb("GUI_DROPDOWN_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
+    IF k = "tabcontrol" AND JSON_HAS(doc, wz$(i, "items")) THEN
+        DIM sei AS INTEGER
+        FOR sei = 0 TO JSON_LEN(doc, wz$(i, "items")) - 1
+            gb("GUI_TABCONTROL_ADD(" + v + ", " + gbText$(JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(sei))) + ")")
+        NEXT
+    END IF
     IF k = "listbox" AND gbSchalter(wz$(i, "list") + ".bearbeitbar") THEN gb("GUI_LISTBOX_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
     IF k = "tree" AND gbSchalter(wz$(i, "tree") + ".bearbeitbar") THEN gb("GUI_TREE_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
     IF k = "tree" AND JSON_HAS(doc, wz$(i, "tree") + ".leer_text") THEN gb("GUI_TREE_PLACEHOLDER(" + v + ", " + gbText$(JSON_GET_STRING(doc, wz$(i, "tree") + ".leer_text")) + ")")
@@ -1068,7 +1308,6 @@ SUB gbControl(i AS INTEGER)
             END IF
         NEXT
         IF k = "accordion" THEN gb("' " + v + ": Controls je Abschnitt -- GUI_ACCORDION_ADD_WIDGET(" + v + ", wdg, abschnitt)")
-        IF k = "wizard" THEN gb("' " + v + ": Controls je Schritt -- GUI_WIZARD_ADD_WIDGET(" + v + ", wdg, schritt)")
     END IF
     IF k = "datepicker" AND feldText$(i, "date") <> "" THEN gb("GUI_SET_DATE(" + v + ", " + gbText$(feldText$(i, "date")) + ")")
     IF k = "timepicker" AND feldText$(i, "time") <> "" THEN gb("GUI_SET_TIME(" + v + ", " + gbText$(feldText$(i, "time")) + ")")
@@ -1088,6 +1327,7 @@ END SUB
 FUNCTION gbCode$() AS STRING
     gbZeilen = []
     gbBenutzt = ["frm"]
+    gbVarNamen = []
     gb("' Erzeugt vom Form-Designer -- das Formular ausgeschrieben, ohne GUI_LOAD")
     gb("' Vorlage: " + BASENAME(formPfad))
     gb("IMPORT " + dhString$("gui"))
@@ -1120,6 +1360,20 @@ FUNCTION gbCode$() AS STRING
     FOR i = 0 TO anzahl() - 1
         gbControl(i)
     NEXT
+    ' Reiterseiten und Assistenten-Schritte, jetzt da es alle gibt.
+    DIM zugeordnet AS BOOLEAN : zugeordnet = FALSE
+    FOR i = 0 TO anzahl() - 1
+        DIM rp AS INTEGER : rp = reiterVon(i)
+        DIM rs AS INTEGER : rs = reiterSeite(i)
+        IF rp < 0 OR rs < 1 OR rs > seitenZahl(rp) THEN CONTINUE
+        IF feldText$(rp, "kind") = "wizard" THEN
+            gb("GUI_WIZARD_ADD_WIDGET(" + gbVarNamen[rp] + ", " + gbVarNamen[i] + ", " + STR$(rs - 1) + ")")
+        ELSE
+            gb("GUI_TABCONTROL_ADD_WIDGET(" + gbVarNamen[rp] + ", " + gbVarNamen[i] + ", " + STR$(rs - 1) + ")")
+        END IF
+        zugeordnet = TRUE
+    NEXT
+    IF zugeordnet THEN gb("")
     gb("WHILE NOT QUITREQUESTED()")
     gb("    GUI_WINDOW_SET_BOUNDS(frm, 0, 0, SCREENWIDTH(), SCREENHEIGHT())")
     gb("    GUI_UPDATE()")
@@ -1157,7 +1411,13 @@ SUB ausfuehren()
 END SUB
 
 ' --- Maus auf der Form --------------------------------------------------------
-DIM modus AS INTEGER : modus = 0          ' 0 nichts, 1 verschieben, 2 groesse
+DIM modus AS INTEGER : modus = 0          ' 0 nichts, 1 verschieben, 2 groesse, 3 Auswahlrahmen
+' Beim Verschieben mehrerer: ihre Lage am Anfang des Zuges.
+DIM zugX AS ARRAY OF INTEGER : zugX = []
+DIM zugY AS ARRAY OF INTEGER : zugY = []
+' Auswahlrahmen: Ecke am Anfang (Formkoordinaten) und ob er dazunimmt.
+DIM rahmenAn AS BOOLEAN : rahmenAn = FALSE
+DIM rahmenDazu AS BOOLEAN : rahmenDazu = FALSE
 DIM griff AS INTEGER : griff = -1         ' 0..7: NW N NE E SE S SW W
 DIM startMx AS INTEGER
 DIM startMy AS INTEGER
@@ -1178,7 +1438,9 @@ END FUNCTION
 
 ' Griff unter der Maus (Bildschirmkoordinaten), -1 = keiner.
 FUNCTION griffBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
-    IF auswahl < 0 THEN RETURN -1
+    ' Griffe gibt es nur bei EINEM gewaehlten Control -- eine Groesse fuer
+    ' mehrere steht im Menue Anordnen.
+    IF auswahl < 0 OR LEN(gewaehlt) <> 1 THEN RETURN -1
     DIM x AS INTEGER : x = formX + feldZahl(auswahl, "x")
     DIM y AS INTEGER : y = formY + feldZahl(auswahl, "y")
     DIM w AS INTEGER : w = feldZahl(auswahl, "w")
@@ -1196,7 +1458,28 @@ FUNCTION griffBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
 END FUNCTION
 
 SUB griffeZeichnen()
+    IF rahmenAn THEN
+        DIM rx1 AS INTEGER : rx1 = MIN(startMx, MOUSEX())
+        DIM ry1 AS INTEGER : ry1 = MIN(startMy, MOUSEY())
+        DIM rx2 AS INTEGER : rx2 = MAX(startMx, MOUSEX())
+        DIM ry2 AS INTEGER : ry2 = MAX(startMy, MOUSEY())
+        RECT(rx1, ry1, rx2, ry2, &H4FC3F7)
+    END IF
     IF auswahl < 0 OR auswahl >= anzahl() THEN RETURN
+    ' Mehrere: je ein Rahmen, der Bezug (zuletzt angeklickt) heller.
+    IF LEN(gewaehlt) > 1 THEN
+        DIM j AS INTEGER
+        FOR EACH j IN gewaehlt
+            IF j < 0 OR j >= anzahl() THEN CONTINUE
+            DIM farbe AS INTEGER : farbe = &H2F7F9F
+            IF j = auswahl THEN farbe = &H9FE7FF
+            DIM jx AS INTEGER : jx = formX + feldZahl(j, "x")
+            DIM jy AS INTEGER : jy = formY + feldZahl(j, "y")
+            RECT(jx - 1, jy - 1, jx + feldZahl(j, "w"), jy + feldZahl(j, "h"), farbe)
+            IF j = auswahl THEN RECT(jx - 2, jy - 2, jx + feldZahl(j, "w") + 1, jy + feldZahl(j, "h") + 1, farbe)
+        NEXT
+        RETURN
+    END IF
     DIM x AS INTEGER : x = formX + feldZahl(auswahl, "x")
     DIM y AS INTEGER : y = formY + feldZahl(auswahl, "y")
     DIM w AS INTEGER : w = feldZahl(auswahl, "w")
@@ -1222,10 +1505,91 @@ END SUB
 
 ' Lage/Groesse waehrend eines Zuges: ins Modell UND live ins Widget.
 SUB lageSetzen(x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER)
-    JSON_SET_INT(doc, wz$(auswahl, "x"), x) : JSON_SET_INT(doc, wz$(auswahl, "y"), y)
-    JSON_SET_INT(doc, wz$(auswahl, "w"), w) : JSON_SET_INT(doc, wz$(auswahl, "h"), h)
-    DIM hd AS GUI_WIDGET : hd = GUI_WINDOW_WIDGET(frm, auswahl)
+    lageSetzenVon(auswahl, x, y, w, h)
+END SUB
+
+SUB lageSetzenVon(i AS INTEGER, x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER)
+    JSON_SET_INT(doc, wz$(i, "x"), x) : JSON_SET_INT(doc, wz$(i, "y"), y)
+    JSON_SET_INT(doc, wz$(i, "w"), w) : JSON_SET_INT(doc, wz$(i, "h"), h)
+    DIM hd AS GUI_WIDGET : hd = GUI_WINDOW_WIDGET(frm, i)
     IF hd >= 0 THEN GUI_SET_BOUNDS(hd, x, y, w, h)
+END SUB
+
+' Anordnen: am zuletzt angeklickten ausrichten, auf seine Groesse bringen
+' oder gleichmaessig verteilen (erstes und letztes bleiben stehen).
+SUB anordnen(was AS STRING)
+    IF auswahl < 0 OR LEN(gewaehlt) < 2 THEN
+        GUI_SET_TEXT(lblStatus, "Anordnen braucht mindestens zwei gewaehlte Controls (Umschalt+Klick oder ein Rahmen).")
+        RETURN
+    END IF
+    DIM bx AS INTEGER : bx = feldZahl(auswahl, "x")
+    DIM by AS INTEGER : by = feldZahl(auswahl, "y")
+    DIM bw AS INTEGER : bw = feldZahl(auswahl, "w")
+    DIM bh AS INTEGER : bh = feldZahl(auswahl, "h")
+    DIM j AS INTEGER
+    IF was = "vert_w" OR was = "vert_s" THEN
+        IF LEN(gewaehlt) < 3 THEN
+            GUI_SET_TEXT(lblStatus, "Verteilen braucht mindestens drei gewaehlte Controls.")
+            RETURN
+        END IF
+        ' Nach Lage sortieren (Auswahl-Sortierung, die Listen sind kurz).
+        DIM reihe AS ARRAY OF INTEGER : reihe = gewaehlt
+        DIM feld AS STRING : feld = IIF(was = "vert_w", "x", "y")
+        DIM mass AS STRING : mass = IIF(was = "vert_w", "w", "h")
+        DIM a AS INTEGER
+        DIM b AS INTEGER
+        FOR a = 0 TO LEN(reihe) - 2
+            FOR b = a + 1 TO LEN(reihe) - 1
+                IF feldZahl(reihe[b], feld) < feldZahl(reihe[a], feld) THEN
+                    DIM t AS INTEGER : t = reihe[a] : reihe[a] = reihe[b] : reihe[b] = t
+                END IF
+            NEXT
+        NEXT
+        DIM erste AS INTEGER : erste = reihe[0]
+        DIM letzte AS INTEGER : letzte = reihe[LEN(reihe) - 1]
+        DIM spanne AS INTEGER : spanne = feldZahl(letzte, feld) + feldZahl(letzte, mass) - feldZahl(erste, feld)
+        DIM summe AS INTEGER : summe = 0
+        FOR EACH j IN reihe
+            summe = summe + feldZahl(j, mass)
+        NEXT
+        DIM luecke AS FLOAT : luecke = (spanne - summe) / (LEN(reihe) - 1)
+        DIM pos AS FLOAT : pos = feldZahl(erste, feld)
+        FOR a = 0 TO LEN(reihe) - 1
+            j = reihe[a]
+            IF a > 0 AND a < LEN(reihe) - 1 THEN
+                IF was = "vert_w" THEN
+                    lageSetzenVon(j, INT(pos + 0.5), feldZahl(j, "y"), feldZahl(j, "w"), feldZahl(j, "h"))
+                ELSE
+                    lageSetzenVon(j, feldZahl(j, "x"), INT(pos + 0.5), feldZahl(j, "w"), feldZahl(j, "h"))
+                END IF
+            END IF
+            pos = pos + feldZahl(j, mass) + luecke
+        NEXT
+    ELSE
+        FOR EACH j IN gewaehlt
+            IF j = auswahl THEN CONTINUE
+            DIM x AS INTEGER : x = feldZahl(j, "x")
+            DIM y AS INTEGER : y = feldZahl(j, "y")
+            DIM w AS INTEGER : w = feldZahl(j, "w")
+            DIM h AS INTEGER : h = feldZahl(j, "h")
+            SELECT CASE was
+                CASE "links" : x = bx
+                CASE "rechts" : x = bx + bw - w
+                CASE "oben" : y = by
+                CASE "unten" : y = by + bh - h
+                CASE "mitte_w" : x = bx + (bw - w) \ 2
+                CASE "mitte_s" : y = by + (bh - h) \ 2
+                CASE "breite" : w = bw
+                CASE "hoehe" : h = bh
+                CASE "groesse" : w = bw : h = bh
+            END SELECT
+            lageSetzenVon(j, x, y, w, h)
+        NEXT
+    END IF
+    merken()
+    inspektorFuellen()
+    GUI_SET_TEXT(lblStatus, "Angeordnet: " + STR$(LEN(gewaehlt)) + " Controls.")
+    protokoll("angeordnet " + was + " " + STR$(LEN(gewaehlt)))
 END SUB
 
 SUB mausAufForm()
@@ -1247,16 +1611,68 @@ SUB mausAufForm()
         ELSE
             DIM h AS GUI_WIDGET : h = GUI_HIT_TEST(mx, my)
             DIM i AS INTEGER : i = indexVonHandle(h)
-            IF i <> auswahl THEN auswahl = i : inspektorFuellen()
-            IF i >= 0 THEN modus = 1 ELSE modus = 0
+            DIM dazu AS BOOLEAN : dazu = KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT) OR KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+            IF i >= 0 AND dazu THEN
+                ' Umschalt/Strg+Klick: dazu oder weg -- ohne Zug.
+                auswahlUmschalten(i)
+                inspektorFuellen()
+                protokoll("gewaehlt " + STR$(LEN(gewaehlt)))
+                modus = 0
+                GUI_FOCUS(lstPalette)
+                RETURN
+            ELSEIF i >= 0 THEN
+                ' Ein Klick in eine Mehrfachauswahl behaelt sie (zum
+                ' Verschieben aller) und macht das Control zum Bezug.
+                IF istGewaehlt(i) THEN auswahl = i ELSE auswahlSetzen(i)
+                inspektorFuellen()
+                modus = 1
+            ELSE
+                ' Leere Flaeche: ein Rahmen waehlt, was ganz darin liegt.
+                IF NOT dazu THEN auswahlSetzen(-1) : inspektorFuellen()
+                modus = 3
+                rahmenAn = TRUE
+                rahmenDazu = dazu
+            END IF
         END IF
+        startMx = mx : startMy = my
+        bewegt = FALSE
         IF auswahl >= 0 THEN
-            startMx = mx : startMy = my
             startX = feldZahl(auswahl, "x") : startY = feldZahl(auswahl, "y")
             startW = feldZahl(auswahl, "w") : startH = feldZahl(auswahl, "h")
-            bewegt = FALSE
+            zugX = [] : zugY = []
+            DIM gj AS INTEGER
+            FOR EACH gj IN gewaehlt
+                ARRAY_PUSH(zugX, feldZahl(gj, "x")) : ARRAY_PUSH(zugY, feldZahl(gj, "y"))
+            NEXT
         END IF
         GUI_FOCUS(lstPalette)     ' Tastatur (Entf, Pfeile) zum Designer, nicht in ein Inspektor-Feld
+        RETURN
+    END IF
+    IF modus = 3 THEN
+        IF MOUSEBUTTON(LINKS) THEN RETURN
+        ' Losgelassen: alles, was ganz im Rahmen liegt.
+        rahmenAn = FALSE
+        modus = 0
+        IF ABS(mx - startMx) < 3 AND ABS(my - startMy) < 3 THEN RETURN
+        DIM rx1 AS INTEGER : rx1 = MIN(startMx, mx) - formX
+        DIM ry1 AS INTEGER : ry1 = MIN(startMy, my) - formY
+        DIM rx2 AS INTEGER : rx2 = MAX(startMx, mx) - formX
+        DIM ry2 AS INTEGER : ry2 = MAX(startMy, my) - formY
+        IF NOT rahmenDazu THEN gewaehlt = []
+        DIM k AS INTEGER
+        FOR k = 0 TO anzahl() - 1
+            DIM kx AS INTEGER : kx = feldZahl(k, "x")
+            DIM ky AS INTEGER : ky = feldZahl(k, "y")
+            IF kx >= rx1 AND ky >= ry1 AND kx + feldZahl(k, "w") <= rx2 AND ky + feldZahl(k, "h") <= ry2 AND NOT istGewaehlt(k) THEN
+                ' Ein Control auf einer verborgenen Reiterseite liegt nicht
+                ' sichtbar im Rahmen -- es bleibt aussen vor.
+                DIM kh AS GUI_WIDGET : kh = GUI_WINDOW_WIDGET(frm, k)
+                IF kh >= 0 AND GUI_VISIBLE(kh) THEN ARRAY_PUSH(gewaehlt, k)
+            END IF
+        NEXT
+        IF LEN(gewaehlt) > 0 THEN auswahl = gewaehlt[LEN(gewaehlt) - 1] ELSE auswahl = -1
+        inspektorFuellen()
+        protokoll("rahmen " + STR$(LEN(gewaehlt)))
         RETURN
     END IF
     IF modus > 0 AND MOUSEBUTTON(LINKS) AND auswahl >= 0 THEN
@@ -1264,7 +1680,17 @@ SUB mausAufForm()
         DIM dy AS INTEGER : dy = my - startMy
         IF dx <> 0 OR dy <> 0 THEN bewegt = TRUE
         IF modus = 1 THEN
-            lageSetzen(amRaster(startX + dx), amRaster(startY + dy), startW, startH)
+            ' Alle gewaehlten gleich weit -- der Bezug rastet ein, die
+            ' anderen behalten ihren Abstand zu ihm.
+            DIM rdx AS INTEGER : rdx = amRaster(startX + dx) - startX
+            DIM rdy AS INTEGER : rdy = amRaster(startY + dy) - startY
+            DIM z AS INTEGER
+            FOR z = 0 TO LEN(gewaehlt) - 1
+                IF z < LEN(zugX) THEN
+                    DIM gz AS INTEGER : gz = gewaehlt[z]
+                    lageSetzenVon(gz, zugX[z] + rdx, zugY[z] + rdy, feldZahl(gz, "w"), feldZahl(gz, "h"))
+                END IF
+            NEXT
         ELSE
             DIM x AS INTEGER : x = startX
             DIM y AS INTEGER : y = startY
@@ -1285,6 +1711,7 @@ SUB mausAufForm()
             merken()
             inspektorFuellen()
             protokoll("bewegt " + STR$(auswahl) + " " + STR$(feldZahl(auswahl, "x")) + " " + STR$(feldZahl(auswahl, "y")) + " " + STR$(feldZahl(auswahl, "w")) + " " + STR$(feldZahl(auswahl, "h")))
+            IF LEN(gewaehlt) > 1 THEN protokoll("bewegt alle " + STR$(LEN(gewaehlt)))
         END IF
         modus = 0
     END IF
@@ -1292,7 +1719,10 @@ END SUB
 
 SUB schieben(dx AS INTEGER, dy AS INTEGER)
     IF auswahl < 0 THEN RETURN
-    lageSetzen(feldZahl(auswahl, "x") + dx, feldZahl(auswahl, "y") + dy, feldZahl(auswahl, "w"), feldZahl(auswahl, "h"))
+    DIM j AS INTEGER
+    FOR EACH j IN gewaehlt
+        lageSetzenVon(j, feldZahl(j, "x") + dx, feldZahl(j, "y") + dy, feldZahl(j, "w"), feldZahl(j, "h"))
+    NEXT
     merken()
     inspektorFuellen()
 END SUB
@@ -1323,6 +1753,33 @@ SUB endeAnfragen()
     IF geaendert THEN dlgSchliessen = GUI_DIALOG("Beenden", "Das Formular ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen") ELSE beenden = TRUE
 END SUB
 
+' [Neu] und [Oeffnen] ersetzen das Formular -- mit ungesicherten Aenderungen
+' fragen sie vorher (bis 2026-09-23 warfen sie sie wortlos weg, wie es das
+' Notenblatt bis 2026-09-21 tat). Der Datei-Dialog kommt erst nach der
+' Antwort; wer abbricht, sieht keinen.
+DIM dlgErsetzen AS GUI_WINDOW : dlgErsetzen = 0
+DIM ersetzenMit AS STRING : ersetzenMit = ""
+
+SUB ersetzenAusfuehren(was AS STRING)
+    IF was = "neu" THEN
+        neuesFormular()
+    ELSE
+        DIM p AS STRING : p = FILE_OPEN_DIALOG("Formular oeffnen", "dhform")
+        IF p <> "" THEN formularLaden(p)
+    END IF
+END SUB
+
+SUB ersetzenAnfragen(was AS STRING)
+    IF dlgErsetzen <> 0 OR dlgSchliessen <> 0 OR GUI_MODAL() THEN RETURN
+    IF NOT geaendert THEN
+        ersetzenAusfuehren(was)
+        RETURN
+    END IF
+    ersetzenMit = was
+    dlgErsetzen = GUI_DIALOG(IIF(was = "neu", "Neues Formular", "Oeffnen"), "Das Formular ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen")
+    protokoll("frage " + was)
+END SUB
+
 WHILE NOT beenden
     ' Das Kreuz (und Alt+F4) fragt wie [Beenden] nach, wenn etwas nicht
     ' gesichert ist. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines
@@ -1340,10 +1797,18 @@ WHILE NOT beenden
     END IF
 
     ' Menue
-    IF GUI_CLICKED(miNeu) THEN neuesFormular()
-    IF GUI_CLICKED(miOeffnen) THEN
-        DIM p AS STRING : p = FILE_OPEN_DIALOG("Formular oeffnen", "dhform")
-        IF p <> "" THEN formularLaden(p)
+    IF GUI_CLICKED(miNeu) THEN ersetzenAnfragen("neu")
+    IF GUI_CLICKED(miOeffnen) THEN ersetzenAnfragen("oeffnen")
+    IF dlgErsetzen <> 0 THEN
+        DIM ae AS INTEGER : ae = GUI_ANSWER(dlgErsetzen)
+        IF ae = 1 THEN
+            dlgErsetzen = 0
+            IF sichern(FALSE) THEN ersetzenAusfuehren(ersetzenMit)
+        ELSEIF ae = 2 THEN
+            dlgErsetzen = 0 : ersetzenAusfuehren(ersetzenMit)
+        ELSEIF ae = 3 THEN
+            dlgErsetzen = 0 : protokoll("ersetzen abgebrochen")
+        END IF
     END IF
     IF GUI_CLICKED(miSichern) THEN sichern(FALSE)
     IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
@@ -1356,6 +1821,18 @@ WHILE NOT beenden
     IF GUI_CLICKED(miLoeschen) THEN controlLoeschen()
     IF GUI_CLICKED(miVorn) THEN controlOrdnen(TRUE)
     IF GUI_CLICKED(miHinten) THEN controlOrdnen(FALSE)
+    IF GUI_CLICKED(miAlle) THEN allesWaehlen()
+    IF GUI_CLICKED(miLinks) THEN anordnen("links")
+    IF GUI_CLICKED(miRechts) THEN anordnen("rechts")
+    IF GUI_CLICKED(miOben) THEN anordnen("oben")
+    IF GUI_CLICKED(miUnten) THEN anordnen("unten")
+    IF GUI_CLICKED(miMitteW) THEN anordnen("mitte_w")
+    IF GUI_CLICKED(miMitteS) THEN anordnen("mitte_s")
+    IF GUI_CLICKED(miGleichB) THEN anordnen("breite")
+    IF GUI_CLICKED(miGleichH) THEN anordnen("hoehe")
+    IF GUI_CLICKED(miGleichG) THEN anordnen("groesse")
+    IF GUI_CLICKED(miVertW) THEN anordnen("vert_w")
+    IF GUI_CLICKED(miVertS) THEN anordnen("vert_s")
     IF dlgSchliessen <> 0 THEN
         DIM a AS INTEGER : a = GUI_ANSWER(dlgSchliessen)
         IF a = 1 THEN
@@ -1404,7 +1881,8 @@ WHILE NOT beenden
         IF KEYHIT(KEY_RIGHT) THEN schieben(schritt, 0)
         IF KEYHIT(KEY_UP) THEN schieben(0, -schritt)
         IF KEYHIT(KEY_DOWN) THEN schieben(0, schritt)
-        IF KEYHIT(KEY_ESCAPE) THEN palScharf = -1 : auswahl = -1 : inspektorFuellen()
+        IF KEYHIT(KEY_ESCAPE) THEN palScharf = -1 : auswahlSetzen(-1) : inspektorFuellen()
+        IF (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) AND KEYHIT(KEY_A) THEN allesWaehlen()
     END IF
 
     mausAufForm()

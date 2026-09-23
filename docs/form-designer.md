@@ -40,7 +40,7 @@ Formular, das beim ersten Sichern dorthin geschrieben wird.
 - **Rechts — Inspektor.** Mit ausgewähltem Control: Name, X, Y, Breite, Höhe,
   Text, Tooltip, Anker (`lrtb`), `on_click`, `on_change`, `on_enter`,
   **Schriftstil** (`fett`, `kursiv`, `unterstrichen`, `durchgestrichen`,
-  verbunden mit `+`) und *Aktiviert*, dazu die Felder je Art (unten). Ohne Auswahl zeigt er das
+  verbunden mit `+`), *Aktiviert* und die **Reiterseite** (siehe unten), dazu die Felder je Art (unten). Ohne Auswahl zeigt er das
   **Formular selbst**: Titel, Breite, Höhe, *Größenveränderbar* und das
   **Thema** (`glas_dunkel`, `glas_hell`, `dark`, `light` oder keines).
   Enter in einem Feld oder [Übernehmen] schreibt die Werte.
@@ -54,15 +54,40 @@ Formular, das beim ersten Sichern dorthin geschrieben wird.
 | `F5` | Formular ausführen (siehe unten) |
 | `Strg+G` | GB-Code schreiben (siehe unten) |
 | `Strg+Z` / `Strg+Y` | rückgängig / wiederholen |
-| `Strg+D` | Control verdoppeln (um ein Raster versetzt) |
-| `Entf` | Control löschen |
+| `Strg+D` | Controls verdoppeln (um ein Raster versetzt) |
+| `Entf` | Controls löschen |
 | Pfeile | um ein Raster schieben, mit `Umschalt` um einen Punkt |
+| `Umschalt`/`Strg`+Klick | Control zur Auswahl dazu oder wieder weg |
+| Zug über leere Fläche | Auswahlrahmen: gewählt ist, was ganz darin liegt (mit `Umschalt` dazu) |
+| `Strg+A` | alle Controls wählen |
 | `Esc` | Palette entschärfen, Auswahl aufheben |
 | `Strg+Q` | beenden |
 
 *Nach vorn* und *Nach hinten* stehen im Menü *Bearbeiten*: die Reihenfolge
-der Controls ist ihre Zeichenreihenfolge, das letzte liegt vorn. Entf und die
-Pfeile wirken nur, solange kein Eingabefeld des Inspektors den Fokus hat.
+der Controls ist ihre Zeichenreihenfolge, das letzte liegt vorn. Entf, die
+Pfeile und `Strg+A` wirken nur, solange kein Eingabefeld des Inspektors den
+Fokus hat (dort markiert `Strg+A` den Text).
+
+**Mehrere Controls.** Ziehen, die Pfeile, Entf und `Strg+D` wirken auf alle
+gewählten; ein Klick in eine Mehrfachauswahl behält sie. Das **zuletzt
+angeklickte** ist der Bezug: der Inspektor zeigt es (mit „+n weitere“), und
+das Menü **Anordnen** richtet an ihm aus — links, rechts, oben, unten,
+waagerecht oder senkrecht mittig —, bringt die anderen auf seine Breite,
+Höhe oder Größe, oder **verteilt** alle mit gleichen Lücken (mindestens drei;
+das erste und das letzte bleiben stehen). Die acht Griffe gibt es nur bei
+einem gewählten Control.
+
+**Reiterseiten.** Ein Control gehört zu einer Seite eines **Reiterwerks**
+(oder einem Schritt eines **Assistenten**), wenn sein Feld *Reiterseite*
+`NAME:SEITE` sagt, die Seite ab 1 — `reiterwerk1:2`. Die Seiten selbst sind
+die *Einträge* des Reiterwerks, *Gezeigte Seite* bestimmt, welche die Form
+gerade zeigt (die Controls der anderen sind dort verborgen wie später im
+Programm). Die Laufzeit führt die Kinder als Widget-**Nummern**
+(`tabctl.kinder`), die sich bei jedem Löschen und Umordnen verschieben; der
+Designer führt sie deshalb am **Namen** und rechnet die Nummern vor jeder
+Ansicht neu aus. Ein umbenanntes Reiterwerk nimmt seine Kinder mit. Eine
+Datei, die nur Nummern kennt (von `GUI_SAVE`), bekommt beim Öffnen die Namen
+— wer keinen hat, bekommt einen.
 
 **Rückgängig** merkt sich je Schritt das ganze Formular als JSON-Text (bis zu
 200 Stände). Ein Zug mit der Maus ist **ein** Schritt, gemerkt beim
@@ -70,7 +95,9 @@ Loslassen.
 
 **Beenden** — über das Menü, das Kreuz oder Alt+F4 — fragt nach
 (*Sichern|Verwerfen|Abbrechen*), wenn das Formular nicht gesichert ist;
-sonst endet der Designer sofort.
+sonst endet der Designer sofort. **Neu** und **Öffnen** fragen genauso
+(bis 2026-09-23 warfen sie Ungesichertes wortlos weg); der Datei-Dialog kommt
+erst nach der Antwort.
 
 ## Felder je Art
 
@@ -79,7 +106,8 @@ weil ein Komma zu oft in einem Eintrag selbst steht.
 
 | Art | Felder |
 |---|---|
-| Klappliste, Liste | Einträge (`Rot; Grün; Blau`); bei der Klappliste der Platzhalter (`Bitte wählen`), bei der Liste das Kästchen *Umbenennen mit F2* (`GUI_LISTBOX_SET … "bearbeitbar"`) |
+| Klappliste, Liste | Einträge (`Rot; Grün; Blau`); bei der Klappliste der Platzhalter (`Bitte wählen`) und das Kästchen *Tippen erlaubt* (Combobox, `GUI_DROPDOWN_SET … "bearbeitbar"`), bei der Liste das Kästchen *Umbenennen mit F2* (`GUI_LISTBOX_SET … "bearbeitbar"`) |
+| Reiterwerk, Assistent | Einträge (die Seiten bzw. Schritte), *Gezeigte Seite* (ab 1) |
 | Tabelle, Gitter | Spalten, Breiten, Bearbeitbar (`0; 2` oder `alle`), Spaltenarten (`text; ganz; zahl; auswahl`), Auswahl (`2 = Rot\|Grün`), Leer-Hinweis (`Keine Treffer`, zeigt die Tabelle, wenn keine Zeile da ist), Kästchen *Zellmodus* |
 | Baum | Kästchen *Umbenennen mit F2*, Leer-Hinweis |
 | Regler, Fortschritt, Zahlenfeld, Drehknopf | Min, Max, Wert |
@@ -164,8 +192,6 @@ Der Designer in Drachenhauch hat ein Viertel der Zeilen der Qt-Fassung
 (1 342 gegen 5 055, Faktor 0,27) — und der Faktor misst vor allem, was
 weggelassen ist. Nicht (oder nicht mehr) vorhanden:
 
-- **Mehrfachauswahl** samt Auswahlrahmen, **Ausrichten**, **gleiche Größe**
-  und **Verteilen**; ausgewählt ist immer genau ein Control.
 - **Ausrichtungs-Hilfslinien** beim Ziehen, **Zoom**, ein **Kontextmenü**.
 - **Kopieren/Einfügen** (nur Verdoppeln) und **Ablegen per Drag&Drop** aus
   der Palette (nur anklicken, dann auf die Form klicken).
