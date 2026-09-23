@@ -94,8 +94,8 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # all che
 
 | Edition | For printing (A4) | For e-readers |
 |---|---|---|
-| **English** — 512 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
-| **Deutsch** — 519 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 518 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 525 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
 
 Both languages come out of the **same** chapter sources (`content/NN_*.js`): the renderers are handed an `H` that puts every string through the catalogue `i18n/en.json` first. A second set of English chapter files would have drifted from the German inside a month — this way it cannot. If an entry is missing, the German sentence stays and the book still builds; `node fehlend.js en` counts what is still outstanding.
 
@@ -115,7 +115,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 - **[Standard built-ins](docs/builtins-core.md)** — math, strings, maps, file I/O, …
 - **[Graphics built-ins](docs/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
 - **[Performance](docs/PERFORMANCE.md)** — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
-- **Modules** — 38 of them, [table below](#modules)
+- **Modules** — 48 of them, [table below](#modules)
 - **[IDE](docs/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
 - **Tools** — all written in Drachenhauch, in the IDE under *Tools* or directly with `dhrt run examples/<file>`:
   - **[Sprite editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — pixel art with frames, layers, lasso/magic wand/move, GIF with a duration per frame, atlas export for `ATLAS_LOAD`, GB code, `.dhanim` template
@@ -133,7 +133,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 
 ### Modules
 
-38 modules, available via `IMPORT "name"`. Each has its own page under
+48 modules, available via `IMPORT "name"`. Each has its own page under
 [docs/](docs/README.md#module) (mostly German for now).
 
 **Game building blocks**
@@ -148,6 +148,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 | [`save`](docs/module-save.md) | save slots backed by JSON, with a version field |
 | [`input`](docs/module-input.md) | named actions instead of key codes, edge detection, gamepad |
 | [`timer`](docs/module-timer.md) | scheduled actions (`TIMER_AFTER`/`EVERY`) + a `COOLDOWN` rate limiter |
+| [`video`](docs/module-video.md) | play videos (MP4/H.264), every frame an `IMAGE` |
 | [`tween`](docs/module-tween.md) | interpolate values smoothly, 13 easings |
 | [`curves`](docs/module-curves.md) | Bézier, Catmull-Rom, Hermite, smoothstep — pure functions |
 | [`astar`](docs/module-astar.md) | A* pathfinding on a tile grid |
@@ -170,6 +171,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 | `g3d` | 3D: camera, models (OBJ/GLTF), skeletal animation, PBR, HDR IBL, shadows, normal maps, picking — see [graphics built-ins](docs/builtins-grafik.md) |
 | [`particles`](docs/module-particles.md) | particle emitters with gravity, colour gradient over lifetime, five render modes |
 | [`imgfx`](docs/module-imgfx.md) | scale, rotate, flip, tint images — including a crisp mode for pixel art |
+| [`g3d`](docs/module-g3d.md) | 3D: camera, primitives, models, skeletal animation, lights, shadows, PBR |
 | [`audio`](docs/module-audio.md) | on **Kira**: channels, buses, real-time effects (filter/reverb/delay/distortion/compressor/EQ), synthesis, sampler, `.mod`/`.xm` playback, seeking through music (`AUDIO_MUSIC_SEEK`), spatial audio, sample-accurate clock. [Modulators](docs/module-audio-modulatoren.md) keep running on the audio thread even when the frame rate drops |
 
 **User interface**
@@ -190,6 +192,18 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 | [`tiled`](docs/module-tiled.md) | load maps from the Tiled editor, including objects and properties |
 | [`tile_collide`](docs/module-tile-collide.md) | box against tilemap, axis by axis — classic platformer physics |
 | [`cloud`](docs/module-cloud.md) | cloud save and leaderboard against the bundled server [`cloudserver/`](cloudserver/README.md) |
+| [`ini`](docs/module-ini.md) | settings files a human can edit — read as a `MAP` |
+| [`xml`](docs/module-xml.md) | read XML from other systems, with path navigation |
+| [`geld`](docs/module-geld.md) | money as its own value: exact, not mixable with numbers, splits without losing cents |
+| [`zeit`](docs/module-zeit.md) | calculating with date and time: differences, weekdays, formatting |
+
+**Handing something over**
+
+| Module | What for |
+|---|---|
+| [`pdf`](docs/module-pdf.md) | print-ready pages: invoice, delivery note, report, label — set in millimetres, fonts embedded, Unicode |
+| [`xlsx`](docs/module-xlsx.md) | reports as an Excel workbook: several sheets, bold header row, number and date formats |
+| [`smtp`](docs/module-smtp.md) | send the report by e-mail: text and HTML, attachments, STARTTLS/TLS |
 
 **Network, hardware, making**
 
@@ -197,10 +211,12 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 |---|---|
 | [`net`](docs/module-net.md) | TCP and UDP, non-blocking by default — won't freeze your game loop |
 | [`html`](docs/module-html.md) | HTTP GET/POST/download + HTML scraping |
+| [`httpd`](docs/module-httpd.md) | the other direction: a small web server driven by the main loop — a control panel on the home network |
 | [`mqtt`](docs/module-mqtt.md) | the IoT world's pub/sub protocol — the way to reach an ESP32 **over Wi-Fi** |
 | [`firmata`](docs/module-firmata.md) | drive Arduino/ESP32 pins directly, no sketch of your own needed |
 | [`serial`](docs/module-serial.md) | raw COM connection for your own protocols |
 | [`usb`](docs/module-usb.md) | USB HID: maker boards, programmers, custom controllers |
+| [`midi`](docs/module-midi.md) | read notes from a connected instrument and send some out |
 | [`bt`](docs/module-bt.md) | Bluetooth Low Energy: scan, connect, read/write characteristics |
 | [`wifi`](docs/module-wifi.md) | scan networks, connect, signal strength |
 
