@@ -593,6 +593,7 @@ DIM miAufrufer AS INTEGER : miAufrufer = GUI_MENU_ITEM(mBearb, "Wer ruft das auf
 DIM miFundstellen AS INTEGER : miFundstellen = GUI_MENU_ITEM(mBearb, "Alle Fundstellen im Projekt", "Strg+Umschalt+F12")
 DIM miVerschieben AS INTEGER : miVerschieben = GUI_MENU_ITEM(mBearb, "Unterprogramm verschieben ...", "Strg+Umschalt+V")
 DIM miUmbauZur AS INTEGER : miUmbauZur = GUI_MENU_ITEM(mBearb, "Letzten Umbau zurücknehmen", "Strg+Umschalt+Z")
+DIM miUmbauWdh AS INTEGER : miUmbauWdh = GUI_MENU_ITEM(mBearb, "Zurückgenommenen Umbau wiederholen")
 DIM miUmbauNach AS INTEGER : miUmbauNach = GUI_MENU_ITEM(mBearb, "Letzten Umbau nachbessern", "Strg+Umschalt+G")
 DIM mZeilenWz AS INTEGER : mZeilenWz = GUI_SUBMENU(mBearb, "Zeilen")
 DIM miZlSort AS INTEGER : miZlSort = GUI_MENU_ITEM(mZeilenWz, "Sortieren")
@@ -1100,8 +1101,20 @@ CONST ZUR_MAX = 10
 DIM zurTabs AS ARRAY OF INTEGER : zurTabs = []
 DIM zurPfade AS ARRAY OF STRING : zurPfade = []
 DIM zurTexte AS ARRAY OF STRING : zurTexte = []
+' Was der Umbau GESCHRIEBEN hat: steht in einer Datei inzwischen etwas
+' anderes, wurde sie danach geaendert -- dann nimmt das Zuruecknehmen
+' nichts zurueck, sonst waere die spaetere Arbeit wortlos weg.
+DIM zurNachher AS ARRAY OF STRING : zurNachher = []
 DIM zurAnzahl AS ARRAY OF INTEGER : zurAnzahl = []
 DIM zurNamen AS ARRAY OF STRING : zurNamen = []
+' Zurueckgenommene Umbauten, zum Wiederholen -- dieselben Felder. Ein neuer
+' Umbau leert sie.
+DIM wdhTabs AS ARRAY OF INTEGER : wdhTabs = []
+DIM wdhPfade AS ARRAY OF STRING : wdhPfade = []
+DIM wdhVorher AS ARRAY OF STRING : wdhVorher = []
+DIM wdhNachher AS ARRAY OF STRING : wdhNachher = []
+DIM wdhAnzahl AS ARRAY OF INTEGER : wdhAnzahl = []
+DIM wdhNamen AS ARRAY OF STRING : wdhNamen = []
 ' Der zuletzt UEBERNOMMENE Umbau, damit er sich nachbessern laesst: die
 ' Schritte (`op*`) stehen ohnehin noch, hier die Dateien dazu.
 DIM umbauNachTabs AS ARRAY OF INTEGER : umbauNachTabs = []
@@ -6754,13 +6767,72 @@ END SUB
 ' Reiter ueber Auswahl + INSERT (ein Undo-Schritt), sonst auf die Platte.
 ' Danach ist der Vorrat leer -- zweimal zurueck gaebe es nur mit einem
 ' Stapel, und einer reicht fuer das, was hier schiefgeht.
+' Ein Stand eines Umbaus: welcher Reiter, welche Datei. Hat die Datei einen
+' Weg, entscheidet der -- die Reiternummer von damals kann nach einem
+' Schliessen auf eine andere Datei zeigen.
+FUNCTION umbauReiter(tab AS INTEGER, pfad AS STRING) AS INTEGER
+    IF pfad <> "" THEN RETURN tabMitPfad(pfad)
+    IF tab >= 0 AND tab < tabAnzahl THEN RETURN tab
+    RETURN -1
+END FUNCTION
+
+' Der Text, der JETZT dort steht -- im Reiter, sonst in der Datei.
+' CHR$(0), wenn es ihn nicht mehr gibt.
+FUNCTION umbauJetzt$(tab AS INTEGER, pfad AS STRING) AS STRING
+    DIM t AS INTEGER : t = umbauReiter(tab, pfad)
+    IF t >= 0 THEN RETURN GUI_TEXT(tabFelder[t])
+    IF pfad = "" THEN RETURN CHR$(0)
+    TRY
+        RETURN dateiLesen(pfad)
+    CATCH e
+        RETURN CHR$(0)
+    END TRY
+END FUNCTION
+
+' Gleich bis auf Umbrueche am Ende -- die Datei traegt einen, der Reiter nicht.
+FUNCTION gleichesEnde(a AS STRING, b AS STRING) AS BOOLEAN
+    WHILE RIGHT$(a, 1) = NL : a = LEFT$(a, LEN(a) - 1) : WEND
+    WHILE RIGHT$(b, 1) = NL : b = LEFT$(b, LEN(b) - 1) : WEND
+    RETURN a = b
+END FUNCTION
+
+SUB umbauStandSetzen(tab AS INTEGER, pfad AS STRING, text AS STRING)
+    DIM t AS INTEGER : t = umbauReiter(tab, pfad)
+    IF t >= 0 THEN
+        ' Offen: in den Reiter, Auswahl ueber alles + INSERT -- ein
+        ' Undo-Schritt dort, gesichert wird wie immer mit Strg+S.
+        DIM ta AS GUI_WIDGET : ta = tabFelder[t]
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        DIM letzte AS INTEGER : letzte = LEN(zeilen)
+        GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
+        GUI_TEXTAREA_INSERT(ta, text)
+        RETURN
+    END IF
+    IF pfad = "" THEN RETURN
+    WRITEALL(pfad, text + NL)
+END SUB
+
+' Die Dateien einer Gruppe (ab `ab`, `n` Stueck), die seit dem Stand
+' `erwartet` geaendert wurden -- "" wenn keine.
+FUNCTION umbauGeaendert$(tabs AS ARRAY OF INTEGER, pfade AS ARRAY OF STRING, _
+                         erwartet AS ARRAY OF STRING, ab AS INTEGER, n AS INTEGER) AS STRING
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM k AS INTEGER
+    FOR k = ab TO ab + n - 1
+        IF NOT gleichesEnde(umbauJetzt$(tabs[k], pfade[k]), erwartet[k]) THEN
+            ARRAY_PUSH(raus, IIF(pfade[k] = "", "Unbenannt", BASENAME(pfade[k])))
+        END IF
+    NEXT
+    RETURN JOIN$(raus, ", ")
+END FUNCTION
+
 SUB umbauZurueck()
     IF LEN(zurAnzahl) = 0 THEN
         GUI_SET_TEXT(lblStatus, "Kein Umbau zum Zurücknehmen.")
         protokoll("umbau zurueck 0")
         RETURN
     END IF
-    ' Der LETZTE Umbau: seine Eintraege stehen am Ende der drei Felder.
+    ' Der LETZTE Umbau: seine Eintraege stehen am Ende der Felder.
     DIM mz AS INTEGER : mz = 0
     DIM ms AS INTEGER : ms = 1
     IF aktivesFeld() >= 0 THEN (mz, ms) = GUI_TEXTAREA_CURSOR(aktivesFeld())
@@ -6768,26 +6840,23 @@ SUB umbauZurueck()
     DIM n AS INTEGER : n = zurAnzahl[letzt]
     DIM ab AS INTEGER : ab = LEN(zurTexte) - n
     DIM zurWas AS STRING : zurWas = zurNamen[letzt]
+    ' Seit dem Umbau geaendert? Dann GAR NICHTS zuruecknehmen -- halb
+    ' zurueckgenommen waere schlimmer als gar nicht.
+    DIM geaendert AS STRING : geaendert = umbauGeaendert$(zurTabs, zurPfade, zurNachher, ab, n)
+    IF geaendert <> "" THEN
+        GUI_SET_TEXT(lblStatus, "Nicht zurückgenommen: seit dem Umbau geändert -- " + geaendert + ". Strg+Z im Reiter nimmt die eigenen Änderungen zurück.")
+        protokoll("umbau zurueck geaendert " + geaendert)
+        RETURN
+    END IF
     DIM k AS INTEGER
     FOR k = ab TO ab + n - 1
-        IF zurTabs[k] >= 0 AND zurTabs[k] < tabAnzahl THEN
-            DIM ta AS GUI_WIDGET : ta = tabFelder[zurTabs[k]]
-            DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-            DIM letzte AS INTEGER : letzte = LEN(zeilen)
-            GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
-            GUI_TEXTAREA_INSERT(ta, zurTexte[k])
-        ELSEIF zurPfade[k] <> "" THEN
-            WRITEALL(zurPfade[k], zurTexte[k] + NL)
-            DIM t AS INTEGER : t = tabMitPfad(zurPfade[k])
-            IF t >= 0 THEN
-                GUI_SET_TEXT(tabFelder[t], zurTexte[k])
-                tabGesichert[t] = zurTexte[k]
-                tabLetzterText[t] = ""
-            END IF
-        END IF
+        umbauStandSetzen(zurTabs[k], zurPfade[k], zurTexte[k])
+        ARRAY_PUSH(wdhTabs, zurTabs[k]) : ARRAY_PUSH(wdhPfade, zurPfade[k])
+        ARRAY_PUSH(wdhVorher, zurTexte[k]) : ARRAY_PUSH(wdhNachher, zurNachher[k])
     NEXT
+    ARRAY_PUSH(wdhAnzahl, n) : ARRAY_PUSH(wdhNamen, zurWas)
     FOR k = 1 TO n
-        ARRAY_POP(zurTabs) : ARRAY_POP(zurPfade) : ARRAY_POP(zurTexte)
+        ARRAY_POP(zurTabs) : ARRAY_POP(zurPfade) : ARRAY_POP(zurTexte) : ARRAY_POP(zurNachher)
     NEXT
     ARRAY_POP(zurAnzahl) : ARRAY_POP(zurNamen)
     reiterNeuSetzen()
@@ -6799,6 +6868,42 @@ SUB umbauZurueck()
         IF mz > 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), mz, ms)
         GUI_FOCUS(aktivesFeld())
     END IF
+END SUB
+
+' Einen zurueckgenommenen Umbau wieder anwenden -- mit derselben Probe in
+' der Gegenrichtung: steht nicht mehr der Stand von vor dem Umbau da, bleibt
+' alles, wie es ist.
+SUB umbauWiederholen()
+    IF LEN(wdhAnzahl) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Kein zurückgenommener Umbau zum Wiederholen.")
+        protokoll("umbau wieder 0")
+        RETURN
+    END IF
+    DIM letzt AS INTEGER : letzt = LEN(wdhAnzahl) - 1
+    DIM n AS INTEGER : n = wdhAnzahl[letzt]
+    DIM ab AS INTEGER : ab = LEN(wdhVorher) - n
+    DIM was AS STRING : was = wdhNamen[letzt]
+    DIM geaendert AS STRING : geaendert = umbauGeaendert$(wdhTabs, wdhPfade, wdhVorher, ab, n)
+    IF geaendert <> "" THEN
+        GUI_SET_TEXT(lblStatus, "Nicht wiederholt: seit dem Zurücknehmen geändert -- " + geaendert + ".")
+        protokoll("umbau wieder geaendert " + geaendert)
+        RETURN
+    END IF
+    DIM k AS INTEGER
+    FOR k = ab TO ab + n - 1
+        umbauStandSetzen(wdhTabs[k], wdhPfade[k], wdhNachher[k])
+        ARRAY_PUSH(zurTabs, wdhTabs[k]) : ARRAY_PUSH(zurPfade, wdhPfade[k])
+        ARRAY_PUSH(zurTexte, wdhVorher[k]) : ARRAY_PUSH(zurNachher, wdhNachher[k])
+    NEXT
+    ARRAY_PUSH(zurAnzahl, n) : ARRAY_PUSH(zurNamen, was)
+    FOR k = 1 TO n
+        ARRAY_POP(wdhTabs) : ARRAY_POP(wdhPfade) : ARRAY_POP(wdhVorher) : ARRAY_POP(wdhNachher)
+    NEXT
+    ARRAY_POP(wdhAnzahl) : ARRAY_POP(wdhNamen)
+    reiterNeuSetzen()
+    symSchluessel = "-"
+    GUI_SET_TEXT(lblStatus, "Wiederholt: " + was + " (" + STR$(n) + " Datei(en))")
+    protokoll("umbau wieder " + STR$(n))
 END SUB
 
 ' Den zuletzt uebernommenen Umbau noch einmal vorlegen.
@@ -6952,9 +7057,12 @@ SUB umbauSchreiben()
         ARRAY_PUSH(zurTabs, umbauTabs[v])
         ARRAY_PUSH(zurPfade, umbauPfade[v])
         ARRAY_PUSH(zurTexte, umbauAlt$(v))
+        ARRAY_PUSH(zurNachher, umbauTexte[v])
     NEXT
     ARRAY_PUSH(zurAnzahl, LEN(umbauTexte))
     ARRAY_PUSH(zurNamen, umbauMeldung)
+    wdhTabs = [] : wdhPfade = [] : wdhVorher = [] : wdhNachher = []
+    wdhAnzahl = [] : wdhNamen = []
     ' Der aelteste faellt heraus -- ein Vorrat, der mit jedem Umbau waechst,
     ' haelt irgendwann das ganze Projekt in mehreren Fassungen.
     WHILE LEN(zurAnzahl) > ZUR_MAX
@@ -6962,6 +7070,7 @@ SUB umbauSchreiben()
         DIM k2 AS INTEGER
         FOR k2 = 1 TO weg
             ARRAY_REMOVE_AT(zurTabs, 0) : ARRAY_REMOVE_AT(zurPfade, 0) : ARRAY_REMOVE_AT(zurTexte, 0)
+            ARRAY_REMOVE_AT(zurNachher, 0)
         NEXT
         ARRAY_REMOVE_AT(zurAnzahl, 0) : ARRAY_REMOVE_AT(zurNamen, 0)
     WEND
@@ -8366,6 +8475,7 @@ paletteEintrag("Wer ruft das auf?", "aufrufer", "Umschalt+F12")
 paletteEintrag("Alle Fundstellen im Projekt", "fundstellen", "Strg+Umschalt+F12")
 paletteEintrag("Unterprogramm verschieben ...", "verschieben", "Strg+Umschalt+V")
 paletteEintrag("Letzten Umbau zurücknehmen", "umbau_zurueck", "Strg+Umschalt+Z")
+paletteEintrag("Zurückgenommenen Umbau wiederholen", "umbau_wieder", "")
 paletteEintrag("Letzten Umbau nachbessern", "umbau_nach", "Strg+Umschalt+G")
 paletteEintrag("Gerüst beim Tippen", "geruest", "")
 paletteEintrag("Klammern automatisch schließen", "klammern", "")
@@ -8831,6 +8941,7 @@ SUB befehl(k AS STRING)
         CASE "fundstellen" : fundstellenZeigen()
         CASE "verschieben" : verschiebenFragen()
         CASE "umbau_zurueck" : umbauZurueck()
+        CASE "umbau_wieder" : umbauWiederholen()
         CASE "umbau_nach" : umbauNachbessern()
         CASE "geruest" : geruestSetzen(NOT geruestAn)
         CASE "klammern" : klammernSetzen(NOT klammernAn)
@@ -9105,6 +9216,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miFundstellen) THEN befehl("fundstellen")
     IF GUI_CLICKED(miVerschieben) THEN befehl("verschieben")
     IF GUI_CLICKED(miUmbauZur) THEN befehl("umbau_zurueck")
+    IF GUI_CLICKED(miUmbauWdh) THEN befehl("umbau_wieder")
     IF GUI_CLICKED(miUmbauNach) THEN befehl("umbau_nach")
     IF GUI_CLICKED(miVergleich) THEN befehl("vergleichen")
     IF GUI_CLICKED(miReiterVgl) THEN befehl("reiter_vergleich")

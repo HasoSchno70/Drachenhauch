@@ -495,3 +495,65 @@ FOR i = 0 TO LEN(P) - 1
 NEXT
 --- erwartet
 baumfilter [HELD] 2
+
+=== ein umbau wird nicht zurueckgenommen, wenn die datei danach geaendert wurde
+' Ein Umbau schreibt b.dh (sie ist nicht offen), danach aendert jemand die
+' Datei noch einmal. Zuruecknehmen schriebe die spaetere Arbeit weg.
+umbauTabs = [-1] : umbauPfade = [PATHJOIN(projektOrdner, "b.dh")] : umbauTexte = ["PRINT " + CHR$(34) + "neu" + CHR$(34)]
+umbauSchreiben()
+WRITEALL(PATHJOIN(projektOrdner, "b.dh"), "PRINT " + CHR$(34) + "spaeter" + CHR$(34) + NL)
+umbauZurueck()
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei b.dh
+PRINT "alt"
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 6) = "umbau " THEN PRINT P[i]
+NEXT
+PRINT "datei " ; READLINES("b.dh")[0]
+--- erwartet
+umbau zurueck geaendert b.dh
+datei PRINT "spaeter"
+
+=== zurueckgenommen und wiederholt
+umbauTabs = [-1] : umbauPfade = [PATHJOIN(projektOrdner, "b.dh")] : umbauTexte = ["PRINT " + CHR$(34) + "neu" + CHR$(34)]
+umbauSchreiben()
+umbauZurueck()
+PRINT "nach dem zuruecknehmen " ; READLINES(PATHJOIN(projektOrdner, "b.dh"))[0]
+umbauWiederholen()
+umbauWiederholen()
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei b.dh
+PRINT "alt"
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 6) = "umbau " THEN PRINT P[i]
+NEXT
+PRINT "datei " ; READLINES("b.dh")[0]
+--- erwartet
+umbau zurueck 1
+umbau wieder 1
+umbau wieder 0
+datei PRINT "neu"
