@@ -633,9 +633,19 @@ nicht beim ersten Bild auf. Kinder werden beim Zeichnen auf den sichtbaren
 Teil beschnitten (`akk_ausschnitt`, eine Quelle mit `widget_shown`),
 bedienbar sind sie erst ganz sichtbar. Das Dreieck dreht sich um seinen
 Schwerpunkt; im Standbild sieht es bei 35 Grad wie ein Pfeil nach oben aus
-(fast gleichseitig), in Bewegung nicht. Noch nicht: Klappliste, Baum, Zeilen
-in Listen/Tabellen. Tests `tests/pruef/gui_uebergaenge.dhtest` (8,
-Bildproben; Gegenprobe mit `uebergang` 0: 4 fallen) und in
+(fast gleichseitig), in Bewegung nicht. **Baum** (selber Tag):
+`TreeState::auf_t` je Knoten, gezeichnet ueber `tree_zeilen_weich` --
+(Knoten, Hoehenanteil = Produkt der Oeffnungsgrade aller Vorfahren), jede
+Zeile mit Anteil < 1 auf ihre Hoehe beschnitten; Treffertest/Tastatur/Rollen
+bleiben bei `tree_visible`. `GUI_TREE_CLEAR` leert `auf_t` (sonst erbten neue
+Knoten die Werte alter Nummern), der Dateibaum fuehrt es beim Neuaufbau am
+WEG mit (`dateibaum_neu`) -- zu geht er sofort, seine Kinder sind dann nicht
+mehr gelesen. **Klappliste**: `Gui::dd_auf_t`/`dd_auf_von`, nur AUF weich
+(von oben herab, eingeblendet), zu sofort; im Bild des Klicks gilt "noch zu"
+(`uebergaenge` lief vor dem Druck) -- mit "ganz offen" blitzte die volle
+Liste einmal auf, gesehen nur im Kontaktbogen. Noch nicht: Zeilen in
+Listen/Tabellen, Menues. Tests `tests/pruef/gui_uebergaenge.dhtest` (15,
+Bildproben; Gegenprobe mit `uebergang` 0 bzw. dem Bau davor) und in
 `tests/pruef/gui_akkordeon.dhtest` "das aufklappen waechst ueber die zeit"
 (Gegenprobe faellt); zwei alte Faelle dort brauchen seither `uebergang` 0
 bzw. klicken spaeter ins Kind.

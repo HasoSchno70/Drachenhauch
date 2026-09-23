@@ -2191,6 +2191,18 @@ steht sofort offen da. Wer direkt nach `GUI_ACCORDION_OPEN` mit
 `GUI_GET_Y` die Endlage eines Kindes braucht, setzt `uebergang` auf 0 oder
 wartet die Dauer ab.
 
+Ein **Baum** klappt genauso: die Kindzeilen wachsen aus ihrer Elternzeile
+heraus und schrumpfen beim Zuklappen hinein, der Winkel dreht sich von `>`
+nach `v`. Treffertest, Pfeiltasten und Rollen rechnen dabei schon mit dem
+neuen Zustand, nur das Bild läuft nach. Der **Dateibaum** klappt weich
+auf; zu geht er sofort, weil er die Kinder eines zugeklappten Ordners gar
+nicht mehr liest.
+
+Eine **Klappliste** rollt beim Öffnen von oben herab und blendet dabei ein.
+Zu geht sie sofort — wer gewählt hat, will die Liste nicht mehr sehen. Ein
+Klick in der Zeit des Aufrollens trifft trotzdem den Eintrag, auf den er
+zeigt.
+
 | Metrik | Bedeutung |
 |---|---|
 | `uebergang` | Dauer in Millisekunden, Vorgabe 120; 0 = springen wie früher |

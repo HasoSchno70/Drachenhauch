@@ -990,6 +990,10 @@ pub struct TreeState {
     kaestchen: bool,      // Haken-Spalte (wie bei der Liste)
     checks: Vec<bool>,    // Haken je Knoten (nur mit `kaestchen`)
     datei: Option<Box<DateiBaum>>,   // nur beim Dateibaum (GUI_FILETREE)
+    /// Wie weit jeder Knoten aufgeklappt ist (0..1), weich nachlaufend. Nur
+    /// fuers ZEICHNEN -- Treffertest, Tastatur und Rollen rechnen mit
+    /// `expanded`. Fehlt ein Eintrag, gilt der Zustand selbst.
+    auf_t: Vec<f32>,
 }
 
 impl TreeState {
@@ -1069,8 +1073,16 @@ fn dateibaum_neu(t: &mut TreeState) {
     let sel_wege: Vec<String> = d.pfade.iter().enumerate()
         .filter(|(i, _)| t.sel.get(*i).copied().unwrap_or(false))
         .map(|(_, p)| p.clone()).collect();
+    // Der Oeffnungsgrad haengt am WEG, nicht an der Nummer: ein eben
+    // aufgeklappter Ordner behaelt seine 0 und klappt weich auf. (Zu geht
+    // ein Dateibaum sofort -- seine Kinder sind dann gar nicht mehr gelesen.)
+    let alt_t: HashMap<String, f32> = d.pfade.iter().zip(t.auf_t.iter())
+        .map(|(p, &v)| (p.clone(), v)).collect();
     let (mut nodes, mut pfade, mut ordner) = (Vec::new(), Vec::new(), Vec::new());
     dateibaum_sammeln(&d, "", -1, 0, &mut nodes, &mut pfade, &mut ordner);
+    t.auf_t = pfade.iter().zip(nodes.iter())
+        .map(|(p, n): (&String, &TreeNode)| alt_t.get(p).copied().unwrap_or(if n.expanded { 1.0 } else { 0.0 }))
+        .collect();
     d.pfade = pfade; d.ordner = ordner;
     t.nodes = nodes;
     t.sel = vec![false; t.nodes.len()];
@@ -2504,6 +2516,10 @@ pub struct Gui {
     active_split: Option<(usize, usize)>,    // laufendes Splitter-Drag
     split_off: i32,                          // Griff-Versatz (Maus -> Balkenkante)
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
+    /// Wie weit die offene Klappliste schon aufgeklappt ist (0..1), und fuer
+    /// welche -- wechselt die Liste, faengt es bei 0 an.
+    dd_auf_t: f32,
+    dd_auf_von: Option<(usize, usize)>,
     open_menu: Option<(usize, usize)>,       // offenes Menueleisten-Dropdown (win, menu)
     context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
     // Strg/Umschalt zum Zeitpunkt des Drucks -- handle_press hat kein `g`.
@@ -2625,7 +2641,7 @@ impl Gui {
             skins: HashMap::new(),
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
-            open_dropdown: None, active_table: None, table_press: None, press_origin: None,
+            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true, cursor_form: None,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false),
@@ -5372,7 +5388,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     pub fn tree_clear(&mut self, h: i64) -> Result<(), String> {
         let t = self.tree_mut(h, "GUI_TREE_CLEAR")?;
         t.nodes.clear(); t.selected = -1; t.hover = -1; t.scroll = 0;
-        t.sel.clear(); t.anker = -1; Ok(())
+        t.sel.clear(); t.anker = -1; t.auf_t.clear(); Ok(())
     }
     pub fn tree_selected(&self, h: i64) -> Result<i64, String> {
         Ok(self.tree_ref(h, "GUI_TREE_SELECTED")?.selected as i64)
@@ -6361,6 +6377,28 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         w.tc_von = p as i32; w.tc_seite = seite;
                     }
                 }
+            }
+        }
+    }
+
+    /// Die Zeilen, wie sie GEZEICHNET werden: (Knoten, Hoehenanteil 0..1).
+    /// Der Anteil ist das Produkt der Oeffnungsgrade aller Vorfahren -- beim
+    /// Aufklappen wachsen die Kinder aus ihrer Elternzeile heraus, beim
+    /// Zuklappen schrumpfen sie hinein. Ohne laufenden Uebergang ist das genau
+    /// `tree_visible` mit lauter 1.
+    fn tree_zeilen_weich(t: &TreeState) -> Vec<(usize, f64)> {
+        let mut out = Vec::new();
+        Self::tree_sammeln_weich(t, -1, 1.0, &mut out);
+        out
+    }
+    fn tree_sammeln_weich(t: &TreeState, parent: i32, faktor: f64, out: &mut Vec<(usize, f64)>) {
+        for i in 0..t.nodes.len() {
+            if t.nodes[i].parent != parent { continue; }
+            out.push((i, faktor));
+            let n = &t.nodes[i];
+            let a = t.auf_t.get(i).copied().unwrap_or(if n.expanded { 1.0 } else { 0.0 });
+            if n.has_children && a > 0.0 {
+                Self::tree_sammeln_weich(t, i as i32, faktor * weich(a), out);
             }
         }
     }
@@ -10561,6 +10599,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let dauer = self.m("uebergang").max(0) as f32;
         let schritt = if dauer > 0.0 { (dt as f32 * 1000.0 / dauer).clamp(0.0, 1.0) } else { 1.0 };
         let (druck, fokus) = (self.press_origin, self.focus_widget);
+        // Klappliste: geht nur AUF weich; zu ist sie sofort weg.
+        if self.open_dropdown.is_none() || self.open_dropdown != self.dd_auf_von {
+            self.dd_auf_t = 0.0;
+            self.dd_auf_von = self.open_dropdown;
+        }
+        if self.open_dropdown.is_some() { naeher(&mut self.dd_auf_t, 1.0, schritt); }
         for (wi, win) in self.windows.iter_mut().enumerate() {
             for (i, wdg) in win.widgets.iter_mut().enumerate() {
                 naeher(&mut wdg.ueber_t, if wdg.hovered && wdg.enabled { 1.0 } else { 0.0 }, schritt);
@@ -10573,6 +10617,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let mut v = wdg.value as f32;
                     naeher(&mut v, ziel, schritt);
                     wdg.value = v as f64;
+                }
+                if let Some(t) = wdg.tree.as_mut() {
+                    let n = t.nodes.len();
+                    t.auf_t.truncate(n);
+                    for k in 0..n {
+                        let ziel = if t.nodes[k].expanded && t.nodes[k].has_children { 1.0 } else { 0.0 };
+                        if k >= t.auf_t.len() { t.auf_t.push(ziel); } else { naeher(&mut t.auf_t[k], ziel, schritt); }
+                    }
                 }
                 if let Some(l) = wdg.leiste.as_mut() {
                     l.hover_t.resize(l.eintraege.len(), 0.0);
@@ -17109,16 +17161,24 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
             self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
         let t = wdg.tree.as_ref().unwrap();
-        let vis = Self::tree_visible(t);
+        let zeilen = Self::tree_zeilen_weich(t);
         let fg = self.txt_col(wdg);
         let acc = self.acc_col(wdg);
         let scroll = t.scroll;
         let hat_icon = t.nodes.iter().any(|n| n.icon >= 0);
         let isz = self.sk(TREE_ROW_H) - 4;
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
-        for (r, &ni) in vis.iter().enumerate() {
-            let ry = ay + 1 + r as i32 * self.sk(TREE_ROW_H) - scroll;
-            if ry + self.sk(TREE_ROW_H) < ay || ry > ay + h { continue; }
+        let rh = self.sk(TREE_ROW_H);
+        let mut summe = 0.0f64;
+        for &(ni, anteil) in &zeilen {
+            let ry = ay + 1 + summe.round() as i32 - scroll;
+            summe += rh as f64 * anteil;
+            let zh = ay + 1 + summe.round() as i32 - scroll - ry;
+            if zh <= 0 || ry + rh < ay || ry > ay + h { continue; }
+            // Eine Zeile, die gerade herauswaechst: auf ihren Anteil
+            // beschnitten, der Inhalt steht oben -- wie unter einem Vorhang.
+            let teil = anteil < 0.999;
+            if teil { g.push_clip(ax + 1, ry, (w - 2).max(0), zh); }
             let node = &t.nodes[ni];
             let indent = node.level * self.sk(TREE_INDENT);
             let markiert = if t.multi { t.sel.get(ni).copied().unwrap_or(false) }
@@ -17133,14 +17193,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let tx = ax + 4 + self.tree_kast_w(t) + indent;
             let cy = ry + self.sk(TREE_ROW_H) / 2;
             if node.has_children {
+                // Der Winkel dreht sich mit: ">" zu, "v" offen, dazwischen
+                // um 90 Grad gedreht (dieselben drei Punkte).
                 let cx = tx + self.sk(TREE_TOGGLE_W) / 2;
-                if node.expanded {
-                    g.line(cx - 4, cy - 2, cx, cy + 2, fg);    // v
-                    g.line(cx, cy + 2, cx + 4, cy - 2, fg);
-                } else {
-                    g.line(cx - 2, cy - 4, cx + 2, cy, fg);    // >
-                    g.line(cx + 2, cy, cx - 2, cy + 4, fg);
-                }
+                let a = weich(t.auf_t.get(ni).copied().unwrap_or(if node.expanded { 1.0 } else { 0.0 }));
+                let (sn, cs) = (a * std::f64::consts::FRAC_PI_2).sin_cos();
+                let dreh = |dx: f64, dy: f64| -> (i32, i32) {
+                    (cx + (dx * cs - dy * sn).round() as i32, cy + (dx * sn + dy * cs).round() as i32)
+                };
+                let (p1, p2, p3) = (dreh(-2.0, -4.0), dreh(2.0, 0.0), dreh(-2.0, 4.0));
+                g.line(p1.0, p1.1, p2.0, p2.1, fg);
+                g.line(p2.0, p2.1, p3.0, p3.1, fg);
             }
             let mut lx = tx + self.sk(TREE_TOGGLE_W) + 2;
             if t.kaestchen {
@@ -17161,6 +17224,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             let farbe = if node.color >= 0 { node.color } else { fg };
             self.wtext(g, wdg, lx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), farbe);
+            if teil { g.pop_clip(); }
         }
         g.pop_clip();
     }
@@ -17295,12 +17359,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn draw_dropdown_popup(&self, g: &mut Graphics, wi: usize, idx: usize) {
         let wdg = &self.windows[wi].widgets[idx];
         if wdg.items.is_empty() { return; }
-        let (px, py, pw, ph) = self.dropdown_popup_rect(wi, idx);
-        let bg = self.wcol(wdg, "bg", "widget_bg");
+        let (px, py, pw, ph_voll) = self.dropdown_popup_rect(wi, idx);
+        // Aufklappen: die Liste rollt von oben herab (die Eintraege stehen
+        // schon an ihrer Stelle, sichtbar ist der obere Teil) und blendet
+        // dabei ein. Der Treffertest nimmt die volle Liste -- so schnell
+        // klickt niemand, und ein Klick soll nie ins Leere gehen.
+        // Im Bild des Klicks hat der Uebergang noch nicht begonnen
+        // (`uebergaenge` lief vor dem Druck) -- das heisst "noch zu",
+        // nicht "ganz offen", sonst blitzte die volle Liste einmal auf.
+        let t = if self.dd_auf_von == Some((wi, idx)) { weich(self.dd_auf_t) }
+                else if self.m("uebergang") > 0 { 0.0 } else { 1.0 };
+        let ph = ((ph_voll as f64 * t).round() as i32).max(1);
+        let bg = deckkraft(self.wcol(wdg, "bg", "widget_bg"), 0.35 + 0.65 * t);
         let border = self.wcol(wdg, "border", "widget_border");
         let fg = self.wcol(wdg, "fg", "text_fg");
         let acc = self.wcol(wdg, "accent", "accent");
         let pad = self.m("pad");
+        g.push_clip(px, py, pw, ph);
         g.box_fill(px, py, px + pw - 1, py + ph - 1, bg);
         g.rect(px, py, px + pw - 1, py + ph - 1, border);
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
@@ -17315,6 +17390,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let th14 = self.ctext_height(g);
             self.ctext(g, px + pad, iy + (self.sk(DROPDOWN_ITEM_H) - th14) / 2, it.clone(), fg);
         }
+        g.pop_clip();
     }
 
     /// Flaechenfarbe einer Zelle: eigene Farbe > Zeilenfarbe > Zebra > nichts.
