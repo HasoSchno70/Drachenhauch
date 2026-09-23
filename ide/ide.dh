@@ -304,6 +304,11 @@ DIM geruestAn AS BOOLEAN : geruestAn = TRUE
 ' selbst (GUI_TEXTAREA_PAIRS). `'` fehlt mit Absicht: es beginnt einen
 ' Kommentar, und ein zweites dahinter waere Unsinn.
 DIM klammernAn AS BOOLEAN : klammernAn = TRUE
+' Beim Sichern formatieren (CODE_FORMAT$). Aus per Vorgabe: es aendert den
+' Text, ohne dass man darum gebeten hat. Das automatische Sichern formatiert
+' NIE -- mitten im Tippen rueckte sonst die Zeile unter der Marke weg.
+DIM formatSichernAn AS BOOLEAN : formatSichernAn = FALSE
+DIM sichernOhneFormat AS BOOLEAN : sichernOhneFormat = FALSE
 ' Vorschau vor dem Umbau: Umbenennen, Herausloesen und Parameter-Umsortieren
 ' zeigen erst den Unterschied und fragen, statt gleich zu schreiben.
 DIM vorschauAn AS BOOLEAN : vorschauAn = TRUE
@@ -434,6 +439,7 @@ IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorsc
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
 IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
 IF JSON_HAS(konfig, "klammern") THEN klammernAn = JSON_GET_BOOL(konfig, "klammern")
+IF JSON_HAS(konfig, "format_sichern") THEN formatSichernAn = JSON_GET_BOOL(konfig, "format_sichern")
 IF JSON_HAS(konfig, "umbau_vorschau") THEN vorschauAn = JSON_GET_BOOL(konfig, "umbau_vorschau")
 IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
@@ -901,6 +907,7 @@ DIM cbVorschau AS GUI_WIDGET : cbVorschau = GUI_CHECKBOX(winEinst, "Vorschau vor
 ' Zweite Spalte: was nach Stand 25 dazukam. Rechts daneben, damit alles
 ' Bisherige an seiner Stelle bleibt.
 DIM cbKlammern AS GUI_WIDGET : cbKlammern = GUI_CHECKBOX(winEinst, "Klammern und Anführungszeichen schließen", 400, 14, TRUE)
+DIM cbFormatSichern AS GUI_WIDGET : cbFormatSichern = GUI_CHECKBOX(winEinst, "Beim Sichern formatieren", 400, 44, FALSE)
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgröße", 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
 DIM lblListen AS GUI_WIDGET : lblListen = GUI_LABEL(winEinst, "Schrift der Listen", 16, 326)
@@ -1238,6 +1245,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "linien", linienAn)
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
     JSON_SET_BOOL(konfig, "klammern", klammernAn)
+    JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
     JSON_SET_BOOL(konfig, "leiste", leisteAn)
     JSON_SET_INT(konfig, "autosichern", autoSichern)
@@ -1685,6 +1693,7 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbGeruest, geruestAn)
     GUI_SET_CHECKED(cbVorschau, vorschauAn)
     GUI_SET_CHECKED(cbKlammern, klammernAn)
+    GUI_SET_CHECKED(cbFormatSichern, formatSichernAn)
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spListen, listenGroesse)
     GUI_SET_VALUE(spHbGr, handbuchGroesse)
@@ -1714,6 +1723,7 @@ SUB einstellungenNachziehen()
     IF GUI_CHECKED(cbLinien) <> linienAn THEN linienSetzen(GUI_CHECKED(cbLinien))
     IF GUI_CHECKED(cbGeruest) <> geruestAn THEN geruestSetzen(GUI_CHECKED(cbGeruest))
     IF GUI_CHECKED(cbKlammern) <> klammernAn THEN klammernSetzen(GUI_CHECKED(cbKlammern))
+    IF GUI_CHECKED(cbFormatSichern) <> formatSichernAn THEN befehl("format_sichern")
     IF GUI_CHECKED(cbVorschau) <> vorschauAn THEN
         vorschauAn = GUI_CHECKED(cbVorschau)
         konfigSichern()
@@ -2134,6 +2144,22 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
         tabPfade[i] = pfad
     END IF
     DIM text AS STRING : text = GUI_TEXT(tabFelder[i])
+    ' Formatieren beim Sichern: nur Drachenhauch-Quelltext, nie beim
+    ' automatischen Sichern. Der Formatierer arbeitet auf Tokens: eine halbe
+    ' Anweisung rueckt er ein wie jede andere, nur was sich gar nicht lesen
+    ' laesst (eine offene Zeichenkette) laesst er stehen -- dann wird
+    ' gesichert, was dasteht.
+    IF formatSichernAn AND NOT sichernOhneFormat AND LOWER$(RIGHT$(pfad, 3)) = ".dh" THEN
+        DIM geformt AS STRING : geformt = CODE_FORMAT$(text)
+        IF geformt <> "" THEN
+            IF RIGHT$(text, 1) = NL THEN geformt = geformt + NL
+            IF geformt <> text THEN
+                feldAustauschen(tabFelder[i], text, geformt)
+                text = geformt
+                protokoll("beim sichern formatiert")
+            END IF
+        END IF
+    END IF
     tabGesichert[i] = text
     ' Die Datei endet mit einem Umbruch (dateiLesen laesst ihn weg, das Feld
     ' kennt ihn nicht) -- sonst verloere jede gesicherte Datei ihre letzte
@@ -7072,14 +7098,21 @@ SUB formatieren()
     END IF
     IF RIGHT$(text, 1) = NL THEN neu = neu + NL
     IF neu = text THEN GUI_SET_TEXT(lblStatus, "Schon formatiert.") : RETURN
+    feldAustauschen(ta, text, neu)
+    GUI_SET_TEXT(lblStatus, "Formatiert.")
+    protokoll("formatiert")
+END SUB
+
+' Den ganzen Text eines Feldes ersetzen -- als EIN Undo-Schritt (Auswahl
+' ueber alles + INSERT; GUI_SET_TEXT leerte den Verlauf), die Marke bleibt
+' auf ihrer Zeile und Spalte.
+SUB feldAustauschen(ta AS GUI_WIDGET, alt AS STRING, neu AS STRING)
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
-    GUI_TEXTAREA_SELECT(ta, 1, 1, LEN(SPLIT$(text, NL)), SPALTE_ENDE)
+    GUI_TEXTAREA_SELECT(ta, 1, 1, LEN(SPLIT$(alt, NL)), SPALTE_ENDE)
     GUI_TEXTAREA_INSERT(ta, neu)
     GUI_TEXTAREA_GOTO(ta, z, s)
-    GUI_SET_TEXT(lblStatus, "Formatiert.")
-    protokoll("formatiert")
 END SUB
 
 ' --- Export als eigenstaendiges Programm (dhrt --export) ----------------
@@ -7873,6 +7906,7 @@ paletteEintrag("Letzten Umbau zurücknehmen", "umbau_zurueck", "Strg+Umschalt+Z"
 paletteEintrag("Letzten Umbau nachbessern", "umbau_nach", "Strg+Umschalt+G")
 paletteEintrag("Gerüst beim Tippen", "geruest", "")
 paletteEintrag("Klammern automatisch schließen", "klammern", "")
+paletteEintrag("Beim Sichern formatieren", "format_sichern", "")
 paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
 paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
 paletteEintrag("Zeilen sortieren", "zl_sortieren", "")
@@ -8332,6 +8366,11 @@ SUB befehl(k AS STRING)
         CASE "umbau_nach" : umbauNachbessern()
         CASE "geruest" : geruestSetzen(NOT geruestAn)
         CASE "klammern" : klammernSetzen(NOT klammernAn)
+        CASE "format_sichern"
+            formatSichernAn = NOT formatSichernAn
+            konfigSichern()
+            GUI_SET_TEXT(lblStatus, IIF(formatSichernAn, "Beim Sichern formatieren an.", "Beim Sichern formatieren aus."))
+            protokoll("format sichern " + IIF(formatSichernAn, "an", "aus"))
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
         CASE "leiste"
@@ -9033,7 +9072,9 @@ WHILE NOT beenden
         IF autoSichern > 0 AND autoFaellig >= 0.0 AND GET_TIME() >= autoFaellig THEN
             autoFaellig = -1.0
             IF tabPfade[aktiverTab] <> "" AND jetzt <> tabGesichert[aktiverTab] THEN
+                sichernOhneFormat = TRUE
                 sichern(aktiverTab, FALSE)
+                sichernOhneFormat = FALSE
                 protokoll("auto gesichert")
             END IF
         END IF

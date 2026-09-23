@@ -53,3 +53,141 @@ PRINT 1
 {"klammern": false}
 --- enthaelt
 an FALSE
+
+=== beim sichern formatieren
+befehl("sichern")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+FOR i = 1 TO 2
+PRINT i
+NEXT
+--- datei _programm/ide.json
+{"format_sichern": true}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    PRINT "|" + L[i] + "|"
+NEXT
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM n AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF P[i] = "beim sichern formatiert" THEN n = n + 1
+NEXT
+PRINT "formatiert " ; n
+--- erwartet
+|FOR i = 1 TO 2|
+|    PRINT i|
+|NEXT|
+formatiert 1
+
+=== ohne die einstellung bleibt der text wie er ist
+befehl("sichern")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+FOR i = 1 TO 2
+PRINT i
+NEXT
+--- datei _programm/ide.json
+{}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    PRINT "|" + L[i] + "|"
+NEXT
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM n AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF P[i] = "beim sichern formatiert" THEN n = n + 1
+NEXT
+PRINT "formatiert " ; n
+--- erwartet
+|FOR i = 1 TO 2|
+|PRINT i|
+|NEXT|
+formatiert 0
+
+=== das automatische sichern formatiert nicht
+sichernOhneFormat = TRUE
+befehl("sichern")
+sichernOhneFormat = FALSE
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+FOR i = 1 TO 2
+PRINT i
+NEXT
+--- datei _programm/ide.json
+{"format_sichern": true}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    PRINT "|" + L[i] + "|"
+NEXT
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM n AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF P[i] = "beim sichern formatiert" THEN n = n + 1
+NEXT
+PRINT "formatiert " ; n
+--- erwartet
+|FOR i = 1 TO 2|
+|PRINT i|
+|NEXT|
+formatiert 0
+
+=== was sich nicht lesen laesst wird gesichert wie es dasteht
+befehl("sichern")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+FOR i = 1 TO 2
+PRINT "ab
+NEXT
+--- datei _programm/ide.json
+{"format_sichern": true}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("spiel.dh")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    PRINT "|" + L[i] + "|"
+NEXT
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM n AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF P[i] = "beim sichern formatiert" THEN n = n + 1
+NEXT
+PRINT "formatiert " ; n
+--- erwartet
+|FOR i = 1 TO 2|
+|PRINT "ab|
+|NEXT|
+formatiert 0
