@@ -34,6 +34,9 @@ const KEY_PAGEUP: i64 = 1073741899;
 const KEY_PAGEDOWN: i64 = 1073741902;
 const KEY_F2: i64 = 1073741883;
 const K_A: i64 = 97;
+const K_B: i64 = 98;
+const K_I: i64 = 105;
+const K_U: i64 = 117;
 const K_C: i64 = 99;
 const K_V: i64 = 118;
 const K_X: i64 = 120;
@@ -411,6 +414,119 @@ impl CellKind {
 /// Zahlenfilter des Textfelds: 1 = ganze Zahl (mit Vorzeichen), 2 = Kommazahl
 /// (Punkt ODER Komma, hoechstens eines). Zwischenstaende wie "" und "-" sind
 /// erlaubt -- sonst liesse sich eine negative Zahl gar nicht tippen.
+/// Stil der Zeichen VOR einer Stelle -- damit schreibt man weiter, wie man
+/// aufgehoert hat. Am Anfang einer Zeile gilt das Zeichen dahinter.
+fn stil_vor(w: &Widget, k: usize) -> u8 {
+    let chars: Vec<char> = w.text.chars().collect();
+    if k > 0 && k <= w.stile.len() && chars.get(k - 1) != Some(&'\n') { return w.stile[k - 1]; }
+    match chars.get(k) { Some(&c) if c != '\n' => w.stile.get(k).copied().unwrap_or(0), _ => 0 }
+}
+
+/// Stile an einen geaenderten Text anpassen: gemeinsamer Anfang und
+/// gemeinsames Ende behalten ihre Bits, das Neue dazwischen bekommt den
+/// Tippstil bzw. den Stil davor. Das deckt Tippen, Loeschen, Einfuegen und
+/// Ersetzen ab, ohne dass jeder dieser Wege die Bits kennen muss.
+fn stile_abgleichen(w: &mut Widget) {
+    if !w.formatiert { return; }
+    let neu: Vec<char> = w.text.chars().collect();
+    if w.stile_text == w.text && w.stile.len() == neu.len() { return; }
+    let alt: Vec<char> = w.stile_text.chars().collect();
+    if w.stile.len() != alt.len() { w.stile = vec![0; alt.len()]; }
+    let mut a = 0;
+    while a < alt.len() && a < neu.len() && alt[a] == neu[a] { a += 1; }
+    let mut e = 0;
+    while e < alt.len() - a && e < neu.len() - a && alt[alt.len() - 1 - e] == neu[neu.len() - 1 - e] { e += 1; }
+    let neu_st = w.tipp_stil.unwrap_or_else(|| {
+        if a > 0 && alt[a - 1] != '\n' { w.stile[a - 1] }
+        else if a < alt.len() - e && alt[a] != '\n' { w.stile[a] }
+        else if a > 0 { w.stile[a - 1] } else { 0 }
+    });
+    let mut st = Vec::with_capacity(neu.len());
+    st.extend_from_slice(&w.stile[..a]);
+    st.extend(std::iter::repeat(neu_st).take(neu.len() - a - e));
+    st.extend_from_slice(&w.stile[alt.len() - e..]);
+    w.stile = st;
+    w.stile_text = w.text.clone();
+}
+
+/// Text + Stile -> Markdown: `**fett**`, `*kursiv*`, `***beides***`,
+/// `~~durch~~`, `<u>unter</u>`. Geschrieben werden nur WECHSEL -- was
+/// endet, dann was anfaengt; fett und kursiv zusammen in EINEM Zeichen,
+/// sonst stuenden `**` und `*` nebeneinander und laesen sich als `***`.
+/// Zeichen mit eigener Bedeutung bekommen einen Rueckstrich.
+pub(crate) fn markdown_aus(chars: &[char], stile: &[u8]) -> String {
+    use crate::schnitt::{DURCH, FETT, KURSIV, UNTER};
+    fn fk(bits: u8) -> &'static str {
+        match bits & (FETT | KURSIV) { x if x == FETT | KURSIV => "***", FETT => "**", KURSIV => "*", _ => "" }
+    }
+    let mut out = String::new();
+    let mut akt = 0u8;
+    let wechsel = |out: &mut String, akt: u8, neu: u8| {
+        let aus = akt & !neu;
+        let ein = neu & !akt;
+        // Zuerst schliessen, in umgekehrter Reihenfolge des Oeffnens.
+        out.push_str(fk(aus));
+        if aus & DURCH != 0 { out.push_str("~~"); }
+        if aus & UNTER != 0 { out.push_str("</u>"); }
+        if ein & UNTER != 0 { out.push_str("<u>"); }
+        if ein & DURCH != 0 { out.push_str("~~"); }
+        out.push_str(fk(ein));
+    };
+    for (k, &c) in chars.iter().enumerate() {
+        let st = stile.get(k).copied().unwrap_or(0);
+        if st != akt { wechsel(&mut out, akt, st); akt = st; }
+        match c {
+            '\\' | '*' | '~' => { out.push('\\'); out.push(c); }
+            '<' => {
+                let rest: String = chars[k..chars.len().min(k + 4)].iter().collect();
+                if rest.starts_with("<u>") || rest.starts_with("</u>") { out.push('\\'); }
+                out.push(c);
+            }
+            _ => out.push(c),
+        }
+    }
+    wechsel(&mut out, akt, 0);
+    out
+}
+
+/// Markdown -> Text + Stile. Die Marken SCHALTEN um (`**` kippt fett,
+/// `***` fett und kursiv, `~~` durch), `<u>` schaltet ein, `</u>` aus; ein
+/// Rueckstrich nimmt das naechste Zeichen woertlich. Ein einzelnes `~` ist
+/// ein Zeichen. So liest es alles, was `markdown_aus` schreibt, und das
+/// uebliche Markdown von Hand ebenso.
+pub(crate) fn markdown_ein(md: &str) -> (String, Vec<u8>) {
+    use crate::schnitt::{DURCH, FETT, KURSIV, UNTER};
+    let z: Vec<char> = md.chars().collect();
+    let (mut text, mut st) = (String::new(), Vec::new());
+    let mut akt = 0u8;
+    let mut k = 0;
+    while k < z.len() {
+        let c = z[k];
+        if c == '\\' && k + 1 < z.len() {
+            text.push(z[k + 1]); st.push(akt); k += 2; continue;
+        }
+        if c == '*' {
+            let mut n = 0;
+            while k + n < z.len() && z[k + n] == '*' { n += 1; }
+            k += n;
+            while n > 0 {
+                let m = n.min(3);
+                akt ^= match m { 3 => FETT | KURSIV, 2 => FETT, _ => KURSIV };
+                n -= m;
+            }
+            continue;
+        }
+        if c == '~' && z.get(k + 1) == Some(&'~') { akt ^= DURCH; k += 2; continue; }
+        if c == '<' {
+            let rest: String = z[k..z.len().min(k + 4)].iter().collect();
+            if rest.starts_with("<u>") { akt |= UNTER; k += 3; continue; }
+            if rest.starts_with("</u>") { akt &= !UNTER; k += 4; continue; }
+        }
+        text.push(c); st.push(akt); k += 1;
+    }
+    (text, st)
+}
+
 fn zahl_erlaubt(text: &str, zahlen: u8) -> bool {
     if zahlen == 0 { return true; }
     let mut trenner = 0;
@@ -2288,6 +2404,26 @@ pub struct Widget {
     // Editierschleife den Ausschnitt NICHT zur Marke zurueck -- sonst
     // sprang ein gerollter Code nach einem Bild wieder zurueck.
     rad_stand: Option<(i32, i32, usize)>,
+    /// Mehrfachklick im Textbereich: wie oft hintereinander (1..3), wann und
+    /// wo -- zweimal waehlt das Wort, dreimal die Zeile.
+    klick_n: u8,
+    klick_zeit: f64,
+    klick_idx: i32,
+    /// Die Taste haengt noch vom Doppel-/Dreifachklick: der Zug darf die
+    /// Wort- bzw. Zeilenauswahl nicht auf einen Punkt zusammenziehen.
+    wort_zug: bool,
+    /// Inline-Formate im Textbereich (`GUI_TEXTAREA_SET "formatiert"`):
+    /// je Zeichen die Stil-Bits aus `schnitt` -- fett, kursiv,
+    /// unterstrichen, durchgestrichen. `stile_text` ist der Text, zu dem
+    /// die Bits gehoeren: aendert sich der Text auf einem Weg, der die Bits
+    /// nicht kennt (Tippen, Einfuegen, GUI_TEXTAREA_INSERT, Eingabemethode),
+    /// gleicht `stile_abgleichen` sie ueber gemeinsamen Anfang und gemeinsames
+    /// Ende nach. `tipp_stil` ist der Stil fuer das naechste Getippte, wenn
+    /// Strg+B ohne Auswahl kam -- er gilt, bis die Marke woanders hinwandert.
+    formatiert: bool,
+    stile: Vec<u8>,
+    stile_text: String,
+    tipp_stil: Option<u8>,
     // Abkuerzungen (nur TextArea): Woerter, die der Tabulator MELDET statt
     // einzuruecken. Was an ihre Stelle kommt, weiss nur der Aufrufer -- die
     // Laufzeit kennt weder Schnipsel noch Sprache.
@@ -2349,8 +2485,8 @@ pub struct Widget {
     // Rueckgaengig beim Tippen (Textfeld und Textbereich): der Stand VOR einer
     // Aenderung samt Schreibmarke. Anschlaege innerhalb von 0,8 s sind EIN
     // Schritt -- sonst naehme Strg+Z ein Zeichen statt eines Wortes zurueck.
-    undo: Vec<(String, i32)>,
-    redo: Vec<(String, i32)>,
+    undo: Vec<(String, i32, Vec<u8>)>,
+    redo: Vec<(String, i32, Vec<u8>)>,
     undo_zeit: f64,
 }
 
@@ -2620,6 +2756,8 @@ pub struct Gui {
     schirm_b: i32,
     /// Rollbalken einer Liste wird gezogen: (Fenster, Liste, Griff-Versatz).
     listbar_zug: Option<(usize, usize, i32)>,
+    /// Dasselbe fuer den Rollbalken eines Textbereichs.
+    tabar_zug: Option<(usize, usize, i32)>,
     /// Enter oder ESC hat in DIESEM Bild ein Umbenennen beendet -- dann
     /// gehoert die Taste nicht mehr dem Standard-/Abbrechen-Knopf, obwohl
     /// die Liste danach nicht mehr bearbeitet wird.
@@ -2745,7 +2883,7 @@ impl Gui {
             skins: HashMap::new(),
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
-            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, liste_taste: false, active_table: None, table_press: None, press_origin: None,
+            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true, cursor_form: None,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false),
@@ -3499,6 +3637,13 @@ impl Gui {
             // Umbruch an Wortgrenzen -- fuer Notizen und Briefe, nicht fuer
             // Code. Mit Umbruch gibt es keinen waagerechten Versatz mehr.
             "umbruch" | "wrap" => { wd.umbruch = n != 0; if wd.umbruch { wd.scroll_x = 0; } }
+            // Inline-Formate: an = alles ungeformt, aus = die Formate fallen weg.
+            "formatiert" | "formatted" => {
+                wd.formatiert = n != 0;
+                wd.stile = if wd.formatiert { vec![0; wd.text.chars().count()] } else { Vec::new() };
+                wd.stile_text = if wd.formatiert { wd.text.clone() } else { String::new() };
+                wd.tipp_stil = None;
+            }
             // Eine neue Zeile faengt mit der Einrueckung der alten an. Das
             // allein ist sprachfrei; die Woerter, die eine Stufe mehr oder
             // weniger bedeuten, kommen ueber GUI_TEXTAREA_INDENT_WORDS.
@@ -3639,7 +3784,8 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
-            farbfelder: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, rad_stand: None,
+            farbfelder: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
+            formatiert: false, stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
@@ -4837,11 +4983,18 @@ impl Gui {
     }
     /// Rollstand: die Liste fuehrt ihn in `value`, der Baum in `tree.scroll`.
     fn roll_ist(w: &Widget) -> f64 {
-        match w.tree.as_ref() { Some(t) if w.kind == Kind::Tree => t.scroll as f64, _ => w.value }
+        match w.tree.as_ref() {
+            Some(t) if w.kind == Kind::Tree => t.scroll as f64,
+            // Der Textbereich rollt in ZEILEN (`scroll` = erste sichtbare).
+            _ if w.kind == Kind::TextArea => w.scroll as f64,
+            _ => w.value,
+        }
     }
     fn roll_setze(w: &mut Widget, v: f64) {
         if w.kind == Kind::Tree {
             if let Some(t) = w.tree.as_mut() { t.scroll = v.round() as i32; }
+        } else if w.kind == Kind::TextArea {
+            w.scroll = v.round() as i32;
         } else {
             w.value = v;
         }
@@ -8814,6 +8967,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // und die decken sich mit dem neuen nur zufaellig. Die Farbfelder
         // haengen an Zeichenstellen -- dasselbe Argument.
         w.gefaltet.clear(); w.faltbar.clear(); w.farbfelder.clear();
+        // Die Stile ebenso -- ein neuer Text ist ungeformt; wer ihn geformt
+        // setzen will, nimmt GUI_TEXTAREA_SET_MARKDOWN.
+        if w.formatiert { w.stile = vec![0; n as usize]; w.stile_text = w.text.clone(); w.tipp_stil = None; }
         // Caret ans Ende, Selektion/Scroll zuruecksetzen (sonst zeigt das Caret
         // hinter das Ende des nun kuerzeren Textes).
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
@@ -9381,7 +9537,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// bilden EINEN Schritt.
     fn undo_merken(w: &mut Widget, before: &str, caret: i32, jetzt: f64) {
         if w.undo.is_empty() || jetzt - w.undo_zeit > 0.8 {
-            w.undo.push((before.to_string(), caret));
+            // Die Stile gehoeren zum Stand VORHER -- abgeglichen sind sie
+            // bis zum Ende des letzten Bildes, also genau dann, wenn ihr Text
+            // `before` ist. Sonst (ein Weg, der den Text aenderte, ohne die
+            // Bits zu kennen) waeren sie zum falschen Text gemerkt.
+            let st = if w.formatiert && w.stile_text == before { w.stile.clone() } else { Vec::new() };
+            w.undo.push((before.to_string(), caret, st));
             if w.undo.len() > 100 { w.undo.remove(0); }
         }
         w.undo_zeit = jetzt;
@@ -9392,11 +9553,18 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn text_undo(&mut self, wi: usize, i: usize, wieder: bool) {
         let w = &mut self.windows[wi].widgets[i];
         let stand = if wieder { w.redo.pop() } else { w.undo.pop() };
-        let Some((t, c)) = stand else { return; };
-        let jetzt_stand = (w.text.clone(), w.caret);
+        let Some((t, c, st)) = stand else { return; };
+        stile_abgleichen(w);
+        let st_jetzt = if w.formatiert { w.stile.clone() } else { Vec::new() };
+        let jetzt_stand = (w.text.clone(), w.caret, st_jetzt);
         if wieder { w.undo.push(jetzt_stand); } else { w.redo.push(jetzt_stand); }
         let n = t.chars().count() as i32;
         w.text = t;
+        if w.formatiert {
+            w.stile = if st.len() == n as usize { st } else { vec![0; n as usize] };
+            w.stile_text = w.text.clone();
+            w.tipp_stil = None;
+        }
         w.caret = c.clamp(0, n); w.sel_anchor = w.caret;
         w.undo_zeit = -10.0;      // die naechste Eingabe ist ein neuer Schritt
         let f = w.on_change.clone();
@@ -9887,6 +10055,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if w.bildmodus != 0 { o["mode"] = serde_json::json!(bildmodus_str(w.bildmodus)); }
         if w.ziehbar { o["draggable"] = serde_json::json!(true); }
         if w.umbruch { o["wrap_text"] = serde_json::json!(true); }
+        // Geformter Text geht als Markdown hinaus -- lesbar und von jedem
+        // Markdown-Betrachter anzeigbar; `text` bleibt der schlichte Text.
+        if w.formatiert {
+            o["formatiert"] = serde_json::json!(true);
+            let chars: Vec<char> = w.text.chars().collect();
+            let st = if w.stile_text == w.text && w.stile.len() == chars.len() { w.stile.clone() } else { vec![0; chars.len()] };
+            o["markdown"] = serde_json::json!(markdown_aus(&chars, &st));
+        }
         if !w.bind.is_empty() {
             o["bind"] = serde_json::json!(w.bind);
             if !w.form.is_empty() { o["form"] = serde_json::json!(w.form); }
@@ -10131,6 +10307,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if let Some(m) = wj["mode"].as_str() { w.bildmodus = bildmodus_parsen(m).unwrap_or(0); }
         w.ziehbar = wj["draggable"].as_bool().unwrap_or(false);
         w.umbruch = kind == Kind::TextArea && wj["wrap_text"].as_bool().unwrap_or(false);
+        if kind == Kind::TextArea && wj["formatiert"].as_bool().unwrap_or(false) {
+            w.formatiert = true;
+            if let Some(md) = wj["markdown"].as_str() {
+                let (t, st) = markdown_ein(md);
+                w.text = t; w.stile = st;
+            } else { w.stile = vec![0; w.text.chars().count()]; }
+            w.stile_text = w.text.clone();
+        }
         w.bind = wj["bind"].as_str().unwrap_or("").to_string();
         w.form = wj["form"].as_str().unwrap_or("").to_string();
         w.min_w = wj["min_w"].as_i64().unwrap_or(0).max(0) as i32;
@@ -11121,6 +11305,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         for (wi, i) in offen_edit { self.edit_ende_any(wi, i, true); }
+        // Formatierte Textbereiche: ein Text, der auf einem Weg ohne Stile
+        // kam (Eingabemethode, Bindung), bekommt sie hier nachgezogen.
+        for win in self.windows.iter_mut() {
+            for w in win.widgets.iter_mut() {
+                if w.formatiert { stile_abgleichen(w); }
+            }
+        }
         let dt = g.delta();
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let dauer = self.m("uebergang").max(0) as f32;
@@ -11404,8 +11595,34 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         if right_just { self.liste_rechtsklick(top, i, k); }
                     }
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
+                    if kind == Kind::TextInput && right_just && !menu_consumed {
+                        self.ti_rechtsklick(g, top, i, mx);
+                    }
                     if kind == Kind::TextArea {
                         self.textarea_wheel(top, i, g);
+                        // Rollbalken: greifen (auf dem Griff) oder hinspringen
+                        // (in der Rinne) -- vor dem Editieren, das denselben
+                        // Druck sonst als Klick in den Text naehme.
+                        if just_pressed && !menu_consumed {
+                            if let Some((tx, ty, bw, th, thy, thh, n, sicht)) = self.ta_bar_geom(g, top, i) {
+                                if Self::in_rect(mx, my, (tx - 2, ty, bw + 3, th)) {
+                                    let griff = if my >= thy && my < thy + thh { my - thy } else {
+                                        let max = (n - sicht).max(0);
+                                        let rel = ((my - ty - thh / 2) as f64 / (th - thh).max(1) as f64).clamp(0.0, 1.0);
+                                        let w = &mut self.windows[top].widgets[i];
+                                        w.scroll = (rel * max as f64).round() as i32;
+                                        w.rad_ziel = None;
+                                        w.rad_stand = Some((w.caret, w.sel_anchor, w.text.chars().count()));
+                                        thh / 2
+                                    };
+                                    self.tabar_zug = Some((top, i, griff));
+                                    self.windows[top].widgets[i].farbfeld_zug = true;
+                                }
+                            }
+                        }
+                        if right_just && !menu_consumed && self.tabar_zug.is_none() {
+                            self.ta_rechtsklick(g, top, i, mx, my);
+                        }
                         if !menu_consumed && !tab_consumed && !scroll_consumed
                            && (just_pressed || right_just) {
                             let taste = if just_pressed { 0 } else { 1 };
@@ -11610,6 +11827,19 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     w.rad_ziel = None;
                 }
             } else { self.listbar_zug = None; }
+        }
+        if let Some((wi, i, griff)) = self.tabar_zug {
+            if is_down {
+                if let Some((_, ty, _, th, _, thh, n, sicht)) = self.ta_bar_geom(g, wi, i) {
+                    let max = (n - sicht).max(0);
+                    let rel = ((my - griff - ty) as f64 / (th - thh).max(1) as f64).clamp(0.0, 1.0);
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.scroll = (rel * max as f64).round() as i32;
+                    w.rad_ziel = None;
+                    // Die Schreibmarke zieht die Ansicht sonst zu sich zurueck.
+                    w.rad_stand = Some((w.caret, w.sel_anchor, w.text.chars().count()));
+                }
+            } else { self.tabar_zug = None; }
         }
         // Laufendes Splitter-Drag.
         if let Some((wi, i)) = self.active_split {
@@ -11970,6 +12200,25 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Zeichen-Index, dessen Caret-Position am naechsten an `target_px` liegt
     /// (Pixel ab Textanfang). Misst echte Textbreiten -> funktioniert mit jedem Font.
+    /// Das Wort um eine Zeichenstelle: Buchstaben, Ziffern, `_` und `$`
+    /// (Drachenhauch-Namen wie `name$`). Steht dort kein Wortzeichen, gilt
+    /// das eine Zeichen -- ein Doppelklick auf eine Klammer waehlt sie.
+    fn wort_um(chars: &[char], idx: usize) -> (usize, usize) {
+        let ist = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
+        if chars.is_empty() { return (0, 0); }
+        let mut k = idx.min(chars.len());
+        // Auf dem Ende eines Wortes (Marke dahinter): das Wort davor.
+        if (k == chars.len() || !ist(chars[k])) && k > 0 && ist(chars[k - 1]) { k -= 1; }
+        if k >= chars.len() || !ist(chars[k]) {
+            let e = (k + 1).min(chars.len());
+            return (k.min(chars.len()), e);
+        }
+        let mut a = k;
+        while a > 0 && ist(chars[a - 1]) { a -= 1; }
+        let mut e = k;
+        while e < chars.len() && ist(chars[e]) { e += 1; }
+        (a, e)
+    }
     fn caret_index_at(g: &Graphics, chars: &[char], target_px: i32, ms: Mass) -> i32 {
         if target_px <= 0 { return 0; }
         for n in 1..=chars.len() {
@@ -12014,14 +12263,33 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         };
 
         // --- Maus: Klick setzt Caret (rising edge), Ziehen erweitert Selektion ---
+        // Doppelklick waehlt das Wort, Dreifachklick alles -- wie im
+        // Textbereich, gezaehlt an DIESER Stelle in 0,4 s. Ein Passwortfeld
+        // kennt keine Woerter (sie verrieten, wo ein Leerzeichen steht): dort
+        // waehlt schon der Doppelklick alles.
+        if !g.mouse_button(0) { self.windows[wi].widgets[i].wort_zug = false; }
         if g.mouse_button(0) {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let target = mx - (ax + 5) + scroll;
             let idx = Self::caret_index_at(g, &sichtbar(&chars), target, ms);
             if !self.was_mouse_down {
                 let r = self.abs_rect(wi, &self.windows[wi].widgets[i]);
-                if Self::in_rect(mx, my, r) { caret = idx; anchor = idx; }
-            } else {
+                if Self::in_rect(mx, my, r) {
+                    caret = idx; anchor = idx;
+                    let jetzt = g.get_time();
+                    let w = &mut self.windows[wi].widgets[i];
+                    let n = if jetzt - w.klick_zeit < 0.4 && (idx - w.klick_idx).abs() <= 2 { w.klick_n % 3 + 1 } else { 1 };
+                    w.klick_n = n; w.klick_zeit = jetzt; w.klick_idx = idx;
+                    if n == 3 || (n == 2 && passwort) {
+                        anchor = 0; caret = chars.len() as i32;
+                        w.wort_zug = true;
+                    } else if n == 2 {
+                        let (a, e) = Self::wort_um(&chars, idx as usize);
+                        anchor = a as i32; caret = e as i32;
+                        w.wort_zug = true;
+                    }
+                }
+            } else if !self.windows[wi].widgets[i].wort_zug {
                 caret = idx;   // Drag -> Selektion bis hierher
             }
         }
@@ -12767,6 +13035,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Self::undo_merken(w, &before, caret0, jetzt);
         w.text = chars.iter().collect();
         w.caret = lo + neu.len() as i32; w.sel_anchor = w.caret;
+        stile_abgleichen(w);
         let nachher = w.text.clone();
         Self::falten_nachziehen(w, &before, &nachher, caret0);
         Self::falte_am_caret_oeffnen(w);
@@ -12823,6 +13092,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             self.text_undo(wi, i, g.key_pressed(K_Y) || shift);
             return;
         }
+        // Inline-Formate: Strg+B fett, Strg+I kursiv, Strg+U unterstrichen --
+        // auf die Auswahl, ohne Auswahl fuer das, was als Naechstes kommt.
+        // Hat ein Menue-Kuerzel die Taste schon genommen, bleibt es bei ihm.
+        if self.windows[wi].widgets[i].formatiert && ctrl && !alt && !kuerzel_weg && !shift {
+            use crate::schnitt::{FETT, KURSIV, UNTER};
+            let bit = if g.key_pressed(K_B) { FETT } else if g.key_pressed(K_I) { KURSIV }
+                      else if g.key_pressed(K_U) { UNTER } else { 0 };
+            if bit != 0 {
+                let jetzt = g.get_time();
+                self.stil_anwenden(wi, i, bit, None, jetzt);
+                return;
+            }
+        }
+        {
+            let w = &mut self.windows[wi].widgets[i];
+            if w.formatiert { stile_abgleichen(w); }
+        }
         let pad = 5;
         let lh = self.ta_line_h(g);
         let (ax, ay, fw, fh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
@@ -12832,6 +13118,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Selektion bis zur aktuellen Position.
         if !g.mouse_button(0) {
             self.windows[wi].widgets[i].farbfeld_zug = false;
+            self.windows[wi].widgets[i].wort_zug = false;
             self.windows[wi].widgets[i].spalten_start = (-1, -1);
         }
         if g.mouse_button(0) && !self.windows[wi].widgets[i].farbfeld_zug {
@@ -12899,6 +13186,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         zusatz.push((idx, idx));
                     } else if !alt {
                         caret = idx; anchor = idx;
+                        // Doppelklick waehlt das Wort, Dreifachklick die Zeile
+                        // (samt Umbruch) -- wie in jedem Editor. Gezaehlt wird
+                        // an DIESER Stelle, in 0,4 s.
+                        let jetzt = g.get_time();
+                        let w = &mut self.windows[wi].widgets[i];
+                        let n = if jetzt - w.klick_zeit < 0.4 && (idx - w.klick_idx).abs() <= 2 { w.klick_n % 3 + 1 } else { 1 };
+                        w.klick_n = n; w.klick_zeit = jetzt; w.klick_idx = idx;
+                        if n == 2 {
+                            let (a, e) = Self::wort_um(&chars, idx as usize);
+                            anchor = a as i32; caret = e as i32;
+                            w.wort_zug = true;
+                        } else if n == 3 {
+                            anchor = starts[rli] as i32;
+                            caret = starts.get(rli + 1).copied().unwrap_or(chars.len()) as i32;
+                            w.wort_zug = true;
+                        }
                     }
                     // Wo ein Alt-Zug anfaengt: ein Klick ohne Bewegung bleibt
                     // die weitere Marke von oben, ein ZUG macht daraus eine
@@ -12908,7 +13211,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                             (rli as i32, idx - starts[rli] as i32);
                     }
                 }
-            } else if !alt {
+            } else if !alt && !self.windows[wi].widgets[i].wort_zug {
                 caret = idx;   // Ziehen -> Selektion bis hierher
             } else if self.windows[wi].widgets[i].spalten_start.0 >= 0 {
                 // Alt-Zug: ein RECHTECK statt eines Laufs. Jede Zeile bekommt
@@ -13203,9 +13506,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Self::undo_merken(w, &before, caret0, jetzt);
             Self::falten_nachziehen(w, &before, &new_text, caret0);
         }
+        let geaendert = new_text != before;
         w.text = new_text; w.caret = caret; w.sel_anchor = anchor; w.scroll = scroll;
         w.scroll_x = sx;
         w.marken_zusatz = zusatz;
+        if w.formatiert {
+            stile_abgleichen(w);
+            // Der Tippstil gilt fuer das naechste Getippte -- ist es getippt
+            // oder wandert die Marke weg, gilt wieder der Stil davor.
+            if geaendert || caret != caret0 { w.tipp_stil = None; }
+        }
         // Links/Rechts und Backspace koennen die Marke in verborgenen Text
         // tragen -- dort waere jede weitere Taste unsichtbar wirksam.
         Self::falte_am_caret_oeffnen(w);
@@ -13238,9 +13548,166 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             (n, ((wd.h - 2 * 5) / lh).max(1))
         };
         let max = (zeilen - sicht).max(0);
+        let weich_an = self.m("uebergang") > 0;
         let w = &mut self.windows[wi].widgets[i];
-        w.scroll = (w.scroll - wheel as i32 * 3).clamp(0, max);
+        // Weich wie Liste und Baum: Radschritte addieren sich aufs ZIEL,
+        // `uebergaenge` zieht Zeile um Zeile nach.
+        let basis = w.rad_ziel.unwrap_or(w.scroll as f64);
+        let ziel = (basis.round() as i32 - wheel as i32 * 3).clamp(0, max);
+        if weich_an { w.rad_ziel = Some(ziel as f64); w.rad_letzt = w.scroll as f64; }
+        else { w.scroll = ziel; }
         w.rad_stand = Some((w.caret, w.sel_anchor, w.text.chars().count()));
+    }
+    /// Rollbalken des Textbereichs: (x, y, Breite, Rinnenhoehe, Griff-y,
+    /// Griff-Hoehe, Zeilen, sichtbare Zeilen) -- nur, wenn der Text nicht
+    /// hineinpasst. Er liegt im rechten Innenabstand, ueber keinem Zeichen.
+    /// EINE Quelle fuer Zeichnen, Klick und Ziehen.
+    fn ta_bar_geom(&self, g: &Graphics, wi: usize, i: usize) -> Option<(i32, i32, i32, i32, i32, i32, i32, i32)> {
+        let wd = &self.windows[wi].widgets[i];
+        if wd.kind != Kind::TextArea || !self.widget_shown(wi, wd) { return None; }
+        let (ax, ay, w, h) = self.abs_rect(wi, wd);
+        let lh = self.ta_line_h(g).max(1);
+        let chars: Vec<char> = wd.text.chars().collect();
+        let starts = Self::line_starts(&chars);
+        let n = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len())).len() as i32;
+        let sicht = ((h - 2 * 5) / lh).max(1);
+        if n <= sicht { return None; }
+        let bw = 5;
+        let (tx, ty, th) = (ax + w - 2 - bw, ay + 2, (h - 4).max(1));
+        let thh = ((th as i64 * sicht as i64 / n.max(1) as i64) as i32).clamp(12.min(th), th);
+        let max = (n - sicht).max(1);
+        let thy = ty + ((th - thh) as i64 * wd.scroll.clamp(0, max) as i64 / max as i64) as i32;
+        Some((tx, ty, bw, th, thy, thh, n, sicht))
+    }
+    /// Zeichenstelle unter der Maus (fuer den Rechtsklick) -- dieselbe Rechnung
+    /// wie ein Klick in `edit_textarea`. None ausserhalb und in der
+    /// Nummernspalte.
+    fn ta_index_at(&self, g: &Graphics, wi: usize, i: usize, mx: i32, my: i32) -> Option<i32> {
+        let wd = &self.windows[wi].widgets[i];
+        let (ax, ay, fw, fh) = self.abs_rect(wi, wd);
+        if !Self::in_rect(mx, my, (ax, ay, fw, fh)) { return None; }
+        let pad = 5;
+        let lh = self.ta_line_h(g).max(1);
+        let chars: Vec<char> = wd.text.chars().collect();
+        let starts = Self::line_starts(&chars);
+        let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
+        if rows.is_empty() { return Some(0); }
+        let row = (wd.scroll + ((my - ay - pad).max(0) / lh)).max(0) as usize;
+        let (_, lstart, lend) = rows[row.min(rows.len() - 1)];
+        let gut = self.ta_gutter(g, wd, starts.len());
+        if mx < ax + pad + gut { return None; }
+        let target = mx - (ax + pad + gut - wd.scroll_x);
+        let ms = self.mass(g, wd);
+        let sub: Vec<char> = chars[lstart..lend].to_vec();
+        Some((lstart + Self::caret_index_at(g, &sub, target, ms) as usize) as i32)
+    }
+    /// Rechtsklick setzt die Schreibmarke -- ein Kontextmenue ("Ausschneiden",
+    /// "Zur Definition") soll sich auf die Stelle beziehen, auf die man zeigt.
+    /// Trifft er die bestehende Auswahl, bleibt sie: dann ist sie gemeint.
+    /// Die Nummernspalte gehoert weiter dem Haltepunkt (GUTTER_CLICKED).
+    /// Stil-Bits auf die Auswahl anwenden. `an` = None schaltet um (Strg+B):
+    /// tragen ALLE gewaehlten Zeichen das Bit schon, geht es weg, sonst kommt
+    /// es auf alle. Ohne Auswahl wird es der Stil fuer das naechste Getippte.
+    /// Eine Aenderung an der Auswahl ist ein eigener Verlaufsschritt.
+    fn stil_anwenden(&mut self, wi: usize, i: usize, bits: u8, an: Option<bool>, jetzt: f64) {
+        let w = &mut self.windows[wi].widgets[i];
+        stile_abgleichen(w);
+        let n = w.stile.len() as i32;
+        let (lo, hi) = (w.caret.clamp(0, n).min(w.sel_anchor.clamp(0, n)) as usize,
+                        w.caret.clamp(0, n).max(w.sel_anchor.clamp(0, n)) as usize);
+        if lo == hi {
+            let jetzt_stil = w.tipp_stil.unwrap_or_else(|| stil_vor(w, lo));
+            let setzen = an.unwrap_or(jetzt_stil & bits != bits);
+            w.tipp_stil = Some(if setzen { jetzt_stil | bits } else { jetzt_stil & !bits });
+            return;
+        }
+        let setzen = an.unwrap_or_else(|| !w.stile[lo..hi].iter().all(|&b| b & bits == bits));
+        let neu: Vec<u8> = w.stile[lo..hi].iter().map(|&b| if setzen { b | bits } else { b & !bits }).collect();
+        if neu[..] == w.stile[lo..hi] { return; }
+        w.undo_zeit = -10.0;
+        let t = w.text.clone();
+        Self::undo_merken(w, &t, w.caret, jetzt);
+        w.undo_zeit = -10.0;      // Tippen danach ist ein neuer Schritt
+        w.stile[lo..hi].copy_from_slice(&neu);
+        if let Some(f) = w.on_change.clone() { self.pending.push(f); }
+    }
+
+    fn ta_formatiert(&mut self, h: i64, name: &str) -> Result<&mut Widget, String> {
+        self.ta_wdg(h, name)?;
+        let w = self.wdg_mut(h, name)?;
+        if !w.formatiert {
+            return Err(format!("{}: der Textbereich ist nicht formatiert -- erst GUI_TEXTAREA_SET(ta, \"formatiert\", 1)", name));
+        }
+        stile_abgleichen(w);
+        Ok(w)
+    }
+
+    /// GUI_TEXTAREA_STYLE(ta, stil$, an)
+    pub fn textarea_style(&mut self, h: i64, bits: u8, an: bool, jetzt: f64) -> Result<(), String> {
+        self.ta_formatiert(h, "GUI_TEXTAREA_STYLE")?;
+        let (wi, i) = Self::dec_widget(h);
+        self.stil_anwenden(wi, i, bits, Some(an), jetzt);
+        Ok(())
+    }
+
+    /// GUI_TEXTAREA_GET_STYLE$(ta): was fuer die Auswahl GEMEINSAM gilt,
+    /// ohne Auswahl der Stil, mit dem das naechste Getippte kaeme.
+    pub fn textarea_get_style(&mut self, h: i64) -> Result<String, String> {
+        let w = self.ta_formatiert(h, "GUI_TEXTAREA_GET_STYLE$")?;
+        let n = w.stile.len() as i32;
+        let (lo, hi) = (w.caret.clamp(0, n).min(w.sel_anchor.clamp(0, n)) as usize,
+                        w.caret.clamp(0, n).max(w.sel_anchor.clamp(0, n)) as usize);
+        let bits = if lo == hi { w.tipp_stil.unwrap_or_else(|| stil_vor(w, lo)) }
+                   else { w.stile[lo..hi].iter().fold(0xFF, |a, &b| a & b) };
+        Ok(crate::schnitt::stil_text(bits))
+    }
+
+    /// GUI_TEXTAREA_MARKDOWN$(ta)
+    pub fn textarea_markdown(&mut self, h: i64) -> Result<String, String> {
+        let w = self.ta_formatiert(h, "GUI_TEXTAREA_MARKDOWN$")?;
+        let chars: Vec<char> = w.text.chars().collect();
+        Ok(markdown_aus(&chars, &w.stile))
+    }
+
+    /// GUI_TEXTAREA_SET_MARKDOWN(ta, md$): wie GUI_SET_TEXT, nur geformt --
+    /// und schaltet die Formate ein, falls sie es noch nicht sind.
+    pub fn textarea_set_markdown(&mut self, h: i64, md: &str) -> Result<(), String> {
+        self.ta_wdg(h, "GUI_TEXTAREA_SET_MARKDOWN")?;
+        let (t, st) = markdown_ein(md);
+        self.set_text(h, t)?;
+        let w = self.wdg_mut(h, "GUI_TEXTAREA_SET_MARKDOWN")?;
+        w.formatiert = true;
+        w.stile = st; w.stile_text = w.text.clone(); w.tipp_stil = None;
+        Ok(())
+    }
+
+    /// Rechtsklick ins Textfeld: die Marke wandert an die Stelle -- ausser
+    /// er trifft die Auswahl, die ein Kontextmenue gleich kopieren soll.
+    fn ti_rechtsklick(&mut self, g: &Graphics, wi: usize, i: usize, mx: i32) {
+        if !self.windows[wi].widgets[i].enabled { return; }
+        let ms = self.mass(g, &self.windows[wi].widgets[i]);
+        let (ax, _, _, _) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let w = &self.windows[wi].widgets[i];
+        let chars: Vec<char> = if w.passwort { vec!['\u{2022}'; w.text.chars().count()] }
+                               else { w.text.chars().collect() };
+        let idx = Self::caret_index_at(g, &chars, mx - (ax + 5) + w.scroll, ms);
+        let w = &mut self.windows[wi].widgets[i];
+        let (lo, hi) = (w.caret.min(w.sel_anchor), w.caret.max(w.sel_anchor));
+        if !(lo != hi && idx >= lo && idx <= hi) { w.caret = idx; w.sel_anchor = idx; }
+        self.focus_widget = Some((wi, i));
+    }
+
+    fn ta_rechtsklick(&mut self, g: &Graphics, wi: usize, i: usize, mx: i32, my: i32) {
+        if !self.windows[wi].widgets[i].enabled { return; }
+        if self.ta_rand_zeile(g, wi, i, mx, my).is_some() { return; }
+        let idx = match self.ta_index_at(g, wi, i, mx, my) { Some(k) => k, None => return };
+        let w = &mut self.windows[wi].widgets[i];
+        let (lo, hi) = (w.caret.min(w.sel_anchor), w.caret.max(w.sel_anchor));
+        if lo != hi && idx >= lo && idx <= hi { self.focus_widget = Some((wi, i)); return; }
+        w.caret = idx;
+        w.sel_anchor = idx;
+        w.marken_zusatz.clear();
+        self.focus_widget = Some((wi, i));
     }
 
     fn listbox_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
@@ -17105,7 +17572,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         let (li, rs, re) = rows[ri as usize];
                         let y = ay + pad + r * lh;
                         let zeile: String = chars[rs..re].iter().collect();
-                        let breite = if wdg.spans.is_empty() {
+                        let geformt = wdg.formatiert && wdg.stile_text == wdg.text
+                            && wdg.stile.len() == chars.len()
+                            && wdg.stile[rs..re].iter().any(|&b| b != 0);
+                        let breite = if wdg.spans.is_empty() && !geformt {
                             self.wtext(g, wdg, tx0, y, zeile.clone(), fg);
                             self.wtext_width(g, wdg, &zeile)
                         } else {
@@ -17770,6 +18240,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // verdeckte er Inhalt -- ein Kaestchen ist nur check_size gross, ein
         // Ring darin waere kaum zu sehen. Ohne sichtbaren Fokus waere die
         // Tab-Navigation wertlos: man wuesste nie, wo man gerade ist.
+        // Rollbalken des Textbereichs, ueber dem Text (er liegt im Innenabstand).
+        if wdg.kind == Kind::TextArea {
+            if let Some((tx, ty, bw, th, thy, thh, _, _)) = self.ta_bar_geom(g, wi, idx) {
+                let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+                g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(self.wcol(wdg, "bg", "win_bg"), -8));
+                let aktiv = self.tabar_zug.map(|(a, b, _)| (a, b) == (wi, idx)).unwrap_or(false)
+                    || (mx >= tx - 2 && mx < tx + bw + 1 && my >= thy && my < thy + thh);
+                let rc = self.wcol(wdg, "border", "widget_border");
+                g.round_rect(tx, thy, tx + bw - 1, thy + thh - 1, 2, if aktiv { mischen(rc, self.th("accent"), 0.5) } else { rc }, true);
+            }
+        }
         if wdg.fokus_t > 0.0 && wdg.kind.fokussierbar() {
             g.rect(ax - 3, ay - 3, ax + w + 2, ay + h + 2, deckkraft(self.th("accent"), weich(wdg.fokus_t)));
         }
@@ -17798,6 +18279,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let z: Vec<char> = zeile.chars().collect();
         if z.is_empty() { return; }
         let mut farbe = vec![grund; z.len()];
+        // Inline-Formate: derselbe Lauf-Mechanismus, ein Lauf endet auch am
+        // Stilwechsel. Gezeichnet wird der Stil NACHGEBILDET auf der
+        // Grundschrift -- ein echter fetter Schnitt waere breiter, und
+        // Schreibmarke, Auswahl und Klick messen am ungeformten Text.
+        let geformt = wdg.formatiert && wdg.stile_text == wdg.text
+            && wdg.stile.len() >= zeilen_start + z.len();
+        let stil = |k: usize| -> u8 { if geformt { wdg.stile[zeilen_start + k] } else { 0 } };
         let ende = zeilen_start + z.len();
         // Die Abschnitte liegen sortiert -- ab dem ersten, der noch in die
         // Zeile hineinreicht, und nur solange er vor ihrem Ende beginnt.
@@ -17822,11 +18310,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let mut lauf = 0usize;
         while lauf < z.len() {
             let c = farbe[lauf];
+            let st = stil(lauf);
             let mut bis = lauf + 1;
-            while bis < z.len() && farbe[bis] == c { bis += 1; }
+            while bis < z.len() && farbe[bis] == c && stil(bis) == st { bis += 1; }
             let vorspann: String = z[..lauf].iter().collect();
             let px = x + self.wtext_width(g, wdg, &vorspann);
-            self.wtext(g, wdg, px, y, z[lauf..bis].iter().collect::<String>(), c);
+            let stueck: String = z[lauf..bis].iter().collect();
+            if st == 0 { self.wtext(g, wdg, px, y, stueck, c); }
+            else {
+                let (sz, basis) = (self.wsize(g, wdg), font_wahl(wdg.font, g.active_font()));
+                g.text_nachgebildet(px, y, stueck, c, basis, sz, st);
+            }
             lauf = bis;
         }
     }
@@ -19376,3 +19870,46 @@ mod tests {
     }
 }
 
+
+#[cfg(test)]
+mod formate_tests {
+    use super::{markdown_aus, markdown_ein};
+    use crate::schnitt::{DURCH, FETT, KURSIV, UNTER};
+
+    fn rund(text: &str, st: &[u8]) {
+        let z: Vec<char> = text.chars().collect();
+        let md = markdown_aus(&z, st);
+        let (t, s) = markdown_ein(&md);
+        assert_eq!(t, text, "Text ueber {md:?}");
+        assert_eq!(s, st, "Stile ueber {md:?}");
+    }
+
+    #[test]
+    fn markdown_schreibt_nur_wechsel() {
+        let z: Vec<char> = "ab cd".chars().collect();
+        assert_eq!(markdown_aus(&z, &[FETT, FETT, 0, KURSIV, KURSIV]), "**ab** *cd*");
+        assert_eq!(markdown_aus(&z, &[FETT | KURSIV; 5]), "***ab cd***");
+        assert_eq!(markdown_aus(&z, &[UNTER, UNTER, 0, DURCH, DURCH]), "<u>ab</u> ~~cd~~");
+    }
+
+    #[test]
+    fn markdown_rundweg() {
+        rund("ab cd", &[FETT, FETT | KURSIV, KURSIV, 0, FETT]);
+        rund("x", &[FETT | KURSIV | UNTER | DURCH]);
+        rund("a*b~c\\d<u>e", &[0, FETT, 0, 0, 0, 0, 0, UNTER, 0, 0, 0]);
+        rund("zwei\nzeilen", &[FETT; 11]);
+        rund("", &[]);
+        // fett endet, kursiv beginnt: ** und * stehen nebeneinander.
+        rund("ab", &[FETT, KURSIV]);
+        rund("abc", &[FETT | KURSIV, FETT, KURSIV]);
+    }
+
+    #[test]
+    fn markdown_von_hand() {
+        let (t, s) = markdown_ein("ein **fettes** und *schiefes* ~Wort~");
+        assert_eq!(t, "ein fettes und schiefes ~Wort~");
+        assert_eq!(s[4], FETT);
+        assert_eq!(s[15], KURSIV);
+        assert_eq!(s[3], 0);
+    }
+}

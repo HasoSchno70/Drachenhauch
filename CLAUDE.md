@@ -750,6 +750,48 @@ Treffertest ging ueber `popup_chain` -- beide Zeichenstellen gehen jetzt
 darueber. Tests `tests/pruef/gui_menue_bedienung.dhtest` (8; gegen den Bau
 davor fallen alle 8).
 
+**Code-Feld bequem wie die Liste** (selber Tag, Textbereich): **Doppelklick
+waehlt das Wort, Dreifachklick die Zeile** -- das gab es gar nicht
+(`Widget::klick_n/klick_zeit/klick_idx`, 0,4 s an derselben Stelle;
+`wort_um` nimmt `_` und `$` mit; `wort_zug` sperrt das Zusammenziehen beim
+Halten). **Rechtsklick setzt die Schreibmarke** (`ta_rechtsklick` ueber
+`ta_index_at`, dieselbe Rechnung wie der Klick; in der Auswahl bleibt sie,
+die Nummernspalte bleibt dem Haltepunkt). **Rollbalken** im rechten
+Innenabstand (`ta_bar_geom`, 5 px, ueber keinem Zeichen -- die Umbruchbreite
+bleibt unveraendert), gegriffen im Hover-Durchlauf VOR dem Editieren
+(`farbfeld_zug` sperrt den Druck fuer die Schreibmarke), gezogen ueber
+`Gui::tabar_zug`; `rad_stand` haelt die Ansicht gegen die Schreibmarke.
+**Weiches Rad** in Zeilenschritten (`roll_ist/roll_setze` kennen `scroll` des
+Textbereichs). Tests `tests/pruef/gui_codefeld_bedienung.dhtest` (9; die
+Klicklagen sucht die Beilage `stelle.dh` zur Laufzeit mit
+`GUI_TEXTAREA_POS_AT` -- `GUI_TEXTAREA_VIEW` zaehlt die erste Zeile ab 0).
+
+**Textfeld bequem, Textbereich mit Inline-Formaten** (selber Tag): das
+Textfeld nimmt Doppelklick (Wort), Dreifachklick (alles; im Passwortfeld
+schon der Doppelklick -- Wortgrenzen verrieten die Leerzeichen) und
+Rechtsklick (`ti_rechtsklick`, in der Auswahl bleibt sie) mit denselben
+Feldern wie der Textbereich. **Inline-Formate:** `GUI_TEXTAREA_SET(ta,
+"formatiert", 1)`, je Zeichen Stil-Bits aus `schnitt` (`Widget::stile`),
+Strg+B/I/U auf die Auswahl (alle haben es -> weg, sonst dran) oder als
+`tipp_stil` fuer das naechste Getippte (verfaellt, sobald getippt oder die
+Marke bewegt ist), `GUI_TEXTAREA_STYLE/GET_STYLE$/MARKDOWN$/SET_MARKDOWN`,
+`.dhform` `formatiert` + `markdown`. **Keiner der Textwege kennt die Bits**
+-- `stile_text` merkt, zu welchem Text sie gehoeren, und `stile_abgleichen`
+zieht sie ueber gemeinsamen Anfang/Ende nach (in `edit_textarea`,
+`textarea_insert`, `text_undo` und je Bild in `uebergaenge`); das Neue
+bekommt den Tippstil oder den Stil davor. Der Verlauf traegt die Stile mit
+(`undo: Vec<(String, i32, Vec<u8>)>`), eine Formataenderung ist ein eigener
+Schritt. **Gezeichnet nachgebildet** (`Graphics::text_nachgebildet` ->
+`Cmd::TextStil` auf der Grundschrift): ein echter fetter Schnitt waere
+breiter, und Marke, Auswahl, Klick messen am ungeformten Text. Markdown
+(`markdown_aus`/`markdown_ein`): Marken SCHALTEN um, geschrieben werden nur
+Wechsel, fett+kursiv in einem Zug (`**` gefolgt von `*` liest sich als `***`
+= beide kippen -- mit Umschalten stimmt das trotzdem), `\` fuer `* ~ \ <u>`.
+Tests `tests/pruef/gui_textfeld_formate.dhtest` (12; Gegenprobe ohne
+Klickzaehlung, ohne Rechtsklick, mit Tippstil, der nie verfaellt: genau die
+5 betroffenen fallen), Rust-Tests `formate_tests`. Getter des Texts ist
+`GUI_TEXT`, nicht `GUI_GET_TEXT`.
+
 **Text und Formular** (2026-09-04, Punkt 1 des gui-Ausbaus -- Ziel: dass Drachenhauch genannt wird, wenn jemand fragt, womit er eine Anwendung schreiben soll): `GUI_SET_ALIGN(wdg, links|mitte|rechts)` fuer Beschriftung/Knopf/Textfeld; `GUI_SET_WRAP(label, breite)` bricht an Wortgrenzen um, die HOEHE folgt dem Text -- gemessen in `umbruch_layout` (in GUI_UPDATE, weil nur dort Graphics und Schreibzugriff zusammenkommen; das Zeichnen ist `&self`); `GUI_TEXTINPUT_SET(tf, key$, wert)` mit `passwort` (Punkte statt Zeichen -- Treffertest und Rollen messen an den PUNKTEN, sonst sitzt die Schreibmarke neben dem Text), `nur_lesen`, `maxlaenge` (schneidet ab, auch beim Einfuegen), `zahlen` (1 ganz, 2 Komma; Zwischenstand `-` erlaubt, sonst liesse sich keine negative Zahl tippen); `GUI_ENTERED`/`GUI_ON_ENTER`; **Strg+Z/Y in Textfeld und Textbereich** (Anschlaege innerhalb 0,8 s = EIN Schritt; `GUI_SET_TEXT` leert den Verlauf); `GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` (Enter/ESC druecken den Knopf -- aber die Taste gehoert zuerst dem Widget mit Fokus: Knopf/Kaestchen nehmen Enter selbst, Textbereich macht einen Umbruch, Zelle in Bearbeitung ihr Ende; aus einem TEXTFELD heraus ist Enter das Abschicken; der Standard-Knopf traegt den Akzent als Rahmen). Alles in der `.dhform` (auch der Tooltip -- der fehlte dort bisher) und im Form-Designer (Inspector + Codegen). **Testfalle:** raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber KEINE Zeichen in die Zeichenwarteschlange -- Tests tippen ueber die Zwischenablage mit Strg+V, das laeuft durch dieselben Filter. Tests `tests/pruef/gui_text_formular.dhtest`, Doku `docs/module-gui.md`.
 
 **Menues** (2026-09-04, Punkt 2 des gui-Ausbaus): `GUI_MENU_ITEM(menu, label$[, kuerzel$])` / `GUI_MENU_SHORTCUT` -- Kuerzel werden als Text geschrieben (`Strg+S`, `Alt+Enter`, `F5`, `Entf`, deutsch oder englisch; `kuerzel_parsen` in gui.rs mit Rust-Tests, unbekannte Taste = Fehler beim Anlegen statt eines still stummen Kuerzels) und jedes Bild geprueft (`kuerzel_pruefen`), auch bei geschlossenem Menue -- **seit 2026-09-07 in ALLEN sichtbaren Fenstern**: zuerst im Fokus-Fenster, dann in den uebrigen von oben nach unten (Form-Designer, Anim-FSM und Notenblatt mussten sich vorher nach jedem Knopf im Nebenfenster den Fokus zurueckholen, sonst war Strg+S stumm -- dreimal derselbe Fund, dreimal zuerst vom Test gesehen); das Fokus-Fenster gewinnt bei gleichem Kuerzel, ein modales laesst nur seine eigenen zu, ein Entwurfsfenster (`GUI_WINDOW_DESIGN`) zaehlt nicht; die Modifier muessen GENAU passen, und **ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus** (ein `Entf`-Kuerzel loescht dort ein Zeichen) -- AUSSER F1..F12 (`ist_funktionstaste`, seit 2026-09-06: die IDE in Drachenhauch startete per F5 nie, weil das Code-Feld den Fokus hatte). `GUI_SUBMENU` (beliebig tief; `sub_chain` = offene Untermenues, `untermenues_folgen` oeffnet beim Ueberfahren und schliesst NICHT, wenn die Maus neben allen Popups ist -- sonst klappt es beim schraegen Hinueberfahren zu; ein Untermenue ist nie Kontextmenue, `Menu::unter`), `GUI_MENU_CHECK`/`GUI_MENU_CHECKED` (Klick oder Kuerzel kippt), `GUI_MENU_ENABLE` (gesperrt = kein Klick, kein Kuerzel), `GUI_MENU_ICON`, `GUI_MENU_TEXT`. Popup-Layout aus EINER Quelle `popup_layout` (Treffertest + Zeichnen). In der `.dhform` verschachtelt (`items` am Eintrag, `shortcut`, `checkable`/`checked`); der Form-Designer bearbeitet Menues nicht, schreibt sie aber jetzt in den GB-Code (`_gb_menus`). **Testfalle:** raylib meldet beim Lesen mancher Aufnahmedateien "Issue reading line to buffer" auf stdout, die Ereignisse kommen trotzdem an -- Tests filtern `WARNING:`-Zeilen. Tests `tests/pruef/gui_menu_ausbau.dhtest`, Beispiel `examples/129_gui_menu.dh`.

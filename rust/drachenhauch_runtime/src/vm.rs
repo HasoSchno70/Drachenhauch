@@ -6358,6 +6358,22 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_insert(gi(a, 0, "GUI_TEXTAREA_INSERT")?, &gs(a, 1, "GUI_TEXTAREA_INSERT")?, jetzt)?;
                 Value::Nil
             }
+            "gui_textarea_style" => {
+                let jetzt = self.gfx.as_ref().map(|g| g.get_time()).unwrap_or(0.0);
+                let bits = crate::schnitt::stil_parsen(&gs(a, 1, "GUI_TEXTAREA_STYLE")?)
+                    .map_err(|e| format!("GUI_TEXTAREA_STYLE: {}", e))?;
+                let an = if a.len() > 2 { gbool(a, 2, "GUI_TEXTAREA_STYLE")? } else { true };
+                self.gui.textarea_style(gi(a, 0, "GUI_TEXTAREA_STYLE")?, bits, an, jetzt)?;
+                Value::Nil
+            }
+            "gui_textarea_get_style$" | "gui_textarea_get_style" =>
+                Value::Str(self.gui.textarea_get_style(gi(a, 0, "GUI_TEXTAREA_GET_STYLE$")?)?.into()),
+            "gui_textarea_markdown$" | "gui_textarea_markdown" =>
+                Value::Str(self.gui.textarea_markdown(gi(a, 0, "GUI_TEXTAREA_MARKDOWN$")?)?.into()),
+            "gui_textarea_set_markdown" => {
+                self.gui.textarea_set_markdown(gi(a, 0, "GUI_TEXTAREA_SET_MARKDOWN")?, &gs(a, 1, "GUI_TEXTAREA_SET_MARKDOWN")?)?;
+                Value::Nil
+            }
             "gui_textarea_find" => {
                 let ab_zeile = if a.len() > 2 { gi(a, 2, "GUI_TEXTAREA_FIND")? } else { 1 };
                 let ab_spalte = if a.len() > 3 { gi(a, 3, "GUI_TEXTAREA_FIND")? } else { 1 };

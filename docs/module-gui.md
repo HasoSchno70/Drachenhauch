@@ -3038,6 +3038,69 @@ WHILE NOT QUITREQUESTED()
 WEND
 ```
 
+## Textbereich bedienen wie eine Liste
+
+Seit 2026-09-23 kann der Textbereich, was man von jedem Editor erwartet:
+
+* **Doppelklick** wählt das Wort (Buchstaben, Ziffern, `_`, `$` —
+  Drachenhauch-Namen wie `name$` bleiben ganz), **Dreifachklick** die Zeile
+  samt Umbruch. Ziehen danach zieht die Auswahl nicht wieder zusammen.
+* **Rechtsklick** setzt die Schreibmarke an die Stelle, damit ein
+  Kontextmenü („Ausschneiden“, „Zur Definition“) sich auf sie bezieht. Trifft
+  er die bestehende Auswahl, bleibt sie. Die Nummernspalte gehört weiter dem
+  Haltepunkt (`GUI_TEXTAREA_GUTTER_CLICKED`).
+* **Rollbalken** rechts im Innenabstand, sobald der Text nicht hineinpasst:
+  Griff ziehen, Klick in die Rinne springt dorthin. Er liegt über keinem
+  Zeichen, und die Schreibmarke zieht die Ansicht danach nicht zurück.
+* Das **Mausrad** rollt weich (drei Zeilen je Schritt, siehe
+  [Übergänge](#übergänge)).
+
+Das einzeilige **Textfeld** (`GUI_TEXTINPUT`) kann dasselbe mit der Maus:
+Doppelklick wählt das Wort, Dreifachklick alles, ein Rechtsklick setzt die
+Marke und lässt eine getroffene Auswahl stehen. Im Passwortfeld wählt schon
+der Doppelklick alles — Wortgrenzen verrieten, wo ein Leerzeichen steht.
+
+## Fett, kursiv, unterstrichen im Textbereich
+
+Ein Textbereich kann seine Zeichen einzeln formen — für Notizen, Briefe,
+Beschreibungen. Überschriften und Listen gehören nicht dazu; wer die will,
+zeigt den Text mit `GUI_RICHTEXT` an.
+
+| Befehl | Wirkung |
+|---|---|
+| `GUI_TEXTAREA_SET(ta, "formatiert", 1)` | schaltet die Formate ein (0 = aus, die Formate fallen weg) |
+| `GUI_TEXTAREA_STYLE(ta, stil$[, an])` | Stil auf die Auswahl setzen (`an` = TRUE, Vorgabe) oder wegnehmen; ohne Auswahl gilt er für das nächste Getippte |
+| `GUI_TEXTAREA_GET_STYLE$(ta)` | was für die ganze Auswahl gilt, ohne Auswahl der Stil des nächsten Getippten (`"normal"`, `"fett+kursiv"` ...) |
+| `GUI_TEXTAREA_MARKDOWN$(ta)` | der Text samt Formaten als Markdown |
+| `GUI_TEXTAREA_SET_MARKDOWN(ta, md$)` | Text aus Markdown setzen (schaltet die Formate ein) |
+
+Die Stil-Wörter sind die von `TEXT_STYLE`: `fett`, `kursiv`,
+`unterstrichen`, `durchgestrichen`, verbunden mit `+`.
+
+Mit der Tastatur: **Strg+B** fett, **Strg+I** kursiv, **Strg+U**
+unterstrichen — auf die Auswahl (tragen alle Zeichen den Stil schon, geht er
+weg), ohne Auswahl für das, was man als Nächstes tippt, bis die Marke
+woanders hinwandert. Getippter Text setzt sonst den Stil des Zeichens davor
+fort. Eine Formatänderung ist ein eigener Schritt für Strg+Z/Strg+Y. Hat ein
+Menü dieselbe Taste als Kürzel, gewinnt das Menü.
+
+Das Markdown: `**fett**`, `*kursiv*`, `***beides***`, `~~durch~~`,
+`<u>unter</u>`; ein Rückstrich nimmt das nächste Zeichen wörtlich (`\*`).
+`GUI_TEXT` liefert weiter den schlichten Text, `GUI_SET_TEXT` setzt
+ungeformt. In der `.dhform` steht ein formatierter Textbereich mit
+`formatiert` und `markdown`.
+
+```basic
+GUI_TEXTAREA_SET(notiz, "formatiert", 1)
+GUI_TEXTAREA_SET_MARKDOWN(notiz, "Ein **wichtiger** Punkt")
+' ... der Nutzer schreibt und formt ...
+WRITEALL("notiz.md", GUI_TEXTAREA_MARKDOWN$(notiz))
+```
+
+Gezeichnet werden die Formate **nachgebildet** auf der Schrift des Feldes
+(zweiter Zug für fett, geschert für kursiv) — ein echter fetter Schnitt wäre
+breiter, und Schreibmarke, Auswahl und Klick messen am ungeformten Text.
+
 ## Das `TEXTAREA` als Code-Feld
 
 Ein mehrzeiliges Textfeld wird mit vier Einstellungen und einer Einfärbung zu

@@ -5007,6 +5007,30 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_STYLE",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_STYLE(ta, stil$[, an])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_GET_STYLE$",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_GET_STYLE$(ta)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_MARKDOWN$",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_MARKDOWN$(ta)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_SET_MARKDOWN",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SET_MARKDOWN(ta, md$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_MARKS",
    "kind": "core",
    "signature": "GUI_TEXTAREA_MARKS(ta, zeilen, farben)",

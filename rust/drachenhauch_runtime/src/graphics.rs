@@ -3443,6 +3443,19 @@ impl Graphics {
         self.text_emit(x, y, s, size.max(1), c, font, sp, stil);
     }
 
+    /// Text mit NACHGEBILDETEM Stil, ohne einen echten Schnitt zu suchen --
+    /// fuer den formatierten Textbereich: dort misst die Schreibmarke am
+    /// ungeformten Text, und ein fetter Schnitt waere breiter.
+    #[allow(clippy::too_many_arguments)]
+    pub fn text_nachgebildet(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
+        if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
+        let (x, y) = self.w2s(x, y);
+        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() { FONT_AUSWEICH } else { font };
+        self.glyphen_pruefen(font, &s);
+        let sp = self.text_spacing;
+        self.emit(Cmd::TextStil(x, y, s, size.max(1), col(c), font, sp, stil));
+    }
+
     /// Laedt einen TTF/OTF-Font in der gegebenen Basis-Groesse -> FONT-Handle.
     ///
     /// Mit erweitertem Zeichensatz: raylib backt sonst nur die 95 ASCII-
