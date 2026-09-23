@@ -47,6 +47,12 @@ impl<'a> Leinwand<'a> {
     /// multipliziert. Echtes "ueber" (Porter-Duff) -- auch wenn das ZIEL
     /// halbdurchsichtig ist. raylibs `ImageDraw` mischt dort falsch: zwei
     /// Punkte mit Deckkraft 60 in Orange ergaben Rot 0x01.
+    /// Alle Punkte ersetzen (gleich gross, RGBA). Passt die Laenge nicht,
+    /// bleibt das Bild, wie es ist -- ein halbes Bild waere schlimmer.
+    pub fn punkte_kopieren(&mut self, src: &[u8]) {
+        if src.len() == self.px.len() { self.px.copy_from_slice(src); }
+    }
+
     pub fn bild_ueber(&mut self, src: &[u8], sw: i32, sh: i32,
                       q: (i32, i32, i32, i32), x: i32, y: i32, tint: Farbe) {
         let (qx, qy, qb, qh) = q;

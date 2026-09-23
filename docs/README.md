@@ -30,6 +30,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `db` | SQLite-Datenbank: CREATE/INSERT/SELECT, Transaktionen | [module-db.md](module-db.md) |
 | `tween` | Werteinterpolation über Zeit (Animationen, Easings) | [module-tween.md](module-tween.md) |
 | `zeit` | Datum und Uhrzeit als Zahl: `ZEIT_PARSE`/`ZEIT_PLUS`/`ZEIT_DIFF`, Anzeige über `ZEIT_FORMAT$` | [module-zeit.md](module-zeit.md) |
+| `video` | Videos abspielen: MP4 mit H.264 in ein `IMAGE` (`VIDEO_LOAD`/`VIDEO_PLAY`/`VIDEO_DRAW`), ohne Ton | [module-video.md](module-video.md) |
 | `timer` | Geplante Aktionen: `TIMER_AFTER`/`TIMER_EVERY` mit FUNCREF-Callbacks (`TIMER_UPDATE` pro Frame) + `COOLDOWN`-Ratenbegrenzer | [module-timer.md](module-timer.md) |
 | `imgfx` | Bild-Effekte: Scale, Rotate, Flip, Tint, Copy | [module-imgfx.md](module-imgfx.md) |
 | `particles` | Partikel-System mit Velocity, Gravity, Lifetime | [module-particles.md](module-particles.md) |

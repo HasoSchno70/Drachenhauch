@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1958,
+ "count": 1977,
  "builtins": [
   {
    "name": "ABS",
@@ -11299,6 +11299,120 @@
    "kind": "core",
    "signature": "VERSION$()",
    "module": "core"
+  },
+  {
+   "name": "VIDEO_LOAD",
+   "kind": "module",
+   "signature": "VIDEO_LOAD(pfad$) AS VIDEO",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_PLAY",
+   "kind": "module",
+   "signature": "VIDEO_PLAY(video)",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_PAUSE",
+   "kind": "module",
+   "signature": "VIDEO_PAUSE(video)",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_STOP",
+   "kind": "module",
+   "signature": "VIDEO_STOP(video)",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_SEEK",
+   "kind": "module",
+   "signature": "VIDEO_SEEK(video, sekunden)",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_LOOP",
+   "kind": "module",
+   "signature": "VIDEO_LOOP(video, an)",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_UPDATE",
+   "kind": "module",
+   "signature": "VIDEO_UPDATE(video)",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_DRAW",
+   "kind": "module",
+   "signature": "VIDEO_DRAW(video, x, y [, breite, hoehe])",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_PLAYING",
+   "kind": "module",
+   "signature": "VIDEO_PLAYING(video) AS BOOLEAN",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_DONE",
+   "kind": "module",
+   "signature": "VIDEO_DONE(video) AS BOOLEAN",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_POSITION",
+   "kind": "module",
+   "signature": "VIDEO_POSITION(video) AS FLOAT",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_DURATION",
+   "kind": "module",
+   "signature": "VIDEO_DURATION(video) AS FLOAT",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_WIDTH",
+   "kind": "module",
+   "signature": "VIDEO_WIDTH(video) AS INTEGER",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_HEIGHT",
+   "kind": "module",
+   "signature": "VIDEO_HEIGHT(video) AS INTEGER",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_FRAMES",
+   "kind": "module",
+   "signature": "VIDEO_FRAMES(video) AS INTEGER",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_FRAME",
+   "kind": "module",
+   "signature": "VIDEO_FRAME(video) AS INTEGER",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_FPS",
+   "kind": "module",
+   "signature": "VIDEO_FPS(video) AS FLOAT",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_IMAGE",
+   "kind": "module",
+   "signature": "VIDEO_IMAGE(video) AS IMAGE",
+   "module": "video"
+  },
+  {
+   "name": "VIDEO_FREE",
+   "kind": "module",
+   "signature": "VIDEO_FREE(video)",
+   "module": "video"
   },
   {
    "name": "WAITKEY",

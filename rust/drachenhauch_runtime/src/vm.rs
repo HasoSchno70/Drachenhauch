@@ -532,6 +532,21 @@ fn ui_lighten(color: i64, factor: f64) -> i64 {
     (r << 16) | (g << 8) | b
 }
 
+/// Ein geladenes Video: der Decoder, das IMAGE, in das jedes neue Bild geht,
+/// und die Uhr. `stand` = Bildzaehler der Grafik beim letzten Weiterstellen,
+/// `geschrieben` = Nummer des Bildes, das im IMAGE steht.
+#[cfg(all(feature = "video", feature = "graphics"))]
+struct VideoZustand {
+    video: crate::video::Video,
+    bild: i64,
+    zeit: f64,
+    spielt: bool,
+    schleife: bool,
+    fertig: bool,
+    stand: Option<u64>,
+    geschrieben: i64,
+}
+
 // --- Debugger (Stufe B, `dhrt debug`) ---------------------------------------
 #[derive(PartialEq, Clone, Copy)]
 enum StepMode { Run, Over, Into, Out }
@@ -821,6 +836,9 @@ pub struct Vm<'p> {
     // Hardware/IoT-Handles (INTEGER-Index in VM-Vecs).
     #[cfg(feature = "midi")]
     midi_ins: Vec<Option<crate::midi::Eingang>>,
+    // Modul video: je Griff ein Video samt seinem IMAGE und der Uhr.
+    #[cfg(all(feature = "video", feature = "graphics"))]
+    videos: Vec<Option<VideoZustand>>,
     #[cfg(feature = "midi")]
     midi_outs: Vec<Option<crate::midi::Ausgang>>,
     #[cfg(feature = "serial")]
@@ -954,6 +972,8 @@ impl<'p> Vm<'p> {
             http_abrufe: crate::html::Abrufe::default(),
             #[cfg(feature = "midi")]
             midi_ins: Vec::new(),
+            #[cfg(all(feature = "video", feature = "graphics"))]
+            videos: Vec::new(),
             #[cfg(feature = "midi")]
             midi_outs: Vec::new(),
             #[cfg(feature = "serial")]
@@ -2524,6 +2544,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_usb(name, bargs)? { v }
                         else if let Some(v) = self.try_wifi(name, bargs)? { v }
                         else if let Some(v) = self.try_bt(name, bargs)? { v }
+                        else if let Some(v) = self.try_video(name, bargs)? { v }
                         else if let Some(v) = self.try_gui(name, bargs)? { v }
                         else if let Some(v) = self.try_graphics(name, bargs)? { v }
                         else {
@@ -4310,6 +4331,179 @@ impl<'p> Vm<'p> {
         { return self.try_midi_impl(name, a); }
         #[allow(unreachable_code)]
         { let _ = (name, a); Ok(None) }
+    }
+
+    // ===================================================================
+    // Modul video (Feature `video` + Grafik): MP4/H.264 in ein IMAGE
+    // ===================================================================
+    fn try_video(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("video_") { return Ok(None); }
+        #[cfg(all(feature = "video", feature = "graphics"))]
+        { return self.try_video_impl(name, a); }
+        // Ohne das Feature: unbekannter Befehl -- "im Rust-Kern noch nicht
+        // verfuegbar", wie jeder andere, den dieser Bau nicht hat.
+        #[allow(unreachable_code)]
+        { let _ = a; Ok(None) }
+    }
+
+    #[cfg(all(feature = "video", feature = "graphics"))]
+    fn video_z(&mut self, a: &[Value], fn_: &str) -> R<usize> {
+        let i = bi_int(a, 0, fn_)?;
+        match self.videos.get(i as usize) {
+            Some(Some(_)) if i >= 0 => Ok(i as usize),
+            _ => Err(format!("{}: ungueltiges oder freigegebenes VIDEO {}", fn_, i)),
+        }
+    }
+
+    /// Das Bild zur Uhrzeit des Videos herstellen und ins IMAGE schreiben,
+    /// wenn es ein neues ist.
+    #[cfg(all(feature = "video", feature = "graphics"))]
+    fn video_bild_zeigen(&mut self, i: usize) -> R<()> {
+        let z = self.videos[i].as_mut().unwrap();
+        // Ein Hauch Zugabe: 120 mal 1/60 s aufsummiert ist knapp UNTER 2,0,
+        // und ohne sie stuende nach genau zwei Sekunden noch das Bild davor.
+        let k = ((z.zeit * z.video.fps + 1e-6) as i64).clamp(0, z.video.bilder as i64 - 1) as u32;
+        z.video.bild(k)?;
+        if z.video.bild_nr != z.geschrieben {
+            z.geschrieben = z.video.bild_nr;
+            let bild = z.bild;
+            let px = std::mem::take(&mut z.video.rgba);
+            let r = match self.gfx.as_mut() { Some(g) => g.image_punkte_setzen(bild, &px), None => Ok(()) };
+            self.videos[i].as_mut().unwrap().video.rgba = px;
+            r?;
+        }
+        Ok(())
+    }
+
+    /// Die Uhr weiterstellen -- hoechstens einmal je gezeigtem Bild, auch wenn
+    /// das Programm VIDEO_UPDATE und VIDEO_DRAW beide ruft. Die Zeit kommt
+    /// aus DELTA(): ohne Fenster (Tests) ist das fest 1/60 s, das Video
+    /// laeuft dort also Bild fuer Bild gleich ab.
+    #[cfg(all(feature = "video", feature = "graphics"))]
+    fn video_weiter(&mut self, i: usize) -> R<()> {
+        let (zaehler, dt) = match self.gfx.as_ref() { Some(g) => (g.bild_zaehler(), g.delta()), None => (0, 0.0) };
+        let z = self.videos[i].as_mut().unwrap();
+        if z.stand == Some(zaehler) { return Ok(()); }
+        z.stand = Some(zaehler);
+        if z.spielt {
+            z.zeit += dt;
+            if z.zeit >= z.video.dauer {
+                if z.schleife && z.video.dauer > 0.0 {
+                    z.zeit %= z.video.dauer;
+                } else {
+                    // Am Ende steht das letzte Bild -- ein Vorspann, der
+                    // danach schwarz wuerde, blitzte beim Uebergang.
+                    z.zeit = z.video.dauer;
+                    z.spielt = false;
+                    z.fertig = true;
+                }
+            }
+        }
+        self.video_bild_zeigen(i)
+    }
+
+    #[cfg(all(feature = "video", feature = "graphics"))]
+    fn try_video_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        let v = match name {
+            "video_load" => {
+                let pfad = bi_str(a, 0, "VIDEO_LOAD")?.to_string();
+                if !std::path::Path::new(&pfad).exists() {
+                    return Err(format!("VIDEO_LOAD: Datei '{}' nicht gefunden", pfad));
+                }
+                let video = crate::video::Video::oeffnen(&pfad)?;
+                if self.gfx.is_none() {
+                    self.gfx = Some(crate::graphics::Graphics::new_headless()
+                        .map_err(|e| format!("VIDEO_LOAD: {}", e))?);
+                }
+                let g = self.gfx.as_mut().unwrap();
+                let bild = g.image_new(video.breite as i32, video.hoehe as i32, Some(0))?;
+                g.image_punkte_setzen(bild, &video.rgba)?;
+                let geschrieben = video.bild_nr;
+                self.videos.push(Some(VideoZustand {
+                    video, bild, zeit: 0.0, spielt: false, schleife: false, fertig: false,
+                    stand: None, geschrieben,
+                }));
+                Value::Int((self.videos.len() - 1) as i64)
+            }
+            "video_play" => {
+                let i = self.video_z(a, "VIDEO_PLAY")?;
+                let z = self.videos[i].as_mut().unwrap();
+                // Ein zu Ende gelaufenes Video beginnt von vorn.
+                if z.fertig { z.zeit = 0.0; z.fertig = false; }
+                z.spielt = true;
+                // Die Uhr laeuft ab dem NAECHSTEN Bild -- sonst zaehlte die
+                // Zeit vor dem Start mit.
+                z.stand = self.gfx.as_ref().map(|g| g.bild_zaehler());
+                Value::Nil
+            }
+            "video_pause" => {
+                let i = self.video_z(a, "VIDEO_PAUSE")?;
+                self.videos[i].as_mut().unwrap().spielt = false;
+                Value::Nil
+            }
+            "video_stop" => {
+                let i = self.video_z(a, "VIDEO_STOP")?;
+                let z = self.videos[i].as_mut().unwrap();
+                z.spielt = false; z.fertig = false; z.zeit = 0.0;
+                self.video_bild_zeigen(i)?;
+                Value::Nil
+            }
+            "video_seek" => {
+                let i = self.video_z(a, "VIDEO_SEEK")?;
+                let t = bi_num(a, 1, "VIDEO_SEEK")?;
+                let z = self.videos[i].as_mut().unwrap();
+                z.zeit = t.clamp(0.0, z.video.dauer);
+                z.fertig = false;
+                self.video_bild_zeigen(i)?;
+                Value::Nil
+            }
+            "video_loop" => {
+                let i = self.video_z(a, "VIDEO_LOOP")?;
+                let an = match a.get(1) { Some(Value::Bool(b)) => *b, Some(Value::Int(n)) => *n != 0,
+                    _ => return Err("VIDEO_LOOP: erwartet (video, an)".into()) };
+                self.videos[i].as_mut().unwrap().schleife = an;
+                Value::Nil
+            }
+            "video_update" => {
+                let i = self.video_z(a, "VIDEO_UPDATE")?;
+                self.video_weiter(i)?;
+                Value::Nil
+            }
+            "video_draw" => {
+                let i = self.video_z(a, "VIDEO_DRAW")?;
+                if !(a.len() == 3 || a.len() == 5) { return Err("VIDEO_DRAW: erwartet (video, x, y [, breite, hoehe])".into()); }
+                let x = bi_int(a, 1, "VIDEO_DRAW")? as i32;
+                let y = bi_int(a, 2, "VIDEO_DRAW")? as i32;
+                self.video_weiter(i)?;
+                let z = self.videos[i].as_ref().unwrap();
+                let (w, h) = if a.len() == 5 { (bi_int(a, 3, "VIDEO_DRAW")? as i32, bi_int(a, 4, "VIDEO_DRAW")? as i32) }
+                             else { (z.video.breite as i32, z.video.hoehe as i32) };
+                let bild = z.bild;
+                match self.gfx.as_mut() {
+                    Some(g) if g.schirm_bereit() => g.draw_image_rect(bild, x, y, w, h),
+                    _ => return Err("VIDEO_DRAW: es gibt noch kein Fenster -- vor dem ersten Zeichenbefehl SCREEN(breite, hoehe, \"Titel\") aufrufen".into()),
+                }
+                Value::Nil
+            }
+            "video_playing" => { let i = self.video_z(a, "VIDEO_PLAYING")?; Value::Bool(self.videos[i].as_ref().unwrap().spielt) }
+            "video_done" => { let i = self.video_z(a, "VIDEO_DONE")?; Value::Bool(self.videos[i].as_ref().unwrap().fertig) }
+            "video_position" => { let i = self.video_z(a, "VIDEO_POSITION")?; Value::Float(self.videos[i].as_ref().unwrap().zeit) }
+            "video_duration" => { let i = self.video_z(a, "VIDEO_DURATION")?; Value::Float(self.videos[i].as_ref().unwrap().video.dauer) }
+            "video_width" => { let i = self.video_z(a, "VIDEO_WIDTH")?; Value::Int(self.videos[i].as_ref().unwrap().video.breite as i64) }
+            "video_height" => { let i = self.video_z(a, "VIDEO_HEIGHT")?; Value::Int(self.videos[i].as_ref().unwrap().video.hoehe as i64) }
+            "video_frames" => { let i = self.video_z(a, "VIDEO_FRAMES")?; Value::Int(self.videos[i].as_ref().unwrap().video.bilder as i64) }
+            "video_frame" => { let i = self.video_z(a, "VIDEO_FRAME")?; Value::Int(self.videos[i].as_ref().unwrap().geschrieben) }
+            "video_fps" => { let i = self.video_z(a, "VIDEO_FPS")?; Value::Float(self.videos[i].as_ref().unwrap().video.fps) }
+            "video_image" => { let i = self.video_z(a, "VIDEO_IMAGE")?; Value::Int(self.videos[i].as_ref().unwrap().bild) }
+            "video_free" => {
+                let i = self.video_z(a, "VIDEO_FREE")?;
+                let z = self.videos[i].take().unwrap();
+                if let Some(g) = self.gfx.as_mut() { let _ = g.image_free(z.bild); }
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
     }
 
     #[cfg(feature = "midi")]

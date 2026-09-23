@@ -1,0 +1,154 @@
+' Modul video (VIDEO_*, 2026-09-23): MP4 mit H.264, dekodiert von openh264.
+' Das Video ist der Vorspann der IDE (daten/video/vorspann.mp4: 1280x720,
+' 240 Bilder, 24 fps, 10 s, ohne Ton). Ohne Fenster laeuft DELTA fest mit
+' 1/60 s -- das Video steht darum nach n Bildern genau bei n/60 Sekunden.
+' Ein Bau ohne das Feature `video` kennt die Befehle nicht; der Laeufer
+' ueberspringt die Faelle dann (ohne Grafik) wie jeden Grafikbefehl.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== eigenschaften des videos
+IMPORT "video"
+DIM v AS VIDEO : v = VIDEO_LOAD(ARG$(0))
+PRINT VIDEO_WIDTH(v); "x"; VIDEO_HEIGHT(v); " "; VIDEO_FRAMES(v); " "; VIDEO_FPS(v); " "; VIDEO_DURATION(v)
+PRINT VIDEO_FRAME(v); " "; VIDEO_POSITION(v); " "; VIDEO_PLAYING(v); " "; VIDEO_DONE(v)
+--- argumente
+{sammlung}/../../daten/video/vorspann.mp4
+--- erwartet
+1280x720 240 24.0 10.0
+0 0.0 FALSE FALSE
+
+=== die uhr laeuft mit den bildern
+' 120 Bilder zu 1/60 s = 2 s = Bild 48. Das erste Bild nach VIDEO_PLAY
+' zaehlt noch nicht -- die Uhr laeuft ab dem naechsten.
+IMPORT "video"
+SCREEN(320, 180, "V", 1)
+DIM v AS VIDEO : v = VIDEO_LOAD(ARG$(0))
+VIDEO_PLAY(v)
+DIM n AS INTEGER
+FOR n = 1 TO 121
+    CLS(0) : VIDEO_DRAW(v, 0, 0, 320, 180) : FLIP()
+NEXT
+PRINT VIDEO_FRAME(v); " "; INT(VIDEO_POSITION(v) * 60 + 0.5); " "; VIDEO_PLAYING(v)
+--- argumente
+{sammlung}/../../daten/video/vorspann.mp4
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+48 120 TRUE
+
+=== zu ende steht das letzte bild und es spielt nicht mehr
+IMPORT "video"
+SCREEN(320, 180, "V", 1)
+DIM v AS VIDEO : v = VIDEO_LOAD(ARG$(0))
+VIDEO_PLAY(v)
+DIM n AS INTEGER
+FOR n = 1 TO 700
+    VIDEO_UPDATE(v) : FLIP()
+NEXT
+PRINT VIDEO_FRAME(v); " "; VIDEO_POSITION(v); " "; VIDEO_PLAYING(v); " "; VIDEO_DONE(v)
+' Noch einmal PLAY beginnt von vorn.
+VIDEO_PLAY(v)
+PRINT VIDEO_POSITION(v); " "; VIDEO_DONE(v)
+--- argumente
+{sammlung}/../../daten/video/vorspann.mp4
+--- umgebung
+DHRT_FRAMES=800
+--- erwartet
+239 10.0 FALSE TRUE
+0.0 FALSE
+
+=== in der schleife beginnt es von vorn
+IMPORT "video"
+SCREEN(320, 180, "V", 1)
+DIM v AS VIDEO : v = VIDEO_LOAD(ARG$(0))
+VIDEO_LOOP(v, TRUE)
+VIDEO_PLAY(v)
+DIM n AS INTEGER
+FOR n = 1 TO 661
+    VIDEO_UPDATE(v) : FLIP()
+NEXT
+' 660 Bilder = 11 s, in der Schleife also 1 s = Bild 24.
+PRINT VIDEO_FRAME(v); " "; VIDEO_PLAYING(v); " "; VIDEO_DONE(v)
+--- argumente
+{sammlung}/../../daten/video/vorspann.mp4
+--- umgebung
+DHRT_FRAMES=800
+--- erwartet
+24 TRUE FALSE
+
+=== springen anhalten und zurueck
+IMPORT "video"
+DIM v AS VIDEO : v = VIDEO_LOAD(ARG$(0))
+VIDEO_SEEK(v, 5.0)
+PRINT "sprung "; VIDEO_FRAME(v)
+VIDEO_SEEK(v, 1.0)
+PRINT "zurueck "; VIDEO_FRAME(v)
+VIDEO_SEEK(v, 99.0)
+PRINT "hinter das ende "; VIDEO_FRAME(v); " "; VIDEO_POSITION(v)
+VIDEO_STOP(v)
+PRINT "stopp "; VIDEO_FRAME(v); " "; VIDEO_PLAYING(v)
+--- argumente
+{sammlung}/../../daten/video/vorspann.mp4
+--- erwartet
+sprung 120
+zurueck 24
+hinter das ende 239 10.0
+stopp 0 FALSE
+
+=== das bild steht im image und aendert sich
+' Die Mitte des Bildes nach 0 und nach 5 Sekunden -- das Video beginnt mit
+' einem Tunnel, dessen Mitte schwarz ist, und endet beim Drachen.
+IMPORT "video"
+DIM v AS VIDEO : v = VIDEO_LOAD(ARG$(0))
+DIM b AS IMAGE : b = VIDEO_IMAGE(v)
+DIM vorher AS INTEGER : vorher = GETPIXEL(b, 640, 360)
+VIDEO_SEEK(v, 5.0)
+DIM nachher AS INTEGER : nachher = GETPIXEL(b, 640, 360)
+PRINT "anders "; vorher <> nachher
+PRINT "breite "; IMAGEWIDTH(b)
+--- argumente
+{sammlung}/../../daten/video/vorspann.mp4
+--- erwartet
+anders TRUE
+breite 1280
+
+=== gezeichnet steht es im fenster
+IMPORT "video"
+SCREEN(320, 180, "V", 1)
+DIM v AS VIDEO : v = VIDEO_LOAD(ARG$(0))
+VIDEO_SEEK(v, 5.0)
+DIM n AS INTEGER
+FOR n = 1 TO 3
+    CLS(&HFF00FF) : VIDEO_DRAW(v, 0, 0, 320, 180) : FLIP()
+NEXT
+--- argumente
+{sammlung}/../../daten/video/vorspann.mp4
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+10 10 nicht #FF00FF +-30
+310 170 nicht #FF00FF +-30
+
+=== fehler im klartext
+IMPORT "video"
+TRY
+    DIM a AS VIDEO : a = VIDEO_LOAD("gibtsnicht.mp4")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM b AS VIDEO : b = VIDEO_LOAD("kein.mp4")
+CATCH e
+    PRINT INSTR(e, "'kein.mp4' ist kein lesbares MP4") >= 0
+END TRY
+TRY
+    VIDEO_PLAY(7)
+CATCH e
+    PRINT e
+END TRY
+--- datei kein.mp4
+das ist kein Video
+--- erwartet
+VIDEO_LOAD: Datei 'gibtsnicht.mp4' nicht gefunden
+TRUE
+VIDEO_PLAY: ungueltiges oder freigegebenes VIDEO 7

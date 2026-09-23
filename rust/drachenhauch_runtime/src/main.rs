@@ -86,6 +86,8 @@ mod bt;
 // Frequenz) brauchen kein Geraet und sollen in jedem Bau stehen. Nur der
 // Geraeteteil in der Datei haengt am Feature.
 mod midi;
+#[cfg(feature = "video")]
+mod video;
 #[cfg(feature = "serial")]
 mod serial;
 #[cfg(feature = "serial")]

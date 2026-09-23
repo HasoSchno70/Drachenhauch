@@ -117,6 +117,11 @@ xmrsplayer = { version = "0.13", optional = true }
 # Desktop-GUI -> ans graphics-Feature gekoppelt. Auf Windows pure-Rust (windows-sys),
 # keine C-Toolchain.
 rfd = { version = "0.14", optional = true }
+# Video (Modul `video`, src/video.rs): MP4-Container in reinem Rust, H.264
+# ueber Ciscos openh264, beim Bau aus dem Quelltext uebersetzt -- beim Nutzer
+# muss nichts installiert sein. Auf dem Desktop immer dabei (build_runtime.py).
+openh264 = { version = "0.9", optional = true }
+mp4 = { version = "0.14", optional = true }
 # Barrierefreiheit (docs/entwurf-barrierefreiheit.md, Weg C): das gui-Modul
 # schiebt seinen Widget-Baum an die Schnittstelle des Systems (Windows: UI
 # Automation), damit Bildschirmleser, Lupe und Sprachsteuerung ihn sehen.
@@ -177,6 +182,7 @@ a11y = ["dep:accesskit", "dep:accesskit_windows", "dep:accesskit_macos", "dep:ac
 # die cpals WebAudio-Host nicht mehr uebersetzt. Auf dem Desktop immer mit
 # dabei (build_runtime.py), im WASM-Build weggelassen.
 dialogs = ["dep:rfd"]
+video = ["dep:openh264", "dep:mp4"]
 db = ["dep:rusqlite"]
 net = []                       # nur std::net -- Gate dient dem Opt-out
 http = ["dep:ureq"]
@@ -187,7 +193,7 @@ midi = ["dep:midir"]
 wifi = []                      # nur std::process (netsh) -- Gate fuer Opt-out
 bt = ["dep:btleplug", "dep:tokio", "dep:futures"]
 hardware = ["serial", "usb", "wifi", "bt", "midi"]
-full = ["graphics", "dialogs", "db", "net", "http", "smtp", "hardware"]
+full = ["graphics", "dialogs", "video", "db", "net", "http", "smtp", "hardware"]
 
 [profile.release]
 opt-level = 3

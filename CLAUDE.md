@@ -4053,6 +4053,27 @@ der Willkommensseite statt des Titels als Text (vorab auf 240x112 skaliert,
 der Satz rechts daneben, alles ab den Knoepfen bleibt an seiner Stelle); ohne
 die Dateien bleibt es beim Text. Tests `tests/pruef/werkzeug_ide_schriftzug.dhtest`
 (3) und zwei Zeilen in `werkzeug_paket.dhtest`.
+**Video und der Vorspann der IDE (2026-09-23, Wunsch des Nutzers):** neues
+Modul `video` (Feature `video`, auf dem Desktop immer dabei) -- MP4 ueber die
+Crate `mp4` (reines Rust), H.264 ueber `openh264` 0.9 (Ciscos Decoder, beim
+Bau aus dem Quelltext uebersetzt). `src/video.rs` kennt kein Fenster und
+liefert RGBA; die VM (`try_video`, `VideoZustand`) schreibt jedes neue Bild
+per `image_punkte_setzen` in ein gewoehnliches IMAGE (hochgeladen beim FLIP).
+Die Uhr geht mit `DELTA()`, hoechstens einmal je Bild weiter (`bild_zaehler`),
+auch wenn DRAW und UPDATE beide gerufen werden; am Ende bleibt das letzte Bild
+stehen. **Falle:** openh264 zieht per Vorgabe nach jedem Paket ein Bild heraus
+(`Flush::Flush`) -- bei einem High-Profile-Video mit acht Slices je Bild kam
+nach neun Bildern "out of memory" (dsOutOfMemory), danach nichts mehr; mit
+`Flush::NoFlush` und `flush_remaining()` am Ende laufen alle 240. Und 120 mal
+1/60 s aufsummiert liegt knapp unter 2,0 -- die Bildnummer bekommt 1e-6
+Zugabe. Kein Ton, nur H.264. Die IDE spielt `daten/video/vorspann.mp4` vor
+allem anderen (Taste/Klick ueberspringt, Kreuz beendet, Einstellung
+`vorspann`); ein Testlauf mit `DHRT_FRAMES` zeigt ihn nur mit
+`DH_IDE_VORSPANN=1`. Installer und Pakete nehmen `daten/video` mit. Tests
+`tests/pruef/video.dhtest` (8), `tests/pruef/werkzeug_ide_vorspann.dhtest` (4;
+mit der Maus -- `KEY_ANY_HIT` blendet eingespielte Tasten aus). Doku
+`docs/module-video.md`.
+
 **Beispiele nach Themen (2026-09-23):** `examples/kategorien.json` ordnet alle
 203 Beispiele (ohne `_*`/`bench_*`) 16 Themen zu; die IDE zeigt sie in einem
 Fenster (`themenZeigen`, Werkzeuge-Menue, Willkommensseite, Palette) als Liste
