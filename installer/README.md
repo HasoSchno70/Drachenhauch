@@ -78,7 +78,7 @@ Dasselbe `bauen.dh` packt auf dem jeweiligen System (tar behaelt die
 Ausfuehrungsrechte, `hdiutil` gibt es nur auf dem Mac):
 
 ```
-cargo build --release --features "graphics dialogs db net http smtp"   # in rust/drachenhauch_runtime
+cargo build --release --features "graphics dialogs video db net http smtp"   # in rust/drachenhauch_runtime
 rust/drachenhauch_runtime/target/release/dhrt run installer/bauen.dh
 ```
 
