@@ -1074,6 +1074,18 @@ impl<'p> Vm<'p> {
         self.exit_code
     }
 
+    /// Hinweis fuers Programmende, oder None. Siehe `Graphics::nie_gezeigt`.
+    #[cfg(feature = "graphics")]
+    pub fn hinweis_ohne_flip(&self) -> Option<&'static str> {
+        self.gfx.as_ref().filter(|g| g.nie_gezeigt()).map(|_| {
+            concat!("Hinweis: Das Fenster ist leer geblieben -- es wurde gezeichnet, aber FLIP() fehlt. ",
+                    "dhrt sammelt die Zeichenbefehle und zeigt sie erst beim FLIP(); ",
+                    "in einer Bildschleife steht es am Ende jedes Durchlaufs.")
+        })
+    }
+    #[cfg(not(feature = "graphics"))]
+    pub fn hinweis_ohne_flip(&self) -> Option<&'static str> { None }
+
     /// Ob `run()` durch den Debugger-Stop-Befehl (oder EOF auf stdin waehrend
     /// `dhrt debug`) abgebrochen wurde -- analog zu `was_stopped`, siehe
     /// dortiger Review-Fund-Kommentar.
@@ -2494,7 +2506,8 @@ impl<'p> Vm<'p> {
                                 if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                             }
                         }
-                        Value::Nil => return Err(format!("Methodenaufruf '.{}' bei NIL-Referenz", method)),
+                        Value::Nil => return Err(format!(
+                            "Methodenaufruf '.{}' bei NIL-Referenz{}", method, NIL_NEW)),
                         _ => {
                             // Container-Methode -> Builtin
                             let kind = container_kind(&obj).ok_or_else(|| format!("Methodenaufruf '.{}' bei nicht-Objekt ({})", method, obj.type_name()))?;
@@ -2590,7 +2603,8 @@ impl<'p> Vm<'p> {
                     };
                     let obj = vm_pop(stack)?;
                     match &obj {
-                        Value::Nil => return Err(format!("Zugriff auf '.{}' bei NIL-Referenz", name)),
+                        Value::Nil => return Err(format!(
+                            "Zugriff auf '.{}' bei NIL-Referenz{}", name, NIL_NEW)),
                         Value::Namespace(ns) => {
                             match ns.members.get(&name.to_lowercase()) {
                                 Some(v) => stack.push(v.clone()),
@@ -2633,7 +2647,8 @@ impl<'p> Vm<'p> {
                     let v = vm_pop(stack)?;
                     let obj = vm_pop(stack)?;
                     match &obj {
-                        Value::Nil => return Err(format!("Zuweisung an '.{}' bei NIL-Referenz", name)),
+                        Value::Nil => return Err(format!(
+                            "Zuweisung an '.{}' bei NIL-Referenz{}", name, NIL_NEW)),
                         Value::Instance(rc) => {
                             let cn = rc.borrow().class_name.clone();
                             if self.is_property(&cn, name) {
@@ -6802,6 +6817,9 @@ impl<'p> Vm<'p> {
                 Some(Value::Nil) => Err(format!(
                     "{}: Argument {} ist NIL -- die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE(\"bild.png\"))",
                     fn_, i + 1)),
+                Some(Value::Str(s)) => Err(format!(
+                    "{}: erwartet Zahl, erhalten STRING (Argument {}){}",
+                    fn_, i + 1, crate::umstieg::text_statt_zahl(fn_, s))),
                 Some(v) => Err(format!("{}: erwartet Zahl, erhalten {} (Argument {})", fn_, v.type_name(), i + 1)),
                 None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
             }
@@ -6949,6 +6967,19 @@ impl<'p> Vm<'p> {
                 }
                 self.gfx.as_mut().unwrap()
             }};
+        }
+        // Zeichnen, ohne dass es je ein SCREEN gab: das haette ein
+        // VERSTECKTES Fenster angelegt (g!(), fuer LOADIMAGE/imgfx) und still
+        // hineingemalt -- kein Fehler, kein Bild, kein Wort. Fuer den ersten
+        // Versuch mit Grafik ist das die teuerste Falle ueberhaupt: das
+        // Programm laeuft, und man sucht den Fehler im eigenen Code.
+        // Innerhalb eines Render-Ziels ist es erlaubt -- dort zeichnet man
+        // absichtlich neben den Schirm.
+        if ist_schirmbefehl(name)
+            && self.gfx.as_ref().is_none_or(|g| !g.schirm_bereit()) {
+            return Err(format!(
+                "{}: es gibt noch kein Fenster -- vor dem ersten Zeichenbefehl SCREEN(breite, hoehe, \"Titel\") aufrufen",
+                name.to_uppercase()));
         }
         let r = match name {
             "screen" => {
@@ -9473,6 +9504,31 @@ pub(crate) fn mit_signatur(msg: &str) -> String {
     msg.to_string()
 }
 
+/// Zeichnet dieser Befehl auf den BILDSCHIRM? Dann braucht er ein Fenster
+/// aus SCREEN -- anders als LOADIMAGE/IMAGE_*/imgfx, die auch ohne eins
+/// arbeiten (sie brauchen nur den GL-Kontext).
+///
+/// Die Liste ist mit Absicht von Hand gefuehrt und kurz: sie deckt die
+/// Befehle ab, mit denen ein erstes Grafikprogramm anfaengt. Ein Befehl, der
+/// hier fehlt, verhaelt sich wie bisher -- ein Befehl, der zu Unrecht
+/// darinstuende, braeche fremden Code.
+pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
+    matches!(name,
+        "flip" | "cls"
+        | "plot" | "plots" | "line" | "lines" | "linew" | "box" | "boxes"
+        | "rect" | "boxround" | "rectround" | "circle" | "circles"
+        | "triangle" | "polygon" | "spline" | "gradientv" | "gradienth"
+        | "text"
+        | "drawimage" | "drawimagerot" | "drawimageflipped"
+        | "drawimagepart" | "drawimagepartex" | "drawtilemap"
+        | "atlas_draw" | "atlas_draw_flipped" | "batch_draw")
+}
+
+/// `DIM p AS Spieler` legt die Variable an, aber kein Objekt -- sie ist NIL,
+/// bis ein NEW kommt. In anderen BASICs (und bei STRUCT hier) entsteht das
+/// Objekt mit der Deklaration, darum ist das die haeufigste NIL-Quelle.
+const NIL_NEW: &str = " -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())";
+
 fn unknown_builtin_msg(name: &str) -> String {
     // Hardware-/IoT-Module sind hinter Cargo-Features (serial/usb/bt/wifi) und im
     // Default-Build NICHT enthalten -- der Dispatch faellt dann hierher durch. Das
@@ -9494,8 +9550,9 @@ fn unknown_builtin_msg(name: &str) -> String {
     // daran erkennen die Pruefsammlungen einen Bau ohne Fenster), sondern ein
     // unbekannter Befehl -- oft einer aus einem anderen BASIC.
     if !crate::compiler::is_known_builtin(name) {
-        return format!("Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler?){}",
-                       name.to_uppercase(), crate::umstieg::befehl_hinweis(name));
+        return format!("Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler?){}{}",
+                       name.to_uppercase(), crate::umstieg::befehl_hinweis(name),
+                       crate::compiler::aehnliche_builtins(name));
     }
     if builtins::is_graphics_builtin(name) {
         format!("Grafik-Builtin '{}' im Rust-Kern noch nicht verfuegbar (Schritt 4)", name.to_uppercase())

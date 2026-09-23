@@ -100,6 +100,57 @@ pub fn name_hinweis(name: &str) -> String {
     }
 }
 
+/// Sieht dieser Text nach einer Datei aus, die man erst LADEN muss?
+///
+/// Gebraucht dort, wo ein Bild-/Klang-/Schrift-HANDLE erwartet wird und ein
+/// Text ankommt: `PLAYSOUND("sprung.wav")` ist die Zeile, die jeder aus einem
+/// anderen BASIC zuerst schreibt, und "erwartet Zahl, erhalten STRING" sagt
+/// ihm nichts. Liefert (Art, Ladebefehl).
+pub fn lader_fuer_datei(text: &str) -> Option<(&'static str, &'static str)> {
+    let t = text.to_lowercase();
+    let endung = t.rsplit_once('.').map(|(_, e)| e)?;
+    Some(match endung {
+        "png" | "jpg" | "jpeg" | "bmp" | "gif" | "tga" | "qoi" => ("Bild", "LOADIMAGE"),
+        "wav" | "ogg" | "mp3" | "flac" | "qoa" => ("Klang", "LOADSOUND"),
+        "ttf" | "otf" => ("Schrift", "LOADFONT"),
+        _ => return None,
+    })
+}
+
+/// Fertiger Anhang fuer genau diesen Fall, oder leer.
+pub fn datei_statt_handle(befehl: &str, text: &str) -> String {
+    match lader_fuer_datei(text) {
+        Some((art, lader)) => format!(
+            " -- ein Dateiname ist noch kein {art}: erst `x = {lader}(\"{text}\")`, dann `{}(x, ...)`",
+            befehl.to_uppercase()),
+        None => String::new(),
+    }
+}
+
+/// Ein TEXT, wo eine Zahl hingehoert: der Anhang, der sagt WARUM.
+///
+/// Drei Faelle, alle gemessen an dem, was man aus anderen BASICs mitbringt:
+/// eine Taste als Buchstabe (`KEYHIT("a")` -- dort vergleicht man INKEY$),
+/// eine Farbe als Hex-Text (`RGB("FF0000")`) und ein Dateiname, wo ein
+/// geladenes Bild/ein geladener Klang hingehoert.
+pub fn text_statt_zahl(befehl: &str, text: &str) -> String {
+    let b = befehl.to_lowercase();
+    if matches!(b.as_str(), "keyhit" | "keypressed" | "keyreleased" | "keyrepeat")
+        && text.chars().count() == 1 {
+        let c = text.chars().next().unwrap_or('a');
+        return format!(
+            " -- eine Taste ist eine ZAHL: {}(ASC(\"{}\")) oder die Konstante KEY_{}",
+            b.to_uppercase(), c, c.to_uppercase());
+    }
+    if (b == "rgb" || b == "rgba")
+        && text.trim_start_matches('#').chars().all(|c| c.is_ascii_hexdigit())
+        && !text.is_empty() {
+        return format!(
+            " -- eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX(\"{}\"); im Quelltext geht auch &H{}", text, text.trim_start_matches('#').to_uppercase());
+    }
+    datei_statt_handle(befehl, text)
+}
+
 /// Anhang fuer einen unbekannten Befehl.
 pub fn befehl_hinweis(name: &str) -> String {
     let n = name.to_lowercase();
@@ -123,6 +174,33 @@ mod tests {
         assert!(typ("long").unwrap().contains("INTEGER"));
         assert!(typ("array:integer").unwrap().contains("g[3, 4]"));
         assert!(typ("integer").is_none());
+    }
+
+    #[test]
+    fn dateiname_statt_handle() {
+        assert_eq!(lader_fuer_datei("held.PNG"), Some(("Bild", "LOADIMAGE")));
+        assert_eq!(lader_fuer_datei("sprung.wav"), Some(("Klang", "LOADSOUND")));
+        assert_eq!(lader_fuer_datei("schrift.ttf"), Some(("Schrift", "LOADFONT")));
+        // Kein Dateiname, und darum auch kein Hinweis: sonst stuende er unter
+        // jedem Text, der zufaellig an der Stelle einer Zahl steht.
+        assert_eq!(lader_fuer_datei("links"), None);
+        assert_eq!(lader_fuer_datei("3.5"), None);
+        assert!(datei_statt_handle("playsound", "sprung.wav").contains("LOADSOUND"));
+        assert!(datei_statt_handle("playsound", "sprung.wav").contains("PLAYSOUND(x, ...)"));
+        assert!(datei_statt_handle("box", "links").is_empty());
+    }
+
+    #[test]
+    fn text_wo_eine_zahl_hingehoert() {
+        assert!(text_statt_zahl("keyhit", "a").contains("ASC(\"a\")"));
+        assert!(text_statt_zahl("keyhit", "a").contains("KEY_A"));
+        // Mehr als ein Zeichen ist keine Taste -- dann kein Tasten-Satz.
+        assert!(text_statt_zahl("keyhit", "leertaste").is_empty());
+        assert!(text_statt_zahl("rgb", "FF0000").contains("COLOR_FROM_HEX"));
+        assert!(text_statt_zahl("rgb", "#f80").contains("&HF80"));
+        assert!(text_statt_zahl("rgb", "rot").is_empty());
+        // Der Datei-Fall laeuft weiter durch.
+        assert!(text_statt_zahl("playsound", "a.wav").contains("LOADSOUND"));
     }
 
     #[test]

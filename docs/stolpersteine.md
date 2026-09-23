@@ -440,6 +440,60 @@ Reflexionen/Mirror-Effekte.
 > - **`x = meineSub()`** brach erst zur Laufzeit ab, und zwar an der ZUWEISUNG
 >   ("Erwartet INTEGER, erhalten NIL"). Jetzt ein Uebersetzungsfehler am Aufruf.
 > - Hinweise: `TRUNC`, `ZEIT_JAHR` und Geschwister, `GUI_WINDOW_NEW`.
+>
+> **Fuenfte Runde (2026-09-23), 100 Proben (der Weg zum ersten Spiel: Sprite,
+> Tilemap, Physik, Kamera, Partikel, Speicherstaende, ECS, Dateien, Klassen):**
+> - **Zeichnen ohne `SCREEN` tat STILL nichts.** Ein Bildbefehl legt bei
+>   Bedarf ein VERSTECKTES Fenster an (nur fuer den GL-Kontext, damit
+>   `LOADIMAGE`/`IMAGE_*` auch in Konsolenprogrammen laufen) -- wer darin auf
+>   den Schirm zeichnete, bekam kein Bild und kein Wort: `BOX(...)`, `CLS()`,
+>   sogar `FLIP()` liefen mit Rueckgabe 0 durch. Jetzt ist es ein Fehler, der
+>   `SCREEN(breite, hoehe, "Titel")` nennt (`vm::ist_schirmbefehl`, 26 Namen
+>   von Hand gefuehrt; `Graphics::sichtbar` ist das Unterscheidungsmerkmal,
+>   ein aktives Render-Ziel ist ausgenommen -- dort zeichnet man absichtlich
+>   neben den Schirm).
+> - **Gezeichnet, aber nie `FLIP()`** ist dieselbe Falle ein Stueck weiter:
+>   dhrt sammelt die Befehle und spielt sie erst beim FLIP ab, das Fenster
+>   bleibt also leer. Am Programmende ein Satz auf stderr
+>   (`Graphics::nie_gezeigt`: sichtbares Fenster, 0 Flips, aber aufgezeichnete
+>   Befehle). Zwei Beispiele im Repo rufen SCREEN ohne FLIP -- sie zeichnen
+>   nicht, der Satz trifft sie nicht.
+> - **Ein unbekannter Befehl schlaegt jetzt den echten Namen vor**
+>   (`aehnlich.rs`, neu und rein): `CIRLCE` -> `CIRCLE`, `MAKEDIR` -> `MKDIR`,
+>   `SPRITE_SET_ANIM` -> `SPRITE_ADD_ANIM`. Dafuer zwei Regeln statt einer --
+>   der Editierabstand faengt Dreher, die WORTTEILE fangen die ausgelassene
+>   Mitte (`PARTICLE_NEW` -> `PARTICLE_SYSTEM_NEW`, Abstand 7, den laesst jede
+>   Schranke liegen). Der Teiletreffer rangiert VOR einem Abstandstreffer von
+>   3, sonst stuende `PARTICLE_DRAW` davor. Die Vorschlaege fuer VARIABLEN
+>   (`compiler::naechster_name`) und fuer Mitglieder laufen seither durch
+>   dieselbe Datei -- vorher hatte der Compiler seine eigene Rechnung.
+> - **Ein Dateiname, wo ein geladenes Bild/ein Klang hingehoert**
+>   (`PLAYSOUND("sprung.wav")`, `DRAWIMAGE("held.png", ...)`,
+>   `SPRITE_NEW("held.png", 16, 16)`) sagte nur "erwartet Zahl, erhalten
+>   STRING". Jetzt nennt die Meldung den Lader, ausgewaehlt an der ENDUNG
+>   (`umstieg::text_statt_zahl`). Derselbe Weg deckt `KEYHIT("a")` (eine Taste
+>   ist eine Zahl: `ASC("a")` oder `KEY_A`) und `RGB("FF0000")`
+>   (`COLOR_FROM_HEX`) ab -- beides ging vorher stumm in eine Typmeldung.
+> - **Die Lader melden ihre fehlende Datei jetzt gleich.** `LOADIMAGE` nannte
+>   Datei und Suchort, `LOADSOUND` gab `"...: os error 2"` heraus und
+>   `PLAYMUSIC` sogar `IoError(Os { code: 2, ... })` -- und zwar unter dem
+>   Namen `AUDIO_MUSIC_LOAD`. Eine Quelle: `builtins::datei_da`.
+> - **`DIM p AS Spieler` legt kein Objekt an** -- die Variable ist NIL, bis ein
+>   `NEW` kommt (bei einem STRUCT entsteht es mit der Deklaration, und in
+>   anderen BASICs ebenfalls). "Zuweisung an '.hp' bei NIL-Referenz" sagt das
+>   nicht; der Satz nennt jetzt `p = NEW Klasse()`.
+> - **`DIM f AS FILE` ohne `OPENFILE`** meldete "WRITE erwartet FILE" -- die
+>   Variable IST als FILE deklariert, die Meldung fuehrte also in die Irre,
+>   und sie nannte WRITE, wo `WRITELINE` stand.
+> - **Ein Index genau EINS zu weit** bekommt den Satz "Felder zaehlen ab 0:
+>   DIM a[3] hat a[0] bis a[2]". Nur genau dann -- bei Index 99 in einem Feld
+>   mit drei Plaetzen hilft er nicht.
+> - Doku: der Abschnitt "Das erste Programm mit Grafik" in `docs/umstieg.md`
+>   (SCREEN, FLIP, Schleife, Laden) und drei Zeilen mehr in der Tabelle
+>   (`MOUSEBUTTON(0)` ist links, nicht 1). Neu unter den stillen
+>   Unterschieden: `=` auf Feldern und MAPs fragt nach DEMSELBEN Behaelter,
+>   nicht nach gleichem Inhalt (gemessen: zwei Felder mit denselben Zahlen
+>   sind `<>`).
 
 ## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
 
