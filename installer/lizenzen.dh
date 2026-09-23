@@ -19,7 +19,7 @@ IMPORT "json"
 ' gen_notices.py), ausgeliefert wurde aber mit --hardware (dazu dialogs, smtp,
 ' serial, usb, bt, wifi, midi): deren Lizenztexte fehlten in der Beilage. Ein
 ' Text zu viel schadet nicht, einer zu wenig verletzt MIT/BSD/Apache.
-CONST FEATURES = "graphics dialogs db net http smtp serial usb bt wifi midi"
+CONST FEATURES = "graphics dialogs video db net http smtp serial usb bt wifi midi"
 DIM SEP AS STRING : SEP = "=============================================================================="
 
 DIM leerraum AS STRING : leerraum = " " + CHR$(9) + CHR$(10) + CHR$(13) + CHR$(11) + CHR$(12)

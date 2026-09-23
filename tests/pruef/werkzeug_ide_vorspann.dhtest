@@ -1,0 +1,111 @@
+' Der Vorspann der IDE (daten/video/vorspann.mp4, 10 s, 240 Bilder): er
+' laeuft vor allem anderen, ein Klick oder eine Taste ueberspringt ihn, das
+' Kreuz beendet die IDE. Ein Testlauf (DHRT_FRAMES gesetzt) zeigt ihn nur mit
+' DH_IDE_VORSPANN=1 -- sonst verschoebe er jede Aufnahme der anderen
+' IDE-Sammlungen um zehn Sekunden. Ohne Fenster laeuft DELTA fest mit 1/60 s,
+' zehn Sekunden sind also 600 Bilder.
+' Getestet wird mit der MAUS: KEY_ANY_HIT blendet Tasten aus, die eine
+' laufende Wiedergabe selbst einspeist (sonst braeche ein Attract-Modus an
+' seiner eigenen Demo ab). In der Aufnahme: 6 Taste runter, 5 hoch.
+--- seriell
+
+=== der vorspann laeuft bis zum ende und dann kommt die ide
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=900
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_VORSPANN=1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 8) = "vorspann" OR L[i] = "bereit" THEN PRINT L[i]
+NEXT
+--- erwartet
+vorspann zu ende bei bild 239
+bereit
+
+=== ein klick ueberspringt ihn
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_VORSPANN=1
+--- datei _programm/ev.txt
+c 3
+e 0 7 400 300 0 0
+e 60 6 0 0 0 0
+e 62 5 0 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM bild AS INTEGER : bild = -1
+DIM bereit AS BOOLEAN : bereit = FALSE
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 23) = "vorspann uebersprungen " THEN bild = VAL(MID$(L[i], INSTR(L[i], "bild ") + 5))
+    IF L[i] = "bereit" THEN bereit = TRUE
+NEXT
+' Nach rund einer Sekunde (24 Bilder), nicht erst am Ende.
+PRINT "uebersprungen "; bild > 10 AND bild < 60
+PRINT "bereit "; bereit
+--- erwartet
+uebersprungen TRUE
+bereit TRUE
+
+=== ein testlauf ohne den schalter zeigt ihn nicht
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM n AS INTEGER : n = 0
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 8) = "vorspann" THEN n = n + 1
+NEXT
+PRINT "vorspann-zeilen "; n
+--- erwartet
+vorspann-zeilen 0
+
+=== die einstellung schaltet ihn ab und wird gemerkt
+' Mit "vorspann": false in der ide.json kommt er nicht, auch mit dem
+' Schalter. Das Kaestchen in den Einstellungen schreibt den Wert zurueck.
+einstellungenZeigen()
+IF GUI_CHECKED(cbVorspann) THEN protokoll("probe kaestchen an") ELSE protokoll("probe kaestchen aus")
+GUI_SET_CHECKED(cbVorspann, TRUE)
+einstellungenNachziehen()
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_VORSPANN=1
+--- datei _programm/ide.json
+{"vorspann": false}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+' Nur die Zeilen, die den Vorspann oder die Einstellung nennen.
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 8) = "vorspann" OR LEFT$(L[i], 5) = "probe" THEN PRINT L[i]
+NEXT
+DIM k AS STRING : k = JOIN$(READLINES("_programm/ide.json"), "")
+k = REPLACE$(k, " ", "")
+PRINT "wieder an "; INSTR(k, CHR$(34) + "vorspann" + CHR$(34) + ":true") >= 0
+--- erwartet
+probe kaestchen aus
+vorspann an
+wieder an TRUE

@@ -74,6 +74,8 @@ Source: "Drachenhauch.ico"; DestDir: "{app}"; DestName: "drachenhauch.ico"; Flag
 ; Logo und Schriftzug: die IDE sucht sie unter daten\bilder neben ide\
 ; (Fenstersymbol, Schriftzug auf der Willkommensseite).
 Source: "..\daten\bilder\*.png"; DestDir: "{app}\daten\bilder"; Flags: ignoreversion
+; Der Vorspann beim Start der IDE (daten\video\vorspann.mp4, H.264).
+Source: "..\daten\video\*.mp4"; DestDir: "{app}\daten\video"; Flags: ignoreversion
 ; Die IDE selbst -- Quelltext, den der Nutzer lesen und aendern kann.
 Source: "..\ide\*.dh"; DestDir: "{app}\ide"; Flags: ignoreversion
 ; Das Handbuch: die IDE liest docs\ neben ide\ (F1 schlaegt dort nach).

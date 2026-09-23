@@ -26,7 +26,7 @@ const MODULES: &[&str] = &[
     "firmata", "g3d", "gui", "html", "httpd", "imgfx", "ini", "input", "json", "m3d", "midi", "mqtt", "net", "particles",
     "geld", "pdf", "smtp", "xlsx", "xml",
     "physics", "physics2d", "physics3d", "regex", "save", "scene", "serial", "sprite",
-    "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "wifi", "zeit",
+    "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "video", "wifi", "zeit",
 ];
 
 /// Hardware-/IoT-Module hinter Cargo-Features (= die `--hardware`-Features in
@@ -75,6 +75,7 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("tween", &["tween"]),
     ("usb", &["usb_handle"]),
     ("vec2", &["vec2"]),
+    ("video", &["video"]),
 ];
 
 /// Alle Built-in-Module, die den externen Typ `t` (lowercase, kanonisch)

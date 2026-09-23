@@ -115,7 +115,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
-- **Module** — 47 Stück, [Tabelle unten](#module)
+- **Module** — 48 Stück, [Tabelle unten](#module)
 - **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
 - **Werkzeuge** — alle in Drachenhauch geschrieben, in der IDE unter *Werkzeuge* oder direkt mit `dhrt run examples/<datei>`:
   - **[Sprite-Editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Lasso/Zauberstab/Verschieben, GIF mit Dauer je Bild, Atlas-Export für `ATLAS_LOAD`, GB-Code, `.dhanim`-Vorlage
@@ -133,7 +133,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
 ### Module
 
-47 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
+48 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
 [docs/](docs/README.md#module).
 
 **Spiel-Bausteine**
@@ -148,6 +148,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`save`](docs/module-save.md) | Speicherstände als JSON, mit Versionsfeld |
 | [`input`](docs/module-input.md) | benannte Aktionen statt Tastencodes, Flankenerkennung, Gamepad |
 | [`timer`](docs/module-timer.md) | geplante Aktionen (`TIMER_AFTER`/`EVERY`) + `COOLDOWN`-Ratenbegrenzer |
+| [`video`](docs/module-video.md) | Videos abspielen (MP4/H.264), jedes Bild ein `IMAGE` |
 | [`tween`](docs/module-tween.md) | Werte weich überführen, 13 Verlaufskurven |
 | [`curves`](docs/module-curves.md) | Bézier, Catmull-Rom, Hermite, Smoothstep — reine Funktionen |
 | [`astar`](docs/module-astar.md) | A*-Wegfindung auf einem Kachelgitter |

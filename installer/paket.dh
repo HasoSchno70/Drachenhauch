@@ -96,6 +96,10 @@ SUB inhaltKopieren(wurzel AS STRING, laufzeit AS STRING, bin AS STRING, res AS S
     PRINT "  examples/ "; ordnerKopieren(PATHJOIN(wurzel, "examples"), PATHJOIN(res, "examples"), "*", TRUE); " Dateien"
     ' Logo und Schriftzug -- die IDE sucht sie unter daten/bilder neben ide/.
     PRINT "  bilder/   "; ordnerKopieren(PATHJOIN(wurzel, "daten/bilder"), PATHJOIN(res, "daten/bilder"), "*.png", FALSE); " Dateien"
+    ' Der Vorspann beim Start der IDE.
+    IF FILEEXISTS(PATHJOIN(wurzel, "daten/video/vorspann.mp4")) THEN
+        PRINT "  video/    "; ordnerKopieren(PATHJOIN(wurzel, "daten/video"), PATHJOIN(res, "daten/video"), "*.mp4", FALSE); " Dateien"
+    END IF
     DIM texte AS ARRAY OF STRING : texte = ["EULA.txt", "THIRD-PARTY-NOTICES-IDE.txt"]
     DIM i AS INTEGER
     FOR i = 0 TO LEN(texte) - 1

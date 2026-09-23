@@ -4002,6 +4002,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         Ok(())
     }
 
+    /// Die Punkte eines Bildes ganz ersetzen (RGBA, Zeile fuer Zeile) -- fuer
+    /// das Video-Modul, das je Bild ein neues liefert. Hochgeladen wird wie
+    /// bei der Leinwand erst beim naechsten FLIP, also hoechstens einmal je
+    /// Bild, auch wenn mehrmals geschrieben wurde.
+    pub fn image_punkte_setzen(&mut self, idx: i64, px: &[u8]) -> Result<(), String> {
+        self.image_leinwand(idx, "VIDEO", |l| l.punkte_kopieren(px))
+    }
+
+    /// Wie viele Bilder schon gezeigt wurden (je FLIP eins mehr).
+    pub fn bild_zaehler(&self) -> u64 { self.frame_count }
+
     /// Alle Texturen hochladen, deren Bild die Leinwand-Befehle seit dem
     /// letzten FLIP geaendert haben. Freigegebene Plaetze werden uebergangen.
     fn texturen_nachladen(&mut self) {

@@ -142,7 +142,7 @@ def main() -> int:
         # `graphics` zieht raylib (Fenster/Input) + Kira (Audio, src/audio.rs).
         # `dialogs` (rfd, native OS-Dateidialoge) ist davon GETRENNT, weil es
         # den WASM-Build blockiert -- auf dem Desktop gehoert es aber dazu.
-        feats += ["graphics", "dialogs"]
+        feats += ["graphics", "dialogs", "video"]
     if "--no-data" not in args:
         feats += ["db", "net", "http", "smtp"]
     if "--hardware" in args:

@@ -59,7 +59,7 @@ jobs:
 
       - name: dhrt bauen (mit Grafik)
         working-directory: rust/drachenhauch_runtime
-        run: cargo build --release --locked --features "graphics dialogs db net http smtp"
+        run: cargo build --release --locked --features "graphics dialogs video db net http smtp"
 
       - name: Laufzeit ansehen
         run: rust/drachenhauch_runtime/target/release/dhrt --version

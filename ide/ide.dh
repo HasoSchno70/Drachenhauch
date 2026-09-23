@@ -112,6 +112,7 @@ IMPORT "pdf"
 IMPORT "imgfx"      ' fuer die gezeichneten Menue-Symbole (IMAGE_NEW/IMAGE_DRAW_*)
 IMPORT "regex"      ' fuer die Suche mit regulaeren Ausdruecken
 IMPORT "zeit"       ' ZEIT_JETZT fuer das Lebenszeichen der Absturz-Wiederherstellung
+IMPORT "video"      ' der Vorspann beim Start (daten/video/vorspann.mp4)
 
 CONST MAX_TABS = 12
 CONST NL = CHR$(10)
@@ -413,6 +414,46 @@ IF FILEEXISTS(konfigPfad) THEN
         konfig = JSON_PARSE("{}")     ' eine kaputte Datei ist kein Grund, nicht zu starten
     END TRY
 END IF
+
+' Der Vorspann: daten/video/vorspann.mp4, vor allem anderen, auf die ganze
+' Flaeche eingepasst (schwarze Raender, wo das Seitenverhaeltnis nicht
+' passt). Jede Taste und jeder Klick ueberspringt ihn, das Kreuz beendet die
+' IDE gleich. Abschalten in den Einstellungen (`vorspann` in der ide.json).
+' Ein Testlauf (DHRT_FRAMES gesetzt) zeigt ihn nicht -- sonst verschoebe er
+' jede Aufnahme um zehn Sekunden --, ausser er verlangt ihn mit
+' DH_IDE_VORSPANN=1. Fehlt die Datei oder kann dieser Bau keine Videos,
+' startet die IDE ohne.
+DIM vorspannAn AS BOOLEAN : vorspannAn = TRUE
+IF JSON_HAS(konfig, "vorspann") THEN vorspannAn = JSON_GET_BOOL(konfig, "vorspann")
+DIM vorspannPfad AS STRING : vorspannPfad = PATHJOIN(wurzel, "daten/video/vorspann.mp4")
+DIM vorspannSchluss AS BOOLEAN : vorspannSchluss = FALSE
+IF (GETENV$("DHRT_FRAMES") = "" OR GETENV$("DH_IDE_VORSPANN") = "1") AND vorspannAn AND FILEEXISTS(vorspannPfad) THEN
+    TRY
+        DIM vsp AS VIDEO : vsp = VIDEO_LOAD(vorspannPfad)
+        VIDEO_PLAY(vsp)
+        DIM vspWeg AS STRING : vspWeg = ""
+        WHILE vspWeg = ""
+            IF WINDOW_CLOSE_REQUESTED() THEN vspWeg = "kreuz"
+            IF QUITREQUESTED() AND vspWeg = "" THEN vspWeg = "ende"
+            IF KEY_ANY_HIT() >= 0 OR MOUSE_HIT(0) OR MOUSE_HIT(1) THEN vspWeg = "uebersprungen"
+            DIM vsb AS INTEGER : vsb = SCREENWIDTH()
+            DIM vsh AS INTEGER : vsh = SCREENHEIGHT()
+            DIM vsm AS FLOAT : vsm = MIN(vsb / VIDEO_WIDTH(vsp), vsh / VIDEO_HEIGHT(vsp))
+            DIM vw AS INTEGER : vw = INT(VIDEO_WIDTH(vsp) * vsm)
+            DIM vh AS INTEGER : vh = INT(VIDEO_HEIGHT(vsp) * vsm)
+            CLS(0)
+            VIDEO_DRAW(vsp, (vsb - vw) \ 2, (vsh - vh) \ 2, vw, vh)
+            FLIP()
+            IF VIDEO_DONE(vsp) AND vspWeg = "" THEN vspWeg = "zu ende"
+        WEND
+        protokoll("vorspann " + vspWeg + " bei bild " + STR$(VIDEO_FRAME(vsp)))
+        VIDEO_FREE(vsp)
+        IF vspWeg = "kreuz" THEN vorspannSchluss = TRUE
+    CATCH e
+        protokoll("vorspann fehler " + e)
+    END TRY
+END IF
+IF vorspannSchluss THEN END
 
 ' Absturz-Wiederherstellung: jede laufende IDE schreibt alle `whTakt`
 ' Sekunden die Texte ihrer ungesicherten Reiter nach
@@ -993,6 +1034,7 @@ DIM cbVorschau AS GUI_WIDGET : cbVorschau = GUI_CHECKBOX(winEinst, "Vorschau vor
 ' Bisherige an seiner Stelle bleibt.
 DIM cbKlammern AS GUI_WIDGET : cbKlammern = GUI_CHECKBOX(winEinst, "Klammern und Anführungszeichen schließen", 400, 14, TRUE)
 DIM cbFormatSichern AS GUI_WIDGET : cbFormatSichern = GUI_CHECKBOX(winEinst, "Beim Sichern formatieren", 400, 44, FALSE)
+DIM cbVorspann AS GUI_WIDGET : cbVorspann = GUI_CHECKBOX(winEinst, "Vorspann beim Start", 400, 74, TRUE)
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgröße", 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
 DIM lblListen AS GUI_WIDGET : lblListen = GUI_LABEL(winEinst, "Schrift der Listen", 16, 326)
@@ -1370,6 +1412,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "linien", linienAn)
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
     JSON_SET_BOOL(konfig, "klammern", klammernAn)
+    JSON_SET_BOOL(konfig, "vorspann", vorspannAn)
     JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
     JSON_SET_BOOL(konfig, "leiste", leisteAn)
@@ -1877,6 +1920,7 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbVorschau, vorschauAn)
     GUI_SET_CHECKED(cbKlammern, klammernAn)
     GUI_SET_CHECKED(cbFormatSichern, formatSichernAn)
+    GUI_SET_CHECKED(cbVorspann, vorspannAn)
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spListen, listenGroesse)
     GUI_SET_VALUE(spHbGr, handbuchGroesse)
@@ -1907,6 +1951,11 @@ SUB einstellungenNachziehen()
     IF GUI_CHECKED(cbGeruest) <> geruestAn THEN geruestSetzen(GUI_CHECKED(cbGeruest))
     IF GUI_CHECKED(cbKlammern) <> klammernAn THEN klammernSetzen(GUI_CHECKED(cbKlammern))
     IF GUI_CHECKED(cbFormatSichern) <> formatSichernAn THEN befehl("format_sichern")
+    IF GUI_CHECKED(cbVorspann) <> vorspannAn THEN
+        vorspannAn = GUI_CHECKED(cbVorspann)
+        konfigSichern()
+        protokoll("vorspann " + IIF(vorspannAn, "an", "aus"))
+    END IF
     IF GUI_CHECKED(cbVorschau) <> vorschauAn THEN
         vorschauAn = GUI_CHECKED(cbVorschau)
         konfigSichern()
