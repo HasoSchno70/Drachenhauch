@@ -331,13 +331,16 @@ nichts mehr offen ist. Die Lücken liegen in Tastatur, Maus, Panels und
 Dialog-Optionen -- einzeln klein, zusammen spürbar für jemanden, der die
 Qt-IDE gewohnt ist:
 
-| Bereich | fehlt in `ide/ide.dh` |
+**Stand 2026-09-23: die Tabelle ist abgearbeitet.** Was darin stand, ist
+gebaut (Einzelheiten in `docs/ide.md`); der Vollständigkeit halber:
+
+| Bereich | seinerzeit offen, heute da |
 |---|---|
-| Datei | ~~**Absturz-Wiederherstellung**~~ (seit 18.09. da, siehe `docs/ide.md`; dabei gefunden: das **Kreuz des Fensters** beendete die IDE ohne Rückfrage, und ESC in einem Dialog beendete sie ganz -- beides seit 18.09. behoben, `WINDOW_CLOSE_REQUESTED`); **Dateien ins Fenster ziehen** ✔ (seit 19.09. wirklich -- das Häkchen stand schon vorher, `ide.dh` fragte hineingezogene Dateien aber gar nicht ab); Druckoptionen (Schriftgröße, Duplex, Ränder, Zeilennummern, Umfang); gefaltete Blöcke je Datei merken |
-| Bearbeiten | Suchen mit **Groß/klein** und **ganzes Wort** als Schalter ✔; **einzeln ersetzen** (nur „alle"); Fundstellen **beliebiger Namen** (heute nur „Wer ruft das auf?" für Unterprogramme); **Klammern und Anführungszeichen automatisch schließen**; Formatieren beim Sichern |
-| Ausführen | **nur die Auswahl ausführen** ✔; Haltepunkt per **Klick in die Nummernspalte**, Bedingung per Rechtsklick; Profil nach **Funktionen** gruppiert; ~~**Klick auf `datei:zeile` in der Ausgabe** springt dorthin~~ ✔; Ausgabe leeren |
-| Ansicht | **Zoom mit Strg+Rad und Strg+Plus/Minus/0**; **eine Datei geteilt** in zwei Ansichten (heute nur zwei verschiedene Reiter); ein- und ausblendbare Seitenleisten und Panels |
-| Hilfe | **Tooltip beim Überfahren** (heute steht `CODE_HOVER$` in der Statuszeile, für das Wort an der Marke) ✔; **Strg+Klick** springt zur Definition; Filterfeld und Beispiel-Kategorien im Dateibaum |
+| Datei | Absturz-Wiederherstellung (18.09.; dabei gefunden: das Kreuz beendete ohne Rückfrage, ESC in einem Dialog beendete die IDE), Dateien ins Fenster ziehen (19.09.), Druckoptionen -- Schriftgröße, Ränder, Zeilennummern, nur die Auswahl (23.09.; Duplex bewusst nicht), gefaltete Blöcke je Datei (23.09.) |
+| Bearbeiten | Suchleiste mit Groß/klein, ganzem Wort und Ausdruck, einzeln ersetzen (19.09.), Fundstellen beliebiger Namen, Klammern und Anführungszeichen schließen, Formatieren beim Sichern (alle 23.09.) |
+| Ausführen | nur die Auswahl ausführen, Haltepunkt per Klick in die Nummernspalte samt Bedingung per Rechtsklick (19.09.), Sprung aus der Ausgabe (18.09.), Profil nach Funktionen und Ausgabe leeren (23.09.); dazu seit 23.09. im Debugger Aufrufstapel, Überwachen, bis zur Marke und Wert setzen |
+| Ansicht | Zoom (18.09.), eine Datei geteilt in zwei Ansichten, ein- und ausblendbare Leisten (23.09.) |
+| Hilfe | Tooltip beim Überfahren, Strg+Klick zur Definition (19.09.), Filter über dem Projektbaum und Beispiele nach Themen (23.09.) |
 
 Umgekehrt hat `ide.dh` vieles, was die Qt-IDE nie hatte (Umbauten mit
 Vorschau, Aufrufer-Baum mit Durchläufen, git-Fenster, Spaltenauswahl,

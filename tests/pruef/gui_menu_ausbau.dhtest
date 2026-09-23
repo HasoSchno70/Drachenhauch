@@ -639,3 +639,38 @@ e 7 1 341 0 0 0 // Strg hoch
 DHRT_FRAMES=24
 --- erwartet
 kuerzel 1 text [PRINT 1]
+
+=== ein kuerzel auf f10 klappt nicht nebenbei die menueleiste auf
+' F10 oeffnet die Menueleiste -- ausser ein Menue-Kuerzel hat die Taste
+' genommen (die IDE: F10 = Schritt drueber). Vorher geschah beides: das
+' Menue stand danach offen, und das naechste Enter loeste dessen ersten
+' Eintrag aus.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM m AS INTEGER : m = GUI_MENU(w, "Datei")
+DIM a AS INTEGER : a = GUI_MENU_ITEM(m, "Erster")
+DIM b AS INTEGER : b = GUI_MENU_ITEM(m, "Schritt", "F10")
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    GUI_UPDATE()
+    IF GUI_CLICKED(a) THEN PRINT "erster"
+    IF GUI_CLICKED(b) THEN PRINT "schritt"
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 299 0 0 0 // Event: test
+e 4 1 299 0 0 0 // Event: test
+e 7 2 257 0 0 0 // Event: test
+e 8 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+schritt

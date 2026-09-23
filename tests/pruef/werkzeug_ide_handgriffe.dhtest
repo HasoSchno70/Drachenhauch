@@ -655,3 +655,123 @@ Serielle Kommunikation - z.B. mit Arduino oder ESP32
 Coin Quest
 Sprite-Collision + Easing-Demo: ein Spieler-Sprite weicht Hindernis-Boxen aus
 gibtsnicht.dh
+
+=== der debugger zeigt aufrufstapel und ueberwachte ausdruecke
+' Haltepunkt in der Funktion, zwei Ausdruecke: beim ersten Halt (Zeile 1)
+' kennt das Programm noch keine Variablen, am Haltepunkt schon.
+GUI_TEXTAREA_GOTO(aktivesFeld(), 4, 1)
+befehl("haltepunkt")
+watchListe = ["n * 10", "summe"]
+befehl("debug")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=240
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM summe AS INTEGER
+FUNCTION doppelt(n AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    r = n * 2
+    RETURN r
+END FUNCTION
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    summe = summe + doppelt(i)
+NEXT
+PRINT summe
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 7) = "stapel " OR LEFT$(P[i], 12) = "ueberwachen " OR LEFT$(P[i], 12) = "debug pause " THEN PRINT P[i]
+NEXT
+--- erwartet
+ueberwachen n * 10=? eval: 'n' nicht gefunden | summe=? eval: 'summe' nicht gefunden
+stapel doppelt:4 Hauptprogramm:9
+ueberwachen n * 10=10 | summe=0
+debug pause 4
+
+=== eine variable im halt setzen
+' Im ersten Halt in doppelt wird n auf 100 gesetzt und weitergelaufen --
+' beim naechsten Halt steht die Summe dann bei 200 statt bei 2.
+GUI_TEXTAREA_GOTO(aktivesFeld(), 4, 1)
+befehl("haltepunkt")
+watchListe = ["summe"]
+DIM prGesetzt AS BOOLEAN : prGesetzt = FALSE
+befehl("debug")
+--- einschub nach     debugPanelNachziehen()
+    IF debugPause AND debugZeile = 4 AND NOT prGesetzt THEN
+        prGesetzt = TRUE
+        debugSetzen("n", "100")
+        befehl("weiter_d")
+    END IF
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM summe AS INTEGER
+FUNCTION doppelt(n AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    r = n * 2
+    RETURN r
+END FUNCTION
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    summe = summe + doppelt(i)
+NEXT
+PRINT summe
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 8) = "gesetzt " OR LEFT$(P[i], 12) = "ueberwachen " THEN PRINT P[i]
+NEXT
+--- erwartet
+ueberwachen summe=? eval: 'summe' nicht gefunden
+ueberwachen summe=0
+ueberwachen summe=0
+gesetzt n 100
+ueberwachen summe=200
+
+=== bis zur marke startet den debugger und haelt dort
+GUI_TEXTAREA_GOTO(aktivesFeld(), 11, 1)
+befehl("bis_marke")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=240
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM summe AS INTEGER
+FUNCTION doppelt(n AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    r = n * 2
+    RETURN r
+END FUNCTION
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    summe = summe + doppelt(i)
+NEXT
+PRINT summe
+--- nachher
+DIM P AS ARRAY OF STRING : P = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(P) - 1
+    IF LEFT$(P[i], 10) = "bis zeile " OR LEFT$(P[i], 12) = "debug pause " OR LEFT$(P[i], 7) = "stapel " THEN PRINT P[i]
+NEXT
+--- erwartet
+bis zeile 11
+stapel Hauptprogramm:11
+debug pause 11

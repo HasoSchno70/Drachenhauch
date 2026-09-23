@@ -170,3 +170,94 @@ PRINT "nachher"
 TRUE TRUE
 FALSE
 -1
+
+=== aufrufstapel ueberwachen setzen und bis zeile
+' Stapel innen zuerst (die aeussere Zeile ist die des Aufrufs), die
+' ueberwachten Ausdruecke bei jedem Halt, "set" wandelt wie eine Zuweisung,
+' "run-to" haelt einmal an der Zeile.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+FUNCTION cmd$(c AS STRING, rest AS STRING) AS STRING
+    DIM s AS STRING : s = "{" + q + "cmd" + q + ":" + q + c + q
+    IF rest <> "" THEN s = s + "," + rest
+    RETURN s + "}"
+END FUNCTION
+sitzung("p.dh", [cmd$("set-breakpoints", q + "lines" + q + ":[4]"), _
+    cmd$("set-watches", q + "exprs" + q + ":[" + q + "n * 10" + q + "," + q + "summe" + q + "," + q + "gibtsnicht" + q + "]"), _
+    cmd$("continue", ""), _
+    cmd$("set", q + "name" + q + ":" + q + "n" + q + "," + q + "value" + q + ":" + q + "100" + q), _
+    cmd$("continue", ""), _
+    cmd$("set-breakpoints", q + "lines" + q + ":[]"), _
+    cmd$("run-to", q + "line" + q + ":11"), _
+    cmd$("continue", "")])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) <> "output" THEN PRINT TRIM$(art$(i) + " " + feld$(i, "line"))
+NEXT
+DIM h AS INTEGER : h = ersteMit("paused", 4)
+PRINT feld$(h, "stack.0.name"); ":"; feld$(h, "stack.0.line"); " "; feld$(h, "stack.1.name"); ":"; feld$(h, "stack.1.line")
+PRINT feld$(h, "watches.0.expr"); "="; feld$(h, "watches.0.value"); " "; feld$(h, "watches.1.value"); " "; feld$(h, "watches.2.error")
+DIM s AS INTEGER : s = ersteMit("set-result", 0)
+PRINT feld$(s, "value"); " "; feld$(s, "type"); " "; feld$(s, "watches.0.value"); " "; paar$(s, "locals", "n")
+DIM e AS INTEGER : e = ersteMit("paused", 11)
+PRINT paar$(e, "globals", "summe"); " "; feld$(e, "stack.0.name"); ":"; feld$(e, "stack.0.line"); " "; feld$(e, "stack.1.name") = ""
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei p.dh
+DIM summe AS INTEGER
+FUNCTION doppelt(n AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    r = n * 2
+    RETURN r
+END FUNCTION
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    summe = summe + doppelt(i)
+NEXT
+PRINT summe
+
+--- erwartet
+paused 1
+watches
+paused 4
+set-result
+paused 4
+paused 11
+finished
+doppelt:4 __main__:9
+n * 10=10 0 eval: 'gibtsnicht' nicht gefunden
+100 INTEGER 1000 100
+210 __main__:11 TRUE
+
+=== setzen wandelt und weist zurueck
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+FUNCTION setze$(name AS STRING, wert AS STRING) AS STRING
+    RETURN "{" + q + "cmd" + q + ":" + q + "set" + q + "," + q + "name" + q + ":" + q + name + q + "," + q + "value" + q + ":" + q + wert + q + "}"
+END FUNCTION
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[4]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    setze$("maxi", "6"), setze$("gibtsnicht", "1"), setze$("x", "\" + q + "abc\" + q), setze$("x", "7 * 3"), _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "set-error" THEN PRINT "fehler "; feld$(i, "message")
+    IF art$(i) = "set-result" THEN PRINT "gesetzt "; feld$(i, "name"); " "; feld$(i, "value")
+    IF art$(i) = "output" THEN PRINT "ausgabe "; TRIM$(feld$(i, "text"))
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+CONST MAXI AS INTEGER = 5
+DIM x AS INTEGER
+x = 1
+PRINT x
+
+--- erwartet
+fehler set: 'maxi' nicht gefunden
+fehler set: 'gibtsnicht' nicht gefunden
+fehler x: Erwartet INTEGER, erhalten STRING
+gesetzt x 21
+ausgabe 21

@@ -359,7 +359,33 @@ impl Kind {
     }
 }
 
+/// Nimmt dieses Widget getippten Text? Wie `Kind::nimmt_text`, dazu die
+/// bearbeitbare Klappliste -- dort gehoert eine Taste ohne Strg/Alt dem Feld,
+/// nicht einem Menue-Kuerzel.
+fn nimmt_text_w(w: &Widget) -> bool {
+    w.kind.nimmt_text() || (w.kind == Kind::Dropdown && w.frei)
+}
+
+/// Bearbeitbare Klappliste: `sel` folgt dem Text -- der Eintrag, der genau so
+/// heisst (Gross/klein egal), sonst -1.
+fn dd_frei_abgleichen(w: &mut Widget) {
+    let t = w.text.to_lowercase();
+    w.sel = w.items.iter().position(|x| x.to_lowercase() == t).map(|k| k as i32).unwrap_or(-1);
+}
+
+/// Bearbeitbare Klappliste: den gewaehlten Eintrag ins Feld schreiben,
+/// Schreibmarke ans Ende.
+fn dd_frei_text_setzen(w: &mut Widget) {
+    if !w.frei || w.sel < 0 || w.sel as usize >= w.items.len() { return; }
+    w.text = w.items[w.sel as usize].clone();
+    let n = w.text.chars().count() as i32;
+    w.caret = n; w.sel_anchor = n; w.scroll = 0;
+}
+
 const DROPDOWN_ITEM_H: i32 = 22;
+/// Breite des Pfeils einer bearbeitbaren Klappliste -- dort klappt ein Klick
+/// auf, links davon setzt er die Schreibmarke.
+const DD_PFEIL_B: i32 = 22;
 /// Hoechstens so viele Eintraege zeigt eine offene Klappliste auf einmal; der
 /// Rest rollt. Vorher war das Popup so hoch wie die Liste lang -- hundert
 /// Eintraege ragten weit ueber den Bildschirm hinaus.
@@ -2488,6 +2514,10 @@ pub struct Widget {
     nur_lesen: bool,
     maxlaenge: i32,
     zahlen: u8,
+    // Nur Klappliste: in das Feld darf getippt werden (Combobox). Der Text
+    // steht dann in `text`, `sel` folgt ihm (der Eintrag, der genau so
+    // heisst, sonst -1).
+    frei: bool,
     // Enter im Textfeld -- GENAU EIN BILD lang, wie `clicked`.
     entered: bool,
     on_enter: Option<Rueckruf>,
@@ -2748,6 +2778,10 @@ pub struct Gui {
     active_split: Option<(usize, usize)>,    // laufendes Splitter-Drag
     split_off: i32,                          // Griff-Versatz (Maus -> Balkenkante)
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
+    // Bearbeitbare Klappliste: steht die Markierung, weil jemand mit den
+    // Pfeilen dorthin ging? Nur dann nimmt Enter den Eintrag -- ein beim
+    // Tippen VORGESCHLAGENER Eintrag ersetzte sonst, was man getippt hat.
+    dd_pfeil: bool,
     /// Wie weit die offene Klappliste schon aufgeklappt ist (0..1), und fuer
     /// welche -- wechselt die Liste, faengt es bei 0 an.
     dd_auf_t: f32,
@@ -2892,7 +2926,7 @@ impl Gui {
             skins: HashMap::new(),
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
-            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, active_table: None, table_press: None, press_origin: None,
+            open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true, cursor_form: None,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false),
@@ -3802,7 +3836,7 @@ impl Gui {
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
             zeit: [12, 0, 0], zeit_sek: false,
             step: 1.0,
-            align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0,
+            align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0, frei: false,
             entered: false, on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
         }
     }
@@ -4632,12 +4666,14 @@ impl Gui {
     }
     pub fn dropdown_text(&self, h: i64) -> Result<String, String> {
         let w = self.item_widget(h, "GUI_DROPDOWN_TEXT")?;
+        if w.kind == Kind::Dropdown && w.frei { return Ok(w.text.clone()); }
         Ok(if w.sel >= 0 && (w.sel as usize) < w.items.len() { w.items[w.sel as usize].clone() } else { String::new() })
     }
     pub fn dropdown_set_selected(&mut self, h: i64, idx: i64) -> Result<(), String> {
         self.item_widget(h, "GUI_DROPDOWN_SET_SELECTED")?;
         let w = self.wdg_mut(h, "GUI_DROPDOWN_SET_SELECTED")?;
         w.sel = if idx >= 0 && (idx as usize) < w.items.len() { idx as i32 } else { -1 };
+        dd_frei_text_setzen(w);
         Ok(())
     }
     pub fn set_dropdown_items(&mut self, h: i64, items: Vec<String>) -> Result<(), String> {
@@ -4652,7 +4688,11 @@ impl Gui {
             l.aus = vec![false; n]; l.kopf = vec![false; n];
             l.anker = -1;
         }
-        w.items = items; w.value = 0.0; Ok(())
+        w.items = items; w.value = 0.0;
+        // Bearbeitbar: der Text bleibt, was er war -- ob er jetzt ein Eintrag
+        // ist, entscheiden die NEUEN Eintraege.
+        if w.kind == Kind::Dropdown && w.frei { dd_frei_abgleichen(w); }
+        Ok(())
     }
 
     // ---- Listen-Ausbau (Punkt 3, 2026-09-04) ------------------------------
@@ -8848,7 +8888,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let mods = (g.key_ctrl() as u8) | ((g.key_shift() as u8) << 1) | ((g.key_alt() as u8) << 2);
         let text_fokus = self.focus_widget
             .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)))
-            .map(|w| w.kind.nimmt_text()).unwrap_or(false);
+            .map(nimmt_text_w).unwrap_or(false);
         let kandidaten: Vec<usize> = self.focus_window.into_iter()
             .chain(self.z_order.iter().rev().copied())
             .filter(|&wi| wi < self.windows.len())
@@ -8982,6 +9022,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Caret ans Ende, Selektion/Scroll zuruecksetzen (sonst zeigt das Caret
         // hinter das Ende des nun kuerzeren Textes).
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
+        if w.kind == Kind::Dropdown && w.frei { dd_frei_abgleichen(w); }
         // Beim gesetzten Text ist der Text die QUELLE -- sonst setzte
         // GUI_SET_TEXT dort etwas, das nie zu sehen ist.
         // Bei der Statusleiste ist der Text das ERSTE Feld -- ein Programm, das
@@ -10100,6 +10141,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if w.wrap { o["wrap"] = serde_json::json!(true); }
         if w.passwort { o["passwort"] = serde_json::json!(true); }
         if w.nur_lesen { o["nur_lesen"] = serde_json::json!(true); }
+        if w.frei { o["bearbeitbar"] = serde_json::json!(true); }
         if w.maxlaenge > 0 { o["maxlaenge"] = serde_json::json!(w.maxlaenge); }
         if w.zahlen != 0 { o["zahlen"] = serde_json::json!(w.zahlen); }
         // Der Tooltip fehlte in der Datei -- ein im Designer gesetzter war
@@ -10304,6 +10346,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         w.wrap = wj["wrap"].as_bool().unwrap_or(false);
         w.passwort = wj["passwort"].as_bool().unwrap_or(false);
         w.nur_lesen = wj["nur_lesen"].as_bool().unwrap_or(false);
+        w.frei = w.kind == Kind::Dropdown && wj["bearbeitbar"].as_bool().unwrap_or(false);
         w.maxlaenge = wj["maxlaenge"].as_i64().unwrap_or(0).max(0) as i32;
         w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 2) as u8;
         w.tooltip = wj["tooltip"].as_str().unwrap_or("").to_string();
@@ -11967,8 +12010,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if !menue_hat_tasten {
         // Tastatur + Maus fuer das fokussierte Textfeld (Caret/Selektion/Editieren).
         if let Some((wi, i)) = self.focus_widget {
+            let frei_dd = self.windows[wi].widgets[i].frei;
             match self.windows[wi].widgets[i].kind {
                 Kind::TextInput => self.edit_textinput(wi, i, g),
+                Kind::Dropdown if frei_dd => self.edit_combo(wi, i, g),
                 Kind::TextArea => self.edit_textarea(wi, i, g),
                 Kind::Spinner => self.spinner_keys(wi, i, g),
                 Kind::Table => self.table_keys(wi, i, g),
@@ -12016,7 +12061,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     self.tip_fokus_frame = self.frame_count;
                     // Nur ein Textfeld bekommt Caret + Markierung -- bei einem
                     // Knopf waeren beide bedeutungslos.
-                    if self.windows[top].widgets[ni].kind.nimmt_text() {
+                    if nimmt_text_w(&self.windows[top].widgets[ni]) {
                         let len = self.windows[top].widgets[ni].text.chars().count() as i32;
                         let w = &mut self.windows[top].widgets[ni];
                         w.caret = len; w.sel_anchor = 0;   // Inhalt markiert (wie ueblich beim Tabben)
@@ -12035,7 +12080,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 && self.modal.map_or(true, |m| m == top) && self.editing_table.is_none() {
                 let fok = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i).map(|w| w.kind));
-                let enter_frei = matches!(fok, None | Some(Kind::TextInput));
+                let fok_frei = self.focus_widget.filter(|(w, _)| *w == top)
+                    .and_then(|(_, i)| self.windows[top].widgets.get(i))
+                    .map(|w| w.kind == Kind::Dropdown && w.frei).unwrap_or(false);
+                let enter_frei = matches!(fok, None | Some(Kind::TextInput)) || fok_frei;
                 // Beim Umbenennen in einer Liste gehoeren Enter und ESC dem Feld.
                 let liste_edit = self.focus_widget.filter(|(w, _)| *w == top)
                     .and_then(|(_, i)| self.windows[top].widgets.get(i))
@@ -12247,6 +12295,68 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Delete, Pfeile/Home/End (Shift = Selektion), Strg+A/C/V/X, Maus-Klick/-Drag
     /// zum Setzen/Aufziehen der Selektion. Caret/Selektion/Scroll werden mit
     /// GEMESSENEN Textbreiten gefuehrt (passt zu jedem Font).
+    /// Bearbeitbare Klappliste mit Fokus: getippt wird wie in einem Textfeld
+    /// (dieselbe Routine), die Liste schlaegt vor. Pfeil ab klappt auf, offen
+    /// waehlen die Pfeile, Enter nimmt den mit den Pfeilen gewaehlten Eintrag
+    /// -- sonst bleibt, was getippt ist. ESC klappt nur zu.
+    fn edit_combo(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let offen = self.open_dropdown == Some((wi, i));
+        let n = self.windows[wi].widgets[i].items.len() as i32;
+        if offen {
+            if g.key_pressed(KEY_ESC) { self.open_dropdown = None; self.liste_taste = true; return; }
+            let rows = self.dd_zeilen(wi, i);
+            let m = self.dd_mark;
+            let neu = if g.key_pressed(KEY_DOWN) { Some(m + 1) }
+                else if g.key_pressed(KEY_UP) { Some(if m < 0 { 0 } else { m - 1 }) }
+                else if g.key_pressed(KEY_PAGEDOWN) { Some(m + rows) }
+                else if g.key_pressed(KEY_PAGEUP) { Some(m - rows) }
+                else { None };
+            if let Some(k) = neu {
+                if n > 0 {
+                    self.dd_mark = k.clamp(0, n - 1);
+                    self.dd_pfeil = true;
+                    self.dd_mark_zeigen(wi, i);
+                }
+                return;
+            }
+            if g.key_pressed(KEY_ENTER) {
+                // Enter gehoert hier der Liste, nicht dem Standard-Knopf.
+                self.liste_taste = true;
+                self.open_dropdown = None;
+                if self.dd_pfeil && self.dd_mark >= 0 {
+                    let k = self.dd_mark;
+                    self.dd_waehle(wi, i, k);
+                    return;
+                }
+            }
+        } else if g.key_pressed(KEY_DOWN) && n > 0 {
+            self.open_dropdown = Some((wi, i));
+            self.dd_pfeil = false;
+            return;
+        }
+        let vorher = self.windows[wi].widgets[i].text.clone();
+        self.edit_textinput(wi, i, g);
+        let w = &mut self.windows[wi].widgets[i];
+        if w.text == vorher { return; }
+        dd_frei_abgleichen(w);
+        // Vorschlag: der erste Eintrag, der so anfaengt. Nur markiert --
+        // uebernommen wird er erst mit den Pfeilen.
+        let t = w.text.to_lowercase();
+        let treffer = if t.is_empty() { None } else { w.items.iter().position(|x| x.to_lowercase().starts_with(&t)) };
+        match treffer {
+            Some(k) => {
+                self.open_dropdown = Some((wi, i));
+                // Selbst als "frisch geoeffnet" gemerkt -- sonst setzte das
+                // naechste Bild die Markierung zurueck auf die Auswahl.
+                self.dd_auf_von = self.open_dropdown;
+                self.dd_mark = k as i32;
+                self.dd_pfeil = false;
+                self.dd_mark_zeigen(wi, i);
+            }
+            None => { if self.open_dropdown == Some((wi, i)) { self.open_dropdown = None; } }
+        }
+    }
+
     fn edit_textinput(&mut self, wi: usize, i: usize, g: &mut Graphics) {
         let ms = self.mass(g, &self.windows[wi].widgets[i]);
         let before = self.windows[wi].widgets[i].text.clone();
@@ -12334,7 +12444,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // --- Horizontalen Scroll so anpassen, dass das Caret sichtbar bleibt ---
         let vor = sichtbar(&chars[..caret as usize]);
         let caret_px = ms.breite(g, &vor.iter().collect::<String>());
-        let inner = (fw - 10).max(1);
+        let pfeil = if self.windows[wi].widgets[i].frei { self.sk(DD_PFEIL_B) } else { 0 };
+        let inner = (fw - 10 - pfeil).max(1);
         let mut scroll = scroll;
         if caret_px - scroll > inner { scroll = caret_px - inner; }
         if caret_px - scroll < 0 { scroll = caret_px; }
@@ -14335,7 +14446,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // Aenderung -- so wie jede Auswahlliste, und ein Irrtum beim
                 // Blaettern feuert kein on_change.
                 if self.open_dropdown == Some((wi, i)) {
-                    if g.key_pressed(KEY_ESC) { self.open_dropdown = None; return; }
+                    // Verbraucht -- sonst saehe die Fensterregel unten eine
+                    // geschlossene Liste und drueckte auch noch Abbrechen.
+                    if g.key_pressed(KEY_ESC) { self.open_dropdown = None; self.liste_taste = true; return; }
                     if ausloesen {
                         let k = self.dd_mark;
                         self.open_dropdown = None;
@@ -14672,8 +14785,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Uebernehmen: den Eintrag waehlen (mit on_change, wenn es ein anderer ist).
     fn dd_waehle(&mut self, wi: usize, idx: usize, k: i32) {
         let w = &mut self.windows[wi].widgets[idx];
-        if k < 0 || k as usize >= w.items.len() || w.sel == k { return; }
+        if k < 0 || k as usize >= w.items.len() { return; }
+        // Bearbeitbar: auch derselbe Eintrag schreibt seinen Text -- getippt
+        // war vielleicht "rot", in der Liste steht "Rot".
+        let text_vorher = w.text.clone();
+        let anders = w.sel != k;
         w.sel = k;
+        dd_frei_text_setzen(w);
+        if !anders && w.text == text_vorher { return; }
         let f = w.on_change.clone();
         if let Some(f) = f { self.pending.push(f); }
     }
@@ -14707,6 +14826,25 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             else { self.dd_waehle(wi, idx, k as i32); }
         }
         true
+    }
+    /// `GUI_DROPDOWN_SET(dd, key$, wert)` -- heute nur `bearbeitbar`: in das
+    /// Feld darf getippt werden, auch etwas, das nicht in der Liste steht.
+    pub fn dropdown_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_DROPDOWN_SET")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_SET: Widget ist keine Klappliste (GUI_DROPDOWN)".into()); }
+        match key.to_lowercase().as_str() {
+            "bearbeitbar" | "editable" => {
+                let an = wert != 0.0;
+                if an && !w.frei {
+                    w.frei = true;
+                    w.text.clear();
+                    dd_frei_text_setzen(w);
+                }
+                if !an { w.frei = false; }
+            }
+            k => return Err(format!("GUI_DROPDOWN_SET: unbekannter Schluessel '{}' (bekannt: bearbeitbar)", k)),
+        }
+        Ok(())
     }
     pub fn dropdown_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_DROPDOWN_PLACEHOLDER")?;
@@ -14781,14 +14919,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         return;
                     }
                     let item = self.dd_scroll + (my - py) / self.sk(DROPDOWN_ITEM_H);
-                    if item >= 0 && item < n {
-                        let changed = self.windows[dw].widgets[di].sel != item;
-                        self.windows[dw].widgets[di].sel = item;
-                        if changed {
-                            let f = self.windows[dw].widgets[di].on_change.clone();
-                            if let Some(f) = f { self.pending.push(f); }
-                        }
-                    }
+                    if item >= 0 && item < n { self.dd_waehle(dw, di, item); }
                     self.open_dropdown = None;
                     return;
                 }
@@ -15053,7 +15184,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if let Some(f) = och { self.pending.push(f); }
                 }
             }
-            Kind::Dropdown => self.open_dropdown = Some((win, i)),
+            Kind::Dropdown => {
+                // Bearbeitbar: ein Klick ins Feld setzt die Schreibmarke
+                // (edit_textinput), nur der Pfeil klappt auf.
+                let w = &self.windows[win].widgets[i];
+                if !w.frei { self.open_dropdown = Some((win, i)); }
+                else {
+                    let (ax, _, ww, _) = self.abs_rect(win, w);
+                    if mx >= ax + ww - self.sk(DD_PFEIL_B) { self.open_dropdown = Some((win, i)); self.dd_pfeil = false; }
+                }
+            }
             Kind::ListBox => {
                 let (ax, _, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
                 let row = self.liste_zeile(win, i, my);
@@ -16034,7 +16174,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if alt && self.alt_allein && g.key_any_pressed_except_alt() { self.alt_allein = false; }
         let alt_los = !alt && self.alt_allein && (g.key_released_edge(K_LALT) || g.key_released_edge(K_RALT));
         if !alt { self.alt_allein = false; }
-        let oeffnen = g.key_pressed(K_F10) || alt_los;
+        // F10 ist die Menue-Taste nur, wenn sie nichts anderes ist: mit Strg
+        // gehoert sie einem Kuerzel ("bis zur Marke"), und hat ein Menue-
+        // Kuerzel sie genommen (die IDE: F10 = Schritt drueber), klappte sonst
+        // nebenbei die Menueleiste auf.
+        let f10 = g.key_pressed(K_F10) && !g.key_ctrl() && !g.key_shift() && !self.kuerzel_gefeuert;
+        let oeffnen = f10 || alt_los;
         let kontext = self.context_open.is_some();
         if self.open_menu.is_none() && !kontext {
             if oeffnen {
@@ -16484,7 +16629,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             Kind::Dropdown => {
                 let mut n = Node::new(Role::ComboBox);
-                if w.sel >= 0 { if let Some(t) = w.items.get(w.sel as usize) { n.set_value(t.clone()); } }
+                if w.frei { n.set_value(w.text.clone()); }
+                else if w.sel >= 0 { if let Some(t) = w.items.get(w.sel as usize) { n.set_value(t.clone()); } }
                 n.set_expanded(self.open_dropdown == Some((wi, i)));
                 n.add_action(Action::Expand);
                 n.add_action(Action::Collapse);
@@ -17318,6 +17464,67 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
     }
 
+    /// Ein einzeiliges Textfeld zeichnen -- das Textfeld selbst und die
+    /// bearbeitbare Klappliste (`rechts` = Platz fuer ihren Pfeil).
+    #[allow(clippy::too_many_arguments)]
+    fn zeichne_textfeld(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget,
+                        ax: i32, ay: i32, w: i32, h: i32, rechts: i32) {
+        let focused = self.focus_widget == Some((wi, idx));
+        let fg = self.txt_col(wdg);
+        let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
+        self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
+        // Im Passwortmodus stehen Punkte -- gemessen wird dann auch an
+        // den Punkten, sonst saesse die Schreibmarke neben dem Text.
+        // Die IME-Vorschau steht an der Schreibmarke mit im Text.
+        let (anz_chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
+        let anzeige: String = anz_chars.iter().collect();
+        let ty = ay + (h - self.wsize(g, wdg)).max(0) / 2;
+        let inner = (w - 10 - rechts).max(1);
+        let tw = self.wtext_width(g, wdg, &anzeige);
+        // Ausrichtung nur, solange der Text hineinpasst -- sonst gilt
+        // links mit Rollen, damit die Schreibmarke sichtbar bleibt.
+        let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
+            (if wdg.align == 1 { ax + 5 + (inner - tw) / 2 } else { ax + 5 + inner - tw }, 0)
+        } else { (ax + 5, wdg.scroll) };
+        // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
+        g.push_clip(ax + 2, ay + 1, (w - 4 - rechts).max(0), (h - 2).max(0));
+        if anzeige.is_empty() {
+            if !wdg.placeholder.is_empty() && !focused {
+                self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
+            }
+        } else {
+            let chars: Vec<char> = anz_chars;
+            // Selektion-Highlight (halbtransparenter Akzent hinter dem Text).
+            if focused && wdg.vorschau.is_empty() {
+                let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
+                let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
+                if lo != hi {
+                    let x0 = tx + self.wtext_width(g, wdg, &chars[..lo as usize].iter().collect::<String>()) - scroll;
+                    let x1 = tx + self.wtext_width(g, wdg, &chars[..hi as usize].iter().collect::<String>()) - scroll;
+                    g.box_fill(x0, ay + 2, x1, ay + h - 3, self.selection_bg(wdg));
+                }
+            }
+            self.wtext(g, wdg, tx - scroll, ty, anzeige.clone(), fg);
+            // Die IME-Vorschau unterstreichen -- so sieht man, was
+            // noch nicht fertig ist.
+            if !wdg.vorschau.is_empty() {
+                let von = wdg.caret.clamp(0, chars.len() as i32) as usize;
+                let bis = (von + wdg.vorschau.chars().count()).min(chars.len());
+                let x0 = tx + self.wtext_width(g, wdg, &chars[..von].iter().collect::<String>()) - scroll;
+                let x1 = tx + self.wtext_width(g, wdg, &chars[..bis].iter().collect::<String>()) - scroll;
+                g.line(x0, ay + h - 5, x1, ay + h - 5, fg);
+            }
+        }
+        // Caret (blinkend) an der gemessenen Position -- in der
+        // Vorschau dort, wo die IME ihre Marke hat.
+        if focused && self.caret_blink_on() {
+            let pre: String = anzeige.chars().take(caret_anz.max(0) as usize).collect();
+            let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
+            g.line(cx, ay + 3, cx, ay + h - 4, fg);
+        }
+        g.pop_clip();
+    }
+
     fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);
         let pad = self.m("pad");
@@ -17600,62 +17807,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     self.wtext(g, wdg, cx - tw / 2, ay + h + 2, wdg.text.clone(), self.txt_col(wdg));
                 }
             }
-            Kind::TextInput => {
-                let focused = self.focus_widget == Some((wi, idx));
-                let fg = self.txt_col(wdg);
-                let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
-                self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
-                // Im Passwortmodus stehen Punkte -- gemessen wird dann auch an
-                // den Punkten, sonst saesse die Schreibmarke neben dem Text.
-                // Die IME-Vorschau steht an der Schreibmarke mit im Text.
-                let (anz_chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
-                let anzeige: String = anz_chars.iter().collect();
-                let ty = ay + (h - self.wsize(g, wdg)).max(0) / 2;
-                let inner = (w - 10).max(1);
-                let tw = self.wtext_width(g, wdg, &anzeige);
-                // Ausrichtung nur, solange der Text hineinpasst -- sonst gilt
-                // links mit Rollen, damit die Schreibmarke sichtbar bleibt.
-                let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
-                    (if wdg.align == 1 { ax + 5 + (inner - tw) / 2 } else { ax + 5 + inner - tw }, 0)
-                } else { (ax + 5, wdg.scroll) };
-                // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
-                g.push_clip(ax + 2, ay + 1, (w - 4).max(0), (h - 2).max(0));
-                if anzeige.is_empty() {
-                    if !wdg.placeholder.is_empty() && !focused {
-                        self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
-                    }
-                } else {
-                    let chars: Vec<char> = anz_chars;
-                    // Selektion-Highlight (halbtransparenter Akzent hinter dem Text).
-                    if focused && wdg.vorschau.is_empty() {
-                        let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
-                        let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
-                        if lo != hi {
-                            let x0 = tx + self.wtext_width(g, wdg, &chars[..lo as usize].iter().collect::<String>()) - scroll;
-                            let x1 = tx + self.wtext_width(g, wdg, &chars[..hi as usize].iter().collect::<String>()) - scroll;
-                            g.box_fill(x0, ay + 2, x1, ay + h - 3, self.selection_bg(wdg));
-                        }
-                    }
-                    self.wtext(g, wdg, tx - scroll, ty, anzeige.clone(), fg);
-                    // Die IME-Vorschau unterstreichen -- so sieht man, was
-                    // noch nicht fertig ist.
-                    if !wdg.vorschau.is_empty() {
-                        let von = wdg.caret.clamp(0, chars.len() as i32) as usize;
-                        let bis = (von + wdg.vorschau.chars().count()).min(chars.len());
-                        let x0 = tx + self.wtext_width(g, wdg, &chars[..von].iter().collect::<String>()) - scroll;
-                        let x1 = tx + self.wtext_width(g, wdg, &chars[..bis].iter().collect::<String>()) - scroll;
-                        g.line(x0, ay + h - 5, x1, ay + h - 5, fg);
-                    }
-                }
-                // Caret (blinkend) an der gemessenen Position -- in der
-                // Vorschau dort, wo die IME ihre Marke hat.
-                if focused && self.caret_blink_on() {
-                    let pre: String = anzeige.chars().take(caret_anz.max(0) as usize).collect();
-                    let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
-                    g.line(cx, ay + 3, cx, ay + h - 4, fg);
-                }
-                g.pop_clip();
-            }
+            Kind::TextInput => self.zeichne_textfeld(g, wi, idx, wdg, ax, ay, w, h, 0),
             Kind::TextArea => {
                 let focused = self.focus_widget == Some((wi, idx));
                 let fg = self.txt_col(wdg);
@@ -17973,6 +18125,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let pctw = self.wtext_width(g, wdg, &pct);
                     self.wtext(g, wdg, ax + w / 2 - pctw / 2, ay + (h - self.wsize(g, wdg)).max(0) / 2, pct, self.txt_col(wdg));
                 }
+            }
+            Kind::Dropdown if wdg.frei => {
+                let pb = self.sk(DD_PFEIL_B);
+                self.zeichne_textfeld(g, wi, idx, wdg, ax, ay, w, h, pb);
+                let fg = self.txt_col(wdg);
+                g.line(ax + w - pb, ay + 4, ax + w - pb, ay + h - 5, self.wcol(wdg, "border", "widget_border"));
+                let (axr, cy) = (ax + w - pb / 2 - 4, ay + h / 2);   // ▼
+                g.line(axr, cy - 2, axr + 4, cy + 2, fg);
+                g.line(axr + 4, cy + 2, axr + 8, cy - 2, fg);
             }
             Kind::Dropdown => {
                 let bg = self.wcol(wdg, "bg", "widget_bg");

@@ -646,6 +646,7 @@ DIM miWeiterD AS INTEGER : miWeiterD = GUI_MENU_ITEM(mLauf, "Weiter", "F8")
 DIM miDrueber AS INTEGER : miDrueber = GUI_MENU_ITEM(mLauf, "Schritt drüber", "F10")
 DIM miHinein AS INTEGER : miHinein = GUI_MENU_ITEM(mLauf, "Schritt hinein", "F11")
 DIM miHeraus AS INTEGER : miHeraus = GUI_MENU_ITEM(mLauf, "Schritt heraus", "Umschalt+F11")
+DIM miBisMarke AS INTEGER : miBisMarke = GUI_MENU_ITEM(mLauf, "Bis zur Marke laufen", "Strg+F10")
 GUI_MENU_SEPARATOR(mLauf)
 DIM miProfil AS INTEGER : miProfil = GUI_MENU_ITEM(mLauf, "Profil aufnehmen", "Strg+Umschalt+Y")
 DIM miAusgabeLeer AS INTEGER : miAusgabeLeer = GUI_MENU_ITEM(mLauf, "Ausgabe leeren")
@@ -913,6 +914,26 @@ GUI_BUTTON_VARIANT(btnStoppD, "gefahr")
 DIM tblVars AS GUI_WIDGET : tblVars = GUI_TABLE(win, 0, 0, 10, 10)
 GUI_TABLE_HEADERS(tblVars, ["Name", "Typ", "Wert", "Bereich"])
 GUI_TABLE_COL_WIDTHS(tblVars, [140, 90, 260, 70])
+GUI_TOOLTIP(tblVars, "Doppelklick setzt einen neuen Wert")
+DIM btnBisMarke AS GUI_WIDGET : btnBisMarke = GUI_BUTTON(win, "Bis Marke", 0, 0, 84, 26)
+GUI_TOOLTIP(btnBisMarke, "Bis zur Zeile mit der Schreibmarke laufen (Strg+F10)")
+' Rechts neben den Variablen: der Aufrufstapel (innen oben, Doppelklick
+' springt hin) und die ueberwachten Ausdruecke -- sie werden bei JEDEM Halt
+' neu ausgewertet, auch ueber mehrere Laeufe hinweg.
+DIM tblStapel AS GUI_WIDGET : tblStapel = GUI_TABLE(win, 0, 0, 10, 10)
+GUI_TABLE_HEADERS(tblStapel, ["Aufrufstapel", "Zeile"])
+GUI_TABLE_COL_WIDTHS(tblStapel, [170, 60])
+DIM tblWatch AS GUI_WIDGET : tblWatch = GUI_TABLE(win, 0, 0, 10, 10)
+GUI_TABLE_HEADERS(tblWatch, ["Überwachen", "Wert"])
+GUI_TABLE_COL_WIDTHS(tblWatch, [130, 160])
+DIM tfWatch AS GUI_WIDGET : tfWatch = GUI_TEXTINPUT(win, 0, 0, 10, 10, "Ausdruck, Enter ...")
+DIM btnWatchWeg AS GUI_WIDGET : btnWatchWeg = GUI_BUTTON(win, "Entfernen", 0, 0, 80, 26)
+DIM watchListe AS ARRAY OF STRING : watchListe = []
+DIM dlgSetzen AS GUI_WINDOW : dlgSetzen = 0
+DIM setzenName AS STRING : setzenName = ""
+' "Bis zur Marke", ehe der Debugger laeuft: er startet und laeuft beim
+' ersten Halt dorthin.
+DIM debugBis AS INTEGER : debugBis = 0
 DIM debugSichtbar AS BOOLEAN : debugSichtbar = FALSE
 
 ' Profil: die Zeilen nach Zeit, ein Klick springt hin.
@@ -1498,6 +1519,8 @@ SUB debugPanelZeigen(an AS BOOLEAN)
     GUI_SET_VISIBLE(lblDebug, d) : GUI_SET_VISIBLE(tblVars, d)
     GUI_SET_VISIBLE(btnWeiter, d) : GUI_SET_VISIBLE(btnDrueber, d) : GUI_SET_VISIBLE(btnHinein, d)
     GUI_SET_VISIBLE(btnHeraus, d) : GUI_SET_VISIBLE(btnStoppD, d)
+    GUI_SET_VISIBLE(btnBisMarke, d) : GUI_SET_VISIBLE(tblStapel, d) : GUI_SET_VISIBLE(tblWatch, d)
+    GUI_SET_VISIBLE(tfWatch, d) : GUI_SET_VISIBLE(btnWatchWeg, d)
 END SUB
 
 SUB leistenSetzen(seiten AS BOOLEAN, unten AS BOOLEAN)
@@ -1655,7 +1678,18 @@ SUB layout()
     GUI_SET_BOUNDS(btnHinein, 236 + halb, uy + 20, 104, 26)
     GUI_SET_BOUNDS(btnHeraus, 346 + halb, uy + 20, 70, 26)
     GUI_SET_BOUNDS(btnStoppD, 422 + halb, uy + 20, 60, 26)
-    GUI_SET_BOUNDS(tblVars, 16 + halb, uy + 52, halb, hoeheUnten - 52)
+    GUI_SET_BOUNDS(btnBisMarke, 488 + halb, uy + 20, 84, 26)
+    ' Variablen links, Stapel und Ueberwachen rechts uebereinander.
+    DIM vw AS INTEGER : vw = (halb * 55) \ 100
+    DIM hh AS INTEGER : hh = MAX(60, hoeheUnten - 52)
+    GUI_SET_BOUNDS(tblVars, 16 + halb, uy + 52, vw, hh)
+    DIM rx AS INTEGER : rx = 16 + halb + vw + 6
+    DIM rw AS INTEGER : rw = MAX(60, halb - vw - 6)
+    DIM sh AS INTEGER : sh = MAX(30, (hh - 32) \ 2)
+    GUI_SET_BOUNDS(tblStapel, rx, uy + 52, rw, sh)
+    GUI_SET_BOUNDS(tblWatch, rx, uy + 56 + sh, rw, MAX(30, hh - sh - 36))
+    GUI_SET_BOUNDS(tfWatch, rx, uy + 52 + hh - 26, MAX(30, rw - 86), 26)
+    GUI_SET_BOUNDS(btnWatchWeg, rx + rw - 80, uy + 52 + hh - 26, 80, 26)
     debugPanelZeigen(debugSichtbar)
     DIM ey AS INTEGER : ey = hi - statusH - eingabeH - 4
     GUI_SET_BOUNDS(tfEingabe, 8, ey, w - 108, 26)
@@ -7748,6 +7782,12 @@ SUB debugEreignis(zeile AS STRING)
                 ' ohne Haltepunkte bleibt es stehen -- sonst saehe man nichts.
                 debugErst = FALSE
                 debugHaltepunkteSenden()
+                debugWatchesSenden()
+                IF debugBis > 0 THEN
+                    debugRunTo(debugBis)
+                    debugBis = 0
+                    RETURN
+                END IF
                 DIM hat AS BOOLEAN : hat = FALSE
                 DIM i AS INTEGER
                 FOR i = 0 TO LEN(hpZeilen) - 1
@@ -7757,6 +7797,8 @@ SUB debugEreignis(zeile AS STRING)
             END IF
             debugPause = TRUE
             variablenZeigen(j)
+            stapelZeigen(j)
+            watchesZeigen(j)
             GUI_SET_TEXT(lblDebug, "Debugger steht in Zeile " + STR$(debugZeile) + " (Tiefe " + STR$(JSON_GET_INT(j, "depth")) + ")")
             dateiOeffnen(prozessDatei)
             DIM ta AS GUI_WIDGET : ta = aktivesFeld()
@@ -7774,7 +7816,159 @@ SUB debugEreignis(zeile AS STRING)
             protokoll("eval " + JSON_GET_STRING(j, "value"))
         CASE "eval-error"
             ausgabe("Fehler: " + JSON_GET_STRING(j, "message"))
+        CASE "watches"
+            watchesZeigen(j)
+        CASE "set-result"
+            variablenZeigen(j)
+            watchesZeigen(j)
+            GUI_SET_TEXT(lblStatus, JSON_GET_STRING(j, "name") + " = " + JSON_GET_STRING(j, "value"))
+            protokoll("gesetzt " + JSON_GET_STRING(j, "name") + " " + JSON_GET_STRING(j, "value"))
+        CASE "set-error"
+            GUI_SET_TEXT(lblStatus, JSON_GET_STRING(j, "message"))
+            protokoll("setzen fehler " + JSON_GET_STRING(j, "message"))
     END SELECT
+END SUB
+
+' Der Aufrufstapel: innen oben. Das Hauptprogramm heisst im Kind
+' "__main__" -- hier heisst es, wie man es nennt.
+SUB stapelZeigen(j AS JSON_HANDLE)
+    GUI_TABLE_CLEAR(tblStapel)
+    IF NOT JSON_HAS(j, "stack") THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "stack") - 1
+        DIM p AS STRING : p = "stack." + STR$(i)
+        DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+        IF name = "" OR LEFT$(name, 2) = "__" THEN name = "Hauptprogramm"
+        GUI_TABLE_ADD_ROW(tblStapel, [name, STR$(JSON_GET_INT(j, p + ".line"))])
+        ARRAY_PUSH(teile, name + ":" + STR$(JSON_GET_INT(j, p + ".line")))
+    NEXT
+    protokoll("stapel " + JOIN$(teile, " "))
+END SUB
+
+SUB watchesZeigen(j AS JSON_HANDLE)
+    GUI_TABLE_CLEAR(tblWatch)
+    IF NOT JSON_HAS(j, "watches") THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "watches") - 1
+        DIM p AS STRING : p = "watches." + STR$(i)
+        DIM wert AS STRING
+        IF JSON_HAS(j, p + ".error") THEN
+            wert = "? " + JSON_GET_STRING(j, p + ".error")
+        ELSE
+            wert = JSON_GET_STRING(j, p + ".value")
+        END IF
+        GUI_TABLE_ADD_ROW(tblWatch, [JSON_GET_STRING(j, p + ".expr"), wert])
+        ARRAY_PUSH(teile, JSON_GET_STRING(j, p + ".expr") + "=" + wert)
+    NEXT
+    protokoll("ueberwachen " + JOIN$(teile, " | "))
+END SUB
+
+' Die Liste an das Kind -- es liest nur, solange es steht; was waehrend
+' des Laufens kommt, liest es beim naechsten Halt und antwortet dann.
+SUB debugWatchesSenden()
+    IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM w AS STRING
+    FOR EACH w IN watchListe
+        ARRAY_PUSH(teile, jsonText$(w))
+    NEXT
+    PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("set-watches") + "," + jsonText$("exprs") + ":[" + JOIN$(teile, ",") + "]}" + NL)
+END SUB
+
+' Eine Variable im Halt setzen -- der Wert ist ein Ausdruck, das Kind
+' rechnet ihn aus und wandelt ihn wie bei einer Zuweisung.
+SUB debugSetzen(name AS STRING, wert AS STRING)
+    IF prozessArt <> "debug" OR NOT debugPause OR prozess < 0 THEN RETURN
+    PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("set") + "," + jsonText$("name") + ":" + jsonText$(name) + "," + jsonText$("value") + ":" + jsonText$(wert) + "}" + NL)
+END SUB
+
+SUB debugRunTo(zeile AS INTEGER)
+    PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("run-to") + "," + jsonText$("line") + ":" + STR$(zeile) + "}" + NL)
+    debugPause = FALSE
+    GUI_SET_TEXT(lblDebug, "Debugger: läuft bis Zeile " + STR$(zeile) + " ...")
+    protokoll("bis zeile " + STR$(zeile))
+END SUB
+
+' Bis zur Zeile mit der Schreibmarke: im Halt sofort, ohne laufenden
+' Debugger startet er ihn und laeuft beim ersten Halt dorthin. Ein
+' Haltepunkt davor haelt trotzdem -- wie in jeder anderen Umgebung.
+SUB bisZurMarke()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+    DIM z AS INTEGER : z = m[0]
+    IF prozessArt = "debug" AND prozess >= 0 THEN
+        IF NOT debugPause THEN
+            GUI_SET_TEXT(lblStatus, "Der Debugger läuft gerade -- erst im Halt geht es bis zur Marke.")
+            RETURN
+        END IF
+        debugRunTo(z)
+        RETURN
+    END IF
+    IF prozess >= 0 THEN RETURN
+    debugBis = z
+    debuggen()
+END SUB
+
+' Je Bild: einen Ausdruck aufnehmen (Enter im Feld), einen entfernen,
+' einen Doppelklick auf eine Variable (neuer Wert) oder auf den Stapel
+' (dorthin springen) auswerten.
+SUB debugPanelNachziehen()
+    IF GUI_ENTERED(tfWatch) THEN
+        DIM neu AS STRING : neu = TRIM$(GUI_TEXT(tfWatch))
+        IF neu <> "" THEN
+            ARRAY_PUSH(watchListe, neu)
+            GUI_SET_TEXT(tfWatch, "")
+            protokoll("ueberwachen neu " + neu)
+            IF prozessArt = "debug" AND prozess >= 0 THEN
+                debugWatchesSenden()
+            ELSE
+                GUI_TABLE_ADD_ROW(tblWatch, [neu, ""])
+            END IF
+        END IF
+    END IF
+    IF GUI_CLICKED(btnWatchWeg) THEN
+        DIM k AS INTEGER : k = GUI_TABLE_SELECTED(tblWatch)
+        IF k >= 0 AND k < LEN(watchListe) THEN
+            DIM rest AS ARRAY OF STRING : rest = []
+            DIM i AS INTEGER
+            FOR i = 0 TO LEN(watchListe) - 1
+                IF i <> k THEN ARRAY_PUSH(rest, watchListe[i])
+            NEXT
+            watchListe = rest
+            GUI_TABLE_REMOVE_ROW(tblWatch, k)
+            protokoll("ueberwachen weg " + STR$(LEN(watchListe)))
+            IF prozessArt = "debug" AND prozess >= 0 THEN debugWatchesSenden()
+        END IF
+    END IF
+    IF GUI_DOUBLE_CLICKED(tblVars) THEN
+        DIM r AS INTEGER : r = GUI_TABLE_SELECTED(tblVars)
+        IF r >= 0 AND prozessArt = "debug" AND debugPause THEN
+            setzenName = GUI_TABLE_GET_CELL(tblVars, r, 0)
+            dlgSetzen = GUI_PROMPT("Wert setzen", "Neuer Wert für " + setzenName + " (ein Ausdruck):", GUI_TABLE_GET_CELL(tblVars, r, 2))
+        END IF
+    END IF
+    IF GUI_DOUBLE_CLICKED(tblStapel) THEN
+        DIM sr AS INTEGER : sr = GUI_TABLE_SELECTED(tblStapel)
+        IF sr >= 0 THEN
+            DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+            DIM zl AS INTEGER : zl = VAL(GUI_TABLE_GET_CELL(tblStapel, sr, 1))
+            IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)
+            protokoll("stapel sprung " + STR$(zl))
+        END IF
+    END IF
+    IF dlgSetzen <> 0 THEN
+        DIM a AS INTEGER : a = GUI_ANSWER(dlgSetzen)
+        IF a = 1 THEN
+            DIM wert AS STRING : wert = GUI_DIALOG_TEXT(dlgSetzen)
+            dlgSetzen = 0
+            debugSetzen(setzenName, wert)
+        ELSEIF a = 2 THEN
+            dlgSetzen = 0
+        END IF
+    END IF
 END SUB
 
 ' --- Profil: `dhrt profile` liefert am Ende EINE JSON-Zeile --------------
@@ -8649,6 +8843,7 @@ paletteEintrag("Debuggen", "debug", "F7") : paletteEintrag("Haltepunkt setzen/en
 paletteEintrag("Bedingter Haltepunkt ...", "bedingung", "Umschalt+F9")
 paletteEintrag("Weiter", "weiter_d", "F8") : paletteEintrag("Schritt drüber", "drueber", "F10")
 paletteEintrag("Schritt hinein", "hinein", "F11") : paletteEintrag("Schritt heraus", "heraus", "Umschalt+F11")
+paletteEintrag("Bis zur Marke laufen", "bis_marke", "Strg+F10")
 paletteEintrag("Profil aufnehmen", "profil", "Strg+Umschalt+Y")
 paletteEintrag("Als eigenständiges Programm exportieren", "export", "Strg+F6")
 paletteEintrag("Umbenennen ...", "umbenennen", "Umschalt+F6")
@@ -9185,6 +9380,7 @@ SUB befehl(k AS STRING)
         CASE "drueber" : debugSchritt("step-over")
         CASE "hinein" : debugSchritt("step-into")
         CASE "heraus" : debugSchritt("step-out")
+        CASE "bis_marke" : bisZurMarke()
         CASE "profil" : profilAufnehmen()
         CASE "thema"
             hell = NOT hell
@@ -9488,6 +9684,8 @@ WHILE NOT beenden
     IF GUI_CLICKED(miHinein) OR GUI_CLICKED(btnHinein) THEN befehl("hinein")
     IF GUI_CLICKED(miHeraus) OR GUI_CLICKED(btnHeraus) THEN befehl("heraus")
     IF GUI_CLICKED(btnStoppD) THEN befehl("stopp")
+    IF GUI_CLICKED(miBisMarke) OR GUI_CLICKED(btnBisMarke) THEN befehl("bis_marke")
+    debugPanelNachziehen()
     IF GUI_CLICKED(miProfil) THEN befehl("profil")
     IF GUI_CLICKED(miAusgabeLeer) THEN befehl("ausgabe_leeren")
     IF GUI_CLICKED(cbProfilFunk) THEN profilTabelleFuellen()
