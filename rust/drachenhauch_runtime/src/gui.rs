@@ -2421,6 +2421,9 @@ pub struct Widget {
     /// Ende nach. `tipp_stil` ist der Stil fuer das naechste Getippte, wenn
     /// Strg+B ohne Auswahl kam -- er gilt, bis die Marke woanders hinwandert.
     formatiert: bool,
+    /// Klammerpaare, die das Feld beim Tippen selbst schliesst
+    /// (GUI_TEXTAREA_PAIRS) -- leer = aus.
+    paare: Vec<(char, char)>,
     stile: Vec<u8>,
     stile_text: String,
     tipp_stil: Option<u8>,
@@ -3785,7 +3788,7 @@ impl Gui {
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
             farbfelder: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
-            formatiert: false, stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
+            formatiert: false, paare: Vec::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
@@ -13239,9 +13242,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if !ctrl {
             let typed: String = g.pop_text_input().chars().filter(|c| !c.is_control()).collect();
             if !typed.is_empty() {
-                Self::an_marken(&mut chars, &mut marken, |_, c, a| {
-                    ((c.min(a)) as usize, (c.max(a)) as usize, typed.clone())
-                });
+                let paare = self.windows[wi].widgets[i].paare.clone();
+                if paare.is_empty() {
+                    Self::an_marken(&mut chars, &mut marken, |_, c, a| {
+                        ((c.min(a)) as usize, (c.max(a)) as usize, typed.clone())
+                    });
+                } else {
+                    for ch in typed.chars() { Self::paar_tippen(&mut chars, &mut marken, ch, &paare); }
+                }
                 geschrieben = true;
             }
         } else if !kuerzel_weg {
@@ -13394,9 +13402,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         // Backspace / Delete (Selektion hat Vorrang).
         if g.key_pressed(KEY_BACKSPACE) {
-            Self::an_marken(&mut chars, &mut marken, |_, c, a| {
+            // Zwischen einem leeren Paar nimmt die Ruecktaste beide -- das
+            // schliessende kam ungefragt, es soll auch ungefragt gehen.
+            let paare = self.windows[wi].widgets[i].paare.clone();
+            Self::an_marken(&mut chars, &mut marken, |zs, c, a| {
                 let (lo, hi) = (c.min(a), c.max(a));
+                let leer_paar = lo > 0 && paare.iter().any(|p| {
+                    zs.get(lo as usize - 1) == Some(&p.0) && zs.get(lo as usize) == Some(&p.1)
+                });
                 if lo != hi { (lo as usize, hi as usize, String::new()) }
+                else if leer_paar { (lo as usize - 1, lo as usize + 1, String::new()) }
                 else if lo > 0 { (lo as usize - 1, lo as usize, String::new()) }
                 else { (0, 0, String::new()) }
             });
@@ -13640,6 +13655,69 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         stile_abgleichen(w);
         Ok(w)
+    }
+
+    /// GUI_TEXTAREA_PAIRS(ta, paare$): je zwei Zeichen ein Paar, oeffnend
+    /// und schliessend (`"()[]{}\"\""`); leer schaltet es ab.
+    pub fn textarea_pairs(&mut self, h: i64, paare: &str) -> Result<(), String> {
+        self.ta_wdg(h, "GUI_TEXTAREA_PAIRS")?;
+        let z: Vec<char> = paare.chars().collect();
+        if z.len() % 2 != 0 {
+            return Err("GUI_TEXTAREA_PAIRS: erwartet je zwei Zeichen, oeffnend und schliessend (z. B. \"()[]\")".into());
+        }
+        let w = self.wdg_mut(h, "GUI_TEXTAREA_PAIRS")?;
+        w.paare = z.chunks(2).map(|p| (p[0], p[1])).collect();
+        Ok(())
+    }
+
+    /// Ein getipptes Zeichen an allen Marken, mit Klammerpaaren: ein
+    /// oeffnendes setzt das schliessende gleich dahinter (um eine Auswahl
+    /// herum: umschliessen), ein schliessendes vor einem gleichen tritt nur
+    /// darueber. Anfuehrungszeichen (oeffnend = schliessend) paaren sich
+    /// nicht hinter einem Wortzeichen und nicht mitten in einer
+    /// Zeichenkette -- sonst kaeme bei `"Hallo"` am Ende ein drittes.
+    /// Gepaart wird nur vor Leerraum, Zeilenende, Satzzeichen oder einem
+    /// schliessenden Zeichen: vor einem Wort will man es selten.
+    fn paar_tippen(chars: &mut Vec<char>, marken: &mut [(i32, i32)], ch: char,
+                   paare: &[(char, char)]) {
+        let wort = |x: Option<char>| x.map_or(false, |c| c.is_alphanumeric() || c == '_' || c == '$');
+        let mut reihe: Vec<usize> = (0..marken.len()).collect();
+        reihe.sort_by_key(|&i| std::cmp::Reverse(marken[i].0.min(marken[i].1)));
+        for i in reihe {
+            let (c, a) = marken[i];
+            let n = chars.len() as i32;
+            let (lo, hi) = (c.min(a).clamp(0, n) as usize, c.max(a).clamp(0, n) as usize);
+            let danach = chars.get(hi).copied();
+            let davor = if lo > 0 { Some(chars[lo - 1]) } else { None };
+            let zu = paare.iter().find(|p| p.0 == ch).map(|p| p.1);
+            let schliesst = paare.iter().any(|p| p.1 == ch);
+            if lo == hi && schliesst && danach == Some(ch) && (zu.is_none() || zu == Some(ch)) {
+                marken[i] = ((lo + 1) as i32, (lo + 1) as i32);
+                continue;
+            }
+            if let Some(zu) = zu {
+                if lo != hi {
+                    chars.insert(hi, zu);
+                    chars.insert(lo, ch);
+                    marken[i] = if c >= a { ((hi + 1) as i32, (lo + 1) as i32) }
+                                else { ((lo + 1) as i32, (hi + 1) as i32) };
+                    continue;
+                }
+                let frei = danach.map_or(true, |d| d.is_whitespace() || ",;:".contains(d)
+                                         || paare.iter().any(|p| p.1 == d && p.0 != p.1));
+                let im_text = zu == ch && {
+                    let anfang = chars[..lo].iter().rposition(|x| *x == '\n').map_or(0, |k| k + 1);
+                    chars[anfang..lo].iter().filter(|x| **x == ch).count() % 2 == 1
+                };
+                if frei && !(zu == ch && (wort(davor) || im_text)) {
+                    chars.splice(lo..lo, [ch, zu]);
+                    marken[i] = ((lo + 1) as i32, (lo + 1) as i32);
+                    continue;
+                }
+            }
+            chars.splice(lo..hi, [ch]);
+            marken[i] = ((lo + 1) as i32, (lo + 1) as i32);
+        }
     }
 
     /// GUI_TEXTAREA_STYLE(ta, stil$, an)

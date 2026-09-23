@@ -1,0 +1,55 @@
+' Die IDE in Drachenhauch (ide/ide.dh): Handgriffe aus der Uebersicht vom
+' 2026-09-23 -- Klammern schliessen und was danach kam.
+'
+' Aufbau wie tests/pruef/werkzeug_ide.dhtest: die IDE als Kopie in _programm/,
+' der Einschub steht hinter `protokoll("bereit")` (dort ist alles angelegt
+' und `befehl` rufbar), gelesen wird mit `--- nachher` aus Protokoll und
+' ide.json. Das Tippen selbst prueft tests/pruef/gui_klammern.dhtest an der
+' Laufzeit -- hier geht es um die Einstellung.
+--- seriell
+
+=== klammern schliessen ist an und laesst sich abschalten
+PRINT "vorher " ; klammernAn
+befehl("klammern")
+PRINT "nachher " ; klammernAn
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM gefunden AS BOOLEAN
+FOR i = 0 TO LEN(L) - 1
+    IF L[i] = "klammern aus" THEN gefunden = TRUE
+NEXT
+PRINT "protokoll " ; gefunden
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt " ; JSON_GET_BOOL(k, "klammern")
+--- erwartet
+protokoll TRUE
+gemerkt FALSE
+
+=== die gemerkte einstellung gilt beim naechsten start
+PRINT "an " ; klammernAn
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ide.json
+{"klammern": false}
+--- enthaelt
+an FALSE

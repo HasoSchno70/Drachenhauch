@@ -300,6 +300,10 @@ DIM linienAn AS BOOLEAN : linienAn = TRUE
 ' Das Geruest, das beim Tippen mitwaechst: `IF ... THEN` und Enter setzen
 ' das `END IF` gleich mit (GUI_TEXTAREA_CLOSE_WORDS).
 DIM geruestAn AS BOOLEAN : geruestAn = TRUE
+' Klammern und Anfuehrungszeichen schliesst das Code-Feld beim Tippen
+' selbst (GUI_TEXTAREA_PAIRS). `'` fehlt mit Absicht: es beginnt einen
+' Kommentar, und ein zweites dahinter waere Unsinn.
+DIM klammernAn AS BOOLEAN : klammernAn = TRUE
 ' Vorschau vor dem Umbau: Umbenennen, Herausloesen und Parameter-Umsortieren
 ' zeigen erst den Unterschied und fragen, statt gleich zu schreiben.
 DIM vorschauAn AS BOOLEAN : vorschauAn = TRUE
@@ -429,6 +433,7 @@ IF JSON_HAS(konfig, "ganzes_wort") THEN ganzesWort = JSON_GET_BOOL(konfig, "ganz
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
 IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
+IF JSON_HAS(konfig, "klammern") THEN klammernAn = JSON_GET_BOOL(konfig, "klammern")
 IF JSON_HAS(konfig, "umbau_vorschau") THEN vorschauAn = JSON_GET_BOOL(konfig, "umbau_vorschau")
 IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
@@ -882,7 +887,7 @@ GUI_WINDOW_CLOSABLE(winProfil, TRUE)
 ' Alle Schalter an EINER Stelle. Sie stehen weiter auch im Menue -- wer
 ' den Umbruch sucht, sucht ihn unter Ansicht; wer alles auf einmal sehen
 ' will, oeffnet dies hier.
-DIM winEinst AS GUI_WINDOW : winEinst = GUI_WINDOW("Einstellungen", 400, 150, 420, 530)
+DIM winEinst AS GUI_WINDOW : winEinst = GUI_WINDOW("Einstellungen", 400, 150, 720, 530)
 GUI_WINDOW_VISIBLE(winEinst, FALSE)
 DIM cbHell AS GUI_WIDGET : cbHell = GUI_CHECKBOX(winEinst, "Helles Thema", 16, 14, FALSE)
 DIM cbUmbruch AS GUI_WIDGET : cbUmbruch = GUI_CHECKBOX(winEinst, "Zeilenumbruch", 16, 44, FALSE)
@@ -893,6 +898,9 @@ DIM cbVorschlag AS GUI_WIDGET : cbVorschlag = GUI_CHECKBOX(winEinst, "Vorschlags
 DIM cbLinien AS GUI_WIDGET : cbLinien = GUI_CHECKBOX(winEinst, "Einrückungslinien", 16, 194, TRUE)
 DIM cbGeruest AS GUI_WIDGET : cbGeruest = GUI_CHECKBOX(winEinst, "Gerüst beim Tippen (END IF, NEXT ...)", 16, 224, TRUE)
 DIM cbVorschau AS GUI_WIDGET : cbVorschau = GUI_CHECKBOX(winEinst, "Vorschau vor dem Umbau", 16, 254, TRUE)
+' Zweite Spalte: was nach Stand 25 dazukam. Rechts daneben, damit alles
+' Bisherige an seiner Stelle bleibt.
+DIM cbKlammern AS GUI_WIDGET : cbKlammern = GUI_CHECKBOX(winEinst, "Klammern und Anführungszeichen schließen", 400, 14, TRUE)
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgröße", 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
 DIM lblListen AS GUI_WIDGET : lblListen = GUI_LABEL(winEinst, "Schrift der Listen", 16, 326)
@@ -1229,6 +1237,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
     JSON_SET_BOOL(konfig, "linien", linienAn)
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
+    JSON_SET_BOOL(konfig, "klammern", klammernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
     JSON_SET_BOOL(konfig, "leiste", leisteAn)
     JSON_SET_INT(konfig, "autosichern", autoSichern)
@@ -1540,6 +1549,22 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
         ["END", "NEXT", "WEND", "UNTIL", "LOOP", "ELSE", "ELSEIF", "ELIF", _
          "CATCH", "FINALLY", "CASE"])
     geruestSetzenAn(ta)
+    klammernSetzenAn(ta)
+END SUB
+
+SUB klammernSetzenAn(ta AS GUI_WIDGET)
+    GUI_TEXTAREA_PAIRS(ta, IIF(klammernAn, "()[]{}" + CHR$(34) + CHR$(34), ""))
+END SUB
+
+SUB klammernSetzen(an AS BOOLEAN)
+    klammernAn = an
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        klammernSetzenAn(tabFelder[i])
+    NEXT
+    konfigSichern()
+    GUI_SET_TEXT(lblStatus, IIF(an, "Klammern schließen an.", "Klammern schließen aus."))
+    protokoll("klammern " + IIF(an, "an", "aus"))
 END SUB
 
 ' Das Geruest, das mitwaechst: wer `IF x > 0 THEN` schreibt und Enter
@@ -1659,11 +1684,13 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbLinien, linienAn)
     GUI_SET_CHECKED(cbGeruest, geruestAn)
     GUI_SET_CHECKED(cbVorschau, vorschauAn)
+    GUI_SET_CHECKED(cbKlammern, klammernAn)
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spListen, listenGroesse)
     GUI_SET_VALUE(spHbGr, handbuchGroesse)
     GUI_SET_VALUE(spAuto, autoSichern)
-    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 420, 530)
+    ' Die linke Kante bleibt, wo sie war: die zweite Spalte waechst nach rechts.
+    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 720, 530)
     GUI_WINDOW_VISIBLE(winEinst, TRUE)
     einstOffen = TRUE
     GUI_FOCUS(cbHell)
@@ -1686,6 +1713,7 @@ SUB einstellungenNachziehen()
     END IF
     IF GUI_CHECKED(cbLinien) <> linienAn THEN linienSetzen(GUI_CHECKED(cbLinien))
     IF GUI_CHECKED(cbGeruest) <> geruestAn THEN geruestSetzen(GUI_CHECKED(cbGeruest))
+    IF GUI_CHECKED(cbKlammern) <> klammernAn THEN klammernSetzen(GUI_CHECKED(cbKlammern))
     IF GUI_CHECKED(cbVorschau) <> vorschauAn THEN
         vorschauAn = GUI_CHECKED(cbVorschau)
         konfigSichern()
@@ -7844,6 +7872,7 @@ paletteEintrag("Unterprogramm verschieben ...", "verschieben", "Strg+Umschalt+V"
 paletteEintrag("Letzten Umbau zurücknehmen", "umbau_zurueck", "Strg+Umschalt+Z")
 paletteEintrag("Letzten Umbau nachbessern", "umbau_nach", "Strg+Umschalt+G")
 paletteEintrag("Gerüst beim Tippen", "geruest", "")
+paletteEintrag("Klammern automatisch schließen", "klammern", "")
 paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
 paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
 paletteEintrag("Zeilen sortieren", "zl_sortieren", "")
@@ -8302,6 +8331,7 @@ SUB befehl(k AS STRING)
         CASE "umbau_zurueck" : umbauZurueck()
         CASE "umbau_nach" : umbauNachbessern()
         CASE "geruest" : geruestSetzen(NOT geruestAn)
+        CASE "klammern" : klammernSetzen(NOT klammernAn)
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
         CASE "leiste"

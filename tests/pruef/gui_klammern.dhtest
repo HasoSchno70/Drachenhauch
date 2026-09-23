@@ -1,0 +1,368 @@
+' Klammern und Anfuehrungszeichen schliessen (GUI_TEXTAREA_PAIRS, 2026-09-23).
+' Getippt wird mit ECHTEN Fensternachrichten (WM_CHAR ueber
+' fenstersender.ps1): eine Aufnahme legt Tasten in raylibs Warteschlange,
+' aber keine Zeichen, und Einfuegen aus der Zwischenablage geht an den
+' Paaren absichtlich vorbei. Das Kind (feld.dh) nimmt als ARG$(1), womit es
+' anfaengt, und gibt am Ende Text und Spalte der Marke aus; ein
+' Anfuehrungszeichen erscheint dort als Q.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein oeffnendes zeichen setzt das schliessende mit
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:f(x", "an")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[f(x)] 4
+
+=== ohne paare bleibt es beim getippten
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:f(x", "aus")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[f(x] 4
+
+=== anfuehrungszeichen paaren sich
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:a = |anf|tippe:hi", "an")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[a = QhiQ] 8
+
+=== hinter einem wort paart sich kein anfuehrungszeichen
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:ab|anf", "an")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[abQ] 4
+
+=== in einer offenen zeichenkette schliesst das anfuehrungszeichen nur
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "anf", "imtext")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[x = QabQ] 9
+
+=== vor einem wort wird nicht gepaart
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:(", "vorwort")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[(wort] 2
+
+=== eine auswahl wird umschlossen
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:(", "umschliessen")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[(wort)] 6
+
+=== die ruecktaste nimmt ein leeres paar ganz
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:x[|rueck", "an")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[x] 2
+
+=== ohne paar nimmt die ruecktaste ein zeichen
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:x[|rechts|rueck", "an")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[x[] 3
+
+=== ein schliessendes zeichen tritt ueber das gleiche
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "feld.dh", "tippe:()|anf|anf", "an")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei feld.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 280, 180)
+DIM art AS STRING : art = ARG$(1)
+IF art <> "aus" THEN GUI_TEXTAREA_PAIRS(ta, "()[]{}" + CHR$(34) + CHR$(34))
+IF art = "vorwort" OR art = "umschliessen" THEN GUI_SET_TEXT(ta, "wort")
+IF art = "imtext" THEN GUI_SET_TEXT(ta, "x = " + CHR$(34) + "ab")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 AND art = "vorwort" THEN GUI_TEXTAREA_GOTO(ta, 1, 1)
+    IF bild = 2 AND art = "umschliessen" THEN GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+DIM m AS TUPLE : m = GUI_TEXTAREA_CURSOR(ta)
+PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(34), "Q") + "] " + STR$(m[1])
+--- system windows
+--- erwartet
+gesendet
+[()QQ] 5

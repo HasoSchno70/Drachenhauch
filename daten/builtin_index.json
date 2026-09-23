@@ -5007,6 +5007,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_PAIRS",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_PAIRS(ta, paare$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_STYLE",
    "kind": "core",
    "signature": "GUI_TEXTAREA_STYLE(ta, stil$[, an])",

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1924,
+ "count": 1925,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -817,6 +817,7 @@
   "GUI_TEXTAREA_INSERT": "ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, GUI_ON_CHANGE feuert wie beim Tippen",
   "GUI_TEXTAREA_MARKDOWN$": "der Text samt Formaten als Markdown",
   "GUI_TEXTAREA_MARKS": "Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text",
+  "GUI_TEXTAREA_PAIRS": "Klammern beim Tippen schließen: je zwei Zeichen ein Paar (\"()[]{}\" plus zwei Anführungszeichen), leer = aus. Das öffnende setzt das schließende gleich dahinter, vor einem gleichen schließenden tritt man nur darüber, eine Auswahl wird umschlossen, die Rücktaste zwischen einem leeren Paar nimmt beide. Anführungszeichen paaren sich nicht hinter einem Wort und nicht in einer offenen Zeichenkette; vor …",
   "GUI_TEXTAREA_POS_AT": "welches Zeichen unter dem Bildschirmpunkt liegt (ab 1; dieselbe Rechnung wie der Klick). (0, 0) neben dem Text: ausserhalb, in der Nummernspalte, unter der letzten Zeile, hinter dem Zeilenende -- fuer Tooltips beim Ueberfahren und Strg+Klick",
   "GUI_TEXTAREA_SELECT": "einen Bereich markieren, Marke am Ende",
   "GUI_TEXTAREA_SELECTION$": "der markierte Text",

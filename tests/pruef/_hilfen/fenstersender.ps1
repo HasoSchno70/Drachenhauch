@@ -35,5 +35,28 @@ if ($Nachricht -eq "esc") {
         [FensterSender]::PostMessage($h, 0x200, [IntPtr]0, $l) | Out-Null
         Start-Sleep -Milliseconds 15
     }
-} else { "unbekannte Nachricht $Nachricht"; exit 3 }
+} else {
+    # Eine Folge, getrennt mit "|": "tippe:abc" = je Zeichen WM_CHAR (dieser
+    # Weg fuellt raylibs Zeichenwarteschlange, eine Aufnahme tut es nicht),
+    # "anf" = ein Anfuehrungszeichen (auf der Befehlszeile schwer zu
+    # uebergeben), "rueck"/"links"/"rechts" = die Taste gedrueckt und los.
+    foreach ($teil in $Nachricht.Split("|")) {
+        if ($teil.StartsWith("tippe:")) {
+            foreach ($z in $teil.Substring(6).ToCharArray()) {
+                [FensterSender]::PostMessage($h, 0x102, [IntPtr][int]$z, [IntPtr]1) | Out-Null
+                Start-Sleep -Milliseconds 60
+            }
+        } elseif ($teil -eq "anf") {
+            [FensterSender]::PostMessage($h, 0x102, [IntPtr]0x22, [IntPtr]1) | Out-Null
+        } elseif ($teil -eq "rueck" -or $teil -eq "links" -or $teil -eq "rechts") {
+            $vk = @{ "rueck" = 0x08; "links" = 0x25; "rechts" = 0x27 }[$teil]
+            # GLFW nimmt die Taste aus dem SCANCODE im lParam, nicht aus dem vk.
+            $ext = @{ "rueck" = 0x000E0001; "links" = 0x014B0001; "rechts" = 0x014D0001 }[$teil]
+            [FensterSender]::PostMessage($h, 0x100, [IntPtr]$vk, [IntPtr]$ext) | Out-Null
+            Start-Sleep -Milliseconds 80
+            [FensterSender]::PostMessage($h, 0x101, [IntPtr]$vk, [IntPtr]($ext -bor 0xC0000000)) | Out-Null
+        } else { "unbekannte Nachricht $teil"; exit 3 }
+        Start-Sleep -Milliseconds 150
+    }
+}
 "gesendet"
