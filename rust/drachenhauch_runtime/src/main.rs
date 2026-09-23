@@ -237,6 +237,7 @@ fn eingebaut() -> String {
     for (name, da) in [
         ("grafik", cfg!(feature = "graphics")),
         ("dialoge", cfg!(feature = "dialogs")),
+        ("video", cfg!(feature = "video")),
         ("datenbank", cfg!(feature = "db")),
         ("netz", cfg!(feature = "net")),
         ("http", cfg!(feature = "http")),
