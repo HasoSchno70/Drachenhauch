@@ -175,6 +175,16 @@ fn need_str<'a>(v: &'a Value, fn_: &str) -> Result<&'a str, String> {
     }
 }
 
+/// Byte-Stelle des Zeichens Nummer `n` (ab 0); hinter dem Ende das Ende.
+///
+/// Fuer LEFT$/RIGHT$/MID$/INSTR: die zaehlen in ZEICHEN, und bis 2026-09-24
+/// legte jeder Aufruf dafuer den ganzen Text als `Vec<char>` an -- ein
+/// `MID$(s, 5, 1)` auf 200 000 Zeichen kostete so 90 Mikrosekunden. Jetzt
+/// laeuft die Suche nur bis zur gefragten Stelle.
+fn zeichen_stelle(s: &str, n: usize) -> usize {
+    s.char_indices().nth(n).map_or(s.len(), |(b, _)| b)
+}
+
 fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
     match v {
         Value::Int(i) => Ok(*i),
@@ -1980,29 +1990,29 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2);
             let s = need_str(&a[0], "LEFT$")?;
             let n = need_int(&a[1], "LEFT$")?.max(0) as usize;
-            Ok(Value::str_rc(&s.chars().take(n).collect::<String>()))
+            Ok(Value::str_rc(&s[..zeichen_stelle(s, n)]))
         }
         "right$" | "right" => {
             arity!(2);
             let s = need_str(&a[0], "RIGHT$")?;
             let n = need_int(&a[1], "RIGHT$")?;
             if n <= 0 { return Ok(Value::str_rc("")); }
-            let chars: Vec<char> = s.chars().collect();
-            let n = (n as usize).min(chars.len());
-            Ok(Value::str_rc(&chars[chars.len() - n..].iter().collect::<String>()))
+            let anzahl = s.chars().count();
+            let n = (n as usize).min(anzahl);
+            Ok(Value::str_rc(&s[zeichen_stelle(s, anzahl - n)..]))
         }
         "mid$" | "mid" => {
             if a.len() < 2 || a.len() > 3 { return err(format!("MID$: erwartet 2..3 Argumente, erhalten {}", a.len())); }
             let s = need_str(&a[0], "MID$")?;
-            let chars: Vec<char> = s.chars().collect();
             let start = need_int(&a[1], "MID$")?.max(0) as usize;
-            let start = start.min(chars.len());
+            // Hinter dem Ende beginnt der leere Rest -- wie vorher, als die
+            // Stelle auf die Zeichenzahl geklemmt wurde.
+            let rest = &s[zeichen_stelle(s, start)..];
             if a.len() == 3 {
                 let cnt = need_int(&a[2], "MID$")?.max(0) as usize;
-                let end = (start + cnt).min(chars.len());
-                Ok(Value::str_rc(&chars[start..end].iter().collect::<String>()))
+                Ok(Value::str_rc(&rest[..zeichen_stelle(rest, cnt)]))
             } else {
-                Ok(Value::str_rc(&chars[start..].iter().collect::<String>()))
+                Ok(Value::str_rc(rest))
             }
         }
         "instr" => {
@@ -2013,20 +2023,21 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let hay = need_str(&a[0], "INSTR")?;
             let needle = need_str(&a[1], "INSTR")?;
             let start = if a.len() == 3 { need_int(&a[2], "INSTR")?.max(0) as usize } else { 0 };
-            // 0-basiert in *Zeichen*. Python str.find ist byte/char-gleich fuer
-            // ASCII; fuer Bit-Identitaet auf Zeichenebene rechnen.
-            let hchars: Vec<char> = hay.chars().collect();
-            let nchars: Vec<char> = needle.chars().collect();
-            // Start ausserhalb -> -1 (auch bei leerem Suchstring; wie Python
-            // str.find). Reihenfolge wichtig: erst Bereich pruefen.
-            if start > hchars.len() { return Ok(Value::Int(-1)); }
-            if nchars.is_empty() { return Ok(Value::Int(start as i64)); }
-            let mut i = start;
-            while i + nchars.len() <= hchars.len() {
-                if hchars[i..i + nchars.len()] == nchars[..] { return Ok(Value::Int(i as i64)); }
-                i += 1;
+            // 0-basiert in *Zeichen*. Gesucht wird auf den Bytes (ein Treffer
+            // in UTF-8 ist immer einer auf Zeichengrenzen), die Stelle dann in
+            // Zeichen zurueckgerechnet.
+            let ab = match hay.char_indices().nth(start) {
+                Some((b, _)) => b,
+                // Start genau am Ende ist erlaubt (leere Suche findet dort),
+                // dahinter -> -1, auch bei leerem Suchstring (wie Python
+                // str.find). Reihenfolge wichtig: erst Bereich pruefen.
+                None if hay.chars().count() == start => hay.len(),
+                None => return Ok(Value::Int(-1)),
+            };
+            match hay[ab..].find(needle) {
+                Some(off) => Ok(Value::Int((start + hay[ab..ab + off].chars().count()) as i64)),
+                None => Ok(Value::Int(-1)),
             }
-            Ok(Value::Int(-1))
         }
         "replace$" | "replace" => {
             arity!(3);

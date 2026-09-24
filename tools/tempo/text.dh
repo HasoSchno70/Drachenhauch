@@ -1,0 +1,13 @@
+' Tempo: Zeichenketten anhaengen und durchsuchen.
+DIM t0 AS FLOAT : t0 = TIMER()
+DIM s AS STRING : s = ""
+DIM i AS INTEGER
+FOR i = 1 TO 200000
+    s = s + CHR$(97 + i MOD 26)
+NEXT
+DIM treffer AS INTEGER : treffer = 0
+FOR i = 0 TO 199999 STEP 7
+    IF MID$(s, i, 1) = "q" THEN treffer = treffer + 1
+NEXT
+PRINT "ZEIT "; (TIMER() - t0) * 1000.0
+IF LEN(s) <> 200000 OR treffer = 0 THEN EXIT(1)

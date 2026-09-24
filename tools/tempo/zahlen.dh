@@ -1,0 +1,9 @@
+' Tempo: Kommazahlen in einer engen Schleife (10 Mio. Additionen).
+DIM t0 AS FLOAT : t0 = TIMER()
+DIM s AS FLOAT : s = 0.0
+DIM i AS INTEGER
+FOR i = 1 TO 10000000
+    s = s + i * 0.5
+NEXT
+PRINT "ZEIT "; (TIMER() - t0) * 1000.0
+IF s <> 25000002500000.0 THEN EXIT(1)

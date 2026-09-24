@@ -50,3 +50,59 @@ Bench                               best-of-2
 zeitzeile schnell
   FEHLER (kaputt.dh): Laufzeitfehler in kaputt.dh:1: Division durch 0
 kaputt.dh                               nan ms
+
+=== die zeit-zeile zaehlt und gegen vergleicht zwei laufzeiten
+' Gibt ein Programm `ZEIT <ms>` aus, zaehlt diese Zahl statt der Wandzeit
+' (die traegt ~40 ms Start mit). Mit --gegen laufen beide Laufzeiten
+' abwechselnd; hier ist es zweimal dieselbe, das Verhaeltnis also 1.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(30)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--runs", "2", CWD$() + "/zeit.dh")
+DIM z AS ARRAY OF STRING : z = SPLIT$(lauf$(p), CHR$(10))
+DIM i AS INTEGER
+FOR i = 0 TO LEN(z) - 1
+    IF z[i] <> "" THEN PRINT z[i]
+NEXT
+p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--runs", "2", "--gegen", EXEPATH$(), CWD$() + "/zeit.dh")
+z = SPLIT$(lauf$(p), CHR$(10))
+FOR i = 0 TO LEN(z) - 1
+    IF LEFT$(z[i], 7) = "gegen: " THEN
+        PRINT "gegen genannt"
+    ELSEIF z[i] <> "" THEN
+        PRINT z[i]
+    END IF
+NEXT
+p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--gegen", CWD$() + "/gibtsnicht.exe", CWD$() + "/zeit.dh")
+z = SPLIT$(lauf$(p), CHR$(10))
+PRINT "rueckgabe "; PROCESS_CODE(p); " "; LEFT$(z[0], 20); " "; RIGHT$(z[0], 14)
+--- argumente
+{sammlung}/../../bench_dhrt.dh
+--- datei zeit.dh
+PRINT "vorher"
+PRINT "ZEIT 12.5"
+
+--- erwartet
+dhrt: (diese Laufzeit)
+Bench                               best-of-2
+----------------------------------------------
+zeit.dh                                12.5 ms
+dhrt: (diese Laufzeit)
+gegen genannt
+Bench                      A best-of-2   B best-of-2    A/B
+--------------------------------------------------------------
+zeit.dh                        12.5 ms       12.5 ms   1.00
+rueckgabe 1 dhrt nicht gefunden: gibtsnicht.exe

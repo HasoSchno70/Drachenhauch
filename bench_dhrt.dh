@@ -1,15 +1,23 @@
 ' Benchmark-Laeufer fuer die Laufzeit dhrt.
 '
-' Misst die Wandzeit von `dhrt run <datei.dh>` (Prozess samt Uebersetzen und
-' Start; bei grossen Benches ueberwiegt die VM-Schleife). Bestwert aus N
-' Laeufen, gegen Rauschen.
+' Misst `dhrt run <datei.dh>`, Bestwert aus N Laeufen, gegen Rauschen.
+' Gibt das Programm eine Zeile `ZEIT <ms>` aus, zaehlt DIESE Zahl (der Kern,
+' den es selbst gemessen hat); sonst die Wandzeit samt Start (~40 ms) und
+' Uebersetzen. Die Programme unter tools/tempo/ geben ihre ZEIT aus.
 '
-'     dhrt run bench_dhrt.dh [-- datei.dh ...]          ' Vorgabe: examples/bench_*.dh
-'     dhrt run bench_dhrt.dh -- --dhrt pfad\zu\dhrt.exe  ' andere Exe (A/B-Vergleich)
-'     dhrt run bench_dhrt.dh -- --runs 7                ' Wiederholungen (Vorgabe 5)
+'     dhrt run bench_dhrt.dh [-- datei.dh ...]            ' Vorgabe: tools/tempo/*.dh
+'     dhrt run bench_dhrt.dh -- --dhrt pfad\zu\dhrt.exe    ' andere Exe
+'     dhrt run bench_dhrt.dh -- --gegen pfad\zu\dhrt.exe   ' A/B: diese gegen jene
+'     dhrt run bench_dhrt.dh -- --runs 7                  ' Wiederholungen (Vorgabe 5)
+'
+' Mit --gegen laufen A und B ABWECHSELND (A, B, A, B, ...) -- nacheinander
+' gemessen landet eine Laststufe des Rechners ganz bei einer Seite. Die
+' letzte Spalte ist A/B: unter 1 ist A schneller.
 '
 ' Ohne --dhrt misst er die Laufzeit, die ihn selbst ausfuehrt. Bis 2026-09-15
-' bench_dhrt.py; die Ausgabe hat dieselbe Form.
+' bench_dhrt.py; die Ausgabe ohne --gegen hat dieselbe Form. Bis 2026-09-24
+' waren examples/bench_*.dh die Vorgabe -- die sind so klein, dass der Start
+' die Messung ueberwiegt.
 
 FUNCTION vomAufrufer$(p AS STRING) AS STRING
     IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
@@ -17,49 +25,70 @@ FUNCTION vomAufrufer$(p AS STRING) AS STRING
     RETURN GETENV$("DHRT_START_DIR") + "/" + p
 END FUNCTION
 
-FUNCTION messen(exe AS STRING, datei AS STRING, laeufe AS INTEGER) AS FLOAT
-    ' Bestwert in ms; -1 bei einem Fehlerlauf (die Meldung steht dann schon da).
-    DIM best AS FLOAT : best = -1
-    DIM k AS INTEGER
-    FOR k = 1 TO laeufe
-        DIM t0 AS FLOAT : t0 = TIMER()
-        DIM p AS INTEGER : p = PROCESS_START(exe, "run", datei)
-        DIM fehlertext AS STRING : fehlertext = ""
-        ' Laufend leeren: ein voller Ausgabepuffer hielte das Kind an.
-        WHILE PROCESS_RUNNING(p)
-            DIM rest AS STRING : rest = PROCESS_READ$(p)
-            fehlertext = fehlertext + PROCESS_ERR$(p)
-            IF TIMER() - t0 > 600 THEN
-                PROCESS_KILL(p)
-                fehlertext = fehlertext + "Zeitgrenze 600 s"
-            END IF
-            SLEEP(1)
-        WEND
-        DIM dauer AS FLOAT : dauer = (TIMER() - t0) * 1000.0
-        ' Das Kind kann schon beendet sein, bevor sein Lesefaden die letzte
-        ' Zeile abgelegt hat -- ein paar leere Abfragen abwarten.
-        DIM leer AS INTEGER : leer = 0
-        WHILE leer < 5
-            DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
-            IF teil = "" THEN leer = leer + 1 ELSE fehlertext = fehlertext + teil
-            SLEEP(10)
-        WEND
-        IF PROCESS_CODE(p) <> 0 THEN
-            PRINT "  FEHLER ("; BASENAME(datei); "): "; LEFT$(TRIM$(fehlertext), 200)
-            RETURN -1
+FUNCTION einLauf(exe AS STRING, datei AS STRING) AS FLOAT
+    ' Ein Lauf in ms (die ZEIT-Zeile, sonst die Wandzeit); -1 bei einem
+    ' Fehlerlauf (die Meldung steht dann schon da).
+    DIM t0 AS FLOAT : t0 = TIMER()
+    DIM p AS INTEGER : p = PROCESS_START(exe, "run", datei)
+    DIM aus AS STRING : aus = ""
+    DIM fehlertext AS STRING : fehlertext = ""
+    ' Laufend leeren: ein voller Ausgabepuffer hielte das Kind an.
+    WHILE PROCESS_RUNNING(p)
+        aus = aus + PROCESS_READ$(p)
+        fehlertext = fehlertext + PROCESS_ERR$(p)
+        IF TIMER() - t0 > 600 THEN
+            PROCESS_KILL(p)
+            fehlertext = fehlertext + "Zeitgrenze 600 s"
         END IF
-        IF best < 0 OR dauer < best THEN best = dauer
+        SLEEP(1)
+    WEND
+    DIM dauer AS FLOAT : dauer = (TIMER() - t0) * 1000.0
+    ' Das Kind kann schon beendet sein, bevor sein Lesefaden die letzte
+    ' Zeile abgelegt hat -- ein paar leere Abfragen abwarten.
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p)
+        DIM fteil AS STRING : fteil = PROCESS_ERR$(p)
+        IF teil = "" AND fteil = "" THEN leer = leer + 1
+        aus = aus + teil
+        fehlertext = fehlertext + fteil
+        SLEEP(10)
+    WEND
+    IF PROCESS_CODE(p) <> 0 THEN
+        PRINT "  FEHLER ("; BASENAME(datei); "): "; LEFT$(TRIM$(fehlertext + aus), 200)
+        RETURN -1
+    END IF
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(REPLACE$(aus, CHR$(13), ""), CHR$(10))
+    DIM z AS INTEGER
+    FOR z = 0 TO LEN(zeilen) - 1
+        IF LEFT$(zeilen[z], 5) = "ZEIT " THEN RETURN VAL(MID$(zeilen[z], 5))
     NEXT
-    RETURN best
+    RETURN dauer
+END FUNCTION
+
+FUNCTION besser(bisher AS FLOAT, neu AS FLOAT) AS FLOAT
+    IF bisher = -2 THEN RETURN -2
+    IF neu < 0 THEN RETURN -2
+    IF bisher < 0 OR neu < bisher THEN RETURN neu
+    RETURN bisher
+END FUNCTION
+
+FUNCTION ms$(wert AS FLOAT) AS STRING
+    IF wert < 0 THEN RETURN FORMAT$("nan", "%10s") + " ms"
+    RETURN FORMAT$(wert, "%10.1f") + " ms"
 END FUNCTION
 
 DIM exe AS STRING : exe = "dhrt"
+DIM gegen AS STRING : gegen = ""
 DIM laeufe AS INTEGER : laeufe = 5
 DIM dateien AS ARRAY OF STRING : dateien = []
 DIM i AS INTEGER : i = 0
 WHILE i < ARGC()
     IF ARG$(i) = "--dhrt" THEN
         exe = vomAufrufer$(ARG$(i + 1))
+        i = i + 2
+    ELSEIF ARG$(i) = "--gegen" THEN
+        gegen = vomAufrufer$(ARG$(i + 1))
         i = i + 2
     ELSEIF ARG$(i) = "--runs" THEN
         laeufe = MAX(1, VAL(ARG$(i + 1)))
@@ -73,22 +102,41 @@ IF exe <> "dhrt" AND NOT FILEEXISTS(exe) THEN
     PRINT "dhrt nicht gefunden: "; exe
     EXIT(1)
 END IF
+IF gegen <> "" AND NOT FILEEXISTS(gegen) THEN
+    PRINT "dhrt nicht gefunden: "; gegen
+    EXIT(1)
+END IF
 IF LEN(dateien) = 0 THEN
-    DIM alle AS ARRAY OF STRING : alle = DIRLIST("examples")
+    DIM alle AS ARRAY OF STRING : alle = DIRLIST("tools/tempo", "*.dh")
     SORT(alle)
     FOR i = 0 TO LEN(alle) - 1
-        IF LEFT$(alle[i], 6) = "bench_" AND RIGHT$(alle[i], 3) = ".dh" THEN ARRAY_PUSH(dateien, CWD$() + "/examples/" + alle[i])
+        ARRAY_PUSH(dateien, CWD$() + "/tools/tempo/" + alle[i])
     NEXT
 END IF
 
 IF exe = "dhrt" THEN PRINT "dhrt: (diese Laufzeit)" ELSE PRINT "dhrt: "; exe
-PRINT FORMAT$("Bench", "%-32s"); " "; FORMAT$("best-of-" + STR$(laeufe), "%12s")
-PRINT "-" * 46
+IF gegen <> "" THEN
+    PRINT "gegen: "; gegen
+    PRINT FORMAT$("Bench", "%-24s"); " "; FORMAT$("A best-of-" + STR$(laeufe), "%13s"); " "; FORMAT$("B best-of-" + STR$(laeufe), "%13s"); "    A/B"
+    PRINT "-" * 62
+ELSE
+    PRINT FORMAT$("Bench", "%-32s"); " "; FORMAT$("best-of-" + STR$(laeufe), "%12s")
+    PRINT "-" * 46
+END IF
 FOR i = 0 TO LEN(dateien) - 1
-    DIM ms AS FLOAT : ms = messen(exe, dateien[i], laeufe)
-    IF ms < 0 THEN
-        PRINT FORMAT$(BASENAME(dateien[i]), "%-32s"); " "; FORMAT$("nan", "%10s"); " ms"
+    DIM a AS FLOAT : a = -1
+    DIM b AS FLOAT : b = -1
+    DIM k AS INTEGER
+    FOR k = 1 TO laeufe
+        a = besser(a, einLauf(exe, dateien[i]))
+        IF gegen <> "" THEN b = besser(b, einLauf(gegen, dateien[i]))
+        IF a = -2 OR b = -2 THEN BREAK
+    NEXT
+    IF gegen = "" THEN
+        PRINT FORMAT$(BASENAME(dateien[i]), "%-32s"); " "; ms$(a)
     ELSE
-        PRINT FORMAT$(BASENAME(dateien[i]), "%-32s"); " "; FORMAT$(ms, "%10.1f"); " ms"
+        DIM verh AS STRING : verh = "    nan"
+        IF a > 0 AND b > 0 THEN verh = FORMAT$(a / b, "%7.2f")
+        PRINT FORMAT$(BASENAME(dateien[i]), "%-24s"); " "; ms$(a); " "; ms$(b); verh
     END IF
 NEXT
