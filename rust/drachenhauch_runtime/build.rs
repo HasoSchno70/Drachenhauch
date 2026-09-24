@@ -1,6 +1,6 @@
 //! Stackgroesse des Hauptthreads setzen -- und zwar NUR fuer das eigene Binary.
 //!
-//! Die VM rekursiert fuer jeden GB-Funktionsaufruf ueber den nativen Stack
+//! Die VM rekursiert fuer jeden DH-Funktionsaufruf ueber den nativen Stack
 //! (`exec` -> `run_frame` -> `dispatch` -> `exec`); ein Aufrufrahmen kostet
 //! gemessen ~6,6 KB. Windows gibt einem Programm per Vorgabe 1 MB, das trug
 //! ganze 146 Ebenen -- `MAX_CALL_DEPTH` in `vm.rs` wurde nie erreicht, der

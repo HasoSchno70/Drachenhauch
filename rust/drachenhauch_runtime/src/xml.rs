@@ -6,7 +6,7 @@
 //! Quellen ausser Reichweite.
 //!
 //! **Nur lesend.** Anders als bei JSON (wo das Schreiben in Punkt 2 die
-//! eigentliche Luecke war) ist ein XML-Baum, den ein GB-Programm selbst baut,
+//! eigentliche Luecke war) ist ein XML-Baum, den ein DH-Programm selbst baut,
 //! die Ausnahme; wer eine XML-Datei schreiben muss, klebt sie mit
 //! `XML_ESCAPE$` zusammen, das genau die fuenf Zeichen ersetzt, an denen
 //! Handarbeit sonst bricht. Ein Baum zum Bauen waere ein zweites Modul in

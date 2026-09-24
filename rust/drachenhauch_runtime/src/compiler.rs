@@ -5,7 +5,7 @@
 //! CONTINUE, CONST). Emittiert die *generischen* Opcodes (kein Constant-
 //! Folding, keine Inline-Caches -- die `_NN`-Spezialisierungen des frueheren
 //! Python-Compilers wurden aus der VM entfernt). Verifiziert per
-//! run_gb-Golden-Tests (tests/); die historische Output-Paritaet gegen den
+//! Pruefsammlungen (tests/pruef/); die historische Output-Paritaet gegen den
 //! geloeschten Python-Tree-Walker ist Geschichte (Stufe B).
 //!
 //! Nicht unterstuetzte Konstrukte liefern `Err("Stufe 3x: ...")` -- die

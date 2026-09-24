@@ -5,7 +5,7 @@
 '  Tasten:  [O] Datei oeffnen   [S] Speichern unter   [F] Ordner waehlen
 '           [ESC] Ende
 '  Alle drei liefern einen STRING (Pfad), bei Abbruch einen leeren String.
-'  Endungs-Filter: kommagetrennt ohne Punkt, z.B. "png,jpg,gb".
+'  Endungs-Filter: kommagetrennt ohne Punkt, z.B. "png,jpg,dh".
 ' ============================================================
 SCREEN(740, 300, "Drachenhauch - Datei-Dialoge", 1)
 SETFPS(60)
@@ -29,7 +29,7 @@ WHILE NOT QUITREQUESTED()
     dF = 0 : IF KEYPRESSED(KEY_F) THEN dF = 1
 
     IF dO = 1 AND pO = 0 THEN
-        lastPath = FILE_OPEN_DIALOG("Datei oeffnen", "png,jpg,gb,txt")
+        lastPath = FILE_OPEN_DIALOG("Datei oeffnen", "png,jpg,dh,txt")
         lastAction = "FILE_OPEN_DIALOG"
     END IF
     IF dS = 1 AND pS = 0 THEN

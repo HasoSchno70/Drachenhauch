@@ -6,7 +6,7 @@
 
 <p align="center"><em><a href="README.md">Deutsch</a> · English</em></p>
 
-A BASIC dialect with Pascal-strict typing and OOP, built for games. Programs run through **`dhrt`** — the native Rust runtime, which lexes, parses, compiles and executes the source itself. Graphics and 3D via **raylib**, sound via **[Kira](https://github.com/tesselode/kira)** on its own audio thread. The IDE and all tools are written in Drachenhauch too; Python is only needed for the runtime's build script.
+A BASIC dialect with Pascal-strict typing and OOP — for games as well as desktop applications with a GUI, command-line tools and small services. Programs run through **`dhrt`** — the native Rust runtime, which lexes, parses, compiles and executes the source itself. Graphics and 3D via **raylib**, sound via **[Kira](https://github.com/tesselode/kira)** on its own audio thread. The IDE and all tools are written in Drachenhauch too; Python is only needed for the runtime's build script.
 
 ```basic
 IMPORT "sprite"
@@ -52,8 +52,10 @@ launchable with a double click.
 
 ### And everything else
 
-Drachenhauch started as a games BASIC. These days you also write the things
-that happen *next to* the game with it — tools, reports, small services:
+Drachenhauch started as a games BASIC (back then called “GameBasic”). These
+days you also write applications with windows, forms and tables with it
+(module `gui`, form designer, database binding, printing) and the things that
+happen *next to* a game — tools, reports, small services:
 
 | | |
 |---|---|
@@ -118,13 +120,13 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 - **Modules** — 48 of them, [table below](#modules)
 - **[IDE](docs/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
 - **Tools** — all written in Drachenhauch, in the IDE under *Tools* or directly with `dhrt run examples/<file>`:
-  - **[Sprite editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — pixel art with frames, layers, lasso/magic wand/move, GIF with a duration per frame, atlas export for `ATLAS_LOAD`, GB code, `.dhanim` template
-  - **[Particle editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — emitter sliders with a live preview, factory presets, your own settings as `.ini`, GB code
-  - **[SFX generator](docs/sfx-generator.md)** (`183_sfx_generator.dh`) — sfxr-style retro sound effects, WAV export, GB code with `AUDIO_SFX`
+  - **[Sprite editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — pixel art with frames, layers, lasso/magic wand/move, GIF with a duration per frame, atlas export for `ATLAS_LOAD`, DH code, `.dhanim` template
+  - **[Particle editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — emitter sliders with a live preview, factory presets, your own settings as `.ini`, DH code
+  - **[SFX generator](docs/sfx-generator.md)** (`183_sfx_generator.dh`) — sfxr-style retro sound effects, WAV export, DH code with `AUDIO_SFX`
   - **[Tracker](docs/tracker.md)** (`190_tracker.dh`) — multi-track music editor, [table below](#tracker)
   - **[Score](docs/score-editor.md)** (`199_notenblatt.dh`) — real music-notation display, playback, hand-over to the tracker
-  - **[Tilemap/level editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — layers, object layers, multiple tilesets, tile properties, Tiled JSON (`TILED_LOAD`), GB code renderer
-  - **[Form designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI forms in Xojo style, `.dhform` for `GUI_LOAD`, F5 launches, GB code
+  - **[Tilemap/level editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — layers, object layers, multiple tilesets, tile properties, Tiled JSON (`TILED_LOAD`), DH code renderer
+  - **[Form designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI forms in Xojo style, `.dhform` for `GUI_LOAD`, F5 launches, DH code
   - **[Animation FSM editor](docs/anim-editor.md)** (`198_anim_fsm_editor.dh`) — states, transitions and conditions as a graph, `.dhanim` for `ANIM_FSM_LOAD` ([module `animfsm`](docs/module-animfsm.md)), preview with F5
 - **[Language server + VSCode extension](docs/lsp.md)** — Drachenhauch in any LSP editor: syntax highlighting, diagnostics, completion, hover, goto-definition, references, outline. The server is the runtime itself (`dhrt lsp`), no Python (`vscode-drachenhauch/`)
 - **[Web playground](docs/web-playground.md)** — `dhrt` as WebAssembly in the browser, [table below](#web-playground)
@@ -234,7 +236,7 @@ itself.
 | Instruments | 18 ready-made ones with envelope, vibrato and detune, all editable; every note may bring its own instrument |
 | Editing | volume, portamento and effect per note; block selection with copy, transpose, interpolate; mute/solo and a mixer fader per channel; undo across the whole song |
 | Playback | on an audio clock, not frame-driven — sixteenths stay in time even when the frame rate wobbles |
-| Output | song JSON (the same as the former Qt version's), WAV with stereo and Amiga panning, GB code as a standalone player |
+| Output | song JSON (the same as the former Qt version's), WAV with stereo and Amiga panning, DH code as a standalone player |
 
 ### Web playground
 
@@ -312,7 +314,7 @@ stops working. One showcase that exercises nearly all of it at once:
 of chrome spheres with IBL, shadows, bloom and stereo techno. Plan and status in
 [docs/rust-runtime.md](docs/rust-runtime.md).
 
-**Front-end port to Rust — complete.** The entire toolchain (lexer → parser → compiler → preprocessor) has been ported to Rust, each stage verified for output parity against the Python tree-walker. **`dhrt run file.dh` is a self-contained end-to-end run with no Python:** it preprocesses (`IMPORT` resolution for both source files and built-in modules), lexes, parses, compiles and executes — scalars/arithmetic/control flow, arrays/maps, functions, classes/OOP, `SELECT`/`FOR EACH`/tuples/`WITH`/`TRY`/slicing/comprehensions/coroutines. It changes into the file's directory so relative `IMPORT` and asset paths resolve correctly (`dhrt file.dh` without `run` works the same way; `.dhc` files still use the direct VM path). Debug entry points: `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Self-export without Python:** `dhrt --export file.dh` compiles the source itself and bundles it into a self-contained `.exe` (appends the bytecode to a copy of the runtime, copies `assets/`). Aliased module imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) work natively too. This also makes the **web playground pure Rust WASM**, compiling the source in the browser (no Pyodide): `rust/build_wasm.py file.dh` produces `web/dhrt.{js,wasm}` with the source embedded (the emscripten toolchain on Windows is wired up automatically). **Console and animated graphics both run in the browser** — the GB render loop yields every frame via ASYNCIFY (`emscripten_sleep(0)` inside `flip()`), so `WHILE … FLIP() … WEND` doesn't freeze the tab; **shareable links** pack the source into the URL hash. Plan & stages in [docs/rust-frontend-port.md](docs/rust-frontend-port.md) (German).
+**Front-end port to Rust — complete.** The entire toolchain (lexer → parser → compiler → preprocessor) has been ported to Rust, each stage verified for output parity against the Python tree-walker. **`dhrt run file.dh` is a self-contained end-to-end run with no Python:** it preprocesses (`IMPORT` resolution for both source files and built-in modules), lexes, parses, compiles and executes — scalars/arithmetic/control flow, arrays/maps, functions, classes/OOP, `SELECT`/`FOR EACH`/tuples/`WITH`/`TRY`/slicing/comprehensions/coroutines. It changes into the file's directory so relative `IMPORT` and asset paths resolve correctly (`dhrt file.dh` without `run` works the same way; `.dhc` files still use the direct VM path). Debug entry points: `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Self-export without Python:** `dhrt --export file.dh` compiles the source itself and bundles it into a self-contained `.exe` (appends the bytecode to a copy of the runtime, copies `assets/`). Aliased module imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) work natively too. This also makes the **web playground pure Rust WASM**, compiling the source in the browser (no Pyodide): `rust/build_wasm.py file.dh` produces `web/dhrt.{js,wasm}` with the source embedded (the emscripten toolchain on Windows is wired up automatically). **Console and animated graphics both run in the browser** — the Drachenhauch render loop yields every frame via ASYNCIFY (`emscripten_sleep(0)` inside `flip()`), so `WHILE … FLIP() … WEND` doesn't freeze the tab; **shareable links** pack the source into the URL hash. Plan & stages in [docs/rust-frontend-port.md](docs/rust-frontend-port.md) (German).
 
 Architecture details and extension notes in [CLAUDE.md](CLAUDE.md) (German).
 

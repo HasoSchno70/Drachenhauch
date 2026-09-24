@@ -198,7 +198,7 @@ hello
 world
 foo
 
-=== invalid regex throws gb error
+=== invalid regex throws dh error
 ' Ungueltige Regex (z.B. unbalanced paren) wirft DHRuntimeError,
 IMPORT "regex"
 PRINT REGEX_TEST("abc", "(unbalanced")

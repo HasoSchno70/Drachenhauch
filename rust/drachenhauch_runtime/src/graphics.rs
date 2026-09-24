@@ -17,7 +17,7 @@ use raylib::prelude::*;
 
 // Web (emscripten): yieldet ans Browser-Event-Loop. Mit `-s ASYNCIFY` (vom
 // build_wasm.py gesetzt) wickelt das den kompletten Rust-Stack ab und setzt ihn
-// beim naechsten Tick fort -- so kooperiert der blockierende GB-Render-Loop
+// beim naechsten Tick fort -- so kooperiert der blockierende DH-Render-Loop
 // (`WHILE ... FLIP() ... WEND`) mit dem Browser, statt den Tab einzufrieren.
 #[cfg(target_os = "emscripten")]
 extern "C" {
@@ -1428,7 +1428,7 @@ fn ausweich_schriften() -> &'static [&'static str] {
         "/usr/share/fonts/truetype/freefont/FreeSans.ttf"] }
 }
 
-/// GB-Farbe (0xRRGGBB INTEGER) -> raylib Color.
+/// DH-Farbe (0xRRGGBB INTEGER) -> raylib Color.
 fn col(c: i64) -> Color {
     let v = c as u32;
     // Oberes Byte = Alpha. 0 bedeutet DECKEND (255) -- so bleiben die alten
@@ -2384,7 +2384,7 @@ impl Graphics {
         // Vertrag ("Distanz oder -1") wird dadurch verletzt: `PICK_SPHERE(...)
         // <> -1` waehlt so ein Objekt hinter der Kamera aus. Ausserdem
         // erwartet die zugrundeliegende Formel eine NORMALISIERTE Richtung --
-        // ein unnormalisierter Vektor (aus GB-Code plausibel, z.B. eine
+        // ein unnormalisierter Vektor (aus DH-Code plausibel, z.B. eine
         // Differenz zweier Punkte) liefert nicht nur einen skalierten,
         // sondern einen tatsaechlich FALSCHEN Treffer/Kein-Treffer-Ausschlag.
         let len = (dx * dx + dy * dy + dz * dz).sqrt();
@@ -4756,13 +4756,13 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     // auf (Tasten, Maus, Rad, Gamepad, Touch) und kann ihn spaeter wieder in
     // seinen Eingabe-Zustand einspeisen. Damit sind Demo-Modus ("Attract"),
     // Bug-Berichte zum Nachspielen und automatische Spieltests moeglich --
-    // vorher hatte GB dafuer gar nichts.
+    // vorher hatte Drachenhauch dafuer gar nichts.
     //
     // WICHTIG: raylib gibt die Wiedergabe NICHT selbst getaktet, das muss der
     // Aufrufer tun (`PlayAutomationEvent` je faelligem Ereignis). Genau das
     // macht `automation_tick()` am Ende jedes FLIP -- direkt NACH dem
     // Einlesen der echten Eingabe, damit die eingespeisten Werte den Frame
-    // gewinnen, den das GB-Programm als naechstes liest.
+    // gewinnen, den das DH-Programm als naechstes liest.
 
     /// AUTOMATION_RECORD(datei$): Aufnahme starten. Eine laufende Wiedergabe
     /// wird beendet (raylib spielt waehrend einer Aufnahme ohnehin nichts ab).
@@ -4872,13 +4872,13 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         if self.auto_play_idx >= self.auto_events.len() { self.auto_playing = false; }
     }
 
-    /// KEY_ANY_HIT(): GB-Code der zuletzt gedrueckten Taste, -1 wenn keine.
+    /// KEY_ANY_HIT(): DH-Code der zuletzt gedrueckten Taste, -1 wenn keine.
     /// Das Gegenstueck zu JOYSTICK_ANY_BUTTON -- zusammen mit `KEY_NAME$` ist
     /// ein Belegungsdialog ("Druecke eine Taste ...") damit in drei Zeilen
     /// gebaut, statt alle Konstanten einzeln mit KEYHIT abzuklappern.
     pub fn key_any_hit(&mut self) -> i64 {
         // raylib fuehrt eine Warteschlange. Wir nehmen die erste Taste dieses
-        // Frames, die GB ueberhaupt kennt, und leeren den Rest -- ein Dialog
+        // Frames, die Drachenhauch ueberhaupt kennt, und leeren den Rest -- ein Dialog
         // will genau eine Belegung, keine Sammlung.
         let mut found = -1;
         while let Some(k) = self.rl.get_key_pressed() {
@@ -4887,7 +4887,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             // Tastendruck abbrechen" prueft, an seiner eigenen Demo ab.
             if self.auto_injected_keys.contains(&(k as i32)) { continue; }
             if found < 0 {
-                if let Some(code) = gb_key_code(k) { found = code; }
+                if let Some(code) = dh_key_code(k) { found = code; }
             }
         }
         found
@@ -5360,7 +5360,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     /// Absichtlich auf http/https begrenzt: raylibs OpenURL reicht die
     /// Zeichenkette an die Shell weiter, und ein `file:`- oder gar
     /// Programm-Schema waere damit ein Weg, aus einem harmlos wirkenden
-    /// GB-Programm heraus Beliebiges zu starten.
+    /// DH-Programm heraus Beliebiges zu starten.
     pub fn open_url(&self, url: &str) -> Result<(), String> {
         let low = url.trim().to_ascii_lowercase();
         if !(low.starts_with("http://") || low.starts_with("https://")) {
@@ -5857,7 +5857,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         }
         // Web (emscripten): nach dem Praesentieren (EndDrawing oben beim Drop des
         // Draw-Handles) ans Browser-Event-Loop yielden -- sonst blockiert der
-        // GB-Render-Loop den Main-Thread und der Tab haengt. ASYNCIFY wickelt den
+        // DH-Render-Loop den Main-Thread und der Tab haengt. ASYNCIFY wickelt den
         // Stack ab; beim naechsten Frame geht es hier weiter.
         #[cfg(target_os = "emscripten")]
         unsafe { emscripten_sleep(0); }
@@ -6781,7 +6781,7 @@ fn load_hdr_rgbe(path: &str) -> Result<(Vec<f32>, i32, i32), String> {
     Ok((out, width, height))
 }
 
-/// SDL/pygame-Keycode (Wert der GB-KEY_*-Konstanten) -> raylib KeyboardKey.
+/// SDL/pygame-Keycode (Wert der DH-KEY_*-Konstanten) -> raylib KeyboardKey.
 /// Randbreite fuer 9-Slice, auf ein sinnvolles Mass gestutzt.
 ///
 /// Der Rand darf nie mehr als die halbe Bild- ODER Zielseite belegen: sonst
@@ -6921,11 +6921,11 @@ fn key_from_i32(v: i32) -> Option<KeyboardKey> {
     })
 }
 
-/// Umkehrung von `map_key`: raylib-Taste -> GB-Tastencode (SDL-Konvention).
+/// Umkehrung von `map_key`: raylib-Taste -> DH-Tastencode (SDL-Konvention).
 /// Buchstaben/Ziffern/F-Tasten rechnet die Nummerierung selbst um, alles
 /// andere kommt aus der Tabelle -- so muss hier KEIN roher raylib-Zahlenwert
 /// geraten werden (die Enum-Variante ist die Quelle).
-fn gb_key_code(k: KeyboardKey) -> Option<i64> {
+fn dh_key_code(k: KeyboardKey) -> Option<i64> {
     use KeyboardKey::*;
     let v = k as u32 as i64;
     match v {

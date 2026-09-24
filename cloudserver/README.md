@@ -9,7 +9,7 @@ kontrollierst.
 ## Schnellstart (lokal ausprobieren)
 
 ```
-set GB_CLOUD_API_KEY=test-schluessel                # Windows (PowerShell: $env:GB_CLOUD_API_KEY="test-schluessel")
+set DH_CLOUD_API_KEY=test-schluessel                # Windows (PowerShell: $env:DH_CLOUD_API_KEY="test-schluessel")
 dhrt run cloudserver/server.dh
 ```
 
@@ -30,11 +30,13 @@ vorhandene `cloud.db` läuft ohne Umbau weiter.
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
-| `GB_CLOUD_API_KEY` | *(leer)* | Geteiltes Secret, das Server und Spiel kennen. **Leer = kein Auth-Schutz** — nur für lokales Testen! |
-| `GB_CLOUD_DB` | `cloud.db` neben `server.dh` | Pfad zur SQLite-Datei |
-| `GB_CLOUD_MAX_SAVE_BYTES` | `65536` | Maximale Größe eines einzelnen Save-Blobs |
-| `GB_CLOUD_HOST` | `0.0.0.0` | Bind-Adresse |
-| `GB_CLOUD_PORT` | `8787` | Port (`0` = freien Port wählen; der Server nennt ihn als `PORT=...` auf der Fehlerausgabe) |
+| `DH_CLOUD_API_KEY` | *(leer)* | Geteiltes Secret, das Server und Spiel kennen. **Leer = kein Auth-Schutz** — nur für lokales Testen! |
+| `DH_CLOUD_DB` | `cloud.db` neben `server.dh` | Pfad zur SQLite-Datei |
+| `DH_CLOUD_MAX_SAVE_BYTES` | `65536` | Maximale Größe eines einzelnen Save-Blobs |
+| `DH_CLOUD_HOST` | `0.0.0.0` | Bind-Adresse |
+| `DH_CLOUD_PORT` | `8787` | Port (`0` = freien Port wählen; der Server nennt ihn als `PORT=...` auf der Fehlerausgabe) |
+
+Die Namen `GB_CLOUD_*` aus der GameBasic-Zeit gelten weiter, wenn der `DH_`-Name fehlt.
 
 ## REST-API
 

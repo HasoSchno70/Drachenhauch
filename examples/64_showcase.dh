@@ -275,7 +275,7 @@ FOR i = 0 TO party.length() - 1
     END IF
 NEXT
 
-' Sort via FUNCREF (manuelle Bubble-Sort weil GB keinen Sort-Built-in
+' Sort via FUNCREF (manuelle Bubble-Sort weil Drachenhauch keinen Sort-Built-in
 ' hat -- aber zeigt FUNCREF im Einsatz)
 PRINT ""
 banner("FUNCREF: Party-Sort nach HP")

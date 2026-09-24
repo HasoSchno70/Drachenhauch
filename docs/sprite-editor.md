@@ -98,7 +98,7 @@ wandert mit. Halbdurchsichtige Punkte behalten dabei ihre Deckkraft.
   Verlauf — der zeichnet je Schritt eine Ebene auf, ein Rückgängig danach
   drehte nur eine zurück. Der Verlauf wird deshalb geleert; die
   Gegenrichtung nimmt eine Wandlung zurück.
-- **[GB-Code]** und **[dhanim]** — siehe Ausgaben.
+- **[DH-Code]** und **[dhanim]** — siehe Ausgaben.
 
 ## Rechte Spalte: Bilder, Ebenen, Vorschau, Bereiche
 
@@ -190,7 +190,7 @@ zusammengerechnete Bild; die Bildnamen kommen über die Atlas-Schlüssel mit.
 | **[PNG]** | das aktuelle Einzelbild (sichtbare Ebenen) als PNG |
 | **[Streifen]** | alle Bilder nebeneinander als PNG, dazu die Atlas-JSON gleichen Namens |
 | **[GIF]** | bewegtes GIF mit Durchsichtigkeit; Bilder mit eigener Dauer behalten sie |
-| **[GB-Code]** | ein lauffähiges Programm `name.dh` samt Blatt `name.png` |
+| **[DH-Code]** | ein lauffähiges Programm `name.dh` samt Blatt `name.png` |
 | **[dhanim]** | die Bereiche als Zustandsmaschine `.dhanim` |
 
 ### Streifen + Atlas
@@ -222,9 +222,9 @@ WHILE NOT QUITREQUESTED()
 WEND
 ```
 
-### GB-Code
+### DH-Code
 
-**[GB-Code]** schreibt Programm und Blatt in einem Zug und unter demselben
+**[DH-Code]** schreibt Programm und Blatt in einem Zug und unter demselben
 Namen — wer nur den Code hätte, hätte einen Verweis ins Leere. Das Programm
 lädt das Blatt mit `SPRITE_NEW`, legt je Bereich eine
 `SPRITE_ADD_ANIM`-Zeile an (ohne Bereiche eine `"idle"` über alle Bilder mit
@@ -247,7 +247,7 @@ Aussage über das Spiel. Die Datei lädt `ANIM_FSM_LOAD` so, wie sie ist; die
    **Zwiebelhaut** sieht man das vorige Bild darunter.
 3. Bild 1 eine **Dauer** von 400 ms geben, die übrigen folgen dem Tempo.
 4. Einen Bereich `lauf` von 2 bis 4 anlegen.
-5. **[Sichern]** als `.dhsprite` (Arbeitsstand), **[GB-Code]** für ein
+5. **[Sichern]** als `.dhsprite` (Arbeitsstand), **[DH-Code]** für ein
    Programm, das sofort läuft.
 
 ### Kachelsatz
@@ -273,6 +273,6 @@ Aussage über das Spiel. Die Datei lädt `ANIM_FSM_LOAD` so, wie sie ist; die
 Die Zusagen dieser Seite prüft [`tests/pruef/werkzeug_sprite.dhtest`](../tests/pruef/werkzeug_sprite.dhtest)
 mit echten Mauswegen über die Aufnahme-Wiedergabe: Auswahl, Lasso und
 Zauberstab, Verschieben, Paletten gegen einen fremden Leser, Statistik,
-Zuschneiden, Bereiche, GB-Code und `.dhanim` (gestartet bzw. von der Laufzeit
+Zuschneiden, Bereiche, DH-Code und `.dhanim` (gestartet bzw. von der Laufzeit
 geladen), Atlas-Schlüssel, Drehen und Spiegeln, Einzeldauern im GIF und die
 Grenzen von 64 Bildern und 8 Ebenen.

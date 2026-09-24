@@ -12,7 +12,7 @@
 IMPORT "mqtt"
 DIM h AS MQTT_HANDLE
 TRY
-    h = MQTT_CONNECT("127.0.0.1", 18999, "gb-test")
+    h = MQTT_CONNECT("127.0.0.1", 18999, "dh-test")
     PRINT "verbunden"
 CATCH e
     PRINT INSTR(e, "MQTT_CONNECT") >= 0
@@ -40,7 +40,7 @@ FUNCTION brokerStarten() AS INTEGER
 END FUNCTION
 
 DIM h AS MQTT_HANDLE
-h = MQTT_CONNECT("127.0.0.1", brokerStarten(), "gb-e2e-test", 30)
+h = MQTT_CONNECT("127.0.0.1", brokerStarten(), "dh-e2e-test", 30)
 PRINT "connected: ", MQTT_IS_CONNECTED(h)
 
 MQTT_SUBSCRIBE(h, "sensors/temp")

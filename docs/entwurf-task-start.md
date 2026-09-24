@@ -1,4 +1,4 @@
-# Entwurf: `TASK_START` — GB-Code im Hintergrund (Stufe C)
+# Entwurf: `TASK_START` — DH-Code im Hintergrund (Stufe C)
 
 **Stand 2026-08-19.** Der letzte offene Punkt aus WP H. Er steht seit dem
 17.08. ausdrücklich als *nicht umgesetzt, und zwar mit Grund* in der Roadmap;

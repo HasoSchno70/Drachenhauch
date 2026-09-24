@@ -6,7 +6,7 @@ name = "drachenhauch_runtime"
 # das. (Cargo verlangt drei Stellen, das Projekt nennt sich "2026.15".)
 version = "2026.15.0"
 edition = "2021"
-description = "Native Drachenhauch runtime (Rust). Loads .dhc bytecode, executes VM core; optional raylib graphics."
+description = "Drachenhauch runtime (Rust): compiles and runs Drachenhauch programs -- games, GUI applications and command-line tools."
 
 [[bin]]
 name = "dhrt"

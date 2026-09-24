@@ -436,10 +436,10 @@ VM-Zustand anfassen.
       `TASK_START`/`READY`/`RESULT$`/`CANCEL`/`PENDING` mit beliebig vielen
       Argumenten, 18 Golden-Tests
 
-**Warum GB-Code nicht im Hintergrund laufen kann.** `Value` hält Zeichenketten,
+**Warum DH-Code nicht im Hintergrund laufen kann.** `Value` hält Zeichenketten,
 Arrays, Maps und Objekte durchgehend in `Rc` (28 Stellen in `value.rs`), und
 `Func` hält `Vec<Value>` als Parameter-Vorgaben — `Program` ist damit weder
-`Send` noch `Sync`. Eine GB-Funktion in einem Thread auszuführen hieße also,
+`Send` noch `Sync`. Eine DH-Funktion in einem Thread auszuführen hieße also,
 `Value` (und mit ihm `Func`/`Program`) auf `Arc` umzustellen. Das verteuert
 **jede** Zeichenketten- und Array-Operation in **jedem** einthreadigen
 Programm, um einem seltenen Fall zu helfen.

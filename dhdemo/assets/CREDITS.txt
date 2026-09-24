@@ -9,7 +9,7 @@ building_energy.xm, cyber_spider.xm
     Drozerix
     Bezogen ueber The Mod Archive (modarchive.org), Rubrik "Public Domain".
     Lizenz: Public Domain -- gemeinfrei, keine Auflagen.
-    Reproduzierbar via gbdemo/download_music.dh (Modul-Nummern dort).
+    Reproduzierbar via dhdemo/download_music.dh (Modul-Nummern dort).
 
 HDR-UMGEBUNG (assets/ibl_env.hdr)
 ---------------------------------

@@ -4,7 +4,7 @@ Ein Werkzeug für Retro-Soundeffekte im sfxr-Stil, geschrieben in Drachenhauch
 auf dem eigenen `gui`-Modul. Es baut seinen Klang mit
 [`AUDIO_SFX`](module-audio.md) — also mit genau dem Aufruf, der später im
 Spiel steht —, zeigt die Wellenform, spielt sie ab und gibt sie als WAV oder
-als fertigen GB-Code heraus. Gegenstück zum Partikel-Editor
+als fertigen DH-Code heraus. Gegenstück zum Partikel-Editor
 ([`particle-editor.md`](particle-editor.md)); Musik macht der
 [Tracker](tracker.md).
 
@@ -22,7 +22,7 @@ Programm. Python braucht er nicht.
 | Wellenform | Die Kurve des aktuellen Klangs (`AUDIO_SOUND_WAVE`), je Abschnitt der größte Ausschlag. Erreicht sie den Rand, steht **Clipping** daneben |
 | Transport | **Abspielen**; **Zufall** würfelt neue Werte *um die jetzigen herum* (Lautstärke und Pan bleiben), dazu eine zufällige Wellenform; **Auto-Play** (an) spielt von selbst, sobald ein Regler sechs Bilder lang zur Ruhe gekommen ist — nicht bei jedem Zwischenwert |
 | Werkseinstellungen | Muenze, Laser, Explosion, Powerup, Treffer, Sprung, Blip, Motor — ein Klick setzt alle Regler und die Wellenform |
-| Ausgabe | **WAV sichern ...**, **GB-Code kopieren**, **Sichern ...**/**Laden ...** (`.ini`), Kästchen **8 Bit (Lo-Fi)** für die WAV |
+| Ausgabe | **WAV sichern ...**, **DH-Code kopieren**, **Sichern ...**/**Laden ...** (`.ini`), Kästchen **8 Bit (Lo-Fi)** für die WAV |
 | Verlauf | **Zurueck**/**Vor** oder Strg+Z/Strg+Y |
 | Statuszeile | Meldung und die Dauer des Klangs (Attack + Sustain + Decay in ms) samt Wellenform |
 
@@ -74,7 +74,7 @@ snd = LOADSOUND("effekt.wav")
 PLAYSOUND(snd)
 ```
 
-**GB-Code kopieren** legt ein lauffähiges Stück in die Zwischenablage: den
+**DH-Code kopieren** legt ein lauffähiges Stück in die Zwischenablage: den
 `IMPORT`, den `AUDIO_SFX`-Aufruf mit allen 16 Werten und das Abspielen. Der
 Klang entsteht dann zur Laufzeit, ein WAV braucht das Spiel nicht. Für die
 Werkseinstellung „Muenze“:
@@ -117,6 +117,6 @@ Klang eine eigene `.ini`, die man ablegt, wo man will.
 Aufnahme: Beschriftungen liegen nicht auf den Knöpfen, ein Zug ist ein
 Schritt, Zurück/Vor über Knopf und Tasten, Würfelwurf und Werkseinstellung
 sind je ein Schritt, ein neuer Zug schneidet den Vor-Weg ab — und der
-GB-Code nimmt den Pan mit und läuft durch `dhrt --check`. Die Rückfrage beim
+DH-Code nimmt den Pan mit und läuft durch `dhrt --check`. Die Rückfrage beim
 Schließen prüft `tests/pruef/werkzeug_kreuz.dhtest` mit echten
 Fensternachrichten.

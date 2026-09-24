@@ -4,7 +4,7 @@
 //! Restitution/Reibung) -- das 2D-Pendant zu `physics3d`. Im Gegensatz zum
 //! `physics`-Modul (reine Kollisions-Helfer) simuliert dies echte Dynamik.
 //!
-//! **Bildschirm-Konvention:** Y waechst nach UNTEN (wie bei allen GB-Draw-
+//! **Bildschirm-Konvention:** Y waechst nach UNTEN (wie bei allen DH-Draw-
 //! Befehlen), Default-Schwerkraft zieht also nach unten (positives Y). Die
 //! Solver-`length_unit` ist auf 100 gesetzt (1 "Meter" = 100 px), damit
 //! pixel-grosse Welten stabil bleiben -- Default-Gravitation 980 px/s^2 ist

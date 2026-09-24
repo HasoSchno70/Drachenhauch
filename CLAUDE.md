@@ -1,6 +1,10 @@
 # Drachenhauch
 
-BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele.
+BASIC-Dialekt mit Pascal-strikter Typisierung und OOP -- für Spiele UND für
+Anwendungen mit GUI (Formulare, Tabellen, Datenbank, Drucken). Früher hieß er
+„GameBasic“; das Kürzel ist überall `dh` (`.dh`, `dhrt`, `DH_*`, „DH-Code“),
+nicht mehr `gb` -- Ausnahmen sind nur Geschichtsdokumente und die Aufräum-
+Regeln für alte GameBasic-Installationen.
 **Eine Runtime: `dhrt`** (Rust/raylib) — sie ist Lexer → Parser → Compiler → VM
 in einem und übernimmt Ausführung, Konsole, Grafik/Audio, Standalone-Export,
 Sprachserver (`dhrt lsp`), Prüfsammlungen (`dhrt test`) und Doku-Werkzeuge.
@@ -38,9 +42,9 @@ Drachenhauch-Programme. **Python gibt es nur noch in zwei Bauskripten**
 > reimplementiert die Module nativ in Rust), `export.py`, `environment.py`, pygame.
 >
 > **Folgen für die Arbeit:** Neue Builtins/Sprach-Features kommen NUR in
-> `rust/drachenhauch_runtime/` (+ ein run_gb-Golden-Test). Es gibt KEIN „beide Pfade" /
+> `rust/drachenhauch_runtime/` (+ ein Fall in einer Pruefsammlung `tests/pruef/*.dhtest`). Es gibt KEIN „beide Pfade" /
 > „drei Pfade" / „Parität gegen Tree-Walker" mehr — Korrektheit sichern
-> run_gb-Golden-Tests (`assert run_gb(src) == expected`) + Rust-`#[test]`s.
+> die Pruefsammlungen (`dhrt test tests/pruef`) + Rust-`#[test]`s.
 >
 > **WICHTIG:** Viele Feature-Abschnitte WEITER UNTEN erwähnen noch
 > `interpreter.py` / `compiler.py` / `vm.py` / `vm_native.pyx` / „Tree-Walker" /
@@ -80,13 +84,13 @@ Drachenhauch-Programme. **Python gibt es nur noch in zwei Bauskripten**
 > **Eine genaue Restzahl gab es dafuer schon vorher nicht mehr** -- der
 > Qt-Eigenschaften-Dialog (167 Zeilen) bedient Kacheln UND Objekte, und
 > beide Haelften sind inzwischen da, nur nicht als EIN Dialog. Die Zahl lag
-> bei 620 (Faktor 0,42 gegen den Rest), als GB-Code-Export,
+> bei 620 (Faktor 0,42 gegen den Rest), als DH-Code-Export,
 > Eigenschaften, Objekt-Ebenen und mehrere Tilesets noch alle fehlten.
 > Wer hochrechnet, muss beide Fragen stellen: wie viel von dem Qt-Code
 > dupliziert etwas, das die Laufzeit schon kann -- und wie viel von dem
 > Qt-Code hat die Drachenhauch-Fassung gar nicht erst?
 >
-> **Der Tilemap-Pilot schreibt seit 2026-09-02 auch GB-Code** -- einen
+> **Der Tilemap-Pilot schreibt seit 2026-09-02 auch DH-Code** -- einen
 > lauffaehigen Renderer, die Karte als Tiled-JSON und das Tileset-Bild, alle
 > drei unter demselben Namen und in einem Zug. Das Bild kommt mit, obwohl die
 > Karte seinen Pfad ohnehin nennt: der Pfad zeigt dorthin, wo das Tileset beim
@@ -187,7 +191,7 @@ Drachenhauch-Programme. **Python gibt es nur noch in zwei Bauskripten**
 > (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten) -> 0,28 (2037,
 > mit Kachel-Ansicht und Statistik) -> 0,32 (2339, mit Zuschneiden,
 > Groesse aendern und Animationsbereichen) -> 0,33 (2413, mit der
-> GB-Code-Ausgabe) -> 0,34 (2474, mit der .dhanim-Ausgabe) -> 0,35 (2604,
+> DH-Code-Ausgabe) -> 0,34 (2474, mit der .dhanim-Ausgabe) -> 0,35 (2604,
 > mit benannten Einzelbildern) -> 0,37 (2696, mit Spiegeln und
 > Vierteldrehen) -> 0,38 (2811, mit einer Dauer je Einzelbild). Nichts daran
 > ist schlechter geworden -- es
@@ -302,7 +306,7 @@ Drachenhauch-Programme. **Python gibt es nur noch in zwei Bauskripten**
 > "Amiga" und die abgeschnittenen Knoepfe beider Werkzeugleisten hat nur das
 > BILD gezeigt** -- der Test dazu prueft jetzt alle 35 Rechtecke paarweise
 > und gegen den Fensterrand. Tests `tests/test_pilot_tracker.py` (17, mit
-> fremden Lesern fuer JSON, WAV und GB-Code; der GB-Code wird gestartet, nicht
+> fremden Lesern fuer JSON, WAV und DH-Code; der DH-Code wird gestartet, nicht
 > nur uebersetzt), `tests/pruef/audio_note_mix.dhtest`.
 >
 > **Der sechste Pilot ist keine Werkzeug-Portierung, sondern eine
@@ -433,7 +437,7 @@ Drachenhauch-Programme. **Python gibt es nur noch in zwei Bauskripten**
 > Vorschau danach etwas anderes, ohne dass sich sichtbar etwas geaendert
 > haette.
 >
-> **Die GB-Code-Ausgabe schliesst den Kreis** (2026-09-01): [GB-Code]
+> **Die DH-Code-Ausgabe schliesst den Kreis** (2026-09-01): [DH-Code]
 > schreibt ein LAUFFAEHIGES Programm samt Blatt -- eine
 > `SPRITE_ADD_ANIM`-Zeile je Bereich, ohne Bereiche eine ueber alles
 > ("idle"), sonst faende `SPRITE_PLAY` nichts. Beides in EINEM Zug und unter
@@ -569,7 +573,7 @@ Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. `vm.rs
    Beide Dateien bettet dhrt fuer `dhrt lsp` ein -> nach einer Aenderung neu
    bauen. **Alle drei liegen in `daten/`** (bis 2026-09-17 in
    `drachenhauch/editor_qt/`, siehe unten).
-3. Einen `tests/`-Golden-Test schreiben (`assert run_gb('PRINT NAME(...)') == ...`).
+3. Einen Fall in einer Pruefsammlung schreiben (`tests/pruef/*.dhtest`, `=== Name` + Quelltext + `--- erwartet`).
    **Die Signatur in `builtin_index.json` muss stimmen** — der Compiler leitet
    daraus die erlaubte Argumentzahl ab und warnt bei Abweichung (`dhrt --check`).
    Formen, die er versteht: `NAME(a, b [, c])`, `NAME(a, b = "")` (Vorgabewert =
@@ -698,10 +702,10 @@ Faelle. Tests `tests/pruef/gui_tabelle_bedienung.dhtest` (13; gegen den Bau
 davor fallen die 10, die Neues pruefen). Im **Form-Designer** (197): Kaestchen "Umbenennen mit
 F2" bei der Liste (`list.bearbeitbar`, abgewaehlt wird der Schluessel
 ENTFERNT) und Feld "Leer-Hinweis" bei der Tabelle (`table.leer_text`), beides
-im GB-Code (`GUI_LISTBOX_SET ... "bearbeitbar"`, `GUI_TABLE_PLACEHOLDER`);
+im DH-Code (`GUI_LISTBOX_SET ... "bearbeitbar"`, `GUI_TABLE_PLACEHOLDER`);
 Uebernehmen/Aktiviert/Hinweis ruecken dafuer eine Zeile tiefer. Tests in
 `tests/pruef/werkzeug_formdesigner.dhtest` (Inspektor-Fall + der
-GB-Code-Fall mit allen Arten; gegen den alten Designer fallen beide).
+DH-Code-Fall mit allen Arten; gegen den alten Designer fallen beide).
 
 **Baum bequem wie die Liste** (selber Tag): Rollbalken (derselbe
 `list_bar_geom`, jetzt fuer Liste UND Baum -- der Rollstand liegt in `value`
@@ -864,8 +868,8 @@ von `ansichtBauen`) baut daraus `tabctl.kinder` fuer Reiterwerk UND
 Assistent -- die Laufzeit fuehrt Nummern, die sich bei jedem Loeschen
 verschieben, der Designer Namen; `reiterAusDatei` beim Laden umgekehrt
 (Namenlose bekommen einen), ein umbenanntes Reiterwerk nimmt seine Kinder
-mit. GB-Code: `GUI_TABCONTROL_ADD` je Seite, die Zuordnungen NACH allen
-Controls (`gbVarNamen`). Dazu Kaestchen *Tippen erlaubt* (Combobox) und
+mit. DH-Code: `GUI_TABCONTROL_ADD` je Seite, die Zuordnungen NACH allen
+Controls (`dhVarNamen`). Dazu Kaestchen *Tippen erlaubt* (Combobox) und
 **[Neu]/[Oeffnen] fragen bei Ungesichertem** (`ersetzenAnfragen`, wie im
 Notenblatt; bis dahin warfen sie es wortlos weg). Tests sieben Faelle in
 `tests/pruef/werkzeug_formdesigner.dhtest`; fuenf Verfaelschungen fallen je in
@@ -917,7 +921,7 @@ je ihre Faelle fallen).
 
 **Text und Formular** (2026-09-04, Punkt 1 des gui-Ausbaus -- Ziel: dass Drachenhauch genannt wird, wenn jemand fragt, womit er eine Anwendung schreiben soll): `GUI_SET_ALIGN(wdg, links|mitte|rechts)` fuer Beschriftung/Knopf/Textfeld; `GUI_SET_WRAP(label, breite)` bricht an Wortgrenzen um, die HOEHE folgt dem Text -- gemessen in `umbruch_layout` (in GUI_UPDATE, weil nur dort Graphics und Schreibzugriff zusammenkommen; das Zeichnen ist `&self`); `GUI_TEXTINPUT_SET(tf, key$, wert)` mit `passwort` (Punkte statt Zeichen -- Treffertest und Rollen messen an den PUNKTEN, sonst sitzt die Schreibmarke neben dem Text), `nur_lesen`, `maxlaenge` (schneidet ab, auch beim Einfuegen), `zahlen` (1 ganz, 2 Komma; Zwischenstand `-` erlaubt, sonst liesse sich keine negative Zahl tippen); `GUI_ENTERED`/`GUI_ON_ENTER`; **Strg+Z/Y in Textfeld und Textbereich** (Anschlaege innerhalb 0,8 s = EIN Schritt; `GUI_SET_TEXT` leert den Verlauf); `GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` (Enter/ESC druecken den Knopf -- aber die Taste gehoert zuerst dem Widget mit Fokus: Knopf/Kaestchen nehmen Enter selbst, Textbereich macht einen Umbruch, Zelle in Bearbeitung ihr Ende; aus einem TEXTFELD heraus ist Enter das Abschicken; der Standard-Knopf traegt den Akzent als Rahmen). Alles in der `.dhform` (auch der Tooltip -- der fehlte dort bisher) und im Form-Designer (Inspector + Codegen). **Testfalle:** raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber KEINE Zeichen in die Zeichenwarteschlange -- Tests tippen ueber die Zwischenablage mit Strg+V, das laeuft durch dieselben Filter. Tests `tests/pruef/gui_text_formular.dhtest`, Doku `docs/module-gui.md`.
 
-**Menues** (2026-09-04, Punkt 2 des gui-Ausbaus): `GUI_MENU_ITEM(menu, label$[, kuerzel$])` / `GUI_MENU_SHORTCUT` -- Kuerzel werden als Text geschrieben (`Strg+S`, `Alt+Enter`, `F5`, `Entf`, deutsch oder englisch; `kuerzel_parsen` in gui.rs mit Rust-Tests, unbekannte Taste = Fehler beim Anlegen statt eines still stummen Kuerzels) und jedes Bild geprueft (`kuerzel_pruefen`), auch bei geschlossenem Menue -- **seit 2026-09-07 in ALLEN sichtbaren Fenstern**: zuerst im Fokus-Fenster, dann in den uebrigen von oben nach unten (Form-Designer, Anim-FSM und Notenblatt mussten sich vorher nach jedem Knopf im Nebenfenster den Fokus zurueckholen, sonst war Strg+S stumm -- dreimal derselbe Fund, dreimal zuerst vom Test gesehen); das Fokus-Fenster gewinnt bei gleichem Kuerzel, ein modales laesst nur seine eigenen zu, ein Entwurfsfenster (`GUI_WINDOW_DESIGN`) zaehlt nicht; die Modifier muessen GENAU passen, und **ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus** (ein `Entf`-Kuerzel loescht dort ein Zeichen) -- AUSSER F1..F12 (`ist_funktionstaste`, seit 2026-09-06: die IDE in Drachenhauch startete per F5 nie, weil das Code-Feld den Fokus hatte). `GUI_SUBMENU` (beliebig tief; `sub_chain` = offene Untermenues, `untermenues_folgen` oeffnet beim Ueberfahren und schliesst NICHT, wenn die Maus neben allen Popups ist -- sonst klappt es beim schraegen Hinueberfahren zu; ein Untermenue ist nie Kontextmenue, `Menu::unter`), `GUI_MENU_CHECK`/`GUI_MENU_CHECKED` (Klick oder Kuerzel kippt), `GUI_MENU_ENABLE` (gesperrt = kein Klick, kein Kuerzel), `GUI_MENU_ICON`, `GUI_MENU_TEXT`. Popup-Layout aus EINER Quelle `popup_layout` (Treffertest + Zeichnen). In der `.dhform` verschachtelt (`items` am Eintrag, `shortcut`, `checkable`/`checked`); der Form-Designer bearbeitet Menues nicht, schreibt sie aber jetzt in den GB-Code (`_gb_menus`). **Testfalle:** raylib meldet beim Lesen mancher Aufnahmedateien "Issue reading line to buffer" auf stdout, die Ereignisse kommen trotzdem an -- Tests filtern `WARNING:`-Zeilen. Tests `tests/pruef/gui_menu_ausbau.dhtest`, Beispiel `examples/129_gui_menu.dh`.
+**Menues** (2026-09-04, Punkt 2 des gui-Ausbaus): `GUI_MENU_ITEM(menu, label$[, kuerzel$])` / `GUI_MENU_SHORTCUT` -- Kuerzel werden als Text geschrieben (`Strg+S`, `Alt+Enter`, `F5`, `Entf`, deutsch oder englisch; `kuerzel_parsen` in gui.rs mit Rust-Tests, unbekannte Taste = Fehler beim Anlegen statt eines still stummen Kuerzels) und jedes Bild geprueft (`kuerzel_pruefen`), auch bei geschlossenem Menue -- **seit 2026-09-07 in ALLEN sichtbaren Fenstern**: zuerst im Fokus-Fenster, dann in den uebrigen von oben nach unten (Form-Designer, Anim-FSM und Notenblatt mussten sich vorher nach jedem Knopf im Nebenfenster den Fokus zurueckholen, sonst war Strg+S stumm -- dreimal derselbe Fund, dreimal zuerst vom Test gesehen); das Fokus-Fenster gewinnt bei gleichem Kuerzel, ein modales laesst nur seine eigenen zu, ein Entwurfsfenster (`GUI_WINDOW_DESIGN`) zaehlt nicht; die Modifier muessen GENAU passen, und **ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus** (ein `Entf`-Kuerzel loescht dort ein Zeichen) -- AUSSER F1..F12 (`ist_funktionstaste`, seit 2026-09-06: die IDE in Drachenhauch startete per F5 nie, weil das Code-Feld den Fokus hatte). `GUI_SUBMENU` (beliebig tief; `sub_chain` = offene Untermenues, `untermenues_folgen` oeffnet beim Ueberfahren und schliesst NICHT, wenn die Maus neben allen Popups ist -- sonst klappt es beim schraegen Hinueberfahren zu; ein Untermenue ist nie Kontextmenue, `Menu::unter`), `GUI_MENU_CHECK`/`GUI_MENU_CHECKED` (Klick oder Kuerzel kippt), `GUI_MENU_ENABLE` (gesperrt = kein Klick, kein Kuerzel), `GUI_MENU_ICON`, `GUI_MENU_TEXT`. Popup-Layout aus EINER Quelle `popup_layout` (Treffertest + Zeichnen). In der `.dhform` verschachtelt (`items` am Eintrag, `shortcut`, `checkable`/`checked`); der Form-Designer bearbeitet Menues nicht, schreibt sie aber jetzt in den DH-Code (`_gb_menus`). **Testfalle:** raylib meldet beim Lesen mancher Aufnahmedateien "Issue reading line to buffer" auf stdout, die Ereignisse kommen trotzdem an -- Tests filtern `WARNING:`-Zeilen. Tests `tests/pruef/gui_menu_ausbau.dhtest`, Beispiel `examples/129_gui_menu.dh`.
 
 **Listen** (2026-09-04, Punkt 3 des gui-Ausbaus): Eintraege einzeln (`GUI_LISTBOX_ADD/REMOVE/CLEAR/COUNT/ITEM/SET_ITEM/MOVE`, auch fuer Klapplisten -- vorher ging nur `GUI_SET_LISTBOX` als Ganzes; die Auswahl rueckt beim Einfuegen/Loeschen davor MIT, sie meint denselben Eintrag), `GUI_LISTBOX_SET(lb, "kaestchen"|"mehrfachauswahl", 1)`, `GUI_LISTBOX_ICON/COLOR` je Eintrag, `GUI_LISTBOX_CHECKED/SET_CHECKED`, Mehrfachauswahl mit denselben Abfragen wie die Tabelle (`IS_SELECTED/SELECT/SEL_COUNT/SEL_ROW/CLEAR_SELECTION`; Strg+Klick sammelt, Umschalt+Klick spannt vom Anker, ein Pfeil setzt die Menge auf eine Zeile), `GUI_DOUBLE_CLICKED` (bisher nur Listen). Zusatzzustand in `ListState` (`Widget::list`, nur bei Bedarf angelegt -- eine schlichte Liste bleibt, was sie war; `sync` haelt die Vektoren mit `items` gleich lang). **Ein Klick aufs Kaestchen kippt NUR den Haken**, die Auswahl bleibt -- sonst waehlte man beim Abhaken jedes Mal um. `handle_press` hat kein `g`, Strg/Umschalt kommen deshalb ueber `tasten_mod`, das `update` vor dem Druck fuellt. In der `.dhform` unter `list` (Sinnbilder nicht -- Textur-Handles). Designer: zwei Schalter im Inspector, Codegen. Tests `tests/pruef/gui_listen.dhtest` (Klicks mit Strg/Umschalt echt eingespeist; der Versatz kommt aus einer Zeichenflaeche bei (0,0)), Beispiel `examples/192_gui_listen.dh`.
 
@@ -991,7 +995,7 @@ Endung schreiben: `IMPORT "json.dh"`.
 | `m3d` | 3D-Mathe: **VEC3/VEC4/QUAT/MAT4** (immutable, Operator-Overloading `+ - * / = <>`, inkl. `mat*mat`/`mat*vec`/`quat*quat`). Quaternionen (`QUAT_FROM_AXIS_ANGLE/EULER/SLERP/ROTATE_VEC3`), Matrizen (`MAT4_TRS/MUL/INVERT/LOOKAT/PERSPECTIVE/ORTHO/...`, column-major). Rendering via **`MODEL_MATRIX(handle, mat[, tint])`** (hierarchische Transforms/Bones/Gizmos) + **`MODEL_INSTANCED(handle, mats[, tint[, anzahl]])`** -- `tint` darf eine Farbe ODER ein `ARRAY OF INTEGER` sein (eine Farbe je Matrix); die Laufzeit gruppiert dann nach Farben und zeichnet **einen Draw-Call je VERSCHIEDENER Farbe**, nicht je Instanz (raylibs `DrawMeshInstanced` uebertraegt nur Matrizen, keine Farb-Attribute -- bei sehr vielen verschiedenen Farben ist ein Verlauf im Shader die bessere Antwort). Echtes GPU-Instancing: dasselbe Mesh mit N MAT4-Welt-Matrizen aus einem `ARRAY OF MAT4`/`TUPLE` in EINEM Draw-Call via raylib `DrawMeshInstanced`; eigener schlanker Instancing-Shader mit Ambient+bis-4-Lichtern, kein PBR/IBL/Schatten/Normal-Maps) + **`CAMERA3D_VIEW/PROJECTION(mat)`** (Ortho/Custom-Frustum) — native-only (dhrt). Doku `docs/module-m3d.md`, Demos `examples/103_m3d.dh` + `examples/104_instancing.dh`, Tests `tests/pruef/m3d.dhtest`. | `VEC3`/`VEC4`/`QUAT`/`MAT4` |
 | `input` | Action-basiertes Input-Mapping mit Edge-Detection. `INPUT_BIND/UNBIND/UPDATE`, `INPUT_HELD/PRESSED/RELEASED/AXIS/BOUND`. Multi-Key-Bindings. **Gamepad-Support**: `JOY_BUTTON_A..Y`, `JOY_DPAD_*` als Bind-Codes, `INPUT_JOY_AXIS(slot, "left_x")` mit Deadzone. | — |
 | `regex` | Python-kompatible Pattern-Matching. `REGEX_MATCH/TEST/FIND/FIND_ALL/REPLACE/REPLACE_ONCE/SPLIT`. Pattern-Cache fuer wiederholte Aufrufe. | — |
-| `audio` | Erweiterte Audio-API (nativ in dhrt ueber **Kira**/cpal -- eigener Audio-Thread, vom Game-Loop entkoppelt; loeste 2026-06-13 raylib-Audio ab, `rust/drachenhauch_runtime/src/audio.rs`). Channels, Pause/Resume/Fade (native Kira-Tweens), Stereo-Pan, Music-Position (lesen `AUDIO_MUSIC_POSITION`, setzen **`AUDIO_MUSIC_SEEK(sekunden)`** -- der Sprung wirkt erst nach ~0,3-0,4 s, weil der Stream seinen Vorlauf zu Ende spielt; **MOD/XM koennen es nicht** und melden das: ihre Zeitachse sind Pattern/Zeilen, die Sekunden bis dorthin haengen an Tempowechseln im Stueck. Ohne laufende Musik ist es ein FEHLER -- anders als bei PAUSE/RESUME, wo ein Nicht-Treffer nichts verliert, fiele hier ein `LOAD : SEEK : PLAY` lautlos auf Position 0 zurueck). Tone-Generation (`AUDIO_TONE`/`AUDIO_NOISE`) mit Sine/Square/Saw/Triangle/Noise. **`AUDIO_SFX`** -- prozeduraler sfxr-Stil-Synth (Waveform + Pitch-Slide + ADSR + Vibrato + optionale `stereo_width` fuer breiten Stereo-Sound; geteilte Mathematik in drachenhauch/synth.py; der SFX-Generator `dhsfx` exportiert solche Aufrufe, Pan via `AUDIO_PAN`). Liefert kompatible `SOUND`-Objekte (auch fuer `PLAYSOUND` nutzbar). **Tracker-Module** `.mod`/`.xm` laufen ueber `PLAYMUSIC`/`AUDIO_MUSIC_LOAD` in **Echtzeit gestreamt** (Kira-Custom-`Sound` `ModuleSound` pollt den reinen Rust-Player `xmrs`/`xmrsplayer` auf dem Audio-Thread; sofort geladen, exaktes Endlos-Loopen, Pitch-Resampler + Volume-Ramp im Sound, Steuerung via `Arc<ModShared>`-Atomics, Modul geleakt + im Drop freigegeben) -- echter 4-Kanal-Amiga-Sound, Demo `examples/115_modplayer.dh`. **Sampler `SAMPLE_*`** (Amiga/Paula-Prinzip): `SAMPLE_LOAD(pfad$)->SAMPLE`, `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])->AUDIO_CHANNEL` (Resampling per linearer Interpolation = Tonhoehe wie Geschwindigkeit; resampelte Noten gecacht), `SAMPLE_SET_LOOP(s, a, e[, "pingpong"])`/`SAMPLE_LEN`, dazu `SAMPLE_FROM_BUFFER` (16-Bit-PCM) und `SAMPLE_NOTE` (Note als SOUND mit AUDIO_NOTE-Huellkurve, fuer AUDIO_PLAY_AT/MIX). One-Shot (dur<=0) fuer Drums/Hits, dur>0 + Loop-Region fuer gehaltene Noten. Reine Resampling-Mathematik = freie `resample()` in audio.rs (Rust-`#[test]`); Demo `examples/116_sampler.dh`. **Paula-Lo-Fi** `AUDIO_LOFI(an[, bits[, cutoff_hz]])` -- Bit-Crush (Default 8-bit) + LED-Tiefpass (Default 3300 Hz) fuer NEU synthetisierte Sounds (TONE/NOISE/SFX/SAMPLE_PLAY; Cache wird geleert); pure `lofi_chain()` mit Rust-`#[test]`. **Mixer-Busse** `AUDIO_BUS_VOLUME(bus$, vol)`/`AUDIO_BUS_GET_VOLUME(bus$)` mit `bus$` = `sfx`/`music`/`master` -- SFX-/Musik-Master getrennt (Kira-Sub-Tracks: SFX/Sampler/Synth -> sfx_track, Musik -> music_track, beide -> Main mit dem FFT-Tap; Bus×Sound-Volume multiplizieren). **Echtzeit-Effekte je Bus** (Kira-Effektkette am Track, live steuerbar, kein Buffer-Bake): `AUDIO_FILTER(bus$, cutoff_hz[, resonance])` (Tiefpass, SID/Acid-Sweep), `AUDIO_REVERB(bus$, mix[, feedback[, damping]])` (Hall), `AUDIO_DELAY(bus$, mix[, feedback[, time_ms]])` (Echo, eigener Ringpuffer-Effekt -> Zeit zur Laufzeit aenderbar, 1..4000 ms), `AUDIO_DISTORTION(bus$, amount[, mix])` (Overdrive/Fuzz), `AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db])` (Dynamik, ratio<=1=aus), `AUDIO_EQ(bus$, freq_hz, gain_db[, q])` (Glocken-EQ, gain 0=transparent); Signalfluss EQ->Filter->Distortion->Compressor->Reverb->Delay, neutral bis aktiviert, Demo `examples/117_audiofx.dh`. **Clock** `AUDIO_CLOCK_NEW(ticks_per_second)->AUDIO_CLOCK` (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing; startet pausiert) + `AUDIO_CLOCK_START/PAUSE/STOP/REMOVE`, `AUDIO_CLOCK_TICKING`/`AUDIO_CLOCK_TICKS`, `AUDIO_CLOCK_SET_SPEED` -- und **`AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]])`**: Sound-Start exakt auf einen Clock-Tick geplant, getrieben vom Kira-Audio-Thread selbst (KEIN Polling/Update-Call noetig -- anders als das frame-getriebene `timer`-Modul). BPM->ticks_per_second rechnet der Aufrufer selbst um (`bpm / 60.0 * subdivisions`). Ticking-Status wird im Wrapper selbst mitgefuehrt (nicht direkt Kiras `ClockHandle::ticking()`), weil Kira das nur asynchron per Audio-Thread-Kommando spiegelt -- eine Abfrage direkt nach START/STOP koennte sonst kurz den alten Wert zeigen. **Nicht-lineare Easings** fuer Fades/Slides: optionaler trailing `easing$`-Parameter (`"linear"` Default/`"in"`/`"out"`/`"inout"`, quadratisch) bei `AUDIO_PLAY` (fade_in_ms), `AUDIO_STOP` (fade_out_ms), `AUDIO_PAN_SLIDE` (dauer_ms), `AUDIO_MUSIC_PLAY`/`AUDIO_MUSIC_STOP` (fade_in/out_ms) -- vorher liefen alle Tweens linear, obwohl Kira `Easing::{In,Out,InOut}Powi` eingebaut hat. Interner Helfer `FadeCurve` (audio.rs) konvertiert zu `kira::Easing` fuer den Kira-Tween-Pfad (Stream/Static-Sounds) UND dupliziert dieselbe Kurven-Mathematik als reine `apply()`-Funktion fuer den MOD/XM-Modul-Fade (eigener Atomics-Ramp in `ModShared`, kein Kira-Tween beteiligt) -- beide Pfade klingen dadurch identisch. Rust-`#[test]`s verifizieren die Kurven-Mathematik gegen Kiras eigene Formel. **Raeumliches Audio (Listener/Emitter):** `AUDIO_LISTENER_NEW(x,y,z)->AUDIO_LISTENER` ("Ohr" der Szene, z.B. Kamera-/Spielerposition; unrotiert blickt -Z), `AUDIO_LISTENER_SET_POSITION`/`AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_grad)` (nur Y-Achsen-Yaw -- deckt die typische Top-Down-/3rd-Person-Kamera ab, ohne BASIC-Nutzern volle Quaternionen zuzumuten) + `AUDIO_LISTENER_REMOVE`; `AUDIO_EMITTER_NEW(listener,x,y,z[,min_dist[,max_dist]])->AUDIO_EMITTER` (ein raeumlicher Kira-Sub-Track, an einen Listener + Position gebunden; Kira berechnet Panning + lineare Lautstaerke-Abnahme zwischen min_dist=laut/max_dist=lautlos komplett selbst -- keine eigene DSP) + `AUDIO_EMITTER_SET_POSITION`/`AUDIO_EMITTER_REMOVE`; **`AUDIO_PLAY_ON(sound,emitter[,loops[,volume[,fade_in_ms[,easing$]]]])->AUDIO_CHANNEL`** startet einen Sound auf dem Emitter-Track statt dem flachen SFX-Bus -- der zurueckgegebene `AUDIO_CHANNEL` ist danach identisch mit `AUDIO_PAUSE`/`STOP`/`VOLUME`/... steuerbar (`StaticSoundHandle` unterscheidet nicht, von welchem Track-Typ es kommt). Listener/Emitter im selben Tombstone-Vec-Pattern wie Clocks (Kira kennt weder `remove_listener()` noch `remove_spatial_sub_track()` -- nur Handle-Drop). `mint`-Crate (winzige, abhaengigkeitsfrei Interop-Structs) baut die Position/Rotation-Werte fuer Kiras API, ohne `glam` direkt einzubinden. Rust-`#[test]`s verifizieren `yaw_quat()` (Einheits-Quaternion, korrekte Komponenten). Demo `examples/139_audio_spatial.dh`. **Modulatoren (LFO + Tweener):** `AUDIO_LFO_NEW(wellenform$, hz [, amplitude [, mitte]])` -> `AUDIO_MOD` (`sine`/`triangle`/`saw`/`pulse`), `AUDIO_LFO_SET`, `AUDIO_LFO_WAVEFORM`; `AUDIO_TWEENER_NEW([start])` + `AUDIO_TWEENER_TO(mod, ziel, dauer_ms [, easing$])`; gebunden per `AUDIO_MODULATE(bus$, ziel$, mod, min, max)` mit ziel$ = **`volume`** (Tremolo) / **`pan`** (Auto-Pan) / `filter` / `resonance` / `reverb` / `distortion`; dazu `AUDIO_BUS_PAN(bus$, pos)` fuer eine feste Bus-Balance (-1..+1) -- vorher liess sich nur ein EINZELNER Kanal pannen, entfernt per `AUDIO_MOD_REMOVE`. Der Wertebereich des Modulators (LFO: -1..+1 bei Standard-Amplitude) wird auf `min..max` abgebildet. **Der Punkt daran:** Kira faehrt sie auf dem AUDIO-Thread -- Tremolo, Vibrato, Wobble-Bass, Auto-Pan und Filter-Sweeps laufen sample-genau weiter, auch wenn die Bildrate einbricht, und das GB-Programm rechnet pro Frame NICHTS nach. LFO und Tweener teilen sich den Handle-Typ `AUDIO_MOD`; ein LFO-Aufruf auf einem Tweener (und umgekehrt) meldet das im Klartext. Doku `docs/module-audio-modulatoren.md`, Demo `examples/150_audio_modulatoren.dh`. | `AUDIO_CHANNEL`, `SAMPLE`, `AUDIO_CLOCK`, `AUDIO_LISTENER`, `AUDIO_EMITTER`, `AUDIO_MOD` |
+| `audio` | Erweiterte Audio-API (nativ in dhrt ueber **Kira**/cpal -- eigener Audio-Thread, vom Game-Loop entkoppelt; loeste 2026-06-13 raylib-Audio ab, `rust/drachenhauch_runtime/src/audio.rs`). Channels, Pause/Resume/Fade (native Kira-Tweens), Stereo-Pan, Music-Position (lesen `AUDIO_MUSIC_POSITION`, setzen **`AUDIO_MUSIC_SEEK(sekunden)`** -- der Sprung wirkt erst nach ~0,3-0,4 s, weil der Stream seinen Vorlauf zu Ende spielt; **MOD/XM koennen es nicht** und melden das: ihre Zeitachse sind Pattern/Zeilen, die Sekunden bis dorthin haengen an Tempowechseln im Stueck. Ohne laufende Musik ist es ein FEHLER -- anders als bei PAUSE/RESUME, wo ein Nicht-Treffer nichts verliert, fiele hier ein `LOAD : SEEK : PLAY` lautlos auf Position 0 zurueck). Tone-Generation (`AUDIO_TONE`/`AUDIO_NOISE`) mit Sine/Square/Saw/Triangle/Noise. **`AUDIO_SFX`** -- prozeduraler sfxr-Stil-Synth (Waveform + Pitch-Slide + ADSR + Vibrato + optionale `stereo_width` fuer breiten Stereo-Sound; geteilte Mathematik in drachenhauch/synth.py; der SFX-Generator `dhsfx` exportiert solche Aufrufe, Pan via `AUDIO_PAN`). Liefert kompatible `SOUND`-Objekte (auch fuer `PLAYSOUND` nutzbar). **Tracker-Module** `.mod`/`.xm` laufen ueber `PLAYMUSIC`/`AUDIO_MUSIC_LOAD` in **Echtzeit gestreamt** (Kira-Custom-`Sound` `ModuleSound` pollt den reinen Rust-Player `xmrs`/`xmrsplayer` auf dem Audio-Thread; sofort geladen, exaktes Endlos-Loopen, Pitch-Resampler + Volume-Ramp im Sound, Steuerung via `Arc<ModShared>`-Atomics, Modul geleakt + im Drop freigegeben) -- echter 4-Kanal-Amiga-Sound, Demo `examples/115_modplayer.dh`. **Sampler `SAMPLE_*`** (Amiga/Paula-Prinzip): `SAMPLE_LOAD(pfad$)->SAMPLE`, `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])->AUDIO_CHANNEL` (Resampling per linearer Interpolation = Tonhoehe wie Geschwindigkeit; resampelte Noten gecacht), `SAMPLE_SET_LOOP(s, a, e[, "pingpong"])`/`SAMPLE_LEN`, dazu `SAMPLE_FROM_BUFFER` (16-Bit-PCM) und `SAMPLE_NOTE` (Note als SOUND mit AUDIO_NOTE-Huellkurve, fuer AUDIO_PLAY_AT/MIX). One-Shot (dur<=0) fuer Drums/Hits, dur>0 + Loop-Region fuer gehaltene Noten. Reine Resampling-Mathematik = freie `resample()` in audio.rs (Rust-`#[test]`); Demo `examples/116_sampler.dh`. **Paula-Lo-Fi** `AUDIO_LOFI(an[, bits[, cutoff_hz]])` -- Bit-Crush (Default 8-bit) + LED-Tiefpass (Default 3300 Hz) fuer NEU synthetisierte Sounds (TONE/NOISE/SFX/SAMPLE_PLAY; Cache wird geleert); pure `lofi_chain()` mit Rust-`#[test]`. **Mixer-Busse** `AUDIO_BUS_VOLUME(bus$, vol)`/`AUDIO_BUS_GET_VOLUME(bus$)` mit `bus$` = `sfx`/`music`/`master` -- SFX-/Musik-Master getrennt (Kira-Sub-Tracks: SFX/Sampler/Synth -> sfx_track, Musik -> music_track, beide -> Main mit dem FFT-Tap; Bus×Sound-Volume multiplizieren). **Echtzeit-Effekte je Bus** (Kira-Effektkette am Track, live steuerbar, kein Buffer-Bake): `AUDIO_FILTER(bus$, cutoff_hz[, resonance])` (Tiefpass, SID/Acid-Sweep), `AUDIO_REVERB(bus$, mix[, feedback[, damping]])` (Hall), `AUDIO_DELAY(bus$, mix[, feedback[, time_ms]])` (Echo, eigener Ringpuffer-Effekt -> Zeit zur Laufzeit aenderbar, 1..4000 ms), `AUDIO_DISTORTION(bus$, amount[, mix])` (Overdrive/Fuzz), `AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db])` (Dynamik, ratio<=1=aus), `AUDIO_EQ(bus$, freq_hz, gain_db[, q])` (Glocken-EQ, gain 0=transparent); Signalfluss EQ->Filter->Distortion->Compressor->Reverb->Delay, neutral bis aktiviert, Demo `examples/117_audiofx.dh`. **Clock** `AUDIO_CLOCK_NEW(ticks_per_second)->AUDIO_CLOCK` (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing; startet pausiert) + `AUDIO_CLOCK_START/PAUSE/STOP/REMOVE`, `AUDIO_CLOCK_TICKING`/`AUDIO_CLOCK_TICKS`, `AUDIO_CLOCK_SET_SPEED` -- und **`AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]])`**: Sound-Start exakt auf einen Clock-Tick geplant, getrieben vom Kira-Audio-Thread selbst (KEIN Polling/Update-Call noetig -- anders als das frame-getriebene `timer`-Modul). BPM->ticks_per_second rechnet der Aufrufer selbst um (`bpm / 60.0 * subdivisions`). Ticking-Status wird im Wrapper selbst mitgefuehrt (nicht direkt Kiras `ClockHandle::ticking()`), weil Kira das nur asynchron per Audio-Thread-Kommando spiegelt -- eine Abfrage direkt nach START/STOP koennte sonst kurz den alten Wert zeigen. **Nicht-lineare Easings** fuer Fades/Slides: optionaler trailing `easing$`-Parameter (`"linear"` Default/`"in"`/`"out"`/`"inout"`, quadratisch) bei `AUDIO_PLAY` (fade_in_ms), `AUDIO_STOP` (fade_out_ms), `AUDIO_PAN_SLIDE` (dauer_ms), `AUDIO_MUSIC_PLAY`/`AUDIO_MUSIC_STOP` (fade_in/out_ms) -- vorher liefen alle Tweens linear, obwohl Kira `Easing::{In,Out,InOut}Powi` eingebaut hat. Interner Helfer `FadeCurve` (audio.rs) konvertiert zu `kira::Easing` fuer den Kira-Tween-Pfad (Stream/Static-Sounds) UND dupliziert dieselbe Kurven-Mathematik als reine `apply()`-Funktion fuer den MOD/XM-Modul-Fade (eigener Atomics-Ramp in `ModShared`, kein Kira-Tween beteiligt) -- beide Pfade klingen dadurch identisch. Rust-`#[test]`s verifizieren die Kurven-Mathematik gegen Kiras eigene Formel. **Raeumliches Audio (Listener/Emitter):** `AUDIO_LISTENER_NEW(x,y,z)->AUDIO_LISTENER` ("Ohr" der Szene, z.B. Kamera-/Spielerposition; unrotiert blickt -Z), `AUDIO_LISTENER_SET_POSITION`/`AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_grad)` (nur Y-Achsen-Yaw -- deckt die typische Top-Down-/3rd-Person-Kamera ab, ohne BASIC-Nutzern volle Quaternionen zuzumuten) + `AUDIO_LISTENER_REMOVE`; `AUDIO_EMITTER_NEW(listener,x,y,z[,min_dist[,max_dist]])->AUDIO_EMITTER` (ein raeumlicher Kira-Sub-Track, an einen Listener + Position gebunden; Kira berechnet Panning + lineare Lautstaerke-Abnahme zwischen min_dist=laut/max_dist=lautlos komplett selbst -- keine eigene DSP) + `AUDIO_EMITTER_SET_POSITION`/`AUDIO_EMITTER_REMOVE`; **`AUDIO_PLAY_ON(sound,emitter[,loops[,volume[,fade_in_ms[,easing$]]]])->AUDIO_CHANNEL`** startet einen Sound auf dem Emitter-Track statt dem flachen SFX-Bus -- der zurueckgegebene `AUDIO_CHANNEL` ist danach identisch mit `AUDIO_PAUSE`/`STOP`/`VOLUME`/... steuerbar (`StaticSoundHandle` unterscheidet nicht, von welchem Track-Typ es kommt). Listener/Emitter im selben Tombstone-Vec-Pattern wie Clocks (Kira kennt weder `remove_listener()` noch `remove_spatial_sub_track()` -- nur Handle-Drop). `mint`-Crate (winzige, abhaengigkeitsfrei Interop-Structs) baut die Position/Rotation-Werte fuer Kiras API, ohne `glam` direkt einzubinden. Rust-`#[test]`s verifizieren `yaw_quat()` (Einheits-Quaternion, korrekte Komponenten). Demo `examples/139_audio_spatial.dh`. **Modulatoren (LFO + Tweener):** `AUDIO_LFO_NEW(wellenform$, hz [, amplitude [, mitte]])` -> `AUDIO_MOD` (`sine`/`triangle`/`saw`/`pulse`), `AUDIO_LFO_SET`, `AUDIO_LFO_WAVEFORM`; `AUDIO_TWEENER_NEW([start])` + `AUDIO_TWEENER_TO(mod, ziel, dauer_ms [, easing$])`; gebunden per `AUDIO_MODULATE(bus$, ziel$, mod, min, max)` mit ziel$ = **`volume`** (Tremolo) / **`pan`** (Auto-Pan) / `filter` / `resonance` / `reverb` / `distortion`; dazu `AUDIO_BUS_PAN(bus$, pos)` fuer eine feste Bus-Balance (-1..+1) -- vorher liess sich nur ein EINZELNER Kanal pannen, entfernt per `AUDIO_MOD_REMOVE`. Der Wertebereich des Modulators (LFO: -1..+1 bei Standard-Amplitude) wird auf `min..max` abgebildet. **Der Punkt daran:** Kira faehrt sie auf dem AUDIO-Thread -- Tremolo, Vibrato, Wobble-Bass, Auto-Pan und Filter-Sweeps laufen sample-genau weiter, auch wenn die Bildrate einbricht, und das DH-Programm rechnet pro Frame NICHTS nach. LFO und Tweener teilen sich den Handle-Typ `AUDIO_MOD`; ein LFO-Aufruf auf einem Tweener (und umgekehrt) meldet das im Klartext. Doku `docs/module-audio-modulatoren.md`, Demo `examples/150_audio_modulatoren.dh`. | `AUDIO_CHANNEL`, `SAMPLE`, `AUDIO_CLOCK`, `AUDIO_LISTENER`, `AUDIO_EMITTER`, `AUDIO_MOD` |
 **Noten und Mischen** (2026-09-04, gefunden beim Tracker-Piloten): `AUDIO_NOTE(wf$, freq, dauer_ms, attack, decay, sustain, release, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` -- eine gehaltene Note mit echter ADSR (Sustain-PEGEL, Release haengt hinten an, Laenge = dauer + release), Detune-Schicht und Portamento in Halbtoenen; `AUDIO_SFX` kann das nicht, es kennt nur drei Zeiten. `AUDIO_SOUND_NEW(dauer_ms)` (Stille), `AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]])` (addieren, NICHT geklemmt, ohne pan bleiben die Kanaele der Quelle), `AUDIO_SOUND_NORMALIZE(sound[, spitze])` (liefert den Faktor) -- damit wird aus vielen Klaengen eine WAV. Rechenkern `build_note_buffer` mit Rust-Tests an der nachgemessenen Huellkurve; Tests `tests/pruef/audio_note_mix.dhtest`.
 
 **FLAC** (2026-09-21, Frage des Nutzers): als Klang ging es immer, als MUSIK mit Schleife (die
@@ -1045,8 +1049,8 @@ zurueckspringen, kaputte Datei ist ein Fehler).
 | Clipboard / Drag&Drop | **Nur native**: `CLIPBOARD_GET()->STRING` / `CLIPBOARD_SET(text$)` (System-Zwischenablage), `FILES_DROPPED()->INTEGER` (Anzahl gedroppter Dateien dieses Frame, unter macOS auch die vom Finder uebergebenen; seit 2026-09-19 je Bild EINMAL eingesammelt -- vorher verbrauchte der erste Aufruf die Liste) + `FILE_DROPPED(i)->STRING` (Pfad). Tree-Walker konsolen-only -> wirft "nur dhrt". **Die Zwischenablage gehoert jeweils EINEM Prozess** (2026-09-20): wer sie nicht bekommt, erfuhr davon NICHTS -- `glfwSetClipboardString` gibt void zurueck, raylib-rs' Result sagt nur, ob der Text ein Nullbyte enthielt. `CLIPBOARD_SET` liest jetzt ZURUECK und wiederholt (vier Versuche, 150 ms Pause -- gemessen deckt das ~700 ms Blockade ab und gibt nach 711 ms auf), danach ist es ein FEHLER statt Schweigen; sonst stuende beim naechsten Einfuegen der ALTE Inhalt da und der Schaden zeigte sich woanders. **Schlimmer war `CLIPBOARD_GET`: es STUERZTE AB** (0xC0000005) -- GLFW liefert NULL, und raylib-rs macht `CStr::from_ptr` darauf ungeprueft; jetzt ueber `raylib::ffi::GetClipboardText` mit NULL-Pruefung (`clipboard_text_roh`), leer ist die Antwort. Das traf JEDES Programm mit Strg+C/V. **Zwei Zahlen, die ueberraschen:** EIN `SetClipboardText` kostet gegen eine gehaltene Zwischenablage 261 ms (GLFWs drei `Sleep(1)` haengen an Windows' Timer-Granularitaet), und eine 5-ms-Pause beim Wiederholen bringt NICHTS -- die Folgeversuche laufen ins Leere. Tests `tests/pruef/zwischenablage.dhtest` (4, seriell; der Blocker haelt sie per OpenClipboard ECHT fest). **Der Test war dreimal gruen und wertlos**, bevor er etwas pruefte: mit festem Text (stand vom vorigen Lauf noch drin) und mit `MILLIS()` (= Zeit seit PROGRAMMstart, und der Ablauf dauert jedes Mal gleich lang) -- erst `UUID4$` ist eindeutig. | — |
 | Render-Targets | **Nur native:** `RENDERTARGET_NEW(w,h[,behalten])->INTEGER` (Off-Screen-Render-Ziel; `behalten`=TRUE laesst den Inhalt ueber das Bild hinaus stehen -> **echte Rueckkopplung/Schweife**, `RENDERTARGET_CLEAR(rt[,farbe])` raeumt es von Hand), `RENDERTARGET_BEGIN(rt)` / `RENDERTARGET_END()` (folgende Draws ins Ziel — pro Frame transparent gecleart), `RENDERTARGET_DRAW(rt,x,y[,skala[,tint]])` (Ziel als Bild stempeln). dhrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die RenderTexture gerendert (y-flip); Tree-Walker konsolen-only -> wirft "nur dhrt". Demo `examples/102_render_target.dh`. *Grenze:* RtDraw innerhalb eines anderen Targets = No-Op -- ein Target kann sich also auch NICHT selbst zeichnen. Schweife entstehen ueber `behalten`=TRUE plus Verblassen mit `BLEND_MODE("mult")` + Vollbild-`BOX` in dunklem Grau (Rezept + Tests: `tests/pruef/rendertarget_persistenz.dhtest`). | — |
 | Zustand sichern | `GFX_PUSH()` / `GFX_POP()` — Zeichenzustand auf einen Stapel legen und zurueckholen: 2D-Kamera+Ruetteln, aktive Layer, Hintergrundfarbe, Licht (Ambient/Nebel/alle Lichtquellen), Umgebung (`LIGHT_ENV`, IBL-Schalter, `SKYBOX`), Schatten (an/Bereich/Ziel), 3D-Kamera samt View-/Projektions-Ueberschreibung, Schrift und `POSTFX`. **Nicht** enthalten: geladene Ressourcen (bleiben geladen — POP schaltet nur ihre Benutzung zurueck), die Schatten-AUFLOESUNG (haengt am allozierten Tiefenpuffer) und der Blend-Modus (ohnehin nur ein Bild lang gueltig). Analog `AUDIO_PUSH()` / `AUDIO_POP()` fuer alle Bus-Einstellungen (Lautstaerke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor, EQ) — eine laufende `AUDIO_MODULATE`-Bindung wird dabei abgeloest, weil das Zurueckschreiben denselben Kira-Parameter beschreibt (empirisch belegt in `tests/pruef/gfx_push_pop.dhtest`). `GFX_DEPTH`/`AUDIO_DEPTH` liefern die Stapeltiefe, ein POP ohne PUSH ist ein Fehler. **Der Grund:** dieser Zustand ist global, und eine vergessene Ruecknahme faellt erst Szenen spaeter auf. | — |
-| Fenster-Zustand | `WINDOW_FOCUSED()` (Spiel pausieren, wenn der Nutzer wegklickt), `WINDOW_MINIMIZED/MAXIMIZED/HIDDEN()`, `WINDOW_IS_FULLSCREEN()`, `WINDOW_FOCUS()` (nach vorne holen), `WINDOW_OPACITY(0..1)` (ganzes Fenster durchscheinend), **`WINDOW_ICON(bild)`** — ohne das trug jedes exportierte Spiel das raylib-Standardsymbol. `WINDOW_DPI_X/Y()` = Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI/Retina — ohne sie weiss ein Programm nicht, ob seine Pixelgroessen auf dem Zielgeraet winzig herauskommen). `GET_TIME()` = monotone Sekunden seit Programmstart. `OPENURL(adresse$)` oeffnet den Standardbrowser — **bewusst auf http/https begrenzt**, weil raylib die Zeichenkette an die Shell weiterreicht und ein `file:`-Schema sonst ein Weg waere, aus einem GB-Programm Beliebiges zu starten. | — |
-| Kompression | `COMPRESS$(text$)` / `DECOMPRESS$(gepackt$)` — DEFLATE, Ergebnis Base64 (GB-Strings sind UTF-8, roher Deflate-Output waere keins). Typisch ~9x kleiner bei Savegame-artigem Text; passt ueberall dorthin, wo heute schon `BASE64_ENCODE`-Ausgaben stehen. **Ungated** (miniz_oxide statt raylibs CompressData) — laeuft also auch in Konsolen-Programmen ohne Fenster. | — |
+| Fenster-Zustand | `WINDOW_FOCUSED()` (Spiel pausieren, wenn der Nutzer wegklickt), `WINDOW_MINIMIZED/MAXIMIZED/HIDDEN()`, `WINDOW_IS_FULLSCREEN()`, `WINDOW_FOCUS()` (nach vorne holen), `WINDOW_OPACITY(0..1)` (ganzes Fenster durchscheinend), **`WINDOW_ICON(bild)`** — ohne das trug jedes exportierte Spiel das raylib-Standardsymbol. `WINDOW_DPI_X/Y()` = Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI/Retina — ohne sie weiss ein Programm nicht, ob seine Pixelgroessen auf dem Zielgeraet winzig herauskommen). `GET_TIME()` = monotone Sekunden seit Programmstart. `OPENURL(adresse$)` oeffnet den Standardbrowser — **bewusst auf http/https begrenzt**, weil raylib die Zeichenkette an die Shell weiterreicht und ein `file:`-Schema sonst ein Weg waere, aus einem DH-Programm Beliebiges zu starten. | — |
+| Kompression | `COMPRESS$(text$)` / `DECOMPRESS$(gepackt$)` — DEFLATE, Ergebnis Base64 (DH-Strings sind UTF-8, roher Deflate-Output waere keins). Typisch ~9x kleiner bei Savegame-artigem Text; passt ueberall dorthin, wo heute schon `BASE64_ENCODE`-Ausgaben stehen. **Ungated** (miniz_oxide statt raylibs CompressData) — laeuft also auch in Konsolen-Programmen ohne Fenster. | — |
 | Bild HERSTELLEN | `IMAGE_NEW(b, h [, farbe])` (**ohne Farbe vollstaendig durchsichtig** -- ueber eine FARBE ist das gar nicht auszudruecken, weil Deckkraft 0 als DECKEND gilt; `GENTEX_COLOR` kann es deshalb nicht), `IMAGE_CLEAR(bild [, x, y, b, h])` (Radierer -- SCHREIBT die Durchsichtigkeit, mischte es, waere es ein Nichts-Tun), `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` (Ebenen verrechnen, Ausschnitt einsetzen), `GETALPHA(bild, x, y)` (0..255, -1 ausserhalb -- noetig, weil `GETPIXEL` eine FARBE liefert und ein durchsichtiger Punkt dort als deckendes Schwarz ankaeme), `IMAGE_FREE(bild)` (Bild + Grafikspeicher-Textur freigeben -- gemessen 1200 Kopien zu 256x256: **393 MB gegen 91 MB**. Das Handle wird danach NICHT neu vergeben, jede weitere Benutzung meldet sich im Klartext statt still auf ein fremdes Bild zu zeigen; `GETPIXEL`/`GETALPHA` bleiben bei -1. Der Pfad-Cache von `LOADIMAGE` wird mitgeraeumt. **Weiss nichts von** Texturen, die per `MODEL_TEXTURE` an ein Modell gingen -- raylibs `Texture2D` ist ein Struct ohne Zaehlung. **Nicht anlegen ist billiger als anlegen und freigeben**), `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` (**bewegtes GIF** aus einem `ARRAY OF IMAGE`; raylib kann GIFs nur LESEN. **Das dritte Argument ist ZWEIERLEI:** eine Zahl sind Bilder je Sekunde fuer alle, ein FELD ist die Dauer JE BILD in Millisekunden. GIF kann das von Haus aus, und eine Bildfolge braucht es -- eine Pose wird gehalten, der Lauf dazwischen nicht. Dass die EINHEIT wechselt, ist Absicht: ein einzelnes Bild hat keine Bildrate, es hat eine Dauer; `[4, 12]` als "250 ms, dann 83 ms" zu lesen waere die schlechtere Zumutung. Zu wenige Zeiten sind ein FEHLER -- die letzte stillschweigend zu wiederholen waere eine Vermutung, und eine falsche Zeit sieht man dem GIF nicht an, man merkt sie nur. Ueber die pure-Rust-Crate `gif` -- ein LZW-Kodierer von Hand ist die Art Code, die auf den ersten Blick stimmt und im Randfall still etwas Falsches liefert. **Farbtafel EXAKT bei bis zu 255 Farben** -- ein Verfahren, das immer zusammenfasst, haette schon ein Vier-Farben-Sprite verfaelscht; darueber wird reduziert. Durchsichtigkeit nur ganz/gar nicht (Schwelle 128), EINE Leinwand fuer alle Bilder (abweichende Groesse = Fehler, nicht beschneiden), Dauer auf >= 2 Hundertstel geklemmt weil Betrachter darunter still ihre eigene nehmen. `anzahl` = wie viele Plaetze des Feldes gelten, sonst sind die leeren Plaetze eines `DIM b[16]` ein Fehler. Reine Kodier-Logik in `gifschreiber.rs` mit 8 Rust-`#[test]`s -- sie kennt raylib nicht und ist damit fuer sich pruefbar), `IMAGE_SAVE(bild, pfad$)` (png/bmp/jpg/tga; unbekannte Endung wird abgelehnt, raylib taete sonst still nichts; ob geschrieben wurde, sagt nur die Datei -- die Bindung wirft das Erfolgs-Flag weg). **Der Anlass:** ein IMAGE war eine Einbahnstrasse -- hineinzeichnen ja, aber nicht herstellen; Ton hatte seit dem SFX-Piloten `AUDIO_SAVE_WAV`, Bild gar nichts. **Nicht dabei:** Bilder ueber die Zwischenablage (raylibs `GetClipboardImage` gibt es nur unter Windows). Doku `docs/module-imgfx.md`, Demo `examples/188_bild_erzeugen.dh`, Tests `tests/pruef/image_io.dhtest`. | — |
 | Bild-Verarbeitung (Ausbau) | `IMAGE_CONVOLVE(bild, kern)` — freie Faltung mit quadratischem, ungerade-seitigem Kern als flachem `ARRAY OF FLOAT` (Schaerfen, Kanten, Praegen; `IMAGE_BLUR` kann nur Gauss). `IMAGE_ALPHA_MASK/CROP/PREMULTIPLY` (weiche Raender, eng zuschneiden, dunkle Saeume beim Skalieren vermeiden). `IMAGE_DITHER(bild, r,g,b,a)` — **nur 5,6,5,0 / 5,5,5,1 / 4,4,4,4**; raylib warnt bei allem anderen bloss und liefert ein Bild mit ungueltigem Format (Textur wird schwarz), deshalb hier hart abgelehnt. `IMAGE_PALETTE(bild, max)` -> `ARRAY OF INTEGER` der haeufigsten Farben. | — |
 | Textur-Generatoren (Ausbau) | `GENTEX_CELLULAR(w,h,kachel)` (Voronoi/Zellrauschen — Steinboden, Risse), `GENTEX_NOISE(w,h,anteil)` (Weissrauschen — Sternenfelder, Korn), `GENTEX_GRADIENT_BOX(w,h,dichte,c1,c2)` (rechteckiger Verlauf von innen nach aussen — Vignetten; das eckige Gegenstueck zu `GENTEX_RADIAL`). | — |
@@ -1061,11 +1065,11 @@ zurueckspringen, kaputte Datei ist ein Fehler).
 | Shader / Post-FX | **Nur native Runtime** (raylib/GPU): `SHADER_LOAD(pfad$_oder_glsl$)` -> SHADER-Handle (oder -1), `SHADER_SET(h, uniform$, f)` / `SHADER_SET2` (vec2) / `SHADER_SET3` (vec3), `POSTFX(h)` (Frame durch Fragment-Shader; -1 = aus). Szene -> RenderTexture -> Shader -> Screen. Tree-Walker konsolen-only -> wirft "nur dhrt". Beispiel-Shader `examples/assets/shaders/` (CRT/Bloom/Vignette), Demo `examples/86_postfx_shaders.dh`. | — |
 
 Module mit eigenem Typ registrieren ihn lowercase (`register_type("json_handle", _JSONHandle)`),
-GB-Code schreibt ihn in jeder Casing-Form (`DIM j AS JSON_HANDLE`).
+DH-Code schreibt ihn in jeder Casing-Form (`DIM j AS JSON_HANDLE`).
 
-## Convention: Wert-Typen in GB
+## Convention: Wert-Typen in Drachenhauch
 
-| GB-Typ | Python-Typ | type-Spec |
+| DH-Typ | Python-Typ | type-Spec |
 |---|---|---|
 | INTEGER | `int` (kein bool) | `"int"` |
 | FLOAT | `float` | `"num"` (akzeptiert auch int) |
@@ -1085,7 +1089,7 @@ Array-Element): `model::neutrales_element` (die Compiler-Konstanten koennen kein
 MAT4 tragen, deshalb wird es beim Laden bzw. beim DECLARE nachgetragen).
 
 **Bool ist KEINE Zahl** — `_check_num(True)` wirft, weil `isinstance(True, int)` zwar `True`
-ist, aber `True` semantisch keine Zahl in GB ist.
+ist, aber `True` semantisch keine Zahl in Drachenhauch ist.
 
 ## Camera-Wirkung auf Drawing
 
@@ -2504,7 +2508,7 @@ Entity -- daher der Unterschied. Die frueheren Python-/Cython-Fassungen
 viele Entities laeuft, sollte es als Bulk-Op-Builtin schreiben statt
 als pro-Entity-BASIC-Loop. Boilerplate fuer einen neuen Bulk-Builtin:
 die Logik in `rust/drachenhauch_runtime/src/ecs.rs` + Dispatch-Arm in `vm.rs`
-(`try_ecs`) + Eintrag in `daten/builtin_index.json` + run_gb-Golden-Test.
+(`try_ecs`) + Eintrag in `daten/builtin_index.json` + Fall in einer Pruefsammlung.
 
 ## Kein Cython mehr, kein `setup.py build_ext`
 
@@ -2684,7 +2688,7 @@ Der erste der vier Editoren ohne Piloten (Form-Designer, Anim-FSM,
 Notenblatt, Audio Studio): `examples/197_form_designer.dh`, 860 Zeilen gegen
 5055 der Qt-Fassung (Faktor 0,17 -- misst wie immer vor allem, was
 weggelassen ist: Mehrfachauswahl, Layout-Zuordnung, Regeln/Bindung,
-Menue-Editor, Code-Editor, GB-Code-Export, Projekte fehlen). **Bauweise:**
+Menue-Editor, Code-Editor, DH-Code-Export, Projekte fehlen). **Bauweise:**
 die Entwurfsflaeche ist ein ECHTES GUI_WINDOW im neuen Entwurfsmodus
 `GUI_WINDOW_DESIGN(win, TRUE)` (gui.rs `Window::entwurf`: `handle_press`
 kehrt nach dem Modal-Check um -- Fenster nach vorn, KEIN Fokus, kein
@@ -3037,8 +3041,8 @@ neben den Beispielen sind Drachenhauch -- `examples/assets/download_cybermatic.d
 `download_hdri.dh`, `download_robot.dh`, `download_techno.dh` (gemeinsamer Teil
 `examples/assets/_laden.dh` per `IMPORT`; `dhrt pruef beispiele` zaehlt nur die
 obere Ebene von `examples/`, ein Helfer darunter ist kein Beispiel),
-`fireplace/assets/download.dh` und `gbdemo/download_music.dh`. Adressen,
-Mindestgroessen und Meldungen wie zuvor; gbdemo laedt in eine `.teil`-Datei und
+`fireplace/assets/download.dh` und `dhdemo/download_music.dh`. Adressen,
+Mindestgroessen und Meldungen wie zuvor; dhdemo laedt in eine `.teil`-Datei und
 speichert nur, was die XM- oder MOD-Kennung traegt. Optionale Argumente
 (Adresse, Ziel, Mindestgroesse) sind fuer Pruefungen da. Der Gegenserver stellt
 im echo-Modus Pfaden ab `/xm` "Extended Module: " voran, damit der Erfolgsweg
@@ -3463,8 +3467,8 @@ fuenf Verfaelschungen des Piloten (ohne Grundtaste, immer erste Zone, ohne
 Loop, alte Stummregel, jede Art als Sample) und zwei der Laufzeit (pingpong
 als vorwaerts, Schritt ohne Abtastrate) -- jede faellt.
 
-**Der GB-Code des SFX-Generators nimmt den Pan mit (2026-09-17):** aus der
-Bestandsaufnahme -- [GB-Code kopieren] gab nur `s = AUDIO_SFX(...)` heraus,
+**Der DH-Code des SFX-Generators nimmt den Pan mit (2026-09-17):** aus der
+Bestandsaufnahme -- [DH-Code kopieren] gab nur `s = AUDIO_SFX(...)` heraus,
 ohne IMPORT, ohne Abspielen und ohne den Pan-Regler. Der Pan liegt am
 WIEDERGABE-Kanal, nicht im Klang (`AUDIO_SFX` kennt ihn nicht), und ein
 fehlender Pan faellt niemandem auf -- der kopierte Code klang schlicht anders
@@ -4037,7 +4041,7 @@ sucht darum einfach beide Dateinamen (`dhrt.exe`, `dhrt`).
 **Seit 2026-09-21 hat er alles, was nur der Qt-Installer hatte:** die Buecher
 (`.docx`/`.epub` nach `{app}\buecher`, wenn gebaut), die ESP32-Sketche, das
 Aufraeumen von GameBasic (Ordner, Verknuepfungen, ProgID, `.gb` nur wenn es noch
-auf uns zeigt) und das Signieren ueber `GB_SIGN_CERT`/`_PASS`/`_TS`. Signiert
+auf uns zeigt) und das Signieren ueber `DH_SIGN_CERT`/`_PASS`/`_TS`. Signiert
 wird eine KOPIE der Laufzeit (`<ausgabe>/stufe/dhrt.exe`, an ISCC als
 `/DDhrtQuelle`) -- die gebaute laeuft womoeglich gerade als `bauen.dh` --, dann
 der Installer; ein Fehlschlag bricht VOR ISCC ab statt nur zu warnen. Tests mit
@@ -4099,7 +4103,7 @@ liegt im `placeholder`-Feld (die .dhform schreibt es schon), das Bild im
 letzte sichtbare Zeile und wird dort mit "..." gekuerzt -- sonst endete ein
 Text, dessen zweites Wort nicht passte, nach dem ersten. `GUI_CARD_SET_TEXT`/
 `GUI_CARD_TEXT$`, `GUI_SET_IMAGE`/`GUI_IMAGE_MODE` gelten auch fuer Kacheln;
-im Form-Designer Palette, Feld "Beschreibung" und GB-Code. (2) **Das Mausrad
+im Form-Designer Palette, Feld "Beschreibung" und DH-Code. (2) **Das Mausrad
 rollte alles zugleich**: die IDE blaetterte ihre Kacheln, sobald die Maus im
 Kachelrechteck stand -- auch unter dem offenen Handbuch. Neu
 **`GUI_WINDOW_AT(x, y)`** (oberstes sichtbares Fenster, -1 = keins); die IDE
@@ -4150,7 +4154,7 @@ deutsch oder englisch, verbunden mit `+`/Komma/Leerzeichen; unbekannt =
 Fehler mit Liste), `TEXT_BOLD`/`TEXT_ITALIC` schalten je ein Bit,
 **`FONT_STYLE(font, stil$)`** / `FONT_HAS_STYLE`, **`GUI_SET_FONT_STYLE`** /
 `GUI_GET_FONT_STYLE$` (in der `.dhform` als `font_style`, im Form-Designer
-ein Feld "Schriftstil" samt GB-Code), im gesetzten Text zusaetzlich
+ein Feld "Schriftstil" samt DH-Code), im gesetzten Text zusaetzlich
 `***beides***`, `~~durch~~`, `<u>unter</u>`; Verweise sind unterstrichen.
 **Echte Schnitte, wo es sie gibt** (`schnitt.rs`, rein und mit Rust-Tests):
 zu einer per LOADFONT geladenen Schrift sucht `schnitt_kandidaten` die
@@ -4206,7 +4210,7 @@ Tabelle aus `GUI_FROM_JSON`/`GUI_LOAD` zeigte KEINE Zeile, bis etwas
 Sortieren oder Filtern anstiess -- der Lader baute `view` nie
 (`ts.rebuild_view()` fehlte); Fall "eine geladene flache tabelle zeigt ihre
 zeilen". Form-Designer: drei Palettenarten (Baumtabelle als `table` mit
-`baum`), Abschnitte/Schritte im Feld "Eintraege", GB-Code. Tests
+`baum`), Abschnitte/Schritte im Feld "Eintraege", DH-Code. Tests
 `tests/pruef/gui_akkordeon.dhtest` (6), `gui_assistent.dhtest` (7, einer davon liest den geladenen Assistenten -- der erste Satz Faelle pruefte nur das Schreiben, und die Verfaelschung des Lesers blieb gruen),
 `gui_baumtabelle.dhtest` (7); zehn Verfaelschungen der Laufzeit (ohne
 Kinder-Ausnahme, ohne Mitwandern, ohne Pruefung, ohne Vorfahren im Filter,
@@ -4498,13 +4502,13 @@ Start, Geldrechnung, Fenstergroesse, Rechnungsfenster) brauchen keine.
 geloescht. Ohne neues Formatstueck: ein Einschub hinter `FLIP()` schreibt je
 Bild `probe.txt`, ein zweiter hinter `bildNr = bildNr + 1` ruft die
 Unterprogramme des Piloten (`zelleSetzen`, `ladeDatei`, `wavRendern`,
-`gbCodeSichern`). Die drei fremden Leser sind ersetzt: die Datei liest das
+`dhCodeSichern`). Die drei fremden Leser sind ersetzt: die Datei liest das
 json-Modul mit genau den Schluesseln, die `drachenhauch.tracker.Song` liest
 (`patterns.N.data.KANAL.REIHE`, leer = `null`); die zwei Dateien der
 Qt-Fassung sind Beilagen, einmal mit `Song.save_json` geschrieben und auf eine
 Zeile gepackt; die Mono-WAV prueft `--- ton`, die Stereo-WAV ein
 `--- nachher` ueber ihre Bytes (RIFF, `BUFFER_GET_I16`), weil `--- ton` keinen
-Pegel je Kanal kennt; der GB-Code geht durch `PROCESS_START("dhrt",
+Pegel je Kanal kennt; der DH-Code geht durch `PROCESS_START("dhrt",
 "--check", ...)` und einen Start. Nur der Klick-Fall braucht die Geometrie des
 Fensters und schreibt seine Aufnahme darum im dritten Bild selbst.
 Gegenprobe ohne `AUTOMATION_PLAY`: alle 9 Faelle mit Eingaben fallen, die
@@ -4688,7 +4692,7 @@ dem Fallordner als Arbeitsordner -- er ist damit `DHRT_START_DIR`, also das
 Unterprogramme (Einschub hinter der Bereit-Zeile, endet mit `EXIT(0)`) --
 der zweite prueft die Logik ohne Bildschirmlagen. **Als Beleg umgezogen:**
 test_pilot_formdesigner.py -> `tests/pruef/werkzeug_formdesigner.dhtest`
-(10 Faelle; der GB-Code-Fall ruft `gbCode$()`, laesst `dhrt --check` und
+(10 Faelle; der DH-Code-Fall ruft `dhCode$()`, laesst `dhrt --check` und
 `dhrt bild` als Prozesse laufen; der Palette-Fall liest gui.rs mit
 `READLINES`). Stolperstein beim Schreiben: `READALL$` nimmt ein FILE-Handle,
 keinen Pfad -- fuer Pfade `READLINES`. Rust-Test
@@ -4706,13 +4710,13 @@ beim Qt-Designer 2026-08-31, jetzt mit Test gegen `Kind::from_str`) und dem
 `artFuellen`/`artUebernehmen`: Eintraege, Spalten, Breiten, Bearbeitbar,
 Spaltenarten, Auswahl, Zellmodus, Min/Max/Wert -- Listen mit Semikolon; eine
 Spalte mit Auswahlliste wird zur Auswahlspalte, sonst wirkte die Liste beim
-Laden nicht); **GB-Code** (Strg+G, `gbCode$`/`gbControl`): jedes Control
+Laden nicht); **DH-Code** (Strg+G, `dhCode$`/`dhControl`): jedes Control
 als Aufruf, ohne `GUI_LOAD`, Texte mit Umbruch als `!"..."`, sich selbst
 messende Konstruktoren mit `GUI_SET_BOUNDS` hinterher, das Bild
 uebersprungen. Die IDE: **eine `.dhform` oeffnet den Designer** (`werkzeugMit`,
 `dhrt run 197 -- datei`), als Text ueber die Befehlspalette ("Formular als
 Text oeffnen"). Tests: vier neue in test_pilot_formdesigner.py (seit Stufe 32 in `tests/pruef/werkzeug_formdesigner.dhtest`) --
-lesen mit `json`, nicht mit dem Qt-Modell; der GB-Code-Test legt JEDE Art an
+lesen mit `json`, nicht mit dem Qt-Modell; der DH-Code-Test legt JEDE Art an
 und laesst den Code durch `--check` und einen Lauf; zwei in `tests/test_ide.py`.
 
 **Stufe 30 (2026-09-13):** die Frage des Nutzers -- gibt es ein
@@ -4927,7 +4931,7 @@ Die Kopfbreite wird an der ZEICHENZAHL geschaetzt, nicht gemessen: der
 Treffertest laeuft in `handle_press`, und dort gibt es keine Grafik. Die
 IDE benutzt den Dateibaum (ihre Buchfuehrung aus Dateiliste, Knoten-Nummern
 und Schluessel ist weg); im Form-Designer ist das Reiterwerk Palette,
-Vorschau und GB-Code, die Seiten-Zuordnung der Controls aber nicht.
+Vorschau und DH-Code, die Seiten-Zuordnung der Controls aber nicht.
 `docs/module-gui.md` sagt am Ende, was der gui weiter FEHLT (Zeitwaehler,
 gesetzter Text, Akkordeon, Pfadleiste, Baum mit Spalten). Tests
 `tests/pruef/gui_dateibaum.dhtest` (13), `tests/pruef/gui_reiterwerk.dhtest`

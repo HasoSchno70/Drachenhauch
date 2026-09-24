@@ -452,7 +452,7 @@ WHILE NOT QUITREQUESTED()
 
     IF INPUT_PRESSED("mute") THEN
         muted = NOT muted
-        ' Musik ebenfalls toggeln (kein Live-Volume-Setter aus GB).
+        ' Musik ebenfalls toggeln (kein Live-Volume-Setter aus Drachenhauch).
         IF has_music THEN
             IF muted THEN
                 STOPMUSIC()

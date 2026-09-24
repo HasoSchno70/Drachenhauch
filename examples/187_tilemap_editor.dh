@@ -23,7 +23,7 @@
 '    Datei       Neu / Oeffnen / Speichern -- echtes Tiled-JSON
 '    Historie    Strg+Z / Strg+Y, 16 Schritte
 '
-'    Ausgabe     [GB-Code] schreibt einen lauffaehigen Renderer, die Karte
+'    Ausgabe     [DH-Code] schreibt einen lauffaehigen Renderer, die Karte
 '                als Tiled-JSON und das Tileset-Bild -- alle drei unter
 '                demselben Namen, damit keins ins Leere zeigt
 '
@@ -347,7 +347,7 @@ GUI_SET_ANCHOR(tb, "lr")
 DIM bNeu AS GUI_WIDGET  : bNeu  = GUI_BUTTON(win, "Neu", 10, 7, 62, 32)
 DIM bAuf AS GUI_WIDGET  : bAuf  = GUI_BUTTON(win, "Oeffnen", 76, 7, 84, 32)
 DIM bSpei AS GUI_WIDGET : bSpei = GUI_BUTTON(win, "Speichern", 164, 7, 100, 32)
-DIM bCode AS GUI_WIDGET : bCode = GUI_BUTTON(win, "GB-Code", 268, 7, 104, 32)
+DIM bCode AS GUI_WIDGET : bCode = GUI_BUTTON(win, "DH-Code", 268, 7, 104, 32)
 GUI_TOOLTIP(bCode, "Ein lauffaehiger Renderer + Karte + Tileset daneben -- alles unter einem Namen")
 
 ' Werkzeuge. GUI_TOGGLE waere das naheliegende Widget, ist aber ein
@@ -774,7 +774,7 @@ END SUB
 
 ' ============================================================ Werkzeuge
 
-' ---------------------------------------------------------------- GB-Code
+' ---------------------------------------------------------------- DH-Code
 ' Ein LAUFFAEHIGER Renderer zu dieser Karte: das Programm, die Karte als
 ' Tiled-JSON und das Tileset-Bild -- alle drei unter demselben Namen und in
 ' einem Zug.
@@ -783,7 +783,7 @@ END SUB
 ' der JSON zeigt dorthin, wo das Tileset beim BEARBEITEN lag. Wer den Ordner
 ' weitergibt, haette sonst eine Karte, die auf nichts zeigt -- und das faellt
 ' erst beim Starten auf.
-SUB gbCodeSichern(pfad AS STRING)
+SUB dhCodeSichern(pfad AS STRING)
     DIM basis AS STRING : basis = pfad
     IF LEN(basis) > 3 AND RIGHT$(LOWER$(basis), 3) = ".dh" THEN
         basis = LEFT$(basis, LEN(basis) - 3)
@@ -1084,10 +1084,10 @@ WHILE NOT beenden
 
     IF GUI_CLICKED(bCode) THEN
         DIM pc AS STRING
-        pc = FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+        pc = FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
         IF pc <> "" THEN
             TRY
-                gbCodeSichern(pc)
+                dhCodeSichern(pc)
             CATCH e
                 meldung = e
             END TRY

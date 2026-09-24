@@ -43,7 +43,7 @@ pub enum Value {
     /// `betrag + 1.0` ablehnen, statt es still zu rechnen.
     Geld(i64),
     /// Modul `m3d`: immutable 3D-Mathe-Typen. f32 hält `Value` kompakt
-    /// (Vec4/Quat = 16 B wie Vec2) und ist render-nativ; GB-FLOAT-Getter casten
+    /// (Vec4/Quat = 16 B wie Vec2) und ist render-nativ; DH-FLOAT-Getter casten
     /// zu f64. MAT4 ist geboxt (16 floats wären zu groß inline), column-major
     /// (raylib/OpenGL) -> direkte Konversion zu raylib::ffi::Matrix.
     Vec3(f32, f32, f32),
@@ -539,7 +539,7 @@ impl GbArray {
 ///
 /// GEMESSEN, warum das noetig war: mit blosser linearer Suche kostete eine
 /// Map mit 5 000 Eintraegen 16 ms zum Fuellen, mit 10 000 schon 75 ms und mit
-/// 20 000 dann 224 ms -- sauber quadratisch. Der Kommentar davor sagte "GB-Maps
+/// 20 000 dann 224 ms -- sauber quadratisch. Der Kommentar davor sagte "DH-Maps
 /// sind klein"; das stimmt fuer Spielstaende, aber nicht fuer eine Sprache, mit
 /// der man auch Daten verarbeiten koennen soll.
 ///

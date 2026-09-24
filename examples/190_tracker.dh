@@ -16,7 +16,7 @@
 '    (samplegenau, nicht bildgetrieben); Rueckgaengig/Wiederholen ueber den
 '    ganzen Song; Datei = dasselbe JSON wie die Qt-Fassung (`dhtracker-song`,
 '    in beide Richtungen); [WAV] mischt den Song offline zu einer Datei,
-'    [GB-Code] schreibt den frame-basierten Live-Player wie die Qt-Fassung.
+'    [DH-Code] schreibt den frame-basierten Live-Player wie die Qt-Fassung.
 '    Sample-, Keymap- und SoundFont-Instrumente aus einer Datei der
 '    Qt-Fassung klingen (SAMPLE_FROM_BUFFER + SAMPLE_NOTE, Loop vorwaerts
 '    und pingpong) und kommen beim Sichern unveraendert zurueck.
@@ -774,7 +774,7 @@ END FUNCTION
 ' ------------------------------------------------------------ Wiedergabe
 ' Die Noten laufen auf einer AUDIO-UHR: geplant wird zwei Reihen voraus,
 ' gestartet wird samplegenau vom Audio-Faden. Ein bildgetriebener Zaehler
-' (wie im GB-Code-Export) schwankt um bis zu ein Bild -- bei 60 Bildern
+' (wie im DH-Code-Export) schwankt um bis zu ein Bild -- bei 60 Bildern
 ' sind das 16 ms, und das hoert man bei schnellen Sechzehnteln.
 DIM takt AS AUDIO_CLOCK
 DIM spielt AS BOOLEAN : spielt = FALSE
@@ -989,10 +989,10 @@ SUB wavRendern(pfad AS STRING)
               FORMAT$(faktor, "%.2f") + ")"
 END SUB
 
-' ------------------------------------------------------------ GB-Code
+' ------------------------------------------------------------ DH-Code
 ' Derselbe Player wie der Export der Qt-Fassung (`Song.dh_code`): die
 ' Reihenfolge wird zu EINER Zeitachse, jede Note klingt genau eine Reihe.
-FUNCTION gbCode$() AS STRING
+FUNCTION dhCode$() AS STRING
     DIM z AS STRING : z = CHR$(10)
     DIM q AS STRING : q = CHR$(34)
     DIM gesamt AS INTEGER : gesamt = 0
@@ -1159,7 +1159,7 @@ DIM cbStereo AS GUI_WIDGET : cbStereo = GUI_CHECKBOX(win, "Stereo", 1122, 14, FA
 GUI_TOOLTIP(cbStereo, "WAV mit Instrument-Pan statt Mono")
 DIM cbAmiga AS GUI_WIDGET : cbAmiga = GUI_CHECKBOX(win, "Amiga", 1204, 14, FALSE)
 GUI_TOOLTIP(cbAmiga, "Kanal 1+4 links, 2+3 rechts -- der Paula-Stereoeindruck")
-DIM bCode AS GUI_WIDGET : bCode = GUI_BUTTON(win, "GB-Code", 1284, 8, 80, 28)
+DIM bCode AS GUI_WIDGET : bCode = GUI_BUTTON(win, "DH-Code", 1284, 8, 80, 28)
 GUI_TOOLTIP(bCode, "Den frame-basierten Live-Player als .dh schreiben")
 
 ' Werkzeugleiste 2: Pattern, Oktave, die Zelle unter dem Cursor
@@ -1757,9 +1757,9 @@ SUB speichern(als AS BOOLEAN)
     meldung = "Gesichert: " + p
 END SUB
 
-SUB gbCodeSichern(p AS STRING)
-    WRITEALL(p, gbCode$())
-    meldung = "GB-Code gesichert: " + p
+SUB dhCodeSichern(p AS STRING)
+    WRITEALL(p, dhCode$())
+    meldung = "DH-Code gesichert: " + p
 END SUB
 
 ' ------------------------------------------------------------ Zeichnen
@@ -2036,8 +2036,8 @@ WHILE TRUE
         END IF
     END IF
     IF GUI_CLICKED(bCode) THEN
-        DIM cp AS STRING : cp = FILE_SAVE_DIALOG("GB-Code sichern", "song.dh", "dh")
-        IF cp <> "" THEN gbCodeSichern(cp)
+        DIM cp AS STRING : cp = FILE_SAVE_DIALOG("DH-Code sichern", "song.dh", "dh")
+        IF cp <> "" THEN dhCodeSichern(cp)
     END IF
 
     ' ---- Werkzeugleiste 2

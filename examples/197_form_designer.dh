@@ -23,7 +23,7 @@
 '  "Anordnen" richtet sie am zuletzt angeklickten aus; "Reiterseite" legt
 '  ein Control auf eine Seite eines Reiterwerks; F5 = Formular laufen lassen
 '  (erzeugt <name>_lauf.dh mit Handler-Ruempfen neben der .dhform);
-'  Strg+G = GB-Code: <name>_code.dh baut das Formular Aufruf fuer Aufruf,
+'  Strg+G = DH-Code: <name>_code.dh baut das Formular Aufruf fuer Aufruf,
 '  ohne GUI_LOAD und ohne .dhform zur Laufzeit.
 '
 '  Aufruf:  dhrt run examples/197_form_designer.dh [-- formular.dhform]
@@ -343,7 +343,7 @@ DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Sichern", "Strg+S"
 DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter ...", "Strg+Umschalt+S")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miLauf AS INTEGER : miLauf = GUI_MENU_ITEM(mDatei, "Formular ausfuehren", "F5")
-DIM miGbCode AS INTEGER : miGbCode = GUI_MENU_ITEM(mDatei, "GB-Code schreiben", "Strg+G")
+DIM miDhCode AS INTEGER : miDhCode = GUI_MENU_ITEM(mDatei, "DH-Code schreiben", "Strg+G")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
 DIM mBearb AS INTEGER : mBearb = GUI_MENU(winPal, "Bearbeiten")
@@ -1106,16 +1106,16 @@ FUNCTION laufProgramm$() AS STRING
     RETURN JOIN$(z, NL) + NL
 END FUNCTION
 
-' --- GB-Code: das Formular Aufruf fuer Aufruf, ohne GUI_LOAD ------------------
+' --- DH-Code: das Formular Aufruf fuer Aufruf, ohne GUI_LOAD ------------------
 ' Das Gegenstueck zu laufProgramm$: dort laedt das Programm die .dhform, hier
 ' steht jedes Control als eigener Aufruf im Quelltext -- lesbar, von Hand
 ' weiterzuschreiben, und ohne Datei daneben lauffaehig.
-DIM gbZeilen AS ARRAY OF STRING : gbZeilen = []
-DIM gbBenutzt AS ARRAY OF STRING : gbBenutzt = []
+DIM dhZeilen AS ARRAY OF STRING : dhZeilen = []
+DIM dhBenutzt AS ARRAY OF STRING : dhBenutzt = []
 
 ' Ein Text als Drachenhauch-Zeichenkette; mit Umbruch oder Rueckstrich als
 ' !"..." mit Escape-Folgen, sonst die schlichte Form.
-FUNCTION gbText$(s AS STRING) AS STRING
+FUNCTION dhText$(s AS STRING) AS STRING
     IF NOT (NL IN s) AND NOT (CHR$(13) IN s) AND NOT (CHR$(9) IN s) THEN RETURN dhString$(s)
     DIM e AS STRING : e = REPLACE$(s, "\", "\\")
     e = REPLACE$(e, CHR$(34), "\" + CHR$(34))
@@ -1125,7 +1125,7 @@ FUNCTION gbText$(s AS STRING) AS STRING
     RETURN "!" + CHR$(34) + e + CHR$(34)
 END FUNCTION
 
-FUNCTION gbIdent$(s AS STRING) AS STRING
+FUNCTION dhIdent$(s AS STRING) AS STRING
     DIM r AS STRING : r = ""
     DIM i AS INTEGER
     FOR i = 0 TO LEN(s) - 1
@@ -1138,60 +1138,60 @@ FUNCTION gbIdent$(s AS STRING) AS STRING
 END FUNCTION
 
 ' Eine JSON-Liste als Feld-Literal: Texte in Anfuehrungszeichen, Zahlen blank.
-FUNCTION gbListe$(pfad AS STRING) AS STRING
+FUNCTION dhListe$(pfad AS STRING) AS STRING
     IF NOT JSON_HAS(doc, pfad) THEN RETURN "[]"
     DIM teile AS ARRAY OF STRING : teile = []
     DIM i AS INTEGER
     FOR i = 0 TO JSON_LEN(doc, pfad) - 1
         DIM ep AS STRING : ep = pfad + "." + STR$(i)
-        IF JSON_TYPE(doc, ep) = "number" THEN ARRAY_PUSH(teile, zahlText$(JSON_GET_FLOAT(doc, ep))) ELSE ARRAY_PUSH(teile, gbText$(JSON_GET_STRING(doc, ep)))
+        IF JSON_TYPE(doc, ep) = "number" THEN ARRAY_PUSH(teile, zahlText$(JSON_GET_FLOAT(doc, ep))) ELSE ARRAY_PUSH(teile, dhText$(JSON_GET_STRING(doc, ep)))
     NEXT
     RETURN "[" + JOIN$(teile, ", ") + "]"
 END FUNCTION
 
-FUNCTION gbZahl$(i AS INTEGER, feld AS STRING, vorgabe AS STRING) AS STRING
+FUNCTION dhZahl$(i AS INTEGER, feld AS STRING, vorgabe AS STRING) AS STRING
     IF NOT JSON_HAS(doc, wz$(i, feld)) THEN RETURN vorgabe
     RETURN zahlText$(JSON_GET_FLOAT(doc, wz$(i, feld)))
 END FUNCTION
 
-FUNCTION gbSchalter(pfad AS STRING) AS BOOLEAN
+FUNCTION dhSchalter(pfad AS STRING) AS BOOLEAN
     IF NOT JSON_HAS(doc, pfad) THEN RETURN FALSE
     IF JSON_TYPE(doc, pfad) <> "boolean" THEN RETURN FALSE
     RETURN JSON_GET_BOOL(doc, pfad)
 END FUNCTION
 
-' Je Control der Variablenname im GB-Code (Index wie in doc.widgets) --
+' Je Control der Variablenname im DH-Code (Index wie in doc.widgets) --
 ' die Zuordnung zu Reiterseiten kommt NACH allen Controls, dann gibt es
 ' Behaelter und Kind beide schon.
-DIM gbVarNamen AS ARRAY OF STRING : gbVarNamen = []
+DIM dhVarNamen AS ARRAY OF STRING : dhVarNamen = []
 
-SUB gb(zeile AS STRING)
-    ARRAY_PUSH(gbZeilen, zeile)
+SUB codeZeile(zeile AS STRING)
+    ARRAY_PUSH(dhZeilen, zeile)
 END SUB
 
-SUB gbControl(i AS INTEGER)
+SUB dhControl(i AS INTEGER)
     DIM k AS STRING : k = feldText$(i, "kind")
     DIM basis AS STRING : basis = feldText$(i, "name")
     IF basis = "" THEN basis = k + STR$(i + 1)
-    basis = gbIdent$(basis)
+    basis = dhIdent$(basis)
     DIM v AS STRING : v = basis
     DIM nr AS INTEGER : nr = 2
-    WHILE ARRAY_INDEXOF(gbBenutzt, LOWER$(v)) >= 0
+    WHILE ARRAY_INDEXOF(dhBenutzt, LOWER$(v)) >= 0
         v = basis + STR$(nr)
         nr = nr + 1
     WEND
-    ARRAY_PUSH(gbBenutzt, LOWER$(v))
-    ARRAY_PUSH(gbVarNamen, v)
+    ARRAY_PUSH(dhBenutzt, LOWER$(v))
+    ARRAY_PUSH(dhVarNamen, v)
     DIM w AS INTEGER : w = feldZahl(i, "w")
     DIM h AS INTEGER : h = feldZahl(i, "h")
     DIM lage AS STRING : lage = STR$(feldZahl(i, "x")) + ", " + STR$(feldZahl(i, "y"))
     DIM rahmen AS STRING : rahmen = lage + ", " + STR$(w) + ", " + STR$(h)
-    DIM t AS STRING : t = gbText$(feldText$(i, "text"))
-    DIM mn AS STRING : mn = gbZahl$(i, "min", "0")
-    DIM mx AS STRING : mx = gbZahl$(i, "max", "100")
-    DIM wert AS STRING : wert = gbZahl$(i, "value", "0")
+    DIM t AS STRING : t = dhText$(feldText$(i, "text"))
+    DIM mn AS STRING : mn = dhZahl$(i, "min", "0")
+    DIM mx AS STRING : mx = dhZahl$(i, "max", "100")
+    DIM wert AS STRING : wert = dhZahl$(i, "value", "0")
     DIM an AS STRING : an = "FALSE"
-    IF gbSchalter(wz$(i, "checked")) THEN an = "TRUE"
+    IF dhSchalter(wz$(i, "checked")) THEN an = "TRUE"
     DIM ctor AS STRING : ctor = ""
     DIM groesse AS BOOLEAN : groesse = FALSE
     SELECT CASE k
@@ -1201,20 +1201,20 @@ SUB gbControl(i AS INTEGER)
         CASE "radio"
             DIM gruppe AS STRING : gruppe = feldText$(i, "group")
             IF gruppe = "" THEN gruppe = "gruppe"
-            ctor = "GUI_RADIO(frm, " + gbText$(gruppe) + ", " + t + ", " + lage + ")"
+            ctor = "GUI_RADIO(frm, " + dhText$(gruppe) + ", " + t + ", " + lage + ")"
             groesse = TRUE
         CASE "slider" : ctor = "GUI_SLIDER(frm, " + lage + ", " + STR$(w) + ", " + mn + ", " + mx + ", " + wert + ")" : groesse = TRUE
-        CASE "textinput" : ctor = "GUI_TEXTINPUT(frm, " + rahmen + ", " + gbText$(feldText$(i, "placeholder")) + ")"
-        CASE "dropdown" : ctor = "GUI_DROPDOWN(frm, " + rahmen + ", " + gbListe$(wz$(i, "items")) + ")"
-        CASE "listbox" : ctor = "GUI_LISTBOX(frm, " + rahmen + ", " + gbListe$(wz$(i, "items")) + ")"
+        CASE "textinput" : ctor = "GUI_TEXTINPUT(frm, " + rahmen + ", " + dhText$(feldText$(i, "placeholder")) + ")"
+        CASE "dropdown" : ctor = "GUI_DROPDOWN(frm, " + rahmen + ", " + dhListe$(wz$(i, "items")) + ")"
+        CASE "listbox" : ctor = "GUI_LISTBOX(frm, " + rahmen + ", " + dhListe$(wz$(i, "items")) + ")"
         CASE "progress" : ctor = "GUI_PROGRESS(frm, " + rahmen + ")"
         CASE "table"
-            IF gbSchalter(wz$(i, "table") + ".baum") THEN ctor = "GUI_TREETABLE(frm, " + rahmen + ")" ELSE ctor = "GUI_TABLE(frm, " + rahmen + ")"
+            IF dhSchalter(wz$(i, "table") + ".baum") THEN ctor = "GUI_TREETABLE(frm, " + rahmen + ")" ELSE ctor = "GUI_TABLE(frm, " + rahmen + ")"
         CASE "canvas" : ctor = "GUI_CANVAS(frm, " + rahmen + ")"
         CASE "panel" : ctor = "GUI_PANEL(frm, " + rahmen + ", " + t + ")"
         CASE "groupbox" : ctor = "GUI_GROUPBOX(frm, " + rahmen + ", " + t + ")"
         CASE "separator" : ctor = "GUI_SEPARATOR(frm, " + lage + ", " + STR$(w) + ")" : groesse = TRUE
-        CASE "textarea" : ctor = "GUI_TEXTAREA(frm, " + rahmen + ", " + gbText$(feldText$(i, "placeholder")) + ")"
+        CASE "textarea" : ctor = "GUI_TEXTAREA(frm, " + rahmen + ", " + dhText$(feldText$(i, "placeholder")) + ")"
         CASE "spinner" : ctor = "GUI_SPINNER(frm, " + lage + ", " + STR$(w) + ", " + mn + ", " + mx + ", " + wert + ")" : groesse = TRUE
         CASE "knob" : ctor = "GUI_KNOB(frm, " + lage + ", " + STR$(MIN(w, h)) + ", " + mn + ", " + mx + ", " + wert + ")" : groesse = TRUE
         CASE "toggle" : ctor = "GUI_TOGGLE(frm, " + t + ", " + lage + ", " + an + ")" : groesse = TRUE
@@ -1222,14 +1222,14 @@ SUB gbControl(i AS INTEGER)
         CASE "layout"
             DIM la AS STRING : la = "spalte"
             IF JSON_HAS(doc, wz$(i, "layout.art")) THEN la = JSON_GET_STRING(doc, wz$(i, "layout.art"))
-            ctor = "GUI_LAYOUT(frm, " + gbText$(la) + ", " + rahmen + ")"
+            ctor = "GUI_LAYOUT(frm, " + dhText$(la) + ", " + rahmen + ")"
         CASE "toolbar" : ctor = "GUI_TOOLBAR(frm, " + rahmen + ")"
         CASE "splitter"
             DIM richtung AS STRING : richtung = LOWER$(feldText$(i, "text"))
             IF richtung <> "v" THEN richtung = "h"
             DIM laenge AS INTEGER : laenge = w
             IF richtung = "v" THEN laenge = h
-            ctor = "GUI_SPLITTER(frm, " + lage + ", " + STR$(laenge) + ", " + gbText$(richtung) + ", 40, " + STR$(MAX(80, laenge)) + ")"
+            ctor = "GUI_SPLITTER(frm, " + lage + ", " + STR$(laenge) + ", " + dhText$(richtung) + ", 40, " + STR$(MAX(80, laenge)) + ")"
             groesse = TRUE
         CASE "colorpicker" : ctor = "GUI_COLORPICKER(frm, " + rahmen + ")"
         CASE "datepicker" : ctor = "GUI_DATEPICKER(frm, " + rahmen + ")"
@@ -1238,127 +1238,127 @@ SUB gbControl(i AS INTEGER)
         CASE "tabcontrol" : ctor = "GUI_TABCONTROL(frm, " + rahmen + ")"
         CASE "statusbar" : ctor = "GUI_STATUSBAR(frm, " + rahmen + ", " + t + ")"
         CASE "breadcrumb" : ctor = "GUI_BREADCRUMB(frm, " + rahmen + ")"
-        CASE "card" : ctor = "GUI_CARD(frm, " + rahmen + ", -1, " + t + ", " + gbText$(feldText$(i, "placeholder")) + ")"
+        CASE "card" : ctor = "GUI_CARD(frm, " + rahmen + ", -1, " + t + ", " + dhText$(feldText$(i, "placeholder")) + ")"
         CASE "accordion" : ctor = "GUI_ACCORDION(frm, " + rahmen + ")"
         CASE "wizard" : ctor = "GUI_WIZARD(frm, " + rahmen + ")"
     END SELECT
     IF ctor = "" THEN
         ' Ein Bild braucht eine Quelle (LOADIMAGE), die die .dhform nicht kennt.
-        gb("' " + k + " '" + v + "' uebersprungen -- dafuer gibt es keinen Aufruf ohne weitere Angaben")
-        gb("")
+        codeZeile("' " + k + " '" + v + "' uebersprungen -- dafuer gibt es keinen Aufruf ohne weitere Angaben")
+        codeZeile("")
         RETURN
     END IF
-    gb("DIM " + v + " AS GUI_WIDGET")
-    gb(v + " = " + ctor)
+    codeZeile("DIM " + v + " AS GUI_WIDGET")
+    codeZeile(v + " = " + ctor)
     ' Diese Konstruktoren messen sich selbst -- die Groesse aus dem Designer
     ' ginge sonst verloren.
-    IF groesse THEN gb("GUI_SET_BOUNDS(" + v + ", " + rahmen + ")")
+    IF groesse THEN codeZeile("GUI_SET_BOUNDS(" + v + ", " + rahmen + ")")
     IF k = "table" THEN
         DIM tp AS STRING : tp = wz$(i, "table")
-        IF JSON_HAS(doc, tp + ".headers") THEN gb("GUI_TABLE_HEADERS(" + v + ", " + gbListe$(tp + ".headers") + ")")
-        IF JSON_HAS(doc, tp + ".col_widths") THEN gb("GUI_TABLE_COL_WIDTHS(" + v + ", " + gbListe$(tp + ".col_widths") + ")")
-        IF gbSchalter(tp + ".zellmodus") THEN gb("GUI_TABLE_SET(" + v + ", " + dhString$("zellmodus") + ", 1)")
-        IF gbSchalter(tp + ".zeilen_anhaengen") THEN gb("GUI_TABLE_SET(" + v + ", " + dhString$("zeilen_anhaengen") + ", 1)")
-        IF gbSchalter(tp + ".zebra") THEN gb("GUI_TABLE_SET(" + v + ", " + dhString$("zebra") + ", 1)")
-        IF gbSchalter(tp + ".filter_row") THEN gb("GUI_TABLE_SET(" + v + ", " + dhString$("filterzeile") + ", 1)")
-        IF gbSchalter(tp + ".multi") THEN gb("GUI_TABLE_SET(" + v + ", " + dhString$("mehrfachauswahl") + ", 1)")
-        IF JSON_HAS(doc, tp + ".leer_text") THEN gb("GUI_TABLE_PLACEHOLDER(" + v + ", " + gbText$(JSON_GET_STRING(doc, tp + ".leer_text")) + ")")
+        IF JSON_HAS(doc, tp + ".headers") THEN codeZeile("GUI_TABLE_HEADERS(" + v + ", " + dhListe$(tp + ".headers") + ")")
+        IF JSON_HAS(doc, tp + ".col_widths") THEN codeZeile("GUI_TABLE_COL_WIDTHS(" + v + ", " + dhListe$(tp + ".col_widths") + ")")
+        IF dhSchalter(tp + ".zellmodus") THEN codeZeile("GUI_TABLE_SET(" + v + ", " + dhString$("zellmodus") + ", 1)")
+        IF dhSchalter(tp + ".zeilen_anhaengen") THEN codeZeile("GUI_TABLE_SET(" + v + ", " + dhString$("zeilen_anhaengen") + ", 1)")
+        IF dhSchalter(tp + ".zebra") THEN codeZeile("GUI_TABLE_SET(" + v + ", " + dhString$("zebra") + ", 1)")
+        IF dhSchalter(tp + ".filter_row") THEN codeZeile("GUI_TABLE_SET(" + v + ", " + dhString$("filterzeile") + ", 1)")
+        IF dhSchalter(tp + ".multi") THEN codeZeile("GUI_TABLE_SET(" + v + ", " + dhString$("mehrfachauswahl") + ", 1)")
+        IF JSON_HAS(doc, tp + ".leer_text") THEN codeZeile("GUI_TABLE_PLACEHOLDER(" + v + ", " + dhText$(JSON_GET_STRING(doc, tp + ".leer_text")) + ")")
         DIM s AS INTEGER
         IF JSON_HAS(doc, tp + ".col_edit") THEN
             FOR s = 0 TO JSON_LEN(doc, tp + ".col_edit") - 1
-                IF gbSchalter(tp + ".col_edit." + STR$(s)) THEN gb("GUI_TABLE_COL_EDIT(" + v + ", " + STR$(s) + ", TRUE)")
+                IF dhSchalter(tp + ".col_edit." + STR$(s)) THEN codeZeile("GUI_TABLE_COL_EDIT(" + v + ", " + STR$(s) + ", TRUE)")
             NEXT
         END IF
         IF JSON_HAS(doc, tp + ".col_type") THEN
             FOR s = 0 TO JSON_LEN(doc, tp + ".col_type") - 1
                 DIM ct AS STRING : ct = JSON_GET_STRING(doc, tp + ".col_type." + STR$(s))
-                IF ct = "ganz" OR ct = "zahl" THEN gb("GUI_TABLE_COL_TYPE(" + v + ", " + STR$(s) + ", " + dhString$(ct) + ")")
+                IF ct = "ganz" OR ct = "zahl" THEN codeZeile("GUI_TABLE_COL_TYPE(" + v + ", " + STR$(s) + ", " + dhString$(ct) + ")")
             NEXT
         END IF
         IF JSON_HAS(doc, tp + ".col_choices") THEN
             FOR s = 0 TO JSON_LEN(doc, tp + ".col_choices") - 1
                 DIM cp AS STRING : cp = tp + ".col_choices." + STR$(s)
-                IF JSON_LEN(doc, cp) > 0 THEN gb("GUI_TABLE_COL_CHOICES(" + v + ", " + STR$(s) + ", " + gbListe$(cp) + ")")
+                IF JSON_LEN(doc, cp) > 0 THEN codeZeile("GUI_TABLE_COL_CHOICES(" + v + ", " + STR$(s) + ", " + dhListe$(cp) + ")")
             NEXT
         END IF
-        IF gbSchalter(tp + ".baum") THEN
-            gb("' " + v + ": Zeilen zur Laufzeit fuellen -- GUI_TREETABLE_ADD(" + v + ", eltern, zellen)")
+        IF dhSchalter(tp + ".baum") THEN
+            codeZeile("' " + v + ": Zeilen zur Laufzeit fuellen -- GUI_TREETABLE_ADD(" + v + ", eltern, zellen)")
         ELSE
-            gb("' " + v + ": Zeilen zur Laufzeit fuellen -- GUI_TABLE_ADD_ROW / GUI_TABLE_ROWS")
+            codeZeile("' " + v + ": Zeilen zur Laufzeit fuellen -- GUI_TABLE_ADD_ROW / GUI_TABLE_ROWS")
         END IF
     END IF
-    IF k = "dropdown" AND feldText$(i, "placeholder") <> "" THEN gb("GUI_DROPDOWN_PLACEHOLDER(" + v + ", " + gbText$(feldText$(i, "placeholder")) + ")")
-    IF k = "dropdown" AND gbSchalter(wz$(i, "bearbeitbar")) THEN gb("GUI_DROPDOWN_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
+    IF k = "dropdown" AND feldText$(i, "placeholder") <> "" THEN codeZeile("GUI_DROPDOWN_PLACEHOLDER(" + v + ", " + dhText$(feldText$(i, "placeholder")) + ")")
+    IF k = "dropdown" AND dhSchalter(wz$(i, "bearbeitbar")) THEN codeZeile("GUI_DROPDOWN_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
     IF k = "tabcontrol" AND JSON_HAS(doc, wz$(i, "items")) THEN
         DIM sei AS INTEGER
         FOR sei = 0 TO JSON_LEN(doc, wz$(i, "items")) - 1
-            gb("GUI_TABCONTROL_ADD(" + v + ", " + gbText$(JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(sei))) + ")")
+            codeZeile("GUI_TABCONTROL_ADD(" + v + ", " + dhText$(JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(sei))) + ")")
         NEXT
     END IF
-    IF k = "listbox" AND gbSchalter(wz$(i, "list") + ".bearbeitbar") THEN gb("GUI_LISTBOX_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
-    IF k = "tree" AND gbSchalter(wz$(i, "tree") + ".bearbeitbar") THEN gb("GUI_TREE_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
-    IF k = "tree" AND JSON_HAS(doc, wz$(i, "tree") + ".leer_text") THEN gb("GUI_TREE_PLACEHOLDER(" + v + ", " + gbText$(JSON_GET_STRING(doc, wz$(i, "tree") + ".leer_text")) + ")")
+    IF k = "listbox" AND dhSchalter(wz$(i, "list") + ".bearbeitbar") THEN codeZeile("GUI_LISTBOX_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
+    IF k = "tree" AND dhSchalter(wz$(i, "tree") + ".bearbeitbar") THEN codeZeile("GUI_TREE_SET(" + v + ", " + dhString$("bearbeitbar") + ", 1)")
+    IF k = "tree" AND JSON_HAS(doc, wz$(i, "tree") + ".leer_text") THEN codeZeile("GUI_TREE_PLACEHOLDER(" + v + ", " + dhText$(JSON_GET_STRING(doc, wz$(i, "tree") + ".leer_text")) + ")")
     IF (k = "accordion" OR k = "wizard") AND JSON_HAS(doc, wz$(i, "items")) THEN
         DIM ab AS INTEGER
         FOR ab = 0 TO JSON_LEN(doc, wz$(i, "items")) - 1
             IF k = "accordion" THEN
-                gb("GUI_ACCORDION_ADD(" + v + ", " + gbText$(JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(ab))) + ")")
+                codeZeile("GUI_ACCORDION_ADD(" + v + ", " + dhText$(JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(ab))) + ")")
             ELSE
-                gb("GUI_WIZARD_ADD(" + v + ", " + gbText$(JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(ab))) + ")")
+                codeZeile("GUI_WIZARD_ADD(" + v + ", " + dhText$(JSON_GET_STRING(doc, wz$(i, "items") + "." + STR$(ab))) + ")")
             END IF
         NEXT
-        IF k = "accordion" THEN gb("' " + v + ": Controls je Abschnitt -- GUI_ACCORDION_ADD_WIDGET(" + v + ", wdg, abschnitt)")
+        IF k = "accordion" THEN codeZeile("' " + v + ": Controls je Abschnitt -- GUI_ACCORDION_ADD_WIDGET(" + v + ", wdg, abschnitt)")
     END IF
-    IF k = "datepicker" AND feldText$(i, "date") <> "" THEN gb("GUI_SET_DATE(" + v + ", " + gbText$(feldText$(i, "date")) + ")")
-    IF k = "timepicker" AND feldText$(i, "time") <> "" THEN gb("GUI_SET_TIME(" + v + ", " + gbText$(feldText$(i, "time")) + ")")
+    IF k = "datepicker" AND feldText$(i, "date") <> "" THEN codeZeile("GUI_SET_DATE(" + v + ", " + dhText$(feldText$(i, "date")) + ")")
+    IF k = "timepicker" AND feldText$(i, "time") <> "" THEN codeZeile("GUI_SET_TIME(" + v + ", " + dhText$(feldText$(i, "time")) + ")")
     IF JSON_HAS(doc, wz$(i, "enabled")) THEN
-        IF NOT gbSchalter(wz$(i, "enabled")) THEN gb("GUI_SET_ENABLED(" + v + ", FALSE)")
+        IF NOT dhSchalter(wz$(i, "enabled")) THEN codeZeile("GUI_SET_ENABLED(" + v + ", FALSE)")
     END IF
     DIM anker AS STRING : anker = feldText$(i, "anchor")
-    IF anker <> "" AND anker <> "lt" THEN gb("GUI_SET_ANCHOR(" + v + ", " + gbText$(anker) + ")")
-    IF feldText$(i, "tooltip") <> "" THEN gb("GUI_TOOLTIP(" + v + ", " + gbText$(feldText$(i, "tooltip")) + ")")
-    IF feldText$(i, "font_style") <> "" AND feldText$(i, "font_style") <> "normal" THEN gb("GUI_SET_FONT_STYLE(" + v + ", " + gbText$(feldText$(i, "font_style")) + ")")
-    IF feldText$(i, "on_click") <> "" THEN gb("GUI_ON_CLICK(" + v + ", " + feldText$(i, "on_click") + ")")
-    IF feldText$(i, "on_change") <> "" THEN gb("GUI_ON_CHANGE(" + v + ", " + feldText$(i, "on_change") + ")")
-    IF feldText$(i, "on_enter") <> "" THEN gb("GUI_ON_ENTER(" + v + ", " + feldText$(i, "on_enter") + ")")
-    gb("")
+    IF anker <> "" AND anker <> "lt" THEN codeZeile("GUI_SET_ANCHOR(" + v + ", " + dhText$(anker) + ")")
+    IF feldText$(i, "tooltip") <> "" THEN codeZeile("GUI_TOOLTIP(" + v + ", " + dhText$(feldText$(i, "tooltip")) + ")")
+    IF feldText$(i, "font_style") <> "" AND feldText$(i, "font_style") <> "normal" THEN codeZeile("GUI_SET_FONT_STYLE(" + v + ", " + dhText$(feldText$(i, "font_style")) + ")")
+    IF feldText$(i, "on_click") <> "" THEN codeZeile("GUI_ON_CLICK(" + v + ", " + feldText$(i, "on_click") + ")")
+    IF feldText$(i, "on_change") <> "" THEN codeZeile("GUI_ON_CHANGE(" + v + ", " + feldText$(i, "on_change") + ")")
+    IF feldText$(i, "on_enter") <> "" THEN codeZeile("GUI_ON_ENTER(" + v + ", " + feldText$(i, "on_enter") + ")")
+    codeZeile("")
 END SUB
 
-FUNCTION gbCode$() AS STRING
-    gbZeilen = []
-    gbBenutzt = ["frm"]
-    gbVarNamen = []
-    gb("' Erzeugt vom Form-Designer -- das Formular ausgeschrieben, ohne GUI_LOAD")
-    gb("' Vorlage: " + BASENAME(formPfad))
-    gb("IMPORT " + dhString$("gui"))
-    gb("SCREEN(" + STR$(JSON_GET_INT(doc, "w")) + ", " + STR$(JSON_GET_INT(doc, "h")) + ", " + gbText$(JSON_GET_STRING(doc, "title")) + ", 1)")
-    IF JSON_HAS(doc, "theme") THEN gb("GUI_THEME_PRESET(" + dhString$(JSON_GET_STRING(doc, "theme")) + ")")
-    IF gbSchalter("resizable") THEN gb("WINDOW_RESIZABLE(TRUE)")
-    gb("")
+FUNCTION dhCode$() AS STRING
+    dhZeilen = []
+    dhBenutzt = ["frm"]
+    dhVarNamen = []
+    codeZeile("' Erzeugt vom Form-Designer -- das Formular ausgeschrieben, ohne GUI_LOAD")
+    codeZeile("' Vorlage: " + BASENAME(formPfad))
+    codeZeile("IMPORT " + dhString$("gui"))
+    codeZeile("SCREEN(" + STR$(JSON_GET_INT(doc, "w")) + ", " + STR$(JSON_GET_INT(doc, "h")) + ", " + dhText$(JSON_GET_STRING(doc, "title")) + ", 1)")
+    IF JSON_HAS(doc, "theme") THEN codeZeile("GUI_THEME_PRESET(" + dhString$(JSON_GET_STRING(doc, "theme")) + ")")
+    IF dhSchalter("resizable") THEN codeZeile("WINDOW_RESIZABLE(TRUE)")
+    codeZeile("")
     DIM n AS STRING
     FOR EACH n IN handlerNamen()
-        ARRAY_PUSH(gbBenutzt, LOWER$(n))
-        gb("SUB " + n + "()")
+        ARRAY_PUSH(dhBenutzt, LOWER$(n))
+        codeZeile("SUB " + n + "()")
         IF JSON_HAS(doc, "code." + n) THEN
             DIM zeile AS STRING
             FOR EACH zeile IN SPLIT$(JSON_GET_STRING(doc, "code." + n), NL)
-                gb("    " + zeile)
+                codeZeile("    " + zeile)
             NEXT
         ELSE
-            gb("    ' TODO: " + n)
+            codeZeile("    ' TODO: " + n)
         END IF
-        gb("END SUB")
-        gb("")
+        codeZeile("END SUB")
+        codeZeile("")
     NEXT
-    gb("DIM frm AS GUI_WINDOW")
-    gb("frm = GUI_WINDOW(" + gbText$(JSON_GET_STRING(doc, "title")) + ", 0, 0, " + STR$(JSON_GET_INT(doc, "w")) + ", " + STR$(JSON_GET_INT(doc, "h")) + ")")
-    gb("GUI_WINDOW_CHROME(frm, FALSE)        ' randlos -- das OS-Fenster liefert den Rahmen")
-    gb("GUI_WINDOW_RESIZABLE(frm, FALSE)")
-    IF JSON_HAS(doc, "menus") THEN gb("' Menues stehen in der .dhform -- dieser Code baut sie nicht nach; GUI_LOAD tut es.")
-    gb("")
+    codeZeile("DIM frm AS GUI_WINDOW")
+    codeZeile("frm = GUI_WINDOW(" + dhText$(JSON_GET_STRING(doc, "title")) + ", 0, 0, " + STR$(JSON_GET_INT(doc, "w")) + ", " + STR$(JSON_GET_INT(doc, "h")) + ")")
+    codeZeile("GUI_WINDOW_CHROME(frm, FALSE)        ' randlos -- das OS-Fenster liefert den Rahmen")
+    codeZeile("GUI_WINDOW_RESIZABLE(frm, FALSE)")
+    IF JSON_HAS(doc, "menus") THEN codeZeile("' Menues stehen in der .dhform -- dieser Code baut sie nicht nach; GUI_LOAD tut es.")
+    codeZeile("")
     DIM i AS INTEGER
     FOR i = 0 TO anzahl() - 1
-        gbControl(i)
+        dhControl(i)
     NEXT
     ' Reiterseiten und Assistenten-Schritte, jetzt da es alle gibt.
     DIM zugeordnet AS BOOLEAN : zugeordnet = FALSE
@@ -1367,32 +1367,32 @@ FUNCTION gbCode$() AS STRING
         DIM rs AS INTEGER : rs = reiterSeite(i)
         IF rp < 0 OR rs < 1 OR rs > seitenZahl(rp) THEN CONTINUE
         IF feldText$(rp, "kind") = "wizard" THEN
-            gb("GUI_WIZARD_ADD_WIDGET(" + gbVarNamen[rp] + ", " + gbVarNamen[i] + ", " + STR$(rs - 1) + ")")
+            codeZeile("GUI_WIZARD_ADD_WIDGET(" + dhVarNamen[rp] + ", " + dhVarNamen[i] + ", " + STR$(rs - 1) + ")")
         ELSE
-            gb("GUI_TABCONTROL_ADD_WIDGET(" + gbVarNamen[rp] + ", " + gbVarNamen[i] + ", " + STR$(rs - 1) + ")")
+            codeZeile("GUI_TABCONTROL_ADD_WIDGET(" + dhVarNamen[rp] + ", " + dhVarNamen[i] + ", " + STR$(rs - 1) + ")")
         END IF
         zugeordnet = TRUE
     NEXT
-    IF zugeordnet THEN gb("")
-    gb("WHILE NOT QUITREQUESTED()")
-    gb("    GUI_WINDOW_SET_BOUNDS(frm, 0, 0, SCREENWIDTH(), SCREENHEIGHT())")
-    gb("    GUI_UPDATE()")
-    gb("    CLS(&H0E1014)")
-    gb("    GUI_DRAW()")
-    gb("    FLIP()")
-    gb("WEND")
-    RETURN JOIN$(gbZeilen, NL) + NL
+    IF zugeordnet THEN codeZeile("")
+    codeZeile("WHILE NOT QUITREQUESTED()")
+    codeZeile("    GUI_WINDOW_SET_BOUNDS(frm, 0, 0, SCREENWIDTH(), SCREENHEIGHT())")
+    codeZeile("    GUI_UPDATE()")
+    codeZeile("    CLS(&H0E1014)")
+    codeZeile("    GUI_DRAW()")
+    codeZeile("    FLIP()")
+    codeZeile("WEND")
+    RETURN JOIN$(dhZeilen, NL) + NL
 END FUNCTION
 
-SUB gbCodeSchreiben()
+SUB dhCodeSchreiben()
     IF formPfad = "" OR geaendert THEN
         IF NOT sichern(FALSE) THEN RETURN
     END IF
     DIM stamm AS STRING : stamm = formPfad
     IF LOWER$(RIGHT$(stamm, 7)) = ".dhform" THEN stamm = LEFT$(stamm, LEN(stamm) - 7)
     DIM ziel AS STRING : ziel = stamm + "_code.dh"
-    WRITEALL(ziel, gbCode$())
-    GUI_SET_TEXT(lblStatus, "GB-Code geschrieben: " + BASENAME(ziel))
+    WRITEALL(ziel, dhCode$())
+    GUI_SET_TEXT(lblStatus, "DH-Code geschrieben: " + BASENAME(ziel))
     protokoll("gbcode " + ziel)
 END SUB
 
@@ -1813,7 +1813,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miSichern) THEN sichern(FALSE)
     IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
     IF GUI_CLICKED(miLauf) THEN ausfuehren()
-    IF GUI_CLICKED(miGbCode) THEN gbCodeSchreiben()
+    IF GUI_CLICKED(miDhCode) THEN dhCodeSchreiben()
     IF GUI_CLICKED(miBeenden) THEN endeAnfragen()
     IF GUI_CLICKED(miRueck) THEN rueckgaengig()
     IF GUI_CLICKED(miWieder) THEN wiederholen()

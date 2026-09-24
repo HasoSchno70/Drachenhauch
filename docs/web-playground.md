@@ -99,7 +99,7 @@ Alle nachgemessen, nicht vermutet:
 
 ## Die Demo im Browser (Stand 2026-08-04)
 
-`gbdemo/` **laeuft vollstaendig** -- mit Bild und Ton, wie auf dem Desktop.
+`dhdemo/` **laeuft vollstaendig** -- mit Bild und Ton, wie auf dem Desktop.
 Im Browser nachgesehen:
 
 | | |
@@ -188,7 +188,7 @@ Konsolen-Ausgabe daneben.
 | `rust/build_wasm.py` | `.dh` → `web/program.dh` (Quelle, im Browser kompiliert) + `web/program.dhc` (Fallback), dann `cargo`+emscripten-Build → `web/dhrt.{js,wasm}` |
 | `rust/drachenhauch_runtime/src/main.rs` | `#[cfg(target_os = "emscripten")]`-Zweig kompiliert+führt `/program.dh` aus (Fallback `/program.dhc`) aus dem virtuellen FS |
 | `web/index.html` | Live-Editor (`<textarea id="src">`) + `<canvas id="canvas">` + Output-Bereich + Run-/Teilen-Button |
-| `web/playground.js` | Live-Playground: Editor→`sessionStorage`, Reload für frische Runtime, schreibt die Quelle nach `/program.dh`, `callMain()`; stdout→Div (Module.print + console.log-Fallback). Einmal-Run-Flag `gb_run` macht hängende Programme reload-erholbar. **Teilbare Links:** Quelle base64url im URL-Hash (`#gb=…`); ein geöffneter Link lädt + startet das Programm. |
+| `web/playground.js` | Live-Playground: Editor→`sessionStorage`, Reload für frische Runtime, schreibt die Quelle nach `/program.dh`, `callMain()`; stdout→Div (Module.print + console.log-Fallback). Einmal-Run-Flag `dh_run` macht hängende Programme reload-erholbar. **Teilbare Links:** Quelle base64url im URL-Hash (`#gb=…`); ein geöffneter Link lädt + startet das Programm. |
 
 ## Bauen
 
@@ -221,7 +221,7 @@ Run klicken → `Module.callMain()` startet `dhrt`, das `/program.dhc` ausführt
 
 ## Architektur-Hinweis: der Render-Loop (gelöst)
 
-Die VM treibt ihren Frame-/Render-Loop **blockierend**: das GB-Programm hat die
+Die VM treibt ihren Frame-/Render-Loop **blockierend**: das DH-Programm hat die
 Schleife (`WHILE NOT QUITREQUESTED() … FLIP() … WEND`), die VM kehrt erst am
 Programmende zurück. Im Browser darf der Main-Thread aber nicht blockieren, sonst
 hängt der Tab.
@@ -233,7 +233,7 @@ blockierende Loop nie ans Browser-Event-Loop zurückgibt. Deshalb ruft
 direkt nach dem Präsentieren (`EndDrawing`). ASYNCIFY wickelt dabei den gesamten
 Rust-Stack ab, gibt die Kontrolle an den Browser (Canvas compositet, Input-Events
 werden zugestellt) und setzt beim nächsten Tick genau dort fort. Damit kooperiert
-der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
+der unveränderte DH-Render-Loop mit dem Browser — **kein Umbau auf
 `emscripten_set_main_loop` nötig**, die VM-/Coroutinen-Logik bleibt unangetastet.
 
 > Der theoretisch sauberere Weg (`emscripten_set_main_loop`, VM kehrt pro Frame
@@ -250,7 +250,7 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
   (ASYNCIFY-Yield in `flip()`, siehe oben) → animierte Demos im Canvas, der Tab
   bleibt reaktionsfähig (im Browser per Preview geprüft: bewegtes Objekt +
   hochzählender Frame-Counter, kein Einfrieren). Das Harness bleibt **hang-sicher**
-  (Einmal-Run-Flag `gb_run`), falls ein Programm doch eng-busy läuft.
+  (Einmal-Run-Flag `dh_run`), falls ein Programm doch eng-busy läuft.
 - **Teilbare Links ✅.** *Link teilen* base64url-kodiert die Quelle in den
   URL-Hash (`#gb=…`, reine Client-JS, kein Backend). Ein geöffneter Link lädt die
   Quelle in den Editor **und startet sie direkt** (frische Runtime). *Ausführen*

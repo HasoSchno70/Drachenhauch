@@ -32,8 +32,8 @@
     try { return decodeSrc(m[1]); } catch (e) { return null; }
   }
 
-  const STORAGE_KEY = "gb_src";   // zuletzt editierte Quelle (bleibt erhalten)
-  const RUN_FLAG = "gb_run";      // Einmal-Flag: nach Reload genau einen Lauf
+  const STORAGE_KEY = "dh_src";   // zuletzt editierte Quelle (bleibt erhalten)
+  const RUN_FLAG = "dh_run";      // Einmal-Flag: nach Reload genau einen Lauf
   const DEFAULT_SRC = [
     "' Willkommen im Drachenhauch-Web-Playground!",
     "' Tippe Code und klicke Ausfuehren -- dhrt kompiliert im Browser.",

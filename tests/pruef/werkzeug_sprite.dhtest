@@ -1,7 +1,7 @@
 ' Der Sprite-Pilot (examples/189_sprite_editor.dh), bedient wie von Hand -- ohne
 ' Python (Stufe 43, bis dahin tests/test_pilot_sprite_auswahl.py): Auswahl
 ' (Lasso, Zauberstab, Verschieben), GIMP-Paletten, Kachel-Ansicht, Statistik,
-' Zuschneiden/Groesse, Animationsbereiche, GB-Code, dhanim, benannte Einzelbilder,
+' Zuschneiden/Groesse, Animationsbereiche, DH-Code, dhanim, benannte Einzelbilder,
 ' Spiegeln/Drehen, Dauer je Einzelbild.
 '
 ' Die fremden Leser sind ersetzt: Pillow (GIF-Zeiten) durch die Bytes der Datei,
@@ -4580,7 +4580,7 @@ SUB prFall()
     t = 1 + prStrich(1, 10, 6, 18) + 2
     prKnopf(t, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
     prKnopf(t + 6, GUI_GET_X(bAnimNeu), GUI_GET_Y(bAnimNeu), 128)
-    prKnopf(t + 12, GUI_GET_X(bGbCode), GUI_GET_Y(bGbCode), 128)
+    prKnopf(t + 12, GUI_GET_X(bDhCode), GUI_GET_Y(bDhCode), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -4590,7 +4590,7 @@ END SUB
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "sprite.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "sprite.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -4798,7 +4798,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     prKnopf(2, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
-    prKnopf(10, GUI_GET_X(bGbCode), GUI_GET_Y(bGbCode), 128)
+    prKnopf(10, GUI_GET_X(bDhCode), GUI_GET_Y(bDhCode), 128)
     prAbspielen()
 END SUB
 SUB prProbe(k AS INTEGER)
@@ -4808,7 +4808,7 @@ END SUB
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "sprite.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "sprite.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -5016,7 +5016,7 @@ SUB prFall()
     DIM t AS INTEGER
     prKnopf(2, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
     prKnopf(8, GUI_GET_X(bAnimNeu), GUI_GET_Y(bAnimNeu), 128)
-    prKnopf(14, GUI_GET_X(bGbCode), GUI_GET_Y(bGbCode), 128)
+    prKnopf(14, GUI_GET_X(bDhCode), GUI_GET_Y(bDhCode), 128)
     prKnopf(20, GUI_GET_X(bDhanim), GUI_GET_Y(bDhanim), 128)
     prAbspielen()
 END SUB
@@ -5027,7 +5027,7 @@ END SUB
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "sprite.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "sprite.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_SAVE_DIALOG("Zustandsmaschine sichern", "sprite.dhanim", "dhanim")
@@ -5248,7 +5248,7 @@ END FUNCTION
 SUB prFall()
     DIM t AS INTEGER
     prKnopf(2, GUI_GET_X(bBildKopie), GUI_GET_Y(bBildKopie), 128)
-    prKnopf(8, GUI_GET_X(bGbCode), GUI_GET_Y(bGbCode), 128)
+    prKnopf(8, GUI_GET_X(bDhCode), GUI_GET_Y(bDhCode), 128)
     prKnopf(14, GUI_GET_X(bDhanim), GUI_GET_Y(bDhanim), 128)
     prAbspielen()
 END SUB
@@ -5259,7 +5259,7 @@ END SUB
 --- ersetzen SET_FULLSCREEN(TRUE)
 SET_WINDOW_POS(-3000, -3000)
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "sprite.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "sprite.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_SAVE_DIALOG("Zustandsmaschine sichern", "sprite.dhanim", "dhanim")

@@ -870,9 +870,9 @@ DIM prBild AS INTEGER : prBild = 0
 --- einschub nach FLIP()
 prBild = prBild + 1
 IF prBild = 3 THEN GUI_SET_VALUE(regler[P_PAN], -0.5)
-IF prBild = 4 THEN WRITEALL("links.dh", gbCode$())
+IF prBild = 4 THEN WRITEALL("links.dh", dhCode$())
 IF prBild = 5 THEN GUI_SET_VALUE(regler[P_PAN], 0.0)
-IF prBild = 6 THEN WRITEALL("mitte.dh", gbCode$())
+IF prBild = 6 THEN WRITEALL("mitte.dh", dhCode$())
 
 --- umgebung
 DHRT_FRAMES=8

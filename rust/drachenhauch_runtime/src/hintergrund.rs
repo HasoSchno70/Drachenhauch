@@ -5,11 +5,11 @@
 //! einmal allgemein, damit die naechste blockierende Sache es nicht ein
 //! drittes Mal nachbaut.
 //!
-//! **Was hier NICHT laeuft: GB-Code.** Ein Auftrag ist eine Rust-Funktion, die
+//! **Was hier NICHT laeuft: DH-Code.** Ein Auftrag ist eine Rust-Funktion, die
 //! ohne VM auskommt (eine SQL-Abfrage, ein Kindprozess). Der Grund steht in
 //! `docs/allzweck-roadmap.md` unter WP H: `Value` haelt seine Zeichenketten,
 //! Felder und Objekte in `Rc`, und ein `Rc` darf den Thread nicht wechseln.
-//! Eine GB-Funktion im Hintergrund auszufuehren hiesse also, `Value` (und
+//! Eine DH-Funktion im Hintergrund auszufuehren hiesse also, `Value` (und
 //! damit auch `Func`/`Program`) auf `Arc` umzustellen -- was JEDEM
 //! einthreadigen Programm Kosten aufbuerdet, um einem seltenen Fall zu
 //! helfen. Diese Entscheidung gehoert nicht nebenbei getroffen.
@@ -128,7 +128,7 @@ pub struct TaskErgebnis {
     pub ausgabe: String,
 }
 
-/// Eine GB-Funktion in einem EIGENEN dhrt-Prozess ausfuehren.
+/// Eine DH-Funktion in einem EIGENEN dhrt-Prozess ausfuehren.
 ///
 /// Warum ein Prozess und kein Thread: `Value` haelt ueberall `Rc`, `Program`
 /// ist damit weder `Send` noch `Sync` und laesst sich nicht ueber eine

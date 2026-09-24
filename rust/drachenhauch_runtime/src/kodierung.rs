@@ -35,7 +35,7 @@ pub enum Kodierung {
 /// Stelle, statt in jedem Builtin neu aufgezaehlt.
 pub const NAMEN: &str = "utf8, cp1252 (= ansi, windows-1252), latin1 (= iso-8859-1)";
 
-/// Namen aus dem GB-Programm auf die Kodierung abbilden.
+/// Namen aus dem DH-Programm auf die Kodierung abbilden.
 ///
 /// Gross-/Kleinschreibung und Bindestriche sind egal (`UTF-8`, `utf8`,
 /// `Windows-1252` -- alles derselbe Name); wer eine Kodierung angibt, hat sie

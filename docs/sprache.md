@@ -812,7 +812,7 @@ FUNCTION fib(n AS INTEGER) AS INTEGER
 END FUNCTION
 ```
 
-**Wie tief?** Bis **1000** verschachtelte Aufrufe. Jeder GB-Aufruf belegt einen
+**Wie tief?** Bis **1000** verschachtelte Aufrufe. Jeder DH-Aufruf belegt einen
 Rahmen auf dem nativen Stack (~6,6 KB), und die Grenze richtet sich nach der
 knappsten Plattform (Linux gibt dem Hauptthread 8 MB, wohin kein Linker-Flag
 reicht) -- damit ein Programm sich ueberall gleich verhaelt statt auf einem

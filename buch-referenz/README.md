@@ -16,7 +16,7 @@ grauen Kasten mit blauer Leiste), Programm-Ausgabe im grünen Kasten.
 - Inhalt liegt modular in `buch/content/NN_*.js` – neues Kapitel = neue Datei.
 
 Das Buch schließt mit **Teil VI — Eine Demo bauen**: zwei Kapitel, die die
-mitgelieferte Demo (`gbdemo/`) auseinandernehmen — wie Bild und Musik über
+mitgelieferte Demo (`dhdemo/`) auseinandernehmen — wie Bild und Musik über
 `AUDIO_MUSIC_POSITION` und `AUDIO_FFT` zusammenhängen, und was in jeder der
 acht Szenen steckt (samt der Stolpersteine, über die beim Bauen tatsächlich
 jemand gefallen ist).

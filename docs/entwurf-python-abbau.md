@@ -6,7 +6,7 @@
 > Tracker, und eine Reihenfolge fürs Löschen mit vier offenen Entscheidungen.
 > **Abgearbeitet ist daraus, was keine Entscheidung braucht:** der
 > Tracker-Datenverlust, die toten Starter samt `openpyxl`, der Pan-Regler im
-> GB-Code des SFX-Generators und der Umzug der drei `builtin_*.json` nach
+> DH-Code des SFX-Generators und der Umzug der drei `builtin_*.json` nach
 > `daten/` (7.2). Von den vier Entscheidungen am Ende von 7.7 sind zwei
 > gefallen (18.09.): alte Qt-`.dhsprite` müssen nicht mehr aufgehen (d),
 > und die zwei Bauskripte bleiben Python, nur mit der Standardbibliothek
@@ -352,7 +352,7 @@ nicht.
 
 | Editor | Dateiformat Qt ↔ Drachenhauch | größte Lücken der Drachenhauch-Fassung |
 |---|---|---|
-| SFX (183) | **verschieden**: Qt-Presets in `~/.drachenhauch/presets/sfx.json`, Drachenhauch in `.ini`-Dateien | Abtastrate beim WAV-Export; benannte Presets (~~der GB-Code übergeht den Pan-Regler~~ -- am 17.09. behoben, er liefert jetzt lauffähigen Code samt Pan) |
+| SFX (183) | **verschieden**: Qt-Presets in `~/.drachenhauch/presets/sfx.json`, Drachenhauch in `.ini`-Dateien | Abtastrate beim WAV-Export; benannte Presets (~~der DH-Code übergeht den Pan-Regler~~ -- am 17.09. behoben, er liefert jetzt lauffähigen Code samt Pan) |
 | Partikel (185) | **verschieden** (wie SFX) | Hintergrund der Vorschau; „in Drachenhauch testen", „als .dh speichern"; benannte Presets |
 | Tilemap (187) | Tiled-JSON, **aber** `CONST KACHEL = 16` ✔ -- eine Qt-Karte mit anderer Kachelgröße wird falsch zerlegt; höchstens 128×128 ✔ (Qt 1000) | Kachelgröße wählen, Karte vergrößern; Eigenschaften an Objekten; Rückgängig für Ebenen und Objekte; „Speichern unter" |
 | Sprite (189) | **unverträglich** ✔: Qt-`.dhsprite` ist JSON mit base64-Pixeln, Drachenhauch liest PNG + JSON (bewusst, siehe Kopfkommentar); einziger Weg ist der Atlas-Export, ohne Ebenen | Farbe ersetzen; Frame-Werkzeuge (umkehren, Ping-Pong, zusammenfügen, ziehen); Deckkraft, Namen und Reihenfolge der Ebenen (höchstens 8); Sheet-Import mit Gitter; ~~höchstens 16 Frames und 128 px~~ (seit 19.09. 64 Bilder und 256 px; die Qt-Fassung erlaubte 1024 px) |
@@ -452,7 +452,7 @@ sich nicht starten lassen).
 
 1. **Sofort, unabhängig von allem:** ~~den Tracker-Datenverlust beheben~~,
    ~~die toten Starter und `openpyxl` streichen~~, ~~den Pan-Regler in den
-   GB-Code des SFX-Generators~~ -- alles drei am 17.09. erledigt.
+   DH-Code des SFX-Generators~~ -- alles drei am 17.09. erledigt.
 2. **Umzüge, die Python nicht stören:** ~~die drei `builtin_*.json` aus
    `drachenhauch/` heraus~~ (am 17.09. nach `daten/`, siehe 7.2);
    ~~`dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`~~ (am 21.09.); ~~`test_midi_module` als

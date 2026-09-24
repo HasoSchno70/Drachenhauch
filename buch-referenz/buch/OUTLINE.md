@@ -235,7 +235,7 @@ gegen dhrt verifiziert. + Kap 69 db (SQLite: DB_OPEN ":memory:"/Datei, DB_EXEC m
 DB_LAST_ROWID, DB_QUERY/NEXT/GET_*/CLOSE_RESULT, DB_IS_NULL [NIL ist KEIN Literal → NULL per
 weggelassener Spalte], DB_COL_COUNT/NAME, Transaktionen BEGIN/COMMIT/ROLLBACK) — Konsole, verifiziert.
 + Kap 70 regex (REGEX_MATCH/TEST/FIND/FIND_ALL [Capture-Gruppe extrahiert], REPLACE/REPLACE_ONCE
-[\\1 im Ersatz ok], SPLIT; Backslash in GB-Strings NICHT escapen; **WARN: Rust-Regex = keine
+[\\1 im Ersatz ok], SPLIT; Backslash in DH-Strings NICHT escapen; **WARN: Rust-Regex = keine
 Lookarounds/Backrefs IM Muster**) — Konsole, verifiziert. + Kap 71 audio erweitert (Kanäle
 AUDIO_PLAY/STOP/PAUSE/RESUME/IS_PLAYING/SET_VOLUME/GET_VOLUME/PITCH, Panorama PAN_POS/PAN_SLIDE/
 AUTOPAN, AUDIO_SFX [wellenform$ = STRING!]/LOFI, Samples SAMPLE_LOAD/PLAY/SET_LOOP/LEN, Musik

@@ -8,7 +8,7 @@
 '            END ENUM
 '
 ' Member ohne expliziten Wert werden auto-nummeriert. Member-Namen duerfen
-' GB-Keywords sein (READ, FILE etc.) - der qualifizierte Zugriff
+' DH-Keywords sein (READ, FILE etc.) - der qualifizierte Zugriff
 ' (`Name.Member`) ist eindeutig.
 
 ' --- Compact-Form ---------------------------------------------------

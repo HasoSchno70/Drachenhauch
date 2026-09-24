@@ -240,7 +240,7 @@ impl Program {
     /// Funktion per Name (LOAD_FUNCREF/CALL_VALUE/Callbacks -- kalte Pfade).
     ///
     /// **Schreibungs-unabhaengig**, und das ist kein Komfort, sondern noetig:
-    /// der Compiler legt jeden Funktionsnamen klein ab, GB-Bezeichner sind
+    /// der Compiler legt jeden Funktionsnamen klein ab, DH-Bezeichner sind
     /// ueberall sonst schreibungs-unabhaengig -- aber Namen, die NICHT aus
     /// dem Compiler kommen, tragen ihre Original-Schreibweise. Das sind die
     /// GUI-Callbacks aus einer `.dhform`-Datei (`GUI_LOAD`/`GUI_FROM_JSON`):

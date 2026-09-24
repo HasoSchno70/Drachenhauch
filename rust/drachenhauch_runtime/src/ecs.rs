@@ -1,7 +1,7 @@
 //! Entity-Component-System fuer das `ecs`-Modul. Sparse-Set pro Component,
 //! Query = Intersection. Queries liefern aufsteigend sortierte Entity-IDs --
 //! dokumentiertes Verhalten (stammt aus der frueheren Python-Implementierung,
-//! GB-Programme duerfen sich darauf verlassen).
+//! DH-Programme duerfen sich darauf verlassen).
 
 use std::collections::{HashMap, HashSet};
 

@@ -113,7 +113,7 @@ WEND
 
 ## Externer Typ
 
-Das Modul registriert keinen GB-sichtbaren Handle-Typ — der Stack lebt im Modul-State. Ein Test sollte `SCENE_RESET()` vor jedem Test-Run aufrufen.
+Das Modul registriert keinen DH-sichtbaren Handle-Typ — der Stack lebt im Modul-State. Ein Test sollte `SCENE_RESET()` vor jedem Test-Run aufrufen.
 
 ## Siehe auch
 

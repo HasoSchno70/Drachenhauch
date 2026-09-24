@@ -29,7 +29,7 @@ ang = PHYS2D_BODY_ANGLE(world, box)       ' Radiant -> Sprite rotieren
 
 ## Konventionen
 
-- **Bildschirm-Koordinaten:** Y wächst nach **unten** (wie bei allen GB-Draw-
+- **Bildschirm-Koordinaten:** Y wächst nach **unten** (wie bei allen DH-Draw-
   Befehlen). Die Default-Schwerkraft zieht daher nach unten (positives Y).
 - **Pixel-Maßstab:** intern ist `length_unit = 100` gesetzt (1 „Meter" = 100 px),
   damit pixel-große Welten stabil bleiben. Die Default-Schwerkraft ist

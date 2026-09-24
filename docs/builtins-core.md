@@ -761,7 +761,7 @@ verdoppelt. Beim Schreiben setzt Drachenhauch Anführungszeichen **nur, wo sie
 nötig sind** — unnötige machen die Datei unleserlich und den Diff größer.
 
 **Ungleich lange Zeilen** werden auf die *breiteste* aufgefüllt (mit
-Leerstrings), weil ein GB-Array rechteckig sein muss. Abschneiden würde Daten
+Leerstrings), weil ein DH-Array rechteckig sein muss. Abschneiden würde Daten
 wegwerfen, ohne es zu sagen.
 
 **Kaputte Dateien** brechen den Import nicht ab: eine fehlende

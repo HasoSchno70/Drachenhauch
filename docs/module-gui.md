@@ -285,7 +285,7 @@ Ein **Textbereich** rollt seit 2026-09-18 drei Zeilen je Schritt (vorher gar
 nicht); die Marke holt den Ausschnitt nicht zurück, solange sie und der Text
 sich nicht ändern -- eine Taste, die sie bewegt, zieht ihn wieder zu ihr.
 
-**Untermenüs** entstehen mit `GUI_SUBMENU` und bekommen ihre Einträge wie jedes Menü; sie öffnen beim Überfahren und bleiben offen, solange man schräg hinüberfährt (erst ein anderer Eintrag derselben Ebene schließt sie). In der `.dhform` liegen sie **verschachtelt** am Eintrag (`items`), Kürzel als `shortcut`, Häkchen als `checkable`/`checked`. Sinnbilder sind Textur-Handles und werden wie bei `GUI_IMAGE` nicht gespeichert. Der Form-Designer bearbeitet Menüs nicht, reicht sie aber unverändert durch und schreibt sie in den GB-Code.
+**Untermenüs** entstehen mit `GUI_SUBMENU` und bekommen ihre Einträge wie jedes Menü; sie öffnen beim Überfahren und bleiben offen, solange man schräg hinüberfährt (erst ein anderer Eintrag derselben Ebene schließt sie). In der `.dhform` liegen sie **verschachtelt** am Eintrag (`items`), Kürzel als `shortcut`, Häkchen als `checkable`/`checked`. Sinnbilder sind Textur-Handles und werden wie bei `GUI_IMAGE` nicht gespeichert. Der Form-Designer bearbeitet Menüs nicht, reicht sie aber unverändert durch und schreibt sie in den DH-Code.
 
 ### Reiter (Tabs) + Tastatur-Navigation
 
