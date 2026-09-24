@@ -156,6 +156,18 @@ pub fn definitionen(quelle: &str) -> Vec<Definition> {
         for m in &muster {
             if let Some(c) = m.re.captures(&sauber) {
                 let g = c.get(1).unwrap();
+                if m.art == "dim" {
+                    // `DIM a, i AS INTEGER, s AS STRING = "x"` legt ALLE Namen an,
+                    // nicht nur den ersten -- sonst fanden Springen und
+                    // Umbenennen `i` und `s` nicht.
+                    for (name, a, e) in dim_namen(&sauber, g.start()) {
+                        out.push(Definition {
+                            name, art: "dim", zeile: ln,
+                            spalte: spalte(&sauber, a), spalte_ende: spalte(&sauber, e),
+                        });
+                    }
+                    break;
+                }
                 out.push(Definition {
                     name: g.as_str().to_string(), art: m.art, zeile: ln,
                     spalte: spalte(&sauber, g.start()), spalte_ende: spalte(&sauber, g.end()),
@@ -185,6 +197,38 @@ pub fn definitionen(quelle: &str) -> Vec<Definition> {
                 }
             }
         }
+    }
+    out
+}
+
+/// Die Namen einer DIM-Zeile ab Byte `ab` (dem ersten Namen): jedes
+/// Komma auf oberster Klammerebene beginnt einen neuen Namen. Was hinter `AS`
+/// oder `=` steht, ist Typ bzw. Startwert und wird uebersprungen, bis das
+/// naechste Komma kommt. Liefert (Name, Anfangsbyte, Endbyte).
+fn dim_namen(zeile: &str, ab: usize) -> Vec<(String, usize, usize)> {
+    let b = zeile.as_bytes();
+    let mut out = Vec::new();
+    let mut i = ab;
+    let mut tiefe = 0i32;
+    let mut erwarte_name = true;
+    while i < b.len() {
+        let c = b[i];
+        if erwarte_name && tiefe == 0 && (c.is_ascii_alphabetic() || c == b'_') {
+            let a = i;
+            while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') { i += 1; }
+            out.push((zeile[a..i].to_string(), a, i));
+            erwarte_name = false;
+            continue;
+        }
+        match c {
+            b'(' | b'[' => tiefe += 1,
+            b')' | b']' => tiefe -= 1,
+            // Doppelpunkt = naechste Anweisung (`DIM a AS INTEGER : PRINT x, y`).
+            b':' if tiefe == 0 => break,
+            b',' if tiefe == 0 => erwarte_name = true,
+            _ => {}
+        }
+        i += 1;
     }
     out
 }
@@ -391,6 +435,14 @@ mod tests {
         // Marke direkt hinter dem `$`.
         assert_eq!(wort_bei("x$ = \"hi\"", 0, 2), ("x".into(), 0, 2));
         assert_eq!(wort_bei("x$ = \"hi\"", 0, 1).0, "x");
+    }
+
+    #[test]
+    fn dim_zeile_legt_alle_namen_an() {
+        let d = definitionen("DIM a, i AS INTEGER, s AS STRING = LEFT$(\"x, y\", 1), feld[2, 3] AS FLOAT : PRINT q, r\n");
+        let namen: Vec<(&str, usize)> = d.iter().map(|x| (x.name.as_str(), x.spalte)).collect();
+        assert_eq!(namen, [("a", 5), ("i", 8), ("s", 22), ("feld", 54)]);
+        assert!(d.iter().all(|x| x.art == "dim"));
     }
 
     #[test]

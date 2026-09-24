@@ -558,6 +558,32 @@ impl Parser {
     // ------------------------------------------------------ DIM/CONST/ENUM
     fn dim(&mut self) -> R<Node> {
         self.expect(Tt::Dim, "")?;
+        // Eine DIM-Zeile besteht aus GRUPPEN, getrennt durch Kommas:
+        //   DIM a, i, z AS INTEGER            -- ein Typ fuer alle Namen davor
+        //   DIM a AS INTEGER, s AS STRING     -- je Gruppe ein eigener Typ
+        //   DIM x, y AS FLOAT, n AS STRING = "Ada"
+        // Anders als in VB6 (dort waeren a und i ein Variant) gilt der Typ fuer
+        // ALLE Namen seiner Gruppe -- eine Variable ohne Typ gibt es hier nicht.
+        let mut knoten: Vec<Node> = Vec::new();
+        loop {
+            let (decls, type_name, startwert) = self.dim_gruppe()?;
+            if startwert.is_some() && decls.len() > 1 {
+                return self.err("Ein Startwert gilt fuer genau eine Variable -- DIM a AS INTEGER = 1, b AS INTEGER = 2");
+            }
+            for (name, d) in decls {
+                knoten.push(Node::Dim { name: name.clone(), type_name: type_name.clone(), array_dims: d });
+                if let Some(v) = &startwert {
+                    knoten.push(Node::Assign { name, value: Box::new(v.clone()) });
+                }
+            }
+            if !self.matches(Tt::Comma) { break; }
+        }
+        self.consume_terminator()?;
+        if knoten.len() == 1 { Ok(knoten.pop().unwrap()) } else { Ok(Node::MultiDim { dims: knoten }) }
+    }
+
+    /// Eine Gruppe einer DIM-Zeile: `name[, name ...] AS Typ [= Startwert]`.
+    fn dim_gruppe(&mut self) -> R<(Vec<(String, Option<Vec<Node>>)>, String, Option<Node>)> {
         let mut decls: Vec<(String, Option<Vec<Node>>)> = Vec::new();
         loop {
             // Hilfreichere Meldung, wenn ein reserviertes Wort als Name kommt
@@ -608,26 +634,8 @@ impl Parser {
         // `DIM x AS INTEGER = 5` -- Anlegen und erster Wert in einer Zeile.
         // Wird zu DIM + Zuweisung; der Wert laeuft also durch dieselbe
         // Typpruefung wie jede andere Zuweisung.
-        let startwert = if self.matches(Tt::Eq) {
-            if decls.len() > 1 {
-                return self.err("Ein Startwert gilt fuer genau eine Variable -- DIM a AS INTEGER = 1 je Zeile");
-            }
-            Some(self.expression()?)
-        } else { None };
-        self.consume_terminator()?;
-        if decls.len() == 1 {
-            let (name, dims) = decls.pop().unwrap();
-            let dim = Node::Dim { name: name.clone(), type_name, array_dims: dims };
-            match startwert {
-                None => Ok(dim),
-                Some(v) => Ok(Node::MultiDim { dims: vec![dim, Node::Assign { name, value: Box::new(v) }] }),
-            }
-        } else {
-            let dims: Vec<Node> = decls.into_iter()
-                .map(|(name, d)| Node::Dim { name, type_name: type_name.clone(), array_dims: d })
-                .collect();
-            Ok(Node::MultiDim { dims })
-        }
+        let startwert = if self.matches(Tt::Eq) { Some(self.expression()?) } else { None };
+        Ok((decls, type_name, startwert))
     }
 
     /// DIM als FELD einer CLASS/STRUCT: dort gibt es keinen Startwert (der

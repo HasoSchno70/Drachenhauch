@@ -35,6 +35,44 @@ DIM a, b AS INTEGER = 3
 --- fehler
 Ein Startwert gilt fuer genau eine Variable
 
+=== mehrere namen mit einem typ sind alle von diesem typ
+' Anders als in VB6, wo `Dim a, i As Integer` nur i zur Ganzzahl macht.
+DIM a, i, z AS INTEGER
+PRINT TYPEOF(a); " "; TYPEOF(i); " "; TYPEOF(z); " "; a + i + z
+--- erwartet
+INTEGER INTEGER INTEGER 0
+
+=== verschiedene typen in einer dim-zeile
+DIM b AS INTEGER, s AS STRING
+DIM x, y AS FLOAT, name AS STRING = "Ada", n AS INTEGER = 3
+DIM feld[3] AS INTEGER, tab[2, 2] AS STRING
+PRINT TYPEOF(b); " "; TYPEOF(s); " "; TYPEOF(x); " "; TYPEOF(y)
+PRINT name; " "; n; " "; LEN(feld); " "; TYPEOF(tab[1, 1])
+SUB innen()
+    DIM p, q AS STRING, r AS BOOLEAN = TRUE
+    PRINT "["; p; q; "] "; r
+END SUB
+innen()
+--- erwartet
+INTEGER STRING FLOAT FLOAT
+Ada 3 3 STRING
+[] TRUE
+
+=== ein startwert in einer spaeteren gruppe gilt auch nur fuer eine
+DIM n AS INTEGER, a, b AS STRING = "x"
+--- fehler
+Ein Startwert gilt fuer genau eine Variable
+
+=== der startwert jeder gruppe laeuft durch die typpruefung
+DIM s AS STRING = "a", i AS INTEGER = "fuenf"
+--- fehler
+Erwartet INTEGER, erhalten STRING
+
+=== eine gruppe ohne typ sagt wie es heisst
+DIM n AS INTEGER, rest
+--- fehler
+jede Variable braucht einen Typ
+
 === ein feld bekommt keinen startwert in der dim-zeile
 CLASS K
     DIM hp AS INTEGER = 100
