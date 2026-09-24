@@ -1302,6 +1302,22 @@ Nicht erfasst: Felder und Feldelemente. Tests
 `tests/pruef/zeichenketten_anhaengen.dhtest`, Doku
 `docs/entwurf-anwendungen-und-tempo.md` (1a).
 
+## Builtin-Aufruf mit Merkplatz (2026-09-24)
+
+CALL_BUILTIN reichte den Namen bei JEDEM Aufruf durch bis zu 27
+`try_*`-Familien, bevor die reinen Befehle in builtins.rs drankamen. Jetzt
+merkt sich jede Aufrufstelle in `Instr::familie` (Cell<u8>, 1-basiert) die
+Familie, die geantwortet hat, und fragt sie zuerst (`Vm::builtin_rufen` /
+`Vm::familie_rufen`, Reihenfolge = Nummern, `BUILTIN_FAMILIEN` = 28). `ABS`
+78 -> 39 ms je Million, `CHART_COUNT` 145 -> 39. **Regel fuer neue
+Familien:** eine Familie darf nur am NAMEN absagen. Sagt sie je nach
+ARGUMENT oder ZUSTAND ab, obwohl eine spaetere denselben Namen kennt, muss
+der Name in `builtin_rufen` vom Merken ausgenommen werden -- wie `SORT`
+(FUNCREF -> `try_array_hof`, Wahrheitswert -> reiner Befehl). Neue Familie =
+neue Nummer in `familie_rufen` UND `BUILTIN_FAMILIEN` anpassen. Eine Nummer
+je Befehl lohnt nicht: gemessen kostet Arm 494 des grossen `match` so viel wie
+Arm 10. Tests `tests/pruef/builtin_familien.dhtest`.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

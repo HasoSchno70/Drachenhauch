@@ -80,14 +80,29 @@ zuletzt der große `match` in `builtins.rs`), und jede vergleicht
 Zeichenketten. Bei knapp 2000 Builtins kostet schon `ABS` so viel wie ein
 eigener Funktionsaufruf, und `MAPGET` das Doppelte.
 
-**Vorschlag:** beim Laden (`model::specialize_args`, dort wird schon der
-Index eigener Funktionen aufgelöst) je Aufrufstelle eine Builtin-Nummer
-vergeben und über eine Sprungtabelle (`fn`-Zeiger je Nummer) aufrufen.
-Zwischenschritt mit wenig Risiko: je Aufrufstelle merken, welche
-`try_*`-Familie zuletzt geantwortet hat, und dort zuerst fragen. **Vorsicht:**
-einige Familien antworten je nach ARGUMENT und nicht nur je Namen (z. B.
-Feld-Befehle mit FUNCREF); die brauchen einen Rückfall auf die volle Kette.
-Prüfstein: `ABS` in der Schleife unter 15 ns.
+**Erledigt (2026-09-24), mit dem Zwischenschritt.** Jede CALL_BUILTIN-Stelle
+merkt sich in `Instr::familie`, welche Familie beim ersten Mal geantwortet
+hat, und fragt beim nächsten Mal dort zuerst (`Vm::builtin_rufen`,
+`Vm::familie_rufen`); sagt sie ab, läuft die ganze Kette wie bisher. Das
+ist richtig, weil jede Familie am NAMEN entscheidet — geprüft an allen 27:
+die einzige Ausnahme ist `SORT` (mit FUNCREF `try_array_hof`, mit
+Wahrheitswert der reine Befehl), und `SORT` merkt sich nichts.
+
+| je 1 Mio. Aufrufe | 2026.15 | jetzt |
+|---|---|---|
+| `ABS(i)` | 78 ms | 39 ms |
+| `CHART_COUNT(c)` (Arm 494 im großen `match`) | 145 ms | 39 ms |
+| `MAPGET(m, "a")` | 152 ms | 98 ms |
+| Map-Test (`MAPPUT`/`MAPGET` mit `STR$`) | 195 ms | 117 ms |
+
+**Die Nummer je Befehl lohnt sich danach nicht mehr:** mit dem Merkplatz
+kostet ein Befehl hinten im `match` der reinen Befehle (Arm 494 von ~700)
+genauso viel wie einer vorn — der Rust-Compiler verzweigt dort nicht linear.
+Teuer war allein die Kette der 27 Familien davor. Was bleibt (~24 ns je
+Aufruf gegen ~13 ns in CPython), ist Aufrufaufwand (`catch_unwind`,
+Argumentprüfung), kein Suchen mehr. Prüfstein:
+`tests/pruef/builtin_familien.dhtest` (Gegenprobe: ohne die
+`SORT`-Ausnahme fällt der erste Fall).
 
 ### 1c. Funktionsaufrufe
 
@@ -127,7 +142,8 @@ schreiben will, trotzdem vermisst:
 ## 3. Empfohlene Reihenfolge
 
 1. ~~Zeichenketten anhängen linear (1a)~~ — erledigt 2026-09-24.
-2. Builtin-Aufruf über eine Nummer (1b) — betrifft jedes Programm.
+2. ~~Builtin-Aufruf ohne Suche (1b)~~ — erledigt 2026-09-24 über den
+   Merkplatz je Aufrufstelle.
 3. Mehrere Variablen in einem `DIM`, englische Fehlermeldungen.
 4. Schlanker Export, Tray/Benachrichtigung.
 5. Aufrufe ohne Zwischen-`Vec` (1c), danach bei Bedarf ein Frame-Stapel.

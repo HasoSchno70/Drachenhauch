@@ -1,0 +1,87 @@
+' Befehlsfamilien merken (2026-09-24): jede CALL_BUILTIN-Stelle merkt sich,
+' welche Familie (`try_db`, `try_gui`, ..., die reinen in builtins.rs) beim
+' ersten Mal geantwortet hat, und fragt beim naechsten Mal dort zuerst
+' (`Vm::builtin_rufen`). Vorher wurde der Name bei jedem Aufruf durch bis zu
+' 28 Familien gereicht. Die Faelle pruefen, dass sich dadurch nichts aendert.
+' Format: docs/werkzeuge.md.
+
+=== sort an derselben stelle erst mit schalter dann mit funcref
+' Die eine Ausnahme: SORT(a, x) ist mit einer FUNCREF die Sortierung mit
+' Vergleich (try_array_hof), mit einem Wahrheitswert die reine. Merkte sich
+' die Stelle die Familie, liefe der zweite Aufruf in die falsche.
+FUNCTION rueckwaerts(x AS INTEGER, y AS INTEGER) AS INTEGER
+    RETURN y - x
+END FUNCTION
+DIM w AS TUPLE
+w = (FALSE, rueckwaerts, TRUE, rueckwaerts)
+FOR EACH wie IN w
+    DIM a AS ARRAY OF INTEGER
+    a = [3, 1, 2]
+    SORT(a, wie)
+    PRINT a[0]; a[1]; a[2]
+NEXT
+--- erwartet
+123
+321
+321
+321
+
+=== dieselbe stelle trifft viele male dieselbe familie
+IMPORT "json"
+DIM i AS INTEGER
+DIM summe AS INTEGER
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{" + CHR$(34) + "n" + CHR$(34) + ": 5}")
+FOR i = 1 TO 1000
+    summe = summe + ABS(-1) + JSON_GET_INT(h, "n") + LEN(STR$(i))
+NEXT
+PRINT summe
+--- erwartet
+8893
+
+=== ein unbekannter befehl bleibt ein fehler auch beim zweiten mal
+DIM i AS INTEGER
+FOR i = 1 TO 2
+    TRY
+        PRINT GIBTSNICHT_XYZ(1)
+    CATCH e
+        PRINT "fehler "; i
+    END TRY
+NEXT
+--- erwartet
+fehler 1
+fehler 2
+
+=== ein fehler in der familie wird nicht gemerkt
+' Scheitert der erste Aufruf (falsches Argument), darf die Stelle danach
+' trotzdem richtig rechnen.
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    TRY
+        IF i = 1 THEN PRINT ABS("x") ELSE PRINT ABS(-i)
+    CATCH e
+        PRINT "fehler"
+    END TRY
+NEXT
+--- erwartet
+fehler
+2
+3
+
+=== ein befehl am ende der kette kostet nicht mehr als einer am anfang
+' Vorher: CHART_COUNT 145 ms je Million, ABS 78 ms. Jetzt beide ~40 ms.
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+DIM i AS INTEGER
+DIM z AS INTEGER
+DIM t AS INTEGER
+t = MILLIS()
+FOR i = 1 TO 1000000 : z = ABS(i) : NEXT
+DIM vorn AS INTEGER : vorn = MILLIS() - t
+t = MILLIS()
+FOR i = 1 TO 1000000 : z = CHART_COUNT(c) : NEXT
+DIM hinten AS INTEGER : hinten = MILLIS() - t
+PRINT hinten < vorn * 3 / 2 + 20
+--- erwartet
+TRUE
