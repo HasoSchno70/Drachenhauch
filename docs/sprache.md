@@ -59,6 +59,16 @@ DIM grid[10, 10], score, lives[3] AS INTEGER
 ```
 
 Alle Variablen einer Multi-DIM bekommen denselben Typ und ihren Typ-Default als Anfangswert.
+**Anders als in VB6**, wo `Dim a, b As Integer` nur `b` zur Ganzzahl macht:
+hier gilt der Typ für alle Namen davor — eine Variable ohne Typ gibt es nicht.
+
+Verschiedene Typen in einer Zeile trennt ein Komma nach dem Typ; jede Gruppe
+darf einen Startwert haben, wenn sie genau eine Variable anlegt:
+
+```basic
+DIM breite, hoehe AS INTEGER, titel AS STRING
+DIM x, y AS FLOAT, name AS STRING = "Ada", leben AS INTEGER = 3
+```
 
 Einen ersten Wert kann man gleich mitgeben — das ist dasselbe wie `DIM` und
 eine Zuweisung darunter, die Typprüfung gilt also genauso:

@@ -16,6 +16,8 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | Du schreibst | Das passiert |
 |---|---|
 | `DIM hp AS INTEGER = 100` | anlegen und ersten Wert setzen in einer Zeile |
+| `DIM a, i, z AS INTEGER` | alle drei sind INTEGER — anders als in VB6, wo nur `z` es wäre |
+| `DIM n AS INTEGER, s AS STRING` | verschiedene Typen in einer Zeile, auch mit Startwert je Variable |
 | `EXIT FOR`, `EXIT DO`, `EXIT WHILE` | verlässt die Schleife — aber nur, wenn es die **innerste** ist; sonst ein Fehler statt still die falsche |
 | `EXIT SUB` | verlässt das Unterprogramm (in einer FUNCTION: `RETURN wert`) |
 | `END` allein auf der Zeile | beendet das Programm, wie `EXIT(0)` |
