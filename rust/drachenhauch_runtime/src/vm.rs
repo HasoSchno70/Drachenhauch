@@ -901,6 +901,7 @@ impl<'p> Vm<'p> {
     /// Strukturen einen Platz haben, traefe sie sonst jedes Programm, dessen
     /// SUB ein Feld liest, bevor dessen DIM gelaufen ist; vorher hiess es dort
     /// klar "Variable 'feld' nicht deklariert".
+    #[inline(never)]
     fn global_ungesetzt(&self, idx: usize) -> String {
         match self.prog.global_names.get(idx).filter(|n| !n.is_empty()) {
             // Der Name HINTER dem alten Text: Aufrufer setzen ihr eigenes
@@ -1312,6 +1313,7 @@ impl<'p> Vm<'p> {
     }
 
     // ---------------------------------------------------------------- OOP
+    #[inline(never)]
     fn resolve_method(&self, class_name: &str, method: &str) -> Option<&'p Func> {
         // Methoden-Keys liegen lowercase vor (Compiler emittiert lowercase) --
         // nur im seltenen gemischten Fall allozieren.
@@ -1338,6 +1340,7 @@ impl<'p> Vm<'p> {
     /// Methode), `Some(None)` = PROPERTY ohne diesen Zugriff. Aus den beim
     /// Laden gerechneten Tabellen (`ClassInfo::prop_get/prop_set`) -- vorher
     /// je Zugriff die Kette abgesucht und `format!("__get_{}")` gebaut.
+    #[inline(never)]
     fn property_methode(&self, class_name: &str, name: &str, lesen: bool) -> Option<Option<&'p Func>> {
         let ci = self.prog.classes.get(class_name)?;
         if !ci.props_kette { return None; }
@@ -1380,6 +1383,7 @@ impl<'p> Vm<'p> {
         }
     }
 
+    #[inline(never)]
     fn allocate_instance(&self, class_name: &str) -> Value {
         let mut fields: rustc_hash::FxHashMap<String, FieldVal> = rustc_hash::FxHashMap::default();
         // Kette parent-first sammeln.
@@ -1434,6 +1438,7 @@ impl<'p> Vm<'p> {
     /// in ADD_STORE_* abgegeben), wird an Ort und Stelle angehaengt. Vorher
     /// entstand bei jedem `+` eine neue Kopie, und `s = s + "x"` in einer
     /// Schleife war quadratisch (400 000 Mal: 7 s).
+    #[inline(never)]
     fn addieren(&mut self, a: Value, b: Value) -> R<Value> {
         // Numerischer Fast-Path zuerst: Int/Float-Paare sind der Normalfall
         // in heissen Schleifen -- Modul-/User-Operator-Checks kosten dort nur
@@ -1542,6 +1547,7 @@ impl<'p> Vm<'p> {
         }
     }
 
+    #[inline(never)]
     fn user_op(&mut self, method: &str, a: &Value, b: &Value, commutative: bool) -> R<Option<Value>> {
         if let Value::Instance(rc) = a {
             let cn = rc.borrow().class_name.clone();
@@ -1580,6 +1586,7 @@ impl<'p> Vm<'p> {
 
     /// Per-Zeile-Hook fuer den Debugger. take/restore von self.dbg vermeidet
     /// Borrow-Konflikte mit self.globals/out beim Snapshot/eval.
+    #[inline(never)]
     fn debug_on_line(&mut self, fn_: &Func, locals: &mut [Value]) -> R<()> {
         let mut dbg = match self.dbg.take() { Some(d) => d, None => return Ok(()) };
         let r = self.debug_cycle(&mut dbg, fn_, locals);
@@ -2233,19 +2240,6 @@ impl<'p> Vm<'p> {
                     let v = vm_pop(stack)?;
                     locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable");
                 }
-                op::DECLARE_LOCAL => {
-                    let l = arg.list();
-                    let slot = l[0].as_usize();
-                    let ty = l[1].str();
-                    if let Some(vt) = ty.strip_prefix("map:") {
-                        if !matches!(locals[slot], Value::Map(_)) {
-                            locals[slot] = Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))));
-                        }
-                    } else if matches!(locals[slot], Value::Nil) {
-                        locals[slot] = if ty.starts_with("array:") { leeres_feld(ty) } else { arg_value(&l[2]) };
-                    }
-                }
-
                 op::FOR_NEXT => {
                     // Fusioniertes FOR-Ende: var += step, Weiter-Test, Sprung
                     // zum Body. Arg: [var_global, var_idx, end_slot,
@@ -2330,110 +2324,6 @@ impl<'p> Vm<'p> {
                     let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global");
                     sb.value = neu;
                 }
-                op::DECLARE_GLOBAL_SLOT => {
-                    let l = arg.list();
-                    let slot_idx = l[0].as_usize();
-                    let name = constants[l[1].as_usize()].fmt();
-                    let ty = constants[l[2].as_usize()].fmt();
-                    let default = if let Some(vt) = ty.strip_prefix("map:") {
-                        Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))))
-                    } else {
-                        let d = constants[l[3].as_usize()].clone();
-                        // Der Compiler kann Mathe-Werte nicht als Konstante
-                        // ablegen (CVal kennt kein MAT4) und legt NIL hin. Hier
-                        // wird daraus das neutrale Element -- fuer alle anderen
-                        // Typen liefert element_default wieder NIL, es aendert
-                        // sich also nichts.
-                        if matches!(d, Value::Nil) { self.element_default(&ty) } else { d }
-                    };
-                    if self.global_slots[slot_idx].is_none() {
-                        let sl = Rc::new(RefCell::new(Slot { ty, value: default, is_const: false }));
-                        self.globals.insert(name, sl.clone());
-                        self.global_slots[slot_idx] = Some(sl);
-                    }
-                }
-                op::DECLARE_GLOBAL_CONST_SLOT => {
-                    let l = arg.list();
-                    let slot_idx = l[0].as_usize();
-                    let value = vm_pop(stack)?;
-                    // Review-Fund: der Compiler emittiert [slot, name_idx,
-                    // type_idx] (siehe stmt_const/emit_namespace_const) --
-                    // dieser Zweig las bisher l[1] (den NAME-Index) statt
-                    // l[2] (den TYPE-Index) als Typ-Konstante. `coerce(value,
-                    // "<name-der-const>", ...)` traf so gut wie nie einen der
-                    // bekannten Typnamen und lief in coerce()'s Catch-all
-                    // (unveraendert durchreichen) -- eine typisierte
-                    // `CONST X AS FLOAT = 1` wurde dadurch NIE tatsaechlich
-                    // nach FLOAT gecoerct.
-                    let ti = l[2].as_usize();
-                    let (ty, value) = if matches!(constants[ti], Value::Nil) {
-                        (infer_type(&value).to_string(), value)
-                    } else {
-                        let t = constants[ti].fmt();
-                        let v = coerce(value, &t, "CONST")?;
-                        (t, v)
-                    };
-                    if self.global_slots[slot_idx].is_none() {
-                        let sl = Rc::new(RefCell::new(Slot { ty, value, is_const: true }));
-                        self.global_slots[slot_idx] = Some(sl);
-                    }
-                }
-
-                // --- Name-Globals ---
-                op::LOAD_NAME => {
-                    let name = constants[arg.as_usize()].fmt();
-                    let s = self.globals.get(&name)
-                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?){}", name, crate::umstieg::name_hinweis(&name)))?;
-                    stack.push(s.borrow().value.clone());
-                }
-                op::STORE_NAME => {
-                    let name = constants[arg.as_usize()].fmt();
-                    let slot = self.globals.get(&name)
-                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?){}", name, crate::umstieg::name_hinweis(&name)))?.clone();
-                    if slot.borrow().is_const {
-                        return Err(format!("CONST '{}' kann nicht ueberschrieben werden", name));
-                    }
-                    let v = vm_pop(stack)?;
-                    let ty = slot.borrow().ty.clone();
-                    slot.borrow_mut().value = coerce(v, &ty, &format!("Zuweisung an '{}'", name))?;
-                }
-                op::DECLARE_NAME => {
-                    let l = arg.list();
-                    let name = constants[l[0].as_usize()].fmt();
-                    let ty = constants[l[1].as_usize()].fmt();
-                    let default = if let Some(vt) = ty.strip_prefix("map:") {
-                        Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))))
-                    } else if ty.starts_with("array:") {
-                        leeres_feld(&ty)
-                    } else {
-                        constants[l[2].as_usize()].clone()
-                    };
-                    self.globals.entry(name).or_insert_with(|| {
-                        Rc::new(RefCell::new(Slot { ty, value: default, is_const: false }))
-                    });
-                }
-                op::DECLARE_CONST => {
-                    let l = arg.list();
-                    let name = constants[l[0].as_usize()].fmt();
-                    let value = vm_pop(stack)?;
-                    // Review-Fund: `type_idx` ist IMMER ein gueltiger Konstanten-
-                    // Index (der Compiler backt auch den untypisierten Fall als
-                    // add_const(Null) ein) -- der Arg selbst ist also nie
-                    // Arg::None, dieser Zweig war faktisch tot. Die eigentliche
-                    // "untypisiert?"-Frage steckt im WERT der Konstante.
-                    let ti = l[1].as_usize();
-                    let (ty, value) = if matches!(constants[ti], Value::Nil) {
-                        (infer_type(&value).to_string(), value)
-                    } else {
-                        let t = constants[ti].fmt();
-                        let v = coerce(value, &t, "CONST")?;
-                        (t, v)
-                    };
-                    self.globals.entry(name).or_insert_with(|| {
-                        Rc::new(RefCell::new(Slot { ty, value, is_const: true }))
-                    });
-                }
-
                 // --- Arithmetik (generisch, mit User-Operator-Overloading) ---
                 op::ADD => {
                     let b = vm_pop(stack)?; let a = vm_pop(stack)?;
@@ -2537,7 +2427,6 @@ impl<'p> Vm<'p> {
                     } else if let Some(r) = self.user_op("__op_mod__", &a, &b, false)? { stack.push(r); }
                     else { stack.push(modulo(a, b)?); }
                 }
-                op::POW => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(pow(a, b)?); }
                 op::INT_DIV => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(int_div(a, b)?); }
                 op::NEG => { let v = vm_pop(stack)?; stack.push(neg(v)?); }
 
@@ -2581,77 +2470,6 @@ impl<'p> Vm<'p> {
                         _ => match self.user_op("__op_ge__", &a, &b, false)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'g')?)) }
                     } }
                 op::NOT => { let v = vm_pop(stack)?; stack.push(Value::Bool(!v.truthy())); }
-
-                // --- Bitwise ---
-                op::BAND => { let (x, y) = int_pair2(stack, "BAND")?; stack.push(Value::Int(x & y)); }
-                op::BOR => { let (x, y) = int_pair2(stack, "BOR")?; stack.push(Value::Int(x | y)); }
-                op::BXOR => { let (x, y) = int_pair2(stack, "BXOR")?; stack.push(Value::Int(x ^ y)); }
-                op::SHL => {
-                    let (x, y) = int_pair2(stack, "SHL")?;
-                    // Review-Fund: Rusts `<<` ist nur fuer 0..=63 definiert -- ohne
-                    // diese Grenze maskiert der Compiler die Schiebeweite still
-                    // (release, falsches Ergebnis) bzw. paniked (debug).
-                    if !(0..64).contains(&y) { return Err(format!("SHL: Schiebeweite muss 0..63 sein, erhalten {}", y)); }
-                    stack.push(Value::Int(x << y));
-                }
-                op::SHR => {
-                    let (x, y) = int_pair2(stack, "SHR")?;
-                    if !(0..64).contains(&y) { return Err(format!("SHR: Schiebeweite muss 0..63 sein, erhalten {}", y)); }
-                    stack.push(Value::Int(x >> y));
-                }
-                op::BNOT => { let v = vm_pop(stack)?; match v { Value::Int(i) => stack.push(Value::Int(!i)), _ => return Err("BNOT erwartet INTEGER".into()) } }
-
-
-                // --- Tupel ---
-                op::BUILD_TUPLE => {
-                    let len = arg.as_usize();
-                    if len == 0 { stack.push(Value::Tuple(Rc::new(vec![]))); }
-                    else {
-                        let split = stack.len() - len;
-                        let items = stack.split_off(split);
-                        stack.push(Value::Tuple(Rc::new(items)));
-                    }
-                }
-                op::BUILD_ARRAY => {
-                    let len = arg.as_usize();
-                    let split = stack.len() - len;
-                    let items = stack.split_off(split);
-                    stack.push(array_literal(items));
-                }
-                op::UNPACK_TUPLE => {
-                    let len = arg.as_usize();
-                    let t = vm_pop(stack)?;
-                    if let Value::Tuple(items) = t {
-                        if items.len() != len {
-                            return Err(format!("Tupel-Destructuring: {} Ziele, aber Tupel hat {} Element(e)", len, items.len()));
-                        }
-                        for v in items.iter().rev() { stack.push(v.clone()); }
-                    } else {
-                        return Err(format!("UNPACK_TUPLE: Erwartet TUPLE, erhalten {}", t.type_name()));
-                    }
-                }
-                op::BUILD_TUPLE_DYN => {
-                    let mut idx = stack.len();
-                    while idx > 0 && !matches!(stack[idx - 1], Value::CompMarker) { idx -= 1; }
-                    if idx == 0 { return Err("BUILD_TUPLE_DYN: kein COMP_MARKER".into()); }
-                    let items = stack.split_off(idx); // ab Element nach Marker
-                    stack.pop(); // Marker
-                    stack.push(Value::Tuple(Rc::new(items)));
-                }
-                op::IN_OP => {
-                    let hay = vm_pop(stack)?;
-                    let needle = vm_pop(stack)?;
-                    stack.push(Value::Bool(eval_in(&needle, &hay)?));
-                }
-                op::SLICE => {
-                    let l = arg.list();
-                    let has_lo = matches!(l[0], Arg::Val(Value::Bool(true)) | Arg::Int(1)) || arg_truthy(&l[0]);
-                    let has_hi = arg_truthy(&l[1]);
-                    let hi = if has_hi { Some(vm_pop(stack)?) } else { None };
-                    let lo = if has_lo { Some(vm_pop(stack)?) } else { None };
-                    let target = vm_pop(stack)?;
-                    stack.push(apply_slice(&target, lo.as_ref(), hi.as_ref())?);
-                }
 
                 // --- Kontrollfluss ---
                 op::JUMP => *ip = arg.as_usize(),
@@ -2711,61 +2529,6 @@ impl<'p> Vm<'p> {
                     };
                     stack.truncate(split);
                     stack.push(v);
-                }
-                op::LOAD_FUNCREF => {
-                    let name = constants[arg.as_usize()].fmt();
-                    if !self.prog.fn_index.contains_key(&name) {
-                        return Err(format!("FUNCREF: Funktion '{}' existiert nicht", name));
-                    }
-                    stack.push(Value::FuncRef(Rc::from(name.as_str())));
-                }
-                op::CALL_VALUE => {
-                    let (cname, argc, _) = call_parts(arg);
-                    let split = stack.len() - argc;
-                    let call_args = stack.split_off(split);
-                    let callee = vm_pop(stack)?;
-                    match callee {
-                        Value::FuncRef(name) => {
-                            let tgt = self.prog.func(name.as_ref())
-                                .ok_or_else(|| format!("FUNCREF: Funktion '{}' existiert nicht (mehr)", name))?;
-                            if tgt.is_coroutine {
-                                stack.push(make_coro(tgt, call_args, None));
-                            } else {
-                                let ret = self.exec(tgt, call_args, None)?;
-                                if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
-                            }
-                        }
-                        // Gebundene Methode (`f = spieler.tick`): dieselbe Ausfuehrung
-                        // wie CALL_METHOD, nur dass der Empfaenger aus dem Wert kommt
-                        // statt vom Stack. Die Methode wird ERST JETZT aufgeloest --
-                        // so trifft sie auch, wenn die Instanz inzwischen einer
-                        // abgeleiteten Klasse angehoert.
-                        Value::BoundMethod(b) => {
-                            let (recv, mname) = (&b.0, &b.1);
-                            let cn = match recv {
-                                Value::Instance(rc) => rc.borrow().class_name.clone(),
-                                other => return Err(format!(
-                                    "FUNCREF: '{}' ist an {} gebunden, nicht an ein Objekt",
-                                    mname, other.type_name())),
-                            };
-                            let tgt = self.resolve_method(&cn, mname).ok_or_else(||
-                                format!("FUNCREF: Methode '{}' existiert nicht (mehr) in {}", mname, cn))?;
-                            let recv = recv.clone();
-                            if tgt.is_coroutine {
-                                stack.push(make_coro(tgt, call_args, Some(recv)));
-                            } else {
-                                let ret = self.exec(tgt, call_args, Some(recv))?;
-                                if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
-                            }
-                        }
-                        other => return Err(format!(
-                            "'{}' ist eine Variable vom Typ {} und kann nicht wie eine Funktion \
-                             aufgerufen werden. Falls du den eingebauten Befehl '{}' meinst: \
-                             benenne die Variable um -- eine Variable mit festem Wert-Typ \
-                             (INTEGER, FLOAT, STRING ...) verdeckt einen Befehl nicht, eine \
-                             FUNCREF schon.",
-                            cname, other.type_name(), cname.to_uppercase())),
-                    }
                 }
                 op::CALL_METHOD => {
                     let (method, argc, _) = call_parts(arg);
@@ -2837,50 +2600,6 @@ impl<'p> Vm<'p> {
                     }
                 }
 
-                // `SUPER.Methode(...)` (WP G). Fast wie CALL_METHOD -- nur
-                // beginnt die Suche bei der im Bytecode stehenden Klasse
-                // (der Elternklasse der Aufrufstelle) statt bei der Klasse
-                // des Objekts. Sonst fande sie die ueberschreibende Methode
-                // wieder und riefe sich selbst, bis der Stapel voll ist.
-                op::CALL_SUPER => {
-                    let l = arg.list();
-                    let start_class = l[0].str();
-                    let method = l[1].str();
-                    let argc = l[2].as_usize();
-                    let split = stack.len() - argc;
-                    let margs = stack.split_off(split);
-                    let obj = vm_pop(stack)?;
-                    let m = self.resolve_method(start_class, method).ok_or_else(|| format!(
-                        "SUPER.{}: Methode existiert nicht in {}", method, start_class))?;
-                    if m.is_coroutine {
-                        stack.push(make_coro(m, margs, Some(obj)));
-                    } else {
-                        let ret = self.exec(m, margs, Some(obj))?;
-                        if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
-                    }
-                }
-
-                // --- OOP ---
-                op::NEW_INSTANCE => {
-                    let l = arg.list();
-                    let class_name = l[0].str();
-                    let argc = l[1].as_usize();
-                    let has_init_args = arg_truthy(&l[2]);
-                    if !self.prog.classes.contains_key(class_name) {
-                        return Err(format!("Klasse '{}' nicht gefunden", class_name));
-                    }
-                    let inst = self.allocate_instance(class_name);
-                    if has_init_args {
-                        let split = stack.len() - argc;
-                        let init_args = stack.split_off(split);
-                        if let Some(init) = self.resolve_method(class_name, "init") {
-                            self.exec(init, init_args, Some(inst.clone()))?;
-                        } else if !init_args.is_empty() {
-                            return Err(format!("Klasse {} hat keine SUB Init - Argumente bei NEW nicht moeglich", class_name));
-                        }
-                    }
-                    stack.push(inst);
-                }
                 op::LOAD_SELF => {
                     let s = self_obj.ok_or("LOAD_SELF (Self) ausserhalb Methodenkontext")?;
                     stack.push(s.clone());
@@ -3019,43 +2738,6 @@ impl<'p> Vm<'p> {
                         _ => return Err(format!("Zuweisung an '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
                     }
                 }
-                op::DECLARE_STRUCT_NAME => {
-                    let l = arg.list();
-                    let name = constants[l[0].as_usize()].fmt();
-                    let class_name = l[1].str();
-                    if !self.prog.classes.contains_key(class_name) {
-                        return Err(format!("STRUCT '{}' nicht gefunden", class_name));
-                    }
-                    if !self.globals.contains_key(&name) {
-                        let inst = self.allocate_instance(class_name);
-                        self.globals.insert(name, Rc::new(RefCell::new(Slot { ty: class_name.to_string(), value: inst, is_const: false })));
-                    }
-                }
-                op::BIND_GLOBAL_SLOT => {
-                    // Den eben unter dem Namen angelegten Eintrag (Feld, Map,
-                    // Struktur) auch in seinen Platz haengen -- dasselbe Rc,
-                    // also sehen Namens- und Platz-Zugriffe denselben Wert.
-                    // Nach jedem Anlegen neu: ein DIM in einer Schleife legt
-                    // unter dem Namen ein NEUES Feld an.
-                    let l = arg.list();
-                    let idx = l[0].as_usize();
-                    let name = constants[l[1].as_usize()].fmt();
-                    if let Some(s) = self.globals.get(&name) {
-                        self.global_slots[idx] = Some(s.clone());
-                    }
-                }
-                op::DECLARE_STRUCT_LOCAL => {
-                    let l = arg.list();
-                    let slot = l[0].as_usize();
-                    let class_name = l[1].str();
-                    if matches!(locals[slot], Value::Nil) {
-                        if !self.prog.classes.contains_key(class_name) {
-                            return Err(format!("STRUCT '{}' nicht gefunden", class_name));
-                        }
-                        locals[slot] = self.allocate_instance(class_name);
-                    }
-                }
-
                 // --- Arrays ---
                 op::LOAD_INDEX => {
                     let num_dims = arg.as_usize();
@@ -3121,6 +2803,367 @@ impl<'p> Vm<'p> {
                         store_index(&arr, &idx_vals, v)?;
                     }
                 }
+                // --- Rueckgabe ---
+                op::RETURN => {
+                    let v = vm_pop(stack)?;
+                    return Ok(Step::Return(coerce(v, &fn_.return_type, "RETURN")?));
+                }
+                op::RETURN_VOID => return Ok(Step::Return(Value::Nil)),
+                // Seltene Befehle stehen in `dispatch_selten` -- dort liegt ihr
+                // Stapelrahmen, und die heisse Schleife hier bleibt schlank.
+                _ => {
+                    if let Some(step) = self.dispatch_selten(instr, fn_, locals, stack, ip, try_handlers)? {
+                        return Ok(step);
+                    }
+                }
+            }
+        }
+        Ok(Step::Return(Value::Nil))
+    }
+
+    /// Die seltenen Befehle von `dispatch` (DECLARE, PRINT, INPUT, TRY, Tupel, NEW,
+    /// YIELD ...). Eigene Funktion, damit ihr Stapelrahmen nicht bei JEDEM Aufruf
+    /// einer Drachenhauch-Funktion mit angelegt wird: `dispatch` wird je Aufruf
+    /// neu betreten. `Some(step)` = `dispatch` kehrt damit zurueck.
+    #[inline(never)]
+    #[allow(clippy::too_many_arguments)]
+    fn dispatch_selten(
+        &mut self,
+        instr: &'p crate::model::Instr,
+        fn_: &'p Func,
+        locals: &mut Vec<Value>,
+        stack: &mut Vec<Value>,
+        ip: &mut usize,
+        try_handlers: &mut Vec<(usize, usize)>,
+    ) -> R<Option<Step>> {
+        let arg = &instr.arg;
+        let constants = &fn_.constants;
+        match instr.op {
+                op::DECLARE_LOCAL => {
+                    let l = arg.list();
+                    let slot = l[0].as_usize();
+                    let ty = l[1].str();
+                    if let Some(vt) = ty.strip_prefix("map:") {
+                        if !matches!(locals[slot], Value::Map(_)) {
+                            locals[slot] = Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))));
+                        }
+                    } else if matches!(locals[slot], Value::Nil) {
+                        locals[slot] = if ty.starts_with("array:") { leeres_feld(ty) } else { arg_value(&l[2]) };
+                    }
+                }
+
+                op::DECLARE_GLOBAL_SLOT => {
+                    let l = arg.list();
+                    let slot_idx = l[0].as_usize();
+                    let name = constants[l[1].as_usize()].fmt();
+                    let ty = constants[l[2].as_usize()].fmt();
+                    let default = if let Some(vt) = ty.strip_prefix("map:") {
+                        Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))))
+                    } else {
+                        let d = constants[l[3].as_usize()].clone();
+                        // Der Compiler kann Mathe-Werte nicht als Konstante
+                        // ablegen (CVal kennt kein MAT4) und legt NIL hin. Hier
+                        // wird daraus das neutrale Element -- fuer alle anderen
+                        // Typen liefert element_default wieder NIL, es aendert
+                        // sich also nichts.
+                        if matches!(d, Value::Nil) { self.element_default(&ty) } else { d }
+                    };
+                    if self.global_slots[slot_idx].is_none() {
+                        let sl = Rc::new(RefCell::new(Slot { ty, value: default, is_const: false }));
+                        self.globals.insert(name, sl.clone());
+                        self.global_slots[slot_idx] = Some(sl);
+                    }
+                }
+                op::DECLARE_GLOBAL_CONST_SLOT => {
+                    let l = arg.list();
+                    let slot_idx = l[0].as_usize();
+                    let value = vm_pop(stack)?;
+                    // Review-Fund: der Compiler emittiert [slot, name_idx,
+                    // type_idx] (siehe stmt_const/emit_namespace_const) --
+                    // dieser Zweig las bisher l[1] (den NAME-Index) statt
+                    // l[2] (den TYPE-Index) als Typ-Konstante. `coerce(value,
+                    // "<name-der-const>", ...)` traf so gut wie nie einen der
+                    // bekannten Typnamen und lief in coerce()'s Catch-all
+                    // (unveraendert durchreichen) -- eine typisierte
+                    // `CONST X AS FLOAT = 1` wurde dadurch NIE tatsaechlich
+                    // nach FLOAT gecoerct.
+                    let ti = l[2].as_usize();
+                    let (ty, value) = if matches!(constants[ti], Value::Nil) {
+                        (infer_type(&value).to_string(), value)
+                    } else {
+                        let t = constants[ti].fmt();
+                        let v = coerce(value, &t, "CONST")?;
+                        (t, v)
+                    };
+                    if self.global_slots[slot_idx].is_none() {
+                        let sl = Rc::new(RefCell::new(Slot { ty, value, is_const: true }));
+                        self.global_slots[slot_idx] = Some(sl);
+                    }
+                }
+
+                // --- Name-Globals ---
+                op::LOAD_NAME => {
+                    let name = constants[arg.as_usize()].fmt();
+                    let s = self.globals.get(&name)
+                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?){}", name, crate::umstieg::name_hinweis(&name)))?;
+                    stack.push(s.borrow().value.clone());
+                }
+                op::STORE_NAME => {
+                    let name = constants[arg.as_usize()].fmt();
+                    let slot = self.globals.get(&name)
+                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?){}", name, crate::umstieg::name_hinweis(&name)))?.clone();
+                    if slot.borrow().is_const {
+                        return Err(format!("CONST '{}' kann nicht ueberschrieben werden", name));
+                    }
+                    let v = vm_pop(stack)?;
+                    let ty = slot.borrow().ty.clone();
+                    slot.borrow_mut().value = coerce(v, &ty, &format!("Zuweisung an '{}'", name))?;
+                }
+                op::DECLARE_NAME => {
+                    let l = arg.list();
+                    let name = constants[l[0].as_usize()].fmt();
+                    let ty = constants[l[1].as_usize()].fmt();
+                    let default = if let Some(vt) = ty.strip_prefix("map:") {
+                        Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))))
+                    } else if ty.starts_with("array:") {
+                        leeres_feld(&ty)
+                    } else {
+                        constants[l[2].as_usize()].clone()
+                    };
+                    self.globals.entry(name).or_insert_with(|| {
+                        Rc::new(RefCell::new(Slot { ty, value: default, is_const: false }))
+                    });
+                }
+                op::DECLARE_CONST => {
+                    let l = arg.list();
+                    let name = constants[l[0].as_usize()].fmt();
+                    let value = vm_pop(stack)?;
+                    // Review-Fund: `type_idx` ist IMMER ein gueltiger Konstanten-
+                    // Index (der Compiler backt auch den untypisierten Fall als
+                    // add_const(Null) ein) -- der Arg selbst ist also nie
+                    // Arg::None, dieser Zweig war faktisch tot. Die eigentliche
+                    // "untypisiert?"-Frage steckt im WERT der Konstante.
+                    let ti = l[1].as_usize();
+                    let (ty, value) = if matches!(constants[ti], Value::Nil) {
+                        (infer_type(&value).to_string(), value)
+                    } else {
+                        let t = constants[ti].fmt();
+                        let v = coerce(value, &t, "CONST")?;
+                        (t, v)
+                    };
+                    self.globals.entry(name).or_insert_with(|| {
+                        Rc::new(RefCell::new(Slot { ty, value, is_const: true }))
+                    });
+                }
+
+                op::POW => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(pow(a, b)?); }
+                // --- Bitwise ---
+                op::BAND => { let (x, y) = int_pair2(stack, "BAND")?; stack.push(Value::Int(x & y)); }
+                op::BOR => { let (x, y) = int_pair2(stack, "BOR")?; stack.push(Value::Int(x | y)); }
+                op::BXOR => { let (x, y) = int_pair2(stack, "BXOR")?; stack.push(Value::Int(x ^ y)); }
+                op::SHL => {
+                    let (x, y) = int_pair2(stack, "SHL")?;
+                    // Review-Fund: Rusts `<<` ist nur fuer 0..=63 definiert -- ohne
+                    // diese Grenze maskiert der Compiler die Schiebeweite still
+                    // (release, falsches Ergebnis) bzw. paniked (debug).
+                    if !(0..64).contains(&y) { return Err(format!("SHL: Schiebeweite muss 0..63 sein, erhalten {}", y)); }
+                    stack.push(Value::Int(x << y));
+                }
+                op::SHR => {
+                    let (x, y) = int_pair2(stack, "SHR")?;
+                    if !(0..64).contains(&y) { return Err(format!("SHR: Schiebeweite muss 0..63 sein, erhalten {}", y)); }
+                    stack.push(Value::Int(x >> y));
+                }
+                op::BNOT => { let v = vm_pop(stack)?; match v { Value::Int(i) => stack.push(Value::Int(!i)), _ => return Err("BNOT erwartet INTEGER".into()) } }
+
+
+                // --- Tupel ---
+                op::BUILD_TUPLE => {
+                    let len = arg.as_usize();
+                    if len == 0 { stack.push(Value::Tuple(Rc::new(vec![]))); }
+                    else {
+                        let split = stack.len() - len;
+                        let items = stack.split_off(split);
+                        stack.push(Value::Tuple(Rc::new(items)));
+                    }
+                }
+                op::BUILD_ARRAY => {
+                    let len = arg.as_usize();
+                    let split = stack.len() - len;
+                    let items = stack.split_off(split);
+                    stack.push(array_literal(items));
+                }
+                op::UNPACK_TUPLE => {
+                    let len = arg.as_usize();
+                    let t = vm_pop(stack)?;
+                    if let Value::Tuple(items) = t {
+                        if items.len() != len {
+                            return Err(format!("Tupel-Destructuring: {} Ziele, aber Tupel hat {} Element(e)", len, items.len()));
+                        }
+                        for v in items.iter().rev() { stack.push(v.clone()); }
+                    } else {
+                        return Err(format!("UNPACK_TUPLE: Erwartet TUPLE, erhalten {}", t.type_name()));
+                    }
+                }
+                op::BUILD_TUPLE_DYN => {
+                    let mut idx = stack.len();
+                    while idx > 0 && !matches!(stack[idx - 1], Value::CompMarker) { idx -= 1; }
+                    if idx == 0 { return Err("BUILD_TUPLE_DYN: kein COMP_MARKER".into()); }
+                    let items = stack.split_off(idx); // ab Element nach Marker
+                    stack.pop(); // Marker
+                    stack.push(Value::Tuple(Rc::new(items)));
+                }
+                op::IN_OP => {
+                    let hay = vm_pop(stack)?;
+                    let needle = vm_pop(stack)?;
+                    stack.push(Value::Bool(eval_in(&needle, &hay)?));
+                }
+                op::SLICE => {
+                    let l = arg.list();
+                    let has_lo = matches!(l[0], Arg::Val(Value::Bool(true)) | Arg::Int(1)) || arg_truthy(&l[0]);
+                    let has_hi = arg_truthy(&l[1]);
+                    let hi = if has_hi { Some(vm_pop(stack)?) } else { None };
+                    let lo = if has_lo { Some(vm_pop(stack)?) } else { None };
+                    let target = vm_pop(stack)?;
+                    stack.push(apply_slice(&target, lo.as_ref(), hi.as_ref())?);
+                }
+
+                op::LOAD_FUNCREF => {
+                    let name = constants[arg.as_usize()].fmt();
+                    if !self.prog.fn_index.contains_key(&name) {
+                        return Err(format!("FUNCREF: Funktion '{}' existiert nicht", name));
+                    }
+                    stack.push(Value::FuncRef(Rc::from(name.as_str())));
+                }
+                op::CALL_VALUE => {
+                    let (cname, argc, _) = call_parts(arg);
+                    let split = stack.len() - argc;
+                    let call_args = stack.split_off(split);
+                    let callee = vm_pop(stack)?;
+                    match callee {
+                        Value::FuncRef(name) => {
+                            let tgt = self.prog.func(name.as_ref())
+                                .ok_or_else(|| format!("FUNCREF: Funktion '{}' existiert nicht (mehr)", name))?;
+                            if tgt.is_coroutine {
+                                stack.push(make_coro(tgt, call_args, None));
+                            } else {
+                                let ret = self.exec(tgt, call_args, None)?;
+                                if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                            }
+                        }
+                        // Gebundene Methode (`f = spieler.tick`): dieselbe Ausfuehrung
+                        // wie CALL_METHOD, nur dass der Empfaenger aus dem Wert kommt
+                        // statt vom Stack. Die Methode wird ERST JETZT aufgeloest --
+                        // so trifft sie auch, wenn die Instanz inzwischen einer
+                        // abgeleiteten Klasse angehoert.
+                        Value::BoundMethod(b) => {
+                            let (recv, mname) = (&b.0, &b.1);
+                            let cn = match recv {
+                                Value::Instance(rc) => rc.borrow().class_name.clone(),
+                                other => return Err(format!(
+                                    "FUNCREF: '{}' ist an {} gebunden, nicht an ein Objekt",
+                                    mname, other.type_name())),
+                            };
+                            let tgt = self.resolve_method(&cn, mname).ok_or_else(||
+                                format!("FUNCREF: Methode '{}' existiert nicht (mehr) in {}", mname, cn))?;
+                            let recv = recv.clone();
+                            if tgt.is_coroutine {
+                                stack.push(make_coro(tgt, call_args, Some(recv)));
+                            } else {
+                                let ret = self.exec(tgt, call_args, Some(recv))?;
+                                if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                            }
+                        }
+                        other => return Err(format!(
+                            "'{}' ist eine Variable vom Typ {} und kann nicht wie eine Funktion \
+                             aufgerufen werden. Falls du den eingebauten Befehl '{}' meinst: \
+                             benenne die Variable um -- eine Variable mit festem Wert-Typ \
+                             (INTEGER, FLOAT, STRING ...) verdeckt einen Befehl nicht, eine \
+                             FUNCREF schon.",
+                            cname, other.type_name(), cname.to_uppercase())),
+                    }
+                }
+                // `SUPER.Methode(...)` (WP G). Fast wie CALL_METHOD -- nur
+                // beginnt die Suche bei der im Bytecode stehenden Klasse
+                // (der Elternklasse der Aufrufstelle) statt bei der Klasse
+                // des Objekts. Sonst fande sie die ueberschreibende Methode
+                // wieder und riefe sich selbst, bis der Stapel voll ist.
+                op::CALL_SUPER => {
+                    let l = arg.list();
+                    let start_class = l[0].str();
+                    let method = l[1].str();
+                    let argc = l[2].as_usize();
+                    let split = stack.len() - argc;
+                    let margs = stack.split_off(split);
+                    let obj = vm_pop(stack)?;
+                    let m = self.resolve_method(start_class, method).ok_or_else(|| format!(
+                        "SUPER.{}: Methode existiert nicht in {}", method, start_class))?;
+                    if m.is_coroutine {
+                        stack.push(make_coro(m, margs, Some(obj)));
+                    } else {
+                        let ret = self.exec(m, margs, Some(obj))?;
+                        if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                    }
+                }
+
+                // --- OOP ---
+                op::NEW_INSTANCE => {
+                    let l = arg.list();
+                    let class_name = l[0].str();
+                    let argc = l[1].as_usize();
+                    let has_init_args = arg_truthy(&l[2]);
+                    if !self.prog.classes.contains_key(class_name) {
+                        return Err(format!("Klasse '{}' nicht gefunden", class_name));
+                    }
+                    let inst = self.allocate_instance(class_name);
+                    if has_init_args {
+                        let split = stack.len() - argc;
+                        let init_args = stack.split_off(split);
+                        if let Some(init) = self.resolve_method(class_name, "init") {
+                            self.exec(init, init_args, Some(inst.clone()))?;
+                        } else if !init_args.is_empty() {
+                            return Err(format!("Klasse {} hat keine SUB Init - Argumente bei NEW nicht moeglich", class_name));
+                        }
+                    }
+                    stack.push(inst);
+                }
+                op::DECLARE_STRUCT_NAME => {
+                    let l = arg.list();
+                    let name = constants[l[0].as_usize()].fmt();
+                    let class_name = l[1].str();
+                    if !self.prog.classes.contains_key(class_name) {
+                        return Err(format!("STRUCT '{}' nicht gefunden", class_name));
+                    }
+                    if !self.globals.contains_key(&name) {
+                        let inst = self.allocate_instance(class_name);
+                        self.globals.insert(name, Rc::new(RefCell::new(Slot { ty: class_name.to_string(), value: inst, is_const: false })));
+                    }
+                }
+                op::BIND_GLOBAL_SLOT => {
+                    // Den eben unter dem Namen angelegten Eintrag (Feld, Map,
+                    // Struktur) auch in seinen Platz haengen -- dasselbe Rc,
+                    // also sehen Namens- und Platz-Zugriffe denselben Wert.
+                    // Nach jedem Anlegen neu: ein DIM in einer Schleife legt
+                    // unter dem Namen ein NEUES Feld an.
+                    let l = arg.list();
+                    let idx = l[0].as_usize();
+                    let name = constants[l[1].as_usize()].fmt();
+                    if let Some(s) = self.globals.get(&name) {
+                        self.global_slots[idx] = Some(s.clone());
+                    }
+                }
+                op::DECLARE_STRUCT_LOCAL => {
+                    let l = arg.list();
+                    let slot = l[0].as_usize();
+                    let class_name = l[1].str();
+                    if matches!(locals[slot], Value::Nil) {
+                        if !self.prog.classes.contains_key(class_name) {
+                            return Err(format!("STRUCT '{}' nicht gefunden", class_name));
+                        }
+                        locals[slot] = self.allocate_instance(class_name);
+                    }
+                }
+
                 op::DECLARE_ARRAY_NAME => {
                     let l = arg.list();
                     let name = constants[l[0].as_usize()].fmt();
@@ -3198,12 +3241,6 @@ impl<'p> Vm<'p> {
                 }
                 op::RESET_DATA_PTR => self.data_ptr = 0,
 
-                // --- Rueckgabe ---
-                op::RETURN => {
-                    let v = vm_pop(stack)?;
-                    return Ok(Step::Return(coerce(v, &fn_.return_type, "RETURN")?));
-                }
-                op::RETURN_VOID => return Ok(Step::Return(Value::Nil)),
                 op::YIELD_VALUE => {
                     // Coroutine: Wert abgeben und suspendieren. Beim Resume legt
                     // coro_resume den Sende-Wert auf den Stack (Wert von `x = YIELD`).
@@ -3211,7 +3248,7 @@ impl<'p> Vm<'p> {
                     if !fn_.return_type.is_empty() {
                         yval = coerce(yval, &fn_.return_type, "YIELD")?;
                     }
-                    return Ok(Step::Yield(yval));
+                    return Ok(Some(Step::Yield(yval)));
                 }
 
                 // --- I/O ---
@@ -3273,12 +3310,11 @@ impl<'p> Vm<'p> {
                     locals[slot_idx] = coerce_input(&raw, &ty)?;
                 }
 
-                op::HALT => return Ok(Step::Return(Value::Nil)),
+                op::HALT => return Ok(Some(Step::Return(Value::Nil))),
 
                 other => return Err(format!("Opcode {} im Rust-VM noch nicht implementiert (ip={})", other, *ip - 1)),
-            }
         }
-        Ok(Step::Return(Value::Nil))
+        Ok(None)
     }
 
     fn pop_dims(&self, stack: &mut Vec<Value>, num_dims: usize) -> R<Vec<i64>> {
@@ -10796,6 +10832,7 @@ fn coerce_input(raw: &str, ty: &str) -> R<Value> {
     }
 }
 
+#[inline(never)]
 fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
     match target {
         "" | "any" => Ok(value),
@@ -10887,6 +10924,7 @@ fn typ_lesbar(t: &str) -> String {
 ///     zuzuweisen ist eine bewusste Entscheidung des Programmierers, so wie
 ///     das Auspacken einer Map. Erst der Schreibzugriff prueft wieder.
 ///   * Ein frisches Ganzzahl-Literal an einem FLOAT-Ziel (siehe unten).
+#[inline(never)]
 fn coerce_array(value: Value, elem: &str, ctx: &str) -> R<Value> {
     if matches!(value, Value::Nil) { return Ok(value); }
     let ziel = if elem.is_empty() { "ARRAY".to_string() }

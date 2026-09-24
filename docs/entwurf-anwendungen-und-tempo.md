@@ -175,6 +175,12 @@ deklariert“), trägt das Programm jetzt die Namen der Plätze
 `tests/pruef/globale_felder.dhtest`. Übrig von Punkt 1: `LOAD_NAME`/
 `STORE_NAME` gibt es noch für FOR-EACH- und CATCH-Variablen im Hauptprogramm.
 
+**`dispatch` verkleinert (2026-09-24):** der Stapelrahmen der zentralen
+VM-Funktion war 4800 Byte (größer als eine Seite, angetastet bei jedem
+Funktionsaufruf). 41 seltene Befehle stehen jetzt in `Vm::dispatch_selten`;
+Rahmen ~2900 Byte, `fib(30)` −8 %, Zahlenschleife −12 %. Den Frame-Stapel
+(1c) spart das nicht, aber seinen größten Einzelposten.
+
 **Punkt 2 erledigt (2026-09-24):** gemessen war der JSON-Umweg kleiner als
 gedacht -- bei der IDE (10 198 Zeilen) kostete das Bauen des .dhc-JSON
 (`finish`) ~13 ms und das Zerlegen ~3 ms, der Compiler selbst ~40 ms.
