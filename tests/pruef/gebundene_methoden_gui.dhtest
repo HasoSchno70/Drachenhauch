@@ -96,7 +96,7 @@ DIM fertig AS BOOLEAN
 FOR y = 0 TO 199
   FOR x = 0 TO 319
     IF GUI_HIT_TEST(x, y) = b AND NOT fertig THEN
-      PRINT STR$(x + GUI_GET_W(b) / 2); " "; STR$(y + GUI_GET_H(b) / 2)
+      PRINT STR$(x + GUI_GET_W(b) \ 2); " "; STR$(y + GUI_GET_H(b) \ 2)
       fertig = TRUE
     END IF
   NEXT

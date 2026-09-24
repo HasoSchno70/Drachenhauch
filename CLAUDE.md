@@ -1443,7 +1443,7 @@ Ausgabe von 2026.15).
 
 **M1:** `Compiler::typ_von` (Typ aus `typen.rs`) -- fuer den CODE, muss
 stimmen; `statischer_typ` bleibt der vorsichtige Helfer fuer Warnungen.
-**`ZAHL`** = INTEGER oder FLOAT je nach Wert: `/` und `^` auf zwei INTEGER,
+**`ZAHL`** = INTEGER oder FLOAT je nach Wert: `^` auf zwei INTEGER,
 `VAL`, `MIN` gemischt; `AND`/`OR` liefern einen der WERTE (`verbinden`).
 Vergleiche mit unbekanntem oder Klassen-Glied bleiben `?` (OPERATOR).
 Builtins nur aus der nachgemessenen Tabelle `typen::builtin_typ` -- **"endet
@@ -1453,10 +1453,23 @@ Probelauf, 284 Proben). `dhrt --typen datei.dh` listet je Ausdruck den Typ.
 (Opcode 123, in `dispatch_selten`), die bei falschem Typ mit "der Compiler
 sagt X, der Wert ist Y" abbricht -- **wer `typ_von` aendert, laesst
 `dhrt test tests/pruef` damit laufen**; das ist der Beleg, nicht die
-Beispiele. Ueber `examples/` sind 76 % der Ausdruecke getypt. Offen: ob `/`
-immer FLOAT werden soll (Nutzerentscheidung, siehe Entwurf). Tests
+Beispiele. Ueber `examples/` sind 76 % der Ausdruecke getypt. Tests
 `tests/pruef/typen.dhtest` (samt Gegenprobe der Probe ueber ein verfaelschtes
 .dhc), Rust-Tests in `typen.rs`.
+
+## `/` liefert immer FLOAT (2026-09-24, Entscheidung des Nutzers)
+
+`vm::div` rechnet immer in Kommazahlen: `8 / 2` ist `4.0` (vorher INTEGER 4,
+der Typ hing am Wert -- fuer M2/M3 nicht vorab festzulegen). Konstanten
+falten geht durch dieselbe Funktion, `typ_von` sagt FLOAT. Zuweisung an eine
+INTEGER-Variable geht weiter, solange das Ergebnis glatt ist; ein Feld-Index
+aus `/` bricht ab ("Array-Index muss INTEGER sein") -- **`--check` warnt vor
+jedem Index, dessen Typ sicher FLOAT ist** (`Compiler::index_pruefen`). Der
+volle Testlauf fand im Bestand keine Stelle, die am alten Verhalten hing;
+geaendert wurden Erwartungen (`4` -> `4.0`), ein Pixel-Mittelpunkt in
+`gebundene_methoden_gui.dhtest` (jetzt `\`) und der Satz im Referenzbuch
+(`11_operatoren.js` samt `en.json`). Doku `docs/sprache.md`,
+`docs/stolpersteine.md` D1. Tests `tests/pruef/div_and_float_display.dhtest`.
 
 ## Coroutines / YIELD
 

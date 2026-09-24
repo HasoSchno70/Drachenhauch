@@ -1049,6 +1049,7 @@ impl Compiler {
                 Ok(())
             }
             Node::IndexAssign { target, indices, value } => {
+                self.index_pruefen(indices);
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
                 self.expr(value)?;
@@ -1276,7 +1277,9 @@ impl Compiler {
                     "+" if l == Typ::Str && r == Typ::Str => Typ::Str,
                     "*" if (l == Typ::Str && r == Typ::Int) || (l == Typ::Int && r == Typ::Str) => Typ::Str,
                     "+" | "-" | "*" | "mod" => l.rechnen(&r),
-                    "/" | "^" => match l.rechnen(&r) {
+                    // `/` ist immer eine Kommazahl (seit 2026-09-24).
+                    "/" => if l.ist_zahl() && r.ist_zahl() { Typ::Float } else { Typ::Unbekannt },
+                    "^" => match l.rechnen(&r) {
                         Typ::Int => Typ::Zahl,
                         t => t,
                     },
@@ -1339,6 +1342,22 @@ impl Compiler {
                 _ => Typ::Unbekannt,
             },
             _ => Typ::Unbekannt,
+        }
+    }
+
+    /// Ein Index, der sicher eine Kommazahl ist, bricht beim Laufen immer ab
+    /// ("Array-Index muss INTEGER sein"). Seit `/` immer FLOAT liefert
+    /// (2026-09-24), ist `feld[n / 2]` genau so ein Fall -- vorher lief er,
+    /// solange die Division aufging. Die Warnung findet ihn vor dem Lauf.
+    fn index_pruefen(&mut self, indices: &[Node]) {
+        for ix in indices {
+            if self.typ_von(ix) == Typ::Float {
+                let mit_teilung = matches!(ix, Node::BinaryOp { op, .. } if op == "/");
+                self.warnings.push((self.ctx.cur_line, format!(
+                    "Der Index ist eine Kommazahl -- das bricht beim Laufen ab ('Array-Index muss INTEGER sein').{}",
+                    if mit_teilung { " `/` liefert immer FLOAT; ganzzahlig teilt `\\`." }
+                    else { " Mit INT() abschneiden oder ROUND() runden." })));
+            }
         }
     }
 
@@ -2538,6 +2557,7 @@ impl Compiler {
             Node::BinaryOp { op, left, right } => self.expr_binary(op, left, right),
             Node::Call { callee, args } => self.expr_call(callee, args),
             Node::IndexAccess { target, indices } => {
+                self.index_pruefen(indices);
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
                 self.ctx.emit(oc::LOAD_INDEX, json!(indices.len()));

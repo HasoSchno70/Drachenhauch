@@ -10751,19 +10751,15 @@ fn array_literal(vals: Vec<Value>) -> Value {
     Value::Array(Rc::new(RefCell::new(arr)))
 }
 
+/// `/` liefert IMMER eine Kommazahl (seit 2026-09-24, Entscheidung des
+/// Nutzers): vorher war `480 / 2` INTEGER und `7 / 2` FLOAT -- ein Typ, der
+/// am Wert hing, und den weder ein Uebersetzer noch ein Leser vorhersehen
+/// kann. Ganzzahlig teilt `\`.
 fn div(a: Value, b: Value) -> R<Value> {
     require_number(&a, &b, "/")?;
-    match (&a, &b) {
-        (Value::Int(x), Value::Int(y)) => {
-            if *y == 0 { return Err("Division durch 0".into()); }
-            // Review-Fund: i64::MIN / -1 ist UB-nah und paniked in Rust IMMER
-            // (unabhaengig von overflow-checks) -- checked_div faengt das ab.
-            let q = x.checked_div(*y).ok_or_else(|| int_overflow_msg("/"))?;
-            let r = x.checked_rem(*y).ok_or_else(|| int_overflow_msg("/"))?;
-            if r == 0 { Ok(Value::Int(q)) } else { Ok(Value::Float(*x as f64 / *y as f64)) }
-        }
-        _ => { let y = as_f64(&b); if y == 0.0 { return Err("Division durch 0".into()); } Ok(Value::Float(as_f64(&a) / y)) }
-    }
+    let y = as_f64(&b);
+    if y == 0.0 { return Err("Division durch 0".into()); }
+    Ok(Value::Float(as_f64(&a) / y))
 }
 
 fn int_div(a: Value, b: Value) -> R<Value> {
