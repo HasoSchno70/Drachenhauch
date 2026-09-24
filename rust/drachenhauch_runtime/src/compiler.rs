@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use serde_json::{json, Map, Value};
 
 use crate::ast::{CaseMatch, CaseVal, NumV, Node};
+use crate::typen::Typ;
 
 // Opcodes (Teilmenge; Werte aus bytecode.py / model::op).
 mod oc {
@@ -112,6 +113,10 @@ mod oc {
     /// unter dem Namen angelegten Eintrag auch in den globalen Platz haengen
     /// (dasselbe Objekt). Danach laufen alle Zugriffe ueber den Platz.
     pub const BIND_GLOBAL_SLOT: i64 = 122;
+    /// Nur mit `DHRT_TYPEN_PRUEFEN=1`: prueft, ob der Wert oben auf dem Stapel
+    /// den Typ hat, den `typ_von` ihm zuschreibt (Arg = Konstante mit der
+    /// Angabe). Der Wert bleibt liegen.
+    pub const TYP_PRUEFEN: i64 = 123;
     pub const HALT: i64 = 99;
 }
 
@@ -318,6 +323,10 @@ struct ClassInfo {
 }
 
 pub struct Compiler {
+    /// `DHRT_TYPEN_PRUEFEN=1`: hinter jeden getypten Ausdruck eine Probe.
+    typen_pruefen: bool,
+    /// `dhrt --typen`: (Zeile, Ausdruck, Typ) je uebersetztem Ausdruck.
+    typen_liste: Option<Vec<(u32, String, String)>>,
     global_slots: HashMap<String, usize>,
     /// Namen aller Top-Level-CONST und ENUM (klein geschrieben). Grundlage fuer
     /// die Verdeckungs-Warnung: Drachenhauch ignoriert Gross-/Kleinschreibung, eine
@@ -619,7 +628,9 @@ impl Compiler {
     fn new(external_types: std::collections::HashSet<String>,
            builtin_aliases: Vec<(String, String)>,
            importierte_module: std::collections::HashSet<String>) -> Self {
-        Compiler { bekannte_namen: std::collections::HashSet::new(),
+        Compiler { typen_pruefen: std::env::var_os("DHRT_TYPEN_PRUEFEN").is_some(),
+                   typen_liste: std::env::var_os("DHRT_TYPEN_LISTE").map(|_| Vec::new()),
+                   bekannte_namen: std::collections::HashSet::new(),
                    offene_namen: Vec::new(),
                    // Platz 0 gehoert dem Hauptprogramm. Es hat keine
                    // Locals ausser den `__`-Hilfsvariablen, die der Compiler
@@ -1211,6 +1222,152 @@ impl Compiler {
             _ => return None,
         };
         if t.is_empty() || t == "any" { None } else { Some(t) }
+    }
+
+    /// Der Typ, den ein Ausdruck ZUR LAUFZEIT hat -- fuer den Code, nicht
+    /// fuer Meldungen (M1, `docs/entwurf-maschinencode.md`). Anders als
+    /// `statischer_typ` muss hier jede Aussage stimmen; `Typ::Unbekannt` ist
+    /// immer erlaubt. Belegt wird das mit `DHRT_TYPEN_PRUEFEN=1`: dann steht
+    /// hinter jedem getypten Ausdruck eine Probe (`TYP_PRUEFEN`).
+    ///
+    /// Zwei Stellen, an denen `statischer_typ` fuer Warnungen bewusst
+    /// vereinfacht und die hier genau sein muessen: `/` und `^` auf zwei
+    /// INTEGER liefern je nach Wert INTEGER oder FLOAT (`Typ::Zahl`), und
+    /// `AND`/`OR` liefern einen der beiden Werte, keinen Wahrheitswert.
+    pub(crate) fn typ_von(&self, n: &Node) -> Typ {
+        let angabe = |t: &str| Typ::aus_angabe(t, &|k| self.classes.contains_key(k));
+        match n {
+            Node::NumberLit(NumV::Float(_)) => Typ::Float,
+            Node::NumberLit(NumV::Int(_)) => Typ::Int,
+            Node::StringLit(_) => Typ::Str,
+            Node::BoolLit(_) => Typ::Bool,
+            Node::TupleLit { .. } | Node::ListComp { .. } | Node::SetComp { .. } => Typ::Tupel,
+            Node::ArrayLit(_) => Typ::Feld(Box::new(Typ::Unbekannt)),
+            Node::MapLit { .. } | Node::DictComp { .. } => Typ::Map(Box::new(Typ::Unbekannt)),
+            Node::New { class_name, .. } if self.classes.contains_key(class_name) =>
+                Typ::Klasse(class_name.clone()),
+            Node::IsTyp { .. } => Typ::Bool,
+            Node::Identifier(name) => match self.angesagter_typ(name) {
+                Some(t) => angabe(&t),
+                None => Typ::Unbekannt,
+            },
+            Node::TernaryExpr { then_expr, else_expr, .. } =>
+                self.typ_von(then_expr).verbinden(&self.typ_von(else_expr)),
+            Node::UnaryOp { op, operand } => match op.as_str() {
+                "not" => Typ::Bool,
+                "bnot" => Typ::Int,
+                "-" | "+" => {
+                    let t = self.typ_von(operand);
+                    if t.ist_zahl() { t } else { Typ::Unbekannt }
+                }
+                _ => Typ::Unbekannt,
+            },
+            Node::BinaryOp { op, left, right } => {
+                let (l, r) = (self.typ_von(left), self.typ_von(right));
+                // Mit einem unbekannten Glied kann ein OPERATOR einer Klasse
+                // mitreden -- dann steht auch `<` nicht fest.
+                let bekannt = |t: &Typ| !matches!(t, Typ::Unbekannt | Typ::Klasse(_));
+                match op.as_str() {
+                    "and" | "or" => l.verbinden(&r),
+                    "in" => Typ::Bool,
+                    "band" | "bor" | "bxor" | "shl" | "shr" | "\\" => Typ::Int,
+                    "=" | "<>" | "<" | ">" | "<=" | ">=" =>
+                        if bekannt(&l) && bekannt(&r) { Typ::Bool } else { Typ::Unbekannt },
+                    "+" if l == Typ::Str && r == Typ::Str => Typ::Str,
+                    "*" if (l == Typ::Str && r == Typ::Int) || (l == Typ::Int && r == Typ::Str) => Typ::Str,
+                    "+" | "-" | "*" | "mod" => l.rechnen(&r),
+                    "/" | "^" => match l.rechnen(&r) {
+                        Typ::Int => Typ::Zahl,
+                        t => t,
+                    },
+                    _ => Typ::Unbekannt,
+                }
+            }
+            Node::IndexAccess { target, indices } => match self.typ_von(target) {
+                Typ::Str if indices.len() == 1 => Typ::Str,
+                Typ::Feld(e) => *e,
+                Typ::Map(e) if indices.len() == 1 => *e,
+                _ => Typ::Unbekannt,
+            },
+            Node::SliceAccess { target, .. } => match self.typ_von(target) {
+                t @ (Typ::Str | Typ::Feld(_)) => t,
+                _ => Typ::Unbekannt,
+            },
+            Node::MemberAccess { target, name } => match self.typ_von(target) {
+                Typ::Klasse(k) => {
+                    if self.ist_property(&k, name) {
+                        self.methode_rueckgabe(&k, &format!("__get_{}", name.to_lowercase()))
+                    } else {
+                        self.feld_typ(&k, name).map_or(Typ::Unbekannt, |t| angabe(&t))
+                    }
+                }
+                _ => Typ::Unbekannt,
+            },
+            Node::Call { callee, args } => match &**callee {
+                Node::MemberAccess { target, name } => match self.typ_von(target) {
+                    Typ::Klasse(k) => self.methode_rueckgabe(&k, name),
+                    _ => Typ::Unbekannt,
+                },
+                Node::Identifier(f) => {
+                    // Eine Variable dieses Namens (FUNCREF, oder eine, die
+                    // heisst wie ein Builtin) -- lieber nichts sagen.
+                    if self.ctx.local_slots.contains_key(f.as_str())
+                        || self.global_slots.contains_key(f.as_str()) || self.is_field(f) {
+                        return Typ::Unbekannt;
+                    }
+                    let low = f.to_lowercase();
+                    if let Some(k) = self.ctx.current_class.as_deref() {
+                        if self.resolve_method(k, f) || self.resolve_method(k, &low) {
+                            return self.methode_rueckgabe(k, f);
+                        }
+                    }
+                    match self.fn_sigs.get(f.as_str()).or_else(|| self.fn_sigs.get(&low)) {
+                        Some(sig) if sig.is_coroutine || sig.return_type.is_empty() => Typ::Unbekannt,
+                        Some(sig) => angabe(&sig.return_type),
+                        None if low == "rnd" && args.is_empty() => Typ::Float,
+                        None => match crate::typen::builtin_typ(&low) {
+                            // ABS behaelt den Typ seines Arguments.
+                            Some(Typ::Zahl) if low == "abs" => match args.first().map(|a| self.typ_von(a)) {
+                                Some(t) if t.ist_zahl() => t,
+                                _ => Typ::Unbekannt,
+                            },
+                            Some(t) => t,
+                            None => Typ::Unbekannt,
+                        },
+                    }
+                }
+                _ => Typ::Unbekannt,
+            },
+            _ => Typ::Unbekannt,
+        }
+    }
+
+    /// Rueckgabetyp einer Methode, die an einer als `klasse` angesagten Stelle
+    /// gerufen wird. Eine Abkoemmlingin kann sie ueberschreiben -- steht dort
+    /// ein anderer Typ, weiss man es erst zur Laufzeit.
+    fn methode_rueckgabe(&self, klasse: &str, m: &str) -> Typ {
+        let low = m.to_lowercase();
+        let sig_in = |ci: &ClassInfo| ci.method_sigs.get(m).or_else(|| ci.method_sigs.get(&low))
+            .map(|s| (s.is_coroutine, s.return_type.clone()));
+        // Die Fassung, die `klasse` selbst sieht (entlang der Vorfahren) ...
+        let mut eigene = None;
+        let mut cur = Some(klasse.to_string());
+        while let Some(cn) = cur {
+            let Some(ci) = self.classes.get(&cn) else { break };
+            if let Some(s) = sig_in(ci) { eigene = Some(s); break; }
+            cur = if ci.parent_name.is_empty() { None } else { Some(ci.parent_name.clone()) };
+        }
+        let Some(eigene) = eigene else { return Typ::Unbekannt };
+        // ... und jede Ueberschreibung darunter muss dasselbe versprechen.
+        for (name, ci) in &self.classes {
+            if name != klasse && self.stammt_ab(name, klasse) {
+                if let Some(s) = sig_in(ci) {
+                    if s.0 != eigene.0 || !s.1.eq_ignore_ascii_case(&eigene.1) { return Typ::Unbekannt; }
+                }
+            }
+        }
+        if eigene.0 || eigene.1.is_empty() { return Typ::Unbekannt; }
+        Typ::aus_angabe(&eigene.1, &|k| self.classes.contains_key(k))
     }
 
     /// Stammt `kind` von `basis` ab (oder ist es dieselbe Klasse)?
@@ -2322,6 +2479,23 @@ impl Compiler {
     }
 
     fn expr(&mut self, e: &Node) -> CR {
+        self.expr_innen(e)?;
+        if self.typen_pruefen || self.typen_liste.is_some() {
+            let t = self.typ_von(e);
+            if let Some(liste) = self.typen_liste.as_mut() {
+                liste.push((self.ctx.cur_line, ausdruck_kurz(e), t.to_string()));
+            }
+            if self.typen_pruefen {
+                if let Some(p) = t.probe() {
+                    let c = self.ctx.add_const(json!(p));
+                    self.ctx.emit(oc::TYP_PRUEFEN, json!(c));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn expr_innen(&mut self, e: &Node) -> CR {
         // Konstanten falten: `2 * 3`, `BREITE \ 2`, `-GRENZE`. Kostete zur
         // Laufzeit gemessen ein Drittel einer Schleife mehr als die fertige Zahl.
         if matches!(e, Node::BinaryOp { .. } | Node::UnaryOp { .. } | Node::Identifier(_)) {
@@ -4111,6 +4285,46 @@ fn stmt_line(n: &Node) -> u32 {
     if let Node::Stmt { line, .. } = n { *line } else { 0 }
 }
 
+/// `dhrt --typen`: je Zeile die uebersetzten Ausdruecke mit ihrem Typ, nach
+/// Zeilen geordnet (uebersetzt wird Klassen, Funktionen, Hauptprogramm --
+/// nicht in Quelltext-Reihenfolge). `?` heisst: der Compiler weiss es nicht.
+fn typen_ausgeben(mut liste: Vec<(u32, String, String)>, herkunft: &[crate::preprocess::Herkunft],
+                  haupt: &str) {
+    liste.sort_by_key(|e| e.0);
+    for (zeile, was, typ) in liste {
+        println!("{}: {} -> {}", crate::preprocess::stelle(herkunft, zeile, haupt), was, typ);
+    }
+}
+
+/// Ein Ausdruck in einer Zeile fuer `dhrt --typen` -- zum Wiedererkennen,
+/// kein Quelltext.
+fn ausdruck_kurz(n: &Node) -> String {
+    match n {
+        Node::NumberLit(NumV::Int(i)) => i.to_string(),
+        Node::NumberLit(NumV::Float(f)) => format!("{:?}", f),
+        Node::StringLit(s) => format!("{:?}", s.chars().take(12).collect::<String>()),
+        Node::BoolLit(b) => if *b { "TRUE".into() } else { "FALSE".into() },
+        Node::NilLit => "NIL".into(),
+        Node::Identifier(x) => x.clone(),
+        Node::BinaryOp { op, left, right } =>
+            format!("({} {} {})", ausdruck_kurz(left), op.to_uppercase(), ausdruck_kurz(right)),
+        Node::UnaryOp { op, operand } => format!("{}{}", op.to_uppercase(), ausdruck_kurz(operand)),
+        Node::Call { callee, args } => format!("{}({})", ausdruck_kurz(callee),
+            args.iter().map(ausdruck_kurz).collect::<Vec<_>>().join(", ")),
+        Node::MemberAccess { target, name } => format!("{}.{}", ausdruck_kurz(target), name),
+        Node::IndexAccess { target, indices } => format!("{}[{}]", ausdruck_kurz(target),
+            indices.iter().map(ausdruck_kurz).collect::<Vec<_>>().join(", ")),
+        Node::New { class_name, .. } => format!("NEW {}()", class_name),
+        Node::TernaryExpr { cond, then_expr, else_expr } => format!("IIF({}, {}, {})",
+            ausdruck_kurz(cond), ausdruck_kurz(then_expr), ausdruck_kurz(else_expr)),
+        Node::NamedArg { name, value } => format!("{}: {}", name, ausdruck_kurz(value)),
+        andere => {
+            let d = format!("{:?}", andere);
+            d.split(|c: char| !c.is_alphanumeric()).next().unwrap_or("?").to_string()
+        }
+    }
+}
+
 fn unwrap_stmt(n: &Node) -> &Node {
     match n {
         Node::Stmt { body, .. } => body,
@@ -4345,6 +4559,9 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
             // noch deklariert wird.
             c.warn_unbekannte_namen();
             let warnings = std::mem::take(&mut c.warnings);
+            if let Some(liste) = c.typen_liste.take() {
+                typen_ausgeben(liste, &c.herkunft, &c.haupt);
+            }
             Ok((c, data, warnings))
         }
         Err(msg) => Err((c.err_line, msg)),

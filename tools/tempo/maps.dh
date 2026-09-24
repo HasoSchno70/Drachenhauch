@@ -1,0 +1,13 @@
+' Tempo: MAP schreiben und lesen (200 000 Schluessel).
+DIM t0 AS FLOAT : t0 = TIMER()
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 199999
+    MAPPUT(m, "k" + STR$(i), i)
+NEXT
+DIM z AS INTEGER : z = 0
+FOR i = 0 TO 199999
+    z = z + MAPGET(m, "k" + STR$(i))
+NEXT
+PRINT "ZEIT "; (TIMER() - t0) * 1000.0
+IF z <> 19999900000 THEN EXIT(1)

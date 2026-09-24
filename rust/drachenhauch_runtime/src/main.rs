@@ -51,6 +51,7 @@ mod smtp;
 mod zipdatei;
 mod builtins;
 mod compiler;
+mod typen;
 mod parser;
 mod controller;
 #[cfg(feature = "http")]
@@ -309,6 +310,20 @@ fn main() -> ExitCode {
         }
         if raw.len() >= 3 && raw[1] == "--tokens" {
             return tokens_main(&raw[2]);
+        }
+        // M1: welchen Typ der Compiler jedem Ausdruck zuschreibt
+        // (`? ` = unbekannt). Uebersetzt nur, laeuft nicht.
+        if raw.len() >= 3 && raw[1] == "--typen" {
+            let src = match std::fs::read_to_string(&raw[2]) {
+                Ok(t) => t,
+                Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", raw[2], e); return ExitCode::from(1); }
+            };
+            let base = std::path::Path::new(&raw[2]).parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
+            std::env::set_var("DHRT_TYPEN_LISTE", "1");
+            return match compile_source(&src, &base, &raw[2]) {
+                Ok(_) => ExitCode::SUCCESS,
+                Err(code) => code,
+            };
         }
         if raw.len() >= 3 && raw[1] == "--ast" {
             return ast_main(&raw[2]);

@@ -1,0 +1,9 @@
+' Tempo: Ganzzahlen mit Vergleich und MOD (10 Mio. Durchlaeufe).
+DIM t0 AS FLOAT : t0 = TIMER()
+DIM s AS INTEGER : s = 0
+DIM i AS INTEGER
+FOR i = 1 TO 10000000
+    IF i MOD 3 = 0 THEN s = s + i ELSE s = s - 1
+NEXT
+PRINT "ZEIT "; (TIMER() - t0) * 1000.0
+IF s <> 16666661666666 THEN EXIT(1)

@@ -7,7 +7,35 @@
 > sind nur noch als Optimierungs-Logbuch interessant; gemessen wird heute gegen
 > `dhrt`. Siehe [docs/rust-runtime.md](rust-runtime.md).
 
-## dhrt-Optimierung 2026-06-11 (aktuell)
+## Messbank (seit 2026-09-24)
+
+`dhrt run bench_dhrt.dh` misst per Vorgabe die acht Programme unter
+`tools/tempo/` (Aufrufe, Kommazahlen, Ganzzahlen, Felder, Objekte, Text, Maps,
+Builtins). Jedes misst seinen Kern selbst und gibt ihn als `ZEIT <ms>` aus --
+die Wandzeit traegt rund 40 ms Start mit und ist darum nur der Rueckfall fuer
+Programme ohne diese Zeile. `--gegen pfad\zu\dhrt.exe` misst eine zweite
+Laufzeit ABWECHSELND mit (A, B, A, B, ...) und gibt A/B aus; unter 1 ist die
+laufende schneller. Stand 2026-09-24 gegen die installierte 2026.15, best-of-3:
+
+| Programm | jetzt | 2026.15 | A/B |
+|---|---|---|---|
+| aufrufe.dh (fib(30)) | 207 ms | 272 ms | 0,76 |
+| builtins.dh | 150 ms | 272 ms | 0,55 |
+| felder.dh | 81 ms | 169 ms | 0,48 |
+| ganzzahl.dh | 530 ms | 586 ms | 0,90 |
+| maps.dh | 108 ms | 194 ms | 0,55 |
+| objekte.dh | 125 ms | 139 ms | 0,90 |
+| text.dh | 1135 ms | 4144 ms | 0,27 |
+| zahlen.dh | 220 ms | 271 ms | 0,81 |
+
+`text.dh` bleibt der langsamste, und zwar aus einem Grund, der in der Bauart
+von UTF-8 steckt: `MID$(s, i, 1)` in einer Schleife ueber den ganzen Text
+zaehlt bei jedem Aufruf bis zur Stelle `i` -- die Schleife waechst mit dem
+Quadrat der Laenge. Bis 2026-09-24 kostete sogar `MID$(s, 5, 1)` so viel wie
+das Durchzaehlen des ganzen Texts (jeder Aufruf baute eine Liste aller
+Zeichen); das ist behoben, das Quadrat nicht.
+
+## dhrt-Optimierung 2026-06-11
 
 Performance-Offensive an der Rust-VM selbst — gemessen mit `bench_dhrt.py` (seit 2026-09-15 `bench_dhrt.dh`, `dhrt run bench_dhrt.dh`)
 (best-of-5, Prozess-Wandzeit `dhrt run`, Windows 11):

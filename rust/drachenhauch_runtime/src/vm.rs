@@ -1244,6 +1244,22 @@ impl<'p> Vm<'p> {
     ///
     /// Gehoert hierher und nicht nach `builtins.rs`, weil die Vererbungskette
     /// nur die VM kennt.
+    /// Ist `kind` die Klasse `basis` oder stammt davon ab? (Gross/klein egal.)
+    fn klasse_stammt_ab(&self, kind: &str, basis: &str) -> bool {
+        let mut cur: Option<String> = Some(kind.to_string());
+        let mut schritte = 0;
+        while let Some(c) = cur {
+            if c.eq_ignore_ascii_case(basis) { return true; }
+            schritte += 1;
+            if schritte > 64 { return false; }
+            cur = match self.prog.classes.get(c.as_str()) {
+                Some(ci) if !ci.parent_name.is_empty() => Some(ci.parent_name.to_string()),
+                _ => None,
+            };
+        }
+        false
+    }
+
     fn try_typtest(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if name != "__is_typ" { return Ok(None); }
         let gesucht = match a.get(1) {
@@ -3137,6 +3153,26 @@ impl<'p> Vm<'p> {
                     if !self.globals.contains_key(&name) {
                         let inst = self.allocate_instance(class_name);
                         self.globals.insert(name, Rc::new(RefCell::new(Slot { ty: class_name.to_string(), value: inst, is_const: false })));
+                    }
+                }
+                op::TYP_PRUEFEN => {
+                    // Nur mit DHRT_TYPEN_PRUEFEN uebersetzt: sagt der Compiler
+                    // (`typ_von`) etwas, das zur Laufzeit nicht stimmt, ist das
+                    // ein Fehler im COMPILER -- darum ein eigener Wortlaut.
+                    let angabe = constants[arg.as_usize()].fmt();
+                    let v = stack.last().unwrap_or(&Value::Nil);
+                    let stimmt = match crate::typen::passt(&angabe, v) {
+                        Ok(b) => b,
+                        // Eine Klasse: NIL oder eine Instanz, die abstammt.
+                        Err(k) => match v {
+                            Value::Nil => true,
+                            Value::Instance(rc) => self.klasse_stammt_ab(&rc.borrow().class_name, &k),
+                            _ => false,
+                        },
+                    };
+                    if !stimmt {
+                        return Err(format!("Typpruefung (DHRT_TYPEN_PRUEFEN): der Compiler sagt {}, der Wert ist {} ({}) -- ein Fehler in compiler.rs typ_von",
+                            angabe, v.type_name(), v.fmt()));
                     }
                 }
                 op::BIND_GLOBAL_SLOT => {

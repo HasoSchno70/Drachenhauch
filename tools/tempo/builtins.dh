@@ -1,0 +1,9 @@
+' Tempo: reine Builtins in einer Schleife (je 1 Mio. ABS, SQR, INT).
+DIM t0 AS FLOAT : t0 = TIMER()
+DIM s AS FLOAT : s = 0.0
+DIM i AS INTEGER
+FOR i = 1 TO 1000000
+    s = s + ABS(-i) + SQR(i) + INT(i / 3)
+NEXT
+PRINT "ZEIT "; (TIMER() - t0) * 1000.0
+IF s <= 0.0 THEN EXIT(1)

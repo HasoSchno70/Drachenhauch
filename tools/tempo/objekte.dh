@@ -1,0 +1,17 @@
+' Tempo: Objektfelder und Methodenaufrufe (1 Mio. Aufrufe).
+CLASS Zaehler
+    DIM n AS INTEGER
+    DIM schritt AS INTEGER
+    SUB weiter()
+        Self.n = Self.n + Self.schritt
+    END SUB
+END CLASS
+DIM t0 AS FLOAT : t0 = TIMER()
+DIM z AS Zaehler : z = NEW Zaehler()
+z.schritt = 3
+DIM i AS INTEGER
+FOR i = 1 TO 1000000
+    z.weiter()
+NEXT
+PRINT "ZEIT "; (TIMER() - t0) * 1000.0
+IF z.n <> 3000000 THEN EXIT(1)

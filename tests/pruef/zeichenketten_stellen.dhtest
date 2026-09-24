@@ -1,0 +1,126 @@
+' LEFT$/RIGHT$/MID$/INSTR zaehlen in ZEICHEN, ab 0. Bis 2026-09-24 legte jeder
+' Aufruf den ganzen Text als Liste von Zeichen an (MID$ auf 200 000 Zeichen:
+' 90 Mikrosekunden, egal an welcher Stelle); jetzt wird nur bis zur Stelle
+' gezaehlt. Die Erwartung ist die Ausgabe der Laufzeit 2026.15 mit der alten
+' Fassung -- Umlaute, Emoji, leere Texte, Stellen vor dem Anfang und hinter
+' dem Ende. Format: docs/werkzeuge.md.
+
+=== randfaelle wie vorher
+DIM texte AS ARRAY OF STRING : texte = ["", "a", "Größe", "x😀yäz", "abcabc"]
+DIM such AS ARRAY OF STRING : such = ["", "a", "ö", "😀y", "bc", "zz", "Größe"]
+DIM i AS INTEGER
+DIM j AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO LEN(texte) - 1
+    FOR j = -1 TO 7
+        PRINT "[" + LEFT$(texte[i], j) + "|" + RIGHT$(texte[i], j) + "|" + MID$(texte[i], j + 1) + "]";
+        FOR k = -1 TO 6
+            PRINT "(" + MID$(texte[i], j + 1, k) + ")";
+        NEXT
+        PRINT
+    NEXT
+    FOR j = 0 TO LEN(such) - 1
+        PRINT INSTR(texte[i], such[j]);
+        FOR k = 0 TO 7
+            PRINT ","; INSTR(texte[i], such[j], k);
+        NEXT
+        PRINT
+    NEXT
+NEXT
+--- erwartet
+[||]()()()()()()()()
+[||]()()()()()()()()
+[||]()()()()()()()()
+[||]()()()()()()()()
+[||]()()()()()()()()
+[||]()()()()()()()()
+[||]()()()()()()()()
+[||]()()()()()()()()
+[||]()()()()()()()()
+0,0,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+[||a]()()(a)(a)(a)(a)(a)(a)
+[||]()()()()()()()()
+[a|a|]()()()()()()()()
+[a|a|]()()()()()()()()
+[a|a|]()()()()()()()()
+[a|a|]()()()()()()()()
+[a|a|]()()()()()()()()
+[a|a|]()()()()()()()()
+[a|a|]()()()()()()()()
+0,0,1,-1,-1,-1,-1,-1,-1
+0,0,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+[||Größe]()()(G)(Gr)(Grö)(Größ)(Größe)(Größe)
+[||röße]()()(r)(rö)(röß)(röße)(röße)(röße)
+[G|e|öße]()()(ö)(öß)(öße)(öße)(öße)(öße)
+[Gr|ße|ße]()()(ß)(ße)(ße)(ße)(ße)(ße)
+[Grö|öße|e]()()(e)(e)(e)(e)(e)(e)
+[Größ|röße|]()()()()()()()()
+[Größe|Größe|]()()()()()()()()
+[Größe|Größe|]()()()()()()()()
+[Größe|Größe|]()()()()()()()()
+0,0,1,2,3,4,5,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+2,2,2,2,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+0,0,-1,-1,-1,-1,-1,-1,-1
+[||x😀yäz]()()(x)(x😀)(x😀y)(x😀yä)(x😀yäz)(x😀yäz)
+[||😀yäz]()()(😀)(😀y)(😀yä)(😀yäz)(😀yäz)(😀yäz)
+[x|z|yäz]()()(y)(yä)(yäz)(yäz)(yäz)(yäz)
+[x😀|äz|äz]()()(ä)(äz)(äz)(äz)(äz)(äz)
+[x😀y|yäz|z]()()(z)(z)(z)(z)(z)(z)
+[x😀yä|😀yäz|]()()()()()()()()
+[x😀yäz|x😀yäz|]()()()()()()()()
+[x😀yäz|x😀yäz|]()()()()()()()()
+[x😀yäz|x😀yäz|]()()()()()()()()
+0,0,1,2,3,4,5,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+1,1,1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+[||abcabc]()()(a)(ab)(abc)(abca)(abcab)(abcabc)
+[||bcabc]()()(b)(bc)(bca)(bcab)(bcabc)(bcabc)
+[a|c|cabc]()()(c)(ca)(cab)(cabc)(cabc)(cabc)
+[ab|bc|abc]()()(a)(ab)(abc)(abc)(abc)(abc)
+[abc|abc|bc]()()(b)(bc)(bc)(bc)(bc)(bc)
+[abca|cabc|c]()()(c)(c)(c)(c)(c)(c)
+[abcab|bcabc|]()()()()()()()()
+[abcabc|abcabc|]()()()()()()()()
+[abcabc|abcabc|]()()()()()()()()
+0,0,1,2,3,4,5,6,-1
+0,0,3,3,3,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+1,1,1,4,4,4,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+-1,-1,-1,-1,-1,-1,-1,-1,-1
+
+=== mid an spaeter stelle ist nicht teurer als vorn
+' Die Schranke ist grosszuegig: vorher kostete jeder Aufruf gleich viel,
+' egal wo -- 28 000 Aufrufe auf 200 000 Zeichen dauerten ueber 2 s.
+DIM s AS STRING : s = "x" * 200000
+DIM t0 AS FLOAT : t0 = TIMER()
+DIM i AS INTEGER
+DIM n AS INTEGER
+FOR i = 0 TO 20000
+    IF MID$(s, 5, 1) = "x" THEN n = n + 1
+    IF LEFT$(s, 3) = "xxx" THEN n = n + 1
+    IF INSTR(s, "x", 7) = 7 THEN n = n + 1
+NEXT
+PRINT n; " schnell "; (TIMER() - t0) < 0.5
+--- erwartet
+60003 schnell TRUE

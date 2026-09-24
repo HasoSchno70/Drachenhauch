@@ -1,0 +1,10 @@
+' Tempo: eigene Funktionsaufrufe (fib(30), 1,35 Mio. Aufrufe).
+' Misst nur den Kern und gibt ihn als ZEIT-Zeile aus (bench_dhrt.dh liest sie).
+FUNCTION fib(n AS INTEGER) AS INTEGER
+    IF n < 2 THEN RETURN n
+    RETURN fib(n - 1) + fib(n - 2)
+END FUNCTION
+DIM t0 AS FLOAT : t0 = TIMER()
+DIM r AS INTEGER : r = fib(30)
+PRINT "ZEIT "; (TIMER() - t0) * 1000.0
+IF r <> 832040 THEN EXIT(1)
