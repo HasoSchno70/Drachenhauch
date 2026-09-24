@@ -123,18 +123,19 @@ der Compiler je Ausdruck weiss.
 
 | Ausdruck | Ergebnis |
 |---|---|
-| `a / b` mit zwei INTEGER | INTEGER, wenn es aufgeht (`480 / 2`), sonst FLOAT |
+| `a / b` mit zwei INTEGER | bis 2026-09-24 INTEGER, wenn es aufgeht (`480 / 2`), sonst FLOAT -- seither immer FLOAT |
 | `a ^ b` mit zwei INTEGER | INTEGER (`2 ^ 3`) oder FLOAT (`2 ^ -1`) |
 | `a AND b`, `a OR b` | einer der beiden WERTE (`6 AND 3` ist 3) |
 | `VAL(t)` | INTEGER oder FLOAT, je nach Text |
 | `MIN(1, 2.0)` | der kleinere Wert samt seinem Typ (INTEGER) |
 
-`typen.rs` fuehrt dafuer `ZAHL` (INTEGER oder FLOAT). Fuer M2 heisst das: wo
-`/` im Spiel ist, kann die VM nicht einfach mit Kommazahlen rechnen -- sie
-muss beide Wege kennen. **Ob `/` bleibt, wie es ist, entscheidet der Nutzer:**
-immer FLOAT waere schneller zu uebersetzen und hiesse `/` so wie in Python
-und im Debugger (`eval` rechnet heute schon immer FLOAT), aber
-`PRINT 480 / 2` zeigte dann `240.0`, und `feld[n / 2]` braeche ab.
+`typen.rs` fuehrt dafuer `ZAHL` (INTEGER oder FLOAT). **`/` ist seit
+2026-09-24 immer FLOAT** (Entscheidung des Nutzers): `PRINT 480 / 2` zeigt
+`240.0`, `feld[n / 2]` bricht ab, und `dhrt --check` warnt vor einem Index,
+der sicher eine Kommazahl ist. Der volle Testlauf fand im ganzen Bestand
+keine Stelle, die am alten Verhalten hing -- nur Erwartungen, die `4` statt
+`4.0` zeigten, und im Referenzbuch den Satz, der das alte Verhalten
+beschrieb. `^`, `VAL` und `MIN` bleiben wertabhaengig.
 
 Offen in M1: Methoden ohne statisch bekannte Klasse, FUNCREF-Aufrufe, die
 Laufvariable von FOR EACH, Modultypen (VEC2 & Co.) und die meisten Builtins

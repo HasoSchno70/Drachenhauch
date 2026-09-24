@@ -396,6 +396,11 @@ Plain-Strings (`"..."`) werden **nicht** interpoliert — `{name}` bleibt buchst
 ## Operatoren
 
 **Arithmetik:** `+ - * / \ ^ MOD`
+- `/` liefert **immer** eine Kommazahl: `8 / 2` ist `4.0`, `9 / 2` ist `4.5`
+  (seit 2026-09-24; vorher war `8 / 2` die ganze Zahl 4 -- der Typ hing am Wert).
+  Als Feld-Index oder fuer Befehle, die eine ganze Zahl verlangen (`MID$`,
+  `LEFT$` ...), taugt das Ergebnis darum nicht; `dhrt --check` meldet einen
+  Index, der sicher eine Kommazahl ist.
 - `\` ist ganzzahlige Division (gibt INTEGER, INTEGER auch bei FLOAT-Eingabe).
 - `^` ist Potenz: `2 ^ 8 = 256`.
 

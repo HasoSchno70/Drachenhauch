@@ -86,7 +86,14 @@ verlangen. Aktuell konsistent, also kein Muss.
 
 (Vermutlich Absicht; hier nur dokumentiert, falls man sie je überdenken will.)
 
-### D1. `/` liefert mal INTEGER, mal FLOAT  —  ✅ ENTSCHIEDEN: nicht-brechend (commit 2492848)
+### D1. `/` liefert mal INTEGER, mal FLOAT  —  ✅ GEÄNDERT 2026-09-24: immer FLOAT
+> **Neue Entscheidung (2026-09-24):** `/` liefert immer eine Kommazahl, `8 / 2` ist
+> `4.0`. Anlass war die Übersetzung in Maschinencode (`docs/entwurf-maschinencode.md`):
+> ein Typ, der am Wert hängt, lässt sich nicht vorab festlegen. `\` teilt ganzzahlig.
+> Eine Zuweisung an eine INTEGER-Variable geht weiter, solange das Ergebnis glatt ist
+> (`i = 8 / 2` ist 4); ein Feld-Index aus `/` bricht ab, und `dhrt --check` warnt
+> davor. Im Bestand fand der volle Testlauf keine einzige Stelle, die daran hing.
+> Der Rest dieses Abschnitts beschreibt den Stand davor.
 > Autor-Entscheidung (2026-06-14): **`/` bleibt wie es ist** (glatt → INTEGER, sonst FLOAT;
 > kein `4.0`-Bruch, Buch unverändert). Stattdessen weist die Fehlermeldung beim Zuweisen
 > eines FLOAT-`/`-Ergebnisses an eine INTEGER-Variable jetzt auf `\` (Ganzzahl-Division)

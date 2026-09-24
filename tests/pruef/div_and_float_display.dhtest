@@ -1,13 +1,20 @@
 ' Aus test_div_and_float_display.py uebertragen (6 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
 
-=== division unchanged
-PRINT 8 / 2
+=== division liefert immer eine kommazahl
+' Seit 2026-09-24 (Entscheidung des Nutzers): vorher war `8 / 2` INTEGER und
+' `9 / 2` FLOAT -- ein Typ, der am Wert hing. Ganzzahlig teilt `\`.
+PRINT 8 / 2; " "; TYPEOF(8 / 2)
 PRINT 9 / 2
 PRINT 6 / 3
+PRINT 8 \ 2; " "; TYPEOF(8 \ 2)
+DIM i AS INTEGER : i = 8 / 2
+PRINT i
 --- erwartet
-4
+4.0 FLOAT
 4.5
-2
+2.0
+4 INTEGER
+4
 
 === float into integer hints backslash
 DIM x AS INTEGER
@@ -45,3 +52,18 @@ PRINT AUDIO_GET_VOLUME(ch)
 --- erwartet
 0.35
 
+
+=== ein kommazahl-index wird vor dem lauf gemeldet
+' Seit `/` immer FLOAT liefert, bricht `feld[n / 2]` ab -- vorher lief es,
+' solange die Division aufging. Der Compiler weiss den Typ und warnt; die SUB
+' laeuft hier nie, gemeldet wird trotzdem. `\` bleibt still.
+DIM a[10] AS INTEGER
+SUB nie(n AS INTEGER)
+    a[n / 2] = 1
+    PRINT a[n \ 2]
+END SUB
+PRINT "lauf"
+--- erwartet
+lauf
+--- stderr
+Der Index ist eine Kommazahl -- das bricht beim Laufen ab ('Array-Index muss INTEGER sein'). `/` liefert immer FLOAT; ganzzahlig teilt `\`.

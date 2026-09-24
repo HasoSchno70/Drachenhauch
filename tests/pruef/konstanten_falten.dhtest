@@ -54,7 +54,7 @@ SUB innen()
 END SUB
 innen()
 --- erwartet
-320 240 2.0 FLOAT Spiel 1
+320 240.0 2.0 FLOAT Spiel 1
 320 -480
 
 === ueberlauf bleibt ein laufzeitfehler

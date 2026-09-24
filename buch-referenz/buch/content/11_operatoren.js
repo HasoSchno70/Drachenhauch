@@ -5,7 +5,7 @@ module.exports = (H) => [
   H.h2("Rechnen mit Zahlen"),
   H.p("Die vier Grundrechenarten funktionieren wie erwartet. Dazu kommen zwei nützliche Spezialisten für ganze Zahlen:"),
   H.cmd("+  -  *  /", "a + b   a - b   a * b   a / b",
-    "Addition, Subtraktion, Multiplikation, Division. Die Division mit / liefert eine Kommazahl, sobald die Rechnung nicht glatt aufgeht – etwa 9 / 2 = 4.5. Geht sie glatt auf, bekommst du eine ganze Zahl (8 / 2 = 4).",
+    "Addition, Subtraktion, Multiplikation, Division. Die Division mit / liefert immer eine Kommazahl: 9 / 2 = 4.5 und 8 / 2 = 4.0. Eine ganze Zahl bekommst du mit dem Rückwärts-Schrägstrich \\: 9 \\ 2 = 4.",
     ['PRINT 7 + 2', 'PRINT 7 - 2', 'PRINT 7 * 2', 'PRINT 9 / 2'],
     { out: ["9", "5", "14", "4.5"] }),
   H.cmd("\\  (Ganzzahl-Division)", "a \\ b",

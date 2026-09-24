@@ -10,8 +10,9 @@
 //!
 //! Zwei Stellen, an denen Drachenhauch den Typ vom WERT abhaengig macht, und
 //! die darum eine eigene Art brauchen:
-//! - `a / b` und `a ^ b` mit zwei INTEGER liefern INTEGER, wenn es aufgeht
-//!   (`480 / 2`, `2 ^ 3`), sonst FLOAT (`7 / 2`, `2 ^ -1`) -> [`Typ::Zahl`].
+//! - `a ^ b` mit zwei INTEGER liefert INTEGER, wenn es aufgeht (`2 ^ 3`),
+//!   sonst FLOAT (`2 ^ -1`) -> [`Typ::Zahl`]. (`/` tat das bis 2026-09-24
+//!   auch; seither ist es immer FLOAT.)
 //! - `a AND b` / `a OR b` liefern einen der beiden WERTE (`6 AND 3` ist 3),
 //!   also den Verbund beider Typen -> [`Typ::verbinden`].
 

@@ -6,7 +6,7 @@
 ' Format: docs/werkzeuge.md.
 
 === typen je ausdruck
-' `/` und `^` auf zwei INTEGER haengen am Wert (ZAHL), AND liefert einen der
+' `/` ist immer FLOAT, `^` auf zwei INTEGER haengt am Wert (ZAHL), AND liefert einen der
 ' beiden Werte, eine Methode behaelt ihren Typ, wenn jede Ueberschreibung
 ' denselben verspricht; Builtins nur aus der nachgemessenen Tabelle (LEN
 ' ja, RND(6) und RGB nicht).
@@ -38,12 +38,12 @@ prog.dh:4: "..." -> STRING
 prog.dh:9: "wau" -> STRING
 prog.dh:13: n -> INTEGER
 prog.dh:13: 2 -> INTEGER
-prog.dh:13: (n / 2) -> ZAHL
+prog.dh:13: (n / 2) -> FLOAT
 prog.dh:15: 7 -> INTEGER
 prog.dh:16: NEW hund() -> hund
 prog.dh:17: a -> INTEGER
 prog.dh:17: 2 -> INTEGER
-prog.dh:17: (a / 2) -> ZAHL
+prog.dh:17: (a / 2) -> FLOAT
 prog.dh:17: " " -> STRING
 prog.dh:17: a -> INTEGER
 prog.dh:17: 2 -> INTEGER
@@ -83,7 +83,7 @@ PRINT feld[1] + a; " "; "ab" * 2; " "; "z" + STR$(a)
 --- umgebung
 DHRT_TYPEN_PRUEFEN=1
 --- erwartet
-4 2.6666666666666665 64 0.5 2 12.0
+4.0 2.6666666666666665 64 0.5 2 12.0
 8 x 1 -1.5
 16.0 abab z8
 
