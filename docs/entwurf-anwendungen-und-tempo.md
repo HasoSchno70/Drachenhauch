@@ -113,6 +113,27 @@ direkt aus dem Stapel in die Locals verschieben (`drain`), ohne
 Zwischen-`Vec`. Größerer Schritt, später: ein Frame-Stapel statt Rekursion
 (macht auch die Tiefengrenze von 1000 überflüssig).
 
+**Erledigt (2026-09-24), ohne den Frame-Stapel:**
+- `CALL_USER` und `CALL_METHOD` verschieben die Argumente per `drain` direkt
+  vom Stapel (`bind_params`, `exec`, `exec_byref` sind generisch über die
+  Quelle; nur eine Coroutine bekommt weiter eine Liste).
+- Parameter nehmen den schnellen Typvergleich `passend!` statt `coerce`.
+- `CALL_METHOD` merkt sich je Aufrufstelle (Klasse, Methode)
+  (`Instr::methode`); hat das nächste Objekt dieselbe Klasse (Namensvergleich,
+  jedes Objekt trägt eine eigene Kopie des Namens), gibt es keine Suche.
+
+| je 1 Mio. | 2026.15 | jetzt |
+|---|---|---|
+| `fib(30)` (1,35 Mio. Aufrufe) | 280 ms | 228 ms |
+| eigene Funktion `leer(i)` | 80 ms | 66 ms |
+| Methode `z.holen()` | 96 ms | 86 ms |
+
+Prüfstein `tests/pruef/aufrufe.dhtest` (14; auf der alten Laufzeit gleich,
+Gegenprobe ohne Namensvergleich im Merkplatz: der Fall mit wechselnden
+Klassen an derselben Stelle fällt). Der Rest des Abstands zu CPython
+(`fib(30)` 56 ms) liegt im rekursiven `exec → run_frame → dispatch` je
+Aufruf — das ist der Frame-Stapel.
+
 ### 1d. Was schon schnell ist
 
 Zahlenschleifen sind schneller als Python, Sortieren liegt nah dran, der

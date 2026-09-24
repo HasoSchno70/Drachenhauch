@@ -1,0 +1,213 @@
+' Aufrufe (2026-09-24): CALL_USER und CALL_METHOD verschieben die Argumente
+' per `drain` direkt vom Stapel in die Locals (vorher je Aufruf eine Liste per
+' `split_off`), und die Parameter nehmen den schnellen Typvergleich
+' (`passend!` statt `coerce`). Die Faelle pruefen, dass sich an der Bedeutung
+' nichts aendert -- vor allem an den Sonderformen.
+' Format: docs/werkzeuge.md.
+
+=== rekursion und rueckgabe
+FUNCTION fib(n AS INTEGER) AS INTEGER
+    IF n < 2 THEN RETURN n
+    RETURN fib(n - 1) + fib(n - 2)
+END FUNCTION
+PRINT fib(20)
+--- erwartet
+6765
+
+=== parameter werden umgewandelt wie bisher
+FUNCTION halb(x AS FLOAT) AS FLOAT
+    RETURN x / 2
+END FUNCTION
+SUB zeig(t AS STRING, n AS INTEGER)
+    PRINT t; n
+END SUB
+PRINT halb(5); " "; TYPEOF(halb(5))
+zeig("n=", 3)
+--- erwartet
+2.5 FLOAT
+n=3
+
+=== ein falscher parametertyp bleibt ein fehler
+SUB zeig(n AS INTEGER)
+    PRINT n
+END SUB
+zeig("drei")
+--- fehler
+Parameter
+
+=== byref schreibt zurueck
+SUB tausche(BYREF a AS INTEGER, BYREF b AS INTEGER)
+    DIM t AS INTEGER
+    t = a : a = b : b = t
+END SUB
+DIM x AS INTEGER
+DIM y AS INTEGER
+x = 1 : y = 2
+tausche(x, y)
+PRINT x; y
+--- erwartet
+21
+
+=== vorgabewerte und benannte argumente
+FUNCTION gruss(name AS STRING, anrede AS STRING = "Hallo", n AS INTEGER = 1) AS STRING
+    RETURN (anrede + " " + name + " ") * n
+END FUNCTION
+PRINT "["; gruss("Ada"); "]"
+PRINT "["; gruss("Ada", "Hi"); "]"
+PRINT "["; gruss(n: 2, name: "Bo"); "]"
+--- erwartet
+[Hallo Ada ]
+[Hi Ada ]
+[Hallo Bo Hallo Bo ]
+
+=== variable zahl von argumenten
+SUB log(stufe AS STRING, ...rest)
+    PRINT stufe; ":"; LEN(rest);
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(rest) - 1
+        PRINT " "; rest[i];
+    NEXT
+    PRINT
+END SUB
+log("A")
+log("B", 1, "x", 2.5)
+--- erwartet
+A:0
+B:3 1 x 2.5
+
+=== methoden mit argumenten und vererbung
+CLASS Tier
+    DIM name AS STRING
+    FUNCTION sag(n AS INTEGER) AS STRING
+        RETURN Self.name + " sagt " + Self.laut() * n
+    END FUNCTION
+    FUNCTION laut() AS STRING
+        RETURN "..."
+    END FUNCTION
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS STRING
+        RETURN "wau "
+    END FUNCTION
+END CLASS
+DIM t AS Tier
+t = NEW Hund()
+t.name = "Rex"
+PRINT "["; t.sag(2); "]"
+--- erwartet
+[Rex sagt wau wau ]
+
+=== methode in einem ausdruck mit weiteren werten auf dem stapel
+' Das Objekt liegt unter den Argumenten; darunter noch Zwischenwerte des
+' Ausdrucks. Nach dem Aufruf muss genau das Objekt abgeraeumt sein.
+CLASS Rechner
+    FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER
+        RETURN a * b
+    END FUNCTION
+END CLASS
+DIM r AS Rechner
+r = NEW Rechner()
+PRINT 1 + r.mal(2, 3) * 10 + r.mal(r.mal(1, 2), 4)
+--- erwartet
+69
+
+=== sub als methode liefert nichts auf den stapel
+CLASS Z
+    DIM n AS INTEGER
+    SUB plus(k AS INTEGER)
+        n = n + k
+    END SUB
+END CLASS
+DIM z AS Z
+z = NEW Z()
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    z.plus(i)
+NEXT
+PRINT z.n
+--- erwartet
+15
+
+=== methode auf nil bleibt ein fehler
+CLASS K
+    SUB f()
+    END SUB
+END CLASS
+DIM k AS K
+k.f()
+--- fehler
+NIL
+
+=== eine coroutine-methode
+CLASS Gen
+    FUNCTION zahlen(bis AS INTEGER) AS INTEGER
+        DIM i AS INTEGER
+        FOR i = 1 TO bis
+            YIELD i * 10
+        NEXT
+    END FUNCTION
+END CLASS
+DIM g AS Gen
+g = NEW Gen()
+DIM c AS COROUTINE
+c = g.zahlen(3)
+PRINT CORO_RESUME(c); CORO_RESUME(c); CORO_RESUME(c)
+--- erwartet
+102030
+
+=== container-methoden
+DIM s AS STRING
+s = "hallo"
+DIM a AS ARRAY OF INTEGER
+a = [3, 1, 2]
+a.sort()
+PRINT s.upper(); " "; s.left(2); " "; a[0]; a[2]; " "; a.length()
+--- erwartet
+HALLO ha 13 3
+
+=== tiefe rekursion bleibt ein fangbarer fehler
+FUNCTION ewig(n AS INTEGER) AS INTEGER
+    RETURN ewig(n + 1)
+END FUNCTION
+TRY
+    PRINT ewig(0)
+CATCH e
+    PRINT "gefangen"
+END TRY
+--- erwartet
+gefangen
+
+=== an derselben stelle abwechselnd verschiedene klassen
+' Der Merkplatz von CALL_METHOD gilt nur fuer DIESELBE Klasse; wechselt sie,
+' muss neu gesucht werden -- sonst riefe die Katze die Methode des Hundes.
+CLASS Tier
+    FUNCTION laut() AS STRING
+        RETURN "..."
+    END FUNCTION
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS STRING
+        RETURN "wau"
+    END FUNCTION
+END CLASS
+CLASS Katze EXTENDS Tier
+    FUNCTION laut() AS STRING
+        RETURN "miau"
+    END FUNCTION
+END CLASS
+CLASS Welpe EXTENDS Hund
+END CLASS
+DIM zoo[5] AS Tier
+zoo[0] = NEW Hund() : zoo[1] = NEW Katze() : zoo[2] = NEW Tier()
+zoo[3] = NEW Welpe() : zoo[4] = NEW Katze()
+DIM runde AS INTEGER
+DIM i AS INTEGER
+FOR runde = 1 TO 2
+    FOR i = 0 TO 4
+        PRINT zoo[i].laut(); ",";
+    NEXT
+    PRINT
+NEXT
+--- erwartet
+wau,miau,...,wau,miau,
+wau,miau,...,wau,miau,

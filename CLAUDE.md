@@ -1351,6 +1351,22 @@ Argumentliste an (wie jeder Funktionsaufruf). Tests
 `tests/pruef/objektfelder.dhtest` (auf beiden Laufzeiten gleich; Gegenprobe
 mit falscher Aufloesung bzw. ohne Kette: 3 Faelle fallen).
 
+## Aufrufe ohne Zwischenliste, Methoden mit Merkplatz (2026-09-24)
+
+`CALL_USER`/`CALL_METHOD` verschieben die Argumente per `stack.drain(split..)`
+direkt in die Locals -- `bind_params`, `exec`, `exec_byref` sind dafuer
+generisch (`A: IntoIterator, A::IntoIter: ExactSizeIterator`; eine `Vec`
+geht weiter hinein). Eine Coroutine bekommt weiter eine Liste (sie laeuft
+spaeter). Parameter nehmen `passend!` statt `coerce`. `CALL_METHOD` merkt sich
+in `Instr::methode` (Cell mit rohen Zeigern auf `ClassInfo` und `Func` --
+gueltig, weil das Programm nach dem Laden nicht mehr veraendert wird, wie
+`CoroState::fn_ptr`) die Klasse und Methode des letzten Aufrufs; getroffen
+wird ueber den NAMEN (`ClassInfo::name`), weil jedes Objekt eine eigene Kopie
+des Klassennamens traegt. **Der Namensvergleich ist die Sicherung** --
+ohne ihn ruft an einer Stelle mit wechselnden Klassen jedes Objekt die
+Methode der ersten (Gegenprobe im Test). fib(30) 280 -> 228 ms, Methode
+96 -> 86 ms. Tests `tests/pruef/aufrufe.dhtest`.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

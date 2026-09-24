@@ -182,6 +182,11 @@ pub struct Instr {
     /// Mal zuerst, statt den Namen durch alle Familien zu reichen
     /// (`Vm::builtin_rufen`).
     pub familie: std::cell::Cell<u8>,
+    /// Nur CALL_METHOD: (Klasse, Methode) des letzten Aufrufs. Hat das naechste
+    /// Objekt dieselbe Klasse, ist die Methode ohne Suche da (`op::CALL_METHOD`).
+    /// Beide Zeiger gelten, solange das Programm lebt -- es wird nach dem
+    /// Laden nicht mehr veraendert (wie `CoroState::fn_ptr`).
+    pub methode: std::cell::Cell<(*const ClassInfo, *const Func)>,
 }
 
 pub struct Func {
@@ -225,6 +230,9 @@ pub struct FieldDecl {
 }
 
 pub struct ClassInfo {
+    /// Der eigene Name (wie der Schluessel in `Program::classes`) -- fuer den
+    /// Merkplatz von CALL_METHOD (`Instr::methode`).
+    pub name: String,
     pub parent_name: String,
     pub is_struct: bool,
     pub fields: Vec<FieldDecl>,
@@ -443,6 +451,7 @@ fn decode_func(j: &J) -> Func {
                         op: pair[0].as_u64().expect("op int") as u16,
                         arg: decode_arg(&pair[1]),
                         familie: std::cell::Cell::new(0),
+                        methode: std::cell::Cell::new((std::ptr::null(), std::ptr::null())),
                     }
                 })
                 .collect()
@@ -509,6 +518,7 @@ fn decode_class(j: &J) -> ClassInfo {
         .map(|a| a.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect())
         .unwrap_or_default();
     ClassInfo {
+        name: get("name").as_str().unwrap_or("").to_string(),
         parent_name: get("parent_name").as_str().unwrap_or("").to_string(),
         is_struct: get("is_struct").as_bool().unwrap_or(false),
         fields,
