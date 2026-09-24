@@ -1403,6 +1403,26 @@ Testen:** Vorgabewerte eines direkten Funktionsaufrufs setzt der Compiler
 beim Uebersetzen ein, `param_defaults` wird nur bei Methoden/FUNCREF gelesen;
 der Fall braucht darum beides, sonst prueft er das Feld gar nicht.
 
+## `dispatch` geteilt: heisse und seltene Befehle (2026-09-24)
+
+`Vm::dispatch` wird bei JEDEM Aufruf einer Drachenhauch-Funktion neu betreten
+(`exec -> run_frame -> dispatch`), und sein Stapelrahmen war 4800 Byte gross
+-- groesser als eine Seite, Windows tastet ihn dann bei jedem Eintritt Seite
+fuer Seite an (`__chkstk`). Gemessen mit einer Fassung mit Symbolen
+(`CARGO_PROFILE_RELEASE_DEBUG=1`, `CARGO_TARGET_DIR=C:/dhsym` -- ein langer
+Zielpfad bricht den raylib-Bau) und `llvm-pdbutil dump -symbols dhrt.pdb`
+(S_FRAMEPROC). **Die aufgerufenen Hilfsfunktionen waren es NICHT**
+(`#[inline(never)]` auf addieren/user_op/coerce/... brachte 4800 -> 4720);
+der Rahmen kommt aus den Armen selbst. Jetzt stehen 41 seltene Befehle
+(DECLARE_*, PRINT, INPUT_*, TRY/THROW/FIN_END, Tupel, SLICE, IN, NEW,
+CALL_VALUE/SUPER, YIELD, HALT, ...) in `Vm::dispatch_selten`
+(`#[inline(never)]`, liefert `Some(step)` zum Zurueckkehren), `dispatch`
+faengt sie mit `_ =>` ab. Rahmen 4800 -> ~2900 Byte, Code 156 -> 87 KB;
+fib(30) -8 %, Zahlenschleife -12 %. **Regel:** ein neuer Befehl, der nicht in
+heissen Schleifen laeuft, gehoert in `dispatch_selten`; und wer `dispatch`
+waechst, misst den Rahmen nach (unter 4096 halten). `builtin_rufen` NICHT auf
+`inline(never)` setzen -- das kostete Builtin-Aufrufe 15 %.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
