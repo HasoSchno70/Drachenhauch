@@ -151,7 +151,10 @@ fn call_parts(arg: &Arg) -> (&str, usize, i32) {
     }
 }
 
-fn bind_params(fn_: &Func, args: Vec<Value>, mut locals: Vec<Value>) -> R<Vec<Value>> {
+/// `args` ist ein Iterator, damit CALL_USER/CALL_METHOD die Argumente direkt
+/// vom Stapel des Aufrufers verschieben koennen (`stack.drain(split..)`) --
+/// vorher entstand je Aufruf per `split_off` eine eigene Liste.
+fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut locals: Vec<Value>) -> R<Vec<Value>> {
     // `locals` ist ein (ggf. gepoolter) Buffer -- Allokation wird
     // wiederverwendet, Inhalt kommt frisch aus den local_defaults.
     locals.clear();
@@ -169,7 +172,7 @@ fn bind_params(fn_: &Func, args: Vec<Value>, mut locals: Vec<Value>) -> R<Vec<Va
         let mut it = args.into_iter();
         for i in 0..normal_n {
             let v = it.next().unwrap();
-            locals[i] = coerce(v, &fn_.local_types[i], "Parameter")?;
+            locals[i] = passend!(v, fn_.local_types[i].as_str(), "Parameter");
         }
         let rest: Vec<Value> = it.collect();
         locals[fn_.n_params - 1] = Value::Tuple(Rc::new(rest));
@@ -196,7 +199,9 @@ fn bind_params(fn_: &Func, args: Vec<Value>, mut locals: Vec<Value>) -> R<Vec<Va
                 && matches!(v, Value::Nil) {
                 locals[i] = Value::Nil;
             } else {
-                locals[i] = coerce(v, &fn_.local_types[i], "Parameter")?;
+                // Schneller Typvergleich wie beim Speichern; `coerce` nur, wenn
+                // der Wert nicht schon passt.
+                locals[i] = passend!(v, fn_.local_types[i].as_str(), "Parameter");
             }
         }
         for i in argn..fn_.n_params {
@@ -1813,7 +1818,8 @@ impl<'p> Vm<'p> {
     }
 
     // ---------------------------------------------------------------- exec
-    fn exec(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>) -> R<Value> {
+    fn exec<A>(&mut self, fn_: &'p Func, args: A, self_obj: Option<Value>) -> R<Value>
+    where A: IntoIterator<Item = Value>, A::IntoIter: ExactSizeIterator {
         // Call-Tiefe fuer den Debugger (Step over/into/out). Inkrement pro Frame;
         // garantiert dekrementiert (auch bei Fehler/Return) via Wrapper.
         // Review-Fund: ohne Obergrenze rekursiert exec->run_frame->dispatch->exec
@@ -1833,9 +1839,10 @@ impl<'p> Vm<'p> {
         r
     }
 
-    fn exec_inner(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>) -> R<Value> {
+    fn exec_inner<A>(&mut self, fn_: &'p Func, args: A, self_obj: Option<Value>) -> R<Value>
+    where A: IntoIterator<Item = Value>, A::IntoIter: ExactSizeIterator {
         let lbuf = self.pool_locals.pop().unwrap_or_default();
-        let mut locals = bind_params(fn_, args, lbuf)?;
+        let mut locals = bind_params(fn_, args.into_iter(), lbuf)?;
         let mut stack: Vec<Value> = self.pool_stacks.pop().unwrap_or_else(|| Vec::with_capacity(16));
         let mut ip: usize = 0;
         let mut try_handlers: Vec<(usize, usize)> = Vec::new();
@@ -1855,8 +1862,9 @@ impl<'p> Vm<'p> {
     /// Wie `exec`, liefert aber zusaetzlich die finalen Werte der BYREF-Param-
     /// Slots (in Param-Reihenfolge). Nur der direkte CALL_USER-Pfad nutzt das --
     /// dort kennt der Compiler die Signatur statisch und emittiert das Write-Back.
-    fn exec_byref(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>)
-        -> R<(Value, Vec<Value>)> {
+    fn exec_byref<A>(&mut self, fn_: &'p Func, args: A, self_obj: Option<Value>)
+        -> R<(Value, Vec<Value>)>
+    where A: IntoIterator<Item = Value>, A::IntoIter: ExactSizeIterator {
         self.depth += 1;
         if self.depth > MAX_CALL_DEPTH {
             self.depth -= 1;
@@ -1870,10 +1878,11 @@ impl<'p> Vm<'p> {
         r
     }
 
-    fn exec_byref_inner(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>)
-        -> R<(Value, Vec<Value>)> {
+    fn exec_byref_inner<A>(&mut self, fn_: &'p Func, args: A, self_obj: Option<Value>)
+        -> R<(Value, Vec<Value>)>
+    where A: IntoIterator<Item = Value>, A::IntoIter: ExactSizeIterator {
         let lbuf = self.pool_locals.pop().unwrap_or_default();
-        let mut locals = bind_params(fn_, args, lbuf)?;
+        let mut locals = bind_params(fn_, args.into_iter(), lbuf)?;
         let mut stack: Vec<Value> = self.pool_stacks.pop().unwrap_or_else(|| Vec::with_capacity(16));
         let mut ip: usize = 0;
         let mut try_handlers: Vec<(usize, usize)> = Vec::new();
@@ -1990,7 +1999,7 @@ impl<'p> Vm<'p> {
         let mut try_handlers: Vec<(usize, usize)>;
         if !started {
             let args = std::mem::take(&mut co.borrow_mut().args);
-            locals = bind_params(fn_, args, Vec::new())?;
+            locals = bind_params(fn_, args.into_iter(), Vec::new())?;
             stack = Vec::with_capacity(16);
             ip = 0;
             try_handlers = Vec::new();
@@ -2660,17 +2669,21 @@ impl<'p> Vm<'p> {
                             .ok_or_else(|| format!("Unbekannte Funktion: {}", fn_name.to_uppercase()))?
                     };
                     let split = stack.len() - argc;
-                    let call_args = stack.split_off(split);
+                    // Die Argumente wandern per `drain` direkt vom Stapel in die
+                    // Locals des Aufgerufenen -- vorher legte `split_off` je
+                    // Aufruf eine eigene Liste an. Nur eine Coroutine braucht
+                    // sie als Liste (sie laeuft erst spaeter).
                     if callee.is_coroutine {
+                        let call_args = stack.split_off(split);
                         stack.push(make_coro(callee, call_args, None));
                     } else if callee.param_byref.iter().any(|&b| b) {
                         // BYREF: finale Param-Werte mit zurueckgeben. Layout fuers
                         // Write-Back: [.., bv0, bv1, .., bv{m-1}, result].
-                        let (ret, byref_vals) = self.exec_byref(callee, call_args, None)?;
+                        let (ret, byref_vals) = self.exec_byref(callee, stack.drain(split..), None)?;
                         for v in byref_vals { stack.push(v); }
                         if !callee.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                     } else {
-                        let ret = self.exec(callee, call_args, None)?;
+                        let ret = self.exec(callee, stack.drain(split..), None)?;
                         if !callee.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                     }
                 }
@@ -2756,6 +2769,39 @@ impl<'p> Vm<'p> {
                 op::CALL_METHOD => {
                     let (method, argc, _) = call_parts(arg);
                     let split = stack.len() - argc;
+                    // Der haeufigste Fall -- Methode einer Instanz -- nimmt die
+                    // Argumente per `drain` direkt vom Stapel (wie CALL_USER);
+                    // das Objekt liegt darunter und wird danach abgeraeumt.
+                    let mut erledigt = false;
+                    if split > 0 {
+                        if let Value::Instance(rc) = &stack[split - 1] {
+                            // Merkplatz: dieselbe Klasse wie beim letzten Mal an
+                            // dieser Stelle -> Methode ohne Suche (sonst je Aufruf
+                            // Klassenname klonen und die Kette absuchen).
+                            let (ci_p, f_p) = instr.methode.get();
+                            let getroffen = !ci_p.is_null()
+                                && unsafe { (*ci_p).name.as_str() } == &*rc.borrow().class_name;
+                            let m: &'p Func = if getroffen {
+                                unsafe { &*f_p }
+                            } else {
+                                let cn = rc.borrow().class_name.clone();
+                                let m = self.resolve_method(&cn, method)
+                                    .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                                if let Some(ci) = self.prog.classes.get(&*cn) {
+                                    instr.methode.set((ci as *const ClassInfo, m as *const Func));
+                                }
+                                m
+                            };
+                            if !m.is_coroutine {
+                                let obj = stack[split - 1].clone();
+                                let ret = self.exec(m, stack.drain(split..), Some(obj))?;
+                                stack.pop();
+                                if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                                erledigt = true;
+                            }
+                        }
+                    }
+                    if !erledigt {
                     let margs = stack.split_off(split);
                     let obj = vm_pop(stack)?;
                     match &obj {
@@ -2786,6 +2832,7 @@ impl<'p> Vm<'p> {
                                 None => return Err(unknown_builtin_msg(bi)),
                             }
                         }
+                    }
                     }
                 }
 
