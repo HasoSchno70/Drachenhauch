@@ -1327,26 +1327,25 @@ impl<'p> Vm<'p> {
         None
     }
 
-    fn is_property(&self, class_name: &str, name: &str) -> bool {
-        // Member-Namen liegen lowercase vor (Compiler) -- nur im seltenen
-        // gemischten Fall allozieren.
+    /// Ist `name` eine PROPERTY von `class_name`, und welche Methode liest
+    /// (`lesen`) bzw. schreibt sie? `None` = keine PROPERTY (ein Feld oder eine
+    /// Methode), `Some(None)` = PROPERTY ohne diesen Zugriff. Aus den beim
+    /// Laden gerechneten Tabellen (`ClassInfo::prop_get/prop_set`) -- vorher
+    /// je Zugriff die Kette abgesucht und `format!("__get_{}")` gebaut.
+    fn property_methode(&self, class_name: &str, name: &str, lesen: bool) -> Option<Option<&'p Func>> {
+        let ci = self.prog.classes.get(class_name)?;
+        if !ci.props_kette { return None; }
         let lowered;
-        let target: &str = if name.bytes().any(|b| b.is_ascii_uppercase()) {
+        let key: &str = if name.bytes().any(|b| b.is_ascii_uppercase()) {
             lowered = name.to_lowercase();
             &lowered
         } else { name };
-        let mut cur = self.prog.classes.get(class_name);
-        while let Some(ci) = cur {
-            if ci.properties.contains(target) {
-                return true;
-            }
-            if ci.parent_name.is_empty() {
-                break;
-            }
-            cur = self.prog.classes.get(&ci.parent_name);
-        }
-        false
+        if !ci.props_alle.contains(key) { return None; }
+        let tabelle = if lesen { &ci.prop_get } else { &ci.prop_set };
+        Some(tabelle.get(key).and_then(|(klasse, methode)|
+            self.prog.classes.get(klasse.as_str()).and_then(|c| c.methods.get(methode.as_str()))))
     }
+
 
     fn element_default(&self, type_name: &str) -> Value {
         if let Some(ci) = self.prog.classes.get(type_name) {
@@ -2839,23 +2838,52 @@ impl<'p> Vm<'p> {
                     stack.push(s.clone());
                 }
                 op::LOAD_FIELD => {
-                    let name = constants[arg.as_usize()].fmt();
+                    // `Self.x` in einer Methode. Name direkt aus dem Const-Pool
+                    // (&str) -- vorher entstand je Zugriff ein neuer String.
+                    let name_owned;
+                    let name: &str = match &constants[arg.as_usize()] {
+                        Value::Str(s) => s,
+                        v => { name_owned = v.fmt(); &name_owned }
+                    };
                     let s = self_obj.ok_or_else(|| format!("LOAD_FIELD '{}' ausserhalb Methodenkontext", name))?;
                     if let Value::Instance(rc) = s {
-                        let v = rc.borrow().fields.get(&name)
+                        let v = rc.borrow().fields.get(name)
                             .ok_or_else(|| format!("Feld '{}' existiert nicht", name))?.value.clone();
                         stack.push(v);
                     } else { return Err("LOAD_FIELD: self ist keine Instanz".into()); }
                 }
                 op::STORE_FIELD => {
-                    let name = constants[arg.as_usize()].fmt();
+                    // Ein borrow_mut, eine Suche, der schnelle Typvergleich --
+                    // vorher je Zugriff: Name als String, zweite Suche, Typ
+                    // geklont und die Fehlermeldung per format! VORAB gebaut.
+                    let name_owned;
+                    let name: &str = match &constants[arg.as_usize()] {
+                        Value::Str(s) => s,
+                        v => { name_owned = v.fmt(); &name_owned }
+                    };
                     let s = self_obj.ok_or_else(|| format!("STORE_FIELD '{}' ausserhalb Methodenkontext", name))?;
                     let v = vm_pop(stack)?;
                     if let Value::Instance(rc) = s {
-                        let ty = rc.borrow().fields.get(&name)
-                            .ok_or_else(|| format!("Feld '{}' existiert nicht", name))?.ty.clone();
-                        let cv = coerce(v, &ty, &format!("Zuweisung an Feld {}", name))?;
-                        rc.borrow_mut().fields.get_mut(&name).unwrap().value = cv;
+                        // Schneller Fall: Wert hat schon den Feldtyp -> direkt.
+                        // Sonst die Sperre VOR `coerce` loesen: bei einem
+                        // Klassentyp schaut es in den Wert, und das kann DIESES
+                        // Objekt sein (`Self.naechster = Self`).
+                        let langsam_ty = {
+                            let mut rcb = rc.borrow_mut();
+                            let f = rcb.fields.get_mut(name)
+                                .ok_or_else(|| format!("Feld '{}' existiert nicht", name))?;
+                            match (&v, f.ty.as_str()) {
+                                (Value::Int(_), "integer") | (Value::Float(_), "float")
+                                | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+                                | (_, "any") | (_, "") => { f.value = v; None }
+                                (Value::Int(n), "float") => { f.value = Value::Float(*n as f64); None }
+                                _ => Some((f.ty.clone(), v)),
+                            }
+                        };
+                        if let Some((ty, v)) = langsam_ty {
+                            let cv = coerce(v, &ty, &format!("Zuweisung an Feld {}", name))?;
+                            if let Some(f) = rc.borrow_mut().fields.get_mut(name) { f.value = cv; }
+                        }
                     } else { return Err("STORE_FIELD: self ist keine Instanz".into()); }
                 }
                 op::LOAD_MEMBER => {
@@ -2878,8 +2906,8 @@ impl<'p> Vm<'p> {
                         }
                         Value::Instance(rc) => {
                             let cn = rc.borrow().class_name.clone();
-                            if self.is_property(&cn, &name) {
-                                let getter = self.resolve_method(&cn, &format!("__get_{}", name.to_lowercase()))
+                            if let Some(getter) = self.property_methode(&cn, name, true) {
+                                let getter = getter
                                     .ok_or_else(|| format!("Property '{}' in {} hat keinen Getter", name, cn))?;
                                 let r = self.exec(getter, vec![], Some(obj.clone()))?;
                                 stack.push(r);
@@ -2916,8 +2944,8 @@ impl<'p> Vm<'p> {
                             "Zuweisung an '.{}' bei NIL-Referenz{}", name, NIL_NEW)),
                         Value::Instance(rc) => {
                             let cn = rc.borrow().class_name.clone();
-                            if self.is_property(&cn, name) {
-                                let setter = self.resolve_method(&cn, &format!("__set_{}", name.to_lowercase()))
+                            if let Some(setter) = self.property_methode(&cn, name, false) {
+                                let setter = setter
                                     .ok_or_else(|| format!("Property '{}' in {} hat keinen Setter (read-only)", name, cn))?;
                                 self.exec(setter, vec![v], Some(obj.clone()))?;
                             } else {

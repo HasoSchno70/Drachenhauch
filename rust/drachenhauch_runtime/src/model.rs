@@ -230,6 +230,18 @@ pub struct ClassInfo {
     pub fields: Vec<FieldDecl>,
     pub methods: rustc_hash::FxHashMap<String, Func>,
     pub properties: std::collections::HashSet<String>,
+    /// Hat diese Klasse ODER eine Vorfahrin eine PROPERTY? Einmal beim Laden
+    /// gerechnet (`load_program`). Jeder `obj.x` fragt sonst die ganze Kette nach
+    /// einer PROPERTY ab, und die meisten Klassen haben keine.
+    pub props_kette: bool,
+    /// Je PROPERTY-Name (klein, samt Vorfahren) die Klasse und der Methodenname
+    /// von Getter bzw. Setter -- aufgeloest wie `resolve_method` (die Klasse
+    /// selbst zuerst). Beim Laden gerechnet; vorher baute jeder Zugriff
+    /// `format!("__get_{}")` und suchte die Kette ab.
+    pub prop_get: rustc_hash::FxHashMap<String, (String, String)>,
+    pub prop_set: rustc_hash::FxHashMap<String, (String, String)>,
+    /// Alle PROPERTY-Namen der Kette, auch ohne Getter oder Setter.
+    pub props_alle: rustc_hash::FxHashSet<String>,
 }
 
 pub struct Program {
@@ -502,6 +514,10 @@ fn decode_class(j: &J) -> ClassInfo {
         fields,
         methods,
         properties,
+        props_kette: false,
+        prop_get: Default::default(),
+        prop_set: Default::default(),
+        props_alle: Default::default(),
     }
 }
 
@@ -543,6 +559,46 @@ pub fn load_program(j: &J) -> Result<Program, String> {
     for f in functions.iter_mut() { specialize_args(&mut f.code, &fn_index); }
     for c in classes.values_mut() {
         for m in c.methods.values_mut() { specialize_args(&mut m.code, &fn_index); }
+    }
+    // PROPERTY irgendwo in der Kette? (props_kette)
+    let mit_props: Vec<String> = classes.keys().filter(|k| {
+        let mut cur = classes.get(k.as_str());
+        let mut tiefe = 0;
+        while let Some(ci) = cur {
+            if !ci.properties.is_empty() { return true; }
+            tiefe += 1;
+            if ci.parent_name.is_empty() || tiefe > 64 { break; }
+            cur = classes.get(ci.parent_name.as_str());
+        }
+        false
+    }).cloned().collect();
+    for k in mit_props { if let Some(ci) = classes.get_mut(&k) { ci.props_kette = true; } }
+    // PROPERTY-Tabellen je Klasse: alle Namen der Kette, Getter/Setter so
+    // aufgeloest wie resolve_method (erst die Klasse, dann aufwaerts).
+    let namen: Vec<String> = classes.keys().cloned().collect();
+    for k in namen {
+        let mut kette: Vec<&ClassInfo> = Vec::new();
+        let mut cur = classes.get(k.as_str());
+        let mut kette_namen: Vec<String> = Vec::new();
+        while let Some(ci) = cur {
+            kette.push(ci);
+            kette_namen.push(if kette_namen.is_empty() { k.clone() } else { kette[kette.len() - 2].parent_name.clone() });
+            if ci.parent_name.is_empty() || kette.len() > 64 { break; }
+            cur = classes.get(ci.parent_name.as_str());
+        }
+        let mut alle = rustc_hash::FxHashSet::default();
+        for ci in &kette { for p in &ci.properties { alle.insert(p.to_lowercase()); } }
+        let mut get = rustc_hash::FxHashMap::default();
+        let mut set = rustc_hash::FxHashMap::default();
+        for p in &alle {
+            for (art, ziel) in [("__get_", &mut get), ("__set_", &mut set)] {
+                let key = format!("{}{}", art, p);
+                if let Some(i) = kette.iter().position(|ci| ci.methods.contains_key(&key)) {
+                    ziel.insert(p.clone(), (kette_namen[i].clone(), key));
+                }
+            }
+        }
+        if let Some(ci) = classes.get_mut(&k) { ci.props_alle = alle; ci.prop_get = get; ci.prop_set = set; }
     }
     Ok(Program {
         n_globals,

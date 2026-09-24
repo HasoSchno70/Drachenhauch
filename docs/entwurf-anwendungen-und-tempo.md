@@ -154,6 +154,22 @@ deklariert“), trägt das Programm jetzt die Namen der Plätze
 `tests/pruef/globale_felder.dhtest`. Übrig von Punkt 1: `LOAD_NAME`/
 `STORE_NAME` gibt es noch für FOR-EACH- und CATCH-Variablen im Hauptprogramm.
 
+**Punkt 3 zum größten Teil erledigt (2026-09-24):** der Aufwand steckte nicht
+im Namen des Feldes, sondern in der Frage „ist das eine PROPERTY?“, die jeder
+`obj.x` über die ganze Klassenkette stellte, und im Aufruf der PROPERTY
+(`format!("__get_x")` + Kettensuche je Aufruf). Beides steht jetzt in beim
+Laden gerechneten Tabellen je Klasse.
+
+| je 1 Mio. | 2026.15 | jetzt | CPython |
+|---|---|---|---|
+| `Self.n = Self.n + 1` | 78 ms | 55 ms | 20 ms |
+| `z.n = z.n + 1` | 77 ms | 55 ms | 32 ms |
+| `z.wert` (PROPERTY GET) | 178 ms | 111 ms | 34 ms |
+
+Felder in einem `Vec` mit fester Nummer statt der Hashtabelle wären der
+nächste Schritt; der Abstand zu CPython liegt aber vor allem im Aufruf
+selbst (`CALL_METHOD`/`exec`, siehe 1c).
+
 ## 2. Was einer Anwendung fehlt
 
 Das `gui`-Modul ist inzwischen breit (Tabellen/Gitter, Baum, Formulare mit

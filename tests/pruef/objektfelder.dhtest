@@ -1,0 +1,187 @@
+' Felder und PROPERTYs von Objekten (2026-09-24). Jeder `obj.x` fragte die
+' ganze Klassenkette ab, ob `x` eine PROPERTY ist, und eine PROPERTY baute je
+' Aufruf `format!("__get_x")` und suchte ihre Methode. Jetzt stehen je Klasse
+' beim Laden gerechnete Tabellen (ClassInfo::props_kette/props_alle/prop_get/
+' prop_set). Die Faelle pruefen vor allem die Vererbung.
+' Format: docs/werkzeuge.md.
+
+=== felder lesen und schreiben von aussen und in methoden
+CLASS Zaehler
+    DIM n AS INTEGER
+    DIM f AS FLOAT
+    SUB plus()
+        Self.n = Self.n + 1
+        n = n + 10
+        f = 2
+    END SUB
+END CLASS
+DIM z AS Zaehler
+z = NEW Zaehler()
+z.plus()
+z.n = z.n + 100
+PRINT z.n; " "; z.f; " "; TYPEOF(z.f)
+--- erwartet
+111 2.0 FLOAT
+
+=== ein feld auf das eigene objekt
+CLASS Knoten
+    DIM wert AS INTEGER
+    DIM naechster AS Knoten
+    SUB auf_mich()
+        Self.naechster = Self
+        naechster = Self
+    END SUB
+END CLASS
+DIM k AS Knoten
+k = NEW Knoten()
+k.wert = 7
+k.naechster = k
+PRINT k.naechster.wert
+k.auf_mich()
+PRINT k.naechster.naechster.wert
+--- erwartet
+7
+7
+
+=== ein falscher wert fuer ein feld bleibt ein fehler
+CLASS K
+    DIM n AS INTEGER
+    SUB setz()
+        n = "x"
+    END SUB
+END CLASS
+DIM k AS K
+k = NEW K()
+k.setz()
+--- fehler
+Zuweisung an Feld n
+
+=== property mit getter und setter
+CLASS Konto
+    DIM _stand AS INTEGER
+    PROPERTY GET stand() AS INTEGER
+        RETURN Self._stand
+    END PROPERTY
+    PROPERTY SET stand(v AS INTEGER)
+        IF v < 0 THEN v = 0
+        Self._stand = v
+    END PROPERTY
+END CLASS
+DIM k AS Konto
+k = NEW Konto()
+k.stand = 50
+k.stand = k.stand - 80
+PRINT k.stand
+--- erwartet
+0
+
+=== property der elternklasse am kind
+CLASS Tier
+    DIM _name AS STRING
+    PROPERTY GET name() AS STRING
+        RETURN "Tier " + Self._name
+    END PROPERTY
+    PROPERTY SET name(v AS STRING)
+        Self._name = v
+    END PROPERTY
+END CLASS
+CLASS Hund EXTENDS Tier
+    DIM laut AS INTEGER
+END CLASS
+DIM h AS Hund
+h = NEW Hund()
+h.name = "Rex"
+h.laut = 3
+PRINT h.name; " "; h.laut
+--- erwartet
+Tier Rex 3
+
+=== das kind ueberschreibt den getter
+CLASS Tier
+    PROPERTY GET art() AS STRING
+        RETURN "Tier"
+    END PROPERTY
+END CLASS
+CLASS Katze EXTENDS Tier
+    PROPERTY GET art() AS STRING
+        RETURN "Katze"
+    END PROPERTY
+END CLASS
+DIM t AS Tier
+t = NEW Katze()
+PRINT t.art
+t = NEW Tier()
+PRINT t.art
+--- erwartet
+Katze
+Tier
+
+=== nur lesbar bleibt nur lesbar
+CLASS Fest
+    PROPERTY GET wert() AS INTEGER
+        RETURN 5
+    END PROPERTY
+END CLASS
+DIM f AS Fest
+f = NEW Fest()
+PRINT f.wert
+f.wert = 3
+--- fehler
+hat keinen Setter
+
+=== nur schreibbar bleibt nur schreibbar
+CLASS Senke
+    DIM zuletzt AS INTEGER
+    PROPERTY SET wert(v AS INTEGER)
+        Self.zuletzt = v
+    END PROPERTY
+END CLASS
+DIM s AS Senke
+s = NEW Senke()
+s.wert = 4
+PRINT s.zuletzt
+PRINT s.wert
+--- fehler
+hat keinen Getter
+
+=== die elternklasse hat die property das kind nur felder
+' Die Klasse ohne eigene PROPERTY muss trotzdem die der Mutter kennen
+' (props_kette gilt fuer die ganze Kette).
+CLASS Basis
+    DIM _x AS INTEGER
+    PROPERTY GET x() AS INTEGER
+        RETURN Self._x * 2
+    END PROPERTY
+    PROPERTY SET x(v AS INTEGER)
+        Self._x = v
+    END PROPERTY
+END CLASS
+CLASS Mitte EXTENDS Basis
+END CLASS
+CLASS Blatt EXTENDS Mitte
+    DIM y AS INTEGER
+END CLASS
+DIM b AS Blatt
+b = NEW Blatt()
+b.x = 21
+b.y = 1
+PRINT b.x; " "; b.y
+--- erwartet
+42 1
+
+=== gebundene methode und feld desselben objekts
+CLASS Spieler
+    DIM punkte AS INTEGER
+    SUB treffer()
+        punkte = punkte + 1
+    END SUB
+END CLASS
+DIM s AS Spieler
+s = NEW Spieler()
+DIM f AS FUNCREF
+f = s.treffer
+f()
+f()
+PRINT s.punkte
+--- erwartet
+2
