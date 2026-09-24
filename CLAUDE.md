@@ -1333,6 +1333,24 @@ ein NEUES Feld an. Ein leerer Platz meldet sich mit dem Namen der Variable
 `task.dhtest`/`dhrt_call.dhtest` ihn pruefen. Tests
 `tests/pruef/globale_felder.dhtest`.
 
+## Felder und PROPERTYs von Objekten (2026-09-24)
+
+`obj.x` (auch `Self.x` -- das ist LOAD_MEMBER, nicht LOAD_FIELD; LOAD_FIELD
+ist nur das nackte `x` in einer Methode) fragte bei JEDEM Zugriff die
+Klassenkette ab, ob `x` eine PROPERTY ist (`std::HashSet` je Ebene), und eine
+PROPERTY baute je Aufruf `format!("__get_x")` und suchte ihre Methode. Jetzt
+rechnet `model::load_program` je Klasse `props_kette` (irgendeine PROPERTY in
+der Kette?), `props_alle` (alle Namen) und `prop_get`/`prop_set` (Name ->
+Klasse + Methode, aufgeloest wie `resolve_method`: die Klasse selbst zuerst);
+`Vm::property_methode` beantwortet beides in einem Schritt, `is_property` ist
+weg. `Self.n = Self.n + 1`: 78 -> 55 ms je Million, PROPERTY 178 -> 111 ms.
+`STORE_FIELD` baut keinen Namen/Typ/Fehlertext mehr vorab und loest die
+Sperre vor `coerce` (`Self.naechster = Self`). Offen: CALL_METHOD sucht die
+Methode je Aufruf ueber die Kette und legt per `split_off` eine neue
+Argumentliste an (wie jeder Funktionsaufruf). Tests
+`tests/pruef/objektfelder.dhtest` (auf beiden Laufzeiten gleich; Gegenprobe
+mit falscher Aufloesung bzw. ohne Kette: 3 Faelle fallen).
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
