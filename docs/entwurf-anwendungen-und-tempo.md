@@ -175,6 +175,19 @@ deklariert“), trägt das Programm jetzt die Namen der Plätze
 `tests/pruef/globale_felder.dhtest`. Übrig von Punkt 1: `LOAD_NAME`/
 `STORE_NAME` gibt es noch für FOR-EACH- und CATCH-Variablen im Hauptprogramm.
 
+**Punkt 2 erledigt (2026-09-24):** gemessen war der JSON-Umweg kleiner als
+gedacht -- bei der IDE (10 198 Zeilen) kostete das Bauen des .dhc-JSON
+(`finish`) ~13 ms und das Zerlegen ~3 ms, der Compiler selbst ~40 ms.
+`dhrt run` und `dhrt call` bauen jetzt direkt `Program`/`Func`
+(`compiler::compile_to_program`, `FuncTeile::zu_func`); das JSON entsteht nur
+noch für `--export`, `--dumpbc` und .dhc-Dateien. Beide Wege gehen durch
+`model::func_bauen`/`programm_bauen`. Dazu sucht `add_const` Dubletten über
+einen Index statt linear. Start der IDE: 128 → 98 ms. Prüfstein
+`tests/pruef/direkt_und_dhc.dhtest` (dasselbe Programm direkt und als .dhc;
+Gegenprobe ohne Vorgabewerte im direkten Weg fällt -- die erste Fassung des
+Tests prüfte sie gar nicht, weil CALL_USER Vorgabewerte beim Übersetzen
+einsetzt).
+
 **Punkt 5 zur Hälfte erledigt (2026-09-24):** der Compiler faltet Konstanten
 (`2 * 3`, `BREITE  2`, globale CONSTs mit festem Wert) mit den Rechenfunktionen
 der VM (`vm::konstant_rechnen`); `x + 2 * FAKTOR` kostet so viel wie `x + 6`

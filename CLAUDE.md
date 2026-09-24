@@ -1386,6 +1386,23 @@ jetzt CONSTs mit festem Wert; `GLOBAL_UNGESETZT` sagt das. `x + 2 * FAKTOR`:
 nimmt fuer `/` immer FLOAT an, die Laufzeit liefert bei glatter Teilung aber
 INTEGER (`480 / 2` = 240). Tests `tests/pruef/konstanten_falten.dhtest`.
 
+## `dhrt run` ohne JSON-Umweg (2026-09-24)
+
+Der Compiler baute fuer jeden Lauf das komplette .dhc-JSON, und `model::
+load_program` zerlegte es sofort wieder (Erbe des gemeinsamen Formats mit
+Python). Jetzt liefert `build_func` `FuncTeile` (die Befehlsliste wird
+UEBERNOMMEN, nicht kopiert); daraus macht `zu_json` das .dhc-JSON (`--export`,
+`--dumpbc`, `--check`, Profiler, Debugger) oder `zu_func` direkt die `Func`
+(`compile_to_program` -> `run`/`call`, `main.rs::compile_source_programm`).
+**Beide Wege gehen durch `model::func_bauen` und `programm_bauen`** (neutrale
+Elemente, Merkplaetze, Aufruf-Indizes, PROPERTY-Tabellen) -- wer dort etwas
+nachtraegt, muss es nur einmal tun. `add_const` sucht Dubletten ueber
+`Ctx::const_index` (JSON-Text als Schluessel) statt linear. IDE-Start
+128 -> 98 ms. Tests `tests/pruef/direkt_und_dhc.dhtest` -- **Falle beim
+Testen:** Vorgabewerte eines direkten Funktionsaufrufs setzt der Compiler
+beim Uebersetzen ein, `param_defaults` wird nur bei Methoden/FUNCREF gelesen;
+der Fall braucht darum beides, sonst prueft er das Feld gar nicht.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

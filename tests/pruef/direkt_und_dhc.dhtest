@@ -1,0 +1,108 @@
+' `dhrt run` baut das Programm seit 2026-09-24 DIREKT fuer die VM
+' (compiler::compile_to_program), ohne das .dhc-JSON erst zu bauen und wieder
+' zu zerlegen. Der JSON-Weg bleibt fuer --export und .dhc-Dateien. Beide gehen
+' durch model::func_bauen / programm_bauen -- dieser Fall prueft, dass sie auch
+' wirklich dasselbe ausfuehren: dasselbe Programm einmal direkt, einmal als
+' .dhc (--dumpbc, dann gestartet).
+' Format: docs/werkzeuge.md.
+
+=== direkt und als dhc gleich
+IMPORT "helfer.dh"
+dlStarten(["run", CWD$() + "/prog.dh"])
+DIM direkt AS STRING : direkt = dlAus
+DIM direktCode AS INTEGER : direktCode = dlCode
+dlStarten(["--dumpbc", CWD$() + "/prog.dh"])
+DIM f AS FILE
+f = OPENFILE(CWD$() + "/prog.dhc", "w")
+WRITELINE(f, dlAus)
+CLOSEFILE(f)
+dlStarten([CWD$() + "/prog.dhc"])
+PRINT "gleich "; direkt = dlAus
+PRINT "codes "; direktCode; " "; dlCode
+PRINT "zeilen "; LEN(SPLIT$(TRIM$(direkt), CHR$(10)))
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- datei prog.dh
+CONST GRENZE = 3
+CONST TEXT_A AS STRING = "A"
+ENUM Farbe = ROT, GRUEN, BLAU
+DIM feld[3] AS INTEGER
+DIM namen AS MAP OF INTEGER
+DATA 5, "fuenf", 2.5
+
+CLASS Tier
+    DIM _name AS STRING
+    PROPERTY GET name() AS STRING
+        RETURN "T:" + Self._name
+    END PROPERTY
+    PROPERTY SET name(v AS STRING)
+        Self._name = v
+    END PROPERTY
+    FUNCTION laut() AS STRING
+        RETURN "..."
+    END FUNCTION
+    FUNCTION ruf(n AS INTEGER = 2) AS STRING
+        RETURN Self.laut() * n
+    END FUNCTION
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS STRING
+        RETURN "wau"
+    END FUNCTION
+END CLASS
+
+FUNCTION zaehler(bis AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 1 TO bis
+        YIELD i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB tausche(BYREF a AS INTEGER, BYREF b AS INTEGER)
+    DIM t AS INTEGER
+    t = a : a = b : b = t
+END SUB
+
+FUNCTION gruss(n AS STRING, anrede AS STRING = "Hallo") AS STRING
+    RETURN anrede + " " + n
+END FUNCTION
+
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    feld[i] = (i + 1) * GRENZE
+    namen["k" + STR$(i)] = i
+NEXT
+PRINT feld[0]; feld[1]; feld[2]; " "; LEN(namen); " "; Farbe.BLAU
+DIM h AS Tier
+h = NEW Hund()
+h.name = "Rex"
+PRINT h.name; " "; h.laut()
+DIM fr AS FUNCREF
+fr = gruss
+PRINT h.ruf(); " "; h.ruf(1); " "; fr("Cy")
+DIM c AS COROUTINE
+c = zaehler(2)
+PRINT CORO_RESUME(c); CORO_RESUME(c); CORO_RESUME(c); " "; CORO_DONE(c)
+DIM x AS INTEGER, y AS INTEGER
+x = 1 : y = 2
+tausche(x, y)
+PRINT x; y; " "; gruss("Ada"); " "; gruss("Bo", "Hi")
+DIM zahl AS INTEGER, wort AS STRING, kom AS FLOAT
+READ zahl, wort, kom
+PRINT zahl; wort; kom
+DIM s AS STRING
+FOR i = 1 TO 5
+    s = s + TEXT_A + STR$(i)
+NEXT
+PRINT s; " "; 2 * GRENZE + 1; " "; -GRENZE
+TRY
+    THROW "weg"
+CATCH e
+    PRINT "gefangen "; e
+END TRY
+PRINT [n * 2 FOR n IN (1, 2, 3) WHERE n > 1]
+--- erwartet
+gleich TRUE
+codes 0 0
+zeilen 9
