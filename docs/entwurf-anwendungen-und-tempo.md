@@ -43,13 +43,34 @@ Mal die ganze Zeichenkette (dazu zwei `fmt`-Kopien in `op::ADD`). Genau das
 tut eine Textanwendung ständig: Bericht, CSV, HTML, Protokoll zusammenbauen.
 Python ist hier linear, weil es bei Referenzzahl 1 an Ort und Stelle anhängt.
 
-**Vorschlag:** `Value::Str(Rc<String>)` statt `Rc<str>` und ein eigener
-Opcode für `x = x + ausdruck`, wenn `x` eine STRING-Variable ist: den Wert
-aus dem Platz nehmen (`mem::take`), mit `Rc::get_mut` anhängen, zurücklegen.
-Dazu im `ADD` für zwei Zeichenketten `format!` durch `String::with_capacity`
-+ `push_str` ersetzen. Prüfstein: 400 000 × Anhängen unter 50 ms, und ein
-Fall, bei dem eine zweite Variable denselben Text hält, darf ihn nicht
-mitverändern.
+**Erledigt (2026-09-24).** `Value::Str` ist jetzt `Rc<String>`, und
+`x = x + e` / `x += e` auf einen lokalen oder globalen Platz wird zu einem
+Befehl `ADD_STORE_LOCAL` bzw. `ADD_STORE_GLOBAL_SLOT`. Der lädt `x` wie
+bisher VOR `e`; hält der Platz danach noch denselben Text (Zeigervergleich)
+und ist `e` ein schlichter Wert, gibt der Platz seinen Verweis ab, und
+`Vm::addieren` hängt mit `Rc::get_mut` an Ort und Stelle an. In jedem anderen
+Fall (zweiter Halter, `e` hat `x` geändert, Objekt mit `OPERATOR +`) rechnet
+er wie ADD + STORE. Eine Kette `x = x + t1 + t2` formt der Compiler zu
+`x + (t1 + t2)` um, wenn `x` und `t1` sicher Text sind (auch `STR$`, `CHR$`
+… und eigene Funktionen `AS STRING`) und die übrigen Glieder schlichte Werte.
+
+| gemessen | 2026.15 | jetzt |
+|---|---|---|
+| 400 000 × `s = s + "x"` | 7 065 ms | 16 ms |
+| 200 000 × `s = s + STR$(i) + ","` (global) | 9 400 ms | 36 ms |
+| 200 000 × `r += CHR$(..) + "-"` (lokal) | 2 661 ms | 47 ms |
+| Zahlenschleife 10 Mio. | 285 ms | 245 ms |
+| Maps mit `"k" + STR$(i)` | 195 ms | 158 ms |
+
+Nebenbei schneller geworden: Zwischenergebnisse wie `"a" + b + c` hängen
+ebenfalls an, statt jedes Mal neu zu kopieren. Die Speicherprüfung von
+`STORE_LOCAL`/`STORE_GLOBAL_SLOT` ist ein Makro (`passend!`); als Funktion
+wurde sie nicht eingebettet und kostete gemessen 25 %.
+
+**Nicht erfasst** (bleiben beim Kopieren): Felder (`Self.text = Self.text +
+z`) und Feldelemente (`a[i] = a[i] + z`). Prüfstein:
+`tests/pruef/zeichenketten_anhaengen.dhtest` -- auf der alten Laufzeit
+fallen genau die zwei Tempo-Fälle.
 
 ### 1b. Builtins werden je Aufruf am NAMEN gesucht
 
@@ -105,8 +126,7 @@ schreiben will, trotzdem vermisst:
 
 ## 3. Empfohlene Reihenfolge
 
-1. Zeichenketten anhängen linear (1a) — der einzige Punkt, an dem eine
-   gewöhnliche Anwendung heute spürbar hängt.
+1. ~~Zeichenketten anhängen linear (1a)~~ — erledigt 2026-09-24.
 2. Builtin-Aufruf über eine Nummer (1b) — betrifft jedes Programm.
 3. Mehrere Variablen in einem `DIM`, englische Fehlermeldungen.
 4. Schlanker Export, Tray/Benachrichtigung.

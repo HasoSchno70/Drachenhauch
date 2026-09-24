@@ -19,7 +19,7 @@ pub enum Value {
     Bool(bool),
     Int(i64),
     Float(f64),
-    Str(Rc<str>),
+    Str(Rc<String>),
     Tuple(Rc<Vec<Value>>),
     FuncRef(Rc<str>),
     /// Eine an eine Instanz GEBUNDENE Methode (`f = spieler.tick`).
@@ -831,8 +831,10 @@ impl Value {
         }
     }
 
-    pub fn str_rc(s: &str) -> Value {
-        Value::Str(Rc::from(s))
+    /// Ein Text-Wert. Nimmt `&str` (dann eine Kopie) oder einen fertigen
+    /// `String` (dann ohne Kopie -- `Rc<String>` braucht sonst zwei Allokationen).
+    pub fn str_rc(s: impl Into<String>) -> Value {
+        Value::Str(Rc::new(s.into()))
     }
 }
 

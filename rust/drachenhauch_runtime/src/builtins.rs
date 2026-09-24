@@ -939,7 +939,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         };
     }
     match name {
-        "str$" | "str" => { arity!(1); Ok(Value::str_rc(&str_of(&a[0]))) }
+        "str$" | "str" => { arity!(1); Ok(Value::str_rc(str_of(&a[0]))) }
         "val" => {
             arity!(1);
             Ok(val_lesen(need_str(&a[0], "VAL")?))
@@ -965,7 +965,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
             let n = need_num(&a[0], "NUMFMT$")?;
             let dec = if a.len() == 2 { need_int(&a[1], "NUMFMT$")? } else { 2 };
-            Ok(Value::str_rc(&numfmt(n, dec)))
+            Ok(Value::str_rc(numfmt(n, dec)))
         }
         "abs" => {
             arity!(1);
@@ -1077,12 +1077,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "time$" | "time" => {
             arity!(0);
             let (_, _, _, h, mi, s) = local_datetime();
-            Ok(Value::str_rc(&format!("{:02}:{:02}:{:02}", h, mi, s)))
+            Ok(Value::str_rc(format!("{:02}:{:02}:{:02}", h, mi, s)))
         }
         "date$" | "date" => {
             arity!(0);
             let (y, mo, d, _, _, _) = local_datetime();
-            Ok(Value::str_rc(&format!("{:04}-{:02}-{:02}", y, mo, d)))
+            Ok(Value::str_rc(format!("{:04}-{:02}-{:02}", y, mo, d)))
         }
         // Die Fassung der Laufzeit, die GERADE laeuft -- dieselbe Zahl, die
         // `dhrt --version` nennt. Ein Programm hatte bisher keinen Weg, sie
@@ -1218,8 +1218,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if x < 0.0 { return err("SQR von negativer Zahl".to_string()); }
             Ok(Value::Float(x.sqrt()))
         }
-        "upper$" | "upper" => { arity!(1); Ok(Value::str_rc(&need_str(&a[0], "UPPER$")?.to_uppercase())) }
-        "lower$" | "lower" => { arity!(1); Ok(Value::str_rc(&need_str(&a[0], "LOWER$")?.to_lowercase())) }
+        "upper$" | "upper" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "UPPER$")?.to_uppercase())) }
+        "lower$" | "lower" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "LOWER$")?.to_lowercase())) }
         "rgb" => {
             // Gerundet statt streng: `RGB` war der einzige Ausreisser unter den
             // Zeichen-Befehlen. CIRCLE/BOX/LINE/PLOT/TEXT/SETFPS nehmen alle
@@ -1354,7 +1354,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Some(v) => return err(format!("EURO$: das Symbol muss ein STRING sein, \
                                                erhalten {}", v.type_name())),
             };
-            Ok(Value::str_rc(&euro_text(cent, &symbol)))
+            Ok(Value::str_rc(euro_text(cent, &symbol)))
         }
         "round_half_up" => {
             if a.is_empty() || a.len() > 2 {
@@ -1583,7 +1583,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "isstr" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Str(_)))) }
         "isbool" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Bool(_)))) }
         // --- Encoding / Hash ---
-        "base64_encode" => { arity!(1); Ok(Value::str_rc(&b64_encode(need_str(&a[0], "BASE64_ENCODE")?.as_bytes()))) }
+        "base64_encode" => { arity!(1); Ok(Value::str_rc(b64_encode(need_str(&a[0], "BASE64_ENCODE")?.as_bytes()))) }
         "base64_decode" => {
             arity!(1);
             let bytes = b64_decode(need_str(&a[0], "BASE64_DECODE")?)?;
@@ -1601,7 +1601,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             let raw = need_str(&a[0], "COMPRESS$")?;
             let packed = miniz_oxide::deflate::compress_to_vec(raw.as_bytes(), 6);
-            Ok(Value::str_rc(&b64_encode(&packed)))
+            Ok(Value::str_rc(b64_encode(&packed)))
         }
         "decompress$" => {
             arity!(1);
@@ -2063,7 +2063,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // --- String-Erweiterungen (WP3) ---
         "ltrim$" | "ltrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "LTRIM$")?.trim_start())) }
         "rtrim$" | "rtrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "RTRIM$")?.trim_end())) }
-        "reverse$" => { arity!(1); Ok(Value::str_rc(&need_str(&a[0], "REVERSE$")?.chars().rev().collect::<String>())) }
+        "reverse$" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "REVERSE$")?.chars().rev().collect::<String>())) }
         "startswith" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "STARTSWITH")?.starts_with(need_str(&a[1], "STARTSWITH")?))) }
         "endswith" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "ENDSWITH")?.ends_with(need_str(&a[1], "ENDSWITH")?))) }
         "contains" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "CONTAINS")?.contains(need_str(&a[1], "CONTAINS")?))) }
@@ -2847,7 +2847,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // einmal -- so schreibt es jeder zuerst, und vorher war es ein
             // Fehler ("READALL$ erwartet FILE").
             if let Value::Str(pfad) = &a[0] {
-                return Ok(Value::str_rc(&text_lesen(pfad, None, "READALL$")?));
+                return Ok(Value::str_rc(text_lesen(pfad, None, "READALL$")?));
             }
             let f = file_h(&a[0], "READALL$")?;
             let mut f = f.borrow_mut();
@@ -2953,7 +2953,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "tempdir$" | "tempdir" => {
             arity!(0);
-            Ok(Value::str_rc(&std::env::temp_dir().to_string_lossy()))
+            Ok(Value::str_rc(std::env::temp_dir().to_string_lossy()))
         }
         "tempfile$" | "tempfile" => {
             // TEMPFILE$([praefix$ [, endung$]]) -- ein noch nicht vergebener
@@ -2974,7 +2974,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 // create_new: legt an ODER schlaegt fehl, wenn es die Datei
                 // schon gibt -- als eine Handlung, ohne Luecke dazwischen.
                 match std::fs::OpenOptions::new().write(true).create_new(true).open(&p) {
-                    Ok(_) => return Ok(Value::str_rc(&p.to_string_lossy())),
+                    Ok(_) => return Ok(Value::str_rc(p.to_string_lossy().into_owned())),
                     Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
                     Err(e) => return err(format!("TEMPFILE$: {}: {}", p.display(), e)),
                 }
@@ -3115,7 +3115,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let pfad = need_str(&a[0], "ZIP_READ$")?;
             let name = need_str(&a[1], "ZIP_READ$")?;
             let daten = crate::zipdatei::lies(std::path::Path::new(pfad), name)?;
-            Ok(Value::str_rc(&String::from_utf8_lossy(&daten)))
+            Ok(Value::str_rc(String::from_utf8_lossy(&daten).into_owned()))
         }
         "zip_extract" => {
             arity!(2);
@@ -3179,7 +3179,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 if a.len() > 1 { Some(need_str(&a[1], "CSV_FORMAT$")?) } else { None },
                 "CSV_FORMAT$")?;
             let zeilen = csv_aus_array(&a[0], "CSV_FORMAT$")?;
-            Ok(Value::str_rc(&crate::csv::schreiben(&zeilen, t)))
+            Ok(Value::str_rc(crate::csv::schreiben(&zeilen, t)))
         }
         "csv_save" => {
             arity!(2, 4);
@@ -3199,7 +3199,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 "CSV_ROW$")?;
             let zeilen = csv_aus_array(&a[0], "CSV_ROW$")?;
             let felder: Vec<String> = zeilen.into_iter().flatten().collect();
-            Ok(Value::str_rc(&crate::csv::zeile_schreiben(&felder, t)))
+            Ok(Value::str_rc(crate::csv::zeile_schreiben(&felder, t)))
         }
 
         // ===== Pruefsummen und Identitaet (WP D) =====
@@ -3224,7 +3224,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let anz = name.to_uppercase();
             let pfad = need_str(&a[0], &anz)?;
             let algo = name.trim_end_matches('$').trim_end_matches("_file");
-            Ok(Value::str_rc(&datei_hash(pfad, algo, &anz)?))
+            Ok(Value::str_rc(datei_hash(pfad, algo, &anz)?))
         }
         "hmac_sha256$" | "hmac_sha256" => {
             // HMAC_SHA256$(schluessel, daten) -- der Standard fuer signierte
@@ -3239,7 +3239,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let mut m = <hmac::Hmac<sha2::Sha256> as hmac::Mac>::new_from_slice(&schluessel)
                 .map_err(|e| format!("HMAC_SHA256$: Schluessel nicht verwendbar: {}", e))?;
             m.update(&daten);
-            Ok(Value::str_rc(&hex_string(&m.finalize().into_bytes())))
+            Ok(Value::str_rc(hex_string(&m.finalize().into_bytes())))
         }
         "secure_equals" => {
             // Zwei Pruefsummen in KONSTANTER Zeit vergleichen.
@@ -3409,7 +3409,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "buffer_to_base64$" | "buffer_to_base64" => {
             arity!(1);
-            Ok(Value::str_rc(&b64_encode(&buf_h(&a[0], "BUFFER_TO_BASE64$")?.borrow())))
+            Ok(Value::str_rc(b64_encode(&buf_h(&a[0], "BUFFER_TO_BASE64$")?.borrow())))
         }
         "buffer_from_base64" => {
             // Anders als BASE64_DECODE (das UTF-8 verlangt) kommen hier rohe
@@ -3630,7 +3630,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let vorgabe = if a.len() == 2 { need_str(&a[1], "GETENV$")? } else { "" };
             // `var_os` + lossy: eine Umgebungsvariable mit ungueltigem UTF-8
             // (unter Unix moeglich) soll nicht den ganzen Lauf abbrechen.
-            Ok(Value::str_rc(&std::env::var_os(name_)
+            Ok(Value::str_rc(std::env::var_os(name_)
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_else(|| vorgabe.to_string())))
         }
@@ -3651,7 +3651,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "cwd$" | "cwd" => {
             arity!(0);
             let p = std::env::current_dir().map_err(|e| format!("CWD$: {}", e))?;
-            Ok(Value::str_rc(&p.to_string_lossy()))
+            Ok(Value::str_rc(p.to_string_lossy().into_owned()))
         }
         "chdir" => {
             arity!(1);
@@ -3668,7 +3668,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // nicht, und wer seine Beilagen NEBEN der Exe sucht (statt im
             // Startverzeichnis, DHRT_START_DIR) fand sie gar nicht.
             let p = std::env::current_exe().map_err(|e| format!("EXEPATH$: {}", e))?;
-            Ok(Value::str_rc(&p.to_string_lossy()))
+            Ok(Value::str_rc(p.to_string_lossy().into_owned()))
         }
 
         // ===== Modul: tween (zeitbasiert -> nicht deterministisch) =====
@@ -3719,7 +3719,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "xml_escape$" | "xml_escape" => {
             arity!(1);
-            Ok(Value::str_rc(&crate::xml::entity_zu(need_str(&a[0], "XML_ESCAPE$")?)))
+            Ok(Value::str_rc(crate::xml::entity_zu(need_str(&a[0], "XML_ESCAPE$")?)))
         }
         "xml_name$" | "xml_name" => { arity!(1); Ok(Value::str_rc(&xml_h(&a[0], "XML_NAME$")?.name)) }
         "xml_text$" | "xml_text" => {
@@ -3808,7 +3808,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "ini_text$" | "ini_text" => {
             arity!(1);
-            Ok(Value::str_rc(&crate::ini::schreiben(&ini_paare(&a[0], "INI_TEXT$")?)))
+            Ok(Value::str_rc(crate::ini::schreiben(&ini_paare(&a[0], "INI_TEXT$")?)))
         }
         "ini_save" => {
             arity!(2, 3);
@@ -3833,8 +3833,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("JSON_LOAD: {}: {}", path, e))?;
             Ok(json_wert(v))
         }
-        "json_stringify" => { arity!(1); Ok(Value::str_rc(&serde_json::to_string(&*json_h(&a[0], "JSON_STRINGIFY")?.borrow()).unwrap_or_default())) }
-        "json_pretty" => { arity!(1); Ok(Value::str_rc(&serde_json::to_string_pretty(&*json_h(&a[0], "JSON_PRETTY")?.borrow()).unwrap_or_default())) }
+        "json_stringify" => { arity!(1); Ok(Value::str_rc(serde_json::to_string(&*json_h(&a[0], "JSON_STRINGIFY")?.borrow()).unwrap_or_default())) }
+        "json_pretty" => { arity!(1); Ok(Value::str_rc(serde_json::to_string_pretty(&*json_h(&a[0], "JSON_PRETTY")?.borrow()).unwrap_or_default())) }
         "json_get_string" => {
             arity!(2); let h = json_h(&a[0], "JSON_GET_STRING")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_GET_STRING")?, "JSON_GET_STRING")?;
             v.as_str().map(Value::str_rc).ok_or_else(|| format!("JSON_GET_STRING: Pfad '{}' ist kein String", need_str(&a[1], "x").unwrap_or("")))
@@ -4261,7 +4261,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "chart_hover_series" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_HOVER_SERIES")?.borrow().hover_serie as i64)) }
         "chart_hover_label$" | "chart_hover_label" => {
             arity!(1);
-            Ok(Value::str_rc(&chart_h(&a[0], "CHART_HOVER_LABEL$")?.borrow().hover_label()))
+            Ok(Value::str_rc(chart_h(&a[0], "CHART_HOVER_LABEL$")?.borrow().hover_label()))
         }
         "chart_hover_value" => { arity!(1); Ok(Value::Float(chart_h(&a[0], "CHART_HOVER_VALUE")?.borrow().hover_value())) }
         "chart_clicked" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_CLICKED")?.borrow().geklickt as i64)) }
@@ -4988,7 +4988,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // nehmen will.
         "regex_escape$" | "regex_escape" => {
             arity!(1);
-            Ok(Value::str_rc(&regex::escape(need_str(&a[0], "REGEX_ESCAPE$")?)))
+            Ok(Value::str_rc(regex::escape(need_str(&a[0], "REGEX_ESCAPE$")?)))
         }
         "regex_split" => {
             arity!(2);

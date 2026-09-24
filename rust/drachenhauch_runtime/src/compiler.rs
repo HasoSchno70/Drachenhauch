@@ -102,6 +102,12 @@ mod oc {
     /// Quelltext) statt bei der Klasse des Objekts -- sonst fände sie wieder
     /// die ueberschreibende Methode und riefe sich selbst.
     pub const CALL_SUPER: i64 = 119;
+    /// `x = x + e` (und `x += e`) fuer einen lokalen bzw. globalen Platz: wie
+    /// ADD + STORE, haengt aber an eine Zeichenkette AN ORT UND STELLE an, wenn
+    /// der Platz sie noch als einziger haelt (sonst waere Anhaengen in einer
+    /// Schleife quadratisch). Siehe `Vm::addieren_und_speichern`.
+    pub const ADD_STORE_LOCAL: i64 = 120;
+    pub const ADD_STORE_GLOBAL_SLOT: i64 = 121;
     pub const HALT: i64 = 99;
 }
 
@@ -863,6 +869,43 @@ impl Compiler {
                     if let Node::Identifier(n) = &**callee { self.pruefe_sub_als_wert(n)?; }
                 }
                 self.pruefe_zuweisung(name, value);
+                // `x = x + e` (auch `x += e`) auf einen lokalen oder globalen
+                // Platz: ein verschmolzener Befehl statt ADD + STORE, damit die
+                // VM an eine Zeichenkette an Ort und Stelle anhaengen kann.
+                // Sonst kopiert jedes Anhaengen den ganzen Text, und eine
+                // Schleife, die einen Bericht zusammenbaut, wird quadratisch.
+                //
+                // Eine Kette `x = x + t1 + t2 + ...` ist fuer den Parser
+                // `((x + t1) + t2) + ...` -- das erste `+` kopierte also wieder.
+                // Ist t1 sicher Text und sind t2... schlichte Werte, rechnet sie
+                // als `x + (t1 + t2 + ...)`: dasselbe Ergebnis (lauter
+                // Zeichenketten-Verbindungen ohne Nebenwirkung, in derselben
+                // Auswertungsreihenfolge), aber mit einem einzigen Anhaengen.
+                let mut glieder: Vec<&Node> = Vec::new();
+                let links = plus_kette(value, &mut glieder);
+                if let (Node::Identifier(l), false) = (links, glieder.is_empty()) {
+                    // Ein einzelnes Glied: die VM entscheidet zur Laufzeit, der
+                    // Befehl rechnet genau wie ADD + STORE. Eine Kette formt der
+                    // Compiler um -- das darf er nur, wenn auch `x` sicher Text
+                    // ist (ein Objekt mit `OPERATOR +` saehe sonst ein anderes
+                    // Argument).
+                    let kette_ok = glieder.len() == 1
+                        || (self.angesagter_typ(name).as_deref() == Some("string")
+                            && self.ist_text(glieder[0])
+                            && glieder[1..].iter().all(|g| self.ist_schlicht_statisch(g)));
+                    if kette_ok {
+                        if let Some((code, slot)) = self.add_store_ziel(name, l) {
+                            self.expr(links)?;
+                            self.expr(glieder[0])?;
+                            for g in &glieder[1..] {
+                                self.expr(g)?;
+                                self.ctx.emit(oc::ADD, Value::Null);
+                            }
+                            self.ctx.emit(code, json!(slot));
+                            return Ok(());
+                        }
+                    }
+                }
                 self.expr(value)?;
                 self.store_var(name);
                 Ok(())
@@ -2043,6 +2086,48 @@ impl Compiler {
             self.offene_namen.push((z, name.to_string(), false, self.aktueller_bereich));
         }
     }
+    /// Passt `name = links + ...` auf ADD_STORE_*? Nur wenn LADEN (`links`)
+    /// und SPEICHERN (`name`) denselben lokalen bzw. globalen Platz treffen
+    /// (dieselbe Reihenfolge wie `load_var`/`store_var`: lokal, Feld, global).
+    /// Felder und Namen ohne Platz bleiben beim alten Weg.
+    fn add_store_ziel(&self, name: &str, links: &str) -> Option<(i64, usize)> {
+        if let Some(&slot) = self.ctx.local_slots.get(name) {
+            return (self.ctx.local_slots.get(links) == Some(&slot))
+                .then_some((oc::ADD_STORE_LOCAL, slot));
+        }
+        if self.ctx.local_slots.contains_key(links)
+            || self.is_field(name) || self.is_field(links) { return None; }
+        let slot = *self.global_slots.get(name)?;
+        (self.global_slots.get(links) == Some(&slot))
+            .then_some((oc::ADD_STORE_GLOBAL_SLOT, slot))
+    }
+
+    /// Liefert dieser Ausdruck sicher Text? Ueber `statischer_typ` hinaus:
+    /// ein Befehl mit `$` am Ende (`STR$`, `CHR$`, `FORMAT$` ...) und eine
+    /// eigene FUNCTION mit `AS STRING` -- genau die stehen in Textketten.
+    fn ist_text(&self, n: &Node) -> bool {
+        if self.statischer_typ(n).as_deref() == Some("string") { return true; }
+        let Node::Call { callee, .. } = n else { return false };
+        let Node::Identifier(f) = &**callee else { return false };
+        let low = f.to_lowercase();
+        // Eine Variable dieses Namens (FUNCREF) kann alles liefern.
+        if self.ctx.local_slots.contains_key(f.as_str()) || self.global_slots.contains_key(f.as_str()) {
+            return false;
+        }
+        match self.fn_sigs.get(&low) {
+            Some(sig) => sig.return_type.eq_ignore_ascii_case("string"),
+            None => low.ends_with('$') && is_known_builtin(&low),
+        }
+    }
+
+    /// Ein Glied, das in einer Textkette nur als Text angehaengt wird: Text,
+    /// Zahl oder Wahrheitswert -- kein Objekt, dessen `OPERATOR +` mitreden
+    /// koennte.
+    fn ist_schlicht_statisch(&self, n: &Node) -> bool {
+        self.ist_text(n) || matches!(self.statischer_typ(n).as_deref(),
+            Some("integer") | Some("float") | Some("boolean"))
+    }
+
     fn store_var(&mut self, name: &str) {
         if self.ctx.local_slots.contains_key(name) {
             let slot = self.ctx.local_slots[name];
@@ -3561,6 +3646,20 @@ fn eval_literal_default(e: &Node) -> Result<CVal, String> {
 /// die koennen in keinem Ausdruck stecken. Der Grund fuer einen eigenen
 /// Durchgang statt einer Erweiterung von `body_has_yield`: der sucht ein
 /// bestimmtes Ding, dieser ein beliebiges.
+/// Zerlegt eine linksgeschachtelte `+`-Kette `((a + b) + c) + d` in ihr
+/// linkestes Glied (`a`, Rueckgabe) und die uebrigen in Reihenfolge
+/// (`[b, c, d]`). Ohne `+` ist der Ausdruck selbst das linkeste Glied.
+fn plus_kette<'a>(n: &'a Node, glieder: &mut Vec<&'a Node>) -> &'a Node {
+    match n {
+        Node::BinaryOp { op, left, right } if op == "+" => {
+            let links = plus_kette(left, glieder);
+            glieder.push(right);
+            links
+        }
+        _ => n,
+    }
+}
+
 fn any_stmt(stmts: &[Node], pred: &dyn Fn(&Node) -> bool) -> bool {
     stmts.iter().any(|s| {
         let n = unwrap_stmt(s);
