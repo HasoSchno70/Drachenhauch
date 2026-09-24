@@ -175,6 +175,13 @@ deklariert“), trägt das Programm jetzt die Namen der Plätze
 `tests/pruef/globale_felder.dhtest`. Übrig von Punkt 1: `LOAD_NAME`/
 `STORE_NAME` gibt es noch für FOR-EACH- und CATCH-Variablen im Hauptprogramm.
 
+**Punkt 5 zur Hälfte erledigt (2026-09-24):** der Compiler faltet Konstanten
+(`2 * 3`, `BREITE  2`, globale CONSTs mit festem Wert) mit den Rechenfunktionen
+der VM (`vm::konstant_rechnen`); `x + 2 * FAKTOR` kostet so viel wie `x + 6`
+(225 → 150 ms je 10 Mio.). Eigene Ganzzahl-Befehle lohnen sich nicht: die
+allgemeinen Befehle prüfen den Ganzzahl-Fall schon zuerst, eine einfache
+Schleife liegt bei ~3 ns je Befehl. Prüfstein `tests/pruef/konstanten_falten.dhtest`.
+
 **Punkt 3 zum größten Teil erledigt (2026-09-24):** der Aufwand steckte nicht
 im Namen des Feldes, sondern in der Frage „ist das eine PROPERTY?“, die jeder
 `obj.x` über die ganze Klassenkette stellte, und im Aufruf der PROPERTY

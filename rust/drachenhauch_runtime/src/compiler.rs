@@ -353,6 +353,10 @@ pub struct Compiler {
     /// das saehe eine Funktion die Typen der Globals nicht (`ctx.dim_types`
     /// gilt immer nur fuer den gerade offenen Geltungsbereich).
     global_types: HashMap<String, String>,
+    /// Werte der globalen CONSTs, die beim Uebersetzen feststehen (Name klein).
+    /// Aus `collect_globals`; `falten` setzt sie ein. `None` = der Name hat zwei
+    /// verschiedene Werte (CONST in zwei Zweigen) und wird nicht eingesetzt.
+    konst_werte: HashMap<String, Option<crate::value::Value>>,
     ctx: Ctx,
     // Quell-Zeile des Statements, dessen Kompilierung fehlschlug (Stufe B:
     // damit Compile-Fehler im Editor/--check eine Zeile bekommen). 0 = unbekannt.
@@ -628,7 +632,7 @@ impl Compiler {
                    external_types, builtin_aliases,
                    importierte_module,
                    gemeldete_module: std::collections::HashSet::new(),
-                   enum_decls: HashMap::new(), global_types: HashMap::new(),
+                   enum_decls: HashMap::new(), global_types: HashMap::new(), konst_werte: HashMap::new(),
                    ctx: Ctx::new(), err_line: 0,
                    warnings: vec![] }
     }
@@ -829,13 +833,33 @@ impl Compiler {
                         }
                     }
                 }
-                Node::Const { name, type_name, .. } => {
+                Node::Const { name, type_name, value } => {
                     self.global_vars.insert(name.clone());
                     self.global_consts.insert(name.to_lowercase());
                     if let Some(t) = type_name {
                         self.merke_global_typ(name, t, &None);
                     }
                     self.alloc_slot(name);
+                    // Steht der Wert beim Uebersetzen fest, wird die CONST
+                    // eingesetzt (`falten`). Mit Typangabe nur, wenn der Wert
+                    // dazu passt (eine Ganzzahl fuer FLOAT wird Kommazahl) --
+                    // alles andere bleibt der Laufzeit ueberlassen. Zwei
+                    // verschiedene Werte (CONST in zwei Zweigen): nie einsetzen.
+                    use crate::value::Value as W;
+                    let wert = self.falten(value).and_then(|v| match (v, type_name.as_deref()) {
+                        (v, None) => Some(v),
+                        (W::Int(i), Some("float")) => Some(W::Float(i as f64)),
+                        (v @ W::Int(_), Some("integer")) | (v @ W::Float(_), Some("float"))
+                        | (v @ W::Str(_), Some("string")) | (v @ W::Bool(_), Some("boolean")) => Some(v),
+                        _ => None,
+                    });
+                    let key = name.to_lowercase();
+                    let neu = match (self.konst_werte.get(&key), wert) {
+                        (None, w) => w,
+                        (Some(Some(alt)), Some(w)) if crate::value::value_eq(alt, &w) => Some(w),
+                        _ => None,
+                    };
+                    self.konst_werte.insert(key, neu);
                 }
                 Node::For { var, .. } => {
                     self.global_vars.insert(var.clone());
@@ -2249,7 +2273,57 @@ impl Compiler {
     }
 
     // ---------------------------------------------------- Ausdruecke
+    /// Steht der Wert dieses Ausdrucks schon beim Uebersetzen fest? Zahlen,
+    /// Texte, Wahrheitswerte, globale CONSTs mit festem Wert und die
+    /// Rechenarten + - * / \ MOD ^ und das Vorzeichen darueber. Gerechnet wird
+    /// mit `vm::konstant_rechnen` -- denselben Funktionen wie zur Laufzeit.
+    /// Vergleiche und AND/OR werden NICHT gefaltet: an ihnen haengen
+    /// Warnungen (`"5" = 5`, `6 AND 3`), die sonst verloren gingen.
+    fn falten(&self, e: &Node) -> Option<crate::value::Value> {
+        use crate::value::Value as W;
+        match e {
+            Node::NumberLit(NumV::Int(i)) => Some(W::Int(*i)),
+            Node::NumberLit(NumV::Float(f)) => Some(W::Float(*f)),
+            Node::StringLit(s) => Some(W::str_rc(s.as_str())),
+            Node::BoolLit(b) => Some(W::Bool(*b)),
+            Node::Identifier(name) => {
+                // Ein lokaler Platz oder ein Feld gleichen Namens verdeckt die CONST.
+                if self.ctx.local_slots.contains_key(name) || self.is_field(name) { return None; }
+                self.konst_werte.get(&name.to_lowercase()).cloned().flatten()
+            }
+            Node::UnaryOp { op, operand } if op == "-" =>
+                crate::vm::konstant_negieren(&self.falten(operand)?),
+            Node::BinaryOp { op, left, right }
+                if matches!(op.as_str(), "+" | "-" | "*" | "/" | "\\" | "mod" | "^") =>
+                crate::vm::konstant_rechnen(op, &self.falten(left)?, &self.falten(right)?),
+            _ => None,
+        }
+    }
+
+    /// Einen gefalteten Wert als LOAD_CONST ausgeben (Kodierung wie bei den
+    /// Literalen: Kommazahl als {"f": ..}, Wahrheitswert als {"b": ..}).
+    fn gefaltet_ausgeben(&mut self, v: &crate::value::Value) {
+        use crate::value::Value as W;
+        let j = match v {
+            W::Int(i) => json!(i),
+            W::Float(f) => json!({ "f": f }),
+            W::Bool(b) => json!({ "b": b }),
+            W::Str(s) => json!(s.as_str()),
+            _ => return,
+        };
+        let c = self.ctx.add_const(j);
+        self.ctx.emit(oc::LOAD_CONST, json!(c));
+    }
+
     fn expr(&mut self, e: &Node) -> CR {
+        // Konstanten falten: `2 * 3`, `BREITE \ 2`, `-GRENZE`. Kostete zur
+        // Laufzeit gemessen ein Drittel einer Schleife mehr als die fertige Zahl.
+        if matches!(e, Node::BinaryOp { .. } | Node::UnaryOp { .. } | Node::Identifier(_)) {
+            if let Some(v) = self.falten(e) {
+                self.gefaltet_ausgeben(&v);
+                return Ok(());
+            }
+        }
         match e {
             Node::NumberLit(NumV::Int(i)) => {
                 let c = self.ctx.add_const(json!(i)); self.ctx.emit(oc::LOAD_CONST, json!(c)); Ok(())

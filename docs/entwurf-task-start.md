@@ -126,6 +126,11 @@ lässt das Hauptprogramm stehen; die Antwort ist eine JSON-Zeile, wie bei
 damit der Aufrufer nichts auseinanderfieseln muss. Ein Argument, das wie eine
 Zahl aussieht, wird eine.
 
+> **Seit 2026-09-24:** eine `CONST` mit festem Wert (`CONST FAKTOR = 10`,
+> auch `CONST MITTE = BREITE \ 2`) setzt der Übersetzer ein — ein Auftrag
+> sieht sie also. Die Meldung unten gilt weiter für Variablen und für
+> Konstanten, deren Wert erst beim Laufen feststeht; ihr Text nennt das jetzt.
+
 **Ein Befund, der das Risiko entschärft.** Weg B stand unter dem Vorbehalt,
 eine frische VM liefere für ein Global still einen *Vorgabewert* — eine
 Funktion mit `CONST` hätte dann heimlich falsch gerechnet. Nachgemessen ist es

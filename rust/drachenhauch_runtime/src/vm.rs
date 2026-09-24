@@ -891,7 +891,8 @@ const GLOBAL_UNGESETZT: &str = concat!(
     "Zugriff auf eine globale Variable, die noch nicht gesetzt ist. ",
     "Laeuft das hier als Auftrag (`dhrt call` / TASK_START)? Dann ist das ",
     "erwartet: das Hauptprogramm laeuft dabei NICHT, also ist kein Global ",
-    "gesetzt -- auch keine CONST auf oberster Ebene. Gib der Funktion als ",
+    "gesetzt -- auch keine CONST, deren Wert erst beim Laufen feststeht (eine ",
+    "mit festem Wert wie `CONST BREITE = 640` setzt der Compiler ein). Gib der Funktion als ",
     "Parameter mit, was sie braucht.");
 
 impl<'p> Vm<'p> {
@@ -10501,6 +10502,64 @@ fn geld_mischt_nicht(op: char) -> String {
 
 fn int_overflow_msg(op: &str) -> String {
     format!("Ganzzahl-Ueberlauf bei '{}' (INTEGER ist 64-bit; Wertebereich ueberschritten)", op)
+}
+
+/// `a op b` fuer zwei SCHLICHTE Werte (Zahl, Text, Wahrheitswert) -- genau so,
+/// wie die Befehle ADD/SUB/MUL/DIV/INT_DIV/MOD/POW es zur Laufzeit rechnen
+/// (fuer solche Werte greift dort weder ein Modul- noch ein Klassen-Operator).
+/// Der Compiler faltet damit Konstanten (`2 * 3`, `BREITE \ 2`); weil er
+/// DIESELBEN Funktionen nimmt, kann das Ergebnis nicht von der Laufzeit
+/// abweichen. `None` = nicht falten: ein anderer Operator, ein Wert, der
+/// kein schlichter ist, ein Fehler (Ueberlauf, Division durch 0 -- der kommt
+/// dann wie bisher zur Laufzeit) oder ein Ergebnis, das keine Konstante sein
+/// kann (NaN/unendlich).
+pub(crate) fn konstant_rechnen(op: &str, a: &Value, b: &Value) -> Option<Value> {
+    let schlicht = |v: &Value| matches!(v, Value::Int(_) | Value::Float(_) | Value::Str(_) | Value::Bool(_));
+    if !schlicht(a) || !schlicht(b) { return None; }
+    let (a, b) = (a.clone(), b.clone());
+    let r = match op {
+        "+" => match zahlen_addieren(&a, &b) {
+            Some(r) => r,
+            None if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) => {
+                let mut s = a.fmt();
+                s.push_str(&b.fmt());
+                Ok(Value::str_rc(s))
+            }
+            None => require_number(&a, &b, "+").and_then(|_| nn_add(a, b)),
+        },
+        "-" => match (&a, &b) {
+            (Value::Int(x), Value::Int(y)) => x.checked_sub(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("-")),
+            (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x - y)),
+            (Value::Int(x), Value::Float(y)) => Ok(Value::Float(*x as f64 - y)),
+            (Value::Float(x), Value::Int(y)) => Ok(Value::Float(x - *y as f64)),
+            _ => require_number(&a, &b, "-").and_then(|_| nn_arith(a, b, '-')),
+        },
+        "*" => match (&a, &b) {
+            (Value::Int(x), Value::Int(y)) => x.checked_mul(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("*")),
+            (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x * y)),
+            (Value::Int(x), Value::Float(y)) => Ok(Value::Float(*x as f64 * y)),
+            (Value::Float(x), Value::Int(y)) => Ok(Value::Float(x * *y as f64)),
+            _ => mul(a, b),
+        },
+        "/" => div(a, b),
+        "\\" => int_div(a, b),
+        "mod" => modulo(a, b),
+        "^" => pow(a, b),
+        _ => return None,
+    };
+    match r {
+        Ok(Value::Float(f)) if !f.is_finite() => None,
+        // `"x" * 100000000` gehoert nicht als 100-MB-Konstante in den Bytecode.
+        Ok(Value::Str(s)) if s.len() > 4096 => None,
+        Ok(v @ (Value::Int(_) | Value::Float(_) | Value::Str(_) | Value::Bool(_))) => Some(v),
+        _ => None,
+    }
+}
+
+/// `-a` fuer eine Zahl, wie NEG zur Laufzeit.
+pub(crate) fn konstant_negieren(a: &Value) -> Option<Value> {
+    if !matches!(a, Value::Int(_) | Value::Float(_)) { return None; }
+    neg(a.clone()).ok()
 }
 
 fn nn_add(a: Value, b: Value) -> R<Value> {
