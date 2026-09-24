@@ -176,6 +176,11 @@ impl Arg {
 pub struct Instr {
     pub op: u16,
     pub arg: Arg,
+    /// Nur CALL_BUILTIN: welche Befehlsfamilie beim ersten Aufruf geantwortet
+    /// hat (1-basiert, 0 = noch unbekannt). Die VM fragt sie beim naechsten
+    /// Mal zuerst, statt den Namen durch alle Familien zu reichen
+    /// (`Vm::builtin_rufen`).
+    pub familie: std::cell::Cell<u8>,
 }
 
 pub struct Func {
@@ -422,6 +427,7 @@ fn decode_func(j: &J) -> Func {
                     Instr {
                         op: pair[0].as_u64().expect("op int") as u16,
                         arg: decode_arg(&pair[1]),
+                        familie: std::cell::Cell::new(0),
                     }
                 })
                 .collect()

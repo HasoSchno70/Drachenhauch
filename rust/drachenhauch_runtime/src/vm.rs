@@ -515,6 +515,9 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// Index-out-of-bounds bei zu wenigen Argumenten in variadischen Builtins),
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
+/// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
+const BUILTIN_FAMILIEN: u8 = 28;
+
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
     match catch_unwind(AssertUnwindSafe(|| crate::builtins::call_builtin(name, args))) {
@@ -1445,6 +1448,76 @@ impl<'p> Vm<'p> {
         }
         require_number(&a, &b, "+")?;
         nn_add(a, b)
+    }
+
+    /// Einen eingebauten Befehl ausfuehren (CALL_BUILTIN).
+    ///
+    /// Die Befehle liegen in Familien (`try_db`, `try_gui`, ... und zuletzt
+    /// die reinen in builtins.rs), und ein Name wurde bei JEDEM Aufruf der
+    /// Reihe nach durch alle gereicht -- bei `ABS` 28 Absagen, bevor der
+    /// richtige `match` kam. `merk` ist der Platz der Aufrufstelle: dort steht
+    /// nach dem ersten Mal, welche Familie geantwortet hat, und sie wird
+    /// zuerst gefragt. Sagt sie ab, laeuft die ganze Kette wie bisher.
+    ///
+    /// **Das ist nur richtig, weil die Familien am NAMEN entscheiden.** Die
+    /// eine Ausnahme ist `SORT`: mit einer FUNCREF sortiert `try_array_hof`,
+    /// sonst der reine Befehl -- an derselben Stelle kann beides kommen, also
+    /// merkt sich `SORT` nichts. Wer eine Familie baut, die je nach ARGUMENT
+    /// absagt, obwohl eine spaetere denselben Namen kennt, muss hier dasselbe
+    /// tun.
+    fn builtin_rufen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>) -> R<Value> {
+        let f = merk.get();
+        if f != 0 {
+            if let Some(v) = self.familie_rufen(f, name, a)? { return Ok(v); }
+        }
+        for f in 1..=BUILTIN_FAMILIEN {
+            if let Some(v) = self.familie_rufen(f, name, a)? {
+                if name != "sort" { merk.set(f); }
+                return Ok(v);
+            }
+        }
+        Err(unknown_builtin_msg(name))
+    }
+
+    /// Eine Familie fragen; die Reihenfolge der Nummern IST die Reihenfolge,
+    /// in der sie gefragt werden (erst typtest/array_hof, zuletzt die reinen).
+    #[inline]
+    fn familie_rufen(&mut self, f: u8, name: &str, a: &[Value]) -> R<Option<Value>> {
+        match f {
+            1 => self.try_typtest(name, a),
+            2 => self.try_array_hof(name, a),
+            3 => self.try_scene(name, a),
+            4 => self.try_coro(name, a),
+            5 => self.try_timer(name, a),
+            6 => self.try_zeit(name, a),
+            7 => self.try_os(name, a),
+            8 => self.try_hintergrund(name, a),
+            9 => self.try_db(name, a),
+            10 => self.try_net(name, a),
+            11 => self.try_midi(name, a),
+            12 => self.try_mqtt(name, a),
+            13 => self.try_httpd(name, a),
+            14 => self.try_pdf(name, a),
+            15 => self.try_xlsx(name, a),
+            16 => self.try_smtp(name, a),
+            17 => self.try_geld(name, a),
+            18 => self.try_html(name, a),
+            19 => self.try_cloud(name, a),
+            20 => self.try_serial(name, a),
+            21 => self.try_firmata(name, a),
+            22 => self.try_usb(name, a),
+            23 => self.try_wifi(name, a),
+            24 => self.try_bt(name, a),
+            25 => self.try_video(name, a),
+            26 => self.try_gui(name, a),
+            27 => self.try_graphics(name, a),
+            _ => match safe_call_builtin(name, a) {
+                Some(Ok(v)) => Ok(Some(v)),
+                Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),
+                Some(Err(e)) => Err(e),
+                None => Err(unknown_builtin_msg(name)),
+            },
+        }
     }
 
     fn user_op(&mut self, method: &str, a: &Value, b: &Value, commutative: bool) -> R<Option<Value>> {
@@ -2603,45 +2676,7 @@ impl<'p> Vm<'p> {
                     }
                     let v = {
                         let bargs: &[Value] = &stack[split..];
-                        if let Some(v) = self.try_typtest(name, bargs)? { v }
-                        else if let Some(v) = self.try_array_hof(name, bargs)? { v }
-                        else if let Some(v) = self.try_scene(name, bargs)? { v }
-                        else if let Some(v) = self.try_coro(name, bargs)? { v }
-                        else if let Some(v) = self.try_timer(name, bargs)? { v }
-                        else if let Some(v) = self.try_zeit(name, bargs)? { v }
-                        else if let Some(v) = self.try_os(name, bargs)? { v }
-                        else if let Some(v) = self.try_hintergrund(name, bargs)? { v }
-                        else if let Some(v) = self.try_db(name, bargs)? { v }
-                        else if let Some(v) = self.try_net(name, bargs)? { v }
-                        else if let Some(v) = self.try_midi(name, bargs)? { v }
-                        else if let Some(v) = self.try_mqtt(name, bargs)? { v }
-                        else if let Some(v) = self.try_httpd(name, bargs)? { v }
-                        else if let Some(v) = self.try_pdf(name, bargs)? { v }
-                        else if let Some(v) = self.try_xlsx(name, bargs)? { v }
-                        else if let Some(v) = self.try_smtp(name, bargs)? { v }
-                        else if let Some(v) = self.try_geld(name, bargs)? { v }
-                        else if let Some(v) = self.try_html(name, bargs)? { v }
-                        else if let Some(v) = self.try_cloud(name, bargs)? { v }
-                        else if let Some(v) = self.try_serial(name, bargs)? { v }
-                        else if let Some(v) = self.try_firmata(name, bargs)? { v }
-                        else if let Some(v) = self.try_usb(name, bargs)? { v }
-                        else if let Some(v) = self.try_wifi(name, bargs)? { v }
-                        else if let Some(v) = self.try_bt(name, bargs)? { v }
-                        else if let Some(v) = self.try_video(name, bargs)? { v }
-                        else if let Some(v) = self.try_gui(name, bargs)? { v }
-                        else if let Some(v) = self.try_graphics(name, bargs)? { v }
-                        else {
-                            match safe_call_builtin(name, bargs) {
-                                Some(Ok(v)) => v,
-                                Some(Err(e)) => {
-                                    if e.starts_with("__UNKNOWN_BUILTIN__:") {
-                                        return Err(unknown_builtin_msg(name));
-                                    }
-                                    return Err(e);
-                                }
-                                None => return Err(unknown_builtin_msg(name)),
-                            }
-                        }
+                        self.builtin_rufen(name, bargs, &instr.familie)?
                     };
                     stack.truncate(split);
                     stack.push(v);
