@@ -1,0 +1,152 @@
+' Globale Felder, Maps und Strukturen ueber ihren Platz (2026-09-24). Bis
+' dahin liefen sie ueber den NAMEN (LOAD_NAME/STORE_NAME) -- ein Erbe der
+' Python-Laufzeit, und ein globales Feld war 2,2x langsamer als ein lokales.
+' Jetzt haengt BIND_GLOBAL_SLOT den unter dem Namen angelegten Eintrag in
+' seinen Platz. Die Faelle pruefen, dass sich sonst nichts aendert.
+' Format: docs/werkzeuge.md.
+
+=== ein globales feld aus sub und hauptprogramm
+DIM feld[3] AS INTEGER
+SUB fuelle()
+    DIM i AS INTEGER
+    FOR i = 0 TO 2
+        feld[i] = (i + 1) * 10
+    NEXT
+END SUB
+FUNCTION summe() AS INTEGER
+    RETURN feld[0] + feld[1] + feld[2]
+END FUNCTION
+fuelle()
+feld[1] = feld[1] + 5
+PRINT summe(); " "; feld[1]; " "; LEN(feld)
+--- erwartet
+65 25 3
+
+=== ein dim in der schleife legt jedes mal ein neues feld an
+DIM runde AS INTEGER
+FOR runde = 1 TO 3
+    DIM f[runde] AS INTEGER
+    f[0] = f[0] + runde
+    PRINT LEN(f); " "; f[0]
+NEXT
+--- erwartet
+1 1
+2 2
+3 3
+
+=== ein wachsendes feld und eine map aus einer sub
+DIM liste AS ARRAY OF STRING
+DIM zaehler AS MAP OF INTEGER
+SUB merke(w AS STRING)
+    ARRAY_PUSH(liste, w)
+    IF MAPHAS(zaehler, w) THEN
+        zaehler[w] = zaehler[w] + 1
+    ELSE
+        zaehler[w] = 1
+    END IF
+END SUB
+merke("a") : merke("b") : merke("a")
+PRINT LEN(liste); " "; liste[2]; " "; zaehler["a"]; " "; zaehler["b"]; " "; LEN(zaehler)
+--- erwartet
+3 a 2 1 2
+
+=== ein ganzes feld zuweisen
+DIM a AS ARRAY OF INTEGER
+a = [1, 2, 3]
+SUB tausche()
+    a = [9, 8]
+END SUB
+tausche()
+PRINT LEN(a); " "; a[0]
+--- erwartet
+2 9
+
+=== eine globale struktur
+STRUCT Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END STRUCT
+DIM p AS Punkt
+SUB schiebe()
+    p.x = p.x + 3
+END SUB
+schiebe()
+p.y = 7
+PRINT p.x; " "; p.y
+--- erwartet
+3 7
+
+=== ein lokales feld verdeckt das globale
+DIM daten[2] AS INTEGER
+daten[0] = 1
+SUB innen()
+    DIM daten[5] AS INTEGER
+    daten[0] = 99
+    PRINT "innen "; LEN(daten); " "; daten[0]
+END SUB
+innen()
+PRINT "aussen "; LEN(daten); " "; daten[0]
+--- erwartet
+innen 5 99
+aussen 2 1
+
+=== ein feld im if block ist genauso global
+IF TRUE THEN
+    DIM tab[2, 2] AS STRING
+END IF
+SUB setz()
+    tab[1, 1] = "x"
+END SUB
+setz()
+PRINT tab[1, 1]
+--- erwartet
+x
+
+=== lesen vor dem dim nennt die variable
+SUB zeig()
+    PRINT feld[0]
+END SUB
+zeig()
+DIM feld[3] AS INTEGER
+--- fehler
+das DIM von 'feld' ist noch nicht gelaufen
+
+=== schreiben vor dem dim nennt die variable
+SUB setz()
+    feld[0] = 5
+END SUB
+setz()
+DIM feld[3] AS INTEGER
+--- fehler
+das DIM von 'feld' ist noch nicht gelaufen
+
+=== ein falscher wert fuer das feld bleibt ein fehler
+DIM a AS ARRAY OF INTEGER
+a = "nein"
+--- fehler
+Erwartet
+
+=== ein globales feld ist so schnell wie ein lokales
+' Vorher 165 gegen 75 ms je Million Zugriffe. Die Grenze laesst Luft fuer
+' Streuung und faellt beim Weg ueber den Namen trotzdem.
+DIM g[1000] AS INTEGER
+DIM i AS INTEGER
+DIM t AS INTEGER
+t = MILLIS()
+FOR i = 0 TO 999999
+    g[i MOD 1000] = g[i MOD 1000] + 1
+NEXT
+DIM global_ms AS INTEGER : global_ms = MILLIS() - t
+FUNCTION lokal() AS INTEGER
+    DIM f[1000] AS INTEGER
+    DIM k AS INTEGER
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    FOR k = 0 TO 999999
+        f[k MOD 1000] = f[k MOD 1000] + 1
+    NEXT
+    RETURN MILLIS() - t0
+END FUNCTION
+DIM lokal_ms AS INTEGER : lokal_ms = lokal()
+PRINT g[5]; " "; global_ms < lokal_ms * 3 / 2 + 15
+--- erwartet
+1000 TRUE

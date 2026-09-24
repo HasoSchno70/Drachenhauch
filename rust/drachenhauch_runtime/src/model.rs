@@ -95,6 +95,7 @@ pub mod op {
     pub const CALL_SUPER: u16 = 119;    // SUPER.Methode(): Suche bei der Elternklasse beginnen
     pub const ADD_STORE_LOCAL: u16 = 120;       // x = x + e: addieren und in den lokalen Platz schreiben
     pub const ADD_STORE_GLOBAL_SLOT: u16 = 121; // dasselbe fuer einen globalen Platz
+    pub const BIND_GLOBAL_SLOT: u16 = 122;      // globalen Eintrag (Feld/Map/Struktur) in seinen Platz haengen
 
     // OOP / Member
     pub const NEW_INSTANCE: u16 = 80;
@@ -233,6 +234,8 @@ pub struct ClassInfo {
 
 pub struct Program {
     pub n_globals: usize,
+    /// Name je globalem Platz (fuer Meldungen); leer bei alten .dhc-Dateien.
+    pub global_names: Vec<String>,
     pub main: Func,
     /// Alle freien User-Funktionen; der Index ist die vorab aufgeloeste
     /// CALL_USER-Referenz (siehe `resolve_calls` -- kein Hash-Lookup pro
@@ -512,6 +515,9 @@ pub fn load_program(j: &J) -> Result<Program, String> {
         return Err(format!("Unbekanntes Format: {:?}", fmt));
     }
     let n_globals = obj.get("n_globals").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+    let global_names: Vec<String> = obj.get("global_names").and_then(|v| v.as_array())
+        .map(|a| a.iter().map(|x| x.as_str().unwrap_or("").to_string()).collect())
+        .unwrap_or_default();
     let main = decode_func(obj.get("main").ok_or("kein main")?);
     let mut functions: Vec<Func> = Vec::new();
     let mut fn_index = rustc_hash::FxHashMap::default();
@@ -540,6 +546,7 @@ pub fn load_program(j: &J) -> Result<Program, String> {
     }
     Ok(Program {
         n_globals,
+        global_names,
         main,
         functions,
         fn_index,
@@ -574,6 +581,7 @@ mod tests {
         fn_index.insert("dd1changed".to_string(), 0usize);
         let p = Program {
             n_globals: 0,
+            global_names: Vec::new(),
             main: leere_func("__main__"),
             functions: vec![leere_func("dd1changed")],
             fn_index,

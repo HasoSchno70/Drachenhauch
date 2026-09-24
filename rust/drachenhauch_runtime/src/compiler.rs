@@ -108,6 +108,10 @@ mod oc {
     /// Schleife quadratisch). Siehe `Vm::addieren_und_speichern`.
     pub const ADD_STORE_LOCAL: i64 = 120;
     pub const ADD_STORE_GLOBAL_SLOT: i64 = 121;
+    /// Nach DECLARE_ARRAY_NAME / DECLARE_NAME / DECLARE_STRUCT_NAME: den eben
+    /// unter dem Namen angelegten Eintrag auch in den globalen Platz haengen
+    /// (dasselbe Objekt). Danach laufen alle Zugriffe ueber den Platz.
+    pub const BIND_GLOBAL_SLOT: i64 = 122;
     pub const HALT: i64 = 99;
 }
 
@@ -754,10 +758,21 @@ impl Compiler {
 
     /// Bekommt ein DIM einen Slot? Skalar (primitiv ODER Klasse), nicht
     /// Array/Map/Struct (die haben eigene Init-Ops).
-    fn is_slot_dim(&self, type_name: &str, array_dims: &Option<Vec<Node>>) -> bool {
-        array_dims.is_none()
-            && !type_name.starts_with("array:") && !type_name.starts_with("map:")
-            && !self.struct_names.contains(type_name)
+    /// Bekommt diese globale DIM einen Platz? Seit 2026-09-24 JEDE: Felder,
+    /// Maps und Strukturen liefen bis dahin ueber ihren NAMEN (LOAD_NAME:
+    /// Name als String, Hash-Suche, Typ-Klon -- ein globales Feld war
+    /// gemessen 2,2x langsamer als ein lokales). Ein Erbe der Python-Laufzeit.
+    /// Sie werden weiter unter dem Namen angelegt und dann per
+    /// BIND_GLOBAL_SLOT in ihren Platz gehaengt (`stmt_dim`).
+    fn is_slot_dim(&self, _type_name: &str, _array_dims: &Option<Vec<Node>>) -> bool {
+        true
+    }
+
+    /// Nach einem Anlegen unter dem Namen: denselben Eintrag in den Platz haengen.
+    fn bind_global(&mut self, name: &str, name_idx: i64) {
+        if let Some(&slot) = self.global_slots.get(name) {
+            self.ctx.emit(oc::BIND_GLOBAL_SLOT, json!([slot as i64, name_idx]));
+        }
     }
 
     /// Pre-Pass: Top-Level-Globals (Skalar-DIM/CONST) -> Slot-Index.
@@ -1521,6 +1536,7 @@ impl Compiler {
             if self.ctx.is_main {
                 let name_idx = self.ctx.add_const(json!(name));
                 self.ctx.emit(oc::DECLARE_ARRAY_NAME, json!([name_idx, type_name, dims.len()]));
+                self.bind_global(name, name_idx);
             } else if self.ctx.local_slots.contains_key(name) {
                 // Idempotent (Schleifenkoerper): Dim-Werte wieder vom Stack poppen.
                 for _ in 0..dims.len() { self.ctx.emit(oc::POP, Value::Null); }
@@ -1541,6 +1557,7 @@ impl Compiler {
                 let type_idx = self.ctx.add_const(json!(type_name));
                 let default_idx = self.ctx.add_const(Value::Null);
                 self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                self.bind_global(name, name_idx);
             } else {
                 // Funktions-lokal: DECLARE_LOCAL erzeugt fuer map: eine leere Map,
                 // sizeless array: bleibt NIL bis zur Zuweisung.
@@ -1553,6 +1570,7 @@ impl Compiler {
             if self.ctx.is_main {
                 let name_idx = self.ctx.add_const(json!(name));
                 self.ctx.emit(oc::DECLARE_STRUCT_NAME, json!([name_idx, type_name]));
+                self.bind_global(name, name_idx);
             } else if !self.ctx.local_slots.contains_key(name) {
                 let slot = self.ctx.local_types.len();
                 self.ctx.local_slots.insert(name.to_string(), slot);
@@ -3239,9 +3257,13 @@ impl Compiler {
                 "fields": fields, "methods": Value::Object(methods), "properties": props,
             }));
         }
+        // Name je globalem Platz, fuer Meldungen der VM (`Vm::global_ungesetzt`).
+        let mut global_names = vec![String::new(); self.global_slots.len()];
+        for (name, &i) in &self.global_slots { global_names[i] = name.clone(); }
         json!({
             "format": "dhc", "version": 1,
             "n_globals": self.global_slots.len(),
+            "global_names": global_names,
             "main": main, "functions": Value::Object(functions),
             "classes": Value::Object(classes), "data": data,
         })
