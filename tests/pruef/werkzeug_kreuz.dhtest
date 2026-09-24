@@ -15,6 +15,7 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
 
+--- langsam
 === sfx: ungesichert fragt das kreuz nach
 DIM prN AS INTEGER
 DIM prS AS INTEGER

@@ -8,6 +8,7 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
 
+--- langsam
 === ein doppelklick auf ein blatt meldet und waehlt
 IMPORT "gui"
 SCREEN(300, 220, "T", 1)

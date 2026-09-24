@@ -12,6 +12,7 @@
 ' weil die Tooltip-Faelle eine Mausposition einspeisen.
 --- seriell
 
+--- langsam
 === ohne den aufruf liegt das gemalte ueber dem fenster
 IMPORT "gui"
 SCREEN(320, 240, "Test", 1)

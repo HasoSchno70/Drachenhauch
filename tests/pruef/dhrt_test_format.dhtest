@@ -118,3 +118,30 @@ IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
 --- erwartet
 rueckgabe 1
 sagt was los ist TRUE
+=== langsam im kopf laesst --schnell die datei aus
+' `--- langsam` markiert eine Sammlung, die lange braucht (Werkzeuge, IDE,
+' echte Fenster). `dhrt test --schnell` laesst sie aus und nennt sie in der
+' Bilanz; ohne den Schalter laeuft sie wie jede andere.
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "--- langsam")
+ARRAY_PUSH(z, "=== a")
+ARRAY_PUSH(z, "PRINT 1")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "1")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+dlStarten(["test", "s.dhtest"])
+PRINT "ohne rueckgabe "; dlCode
+PRINT "ohne laeuft "; (INSTR(dlAus, "1 Faelle") >= 0)
+dlStarten(["test", "--schnell", "s.dhtest"])
+PRINT "mit rueckgabe "; dlCode
+PRINT "mit laeuft "; (INSTR(dlAus, "1 Faelle") >= 0)
+PRINT "mit nennt "; (INSTR(dlAus, "langsam s") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+ohne rueckgabe 0
+ohne laeuft TRUE
+mit rueckgabe 0
+mit laeuft FALSE
+mit nennt TRUE

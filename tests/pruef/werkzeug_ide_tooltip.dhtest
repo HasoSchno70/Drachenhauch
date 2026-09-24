@@ -11,6 +11,7 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
 
+--- langsam
 === verweilen zeigt die hilfe zum eigenen unterprogramm
 DIM prBild AS INTEGER : prBild = 0
 --- programm ../../ide/ide.dh nach SETFPS(60)

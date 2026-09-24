@@ -15,6 +15,7 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
 
+--- langsam
 === ein verwaister stand wird angeboten und wiederhergestellt
 IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
 --- programm ../../ide/ide.dh nach SETFPS(60)

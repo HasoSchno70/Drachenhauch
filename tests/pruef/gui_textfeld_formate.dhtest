@@ -10,6 +10,7 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
 
+--- langsam
 === textfeld: doppelklick waehlt das wort
 IMPORT "gui"
 IMPORT "tf.dh"

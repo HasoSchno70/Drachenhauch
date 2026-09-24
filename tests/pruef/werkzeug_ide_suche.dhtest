@@ -12,6 +12,7 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
 
+--- langsam
 === tippen springt, enter geht weiter und zurueck
 ' Ohne Schalter: Teiltext, Gross/klein egal -- fuenf Treffer.
 AUTOMATION_PLAY("ev.txt")

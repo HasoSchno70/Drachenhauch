@@ -1140,10 +1140,15 @@ fn test_main(args: &[String]) -> ExitCode {
     // `--filter text`: nur die Faelle einer Sammlung, deren Name den Text
     // enthaelt -- zum Nachstellen eines einzelnen Fehlschlags.
     let mut filter: Option<String> = None;
+    // `--schnell`: Sammlungen mit `--- langsam` im Kopf auslassen (Fenster in
+    // Echtzeit, Durchlaeufe ueber das ganze Repo) -- fuer die Rueckmeldung
+    // waehrend der Arbeit. Die volle Pruefung laeuft in der CI.
+    let mut schnell = false;
     let mut pfade: Vec<String> = Vec::new();
     let mut i = 0;
     while i < args.len() {
         if args[i] == "--filter" && i + 1 < args.len() { filter = Some(args[i + 1].clone()); i += 2; continue; }
+        if args[i] == "--schnell" { schnell = true; i += 1; continue; }
         pfade.push(args[i].clone());
         i += 1;
     }
@@ -1172,11 +1177,18 @@ fn test_main(args: &[String]) -> ExitCode {
     }
     let start = std::time::Instant::now();
     let mut fehler = 0usize;
+    let mut ausgelassen: Vec<String> = Vec::new();
     let (mut faelle_ok, mut faelle_fehl, mut faelle_ueber) = (0usize, 0usize, 0usize);
     for d in &dateien {
         let t0 = std::time::Instant::now();
         let name = d.display().to_string();
         if name.ends_with(SAMMLUNG_ENDUNG) {
+            if schnell && std::fs::read_to_string(d).ok()
+                .and_then(|t| pruefsammlung::sammlung_parsen(&t).ok())
+                .map_or(false, |s| s.langsam) {
+                ausgelassen.push(name);
+                continue;
+            }
             match sammlung_laufen(&exe, d, filter.as_deref()) {
                 Ok((ok, fehl, ueber, meldungen)) => {
                     let dauer = t0.elapsed().as_secs_f64();
@@ -1227,13 +1239,21 @@ fn test_main(args: &[String]) -> ExitCode {
         }
     }
     let faelle = faelle_ok + faelle_fehl + faelle_ueber;
+    // Ausgelassenes nennen, statt es still verschwinden zu lassen -- wer die
+    // Bilanz liest, soll sehen, dass nicht alles gelaufen ist.
+    let gelaufen = dateien.len() - ausgelassen.len();
+    if !ausgelassen.is_empty() {
+        println!("\n--schnell: {} langsame Sammlung(en) ausgelassen (die volle Pruefung laeuft in der CI):",
+                 ausgelassen.len());
+        for a in &ausgelassen { println!("  langsam {}", a); }
+    }
     if faelle > 0 {
         println!("\n{} Datei(en), {} ok, {} mit Fehlern; {} Faelle, {} ok, {} fehl, {} uebersprungen  ({:.2}s)",
-                 dateien.len(), dateien.len() - fehler, fehler,
+                 gelaufen, gelaufen - fehler, fehler,
                  faelle, faelle_ok, faelle_fehl, faelle_ueber, start.elapsed().as_secs_f64());
     } else {
         println!("\n{} Datei(en), {} ok, {} mit Fehlern  ({:.2}s)",
-                 dateien.len(), dateien.len() - fehler, fehler, start.elapsed().as_secs_f64());
+                 gelaufen, gelaufen - fehler, fehler, start.elapsed().as_secs_f64());
     }
     if fehler > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS }
 }

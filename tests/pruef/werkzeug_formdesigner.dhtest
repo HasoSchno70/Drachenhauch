@@ -14,6 +14,7 @@
 ' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
 --- seriell
 
+--- langsam
 === ablegen und sichern
 AUTOMATION_PLAY("ev.txt")
 --- programm ../../examples/197_form_designer.dh nach SETFPS(60)

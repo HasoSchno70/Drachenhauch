@@ -4,6 +4,7 @@
 ' Format: docs/werkzeuge.md.
 --- seriell
 
+--- langsam
 === ohne die listen bleibt enter was es war
 ' Die Gegenprobe zuerst: derselbe Ablauf ohne CLOSE_WORDS.
 IMPORT "gui"

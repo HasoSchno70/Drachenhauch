@@ -11,6 +11,7 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
 
+--- langsam
 === links setzt den haltepunkt, der debugger haelt dort
 ' Die Marke steht nach dem Oeffnen in Zeile 1 und bleibt dort; F7 haelt
 ' dann in Zeile 3, nicht in Zeile 1 (ohne Haltepunkt stuende er in 1).

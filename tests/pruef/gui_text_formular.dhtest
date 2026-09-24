@@ -2,6 +2,7 @@
 ' Die Faelle laufen nacheinander: tippt ueber die Zwischenablage -- die gibt es nur einmal.
 --- seriell
 
+--- langsam
 === umbruch laesst die hoehe wachsen
 IMPORT "gui"
 SCREEN(400, 300, "T", 1)
