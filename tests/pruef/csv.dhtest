@@ -1,12 +1,12 @@
 ' Aus test_csv.py uebertragen (11 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
 
-=== gb helfer baut gueltigen ausdruck (1)
+=== dh helfer baut gueltigen ausdruck (1)
 ' Erst den Helfer pruefen -- sonst misst der Rest den Helfer mit.
 PRINT "a" + CHR$(34) + "b"
 --- erwartet
 a"b
 
-=== gb helfer baut gueltigen ausdruck (2)
+=== dh helfer baut gueltigen ausdruck (2)
 ' Erst den Helfer pruefen -- sonst misst der Rest den Helfer mit.
 PRINT "x" + CHR$(10) + "y"
 --- erwartet
@@ -38,7 +38,7 @@ PRINT t[0, 2]
 c
 
 === ungleich lange zeilen werden aufgefuellt
-' Ein GB-Array muss rechteckig sein. Aufgefuellt wird auf die BREITESTE
+' Ein DH-Array muss rechteckig sein. Aufgefuellt wird auf die BREITESTE
 DIM t AS ARRAY OF STRING
 t = CSV_PARSE("a;b;c" + CHR$(10) + "d", ";")
 PRINT STR$(DIMSIZE(t, 1)) + "|" + t[1, 0] + "|" + t[1, 2] + "|"

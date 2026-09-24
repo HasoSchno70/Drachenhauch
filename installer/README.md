@@ -55,14 +55,14 @@ IDE (`-- "%1"`).
   `GameBasic.Source` und `.gb` -- dieses nur, wenn es noch auf uns zeigt
   (`.gb` ist auch die Endung fuer Game-Boy-ROMs); dazu die veralteten
   Vorschaubilder unter `examples\screenshots`;
-* **das Signieren**, mit denselben Variablen wie unten (`GB_SIGN_CERT`,
-  `GB_SIGN_PASS`, `GB_SIGN_TS`, `SIGNTOOL`). `bauen.dh` packt dafuer eine
+* **das Signieren**, mit denselben Variablen wie unten (`DH_SIGN_CERT`,
+  `DH_SIGN_PASS`, `DH_SIGN_TS`, `SIGNTOOL`). `bauen.dh` packt dafuer eine
   KOPIE der Laufzeit (`<ausgabe>\stufe\dhrt.exe`, an ISCC ueber
   `/DDhrtQuelle`): signiert wird die Kopie vor dem Einpacken, danach der
   fertige Installer. Die gebaute `dhrt.exe` bleibt unberuehrt -- sie laeuft
   womoeglich gerade als `bauen.dh`. **Ein Fehlschlag ist ein Abbruch**, nicht
   eine Warnung wie in `build_installer.py`: ein Installer, der signiert sein
-  sollte und es nicht ist, fiele erst beim Nutzer auf. Ohne `GB_SIGN_CERT`
+  sollte und es nicht ist, fiele erst beim Nutzer auf. Ohne `DH_SIGN_CERT`
   sagt der Bau am Ende "Nicht signiert".
 
 Geprueft in `tests/pruef/werkzeug_installer.dhtest` mit Attrappen fuer ISCC
@@ -181,7 +181,7 @@ Inno Setup haben die Läufer nicht.
 
 | Datei | Zweck |
 |---|---|
-| `bauen.dh` | Baut die Distribution: Lizenzen, dann Inno Setup (Windows) bzw. `paket.dh` (macOS/Linux); signiert unter Windows, wenn `GB_SIGN_CERT` gesetzt ist. |
+| `bauen.dh` | Baut die Distribution: Lizenzen, dann Inno Setup (Windows) bzw. `paket.dh` (macOS/Linux); signiert unter Windows, wenn `DH_SIGN_CERT` gesetzt ist. |
 | `paket.dh` | Das `.tar.gz` für Linux und das `.dmg` für macOS. |
 | `Drachenhauch-IDE.iss` | Inno-Setup-Skript: Dateien, Verknüpfungen, PATH, `.dh`-Zuordnung, Bücher, ESP32, Aufräumen von GameBasic. |
 | `lizenzen.dh` | Sammelt die Lizenztexte der Rust-Crates → `THIRD-PARTY-NOTICES-IDE.txt`. |
@@ -212,9 +212,9 @@ Umgebungsvariablen konfiguriert ist. Ohne Konfiguration sagt der Bau am Ende
 „Nicht signiert“; ein Fehlschlag beim Signieren bricht ab.
 
 ```
-set GB_SIGN_CERT=C:\keys\meincert.pfx     REM .pfx-Datei ODER SHA1-Thumbprint im Zertspeicher
-set GB_SIGN_PASS=geheim                    REM nur bei .pfx
-set GB_SIGN_TS=http://timestamp.digicert.com   REM optional (Default gesetzt)
+set DH_SIGN_CERT=C:\keys\meincert.pfx     REM .pfx-Datei ODER SHA1-Thumbprint im Zertspeicher
+set DH_SIGN_PASS=geheim                    REM nur bei .pfx
+set DH_SIGN_TS=http://timestamp.digicert.com   REM optional (Default gesetzt)
 dhrt run installer\bauen.dh
 ```
 

@@ -96,8 +96,8 @@ fn type_name(v: &DbVal) -> &'static str {
     }
 }
 
-/// GB-Wert -> SQLite-Bind-Wert (bool -> 0/1, Nil -> NULL).
-pub fn gb_to_sql(v: &Value, fn_: &str) -> Result<SqlValue, String> {
+/// DH-Wert -> SQLite-Bind-Wert (bool -> 0/1, Nil -> NULL).
+pub fn dh_to_sql(v: &Value, fn_: &str) -> Result<SqlValue, String> {
     Ok(match v {
         Value::Nil => SqlValue::Null,
         Value::Bool(b) => SqlValue::Integer(if *b { 1 } else { 0 }),

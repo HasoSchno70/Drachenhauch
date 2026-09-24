@@ -52,7 +52,7 @@ Formular, das beim ersten Sichern dorthin geschrieben wird.
 | `Strg+N` / `Strg+O` | neues Formular / Formular öffnen |
 | `Strg+S` / `Strg+Umschalt+S` | sichern / sichern unter |
 | `F5` | Formular ausführen (siehe unten) |
-| `Strg+G` | GB-Code schreiben (siehe unten) |
+| `Strg+G` | DH-Code schreiben (siehe unten) |
 | `Strg+Z` / `Strg+Y` | rückgängig / wiederholen |
 | `Strg+D` | Controls verdoppeln (um ein Raster versetzt) |
 | `Entf` | Controls löschen |
@@ -152,7 +152,7 @@ WEND
    `.dhform`, sonst mit einem `' TODO`. Ein erneutes F5 beendet den vorigen
    Lauf; beim Ende des Designers wird er ebenfalls beendet. Wie er ausging,
    meldet die Statuszeile.
-3. **GB-Code (Strg+G):** `<name>_code.dh` baut das Formular **Aufruf für
+3. **DH-Code (Strg+G):** `<name>_code.dh` baut das Formular **Aufruf für
    Aufruf** — Konstruktor je Control, bei der Tabelle Kopf, Breiten,
    Zellmodus, bearbeitbare Spalten, Spaltenarten, Auswahllisten und
    Leer-Hinweis, bei Liste und Baum das Umbenennen, beim Baum den
@@ -207,7 +207,7 @@ weggelassen ist. Nicht (oder nicht mehr) vorhanden:
   Formulars, die Schalter der Tabelle (Zebra, Filterzeile, Sortieren …) und
   die Werte von Baum, Farb- und Datumswähler. Was davon in einer Datei
   steht, bleibt beim Öffnen und Sichern erhalten (siehe Dateiformat).
-- **Menüs im GB-Code** — die Qt-Fassung schrieb sie mit, diese sagt nur in
+- **Menüs im DH-Code** — die Qt-Fassung schrieb sie mit, diese sagt nur in
   einem Kommentar, dass `GUI_LOAD` sie baut. Einen Menü-*Editor* hatte auch
   die Qt-Fassung nicht.
 - F5 prüft das Laufprogramm nicht vorher mit `dhrt --check`; ein Fehler zeigt
@@ -235,7 +235,7 @@ weggelassen ist. Nicht (oder nicht mehr) vorhanden:
 Strg+S und liest die Datei mit dem json-Modul; einer zieht ein Control und
 nimmt zweimal zurück; einer prüft das F5-Laufprogramm; einer, dass fremde
 Felder einer bestehenden Form erhalten bleiben; einer legt **jede** Art an
-und lässt den GB-Code durch `dhrt --check` und einen Lauf; zwei prüfen den
+und lässt den DH-Code durch `dhrt --check` und einen Lauf; zwei prüfen den
 Inspektor an Tabelle und Gitter; einer misst die Palette gegen
 `Kind::from_str` in `gui.rs` — eine Art, die die Laufzeit kann und der
 Designer nicht, fällt sonst niemandem auf; zwei belegen den Entwurfsmodus

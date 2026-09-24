@@ -6,7 +6,7 @@
 '   (Beilage _programm/ev.txt -- der Designer laeuft in _programm/, also
 '   liegen dort auch Aufnahme und Protokoll);
 ' - ueber seine Unterprogramme: der Einschub hinter protokoll("bereit") ruft
-'   Inspektor, GB-Code oder Sichern direkt und endet mit EXIT(0).
+'   Inspektor, DH-Code oder Sichern direkt und endet mit EXIT(0).
 ' Die gesicherte Datei liegt im Fallordner (das Argument ist relativ zum Ort
 ' des Aufrufers). Format: docs/werkzeuge.md, dhrt test.
 '
@@ -176,7 +176,7 @@ PRINT \"gesichert\"
 === gb-code baut jedes control ohne gui_load
 ' Ein Formular mit JEDER Art der Laufzeit. Der Code muss uebersetzen UND
 ' laufen -- eine Signatur, die nicht passt, faellt erst dort auf.
-WRITEALL("code.dh", gbCode$())
+WRITEALL("code.dh", dhCode$())
 DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "code.dh")
 DIM bis AS INTEGER : bis = MILLIS() + 60000
 DIM befund AS STRING : befund = ""
@@ -629,7 +629,7 @@ auswahlSetzen(1)
 controlLoeschen()
 PRINT "nach loeschen "; JSON_STRINGIFY(teilbaum(doc, "widgets.0.tabctl.kinder"))
 ' Der Code legt die Seiten an und ordnet zu -- und laeuft.
-WRITEALL("code.dh", gbCode$())
+WRITEALL("code.dh", dhCode$())
 DIM zeilen AS ARRAY OF STRING : zeilen = READLINES("code.dh")
 DIM z AS STRING
 FOR EACH z IN zeilen
@@ -697,7 +697,7 @@ PRINT "sichtbar "; GUI_VISIBLE(cbFrei)
 GUI_SET_CHECKED(cbFrei, TRUE)
 inspektorUebernehmen()
 PRINT "an "; JSON_GET_BOOL(doc, "widgets.0.bearbeitbar")
-PRINT "code "; INSTR(gbCode$(), "GUI_DROPDOWN_SET(stadt, " + CHR$(34) + "bearbeitbar" + CHR$(34) + ", 1)") >= 0
+PRINT "code "; INSTR(dhCode$(), "GUI_DROPDOWN_SET(stadt, " + CHR$(34) + "bearbeitbar" + CHR$(34) + ", 1)") >= 0
 GUI_SET_CHECKED(cbFrei, FALSE)
 inspektorUebernehmen()
 PRINT "ab "; JSON_HAS(doc, "widgets.0.bearbeitbar")

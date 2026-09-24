@@ -354,11 +354,11 @@ pub fn apply_theme(s: &mut Style, name: &str) -> bool {
 
 // --- Farb-Hilfen -----------------------------------------------------------
 //
-// GB-Farben sind 0xAARRGGBB; ein Alpha von 0 gilt in dhrt als DECKEND (damit
+// DH-Farben sind 0xAARRGGBB; ein Alpha von 0 gilt in dhrt als DECKEND (damit
 // alte 24-Bit-Farben unveraendert bleiben). Beim Rechnen muss man das also
 // zuerst auf 255 heben, sonst wird aus "deckend" versehentlich "unsichtbar".
 
-/// Alpha-Anteil einer GB-Farbe als 0..255 (0 im obersten Byte = deckend).
+/// Alpha-Anteil einer DH-Farbe als 0..255 (0 im obersten Byte = deckend).
 fn alpha_of(c: i64) -> u32 {
     let a = ((c as u32) >> 24) & 0xFF;
     if a == 0 {
@@ -2681,7 +2681,7 @@ impl ChartObj {
 pub const THEMES: &[&str] = &["dunkel", "hell", "neon", "pastell"];
 
 /// Statistik-Kennzahlen ueber eine Reihe -- die typischen Fragen an einen
-/// Datensatz, ohne dass das GB-Programm selbst schleifen muss.
+/// Datensatz, ohne dass das DH-Programm selbst schleifen muss.
 pub fn stats(values: &[f64]) -> HashMap<&'static str, f64> {
     let mut m = HashMap::new();
     let gueltig: Vec<f64> = values.iter().copied().filter(|v| v.is_finite()).collect();

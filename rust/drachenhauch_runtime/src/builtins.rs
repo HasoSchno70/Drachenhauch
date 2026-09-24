@@ -84,7 +84,7 @@ fn programmstart() -> std::time::Instant {
 /// Programm, das nach dem Laden von Bildern misst, faenge nicht bei 0 an.
 pub fn uhr_starten() { let _ = programmstart(); }
 
-/// Argumente, die dem GB-PROGRAMM gehoeren (nicht der Runtime) -- Quelle fuer
+/// Argumente, die dem DH-PROGRAMM gehoeren (nicht der Runtime) -- Quelle fuer
 /// `ARGC()`/`ARG$(n)`.
 ///
 /// Wird von `main.rs` genau einmal beim Start gesetzt; wer nie setzt (Tests,
@@ -401,7 +401,7 @@ fn translate_repl(s: &str) -> String {
 
 /// Zeilen unterschiedlicher Laenge in ein 2D-ARRAY OF STRING giessen.
 ///
-/// CSV-Zeilen duerfen verschieden lang sein, ein GB-Array muss rechteckig
+/// CSV-Zeilen duerfen verschieden lang sein, ein DH-Array muss rechteckig
 /// sein. Aufgefuellt wird mit Leerstrings auf die BREITESTE Zeile -- abzu-
 /// schneiden hiesse, Daten stillschweigend wegzuwerfen.
 fn csv_tabelle(zeilen: Vec<Vec<String>>) -> Value {
@@ -1593,7 +1593,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         // COMPRESS$/DECOMPRESS$: DEFLATE, danach Base64. Der Umweg ueber Base64
-        // ist noetig, weil GB-Strings UTF-8 sind -- roher Deflate-Output waere
+        // ist noetig, weil DH-Strings UTF-8 sind -- roher Deflate-Output waere
         // kein gueltiges UTF-8 und liesse sich weder in eine Datei noch durch
         // JSON schleusen. Damit passen Ergebnisse ueberall dorthin, wo heute
         // schon BASE64_ENCODE-Ausgaben stehen (Savegames, Cloud-Slots).
@@ -3695,7 +3695,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // ===== Modul: xml =====
         //
-        // Nur LESEND: ein XML-Baum, den ein GB-Programm selbst baut, ist die
+        // Nur LESEND: ein XML-Baum, den ein DH-Programm selbst baut, ist die
         // Ausnahme -- wer eine Datei schreiben muss, klebt sie mit
         // XML_ESCAPE$ zusammen. (Bei JSON war das Schreiben die eigentliche
         // Luecke, hier ist es das Lesen.)
@@ -5595,7 +5595,7 @@ fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<GbFile>>, String
 
 /// Obergrenze fuer BUFFER_NEW/RESIZE. Ohne sie macht ein Tippfehler
 /// (`BUFFER_NEW(1000000000000)`) den ganzen Rechner unbenutzbar, statt eine
-/// Meldung zu geben. 1 GiB ist weit jenseits dessen, was ein GB-Programm
+/// Meldung zu geben. 1 GiB ist weit jenseits dessen, was ein DH-Programm
 /// sinnvoll im Speicher haelt, und immer noch eine klare Ansage.
 const MAX_BUFFER: i64 = 1 << 30;
 
@@ -5607,7 +5607,7 @@ fn neuer_buffer(bytes: Vec<u8>) -> Value {
     Value::Buffer(Rc::new(RefCell::new(bytes)))
 }
 
-/// Ein einzelnes Byte aus einem GB-Wert. 0..255 -- alles andere ist ein Fehler
+/// Ein einzelnes Byte aus einem DH-Wert. 0..255 -- alles andere ist ein Fehler
 /// und wird NICHT stillschweigend beschnitten: `BUFFER_SET(b, i, 256)` als 0
 /// durchgehen zu lassen waere die Art Fehler, die man erst in der Ausgabedatei
 /// bemerkt.

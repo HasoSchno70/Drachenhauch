@@ -37,7 +37,7 @@ drei-Pfade-neutral, bit-identisch-unkritisch (Grafik/Interaktion).
   - **Polling als Standard** (`IF GUI_CLICKED(btn) THEN ...`) — einfach, passt
     zum Builtin-Modell, kein Interpreter-Rückruf nötig.
   - **FUNCREF-Callbacks optional** (`GUI_ON_CLICK(btn, on_ok)`) — braucht eine
-    kleine **Builtin→Interpreter/VM-Brücke**, damit ein Builtin eine GB-Funktion
+    kleine **Builtin→Interpreter/VM-Brücke**, damit ein Builtin eine DH-Funktion
     aufrufen kann (s. „Offene technische Punkte").
 
 ## Was es bereits gibt (Basis)

@@ -73,13 +73,13 @@ PRINT "x" * 3.0
 Operator '*' erwartet Zahlen, erhalten STRING / FLOAT
 
 === string mul rejects bool (1)
-' `"x" * TRUE` wird abgelehnt -- Bool ist keine Zahl in GB.
+' `"x" * TRUE` wird abgelehnt -- Bool ist keine Zahl in Drachenhauch.
 PRINT "x" * TRUE
 --- fehler
 Operator '*' erwartet Zahlen, erhalten STRING / BOOLEAN
 
 === string mul rejects bool (2)
-' `"x" * TRUE` wird abgelehnt -- Bool ist keine Zahl in GB.
+' `"x" * TRUE` wird abgelehnt -- Bool ist keine Zahl in Drachenhauch.
 PRINT "x" * TRUE
 --- fehler
 Operator '*' erwartet Zahlen, erhalten STRING / BOOLEAN

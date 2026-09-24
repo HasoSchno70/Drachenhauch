@@ -62,7 +62,7 @@ pub fn schreiben(zeilen: &[Vec<String>], trenner: char) -> String {
 /// CSV-Text in Zeilen und Felder zerlegen.
 ///
 /// Die Zeilen koennen unterschiedlich lang sein -- das Auffuellen auf ein
-/// Rechteck passiert erst beim Bau des GB-Arrays, weil nur dort eine feste
+/// Rechteck passiert erst beim Bau des DH-Arrays, weil nur dort eine feste
 /// Spaltenzahl noetig ist.
 pub fn lesen(text: &str, trenner: char) -> Vec<Vec<String>> {
     let mut zeilen: Vec<Vec<String>> = Vec::new();

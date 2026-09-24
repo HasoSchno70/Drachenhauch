@@ -8,11 +8,11 @@
 ' Die Zusagen aus test_server.py, nacheinander gegen EINEN Server.
 IMPORT "klient.dh"
 IMPORT "json"
-SETENV("GB_CLOUD_API_KEY", "test-key")
-SETENV("GB_CLOUD_DB", CWD$() + "/test.db")
-SETENV("GB_CLOUD_MAX_SAVE_BYTES", "64")
-SETENV("GB_CLOUD_PORT", "0")
-SETENV("GB_CLOUD_HOST", "127.0.0.1")
+SETENV("DH_CLOUD_API_KEY", "test-key")
+SETENV("DH_CLOUD_DB", CWD$() + "/test.db")
+SETENV("DH_CLOUD_MAX_SAVE_BYTES", "64")
+SETENV("DH_CLOUD_PORT", "0")
+SETENV("DH_CLOUD_HOST", "127.0.0.1")
 DIM port AS INTEGER : port = serverStarten("srv.dh")
 DIM AUTH AS STRING : AUTH = "X-Api-Key: test-key"
 DIM a AS STRING
@@ -144,10 +144,10 @@ falsche methode 405
 
 === ohne schluessel ist der server offen und sagt es
 IMPORT "klient.dh"
-SETENV("GB_CLOUD_API_KEY", "")
-SETENV("GB_CLOUD_DB", CWD$() + "/offen.db")
-SETENV("GB_CLOUD_PORT", "0")
-SETENV("GB_CLOUD_HOST", "127.0.0.1")
+SETENV("DH_CLOUD_API_KEY", "")
+SETENV("DH_CLOUD_DB", CWD$() + "/offen.db")
+SETENV("DH_CLOUD_PORT", "0")
+SETENV("DH_CLOUD_HOST", "127.0.0.1")
 DIM port AS INTEGER : port = serverStarten("srv.dh")
 DIM a AS STRING : a = holen$(port, "POST", "/save/p1", "", "{""data"": ""frei""}")
 PRINT status(a)
@@ -171,10 +171,10 @@ warnung TRUE
 ' "CORS-Fehler" statt "falscher Schluessel". Die Vorabfrage kommt ohne
 ' X-Api-Key und muss trotzdem durch.
 IMPORT "klient.dh"
-SETENV("GB_CLOUD_API_KEY", "test-key")
-SETENV("GB_CLOUD_DB", CWD$() + "/cors.db")
-SETENV("GB_CLOUD_PORT", "0")
-SETENV("GB_CLOUD_HOST", "127.0.0.1")
+SETENV("DH_CLOUD_API_KEY", "test-key")
+SETENV("DH_CLOUD_DB", CWD$() + "/cors.db")
+SETENV("DH_CLOUD_PORT", "0")
+SETENV("DH_CLOUD_HOST", "127.0.0.1")
 DIM port AS INTEGER : port = serverStarten("srv.dh")
 DIM a AS STRING : a = holen$(port, "OPTIONS", "/save/p1", "Origin: http://spiel.example", "")
 PRINT "vorabfrage "; status(a); " origin="; kopf$(a, "Access-Control-Allow-Origin"); " kopfzeilen="; kopf$(a, "Access-Control-Allow-Headers"); " methoden="; kopf$(a, "Access-Control-Allow-Methods")
@@ -195,10 +195,10 @@ abgewiesen 401 origin=* typ=application/json
 ' Der eigentliche Zweck: CLOUD_* und LEADERBOARD_* gegen genau diesen Server.
 IMPORT "klient.dh"
 IMPORT "cloud"
-SETENV("GB_CLOUD_API_KEY", "spiel-key")
-SETENV("GB_CLOUD_DB", CWD$() + "/spiel.db")
-SETENV("GB_CLOUD_PORT", "0")
-SETENV("GB_CLOUD_HOST", "127.0.0.1")
+SETENV("DH_CLOUD_API_KEY", "spiel-key")
+SETENV("DH_CLOUD_DB", CWD$() + "/spiel.db")
+SETENV("DH_CLOUD_PORT", "0")
+SETENV("DH_CLOUD_HOST", "127.0.0.1")
 DIM port AS INTEGER : port = serverStarten("srv.dh")
 CLOUD_CONFIGURE("http://127.0.0.1:" + STR$(port), "spiel-key")
 PRINT CLOUD_LOAD("neu"); "|"; CLOUD_LAST_ERROR$(); "|"
@@ -234,10 +234,10 @@ FALSE TRUE
 
 === daten ueberleben einen neustart
 IMPORT "klient.dh"
-SETENV("GB_CLOUD_API_KEY", "k")
-SETENV("GB_CLOUD_DB", CWD$() + "/bleibt.db")
-SETENV("GB_CLOUD_PORT", "0")
-SETENV("GB_CLOUD_HOST", "127.0.0.1")
+SETENV("DH_CLOUD_API_KEY", "k")
+SETENV("DH_CLOUD_DB", CWD$() + "/bleibt.db")
+SETENV("DH_CLOUD_PORT", "0")
+SETENV("DH_CLOUD_HOST", "127.0.0.1")
 DIM port AS INTEGER : port = serverStarten("srv.dh")
 DIM a AS STRING : a = holen$(port, "POST", "/save/p1", "X-Api-Key: k", "{""data"": ""gemerkt""}")
 a = holen$(port, "POST", "/leaderboard/b/submit", "X-Api-Key: k", "{""name"": ""anna"", ""score"": 7}")

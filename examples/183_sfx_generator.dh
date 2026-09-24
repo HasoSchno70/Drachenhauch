@@ -12,7 +12,7 @@
 '
 '  Ausgabe:
 '    [WAV sichern]  schreibt eine Datei, die LOADSOUND direkt laedt.
-'    [GB-Code]      legt den fertigen AUDIO_SFX-Aufruf in die
+'    [DH-Code]      legt den fertigen AUDIO_SFX-Aufruf in die
 '                   Zwischenablage -- der Weg vom Klang ins Programm.
 '    [Sichern]      schreibt alle Regler in eine `.ini` ...
 '    [Laden]        ... und holt sie zurueck. Lesbares Format: die Datei
@@ -88,7 +88,7 @@ liste = GUI_LISTBOX(win, 16, 222, 210, 176, presetNamen)
 DIM knopfWav AS GUI_WIDGET
 knopfWav = GUI_BUTTON(win, "WAV sichern ...", 16, 410, 210, 28)
 DIM knopfCode AS GUI_WIDGET
-knopfCode = GUI_BUTTON(win, "GB-Code kopieren", 16, 444, 210, 28)
+knopfCode = GUI_BUTTON(win, "DH-Code kopieren", 16, 444, 210, 28)
 DIM knopfSichern AS GUI_WIDGET
 knopfSichern = GUI_BUTTON(win, "Sichern ...", 16, 478, 102, 28)
 GUI_TOOLTIP(knopfSichern, "Alle Regler in eine .ini schreiben")
@@ -375,7 +375,7 @@ END SUB
 ' WIEDERGABE-Kanal. Bis 2026-09-17 fehlte er hier, der kopierte Code klang
 ' also anders als die Vorschau daneben -- und zwar stumm anders, weil man
 ' einen fehlenden Pan nicht sieht.
-FUNCTION gbCode$() AS STRING
+FUNCTION dhCode$() AS STRING
     DIM nl AS STRING : nl = CHR$(10)
     DIM z AS STRING
     z = "IMPORT " + CHR$(34) + "audio" + CHR$(34) + nl + nl + "DIM snd AS SOUND" + nl
@@ -634,8 +634,8 @@ WHILE NOT beenden
     END IF
 
     IF GUI_CLICKED(knopfCode) THEN
-        CLIPBOARD_SET(gbCode$())
-        GUI_SET_TEXT(lblStatus, "GB-Code in der Zwischenablage.")
+        CLIPBOARD_SET(dhCode$())
+        GUI_SET_TEXT(lblStatus, "DH-Code in der Zwischenablage.")
     END IF
 
     IF GUI_CLICKED(knopfSichern) THEN einstellungSichern()

@@ -18,7 +18,7 @@ canvas = GENTEX_COLOR(120, 120, RGB(28, 36, 52))
 IMAGE_DRAW_RECT(canvas, 8, 8, 104, 104, RGB(54, 74, 108))
 IMAGE_DRAW_CIRCLE(canvas, 60, 52, 30, RGB(255, 200, 60))
 IMAGE_DRAW_LINE(canvas, 8, 112, 112, 88, RGB(255, 90, 90))
-IMAGE_DRAW_TEXT(canvas, 16, 92, "GB", 28, RGB(255, 255, 255))
+IMAGE_DRAW_TEXT(canvas, 16, 92, "DH", 28, RGB(255, 255, 255))
 
 ' --- 2) Filter darauf anwenden (Original bleibt erhalten) ---
 DIM gray AS IMAGE     : gray = IMAGE_GRAYSCALE(canvas)

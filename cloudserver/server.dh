@@ -12,7 +12,7 @@
 ' der seinen eigenen (im Spiel eingebetteten) Key extrahiert. Siehe README.md,
 ' "Sicherheitsmodell".
 '
-'     set GB_CLOUD_API_KEY=dein-geheimes-schluesselwort
+'     set DH_CLOUD_API_KEY=dein-geheimes-schluesselwort
 '     dhrt run cloudserver/server.dh
 '
 ' Bis 2026-09-15 server.py (Flask). Pfade, Antworten, Fehlercodes und das
@@ -27,11 +27,12 @@ IMPORT "json"
 IMPORT "regex"
 IMPORT "zeit"
 
-DIM cloudDbPfad AS STRING : cloudDbPfad = GETENV$("GB_CLOUD_DB", "cloud.db")
-DIM cloudSchluessel AS STRING : cloudSchluessel = GETENV$("GB_CLOUD_API_KEY", "")
-DIM cloudMaxBytes AS INTEGER : cloudMaxBytes = VAL(GETENV$("GB_CLOUD_MAX_SAVE_BYTES", "65536"))
-DIM cloudHost AS STRING : cloudHost = GETENV$("GB_CLOUD_HOST", "0.0.0.0")
-DIM cloudPort AS INTEGER : cloudPort = VAL(GETENV$("GB_CLOUD_PORT", "8787"))
+' Die alten Namen GB_CLOUD_* (aus der Zeit als GameBasic) gelten weiter, wenn DH_CLOUD_* fehlt.
+DIM cloudDbPfad AS STRING : cloudDbPfad = GETENV$("DH_CLOUD_DB", GETENV$("GB_CLOUD_DB", "cloud.db"))
+DIM cloudSchluessel AS STRING : cloudSchluessel = GETENV$("DH_CLOUD_API_KEY", GETENV$("GB_CLOUD_API_KEY", ""))
+DIM cloudMaxBytes AS INTEGER : cloudMaxBytes = VAL(GETENV$("DH_CLOUD_MAX_SAVE_BYTES", GETENV$("GB_CLOUD_MAX_SAVE_BYTES", "65536")))
+DIM cloudHost AS STRING : cloudHost = GETENV$("DH_CLOUD_HOST", GETENV$("GB_CLOUD_HOST", "0.0.0.0"))
+DIM cloudPort AS INTEGER : cloudPort = VAL(GETENV$("DH_CLOUD_PORT", GETENV$("GB_CLOUD_PORT", "8787")))
 CONST CLOUD_MAX_TOP = 200
 ' player_id / board / name: konservativ begrenzt. Sie landen nur als
 ' SQL-Parameter, aber eine Laengen-/Zeichengrenze haelt kaputte oder
@@ -271,7 +272,7 @@ cloudSrv = HTTPD_START(cloudPort, cloudHost)
 HTTPD_SET_HEADER(cloudSrv, "Access-Control-Allow-Origin", "*")
 HTTPD_SET_HEADER(cloudSrv, "Access-Control-Allow-Headers", "X-Api-Key, Content-Type")
 HTTPD_SET_HEADER(cloudSrv, "Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-IF cloudSchluessel = "" THEN EPRINT("WARNUNG: GB_CLOUD_API_KEY nicht gesetzt -- Server laeuft OHNE Auth (nur zum lokalen Testen!)")
+IF cloudSchluessel = "" THEN EPRINT("WARNUNG: DH_CLOUD_API_KEY nicht gesetzt -- Server laeuft OHNE Auth (nur zum lokalen Testen!)")
 ' EPRINT statt PRINT: PRINT wird gepuffert und erschiene erst am Ende.
 EPRINT("PORT=" + STR$(HTTPD_PORT(cloudSrv)))
 EPRINT("Cloud-Server laeuft auf " + cloudHost + ":" + STR$(HTTPD_PORT(cloudSrv)) + ", Datenbank " + cloudDbPfad)

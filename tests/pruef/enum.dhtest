@@ -83,7 +83,7 @@ PRINT Permission.RW
 3
 
 === keyword member names allowed
-' READ, FILE, DATA, NONE etc. sind GB-Keywords, sollten aber als
+' READ, FILE, DATA, NONE etc. sind DH-Keywords, sollten aber als
 ENUM Tag = NEW, READ, DATA, FILE
 PRINT Tag.NEW
 PRINT Tag.READ

@@ -23,7 +23,7 @@ Der Editor geht im Vollbild auf und beginnt mit einer leeren Karte von
 
 ## Aufbau
 
-Oben die Werkzeugleiste (Neu, Öffnen, Speichern, GB-Code, die sechs
+Oben die Werkzeugleiste (Neu, Öffnen, Speichern, DH-Code, die sechs
 Werkzeuge, Zurück/Vor, Schalter „Gitter" und „Nummern"). Links die Spalte
 mit Tileset-Wahl, Kachel-Palette, Ebenenliste und darunter — je nach Art der
 aktiven Ebene — entweder die Eigenschaften der gewählten Kachel oder die
@@ -145,9 +145,9 @@ lvl = TILED_LOAD("level.json")
 PRINT TILED_WIDTH(lvl); "x"; TILED_HEIGHT(lvl)
 ```
 
-## GB-Code
+## DH-Code
 
-**GB-Code** schreibt drei Dateien unter **einem** Namen: das Programm
+**DH-Code** schreibt drei Dateien unter **einem** Namen: das Programm
 (`karte.dh`), die Karte als Tiled-JSON (`karte.json`) und jedes Tileset-Bild
 (`karte_1.png`, `karte_2.png`, …). Das Bild kommt mit, obwohl die Karte
 seinen Pfad nennt: der Pfad zeigt dorthin, wo das Tileset beim Bearbeiten
@@ -178,7 +178,7 @@ Was die Qt-Fassung konnte und dieser Editor nicht:
 ## Prüfung
 
 `tests/pruef/werkzeug_tilemap.dhtest` fährt den Editor mit echten Klicks und
-Tasten: GB-Code samt Bild des erzeugten Renderers (leere und gemalte Karte),
+Tasten: DH-Code samt Bild des erzeugten Renderers (leere und gemalte Karte),
 das Deuten der Eigenschaftswerte, `solid` setzen und entfernen, Objekt-Ebenen
 (ziehen, klicken, wählen, `Entf`), mehrere Tilesets mit Pipette und
 Palette-Rollen, Umsortieren der Ebenen samt Rückgängig. Gelesen wird die

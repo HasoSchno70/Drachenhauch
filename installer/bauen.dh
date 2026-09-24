@@ -176,10 +176,11 @@ FUNCTION isccFinden$() AS STRING
     RETURN ""
 END FUNCTION
 
-' --- Signieren (Windows, nur wenn GB_SIGN_CERT gesetzt ist) -------------
-' Dieselben drei Variablen wie in build_installer.py: GB_SIGN_CERT ist der
+' --- Signieren (Windows, nur wenn DH_SIGN_CERT gesetzt ist) -------------
+' Die alten Namen GB_SIGN_* gelten weiter, falls DH_SIGN_* fehlt.
+' Dieselben drei Variablen wie in build_installer.py: DH_SIGN_CERT ist der
 ' Pfad einer .pfx ODER der SHA1-Fingerabdruck eines Zertifikats im
-' Windows-Speicher, GB_SIGN_PASS das Passwort der .pfx, GB_SIGN_TS die
+' Windows-Speicher, DH_SIGN_PASS das Passwort der .pfx, DH_SIGN_TS die
 ' Zeitstempel-Adresse. Die Werte gehen nur an signtool und werden nirgends
 ' ausgegeben. Anders als dort ist ein Fehlschlag hier ein ABBRUCH: ein
 ' Installer, der als signiert gedacht war und es nicht ist, faellt erst beim
@@ -200,22 +201,22 @@ FUNCTION signtoolFinden$() AS STRING
 END FUNCTION
 
 FUNCTION signieren(datei AS STRING) AS BOOLEAN
-    DIM zert AS STRING : zert = GETENV$("GB_SIGN_CERT")
+    DIM zert AS STRING : zert = GETENV$("DH_SIGN_CERT", GETENV$("GB_SIGN_CERT"))
     IF zert = "" THEN RETURN TRUE
     DIM st AS STRING : st = signtoolFinden$()
     IF st = "" THEN
-        PRINT "GB_SIGN_CERT ist gesetzt, aber signtool.exe fehlt (Windows SDK, oder SIGNTOOL setzen)."
+        PRINT "DH_SIGN_CERT ist gesetzt, aber signtool.exe fehlt (Windows SDK, oder SIGNTOOL setzen)."
         RETURN FALSE
     END IF
-    DIM ts AS STRING : ts = GETENV$("GB_SIGN_TS")
+    DIM ts AS STRING : ts = GETENV$("DH_SIGN_TS", GETENV$("GB_SIGN_TS"))
     IF ts = "" THEN ts = "http://timestamp.digicert.com"
     PRINT "Signiere "; BASENAME(datei)
     ' signtool bekommt den Pfad in Windows-Schreibweise.
     DIM dw AS STRING : dw = REPLACE$(datei, "/", CHR$(92))
     DIM p AS INTEGER
     IF FILEEXISTS(zert) THEN
-        IF GETENV$("GB_SIGN_PASS") <> "" THEN
-            p = PROCESS_START(st, "sign", "/fd", "SHA256", "/tr", ts, "/td", "SHA256", "/f", zert, "/p", GETENV$("GB_SIGN_PASS"), dw)
+        IF GETENV$("DH_SIGN_PASS", GETENV$("GB_SIGN_PASS")) <> "" THEN
+            p = PROCESS_START(st, "sign", "/fd", "SHA256", "/tr", ts, "/td", "SHA256", "/f", zert, "/p", GETENV$("DH_SIGN_PASS", GETENV$("GB_SIGN_PASS")), dw)
         ELSE
             p = PROCESS_START(st, "sign", "/fd", "SHA256", "/tr", ts, "/td", "SHA256", "/f", zert, dw)
         END IF
@@ -261,4 +262,4 @@ IF NOT FILEEXISTS(ergebnis) THEN
 END IF
 IF NOT signieren(ergebnis) THEN EXIT(1)
 PRINT "FERTIG -> "; ergebnis; " ("; FILESIZE(ergebnis) \ 1048576; " MB)"
-IF GETENV$("GB_SIGN_CERT") = "" THEN PRINT "Nicht signiert (GB_SIGN_CERT ist nicht gesetzt)."
+IF GETENV$("DH_SIGN_CERT", GETENV$("GB_SIGN_CERT")) = "" THEN PRINT "Nicht signiert (DH_SIGN_CERT ist nicht gesetzt)."

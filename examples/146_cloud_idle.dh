@@ -3,7 +3,7 @@
 ' Highscore in eine gemeinsame Bestenliste einreichen (LEADERBOARD_*).
 '
 ' Voraussetzung: ein laufender Cloud-Server (cloudserver/server.dh).
-'   set GB_CLOUD_API_KEY=demo-key          (Windows; PowerShell: $env:GB_CLOUD_API_KEY="demo-key")
+'   set DH_CLOUD_API_KEY=demo-key          (Windows; PowerShell: $env:DH_CLOUD_API_KEY="demo-key")
 '   dhrt run cloudserver/server.dh
 ' Laeuft dann per Default auf http://localhost:8787.
 '

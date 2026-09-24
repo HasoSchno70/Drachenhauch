@@ -170,7 +170,7 @@ attrappe lief TRUE
 
 === der installer wird aus einer kopie der laufzeit gebaut
 ' Gepackt wird eine KOPIE der Laufzeit (sie laesst sich signieren, auch
-' wenn die gebaute gerade laeuft), und ohne GB_SIGN_CERT wird nichts
+' wenn die gebaute gerade laeuft), und ohne DH_SIGN_CERT wird nichts
 ' signiert -- das sagt der Bau dann auch.
 FUNCTION lauf$(p AS INTEGER) AS STRING
     DIM aus AS STRING : aus = ""
@@ -195,7 +195,7 @@ DIM aus AS STRING : aus = CWD$() + "/aus"
 SETENV("ISCC", CWD$() + "/iscc.cmd")
 SETENV("SIGNTOOL", CWD$() + "/signtool.cmd")
 SETENV("ATTRAPPE_ZIEL", win$(aus + "/Drachenhauch-IDE-Setup-" + VERSION$() + ".exe"))
-SETENV("GB_SIGN_CERT", "")
+SETENV("DH_SIGN_CERT", "")
 DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
     "--ohne-lizenzen", "--wurzel", CWD$() + "/wurzel", "--ausgabe", aus)
 DIM text AS STRING : text = lauf$(p)
@@ -206,7 +206,7 @@ PRINT "iscc schreibt nach aus "; INSTR(iscc, "/O" + win$(aus)) >= 0
 PRINT "kopie da "; READLINES(aus + "/stufe/dhrt.exe")[0]
 PRINT "signtool lief "; FILEEXISTS("sign.txt")
 PRINT "fertig gemeldet "; INSTR(text, "FERTIG -> ") >= 0
-PRINT "nicht signiert gesagt "; INSTR(text, "Nicht signiert (GB_SIGN_CERT ist nicht gesetzt).") >= 0
+PRINT "nicht signiert gesagt "; INSTR(text, "Nicht signiert (DH_SIGN_CERT ist nicht gesetzt).") >= 0
 --- system windows
 --- argumente
 {sammlung}/../../installer/bauen.dh
@@ -259,8 +259,8 @@ DIM aus AS STRING : aus = CWD$() + "/aus"
 SETENV("ISCC", CWD$() + "/iscc.cmd")
 SETENV("SIGNTOOL", CWD$() + "/signtool.cmd")
 SETENV("ATTRAPPE_ZIEL", win$(aus + "/Drachenhauch-IDE-Setup-" + VERSION$() + ".exe"))
-SETENV("GB_SIGN_CERT", "ABC123")
-SETENV("GB_SIGN_PASS", "")
+SETENV("DH_SIGN_CERT", "ABC123")
+SETENV("DH_SIGN_PASS", "")
 DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
     "--ohne-lizenzen", "--wurzel", CWD$() + "/wurzel", "--ausgabe", aus)
 DIM text AS STRING : text = lauf$(p)
@@ -298,7 +298,7 @@ aufrufe 2
 kein signiert-hinweis TRUE
 
 === mit pfx-datei gehen datei und passwort an signtool
-' GB_SIGN_CERT als Pfad einer Datei = .pfx, GB_SIGN_PASS ihr Passwort.
+' DH_SIGN_CERT als Pfad einer Datei = .pfx, DH_SIGN_PASS ihr Passwort.
 FUNCTION lauf$(p AS INTEGER) AS STRING
     DIM aus AS STRING : aus = ""
     DIM leer AS INTEGER : leer = 0
@@ -323,9 +323,9 @@ SETENV("ISCC", CWD$() + "/iscc.cmd")
 SETENV("SIGNTOOL", CWD$() + "/signtool.cmd")
 SETENV("ATTRAPPE_ZIEL", win$(aus + "/Drachenhauch-IDE-Setup-" + VERSION$() + ".exe"))
 WRITEALL("zert.pfx", "kein echtes Zertifikat")
-SETENV("GB_SIGN_CERT", CWD$() + "/zert.pfx")
-SETENV("GB_SIGN_PASS", "geheim")
-SETENV("GB_SIGN_TS", "http://zeit.example")
+SETENV("DH_SIGN_CERT", CWD$() + "/zert.pfx")
+SETENV("DH_SIGN_PASS", "geheim")
+SETENV("DH_SIGN_TS", "http://zeit.example")
 DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
     "--ohne-lizenzen", "--wurzel", CWD$() + "/wurzel", "--ausgabe", aus)
 DIM text AS STRING : text = lauf$(p)
@@ -383,7 +383,7 @@ DIM aus AS STRING : aus = CWD$() + "/aus"
 SETENV("ISCC", CWD$() + "/iscc.cmd")
 SETENV("SIGNTOOL", CWD$() + "/signtool.cmd")
 SETENV("ATTRAPPE_ZIEL", win$(aus + "/Drachenhauch-IDE-Setup-" + VERSION$() + ".exe"))
-SETENV("GB_SIGN_CERT", "ABC123")
+SETENV("DH_SIGN_CERT", "ABC123")
 SETENV("ATTRAPPE_SIGN_FEHLT", "1")
 DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
     "--ohne-lizenzen", "--wurzel", CWD$() + "/wurzel", "--ausgabe", aus)

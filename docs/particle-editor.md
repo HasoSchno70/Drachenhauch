@@ -1,7 +1,7 @@
 # Partikel-Editor (`examples/185_partikel_editor.dh`)
 
 Alle Parameter des [`particles`](module-particles.md)-Moduls live einstellen,
-mit echter Vorschau, und das Ergebnis als GB-Code mitnehmen — geschrieben in
+mit echter Vorschau, und das Ergebnis als DH-Code mitnehmen — geschrieben in
 Drachenhauch auf dem eigenen `gui`-Modul. Die Vorschau ist **keine
 Nachbildung**: sie treibt ein echtes `PARTICLE_SYSTEM` mit denselben Aufrufen,
 die später im Spiel stehen, und zeichnet es mit `PARTICLE_DRAW`. Was man
@@ -21,7 +21,7 @@ Programm. Python braucht er nicht.
 | Vorschau | Die Teilchen, beschnitten auf die Fläche; die Quelle sitzt in der Mitte oder, mit **folgt der Maus**, unter dem Zeiger. Unten die Zahl der lebenden Teilchen |
 | Bedienung | **Pause**/**Weiter**, **Leeren**, **Salve** (200 Teilchen auf einmal — für Explosionen) |
 | Werkseinstellungen | Funken, Rauch, Feuer, Regen, Schnee, Explosion, Zauber, Springbrunnen — ein Klick setzt alle Regler, Darstellung und Schalter und leert die Vorschau |
-| Ausgabe | **Sichern ...**/**Laden ...** (`.ini`), **GB-Code kopieren** |
+| Ausgabe | **Sichern ...**/**Laden ...** (`.ini`), **DH-Code kopieren** |
 | Verlauf | **Zurueck**/**Vor** oder Strg+Z/Strg+Y |
 
 Die Regler:
@@ -61,9 +61,9 @@ Beim Schließen (Kreuz, Alt+F4 oder ESC) fragt der Editor nach
 (Sichern / Verwerfen / Abbrechen), aber nur, wenn etwas vom letzten Sichern,
 Laden oder Wählen einer Werkseinstellung abweicht.
 
-## GB-Code
+## DH-Code
 
-**GB-Code kopieren** legt die Aufrufe in die Zwischenablage, die dieses System
+**DH-Code kopieren** legt die Aufrufe in die Zwischenablage, die dieses System
 im eigenen Programm erzeugen. Die Quelle steht dort als `x, y` — die Lage
 bestimmt das Spiel —, und den `IMPORT "particles"` schreibt man selbst dazu.
 Für die Werkseinstellung „Funken“, mit einer festen Lage davor:
@@ -99,7 +99,7 @@ Die drei Zeilen nach `' pro Bild:` gehören in die Bildschleife.
 
 Die frühere Qt-Fassung (`dhparticles`) hatte eine **Preset-Bibliothek** mit
 benannten eigenen Einstellungen in einer gemeinsamen Datei und zeigte den
-GB-Code in einem eigenen Fenster. Hier ist jede eigene Einstellung eine eigene
+DH-Code in einem eigenen Fenster. Hier ist jede eigene Einstellung eine eigene
 `.ini`, und der Code geht direkt in die Zwischenablage.
 
 ## Tests

@@ -154,7 +154,7 @@ pub fn connect(addr: &str) -> Result<Peripheral, String> {
         if !connected {
             // Review-Fund: der Connect-Versuch kann teilweise durchgekommen
             // sein (OS-Link steht, GATT-Handshake aber nicht abgeschlossen)
-            // -- ohne diesen Disconnect blieb das dem GB-Programm verborgen,
+            // -- ohne diesen Disconnect blieb das dem DH-Programm verborgen,
             // weil bei einem Err niemals ein Handle zurueckgegeben wird und
             // es damit auch keine Moeglichkeit gibt, BT_DISCONNECT selbst
             // aufzurufen. Best-effort aufraeumen, bevor der Fehler propagiert.

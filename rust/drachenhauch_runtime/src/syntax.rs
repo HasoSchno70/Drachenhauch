@@ -14,7 +14,7 @@
 //! Ausgabe sind Abschnitte `(start, länge, art)` in ZEICHEN (nicht Bytes),
 //! damit sie zu den Zeichen-Positionen des `gui`-Textfelds passen.
 
-/// Was ein Abschnitt ist. Die Namen gehen so nach außen (GB-Programm) und
+/// Was ein Abschnitt ist. Die Namen gehen so nach außen (DH-Programm) und
 /// werden dort auf Farben abgebildet -- absichtlich, denn welche Farbe ein
 /// Kommentar hat, ist eine Frage des Themas und nicht der Sprache.
 #[derive(Clone, Copy, PartialEq, Debug)]

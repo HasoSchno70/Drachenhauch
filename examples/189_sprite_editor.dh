@@ -52,7 +52,7 @@
 '                ATLAS_LOAD direkt liest -- der Kreis schliesst sich),
 '                bewegtes GIF (Tempo aus dem Regler, je Bild mit eigener
 '                Dauer die eigene), und
-'                [GB-Code]: ein lauffaehiges Programm samt Blatt, mit einer
+'                [DH-Code]: ein lauffaehiges Programm samt Blatt, mit einer
 '                SPRITE_ADD_ANIM-Zeile je Bereich, und [dhanim]: dieselben
 '                Bereiche als Zustandsmaschine (.dhanim), die der
 '                dhanim-Editor oeffnet
@@ -935,14 +935,14 @@ FUNCTION mitAlpha(c AS INTEGER, a AS INTEGER) AS INTEGER
     RETURN RGBA((c \ 65536) MOD 256, (c \ 256) MOD 256, c MOD 256, a)
 END FUNCTION
 
-' ---------------------------------------------------------------- GB-Code
+' ---------------------------------------------------------------- DH-Code
 ' Ein LAUFFAEHIGES Drachenhauch-Programm zu diesem Sprite: der Streifen als
 ' PNG daneben, dazu eine SPRITE_ADD_ANIM-Zeile je Bereich. Damit schliesst
 ' sich der Kreis -- was hier gemalt wurde, laeuft ohne Zwischenschritt.
 '
 ' Beides unter DEMSELBEN Namen und in EINEM Zug. Wer nur den Code schreibt,
 ' hat einen Verweis ins Leere, und das faellt erst beim Starten auf.
-SUB gbCodeSichern(pfad AS STRING)
+SUB dhCodeSichern(pfad AS STRING)
     DIM png AS STRING : png = pfad
     IF LEN(png) > 3 AND RIGHT$(LOWER$(png), 3) = ".dh" THEN
         png = LEFT$(png, LEN(png) - 3)
@@ -1785,9 +1785,9 @@ DIM bDrehL AS GUI_WIDGET
 bDrehL = GUI_BUTTON(win, "< 90", 210, y, 62, 28)
 GUI_TOOLTIP(bDrehL, "Vierteldrehung nach links -- Breite und Hoehe tauschen")
 y = y + 34
-DIM bGbCode AS GUI_WIDGET
-bGbCode = GUI_BUTTON(win, "GB-Code", 12, y, 128, 28)
-GUI_TOOLTIP(bGbCode, "Ein lauffaehiges Programm + das Blatt daneben -- je Bereich eine SPRITE_ADD_ANIM-Zeile")
+DIM bDhCode AS GUI_WIDGET
+bDhCode = GUI_BUTTON(win, "DH-Code", 12, y, 128, 28)
+GUI_TOOLTIP(bDhCode, "Ein lauffaehiges Programm + das Blatt daneben -- je Bereich eine SPRITE_ADD_ANIM-Zeile")
 DIM bDhanim AS GUI_WIDGET
 bDhanim = GUI_BUTTON(win, "dhanim", 144, y, 128, 28)
 GUI_TOOLTIP(bDhanim, "Die Bereiche als Zustandsmaschine (.dhanim) -- Uebergaenge ergaenzt der dhanim-Editor")
@@ -2144,12 +2144,12 @@ WHILE NOT beenden
             END TRY
         END IF
     END IF
-    IF GUI_CLICKED(bGbCode) THEN
+    IF GUI_CLICKED(bDhCode) THEN
         DIM pc AS STRING
-        pc = FILE_SAVE_DIALOG("GB-Code sichern", "sprite.dh", "dh")
+        pc = FILE_SAVE_DIALOG("DH-Code sichern", "sprite.dh", "dh")
         IF pc <> "" THEN
             TRY
-                gbCodeSichern(pc)
+                dhCodeSichern(pc)
             CATCH e
                 meldung = e
             END TRY

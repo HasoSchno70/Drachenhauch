@@ -436,7 +436,7 @@ impl Parser {
                 let expr = self.expression()?;
                 self.consume_terminator()?;
                 // Review-Fund (Sicherheitsnetz, siehe inline_statement): kein
-                // gueltiges GB-Programm berechnet einen Top-Level-Vergleich
+                // gueltiges DH-Programm berechnet einen Top-Level-Vergleich
                 // und verwirft ihn -- jede Lvalue-Form, die trotz der obigen
                 // Zweige noch durchrutscht, bricht hier klar statt lautlos.
                 // Die Stelle der ANWEISUNG, nicht die hinter dem Zeilenende --
@@ -1215,7 +1215,7 @@ impl Parser {
                 // der wie ein Keyword lexed, als Ziel EINER einzelnen
                 // Zuweisung ohne with_stack), soll nicht lautlos als
                 // verworfener Vergleichswert enden -- kein gueltiges
-                // GB-Programm berechnet einen Top-Level-Vergleich und
+                // DH-Programm berechnet einen Top-Level-Vergleich und
                 // verwirft ihn.
                 if let Node::BinaryOp { op, .. } = &e {
                     if op.as_str() == "=" {

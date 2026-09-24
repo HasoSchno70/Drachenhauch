@@ -23,7 +23,7 @@ den vier Pfaden genau einer übrig, und der bringt sein Frontend selbst mit.
 2. **Rust-VM-Kern** — Dispatch-Schleife + Skalar-Ops + Control-Flow. Test:
    Konsolen-Programme, `stdout == Python-VM`. ✅ *erledigt (Spike)*
 3. Strings/Arrays/Maps/Structs in Rust nachziehen (echte Rust-Typen statt
-   geboxt — die Typ-Strenge von GB hilft). ✅ *erledigt*
+   geboxt — die Typ-Strenge von Drachenhauch hilft). ✅ *erledigt*
 4. raylib einbinden, Grafik-Builtins nach Rust. ✅ *erledigt (Core-2D)*
 5. Module portieren (gui/ui/physics …). ✅ *erledigt — ALLE Module nativ inkl.
    ui (komplett, mit UI_TABLE) + gui (komplett, mit GUI_TABLE + Callbacks)*
@@ -291,9 +291,9 @@ dhrt --dumpbc <datei.dh>
 hängt dieselbe `.dhc` an eine Kopie der Exe.
 
 **Wert-Encoding** (eindeutig dekodierbar — INT/FLOAT/BOOL müssen unterscheidbar
-bleiben, da `bool` in Python ein `int`-Subtyp ist und `1` ≠ `1.0` in GB):
+bleiben, da `bool` in Python ein `int`-Subtyp ist und `1` ≠ `1.0` in Drachenhauch):
 
-| GB-Wert | JSON |
+| DH-Wert | JSON |
 |---|---|
 | `None` | `null` |
 | `bool` | `{"b": true}` |
@@ -954,7 +954,7 @@ extrahiert den Bytecode.
 > eigenes Zertifikat und signiert die fertige `.exe` selbst. Ist ein Payload da (Bundle-Modus), wechselt `dhrt` ins Exe-Verzeichnis
 (damit relative Asset-Pfade beim Doppelklick von überall stimmen) und führt den
 eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`dhrt datei.dhc`).
-Beide Pfade teilen sich `run_gbc_text(text, label)`.
+Beide Pfade teilen sich `run_dhc_text(text, label)`.
 
 **Export-Seite** (`export_main` in [main.rs](../rust/drachenhauch_runtime/src/main.rs)):
 `dhrt` übersetzt die Quelle zu `.dhc`, hängt `<gbc><len><magic>` an eine Kopie

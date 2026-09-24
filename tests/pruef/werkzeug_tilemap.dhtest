@@ -101,7 +101,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -214,7 +214,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -340,7 +340,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -465,7 +465,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -639,7 +639,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -811,7 +811,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
@@ -989,7 +989,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
@@ -1167,7 +1167,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
@@ -1345,7 +1345,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
@@ -1523,7 +1523,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
@@ -1701,7 +1701,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
@@ -1879,7 +1879,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
@@ -2058,7 +2058,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
@@ -2237,7 +2237,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
@@ -2418,7 +2418,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
@@ -2527,7 +2527,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
@@ -2638,7 +2638,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
@@ -2822,7 +2822,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
@@ -3003,7 +3003,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
@@ -3115,7 +3115,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
@@ -3227,7 +3227,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
@@ -3406,7 +3406,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
@@ -3510,7 +3510,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
@@ -3617,7 +3617,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
@@ -3798,7 +3798,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
@@ -3907,7 +3907,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
@@ -4049,7 +4049,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
@@ -4165,7 +4165,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
@@ -4274,7 +4274,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -4450,7 +4450,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -4626,7 +4626,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()
@@ -4807,7 +4807,7 @@ SET_WINDOW_POS(-3000, -3000)
 --- ersetzen "assets/editor_tileset.png"
 "{sammlung}/../../examples/assets/editor_tileset.png"
 
---- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+--- ersetzen FILE_SAVE_DIALOG("DH-Code sichern", "karte.dh", "dh")
 "raus.dh"
 
 --- einschub nach FLIP()

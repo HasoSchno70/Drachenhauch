@@ -22,7 +22,7 @@
 '
 '  Steuerung:  LEER = Szene weiter    F11 = Vollbild    ESC = Ende
 '
-'  Start:  dhrt run gbdemo\gbdemo.dh
+'  Start:  dhrt run dhdemo\dhdemo.dh
 ' ======================================================================
 
 IMPORT "audio"

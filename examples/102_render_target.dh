@@ -1,4 +1,4 @@
-' 102_render_target.dh -- Render-Texturen als GB-Handle (Batch 4, dual-path).
+' 102_render_target.dh -- Render-Texturen als DH-Handle (Batch 4, dual-path).
 ' Ein "Badge" wird einmal pro Frame in ein Off-Screen-Render-Ziel gezeichnet und
 ' dann mehrfach (skaliert + getoent) auf den Screen gestempelt.
 
@@ -21,7 +21,7 @@ FOR frame = 0 TO 100000
         r = 28 + INT(8 * SIN(frame * 0.08))
         CIRCLE(60, 52, r, &HFFD040)
         CIRCLE(60, 52, r - 8, &HFF8020)
-        TEXT(40, 92, "GB", &HE0ECFF)
+        TEXT(40, 92, "DH", &HE0ECFF)
     RENDERTARGET_END()
 
     ' --- Mehrfach stempeln: original / vergroessert / verkleinert + getoent ---

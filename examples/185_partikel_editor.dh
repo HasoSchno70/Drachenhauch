@@ -2,7 +2,7 @@
 '  DRACHENHAUCH -- Partikel-Editor
 ' ============================================================
 '  Alle Parameter des `particles`-Moduls live einstellen, mit echter
-'  Vorschau, und das Ergebnis als GB-Code mitnehmen. Das Gegenstueck
+'  Vorschau, und das Ergebnis als DH-Code mitnehmen. Das Gegenstueck
 '  zum Qt-Werkzeug `dhparticles` -- hier in Drachenhauch selbst.
 '
 '  Die Vorschau ist KEINE Nachbildung: sie treibt ein echtes
@@ -101,7 +101,7 @@ DIM knopfLaden AS GUI_WIDGET
 knopfLaden = GUI_BUTTON(win, "Laden ...", 358, 532, 102, 30)
 GUI_TOOLTIP(knopfLaden, "Eine gesicherte Einstellung zurueckholen")
 DIM knopfCode AS GUI_WIDGET
-knopfCode = GUI_BUTTON(win, "GB-Code kopieren", 250, 570, 210, 30)
+knopfCode = GUI_BUTTON(win, "DH-Code kopieren", 250, 570, 210, 30)
 DIM lblStatus AS GUI_WIDGET
 lblStatus = GUI_LABEL(win, "Bereit.", 250, 612)
 DIM lblZahl AS GUI_WIDGET
@@ -327,7 +327,7 @@ SUB uebertrage()
 END SUB
 
 ' Der Aufruf-Block, der dieses System im eigenen Programm erzeugt.
-FUNCTION gbCode$() AS STRING
+FUNCTION dhCode$() AS STRING
     DIM nl AS STRING
     nl = CHR$(10)
     DIM z AS STRING
@@ -595,7 +595,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(knopfLaden) THEN einstellungLaden()
 
     IF GUI_CLICKED(knopfCode) THEN
-        CLIPBOARD_SET(gbCode$())
+        CLIPBOARD_SET(dhCode$())
         GUI_SET_TEXT(lblStatus, "Aufrufe in der Zwischenablage.")
     END IF
 

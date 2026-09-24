@@ -6,7 +6,7 @@
 
 <p align="center"><em>Deutsch · <a href="README.en.md">English</a></em></p>
 
-Ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`dhrt`** — die native Rust-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Grafik und 3D über **raylib**, Ton über **[Kira](https://github.com/tesselode/kira)** auf einem eigenen Audio-Thread. Auch die IDE und alle Werkzeuge sind in Drachenhauch geschrieben; Python braucht nur noch das Bauskript der Laufzeit.
+Ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP — für Spiele ebenso wie für Anwendungen mit grafischer Oberfläche, Kommandozeilen-Werkzeuge und kleine Dienste. Programme laufen über **`dhrt`** — die native Rust-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Grafik und 3D über **raylib**, Ton über **[Kira](https://github.com/tesselode/kira)** auf einem eigenen Audio-Thread. Auch die IDE und alle Werkzeuge sind in Drachenhauch geschrieben; Python braucht nur noch das Bauskript der Laufzeit.
 
 ```basic
 IMPORT "sprite"
@@ -52,9 +52,10 @@ Startseite, jede per Doppelklick startbar.
 
 ### Und außerdem: alles andere
 
-Drachenhauch fing als Spiele-BASIC an. Inzwischen schreibt man damit auch die
-Dinge, die *neben* dem Spiel anfallen — Werkzeuge, Auswertungen, kleine
-Dienste:
+Drachenhauch fing als Spiele-BASIC an (damals „GameBasic“). Inzwischen
+schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
+(Modul `gui`, Form-Designer, Datenbank-Bindung, Drucken) und die Dinge, die
+*neben* einem Spiel anfallen — Werkzeuge, Auswertungen, kleine Dienste:
 
 | | |
 |---|---|
@@ -118,13 +119,13 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **Module** — 48 Stück, [Tabelle unten](#module)
 - **[IDE](docs/ide.md)** — die Entwicklungsumgebung, selbst in Drachenhauch geschrieben: Reiter, Projektbaum, Vervollständigung, Hilfe zum Wort, Schnipsel, Mehrfach-Marken, Faltung, geteilte Ansicht, Umbauten über das ganze Projekt, **Debugger** (auch bedingte Haltepunkte), **Profiler**, git blame/diff, Handbuch im Fenster, Willkommensseite mit Beispiel-Galerie
 - **Werkzeuge** — alle in Drachenhauch geschrieben, in der IDE unter *Werkzeuge* oder direkt mit `dhrt run examples/<datei>`:
-  - **[Sprite-Editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Lasso/Zauberstab/Verschieben, GIF mit Dauer je Bild, Atlas-Export für `ATLAS_LOAD`, GB-Code, `.dhanim`-Vorlage
-  - **[Partikel-Editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — Emitter-Regler mit Live-Vorschau, Werkseinstellungen, eigene Stände als `.ini`, GB-Code
-  - **[SFX-Generator](docs/sfx-generator.md)** (`183_sfx_generator.dh`) — Retro-Soundeffekte im sfxr-Stil, WAV-Export, GB-Code mit `AUDIO_SFX`
+  - **[Sprite-Editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Lasso/Zauberstab/Verschieben, GIF mit Dauer je Bild, Atlas-Export für `ATLAS_LOAD`, DH-Code, `.dhanim`-Vorlage
+  - **[Partikel-Editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — Emitter-Regler mit Live-Vorschau, Werkseinstellungen, eigene Stände als `.ini`, DH-Code
+  - **[SFX-Generator](docs/sfx-generator.md)** (`183_sfx_generator.dh`) — Retro-Soundeffekte im sfxr-Stil, WAV-Export, DH-Code mit `AUDIO_SFX`
   - **[Tracker](docs/tracker.md)** (`190_tracker.dh`) — mehrspuriger Musik-Editor, [Tabelle unten](#tracker)
   - **[Notenblatt](docs/score-editor.md)** (`199_notenblatt.dh`) — echte Notensatz-Darstellung, Wiedergabe, Übergabe an den Tracker
-  - **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — Ebenen, Objekt-Ebenen, mehrere Tilesets, Kachel-Eigenschaften, Tiled-JSON (`TILED_LOAD`), GB-Code-Renderer
-  - **[Form-Designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI-Formulare im Xojo-Stil, `.dhform` für `GUI_LOAD`, F5 startet, GB-Code
+  - **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — Ebenen, Objekt-Ebenen, mehrere Tilesets, Kachel-Eigenschaften, Tiled-JSON (`TILED_LOAD`), DH-Code-Renderer
+  - **[Form-Designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI-Formulare im Xojo-Stil, `.dhform` für `GUI_LOAD`, F5 startet, DH-Code
   - **[Animations-FSM-Editor](docs/anim-editor.md)** (`198_anim_fsm_editor.dh`) — Zustände, Übergänge und Bedingungen als Graph, `.dhanim` für `ANIM_FSM_LOAD` ([Modul `animfsm`](docs/module-animfsm.md)), Vorschau mit F5
 - **[Sprachserver + VS Code](docs/lsp.md)** — Drachenhauch in jedem LSP-Editor: Syntax-Highlighting, Diagnostics, Completion, Hover, Goto-Definition, References, Outline. Der Server ist die Runtime selbst (`dhrt lsp`), ohne Python (`vscode-drachenhauch/`)
 - **[Web-Playground](docs/web-playground.md)** — `dhrt` als WebAssembly im Browser, [Tabelle unten](#web-playground)
@@ -234,7 +235,7 @@ Drachenhauch selbst.
 | Instrumente | 18 fertige mit Hüllkurve, Vibrato und Detune, alle änderbar; je Note ein eigenes Instrument möglich |
 | Bearbeiten | je Note Lautstärke, Portamento und Effekt; Blockauswahl mit Kopieren, Transponieren, Interpolieren; Stumm/Solo und Mixer-Regler je Kanal; Rückgängig über den ganzen Song |
 | Wiedergabe | auf einer Audio-Uhr, nicht bildgetrieben — Sechzehntel bleiben im Takt, auch wenn die Bildrate schwankt |
-| Ausgabe | Song-JSON (dasselbe wie das der früheren Qt-Fassung), WAV mit Stereo und Amiga-Panning, GB-Code als eigenständiger Abspieler |
+| Ausgabe | Song-JSON (dasselbe wie das der früheren Qt-Fassung), WAV mit Stereo und Amiga-Panning, DH-Code als eigenständiger Abspieler |
 
 ### Web-Playground
 
@@ -282,12 +283,12 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `193_gui_dialoge.dh` | **Dialoge im gui-Modul** — eigene Knopfsätze, Frage mit Eingabefeld, eigene Fenster modal |
 | `192_gui_listen.dh` | **Listen im gui-Modul** — Einträge einzeln, Sinnbilder, Kästchen, Mehrfachauswahl, Doppelklick |
 | `191_gui_formular.dh` | **Text und Formular im gui-Modul** — umbrechende Beschriftung, Ausrichtung, Passwort-, Zahlen- und Nur-Lesen-Feld, Enter/ESC als Standard- und Abbrechen-Knopf |
-| `190_tracker.dh` | **der Tracker, geschrieben IN Drachenhauch** — Patterns, Reihenfolge, 18 Instrumente, Effekte je Note, Wiedergabe auf einer Audio-Uhr, dasselbe JSON wie `dhtracker`, WAV-Mischung und GB-Code |
+| `190_tracker.dh` | **der Tracker, geschrieben IN Drachenhauch** — Patterns, Reihenfolge, 18 Instrumente, Effekte je Note, Wiedergabe auf einer Audio-Uhr, dasselbe JSON wie `dhtracker`, WAV-Mischung und DH-Code |
 | `189_sprite_editor.dh` | **der Sprite-Editor, geschrieben IN Drachenhauch** — zwoelf Werkzeuge, Ebenen, Einzelbilder, Zwiebelhaut, Spiegeln und Vierteldrehen, Streifen- und Atlas-Ausgabe |
 | `188_bild_erzeugen.dh` | **ein Bild herstellen statt nur anzeigen** — Malprogramm mit durchsichtigen Ebenen, Radierer und PNG-Export |
 | `187_tilemap_editor.dh` | **der Tilemap-Editor, geschrieben IN Drachenhauch** — sechs Werkzeuge, Auswahl mit Zwischenablage, Rueckgaengig, Ebenen (mit Umsortieren), Objekt-Ebenen, mehrere Tilesets, echtes Tiled-JSON |
 | `186_farbe_und_datum.dh` | **Farbwaehler und Datumswaehler** — zwei neue Widget-Arten, beide ohne Maus bedienbar |
-| `185_partikel_editor.dh` | **der Partikel-Editor, geschrieben IN Drachenhauch** — 17 Regler, echte Vorschau, GB-Code-Export, Rueckgaengig/Wiederholen |
+| `185_partikel_editor.dh` | **der Partikel-Editor, geschrieben IN Drachenhauch** — 17 Regler, echte Vorschau, DH-Code-Export, Rueckgaengig/Wiederholen |
 | `184_codefeld.dh` | **das TEXTAREA als Code-Feld** — Syntax-Einfaerbung, Zeilennummern, aktive Zeile, Tabulator |
 | `183_sfx_generator.dh` | **der SFX-Generator, geschrieben IN Drachenhauch** — 16 Regler, Wellenform-Anzeige, WAV-Export, Rueckgaengig/Wiederholen; das Gegenstueck zum Qt-Werkzeug `dhsfx` |
 | `182_gui_tastatur_massstab.dh` | **Bedienung ohne Maus**, `GUI_SCALE` fuer HiDPI und ein modaler Dialog im eigenen Thema |
@@ -338,7 +339,7 @@ plötzlich nicht mehr läuft. Ein Schaustück, das fast alles davon gleichzeitig
 Chrom-Kugeln mit IBL, Schatten, Bloom und Stereo-Techno. Plan und Stand in
 [docs/rust-runtime.md](docs/rust-runtime.md).
 
-**Front-End-Portierung nach Rust — abgeschlossen.** Die komplette Toolchain (Lexer → Parser → Compiler → Preprocessor) wurde nach Rust portiert, jede Stufe per Output-Parität gegen den Python-Tree-Walker verifiziert. **`dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python:** preprocesst (`IMPORT`-Auflösung von Quelldateien und Built-in-Modulen), lext, parst, kompiliert und führt aus — Skalare/Arithmetik/Kontrollfluss, Arrays/Maps, Funktionen, Klassen/OOP, `SELECT`/`FOR EACH`/Tupel/`WITH`/`TRY`/Slicing/Comprehensions/Coroutinen. Es wird ins Datei-Verzeichnis gewechselt, sodass relative `IMPORT`- und Asset-Pfade stimmen (`dhrt datei.dh` ohne `run` funktioniert genauso; `.dhc`-Dateien laufen weiter den direkten VM-Pfad). Debug-Einstiege `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Selbst-Export ohne Python:** `dhrt --export datei.dh` kompiliert die Quelle selbst und bündelt sie zu einer eigenständigen `.exe` (hängt den Bytecode an eine Kopie der Runtime, kopiert `assets/`). Aliasierte Modul-Imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) funktionieren ebenfalls nativ. Damit ist auch der **Web-Playground ein reines Rust-WASM**, das die Quelle im Browser kompiliert (kein Pyodide): `rust/build_wasm.py datei.dh` erzeugt `web/dhrt.{js,wasm}` mit eingebetteter Quelle (emscripten-Toolchain auf Windows wird automatisch verdrahtet). **Konsole und animierte Grafik laufen im Browser** — der GB-Render-Loop yieldet pro Frame via ASYNCIFY (`emscripten_sleep(0)` in `flip()`), sodass `WHILE … FLIP() … WEND` den Tab nicht einfriert; **teilbare Links** packen die Quelle in den URL-Hash. Plan & Stufen in [docs/rust-frontend-port.md](docs/rust-frontend-port.md).
+**Front-End-Portierung nach Rust — abgeschlossen.** Die komplette Toolchain (Lexer → Parser → Compiler → Preprocessor) wurde nach Rust portiert, jede Stufe per Output-Parität gegen den Python-Tree-Walker verifiziert. **`dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python:** preprocesst (`IMPORT`-Auflösung von Quelldateien und Built-in-Modulen), lext, parst, kompiliert und führt aus — Skalare/Arithmetik/Kontrollfluss, Arrays/Maps, Funktionen, Klassen/OOP, `SELECT`/`FOR EACH`/Tupel/`WITH`/`TRY`/Slicing/Comprehensions/Coroutinen. Es wird ins Datei-Verzeichnis gewechselt, sodass relative `IMPORT`- und Asset-Pfade stimmen (`dhrt datei.dh` ohne `run` funktioniert genauso; `.dhc`-Dateien laufen weiter den direkten VM-Pfad). Debug-Einstiege `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Selbst-Export ohne Python:** `dhrt --export datei.dh` kompiliert die Quelle selbst und bündelt sie zu einer eigenständigen `.exe` (hängt den Bytecode an eine Kopie der Runtime, kopiert `assets/`). Aliasierte Modul-Imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) funktionieren ebenfalls nativ. Damit ist auch der **Web-Playground ein reines Rust-WASM**, das die Quelle im Browser kompiliert (kein Pyodide): `rust/build_wasm.py datei.dh` erzeugt `web/dhrt.{js,wasm}` mit eingebetteter Quelle (emscripten-Toolchain auf Windows wird automatisch verdrahtet). **Konsole und animierte Grafik laufen im Browser** — der DH-Render-Loop yieldet pro Frame via ASYNCIFY (`emscripten_sleep(0)` in `flip()`), sodass `WHILE … FLIP() … WEND` den Tab nicht einfriert; **teilbare Links** packen die Quelle in den URL-Hash. Plan & Stufen in [docs/rust-frontend-port.md](docs/rust-frontend-port.md).
 
 Architektur-Details und Erweiterungs-Hinweise in [CLAUDE.md](CLAUDE.md).
 

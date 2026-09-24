@@ -3,7 +3,7 @@
 //! Fuehrt `.dh`-Quelltext end-to-end aus (preprocess -> lex -> parse ->
 //! compile -> VM, alles in Rust) oder eine fertige `.dhc`-Datei (JSON-
 //! Bytecode, vom eigenen Compiler bzw. via `--export` erzeugt). Korrektheit
-//! sichern die run_gb-Golden-Tests (tests/) -- die fruehere Python-Referenz
+//! sichern die Pruefsammlungen (tests/pruef/) -- die fruehere Python-Referenz
 //! (Tree-Walker) ist geloescht.
 //!
 //! Verwendung: dhrt <datei.dhc> [quell-label]
@@ -197,7 +197,7 @@ fn embedded_gbc_in(data: &[u8]) -> Option<String> {
     None
 }
 
-/// WP A: die Argumente, die dem GB-PROGRAMM gehoeren (`ARGC`/`ARG$`), aus der
+/// WP A: die Argumente, die dem DH-PROGRAMM gehoeren (`ARGC`/`ARG$`), aus der
 /// Runtime-Kommandozeile herausloesen -- alles hinter einem alleinstehenden
 /// `--`.
 ///
@@ -476,7 +476,7 @@ fn main() -> ExitCode {
         let label = std::env::current_exe().ok()
             .and_then(|p| p.file_name().map(|s| s.to_string_lossy().into_owned()))
             .unwrap_or_else(|| "spiel".into());
-        return run_gbc_text(&text, &label);
+        return run_dhc_text(&text, &label);
     }
 
     // WASM/Web (emscripten): Programm aus einem festen Pfad im virtuellen FS
@@ -494,7 +494,7 @@ fn main() -> ExitCode {
             return compile_and_run_source(&src, std::path::Path::new("/"), "playground");
         }
         if let Ok(text) = std::fs::read_to_string("/program.dhc") {
-            return run_gbc_text(&text, "playground");
+            return run_dhc_text(&text, "playground");
         }
     }
 
@@ -536,7 +536,7 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    run_gbc_text(&text, &source_label)
+    run_dhc_text(&text, &source_label)
 }
 
 /// Was auf dem Block-Stapel des Formatierers liegt.
@@ -1472,7 +1472,7 @@ fn debug_main(path: &str) -> ExitCode {
     let res = machine.run();
     machine.debug_flush_output();
     // Review-Fund: verglich frueher den Fehlertext gegen "__DEBUG_STOP__" --
-    // ein GB-Programm mit `THROW "__DEBUG_STOP__"` haette einen echten Fehler
+    // ein DH-Programm mit `THROW "__DEBUG_STOP__"` haette einen echten Fehler
     // so faelschlich als "sauber gestoppt" gemeldet. `was_debug_stopped()`
     // liest stattdessen das interne Flag, das THROW nie setzt.
     let ev = match &res {
@@ -1883,7 +1883,7 @@ fn strip_parent_prefix(p: &str) -> String {
     s
 }
 
-/// Liefert alle String-Literale (Inhalt zwischen `"..."`, mit GB-Escape `""`).
+/// Liefert alle String-Literale (Inhalt zwischen `"..."`, mit DH-Escape `""`).
 fn string_literals(src: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut chars = src.chars().peekable();
@@ -1948,7 +1948,7 @@ fn bundle_referenced_assets(source: &str, base: &std::path::Path, out: &std::pat
         // selbst hinein und rekursiert bis zur Pfadlaengen-Grenze, wobei bei
         // jeder Ebene die frisch geschriebene Bundle-Exe erneut kopiert wird
         // -- ein reproduzierbarer Festplatten-Fuellstand-Bug aus voellig
-        // gewoehnlichem GB-Code.
+        // gewoehnlichem DH-Code.
         if lit == "." || lit == ".." { continue; }
         // Absolute Pfade ueberspringen (nicht buendelbar): /... oder C:\...
         if lit.starts_with('/') || lit.starts_with('\\') { continue; }
@@ -1985,7 +1985,7 @@ fn bundle_referenced_assets(source: &str, base: &std::path::Path, out: &std::pat
 
 /// Laedt eine `.dhc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus
 /// (Datei aus Argumenten) und Bundle-Modus (eingebettet in die Exe).
-fn run_gbc_text(text: &str, source_label: &str) -> ExitCode {
+fn run_dhc_text(text: &str, source_label: &str) -> ExitCode {
     let json: serde_json::Value = match serde_json::from_str(text) {
         Ok(j) => j,
         Err(e) => {

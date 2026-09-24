@@ -12,7 +12,7 @@ immer der Schlagzeugkanal**; eine Reihenfolge (Order) daraus; 18 fertige
 Instrumente mit Hüllkurve, Vibrato und Detune, alle änderbar; je Note
 Lautstärke, Portamento, Effekt und ein eigenes Instrument; Blockauswahl mit
 Kopieren, Transponieren und Interpolieren; Stumm/Solo und Mixer-Regler je
-Kanal; Rückgängig über den ganzen Song; die Ausgabe als WAV und als GB-Code.
+Kanal; Rückgängig über den ganzen Song; die Ausgabe als WAV und als DH-Code.
 
 ## Starten
 
@@ -40,7 +40,7 @@ die **Klaviatur**, ganz unten die Statuszeile (ein `*` heißt: ungesichert).
 
 | Bereich | Was es gibt |
 |---|---|
-| Leiste 1 | [Neu], [Oeffnen], [Sichern], [Sichern als], **BPM**, **Kanäle** (4–32), [> Pattern], [> Song], [Stopp], [Zurueck], [Vor], [WAV ...] mit den Kästchen **Stereo** und **Amiga**, [GB-Code] |
+| Leiste 1 | [Neu], [Oeffnen], [Sichern], [Sichern als], **BPM**, **Kanäle** (4–32), [> Pattern], [> Song], [Stopp], [Zurueck], [Vor], [WAV ...] mit den Kästchen **Stereo** und **Amiga**, [DH-Code] |
 | Leiste 2 | Pattern-Auswahl, **Reihen** (1–64), [+] neues Pattern, [Dup] kopieren, [Loesch], [Leeren], **Oktave** der Tastatur, dann die Felder der Zelle unter dem Cursor: **Vol** (1–15, 0 = Standard), **Slide** (−12…+12 Halbtöne), **FX** mit Parameter (0–255), **Instrument** der Note, [Note aus] |
 | Kanal | Standard-Instrument des Kanals (oder nackte Wellenform `square`/`saw`/`sine`/`triangle`), **M** stumm, **S** solo, Mixer-Regler 0–100 % |
 | Instrument | Wellenform (dazu `noise`), Lautstärke 1–15, Attack/Decay/Sustain/Release, Vibrato (Tiefe %, Hz), Detune in Cent, Pan; [+ Instrument] legt eine Kopie des gezeigten an, [Entfernen] entfernt es — Kanäle und Noten, die auf die Instrumente dahinter zeigen, rücken mit |
@@ -133,9 +133,9 @@ Datei anders als das, was man hört. Danach wird normalisiert
 
 Im Spiel dann `PLAYMUSIC("song.wav")`.
 
-## GB-Code
+## DH-Code
 
-[GB-Code] schreibt einen **bildgetriebenen Live-Player** als `.dh`-Datei,
+[DH-Code] schreibt einen **bildgetriebenen Live-Player** als `.dh`-Datei,
 wie der Export der Qt-Fassung: die Reihenfolge wird zu einer Zeitachse
 (wiederholte Patterns werden dupliziert), je Kanal ein Feld `trk<n>` mit den
 Frequenzen, dazu `TRACKER_PLAY_ROW` und `TRACKER_UPDATE`. Hat ein Kanal
@@ -199,7 +199,7 @@ schrieb der Tracker es als Synth zurück, und die eingebetteten Samples waren
 nach einem Sichern weg. Ein Instrument einer Art, die der Tracker nicht
 kennt, bleibt erhalten und **stumm** („hier stumm" in der Liste). Die
 Samples werden je Inhalt einmal dekodiert und nicht bei jedem Rückgängig
-neu. Der **GB-Code** spielt weiterhin nur Wellenformen — ein
+neu. Der **DH-Code** spielt weiterhin nur Wellenformen — ein
 Sample-Instrument klingt dort als die Wellenform seines Kanals.
 
 ## Beenden
@@ -246,7 +246,7 @@ die Art `pingpong`.
 Drachenhauch selbst liest: die **Datei** (json-Modul, mit den Schlüsseln,
 die die Qt-Fassung las; dazu zwei Dateien, die die Qt-Fassung geschrieben
 hat), die **WAV** (Länge, Noten, Stereo- und Amiga-Pan) und den
-**GB-Code** (`dhrt --check` und ein Start). Dazu Tastatur, Rückgängig,
+**DH-Code** (`dhrt --check` und ein Start). Dazu Tastatur, Rückgängig,
 Blockbefehle, Transponieren ohne das Schlagzeug, die Uhr per Leertaste,
 das Mitlaufen im Song-Modus, die Lage aller Bedienelemente und die
 Sample-/Keymap-Instrumente: ein Lied, das der Fall selbst baut (Sinus mit

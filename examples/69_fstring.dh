@@ -2,7 +2,7 @@
 '
 ' Lexer expandiert f"..." zu ("text" + STR$(expr) + "text" + ...).
 ' Der Wrapper STR$ bedeutet: jeder Wert geht (auch INTEGER, FLOAT, BOOL,
-' Klassen, etc.). Wer formatiert STR$ schon korrekt fuer die GB-Typen.
+' Klassen, etc.). Wer formatiert STR$ schon korrekt fuer die DH-Typen.
 '
 ' Konvention: doppelt-geklammertes {{ und }} sind Escapes fuer literale
 ' geschweifte Klammern.

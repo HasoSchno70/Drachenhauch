@@ -1,7 +1,7 @@
 ' Aus test_module_alias.py uebertragen (3 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
 
 === alias in full program
-' GB-Programm mit IMPORT-AS: aliasierte Builtins + externer Typ.
+' DH-Programm mit IMPORT-AS: aliasierte Builtins + externer Typ.
 IMPORT "json" AS j
 DIM h AS J_HANDLE
 h = J_PARSE("[10,20,30]")

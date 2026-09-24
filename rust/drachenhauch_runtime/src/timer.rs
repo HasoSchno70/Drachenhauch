@@ -7,7 +7,7 @@
 //! des Immediate-Mode-ui-Moduls: TRUE wenn frei, startet dann die Sperre.
 //!
 //! Die Struktur haelt nur State + Zeitmathematik; das Aufrufen der
-//! GB-Funktionen macht die VM (`try_timer` in vm.rs, gleiches Muster wie
+//! DH-Funktionen macht die VM (`try_timer` in vm.rs, gleiches Muster wie
 //! die GUI-Callbacks). Kein Grafik-Bezug -- laeuft auch konsolen-only.
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

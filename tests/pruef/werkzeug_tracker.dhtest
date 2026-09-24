@@ -2,7 +2,7 @@
 ' Python (Stufe 40, bis dahin tests/test_pilot_tracker.py). Der erste Pilot mit
 ' einer Zeitachse; geprueft an drei Ergebnissen, die Drachenhauch selbst liest:
 ' die Datei (json-Modul, Schluessel wie die Qt-Fassung sie liest), die WAV
-' (`--- ton` bzw. ihre Bytes) und der GB-Code (`dhrt --check` und ein Start).
+' (`--- ton` bzw. ihre Bytes) und der DH-Code (`dhrt --check` und ein Start).
 '
 ' Der Quelltext des Falls steht hinter SETFPS(60): Fenster aus dem Bild, die
 ' Aufnahme (falls es eine gibt) und Helfer. Der Einschub hinter FLIP() schreibt
@@ -818,7 +818,7 @@ prSchreib("")
 IF bildNr = 3 THEN
     zelleSetzen(0, 0, 0, 60) : vol[0, 0, 0] = 9 : slide[0, 0, 0] = 2
     zelleSetzen(0, 3, 4, 60)
-    gbCodeSichern("song_gb.dh")
+    dhCodeSichern("song_gb.dh")
 END IF
 
 --- umgebung

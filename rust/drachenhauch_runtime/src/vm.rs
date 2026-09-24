@@ -26,7 +26,7 @@ const EXIT_REQUEST: &str = "__EXIT__";
 
 /// Obergrenze fuer verschachtelte `exec`/`exec_byref`-Aufrufe (Rekursionstiefe).
 /// `exec` rekursiert ueber den NATIVEN Rust-Stack (exec->run_frame->dispatch->
-/// exec), es gibt kein GB-seitiges Frame-Limit -- ohne diese Grenze crasht eine
+/// exec), es gibt kein DH-seitiges Frame-Limit -- ohne diese Grenze crasht eine
 /// unendliche Rekursion den ganzen Prozess statt einen fangbaren Fehler zu werfen.
 ///
 /// DER WERT HAENGT AN DER STACKGROESSE, nicht am Geschmack. Gemessen kostet ein
@@ -273,7 +273,7 @@ fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> {
 }
 #[cfg(feature = "db")]
 fn db_params(args: &[Value], fn_: &str) -> R<Vec<rusqlite::types::Value>> {
-    args.iter().map(|v| crate::db::gb_to_sql(v, fn_)).collect()
+    args.iter().map(|v| crate::db::dh_to_sql(v, fn_)).collect()
 }
 
 struct Slot {
@@ -494,7 +494,7 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 
 /// Ruft ein reines Builtin auf und faengt einen evtl. Rust-Panic ab (z.B.
 /// Index-out-of-bounds bei zu wenigen Argumenten in variadischen Builtins),
-/// damit ein Tippfehler im GB-Programm NICHT die Runtime abstuerzen laesst,
+/// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -686,7 +686,7 @@ pub struct Vm<'p> {
     // von TRY/CATCH beim Konsumieren geloescht (s. run_frame).
     err_line_set: bool,
     // Review-Fund: TRY/CATCH-Bypass + `was_stopped()` verglichen bisher den
-    // FEHLERTEXT gegen "__DEBUG_STOP__"/PROFILE_STOP -- ein GB-Programm mit
+    // FEHLERTEXT gegen "__DEBUG_STOP__"/PROFILE_STOP -- ein DH-Programm mit
     // `THROW "__DEBUG_STOP__"` konnte diese internen Kontroll-Signale also
     // faelschlich vortaeuschen (TRY/CATCH faengt es dann nie, main.rs meldet
     // "gestoppt" statt den echten Fehler). Diese beiden Flags sind der
@@ -731,7 +731,7 @@ pub struct Vm<'p> {
     /// Kindprozesse mit laufender Ausgabe (`PROCESS_*`, prozess.rs). Tombstone-
     /// Vec wie die Auftraege: eine Nummer bleibt gueltig, bis PROCESS_CLOSE.
     prozesse: Vec<Option<crate::prozess::Prozess>>,
-    /// Auftraege, die eine EIGENE GB-Funktion ausfuehren (`TASK_*`).
+    /// Auftraege, die eine EIGENE DH-Funktion ausfuehren (`TASK_*`).
     task_auftraege: crate::hintergrund::Auftraege<Result<crate::hintergrund::TaskErgebnis, String>>,
     /// Fenster als Prozess: die Kinder (WINDOW_*) und, wenn dieses Programm
     /// selbst ein Kind ist, die Verbindung zu den Eltern (PARENT_*). Die
@@ -1014,7 +1014,7 @@ impl<'p> Vm<'p> {
     /// `dhrt call`).
     ///
     /// Grundlage fuer `TASK_START`: ein Auftrag laeuft als eigener Prozess,
-    /// damit GB-Code nicht ueber eine Thread-Grenze muss (`Value` haelt
+    /// damit DH-Code nicht ueber eine Thread-Grenze muss (`Value` haelt
     /// ueberall `Rc`, `Program` ist weder Send noch Sync -- siehe
     /// docs/entwurf-task-start.md).
     ///
@@ -1089,7 +1089,7 @@ impl<'p> Vm<'p> {
     /// Ob `run()` durch das externe Stop-Signal abgebrochen wurde.
     ///
     /// Review-Fund: verglich frueher den Fehlertext gegen PROFILE_STOP -- ein
-    /// GB-Programm mit `THROW "__PROFILE_STOP__"` haette einen echten Fehler
+    /// DH-Programm mit `THROW "__PROFILE_STOP__"` haette einen echten Fehler
     /// so als "sauber gestoppt" maskiert. Jetzt liest die Funktion das
     /// interne Flag, das THROW nie setzt (`err` bleibt fuer Kompatibilitaet
     /// im Signature, wird aber nicht mehr fuer die Entscheidung genutzt).
@@ -1664,7 +1664,7 @@ impl<'p> Vm<'p> {
         // Call-Tiefe fuer den Debugger (Step over/into/out). Inkrement pro Frame;
         // garantiert dekrementiert (auch bei Fehler/Return) via Wrapper.
         // Review-Fund: ohne Obergrenze rekursiert exec->run_frame->dispatch->exec
-        // auf dem NATIVEN Stack -- eine ausufernde GB-Rekursion (oder eine
+        // auf dem NATIVEN Stack -- eine ausufernde DH-Rekursion (oder eine
         // Property/Operator, die sich selbst aufruft) fuehrte zu einem
         // Stack-Overflow-Absturz statt einem fangbaren DHRuntimeError.
         self.depth += 1;
@@ -1764,7 +1764,7 @@ impl<'p> Vm<'p> {
                 // Debugger-Abbruch (`stop`), Profiler-Stop-Signal und EXIT(code)
                 // duerfen NICHT von TRY/CATCH gefangen werden -- unbedingt
                 // durchreichen. Entscheidend ist das Flag, NICHT der Fehlertext:
-                // ein GB-Programm mit `THROW "__DEBUG_STOP__"` erzeugt zwar
+                // ein DH-Programm mit `THROW "__DEBUG_STOP__"` erzeugt zwar
                 // denselben String, setzt aber keines der Flags (Review-Fund).
                 Err(e) if self.debug_stop_flag || self.profile_stop_flag
                           || self.exit_code.is_some() => return Err(e),
@@ -3072,7 +3072,7 @@ impl<'p> Vm<'p> {
         // Groessen-Diskrepanz, die spaeter beim Indexzugriff in einen rohen
         // Index-Out-Of-Bounds-Panic lief), und ein legitimer, aber riesiger
         // Wert wie `DIM a[100000, 100000]` (1e10 Elemente, ~80 GB) fuehrte zu
-        // einem harten Allocator-Abort statt eines GB-Fehlers. Hier einmalig
+        // einem harten Allocator-Abort statt eines DH-Fehlers. Hier einmalig
         // mit checked_mul + einer Obergrenze validieren, BEVOR GbArray::new
         // (das selbst keinen Result-Rueckgabewert hat) ueberhaupt aufgerufen wird.
         const MAX_ARRAY_ELEMENTS: i64 = 100_000_000;
@@ -4978,7 +4978,7 @@ impl<'p> Vm<'p> {
     ///
     /// Dasselbe Muster ueberall -- starten, pro Bild nachsehen, abholen.
     /// `shell_`/`db_query_` laufen als reine Rust-Arbeit ohne VM. `task_`
-    /// fuehrt dagegen GB-Code aus, und zwar in einem EIGENEN dhrt-Prozess:
+    /// fuehrt dagegen DH-Code aus, und zwar in einem EIGENEN dhrt-Prozess:
     /// im Thread ginge es nicht, weil `Value` ueberall `Rc` haelt und
     /// `Program` damit weder Send noch Sync ist.
     /// Der Kindprozess zu Argument 0 (PROCESS_*), mit Meldung fuer eine
@@ -5177,7 +5177,7 @@ impl<'p> Vm<'p> {
                 Value::Int(self.shell_auftraege.start(&prog.clone(),
                     move || crate::hintergrund::shell_arbeit(prog, rest)))
             }
-            // ===== Auftraege mit eigener GB-Funktion (WP H, Weg C) =====
+            // ===== Auftraege mit eigener DH-Funktion (WP H, Weg C) =====
             // Der Auftrag laeuft als eigener dhrt-Prozess, nicht als Thread:
             // `Value` haelt ueberall `Rc`, `Program` ist weder Send noch Sync.
             // Die Grenze ist zugleich die Zusage -- ein Auftrag sieht KEINE
@@ -6019,7 +6019,7 @@ impl<'p> Vm<'p> {
                     } else {
                         let werte = self.gui.form_get_typisiert(win, &form)?;
                         let mut params: Vec<rusqlite::types::Value> = Vec::new();
-                        for (_, wv) in &werte { params.push(crate::db::gb_to_sql(wv, fn_)?); }
+                        for (_, wv) in &werte { params.push(crate::db::dh_to_sql(wv, fn_)?); }
                         let neue_id = if id < 0 {
                             let sql = format!("INSERT INTO {} ({}) VALUES ({})", tabelle, keys.join(", "),
                                               keys.iter().map(|_| "?").collect::<Vec<_>>().join(", "));
@@ -8552,7 +8552,7 @@ impl<'p> Vm<'p> {
                 // `vec![0.0f64; n]` (n = Samples fuer die Dauer), ein absurd
                 // grosser Wert (z.B. eine fehlerhafte Berechnung) fuehrte zu
                 // einer Mehrere-GB-Allokation / Allocator-Abort statt eines
-                // GB-Fehlers.
+                // DH-Fehlers.
                 if !(0..=600_000).contains(&dur) {
                     return Err("AUDIO_TONE: dur_ms muss 0..600000 sein".into());
                 }
@@ -8741,7 +8741,7 @@ impl<'p> Vm<'p> {
             // --- Modulatoren: LFO + Tweener ---------------------------------
             // Kira faehrt sie auf dem Audio-Thread: ein Tremolo/Filter-Sweep
             // laeuft sample-genau weiter, auch wenn ein Frame einbricht -- und
-            // das GB-Programm ruft dafuer NICHTS pro Frame.
+            // das DH-Programm ruft dafuer NICHTS pro Frame.
             "audio_lfo_new" => {
                 let wave = gs(a, 0, "AUDIO_LFO_NEW")?.to_string();
                 let hz = need_f(a, 1, "AUDIO_LFO_NEW")?;
@@ -9788,7 +9788,7 @@ pub(crate) const DEFAULT_KEYS: &[(&str, i64)] = &[
     ("key_f5", 1073741886), ("key_f6", 1073741887), ("key_f7", 1073741888), ("key_f8", 1073741889),
     ("key_f9", 1073741890), ("key_f10", 1073741891), ("key_f11", 1073741892), ("key_f12", 1073741893),
     // Umschalt-/Steuertasten: bis hierher gab es KEINEN Code dafuer -- ein
-    // "Sprint mit Shift" oder "Strg+S" war aus GB heraus nicht abfragbar.
+    // "Sprint mit Shift" oder "Strg+S" war aus Drachenhauch heraus nicht abfragbar.
     ("key_lshift", 1073742049), ("key_rshift", 1073742053),
     ("key_lctrl", 1073742048), ("key_rctrl", 1073742052),
     ("key_lalt", 1073742050), ("key_ralt", 1073742054),
@@ -10300,7 +10300,7 @@ fn mul(a: Value, b: Value) -> R<Value> {
 fn round_audio(f: f64) -> f64 { (f * 1_000_000.0).round() / 1_000_000.0 }
 
 /// Baut aus den Werten eines Array-Literals `[a, b, c]` ein 1D-GbArray.
-/// Element-Typ wird aus den Werten hergeleitet (wie ein homogenes GB-Array):
+/// Element-Typ wird aus den Werten hergeleitet (wie ein homogenes DH-Array):
 /// nur Ganzzahlen -> integer; Zahlen mit mind. einem Float -> float (Ints
 /// werden hochgezogen); nur Strings -> string; nur Wahrheitswerte -> boolean;
 /// gemischt -> any (generisches Value-Backing).

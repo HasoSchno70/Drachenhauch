@@ -37,8 +37,8 @@ Ohne Signatur zeigt Windows bei **jedem** Käufer „Unbekannter Herausgeber"
   genug Downloads gesammelt sind).
 - Danach signieren (Hook ist fertig, `signtool` ist auf dem Rechner):
   ```
-  set GB_SIGN_CERT=C:\keys\meincert.pfx     (oder SHA1-Thumbprint bei EV-USB-Token)
-  set GB_SIGN_PASS=geheim
+  set DH_SIGN_CERT=C:\keys\meincert.pfx     (oder SHA1-Thumbprint bei EV-USB-Token)
+  set DH_SIGN_PASS=geheim
   dhrt run installer\bauen.dh
   ```
 

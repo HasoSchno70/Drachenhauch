@@ -8,11 +8,11 @@
 ' Die Module sind zusammen ~0,6 MB und gemeinfrei, liegen also mit im Repo --
 ' dieses Programm dient der Reproduzierbarkeit und dem Nachweis der Herkunft.
 '
-'     dhrt run gbdemo/download_music.dh [-- basisadresse [zielordner]]
+'     dhrt run dhdemo/download_music.dh [-- basisadresse [zielordner]]
 '
 ' Ein anderes Stueck einsetzen: Modul-Nummer von der Detailseite ablesen
 ' (modarchive.org/index.php?request=view_by_moduleid&query=<nr>), unten
-' eintragen, Programm laufen lassen, in gbdemo.dh MUSIK umstellen.
+' eintragen, Programm laufen lassen, in dhdemo.dh MUSIK umstellen.
 ' Bis 2026-09-14 download_music.py.
 IMPORT "html"
 

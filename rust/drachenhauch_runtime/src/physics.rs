@@ -2,7 +2,7 @@
 //!
 //! (Urspruenglich portiert aus dem geloeschten PyO3-Helfer gb_native.)
 //! Die Paar-Reihenfolge ist deterministisch (pro i aufsteigende j, j > i) --
-//! GB-Programme sollten sich trotzdem nicht auf die Reihenfolge verlassen.
+//! DH-Programme sollten sich trotzdem nicht auf die Reihenfolge verlassen.
 //!
 //! Uniform-Grid mit Zellgroesse = 2 * max(radius): jede Entity liegt in genau
 //! EINER Zelle, ueberlappende Kreise sind in derselben oder einer Nachbarzelle

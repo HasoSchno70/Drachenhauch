@@ -55,7 +55,7 @@ struct BusFx {
 /// Ein Modulator: entweder ein LFO (schwingt von selbst) oder ein Tweener
 /// (faehrt auf Kommando weich zu einem Zielwert). Beide liefern eine
 /// `ModulatorId`, die sich an jeden Kira-Parameter binden laesst -- deshalb
-/// teilen sie sich EINEN GB-Handle-Typ (`AUDIO_MOD`), und `AUDIO_MODULATE`
+/// teilen sie sich EINEN DH-Handle-Typ (`AUDIO_MOD`), und `AUDIO_MODULATE`
 /// nimmt beide entgegen.
 enum ModSlot {
     Lfo(LfoHandle),
@@ -551,7 +551,7 @@ fn finite(v: f64, fallback: f64) -> f64 { if v.is_finite() { v } else { fallback
 
 // --- Listener/Emitter (raeumliches Audio) -------------------------------
 
-/// GB-Weltkoordinaten (f64, beliebige Einheit) -> Kiras `mint::Vector3<f32>`.
+/// DH-Weltkoordinaten (f64, beliebige Einheit) -> Kiras `mint::Vector3<f32>`.
 fn vec3(x: f64, y: f64, z: f64) -> mint::Vector3<f32> {
     mint::Vector3 { x: x as f32, y: y as f32, z: z as f32 }
 }
@@ -776,7 +776,7 @@ pub struct Audio {
     listeners: Vec<Option<ListenerHandle>>,
     emitters: Vec<Option<SpatialTrackHandle>>,
     // Modulatoren (AUDIO_LFO_* / AUDIO_TWEENER_*): Kira faehrt sie auf dem
-    // Audio-Thread und speist damit Parameter -- das GB-Programm muss pro Frame
+    // Audio-Thread und speist damit Parameter -- das DH-Programm muss pro Frame
     // NICHTS nachrechnen. Gleiches Tombstone-Vec-Pattern wie Clocks (Kira kennt
     // kein remove_modulator(), nur Handle-Drop gibt sie frei).
     mods: Vec<Option<ModSlot>>,
@@ -1029,7 +1029,7 @@ impl Audio {
     // --- Modulatoren: LFO + Tweener -------------------------------------
     // Der Gewinn liegt darin, dass Kira sie auf dem AUDIO-Thread faehrt: ein
     // Tremolo oder Filter-Sweep laeuft sample-genau weiter, auch wenn der
-    // Frame einbricht -- und das GB-Programm ruft dafuer gar nichts pro Frame.
+    // Frame einbricht -- und das DH-Programm ruft dafuer gar nichts pro Frame.
 
     fn waveform_from(name: &str) -> Result<Waveform, String> {
         Ok(match name.to_ascii_lowercase().as_str() {
