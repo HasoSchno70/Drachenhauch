@@ -84,21 +84,67 @@ der unter beiden Schaltern läuft.
 Jeder Schritt endet mit einer Messung gegen den Stand davor und wird einzeln
 gemergt.
 
-### M0 — Messbank (Tage)
+### M0 — Messbank (Tage) — erledigt 2026-09-24
 
-Ein Messprogramm unter tools/ (tempo.dh): feste Programme (Aufrufe, Zahlenschleife, Felder,
-Objekte, Text, MAPs, ein echtes Spiel aus `examples/` mit `--bilder`), je
-fünf Läufe, Bestwert, Tabelle gegen eine zweite `dhrt`. Ohne das ist jede
-Aussage „schneller“ ein Gefühl. (Bisher lagen die Programme im Notizordner.)
+`bench_dhrt.dh` nimmt per Vorgabe die acht Programme unter `tools/tempo/`
+(Aufrufe, Kommazahlen, Ganzzahlen, Felder, Objekte, Text, Maps, Builtins).
+Jedes misst seinen Kern selbst und gibt ihn als `ZEIT <ms>` aus -- die
+Wandzeit traegt rund 40 ms Start mit. `--gegen pfad\zu\dhrt.exe` misst eine
+zweite Laufzeit abwechselnd mit und gibt A/B aus. Erste Tabelle in
+`docs/PERFORMANCE.md` (Messbank). Ein echtes Spiel ist nicht dabei: es
+braucht ein Fenster, und die Bank soll auf jeder Maschine laufen.
 
-### M1 — getypte Zwischenstufe im Compiler (2–3 Wochen)
+**Der erste Fund der Bank:** `LEFT$`/`RIGHT$`/`MID$`/`INSTR` legten je Aufruf
+den ganzen Text als Zeichenliste an -- behoben (`text.dh` 4144 -> 1135 ms).
+Uebrig bleibt, dass `MID$(s, i, 1)` in einer Schleife ueber den Text mit dem
+Quadrat der Laenge waechst; das ist ein Punkt fuer M4 (Zeichenketten, die
+wissen, dass sie nur ASCII enthalten, oder einen Zeichenindex tragen).
+
+### M1 — getypte Zwischenstufe im Compiler (2–3 Wochen) — erster Schritt 2026-09-24
 
 Heute geht der Compiler vom Syntaxbaum direkt zu Bytecode, und die Typen
-kennt er nur stellenweise (`statischer_typ`, das nebenbei annimmt, `/` liefere
-immer FLOAT — stimmt nicht, `480/2` ist INTEGER). Neu: eine Stufe, in der
-**jeder Ausdruck seinen Typ trägt** (oder „unbekannt“: FUNCREF, `any`,
-Rückgabe aus Coroutinen). Sie ist die Grundlage für A und B, und sie ist für
-sich prüfbar: ein Schalter wie dhrt --typen gibt sie aus, eine Sammlung hält sie fest.
+kennt er nur stellenweise. Neu ist `Compiler::typ_von` mit dem Typ aus
+`typen.rs`: jedem Ausdruck ein Typ, oder `?` (unbekannt), wo er nicht
+feststeht. `statischer_typ` bleibt, was es war -- ein vorsichtiger Helfer
+fuer Warnungen, der vereinfachen darf; `typ_von` ist fuer den Code und darf
+es nicht.
+
+**Geprueft wird nicht an Beispielen, sondern am ganzen Bestand:** mit
+`DHRT_TYPEN_PRUEFEN=1` setzt der Compiler hinter jeden getypten Ausdruck
+eine Probe (`TYP_PRUEFEN`), die abbricht, wenn der Wert einen anderen Typ
+hat. Die Pruefsammlung laeuft damit (Kinder erben die Variable). Der erste
+Lauf fand genau eine falsche Regel -- "ein Befehl auf `$` liefert Text" --,
+denn `SPLIT$` liefert ein Feld; 284 Proben in 49 Sammlungen schlugen an.
+Seither kennt `typ_von` nur Befehle aus einer Tabelle, deren Typen
+nachgemessen sind (`typen::builtin_typ`). `dhrt --typen datei.dh` zeigt, was
+der Compiler je Ausdruck weiss.
+
+**Wo der Typ am WERT haengt** (gemessen, nicht angenommen):
+
+| Ausdruck | Ergebnis |
+|---|---|
+| `a / b` mit zwei INTEGER | INTEGER, wenn es aufgeht (`480 / 2`), sonst FLOAT |
+| `a ^ b` mit zwei INTEGER | INTEGER (`2 ^ 3`) oder FLOAT (`2 ^ -1`) |
+| `a AND b`, `a OR b` | einer der beiden WERTE (`6 AND 3` ist 3) |
+| `VAL(t)` | INTEGER oder FLOAT, je nach Text |
+| `MIN(1, 2.0)` | der kleinere Wert samt seinem Typ (INTEGER) |
+
+`typen.rs` fuehrt dafuer `ZAHL` (INTEGER oder FLOAT). Fuer M2 heisst das: wo
+`/` im Spiel ist, kann die VM nicht einfach mit Kommazahlen rechnen -- sie
+muss beide Wege kennen. **Ob `/` bleibt, wie es ist, entscheidet der Nutzer:**
+immer FLOAT waere schneller zu uebersetzen und hiesse `/` so wie in Python
+und im Debugger (`eval` rechnet heute schon immer FLOAT), aber
+`PRINT 480 / 2` zeigte dann `240.0`, und `feld[n / 2]` braeche ab.
+
+Offen in M1: Methoden ohne statisch bekannte Klasse, FUNCREF-Aufrufe, die
+Laufvariable von FOR EACH, Modultypen (VEC2 & Co.) und die meisten Builtins
+bleiben `?`. Das ist erlaubt (dort bleibt M2 beim heutigen Code), aber es
+begrenzt, wie viel M2 bringt. Gemessen ueber alle `examples/*.dh` mit
+`dhrt --typen`: **76 % von 86 700 Ausdruecken sind getypt.** Die groessten
+Posten im Rest sind Builtins (`RGB`, `GUI_*`, `KEYPRESSED`, `MIN`/`MAX`) und
+Modulhandles (`GUI_WINDOW`, `JSON_HANDLE`) -- fuer die Rechenschleifen, um
+die es M2/M3 geht, zaehlen die wenig; fuer die naechsten Schritte heisst das:
+Builtins mit Zahlen zuerst in die Tabelle.
 
 ### M2 — VM auf die Typen setzen (2–3 Wochen, Weg A)
 

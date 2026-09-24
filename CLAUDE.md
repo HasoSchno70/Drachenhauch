@@ -1430,6 +1430,34 @@ heissen Schleifen laeuft, gehoert in `dispatch_selten`; und wer `dispatch`
 waechst, misst den Rahmen nach (unter 4096 halten). `builtin_rufen` NICHT auf
 `inline(never)` setzen -- das kostete Builtin-Aufrufe 15 %.
 
+## Messbank und getypte Stufe (2026-09-24, M0/M1 aus `docs/entwurf-maschinencode.md`)
+
+**M0:** `dhrt run bench_dhrt.dh` misst per Vorgabe `tools/tempo/*.dh`; ein
+Programm, das `ZEIT <ms>` ausgibt, wird an dieser Zahl gemessen (die Wandzeit
+traegt ~40 ms Start), `--gegen exe` misst eine zweite Laufzeit ABWECHSELND
+mit und gibt A/B aus. Erster Fund: `LEFT$/RIGHT$/MID$/INSTR` bauten je Aufruf
+den ganzen Text als `Vec<char>` -- jetzt `builtins::zeichen_stelle` (zaehlt
+nur bis zur Stelle). Tests `werkzeug_bench.dhtest`,
+`zeichenketten_stellen.dhtest` (Randfaelle mit Umlaut/Emoji gegen die
+Ausgabe von 2026.15).
+
+**M1:** `Compiler::typ_von` (Typ aus `typen.rs`) -- fuer den CODE, muss
+stimmen; `statischer_typ` bleibt der vorsichtige Helfer fuer Warnungen.
+**`ZAHL`** = INTEGER oder FLOAT je nach Wert: `/` und `^` auf zwei INTEGER,
+`VAL`, `MIN` gemischt; `AND`/`OR` liefern einen der WERTE (`verbinden`).
+Vergleiche mit unbekanntem oder Klassen-Glied bleiben `?` (OPERATOR).
+Builtins nur aus der nachgemessenen Tabelle `typen::builtin_typ` -- **"endet
+auf `$` = Text" ist falsch** (`SPLIT$` liefert ein Feld; so fand es der erste
+Probelauf, 284 Proben). `dhrt --typen datei.dh` listet je Ausdruck den Typ.
+**`DHRT_TYPEN_PRUEFEN=1`** setzt hinter jeden getypten Ausdruck `TYP_PRUEFEN`
+(Opcode 123, in `dispatch_selten`), die bei falschem Typ mit "der Compiler
+sagt X, der Wert ist Y" abbricht -- **wer `typ_von` aendert, laesst
+`dhrt test tests/pruef` damit laufen**; das ist der Beleg, nicht die
+Beispiele. Ueber `examples/` sind 76 % der Ausdruecke getypt. Offen: ob `/`
+immer FLOAT werden soll (Nutzerentscheidung, siehe Entwurf). Tests
+`tests/pruef/typen.dhtest` (samt Gegenprobe der Probe ueber ein verfaelschtes
+.dhc), Rust-Tests in `typen.rs`.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

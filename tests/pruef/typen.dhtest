@@ -1,0 +1,112 @@
+' M1 aus docs/entwurf-maschinencode.md: der Compiler schreibt jedem Ausdruck
+' einen Typ zu (`Compiler::typ_von`, `typen.rs`). `dhrt --typen` zeigt ihn;
+' mit `DHRT_TYPEN_PRUEFEN=1` steht hinter jedem getypten Ausdruck eine Probe,
+' die zur Laufzeit abbricht, wenn der Typ nicht stimmt -- damit laeuft die
+' ganze Pruefsammlung, und das ist der eigentliche Beleg.
+' Format: docs/werkzeuge.md.
+
+=== typen je ausdruck
+' `/` und `^` auf zwei INTEGER haengen am Wert (ZAHL), AND liefert einen der
+' beiden Werte, eine Methode behaelt ihren Typ, wenn jede Ueberschreibung
+' denselben verspricht; Builtins nur aus der nachgemessenen Tabelle (LEN
+' ja, RND(6) und RGB nicht).
+IMPORT "helfer.dh"
+dlStarten(["--typen", "prog.dh"])
+PRINT dlAus
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- datei prog.dh
+CLASS Tier
+    DIM name AS STRING
+    FUNCTION laut() AS STRING
+        RETURN "..."
+    END FUNCTION
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS STRING
+        RETURN "wau"
+    END FUNCTION
+END CLASS
+FUNCTION halb(n AS INTEGER) AS FLOAT
+    RETURN n / 2
+END FUNCTION
+DIM a AS INTEGER : a = 7
+DIM t AS Tier : t = NEW Hund()
+PRINT a / 2; " "; a ^ 2; " "; 6 AND a; " "; halb(a); " "; t.laut(); " "; LEN("x"); " "; RND(6); " "; RGB(1, 2, 3)
+--- erwartet
+prog.dh:4: "..." -> STRING
+prog.dh:9: "wau" -> STRING
+prog.dh:13: n -> INTEGER
+prog.dh:13: 2 -> INTEGER
+prog.dh:13: (n / 2) -> ZAHL
+prog.dh:15: 7 -> INTEGER
+prog.dh:16: NEW hund() -> hund
+prog.dh:17: a -> INTEGER
+prog.dh:17: 2 -> INTEGER
+prog.dh:17: (a / 2) -> ZAHL
+prog.dh:17: " " -> STRING
+prog.dh:17: a -> INTEGER
+prog.dh:17: 2 -> INTEGER
+prog.dh:17: (a ^ 2) -> ZAHL
+prog.dh:17: " " -> STRING
+prog.dh:17: 6 -> INTEGER
+prog.dh:17: a -> INTEGER
+prog.dh:17: (6 AND a) -> INTEGER
+prog.dh:17: " " -> STRING
+prog.dh:17: a -> INTEGER
+prog.dh:17: halb(a) -> FLOAT
+prog.dh:17: " " -> STRING
+prog.dh:17: t -> tier
+prog.dh:17: t.laut() -> STRING
+prog.dh:17: " " -> STRING
+prog.dh:17: "x" -> STRING
+prog.dh:17: len("x") -> INTEGER
+prog.dh:17: " " -> STRING
+prog.dh:17: 6 -> INTEGER
+prog.dh:17: rnd(6) -> ?
+prog.dh:17: " " -> STRING
+prog.dh:17: 1 -> INTEGER
+prog.dh:17: 2 -> INTEGER
+prog.dh:17: 3 -> INTEGER
+prog.dh:17: rgb(1, 2, 3) -> ?
+
+=== mit proben laeuft ein programm wie ohne
+' Die Werte, an denen der Typ am Wert haengt, einmal ganz und einmal nicht.
+DIM a AS INTEGER : a = 8
+DIM b AS INTEGER : b = 3
+DIM f AS FLOAT : f = 1.5
+PRINT a / 2; " "; a / b; " "; a ^ 2; " "; 2 ^ -1; " "; a MOD b; " "; f * a
+PRINT 6 AND a; " "; FALSE OR "x"; " "; IIF(a > b, 1, 2.5); " "; -f
+DIM feld[3] AS FLOAT
+feld[1] = a
+PRINT feld[1] + a; " "; "ab" * 2; " "; "z" + STR$(a)
+--- umgebung
+DHRT_TYPEN_PRUEFEN=1
+--- erwartet
+4 2.6666666666666665 64 0.5 2 12.0
+8 x 1 -1.5
+16.0 abab z8
+
+=== eine falsche angabe haelt an
+' Gegenprobe der Probe selbst: im .dhc wird die Angabe INTEGER durch STRING
+' ersetzt -- der Lauf muss mit der Meldung ueber den Compiler abbrechen.
+IMPORT "helfer.dh"
+WRITEALL("tiny.dh", "DIM a AS INTEGER : a = 4" + CHR$(10) + "PRINT a + 1" + CHR$(10))
+SETENV("DHRT_TYPEN_PRUEFEN", "1")
+dlStarten(["--dumpbc", CWD$() + "/tiny.dh"])
+PRINT "probe drin "; (INSTR(dlAus, CHR$(34) + "INTEGER" + CHR$(34)) >= 0)
+WRITEALL("falsch.dhc", REPLACE$(dlAus, CHR$(34) + "INTEGER" + CHR$(34), CHR$(34) + "STRING" + CHR$(34)))
+dlStarten([CWD$() + "/falsch.dhc"])
+PRINT "rueckgabe "; dlCode <> 0
+PRINT "meldung "; (INSTR(dlErr + dlAus, "der Compiler sagt STRING, der Wert ist INTEGER") >= 0)
+dlStarten(["--dumpbc", CWD$() + "/tiny.dh"])
+WRITEALL("richtig.dhc", dlAus)
+dlStarten([CWD$() + "/richtig.dhc"])
+PRINT "unveraendert "; TRIM$(dlAus)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+probe drin TRUE
+rueckgabe TRUE
+meldung TRUE
+unveraendert 5
