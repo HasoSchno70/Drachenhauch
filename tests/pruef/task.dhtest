@@ -78,8 +78,10 @@ PRINT TASK_RESULT$(a)
 hallo welt
 
 === auftrag sieht die globals NICHT
-' Die Zusage, und sie meldet sich statt still zu rechnen.
-CONST FAKTOR AS INTEGER = 10
+' Die Zusage, und sie meldet sich statt still zu rechnen. (Eine CONST mit
+' festem Wert sieht er seit 2026-09-24 -- siehe den Fall danach.)
+DIM FAKTOR AS INTEGER
+FAKTOR = 10
 FUNCTION Nutzt() AS INTEGER
     RETURN FAKTOR
 END FUNCTION
@@ -90,7 +92,24 @@ WHILE NOT TASK_READY(a)
 WEND
 PRINT TASK_RESULT$(a)
 --- fehler
-TASK: Zugriff auf eine globale Variable, die noch nicht gesetzt ist. Laeuft das hier als Auftrag (`dhrt call` / TASK_START)? Dann ist das erwartet: das Hauptprogramm laeuft dabei NICHT, also ist kein Global gesetzt -- auch keine CONST auf oberster Ebene. Gib der Funktion als Parameter mit, was sie braucht.
+TASK: Zugriff auf eine globale Variable, die noch nicht gesetzt ist. Laeuft das hier als Auftrag (`dhrt call` / TASK_START)? Dann ist das erwartet: das Hauptprogramm laeuft dabei NICHT, also ist kein Global gesetzt -- auch keine CONST, deren Wert erst beim Laufen feststeht (eine mit festem Wert wie `CONST BREITE = 640` setzt der Compiler ein). Gib der Funktion als Parameter mit, was sie braucht.
+
+=== auftrag sieht eine const mit festem wert
+' Seit 2026-09-24 setzt der Compiler eine CONST mit festem Wert ein -- im
+' Auftrag steht dann schlicht die Zahl, das Hauptprogramm muss nicht laufen.
+CONST FAKTOR AS INTEGER = 10
+CONST DOPPELT = FAKTOR * 2
+FUNCTION Nutzt() AS INTEGER
+    RETURN DOPPELT + 1
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Nutzt)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- erwartet
+21
 
 === unbekannte funktion meldet
 FUNCTION Langsam(x AS INTEGER) AS INTEGER

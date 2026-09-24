@@ -104,6 +104,14 @@ CONST FPS = 60
 
 Konstanten dürfen nur einmalig zugewiesen werden; späteres Schreiben ist ein Fehler.
 
+Steht der Wert einer Konstante beim Übersetzen fest (Zahlen, Texte und
+Rechnungen daraus, auch mit anderen solchen Konstanten), setzt der Übersetzer
+ihn direkt ein und rechnet aus, was sich ausrechnen lässt: `BREITE \ 2`
+kostet dann zur Laufzeit nichts mehr als `320`. Das gilt überall, auch in
+einem Auftrag (`TASK_START`, `dhrt call`), in dem das Hauptprogramm nicht
+läuft. Eine Konstante, deren Wert erst beim Laufen feststeht
+(`CONST START = MILLIS()`), bleibt ein gewöhnlicher Wert.
+
 ## Zahlen-Literale
 
 Klassische Schreibweisen:

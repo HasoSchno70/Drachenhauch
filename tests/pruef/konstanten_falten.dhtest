@@ -1,0 +1,127 @@
+' Konstanten falten (2026-09-24): der Compiler rechnet `2 * 3`, `BREITE \ 2`
+' oder `-GRENZE` schon beim Uebersetzen aus, mit denselben Funktionen wie die
+' Laufzeit (`vm::konstant_rechnen`). Globale CONSTs mit festem Wert setzt er
+' ein. Die Faelle pruefen, dass das Ergebnis GENAU dem der Laufzeit gleicht.
+' Format: docs/werkzeuge.md.
+
+=== gefaltet und zur laufzeit gerechnet sind gleich
+' Links Literale (gefaltet), rechts dieselben Werte ueber Variablen (Laufzeit).
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM s AS STRING
+a = 17 : b = 5 : x = 2.5 : y = 0.4 : s = "ab"
+PRINT 17 + 5; " "; a + b
+PRINT 17 - 5; " "; a - b
+PRINT 17 * 5; " "; a * b
+PRINT 17 / 5; " "; a / b
+PRINT 17 \ 5; " "; a \ b
+PRINT 17 MOD 5; " "; a MOD b
+PRINT -17 MOD 5; " "; -a MOD b
+PRINT 17 ^ 2; " "; a ^ 2
+PRINT 2.5 * 0.4; " "; x * y
+PRINT 2.5 + 17; " "; x + a
+PRINT "ab" + 5; " "; s + b
+PRINT "ab" * 3; " "; s * 3
+PRINT -(17 - 20); " "; -(a - 20)
+PRINT TYPEOF(17 / 5); " "; TYPEOF(a / b); " "; TYPEOF(17 \ 5); " "; TYPEOF(a \ b)
+--- erwartet
+22 22
+12 12
+85 85
+3.4 3.4
+3 3
+2 2
+3 3
+289 289
+1.0 1.0
+19.5 19.5
+ab5 ab5
+ababab ababab
+3 3
+FLOAT FLOAT INTEGER INTEGER
+
+=== eine const wird eingesetzt und mitgerechnet
+CONST BREITE = 640
+CONST HOEHE AS INTEGER = 480
+CONST MITTE_X = BREITE \ 2
+CONST SKALA AS FLOAT = 2
+CONST TITEL = "Spiel " + "1"
+PRINT MITTE_X; " "; HOEHE / 2; " "; SKALA; " "; TYPEOF(SKALA); " "; TITEL
+SUB innen()
+    PRINT BREITE - MITTE_X; " "; -HOEHE
+END SUB
+innen()
+--- erwartet
+320 240 2.0 FLOAT Spiel 1
+320 -480
+
+=== ueberlauf bleibt ein laufzeitfehler
+DIM x AS INTEGER
+x = 9223372036854775807 + 1
+--- fehler
++
+
+=== division durch 0 in einem nie genommenen zweig stoert nicht
+' Faltet der Compiler einen Fehler nicht, bleibt er dort, wo er hingehoert:
+' in der Zeile, die auch laeuft.
+IF FALSE THEN PRINT 1 \ 0
+PRINT "weiter"
+PRINT 1 \ 0
+--- fehler
+Division
+
+=== eine const in zwei zweigen wird nicht eingesetzt
+DIM modus AS INTEGER
+modus = 2
+IF modus = 1 THEN
+    CONST TEMPO = 10
+ELSE
+    CONST TEMPO = 20
+END IF
+PRINT TEMPO * 2
+--- erwartet
+40
+
+=== ein lokaler name verdeckt die const
+CONST WERT = 5
+FUNCTION f(wert AS INTEGER) AS INTEGER
+    RETURN wert * 2
+END FUNCTION
+SUB g()
+    DIM wert AS INTEGER
+    wert = 7
+    PRINT wert + 1
+END SUB
+PRINT f(3); " "; WERT * 2
+g()
+--- erwartet
+6 10
+8
+
+=== eine const mit falschem typ bleibt ein laufzeitfehler
+CONST ZAHL AS INTEGER = "sieben"
+PRINT ZAHL
+--- fehler
+Erwartet INTEGER
+
+=== ein gefalteter ausdruck ist so schnell wie die fertige zahl
+' Vorher: `x + 2 * 3` 225 ms, `x + 6` 150 ms je 10 Mio. Schleifen.
+CONST FAKTOR = 3
+DIM i AS INTEGER
+DIM x AS INTEGER
+DIM t AS INTEGER
+t = MILLIS()
+FOR i = 1 TO 3000000
+    x = x + 6
+NEXT
+DIM fertig AS INTEGER : fertig = MILLIS() - t
+t = MILLIS()
+FOR i = 1 TO 3000000
+    x = x + 2 * FAKTOR
+NEXT
+DIM gefaltet AS INTEGER : gefaltet = MILLIS() - t
+PRINT x; " "; gefaltet < fertig * 5 / 4 + 10
+--- erwartet
+36000000 TRUE

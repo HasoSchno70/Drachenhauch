@@ -1367,6 +1367,25 @@ ohne ihn ruft an einer Stelle mit wechselnden Klassen jedes Objekt die
 Methode der ersten (Gegenprobe im Test). fib(30) 280 -> 228 ms, Methode
 96 -> 86 ms. Tests `tests/pruef/aufrufe.dhtest`.
 
+## Konstanten falten (2026-09-24)
+
+Der Compiler faltet `+ - * / \ MOD ^` und das Vorzeichen ueber Literalen und
+globalen CONSTs mit festem Wert (`Compiler::falten`, Einstieg am Anfang von
+`expr`). **Gerechnet wird mit `vm::konstant_rechnen`/`konstant_negieren` --
+denselben Funktionen wie die Befehle**, darum kann das Ergebnis nicht von der
+Laufzeit abweichen (Test: jede Rechenart gefaltet gegen ueber Variablen;
+Gegenprobe `\` als `/` faellt). Nicht gefaltet wird bei Fehler (Ueberlauf,
+Division durch 0 -- bleibt Laufzeitfehler in DER Zeile), NaN/unendlich,
+Texten > 4 KB, und Vergleiche/AND/OR (an ihnen haengen Warnungen). Die
+CONST-Werte sammelt `collect_globals` in `konst_werte` (mit Typangabe nur,
+wenn der Wert passt, Int -> FLOAT wird Kommazahl; zwei verschiedene Werte =
+nie einsetzen); ein lokaler Platz oder ein Feld gleichen Namens verdeckt.
+**Folge, vom Nutzer entschieden:** ein Auftrag (TASK_START / `dhrt call`) sieht
+jetzt CONSTs mit festem Wert; `GLOBAL_UNGESETZT` sagt das. `x + 2 * FAKTOR`:
+225 -> 150 ms je 10 Mio. **Nebenbefund, nicht angefasst:** `statischer_typ`
+nimmt fuer `/` immer FLOAT an, die Laufzeit liefert bei glatter Teilung aber
+INTEGER (`480 / 2` = 240). Tests `tests/pruef/konstanten_falten.dhtest`.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
