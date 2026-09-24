@@ -177,6 +177,9 @@ struct Ctx {
     lines: Vec<u32>,
     cur_line: u32,
     consts: Vec<Value>,
+    /// Index in `consts` je Konstante (ihr JSON-Text) -- `add_const` suchte
+    /// vorher die ganze Liste linear ab, bei grossen Funktionen quadratisch.
+    const_index: HashMap<String, i64>,
     // Jeder Eintrag: (Patch-IPs, Tiefe von `try_stack` bei Schleifen-Eintritt).
     // BREAK/CONTINUE muessen jedes dazwischenliegende TRY abraeumen -- seine
     // Handler entfernen UND seinen FINALLY-Block ausfuehren.
@@ -203,7 +206,7 @@ struct Ctx {
 impl Ctx {
     fn new() -> Self {
         Ctx { code: vec![], lines: vec![], cur_line: 0,
-              consts: vec![], break_patches: vec![], continue_patches: vec![],
+              consts: vec![], const_index: HashMap::new(), break_patches: vec![], continue_patches: vec![],
               try_stack: vec![],
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
               dim_types: HashMap::new(),
@@ -251,11 +254,14 @@ impl Ctx {
         slot
     }
     fn add_const(&mut self, v: Value) -> i64 {
-        if let Some(i) = self.consts.iter().position(|c| *c == v) {
-            return i as i64;
-        }
+        // Schluessel = JSON-Text: gleich genau dann, wenn die Werte gleich sind
+        // (1 und 1.0 bleiben verschieden, wie beim Vergleich vorher).
+        let key = v.to_string();
+        if let Some(&i) = self.const_index.get(&key) { return i; }
+        let i = self.consts.len() as i64;
         self.consts.push(v);
-        (self.consts.len() - 1) as i64
+        self.const_index.insert(key, i);
+        i
     }
     fn emit(&mut self, op: i64, arg: Value) -> usize {
         let ip = self.code.len();
@@ -308,7 +314,7 @@ struct ClassInfo {
     /// Methoden, die diese Klasse nur ANKUENDIGT (WP G). Eine Klasse, in der
     /// noch eine davon offen ist, laesst sich nicht mit NEW erzeugen.
     abstracts: std::collections::HashSet<String>,
-    compiled: Vec<(String, Value)>,    // method-name -> func-json
+    compiled: Vec<(String, FuncTeile)>,    // method-name -> fertige Methode
 }
 
 pub struct Compiler {
@@ -327,7 +333,7 @@ pub struct Compiler {
     /// Meldungen auf eine ANDERE Stelle zu verweisen (`mathe.dh:5`).
     herkunft: Vec<crate::preprocess::Herkunft>,
     haupt: String,
-    compiled_fns: Vec<(String, Value)>,
+    compiled_fns: Vec<(String, FuncTeile)>,
     classes: HashMap<String, ClassInfo>,
     struct_names: std::collections::HashSet<String>,
     /// Externe Typen importierter Module (lowercase) -- gueltige DIM-Typen
@@ -3310,37 +3316,72 @@ impl Compiler {
         r
     }
 
-    fn finish(self, data: Vec<Value>) -> Value {
-        let main = build_func(&self.ctx, "__main__", true, true, 0, 0,
+    /// Hauptprogramm, Funktionen und Klassen als fertige Teile, dazu die Namen
+    /// der globalen Plaetze -- die gemeinsame Grundlage von `finish` (JSON)
+    /// und `finish_direkt` (Programm fuer die VM).
+    #[allow(clippy::type_complexity)]
+    fn teile(self) -> (FuncTeile, Vec<(String, FuncTeile)>, Vec<(String, ClassInfo)>, usize, Vec<String>) {
+        let n_globals = self.global_slots.len();
+        // Name je globalem Platz, fuer Meldungen der VM (`Vm::global_ungesetzt`).
+        let mut global_names = vec![String::new(); n_globals];
+        for (name, &i) in &self.global_slots { global_names[i] = name.clone(); }
+        let main = build_func(self.ctx, "__main__", true, true, 0, 0,
                               false, false, "", &[], &[], &[], &[]);
+        let classes: Vec<(String, ClassInfo)> = self.classes.into_iter().collect();
+        (main, self.compiled_fns, classes, n_globals, global_names)
+    }
+
+    fn finish(self, data: Vec<Value>) -> Value {
+        let (main, fns, classes, n_globals, global_names) = self.teile();
         let mut functions = Map::new();
-        for (name, fnj) in self.compiled_fns {
-            functions.insert(name, fnj);
+        for (name, f) in fns {
+            functions.insert(name, f.zu_json());
         }
-        let mut classes = Map::new();
-        for (cname, ci) in &self.classes {
-            let mut methods = Map::new();
-            for (mn, mj) in &ci.compiled { methods.insert(mn.clone(), mj.clone()); }
+        let mut klassen = Map::new();
+        for (cname, ci) in classes {
             let fields: Vec<Value> = ci.fields.iter().map(|f| json!({
                 "name": f.name, "type_name": f.type_name, "array_dims": f.array_dims,
             })).collect();
-            let mut props = ci.property_set.clone();
+            let mut props: Vec<String> = ci.property_set.iter().cloned().collect();
             props.sort();
-            classes.insert(cname.clone(), json!({
+            let mut methods = Map::new();
+            for (mn, m) in ci.compiled { methods.insert(mn, m.zu_json()); }
+            klassen.insert(cname, json!({
                 "name": ci.name, "parent_name": ci.parent_name, "is_struct": ci.is_struct,
                 "fields": fields, "methods": Value::Object(methods), "properties": props,
             }));
         }
-        // Name je globalem Platz, fuer Meldungen der VM (`Vm::global_ungesetzt`).
-        let mut global_names = vec![String::new(); self.global_slots.len()];
-        for (name, &i) in &self.global_slots { global_names[i] = name.clone(); }
         json!({
             "format": "dhc", "version": 1,
-            "n_globals": self.global_slots.len(),
+            "n_globals": n_globals,
             "global_names": global_names,
-            "main": main, "functions": Value::Object(functions),
-            "classes": Value::Object(classes), "data": data,
+            "main": main.zu_json(), "functions": Value::Object(functions),
+            "classes": Value::Object(klassen), "data": data,
         })
+    }
+
+    /// Wie `finish`, aber gleich das Programm fuer die VM -- ohne das JSON
+    /// erst zu bauen und dann wieder zu zerlegen.
+    fn finish_direkt(self, data: Vec<Value>) -> crate::model::Program {
+        let (main, fns, classes, n_globals, global_names) = self.teile();
+        let functions: Vec<(String, crate::model::Func)> =
+            fns.into_iter().map(|(n, f)| (n, f.zu_func())).collect();
+        let mut klassen = rustc_hash::FxHashMap::default();
+        for (cname, ci) in classes {
+            let fields = ci.fields.iter().map(|f| crate::model::FieldDecl {
+                name: f.name.clone(), type_name: f.type_name.clone(), array_dims: f.array_dims.clone(),
+            }).collect();
+            let methods = ci.compiled.into_iter().map(|(n, m)| (n, m.zu_func())).collect();
+            klassen.insert(cname, crate::model::ClassInfo {
+                name: ci.name, parent_name: ci.parent_name, is_struct: ci.is_struct,
+                fields, methods,
+                properties: ci.property_set.iter().cloned().collect(),
+                props_kette: false, prop_get: Default::default(),
+                prop_set: Default::default(), props_alle: Default::default(),
+            });
+        }
+        let data = data.iter().map(crate::model::decode_value).collect();
+        crate::model::programm_bauen(n_globals, global_names, main.zu_func(), functions, klassen, data)
     }
 
     // ---------------------------------------------------- User-Funktionen
@@ -3476,7 +3517,7 @@ impl Compiler {
             self.bereich_beenden(alt_bereich, mein_bereich, &fn_ctx);
             r?;
             let sig = &self.classes[&cname].method_sigs[mname];
-            let fnj = build_func(&fn_ctx, mname, false, is_sub, sig.n_params, sig.n_required,
+            let fnj = build_func(fn_ctx, mname, false, is_sub, sig.n_params, sig.n_required,
                                  sig.is_variadic, sig.is_coroutine, &sig.return_type,
                                  &sig.param_defaults, &sig.param_names, &sig.param_byref,
                                  &sig.param_default_is_expr);
@@ -3581,7 +3622,7 @@ impl Compiler {
         self.bereich_beenden(alt_bereich, mein_bereich, &fn_ctx);
         r?;
         let sig = &self.fn_sigs[name];
-        let fnj = build_func(&fn_ctx, name, false, is_sub, sig.n_params, sig.n_required,
+        let fnj = build_func(fn_ctx, name, false, is_sub, sig.n_params, sig.n_required,
                              sig.is_variadic, sig.is_coroutine, &sig.return_type,
                              &sig.param_defaults, &sig.param_names, &sig.param_byref,
                              &sig.param_default_is_expr);
@@ -3849,20 +3890,43 @@ fn body_has_yield(stmts: &[Node]) -> bool {
     stmts.iter().any(ns)
 }
 
-/// Baut das `_enc_func`-JSON aus einem fertig kompilierten Ctx.
+/// Eine fertig uebersetzte Funktion, noch ohne Format. Daraus entsteht
+/// entweder das JSON der .dhc-Datei (`zu_json` -- fuer `--export`,
+/// `--dumpbc`) oder direkt die `Func` der VM (`zu_func` -- fuer `dhrt run`
+/// und `dhrt call`, ohne JSON-Umweg: der kostete bei der IDE ~16 ms je Start).
+struct FuncTeile {
+    name: String,
+    is_main: bool,
+    is_sub: bool,
+    n_params: usize,
+    n_required: usize,
+    is_variadic: bool,
+    is_coroutine: bool,
+    return_type: String,
+    param_defaults: Vec<Value>,
+    param_names: Vec<String>,
+    param_byref: Vec<bool>,
+    param_default_is_expr: Vec<bool>,
+    local_types: Vec<String>,
+    local_defaults: Vec<Value>,
+    local_names: Vec<String>,
+    constants: Vec<Value>,
+    code: Vec<(i64, Value)>,
+    lines: Vec<u32>,
+}
+
 #[allow(clippy::too_many_arguments)]
-fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
+fn build_func(ctx: Ctx, name: &str, is_main: bool, is_sub: bool,
               n_params: usize, n_required: usize, is_variadic: bool,
               is_coroutine: bool, return_type: &str,
               param_defaults: &[Option<CVal>], param_names: &[String],
-              param_byref: &[bool], param_default_is_expr: &[bool]) -> Value {
-    let code: Vec<Value> = ctx.code.iter().map(|(op, arg)| json!([op, arg])).collect();
+              param_byref: &[bool], param_default_is_expr: &[bool]) -> FuncTeile {
     // Zeilen parallel zum Code (Stufe B). Defensive: bei (theoretischem)
     // Laengen-Mismatch auf 0 zurueckfallen statt zu paniken.
-    let lines: Vec<Value> = if ctx.lines.len() == ctx.code.len() {
-        ctx.lines.iter().map(|&l| json!(l)).collect()
+    let lines: Vec<u32> = if ctx.lines.len() == ctx.code.len() {
+        ctx.lines
     } else {
-        ctx.code.iter().map(|_| json!(0)).collect()
+        vec![0; ctx.code.len()]
     };
     let local_defaults: Vec<Value> = ctx.local_defaults.iter().map(enc).collect();
     // Debug-Namen pro Slot (Stufe B, 3a): local_slots invertieren; Slots ohne
@@ -3873,16 +3937,55 @@ fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
     }
     let pdef: Vec<Value> = param_defaults.iter()
         .map(|d| match d { Some(cv) => enc(cv), None => Value::Null }).collect();
-    json!({
-        "name": name, "n_params": n_params, "n_required": n_required,
-        "is_variadic": is_variadic, "is_sub": is_sub, "is_main": is_main,
-        "is_coroutine": is_coroutine, "return_type": return_type,
-        "param_defaults": pdef, "param_names": param_names,
-        "param_byref": param_byref, "param_default_is_expr": param_default_is_expr,
-        "local_types": ctx.local_types.clone(), "local_defaults": local_defaults,
-        "local_names": local_names,
-        "constants": ctx.consts.clone(), "code": code, "lines": lines,
-    })
+    FuncTeile {
+        name: name.to_string(), is_main, is_sub, n_params, n_required, is_variadic,
+        is_coroutine, return_type: return_type.to_string(),
+        param_defaults: pdef, param_names: param_names.to_vec(),
+        param_byref: param_byref.to_vec(), param_default_is_expr: param_default_is_expr.to_vec(),
+        local_types: ctx.local_types, local_defaults, local_names,
+        constants: ctx.consts, code: ctx.code, lines,
+    }
+}
+
+impl FuncTeile {
+    /// Das `_enc_func`-JSON der .dhc-Datei.
+    fn zu_json(self) -> Value {
+        let code: Vec<Value> = self.code.into_iter().map(|(op, arg)| json!([op, arg])).collect();
+        json!({
+            "name": self.name, "n_params": self.n_params, "n_required": self.n_required,
+            "is_variadic": self.is_variadic, "is_sub": self.is_sub, "is_main": self.is_main,
+            "is_coroutine": self.is_coroutine, "return_type": self.return_type,
+            "param_defaults": self.param_defaults, "param_names": self.param_names,
+            "param_byref": self.param_byref, "param_default_is_expr": self.param_default_is_expr,
+            "local_types": self.local_types, "local_defaults": self.local_defaults,
+            "local_names": self.local_names,
+            "constants": self.constants, "code": code, "lines": self.lines,
+        })
+    }
+
+    /// Direkt die `Func` der VM -- dieselben Zerleger wie beim Laden einer
+    /// .dhc (`model::decode_arg`/`decode_value`, `model::func_bauen`).
+    fn zu_func(self) -> crate::model::Func {
+        use crate::model::{decode_arg, decode_value};
+        crate::model::func_bauen(crate::model::FuncRoh {
+            name: self.name,
+            n_params: self.n_params,
+            n_required: self.n_required,
+            is_variadic: self.is_variadic,
+            is_sub: self.is_sub,
+            is_coroutine: self.is_coroutine,
+            return_type: self.return_type,
+            param_defaults: self.param_defaults.iter().map(decode_value).collect(),
+            param_byref: self.param_byref,
+            param_default_is_expr: self.param_default_is_expr,
+            local_types: self.local_types,
+            local_defaults: self.local_defaults.iter().map(decode_value).collect(),
+            constants: self.constants.iter().map(decode_value).collect(),
+            code: self.code.iter().map(|(op, arg)| (*op as u16, decode_arg(arg))).collect(),
+            lines: self.lines,
+            local_names: self.local_names,
+        })
+    }
 }
 
 /// DATA-Literale rekursiv einsammeln (wie compiler._collect_data, 3b-Subset).
@@ -4092,11 +4195,33 @@ fn node_name(n: &Node) -> &'static str {
 /// `IMPORT "vec2"` kompilieren. `builtin_aliases` sind `(alias, modul)`-Paare
 /// fuer `IMPORT "json" AS j` (Builtin-Namen-Rueckabbildung). Beide aus
 /// preprocess::compile_env. Fehler bei nicht unterstuetzten Konstrukten.
+/// Uebersetzt ein Programm ins .dhc-JSON (fuer `--export`, `--dumpbc`, `--check`).
 pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>,
                       builtin_aliases: &[(String, String)],
                       importierte_module: &std::collections::HashSet<String>,
                       herkunft: &[crate::preprocess::Herkunft], haupt: &str)
     -> Result<(Value, Vec<(u32, String)>), (u32, String)> {
+    let (c, data, warnings) = uebersetzen(ast, external_types, builtin_aliases, importierte_module, herkunft, haupt)?;
+    Ok((c.finish(data), warnings))
+}
+
+/// Uebersetzt ein Programm direkt fuer die VM -- ohne das JSON erst zu bauen
+/// und dann wieder zu zerlegen (`dhrt run`, `dhrt call`).
+pub fn compile_to_program(ast: &Node, external_types: &std::collections::HashSet<String>,
+                          builtin_aliases: &[(String, String)],
+                          importierte_module: &std::collections::HashSet<String>,
+                          herkunft: &[crate::preprocess::Herkunft], haupt: &str)
+    -> Result<(crate::model::Program, Vec<(u32, String)>), (u32, String)> {
+    let (c, data, warnings) = uebersetzen(ast, external_types, builtin_aliases, importierte_module, herkunft, haupt)?;
+    Ok((c.finish_direkt(data), warnings))
+}
+
+#[allow(clippy::type_complexity)]
+fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
+               builtin_aliases: &[(String, String)],
+               importierte_module: &std::collections::HashSet<String>,
+               herkunft: &[crate::preprocess::Herkunft], haupt: &str)
+    -> Result<(Compiler, Vec<Value>, Vec<(u32, String)>), (u32, String)> {
     let stmts = match ast {
         Node::Program { statements } => statements,
         _ => return Err((0, "Erwartet Program-Knoten".into())),
@@ -4220,7 +4345,7 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
             // noch deklariert wird.
             c.warn_unbekannte_namen();
             let warnings = std::mem::take(&mut c.warnings);
-            Ok((c.finish(data), warnings))
+            Ok((c, data, warnings))
         }
         Err(msg) => Err((c.err_line, msg)),
     }

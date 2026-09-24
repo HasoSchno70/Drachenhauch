@@ -1307,6 +1307,21 @@ fn preprocess_main(path: &str) -> ExitCode {
 /// `.dhc`-JSON oder einen Exit-Code (Fehler bereits auf stderr gemeldet).
 /// Geteilt von `--runsrc`, `run` und `--export`.
 fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Result<serde_json::Value, ExitCode> {
+    compile_source_mit(raw_source, base, label, compiler::compile_to_gbc)
+}
+
+/// Wie `compile_source`, aber gleich das Programm fuer die VM (ohne JSON-Umweg).
+fn compile_source_programm(raw_source: &str, base: &std::path::Path, label: &str) -> Result<model::Program, ExitCode> {
+    compile_source_mit(raw_source, base, label, compiler::compile_to_program)
+}
+
+/// Der letzte Schritt einer Uebersetzung: ins .dhc-JSON oder direkt ins Programm.
+type Uebersetzer<T> = fn(&ast::Node, &std::collections::HashSet<String>, &[(String, String)],
+                         &std::collections::HashSet<String>, &[preprocess::Herkunft], &str)
+                         -> Result<(T, Vec<(u32, String)>), (u32, String)>;
+
+fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
+                         uebersetze: Uebersetzer<T>) -> Result<T, ExitCode> {
     // Fehler-Format `<label>:<zeile>: <msg>` -- so erkennt der Editor (Pattern
     // `(\S+\.dh):(\d+)`) die Zeile und macht sie klickbar (wie bei Laufzeitfehlern).
     let (source, imports, herkunft, namensraeume) = match preprocess::process(raw_source, base) {
@@ -1341,7 +1356,7 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
         eprintln!("{}: Namensraum-Fehler: {}", wo(zeile), msg);
         return Err(ExitCode::from(3));
     }
-    match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &module, &herkunft, label) {
+    match uebersetze(&ast, &ext_types, &aliases, &module, &herkunft, label) {
         Ok((j, warns)) => {
             // Nicht-fatale Compile-Warnungen (z.B. unbekanntes Builtin) vor dem
             // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
@@ -1606,8 +1621,8 @@ fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<se
 
 /// Front-End-Kette + Ausfuehrung. `label` = Quell-Label fuer Laufzeitfehler.
 fn compile_and_run_source(raw_source: &str, base: &std::path::Path, label: &str) -> ExitCode {
-    match compile_source(raw_source, base, label) {
-        Ok(json) => run_program_value(json, label),
+    match compile_source_programm(raw_source, base, label) {
+        Ok(prog) => run_program(prog, label),
         Err(code) => code,
     }
 }
@@ -1662,8 +1677,8 @@ fn call_main(path: &str, fn_name: &str, args: Vec<String>) -> ExitCode {
     };
     ins_quellverzeichnis(&base);
     builtins::set_quelldatei(label.clone());
-    match compile_source(&raw_source, &base, &label) {
-        Ok(json) => call_program_value(json, fn_name, args),
+    match compile_source_programm(&raw_source, &base, &label) {
+        Ok(prog) => call_program(prog, fn_name, args),
         Err(code) => code,
     }
 }
@@ -1674,12 +1689,7 @@ fn call_fehler(msg: &str) -> ExitCode {
     ExitCode::from(1)
 }
 
-fn call_program_value(json: serde_json::Value, fn_name: &str,
-                      args: Vec<String>) -> ExitCode {
-    let prog = match model::load_program(&json) {
-        Ok(p) => p,
-        Err(e) => return call_fehler(&format!("Lade-Fehler: {}", e)),
-    };
+fn call_program(prog: model::Program, fn_name: &str, args: Vec<String>) -> ExitCode {
     // Ein String-Argument, das wie eine Zahl aussieht, wird zur Zahl -- sonst
     // muesste jede Auftragsfunktion ihr Argument selbst umwandeln, und der
     // haeufigste Fall (eine Kennung, ein Zaehler) waere der unbequemste.
@@ -1998,13 +2008,16 @@ fn run_dhc_text(text: &str, source_label: &str) -> ExitCode {
 
 /// Laedt ein bereits geparstes `.dhc`-JSON-`Value` und fuehrt es aus.
 fn run_program_value(json: serde_json::Value, source_label: &str) -> ExitCode {
-    let prog = match model::load_program(&json) {
-        Ok(p) => p,
+    match model::load_program(&json) {
+        Ok(p) => run_program(p, source_label),
         Err(e) => {
             eprintln!("Lade-Fehler: {}", e);
-            return ExitCode::from(1);
+            ExitCode::from(1)
         }
-    };
+    }
+}
+
+fn run_program(prog: model::Program, source_label: &str) -> ExitCode {
 
     let mut machine = vm::Vm::new(&prog);
     match machine.run() {

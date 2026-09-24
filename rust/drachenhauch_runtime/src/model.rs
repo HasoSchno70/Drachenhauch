@@ -1,4 +1,7 @@
-//! Laden des `.dhc`-Formats (siehe `drachenhauch/serialize.py`) in Rust-Structs.
+//! Das geladene Programm der VM (`Program`, `Func`, `Instr`) -- aus einer
+//! `.dhc`-Datei (`load_program`, JSON) oder direkt vom Compiler
+//! (`compiler::compile_to_program`, ohne JSON-Umweg). Beide Wege gehen durch
+//! `func_bauen` und `programm_bauen`.
 //!
 //! Der const-Pool und die Code-Instruktionen werden beim Laden EINMALIG in
 //! native Rust-Typen dekodiert (kein serde_json zur Laufzeit der Dispatch-
@@ -11,7 +14,8 @@ use serde_json::Value as J;
 
 use crate::value::Value;
 
-/// Opcode-Konstanten -- muessen exakt zu `drachenhauch/bytecode.py::Op` passen.
+/// Opcode-Konstanten -- muessen exakt zu `compiler::oc` passen (dieselben Nummern
+/// stehen in jeder .dhc-Datei).
 pub mod op {
     pub const LOAD_CONST: u16 = 1;
     pub const POP: u16 = 2;
@@ -343,7 +347,7 @@ pub(crate) fn neutrales_element(t: &str) -> Option<Value> {
     }
 }
 
-fn decode_value(j: &J) -> Value {
+pub(crate) fn decode_value(j: &J) -> Value {
     match j {
         J::Null => Value::Nil,
         J::Bool(b) => Value::Bool(*b), // sollte nur in {"b":..} auftreten
@@ -385,7 +389,7 @@ fn decode_value(j: &J) -> Value {
 /// Dekodiert ein Code-Argument. Plain-Zahl -> Int (Index/Slot), String -> Str,
 /// null -> None, Array -> rekursive Liste. Getaggte Objekte ({"f"},{"b"},...)
 /// werden als eingebetteter Wert behandelt.
-fn decode_arg(j: &J) -> Arg {
+pub(crate) fn decode_arg(j: &J) -> Arg {
     match j {
         J::Null => Arg::None,
         J::Number(n) => {
@@ -422,7 +426,7 @@ fn decode_func(j: &J) -> Func {
         .as_array()
         .map(|a| a.iter().map(|x| x.as_bool().unwrap_or(false)).collect())
         .unwrap_or_default();
-    let mut local_defaults: Vec<Value> = get("local_defaults")
+    let local_defaults: Vec<Value> = get("local_defaults")
         .as_array()
         .map(|a| a.iter().map(decode_value).collect())
         .unwrap_or_default();
@@ -430,29 +434,13 @@ fn decode_func(j: &J) -> Func {
         .as_array()
         .map(|a| a.iter().map(|x| x.as_str().unwrap_or("any").to_string()).collect())
         .unwrap_or_default();
-    // Mathe-Typen starten mit ihrem neutralen Element statt mit NIL. Der
-    // Compiler kann das nicht ablegen (seine Konstanten kennen kein MAT4),
-    // also wird es hier beim Laden nachgetragen -- genauso wie fuer globale
-    // Variablen in vm.rs. Alle anderen Typen bleiben, wie sie sind.
-    for (i, t) in local_types.iter().enumerate() {
-        if i < local_defaults.len() && matches!(local_defaults[i], Value::Nil) {
-            if let Some(v) = neutrales_element(t) {
-                local_defaults[i] = v;
-            }
-        }
-    }
     let code = get("code")
         .as_array()
         .map(|a| {
             a.iter()
                 .map(|instr| {
                     let pair = instr.as_array().expect("instr ist [op, arg]");
-                    Instr {
-                        op: pair[0].as_u64().expect("op int") as u16,
-                        arg: decode_arg(&pair[1]),
-                        familie: std::cell::Cell::new(0),
-                        methode: std::cell::Cell::new((std::ptr::null(), std::ptr::null())),
-                    }
+                    (pair[0].as_u64().expect("op int") as u16, decode_arg(&pair[1]))
                 })
                 .collect()
         })
@@ -466,7 +454,7 @@ fn decode_func(j: &J) -> Func {
         .map(|a| a.iter().map(|x| x.as_str().unwrap_or("").to_string()).collect())
         .unwrap_or_default();
 
-    Func {
+    func_bauen(FuncRoh {
         name: get("name").as_str().unwrap_or("").to_string(),
         n_params: get("n_params").as_u64().unwrap_or(0) as usize,
         n_required: get("n_required").as_u64().unwrap_or(0) as usize,
@@ -483,6 +471,68 @@ fn decode_func(j: &J) -> Func {
         code,
         lines,
         local_names,
+    })
+}
+
+/// Die Teile einer Funktion, schon als Laufzeit-Werte -- aus einer
+/// .dhc-Datei (`decode_func`) ODER direkt vom Compiler
+/// (`compiler::compile_to_program`, ohne JSON-Umweg). Beide Wege gehen durch
+/// `func_bauen`, damit sie nicht auseinanderlaufen.
+pub(crate) struct FuncRoh {
+    pub name: String,
+    pub n_params: usize,
+    pub n_required: usize,
+    pub is_variadic: bool,
+    pub is_sub: bool,
+    pub is_coroutine: bool,
+    pub return_type: String,
+    pub param_defaults: Vec<Value>,
+    pub param_byref: Vec<bool>,
+    pub param_default_is_expr: Vec<bool>,
+    pub local_types: Vec<String>,
+    pub local_defaults: Vec<Value>,
+    pub constants: Vec<Value>,
+    pub code: Vec<(u16, Arg)>,
+    pub lines: Vec<u32>,
+    pub local_names: Vec<String>,
+}
+
+pub(crate) fn func_bauen(r: FuncRoh) -> Func {
+    let mut local_defaults = r.local_defaults;
+    // Mathe-Typen starten mit ihrem neutralen Element statt mit NIL. Der
+    // Compiler kann das nicht ablegen (seine Konstanten kennen kein MAT4),
+    // also wird es hier beim Laden nachgetragen -- genauso wie fuer globale
+    // Variablen in vm.rs. Alle anderen Typen bleiben, wie sie sind.
+    for (i, t) in r.local_types.iter().enumerate() {
+        if i < local_defaults.len() && matches!(local_defaults[i], Value::Nil) {
+            if let Some(v) = neutrales_element(t) {
+                local_defaults[i] = v;
+            }
+        }
+    }
+    let code = r.code.into_iter().map(|(op, arg)| Instr {
+        op,
+        arg,
+        familie: std::cell::Cell::new(0),
+        methode: std::cell::Cell::new((std::ptr::null(), std::ptr::null())),
+    }).collect();
+    Func {
+        name: r.name,
+        n_params: r.n_params,
+        n_required: r.n_required,
+        is_variadic: r.is_variadic,
+        is_sub: r.is_sub,
+        is_coroutine: r.is_coroutine,
+        return_type: r.return_type,
+        param_defaults: r.param_defaults,
+        param_byref: r.param_byref,
+        param_default_is_expr: r.param_default_is_expr,
+        local_types: r.local_types,
+        local_defaults,
+        constants: r.constants,
+        code,
+        lines: r.lines,
+        local_names: r.local_names,
     }
 }
 
@@ -545,12 +595,10 @@ pub fn load_program(j: &J) -> Result<Program, String> {
         .map(|a| a.iter().map(|x| x.as_str().unwrap_or("").to_string()).collect())
         .unwrap_or_default();
     let main = decode_func(obj.get("main").ok_or("kein main")?);
-    let mut functions: Vec<Func> = Vec::new();
-    let mut fn_index = rustc_hash::FxHashMap::default();
+    let mut functions: Vec<(String, Func)> = Vec::new();
     if let Some(fobj) = obj.get("functions").and_then(|v| v.as_object()) {
         for (name, fj) in fobj {
-            fn_index.insert(name.clone(), functions.len());
-            functions.push(decode_func(fj));
+            functions.push((name.clone(), decode_func(fj)));
         }
     }
     let mut classes = rustc_hash::FxHashMap::default();
@@ -563,6 +611,22 @@ pub fn load_program(j: &J) -> Result<Program, String> {
         .and_then(|v| v.as_array())
         .map(|a| a.iter().map(decode_value).collect())
         .unwrap_or_default();
+    Ok(programm_bauen(n_globals, global_names, main, functions, classes, data))
+}
+
+/// Ein geladenes Programm fertig machen -- fuer `load_program` (.dhc) UND fuer
+/// den Compiler (`compiler::compile_to_program`, ohne JSON-Umweg): Aufruf-
+/// Indizes, vor-zerlegte Argumente, PROPERTY-Tabellen.
+pub(crate) fn programm_bauen(n_globals: usize, global_names: Vec<String>, main: Func,
+                             benannte: Vec<(String, Func)>,
+                             mut classes: rustc_hash::FxHashMap<String, ClassInfo>,
+                             data: Vec<Value>) -> Program {
+    let mut functions: Vec<Func> = Vec::with_capacity(benannte.len());
+    let mut fn_index = rustc_hash::FxHashMap::default();
+    for (name, f) in benannte {
+        fn_index.insert(name, functions.len());
+        functions.push(f);
+    }
     // Heisse Opcode-Args vor-zerlegen (main + Funktionen + Methoden).
     let mut main = main;
     specialize_args(&mut main.code, &fn_index);
@@ -610,7 +674,7 @@ pub fn load_program(j: &J) -> Result<Program, String> {
         }
         if let Some(ci) = classes.get_mut(&k) { ci.props_alle = alle; ci.prop_get = get; ci.prop_set = set; }
     }
-    Ok(Program {
+    Program {
         n_globals,
         global_names,
         main,
@@ -618,7 +682,7 @@ pub fn load_program(j: &J) -> Result<Program, String> {
         fn_index,
         classes,
         data,
-    })
+    }
 }
 
 #[cfg(test)]
