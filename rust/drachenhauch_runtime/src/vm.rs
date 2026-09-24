@@ -5,6 +5,25 @@
 //! DATA/READ, TRY/THROW und die puren Builtins (siehe builtins.rs).
 //! Semantik 1:1 aus `drachenhauch/vm.py`, damit `stdout` bit-identisch bleibt.
 
+/// Einen Wert fuer einen Platz vom Typ `$ty` passend machen (STORE_LOCAL,
+/// STORE_GLOBAL_SLOT und die ADD_STORE_*-Befehle). Fast-Arm: Wert hat schon
+/// den Zieltyp -> kein coerce-Aufruf. Ein Makro und keine Funktion, weil es in
+/// der heissesten Schleife steht: als Funktion wurde es nicht eingebettet, und
+/// `z = z + i` wurde gemessen 25 % langsamer.
+macro_rules! passend {
+    ($v:expr, $ty:expr, $wo:expr) => {{
+        let v = $v;
+        let ty: &str = $ty;
+        match (&v, ty) {
+            (Value::Int(_), "integer") | (Value::Float(_), "float")
+            | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+            | (_, "any") | (_, "") => v,
+            (Value::Int(n), "float") => Value::Float(*n as f64),
+            _ => coerce(v, ty, $wo)?,
+        }
+    }};
+}
+
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -644,7 +663,7 @@ fn dbg_binop(op: &str, a: &Value, b: &Value) -> R<Value> {
         "or" => Ok(Value::Bool(dbg_truthy(a) || dbg_truthy(b))),
         "+" => {
             if let (Value::Str(x), Value::Str(y)) = (a, b) {
-                return Ok(Value::str_rc(&format!("{}{}", x, y)));
+                return Ok(Value::str_rc(format!("{}{}", x, y)));
             }
             dbg_arith(a, b, |x, y| x + y)
         }
@@ -1383,6 +1402,51 @@ impl<'p> Vm<'p> {
     /// (`__radd__` etc.) sind laut CLAUDE.md bewusst nicht unterstuetzt --
     /// fuer die nicht-kommutativen Faelle daher lieber `None` (-> normaler
     /// Typ-Fehler) als ein stillschweigend falsches Ergebnis.
+    /// `a + b` fuer alle Arten -- der eine Weg fuer ADD und ADD_STORE_*.
+    ///
+    /// Zeichenketten: haelt niemand ausser `a` den linken Text (ein
+    /// Zwischenergebnis wie in `"x" + y + z`, oder der Platz hat seinen Verweis
+    /// in ADD_STORE_* abgegeben), wird an Ort und Stelle angehaengt. Vorher
+    /// entstand bei jedem `+` eine neue Kopie, und `s = s + "x"` in einer
+    /// Schleife war quadratisch (400 000 Mal: 7 s).
+    fn addieren(&mut self, a: Value, b: Value) -> R<Value> {
+        // Numerischer Fast-Path zuerst: Int/Float-Paare sind der Normalfall
+        // in heissen Schleifen -- Modul-/User-Operator-Checks kosten dort nur
+        // (Semantik unveraendert: weder Zahlen noch der Sonderfall-Pfad
+        // ueberlappen sich).
+        if let Some(r) = zahlen_addieren(&a, &b) { return r; }
+        if let Some(r) = module_op('+', &a, &b) { return r; }
+        if let Some(r) = self.user_op("__op_add__", &a, &b, true)? { return Ok(r); }
+        if let Value::Str(mut links) = a {
+            match Rc::get_mut(&mut links) {
+                Some(s) => {
+                    match &b { Value::Str(r) => s.push_str(r), _ => s.push_str(&b.fmt()) }
+                }
+                None => {
+                    let rechts: std::borrow::Cow<str> = match &b {
+                        Value::Str(r) => std::borrow::Cow::Borrowed(r.as_str()),
+                        _ => std::borrow::Cow::Owned(b.fmt()),
+                    };
+                    let mut s = String::with_capacity(links.len() + rechts.len());
+                    s.push_str(&links);
+                    s.push_str(&rechts);
+                    links = Rc::new(s);
+                }
+            }
+            return Ok(Value::Str(links));
+        }
+        if let Value::Str(r) = &b {
+            let mut s = a.fmt();
+            s.push_str(r);
+            return Ok(Value::Str(Rc::new(s)));
+        }
+        if let (Value::Array(x), Value::Array(y)) = (&a, &b) {
+            return felder_verbinden(x, y);
+        }
+        require_number(&a, &b, "+")?;
+        nn_add(a, b)
+    }
+
     fn user_op(&mut self, method: &str, a: &Value, b: &Value, commutative: bool) -> R<Option<Value>> {
         if let Value::Instance(rc) = a {
             let cn = rc.borrow().class_name.clone();
@@ -2068,15 +2132,7 @@ impl<'p> Vm<'p> {
                 op::STORE_LOCAL => {
                     let slot = arg.as_usize();
                     let v = vm_pop(stack)?;
-                    // Fast-Arm: Wert hat schon den Zieltyp -> kein coerce-Call.
-                    let ty = &fn_.local_types[slot];
-                    locals[slot] = match (&v, ty.as_str()) {
-                        (Value::Int(_), "integer") | (Value::Float(_), "float")
-                        | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
-                        | (_, "any") | (_, "") => v,
-                        (Value::Int(n), "float") => Value::Float(*n as f64),
-                        _ => coerce(v, ty, "Lokale Variable")?,
-                    };
+                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable");
                 }
                 op::DECLARE_LOCAL => {
                     let l = arg.list();
@@ -2172,14 +2228,8 @@ impl<'p> Vm<'p> {
                     if sb.is_const {
                         return Err("CONST kann nicht ueberschrieben werden".into());
                     }
-                    // Fast-Arm: Typ passt schon -> kein ty-Clone, kein coerce.
-                    sb.value = match (&v, sb.ty.as_str()) {
-                        (Value::Int(_), "integer") | (Value::Float(_), "float")
-                        | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
-                        | (_, "any") | (_, "") => v,
-                        (Value::Int(n), "float") => Value::Float(*n as f64),
-                        _ => { let ty = sb.ty.clone(); coerce(v, &ty, "Zuweisung an global")? }
-                    };
+                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global");
+                    sb.value = neu;
                 }
                 op::DECLARE_GLOBAL_SLOT => {
                     let l = arg.list();
@@ -2288,26 +2338,59 @@ impl<'p> Vm<'p> {
                 // --- Arithmetik (generisch, mit User-Operator-Overloading) ---
                 op::ADD => {
                     let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    // Numerischer Fast-Path zuerst: Int/Float-Paare sind der
-                    // Normalfall in heissen Schleifen -- Modul-/User-Operator-
-                    // Checks kosten dort nur (Semantik unveraendert: weder
-                    // Zahlen noch der Sonderfall-Pfad ueberlappen sich).
-                    match (&a, &b) {
-                        (Value::Int(x), Value::Int(y)) => stack.push(
-                            x.checked_add(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("+"))?),
-                        (Value::Float(x), Value::Float(y)) => stack.push(Value::Float(x + y)),
-                        (Value::Int(x), Value::Float(y)) => stack.push(Value::Float(*x as f64 + y)),
-                        (Value::Float(x), Value::Int(y)) => stack.push(Value::Float(x + *y as f64)),
-                        _ => {
-                            if let Some(r) = module_op('+', &a, &b) { stack.push(r?); }
-                            else if let Some(r) = self.user_op("__op_add__", &a, &b, true)? { stack.push(r); }
-                            else if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
-                                stack.push(Value::str_rc(&format!("{}{}", a.fmt(), b.fmt())));
-                            } else if let (Value::Array(x), Value::Array(y)) = (&a, &b) {
-                                stack.push(felder_verbinden(x, y)?);
-                            } else { require_number(&a, &b, "+")?; stack.push(nn_add(a, b)?); }
+                    // Zahlen direkt hier -- `addieren` ist gross und wird nicht
+                    // eingebettet; in einer heissen Schleife kostet der Aufruf.
+                    let v = match zahlen_addieren(&a, &b) {
+                        Some(r) => r?,
+                        None => self.addieren(a, b)?,
+                    };
+                    stack.push(v);
+                }
+                op::ADD_STORE_LOCAL => {
+                    // `x = x + e`: auf dem Stapel liegen der geladene Wert von x
+                    // und e. Haelt der Platz noch GENAU diese Zeichenkette (e hat
+                    // x nicht veraendert), gibt er seinen Verweis ab -- dann ist
+                    // `a` der einzige Halter und `addieren` haengt an, statt zu
+                    // kopieren. Sonst ist es ADD + STORE wie bisher.
+                    let slot = arg.as_usize();
+                    let b = vm_pop(stack)?; let a = vm_pop(stack)?;
+                    let v = match zahlen_addieren(&a, &b) {
+                        Some(r) => r?,
+                        None => {
+                            if let (Value::Str(ra), Value::Str(rs)) = (&a, &locals[slot]) {
+                                if Rc::ptr_eq(ra, rs) && ist_schlicht(&b) { locals[slot] = Value::Nil; }
+                            }
+                            self.addieren(a, b)?
                         }
+                    };
+                    locals[slot] = passend!(v, fn_.local_types[slot].as_str(), "Lokale Variable");
+                }
+                op::ADD_STORE_GLOBAL_SLOT => {
+                    let idx = arg.as_usize();
+                    let b = vm_pop(stack)?; let a = vm_pop(stack)?;
+                    let v = match zahlen_addieren(&a, &b) {
+                        Some(r) => r?,
+                        None => {
+                            let slot = self.global_slots[idx].as_ref().ok_or("Slot leer")?.clone();
+                            {
+                                let mut sb = slot.borrow_mut();
+                                if let (Value::Str(ra), Value::Str(rs)) = (&a, &sb.value) {
+                                    if !sb.is_const && Rc::ptr_eq(ra, rs) && ist_schlicht(&b) {
+                                        sb.value = Value::Nil;
+                                    }
+                                }
+                            }
+                            // Kein Borrow ueber `addieren` halten: ein Operator
+                            // einer Klasse (`OPERATOR +`) darf dieselbe Globale lesen.
+                            self.addieren(a, b)?
+                        }
+                    };
+                    let mut sb = self.global_slots[idx].as_ref().ok_or("Slot leer")?.borrow_mut();
+                    if sb.is_const {
+                        return Err("CONST kann nicht ueberschrieben werden".into());
                     }
+                    let neu = passend!(v, sb.ty.as_str(), "Zuweisung an global");
+                    sb.value = neu;
                 }
                 op::SUB => {
                     let b = vm_pop(stack)?; let a = vm_pop(stack)?;
@@ -3287,7 +3370,7 @@ impl<'p> Vm<'p> {
                 let bytes = net::recv_bytes(self.net_sock_mut(i)?, n)?;
                 Value::Buffer(std::rc::Rc::new(std::cell::RefCell::new(bytes)))
             }
-            "net_recv" => { let i = bi_int(a, 0, "NET_RECV")?; let n = bi_int(a, 1, "NET_RECV")?; Value::str_rc(&net::recv(self.net_sock_mut(i)?, n)?) }
+            "net_recv" => { let i = bi_int(a, 0, "NET_RECV")?; let n = bi_int(a, 1, "NET_RECV")?; Value::str_rc(net::recv(self.net_sock_mut(i)?, n)?) }
             "net_peer_addr" => Value::str_rc(&self.net_sock(bi_int(a, 0, "NET_PEER_ADDR")?)?.peer_host),
             "net_peer_port" => Value::Int(self.net_sock(bi_int(a, 0, "NET_PEER_PORT")?)?.peer_port),
             "net_is_connected" => Value::Bool(net::is_connected(self.net_sock(bi_int(a, 0, "NET_IS_CONNECTED")?)?)),
@@ -3309,10 +3392,10 @@ impl<'p> Vm<'p> {
                 let t = bi_str(a, 3, "NET_UDP_SEND")?.to_string();
                 Value::Int(net::udp_send(self.net_udp(i)?, &h, p, &t)?)
             }
-            "net_udp_recv" => { let i = bi_int(a, 0, "NET_UDP_RECV")?; let n = bi_int(a, 1, "NET_UDP_RECV")?; Value::str_rc(&net::udp_recv(self.net_udp_mut(i)?, n)?) }
+            "net_udp_recv" => { let i = bi_int(a, 0, "NET_UDP_RECV")?; let n = bi_int(a, 1, "NET_UDP_RECV")?; Value::str_rc(net::udp_recv(self.net_udp_mut(i)?, n)?) }
             "net_udp_last_from" => {
                 let s = self.net_udp(bi_int(a, 0, "NET_UDP_LAST_FROM")?)?;
-                if s.last_from.0.is_empty() { Value::str_rc("") } else { Value::str_rc(&format!("{}:{}", s.last_from.0, s.last_from.1)) }
+                if s.last_from.0.is_empty() { Value::str_rc("") } else { Value::str_rc(format!("{}:{}", s.last_from.0, s.last_from.1)) }
             }
             "net_udp_set_timeout" => { let i = bi_int(a, 0, "NET_UDP_SET_TIMEOUT")?; let ms = bi_int(a, 1, "NET_UDP_SET_TIMEOUT")?; net::set_timeout_udp(&self.net_udp(i)?.sock, ms); Value::Nil }
             "net_udp_close" => { let i = bi_int(a, 0, "NET_UDP_CLOSE")? as usize; if let Some(s) = self.udp_socks.get_mut(i) { *s = None; } Value::Nil }
@@ -3374,7 +3457,7 @@ impl<'p> Vm<'p> {
                     Some(v) => return Err(format!("GELD_TEXT$: das Symbol muss ein STRING sein, \
                                                    erhalten {}", v.type_name())),
                 };
-                Value::str_rc(&geld::text(w, &symbol, 2))
+                Value::str_rc(geld::text(w, &symbol, 2))
             }
             "geld_teilen" => {
                 let w = wert(&a[0], "GELD_TEILEN")?;
@@ -3891,7 +3974,7 @@ impl<'p> Vm<'p> {
             "httpd_body$" | "httpd_body" => {
                 let i = bi_int(a, 0, "HTTPD_BODY$")?;
                 let r = Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_BODY$")?;
-                Value::str_rc(&String::from_utf8_lossy(&r.rumpf))
+                Value::str_rc(String::from_utf8_lossy(&r.rumpf).into_owned())
             }
             "httpd_query$" | "httpd_query" => {
                 let i = bi_int(a, 0, "HTTPD_QUERY$")?;
@@ -4018,8 +4101,8 @@ impl<'p> Vm<'p> {
             "mqtt_subscribe" => { let i = bi_int(a, 0, "MQTT_SUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_SUBSCRIBE")?.to_string(); mqtt::subscribe(self.mqtt_client(i)?, &topic)?; Value::Nil }
             "mqtt_update" => { let i = bi_int(a, 0, "MQTT_UPDATE")?; mqtt::update(self.mqtt_client(i)?)?; Value::Nil }
             "mqtt_next_message" => { let i = bi_int(a, 0, "MQTT_NEXT_MESSAGE")?; Value::Bool(mqtt::next_message(self.mqtt_client(i)?)) }
-            "mqtt_message_topic" => { let i = bi_int(a, 0, "MQTT_MESSAGE_TOPIC")?; Value::str_rc(&mqtt::message_topic(self.mqtt_client(i)?)) }
-            "mqtt_message_payload" => { let i = bi_int(a, 0, "MQTT_MESSAGE_PAYLOAD")?; Value::str_rc(&mqtt::message_payload(self.mqtt_client(i)?)) }
+            "mqtt_message_topic" => { let i = bi_int(a, 0, "MQTT_MESSAGE_TOPIC")?; Value::str_rc(mqtt::message_topic(self.mqtt_client(i)?)) }
+            "mqtt_message_payload" => { let i = bi_int(a, 0, "MQTT_MESSAGE_PAYLOAD")?; Value::str_rc(mqtt::message_payload(self.mqtt_client(i)?)) }
             _ => return Ok(None),
         };
         Ok(Some(v))
@@ -4199,10 +4282,10 @@ impl<'p> Vm<'p> {
                 let n = bi_str(a, 0, "HTTP_HEADER")?.to_lowercase();
                 Value::str_rc(self.http_headers.iter().find(|(k, _)| *k == n).map(|(_, v)| v.as_str()).unwrap_or(""))
             }
-            "url_encode" => Value::str_rc(&html::url_encode(bi_str(a, 0, "URL_ENCODE")?)),
-            "url_decode" => Value::str_rc(&html::url_decode(bi_str(a, 0, "URL_DECODE")?)),
-            "html_text" => Value::str_rc(&html::html_text(bi_str(a, 0, "HTML_TEXT")?)),
-            "html_get_attr" => Value::str_rc(&html::html_get_attr(bi_str(a, 0, "HTML_GET_ATTR")?, bi_str(a, 1, "HTML_GET_ATTR")?)),
+            "url_encode" => Value::str_rc(html::url_encode(bi_str(a, 0, "URL_ENCODE")?)),
+            "url_decode" => Value::str_rc(html::url_decode(bi_str(a, 0, "URL_DECODE")?)),
+            "html_text" => Value::str_rc(html::html_text(bi_str(a, 0, "HTML_TEXT")?)),
+            "html_get_attr" => Value::str_rc(html::html_get_attr(bi_str(a, 0, "HTML_GET_ATTR")?, bi_str(a, 1, "HTML_GET_ATTR")?)),
             "html_find_all" => {
                 let items = html::html_find_all(bi_str(a, 0, "HTML_FIND_ALL")?, bi_str(a, 1, "HTML_FIND_ALL")?);
                 let n = items.len() as i64;
@@ -4319,7 +4402,7 @@ impl<'p> Vm<'p> {
         match name {
             "midi_note_name$" | "midi_note_name" => {
                 let n = bi_int(a, 0, "MIDI_NOTE_NAME$")?;
-                return Ok(Some(Value::str_rc(&crate::midi::note_name(n))));
+                return Ok(Some(Value::str_rc(crate::midi::note_name(n))));
             }
             "midi_note_freq" => {
                 let n = bi_int(a, 0, "MIDI_NOTE_FREQ")?;
@@ -4523,9 +4606,9 @@ impl<'p> Vm<'p> {
             "midi_in_count" => Value::Int(midi::in_count()?),
             "midi_out_count" => Value::Int(midi::out_count()?),
             "midi_in_name$" | "midi_in_name" =>
-                Value::str_rc(&midi::in_name(bi_int(a, 0, "MIDI_IN_NAME$")?)?),
+                Value::str_rc(midi::in_name(bi_int(a, 0, "MIDI_IN_NAME$")?)?),
             "midi_out_name$" | "midi_out_name" =>
-                Value::str_rc(&midi::out_name(bi_int(a, 0, "MIDI_OUT_NAME$")?)?),
+                Value::str_rc(midi::out_name(bi_int(a, 0, "MIDI_OUT_NAME$")?)?),
             // --- Oeffnen und schliessen ---
             "midi_in_open" => {
                 let e = midi::in_open(bi_int(a, 0, "MIDI_IN_OPEN")?)?;
@@ -4618,7 +4701,7 @@ impl<'p> Vm<'p> {
     fn try_serial_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::serial;
         let v = match name {
-            "serial_ports" => Value::str_rc(&serial::ports()),
+            "serial_ports" => Value::str_rc(serial::ports()),
             "serial_open" => {
                 let p = serial::open(bi_str(a, 0, "SERIAL_OPEN")?, bi_int(a, 1, "SERIAL_OPEN")?)?;
                 self.serial_ports.push(Some(p));
@@ -4627,8 +4710,8 @@ impl<'p> Vm<'p> {
             "serial_close" => { let i = bi_int(a, 0, "SERIAL_CLOSE")? as usize; if let Some(s) = self.serial_ports.get_mut(i) { *s = None; } Value::Nil }
             "serial_is_open" => { let i = bi_int(a, 0, "SERIAL_IS_OPEN")?; Value::Bool(self.serial_ports.get(i as usize).map(|o| o.is_some()).unwrap_or(false)) }
             "serial_write" => { let i = bi_int(a, 0, "SERIAL_WRITE")?; let s = bi_str(a, 1, "SERIAL_WRITE")?.to_string(); Value::Int(serial::write(self.ser_port(i)?, &s)?) }
-            "serial_read" => { let i = bi_int(a, 0, "SERIAL_READ")?; let n = bi_int(a, 1, "SERIAL_READ")?; Value::str_rc(&serial::read(self.ser_port(i)?, n)?) }
-            "serial_readline" => { let i = bi_int(a, 0, "SERIAL_READLINE")?; Value::str_rc(&serial::readline(self.ser_port(i)?)?) }
+            "serial_read" => { let i = bi_int(a, 0, "SERIAL_READ")?; let n = bi_int(a, 1, "SERIAL_READ")?; Value::str_rc(serial::read(self.ser_port(i)?, n)?) }
+            "serial_readline" => { let i = bi_int(a, 0, "SERIAL_READLINE")?; Value::str_rc(serial::readline(self.ser_port(i)?)?) }
             "serial_available" => { let i = bi_int(a, 0, "SERIAL_AVAILABLE")?; Value::Int(serial::available(self.ser_port(i)?)?) }
             "serial_flush" => { let i = bi_int(a, 0, "SERIAL_FLUSH")?; serial::flush(self.ser_port(i)?); Value::Nil }
             "serial_timeout" => { let i = bi_int(a, 0, "SERIAL_TIMEOUT")?; let s = bi_num(a, 1, "SERIAL_TIMEOUT")?; serial::set_timeout(self.ser_port(i)?, s); Value::Nil }
@@ -4657,7 +4740,7 @@ impl<'p> Vm<'p> {
         let v = match name {
             // Dieselbe Port-Liste wie SERIAL_PORTS() (serialport::available_ports) --
             // eigener Name, damit ein firmata-only-Script nicht extra IMPORT "serial" braucht.
-            "firmata_ports" => Value::str_rc(&crate::serial::ports()),
+            "firmata_ports" => Value::str_rc(crate::serial::ports()),
             "firmata_open" => {
                 let b = firmata::open(bi_str(a, 0, "FIRMATA_OPEN")?, bi_int(a, 1, "FIRMATA_OPEN")?)?;
                 self.firmata_boards.push(Some(b));
@@ -4709,15 +4792,15 @@ impl<'p> Vm<'p> {
     fn try_usb_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::usb;
         let v = match name {
-            "usb_list" => Value::str_rc(&usb::list()?),
+            "usb_list" => Value::str_rc(usb::list()?),
             "usb_open" => { let d = usb::open(bi_int(a, 0, "USB_OPEN")?, bi_int(a, 1, "USB_OPEN")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_open_path" => { let d = usb::open_path(bi_str(a, 0, "USB_OPEN_PATH")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
             "usb_close" => { let i = bi_int(a, 0, "USB_CLOSE")? as usize; if let Some(s) = self.usb_devs.get_mut(i) { *s = None; } Value::Nil }
             "usb_write" => { let i = bi_int(a, 0, "USB_WRITE")?; let s = bi_str(a, 1, "USB_WRITE")?.to_string(); Value::Int(usb::write(self.usb_dev(i)?, &s)?) }
-            "usb_read" => { let i = bi_int(a, 0, "USB_READ")?; let n = bi_int(a, 1, "USB_READ")?; let t = bi_int(a, 2, "USB_READ")?; Value::str_rc(&usb::read(self.usb_dev(i)?, n, t)?) }
-            "usb_product" => Value::str_rc(&usb::product(self.usb_dev(bi_int(a, 0, "USB_PRODUCT")?)?)),
-            "usb_manufacturer" => Value::str_rc(&usb::manufacturer(self.usb_dev(bi_int(a, 0, "USB_MANUFACTURER")?)?)),
-            "usb_serial" => Value::str_rc(&usb::serial(self.usb_dev(bi_int(a, 0, "USB_SERIAL")?)?)),
+            "usb_read" => { let i = bi_int(a, 0, "USB_READ")?; let n = bi_int(a, 1, "USB_READ")?; let t = bi_int(a, 2, "USB_READ")?; Value::str_rc(usb::read(self.usb_dev(i)?, n, t)?) }
+            "usb_product" => Value::str_rc(usb::product(self.usb_dev(bi_int(a, 0, "USB_PRODUCT")?)?)),
+            "usb_manufacturer" => Value::str_rc(usb::manufacturer(self.usb_dev(bi_int(a, 0, "USB_MANUFACTURER")?)?)),
+            "usb_serial" => Value::str_rc(usb::serial(self.usb_dev(bi_int(a, 0, "USB_SERIAL")?)?)),
             _ => return Ok(None),
         };
         Ok(Some(v))
@@ -4739,12 +4822,12 @@ impl<'p> Vm<'p> {
         use crate::wifi;
         let v = match name {
             "wifi_available" => Value::Bool(wifi::available()),
-            "wifi_current" => Value::str_rc(&wifi::current()?),
+            "wifi_current" => Value::str_rc(wifi::current()?),
             "wifi_signal" => Value::Int(wifi::signal()?),
-            "wifi_scan" => Value::str_rc(&wifi::scan()?),
+            "wifi_scan" => Value::str_rc(wifi::scan()?),
             "wifi_connect" => Value::Bool(wifi::connect(bi_str(a, 0, "WIFI_CONNECT")?, bi_str(a, 1, "WIFI_CONNECT")?)?),
             "wifi_disconnect" => Value::Bool(wifi::disconnect()?),
-            "wifi_profiles" => Value::str_rc(&wifi::profiles()?),
+            "wifi_profiles" => Value::str_rc(wifi::profiles()?),
             "wifi_delete_profile" => Value::Bool(wifi::delete_profile(bi_str(a, 0, "WIFI_DELETE_PROFILE")?)?),
             _ => return Ok(None),
         };
@@ -4769,13 +4852,13 @@ impl<'p> Vm<'p> {
     fn try_bt_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::bt;
         let v = match name {
-            "bt_scan" => Value::str_rc(&bt::scan(bi_num(a, 0, "BT_SCAN")?)?),
+            "bt_scan" => Value::str_rc(bt::scan(bi_num(a, 0, "BT_SCAN")?)?),
             "bt_connect" => { let p = bt::connect(bi_str(a, 0, "BT_CONNECT")?)?; self.bt_periphs.push(Some(p)); Value::Int((self.bt_periphs.len() - 1) as i64) }
             "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; bt::disconnect(self.bt_periph(i)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }
             "bt_is_connected" => { let i = bi_int(a, 0, "BT_IS_CONNECTED")?; Value::Bool(match self.bt_periphs.get(i as usize).and_then(|o| o.as_ref()) { Some(p) => bt::is_connected(p), None => false }) }
-            "bt_services" => { let i = bi_int(a, 0, "BT_SERVICES")?; Value::str_rc(&bt::services(self.bt_periph(i)?)?) }
-            "bt_characteristics" => { let i = bi_int(a, 0, "BT_CHARACTERISTICS")?; let s = bi_str(a, 1, "BT_CHARACTERISTICS")?.to_string(); Value::str_rc(&bt::characteristics(self.bt_periph(i)?, &s)?) }
-            "bt_read" => { let i = bi_int(a, 0, "BT_READ")?; let c = bi_str(a, 1, "BT_READ")?.to_string(); Value::str_rc(&bt::read(self.bt_periph(i)?, &c)?) }
+            "bt_services" => { let i = bi_int(a, 0, "BT_SERVICES")?; Value::str_rc(bt::services(self.bt_periph(i)?)?) }
+            "bt_characteristics" => { let i = bi_int(a, 0, "BT_CHARACTERISTICS")?; let s = bi_str(a, 1, "BT_CHARACTERISTICS")?.to_string(); Value::str_rc(bt::characteristics(self.bt_periph(i)?, &s)?) }
+            "bt_read" => { let i = bi_int(a, 0, "BT_READ")?; let c = bi_str(a, 1, "BT_READ")?.to_string(); Value::str_rc(bt::read(self.bt_periph(i)?, &c)?) }
             "bt_write" => { let i = bi_int(a, 0, "BT_WRITE")?; let c = bi_str(a, 1, "BT_WRITE")?.to_string(); let d = bi_str(a, 2, "BT_WRITE")?.to_string(); bt::write(self.bt_periph(i)?, &c, &d)?; Value::Nil }
             _ => return Ok(None),
         };
@@ -4828,12 +4911,12 @@ impl<'p> Vm<'p> {
             // weil "lesbar" sich als beides lesen laesst -- ich habe die
             // zwei beim Schreiben der ersten Pruefung selbst verwechselt.
             "zeit_text$" | "zeit_text" =>
-                Value::str_rc(&zeit::format(z_int(a, 0, "ZEIT_TEXT$")?, "")),
+                Value::str_rc(zeit::format(z_int(a, 0, "ZEIT_TEXT$")?, "")),
             "zeit_lesbar" => Value::Bool(zeit::parse(z_str(a, 0, "ZEIT_LESBAR")?).is_some()),
             "zeit_format$" | "zeit_format" => {
                 let t = z_int(a, 0, "ZEIT_FORMAT$")?;
                 let muster = if a.len() > 1 { z_str(a, 1, "ZEIT_FORMAT$")? } else { "" };
-                Value::str_rc(&zeit::format(t, muster))
+                Value::str_rc(zeit::format(t, muster))
             }
             "zeit_teil" => {
                 let t = z_int(a, 0, "ZEIT_TEIL")?;
@@ -4856,7 +4939,7 @@ impl<'p> Vm<'p> {
                 z_int(a, 0, "ZEIT_PLUS")?.saturating_add(z_int(a, 1, "ZEIT_PLUS")?)),
             "zeit_diff" => Value::Int(
                 z_int(a, 0, "ZEIT_DIFF")?.saturating_sub(z_int(a, 1, "ZEIT_DIFF")?)),
-            "zeit_dauer$" | "zeit_dauer" => Value::str_rc(&zeit::dauer(z_int(a, 0, "ZEIT_DAUER$")?)),
+            "zeit_dauer$" | "zeit_dauer" => Value::str_rc(zeit::dauer(z_int(a, 0, "ZEIT_DAUER$")?)),
             "zeit_wochentag" => Value::Int(zeit::wochentag(z_int(a, 0, "ZEIT_WOCHENTAG")?)),
             _ => return Ok(None),
         };
@@ -4966,7 +5049,7 @@ impl<'p> Vm<'p> {
                     use std::io::Write;
                     let se = std::io::stderr();
                     let _ = se.lock().write_all(&out.stderr);
-                    Value::str_rc(&String::from_utf8_lossy(&out.stdout))
+                    Value::str_rc(String::from_utf8_lossy(&out.stdout).into_owned())
                 }
             }
             _ => return Ok(None),
@@ -5088,7 +5171,7 @@ impl<'p> Vm<'p> {
             "code_format$" | "code_format" => {
                 let text = bi_str(a, 0, "CODE_FORMAT$")?;
                 let einruecken = if a.len() > 1 { a[1].truthy() } else { true };
-                Value::str_rc(&crate::formatiere(text, einruecken, "    ").unwrap_or_default())
+                Value::str_rc(crate::formatiere(text, einruecken, "    ").unwrap_or_default())
             }
             // CODE_RENAME$: ein Symbol im ganzen Text umbenennen. Liefert den
             // neuen Quelltext, oder LEER, wenn an der Stelle kein Name steht
@@ -5099,7 +5182,7 @@ impl<'p> Vm<'p> {
                 let z = bi_int(a, 1, "CODE_RENAME$")?.max(1) as usize - 1;
                 let s = bi_int(a, 2, "CODE_RENAME$")?.max(1) as usize - 1;
                 let neu = bi_str(a, 3, "CODE_RENAME$")?;
-                Value::str_rc(&crate::lsp::umbenennen(text, z, s, neu).unwrap_or_default())
+                Value::str_rc(crate::lsp::umbenennen(text, z, s, neu).unwrap_or_default())
             }
             "code_symbols$" | "code_symbols" => {
                 fn um(v: &serde_json::Value) -> serde_json::Value {
@@ -5125,7 +5208,7 @@ impl<'p> Vm<'p> {
                 for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
-            "printer_default$" | "printer_default" => Value::str_rc(&crate::drucken::standard_drucker()?),
+            "printer_default$" | "printer_default" => Value::str_rc(crate::drucken::standard_drucker()?),
             // ===== Fenster als Prozess (docs/entwurf-native-fenster.md, Weg B) =====
             // Ein zweites OS-Fenster ist ein zweiter dhrt mit eigenem SCREEN;
             // die Seiten reden ueber Textzeilen. Kein geteilter Zustand --
@@ -6010,7 +6093,7 @@ impl<'p> Vm<'p> {
                                     crate::db::DbVal::Int(n) => Value::Int(*n),
                                     crate::db::DbVal::Real(f) => Value::Float(*f),
                                     crate::db::DbVal::Text(t) => Value::str_rc(t),
-                                    crate::db::DbVal::Blob(b) => Value::str_rc(&String::from_utf8_lossy(b)),
+                                    crate::db::DbVal::Blob(b) => Value::str_rc(String::from_utf8_lossy(b).into_owned()),
                                 })).collect();
                                 self.gui.form_set(win, &form, &werte)?;
                                 Value::Bool(true)
@@ -7795,19 +7878,19 @@ impl<'p> Vm<'p> {
             "file_open_dialog" => {
                 let title = if !a.is_empty() { gs(a, 0, "FILE_OPEN_DIALOG")?.to_string() } else { String::new() };
                 let exts = if a.len() >= 2 { crate::filedialog::parse_exts(gs(a, 1, "FILE_OPEN_DIALOG")?) } else { vec![] };
-                Value::str_rc(&crate::filedialog::open(&title, &exts))
+                Value::str_rc(crate::filedialog::open(&title, &exts))
             }
             #[cfg(feature = "dialogs")]
             "file_save_dialog" => {
                 let title = if !a.is_empty() { gs(a, 0, "FILE_SAVE_DIALOG")?.to_string() } else { String::new() };
                 let default_name = if a.len() >= 2 { gs(a, 1, "FILE_SAVE_DIALOG")?.to_string() } else { String::new() };
                 let exts = if a.len() >= 3 { crate::filedialog::parse_exts(gs(a, 2, "FILE_SAVE_DIALOG")?) } else { vec![] };
-                Value::str_rc(&crate::filedialog::save(&title, &default_name, &exts))
+                Value::str_rc(crate::filedialog::save(&title, &default_name, &exts))
             }
             #[cfg(feature = "dialogs")]
             "folder_dialog" => {
                 let title = if !a.is_empty() { gs(a, 0, "FOLDER_DIALOG")?.to_string() } else { String::new() };
-                Value::str_rc(&crate::filedialog::folder(&title))
+                Value::str_rc(crate::filedialog::folder(&title))
             }
             #[cfg(feature = "dialogs")]
             "gui_message" => {
@@ -9910,7 +9993,7 @@ fn arg_value(a: &Arg) -> Value {
     match a {
         Arg::None => Value::Nil,
         Arg::Int(i) => Value::Int(*i),
-        Arg::Str(s) => Value::Str(Rc::from(s.as_ref())),
+        Arg::Str(s) => Value::Str(Rc::new(String::from(s.as_ref()))),
         Arg::Val(v) => v.clone(),
         Arg::List(_) | Arg::Ints(_) | Arg::Call(..) => Value::Nil,
     }
@@ -10099,6 +10182,29 @@ fn infer_type(v: &Value) -> &'static str {
         Value::Str(_) => "string",
         _ => "any",
     }
+}
+
+/// `a + b` fuer zwei Zahlen; `None` fuer alles andere. Getrennt von
+/// `Vm::addieren`, damit ADD_STORE_* den haeufigsten Fall (`z = z + i`) ohne
+/// Umweg ueber den Platz der Zeichenkette erledigt.
+#[inline(always)]
+fn zahlen_addieren(a: &Value, b: &Value) -> Option<R<Value>> {
+    Some(match (a, b) {
+        (Value::Int(x), Value::Int(y)) =>
+            x.checked_add(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("+")),
+        (Value::Float(x), Value::Float(y)) => Ok(Value::Float(x + y)),
+        (Value::Int(x), Value::Float(y)) => Ok(Value::Float(*x as f64 + y)),
+        (Value::Float(x), Value::Int(y)) => Ok(Value::Float(x + *y as f64)),
+        _ => return None,
+    })
+}
+
+/// Ein rechter Summand, bei dem `Text + b` sicher nicht scheitert und keinen
+/// eigenen Code (OPERATOR einer Klasse) laufen laesst. Nur dann darf
+/// ADD_STORE_* den Platz vorher leeren -- ein Fehler danach liesse die
+/// Variable sonst leer zurueck, und ein TRY/CATCH saehe NIL statt des Texts.
+fn ist_schlicht(b: &Value) -> bool {
+    matches!(b, Value::Str(_) | Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::Nil)
 }
 
 fn require_number(a: &Value, b: &Value, op: &str) -> R<()> {

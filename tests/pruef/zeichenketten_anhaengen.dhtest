@@ -1,0 +1,181 @@
+' Anhaengen an Zeichenketten (2026-09-24): `x = x + e`, `x += e` und die
+' Kette `x = x + t1 + t2 ...` haengen an Ort und Stelle an (ADD_STORE_LOCAL /
+' ADD_STORE_GLOBAL_SLOT in vm.rs, Umformung der Kette in compiler.rs). Vorher
+' kopierte jedes Anhaengen den ganzen Text: 400 000 Mal dauerte 7 s.
+' Die Faelle pruefen vor allem, dass sich NICHTS an der Bedeutung aendert.
+' Format: docs/werkzeuge.md.
+
+=== global lokal und += liefern dasselbe wie vorher
+DIM s AS STRING
+s = "a"
+s = s + "b"
+s += "c"
+s = s + 1 + 2
+s = s + 0.5
+s = s + TRUE
+PRINT s
+SUB f()
+    DIM r AS STRING
+    r = "x"
+    r = r + "y" + STR$(7) + CHR$(33)
+    r += "-" + "z"
+    PRINT r
+END SUB
+f()
+--- erwartet
+abc120.5TRUE
+xy7!-z
+
+=== ein zweiter halter behaelt seinen text
+DIM s AS STRING
+DIM kopie AS STRING
+s = "abc"
+kopie = s
+s = s + "d"
+s = s + "e" + "f"
+PRINT s; " "; kopie
+DIM feld[2] AS STRING
+feld[0] = s
+s += "g"
+PRINT s; " "; feld[0]
+--- erwartet
+abcdef abc
+abcdefg abcdef
+
+=== der ausdruck darf die variable lesen
+DIM s AS STRING
+s = "ab"
+s = s + s
+s = s + LEFT$(s, 1) + s
+PRINT s
+--- erwartet
+ababaabab
+
+=== der ausdruck darf die variable aendern und die alte wird angehaengt
+' Wie vorher: x wird VOR e geladen. Aendert e die Variable, gilt der alte Text.
+DIM s AS STRING
+FUNCTION stoer$() AS STRING
+    s = "WEG"
+    RETURN "!"
+END FUNCTION
+s = "alt"
+s = s + stoer$()
+PRINT s
+s = "alt"
+s = s + stoer$() + "?"
+PRINT s
+--- erwartet
+alt!
+alt!?
+
+=== zahlen bleiben zahlen
+DIM z AS INTEGER
+DIM f AS FLOAT
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    z = z + i
+    f = f + i
+NEXT
+z += 5
+PRINT z; " "; f; " "; TYPEOF(f)
+--- erwartet
+60 55.0 FLOAT
+
+=== ueberlauf bleibt ein fehler
+DIM z AS INTEGER
+z = 9223372036854775807
+z = z + 1
+--- fehler
++
+
+=== const bleibt unveraenderlich
+CONST GRUSS = "Hallo"
+GRUSS = GRUSS + " Welt"
+--- fehler
+CONST
+
+=== operator einer klasse sieht den ganzen text
+CLASS Marke
+    DIM n AS INTEGER
+    OPERATOR + (other AS STRING) AS STRING
+        RETURN other + "<" + STR$(Self.n) + ">"
+    END OPERATOR
+END CLASS
+DIM m AS Marke
+m = NEW Marke()
+m.n = 3
+DIM s AS STRING
+s = "a"
+s = s + m
+PRINT s
+--- erwartet
+a<3>
+
+=== scheitert der operator bleibt der alte text stehen
+CLASS Boese
+    OPERATOR + (other AS STRING) AS STRING
+        THROW "nein"
+    END OPERATOR
+END CLASS
+DIM b AS Boese
+b = NEW Boese()
+DIM s AS STRING
+s = "bleibt"
+TRY
+    s = s + b
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT s
+--- erwartet
+gefangen: nein
+bleibt
+
+=== feld und mitglied haengen richtig an
+CLASS Protokoll
+    DIM text AS STRING
+    SUB schreib(z AS STRING)
+        Self.text = Self.text + z + ";"
+    END SUB
+END CLASS
+DIM p AS Protokoll
+p = NEW Protokoll()
+p.schreib("a")
+p.schreib("b")
+DIM feld[1] AS STRING
+feld[0] = "x"
+feld[0] = feld[0] + "y"
+PRINT p.text; " "; feld[0]
+--- erwartet
+a;b; xy
+
+=== 400000 mal anhaengen ist linear
+' Vorher 7 s auf dem Entwicklungsrechner, jetzt ~20 ms. Die Grenze laesst
+' langsamen CI-Rechnern viel Luft und faellt beim quadratischen Weg trotzdem.
+DIM s AS STRING
+DIM i AS INTEGER
+DIM t AS INTEGER : t = MILLIS()
+FOR i = 1 TO 400000
+    s = s + "x"
+NEXT
+PRINT LEN(s)
+PRINT MILLIS() - t < 2000
+--- erwartet
+400000
+TRUE
+
+=== eine kette in einer sub ist linear
+SUB bau()
+    DIM r AS STRING
+    DIM k AS INTEGER
+    DIM t AS INTEGER : t = MILLIS()
+    FOR k = 1 TO 200000
+        r = r + STR$(k MOD 10) + ","
+    NEXT
+    PRINT LEN(r)
+    PRINT MILLIS() - t < 2000
+END SUB
+bau()
+--- erwartet
+400000
+TRUE

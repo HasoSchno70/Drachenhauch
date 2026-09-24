@@ -93,6 +93,8 @@ pub mod op {
     pub const BUILD_ARRAY: u16 = 117;   // Array-Literal [a, b, c]
     pub const FIN_END: u16 = 118;       // FINALLY: gestapelten Fehler weiterwerfen
     pub const CALL_SUPER: u16 = 119;    // SUPER.Methode(): Suche bei der Elternklasse beginnen
+    pub const ADD_STORE_LOCAL: u16 = 120;       // x = x + e: addieren und in den lokalen Platz schreiben
+    pub const ADD_STORE_GLOBAL_SLOT: u16 = 121; // dasselbe fuer einen globalen Platz
 
     // OOP / Member
     pub const NEW_INSTANCE: u16 = 80;
@@ -324,7 +326,7 @@ fn decode_value(j: &J) -> Value {
                 Value::Float(n.as_f64().expect("Zahl"))
             }
         }
-        J::String(s) => Value::Str(Rc::from(s.as_str())),
+        J::String(s) => Value::Str(Rc::new(s.clone())),
         J::Array(a) => Value::Tuple(Rc::new(a.iter().map(decode_value).collect())),
         J::Object(map) => {
             if let Some(v) = map.get("f") {

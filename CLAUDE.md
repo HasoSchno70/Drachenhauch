@@ -1282,6 +1282,26 @@ Details: docs/rust-runtime.md.
   sie nicht) — zusammen mit dem allgemeinen Typtest `x IS Typname`, siehe
   Abschnitt „Laufzeit-Typtest". `IS_NIL(x)` bleibt gleichwertig.
 
+## Zeichenketten anhaengen ist linear (2026-09-24)
+
+`Value::Str` ist `Rc<String>` (vorher `Rc<str>`, jedes Anhaengen kopierte:
+400 000 x `s = s + "x"` = 7 s, jetzt 16 ms). `x = x + e` / `x += e` auf einen
+lokalen/globalen Platz kompiliert zu `ADD_STORE_LOCAL`/`ADD_STORE_GLOBAL_SLOT`
+(Opcodes 120/121): `x` wird wie bisher VOR `e` geladen; haelt der Platz danach
+noch DENSELBEN Text (`Rc::ptr_eq`) und ist `e` schlicht (`ist_schlicht`:
+Text/Zahl/Bool/NIL), gibt er seinen Verweis ab und `Vm::addieren` haengt per
+`Rc::get_mut` an. **`ist_schlicht` ist die Sicherung:** ein `OPERATOR +`, der
+wirft, liesse sonst NIL in der Variable (Gegenprobe im Test). Ketten
+`x = x + t1 + t2` formt der Compiler zu `x + (t1 + t2)` um -- nur wenn `x` und
+`t1` sicher Text sind (`ist_text`: auch `$`-Builtins und FUNCTION `AS STRING`)
+und der Rest schlicht (`plus_kette`, `add_store_ziel`). `Value::str_rc` nimmt
+`impl Into<String>` -- ein fertiger `String` geht ohne Kopie hinein. **Falle:**
+die Typpruefung beim Speichern (`passend!`) MUSS ein Makro bleiben; als
+Funktion wurde sie nicht eingebettet und `z = z + i` war 25 % langsamer.
+Nicht erfasst: Felder und Feldelemente. Tests
+`tests/pruef/zeichenketten_anhaengen.dhtest`, Doku
+`docs/entwurf-anwendungen-und-tempo.md` (1a).
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
