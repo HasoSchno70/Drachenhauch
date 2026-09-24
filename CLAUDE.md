@@ -1318,6 +1318,21 @@ neue Nummer in `familie_rufen` UND `BUILTIN_FAMILIEN` anpassen. Eine Nummer
 je Befehl lohnt nicht: gemessen kostet Arm 494 des grossen `match` so viel wie
 Arm 10. Tests `tests/pruef/builtin_familien.dhtest`.
 
+## Globale Felder ueber Plaetze (2026-09-24)
+
+Bis dahin bekamen nur skalare Globals einen Platz; Felder, Maps und
+Strukturen im Hauptprogramm liefen ueber ihren NAMEN (`LOAD_NAME`: Name als
+String, Hash-Suche, Typ-Klon) -- ein Erbe der Python-Laufzeit, gemessen 2,2x
+langsamer als ein lokales Feld. Jetzt ist `is_slot_dim` immer wahr; angelegt
+wird weiter unter dem Namen, dann haengt `BIND_GLOBAL_SLOT` (Opcode 122,
+`Compiler::bind_global`) denselben `Rc<RefCell<Slot>>` in den Platz. **Nach
+JEDEM Anlegen neu**: `DECLARE_ARRAY_NAME` legt bei einem DIM in einer Schleife
+ein NEUES Feld an. Ein leerer Platz meldet sich mit dem Namen der Variable
+(`Program::global_names`, vom Compiler als `global_names` im .dhc,
+`Vm::global_ungesetzt`) -- der Name steht HINTER dem alten Text, weil
+`task.dhtest`/`dhrt_call.dhtest` ihn pruefen. Tests
+`tests/pruef/globale_felder.dhtest`.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

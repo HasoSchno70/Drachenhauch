@@ -141,6 +141,19 @@ ginge mit einer Laufzeit einfacher oder schneller. Nach Nutzen geordnet
 Empfehlung: **1** zuerst (größter gemessener Gewinn, trifft Einsteiger),
 dann **3** und **5**, dann **2**.
 
+**Punkt 1 erledigt (2026-09-24):** jede globale Variable bekommt einen Platz
+(`is_slot_dim` ist immer wahr). Felder, Maps und Strukturen werden weiter
+unter dem Namen angelegt (`DECLARE_ARRAY_NAME`/`DECLARE_NAME`/
+`DECLARE_STRUCT_NAME`), dann hängt der neue Befehl `BIND_GLOBAL_SLOT`
+denselben Eintrag in den Platz — bei jedem Durchlauf, weil ein `DIM` in einer
+Schleife ein neues Feld anlegt. Globales Feld: 162 → 79 ms je Million
+Zugriffe, so schnell wie ein lokales. Weil ein Zugriff vor dem `DIM` damit
+die Meldung des leeren Platzes traf (vorher klar „Variable 'feld' nicht
+deklariert“), trägt das Programm jetzt die Namen der Plätze
+(`Program::global_names`), und die Meldung nennt die Variable. Prüfstein
+`tests/pruef/globale_felder.dhtest`. Übrig von Punkt 1: `LOAD_NAME`/
+`STORE_NAME` gibt es noch für FOR-EACH- und CATCH-Variablen im Hauptprogramm.
+
 ## 2. Was einer Anwendung fehlt
 
 Das `gui`-Modul ist inzwischen breit (Tabellen/Gitter, Baum, Formulare mit

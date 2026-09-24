@@ -890,6 +890,23 @@ const GLOBAL_UNGESETZT: &str = concat!(
     "Parameter mit, was sie braucht.");
 
 impl<'p> Vm<'p> {
+    /// Meldung fuer einen globalen Platz, der gelesen wird, bevor er gesetzt
+    /// ist -- mit dem NAMEN der Variable. Seit auch Felder, Maps und
+    /// Strukturen einen Platz haben, traefe sie sonst jedes Programm, dessen
+    /// SUB ein Feld liest, bevor dessen DIM gelaufen ist; vorher hiess es dort
+    /// klar "Variable 'feld' nicht deklariert".
+    fn global_ungesetzt(&self, idx: usize) -> String {
+        match self.prog.global_names.get(idx).filter(|n| !n.is_empty()) {
+            // Der Name HINTER dem alten Text: Aufrufer setzen ihr eigenes
+            // Praefix davor ("TASK: ..."), und task.dhtest prueft genau diese
+            // Folge.
+            Some(n) => format!(
+                "{} Im gewoehnlichen Lauf heisst das: das DIM von '{}' ist noch nicht gelaufen -- steht es weiter unten im Programm als die Stelle, die es benutzt?",
+                GLOBAL_UNGESETZT, n),
+            None => GLOBAL_UNGESETZT.to_string(),
+        }
+    }
+
     /// Maus fuer ui-Widgets: liefert Off-Screen-Koordinaten, wenn die aktuelle
     /// Fenster-Ebene keinen Input besitzt (von einem anderen Fenster ueberdeckt).
     /// Liefert (mx, my, down). Spiegelt ui._mouse + g.mouse_button(0).
@@ -2265,14 +2282,14 @@ impl<'p> Vm<'p> {
                             // Generisch: ADD + Store-Coerce + Vergleich -- wie
                             // die ehemalige Opcode-Folge.
                             let cur = if var_global {
-                                let s = self.global_slots[var_idx].as_ref().ok_or(GLOBAL_UNGESETZT)?;
+                                let s = match self.global_slots[var_idx].as_ref() { Some(s) => s, None => return Err(self.global_ungesetzt(var_idx)) };
                                 s.borrow().value.clone()
                             } else { locals[var_idx].clone() };
                             let stepv = if step_is_slot { locals[step_idx].clone() } else { constants[step_idx].clone() };
                             require_number(&cur, &stepv, "+")?;
                             let next = nn_add(cur, stepv)?;
                             if var_global {
-                                let slot = self.global_slots[var_idx].as_ref().ok_or("Slot leer")?.clone();
+                                let slot = match self.global_slots[var_idx].clone() { Some(s) => s, None => return Err(self.global_ungesetzt(var_idx)) };
                                 if slot.borrow().is_const { return Err("CONST kann nicht ueberschrieben werden".into()); }
                                 let ty = slot.borrow().ty.clone();
                                 let cv = coerce(next.clone(), &ty, "Zuweisung an global")?;
@@ -2290,13 +2307,13 @@ impl<'p> Vm<'p> {
 
                 // --- Slot-Globals ---
                 op::LOAD_GLOBAL_SLOT => {
-                    let s = self.global_slots[arg.as_usize()].as_ref().ok_or(GLOBAL_UNGESETZT)?;
+                    let s = match self.global_slots[arg.as_usize()].as_ref() { Some(s) => s, None => return Err(self.global_ungesetzt(arg.as_usize())) };
                     stack.push(s.borrow().value.clone());
                 }
                 op::STORE_GLOBAL_SLOT => {
                     let idx = arg.as_usize();
                     let v = vm_pop(stack)?;
-                    let slot = self.global_slots[idx].as_ref().ok_or("Slot leer")?.clone();
+                    let slot = match self.global_slots[idx].clone() { Some(s) => s, None => return Err(self.global_ungesetzt(idx)) };
                     let mut sb = slot.borrow_mut();
                     if sb.is_const {
                         return Err("CONST kann nicht ueberschrieben werden".into());
@@ -2444,7 +2461,7 @@ impl<'p> Vm<'p> {
                     let v = match zahlen_addieren(&a, &b) {
                         Some(r) => r?,
                         None => {
-                            let slot = self.global_slots[idx].as_ref().ok_or("Slot leer")?.clone();
+                            let slot = match self.global_slots[idx].clone() { Some(s) => s, None => return Err(self.global_ungesetzt(idx)) };
                             {
                                 let mut sb = slot.borrow_mut();
                                 if let (Value::Str(ra), Value::Str(rs)) = (&a, &sb.value) {
@@ -2458,7 +2475,8 @@ impl<'p> Vm<'p> {
                             self.addieren(a, b)?
                         }
                     };
-                    let mut sb = self.global_slots[idx].as_ref().ok_or("Slot leer")?.borrow_mut();
+                    let slot_ref = match self.global_slots[idx].as_ref() { Some(s) => s, None => return Err(self.global_ungesetzt(idx)) };
+                    let mut sb = slot_ref.borrow_mut();
                     if sb.is_const {
                         return Err("CONST kann nicht ueberschrieben werden".into());
                     }
@@ -2935,6 +2953,19 @@ impl<'p> Vm<'p> {
                     if !self.globals.contains_key(&name) {
                         let inst = self.allocate_instance(class_name);
                         self.globals.insert(name, Rc::new(RefCell::new(Slot { ty: class_name.to_string(), value: inst, is_const: false })));
+                    }
+                }
+                op::BIND_GLOBAL_SLOT => {
+                    // Den eben unter dem Namen angelegten Eintrag (Feld, Map,
+                    // Struktur) auch in seinen Platz haengen -- dasselbe Rc,
+                    // also sehen Namens- und Platz-Zugriffe denselben Wert.
+                    // Nach jedem Anlegen neu: ein DIM in einer Schleife legt
+                    // unter dem Namen ein NEUES Feld an.
+                    let l = arg.list();
+                    let idx = l[0].as_usize();
+                    let name = constants[l[1].as_usize()].fmt();
+                    if let Some(s) = self.globals.get(&name) {
+                        self.global_slots[idx] = Some(s.clone());
                     }
                 }
                 op::DECLARE_STRUCT_LOCAL => {
