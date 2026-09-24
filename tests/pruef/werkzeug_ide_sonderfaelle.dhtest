@@ -12,6 +12,7 @@
 ' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
 --- seriell
 
+--- langsam
 === sitzung und zuletzt geoeffnet ueberleben den neustart
 ' Der erste Lauf merkt sich die Datei (zuletzt + Sitzung) in der ide.json;
 ' der zweite Lauf mit einer Datei, die es nicht gibt, stellt sie wieder her.

@@ -1131,9 +1131,16 @@ Gebraucht werden Rust (`cargo`) und ein beliebiges Python 3 für das Bauskript
 (nur Standardbibliothek, kein venv):
 ```
 python rust\build_runtime.py            # dhrt bauen (--hardware: serial/usb/bt/wifi/midi)
-rust\drachenhauch_runtime\target\release\dhrt test tests\pruef    # alle Pruefsammlungen (~13 min)
+rust\drachenhauch_runtime\target\release\dhrt test tests\pruef    # alle Pruefsammlungen (~50 min)
+rust\drachenhauch_runtime\target\release\dhrt test tests\pruef --schnell   # ohne `--- langsam` (~12 min)
 rust\drachenhauch_runtime\target\release\dhrt test tests\pruef\json.dhtest --filter Text
 ```
+**`--schnell` (2026-09-24)** laesst die 32 Sammlungen mit `--- langsam` im
+Kopf aus (Werkzeuge, IDE, echte Fenster -- gemessen 2342 s der ~2980 s) und
+nennt sie in der Bilanz. Fuer die Arbeit an der Laufzeit reicht das; wer an
+einem Werkzeug oder der IDE aendert, laeuft dessen Sammlung einzeln, die CI
+laeuft immer alles. Eine neue Sammlung, die Minuten braucht, bekommt die
+Zeile ebenfalls.
 `dhrt test` laeuft die Faelle einer Datei parallel (bis 8 Faeden), Dateien mit
 `--- seriell` nacheinander; ohne Fenster oder Ton ueberspringt sich, was sie
 braucht. Die CI fuehrt dasselbe auf Windows (mit Grafik), Linux und macOS

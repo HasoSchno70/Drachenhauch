@@ -11,6 +11,7 @@
 ' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
 --- seriell
 
+--- langsam
 === am anfang gibt es nichts zurueckzunehmen
 ' Der Anfangsstand ist Schritt 0 -- aber eben nur einer.
 SET_WINDOW_POS(-3000, -3000)

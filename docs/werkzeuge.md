@@ -260,7 +260,11 @@ Fall läuft als eigener Prozess in einem eigenen Verzeichnis**, die Fälle
 einer Datei parallel — außer die Datei trägt vor dem ersten Fall die Zeile
 `--- seriell`, dann laufen sie nacheinander (für Fälle, die sich die
 Zwischenablage, einen festen Port oder die Soundkarte teilen); `dhrt test datei.dhtest --filter Text` lässt nur die
-Fälle laufen, deren Name den Text enthält. Ein Fall, der an einer Maschine
+Fälle laufen, deren Name den Text enthält. Eine Datei mit der Zeile
+`--- langsam` vor dem ersten Fall lässt `dhrt test --schnell` aus (die
+Werkzeuge, die IDE und alles, was echte Fenster in Echtzeit bedient) — die
+Bilanz nennt jede ausgelassene Datei mit `langsam <name>`, damit niemand
+einen schnellen Lauf für einen vollen hält. Die CI läuft immer alles. Ein Fall, der an einer Maschine
 ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
 falsch (erkannt an der Meldung „Kein Fenster moeglich“, die `dhrt` dann
 statt eines Absturzes ausgibt; `DHRT_KEIN_FENSTER=1` täuscht genau diesen

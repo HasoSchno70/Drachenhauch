@@ -12,6 +12,7 @@
 ' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
 --- seriell
 
+--- langsam
 === erster start legt die datenbank mit beispieldaten an
 ' Drei Kunden, vier Artikel, zwei Rechnungen, Waehrung EUR -- gelesen mit dem
 ' db-Modul (bis Stufe 41 Pythons sqlite3). Ein zweiter Start legt nichts doppelt an.

@@ -13,6 +13,7 @@
 ' In der Aufnahme: 2 Taste runter, 1 hoch.
 --- seriell
 
+--- langsam
 === ide uebersetzt ohne befund
 DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", GETENV$("IDE_QUELLE"))
 DIM bis AS INTEGER : bis = MILLIS() + 120000

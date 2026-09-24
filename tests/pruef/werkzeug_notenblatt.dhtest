@@ -13,6 +13,7 @@
 ' 64-Zeilen-Grenze (gekuerzt), NOTE_OFF (-1), zwei Spuren.
 --- seriell
 
+--- langsam
 === klick setzt eine viertelnote auf die mittellinie
 ' Mittellinie im Violinschluessel = H4 (MIDI 71); Beat 2, Viertel (Vorgabe).
 AUTOMATION_PLAY("ev.txt")

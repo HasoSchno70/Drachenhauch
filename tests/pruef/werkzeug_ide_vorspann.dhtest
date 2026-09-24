@@ -9,6 +9,7 @@
 ' seiner eigenen Demo ab). In der Aufnahme: 6 Taste runter, 5 hoch.
 --- seriell
 
+--- langsam
 === der vorspann laeuft bis zum ende und dann kommt die ide
 EXIT(0)
 --- programm ../../ide/ide.dh nach protokoll("bereit")

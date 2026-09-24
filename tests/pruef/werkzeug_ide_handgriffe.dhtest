@@ -8,6 +8,7 @@
 ' Laufzeit -- hier geht es um die Einstellung.
 --- seriell
 
+--- langsam
 === klammern schliessen ist an und laesst sich abschalten
 PRINT "vorher " ; klammernAn
 befehl("klammern")

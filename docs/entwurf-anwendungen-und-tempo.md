@@ -250,3 +250,7 @@ schreiben will, trotzdem vermisst:
 Jeder Tempo-Punkt bekommt eine eigene Messung in `tests/pruef/` mit einer
 Obergrenze, die großzügig genug für die CI-Rechner ist, aber den
 quadratischen bzw. namensbasierten Weg sicher durchfallen lässt.
+
+**Wie es danach weitergeht** — getypte Zwischenstufe, getypte VM und
+Maschinencode über Cranelift — steht in
+[entwurf-maschinencode.md](entwurf-maschinencode.md).

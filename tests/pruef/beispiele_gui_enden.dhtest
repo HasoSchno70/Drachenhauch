@@ -11,6 +11,7 @@
 ' `dhrt run --bilder 20` (der Schalter kam fuer genau diesen Fall dazu: aus
 ' einem Programm heraus nimmt PROCESS_START dem Kind DHRT_FRAMES ab).
 
+--- langsam
 === jedes interaktive gui-beispiel endet von selbst
 DIM ordner AS STRING : ordner = ARG$(0)
 ' Wer ein neues Fenster-Programm baut, traegt es hier ein.

@@ -14,6 +14,7 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
 
+--- langsam
 === das bildlimit ist kein kreuz
 SCREEN(200, 100)
 PRINT QUITREQUESTED(); " "; WINDOW_CLOSE_REQUESTED()

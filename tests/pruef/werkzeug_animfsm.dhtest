@@ -10,6 +10,7 @@
 ' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
 --- seriell
 
+--- langsam
 === doppelklick legt einen zustand an
 ' Doppelklick auf freie Flaeche (700,500) -> (700-290-75, 500-20-25) aufs Raster.
 AUTOMATION_PLAY("ev.txt")

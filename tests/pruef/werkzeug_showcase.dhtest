@@ -3,6 +3,7 @@
 ' in Drachenhauch zeigt dieselbe Liste als Kacheln auf der Willkommensseite.
 --- seriell
 
+--- langsam
 === der erzeuger schreibt 480 punkte breit ohne alphakanal
 ' Ein Bau ohne Grafik kann keine Bilder: die Meldung ausgeben, dann heisst der
 ' Fall "uebersprungen" statt falsch.

@@ -8,6 +8,7 @@
 '
 ' Bis 2026-09-16 tests/test_dhrt_check.py.
 
+--- langsam
 === sauberer code meldet nichts, ein parse-fehler nennt die zeile
 IMPORT "helfer.dh"
 IMPORT "json"

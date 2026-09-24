@@ -4,6 +4,7 @@
 ' keine ZEICHEN in die Zeichenwarteschlange. Format: docs/werkzeuge.md.
 --- seriell
 
+--- langsam
 === ohne den schalter bleibt alles wie zuvor
 ' Die Gegenprobe zuerst: ein Textbereich ohne auto_einzug faengt die neue
 ' Zeile am linken Rand an.

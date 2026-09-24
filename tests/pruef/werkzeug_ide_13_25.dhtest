@@ -10,6 +10,7 @@
 ' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
 --- seriell
 
+--- langsam
 === das geruest setzt den abschluss gleich mit
 ' `IF x > 0 THEN` getippt und Enter -- das END IF steht da, die Marke dazwischen.
 AUTOMATION_PLAY("ev.txt")

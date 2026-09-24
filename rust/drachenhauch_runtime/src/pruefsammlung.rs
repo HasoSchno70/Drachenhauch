@@ -572,6 +572,9 @@ enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebun
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Sammlung {
     pub seriell: bool,
+    /// `--- langsam` im Kopf: die Sammlung braucht lange (Fenster in Echtzeit,
+    /// Durchlaeufe ueber das ganze Repo). `dhrt test --schnell` laesst sie aus.
+    pub langsam: bool,
     pub faelle: Vec<Fall>,
 }
 
@@ -584,6 +587,7 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
 pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
     let mut faelle: Vec<Fall> = Vec::new();
     let mut seriell = false;
+    let mut langsam = false;
     let mut abschnitt = Abschnitt::Quelle;
     let mut puffer: Vec<String> = Vec::new();
     let mut datei_name = String::new();
@@ -685,7 +689,8 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
         }
         if faelle.is_empty() {                       // Kopfkommentar vor dem ersten Fall
             if zeile.trim() == "--- seriell" { seriell = true; }
-            else if zeile.starts_with("--- ") { return Err(format!("Zeile {}: vor dem ersten Fall ist nur '--- seriell' erlaubt", nr + 1)); }
+            else if zeile.trim() == "--- langsam" { langsam = true; }
+            else if zeile.starts_with("--- ") { return Err(format!("Zeile {}: vor dem ersten Fall ist nur '--- seriell' oder '--- langsam' erlaubt", nr + 1)); }
             continue;
         }
         if let Some(rest) = zeile.strip_prefix("--- ") {
@@ -824,7 +829,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
             return Err(format!("Zeile {}: der Fall '{}' hat keinen Quelltext", f.zeile, f.name));
         }
     }
-    Ok(Sammlung { seriell, faelle })
+    Ok(Sammlung { seriell, langsam, faelle })
 }
 
 /// Leerzeilen am Ende zaehlen nicht, Windows-Umbrueche auch nicht -- in einer
@@ -1176,6 +1181,13 @@ mod tests {
         assert_eq!(s.faelle.len(), 1);
         assert!(!sammlung_parsen("=== a\nPRINT 1\n").unwrap().seriell);
         assert!(sammlung_parsen("--- erwartet\n1\n=== a\nPRINT 1\n").unwrap_err().contains("nur '--- seriell'"));
+    }
+
+    #[test]
+    fn langsam_steht_im_kopf() {
+        let s = sammlung_parsen("' Kopf\n--- langsam\n--- seriell\n=== a\nPRINT 1\n").unwrap();
+        assert!(s.langsam && s.seriell);
+        assert!(!sammlung_parsen("=== a\nPRINT 1\n").unwrap().langsam);
     }
 
     #[test]

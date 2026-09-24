@@ -13,6 +13,7 @@
 ' 2/1 Taste runter/hoch.
 --- seriell
 
+--- langsam
 === gb-code bringt karte und tileset mit
 ' Alle drei Dateien unter demselben Namen. Fehlt eine, zeigt der Code ins Leere --
 ' und das faellt erst beim Starten auf.
