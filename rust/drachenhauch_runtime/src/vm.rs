@@ -2195,6 +2195,90 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// Eine markierte Folge (`model::verschmelzen`) in einem Schritt: zwei
+    /// Zahlen holen, rechnen oder vergleichen, und je nach Art das Ergebnis
+    /// ablegen, speichern oder springen. `None`, sobald etwas nicht der
+    /// sichere Fall ist (kein Zahlenpaar, Ueberlauf, Division durch 0, ein
+    /// Typ, der beim Speichern umgewandelt werden muesste, ein leerer oder
+    /// konstanter Platz) -- dann laeuft die Folge Befehl fuer Befehl, mit
+    /// derselben Meldung wie immer. Bis dahin ist nichts veraendert.
+    /// Liefert die Stelle, an der es weitergeht.
+    #[inline]
+    fn verschmolzen(&mut self, fn_: &'p Func, art: u8, p: usize, locals: &mut [Value],
+                    stack: &mut Vec<Value>) -> Option<usize> {
+        #[derive(Clone, Copy)]
+        enum Z { I(i64), F(f64) }
+        let code = &fn_.code;
+        let hol = |vm: &Self, ins: &crate::model::Instr, locals: &[Value]| -> Option<Z> {
+            let z = |v: &Value| match v { Value::Int(i) => Some(Z::I(*i)), Value::Float(f) => Some(Z::F(*f)), _ => None };
+            match ins.op {
+                op::LOAD_LOCAL => z(&locals[ins.arg.as_usize()]),
+                op::LOAD_CONST => z(&fn_.constants[ins.arg.as_usize()]),
+                _ => vm.global_slots[ins.arg.as_usize()].as_ref().and_then(|s| z(&s.borrow().value)),
+            }
+        };
+        let a = hol(self, &code[p], locals)?;
+        let b = hol(self, &code[p + 1], locals)?;
+        let f = |z: Z| match z { Z::I(i) => i as f64, Z::F(x) => x };
+        let o = code[p + 2].op;
+        let r = match (o, a, b) {
+            (op::ADD, Z::I(x), Z::I(y)) => Value::Int(x.checked_add(y)?),
+            (op::SUB, Z::I(x), Z::I(y)) => Value::Int(x.checked_sub(y)?),
+            (op::MUL, Z::I(x), Z::I(y)) => Value::Int(x.checked_mul(y)?),
+            (op::ADD, ..) => Value::Float(f(a) + f(b)),
+            (op::SUB, ..) => Value::Float(f(a) - f(b)),
+            (op::MUL, ..) => Value::Float(f(a) * f(b)),
+            (op::DIV, ..) => { if f(b) == 0.0 { return None; } Value::Float(f(a) / f(b)) }
+            (op::LT, Z::I(x), Z::I(y)) => Value::Bool(x < y),
+            (op::GT, Z::I(x), Z::I(y)) => Value::Bool(x > y),
+            (op::LEQ, Z::I(x), Z::I(y)) => Value::Bool(x <= y),
+            (op::GEQ, Z::I(x), Z::I(y)) => Value::Bool(x >= y),
+            (op::EQ, Z::I(x), Z::I(y)) => Value::Bool(x == y),
+            (op::NEQ, Z::I(x), Z::I(y)) => Value::Bool(x != y),
+            // MOD und Vergleiche mit Kommazahlen: dieselben Funktionen wie
+            // der Einzelbefehl; ein Fehler heisst "Befehl fuer Befehl".
+            _ => {
+                let w = |z: Z| match z { Z::I(i) => Value::Int(i), Z::F(x) => Value::Float(x) };
+                let (va, vb) = (w(a), w(b));
+                match o {
+                    op::MOD => modulo(va, vb).ok()?,
+                    op::LT => Value::Bool(cmp(&va, &vb, '<').ok()?),
+                    op::GT => Value::Bool(cmp(&va, &vb, '>').ok()?),
+                    op::LEQ => Value::Bool(cmp(&va, &vb, 'l').ok()?),
+                    op::GEQ => Value::Bool(cmp(&va, &vb, 'g').ok()?),
+                    _ => return None,
+                }
+            }
+        };
+        let genau = |v: &Value, ty: &str| match v {
+            Value::Int(_) => ty == "integer",
+            Value::Float(_) => ty == "float",
+            Value::Bool(_) => ty == "boolean",
+            _ => false,
+        };
+        match art {
+            crate::model::VS_LOKAL => {
+                let slot = code[p + 3].arg.as_usize();
+                if !genau(&r, &fn_.local_types[slot]) { return None; }
+                locals[slot] = r;
+                Some(p + 4)
+            }
+            crate::model::VS_GLOBAL => {
+                let slot = self.global_slots[code[p + 3].arg.as_usize()].as_ref()?;
+                let mut sb = slot.borrow_mut();
+                if sb.is_const || !genau(&r, &sb.ty) { return None; }
+                sb.value = r;
+                Some(p + 4)
+            }
+            crate::model::VS_SPRUNG_FALSCH | crate::model::VS_SPRUNG_WAHR => {
+                let Value::Bool(w) = r else { return None };
+                let springen = w == (art == crate::model::VS_SPRUNG_WAHR);
+                Some(if springen { code[p + 3].arg.as_usize() } else { p + 4 })
+            }
+            _ => { stack.push(r); Some(p + 3) }
+        }
+    }
+
     fn dispatch(
         &mut self,
         fn_: &'p Func,
@@ -2214,6 +2298,15 @@ impl<'p> Vm<'p> {
 
         while *ip < n {
             let instr = &code[*ip];
+            // Superinstruktion (M2): die ganze Folge in einem Schritt, wenn es
+            // sicher geht; sonst Befehl fuer Befehl wie immer. Nicht, wenn
+            // jemand die Zeile je Befehl braucht (Profiler, Debugger, Stop).
+            if instr.schnell != 0 && !track_lines {
+                if let Some(weiter) = self.verschmolzen(fn_, instr.schnell, *ip, locals, stack) {
+                    *ip = weiter;
+                    continue;
+                }
+            }
             let arg = &instr.arg;
             if track_lines {
                 if let Some(ln) = fn_.lines.get(*ip) {

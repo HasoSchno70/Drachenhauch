@@ -1471,6 +1471,26 @@ geaendert wurden Erwartungen (`4` -> `4.0`), ein Pixel-Mittelpunkt in
 (`11_operatoren.js` samt `en.json`). Doku `docs/sprache.md`,
 `docs/stolpersteine.md` D1. Tests `tests/pruef/div_and_float_display.dhtest`.
 
+## Superinstruktionen (2026-09-24, M2 Schritt 1)
+
+`model::verschmelzen` markiert beim Laden (`Instr::schnell`, Arten `VS_*`)
+Folgen `a b OP [STORE_LOCAL | STORE_GLOBAL_SLOT | JUMP_IF_*]` mit a/b aus
+LOAD_LOCAL/LOAD_CONST/LOAD_GLOBAL_SLOT und OP aus + - * / MOD und den
+Vergleichen -- nur, wenn kein Sprungziel (JUMP*, FOR_NEXT-Rumpf, TRY_BEGIN)
+IN die Folge zeigt. Der Bytecode bleibt stehen; `Vm::verschmolzen` fuehrt die
+Folge vor dem grossen `match` in einem Schritt aus und gibt bei allem, was
+nicht der sichere Fall ist, `None` zurueck -- dann laeuft sie Befehl fuer
+Befehl mit denselben Meldungen. **Regel fuer Aenderungen:** der schnelle Weg
+darf nichts veraendern, bevor feststeht, dass er gelingt, und nie selbst einen
+Fehler erzeugen. Nicht unter Profiler/Debugger/Stop. `DHRT_OHNE_VERSCHMELZEN=1`
+schaltet ab (auch fuer A/B in derselben Exe), `dhrt --verschmolzen datei.dh`
+listet die Stellen. fib 0,86, Ganzzahl-Schleife 0,88. **Gemessen und
+verworfen:** Typangabe als Byte statt Text (kein Effekt) und eine eigene
+kleine Schleife fuer die haeufigsten Befehle (20 % langsamer bei gemischtem
+Code) -- Einzelheiten `docs/entwurf-maschinencode.md` M2. Tests
+`tests/pruef/verschmelzen.dhtest` (jeder Fall mit und ohne; Gegenprobe: ohne
+Typpruefung beim globalen Speichern faellt "umwandeln beim speichern").
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

@@ -325,6 +325,35 @@ fn main() -> ExitCode {
                 Err(code) => code,
             };
         }
+        // M2: welche Folgen beim Laden zu Superinstruktionen markiert werden
+        // (`model::verschmelzen`) -- je Funktion "Stelle Art". Uebersetzt nur.
+        if raw.len() >= 3 && raw[1] == "--verschmolzen" {
+            let src = match std::fs::read_to_string(&raw[2]) {
+                Ok(t) => t,
+                Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", raw[2], e); return ExitCode::from(1); }
+            };
+            let base = std::path::Path::new(&raw[2]).parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
+            let prog = match compile_source_programm(&src, &base, &raw[2]) { Ok(p) => p, Err(c) => return c };
+            let arten = ["", "wert", "lokal", "global", "sprung-falsch", "sprung-wahr"];
+            let mut fns: Vec<&model::Func> = vec![&prog.main];
+            fns.extend(prog.functions.iter());
+            let mut klassen: Vec<_> = prog.classes.values().collect();
+            klassen.sort_by(|a, b| a.name.cmp(&b.name));
+            for k in klassen {
+                let mut ms: Vec<_> = k.methods.values().collect();
+                ms.sort_by(|a, b| a.name.cmp(&b.name));
+                fns.extend(ms);
+            }
+            for f in fns {
+                for (i, ins) in f.code.iter().enumerate() {
+                    if ins.schnell != 0 {
+                        println!("{} {} {}", if f.name.is_empty() { "(haupt)" } else { &f.name }, i,
+                                 arten.get(ins.schnell as usize).copied().unwrap_or("?"));
+                    }
+                }
+            }
+            return ExitCode::SUCCESS;
+        }
         if raw.len() >= 3 && raw[1] == "--ast" {
             return ast_main(&raw[2]);
         }

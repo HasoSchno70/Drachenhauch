@@ -158,6 +158,42 @@ Builtins mit Zahlen zuerst in die Tabelle.
 Ziel: `fib(30)` unter 100 ms, Zahlenschleife unter 100 ms. Das kommt auch dem
 Web-Bau zugute, der keinen JIT bekommen kann.
 
+**Erster Schritt 2026-09-24 -- was gemessen wurde, bevor gebaut wurde:**
+
+| Messung | Ergebnis |
+|---|---|
+| leere Schleife (nur FOR_NEXT) | 3,2 ns je Durchlauf |
+| `s = i` (LOAD_LOCAL + STORE_LOCAL) | +9,5 ns |
+| `s = i + i` (noch ein LOAD + ADD) | +8 ns |
+| ein Aufruf `f(n)` ohne Rumpf | ~45 ns |
+| dieselbe Schleife mit lokalen statt globalen Variablen | nur 5 % schneller |
+
+Ein trivialer Befehl kostet also 4-5 ns. **Zwei Versuche brachten nichts und
+sind wieder draussen:** (1) die Typangabe je Variable als Byte statt als
+Zeichenkette vergleichen (A/B 0,99-1,09 -- der Textvergleich war nicht der
+Engpass); (2) eine kleine eigene Schleife fuer die 15 haeufigsten Befehle, in
+der Hoffnung, dass der Compiler dort Register frei hat (`dispatch` ist riesig).
+Die Befehle wurden darin kaum billiger (3,7 ns), und jedes Verlassen der
+Schleife fuer einen fremden Befehl kostete mehr, als sie sparte --
+`zahlen.dh` wurde 20 % LANGSAMER. Die Lehre: ein Befehl tut hier echte Arbeit
+(Wert klonen, Stapel, Typ pruefen, alten Wert freigeben); der Hebel ist die
+ANZAHL der Befehle, nicht die Schleife um sie.
+
+**Gebaut: Superinstruktionen.** `model::verschmelzen` markiert beim Laden
+Folgen aus zwei Operanden (LOAD_LOCAL/LOAD_CONST/LOAD_GLOBAL_SLOT), einem
+Rechen- oder Vergleichsbefehl und optional STORE_LOCAL, STORE_GLOBAL_SLOT
+oder JUMP_IF_FALSE/TRUE -- nur, wo kein Sprung in die Folge fuehrt. Der
+Bytecode bleibt dabei unveraendert stehen, Sprungziele und Zeilen stimmen
+also weiter. `Vm::verschmolzen` fuehrt eine markierte Folge in einem Schritt
+aus, aber nur den sicheren Fall; bei allem anderen (Ueberlauf, Division
+durch 0, Umwandlung beim Speichern, konstanter oder leerer Platz,
+Kommazahl-Gleichheit) laeuft sie Befehl fuer Befehl wie immer, mit derselben
+Meldung. `DHRT_OHNE_VERSCHMELZEN=1` schaltet es ab, `dhrt --verschmolzen
+datei.dh` listet die Stellen. Gemessen gegen den Stand davor: `aufrufe.dh`
+(fib) 0,86, `ganzzahl.dh` 0,88, die uebrigen gleich. Offen fuer die naechsten
+Schritte: der Aufruf selbst (~45 ns) und Folgen, deren zweiter Operand
+schon auf dem Stapel liegt (`i MOD 3 = 0` verschmilzt heute nur zur Haelfte).
+
 ### M3 — Cranelift für Zahlenfunktionen (4–6 Wochen, Weg B)
 
 Feature `jit` (standardmäßig aus). Übersetzt wird eine FUNCTION/SUB, wenn alle

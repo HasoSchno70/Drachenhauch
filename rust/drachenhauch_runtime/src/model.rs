@@ -192,6 +192,59 @@ pub struct Instr {
     /// Beide Zeiger gelten, solange das Programm lebt -- es wird nach dem
     /// Laden nicht mehr veraendert (wie `CoroState::fn_ptr`).
     pub methode: std::cell::Cell<(*const ClassInfo, *const Func)>,
+    /// Superinstruktion (M2): beginnt hier eine Folge, die `dispatch` in einem
+    /// Schritt ausfuehren kann? 0 = nein, sonst die Art (`VS_*`). Die Folge
+    /// selbst bleibt unveraendert stehen -- klappt der schnelle Weg nicht,
+    /// laeuft sie Befehl fuer Befehl wie immer. Gesetzt von `verschmelzen`.
+    pub schnell: u8,
+}
+
+/// Arten der Superinstruktionen (M2). Alle beginnen mit zwei Operanden
+/// (LOAD_LOCAL / LOAD_CONST / LOAD_GLOBAL_SLOT) und einem Rechen- oder
+/// Vergleichsbefehl; danach:
+pub const VS_WERT: u8 = 1;          // ... nichts: das Ergebnis liegt auf dem Stapel
+pub const VS_LOKAL: u8 = 2;         // ... STORE_LOCAL
+pub const VS_GLOBAL: u8 = 3;        // ... STORE_GLOBAL_SLOT
+pub const VS_SPRUNG_FALSCH: u8 = 4; // ... JUMP_IF_FALSE (nur Vergleiche)
+pub const VS_SPRUNG_WAHR: u8 = 5;   // ... JUMP_IF_TRUE (nur Vergleiche)
+
+/// Markiert Folgen `a b OP [ZIEL]` fuer `dispatch` (siehe `Instr::schnell`).
+///
+/// Nur wo kein Sprung IN die Folge fuehrt -- sonst liefe an dieser Stelle
+/// ein halber Rest. Sprungziele haben JUMP/JUMP_IF_*, FOR_NEXT (Rumpf) und
+/// TRY_BEGIN (CATCH); ein YIELD kommt in keiner Folge vor.
+fn verschmelzen(code: &mut [Instr]) {
+    let mut ziel = vec![false; code.len() + 1];
+    for ins in code.iter() {
+        let t = match ins.op {
+            op::JUMP | op::JUMP_IF_FALSE | op::JUMP_IF_TRUE | op::TRY_BEGIN => ins.arg.as_i64(),
+            // Beim Laden steht das Argument noch als Liste da; gepackt
+            // (`Arg::Ints`) wird es erst spaeter.
+            op::FOR_NEXT => match &ins.arg {
+                Arg::Ints(v) => v.get(6).copied().unwrap_or(-1),
+                Arg::List(l) => l.get(6).map(|a| a.as_i64()).unwrap_or(-1),
+                _ => -1,
+            },
+            _ => continue,
+        };
+        if t >= 0 && (t as usize) < ziel.len() { ziel[t as usize] = true; }
+    }
+    let operand = |o: u16| matches!(o, op::LOAD_LOCAL | op::LOAD_CONST | op::LOAD_GLOBAL_SLOT);
+    let vergleich = |o: u16| matches!(o, op::LT | op::GT | op::LEQ | op::GEQ | op::EQ | op::NEQ);
+    let rechnen = |o: u16| matches!(o, op::ADD | op::SUB | op::MUL | op::DIV | op::MOD);
+    for p in 0..code.len().saturating_sub(2) {
+        let (a, b, o) = (code[p].op, code[p + 1].op, code[p + 2].op);
+        if !operand(a) || !operand(b) || !(rechnen(o) || vergleich(o)) { continue; }
+        if ziel[p + 1] || ziel[p + 2] { continue; }
+        let danach = if ziel.get(p + 3).copied().unwrap_or(true) { None } else { code.get(p + 3).map(|i| i.op) };
+        code[p].schnell = match danach {
+            Some(op::STORE_LOCAL) => VS_LOKAL,
+            Some(op::STORE_GLOBAL_SLOT) => VS_GLOBAL,
+            Some(op::JUMP_IF_FALSE) if vergleich(o) => VS_SPRUNG_FALSCH,
+            Some(op::JUMP_IF_TRUE) if vergleich(o) => VS_SPRUNG_WAHR,
+            _ => VS_WERT,
+        };
+    }
 }
 
 pub struct Func {
@@ -511,12 +564,16 @@ pub(crate) fn func_bauen(r: FuncRoh) -> Func {
             }
         }
     }
-    let code = r.code.into_iter().map(|(op, arg)| Instr {
+    let mut code: Vec<Instr> = r.code.into_iter().map(|(op, arg)| Instr {
         op,
         arg,
         familie: std::cell::Cell::new(0),
         methode: std::cell::Cell::new((std::ptr::null(), std::ptr::null())),
+        schnell: 0,
     }).collect();
+    if std::env::var_os("DHRT_OHNE_VERSCHMELZEN").is_none() {
+        verschmelzen(&mut code);
+    }
     Func {
         name: r.name,
         n_params: r.n_params,
