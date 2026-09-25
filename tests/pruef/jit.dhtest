@@ -3103,8 +3103,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 ABCa1cABCa2cABCa3cABCa4c
 --- stderr
-jit: Schleife an Stelle 15 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: Objekt
-jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === befehle einer familie der vm in einer schleife
 IMPORT "zeit"
@@ -3302,6 +3301,416 @@ DHRT_JIT_BILANZ=1
 jit: Schleife an Stelle 16 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: eingebauter Befehl CORO_RESUME (ruft Drachenhauch-Code oder braucht die Zeile)
 jit: Schleife an Stelle 0 in gen bleibt in der VM: Befehl 115; mit Werten: Befehl 115
 jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== methode in einer schleife
+CLASS Zaehler
+    DIM n AS INTEGER
+    DIM schritt AS INTEGER
+    SUB weiter()
+        Self.n = Self.n + Self.schritt
+    END SUB
+    FUNCTION doppelt(x AS INTEGER) AS INTEGER
+        RETURN x * 2 + Self.n
+    END FUNCTION
+END CLASS
+DIM z AS Zaehler : z = NEW Zaehler()
+z.schritt = 3
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    z.weiter()
+    s = s + z.doppelt(i) MOD 1000
+NEXT
+PRINT z.n; " "; s
+--- erwartet
+300 25250
+
+=== methode in einer schleife (maschinencode)
+CLASS Zaehler
+    DIM n AS INTEGER
+    DIM schritt AS INTEGER
+    SUB weiter()
+        Self.n = Self.n + Self.schritt
+    END SUB
+    FUNCTION doppelt(x AS INTEGER) AS INTEGER
+        RETURN x * 2 + Self.n
+    END FUNCTION
+END CLASS
+DIM z AS Zaehler : z = NEW Zaehler()
+z.schritt = 3
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    z.weiter()
+    s = s + z.doppelt(i) MOD 1000
+NEXT
+PRINT z.n; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+300 25250
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== methode liest eine globale des bereichs
+DIM faktor AS INTEGER
+CLASS Rechner
+    DIM summe AS INTEGER
+    SUB dazu(x AS INTEGER)
+        Self.summe = Self.summe + x * faktor
+    END SUB
+END CLASS
+DIM r AS Rechner : r = NEW Rechner()
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    faktor = i MOD 4
+    r.dazu(i)
+NEXT
+PRINT r.summe; " "; faktor
+--- erwartet
+1901 2
+
+=== methode liest eine globale des bereichs (maschinencode)
+DIM faktor AS INTEGER
+CLASS Rechner
+    DIM summe AS INTEGER
+    SUB dazu(x AS INTEGER)
+        Self.summe = Self.summe + x * faktor
+    END SUB
+END CLASS
+DIM r AS Rechner : r = NEW Rechner()
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    faktor = i MOD 4
+    r.dazu(i)
+NEXT
+PRINT r.summe; " "; faktor
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1901 2
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: Objekt; mit Werten: Methode dazu: dazu beruehrt die Globale 'faktor' des Bereichs
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== methode liest eine andere globale
+DIM faktor AS INTEGER : faktor = 3
+CLASS Rechner
+    DIM summe AS INTEGER
+    SUB dazu(x AS INTEGER)
+        Self.summe = Self.summe + x * faktor
+    END SUB
+END CLASS
+DIM r AS Rechner : r = NEW Rechner()
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    r.dazu(i)
+NEXT
+PRINT r.summe
+--- erwartet
+3825
+
+=== methode liest eine andere globale (maschinencode)
+DIM faktor AS INTEGER : faktor = 3
+CLASS Rechner
+    DIM summe AS INTEGER
+    SUB dazu(x AS INTEGER)
+        Self.summe = Self.summe + x * faktor
+    END SUB
+END CLASS
+DIM r AS Rechner : r = NEW Rechner()
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    r.dazu(i)
+NEXT
+PRINT r.summe
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+3825
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== zwei klassen mit derselben methode
+DIM zaehler AS INTEGER
+CLASS Hund
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS Katze
+    FUNCTION laut() AS INTEGER
+        zaehler = zaehler + 100
+        RETURN 2
+    END FUNCTION
+END CLASS
+DIM tiere AS TUPLE
+tiere = (NEW Hund(), NEW Katze(), NEW Hund())
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    zaehler = zaehler + 1
+    s = s + tiere[i MOD 3].laut()
+NEXT
+PRINT s; " "; zaehler
+--- erwartet
+40 1030
+
+=== zwei klassen mit derselben methode (maschinencode)
+DIM zaehler AS INTEGER
+CLASS Hund
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+END CLASS
+CLASS Katze
+    FUNCTION laut() AS INTEGER
+        zaehler = zaehler + 100
+        RETURN 2
+    END FUNCTION
+END CLASS
+DIM tiere AS TUPLE
+tiere = (NEW Hund(), NEW Katze(), NEW Hund())
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    zaehler = zaehler + 1
+    s = s + tiere[i MOD 3].laut()
+NEXT
+PRINT s; " "; zaehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+40 1030
+--- stderr
+jit: Schleife an Stelle 19 in __main__ bleibt in der VM: Objekt; mit Werten: Methode laut: laut beruehrt die Globale 'zaehler' des Bereichs
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== methoden von text und map in einer schleife
+DIM m AS MAP OF INTEGER : m = {}
+DIM s AS STRING : s = "ab"
+DIM r AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    r = r + s.upper() + STR$(s.length())
+    m.put("k" + STR$(i), i * i)
+    s = s + "c"
+NEXT
+PRINT r; " "; m.size(); " "; m.get("k3")
+--- erwartet
+AB2ABC3ABCC4ABCCC5 4 9
+
+=== methoden von text und map in einer schleife (maschinencode)
+DIM m AS MAP OF INTEGER : m = {}
+DIM s AS STRING : s = "ab"
+DIM r AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    r = r + s.upper() + STR$(s.length())
+    m.put("k" + STR$(i), i * i)
+    s = s + "c"
+NEXT
+PRINT r; " "; m.size(); " "; m.get("k3")
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+AB2ABC3ABCC4ABCCC5 4 9
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== fehler in einer methode mitten in der schleife
+CLASS Konto
+    DIM stand AS INTEGER
+    SUB abheben(b AS INTEGER)
+        Self.stand = Self.stand - b
+        IF Self.stand < 0 THEN THROW "Konto leer bei " + STR$(Self.stand)
+    END SUB
+END CLASS
+DIM k AS Konto : k = NEW Konto()
+k.stand = 10
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 10
+        k.abheben(3)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT k.stand; " "; i
+--- erwartet
+gefangen: Konto leer bei -2 zeile 5
+-2 4
+
+=== fehler in einer methode mitten in der schleife (maschinencode)
+CLASS Konto
+    DIM stand AS INTEGER
+    SUB abheben(b AS INTEGER)
+        Self.stand = Self.stand - b
+        IF Self.stand < 0 THEN THROW "Konto leer bei " + STR$(Self.stand)
+    END SUB
+END CLASS
+DIM k AS Konto : k = NEW Konto()
+k.stand = 10
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 10
+        k.abheben(3)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT k.stand; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Konto leer bei -2 zeile 5
+-2 4
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== methode auf nil in der schleife
+CLASS Ding
+    DIM n AS INTEGER
+    SUB tick()
+        Self.n = Self.n + 1
+    END SUB
+END CLASS
+DIM dinge AS TUPLE
+DIM leer AS Ding
+dinge = (NEW Ding(), NEW Ding(), leer)
+DIM i AS INTEGER
+TRY
+    FOR i = 0 TO 5
+        dinge[i MOD 3].tick()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i
+--- erwartet
+gefangen: Methodenaufruf '.tick' bei NIL-Referenz -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+2
+
+=== methode auf nil in der schleife (maschinencode)
+CLASS Ding
+    DIM n AS INTEGER
+    SUB tick()
+        Self.n = Self.n + 1
+    END SUB
+END CLASS
+DIM dinge AS TUPLE
+DIM leer AS Ding
+dinge = (NEW Ding(), NEW Ding(), leer)
+DIM i AS INTEGER
+TRY
+    FOR i = 0 TO 5
+        dinge[i MOD 3].tick()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Methodenaufruf '.tick' bei NIL-Referenz -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+2
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== methode ruft eine funcref und bleibt in der vm
+DIM g AS INTEGER
+FUNCTION plus(x AS INTEGER) AS INTEGER
+    RETURN x + g
+END FUNCTION
+CLASS Werk
+    DIM f AS FUNCREF
+    FUNCTION los(x AS INTEGER) AS INTEGER
+        DIM h AS FUNCREF
+        h = Self.f
+        RETURN h(x)
+    END FUNCTION
+END CLASS
+DIM w AS Werk : w = NEW Werk()
+w.f = plus
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    g = i
+    s = s + w.los(i)
+NEXT
+PRINT s
+--- erwartet
+110
+
+=== methode ruft eine funcref und bleibt in der vm (maschinencode)
+DIM g AS INTEGER
+FUNCTION plus(x AS INTEGER) AS INTEGER
+    RETURN x + g
+END FUNCTION
+CLASS Werk
+    DIM f AS FUNCREF
+    FUNCTION los(x AS INTEGER) AS INTEGER
+        DIM h AS FUNCREF
+        h = Self.f
+        RETURN h(x)
+    END FUNCTION
+END CLASS
+DIM w AS Werk : w = NEW Werk()
+w.f = plus
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    g = i
+    s = s + w.los(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+110
+--- stderr
+jit: Schleife an Stelle 19 in __main__ bleibt in der VM: Objekt; mit Werten: Methode los: los ruft FUNCREF
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== langer text neu zusammengesetzt
+DIM s AS STRING
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 5000
+    s = s + CHR$(65 + i MOD 26)
+    t = s + "!"
+NEXT
+PRINT LEN(s); " "; LEN(t); " "; RIGHT$(t, 3)
+--- erwartet
+5000 5001 HI!
+
+=== langer text neu zusammengesetzt (maschinencode)
+DIM s AS STRING
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 5000
+    s = s + CHR$(65 + i MOD 26)
+    t = s + "!"
+NEXT
+PRINT LEN(s); " "; LEN(t); " "; RIGHT$(t, 3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+5000 5001 HI!
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in

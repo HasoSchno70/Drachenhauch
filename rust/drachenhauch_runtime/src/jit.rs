@@ -428,7 +428,7 @@ extern "C" fn w_op(k: *mut Kontext, o: u64, a_i: u64, b_i: u64, ziel: u64, lokal
                 return 0;
             }
             let a = Value::Str(links);
-            return match crate::vm::konstant_rechnen("+", &a, &b) {
+            return match crate::vm::wert_rechnen("+", &a, &b) {
                 Some(v) => { *w_platz(k, ziel) = v; 0 }
                 None => { zurueck(k, a, b, abgegeben); 0 }
             };
@@ -436,9 +436,9 @@ extern "C" fn w_op(k: *mut Kontext, o: u64, a_i: u64, b_i: u64, ziel: u64, lokal
     }
     let zeichen = match o {
         op::ADD => "+", op::SUB => "-", op::MUL => "*", op::DIV => "/",
-        op::INT_DIV => "\\", op::MOD => "MOD", _ => { zurueck(k, a, b, abgegeben); return 0; }
+        op::INT_DIV => "\\", op::MOD => "mod", _ => { zurueck(k, a, b, abgegeben); return 0; }
     };
-    match crate::vm::konstant_rechnen(zeichen, &a, &b) {
+    match crate::vm::wert_rechnen(zeichen, &a, &b) {
         Some(v) => { *w_platz(k, ziel) = v; 0 }
         None => { zurueck(k, a, b, abgegeben); 0 }
     }
@@ -506,6 +506,109 @@ extern "C" fn w_builtin_f(k: *mut Kontext, ins: u64, basis: u64, argc: u64) -> f
     }
 }
 
+/// `obj.methode(args)`: das Objekt in `basis`, die Argumente dahinter; das
+/// Ergebnis nach `basis`. Derselbe Weg wie CALL_METHOD in der VM
+/// (`Vm::methode_rufen`: Merkplatz, Coroutine, Methoden von Text/Feld/MAP).
+/// Ob die Methode laufen darf, hat `methoden_harmlos` beim Bauen geprueft.
+/// Ein Fehler wird nicht nachgerechnet -- die Methode hat womoeglich schon
+/// etwas getan; die VM meldet ihn an dieser Stelle.
+extern "C" fn w_methode(k: *mut Kontext, ins: u64, basis: u64, argc: u64) {
+    let ins: &'static crate::model::Instr = unsafe { &*(ins as *const crate::model::Instr) };
+    let name = match &ins.arg { Arg::Call(n, _, _) => &n[..], _ => { w_fehler(k); return; } };
+    let obj = w_nehmen(k, basis);
+    let args: Vec<Value> = (1..=argc).map(|j| w_nehmen(k, basis + j)).collect();
+    let vm = unsafe { &mut *(*k).vm };
+    match vm.methode_rufen(ins, name, obj, args) {
+        Ok(v) => *w_platz(k, basis) = v,
+        Err(e) => { unsafe { (*k).meldung = Some(e); } w_fehler(k); }
+    }
+}
+
+/// Plaetze, die ein Befehl anfasst; Namen (LOAD_NAME ...) ueber `global_names`.
+fn globale_plaetze(prog: &Program, g: &Func, ins: &crate::model::Instr) -> Vec<usize> {
+    match ins.op {
+        op::LOAD_GLOBAL_SLOT | op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT => vec![ins.arg.as_usize()],
+        op::FOR_NEXT => match for_teile(&ins.arg) { Some(t) if t[0] == 1 => vec![t[1] as usize], _ => vec![] },
+        op::LOAD_NAME | op::STORE_NAME | op::INPUT_NAME => match g.constants.get(ins.arg.as_usize()) {
+            Some(Value::Str(n)) => prog.global_names.iter()
+                .position(|x| !x.is_empty() && x.eq_ignore_ascii_case(n)).into_iter().collect(),
+            _ => vec![],
+        },
+        _ => vec![],
+    }
+}
+
+/// Darf ein Bereich `obj.name(...)` rufen? Die Methode laeuft in der VM,
+/// waehrend der Bereich Locals und manche Globale bei sich haelt (Register,
+/// Werteplaetze, Schatten). Also: keine Methode dieses Namens -- in keiner
+/// Klasse, der Empfaenger steht erst beim Laufen fest -- und nichts, was sie
+/// ruft, darf eine Globale beruehren, die der Bereich beruehrt; und nichts
+/// darf Drachenhauch-Code ueber Umwege rufen (FUNCREF, Coroutinen,
+/// Rueckrufe) oder das Programm beenden.
+fn methoden_harmlos<'a>(prog: &'a Program, f: &'a Func, von: usize, bis: usize, name: &str) -> Result<(), String> {
+    // Die Globalen des Bereichs samt aller freien Funktionen, die er ruft
+    // (die lesen und schreiben ueber den Schatten).
+    let mut bereich: Vec<usize> = Vec::new();
+    let mut offen: Vec<&'a Func> = Vec::new();
+    let mut gesehen: Vec<*const Func> = Vec::new();
+    let rufe = |ins: &crate::model::Instr, offen: &mut Vec<&'a Func>| {
+        if ins.op == op::CALL_USER {
+            if let Arg::Call(_, _, i) = &ins.arg { if let Some(h) = prog.functions.get(*i as usize) { offen.push(h); } }
+        }
+    };
+    for ins in &f.code[von..=bis] { bereich.extend(globale_plaetze(prog, f, ins)); rufe(ins, &mut offen); }
+    while let Some(g) = offen.pop() {
+        if gesehen.contains(&(g as *const Func)) { continue; }
+        gesehen.push(g);
+        for ins in &g.code { bereich.extend(globale_plaetze(prog, g, ins)); rufe(ins, &mut offen); }
+    }
+    // Alle Methoden dieses Namens, dazu die Operatoren und PROPERTYs, die sie
+    // ueber `a + b` bzw. `obj.x` erreichen, und alles, was die rufen.
+    let methoden = |n: &str| -> Vec<&'a Func> {
+        prog.classes.values().flat_map(|c| c.methods.iter())
+            .filter(|(m, _)| m.eq_ignore_ascii_case(n)).map(|(_, g)| g).collect()
+    };
+    let mut offen: Vec<&'a Func> = methoden(name);
+    if offen.is_empty() && !crate::vm::ist_container_methode(name) {
+        return Err(format!("Methode {} (keine Klasse hat sie)", name));
+    }
+    for c in prog.classes.values() {
+        for (m, g) in &c.methods { if m.starts_with("__op_") { offen.push(g); } }
+    }
+    let mut gesehen: Vec<*const Func> = Vec::new();
+    while let Some(g) = offen.pop() {
+        if gesehen.contains(&(g as *const Func)) { continue; }
+        gesehen.push(g);
+        for ins in &g.code {
+            for p in globale_plaetze(prog, g, ins) {
+                if bereich.contains(&p) {
+                    let gn = prog.global_names.get(p).cloned().unwrap_or_default();
+                    return Err(format!("Methode {}: {} beruehrt die Globale '{}' des Bereichs", name, g.name, gn));
+                }
+            }
+            match ins.op {
+                op::CALL_USER => rufe(ins, &mut offen),
+                op::CALL_METHOD => if let Arg::Call(n, _, _) = &ins.arg { offen.extend(methoden(n)); },
+                op::LOAD_MEMBER | op::STORE_MEMBER => if let Some(Value::Str(n)) = g.constants.get(ins.arg.as_usize()) {
+                    offen.extend(methoden(&format!("__get_{}", n)));
+                    offen.extend(methoden(&format!("__set_{}", n)));
+                },
+                op::CALL_VALUE | op::CALL_SUPER =>
+                    return Err(format!("Methode {}: {} ruft {}", name, g.name, befehl_name(ins.op))),
+                op::CALL_BUILTIN => if let Arg::Call(n, _, _) = &ins.arg {
+                    let n: &str = n;
+                    if n == "sort" || n == "__comp_iter" || n.starts_with("coro_") || n.starts_with("task_")
+                        || n == "gui_update" || n == "timer_update" || n == "exit" || n == "end" {
+                        return Err(format!("Methode {}: {} ruft {}", name, g.name, n.to_uppercase()));
+                    }
+                },
+                _ => {}
+            }
+        }
+    }
+    Ok(())
+}
+
 /// `c[i...]` lesen: Behaelter in `basis`, die Indizes dahinter; das Ergebnis
 /// nach `basis`.
 extern "C" fn w_index(k: *mut Kontext, basis: u64, n: u64) {
@@ -561,6 +664,7 @@ const W_BUILTIN_I: usize = 10;
 const W_BUILTIN_F: usize = 11;
 const W_INDEX: usize = 12;
 const W_SETZEN: usize = 13;
+const W_METHODE: usize = 14;
 
 type Einstieg = unsafe extern "C" fn(*mut Kontext, *const u64, *mut u64);
 
@@ -902,6 +1006,15 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 for _ in 0..n { if !w_oder_skalar(pop!()) { return Err("Index, der kein Wert ist".into()); } }
                 if pop!() != Art::W { return Err("Index auf etwas, das kein Wert ist".into()); }
                 if o == op::LOAD_INDEX { z.stapel.push(Art::W); } else { schreibt_felder = true; }
+            }
+            op::CALL_METHOD if modus_w => {
+                let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => return Err("Methode ohne Namen".into()) };
+                let b = bereich.ok_or("Methode ausserhalb eines Bereichs")?;
+                methoden_harmlos(prog, f, b.von, b.bis, &name)?;
+                for _ in 0..argc { if !w_oder_skalar(pop!()) { return Err("Argument NIL".into()); } }
+                if pop!() != Art::W { return Err("Methode auf etwas, das kein Wert ist".into()); }
+                z.stapel.push(Art::W);
+                schreibt_felder = true;
             }
             op::CALL_BUILTIN if modus_w => {
                 let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => return Err("Befehl ohne Namen".into()) };
@@ -1736,6 +1849,17 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         bau.fehler_pruefen();
                         st.push((w, erg));
                     }
+                    op::CALL_METHOD => {
+                        let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
+                        let d = st.len() - argc - 1;
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let (ip_c, basis, n) = (bau.iconst(ins as *const crate::model::Instr as i64), bau.iconst(bau.w_slot(d)), bau.iconst(argc as i64));
+                        bau.w_ruf(W_METHODE, &[ip_c, basis, n]);
+                        bau.fehler_pruefen();
+                        let z = bau.iconst(0);
+                        st.push((z, Art::W));
+                    }
                     op::LOAD_INDEX | op::STORE_INDEX if an.modus_w => {
                         let n = ins.arg.as_usize();
                         let d = st.len() - n - 1 - (o == op::STORE_INDEX) as usize;
@@ -2189,7 +2313,7 @@ impl Jit {
         builder.symbol("dh_feld_setzen_f", feld_setzen_f as *const u8);
         builder.symbol("dh_element_i", element_i as *const u8);
         builder.symbol("dh_element_f", element_f as *const u8);
-        let w_namen: [(&str, *const u8); 14] = [
+        let w_namen: [(&str, *const u8); 15] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
             ("dh_w_ablegen_f", w_ablegen_f as *const u8), ("dh_w_zahl_i", w_zahl_i as *const u8),
@@ -2197,6 +2321,7 @@ impl Jit {
             ("dh_w_op", w_op as *const u8), ("dh_w_wahr", w_wahr as *const u8),
             ("dh_w_builtin_i", w_builtin_i as *const u8), ("dh_w_builtin_f", w_builtin_f as *const u8),
             ("dh_w_index", w_index as *const u8), ("dh_w_setzen", w_setzen as *const u8),
+            ("dh_w_methode", w_methode as *const u8),
         ];
         for (n, f) in w_namen { builder.symbol(n, f); }
         let mut modul = JITModule::new(builder);
@@ -2238,6 +2363,7 @@ impl Jit {
             ("dh_w_builtin_f", vec![ptr, i, i, i], Some(f64t)),
             ("dh_w_index", vec![ptr, i, i], None),
             ("dh_w_setzen", vec![ptr, i, i], None),
+            ("dh_w_methode", vec![ptr, i, i, i], None),
         ].into_iter().map(|(n, pa, r): (&str, Vec<Type>, Option<Type>)| (n, sig_h(&pa, r))).collect();
         let mut dekl = |name: &str, sg: &cranelift_codegen::ir::Signature| modul.declare_function(name, Linkage::Import, sg)
             .map_err(|e| format!("{:?}", e));

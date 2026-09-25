@@ -588,6 +588,43 @@ Gegenproben: Coroutinen zugelassen -> 20 statt 110; TIMER_UPDATE
 zugelassen -> 200 statt 2100 (beide jeweils mit falschem Ergebnis, nicht
 nur an der Bilanzzeile); `*ip = weiter` statt `+ 1` -> falsche Zeile.
 
+**Schritt 7a (2026-09-25): Methodenaufrufe in Bereichen -- gebaut.** Im
+Wertemodus ruft ein Bereich `obj.methode(...)` ueber den Helfer
+`w_methode` und `Vm::methode_rufen` -- derselbe Weg wie CALL_METHOD
+(Merkplatz, Coroutine als Handle, Methoden von Text/Feld/MAP, NIL-Meldung).
+Der Rumpf der Methode laeuft noch in der VM (das ist 7b); gewonnen ist,
+dass eine Schleife mit einem Methodenaufruf nicht mehr ganz in der VM
+bleibt. **Die Methode laeuft, waehrend der Bereich Locals und Globale bei
+sich haelt** (Register, Werteplaetze, Schatten) -- darum prueft
+`methoden_harmlos` beim Bauen: JEDE Methode dieses Namens in JEDER Klasse
+(der Empfaenger steht erst beim Laufen fest), dazu alle Operatoren und die
+PROPERTYs, die sie ueber `obj.x` erreichen, und alles, was die rufen, darf
+keine Globale beruehren, die der Bereich oder eine von ihm gerufene
+Funktion beruehrt; kein FUNCREF-Aufruf, kein SUPER, keine Coroutine, kein
+`SORT`/`TIMER_UPDATE`/`GUI_UPDATE`/`TASK_*`/`EXIT`. Eine Globale, die der
+Bereich nicht anfasst, darf die Methode lesen und schreiben. Ein Fehler in
+der Methode wird nicht nachgerechnet (sie hat womoeglich schon Felder
+geschrieben); die VM meldet ihn an der Aufrufstelle, die Zeile bleibt die
+in der Methode.
+
+**Zwei Fehler aus Schritt 5, dabei gefunden:** `w_op` reichte `"MOD"`
+weiter, `konstant_rechnen` kennt nur `"mod"` -- jedes `MOD` mit einem Wert
+stieg aus (richtiges Ergebnis, 99 Ausstiege bei 100 Runden). Und
+`konstant_rechnen` verwirft Texte ueber 4 KB (die Grenze des Faltens), ein
+neu zusammengesetzter langer Text stieg also jede Runde aus. Jetzt rechnet
+`w_op` mit `vm::wert_rechnen` (dieselben Regeln ohne die Grenzen des
+Faltens; `konstant_rechnen` ist ein Aufruf davon plus die Grenzen).
+
+Gemessen `tools/tempo/objekte.dh`: 100 -> 92 ms (der Rumpf ist noch VM).
+Pruefung: 9 Faelle mehr in `jit.dhtest` (Methode mit Feldern, Methode liest
+eine Globale des Bereichs, eine andere Globale, zwei Klassen mit derselben
+Methode, Methoden von Text und MAP, Fehler in einer Methode, Methode auf
+NIL, Methode ruft FUNCREF, ein langer Text). Gegenproben, alle mit falschem
+Ergebnis und nicht nur an der Bilanzzeile: ohne Globalen-Pruefung (andere
+Summen als die 1901 bzw. 40 der VM), nur die erste Klasse eines Namens geprueft,
+ein Fehler wird nachgerechnet (Konto -5 statt -2), FUNCREF zugelassen;
+dazu `"MOD"` und die Faltgrenze (Ausstiege an der Bilanzzeile).
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

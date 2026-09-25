@@ -1663,6 +1663,45 @@ impl<'p> Vm<'p> {
     /// merkt sich `SORT` nichts. Wer eine Familie baut, die je nach ARGUMENT
     /// absagt, obwohl eine spaetere denselben Namen kennt, muss hier dasselbe
     /// tun.
+    /// `obj.methode(args)` wie CALL_METHOD (fuer den Maschinencode, M4 Schritt
+    /// 7): Methode einer Instanz ueber den Merkplatz, Coroutine als Handle,
+    /// sonst die Methoden von Text/Feld/MAP. Die VM selbst nimmt weiter ihren
+    /// schnellen Weg im Befehl (Argumente direkt vom Stapel).
+    pub(crate) fn methode_rufen(&mut self, instr: &'p crate::model::Instr, method: &str, obj: Value, margs: Vec<Value>) -> R<Value> {
+        match &obj {
+            Value::Instance(rc) => {
+                let (lage, f_p) = instr.merk.get();
+                let getroffen = std::ptr::eq(Rc::as_ptr(&rc.borrow().layout), lage);
+                let m: &'p Func = if getroffen {
+                    unsafe { &*(f_p as *const Func) }
+                } else {
+                    let cn = rc.borrow().class_name.clone();
+                    let m = self.resolve_method(&cn, method)
+                        .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                    instr.merk.set((Rc::as_ptr(&rc.borrow().layout), m as *const Func as usize));
+                    m
+                };
+                if m.is_coroutine { return Ok(make_coro(m, margs, Some(obj.clone()))); }
+                let ret = self.exec(m, margs, Some(obj.clone()))?;
+                Ok(if m.is_sub { Value::Nil } else { ret })
+            }
+            Value::Nil => Err(format!("Methodenaufruf '.{}' bei NIL-Referenz{}", method, NIL_NEW)),
+            _ => {
+                let kind = container_kind(&obj).ok_or_else(|| format!("Methodenaufruf '.{}' bei nicht-Objekt ({})", method, obj.type_name()))?;
+                let bi = container_method(kind, &method.to_lowercase())
+                    .ok_or_else(|| format!("{} hat keine Methode '{}'", kind.to_uppercase(), method))?;
+                let mut call_args = Vec::with_capacity(margs.len() + 1);
+                call_args.push(obj.clone());
+                call_args.extend(margs);
+                match safe_call_builtin(bi, &call_args) {
+                    Some(Ok(v)) => Ok(v),
+                    Some(Err(e)) => Err(e),
+                    None => Err(unknown_builtin_msg(bi)),
+                }
+            }
+        }
+    }
+
     pub(crate) fn builtin_rufen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>) -> R<Value> {
         let f = merk.get();
         if f != 0 {
@@ -10542,6 +10581,12 @@ fn arg_value(a: &Arg) -> Value {
     }
 }
 
+/// Gibt es eine Methode dieses Namens fuer Text, Feld, MAP oder Tupel?
+pub(crate) fn ist_container_methode(name: &str) -> bool {
+    let n = name.to_lowercase();
+    ["string", "array", "map", "tuple"].iter().any(|k| container_method(k, &n).is_some())
+}
+
 fn container_kind(v: &Value) -> Option<&'static str> {
     match v {
         Value::Str(_) => Some("string"),
@@ -10915,6 +10960,18 @@ fn int_overflow_msg(op: &str) -> String {
 /// dann wie bisher zur Laufzeit) oder ein Ergebnis, das keine Konstante sein
 /// kann (NaN/unendlich).
 pub(crate) fn konstant_rechnen(op: &str, a: &Value, b: &Value) -> Option<Value> {
+    match wert_rechnen(op, a, b)? {
+        Value::Float(f) if !f.is_finite() => None,
+        // `"x" * 100000000` gehoert nicht als 100-MB-Konstante in den Bytecode.
+        Value::Str(s) if s.len() > 4096 => None,
+        v => Some(v),
+    }
+}
+
+/// `a op b` fuer zwei schlichte Werte mit den Regeln der Befehle -- ohne die
+/// Grenzen des Faltens (fuer den Wertemodus des Maschinencodes, `jit::w_op`).
+/// `None` bei einem Fehler: dann rechnet die VM und meldet ihn.
+pub(crate) fn wert_rechnen(op: &str, a: &Value, b: &Value) -> Option<Value> {
     let schlicht = |v: &Value| matches!(v, Value::Int(_) | Value::Float(_) | Value::Str(_) | Value::Bool(_));
     if !schlicht(a) || !schlicht(b) { return None; }
     let (a, b) = (a.clone(), b.clone());
@@ -10949,9 +11006,6 @@ pub(crate) fn konstant_rechnen(op: &str, a: &Value, b: &Value) -> Option<Value> 
         _ => return None,
     };
     match r {
-        Ok(Value::Float(f)) if !f.is_finite() => None,
-        // `"x" * 100000000` gehoert nicht als 100-MB-Konstante in den Bytecode.
-        Ok(Value::Str(s)) if s.len() > 4096 => None,
         Ok(v @ (Value::Int(_) | Value::Float(_) | Value::Str(_) | Value::Bool(_))) => Some(v),
         _ => None,
     }

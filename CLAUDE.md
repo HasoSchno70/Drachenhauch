@@ -1610,6 +1610,15 @@ Rueckrufe feuert, traegt ihn dort ein.** Ein gescheiterter Befehl wird
 nicht nachgerechnet: `Jit::meldung_nehmen` im Haken der VM gibt den Fehler
 an seiner Stelle aus. familien.dh 200 -> 16,5 ms.
 
+**Methodenaufrufe in Bereichen (M4 Schritt 7a):** `w_methode` ->
+`Vm::methode_rufen` (derselbe Weg wie CALL_METHOD). `methoden_harmlos`
+prueft beim Bauen alle Methoden des Namens in allen Klassen samt
+Operatoren, PROPERTYs und allem Gerufenen: keine Globale, die der Bereich
+beruehrt, kein FUNCREF/SUPER/Coroutine/Rueckruf. **Wer einen Befehl
+dazubaut, der Drachenhauch-Code ruft, traegt ihn dort UND in
+`befehl_im_bereich` ein.** `w_op` rechnet mit `vm::wert_rechnen`, nicht mit
+`konstant_rechnen` (das hat die Grenzen des Faltens).
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
