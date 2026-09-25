@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Berechtigungen fuer dhrt unter Hardened Runtime (installer/paket.dh,
+  macosSignieren). Der Maschinencode (src/jit.rs, Cranelift) legt seinen Code
+  in gewoehnlichem Speicher an und macht ihn danach per mprotect ausfuehrbar
+  -- ohne MAP_JIT. `allow-jit` allein deckt nur MAP_JIT-Speicher; ohne
+  `allow-unsigned-executable-memory` stuerzte die beglaubigte App beim ersten
+  uebersetzten Aufruf ab. `allow-jit` steht dabei, falls eine spaetere
+  Cranelift-Fassung auf MAP_JIT umstellt.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+</dict>
+</plist>

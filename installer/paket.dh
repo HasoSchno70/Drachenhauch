@@ -189,11 +189,14 @@ END FUNCTION
 ' reicht). Hardened Runtime gilt IMMER -- Apple verlangt sie fuer die
 ' Beglaubigung, und so zeigt schon der Lauf ohne Zugangsdaten, dass dhrt
 ' damit laeuft. Ohne DH_NOTAR_* wird nicht beglaubigt.
-SUB macosSignieren(ziel AS STRING, ident AS STRING, istApp AS BOOLEAN)
+' Die App bekommt die Berechtigungen aus `rechte` (dhrt.entitlements): der
+' Maschinencode macht Speicher ausfuehrbar, und das verbietet Hardened
+' Runtime ohne sie -- die App stuerzte beim ersten uebersetzten Aufruf ab.
+SUB macosSignieren(ziel AS STRING, ident AS STRING, istApp AS BOOLEAN, rechte AS STRING)
     IF ident = "" THEN
-        IF istApp THEN mussLaufen(PROCESS_START("codesign", "--force", "--options", "runtime", "--sign", "-", ziel), "codesign")
+        IF istApp THEN mussLaufen(PROCESS_START("codesign", "--force", "--options", "runtime", "--entitlements", rechte, "--sign", "-", ziel), "codesign")
     ELSEIF istApp THEN
-        mussLaufen(PROCESS_START("codesign", "--force", "--options", "runtime", "--timestamp", "--sign", ident, ziel), "codesign")
+        mussLaufen(PROCESS_START("codesign", "--force", "--options", "runtime", "--entitlements", rechte, "--timestamp", "--sign", ident, ziel), "codesign")
     ELSE
         mussLaufen(PROCESS_START("codesign", "--force", "--timestamp", "--sign", ident, ziel), "codesign")
     END IF
@@ -265,14 +268,14 @@ SUB macosPaket(wurzel AS STRING, laufzeit AS STRING, vorlagen AS STRING, ausgabe
     ELSE
         PRINT "Signatur: "; ident
     END IF
-    macosSignieren(app, ident, TRUE)
+    macosSignieren(app, ident, TRUE, PATHJOIN(vorlagen, "dhrt.entitlements"))
     ' Der Verweis macht aus dem geoeffneten Abbild ein "hierher ziehen".
     mussLaufen(PROCESS_START("ln", "-s", "/Applications", PATHJOIN(buehne, "Programme")), "ln")
     DIM dmg AS STRING : dmg = PATHJOIN(ausgabe, "Drachenhauch-IDE-" + fassung + "-macos-" + arch + ".dmg")
     IF FILEEXISTS(dmg) THEN DELETEFILE(dmg)
     mussLaufen(PROCESS_START("hdiutil", "create", "-volname", "Drachenhauch " + fassung, _
                              "-srcfolder", buehne, "-ov", "-format", "UDZO", dmg), "hdiutil")
-    macosSignieren(dmg, ident, FALSE)
+    macosSignieren(dmg, ident, FALSE, "")
     macosBeglaubigen(dmg, ident)
     PRINT "FERTIG -> "; dmg; " ("; FILESIZE(dmg) \ 1048576; " MB)"
 END SUB

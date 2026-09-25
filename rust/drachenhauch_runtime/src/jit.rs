@@ -26,8 +26,11 @@
 //! auf, und die VM rechnet denselben Aufruf noch einmal. Sie liefert dann
 //! genau ihre Meldung mit genau ihrer Zeile. Es gibt also keine zweite
 //! Fassung einer Fehlermeldung, nur eine zweite Fassung des Rechnens -- und
-//! die prueft `tests/pruef/jit.dhtest` samt der ganzen Sammlung unter
-//! `DHRT_JIT=immer`.
+//! die prueft `tests/pruef/jit.dhtest` samt der ganzen Sammlung mit und
+//! ohne Maschinencode.
+//!
+//! **Seit M5 an per Vorgabe**; `DHRT_JIT=aus` laesst alles in der VM (die CI
+//! faehrt beide Wege).
 
 use std::collections::HashMap;
 

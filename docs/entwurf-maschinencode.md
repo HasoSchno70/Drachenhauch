@@ -68,7 +68,7 @@ auseinander. Deshalb drei Regeln, die nicht verhandelbar sind:
    Felder, MAPs, Objekte, Builtins — ruft er als **dieselbe Rust-Funktion**,
    die auch die VM ruft. Es gibt keine zweite Fassung von `addieren` oder
    `MAPGET`.
-3. **Jede Prüfsammlung läuft zweimal**: `DHRT_JIT=aus` und `DHRT_JIT=immer`
+3. **Jede Prüfsammlung läuft zweimal**: `DHRT_JIT=aus` und mit Maschinencode (seit M5 die Vorgabe)
    (jede übersetzbare Funktion sofort übersetzt), dieselbe Erwartung. Das ist
    der Ersatz für die alte Parität gegen den Tree-Walker — nur dass die
    Referenz diesmal nicht gelöscht wird.
@@ -248,7 +248,7 @@ Ausstiegsroutine, die dieselbe Meldung mit derselben Zeile baut wie die VM.
 Ziel: `fib(30)` unter 20 ms, Zahlenschleife unter 20 ms.
 
 **Erster Schritt 2026-09-25 -- reine Zahlenfunktionen, gebaut** (`src/jit.rs`,
-Feature `jit` mit Cranelift 0.134 -- 0.135 und neuer verlangen Rust 1.96).
+Feature `jit` mit Cranelift 0.134 -- 0.135 und neuer verlangen Rust 1.96; seit M5 0.136 mit Rust 1.98).
 Uebersetzt wird eine Funktion, wenn sie REIN ist: Parameter/Locals/Rueckgabe
 INTEGER, FLOAT oder BOOLEAN (`any`-Locals, deren Art aus den Zuweisungen
 folgt, gehen mit), und sie nur rechnet (+ - * / \ MOD, Vorzeichen,
@@ -681,15 +681,37 @@ Tafel (die geerbten bleiben in der VM).
    dorthin.
 5. Methoden (Merkplatz je Aufrufstelle wie in der VM, #238).
 
-### M5 — Standard an (wenn M4 1–3 stehen)
+### M5 — Standard an (gebaut 2026-09-25)
 
-- `auto` wird Vorgabe, die CI läuft weiter beide Schalter.
-- Export: nichts zu tun (übersetzt wird beim Start).
-- **macOS**: Hardened Runtime verbietet ausführbaren Speicher ohne die
-  Berechtigung `com.apple.security.cs.allow-jit` — sie muss in die Signatur
-  (`installer/bauen.dh`), sonst stürzt die beglaubigte App beim ersten
-  übersetzten Aufruf ab.
+- **Maschinencode ist Vorgabe**; `DHRT_JIT=aus` laesst alles in der VM
+  (`immer` bleibt als Wort gueltig). Kein eigenes `auto`: uebersetzt werden
+  Funktionen beim Start und Schleifen beim ersten Ruecksprung, und gemessen
+  kostet das nichts -- `PRINT "hallo"` 32 ms mit wie ohne, die IDE 720 ms mit
+  wie ohne.
+- **Die CI laeuft weiter beide Wege**, nur umgekehrt beschriftet: der
+  Hauptlauf mit Maschinencode (Windows die ganze Suite, vorher nur
+  `--schnell`), der zweite mit `DHRT_JIT=aus`. `jit.dhtest` setzt fuer seine
+  VM-Haelfte `DHRT_JIT=aus` ausdruecklich -- sonst pruefte sie ebenfalls den
+  Maschinencode. Die ganze Suite lief vor der Umstellung lokal mit
+  Maschinencode: 4263 ok, 0 fehl in 296 Sammlungen, darunter zum ersten Mal IDE und Werkzeuge; ohne Maschinencode (--schnell) 3753 ok.
+- Export: nichts zu tun (uebersetzt wird beim Start).
+- **macOS**: Hardened Runtime verbietet, Speicher ausfuehrbar zu machen.
+  **Hier stand, `allow-jit` reiche -- das stimmt fuer Cranelift nicht**:
+  cranelift-jit 0.136 legt Code in gewoehnlichem Speicher an und schaltet ihn
+  per `mprotect` auf ausfuehrbar (in cranelift-jit, Datei memory/mod.rs), ohne `MAP_JIT`; `allow-jit`
+  deckt nur `MAP_JIT`-Speicher. Die App bekommt darum
+  `installer/posix/dhrt.entitlements` mit `allow-unsigned-executable-memory`
+  (und `allow-jit` fuer eine spaetere Fassung mit `MAP_JIT`), eingetragen in
+  `macosSignieren` (`installer/paket.dh`). Der Paketlauf (`package.yml`)
+  prueft die Berechtigung in der Signatur und laesst eine Schleife aus dem
+  Bundle laufen, bis die Bilanz "1 Schleifenlaeufe" sagt -- vorher baute er
+  dhrt nicht einmal mit dem Feature `jit`. **Ungeprueft, bis der Paketlauf
+  gelaufen ist** (er wird nur von Hand gestartet).
 - **Web**: kein JIT (emscripten), dort bleibt M2.
+- **Rust 1.98 und Cranelift 0.136** (vorher 0.134, weil 0.135/0.136 Rust
+  1.95/1.96 verlangen und lokal 1.95 lag; die CI nahm ohnehin das neueste
+  Stable). Der Sprung brauchte keine Quellaenderung; Tempo gleich,
+  `aufrufe.dh` mit dem neuen Compiler etwas schneller (4,2 -> 3,3 ms).
 
 ## 5. Was bewusst nicht kommt
 

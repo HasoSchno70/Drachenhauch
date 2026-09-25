@@ -59,7 +59,7 @@ jobs:
 
       - name: dhrt bauen (mit Grafik)
         working-directory: rust/drachenhauch_runtime
-        run: cargo build --release --locked --features "graphics dialogs video db net http smtp"
+        run: cargo build --release --locked --features "graphics dialogs video db net http smtp jit"
 
       - name: Laufzeit ansehen
         run: rust/drachenhauch_runtime/target/release/dhrt --version
@@ -174,6 +174,17 @@ jobs:
           test -f "$APP/Contents/Resources/Drachenhauch.icns"
           "$APP/Contents/MacOS/dhrt" --version
           "$APP/Contents/MacOS/dhrt" run "$APP/Contents/Resources/examples/01_hello.dh"
+          # Maschinencode unter Hardened Runtime (M5): ohne die Berechtigung
+          # allow-unsigned-executable-memory (installer/posix/dhrt.entitlements)
+          # stuerzt der erste uebersetzte Aufruf ab. Die Bilanz zeigt, DASS er
+          # lief -- ein gruener Lauf ohne sie saehe genauso aus.
+          codesign -d --entitlements - "$APP" 2>&1 | tee "$RUNNER_TEMP/rechte.txt"
+          grep -q allow-unsigned-executable-memory "$RUNNER_TEMP/rechte.txt"
+          printf 'DIM s AS INTEGER\nDIM i AS INTEGER\nFOR i = 1 TO 100000\n    s = s + i MOD 7\nNEXT\nPRINT s\n' > "$RUNNER_TEMP/schleife.dh"
+          DHRT_JIT_BILANZ=1 "$APP/Contents/MacOS/dhrt" run "$RUNNER_TEMP/schleife.dh" > "$RUNNER_TEMP/jit.txt" 2>&1
+          cat "$RUNNER_TEMP/jit.txt"
+          grep -qx 300000 "$RUNNER_TEMP/jit.txt"
+          grep -q "1 Schleifenlaeufe" "$RUNNER_TEMP/jit.txt"
           export HOME="$RUNNER_TEMP/home"
           mkdir -p "$HOME/Documents"
           set +e

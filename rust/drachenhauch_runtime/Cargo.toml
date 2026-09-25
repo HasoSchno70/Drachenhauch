@@ -127,11 +127,11 @@ mp4 = { version = "0.14", optional = true }
 # Automation), damit Bildschirmleser, Lupe und Sprachsteuerung ihn sehen.
 # Reines Rust; der Baum wird nur gebaut, wenn ein Hilfsprogramm danach fragt.
 accesskit = { version = "0.25", optional = true }
-cranelift-codegen = { version = "0.134", optional = true }
-cranelift-frontend = { version = "0.134", optional = true }
-cranelift-jit = { version = "0.134", optional = true }
-cranelift-module = { version = "0.134", optional = true }
-cranelift-native = { version = "0.134", optional = true }
+cranelift-codegen = { version = "0.136", optional = true }
+cranelift-frontend = { version = "0.136", optional = true }
+cranelift-jit = { version = "0.136", optional = true }
+cranelift-module = { version = "0.136", optional = true }
+cranelift-native = { version = "0.136", optional = true }
 
 # --- Web-Build (emscripten): wasm-bindgen-Familie festnageln ---------------
 # Kira zieht cpal fuer JEDES wasm32-Ziel mit dem Feature `wasm-bindgen` herein

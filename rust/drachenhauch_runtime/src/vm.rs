@@ -740,8 +740,8 @@ pub struct Vm<'p> {
     // einzusteigen. Hier liegt je laufendem Aufruf der Zustand des AUFRUFERS.
     // Jeder `run_frame` kennt seine Basis (die Laenge beim Eintritt).
     rahmen: Vec<Rahmen<'p>>,
-    // Maschinencode fuer reine Zahlenfunktionen (M3, src/jit.rs); nur mit
-    // DHRT_JIT=immer, sonst None.
+    // Maschinencode (M3..M5, src/jit.rs): Vorgabe seit M5; `DHRT_JIT=aus`
+    // laesst alles in der VM.
     #[cfg(feature = "jit")]
     jit: Option<crate::jit::Jit>,
     // Quell-Zeile der zuletzt ausgefuehrten Instruktion (fuer Laufzeitfehler-
@@ -986,7 +986,7 @@ impl<'p> Vm<'p> {
             pool_stacks: Vec::new(),
             rahmen: Vec::new(),
             #[cfg(feature = "jit")]
-            jit: if std::env::var("DHRT_JIT").map_or(false, |v| v == "immer") {
+            jit: if std::env::var("DHRT_JIT").map_or(true, |v| v != "aus") {
                 match crate::jit::Jit::neu(prog) {
                     Ok(j) => Some(j),
                     // Uebersetzen scheiterte: melden, dann laeuft alles in der VM.
