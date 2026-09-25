@@ -109,6 +109,17 @@ jobs:
           DH_OHNE_AUDIO: 1
         run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef
 
+      # Regel 3 aus docs/entwurf-maschinencode.md: jede Sammlung auch mit
+      # Maschinencode (jede reine Zahlenfunktion sofort uebersetzt), dieselbe
+      # Erwartung. Hier `--schnell` -- die langsamen Sammlungen (IDE,
+      # Werkzeuge) haben kaum reine Zahlenfunktionen; Linux und macOS laufen
+      # die ganze Suite so.
+      - name: Pruefsammlungen mit Maschinencode (DHRT_JIT=immer)
+        env:
+          DH_OHNE_AUDIO: 1
+          DHRT_JIT: immer
+        run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef --schnell
+
   # Cross-Platform-Migration Phase 3: auf Linux UND macOS nicht nur BAUEN,
   # sondern TESTEN.
   #
@@ -172,11 +183,19 @@ jobs:
       # gleicht am besten gegen `feats` in `rust/build_runtime.py` ab.
       - name: dhrt bauen (ohne Grafik)
         working-directory: rust/drachenhauch_runtime
-        run: cargo build --release --locked --features "db net http smtp"
+        run: cargo build --release --locked --features "db net http smtp jit"
 
       # Wie im Windows-Job: die Sammlungen direkt, ohne pytest als Anker.
       # Ohne Grafik ueberspringen sich die Fenster-Faelle selbst.
       - name: Pruefsammlungen (dhrt test)
+        run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
+
+      # Dieselben Sammlungen mit Maschinencode (Regel 3 aus
+      # docs/entwurf-maschinencode.md) -- auf macOS zugleich der Beleg fuer
+      # arm64.
+      - name: Pruefsammlungen mit Maschinencode (DHRT_JIT=immer)
+        env:
+          DHRT_JIT: immer
         run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
@@ -230,4 +249,4 @@ jobs:
       # unbemerkt herum. Ohne Grafik-Feature, wie die Checks davor; die
       # Grafik-Tests laufen lokal mit CARGO_TARGET_DIR=C:/dht.
       - name: cargo test (ohne Grafik)
-        run: cargo test --locked --features "db net http smtp"
+        run: cargo test --locked --features "db net http smtp jit"

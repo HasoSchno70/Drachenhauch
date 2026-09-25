@@ -1,0 +1,719 @@
+' Maschinencode fuer reine Zahlenfunktionen (M3, docs/entwurf-maschinencode.md,
+' src/jit.rs). Jeder Fall steht zweimal: in der VM und mit DHRT_JIT=immer --
+' die Erwartung ist dieselbe, und sie ist die Ausgabe der VM. Gibt der
+' Maschinencode bei einem Fehler auf, rechnet die VM den Aufruf nach; darum
+' stimmen auch Meldung und Zeile ueberein.
+' Format: docs/werkzeuge.md.
+
+=== rechnen mit ueberlauf wird in der zeile gemeldet
+FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    r = a * b
+    RETURN r + 1
+END FUNCTION
+FUNCTION aussen(a AS INTEGER) AS INTEGER
+    RETURN mal(a, a) - 1
+END FUNCTION
+PRINT aussen(1000)
+TRY
+    PRINT aussen(4000000000)
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT aussen(3)
+--- erwartet
+1000000
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 3
+9
+
+=== rechnen mit ueberlauf wird in der zeile gemeldet (maschinencode)
+FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    r = a * b
+    RETURN r + 1
+END FUNCTION
+FUNCTION aussen(a AS INTEGER) AS INTEGER
+    RETURN mal(a, a) - 1
+END FUNCTION
+PRINT aussen(1000)
+TRY
+    PRINT aussen(4000000000)
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT aussen(3)
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+1000000
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 3
+9
+
+=== teilen durch null in allen formen
+FUNCTION t1(a AS INTEGER, b AS INTEGER) AS FLOAT
+    RETURN a / b
+END FUNCTION
+FUNCTION t2(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+FUNCTION t3(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION t4(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a MOD b
+END FUNCTION
+FUNCTION t5(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a / b
+END FUNCTION
+PRINT t1(7, 2); " "; t2(7, 2); " "; t3(7, 2); " "; t4(7.5, 2.0); " "; t5(1.0, 4.0)
+TRY
+    PRINT t1(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t2(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t3(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t4(1.0, 0.0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t5(1.0, -0.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+3.5 3 1 1.5 0.25
+Division durch 0
+Integer-Division durch 0
+MOD durch 0
+MOD durch 0
+Division durch 0
+
+=== teilen durch null in allen formen (maschinencode)
+FUNCTION t1(a AS INTEGER, b AS INTEGER) AS FLOAT
+    RETURN a / b
+END FUNCTION
+FUNCTION t2(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+FUNCTION t3(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION t4(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a MOD b
+END FUNCTION
+FUNCTION t5(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a / b
+END FUNCTION
+PRINT t1(7, 2); " "; t2(7, 2); " "; t3(7, 2); " "; t4(7.5, 2.0); " "; t5(1.0, 4.0)
+TRY
+    PRINT t1(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t2(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t3(1, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t4(1.0, 0.0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT t5(1.0, -0.0)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+3.5 3 1 1.5 0.25
+Division durch 0
+Integer-Division durch 0
+MOD durch 0
+MOD durch 0
+Division durch 0
+
+=== kleinste zahl durch minus eins
+FUNCTION q(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+FUNCTION r(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION n(a AS INTEGER) AS INTEGER
+    RETURN -a
+END FUNCTION
+DIM m AS INTEGER : m = -9223372036854775807 - 1
+PRINT q(m, 2); " "; r(m, 3); " "; n(m + 1)
+TRY
+    PRINT q(m, -1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT r(m, -1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT n(m)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+-4611686018427387904 1 9223372036854775807
+Ganzzahl-Ueberlauf bei '\' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Ganzzahl-Ueberlauf bei 'MOD' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Ganzzahl-Ueberlauf bei '-' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== kleinste zahl durch minus eins (maschinencode)
+FUNCTION q(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+FUNCTION r(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION n(a AS INTEGER) AS INTEGER
+    RETURN -a
+END FUNCTION
+DIM m AS INTEGER : m = -9223372036854775807 - 1
+PRINT q(m, 2); " "; r(m, 3); " "; n(m + 1)
+TRY
+    PRINT q(m, -1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT r(m, -1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT n(m)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+-4611686018427387904 1 9223372036854775807
+Ganzzahl-Ueberlauf bei '\' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Ganzzahl-Ueberlauf bei 'MOD' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+Ganzzahl-Ueberlauf bei '-' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== mod folgt dem vorzeichen des teilers
+FUNCTION r(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION rf(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a MOD b
+END FUNCTION
+FUNCTION g(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+PRINT r(-17, 5); " "; r(17, -5); " "; r(-17, -5); " "; r(17, 5); " "; r(-15, 5)
+PRINT rf(-7.5, 2.0); " "; rf(7.5, -2.0); " "; rf(-7.5, -2.0)
+PRINT g(-7, 2); " "; g(7, -2); " "; g(-7, -2)
+--- erwartet
+3 -3 -2 2 0
+0.5 -0.5 -1.5
+-3 -3 3
+
+=== mod folgt dem vorzeichen des teilers (maschinencode)
+FUNCTION r(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a MOD b
+END FUNCTION
+FUNCTION rf(a AS FLOAT, b AS FLOAT) AS FLOAT
+    RETURN a MOD b
+END FUNCTION
+FUNCTION g(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a \ b
+END FUNCTION
+PRINT r(-17, 5); " "; r(17, -5); " "; r(-17, -5); " "; r(17, 5); " "; r(-15, 5)
+PRINT rf(-7.5, 2.0); " "; rf(7.5, -2.0); " "; rf(-7.5, -2.0)
+PRINT g(-7, 2); " "; g(7, -2); " "; g(-7, -2)
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+3 -3 -2 2 0
+0.5 -0.5 -1.5
+-3 -3 3
+
+=== nan vergleiche und gleichheit
+FUNCTION nan() AS FLOAT
+    DIM gross AS FLOAT
+    DIM k AS INTEGER
+    gross = 1.0
+    FOR k = 1 TO 400
+        gross = gross * 1000.0
+    NEXT
+    RETURN gross - gross
+END FUNCTION
+FUNCTION gleich(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a = b
+END FUNCTION
+FUNCTION ungleich(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a <> b
+END FUNCTION
+FUNCTION kleiner(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a < b
+END FUNCTION
+FUNCTION gemischt(a AS INTEGER, b AS FLOAT) AS BOOLEAN
+    RETURN a = b AND a <= b AND NOT (a > b)
+END FUNCTION
+DIM x AS FLOAT : x = nan()
+PRINT gleich(x, x); " "; ungleich(x, x); " "; gleich(2.0, 2.0); " "; gemischt(2, 2.0); " "; gemischt(2, 2.5)
+TRY
+    PRINT kleiner(x, 1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+FALSE TRUE TRUE TRUE FALSE
+Vergleich mit NaN
+
+=== nan vergleiche und gleichheit (maschinencode)
+FUNCTION nan() AS FLOAT
+    DIM gross AS FLOAT
+    DIM k AS INTEGER
+    gross = 1.0
+    FOR k = 1 TO 400
+        gross = gross * 1000.0
+    NEXT
+    RETURN gross - gross
+END FUNCTION
+FUNCTION gleich(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a = b
+END FUNCTION
+FUNCTION ungleich(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a <> b
+END FUNCTION
+FUNCTION kleiner(a AS FLOAT, b AS FLOAT) AS BOOLEAN
+    RETURN a < b
+END FUNCTION
+FUNCTION gemischt(a AS INTEGER, b AS FLOAT) AS BOOLEAN
+    RETURN a = b AND a <= b AND NOT (a > b)
+END FUNCTION
+DIM x AS FLOAT : x = nan()
+PRINT gleich(x, x); " "; ungleich(x, x); " "; gleich(2.0, 2.0); " "; gemischt(2, 2.0); " "; gemischt(2, 2.5)
+TRY
+    PRINT kleiner(x, 1.0)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+FALSE TRUE TRUE TRUE FALSE
+Vergleich mit NaN
+
+=== kommazahl in eine ganze zahl
+FUNCTION halb(a AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = a / 2
+    RETURN h
+END FUNCTION
+FUNCTION rueck(a AS FLOAT) AS INTEGER
+    RETURN a
+END FUNCTION
+PRINT halb(8); " "; rueck(3.0); " "; rueck(-0.0)
+TRY
+    PRINT halb(7)
+CATCH e
+    PRINT LEFT$(e, 45)
+END TRY
+TRY
+    PRINT rueck(10000000000000000000.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+4 3 0
+Lokale Variable: FLOAT 3.5 passt nicht verlus
+RETURN: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== kommazahl in eine ganze zahl (maschinencode)
+FUNCTION halb(a AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = a / 2
+    RETURN h
+END FUNCTION
+FUNCTION rueck(a AS FLOAT) AS INTEGER
+    RETURN a
+END FUNCTION
+PRINT halb(8); " "; rueck(3.0); " "; rueck(-0.0)
+TRY
+    PRINT halb(7)
+CATCH e
+    PRINT LEFT$(e, 45)
+END TRY
+TRY
+    PRINT rueck(10000000000000000000.0)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+4 3 0
+Lokale Variable: FLOAT 3.5 passt nicht verlus
+RETURN: Ganzzahl-Ueberlauf bei 'Zuweisung' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== funktion ohne return liefert nil
+FUNCTION vielleicht(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN RETURN a * 2
+END FUNCTION
+FUNCTION kette(a AS INTEGER) AS INTEGER
+    RETURN vielleicht(a) + 1
+END FUNCTION
+PRINT vielleicht(4); " "; kette(4)
+PRINT TYPEOF(vielleicht(-1))
+TRY
+    PRINT kette(-1)
+CATCH e
+    PRINT LEFT$(e, 30)
+END TRY
+--- erwartet
+8 9
+NIL
+Operator '+' erwartet Zahlen, 
+
+=== funktion ohne return liefert nil (maschinencode)
+FUNCTION vielleicht(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN RETURN a * 2
+END FUNCTION
+FUNCTION kette(a AS INTEGER) AS INTEGER
+    RETURN vielleicht(a) + 1
+END FUNCTION
+PRINT vielleicht(4); " "; kette(4)
+PRINT TYPEOF(vielleicht(-1))
+TRY
+    PRINT kette(-1)
+CATCH e
+    PRINT LEFT$(e, 30)
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+8 9
+NIL
+Operator '+' erwartet Zahlen, 
+
+=== rekursion bis zur grenze
+FUNCTION tief(n AS INTEGER) AS INTEGER
+    IF n = 0 THEN RETURN 0
+    RETURN tief(n - 1) + 1
+END FUNCTION
+FUNCTION ewig(n AS INTEGER) AS INTEGER
+    RETURN ewig(n + 1)
+END FUNCTION
+PRINT tief(900)
+TRY
+    PRINT ewig(0)
+CATCH e
+    PRINT LEFT$(e, 33)
+END TRY
+PRINT tief(10)
+--- erwartet
+900
+Maximale Aufruftiefe (1000) ueber
+10
+
+=== rekursion bis zur grenze (maschinencode)
+FUNCTION tief(n AS INTEGER) AS INTEGER
+    IF n = 0 THEN RETURN 0
+    RETURN tief(n - 1) + 1
+END FUNCTION
+FUNCTION ewig(n AS INTEGER) AS INTEGER
+    RETURN ewig(n + 1)
+END FUNCTION
+PRINT tief(900)
+TRY
+    PRINT ewig(0)
+CATCH e
+    PRINT LEFT$(e, 33)
+END TRY
+PRINT tief(10)
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+900
+Maximale Aufruftiefe (1000) ueber
+10
+
+=== schleifen, auswahl und wahrheitswerte
+FUNCTION summe(n AS INTEGER, schritt AS INTEGER) AS INTEGER
+    DIM s AS INTEGER
+    DIM i AS INTEGER
+    FOR i = n TO 1 STEP schritt
+        s = s + i
+    NEXT
+    FOR i = 1 TO n
+        IF i MOD 3 = 0 OR i = 7 AND NOT (i > 50) THEN s = s + 1
+    NEXT
+    RETURN s
+END FUNCTION
+FUNCTION stufe(x AS FLOAT) AS INTEGER
+    SELECT CASE x
+        CASE IS < 0.0
+            RETURN -1
+        CASE 0.0 TO 10.0
+            RETURN 1
+        CASE ELSE
+            RETURN 2
+    END SELECT
+END FUNCTION
+FUNCTION wahr(a AS INTEGER, b AS BOOLEAN) AS BOOLEAN
+    DIM r AS BOOLEAN
+    r = NOT b
+    WHILE a > 0
+        r = NOT r
+        a = a - 1
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION wieder(n AS INTEGER) AS INTEGER
+    DIM k AS INTEGER
+    REPEAT
+        k = k + n
+    UNTIL k > 20
+    RETURN k
+END FUNCTION
+PRINT summe(10, -2); " "; summe(20, -1); " "; stufe(-3.5); stufe(4); stufe(10.5); " "; wahr(3, TRUE); " "; wahr(2, TRUE); " "; wieder(6)
+--- erwartet
+34 217 -112 TRUE FALSE 24
+
+=== schleifen, auswahl und wahrheitswerte (maschinencode)
+FUNCTION summe(n AS INTEGER, schritt AS INTEGER) AS INTEGER
+    DIM s AS INTEGER
+    DIM i AS INTEGER
+    FOR i = n TO 1 STEP schritt
+        s = s + i
+    NEXT
+    FOR i = 1 TO n
+        IF i MOD 3 = 0 OR i = 7 AND NOT (i > 50) THEN s = s + 1
+    NEXT
+    RETURN s
+END FUNCTION
+FUNCTION stufe(x AS FLOAT) AS INTEGER
+    SELECT CASE x
+        CASE IS < 0.0
+            RETURN -1
+        CASE 0.0 TO 10.0
+            RETURN 1
+        CASE ELSE
+            RETURN 2
+    END SELECT
+END FUNCTION
+FUNCTION wahr(a AS INTEGER, b AS BOOLEAN) AS BOOLEAN
+    DIM r AS BOOLEAN
+    r = NOT b
+    WHILE a > 0
+        r = NOT r
+        a = a - 1
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION wieder(n AS INTEGER) AS INTEGER
+    DIM k AS INTEGER
+    REPEAT
+        k = k + n
+    UNTIL k > 20
+    RETURN k
+END FUNCTION
+PRINT summe(10, -2); " "; summe(20, -1); " "; stufe(-3.5); stufe(4); stufe(10.5); " "; wahr(3, TRUE); " "; wahr(2, TRUE); " "; wieder(6)
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+34 217 -112 TRUE FALSE 24
+
+=== for am ende des zahlenbereichs
+FUNCTION bis(n AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM z AS INTEGER
+    FOR i = n TO 9223372036854775807
+        z = z + 1
+    NEXT
+    RETURN z
+END FUNCTION
+TRY
+    PRINT bis(9223372036854775805)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+Ganzzahl-Ueberlauf bei '+' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== for am ende des zahlenbereichs (maschinencode)
+FUNCTION bis(n AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM z AS INTEGER
+    FOR i = n TO 9223372036854775807
+        z = z + 1
+    NEXT
+    RETURN z
+END FUNCTION
+TRY
+    PRINT bis(9223372036854775805)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+Ganzzahl-Ueberlauf bei '+' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== argumente werden wie in der vm gewandelt
+FUNCTION f(x AS FLOAT, n AS INTEGER, b AS BOOLEAN) AS FLOAT
+    IF b THEN RETURN x * n
+    RETURN x + n
+END FUNCTION
+FUNCTION rufer(k AS INTEGER) AS FLOAT
+    RETURN f(k, 3, k > 2) + f(0.5, k, FALSE)
+END FUNCTION
+SUB nichts(a AS INTEGER)
+    DIM b AS INTEGER
+    b = a + 1
+END SUB
+FUNCTION mit_sub(a AS INTEGER) AS INTEGER
+    nichts(a)
+    RETURN a
+END FUNCTION
+PRINT f(2, 3, TRUE); " "; f(2.5, 4.0, FALSE); " "; rufer(1); " "; rufer(5); " "; mit_sub(9)
+TRY
+    PRINT f(1.0, 2.5, TRUE)
+CATCH e
+    PRINT LEFT$(e, 40)
+END TRY
+--- erwartet
+6.0 6.5 5.5 20.5 9
+Parameter: FLOAT 2.5 passt nicht verlust
+
+=== argumente werden wie in der vm gewandelt (maschinencode)
+FUNCTION f(x AS FLOAT, n AS INTEGER, b AS BOOLEAN) AS FLOAT
+    IF b THEN RETURN x * n
+    RETURN x + n
+END FUNCTION
+FUNCTION rufer(k AS INTEGER) AS FLOAT
+    RETURN f(k, 3, k > 2) + f(0.5, k, FALSE)
+END FUNCTION
+SUB nichts(a AS INTEGER)
+    DIM b AS INTEGER
+    b = a + 1
+END SUB
+FUNCTION mit_sub(a AS INTEGER) AS INTEGER
+    nichts(a)
+    RETURN a
+END FUNCTION
+PRINT f(2, 3, TRUE); " "; f(2.5, 4.0, FALSE); " "; rufer(1); " "; rufer(5); " "; mit_sub(9)
+TRY
+    PRINT f(1.0, 2.5, TRUE)
+CATCH e
+    PRINT LEFT$(e, 40)
+END TRY
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+6.0 6.5 5.5 20.5 9
+Parameter: FLOAT 2.5 passt nicht verlust
+
+=== mehrfach aufgeben geht auf die vm ueber
+FUNCTION heikel(a AS INTEGER) AS INTEGER
+    RETURN 100 \ a
+END FUNCTION
+DIM i AS INTEGER
+DIM fehler AS INTEGER
+DIM summe AS INTEGER
+FOR i = -12 TO 12
+    TRY
+        summe = summe + heikel(i MOD 3)
+    CATCH e
+        fehler = fehler + 1
+    END TRY
+NEXT
+PRINT summe; " "; fehler
+--- erwartet
+1200 9
+
+=== mehrfach aufgeben geht auf die vm ueber (maschinencode)
+FUNCTION heikel(a AS INTEGER) AS INTEGER
+    RETURN 100 \ a
+END FUNCTION
+DIM i AS INTEGER
+DIM fehler AS INTEGER
+DIM summe AS INTEGER
+FOR i = -12 TO 12
+    TRY
+        summe = summe + heikel(i MOD 3)
+    CATCH e
+        fehler = fehler + 1
+    END TRY
+NEXT
+PRINT summe; " "; fehler
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+1200 9
+
+=== welche funktionen uebersetzt werden
+' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in
+' der VM bleibt. Ohne diesen Fall bliebe die Sammlung auch gruen, wenn der
+' Maschinencode still gar nichts mehr uebersetzte. Ein Bau ohne das Feature
+' `jit` kennt den Schalter nicht und ueberspringt sich.
+IMPORT "helfer.dh"
+dlStarten(["--jit", "prog.dh"])
+IF INSTR(dlAus, "uebersetzt") < 0 AND INSTR(dlAus, "VM:") < 0 THEN
+    PRINT "UEBERSPRINGEN: Bau ohne Maschinencode"
+ELSE
+    PRINT dlAus
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- datei prog.dh
+FUNCTION rein(a AS INTEGER, b AS FLOAT) AS FLOAT
+    RETURN a * b
+END FUNCTION
+FUNCTION ruft(a AS INTEGER) AS FLOAT
+    RETURN rein(a, 0.5) + 1
+END FUNCTION
+FUNCTION druckt(a AS INTEGER) AS INTEGER
+    PRINT a
+    RETURN a
+END FUNCTION
+FUNCTION ueber(a AS INTEGER) AS INTEGER
+    RETURN druckt(a) + 1
+END FUNCTION
+FUNCTION text(a AS STRING) AS INTEGER
+    RETURN LEN(a)
+END FUNCTION
+DIM g AS INTEGER
+FUNCTION global_(a AS INTEGER) AS INTEGER
+    RETURN a + g
+END FUNCTION
+PRINT ruft(3)
+
+--- erwartet
+rein: uebersetzt
+ruft: uebersetzt
+druckt: VM: Ausgabe (PRINT)
+ueber: VM: ruft druckt, das in der VM bleibt
+text: VM: Platz 0 hat den Typ 'string'
+global_: VM: globale Variable

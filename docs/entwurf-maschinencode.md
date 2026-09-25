@@ -247,6 +247,51 @@ Ausstiegsroutine, die dieselbe Meldung mit derselben Zeile baut wie die VM.
 
 Ziel: `fib(30)` unter 20 ms, Zahlenschleife unter 20 ms.
 
+**Erster Schritt 2026-09-25 -- reine Zahlenfunktionen, gebaut** (`src/jit.rs`,
+Feature `jit` mit Cranelift 0.134 -- 0.135 und neuer verlangen Rust 1.96).
+Uebersetzt wird eine Funktion, wenn sie REIN ist: Parameter/Locals/Rueckgabe
+INTEGER, FLOAT oder BOOLEAN (`any`-Locals, deren Art aus den Zuweisungen
+folgt, gehen mit), und sie nur rechnet (+ - * / \ MOD, Vorzeichen,
+Vergleiche, NOT), springt (IF, SELECT, WHILE, REPEAT, FOR ueber INTEGER) und
+andere reine Funktionen ruft. Eine abstrakte Ausfuehrung ueber den Bytecode
+bestimmt je Stelle die Art jedes Stapelplatzes und Locals; widersprechen sich
+zwei Wege, bleibt die Funktion in der VM. Ruft sie eine, die in der VM
+bleibt, bleibt sie auch dort (ganz oder gar nicht, Regel 1).
+
+**Fehler: die VM rechnet nach.** Weil eine reine Funktion keine
+Nebenwirkung hat, gibt der Maschinencode bei JEDEM Fehlerfall auf --
+Ueberlauf, Division durch 0, `MIN \ -1`, FLOAT -> INTEGER mit
+Nachkommastellen oder ausserhalb des Bereichs, `<` mit NaN, fehlendes
+RETURN, zu tiefe Rekursion (Zaehler im `Kontext`, gleiche Grenze wie `exec`)
+-- und die VM rechnet denselben Aufruf noch einmal. Meldung und Zeile kommen
+damit von der VM selbst; es gibt keine zweite Fassung einer Fehlermeldung.
+Nach 8 Rueckfaellen nimmt eine Funktion nur noch die VM. Die VM ruft den
+Maschinencode nur, wenn jedes Argument genau passt (Umwandlungen und ihre
+Fehler bleiben bei ihr), und nicht unter Profiler/Debugger/Stop.
+
+Schalter: `DHRT_JIT=immer` uebersetzt beim Start jede reine Funktion (sonst
+laeuft alles in der VM wie bisher -- `auto` kommt spaeter), `dhrt --jit
+datei.dh` nennt je Funktion "uebersetzt" oder den Grund.
+
+| gemessen | VM | Maschinencode |
+|---|---|---|
+| `fib(30)` (`tools/tempo/aufrufe.dh`) | 144 ms | 3,3 ms |
+| 10 Mio. `s = s + i * 0.5` in einer Funktion | 189 ms | 5,1 ms |
+| 10 Mio. `IF i MOD 3 = 0 THEN s = s + i` in einer Funktion | 382 ms | 8,1 ms |
+
+Die Tempo-Programme, die im Hauptprogramm rechnen, aendern sich nicht --
+dort sind die Variablen global (M4 Punkt 1). Ueber alle `.dh` des Repos:
+85 Funktionen werden uebersetzt, keine laesst Cranelift scheitern; die
+haeufigsten Gruende, in der VM zu bleiben, sind STRING (701, nur der erste
+Grund zaehlt), globale Variablen (488) und eingebaute Befehle (95).
+
+Pruefung: `tests/pruef/jit.dhtest` (jeder Randfall zweimal, Erwartung =
+Ausgabe der VM; Gegenprobe: ohne die MOD-Korrektur bzw. ohne die
+Ueberlaufpruefung beim Multiplizieren fallen genau die Maschinencode-Faelle),
+die ganze Suite unter `DHRT_JIT=immer` (lokal `--schnell`: 3580 ok, 0 fehl),
+und die CI laeuft die Sammlungen zweimal (Windows zweiter Lauf `--schnell`,
+Linux/macOS ganz -- macOS ist zugleich arm64).
+
 ### M4 — Breite (laufend)
 
 Nach Wirkung, jeweils mit eigener Messung:
