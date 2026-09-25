@@ -1,0 +1,170 @@
+' Rahmenstapel (M2, docs/entwurf-maschinencode.md): ein Aufruf einer
+' schlichten Funktion (CALL_USER, keine Coroutine, kein BYREF) wechselt in
+' `dispatch` den Rahmen, statt ueber exec -> run_frame -> dispatch neu
+' einzusteigen. Fehler laufen Rahmen fuer Rahmen nach aussen, bis ein TRY sie
+' faengt. Jede Erwartung hier ist die Ausgabe des Baus VOR dem Rahmenstapel
+' (2026.15 + M2 Schritt 1) -- es darf sich nichts aendern.
+' Format: docs/werkzeuge.md.
+
+=== fehler drei ebenen tief wird aussen gefangen
+FUNCTION c(x AS INTEGER) AS INTEGER
+    IF x = 0 THEN THROW "null in c"
+    RETURN 100 \ x
+END FUNCTION
+FUNCTION b(x AS INTEGER) AS INTEGER
+    RETURN c(x) + 1
+END FUNCTION
+FUNCTION a(x AS INTEGER) AS INTEGER
+    DIM r AS INTEGER
+    TRY
+        r = b(x)
+    CATCH e
+        PRINT "a faengt: "; e; " zeile "; ERROR_LINE()
+        r = -1
+    END TRY
+    RETURN r
+END FUNCTION
+PRINT a(4)
+PRINT a(0)
+PRINT a(5)
+--- erwartet
+26
+a faengt: null in c zeile 2
+-1
+21
+
+=== fehler ohne try nennt die innerste zeile
+FUNCTION tief(x AS INTEGER) AS INTEGER
+    DIM f[3] AS INTEGER
+    RETURN f[x]
+END FUNCTION
+FUNCTION mitte(x AS INTEGER) AS INTEGER
+    RETURN tief(x) * 2
+END FUNCTION
+PRINT mitte(1)
+PRINT mitte(7)
+--- erwartet
+0
+--- fehler
+fall.dh:3:
+
+=== try im gerufenen faengt selbst und kehrt normal zurueck
+FUNCTION sicher(t AS STRING) AS INTEGER
+    TRY
+        RETURN VAL(t) \ 0
+    CATCH e
+        RETURN -1
+    END TRY
+END FUNCTION
+FUNCTION summe() AS INTEGER
+    RETURN sicher("8") + sicher("2") + 5
+END FUNCTION
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    PRINT summe()
+NEXT
+--- erwartet
+3
+3
+3
+
+=== rekursion und tiefe grenze
+FUNCTION fib(n AS INTEGER) AS INTEGER
+    IF n < 2 THEN RETURN n
+    RETURN fib(n - 1) + fib(n - 2)
+END FUNCTION
+FUNCTION ewig(n AS INTEGER) AS INTEGER
+    RETURN ewig(n + 1)
+END FUNCTION
+PRINT fib(20)
+TRY
+    PRINT ewig(0)
+CATCH e
+    PRINT LEFT$(e, 33)
+END TRY
+PRINT fib(10)
+--- erwartet
+6765
+Maximale Aufruftiefe (1000) ueber
+55
+
+=== exit mitten im aufruf endet das programm
+FUNCTION tief() AS INTEGER
+    PRINT "vor exit"
+    EXIT(3)
+    RETURN 1
+END FUNCTION
+FUNCTION aussen() AS INTEGER
+    TRY
+        RETURN tief()
+    CATCH e
+        PRINT "darf nicht fangen"
+    END TRY
+    RETURN 0
+END FUNCTION
+PRINT aussen()
+PRINT "nie"
+--- erwartet
+vor exit
+--- rueckgabe 3
+
+=== sub und funktion ohne return, rueckgabetyp wird gewandelt
+SUB sag(t AS STRING)
+    PRINT "sag "; t
+END SUB
+FUNCTION halb(x AS INTEGER) AS FLOAT
+    RETURN x \ 2
+END FUNCTION
+FUNCTION kette(x AS INTEGER) AS STRING
+    sag("kette")
+    RETURN STR$(halb(x))
+END FUNCTION
+PRINT kette(9); " "; TYPEOF(halb(4))
+--- erwartet
+sag kette
+4.0 FLOAT
+
+=== methoden und rueckrufe mitten im stapel
+CLASS Zaehler
+    DIM n AS INTEGER
+    FUNCTION plus(k AS INTEGER) AS INTEGER
+        Self.n = Self.n + doppel(k)
+        RETURN Self.n
+    END FUNCTION
+END CLASS
+FUNCTION doppel(k AS INTEGER) AS INTEGER
+    RETURN k * 2
+END FUNCTION
+FUNCTION vergleich(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN b - a
+END FUNCTION
+FUNCTION sortiert() AS STRING
+    DIM f AS ARRAY OF INTEGER
+    f = [3, 1, 2]
+    SORT(f, vergleich)
+    RETURN STR$(f[0]) + STR$(f[1]) + STR$(f[2])
+END FUNCTION
+DIM z AS Zaehler
+z = NEW Zaehler()
+PRINT z.plus(1); " "; z.plus(2); " "; sortiert()
+--- erwartet
+2 6 321
+
+=== lokale und parameter bleiben je rahmen getrennt
+FUNCTION innen(a AS INTEGER) AS INTEGER
+    DIM tmp AS INTEGER
+    tmp = a * 10
+    RETURN tmp
+END FUNCTION
+FUNCTION aussen(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM tmp AS INTEGER
+    tmp = 1
+    tmp = tmp + innen(a) + innen(b)
+    RETURN tmp + a + b
+END FUNCTION
+FUNCTION vorgabe(a AS INTEGER, b AS INTEGER = 7) AS INTEGER
+    RETURN a + b
+END FUNCTION
+PRINT aussen(2, 3); " "; vorgabe(1); " "; vorgabe(1, 2)
+--- erwartet
+56 8 3
