@@ -883,6 +883,18 @@ impl Compiler {
                     self.merke_global_typ(var, "integer", &None);
                     self.alloc_slot(var);
                 }
+                // Die Laufvariable(n) von FOR EACH bekommen ebenfalls einen
+                // Platz; ohne ihn liefen sie ueber den NAMEN (LOAD_NAME: Hash-
+                // Suche je Zugriff), und eine Schleife damit liess sich nicht
+                // in Maschinencode uebersetzen.
+                Node::ForEach { var, var2, .. } => {
+                    // Nur der Platz -- NICHT in `global_vars`: die Laufvariable
+                    // verdeckt keinen Befehl gleichen Namens (`FOR EACH len IN
+                    // ...` und darin `LEN(x)`, variable_wie_builtin.dhtest).
+                    for n in [Some(var), var2.as_ref()].into_iter().flatten() {
+                        self.alloc_slot(n);
+                    }
+                }
                 Node::EnumDecl { name, .. } => {
                     self.global_consts.insert(name.to_lowercase());
                     self.alloc_slot(name);

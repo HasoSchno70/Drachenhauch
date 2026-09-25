@@ -1581,6 +1581,17 @@ Ausnahme: ruft der Bereich eine Funktion, die Globale schreibt
 (`schreibt_globale`), gibt er wie frueher auf und darf keine Felder
 schreiben. felder.dh 92 -> 13 ms.
 
+**Objekte im Maschinencode (M4 Schritt 4b):** `Art::Obj(k)` = Zeiger auf
+`RefCell<Instance>`, Felder ueber die Helfer `feld_lesen_*`/`feld_setzen_*`
+(die Lage eines `Value` ist nicht festgelegt, also kein direkter
+Speicherzugriff). Elemente von Feldern von Werten/Tupeln (`Elem::Wert`) und
+Objekt-Felder werden beim Lesen auf ihre Klasse geprueft -- sonst
+aussteigen. Globale ohne festen Zahlentyp (Objekte, FOR-EACH-Variable)
+fuehrt ein Bereich wie Locals (`dyn_glob`, `umleiten`). **Die Laufvariable
+von FOR EACH im Hauptprogramm hat seither einen globalen Platz**
+(`collect_globals`) statt ueber ihren Namen zu laufen. teilchen.dh
+661 -> 177 ms (VM) -> 27 ms (Maschinencode).
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
