@@ -1663,7 +1663,7 @@ impl<'p> Vm<'p> {
     /// merkt sich `SORT` nichts. Wer eine Familie baut, die je nach ARGUMENT
     /// absagt, obwohl eine spaetere denselben Namen kennt, muss hier dasselbe
     /// tun.
-    fn builtin_rufen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>) -> R<Value> {
+    pub(crate) fn builtin_rufen(&mut self, name: &str, a: &[Value], merk: &std::cell::Cell<u8>) -> R<Value> {
         let f = merk.get();
         if f != 0 {
             if let Some(v) = self.familie_rufen(f, name, a)? { return Ok(v); }
@@ -2629,10 +2629,15 @@ impl<'p> Vm<'p> {
                     if !exit {
                         // M4: eine Schleife im Maschinencode (jit::Jit::schleife).
                         #[cfg(feature = "jit")]
+                        let vmp: *mut Vm = self;
+                        #[cfg(feature = "jit")]
                         if let Some(j) = self.jit.as_ref().filter(|_| !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
                             {
-                                if let Some(weiter) = j.schleife(self.prog, fn_, *ip - 1, target, locals, stack, self_obj,
+                                if let Some(weiter) = j.schleife(vmp, self.prog, fn_, *ip - 1, target, locals, stack, self_obj,
                                                                  self.depth, MAX_CALL_DEPTH, &self.global_slots) {
+                                    // Ein Befehl im Bereich ist gescheitert: sein Fehler,
+                                    // an seiner Stelle (die Zeile nimmt run_frame von ip - 1).
+                                    if let Some(e) = j.meldung_nehmen() { *ip = weiter + 1; return Err(e); }
                                     *ip = weiter;
                                     continue;
                                 }
@@ -2810,10 +2815,13 @@ impl<'p> Vm<'p> {
                     let ziel = arg.as_usize();
                     // M4: Ruecksprung einer Schleife -> vielleicht Maschinencode.
                     #[cfg(feature = "jit")]
+                    let vmp: *mut Vm = self;
+                    #[cfg(feature = "jit")]
                     if let Some(j) = self.jit.as_ref().filter(|_| ziel < *ip && !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
                         {
-                            if let Some(weiter) = j.schleife(self.prog, fn_, *ip - 1, ziel, locals, stack, self_obj,
+                            if let Some(weiter) = j.schleife(vmp, self.prog, fn_, *ip - 1, ziel, locals, stack, self_obj,
                                                              self.depth, MAX_CALL_DEPTH, &self.global_slots) {
+                                if let Some(e) = j.meldung_nehmen() { *ip = weiter + 1; return Err(e); }
                                 *ip = weiter;
                                 continue;
                             }

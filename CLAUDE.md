@@ -1601,6 +1601,15 @@ zurueck. Befehle nur mit `familie == BUILTIN_FAMILIEN` (also schon einmal
 von der VM an dieser Stelle gerufen). **`s = s + e` gibt den Platz von `s`
 vorher ab** (`w_op`, `lokal`), sonst kopiert jede Runde. text.dh 53 -> 41 ms.
 
+**Befehle aller Familien im Wertemodus (M4 Schritt 6):** `w_builtin_roh`
+ruft ueber `Kontext::vm` `Vm::builtin_rufen`, ausser `befehl_im_bereich`
+sagt nein (Familien 2/4/8, `TIMER_UPDATE`, `GUI_UPDATE`, `ASSERT` --
+alles, was Drachenhauch-Code ruft, sieht sonst Locals/Globale, die der
+Bereich gerade haelt). **Wer eine Familie oder einen Befehl dazubaut, der
+Rueckrufe feuert, traegt ihn dort ein.** Ein gescheiterter Befehl wird
+nicht nachgerechnet: `Jit::meldung_nehmen` im Haken der VM gibt den Fehler
+an seiner Stelle aus. familien.dh 200 -> 16,5 ms.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
