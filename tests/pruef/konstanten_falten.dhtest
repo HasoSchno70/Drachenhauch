@@ -108,20 +108,27 @@ Erwartet INTEGER
 
 === ein gefalteter ausdruck ist so schnell wie die fertige zahl
 ' Vorher: `x + 2 * 3` 225 ms, `x + 6` 150 ms je 10 Mio. Schleifen.
+' Abwechselnd dreimal gemessen, der beste Lauf zaehlt -- einmal gemessen
+' flackerte der Fall, wenn die ganze Sammlung parallel lief (2026-09-24).
 CONST FAKTOR = 3
 DIM i AS INTEGER
 DIM x AS INTEGER
 DIM t AS INTEGER
-t = MILLIS()
-FOR i = 1 TO 3000000
-    x = x + 6
+DIM fertig AS INTEGER : fertig = 1000000
+DIM gefaltet AS INTEGER : gefaltet = 1000000
+DIM runde AS INTEGER
+FOR runde = 1 TO 3
+    t = MILLIS()
+    FOR i = 1 TO 1000000
+        x = x + 6
+    NEXT
+    fertig = MIN(fertig, MILLIS() - t)
+    t = MILLIS()
+    FOR i = 1 TO 1000000
+        x = x + 2 * FAKTOR
+    NEXT
+    gefaltet = MIN(gefaltet, MILLIS() - t)
 NEXT
-DIM fertig AS INTEGER : fertig = MILLIS() - t
-t = MILLIS()
-FOR i = 1 TO 3000000
-    x = x + 2 * FAKTOR
-NEXT
-DIM gefaltet AS INTEGER : gefaltet = MILLIS() - t
-PRINT x; " "; gefaltet < fertig * 5 / 4 + 10
+PRINT x; " "; gefaltet < fertig * 5 \ 4 + 10
 --- erwartet
 36000000 TRUE

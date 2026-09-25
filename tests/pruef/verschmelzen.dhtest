@@ -1,0 +1,215 @@
+' Superinstruktionen (M2, docs/entwurf-maschinencode.md): beim Laden markiert
+' `model::verschmelzen` Folgen wie `LOAD a, LOAD b, ADD, STORE c`, und
+' `dispatch` fuehrt sie in einem Schritt aus -- aber nur den sicheren Fall.
+' Alles andere (Ueberlauf, Division durch 0, eine Umwandlung beim Speichern,
+' ein konstanter oder leerer Platz, Kommazahl-Vergleiche) laeuft Befehl fuer
+' Befehl. Jeder Fall steht zweimal: einmal mit, einmal ohne
+' (`DHRT_OHNE_VERSCHMELZEN`) -- die Erwartung ist dieselbe.
+' Format: docs/werkzeuge.md.
+
+=== rechnen und vergleichen wie ohne
+SUB lauf()
+    DIM a AS INTEGER : a = 7
+    DIM b AS INTEGER : b = 3
+    DIM f AS FLOAT : f = 2.5
+    DIM c AS INTEGER
+    DIM g AS FLOAT
+    c = a + b : PRINT c;
+    c = a - b : PRINT " "; c;
+    c = a * b : PRINT " "; c;
+    c = a MOD b : PRINT " "; c;
+    c = -7 MOD b : PRINT " "; c;
+    g = a / b : PRINT " "; g;
+    g = a * f : PRINT " "; g;
+    g = a + b : PRINT " "; g
+    IF a < b THEN PRINT "lt" ELSE PRINT "ge"
+    IF a <= 7 THEN PRINT "le"
+    IF f > a THEN PRINT "gt" ELSE PRINT "ngt"
+    IF a = 7 AND b <> 7 THEN PRINT "eq"
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    FOR i = 1 TO 10
+        IF i MOD 2 = 0 THEN s = s + i
+    NEXT
+    PRINT s
+END SUB
+lauf()
+--- erwartet
+10 4 21 1 2 2.3333333333333335 17.5 10.0
+ge
+le
+ngt
+eq
+30
+
+=== rechnen und vergleichen wie ohne (ohne verschmelzen)
+SUB lauf()
+    DIM a AS INTEGER : a = 7
+    DIM b AS INTEGER : b = 3
+    DIM f AS FLOAT : f = 2.5
+    DIM c AS INTEGER
+    DIM g AS FLOAT
+    c = a + b : PRINT c;
+    c = a - b : PRINT " "; c;
+    c = a * b : PRINT " "; c;
+    c = a MOD b : PRINT " "; c;
+    c = -7 MOD b : PRINT " "; c;
+    g = a / b : PRINT " "; g;
+    g = a * f : PRINT " "; g;
+    g = a + b : PRINT " "; g
+    IF a < b THEN PRINT "lt" ELSE PRINT "ge"
+    IF a <= 7 THEN PRINT "le"
+    IF f > a THEN PRINT "gt" ELSE PRINT "ngt"
+    IF a = 7 AND b <> 7 THEN PRINT "eq"
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    FOR i = 1 TO 10
+        IF i MOD 2 = 0 THEN s = s + i
+    NEXT
+    PRINT s
+END SUB
+lauf()
+--- umgebung
+DHRT_OHNE_VERSCHMELZEN=1
+--- erwartet
+10 4 21 1 2 2.3333333333333335 17.5 10.0
+ge
+le
+ngt
+eq
+30
+
+=== ueberlauf meldet sich in seiner zeile
+' Der schnelle Weg gibt beim Ueberlauf ab; die Meldung kommt vom Einzelbefehl.
+SUB lauf()
+    DIM a AS INTEGER : a = 9223372036854775807
+    DIM b AS INTEGER : b = 1
+    DIM c AS INTEGER
+    TRY
+        c = a + b
+    CATCH e
+        PRINT "gefangen: "; e
+    END TRY
+    c = a * b
+    PRINT c
+    c = a + b
+END SUB
+lauf()
+--- erwartet
+gefangen: Ganzzahl-Ueberlauf bei '+' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+9223372036854775807
+--- fehler
+fall.dh:13: Ganzzahl-Ueberlauf bei '+'
+
+=== ueberlauf meldet sich in seiner zeile (ohne verschmelzen)
+SUB lauf()
+    DIM a AS INTEGER : a = 9223372036854775807
+    DIM b AS INTEGER : b = 1
+    DIM c AS INTEGER
+    TRY
+        c = a + b
+    CATCH e
+        PRINT "gefangen: "; e
+    END TRY
+    c = a * b
+    PRINT c
+    c = a + b
+END SUB
+lauf()
+--- umgebung
+DHRT_OHNE_VERSCHMELZEN=1
+--- erwartet
+gefangen: Ganzzahl-Ueberlauf bei '+' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+9223372036854775807
+--- fehler
+fall.dh:12: Ganzzahl-Ueberlauf bei '+'
+
+=== umwandeln beim speichern und division durch null
+' Ein INTEGER-Ergebnis in eine FLOAT-Variable braucht eine Umwandlung, eine
+' Kommazahl in eine INTEGER-Variable die Pruefung "verlustfrei" -- beides
+' macht der Einzelbefehl. Ebenso die Division durch 0.
+DIM gf AS FLOAT
+DIM gi AS INTEGER
+DIM x AS INTEGER : x = 6
+DIM y AS INTEGER : y = 4
+gf = x + y
+PRINT gf; " "; TYPEOF(gf)
+gi = x / 2
+PRINT gi; " "; TYPEOF(gi)
+TRY
+    gi = x / y
+CATCH e
+    PRINT "halb: "; LEFT$(e, 40)
+END TRY
+DIM null AS INTEGER
+TRY
+    gf = x / null
+CATCH e
+    PRINT "null: "; e
+END TRY
+--- erwartet
+10.0 FLOAT
+3 INTEGER
+halb: Zuweisung an global: FLOAT 1.5 passt nic
+null: Division durch 0
+
+=== umwandeln beim speichern und division durch null (ohne verschmelzen)
+DIM gf AS FLOAT
+DIM gi AS INTEGER
+DIM x AS INTEGER : x = 6
+DIM y AS INTEGER : y = 4
+gf = x + y
+PRINT gf; " "; TYPEOF(gf)
+gi = x / 2
+PRINT gi; " "; TYPEOF(gi)
+TRY
+    gi = x / y
+CATCH e
+    PRINT "halb: "; LEFT$(e, 40)
+END TRY
+DIM null AS INTEGER
+TRY
+    gf = x / null
+CATCH e
+    PRINT "null: "; e
+END TRY
+--- umgebung
+DHRT_OHNE_VERSCHMELZEN=1
+--- erwartet
+10.0 FLOAT
+3 INTEGER
+halb: Zuweisung an global: FLOAT 1.5 passt nic
+null: Division durch 0
+
+=== welche folgen markiert werden
+' Gegenprobe, dass der schnelle Weg ueberhaupt da ist -- ohne Zeitmessung
+' (die flackert auf einer belasteten Maschine): `dhrt --verschmolzen` listet
+' die markierten Stellen. Die Folge im Rumpf der Schleife ist ein Sprung
+' (IF i MOD 3 = 0), die Zuweisung `c = a * b` speichert lokal; `a + b` als
+' Argument bleibt ein Wert. Mit DHRT_OHNE_VERSCHMELZEN steht nichts da.
+IMPORT "helfer.dh"
+dlStarten(["--verschmolzen", "prog.dh"])
+PRINT dlAus
+SETENV("DHRT_OHNE_VERSCHMELZEN", "1")
+dlStarten(["--verschmolzen", "prog.dh"])
+PRINT "ohne: ["; TRIM$(dlAus); "]"
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- datei prog.dh
+SUB lauf(a AS INTEGER, b AS INTEGER)
+    DIM c AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 1 TO 10
+        IF i MOD 3 = 0 THEN c = a * b
+    NEXT
+    PRINT a + b
+END SUB
+lauf(2, 3)
+
+--- erwartet
+lauf 7 sprung-wahr
+lauf 11 wert
+lauf 17 lokal
+lauf 23 wert
+
+ohne: []

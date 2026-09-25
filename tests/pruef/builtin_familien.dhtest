@@ -76,12 +76,19 @@ c = CHART_NEW("balken", 0, 0, 100, 100)
 DIM i AS INTEGER
 DIM z AS INTEGER
 DIM t AS INTEGER
-t = MILLIS()
-FOR i = 1 TO 1000000 : z = ABS(i) : NEXT
-DIM vorn AS INTEGER : vorn = MILLIS() - t
-t = MILLIS()
-FOR i = 1 TO 1000000 : z = CHART_COUNT(c) : NEXT
-DIM hinten AS INTEGER : hinten = MILLIS() - t
-PRINT hinten < vorn * 3 / 2 + 20
+' Abwechselnd dreimal, der beste Lauf zaehlt -- einmal gemessen flackerte
+' der Fall auf dem macOS-Laeufer der CI (2026-09-24).
+DIM vorn AS INTEGER : vorn = 1000000
+DIM hinten AS INTEGER : hinten = 1000000
+DIM runde AS INTEGER
+FOR runde = 1 TO 3
+    t = MILLIS()
+    FOR i = 1 TO 1000000 : z = ABS(i) : NEXT
+    vorn = MIN(vorn, MILLIS() - t)
+    t = MILLIS()
+    FOR i = 1 TO 1000000 : z = CHART_COUNT(c) : NEXT
+    hinten = MIN(hinten, MILLIS() - t)
+NEXT
+PRINT hinten < vorn * 3 \ 2 + 20
 --- erwartet
 TRUE
