@@ -673,6 +673,296 @@ DHRT_JIT=immer
 --- erwartet
 1200 9
 
+=== globale werden erst nach dem aufruf uebernommen
+DIM zaehler AS INTEGER
+DIM summe AS FLOAT
+DIM an AS BOOLEAN
+SUB schritt(k AS INTEGER)
+    zaehler = zaehler + 1
+    summe = summe + k * 0.5
+    IF zaehler > 5 THEN an = TRUE
+END SUB
+FUNCTION lauf(n AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        schritt(i)
+    NEXT
+    RETURN zaehler
+END FUNCTION
+PRINT lauf(10); " "; summe; " "; an
+zaehler = 9223372036854775806
+TRY
+    PRINT lauf(3)
+CATCH e
+    PRINT "fehler: "; LEFT$(e, 30)
+END TRY
+PRINT zaehler; " "; summe
+zaehler = 0
+PRINT lauf(2); " "; zaehler
+--- erwartet
+10 27.5 TRUE
+fehler: Ganzzahl-Ueberlauf bei '+' (IN
+9223372036854775807 28.0
+2 2
+
+=== globale werden erst nach dem aufruf uebernommen (maschinencode)
+DIM zaehler AS INTEGER
+DIM summe AS FLOAT
+DIM an AS BOOLEAN
+SUB schritt(k AS INTEGER)
+    zaehler = zaehler + 1
+    summe = summe + k * 0.5
+    IF zaehler > 5 THEN an = TRUE
+END SUB
+FUNCTION lauf(n AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        schritt(i)
+    NEXT
+    RETURN zaehler
+END FUNCTION
+PRINT lauf(10); " "; summe; " "; an
+zaehler = 9223372036854775806
+TRY
+    PRINT lauf(3)
+CATCH e
+    PRINT "fehler: "; LEFT$(e, 30)
+END TRY
+PRINT zaehler; " "; summe
+zaehler = 0
+PRINT lauf(2); " "; zaehler
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+10 27.5 TRUE
+fehler: Ganzzahl-Ueberlauf bei '+' (IN
+9223372036854775807 28.0
+2 2
+
+=== globale vor ihrem dim
+FUNCTION lies() AS INTEGER
+    RETURN spaet + 1
+END FUNCTION
+TRY
+    PRINT lies()
+CATCH e
+    PRINT LEFT$(e, 40)
+END TRY
+DIM spaet AS INTEGER
+spaet = 41
+PRINT lies()
+--- erwartet
+Zugriff auf eine globale Variable, die n
+42
+
+=== globale vor ihrem dim (maschinencode)
+FUNCTION lies() AS INTEGER
+    RETURN spaet + 1
+END FUNCTION
+TRY
+    PRINT lies()
+CATCH e
+    PRINT LEFT$(e, 40)
+END TRY
+DIM spaet AS INTEGER
+spaet = 41
+PRINT lies()
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+Zugriff auf eine globale Variable, die n
+42
+
+=== for ueber eine globale laufvariable
+DIM k AS INTEGER
+DIM spur AS INTEGER
+SUB zaehle(n AS INTEGER)
+    FOR k = n TO 1 STEP -2
+        spur = spur * 10 + k
+    NEXT
+END SUB
+zaehle(7)
+PRINT k; " "; spur
+--- erwartet
+0 7531
+
+=== for ueber eine globale laufvariable (maschinencode)
+DIM k AS INTEGER
+DIM spur AS INTEGER
+SUB zaehle(n AS INTEGER)
+    FOR k = n TO 1 STEP -2
+        spur = spur * 10 + k
+    NEXT
+END SUB
+zaehle(7)
+PRINT k; " "; spur
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+0 7531
+
+=== umwandeln beim schreiben in globale
+DIM gf AS FLOAT
+DIM gi AS INTEGER
+SUB setze(a AS INTEGER, b AS FLOAT)
+    gf = a
+    gi = b
+END SUB
+setze(3, 4.0)
+PRINT gf; " "; TYPEOF(gf); " "; gi; " "; TYPEOF(gi)
+TRY
+    setze(5, 2.5)
+CATCH e
+    PRINT LEFT$(e, 35)
+END TRY
+PRINT gf; " "; gi
+--- erwartet
+3.0 FLOAT 4 INTEGER
+Zuweisung an global: FLOAT 2.5 pass
+5.0 4
+
+=== umwandeln beim schreiben in globale (maschinencode)
+DIM gf AS FLOAT
+DIM gi AS INTEGER
+SUB setze(a AS INTEGER, b AS FLOAT)
+    gf = a
+    gi = b
+END SUB
+setze(3, 4.0)
+PRINT gf; " "; TYPEOF(gf); " "; gi; " "; TYPEOF(gi)
+TRY
+    setze(5, 2.5)
+CATCH e
+    PRINT LEFT$(e, 35)
+END TRY
+PRINT gf; " "; gi
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+3.0 FLOAT 4 INTEGER
+Zuweisung an global: FLOAT 2.5 pass
+5.0 4
+
+=== mehrere funktionen teilen einen schatten
+DIM stand AS INTEGER
+FUNCTION plus(n AS INTEGER) AS INTEGER
+    stand = stand + n
+    RETURN stand
+END FUNCTION
+FUNCTION doppelt() AS INTEGER
+    DIM a AS INTEGER
+    a = plus(3)
+    stand = stand * 2
+    RETURN a + plus(1) + stand
+END FUNCTION
+stand = 10
+PRINT doppelt(); " "; stand
+stand = stand + 100
+PRINT plus(0); " "; doppelt(); " "; stand
+--- erwartet
+67 27
+127 652 261
+
+=== mehrere funktionen teilen einen schatten (maschinencode)
+DIM stand AS INTEGER
+FUNCTION plus(n AS INTEGER) AS INTEGER
+    stand = stand + n
+    RETURN stand
+END FUNCTION
+FUNCTION doppelt() AS INTEGER
+    DIM a AS INTEGER
+    a = plus(3)
+    stand = stand * 2
+    RETURN a + plus(1) + stand
+END FUNCTION
+stand = 10
+PRINT doppelt(); " "; stand
+stand = stand + 100
+PRINT plus(0); " "; doppelt(); " "; stand
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+67 27
+127 652 261
+
+=== konstante zur laufzeit
+CONST BASIS AS INTEGER = LEN("abcd")
+CONST FAKTOR = LEN("xy")
+FUNCTION mal(n AS INTEGER) AS INTEGER
+    RETURN n * BASIS
+END FUNCTION
+FUNCTION mal2(n AS INTEGER) AS INTEGER
+    RETURN n * FAKTOR
+END FUNCTION
+PRINT mal(3); " "; mal2(3)
+--- erwartet
+12 6
+
+=== konstante zur laufzeit (maschinencode)
+CONST BASIS AS INTEGER = LEN("abcd")
+CONST FAKTOR = LEN("xy")
+FUNCTION mal(n AS INTEGER) AS INTEGER
+    RETURN n * BASIS
+END FUNCTION
+FUNCTION mal2(n AS INTEGER) AS INTEGER
+    RETURN n * FAKTOR
+END FUNCTION
+PRINT mal(3); " "; mal2(3)
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+12 6
+
+=== hochzaehlen vor einem fehler zaehlt einmal
+DIM zaehler AS INTEGER
+DIM teiler AS INTEGER
+FUNCTION kaputt(n AS INTEGER) AS INTEGER
+    zaehler = zaehler + 1
+    RETURN n \ teiler
+END FUNCTION
+teiler = 2
+PRINT kaputt(10); " "; zaehler
+teiler = 0
+TRY
+    PRINT kaputt(10)
+CATCH e
+    PRINT e
+END TRY
+PRINT zaehler
+teiler = 5
+PRINT kaputt(10); " "; zaehler
+--- erwartet
+5 1
+Integer-Division durch 0
+2
+2 3
+
+=== hochzaehlen vor einem fehler zaehlt einmal (maschinencode)
+DIM zaehler AS INTEGER
+DIM teiler AS INTEGER
+FUNCTION kaputt(n AS INTEGER) AS INTEGER
+    zaehler = zaehler + 1
+    RETURN n \ teiler
+END FUNCTION
+teiler = 2
+PRINT kaputt(10); " "; zaehler
+teiler = 0
+TRY
+    PRINT kaputt(10)
+CATCH e
+    PRINT e
+END TRY
+PRINT zaehler
+teiler = 5
+PRINT kaputt(10); " "; zaehler
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+5 1
+Integer-Division durch 0
+2
+2 3
+
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in
 ' der VM bleibt. Ohne diesen Fall bliebe die Sammlung auch gruen, wenn der
@@ -705,8 +995,13 @@ FUNCTION text(a AS STRING) AS INTEGER
     RETURN LEN(a)
 END FUNCTION
 DIM g AS INTEGER
+DIM name$ AS STRING
 FUNCTION global_(a AS INTEGER) AS INTEGER
     RETURN a + g
+END FUNCTION
+FUNCTION namenslaenge(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN name$ = "x"
+    RETURN 3
 END FUNCTION
 PRINT ruft(3)
 
@@ -716,4 +1011,5 @@ ruft: uebersetzt
 druckt: VM: Ausgabe (PRINT)
 ueber: VM: ruft druckt, das in der VM bleibt
 text: VM: Platz 0 hat den Typ 'string'
-global_: VM: globale Variable
+global_: uebersetzt
+namenslaenge: VM: Konstante STRING ist keine Zahl

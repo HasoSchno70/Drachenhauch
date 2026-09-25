@@ -319,9 +319,9 @@ fn db_params(args: &[Value], fn_: &str) -> R<Vec<rusqlite::types::Value>> {
     args.iter().map(|v| crate::db::dh_to_sql(v, fn_)).collect()
 }
 
-struct Slot {
+pub(crate) struct Slot {
     ty: String,
-    value: Value,
+    pub(crate) value: Value,
     is_const: bool,
 }
 
@@ -2708,7 +2708,7 @@ impl<'p> Vm<'p> {
                     #[cfg(feature = "jit")]
                     if idx >= 0 && !track_lines {
                         if let Some(j) = self.jit.as_ref() {
-                            if let Some(v) = j.rufen(idx as usize, &stack[split..], self.depth, MAX_CALL_DEPTH) {
+                            if let Some(v) = j.rufen(idx as usize, &stack[split..], self.depth, MAX_CALL_DEPTH, &self.global_slots) {
                                 stack.truncate(split);
                                 stack.push(v);
                                 continue;

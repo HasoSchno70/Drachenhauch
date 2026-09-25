@@ -295,6 +295,39 @@ Linux/macOS ganz -- macOS ist zugleich arm64).
 ### M4 — Breite (laufend)
 
 Nach Wirkung, jeweils mit eigener Messung:
+
+**Schritt 1 (2026-09-25): globale Zahl-Variablen in Funktionen -- gebaut.**
+Eine Funktion, die globale INTEGER/FLOAT/BOOLEAN liest und schreibt, ist fuer
+die VM nicht mehr rein -- der Rueckfall "die VM rechnet nach" schriebe doppelt.
+Darum arbeitet der Maschinencode auf einem **Schatten**: je globalem Platz ein
+Wert und ein Merkbyte (0 frei, 1 geholt, 2 geaendert). Beim ersten Lesen holt
+`global_holen` (eine Rust-Funktion, die der Maschinencode ruft) den Wert aus
+dem Slot der VM; ein leerer Platz -- die Funktion laeuft vor dem DIM -- laesst
+ihn aufgeben. Geschrieben wird nur in den Schatten. Kommt der Aufruf ohne
+Fehler zurueck, schreibt die VM die geaenderten Plaetze in ihre Slots; sonst
+wird der Schatten verworfen, und die VM rechnet von vorn -- mit genau ihren
+Zwischenstaenden (ein `zaehler = zaehler + 1` vor einem Fehler zaehlt einmal).
+Welche Plaetze eine Funktion samt allen, die sie ruft, beruehren kann, steht
+beim Uebersetzen fest; nur deren Marken werden nach dem Aufruf geloescht. Die
+Art eines Platzes kommt aus den DECLARE-Befehlen des Hauptprogramms
+(widersprechen sich zwei, bleibt er der VM); Konstanten sind lesbar, wenn sie
+eine Typangabe haben. FOR ueber eine globale Laufvariable geht mit.
+
+Ergebnis ueber alle `.dh` des Repos: 100 statt 85 uebersetzte Funktionen --
+Globals waren zwar bei 488 Funktionen der ERSTE Grund, aber dieselben rufen
+fast immer auch Builtins oder benutzen Texte. Der grosse Hebel fuer Globals
+sind **Schleifen im Hauptprogramm** (`zahlen.dh`, `ganzzahl.dh`, Spielschleifen):
+dort ist alles global, aber das Hauptprogramm als Ganzes nie rein. Das braucht
+die Uebersetzung einzelner Schleifen -- der naechste Schritt.
+
+Pruefung: sieben Faelle mehr in `jit.dhtest` (uebernommen erst nach dem
+Aufruf, vor dem DIM, FOR ueber ein Global, Umwandeln beim Schreiben, zwei
+Funktionen auf einem Schatten, Konstante zur Laufzeit, Hochzaehlen vor einem
+Fehler). Gegenprobe: wird der Schatten auch nach einem Fehlschlag
+uebernommen, faellt "hochzaehlen vor einem fehler" (3 statt 2) -- die ersten
+sechs Faelle hatten das NICHT gesehen, weil die VM beim Nachrechnen denselben
+Wert noch einmal schreibt. Suite unter `DHRT_JIT=immer` (`--schnell`): 3593
+ok, 0 fehl.
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

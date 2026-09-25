@@ -1533,6 +1533,13 @@ VM aendert (`div`, `modulo`, `int_div`, `cmp`, `coerce`, `value_eq`), muss
 es (jeder Fall mit und ohne). `dhrt --jit datei.dh` nennt je Funktion den
 Grund. fib(30) 144 -> 3,3 ms, Zahlenschleife in einer Funktion 189 -> 5 ms.
 Die CI laeuft die Sammlungen zweimal. Einzelheiten `docs/entwurf-maschinencode.md` M3.
+**Globale Zahl-Variablen (M4 Schritt 1) ueber einen Schatten**: der
+Maschinencode liest ueber `global_holen` in `Kontext::schatten` (Merkbyte je
+Platz: 0 frei, 1 geholt, 2 geaendert) und schreibt nur dorthin; `Jit::rufen`
+uebernimmt die geaenderten Plaetze NUR nach einem fehlerfreien Aufruf, sonst
+rechnet die VM von vorn. **Wer das aendert, braucht den Fall "hochzaehlen vor
+einem fehler zaehlt einmal"** -- ein Wert, den die VM beim Nachrechnen
+ueberschreibt, verraet ein falsches Uebernehmen nicht.
 
 ## Coroutines / YIELD
 
