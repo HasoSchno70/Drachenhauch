@@ -124,3 +124,17 @@ NEXT
 PRINT n; " schnell "; (TIMER() - t0) < 0.5
 --- erwartet
 60003 schnell TRUE
+
+=== ascii davor und umlaut dahinter
+' Die Abkuerzung (M2, 2026-09-25): steht vor der Stelle nur ASCII, ist die
+' Byte-Stelle die Zeichenstelle. Hier liegt der Umlaut mal hinter, mal vor
+' der Stelle, und die Stelle mal am und mal hinter dem Ende.
+IMPORT "regex"
+DIM t AS STRING : t = "abcdef" + CHR$(252) + "gh" + CHR$(228) + "ij"
+PRINT LEN(t); " "; MID$(t, 3, 2); "|"; MID$(t, 5, 3); "|"; MID$(t, 7); "|"; MID$(t, 11); "|"; MID$(t, 12); "|"
+PRINT LEFT$(t, 7); "|"; RIGHT$(t, 4); "|"; INSTR(t, "g"); " "; INSTR(t, "i", 8); " "; INSTR(t, "a", 6); " "; INSTR(t, "", 11); " "; INSTR(t, "", 12)
+PRINT REGEX_FIND_POS(t, "[a-j]", 7); " "; REGEX_FIND_POS(t, "h.i", 0); " "; REGEX_FIND_POS(t, "x", 11); " "; REGEX_FIND_POS(t, "x", 12)
+--- erwartet
+12 de|füg|ghäij|j||
+abcdefü|häij|7 10 -1 11 12
+(7, 1) (8, 3) (-1, 0) (-1, 0)

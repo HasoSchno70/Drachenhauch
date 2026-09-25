@@ -211,6 +211,26 @@ Aufruf 41 -> 29 ns, `aufrufe.dh` (fib) 0,85 gegen Schritt 1. Tests
 erste Fassung nannte bei einem Fehler drei Ebenen tief die Zeile des
 Aufrufers -- gefunden von genau diesem Vergleich).
 
+**Dritter Schritt 2026-09-25: Methoden auf den Rahmenstapel -- gemessen und
+verworfen.** Dafuer muss `dispatch` das `Self` je Rahmen fuehren (eine
+Variable, die ueber die ganze Schleife lebt) und jeder Rahmen das `Self` von
+Aufrufer und Gerufenem tragen. Ergebnis: ein Methodenaufruf 37 -> 35 ns, aber
+JEDER Befehl in `dispatch` wurde teurer -- ein freier Aufruf 30 -> 35 ns, fib
+1,07; mit schmalerer Buchfuehrung (freie Funktionen erben das `Self`) sogar
+40 ns und fib 1,09. Die zusaetzliche lebende Variable und der Block kosten die
+heisse Schleife mehr, als der Methodenaufruf spart. **Lehre fuer M3:** der
+Rest liegt nicht mehr im Aufruf, sondern daran, dass `dispatch` als Ganzes
+schlecht in Register passt -- das loest erst Maschinencode.
+
+**Dabei gefunden: `MID$`/`INSTR`/`REGEX_FIND_POS` zaehlten Zeichen einzeln.**
+`text.dh` war im Methoden-Bau 1,6-mal langsamer, obwohl es keine Funktion
+aufruft: die Schleife je Zeichen in `builtins::zeichen_stelle` haengt an der
+Lage des Codes. Jetzt nimmt sie bei reinem ASCII vor der Stelle die
+Byte-Stelle direkt (`is_ascii` prueft wortweise), `zeichen_zahl` und
+`zeichen_stelle_genau` dasselbe fuer die Zaehlungen in INSTR und
+REGEX_FIND_POS. 28000 x `MID$` in 200000 Zeichen: 700 -> 23 ms, `text.dh`
+0,07.
+
 ### M3 — Cranelift für Zahlenfunktionen (4–6 Wochen, Weg B)
 
 Feature `jit` (standardmäßig aus). Übersetzt wird eine FUNCTION/SUB, wenn alle
