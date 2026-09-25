@@ -1592,6 +1592,15 @@ von FOR EACH im Hauptprogramm hat seither einen globalen Platz**
 (`collect_globals`) statt ueber ihren Namen zu laufen. teilchen.dh
 661 -> 177 ms (VM) -> 27 ms (Maschinencode).
 
+**Wertemodus (M4 Schritt 5):** scheitert ein Bereich getypt (Text, MAP,
+Befehl), baut `Jit::wertebereich` ihn mit `Art::W`: Werte liegen als
+`Value` in `Kontext::werte` (Local s = Platz s, Stapeltiefe d = Platz
+`n_gesamt + d`), der Maschinencode ruft je Befehl einen Helfer `w_*`.
+Werte werden beim Eintritt aus der VM VERSCHOBEN und an jedem Ausgang
+zurueck. Befehle nur mit `familie == BUILTIN_FAMILIEN` (also schon einmal
+von der VM an dieser Stelle gerufen). **`s = s + e` gibt den Platz von `s`
+vorher ab** (`w_op`, `lokal`), sonst kopiert jede Runde. text.dh 53 -> 41 ms.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
