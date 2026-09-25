@@ -1531,9 +1531,9 @@ Faktor 1,6 mit der Codelage. Fall "ascii davor und umlaut dahinter" in
 
 ## Maschinencode fuer reine Zahlenfunktionen (2026-09-25, M3 Schritt 1)
 
-`src/jit.rs`, Feature `jit` (Cranelift **0.134** -- neuere verlangen Rust
-1.96), eingeschaltet mit **`DHRT_JIT=immer`** (uebersetzt beim Start; ohne
-bleibt alles VM). Uebersetzt wird nur eine REINE Funktion: Parameter/Locals/
+`src/jit.rs`, Feature `jit` (Cranelift **0.136**, Rust 1.98), **seit M5
+an per Vorgabe; `DHRT_JIT=aus` schaltet ab** (Funktionen beim Start,
+Schleifen beim ersten Ruecksprung). Uebersetzt wird nur eine REINE Funktion: Parameter/Locals/
 Rueckgabe INTEGER/FLOAT/BOOLEAN, nur Rechnen/Vergleichen/Springen/FOR ueber
 INTEGER und Aufrufe reiner Funktionen -- keine Globals, Builtins, Ausgabe.
 `analysieren` verfolgt je Stelle die Art jedes Stapelplatzes und Locals
@@ -1627,6 +1627,15 @@ getyptem Code statisch ueber `Obj(k)`. **Feldschreibungen gehen ins
 Journal** (`Kontext::journal`), damit ein aufgebender Aufruf von vorn
 gerechnet werden darf; im Bereich nur waehrend eines Methodenaufrufs.
 objekte.dh 97 -> 12 ms.
+
+**Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
+alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
+`DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
+`DHRT_JIT=aus` in `--- umgebung`** (so die VM-Haelfte von `jit.dhtest`).
+macOS: die App wird mit `installer/posix/dhrt.entitlements` signiert --
+Cranelift macht Speicher per mprotect ausfuehrbar (kein MAP_JIT), dafuer
+braucht Hardened Runtime `allow-unsigned-executable-memory`, `allow-jit`
+reicht NICHT.
 
 ## Coroutines / YIELD
 

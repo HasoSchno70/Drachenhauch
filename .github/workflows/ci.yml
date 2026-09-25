@@ -109,15 +109,15 @@ jobs:
           DH_OHNE_AUDIO: 1
         run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef
 
-      # Regel 3 aus docs/entwurf-maschinencode.md: jede Sammlung auch mit
-      # Maschinencode (jede reine Zahlenfunktion sofort uebersetzt), dieselbe
-      # Erwartung. Hier `--schnell` -- die langsamen Sammlungen (IDE,
-      # Werkzeuge) haben kaum reine Zahlenfunktionen; Linux und macOS laufen
-      # die ganze Suite so.
-      - name: Pruefsammlungen mit Maschinencode (DHRT_JIT=immer)
+      # Regel 3 aus docs/entwurf-maschinencode.md: jede Sammlung auf beiden
+      # Wegen, dieselbe Erwartung. Seit M5 ist der Maschinencode Vorgabe (der
+      # Lauf oben), hier dieselben Sammlungen in der VM allein. `--schnell`
+      # -- die langsamen Sammlungen (IDE, Werkzeuge) laufen oben mit
+      # Maschinencode; Linux und macOS fahren beide Wege ganz.
+      - name: Pruefsammlungen ohne Maschinencode (DHRT_JIT=aus)
         env:
           DH_OHNE_AUDIO: 1
-          DHRT_JIT: immer
+          DHRT_JIT: aus
         run: rust/drachenhauch_runtime/target/release/dhrt.exe test tests/pruef --schnell
 
   # Cross-Platform-Migration Phase 3: auf Linux UND macOS nicht nur BAUEN,
@@ -190,12 +190,12 @@ jobs:
       - name: Pruefsammlungen (dhrt test)
         run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
 
-      # Dieselben Sammlungen mit Maschinencode (Regel 3 aus
-      # docs/entwurf-maschinencode.md) -- auf macOS zugleich der Beleg fuer
-      # arm64.
-      - name: Pruefsammlungen mit Maschinencode (DHRT_JIT=immer)
+      # Dieselben Sammlungen ohne Maschinencode (Regel 3 aus
+      # docs/entwurf-maschinencode.md; seit M5 ist der Lauf oben der mit
+      # Maschinencode -- auf macOS zugleich der Beleg fuer arm64).
+      - name: Pruefsammlungen ohne Maschinencode (DHRT_JIT=aus)
         env:
-          DHRT_JIT: immer
+          DHRT_JIT: aus
         run: rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
