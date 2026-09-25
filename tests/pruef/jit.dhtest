@@ -2175,7 +2175,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 70 140.0
 --- stderr
-jit: 0 Funktionen, 1 Schleifen, 2 Schleifenlaeufe
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === verschiedene klassen in einem tupel
 CLASS A
@@ -2274,7 +2274,7 @@ DHRT_JIT_BILANZ=1
 114
 --- stderr
 jit: Schleife an Stelle 14 in __main__ bleibt in der VM: PROPERTY w; mit Werten: Mitglied von etwas, das kein Objekt ist
-jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 2 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === objekt in einem feld eines objekts
 CLASS Punkt
@@ -3351,7 +3351,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 300 25250
 --- stderr
-jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === methode liest eine globale des bereichs
 DIM faktor AS INTEGER
@@ -3392,8 +3392,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 1901 2
 --- stderr
-jit: Schleife an Stelle 15 in __main__ bleibt in der VM: Objekt; mit Werten: Methode dazu: dazu beruehrt die Globale 'faktor' des Bereichs
-jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === methode liest eine andere globale
 DIM faktor AS INTEGER : faktor = 3
@@ -3432,7 +3431,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 3825
 --- stderr
-jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === zwei klassen mit derselben methode
 DIM zaehler AS INTEGER
@@ -3487,8 +3486,8 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 40 1030
 --- stderr
-jit: Schleife an Stelle 19 in __main__ bleibt in der VM: Objekt; mit Werten: Methode laut: laut beruehrt die Globale 'zaehler' des Bereichs
-jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 10 mal mitten in einer Schleife ausgestiegen
 
 === methoden von text und map in einer schleife
 DIM m AS MAP OF INTEGER : m = {}
@@ -3572,8 +3571,8 @@ DHRT_JIT_BILANZ=1
 gefangen: Konto leer bei -2 zeile 5
 -2 4
 --- stderr
-jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
-jit: 1 mal mitten in einer Schleife ausgestiegen
+jit: Schleife an Stelle 18 in __main__ bleibt in der VM: ruft eine Funktion, die in der VM bleibt
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === methode auf nil in der schleife
 CLASS Ding
@@ -3624,7 +3623,7 @@ DHRT_JIT_BILANZ=1
 gefangen: Methodenaufruf '.tick' bei NIL-Referenz -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
 2
 --- stderr
-jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
 jit: 1 mal mitten in einer Schleife ausgestiegen
 
 === methode ruft eine funcref und bleibt in der vm
@@ -3680,7 +3679,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 110
 --- stderr
-jit: Schleife an Stelle 19 in __main__ bleibt in der VM: Objekt; mit Werten: Methode los: los ruft FUNCREF
+jit: Schleife an Stelle 19 in __main__ bleibt in der VM: ruft eine Funktion, die in der VM bleibt
 jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === langer text neu zusammengesetzt
@@ -3711,6 +3710,451 @@ DHRT_JIT_BILANZ=1
 5000 5001 HI!
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== methodenrumpf aus der vm gerufen
+CLASS Punkt
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    SUB schieben(dx AS FLOAT, dy AS FLOAT)
+        Self.x = Self.x + dx
+        Self.y = Self.y + dy
+    END SUB
+    FUNCTION laenge2() AS FLOAT
+        RETURN Self.x * Self.x + Self.y * Self.y
+    END FUNCTION
+    FUNCTION rechts(grenze AS FLOAT) AS BOOLEAN
+        RETURN Self.x > grenze
+    END FUNCTION
+END CLASS
+DIM p AS Punkt : p = NEW Punkt()
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    p.schieben(1.5, -0.5)
+    PRINT p.laenge2(); " "; p.rechts(4.0)
+NEXT
+--- erwartet
+2.5 FALSE
+10.0 FALSE
+22.5 TRUE
+40.0 TRUE
+62.5 TRUE
+
+=== methodenrumpf aus der vm gerufen (maschinencode)
+CLASS Punkt
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    SUB schieben(dx AS FLOAT, dy AS FLOAT)
+        Self.x = Self.x + dx
+        Self.y = Self.y + dy
+    END SUB
+    FUNCTION laenge2() AS FLOAT
+        RETURN Self.x * Self.x + Self.y * Self.y
+    END FUNCTION
+    FUNCTION rechts(grenze AS FLOAT) AS BOOLEAN
+        RETURN Self.x > grenze
+    END FUNCTION
+END CLASS
+DIM p AS Punkt : p = NEW Punkt()
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    p.schieben(1.5, -0.5)
+    PRINT p.laenge2(); " "; p.rechts(4.0)
+NEXT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2.5 FALSE
+10.0 FALSE
+22.5 TRUE
+40.0 TRUE
+62.5 TRUE
+--- stderr
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Konstante STRING ist keine Zahl; mit Werten: Ausgabe (PRINT)
+jit: 3 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== ueberschriebene hilfsmethode gewinnt
+CLASS Tier
+    DIM n AS INTEGER
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    SUB rufen()
+        Self.n = Self.n + laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS INTEGER
+        RETURN 10
+    END FUNCTION
+END CLASS
+DIM t AS Tier : t = NEW Tier()
+DIM h AS Hund : h = NEW Hund()
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    t.rufen()
+    h.rufen()
+NEXT
+PRINT t.n; " "; h.n
+--- erwartet
+20 200
+
+=== ueberschriebene hilfsmethode gewinnt (maschinencode)
+CLASS Tier
+    DIM n AS INTEGER
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    SUB rufen()
+        Self.n = Self.n + laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS INTEGER
+        RETURN 10
+    END FUNCTION
+END CLASS
+DIM t AS Tier : t = NEW Tier()
+DIM h AS Hund : h = NEW Hund()
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    t.rufen()
+    h.rufen()
+NEXT
+PRINT t.n; " "; h.n
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+20 200
+--- stderr
+jit: 4 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== geerbte methode auf der unterklasse
+CLASS Basis
+    DIM wert AS INTEGER
+    SUB mehr(x AS INTEGER)
+        Self.wert = Self.wert + x
+    END SUB
+END CLASS
+CLASS Kind EXTENDS Basis
+    DIM extra AS INTEGER
+END CLASS
+DIM k AS Kind : k = NEW Kind()
+DIM b AS Basis : b = NEW Basis()
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    k.mehr(i)
+    b.mehr(2)
+NEXT
+PRINT k.wert; " "; b.wert; " "; k.extra
+--- erwartet
+465 60 0
+
+=== geerbte methode auf der unterklasse (maschinencode)
+CLASS Basis
+    DIM wert AS INTEGER
+    SUB mehr(x AS INTEGER)
+        Self.wert = Self.wert + x
+    END SUB
+END CLASS
+CLASS Kind EXTENDS Basis
+    DIM extra AS INTEGER
+END CLASS
+DIM k AS Kind : k = NEW Kind()
+DIM b AS Basis : b = NEW Basis()
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    k.mehr(i)
+    b.mehr(2)
+NEXT
+PRINT k.wert; " "; b.wert; " "; k.extra
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+465 60 0
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== methode gibt auf nach einer feldschreibung
+CLASS Zins
+    DIM zaehler AS INTEGER
+    DIM betrag AS INTEGER
+    SUB verdoppeln()
+        Self.zaehler = Self.zaehler + 1
+        Self.betrag = Self.betrag * 1000
+    END SUB
+END CLASS
+DIM z AS Zins : z = NEW Zins()
+z.betrag = 7
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        z.verdoppeln()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z.zaehler; " "; z.betrag; " "; i
+--- erwartet
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 6
+7 7000000000000000000 7
+
+=== methode gibt auf nach einer feldschreibung (maschinencode)
+CLASS Zins
+    DIM zaehler AS INTEGER
+    DIM betrag AS INTEGER
+    SUB verdoppeln()
+        Self.zaehler = Self.zaehler + 1
+        Self.betrag = Self.betrag * 1000
+    END SUB
+END CLASS
+DIM z AS Zins : z = NEW Zins()
+z.betrag = 7
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        z.verdoppeln()
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z.zaehler; " "; z.betrag; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 6
+7 7000000000000000000 7
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== methode ruft methode eines anderen objekts
+CLASS Rad
+    DIM umdrehungen AS INTEGER
+    SUB drehen(n AS INTEGER)
+        Self.umdrehungen = Self.umdrehungen + n
+    END SUB
+END CLASS
+CLASS Auto
+    DIM vorne AS Rad
+    DIM hinten AS Rad
+    DIM km AS INTEGER
+    SUB fahren(n AS INTEGER)
+        Self.vorne.drehen(n)
+        Self.hinten.drehen(n * 2)
+        Self.km = Self.km + n
+    END SUB
+END CLASS
+DIM a AS Auto : a = NEW Auto()
+a.vorne = NEW Rad()
+a.hinten = NEW Rad()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    a.fahren(i)
+NEXT
+PRINT a.km; " "; a.vorne.umdrehungen; " "; a.hinten.umdrehungen
+--- erwartet
+55 55 110
+
+=== methode ruft methode eines anderen objekts (maschinencode)
+CLASS Rad
+    DIM umdrehungen AS INTEGER
+    SUB drehen(n AS INTEGER)
+        Self.umdrehungen = Self.umdrehungen + n
+    END SUB
+END CLASS
+CLASS Auto
+    DIM vorne AS Rad
+    DIM hinten AS Rad
+    DIM km AS INTEGER
+    SUB fahren(n AS INTEGER)
+        Self.vorne.drehen(n)
+        Self.hinten.drehen(n * 2)
+        Self.km = Self.km + n
+    END SUB
+END CLASS
+DIM a AS Auto : a = NEW Auto()
+a.vorne = NEW Rad()
+a.hinten = NEW Rad()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    a.fahren(i)
+NEXT
+PRINT a.km; " "; a.vorne.umdrehungen; " "; a.hinten.umdrehungen
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+55 55 110
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== methode mit globaler zahl
+DIM schritte AS INTEGER
+CLASS Laeufer
+    DIM weg AS INTEGER
+    SUB schritt(n AS INTEGER)
+        Self.weg = Self.weg + n
+        schritte = schritte + 1
+    END SUB
+END CLASS
+DIM l AS Laeufer : l = NEW Laeufer()
+DIM i AS INTEGER
+FOR i = 1 TO 25
+    l.schritt(i MOD 4)
+NEXT
+PRINT l.weg; " "; schritte
+--- erwartet
+37 25
+
+=== methode mit globaler zahl (maschinencode)
+DIM schritte AS INTEGER
+CLASS Laeufer
+    DIM weg AS INTEGER
+    SUB schritt(n AS INTEGER)
+        Self.weg = Self.weg + n
+        schritte = schritte + 1
+    END SUB
+END CLASS
+DIM l AS Laeufer : l = NEW Laeufer()
+DIM i AS INTEGER
+FOR i = 1 TO 25
+    l.schritt(i MOD 4)
+NEXT
+PRINT l.weg; " "; schritte
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+37 25
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== methode aus der vm gibt auf nach einer feldschreibung
+CLASS Zins
+    DIM zaehler AS INTEGER
+    DIM betrag AS INTEGER
+    SUB verdoppeln()
+        Self.zaehler = Self.zaehler + 1
+        Self.betrag = Self.betrag * 1000
+    END SUB
+END CLASS
+DIM z AS Zins : z = NEW Zins()
+z.betrag = 7
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        z.verdoppeln()
+        PRINT z.zaehler;
+    NEXT
+CATCH e
+    PRINT
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z.zaehler; " "; z.betrag
+--- erwartet
+123456
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 6
+7 7000000000000000000
+
+=== methode aus der vm gibt auf nach einer feldschreibung (maschinencode)
+CLASS Zins
+    DIM zaehler AS INTEGER
+    DIM betrag AS INTEGER
+    SUB verdoppeln()
+        Self.zaehler = Self.zaehler + 1
+        Self.betrag = Self.betrag * 1000
+    END SUB
+END CLASS
+DIM z AS Zins : z = NEW Zins()
+z.betrag = 7
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        z.verdoppeln()
+        PRINT z.zaehler;
+    NEXT
+CATCH e
+    PRINT
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z.zaehler; " "; z.betrag
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+123456
+gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 6
+7 7000000000000000000
+--- stderr
+jit: Schleife an Stelle 18 in __main__ bleibt in der VM: Ausgabe (PRINT); mit Werten: Mitglied von etwas, das kein Objekt ist
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== ueberschreibung aus der vm gerufen
+CLASS Tier
+    DIM n AS INTEGER
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    SUB rufen()
+        Self.n = Self.n + laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS INTEGER
+        RETURN 10
+    END FUNCTION
+END CLASS
+DIM t AS Tier : t = NEW Tier()
+DIM h AS Hund : h = NEW Hund()
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    t.rufen()
+    h.rufen()
+    PRINT t.n; " "; h.n
+NEXT
+--- erwartet
+1 10
+2 20
+3 30
+
+=== ueberschreibung aus der vm gerufen (maschinencode)
+CLASS Tier
+    DIM n AS INTEGER
+    FUNCTION laut() AS INTEGER
+        RETURN 1
+    END FUNCTION
+    SUB rufen()
+        Self.n = Self.n + laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    FUNCTION laut() AS INTEGER
+        RETURN 10
+    END FUNCTION
+END CLASS
+DIM t AS Tier : t = NEW Tier()
+DIM h AS Hund : h = NEW Hund()
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    t.rufen()
+    h.rufen()
+    PRINT t.n; " "; h.n
+NEXT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1 10
+2 20
+3 30
+--- stderr
+jit: Schleife an Stelle 17 in __main__ bleibt in der VM: Konstante STRING ist keine Zahl; mit Werten: Mitglied von etwas, das kein Objekt ist
+jit: 4 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in

@@ -1667,6 +1667,16 @@ impl<'p> Vm<'p> {
     /// 7): Methode einer Instanz ueber den Merkplatz, Coroutine als Handle,
     /// sonst die Methoden von Text/Feld/MAP. Die VM selbst nimmt weiter ihren
     /// schnellen Weg im Befehl (Argumente direkt vom Stapel).
+    /// CALL_METHOD in den Maschinencode (M4 Schritt 7b), ausserhalb von
+    /// `dispatch`, damit dessen Rahmen nicht waechst.
+    #[cfg(feature = "jit")]
+    #[inline(never)]
+    fn methode_maschinencode(&self, m: &Func, rc: &Rc<RefCell<crate::value::Instance>>, args: &[Value]) -> Option<Value> {
+        let j = self.jit.as_ref()?;
+        let lage = Rc::as_ptr(&rc.borrow().layout);
+        j.methode(lage, m, Rc::as_ptr(rc), args, self.depth, MAX_CALL_DEPTH, &self.global_slots)
+    }
+
     pub(crate) fn methode_rufen(&mut self, instr: &'p crate::model::Instr, method: &str, obj: Value, margs: Vec<Value>) -> R<Value> {
         match &obj {
             Value::Instance(rc) => {
@@ -2542,6 +2552,10 @@ impl<'p> Vm<'p> {
         // Fuer Laufzeitfehler wird die Quell-Zeile LAZY im Fehlerfall
         // ermittelt (run_frame) -- der Normalfall zahlt pro Instruktion nichts.
         let track_lines = self.prof.is_some() || self.stop.is_some() || self.dbg.is_some();
+        // Methoden in den Maschinencode (M4 Schritt 7b): einmal je Eintritt
+        // gefragt statt je Aufruf.
+        #[cfg(feature = "jit")]
+        let methoden_jit = self.jit.is_some() && !track_lines;
 
         loop {
             if *ip >= n {
@@ -2986,6 +3000,17 @@ impl<'p> Vm<'p> {
                                 instr.merk.set((Rc::as_ptr(&rc.borrow().layout), m as *const Func as usize));
                                 m
                             };
+                            // M4 Schritt 7b: die Methode als Maschinencode, wenn sie
+                            // fuer genau diese Klasse uebersetzt ist; sonst (oder
+                            // wenn er aufgibt) rechnet die VM sie.
+                            #[cfg(feature = "jit")]
+                            if methoden_jit && !m.is_coroutine {
+                                if let Some(v) = self.methode_maschinencode(m, rc, &stack[split..]) {
+                                    stack.truncate(split - 1);
+                                    stack.push(if m.is_sub { Value::Nil } else { v });
+                                    continue;
+                                }
+                            }
                             if !m.is_coroutine {
                                 let obj = stack[split - 1].clone();
                                 let ret = self.exec(m, stack.drain(split..), Some(obj))?;

@@ -1619,6 +1619,15 @@ dazubaut, der Drachenhauch-Code ruft, traegt ihn dort UND in
 `befehl_im_bereich` ein.** `w_op` rechnet mit `vm::wert_rechnen`, nicht mit
 `konstant_rechnen` (das hat die Grenzen des Faltens).
 
+**Methodenrumpfe als Maschinencode (M4 Schritt 7b):** Methodentafel
+`Globale::tafel` -- je Klasse jede sichtbare Methode (auch geerbte) mit der
+Lage DIESER Klasse, sonst loeste `Self.hilfe()` statisch falsch auf.
+Aus der VM ueber `Jit::methode` (nur bei genau passender Lage), aus
+getyptem Code statisch ueber `Obj(k)`. **Feldschreibungen gehen ins
+Journal** (`Kontext::journal`), damit ein aufgebender Aufruf von vorn
+gerechnet werden darf; im Bereich nur waehrend eines Methodenaufrufs.
+objekte.dh 97 -> 12 ms.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

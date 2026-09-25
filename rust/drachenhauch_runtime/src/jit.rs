@@ -232,6 +232,31 @@ pub struct Kontext {
     /// VM gibt sie an seiner Stelle aus, statt ihn noch einmal zu rufen.
     vm: *mut crate::vm::Vm<'static>,
     meldung: Option<String>,
+    /// Nur Funktionen (nicht Bereiche): jede geschriebene Objekt-Feld mit dem
+    /// alten Wert -- gibt der Maschinencode auf, stellt der Einstieg sie
+    /// zurueck, und die VM rechnet den Aufruf von vorn.
+    journal: *mut Vec<(u64, u64, Value)>,
+    /// Nur Bereiche: das Journal, das der Bereich fuer die Dauer eines
+    /// Methodenaufrufs nach `journal` legt. Gibt die Methode auf, steigt der
+    /// Bereich vor dem Aufruf aus, und die VM ruft sie noch einmal -- ihre
+    /// Schreibungen muessen dann zurueck sein. Die eigenen Schreibungen des
+    /// Bereichs gehoeren NICHT hinein (sie gelten, und sie waeren bei
+    /// 10 000 Objekten mal 100 Runden ein unnoetig grosses Journal).
+    journal_bereich: *mut Vec<(u64, u64, Value)>,
+}
+
+const K_JOURNAL: i32 = std::mem::offset_of!(Kontext, journal) as i32;
+const K_JOURNAL_BEREICH: i32 = std::mem::offset_of!(Kontext, journal_bereich) as i32;
+
+/// Nach einem Methodenaufruf aus einem Bereich: gab sie auf, ihre
+/// Feldschreibungen zuruecknehmen, sonst vergessen; das Journal wieder aus.
+extern "C" fn journal_schluss(k: *mut Kontext) {
+    let j = unsafe { (*k).journal };
+    if j.is_null() { return; }
+    unsafe {
+        if (*k).fehler != 0 { journal_zurueck(&mut *j); } else { (*j).clear(); }
+        (*k).journal = std::ptr::null_mut();
+    }
 }
 
 const K_SCHATTEN: i32 = 24;
@@ -298,17 +323,30 @@ extern "C" fn feld_lesen_f(k: *mut Kontext, obj: u64, platz: u64) -> f64 {
 
 /// Ein Zahlenfeld schreiben; den Wert hat der Maschinencode schon in die Art
 /// des Feldes gewandelt (`art` 1 INTEGER, 3 BOOLEAN).
-extern "C" fn feld_setzen_i(obj: u64, platz: u64, art: u64, w: i64) {
+extern "C" fn feld_setzen_i(k: *mut Kontext, obj: u64, platz: u64, art: u64, w: i64) {
+    feld_setzen(k, obj, platz, if art == 3 { Value::Bool(w != 0) } else { Value::Int(w) });
+}
+
+extern "C" fn feld_setzen_f(k: *mut Kontext, obj: u64, platz: u64, w: f64) {
+    feld_setzen(k, obj, platz, Value::Float(w));
+}
+
+fn feld_setzen(k: *mut Kontext, obj: u64, platz: u64, v: Value) {
     if let Ok(mut b) = objekt(obj).try_borrow_mut() {
         if let Some(f) = b.fields.get_mut(platz as usize) {
-            *f = if art == 3 { Value::Bool(w != 0) } else { Value::Int(w) };
+            let alt = std::mem::replace(f, v);
+            let j = unsafe { (*k).journal };
+            if !j.is_null() { unsafe { (*j).push((obj, platz, alt)); } }
         }
     }
 }
 
-extern "C" fn feld_setzen_f(obj: u64, platz: u64, w: f64) {
-    if let Ok(mut b) = objekt(obj).try_borrow_mut() {
-        if let Some(f) = b.fields.get_mut(platz as usize) { *f = Value::Float(w); }
+/// Die Feldschreibungen eines aufgegebenen Aufrufs zuruecknehmen (rueckwaerts).
+fn journal_zurueck(j: &mut Vec<(u64, u64, Value)>) {
+    while let Some((obj, platz, alt)) = j.pop() {
+        if let Ok(mut b) = objekt(obj).try_borrow_mut() {
+            if let Some(f) = b.fields.get_mut(platz as usize) { *f = alt; }
+        }
     }
 }
 
@@ -646,6 +684,7 @@ struct Hilfe {
     setzen_f: FuncId,
     element_i: FuncId,
     element_f: FuncId,
+    journal_schluss: FuncId,
     w: [FuncId; 16],
 }
 
@@ -706,6 +745,8 @@ pub struct Jit {
     arten: Vec<u8>,
     schatten: std::cell::UnsafeCell<Vec<u64>>,
     marken: std::cell::UnsafeCell<Vec<u8>>,
+    /// (Lage der Klasse, Methode) -> Index in `fns` (siehe `Globale::tafel`).
+    mtab: HashMap<(usize, usize), usize>,
     /// Die Meldung eines Befehls, an dem ein Bereich zuletzt ausgestiegen ist
     /// (siehe `Kontext::meldung`); die VM holt sie mit `meldung_nehmen`.
     meldung: RefCell<Option<String>>,
@@ -744,6 +785,67 @@ struct Globale {
     konst: Vec<bool>,
     /// Deklarierter Typ je Platz (fuer Objekte in `dyn_glob`).
     typ: Vec<String>,
+    /// Die Methoden, die als Funktion uebersetzt werden koennen: je Klasse
+    /// JEDE Methode, die sie sieht (auch geerbte), mit der Lage DIESER Klasse.
+    /// Eine geerbte Methode bekommt also je Unterklasse eine eigene Fassung --
+    /// sonst loeste `Self.hilfe()` darin statisch die Fassung der Vorfahrin
+    /// auf, die VM aber die Ueberschreibung der Unterklasse. Index im Jit:
+    /// `Program::functions.len() + j`.
+    tafel: Vec<MEintrag>,
+}
+
+/// Ein Eintrag der Methodentafel (siehe `Globale::tafel`).
+#[derive(Clone)]
+struct MEintrag {
+    lage: *const crate::value::Layout,
+    klasse: String,
+    name: String,
+    func: *const Func,
+}
+
+/// Die Methode `name`, wie `Vm::resolve_method` sie fuer `klasse` findet:
+/// erst die Klasse selbst, dann die Vorfahrinnen.
+fn methode_suchen<'a>(prog: &'a Program, klasse: &str, name: &str) -> Option<&'a Func> {
+    let mut c = prog.classes.get(klasse)?;
+    loop {
+        if let Some(f) = c.methods.get(name) { return Some(f); }
+        if let Some((_, f)) = c.methods.iter().find(|(m, _)| m.eq_ignore_ascii_case(name)) { return Some(f); }
+        if c.parent_name.is_empty() { return None; }
+        c = prog.classes.get(c.parent_name.as_str())?;
+    }
+}
+
+fn methoden_tafel(prog: &Program) -> Vec<MEintrag> {
+    let mut klassen: Vec<&crate::model::ClassInfo> = prog.classes.values().filter(|c| !c.is_struct).collect();
+    klassen.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut tafel = Vec::new();
+    for c in klassen {
+        let mut namen: Vec<String> = Vec::new();
+        let mut k = Some(c);
+        while let Some(ci) = k {
+            for m in ci.methods.keys() { if !namen.iter().any(|n| n.eq_ignore_ascii_case(m)) { namen.push(m.clone()); } }
+            k = if ci.parent_name.is_empty() { None } else { prog.classes.get(ci.parent_name.as_str()) };
+        }
+        namen.sort();
+        for n in namen {
+            if let Some(f) = methode_suchen(prog, &c.name, &n) {
+                tafel.push(MEintrag { lage: Rc::as_ptr(&c.layout), klasse: c.name.clone(), name: n, func: f as *const Func });
+            }
+        }
+    }
+    tafel
+}
+
+/// Alle Funktionen des Jit: erst die freien, dann die Methodentafel, je mit
+/// der Klasse (fuer `Self`).
+fn alle_funktionen<'a>(prog: &'a Program, glob: &Globale) -> Vec<(&'a Func, Option<&'a crate::model::ClassInfo>, String)> {
+    let mut v: Vec<(&Func, Option<&crate::model::ClassInfo>, String)> =
+        prog.functions.iter().map(|f| (f, None, f.name.clone())).collect();
+    for e in &glob.tafel {
+        let f: &'a Func = unsafe { &*e.func };
+        v.push((f, prog.classes.get(e.klasse.as_str()), format!("{}.{}", e.klasse, e.name)));
+    }
+    v
 }
 
 fn globale_lesen(prog: &Program) -> Globale {
@@ -766,7 +868,7 @@ fn globale_lesen(prog: &Program) -> Globale {
         typ[i] = ty;
         if ist_konst { konst[i] = true; }
     }
-    Globale { art: art.into_iter().map(|a| a.flatten()).collect(), konst, typ }
+    Globale { art: art.into_iter().map(|a| a.flatten()).collect(), konst, typ, tafel: methoden_tafel(prog) }
 }
 
 // ---------------------------------------------------------------------------
@@ -869,7 +971,8 @@ fn passt(von: Art, nach: Art) -> bool {
     von == nach || (zahl(von) && zahl(nach))
 }
 
-fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereich>) -> Result<Analyse, String> {
+fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereich>,
+               klasse: Option<&crate::model::ClassInfo>) -> Result<Analyse, String> {
     let typen: Vec<String> = bereich.map_or_else(|| f.local_types.clone(), |b| b.lok_typen.clone());
     let n_lok = typen.len();
     let n_echt = f.local_types.len();
@@ -922,7 +1025,13 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
     let mut felder: Vec<FeldInfo> = bereich.map_or(Vec::new(), |b| b.felder.clone());
     let mut schreibt_felder = false;
     let mut klassen: Vec<Klasse> = bereich.map_or(Vec::new(), |b| b.klassen.clone());
-    let selbst = bereich.and_then(|b| b.selbst);
+    let mut selbst = bereich.and_then(|b| b.selbst);
+    // Eine Methode, als Funktion uebersetzt: `Self` ist ein Objekt genau
+    // dieser Klasse (der Einstieg prueft die Lage).
+    if let (None, Some(ci)) = (bereich, klasse) {
+        klassen.push(Klasse { lage: Rc::as_ptr(&ci.layout), name: ci.name.clone() });
+        selbst = Some(0);
+    }
     let dyn_glob: Vec<usize> = bereich.map_or(Vec::new(), |b| b.dyn_glob.clone());
     let modus_w = bereich.map_or(false, |b| b.modus_w);
     // Im Wertemodus: ist einer der Operanden ein Wert, rechnet ein Helfer.
@@ -973,7 +1082,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 z.stapel.push(z.lokal[s_arg].unwrap());
             }
             op::LOAD_SELF if selbst.is_some() => { z.stapel.push(Art::Obj(selbst.unwrap())); }
-            op::LOAD_FIELD | op::LOAD_MEMBER | op::STORE_FIELD | op::STORE_MEMBER if bereich.is_some() => {
+            op::LOAD_FIELD | op::LOAD_MEMBER | op::STORE_FIELD | op::STORE_MEMBER if bereich.is_some() || selbst.is_some() => {
                 let name = match f.constants.get(ins.arg.as_usize()) { Some(Value::Str(n)) => n.to_string(), _ => return Err("Feldname".into()) };
                 let wert = if matches!(o, op::STORE_FIELD | op::STORE_MEMBER) { Some(pop!()) } else { None };
                 let k = if matches!(o, op::LOAD_FIELD | op::STORE_FIELD) {
@@ -1006,6 +1115,27 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 for _ in 0..n { if !w_oder_skalar(pop!()) { return Err("Index, der kein Wert ist".into()); } }
                 if pop!() != Art::W { return Err("Index auf etwas, das kein Wert ist".into()); }
                 if o == op::LOAD_INDEX { z.stapel.push(Art::W); } else { schreibt_felder = true; }
+            }
+            op::CALL_METHOD if !modus_w => {
+                let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => return Err("Methode ohne Namen".into()) };
+                let mut args = Vec::with_capacity(argc);
+                for _ in 0..argc { args.push(pop!()); }
+                args.reverse();
+                let k = match pop!() { Art::Obj(k) => k as usize, _ => return Err(format!("Methode {} auf etwas, das kein Objekt ist", name)) };
+                let lage = klassen[k].lage;
+                let j = glob.tafel.iter().position(|e| std::ptr::eq(e.lage, lage) && e.name.eq_ignore_ascii_case(&name))
+                    .ok_or_else(|| format!("Methode {} (nicht in der Tafel)", name))?;
+                let g: &Func = unsafe { &*glob.tafel[j].func };
+                if g.is_coroutine { return Err(format!("Methode {} ist eine Coroutine", name)); }
+                if argc != g.n_params { return Err(format!("Methode {} mit {} statt {} Argumenten", name, argc, g.n_params)); }
+                for (i, a) in args.iter().enumerate() {
+                    let p = art_von_typ(&g.local_types[i]).ok_or_else(|| format!("{} hat einen Parameter vom Typ '{}'", name, g.local_types[i]))?;
+                    if !passt(*a, p) { return Err(format!("Argument {} an {} passt nicht", i + 1, name)); }
+                }
+                gerufen.push(prog.functions.len() + j);
+                z.stapel.push(if g.is_sub { Art::N } else { art_von_typ(&g.return_type).ok_or_else(|| format!("{} liefert '{}'", name, g.return_type))? });
+                // Die Methode kann Felder schreiben -- auch die, die dieser Code liest.
+                schreibt_felder = true;
             }
             op::CALL_METHOD if modus_w => {
                 let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => return Err("Methode ohne Namen".into()) };
@@ -1269,8 +1399,9 @@ fn befehl_name(o: u16) -> String {
 fn auswahl(prog: &Program, glob: &Globale) -> (Vec<Option<Analyse>>, Vec<String>) {
     let mut an: Vec<Option<Analyse>> = Vec::new();
     let mut gruende: Vec<String> = Vec::new();
-    for f in &prog.functions {
-        match analysieren(prog, glob, f, None) {
+    let alle = alle_funktionen(prog, glob);
+    for (f, kl, _) in &alle {
+        match analysieren(prog, glob, f, None, *kl) {
             Ok(a) => { an.push(Some(a)); gruende.push(String::new()); }
             Err(e) => { an.push(None); gruende.push(e); }
         }
@@ -1286,7 +1417,7 @@ fn auswahl(prog: &Program, glob: &Globale) -> (Vec<Option<Analyse>>, Vec<String>
             }
         }
         match raus {
-            Some((i, g)) => { an[i] = None; gruende[i] = format!("ruft {}, das in der VM bleibt", prog.functions[g].name); }
+            Some((i, g)) => { an[i] = None; gruende[i] = format!("ruft {}, das in der VM bleibt", alle[g].2); }
             None => break,
         }
     }
@@ -1295,9 +1426,10 @@ fn auswahl(prog: &Program, glob: &Globale) -> (Vec<Option<Analyse>>, Vec<String>
 
 /// Fuer `dhrt --jit datei.dh`: je Funktion "uebersetzt" oder der Grund.
 pub fn bericht(prog: &Program) -> Vec<(String, String)> {
-    let (_, gruende) = auswahl(prog, &globale_lesen(prog));
-    prog.functions.iter().zip(gruende).map(|(f, g)| {
-        (f.name.clone(), if g.is_empty() { "uebersetzt".to_string() } else { format!("VM: {}", g) })
+    let glob = globale_lesen(prog);
+    let (_, gruende) = auswahl(prog, &glob);
+    alle_funktionen(prog, &glob).into_iter().zip(gruende).map(|((_, _, name), g)| {
+        (name, if g.is_empty() { "uebersetzt".to_string() } else { format!("VM: {}", g) })
     }).collect()
 }
 
@@ -1340,6 +1472,7 @@ struct Bauer<'a, 'b> {
     h_setzen_f: cranelift_codegen::ir::FuncRef,
     h_element_i: cranelift_codegen::ir::FuncRef,
     h_element_f: cranelift_codegen::ir::FuncRef,
+    h_journal: cranelift_codegen::ir::FuncRef,
     /// Wertemodus: die Helfer `w_*` und der erste Platz des Stapels unter den
     /// Werteplaetzen (= Zahl aller Locals samt `dyn_glob`).
     hw: Vec<cranelift_codegen::ir::FuncRef>,
@@ -1488,10 +1621,10 @@ impl<'a, 'b> Bauer<'a, 'b> {
     fn feld_setzen(&mut self, obj: CWert, platz: usize, a: Art, w: CWert) {
         let pl = self.b.ins().iconst(types::I64, platz as i64);
         if a == Art::F {
-            self.b.ins().call(self.h_setzen_f, &[obj, pl, w]);
+            self.b.ins().call(self.h_setzen_f, &[self.ctx, obj, pl, w]);
         } else {
             let c = self.b.ins().iconst(types::I64, if a == Art::B { 3 } else { 1 });
-            self.b.ins().call(self.h_setzen_i, &[obj, pl, c, w]);
+            self.b.ins().call(self.h_setzen_i, &[self.ctx, obj, pl, c, w]);
         }
     }
     fn als_f(&mut self, v: CWert, a: Art) -> CWert {
@@ -1645,11 +1778,12 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let h_setzen_f = modul.declare_func_in_func(hilfe.setzen_f, fb.func);
         let h_element_i = modul.declare_func_in_func(hilfe.element_i, fb.func);
         let h_element_f = modul.declare_func_in_func(hilfe.element_f, fb.func);
+        let h_journal = modul.declare_func_in_func(hilfe.journal_schluss, fb.func);
         let selbst = if an.selbst.is_some() { Some(fb.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_SELBST)) } else { None };
         let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new(), schatten, marken, holen,
                               befoerdert: HashMap::new(), felder: Vec::new(), mitten, punkt: None,
                               aussteige: Vec::new(), lok_zeiger, zu_tief: false, selbst,
-                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f,
+                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_journal,
                               hw: Vec::new(), w_basis: an.typen.len() as i64 };
         if an.modus_w {
             for id in hilfe.w { let r = modul.declare_func_in_func(id, bau.b.func); bau.hw.push(r); }
@@ -1848,6 +1982,38 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         };
                         bau.fehler_pruefen();
                         st.push((w, erg));
+                    }
+                    op::CALL_METHOD if !an.modus_w => {
+                        let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => unreachable!() };
+                        let teil = st.split_off(st.len() - argc);
+                        let Some((obj, Art::Obj(k))) = st.pop() else { unreachable!() };
+                        let lage = klassen[k as usize].lage;
+                        let j = glob.tafel.iter().position(|e| std::ptr::eq(e.lage, lage) && e.name.eq_ignore_ascii_case(&name)).unwrap();
+                        let g: &Func = unsafe { &*glob.tafel[j].func };
+                        let idx = prog.functions.len() + j;
+                        let mut args = Vec::with_capacity(argc + 1);
+                        args.push(bau.ctx);
+                        for (i, (w, a)) in teil.into_iter().enumerate() {
+                            let p = art_von_typ(&g.local_types[i]).unwrap();
+                            args.push(bau.wandeln(w, a, p));
+                        }
+                        // `Self` des Gerufenen; der Rufer hat sein eigenes beim
+                        // Eintritt gelesen und braucht es nicht zurueck.
+                        bau.b.ins().store(MemFlagsData::trusted(), obj, bau.ctx, K_SELBST);
+                        if bereich.is_some() {
+                            let jb = bau.b.ins().load(types::I64, MemFlagsData::trusted(), bau.ctx, K_JOURNAL_BEREICH);
+                            bau.b.ins().store(MemFlagsData::trusted(), jb, bau.ctx, K_JOURNAL);
+                        }
+                        let fref = modul.declare_func_in_func(ids[idx].unwrap(), bau.b.func);
+                        let ruf = bau.b.ins().call(fref, &args);
+                        let erg = bau.b.inst_results(ruf).first().copied();
+                        if bereich.is_some() { bau.b.ins().call(bau.h_journal, &[bau.ctx]); }
+                        let fl = bau.b.ins().load(types::I64, MemFlagsData::trusted(), bau.ctx, 0);
+                        bau.aussteigen_wenn(fl);
+                        match erg {
+                            Some(w) => st.push((w, art_von_typ(&g.return_type).unwrap())),
+                            None => { let n = bau.b.ins().iconst(types::I64, 0); st.push((n, Art::N)); }
+                        }
                     }
                     op::CALL_METHOD => {
                         let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
@@ -2313,6 +2479,7 @@ impl Jit {
         builder.symbol("dh_feld_setzen_f", feld_setzen_f as *const u8);
         builder.symbol("dh_element_i", element_i as *const u8);
         builder.symbol("dh_element_f", element_f as *const u8);
+        builder.symbol("dh_journal_schluss", journal_schluss as *const u8);
         let w_namen: [(&str, *const u8); 15] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
@@ -2343,10 +2510,11 @@ impl Jit {
         let i = types::I64;
         let s_lesen_i = sig_h(&[ptr, i, i, i, i], Some(i));
         let s_lesen_f = sig_h(&[ptr, i, i], Some(types::F64));
-        let s_setzen_i = sig_h(&[i, i, i, i], None);
-        let s_setzen_f = sig_h(&[i, i, types::F64], None);
+        let s_setzen_i = sig_h(&[ptr, i, i, i, i], None);
+        let s_setzen_f = sig_h(&[ptr, i, i, types::F64], None);
         let s_element_i = sig_h(&[ptr, i, i, i], Some(i));
         let s_element_f = sig_h(&[ptr, i], Some(types::F64));
+        let s_journal = sig_h(&[ptr], None);
         let f64t = types::F64;
         let w_sigs: Vec<(&str, cranelift_codegen::ir::Signature)> = [
             ("dh_w_konst", vec![ptr, i, i], None),
@@ -2377,6 +2545,7 @@ impl Jit {
             setzen_f: dekl("dh_feld_setzen_f", &s_setzen_f)?,
             element_i: dekl("dh_element_i", &s_element_i)?,
             element_f: dekl("dh_element_f", &s_element_f)?,
+            journal_schluss: dekl("dh_journal_schluss", &s_journal)?,
             w: w_ids,
         };
         // Beruehrte Plaetze je Funktion samt allen, die sie ruft.
@@ -2411,13 +2580,14 @@ impl Jit {
             }
         }
         let mut fctx = FunctionBuilderContext::new();
+        let alle = alle_funktionen(prog, &glob);
         let mut einstiege: Vec<Option<FuncId>> = vec![None; an.len()];
         for (i, a) in an.iter().enumerate() {
             if let (Some(a), Some(id)) = (a, ids[i]) {
                 let bef: Vec<usize> = a.beruehrt.iter().copied()
                     .filter(|p| !a.gerufen.iter().any(|&g| ber[g].contains(p))).collect();
-                erzeugen(&mut modul, prog, &glob, &prog.functions[i], a, &ids, &hilfe, &mut fctx, id, None, &bef, false)
-                    .map_err(|e| format!("{}: {}", prog.functions[i].name, e))?;
+                erzeugen(&mut modul, prog, &glob, alle[i].0, a, &ids, &hilfe, &mut fctx, id, None, &bef, false)
+                    .map_err(|e| format!("{}: {}", alle[i].2, e))?;
                 einstiege[i] = Some(trampolin(&mut modul, &mut fctx, id, &a.params, a.rueck, i as u32)?);
             }
         }
@@ -2441,12 +2611,14 @@ impl Jit {
         }
         let arten = glob.art.iter().map(|a| match a { Some(Art::I) => 1, Some(Art::F) => 2, Some(Art::B) => 3, _ => 0 }).collect();
         let n = prog.n_globals;
+        let mtab: HashMap<(usize, usize), usize> = glob.tafel.iter().enumerate()
+            .map(|(j, e)| ((e.lage as usize, e.func as usize), prog.functions.len() + j)).collect();
         Ok(Jit { modul: RefCell::new(modul), fctx: RefCell::new(fctx), ids, hilfe, glob,
                  schleifen: RefCell::new(Vec::new()),
                  zahl_schleifen: std::cell::Cell::new(0), zahl_laeufe: std::cell::Cell::new(0),
                  zahl_aussteige: std::cell::Cell::new(0),
                  meldung: RefCell::new(None),
-                 fns, arten,
+                 fns, arten, mtab,
                  schatten: std::cell::UnsafeCell::new(vec![0; n]),
                  marken: std::cell::UnsafeCell::new(vec![0; n]) })
     }
@@ -2555,6 +2727,7 @@ impl Jit {
         // kopiert -- sonst hielten zwei einen Text, und `s = s + x` haengte nie
         // an Ort und Stelle an). Zurueck an jedem Ausgang, und auch beim
         // Aufgeben vor dem ersten Befehl.
+        let mut bereich_journal: Vec<(u64, u64, Value)> = Vec::new();
         let mut arena: Vec<Value> = Vec::new();
         if s.modus_w {
             arena = vec![Value::Nil; s.start.len() + MAX_STAPEL];
@@ -2572,7 +2745,8 @@ impl Jit {
             slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
             stapel: st_puffer.as_mut_ptr(), felder: besch.as_ptr(), selbst: selbst_zeiger,
             werte: arena.as_mut_ptr(),
-            vm: vm as *mut crate::vm::Vm<'static>, meldung: None,
+            vm: vm as *mut crate::vm::Vm<'static>, meldung: None, journal: std::ptr::null_mut(),
+            journal_bereich: &mut bereich_journal,
         };
         let aus = unsafe { (s.einstieg)(&mut k, lok.as_mut_ptr()) };
         if aus <= -2 { *self.meldung.borrow_mut() = k.meldung.take(); }
@@ -2728,13 +2902,13 @@ impl Jit {
         let start = Zustand { stapel: Vec::new(), lokal };
         let bereich = Bereich { von: kopf, bis, start, globale_da, felder, glob_felder,
                                 klassen, selbst: selbst_k, dyn_glob, lok_typen, modus_w: false };
-        let an = match analysieren(prog, &self.glob, f, Some(&bereich)) {
+        let an = match analysieren(prog, &self.glob, f, Some(&bereich), None) {
             Ok(an) => an,
             Err(e) => {
                 // Zweiter Versuch im Wertemodus: Texte, MAPs, eingebaute
                 // Befehle -- alles, was keine Zahl ist, als Wert.
                 let w = self.wertebereich(f, kopf, bis, locals, slots);
-                match analysieren(prog, &self.glob, f, Some(&w)) {
+                match analysieren(prog, &self.glob, f, Some(&w), None) {
                     Ok(an) => an,
                     Err(e2) => return Err(format!("{}; mit Werten: {}", e, e2)),
                 }
@@ -2831,6 +3005,20 @@ impl Jit {
 
     pub fn rufen(&self, idx: usize, args: &[Value], tiefe: u32, grenze: u32,
                  slots: &[Option<Rc<RefCell<Slot>>>]) -> Option<Value> {
+        self.rufen_mit(idx, 0, args, tiefe, grenze, slots)
+    }
+
+    /// Eine Methode als Maschinencode (M4 Schritt 7b): nur, wenn sie fuer
+    /// GENAU die Klasse des Objekts uebersetzt ist (`lage`) -- eine
+    /// Unterklasse hat eine eigene Fassung oder bleibt in der VM.
+    pub fn methode(&self, lage: *const crate::value::Layout, m: *const Func, obj: *const RefCell<crate::value::Instance>,
+                   args: &[Value], tiefe: u32, grenze: u32, slots: &[Option<Rc<RefCell<Slot>>>]) -> Option<Value> {
+        let idx = *self.mtab.get(&(lage as usize, m as usize))?;
+        self.rufen_mit(idx, obj as u64, args, tiefe, grenze, slots)
+    }
+
+    fn rufen_mit(&self, idx: usize, selbst: u64, args: &[Value], tiefe: u32, grenze: u32,
+                 slots: &[Option<Rc<RefCell<Slot>>>]) -> Option<Value> {
         let u = self.fns.get(idx)?.as_ref()?;
         if u.fehlschlaege.get() >= MAX_FEHLSCHLAEGE || args.len() != u.params.len() { return None; }
         let mut roh = [0u64; 16];
@@ -2852,12 +3040,15 @@ impl Jit {
             fehler: 0, tiefe: tiefe as u64, grenze: grenze as u64,
             schatten: schatten.as_mut_ptr(), marken: marken.as_mut_ptr(),
             slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
-            stapel: std::ptr::null_mut(), felder: std::ptr::null(), selbst: 0, werte: std::ptr::null_mut(),
-            vm: std::ptr::null_mut(), meldung: None,
+            stapel: std::ptr::null_mut(), felder: std::ptr::null(), selbst, werte: std::ptr::null_mut(),
+            vm: std::ptr::null_mut(), meldung: None, journal: std::ptr::null_mut(), journal_bereich: std::ptr::null_mut(),
         };
+        let mut journal: Vec<(u64, u64, Value)> = Vec::new();
+        k.journal = &mut journal;
         let mut erg = 0u64;
         unsafe { (u.einstieg)(&mut k, roh.as_ptr(), &mut erg) };
         let ok = k.fehler == 0;
+        if !ok { journal_zurueck(&mut journal); }
         // Nur ohne Fehler kommen die geaenderten Plaetze in die VM; die
         // Marken werden in jedem Fall wieder frei.
         for &g in &u.beruehrt {
