@@ -1358,6 +1358,21 @@ Argumentliste an (wie jeder Funktionsaufruf). Tests
 `tests/pruef/objektfelder.dhtest` (auf beiden Laufzeiten gleich; Gegenprobe
 mit falscher Aufloesung bzw. ohne Kette: 3 Faelle fallen).
 
+## Feste Lage der Objektfelder (2026-09-25, M4 Schritt 4a)
+
+Eine Instanz ist `Rc<Layout>` + `Vec<Value>` (`value::Instance`); die Lage
+(Name -> Platz, Typ je Platz) gehoert der Klasse (`ClassInfo::layout`, in
+`model::programm_bauen` gerechnet, Vorfahren zuerst -- ein in der
+Unterklasse neu deklariertes Feld bleibt auf dem Platz der Vorfahrin und
+nimmt ihren Typ). Die Feldbefehle und CALL_METHOD merken sich (Lage, Platz
+bzw. Methode) in `Instr::merk` -- EIN Merkfeld fuer beide, weil ein
+groesseres `Instr` Zahlenschleifen 7 % kostete; verglichen wird die LAGE,
+nicht der Klassenname. Wer ein Feld liest oder schreibt, geht ueber
+`feld_platz`; eine PROPERTY darf NIE in den Merkplatz. `objekte.dh`
+125 -> 95 ms; `ganzzahl.dh` +4 % durch die Codelage (gemessen, drei
+Aufteilungen probiert, siehe `docs/entwurf-maschinencode.md` M4). Tests
+`tests/pruef/objektlage.dhtest`.
+
 ## Aufrufe ohne Zwischenliste, Methoden mit Merkplatz (2026-09-24)
 
 `CALL_USER`/`CALL_METHOD` verschieben die Argumente per `stack.drain(split..)`
