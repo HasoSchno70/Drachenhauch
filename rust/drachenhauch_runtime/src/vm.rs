@@ -158,6 +158,25 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
     // `locals` ist ein (ggf. gepoolter) Buffer -- Allokation wird
     // wiederverwendet, Inhalt kommt frisch aus den local_defaults.
     locals.clear();
+    // Der haeufigste Fall (CALL_USER reicht immer alle Argumente, keine
+    // Ausdruck-Vorgaben): die Parameter direkt hineinschieben und nur den
+    // Rest aus den Vorgaben kopieren -- sonst wird jeder Parameterplatz erst
+    // mit seiner Vorgabe belegt und gleich wieder ueberschrieben.
+    if !fn_.is_variadic && args.len() == fn_.n_params
+        && !fn_.param_default_is_expr.iter().any(|&b| b) {
+        for (i, v) in args.enumerate() {
+            locals.push(passend!(v, fn_.local_types[i].as_str(), "Parameter"));
+        }
+        let np = fn_.n_params;
+        if fn_.local_defaults.len() > np {
+            locals.extend_from_slice(&fn_.local_defaults[np..]);
+        }
+        let n_locals = fn_.local_types.len();
+        if locals.len() < n_locals {
+            locals.resize(n_locals, Value::Nil);
+        }
+        return Ok(locals);
+    }
     locals.extend_from_slice(&fn_.local_defaults);
     let n_locals = fn_.local_types.len();
     if locals.len() < n_locals {
@@ -689,6 +708,17 @@ fn dbg_binop(op: &str, a: &Value, b: &Value) -> R<Value> {
     }
 }
 
+/// Ein laufender Aufruf auf dem Rahmenstapel (siehe `Vm::rahmen`): der
+/// Zustand des Aufrufers, waehrend `gerufen` laeuft.
+struct Rahmen<'p> {
+    fn_: &'p Func,
+    locals: Vec<Value>,
+    stack: Vec<Value>,
+    ip: usize,
+    try_handlers: Vec<(usize, usize)>,
+    gerufen: &'p Func,
+}
+
 pub struct Vm<'p> {
     prog: &'p Program,
     globals: HashMap<String, Rc<RefCell<Slot>>>,
@@ -705,6 +735,11 @@ pub struct Vm<'p> {
     // pro Funktionsaufruf in heissen Call-Pfaden (fib, Methoden-Loops).
     pool_locals: Vec<Vec<Value>>,
     pool_stacks: Vec<Vec<Value>>,
+    // Rahmenstapel (M2): ein Aufruf einer schlichten Funktion wechselt in
+    // `dispatch` den Rahmen, statt ueber exec -> run_frame -> dispatch neu
+    // einzusteigen. Hier liegt je laufendem Aufruf der Zustand des AUFRUFERS.
+    // Jeder `run_frame` kennt seine Basis (die Laenge beim Eintritt).
+    rahmen: Vec<Rahmen<'p>>,
     // Quell-Zeile der zuletzt ausgefuehrten Instruktion (fuer Laufzeitfehler-
     // Meldungen). Bei einem propagierenden Fehler haelt es die Zeile der
     // innersten fehlschlagenden Instruktion (sie lief zuletzt). 0 = unbekannt.
@@ -945,6 +980,7 @@ impl<'p> Vm<'p> {
             timers: crate::timer::Timers::default(),
             pool_locals: Vec::new(),
             pool_stacks: Vec::new(),
+            rahmen: Vec::new(),
             cur_line: 0,
             err_line_set: false,
             debug_stop_flag: false,
@@ -1944,8 +1980,12 @@ impl<'p> Vm<'p> {
         try_handlers: &mut Vec<(usize, usize)>,
         self_obj: Option<&Value>,
     ) -> R<Step> {
+        // Rahmen oberhalb dieser Basis gehoeren zu Aufrufen, die `dispatch`
+        // in diesem run_frame selbst begonnen hat (siehe `Vm::rahmen`).
+        let basis = self.rahmen.len();
         loop {
-            match self.dispatch(fn_, locals, stack, ip, try_handlers, self_obj) {
+            let akt = match self.rahmen.last() { Some(r) if self.rahmen.len() > basis => r.gerufen, _ => fn_ };
+            match self.dispatch(akt, locals, stack, ip, try_handlers, self_obj, basis) {
                 Ok(step) => return Ok(step),
                 // Debugger-Abbruch (`stop`), Profiler-Stop-Signal und EXIT(code)
                 // duerfen NICHT von TRY/CATCH gefangen werden -- unbedingt
@@ -1953,8 +1993,15 @@ impl<'p> Vm<'p> {
                 // ein DH-Programm mit `THROW "__DEBUG_STOP__"` erzeugt zwar
                 // denselben String, setzt aber keines der Flags (Review-Fund).
                 Err(e) if self.debug_stop_flag || self.profile_stop_flag
-                          || self.exit_code.is_some() => return Err(e),
+                          || self.exit_code.is_some() => {
+                    while self.rahmen.len() > basis { self.rahmen_verlassen(locals, stack, ip, try_handlers); }
+                    return Err(e);
+                }
                 Err(e) => {
+                    // Die Funktion, in der der Fehler FIEL -- nicht die, mit
+                    // der dispatch betreten wurde; es kann Rahmen gewechselt
+                    // haben.
+                    let fn_ = match self.rahmen.last() { Some(r) if self.rahmen.len() > basis => r.gerufen, _ => fn_ };
                     // Quell-Zeile lazy ermitteln: ip zeigt HINTER die
                     // fehlgeschlagene Instruktion. Nur der innerste Frame
                     // (Fehler-Ursprung) setzt sie; aeussere Frames sehen das
@@ -1983,14 +2030,22 @@ impl<'p> Vm<'p> {
                         };
                         self.throw_active = false;
                     }
-                    match try_handlers.pop() {
-                        Some((target, depth)) => {
-                            self.err_line_set = false;   // Fehler konsumiert (CATCH)
-                            stack.truncate(depth);
-                            stack.push(Value::str_rc(&e));
-                            *ip = target;
+                    // Erst der innerste Rahmen, dann nach aussen -- wie frueher,
+                    // als jeder Aufruf sein eigenes run_frame hatte.
+                    loop {
+                        match try_handlers.pop() {
+                            Some((target, depth)) => {
+                                self.err_line_set = false;   // Fehler konsumiert (CATCH)
+                                stack.truncate(depth);
+                                stack.push(Value::str_rc(&e));
+                                *ip = target;
+                                break;
+                            }
+                            None if self.rahmen.len() > basis => {
+                                self.rahmen_verlassen(locals, stack, ip, try_handlers);
+                            }
+                            None => return Err(e),
                         }
-                        None => return Err(e),
                     }
                 }
             }
@@ -2279,6 +2334,24 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// Den obersten Rahmen verlassen: die Vecs des Gerufenen zurueck in den
+    /// Vorrat, der Zustand des Aufrufers zurueck an seinen Platz. Liefert
+    /// (Aufrufer, Gerufener).
+    fn rahmen_verlassen(&mut self, locals: &mut Vec<Value>, stack: &mut Vec<Value>,
+                        ip: &mut usize, try_handlers: &mut Vec<(usize, usize)>) -> (&'p Func, &'p Func) {
+        let r = self.rahmen.pop().expect("Rahmen");
+        let mut l = std::mem::replace(locals, r.locals);
+        let mut st = std::mem::replace(stack, r.stack);
+        l.clear();
+        st.clear();
+        if self.pool_locals.len() < 64 { self.pool_locals.push(l); }
+        if self.pool_stacks.len() < 64 { self.pool_stacks.push(st); }
+        *try_handlers = r.try_handlers;
+        *ip = r.ip;
+        self.depth -= 1;
+        (r.fn_, r.gerufen)
+    }
+
     fn dispatch(
         &mut self,
         fn_: &'p Func,
@@ -2287,16 +2360,36 @@ impl<'p> Vm<'p> {
         ip: &mut usize,
         try_handlers: &mut Vec<(usize, usize)>,
         self_obj: Option<&Value>,
+        basis: usize,
     ) -> R<Step> {
-        let code = &fn_.code;
-        let constants = &fn_.constants;
-        let n = code.len();
+        let mut fn_ = fn_;
+        let mut code = &fn_.code;
+        let mut constants = &fn_.constants;
+        let mut n = code.len();
+        // Ein RETURN mit offenem Rahmen kehrt in den Aufrufer zurueck, statt
+        // `dispatch` zu verlassen (siehe `Vm::rahmen`).
+        macro_rules! zurueck {
+            ($wert:expr) => {{
+                let wert: Value = $wert;
+                let (aufrufer, gerufen) = self.rahmen_verlassen(locals, stack, ip, try_handlers);
+                stack.push(if gerufen.is_sub { Value::Nil } else { wert });
+                fn_ = aufrufer;
+                code = &fn_.code;
+                constants = &fn_.constants;
+                n = code.len();
+                continue;
+            }};
+        }
         // Zeilen-Tracking nur, wenn jemand zusieht (Profiler/Stop/Debugger).
         // Fuer Laufzeitfehler wird die Quell-Zeile LAZY im Fehlerfall
         // ermittelt (run_frame) -- der Normalfall zahlt pro Instruktion nichts.
         let track_lines = self.prof.is_some() || self.stop.is_some() || self.dbg.is_some();
 
-        while *ip < n {
+        loop {
+            if *ip >= n {
+                if self.rahmen.len() > basis { zurueck!(Value::Nil); }
+                return Ok(Step::Return(Value::Nil));
+            }
             let instr = &code[*ip];
             // Superinstruktion (M2): die ganze Folge in einem Schritt, wenn es
             // sicher geht; sonst Befehl fuer Befehl wie immer. Nicht, wenn
@@ -2604,6 +2697,31 @@ impl<'p> Vm<'p> {
                     if callee.is_coroutine {
                         let call_args = stack.split_off(split);
                         stack.push(make_coro(callee, call_args, None));
+                    } else if !track_lines && !callee.param_byref.iter().any(|&b| b) {
+                        // M2: Rahmen wechseln statt exec -> run_frame -> dispatch.
+                        // Nicht, wenn jemand zusieht (Profiler, Debugger, Stop:
+                        // die fuehren einen Stapel je exec).
+                        if self.depth >= MAX_CALL_DEPTH {
+                            return Err(format!("Maximale Aufruftiefe ({}) ueberschritten -- unendliche Rekursion?", MAX_CALL_DEPTH));
+                        }
+                        let lbuf = self.pool_locals.pop().unwrap_or_default();
+                        let neu_locals = bind_params(callee, stack.drain(split..), lbuf)?;
+                        let neu_stack = self.pool_stacks.pop().unwrap_or_else(|| Vec::with_capacity(16));
+                        self.depth += 1;
+                        self.rahmen.push(Rahmen {
+                            fn_,
+                            locals: std::mem::replace(locals, neu_locals),
+                            stack: std::mem::replace(stack, neu_stack),
+                            ip: *ip,
+                            try_handlers: std::mem::take(try_handlers),
+                            gerufen: callee,
+                        });
+                        fn_ = callee;
+                        code = &fn_.code;
+                        constants = &fn_.constants;
+                        n = code.len();
+                        *ip = 0;
+                        continue;
                     } else if callee.param_byref.iter().any(|&b| b) {
                         // BYREF: finale Param-Werte mit zurueckgeben. Layout fuers
                         // Write-Back: [.., bv0, bv1, .., bv{m-1}, result].
@@ -2915,19 +3033,27 @@ impl<'p> Vm<'p> {
                 // --- Rueckgabe ---
                 op::RETURN => {
                     let v = vm_pop(stack)?;
-                    return Ok(Step::Return(coerce(v, &fn_.return_type, "RETURN")?));
+                    let v = coerce(v, &fn_.return_type, "RETURN")?;
+                    if self.rahmen.len() > basis { zurueck!(v); }
+                    return Ok(Step::Return(v));
                 }
-                op::RETURN_VOID => return Ok(Step::Return(Value::Nil)),
+                op::RETURN_VOID => {
+                    if self.rahmen.len() > basis { zurueck!(Value::Nil); }
+                    return Ok(Step::Return(Value::Nil));
+                }
                 // Seltene Befehle stehen in `dispatch_selten` -- dort liegt ihr
                 // Stapelrahmen, und die heisse Schleife hier bleibt schlank.
                 _ => {
                     if let Some(step) = self.dispatch_selten(instr, fn_, locals, stack, ip, try_handlers)? {
+                        if let Step::Return(v) = step {
+                            if self.rahmen.len() > basis { zurueck!(v); }
+                            return Ok(Step::Return(v));
+                        }
                         return Ok(step);
                     }
                 }
             }
         }
-        Ok(Step::Return(Value::Nil))
     }
 
     /// Die seltenen Befehle von `dispatch` (DECLARE, PRINT, INPUT, TRY, Tupel, NEW,

@@ -194,6 +194,23 @@ datei.dh` listet die Stellen. Gemessen gegen den Stand davor: `aufrufe.dh`
 Schritte: der Aufruf selbst (~45 ns) und Folgen, deren zweiter Operand
 schon auf dem Stapel liegt (`i MOD 3 = 0` verschmilzt heute nur zur Haelfte).
 
+**Zweiter Schritt 2026-09-25: Rahmenstapel.** Ein Aufruf einer schlichten
+Funktion (CALL_USER, keine Coroutine, kein BYREF) stieg bisher ueber
+`exec -> exec_inner -> run_frame -> dispatch` neu in den Interpreter ein. Jetzt
+legt `dispatch` den Zustand des Aufrufers auf `Vm::rahmen` und laeuft im
+selben Aufruf mit dem Gerufenen weiter; RETURN (auch RETURN_VOID, HALT, Ende
+des Codes) holt ihn zurueck. Fehler wickelt `run_frame` Rahmen fuer Rahmen
+ab: erst die TRY-Handler des innersten, dann die des Aufrufers -- wie vorher,
+als jeder Aufruf sein eigenes `run_frame` hatte; die Fehlerzeile nimmt die
+Funktion, in der der Fehler FIEL. EXIT und die Stop-Signale raeumen alle
+Rahmen ab. Nicht unter Profiler/Debugger/Stop (die fuehren einen Stapel je
+`exec`). Dazu bindet `bind_params` im haeufigsten Fall die Parameter direkt,
+statt jeden Platz erst mit seiner Vorgabe zu belegen. Gemessen: ein leerer
+Aufruf 41 -> 29 ns, `aufrufe.dh` (fib) 0,85 gegen Schritt 1. Tests
+`tests/pruef/rahmenstapel.dhtest` (Erwartungen = Ausgabe des Baus davor; die
+erste Fassung nannte bei einem Fehler drei Ebenen tief die Zeile des
+Aufrufers -- gefunden von genau diesem Vergleich).
+
 ### M3 — Cranelift für Zahlenfunktionen (4–6 Wochen, Weg B)
 
 Feature `jit` (standardmäßig aus). Übersetzt wird eine FUNCTION/SUB, wenn alle

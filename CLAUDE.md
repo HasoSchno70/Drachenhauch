@@ -1491,6 +1491,20 @@ Code) -- Einzelheiten `docs/entwurf-maschinencode.md` M2. Tests
 `tests/pruef/verschmelzen.dhtest` (jeder Fall mit und ohne; Gegenprobe: ohne
 Typpruefung beim globalen Speichern faellt "umwandeln beim speichern").
 
+## Rahmenstapel (2026-09-25, M2 Schritt 2)
+
+CALL_USER auf eine schlichte Funktion (keine Coroutine, kein BYREF, nicht
+unter Profiler/Debugger/Stop) steigt nicht mehr ueber `exec -> run_frame ->
+dispatch` neu ein: `dispatch` schiebt den Aufrufer als `Rahmen` auf
+`Vm::rahmen` und laeuft mit dem Gerufenen weiter, RETURN/RETURN_VOID/HALT/
+Code-Ende kehren per `zurueck!` zurueck (nur oberhalb der `basis`, die jeder
+`run_frame` beim Eintritt nimmt). `run_frame` wickelt Fehler Rahmen fuer
+Rahmen ab (`rahmen_verlassen`) und nimmt die Fehlerzeile aus der Funktion,
+in der der Fehler FIEL -- nicht aus der, mit der `dispatch` betreten wurde.
+EXIT/Stop raeumen alle Rahmen oberhalb der Basis ab. `bind_params` bindet
+den Normalfall direkt. Leerer Aufruf 41 -> 29 ns, fib 0,85. Tests
+`tests/pruef/rahmenstapel.dhtest` (Erwartung = Ausgabe des Baus davor).
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
