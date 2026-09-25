@@ -557,6 +557,37 @@ eines Befehls" faellt. Zwei davon blieben im ersten Anlauf gruen: kein Text
 war je GLEICH seinem Vergleich, und die `coerce`-Probe stand in einem TRY,
 dessen Schleife in der VM blieb.
 
+**Schritt 6 (2026-09-25): Befehle der uebrigen Familien -- gebaut.** Im
+Wertemodus ruft `w_builtin_roh` jetzt auch Befehle, die die VM braucht
+(Grafik, gui, zeit, scene, Datei, db ...): ueber einen Zeiger auf die VM
+(`Kontext::vm`) und DENSELBEN Weg wie CALL_BUILTIN (`Vm::builtin_rufen`
+samt Merkplatz). **Ausgenommen ist, was Drachenhauch-Code ruft** -- dessen
+Locals und Globale liegen waehrend des Bereichs in den Werteplaetzen bzw.
+Registern: Coroutinen (Familie 4), `TIMER_UPDATE` und `GUI_UPDATE`
+(Rueckrufe), Auftraege (8, lesen die Globalen), `SORT` mit Vergleich (2 --
+merkt sich ohnehin nie eine Familie), dazu `ASSERT` (braucht die Zeile);
+`befehl_im_bereich` ist die eine Stelle. **Scheitert so ein Befehl, wird
+er nicht nachgerechnet**: er hat womoeglich schon etwas getan; der Bereich
+steigt vor ihm aus, und die VM gibt die Meldung an seiner Stelle aus
+(`Kontext::meldung` -> `Jit::meldung_nehmen`, `*ip = weiter + 1`, damit
+`run_frame` die Zeile des Befehls nimmt). Einen Befehl, der erst etwas tut
+und dann scheitert, gibt es im Bestand nicht -- dass die VM ihn nicht
+doppelt ruft, laesst sich darum nicht beobachten (die Gegenprobe
+"nachrechnen" bleibt gruen). Die VM gibt dafuer ihren Zeiger vor dem Leihen
+von `self.jit` als rohen Zeiger mit (`vmp`); die Befehle beruehren weder
+`self.jit` noch die Locals.
+
+Gemessen `tools/tempo/familien.dh` (200 000 Runden Rechnen plus ein
+`ZEIT_WOCHENTAG` je Runde): VM 200 ms, vorher 66 ms (nur die innere
+Schleife im Maschinencode), jetzt 16,5 ms. Ein Befehl allein wird nicht
+schneller (der Befehl selbst kostet das meiste), aber er haelt die Schleife
+nicht mehr in der VM. Pruefung: 5 Faelle mehr in `jit.dhtest` (zeit-Befehle,
+ein scene-Befehl scheitert mit und ohne TRY samt `ERROR_LINE`, TIMER_UPDATE
+mit Rueckruf auf eine Globale, eine Coroutine, die eine Globale liest).
+Gegenproben: Coroutinen zugelassen -> 20 statt 110; TIMER_UPDATE
+zugelassen -> 200 statt 2100 (beide jeweils mit falschem Ergebnis, nicht
+nur an der Bilanzzeile); `*ip = weiter` statt `+ 1` -> falsche Zeile.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

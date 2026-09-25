@@ -227,6 +227,11 @@ pub struct Kontext {
     /// Nur Wertemodus: die Werteplaetze (Versatz 88; Local s = Platz s,
     /// Stapeltiefe d = Platz n_lokal_gesamt + d).
     werte: *mut Value,
+    /// Nur Wertemodus: die VM, fuer Befehle der uebrigen Familien (Grafik,
+    /// gui, Datei ...), und die Meldung, wenn einer davon scheitert -- die
+    /// VM gibt sie an seiner Stelle aus, statt ihn noch einmal zu rufen.
+    vm: *mut crate::vm::Vm<'static>,
+    meldung: Option<String>,
 }
 
 const K_SCHATTEN: i32 = 24;
@@ -441,6 +446,16 @@ extern "C" fn w_op(k: *mut Kontext, o: u64, a_i: u64, b_i: u64, ziel: u64, lokal
 
 extern "C" fn w_wahr(k: *mut Kontext, i: u64) -> i64 { w_nehmen(k, i).truthy() as i64 }
 
+/// Darf ein Befehl der Familie `f` (Nummer aus `Vm::familie_rufen`) im
+/// Wertemodus laufen? Nicht, was Drachenhauch-Code ruft -- dessen Locals und
+/// Globale liegen waehrend des Bereichs in den Werteplaetzen: SORT mit
+/// Vergleich (2), Coroutinen (4), TIMER_UPDATE und GUI_UPDATE (Rueckrufe),
+/// Auftraege (8, lesen die Globalen). Und nicht ASSERT (braucht die Zeile).
+fn befehl_im_bereich(f: u8, name: &str) -> bool {
+    f != 0 && !matches!(f, 2 | 4 | 8) && !name.starts_with("assert")
+        && !matches!(name, "gui_update" | "timer_update")
+}
+
 /// Ein eingebauter Befehl aus der Familie der REINEN (`builtins::call_builtin`
 /// -- die VM hat an dieser Stelle schon einmal genau sie gefragt,
 /// `Instr::familie`). Argumente aus den Plaetzen `basis..basis+argc`, das
@@ -452,6 +467,17 @@ fn w_builtin_roh(k: *mut Kontext, ins: u64, basis: u64, argc: u64) -> Option<Val
     // hinein, ohne sie herauszunehmen (kein Vec je Aufruf). Erst nach Erfolg
     // werden die Plaetze frei.
     let args: &[Value] = unsafe { std::slice::from_raw_parts((*k).werte.add(basis as usize), argc as usize) };
+    if ins.familie.get() != crate::vm::BUILTIN_FAMILIEN {
+        // Eine andere Familie: derselbe Weg wie CALL_BUILTIN in der VM. Ein
+        // Fehler wird NICHT nachgerechnet -- der Befehl hat womoeglich schon
+        // etwas getan (gezeichnet, geschrieben); die VM meldet ihn an seiner
+        // Stelle.
+        let vm = unsafe { &mut *(*k).vm };
+        return match vm.builtin_rufen(name, args, &ins.familie) {
+            Ok(v) => { for j in 0..argc { drop(w_nehmen(k, basis + j)); } Some(v) }
+            Err(e) => { unsafe { (*k).meldung = Some(e); } w_fehler(k); None }
+        };
+    }
     match crate::builtins::call_builtin(name, args) {
         Some(Ok(v)) => {
             for j in 0..argc { drop(w_nehmen(k, basis + j)); }
@@ -576,6 +602,9 @@ pub struct Jit {
     arten: Vec<u8>,
     schatten: std::cell::UnsafeCell<Vec<u64>>,
     marken: std::cell::UnsafeCell<Vec<u8>>,
+    /// Die Meldung eines Befehls, an dem ein Bereich zuletzt ausgestiegen ist
+    /// (siehe `Kontext::meldung`); die VM holt sie mit `meldung_nehmen`.
+    meldung: RefCell<Option<String>>,
 }
 
 /// Eine uebersetzte Schleife: Einstieg, die Arten der Locals, fuer die sie
@@ -881,8 +910,8 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 if ins.familie.get() == 0 {
                     return Err(format!("eingebauter Befehl {} (an dieser Stelle noch nie gerufen)", name.to_uppercase()));
                 }
-                if ins.familie.get() != crate::vm::BUILTIN_FAMILIEN || name.starts_with("assert") {
-                    return Err(format!("eingebauter Befehl {} (nicht aus der reinen Familie)", name.to_uppercase()));
+                if !befehl_im_bereich(ins.familie.get(), &name) {
+                    return Err(format!("eingebauter Befehl {} (ruft Drachenhauch-Code oder braucht die Zeile)", name.to_uppercase()));
                 }
                 for _ in 0..argc { if !w_oder_skalar(pop!()) { return Err("Argument NIL".into()); } }
                 z.stapel.push(match crate::typen::builtin_typ(&name) {
@@ -2290,6 +2319,7 @@ impl Jit {
                  schleifen: RefCell::new(Vec::new()),
                  zahl_schleifen: std::cell::Cell::new(0), zahl_laeufe: std::cell::Cell::new(0),
                  zahl_aussteige: std::cell::Cell::new(0),
+                 meldung: RefCell::new(None),
                  fns, arten,
                  schatten: std::cell::UnsafeCell::new(vec![0; n]),
                  marken: std::cell::UnsafeCell::new(vec![0; n]) })
@@ -2306,7 +2336,11 @@ impl Jit {
     /// Ausgang, die Locals und Globals sind nachgetragen. `None`: die VM
     /// macht am Kopf weiter wie immer (auch, wenn der Maschinencode aufgab --
     /// dann ist nichts geschehen).
-    pub fn schleife(&self, prog: &Program, f: &Func, ruecksprung: usize, kopf: usize, locals: &mut [Value],
+    /// Ist ein Bereich an einem Befehl ausgestiegen, der gescheitert ist?
+    /// Dann gibt die VM diese Meldung an seiner Stelle aus.
+    pub fn meldung_nehmen(&self) -> Option<String> { self.meldung.borrow_mut().take() }
+
+    pub fn schleife(&self, vm: *mut crate::vm::Vm<'_>, prog: &Program, f: &Func, ruecksprung: usize, kopf: usize, locals: &mut [Value],
                     stapel: &mut Vec<Value>, selbst: Option<&Value>, tiefe: u32, grenze: u32,
                     slots: &[Option<Rc<RefCell<Slot>>>]) -> Option<usize> {
         let marke = &f.code[ruecksprung].schleife;
@@ -2412,8 +2446,10 @@ impl Jit {
             slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
             stapel: st_puffer.as_mut_ptr(), felder: besch.as_ptr(), selbst: selbst_zeiger,
             werte: arena.as_mut_ptr(),
+            vm: vm as *mut crate::vm::Vm<'static>, meldung: None,
         };
         let aus = unsafe { (s.einstieg)(&mut k, lok.as_mut_ptr()) };
+        if aus <= -2 { *self.meldung.borrow_mut() = k.meldung.take(); }
         // >= 0: an einem Ausgang; <= -2: mitten drin ausgestiegen -- beides
         // ist ein gueltiger Stand der VM. -1: aufgegeben, nichts geschehen.
         let ok = (k.fehler == 0 && aus >= 0) || aus <= -2;
@@ -2691,6 +2727,7 @@ impl Jit {
             schatten: schatten.as_mut_ptr(), marken: marken.as_mut_ptr(),
             slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
             stapel: std::ptr::null_mut(), felder: std::ptr::null(), selbst: 0, werte: std::ptr::null_mut(),
+            vm: std::ptr::null_mut(), meldung: None,
         };
         let mut erg = 0u64;
         unsafe { (u.einstieg)(&mut k, roh.as_ptr(), &mut erg) };
