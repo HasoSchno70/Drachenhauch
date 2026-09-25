@@ -625,6 +625,50 @@ Summen als die 1901 bzw. 40 der VM), nur die erste Klasse eines Namens geprueft,
 ein Fehler wird nachgerechnet (Konto -5 statt -2), FUNCREF zugelassen;
 dazu `"MOD"` und die Faltgrenze (Ausstiege an der Bilanzzeile).
 
+**Schritt 7b (2026-09-25): Methodenrumpfe als Maschinencode -- gebaut.**
+Methoden werden wie freie Funktionen uebersetzt; `Self` kommt ueber
+`Kontext::selbst`, Feldzugriffe laufen ueber dieselben Helfer wie in
+Bereichen. **Die Methodentafel** (`Globale::tafel`, Index
+`functions.len() + j`) fuehrt je Klasse JEDE Methode, die sie sieht --
+auch geerbte, mit der Lage DIESER Klasse. Eine geerbte Methode bekommt also
+je Unterklasse eine eigene Fassung: sonst loeste `Self.hilfe()` darin
+statisch die Fassung der Vorfahrin auf, die VM aber die Ueberschreibung.
+Gerufen wird (1) aus der VM (CALL_METHOD -> `Jit::methode`, nur wenn es
+eine Fassung fuer genau die Lage des Objekts gibt; ausserhalb von
+`dispatch` in `methode_maschinencode`, die Abfrage einmal je Eintritt als
+`methoden_jit` -- mitten in `dispatch` kostete sie jeden Methodenaufruf der
+VM 3 %), (2) aus uebersetztem Code und Bereichen im getypten Modus, wenn
+der Empfaenger ein `Obj(k)` ist (statisch ueber die Tafel; `Self` des
+Gerufenen wird vor dem Aufruf in den Kontext geschrieben).
+
+**Feldschreibungen und das Aufgeben:** eine Funktion, die aufgibt, rechnet
+die VM von vorn -- bisher harmlos, weil reine Funktionen nichts schrieben.
+Eine Methode schreibt Felder. Darum fuehrt `feld_setzen` ein **Journal**
+(`Kontext::journal`: Objekt, Platz, alter Wert); gibt der Aufruf auf,
+stellt `journal_zurueck` die Felder rueckwaerts wieder her. Aus der VM ist
+das Journal fuer den ganzen Aufruf an; **in einem Bereich nur fuer die
+Dauer eines Methodenaufrufs** (`journal_bereich` -> `journal`, danach
+`journal_schluss`): der Bereich steigt bei einem Fehler VOR dem Aufruf aus,
+und die VM ruft die Methode noch einmal -- ihre Schreibungen muessen dann
+zurueck sein; die eigenen Schreibungen des Bereichs gelten und gehoeren
+nicht hinein. **Gefunden hat das die Gegenprobe VM gegen Maschinencode**:
+der erste Bau hatte das Journal nur im Einstieg aus der VM, und ein
+Bereich, dessen Methode nach einer Feldschreibung ueberlief, zaehlte die
+Schreibung doppelt (8 statt 7).
+
+Gemessen `tools/tempo/objekte.dh` (1 Mio. Methodenaufrufe): VM 97 ms,
+Maschinencode 12 ms (7 ms ohne das Journal im Bereich -- es ist der Preis
+dafuer, dass ein Fehler die Felder nicht doppelt schreibt). Pruefung: 8
+Faelle mehr in `jit.dhtest` (Methodenrumpf aus der VM gerufen,
+ueberschriebene Hilfsmethode gewinnt -- aus einem Bereich und aus der VM --,
+geerbte Methode auf der Unterklasse, Methode gibt nach einer Feldschreibung
+auf -- aus einem Bereich und aus der VM --, Methode ruft Methode eines
+anderen Objekts, Methode mit globaler Zahl). Gegenproben, alle mit falschem
+Ergebnis: Journal im Bereich aus (8 statt 7), Journal nicht zuruecknehmen,
+Lage beim Einstieg aus der VM nicht pruefen (29 statt 20, 1 statt 10),
+`Self` des Gerufenen nicht setzen (Absturz), nur eigene Methoden in der
+Tafel (die geerbten bleiben in der VM).
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur
