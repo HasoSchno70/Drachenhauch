@@ -540,7 +540,7 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 /// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
-const BUILTIN_FAMILIEN: u8 = 28;
+pub(crate) const BUILTIN_FAMILIEN: u8 = 28;
 
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -10567,7 +10567,7 @@ fn container_method(kind: &str, method: &str) -> Option<&'static str> {
     })
 }
 
-fn load_index(arr: &Value, idx_vals: &[Value]) -> R<Value> {
+pub(crate) fn load_index(arr: &Value, idx_vals: &[Value]) -> R<Value> {
     match arr {
         Value::Array(a) => {
             let a = a.borrow();
@@ -10613,7 +10613,7 @@ fn load_index(arr: &Value, idx_vals: &[Value]) -> R<Value> {
     }
 }
 
-fn store_index(arr: &Value, idx_vals: &[Value], v: Value) -> R<()> {
+pub(crate) fn store_index(arr: &Value, idx_vals: &[Value], v: Value) -> R<()> {
     match arr {
         Value::Array(a) => {
             let mut a = a.borrow_mut();
@@ -11130,7 +11130,7 @@ fn neg(v: Value) -> R<Value> {
     }
 }
 
-fn cmp(a: &Value, b: &Value, op: char) -> R<bool> {
+pub(crate) fn cmp(a: &Value, b: &Value, op: char) -> R<bool> {
     let ord = if let (Value::Geld(x), Value::Geld(y)) = (a, b) {
         // Betraege vergleichen sich EXAKT -- das ist einer der Gruende,
         // warum es den Typ gibt.
@@ -11186,7 +11186,7 @@ fn coerce_input(raw: &str, ty: &str) -> R<Value> {
 }
 
 #[inline(never)]
-fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
+pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
     match target {
         "" | "any" => Ok(value),
         "integer" => match value {

@@ -42,7 +42,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::model::{op, Arg, Func, Program};
-use crate::value::Value;
+use crate::value::{value_eq, Value};
 use crate::vm::Slot;
 
 /// Die Art eines Wertes im Maschinencode. `N` ist das NIL, das der Aufruf
@@ -51,7 +51,13 @@ use crate::vm::Slot;
 /// Eintritt vorfindet (nur in Bereichen, siehe `FeldInfo`); der Wert im
 /// Maschinencode ist bedeutungslos, die Daten beschreibt der Kontext.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-enum Art { I, F, B, N, Feld(u16), Obj(u16) }
+enum Art { I, F, B, N, Feld(u16), Obj(u16), W }
+
+/// `W` (M4 Schritt 5): ein beliebiger Wert -- Text, MAP, Feld, Objekt --, der
+/// in einem Werteplatz des Kontexts liegt (`Kontext::werte`: je Local ein
+/// Platz, dahinter je Stapeltiefe einer). Der Maschinencode fasst ihn nie
+/// selbst an, nur ueber die Helfer `w_*`; das Zaehlen der Verweise bleibt beim
+/// Rust-Code. Nur in Bereichen im Wertemodus (`Bereich::modus_w`).
 
 /// Was in einem Feld steht: Zahlen direkt (Speicher der VM) oder Werte
 /// (ein Feld von Werten oder ein Tupel) -- dann mit der Art, die jedes
@@ -218,6 +224,9 @@ pub struct Kontext {
     felder: *const u64,
     /// Nur Bereiche in einer Methode: `Self` als Zeiger (Versatz 80).
     selbst: u64,
+    /// Nur Wertemodus: die Werteplaetze (Versatz 88; Local s = Platz s,
+    /// Stapeltiefe d = Platz n_lokal_gesamt + d).
+    werte: *mut Value,
 }
 
 const K_SCHATTEN: i32 = 24;
@@ -311,6 +320,193 @@ extern "C" fn element_f(k: *mut Kontext, p: u64) -> f64 {
     }
 }
 
+// --- Helfer fuer Werte (Wertemodus). Jeder Helfer, der scheitern kann, legt
+// seine Operanden zurueck, bevor er `fehler` setzt: der Bereich steigt dann an
+// diesem Befehl aus, und die VM findet den Stand davor.
+
+fn w_platz<'a>(k: *mut Kontext, i: u64) -> &'a mut Value {
+    unsafe { &mut *(*k).werte.add(i as usize) }
+}
+/// Einen Wert herausnehmen (der Platz wird NIL).
+fn nimm(v: &mut Value) -> Value { std::mem::replace(v, Value::Nil) }
+fn w_nehmen(k: *mut Kontext, i: u64) -> Value { nimm(w_platz(k, i)) }
+fn w_fehler(k: *mut Kontext) { unsafe { (*k).fehler = 1; } }
+
+extern "C" fn w_konst(k: *mut Kontext, p: u64, ziel: u64) {
+    *w_platz(k, ziel) = unsafe { (*(p as *const Value)).clone() };
+}
+extern "C" fn w_kopie(k: *mut Kontext, von: u64, ziel: u64) {
+    let v = w_platz(k, von).clone();
+    *w_platz(k, ziel) = v;
+}
+extern "C" fn w_frei(k: *mut Kontext, i: u64) { drop(w_nehmen(k, i)); }
+extern "C" fn w_ablegen_i(k: *mut Kontext, bits: i64, art: u64, ziel: u64) {
+    *w_platz(k, ziel) = if art == 3 { Value::Bool(bits != 0) } else { Value::Int(bits) };
+}
+extern "C" fn w_ablegen_f(k: *mut Kontext, x: f64, ziel: u64) { *w_platz(k, ziel) = Value::Float(x); }
+
+/// Einen Wert als Zahl heraus (in einen Platz der Art `art`: 1 INTEGER,
+/// 3 BOOLEAN). Die Regeln wie `passend!`: INTEGER bleibt INTEGER; alles
+/// andere -- auch eine Kommazahl mit Nachkommastellen -- rechnet die VM.
+extern "C" fn w_zahl_i(k: *mut Kontext, i: u64, art: u64) -> i64 {
+    match (art, w_platz(k, i)) {
+        (1, Value::Int(x)) => { let x = *x; *w_platz(k, i) = Value::Nil; x }
+        (3, Value::Bool(b)) => { let b = *b; *w_platz(k, i) = Value::Nil; b as i64 }
+        _ => { w_fehler(k); 0 }
+    }
+}
+extern "C" fn w_zahl_f(k: *mut Kontext, i: u64) -> f64 {
+    match w_platz(k, i) {
+        Value::Float(x) => { let x = *x; *w_platz(k, i) = Value::Nil; x }
+        Value::Int(x) => { let x = *x as f64; *w_platz(k, i) = Value::Nil; x }
+        _ => { w_fehler(k); 0.0 }
+    }
+}
+
+/// Einen Wert in einen Platz mit Typ legen (`typ` als Text, wie im
+/// Programm): mit `coerce` wie die VM; passt er nicht, steigt der
+/// Bereich aus, und die VM meldet es.
+extern "C" fn w_speichern(k: *mut Kontext, von: u64, ziel: u64, typ: u64, typ_len: u64) {
+    let t = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(typ as *const u8, typ_len as usize)) };
+    let v = w_nehmen(k, von);
+    match crate::vm::coerce(v.clone(), t, "Lokale Variable") {
+        Ok(cv) => *w_platz(k, ziel) = cv,
+        Err(_) => { *w_platz(k, von) = v; w_fehler(k); }
+    }
+}
+
+/// `a op b` fuer zwei schlichte Werte (Text, Zahl, Wahrheitswert) mit den
+/// Regeln der VM. Vergleiche liefern 0/1, alles andere legt das Ergebnis in
+/// `ziel`. `lokal` >= 0: der Platz, in den das Ergebnis geht (`x = x + e`) --
+/// haelt er denselben Text wie `a`, gibt er ihn ab, damit angehaengt statt
+/// kopiert wird (wie ADD_STORE_* in der VM). Alles andere (Objekte mit
+/// OPERATOR, Felder, NaN ...) laesst aussteigen.
+extern "C" fn w_op(k: *mut Kontext, o: u64, a_i: u64, b_i: u64, ziel: u64, lokal: i64) -> i64 {
+    let schlicht = |v: &Value| matches!(v, Value::Int(_) | Value::Float(_) | Value::Str(_) | Value::Bool(_));
+    let a = w_nehmen(k, a_i);
+    let b = w_nehmen(k, b_i);
+    // Der Platz gibt seinen Verweis GANZ ab (sofort fallen gelassen, sonst
+    // hielten zwei den Text, und es wuerde nie angehaengt); zurueck kommt er
+    // notfalls als Kopie von `a` -- es ist derselbe Text.
+    let mut abgegeben = false;
+    if lokal >= 0 {
+        if let (Value::Str(ra), Value::Str(rl)) = (&a, &*w_platz(k, lokal as u64)) {
+            if Rc::ptr_eq(ra, rl) { drop(w_nehmen(k, lokal as u64)); abgegeben = true; }
+        }
+    }
+    let zurueck = |k: *mut Kontext, a: Value, b: Value, abgegeben: bool| {
+        if abgegeben { *w_platz(k, lokal as u64) = a.clone(); }
+        *w_platz(k, a_i) = a;
+        *w_platz(k, b_i) = b;
+        w_fehler(k);
+    };
+    if !schlicht(&a) || !schlicht(&b) { zurueck(k, a, b, abgegeben); return 0; }
+    let o = o as u16;
+    let vergleich = match o {
+        op::EQ => Some(Ok(value_eq(&a, &b))),
+        op::NEQ => Some(Ok(!value_eq(&a, &b))),
+        op::LT => Some(crate::vm::cmp(&a, &b, '<')),
+        op::GT => Some(crate::vm::cmp(&a, &b, '>')),
+        op::LEQ => Some(crate::vm::cmp(&a, &b, 'l')),
+        op::GEQ => Some(crate::vm::cmp(&a, &b, 'g')),
+        _ => None,
+    };
+    if let Some(r) = vergleich {
+        return match r { Ok(x) => x as i64, Err(_) => { zurueck(k, a, b, abgegeben); 0 } };
+    }
+    // Anhaengen an Ort und Stelle: `a` ist ein Text, den sonst niemand haelt.
+    if o == op::ADD {
+        if let Value::Str(mut links) = a {
+            if let Some(t) = Rc::get_mut(&mut links) {
+                match &b { Value::Str(r) => t.push_str(r), _ => t.push_str(&b.fmt()) }
+                *w_platz(k, ziel) = Value::Str(links);
+                return 0;
+            }
+            let a = Value::Str(links);
+            return match crate::vm::konstant_rechnen("+", &a, &b) {
+                Some(v) => { *w_platz(k, ziel) = v; 0 }
+                None => { zurueck(k, a, b, abgegeben); 0 }
+            };
+        }
+    }
+    let zeichen = match o {
+        op::ADD => "+", op::SUB => "-", op::MUL => "*", op::DIV => "/",
+        op::INT_DIV => "\\", op::MOD => "MOD", _ => { zurueck(k, a, b, abgegeben); return 0; }
+    };
+    match crate::vm::konstant_rechnen(zeichen, &a, &b) {
+        Some(v) => { *w_platz(k, ziel) = v; 0 }
+        None => { zurueck(k, a, b, abgegeben); 0 }
+    }
+}
+
+extern "C" fn w_wahr(k: *mut Kontext, i: u64) -> i64 { w_nehmen(k, i).truthy() as i64 }
+
+/// Ein eingebauter Befehl aus der Familie der REINEN (`builtins::call_builtin`
+/// -- die VM hat an dieser Stelle schon einmal genau sie gefragt,
+/// `Instr::familie`). Argumente aus den Plaetzen `basis..basis+argc`, das
+/// Ergebnis nach `basis` (art 5) oder als Zahl (1 INTEGER, 3 BOOLEAN).
+fn w_builtin_roh(k: *mut Kontext, ins: u64, basis: u64, argc: u64) -> Option<Value> {
+    let ins = unsafe { &*(ins as *const crate::model::Instr) };
+    let name = match &ins.arg { Arg::Call(n, _, _) => &n[..], _ => { w_fehler(k); return None; } };
+    // Die Argumente liegen hintereinander in den Plaetzen -- als Scheibe
+    // hinein, ohne sie herauszunehmen (kein Vec je Aufruf). Erst nach Erfolg
+    // werden die Plaetze frei.
+    let args: &[Value] = unsafe { std::slice::from_raw_parts((*k).werte.add(basis as usize), argc as usize) };
+    match crate::builtins::call_builtin(name, args) {
+        Some(Ok(v)) => {
+            for j in 0..argc { drop(w_nehmen(k, basis + j)); }
+            Some(v)
+        }
+        _ => { w_fehler(k); None }
+    }
+}
+extern "C" fn w_builtin_i(k: *mut Kontext, ins: u64, basis: u64, argc: u64, art: u64) -> i64 {
+    let Some(v) = w_builtin_roh(k, ins, basis, argc) else { return 0 };
+    match (art, v) {
+        (5, v) => { *w_platz(k, basis) = v; 0 }
+        (1, Value::Int(x)) => x,
+        (3, Value::Bool(b)) => b as i64,
+        // Die Tabelle der Ergebnis-Typen (typen::builtin_typ) haette nicht
+        // gestimmt -- sie ist mit DHRT_TYPEN_PRUEFEN geprueft. Der Befehl ist
+        // gelaufen; der Wert kommt als Wert, und der Bereich steigt aus.
+        (_, v) => { *w_platz(k, basis) = v; w_fehler(k); 0 }
+    }
+}
+extern "C" fn w_builtin_f(k: *mut Kontext, ins: u64, basis: u64, argc: u64) -> f64 {
+    match w_builtin_roh(k, ins, basis, argc) {
+        Some(Value::Float(x)) => x,
+        Some(v) => { *w_platz(k, basis) = v; w_fehler(k); 0.0 }
+        None => 0.0,
+    }
+}
+
+/// `c[i...]` lesen: Behaelter in `basis`, die Indizes dahinter; das Ergebnis
+/// nach `basis`.
+extern "C" fn w_index(k: *mut Kontext, basis: u64, n: u64) {
+    let (c, idx): (&Value, &[Value]) = unsafe {
+        (&*(*k).werte.add(basis as usize), std::slice::from_raw_parts((*k).werte.add(basis as usize + 1), n as usize))
+    };
+    match crate::vm::load_index(c, idx) {
+        Ok(v) => {
+            for j in 1..=n { drop(w_nehmen(k, basis + j)); }
+            *w_platz(k, basis) = v;
+        }
+        Err(_) => w_fehler(k),
+    }
+}
+
+/// `c[i...] = v`: Behaelter in `basis`, dann die Indizes, dann der Wert.
+extern "C" fn w_setzen(k: *mut Kontext, basis: u64, n: u64) {
+    let v = w_nehmen(k, basis + n + 1);
+    let (c, idx): (&Value, &[Value]) = unsafe {
+        (&*(*k).werte.add(basis as usize), std::slice::from_raw_parts((*k).werte.add(basis as usize + 1), n as usize))
+    };
+    match crate::vm::store_index(c, idx, v.clone()) {
+        Ok(()) => { for j in 0..=n { drop(w_nehmen(k, basis + j)); } }
+        Err(_) => { *w_platz(k, basis + n + 1) = v; w_fehler(k); }
+    }
+}
+
 /// Die Helfer, die der Maschinencode ruft (Kennungen im Modul).
 #[derive(Clone, Copy)]
 struct Hilfe {
@@ -321,7 +517,24 @@ struct Hilfe {
     setzen_f: FuncId,
     element_i: FuncId,
     element_f: FuncId,
+    w: [FuncId; 16],
 }
+
+/// Plaetze in `Hilfe::w`.
+const W_KONST: usize = 0;
+const W_KOPIE: usize = 1;
+const W_FREI: usize = 2;
+const W_ABLEGEN_I: usize = 3;
+const W_ABLEGEN_F: usize = 4;
+const W_ZAHL_I: usize = 5;
+const W_ZAHL_F: usize = 6;
+const W_SPEICHERN: usize = 7;
+const W_OP: usize = 8;
+const W_WAHR: usize = 9;
+const W_BUILTIN_I: usize = 10;
+const W_BUILTIN_F: usize = 11;
+const W_INDEX: usize = 12;
+const W_SETZEN: usize = 13;
 
 type Einstieg = unsafe extern "C" fn(*mut Kontext, *const u64, *mut u64);
 
@@ -382,6 +595,12 @@ struct Schleife {
     /// viele echte Locals es gibt -- Platz `n_lokal + j` ist `dyn_glob[j]`.
     dyn_glob: Vec<usize>,
     n_lokal: usize,
+    /// Wertemodus; und die Typen der Locals (die Texte, auf die der
+    /// Maschinencode fuer `w_speichern` zeigt -- sie muessen so lange leben
+    /// wie er).
+    modus_w: bool,
+    #[allow(dead_code)]
+    typen: Vec<String>,
 }
 
 /// Was der Maschinencode ueber die globalen Plaetze wissen muss: ihre Art
@@ -449,6 +668,10 @@ struct Bereich {
     selbst: Option<u16>,
     dyn_glob: Vec<usize>,
     lok_typen: Vec<String>,
+    /// Wertemodus: alles, was keine Zahl ist, ist `W` (keine Felder und
+    /// Objekte mit Zeigern -- ein eingebauter Befehl koennte ein Feld wachsen
+    /// lassen oder ein Objekt freigeben, auf das ein Zeiger zeigt).
+    modus_w: bool,
 }
 
 struct Analyse {
@@ -474,6 +697,7 @@ struct Analyse {
     dyn_glob: Vec<usize>,
     /// Typ je Local (bei einem Bereich samt `dyn_glob`).
     typen: Vec<String>,
+    modus_w: bool,
 }
 
 fn ziel(arg: &Arg) -> usize { arg.as_i64().max(0) as usize }
@@ -567,6 +791,9 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
     let mut klassen: Vec<Klasse> = bereich.map_or(Vec::new(), |b| b.klassen.clone());
     let selbst = bereich.and_then(|b| b.selbst);
     let dyn_glob: Vec<usize> = bereich.map_or(Vec::new(), |b| b.dyn_glob.clone());
+    let modus_w = bereich.map_or(false, |b| b.modus_w);
+    // Im Wertemodus: ist einer der Operanden ein Wert, rechnet ein Helfer.
+    let w_oder_skalar = |a: Art| skalar(a) || a == Art::W;
     let mut offen = vec![von];
     vor[von] = Some(start);
 
@@ -605,10 +832,11 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 match art_von_wert(c) {
                     Some(a) => z.stapel.push(a),
                     None if vor_halt => z.stapel.push(Art::N),
+                    None if modus_w => z.stapel.push(Art::W),
                     None => return Err(format!("Konstante {} ist keine Zahl", c.type_name())),
                 }
             }
-            op::LOAD_LOCAL if matches!(z.lokal.get(s_arg).copied().flatten(), Some(Art::Feld(_) | Art::Obj(_))) => {
+            op::LOAD_LOCAL if matches!(z.lokal.get(s_arg).copied().flatten(), Some(Art::Feld(_) | Art::Obj(_) | Art::W)) => {
                 z.stapel.push(z.lokal[s_arg].unwrap());
             }
             op::LOAD_SELF if selbst.is_some() => { z.stapel.push(Art::Obj(selbst.unwrap())); }
@@ -638,6 +866,31 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                     None => { felder.push(FeldInfo { quelle: Quelle::Global(g), elem, dims, tupel }); felder.len() - 1 }
                 };
                 z.stapel.push(Art::Feld(nr as u16));
+            }
+            op::LOAD_INDEX | op::STORE_INDEX if modus_w => {
+                let n = ins.arg.as_usize();
+                if o == op::STORE_INDEX { if !w_oder_skalar(pop!()) { return Err("Feld bekommt NIL".into()); } }
+                for _ in 0..n { if !w_oder_skalar(pop!()) { return Err("Index, der kein Wert ist".into()); } }
+                if pop!() != Art::W { return Err("Index auf etwas, das kein Wert ist".into()); }
+                if o == op::LOAD_INDEX { z.stapel.push(Art::W); } else { schreibt_felder = true; }
+            }
+            op::CALL_BUILTIN if modus_w => {
+                let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => return Err("Befehl ohne Namen".into()) };
+                // Nur die REINEN Befehle, und nur, wenn die VM an genau dieser
+                // Stelle schon sie gefragt hat (Merkplatz der Familie).
+                if ins.familie.get() == 0 {
+                    return Err(format!("eingebauter Befehl {} (an dieser Stelle noch nie gerufen)", name.to_uppercase()));
+                }
+                if ins.familie.get() != crate::vm::BUILTIN_FAMILIEN || name.starts_with("assert") {
+                    return Err(format!("eingebauter Befehl {} (nicht aus der reinen Familie)", name.to_uppercase()));
+                }
+                for _ in 0..argc { if !w_oder_skalar(pop!()) { return Err("Argument NIL".into()); } }
+                z.stapel.push(match crate::typen::builtin_typ(&name) {
+                    Some(crate::typen::Typ::Int) => Art::I,
+                    Some(crate::typen::Typ::Float) => Art::F,
+                    _ => Art::W,
+                });
+                schreibt_felder = true;
             }
             op::LOAD_INDEX | op::STORE_INDEX if bereich.is_some() => {
                 let n = ins.arg.as_usize();
@@ -673,10 +926,14 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 let mut a = pop!();
                 if ins.op == op::ADD_STORE_GLOBAL_SLOT {
                     let x = pop!();
-                    if !zahl(a) || !zahl(x) { return Err("+ mit einem Nicht-Zahl-Wert".into()); }
-                    a = if a == Art::I && x == Art::I { Art::I } else { Art::F };
+                    if modus_w && (a == Art::W || x == Art::W) && w_oder_skalar(a) && w_oder_skalar(x) {
+                        a = Art::W;
+                    } else {
+                        if !zahl(a) || !zahl(x) { return Err("+ mit einem Nicht-Zahl-Wert".into()); }
+                        a = if a == Art::I && x == Art::I { Art::I } else { Art::F };
+                    }
                 }
-                if !passt(a, d) { return Err(format!("{:?} in eine globale {:?}", a, d)); }
+                if a != Art::W && !passt(a, d) { return Err(format!("{:?} in eine globale {:?}", a, d)); }
                 if !beruehrt.contains(&g) { beruehrt.push(g); }
                 if !geschrieben.contains(&g) { geschrieben.push(g); }
             }
@@ -685,10 +942,21 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 let mut a = pop!();
                 if o == op::ADD_STORE_LOCAL {
                     let x = pop!();
-                    if !zahl(a) || !zahl(x) { return Err("+ mit einem Nicht-Zahl-Wert".into()); }
-                    a = if a == Art::I && x == Art::I { Art::I } else { Art::F };
+                    if modus_w && (a == Art::W || x == Art::W) && w_oder_skalar(a) && w_oder_skalar(x) {
+                        a = Art::W;
+                    } else {
+                        if !zahl(a) || !zahl(x) { return Err("+ mit einem Nicht-Zahl-Wert".into()); }
+                        a = if a == Art::I && x == Art::I { Art::I } else { Art::F };
+                    }
                 }
                 if a == Art::N { return Err("NIL gespeichert".into()); }
+                if a == Art::W {
+                    // In einen Platz mit Zahlentyp: dort als Zahl (geprueft);
+                    // sonst bleibt es ein Wert.
+                    z.lokal[s] = Some(dekl[s].unwrap_or(Art::W));
+                    melden(&mut vor, &mut offen, ip + 1, &z)?;
+                    continue;
+                }
                 if let Art::Feld(nr) = a {
                     let t = typen[s].as_str();
                     let passend = match felder[nr as usize].elem { Elem::F => "array:float", Elem::I => "array:integer", Elem::Wert(_) => "" };
@@ -733,6 +1001,18 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
             }
             op::POP => { pop!(); }
             op::DUP => { let a = *z.stapel.last().ok_or("DUP auf leerem Stapel")?; z.stapel.push(a); }
+            op::ADD | op::SUB | op::MUL | op::MOD | op::DIV | op::INT_DIV
+                if modus_w && z.stapel.len() >= 2 && z.stapel[z.stapel.len() - 2..].iter().any(|&a| a == Art::W) => {
+                let b = pop!(); let a = pop!();
+                if !w_oder_skalar(a) || !w_oder_skalar(b) { return Err("Rechnen mit NIL".into()); }
+                z.stapel.push(Art::W);
+            }
+            op::LT | op::GT | op::LEQ | op::GEQ | op::EQ | op::NEQ
+                if modus_w && z.stapel.len() >= 2 && z.stapel[z.stapel.len() - 2..].iter().any(|&a| a == Art::W) => {
+                let b = pop!(); let a = pop!();
+                if !w_oder_skalar(a) || !w_oder_skalar(b) { return Err("Vergleich mit NIL".into()); }
+                z.stapel.push(Art::B);
+            }
             op::ADD | op::SUB | op::MUL | op::MOD => {
                 let b = pop!(); let a = pop!();
                 if !zahl(a) || !zahl(b) { return Err("Rechnen mit einem Nicht-Zahl-Wert".into()); }
@@ -767,7 +1047,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
             op::JUMP => { melden(&mut vor, &mut offen, ziel(&ins.arg), &z)?; weiter = false; }
             op::JUMP_IF_FALSE | op::JUMP_IF_TRUE => {
                 let a = pop!();
-                if !skalar(a) { return Err("Sprung auf NIL oder ein Feld".into()); }
+                if !skalar(a) && !(modus_w && a == Art::W) { return Err("Sprung auf NIL oder ein Feld".into()); }
                 melden(&mut vor, &mut offen, ziel(&ins.arg), &z)?;
             }
             op::CALL_USER => {
@@ -818,7 +1098,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
         if weiter { melden(&mut vor, &mut offen, ip + 1, &z)?; }
     }
     Ok(Analyse { vor, ausgaenge, params, rueck, gerufen, beruehrt, geschrieben, felder, schreibt_felder,
-                 klassen, selbst, dyn_glob, typen })
+                 klassen, selbst, dyn_glob, typen, modus_w })
 }
 
 /// Fuer den Grund in `dhrt --jit`: was die Funktion tut, das der
@@ -918,6 +1198,10 @@ struct Bauer<'a, 'b> {
     h_setzen_f: cranelift_codegen::ir::FuncRef,
     h_element_i: cranelift_codegen::ir::FuncRef,
     h_element_f: cranelift_codegen::ir::FuncRef,
+    /// Wertemodus: die Helfer `w_*` und der erste Platz des Stapels unter den
+    /// Werteplaetzen (= Zahl aller Locals samt `dyn_glob`).
+    hw: Vec<cranelift_codegen::ir::FuncRef>,
+    w_basis: i64,
 }
 
 /// Eine Stelle, an der ein Bereich mitten drin aussteigt: dort macht die VM
@@ -949,7 +1233,7 @@ impl<'a, 'b> Bauer<'a, 'b> {
                 let lz = self.lok_zeiger.unwrap();
                 for (i, a) in lokal.iter().enumerate() {
                     let Some(a) = a else { continue };
-                    if matches!(a, Art::Feld(_)) { continue; }
+                    if matches!(a, Art::Feld(_) | Art::W) { continue; }
                     let v = self.var(1, i, *a);
                     let w = self.b.use_var(v);
                     self.b.ins().store(MemFlagsData::trusted(), w, lz, (i * 8) as i32);
@@ -979,6 +1263,62 @@ impl<'a, 'b> Bauer<'a, 'b> {
         }
         let off = if breite == 8 { self.b.ins().ishl_imm_s(flach.unwrap(), 3) } else { self.b.ins().imul_imm_s(flach.unwrap(), breite) };
         self.b.ins().iadd(zeiger, off)
+    }
+    fn iconst(&mut self, x: i64) -> CWert { self.b.ins().iconst(types::I64, x) }
+    /// Ein Helfer `w_*` ohne Ergebnis.
+    fn w_ruf(&mut self, h: usize, args: &[CWert]) {
+        let mut a = vec![self.ctx];
+        a.extend_from_slice(args);
+        self.b.ins().call(self.hw[h], &a);
+    }
+    /// Ein Helfer `w_*` mit Ergebnis.
+    fn w_ruf_w(&mut self, h: usize, args: &[CWert]) -> CWert {
+        let mut a = vec![self.ctx];
+        a.extend_from_slice(args);
+        let r = self.b.ins().call(self.hw[h], &a);
+        self.b.inst_results(r)[0]
+    }
+    fn w_slot(&self, tiefe: usize) -> i64 { self.w_basis + tiefe as i64 }
+    /// Die Zahlen unter `st[von..]` in ihre Werteplaetze legen (ein Helfer
+    /// rechnet danach nur mit Plaetzen).
+    fn w_boxen(&mut self, st: &[(CWert, Art)], von: usize) {
+        for d in von..st.len() {
+            let (w, a) = st[d];
+            let z = self.iconst(self.w_slot(d));
+            match a {
+                Art::F => self.w_ruf(W_ABLEGEN_F, &[w, z]),
+                Art::I | Art::B => { let c = self.iconst(if a == Art::B { 3 } else { 1 }); self.w_ruf(W_ABLEGEN_I, &[w, c, z]) }
+                _ => {}
+            }
+        }
+    }
+    /// Einen Wert aus Platz `von` in Local `s` legen: als Zahl, wenn das Local
+    /// einen Zahlentyp hat, sonst als Wert (mit dem Typ des Locals geprueft).
+    fn w_nach_lokal(&mut self, von: i64, s: usize, typ: &str, ziel: Option<Art>) -> Result<(), String> {
+        let vz = self.iconst(von);
+        match ziel {
+            Some(a @ (Art::I | Art::B)) => {
+                let c = self.iconst(if a == Art::B { 3 } else { 1 });
+                let w = self.w_ruf_w(W_ZAHL_I, &[vz, c]);
+                self.fehler_pruefen();
+                let v = self.var(1, s, a); self.b.def_var(v, w);
+            }
+            Some(Art::F) => {
+                let w = self.w_ruf_w(W_ZAHL_F, &[vz]);
+                self.fehler_pruefen();
+                let v = self.var(1, s, Art::F); self.b.def_var(v, w);
+            }
+            _ => {
+                let t = if typ.is_empty() { "any" } else { typ };
+                let (tp, tl) = (self.iconst(t.as_ptr() as i64), self.iconst(t.len() as i64));
+                let sz = self.iconst(s as i64);
+                self.w_ruf(W_SPEICHERN, &[vz, sz, tp, tl]);
+                self.fehler_pruefen();
+                let n = self.iconst(0);
+                let v = self.var(1, s, Art::W); self.b.def_var(v, n);
+            }
+        }
+        Ok(())
     }
     /// Nach einem Helfer, der scheitern kann: `fehler` gesetzt -> aussteigen.
     fn fehler_pruefen(&mut self) {
@@ -1167,7 +1507,11 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new(), schatten, marken, holen,
                               befoerdert: HashMap::new(), felder: Vec::new(), mitten, punkt: None,
                               aussteige: Vec::new(), lok_zeiger, zu_tief: false, selbst,
-                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f };
+                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f,
+                              hw: Vec::new(), w_basis: an.typen.len() as i64 };
+        if an.modus_w {
+            for id in hilfe.w { let r = modul.declare_func_in_func(id, bau.b.func); bau.hw.push(r); }
+        }
         let mut klassen = an.klassen.clone();
         // Die Felder beschreibt der Kontext: je Feld Zeiger, Groessen, Schritte.
         if !an.felder.is_empty() {
@@ -1198,6 +1542,8 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
             let Some(a) = a else { continue };
             let wert = if let Art::Feld(nr) = a {
                 bau.b.ins().iconst(types::I64, *nr as i64)
+            } else if *a == Art::W {
+                bau.b.ins().iconst(types::I64, 0)
             } else if let Some(lz) = lok_zeiger {
                 bau.b.ins().load(cl_typ(*a), MemFlagsData::trusted(), lz, (i * 8) as i32)
             } else if i < f.n_params { pwerte[i] } else {
@@ -1243,7 +1589,140 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                 let z = an.vor[ip].as_ref().unwrap();
                 bau.punkt = Some((ip, st.clone(), z.lokal.clone()));
                 let (o, s_arg) = umleiten(ins, &an.dyn_glob, f.local_types.len());
+                let oben_w = st.last().map_or(false, |x| x.1 == Art::W);
+                let zwei_w = st.len() >= 2 && st[st.len() - 2..].iter().any(|x| x.1 == Art::W);
+                let nach_art = |ip: usize| an.vor.get(ip + 1).and_then(|z| z.as_ref()).and_then(|z| z.stapel.last().copied());
                 match o {
+                    op::POP if oben_w => {
+                        let z = bau.iconst(bau.w_slot(st.len() - 1));
+                        bau.w_ruf(W_FREI, &[z]);
+                        st.pop();
+                    }
+                    op::DUP if oben_w => {
+                        let (a, b) = (bau.iconst(bau.w_slot(st.len() - 1)), bau.iconst(bau.w_slot(st.len())));
+                        bau.w_ruf(W_KOPIE, &[a, b]);
+                        let n = bau.iconst(0);
+                        st.push((n, Art::W));
+                    }
+                    op::LOAD_CONST if an.modus_w && nach_art(ip) == Some(Art::W) => {
+                        let pz = bau.iconst(&f.constants[ins.arg.as_usize()] as *const Value as i64);
+                        let z = bau.iconst(bau.w_slot(st.len()));
+                        bau.w_ruf(W_KONST, &[pz, z]);
+                        let n = bau.iconst(0);
+                        st.push((n, Art::W));
+                    }
+                    op::LOAD_LOCAL if z.lokal.get(s_arg).copied().flatten() == Some(Art::W) => {
+                        let (a, b) = (bau.iconst(s_arg as i64), bau.iconst(bau.w_slot(st.len())));
+                        bau.w_ruf(W_KOPIE, &[a, b]);
+                        let n = bau.iconst(0);
+                        st.push((n, Art::W));
+                    }
+                    op::STORE_LOCAL | op::ADD_STORE_LOCAL
+                        if (o == op::STORE_LOCAL && oben_w) || (o == op::ADD_STORE_LOCAL && zwei_w) => {
+                        let s = s_arg;
+                        let ziel_art = an.vor[ip + 1].as_ref().and_then(|z| z.lokal[s]).filter(|a| *a != Art::W);
+                        let quelle = if o == op::ADD_STORE_LOCAL {
+                            let d = st.len() - 2;
+                            bau.w_boxen(&st, d);
+                            // Haelt das Local den Text links, gibt es ihn ab (anhaengen).
+                            let lokal = if z.lokal[s] == Some(Art::W) && ziel_art.is_none() { s as i64 } else { -1 };
+                            let (c, a, b, zl, lk) = (bau.iconst(op::ADD as i64), bau.iconst(bau.w_slot(d)), bau.iconst(bau.w_slot(d + 1)),
+                                                     bau.iconst(bau.w_slot(d)), bau.iconst(lokal));
+                            bau.w_ruf_w(W_OP, &[c, a, b, zl, lk]);
+                            bau.fehler_pruefen();
+                            st.truncate(d);
+                            bau.w_slot(d)
+                        } else {
+                            st.pop();
+                            bau.w_slot(st.len())
+                        };
+                        bau.w_nach_lokal(quelle, s, &an.typen[s], ziel_art)?;
+                    }
+                    op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT
+                        if (o == op::STORE_GLOBAL_SLOT && oben_w) || (o == op::ADD_STORE_GLOBAL_SLOT && zwei_w) => {
+                        let g = ins.arg.as_usize();
+                        let d = if o == op::ADD_STORE_GLOBAL_SLOT {
+                            let d = st.len() - 2;
+                            bau.w_boxen(&st, d);
+                            let (c, a, b, zl, lk) = (bau.iconst(op::ADD as i64), bau.iconst(bau.w_slot(d)), bau.iconst(bau.w_slot(d + 1)),
+                                                     bau.iconst(bau.w_slot(d)), bau.iconst(-1));
+                            bau.w_ruf_w(W_OP, &[c, a, b, zl, lk]);
+                            bau.fehler_pruefen();
+                            st.truncate(d);
+                            d
+                        } else { st.pop(); st.len() };
+                        let a = glob.art[g].unwrap();
+                        let vz = bau.iconst(bau.w_slot(d));
+                        let w = if a == Art::F {
+                            bau.w_ruf_w(W_ZAHL_F, &[vz])
+                        } else {
+                            let c = bau.iconst(if a == Art::B { 3 } else { 1 });
+                            bau.w_ruf_w(W_ZAHL_I, &[vz, c])
+                        };
+                        bau.fehler_pruefen();
+                        bau.global_schreiben(g, w);
+                    }
+                    op::ADD | op::SUB | op::MUL | op::DIV | op::MOD | op::INT_DIV
+                    | op::LT | op::GT | op::LEQ | op::GEQ | op::EQ | op::NEQ if an.modus_w && zwei_w => {
+                        let d = st.len() - 2;
+                        bau.w_boxen(&st, d);
+                        let (c, a, b, zl, lk) = (bau.iconst(o as i64), bau.iconst(bau.w_slot(d)), bau.iconst(bau.w_slot(d + 1)),
+                                                 bau.iconst(bau.w_slot(d)), bau.iconst(-1));
+                        let r = bau.w_ruf_w(W_OP, &[c, a, b, zl, lk]);
+                        bau.fehler_pruefen();
+                        st.truncate(d);
+                        if matches!(o, op::LT | op::GT | op::LEQ | op::GEQ | op::EQ | op::NEQ) {
+                            st.push((r, Art::B));
+                        } else {
+                            let n = bau.iconst(0);
+                            st.push((n, Art::W));
+                        }
+                    }
+                    op::JUMP_IF_FALSE | op::JUMP_IF_TRUE if oben_w => {
+                        let z = bau.iconst(bau.w_slot(st.len() - 1));
+                        let w = bau.w_ruf_w(W_WAHR, &[z]);
+                        st.pop();
+                        ablegen(&mut bau, &st);
+                        let (z_ja, z_nein) = (bloecke[&ziel(&ins.arg)], bloecke[&(ip + 1)]);
+                        if o == op::JUMP_IF_TRUE {
+                            bau.b.ins().brif(w, z_ja, &[], z_nein, &[]);
+                        } else {
+                            bau.b.ins().brif(w, z_nein, &[], z_ja, &[]);
+                        }
+                        offen = false;
+                    }
+                    op::CALL_BUILTIN => {
+                        let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
+                        let d = st.len() - argc;
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let erg = nach_art(ip).unwrap();
+                        let (ip_c, basis, n) = (bau.iconst(ins as *const crate::model::Instr as i64), bau.iconst(bau.w_slot(d)), bau.iconst(argc as i64));
+                        let w = if erg == Art::F {
+                            bau.w_ruf_w(W_BUILTIN_F, &[ip_c, basis, n])
+                        } else {
+                            let c = bau.iconst(match erg { Art::I => 1, Art::B => 3, _ => 5 });
+                            bau.w_ruf_w(W_BUILTIN_I, &[ip_c, basis, n, c])
+                        };
+                        bau.fehler_pruefen();
+                        st.push((w, erg));
+                    }
+                    op::LOAD_INDEX | op::STORE_INDEX if an.modus_w => {
+                        let n = ins.arg.as_usize();
+                        let d = st.len() - n - 1 - (o == op::STORE_INDEX) as usize;
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let (basis, nz) = (bau.iconst(bau.w_slot(d)), bau.iconst(n as i64));
+                        if o == op::LOAD_INDEX {
+                            bau.w_ruf(W_INDEX, &[basis, nz]);
+                            bau.fehler_pruefen();
+                            let z = bau.iconst(0);
+                            st.push((z, Art::W));
+                        } else {
+                            bau.w_ruf(W_SETZEN, &[basis, nz]);
+                            bau.fehler_pruefen();
+                        }
+                    }
                     op::LOAD_INDEX => {
                         let n = ins.arg.as_usize();
                         let idx = st.split_off(st.len() - n);
@@ -1508,7 +1987,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                 let z = an.vor[x].as_ref().unwrap();
                 for (i, a) in z.lokal.iter().enumerate() {
                     let Some(a) = a else { continue };
-                    if matches!(a, Art::Feld(_)) { continue; }
+                    if matches!(a, Art::Feld(_) | Art::W) { continue; }
                     let v = bau.var(1, i, *a);
                     let w = bau.b.use_var(v);
                     bau.b.ins().store(MemFlagsData::trusted(), w, lz, (i * 8) as i32);
@@ -1681,6 +2160,16 @@ impl Jit {
         builder.symbol("dh_feld_setzen_f", feld_setzen_f as *const u8);
         builder.symbol("dh_element_i", element_i as *const u8);
         builder.symbol("dh_element_f", element_f as *const u8);
+        let w_namen: [(&str, *const u8); 14] = [
+            ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
+            ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
+            ("dh_w_ablegen_f", w_ablegen_f as *const u8), ("dh_w_zahl_i", w_zahl_i as *const u8),
+            ("dh_w_zahl_f", w_zahl_f as *const u8), ("dh_w_speichern", w_speichern as *const u8),
+            ("dh_w_op", w_op as *const u8), ("dh_w_wahr", w_wahr as *const u8),
+            ("dh_w_builtin_i", w_builtin_i as *const u8), ("dh_w_builtin_f", w_builtin_f as *const u8),
+            ("dh_w_index", w_index as *const u8), ("dh_w_setzen", w_setzen as *const u8),
+        ];
+        for (n, f) in w_namen { builder.symbol(n, f); }
         let mut modul = JITModule::new(builder);
         let glob = globale_lesen(prog);
         let (an, _) = auswahl(prog, &glob);
@@ -1704,8 +2193,27 @@ impl Jit {
         let s_setzen_f = sig_h(&[i, i, types::F64], None);
         let s_element_i = sig_h(&[ptr, i, i, i], Some(i));
         let s_element_f = sig_h(&[ptr, i], Some(types::F64));
+        let f64t = types::F64;
+        let w_sigs: Vec<(&str, cranelift_codegen::ir::Signature)> = [
+            ("dh_w_konst", vec![ptr, i, i], None),
+            ("dh_w_kopie", vec![ptr, i, i], None),
+            ("dh_w_frei", vec![ptr, i], None),
+            ("dh_w_ablegen_i", vec![ptr, i, i, i], None),
+            ("dh_w_ablegen_f", vec![ptr, f64t, i], None),
+            ("dh_w_zahl_i", vec![ptr, i, i], Some(i)),
+            ("dh_w_zahl_f", vec![ptr, i], Some(f64t)),
+            ("dh_w_speichern", vec![ptr, i, i, i, i], None),
+            ("dh_w_op", vec![ptr, i, i, i, i, i], Some(i)),
+            ("dh_w_wahr", vec![ptr, i], Some(i)),
+            ("dh_w_builtin_i", vec![ptr, i, i, i, i], Some(i)),
+            ("dh_w_builtin_f", vec![ptr, i, i, i], Some(f64t)),
+            ("dh_w_index", vec![ptr, i, i], None),
+            ("dh_w_setzen", vec![ptr, i, i], None),
+        ].into_iter().map(|(n, pa, r): (&str, Vec<Type>, Option<Type>)| (n, sig_h(&pa, r))).collect();
         let mut dekl = |name: &str, sg: &cranelift_codegen::ir::Signature| modul.declare_function(name, Linkage::Import, sg)
             .map_err(|e| format!("{:?}", e));
+        let mut w_ids = [holen_id; 16];
+        for (j, (n, sg)) in w_sigs.iter().enumerate() { w_ids[j] = dekl(n, sg)?; }
         let hilfe = Hilfe {
             holen: holen_id,
             lesen_i: dekl("dh_feld_lesen_i", &s_lesen_i)?,
@@ -1714,6 +2222,7 @@ impl Jit {
             setzen_f: dekl("dh_feld_setzen_f", &s_setzen_f)?,
             element_i: dekl("dh_element_i", &s_element_i)?,
             element_f: dekl("dh_element_f", &s_element_f)?,
+            w: w_ids,
         };
         // Beruehrte Plaetze je Funktion samt allen, die sie ruft.
         let mut ber: Vec<Vec<usize>> = an.iter().map(|a| a.as_ref().map_or(Vec::new(), |a| a.beruehrt.clone())).collect();
@@ -1838,6 +2347,8 @@ impl Jit {
                 (Art::Feld(_), _) => 0,   // geprueft mit den Feldern unten
                 (Art::Obj(k), Value::Instance(rc)) if std::ptr::eq(Rc::as_ptr(&rc.borrow().layout), s.klassen[*k as usize].lage)
                     => Rc::as_ptr(rc) as u64,
+                (Art::W, Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::Nil) => return None,
+                (Art::W, _) => 0,
                 _ => return None,
             };
         }
@@ -1880,11 +2391,27 @@ impl Jit {
         let schatten = unsafe { &mut *self.schatten.get() };
         let marken = unsafe { &mut *self.marken.get() };
         if marken.len() < slots.len() { return None; }
+        // Wertemodus: die Werte wandern aus der VM in die Werteplaetze (nicht
+        // kopiert -- sonst hielten zwei einen Text, und `s = s + x` haengte nie
+        // an Ort und Stelle an). Zurueck an jedem Ausgang, und auch beim
+        // Aufgeben vor dem ersten Befehl.
+        let mut arena: Vec<Value> = Vec::new();
+        if s.modus_w {
+            arena = vec![Value::Nil; s.start.len() + MAX_STAPEL];
+            for (i, a) in s.start.iter().enumerate() {
+                if *a != Some(Art::W) { continue; }
+                arena[i] = if i < s.n_lokal { nimm(&mut locals[i]) } else {
+                    let v = nimm(&mut slots[s.dyn_glob[i - s.n_lokal]].as_ref()?.borrow_mut().value);
+                    v
+                };
+            }
+        }
         let mut k = Kontext {
             fehler: 0, tiefe: tiefe as u64, grenze: grenze as u64,
             schatten: schatten.as_mut_ptr(), marken: marken.as_mut_ptr(),
             slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
             stapel: st_puffer.as_mut_ptr(), felder: besch.as_ptr(), selbst: selbst_zeiger,
+            werte: arena.as_mut_ptr(),
         };
         let aus = unsafe { (s.einstieg)(&mut k, lok.as_mut_ptr()) };
         // >= 0: an einem Ausgang; <= -2: mitten drin ausgestiegen -- beides
@@ -1903,7 +2430,21 @@ impl Jit {
             }
             marken[g] = 0;
         }
-        if !ok { s.fehlschlaege += 1; return None; }
+        if !ok {
+            // Aufgegeben, nichts geschehen: die Werte gehen zurueck.
+            for (i, a) in s.start.iter().enumerate() {
+                if *a != Some(Art::W) { continue; }
+                let v = nimm(&mut arena[i]);
+                if i < s.n_lokal { locals[i] = v; }
+                else if let Some(Some(sl)) = slots.get(s.dyn_glob[i - s.n_lokal]) { sl.borrow_mut().value = v; }
+            }
+            s.fehlschlaege += 1;
+            return None;
+        }
+        let n_gesamt = s.start.len();
+        let arena_z: *mut Value = arena.as_mut_ptr();
+        // Ein Wert aus Platz i der Werteplaetze (nur Wertemodus).
+        let aus_arena = |i: usize| unsafe { nimm(&mut *arena_z.add(i)) };
         let wert = |a: &Art, bits: u64| match a {
             Art::I => Value::Int(bits as i64),
             Art::F => Value::Float(f64::from_bits(bits)),
@@ -1917,6 +2458,7 @@ impl Jit {
                 Rc::increment_strong_count(p);
                 Value::Instance(Rc::from_raw(p))
             },
+            Art::W => Value::Nil,   // kommt aus den Werteplaetzen, siehe unten
         };
         // Zurueck in die VM: ein echtes Local oder ein globaler Platz.
         let n_lokal = s.n_lokal;
@@ -1931,9 +2473,12 @@ impl Jit {
             let a = s.aussteige.get((-2 - aus) as usize)?;
             for (i, art) in a.lokal.iter().enumerate() {
                 let Some(art) = art else { continue };
-                ablegen(i, wert(art, lok[i]), locals);
+                let v = if *art == Art::W { aus_arena(i) } else { wert(art, lok[i]) };
+                ablegen(i, v, locals);
             }
-            for (d, art) in a.stapel.iter().enumerate() { stapel.push(wert(art, st_puffer[d])); }
+            for (d, art) in a.stapel.iter().enumerate() {
+                stapel.push(if *art == Art::W { aus_arena(n_gesamt + d) } else { wert(art, st_puffer[d]) });
+            }
             self.zahl_aussteige.set(self.zahl_aussteige.get() + 1);
             return Some(a.stelle);
         }
@@ -1942,7 +2487,8 @@ impl Jit {
         self.zahl_laeufe.set(self.zahl_laeufe.get() + 1);
         for (i, a) in arten.iter().enumerate() {
             let Some(a) = a else { continue };
-            ablegen(i, wert(a, lok[i]), locals);
+            let v = if *a == Art::W { aus_arena(i) } else { wert(a, lok[i]) };
+            ablegen(i, v, locals);
         }
         Some(aus)
     }
@@ -2019,8 +2565,19 @@ impl Jit {
         };
         let start = Zustand { stapel: Vec::new(), lokal };
         let bereich = Bereich { von: kopf, bis, start, globale_da, felder, glob_felder,
-                                klassen, selbst: selbst_k, dyn_glob, lok_typen };
-        let an = analysieren(prog, &self.glob, f, Some(&bereich))?;
+                                klassen, selbst: selbst_k, dyn_glob, lok_typen, modus_w: false };
+        let an = match analysieren(prog, &self.glob, f, Some(&bereich)) {
+            Ok(an) => an,
+            Err(e) => {
+                // Zweiter Versuch im Wertemodus: Texte, MAPs, eingebaute
+                // Befehle -- alles, was keine Zahl ist, als Wert.
+                let w = self.wertebereich(f, kopf, bis, locals, slots);
+                match analysieren(prog, &self.glob, f, Some(&w)) {
+                    Ok(an) => an,
+                    Err(e2) => return Err(format!("{}; mit Werten: {}", e, e2)),
+                }
+            }
+        };
         if an.gerufen.iter().any(|&g| self.ids.get(g).copied().flatten().is_none()) {
             return Err("ruft eine Funktion, die in der VM bleibt".into());
         }
@@ -2029,8 +2586,8 @@ impl Jit {
         // VM riefe ihn noch einmal. Ohne das darf der Bereich keine Felder
         // schreiben -- aufgeben hiesse dann, die VM wiederholt Geschriebenes.
         let mitten = an.gerufen.iter().all(|&g| self.fns.get(g).and_then(|u| u.as_ref()).map_or(false, |u| !u.schreibt_globale));
-        if an.schreibt_felder && !mitten {
-            return Err("schreibt in ein Feld und ruft eine Funktion, die globale Variablen schreibt".into());
+        if (an.schreibt_felder || an.modus_w) && !mitten {
+            return Err("schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt".into());
         }
         let mut beruehrt = an.beruehrt.clone();
         for &g in &an.gerufen {
@@ -2053,7 +2610,9 @@ impl Jit {
         self.schleifen.borrow_mut().push(Schleife {
             einstieg: unsafe { std::mem::transmute::<*const u8, unsafe extern "C" fn(*mut Kontext, *mut u64) -> i64>(p) },
             kopf,
-            start: bereich.start.lokal.clone(),
+            // Der Zustand am Kopf aus der Analyse, die gilt (im Wertemodus
+            // ist es nicht der des ersten Versuchs).
+            start: an.vor[kopf].as_ref().map_or_else(Vec::new, |z| z.lokal.clone()),
             ausgaenge,
             beruehrt,
             fehlschlaege: 0,
@@ -2063,9 +2622,49 @@ impl Jit {
             selbst: an.selbst,
             dyn_glob: an.dyn_glob.clone(),
             n_lokal: f.local_types.len(),
+            modus_w: an.modus_w,
+            typen: an.typen,
         });
         self.zahl_schleifen.set(self.zahl_schleifen.get() + 1);
         Ok(nr)
+    }
+
+    /// Der Bereich im Wertemodus: Zahlen bleiben Zahlen, alles andere (ausser
+    /// NIL) ist ein Wert; jeder globale Platz ohne festen Zahlentyp, den die
+    /// Schleife benutzt, wird wie ein Local gefuehrt.
+    fn wertebereich(&self, f: &Func, kopf: usize, bis: usize, locals: &[Value],
+                    slots: &[Option<Rc<RefCell<Slot>>>]) -> Bereich {
+        let art = |v: &Value| match v {
+            Value::Nil => None,
+            Value::Int(_) => Some(Art::I),
+            Value::Float(_) => Some(Art::F),
+            Value::Bool(_) => Some(Art::B),
+            _ => Some(Art::W),
+        };
+        let mut lokal: Vec<Option<Art>> = locals.iter().map(art).collect();
+        let mut dyn_glob: Vec<usize> = Vec::new();
+        let mut lok_typen: Vec<String> = f.local_types.clone();
+        for ins in &f.code[kopf..=bis] {
+            if !matches!(ins.op, op::LOAD_GLOBAL_SLOT | op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT) { continue; }
+            let g = ins.arg.as_usize();
+            if self.glob.art.get(g).copied().flatten().is_some() || dyn_glob.contains(&g) { continue; }
+            let Some(Some(sl)) = slots.get(g) else { continue };
+            dyn_glob.push(g);
+            lok_typen.push(self.glob.typ.get(g).cloned().unwrap_or_default());
+            lokal.push(art(&sl.borrow().value));
+        }
+        Bereich {
+            von: kopf, bis,
+            start: Zustand { stapel: Vec::new(), lokal },
+            globale_da: slots.iter().map(|x| x.is_some()).collect(),
+            felder: Vec::new(),
+            glob_felder: vec![None; slots.len()],
+            klassen: Vec::new(),
+            selbst: None,
+            dyn_glob,
+            lok_typen,
+            modus_w: true,
+        }
     }
 
     pub fn rufen(&self, idx: usize, args: &[Value], tiefe: u32, grenze: u32,
@@ -2091,7 +2690,7 @@ impl Jit {
             fehler: 0, tiefe: tiefe as u64, grenze: grenze as u64,
             schatten: schatten.as_mut_ptr(), marken: marken.as_mut_ptr(),
             slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
-            stapel: std::ptr::null_mut(), felder: std::ptr::null(), selbst: 0,
+            stapel: std::ptr::null_mut(), felder: std::ptr::null(), selbst: 0, werte: std::ptr::null_mut(),
         };
         let mut erg = 0u64;
         unsafe { (u.einstieg)(&mut k, roh.as_ptr(), &mut erg) };

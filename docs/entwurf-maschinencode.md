@@ -517,6 +517,46 @@ FOR-EACH-Variable auch in `global_vars` -- und verdeckte damit einen Befehl
 gleichen Namens (`FOR EACH len IN ...` mit `LEN(x)` darin brach ab). Sie
 bekommt nur den Platz.
 
+**Schritt 5 (2026-09-25): Zeichenketten, MAPs und reine Befehle -- gebaut
+als Wertemodus.** Scheitert ein Bereich im getypten Modus (ein Text, eine
+MAP, ein Befehl), wird er ein zweites Mal im **Wertemodus** gebaut
+(`Jit::wertebereich`, `Art::W`): alles, was keine Zahl ist, liegt als
+`Value` in einer Ablage (`Kontext::werte`) -- Local s auf Platz s,
+Stapeltiefe d auf Platz `n_gesamt + d` --, und der Maschinencode fuehrt
+nur noch die Reihenfolge und ruft je Befehl einen Rust-Helfer (`w_op`,
+`w_builtin_*`, `w_index`, `w_setzen`, `w_speichern` ...). Beim Eintritt
+werden die Werte aus den Plaetzen der VM in die Ablage **verschoben**
+(nicht kopiert), an jedem Ausgang, beim Aussteigen und beim Aufgeben
+wieder zurueck. Regeln: Befehle nur aus der reinen Familie (Merkplatz
+`familie` = `BUILTIN_FAMILIEN`, nur wenn die VM an dieser Stelle schon
+gefragt hat -- ein nie genommener Zweig bleibt VM), Rechnen und
+Vergleichen nur fuer schlichte Werte (sonst aussteigen, die VM rechnet mit
+ihren Meldungen), eine getypte Zuweisung ueber `coerce` wie die VM.
+**Anhaengen an Ort und Stelle:** bei `s = s + e` gibt der Platz von `s`
+seinen Verweis ganz ab, bevor gerechnet wird -- sonst hielten zwei den
+Text, `Rc::get_mut` schluege fehl, und jede Runde kopierte. Beim ersten
+Bau wurde das uebersehen: `text.dh` stieg 195 904 Mal aus, weil die Kopie
+ab 4 KB ueber `konstant_rechnen` lief, das (fuer das Falten gedacht)
+laengere Texte ablehnt. Die Argumente eines Befehls gehen als Scheibe der
+Ablage hinein, ohne `Vec` je Aufruf.
+
+Gemessen: `text.dh` VM 53 ms, Maschinencode 41 ms; `maps.dh` gleich
+schnell (104 gegen 107 ms) -- dort ist die Hash-Suche der Befehl selbst,
+der Weg dorthin kostet kaum etwas. Ein Befehl, der an seiner Stelle vor
+dem ersten Ruecksprung noch nie lief (Merkplatz 0), laesst den Bereich in
+der VM -- welche Familie er ist, weiss dann niemand. Pruefung: 14 Faelle
+mehr in `jit.dhtest` (Text anhaengen, ein zweiter Name auf denselben Text,
+MAP schreiben/lesen, `m[k]`, Fehler mit Text auf dem Stapel, Fehler eines
+Befehls, Text in getypte Variablen, eine Zahl in eine Textvariable,
+Zahlen aus Text, Textvergleiche, Text in einem Feld, drei Faelle, die in
+der VM bleiben). Gegenproben: Werte an Ausgaengen nicht zurueck -> 10 Faelle fallen; der
+Stapel beim Aussteigen NIL -> "Fehler eines Befehls" faellt; ohne `coerce`
+-> "eine Zahl in eine Textvariable" laeuft durch; `<` als `<=` -> der
+Textvergleich faellt; ein gescheiterter Befehl liefert still NIL -> "Fehler
+eines Befehls" faellt. Zwei davon blieben im ersten Anlauf gruen: kein Text
+war je GLEICH seinem Vergleich, und die `coerce`-Probe stand in einem TRY,
+dessen Schleife in der VM blieb.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

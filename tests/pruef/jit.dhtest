@@ -708,7 +708,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 1200 9
 --- stderr
-jit: Schleife an Stelle 13 in __main__ bleibt in der VM: TRY/THROW
+jit: Schleife an Stelle 13 in __main__ bleibt in der VM: TRY/THROW; mit Werten: TRY/THROW
 jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === globale werden erst nach dem aufruf uebernommen
@@ -1273,8 +1273,7 @@ xxx 1279
 1280
 xxx 1280
 --- stderr
-jit: Schleife an Stelle 29 in lauf bleibt in der VM: Platz 1 hat den Typ 'string'
-jit: 0 Funktionen, 1 Schleifen, 2 Schleifenlaeufe
+jit: 0 Funktionen, 2 Schleifen, 4 Schleifenlaeufe
 
 === schleife ruft reine und unreine funktionen
 FUNCTION quadrat(n AS INTEGER) AS INTEGER
@@ -1856,8 +1855,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 1275 51
 --- stderr
-jit: Schleife an Stelle 16 in __main__ bleibt in der VM: eingebauter Befehl
-jit: 0 Funktionen, 1 Schleifen, 50 Schleifenlaeufe
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
 
 === schleife mit feld ruft reine funktion
 FUNCTION quadrat(x AS INTEGER) AS INTEGER
@@ -1923,7 +1921,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 40 20
 --- stderr
-jit: Schleife an Stelle 15 in __main__ bleibt in der VM: schreibt in ein Feld und ruft eine Funktion, die globale Variablen schreibt
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
 jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === feld von texten bleibt in der vm
@@ -1949,8 +1947,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 x4
 --- stderr
-jit: Schleife an Stelle 14 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist
-jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === globaler zaehler und aussteigen
 DIM zaehler AS INTEGER
@@ -2129,8 +2126,8 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 4.75 -4.75 5 4.75
 --- stderr
-jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt
-jit: Schleife an Stelle 37 in __main__ bleibt in der VM: eingebauter Befehl
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
+jit: Schleife an Stelle 37 in __main__ bleibt in der VM: eingebauter Befehl; mit Werten: Mitglied von etwas, das kein Objekt ist
 jit: 0 Funktionen, 1 Schleifen, 5 Schleifenlaeufe
 
 === self-felder in einer schleife einer methode
@@ -2231,7 +2228,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 11808 7 12 13 20
 --- stderr
-jit: Schleife an Stelle 39 in __main__ bleibt in der VM: Befehl 68
+jit: Schleife an Stelle 39 in __main__ bleibt in der VM: Befehl 68; mit Werten: Befehl 68
 jit: 0 Funktionen, 1 Schleifen, 3 Schleifenlaeufe
 jit: 3 mal mitten in einer Schleife ausgestiegen
 
@@ -2276,7 +2273,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 114
 --- stderr
-jit: Schleife an Stelle 14 in __main__ bleibt in der VM: PROPERTY w
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: PROPERTY w; mit Werten: Mitglied von etwas, das kein Objekt ist
 jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === objekt in einem feld eines objekts
@@ -2383,7 +2380,7 @@ DHRT_JIT_BILANZ=1
 Integer-Division durch 0
 3 4 38 0 48
 --- stderr
-jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
 jit: 1 mal mitten in einer Schleife ausgestiegen
 
@@ -2457,7 +2454,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 260 11
 --- stderr
-jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68
+jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68; mit Werten: Befehl 68
 jit: 0 Funktionen, 1 Schleifen, 4 Schleifenlaeufe
 
 === gemischte zahlen in einem tupel
@@ -2487,7 +2484,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 33.0
 --- stderr
-jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68
+jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68; mit Werten: Befehl 68
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
 jit: 6 mal mitten in einer Schleife ausgestiegen
 
@@ -2540,7 +2537,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 104 0 2 104
 --- stderr
-jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
 jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
 
 === objektfeld schreiben mit aufruf, der globale schreibt
@@ -2582,7 +2579,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 55 10
 --- stderr
-jit: Schleife an Stelle 15 in __main__ bleibt in der VM: schreibt in ein Feld und ruft eine Funktion, die globale Variablen schreibt
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
 jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === unterklasse an der stelle der oberklasse
@@ -2630,9 +2627,484 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 66 8 10
 --- stderr
-jit: Schleife an Stelle 24 in __main__ bleibt in der VM: Befehl 68
+jit: Schleife an Stelle 24 in __main__ bleibt in der VM: Befehl 68; mit Werten: Befehl 68
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
 jit: 6 mal mitten in einer Schleife ausgestiegen
+
+=== text anhaengen in einer schleife
+DIM s AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 999
+    s = s + CHR$(97 + i MOD 26)
+NEXT
+DIM z AS INTEGER
+FOR i = 0 TO LEN(s) - 1
+    IF MID$(s, i, 1) = "c" THEN z = z + 1
+NEXT
+PRINT LEN(s); " "; z; " "; LEFT$(s, 5); " "; RIGHT$(s, 3)
+--- erwartet
+1000 39 abcde jkl
+
+=== text anhaengen in einer schleife (maschinencode)
+DIM s AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 999
+    s = s + CHR$(97 + i MOD 26)
+NEXT
+DIM z AS INTEGER
+FOR i = 0 TO LEN(s) - 1
+    IF MID$(s, i, 1) = "c" THEN z = z + 1
+NEXT
+PRINT LEN(s); " "; z; " "; LEFT$(s, 5); " "; RIGHT$(s, 3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1000 39 abcde jkl
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== ein zweiter name auf den text sieht das anhaengen nicht
+DIM s AS STRING : s = "ab"
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    t = s
+    s = s + STR$(i)
+    s = s + "-"
+NEXT
+PRINT s; " "; t
+--- erwartet
+ab1-2-3-4-5- ab1-2-3-4-
+
+=== ein zweiter name auf den text sieht das anhaengen nicht (maschinencode)
+DIM s AS STRING : s = "ab"
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    t = s
+    s = s + STR$(i)
+    s = s + "-"
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+ab1-2-3-4-5- ab1-2-3-4-
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== map schreiben und lesen in schleifen
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 499
+    MAPPUT(m, "k" + STR$(i MOD 50), i)
+NEXT
+DIM z AS INTEGER
+FOR i = 0 TO 49
+    z = z + MAPGET(m, "k" + STR$(i))
+NEXT
+PRINT z; " "; MAPSIZE(m)
+--- erwartet
+23725 50
+
+=== map schreiben und lesen in schleifen (maschinencode)
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 499
+    MAPPUT(m, "k" + STR$(i MOD 50), i)
+NEXT
+DIM z AS INTEGER
+FOR i = 0 TO 49
+    z = z + MAPGET(m, "k" + STR$(i))
+NEXT
+PRINT z; " "; MAPSIZE(m)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+23725 50
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== map mit eckigen klammern
+DIM m AS MAP OF INTEGER : m = {}
+DIM w AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    w = "w" + STR$(i MOD 7)
+    IF MAPHAS(m, w) THEN
+        m[w] = m[w] + 1
+    ELSE
+        m[w] = 1
+    END IF
+NEXT
+PRINT m["w0"]; " "; m["w6"]
+--- erwartet
+15 14
+
+=== map mit eckigen klammern (maschinencode)
+DIM m AS MAP OF INTEGER : m = {}
+DIM w AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 99
+    w = "w" + STR$(i MOD 7)
+    IF MAPHAS(m, w) THEN
+        m[w] = m[w] + 1
+    ELSE
+        m[w] = 1
+    END IF
+NEXT
+PRINT m["w0"]; " "; m["w6"]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+15 14
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== fehler mitten in der schleife mit text auf dem stapel
+DIM s AS STRING
+DIM i AS INTEGER
+DIM n AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        s = s + STR$(i) + MID$("abcdefghij", 10 \ (7 - i), 1)
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT s; " "; n; " "; i
+--- erwartet
+gefangen: Integer-Division durch 0 zeile 6
+1b2c3c4d5f6 6 7
+
+=== fehler mitten in der schleife mit text auf dem stapel (maschinencode)
+DIM s AS STRING
+DIM i AS INTEGER
+DIM n AS INTEGER
+TRY
+    FOR i = 1 TO 20
+        s = s + STR$(i) + MID$("abcdefghij", 10 \ (7 - i), 1)
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT s; " "; n; " "; i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Integer-Division durch 0 zeile 6
+1b2c3c4d5f6 6 7
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== fehler eines befehls mitten in der schleife
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 1) : MAPPUT(m, "b", 2)
+DIM z AS INTEGER
+DIM i AS INTEGER
+DIM k AS STRING
+TRY
+    FOR i = 0 TO 5
+        k = CHR$(97 + i)
+        z = z + MAPGET(m, k) * 10
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z; " "; i; " "; k
+--- erwartet
+gefangen: MAPGET: Schluessel 'c' nicht in Map zeile 9
+30 2 c
+
+=== fehler eines befehls mitten in der schleife (maschinencode)
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 1) : MAPPUT(m, "b", 2)
+DIM z AS INTEGER
+DIM i AS INTEGER
+DIM k AS STRING
+TRY
+    FOR i = 0 TO 5
+        k = CHR$(97 + i)
+        z = z + MAPGET(m, k) * 10
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e; " zeile "; ERROR_LINE()
+END TRY
+PRINT z; " "; i; " "; k
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: MAPGET: Schluessel 'c' nicht in Map zeile 9
+30 2 c
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== text in eine getypte variable
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 7)
+DIM t AS STRING
+DIM f AS FLOAT
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    f = f + VAL("2")
+    t = t + "x"
+NEXT
+PRINT t; " "; f; " "; TYPEOF(f)
+--- erwartet
+xxx 6.0 FLOAT
+
+=== text in eine getypte variable (maschinencode)
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 7)
+DIM t AS STRING
+DIM f AS FLOAT
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    f = f + VAL("2")
+    t = t + "x"
+NEXT
+PRINT t; " "; f; " "; TYPEOF(f)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+xxx 6.0 FLOAT
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== eine zahl in eine textvariable ist ein fehler
+DIM w AS TUPLE
+w = ("a", "b", 7)
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    t = t + "-"
+    t = w[i]
+NEXT
+PRINT t
+--- erwartet
+--- fehler
+Zuweisung an global: Erwartet STRING, erhalten INTEGER
+
+=== eine zahl in eine textvariable ist ein fehler (maschinencode)
+DIM w AS TUPLE
+w = ("a", "b", 7)
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    t = t + "-"
+    t = w[i]
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+--- fehler
+Zuweisung an global: Erwartet STRING, erhalten INTEGER
+
+=== zahlen aus text in getypte variablen
+DIM f AS FLOAT
+DIM n AS INTEGER
+DIM i AS INTEGER
+DIM teile AS STRING : teile = "1.5 2 3.25 4"
+FOR i = 1 TO 100
+    f = f + VAL(MID$(teile, (i MOD 4) * 0, 3))
+    n = n + LEN(STR$(i))
+NEXT
+PRINT f; " "; n
+--- erwartet
+150.0 192
+
+=== zahlen aus text in getypte variablen (maschinencode)
+DIM f AS FLOAT
+DIM n AS INTEGER
+DIM i AS INTEGER
+DIM teile AS STRING : teile = "1.5 2 3.25 4"
+FOR i = 1 TO 100
+    f = f + VAL(MID$(teile, (i MOD 4) * 0, 3))
+    n = n + LEN(STR$(i))
+NEXT
+PRINT f; " "; n
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+150.0 192
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== text vergleichen und sortieren
+DIM w AS STRING : w = "zebra"
+DIM k AS STRING : k = "zebra"
+DIM i AS INTEGER
+DIM z AS INTEGER
+DIM s AS STRING
+FOR i = 0 TO 25
+    s = CHR$(97 + i) + "x"
+    IF s < w THEN z = z + 1
+    IF s <> k THEN z = z + 100
+    IF s >= "mx" THEN k = s
+    IF s < "mx" THEN z = z + 10000
+NEXT
+PRINT z; " "; k
+--- erwartet
+122625 zx
+
+=== text vergleichen und sortieren (maschinencode)
+DIM w AS STRING : w = "zebra"
+DIM k AS STRING : k = "zebra"
+DIM i AS INTEGER
+DIM z AS INTEGER
+DIM s AS STRING
+FOR i = 0 TO 25
+    s = CHR$(97 + i) + "x"
+    IF s < w THEN z = z + 1
+    IF s <> k THEN z = z + 100
+    IF s >= "mx" THEN k = s
+    IF s < "mx" THEN z = z + 10000
+NEXT
+PRINT z; " "; k
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+122625 zx
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== text in einem feld
+DIM a[5] AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    a[i MOD 5] = a[i MOD 5] + CHR$(65 + i MOD 26)
+NEXT
+PRINT a[0]; " "; a[4]
+--- erwartet
+AFKPUZEJOT EJOTYDINSX
+
+=== text in einem feld (maschinencode)
+DIM a[5] AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 49
+    a[i MOD 5] = a[i MOD 5] + CHR$(65 + i MOD 26)
+NEXT
+PRINT a[0]; " "; a[4]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+AFKPUZEJOT EJOTYDINSX
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== text in einer funktion
+FUNCTION wiederholt(t AS STRING, n AS INTEGER) AS STRING
+    DIM r AS STRING
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        r = r + t
+        IF LEN(r) > 20 THEN r = MID$(r, 1, 10)
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT wiederholt("abc", 30); " "; wiederholt("x", 3)
+--- erwartet
+abcabaaaaaabcabcabc xxx
+
+=== text in einer funktion (maschinencode)
+FUNCTION wiederholt(t AS STRING, n AS INTEGER) AS STRING
+    DIM r AS STRING
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        r = r + t
+        IF LEN(r) > 20 THEN r = MID$(r, 1, 10)
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT wiederholt("abc", 30); " "; wiederholt("x", 3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+abcabaaaaaabcabcabc xxx
+--- stderr
+jit: Schleife an Stelle 11 in wiederholt bleibt in der VM: Platz 2 hat den Typ 'string'; mit Werten: eingebauter Befehl MID$ (an dieser Stelle noch nie gerufen)
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== globaler text aus einer funktion geschrieben
+DIM protokoll AS STRING
+SUB merke(t AS STRING)
+    protokoll = protokoll + t + ";"
+END SUB
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 1 TO 5
+    s = s + STR$(i)
+    merke(s)
+NEXT
+PRINT protokoll
+--- erwartet
+1;12;123;1234;12345;
+
+=== globaler text aus einer funktion geschrieben (maschinencode)
+DIM protokoll AS STRING
+SUB merke(t AS STRING)
+    protokoll = protokoll + t + ";"
+END SUB
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 1 TO 5
+    s = s + STR$(i)
+    merke(s)
+NEXT
+PRINT protokoll
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1;12;123;1234;12345;
+--- stderr
+jit: Schleife an Stelle 13 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: merke hat einen Parameter vom Typ 'string'
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== upper und replace als methoden
+DIM s AS STRING : s = "abc"
+DIM r AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    r = r + s.upper() + REPLACE$(s, "b", STR$(i))
+NEXT
+PRINT r
+--- erwartet
+ABCa1cABCa2cABCa3cABCa4c
+
+=== upper und replace als methoden (maschinencode)
+DIM s AS STRING : s = "abc"
+DIM r AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    r = r + s.upper() + REPLACE$(s, "b", STR$(i))
+NEXT
+PRINT r
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+ABCa1cABCa2cABCa3cABCa4c
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: Objekt
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in
