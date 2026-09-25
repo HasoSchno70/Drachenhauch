@@ -187,11 +187,15 @@ pub struct Instr {
     /// Mal zuerst, statt den Namen durch alle Familien zu reichen
     /// (`Vm::builtin_rufen`).
     pub familie: std::cell::Cell<u8>,
-    /// Nur CALL_METHOD: (Klasse, Methode) des letzten Aufrufs. Hat das naechste
-    /// Objekt dieselbe Klasse, ist die Methode ohne Suche da (`op::CALL_METHOD`).
-    /// Beide Zeiger gelten, solange das Programm lebt -- es wird nach dem
-    /// Laden nicht mehr veraendert (wie `CoroState::fn_ptr`).
-    pub methode: std::cell::Cell<(*const ClassInfo, *const Func)>,
+    /// Merkplatz fuer Objekte: (Lage der Klasse, was an ihr gefunden wurde).
+    /// CALL_METHOD merkt sich die Methode (`*const Func` als Zahl), die
+    /// Feldbefehle (LOAD/STORE_MEMBER, LOAD/STORE_FIELD) den Platz des
+    /// Feldes. Hat das naechste Objekt dieselbe Lage (dieselbe Klasse -- jede
+    /// hat ihr eigenes `Rc<Layout>`), ist es ohne Suche da. Ein Platz fuer
+    /// beide: kein Befehl braucht beides, und ein groesseres `Instr` kostete
+    /// gemessen 7 % bei reinen Zahlenschleifen. Die Zeiger gelten, solange das
+    /// Programm lebt -- es wird nach dem Laden nicht mehr veraendert.
+    pub merk: std::cell::Cell<(*const crate::value::Layout, usize)>,
     /// Superinstruktion (M2): beginnt hier eine Folge, die `dispatch` in einem
     /// Schritt ausfuehren kann? 0 = nein, sonst die Art (`VS_*`). Die Folge
     /// selbst bleibt unveraendert stehen -- klappt der schnelle Weg nicht,
@@ -312,6 +316,8 @@ pub struct ClassInfo {
     pub prop_set: rustc_hash::FxHashMap<String, (String, String)>,
     /// Alle PROPERTY-Namen der Kette, auch ohne Getter oder Setter.
     pub props_alle: rustc_hash::FxHashSet<String>,
+    /// Feste Lage der Felder samt Vorfahren (`programm_bauen`).
+    pub layout: std::rc::Rc<crate::value::Layout>,
 }
 
 pub struct Program {
@@ -572,7 +578,7 @@ pub(crate) fn func_bauen(r: FuncRoh) -> Func {
         op,
         arg,
         familie: std::cell::Cell::new(0),
-        methode: std::cell::Cell::new((std::ptr::null(), std::ptr::null())),
+        merk: std::cell::Cell::new((std::ptr::null(), 0)),
         schnell: 0,
         schleife: std::cell::Cell::new(0),
     }).collect();
@@ -641,6 +647,7 @@ fn decode_class(j: &J) -> ClassInfo {
         prop_get: Default::default(),
         prop_set: Default::default(),
         props_alle: Default::default(),
+        layout: Default::default(),
     }
 }
 
@@ -736,6 +743,29 @@ pub(crate) fn programm_bauen(n_globals: usize, global_names: Vec<String>, main: 
             }
         }
         if let Some(ci) = classes.get_mut(&k) { ci.props_alle = alle; ci.prop_get = get; ci.prop_set = set; }
+    }
+    // Feste Lage der Felder je Klasse: Vorfahren zuerst, wie allocate_instance
+    // sie anlegt.
+    let namen: Vec<String> = classes.keys().cloned().collect();
+    for k in namen {
+        let mut kette: Vec<&ClassInfo> = Vec::new();
+        let mut cur = classes.get(k.as_str());
+        while let Some(ci) = cur {
+            kette.push(ci);
+            if ci.parent_name.is_empty() || kette.len() > 64 { break; }
+            cur = classes.get(ci.parent_name.as_str());
+        }
+        let mut lage = crate::value::Layout::default();
+        for ci in kette.iter().rev() {
+            for fd in &ci.fields {
+                let ty = if fd.array_dims.is_empty() { fd.type_name.clone() } else { format!("array:{}", fd.type_name) };
+                match lage.index.get(&fd.name) {
+                    Some(&i) => lage.typen[i as usize] = ty,
+                    None => { lage.index.insert(fd.name.clone(), lage.typen.len() as u32); lage.typen.push(ty); }
+                }
+            }
+        }
+        if let Some(ci) = classes.get_mut(&k) { ci.layout = std::rc::Rc::new(lage); }
     }
     Program {
         n_globals,

@@ -436,6 +436,43 @@ die Bilanzzeile auf stderr kommt vor der Ausgabe -- zwei Mutationen fielen
 zuerst nur an der Bilanz, und ob die gedruckten Werte sie auch zeigen,
 sagte erst der Vergleich VM gegen Maschinencode ohne die Bilanz.
 
+**Schritt 4a (2026-09-25): feste Lage der Objektfelder in der VM -- gebaut.**
+Bis dahin trug jede Instanz eine `FxHashMap<String, FieldVal>`, und jedes
+`obj.x` hashte den Namen; jedes Feld jeder Instanz trug ausserdem seinen
+Typ als eigenen `String`. Jetzt hat jede KLASSE eine Lage
+(`value::Layout`: Name -> Platz, Typ je Platz; beim Laden in
+`model::programm_bauen` gerechnet, Vorfahren zuerst), und eine Instanz
+haelt `Rc<Layout>` plus `Vec<Value>`. Ein Feld, das eine Unterklasse noch
+einmal deklariert, bleibt auf dem Platz der Vorfahrin und nimmt den Typ der
+Unterklasse -- wie die Hash-Ablage davor. Die Feldbefehle (LOAD/STORE_MEMBER,
+LOAD/STORE_FIELD) merken sich (Lage, Platz) ihres letzten Treffers; hat das
+naechste Objekt dieselbe Lage, gibt es keine Suche. Den Merkplatz teilen
+sie sich mit CALL_METHOD (`Instr::merk`), das seither ebenfalls die LAGE
+vergleicht statt den Klassennamen als Text. Eine PROPERTY kommt nie in den
+Merkplatz (gesetzt wird er erst, nachdem feststeht, dass es keine ist).
+Eine Klasse, die es nicht gibt, bekommt EINE geteilte leere Lage -- eine je
+Instanz wuerde freigegeben, und eine spaetere Lage koennte ihre Adresse
+erben; der Merkplatz traefe dann falsch.
+
+Gemessen (`bench_dhrt.dh --gegen`, je zweimal): `objekte.dh` 125 -> 95 ms
+(0,76). **Ein Preis, der sich nicht ganz vermeiden liess:** `ganzzahl.dh`
+(kein einziges Objekt) wurde 4 % langsamer. Drei Aufteilungen gemessen:
+alles in `dispatch` und ein eigenes Merkfeld in `Instr` (+16 Byte) 1,07;
+ein gemeinsames Merkfeld 1,05; alles in eigene Funktionen 1,03, aber dann
+`zahlen.dh` 1,08 und `objekte.dh` nur 0,87. Genommen ist: nur der schnelle
+Weg (dieselbe Klasse wie zuletzt) in `dispatch`, der Rest in
+`member_laden`/`member_setzen` -- `objekte.dh` 0,76, `ganzzahl.dh` 1,04,
+alles andere 0,98..1,03. Es ist Codelage, keine Arbeit: die Schleife
+fasst nichts davon an. Pruefung `tests/pruef/objektlage.dhtest` (8, auf
+dem Bau davor ebenso gruen): eine Stelle mit zwei Klassen, deren Felder
+verschieden liegen, Vererbung, ein neu deklariertes Feld, PROPERTY und Feld
+an derselben Stelle, Methoden an einer Stelle mit wechselnden Klassen,
+Umwandeln beim Speichern. Gegenproben: Merkplatz ohne Vergleich der Lage
+-> zwei Faelle fallen (die Felder der zweiten Klasse kommen vertauscht, und
+die PROPERTY wird uebergangen); Typ der Vorfahrin statt der Unterklasse ->
+"noch einmal deklariert" faellt; CALL_METHOD ohne Vergleich -> "wechselnde
+Klassen" bricht ab.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

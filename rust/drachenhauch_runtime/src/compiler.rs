@@ -3572,6 +3572,7 @@ impl Compiler {
                 properties: ci.property_set.iter().cloned().collect(),
                 props_kette: false, prop_get: Default::default(),
                 prop_set: Default::default(), props_alle: Default::default(),
+                layout: Default::default(),
             });
         }
         let data = data.iter().map(crate::model::decode_value).collect();

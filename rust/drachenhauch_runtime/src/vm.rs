@@ -66,7 +66,7 @@ const MAX_CALL_DEPTH: u32 = 1000;
 
 use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};
-use crate::value::{as_f64, is_num, value_eq, Cells, CoroState, FieldVal, GbArray, GbMap, Instance, Value};
+use crate::value::{as_f64, is_num, value_eq, Cells, CoroState, GbArray, GbMap, Instance, Value};
 
 /// Profiler-Sammler (Stufe B, Phase 3): pro Quell-Zeile Besuchs-Count +
 /// kumulierte Zeit. Spiegelt `editor_qt/profiler.py`: die Zeit zwischen zwei
@@ -1447,10 +1447,121 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// `obj.name` lesen (LOAD_MEMBER): Feld ueber den Merkplatz, PROPERTY,
+    /// gebundene Methode oder Namensraum.
+    #[inline(never)]
+    fn member_laden(&mut self, instr: &crate::model::Instr, name_wert: &Value, obj: Value) -> Result<Value, String> {
+        if let Value::Instance(rc) = &obj {
+            // Schneller Weg: dieselbe Lage wie beim letzten Mal -- dann ist es
+            // ein Feld (eine PROPERTY kommt nie in den Merkplatz), und sein
+            // Platz steht fest.
+            let b = rc.borrow();
+            let (lage, platz) = instr.merk.get();
+            if std::ptr::eq(Rc::as_ptr(&b.layout), lage) { return Ok(b.fields[platz].clone()); }
+        }
+        let name_owned;
+        let name: &str = match name_wert {
+            Value::Str(s) => s,
+            v => { name_owned = v.fmt(); &name_owned }
+        };
+        match &obj {
+            Value::Nil => Err(format!("Zugriff auf '.{}' bei NIL-Referenz{}", name, NIL_NEW)),
+            Value::Namespace(ns) => match ns.members.get(&name.to_lowercase()) {
+                Some(v) => Ok(v.clone()),
+                None => Err(format!("{} hat keinen Member '{}'", ns.name, name)),
+            },
+            Value::Instance(rc) => {
+                let cn = rc.borrow().class_name.clone();
+                if let Some(getter) = self.property_methode(&cn, name, true) {
+                    let getter = getter
+                        .ok_or_else(|| format!("Property '{}' in {} hat keinen Getter", name, cn))?;
+                    return self.exec(getter, vec![], Some(obj.clone()));
+                }
+                let feld = { let b = rc.borrow(); feld_platz(instr, &b, name).map(|i| b.fields[i].clone()) };
+                match feld {
+                    Some(v) => Ok(v),
+                    // Kein Feld -- aber vielleicht eine Methode. `obj.methode`
+                    // OHNE Klammern ist eine an DIESE Instanz gebundene FUNCREF;
+                    // mit Klammern laeuft der Aufruf ueber CALL_METHOD und kommt
+                    // hier gar nicht an.
+                    None => match self.resolve_method(&cn, name) {
+                        Some(_) => Ok(Value::BoundMethod(Rc::new((
+                            obj.clone(), Rc::from(name.to_lowercase().as_str()))))),
+                        None => Err(format!("Feld '{}' existiert nicht in {}", name, cn)),
+                    },
+                }
+            }
+            _ => Err(format!("Zugriff auf '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
+        }
+    }
+
+    /// `obj.name = v` (STORE_MEMBER): Feld ueber den Merkplatz oder PROPERTY.
+    #[inline(never)]
+    fn member_setzen(&mut self, instr: &crate::model::Instr, name_wert: &Value, obj: Value, v: Value) -> Result<(), String> {
+        let v = match &obj {
+            Value::Instance(rc) => {
+                // Schneller Weg wie beim Lesen, fuer einen Wert, der schon den
+                // Typ des Feldes hat.
+                let mut b = rc.borrow_mut();
+                let (lage, platz) = instr.merk.get();
+                if std::ptr::eq(Rc::as_ptr(&b.layout), lage) {
+                    let passt = matches!((&v, b.layout.typen[platz].as_str()),
+                        (Value::Int(_), "integer") | (Value::Float(_), "float")
+                        | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+                        | (_, "any") | (_, ""));
+                    if passt { b.fields[platz] = v; return Ok(()); }
+                }
+                v
+            }
+            _ => v,
+        };
+        let name_owned;
+        let name: &str = match name_wert {
+            Value::Str(s) => s,
+            x => { name_owned = x.fmt(); &name_owned }
+        };
+        match &obj {
+            Value::Nil => Err(format!("Zuweisung an '.{}' bei NIL-Referenz{}", name, NIL_NEW)),
+            Value::Instance(rc) => {
+                let cn = rc.borrow().class_name.clone();
+                if let Some(setter) = self.property_methode(&cn, name, false) {
+                    let setter = setter
+                        .ok_or_else(|| format!("Property '{}' in {} hat keinen Setter (read-only)", name, cn))?;
+                    self.exec(setter, vec![v], Some(obj.clone()))?;
+                    return Ok(());
+                }
+                // Ein borrow_mut, Coerce-Fast-Arm; der format!-Fehlerkontext
+                // entsteht nur im langsamen Weg.
+                let mut rcb = rc.borrow_mut();
+                let i = feld_platz(instr, &rcb, name)
+                    .ok_or_else(|| format!("Feld '{}' existiert nicht in {}", name, cn))?;
+                let lage = rcb.layout.clone();
+                let cv = match (&v, lage.typen[i].as_str()) {
+                    (Value::Int(_), "integer") | (Value::Float(_), "float")
+                    | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+                    | (_, "any") | (_, "") => v,
+                    (Value::Int(n), "float") => Value::Float(*n as f64),
+                    (_, ty) => coerce(v, ty, &format!("Zuweisung an {}.{}", cn, name))?,
+                };
+                rcb.fields[i] = cv;
+                Ok(())
+            }
+            _ => Err(format!("Zuweisung an '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
+        }
+    }
+
     #[inline(never)]
     fn allocate_instance(&self, class_name: &str) -> Value {
-        let mut fields: rustc_hash::FxHashMap<String, FieldVal> = rustc_hash::FxHashMap::default();
-        // Kette parent-first sammeln.
+        let layout = match self.prog.classes.get(class_name) {
+            Some(ci) => ci.layout.clone(),
+            // Eine Klasse, die es nicht gibt, hat keine Felder. EINE geteilte
+            // leere Lage: eine je Instanz wuerde freigegeben, und ihre Adresse
+            // koennte eine spaetere erben -- ein Merkplatz traefe dann falsch.
+            None => LEERE_LAGE.with(|l| l.clone()),
+        };
+        let mut fields: Vec<Value> = vec![Value::Nil; layout.typen.len()];
+        // Kette parent-first sammeln (ein Feld, das eine Unterklasse noch
+        // einmal deklariert, ueberschreibt den Wert auf demselben Platz).
         let mut chain: Vec<&ClassInfo> = Vec::new();
         let mut cur = self.prog.classes.get(class_name);
         while let Some(ci) = cur {
@@ -1468,16 +1579,12 @@ impl<'p> Vm<'p> {
                 } else {
                     self.element_default(&fd.type_name)
                 };
-                let ty = if fd.array_dims.is_empty() {
-                    fd.type_name.clone()
-                } else {
-                    format!("array:{}", fd.type_name)
-                };
-                fields.insert(fd.name.clone(), FieldVal { ty, value });
+                if let Some(&i) = layout.index.get(&fd.name) { fields[i as usize] = value; }
             }
         }
         Value::Instance(Rc::new(RefCell::new(Instance {
             class_name: Rc::from(class_name),
+            layout,
             fields,
         })))
     }
@@ -2821,18 +2928,15 @@ impl<'p> Vm<'p> {
                             // Merkplatz: dieselbe Klasse wie beim letzten Mal an
                             // dieser Stelle -> Methode ohne Suche (sonst je Aufruf
                             // Klassenname klonen und die Kette absuchen).
-                            let (ci_p, f_p) = instr.methode.get();
-                            let getroffen = !ci_p.is_null()
-                                && unsafe { (*ci_p).name.as_str() } == &*rc.borrow().class_name;
+                            let (lage, f_p) = instr.merk.get();
+                            let getroffen = std::ptr::eq(Rc::as_ptr(&rc.borrow().layout), lage);
                             let m: &'p Func = if getroffen {
-                                unsafe { &*f_p }
+                                unsafe { &*(f_p as *const Func) }
                             } else {
                                 let cn = rc.borrow().class_name.clone();
                                 let m = self.resolve_method(&cn, method)
                                     .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
-                                if let Some(ci) = self.prog.classes.get(&*cn) {
-                                    instr.methode.set((ci as *const ClassInfo, m as *const Func));
-                                }
+                                instr.merk.set((Rc::as_ptr(&rc.borrow().layout), m as *const Func as usize));
                                 m
                             };
                             if !m.is_coroutine {
@@ -2893,8 +2997,11 @@ impl<'p> Vm<'p> {
                     };
                     let s = self_obj.ok_or_else(|| format!("LOAD_FIELD '{}' ausserhalb Methodenkontext", name))?;
                     if let Value::Instance(rc) = s {
-                        let v = rc.borrow().fields.get(name)
-                            .ok_or_else(|| format!("Feld '{}' existiert nicht", name))?.value.clone();
+                        let b = rc.borrow();
+                        let i = feld_platz(instr, &b, name)
+                            .ok_or_else(|| format!("Feld '{}' existiert nicht", name))?;
+                        let v = b.fields[i].clone();
+                        drop(b);
                         stack.push(v);
                     } else { return Err("LOAD_FIELD: self ist keine Instanz".into()); }
                 }
@@ -2916,106 +3023,49 @@ impl<'p> Vm<'p> {
                         // Objekt sein (`Self.naechster = Self`).
                         let langsam_ty = {
                             let mut rcb = rc.borrow_mut();
-                            let f = rcb.fields.get_mut(name)
+                            let i = feld_platz(instr, &rcb, name)
                                 .ok_or_else(|| format!("Feld '{}' existiert nicht", name))?;
-                            match (&v, f.ty.as_str()) {
+                            let lage = rcb.layout.clone();
+                            let ty = lage.typen[i].as_str();
+                            match (&v, ty) {
                                 (Value::Int(_), "integer") | (Value::Float(_), "float")
                                 | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
-                                | (_, "any") | (_, "") => { f.value = v; None }
-                                (Value::Int(n), "float") => { f.value = Value::Float(*n as f64); None }
-                                _ => Some((f.ty.clone(), v)),
+                                | (_, "any") | (_, "") => { rcb.fields[i] = v; None }
+                                (Value::Int(n), "float") => { rcb.fields[i] = Value::Float(*n as f64); None }
+                                _ => Some((i, ty.to_string(), v)),
                             }
                         };
-                        if let Some((ty, v)) = langsam_ty {
+                        if let Some((i, ty, v)) = langsam_ty {
                             let cv = coerce(v, &ty, &format!("Zuweisung an Feld {}", name))?;
-                            if let Some(f) = rc.borrow_mut().fields.get_mut(name) { f.value = cv; }
+                            rc.borrow_mut().fields[i] = cv;
                         }
                     } else { return Err("STORE_FIELD: self ist keine Instanz".into()); }
                 }
                 op::LOAD_MEMBER => {
-                    // Member-Name direkt aus dem Const-Pool (&str) -- fmt()
-                    // allozierte vorher einen String PRO Zugriff.
-                    let name_owned;
-                    let name: &str = match &constants[arg.as_usize()] {
-                        Value::Str(s) => s,
-                        v => { name_owned = v.fmt(); &name_owned }
-                    };
+                    // Der langsame Weg liegt in `member_laden` (eigene
+                    // Funktion): was in `dispatch` waechst, verschiebt die
+                    // Codelage, und das kostete gemessen bis zu 8 % bei reinen
+                    // Zahlenschleifen, die gar kein Objekt anfassen.
                     let obj = vm_pop(stack)?;
-                    match &obj {
-                        Value::Nil => return Err(format!(
-                            "Zugriff auf '.{}' bei NIL-Referenz{}", name, NIL_NEW)),
-                        Value::Namespace(ns) => {
-                            match ns.members.get(&name.to_lowercase()) {
-                                Some(v) => stack.push(v.clone()),
-                                None => return Err(format!("{} hat keinen Member '{}'", ns.name, name)),
-                            }
+                    // Nur der schnelle Weg (dieselbe Klasse wie beim letzten
+                    // Mal) steht hier; alles andere in `member_laden`.
+                    if let Value::Instance(rc) = &obj {
+                        let b = rc.borrow();
+                        let (lage, platz) = instr.merk.get();
+                        if std::ptr::eq(Rc::as_ptr(&b.layout), lage) {
+                            let v = b.fields[platz].clone();
+                            drop(b);
+                            stack.push(v);
+                            continue;
                         }
-                        Value::Instance(rc) => {
-                            let cn = rc.borrow().class_name.clone();
-                            if let Some(getter) = self.property_methode(&cn, name, true) {
-                                let getter = getter
-                                    .ok_or_else(|| format!("Property '{}' in {} hat keinen Getter", name, cn))?;
-                                let r = self.exec(getter, vec![], Some(obj.clone()))?;
-                                stack.push(r);
-                            } else {
-                                let feld = rc.borrow().fields.get(name).map(|f| f.value.clone());
-                                match feld {
-                                    Some(v) => stack.push(v),
-                                    // Kein Feld -- aber vielleicht eine Methode. `obj.methode`
-                                    // OHNE Klammern ist eine an DIESE Instanz gebundene FUNCREF;
-                                    // mit Klammern laeuft der Aufruf ueber CALL_METHOD und kommt
-                                    // hier gar nicht an.
-                                    None => match self.resolve_method(&cn, name) {
-                                        Some(_) => stack.push(Value::BoundMethod(Rc::new((
-                                            obj.clone(), Rc::from(name.to_lowercase().as_str()))))),
-                                        None => return Err(format!(
-                                            "Feld '{}' existiert nicht in {}", name, cn)),
-                                    },
-                                }
-                            }
-                        }
-                        _ => return Err(format!("Zugriff auf '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
                     }
+                    let v = self.member_laden(instr, &constants[arg.as_usize()], obj)?;
+                    stack.push(v);
                 }
                 op::STORE_MEMBER => {
-                    let name_owned;
-                    let name: &str = match &constants[arg.as_usize()] {
-                        Value::Str(s) => s,
-                        v => { name_owned = v.fmt(); &name_owned }
-                    };
                     let v = vm_pop(stack)?;
                     let obj = vm_pop(stack)?;
-                    match &obj {
-                        Value::Nil => return Err(format!(
-                            "Zuweisung an '.{}' bei NIL-Referenz{}", name, NIL_NEW)),
-                        Value::Instance(rc) => {
-                            let cn = rc.borrow().class_name.clone();
-                            if let Some(setter) = self.property_methode(&cn, name, false) {
-                                let setter = setter
-                                    .ok_or_else(|| format!("Property '{}' in {} hat keinen Setter (read-only)", name, cn))?;
-                                self.exec(setter, vec![v], Some(obj.clone()))?;
-                            } else {
-                                // Ein borrow_mut, Coerce-Fast-Arm; der
-                                // format!-Fehlerkontext entsteht nur noch im
-                                // Slow-Path (vorher bei JEDEM Store).
-                                let mut rcb = rc.borrow_mut();
-                                let f = rcb.fields.get_mut(name)
-                                    .ok_or_else(|| format!("Feld '{}' existiert nicht in {}", name, cn))?;
-                                let cv = match (&v, f.ty.as_str()) {
-                                    (Value::Int(_), "integer") | (Value::Float(_), "float")
-                                    | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
-                                    | (_, "any") | (_, "") => v,
-                                    (Value::Int(n), "float") => Value::Float(*n as f64),
-                                    _ => {
-                                        let ty = f.ty.clone();
-                                        coerce(v, &ty, &format!("Zuweisung an {}.{}", cn, name))?
-                                    }
-                                };
-                                f.value = cv;
-                            }
-                        }
-                        _ => return Err(format!("Zuweisung an '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
-                    }
+                    self.member_setzen(instr, &constants[arg.as_usize()], obj, v)?;
                 }
                 // --- Arrays ---
                 op::LOAD_INDEX => {
@@ -11259,4 +11309,20 @@ fn coerce_array(value: Value, elem: &str, ctx: &str) -> R<Value> {
     };
     if ist == elem || ist == "any" { return Ok(value); }
     Err(format!("{}: Erwartet {}, erhalten ARRAY OF {}", ctx, ziel, typ_lesbar(&ist)))
+}
+
+/// Platz des Feldes `name` im Objekt, ueber den Merkplatz des Befehls: hat
+/// das Objekt die Lage des letzten Treffers, ohne Suche; sonst gesucht und
+/// gemerkt. Nur fuer FELDER -- wer eine PROPERTY meint, fragt vorher.
+#[inline]
+fn feld_platz(instr: &crate::model::Instr, obj: &Instance, name: &str) -> Option<usize> {
+    let (lage, platz) = instr.merk.get();
+    if std::ptr::eq(Rc::as_ptr(&obj.layout), lage) { return Some(platz); }
+    let i = obj.platz(name)?;
+    instr.merk.set((Rc::as_ptr(&obj.layout), i));
+    Some(i)
+}
+
+thread_local! {
+    static LEERE_LAGE: Rc<crate::value::Layout> = Rc::new(crate::value::Layout::default());
 }

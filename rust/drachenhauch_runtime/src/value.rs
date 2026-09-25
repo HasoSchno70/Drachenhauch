@@ -633,12 +633,31 @@ impl GbMap {
 /// Instanz einer User-Klasse/Struct.
 pub struct Instance {
     pub class_name: Rc<str>,
-    pub fields: FxHashMap<String, FieldVal>,
+    /// Die Lage der Felder: gehoert der Klasse, jede Instanz haelt nur einen
+    /// Verweis (siehe `Layout`).
+    pub layout: Rc<Layout>,
+    /// Die Werte in der Reihenfolge von `layout` -- Feld k ist `fields[k]`.
+    pub fields: Vec<Value>,
 }
 
-pub struct FieldVal {
-    pub ty: String,
-    pub value: Value,
+/// Feste Lage der Felder einer Klasse (M4, docs/entwurf-maschinencode.md):
+/// Name -> Platz und je Platz der Typ. Einmal beim Laden gerechnet
+/// (`model::programm_bauen`), Vorfahren zuerst; ein Feld, das eine
+/// Unterklasse noch einmal deklariert, bleibt auf dem Platz der Vorfahrin
+/// und nimmt den Typ der Unterklasse (so verhielt sich die Hash-Ablage
+/// davor). Die Befehle `obj.x` merken sich (Lage, Platz) ihres letzten
+/// Treffers (`Instr::feld`) -- dieselbe Klasse findet ihr Feld ohne Suche.
+#[derive(Default, Debug)]
+pub struct Layout {
+    pub index: FxHashMap<String, u32>,
+    pub typen: Vec<String>,
+}
+
+impl Instance {
+    /// Platz eines Feldes (None = gibt es nicht).
+    pub fn platz(&self, name: &str) -> Option<usize> {
+        self.layout.index.get(name).map(|&i| i as usize)
+    }
 }
 
 /// Ein gespeicherter Rueckruf, wie ihn `gui` und `timer` fuehren.

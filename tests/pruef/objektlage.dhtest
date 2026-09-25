@@ -1,0 +1,175 @@
+' Feste Lage der Objektfelder (M4, docs/entwurf-maschinencode.md): jede
+' Klasse hat eine Lage (Name -> Platz, Vorfahren zuerst), jede Instanz ein
+' Feld von Werten, und die Befehle `obj.x` merken sich (Lage, Platz) ihres
+' letzten Treffers. Die Faelle pruefen, was dabei schiefgehen koennte: eine
+' Stelle, an der verschiedene Klassen vorbeikommen, Vererbung, ein Feld, das
+' eine Unterklasse noch einmal deklariert, eine PROPERTY neben Feldern, und
+' Methoden an einer Stelle mit wechselnden Klassen.
+' Format: docs/werkzeuge.md.
+
+=== eine stelle, verschiedene klassen
+CLASS A
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+CLASS B
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+END CLASS
+DIM a AS A : a = NEW A()
+DIM b AS B : b = NEW B()
+a.x = 1 : a.y = 2 : b.x = 10 : b.y = 20
+DIM s AS STRING
+FOR EACH o IN (a, b, a, b, b, a)
+    s = s + STR$(o.x) + "/" + STR$(o.y) + " "
+    o.x = o.x + 100
+NEXT
+PRINT s; "|"
+PRINT a.x; " "; b.x
+--- erwartet
+1/2 10/20 101/2 110/20 210/20 201/2 |
+301 310
+
+=== vererbung: felder der vorfahrin vor denen der klasse
+CLASS Tier
+    DIM name AS STRING
+    DIM beine AS INTEGER
+END CLASS
+CLASS Hund EXTENDS Tier
+    DIM rasse AS STRING
+END CLASS
+DIM t AS Tier : t = NEW Tier()
+DIM h AS Hund : h = NEW Hund()
+t.name = "Katze" : t.beine = 4
+h.name = "Rex" : h.beine = 4 : h.rasse = "Dackel"
+FOR EACH x IN (t, h, t, h)
+    PRINT x.name; " "; x.beine
+NEXT
+PRINT h.rasse
+--- erwartet
+Katze 4
+Rex 4
+Katze 4
+Rex 4
+Dackel
+
+=== ein feld, das die unterklasse noch einmal deklariert
+CLASS Basis
+    DIM wert AS INTEGER
+    DIM rest AS INTEGER
+END CLASS
+CLASS Kind EXTENDS Basis
+    DIM wert AS FLOAT
+END CLASS
+DIM k AS Kind : k = NEW Kind()
+k.wert = 3
+k.rest = 7
+PRINT k.wert; " "; k.rest; " "; TYPEOF(k.wert)
+DIM b AS Basis : b = NEW Basis()
+b.wert = 5
+PRINT b.wert; " "; TYPEOF(b.wert)
+--- erwartet
+3.0 7 FLOAT
+5 INTEGER
+
+=== property neben einem feld an derselben stelle
+CLASS Mit
+    DIM _v AS INTEGER
+    PROPERTY GET v() AS INTEGER
+        RETURN Self._v * 10
+    END PROPERTY
+    PROPERTY SET v(x AS INTEGER)
+        Self._v = x + 1
+    END PROPERTY
+END CLASS
+CLASS Ohne
+    DIM v AS INTEGER
+END CLASS
+DIM m AS Mit : m = NEW Mit()
+DIM o AS Ohne : o = NEW Ohne()
+DIM i AS INTEGER
+FOR EACH z IN (o, m, o, m)
+    i = i + 1
+    z.v = i
+    PRINT z.v
+NEXT
+--- erwartet
+1
+30
+3
+50
+
+=== methoden an einer stelle mit wechselnden klassen
+CLASS Kreis
+    DIM r AS INTEGER
+    FUNCTION flaeche() AS INTEGER
+        RETURN 3 * Self.r * Self.r
+    END FUNCTION
+END CLASS
+CLASS Quadrat
+    DIM a AS INTEGER
+    FUNCTION flaeche() AS INTEGER
+        RETURN Self.a * Self.a
+    END FUNCTION
+END CLASS
+DIM k AS Kreis : k = NEW Kreis() : k.r = 2
+DIM q AS Quadrat : q = NEW Quadrat() : q.a = 5
+FOR EACH f IN (k, q, q, k)
+    PRINT f.flaeche()
+NEXT
+--- erwartet
+12
+25
+25
+12
+
+=== self-felder in einer methode
+CLASS Zaehler
+    DIM n AS INTEGER
+    DIM schritt AS INTEGER
+    SUB weiter()
+        n = n + schritt
+        Self.n = Self.n + 1
+    END SUB
+END CLASS
+DIM z AS Zaehler : z = NEW Zaehler()
+z.schritt = 3
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    z.weiter()
+NEXT
+PRINT z.n
+--- erwartet
+20
+
+=== umwandeln beim speichern ueber den merkplatz
+CLASS P
+    DIM f AS FLOAT
+    DIM g AS INTEGER
+END CLASS
+DIM p AS P : p = NEW P()
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    p.f = i
+    p.g = i * 2
+NEXT
+PRINT p.f; " "; TYPEOF(p.f); " "; p.g
+TRY
+    p.g = 1.5
+CATCH e
+    PRINT "fehler"
+END TRY
+PRINT p.g
+--- erwartet
+3.0 FLOAT 6
+fehler
+6
+
+=== ein feld, das es nicht gibt
+CLASS Leer
+    DIM a AS INTEGER
+END CLASS
+DIM l AS Leer : l = NEW Leer()
+PRINT l.b
+--- fehler
+Feld 'b' existiert nicht in
