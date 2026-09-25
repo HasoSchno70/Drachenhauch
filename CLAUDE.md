@@ -1540,6 +1540,18 @@ uebernimmt die geaenderten Plaetze NUR nach einem fehlerfreien Aufruf, sonst
 rechnet die VM von vorn. **Wer das aendert, braucht den Fall "hochzaehlen vor
 einem fehler zaehlt einmal"** -- ein Wert, den die VM beim Nachrechnen
 ueberschreibt, verraet ein falsches Uebernehmen nicht.
+**Schleifen einzeln (M4 Schritt 2):** beim ersten Ruecksprung (FOR_NEXT/
+JUMP rueckwaerts) wird die Schleife als Bereich mit den AKTUELLEN Arten der
+Locals uebersetzt (`Jit::schleife`, Merker `Instr::schleife`: 0 unversucht,
+1 nie, n>=2 Bereich n-2); Rueckgabe = Stelle, an der die VM weitermacht, -1 =
+aufgegeben. Globale, die keine gerufene Funktion beruehrt, leben im Bereich
+als Variable (`befoerdert`) und gehen an jedem Ausgang in den Schatten.
+**Beim Aufgeben rechnet die VM die GANZE Schleife ab dem Kopf** -- darum darf
+der Bereich Locals/Globale nur an Ausgaengen schreiben (Fall "schleife ruft
+eine funktion mit global und laeuft ueber"). `DECLARE_GLOBAL_SLOT` mit schon
+vorhandenem Platz ist im Bereich ein Nichts (sonst blieb die aeussere von zwei
+Schleifen VM). `DHRT_JIT_BILANZ=1` nennt Zahlen und Gruende. zahlen.dh
+236 -> 6 ms, ganzzahl.dh 488 -> 10 ms.
 
 ## Coroutines / YIELD
 
