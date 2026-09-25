@@ -376,6 +376,66 @@ Global danach in einer Funktion, Global im Aufruf mit Ueberlauf), jeder mit
 der Bilanz als `--- stderr`. Gegenproben: Locals an den Ausgaengen nicht
 zurueckschreiben -> 2 Faelle fallen; Schatten beim Aufgeben uebernehmen -> 1.
 
+**Schritt 3 (2026-09-25): Felder von INTEGER/FLOAT in Schleifen -- gebaut.**
+Eine Schleife, die beim Eintritt ein Feld von Zahlen vorfindet (in einem
+Local oder einem globalen Platz), liest und schreibt es direkt im Speicher:
+die VM beschreibt es beim Eintritt im Kontext (Zeiger auf die Daten,
+Groessen, Schritte), der Maschinencode prueft jeden Index gegen die Groesse
+(`feld_adresse`, vorzeichenlos -- ein negativer Index ist damit auch
+ausserhalb) und rechnet die Adresse. Die Groesse aendert sich im Bereich
+nicht: jeder Befehl, der ein Feld wachsen laesst, ist ein eingebauter
+Befehl und laesst die Schleife in der VM. Zwischen zwei Eintritten darf es
+wachsen (und umziehen) -- beschrieben wird bei JEDEM Eintritt neu, Art und
+Dimensionen muessen zu denen beim Bauen passen. Nur in Bereichen: eine
+Funktion mit einem Feld bleibt der VM, ihre Schleifen werden trotzdem
+uebersetzt.
+
+**Der eigentliche Umbau ist das Aussteigen mitten in der Schleife.** Bis
+dahin gab ein Bereich bei einem Fehler auf, und die VM rechnete die ganze
+Schleife ab dem Kopf noch einmal -- richtig, solange nichts geschrieben war,
+was die VM nicht zuruecknimmt. Ein Feld ist genau das: `a[i] = a[i] * 7`
+doppelt gerechnet ist falsch, und in einem CATCH sieht man es. Jetzt steigt
+der Bereich am FEHLERHAFTEN Befehl aus: vor jedem Befehl merkt sich die
+Erzeugung Stelle, Stapel und Arten der Locals (`Bauer::punkt`); jede
+Pruefung, die fehlschlagen kann, springt in einen eigenen Block, der die
+Locals und die beforderten Globalen zurueckschreibt, den Stapel in einen
+Puffer legt und `-2 - nr` zurueckgibt. Die VM uebernimmt den Schatten wie
+nach einem Ausgang, legt die Locals ab, schiebt den Stapel (ein Feld auf
+dem Stapel ist sein Wert von beim Eintritt) und macht an genau diesem
+Befehl weiter -- sie fuehrt ihn selbst aus und meldet ihren Fehler mit
+ihrer Zeile. Nichts wird doppelt gerechnet. Das gilt jetzt fuer JEDEN
+Bereich, nicht nur fuer die mit Feldern; aufgegeben (-1) wird nur noch vor
+dem ersten Befehl (Globale holen beim Eintritt).
+
+**Eine Ausnahme bleibt:** ruft der Bereich eine Funktion, die globale
+Variablen schreibt (auch mittelbar, `Uebersetzt::schreibt_globale`), laege
+deren halbe Arbeit beim Aussteigen schon im Schatten, und die VM riefe sie
+noch einmal. Solche Bereiche bleiben beim alten Aufgeben -- und duerfen
+dann keine Felder schreiben (sie bleiben der VM, der Grund steht in der
+Bilanz).
+
+Gemessen: `tools/tempo/felder.dh` (1 Mio. Plaetze fuellen, summieren,
+SORT) 92 -> 13 ms. `DHRT_JIT_BILANZ=1` zaehlt das Aussteigen eigens
+("N mal mitten in einer Schleife ausgestiegen"). Pruefung: 18 Faelle mehr
+in `jit.dhtest` -- fuellen/summieren, FLOAT, zwei Dimensionen, Feld in
+einer Funktion und als Parameter, zwei Namen fuer ein Feld, ein Feld, das
+zwischen 50 Eintritten waechst, und sieben Faelle, die mitten in der
+Schleife aussteigen (Index ausserhalb beim Schreiben und Lesen, Ueberlauf
+mit dem Vorgaenger im Feld, krumme Zahl ins Ganzzahlfeld, Division durch 0
+mitten im Ausdruck, globaler Zaehler, ohne TRY); im CATCH wird der Stand
+gedruckt, doppelt Gerechnetes faellt also auf -- dazu ein Fall, der in
+einer FUNKTION aussteigt (im Hauptprogramm ist alles global, die Locals
+wuerden dort gar nicht geprueft). Gegenproben: Aufgeben statt Aussteigen
+(das alte Modell, Felder schreiben erlaubt) -> "index ausserhalb" druckt eine
+andere Summe (die ersten Plaetze werden doppelt hochgezaehlt); Locals beim Aussteigen nicht
+zurueckschreiben -> der Funktionsfall faellt; ohne Schritt bei zwei
+Dimensionen -> "zwei dimensionen" faellt; den Stapel nicht vollstaendig
+zurueckgeben -> vier Faelle melden "Stack underflow" statt ihres Fehlers.
+**Falle beim Gegenproben:** ein Fall meldet nur seine ERSTE Abweichung, und
+die Bilanzzeile auf stderr kommt vor der Ausgabe -- zwei Mutationen fielen
+zuerst nur an der Bilanz, und ob die gedruckten Werte sie auch zeigen,
+sagte erst der Vergleich VM gegen Maschinencode ohne die Bilanz.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur
