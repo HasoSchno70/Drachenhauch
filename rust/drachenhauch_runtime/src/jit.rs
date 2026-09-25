@@ -2,8 +2,16 @@
 //!
 //! Uebersetzt wird eine FUNCTION/SUB nur, wenn sie REIN ist: Parameter,
 //! Locals und Rueckgabe sind INTEGER, FLOAT oder BOOLEAN, und sie tut nichts
-//! als rechnen, vergleichen, springen und andere solche Funktionen rufen.
-//! Keine Globals, keine Builtins, keine Ausgabe.
+//! als rechnen, vergleichen, springen, globale Zahl-Variablen lesen und
+//! schreiben und andere solche Funktionen rufen. Keine Builtins, keine
+//! Ausgabe.
+//!
+//! **Globale Variablen im Schatten (M4 Schritt 1):** der Maschinencode liest
+//! und schreibt sie in einer Schattenkopie (`Kontext::schatten`, je Platz ein
+//! Merkbyte: 0 = noch nicht geholt, 1 = geholt, 2 = geaendert). Erst wenn der
+//! Aufruf OHNE Fehler zurueckkommt, schreibt die VM die geaenderten Plaetze
+//! in ihre Slots. Damit bleibt die Funktion fuer die VM rein: gibt der
+//! Maschinencode auf, ist nichts geschehen, und die VM rechnet von vorn.
 //!
 //! **Die VM bleibt die Wahrheit** -- und weil eine reine Funktion keine
 //! Nebenwirkung hat, ist das hier woertlich zu nehmen: bei JEDEM Fehler
@@ -24,8 +32,12 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{default_libcall_names, FuncId, Linkage, Module};
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::model::{op, Arg, Func, Program};
 use crate::value::Value;
+use crate::vm::Slot;
 
 /// Die Art eines Wertes im Maschinencode. `N` ist das NIL, das der Aufruf
 /// einer SUB auf den Stapel legt -- es darf nur wieder weggeworfen werden.
@@ -58,6 +70,42 @@ pub struct Kontext {
     pub fehler: u64,
     pub tiefe: u64,
     pub grenze: u64,
+    /// Schatten der globalen Plaetze (Werte als u64) und je Platz ein
+    /// Merkbyte (0 frei, 1 geholt, 2 geaendert) -- Versatz 24 und 32.
+    schatten: *mut u64,
+    marken: *mut u8,
+    /// Die Slots der VM und je Platz die erwartete Art (1 I, 2 F, 3 B) --
+    /// nur fuer `global_holen`.
+    slots: *const Option<Rc<RefCell<Slot>>>,
+    n_slots: u64,
+    arten: *const u8,
+}
+
+const K_SCHATTEN: i32 = 24;
+const K_MARKEN: i32 = 32;
+
+/// Aus dem Maschinencode gerufen, wenn ein globaler Platz zum ersten Mal
+/// gelesen wird: Wert aus dem Slot der VM in den Schatten. Ein leerer Platz
+/// (die Funktion lief vor dem DIM) oder ein Wert anderer Art setzt `fehler`
+/// -- dann gibt der Maschinencode auf, und die VM meldet es selbst.
+extern "C" fn global_holen(k: *mut Kontext, idx: u64) {
+    let k = unsafe { &mut *k };
+    let i = idx as usize;
+    let slots = unsafe { std::slice::from_raw_parts(k.slots, k.n_slots as usize) };
+    let art = unsafe { *k.arten.add(i) };
+    let bits = match slots.get(i).and_then(|s| s.as_ref()) {
+        Some(sl) => match (&sl.borrow().value, art) {
+            (Value::Int(x), 1) => *x as u64,
+            (Value::Float(f), 2) => f.to_bits(),
+            (Value::Bool(b), 3) => *b as u64,
+            _ => { k.fehler = 1; return; }
+        },
+        None => { k.fehler = 1; return; }
+    };
+    unsafe {
+        *k.schatten.add(i) = bits;
+        *k.marken.add(i) = 1;
+    }
 }
 
 type Einstieg = unsafe extern "C" fn(*mut Kontext, *const u64, *mut u64);
@@ -68,6 +116,10 @@ pub struct Uebersetzt {
     params: Vec<Art>,
     rueck: Option<Art>,
     fehlschlaege: std::cell::Cell<u32>,
+    /// Globale Plaetze, die diese Funktion samt allen, die sie ruft,
+    /// beruehren kann -- nach dem Aufruf werden nur sie zurueckgeschrieben
+    /// und ihre Marken geloescht.
+    beruehrt: Vec<usize>,
 }
 
 /// Nach so vielen Rueckfaellen in die VM nimmt eine Funktion nur noch die
@@ -78,6 +130,39 @@ pub struct Jit {
     // Haelt den ausfuehrbaren Speicher; darf erst mit dem Jit gehen.
     _modul: JITModule,
     fns: Vec<Option<Uebersetzt>>,
+    /// Art je globalem Platz als Byte fuer `global_holen` (0 = keine Zahl).
+    arten: Vec<u8>,
+    schatten: std::cell::UnsafeCell<Vec<u64>>,
+    marken: std::cell::UnsafeCell<Vec<u8>>,
+}
+
+/// Was der Maschinencode ueber die globalen Plaetze wissen muss: ihre Art
+/// (aus den DECLARE-Befehlen des Hauptprogramms; widersprechen sich zwei,
+/// bleibt der Platz der VM) und ob sie Konstanten sind.
+struct Globale {
+    art: Vec<Option<Art>>,
+    konst: Vec<bool>,
+}
+
+fn globale_lesen(prog: &Program) -> Globale {
+    let n = prog.n_globals;
+    let mut art: Vec<Option<Option<Art>>> = vec![None; n];
+    let mut konst = vec![false; n];
+    let f = &prog.main;
+    for ins in &f.code {
+        let (l, ist_konst) = match (ins.op, &ins.arg) {
+            (op::DECLARE_GLOBAL_SLOT, Arg::List(l)) => (l, false),
+            (op::DECLARE_GLOBAL_CONST_SLOT, Arg::List(l)) => (l, true),
+            _ => continue,
+        };
+        let i = l[0].as_usize();
+        if i >= n { continue; }
+        let ty = match f.constants.get(l[2].as_usize()) { Some(Value::Str(t)) => t.to_string(), _ => String::new() };
+        let a = art_von_typ(&ty);
+        art[i] = Some(match art[i] { None => a, Some(alt) if alt == a => a, Some(_) => None });
+        if ist_konst { konst[i] = true; }
+    }
+    Globale { art: art.into_iter().map(|a| a.flatten()).collect(), konst }
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +183,8 @@ struct Analyse {
     rueck: Option<Art>,
     /// Funktionen, die gerufen werden (Index in `Program::functions`).
     gerufen: Vec<usize>,
+    /// Globale Plaetze, die sie selbst liest oder schreibt.
+    beruehrt: Vec<usize>,
 }
 
 fn ziel(arg: &Arg) -> usize { arg.as_i64().max(0) as usize }
@@ -120,7 +207,7 @@ fn passt(von: Art, nach: Art) -> bool {
     von == nach || (zahl(von) && zahl(nach))
 }
 
-fn analysieren(prog: &Program, f: &Func) -> Result<Analyse, String> {
+fn analysieren(prog: &Program, glob: &Globale, f: &Func) -> Result<Analyse, String> {
     if f.is_coroutine { return Err("Coroutine".into()); }
     if f.is_variadic { return Err("variadisch".into()); }
     if f.param_byref.iter().any(|&b| b) { return Err("BYREF".into()); }
@@ -154,6 +241,7 @@ fn analysieren(prog: &Program, f: &Func) -> Result<Analyse, String> {
     let code = &f.code;
     let mut vor: Vec<Option<Zustand>> = vec![None; code.len() + 1];
     let mut gerufen = Vec::new();
+    let mut beruehrt: Vec<usize> = Vec::new();
     let mut offen = vec![0usize];
     vor[0] = Some(start);
 
@@ -189,6 +277,25 @@ fn analysieren(prog: &Program, f: &Func) -> Result<Analyse, String> {
             op::LOAD_LOCAL => {
                 let s = ins.arg.as_usize();
                 z.stapel.push(z.lokal.get(s).copied().flatten().ok_or_else(|| format!("Platz {} gelesen, bevor er belegt ist", s))?);
+            }
+            op::LOAD_GLOBAL_SLOT => {
+                let g = ins.arg.as_usize();
+                let a = glob.art.get(g).copied().flatten().ok_or("globale Variable, die keine Zahl ist")?;
+                z.stapel.push(a);
+                if !beruehrt.contains(&g) { beruehrt.push(g); }
+            }
+            op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT => {
+                let g = ins.arg.as_usize();
+                let d = glob.art.get(g).copied().flatten().ok_or("globale Variable, die keine Zahl ist")?;
+                if glob.konst[g] { return Err("Zuweisung an eine Konstante".into()); }
+                let mut a = pop!();
+                if ins.op == op::ADD_STORE_GLOBAL_SLOT {
+                    let x = pop!();
+                    if !zahl(a) || !zahl(x) { return Err("+ mit einem Nicht-Zahl-Wert".into()); }
+                    a = if a == Art::I && x == Art::I { Art::I } else { Art::F };
+                }
+                if !passt(a, d) { return Err(format!("{:?} in eine globale {:?}", a, d)); }
+                if !beruehrt.contains(&g) { beruehrt.push(g); }
             }
             op::STORE_LOCAL | op::ADD_STORE_LOCAL => {
                 let s = ins.arg.as_usize();
@@ -281,10 +388,15 @@ fn analysieren(prog: &Program, f: &Func) -> Result<Analyse, String> {
             op::RETURN_VOID | op::HALT => { weiter = false; }
             op::FOR_NEXT => {
                 let t = for_teile(&ins.arg).ok_or("FOR_NEXT")?;
-                if t[0] == 1 { return Err("FOR mit globaler Laufvariable".into()); }
                 let lok = |s: i64| z.lokal.get(s as usize).copied().flatten();
+                let lauf = if t[0] == 1 {
+                    let g = t[1] as usize;
+                    if glob.konst.get(g).copied().unwrap_or(true) { return Err("FOR ueber eine Konstante".into()); }
+                    if !beruehrt.contains(&g) { beruehrt.push(g); }
+                    glob.art.get(g).copied().flatten()
+                } else { lok(t[1]) };
                 let schritt = if t[3] == 1 { lok(t[4]) } else { f.constants.get(t[4] as usize).and_then(art_von_wert) };
-                if lok(t[1]) != Some(Art::I) || lok(t[2]) != Some(Art::I) || schritt != Some(Art::I) {
+                if lauf != Some(Art::I) || lok(t[2]) != Some(Art::I) || schritt != Some(Art::I) {
                     return Err("FOR nicht ueber INTEGER".into());
                 }
                 melden(&mut vor, &mut offen, t[6] as usize, &z)?;
@@ -293,7 +405,7 @@ fn analysieren(prog: &Program, f: &Func) -> Result<Analyse, String> {
         }
         if weiter { melden(&mut vor, &mut offen, ip + 1, &z)?; }
     }
-    Ok(Analyse { vor, params, rueck, gerufen })
+    Ok(Analyse { vor, params, rueck, gerufen, beruehrt })
 }
 
 /// Fuer den Grund in `dhrt --jit`: was die Funktion tut, das der
@@ -319,11 +431,11 @@ fn befehl_name(o: u16) -> String {
 /// Welche Funktionen uebersetzt werden, und fuer die anderen: warum nicht.
 /// Eine Funktion, die eine nicht uebersetzbare ruft, bleibt ebenfalls in der
 /// VM (sie wird ganz uebersetzt oder gar nicht).
-fn auswahl(prog: &Program) -> (Vec<Option<Analyse>>, Vec<String>) {
+fn auswahl(prog: &Program, glob: &Globale) -> (Vec<Option<Analyse>>, Vec<String>) {
     let mut an: Vec<Option<Analyse>> = Vec::new();
     let mut gruende: Vec<String> = Vec::new();
     for f in &prog.functions {
-        match analysieren(prog, f) {
+        match analysieren(prog, glob, f) {
             Ok(a) => { an.push(Some(a)); gruende.push(String::new()); }
             Err(e) => { an.push(None); gruende.push(e); }
         }
@@ -348,7 +460,7 @@ fn auswahl(prog: &Program) -> (Vec<Option<Analyse>>, Vec<String>) {
 
 /// Fuer `dhrt --jit datei.dh`: je Funktion "uebersetzt" oder der Grund.
 pub fn bericht(prog: &Program) -> Vec<(String, String)> {
-    let (_, gruende) = auswahl(prog);
+    let (_, gruende) = auswahl(prog, &globale_lesen(prog));
     prog.functions.iter().zip(gruende).map(|(f, g)| {
         (f.name.clone(), if g.is_empty() { "uebersetzt".to_string() } else { format!("VM: {}", g) })
     }).collect()
@@ -365,6 +477,9 @@ struct Bauer<'a, 'b> {
     ctx: CWert,
     fehler: Block,
     vars: HashMap<(u8, usize, Art), Variable>,
+    schatten: CWert,
+    marken: CWert,
+    holen: cranelift_codegen::ir::FuncRef,
 }
 
 impl<'a, 'b> Bauer<'a, 'b> {
@@ -410,6 +525,27 @@ impl<'a, 'b> Bauer<'a, 'b> {
             _ => v,
         }
     }
+    /// Globalen Platz lesen: steht er noch nicht im Schatten, holt ihn
+    /// `global_holen` (und gibt bei einem leeren Platz auf).
+    fn global_lesen(&mut self, g: usize, a: Art) -> CWert {
+        let marke = self.b.ins().load(types::I8, MemFlagsData::trusted(), self.marken, g as i32);
+        let holen = self.b.create_block();
+        let da = self.b.create_block();
+        self.b.ins().brif(marke, da, &[], holen, &[]);
+        self.b.switch_to_block(holen);
+        let nr = self.b.ins().iconst(types::I64, g as i64);
+        self.b.ins().call(self.holen, &[self.ctx, nr]);
+        let fl = self.b.ins().load(types::I64, MemFlagsData::trusted(), self.ctx, 0);
+        self.aussteigen_wenn(fl);
+        self.b.ins().jump(da, &[]);
+        self.b.switch_to_block(da);
+        self.b.ins().load(cl_typ(a), MemFlagsData::trusted(), self.schatten, (g * 8) as i32)
+    }
+    fn global_schreiben(&mut self, g: usize, w: CWert) {
+        self.b.ins().store(MemFlagsData::trusted(), w, self.schatten, (g * 8) as i32);
+        let zwei = self.b.ins().iconst(types::I8, 2);
+        self.b.ins().store(MemFlagsData::trusted(), zwei, self.marken, g as i32);
+    }
     fn tiefe_minus(&mut self) {
         let t = self.b.ins().load(types::I64, MemFlagsData::trusted(), self.ctx, 8);
         let t = self.b.ins().iadd_imm_s(t, -1);
@@ -425,8 +561,8 @@ fn signatur(modul: &JITModule, params: &[Art], rueck: Option<Art>) -> cranelift_
     sig
 }
 
-fn erzeugen(modul: &mut JITModule, prog: &Program, f: &Func, an: &Analyse, ids: &[Option<FuncId>],
-            fctx: &mut FunctionBuilderContext, id: FuncId) -> Result<(), String> {
+fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an: &Analyse, ids: &[Option<FuncId>],
+            holen_id: FuncId, fctx: &mut FunctionBuilderContext, id: FuncId) -> Result<(), String> {
     let tc = modul.target_config();
     let mut ctx = modul.make_context();
     ctx.func.signature = signatur(modul, &an.params, an.rueck);
@@ -457,7 +593,10 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, f: &Func, an: &Analyse, ids: 
         fb.switch_to_block(eintritt);
         let ctxp = fb.block_params(eintritt)[0];
         let pwerte: Vec<CWert> = fb.block_params(eintritt)[1..].to_vec();
-        let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new() };
+        let schatten = fb.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_SCHATTEN);
+        let marken = fb.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_MARKEN);
+        let holen = modul.declare_func_in_func(holen_id, fb.func);
+        let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new(), schatten, marken, holen };
 
         // Tiefe wie `exec`: erst zaehlen, dann gegen die Grenze.
         let t = bau.b.ins().load(types::I64, MemFlagsData::trusted(), ctxp, 8);
@@ -519,6 +658,22 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, f: &Func, an: &Analyse, ids: 
                         let a = z.lokal[s].unwrap();
                         let v = bau.var(1, s, a);
                         st.push((bau.b.use_var(v), a));
+                    }
+                    op::LOAD_GLOBAL_SLOT => {
+                        let g = ins.arg.as_usize();
+                        let a = glob.art[g].unwrap();
+                        let w = bau.global_lesen(g, a);
+                        st.push((w, a));
+                    }
+                    op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT => {
+                        let g = ins.arg.as_usize();
+                        let (mut w, mut a) = st.pop().unwrap();
+                        if ins.op == op::ADD_STORE_GLOBAL_SLOT {
+                            let (x, xa) = st.pop().unwrap();
+                            (w, a) = rechnen(&mut bau, op::ADD, x, xa, w, a);
+                        }
+                        let w = bau.wandeln(w, a, glob.art[g].unwrap());
+                        bau.global_schreiben(g, w);
                     }
                     op::STORE_LOCAL | op::ADD_STORE_LOCAL => {
                         let s = ins.arg.as_usize();
@@ -632,8 +787,9 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, f: &Func, an: &Analyse, ids: 
                     }
                     op::FOR_NEXT => {
                         let t = for_teile(&ins.arg).unwrap();
+                        let global = t[0] == 1;
                         let v = bau.var(1, t[1] as usize, Art::I);
-                        let cur = bau.b.use_var(v);
+                        let cur = if global { bau.global_lesen(t[1] as usize, Art::I) } else { bau.b.use_var(v) };
                         let e = bau.var(1, t[2] as usize, Art::I);
                         let en = bau.b.use_var(e);
                         let schritt = if t[3] == 1 {
@@ -643,7 +799,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, f: &Func, an: &Analyse, ids: 
                         };
                         let (next, ueber) = bau.b.ins().sadd_overflow(cur, schritt);
                         bau.aussteigen_wenn(ueber);
-                        bau.b.def_var(v, next);
+                        if global { bau.global_schreiben(t[1] as usize, next); } else { bau.b.def_var(v, next); }
                         let raus = if t[5] == 1 { bau.b.ins().icmp(IntCC::SignedLessThan, next, en) }
                                    else { bau.b.ins().icmp(IntCC::SignedGreaterThan, next, en) };
                         ablegen(&mut bau, &st);
@@ -818,8 +974,31 @@ impl Jit {
     pub fn neu(prog: &Program) -> Result<Jit, String> {
         let builder = JITBuilder::with_flags(&[("opt_level", "speed")], default_libcall_names())
             .map_err(|e| format!("Cranelift: {:?}", e))?;
+        let mut builder = builder;
+        builder.symbol("dh_global_holen", global_holen as *const u8);
         let mut modul = JITModule::new(builder);
-        let (an, _) = auswahl(prog);
+        let glob = globale_lesen(prog);
+        let (an, _) = auswahl(prog, &glob);
+        let ptr = modul.target_config().pointer_type();
+        let mut hsig = modul.make_signature();
+        hsig.params.push(AbiParam::new(ptr));
+        hsig.params.push(AbiParam::new(types::I64));
+        let holen_id = modul.declare_function("dh_global_holen", Linkage::Import, &hsig)
+            .map_err(|e| format!("{:?}", e))?;
+        // Beruehrte Plaetze je Funktion samt allen, die sie ruft.
+        let mut ber: Vec<Vec<usize>> = an.iter().map(|a| a.as_ref().map_or(Vec::new(), |a| a.beruehrt.clone())).collect();
+        loop {
+            let mut neu = false;
+            for i in 0..an.len() {
+                let Some(a) = &an[i] else { continue };
+                for &g in &a.gerufen {
+                    for p in ber[g].clone() {
+                        if !ber[i].contains(&p) { ber[i].push(p); neu = true; }
+                    }
+                }
+            }
+            if !neu { break; }
+        }
         let mut ids: Vec<Option<FuncId>> = vec![None; an.len()];
         for (i, a) in an.iter().enumerate() {
             if let Some(a) = a {
@@ -832,7 +1011,7 @@ impl Jit {
         let mut einstiege: Vec<Option<FuncId>> = vec![None; an.len()];
         for (i, a) in an.iter().enumerate() {
             if let (Some(a), Some(id)) = (a, ids[i]) {
-                erzeugen(&mut modul, prog, &prog.functions[i], a, &ids, &mut fctx, id)
+                erzeugen(&mut modul, prog, &glob, &prog.functions[i], a, &ids, holen_id, &mut fctx, id)
                     .map_err(|e| format!("{}: {}", prog.functions[i].name, e))?;
                 einstiege[i] = Some(trampolin(&mut modul, &mut fctx, id, &a.params, a.rueck, i as u32)?);
             }
@@ -848,19 +1027,25 @@ impl Jit {
                         params: a.params,
                         rueck: a.rueck,
                         fehlschlaege: std::cell::Cell::new(0),
+                        beruehrt: std::mem::take(&mut ber[i]),
                     })
                 }
                 _ => None,
             });
         }
-        Ok(Jit { _modul: modul, fns })
+        let arten = glob.art.iter().map(|a| match a { Some(Art::I) => 1, Some(Art::F) => 2, Some(Art::B) => 3, _ => 0 }).collect();
+        let n = prog.n_globals;
+        Ok(Jit { _modul: modul, fns, arten,
+                 schatten: std::cell::UnsafeCell::new(vec![0; n]),
+                 marken: std::cell::UnsafeCell::new(vec![0; n]) })
     }
 
     /// Ruft Funktion `idx` mit den Argumenten vom Stapel der VM. `None`, wenn
     /// sie nicht uebersetzt ist, ein Argument nicht genau passt (die VM
     /// wandelt oder meldet) oder der Maschinencode aufgab -- dann rechnet die
     /// VM den Aufruf selbst.
-    pub fn rufen(&self, idx: usize, args: &[Value], tiefe: u32, grenze: u32) -> Option<Value> {
+    pub fn rufen(&self, idx: usize, args: &[Value], tiefe: u32, grenze: u32,
+                 slots: &[Option<Rc<RefCell<Slot>>>]) -> Option<Value> {
         let u = self.fns.get(idx)?.as_ref()?;
         if u.fehlschlaege.get() >= MAX_FEHLSCHLAEGE || args.len() != u.params.len() { return None; }
         let mut roh = [0u64; 16];
@@ -873,10 +1058,35 @@ impl Jit {
                 _ => return None,
             };
         }
-        let mut k = Kontext { fehler: 0, tiefe: tiefe as u64, grenze: grenze as u64 };
+        // Schatten und Marken gehoeren dem Jit; waehrend des Aufrufs benutzt
+        // sie nur der Maschinencode, und der ruft nichts zurueck in die VM.
+        let schatten = unsafe { &mut *self.schatten.get() };
+        let marken = unsafe { &mut *self.marken.get() };
+        if marken.len() < slots.len() { return None; }
+        let mut k = Kontext {
+            fehler: 0, tiefe: tiefe as u64, grenze: grenze as u64,
+            schatten: schatten.as_mut_ptr(), marken: marken.as_mut_ptr(),
+            slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
+        };
         let mut erg = 0u64;
         unsafe { (u.einstieg)(&mut k, roh.as_ptr(), &mut erg) };
-        if k.fehler != 0 {
+        let ok = k.fehler == 0;
+        // Nur ohne Fehler kommen die geaenderten Plaetze in die VM; die
+        // Marken werden in jedem Fall wieder frei.
+        for &g in &u.beruehrt {
+            if ok && marken[g] == 2 {
+                if let Some(sl) = slots.get(g).and_then(|s| s.as_ref()) {
+                    let bits = schatten[g];
+                    sl.borrow_mut().value = match self.arten[g] {
+                        1 => Value::Int(bits as i64),
+                        2 => Value::Float(f64::from_bits(bits)),
+                        _ => Value::Bool(bits != 0),
+                    };
+                }
+            }
+            marken[g] = 0;
+        }
+        if !ok {
             u.fehlschlaege.set(u.fehlschlaege.get() + 1);
             return None;
         }
