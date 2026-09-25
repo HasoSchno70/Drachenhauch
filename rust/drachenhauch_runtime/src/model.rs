@@ -197,6 +197,10 @@ pub struct Instr {
     /// selbst bleibt unveraendert stehen -- klappt der schnelle Weg nicht,
     /// laeuft sie Befehl fuer Befehl wie immer. Gesetzt von `verschmelzen`.
     pub schnell: u8,
+    /// Nur Ruecksprung (FOR_NEXT, JUMP nach hinten), nur mit Maschinencode:
+    /// 0 = noch nicht versucht, 1 = die Schleife bleibt in der VM, n >= 2 =
+    /// uebersetzt als Schleife n - 2 (`jit::Jit::schleife`).
+    pub schleife: std::cell::Cell<u32>,
 }
 
 /// Arten der Superinstruktionen (M2). Alle beginnen mit zwei Operanden
@@ -570,6 +574,7 @@ pub(crate) fn func_bauen(r: FuncRoh) -> Func {
         familie: std::cell::Cell::new(0),
         methode: std::cell::Cell::new((std::ptr::null(), std::ptr::null())),
         schnell: 0,
+        schleife: std::cell::Cell::new(0),
     }).collect();
     if std::env::var_os("DHRT_OHNE_VERSCHMELZEN").is_none() {
         verschmelzen(&mut code);

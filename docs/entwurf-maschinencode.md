@@ -328,6 +328,54 @@ uebernommen, faellt "hochzaehlen vor einem fehler" (3 statt 2) -- die ersten
 sechs Faelle hatten das NICHT gesehen, weil die VM beim Nachrechnen denselben
 Wert noch einmal schreibt. Suite unter `DHRT_JIT=immer` (`--schnell`): 3593
 ok, 0 fehl.
+
+**Schritt 2 (2026-09-25): Schleifen einzeln uebersetzen -- gebaut.** Eine
+Schleife wird beim ersten Ruecksprung (FOR_NEXT genommen, JUMP rueckwaerts)
+als **Bereich** uebersetzt -- mit den Arten, die ihre Locals in DIESEM
+Augenblick haben (die abstrakte Ausfuehrung startet dort statt beim
+Funktionsanfang). Bereich = vom Kopf (Ziel des Ruecksprungs) bis zum
+LETZTEN Ruecksprung dorthin; springt etwas von aussen in die Mitte, bleibt
+die Schleife der VM. Signatur `(ctx, locals*) -> i64`: der Maschinencode
+liest und schreibt die Locals ueber Zeiger, zurueck kommt die Stelle, an der
+die VM weitermacht (jeder Sprung aus dem Bereich ist ein Ausgang, der Stapel
+muss dort leer sein), oder -1 fuer "aufgegeben". Je Ausgang steht fest,
+welche Art jeder Local dort hat -- ein Local, den der Bereich nicht anfasst,
+bleibt, wie er ist. RETURN im Bereich bleibt der VM. `Instr::schleife`
+merkt je Ruecksprung: 0 unversucht, 1 nie, n >= 2 Bereich n - 2. Die VM
+fragt den Merker erst, wenn der JIT ueberhaupt an ist.
+
+**Globale in Variablen:** ein globaler Platz, den KEINE aus dem Bereich
+gerufene Funktion beruehrt, wird einmal am Eingang geholt, lebt als
+Cranelift-Variable (also im Register) und wird an jedem Ausgang in den
+Schatten zurueckgeschrieben; uebernommen wird wie bei Funktionen nur nach
+Erfolg. Ohne das kostete jedes `summe = summe + i` einen Gang durch den
+Schatten und die Schleife lag bei der Haelfte der Wirkung.
+
+**Aufgeben mitten in der Schleife** (Ueberlauf nach 40 Runden) ist heikel,
+weil die VM dann ab dem KOPF der Schleife weiterrechnet -- mit den Locals,
+die der Maschinencode bis dahin geschrieben hat, waere das falsch. Darum
+schreibt der Bereich Locals und Globale erst an einem Ausgang; beim Aufgeben
+bleiben die Werte vom Eingang stehen, und die VM rechnet die ganze Schleife
+selbst. Die Gegenprobe (Schatten auch beim Aufgeben uebernehmen) faellt im
+Fall "schleife ruft eine funktion mit global und laeuft ueber" (324 statt
+40) -- die uebrigen Schleifenfaelle haetten es nicht gesehen.
+
+**Ein Nebenfund:** die aeussere von zwei verschachtelten Schleifen blieb
+anfangs der VM, weil ihr Rumpf das DIM der inneren Laufvariable enthaelt
+(`DECLARE_GLOBAL_SLOT`). Steht der Platz beim Uebersetzen schon, tut der
+Befehl nichts -- der Maschinencode ueberspringt ihn dann.
+
+Gemessen: `tools/tempo/zahlen.dh` 236 -> 6,1 ms, `ganzzahl.dh` 488 -> 9,6 ms
+(beide Schleifen im Hauptprogramm, alles global). Die VM selbst bleibt
+unveraendert (A/B gegen den Bau davor 0,96..1,04). `DHRT_JIT_BILANZ=1`
+schreibt am Ende nach stderr, wie viele Funktionen und Schleifen uebersetzt
+wurden und warum eine Schleife der VM blieb. Pruefung: neun Schleifenfaelle
+in `jit.dhtest` (Hauptprogramm, Funktion mit Ausgabe, Ueberlauf mittendrin,
+BREAK/CONTINUE, verschachtelt, Text bleibt VM, reine und unreine Aufrufe,
+Global danach in einer Funktion, Global im Aufruf mit Ueberlauf), jeder mit
+der Bilanz als `--- stderr`. Gegenproben: Locals an den Ausgaengen nicht
+zurueckschreiben -> 2 Faelle fallen; Schatten beim Aufgeben uebernehmen -> 1.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

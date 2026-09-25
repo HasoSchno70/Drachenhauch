@@ -2519,7 +2519,20 @@ impl<'p> Vm<'p> {
                             cmp(&next, &endv, if neg { '<' } else { '>' })?
                         }
                     };
-                    if !exit { *ip = target; }
+                    if !exit {
+                        // M4: eine Schleife im Maschinencode (jit::Jit::schleife).
+                        #[cfg(feature = "jit")]
+                        if let Some(j) = self.jit.as_ref().filter(|_| !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
+                            {
+                                if let Some(weiter) = j.schleife(self.prog, fn_, *ip - 1, target, locals,
+                                                                 self.depth, MAX_CALL_DEPTH, &self.global_slots) {
+                                    *ip = weiter;
+                                    continue;
+                                }
+                            }
+                        }
+                        *ip = target;
+                    }
                 }
 
                 // --- Slot-Globals ---
@@ -2686,7 +2699,21 @@ impl<'p> Vm<'p> {
                 op::NOT => { let v = vm_pop(stack)?; stack.push(Value::Bool(!v.truthy())); }
 
                 // --- Kontrollfluss ---
-                op::JUMP => *ip = arg.as_usize(),
+                op::JUMP => {
+                    let ziel = arg.as_usize();
+                    // M4: Ruecksprung einer Schleife -> vielleicht Maschinencode.
+                    #[cfg(feature = "jit")]
+                    if let Some(j) = self.jit.as_ref().filter(|_| ziel < *ip && !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
+                        {
+                            if let Some(weiter) = j.schleife(self.prog, fn_, *ip - 1, ziel, locals,
+                                                             self.depth, MAX_CALL_DEPTH, &self.global_slots) {
+                                *ip = weiter;
+                                continue;
+                            }
+                        }
+                    }
+                    *ip = ziel;
+                }
                 op::JUMP_IF_FALSE => { let v = vm_pop(stack)?; if !v.truthy() { *ip = arg.as_usize(); } }
                 op::JUMP_IF_TRUE => { let v = vm_pop(stack)?; if v.truthy() { *ip = arg.as_usize(); } }
 
