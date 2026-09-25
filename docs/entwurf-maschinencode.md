@@ -473,6 +473,50 @@ die PROPERTY wird uebergangen); Typ der Vorfahrin statt der Unterklasse ->
 "noch einmal deklariert" faellt; CALL_METHOD ohne Vergleich -> "wechselnde
 Klassen" bricht ab.
 
+**Schritt 4b (2026-09-25): Objektfelder im Maschinencode -- gebaut.** Ein
+Bereich kennt jetzt Objekte (`Art::Obj(k)`, k = Klasse im Bereich, erkannt
+an ihrer Lage). Im Maschinencode ist ein Objekt ein Zeiger auf
+`RefCell<Instance>`; seine Felder liest und schreibt er ueber kleine
+Rust-Helfer (`feld_lesen_i/_f`, `feld_setzen_i/_f`), weil die Lage eines
+`Value` im Speicher nicht festgelegt ist -- ein Aufruf statt der Suche,
+der Bereich bleibt Maschinencode. Woher Objekte kommen: Locals, `Self`
+(LOAD_SELF, LOAD_FIELD/STORE_FIELD in einer Methode), Felder eines
+Objekts, die selbst ein Objekt halten, und Elemente von Feldern von
+Werten und Tupeln (`Elem::Wert`, auch fuer Zahlen). **Jedes Element und
+jedes Objekt-Feld wird beim Lesen auf seine Klasse geprueft** (die Lage
+aus dem ersten Element beim Bauen); passt sie nicht, steigt der Bereich
+aus, und die VM rechnet diesen Durchgang -- gemischte Klassen und
+Unterklassen gehen also, nur langsamer. Eine PROPERTY laesst den Bereich
+in der VM; Felder vom Typ Text/`any` ebenso.
+
+**Globale Plaetze ohne festen Zahlentyp** (Objekte, die Laufvariable von
+FOR EACH) fuehrt der Bereich wie Locals (`dyn_glob`, Platz `n_lokal + j`):
+ihre Art folgt dem, was hineinkommt, und an Ausgaengen schreibt die VM
+sie in die globalen Plaetze zurueck. **Dafuer bekommt die Laufvariable von
+FOR EACH im Hauptprogramm einen Platz** (`collect_globals`) -- vorher lief
+sie ueber ihren Namen (LOAD_NAME), und das war schon in der VM teuer.
+Zurueck in die VM kommt ein Objekt als neuer Verweis auf das alte
+(`Rc::increment_strong_count`): waehrend des Bereichs halten es die
+Locals, Globalen und Felder der VM, die er nicht veraendert.
+
+Gemessen `tools/tempo/teilchen.dh` (10 000 Objekte, 100 Schritte, drei
+Felder lesen und schreiben): vor 4a 661 ms, VM mit fester Lage und
+FOR-EACH-Platz 177 ms, Maschinencode 27 ms. Pruefung: 12 Faelle mehr in
+`jit.dhtest` (Objekte in einem Feld, Self in einer Methode, zwei Klassen
+mit vertauschten Feldern in einem Tupel, PROPERTY bleibt VM, Objekt im
+Feld eines Objekts, Fehler mit Objekten auf dem Stapel, Objekt als Local
+einer Funktion, Tupel von Zahlen, gemischte Zahlen, Objekt in eine globale
+Variable, Aufruf, der Globale schreibt, Unterklasse an der Stelle der
+Oberklasse). Gegenproben: ohne Klassenpruefung beim Lesen -> "verschiedene
+Klassen in einem Tupel" rechnet mit vertauschten Feldern (erst beim
+Vergleich VM gegen Maschinencode sichtbar, im Fall selbst faellt zuerst die
+Bilanzzeile); globale Plaetze an Ausgaengen nicht zurueckschreiben -> vier
+Faelle fallen (Laufvariable nach der Schleife, Objekt in einer globalen
+Variable). **Ein Fund aus der Suite:** mit ihrem neuen Platz stand die
+FOR-EACH-Variable auch in `global_vars` -- und verdeckte damit einen Befehl
+gleichen Namens (`FOR EACH len IN ...` mit `LEN(x)` darin brach ab). Sie
+bekommt nur den Platz.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

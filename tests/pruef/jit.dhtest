@@ -2078,6 +2078,562 @@ Index 5 ausserhalb [0..4] in Dimension 0 -- Felder zaehlen ab 0: DIM a[5] hat a[
 jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 jit: 1 mal mitten in einer Schleife ausgestiegen
 
+=== objekte in einem feld bewegen
+CLASS Teil
+    DIM x AS FLOAT
+    DIM vx AS FLOAT
+    DIM n AS INTEGER
+END CLASS
+DIM teile[20] AS Teil
+DIM i AS INTEGER
+FOR i = 0 TO 19
+    teile[i] = NEW Teil()
+    teile[i].vx = i * 0.25
+NEXT
+DIM r AS INTEGER
+FOR r = 1 TO 5
+    FOR EACH t IN teile
+        t.x = t.x + t.vx
+        t.n = t.n + 1
+        IF t.x > 10.0 THEN t.vx = 0.0 - t.vx
+    NEXT
+NEXT
+PRINT teile[19].x; " "; teile[19].vx; " "; teile[3].n; " "; t.x
+--- erwartet
+4.75 -4.75 5 4.75
+
+=== objekte in einem feld bewegen (maschinencode)
+CLASS Teil
+    DIM x AS FLOAT
+    DIM vx AS FLOAT
+    DIM n AS INTEGER
+END CLASS
+DIM teile[20] AS Teil
+DIM i AS INTEGER
+FOR i = 0 TO 19
+    teile[i] = NEW Teil()
+    teile[i].vx = i * 0.25
+NEXT
+DIM r AS INTEGER
+FOR r = 1 TO 5
+    FOR EACH t IN teile
+        t.x = t.x + t.vx
+        t.n = t.n + 1
+        IF t.x > 10.0 THEN t.vx = 0.0 - t.vx
+    NEXT
+NEXT
+PRINT teile[19].x; " "; teile[19].vx; " "; teile[3].n; " "; t.x
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+4.75 -4.75 5 4.75
+--- stderr
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt
+jit: Schleife an Stelle 37 in __main__ bleibt in der VM: eingebauter Befehl
+jit: 0 Funktionen, 1 Schleifen, 5 Schleifenlaeufe
+
+=== self-felder in einer schleife einer methode
+CLASS Konto
+    DIM stand AS INTEGER
+    DIM zins AS FLOAT
+    DIM verlauf AS FLOAT
+    SUB jahre(n AS INTEGER)
+        DIM j AS INTEGER
+        FOR j = 1 TO n
+            stand = stand + 10
+            Self.verlauf = Self.verlauf + stand * zins
+        NEXT
+    END SUB
+END CLASS
+DIM k AS Konto : k = NEW Konto()
+k.zins = 0.5
+k.jahre(4)
+k.jahre(3)
+PRINT k.stand; " "; k.verlauf
+--- erwartet
+70 140.0
+
+=== self-felder in einer schleife einer methode (maschinencode)
+CLASS Konto
+    DIM stand AS INTEGER
+    DIM zins AS FLOAT
+    DIM verlauf AS FLOAT
+    SUB jahre(n AS INTEGER)
+        DIM j AS INTEGER
+        FOR j = 1 TO n
+            stand = stand + 10
+            Self.verlauf = Self.verlauf + stand * zins
+        NEXT
+    END SUB
+END CLASS
+DIM k AS Konto : k = NEW Konto()
+k.zins = 0.5
+k.jahre(4)
+k.jahre(3)
+PRINT k.stand; " "; k.verlauf
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+70 140.0
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 2 Schleifenlaeufe
+
+=== verschiedene klassen in einem tupel
+CLASS A
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+CLASS B
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+END CLASS
+DIM a1 AS A : a1 = NEW A() : a1.x = 1 : a1.y = 2
+DIM a2 AS A : a2 = NEW A() : a2.x = 3 : a2.y = 4
+DIM b1 AS B : b1 = NEW B() : b1.x = 10 : b1.y = 20
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH o IN (a1, a2, b1, a1, a2, a2)
+        s = s + o.x * 100 + o.y
+        o.x = o.x + 1
+    NEXT
+NEXT
+PRINT s; " "; a1.x; " "; a2.x; " "; b1.x; " "; b1.y
+--- erwartet
+11808 7 12 13 20
+
+=== verschiedene klassen in einem tupel (maschinencode)
+CLASS A
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+CLASS B
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+END CLASS
+DIM a1 AS A : a1 = NEW A() : a1.x = 1 : a1.y = 2
+DIM a2 AS A : a2 = NEW A() : a2.x = 3 : a2.y = 4
+DIM b1 AS B : b1 = NEW B() : b1.x = 10 : b1.y = 20
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH o IN (a1, a2, b1, a1, a2, a2)
+        s = s + o.x * 100 + o.y
+        o.x = o.x + 1
+    NEXT
+NEXT
+PRINT s; " "; a1.x; " "; a2.x; " "; b1.x; " "; b1.y
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+11808 7 12 13 20
+--- stderr
+jit: Schleife an Stelle 39 in __main__ bleibt in der VM: Befehl 68
+jit: 0 Funktionen, 1 Schleifen, 3 Schleifenlaeufe
+jit: 3 mal mitten in einer Schleife ausgestiegen
+
+=== property in der schleife bleibt in der vm
+CLASS P
+    DIM _w AS INTEGER
+    PROPERTY GET w() AS INTEGER
+        RETURN Self._w * 2
+    END PROPERTY
+    PROPERTY SET w(v AS INTEGER)
+        Self._w = v
+    END PROPERTY
+END CLASS
+DIM p AS P : p = NEW P()
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    p.w = p.w + i
+NEXT
+PRINT p.w
+--- erwartet
+114
+
+=== property in der schleife bleibt in der vm (maschinencode)
+CLASS P
+    DIM _w AS INTEGER
+    PROPERTY GET w() AS INTEGER
+        RETURN Self._w * 2
+    END PROPERTY
+    PROPERTY SET w(v AS INTEGER)
+        Self._w = v
+    END PROPERTY
+END CLASS
+DIM p AS P : p = NEW P()
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    p.w = p.w + i
+NEXT
+PRINT p.w
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+114
+--- stderr
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: PROPERTY w
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== objekt in einem feld eines objekts
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+CLASS Figur
+    DIM pos AS Punkt
+    DIM schritte AS INTEGER
+END CLASS
+DIM f AS Figur : f = NEW Figur()
+f.pos = NEW Punkt()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    f.pos.x = f.pos.x + i
+    f.pos.y = f.pos.y - 1
+    f.schritte = f.schritte + 1
+NEXT
+PRINT f.pos.x; " "; f.pos.y; " "; f.schritte
+--- erwartet
+55 -10 10
+
+=== objekt in einem feld eines objekts (maschinencode)
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+CLASS Figur
+    DIM pos AS Punkt
+    DIM schritte AS INTEGER
+END CLASS
+DIM f AS Figur : f = NEW Figur()
+f.pos = NEW Punkt()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    f.pos.x = f.pos.x + i
+    f.pos.y = f.pos.y - 1
+    f.schritte = f.schritte + 1
+NEXT
+PRINT f.pos.x; " "; f.pos.y; " "; f.schritte
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+55 -10 10
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== fehler mitten in der schleife mit objekten auf dem stapel
+CLASS Z
+    DIM a AS INTEGER
+    DIM d AS INTEGER
+    DIM q AS INTEGER
+END CLASS
+DIM zs[6] AS Z
+DIM i AS INTEGER
+FOR i = 0 TO 5
+    zs[i] = NEW Z()
+    zs[i].a = (i + 1) * 12
+    zs[i].d = 3 - i
+NEXT
+DIM n AS INTEGER
+TRY
+    FOR EACH z IN zs
+        z.q = z.a \ z.d + n
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT n; " "; zs[0].q; " "; zs[2].q; " "; zs[3].q; " "; z.a
+--- erwartet
+Integer-Division durch 0
+3 4 38 0 48
+
+=== fehler mitten in der schleife mit objekten auf dem stapel (maschinencode)
+CLASS Z
+    DIM a AS INTEGER
+    DIM d AS INTEGER
+    DIM q AS INTEGER
+END CLASS
+DIM zs[6] AS Z
+DIM i AS INTEGER
+FOR i = 0 TO 5
+    zs[i] = NEW Z()
+    zs[i].a = (i + 1) * 12
+    zs[i].d = 3 - i
+NEXT
+DIM n AS INTEGER
+TRY
+    FOR EACH z IN zs
+        z.q = z.a \ z.d + n
+        n = n + 1
+    NEXT
+CATCH e
+    PRINT e
+END TRY
+PRINT n; " "; zs[0].q; " "; zs[2].q; " "; zs[3].q; " "; z.a
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+Integer-Division durch 0
+3 4 38 0 48
+--- stderr
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== objekt als local einer funktion
+CLASS Summe
+    DIM wert AS INTEGER
+    DIM zahl AS INTEGER
+END CLASS
+FUNCTION rechne(n AS INTEGER) AS INTEGER
+    DIM s AS Summe
+    s = NEW Summe()
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        s.wert = s.wert + i * i
+        s.zahl = s.zahl + 1
+    NEXT
+    RETURN s.wert * 1000 + s.zahl
+END FUNCTION
+PRINT rechne(10); " "; rechne(3)
+--- erwartet
+385010 14003
+
+=== objekt als local einer funktion (maschinencode)
+CLASS Summe
+    DIM wert AS INTEGER
+    DIM zahl AS INTEGER
+END CLASS
+FUNCTION rechne(n AS INTEGER) AS INTEGER
+    DIM s AS Summe
+    s = NEW Summe()
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        s.wert = s.wert + i * i
+        s.zahl = s.zahl + 1
+    NEXT
+    RETURN s.wert * 1000 + s.zahl
+END FUNCTION
+PRINT rechne(10); " "; rechne(3)
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+385010 14003
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 2 Schleifenlaeufe
+
+=== tupel von zahlen
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 4
+    FOR EACH x IN (3, 5, 7, 11)
+        s = s + x * r
+    NEXT
+NEXT
+PRINT s; " "; x
+--- erwartet
+260 11
+
+=== tupel von zahlen (maschinencode)
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 4
+    FOR EACH x IN (3, 5, 7, 11)
+        s = s + x * r
+    NEXT
+NEXT
+PRINT s; " "; x
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+260 11
+--- stderr
+jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68
+jit: 0 Funktionen, 1 Schleifen, 4 Schleifenlaeufe
+
+=== gemischte zahlen in einem tupel
+DIM s AS FLOAT
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH x IN (1, 2.5, 3, 4.5)
+        s = s + x
+    NEXT
+NEXT
+PRINT s
+--- erwartet
+33.0
+
+=== gemischte zahlen in einem tupel (maschinencode)
+DIM s AS FLOAT
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH x IN (1, 2.5, 3, 4.5)
+        s = s + x
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+33.0
+--- stderr
+jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 6 mal mitten in einer Schleife ausgestiegen
+
+=== objekt in eine globale variable
+CLASS Teil
+    DIM wert AS INTEGER
+END CLASS
+DIM teile[5] AS Teil
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    teile[i] = NEW Teil()
+    teile[i].wert = (i * 7) MOD 5
+NEXT
+DIM bester AS Teil
+bester = teile[0]
+DIM r AS INTEGER
+FOR r = 1 TO 2
+    FOR i = 0 TO 4
+        IF teile[i].wert > bester.wert THEN bester = teile[i]
+    NEXT
+NEXT
+bester.wert = bester.wert + 100
+PRINT bester.wert; " "; teile[0].wert; " "; teile[1].wert; " "; teile[2].wert
+--- erwartet
+104 0 2 104
+
+=== objekt in eine globale variable (maschinencode)
+CLASS Teil
+    DIM wert AS INTEGER
+END CLASS
+DIM teile[5] AS Teil
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    teile[i] = NEW Teil()
+    teile[i].wert = (i * 7) MOD 5
+NEXT
+DIM bester AS Teil
+bester = teile[0]
+DIM r AS INTEGER
+FOR r = 1 TO 2
+    FOR i = 0 TO 4
+        IF teile[i].wert > bester.wert THEN bester = teile[i]
+    NEXT
+NEXT
+bester.wert = bester.wert + 100
+PRINT bester.wert; " "; teile[0].wert; " "; teile[1].wert; " "; teile[2].wert
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+104 0 2 104
+--- stderr
+jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== objektfeld schreiben mit aufruf, der globale schreibt
+CLASS Teil
+    DIM n AS INTEGER
+END CLASS
+DIM zaehler AS INTEGER
+FUNCTION weiter() AS INTEGER
+    zaehler = zaehler + 1
+    RETURN zaehler
+END FUNCTION
+DIM t AS Teil : t = NEW Teil()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    t.n = t.n + weiter()
+NEXT
+PRINT t.n; " "; zaehler
+--- erwartet
+55 10
+
+=== objektfeld schreiben mit aufruf, der globale schreibt (maschinencode)
+CLASS Teil
+    DIM n AS INTEGER
+END CLASS
+DIM zaehler AS INTEGER
+FUNCTION weiter() AS INTEGER
+    zaehler = zaehler + 1
+    RETURN zaehler
+END FUNCTION
+DIM t AS Teil : t = NEW Teil()
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    t.n = t.n + weiter()
+NEXT
+PRINT t.n; " "; zaehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+55 10
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: schreibt in ein Feld und ruft eine Funktion, die globale Variablen schreibt
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== unterklasse an der stelle der oberklasse
+CLASS Tier
+    DIM beine AS INTEGER
+END CLASS
+CLASS Hund EXTENDS Tier
+    DIM bellt AS INTEGER
+END CLASS
+DIM t1 AS Tier : t1 = NEW Tier() : t1.beine = 2
+DIM h1 AS Hund : h1 = NEW Hund() : h1.beine = 4
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH w IN (t1, h1, t1, h1)
+        s = s + w.beine
+        w.beine = w.beine + 1
+    NEXT
+NEXT
+PRINT s; " "; t1.beine; " "; h1.beine
+--- erwartet
+66 8 10
+
+=== unterklasse an der stelle der oberklasse (maschinencode)
+CLASS Tier
+    DIM beine AS INTEGER
+END CLASS
+CLASS Hund EXTENDS Tier
+    DIM bellt AS INTEGER
+END CLASS
+DIM t1 AS Tier : t1 = NEW Tier() : t1.beine = 2
+DIM h1 AS Hund : h1 = NEW Hund() : h1.beine = 4
+DIM s AS INTEGER
+DIM r AS INTEGER
+FOR r = 1 TO 3
+    FOR EACH w IN (t1, h1, t1, h1)
+        s = s + w.beine
+        w.beine = w.beine + 1
+    NEXT
+NEXT
+PRINT s; " "; t1.beine; " "; h1.beine
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+66 8 10
+--- stderr
+jit: Schleife an Stelle 24 in __main__ bleibt in der VM: Befehl 68
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 6 mal mitten in einer Schleife ausgestiegen
+
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in
 ' der VM bleibt. Ohne diesen Fall bliebe die Sammlung auch gruen, wenn der

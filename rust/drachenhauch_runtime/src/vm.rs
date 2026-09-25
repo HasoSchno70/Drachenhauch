@@ -2631,7 +2631,7 @@ impl<'p> Vm<'p> {
                         #[cfg(feature = "jit")]
                         if let Some(j) = self.jit.as_ref().filter(|_| !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
                             {
-                                if let Some(weiter) = j.schleife(self.prog, fn_, *ip - 1, target, locals, stack,
+                                if let Some(weiter) = j.schleife(self.prog, fn_, *ip - 1, target, locals, stack, self_obj,
                                                                  self.depth, MAX_CALL_DEPTH, &self.global_slots) {
                                     *ip = weiter;
                                     continue;
@@ -2812,7 +2812,7 @@ impl<'p> Vm<'p> {
                     #[cfg(feature = "jit")]
                     if let Some(j) = self.jit.as_ref().filter(|_| ziel < *ip && !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
                         {
-                            if let Some(weiter) = j.schleife(self.prog, fn_, *ip - 1, ziel, locals, stack,
+                            if let Some(weiter) = j.schleife(self.prog, fn_, *ip - 1, ziel, locals, stack, self_obj,
                                                              self.depth, MAX_CALL_DEPTH, &self.global_slots) {
                                 *ip = weiter;
                                 continue;
