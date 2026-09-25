@@ -1552,6 +1552,19 @@ eine funktion mit global und laeuft ueber"). `DECLARE_GLOBAL_SLOT` mit schon
 vorhandenem Platz ist im Bereich ein Nichts (sonst blieb die aeussere von zwei
 Schleifen VM). `DHRT_JIT_BILANZ=1` nennt Zahlen und Gruende. zahlen.dh
 236 -> 6 ms, ganzzahl.dh 488 -> 10 ms.
+**Felder und Aussteigen mitten drin (M4 Schritt 3):** ein Bereich liest
+und schreibt Felder von INTEGER/FLOAT direkt (`Art::Feld(nr)`,
+`FeldInfo`; die VM beschreibt sie bei JEDEM Eintritt im Kontext: Zeiger,
+Groessen, Schritte -- zwischen Eintritten darf ein Feld wachsen). Dafuer
+steigt jeder Bereich jetzt am FEHLERHAFTEN Befehl aus statt aufzugeben
+(`Bauer::punkt`, `Aussteig`, Rueckgabe `-2 - nr`): Locals, Globale und
+Stapel VOR dem Befehl gehen zurueck, die VM fuehrt ihn selbst aus und
+meldet ihren Fehler -- Geschriebenes wird nie doppelt gerechnet. **Wer
+einen neuen Befehl in `erzeugen` einbaut, muss `bau.punkt` vor jeder
+Pruefung gueltig lassen** (es wird am Anfang jedes Befehls gesetzt).
+Ausnahme: ruft der Bereich eine Funktion, die Globale schreibt
+(`schreibt_globale`), gibt er wie frueher auf und darf keine Felder
+schreiben. felder.dh 92 -> 13 ms.
 
 ## Coroutines / YIELD
 

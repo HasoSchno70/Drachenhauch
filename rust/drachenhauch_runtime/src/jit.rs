@@ -13,6 +13,12 @@
 //! in ihre Slots. Damit bleibt die Funktion fuer die VM rein: gibt der
 //! Maschinencode auf, ist nichts geschehen, und die VM rechnet von vorn.
 //!
+//! **Schleifen (M4 Schritt 2/3)** werden beim ersten Ruecksprung als Bereich
+//! uebersetzt, mit den Arten, die ihre Locals da haben; sie duerfen Felder
+//! von INTEGER/FLOAT lesen und schreiben. Ein Fehler mitten im Bereich gibt
+//! NICHT auf, sondern steigt am fehlerhaften Befehl aus (`Aussteig`): der
+//! Stand davor geht an die VM, und sie fuehrt den Befehl selbst aus.
+//!
 //! **Die VM bleibt die Wahrheit** -- und weil eine reine Funktion keine
 //! Nebenwirkung hat, ist das hier woertlich zu nehmen: bei JEDEM Fehler
 //! (Ueberlauf, Division durch 0, verlustbehaftete Umwandlung, fehlendes
@@ -41,8 +47,36 @@ use crate::vm::Slot;
 
 /// Die Art eines Wertes im Maschinencode. `N` ist das NIL, das der Aufruf
 /// einer SUB auf den Stapel legt -- es darf nur wieder weggeworfen werden.
+/// `Feld(nr)` ist ein Feld von INTEGER oder FLOAT, das eine Schleife beim
+/// Eintritt vorfindet (nur in Bereichen, siehe `FeldInfo`); der Wert im
+/// Maschinencode ist bedeutungslos, die Daten beschreibt der Kontext.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-enum Art { I, F, B, N }
+enum Art { I, F, B, N, Feld(u16) }
+
+/// Woher ein Feld einer Schleife kommt: aus einem Local oder einem globalen
+/// Platz -- beim Eintritt holt die VM es von dort und beschreibt es im
+/// Kontext (Zeiger, Groessen, Schritte).
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Quelle { Lokal(usize), Global(usize) }
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct FeldInfo {
+    quelle: Quelle,
+    komma: bool,
+    dims: u8,
+}
+
+/// Ein Feld von INTEGER oder FLOAT: (Kommazahlen?, Dimensionen).
+fn feld_art(v: &Value) -> Option<(bool, u8)> {
+    let Value::Array(a) = v else { return None };
+    let a = a.borrow();
+    if a.dims.is_empty() || a.dims.len() > 8 { return None; }
+    match a.cells {
+        crate::value::Cells::Int(_) => Some((false, a.dims.len() as u8)),
+        crate::value::Cells::Float(_) => Some((true, a.dims.len() as u8)),
+        _ => None,
+    }
+}
 
 fn art_von_typ(t: &str) -> Option<Art> {
     match t {
@@ -63,6 +97,7 @@ fn art_von_wert(v: &Value) -> Option<Art> {
 }
 
 fn zahl(a: Art) -> bool { matches!(a, Art::I | Art::F) }
+fn skalar(a: Art) -> bool { matches!(a, Art::I | Art::F | Art::B) }
 
 /// Geteilt zwischen VM und Maschinencode (Versaetze fest: 0, 8, 16).
 #[repr(C)]
@@ -79,10 +114,19 @@ pub struct Kontext {
     slots: *const Option<Rc<RefCell<Slot>>>,
     n_slots: u64,
     arten: *const u8,
+    /// Nur Bereiche: der Stapel beim Aussteigen mitten in der Schleife
+    /// (Versatz 64) und die Beschreibung der Felder (Versatz 72): je Feld
+    /// Zeiger auf die Daten, dann die Groessen, dann die Schritte.
+    stapel: *mut u64,
+    felder: *const u64,
 }
 
 const K_SCHATTEN: i32 = 24;
 const K_MARKEN: i32 = 32;
+const K_STAPEL: i32 = 64;
+const K_FELDER: i32 = 72;
+/// So viele Werte darf der Stapel an einer Aussteigestelle haben.
+const MAX_STAPEL: usize = 64;
 
 /// Aus dem Maschinencode gerufen, wenn ein globaler Platz zum ersten Mal
 /// gelesen wird: Wert aus dem Slot der VM in den Schatten. Ein leerer Platz
@@ -120,6 +164,9 @@ pub struct Uebersetzt {
     /// beruehren kann -- nach dem Aufruf werden nur sie zurueckgeschrieben
     /// und ihre Marken geloescht.
     beruehrt: Vec<usize>,
+    /// Schreibt sie (oder eine, die sie ruft) globale Plaetze? Dann darf ein
+    /// Bereich, der sie ruft, nicht mitten drin aussteigen (siehe `schleife`).
+    schreibt_globale: bool,
 }
 
 /// Nach so vielen Rueckfaellen in die VM nimmt eine Funktion nur noch die
@@ -139,6 +186,7 @@ pub struct Jit {
     schleifen: RefCell<Vec<Schleife>>,
     zahl_schleifen: std::cell::Cell<usize>,
     zahl_laeufe: std::cell::Cell<u64>,
+    zahl_aussteige: std::cell::Cell<u64>,
     fns: Vec<Option<Uebersetzt>>,
     /// Art je globalem Platz als Byte fuer `global_holen` (0 = keine Zahl).
     arten: Vec<u8>,
@@ -155,6 +203,8 @@ struct Schleife {
     ausgaenge: Vec<(usize, Vec<Option<Art>>)>,
     beruehrt: Vec<usize>,
     fehlschlaege: u32,
+    felder: Vec<FeldInfo>,
+    aussteige: Vec<Aussteig>,
 }
 
 /// Was der Maschinencode ueber die globalen Plaetze wissen muss: ihre Art
@@ -207,6 +257,10 @@ struct Bereich {
     /// verschwindet nie wieder -- ein DECLARE fuer einen vorhandenen ist
     /// darum fuer immer ein Nichtstun (die VM legt nur leere Plaetze an).
     globale_da: Vec<bool>,
+    /// Die Felder in Locals (schon als `Art::Feld` im Startzustand) und je
+    /// globalem Platz, ob er gerade ein Feld von Zahlen haelt.
+    felder: Vec<FeldInfo>,
+    glob_felder: Vec<Option<(bool, u8)>>,
 }
 
 struct Analyse {
@@ -220,8 +274,13 @@ struct Analyse {
     rueck: Option<Art>,
     /// Funktionen, die gerufen werden (Index in `Program::functions`).
     gerufen: Vec<usize>,
-    /// Globale Plaetze, die sie selbst liest oder schreibt.
+    /// Globale Plaetze, die sie selbst liest oder schreibt, und die sie
+    /// schreibt.
     beruehrt: Vec<usize>,
+    geschrieben: Vec<usize>,
+    /// Nur Bereich: die Felder, die er benutzt, und ob er in eins schreibt.
+    felder: Vec<FeldInfo>,
+    schreibt_felder: bool,
 }
 
 fn ziel(arg: &Arg) -> usize { arg.as_i64().max(0) as usize }
@@ -290,7 +349,10 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
     let mut vor: Vec<Option<Zustand>> = vec![None; code.len() + 1];
     let mut gerufen = Vec::new();
     let mut beruehrt: Vec<usize> = Vec::new();
+    let mut geschrieben: Vec<usize> = Vec::new();
     let mut ausgaenge: Vec<usize> = Vec::new();
+    let mut felder: Vec<FeldInfo> = bereich.map_or(Vec::new(), |b| b.felder.clone());
+    let mut schreibt_felder = false;
     let mut offen = vec![von];
     vor[von] = Some(start);
 
@@ -331,6 +393,34 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                     None => return Err(format!("Konstante {} ist keine Zahl", c.type_name())),
                 }
             }
+            op::LOAD_LOCAL if matches!(z.lokal.get(ins.arg.as_usize()).copied().flatten(), Some(Art::Feld(_))) => {
+                z.stapel.push(z.lokal[ins.arg.as_usize()].unwrap());
+            }
+            op::LOAD_GLOBAL_SLOT if glob.art.get(ins.arg.as_usize()).copied().flatten().is_none()
+                && bereich.map_or(false, |b| b.glob_felder.get(ins.arg.as_usize()).copied().flatten().is_some()) => {
+                let g = ins.arg.as_usize();
+                let (komma, dims) = bereich.unwrap().glob_felder[g].unwrap();
+                let nr = match felder.iter().position(|x| x.quelle == Quelle::Global(g)) {
+                    Some(nr) => nr,
+                    None => { felder.push(FeldInfo { quelle: Quelle::Global(g), komma, dims }); felder.len() - 1 }
+                };
+                z.stapel.push(Art::Feld(nr as u16));
+            }
+            op::LOAD_INDEX | op::STORE_INDEX if bereich.is_some() => {
+                let n = ins.arg.as_usize();
+                let wert = if ins.op == op::STORE_INDEX { Some(pop!()) } else { None };
+                for _ in 0..n { if pop!() != Art::I { return Err("Feld-Index, der kein INTEGER ist".into()); } }
+                let nr = match pop!() { Art::Feld(nr) => nr as usize, _ => return Err("Index auf etwas, das kein Feld von Zahlen ist".into()) };
+                if felder[nr].dims as usize != n { return Err("Feld mit anderer Zahl von Indizes".into()); }
+                let elem = if felder[nr].komma { Art::F } else { Art::I };
+                match wert {
+                    Some(w) => {
+                        if !zahl(w) { return Err("Feld bekommt einen Nicht-Zahl-Wert".into()); }
+                        schreibt_felder = true;
+                    }
+                    None => z.stapel.push(elem),
+                }
+            }
             op::LOAD_LOCAL => {
                 let s = ins.arg.as_usize();
                 if fremd.get(s).copied().unwrap_or(false) { return Err(format!("Platz {} hat den Typ '{}'", s, f.local_types[s])); }
@@ -354,6 +444,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 }
                 if !passt(a, d) { return Err(format!("{:?} in eine globale {:?}", a, d)); }
                 if !beruehrt.contains(&g) { beruehrt.push(g); }
+                if !geschrieben.contains(&g) { geschrieben.push(g); }
             }
             op::STORE_LOCAL | op::ADD_STORE_LOCAL => {
                 let s = ins.arg.as_usize();
@@ -364,6 +455,14 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                     a = if a == Art::I && x == Art::I { Art::I } else { Art::F };
                 }
                 if a == Art::N { return Err("NIL gespeichert".into()); }
+                if let Art::Feld(nr) = a {
+                    let t = f.local_types[s].as_str();
+                    let passend = if felder[nr as usize].komma { "array:float" } else { "array:integer" };
+                    if !(matches!(t, "any" | "") || t == passend) { return Err(format!("Feld in Platz vom Typ '{}'", t)); }
+                    z.lokal[s] = Some(a);
+                    melden(&mut vor, &mut offen, ip + 1, &z)?;
+                    continue;
+                }
                 if fremd[s] { return Err(format!("Platz {} hat den Typ '{}'", s, f.local_types[s])); }
                 let nach = match dekl[s] { Some(d) => { if !passt(a, d) { return Err(format!("{:?} in Platz {:?}", a, d)); } d } None => a };
                 z.lokal[s] = Some(nach);
@@ -420,11 +519,11 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 if !((zahl(a) && zahl(b)) || (a == Art::B && b == Art::B)) { return Err("= zwischen verschiedenen Arten".into()); }
                 z.stapel.push(Art::B);
             }
-            op::NOT => { let a = pop!(); if a == Art::N { return Err("NOT NIL".into()); } z.stapel.push(Art::B); }
+            op::NOT => { let a = pop!(); if !skalar(a) { return Err("NOT auf NIL oder ein Feld".into()); } z.stapel.push(Art::B); }
             op::JUMP => { melden(&mut vor, &mut offen, ziel(&ins.arg), &z)?; weiter = false; }
             op::JUMP_IF_FALSE | op::JUMP_IF_TRUE => {
                 let a = pop!();
-                if a == Art::N { return Err("Sprung auf NIL".into()); }
+                if !skalar(a) { return Err("Sprung auf NIL oder ein Feld".into()); }
                 melden(&mut vor, &mut offen, ziel(&ins.arg), &z)?;
             }
             op::CALL_USER => {
@@ -461,6 +560,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                     let g = t[1] as usize;
                     if glob.konst.get(g).copied().unwrap_or(true) { return Err("FOR ueber eine Konstante".into()); }
                     if !beruehrt.contains(&g) { beruehrt.push(g); }
+                    if !geschrieben.contains(&g) { geschrieben.push(g); }
                     glob.art.get(g).copied().flatten()
                 } else { lok(t[1]) };
                 let schritt = if t[3] == 1 { lok(t[4]) } else { f.constants.get(t[4] as usize).and_then(art_von_wert) };
@@ -473,7 +573,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
         }
         if weiter { melden(&mut vor, &mut offen, ip + 1, &z)?; }
     }
-    Ok(Analyse { vor, ausgaenge, params, rueck, gerufen, beruehrt })
+    Ok(Analyse { vor, ausgaenge, params, rueck, gerufen, beruehrt, geschrieben, felder, schreibt_felder })
 }
 
 /// Fuer den Grund in `dhrt --jit`: was die Funktion tut, das der
@@ -552,6 +652,27 @@ struct Bauer<'a, 'b> {
     /// einmal geholt, dann wie Locals in Variablen, am Ende zurueck in den
     /// Schatten (`befoerdert_schreiben`).
     befoerdert: HashMap<usize, (Variable, Art)>,
+    /// Je Feld: Zeiger auf die Daten, Groessen, Schritte (beim Eintritt
+    /// geladen -- die Felder aendern ihre Groesse im Bereich nicht).
+    felder: Vec<(CWert, Vec<CWert>, Vec<CWert>)>,
+    /// Aussteigen mitten im Bereich (siehe `Jit::schleife`): statt aufzugeben
+    /// wird der Stand VOR dem Befehl zurueckgeschrieben, und die VM macht bei
+    /// genau diesem Befehl weiter. `punkt` ist dieser Stand (Stelle, Stapel,
+    /// Arten der Locals), `aussteige` sammelt die Stellen.
+    mitten: bool,
+    punkt: Option<(usize, Vec<(CWert, Art)>, Vec<Option<Art>>)>,
+    aussteige: Vec<Aussteig>,
+    lok_zeiger: Option<CWert>,
+    zu_tief: bool,
+}
+
+/// Eine Stelle, an der ein Bereich mitten drin aussteigt: dort macht die VM
+/// weiter, mit diesen Locals und diesem Stapel.
+#[derive(Clone)]
+struct Aussteig {
+    stelle: usize,
+    lokal: Vec<Option<Art>>,
+    stapel: Vec<Art>,
 }
 
 impl<'a, 'b> Bauer<'a, 'b> {
@@ -564,8 +685,46 @@ impl<'a, 'b> Bauer<'a, 'b> {
     /// Bei `bed` != 0 in den Ausstieg springen, sonst weiter.
     fn aussteigen_wenn(&mut self, bed: CWert) {
         let weiter = self.b.create_block();
-        self.b.ins().brif(bed, self.fehler, &[], weiter, &[]);
+        match self.punkt.clone().filter(|_| self.mitten) {
+            None => { self.b.ins().brif(bed, self.fehler, &[], weiter, &[]); }
+            Some((stelle, st, lokal)) => {
+                let raus = self.b.create_block();
+                self.b.ins().brif(bed, raus, &[], weiter, &[]);
+                self.b.switch_to_block(raus);
+                self.befoerdert_schreiben();
+                let lz = self.lok_zeiger.unwrap();
+                for (i, a) in lokal.iter().enumerate() {
+                    let Some(a) = a else { continue };
+                    if matches!(a, Art::Feld(_)) { continue; }
+                    let v = self.var(1, i, *a);
+                    let w = self.b.use_var(v);
+                    self.b.ins().store(MemFlagsData::trusted(), w, lz, (i * 8) as i32);
+                }
+                if st.len() > MAX_STAPEL { self.zu_tief = true; }
+                let sp = self.b.ins().load(types::I64, MemFlagsData::trusted(), self.ctx, K_STAPEL);
+                for (d, (w, a)) in st.iter().enumerate().take(MAX_STAPEL) {
+                    if skalar(*a) { self.b.ins().store(MemFlagsData::trusted(), *w, sp, (d * 8) as i32); }
+                }
+                let nr = self.aussteige.len() as i64;
+                self.aussteige.push(Aussteig { stelle, lokal, stapel: st.iter().map(|(_, a)| *a).collect() });
+                let code = self.b.ins().iconst(types::I64, -2 - nr);
+                self.b.ins().return_(&[code]);
+            }
+        }
         self.b.switch_to_block(weiter);
+    }
+    /// Adresse eines Feldelements, mit Pruefung jedes Index (sonst Ausstieg).
+    fn feld_adresse(&mut self, nr: usize, idx: &[(CWert, Art)]) -> CWert {
+        let (zeiger, dims, schritte) = self.felder[nr].clone();
+        let mut flach: Option<CWert> = None;
+        for (k, (i, _)) in idx.iter().enumerate() {
+            let aus = self.b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, *i, dims[k]);
+            self.aussteigen_wenn(aus);
+            let teil = if idx.len() == 1 { *i } else { self.b.ins().imul(*i, schritte[k]) };
+            flach = Some(match flach { None => teil, Some(f) => self.b.ins().iadd(f, teil) });
+        }
+        let off = self.b.ins().ishl_imm_s(flach.unwrap(), 3);
+        self.b.ins().iadd(zeiger, off)
     }
     fn als_f(&mut self, v: CWert, a: Art) -> CWert {
         if a == Art::I { self.b.ins().fcvt_from_sint(types::F64, v) } else { v }
@@ -667,7 +826,7 @@ fn signatur(modul: &JITModule, params: &[Art], rueck: Option<Art>) -> cranelift_
 
 fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an: &Analyse, ids: &[Option<FuncId>],
             holen_id: FuncId, fctx: &mut FunctionBuilderContext, id: FuncId,
-            bereich: Option<(usize, usize)>, befoerdert: &[usize]) -> Result<(), String> {
+            bereich: Option<(usize, usize)>, befoerdert: &[usize], mitten: bool) -> Result<Vec<Aussteig>, String> {
     let tc = modul.target_config();
     let mut ctx = modul.make_context();
     ctx.func.signature = match bereich {
@@ -708,11 +867,26 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let pwerte: Vec<CWert> = fb.block_params(eintritt)[1..].to_vec();
         // Bereich: der zweite Parameter zeigt auf die Locals (je 8 Byte).
         let lok_zeiger = if bereich.is_some() { Some(pwerte[0]) } else { None };
+        let mitten = mitten && bereich.is_some();
         let schatten = fb.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_SCHATTEN);
         let marken = fb.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_MARKEN);
         let holen = modul.declare_func_in_func(holen_id, fb.func);
         let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new(), schatten, marken, holen,
-                              befoerdert: HashMap::new() };
+                              befoerdert: HashMap::new(), felder: Vec::new(), mitten, punkt: None,
+                              aussteige: Vec::new(), lok_zeiger, zu_tief: false };
+        // Die Felder beschreibt der Kontext: je Feld Zeiger, Groessen, Schritte.
+        if !an.felder.is_empty() {
+            let fz = bau.b.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_FELDER);
+            let mut off = 0i32;
+            for fi in &an.felder {
+                let d = fi.dims as i32;
+                let z = bau.b.ins().load(types::I64, MemFlagsData::trusted(), fz, off * 8);
+                let dims: Vec<CWert> = (0..d).map(|k| bau.b.ins().load(types::I64, MemFlagsData::trusted(), fz, (off + 1 + k) * 8)).collect();
+                let schr: Vec<CWert> = (0..d).map(|k| bau.b.ins().load(types::I64, MemFlagsData::trusted(), fz, (off + 1 + d + k) * 8)).collect();
+                bau.felder.push((z, dims, schr));
+                off += 1 + 2 * d;
+            }
+        }
 
         // Tiefe wie `exec`: erst zaehlen, dann gegen die Grenze. Ein Bereich
         // ist kein Aufruf und zaehlt nicht.
@@ -727,7 +901,9 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let start = an.vor[von].as_ref().unwrap();
         for (i, a) in start.lokal.iter().enumerate() {
             let Some(a) = a else { continue };
-            let wert = if let Some(lz) = lok_zeiger {
+            let wert = if let Art::Feld(nr) = a {
+                bau.b.ins().iconst(types::I64, *nr as i64)
+            } else if let Some(lz) = lok_zeiger {
                 bau.b.ins().load(cl_typ(*a), MemFlagsData::trusted(), lz, (i * 8) as i32)
             } else if i < f.n_params { pwerte[i] } else {
                 match f.local_defaults.get(i) {
@@ -770,7 +946,28 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
             loop {
                 let ins = &code[ip];
                 let z = an.vor[ip].as_ref().unwrap();
+                bau.punkt = Some((ip, st.clone(), z.lokal.clone()));
                 match ins.op {
+                    op::LOAD_INDEX => {
+                        let n = ins.arg.as_usize();
+                        let idx = st.split_off(st.len() - n);
+                        let Some((_, Art::Feld(nr))) = st.pop() else { unreachable!() };
+                        let komma = an.felder[nr as usize].komma;
+                        let adr = bau.feld_adresse(nr as usize, &idx);
+                        let a = if komma { Art::F } else { Art::I };
+                        let w = bau.b.ins().load(cl_typ(a), MemFlagsData::trusted(), adr, 0);
+                        st.push((w, a));
+                    }
+                    op::STORE_INDEX => {
+                        let n = ins.arg.as_usize();
+                        let (w, wa) = st.pop().unwrap();
+                        let idx = st.split_off(st.len() - n);
+                        let Some((_, Art::Feld(nr))) = st.pop() else { unreachable!() };
+                        let a = if an.felder[nr as usize].komma { Art::F } else { Art::I };
+                        let adr = bau.feld_adresse(nr as usize, &idx);
+                        let w = bau.wandeln(w, wa, a);
+                        bau.b.ins().store(MemFlagsData::trusted(), w, adr, 0);
+                    }
                     op::LOAD_CONST => {
                         let w = match &f.constants[ins.arg.as_usize()] {
                             Value::Int(x) => (bau.b.ins().iconst(types::I64, *x), Art::I),
@@ -786,6 +983,12 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let a = z.lokal[s].unwrap();
                         let v = bau.var(1, s, a);
                         st.push((bau.b.use_var(v), a));
+                    }
+                    op::LOAD_GLOBAL_SLOT if glob.art[ins.arg.as_usize()].is_none() => {
+                        // Ein Feld: welches, sagt der Zustand dahinter.
+                        let a = *an.vor[ip + 1].as_ref().unwrap().stapel.last().unwrap();
+                        let Art::Feld(nr) = a else { unreachable!() };
+                        st.push((bau.b.ins().iconst(types::I64, nr as i64), a));
                     }
                     op::LOAD_GLOBAL_SLOT => {
                         let g = ins.arg.as_usize();
@@ -810,7 +1013,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                             let (x, xa) = st.pop().unwrap();
                             (w, a) = rechnen(&mut bau, op::ADD, x, xa, w, a);
                         }
-                        let nach = art_von_typ(&f.local_types[s]).unwrap_or(a);
+                        let nach = if matches!(a, Art::Feld(_)) { a } else { art_von_typ(&f.local_types[s]).unwrap_or(a) };
                         let w = bau.wandeln(w, a, nach);
                         let v = bau.var(1, s, nach);
                         bau.b.def_var(v, w);
@@ -962,6 +1165,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                 let z = an.vor[x].as_ref().unwrap();
                 for (i, a) in z.lokal.iter().enumerate() {
                     let Some(a) = a else { continue };
+                    if matches!(a, Art::Feld(_)) { continue; }
                     let v = bau.var(1, i, *a);
                     let w = bau.b.use_var(v);
                     bau.b.ins().store(MemFlagsData::trusted(), w, lz, (i * 8) as i32);
@@ -989,12 +1193,15 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
             Some(_) => { let z = bau.b.ins().iconst(types::I64, 0); bau.b.ins().return_(&[z]); }
             None => { bau.b.ins().return_(&[]); }
         } }
+        let zu_tief = bau.zu_tief;
+        let aussteige = std::mem::take(&mut bau.aussteige);
         fb.seal_all_blocks();
         fb.finalize(tc);
+        if zu_tief { return Err("mehr als 64 Werte auf dem Stapel".into()); }
+        modul.define_function(id, &mut ctx).map_err(|e| format!("Cranelift: {:?}", e))?;
+        modul.clear_context(&mut ctx);
+        Ok(aussteige)
     }
-    modul.define_function(id, &mut ctx).map_err(|e| format!("Cranelift: {:?}", e))?;
-    modul.clear_context(&mut ctx);
-    Ok(())
 }
 
 /// + - * / MOD \ mit den Regeln der VM (`zahlen_addieren`, `nn_arith`,
@@ -1148,6 +1355,15 @@ impl Jit {
             }
             if !neu { break; }
         }
+        let mut schreibt: Vec<bool> = an.iter().map(|a| a.as_ref().map_or(false, |a| !a.geschrieben.is_empty())).collect();
+        loop {
+            let mut neu = false;
+            for i in 0..an.len() {
+                let Some(a) = &an[i] else { continue };
+                if !schreibt[i] && a.gerufen.iter().any(|&g| schreibt[g]) { schreibt[i] = true; neu = true; }
+            }
+            if !neu { break; }
+        }
         let mut ids: Vec<Option<FuncId>> = vec![None; an.len()];
         for (i, a) in an.iter().enumerate() {
             if let Some(a) = a {
@@ -1162,7 +1378,7 @@ impl Jit {
             if let (Some(a), Some(id)) = (a, ids[i]) {
                 let bef: Vec<usize> = a.beruehrt.iter().copied()
                     .filter(|p| !a.gerufen.iter().any(|&g| ber[g].contains(p))).collect();
-                erzeugen(&mut modul, prog, &glob, &prog.functions[i], a, &ids, holen_id, &mut fctx, id, None, &bef)
+                erzeugen(&mut modul, prog, &glob, &prog.functions[i], a, &ids, holen_id, &mut fctx, id, None, &bef, false)
                     .map_err(|e| format!("{}: {}", prog.functions[i].name, e))?;
                 einstiege[i] = Some(trampolin(&mut modul, &mut fctx, id, &a.params, a.rueck, i as u32)?);
             }
@@ -1179,6 +1395,7 @@ impl Jit {
                         rueck: a.rueck,
                         fehlschlaege: std::cell::Cell::new(0),
                         beruehrt: std::mem::take(&mut ber[i]),
+                        schreibt_globale: schreibt[i],
                     })
                 }
                 _ => None,
@@ -1189,6 +1406,7 @@ impl Jit {
         Ok(Jit { modul: RefCell::new(modul), fctx: RefCell::new(fctx), ids, holen_id, glob,
                  schleifen: RefCell::new(Vec::new()),
                  zahl_schleifen: std::cell::Cell::new(0), zahl_laeufe: std::cell::Cell::new(0),
+                 zahl_aussteige: std::cell::Cell::new(0),
                  fns, arten,
                  schatten: std::cell::UnsafeCell::new(vec![0; n]),
                  marken: std::cell::UnsafeCell::new(vec![0; n]) })
@@ -1206,7 +1424,8 @@ impl Jit {
     /// macht am Kopf weiter wie immer (auch, wenn der Maschinencode aufgab --
     /// dann ist nichts geschehen).
     pub fn schleife(&self, prog: &Program, f: &Func, ruecksprung: usize, kopf: usize, locals: &mut [Value],
-                    tiefe: u32, grenze: u32, slots: &[Option<Rc<RefCell<Slot>>>]) -> Option<usize> {
+                    stapel: &mut Vec<Value>, tiefe: u32, grenze: u32,
+                    slots: &[Option<Rc<RefCell<Slot>>>]) -> Option<usize> {
         let marke = &f.code[ruecksprung].schleife;
         if marke.get() == 0 {
             match self.schleife_bauen(prog, f, kopf, locals, slots) {
@@ -1236,9 +1455,36 @@ impl Jit {
                 (Art::I, Value::Int(x)) => *x as u64,
                 (Art::F, Value::Float(x)) => x.to_bits(),
                 (Art::B, Value::Bool(b)) => *b as u64,
+                (Art::Feld(_), _) => 0,   // geprueft mit den Feldern unten
                 _ => return None,
             };
         }
+        // Die Felder: holen, pruefen (Art und Dimensionen wie beim Bauen) und
+        // beschreiben. `werte` haelt sie am Leben, solange der Bereich laeuft;
+        // dort aendert niemand ihre Groesse, also bleiben die Zeiger gueltig.
+        let mut werte: Vec<Value> = Vec::with_capacity(s.felder.len());
+        let mut besch: Vec<u64> = Vec::new();
+        for fi in &s.felder {
+            let v = match fi.quelle {
+                Quelle::Lokal(i) => locals.get(i)?.clone(),
+                Quelle::Global(g) => slots.get(g)?.as_ref()?.borrow().value.clone(),
+            };
+            if feld_art(&v) != Some((fi.komma, fi.dims)) { return None; }
+            let Value::Array(a) = &v else { return None };
+            {
+                let mut ab = a.borrow_mut();
+                let zeiger = match &mut ab.cells {
+                    crate::value::Cells::Int(x) => x.as_mut_ptr() as u64,
+                    crate::value::Cells::Float(x) => x.as_mut_ptr() as u64,
+                    _ => return None,
+                };
+                besch.push(zeiger);
+                for &d in &ab.dims { besch.push(d as u64); }
+                for &st in &ab.strides { besch.push(st as u64); }
+            }
+            werte.push(v);
+        }
+        let mut st_puffer = [0u64; MAX_STAPEL];
         let schatten = unsafe { &mut *self.schatten.get() };
         let marken = unsafe { &mut *self.marken.get() };
         if marken.len() < slots.len() { return None; }
@@ -1246,9 +1492,12 @@ impl Jit {
             fehler: 0, tiefe: tiefe as u64, grenze: grenze as u64,
             schatten: schatten.as_mut_ptr(), marken: marken.as_mut_ptr(),
             slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
+            stapel: st_puffer.as_mut_ptr(), felder: besch.as_ptr(),
         };
         let aus = unsafe { (s.einstieg)(&mut k, lok.as_mut_ptr()) };
-        let ok = k.fehler == 0 && aus >= 0;
+        // >= 0: an einem Ausgang; <= -2: mitten drin ausgestiegen -- beides
+        // ist ein gueltiger Stand der VM. -1: aufgegeben, nichts geschehen.
+        let ok = (k.fehler == 0 && aus >= 0) || aus <= -2;
         for &g in &s.beruehrt {
             if ok && marken[g] == 2 {
                 if let Some(sl) = slots.get(g).and_then(|x| x.as_ref()) {
@@ -1263,18 +1512,32 @@ impl Jit {
             marken[g] = 0;
         }
         if !ok { s.fehlschlaege += 1; return None; }
+        let wert = |a: &Art, bits: u64| match a {
+            Art::I => Value::Int(bits as i64),
+            Art::F => Value::Float(f64::from_bits(bits)),
+            Art::B => Value::Bool(bits != 0),
+            Art::Feld(nr) => werte[*nr as usize].clone(),
+            Art::N => Value::Nil,
+        };
+        if aus <= -2 {
+            // Mitten drin ausgestiegen: die VM fuehrt den Befehl an `stelle`
+            // selbst aus -- mit genau dem Stand davor.
+            let a = s.aussteige.get((-2 - aus) as usize)?;
+            for (i, art) in a.lokal.iter().enumerate() {
+                let Some(art) = art else { continue };
+                locals[i] = wert(art, lok[i]);
+            }
+            for (d, art) in a.stapel.iter().enumerate() { stapel.push(wert(art, st_puffer[d])); }
+            self.zahl_aussteige.set(self.zahl_aussteige.get() + 1);
+            return Some(a.stelle);
+        }
         let aus = aus as usize;
         let (_, arten) = s.ausgaenge.iter().find(|(x, _)| *x == aus)?;
+        self.zahl_laeufe.set(self.zahl_laeufe.get() + 1);
         for (i, a) in arten.iter().enumerate() {
             let Some(a) = a else { continue };
-            let bits = lok[i];
-            locals[i] = match a {
-                Art::I => Value::Int(bits as i64),
-                Art::F => Value::Float(f64::from_bits(bits)),
-                _ => Value::Bool(bits != 0),
-            };
+            locals[i] = wert(a, lok[i]);
         }
-        self.zahl_laeufe.set(self.zahl_laeufe.get() + 1);
         Some(aus)
     }
 
@@ -1302,12 +1565,29 @@ impl Jit {
             };
             if t > kopf && t <= bis { return Err("Sprung mitten in die Schleife".into()); }
         }
-        let start = Zustand { stapel: Vec::new(), lokal: locals.iter().map(art_von_wert).collect() };
+        let mut felder: Vec<FeldInfo> = Vec::new();
+        let lokal = locals.iter().enumerate().map(|(i, v)| match feld_art(v) {
+            Some((komma, dims)) => {
+                felder.push(FeldInfo { quelle: Quelle::Lokal(i), komma, dims });
+                Some(Art::Feld((felder.len() - 1) as u16))
+            }
+            None => art_von_wert(v),
+        }).collect();
+        let start = Zustand { stapel: Vec::new(), lokal };
         let globale_da = slots.iter().map(|x| x.is_some()).collect();
-        let bereich = Bereich { von: kopf, bis, start, globale_da };
+        let glob_felder = slots.iter().map(|x| x.as_ref().and_then(|sl| feld_art(&sl.borrow().value))).collect();
+        let bereich = Bereich { von: kopf, bis, start, globale_da, felder, glob_felder };
         let an = analysieren(prog, &self.glob, f, Some(&bereich))?;
         if an.gerufen.iter().any(|&g| self.ids.get(g).copied().flatten().is_none()) {
             return Err("ruft eine Funktion, die in der VM bleibt".into());
+        }
+        // Mitten drin aussteigen geht nur, wenn kein Gerufener globale Plaetze
+        // schreibt: dessen halbe Arbeit laege sonst schon im Schatten, und die
+        // VM riefe ihn noch einmal. Ohne das darf der Bereich keine Felder
+        // schreiben -- aufgeben hiesse dann, die VM wiederholt Geschriebenes.
+        let mitten = an.gerufen.iter().all(|&g| self.fns.get(g).and_then(|u| u.as_ref()).map_or(false, |u| !u.schreibt_globale));
+        if an.schreibt_felder && !mitten {
+            return Err("schreibt in ein Feld und ruft eine Funktion, die globale Variablen schreibt".into());
         }
         let mut beruehrt = an.beruehrt.clone();
         for &g in &an.gerufen {
@@ -1323,7 +1603,7 @@ impl Jit {
             .map_err(|e| format!("{:?}", e))?;
         let bef: Vec<usize> = an.beruehrt.iter().copied()
             .filter(|p| !an.gerufen.iter().any(|&g| self.fns.get(g).and_then(|u| u.as_ref()).map_or(true, |u| u.beruehrt.contains(p)))).collect();
-        erzeugen(&mut modul, prog, &self.glob, f, &an, &self.ids, self.holen_id, &mut fctx, id, Some((kopf, bis)), &bef)?;
+        let aussteige = erzeugen(&mut modul, prog, &self.glob, f, &an, &self.ids, self.holen_id, &mut fctx, id, Some((kopf, bis)), &bef, mitten)?;
         modul.finalize_definitions().map_err(|e| format!("Cranelift: {:?}", e))?;
         let p = modul.get_finalized_function(id);
         let ausgaenge = an.ausgaenge.iter().map(|&x| (x, an.vor[x].as_ref().unwrap().lokal.clone())).collect();
@@ -1334,6 +1614,8 @@ impl Jit {
             ausgaenge,
             beruehrt,
             fehlschlaege: 0,
+            felder: an.felder.clone(),
+            aussteige,
         });
         self.zahl_schleifen.set(self.zahl_schleifen.get() + 1);
         Ok(nr)
@@ -1362,6 +1644,7 @@ impl Jit {
             fehler: 0, tiefe: tiefe as u64, grenze: grenze as u64,
             schatten: schatten.as_mut_ptr(), marken: marken.as_mut_ptr(),
             slots: slots.as_ptr(), n_slots: slots.len() as u64, arten: self.arten.as_ptr(),
+            stapel: std::ptr::null_mut(), felder: std::ptr::null(),
         };
         let mut erg = 0u64;
         unsafe { (u.einstieg)(&mut k, roh.as_ptr(), &mut erg) };
@@ -1404,6 +1687,9 @@ impl Drop for Jit {
             let f = self.fns.iter().filter(|f| f.is_some()).count();
             eprintln!("jit: {} Funktionen, {} Schleifen, {} Schleifenlaeufe",
                       f, self.zahl_schleifen.get(), self.zahl_laeufe.get());
+            if self.zahl_aussteige.get() > 0 {
+                eprintln!("jit: {} mal mitten in einer Schleife ausgestiegen", self.zahl_aussteige.get());
+            }
         }
     }
 }
