@@ -182,7 +182,33 @@ fn need_str<'a>(v: &'a Value, fn_: &str) -> Result<&'a str, String> {
 /// `MID$(s, 5, 1)` auf 200 000 Zeichen kostete so 90 Mikrosekunden. Jetzt
 /// laeuft die Suche nur bis zur gefragten Stelle.
 fn zeichen_stelle(s: &str, n: usize) -> usize {
+    // Steht davor nur ASCII (der Normalfall), ist die Byte-Stelle die
+    // Zeichenstelle -- `is_ascii` prueft wortweise statt Zeichen fuer Zeichen.
+    // Gemessen: 28000 x MID$ in einem Text aus 200000 Zeichen 700 ms -> 23 ms;
+    // die Schleife je Zeichen schwankte zudem um den Faktor 1,6 mit der Lage
+    // des Codes (M2, 2026-09-25).
+    let k = n.min(s.len());
+    if s.as_bytes()[..k].is_ascii() {
+        return k;
+    }
     s.char_indices().nth(n).map_or(s.len(), |(b, _)| b)
+}
+
+/// Zeichenzahl eines Textes -- bei reinem ASCII die Bytezahl, ohne Zaehlen.
+fn zeichen_zahl(s: &str) -> usize {
+    if s.is_ascii() { s.len() } else { s.chars().count() }
+}
+
+/// Byte-Stelle des n-ten Zeichens; genau am Ende die Laenge, dahinter None.
+fn zeichen_stelle_genau(s: &str, n: usize) -> Option<usize> {
+    if n <= s.len() && s.as_bytes()[..n].is_ascii() {
+        return Some(n);
+    }
+    match s.char_indices().nth(n) {
+        Some((b, _)) => Some(b),
+        None if zeichen_zahl(s) == n => Some(s.len()),
+        None => None,
+    }
 }
 
 fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
@@ -2026,16 +2052,15 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // 0-basiert in *Zeichen*. Gesucht wird auf den Bytes (ein Treffer
             // in UTF-8 ist immer einer auf Zeichengrenzen), die Stelle dann in
             // Zeichen zurueckgerechnet.
-            let ab = match hay.char_indices().nth(start) {
-                Some((b, _)) => b,
-                // Start genau am Ende ist erlaubt (leere Suche findet dort),
-                // dahinter -> -1, auch bei leerem Suchstring (wie Python
-                // str.find). Reihenfolge wichtig: erst Bereich pruefen.
-                None if hay.chars().count() == start => hay.len(),
+            // Start genau am Ende ist erlaubt (leere Suche findet dort),
+            // dahinter -> -1, auch bei leerem Suchstring (wie Python
+            // str.find).
+            let ab = match zeichen_stelle_genau(hay, start) {
+                Some(b) => b,
                 None => return Ok(Value::Int(-1)),
             };
             match hay[ab..].find(needle) {
-                Some(off) => Ok(Value::Int((start + hay[ab..ab + off].chars().count()) as i64)),
+                Some(off) => Ok(Value::Int((start + zeichen_zahl(&hay[ab..ab + off])) as i64)),
                 None => Ok(Value::Int(-1)),
             }
         }
@@ -4980,15 +5005,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let ab = if a.len() == 3 { need_int(&a[2], "REGEX_FIND_POS")? } else { 0 };
             let keins = || -> R { Ok(Value::Tuple(Rc::new(vec![Value::Int(-1), Value::Int(0)]))) };
             if ab < 0 { return keins(); }
-            let byte_ab = match t.char_indices().nth(ab as usize) {
-                Some((b, _)) => b,
-                None if ab as usize == t.chars().count() => t.len(),
+            let byte_ab = match zeichen_stelle_genau(t, ab as usize) {
+                Some(b) => b,
                 None => return keins(),
             };
             match re.find_at(t, byte_ab) {
                 Some(m) => {
-                    let start = t[..m.start()].chars().count() as i64;
-                    let laenge = m.as_str().chars().count() as i64;
+                    let start = zeichen_zahl(&t[..m.start()]) as i64;
+                    let laenge = zeichen_zahl(m.as_str()) as i64;
                     Ok(Value::Tuple(Rc::new(vec![Value::Int(start), Value::Int(laenge)])))
                 }
                 None => keins(),

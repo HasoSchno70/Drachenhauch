@@ -1504,6 +1504,15 @@ in der der Fehler FIEL -- nicht aus der, mit der `dispatch` betreten wurde.
 EXIT/Stop raeumen alle Rahmen oberhalb der Basis ab. `bind_params` bindet
 den Normalfall direkt. Leerer Aufruf 41 -> 29 ns, fib 0,85. Tests
 `tests/pruef/rahmenstapel.dhtest` (Erwartung = Ausgabe des Baus davor).
+**Methoden (CALL_METHOD) bewusst NICHT auf dem Rahmenstapel** -- gemessen:
+das je Rahmen gefuehrte `Self` machte jeden Befehl in `dispatch` teurer
+(freier Aufruf 30 -> 35..40 ns, fib 1,07..1,09) fuer 2 ns je Methode.
+**Zeichenstellen mit ASCII-Abkuerzung** (`builtins::zeichen_stelle`,
+`zeichen_stelle_genau`, `zeichen_zahl`): MID$/LEFT$/RIGHT$/INSTR/
+REGEX_FIND_POS zaehlen nur noch, wenn vor der Stelle Nicht-ASCII steht --
+`text.dh` 700 -> 50 ms; die Schleife je Zeichen schwankte vorher um den
+Faktor 1,6 mit der Codelage. Fall "ascii davor und umlaut dahinter" in
+`zeichenketten_stellen.dhtest` (gegen den Bau davor gleich).
 
 ## Coroutines / YIELD
 
