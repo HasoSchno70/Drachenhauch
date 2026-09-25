@@ -1514,6 +1514,26 @@ REGEX_FIND_POS zaehlen nur noch, wenn vor der Stelle Nicht-ASCII steht --
 Faktor 1,6 mit der Codelage. Fall "ascii davor und umlaut dahinter" in
 `zeichenketten_stellen.dhtest` (gegen den Bau davor gleich).
 
+## Maschinencode fuer reine Zahlenfunktionen (2026-09-25, M3 Schritt 1)
+
+`src/jit.rs`, Feature `jit` (Cranelift **0.134** -- neuere verlangen Rust
+1.96), eingeschaltet mit **`DHRT_JIT=immer`** (uebersetzt beim Start; ohne
+bleibt alles VM). Uebersetzt wird nur eine REINE Funktion: Parameter/Locals/
+Rueckgabe INTEGER/FLOAT/BOOLEAN, nur Rechnen/Vergleichen/Springen/FOR ueber
+INTEGER und Aufrufe reiner Funktionen -- keine Globals, Builtins, Ausgabe.
+`analysieren` verfolgt je Stelle die Art jedes Stapelplatzes und Locals
+(abstrakte Ausfuehrung; zwei Wege mit verschiedenen Arten = VM), `erzeugen`
+baut daraus Cranelift-Code, ein `trampolin` je Funktion ist der Einstieg fuer
+die VM (CALL_USER, nur wenn jedes Argument genau passt, nicht unter
+Profiler/Debugger/Stop). **Bei JEDEM Fehlerfall gibt der Maschinencode auf
+und die VM rechnet den Aufruf nach** (rein = keine Nebenwirkung) -- Meldung
+und Zeile kommen von ihr, es gibt keine zweite Fassung. Wer eine Regel der
+VM aendert (`div`, `modulo`, `int_div`, `cmp`, `coerce`, `value_eq`), muss
+`rechnen`/`vergleichen`/`wandeln` in jit.rs mitziehen -- `jit.dhtest` faengt
+es (jeder Fall mit und ohne). `dhrt --jit datei.dh` nennt je Funktion den
+Grund. fib(30) 144 -> 3,3 ms, Zahlenschleife in einer Funktion 189 -> 5 ms.
+Die CI laeuft die Sammlungen zweimal. Einzelheiten `docs/entwurf-maschinencode.md` M3.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

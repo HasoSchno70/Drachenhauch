@@ -89,6 +89,8 @@ mod bt;
 mod midi;
 #[cfg(feature = "video")]
 mod video;
+#[cfg(feature = "jit")]
+mod jit;
 #[cfg(feature = "serial")]
 mod serial;
 #[cfg(feature = "serial")]
@@ -327,6 +329,20 @@ fn main() -> ExitCode {
         }
         // M2: welche Folgen beim Laden zu Superinstruktionen markiert werden
         // (`model::verschmelzen`) -- je Funktion "Stelle Art". Uebersetzt nur.
+        // M3: welche Funktionen Maschinencode bekaemen und warum die anderen
+        // nicht. Uebersetzt nur (das Programm laeuft nicht).
+        #[cfg(feature = "jit")]
+        if raw.len() >= 3 && raw[1] == "--jit" {
+            let src = match std::fs::read_to_string(&raw[2]) {
+                Ok(t) => t,
+                Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", raw[2], e); return ExitCode::from(1); }
+            };
+            let base = std::path::Path::new(&raw[2]).parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
+            let prog = match compile_source_programm(&src, &base, &raw[2]) { Ok(p) => p, Err(c) => return c };
+            for (name, was) in jit::bericht(&prog) { println!("{}: {}", name, was); }
+            if let Err(e) = jit::Jit::neu(&prog) { println!("FEHLER beim Erzeugen: {}", e); return ExitCode::from(1); }
+            return ExitCode::SUCCESS;
+        }
         if raw.len() >= 3 && raw[1] == "--verschmolzen" {
             let src = match std::fs::read_to_string(&raw[2]) {
                 Ok(t) => t,

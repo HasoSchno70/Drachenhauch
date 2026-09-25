@@ -740,6 +740,10 @@ pub struct Vm<'p> {
     // einzusteigen. Hier liegt je laufendem Aufruf der Zustand des AUFRUFERS.
     // Jeder `run_frame` kennt seine Basis (die Laenge beim Eintritt).
     rahmen: Vec<Rahmen<'p>>,
+    // Maschinencode fuer reine Zahlenfunktionen (M3, src/jit.rs); nur mit
+    // DHRT_JIT=immer, sonst None.
+    #[cfg(feature = "jit")]
+    jit: Option<crate::jit::Jit>,
     // Quell-Zeile der zuletzt ausgefuehrten Instruktion (fuer Laufzeitfehler-
     // Meldungen). Bei einem propagierenden Fehler haelt es die Zeile der
     // innersten fehlschlagenden Instruktion (sie lief zuletzt). 0 = unbekannt.
@@ -981,6 +985,14 @@ impl<'p> Vm<'p> {
             pool_locals: Vec::new(),
             pool_stacks: Vec::new(),
             rahmen: Vec::new(),
+            #[cfg(feature = "jit")]
+            jit: if std::env::var("DHRT_JIT").map_or(false, |v| v == "immer") {
+                match crate::jit::Jit::neu(prog) {
+                    Ok(j) => Some(j),
+                    // Uebersetzen scheiterte: melden, dann laeuft alles in der VM.
+                    Err(e) => { eprintln!("dhrt: Maschinencode nicht moeglich -- {}", e); None }
+                }
+            } else { None },
             cur_line: 0,
             err_line_set: false,
             debug_stop_flag: false,
@@ -2690,6 +2702,19 @@ impl<'p> Vm<'p> {
                             .ok_or_else(|| format!("Unbekannte Funktion: {}", fn_name.to_uppercase()))?
                     };
                     let split = stack.len() - argc;
+                    // M3: uebersetzte reine Zahlenfunktion. Gibt sie auf (oder
+                    // passt ein Argument nicht genau), rechnet die VM den Aufruf
+                    // unten selbst -- mit ihrer Meldung und ihrer Zeile.
+                    #[cfg(feature = "jit")]
+                    if idx >= 0 && !track_lines {
+                        if let Some(j) = self.jit.as_ref() {
+                            if let Some(v) = j.rufen(idx as usize, &stack[split..], self.depth, MAX_CALL_DEPTH) {
+                                stack.truncate(split);
+                                stack.push(v);
+                                continue;
+                            }
+                        }
+                    }
                     // Die Argumente wandern per `drain` direkt vom Stapel in die
                     // Locals des Aufgerufenen -- vorher legte `split_off` je
                     // Aufruf eine eigene Liste an. Nur eine Coroutine braucht
