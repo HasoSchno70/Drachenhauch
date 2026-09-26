@@ -814,6 +814,11 @@ pub struct Jit {
     arten: Vec<u8>,
     schatten: std::cell::UnsafeCell<Vec<u64>>,
     marken: std::cell::UnsafeCell<Vec<u8>>,
+    /// `DHRT_JIT_BILANZ`, einmal beim Start gelesen.
+    bilanz: bool,
+    /// Nur mit Bilanz: je Schleife, die in der VM bleibt, ihre Marke (Adresse
+    /// der Zelle), wo und warum, und wie oft die VM sie gedreht hat.
+    vm_runden: RefCell<Vec<(usize, String, u64)>>,
     /// (Lage der Klasse, Methode) -> Index in `fns` (siehe `Globale::tafel`).
     mtab: HashMap<(usize, usize), usize>,
     /// Die Meldung eines Befehls, an dem ein Bereich zuletzt ausgestiegen ist
@@ -1272,8 +1277,14 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
             }
             op::LOAD_LOCAL => {
                 let s = s_arg;
-                if fremd.get(s).copied().unwrap_or(false) { return Err(format!("Platz {} hat den Typ '{}'", s, typen[s])); }
-                z.stapel.push(z.lokal.get(s).copied().flatten().ok_or_else(|| format!("Platz {} gelesen, bevor er belegt ist", s))?);
+                // Ein Handle (IMAGE, SPRITE_ATLAS, SOUND ...) ist in der VM eine
+                // Ganzzahl: lesen ist dann nur die Zahl. Geschrieben wird so ein
+                // Platz weiter nicht -- dort prueft die VM den Typ (M4 Schritt 11).
+                let jetzt = z.lokal.get(s).copied().flatten();
+                if fremd.get(s).copied().unwrap_or(false) && !jetzt.map_or(false, skalar) {
+                    return Err(format!("Platz {} hat den Typ '{}'", s, typen[s]));
+                }
+                z.stapel.push(jetzt.ok_or_else(|| format!("Platz {} gelesen, bevor er belegt ist", s))?);
             }
             op::LOAD_GLOBAL_SLOT => {
                 let g = ins.arg.as_usize();
@@ -2874,10 +2885,19 @@ impl Jit {
                  schleifen: RefCell::new(Vec::new()),
                  zahl_schleifen: std::cell::Cell::new(0), zahl_laeufe: std::cell::Cell::new(0),
                  zahl_aussteige: std::cell::Cell::new(0),
+                 bilanz: std::env::var_os("DHRT_JIT_BILANZ").is_some(),
+                 vm_runden: RefCell::new(Vec::new()),
                  meldung: RefCell::new(None),
                  fns, arten, mtab,
                  schatten: std::cell::UnsafeCell::new(vec![0; n]),
                  marken: std::cell::UnsafeCell::new(vec![0; n]) })
+    }
+
+    /// Eine Runde einer Schleife, die in der VM bleibt (nur mit Bilanz).
+    pub fn vm_runde(&self, marke: &std::cell::Cell<u32>) {
+        if !self.bilanz { return; }
+        let adr = marke as *const std::cell::Cell<u32> as usize;
+        if let Some(e) = self.vm_runden.borrow_mut().iter_mut().find(|(a, _, _)| *a == adr) { e.2 += 1; }
     }
 
     /// Ruft Funktion `idx` mit den Argumenten vom Stapel der VM. `None`, wenn
@@ -2904,9 +2924,15 @@ impl Jit {
                 Ok(nr) => marke.set(nr as u32 + 2),
                 Err(e) => {
                     // Mit DHRT_JIT_BILANZ: warum eine Schleife in der VM bleibt.
-                    if std::env::var_os("DHRT_JIT_BILANZ").is_some() {
-                        eprintln!("jit: Schleife an Stelle {} in {} bleibt in der VM: {}", kopf,
-                                  if f.name.is_empty() { "(Hauptprogramm)" } else { &f.name }, e);
+                    if self.bilanz {
+                        let wo = format!("Stelle {} in {}", kopf, if f.name.is_empty() { "(Hauptprogramm)" } else { &f.name });
+                        eprintln!("jit: Schleife an {} bleibt in der VM: {}", wo, e);
+                        // Die Runden zaehlt die VM (`vm_runde`) -- eine
+                        // Startschleife mit drei Runden wiegt nicht wie die
+                        // Hauptschleife.
+                        let mut r = self.vm_runden.borrow_mut();
+                        let adr = marke as *const std::cell::Cell<u32> as usize;
+                        if !r.iter().any(|(a, _, _)| *a == adr) { r.push((adr, format!("{}: {}", wo, e), 0)); }
                     }
                     marke.set(1);
                     return None;
@@ -3346,6 +3372,11 @@ impl Drop for Jit {
                       f, self.zahl_schleifen.get(), self.zahl_laeufe.get());
             if self.zahl_aussteige.get() > 0 {
                 eprintln!("jit: {} mal mitten in einer Schleife ausgestiegen", self.zahl_aussteige.get());
+            }
+            let mut r: Vec<(usize, String, u64)> = self.vm_runden.borrow().clone();
+            r.sort_by(|a, b| b.2.cmp(&a.2));
+            for (_, wo, n) in r.iter().filter(|e| e.2 > 0).take(10) {
+                eprintln!("jit: {} Runden in der VM -- {}", n, wo);
             }
         }
     }

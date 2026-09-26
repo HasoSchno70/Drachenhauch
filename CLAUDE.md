@@ -1645,6 +1645,13 @@ in der VM, `WHILE NOT QUITREQUESTED()` blockiert nicht mehr.
 `op::PRINT`, `w_drucken` ruft ihn aus dem Maschinencode. Beispiele: 343 ->
 304 Schleifen in der VM.
 
+**Bilanz mit Runden (M4 Schritt 11):** `DHRT_JIT_BILANZ=1` nennt am Ende
+die zehn Schleifen, die am oeftesten in der VM gedreht haben, samt Grund --
+**den naechsten Schritt danach waehlen, nicht nach der Zahl der
+Schleifen** (eine Startschleife mit drei Runden wog sonst wie die
+Hauptschleife). Handles (IMAGE, SPRITE_ATLAS, SOUND ...) sind Ganzzahlen
+und duerfen im Bereich gelesen werden.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

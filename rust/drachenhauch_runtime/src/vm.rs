@@ -2701,6 +2701,9 @@ impl<'p> Vm<'p> {
                         #[cfg(feature = "jit")]
                         let vmp: *mut Vm = self;
                         #[cfg(feature = "jit")]
+                        // Mit Bilanz: eine Runde einer Schleife, die in der VM bleibt.
+                        #[cfg(feature = "jit")]
+                        if instr.schleife.get() == 1 { if let Some(j) = self.jit.as_ref() { j.vm_runde(&instr.schleife); } }
                         if let Some(j) = self.jit.as_ref().filter(|_| !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
                             {
                                 if let Some(weiter) = j.schleife(vmp, self.prog, fn_, *ip - 1, target, locals, stack, self_obj,
@@ -2887,6 +2890,8 @@ impl<'p> Vm<'p> {
                     #[cfg(feature = "jit")]
                     let vmp: *mut Vm = self;
                     #[cfg(feature = "jit")]
+                    #[cfg(feature = "jit")]
+                    if ziel < *ip && instr.schleife.get() == 1 { if let Some(j) = self.jit.as_ref() { j.vm_runde(&instr.schleife); } }
                     if let Some(j) = self.jit.as_ref().filter(|_| ziel < *ip && !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
                         {
                             if let Some(weiter) = j.schleife(vmp, self.prog, fn_, *ip - 1, ziel, locals, stack, self_obj,
