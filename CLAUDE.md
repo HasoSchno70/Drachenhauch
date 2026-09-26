@@ -1680,6 +1680,11 @@ Coroutinen bleiben in der VM. Runden 132 738 -> 73 456.
 ueber `w_auspacken`/`w_tupel`; passt ein Tupel nicht, steigt der Bereich
 vor dem Befehl aus und die VM meldet. Runden 73 456 -> 40 114.
 
+**Mitglieder von Werten (M4 Schritt 17):** `obj.x` auf einem Objekt als
+Wert (Wertemodus) ueber `w_mitglied_lesen`/`_setzen` -> `Vm::member_laden`/
+`member_setzen`; PROPERTYs dieses Namens prueft `mitglied_harmlos` wie
+Methoden. Runden 40 114 -> 18 233.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

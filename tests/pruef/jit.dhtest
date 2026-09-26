@@ -2222,10 +2222,8 @@ DHRT_JIT_BILANZ=1
 4.75 -4.75 5 4.75
 --- stderr
 jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
-jit: Schleife an Stelle 37 in __main__ bleibt in der VM: eingebauter Befehl; mit Werten: Mitglied von etwas, das kein Objekt ist
-jit: 0 Funktionen, 1 Schleifen, 5 Schleifenlaeufe
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
 jit: 18 Runden in der VM -- Stelle 14 in __main__: Objekt; mit Werten: Objekt
-jit: 3 Runden in der VM -- Stelle 37 in __main__: eingebauter Befehl; mit Werten: Mitglied von etwas, das kein Objekt ist
 
 === self-felder in einer schleife einer methode
 CLASS Konto
@@ -2329,10 +2327,8 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 11808 7 12 13 20
 --- stderr
-jit: Schleife an Stelle 39 in __main__ bleibt in der VM: Befehl 68; mit Werten: Mitglied von etwas, das kein Objekt ist
-jit: 0 Funktionen, 1 Schleifen, 3 Schleifenlaeufe
-jit: 3 mal mitten in einer Schleife ausgestiegen
-jit: 1 Runden in der VM -- Stelle 39 in __main__: Befehl 68; mit Werten: Mitglied von etwas, das kein Objekt ist
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
 
 === property in der schleife bleibt in der vm
 CLASS P
@@ -2377,9 +2373,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 114
 --- stderr
-jit: Schleife an Stelle 14 in __main__ bleibt in der VM: PROPERTY w; mit Werten: Mitglied von etwas, das kein Objekt ist
-jit: 2 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
-jit: 3 Runden in der VM -- Stelle 14 in __main__: PROPERTY w; mit Werten: Mitglied von etwas, das kein Objekt ist
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === objekt in einem feld eines objekts
 CLASS Punkt
@@ -2753,10 +2747,8 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 66 8 10
 --- stderr
-jit: Schleife an Stelle 24 in __main__ bleibt in der VM: Befehl 68; mit Werten: Mitglied von etwas, das kein Objekt ist
-jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
-jit: 6 mal mitten in einer Schleife ausgestiegen
-jit: 1 Runden in der VM -- Stelle 24 in __main__: Befehl 68; mit Werten: Mitglied von etwas, das kein Objekt ist
+jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
+jit: 2 mal mitten in einer Schleife ausgestiegen
 
 === text anhaengen in einer schleife
 DIM s AS STRING
@@ -4291,9 +4283,8 @@ DHRT_JIT_BILANZ=1
 gefangen: Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 6
 7 7000000000000000000
 --- stderr
-jit: Schleife an Stelle 18 in __main__ bleibt in der VM: Ausgabe (PRINT); mit Werten: Mitglied von etwas, das kein Objekt ist
-jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
-jit: 5 Runden in der VM -- Stelle 18 in __main__: Ausgabe (PRINT); mit Werten: Mitglied von etwas, das kein Objekt ist
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
 
 === ueberschreibung aus der vm gerufen
 CLASS Tier
@@ -4356,9 +4347,7 @@ DHRT_JIT_BILANZ=1
 2 20
 3 30
 --- stderr
-jit: Schleife an Stelle 17 in __main__ bleibt in der VM: Konstante STRING ist keine Zahl; mit Werten: Mitglied von etwas, das kein Objekt ist
-jit: 4 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
-jit: 1 Runden in der VM -- Stelle 17 in __main__: Konstante STRING ist keine Zahl; mit Werten: Mitglied von etwas, das kein Objekt ist
+jit: 4 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === zahlbefehle in einer schleife
 DIM s AS FLOAT
@@ -6525,6 +6514,369 @@ DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 gefangen: Zuweisung an global: FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+4 112233
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== felder von objekten als werte lesen und setzen
+CLASS Flocke
+    DIM x AS FLOAT
+    DIM name AS STRING
+END CLASS
+DIM teile[5] AS Flocke
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO 4
+    teile[i] = NEW Flocke()
+    teile[i].x = i * 1.5
+NEXT
+DIM t AS STRING
+FOR k = 1 TO 3
+    FOR i = 0 TO 4
+        teile[i].x = teile[i].x + k
+        teile[i].name = teile[i].name + STR$(i)
+    NEXT
+NEXT
+FOR i = 0 TO 4
+    t = t + STR$(teile[i].x) + ":" + teile[i].name + " "
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+6.0:000 7.5:111 9.0:222 10.5:333 12.0:444 
+
+=== felder von objekten als werte lesen und setzen (maschinencode)
+CLASS Flocke
+    DIM x AS FLOAT
+    DIM name AS STRING
+END CLASS
+DIM teile[5] AS Flocke
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO 4
+    teile[i] = NEW Flocke()
+    teile[i].x = i * 1.5
+NEXT
+DIM t AS STRING
+FOR k = 1 TO 3
+    FOR i = 0 TO 4
+        teile[i].x = teile[i].x + k
+        teile[i].name = teile[i].name + STR$(i)
+    NEXT
+NEXT
+FOR i = 0 TO 4
+    t = t + STR$(teile[i].x) + ":" + teile[i].name + " "
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+6.0:000 7.5:111 9.0:222 10.5:333 12.0:444 
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
+jit: 0 Funktionen, 3 Schleifen, 3 Schleifenlaeufe
+jit: 3 Runden in der VM -- Stelle 15 in __main__: Objekt; mit Werten: Objekt
+
+=== property als wert in der schleife
+DIM zugriffe AS INTEGER
+CLASS Konto
+    DIM _stand AS INTEGER
+    PROPERTY GET stand() AS INTEGER
+        zugriffe = zugriffe + 1
+        RETURN Self._stand
+    END PROPERTY
+    PROPERTY SET stand(v AS INTEGER)
+        IF v < 0 THEN v = 0
+        Self._stand = v
+    END PROPERTY
+END CLASS
+DIM ks[3] AS Konto
+DIM i AS INTEGER
+DIM r AS INTEGER
+FOR i = 0 TO 2
+    ks[i] = NEW Konto()
+NEXT
+DIM t AS STRING
+FOR r = 1 TO 4
+    FOR i = 0 TO 2
+        ks[i].stand = ks[i].stand + i - 1
+        t = t + STR$(ks[i].stand)
+    NEXT
+NEXT
+PRINT t; " "; zugriffe
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+001002003004 24
+
+=== property als wert in der schleife (maschinencode)
+DIM zugriffe AS INTEGER
+CLASS Konto
+    DIM _stand AS INTEGER
+    PROPERTY GET stand() AS INTEGER
+        zugriffe = zugriffe + 1
+        RETURN Self._stand
+    END PROPERTY
+    PROPERTY SET stand(v AS INTEGER)
+        IF v < 0 THEN v = 0
+        Self._stand = v
+    END PROPERTY
+END CLASS
+DIM ks[3] AS Konto
+DIM i AS INTEGER
+DIM r AS INTEGER
+FOR i = 0 TO 2
+    ks[i] = NEW Konto()
+NEXT
+DIM t AS STRING
+FOR r = 1 TO 4
+    FOR i = 0 TO 2
+        ks[i].stand = ks[i].stand + i - 1
+        t = t + STR$(ks[i].stand)
+    NEXT
+NEXT
+PRINT t; " "; zugriffe
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+001002003004 24
+--- stderr
+jit: Schleife an Stelle 16 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
+jit: 2 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+jit: 1 Runden in der VM -- Stelle 16 in __main__: Objekt; mit Werten: Objekt
+
+=== property beruehrt eine globale des bereichs
+DIM summe AS INTEGER
+CLASS Zaehler
+    DIM _n AS INTEGER
+    PROPERTY GET n() AS INTEGER
+        summe = summe + 1000
+        RETURN Self._n
+    END PROPERTY
+END CLASS
+DIM zs[2] AS Zaehler
+DIM i AS INTEGER
+DIM t AS STRING
+zs[0] = NEW Zaehler()
+zs[1] = NEW Zaehler()
+FOR i = 1 TO 6
+    summe = summe + 1
+    t = t + STR$(zs[i MOD 2].n)
+NEXT
+PRINT summe; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+6006 000000
+
+=== property beruehrt eine globale des bereichs (maschinencode)
+DIM summe AS INTEGER
+CLASS Zaehler
+    DIM _n AS INTEGER
+    PROPERTY GET n() AS INTEGER
+        summe = summe + 1000
+        RETURN Self._n
+    END PROPERTY
+END CLASS
+DIM zs[2] AS Zaehler
+DIM i AS INTEGER
+DIM t AS STRING
+zs[0] = NEW Zaehler()
+zs[1] = NEW Zaehler()
+FOR i = 1 TO 6
+    summe = summe + 1
+    t = t + STR$(zs[i MOD 2].n)
+NEXT
+PRINT summe; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+6006 000000
+--- stderr
+jit: Schleife an Stelle 24 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: PROPERTY n: __get_n beruehrt die Globale 'summe' des Bereichs
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 4 Runden in der VM -- Stelle 24 in __main__: globale Variable, die keine Zahl ist; mit Werten: PROPERTY n: __get_n beruehrt die Globale 'summe' des Bereichs
+
+=== mitglied von nil mitten in der schleife
+CLASS Punkt
+    DIM x AS INTEGER
+END CLASS
+DIM ps[4] AS Punkt
+DIM i AS INTEGER
+DIM t AS STRING
+ps[0] = NEW Punkt()
+ps[1] = NEW Punkt()
+ps[3] = NEW Punkt()
+TRY
+    FOR i = 0 TO 3
+        ps[i].x = i * 10
+        t = t + STR$(ps[i].x) + ","
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Zuweisung an '.x' bei NIL-Referenz -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+2 0,10,
+
+=== mitglied von nil mitten in der schleife (maschinencode)
+CLASS Punkt
+    DIM x AS INTEGER
+END CLASS
+DIM ps[4] AS Punkt
+DIM i AS INTEGER
+DIM t AS STRING
+ps[0] = NEW Punkt()
+ps[1] = NEW Punkt()
+ps[3] = NEW Punkt()
+TRY
+    FOR i = 0 TO 3
+        ps[i].x = i * 10
+        t = t + STR$(ps[i].x) + ","
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Zuweisung an '.x' bei NIL-Referenz -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())
+2 0,10,
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== setter wirft mitten in der schleife
+DIM protokoll AS STRING
+CLASS Wert
+    DIM _v AS INTEGER
+    PROPERTY GET v() AS INTEGER
+        RETURN Self._v
+    END PROPERTY
+    PROPERTY SET v(neu AS INTEGER)
+        protokoll = protokoll + STR$(neu) + ";"
+        IF neu > 3 THEN THROW "zu gross"
+        Self._v = neu
+    END PROPERTY
+END CLASS
+DIM ws[2] AS Wert
+DIM i AS INTEGER
+DIM t AS STRING
+ws[0] = NEW Wert()
+ws[1] = NEW Wert()
+TRY
+    FOR i = 1 TO 6
+        ws[i MOD 2].v = i
+        t = t + STR$(ws[i MOD 2].v)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t; " "; protokoll
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: zu gross
+4 123 1;2;3;4;
+
+=== setter wirft mitten in der schleife (maschinencode)
+DIM protokoll AS STRING
+CLASS Wert
+    DIM _v AS INTEGER
+    PROPERTY GET v() AS INTEGER
+        RETURN Self._v
+    END PROPERTY
+    PROPERTY SET v(neu AS INTEGER)
+        protokoll = protokoll + STR$(neu) + ";"
+        IF neu > 3 THEN THROW "zu gross"
+        Self._v = neu
+    END PROPERTY
+END CLASS
+DIM ws[2] AS Wert
+DIM i AS INTEGER
+DIM t AS STRING
+ws[0] = NEW Wert()
+ws[1] = NEW Wert()
+TRY
+    FOR i = 1 TO 6
+        ws[i MOD 2].v = i
+        t = t + STR$(ws[i MOD 2].v)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t; " "; protokoll
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: zu gross
+4 123 1;2;3;4;
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== falscher typ fuer ein feld als wert
+CLASS Box
+    DIM n AS INTEGER
+    DIM s AS STRING
+END CLASS
+DIM bs[2] AS Box
+DIM i AS INTEGER
+DIM t AS STRING
+bs[0] = NEW Box()
+bs[1] = NEW Box()
+TRY
+    FOR i = 1 TO 5
+        bs[i MOD 2].s = STR$(i)
+        IF i = 4 THEN bs[i MOD 2].n = 2.5 ELSE bs[i MOD 2].n = i
+        t = t + bs[i MOD 2].s + STR$(bs[i MOD 2].n)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Zuweisung an box.n: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+4 112233
+
+=== falscher typ fuer ein feld als wert (maschinencode)
+CLASS Box
+    DIM n AS INTEGER
+    DIM s AS STRING
+END CLASS
+DIM bs[2] AS Box
+DIM i AS INTEGER
+DIM t AS STRING
+bs[0] = NEW Box()
+bs[1] = NEW Box()
+TRY
+    FOR i = 1 TO 5
+        bs[i MOD 2].s = STR$(i)
+        IF i = 4 THEN bs[i MOD 2].n = 2.5 ELSE bs[i MOD 2].n = i
+        t = t + bs[i MOD 2].s + STR$(bs[i MOD 2].n)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Zuweisung an box.n: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
 4 112233
 --- stderr
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
