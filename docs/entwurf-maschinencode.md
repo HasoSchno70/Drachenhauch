@@ -727,6 +727,25 @@ Text/Zahl/NIL als Wert, Spielschleife mit NOT und Konstanten, Konstanten in
 Funktionen); drei Gegenproben, alle mit falschem Ergebnis (NOT ungekippt,
 PI als TAU, Farbwert + 1).
 
+**Schritt 10 (2026-09-26): PRINT im Wertemodus.** Naechster Grund im
+Durchlauf ueber die Beispiele: "Ausgabe (PRINT)", 42 Schleifen. Der Rumpf
+von `op::PRINT` steht jetzt in `Vm::drucken` (Trenner, Umbruch, Leeren bei
+`DHRT_LIVE`), und der Wertemodus ruft ihn ueber `w_drucken` mit den Werten
+von den Plaetzen -- dieselbe Ausgabe, derselbe Puffer. PRINT kann nicht
+scheitern; weil es eine Nebenwirkung ist, setzt es `schreibt_felder`: ein
+Bereich, der aufgeben und die VM von vorn rechnen lassen muesste (er ruft
+eine Funktion, die Globale schreibt), wuerde doppelt drucken -- so einer wird
+im Wertemodus ohnehin nicht gebaut, und genau das haelt ein Fall fest
+(Gegenprobe: ohne die Pruefung stehen die Zeilen doppelt da). Danach 304
+statt 343 Schleifen in der VM. Die naechsten Gruende: zwei Wege mit
+verschiedenen Arten (32), GUI_UPDATE (23), Mitglied von etwas, das kein
+Objekt ist (21).
+
+Pruefung: 4 Faelle mehr in `jit.dhtest` (Trenner und leere PRINTs, PRINT vor
+einem Fehler in derselben Runde, PRINT mit einer Funktion, die Globale
+schreibt, Werte aller Art); drei Gegenproben am Ergebnis (Werte vertauscht,
+letzter Wert fehlt, Schutz vor dem Aufgeben entfernt).
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

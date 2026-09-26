@@ -619,6 +619,15 @@ extern "C" fn w_methode(k: *mut Kontext, ins: u64, basis: u64, argc: u64) {
     }
 }
 
+/// PRINT im Wertemodus (M4 Schritt 10): die Werte von den Plaetzen nehmen und
+/// denselben Code der VM rufen (`Vm::drucken`). Kann nicht scheitern.
+extern "C" fn w_drucken(k: *mut Kontext, ins: u64, basis: u64, n: u64) {
+    let ins: &'static crate::model::Instr = unsafe { &*(ins as *const crate::model::Instr) };
+    let items: Vec<Value> = (0..n).map(|j| w_nehmen(k, basis + j)).collect();
+    let vm = unsafe { &mut *(*k).vm };
+    vm.drucken(&ins.arg, &items);
+}
+
 /// Plaetze, die ein Befehl anfasst; Namen (LOAD_NAME ...) ueber `global_names`.
 fn globale_plaetze(prog: &Program, g: &Func, ins: &crate::model::Instr) -> Vec<usize> {
     match ins.op {
@@ -763,6 +772,7 @@ const W_BUILTIN_F: usize = 11;
 const W_INDEX: usize = 12;
 const W_SETZEN: usize = 13;
 const W_METHODE: usize = 14;
+const W_DRUCKEN: usize = 15;
 
 type Einstieg = unsafe extern "C" fn(*mut Kontext, *const u64, *mut u64);
 
@@ -1217,6 +1227,14 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 let a = zahl_befehl(&name, &z.stapel[z.stapel.len() - argc..]).unwrap();
                 z.stapel.truncate(z.stapel.len() - argc);
                 z.stapel.push(a);
+            }
+            op::PRINT if modus_w => {
+                let n = ins.arg.list()[0].as_usize();
+                for _ in 0..n { if !w_oder_skalar(pop!()) { return Err("PRINT eines Feldes".into()); } }
+                // Eine Nebenwirkung wie eine Feldschreibung: ein Bereich, der
+                // aufgeben und die VM von vorn rechnen lassen muesste, druckte
+                // sonst doppelt.
+                schreibt_felder = true;
             }
             op::CALL_BUILTIN if modus_w => {
                 let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => return Err("Befehl ohne Namen".into()) };
@@ -2106,6 +2124,14 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                             None => { let n = bau.b.ins().iconst(types::I64, 0); st.push((n, Art::N)); }
                         }
                     }
+                    op::PRINT => {
+                        let n = ins.arg.list()[0].as_usize();
+                        let d = st.len() - n;
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let (ip_c, basis, nc) = (bau.iconst(ins as *const crate::model::Instr as i64), bau.iconst(bau.w_slot(d)), bau.iconst(n as i64));
+                        bau.w_ruf(W_DRUCKEN, &[ip_c, basis, nc]);
+                    }
                     op::CALL_METHOD => {
                         let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
                         let d = st.len() - argc - 1;
@@ -2706,7 +2732,7 @@ impl Jit {
         builder.symbol("dh_journal_schluss", journal_schluss as *const u8);
         builder.symbol("dh_mathe1", mathe1 as *const u8);
         builder.symbol("dh_mathe2", mathe2 as *const u8);
-        let w_namen: [(&str, *const u8); 15] = [
+        let w_namen: [(&str, *const u8); 16] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
             ("dh_w_ablegen_f", w_ablegen_f as *const u8), ("dh_w_zahl_i", w_zahl_i as *const u8),
@@ -2714,7 +2740,7 @@ impl Jit {
             ("dh_w_op", w_op as *const u8), ("dh_w_wahr", w_wahr as *const u8),
             ("dh_w_builtin_i", w_builtin_i as *const u8), ("dh_w_builtin_f", w_builtin_f as *const u8),
             ("dh_w_index", w_index as *const u8), ("dh_w_setzen", w_setzen as *const u8),
-            ("dh_w_methode", w_methode as *const u8),
+            ("dh_w_methode", w_methode as *const u8), ("dh_w_drucken", w_drucken as *const u8),
         ];
         for (n, f) in w_namen { builder.symbol(n, f); }
         let mut modul = JITModule::new(builder);
@@ -2760,6 +2786,7 @@ impl Jit {
             ("dh_w_index", vec![ptr, i, i], None),
             ("dh_w_setzen", vec![ptr, i, i], None),
             ("dh_w_methode", vec![ptr, i, i, i], None),
+            ("dh_w_drucken", vec![ptr, i, i, i], None),
         ].into_iter().map(|(n, pa, r): (&str, Vec<Type>, Option<Type>)| (n, sig_h(&pa, r))).collect();
         let mut dekl = |name: &str, sg: &cranelift_codegen::ir::Signature| modul.declare_function(name, Linkage::Import, sg)
             .map_err(|e| format!("{:?}", e));
