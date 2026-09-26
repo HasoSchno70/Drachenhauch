@@ -192,6 +192,10 @@ END FUNCTION
 ' Die App bekommt die Berechtigungen aus `rechte` (dhrt.entitlements): der
 ' Maschinencode macht Speicher ausfuehrbar, und das verbietet Hardened
 ' Runtime ohne sie -- die App stuerzte beim ersten uebersetzten Aufruf ab.
+' Cranelift schaltet Speicher per mprotect auf ausfuehrbar (kein MAP_JIT),
+' darum allow-unsigned-executable-memory; allow-jit allein reicht nicht.
+' Die Datei traegt KEINEN Kommentar: codesign liest sie mit einem strengen
+' XML-Leser, und ein "--" im Kommentar liess die Signatur scheitern.
 SUB macosSignieren(ziel AS STRING, ident AS STRING, istApp AS BOOLEAN, rechte AS STRING)
     IF ident = "" THEN
         IF istApp THEN mussLaufen(PROCESS_START("codesign", "--force", "--options", "runtime", "--entitlements", rechte, "--sign", "-", ziel), "codesign")
