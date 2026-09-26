@@ -669,6 +669,19 @@ extern "C" fn w_methode(k: *mut Kontext, ins: u64, basis: u64, argc: u64) {
     }
 }
 
+/// Eine Funktion, die in der VM bleibt, aus einem Bereich rufen (M4 Schritt
+/// 15): Argumente von den Plaetzen nehmen, das Ergebnis nach `basis`.
+extern "C" fn w_funktion(k: *mut Kontext, ins: u64, basis: u64, argc: u64) {
+    let ins: &'static crate::model::Instr = unsafe { &*(ins as *const crate::model::Instr) };
+    let idx = match &ins.arg { Arg::Call(_, _, i) if *i >= 0 => *i as usize, _ => { w_fehler(k); return; } };
+    let args: Vec<Value> = (0..argc).map(|j| w_nehmen(k, basis + j)).collect();
+    let vm = unsafe { &mut *(*k).vm };
+    match vm.funktion_rufen(idx, args) {
+        Ok(v) => *w_platz(k, basis) = v,
+        Err(e) => { unsafe { (*k).meldung = Some(e); } w_fehler(k); }
+    }
+}
+
 /// PRINT im Wertemodus (M4 Schritt 10): die Werte von den Plaetzen nehmen und
 /// denselben Code der VM rufen (`Vm::drucken`). Kann nicht scheitern.
 extern "C" fn w_drucken(k: *mut Kontext, ins: u64, basis: u64, n: u64) {
@@ -699,9 +712,31 @@ fn globale_plaetze(prog: &Program, g: &Func, ins: &crate::model::Instr) -> Vec<u
 /// ruft, darf eine Globale beruehren, die der Bereich beruehrt; und nichts
 /// darf Drachenhauch-Code ueber Umwege rufen (FUNCREF, Coroutinen,
 /// Rueckrufe) oder das Programm beenden.
-fn methoden_harmlos<'a>(prog: &'a Program, f: &'a Func, von: usize, bis: usize, name: &str) -> Result<(), String> {
-    // Die Globalen des Bereichs samt aller freien Funktionen, die er ruft
-    // (die lesen und schreiben ueber den Schatten).
+fn methoden_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, name: &str) -> Result<(), String> {
+    let methoden: Vec<&'a Func> = prog.classes.values().flat_map(|c| c.methods.iter())
+        .filter(|(m, _)| m.eq_ignore_ascii_case(name)).map(|(_, g)| g).collect();
+    if methoden.is_empty() && !crate::vm::ist_container_methode(name) {
+        return Err(format!("Methode {} (keine Klasse hat sie)", name));
+    }
+    gerufenes_harmlos(prog, f, b, methoden, &format!("Methode {}", name))
+}
+
+/// Darf ein Bereich die Funktion `g` rufen, die in der VM bleibt (M4 Schritt
+/// 15)? Dieselben Regeln wie fuer Methoden.
+fn funktion_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, g: &'a Func) -> Result<(), String> {
+    if g.is_coroutine { return Err(format!("Funktion {} ist eine Coroutine", g.name)); }
+    if g.param_byref.iter().any(|&x| x) { return Err(format!("Funktion {} hat BYREF-Parameter", g.name)); }
+    gerufenes_harmlos(prog, f, b, vec![g], &format!("Funktion {}", g.name))
+}
+
+/// Gemeinsamer Teil: `start` und alles, was es ruft, darf keine Globale
+/// beruehren, die der Bereich (samt der Funktionen, die er als Maschinencode
+/// ruft) beruehrt, und nichts ueber Umwege rufen.
+fn gerufenes_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, start: Vec<&'a Func>, was: &str) -> Result<(), String> {
+    let name = was;
+    // Die Globalen des Bereichs samt aller freien Funktionen, die er als
+    // Maschinencode ruft (die lesen und schreiben ueber den Schatten). Was er
+    // ueber die VM ruft, zaehlt nicht: das laeuft wie hier nacheinander.
     let mut bereich: Vec<usize> = Vec::new();
     let mut offen: Vec<&'a Func> = Vec::new();
     let mut gesehen: Vec<*const Func> = Vec::new();
@@ -710,22 +745,26 @@ fn methoden_harmlos<'a>(prog: &'a Program, f: &'a Func, von: usize, bis: usize, 
             if let Arg::Call(_, _, i) = &ins.arg { if let Some(h) = prog.functions.get(*i as usize) { offen.push(h); } }
         }
     };
-    for ins in &f.code[von..=bis] { bereich.extend(globale_plaetze(prog, f, ins)); rufe(ins, &mut offen); }
+    for ins in &f.code[b.von..=b.bis] {
+        bereich.extend(globale_plaetze(prog, f, ins));
+        let ueber_vm = match &ins.arg {
+            Arg::Call(_, _, i) if ins.op == op::CALL_USER && *i >= 0 => b.vm_fns.get(*i as usize).copied().unwrap_or(false),
+            _ => false,
+        };
+        if !ueber_vm { rufe(ins, &mut offen); }
+    }
     while let Some(g) = offen.pop() {
         if gesehen.contains(&(g as *const Func)) { continue; }
         gesehen.push(g);
         for ins in &g.code { bereich.extend(globale_plaetze(prog, g, ins)); rufe(ins, &mut offen); }
     }
-    // Alle Methoden dieses Namens, dazu die Operatoren und PROPERTYs, die sie
-    // ueber `a + b` bzw. `obj.x` erreichen, und alles, was die rufen.
+    // Der Anfang, dazu die Operatoren und PROPERTYs, die er ueber `a + b`
+    // bzw. `obj.x` erreicht, und alles, was die rufen.
     let methoden = |n: &str| -> Vec<&'a Func> {
         prog.classes.values().flat_map(|c| c.methods.iter())
             .filter(|(m, _)| m.eq_ignore_ascii_case(n)).map(|(_, g)| g).collect()
     };
-    let mut offen: Vec<&'a Func> = methoden(name);
-    if offen.is_empty() && !crate::vm::ist_container_methode(name) {
-        return Err(format!("Methode {} (keine Klasse hat sie)", name));
-    }
+    let mut offen: Vec<&'a Func> = start;
     for c in prog.classes.values() {
         for (m, g) in &c.methods { if m.starts_with("__op_") { offen.push(g); } }
     }
@@ -737,7 +776,7 @@ fn methoden_harmlos<'a>(prog: &'a Program, f: &'a Func, von: usize, bis: usize, 
             for p in globale_plaetze(prog, g, ins) {
                 if bereich.contains(&p) {
                     let gn = prog.global_names.get(p).cloned().unwrap_or_default();
-                    return Err(format!("Methode {}: {} beruehrt die Globale '{}' des Bereichs", name, g.name, gn));
+                    return Err(format!("{}: {} beruehrt die Globale '{}' des Bereichs", name, g.name, gn));
                 }
             }
             match ins.op {
@@ -748,12 +787,12 @@ fn methoden_harmlos<'a>(prog: &'a Program, f: &'a Func, von: usize, bis: usize, 
                     offen.extend(methoden(&format!("__set_{}", n)));
                 },
                 op::CALL_VALUE | op::CALL_SUPER =>
-                    return Err(format!("Methode {}: {} ruft {}", name, g.name, befehl_name(ins.op))),
+                    return Err(format!("{}: {} ruft {}", name, g.name, befehl_name(ins.op))),
                 op::CALL_BUILTIN => if let Arg::Call(n, _, _) = &ins.arg {
                     let n: &str = n;
                     if n == "sort" || n == "__comp_iter" || n.starts_with("coro_") || n.starts_with("task_")
                         || n == "gui_update" || n == "timer_update" || n == "exit" || n == "end" {
-                        return Err(format!("Methode {}: {} ruft {}", name, g.name, n.to_uppercase()));
+                        return Err(format!("{}: {} ruft {}", name, g.name, n.to_uppercase()));
                     }
                 },
                 _ => {}
@@ -804,7 +843,7 @@ struct Hilfe {
     journal_schluss: FuncId,
     mathe1: FuncId,
     mathe2: FuncId,
-    w: [FuncId; 16],
+    w: [FuncId; 17],
 }
 
 /// Plaetze in `Hilfe::w`.
@@ -824,6 +863,7 @@ const W_INDEX: usize = 12;
 const W_SETZEN: usize = 13;
 const W_METHODE: usize = 14;
 const W_DRUCKEN: usize = 15;
+const W_FUNKTION: usize = 16;
 
 type Einstieg = unsafe extern "C" fn(*mut Kontext, *const u64, *mut u64);
 
@@ -856,7 +896,10 @@ pub struct Jit {
     glob: Globale,
     /// Uebersetzte Schleifen; `Instr::schleife` an der Ruecksprung-Stelle
     /// zeigt hierher (Index + 2; 1 = nie, 0 = noch nicht versucht).
-    schleifen: RefCell<Vec<Schleife>>,
+    /// Als `Rc`: waehrend ein Bereich laeuft, haelt niemand die Liste -- eine
+    /// Funktion, die er ueber die VM ruft, darf selbst in eine Schleife
+    /// eintreten (M4 Schritt 15).
+    schleifen: RefCell<Vec<Rc<Schleife>>>,
     zahl_schleifen: std::cell::Cell<usize>,
     zahl_laeufe: std::cell::Cell<u64>,
     zahl_aussteige: std::cell::Cell<u64>,
@@ -889,7 +932,7 @@ struct Schleife {
     start: Vec<Option<Art>>,
     ausgaenge: Vec<(usize, Vec<Option<Art>>)>,
     beruehrt: Vec<usize>,
-    fehlschlaege: u32,
+    fehlschlaege: std::cell::Cell<u32>,
     felder: Vec<FeldInfo>,
     aussteige: Vec<Aussteig>,
     klassen: Vec<Klasse>,
@@ -1066,6 +1109,9 @@ struct Bereich {
     /// Objekte mit Zeigern -- ein eingebauter Befehl koennte ein Feld wachsen
     /// lassen oder ein Objekt freigeben, auf das ein Zeiger zeigt).
     modus_w: bool,
+    /// Nur Wertemodus: je Funktion, ob sie in der VM bleibt -- dann ruft der
+    /// Bereich sie ueber die VM (`w_funktion`, M4 Schritt 15).
+    vm_fns: Vec<bool>,
 }
 
 struct Analyse {
@@ -1083,6 +1129,8 @@ struct Analyse {
     /// und diese Plaetze -- gibt es einen davon spaeter, wird neu gebaut.
     feste_ausstiege: Vec<usize>,
     fehlende: Vec<usize>,
+    /// Aufrufe, die ueber die VM gehen (M4 Schritt 15).
+    vm_aufrufe: Vec<usize>,
     /// Globale Plaetze, die sie selbst liest oder schreibt, und die sie
     /// schreibt.
     beruehrt: Vec<usize>,
@@ -1186,6 +1234,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
     let mut geschrieben: Vec<usize> = Vec::new();
     let mut ausgaenge: Vec<usize> = Vec::new();
     let mut feste_ausstiege: Vec<usize> = Vec::new();
+    let mut vm_aufrufe: Vec<usize> = Vec::new();
     let mut fehlende: Vec<usize> = Vec::new();
     let mut felder: Vec<FeldInfo> = bereich.map_or(Vec::new(), |b| b.felder.clone());
     let mut schreibt_felder = false;
@@ -1334,7 +1383,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
             op::CALL_METHOD if modus_w => {
                 let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => return Err("Methode ohne Namen".into()) };
                 let b = bereich.ok_or("Methode ausserhalb eines Bereichs")?;
-                methoden_harmlos(prog, f, b.von, b.bis, &name)?;
+                methoden_harmlos(prog, f, b, &name)?;
                 for _ in 0..argc { if !w_oder_skalar(pop!()) { return Err("Argument NIL".into()); } }
                 if pop!() != Art::W { return Err("Methode auf etwas, das kein Wert ist".into()); }
                 z.stapel.push(Art::W);
@@ -1545,6 +1594,21 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 if !skalar(a) && !(modus_w && a == Art::W) { return Err("Sprung auf NIL oder ein Feld".into()); }
                 melden(&mut vor, &mut offen, ziel(&ins.arg), &z)?;
             }
+            op::CALL_USER if modus_w && match &ins.arg {
+                Arg::Call(_, _, i) => *i >= 0 && bereich.map_or(false, |b| b.vm_fns.get(*i as usize).copied().unwrap_or(false)),
+                _ => false,
+            } => {
+                // Eine Funktion, die in der VM bleibt: die VM ruft sie
+                // (`w_funktion`), wie eine Methode (M4 Schritt 15).
+                let (argc, idx) = match &ins.arg { Arg::Call(_, c, i) => (*c as usize, *i as usize), _ => unreachable!() };
+                let g = prog.functions.get(idx).ok_or("Aufruf ins Leere")?;
+                if argc != g.n_params { return Err(format!("Aufruf von {} mit {} statt {} Argumenten", g.name, argc, g.n_params)); }
+                funktion_harmlos(prog, f, bereich.unwrap(), g)?;
+                for _ in 0..argc { if !w_oder_skalar(pop!()) { return Err("Argument NIL".into()); } }
+                z.stapel.push(Art::W);
+                if !vm_aufrufe.contains(&ip) { vm_aufrufe.push(ip); }
+                schreibt_felder = true;
+            }
             op::CALL_USER => {
                 let (argc, idx) = match &ins.arg { Arg::Call(_, c, i) => (*c as usize, *i), _ => return Err("Aufruf ohne Index".into()) };
                 if idx < 0 { return Err("Aufruf ohne Index".into()); }
@@ -1593,7 +1657,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
         if weiter { melden(&mut vor, &mut offen, ip + 1, &z)?; }
     }
     Ok(Analyse { vor, ausgaenge, params, rueck, gerufen, beruehrt, geschrieben, felder, schreibt_felder,
-                 klassen, selbst, dyn_glob, typen, modus_w, feste_ausstiege, fehlende })
+                 klassen, selbst, dyn_glob, typen, modus_w, feste_ausstiege, fehlende, vm_aufrufe })
 }
 
 /// Fuer den Grund in `dhrt --jit`: was die Funktion tut, das der
@@ -2270,6 +2334,17 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let (ip_c, basis, nc) = (bau.iconst(ins as *const crate::model::Instr as i64), bau.iconst(bau.w_slot(d)), bau.iconst(n as i64));
                         bau.w_ruf(W_DRUCKEN, &[ip_c, basis, nc]);
                     }
+                    op::CALL_USER if an.vm_aufrufe.contains(&ip) => {
+                        let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
+                        let d = st.len() - argc;
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let (ip_c, basis, n) = (bau.iconst(ins as *const crate::model::Instr as i64), bau.iconst(bau.w_slot(d)), bau.iconst(argc as i64));
+                        bau.w_ruf(W_FUNKTION, &[ip_c, basis, n]);
+                        bau.fehler_pruefen();
+                        let z = bau.iconst(0);
+                        st.push((z, Art::W));
+                    }
                     op::CALL_METHOD => {
                         let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
                         let d = st.len() - argc - 1;
@@ -2904,7 +2979,7 @@ impl Jit {
         builder.symbol("dh_journal_schluss", journal_schluss as *const u8);
         builder.symbol("dh_mathe1", mathe1 as *const u8);
         builder.symbol("dh_mathe2", mathe2 as *const u8);
-        let w_namen: [(&str, *const u8); 16] = [
+        let w_namen: [(&str, *const u8); 17] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
             ("dh_w_ablegen_f", w_ablegen_f as *const u8), ("dh_w_zahl_i", w_zahl_i as *const u8),
@@ -2913,6 +2988,7 @@ impl Jit {
             ("dh_w_builtin_i", w_builtin_i as *const u8), ("dh_w_builtin_f", w_builtin_f as *const u8),
             ("dh_w_index", w_index as *const u8), ("dh_w_setzen", w_setzen as *const u8),
             ("dh_w_methode", w_methode as *const u8), ("dh_w_drucken", w_drucken as *const u8),
+            ("dh_w_funktion", w_funktion as *const u8),
         ];
         for (n, f) in w_namen { builder.symbol(n, f); }
         let mut modul = JITModule::new(builder);
@@ -2960,10 +3036,11 @@ impl Jit {
             ("dh_w_setzen", vec![ptr, i, i], None),
             ("dh_w_methode", vec![ptr, i, i, i], None),
             ("dh_w_drucken", vec![ptr, i, i, i], None),
+            ("dh_w_funktion", vec![ptr, i, i, i], None),
         ].into_iter().map(|(n, pa, r): (&str, Vec<Type>, Option<Type>)| (n, sig_h(&pa, r))).collect();
         let mut dekl = |name: &str, sg: &cranelift_codegen::ir::Signature| modul.declare_function(name, Linkage::Import, sg)
             .map_err(|e| format!("{:?}", e));
-        let mut w_ids = [holen_id; 16];
+        let mut w_ids = [holen_id; 17];
         for (j, (n, sg)) in w_sigs.iter().enumerate() { w_ids[j] = dekl(n, sg)?; }
         let hilfe = Hilfe {
             holen: holen_id,
@@ -3106,13 +3183,11 @@ impl Jit {
         let nr = marke.get();
         if nr < 2 { return None; }
         let nr = (nr - 2) as usize;
-        let mut sch = self.schleifen.borrow_mut();
-        let s = &mut sch[nr];
-        if s.kopf != kopf || s.fehlschlaege >= MAX_FEHLSCHLAEGE { return None; }
+        let s: Rc<Schleife> = match self.schleifen.borrow().get(nr) { Some(s) => s.clone(), None => return None };
+        if s.kopf != kopf || s.fehlschlaege.get() >= MAX_FEHLSCHLAEGE { return None; }
         // Hat eine der Globalen, die beim Bauen fehlten, jetzt einen Platz, wird
         // beim naechsten Ruecksprung neu gebaut -- dann ohne den festen Ausgang.
         if s.fehlende.iter().any(|&g| slots.get(g).map_or(false, |x| x.is_some())) {
-            drop(sch);
             marke.set(0);
             self.zahl_neu.set(self.zahl_neu.get() + 1);
             return None;
@@ -3229,7 +3304,7 @@ impl Jit {
                 if i < s.n_lokal { locals[i] = v; }
                 else if let Some(Some(sl)) = slots.get(s.dyn_glob[i - s.n_lokal]) { sl.borrow_mut().value = v; }
             }
-            s.fehlschlaege += 1;
+            s.fehlschlaege.set(s.fehlschlaege.get() + 1);
             return None;
         }
         let n_gesamt = s.start.len();
@@ -3356,8 +3431,15 @@ impl Jit {
         };
         let start = Zustand { stapel: Vec::new(), lokal };
         let bereich = Bereich { von: kopf, bis, start, globale_da, felder, glob_felder,
-                                klassen, selbst: selbst_k, dyn_glob, lok_typen, modus_w: false };
-        let an = match analysieren(prog, &self.glob, f, Some(&bereich), None) {
+                                klassen, selbst: selbst_k, dyn_glob, lok_typen, modus_w: false, vm_fns: Vec::new() };
+        let vm_ruf = |an: &Analyse| an.gerufen.iter().any(|&g| self.ids.get(g).copied().flatten().is_none());
+        let getypt = match analysieren(prog, &self.glob, f, Some(&bereich), None) {
+            // Ruft er eine Funktion, die in der VM bleibt, geht das nur im
+            // Wertemodus (ueber `w_funktion`, M4 Schritt 15).
+            Ok(an) if vm_ruf(&an) => Err("ruft eine Funktion, die in der VM bleibt".to_string()),
+            anders => anders,
+        };
+        let an = match getypt {
             Ok(an) => an,
             Err(e) => {
                 // Zweiter Versuch im Wertemodus: Texte, MAPs, eingebaute
@@ -3398,7 +3480,7 @@ impl Jit {
         modul.finalize_definitions().map_err(|e| format!("Cranelift: {:?}", e))?;
         let p = modul.get_finalized_function(id);
         let ausgaenge = an.ausgaenge.iter().map(|&x| (x, an.vor[x].as_ref().unwrap().lokal.clone())).collect();
-        self.schleifen.borrow_mut().push(Schleife {
+        self.schleifen.borrow_mut().push(Rc::new(Schleife {
             fehlende: an.fehlende.clone(),
             einstieg: unsafe { std::mem::transmute::<*const u8, unsafe extern "C" fn(*mut Kontext, *mut u64) -> i64>(p) },
             kopf,
@@ -3407,7 +3489,7 @@ impl Jit {
             start: an.vor[kopf].as_ref().map_or_else(Vec::new, |z| z.lokal.clone()),
             ausgaenge,
             beruehrt,
-            fehlschlaege: 0,
+            fehlschlaege: std::cell::Cell::new(0),
             felder: an.felder.clone(),
             aussteige,
             klassen: an.klassen.clone(),
@@ -3416,7 +3498,7 @@ impl Jit {
             n_lokal: f.local_types.len(),
             modus_w: an.modus_w,
             typen: an.typen,
-        });
+        }));
         self.zahl_schleifen.set(self.zahl_schleifen.get() + 1);
         Ok(nr)
     }
@@ -3456,6 +3538,7 @@ impl Jit {
             dyn_glob,
             lok_typen,
             modus_w: true,
+            vm_fns: (0..self.ids.len()).map(|i| self.ids[i].is_none()).collect(),
         }
     }
 

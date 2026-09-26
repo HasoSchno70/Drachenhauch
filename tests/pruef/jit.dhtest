@@ -1379,9 +1379,7 @@ DHRT_JIT_BILANZ=1
 drei
 15
 --- stderr
-jit: Schleife an Stelle 31 in __main__ bleibt in der VM: ruft eine Funktion, die in der VM bleibt
-jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
-jit: 3 Runden in der VM -- Stelle 31 in __main__: ruft eine Funktion, die in der VM bleibt
+jit: 1 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
 
 === global in der schleife und danach in einer funktion
 DIM stand AS INTEGER
@@ -3230,9 +3228,7 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 1;12;123;1234;12345;
 --- stderr
-jit: Schleife an Stelle 13 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: merke hat einen Parameter vom Typ 'string'
-jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
-jit: 3 Runden in der VM -- Stelle 13 in __main__: globale Variable, die keine Zahl ist; mit Werten: merke hat einen Parameter vom Typ 'string'
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === upper und replace als methoden
 DIM s AS STRING : s = "abc"
@@ -3754,9 +3750,8 @@ DHRT_JIT_BILANZ=1
 gefangen: Konto leer bei -2 zeile 5
 -2 4
 --- stderr
-jit: Schleife an Stelle 18 in __main__ bleibt in der VM: ruft eine Funktion, die in der VM bleibt
-jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
-jit: 2 Runden in der VM -- Stelle 18 in __main__: ruft eine Funktion, die in der VM bleibt
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
 
 === methode auf nil in der schleife
 CLASS Ding
@@ -3867,9 +3862,9 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 110
 --- stderr
-jit: Schleife an Stelle 19 in __main__ bleibt in der VM: ruft eine Funktion, die in der VM bleibt
+jit: Schleife an Stelle 19 in __main__ bleibt in der VM: ruft eine Funktion, die in der VM bleibt; mit Werten: Methode los: los ruft FUNCREF
 jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
-jit: 8 Runden in der VM -- Stelle 19 in __main__: ruft eine Funktion, die in der VM bleibt
+jit: 8 Runden in der VM -- Stelle 19 in __main__: ruft eine Funktion, die in der VM bleibt; mit Werten: Methode los: los ruft FUNCREF
 
 === langer text neu zusammengesetzt
 DIM s AS STRING
@@ -5905,6 +5900,412 @@ gefangen: RGB-Werte muessen 0..255 sein
 --- stderr
 jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
 jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== schleife ruft eine funktion mit textbefehl ueber die vm
+FUNCTION kurz$(i AS INTEGER) AS STRING
+    RETURN LEFT$(STR$(i * 7), 2)
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 30
+    s = s + LEN(kurz$(i)) + i
+    t = kurz$(i)
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+524 21
+
+=== schleife ruft eine funktion mit textbefehl ueber die vm (maschinencode)
+FUNCTION kurz$(i AS INTEGER) AS STRING
+    RETURN LEFT$(STR$(i * 7), 2)
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 30
+    s = s + LEN(kurz$(i)) + i
+    t = kurz$(i)
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+524 21
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== sub ueber die vm schreibt eine fremde globale
+DIM zaehler AS INTEGER
+DIM protokoll AS STRING
+SUB notiere(k AS INTEGER)
+    zaehler = zaehler + k
+    protokoll = protokoll + STR$(k) + ","
+END SUB
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 8
+    s = s + i * 2
+    notiere(i)
+NEXT
+PRINT s; " "; zaehler; " "; protokoll
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+72 36 1,2,3,4,5,6,7,8,
+
+=== sub ueber die vm schreibt eine fremde globale (maschinencode)
+DIM zaehler AS INTEGER
+DIM protokoll AS STRING
+SUB notiere(k AS INTEGER)
+    zaehler = zaehler + k
+    protokoll = protokoll + STR$(k) + ","
+END SUB
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 8
+    s = s + i * 2
+    notiere(i)
+NEXT
+PRINT s; " "; zaehler; " "; protokoll
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+72 36 1,2,3,4,5,6,7,8,
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== funktion ueber die vm beruehrt eine globale des bereichs
+DIM s AS INTEGER
+DIM t AS STRING
+SUB mehr(k AS INTEGER)
+    s = s + k * 100
+    t = t + "x"
+END SUB
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    s = s + 1
+    mehr(i)
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2106 xxxxxx
+
+=== funktion ueber die vm beruehrt eine globale des bereichs (maschinencode)
+DIM s AS INTEGER
+DIM t AS STRING
+SUB mehr(k AS INTEGER)
+    s = s + k * 100
+    t = t + "x"
+END SUB
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    s = s + 1
+    mehr(i)
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2106 xxxxxx
+--- stderr
+jit: Schleife an Stelle 13 in __main__ bleibt in der VM: ruft eine Funktion, die in der VM bleibt; mit Werten: Funktion mehr: mehr beruehrt die Globale 's' des Bereichs
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 4 Runden in der VM -- Stelle 13 in __main__: ruft eine Funktion, die in der VM bleibt; mit Werten: Funktion mehr: mehr beruehrt die Globale 's' des Bereichs
+
+=== funktion ueber die vm mit argumenten in reihenfolge
+FUNCTION teil$(a AS STRING, von AS INTEGER, laenge AS INTEGER) AS STRING
+    RETURN MID$(a, von, laenge)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 0 TO 5
+    t = t + teil$("abcdefghij", i, 2) + "|"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+ab|bc|cd|de|ef|fg|
+
+=== funktion ueber die vm mit argumenten in reihenfolge (maschinencode)
+FUNCTION teil$(a AS STRING, von AS INTEGER, laenge AS INTEGER) AS STRING
+    RETURN MID$(a, von, laenge)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 0 TO 5
+    t = t + teil$("abcdefghij", i, 2) + "|"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+ab|bc|cd|de|ef|fg|
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== funktion ueber die vm wirft mitten in der schleife
+DIM protokoll AS STRING
+FUNCTION pruefe(k AS INTEGER) AS INTEGER
+    protokoll = protokoll + STR$(k) + ";"
+    IF k = 4 THEN THROW "vier geht nicht"
+    RETURN LEN(STR$(k)) + k
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 1 TO 9
+        s = s + pruefe(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s; " "; protokoll
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: vier geht nicht
+4 9 1;2;3;4;
+
+=== funktion ueber die vm wirft mitten in der schleife (maschinencode)
+DIM protokoll AS STRING
+FUNCTION pruefe(k AS INTEGER) AS INTEGER
+    protokoll = protokoll + STR$(k) + ";"
+    IF k = 4 THEN THROW "vier geht nicht"
+    RETURN LEN(STR$(k)) + k
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 1 TO 9
+        s = s + pruefe(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s; " "; protokoll
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: vier geht nicht
+4 9 1;2;3;4;
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== funktion ueber die vm mit laufzeitfehler
+FUNCTION stelle$(a AS STRING, k AS INTEGER) AS STRING
+    DIM f[3] AS INTEGER
+    f[k] = 1
+    RETURN a + STR$(k)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+TRY
+    FOR i = 0 TO 5
+        t = t + stelle$("n", i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Index 3 ausserhalb [0..2] in Dimension 0 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+3 n0n1n2
+
+=== funktion ueber die vm mit laufzeitfehler (maschinencode)
+FUNCTION stelle$(a AS STRING, k AS INTEGER) AS STRING
+    DIM f[3] AS INTEGER
+    f[k] = 1
+    RETURN a + STR$(k)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+TRY
+    FOR i = 0 TO 5
+        t = t + stelle$("n", i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Index 3 ausserhalb [0..2] in Dimension 0 -- Felder zaehlen ab 0: DIM a[3] hat a[0] bis a[2]
+3 n0n1n2
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== funktion ueber die vm ruft sich selbst
+FUNCTION kette$(n AS INTEGER) AS STRING
+    IF n <= 0 THEN RETURN ""
+    RETURN STR$(n) + kette$(n - 1)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 5
+    t = t + kette$(i) + "/"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1/21/321/4321/54321/
+
+=== funktion ueber die vm ruft sich selbst (maschinencode)
+FUNCTION kette$(n AS INTEGER) AS STRING
+    IF n <= 0 THEN RETURN ""
+    RETURN STR$(n) + kette$(n - 1)
+END FUNCTION
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 5
+    t = t + kette$(i) + "/"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1/21/321/4321/54321/
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== byref-funktion bleibt beim aufruf der vm
+SUB verdopple(BYREF x AS INTEGER, s AS STRING)
+    x = x * 2 + LEN(s)
+END SUB
+DIM i AS INTEGER
+DIM w AS INTEGER
+DIM t AS STRING
+w = 1
+FOR i = 1 TO 5
+    t = t + "a"
+    verdopple(w, t)
+NEXT
+PRINT w; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+89 aaaaa
+
+=== byref-funktion bleibt beim aufruf der vm (maschinencode)
+SUB verdopple(BYREF x AS INTEGER, s AS STRING)
+    x = x * 2 + LEN(s)
+END SUB
+DIM i AS INTEGER
+DIM w AS INTEGER
+DIM t AS STRING
+w = 1
+FOR i = 1 TO 5
+    t = t + "a"
+    verdopple(w, t)
+NEXT
+PRINT w; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+89 aaaaa
+--- stderr
+jit: Schleife an Stelle 15 in __main__ bleibt in der VM: globale Variable, die keine Zahl ist; mit Werten: Funktion verdopple hat BYREF-Parameter
+jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 3 Runden in der VM -- Stelle 15 in __main__: globale Variable, die keine Zahl ist; mit Werten: Funktion verdopple hat BYREF-Parameter
+
+=== sub ueber die vm liefert nichts
+DIM ablage AS STRING
+SUB lege(t AS STRING)
+    ablage = t + ablage
+END SUB
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 4
+    t = STR$(i)
+    lege(t)
+NEXT
+PRINT ablage; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+4321 4
+
+=== sub ueber die vm liefert nichts (maschinencode)
+DIM ablage AS STRING
+SUB lege(t AS STRING)
+    ablage = t + ablage
+END SUB
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 4
+    t = STR$(i)
+    lege(t)
+NEXT
+PRINT ablage; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+4321 4
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== funktion ueber die vm hat selbst eine schleife
+FUNCTION reihe$(t AS STRING, n AS INTEGER) AS STRING
+    DIM j AS INTEGER
+    DIM r AS STRING
+    FOR j = 1 TO n
+        r = r + t + STR$(j)
+    NEXT
+    RETURN r
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 1 TO 5
+    s = s + reihe$("x", i) + "/"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+x1/x1x2/x1x2x3/x1x2x3x4/x1x2x3x4x5/
+
+=== funktion ueber die vm hat selbst eine schleife (maschinencode)
+FUNCTION reihe$(t AS STRING, n AS INTEGER) AS STRING
+    DIM j AS INTEGER
+    DIM r AS STRING
+    FOR j = 1 TO n
+        r = r + t + STR$(j)
+    NEXT
+    RETURN r
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS STRING
+FOR i = 1 TO 5
+    s = s + reihe$("x", i) + "/"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+x1/x1x2/x1x2x3/x1x2x3x4/x1x2x3x4x5/
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 5 Schleifenlaeufe
 
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in

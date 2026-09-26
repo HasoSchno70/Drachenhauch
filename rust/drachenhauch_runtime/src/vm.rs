@@ -1694,6 +1694,16 @@ impl<'p> Vm<'p> {
         if newline && live_ausgabe() { self.flush_out(); }
     }
 
+    /// Eine Funktion des Programms rufen, fuer den Maschinencode (M4 Schritt
+    /// 15): derselbe Weg wie CALL_USER ohne BYREF.
+    #[cfg(feature = "jit")]
+    pub(crate) fn funktion_rufen(&mut self, idx: usize, args: Vec<Value>) -> R<Value> {
+        let g: &'p Func = self.prog.functions.get(idx).ok_or("Unbekannte Funktion")?;
+        if g.is_coroutine { return Ok(make_coro(g, args, None)); }
+        let ret = self.exec(g, args, None)?;
+        Ok(if g.is_sub { Value::Nil } else { ret })
+    }
+
     pub(crate) fn methode_rufen(&mut self, instr: &'p crate::model::Instr, method: &str, obj: Value, margs: Vec<Value>) -> R<Value> {
         match &obj {
             Value::Instance(rc) => {
