@@ -265,6 +265,23 @@ die ide lief TRUE
 keine verwendung TRUE
 mit argument: nur dieses programm
 
+=== die berechtigungen fuer codesign sind schlichtes xml ohne kommentar
+' codesign liest dhrt.entitlements mit einem strengen XML-Leser (AMFI):
+' ein "--" in einem Kommentar liess die Signatur im Paketlauf scheitern,
+' und das zeigt sich nur dort -- der Lauf wird von Hand gestartet.
+DIM z AS ARRAY OF STRING
+z = READLINES(ARG$(0))
+DIM t AS STRING : t = JOIN$(z, CHR$(10))
+PRINT "kommentar "; (INSTR(t, "<!--") >= 0)
+PRINT "jit "; (INSTR(t, "com.apple.security.cs.allow-jit") >= 0)
+PRINT "speicher "; (INSTR(t, "com.apple.security.cs.allow-unsigned-executable-memory") >= 0)
+--- argumente
+{sammlung}/../../installer/posix/dhrt.entitlements
+--- erwartet
+kommentar FALSE
+jit TRUE
+speicher TRUE
+
 === ein unbekanntes system ist ein fehler
 FUNCTION lauf$(p AS INTEGER) AS STRING
     DIM aus AS STRING : aus = ""
