@@ -286,6 +286,9 @@ fn zahl_befehl(name: &str, arts: &[Art]) -> Option<Art> {
         // dieselbe haben.
         ("min" | "max", _) if gleich => Some(arts[0]),
         ("clamp", 3) if gleich => Some(arts[0]),
+        // Nur mit Ganzzahlen: eine Kommazahl rundet `need_int_gerundet`, und
+        // das muesste hier genauso geschehen (M4 Schritt 14).
+        ("rgb", 3) | ("rgba", 4) if arts.iter().all(|a| *a == Art::I) => Some(Art::I),
         _ => None,
     }
 }
@@ -424,6 +427,34 @@ fn journal_zurueck(j: &mut Vec<(u64, u64, Value)>) {
 /// `Value`; die Grenze hat der Maschinencode schon geprueft).
 extern "C" fn element_i(k: *mut Kontext, p: u64, art: u64, lage: u64) -> i64 {
     wert_bits(k, Some(unsafe { &*(p as *const Value) }), art, lage)
+}
+
+/// Ein Element eines globalen Feldes von Zahlen, aus einer FUNKTION gelesen
+/// (sie hat keine Feldbeschreibung wie ein Bereich): Platz `g`, `n` Indizes,
+/// `art` 1 INTEGER, 2 FLOAT (als Bits). Passt etwas nicht, gibt die Funktion
+/// auf und die VM rechnet sie nach (M4 Schritt 14).
+extern "C" fn gfeld_lesen(k: *mut Kontext, g: u64, n: u64, i0: i64, i1: i64, i2: i64, art: u64) -> i64 {
+    let kk = unsafe { &mut *k };
+    let slots = unsafe { std::slice::from_raw_parts(kk.slots, kk.n_slots as usize) };
+    let idx = [i0, i1, i2];
+    let wert = slots.get(g as usize).and_then(|s| s.as_ref()).and_then(|sl| match &sl.borrow().value {
+        Value::Array(a) => {
+            let a = a.borrow();
+            if a.dims.len() != n as usize { return None; }
+            let mut off = 0i64;
+            for j in 0..n as usize {
+                if idx[j] < 0 || idx[j] >= a.dims[j] { return None; }
+                off += idx[j] * a.strides[j];
+            }
+            match (&a.cells, art) {
+                (crate::value::Cells::Int(x), 1) => x.get(off as usize).copied(),
+                (crate::value::Cells::Float(x), 2) => x.get(off as usize).map(|f| f.to_bits() as i64),
+                _ => None,
+            }
+        }
+        _ => None,
+    });
+    match wert { Some(w) => w, None => { kk.fehler = 1; 0 } }
 }
 
 extern "C" fn element_f(k: *mut Kontext, p: u64) -> f64 {
@@ -769,6 +800,7 @@ struct Hilfe {
     setzen_f: FuncId,
     element_i: FuncId,
     element_f: FuncId,
+    gfeld: FuncId,
     journal_schluss: FuncId,
     mathe1: FuncId,
     mathe2: FuncId,
@@ -882,6 +914,10 @@ struct Globale {
     konst: Vec<bool>,
     /// Deklarierter Typ je Platz (fuer Objekte in `dyn_glob`).
     typ: Vec<String>,
+    /// Je Platz: ein Feld von Zahlen, wie es das Hauptprogramm anlegt
+    /// (Element, Dimensionen) -- nur wenn jede Anlage dasselbe sagt. Eine
+    /// FUNKTION liest es ueber `gfeld_lesen` (M4 Schritt 14).
+    felder: Vec<Option<(Elem, u8)>>,
     /// Die Methoden, die als Funktion uebersetzt werden koennen: je Klasse
     /// JEDE Methode, die sie sieht (auch geerbte), mit der Lage DIESER Klasse.
     /// Eine geerbte Methode bekommt also je Unterklasse eine eigene Fassung --
@@ -951,6 +987,31 @@ fn globale_lesen(prog: &Program) -> Globale {
     let mut konst = vec![false; n];
     let mut typ = vec![String::new(); n];
     let f = &prog.main;
+    // Felder: DECLARE_ARRAY_NAME / DECLARE_NAME "array:T", danach haengt
+    // BIND_GLOBAL_SLOT den Eintrag in seinen Platz.
+    let mut felder: Vec<Option<Option<(Elem, u8)>>> = vec![None; n];
+    let mut offen: Option<(String, Option<(Elem, u8)>)> = None;
+    let elem = |t: &str| match art_von_typ(t) { Some(Art::I) => Some(Elem::I), Some(Art::F) => Some(Elem::F), _ => None };
+    for ins in &f.code {
+        match (ins.op, &ins.arg) {
+            (op::DECLARE_ARRAY_NAME, Arg::List(l)) => {
+                let name = f.constants.get(l[0].as_usize()).map(|v| v.fmt()).unwrap_or_default();
+                offen = Some((name, elem(l[1].str()).map(|e| (e, l[2].as_usize().min(255) as u8))));
+            }
+            (op::DECLARE_NAME, Arg::List(l)) => {
+                let name = f.constants.get(l[0].as_usize()).map(|v| v.fmt()).unwrap_or_default();
+                let t = match f.constants.get(l[1].as_usize()) { Some(Value::Str(t)) => t.to_string(), _ => String::new() };
+                offen = Some((name, t.strip_prefix("array:").and_then(|e| elem(e)).map(|e| (e, 1))));
+            }
+            (op::BIND_GLOBAL_SLOT, Arg::List(l)) => {
+                let i = l[0].as_usize();
+                let name = f.constants.get(l[1].as_usize()).map(|v| v.fmt()).unwrap_or_default();
+                let a = match offen.take() { Some((n2, a)) if n2 == name => a, _ => None };
+                if i < n { felder[i] = Some(match felder[i] { None => a, Some(alt) if alt == a => a, Some(_) => None }); }
+            }
+            _ => {}
+        }
+    }
     for ins in &f.code {
         let (l, ist_konst) = match (ins.op, &ins.arg) {
             (op::DECLARE_GLOBAL_SLOT, Arg::List(l)) => (l, false),
@@ -965,7 +1026,8 @@ fn globale_lesen(prog: &Program) -> Globale {
         typ[i] = ty;
         if ist_konst { konst[i] = true; }
     }
-    Globale { art: art.into_iter().map(|a| a.flatten()).collect(), konst, typ, tafel: methoden_tafel(prog) }
+    Globale { art: art.into_iter().map(|a| a.flatten()).collect(), konst, typ,
+              felder: felder.into_iter().map(|a| a.flatten()).collect(), tafel: methoden_tafel(prog) }
 }
 
 // ---------------------------------------------------------------------------
@@ -1222,6 +1284,25 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 };
                 z.stapel.push(Art::Feld(nr as u16));
             }
+            op::LOAD_GLOBAL_SLOT if bereich.is_none() && glob.art.get(ins.arg.as_usize()).copied().flatten().is_none()
+                && glob.felder.get(ins.arg.as_usize()).copied().flatten().is_some() => {
+                let g = ins.arg.as_usize();
+                let (elem, dims) = glob.felder[g].unwrap();
+                if dims == 0 || dims > 3 { return Err("globales Feld mit mehr als drei Dimensionen".into()); }
+                let nr = match felder.iter().position(|x| x.quelle == Quelle::Global(g)) {
+                    Some(nr) => nr,
+                    None => { felder.push(FeldInfo { quelle: Quelle::Global(g), elem, dims, tupel: false }); felder.len() - 1 }
+                };
+                z.stapel.push(Art::Feld(nr as u16));
+            }
+            op::LOAD_INDEX if bereich.is_none() => {
+                // Nur lesen: die Funktion bleibt rein (M4 Schritt 14).
+                let n = ins.arg.as_usize();
+                for _ in 0..n { if pop!() != Art::I { return Err("Feld-Index, der kein INTEGER ist".into()); } }
+                let nr = match pop!() { Art::Feld(nr) => nr as usize, _ => return Err("Index auf etwas, das kein Feld von Zahlen ist".into()) };
+                if felder[nr].dims as usize != n { return Err("Feld mit anderer Zahl von Indizes".into()); }
+                z.stapel.push(felder[nr].art());
+            }
             op::LOAD_INDEX | op::STORE_INDEX if modus_w => {
                 let n = ins.arg.as_usize();
                 if o == op::STORE_INDEX { if !w_oder_skalar(pop!()) { return Err("Feld bekommt NIL".into()); } }
@@ -1368,6 +1449,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                     continue;
                 }
                 if let Art::Feld(nr) = a {
+                    if bereich.is_none() { return Err("Feld in einem Local einer Funktion".into()); }
                     let t = typen[s].as_str();
                     let passend = match felder[nr as usize].elem { Elem::F => "array:float", Elem::I => "array:integer", Elem::Wert(_) => "" };
                     if !(matches!(t, "any" | "") || t == passend) { return Err(format!("Feld in Platz vom Typ '{}'", t)); }
@@ -1613,6 +1695,7 @@ struct Bauer<'a, 'b> {
     h_setzen_f: cranelift_codegen::ir::FuncRef,
     h_element_i: cranelift_codegen::ir::FuncRef,
     h_element_f: cranelift_codegen::ir::FuncRef,
+    h_gfeld: cranelift_codegen::ir::FuncRef,
     h_journal: cranelift_codegen::ir::FuncRef,
     h_mathe1: cranelift_codegen::ir::FuncRef,
     h_mathe2: cranelift_codegen::ir::FuncRef,
@@ -1921,6 +2004,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let h_setzen_f = modul.declare_func_in_func(hilfe.setzen_f, fb.func);
         let h_element_i = modul.declare_func_in_func(hilfe.element_i, fb.func);
         let h_element_f = modul.declare_func_in_func(hilfe.element_f, fb.func);
+        let h_gfeld = modul.declare_func_in_func(hilfe.gfeld, fb.func);
         let h_journal = modul.declare_func_in_func(hilfe.journal_schluss, fb.func);
         let h_mathe1 = modul.declare_func_in_func(hilfe.mathe1, fb.func);
         let h_mathe2 = modul.declare_func_in_func(hilfe.mathe2, fb.func);
@@ -1928,7 +2012,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new(), schatten, marken, holen,
                               befoerdert: HashMap::new(), felder: Vec::new(), mitten, punkt: None,
                               aussteige: Vec::new(), lok_zeiger, zu_tief: false, selbst,
-                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_journal, h_mathe1, h_mathe2,
+                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_gfeld, h_journal, h_mathe1, h_mathe2,
                               hw: Vec::new(), w_basis: an.typen.len() as i64 };
         if an.modus_w {
             for id in hilfe.w { let r = modul.declare_func_in_func(id, bau.b.func); bau.hw.push(r); }
@@ -2212,6 +2296,21 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                             bau.w_ruf(W_SETZEN, &[basis, nz]);
                             bau.fehler_pruefen();
                         }
+                    }
+                    op::LOAD_INDEX if bereich.is_none() => {
+                        let n = ins.arg.as_usize();
+                        let idx = st.split_off(st.len() - n);
+                        let Some((_, Art::Feld(nr))) = st.pop() else { unreachable!() };
+                        let fi = an.felder[nr as usize];
+                        let Quelle::Global(g) = fi.quelle else { unreachable!() };
+                        let mut a = vec![bau.ctx, bau.iconst(g as i64), bau.iconst(n as i64)];
+                        for j in 0..3 { a.push(match idx.get(j) { Some((w, _)) => *w, None => bau.iconst(0) }); }
+                        a.push(bau.iconst(if fi.elem == Elem::F { 2 } else { 1 }));
+                        let r = bau.b.ins().call(bau.h_gfeld, &a);
+                        let w = bau.b.inst_results(r)[0];
+                        bau.fehler_pruefen();
+                        let w = if fi.elem == Elem::F { bau.b.ins().bitcast(types::F64, MemFlagsData::new(), w) } else { w };
+                        st.push((w, fi.art()));
                     }
                     op::LOAD_INDEX => {
                         let n = ins.arg.as_usize();
@@ -2623,6 +2722,24 @@ fn zahl_rechnen(bau: &mut Bauer, name: &str, args: &[(CWert, Art)]) -> (CWert, A
             let r = bau.b.ins().call(bau.h_mathe2, &[c, f[0], f[1]]);
             bau.b.inst_results(r)[0]
         }
+        "rgb" | "rgba" => {
+            // Wie builtins.rs: jeder Anteil 0..255, sonst Fehler (dann steigt
+            // der Code aus und die VM meldet ihn); Deckkraft 0 wird 1.
+            let mut w = bau.iconst(0);
+            for (i, (x, _)) in args.iter().enumerate() {
+                let u = bau.b.ins().icmp_imm(IntCC::UnsignedGreaterThan, *x, 255);
+                bau.aussteigen_wenn(u);
+                let x = if name == "rgba" && i == 3 {
+                    let null = bau.b.ins().icmp_imm(IntCC::Equal, *x, 0);
+                    let eins = bau.iconst(1);
+                    bau.b.ins().select(null, eins, *x)
+                } else { *x };
+                let schub = if name == "rgba" && i == 3 { 24 } else { 16 - 8 * i as i64 };
+                let t = bau.b.ins().ishl_imm(x, schub);
+                w = bau.b.ins().bor(w, t);
+            }
+            w
+        }
         "lerp" => {
             let d = bau.b.ins().fsub(f[1], f[0]);
             let m = bau.b.ins().fmul(d, f[2]);
@@ -2783,6 +2900,7 @@ impl Jit {
         builder.symbol("dh_feld_setzen_f", feld_setzen_f as *const u8);
         builder.symbol("dh_element_i", element_i as *const u8);
         builder.symbol("dh_element_f", element_f as *const u8);
+        builder.symbol("dh_gfeld_lesen", gfeld_lesen as *const u8);
         builder.symbol("dh_journal_schluss", journal_schluss as *const u8);
         builder.symbol("dh_mathe1", mathe1 as *const u8);
         builder.symbol("dh_mathe2", mathe2 as *const u8);
@@ -2820,6 +2938,7 @@ impl Jit {
         let s_setzen_f = sig_h(&[ptr, i, i, types::F64], None);
         let s_element_i = sig_h(&[ptr, i, i, i], Some(i));
         let s_element_f = sig_h(&[ptr, i], Some(types::F64));
+        let s_gfeld = sig_h(&[ptr, i, i, i, i, i, i], Some(i));
         let s_journal = sig_h(&[ptr], None);
         let s_mathe1 = sig_h(&[i, types::F64], Some(types::F64));
         let s_mathe2 = sig_h(&[i, types::F64, types::F64], Some(types::F64));
@@ -2854,6 +2973,7 @@ impl Jit {
             setzen_f: dekl("dh_feld_setzen_f", &s_setzen_f)?,
             element_i: dekl("dh_element_i", &s_element_i)?,
             element_f: dekl("dh_element_f", &s_element_f)?,
+            gfeld: dekl("dh_gfeld_lesen", &s_gfeld)?,
             journal_schluss: dekl("dh_journal_schluss", &s_journal)?,
             mathe1: dekl("dh_mathe1", &s_mathe1)?,
             mathe2: dekl("dh_mathe2", &s_mathe2)?,
