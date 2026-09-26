@@ -253,6 +253,43 @@ const K_JOURNAL_BEREICH: i32 = std::mem::offset_of!(Kontext, journal_bereich) as
 
 /// Nach einem Methodenaufruf aus einem Bereich: gab sie auf, ihre
 /// Feldschreibungen zuruecknehmen, sonst vergessen; das Journal wieder aus.
+/// Reine Zahlenbefehle, die Cranelift nicht als Anweisung hat (M4 Schritt 8).
+/// Dieselben Rust-Funktionen wie in builtins.rs -- darum bitgleich.
+extern "C" fn mathe1(art: i64, x: f64) -> f64 {
+    match art {
+        0 => x.sin(), 1 => x.cos(), 2 => x.tan(), 3 => x.atan(),
+        4 => x.exp(), 5 => x.ln(), 6 => x.asin(), _ => x.acos(),
+    }
+}
+
+extern "C" fn mathe2(art: i64, x: f64, y: f64) -> f64 {
+    if art == 0 { x.atan2(y) } else { x.hypot(y) }
+}
+
+/// Welche eingebauten Befehle der getypte Maschinencode selbst rechnet, und
+/// mit welcher Art Ergebnis. Nur Zahlen (INTEGER/FLOAT) als Argumente; jeder
+/// Fehlerfall der VM (ABS von MIN, SQR negativ, INT ausserhalb, LOG <= 0,
+/// ASIN/ACOS ausserhalb [-1, 1]) steigt aus, und die VM meldet ihn. Keiner
+/// dieser Namen wird von einer frueheren Familie beantwortet (nachgesehen),
+/// der Merkplatz braucht also nicht gefragt zu werden.
+fn zahl_befehl(name: &str, arts: &[Art]) -> Option<Art> {
+    if arts.is_empty() || !arts.iter().all(|a| matches!(a, Art::I | Art::F)) { return None; }
+    let gleich = arts.iter().all(|a| *a == arts[0]);
+    match (name, arts.len()) {
+        ("abs", 1) => Some(arts[0]),
+        ("int" | "floor" | "ceil" | "round" | "sgn" | "sign", 1) => Some(Art::I),
+        ("flt" | "sqr" | "sqrt" | "sin" | "cos" | "tan" | "atan" | "exp" | "log"
+         | "asin" | "acos" | "deg" | "rad" | "frac", 1) => Some(Art::F),
+        ("atan2" | "hypot", 2) => Some(Art::F),
+        ("lerp", 3) => Some(Art::F),
+        // Sie liefern einen der WERTE -- seine Art steht nur fest, wenn alle
+        // dieselbe haben.
+        ("min" | "max", _) if gleich => Some(arts[0]),
+        ("clamp", 3) if gleich => Some(arts[0]),
+        _ => None,
+    }
+}
+
 extern "C" fn journal_schluss(k: *mut Kontext) {
     let j = unsafe { (*k).journal };
     if j.is_null() { return; }
@@ -688,6 +725,8 @@ struct Hilfe {
     element_i: FuncId,
     element_f: FuncId,
     journal_schluss: FuncId,
+    mathe1: FuncId,
+    mathe2: FuncId,
     w: [FuncId; 16],
 }
 
@@ -1149,6 +1188,16 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 z.stapel.push(Art::W);
                 schreibt_felder = true;
             }
+            op::CALL_BUILTIN if match &ins.arg {
+                Arg::Call(n, c, _) => z.stapel.len() >= *c as usize
+                    && zahl_befehl(n, &z.stapel[z.stapel.len() - *c as usize..]).is_some(),
+                _ => false,
+            } => {
+                let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => unreachable!() };
+                let a = zahl_befehl(&name, &z.stapel[z.stapel.len() - argc..]).unwrap();
+                z.stapel.truncate(z.stapel.len() - argc);
+                z.stapel.push(a);
+            }
             op::CALL_BUILTIN if modus_w => {
                 let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => return Err("Befehl ohne Namen".into()) };
                 // Nur die REINEN Befehle, und nur, wenn die VM an genau dieser
@@ -1476,6 +1525,8 @@ struct Bauer<'a, 'b> {
     h_element_i: cranelift_codegen::ir::FuncRef,
     h_element_f: cranelift_codegen::ir::FuncRef,
     h_journal: cranelift_codegen::ir::FuncRef,
+    h_mathe1: cranelift_codegen::ir::FuncRef,
+    h_mathe2: cranelift_codegen::ir::FuncRef,
     /// Wertemodus: die Helfer `w_*` und der erste Platz des Stapels unter den
     /// Werteplaetzen (= Zahl aller Locals samt `dyn_glob`).
     hw: Vec<cranelift_codegen::ir::FuncRef>,
@@ -1782,11 +1833,13 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let h_element_i = modul.declare_func_in_func(hilfe.element_i, fb.func);
         let h_element_f = modul.declare_func_in_func(hilfe.element_f, fb.func);
         let h_journal = modul.declare_func_in_func(hilfe.journal_schluss, fb.func);
+        let h_mathe1 = modul.declare_func_in_func(hilfe.mathe1, fb.func);
+        let h_mathe2 = modul.declare_func_in_func(hilfe.mathe2, fb.func);
         let selbst = if an.selbst.is_some() { Some(fb.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_SELBST)) } else { None };
         let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new(), schatten, marken, holen,
                               befoerdert: HashMap::new(), felder: Vec::new(), mitten, punkt: None,
                               aussteige: Vec::new(), lok_zeiger, zu_tief: false, selbst,
-                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_journal,
+                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_journal, h_mathe1, h_mathe2,
                               hw: Vec::new(), w_basis: an.typen.len() as i64 };
         if an.modus_w {
             for id in hilfe.w { let r = modul.declare_func_in_func(id, bau.b.func); bau.hw.push(r); }
@@ -1969,6 +2022,18 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                             bau.b.ins().brif(w, z_nein, &[], z_ja, &[]);
                         }
                         offen = false;
+                    }
+                    op::CALL_BUILTIN if match &ins.arg {
+                        Arg::Call(n, c, _) => st.len() >= *c as usize && {
+                            let arts: Vec<Art> = st[st.len() - *c as usize..].iter().map(|(_, a)| *a).collect();
+                            zahl_befehl(n, &arts).is_some()
+                        },
+                        _ => false,
+                    } => {
+                        let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => unreachable!() };
+                        let teil = st.split_off(st.len() - argc);
+                        let erg = zahl_rechnen(&mut bau, &name, &teil);
+                        st.push(erg);
                     }
                     op::CALL_BUILTIN => {
                         let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
@@ -2350,6 +2415,123 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
 
 /// + - * / MOD \ mit den Regeln der VM (`zahlen_addieren`, `nn_arith`,
 /// `div`, `modulo`, `int_div`); jeder Fehlerfall ist ein Ausstieg.
+/// Ein Befehl aus `zahl_befehl`, gerechnet wie builtins.rs. Die Art des
+/// Ergebnisses sagt `zahl_befehl`; hier steht nur, WIE.
+fn zahl_rechnen(bau: &mut Bauer, name: &str, args: &[(CWert, Art)]) -> (CWert, Art) {
+    let arts: Vec<Art> = args.iter().map(|(_, a)| *a).collect();
+    let art = zahl_befehl(name, &arts).unwrap();
+    // `need_num`: eine Ganzzahl geht als Kommazahl hinein, auch wo das
+    // Ergebnis wieder eine Ganzzahl ist (INT(2^53 + 1) rundet wie in der VM).
+    let f: Vec<CWert> = args.iter().map(|(w, a)| bau.als_f(*w, *a)).collect();
+    let m1 = |bau: &mut Bauer, k: i64, x: CWert| -> CWert {
+        let c = bau.iconst(k);
+        let r = bau.b.ins().call(bau.h_mathe1, &[c, x]);
+        bau.b.inst_results(r)[0]
+    };
+    let w = match name {
+        "abs" if args[0].1 == Art::I => {
+            let x = args[0].0;
+            let min = bau.b.ins().icmp_imm_s(IntCC::Equal, x, i64::MIN);
+            bau.aussteigen_wenn(min);
+            bau.b.ins().iabs(x)
+        }
+        "abs" => bau.b.ins().fabs(f[0]),
+        "int" => {
+            let fl = bau.b.ins().floor(f[0]);
+            let lo = bau.b.ins().f64const(i64::MIN as f64);
+            let hi = bau.b.ins().f64const(i64::MAX as f64);
+            let u = bau.b.ins().fcmp(FloatCC::UnorderedOrLessThan, fl, lo);   // auch NaN
+            let o = bau.b.ins().fcmp(FloatCC::GreaterThan, fl, hi);
+            let aus = bau.b.ins().bor(u, o);
+            bau.aussteigen_wenn(aus);
+            bau.b.ins().fcvt_to_sint_sat(types::I64, fl)
+        }
+        // `as i64` in Rust saettigt und macht aus NaN 0 -- wie fcvt_to_sint_sat.
+        "floor" => { let r = bau.b.ins().floor(f[0]); bau.b.ins().fcvt_to_sint_sat(types::I64, r) }
+        "ceil" => { let r = bau.b.ins().ceil(f[0]); bau.b.ins().fcvt_to_sint_sat(types::I64, r) }
+        // round_half_even == IEEE-Runden zur geraden Zahl (`nearest`).
+        "round" => { let r = bau.b.ins().nearest(f[0]); bau.b.ins().fcvt_to_sint_sat(types::I64, r) }
+        "sgn" | "sign" => {
+            let z = bau.b.ins().f64const(0.0);
+            let pos = bau.b.ins().fcmp(FloatCC::GreaterThan, f[0], z);
+            let neg = bau.b.ins().fcmp(FloatCC::LessThan, f[0], z);
+            let p = bau.bool64(pos);
+            let n = bau.bool64(neg);
+            bau.b.ins().isub(p, n)
+        }
+        "flt" => f[0],
+        "sqr" | "sqrt" => {
+            let z = bau.b.ins().f64const(0.0);
+            let neg = bau.b.ins().fcmp(FloatCC::LessThan, f[0], z);
+            bau.aussteigen_wenn(neg);
+            bau.b.ins().sqrt(f[0])
+        }
+        "sin" => m1(bau, 0, f[0]),
+        "cos" => m1(bau, 1, f[0]),
+        "tan" => m1(bau, 2, f[0]),
+        "atan" => m1(bau, 3, f[0]),
+        "exp" => m1(bau, 4, f[0]),
+        "log" => {
+            let z = bau.b.ins().f64const(0.0);
+            let aus = bau.b.ins().fcmp(FloatCC::LessThanOrEqual, f[0], z);
+            bau.aussteigen_wenn(aus);
+            m1(bau, 5, f[0])
+        }
+        "asin" | "acos" => {
+            let lo = bau.b.ins().f64const(-1.0);
+            let hi = bau.b.ins().f64const(1.0);
+            let u = bau.b.ins().fcmp(FloatCC::LessThan, f[0], lo);
+            let o = bau.b.ins().fcmp(FloatCC::GreaterThan, f[0], hi);
+            let aus = bau.b.ins().bor(u, o);
+            bau.aussteigen_wenn(aus);
+            m1(bau, if name == "asin" { 6 } else { 7 }, f[0])
+        }
+        "deg" => {
+            let c = bau.b.ins().f64const(180.0);
+            let pi = bau.b.ins().f64const(std::f64::consts::PI);
+            let m = bau.b.ins().fmul(f[0], c);
+            bau.b.ins().fdiv(m, pi)
+        }
+        "rad" => {
+            let c = bau.b.ins().f64const(180.0);
+            let pi = bau.b.ins().f64const(std::f64::consts::PI);
+            let m = bau.b.ins().fmul(f[0], pi);
+            bau.b.ins().fdiv(m, c)
+        }
+        "frac" => { let t = bau.b.ins().trunc(f[0]); bau.b.ins().fsub(f[0], t) }
+        "atan2" | "hypot" => {
+            let c = bau.iconst(if name == "atan2" { 0 } else { 1 });
+            let r = bau.b.ins().call(bau.h_mathe2, &[c, f[0], f[1]]);
+            bau.b.inst_results(r)[0]
+        }
+        "lerp" => {
+            let d = bau.b.ins().fsub(f[1], f[0]);
+            let m = bau.b.ins().fmul(d, f[2]);
+            bau.b.ins().fadd(f[0], m)
+        }
+        "min" | "max" => {
+            // Wie builtins.rs: der erste gewinnt bei Gleichstand, verglichen
+            // wird ueber f64, geliefert wird der WERT.
+            let cc = if name == "min" { FloatCC::LessThan } else { FloatCC::GreaterThan };
+            let (mut best, mut bf) = (args[0].0, f[0]);
+            for i in 1..args.len() {
+                let take = bau.b.ins().fcmp(cc, f[i], bf);
+                best = bau.b.ins().select(take, args[i].0, best);
+                bf = bau.b.ins().select(take, f[i], bf);
+            }
+            best
+        }
+        "clamp" => {
+            let u = bau.b.ins().fcmp(FloatCC::LessThan, f[0], f[1]);
+            let o = bau.b.ins().fcmp(FloatCC::GreaterThan, f[0], f[2]);
+            let r = bau.b.ins().select(o, args[2].0, args[0].0);
+            bau.b.ins().select(u, args[1].0, r)
+        }
+        _ => unreachable!(),
+    };
+    (w, art)
+}
+
 fn rechnen(bau: &mut Bauer, o: u16, x: CWert, xa: Art, y: CWert, ya: Art) -> (CWert, Art) {
     if xa == Art::I && ya == Art::I && o != op::DIV {
         let r = match o {
@@ -2483,6 +2665,8 @@ impl Jit {
         builder.symbol("dh_element_i", element_i as *const u8);
         builder.symbol("dh_element_f", element_f as *const u8);
         builder.symbol("dh_journal_schluss", journal_schluss as *const u8);
+        builder.symbol("dh_mathe1", mathe1 as *const u8);
+        builder.symbol("dh_mathe2", mathe2 as *const u8);
         let w_namen: [(&str, *const u8); 15] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
@@ -2518,6 +2702,8 @@ impl Jit {
         let s_element_i = sig_h(&[ptr, i, i, i], Some(i));
         let s_element_f = sig_h(&[ptr, i], Some(types::F64));
         let s_journal = sig_h(&[ptr], None);
+        let s_mathe1 = sig_h(&[i, types::F64], Some(types::F64));
+        let s_mathe2 = sig_h(&[i, types::F64, types::F64], Some(types::F64));
         let f64t = types::F64;
         let w_sigs: Vec<(&str, cranelift_codegen::ir::Signature)> = [
             ("dh_w_konst", vec![ptr, i, i], None),
@@ -2549,6 +2735,8 @@ impl Jit {
             element_i: dekl("dh_element_i", &s_element_i)?,
             element_f: dekl("dh_element_f", &s_element_f)?,
             journal_schluss: dekl("dh_journal_schluss", &s_journal)?,
+            mathe1: dekl("dh_mathe1", &s_mathe1)?,
+            mathe2: dekl("dh_mathe2", &s_mathe2)?,
             w: w_ids,
         };
         // Beruehrte Plaetze je Funktion samt allen, die sie ruft.

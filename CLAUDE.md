@@ -1628,6 +1628,14 @@ Journal** (`Kontext::journal`), damit ein aufgebender Aufruf von vorn
 gerechnet werden darf; im Bereich nur waehrend eines Methodenaufrufs.
 objekte.dh 97 -> 12 ms.
 
+**Reine Zahlenbefehle im Maschinencode (M4 Schritt 8):** `zahl_befehl`
+nennt ABS/INT/FLOOR/CEIL/ROUND/SGN/FLT/SQR/SIN/COS/TAN/ATAN/EXP/LOG/ASIN/
+ACOS/DEG/RAD/FRAC/ATAN2/HYPOT/LERP/MIN/MAX/CLAMP mit Zahlen-Argumenten,
+`zahl_rechnen` baut sie nach builtins.rs (Ganzzahl geht als Kommazahl
+hinein wie `need_num`); jeder Fehlerfall steigt aus. **Wer einen dieser
+Befehle in builtins.rs aendert, zieht `zahl_rechnen` mit** -- `jit.dhtest`
+faengt es. builtins.dh 107 -> 3,3 ms.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
