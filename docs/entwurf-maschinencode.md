@@ -805,6 +805,31 @@ gebundenen Befehls mit Zeile). Gegenproben: ohne die Laufzeitpruefung
 liefert der SORT-Fall ein anderes Ergebnis; mit der alten Regel faellt die
 Bilanz.
 
+**Schritt 13 (2026-09-26): Globale ohne Platz werden feste Ausgaenge.** Ein
+`DIM` in einem Zweig der Schleife, der vor dem Bauen nicht lief, legt eine
+Globale an, die es beim Bauen noch nicht gibt -- die ganze Schleife blieb
+in der VM ("legt eine globale Variable an", 95 000 Runden). **Der erste
+Versuch war Warten**: die Schleife merkte sich den fehlenden Platz und wurde
+neu gebaut, sobald es ihn gab. Richtig, aber im Messlauf wirkungslos (95 104
+-> 94 941 Runden) -- die Zweige (Dialoge im Tilemap-Editor ...) liefen in
+60 Bildern nie, die Schleife wartete also die ganze Zeit. Jetzt wird sie
+trotzdem gebaut: `globale_fehlt` macht jeden Befehl, der so eine Globale
+anfasst (DIM, Lesen, Schreiben, FOR ueber sie), zu einem **festen Ausgang**
+ohne Nachfolger -- dort steigt der Bereich immer aus, die VM fuehrt den
+Befehl und den Rest der Runde aus. Die gebaute Schleife merkt sich die
+fehlenden Plaetze (`Schleife::fehlende`); gibt es einen davon beim Eintritt,
+wird sie beim naechsten Ruecksprung neu gebaut, dann ohne den Ausgang.
+
+Runden in der VM ueber alle Beispiele (Warteschleifen ausgenommen): 248 320
+-> 156 616. Die naechsten Gruende: "ruft eine Funktion, die in der VM
+bleibt" (38 Schleifen, 55 000), "Mitglied von etwas, das kein Objekt ist"
+(21, 24 000), Funktionen, die ein TUPLE liefern (40 000), "Befehl" (19 000).
+
+Pruefung: 3 Faelle in `jit.dhtest` (DIM im seltenen Zweig: ein Ausstieg,
+einmal neu gebaut; DIM im nie genommenen Zweig: gebaut, nie ausgestiegen;
+seltenes DIM neben TRY bleibt in der VM). Gegenproben, beide an der Bilanz
+(das Ergebnis bleibt per Bauart richtig): ohne Neubau, ohne festen Ausgang.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

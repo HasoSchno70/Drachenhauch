@@ -307,6 +307,19 @@ fn vorbelegt(prog: &Program, f: &Func, ins: &crate::model::Instr) -> Option<Valu
     }
 }
 
+/// Fasst der Befehl eine Globale an, deren Platz es beim Bauen des Bereichs
+/// noch nicht gibt (ein DIM in einem Zweig, der noch nicht lief)? Dann ist er
+/// ein fester Ausgang (M4 Schritt 13).
+fn globale_fehlt(ins: &crate::model::Instr, b: &Bereich) -> Option<usize> {
+    let g = match (ins.op, &ins.arg) {
+        (op::LOAD_GLOBAL_SLOT | op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT, _) => ins.arg.as_usize(),
+        (op::DECLARE_GLOBAL_SLOT, Arg::List(l)) => l[0].as_usize(),
+        (op::FOR_NEXT, _) => match for_teile(&ins.arg) { Some(t) if t[0] == 1 => t[1] as usize, _ => return None },
+        _ => return None,
+    };
+    if b.globale_da.get(g).copied().unwrap_or(false) { None } else { Some(g) }
+}
+
 extern "C" fn journal_schluss(k: *mut Kontext) {
     let j = unsafe { (*k).journal };
     if j.is_null() { return; }
@@ -822,6 +835,8 @@ pub struct Jit {
     marken: std::cell::UnsafeCell<Vec<u8>>,
     /// `DHRT_JIT_BILANZ`, einmal beim Start gelesen.
     bilanz: bool,
+    /// Wie oft eine Schleife neu gebaut wurde, weil eine Globale dazukam.
+    zahl_neu: std::cell::Cell<u32>,
     /// Nur mit Bilanz: je Schleife, die in der VM bleibt, ihre Marke (Adresse
     /// der Zelle), wo und warum, und wie oft die VM sie gedreht hat.
     vm_runden: RefCell<Vec<(usize, String, u64)>>,
@@ -837,6 +852,8 @@ pub struct Jit {
 struct Schleife {
     einstieg: unsafe extern "C" fn(*mut Kontext, *mut u64) -> i64,
     kopf: usize,
+    /// Globale, die beim Bauen keinen Platz hatten (feste Ausgaenge).
+    fehlende: Vec<usize>,
     start: Vec<Option<Art>>,
     ausgaenge: Vec<(usize, Vec<Option<Art>>)>,
     beruehrt: Vec<usize>,
@@ -1000,6 +1017,10 @@ struct Analyse {
     rueck: Option<Art>,
     /// Funktionen, die gerufen werden (Index in `Program::functions`).
     gerufen: Vec<usize>,
+    /// Stellen, an denen der Bereich immer aussteigt (eine Globale ohne Platz),
+    /// und diese Plaetze -- gibt es einen davon spaeter, wird neu gebaut.
+    feste_ausstiege: Vec<usize>,
+    fehlende: Vec<usize>,
     /// Globale Plaetze, die sie selbst liest oder schreibt, und die sie
     /// schreibt.
     beruehrt: Vec<usize>,
@@ -1102,6 +1123,8 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
     let mut beruehrt: Vec<usize> = Vec::new();
     let mut geschrieben: Vec<usize> = Vec::new();
     let mut ausgaenge: Vec<usize> = Vec::new();
+    let mut feste_ausstiege: Vec<usize> = Vec::new();
+    let mut fehlende: Vec<usize> = Vec::new();
     let mut felder: Vec<FeldInfo> = bereich.map_or(Vec::new(), |b| b.felder.clone());
     let mut schreibt_felder = false;
     let mut klassen: Vec<Klasse> = bereich.map_or(Vec::new(), |b| b.klassen.clone());
@@ -1142,6 +1165,13 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
         let mut z = vor[ip].clone().unwrap();
         if ip >= code.len() { continue; }  // Ende = RETURN Nil (siehe dispatch)
         let ins = &code[ip];
+        // Eine Globale ohne Platz: hier steigt der Bereich immer aus, die VM
+        // fuehrt den Befehl und den Rest der Runde aus. Kein Nachfolger.
+        if let Some(g) = bereich.and_then(|b| globale_fehlt(ins, b)) {
+            if !feste_ausstiege.contains(&ip) { feste_ausstiege.push(ip); }
+            if !fehlende.contains(&g) { fehlende.push(g); }
+            continue;
+        }
         macro_rules! pop { () => { z.stapel.pop().ok_or_else(|| format!("leerer Stapel an Stelle {}", ip))? } }
         let mut weiter = true;
         let (o, s_arg) = umleiten(ins, &dyn_glob, n_echt);
@@ -1481,7 +1511,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
         if weiter { melden(&mut vor, &mut offen, ip + 1, &z)?; }
     }
     Ok(Analyse { vor, ausgaenge, params, rueck, gerufen, beruehrt, geschrieben, felder, schreibt_felder,
-                 klassen, selbst, dyn_glob, typen, modus_w })
+                 klassen, selbst, dyn_glob, typen, modus_w, feste_ausstiege, fehlende })
 }
 
 /// Fuer den Grund in `dhrt --jit`: was die Funktion tut, das der
@@ -1984,6 +2014,12 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                 let zwei_w = st.len() >= 2 && st[st.len() - 2..].iter().any(|x| x.1 == Art::W);
                 let nach_art = |ip: usize| an.vor.get(ip + 1).and_then(|z| z.as_ref()).and_then(|z| z.stapel.last().copied());
                 match o {
+                    _ if an.feste_ausstiege.contains(&ip) => {
+                        let ja = bau.b.ins().iconst(types::I8, 1);
+                        bau.aussteigen_wenn(ja);
+                        bau.b.ins().jump(fehler, &[]);
+                        offen = false;
+                    }
                     op::POP if oben_w => {
                         let z = bau.iconst(bau.w_slot(st.len() - 1));
                         bau.w_ruf(W_FREI, &[z]);
@@ -2893,6 +2929,7 @@ impl Jit {
                  zahl_schleifen: std::cell::Cell::new(0), zahl_laeufe: std::cell::Cell::new(0),
                  zahl_aussteige: std::cell::Cell::new(0),
                  bilanz: std::env::var_os("DHRT_JIT_BILANZ").is_some(),
+                 zahl_neu: std::cell::Cell::new(0),
                  vm_runden: RefCell::new(Vec::new()),
                  meldung: RefCell::new(None),
                  fns, arten, mtab,
@@ -2952,6 +2989,14 @@ impl Jit {
         let mut sch = self.schleifen.borrow_mut();
         let s = &mut sch[nr];
         if s.kopf != kopf || s.fehlschlaege >= MAX_FEHLSCHLAEGE { return None; }
+        // Hat eine der Globalen, die beim Bauen fehlten, jetzt einen Platz, wird
+        // beim naechsten Ruecksprung neu gebaut -- dann ohne den festen Ausgang.
+        if s.fehlende.iter().any(|&g| slots.get(g).map_or(false, |x| x.is_some())) {
+            drop(sch);
+            marke.set(0);
+            self.zahl_neu.set(self.zahl_neu.get() + 1);
+            return None;
+        }
         // Passen die Arten der Locals noch zu denen, fuer die gebaut wurde?
         // Hinter den echten Locals kommen die globalen Plaetze, die der
         // Bereich wie Locals fuehrt (`dyn_glob`).
@@ -3234,6 +3279,7 @@ impl Jit {
         let p = modul.get_finalized_function(id);
         let ausgaenge = an.ausgaenge.iter().map(|&x| (x, an.vor[x].as_ref().unwrap().lokal.clone())).collect();
         self.schleifen.borrow_mut().push(Schleife {
+            fehlende: an.fehlende.clone(),
             einstieg: unsafe { std::mem::transmute::<*const u8, unsafe extern "C" fn(*mut Kontext, *mut u64) -> i64>(p) },
             kopf,
             // Der Zustand am Kopf aus der Analyse, die gilt (im Wertemodus
@@ -3379,6 +3425,9 @@ impl Drop for Jit {
                       f, self.zahl_schleifen.get(), self.zahl_laeufe.get());
             if self.zahl_aussteige.get() > 0 {
                 eprintln!("jit: {} mal mitten in einer Schleife ausgestiegen", self.zahl_aussteige.get());
+            }
+            if self.zahl_neu.get() > 0 {
+                eprintln!("jit: {} mal neu gebaut, weil eine globale Variable dazukam", self.zahl_neu.get());
             }
             let mut r: Vec<(usize, String, u64)> = self.vm_runden.borrow().clone();
             r.sort_by(|a, b| b.2.cmp(&a.2));
