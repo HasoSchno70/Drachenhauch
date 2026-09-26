@@ -1697,6 +1697,12 @@ aeussere nicht im Wertemodus gebaut (`innere_schleife_mit`). **Wer am
 Maschinencode aendert, laesst `dhrt run bench_dhrt.dh` mit und ohne
 `DHRT_JIT=aus` laufen**, nicht nur die Rundenzaehlung.
 
+**maps.dh (M4 Schritt 20):** Text zusammensetzen im Wertemodus wie
+`Vm::addieren` (ein Text in passender Groesse; vorher langsamer als die
+VM), `w_speichern` mit schnellem Weg wie `passend!`, der Index der MAP mit
+foldhash (zufaelliger Startwert -- Schluessel koennen von aussen kommen)
+und `GbMap::put_str`. maps.dh 107 -> 81 ms.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

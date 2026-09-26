@@ -530,6 +530,16 @@ extern "C" fn w_zahl_f(k: *mut Kontext, i: u64) -> f64 {
 /// Bereich aus, und die VM meldet es.
 extern "C" fn w_speichern(k: *mut Kontext, von: u64, ziel: u64, typ: u64, typ_len: u64) {
     let t = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(typ as *const u8, typ_len as usize)) };
+    // Passt der Wert schon (der Normalfall), ohne Kopie und ohne `coerce`
+    // -- wie `passend!` in der VM (M4 Schritt 20).
+    let passt = matches!((&*w_platz(k, von), t),
+        (Value::Str(_), "string") | (Value::Int(_), "integer") | (Value::Float(_), "float")
+        | (Value::Bool(_), "boolean") | (_, "any") | (_, ""));
+    if passt {
+        let v = w_nehmen(k, von);
+        *w_platz(k, ziel) = v;
+        return;
+    }
     let v = w_nehmen(k, von);
     match crate::vm::coerce(v.clone(), t, "Lokale Variable") {
         Ok(cv) => *w_platz(k, ziel) = cv,
@@ -584,11 +594,25 @@ extern "C" fn w_op(k: *mut Kontext, o: u64, a_i: u64, b_i: u64, ziel: u64, lokal
                 *w_platz(k, ziel) = Value::Str(links);
                 return 0;
             }
-            let a = Value::Str(links);
-            return match crate::vm::wert_rechnen("+", &a, &b) {
-                Some(v) => { *w_platz(k, ziel) = v; 0 }
-                None => { zurueck(k, a, b, abgegeben); 0 }
+            // Wie `Vm::addieren`: EIN neuer Text in passender Groesse (vorher
+            // ueber `wert_rechnen` -- Kopie von links, dann angehaengt, also
+            // womoeglich zweimal Speicher; gemessen langsamer als die VM,
+            // M4 Schritt 20).
+            let rechts: std::borrow::Cow<str> = match &b {
+                Value::Str(r) => std::borrow::Cow::Borrowed(r.as_str()),
+                _ => std::borrow::Cow::Owned(b.fmt()),
             };
+            let mut t = String::with_capacity(links.len() + rechts.len());
+            t.push_str(&links);
+            t.push_str(&rechts);
+            *w_platz(k, ziel) = Value::Str(Rc::new(t));
+            return 0;
+        }
+        if let Value::Str(r) = &b {
+            let mut t = a.fmt();
+            t.push_str(r);
+            *w_platz(k, ziel) = Value::Str(Rc::new(t));
+            return 0;
         }
     }
     let zeichen = match o {

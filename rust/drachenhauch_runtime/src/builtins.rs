@@ -1731,9 +1731,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "mapput" => {
             arity!(3);
             if let Value::Map(m) = &a[0] {
-                let k = need_str(&a[1], "MAPPUT")?.to_string();
+                let k = need_str(&a[1], "MAPPUT")?;
                 let v = coerce_map_value(&a[2], &m.borrow().value_type)?;
-                m.borrow_mut().put(k, v);
+                m.borrow_mut().put_str(k, v);
                 Ok(Value::Nil)
             } else { err("MAPPUT erwartet MAP".to_string()) }
         }
