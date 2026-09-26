@@ -562,6 +562,12 @@ fn w_builtin_roh(k: *mut Kontext, ins: u64, basis: u64, argc: u64) -> Option<Val
     // hinein, ohne sie herauszunehmen (kein Vec je Aufruf). Erst nach Erfolg
     // werden die Plaetze frei.
     let args: &[Value] = unsafe { std::slice::from_raw_parts((*k).werte.add(basis as usize), argc as usize) };
+    // Spaet gebunden (M4 Schritt 12): steht die Familie noch nicht fest oder
+    // ruft sie Drachenhauch-Code, steigt der Bereich VOR dem Befehl aus (ohne
+    // Meldung, die Argumente bleiben auf ihren Plaetzen). Die VM fuehrt ihn
+    // selbst aus und merkt sich dabei die Familie; beim naechsten Eintritt
+    // laeuft er hier.
+    if !befehl_im_bereich(ins.familie.get(), name) { w_fehler(k); return None; }
     if ins.familie.get() != crate::vm::BUILTIN_FAMILIEN {
         // Eine andere Familie: derselbe Weg wie CALL_BUILTIN in der VM. Ein
         // Fehler wird NICHT nachgerechnet -- der Befehl hat womoeglich schon
@@ -1243,12 +1249,13 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
             }
             op::CALL_BUILTIN if modus_w => {
                 let (name, argc) = match &ins.arg { Arg::Call(n, c, _) => (n.clone(), *c as usize), _ => return Err("Befehl ohne Namen".into()) };
-                // Nur die REINEN Befehle, und nur, wenn die VM an genau dieser
-                // Stelle schon sie gefragt hat (Merkplatz der Familie).
-                if ins.familie.get() == 0 {
-                    return Err(format!("eingebauter Befehl {} (an dieser Stelle noch nie gerufen)", name.to_uppercase()));
-                }
-                if !befehl_im_bereich(ins.familie.get(), &name) {
+                // Hat die VM die Stelle noch nie gerufen (ein Zweig, der vor dem
+                // ersten Ruecksprung nicht lief), steht die Familie noch nicht
+                // fest: der Befehl wird SPAET gebunden -- der Helfer fragt beim
+                // Laufen und steigt aus, solange sie fehlt oder verboten ist
+                // (M4 Schritt 12). Beim Bauen zaehlt dann nur der Name.
+                let fam = ins.familie.get();
+                if !befehl_im_bereich(if fam == 0 { 1 } else { fam }, &name) {
                     return Err(format!("eingebauter Befehl {} (ruft Drachenhauch-Code oder braucht die Zeile)", name.to_uppercase()));
                 }
                 for _ in 0..argc { if !w_oder_skalar(pop!()) { return Err("Argument NIL".into()); } }
