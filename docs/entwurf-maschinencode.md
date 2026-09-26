@@ -922,6 +922,30 @@ der Ziele, bauen und weitergeben, falsche Laenge, falscher Typ fuer ein
 Ziel). Gegenproben: Reihenfolge verdreht, Laenge nicht geprueft, Tupel
 verkehrt gebaut.
 
+**Schritt 17 (2026-09-26): Mitglieder von Werten.** Im Wertemodus ist ein
+Objekt ein Wert (`Art::W`), und `obj.x` darauf liess die Schleife in der VM
+("Mitglied von etwas, das kein Objekt ist" -- Schneefall 21 600 Runden,
+Coinquest 8 900). `LOAD_MEMBER`/`STORE_MEMBER` auf einem Wert gehen jetzt
+ueber `w_mitglied_lesen`/`w_mitglied_setzen` -> `Vm::member_laden`/
+`member_setzen`, also denselben Weg wie die VM: Feld ueber den Merkplatz,
+PROPERTY, Namensraum, gebundene Methode, Typpruefung beim Setzen. Eine
+PROPERTY fuehrt Drachenhauch-Code aus; `mitglied_harmlos` prueft darum alle
+Getter bzw. Setter dieses Namens (in allen Klassen -- der Empfaenger steht
+erst beim Laufen fest) mit `gerufenes_harmlos` wie eine Methode. Ein Fehler
+geht als Meldung an die Stelle, die VM fuehrt den Befehl nicht noch einmal
+aus -- ein Setter mit Nebenwirkung liefe sonst zweimal.
+
+Runden in der VM ueber alle Beispiele: 40 114 -> 18 233. Schneefall laeuft
+fast ganz im Maschinencode; Coinquest scheitert jetzt an "FOR nicht ueber
+INTEGER".
+
+Pruefung: 6 Faelle in `jit.dhtest` (Felder von Objekten als Werte,
+PROPERTY als Wert, PROPERTY beruehrt eine Globale des Bereichs -> VM, NIL
+mitten drin, Setter wirft, falscher Typ fuer ein Feld); sechs alte Faelle,
+die hier absichtlich in der VM blieben, werden jetzt uebersetzt (gleiche
+Ausgabe, neue Bilanz). Gegenproben: ohne Pruefung der PROPERTYs, ohne
+Meldung (der Setter liefe doppelt), Setzen ohne Wirkung.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

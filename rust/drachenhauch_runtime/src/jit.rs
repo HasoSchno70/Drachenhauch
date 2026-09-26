@@ -701,6 +701,46 @@ extern "C" fn w_tupel(k: *mut Kontext, basis: u64, n: u64) {
     *w_platz(k, basis) = Value::Tuple(Rc::new(items));
 }
 
+/// `obj.name` im Wertemodus (M4 Schritt 17): derselbe Weg wie LOAD_MEMBER
+/// (`Vm::member_laden` -- Feld, PROPERTY, Namensraum, gebundene Methode).
+/// `name` zeigt auf die Konstante mit dem Namen. Ein Fehler geht als Meldung
+/// an diese Stelle; die VM fuehrt den Befehl nicht noch einmal aus (ein
+/// Getter mit Nebenwirkung liefe sonst zweimal).
+extern "C" fn w_mitglied_lesen(k: *mut Kontext, ins: u64, name: u64, basis: u64) {
+    let ins: &'static crate::model::Instr = unsafe { &*(ins as *const crate::model::Instr) };
+    let name: &Value = unsafe { &*(name as *const Value) };
+    let obj = w_nehmen(k, basis);
+    let vm = unsafe { &mut *(*k).vm };
+    match vm.member_laden(ins, name, obj) {
+        Ok(v) => *w_platz(k, basis) = v,
+        Err(e) => { unsafe { (*k).meldung = Some(e); } w_fehler(k); }
+    }
+}
+
+/// `obj.name = wert` im Wertemodus: Objekt in `basis`, Wert dahinter.
+extern "C" fn w_mitglied_setzen(k: *mut Kontext, ins: u64, name: u64, basis: u64) {
+    let ins: &'static crate::model::Instr = unsafe { &*(ins as *const crate::model::Instr) };
+    let name: &Value = unsafe { &*(name as *const Value) };
+    let obj = w_nehmen(k, basis);
+    let v = w_nehmen(k, basis + 1);
+    let vm = unsafe { &mut *(*k).vm };
+    if let Err(e) = vm.member_setzen(ins, name, obj, v) {
+        unsafe { (*k).meldung = Some(e); }
+        w_fehler(k);
+    }
+}
+
+/// Darf ein Bereich `obj.name` lesen oder schreiben, wenn `obj` erst beim
+/// Laufen feststeht? Eine PROPERTY dieses Namens (in irgendeiner Klasse)
+/// fuehrt Drachenhauch-Code aus -- geprueft wie eine Methode.
+fn mitglied_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, name: &str, schreiben: bool) -> Result<(), String> {
+    let n = format!("{}{}", if schreiben { "__set_" } else { "__get_" }, name);
+    let props: Vec<&'a Func> = prog.classes.values().flat_map(|c| c.methods.iter())
+        .filter(|(m, _)| m.eq_ignore_ascii_case(&n)).map(|(_, g)| g).collect();
+    if props.is_empty() { return Ok(()); }
+    gerufenes_harmlos(prog, f, b, props, &format!("PROPERTY {}", name))
+}
+
 /// PRINT im Wertemodus (M4 Schritt 10): die Werte von den Plaetzen nehmen und
 /// denselben Code der VM rufen (`Vm::drucken`). Kann nicht scheitern.
 extern "C" fn w_drucken(k: *mut Kontext, ins: u64, basis: u64, n: u64) {
@@ -862,7 +902,7 @@ struct Hilfe {
     journal_schluss: FuncId,
     mathe1: FuncId,
     mathe2: FuncId,
-    w: [FuncId; 19],
+    w: [FuncId; 21],
 }
 
 /// Plaetze in `Hilfe::w`.
@@ -885,6 +925,8 @@ const W_DRUCKEN: usize = 15;
 const W_FUNKTION: usize = 16;
 const W_AUSPACKEN: usize = 17;
 const W_TUPEL: usize = 18;
+const W_MLESEN: usize = 19;
+const W_MSETZEN: usize = 20;
 
 type Einstieg = unsafe extern "C" fn(*mut Kontext, *const u64, *mut u64);
 
@@ -1152,6 +1194,8 @@ struct Analyse {
     fehlende: Vec<usize>,
     /// Aufrufe, die ueber die VM gehen (M4 Schritt 15).
     vm_aufrufe: Vec<usize>,
+    /// `obj.name` auf einem Wert, ueber die VM (M4 Schritt 17).
+    w_mitglieder: Vec<usize>,
     /// Globale Plaetze, die sie selbst liest oder schreibt, und die sie
     /// schreibt.
     beruehrt: Vec<usize>,
@@ -1256,6 +1300,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
     let mut ausgaenge: Vec<usize> = Vec::new();
     let mut feste_ausstiege: Vec<usize> = Vec::new();
     let mut vm_aufrufe: Vec<usize> = Vec::new();
+    let mut w_mitglieder: Vec<usize> = Vec::new();
     let mut fehlende: Vec<usize> = Vec::new();
     let mut felder: Vec<FeldInfo> = bereich.map_or(Vec::new(), |b| b.felder.clone());
     let mut schreibt_felder = false;
@@ -1326,6 +1371,24 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
             op::LOAD_SELF if selbst.is_some() => { z.stapel.push(Art::Obj(selbst.unwrap())); }
             op::LOAD_NAME if vorbelegt(prog, f, ins).is_some() => {
                 z.stapel.push(if matches!(vorbelegt(prog, f, ins), Some(Value::Float(_))) { Art::F } else { Art::I });
+            }
+            op::LOAD_MEMBER | op::STORE_MEMBER if modus_w && {
+                let tiefe = if o == op::STORE_MEMBER { 2 } else { 1 };
+                z.stapel.len() >= tiefe && z.stapel[z.stapel.len() - tiefe] == Art::W
+            } => {
+                // Ein Objekt als Wert (Wertemodus): die VM liest bzw. setzt
+                // das Mitglied (M4 Schritt 17).
+                let name = match f.constants.get(ins.arg.as_usize()) { Some(Value::Str(n)) => n.to_string(), _ => return Err("Feldname".into()) };
+                mitglied_harmlos(prog, f, bereich.ok_or("Mitglied ausserhalb eines Bereichs")?, &name, o == op::STORE_MEMBER)?;
+                if o == op::STORE_MEMBER {
+                    if !w_oder_skalar(pop!()) { return Err("NIL in ein Feld".into()); }
+                    pop!();
+                } else {
+                    pop!();
+                    z.stapel.push(Art::W);
+                }
+                if !w_mitglieder.contains(&ip) { w_mitglieder.push(ip); }
+                schreibt_felder = true;
             }
             op::LOAD_FIELD | op::LOAD_MEMBER | op::STORE_FIELD | op::STORE_MEMBER if bereich.is_some() || selbst.is_some() => {
                 let name = match f.constants.get(ins.arg.as_usize()) { Some(Value::Str(n)) => n.to_string(), _ => return Err("Feldname".into()) };
@@ -1690,7 +1753,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
         if weiter { melden(&mut vor, &mut offen, ip + 1, &z)?; }
     }
     Ok(Analyse { vor, ausgaenge, params, rueck, gerufen, beruehrt, geschrieben, felder, schreibt_felder,
-                 klassen, selbst, dyn_glob, typen, modus_w, feste_ausstiege, fehlende, vm_aufrufe })
+                 klassen, selbst, dyn_glob, typen, modus_w, feste_ausstiege, fehlende, vm_aufrufe, w_mitglieder })
 }
 
 /// Fuer den Grund in `dhrt --jit`: was die Funktion tut, das der
@@ -2367,6 +2430,17 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let (ip_c, basis, nc) = (bau.iconst(ins as *const crate::model::Instr as i64), bau.iconst(bau.w_slot(d)), bau.iconst(n as i64));
                         bau.w_ruf(W_DRUCKEN, &[ip_c, basis, nc]);
                     }
+                    op::LOAD_MEMBER | op::STORE_MEMBER if an.w_mitglieder.contains(&ip) => {
+                        let d = st.len() - if o == op::STORE_MEMBER { 2 } else { 1 };
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let ip_c = bau.iconst(ins as *const crate::model::Instr as i64);
+                        let pz = bau.iconst(&f.constants[ins.arg.as_usize()] as *const Value as i64);
+                        let basis = bau.iconst(bau.w_slot(d));
+                        bau.w_ruf(if o == op::STORE_MEMBER { W_MSETZEN } else { W_MLESEN }, &[ip_c, pz, basis]);
+                        bau.fehler_pruefen();
+                        if o == op::LOAD_MEMBER { let z = bau.iconst(0); st.push((z, Art::W)); }
+                    }
                     op::UNPACK_TUPLE if an.modus_w => {
                         let n = ins.arg.as_usize();
                         let d = st.len() - 1;
@@ -3032,7 +3106,7 @@ impl Jit {
         builder.symbol("dh_journal_schluss", journal_schluss as *const u8);
         builder.symbol("dh_mathe1", mathe1 as *const u8);
         builder.symbol("dh_mathe2", mathe2 as *const u8);
-        let w_namen: [(&str, *const u8); 19] = [
+        let w_namen: [(&str, *const u8); 21] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
             ("dh_w_ablegen_f", w_ablegen_f as *const u8), ("dh_w_zahl_i", w_zahl_i as *const u8),
@@ -3043,6 +3117,7 @@ impl Jit {
             ("dh_w_methode", w_methode as *const u8), ("dh_w_drucken", w_drucken as *const u8),
             ("dh_w_funktion", w_funktion as *const u8),
             ("dh_w_auspacken", w_auspacken as *const u8), ("dh_w_tupel", w_tupel as *const u8),
+            ("dh_w_mlesen", w_mitglied_lesen as *const u8), ("dh_w_msetzen", w_mitglied_setzen as *const u8),
         ];
         for (n, f) in w_namen { builder.symbol(n, f); }
         let mut modul = JITModule::new(builder);
@@ -3093,10 +3168,12 @@ impl Jit {
             ("dh_w_funktion", vec![ptr, i, i, i], None),
             ("dh_w_auspacken", vec![ptr, i, i], None),
             ("dh_w_tupel", vec![ptr, i, i], None),
+            ("dh_w_mlesen", vec![ptr, i, i, i], None),
+            ("dh_w_msetzen", vec![ptr, i, i, i], None),
         ].into_iter().map(|(n, pa, r): (&str, Vec<Type>, Option<Type>)| (n, sig_h(&pa, r))).collect();
         let mut dekl = |name: &str, sg: &cranelift_codegen::ir::Signature| modul.declare_function(name, Linkage::Import, sg)
             .map_err(|e| format!("{:?}", e));
-        let mut w_ids = [holen_id; 19];
+        let mut w_ids = [holen_id; 21];
         for (j, (n, sg)) in w_sigs.iter().enumerate() { w_ids[j] = dekl(n, sg)?; }
         let hilfe = Hilfe {
             holen: holen_id,
