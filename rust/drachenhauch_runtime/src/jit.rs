@@ -1613,6 +1613,13 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                     continue;
                 }
                 if fremd[s] { return Err(format!("Platz {} hat den Typ '{}'", s, typen[s])); }
+                // Ein Local ohne Typ bleibt im Wertemodus ein Wert, auch mit
+                // einer Zahl (siehe `wertebereich`, M4 Schritt 18).
+                if modus_w && dekl[s].is_none() && matches!(typen[s].as_str(), "" | "any") && zahl(a) {
+                    z.lokal[s] = Some(Art::W);
+                    melden(&mut vor, &mut offen, ip + 1, &z)?;
+                    continue;
+                }
                 let nach = match dekl[s] { Some(d) => { if !passt(a, d) { return Err(format!("{:?} in Platz {:?}", a, d)); } d } None => a };
                 z.lokal[s] = Some(nach);
             }
@@ -1743,7 +1750,11 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                     glob.art.get(g).copied().flatten()
                 } else { lok(t[1]) };
                 let schritt = if t[3] == 1 { lok(t[4]) } else { f.constants.get(t[4] as usize).and_then(art_von_wert) };
-                if lauf != Some(Art::I) || lok(t[2]) != Some(Art::I) || schritt != Some(Art::I) {
+                // Die Grenze darf eine Kommazahl sein (`TO b / 2`, `/` liefert
+                // immer FLOAT): verglichen wird dann wie in der VM ueber `cmp`
+                // (M4 Schritt 18).
+                let grenze_ok = match lok(t[2]) { Some(Art::I | Art::F) => true, Some(Art::W) => modus_w, _ => false };
+                if lauf != Some(Art::I) || !grenze_ok || schritt != Some(Art::I) {
                     return Err("FOR nicht ueber INTEGER".into());
                 }
                 melden(&mut vor, &mut offen, t[6] as usize, &z)?;
@@ -2289,8 +2300,12 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         st.push((n, Art::W));
                     }
                     op::STORE_LOCAL | op::ADD_STORE_LOCAL
-                        if (o == op::STORE_LOCAL && oben_w) || (o == op::ADD_STORE_LOCAL && zwei_w) => {
+                        if (o == op::STORE_LOCAL && (oben_w || an.vor[ip + 1].as_ref().and_then(|z| z.lokal[s_arg]) == Some(Art::W)))
+                            || (o == op::ADD_STORE_LOCAL && zwei_w) => {
                         let s = s_arg;
+                        // Eine Zahl in ein Local, das ein Wert bleibt: erst auf
+                        // ihren Platz legen.
+                        if o == op::STORE_LOCAL && !oben_w { bau.w_boxen(&st, st.len() - 1); }
                         let ziel_art = an.vor[ip + 1].as_ref().and_then(|z| z.lokal[s]).filter(|a| *a != Art::W);
                         let quelle = if o == op::ADD_STORE_LOCAL {
                             let d = st.len() - 2;
@@ -2751,8 +2766,21 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let global = t[0] == 1;
                         let v = bau.var(1, t[1] as usize, Art::I);
                         let cur = if global { bau.global_lesen(t[1] as usize, Art::I) } else { bau.b.use_var(v) };
-                        let e = bau.var(1, t[2] as usize, Art::I);
-                        let en = bau.b.use_var(e);
+                        let mut ea = z.lokal[t[2] as usize].unwrap();
+                        let en = if ea == Art::W {
+                            // Die Grenze als Wert (Wertemodus): auf einen
+                            // freien Platz kopieren und als Zahl lesen -- das
+                            // Local selbst bleibt stehen. Keine Zahl: aussteigen.
+                            let (von, frei) = (bau.iconst(t[2]), bau.iconst(bau.w_slot(st.len())));
+                            bau.w_ruf(W_KOPIE, &[von, frei]);
+                            let x = bau.w_ruf_w(W_ZAHL_F, &[frei]);
+                            bau.fehler_pruefen();
+                            ea = Art::F;
+                            x
+                        } else {
+                            let e = bau.var(1, t[2] as usize, ea);
+                            bau.b.use_var(e)
+                        };
                         let schritt = if t[3] == 1 {
                             let s = bau.var(1, t[4] as usize, Art::I); bau.b.use_var(s)
                         } else {
@@ -2760,9 +2788,10 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         };
                         let (next, ueber) = bau.b.ins().sadd_overflow(cur, schritt);
                         bau.aussteigen_wenn(ueber);
+                        // Vor dem Schreiben: steigt der Vergleich aus (NaN als
+                        // Grenze), fuehrt die VM den Befehl von vorn aus.
+                        let raus = vergleichen(&mut bau, if t[5] == 1 { op::LT } else { op::GT }, next, Art::I, en, ea);
                         if global { bau.global_schreiben(t[1] as usize, next); } else { bau.b.def_var(v, next); }
-                        let raus = if t[5] == 1 { bau.b.ins().icmp(IntCC::SignedLessThan, next, en) }
-                                   else { bau.b.ins().icmp(IntCC::SignedGreaterThan, next, en) };
                         ablegen(&mut bau, &st);
                         bau.b.ins().brif(raus, bloecke[&(ip + 1)], &[], bloecke[&(t[6] as usize)], &[]);
                         offen = false;
@@ -3342,6 +3371,10 @@ impl Jit {
                 (Art::Feld(_), _) => 0,   // geprueft mit den Feldern unten
                 (Art::Obj(k), Value::Instance(rc)) if std::ptr::eq(Rc::as_ptr(&rc.borrow().layout), s.klassen[*k as usize].lage)
                     => Rc::as_ptr(rc) as u64,
+                // Ein Local ohne Typ fuehrt der Wertemodus auch mit einer Zahl
+                // als Wert (siehe `wertebereich`).
+                (Art::W, Value::Int(_) | Value::Float(_) | Value::Bool(_))
+                    if s.modus_w && matches!(s.typen.get(i).map(|t| t.as_str()), Some("" | "any")) => 0,
                 (Art::W, Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::Nil) => return None,
                 (Art::W, _) => 0,
                 _ => return None,
@@ -3649,6 +3682,15 @@ impl Jit {
             _ => Some(Art::W),
         };
         let mut lokal: Vec<Option<Art>> = locals.iter().map(art).collect();
+        // Ein Local ohne Typ (`any`, etwa die verborgene Grenze einer FOR-
+        // Schleife) haelt im Wertemodus nach jeder Zuweisung eines Werts `W`
+        // -- beim Eintritt als Zahl gefuehrt, trafen sich am Ruecksprung
+        // zwei Arten. Darum gleich als Wert (M4 Schritt 18).
+        for (i, a) in lokal.iter_mut().enumerate() {
+            if matches!(f.local_types.get(i).map(|t| t.as_str()), Some("" | "any")) && matches!(a, Some(Art::I | Art::F | Art::B)) {
+                *a = Some(Art::W);
+            }
+        }
         let mut dyn_glob: Vec<usize> = Vec::new();
         let mut lok_typen: Vec<String> = f.local_types.clone();
         for ins in &f.code[kopf..=bis] {

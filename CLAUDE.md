@@ -1685,6 +1685,11 @@ Wert (Wertemodus) ueber `w_mitglied_lesen`/`_setzen` -> `Vm::member_laden`/
 `member_setzen`; PROPERTYs dieses Namens prueft `mitglied_harmlos` wie
 Methoden. Runden 40 114 -> 18 233.
 
+**FOR mit Kommazahl- oder Wert-Grenze (M4 Schritt 18):** die Grenze einer
+FOR-Schleife darf F oder (Wertemodus) W sein; Locals ohne Typ (`any`, etwa
+die verborgene Grenze) sind im Wertemodus immer ein Wert. Runden 18 233 ->
+9 033.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

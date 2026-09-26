@@ -946,6 +946,37 @@ die hier absichtlich in der VM blieben, werden jetzt uebersetzt (gleiche
 Ausgabe, neue Bilanz). Gegenproben: ohne Pruefung der PROPERTYs, ohne
 Meldung (der Setter liefe doppelt), Setzen ohne Wirkung.
 
+**Schritt 18 (2026-09-26): FOR mit Kommazahl oder Wert als Grenze.** Seit
+`/` immer FLOAT liefert, ist `FOR r = 0 TO WORLD_H / TILE - 1` eine
+Schleife mit Kommazahl-Grenze -- der Maschinencode kannte nur INTEGER
+("FOR nicht ueber INTEGER", Coinquest 8 900 Runden). Die Laufvariable und
+die Schrittweite bleiben INTEGER; die Grenze darf jetzt F sein (verglichen
+ueber `vergleichen`, wie die VM mit `cmp`) oder im Wertemodus W (auf einen
+freien Platz kopiert und als Zahl gelesen -- das Local bleibt stehen; keine
+Zahl: aussteigen, die VM meldet). Verglichen wird VOR dem Zurueckschreiben
+der Laufvariable, damit ein Ausstieg (NaN) nichts halb geschrieben
+hinterlaesst. Eine W-Grenze, die eine Ganzzahl ist, wird als Kommazahl
+verglichen -- das weicht von der VM erst jenseits von 2^53 ab.
+
+**Dazu ein zweiter Punkt:** die verborgene Grenze einer FOR-Schleife ist ein
+Local ohne Typ (`any`). Im Wertemodus hielt es nach einer Zuweisung eines
+Werts `W`, beim Eintritt aber eine Zahl (F) -- am Ruecksprung trafen sich
+zwei Arten, und die aeussere Schleife blieb in der VM. Locals ohne Typ sind
+im Wertemodus jetzt immer ein Wert: beim Eintritt (`wertebereich`, die
+Eintrittspruefung laesst dort Zahlen zu) und beim Schreiben einer Zahl
+(`w_boxen` + `w_nach_lokal`).
+
+Runden in der VM ueber alle Beispiele: 18 233 -> 9 033.
+
+Pruefung: 4 Faelle in `jit.dhtest` (Kommazahl-Grenze, rueckwaerts mit
+Kommazahl-Grenze, Wert als Grenze, Grenze wird mitten drin ein Text).
+Gegenproben: Grenze verbraucht statt kopiert, ohne `any` als Wert (nur an
+der Bilanz -- die Schleifen bleiben dann richtig in der VM), vorwaerts mit
+`>=` statt `>`. **Eine Gegenprobe blieb gruen:** rueckwaerts `<=` statt `<`
+-- eine FOR-Schleife mit negativer Schrittweite wird gar nicht zu
+`FOR_NEXT` verschmolzen, sondern laeuft ueber gewoehnliche Vergleiche; der
+Zweig `neg` im Maschinencode kommt in keinem Fall vor.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur
