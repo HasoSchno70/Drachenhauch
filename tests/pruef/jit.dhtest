@@ -2222,8 +2222,10 @@ DHRT_JIT_BILANZ=1
 4.75 -4.75 5 4.75
 --- stderr
 jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
-jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+jit: Schleife an Stelle 37 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 49..86
+jit: 0 Funktionen, 1 Schleifen, 5 Schleifenlaeufe
 jit: 18 Runden in der VM -- Stelle 14 in __main__: Objekt; mit Werten: Objekt
+jit: 3 Runden in der VM -- Stelle 37 in __main__: mit Werten: Mitglieder in der inneren Schleife 49..86
 
 === self-felder in einer schleife einer methode
 CLASS Konto
@@ -2327,8 +2329,10 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 11808 7 12 13 20
 --- stderr
-jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
-jit: 1 mal mitten in einer Schleife ausgestiegen
+jit: Schleife an Stelle 39 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 57..85
+jit: 0 Funktionen, 1 Schleifen, 3 Schleifenlaeufe
+jit: 3 mal mitten in einer Schleife ausgestiegen
+jit: 1 Runden in der VM -- Stelle 39 in __main__: mit Werten: Mitglieder in der inneren Schleife 57..85
 
 === property in der schleife bleibt in der vm
 CLASS P
@@ -2747,8 +2751,10 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 66 8 10
 --- stderr
-jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
-jit: 2 mal mitten in einer Schleife ausgestiegen
+jit: Schleife an Stelle 24 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 40..62
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 6 mal mitten in einer Schleife ausgestiegen
+jit: 1 Runden in der VM -- Stelle 24 in __main__: mit Werten: Mitglieder in der inneren Schleife 40..62
 
 === text anhaengen in einer schleife
 DIM s AS STRING
@@ -6577,8 +6583,10 @@ DHRT_JIT_BILANZ=1
 6.0:000 7.5:111 9.0:222 10.5:333 12.0:444 
 --- stderr
 jit: Schleife an Stelle 15 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
-jit: 0 Funktionen, 3 Schleifen, 3 Schleifenlaeufe
+jit: Schleife an Stelle 38 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 48..69
+jit: 0 Funktionen, 2 Schleifen, 4 Schleifenlaeufe
 jit: 3 Runden in der VM -- Stelle 15 in __main__: Objekt; mit Werten: Objekt
+jit: 1 Runden in der VM -- Stelle 38 in __main__: mit Werten: Mitglieder in der inneren Schleife 48..69
 
 === property als wert in der schleife
 DIM zugriffe AS INTEGER
@@ -6646,7 +6654,9 @@ DHRT_JIT_BILANZ=1
 001002003004 24
 --- stderr
 jit: Schleife an Stelle 16 in __main__ bleibt in der VM: Objekt; mit Werten: Objekt
-jit: 2 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+jit: Schleife an Stelle 32 in __main__ bleibt in der VM: mit Werten: Mitglieder in der inneren Schleife 42..61
+jit: 2 Funktionen, 1 Schleifen, 4 Schleifenlaeufe
+jit: 2 Runden in der VM -- Stelle 32 in __main__: mit Werten: Mitglieder in der inneren Schleife 42..61
 jit: 1 Runden in der VM -- Stelle 16 in __main__: Objekt; mit Werten: Objekt
 
 === property beruehrt eine globale des bereichs
