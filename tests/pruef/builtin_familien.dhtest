@@ -70,6 +70,8 @@ fehler
 
 === ein befehl am ende der kette kostet nicht mehr als einer am anfang
 ' Vorher: CHART_COUNT 145 ms je Million, ABS 78 ms. Jetzt beide ~40 ms.
+' Gemessen wird der Befehlsweg der VM: mit Maschinencode rechnet der ABS
+' selbst (M4 Schritt 8), der Vergleich hiesse dann etwas anderes.
 IMPORT "chart"
 DIM c AS CHART
 c = CHART_NEW("balken", 0, 0, 100, 100)
@@ -90,5 +92,7 @@ FOR runde = 1 TO 3
     hinten = MIN(hinten, MILLIS() - t)
 NEXT
 PRINT hinten < vorn * 3 \ 2 + 20
+--- umgebung
+DHRT_JIT=aus
 --- erwartet
 TRUE

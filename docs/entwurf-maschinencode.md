@@ -669,6 +669,41 @@ Lage beim Einstieg aus der VM nicht pruefen (29 statt 20, 1 statt 10),
 `Self` des Gerufenen nicht setzen (Absturz), nur eigene Methoden in der
 Tafel (die geerbten bleiben in der VM).
 
+**Schritt 8 (2026-09-26): reine Zahlenbefehle direkt im Maschinencode --
+gebaut.** Nach M5 ist der naechste Schritt gemessen, nicht geplant: ueber
+`tools/tempo` liefen alle Schleifen schon als Maschinencode, aber
+`builtins.dh` (3 Mio. `ABS`/`SQR`/`INT`) brauchte 107 ms -- ~35 ns je
+Aufruf im Wertemodus, fuer eine Rechnung, die eine Anweisung ist.
+`zahl_befehl` (jit.rs) nennt die Befehle, die der Maschinencode selbst
+rechnet, und die Art ihres Ergebnisses: `ABS INT FLOOR CEIL ROUND SGN/SIGN
+FLT SQR/SQRT SIN COS TAN ATAN EXP LOG ASIN ACOS DEG RAD FRAC ATAN2 HYPOT LERP
+MIN MAX CLAMP`, nur mit INTEGER/FLOAT als Argument; `MIN`/`MAX`/`CLAMP` nur,
+wenn alle Argumente dieselbe Art haben (sie liefern einen der WERTE).
+`zahl_rechnen` baut sie nach builtins.rs: eine Ganzzahl geht wie bei
+`need_num` als Kommazahl hinein, auch bei `INT` (INT(2^53 + 1) rundet wie in
+der VM); `ROUND` ist IEEE-Runden zur geraden Zahl (`nearest`), `FLOOR`/`CEIL`
+saettigen wie Rusts `as i64`; Sinus und Co. rufen dieselben Rust-Funktionen
+(`mathe1`/`mathe2`), darum bitgleich. **Jeder Fehlerfall der VM steigt aus**
+(ABS von i64::MIN, SQR negativ, INT ausserhalb oder NaN, LOG <= 0,
+ASIN/ACOS ausserhalb [-1, 1]); die VM fuehrt den Befehl selbst aus und
+meldet ihn. Das gilt im getypten Modus und im Wertemodus (dort, wenn die
+Argumente Zahlen sind), in Funktionen gibt der Aufruf auf. Keiner der Namen
+wird von einer frueheren Familie beantwortet -- der Merkplatz braucht nicht
+gefragt zu werden, und Funktionen mit diesen Befehlen werden beim Start
+uebersetzt.
+
+Gemessen: `builtins.dh` VM 155 ms, vorher 107 ms, jetzt 3,3 ms.
+Pruefung: 10 Faelle mehr in `jit.dhtest` (alle Befehle in einer Schleife,
+Runden und Abschneiden, INT einer grossen Ganzzahl, SQR negativ, ABS von
+MIN, INT ausserhalb/LOG/ASIN, MIN/MAX gemischt, DEG/RAD/LERP bis aufs letzte
+Bit, Befehle in Funktionen). Neun Gegenproben, alle mit falschem Ergebnis:
+ROUND als FLOOR, INT ohne Grenze, INT einer Ganzzahl ohne den Umweg ueber
+Komma, ABS ohne MIN-Pruefung, SQR und LOG ohne Pruefung, DEG in anderer
+Reihenfolge (ein Bit), SGN vertauscht, CLAMP vertauscht. **Zwei davon
+fielen erst im zweiten Anlauf**: bei der grossen Ganzzahl hoben sich mit
+Schritt 2 die Rundungen in der Summe auf (995 + 997 = 996 + 996), und bei
+ganzen Zahlen -6..6 rechnen `x * 180 / PI` und `x * (180 / PI)` gleich.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur
