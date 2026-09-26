@@ -903,6 +903,25 @@ Rekursion, BYREF -> VM, SUB ohne Ergebnis). Gegenproben: ohne Pruefung auf
 Globale, Argumente umgedreht, ohne Meldung (die VM riefe doppelt), ohne
 Rueckfall in den Wertemodus, ohne `Rc` (stuerzt ab).
 
+**Schritt 16 (2026-09-26): Tupel im Wertemodus.** Seit Schritt 15
+laufen Funktionen, die ein TUPLE liefern, ueber die VM -- die Schleife
+scheiterte danach am Auspacken (`(r, g, b) = sinscrollrgb(...)`, Befehl
+69). `UNPACK_TUPLE` und `BUILD_TUPLE` im Wertemodus gehen ueber zwei
+Helfer: `w_auspacken` legt die Elemente so auf die Werteplaetze, wie die
+VM sie auf ihren Stapel legt (das erste oben); passt die Laenge nicht oder
+ist es kein Tupel, bleibt der Wert liegen und der Bereich steigt VOR dem
+Befehl aus -- die VM meldet den Fehler mit ihrem Wortlaut. `w_tupel`
+baut ein Tupel aus den Plaetzen. Was danach in ein INTEGER-Ziel geht,
+prueft wie immer `w_speichern`.
+
+Runden in der VM ueber alle Beispiele: 73 456 -> 40 114. Orbital und
+Hires-Showcase laufen fast ganz im Maschinencode.
+
+Pruefung: 5 Faelle in `jit.dhtest` (Tupel aus einer Funktion, Reihenfolge
+der Ziele, bauen und weitergeben, falsche Laenge, falscher Typ fuer ein
+Ziel). Gegenproben: Reihenfolge verdreht, Laenge nicht geprueft, Tupel
+verkehrt gebaut.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

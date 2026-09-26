@@ -2329,10 +2329,10 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 11808 7 12 13 20
 --- stderr
-jit: Schleife an Stelle 39 in __main__ bleibt in der VM: Befehl 68; mit Werten: Befehl 68
+jit: Schleife an Stelle 39 in __main__ bleibt in der VM: Befehl 68; mit Werten: Mitglied von etwas, das kein Objekt ist
 jit: 0 Funktionen, 1 Schleifen, 3 Schleifenlaeufe
 jit: 3 mal mitten in einer Schleife ausgestiegen
-jit: 1 Runden in der VM -- Stelle 39 in __main__: Befehl 68; mit Werten: Befehl 68
+jit: 1 Runden in der VM -- Stelle 39 in __main__: Befehl 68; mit Werten: Mitglied von etwas, das kein Objekt ist
 
 === property in der schleife bleibt in der vm
 CLASS P
@@ -2568,9 +2568,9 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 260 11
 --- stderr
-jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68; mit Werten: Befehl 68
+jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68; mit Werten: zwei Wege treffen sich an Stelle 28 mit verschiedenen Arten
 jit: 0 Funktionen, 1 Schleifen, 4 Schleifenlaeufe
-jit: 2 Runden in der VM -- Stelle 12 in __main__: Befehl 68; mit Werten: Befehl 68
+jit: 2 Runden in der VM -- Stelle 12 in __main__: Befehl 68; mit Werten: zwei Wege treffen sich an Stelle 28 mit verschiedenen Arten
 
 === gemischte zahlen in einem tupel
 DIM s AS FLOAT
@@ -2601,10 +2601,10 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 33.0
 --- stderr
-jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68; mit Werten: Befehl 68
+jit: Schleife an Stelle 12 in __main__ bleibt in der VM: Befehl 68; mit Werten: zwei Wege treffen sich an Stelle 28 mit verschiedenen Arten
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
 jit: 6 mal mitten in einer Schleife ausgestiegen
-jit: 1 Runden in der VM -- Stelle 12 in __main__: Befehl 68; mit Werten: Befehl 68
+jit: 1 Runden in der VM -- Stelle 12 in __main__: Befehl 68; mit Werten: zwei Wege treffen sich an Stelle 28 mit verschiedenen Arten
 
 === objekt in eine globale variable
 CLASS Teil
@@ -2753,10 +2753,10 @@ DHRT_JIT_BILANZ=1
 --- erwartet
 66 8 10
 --- stderr
-jit: Schleife an Stelle 24 in __main__ bleibt in der VM: Befehl 68; mit Werten: Befehl 68
+jit: Schleife an Stelle 24 in __main__ bleibt in der VM: Befehl 68; mit Werten: Mitglied von etwas, das kein Objekt ist
 jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
 jit: 6 mal mitten in einer Schleife ausgestiegen
-jit: 1 Runden in der VM -- Stelle 24 in __main__: Befehl 68; mit Werten: Befehl 68
+jit: 1 Runden in der VM -- Stelle 24 in __main__: Befehl 68; mit Werten: Mitglied von etwas, das kein Objekt ist
 
 === text anhaengen in einer schleife
 DIM s AS STRING
@@ -6306,6 +6306,229 @@ DHRT_JIT_BILANZ=1
 x1/x1x2/x1x2x3/x1x2x3x4/x1x2x3x4x5/
 --- stderr
 jit: 0 Funktionen, 2 Schleifen, 5 Schleifenlaeufe
+
+=== tupel aus einer funktion auspacken
+FUNCTION farbe(p AS FLOAT) AS TUPLE
+    RETURN (INT(p * 10) MOD 256, INT(p * 20) MOD 256, INT(p * 30) MOD 256)
+END FUNCTION
+DIM i AS INTEGER
+DIM r AS INTEGER
+DIM g AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 40
+    (r, g, b) = farbe(i * 1.5)
+    s = s + r * 3 + g * 2 + b
+NEXT
+PRINT s; " "; r; " "; g; " "; b
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+30072 88 176 8
+
+=== tupel aus einer funktion auspacken (maschinencode)
+FUNCTION farbe(p AS FLOAT) AS TUPLE
+    RETURN (INT(p * 10) MOD 256, INT(p * 20) MOD 256, INT(p * 30) MOD 256)
+END FUNCTION
+DIM i AS INTEGER
+DIM r AS INTEGER
+DIM g AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 40
+    (r, g, b) = farbe(i * 1.5)
+    s = s + r * 3 + g * 2 + b
+NEXT
+PRINT s; " "; r; " "; g; " "; b
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+30072 88 176 8
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== tupel in der reihenfolge der ziele
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS STRING
+DIM c AS FLOAT
+DIM t AS STRING
+FOR i = 1 TO 4
+    (a, b, c) = (i, STR$(i * 2), i / 4)
+    t = t + STR$(a) + b + STR$(c) + "|"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+120.25|240.5|360.75|481.0|
+
+=== tupel in der reihenfolge der ziele (maschinencode)
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS STRING
+DIM c AS FLOAT
+DIM t AS STRING
+FOR i = 1 TO 4
+    (a, b, c) = (i, STR$(i * 2), i / 4)
+    t = t + STR$(a) + b + STR$(c) + "|"
+NEXT
+PRINT t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+120.25|240.5|360.75|481.0|
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== tupel bauen und weitergeben
+FUNCTION summe(t AS TUPLE) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    (x, y) = t
+    RETURN x * 10 + y
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM p AS TUPLE
+FOR i = 1 TO 6
+    p = (i, i + 1)
+    s = s + summe(p)
+NEXT
+PRINT s; " "; p
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+237 (6, 7)
+
+=== tupel bauen und weitergeben (maschinencode)
+FUNCTION summe(t AS TUPLE) AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    (x, y) = t
+    RETURN x * 10 + y
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+DIM p AS TUPLE
+FOR i = 1 TO 6
+    p = (i, i + 1)
+    s = s + summe(p)
+NEXT
+PRINT s; " "; p
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+237 (6, 7)
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== tupel mit falscher laenge
+FUNCTION paar(k AS INTEGER) AS TUPLE
+    IF k = 3 THEN RETURN (k, k, k)
+    RETURN (k, k * 2)
+END FUNCTION
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 1 TO 6
+        (a, b) = paar(i)
+        s = s + a + b
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+3 9
+
+=== tupel mit falscher laenge (maschinencode)
+FUNCTION paar(k AS INTEGER) AS TUPLE
+    IF k = 3 THEN RETURN (k, k, k)
+    RETURN (k, k * 2)
+END FUNCTION
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 1 TO 6
+        (a, b) = paar(i)
+        s = s + a + b
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+3 9
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== tupel mit falschem typ fuer ein ziel
+FUNCTION paar(k AS INTEGER) AS TUPLE
+    IF k = 4 THEN RETURN (1.5, "x")
+    RETURN (k, STR$(k))
+END FUNCTION
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS STRING
+DIM t AS STRING
+TRY
+    FOR i = 1 TO 6
+        (a, b) = paar(i)
+        t = t + b + STR$(a)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Zuweisung an global: FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+4 112233
+
+=== tupel mit falschem typ fuer ein ziel (maschinencode)
+FUNCTION paar(k AS INTEGER) AS TUPLE
+    IF k = 4 THEN RETURN (1.5, "x")
+    RETURN (k, STR$(k))
+END FUNCTION
+DIM i AS INTEGER
+DIM a AS INTEGER
+DIM b AS STRING
+DIM t AS STRING
+TRY
+    FOR i = 1 TO 6
+        (a, b) = paar(i)
+        t = t + b + STR$(a)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; t
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Zuweisung an global: FLOAT 1.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+4 112233
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
 
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in
