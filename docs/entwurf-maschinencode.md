@@ -746,6 +746,38 @@ einem Fehler in derselben Runde, PRINT mit einer Funktion, die Globale
 schreibt, Werte aller Art); drei Gegenproben am Ergebnis (Werte vertauscht,
 letzter Wert fehlt, Schutz vor dem Aufgeben entfernt).
 
+**Schritt 11 (2026-09-26): die Bilanz zaehlt Runden; Handles lesen.** Der
+Durchlauf nach Schritt 10 zaehlte SCHLEIFEN -- und bei 12 der 32 Treffer des
+naechsten Grundes war es dieselbe Startschleife der gui-Beispiele (`FOR EACH
+fp IN (drei Schriftdateien)`), die dreimal laeuft. Eine Startschleife wog so
+viel wie die Hauptschleife. Jetzt zaehlt die VM jede Runde einer Schleife,
+die in der VM bleibt (`Jit::vm_runde` in beiden Haken, nur mit
+`DHRT_JIT_BILANZ`; ohne Bilanz ein nicht genommener Zweig), und die Bilanz
+nennt am Ende die zehn meistgedrehten: `jit: N Runden in der VM -- Stelle ...:
+Grund`. Gewichtet ueber alle Beispiele (60 Bilder) fuehrten Warteschleifen
+(`WHILE AUDIO_IS_PLAYING(ch)`, 35 Mio. Runden -- sie warten auf echte Zeit,
+Maschinencode braechte nichts), dann **Handles**: Bild-, Atlas-, Klang- und
+Schrift-Handles sind in der VM GANZZAHLEN, der deklarierte Typ
+(`sprite_atlas`) machte den Platz "fremd", und schon das Lesen liess die
+Schleife in der VM (`76_layers_atlas.dh`, 348 579 Runden). Lesen ist nur die
+Zahl und jetzt erlaubt; Schreiben bleibt gesperrt, dort prueft die VM den
+Typ. Danach laufen alle fuenf Schleifen von `76_layers_atlas.dh` als
+Maschinencode (die Wandzeit bleibt gleich -- das Programm ist auf eine
+Bildrate gebremst).
+
+Die gewichtete Liste danach, Warteschleifen ausgenommen: "eingebauter Befehl
+(an dieser Stelle noch nie gerufen)" (57 Schleifen, 73 000 Runden -- Befehle
+in Zweigen, die vor dem ersten Ruecksprung nicht liefen), "legt eine globale
+Variable an" (13, 95 000), "ruft eine Funktion, die in der VM bleibt" (29,
+49 000), "Mitglied von etwas, das kein Objekt ist" (21, 24 000).
+
+Pruefung: 2 Faelle mehr in `jit.dhtest` (Handle als Zahl lesen; Handle
+schreiben bleibt in der VM und zaehlt 4 Runden); 21 alte Faelle tragen jetzt
+ihre Rundenzeile. Gegenproben: Handles wieder sperren und Runden nicht
+zaehlen fallen (dort ist die Bilanzzeile das Gepruefte); eine falsche Art im
+Analysezustand beim Lesen fiel NICHT -- der Code nimmt die Art des Platzes
+aus seinem eigenen Zustand, die Verfaelschung traf eine Stelle ohne Wirkung.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

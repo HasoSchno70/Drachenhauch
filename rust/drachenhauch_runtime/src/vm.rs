@@ -2700,6 +2700,9 @@ impl<'p> Vm<'p> {
                         // M4: eine Schleife im Maschinencode (jit::Jit::schleife).
                         #[cfg(feature = "jit")]
                         let vmp: *mut Vm = self;
+                        // Mit Bilanz: eine Runde einer Schleife, die in der VM bleibt.
+                        #[cfg(feature = "jit")]
+                        if instr.schleife.get() == 1 { if let Some(j) = self.jit.as_ref() { j.vm_runde(&instr.schleife); } }
                         #[cfg(feature = "jit")]
                         if let Some(j) = self.jit.as_ref().filter(|_| !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
                             {
@@ -2886,6 +2889,8 @@ impl<'p> Vm<'p> {
                     // M4: Ruecksprung einer Schleife -> vielleicht Maschinencode.
                     #[cfg(feature = "jit")]
                     let vmp: *mut Vm = self;
+                    #[cfg(feature = "jit")]
+                    if ziel < *ip && instr.schleife.get() == 1 { if let Some(j) = self.jit.as_ref() { j.vm_runde(&instr.schleife); } }
                     #[cfg(feature = "jit")]
                     if let Some(j) = self.jit.as_ref().filter(|_| ziel < *ip && !track_lines && stack.is_empty() && instr.schleife.get() != 1) {
                         {
