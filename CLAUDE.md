@@ -1658,6 +1658,11 @@ nicht mehr in der VM; `w_builtin_roh` steigt beim Laufen aus, solange die
 Familie fehlt oder verboten ist. Runden in der VM ueber die Beispiele
 708 451 -> 248 320 (Schritte 11+12).
 
+**Globale ohne Platz (M4 Schritt 13):** ein Befehl, der eine Globale
+anfasst, die es beim Bauen noch nicht gibt (DIM im seltenen Zweig), ist ein
+fester Ausgang (`globale_fehlt`); taucht der Platz auf, wird die Schleife
+neu gebaut. Runden in der VM ueber die Beispiele 248 320 -> 156 616.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
