@@ -549,7 +549,7 @@ impl GbArray {
 pub struct GbMap {
     pub value_type: String,
     eintraege: Vec<(String, Value)>,
-    index: HashMap<String, usize>,
+    index: HashMap<String, usize, foldhash::fast::RandomState>,
     /// Elementart, wenn die Map als MENGE benutzt wird (`SET_*`): `'i'` oder
     /// `'s'`, gesetzt von der ersten Aufnahme.
     ///
@@ -564,7 +564,7 @@ pub struct GbMap {
 
 impl GbMap {
     pub fn new(value_type: String) -> Self {
-        GbMap { value_type, eintraege: Vec::new(), index: HashMap::new(),
+        GbMap { value_type, eintraege: Vec::new(), index: HashMap::default(),
                 set_art: None }
     }
 
@@ -600,6 +600,18 @@ impl GbMap {
             None => {
                 self.index.insert(k.clone(), self.eintraege.len());
                 self.eintraege.push((k, v));
+            }
+        }
+    }
+
+    /// Wie `put`, legt den Schluessel aber nur an, wenn er neu ist -- beim
+    /// Ueberschreiben kein Speicher (MAPPUT, M4 Schritt 20).
+    pub fn put_str(&mut self, k: &str, v: Value) {
+        match self.index.get(k) {
+            Some(i) => self.eintraege[*i].1 = v,
+            None => {
+                self.index.insert(k.to_string(), self.eintraege.len());
+                self.eintraege.push((k.to_string(), v));
             }
         }
     }

@@ -1194,6 +1194,7 @@ dependencies = [
  "cranelift-module",
  "cranelift-native",
  "dejavu",
+ "foldhash",
  "futures",
  "getrandom 0.2.17",
  "gif",

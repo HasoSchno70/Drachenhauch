@@ -1010,6 +1010,36 @@ ganzzahl 487 / 8,9; maps 106 / 107 (die Zeit steckt in MAPPUT/MAPGET/STR$
 selbst, nicht in der Schleife); objekte 103 / 11,5; teilchen 200 / 28;
 text 51 / 40; zahlen 221 / 5,4.
 
+**Schritt 20 (2026-09-26): maps.dh angesehen.** Zerlegt (200 000 Runden,
+mit/ohne Maschinencode praktisch gleich): Schluessel bauen `"k" + STR$(i)`
+37 ms, dazu MAPPUT 24 ms, MAPGET 9 ms -- die Map war nicht das Teuerste.
+Drei Funde:
+
+- **Text zusammensetzen war im Maschinencode langsamer als in der VM**
+  (`"k" + a`: 24 gegen 17 ms). `w_op` rechnete ueber `wert_rechnen`:
+  Kopie des linken Texts, dann angehaengt -- zwei Speicheranlagen. Jetzt
+  wie `Vm::addieren` ein Text in passender Groesse: 12,5 ms.
+- **`w_speichern` rief bei JEDEM Speichern `coerce(v.clone(), ...)`**,
+  also Verweis kopieren und Typnamen vergleichen, auch wenn der Wert schon
+  passt. Jetzt vorher der schnelle Weg wie `passend!` in der VM.
+- **MAPPUT**: der Index der MAP nahm Rusts SipHash; jetzt foldhash mit
+  zufaelligem Startwert je Prozess (die Schluessel koennen von aussen
+  kommen -- FxHash waere mit ausgesuchten Schluesseln zu Kollisionen zu
+  treiben). Und ein vorhandener Schluessel wird ohne Speicheranlage
+  ueberschrieben (`GbMap::put_str`). Die zwei Kopien je neuem Schluessel
+  (Liste und Index) bleiben -- sie zu teilen hiesse, die Schnittstelle von
+  `GbMap` umzubauen.
+
+maps.dh: 107 -> 81 ms mit Maschinencode, 106 -> 100 ms in der VM; die
+uebrigen Werte der Messbank unveraendert. Zwei Faelle neu in `jit.dhtest`
+(Wert in ein INTEGER- bzw. STRING-Local einer SUB). Gegenproben: der
+schnelle Weg nimmt eine Zahl fuer ein STRING-Local an, der Text wird
+verkehrt herum zusammengesetzt -- beide fallen. **Die erste Fassung der
+ersten Gegenprobe blieb gruen:** sie liess eine Kommazahl in ein
+INTEGER-Local, aber ein Local mit Zahlentyp nimmt gar nicht `w_speichern`,
+sondern `w_zahl_i` -- die Mutation traf eine Kombination, die dort nie
+ankommt.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

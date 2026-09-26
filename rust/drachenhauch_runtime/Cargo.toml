@@ -26,6 +26,12 @@ regex = "1"
 # Schneller Nicht-DoS-Hasher fuer interne Lookup-Maps (Funktionen/Klassen/
 # Instanz-Felder) -- Keys kommen aus dem Compiler, nicht von Angreifern.
 rustc-hash = "2"
+# Index der MAP (GbMap): deren Schluessel koennen von aussen kommen (httpd,
+# JSON, Dateien) -- darum nicht FxHash, sondern foldhash mit zufaelligem
+# Startwert je Prozess; so schnell wie Fx, aber nicht mit ausgesuchten
+# Schluesseln zu Kollisionen zu treiben. Steht ueber hashbrown ohnehin in der
+# Lockfile.
+foldhash = "0.2"
 # COMPRESS$/DECOMPRESS$ (DEFLATE). Pure-Rust und ohnehin schon transitiv in der
 # Lockfile -> ungated, damit auch Konsolen-Programme ihre Savegames packen
 # koennen (raylibs CompressData haengt dagegen am graphics-Feature).

@@ -7051,6 +7051,110 @@ gefangen: Vergleich nicht moeglich: INTEGER / STRING
 jit: 0 Funktionen, 2 Schleifen, 1 Schleifenlaeufe
 jit: 1 mal mitten in einer Schleife ausgestiegen
 
+=== wert in ein getyptes local einer sub
+SUB rechne(t AS TUPLE)
+    DIM i AS INTEGER
+    DIM n AS INTEGER
+    DIM s AS STRING
+    DIM summe AS INTEGER
+    FOR i = 0 TO 4
+        n = t[i]
+        s = s + STR$(n)
+        summe = summe + n
+    NEXT
+    PRINT s; " "; summe
+END SUB
+rechne((1, 2, 3, 4, 5))
+TRY
+    rechne((1, 2, 2.5, 4, 5))
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+12345 15
+gefangen: Lokale Variable: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+
+=== wert in ein getyptes local einer sub (maschinencode)
+SUB rechne(t AS TUPLE)
+    DIM i AS INTEGER
+    DIM n AS INTEGER
+    DIM s AS STRING
+    DIM summe AS INTEGER
+    FOR i = 0 TO 4
+        n = t[i]
+        s = s + STR$(n)
+        summe = summe + n
+    NEXT
+    PRINT s; " "; summe
+END SUB
+rechne((1, 2, 3, 4, 5))
+TRY
+    rechne((1, 2, 2.5, 4, 5))
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+12345 15
+gefangen: Lokale Variable: FLOAT 2.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== zahl in ein text-local einer sub
+SUB rechne(t AS TUPLE)
+    DIM i AS INTEGER
+    DIM w AS STRING
+    DIM s AS STRING
+    FOR i = 0 TO 3
+        w = t[i]
+        s = s + w + ","
+    NEXT
+    PRINT s
+END SUB
+rechne(("a", "b", "c", "d"))
+TRY
+    rechne(("a", "b", 3, "d"))
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+a,b,c,d,
+gefangen: Lokale Variable: Erwartet STRING, erhalten INTEGER
+
+=== zahl in ein text-local einer sub (maschinencode)
+SUB rechne(t AS TUPLE)
+    DIM i AS INTEGER
+    DIM w AS STRING
+    DIM s AS STRING
+    FOR i = 0 TO 3
+        w = t[i]
+        s = s + w + ","
+    NEXT
+    PRINT s
+END SUB
+rechne(("a", "b", "c", "d"))
+TRY
+    rechne(("a", "b", 3, "d"))
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+a,b,c,d,
+gefangen: Lokale Variable: Erwartet STRING, erhalten INTEGER
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in
 ' der VM bleibt. Ohne diesen Fall bliebe die Sammlung auch gruen, wenn der
