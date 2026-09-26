@@ -1670,6 +1670,12 @@ statisch aus der Anlage im Hauptprogramm (`Globale::felder`). Nur lesen,
 bei jedem Fehler rechnet die VM die Funktion nach. `RGB`/`RGBA` mit
 Ganzzahlen stehen in `zahl_befehl`. Runden 156 616 -> 132 738.
 
+**VM-Funktionen aus Bereichen (M4 Schritt 15):** eine Funktion, die nicht
+uebersetzt ist, ruft ein Bereich im Wertemodus ueber `w_funktion` ->
+`Vm::funktion_rufen` (`Bereich::vm_fns`); geprueft wie Methoden
+(`gerufenes_harmlos`: keine Globale des Bereichs, keine Umwege). BYREF und
+Coroutinen bleiben in der VM. Runden 132 738 -> 73 456.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

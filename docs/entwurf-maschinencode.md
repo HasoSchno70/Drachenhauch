@@ -862,6 +862,47 @@ ausserhalb im Bereich und in der Funktion). Gegenproben: Indizes
 vertauscht, Kommazahl falsch gelesen, Anteile verschoben, Deckkraft 0
 bleibt 0, ohne Bereichspruefung -- jede faellt in ihren Faellen.
 
+**Schritt 15 (2026-09-26): Funktionen, die in der VM bleiben, aus dem
+Bereich rufen.** Ein Bereich im Wertemodus ruft eine Funktion, die nicht
+uebersetzt ist, jetzt ueber die VM (`w_funktion` -> `Vm::funktion_rufen`,
+derselbe Weg wie CALL_USER ohne BYREF) -- wie Methoden seit Schritt 7a.
+`Bereich::vm_fns` sagt je Funktion, ob sie in der VM bleibt; der
+getypte Weg, der so einen Aufruf enthaelt, faellt in den Wertemodus
+zurueck (vorher gab er auf, obwohl die Analyse gelang). Die Pruefung
+teilt sich `gerufenes_harmlos` mit den Methoden: nichts, was die Funktion
+ruft, darf eine Globale beruehren, die der Bereich oder seine uebersetzten
+Funktionen beruehren -- die haelt der Bereich bei sich (Schatten,
+Werteplaetze), die VM saehe einen alten Stand oder ueberschriebe ihn.
+Was er ueber die VM ruft, zaehlt dabei NICHT zu seinen Globalen: das
+laeuft wie jede VM-Funktion nacheinander. BYREF und Coroutinen bleiben in
+der VM. Ein Fehler in der gerufenen Funktion geht als Meldung an ihre
+Stelle (`meldung`), die VM ruft sie nicht noch einmal.
+
+**Der Fund dabei, und er lag schon seit Schritt 7a:** `Jit::schleife`
+hielt `schleifen.borrow_mut()`, solange der Bereich lief. Hat die ueber die
+VM gerufene Funktion selbst eine Schleife, tritt die VM in `schleife`
+wieder ein -- "RefCell already borrowed", Absturz. Gefunden hat es
+`httpd.dhtest` (der Klient ruft `holen$` in einer Schleife, `holen$` liest
+in einer Schleife); bei Methoden haette es genauso passieren koennen, nur
+traf es kein Fall. Die Schleifen liegen jetzt als `Rc<Schleife>` in der
+Liste, die Ausleihe gilt nur fuer das Nachschlagen, `fehlschlaege` ist eine
+`Cell`. Den Schatten teilen sich innen und aussen weiter: die Pruefung
+verlangt verschiedene Globale, und jeder Bereich raeumt nur die Merkbytes
+seiner eigenen ab.
+
+Runden in der VM ueber alle Beispiele: 132 738 -> 73 456. Tetris'
+`drawfield` laeuft jetzt als Maschinencode (`DrawBlock` mit `BOX` ueber
+die VM). Die naechsten Gruende: TUPLE auspacken im Wertemodus (Befehl 69:
+Orbital 28 000, Hires 6 600), "Mitglied von etwas, das kein Objekt ist"
+(Schneefall 22 000, Coinquest 9 000).
+
+Pruefung: 10 Faelle in `jit.dhtest` (Funktion mit eigener Schleife, Textfunktion, SUB schreibt fremde
+Globale, Funktion beruehrt eine Globale des Bereichs -> VM, Argumente in
+Reihenfolge, THROW mitten drin ohne doppelten Aufruf, Laufzeitfehler,
+Rekursion, BYREF -> VM, SUB ohne Ergebnis). Gegenproben: ohne Pruefung auf
+Globale, Argumente umgedreht, ohne Meldung (die VM riefe doppelt), ohne
+Rueckfall in den Wertemodus, ohne `Rc` (stuerzt ab).
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur
