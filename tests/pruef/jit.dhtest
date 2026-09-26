@@ -4743,6 +4743,170 @@ DHRT_JIT_BILANZ=1
 --- fehler
 SQR von negativer Zahl
 
+=== not auf einen wert in der schleife
+DIM m AS MAP OF INTEGER
+DIM s AS STRING
+DIM i AS INTEGER
+MAPPUT(m, "k3", 3)
+MAPPUT(m, "k5", 5)
+FOR i = 0 TO 6
+    IF NOT MAPHAS(m, "k" + STR$(i)) THEN s = s + "-" ELSE s = s + "+"
+    IF NOT STR$(i) = "4" THEN s = s + "a"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+-a-a-a+a-+a-a
+
+=== not auf einen wert in der schleife (maschinencode)
+DIM m AS MAP OF INTEGER
+DIM s AS STRING
+DIM i AS INTEGER
+MAPPUT(m, "k3", 3)
+MAPPUT(m, "k5", 5)
+FOR i = 0 TO 6
+    IF NOT MAPHAS(m, "k" + STR$(i)) THEN s = s + "-" ELSE s = s + "+"
+    IF NOT STR$(i) = "4" THEN s = s + "a"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+-a-a-a+a-+a-a
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== not auf text zahl und nil als wert
+DIM s AS STRING
+DIM t AS STRING
+DIM i AS INTEGER
+DIM m AS MAP OF STRING
+MAPPUT(m, "a", "")
+MAPPUT(m, "b", "x")
+FOR i = 0 TO 3
+    t = MID$("ab  ", i, 1)
+    s = s + STR$(NOT t) + " " + STR$(NOT MAPGETOR(m, t, "y")) + " " + STR$(NOT VAL(STR$(i - 1))) + ";"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+FALSE TRUE FALSE;FALSE FALSE TRUE;FALSE FALSE FALSE;FALSE FALSE FALSE;
+
+=== not auf text zahl und nil als wert (maschinencode)
+DIM s AS STRING
+DIM t AS STRING
+DIM i AS INTEGER
+DIM m AS MAP OF STRING
+MAPPUT(m, "a", "")
+MAPPUT(m, "b", "x")
+FOR i = 0 TO 3
+    t = MID$("ab  ", i, 1)
+    s = s + STR$(NOT t) + " " + STR$(NOT MAPGETOR(m, t, "y")) + " " + STR$(NOT VAL(STR$(i - 1))) + ";"
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+FALSE TRUE FALSE;FALSE FALSE TRUE;FALSE FALSE FALSE;FALSE FALSE FALSE;
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== spielschleife mit not und vorbelegten namen
+DIM runde AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+DIM log AS STRING
+FUNCTION fertig(r AS INTEGER) AS BOOLEAN
+    RETURN r >= 5
+END FUNCTION
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "x", 1)
+WHILE NOT fertig(runde) AND NOT MAPHAS(m, STR$(runde))
+    n = n + RED + KEY_ESCAPE + KEY_SPACE - WHITE + BLUE
+    s = s + PI * runde + TAU
+    log = log + STR$(runde)
+    runde = runde + 1
+WEND
+PRINT n; " "; s; " "; log
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+-326105 62.83185307179586 01234
+
+=== spielschleife mit not und vorbelegten namen (maschinencode)
+DIM runde AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+DIM log AS STRING
+FUNCTION fertig(r AS INTEGER) AS BOOLEAN
+    RETURN r >= 5
+END FUNCTION
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "x", 1)
+WHILE NOT fertig(runde) AND NOT MAPHAS(m, STR$(runde))
+    n = n + RED + KEY_ESCAPE + KEY_SPACE - WHITE + BLUE
+    s = s + PI * runde + TAU
+    log = log + STR$(runde)
+    runde = runde + 1
+WEND
+PRINT n; " "; s; " "; log
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+-326105 62.83185307179586 01234
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== vorbelegte namen in einer funktion
+FUNCTION kreis(r AS FLOAT) AS FLOAT
+    RETURN PI * r * r + TAU
+END FUNCTION
+FUNCTION farbe(i AS INTEGER) AS INTEGER
+    IF i MOD 2 = 0 THEN RETURN RED
+    RETURN GREEN + DARKBLUE
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+FOR i = 1 TO 4
+    s = s + kreis(i)
+    n = n + farbe(i)
+NEXT
+PRINT s; " "; n
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+119.38052083641213 33554176
+
+=== vorbelegte namen in einer funktion (maschinencode)
+FUNCTION kreis(r AS FLOAT) AS FLOAT
+    RETURN PI * r * r + TAU
+END FUNCTION
+FUNCTION farbe(i AS INTEGER) AS INTEGER
+    IF i MOD 2 = 0 THEN RETURN RED
+    RETURN GREEN + DARKBLUE
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS FLOAT
+DIM n AS INTEGER
+FOR i = 1 TO 4
+    s = s + kreis(i)
+    n = n + farbe(i)
+NEXT
+PRINT s; " "; n
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+119.38052083641213 33554176
+--- stderr
+jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in
 ' der VM bleibt. Ohne diesen Fall bliebe die Sammlung auch gruen, wenn der
