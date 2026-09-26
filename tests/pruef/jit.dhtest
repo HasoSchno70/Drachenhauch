@@ -3944,8 +3944,7 @@ DHRT_JIT_BILANZ=1
 40.0 TRUE
 62.5 TRUE
 --- stderr
-jit: Schleife an Stelle 14 in __main__ bleibt in der VM: Konstante STRING ist keine Zahl; mit Werten: Ausgabe (PRINT)
-jit: 3 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 3 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === ueberschriebene hilfsmethode gewinnt
 CLASS Tier
@@ -4426,8 +4425,7 @@ DHRT_JIT_BILANZ=1
 4 4 3 4 0.75
 6 5 4 5 0.75
 --- stderr
-jit: Schleife an Stelle 11 in __main__ bleibt in der VM: Konstante STRING ist keine Zahl; mit Werten: Ausgabe (PRINT)
-jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === int einer grossen ganzzahl geht ueber komma
 DIM x AS INTEGER
@@ -4906,6 +4904,222 @@ DHRT_JIT_BILANZ=1
 119.38052083641213 33554176
 --- stderr
 jit: 2 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== print in der schleife mit trennern
+DIM i AS INTEGER
+DIM s AS FLOAT
+DIM t AS STRING
+FOR i = 1 TO 4
+    s = s + SQR(i)
+    t = t + CHR$(64 + i)
+    PRINT i; " "; s, t; "|"
+    PRINT i, i * 2, i * 0.5
+    PRINT
+    PRINT "ende"; i;
+NEXT
+PRINT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1 1.0 A|
+1 2 0.5
+
+ende12 2.414213562373095 AB|
+2 4 1.0
+
+ende23 4.146264369941973 ABC|
+3 6 1.5
+
+ende34 6.146264369941973 ABCD|
+4 8 2.0
+
+ende4
+
+=== print in der schleife mit trennern (maschinencode)
+DIM i AS INTEGER
+DIM s AS FLOAT
+DIM t AS STRING
+FOR i = 1 TO 4
+    s = s + SQR(i)
+    t = t + CHR$(64 + i)
+    PRINT i; " "; s, t; "|"
+    PRINT i, i * 2, i * 0.5
+    PRINT
+    PRINT "ende"; i;
+NEXT
+PRINT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1 1.0 A|
+1 2 0.5
+
+ende12 2.414213562373095 AB|
+2 4 1.0
+
+ende23 4.146264369941973 ABC|
+3 6 1.5
+
+ende34 6.146264369941973 ABCD|
+4 8 2.0
+
+ende4
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== print dann fehler in derselben runde
+DIM i AS INTEGER
+DIM s AS FLOAT
+TRY
+    FOR i = 3 TO -3 STEP -1
+        PRINT "vorher "; i
+        s = s + SQR(i)
+        PRINT "nachher "; s
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+vorher 3
+nachher 1.7320508075688772
+vorher 2
+nachher 3.1462643699419726
+vorher 1
+nachher 4.146264369941973
+vorher 0
+nachher 4.146264369941973
+vorher -1
+gefangen: SQR von negativer Zahl
+-1
+
+=== print dann fehler in derselben runde (maschinencode)
+DIM i AS INTEGER
+DIM s AS FLOAT
+TRY
+    FOR i = 3 TO -3 STEP -1
+        PRINT "vorher "; i
+        s = s + SQR(i)
+        PRINT "nachher "; s
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+vorher 3
+nachher 1.7320508075688772
+vorher 2
+nachher 3.1462643699419726
+vorher 1
+nachher 4.146264369941973
+vorher 0
+nachher 4.146264369941973
+vorher -1
+gefangen: SQR von negativer Zahl
+-1
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== print mit einer funktion, die globale schreibt
+DIM zaehler AS INTEGER
+SUB zaehle()
+    zaehler = zaehler + 1
+END SUB
+DIM i AS INTEGER
+DIM s AS FLOAT
+TRY
+    FOR i = 2 TO -2 STEP -1
+        zaehle()
+        PRINT "runde "; i; " "; zaehler
+        s = s + SQR(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT zaehler
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+runde 2 1
+runde 1 2
+runde 0 3
+runde -1 4
+gefangen: SQR von negativer Zahl
+4
+
+=== print mit einer funktion, die globale schreibt (maschinencode)
+DIM zaehler AS INTEGER
+SUB zaehle()
+    zaehler = zaehler + 1
+END SUB
+DIM i AS INTEGER
+DIM s AS FLOAT
+TRY
+    FOR i = 2 TO -2 STEP -1
+        zaehle()
+        PRINT "runde "; i; " "; zaehler
+        s = s + SQR(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT zaehler
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+runde 2 1
+runde 1 2
+runde 0 3
+runde -1 4
+gefangen: SQR von negativer Zahl
+4
+--- stderr
+jit: Schleife an Stelle 13 in __main__ bleibt in der VM: schreibt in ein Feld (oder rechnet mit Werten) und ruft eine Funktion, die globale Variablen schreibt
+jit: 1 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
+
+=== print von werten aller art
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+DIM b AS BOOLEAN
+MAPPUT(m, "a", 1)
+FOR i = 0 TO 2
+    b = i MOD 2 = 0
+    PRINT b; " "; MAPHAS(m, "a"); " "; STR$(i) + "x"; " "; i / 2
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+TRUE TRUE 0x 0.0
+FALSE TRUE 1x 0.5
+TRUE TRUE 2x 1.0
+
+=== print von werten aller art (maschinencode)
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+DIM b AS BOOLEAN
+MAPPUT(m, "a", 1)
+FOR i = 0 TO 2
+    b = i MOD 2 = 0
+    PRINT b; " "; MAPHAS(m, "a"); " "; STR$(i) + "x"; " "; i / 2
+NEXT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+TRUE TRUE 0x 0.0
+FALSE TRUE 1x 0.5
+TRUE TRUE 2x 1.0
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
 
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in

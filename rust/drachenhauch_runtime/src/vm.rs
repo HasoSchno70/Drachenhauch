@@ -1677,6 +1677,23 @@ impl<'p> Vm<'p> {
         j.methode(lage, m, Rc::as_ptr(rc), args, self.depth, MAX_CALL_DEPTH, &self.global_slots)
     }
 
+    /// PRINT mit seinen Werten -- dieselbe Stelle fuer den Befehl der VM und
+    /// fuer den Maschinencode (M4 Schritt 10, `w_drucken`).
+    pub(crate) fn drucken(&mut self, arg: &crate::model::Arg, items: &[Value]) {
+        let l = arg.list();
+        let newline = arg_truthy(&l[1]);
+        for (i, it) in items.iter().enumerate() {
+            if i > 0 && l[i + 1].str() != ";" { self.out.push(' '); }
+            self.out.push_str(&it.fmt());
+        }
+        if newline { self.out.push('\n'); }
+        // Zeilenweise hinaus, wenn jemand live mitliest (die IDE
+        // ueber PROCESS_START setzt DHRT_LIVE): an einer Leitung
+        // waere stdout sonst blockgepuffert, und die Ausgabe kaeme
+        // erst am Ende auf einmal.
+        if newline && live_ausgabe() { self.flush_out(); }
+    }
+
     pub(crate) fn methode_rufen(&mut self, instr: &'p crate::model::Instr, method: &str, obj: Value, margs: Vec<Value>) -> R<Value> {
         match &obj {
             Value::Instance(rc) => {
@@ -3685,23 +3702,9 @@ impl<'p> Vm<'p> {
                 // item_i und item_{i+1}: "," -> Leerzeichen, ";" -> kein Trennzeichen.
                 // Trailing-Trenner setzt newline=false (kein Zeilenumbruch).
                 op::PRINT => {
-                    let l = arg.list();
-                    let count = l[0].as_usize();
-                    let newline = arg_truthy(&l[1]);
-                    if count > 0 {
-                        let split = stack.len() - count;
-                        let items = stack.split_off(split);
-                        for (i, it) in items.iter().enumerate() {
-                            if i > 0 && l[i + 1].str() != ";" { self.out.push(' '); }
-                            self.out.push_str(&it.fmt());
-                        }
-                    }
-                    if newline { self.out.push('\n'); }
-                    // Zeilenweise hinaus, wenn jemand live mitliest (die IDE
-                    // ueber PROCESS_START setzt DHRT_LIVE): an einer Leitung
-                    // waere stdout sonst blockgepuffert, und die Ausgabe kaeme
-                    // erst am Ende auf einmal.
-                    if newline && live_ausgabe() { self.flush_out(); }
+                    let count = arg.list()[0].as_usize();
+                    let items = stack.split_off(stack.len() - count);
+                    self.drucken(arg, &items);
                 }
 
                 // --- INPUT (Konsolen-Eingabe) ---

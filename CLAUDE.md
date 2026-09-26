@@ -1641,6 +1641,10 @@ faengt es. builtins.dh 107 -> 3,3 ms.
 Tasten, PI/TAU aus `LOAD_NAME` als Zahl). Beispiele: 377 -> 343 Schleifen
 in der VM, `WHILE NOT QUITREQUESTED()` blockiert nicht mehr.
 
+**PRINT im Wertemodus (M4 Schritt 10):** `Vm::drucken` ist der Rumpf von
+`op::PRINT`, `w_drucken` ruft ihn aus dem Maschinencode. Beispiele: 343 ->
+304 Schleifen in der VM.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
