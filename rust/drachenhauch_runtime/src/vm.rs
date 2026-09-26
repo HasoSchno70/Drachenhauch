@@ -1450,7 +1450,7 @@ impl<'p> Vm<'p> {
     /// `obj.name` lesen (LOAD_MEMBER): Feld ueber den Merkplatz, PROPERTY,
     /// gebundene Methode oder Namensraum.
     #[inline(never)]
-    fn member_laden(&mut self, instr: &crate::model::Instr, name_wert: &Value, obj: Value) -> Result<Value, String> {
+    pub(crate) fn member_laden(&mut self, instr: &crate::model::Instr, name_wert: &Value, obj: Value) -> Result<Value, String> {
         if let Value::Instance(rc) = &obj {
             // Schneller Weg: dieselbe Lage wie beim letzten Mal -- dann ist es
             // ein Feld (eine PROPERTY kommt nie in den Merkplatz), und sein
@@ -1497,7 +1497,7 @@ impl<'p> Vm<'p> {
 
     /// `obj.name = v` (STORE_MEMBER): Feld ueber den Merkplatz oder PROPERTY.
     #[inline(never)]
-    fn member_setzen(&mut self, instr: &crate::model::Instr, name_wert: &Value, obj: Value, v: Value) -> Result<(), String> {
+    pub(crate) fn member_setzen(&mut self, instr: &crate::model::Instr, name_wert: &Value, obj: Value, v: Value) -> Result<(), String> {
         let v = match &obj {
             Value::Instance(rc) => {
                 // Schneller Weg wie beim Lesen, fuer einen Wert, der schon den
