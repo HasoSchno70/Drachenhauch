@@ -5483,6 +5483,429 @@ jit: Schleife an Stelle 12 in __main__ bleibt in der VM: TRY/THROW; mit Werten: 
 jit: 0 Funktionen, 0 Schleifen, 0 Schleifenlaeufe
 jit: 10 Runden in der VM -- Stelle 12 in __main__: TRY/THROW; mit Werten: TRY/THROW
 
+=== funktion liest ein globales feld
+DIM tab[10] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 9
+    tab[i] = i * i
+NEXT
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k MOD 10]
+END FUNCTION
+DIM s AS INTEGER
+FOR i = 0 TO 200
+    s = s + nimm(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+5700
+
+=== funktion liest ein globales feld (maschinencode)
+DIM tab[10] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 9
+    tab[i] = i * i
+NEXT
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k MOD 10]
+END FUNCTION
+DIM s AS INTEGER
+FOR i = 0 TO 200
+    s = s + nimm(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+5700
+--- stderr
+jit: 1 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== funktion liest ein globales feld mit drei indizes
+DIM form[3, 4, 16] AS INTEGER
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM c AS INTEGER
+FOR a = 0 TO 2
+    FOR b = 0 TO 3
+        FOR c = 0 TO 15
+            form[a, b, c] = (a * 7 + b * 3 + c) MOD 5
+        NEXT
+    NEXT
+NEXT
+FUNCTION zelle(k AS INTEGER, r AS INTEGER, dx AS INTEGER, dy AS INTEGER) AS INTEGER
+    RETURN form[k, r, dy * 4 + dx]
+END FUNCTION
+DIM s AS INTEGER
+FOR a = 0 TO 2
+    FOR b = 0 TO 3
+        FOR c = 0 TO 3
+            s = s + zelle(a, b, c, 3 - c) * (c + 1)
+        NEXT
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+245
+
+=== funktion liest ein globales feld mit drei indizes (maschinencode)
+DIM form[3, 4, 16] AS INTEGER
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM c AS INTEGER
+FOR a = 0 TO 2
+    FOR b = 0 TO 3
+        FOR c = 0 TO 15
+            form[a, b, c] = (a * 7 + b * 3 + c) MOD 5
+        NEXT
+    NEXT
+NEXT
+FUNCTION zelle(k AS INTEGER, r AS INTEGER, dx AS INTEGER, dy AS INTEGER) AS INTEGER
+    RETURN form[k, r, dy * 4 + dx]
+END FUNCTION
+DIM s AS INTEGER
+FOR a = 0 TO 2
+    FOR b = 0 TO 3
+        FOR c = 0 TO 3
+            s = s + zelle(a, b, c, 3 - c) * (c + 1)
+        NEXT
+    NEXT
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+245
+--- stderr
+jit: 1 Funktionen, 6 Schleifen, 6 Schleifenlaeufe
+
+=== funktion liest ein globales kommazahlfeld
+DIM stufen[8] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO 7
+    stufen[i] = i * 0.25 + 0.125
+NEXT
+FUNCTION fband(k AS INTEGER) AS FLOAT
+    RETURN stufen[k MOD 8] * 2.0
+END FUNCTION
+DIM s AS FLOAT
+FOR i = 0 TO 100
+    s = s + fband(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+198.25
+
+=== funktion liest ein globales kommazahlfeld (maschinencode)
+DIM stufen[8] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO 7
+    stufen[i] = i * 0.25 + 0.125
+NEXT
+FUNCTION fband(k AS INTEGER) AS FLOAT
+    RETURN stufen[k MOD 8] * 2.0
+END FUNCTION
+DIM s AS FLOAT
+FOR i = 0 TO 100
+    s = s + fband(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+198.25
+--- stderr
+jit: 1 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== funktion liest ein globales feld ausserhalb
+DIM tab[4] AS INTEGER
+tab[2] = 5
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k]
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 0 TO 10
+        s = s + nimm(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: Index 4 ausserhalb [0..3] in Dimension 0 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+4 5
+
+=== funktion liest ein globales feld ausserhalb (maschinencode)
+DIM tab[4] AS INTEGER
+tab[2] = 5
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k]
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 0 TO 10
+        s = s + nimm(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: Index 4 ausserhalb [0..3] in Dimension 0 -- Felder zaehlen ab 0: DIM a[4] hat a[0] bis a[3]
+4 5
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== funktion sieht aenderungen am globalen feld
+DIM tab[5] AS INTEGER
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k]
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 40
+    tab[i MOD 5] = tab[i MOD 5] + i
+    s = s + nimm((i + 2) MOD 5)
+NEXT
+PRINT s; " "; tab[0]; " "; tab[4]
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2124 180 172
+
+=== funktion sieht aenderungen am globalen feld (maschinencode)
+DIM tab[5] AS INTEGER
+FUNCTION nimm(k AS INTEGER) AS INTEGER
+    RETURN tab[k]
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 40
+    tab[i MOD 5] = tab[i MOD 5] + i
+    s = s + nimm((i + 2) MOD 5)
+NEXT
+PRINT s; " "; tab[0]; " "; tab[4]
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+2124 180 172
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== globales feld von zahlen ohne groesse
+DIM werte AS ARRAY OF INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    ARRAY_PUSH(werte, i * 3)
+NEXT
+FUNCTION w(k AS INTEGER) AS INTEGER
+    RETURN werte[k MOD 6]
+END FUNCTION
+DIM s AS INTEGER
+FOR i = 0 TO 50
+    s = s + w(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+522
+
+=== globales feld von zahlen ohne groesse (maschinencode)
+DIM werte AS ARRAY OF INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    ARRAY_PUSH(werte, i * 3)
+NEXT
+FUNCTION w(k AS INTEGER) AS INTEGER
+    RETURN werte[k MOD 6]
+END FUNCTION
+DIM s AS INTEGER
+FOR i = 0 TO 50
+    s = s + w(i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+522
+--- stderr
+jit: 1 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== rgb in einer funktion
+FUNCTION farbe(p AS FLOAT, hell AS FLOAT) AS INTEGER
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT((0.5 + 0.5 * SIN(p)) * hell * 255.0)
+    g = INT((0.5 + 0.5 * SIN(p + 2.094)) * hell * 255.0)
+    b = INT((0.5 + 0.5 * SIN(p + 4.188)) * hell * 255.0)
+    RETURN RGB(MIN(255, r), MIN(255, g), MIN(255, b))
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 100
+    s = (s + farbe(i * 0.1, 0.9)) MOD 1000003
+NEXT
+PRINT s; " "; HEX$(farbe(1.0, 1.0))
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+94680 EA850E
+
+=== rgb in einer funktion (maschinencode)
+FUNCTION farbe(p AS FLOAT, hell AS FLOAT) AS INTEGER
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT((0.5 + 0.5 * SIN(p)) * hell * 255.0)
+    g = INT((0.5 + 0.5 * SIN(p + 2.094)) * hell * 255.0)
+    b = INT((0.5 + 0.5 * SIN(p + 4.188)) * hell * 255.0)
+    RETURN RGB(MIN(255, r), MIN(255, g), MIN(255, b))
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 100
+    s = (s + farbe(i * 0.1, 0.9)) MOD 1000003
+NEXT
+PRINT s; " "; HEX$(farbe(1.0, 1.0))
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+94680 EA850E
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== rgba mit deckkraft null wird eins
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 20
+    s = (s + RGBA(i, 255 - i, i * 2, i MOD 3)) MOD 1000003
+NEXT
+PRINT s; " "; HEX$(RGBA(1, 2, 3, 0)); " "; HEX$(RGBA(1, 2, 3, 255))
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+840696 1010203 FF010203
+
+=== rgba mit deckkraft null wird eins (maschinencode)
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 0 TO 20
+    s = (s + RGBA(i, 255 - i, i * 2, i MOD 3)) MOD 1000003
+NEXT
+PRINT s; " "; HEX$(RGBA(1, 2, 3, 0)); " "; HEX$(RGBA(1, 2, 3, 255))
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+840696 1010203 FF010203
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== rgb ausserhalb des bereichs
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 250 TO 260
+        s = (s + RGB(i, 0, 0)) MOD 1000003
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: RGB-Werte muessen 0..255 sein
+256 286743
+
+=== rgb ausserhalb des bereichs (maschinencode)
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 250 TO 260
+        s = (s + RGB(i, 0, 0)) MOD 1000003
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: RGB-Werte muessen 0..255 sein
+256 286743
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
+=== rgb mit negativem anteil
+FUNCTION f(k AS INTEGER) AS INTEGER
+    RETURN RGB(10, k, 20)
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 3 TO -3 STEP -1
+        s = s + f(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+gefangen: RGB-Werte muessen 0..255 sein
+-1 2623056
+
+=== rgb mit negativem anteil (maschinencode)
+FUNCTION f(k AS INTEGER) AS INTEGER
+    RETURN RGB(10, k, 20)
+END FUNCTION
+DIM i AS INTEGER
+DIM s AS INTEGER
+TRY
+    FOR i = 3 TO -3 STEP -1
+        s = s + f(i)
+    NEXT
+CATCH e
+    PRINT "gefangen: "; e
+END TRY
+PRINT i; " "; s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+gefangen: RGB-Werte muessen 0..255 sein
+-1 2623056
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 0 Schleifenlaeufe
+jit: 1 mal mitten in einer Schleife ausgestiegen
+
 === welche funktionen uebersetzt werden
 ' `dhrt --jit` nennt je Funktion "uebersetzt" oder den Grund, warum sie in
 ' der VM bleibt. Ohne diesen Fall bliebe die Sammlung auch gruen, wenn der

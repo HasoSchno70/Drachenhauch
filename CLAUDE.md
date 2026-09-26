@@ -1663,6 +1663,13 @@ anfasst, die es beim Bauen noch nicht gibt (DIM im seltenen Zweig), ist ein
 fester Ausgang (`globale_fehlt`); taucht der Platz auf, wird die Schleife
 neu gebaut. Runden in der VM ueber die Beispiele 248 320 -> 156 616.
 
+**Globale Felder in Funktionen, RGB (M4 Schritt 14):** eine FUNKTION
+liest ein globales Feld von INTEGER/FLOAT ueber den Helfer `gfeld_lesen`
+(sie hat keine Feldbeschreibung wie ein Bereich); die Elementart kommt
+statisch aus der Anlage im Hauptprogramm (`Globale::felder`). Nur lesen,
+bei jedem Fehler rechnet die VM die Funktion nach. `RGB`/`RGBA` mit
+Ganzzahlen stehen in `zahl_befehl`. Runden 156 616 -> 132 738.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

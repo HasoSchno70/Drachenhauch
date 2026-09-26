@@ -830,6 +830,38 @@ einmal neu gebaut; DIM im nie genommenen Zweig: gebaut, nie ausgestiegen;
 seltenes DIM neben TRY bleibt in der VM). Gegenproben, beide an der Bilanz
 (das Ergebnis bleibt per Bauart richtig): ohne Neubau, ohne festen Ausgang.
 
+**Schritt 14 (2026-09-26): Funktionen lesen globale Zahlenfelder; RGB.**
+Der naechste Grund aus der Messung, "ruft eine Funktion, die in der VM
+bleibt", hing an den gerufenen FUNKTIONEN: `ShapeCell` in Tetris liest
+`SHAPES[k, r, i]`, `fband` in Cybermatic `fft[k]`, `IsWhite` im Sampler
+`whitePat[m]` -- alle drei "globale Variable, die keine Zahl ist". Ein
+Bereich liest Felder ueber eine Beschreibung, die die VM bei jedem Eintritt
+ausfuellt; eine Funktion hat keine (sie wird auch aus anderem Maschinencode
+gerufen, und ihre Beschreibung stuende dann im Kontext des Rufers). Sie
+liest darum ueber den Helfer `gfeld_lesen` (Platz, bis drei Indizes, Art):
+Grenzen und Zellenart prueft er, bei jedem Fehler gibt die Funktion auf und
+die VM rechnet sie nach. Die Art der Elemente kommt STATISCH aus dem
+Hauptprogramm (`Globale::felder`: DECLARE_ARRAY_NAME bzw. DECLARE_NAME
+`array:T`, gefolgt von BIND_GLOBAL_SLOT; zwei verschiedene Anlagen = nicht
+genommen). Nur lesen -- eine schreibende Funktion waere nicht mehr rein --,
+und ein Feld darf in einer Funktion nicht in ein Local wandern. Dazu
+`RGB`/`RGBA` mit Ganzzahlen in `zahl_befehl` (Bereich 0..255 prueft der
+Code, Deckkraft 0 wird 1 wie in builtins.rs) -- `hue` in Cybermatic und
+PBR-Reaktor scheiterte nur daran.
+
+Runden in der VM ueber alle Beispiele: 156 616 -> 132 738; Sampler und
+PBR-Reaktor sind ganz im Maschinencode. Tetris bleibt: seine Schleife ruft
+`drawblock`, ein SUB mit `BOX` -- eine Funktion mit Befehlen, die nicht
+nur rechnen, laeuft weiter in der VM (naechster Schritt: solche Aufrufe aus
+dem Bereich heraus ueber die VM, wie `w_methode`).
+
+Pruefung: 10 Faelle in `jit.dhtest` (Feld mit einem und drei Indizes,
+Kommazahlfeld, Index ausserhalb, Feld aendert sich zwischen den Aufrufen,
+Feld ohne Groesse, RGB in einer Funktion, RGBA mit Deckkraft 0, RGB
+ausserhalb im Bereich und in der Funktion). Gegenproben: Indizes
+vertauscht, Kommazahl falsch gelesen, Anteile verschoben, Deckkraft 0
+bleibt 0, ohne Bereichspruefung -- jede faellt in ihren Faellen.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur
