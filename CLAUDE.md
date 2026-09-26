@@ -1676,6 +1676,10 @@ uebersetzt ist, ruft ein Bereich im Wertemodus ueber `w_funktion` ->
 (`gerufenes_harmlos`: keine Globale des Bereichs, keine Umwege). BYREF und
 Coroutinen bleiben in der VM. Runden 132 738 -> 73 456.
 
+**Tupel im Wertemodus (M4 Schritt 16):** `UNPACK_TUPLE`/`BUILD_TUPLE`
+ueber `w_auspacken`/`w_tupel`; passt ein Tupel nicht, steigt der Bereich
+vor dem Befehl aus und die VM meldet. Runden 73 456 -> 40 114.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

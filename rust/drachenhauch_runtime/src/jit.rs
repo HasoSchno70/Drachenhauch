@@ -682,6 +682,25 @@ extern "C" fn w_funktion(k: *mut Kontext, ins: u64, basis: u64, argc: u64) {
     }
 }
 
+/// `(a, b, c) = t` im Wertemodus (M4 Schritt 16): das Tupel in `basis`
+/// auspacken wie UNPACK_TUPLE -- das letzte Element nach `basis`, das erste
+/// nach `basis + n - 1` (es liegt oben). Passt es nicht, bleibt das Tupel
+/// liegen und der Bereich steigt aus; die VM meldet den Fehler selbst.
+extern "C" fn w_auspacken(k: *mut Kontext, basis: u64, n: u64) {
+    let items = match w_platz(k, basis) {
+        Value::Tuple(t) if t.len() == n as usize => t.clone(),
+        _ => { w_fehler(k); return; }
+    };
+    for (j, v) in items.iter().rev().enumerate() { *w_platz(k, basis + j as u64) = v.clone(); }
+}
+
+/// `(a, b)` bauen im Wertemodus: die Werte aus `basis..basis+n` als Tupel
+/// nach `basis` (wie BUILD_TUPLE). Kann nicht scheitern.
+extern "C" fn w_tupel(k: *mut Kontext, basis: u64, n: u64) {
+    let items: Vec<Value> = (0..n).map(|j| w_nehmen(k, basis + j)).collect();
+    *w_platz(k, basis) = Value::Tuple(Rc::new(items));
+}
+
 /// PRINT im Wertemodus (M4 Schritt 10): die Werte von den Plaetzen nehmen und
 /// denselben Code der VM rufen (`Vm::drucken`). Kann nicht scheitern.
 extern "C" fn w_drucken(k: *mut Kontext, ins: u64, basis: u64, n: u64) {
@@ -843,7 +862,7 @@ struct Hilfe {
     journal_schluss: FuncId,
     mathe1: FuncId,
     mathe2: FuncId,
-    w: [FuncId; 17],
+    w: [FuncId; 19],
 }
 
 /// Plaetze in `Hilfe::w`.
@@ -864,6 +883,8 @@ const W_SETZEN: usize = 13;
 const W_METHODE: usize = 14;
 const W_DRUCKEN: usize = 15;
 const W_FUNKTION: usize = 16;
+const W_AUSPACKEN: usize = 17;
+const W_TUPEL: usize = 18;
 
 type Einstieg = unsafe extern "C" fn(*mut Kontext, *const u64, *mut u64);
 
@@ -1398,6 +1419,18 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 let a = zahl_befehl(&name, &z.stapel[z.stapel.len() - argc..]).unwrap();
                 z.stapel.truncate(z.stapel.len() - argc);
                 z.stapel.push(a);
+            }
+            op::UNPACK_TUPLE if modus_w => {
+                let n = ins.arg.as_usize();
+                if n == 0 || z.stapel.len() + n > MAX_STAPEL { return Err("Tupel auspacken".into()); }
+                if pop!() != Art::W { return Err("Auspacken von etwas, das kein Wert ist".into()); }
+                for _ in 0..n { z.stapel.push(Art::W); }
+            }
+            op::BUILD_TUPLE if modus_w => {
+                let n = ins.arg.as_usize();
+                if n == 0 { return Err("leeres Tupel".into()); }
+                for _ in 0..n { if !w_oder_skalar(pop!()) { return Err("Tupel mit NIL".into()); } }
+                z.stapel.push(Art::W);
             }
             op::PRINT if modus_w => {
                 let n = ins.arg.list()[0].as_usize();
@@ -2334,6 +2367,26 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let (ip_c, basis, nc) = (bau.iconst(ins as *const crate::model::Instr as i64), bau.iconst(bau.w_slot(d)), bau.iconst(n as i64));
                         bau.w_ruf(W_DRUCKEN, &[ip_c, basis, nc]);
                     }
+                    op::UNPACK_TUPLE if an.modus_w => {
+                        let n = ins.arg.as_usize();
+                        let d = st.len() - 1;
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let (basis, nz) = (bau.iconst(bau.w_slot(d)), bau.iconst(n as i64));
+                        bau.w_ruf(W_AUSPACKEN, &[basis, nz]);
+                        bau.fehler_pruefen();
+                        for _ in 0..n { let z = bau.iconst(0); st.push((z, Art::W)); }
+                    }
+                    op::BUILD_TUPLE if an.modus_w => {
+                        let n = ins.arg.as_usize();
+                        let d = st.len() - n;
+                        bau.w_boxen(&st, d);
+                        st.truncate(d);
+                        let (basis, nz) = (bau.iconst(bau.w_slot(d)), bau.iconst(n as i64));
+                        bau.w_ruf(W_TUPEL, &[basis, nz]);
+                        let z = bau.iconst(0);
+                        st.push((z, Art::W));
+                    }
                     op::CALL_USER if an.vm_aufrufe.contains(&ip) => {
                         let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
                         let d = st.len() - argc;
@@ -2979,7 +3032,7 @@ impl Jit {
         builder.symbol("dh_journal_schluss", journal_schluss as *const u8);
         builder.symbol("dh_mathe1", mathe1 as *const u8);
         builder.symbol("dh_mathe2", mathe2 as *const u8);
-        let w_namen: [(&str, *const u8); 17] = [
+        let w_namen: [(&str, *const u8); 19] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
             ("dh_w_ablegen_f", w_ablegen_f as *const u8), ("dh_w_zahl_i", w_zahl_i as *const u8),
@@ -2989,6 +3042,7 @@ impl Jit {
             ("dh_w_index", w_index as *const u8), ("dh_w_setzen", w_setzen as *const u8),
             ("dh_w_methode", w_methode as *const u8), ("dh_w_drucken", w_drucken as *const u8),
             ("dh_w_funktion", w_funktion as *const u8),
+            ("dh_w_auspacken", w_auspacken as *const u8), ("dh_w_tupel", w_tupel as *const u8),
         ];
         for (n, f) in w_namen { builder.symbol(n, f); }
         let mut modul = JITModule::new(builder);
@@ -3037,10 +3091,12 @@ impl Jit {
             ("dh_w_methode", vec![ptr, i, i, i], None),
             ("dh_w_drucken", vec![ptr, i, i, i], None),
             ("dh_w_funktion", vec![ptr, i, i, i], None),
+            ("dh_w_auspacken", vec![ptr, i, i], None),
+            ("dh_w_tupel", vec![ptr, i, i], None),
         ].into_iter().map(|(n, pa, r): (&str, Vec<Type>, Option<Type>)| (n, sig_h(&pa, r))).collect();
         let mut dekl = |name: &str, sg: &cranelift_codegen::ir::Signature| modul.declare_function(name, Linkage::Import, sg)
             .map_err(|e| format!("{:?}", e));
-        let mut w_ids = [holen_id; 17];
+        let mut w_ids = [holen_id; 19];
         for (j, (n, sg)) in w_sigs.iter().enumerate() { w_ids[j] = dekl(n, sg)?; }
         let hilfe = Hilfe {
             holen: holen_id,
