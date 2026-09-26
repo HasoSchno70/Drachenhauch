@@ -1636,6 +1636,11 @@ hinein wie `need_num`); jeder Fehlerfall steigt aus. **Wer einen dieser
 Befehle in builtins.rs aendert, zieht `zahl_rechnen` mit** -- `jit.dhtest`
 faengt es. builtins.dh 107 -> 3,3 ms.
 
+**Spielschleifen (M4 Schritt 9):** `NOT` auf einen Wert im Wertemodus
+(`W_WAHR` + Bit kippen) und vorbelegte Konstanten (`vorbelegt`: Farben,
+Tasten, PI/TAU aus `LOAD_NAME` als Zahl). Beispiele: 377 -> 343 Schleifen
+in der VM, `WHILE NOT QUITREQUESTED()` blockiert nicht mehr.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

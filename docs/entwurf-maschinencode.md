@@ -704,6 +704,29 @@ fielen erst im zweiten Anlauf**: bei der grossen Ganzzahl hoben sich mit
 Schritt 2 die Rundungen in der Summe auf (995 + 997 = 996 + 996), und bei
 ganzen Zahlen -6..6 rechnen `x * 180 / PI` und `x * (180 / PI)` gleich.
 
+**Schritt 9 (2026-09-26): Spielschleifen -- `NOT` auf Werte und vorbelegte
+Konstanten.** Ein Durchlauf ueber alle Beispiele (je 30 Bilder, Bilanz der
+Gruende) zeigte, woran echte Programme scheitern: 377 Schleifen blieben in
+der VM, 99 davon an "NOT auf NIL oder ein Feld" -- `WHILE NOT
+QUITREQUESTED()`: der Befehl liefert im Wertemodus einen Wert, und `NOT`
+darauf kannte der Wertemodus nicht. Jetzt ruft er `W_WAHR` (`truthy()`,
+nimmt den Wert vom Platz wie ein Sprung) und kippt das Bit -- die VM rechnet
+`!v.truthy()`. Dahinter kam der naechste Grund, "globale Variable" (21): die
+vorbelegten Konstanten (`BLACK`, `RED`, `KEY_ESCAPE`, `PI` ...) haben keinen
+Platz und laufen ueber `LOAD_NAME`. Sie sind unveraenderlich, `vorbelegt`
+setzt sie als Zahl ein -- ausser ein Platz heisst genauso (dann hat das
+Programm den Namen selbst angelegt; mit Plaetzen fuer jede Globale erzeugt
+der Compiler dann aber gar kein `LOAD_NAME`, die Pruefung ist eine
+Absicherung). Danach 343 Schleifen in der VM; die Spielschleife von
+`09_shapes.dh` laeuft ganz als Maschinencode. Die naechsten Gruende:
+Ausgabe (PRINT, 42), zwei Wege mit verschiedenen Arten (31), GUI_UPDATE
+(23, ruft Rueckrufe), Mitglied von etwas, das kein Objekt ist (21).
+
+Pruefung: 4 Faelle mehr in `jit.dhtest` (NOT auf Wahrheitswerte, NOT auf
+Text/Zahl/NIL als Wert, Spielschleife mit NOT und Konstanten, Konstanten in
+Funktionen); drei Gegenproben, alle mit falschem Ergebnis (NOT ungekippt,
+PI als TAU, Farbwert + 1).
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

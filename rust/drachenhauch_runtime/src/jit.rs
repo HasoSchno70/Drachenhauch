@@ -290,6 +290,23 @@ fn zahl_befehl(name: &str, arts: &[Art]) -> Option<Art> {
     }
 }
 
+/// Eine vorbelegte Konstante (Farbe, Taste, PI/TAU), die `LOAD_NAME` laedt:
+/// sie hat keinen Platz, ist unveraenderlich (Zuweisen ist ein Fehler) und
+/// wird darum als Zahl eingesetzt -- ausser ein Platz heisst genauso, dann
+/// hat das Programm den Namen selbst angelegt (M4 Schritt 9).
+fn vorbelegt(prog: &Program, f: &Func, ins: &crate::model::Instr) -> Option<Value> {
+    let name = match f.constants.get(ins.arg.as_usize()) { Some(Value::Str(n)) => n.to_lowercase(), _ => return None };
+    if !crate::vm::ist_vorbelegter_name(&name) || prog.global_names.iter().any(|g| g.eq_ignore_ascii_case(&name)) {
+        return None;
+    }
+    match name.as_str() {
+        "pi" => Some(Value::Float(std::f64::consts::PI)),
+        "tau" => Some(Value::Float(std::f64::consts::TAU)),
+        _ => crate::vm::DEFAULT_COLORS.iter().chain(crate::vm::DEFAULT_KEYS.iter())
+            .find(|(n, _)| *n == name).map(|(_, v)| Value::Int(*v)),
+    }
+}
+
 extern "C" fn journal_schluss(k: *mut Kontext) {
     let j = unsafe { (*k).journal };
     if j.is_null() { return; }
@@ -1124,6 +1141,9 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 z.stapel.push(z.lokal[s_arg].unwrap());
             }
             op::LOAD_SELF if selbst.is_some() => { z.stapel.push(Art::Obj(selbst.unwrap())); }
+            op::LOAD_NAME if vorbelegt(prog, f, ins).is_some() => {
+                z.stapel.push(if matches!(vorbelegt(prog, f, ins), Some(Value::Float(_))) { Art::F } else { Art::I });
+            }
             op::LOAD_FIELD | op::LOAD_MEMBER | op::STORE_FIELD | op::STORE_MEMBER if bereich.is_some() || selbst.is_some() => {
                 let name = match f.constants.get(ins.arg.as_usize()) { Some(Value::Str(n)) => n.to_string(), _ => return Err("Feldname".into()) };
                 let wert = if matches!(o, op::STORE_FIELD | op::STORE_MEMBER) { Some(pop!()) } else { None };
@@ -1367,7 +1387,10 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 if !((zahl(a) && zahl(b)) || (a == Art::B && b == Art::B)) { return Err("= zwischen verschiedenen Arten".into()); }
                 z.stapel.push(Art::B);
             }
-            op::NOT => { let a = pop!(); if !skalar(a) { return Err("NOT auf NIL oder ein Feld".into()); } z.stapel.push(Art::B); }
+            // Im Wertemodus auch auf einen Wert: `WHILE NOT QUITREQUESTED()` --
+            // der Befehl liefert dort einen Wert, und ohne das blieb fast jede
+            // Spielschleife der Beispiele in der VM (M4 Schritt 9).
+            op::NOT => { let a = pop!(); if !(skalar(a) || (modus_w && a == Art::W)) { return Err("NOT auf NIL oder ein Feld".into()); } z.stapel.push(Art::B); }
             op::JUMP => { melden(&mut vor, &mut offen, ziel(&ins.arg), &z)?; weiter = false; }
             op::JUMP_IF_FALSE | op::JUMP_IF_TRUE => {
                 let a = pop!();
@@ -2153,6 +2176,13 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                     op::LOAD_SELF => {
                         st.push((bau.selbst.unwrap(), Art::Obj(an.selbst.unwrap())));
                     }
+                    op::LOAD_NAME if vorbelegt(prog, f, ins).is_some() => {
+                        st.push(match vorbelegt(prog, f, ins) {
+                            Some(Value::Float(x)) => (bau.b.ins().f64const(x), Art::F),
+                            Some(Value::Int(x)) => (bau.iconst(x), Art::I),
+                            _ => unreachable!(),
+                        });
+                    }
                     op::LOAD_FIELD | op::LOAD_MEMBER | op::STORE_FIELD | op::STORE_MEMBER => {
                         let name = match &f.constants[ins.arg.as_usize()] { Value::Str(n) => n.to_string(), _ => unreachable!() };
                         let schreiben = matches!(o, op::STORE_FIELD | op::STORE_MEMBER);
@@ -2263,6 +2293,15 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let (y, ya) = st.pop().unwrap(); let (x, xa) = st.pop().unwrap();
                         let c = vergleichen(&mut bau, ins.op, x, xa, y, ya);
                         st.push((bau.bool64(c), Art::B));
+                    }
+                    op::NOT if st.last().map_or(false, |(_, a)| *a == Art::W) => {
+                        // Wie JUMP_IF: `w_wahr` nimmt den Wert vom Platz und
+                        // sagt `truthy()` -- die VM rechnet `!v.truthy()`.
+                        let z = bau.iconst(bau.w_slot(st.len() - 1));
+                        st.pop();
+                        let w = bau.w_ruf_w(W_WAHR, &[z]);
+                        let n = bau.b.ins().bxor_imm(w, 1);
+                        st.push((n, Art::B));
                     }
                     op::NOT => {
                         let (x, a) = st.pop().unwrap();
