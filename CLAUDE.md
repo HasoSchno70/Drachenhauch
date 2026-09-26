@@ -1652,6 +1652,12 @@ Schleifen** (eine Startschleife mit drei Runden wog sonst wie die
 Hauptschleife). Handles (IMAGE, SPRITE_ATLAS, SOUND ...) sind Ganzzahlen
 und duerfen im Bereich gelesen werden.
 
+**Spaet gebundene Befehle (M4 Schritt 12):** ein Befehl ohne bekannte
+Familie (Zweig lief vor dem ersten Ruecksprung nicht) haelt die Schleife
+nicht mehr in der VM; `w_builtin_roh` steigt beim Laufen aus, solange die
+Familie fehlt oder verboten ist. Runden in der VM ueber die Beispiele
+708 451 -> 248 320 (Schritte 11+12).
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

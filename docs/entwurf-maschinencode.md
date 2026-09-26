@@ -778,6 +778,33 @@ zaehlen fallen (dort ist die Bilanzzeile das Gepruefte); eine falsche Art im
 Analysezustand beim Lesen fiel NICHT -- der Code nimmt die Art des Platzes
 aus seinem eigenen Zustand, die Verfaelschung traf eine Stelle ohne Wirkung.
 
+**Schritt 12 (2026-09-26): Befehle in seltenen Zweigen spaet binden.** Eine
+Schleife wird beim ersten Ruecksprung uebersetzt, und jeder Befehl in einem
+Zweig, der bis dahin nicht lief (Tastendruck, Themawechsel, `IF i = 25`),
+hatte noch keine Familie -- die GANZE Schleife blieb dann in der VM
+("an dieser Stelle noch nie gerufen", 57 Schleifen). Jetzt zaehlt beim
+Bauen nur der Name (`befehl_im_bereich` mit einer beliebigen erlaubten
+Familie); `w_builtin_roh` fragt beim Laufen: fehlt die Familie oder ruft sie
+Drachenhauch-Code (2/4/8), steigt der Bereich VOR dem Befehl aus -- ohne
+Meldung, die Argumente bleiben auf ihren Plaetzen --, die VM fuehrt ihn aus
+und merkt sich dabei die Familie; beim naechsten Eintritt laeuft er im
+Maschinencode. Ein Befehl einer verbotenen Familie steigt jedes Mal aus
+(SORT mit Vergleich), ist aber richtig.
+
+Runden in der VM ueber alle Beispiele, Warteschleifen ausgenommen: 708 451
+vor Schritt 11, 248 320 danach. Die naechsten Gruende nach Runden: "legt eine
+globale Variable an" (17 Schleifen, 95 000 -- ein `DIM` in der Schleife von
+etwas, das keine Zahl ist), "ruft eine Funktion, die in der VM bleibt" (34,
+51 000), "Mitglied von etwas, das kein Objekt ist" (22, 25 000), Funktionen,
+die ein TUPLE liefern (`sinscroll_rgb`, 40 000).
+
+Pruefung: 3 Faelle mehr in `jit.dhtest` (JSON und LEN in seltenen Zweigen:
+zwei Ausstiege, danach Maschinencode; SORT mit Vergleich, der eine Globale
+zaehlt, die die Schleife liest: steigt jedes Mal aus; Fehler eines spaet
+gebundenen Befehls mit Zeile). Gegenproben: ohne die Laufzeitpruefung
+liefert der SORT-Fall ein anderes Ergebnis; mit der alten Regel faellt die
+Bilanz.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur
