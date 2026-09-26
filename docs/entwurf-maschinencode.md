@@ -977,6 +977,39 @@ der Bilanz -- die Schleifen bleiben dann richtig in der VM), vorwaerts mit
 `FOR_NEXT` verschmolzen, sondern laeuft ueber gewoehnliche Vergleiche; der
 Zweig `neg` im Maschinencode kommt in keinem Fall vor.
 
+**Schritt 19 (2026-09-26): Laufzeit statt Runden -- zwei Rueckschritte.**
+Die Messung einzelner Programme (`bench_dhrt.dh`, `tools/tempo`) zeigte,
+was die Zaehlung der VM-Runden nicht zeigt:
+
+| Programm | VM | vor Schritt 19 | nach Schritt 19 |
+|---|---|---|---|
+| teilchen.dh | 200 ms | **221 ms** | 28 ms |
+| familien.dh | 216 ms | 37 ms | 16 ms |
+
+(1) `teilchen.dh`: seit Schritt 17 wurde die AEUSSERE Schleife im
+Wertemodus gebaut und schluckte die innere `FOR EACH`, die vorher getypt
+lief -- jeder Feldzugriff ging jetzt ueber einen Helfer statt ueber einen
+Objektzeiger, langsamer als die VM. Die aeussere scheiterte getypt schon
+immer (`__comp_iter` fuer FOR EACH), im Wertemodus bis Schritt 17 an den
+Mitgliedern. Jetzt: liegen Mitglieder von Werten in einer INNEREN Schleife
+(`innere_schleife_mit`), bleibt die aeussere in der VM, und die innere
+bekommt ihren eigenen, getypten Bereich. (2) `familien.dh`: seit Schritt 18
+waren Locals ohne Typ im Wertemodus immer Werte -- auch die verborgene
+Grenze `TO 10` der inneren Schleife, und jede Runde kostete zwei
+Helferaufrufe. Jetzt ist das nur noch der dritte Versuch
+(`Bereich::any_w`): erst getypt, dann Wertemodus ohne, dann mit.
+
+**Die Lehre:** die Zahl der VM-Runden war ein Stellvertreter fuer die
+Laufzeit, und er hat zweimal in die falsche Richtung gezeigt -- eine
+Runde im Maschinencode ist nicht immer schneller als eine in der VM. Die
+Messbank gehoert zu jedem Schritt, nicht nur die Runden.
+
+Stand der Messbank (Bestwert aus 5, ms, VM / Maschinencode): aufrufe
+138 / 3,2; builtins 149 / 2,9; familien 216 / 16; felder 92 / 11;
+ganzzahl 487 / 8,9; maps 106 / 107 (die Zeit steckt in MAPPUT/MAPGET/STR$
+selbst, nicht in der Schleife); objekte 103 / 11,5; teilchen 200 / 28;
+text 51 / 40; zahlen 221 / 5,4.
+
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
 2. **Objektfelder mit fester Lage**: eine Klasse kennt ihre Felder zur

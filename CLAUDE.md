@@ -1687,8 +1687,15 @@ Methoden. Runden 40 114 -> 18 233.
 
 **FOR mit Kommazahl- oder Wert-Grenze (M4 Schritt 18):** die Grenze einer
 FOR-Schleife darf F oder (Wertemodus) W sein; Locals ohne Typ (`any`, etwa
-die verborgene Grenze) sind im Wertemodus immer ein Wert. Runden 18 233 ->
-9 033.
+die verborgene Grenze) sind im Wertemodus ein Wert, aber seit Schritt 19
+nur im dritten Versuch (`Bereich::any_w`). Runden 18 233 -> 9 033.
+
+**Laufzeit statt Runden (M4 Schritt 19):** die VM-Runden haben zweimal in
+die falsche Richtung gezeigt (teilchen.dh mit Maschinencode LANGSAMER als
+die VM). Liegen Mitglieder von Werten in einer inneren Schleife, wird die
+aeussere nicht im Wertemodus gebaut (`innere_schleife_mit`). **Wer am
+Maschinencode aendert, laesst `dhrt run bench_dhrt.dh` mit und ohne
+`DHRT_JIT=aus` laufen**, nicht nur die Rundenzaehlung.
 
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf

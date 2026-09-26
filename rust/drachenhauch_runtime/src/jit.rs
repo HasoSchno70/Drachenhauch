@@ -310,6 +310,24 @@ fn vorbelegt(prog: &Program, f: &Func, ins: &crate::model::Instr) -> Option<Valu
     }
 }
 
+/// Eine innere Schleife im Bereich `kopf..=bis` (ein Ruecksprung, dessen Ziel
+/// hinter dem Kopf liegt), in der eine der Stellen `stellen` liegt.
+fn innere_schleife_mit(f: &Func, kopf: usize, bis: usize, stellen: &[usize]) -> Option<(usize, usize)> {
+    if stellen.is_empty() { return None; }
+    for ip in kopf..bis {
+        let ins = &f.code[ip];
+        let ziel = match ins.op {
+            op::FOR_NEXT => for_teile(&ins.arg).map_or(usize::MAX, |t| t[6] as usize),
+            op::JUMP => ziel(&ins.arg),
+            _ => continue,
+        };
+        if ziel > kopf && ziel <= ip && stellen.iter().any(|&p| p >= ziel && p <= ip) {
+            return Some((ziel, ip));
+        }
+    }
+    None
+}
+
 /// Fasst der Befehl eine Globale an, deren Platz es beim Bauen des Bereichs
 /// noch nicht gibt (ein DIM in einem Zweig, der noch nicht lief)? Dann ist er
 /// ein fester Ausgang (M4 Schritt 13).
@@ -1008,8 +1026,9 @@ struct Schleife {
     /// Maschinencode fuer `w_speichern` zeigt -- sie muessen so lange leben
     /// wie er).
     modus_w: bool,
-    #[allow(dead_code)]
     typen: Vec<String>,
+    /// Locals ohne Typ als Wert gebaut (M4 Schritt 18/19).
+    any_w: bool,
 }
 
 /// Was der Maschinencode ueber die globalen Plaetze wissen muss: ihre Art
@@ -1175,6 +1194,9 @@ struct Bereich {
     /// Nur Wertemodus: je Funktion, ob sie in der VM bleibt -- dann ruft der
     /// Bereich sie ueber die VM (`w_funktion`, M4 Schritt 15).
     vm_fns: Vec<bool>,
+    /// Nur Wertemodus: Locals ohne Typ immer als Wert fuehren (M4 Schritt 18).
+    /// Kostet je Runde Helferaufrufe, darum nur der zweite Versuch (Schritt 19).
+    any_w: bool,
 }
 
 struct Analyse {
@@ -1196,6 +1218,8 @@ struct Analyse {
     vm_aufrufe: Vec<usize>,
     /// `obj.name` auf einem Wert, ueber die VM (M4 Schritt 17).
     w_mitglieder: Vec<usize>,
+    /// Locals ohne Typ als Wert (siehe `Bereich::any_w`).
+    any_w: bool,
     /// Globale Plaetze, die sie selbst liest oder schreibt, und die sie
     /// schreibt.
     beruehrt: Vec<usize>,
@@ -1615,7 +1639,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 if fremd[s] { return Err(format!("Platz {} hat den Typ '{}'", s, typen[s])); }
                 // Ein Local ohne Typ bleibt im Wertemodus ein Wert, auch mit
                 // einer Zahl (siehe `wertebereich`, M4 Schritt 18).
-                if modus_w && dekl[s].is_none() && matches!(typen[s].as_str(), "" | "any") && zahl(a) {
+                if bereich.map_or(false, |b| b.any_w) && dekl[s].is_none() && matches!(typen[s].as_str(), "" | "any") && zahl(a) {
                     z.lokal[s] = Some(Art::W);
                     melden(&mut vor, &mut offen, ip + 1, &z)?;
                     continue;
@@ -1764,7 +1788,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
         if weiter { melden(&mut vor, &mut offen, ip + 1, &z)?; }
     }
     Ok(Analyse { vor, ausgaenge, params, rueck, gerufen, beruehrt, geschrieben, felder, schreibt_felder,
-                 klassen, selbst, dyn_glob, typen, modus_w, feste_ausstiege, fehlende, vm_aufrufe, w_mitglieder })
+                 klassen, selbst, dyn_glob, typen, modus_w, feste_ausstiege, fehlende, vm_aufrufe, w_mitglieder, any_w: bereich.map_or(false, |b| b.any_w) })
 }
 
 /// Fuer den Grund in `dhrt --jit`: was die Funktion tut, das der
@@ -3374,7 +3398,7 @@ impl Jit {
                 // Ein Local ohne Typ fuehrt der Wertemodus auch mit einer Zahl
                 // als Wert (siehe `wertebereich`).
                 (Art::W, Value::Int(_) | Value::Float(_) | Value::Bool(_))
-                    if s.modus_w && matches!(s.typen.get(i).map(|t| t.as_str()), Some("" | "any")) => 0,
+                    if s.any_w && matches!(s.typen.get(i).map(|t| t.as_str()), Some("" | "any")) => 0,
                 (Art::W, Value::Int(_) | Value::Float(_) | Value::Bool(_) | Value::Nil) => return None,
                 (Art::W, _) => 0,
                 _ => return None,
@@ -3597,7 +3621,7 @@ impl Jit {
         };
         let start = Zustand { stapel: Vec::new(), lokal };
         let bereich = Bereich { von: kopf, bis, start, globale_da, felder, glob_felder,
-                                klassen, selbst: selbst_k, dyn_glob, lok_typen, modus_w: false, vm_fns: Vec::new() };
+                                klassen, selbst: selbst_k, dyn_glob, lok_typen, modus_w: false, vm_fns: Vec::new(), any_w: false };
         let vm_ruf = |an: &Analyse| an.gerufen.iter().any(|&g| self.ids.get(g).copied().flatten().is_none());
         let getypt = match analysieren(prog, &self.glob, f, Some(&bereich), None) {
             // Ruft er eine Funktion, die in der VM bleibt, geht das nur im
@@ -3610,11 +3634,27 @@ impl Jit {
             Err(e) => {
                 // Zweiter Versuch im Wertemodus: Texte, MAPs, eingebaute
                 // Befehle -- alles, was keine Zahl ist, als Wert.
-                let w = self.wertebereich(f, kopf, bis, locals, slots);
-                match analysieren(prog, &self.glob, f, Some(&w), None) {
+                let w = self.wertebereich(f, kopf, bis, locals, slots, false);
+                let an = match analysieren(prog, &self.glob, f, Some(&w), None) {
                     Ok(an) => an,
-                    Err(e2) => return Err(format!("{}; mit Werten: {}", e, e2)),
+                    Err(e2) => {
+                        // Dritter Versuch: Locals ohne Typ als Wert -- teurer
+                        // je Runde, darum erst hier (M4 Schritt 19).
+                        let w2 = self.wertebereich(f, kopf, bis, locals, slots, true);
+                        match analysieren(prog, &self.glob, f, Some(&w2), None) {
+                            Ok(an) => an,
+                            Err(_) => return Err(format!("{}; mit Werten: {}", e, e2)),
+                        }
+                    }
+                };
+                // Mitglieder von Werten in einer INNEREN Schleife: die innere
+                // liefe fuer sich getypt ueber Objektzeiger, hier ginge jeder
+                // Zugriff ueber einen Helfer -- dann bleibt die aeussere in
+                // der VM (M4 Schritt 19, gemessen an tools/tempo/teilchen.dh).
+                if let Some((kk, bb)) = innere_schleife_mit(f, kopf, bis, &an.w_mitglieder) {
+                    return Err(format!("mit Werten: Mitglieder in der inneren Schleife {}..{}", kk, bb));
                 }
+                an
             }
         };
         if an.gerufen.iter().any(|&g| self.ids.get(g).copied().flatten().is_none()) {
@@ -3663,6 +3703,7 @@ impl Jit {
             dyn_glob: an.dyn_glob.clone(),
             n_lokal: f.local_types.len(),
             modus_w: an.modus_w,
+            any_w: an.any_w,
             typen: an.typen,
         }));
         self.zahl_schleifen.set(self.zahl_schleifen.get() + 1);
@@ -3673,7 +3714,7 @@ impl Jit {
     /// NIL) ist ein Wert; jeder globale Platz ohne festen Zahlentyp, den die
     /// Schleife benutzt, wird wie ein Local gefuehrt.
     fn wertebereich(&self, f: &Func, kopf: usize, bis: usize, locals: &[Value],
-                    slots: &[Option<Rc<RefCell<Slot>>>]) -> Bereich {
+                    slots: &[Option<Rc<RefCell<Slot>>>], any_w: bool) -> Bereich {
         let art = |v: &Value| match v {
             Value::Nil => None,
             Value::Int(_) => Some(Art::I),
@@ -3687,7 +3728,7 @@ impl Jit {
         // -- beim Eintritt als Zahl gefuehrt, trafen sich am Ruecksprung
         // zwei Arten. Darum gleich als Wert (M4 Schritt 18).
         for (i, a) in lokal.iter_mut().enumerate() {
-            if matches!(f.local_types.get(i).map(|t| t.as_str()), Some("" | "any")) && matches!(a, Some(Art::I | Art::F | Art::B)) {
+            if any_w && matches!(f.local_types.get(i).map(|t| t.as_str()), Some("" | "any")) && matches!(a, Some(Art::I | Art::F | Art::B)) {
                 *a = Some(Art::W);
             }
         }
@@ -3714,6 +3755,7 @@ impl Jit {
             lok_typen,
             modus_w: true,
             vm_fns: (0..self.ids.len()).map(|i| self.ids[i].is_none()).collect(),
+            any_w,
         }
     }
 
