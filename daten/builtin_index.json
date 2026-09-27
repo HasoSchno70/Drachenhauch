@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2004,
+ "count": 2005,
  "builtins": [
   {
    "name": "ABS",
@@ -6222,6 +6222,12 @@
    "name": "IMAGE_REPLACE_COLOR",
    "kind": "core",
    "signature": "IMAGE_REPLACE_COLOR(img, from: INTEGER, to: INTEGER)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_COLOR_TO_ALPHA",
+   "kind": "core",
+   "signature": "IMAGE_COLOR_TO_ALPHA(img, farbe [, schwelle])",
    "module": "imgfx"
   },
   {

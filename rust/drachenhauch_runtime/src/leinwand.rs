@@ -316,6 +316,71 @@ impl NaechsteZahl for f32 {
     }
 }
 
+/// Eine Hintergrundfarbe in Durchsichtigkeit verwandeln (IMAGE_COLOR_TO_ALPHA),
+/// wie "Farbe zu Alpha" in GIMP: jeder Punkt wird als Mischung aus `bg` und
+/// einer Vordergrundfarbe gedeutet, die Deckkraft ist der kleinste Anteil,
+/// der reicht, und die Farbe wird "entmischt". Ueber `bg` gelegt ergibt das
+/// Ergebnis also wieder genau das Bild -- aber ein weicher Schein bleibt
+/// ein weicher Schein, statt als dunkler Rand stehen zu bleiben, wie bei einem
+/// harten Freistellen. `schwelle` (0..1) nimmt schwache Reste weg: was darunter
+/// liegt, wird ganz durchsichtig, darueber wird auf 0..1 gestreckt.
+/// `px` ist RGBA, eine vorhandene Deckkraft wird mitgenommen.
+pub fn farbe_zu_alpha(px: &mut [u8], bg: [u8; 3], schwelle: f32) {
+    let s = schwelle.clamp(0.0, 0.99);
+    let b = [bg[0] as f32 / 255.0, bg[1] as f32 / 255.0, bg[2] as f32 / 255.0];
+    for p in px.chunks_exact_mut(4) {
+        let c = [p[0] as f32 / 255.0, p[1] as f32 / 255.0, p[2] as f32 / 255.0];
+        let mut a = 0.0f32;
+        for i in 0..3 {
+            let t = if c[i] > b[i] { (c[i] - b[i]) / (1.0 - b[i]).max(1e-6) }
+                    else if c[i] < b[i] { (b[i] - c[i]) / b[i].max(1e-6) }
+                    else { 0.0 };
+            a = a.max(t);
+        }
+        let a = a.min(1.0);
+        if a > 0.0 {
+            for i in 0..3 {
+                let v = ((c[i] - b[i]) / a + b[i]).clamp(0.0, 1.0);
+                p[i] = (v * 255.0).round() as u8;
+            }
+        }
+        let a2 = if s > 0.0 { ((a - s) / (1.0 - s)).clamp(0.0, 1.0) } else { a };
+        p[3] = (a2 * p[3] as f32).round() as u8;
+    }
+}
+
+#[cfg(test)]
+mod farbe_alpha_tests {
+    use super::farbe_zu_alpha;
+
+    #[test]
+    fn hintergrund_wird_durchsichtig_und_mischungen_halb() {
+        // schwarz auf schwarz, weiss auf schwarz, halbes grau auf schwarz
+        let mut px = vec![0, 0, 0, 255,  255, 255, 255, 255,  128, 128, 128, 255];
+        farbe_zu_alpha(&mut px, [0, 0, 0], 0.0);
+        assert_eq!(px[3], 0);
+        assert_eq!(&px[4..8], &[255, 255, 255, 255]);
+        // Grau = weiss mit halber Deckkraft.
+        assert_eq!(&px[8..11], &[255, 255, 255]);
+        assert!((px[11] as i32 - 128).abs() <= 1);
+    }
+
+    #[test]
+    fn schwelle_nimmt_schwache_reste_weg() {
+        let mut px = vec![20, 20, 20, 255,  255, 255, 255, 255];
+        farbe_zu_alpha(&mut px, [0, 0, 0], 0.15);
+        assert_eq!(px[3], 0);
+        assert_eq!(px[7], 255);
+    }
+
+    #[test]
+    fn vorhandene_deckkraft_bleibt_anteilig() {
+        let mut px = vec![255, 0, 0, 100];
+        farbe_zu_alpha(&mut px, [0, 0, 0], 0.0);
+        assert_eq!(px[3], 100);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

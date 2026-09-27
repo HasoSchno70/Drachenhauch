@@ -31,6 +31,7 @@ IMPORT "imgfx"
 | `IMAGE_GRAYSCALE(img)` | IMAGE (neu, in Graustufen) |
 | `IMAGE_INVERT(img)` | IMAGE (neu, Farben invertiert) |
 | `IMAGE_REPLACE_COLOR(img, from, to)` | IMAGE (neu): tauscht **exakt** die Farbe `from` gegen `to` |
+| `IMAGE_COLOR_TO_ALPHA(img, farbe [, schwelle])` | IMAGE (neu): macht eine Hintergrundfarbe durchsichtig wie „Farbe zu Alpha“ in GIMP -- Mischungen werden halb durchsichtig und entmischt, ein Schein bleibt weich; `schwelle` (0..1) nimmt schwache Reste ganz weg. Zum Freistellen von Logos und Sprites vor einfarbigem Grund |
 
 ### In ein Image zeichnen (MUTIEREND — verändert das übergebene IMAGE)
 

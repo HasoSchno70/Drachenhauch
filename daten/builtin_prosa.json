@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1957,
+ "count": 1958,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -991,6 +991,7 @@
   "IMAGE_BLUR": "IMAGE (neu, Gauß-Weichzeichner, radius in px)",
   "IMAGE_BRIGHTNESS": "IMAGE (neu): Helligkeit, n = -255..255",
   "IMAGE_CLEAR": "einen Bereich vollstaendig durchsichtig machen — der Radierer; ohne Rechteck das ganze Bild",
+  "IMAGE_COLOR_TO_ALPHA": "IMAGE (neu): macht eine Hintergrundfarbe durchsichtig wie „Farbe zu Alpha“ in GIMP -- Mischungen werden halb durchsichtig und entmischt, ein Schein bleibt weich; schwelle (0..1) nimmt schwache Reste ganz weg. Zum Freistellen von Logos und Sprites vor einfarbigem Grund",
   "IMAGE_CONTRAST": "IMAGE (neu): Kontrast, n = -100..100",
   "IMAGE_CONVOLVE": "Freie Faltung mit einem quadratischen Kern (3×3, 5×5 …) als flachem ARRAY OF FLOAT in Zeilenfolge.",
   "IMAGE_COPY": "IMAGE (tiefer Klon)",

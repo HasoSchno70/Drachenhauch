@@ -3925,6 +3925,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         img.color_invert();
         self.push_tex_from_image(img)
     }
+    /// IMAGE_COLOR_TO_ALPHA(bild, farbe [, schwelle]) -> neues Bild (siehe
+    /// `leinwand::farbe_zu_alpha`).
+    pub fn image_color_to_alpha(&mut self, idx: i64, farbe: i64, schwelle: f32) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_COLOR_TO_ALPHA")?;
+        img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        let n = (img.width.max(0) as usize) * (img.height.max(0) as usize) * 4;
+        let px: &mut [u8] = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, n) };
+        let v = farbe as u32;
+        crate::leinwand::farbe_zu_alpha(px, [((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8], schwelle);
+        self.push_tex_from_image(img)
+    }
     pub fn image_replace_color(&mut self, idx: i64, from: i64, to: i64) -> Result<i64, String> {
         let mut img = self.src_image(idx, "IMAGE_REPLACE_COLOR")?;
         img.color_replace(col(from), col(to));

@@ -450,6 +450,11 @@ IF JSON_HAS(konfig, "vorspann") THEN vorspannAn = JSON_GET_BOOL(konfig, "vorspan
 ' ein neuer Drachenhauch. Abschalten in den Einstellungen (`glanz`).
 DIM glanzAn AS BOOLEAN : glanzAn = TRUE
 IF JSON_HAS(konfig, "glanz") THEN glanzAn = JSON_GET_BOOL(konfig, "glanz")
+' Die Kaestchen im Projektbaum (Suche und Umbau auf eine Auswahl beschraenken)
+' stehen nur auf Wunsch da -- immer sichtbar sahen sie aus wie etwas, das
+' beim Anklicken etwas tun muesste (`baum_haken` in der ide.json).
+DIM baumHakenAn AS BOOLEAN : baumHakenAn = FALSE
+IF JSON_HAS(konfig, "baum_haken") THEN baumHakenAn = JSON_GET_BOOL(konfig, "baum_haken")
 ' Welcher Vorspann: jede .mp4 in daten/video steht in den Einstellungen zur
 ' Wahl (`vorspann_datei` in der ide.json), dazu "abwechselnd" -- dann kommt
 ' bei jedem Start der naechste (`vorspann_zuletzt`). Eine gewaehlte Datei,
@@ -620,6 +625,8 @@ DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
 DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Öffnen ...", "Strg+O")
 DIM miSchnell AS INTEGER : miSchnell = GUI_MENU_ITEM(mDatei, "Datei im Projekt öffnen ...", "Strg+Umschalt+O")
 DIM miBaumOeffnen AS INTEGER : miBaumOeffnen = GUI_MENU_ITEM(mDatei, "Gewählte Dateien öffnen", "Strg+Umschalt+E")
+DIM miBaumHaken AS INTEGER : miBaumHaken = GUI_MENU_ITEM(mDatei, "Kästchen im Projektbaum zeigen")
+GUI_MENU_CHECK(miBaumHaken, baumHakenAn)
 DIM miHakenWeg AS INTEGER : miHakenWeg = GUI_MENU_ITEM(mDatei, "Haken im Projektbaum entfernen")
 ' Zuletzt geoeffnet: acht feste Eintraege, die Texte wechseln -- ein Menue
 ' kann Eintraege nicht wieder loswerden, also werden freie gesperrt.
@@ -901,6 +908,14 @@ DIM lstGliederung AS GUI_WIDGET : lstGliederung = GUI_LISTBOX(win, 0, 0, 10, 10,
 ' verschwindet mit dem ersten Reiter.
 DIM lblWkTitel AS GUI_WIDGET : lblWkTitel = GUI_LABEL(win, "Drachenhauch", 0, 0)
 GUI_SET_FONT_SIZE(lblWkTitel, 34)
+' Ein Bild vorab so verkleinert, dass es in b x h passt, OHNE es zu
+' verzerren -- der Kasten bleibt, das Bild steht in seiner Mitte.
+FUNCTION bildEingepasst(pfad AS STRING, b AS INTEGER, h AS INTEGER) AS IMAGE
+    DIM roh AS IMAGE : roh = LOADIMAGE(pfad)
+    DIM f AS FLOAT : f = MIN(b / IMAGEWIDTH(roh), h / IMAGEHEIGHT(roh))
+    RETURN IMAGE_SCALE(roh, MAX(1, INT(IMAGEWIDTH(roh) * f + 0.5)), MAX(1, INT(IMAGEHEIGHT(roh) * f + 0.5)))
+END FUNCTION
+
 ' Der Schriftzug statt des Titels -- vorab auf seine Anzeigegroesse gebracht:
 ' 1200 Punkte breit beim Zeichnen auf ein Fuenftel gestaucht flimmerten die
 ' feinen Linien. Ohne Bilddatei bleibt der Titel als Text.
@@ -909,8 +924,8 @@ CONST WK_BILD_H = 112
 DIM wkSchriftzug AS BOOLEAN : wkSchriftzug = FILEEXISTS(PATHJOIN(bilderOrdner, "schriftzug.png"))
 DIM imgWkTitel AS GUI_WIDGET
 IF wkSchriftzug THEN
-    imgWkTitel = GUI_IMAGE(win, 0, 0, WK_BILD_B, WK_BILD_H, _
-        IMAGE_SCALE(LOADIMAGE(PATHJOIN(bilderOrdner, "schriftzug.png")), WK_BILD_B, WK_BILD_H))
+    imgWkTitel = GUI_IMAGE(win, 0, 0, WK_BILD_B, WK_BILD_H, bildEingepasst(PATHJOIN(bilderOrdner, "schriftzug.png"), WK_BILD_B, WK_BILD_H))
+    GUI_IMAGE_MODE(imgWkTitel, "mitte")
     GUI_TOOLTIP(imgWkTitel, "Drachenhauch " + VERSION$())
     GUI_SET_VISIBLE(lblWkTitel, FALSE)
     protokoll("schriftzug")
@@ -1076,6 +1091,7 @@ DIM ddVorspann AS GUI_WIDGET : ddVorspann = GUI_DROPDOWN(winEinst, 400, 164, 200
 DIM btnVorspannSehen AS GUI_WIDGET : btnVorspannSehen = GUI_BUTTON(winEinst, "Ansehen", 608, 164, 96, 28)
 GUI_TOOLTIP(btnVorspannSehen, "Den gewählten Vorspann jetzt abspielen (eine Taste oder ein Klick bricht ab)")
 DIM vorspannWahlStand AS INTEGER : vorspannWahlStand = 0
+DIM cbBaumHaken AS GUI_WIDGET : cbBaumHaken = GUI_CHECKBOX(winEinst, "Kästchen im Projektbaum (Suche/Umbau begrenzen)", 400, 210, FALSE)
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgröße", 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
 DIM lblListen AS GUI_WIDGET : lblListen = GUI_LABEL(winEinst, "Schrift der Listen", 16, 326)
@@ -1456,6 +1472,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "vorspann", vorspannAn)
     JSON_SET_STRING(konfig, "vorspann_datei", vorspannDatei)
     JSON_SET_BOOL(konfig, "glanz", glanzAn)
+    JSON_SET_BOOL(konfig, "baum_haken", baumHakenAn)
     JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
     JSON_SET_BOOL(konfig, "leiste", leisteAn)
@@ -1930,7 +1947,8 @@ IF FILEEXISTS(PATHJOIN(bilderOrdner, "logo.png")) THEN
 END IF
 IF FILEEXISTS(PATHJOIN(bilderOrdner, "schriftzug.png")) THEN
     DIM imgUeberZug AS GUI_WIDGET
-    imgUeberZug = GUI_IMAGE(winUeber, 144, 16, 300, 140, IMAGE_SCALE(LOADIMAGE(PATHJOIN(bilderOrdner, "schriftzug.png")), 300, 140))
+    imgUeberZug = GUI_IMAGE(winUeber, 144, 16, 300, 140, bildEingepasst(PATHJOIN(bilderOrdner, "schriftzug.png"), 300, 140))
+    GUI_IMAGE_MODE(imgUeberZug, "mitte")
     ueberBilder = ueberBilder + 1
 END IF
 DIM lblUeber AS GUI_WIDGET : lblUeber = GUI_LABEL(winUeber, "", 16, 168)
@@ -2041,6 +2059,7 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbFormatSichern, formatSichernAn)
     GUI_SET_CHECKED(cbVorspann, vorspannAn)
     GUI_SET_CHECKED(cbGlanz, glanzAn)
+    GUI_SET_CHECKED(cbBaumHaken, baumHakenAn)
     vorspannAuswahlFuellen()
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spListen, listenGroesse)
@@ -2094,6 +2113,7 @@ SUB einstellungenNachziehen()
             IF vorspannSpielen(PATHJOIN(vorspannOrdner, vl2[vi])) = "kreuz" THEN beendenAnfragen()
         END IF
     END IF
+    IF GUI_CHECKED(cbBaumHaken) <> baumHakenAn THEN baumHakenSetzen(GUI_CHECKED(cbBaumHaken))
     IF GUI_CHECKED(cbGlanz) <> glanzAn THEN
         glanzAn = GUI_CHECKED(cbGlanz)
         konfigSichern()
@@ -2840,8 +2860,8 @@ GUI_FILETREE_SET(baum, "auffrischen", 2000)
 ' nach einem Fehler aus.
 GUI_FILETREE_SET(baum, "klick_klappt", 1)
 ' Haken am Baum: was angehakt ist, IST das Projekt (siehe projektDateien).
-GUI_FILETREE_SET(baum, "kaestchen", 1)
-GUI_TOOLTIP(baum, "Haken: Projektsuche, Umbenennen, Ersetzen und Symbolverzeichnis gelten dann nur für die angehakten Dateien und Ordner. Ohne Haken: das ganze Projekt.")
+GUI_FILETREE_SET(baum, "kaestchen", IIF(baumHakenAn, 1, 0))
+IF baumHakenAn THEN GUI_TOOLTIP(baum, baumHakenTipp$())
 
 ' Laesst sich die Datei im Editor bearbeiten? Alles andere geht an das
 ' Programm des Systems (ein PNG im Code-Feld waere Kauderwelsch).
@@ -2864,6 +2884,27 @@ SUB baumFuellen()
         GUI_FILETREE_REFRESH(baum)
     END IF
     projektBeschriften()
+END SUB
+
+FUNCTION baumHakenTipp$() AS STRING
+    RETURN "Haken: Projektsuche, Umbenennen, Ersetzen und Symbolverzeichnis gelten dann nur für die angehakten Dateien und Ordner. Ohne Haken: das ganze Projekt."
+END FUNCTION
+
+' Die Kaestchen ein- oder ausblenden. Beim Ausblenden fallen die Haken weg --
+' eine Einschraenkung, die man nicht mehr sieht, waere eine Falle.
+SUB baumHakenSetzen(an AS BOOLEAN)
+    IF NOT an AND GUI_FILETREE_CHECKED_COUNT(baum) > 0 THEN hakenEntfernen()
+    baumHakenAn = an
+    GUI_FILETREE_SET(baum, "kaestchen", IIF(an, 1, 0))
+    GUI_TOOLTIP(baum, IIF(an, baumHakenTipp$(), ""))
+    GUI_MENU_CHECK(miBaumHaken, an)
+    konfigSichern()
+    IF an THEN
+        GUI_SET_TEXT(lblStatus, "Kästchen im Projektbaum: was angehakt ist, begrenzt Projektsuche und Umbauten.")
+    ELSE
+        GUI_SET_TEXT(lblStatus, "Kästchen im Projektbaum ausgeblendet -- Suche und Umbau gelten wieder dem ganzen Projekt.")
+    END IF
+    protokoll("baum haken " + IIF(an, "an", "aus"))
 END SUB
 
 ' Was ueber dem Baum steht. Angehakte Dateien schraenken JEDEN Umbau ein --
@@ -9274,7 +9315,7 @@ paletteEintrag("Einrückungslinien", "linien", "")
 paletteEintrag("Werkzeugleiste", "leiste", "")
 paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
 paletteEintrag("Gewählte Dateien öffnen", "baum_oeffnen", "Strg+Umschalt+E")
-paletteEintrag("Haken im Projektbaum entfernen", "haken_weg", "")
+paletteEintrag("Haken im Projektbaum entfernen", "haken_weg", "") : paletteEintrag("Kästchen im Projektbaum ein/aus", "baum_haken", "")
 paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
 paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
@@ -9769,6 +9810,7 @@ SUB befehl(k AS STRING)
         CASE "symbole" : symbolVerzeichnis()
         CASE "baum_oeffnen" : baumAuswahlOeffnen()
         CASE "haken_weg" : hakenEntfernen()
+        CASE "baum_haken" : baumHakenSetzen(NOT baumHakenAn)
         CASE "marken" : markenAufFundstellen()
         CASE "palette" : paletteOeffnen()
         CASE "start" : starten()
@@ -10074,6 +10116,7 @@ WHILE NOT beenden
     END IF
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miHakenWeg) THEN befehl("haken_weg")
+    IF GUI_CLICKED(miBaumHaken) THEN befehl("baum_haken")
     IF GUI_CLICKED(miMarken) THEN befehl("marken")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")
     IF GUI_CLICKED(miStart) THEN befehl("start")
