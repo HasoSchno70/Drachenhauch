@@ -33,8 +33,8 @@ pub enum Value {
     /// die Methoden-Schluessel ab (`resolve_method` sucht damit).
     BoundMethod(Rc<(Value, Rc<str>)>),
     CompMarker,
-    Array(Rc<RefCell<GbArray>>),
-    Map(Rc<RefCell<GbMap>>),
+    Array(Rc<RefCell<DhArray>>),
+    Map(Rc<RefCell<DhMap>>),
     Instance(Rc<RefCell<Instance>>),
     /// Modul `vec2`: immutabler 2D-Vektor (Wert-Semantik wie ein Skalar).
     Vec2(f64, f64),
@@ -56,7 +56,7 @@ pub enum Value {
     /// Modul `sprite`: animiertes Sheet-Sprite (Referenz-Typ).
     Sprite(Rc<RefCell<SpriteObj>>),
     /// FILE-Handle (core File-I/O).
-    File(Rc<RefCell<GbFile>>),
+    File(Rc<RefCell<DhFile>>),
     /// BUFFER: veraenderliche Bytefolge (WP B). Referenz-Typ wie ARRAY --
     /// uebergibt man ihn an eine SUB, teilen sich beide Seiten die Bytes.
     /// Bewusst KEIN STRING: der ist UTF-8 und kann gar nicht jede Bytefolge
@@ -208,7 +208,7 @@ pub enum FileH {
     Closed,
 }
 
-impl GbFile {
+impl DhFile {
     /// Der Lesestrom dieses Handles -- egal ob Datei oder Standardeingabe.
     ///
     /// Ohne diesen Helfer braeuchte jeder Leser (READLINE, READALL$,
@@ -223,7 +223,7 @@ impl GbFile {
     }
 }
 
-pub struct GbFile {
+pub struct DhFile {
     pub path: String,
     pub h: FileH,
     /// Kodierung dieser Datei (aus `OPENFILE(pfad, modus, kodierung)`; ohne
@@ -334,7 +334,7 @@ pub struct Namespace {
     pub members: FxHashMap<String, Value>, // key = lower-case Member-Name
 }
 
-/// Element-Backing eines GbArray. ARRAY OF INTEGER/FLOAT speichern rohe
+/// Element-Backing eines DhArray. ARRAY OF INTEGER/FLOAT speichern rohe
 /// i64/f64 (dicht, cache-freundlich, kein Enum-Tag pro Element) -- alle
 /// anderen Element-Typen generische Values. Entspricht dem
 /// array.array('q'/'d')-Backing der frueheren Python-Referenz (daher gilt
@@ -477,14 +477,14 @@ impl<'a> Iterator for CellsIter<'a> {
 }
 
 /// Mehrdimensionales, homogen getyptes Array (entspricht `_GBArray`).
-pub struct GbArray {
+pub struct DhArray {
     pub element_type: String,
     pub dims: Vec<i64>,
     pub strides: Vec<i64>,
     pub cells: Cells,
 }
 
-impl GbArray {
+impl DhArray {
     pub fn new(element_type: String, dims: Vec<i64>, default: impl Fn() -> Value) -> Self {
         let mut strides = vec![0i64; dims.len()];
         let mut acc = 1i64;
@@ -498,7 +498,7 @@ impl GbArray {
             "float" => Cells::Float(vec![0.0f64; total]),
             _ => Cells::Val((0..total).map(|_| default()).collect()),
         };
-        GbArray { element_type, dims, strides, cells }
+        DhArray { element_type, dims, strides, cells }
     }
 
     /// Flacher Index mit Bounds-Check (entspricht `_GBArray.flat_index`).
@@ -532,10 +532,14 @@ impl GbArray {
 
 /// Map mit STRING-Keys und erhaltener Einfuege-Reihenfolge.
 ///
-/// Zwei Datenstrukturen, die zusammengehalten werden muessen:
-///   - `eintraege` haelt die Reihenfolge (MAPKEYS/MAPVALUES/MAPITEMS und die
-///     JSON-Ausgabe verlassen sich darauf),
-///   - `index` bildet Key -> Position ab, damit Nachschlagen nicht linear ist.
+/// Ueber `indexmap` (M4 Schritt 21): eine dichte Liste der Eintraege in
+/// Einfuege-Reihenfolge (MAPKEYS/MAPVALUES/MAPITEMS und die JSON-Ausgabe
+/// verlassen sich darauf) plus eine Hashtabelle, die nur POSITIONEN haelt --
+/// derselbe Aufbau wie Pythons `dict`. Vorher standen hier eine eigene
+/// `Vec<(String, Value)>` und ein `HashMap<String, usize>` daneben: jeder
+/// Schluessel lag zweimal im Speicher und wurde beim Einfuegen zweimal
+/// gehasht, und Loeschen baute den ganzen Index neu auf. Gehasht wird mit
+/// foldhash und zufaelligem Startwert (Schluessel koennen von aussen kommen).
 ///
 /// GEMESSEN, warum das noetig war: mit blosser linearer Suche kostete eine
 /// Map mit 5 000 Eintraegen 16 ms zum Fuellen, mit 10 000 schon 75 ms und mit
@@ -546,10 +550,9 @@ impl GbArray {
 /// `eintraege` ist ABSICHTLICH privat. Vorher war es `pub`, und `MAPCLEAR`
 /// griff direkt darauf zu -- mit einem Index daneben waere genau das die
 /// Stelle, an der beide still auseinanderlaufen.
-pub struct GbMap {
+pub struct DhMap {
     pub value_type: String,
-    eintraege: Vec<(String, Value)>,
-    index: HashMap<String, usize, foldhash::fast::RandomState>,
+    eintraege: indexmap::IndexMap<String, Value, foldhash::fast::RandomState>,
     /// Elementart, wenn die Map als MENGE benutzt wird (`SET_*`): `'i'` oder
     /// `'s'`, gesetzt von der ersten Aufnahme.
     ///
@@ -562,10 +565,9 @@ pub struct GbMap {
     set_art: Option<char>,
 }
 
-impl GbMap {
+impl DhMap {
     pub fn new(value_type: String) -> Self {
-        GbMap { value_type, eintraege: Vec::new(), index: HashMap::default(),
-                set_art: None }
+        DhMap { value_type, eintraege: indexmap::IndexMap::default(), set_art: None }
     }
 
     /// Elementart der Menge (None = noch leer bzw. nie als Menge benutzt).
@@ -585,57 +587,32 @@ impl GbMap {
     }
 
     /// Eintraege in Einfuege-Reihenfolge, nur lesend.
-    pub fn entries(&self) -> &[(String, Value)] { &self.eintraege }
+    pub fn entries(&self) -> &indexmap::map::Slice<String, Value> { self.eintraege.as_slice() }
 
     pub fn len(&self) -> usize { self.eintraege.len() }
     pub fn is_empty(&self) -> bool { self.eintraege.is_empty() }
 
-    pub fn get(&self, k: &str) -> Option<&Value> {
-        self.index.get(k).map(|i| &self.eintraege[*i].1)
-    }
+    pub fn get(&self, k: &str) -> Option<&Value> { self.eintraege.get(k) }
 
-    pub fn put(&mut self, k: String, v: Value) {
-        match self.index.get(&k) {
-            Some(i) => self.eintraege[*i].1 = v,
-            None => {
-                self.index.insert(k.clone(), self.eintraege.len());
-                self.eintraege.push((k, v));
-            }
-        }
-    }
+    /// Ein vorhandener Schluessel behaelt seinen Platz in der Reihenfolge.
+    pub fn put(&mut self, k: String, v: Value) { self.eintraege.insert(k, v); }
 
     /// Wie `put`, legt den Schluessel aber nur an, wenn er neu ist -- beim
     /// Ueberschreiben kein Speicher (MAPPUT, M4 Schritt 20).
     pub fn put_str(&mut self, k: &str, v: Value) {
-        match self.index.get(k) {
-            Some(i) => self.eintraege[*i].1 = v,
-            None => {
-                self.index.insert(k.to_string(), self.eintraege.len());
-                self.eintraege.push((k.to_string(), v));
-            }
+        match self.eintraege.get_mut(k) {
+            Some(alt) => *alt = v,
+            None => { self.eintraege.insert(k.to_string(), v); }
         }
     }
 
-    /// Loeschen ist O(n): die Positionen aller nachfolgenden Eintraege
-    /// verschieben sich, der Index wird also neu aufgebaut. Bewusst so --
-    /// Nachschlagen und Einfuegen sind der haeufige Fall, Loeschen nicht, und
-    /// Grabsteine wuerden die Reihenfolge-Zusage verkomplizieren.
-    pub fn remove(&mut self, k: &str) -> bool {
-        match self.index.remove(k) {
-            None => false,
-            Some(pos) => {
-                self.eintraege.remove(pos);
-                for (_, i) in self.index.iter_mut() {
-                    if *i > pos { *i -= 1; }
-                }
-                true
-            }
-        }
-    }
+    /// Loeschen behaelt die Reihenfolge (`shift_remove`): die Eintraege
+    /// dahinter ruecken auf. O(n), aber als Verschieben im Speicher statt wie
+    /// vorher mit neu aufgebautem Index.
+    pub fn remove(&mut self, k: &str) -> bool { self.eintraege.shift_remove(k).is_some() }
 
     pub fn clear(&mut self) {
         self.eintraege.clear();
-        self.index.clear();
         // Mit dem letzten Element geht auch die Elementart -- sonst koennte
         // eine geleerte Menge nie die Art wechseln.
         self.set_art = None;

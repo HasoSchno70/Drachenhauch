@@ -1026,9 +1026,9 @@ Drei Funde:
   zufaelligem Startwert je Prozess (die Schluessel koennen von aussen
   kommen -- FxHash waere mit ausgesuchten Schluesseln zu Kollisionen zu
   treiben). Und ein vorhandener Schluessel wird ohne Speicheranlage
-  ueberschrieben (`GbMap::put_str`). Die zwei Kopien je neuem Schluessel
+  ueberschrieben (`DhMap::put_str`). Die zwei Kopien je neuem Schluessel
   (Liste und Index) bleiben -- sie zu teilen hiesse, die Schnittstelle von
-  `GbMap` umzubauen.
+  `DhMap` umzubauen.
 
 maps.dh: 107 -> 81 ms mit Maschinencode, 106 -> 100 ms in der VM; die
 uebrigen Werte der Messbank unveraendert. Zwei Faelle neu in `jit.dhtest`
@@ -1039,6 +1039,53 @@ ersten Gegenprobe blieb gruen:** sie liess eine Kommazahl in ein
 INTEGER-Local, aber ein Local mit Zahlentyp nimmt gar nicht `w_speichern`,
 sondern `w_zahl_i` -- die Mutation traf eine Kombination, die dort nie
 ankommt.
+
+**Schritt 21 (2026-09-27): die MAP ueber `indexmap`, `Gb*` heisst `Dh*`.**
+Wie die schnellen Sprachen Maps bauen (Python `dict`, Rust `indexmap`):
+eine dichte Liste der Eintraege in Einfuege-Reihenfolge und daneben eine
+Hashtabelle, die nur POSITIONEN haelt -- jeder Schluessel liegt einmal im
+Speicher. `DhMap` hatte denselben Aufbau von Hand, aber mit einem
+`HashMap<String, usize>` daneben: jeder Schluessel zweimal, beim Einfuegen
+zweimal gehasht, und Loeschen baute den ganzen Index neu auf. Jetzt
+`indexmap::IndexMap<String, Value>` mit foldhash (stand schon in der
+Lockfile); die Schnittstelle von `DhMap` ist gleich geblieben, `entries()`
+liefert eine `indexmap`-Scheibe, die dieselben `(k, v)`-Paare hergibt.
+Loeschen behaelt die Reihenfolge (`shift_remove`).
+
+Gemessen gegen den Bau davor: maps.dh 81 -> 79 ms (VM 100 -> 96), 20 000
+Schluessel vorn beginnend loeschen 493 -> 288 ms, eine Million Schluessel
+214 -> 160 MB Spitze. Die uebrigen Werte der Messbank unveraendert. Beim
+Einfuegen und Suchen bleibt der Unterschied klein -- der Schluessel
+`"k" + STR$(i)` wird weiter je Runde gebaut, und das ist der groessere
+Teil. Im selben Zug heissen die Laufzeit-Typen `GbMap`/`GbArray`/`GbFile`
+jetzt `DhMap`/`DhArray`/`DhFile` -- das `Gb` kam noch von GameBasic.
+
+Pruefung: ein Fall mehr in `map_reihenfolge.dhtest` (Ueberschreiben behaelt
+den Platz). Gegenproben: Loeschen mit `swap_remove` (die Reihenfolge geht
+verloren) laesst zwei Faelle dort fallen, Ueberschreiben ans Ende schieben
+den neuen Fall und einen in `mengen.dhtest`.
+
+## 5. Was bewusst nicht kommt
+
+- Kein eigener Registerzuteiler, keine eigenen Optimierungen jenseits dessen,
+  was Cranelift mitbringt — der Gewinn liegt im Wegfall der Typprüfungen und
+  des Dispatch, nicht in cleveren Schleifen.
+- Keine Übersetzung von Coroutinen (YIELD), TRY/CATCH und `any`-Code in M3/M4;
+  das ist die VM, bis gemessen wird, dass es sich lohnt.
+- Kein AOT (Weg C), solange B den Export nicht bremst.
+
+## 6. Grobe Rechnung
+
+| Schritt | Aufwand | `fib(30)` | Zahlenschleife |
+|---|---|---|---|
+| heute | — | 210 ms | 219 ms |
+| M2 (VM getypt) | ~5 Wochen inkl. M0/M1 | ~100 ms | ~100 ms |
+| M3 (JIT Zahlen) | +4–6 Wochen | ~15 ms | ~15 ms |
+| M4 (Breite) | laufend | — | Objekte/Felder 5–10×, Text/Maps 2–3× |
+
+Die Zahlen für M2/M3 sind Schätzungen aus dem, was Stapel-VMs und
+Cranelift-Code anderswo erreichen, nicht gemessen — M0 ist genau dafür da,
+sie nach jedem Schritt zu ersetzen.
 
 1. **Globale Variablen** (feste Slots, seit #235/#236 gibt es die) und
    **Felder von INTEGER/FLOAT** mit Grenzprüfung inline.
@@ -1083,25 +1130,3 @@ ankommt.
   1.95/1.96 verlangen und lokal 1.95 lag; die CI nahm ohnehin das neueste
   Stable). Der Sprung brauchte keine Quellaenderung; Tempo gleich,
   `aufrufe.dh` mit dem neuen Compiler etwas schneller (4,2 -> 3,3 ms).
-
-## 5. Was bewusst nicht kommt
-
-- Kein eigener Registerzuteiler, keine eigenen Optimierungen jenseits dessen,
-  was Cranelift mitbringt — der Gewinn liegt im Wegfall der Typprüfungen und
-  des Dispatch, nicht in cleveren Schleifen.
-- Keine Übersetzung von Coroutinen (YIELD), TRY/CATCH und `any`-Code in M3/M4;
-  das ist die VM, bis gemessen wird, dass es sich lohnt.
-- Kein AOT (Weg C), solange B den Export nicht bremst.
-
-## 6. Grobe Rechnung
-
-| Schritt | Aufwand | `fib(30)` | Zahlenschleife |
-|---|---|---|---|
-| heute | — | 210 ms | 219 ms |
-| M2 (VM getypt) | ~5 Wochen inkl. M0/M1 | ~100 ms | ~100 ms |
-| M3 (JIT Zahlen) | +4–6 Wochen | ~15 ms | ~15 ms |
-| M4 (Breite) | laufend | — | Objekte/Felder 5–10×, Text/Maps 2–3× |
-
-Die Zahlen für M2/M3 sind Schätzungen aus dem, was Stapel-VMs und
-Cranelift-Code anderswo erreichen, nicht gemessen — M0 ist genau dafür da,
-sie nach jedem Schritt zu ersetzen.

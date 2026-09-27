@@ -1701,7 +1701,14 @@ Maschinencode aendert, laesst `dhrt run bench_dhrt.dh` mit und ohne
 `Vm::addieren` (ein Text in passender Groesse; vorher langsamer als die
 VM), `w_speichern` mit schnellem Weg wie `passend!`, der Index der MAP mit
 foldhash (zufaelliger Startwert -- Schluessel koennen von aussen kommen)
-und `GbMap::put_str`. maps.dh 107 -> 81 ms.
+und `DhMap::put_str`. maps.dh 107 -> 81 ms.
+
+**MAP ueber indexmap (M4 Schritt 21):** `DhMap` ist eine
+`indexmap::IndexMap<String, Value>` mit foldhash (dichte Eintraege in
+Einfuege-Reihenfolge, der Index haelt nur Positionen -- wie Pythons `dict`);
+Loeschen mit `shift_remove`. Eine Million Schluessel 214 -> 160 MB, Loeschen
+493 -> 288 ms. Die Laufzeit-Typen heissen `DhMap`/`DhArray`/`DhFile` (vorher
+`Gb*`, von GameBasic).
 
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf

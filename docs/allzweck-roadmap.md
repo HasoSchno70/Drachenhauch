@@ -515,7 +515,7 @@ als Ausgangspunkt:
       statt geschrieben. Drei Rust-`#[test]`s für die Namensprüfung, neun
       Golden-Tests, davon zwei mit einem echten bösartigen Archiv
 - [x] **MAP beschleunigt** (2026-08-19) — der Punkt war falsch zugeschnitten.
-      Nachgemessen war nicht nur der TUPLE-Behelf O(n), sondern `GbMap` selbst:
+      Nachgemessen war nicht nur der TUPLE-Behelf O(n), sondern `DhMap` selbst:
       ein `Vec` mit linearer Suche. 20 000 Einträge kosteten 224 ms zum Füllen
       und 187 ms zum Lesen; mit einem Hash-Index daneben sind es 8 bzw. 7 ms,
       und das Wachstum ist linear statt quadratisch. Das half jedem

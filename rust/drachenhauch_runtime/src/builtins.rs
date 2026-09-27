@@ -10,7 +10,7 @@ use std::io::{Read, Seek, Write};
 use std::rc::Rc;
 
 use crate::tiled::{TiledLayer, TiledMap, TiledObject};
-use crate::value::{as_f64, is_num, value_eq, Cells, FileH, GbArray, GbFile, GbMap, Particle, ParticleSys, SaveHandle, SpriteObj, TweenObj, Value};
+use crate::value::{as_f64, is_num, value_eq, Cells, FileH, DhArray, DhFile, DhMap, Particle, ParticleSys, SaveHandle, SpriteObj, TweenObj, Value};
 
 type R = Result<Value, String>;
 
@@ -286,7 +286,7 @@ pub(crate) fn numfmt(n: f64, decimals: i64) -> String {
 /// z.B. ueber die Cells-Variante statt `element_type`). Leere Arrays werden
 /// hier NICHT abgelehnt -- ARRAY_SUM erlaubt sie (Summe 0), AVG/MIN/MAX prüfen
 /// das selbst mit ihrer je eigenen "Array ist leer"-Meldung.
-fn numeric_1d_array<'a>(v: &'a Value, fn_: &str) -> Result<std::cell::Ref<'a, GbArray>, String> {
+fn numeric_1d_array<'a>(v: &'a Value, fn_: &str) -> Result<std::cell::Ref<'a, DhArray>, String> {
     let arr = match v {
         Value::Array(arr) => arr.borrow(),
         _ => return Err(format!("{} erwartet ARRAY", fn_)),
@@ -443,7 +443,7 @@ fn translate_repl(s: &str) -> String {
 fn csv_tabelle(zeilen: Vec<Vec<String>>) -> Value {
     let rows = zeilen.len() as i64;
     let cols = zeilen.iter().map(|z| z.len()).max().unwrap_or(0) as i64;
-    let mut arr = GbArray::new("string".to_string(), vec![rows.max(0), cols.max(0)],
+    let mut arr = DhArray::new("string".to_string(), vec![rows.max(0), cols.max(0)],
                                || Value::str_rc(""));
     for (r, zeile) in zeilen.iter().enumerate() {
         for (c, feld) in zeile.iter().enumerate() {
@@ -494,7 +494,7 @@ fn str_array(v: &Value, fn_: &str) -> Result<Vec<String>, String> {
 
 fn new_str_array(items: Vec<String>) -> Value {
     let n = items.len() as i64;
-    let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+    let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
     for (i, s) in items.into_iter().enumerate() {
         arr.cells.set(i, Value::str_rc(&s));
     }
@@ -520,7 +520,7 @@ fn num_array(v: &Value, fn_: &str) -> Result<Vec<f64>, String> {
 /// 1D `ARRAY OF GELD` -- fuer GELD_TEILEN.
 pub fn new_geld_array(items: Vec<i64>) -> Value {
     let n = items.len() as i64;
-    let mut arr = GbArray::new("geld".to_string(), vec![n], || Value::Geld(0));
+    let mut arr = DhArray::new("geld".to_string(), vec![n], || Value::Geld(0));
     for (i, v) in items.into_iter().enumerate() {
         arr.cells.set(i, Value::Geld(v));
     }
@@ -531,7 +531,7 @@ pub fn new_geld_array(items: Vec<i64>) -> Value {
 /// `ARRAY OF FLOAT` aus einer Rust-Liste (Gegenstueck zu `new_int_array`).
 pub fn new_float_array(items: Vec<f64>) -> Value {
     let n = items.len() as i64;
-    let mut arr = GbArray::new("float".to_string(), vec![n], || Value::Float(0.0));
+    let mut arr = DhArray::new("float".to_string(), vec![n], || Value::Float(0.0));
     for (i, v) in items.into_iter().enumerate() {
         arr.cells.set(i, Value::Float(v));
     }
@@ -541,7 +541,7 @@ pub fn new_float_array(items: Vec<f64>) -> Value {
 /// `ARRAY OF STRING` aus einer Rust-Liste.
 pub fn new_string_array(items: Vec<String>) -> Value {
     let n = items.len() as i64;
-    let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+    let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
     for (i, v) in items.into_iter().enumerate() {
         arr.cells.set(i, Value::str_rc(&v));
     }
@@ -550,7 +550,7 @@ pub fn new_string_array(items: Vec<String>) -> Value {
 
 pub fn new_int_array(items: Vec<i64>) -> Value {
     let n = items.len() as i64;
-    let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));
+    let mut arr = DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
     for (i, v) in items.into_iter().enumerate() {
         arr.cells.set(i, Value::Int(v));
     }
@@ -1189,7 +1189,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                         }.to_string();
                     }
                 }
-                let mut m = GbMap::new(vt);
+                let mut m = DhMap::new(vt);
                 for p in t.iter() {
                     if let Value::Tuple(kv) = p {
                         if kv.len() == 2 {
@@ -1785,7 +1785,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let m = m.borrow();
                 let vals: Vec<Value> = m.entries().iter().map(|(_, v)| v.clone()).collect();
                 let n = vals.len() as i64;
-                let mut arr = GbArray::new(m.value_type.clone(), vec![n], || type_default(&m.value_type));
+                let mut arr = DhArray::new(m.value_type.clone(), vec![n], || type_default(&m.value_type));
                 for (i, v) in vals.into_iter().enumerate() { arr.cells.set(i, v); }
                 Ok(Value::Array(Rc::new(RefCell::new(arr))))
             } else { err("MAPVALUES erwartet MAP".to_string()) }
@@ -1806,7 +1806,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let items: Vec<Value> = m.entries().iter()
                     .map(|(k, v)| Value::Tuple(Rc::new(vec![Value::str_rc(k), v.clone()]))).collect();
                 let n = items.len() as i64;
-                let mut arr = GbArray::new("tuple".to_string(), vec![n], || Value::Tuple(Rc::new(vec![])));
+                let mut arr = DhArray::new("tuple".to_string(), vec![n], || Value::Tuple(Rc::new(vec![])));
                 for (i, v) in items.into_iter().enumerate() { arr.cells.set(i, v); }
                 Ok(Value::Array(Rc::new(RefCell::new(arr))))
             } else { err("MAPITEMS erwartet MAP".to_string()) }
@@ -1919,7 +1919,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             if let Value::Array(arr) = &a[0] {
                 let arr = arr.borrow();
-                let new = GbArray {
+                let new = DhArray {
                     element_type: arr.element_type.clone(),
                     dims: arr.dims.clone(),
                     strides: arr.strides.clone(),
@@ -2830,7 +2830,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 "a" => FileH::Write(std::fs::OpenOptions::new().append(true).create(true).open(&path).map_err(|e| format!("OPENFILE: {}", e))?),
                 _ => return err(format!("OPENFILE: ungueltiger Modus '{}' (erlaubt: r, w, a)", mode)),
             };
-            Ok(Value::File(Rc::new(RefCell::new(GbFile { path, h, kod, am_anfang: true }))))
+            Ok(Value::File(Rc::new(RefCell::new(DhFile { path, h, kod, am_anfang: true }))))
         }
         "closefile" => {
             arity!(1);
@@ -4014,7 +4014,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 serde_json::Value::Object(obj) => {
                     let keys: Vec<Value> = obj.keys().map(|k| Value::str_rc(k)).collect();
                     let n = keys.len() as i64;
-                    let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                    let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
                     for (i, k) in keys.into_iter().enumerate() { arr.cells.set(i, k); }
                     Ok(Value::Array(Rc::new(RefCell::new(arr))))
                 }
@@ -4700,7 +4700,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     .properties.keys().cloned().collect()
             };
             keys.sort();
-            let mut arr = GbArray::new("string".to_string(), vec![keys.len() as i64],
+            let mut arr = DhArray::new("string".to_string(), vec![keys.len() as i64],
                                        || Value::str_rc(""));
             for (i, k) in keys.iter().enumerate() { arr.cells.set(i, Value::str_rc(k)); }
             Ok(Value::Array(Rc::new(RefCell::new(arr))))
@@ -5053,7 +5053,7 @@ fn ecs_or(a: &[Value]) -> Result<Option<Value>, String> {
 }
 fn int_array(values: Vec<i64>) -> Value {
     let n = values.len() as i64;
-    let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));
+    let mut arr = DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
     for (i, v) in values.into_iter().enumerate() { arr.cells.set(i, Value::Int(v)); }
     Value::Array(Rc::new(RefCell::new(arr)))
 }
@@ -5399,7 +5399,7 @@ fn xml_folge(k: &std::rc::Rc<crate::xml::Knoten>, pfad: &str, fn_: &str)
 
 /// Paare aus `ini::lesen` in eine `MAP OF STRING` umsetzen.
 fn ini_map(paare: Vec<(String, String)>) -> Value {
-    let mut m = GbMap::new("string".to_string());
+    let mut m = DhMap::new("string".to_string());
     for (k, v) in paare { m.put(k, Value::str_rc(&v)); }
     Value::Map(Rc::new(RefCell::new(m)))
 }
@@ -5613,7 +5613,7 @@ fn json_haenge_an(h: &Value, path: &str, wert: serde_json::Value, fn_: &str) -> 
     }
 }
 
-fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<GbFile>>, String> {
+fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<DhFile>>, String> {
     match v {
         Value::File(f) => Ok(f),
         // `DIM f AS FILE` legt kein Handle an -- die Variable ist NIL, bis

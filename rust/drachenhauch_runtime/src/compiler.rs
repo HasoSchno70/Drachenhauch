@@ -2590,7 +2590,7 @@ impl Compiler {
             }
             Node::ArrayLit(elements) => {
                 // Array-Literal `[a, b, c]`: Elemente auf den Stack, dann zur
-                // Laufzeit zu einem 1D-GbArray zusammensetzen (Element-Typ aus
+                // Laufzeit zu einem 1D-DhArray zusammensetzen (Element-Typ aus
                 // den Werten hergeleitet -- int/float/string/boolean/any).
                 for el in elements { self.expr(el)?; }
                 self.ctx.emit(oc::BUILD_ARRAY, json!(elements.len()));

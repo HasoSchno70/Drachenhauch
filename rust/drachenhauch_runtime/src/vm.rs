@@ -66,7 +66,7 @@ const MAX_CALL_DEPTH: u32 = 1000;
 
 use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};
-use crate::value::{as_f64, is_num, value_eq, Cells, CoroState, GbArray, GbMap, Instance, Value};
+use crate::value::{as_f64, is_num, value_eq, Cells, CoroState, DhArray, DhMap, Instance, Value};
 
 /// Profiler-Sammler (Stufe B, Phase 3): pro Quell-Zeile Besuchs-Count +
 /// kumulierte Zeit. Spiegelt `editor_qt/profiler.py`: die Zeit zwischen zwei
@@ -1262,7 +1262,7 @@ impl<'p> Vm<'p> {
         } else {
             Box::new(std::io::stdin().lock())
         };
-        let h = Value::File(Rc::new(RefCell::new(crate::value::GbFile {
+        let h = Value::File(Rc::new(RefCell::new(crate::value::DhFile {
             path: "<Standardeingabe>".to_string(),
             h: crate::value::FileH::Strom(strom),
             kod,
@@ -1572,7 +1572,7 @@ impl<'p> Vm<'p> {
             for fd in &ci.fields {
                 let value = if !fd.array_dims.is_empty() {
                     let et = fd.type_name.clone();
-                    let arr = GbArray::new(et.clone(), fd.array_dims.clone(), || self.element_default(&et));
+                    let arr = DhArray::new(et.clone(), fd.array_dims.clone(), || self.element_default(&et));
                     Value::Array(Rc::new(RefCell::new(arr)))
                 } else if self.prog.classes.get(&fd.type_name).map(|c| c.is_struct).unwrap_or(false) {
                     self.allocate_instance(&fd.type_name)
@@ -3286,7 +3286,7 @@ impl<'p> Vm<'p> {
                     let ty = l[1].str();
                     if let Some(vt) = ty.strip_prefix("map:") {
                         if !matches!(locals[slot], Value::Map(_)) {
-                            locals[slot] = Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))));
+                            locals[slot] = Value::Map(Rc::new(RefCell::new(DhMap::new(vt.to_string()))));
                         }
                     } else if matches!(locals[slot], Value::Nil) {
                         locals[slot] = if ty.starts_with("array:") { leeres_feld(ty) } else { arg_value(&l[2]) };
@@ -3299,7 +3299,7 @@ impl<'p> Vm<'p> {
                     let name = constants[l[1].as_usize()].fmt();
                     let ty = constants[l[2].as_usize()].fmt();
                     let default = if let Some(vt) = ty.strip_prefix("map:") {
-                        Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))))
+                        Value::Map(Rc::new(RefCell::new(DhMap::new(vt.to_string()))))
                     } else {
                         let d = constants[l[3].as_usize()].clone();
                         // Der Compiler kann Mathe-Werte nicht als Konstante
@@ -3365,7 +3365,7 @@ impl<'p> Vm<'p> {
                     let name = constants[l[0].as_usize()].fmt();
                     let ty = constants[l[1].as_usize()].fmt();
                     let default = if let Some(vt) = ty.strip_prefix("map:") {
-                        Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))))
+                        Value::Map(Rc::new(RefCell::new(DhMap::new(vt.to_string()))))
                     } else if ty.starts_with("array:") {
                         leeres_feld(&ty)
                     } else {
@@ -3632,7 +3632,7 @@ impl<'p> Vm<'p> {
                     let num_dims = l[2].as_usize();
                     let dims = self.pop_dims(stack, num_dims)?;
                     let et = elem_type.clone();
-                    let arr = GbArray::new(elem_type.clone(), dims, || self.element_default(&et));
+                    let arr = DhArray::new(elem_type.clone(), dims, || self.element_default(&et));
                     self.globals.insert(name, Rc::new(RefCell::new(Slot {
                         ty: format!("array:{}", elem_type),
                         value: Value::Array(Rc::new(RefCell::new(arr))),
@@ -3646,7 +3646,7 @@ impl<'p> Vm<'p> {
                     let num_dims = l[2].as_usize();
                     let dims = self.pop_dims(stack, num_dims)?;
                     let et = elem_type.clone();
-                    let arr = GbArray::new(elem_type, dims, || self.element_default(&et));
+                    let arr = DhArray::new(elem_type, dims, || self.element_default(&et));
                     locals[slot] = Value::Array(Rc::new(RefCell::new(arr)));
                 }
 
@@ -3774,14 +3774,14 @@ impl<'p> Vm<'p> {
                 _ => return Err("Array-Groesse muss INTEGER >= 0 sein".into()),
             }
         }
-        // Review-Fund: GbArray::new multipliziert die Dimensionen ungeprueft
+        // Review-Fund: DhArray::new multipliziert die Dimensionen ungeprueft
         // (`acc *= dims[k]`) -- `DIM a[4294967296, 4294967296]` ueberlief den
         // i64-Akkumulator lautlos zu einem kleinen/negativen Wert (eine
         // Groessen-Diskrepanz, die spaeter beim Indexzugriff in einen rohen
         // Index-Out-Of-Bounds-Panic lief), und ein legitimer, aber riesiger
         // Wert wie `DIM a[100000, 100000]` (1e10 Elemente, ~80 GB) fuehrte zu
         // einem harten Allocator-Abort statt eines DH-Fehlers. Hier einmalig
-        // mit checked_mul + einer Obergrenze validieren, BEVOR GbArray::new
+        // mit checked_mul + einer Obergrenze validieren, BEVOR DhArray::new
         // (das selbst keinen Result-Rueckgabewert hat) ueberhaupt aufgerufen wird.
         const MAX_ARRAY_ELEMENTS: i64 = 100_000_000;
         let mut total: i64 = 1;
@@ -4914,7 +4914,7 @@ impl<'p> Vm<'p> {
             "html_find_all" => {
                 let items = html::html_find_all(bi_str(a, 0, "HTML_FIND_ALL")?, bi_str(a, 1, "HTML_FIND_ALL")?);
                 let n = items.len() as i64;
-                let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
                 for (i, s) in items.into_iter().enumerate() { arr.cells.set(i, Value::str_rc(&s)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
@@ -5005,7 +5005,7 @@ impl<'p> Vm<'p> {
                     .map(|e| Value::Tuple(Rc::new(vec![Value::str_rc(&e.name), Value::Float(e.score)])))
                     .collect();
                 let cnt = items.len() as i64;
-                let mut arr = GbArray::new("tuple".to_string(), vec![cnt], || Value::Tuple(Rc::new(vec![])));
+                let mut arr = DhArray::new("tuple".to_string(), vec![cnt], || Value::Tuple(Rc::new(vec![])));
                 for (i, v) in items.into_iter().enumerate() { arr.cells.set(i, v); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
@@ -5762,7 +5762,7 @@ impl<'p> Vm<'p> {
                 let namen: Vec<String> = crate::lsp::vervollstaendigung(text, z, s).into_iter()
                     .filter_map(|e| e["label"].as_str().map(str::to_string)).collect();
                 let n = namen.len() as i64;
-                let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
                 for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
@@ -5784,7 +5784,7 @@ impl<'p> Vm<'p> {
                 let zeilen: Vec<i64> = crate::lsp::fundstellen(text, "", z, s).as_array().map(|v| v.iter()
                     .filter_map(|o| o["range"]["start"]["line"].as_u64().map(|l| l as i64 + 1)).collect()).unwrap_or_default();
                 let n = zeilen.len() as i64;
-                let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));
+                let mut arr = DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
                 for (k, l) in zeilen.into_iter().enumerate() { arr.cells.set(k, Value::Int(l)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
@@ -5829,7 +5829,7 @@ impl<'p> Vm<'p> {
             "printers" => {
                 let namen = crate::drucken::drucker_liste()?;
                 let n = namen.len() as i64;
-                let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
                 for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
@@ -6663,7 +6663,7 @@ impl<'p> Vm<'p> {
             }
             "gui_form_get" => {
                 let form = if a.len() > 1 { gs(a,1,"GUI_FORM_GET")? } else { String::new() };
-                let mut m = GbMap::new("string".to_string());
+                let mut m = DhMap::new("string".to_string());
                 for (k, t) in self.gui.form_get(gi(a,0,"GUI_FORM_GET")?, &form)? { m.put(k, Value::str_rc(&t)); }
                 Value::Map(Rc::new(RefCell::new(m)))
             }
@@ -7529,7 +7529,7 @@ impl<'p> Vm<'p> {
             "gui_textarea_folds" => {
                 let z = self.gui.textarea_folds(gi(a, 0, "GUI_TEXTAREA_FOLDS")?)?;
                 let n = z.len() as i64;
-                let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));
+                let mut arr = DhArray::new("integer".to_string(), vec![n], || Value::Int(0));
                 for (k, l) in z.into_iter().enumerate() { arr.cells.set(k, Value::Int(l)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
@@ -9399,7 +9399,7 @@ impl<'p> Vm<'p> {
                 if !a.is_empty() { return Err("SPEAK_VOICES: erwartet keine Argumente".into()); }
                 let namen = self.sprecher.stimmen()?;
                 let n = namen.len() as i64;
-                let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                let mut arr = DhArray::new("string".to_string(), vec![n], || Value::str_rc(""));
                 for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
@@ -10789,7 +10789,7 @@ fn apply_slice(target: &Value, lo: Option<&Value>, hi: Option<&Value>) -> R<Valu
             let b = to_idx(hi, n)?.min(n).max(0);
             let slice = if a >= b { Cells::Val(vec![]) } else { arr.cells.slice(a as usize, b as usize) };
             let len = slice.len() as i64;
-            let mut new = GbArray::new(arr.element_type.clone(), vec![len], || Value::Nil);
+            let mut new = DhArray::new(arr.element_type.clone(), vec![len], || Value::Nil);
             new.cells = slice;
             Ok(Value::Array(Rc::new(RefCell::new(new))))
         }
@@ -11103,7 +11103,7 @@ fn mul(a: Value, b: Value) -> R<Value> {
 /// (siehe docs/drachenhauch-stolpersteine.md D2). 6 Stellen reichen fuer Volumes weit.
 fn round_audio(f: f64) -> f64 { (f * 1_000_000.0).round() / 1_000_000.0 }
 
-/// Baut aus den Werten eines Array-Literals `[a, b, c]` ein 1D-GbArray.
+/// Baut aus den Werten eines Array-Literals `[a, b, c]` ein 1D-DhArray.
 /// Element-Typ wird aus den Werten hergeleitet (wie ein homogenes DH-Array):
 /// nur Ganzzahlen -> integer; Zahlen mit mind. einem Float -> float (Ints
 /// werden hochgezogen); nur Strings -> string; nur Wahrheitswerte -> boolean;
@@ -11112,13 +11112,13 @@ fn round_audio(f: f64) -> f64 { (f * 1_000_000.0).round() / 1_000_000.0 }
 /// `DIM a AS ARRAY OF T` ohne Groesse.
 fn leeres_feld(ty: &str) -> Value {
     let elem = ty.strip_prefix("array:").unwrap_or("any").to_string();
-    Value::Array(Rc::new(RefCell::new(GbArray::new(elem, vec![0], || Value::Nil))))
+    Value::Array(Rc::new(RefCell::new(DhArray::new(elem, vec![0], || Value::Nil))))
 }
 
 /// `a + b` fuer zwei Felder: ein NEUES Feld mit den Elementen beider
 /// (`a = a + [x]` haengt an). Nur eindimensional; der Elementtyp bleibt,
 /// wenn beide denselben haben, sonst bestimmen ihn die Werte.
-fn felder_verbinden(x: &Rc<RefCell<GbArray>>, y: &Rc<RefCell<GbArray>>) -> R<Value> {
+fn felder_verbinden(x: &Rc<RefCell<DhArray>>, y: &Rc<RefCell<DhArray>>) -> R<Value> {
     let (a, b) = (x.borrow(), y.borrow());
     if a.dims.len() != 1 || b.dims.len() != 1 {
         return Err("'+' verbindet nur eindimensionale Felder".into());
@@ -11140,7 +11140,7 @@ fn felder_verbinden(x: &Rc<RefCell<GbArray>>, y: &Rc<RefCell<GbArray>>) -> R<Val
             }
         };
     if et.is_empty() || et == "any" { return Ok(array_literal(vals)); }
-    let mut neu = GbArray::new(et.clone(), vec![vals.len() as i64], || Value::Nil);
+    let mut neu = DhArray::new(et.clone(), vec![vals.len() as i64], || Value::Nil);
     for (i, v) in vals.into_iter().enumerate() {
         neu.cells.set(i, coerce(v, &et, "Feld verbinden")?);
     }
@@ -11173,7 +11173,7 @@ fn array_literal(vals: Vec<Value>) -> Value {
     } else {
         ("any", Cells::Val(vals))
     };
-    let arr = GbArray { element_type: etype.to_string(), dims: vec![n], strides: vec![1], cells };
+    let arr = DhArray { element_type: etype.to_string(), dims: vec![n], strides: vec![1], cells };
     Value::Array(Rc::new(RefCell::new(arr)))
 }
 
