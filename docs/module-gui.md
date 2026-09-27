@@ -53,7 +53,8 @@ IMPORT "gui"
 | `GUI_PANEL_ADD(panel, wdg)` / `GUI_PANEL_REMOVE` / `GUI_PANEL_SCROLL(panel, y)` / `GUI_PANEL_SCROLL_GET(panel)` | — | ein **Panel, das seine Kinder rollt** (Mausrad, Rollbalken) — siehe [Feinschliff](#feinschliff-schieber-fortschritt-bild-baum-panel-ziehen) |
 | `GUI_DRAGGABLE(wdg, an)` / `GUI_DROP_TARGET(wdg, an)` | — | **Ziehen zwischen Widgets**: Quelle und Ablage |
 | `GUI_DRAGGING()` / `GUI_DROPPED(wdg)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile |
-| `GUI_CURSORS(an)` | — | Cursorformen über Widgets (Vorgabe an): I-Balken über Text, Hand über Knöpfen, Doppelpfeil an Trennern und am Fenstergriff |
+| `GUI_CURSORS(an)` | — | Zeigerformen je nach Stelle im Widget (Vorgabe an): Textstrich über Text, Hand über allem Anklickbaren, Doppelpfeil an Trennern, Spaltenkanten und am Fenstergriff |
+| `GUI_SET_CURSOR(wdg, form$)` / `GUI_GET_CURSOR$(wdg)` | — / STRING | eigene Zeigerform über einem Widget (etwa einer Zeichenfläche); `auto` oder `""` = die gui entscheidet |
 | `GUI_LAYOUT(win, art$, x, y, w, h)` | GUI_WIDGET | unsichtbarer **Layout-Behälter**: `zeile`, `spalte` oder `raster:N` — verteilt seine Kinder in jedem `GUI_UPDATE` (siehe [Layout](#layout-größe-nach-inhalt-und-behälter)) |
 | `GUI_LAYOUT_ADD(layout, wdg[, gewicht])` / `GUI_LAYOUT_SPACER(layout[, gewicht])` / `GUI_LAYOUT_REMOVE(layout, wdg)` | — | Kind anhängen (Gewicht 0 = eigene Größe, ab 1 = Anteil am Restplatz), Leerraum, lösen |
 | `GUI_LAYOUT_SET(layout, key$, wert)` | — | `abstand`, `rand`, `ausrichtung` (0/1/2 quer), `dehnen` (quer, Vorgabe an), `rahmen` (sichtbar zum Entwickeln) |
@@ -2887,12 +2888,28 @@ Die kleinen Dinge, an denen man eine Anwendung von einer Demo unterscheidet
   Beschriftung: ein Klick auf den Text trifft, und ein Layout-Behälter
   reserviert den ganzen Platz. Das Kästchen selbst behält die Größe der
   Metrik `check_size`, wie breit das Rechteck auch ist.
-- **Cursorformen** kommen von selbst: I-Balken über Textfeldern, Hand über
-  Knopf, Kästchen, Radio und Kippschalter (und während eines Zugs),
-  Doppelpfeil an Trennern und am Fenstergriff. Die gui setzt die Form nur bei
-  Wechsel und nimmt nur zurück, was sie selbst gesetzt hat — ein Programm,
-  das `MOUSE_CURSOR` nach `GUI_UPDATE` ruft, gewinnt. `GUI_CURSORS(FALSE)`
-  schaltet es ab.
+- **Zeigerformen** kommen von selbst, und zwar nach der STELLE im Widget,
+  nicht nur nach seiner Art:
+
+  | Wo | Zeiger |
+  |---|---|
+  | Textfeld, Text im Textbereich, bearbeitbare Klappliste (links vom Pfeil), Filterzeile und Zelle in Bearbeitung einer Tabelle, Umbenennen in Liste und Baum, gesetzter Text | Textstrich |
+  | Nummernspalte und Rollbalken des Textbereichs | Pfeil |
+  | Knopf, Kachel, Kästchen, Radio, Kippschalter, Farbfeld im Textbereich, Verweis im gesetzten Text, Kopf einer sortierbaren Tabelle, bedienbarer Knopf der Werkzeugleiste (und ihr »), klickbares Feld der Statusleiste, Teil der Pfadleiste (nicht der letzte) | Hand |
+  | Spaltenkante im Tabellenkopf (auch während des Ziehens), Trenner, Fenstergriff | Doppelpfeil |
+  | Farbfeld und Streifen des Farbwählers | Kreuz |
+  | Ziehen: über einem Ablageziel oder der eigenen Quelle Hand, sonst »verboten« | |
+  | gesperrtes Widget, alles andere | Pfeil |
+
+  Die gui meldet je Bild einen Wunsch, gesetzt wird er beim `FLIP` — nur bei
+  Wechsel. **Die Form des Programms hat Vorrang:** `MOUSE_CURSOR(form$)`
+  bleibt stehen, bis das Programm eine andere nennt, und
+  `MOUSE_CURSOR("auto")` gibt den Zeiger an die gui zurück (bis 2026-09-27
+  setzten beide raylib direkt, und wer seine Form wieder loswerden wollte,
+  musste raten, was die gui dort gezeigt hätte). `GUI_SET_CURSOR(wdg,
+  form$)` gibt einem Widget eine eigene Form — für Zeichenflächen, auf denen
+  das Programm selbst etwas anbietet. `MOUSE_CURSOR_GET$()` sagt, welche
+  Form gilt. `GUI_CURSORS(FALSE)` schaltet die Formen der gui ab.
 
 In der `.dhform`: `vertical`, `indeterminate`, `mode`, `draggable`,
 `drop_target`, `panel` (mit `kinder` als Indizes und `scroll`). Baumsymbole

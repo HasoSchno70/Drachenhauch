@@ -900,6 +900,11 @@ pub struct Graphics {
     /// ESC-Taste, wie es sie gesetzt hat -- auch wenn es die gui benutzt
     /// (`esc_der_gui`).
     esc_ausdruecklich: bool,
+    /// Mauszeiger (M4 Schritt 22): Form des Programms (MOUSE_CURSOR, bleibt
+    /// stehen), Wunsch der gui fuer dieses Bild, und was raylib gerade hat.
+    zeiger_prog: Option<&'static str>,
+    zeiger_gui: Option<&'static str>,
+    zeiger_gesetzt: Option<&'static str>,
     /// SPEAK bei laufendem Bildschirmleser ohne gui: die Ansage fuer den
     /// Baum, den FLIP ohne GUI_UPDATE schickt (wie `Gui::ansage`).
     ansage: String,
@@ -1593,6 +1598,7 @@ impl Graphics {
             rl, thread, width, height, scale,
             a11y, a11y_versorgt: false, sichtbar: !hidden, flips: 0,
             titel: title.to_string(), esc_ausdruecklich: false,
+            zeiger_prog: None, zeiger_gui: None, zeiger_gesetzt: None,
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), shader_textures: HashMap::new(),
@@ -4909,25 +4915,49 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
 
     /// MOUSE_CURSOR(form$): Systemcursor umschalten -- Hand ueber Knoepfen,
     /// Textmarke ueber Eingabefeldern, Groesse-Pfeile an Kanten.
+    /// MOUSE_CURSOR(form$): die Form des PROGRAMMS. Sie bleibt stehen, bis das
+    /// Programm eine andere nennt, und hat Vorrang vor der gui; "auto" (oder
+    /// "") gibt den Zeiger an die gui zurueck. Gesetzt wird erst beim FLIP
+    /// (`zeiger_anwenden`) -- vorher setzten gui und Programm raylib direkt, wer
+    /// zuletzt kam, gewann, und die gui setzte nur beim Wechsel; ein Programm,
+    /// das seine Hand wieder loswerden wollte, musste raten, was die gui dort
+    /// gezeigt haette (M4 Schritt 22).
     pub fn mouse_cursor(&mut self, name: &str) -> Result<(), String> {
+        if matches!(name.trim().to_ascii_lowercase().as_str(), "" | "auto") {
+            self.zeiger_prog = None;
+            return Ok(());
+        }
+        match zeiger_form(name) {
+            Some(f) => { self.zeiger_prog = Some(f); Ok(()) }
+            None => Err(format!(
+                "MOUSE_CURSOR: unbekannte Form '{}' -- erwartet default/ibeam/crosshair/\
+hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed oder auto", name)),
+        }
+    }
+    /// Die Form, die die gui fuer dieses Bild wuenscht (None = Pfeil).
+    pub fn zeiger_gui(&mut self, form: Option<&'static str>) { self.zeiger_gui = form; }
+    /// Die Form, die gilt: die des Programms, sonst die der gui, sonst der Pfeil.
+    pub fn zeiger_jetzt(&self) -> &'static str { self.zeiger_prog.or(self.zeiger_gui).unwrap_or("default") }
+    /// Beim FLIP, EINE Stelle: nur bei Wechsel an raylib -- raylib legt bei
+    /// jedem SetMouseCursor einen neuen Systemzeiger an und gibt ihn nie frei.
+    fn zeiger_anwenden(&mut self) {
         use raylib::consts::MouseCursor::*;
-        let c = match name.to_ascii_lowercase().as_str() {
-            "default" | "arrow" => MOUSE_CURSOR_DEFAULT,
-            "ibeam" | "text" => MOUSE_CURSOR_IBEAM,
-            "crosshair" | "cross" => MOUSE_CURSOR_CROSSHAIR,
-            "hand" | "pointer" => MOUSE_CURSOR_POINTING_HAND,
+        let f = self.zeiger_jetzt();
+        if self.zeiger_gesetzt == Some(f) { return; }
+        let c = match f {
+            "ibeam" => MOUSE_CURSOR_IBEAM,
+            "crosshair" => MOUSE_CURSOR_CROSSHAIR,
+            "hand" => MOUSE_CURSOR_POINTING_HAND,
             "resize_ew" => MOUSE_CURSOR_RESIZE_EW,
             "resize_ns" => MOUSE_CURSOR_RESIZE_NS,
             "resize_nwse" => MOUSE_CURSOR_RESIZE_NWSE,
             "resize_nesw" => MOUSE_CURSOR_RESIZE_NESW,
-            "resize_all" | "move" => MOUSE_CURSOR_RESIZE_ALL,
-            "not_allowed" | "no" => MOUSE_CURSOR_NOT_ALLOWED,
-            other => return Err(format!(
-                "MOUSE_CURSOR: unbekannte Form '{}' -- erwartet default/ibeam/crosshair/\
-hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)),
+            "resize_all" => MOUSE_CURSOR_RESIZE_ALL,
+            "not_allowed" => MOUSE_CURSOR_NOT_ALLOWED,
+            _ => MOUSE_CURSOR_DEFAULT,
         };
         self.rl.set_mouse_cursor(c);
-        Ok(())
+        self.zeiger_gesetzt = Some(f);
     }
 
     /// JOYSTICK_HIT / JOYSTICK_RELEASED: Flanken analog zu JOYSTICK_BUTTON.
@@ -5750,6 +5780,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     }
 
     pub fn flip(&mut self) {
+        self.zeiger_anwenden();
         self.flips += 1;
         // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
         // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.
@@ -7208,4 +7239,23 @@ mod tests {
             assert_eq!(ecken_einzug(0, 10, zeile), 0);
         }
     }
+}
+
+/// Name einer Zeigerform in ihrer Grundform (die Kurznamen und Gross/klein
+/// eingeschlossen), None = unbekannt. EINE Liste fuer MOUSE_CURSOR und
+/// GUI_SET_CURSOR.
+pub fn zeiger_form(name: &str) -> Option<&'static str> {
+    Some(match name.trim().to_ascii_lowercase().as_str() {
+        "default" | "arrow" => "default",
+        "ibeam" | "text" => "ibeam",
+        "crosshair" | "cross" => "crosshair",
+        "hand" | "pointer" => "hand",
+        "resize_ew" => "resize_ew",
+        "resize_ns" => "resize_ns",
+        "resize_nwse" => "resize_nwse",
+        "resize_nesw" => "resize_nesw",
+        "resize_all" | "move" => "resize_all",
+        "not_allowed" | "no" => "not_allowed",
+        _ => return None,
+    })
 }

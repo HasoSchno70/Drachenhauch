@@ -1,0 +1,130 @@
+' Mauszeiger nach der Stelle im Widget (M4 Schritt 22). Die gui meldet je
+' Bild einen Wunsch, gesetzt wird beim FLIP; MOUSE_CURSOR_GET$ liefert, was
+' gilt. Die Maus faehrt per Aufnahme ueber die Flaeche, ausgegeben wird jeder
+' WECHSEL mit der Stelle -- so haengt der Fall nicht an einzelnen Pixeln.
+--- seriell
+
+=== zeiger nach widget und stelle
+IMPORT "gui"
+SCREEN(760, 360, "zeiger")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("", 0, 0, 760, 360)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 10, 10, 150, 24)
+DIM kn AS GUI_WIDGET : kn = GUI_BUTTON(w, "Knopf", 200, 10, 100, 30)
+DIM aus AS GUI_WIDGET : aus = GUI_BUTTON(w, "Aus", 200, 50, 100, 30)
+GUI_SET_ENABLED(aus, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 100, 300, 150)
+GUI_TABLE_HEADERS(tb, ["A", "B"])
+GUI_TABLE_ADD_ROW(tb, ["1", "2"])
+GUI_TABLE_COL_WIDTHS(tb, [100, 150])
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 350, 10, 300, 120)
+GUI_SET_TEXT(ta, "zeile eins" + CHR$(10) + "zeile zwei")
+GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+DIM cp AS GUI_WIDGET : cp = GUI_COLORPICKER(w, 350, 160, 160, 120)
+DIM cv AS GUI_WIDGET : cv = GUI_CANVAS(w, 560, 160, 100, 100)
+GUI_SET_CURSOR(cv, "move")
+' Punkte der Fahrt: Textfeld, Knopf, gesperrter Knopf, leere Flaeche, Kopf
+' der Tabelle quer ueber die Spaltenkante, Tabellenkoerper, Nummernspalte und
+' Text des Textbereichs, Farbwaehler, Zeichenflaeche mit eigener Form.
+DIM px AS ARRAY OF INTEGER : px = [50, 250, 250, 330]
+DIM py AS ARRAY OF INTEGER : py = [20, 25, 65, 300]
+DIM x AS INTEGER
+FOR x = 90 TO 120 STEP 2
+    ARRAY_PUSH(px, x) : ARRAY_PUSH(py, 110)
+NEXT
+ARRAY_PUSH(px, 60) : ARRAY_PUSH(py, 200)
+FOR x = 352 TO 420 STEP 4
+    ARRAY_PUSH(px, x) : ARRAY_PUSH(py, 30)
+NEXT
+ARRAY_PUSH(px, 400) : ARRAY_PUSH(py, 200)
+ARRAY_PUSH(px, 600) : ARRAY_PUSH(py, 200)
+DIM ev AS STRING : ev = "# ev" + CHR$(10) + "c " + STR$(LEN(px)) + CHR$(10)
+DIM k AS INTEGER
+FOR k = 0 TO LEN(px) - 1
+    ev = ev + "e " + STR$(k * 2) + " 7 " + STR$(px[k]) + " " + STR$(py[k]) + " 0" + CHR$(10)
+NEXT
+WRITEALL("ev.txt", ev)
+AUTOMATION_PLAY("ev.txt")
+DIM alt AS STRING : alt = "?"
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED() AND n < LEN(px) * 2 + 10
+    GUI_UPDATE()
+    DIM f AS STRING : f = MOUSE_CURSOR_GET$()
+    IF f <> alt AND n > 0 THEN PRINT MOUSEX(); ","; MOUSEY(); " "; f
+    alt = f
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+    n = n + 1
+WEND
+--- erwartet
+50,20 ibeam
+250,25 hand
+250,65 default
+90,110 hand
+108,110 resize_ew
+116,110 hand
+60,200 default
+384,30 ibeam
+400,200 crosshair
+600,200 resize_all
+
+=== programm hat vorrang und gibt mit auto zurueck
+IMPORT "gui"
+SCREEN(300, 200, "zeiger")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 0, 0, 300, 200)
+WRITEALL("ev.txt", "# ev" + CHR$(10) + "c 1" + CHR$(10) + "e 0 7 100 100 0" + CHR$(10))
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED() AND n < 12
+    IF n = 4 THEN MOUSE_CURSOR("hand")
+    IF n = 8 THEN MOUSE_CURSOR("auto")
+    GUI_UPDATE()
+    IF n = 3 OR n = 6 OR n = 10 THEN PRINT n; " "; MOUSE_CURSOR_GET$()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+    n = n + 1
+WEND
+PRINT GUI_GET_CURSOR$(tf)
+GUI_SET_CURSOR(tf, "move")
+PRINT GUI_GET_CURSOR$(tf)
+GUI_SET_CURSOR(tf, "")
+PRINT GUI_GET_CURSOR$(tf)
+--- erwartet
+3 ibeam
+6 hand
+10 ibeam
+auto
+resize_all
+auto
+
+=== unbekannte form ist ein fehler
+IMPORT "gui"
+SCREEN(100, 100, "zeiger")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("", 0, 0, 100, 100)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 0, 0, 50, 20)
+GUI_SET_CURSOR(b, "quatsch")
+--- fehler
+GUI_SET_CURSOR: unbekannte Form 'quatsch'
+
+=== ohne gui bleibt die form des programms stehen
+SCREEN(100, 100, "zeiger")
+MOUSE_CURSOR("crosshair")
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED() AND n < 3
+    CLS(0)
+    FLIP()
+    n = n + 1
+WEND
+PRINT MOUSE_CURSOR_GET$()
+MOUSE_CURSOR("auto")
+PRINT MOUSE_CURSOR_GET$()
+--- erwartet
+crosshair
+default

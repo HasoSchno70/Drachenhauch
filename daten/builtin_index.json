@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1993,
+ "count": 1996,
  "builtins": [
   {
    "name": "ABS",
@@ -11958,6 +11958,24 @@
    "name": "__SET_DEDUP",
    "kind": "core",
    "signature": "__SET_DEDUP(v)",
+   "module": "core"
+  },
+  {
+   "name": "GUI_GET_CURSOR$",
+   "kind": "core",
+   "signature": "GUI_GET_CURSOR$(wdg) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_CURSOR",
+   "kind": "core",
+   "signature": "GUI_SET_CURSOR(wdg, form$)",
+   "module": "gui"
+  },
+  {
+   "name": "MOUSE_CURSOR_GET$",
+   "kind": "graphics",
+   "signature": "MOUSE_CURSOR_GET$() AS STRING",
    "module": "core"
   }
  ]

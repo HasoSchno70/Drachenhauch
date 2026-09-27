@@ -1710,6 +1710,14 @@ Loeschen mit `shift_remove`. Eine Million Schluessel 214 -> 160 MB, Loeschen
 493 -> 288 ms. Die Laufzeit-Typen heissen `DhMap`/`DhArray`/`DhFile` (vorher
 `Gb*`, von GameBasic).
 
+**Mauszeiger (2026-09-27):** die gui meldet je Bild einen Zeigerwunsch nach
+der STELLE im Widget (`Gui::zeiger_ueber`: Tabellenkante, Nummernspalte,
+Verweis, Farbfeld ...), Graphics setzt beim FLIP (`zeiger_anwenden`, nur bei
+Wechsel). `MOUSE_CURSOR` bleibt stehen und hat Vorrang, `"auto"` gibt an die
+gui zurueck; `GUI_SET_CURSOR(wdg, form$)`, `MOUSE_CURSOR_GET$()`. Neue Stellen
+bekommen ihren Zeiger aus derselben Geometrie wie Treffertest und Zeichnen.
+Tests `tests/pruef/gui_mauszeiger.dhtest`.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
