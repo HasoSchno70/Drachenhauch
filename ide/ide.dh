@@ -961,6 +961,8 @@ GUI_TOOLTIP(tfBaumFilter, "Nur Dateien, deren Name das enthält")
 DIM baumFilterZuletzt AS STRING : baumFilterZuletzt = ""
 DIM lblGliederung AS GUI_WIDGET : lblGliederung = GUI_LABEL(win, "Gliederung", 0, 0)
 DIM lstGliederung AS GUI_WIDGET : lstGliederung = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+' Leer sah sie aus wie ein vergessenes Feld.
+GUI_LISTBOX_PLACEHOLDER(lstGliederung, "Keine Unterprogramme")
 ' Willkommensseite -- sie steht dort, wo sonst die Code-Felder liegen, und
 ' verschwindet mit dem ersten Reiter.
 DIM lblWkTitel AS GUI_WIDGET : lblWkTitel = GUI_LABEL(win, "Drachenhauch", 0, 0)
@@ -1007,7 +1009,14 @@ DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "Ausgabe", 0, 0)
 DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "Probleme", 0, 0)
 DIM lstProbleme AS GUI_WIDGET : lstProbleme = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+GUI_LISTBOX_PLACEHOLDER(lstProbleme, "Keine Probleme gefunden")
+' Unter den Problemen steht die Hilfe zum Wort unter der Schreibmarke. Leer
+' sah der Streifen wie ein Lagefehler aus -- darum ein eigener Kopf und ein
+' Hinweis, solange es nichts zu sagen gibt.
+DIM lblHilfeKopf AS GUI_WIDGET : lblHilfeKopf = GUI_LABEL(win, "Hilfe zum Wort unter der Schreibmarke", 0, 0)
 DIM lblHilfe AS GUI_WIDGET : lblHilfe = GUI_LABEL(win, "", 0, 0)
+CONST HILFE_LEER = "Schreibmarke auf einen Befehl oder Namen stellen -- hier steht dann, was er tut und wie er aufgerufen wird."
+GUI_SET_TEXT(lblHilfe, HILFE_LEER)
 ' Statusleiste mit Feldern (seit Stand 28): links die Meldung, rechts die
 ' Stelle der Marke und der Umbruch -- beide anklickbar. Bis dahin schrieb
 ' die IDE alles in EINE Beschriftung, und jeder Pfeil ueberschrieb die
@@ -1175,6 +1184,7 @@ DIM hbVorScroll AS ARRAY OF INTEGER : hbVorScroll = []
 DIM hbInhaltWahl AS INTEGER : hbInhaltWahl = -1   ' was die Liste zuletzt zeigte
 DIM hbInhaltHalt AS INTEGER : hbInhaltHalt = -1   ' Rollstand nach einem Klick; -2 = noch zu lesen
 DIM hbMassStand AS STRING : hbMassStand = ""
+DIM stoppFrist AS FLOAT : stoppFrist = 0
 DIM hbGesetzt AS BOOLEAN : hbGesetzt = TRUE
 GUI_TEXTAREA_SET(taHandbuch, "umbruch", 1)
 GUI_WINDOW_VISIBLE(winHandbuch, FALSE)
@@ -1184,7 +1194,7 @@ GUI_WINDOW_CLOSABLE(winProfil, TRUE)
 ' Alle Schalter an EINER Stelle. Sie stehen weiter auch im Menue -- wer
 ' den Umbruch sucht, sucht ihn unter Ansicht; wer alles auf einmal sehen
 ' will, oeffnet dies hier.
-DIM winEinst AS GUI_WINDOW : winEinst = GUI_WINDOW("Einstellungen", 400, 150, 720, 530)
+DIM winEinst AS GUI_WINDOW : winEinst = GUI_WINDOW("Einstellungen", 400, 150, 820, 530)
 GUI_WINDOW_VISIBLE(winEinst, FALSE)
 DIM cbHell AS GUI_WIDGET : cbHell = GUI_CHECKBOX(winEinst, "Helles Thema", 16, 14, FALSE)
 DIM cbUmbruch AS GUI_WIDGET : cbUmbruch = GUI_CHECKBOX(winEinst, "Zeilenumbruch", 16, 44, FALSE)
@@ -1764,7 +1774,7 @@ SUB debugPanelZeigen(an AS BOOLEAN)
     ' `debugSichtbar` merkt sich trotzdem, welches dran waere.
     DIM p AS BOOLEAN : p = (NOT an) AND untenAn
     DIM d AS BOOLEAN : d = an AND untenAn
-    GUI_SET_VISIBLE(lblProbleme, p) : GUI_SET_VISIBLE(lstProbleme, p) : GUI_SET_VISIBLE(lblHilfe, p)
+    GUI_SET_VISIBLE(lblProbleme, p) : GUI_SET_VISIBLE(lstProbleme, p) : GUI_SET_VISIBLE(lblHilfe, p) : GUI_SET_VISIBLE(lblHilfeKopf, p)
     GUI_SET_VISIBLE(lblDebug, d) : GUI_SET_VISIBLE(tblVars, d)
     GUI_SET_VISIBLE(btnWeiter, d) : GUI_SET_VISIBLE(btnDrueber, d) : GUI_SET_VISIBLE(btnHinein, d)
     GUI_SET_VISIBLE(btnHeraus, d) : GUI_SET_VISIBLE(btnStoppD, d)
@@ -1814,8 +1824,12 @@ SUB layout()
     GUI_SET_VISIBLE(lblProjekt, seitenAn) : GUI_SET_VISIBLE(baum, seitenAn)
     GUI_SET_VISIBLE(tfBaumFilter, seitenAn)
     GUI_SET_VISIBLE(lblGliederung, seitenAn) : GUI_SET_VISIBLE(lstGliederung, seitenAn)
-    GUI_SET_BOUNDS(lblProjekt, 8, oben, (breiteLinks - 16) \ 2 - 4, 18)
-    GUI_SET_BOUNDS(tfBaumFilter, 8 + (breiteLinks - 16) \ 2, oben - 2, (breiteLinks - 16) \ 2, 22)
+    ' Der Projektname nimmt sich, was er braucht (hoechstens die Haelfte),
+    ' das Filterfeld den Rest -- mit fester Haelfte war es bei der groesseren
+    ' Schrift so schmal, dass "Filter ..." nicht mehr hineinpasste.
+    DIM projB AS INTEGER : projB = MIN((breiteLinks - 16) \ 2 - 4, TEXT_WIDTH(GUI_TEXT(lblProjekt)) + 8)
+    GUI_SET_BOUNDS(lblProjekt, 8, oben, projB, 18)
+    GUI_SET_BOUNDS(tfBaumFilter, 12 + projB, oben - 2, breiteLinks - 20 - projB, 24)
     GUI_SET_BOUNDS(baum, 8, oben + 22, breiteLinks - 16, baumH)
     GUI_SET_BOUNDS(lblGliederung, 8, oben + 30 + baumH, breiteLinks - 16, 18)
     GUI_SET_BOUNDS(lstGliederung, 8, oben + 52 + baumH, breiteLinks - 16, mitteH - baumH - 52)
@@ -1918,8 +1932,9 @@ SUB layout()
     GUI_SET_BOUNDS(lstAusgabe, 8, uy + 20, halb, hoeheUnten - 20)
     GUI_SET_BOUNDS(lblProbleme, 16 + halb, uy, halb, 18)
     GUI_SET_BOUNDS(lstProbleme, 16 + halb, uy + 20, halb, (hoeheUnten - 20) \ 2 - 4)
-    GUI_SET_BOUNDS(lblHilfe, 16 + halb, uy + 20 + (hoeheUnten - 20) \ 2, halb, (hoeheUnten - 20) \ 2)
-    GUI_SET_WRAP(lblHilfe, halb - 8)
+    GUI_SET_BOUNDS(lblHilfeKopf, 16 + halb, uy + 20 + (hoeheUnten - 20) \ 2, halb, 18)
+    GUI_SET_BOUNDS(lblHilfe, 24 + halb, uy + 42 + (hoeheUnten - 20) \ 2, halb - 8, (hoeheUnten - 20) \ 2 - 22)
+    GUI_SET_WRAP(lblHilfe, halb - 16)
     ' Debugger-Panel auf derselben Flaeche
     GUI_SET_BOUNDS(lblDebug, 16 + halb, uy, halb, 18)
     GUI_SET_BOUNDS(btnWeiter, 16 + halb, uy + 20, 100, 26)
@@ -2240,7 +2255,7 @@ SUB einstellungenZeigen()
     GUI_SET_VALUE(spHbGr, handbuchGroesse)
     GUI_SET_VALUE(spAuto, autoSichern)
     ' Die linke Kante bleibt, wo sie war: die zweite Spalte waechst nach rechts.
-    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 720, 530)
+    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 820, 530)
     GUI_WINDOW_VISIBLE(winEinst, TRUE)
     einstOffen = TRUE
     GUI_FOCUS(cbHell)
@@ -4580,6 +4595,7 @@ SUB hilfeNachziehen()
     md = REPLACE$(md, "```drachenhauch" + NL, "")
     md = REPLACE$(md, NL + "```", "")
     md = REPLACE$(md, "```", "")
+    IF TRIM$(md) = "" THEN md = HILFE_LEER
     GUI_SET_TEXT(lblHilfe, md)
 END SUB
 
@@ -8468,9 +8484,18 @@ END SUB
 
 SUB stoppen()
     IF prozess < 0 THEN RETURN
-    IF prozessArt = "debug" AND debugPause THEN debugSenden("stop")
-    PROCESS_KILL(prozess)
     fertigNachStopp = TRUE
+    ' Ein stehender Debugger bekommt "stop" und beendet sich selbst -- er
+    ' meldet dabei noch sein `finished`. Bis 2026-09-27 wurde er im selben
+    ' Augenblick abgeschossen, und ob das `finished` noch herauskam, war
+    ' Glueckssache (der Neustart-Test wackelte daran). Laeuft er nach einer
+    ' Sekunde noch, wird er doch beendet (prozessNachsehen).
+    IF prozessArt = "debug" AND debugPause THEN
+        debugSenden("stop")
+        stoppFrist = GET_TIME() + 1.0
+        RETURN
+    END IF
+    PROCESS_KILL(prozess)
 END SUB
 
 ' --- Debugger: Client von `dhrt debug` (JSON-Zeilen: stdin Kommandos,
@@ -9186,11 +9211,31 @@ END SUB
 
 SUB prozessNachsehen()
     IF prozess < 0 THEN RETURN
+    IF stoppFrist > 0 AND GET_TIME() > stoppFrist THEN
+        stoppFrist = 0
+        IF PROCESS_RUNNING(prozess) THEN PROCESS_KILL(prozess)
+    END IF
     stdoutVerteilen(PROCESS_READ$(prozess))
     DIM err AS STRING : err = PROCESS_ERR$(prozess)
     IF err <> "" THEN ausgabeVerteilen(err)
     IF NOT PROCESS_RUNNING(prozess) THEN
-        stdoutVerteilen(PROCESS_READ$(prozess))
+        ' Das Kind kann schon beendet sein, bevor sein Lesefaden die letzte
+        ' Zeile abgelegt hat -- beim Debugger ist das oft das `finished`.
+        ' Einmal lesen liess es dann fallen (der Neustart-Test wackelte so);
+        ' gelesen wird, bis fuenf Abfragen hintereinander leer sind.
+        DIM leerIn AS INTEGER : leerIn = 0
+        WHILE leerIn < 5
+            DIM restA AS STRING : restA = PROCESS_READ$(prozess)
+            DIM restE AS STRING : restE = PROCESS_ERR$(prozess)
+            IF restE <> "" THEN ausgabeVerteilen(restE)
+            IF restA = "" AND restE = "" THEN
+                leerIn = leerIn + 1
+                SLEEP(10)
+            ELSE
+                IF restA <> "" THEN stdoutVerteilen(restA)
+                leerIn = 0
+            END IF
+        WEND
         IF prozessRest <> "" THEN stdoutVerteilen(NL)
         IF ausgabeRest <> "" THEN ausgabe(ausgabeRest) : ausgabeRest = ""
         DIM code AS INTEGER : code = PROCESS_CODE(prozess)
@@ -9208,6 +9253,7 @@ SUB prozessNachsehen()
             protokoll("beendet " + STR$(code))
         END IF
         fertigNachStopp = FALSE
+        stoppFrist = 0
         prozessArt = ""
         IF neustartArt <> "" THEN neustartAusfuehren()
     END IF

@@ -1,0 +1,50 @@
+' Feinschliff der IDE (2026-09-27): die Hilfe unter den Problemen hat einen
+' Kopf und einen Hinweis statt einer leeren Flaeche, die Gliederung sagt,
+' wenn es nichts zu gliedern gibt, das Filterfeld ueber dem Baum bekommt den
+' Platz, den der Projektname nicht braucht, und im Einstellungsfenster passt
+' jedes Kaestchen samt Beschriftung hinein.
+
+=== leere flaechen sagen etwas und alles passt
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 5 THEN
+    protokoll("pr hilfe " + STR$(GUI_TEXT(lblHilfe) = HILFE_LEER) + " kopf " + STR$(GUI_VISIBLE(lblHilfeKopf)))
+    protokoll("pr gliederung " + STR$(GUI_LISTBOX_COUNT(lstGliederung)))
+    protokoll("pr filter breit " + STR$(GUI_GET_W(tfBaumFilter) > (breiteLinks - 16) \ 2))
+    protokoll("pr filter im rand " + STR$(GUI_GET_X(tfBaumFilter) + GUI_GET_W(tfBaumFilter) <= breiteLinks - 8))
+    einstellungenZeigen()
+END IF
+IF prBild = 10 THEN
+    DIM prRechts AS INTEGER : prRechts = 0
+    DIM prI AS INTEGER
+    FOR prI = 0 TO GUI_WINDOW_WIDGET_COUNT(winEinst) - 1
+        DIM prW AS GUI_WIDGET : prW = GUI_WINDOW_WIDGET(winEinst, prI)
+        prRechts = MAX(prRechts, GUI_GET_X(prW) + GUI_GET_W(prW))
+    NEXT
+    protokoll("pr einstellungen passen " + STR$(prRechts <= GUI_WINDOW_GET_W(winEinst) - 8))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+x = 1
+PRINT x
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr hilfe TRUE kopf TRUE
+pr gliederung 0
+pr filter breit TRUE
+pr filter im rand TRUE
+pr einstellungen passen TRUE
