@@ -8099,30 +8099,36 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let luecke = self.sk(14);
         let x0 = x0 + self.sk(6);
         let innen = innen - self.sk(12);
-        let mut breiten = vec![0i32; spalten];
-        for z in roh {
-            for (c, zelle) in z.iter().enumerate() {
-                let roh_text = zelle.replace("**", "").replace('`', "");
-                breiten[c] = breiten[c].max(breite_von(&roh_text, basis, false, 0).min(innen / 2));
-            }
-        }
-        // Unter das BREITESTE WORT darf keine Spalte gestaucht werden -- ein
-        // Wort bricht nicht um, es liefe sonst in die Nachbarspalte hinein
-        // und klebte an deren Text (im Bild zuerst gesehen:
-        // "GUI_WIDGETsetzt Markdown").
+        // Breiten wie bei HTML-Tabellen: jede Spalte hat ein MINDESTmass (ihr
+        // laengstes Wort -- ein Wort bricht nicht um, es liefe sonst in die
+        // Nachbarspalte) und ein WUNSCHmass (die laengste Zelle ohne Umbruch).
+        // Passt alles, bekommt jede ihren Wunsch; sonst ihr Minimum plus einen
+        // Anteil am Rest nach dem, was ihr zum Wunsch fehlt. Bis 2026-09-27
+        // bekam jede Spalte bis zur HALBEN Breite -- eine Signaturspalte nahm
+        // dann die Haelfte, und die Beschreibung daneben brach nach drei
+        // Woertern um.
+        let mut wunsch = vec![0i32; spalten];
         let mut mindest = vec![self.sk(24); spalten];
         for z in roh {
             for (c, zelle) in z.iter().enumerate() {
-                for wort in zelle.replace("**", "").replace('`', "").split(' ') {
+                let roh_text = zelle.replace("**", "").replace('`', "");
+                wunsch[c] = wunsch[c].max(breite_von(&roh_text, basis, false, 0));
+                for wort in roh_text.split(' ') {
                     mindest[c] = mindest[c].max(breite_von(wort, basis, false, 0).min(innen / 3));
                 }
             }
         }
-        let summe: i32 = breiten.iter().sum::<i32>() + luecke * (spalten as i32 - 1);
-        if summe > innen && summe > 0 {
-            let f = innen as f64 / summe as f64;
-            for (c, b) in breiten.iter_mut().enumerate() { *b = ((*b as f64 * f) as i32).max(mindest[c]); }
-        }
+        for c in 0..spalten { wunsch[c] = wunsch[c].max(mindest[c]); }
+        let platz = innen - luecke * (spalten as i32 - 1);
+        let (s_min, s_wunsch): (i32, i32) = (mindest.iter().sum(), wunsch.iter().sum());
+        let breiten: Vec<i32> = if s_wunsch <= platz {
+            wunsch.clone()
+        } else if s_min >= platz || s_wunsch == s_min {
+            mindest.clone()
+        } else {
+            let f = (platz - s_min) as f64 / (s_wunsch - s_min) as f64;
+            (0..spalten).map(|c| mindest[c] + ((wunsch[c] - mindest[c]) as f64 * f) as i32).collect()
+        };
         let rechts = x0 + breiten.iter().sum::<i32>() + luecke * (spalten as i32 - 1);
         let mut y = y0 + self.sk(8);
         for (ri, z) in roh.iter().enumerate() {

@@ -219,3 +219,29 @@ DHRT_FRAMES=2
 --- erwartet
 gross 3
 vorgabe TRUE
+
+=== eine lange beschreibung bekommt die breite der tabelle
+' Bis 2026-09-27 bekam jede Spalte bis zur halben Breite -- eine
+' Signaturspalte nahm sich ihre ganze Laenge, und die Beschreibung daneben
+' brach in einem schmalen Streifen um. Jetzt bekommt die Signatur ihr
+' Minimum plus einen Anteil, und die Beschreibung ist kaum hoeher als
+' derselbe Text als schlichter Absatz in zwei Dritteln der Breite
+' (mit der alten Regel war sie fast doppelt so hoch).
+IMPORT "gui"
+SCREEN(700, 500, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 700, 500)
+DIM lang AS STRING : lang = ""
+DIM i AS INTEGER
+FOR i = 1 TO 40
+    lang = lang + "Wort" + STR$(i) + " "
+NEXT
+DIM tab AS GUI_WIDGET : tab = GUI_RICHTEXT(w, 0, 0, 500, 400, "| Befehl | Zweck |" + NL + "|---|---|" + NL + "| F(a, b, c, d, e, f, g, h) | " + lang + "|" + NL)
+DIM abs AS GUI_WIDGET : abs = GUI_RICHTEXT(w, 0, 0, 330, 400, lang)
+GUI_UPDATE()
+PRINT GUI_RICHTEXT_HEIGHT(tab) <= GUI_RICHTEXT_HEIGHT(abs) + 40
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE

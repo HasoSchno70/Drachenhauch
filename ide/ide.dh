@@ -1138,7 +1138,7 @@ DIM hpListeStand AS STRING : hpListeStand = "-"
 ' `handbuchLayout`, das Fenster waechst mit dem Schirm.
 CONST HB_X = 120
 CONST HB_Y = 50
-CONST HB_INHALT_B = 250
+CONST HB_INHALT_B = 290
 DIM winHandbuch AS GUI_WINDOW : winHandbuch = GUI_WINDOW("Handbuch", HB_X, HB_Y, 1180, 780)
 GUI_WINDOW_CLOSABLE(winHandbuch, TRUE)
 GUI_WINDOW_RESIZABLE(winHandbuch, TRUE)
@@ -1965,7 +1965,7 @@ END SUB
 ' hellen Thema etwas kraeftiger, dort verschluckt der Grund mehr.
 SUB wasserzeichenSetzen(ta AS GUI_WIDGET)
     IF wasserzeichenAn AND hgBild >= 0 THEN
-        GUI_TEXTAREA_BACKGROUND(ta, hgBild, IIF(hell, 34, 22))
+        GUI_TEXTAREA_BACKGROUND(ta, hgBild, IIF(hell, 24, 22))
     ELSE
         GUI_TEXTAREA_BACKGROUND(ta, -1)
     END IF
@@ -9384,6 +9384,8 @@ SUB hbInhaltFuellen()
     GUI_LISTBOX_SET_SELECTED(lstHbInhalt, -1)
     FOR i = 0 TO LEN(titel) - 1
         IF ebene[i] = 1 THEN GUI_LISTBOX_COLOR(lstHbInhalt, i, GUI_THEME_GET("accent"))
+        ' Lange Titel passen nicht in die Spalte -- der ganze steht im Tooltip.
+        GUI_LISTBOX_TIP(lstHbInhalt, i, titel[i])
     NEXT
     hbInhaltWahl = -1
     hbInhaltHalt = -1
