@@ -117,3 +117,50 @@ PRINT "sum=" + STR$(total)
 ausgabe TRUE
 zeit TRUE angehalten FALSE
 zeile 3 1001 zeile 4 1000
+
+=== mit import zaehlen die zeilen der datei samt ihrem namen
+' Bis 2026-09-27 zaehlte `dhrt profile` die Zeilen der zusammengefuegten
+' Quelle: nach einem IMPORT stand jede Zeile der Hauptdatei um die Laenge
+' der importierten verschoben, und die Zeilen der importierten Datei galten
+' als Zeilen der Hauptdatei.
+IMPORT "json"
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "profile", "p.dh")
+DIM r AS STRING : r = ""
+DIM stille AS INTEGER : stille = 0
+DIM bis AS INTEGER : bis = MILLIS() + 60000
+WHILE MILLIS() < bis AND stille < 5
+    DIM zz AS STRING : zz = PROCESS_READ$(pc)
+    IF zz <> "" THEN
+        stille = 0
+        IF LEFT$(TRIM$(zz), 1) = "{" THEN r = TRIM$(zz)
+    END IF
+    IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+WEND
+DIM j AS JSON_HANDLE : j = JSON_PARSE(r)
+DIM i AS INTEGER
+DIM zeilen AS ARRAY OF STRING : zeilen = []
+FOR i = 0 TO JSON_LEN(j, "lines") - 1
+    DIM p AS STRING : p = "lines." + STR$(i)
+    ARRAY_PUSH(zeilen, BASENAME(REPLACE$(JSON_GET_STRING(j, p + ".file"), CHR$(92), "/")) + ":" + STR$(JSON_GET_INT(j, p + ".line")))
+NEXT
+SORT(zeilen)
+PRINT JOIN$(zeilen, " ")
+PRINT BASENAME(REPLACE$(JSON_GET_STRING(j, "error_file"), CHR$(92), "/")); ":"; JSON_GET_INT(j, "error_line")
+--- datei p.dh
+IMPORT "helfer.dh"
+DIM x AS INTEGER
+x = 1
+hallo()
+kaputt()
+--- datei helfer.dh
+' eine Hilfe
+SUB hallo()
+    PRINT "hallo"
+END SUB
+SUB kaputt()
+    DIM a[2] AS INTEGER
+    a[5] = 1
+END SUB
+--- erwartet
+helfer.dh:3 helfer.dh:6 helfer.dh:7 p.dh:2 p.dh:3 p.dh:4 p.dh:5
+helfer.dh:7
