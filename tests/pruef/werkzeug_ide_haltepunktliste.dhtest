@@ -1,0 +1,108 @@
+' Die Haltepunkt-Liste (Strg+Umschalt+F9) und Werte beim Ueberfahren
+' (ide/ide.dh, 2026-09-27). Getrieben ueber die Unterprogramme der IDE.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+--- langsam
+=== ein abgeschalteter haltepunkt haelt nicht und bleibt gemerkt
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 10 AND NOT FILEEXISTS("zweiter.txt") THEN
+    haltepunktUmschaltenIn(tabPfade[aktiverTab], 2)
+    haltepunktUmschaltenIn(tabPfade[aktiverTab], 4)
+    befehl("hp_liste")
+END IF
+IF prBild = 15 AND NOT FILEEXISTS("zweiter.txt") THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO GUI_LISTBOX_COUNT(lstHp) - 1
+        protokoll("probe eintrag " + GUI_LISTBOX_ITEM(lstHp, prI) + " | " + STR$(GUI_LISTBOX_CHECKED(lstHp, prI)))
+    NEXT
+    GUI_LISTBOX_SET_CHECKED(lstHp, 0, FALSE)
+END IF
+IF prBild = 30 AND NOT FILEEXISTS("zweiter.txt") THEN befehl("debug")
+IF prBild = 150 AND debugPause THEN befehl("weiter_d")
+IF prBild = 200 AND NOT FILEEXISTS("zweiter.txt") THEN
+    WRITEALL("zweiter.txt", "ja")
+    konfigSichern()
+    EXIT(0)
+END IF
+IF prBild = 20 AND FILEEXISTS("zweiter.txt") THEN
+    FOR prI = 0 TO LEN(hpZeilen) - 1
+        protokoll("probe gemerkt " + STR$(hpZeilen[prI]) + " " + STR$(hpIstAktiv(prI)))
+    NEXT
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM x AS INTEGER
+x = 1
+x = 2
+x = 3
+PRINT x
+--- nochmal
+spiel.dh
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 11) = "debug pause" OR INSTR(L[i], "geschaltet") >= 0 THEN PRINT L[i]
+NEXT
+--- erwartet
+probe eintrag spiel.dh:2 | TRUE
+probe eintrag spiel.dh:4 | TRUE
+haltepunkt 2 ausgeschaltet
+debug pause 4
+probe gemerkt 2 FALSE
+probe gemerkt 4 TRUE
+
+=== im halt zeigt das ueberfahren den wert samt mitgliedskette
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 10 THEN
+    protokoll("probe kette " + ausdruckBeiWort$("    s = held.hp + held.name", "hp", 14) + " / " + ausdruckBeiWort$("x = a.b.c", "c", 9) + " / " + ausdruckBeiWort$("f(x).y", "y", 6))
+    haltepunktUmschaltenIn(tabPfade[aktiverTab], 8)
+    befehl("debug")
+END IF
+IF prBild = 150 AND debugPause THEN
+    protokoll("probe moeglich " + STR$(debugWertMoeglich()))
+    debugWertFragen(tabFelder[aktiverTab], "held.hp", "")
+END IF
+IF prBild = 190 THEN protokoll("probe tooltip " + STR$(tippFeld = tabFelder[aktiverTab]))
+IF prBild = 200 AND debugPause THEN befehl("stopp")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=240
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+CLASS Held
+    DIM hp AS INTEGER
+    DIM name AS STRING
+END CLASS
+DIM held AS Held
+held = NEW Held()
+held.hp = 7
+PRINT held.hp
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 5) = "wert " THEN PRINT L[i]
+NEXT
+--- erwartet
+probe kette held.hp / a.b.c / y
+probe moeglich TRUE
+wert held.hp = 7
+probe tooltip TRUE
