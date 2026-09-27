@@ -219,10 +219,12 @@ PRINT summe
 
 --- erwartet
 paused 1
+breakpoints
 watches
 paused 4
 set-result
 paused 4
+breakpoints
 paused 11
 finished
 doppelt:4 __main__:9
@@ -261,3 +263,246 @@ fehler set: 'gibtsnicht' nicht gefunden
 fehler x: Erwartet INTEGER, erhalten STRING
 gesetzt x 21
 ausgabe 21
+
+=== mit import halten zeilen und haltepunkte in der richtigen datei
+' Bis 2026-09-27 zaehlte der Debugger Zeilen der GEMERGTEN Quelle: mit
+' einem IMPORT am Anfang hielt er "in Zeile 7" statt 3, und ein Haltepunkt
+' in Zeile 4 traf nie. Jetzt spricht er (Datei, Zeile); ein Haltepunkt auf
+' dem SUB-Kopf rutscht in die erste Zeile mit Code.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+' Schraegstriche: ein Rueckstrich waere im JSON ein Escape.
+DIM haupt AS STRING : haupt = REPLACE$(CWD$(), CHR$(92), "/") + "/p.dh"
+DIM helfer AS STRING : helfer = REPLACE$(CWD$(), CHR$(92), "/") + "/helfer.dh"
+sitzung("p.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "breakpoints" + q + ":[{" _
+    + q + "file" + q + ":" + q + haupt + q + "," + q + "line" + q + ":4},{" _
+    + q + "file" + q + ":" + q + helfer + q + "," + q + "line" + q + ":2}]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN PRINT "halt "; BASENAME(feld$(i, "file")); ":"; feld$(i, "line"); "  "; feld$(i, "stack.0.name"); " "; BASENAME(feld$(i, "stack.1.file")); ":"; feld$(i, "stack.1.line")
+    IF art$(i) = "breakpoints" THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO 1
+            PRINT "hp "; BASENAME(feld$(i, "breakpoints." + STR$(k) + ".file")); ":"; feld$(i, "breakpoints." + STR$(k) + ".line"); " -> "; feld$(i, "breakpoints." + STR$(k) + ".actual")
+        NEXT
+    END IF
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei p.dh
+IMPORT "helfer.dh"
+DIM x AS INTEGER
+x = 1
+x = 2
+hallo()
+PRINT x
+
+--- datei helfer.dh
+' eine Hilfe
+SUB hallo()
+    PRINT "hallo"
+END SUB
+
+--- erwartet
+halt p.dh:2  __main__ :
+hp p.dh:4 -> 4
+hp helfer.dh:2 -> 3
+halt p.dh:4  __main__ :
+halt helfer.dh:3  hallo p.dh:5
+ende done
+
+=== haltepunkt ohne code rutscht nach unten oder haelt nie
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[2,4,99]}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "breakpoints" THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO 2
+            DIM p AS STRING : p = "breakpoints." + STR$(k)
+            PRINT feld$(i, p + ".line"); " -> "; feld$(i, p + ".actual"); " "; JSON_GET_BOOL(JSON_PARSE(ereignisse[i]), p + ".verified")
+        NEXT
+    END IF
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+' ein Kommentar
+
+x = 5
+PRINT x
+
+--- erwartet
+2 -> 4 TRUE
+4 -> 4 TRUE
+99 -> 0 FALSE
+
+=== waehrend des laufens gesetzt haelt sofort
+' Mit "now" gilt ein set-breakpoints auch waehrend das Programm laeuft --
+' vorher las der Debugger nur im Halt, und ein Programm, das nie hielt, sah
+' einen neuen Haltepunkt nie.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("lang.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "now" + q + ":true," + q + "lines" + q + ":[4]}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN PRINT "halt "; feld$(i, "line")
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei lang.dh
+DIM i AS INTEGER
+FOR i = 1 TO 200
+    SLEEP(5)
+    i = i
+NEXT
+PRINT "durch"
+
+--- erwartet
+halt 1
+halt 4
+ende stopped
+
+=== ohne now gilt ein vorab geschicktes set-breakpoints dem naechsten halt
+' Die Gegenprobe: dasselbe ohne "now" -- ein Skript, das alles vorab
+' schickt, meint den Halt nach dem continue, und es gibt keinen.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("lang.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[4]}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN PRINT "halt "; feld$(i, "line")
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei lang.dh
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    SLEEP(1)
+    i = i
+NEXT
+PRINT "durch"
+
+--- erwartet
+halt 1
+ende done
+
+=== pause haelt ein laufendes programm an
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("lang.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "pause" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN n = n + 1
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+PRINT "halte "; n
+PRINT INSTR(ausgaben$(), "durch") < 0
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei lang.dh
+DIM i AS INTEGER
+FOR i = 1 TO 200
+    SLEEP(5)
+    i = i
+NEXT
+PRINT "durch"
+
+--- erwartet
+ende stopped
+halte 2
+TRUE
+
+=== input wartet auf die eingabe des debuggers
+' Bis 2026-09-27 bekam INPUT unter dem Debugger immer "".
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("ein.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "input" + q + "," + q + "text" + q + ":" + q + "21" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "input" THEN PRINT "eingabe in "; feld$(i, "line")
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+PRINT TRIM$(ausgaben$())
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei ein.dh
+DIM n AS INTEGER
+INPUT "Zahl"; n
+PRINT n * 2
+
+--- erwartet
+eingabe in 2
+ende done
+Zahl? 42
+
+=== ein fehler in einer importierten datei nennt sie
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("p.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM e AS INTEGER : e = ersteMit("error", 0)
+PRINT BASENAME(feld$(e, "file")); ":"; feld$(e, "line")
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei p.dh
+IMPORT "kaputt.dh"
+PRINT "los"
+kaputt()
+
+--- datei kaputt.dh
+SUB kaputt()
+    DIM a[2] AS INTEGER
+    a[5] = 1
+END SUB
+
+--- erwartet
+kaputt.dh:3
+
+=== bis zur zeile ohne haltestelle sagt es und bleibt stehen
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "run-to" + q + "," + q + "line" + q + ":50}", _
+    "{" + q + "cmd" + q + ":" + q + "run-to" + q + "," + q + "line" + q + ":2}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) <> "output" THEN PRINT TRIM$(art$(i) + " " + feld$(i, "line"))
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+' Kommentar
+x = 5
+PRINT x
+
+--- erwartet
+paused 1
+run-to-error 50
+paused 3
+finished

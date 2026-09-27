@@ -295,6 +295,11 @@ pub struct Herkunft {
     pub datei: String,
     /// Zeile INNERHALB dieser Datei, 1-basiert.
     pub zeile: u32,
+    /// Kanonischer Pfad der Datei ("" = die Hauptdatei). `datei` ist, wie es
+    /// im IMPORT stand -- bei einem IMPORT aus einer importierten Datei oder
+    /// aus einem Bibliothekspfad sagt das nicht, WELCHE Datei gemeint ist;
+    /// der Debugger braucht es, um einen Haltepunkt der Datei zuzuordnen.
+    pub pfad: String,
 }
 
 /// Die Herkunft einer gemergten Zeile (1-basiert) als `datei:zeile`.
@@ -339,7 +344,7 @@ pub fn process(source: &str, base: &Path)
     let mut imports: Vec<(String, Option<String>)> = Vec::new();
     let mut herkunft: Vec<Herkunft> = Vec::new();
     let mut namensraeume: Vec<(String, String)> = Vec::new();
-    process_inner(ohne_bom(source), base, "", &mut seen, &mut out, &mut imports,
+    process_inner(ohne_bom(source), base, "", "", &mut seen, &mut out, &mut imports,
                   &mut herkunft, &mut namensraeume)?;
     Ok((out.join("\n"), imports, herkunft, namensraeume))
 }
@@ -348,6 +353,7 @@ fn process_inner(
     source: &str,
     base: &Path,
     datei: &str,
+    pfad: &str,
     seen: &mut HashSet<PathBuf>,
     out: &mut Vec<String>,
     imports: &mut Vec<(String, Option<String>)>,
@@ -364,7 +370,7 @@ fn process_inner(
             Some(c) => c,
             None => {
                 out.push(raw.to_string());
-                herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
+                herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32, pfad: pfad.to_string() });
                 continue;
             }
         };
@@ -398,7 +404,7 @@ fn process_inner(
 
         if exists && seen.contains(&canon) {
             out.push(format!("' [IMPORT bereits inkludiert: {}]", rel));
-            herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
+            herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32, pfad: pfad.to_string() });
             continue;
         }
 
@@ -411,7 +417,7 @@ fn process_inner(
                     None => String::new(),
                 };
                 out.push(format!("' === IMPORT MODULE {}{} ===", rel, tag));
-                herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
+                herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32, pfad: pfad.to_string() });
                 let low = rel.to_lowercase();
                 let alias_lc = alias.as_ref().map(|a| a.to_lowercase());
                 let entry = (low, alias_lc);
@@ -444,7 +450,7 @@ fn process_inner(
         out.push(format!("' === IMPORT {} ===", rel));
         // Marker-Zeilen zeigen auf die IMPORT-Zeile selbst -- das ist die
         // einzige Koordinate, die der Nutzer in SEINER Datei anfassen kann.
-        herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
+        herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32, pfad: pfad.to_string() });
         let inner_base = canon.parent().unwrap_or(base).to_path_buf();
         // Ein IMPORT-Fehler TIEFER in der Kette trug bisher die Zeile der
         // INNEREN Datei unveraendert nach oben -- der Editor markierte damit
@@ -452,14 +458,16 @@ fn process_inner(
         // Koordinate, die der Nutzer anfassen kann, ist SEINE IMPORT-Zeile;
         // die innere Position gehoert in den Meldungstext (gleiche Behandlung
         // wie in drachenhauch/preprocess.py).
-        process_inner(ohne_bom(&content), &inner_base, &rel, seen, out, imports,
+        let canon_text = canon.display().to_string();
+        let canon_text = canon_text.strip_prefix(r"\\?\").unwrap_or(&canon_text).to_string();
+        process_inner(ohne_bom(&content), &inner_base, &rel, &canon_text, seen, out, imports,
                       herkunft, namensraeume)
             .map_err(|e| PreprocessError {
                 line: line_idx,
                 msg: format!("in {}: (Zeile {}) {}", rel, e.line, e.msg),
             })?;
         out.push(format!("' === END IMPORT {} ===", rel));
-        herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
+        herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32, pfad: pfad.to_string() });
     }
     Ok(())
 }

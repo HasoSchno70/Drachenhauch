@@ -2816,6 +2816,26 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let dir = std::path::Path::new(p).parent().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             Ok(Value::str_rc(&dir))
         }
+        "realpath$" | "realpath" => {
+            // REALPATH$(pfad$) -> der volle, bereinigte Pfad: absolut, `.`/`..`
+            // aufgeloest, Verknuepfungen verfolgt, die Schreibweise der Platte.
+            // Gibt es die Datei nicht, wird nur absolut gemacht und bereinigt.
+            arity!(1);
+            Ok(Value::str_rc(echter_pfad(need_str(&a[0], "REALPATH$")?)))
+        }
+        "samefile" => {
+            // SAMEFILE(a$, b$) -> meinen beide Pfade dieselbe Datei? Ein Text-
+            // vergleich irrt bei `/` gegen `\`, bei `lib/../x.dh`, bei kurzen
+            // 8.3-Namen und (unter Windows) bei Gross/klein.
+            arity!(2);
+            let x = echter_pfad(need_str(&a[0], "SAMEFILE")?);
+            let y = echter_pfad(need_str(&a[1], "SAMEFILE")?);
+            #[cfg(windows)]
+            let gleich = x.to_lowercase() == y.to_lowercase();
+            #[cfg(not(windows))]
+            let gleich = x == y;
+            Ok(Value::Bool(gleich))
+        }
         "openfile" => {
             arity!(2, 3);
             let path = need_str(&a[0], "OPENFILE")?.to_string();
@@ -6401,4 +6421,30 @@ mod geld_tests {
         assert!(dez_runden(f64::NAN, 2).is_err());
         assert!(dez_runden(f64::INFINITY, 2).is_err());
     }
+}
+
+/// Der volle, bereinigte Pfad (REALPATH$/SAMEFILE): kanonisch, wenn es die
+/// Datei gibt; sonst absolut gemacht und `.`/`..` von Hand aufgeloest. Ohne
+/// das `\\?\`, das Windows beim Kanonisieren voranstellt.
+pub fn echter_pfad(p: &str) -> String {
+    use std::path::{Component, PathBuf};
+    let roh = PathBuf::from(p);
+    let s = match std::fs::canonicalize(&roh) {
+        Ok(c) => c.to_string_lossy().to_string(),
+        Err(_) => {
+            let abs = if roh.is_absolute() { roh } else {
+                std::env::current_dir().map(|d| d.join(&roh)).unwrap_or(roh)
+            };
+            let mut out = PathBuf::new();
+            for c in abs.components() {
+                match c {
+                    Component::CurDir => {}
+                    Component::ParentDir => { out.pop(); }
+                    other => out.push(other.as_os_str()),
+                }
+            }
+            out.to_string_lossy().to_string()
+        }
+    };
+    s.strip_prefix(r"\\?\").map(|x| x.to_string()).unwrap_or(s)
 }

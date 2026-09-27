@@ -232,3 +232,35 @@ TRUE
 TRUE
 TRUE
 TRUE
+
+=== samefile und realpath vergleichen dieselbe datei
+' Ein Textvergleich irrt bei `/` gegen den Rueckstrich, bei `..` und
+' unter Windows bei Gross/klein -- SAMEFILE fragt die Platte.
+MKDIR("unter")
+PRINT SAMEFILE("b.txt", "unter/../b.txt")
+PRINT SAMEFILE("b.txt", CWD$() + "/b.txt")
+PRINT SAMEFILE("b.txt", "unter")
+' Gibt es die Datei nicht, wird nur bereinigt -- verglichen wird trotzdem.
+PRINT SAMEFILE("fehlt.txt", "unter/../fehlt.txt")
+DIM r AS STRING : r = REALPATH$("unter/../b.txt")
+PRINT RIGHT$(r, 5); " "; INSTR(r, "..") < 0; " "; LEN(r) > LEN("b.txt")
+PRINT RIGHT$(REALPATH$("nix/../fehlt.txt"), 9)
+--- datei b.txt
+b
+--- erwartet
+TRUE
+TRUE
+FALSE
+TRUE
+b.txt TRUE TRUE
+fehlt.txt
+
+=== samefile ohne unterschied der schreibweise unter windows
+PRINT SAMEFILE("B.TXT", "b.txt")
+PRINT SAMEFILE(REPLACE$(REALPATH$("b.txt"), "\", "/"), "b.txt")
+--- system windows
+--- datei b.txt
+b
+--- erwartet
+TRUE
+TRUE

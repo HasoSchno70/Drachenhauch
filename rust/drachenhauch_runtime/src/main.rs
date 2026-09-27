@@ -128,6 +128,7 @@ mod physics;
 mod physics2d;
 mod physics3d;
 mod preprocess;
+mod debugger;
 mod tiled;
 mod timer;
 mod value;
@@ -1570,8 +1571,21 @@ fn debug_main(path: &str) -> ExitCode {
         Ok(p) => p,
         Err(e) => { eprintln!("Lade-Fehler: {}", e); return ExitCode::from(1); }
     };
+    // Zeilenkarte: der Debugger spricht nach aussen (Datei, Zeile), nicht die
+    // Zeilen der gemergten Quelle (debugger.rs). Die Herkunft kommt aus einem
+    // zweiten Preprocess -- derselbe Text, dasselbe Ergebnis, und es spart
+    // einen Umbau der ganzen Uebersetzungskette fuer diesen einen Aufrufer.
+    let karte = preprocess::process(&raw_source, &base).ok().map(|(_, _, herkunft, _)| {
+        let h: Vec<(String, u32)> = herkunft.iter().map(|x| (x.pfad.clone(), x.zeile)).collect();
+        let mut aus = std::collections::BTreeSet::new();
+        let mut sammle = |f: &model::Func| for &l in &f.lines { if l != 0 { aus.insert(l); } };
+        sammle(&prog.main);
+        for f in &prog.functions { sammle(f); }
+        for c in prog.classes.values() { for m in c.methods.values() { sammle(m); } }
+        debugger::Karte::neu(path, &abs.display().to_string(), &h, aus)
+    });
     let mut machine = vm::Vm::new(&prog);
-    machine.enable_debug();
+    machine.enable_debug(karte);
     let res = machine.run();
     machine.debug_flush_output();
     // Review-Fund: verglich frueher den Fehlertext gegen "__DEBUG_STOP__" --
@@ -1586,8 +1600,10 @@ fn debug_main(path: &str) -> ExitCode {
         // soll dafuer keinen roten Fehlerbalken zeigen.
         Err(_) if machine.exit_code().is_some() =>
             serde_json::json!({"event": "finished", "reason": "done"}),
-        Err(e) => serde_json::json!({
-            "event": "error", "line": machine.error_line(), "message": e }),
+        Err(e) => {
+            let (datei, zeile) = machine.debug_stelle(machine.error_line());
+            serde_json::json!({"event": "error", "line": zeile, "file": datei, "message": e })
+        }
     };
     println!("{}", serde_json::to_string(&ev).unwrap_or_default());
     ExitCode::SUCCESS
