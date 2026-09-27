@@ -683,3 +683,72 @@ WEND
 --- system windows
 --- erwartet
 ansprechbar True
+
+=== ein protokollpunkt schreibt statt anzuhalten
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "breakpoints" + q + ":[{" + q + "line" + q + ":4," + q + "log" + q + ":" + q + "i = {i}, s = {s}, {{x}} {gibts}" + q + "}]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "log" THEN PRINT feld$(i, "line"); ": "; feld$(i, "text")
+    IF art$(i) = "paused" THEN PRINT "halt "; feld$(i, "line")
+    IF art$(i) = "finished" THEN PRINT "ende "; feld$(i, "reason")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 3
+    s = s + i
+NEXT
+PRINT s
+
+--- erwartet
+halt 1
+4: i = 1, s = 0, {x} {? eval: 'gibts' nicht gefunden}
+4: i = 2, s = 1, {x} {? eval: 'gibts' nicht gefunden}
+4: i = 3, s = 3, {x} {? eval: 'gibts' nicht gefunden}
+ende done
+
+=== trefferzahl ab genau und jedes
+' "3" = ab dem 3. Mal, "=2" = nur beim 2., "%3" = jedes 3. Mal; gezaehlt
+' wird nur, wenn die Bedingung stimmt.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+FUNCTION lauf(hits AS STRING, bed AS STRING) AS STRING
+    ereignisse = []
+    DIM b AS STRING : b = "{" + q + "line" + q + ":4," + q + "hits" + q + ":" + q + hits + q
+    IF bed <> "" THEN b = b + "," + q + "condition" + q + ":" + q + bed + q
+    sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "breakpoints" + q + ":[" + b + "}]}", _
+        "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+        "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+        "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+    DIM r AS STRING : r = ""
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ereignisse) - 1
+        IF art$(k) = "paused" AND feld$(k, "line") = "4" THEN r = r + " " + paar$(k, "globals", "i")
+    NEXT
+    RETURN TRIM$(r)
+END FUNCTION
+PRINT "ab 3: "; lauf("3", "")
+PRINT "genau 2: "; lauf("=2", "")
+PRINT "jedes 3: "; lauf("%3", "")
+PRINT "gerade, ab 2: "; lauf("2", "i MOD 2 = 0")
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = 1 TO 7
+    s = s + i
+NEXT
+
+--- erwartet
+ab 3: 3 4 5 6 7
+genau 2: 2
+jedes 3: 3 6
+gerade, ab 2: 4 6

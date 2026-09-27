@@ -243,6 +243,55 @@ impl Karte {
     pub fn haupt(&self) -> &str { &self.anzeige[0] }
 }
 
+/// Trefferzahl eines Haltepunkts lesen: `5` oder `>=5` = ab dem 5. Mal,
+/// `=5` = genau beim 5. Mal, `%5` = jedes 5. Mal. Leer oder unlesbar = keine.
+pub fn treffer_lesen(s: &str) -> Option<(char, u32)> {
+    let t = s.trim();
+    let (art, zahl) = if let Some(r) = t.strip_prefix('%') { ('%', r) }
+        else if let Some(r) = t.strip_prefix(">=") { ('>', r) }
+        else if let Some(r) = t.strip_prefix("==") { ('=', r) }
+        else if let Some(r) = t.strip_prefix('=') { ('=', r) }
+        else { ('>', t) };
+    let n: u32 = zahl.trim().parse().ok()?;
+    if n == 0 { return None; }
+    Some((art, n))
+}
+
+/// Haelt ein Haltepunkt mit dieser Trefferzahl beim `zaehler`-ten Treffer?
+pub fn treffer_passt(art: char, n: u32, zaehler: u32) -> bool {
+    match art {
+        '=' => zaehler == n,
+        '%' => zaehler % n == 0,
+        _ => zaehler >= n,
+    }
+}
+
+/// Die Stuecke eines Protokolltexts: (Text, ist Ausdruck). `{ausdruck}` wird
+/// ausgewertet, `{{` und `}}` stehen fuer die Klammern selbst.
+pub fn log_stuecke(vorlage: &str) -> Vec<(String, bool)> {
+    let mut out = Vec::new();
+    let mut text = String::new();
+    let z: Vec<char> = vorlage.chars().collect();
+    let mut i = 0;
+    while i < z.len() {
+        let c = z[i];
+        if c == '{' && z.get(i + 1) == Some(&'{') { text.push('{'); i += 2; continue; }
+        if c == '}' && z.get(i + 1) == Some(&'}') { text.push('}'); i += 2; continue; }
+        if c == '{' {
+            if let Some(ende) = z[i + 1..].iter().position(|&x| x == '}') {
+                if !text.is_empty() { out.push((std::mem::take(&mut text), false)); }
+                out.push((z[i + 1..i + 1 + ende].iter().collect(), true));
+                i += ende + 2;
+                continue;
+            }
+        }
+        text.push(c);
+        i += 1;
+    }
+    if !text.is_empty() { out.push((text, false)); }
+    out
+}
+
 /// Die Schreibweise der Klassennamen, wie sie im Quelltext steht: der Parser
 /// fuehrt Namen klein (`held`), der Nutzer hat `Held` geschrieben. Gelesen
 /// aus `CLASS Name` / `STRUCT Name` am Zeilenanfang; klein -> wie geschrieben.
@@ -314,6 +363,30 @@ mod tests {
         assert_eq!(art(&k.naechstes(&mut || {}).unwrap()), "continue");
         assert_eq!(art(&k.naechstes(&mut || {}).unwrap()), "set-watches");
         assert!(k.naechstes(&mut || {}).is_none());
+    }
+
+    #[test]
+    fn trefferzahl_lesen_und_pruefen() {
+        assert_eq!(treffer_lesen("5"), Some(('>', 5)));
+        assert_eq!(treffer_lesen(" >= 3 "), Some(('>', 3)));
+        assert_eq!(treffer_lesen("=2"), Some(('=', 2)));
+        assert_eq!(treffer_lesen("%4"), Some(('%', 4)));
+        assert_eq!(treffer_lesen(""), None);
+        assert_eq!(treffer_lesen("0"), None);
+        assert_eq!(treffer_lesen("x"), None);
+        let ab3: Vec<bool> = (1..=5).map(|z| treffer_passt('>', 3, z)).collect();
+        assert_eq!(ab3, vec![false, false, true, true, true]);
+        let genau2: Vec<bool> = (1..=4).map(|z| treffer_passt('=', 2, z)).collect();
+        assert_eq!(genau2, vec![false, true, false, false]);
+        let jedes2: Vec<bool> = (1..=4).map(|z| treffer_passt('%', 2, z)).collect();
+        assert_eq!(jedes2, vec![false, true, false, true]);
+    }
+
+    #[test]
+    fn protokolltext_zerlegen() {
+        assert_eq!(log_stuecke("i = {i}, {{roh}}"),
+            vec![("i = ".to_string(), false), ("i".to_string(), true), (", {roh}".to_string(), false)]);
+        assert_eq!(log_stuecke("offen {x"), vec![("offen {x".to_string(), false)]);
     }
 
     #[test]
