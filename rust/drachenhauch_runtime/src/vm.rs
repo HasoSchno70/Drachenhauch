@@ -6792,6 +6792,8 @@ impl<'p> Vm<'p> {
             "gui_image_mode" => { self.gui.image_mode(gi(a,0,"GUI_IMAGE_MODE")?, &gs(a,1,"GUI_IMAGE_MODE")?)?; Value::Nil }
             "gui_image_mode_get" => Value::Str(Rc::from(self.gui.image_mode_get(gi(a,0,"GUI_IMAGE_MODE_GET")?)?)),
             "gui_cursors" => { self.gui.cursors(gbool(a,0,"GUI_CURSORS")?); Value::Nil }
+            "gui_set_cursor" => { self.gui.set_cursor(gi(a,0,"GUI_SET_CURSOR")?, &gs(a,1,"GUI_SET_CURSOR")?)?; Value::Nil }
+            "gui_get_cursor$" | "gui_get_cursor" => Value::str_rc(self.gui.get_cursor(gi(a,0,"GUI_GET_CURSOR$")?)?),
             "gui_tree_icon" => { self.gui.tree_icon(gi(a,0,"GUI_TREE_ICON")?, gi(a,1,"GUI_TREE_ICON")?, gi(a,2,"GUI_TREE_ICON")?)?; Value::Nil }
             "gui_tree_color" => { self.gui.tree_color(gi(a,0,"GUI_TREE_COLOR")?, gi(a,1,"GUI_TREE_COLOR")?, gi(a,2,"GUI_TREE_COLOR")?)?; Value::Nil }
             "gui_panel_add" => { self.gui.panel_add(gi(a,0,"GUI_PANEL_ADD")?, gi(a,1,"GUI_PANEL_ADD")?)?; Value::Nil }
@@ -8365,6 +8367,7 @@ impl<'p> Vm<'p> {
             "mouse_on_screen" => Value::Bool(g!().mouse_on_screen()),
             "mouse_cursor" => { let s = gs(a,0,"MOUSE_CURSOR")?.to_string();
                                 g!().mouse_cursor(&s)?; Value::Nil }
+            "mouse_cursor_get$" | "mouse_cursor_get" => Value::str_rc(g!().zeiger_jetzt()),
             "joystick_hit" => Value::Bool(g!().joystick_hit(gi(a,0,"JOYSTICK_HIT")?,
                                                             gi(a,1,"JOYSTICK_HIT")?)?),
             "joystick_released" => Value::Bool(g!().joystick_released(

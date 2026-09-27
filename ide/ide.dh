@@ -4036,9 +4036,9 @@ SUB mausNachziehen(ta AS GUI_WIDGET)
     IF hand THEN
         MOUSE_CURSOR("hand")
     ELSEIF tippHand THEN
-        ' Nur zuruecknehmen, was hier gesetzt wurde -- die gui setzt ihre
-        ' Zeiger nur beim Wechsel und saehe die Hand sonst nie wieder weg.
-        MOUSE_CURSOR(IIF(z > 0, "ibeam", "default"))
+        ' Die Hand des Programms bleibt stehen, bis es sie zurueckgibt --
+        ' danach entscheidet wieder die gui (Textstrich, Pfeil ...).
+        MOUSE_CURSOR("auto")
     END IF
     tippHand = hand
 

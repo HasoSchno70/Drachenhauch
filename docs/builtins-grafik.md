@@ -797,7 +797,8 @@ Sampler bliebe schwarz.
 | `MOUSEWHEEL_X()`, `MOUSEWHEEL_Y()` → FLOAT | Rad in **beiden** Achsen und als Kommazahl; `MOUSEWHEEL()` kennt nur die senkrechte und rundet — feine Touchpad-Schritte fallen dort auf 0 |
 | `MOUSE_SET_POS(x, y)` | Zeiger an eine Stelle setzen |
 | `MOUSE_ON_SCREEN()` → BOOLEAN | ist der Zeiger überhaupt im Fenster? |
-| `MOUSE_CURSOR(form$)` | Zeigerform: `default`, `ibeam`, `crosshair`, `hand`, `resize_ew`, `resize_ns`, `resize_nwse`, `resize_nesw`, `resize_all`, `not_allowed` |
+| `MOUSE_CURSOR(form$)` | Zeigerform: `default`, `ibeam`, `crosshair`, `hand`, `resize_ew`, `resize_ns`, `resize_nwse`, `resize_nesw`, `resize_all`, `not_allowed`; bleibt stehen und hat Vorrang vor der gui, `auto` gibt den Zeiger an die gui zurück |
+| `MOUSE_CURSOR_GET$()` | die Zeigerform, die gerade gilt (die des Programms, sonst die der gui, sonst `default`) |
 | `KEY_ANY_HIT()` → INTEGER | Code der zuletzt gedrückten Taste, `-1` = keine — fuer Belegungsdialoge |
 | `KEY_NAME$(code)` → STRING | Anzeigename einer Taste (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
 | `INKEY$()` → STRING | zuletzt getipptes Zeichen oder `""` — wartet **nicht**, für Texteingabe im Spielablauf |

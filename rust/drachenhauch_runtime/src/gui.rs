@@ -2425,6 +2425,9 @@ pub struct Widget {
     // Auswahl. Ohne das setzte das naechste Bild -- die Taste ist noch
     // unten -- die Marke doch noch ans Feld.
     farbfeld_zug: bool,
+    /// Eigene Zeigerform des Programms fuer dieses Widget (GUI_SET_CURSOR),
+    /// None = die gui entscheidet.
+    zeiger: Option<&'static str>,
     // Mit dem Rad gerollt (nur TextArea): Marke, Anker und Zeichenzahl zu
     // dem Zeitpunkt. Solange sich keins davon aendert, zieht die
     // Editierschleife den Ausschnitt NICHT zur Marke zurueck -- sonst
@@ -2836,11 +2839,9 @@ pub struct Gui {
     drag: Option<DragState>,
     /// Ablage dieses Bildes (transient).
     drop: Option<DropInfo>,
-    /// Cursorformen ueber Widgets (GUI_CURSORS, Vorgabe an). `cursor_form`
-    /// merkt, was die gui zuletzt gesetzt hat -- sie setzt nur zurueck, was
-    /// sie selbst war, und laesst eine Form des Programms in Ruhe.
+    /// Cursorformen ueber Widgets (GUI_CURSORS, Vorgabe an). Die gui meldet je
+    /// Bild einen Wunsch an Graphics, gesetzt wird beim FLIP.
     cursors: bool,
-    cursor_form: Option<&'static str>,
     was_mouse_down: bool,
     frame_count: i64,
     theme: HashMap<String, i64>,
@@ -2927,7 +2928,7 @@ impl Gui {
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
             open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, active_table: None, table_press: None, press_origin: None,
-            drag: None, drop: None, cursors: true, cursor_form: None,
+            drag: None, drop: None, cursors: true,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
@@ -3827,7 +3828,7 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
-            farbfelder: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
+            farbfelder: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
             formatiert: false, paare: Vec::new(), teil_von: None, teil_stand: String::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
             tab_meldet: false, tab_treffer: false,
@@ -15641,40 +15642,151 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
     pub fn cursors(&mut self, an: bool) { self.cursors = an; }
 
-    /// Welche Form die Maus ueber dem obersten Widget bekommt. Gesetzt wird
-    /// nur bei Wechsel, und zurueckgesetzt nur, was die gui selbst gesetzt
-    /// hat -- ein Programm, das MOUSE_CURSOR nach GUI_UPDATE ruft, gewinnt.
+    /// GUI_SET_CURSOR(wdg, form$): eigene Zeigerform ueber diesem Widget
+    /// ("auto" oder "" = die gui entscheidet) -- fuer Zeichenflaechen, auf
+    /// denen das Programm selbst etwas anbietet.
+    pub fn set_cursor(&mut self, h: i64, form: &str) -> Result<(), String> {
+        let f = if matches!(form.trim().to_ascii_lowercase().as_str(), "" | "auto") { None } else {
+            Some(crate::graphics::zeiger_form(form).ok_or_else(|| format!(
+                "GUI_SET_CURSOR: unbekannte Form '{}' -- erwartet default/ibeam/crosshair/hand/\
+resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed oder auto", form))?)
+        };
+        self.wdg_mut(h, "GUI_SET_CURSOR")?.zeiger = f;
+        Ok(())
+    }
+    pub fn get_cursor(&self, h: i64) -> Result<&'static str, String> {
+        Ok(self.wdg(h, "GUI_GET_CURSOR$")?.zeiger.unwrap_or("auto"))
+    }
+
+    /// Welche Form die Maus bekommt -- je Bild als Wunsch an Graphics, das sie
+    /// beim FLIP setzt (eine Form des Programms per MOUSE_CURSOR gewinnt).
+    /// Zuerst laufende Gesten (sie gelten auch neben dem Widget), dann das
+    /// oberste Widget unter der Maus, dort nach der STELLE (`zeiger_ueber`).
     fn cursor_pass(&mut self, g: &mut Graphics, mx: i32, my: i32) {
-        if !self.cursors {
-            if self.cursor_form.take().is_some() { let _ = g.mouse_cursor("default"); }
-            return;
+        if !self.cursors { g.zeiger_gui(None); return; }
+        let form = self.zeiger_wahl(g, mx, my);
+        g.zeiger_gui(form);
+    }
+
+    fn zeiger_wahl(&self, g: &Graphics, mx: i32, my: i32) -> Option<&'static str> {
+        if let Some(d) = self.drag.as_ref().filter(|d| d.aktiv) {
+            // Ueber einem Ablageziel oder der eigenen Quelle (dort sortiert sie
+            // um) geht es, sonst nicht -- das soll man vor dem Loslassen sehen.
+            let (qw, qi) = d.quelle;
+            let ueber_quelle = self.windows.get(qw).and_then(|w| w.widgets.get(qi))
+                .map(|w| Self::in_rect(mx, my, self.abs_rect(qw, w))).unwrap_or(false);
+            return Some(if ueber_quelle || self.ablage_unter(mx, my).is_some() { "hand" } else { "not_allowed" });
         }
-        let mut form: Option<&'static str> = None;
-        if self.drag.as_ref().map(|d| d.aktiv).unwrap_or(false) { form = Some("hand"); }
-        else if self.resize_window.is_some() { form = Some("resize_nwse"); }
-        else if let Some((sw, si)) = self.active_split {
-            form = Some(if self.windows[sw].widgets[si].group == "v" { "resize_ew" } else { "resize_ns" });
+        if self.resize_window.is_some() { return Some("resize_nwse"); }
+        if let Some((sw, si)) = self.active_split {
+            return Some(if self.windows[sw].widgets[si].group == "v" { "resize_ew" } else { "resize_ns" });
         }
-        else if let Some(top) = self.topmost_at(mx, my) {
-            let win = &self.windows[top];
-            if win.chrome && win.resizable && Self::in_rect(mx, my, (win.x + win.w - 14, win.y + win.h - 14, 14, 14)) {
-                form = Some("resize_nwse");
-            } else {
-                for w in win.widgets.iter().rev() {
-                    if !w.hovered { continue; }
-                    form = match w.kind {
-                        Kind::TextInput | Kind::TextArea => Some("ibeam"),
-                        Kind::Button | Kind::Card | Kind::Checkbox | Kind::Radio | Kind::Toggle => Some("hand"),
-                        Kind::Splitter => Some(if w.group == "v" { "resize_ew" } else { "resize_ns" }),
-                        _ => None,
-                    };
-                    break;
-                }
+        if let Some((tw, ti)) = self.active_table {
+            if let Some(t) = self.windows.get(tw).and_then(|w| w.widgets.get(ti)).and_then(|w| w.tbl.as_ref()) {
+                if t.drag_col >= 0 { return Some("resize_ew"); }
             }
         }
-        if form != self.cursor_form {
-            let _ = g.mouse_cursor(form.unwrap_or("default"));
-            self.cursor_form = form;
+        let top = self.topmost_at(mx, my)?;
+        let win = &self.windows[top];
+        if win.chrome && win.resizable && Self::in_rect(mx, my, (win.x + win.w - 14, win.y + win.h - 14, 14, 14)) {
+            return Some("resize_nwse");
+        }
+        let i = win.widgets.iter().rposition(|w| w.hovered)?;
+        let w = &win.widgets[i];
+        if let Some(f) = w.zeiger { return Some(f); }
+        if !w.enabled { return None; }
+        self.zeiger_ueber(g, top, i, mx, my)
+    }
+
+    /// Die Form ueber EINER Stelle eines Widgets. Jede Zeile fragt dieselbe
+    /// Geometrie wie Treffertest und Zeichnen -- ein Zeiger, der etwas
+    /// anbietet, was der Klick dort nicht tut, waere schlimmer als der Pfeil.
+    fn zeiger_ueber(&self, g: &Graphics, wi: usize, i: usize, mx: i32, my: i32) -> Option<&'static str> {
+        let w = &self.windows[wi].widgets[i];
+        let (ax, ay, bw, bh) = self.abs_rect(wi, w);
+        match w.kind {
+            Kind::TextInput => Some("ibeam"),
+            Kind::TextArea => {
+                if let Some((tx, ty, tb, th, _, _, _, _)) = self.ta_bar_geom(g, wi, i) {
+                    if Self::in_rect(mx, my, (tx - 2, ty, tb + 4, th)) { return None; }
+                }
+                let chars: Vec<char> = w.text.chars().collect();
+                let starts = Self::line_starts(&chars);
+                if mx < ax + self.ta_gutter(g, w, starts.len()) { return None; }
+                if !w.farbfelder.is_empty() {
+                    let rows = self.ta_rows(g, w, &chars, &starts, self.ta_breite(g, w, starts.len()));
+                    let sicht = ((bh - 10) / self.ta_line_h(g)).max(1);
+                    if self.ta_farbfeld_rects(g, w, ax, ay, &chars, &rows, starts.len(), sicht)
+                        .into_iter().any(|(_, fx, fy, k)| Self::in_rect(mx, my, (fx, fy, k, k))) {
+                        return Some("hand");
+                    }
+                }
+                Some("ibeam")
+            }
+            Kind::Button | Kind::Card | Kind::Checkbox | Kind::Radio | Kind::Toggle => Some("hand"),
+            Kind::Splitter => Some(if w.group == "v" { "resize_ew" } else { "resize_ns" }),
+            Kind::Table => {
+                let t = w.tbl.as_ref()?;
+                if self.editing_table == Some((wi, i)) {
+                    if let Some(r) = self.edit_cell_rect(wi, i) {
+                        if Self::in_rect(mx, my, r) { return Some("ibeam"); }
+                    }
+                }
+                let gm = self.table_geom(wi, i);
+                if my >= gm.ay && my < gm.ay + t.header_h {
+                    if t.resizable_cols && Self::edge_at(&gm, mx, self.sk(TBL_EDGE_GRAB)) >= 0 { return Some("resize_ew"); }
+                    if t.sortable && Self::pos_at(&gm, mx) >= 0 { return Some("hand"); }
+                    return None;
+                }
+                if t.filter_row && my < gm.ay + t.header_h + self.sk(TBL_FILTER_H) && Self::col_at(&gm, mx) >= 0 {
+                    return Some("ibeam");
+                }
+                None
+            }
+            Kind::ListBox | Kind::Tree => {
+                match self.edit_rect_any(wi, i) {
+                    Some(r) if Self::in_rect(mx, my, r) => Some("ibeam"),
+                    _ => None,
+                }
+            }
+            Kind::Dropdown => {
+                // Die bearbeitbare Klappliste ist links ein Textfeld, rechts
+                // der Pfeil.
+                if w.frei && mx < ax + bw - self.sk(DD_PFEIL_B) { Some("ibeam") } else { None }
+            }
+            Kind::RichText => {
+                let r = w.rich.as_ref()?;
+                if Self::rt_link_unter(r, mx - ax, my - ay + r.scroll).is_some() { Some("hand") } else { Some("ibeam") }
+            }
+            Kind::ColorPicker => {
+                let (feld, ton, deck) = self.cp_geom(w, ax, ay, bw, bh);
+                let drin = Self::in_rect(mx, my, feld) || Self::in_rect(mx, my, ton)
+                    || deck.map(|d| Self::in_rect(mx, my, d)).unwrap_or(false);
+                if drin { Some("crosshair") } else { None }
+            }
+            Kind::Toolbar => {
+                let l = w.leiste.as_ref()?;
+                if self.tb_chevron_hit(wi, i, mx, my) { return Some("hand"); }
+                let knopf = self.tb_geom(ax, ay, bw, bh, w).into_iter()
+                    .any(|(k, x, b)| mx >= x && mx < x + b && l.eintraege[k].art == 0 && !l.eintraege[k].aus);
+                if knopf { Some("hand") } else { None }
+            }
+            Kind::StatusBar => {
+                let s = w.status.as_ref()?;
+                let feld = self.sb_geom(ax, bw, w).into_iter()
+                    .any(|(k, x, b)| mx >= x && mx < x + b && s.felder[k].klickbar);
+                if feld { Some("hand") } else { None }
+            }
+            Kind::Breadcrumb => {
+                let (teile, punkte) = self.pf_geom(ax, bw, w);
+                let n = w.pfad.as_ref().map(|p| p.texte.len()).unwrap_or(0);
+                // Der letzte Teil ist die Stelle, an der man steht -- ein Klick
+                // darauf tut nichts.
+                let teil = teile.into_iter().any(|(k, x, b)| mx >= x && mx < x + b && k + 1 < n);
+                let pkt = punkte.map(|(x, b)| mx >= x && mx < x + b).unwrap_or(false);
+                if teil || pkt { Some("hand") } else { None }
+            }
+            _ => None,
         }
     }
 
