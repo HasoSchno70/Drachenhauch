@@ -269,6 +269,9 @@ DIM stapelZeilen AS ARRAY OF INTEGER : stapelZeilen = []
 DIM hpDateien AS ARRAY OF STRING : hpDateien = []
 DIM hpZeilen AS ARRAY OF INTEGER : hpZeilen = []
 DIM hpBedingungen AS ARRAY OF STRING : hpBedingungen = []   ' "" = unbedingt
+' Abgeschaltete Haltepunkte bleiben stehen (grau), halten aber nicht --
+' man will einen nicht jedes Mal neu setzen, nur weil er gerade stoert.
+DIM hpAktiv AS ARRAY OF BOOLEAN : hpAktiv = []
 DIM markenSchluessel AS STRING : markenSchluessel = ""
 ' Welche gesetzte Marke wofuer steht: beim Bearbeiten wandern die Marken im
 ' Feld mit ihrer Zeile (GUI_TEXTAREA_MARKS_GET), und Haltepunkte und
@@ -583,6 +586,7 @@ IF JSON_HAS(konfig, "haltepunkte") THEN
         ARRAY_PUSH(hpDateien, JSON_GET_STRING(konfig, hlP + ".datei"))
         ARRAY_PUSH(hpZeilen, JSON_GET_INT(konfig, hlP + ".zeile"))
         IF JSON_HAS(konfig, hlP + ".bedingung") THEN ARRAY_PUSH(hpBedingungen, JSON_GET_STRING(konfig, hlP + ".bedingung")) ELSE ARRAY_PUSH(hpBedingungen, "")
+        IF JSON_HAS(konfig, hlP + ".aktiv") THEN ARRAY_PUSH(hpAktiv, JSON_GET_BOOL(konfig, hlP + ".aktiv")) ELSE ARRAY_PUSH(hpAktiv, TRUE)
     NEXT
 END IF
 IF JSON_HAS(konfig, "lesezeichen") THEN
@@ -750,6 +754,7 @@ GUI_MENU_SEPARATOR(mLauf)
 DIM miDebug AS INTEGER : miDebug = GUI_MENU_ITEM(mLauf, "Debuggen", "F7")
 DIM miHaltepunkt AS INTEGER : miHaltepunkt = GUI_MENU_ITEM(mLauf, "Haltepunkt setzen/entfernen", "F9")
 DIM miBedingung AS INTEGER : miBedingung = GUI_MENU_ITEM(mLauf, "Bedingter Haltepunkt ...", "Umschalt+F9")
+DIM miHpListe AS INTEGER : miHpListe = GUI_MENU_ITEM(mLauf, "Alle Haltepunkte ...", "Strg+Umschalt+F9")
 DIM miWeiterD AS INTEGER : miWeiterD = GUI_MENU_ITEM(mLauf, "Weiter", "F8")
 DIM miAnhalten AS INTEGER : miAnhalten = GUI_MENU_ITEM(mLauf, "Anhalten", "F6")
 DIM miDrueber AS INTEGER : miDrueber = GUI_MENU_ITEM(mLauf, "Schritt drüber", "F10")
@@ -1067,6 +1072,24 @@ GUI_TABLE_SET(tblProfil, "zellmodus", 1)
 ' Je Zeile oder je Funktion: dieselbe Messung, anders zusammengezaehlt.
 DIM cbProfilFunk AS GUI_WIDGET : cbProfilFunk = GUI_CHECKBOX(winProfil, "Nach Funktionen", 480, 4, FALSE)
 GUI_WINDOW_VISIBLE(winProfil, FALSE)
+
+' Haltepunkte: alle, aus allen Dateien. Das Kaestchen schaltet einen an und
+' aus, ein Doppelklick (oder Enter) springt hin.
+DIM winHp AS GUI_WINDOW : winHp = GUI_WINDOW("Haltepunkte", 560, 90, 640, 420)
+GUI_WINDOW_CLOSABLE(winHp, TRUE)
+DIM lblHp AS GUI_WIDGET : lblHp = GUI_LABEL(winHp, "", 8, 6)
+DIM lstHp AS GUI_WIDGET : lstHp = GUI_LISTBOX(winHp, 8, 30, 624, 300, [])
+GUI_LISTBOX_SET(lstHp, "kaestchen", 1)
+GUI_LISTBOX_PLACEHOLDER(lstHp, "Keine Haltepunkte -- F9 oder ein Klick in die Nummernspalte setzt einen.")
+DIM btnHpSpringen AS GUI_WIDGET : btnHpSpringen = GUI_BUTTON(winHp, "Springen", 8, 340, 90, 28)
+DIM btnHpBed AS GUI_WIDGET : btnHpBed = GUI_BUTTON(winHp, "Bedingung ...", 104, 340, 112, 28)
+DIM btnHpWeg AS GUI_WIDGET : btnHpWeg = GUI_BUTTON(winHp, "Entfernen", 222, 340, 96, 28)
+DIM btnHpAn AS GUI_WIDGET : btnHpAn = GUI_BUTTON(winHp, "Alle an", 324, 340, 80, 28)
+DIM btnHpAus AS GUI_WIDGET : btnHpAus = GUI_BUTTON(winHp, "Alle aus", 410, 340, 80, 28)
+DIM btnHpAlleWeg AS GUI_WIDGET : btnHpAlleWeg = GUI_BUTTON(winHp, "Alle entfernen", 496, 340, 136, 28)
+GUI_BUTTON_VARIANT(btnHpAlleWeg, "gefahr")
+GUI_WINDOW_VISIBLE(winHp, FALSE)
+DIM hpListeStand AS STRING : hpListeStand = "-"
 
 ' Handbuch: Klappliste der Dokumente, Suche im Dokument, Text mit Umbruch.
 DIM winHandbuch AS GUI_WINDOW : winHandbuch = GUI_WINDOW("Handbuch", 200, 60, 980, 720)
@@ -1528,6 +1551,7 @@ SUB konfigSichern()
         JSON_SET_STRING(hpE, "datei", hpDateien[hk])
         JSON_SET_INT(hpE, "zeile", hpZeilen[hk])
         IF hpBedingungen[hk] <> "" THEN JSON_SET_STRING(hpE, "bedingung", hpBedingungen[hk])
+        IF NOT hpIstAktiv(hk) THEN JSON_SET_BOOL(hpE, "aktiv", FALSE)
         JSON_APPEND_JSON(konfig, "haltepunkte", hpE)
     NEXT
     JSON_SET_JSON(konfig, "lesezeichen", JSON_NEW_ARRAY())
@@ -3869,6 +3893,24 @@ SUB gitRandNachziehen(erzwingen AS BOOLEAN)
     protokoll("git rand " + STR$(LEN(neu)))
 END SUB
 
+' Die Haltepunkt-Felder gehen nur hier hinein und hinaus -- vier Felder,
+' die gleich lang bleiben muessen.
+SUB hpNeu(pfad AS STRING, z AS INTEGER, bed AS STRING)
+    ARRAY_PUSH(hpDateien, pfad) : ARRAY_PUSH(hpZeilen, z) : ARRAY_PUSH(hpBedingungen, bed)
+    WHILE LEN(hpAktiv) < LEN(hpZeilen) - 1 : ARRAY_PUSH(hpAktiv, TRUE) : WEND
+    ARRAY_PUSH(hpAktiv, TRUE)
+END SUB
+
+SUB hpEntfernen(k AS INTEGER)
+    ARRAY_REMOVE_AT(hpDateien, k) : ARRAY_REMOVE_AT(hpZeilen, k) : ARRAY_REMOVE_AT(hpBedingungen, k)
+    IF k < LEN(hpAktiv) THEN ARRAY_REMOVE_AT(hpAktiv, k)
+END SUB
+
+FUNCTION hpIstAktiv(k AS INTEGER) AS BOOLEAN
+    IF k >= LEN(hpAktiv) THEN RETURN TRUE
+    RETURN hpAktiv[k]
+END FUNCTION
+
 FUNCTION haltepunktIndex(pfad AS STRING, zeile AS INTEGER) AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO LEN(hpZeilen) - 1
@@ -3892,14 +3934,10 @@ SUB haltepunktUmschaltenIn(pfad AS STRING, z AS INTEGER)
     IF pfad = "" THEN GUI_SET_TEXT(lblStatus, "Erst sichern -- Haltepunkte gehören zu einer Datei.") : RETURN
     DIM k AS INTEGER : k = haltepunktIndex(pfad, z)
     IF k >= 0 THEN
-        ARRAY_REMOVE_AT(hpDateien, k)
-        ARRAY_REMOVE_AT(hpZeilen, k)
-        ARRAY_REMOVE_AT(hpBedingungen, k)
+        hpEntfernen(k)
         protokoll("haltepunkt " + STR$(z) + " aus")
     ELSE
-        ARRAY_PUSH(hpDateien, pfad)
-        ARRAY_PUSH(hpZeilen, z)
-        ARRAY_PUSH(hpBedingungen, "")
+        hpNeu(pfad, z, "")
         protokoll("haltepunkt " + STR$(z) + " an")
     END IF
     ' Laeuft der Debugger, gilt es sofort -- auch waehrend des Laufens und
@@ -3933,7 +3971,7 @@ SUB haltepunktBedingungSetzen(ausdruck AS STRING)
     IF pfad = "" THEN RETURN
     DIM k AS INTEGER : k = haltepunktIndex(pfad, bedingungZeile)
     IF k < 0 THEN
-        ARRAY_PUSH(hpDateien, pfad) : ARRAY_PUSH(hpZeilen, bedingungZeile) : ARRAY_PUSH(hpBedingungen, TRIM$(ausdruck))
+        hpNeu(pfad, bedingungZeile, TRIM$(ausdruck))
     ELSE
         hpBedingungen[k] = TRIM$(ausdruck)
     END IF
@@ -3944,6 +3982,112 @@ SUB haltepunktBedingungSetzen(ausdruck AS STRING)
     END IF
     markenSchluessel = ""
     IF prozessArt = "debug" AND prozess >= 0 THEN debugHaltepunkteSenden()
+END SUB
+
+' --- Haltepunkt-Liste --------------------------------------------------
+' Eine Zeile Quelltext -- aus dem offenen Reiter, sonst von der Platte.
+FUNCTION zeileAusDatei$(pfad AS STRING, z AS INTEGER) AS STRING
+    DIM text AS STRING : text = ""
+    DIM t AS INTEGER : t = tabMitPfad(pfad)
+    IF t >= 0 THEN
+        text = GUI_TEXT(tabFelder[t])
+    ELSE
+        TRY
+            text = dateiLesen(pfad)
+        CATCH e
+            RETURN ""
+        END TRY
+    END IF
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(text, NL)
+    IF z >= 1 AND z <= LEN(zeilen) THEN RETURN TRIM$(zeilen[z - 1])
+    RETURN ""
+END FUNCTION
+
+SUB haltepunkteListeZeigen()
+    hpListeStand = "-"
+    haltepunkteListeFuellen()
+    GUI_WINDOW_VISIBLE(winHp, TRUE)
+    GUI_FOCUS(lstHp)            ' holt das Fenster vor das Hauptfenster
+    protokoll("haltepunkte liste " + STR$(LEN(hpZeilen)))
+END SUB
+
+' Neu fuellen, wenn sich etwas geaendert hat (auch von aussen: F9 im Code,
+' ein gerutschter Haltepunkt) -- die Auswahl bleibt stehen.
+SUB haltepunkteListeFuellen()
+    DIM stand AS STRING : stand = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hpZeilen) - 1
+        stand = stand + hpDateien[i] + ":" + STR$(hpZeilen[i]) + ":" + hpBedingungen[i] + ":" + IIF(hpIstAktiv(i), "1", "0") + "|"
+    NEXT
+    IF stand = hpListeStand THEN RETURN
+    hpListeStand = stand
+    DIM wahl AS INTEGER : wahl = GUI_LISTBOX_SELECTED(lstHp)
+    GUI_LISTBOX_CLEAR(lstHp)
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    FOR i = 0 TO LEN(hpZeilen) - 1
+        DIM eintrag AS STRING : eintrag = BASENAME(hpDateien[i]) + ":" + STR$(hpZeilen[i])
+        IF hpBedingungen[i] <> "" THEN eintrag = eintrag + "   wenn " + hpBedingungen[i]
+        GUI_LISTBOX_ADD(lstHp, eintrag)
+        GUI_LISTBOX_SET_CHECKED(lstHp, i, hpIstAktiv(i))
+        GUI_LISTBOX_DETAIL(lstHp, i, zeileAusDatei$(hpDateien[i], hpZeilen[i]))
+        IF ARRAY_INDEXOF(dateien, hpDateien[i]) < 0 THEN ARRAY_PUSH(dateien, hpDateien[i])
+    NEXT
+    IF wahl >= 0 AND wahl < LEN(hpZeilen) THEN GUI_LISTBOX_SET_SELECTED(lstHp, wahl)
+    GUI_SET_TEXT(lblHp, STR$(LEN(hpZeilen)) + IIF(LEN(hpZeilen) = 1, " Haltepunkt in ", " Haltepunkte in ") + STR$(LEN(dateien)) + IIF(LEN(dateien) = 1, " Datei", " Dateien") + " -- das Kästchen schaltet einen an und aus, Doppelklick springt hin")
+END SUB
+
+' Nach jeder Aenderung: Marken neu, und ein laufender Debugger erfaehrt es.
+SUB haltepunkteGeaendert()
+    markenSchluessel = ""
+    IF prozessArt = "debug" AND prozess >= 0 THEN debugHaltepunkteSenden()
+END SUB
+
+SUB haltepunkteListeNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winHp) THEN RETURN
+    haltepunkteListeFuellen()
+    DIM i AS INTEGER
+    DIM anders AS BOOLEAN : anders = FALSE
+    FOR i = 0 TO MIN(GUI_LISTBOX_COUNT(lstHp), LEN(hpZeilen)) - 1
+        IF GUI_LISTBOX_CHECKED(lstHp, i) <> hpIstAktiv(i) THEN
+            WHILE LEN(hpAktiv) < LEN(hpZeilen) : ARRAY_PUSH(hpAktiv, TRUE) : WEND
+            hpAktiv[i] = GUI_LISTBOX_CHECKED(lstHp, i)
+            protokoll("haltepunkt " + STR$(hpZeilen[i]) + IIF(hpAktiv[i], " eingeschaltet", " ausgeschaltet"))
+            anders = TRUE
+        END IF
+    NEXT
+    DIM w AS INTEGER : w = GUI_LISTBOX_SELECTED(lstHp)
+    IF GUI_DOUBLE_CLICKED(lstHp) OR GUI_CLICKED(btnHpSpringen) THEN
+        IF w >= 0 AND w < LEN(hpZeilen) THEN
+            dateiOeffnen(hpDateien[w])
+            DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+            IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, hpZeilen[w], 1) : GUI_FOCUS(ta)
+            protokoll("haltepunkt sprung " + BASENAME(hpDateien[w]) + " " + STR$(hpZeilen[w]))
+        END IF
+    END IF
+    IF GUI_CLICKED(btnHpBed) AND w >= 0 AND w < LEN(hpZeilen) THEN haltepunktBedingungFragenIn(hpDateien[w], hpZeilen[w])
+    IF GUI_CLICKED(btnHpWeg) AND w >= 0 AND w < LEN(hpZeilen) THEN
+        protokoll("haltepunkt " + STR$(hpZeilen[w]) + " aus")
+        hpEntfernen(w)
+        anders = TRUE
+    END IF
+    IF GUI_CLICKED(btnHpAn) OR GUI_CLICKED(btnHpAus) THEN
+        DIM an AS BOOLEAN : an = GUI_CLICKED(btnHpAn)
+        hpAktiv = []
+        FOR i = 0 TO LEN(hpZeilen) - 1
+            ARRAY_PUSH(hpAktiv, an)
+        NEXT
+        protokoll("haltepunkte alle " + IIF(an, "an", "aus"))
+        anders = TRUE
+    END IF
+    IF GUI_CLICKED(btnHpAlleWeg) THEN
+        hpDateien = [] : hpZeilen = [] : hpBedingungen = [] : hpAktiv = []
+        protokoll("haltepunkte alle entfernt")
+        anders = TRUE
+    END IF
+    IF anders THEN
+        haltepunkteListeFuellen()
+        haltepunkteGeaendert()
+    END IF
 END SUB
 
 ' --- Lesezeichen -------------------------------------------------------
@@ -4121,8 +4265,14 @@ SUB markenNachziehen()
     FOR i = 0 TO LEN(hpZeilen) - 1
         IF hpDateien[i] = pfad THEN
             ARRAY_PUSH(zeilen, hpZeilen[i])
-            IF hpBedingungen[i] = "" THEN ARRAY_PUSH(farben, &HE05050) ELSE ARRAY_PUSH(farben, &HC060E0)
-            schl = schl + "h" + STR$(hpZeilen[i]) + hpBedingungen[i]
+            IF NOT hpIstAktiv(i) THEN
+                ARRAY_PUSH(farben, &H7A7A86)
+            ELSEIF hpBedingungen[i] = "" THEN
+                ARRAY_PUSH(farben, &HE05050)
+            ELSE
+                ARRAY_PUSH(farben, &HC060E0)
+            END IF
+            schl = schl + "h" + STR$(hpZeilen[i]) + hpBedingungen[i] + IIF(hpIstAktiv(i), "", "-")
             ARRAY_PUSH(arten, "h") : ARRAY_PUSH(idx, i)
         END IF
     NEXT
@@ -4329,6 +4479,55 @@ END FUNCTION
 SUB tippWeg()
     IF tippFeld >= 0 THEN GUI_TOOLTIP(tippFeld, "")
     tippFeld = -1
+    tippWertAusdruck = ""
+END SUB
+
+' Werte beim Ueberfahren: steht der Debugger in der Datei unter der Maus,
+' fragt die IDE den Ausdruck ab (`eval` mit `id` "hover") und setzt die
+' Antwort oben in den Tooltip. Die Antwort kommt ein, zwei Bilder spaeter
+' ueber debugEreignis -- bis dahin steht die Hilfe allein da.
+DIM tippWertAusdruck AS STRING : tippWertAusdruck = ""
+DIM tippWertFeld AS GUI_WIDGET : tippWertFeld = -1
+DIM tippDoku AS STRING : tippDoku = ""
+
+FUNCTION debugWertMoeglich() AS BOOLEAN
+    IF prozessArt <> "debug" OR NOT debugPause OR prozess < 0 OR aktiverTab < 0 THEN RETURN FALSE
+    IF tabPfade[aktiverTab] = "" THEN RETURN FALSE
+    RETURN SAMEFILE(debugDatei, tabPfade[aktiverTab])
+END FUNCTION
+
+' Das Wort samt davorstehender Mitglieds-Kette: bei `spieler.hp` unter der
+' Maus auf `hp` der ganze Ausdruck. Nie mit Klammern -- ein Aufruf haette
+' Nebenwirkungen, und die sollen nicht beim blossen Hinsehen passieren.
+FUNCTION ausdruckBeiWort$(zeile AS STRING, wort AS STRING, anfang AS INTEGER) AS STRING
+    DIM a AS INTEGER : a = anfang - 1          ' 0-basiert, erstes Zeichen des Worts
+    DIM ende AS INTEGER : ende = a + LEN(wort)
+    WHILE a >= 2
+        IF MID$(zeile, a - 1, 1) <> "." THEN EXIT WHILE
+        IF NOT istWortzeichen(MID$(zeile, a - 2, 1)) THEN EXIT WHILE
+        DIM b AS INTEGER : b = a - 2
+        WHILE b > 0 AND istWortzeichen(MID$(zeile, b - 1, 1)) : b = b - 1 : WEND
+        a = b
+    WEND
+    RETURN MID$(zeile, a, ende - a)
+END FUNCTION
+
+SUB debugWertFragen(ta AS GUI_WIDGET, ausdruck AS STRING, doku AS STRING)
+    tippWertAusdruck = ausdruck
+    tippWertFeld = ta
+    tippDoku = doku
+    PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("eval") + "," + jsonText$("expr") + ":" + jsonText$(ausdruck) + "," + jsonText$("id") + ":" + jsonText$("hover") + "}" + NL)
+END SUB
+
+SUB wertTooltip(ausdruck AS STRING, wert AS STRING, typ AS STRING)
+    IF ausdruck <> tippWertAusdruck OR tippWertFeld < 0 THEN RETURN
+    DIM w AS STRING : w = wert
+    IF LEN(w) > 160 THEN w = LEFT$(w, 157) + "..."
+    DIM text AS STRING : text = ausdruck + " = " + w + "   (" + typ + ")"
+    IF tippDoku <> "" THEN text = text + NL + NL + tippDoku
+    GUI_TOOLTIP(tippWertFeld, text)
+    tippFeld = tippWertFeld
+    protokoll("wert " + ausdruck + " = " + wert)
 END SUB
 
 SUB mausNachziehen(ta AS GUI_WIDGET)
@@ -4390,6 +4589,10 @@ SUB mausNachziehen(ta AS GUI_WIDGET)
     IF stelle = "" OR tippGefragt OR tippRuhe < TIPP_RUHE THEN RETURN
     tippGefragt = TRUE
     DIM text AS STRING : text = tippText$(CODE_HOVER$(GUI_TEXT(ta), z, anfang))
+    IF debugWertMoeglich() THEN
+        DIM wz AS ARRAY OF STRING : wz = SPLIT$(GUI_TEXT(ta), NL)
+        debugWertFragen(ta, ausdruckBeiWort$(wz[z - 1], wort, anfang), text)
+    END IF
     IF text = "" THEN RETURN
     GUI_TOOLTIP(ta, text)
     tippFeld = ta
@@ -8127,6 +8330,7 @@ SUB debugHaltepunkteSenden()
     DIM teile AS ARRAY OF STRING : teile = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(hpZeilen) - 1
+        IF NOT hpIstAktiv(i) THEN CONTINUE
         DIM e AS STRING : e = "{" + jsonText$("file") + ":" + jsonText$(hpDateien[i]) + "," + jsonText$("line") + ":" + STR$(hpZeilen[i])
         IF hpBedingungen[i] <> "" THEN e = e + "," + jsonText$("condition") + ":" + jsonText$(hpBedingungen[i])
         ARRAY_PUSH(teile, e + "}")
@@ -8166,7 +8370,7 @@ SUB haltepunkteBestaetigt(j AS JSON_HANDLE)
             IF hpZeilen[i] = z AND SAMEFILE(hpDateien[i], datei) THEN
                 IF haltepunktIndex(hpDateien[i], echt) >= 0 THEN
                     ' Dort steht schon einer: dieser faellt weg.
-                    ARRAY_REMOVE_AT(hpDateien, i) : ARRAY_REMOVE_AT(hpZeilen, i) : ARRAY_REMOVE_AT(hpBedingungen, i)
+                    hpEntfernen(i)
                 ELSE
                     hpZeilen[i] = echt
                 END IF
@@ -8295,9 +8499,18 @@ SUB debugEreignis(zeile AS STRING)
             END IF
             protokoll("debug fehler " + STR$(debugZeile))
         CASE "eval-result"
+            IF JSON_HAS(j, "id") THEN
+                IF JSON_GET_STRING(j, "id") = "hover" THEN
+                    wertTooltip(JSON_GET_STRING(j, "expr"), JSON_GET_STRING(j, "value"), JSON_GET_STRING(j, "type"))
+                    RETURN
+                END IF
+            END IF
             ausgabe("= " + JSON_GET_STRING(j, "value") + "   (" + JSON_GET_STRING(j, "type") + ")")
             protokoll("eval " + JSON_GET_STRING(j, "value"))
         CASE "eval-error"
+            ' Ein Wort unter der Maus, das keinen Wert hat (Schluesselwort,
+            ' Befehl), ist kein Fehler, den man sehen muesste.
+            IF JSON_HAS(j, "id") THEN RETURN
             ausgabe("Fehler: " + JSON_GET_STRING(j, "message"))
         CASE "watches"
             watchesZeigen(j)
@@ -9425,7 +9638,7 @@ paletteEintrag("Geschlossenen Reiter wieder öffnen", "wiederauf", "Strg+Umschal
 paletteEintrag("Starten", "start", "F5") : paletteEintrag("Stoppen", "stopp", "Umschalt+F5") : paletteEintrag("Prüfen", "pruefen", "Umschalt+F7")
 paletteEintrag("Debuggen", "debug", "F7") : paletteEintrag("Haltepunkt setzen/entfernen", "haltepunkt", "F9")
 paletteEintrag("Bedingter Haltepunkt ...", "bedingung", "Umschalt+F9")
-paletteEintrag("Anhalten", "anhalten", "F6") : paletteEintrag("Weiter", "weiter_d", "F8") : paletteEintrag("Schritt drüber", "drueber", "F10")
+paletteEintrag("Alle Haltepunkte", "hp_liste", "Strg+Umschalt+F9") : paletteEintrag("Anhalten", "anhalten", "F6") : paletteEintrag("Weiter", "weiter_d", "F8") : paletteEintrag("Schritt drüber", "drueber", "F10")
 paletteEintrag("Schritt hinein", "hinein", "F11") : paletteEintrag("Schritt heraus", "heraus", "Umschalt+F11")
 paletteEintrag("Bis zur Marke laufen", "bis_marke", "Strg+F10")
 paletteEintrag("Profil aufnehmen", "profil", "Strg+Umschalt+Y")
@@ -9973,6 +10186,7 @@ SUB befehl(k AS STRING)
         CASE "haltepunkt" : haltepunktUmschalten()
         CASE "weiter_d" : debugSchritt("continue")
         CASE "anhalten" : debugAnhalten()
+        CASE "hp_liste" : haltepunkteListeZeigen()
         CASE "drueber" : debugSchritt("step-over")
         CASE "hinein" : debugSchritt("step-into")
         CASE "heraus" : debugSchritt("step-out")
@@ -10289,11 +10503,13 @@ WHILE NOT beenden
     IF GUI_CLICKED(miHaltepunkt) THEN befehl("haltepunkt")
     IF GUI_CLICKED(miWeiterD) OR GUI_CLICKED(btnWeiter) THEN befehl("weiter_d")
     IF GUI_CLICKED(miAnhalten) THEN befehl("anhalten")
+    IF GUI_CLICKED(miHpListe) THEN befehl("hp_liste")
     IF GUI_CLICKED(miDrueber) OR GUI_CLICKED(btnDrueber) THEN befehl("drueber")
     IF GUI_CLICKED(miHinein) OR GUI_CLICKED(btnHinein) THEN befehl("hinein")
     IF GUI_CLICKED(miHeraus) OR GUI_CLICKED(btnHeraus) THEN befehl("heraus")
     IF GUI_CLICKED(btnStoppD) THEN befehl("stopp")
     IF GUI_CLICKED(miBisMarke) OR GUI_CLICKED(btnBisMarke) THEN befehl("bis_marke")
+    haltepunkteListeNachziehen()
     debugPanelNachziehen()
     IF GUI_CLICKED(miProfil) THEN befehl("profil")
     IF GUI_CLICKED(miAusgabeLeer) THEN befehl("ausgabe_leeren")

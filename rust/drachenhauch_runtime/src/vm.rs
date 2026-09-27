@@ -2010,12 +2010,17 @@ impl<'p> Vm<'p> {
                 }
                 "eval" => {
                     let src = cmd.get("expr").and_then(|v| v.as_str()).unwrap_or("");
-                    match crate::parser::parse_expression(src)
+                    // `id` kommt unveraendert zurueck -- so weiss ein Editor,
+                    // welche Frage beantwortet ist (Tooltip oder Eingabezeile).
+                    let id = cmd.get("id").cloned().unwrap_or(serde_json::Value::Null);
+                    let mut ev = match crate::parser::parse_expression(src)
                         .and_then(|n| self.eval_node(&n, fn_, locals)) {
-                        Ok(v) => dbg_emit(&serde_json::json!({
-                            "event":"eval-result","value":v.fmt(),"type":v.type_name()})),
-                        Err(e) => dbg_emit(&serde_json::json!({"event":"eval-error","message":e})),
-                    }
+                        Ok(v) => serde_json::json!({
+                            "event":"eval-result","value":v.fmt(),"type":v.type_name()}),
+                        Err(e) => serde_json::json!({"event":"eval-error","message":e}),
+                    };
+                    if !id.is_null() { ev["id"] = id; ev["expr"] = serde_json::json!(src); }
+                    dbg_emit(&ev);
                 }
                 _ => {}
             }
@@ -2198,7 +2203,48 @@ impl<'p> Vm<'p> {
                 let b = self.eval_node(right, fn_, locals)?;
                 dbg_binop(op, &a, &b)
             }
-            _ => Err("eval: Ausdruck nicht unterstuetzt (nur Vars/Literale/Operatoren)".into()),
+            // Mitglieder und Indizes (2026-09-27): `held.hp`, `feld[3]`,
+            // `karte["a"]` -- fuer Ueberwachen, die Eingabezeile und die
+            // Werte beim Ueberfahren. Nur FELDER: eine PROPERTY fuehrte Code
+            // aus, und Hinsehen soll nichts veraendern.
+            Node::MemberAccess { target, name } => {
+                let t = self.eval_node(target, fn_, locals)?;
+                match &t {
+                    Value::Instance(rc) => {
+                        let inst = rc.borrow();
+                        match inst.platz(&name.to_lowercase()) {
+                            Some(k) => Ok(inst.fields[k].clone()),
+                            None => Err(format!("eval: {} hat kein Feld '{}' (eine PROPERTY wertet der Debugger nicht aus)", inst.class_name, name)),
+                        }
+                    }
+                    Value::Nil => Err(format!("eval: '{}' auf NIL", name)),
+                    _ => Err(format!("eval: {} hat keine Mitglieder", t.type_name())),
+                }
+            }
+            Node::IndexAccess { target, indices } => {
+                let t = self.eval_node(target, fn_, locals)?;
+                let idx: Vec<Value> = indices.iter().map(|i| self.eval_node(i, fn_, locals)).collect::<R<_>>()?;
+                match (&t, idx.as_slice()) {
+                    (Value::Array(rc), _) => {
+                        let mut ganz = Vec::with_capacity(idx.len());
+                        for v in &idx {
+                            match v { Value::Int(i) => ganz.push(*i), _ => return Err("eval: ein Feld-Index muss INTEGER sein".into()) }
+                        }
+                        let a = rc.borrow();
+                        let k = a.flat_index(&ganz)?;
+                        Ok(a.cells.get(k))
+                    }
+                    (Value::Map(rc), [Value::Str(k)]) => rc.borrow().get(k.as_str()).cloned()
+                        .ok_or_else(|| format!("eval: Schluessel '{}' fehlt", k)),
+                    (Value::Tuple(tp), [Value::Int(i)]) => tp.get(*i as usize).cloned()
+                        .ok_or_else(|| format!("eval: Index {} ausserhalb", i)),
+                    (Value::Str(s), [Value::Int(i)]) => s.chars().nth((*i).max(0) as usize)
+                        .map(|c| Value::str_rc(c.to_string()))
+                        .ok_or_else(|| format!("eval: Index {} ausserhalb", i)),
+                    _ => Err(format!("eval: {} laesst sich so nicht indizieren", t.type_name())),
+                }
+            }
+            _ => Err("eval: Ausdruck nicht unterstuetzt (nur Namen, Literale, Operatoren, Felder und Indizes -- keine Aufrufe)".into()),
         }
     }
 

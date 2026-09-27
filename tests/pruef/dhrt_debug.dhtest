@@ -506,3 +506,66 @@ paused 1
 run-to-error 50
 paused 3
 finished
+
+=== eval mit id gibt id und ausdruck zurueck
+' Ein Editor, der Tooltip-Werte und die Eingabezeile ueber dasselbe eval
+' fragt, erkennt die Antwort an der id.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[3]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "x" + q + "," + q + "id" + q + ":" + q + "hover" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "gibtsnicht" + q + "," + q + "id" + q + ":" + q + "hover" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "x + 1" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF LEFT$(art$(i), 4) = "eval" THEN PRINT art$(i); " ["; feld$(i, "id"); "] ["; feld$(i, "expr"); "] "; feld$(i, "value")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+x = 5
+PRINT x
+
+--- erwartet
+eval-result [hover] [x] 5
+eval-error [hover] [gibtsnicht] 
+eval-result [] [] 6
+
+=== eval kennt felder und indizes aber keine aufrufe
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+FUNCTION ev$(ausdruck AS STRING) AS STRING
+    RETURN "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + REPLACE$(ausdruck, q, "\" + q) + q + "}"
+END FUNCTION
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[9]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    ev$("held.hp * 2"), ev$("f[1] + m[" + q + "a" + q + "]"), ev$("held.gibts"), ev$("zweimal(3)"), _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "eval-result" THEN PRINT "wert "; feld$(i, "value")
+    IF art$(i) = "eval-error" THEN PRINT "fehler "; LEFT$(feld$(i, "message"), 30)
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+CLASS Held
+    DIM hp AS INTEGER
+END CLASS
+DIM held AS Held : held = NEW Held()
+held.hp = 7
+DIM f AS ARRAY OF INTEGER : f = [4, 5, 6]
+DIM m AS MAP OF INTEGER : m = {"a": 9}
+FUNCTION zweimal(n AS INTEGER) AS INTEGER : RETURN n * 2 : END FUNCTION
+PRINT held.hp
+
+--- erwartet
+wert 14
+wert 14
+fehler eval: held hat kein Feld 'gibt
+fehler eval: Ausdruck nicht unterstue
