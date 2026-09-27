@@ -1599,8 +1599,10 @@ fn debug_main(path: &str) -> ExitCode {
         Err(e) => { eprintln!("Lade-Fehler: {}", e); return ExitCode::from(1); }
     };
     let karte = zeilenkarte(&raw_source, &base, path, &abs, &prog);
+    let klassen = preprocess::process(&raw_source, &base).ok()
+        .map(|(quelle, _, _, _)| debugger::klassen_namen(&quelle)).unwrap_or_default();
     let mut machine = vm::Vm::new(&prog);
-    machine.enable_debug(karte);
+    machine.enable_debug(karte, klassen);
     let res = machine.run();
     machine.debug_flush_output();
     // Review-Fund: verglich frueher den Fehlertext gegen "__DEBUG_STOP__" --
@@ -1616,6 +1618,8 @@ fn debug_main(path: &str) -> ExitCode {
         Err(_) if machine.exit_code().is_some() =>
             serde_json::json!({"event": "finished", "reason": "done"}),
         Err(e) => {
+            // Erst an der Fehlerstelle anhalten (Variablen ansehen), dann melden.
+            machine.debug_fehler_halt(e);
             let (datei, zeile) = machine.debug_stelle(machine.error_line());
             serde_json::json!({"event": "error", "line": zeile, "file": datei, "message": e })
         }

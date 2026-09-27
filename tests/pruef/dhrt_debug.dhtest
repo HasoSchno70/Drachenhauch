@@ -567,5 +567,119 @@ PRINT held.hp
 --- erwartet
 wert 14
 wert 14
-fehler eval: held hat kein Feld 'gibt
+fehler eval: Held hat kein Feld 'gibt
 fehler eval: Ausdruck nicht unterstue
+
+=== variablen tragen ihre kinder und klassen ihren namen
+' Felder, Objekte und MAPs klappen in der IDE auf -- der Debugger liefert
+' die Inhalte mit, je Ebene hoechstens 100, und nennt die Klasse, wie sie
+' geschrieben wurde (der Parser fuehrt sie klein).
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[12]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM h AS INTEGER : h = ersteMit("paused", 12)
+DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[h])
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(k, "globals") - 1
+    DIM p AS STRING : p = "globals." + STR$(i)
+    DIM z AS STRING : z = JSON_GET_STRING(k, p + ".name") + " " + JSON_GET_STRING(k, p + ".type") + " " + JSON_GET_STRING(k, p + ".value")
+    IF JSON_HAS(k, p + ".children") THEN
+        z = z + " | " + STR$(JSON_LEN(k, p + ".children")) + ": " + JSON_GET_STRING(k, p + ".children.0.name") + "=" + JSON_GET_STRING(k, p + ".children.0.value")
+        DIM letzt AS INTEGER : letzt = JSON_LEN(k, p + ".children") - 1
+        z = z + " ... " + JSON_GET_STRING(k, p + ".children." + STR$(letzt) + ".name") + "=" + JSON_GET_STRING(k, p + ".children." + STR$(letzt) + ".value")
+    END IF
+    PRINT z
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+CLASS Held
+    DIM hp AS INTEGER
+    DIM name AS STRING
+END CLASS
+DIM held AS Held : held = NEW Held()
+held.hp = 7 : held.name = "Ada"
+DIM gross[150] AS INTEGER
+DIM m AS MAP OF INTEGER : m = {"a": 1, "b": 2}
+DIM t AS TUPLE : t = (1, "zwei")
+DIM i AS INTEGER
+FOR i = 0 TO 149 : gross[i] = i : NEXT
+PRINT held.hp
+
+--- erwartet
+gross ARRAY <ARRAY[150] OF INTEGER> | 101: [0]=0 ... ...=50 weitere
+held Held <Held> | 2: hp=7 ... name=Ada
+i INTEGER 150
+m MAP <MAP[2] OF INTEGER> | 2: "a"=1 ... "b"=2
+t TUPLE (1, zwei) | 2: [0]=1 ... [1]=zwei
+
+=== ein nicht abgefangener fehler haelt an seiner stelle an
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "i * 10" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" THEN PRINT "halt "; feld$(i, "line"); " ["; feld$(i, "reason"); "] "; paar$(i, "locals", "i"); " "; feld$(i, "stack.0.name")
+    IF art$(i) = "eval-result" THEN PRINT "wert "; feld$(i, "value")
+    IF art$(i) = "error" THEN PRINT "fehler "; feld$(i, "line")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+' Ein Fehler, der abgefangen wird, haelt NICHT an.
+TRY
+    THROW "harmlos"
+CATCH e
+    PRINT "gefangen"
+END TRY
+SUB fuellen()
+    DIM f[3] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO 5
+        f[i] = i
+    NEXT
+END SUB
+fuellen()
+
+--- erwartet
+halt 2 []  __main__
+halt 11 [error] 3 fuellen
+wert 30
+fehler 11
+
+=== ein grafikfenster bleibt im halt ansprechbar
+' Waehrend der Debugger auf Kommandos wartet, holt er alle 50 ms die
+' Fensternachrichten ab -- sonst meldete Windows das Fenster nach wenigen
+' Sekunden als "reagiert nicht" (vorher gemessen: Responding False).
+DIM q AS STRING : q = CHR$(34)
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "debug", CWD$() + "/fenster.dh")
+PROCESS_WRITE(p, "{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[4]}" + CHR$(10))
+PROCESS_WRITE(p, "{" + q + "cmd" + q + ":" + q + "continue" + q + "}" + CHR$(10))
+SLEEP(7000)
+DIM ps AS STRING : ps = "Get-Process dhrt | Where-Object { $_.MainWindowTitle -eq 'Halt-Pruefung' } | ForEach-Object { $_.Responding }"
+DIM antwort AS STRING : antwort = TRIM$(SHELL_OUT$("powershell", "-NoProfile", "-Command", ps))
+PROCESS_WRITE(p, "{" + q + "cmd" + q + ":" + q + "stop" + q + "}" + CHR$(10))
+SLEEP(300)
+IF PROCESS_RUNNING(p) THEN PROCESS_KILL(p)
+IF antwort = "" THEN
+    PRINT "UEBERSPRINGEN: kein Fenster gefunden"
+ELSE
+    PRINT "ansprechbar "; antwort
+END IF
+--- datei fenster.dh
+SCREEN(320, 200, "Halt-Pruefung")
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    n = n + 1
+    CLS(RGB(20, 40, 80))
+    FLIP()
+WEND
+--- system windows
+--- erwartet
+ansprechbar True

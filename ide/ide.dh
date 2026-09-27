@@ -1035,8 +1035,13 @@ DIM btnStoppD AS GUI_WIDGET : btnStoppD = GUI_BUTTON(win, "Stopp", 0, 0, 60, 26)
 GUI_BUTTON_VARIANT(btnStoppD, "gefahr")
 DIM tblVars AS GUI_WIDGET : tblVars = GUI_TABLE(win, 0, 0, 10, 10)
 GUI_TABLE_HEADERS(tblVars, ["Name", "Typ", "Wert", "Bereich"])
-GUI_TABLE_COL_WIDTHS(tblVars, [140, 90, 260, 70])
-GUI_TOOLTIP(tblVars, "Doppelklick setzt einen neuen Wert")
+GUI_TABLE_COL_WIDTHS(tblVars, [160, 90, 250, 60])
+' Als Baum: Felder, Objekte und MAPs klappen auf (der Debugger liefert die
+' Inhalte begrenzt mit). Was aufgeklappt war, ist es beim naechsten Halt wieder.
+GUI_TABLE_SET(tblVars, "baum", 1)
+GUI_TOOLTIP(tblVars, "Doppelklick setzt einen neuen Wert -- das Dreieck klappt Felder und Objekte auf")
+DIM varPfade AS ARRAY OF STRING : varPfade = []
+DIM varOffen AS ARRAY OF STRING : varOffen = []
 DIM btnBisMarke AS GUI_WIDGET : btnBisMarke = GUI_BUTTON(win, "Bis Marke", 0, 0, 84, 26)
 GUI_TOOLTIP(btnBisMarke, "Bis zur Zeile mit der Schreibmarke laufen (Strg+F10)")
 ' Rechts neben den Variablen: der Aufrufstapel (innen oben, Doppelklick
@@ -8419,18 +8424,43 @@ SUB debugSchritt(cmd AS STRING)
 END SUB
 
 SUB variablenZeigen(j AS JSON_HANDLE)
+    ' Welche Eintraege offen sind, gilt ueber den Halt hinaus -- gemerkt
+    ' an ihrem Weg (`held`, `held.waffe`, `f[3]`), nicht an der Zeilennummer.
+    DIM r AS INTEGER
+    IF LEN(varPfade) > 0 THEN
+        varOffen = []
+        FOR r = 0 TO MIN(LEN(varPfade), GUI_TABLE_ROW_COUNT(tblVars)) - 1
+            IF GUI_TREETABLE_EXPANDED(tblVars, r) THEN ARRAY_PUSH(varOffen, varPfade[r])
+        NEXT
+    END IF
     GUI_TABLE_CLEAR(tblVars)
+    varPfade = []
     DIM bereich AS STRING
     FOR EACH bereich IN ("locals", "globals")
         IF NOT JSON_HAS(j, bereich) THEN CONTINUE
-        DIM n AS INTEGER : n = JSON_LEN(j, bereich)
-        DIM i AS INTEGER
-        FOR i = 0 TO n - 1
-            DIM p AS STRING : p = bereich + "." + STR$(i)
-            DIM wo AS STRING : wo = "lokal"
-            IF bereich = "globals" THEN wo = "global"
-            GUI_TABLE_ADD_ROW(tblVars, [JSON_GET_STRING(j, p + ".name"), JSON_GET_STRING(j, p + ".type"), JSON_GET_STRING(j, p + ".value"), wo])
-        NEXT
+        DIM wo AS STRING : wo = "lokal"
+        IF bereich = "globals" THEN wo = "global"
+        variablenEbene(j, bereich, -1, "", wo)
+    NEXT
+    FOR r = 0 TO LEN(varPfade) - 1
+        IF ARRAY_INDEXOF(varOffen, varPfade[r]) >= 0 THEN GUI_TREETABLE_EXPAND(tblVars, r, TRUE)
+    NEXT
+END SUB
+
+' Eine Ebene der Variablenliste samt ihren Kindern.
+SUB variablenEbene(j AS JSON_HANDLE, pfad AS STRING, eltern AS INTEGER, vor AS STRING, wo AS STRING)
+    DIM n AS INTEGER : n = JSON_LEN(j, pfad)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = pfad + "." + STR$(i)
+        DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+        DIM zeile AS INTEGER : zeile = GUI_TREETABLE_ADD(tblVars, eltern, [name, JSON_GET_STRING(j, p + ".type"), JSON_GET_STRING(j, p + ".value"), IIF(eltern < 0, wo, "")])
+        ' Der Weg wie ein Ausdruck: Feld mit Punkt, Index/Schluessel ohne.
+        DIM weg AS STRING : weg = name
+        IF vor <> "" THEN weg = IIF(LEFT$(name, 1) = "[" OR LEFT$(name, 1) = CHR$(34), vor + name, vor + "." + name)
+        WHILE LEN(varPfade) < zeile : ARRAY_PUSH(varPfade, "") : WEND
+        IF zeile < LEN(varPfade) THEN varPfade[zeile] = weg ELSE ARRAY_PUSH(varPfade, weg)
+        IF JSON_HAS(j, p + ".children") THEN variablenEbene(j, p + ".children", zeile, weg, wo)
     NEXT
 END SUB
 
@@ -8534,6 +8564,14 @@ SUB debugHaltZeigen(j AS JSON_HANDLE)
     DIM wo AS STRING : wo = "Zeile " + STR$(debugZeile)
     IF NOT SAMEFILE(debugDatei, prozessDatei) THEN wo = BASENAME(debugDatei) + ", " + wo
     GUI_SET_TEXT(lblDebug, "Debugger steht in " + wo + " (Tiefe " + STR$(JSON_GET_INT(j, "depth")) + ")")
+    ' Ein Halt am FEHLER: Variablen so, wie sie beim Fehler waren; weiter
+    ' geht es nicht mehr, F8 beendet.
+    IF JSON_HAS(j, "reason") THEN
+        IF JSON_GET_STRING(j, "reason") = "error" THEN
+            GUI_SET_TEXT(lblDebug, "Fehler in " + wo + ": " + JSON_GET_STRING(j, "message") + "  -- F8 beendet")
+            protokoll("debug fehlerhalt " + STR$(debugZeile))
+        END IF
+    END IF
     dateiOeffnen(debugDatei)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, debugZeile, 1)
@@ -8671,6 +8709,11 @@ SUB debugPanelNachziehen()
     END IF
     IF GUI_DOUBLE_CLICKED(tblVars) THEN
         DIM r AS INTEGER : r = GUI_TABLE_SELECTED(tblVars)
+        ' Setzen geht nur fuer eine ganze Variable -- ein Feld darin nicht.
+        IF r >= 0 AND GUI_TREETABLE_PARENT(tblVars, r) >= 0 THEN
+            GUI_SET_TEXT(lblStatus, "Setzen geht nur für eine ganze Variable, nicht für ein Feld darin.")
+            r = -1
+        END IF
         IF r >= 0 AND prozessArt = "debug" AND debugPause THEN
             setzenName = GUI_TABLE_GET_CELL(tblVars, r, 0)
             dlgSetzen = GUI_PROMPT("Wert setzen", "Neuer Wert für " + setzenName + " (ein Ausdruck):", GUI_TABLE_GET_CELL(tblVars, r, 2))

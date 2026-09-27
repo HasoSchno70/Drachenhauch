@@ -18,7 +18,7 @@
 //! Haltepunkt auf eine Zeile ohne Code (Kommentar, Leerzeile, `END IF`,
 //! `SUB`-Kopf) zur naechsten Zeile DERSELBEN Datei, die Code hat.
 
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, TryRecvError};
 
@@ -88,24 +88,30 @@ impl Kanal {
     }
 
     /// Das naechste Kommando, das kein `input` ist -- blockierend. None =
-    /// stdin ist zu und nichts mehr da.
-    pub fn naechstes(&mut self) -> Option<serde_json::Value> {
+    /// stdin ist zu und nichts mehr da. `pumpe` laeuft alle 50 ms, solange
+    /// nichts kommt: dort holt die VM die Fensternachrichten ab -- sonst
+    /// meldete Windows ein Grafikprogramm im Halt nach wenigen Sekunden als
+    /// "reagiert nicht" (gemessen 2026-09-27).
+    pub fn naechstes(&mut self, pumpe: &mut dyn FnMut()) -> Option<serde_json::Value> {
         loop {
             self.einsammeln();
             if let Some(i) = self.warte.iter().position(|c| art(c) != "input") {
                 return self.warte.remove(i);
             }
             if self.zu { return None; }
-            self.warten();
+            self.warten(pumpe);
         }
     }
 
-    /// Einen Moment auf ein neues Kommando warten (blockierend).
-    fn warten(&mut self) {
-        let rx = match &self.rx { Some(r) => r, None => { self.zu = true; return; } };
-        match rx.recv() {
-            Ok(Some(v)) => self.warte.push_back(v),
-            _ => { self.zu = true; self.rx = None; }
+    /// Einen Moment auf ein neues Kommando warten (blockierend, mit Pumpe).
+    fn warten(&mut self, pumpe: &mut dyn FnMut()) {
+        loop {
+            let rx = match &self.rx { Some(r) => r, None => { self.zu = true; return; } };
+            match rx.recv_timeout(std::time::Duration::from_millis(50)) {
+                Ok(Some(v)) => { self.warte.push_back(v); return; }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => pumpe(),
+                _ => { self.zu = true; self.rx = None; return; }
+            }
         }
     }
 
@@ -146,10 +152,10 @@ impl Kanal {
     }
 
     /// Blockierend auf irgendein neues Kommando warten; FALSE = stdin zu.
-    pub fn auf_neues_warten(&mut self) -> bool {
+    pub fn auf_neues_warten(&mut self, pumpe: &mut dyn FnMut()) -> bool {
         self.einsammeln();
         if self.zu { return false; }
-        self.warten();
+        self.warten(pumpe);
         !self.zu || !self.warte.is_empty()
     }
 }
@@ -237,6 +243,24 @@ impl Karte {
     pub fn haupt(&self) -> &str { &self.anzeige[0] }
 }
 
+/// Die Schreibweise der Klassennamen, wie sie im Quelltext steht: der Parser
+/// fuehrt Namen klein (`held`), der Nutzer hat `Held` geschrieben. Gelesen
+/// aus `CLASS Name` / `STRUCT Name` am Zeilenanfang; klein -> wie geschrieben.
+pub fn klassen_namen(quelle: &str) -> HashMap<String, String> {
+    let mut m = HashMap::new();
+    for zeile in quelle.lines() {
+        let z = zeile.trim_start();
+        let lz = z.to_lowercase();
+        let rest = if lz.starts_with("class ") { &z[6..] }
+                   else if lz.starts_with("struct ") { &z[7..] }
+                   else { continue };
+        let name: String = rest.trim_start().chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+        if !name.is_empty() { m.entry(name.to_lowercase()).or_insert(name); }
+    }
+    m
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,9 +311,17 @@ mod tests {
         let mut k2 = Kanal::aus(vec![json!({"cmd":"set-breakpoints","lines":[3]})]);
         assert!(k2.lebende().is_empty());
         assert_eq!(k.eingabe(), Ok(Some("5".to_string())));
-        assert_eq!(art(&k.naechstes().unwrap()), "continue");
-        assert_eq!(art(&k.naechstes().unwrap()), "set-watches");
-        assert!(k.naechstes().is_none());
+        assert_eq!(art(&k.naechstes(&mut || {}).unwrap()), "continue");
+        assert_eq!(art(&k.naechstes(&mut || {}).unwrap()), "set-watches");
+        assert!(k.naechstes(&mut || {}).is_none());
+    }
+
+    #[test]
+    fn klassennamen_wie_geschrieben() {
+        let m = klassen_namen("CLASS Held EXTENDS Figur\n  struct PunktXY\n' CLASS Kommentar? nein: Zeile beginnt mit '\nDIM class_x AS INTEGER");
+        assert_eq!(m.get("held").map(|s| s.as_str()), Some("Held"));
+        assert_eq!(m.get("punktxy").map(|s| s.as_str()), Some("PunktXY"));
+        assert_eq!(m.len(), 2);
     }
 
     #[test]
