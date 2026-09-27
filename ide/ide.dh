@@ -450,33 +450,42 @@ IF JSON_HAS(konfig, "vorspann") THEN vorspannAn = JSON_GET_BOOL(konfig, "vorspan
 ' ein neuer Drachenhauch. Abschalten in den Einstellungen (`glanz`).
 DIM glanzAn AS BOOLEAN : glanzAn = TRUE
 IF JSON_HAS(konfig, "glanz") THEN glanzAn = JSON_GET_BOOL(konfig, "glanz")
-DIM vorspannPfad AS STRING : vorspannPfad = PATHJOIN(wurzel, "daten/video/vorspann.mp4")
+' Welcher Vorspann: jede .mp4 in daten/video steht in den Einstellungen zur
+' Wahl (`vorspann_datei` in der ide.json), dazu "abwechselnd" -- dann kommt
+' bei jedem Start der naechste (`vorspann_zuletzt`). Eine gewaehlte Datei,
+' die es nicht mehr gibt, faellt auf die erste zurueck.
+DIM vorspannOrdner AS STRING : vorspannOrdner = PATHJOIN(wurzel, "daten/video")
+DIM vorspannDatei AS STRING : vorspannDatei = "vorspann.mp4"
+IF JSON_HAS(konfig, "vorspann_datei") THEN vorspannDatei = JSON_GET_STRING(konfig, "vorspann_datei")
+DIM vorspannZuletzt AS INTEGER : vorspannZuletzt = -1
+IF JSON_HAS(konfig, "vorspann_zuletzt") THEN vorspannZuletzt = JSON_GET_INT(konfig, "vorspann_zuletzt")
+DIM vorspannPfad AS STRING : vorspannPfad = ""
 DIM vorspannSchluss AS BOOLEAN : vorspannSchluss = FALSE
-IF (GETENV$("DHRT_FRAMES") = "" OR GETENV$("DH_IDE_VORSPANN") = "1") AND vorspannAn AND FILEEXISTS(vorspannPfad) THEN
-    TRY
-        DIM vsp AS VIDEO : vsp = VIDEO_LOAD(vorspannPfad)
-        VIDEO_PLAY(vsp)
-        DIM vspWeg AS STRING : vspWeg = ""
-        WHILE vspWeg = ""
-            IF WINDOW_CLOSE_REQUESTED() THEN vspWeg = "kreuz"
-            IF QUITREQUESTED() AND vspWeg = "" THEN vspWeg = "ende"
-            IF KEY_ANY_HIT() >= 0 OR MOUSE_HIT(0) OR MOUSE_HIT(1) THEN vspWeg = "uebersprungen"
-            DIM vsb AS INTEGER : vsb = SCREENWIDTH()
-            DIM vsh AS INTEGER : vsh = SCREENHEIGHT()
-            DIM vsm AS FLOAT : vsm = MIN(vsb / VIDEO_WIDTH(vsp), vsh / VIDEO_HEIGHT(vsp))
-            DIM vw AS INTEGER : vw = INT(VIDEO_WIDTH(vsp) * vsm)
-            DIM vh AS INTEGER : vh = INT(VIDEO_HEIGHT(vsp) * vsm)
-            CLS(0)
-            VIDEO_DRAW(vsp, (vsb - vw) \ 2, (vsh - vh) \ 2, vw, vh)
-            FLIP()
-            IF VIDEO_DONE(vsp) AND vspWeg = "" THEN vspWeg = "zu ende"
-        WEND
-        protokoll("vorspann " + vspWeg + " bei bild " + STR$(VIDEO_FRAME(vsp)))
-        VIDEO_FREE(vsp)
-        IF vspWeg = "kreuz" THEN vorspannSchluss = TRUE
-    CATCH e
-        protokoll("vorspann fehler " + e)
-    END TRY
+IF (GETENV$("DHRT_FRAMES") = "" OR GETENV$("DH_IDE_VORSPANN") = "1") AND vorspannAn THEN
+    DIM vsListe AS ARRAY OF STRING : vsListe = vorspannListe()
+    IF LEN(vsListe) > 0 THEN
+        IF LOWER$(vorspannDatei) = "abwechselnd" THEN
+            vorspannZuletzt = (vorspannZuletzt + 1) MOD LEN(vsListe)
+            IF vorspannZuletzt < 0 THEN vorspannZuletzt = 0
+            vorspannPfad = PATHJOIN(vorspannOrdner, vsListe[vorspannZuletzt])
+            ' Gleich merken: beendet die IDE nicht sauber, kaeme sonst
+            ' beim naechsten Start derselbe.
+            JSON_SET_INT(konfig, "vorspann_zuletzt", vorspannZuletzt)
+            TRY
+                MKDIR(DIRNAME(konfigPfad))
+                WRITEALL(konfigPfad, JSON_STRINGIFY(konfig))
+            CATCH e
+            END TRY
+        ELSEIF ARRAY_INDEXOF(vsListe, vorspannDatei) >= 0 THEN
+            vorspannPfad = PATHJOIN(vorspannOrdner, vorspannDatei)
+        ELSE
+            vorspannPfad = PATHJOIN(vorspannOrdner, vsListe[0])
+        END IF
+    END IF
+    IF vorspannPfad <> "" THEN
+        protokoll("film " + BASENAME(vorspannPfad))
+        IF vorspannSpielen(vorspannPfad) = "kreuz" THEN vorspannSchluss = TRUE
+    END IF
 END IF
 IF vorspannSchluss THEN END
 
@@ -1062,6 +1071,11 @@ DIM cbKlammern AS GUI_WIDGET : cbKlammern = GUI_CHECKBOX(winEinst, "Klammern und
 DIM cbFormatSichern AS GUI_WIDGET : cbFormatSichern = GUI_CHECKBOX(winEinst, "Beim Sichern formatieren", 400, 44, FALSE)
 DIM cbVorspann AS GUI_WIDGET : cbVorspann = GUI_CHECKBOX(winEinst, "Vorspann beim Start", 400, 74, TRUE)
 DIM cbGlanz AS GUI_WIDGET : cbGlanz = GUI_CHECKBOX(winEinst, "Lichtstreif beim Start und beim Starten", 400, 104, TRUE)
+DIM lblVorspann AS GUI_WIDGET : lblVorspann = GUI_LABEL(winEinst, "Welcher Vorspann", 400, 142)
+DIM ddVorspann AS GUI_WIDGET : ddVorspann = GUI_DROPDOWN(winEinst, 400, 164, 200, 28, ["Vorspann"])
+DIM btnVorspannSehen AS GUI_WIDGET : btnVorspannSehen = GUI_BUTTON(winEinst, "Ansehen", 608, 164, 96, 28)
+GUI_TOOLTIP(btnVorspannSehen, "Den gewählten Vorspann jetzt abspielen (eine Taste oder ein Klick bricht ab)")
+DIM vorspannWahlStand AS INTEGER : vorspannWahlStand = 0
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgröße", 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
 DIM lblListen AS GUI_WIDGET : lblListen = GUI_LABEL(winEinst, "Schrift der Listen", 16, 326)
@@ -1440,6 +1454,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
     JSON_SET_BOOL(konfig, "klammern", klammernAn)
     JSON_SET_BOOL(konfig, "vorspann", vorspannAn)
+    JSON_SET_STRING(konfig, "vorspann_datei", vorspannDatei)
     JSON_SET_BOOL(konfig, "glanz", glanzAn)
     JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
@@ -1936,6 +1951,82 @@ SUB ueberZeigen()
     protokoll("ueber bilder " + STR$(ueberBilder))
 END SUB
 
+' Die Vorspann-Videos: jede .mp4 in daten/video, nach Namen.
+FUNCTION vorspannListe() AS ARRAY OF STRING
+    DIM raus AS ARRAY OF STRING : raus = []
+    ' FILEEXISTS kennt nur Dateien -- ein fehlender Ordner ist ein Fehler
+    ' von DIRLIST, und dann gibt es eben keinen Vorspann.
+    TRY
+        DIM n AS STRING
+        FOR EACH n IN DIRLIST(vorspannOrdner, "*.mp4")
+            ARRAY_PUSH(raus, BASENAME(n))
+        NEXT
+    CATCH e
+        RETURN raus
+    END TRY
+    SORT(raus)
+    RETURN raus
+END FUNCTION
+
+' Wie ein Vorspann in der Auswahl heisst: der Dateiname ohne Endung,
+' "_" als Leerzeichen, vorn gross -- "vorspann_2.mp4" wird "Vorspann 2".
+FUNCTION vorspannName$(datei AS STRING) AS STRING
+    DIM n AS STRING : n = datei
+    IF LOWER$(RIGHT$(n, 4)) = ".mp4" THEN n = LEFT$(n, LEN(n) - 4)
+    n = REPLACE$(n, "_", " ")
+    IF n = "" THEN RETURN datei
+    RETURN UPPER$(LEFT$(n, 1)) + MID$(n, 1, LEN(n))
+END FUNCTION
+
+' Ein Video auf der ganzen Flaeche, eingepasst (schwarze Raender, wo das
+' Seitenverhaeltnis nicht passt). Jede Taste und jeder Klick
+' ueberspringt, das Kreuz liefert "kreuz". Kann dieser Bau keine Videos
+' oder ist die Datei kaputt, steht es im Protokoll, und es geht weiter.
+FUNCTION vorspannSpielen(pfad AS STRING) AS STRING
+    DIM vspWeg AS STRING : vspWeg = ""
+    TRY
+        DIM vsp AS VIDEO : vsp = VIDEO_LOAD(pfad)
+        VIDEO_PLAY(vsp)
+        WHILE vspWeg = ""
+            IF WINDOW_CLOSE_REQUESTED() THEN vspWeg = "kreuz"
+            IF QUITREQUESTED() AND vspWeg = "" THEN vspWeg = "ende"
+            IF KEY_ANY_HIT() >= 0 OR MOUSE_HIT(0) OR MOUSE_HIT(1) THEN vspWeg = "uebersprungen"
+            DIM vsb AS INTEGER : vsb = SCREENWIDTH()
+            DIM vsh AS INTEGER : vsh = SCREENHEIGHT()
+            DIM vsm AS FLOAT : vsm = MIN(vsb / VIDEO_WIDTH(vsp), vsh / VIDEO_HEIGHT(vsp))
+            DIM vw AS INTEGER : vw = INT(VIDEO_WIDTH(vsp) * vsm)
+            DIM vh AS INTEGER : vh = INT(VIDEO_HEIGHT(vsp) * vsm)
+            CLS(0)
+            VIDEO_DRAW(vsp, (vsb - vw) \ 2, (vsh - vh) \ 2, vw, vh)
+            FLIP()
+            IF VIDEO_DONE(vsp) AND vspWeg = "" THEN vspWeg = "zu ende"
+        WEND
+        protokoll("vorspann " + vspWeg + " bei bild " + STR$(VIDEO_FRAME(vsp)))
+        VIDEO_FREE(vsp)
+    CATCH e
+        protokoll("vorspann fehler " + e)
+    END TRY
+    RETURN vspWeg
+END FUNCTION
+
+' Die Klappliste der Einstellungen: jeder Vorspann, dann "Abwechselnd".
+SUB vorspannAuswahlFuellen()
+    GUI_LISTBOX_CLEAR(ddVorspann)
+    DIM liste AS ARRAY OF STRING : liste = vorspannListe()
+    DIM n AS STRING
+    DIM wahl AS INTEGER : wahl = 0
+    DIM i AS INTEGER : i = 0
+    FOR EACH n IN liste
+        GUI_LISTBOX_ADD(ddVorspann, vorspannName$(n))
+        IF LOWER$(n) = LOWER$(vorspannDatei) THEN wahl = i
+        i = i + 1
+    NEXT
+    GUI_LISTBOX_ADD(ddVorspann, "Abwechselnd")
+    IF LOWER$(vorspannDatei) = "abwechselnd" THEN wahl = LEN(liste)
+    GUI_DROPDOWN_SET_SELECTED(ddVorspann, wahl)
+    vorspannWahlStand = wahl
+END SUB
+
 SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbHell, hell)
     GUI_SET_CHECKED(cbUmbruch, umbruchAn)
@@ -1950,6 +2041,7 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbFormatSichern, formatSichernAn)
     GUI_SET_CHECKED(cbVorspann, vorspannAn)
     GUI_SET_CHECKED(cbGlanz, glanzAn)
+    vorspannAuswahlFuellen()
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spListen, listenGroesse)
     GUI_SET_VALUE(spHbGr, handbuchGroesse)
@@ -1984,6 +2076,23 @@ SUB einstellungenNachziehen()
         vorspannAn = GUI_CHECKED(cbVorspann)
         konfigSichern()
         protokoll("vorspann " + IIF(vorspannAn, "an", "aus"))
+    END IF
+    IF GUI_DROPDOWN_SELECTED(ddVorspann) <> vorspannWahlStand AND GUI_DROPDOWN_SELECTED(ddVorspann) >= 0 THEN
+        vorspannWahlStand = GUI_DROPDOWN_SELECTED(ddVorspann)
+        DIM vl AS ARRAY OF STRING : vl = vorspannListe()
+        IF vorspannWahlStand < LEN(vl) THEN vorspannDatei = vl[vorspannWahlStand] ELSE vorspannDatei = "abwechselnd"
+        konfigSichern()
+        protokoll("vorspann wahl " + vorspannDatei)
+    END IF
+    IF GUI_CLICKED(btnVorspannSehen) THEN
+        DIM vl2 AS ARRAY OF STRING : vl2 = vorspannListe()
+        IF LEN(vl2) > 0 THEN
+            DIM vi AS INTEGER : vi = GUI_DROPDOWN_SELECTED(ddVorspann)
+            ' "Abwechselnd" zeigt den, der beim naechsten Start kaeme.
+            IF vi < 0 OR vi >= LEN(vl2) THEN vi = (vorspannZuletzt + 1) MOD LEN(vl2)
+            IF vi < 0 THEN vi = 0
+            IF vorspannSpielen(PATHJOIN(vorspannOrdner, vl2[vi])) = "kreuz" THEN beendenAnfragen()
+        END IF
     END IF
     IF GUI_CHECKED(cbGlanz) <> glanzAn THEN
         glanzAn = GUI_CHECKED(cbGlanz)
@@ -2671,9 +2780,19 @@ FUNCTION projektDateien(muster AS STRING) AS ARRAY OF STRING
     FOR hi = 0 TO GUI_FILETREE_CHECKED_COUNT(baum) - 1
         ARRAY_PUSH(gewaehlt, wegGleich$(GUI_FILETREE_CHECKED_PATH$(baum, hi)))
     NEXT
+    ' Ein angehakter ORDNER nimmt alles darunter mit -- bis 2026-09-27 zaehlte
+    ' nur der genaue Weg einer Datei, ein Ordner-Haken machte das Projekt
+    ' also LEER: die Projektsuche fand nichts, und es sah aus, als taete der
+    ' Haken nichts.
     DIM nur AS ARRAY OF STRING : nur = []
     FOR EACH d IN raus
-        IF ARRAY_INDEXOF(gewaehlt, wegGleich$(PATHJOIN(projektOrdner, d))) >= 0 THEN ARRAY_PUSH(nur, d)
+        DIM voll AS STRING : voll = wegGleich$(PATHJOIN(projektOrdner, d))
+        DIM drin AS BOOLEAN : drin = ARRAY_INDEXOF(gewaehlt, voll) >= 0
+        DIM g AS STRING
+        FOR EACH g IN gewaehlt
+            IF NOT drin AND LEFT$(voll, LEN(g) + 1) = g + "/" THEN drin = TRUE
+        NEXT
+        IF drin THEN ARRAY_PUSH(nur, d)
     NEXT
     RETURN nur
 END FUNCTION
@@ -2722,6 +2841,7 @@ GUI_FILETREE_SET(baum, "auffrischen", 2000)
 GUI_FILETREE_SET(baum, "klick_klappt", 1)
 ' Haken am Baum: was angehakt ist, IST das Projekt (siehe projektDateien).
 GUI_FILETREE_SET(baum, "kaestchen", 1)
+GUI_TOOLTIP(baum, "Haken: Projektsuche, Umbenennen, Ersetzen und Symbolverzeichnis gelten dann nur für die angehakten Dateien und Ordner. Ohne Haken: das ganze Projekt.")
 
 ' Laesst sich die Datei im Editor bearbeiten? Alles andere geht an das
 ' Programm des Systems (ein PNG im Code-Feld waere Kauderwelsch).
@@ -2753,7 +2873,7 @@ SUB projektBeschriften()
     IF n = 0 THEN
         GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner))
     ELSE
-        GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner) + " -- nur " + STR$(n) + " angehakt")
+        GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner) + " -- Suche/Umbau nur in " + STR$(n) + " angehakten")
     END IF
 END SUB
 
