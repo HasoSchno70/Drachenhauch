@@ -1,0 +1,101 @@
+' Die Variablenliste des Debuggers als Baum und der Halt am Fehler
+' (ide/ide.dh, 2026-09-27). Getrieben ueber die Unterprogramme der IDE.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+--- langsam
+=== felder und objekte klappen auf und bleiben offen
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 10 THEN
+    haltepunktUmschaltenIn(tabPfade[aktiverTab], 8)
+    haltepunktUmschaltenIn(tabPfade[aktiverTab], 9)
+    befehl("debug")
+END IF
+IF prBild = 120 AND debugPause THEN
+    DIM prR AS INTEGER
+    FOR prR = 0 TO GUI_TABLE_ROW_COUNT(tblVars) - 1
+        protokoll("probe zeile " + STR$(GUI_TREETABLE_LEVEL(tblVars, prR)) + " " + varPfade[prR] + " = " + GUI_TABLE_GET_CELL(tblVars, prR, 2) + " (" + GUI_TABLE_GET_CELL(tblVars, prR, 1) + ")")
+        IF varPfade[prR] = "held" THEN GUI_TREETABLE_EXPAND(tblVars, prR, TRUE)
+    NEXT
+    befehl("weiter_d")
+END IF
+IF prBild = 200 AND debugPause THEN
+    FOR prR = 0 TO GUI_TABLE_ROW_COUNT(tblVars) - 1
+        IF GUI_TREETABLE_EXPANDED(tblVars, prR) THEN protokoll("probe offen " + varPfade[prR])
+    NEXT
+    befehl("stopp")
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+CLASS Held
+    DIM hp AS INTEGER
+END CLASS
+DIM held AS Held : held = NEW Held()
+held.hp = 7
+DIM f AS ARRAY OF INTEGER : f = [4, 5]
+DIM n AS INTEGER
+n = 1
+n = 2
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " THEN PRINT MID$(L[i], 6, LEN(L[i]))
+NEXT
+--- erwartet
+zeile 0 f = <ARRAY[2] OF INTEGER> (ARRAY)
+zeile 1 f[0] = 4 (INTEGER)
+zeile 1 f[1] = 5 (INTEGER)
+zeile 0 held = <Held> (Held)
+zeile 1 held.hp = 7 (INTEGER)
+zeile 0 n = 0 (INTEGER)
+offen held
+
+=== ein fehler haelt an und zeigt die variablen von dort
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 10 THEN befehl("debug")
+IF prBild = 100 AND debugPause THEN befehl("weiter_d")
+IF prBild = 180 AND debugPause THEN
+    DIM prR AS INTEGER
+    FOR prR = 0 TO GUI_TABLE_ROW_COUNT(tblVars) - 1
+        IF varPfade[prR] = "i" THEN protokoll("probe i = " + GUI_TABLE_GET_CELL(tblVars, prR, 2))
+    NEXT
+    protokoll("probe text " + LEFT$(GUI_TEXT(lblDebug), 22))
+    befehl("weiter_d")
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM f[3] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 5
+    f[i] = i
+NEXT
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 16) = "debug fehlerhalt" OR LEFT$(L[i], 12) = "debug fehler" THEN PRINT L[i]
+NEXT
+--- erwartet
+debug fehlerhalt 4
+probe i = 3
+probe text Fehler in Zeile 4: Ind
+debug fehler 4

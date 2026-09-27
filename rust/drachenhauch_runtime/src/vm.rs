@@ -617,6 +617,19 @@ struct DebugState {
     kanal: crate::debugger::Kanal,
     // Gemergte Zeile <-> (Datei, Zeile). None = ohne Karte (Zeilen roh).
     karte: Option<crate::debugger::Karte>,
+    // Die Fehlerstelle eines frischen Fehlers (Funktion, Locals, Stapel,
+    // Zeile) -- ein CATCH wirft sie weg; kommt der Fehler oben an, haelt der
+    // Debugger mit diesem Stand an (`debug_fehler_halt`).
+    fehler_stand: Option<FehlerStand>,
+}
+
+struct FehlerStand {
+    // Zeigt in das Programm, das laenger lebt als der Lauf (wie
+    // CoroState::fn_ptr); nach dem Laden wird es nicht mehr veraendert.
+    fn_: *const Func,
+    locals: Vec<Value>,
+    stapel: Vec<(String, u32)>,
+    zeile: u32,
 }
 
 impl DebugState {
@@ -626,7 +639,7 @@ impl DebugState {
         DebugState { breakpoints: HashMap::new(), step: StepMode::Into,
                      step_depth: 0, out_sent: 0, stapel: Vec::new(),
                      watches: Vec::new(), run_to: None,
-                     kanal: crate::debugger::Kanal::neu(), karte: None }
+                     kanal: crate::debugger::Kanal::neu(), karte: None, fehler_stand: None }
     }
 
     /// (Datei, Zeile) einer gemergten Zeile -- ohne Karte die Zeile selbst.
@@ -836,6 +849,9 @@ pub struct Vm<'p> {
     // Debugger-State (Stufe B): None = kein Debug-Overhead. Call-Tiefe fuer
     // Step over/into/out (inkrementiert pro `exec`).
     dbg: Option<DebugState>,
+    // Klassennamen, wie sie im Quelltext stehen (klein -> wie geschrieben),
+    // fuer die Anzeige im Debugger; leer ohne Debugger.
+    dbg_klassen: HashMap<String, String>,
     depth: u32,
     // `dhrt call`: die Ausgabe der Funktion wird GESAMMELT und als Feld
     // `ausgabe` der JSON-Zeile geliefert. Ohne dieses Flag schriebe ein von
@@ -1033,6 +1049,7 @@ impl<'p> Vm<'p> {
             prof: None,
             stop: None,
             dbg: None,
+            dbg_klassen: HashMap::new(),
             sammeln: false,
             depth: 0,
             #[cfg(feature = "graphics")]
@@ -1284,7 +1301,7 @@ impl<'p> Vm<'p> {
                     break Err("__DEBUG_STOP__".to_string());
                 }
             }
-            if !dbg.kanal.auf_neues_warten() { break Ok(String::new()); }
+            if !dbg.kanal.auf_neues_warten(&mut Self::fenster_pumpe(self.fenster_da())) { break Ok(String::new()); }
         };
         self.dbg = Some(dbg);
         r
@@ -1873,10 +1890,174 @@ impl<'p> Vm<'p> {
 
     /// Debugging fuer den naechsten `run()` aktivieren (`dhrt debug`).
     /// `karte`: gemergte Zeilen <-> (Datei, Zeile), siehe debugger.rs.
-    pub fn enable_debug(&mut self, karte: Option<crate::debugger::Karte>) {
+    pub fn enable_debug(&mut self, karte: Option<crate::debugger::Karte>, klassen: HashMap<String, String>) {
         let mut d = DebugState::new();
         d.karte = karte;
         self.dbg = Some(d);
+        self.dbg_klassen = klassen;
+    }
+
+    /// Wie ein Wert im Debugger dasteht: (Typ, Wert). Eine Instanz traegt
+    /// den Klassennamen, wie er geschrieben wurde, statt `OBJECT` / `<held>`.
+    fn dbg_anzeige(&self, v: &Value) -> (String, String) {
+        if let Value::Instance(rc) = v {
+            let cn = rc.borrow().class_name.to_string();
+            let name = self.dbg_klassen.get(&cn.to_lowercase()).cloned().unwrap_or(cn);
+            return (name.clone(), format!("<{}>", name));
+        }
+        (v.type_name().to_string(), dbg_short(v))
+    }
+
+    /// Die Kinder eines zusammengesetzten Werts fuer die Variablenliste:
+    /// Felder einer Instanz, Elemente eines Feldes oder Tupels, Eintraege
+    /// einer MAP. Begrenzt (100 je Ebene, drei Ebenen tief, `budget` Knoten
+    /// je Variable), damit ein Halt mit einem Feld von 100 000 Zahlen nicht
+    /// Megabytes JSON schickt. None = keine Kinder.
+    fn dbg_kinder(&self, v: &Value, tiefe: u32, budget: &mut usize) -> Option<serde_json::Value> {
+        const JE_EBENE: usize = 100;
+        if tiefe >= 3 || *budget == 0 { return None; }
+        let mut paare: Vec<(String, Value)> = Vec::new();
+        let mut gesamt = 0usize;
+        match v {
+            Value::Instance(rc) => {
+                let inst = rc.borrow();
+                let mut namen: Vec<(&String, &u32)> = inst.layout.index.iter().collect();
+                namen.sort_by_key(|(_, &k)| k);
+                gesamt = namen.len();
+                for (n, &k) in namen.into_iter().take(JE_EBENE) {
+                    if let Some(w) = inst.fields.get(k as usize) { paare.push((n.clone(), w.clone())); }
+                }
+            }
+            Value::Array(rc) => {
+                let a = rc.borrow();
+                gesamt = a.cells.len();
+                for i in 0..gesamt.min(JE_EBENE) {
+                    let name = if a.dims.len() <= 1 { format!("[{}]", i) } else {
+                        let mut rest = i as i64;
+                        let teile: Vec<String> = a.strides.iter().map(|&s| { let q = rest / s.max(1); rest %= s.max(1); q.to_string() }).collect();
+                        format!("[{}]", teile.join(", "))
+                    };
+                    paare.push((name, a.cells.get(i)));
+                }
+            }
+            Value::Tuple(t) => {
+                gesamt = t.len();
+                for (i, w) in t.iter().take(JE_EBENE).enumerate() { paare.push((format!("[{}]", i), w.clone())); }
+            }
+            Value::Map(rc) => {
+                let m = rc.borrow();
+                gesamt = m.len();
+                for (k, w) in m.entries().iter().take(JE_EBENE) { paare.push((format!("\"{}\"", k), w.clone())); }
+            }
+            _ => return None,
+        }
+        let mut out = Vec::new();
+        for (name, w) in paare {
+            if *budget == 0 { break; }
+            *budget -= 1;
+            let (typ, wert) = self.dbg_anzeige(&w);
+            let mut e = serde_json::json!({"name": name, "type": typ, "value": wert});
+            if let Some(k) = self.dbg_kinder(&w, tiefe + 1, budget) { e["children"] = k; }
+            out.push(e);
+        }
+        if gesamt > out.len() {
+            out.push(serde_json::json!({"name": "...", "type": "", "value": format!("{} weitere", gesamt - out.len())}));
+        }
+        if out.is_empty() { None } else { Some(serde_json::Value::Array(out)) }
+    }
+
+    /// Ein Eintrag der Variablenliste samt Kindern.
+    fn dbg_var_json(&self, name: &str, v: &Value) -> serde_json::Value {
+        let (typ, wert) = self.dbg_anzeige(v);
+        let mut e = serde_json::json!({"name": name, "type": typ, "value": wert});
+        let mut budget = 400usize;
+        if let Some(k) = self.dbg_kinder(v, 0, &mut budget) { e["children"] = k; }
+        e
+    }
+
+    /// Kommt ein Fehler oben an, haelt der Debugger an seiner Stelle an:
+    /// Variablen, Stapel und Ueberwachen so, wie sie beim Fehler waren, und
+    /// `eval` geht noch -- `continue`/Schritt/`stop` beenden. Ohne Stand
+    /// (Fehler vor der ersten Zeile, oder kein Debugger) nichts.
+    pub fn debug_fehler_halt(&mut self, meldung: &str) {
+        let mut dbg = match self.dbg.take() { Some(d) => d, None => return };
+        let stand = match dbg.fehler_stand.take() {
+            Some(s) => s,
+            None => { self.dbg = Some(dbg); return; }
+        };
+        if self.out.len() > dbg.out_sent {
+            let chunk = self.out[dbg.out_sent..].to_string();
+            dbg.out_sent = self.out.len();
+            dbg_emit(&serde_json::json!({"event":"output","text":chunk}));
+        }
+        // SAFETY: zeigt in `prog`, das der Aufrufer (debug_main) haelt.
+        let fn_: &Func = unsafe { &*stand.fn_ };
+        let mut locals = stand.locals;
+        dbg.stapel = stand.stapel;
+        let (datei, zeile) = dbg.stelle(stand.zeile);
+        dbg_emit(&serde_json::json!({
+            "event": "paused", "reason": "error", "message": meldung,
+            "line": zeile, "file": datei, "depth": dbg.stapel.len(),
+            "locals": self.dbg_locals_json(fn_, &locals),
+            "globals": self.dbg_globals_json(),
+            "stack": Self::dbg_stack_json(&dbg, stand.zeile),
+            "watches": self.dbg_watches_json(&dbg, fn_, &locals),
+        }));
+        while let Some(cmd) = dbg.kanal.naechstes(&mut Self::fenster_pumpe(self.fenster_da())) {
+            match crate::debugger::art(&cmd) {
+                "eval" => self.dbg_eval_antwort(&cmd, fn_, &mut locals),
+                "set-watches" => {
+                    Self::dbg_watches_setzen(&mut dbg, &cmd);
+                    dbg_emit(&serde_json::json!({"event":"watches",
+                        "watches": self.dbg_watches_json(&dbg, fn_, &locals)}));
+                }
+                "set-breakpoints" => self.dbg_set_breakpoints(&mut dbg, &cmd),
+                "set" => dbg_emit(&serde_json::json!({"event":"set-error",
+                    "name": cmd.get("name").cloned().unwrap_or_default(),
+                    "message": "set: nach einem Fehler laeuft das Programm nicht weiter"})),
+                _ => break,
+            }
+        }
+        self.dbg = Some(dbg);
+    }
+
+    /// `eval` beantworten (im Halt und im Fehler-Halt).
+    fn dbg_eval_antwort(&self, cmd: &serde_json::Value, fn_: &Func, locals: &mut [Value]) {
+        let src = cmd.get("expr").and_then(|v| v.as_str()).unwrap_or("");
+        // `id` kommt unveraendert zurueck -- so weiss ein Editor,
+        // welche Frage beantwortet ist (Tooltip oder Eingabezeile).
+        let id = cmd.get("id").cloned().unwrap_or(serde_json::Value::Null);
+        let mut ev = match crate::parser::parse_expression(src)
+            .and_then(|n| self.eval_node(&n, fn_, locals)) {
+            Ok(v) => {
+                let (typ, wert) = self.dbg_anzeige(&v);
+                serde_json::json!({"event":"eval-result","value":wert,"type":typ})
+            }
+            Err(e) => serde_json::json!({"event":"eval-error","message":e}),
+        };
+        if !id.is_null() { ev["id"] = id; ev["expr"] = serde_json::json!(src); }
+        dbg_emit(&ev);
+    }
+
+    /// Gibt es ein Fenster, dessen Nachrichten waehrend eines Halts abgeholt
+    /// werden muessen?
+    fn fenster_da(&self) -> bool {
+        #[cfg(feature = "graphics")]
+        { return self.gfx.is_some(); }
+        #[allow(unreachable_code)]
+        false
+    }
+
+    /// Die Pumpe fuer das Warten im Halt: holt die Fensternachrichten ab
+    /// (raylibs PollInputEvents), ohne zu zeichnen -- das Fenster bleibt
+    /// stehen, aber Windows haelt es nicht fuer abgestuerzt.
+    fn fenster_pumpe(da: bool) -> impl FnMut() {
+        move || {
+            #[cfg(feature = "graphics")]
+            if da { unsafe { raylib::ffi::PollInputEvents(); } }
+            #[cfg(not(feature = "graphics"))]
+            let _ = da;
+        }
     }
 
     /// (Datei, Zeile) einer gemergten Zeile fuer die Meldungen des Debuggers.
@@ -1960,7 +2141,7 @@ impl<'p> Vm<'p> {
         }));
         // Kommandos lesen bis continue/step/stop/EOF.
         loop {
-            let cmd = match dbg.kanal.naechstes() {
+            let cmd = match dbg.kanal.naechstes(&mut Self::fenster_pumpe(self.fenster_da())) {
                 Some(c) => c,
                 None => { self.debug_stop_flag = true; return Err("__DEBUG_STOP__".into()); }
             };
@@ -2008,20 +2189,7 @@ impl<'p> Vm<'p> {
                         Err(e) => dbg_emit(&serde_json::json!({"event":"set-error","name":name,"message":e})),
                     }
                 }
-                "eval" => {
-                    let src = cmd.get("expr").and_then(|v| v.as_str()).unwrap_or("");
-                    // `id` kommt unveraendert zurueck -- so weiss ein Editor,
-                    // welche Frage beantwortet ist (Tooltip oder Eingabezeile).
-                    let id = cmd.get("id").cloned().unwrap_or(serde_json::Value::Null);
-                    let mut ev = match crate::parser::parse_expression(src)
-                        .and_then(|n| self.eval_node(&n, fn_, locals)) {
-                        Ok(v) => serde_json::json!({
-                            "event":"eval-result","value":v.fmt(),"type":v.type_name()}),
-                        Err(e) => serde_json::json!({"event":"eval-error","message":e}),
-                    };
-                    if !id.is_null() { ev["id"] = id; ev["expr"] = serde_json::json!(src); }
-                    dbg_emit(&ev);
-                }
+                "eval" => self.dbg_eval_antwort(&cmd, fn_, locals),
                 _ => {}
             }
         }
@@ -2058,7 +2226,7 @@ impl<'p> Vm<'p> {
                 None => Err("laesst sich nicht lesen".into()),
             };
             out.push(match r {
-                Ok(v) => serde_json::json!({"expr": src, "value": dbg_short(&v), "type": v.type_name()}),
+                Ok(v) => { let (typ, wert) = self.dbg_anzeige(&v); serde_json::json!({"expr": src, "value": wert, "type": typ}) }
                 Err(e) => serde_json::json!({"expr": src, "error": e}),
             });
         }
@@ -2151,7 +2319,7 @@ impl<'p> Vm<'p> {
             // Compiler-Zwischenwerte ueberspringen (namenlos oder __-Praefix).
             if nm.is_empty() || nm.starts_with("__") { continue; }
             if let Some(v) = locals.get(i) {
-                out.push(serde_json::json!({"name": nm, "type": v.type_name(), "value": dbg_short(v)}));
+                out.push(self.dbg_var_json(nm, v));
             }
         }
         serde_json::Value::Array(out)
@@ -2163,7 +2331,7 @@ impl<'p> Vm<'p> {
             if name.starts_with("__") { continue; }
             let s = slot.borrow();
             if s.is_const { continue; }      // Baseline-Konstanten (Farben/Keys/PI) ausblenden
-            out.push(serde_json::json!({"name": name, "type": s.value.type_name(), "value": dbg_short(&s.value)}));
+            out.push(self.dbg_var_json(name, &s.value));
         }
         out.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
         serde_json::Value::Array(out)
@@ -2214,7 +2382,8 @@ impl<'p> Vm<'p> {
                         let inst = rc.borrow();
                         match inst.platz(&name.to_lowercase()) {
                             Some(k) => Ok(inst.fields[k].clone()),
-                            None => Err(format!("eval: {} hat kein Feld '{}' (eine PROPERTY wertet der Debugger nicht aus)", inst.class_name, name)),
+                            None => Err(format!("eval: {} hat kein Feld '{}' (eine PROPERTY wertet der Debugger nicht aus)",
+                                self.dbg_klassen.get(&inst.class_name.to_lowercase()).cloned().unwrap_or_else(|| inst.class_name.to_string()), name)),
                         }
                     }
                     Value::Nil => Err(format!("eval: '{}' auf NIL", name)),
@@ -2394,6 +2563,14 @@ impl<'p> Vm<'p> {
                         // Ein Fehler, der nicht von THROW kam, loescht den Code;
                         // sonst klebte er von einem frueheren THROW noch an.
                         self.error_line = self.cur_line;
+                        // Unter dem Debugger: die Fehlerstelle festhalten, damit
+                        // er dort anhalten kann, falls kein CATCH den Fehler nimmt.
+                        if self.dbg.is_some() {
+                            let stapel = self.dbg.as_ref().map(|d| d.stapel.clone()).unwrap_or_default();
+                            let stand = FehlerStand { fn_: fn_ as *const Func, locals: locals.clone(),
+                                                      stapel, zeile: self.cur_line };
+                            if let Some(d) = self.dbg.as_mut() { d.fehler_stand = Some(stand); }
+                        }
                         self.error_code = if self.throw_active {
                             std::mem::take(&mut self.throw_code)
                         } else {
@@ -2407,6 +2584,7 @@ impl<'p> Vm<'p> {
                         match try_handlers.pop() {
                             Some((target, depth)) => {
                                 self.err_line_set = false;   // Fehler konsumiert (CATCH)
+                                if let Some(d) = self.dbg.as_mut() { d.fehler_stand = None; }
                                 stack.truncate(depth);
                                 stack.push(Value::str_rc(&e));
                                 *ip = target;
