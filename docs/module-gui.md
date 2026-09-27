@@ -2908,7 +2908,9 @@ Die kleinen Dinge, an denen man eine Anwendung von einer Demo unterscheidet
   setzten beide raylib direkt, und wer seine Form wieder loswerden wollte,
   musste raten, was die gui dort gezeigt hätte). `GUI_SET_CURSOR(wdg,
   form$)` gibt einem Widget eine eigene Form — für Zeichenflächen, auf denen
-  das Programm selbst etwas anbietet. `MOUSE_CURSOR_GET$()` sagt, welche
+  das Programm selbst etwas anbietet; neben den Standardformen gehen auch
+  `warten`, `arbeitet`, `hilfe`, `kopieren`, `stift`, `pipette` und Zeiger
+  aus `MOUSE_CURSOR_NEW(bild, bx, by)`. `MOUSE_CURSOR_GET$()` sagt, welche
   Form gilt. `GUI_CURSORS(FALSE)` schaltet die Formen der gui ab.
 
 In der `.dhform`: `vertical`, `indeterminate`, `mode`, `draggable`,

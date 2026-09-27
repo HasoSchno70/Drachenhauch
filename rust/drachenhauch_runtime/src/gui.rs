@@ -15648,8 +15648,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     pub fn set_cursor(&mut self, h: i64, form: &str) -> Result<(), String> {
         let f = if matches!(form.trim().to_ascii_lowercase().as_str(), "" | "auto") { None } else {
             Some(crate::graphics::zeiger_form(form).ok_or_else(|| format!(
-                "GUI_SET_CURSOR: unbekannte Form '{}' -- erwartet default/ibeam/crosshair/hand/\
-resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed oder auto", form))?)
+                "GUI_SET_CURSOR: unbekannte Form '{}' -- erwartet {} oder auto", form, crate::graphics::ZEIGER_LISTE))?)
         };
         self.wdg_mut(h, "GUI_SET_CURSOR")?.zeiger = f;
         Ok(())

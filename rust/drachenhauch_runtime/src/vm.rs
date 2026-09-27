@@ -8368,6 +8368,8 @@ impl<'p> Vm<'p> {
             "mouse_cursor" => { let s = gs(a,0,"MOUSE_CURSOR")?.to_string();
                                 g!().mouse_cursor(&s)?; Value::Nil }
             "mouse_cursor_get$" | "mouse_cursor_get" => Value::str_rc(g!().zeiger_jetzt()),
+            "mouse_cursor_new" => { let (b, x, y) = (gi(a,0,"MOUSE_CURSOR_NEW")?, gi(a,1,"MOUSE_CURSOR_NEW")?, gi(a,2,"MOUSE_CURSOR_NEW")?);
+                                    Value::str_rc(g!().zeiger_neu(b, x, y)?) }
             "joystick_hit" => Value::Bool(g!().joystick_hit(gi(a,0,"JOYSTICK_HIT")?,
                                                             gi(a,1,"JOYSTICK_HIT")?)?),
             "joystick_released" => Value::Bool(g!().joystick_released(
