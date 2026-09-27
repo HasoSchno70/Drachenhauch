@@ -250,6 +250,8 @@ fn eingebaut() -> String {
         ("datenbank", cfg!(feature = "db")),
         ("netz", cfg!(feature = "net")),
         ("http", cfg!(feature = "http")),
+        ("mail", cfg!(feature = "smtp")),
+        ("maschinencode", cfg!(feature = "jit")),
         ("seriell", cfg!(feature = "serial")),
         ("usb", cfg!(feature = "usb")),
         ("bluetooth", cfg!(feature = "bt")),
