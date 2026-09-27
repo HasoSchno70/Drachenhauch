@@ -170,6 +170,9 @@ IMPORT "gui"
 | `GUI_RICHTEXT_SET(rt, key$, wert)` | — | `groesse` (Grundschrift), `codeschrift` (FONT-Handle für Codeblöcke) und die Farben der Codeblöcke `farbe_kommentar`/`farbe_text`/`farbe_zahl`/`farbe_schluessel`/`farbe_name`/`farbe_operator` (-1 = Vorgabe passend zum Grund) |
 | `GUI_RICHTEXT_HEADINGS(rt)` | ARRAY OF STRING | die Überschriften (`#` bis `###`) ohne Auszeichnung, aus der Quelle -- stimmen gleich nach `SET_TEXT` |
 | `GUI_RICHTEXT_HEADING_LEVELS(rt)` | ARRAY OF INTEGER | ihre Stufen 1..3, in derselben Reihenfolge |
+| `GUI_RICHTEXT_CODE_BUTTONS(rt, knoepfe$)` | — | Knöpfe an jedem Codeblock, getrennt mit `\|` (z. B. `"Kopieren\|Starten"`); leer = keine. Der Block bekommt oben einen Streifen dafür |
+| `GUI_RICHTEXT_CODE_ACTION$(rt)` | STRING | Beschriftung des Code-Knopfs, der in diesem Bild gedrückt wurde (leer = keiner); feuert auch `GUI_ON_CLICK` |
+| `GUI_RICHTEXT_CODE$(rt)` | STRING | der Code des Blocks, an dem zuletzt ein Knopf gedrückt wurde (ohne die Zäune) |
 | `GUI_RICHTEXT_GOTO_HEADING(rt, nr)` | — | zur Überschrift Nummer `nr` rollen; vor dem Satz wird der Sprung vorgemerkt |
 | `GUI_RICHTEXT_HEADING_AT(rt)` | INTEGER | in welchem Abschnitt der obere Rand steht (-1 = davor) -- für ein Inhaltsverzeichnis, das mitgeht |
 | `GUI_RICHTEXT_LINK$(rt)` | STRING | welcher Verweis in diesem Bild angeklickt wurde (leer = keiner) |

@@ -538,3 +538,207 @@ hbmarke zweiter-teil 2
 pr abschnitt 2
 hbmarke sprite-atlas--batch-draw 3
 pr abschnitt 3
+
+=== die suche ueber alle dokumente listet treffer und springt
+' "In allen": die Liste links zeigt je Dokument einen Kopf und darunter
+' die Treffer mit Zeilennummer; ein Klick oeffnet das Dokument an der
+' Stelle. "Inhalt" holt das Inhaltsverzeichnis zurueck.
+DIM prN AS INTEGER : prN = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prN = prN + 1
+IF prN = 5 THEN handbuchZeigen("aaa.md", 1)
+IF prN = 8 THEN GUI_SET_TEXT(tfHbSuche, "NADEL") : hbSucheAlle()
+IF prN = 10 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO GUI_LISTBOX_COUNT(lstHbInhalt) - 1
+        protokoll("pr eintrag " + TRIM$(GUI_LISTBOX_ITEM(lstHbInhalt, prI)))
+    NEXT
+    protokoll("pr stand " + GUI_TEXT(lblHbStand))
+    GUI_LISTBOX_SET_SELECTED(lstHbInhalt, 4)
+END IF
+IF prN = 20 THEN protokoll("pr doku " + docNamen[docLetzteWahl] + " " + GUI_LISTBOX_ITEM(lstHbInhalt, 0)) : hbSucheAlleEnde()
+IF prN = 22 THEN protokoll("pr inhalt " + STR$(GUI_LISTBOX_COUNT(lstHbInhalt)) + " " + GUI_LISTBOX_ITEM(lstHbInhalt, 0) + " " + GUI_TEXT(btnHbAlle)) : EXIT(0)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}/wurzel
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei wurzel/docs/aaa.md
+# Alpha
+
+Die nadel hier.
+--- datei wurzel/docs/bbb.md
+# Beta
+
+Zwei Nadeln.
+
+Und noch eine nadel.
+--- datei wurzel/docs/ccc.md
+# Gamma
+
+Nichts.
+--- verzeichnis wurzel/examples
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 7) = "hballe " OR LEFT$(L[i], 10) = "hbtreffer " THEN PRINT L[i]
+NEXT
+--- erwartet
+hballe 3 2
+pr eintrag aaa.md
+pr eintrag Die nadel hier.
+pr eintrag bbb.md
+pr eintrag Zwei Nadeln.
+pr eintrag Und noch eine nadel.
+pr stand 'NADEL': 3 Treffer in 2 Dokumenten
+hbtreffer bbb.md 5
+pr doku bbb.md aaa.md
+pr inhalt 1 Beta In allen
+
+=== die knoepfe am codeblock kopieren oeffnen und starten
+' Echte Klicks auf die Knoepfe im Handbuch ("In neuen Reiter" zuletzt --
+' der neue Reiter holt das Hauptfenster nach vorn). Er legt einen
+' ungesicherten Reiter mit dem Code an, "Starten" laesst ihn laufen, ohne
+' nach einem Namen zu fragen.
+DIM prN AS INTEGER : prN = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prN = prN + 1
+IF prN = 5 THEN handbuchZeigen("aaa.md", 1)
+IF prN = 12 THEN
+    ' Geklickt wird immer der RECHTE Knopf -- seine Lage haengt nicht an
+    ' Schriftbreiten; die Reihenfolge stellt der Fall vorher um.
+    DIM prX AS INTEGER : prX = -1
+    DIM prY AS INTEGER : prY = -1
+    DIM prA AS INTEGER
+    DIM prB AS INTEGER
+    FOR prB = 0 TO SCREENHEIGHT() - 1 STEP 2
+        FOR prA = 0 TO SCREENWIDTH() - 1 STEP 2
+            IF prX < 0 AND GUI_HIT_TEST(prA, prB) = rtHandbuch THEN prX = prA : prY = prB
+        NEXT
+    NEXT
+    DIM prW AS INTEGER : prW = GUI_GET_W(rtHandbuch)
+    DIM prK AS STRING : prK = STR$(prX + prW - 34) + " " + STR$(prY + 30)
+    DIM prE AS STRING : prE = "c 12" + CHR$(10)
+    prE = prE + "e 0 7 " + prK + " 0 0" + CHR$(10) + "e 1 6 0 0 0 0" + CHR$(10) + "e 3 5 0 0 0 0" + CHR$(10)
+    prE = prE + "e 20 7 " + prK + " 0 0" + CHR$(10) + "e 21 6 0 0 0 0" + CHR$(10) + "e 23 5 0 0 0 0" + CHR$(10)
+    prE = prE + "e 40 7 " + prK + " 0 0" + CHR$(10) + "e 41 6 0 0 0 0" + CHR$(10) + "e 43 5 0 0 0 0" + CHR$(10)
+    prE = prE + "e 44 7 10 10 0 0" + CHR$(10) + CHR$(10)
+    WRITEALL("prklick.txt", prE)
+    AUTOMATION_PLAY("prklick.txt")
+END IF
+IF prN = 25 THEN GUI_RICHTEXT_CODE_BUTTONS(rtHandbuch, "In neuen Reiter|Kopieren")
+IF prN = 45 THEN GUI_RICHTEXT_CODE_BUTTONS(rtHandbuch, "Kopieren|In neuen Reiter")
+IF prN = 70 THEN protokoll("pr reiter " + STR$(tabAnzahl) + " " + BASENAME(tabPfade[aktiverTab]) + "|" + STR$(GUI_TEXT(tabFelder[aktiverTab]) = tabGesichert[aktiverTab]) + "|" + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), CHR$(10), "/"))
+IF prN = 150 THEN
+    DIM prJ AS INTEGER
+    FOR prJ = 0 TO GUI_LISTBOX_COUNT(lstAusgabe) - 1
+        protokoll("pr ausgabe " + GUI_LISTBOX_ITEM(lstAusgabe, prJ))
+    NEXT
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}/wurzel
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei wurzel/docs/aaa.md
+```
+PRINT "hallo aus dem handbuch"
+```
+
+Danach Text.
+--- verzeichnis wurzel/examples
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 7) = "hbcode " OR LEFT$(L[i], 9) = "gestartet" THEN PRINT L[i]
+NEXT
+--- erwartet
+hbcode Starten 1
+gestartet handbuch_beispiel.dh
+hbcode Kopieren 1
+hbcode In neuen Reiter 1
+pr reiter 2 |FALSE|PRINT "hallo aus dem handbuch"/
+pr ausgabe hallo aus dem handbuch
+
+=== der quelltext im handbuch ist eingefaerbt
+' Die Quelltext-Ansicht faerbt Ueberschriften (Schluesselwort-Farbe) und
+' `Code` (Text-Farbe) wie der Editor -- gezaehlt im Bild, innerhalb des
+' Feldes. Gegenprobe: ohne hbQuelleFaerben ist beides 0.
+DIM prN AS INTEGER : prN = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prN = prN + 1
+IF prN = 5 THEN handbuchZeigen("aaa.md", 1)
+IF prN = 8 THEN handbuchAnsicht(FALSE)
+IF prN = 12 THEN
+    DIM prX0 AS INTEGER : prX0 = 99999
+    DIM prY0 AS INTEGER : prY0 = 99999
+    DIM prX1 AS INTEGER : prX1 = -1
+    DIM prY1 AS INTEGER : prY1 = -1
+    DIM prA AS INTEGER
+    DIM prB AS INTEGER
+    FOR prB = 0 TO SCREENHEIGHT() - 1 STEP 4
+        FOR prA = 0 TO SCREENWIDTH() - 1 STEP 4
+            IF GUI_HIT_TEST(prA, prB) = taHandbuch THEN
+                prX0 = MIN(prX0, prA) : prY0 = MIN(prY0, prB)
+                prX1 = MAX(prX1, prA) : prY1 = MAX(prY1, prB)
+            END IF
+        NEXT
+    NEXT
+    protokoll("pr feld " + STR$(prX0) + " " + STR$(prY0) + " " + STR$(prX1) + " " + STR$(prY1) + " " + STR$(F_TEXT) + " " + STR$(F_SCHLUESSEL))
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=20
+DHRT_SCREENSHOT={fall}/q.png
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}/wurzel
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei wurzel/docs/aaa.md
+# Eine grosse Ueberschrift hier
+
+Mit `CODE_EINS` und `CODE_ZWEI` und `CODE_DREI` im Satz.
+--- verzeichnis wurzel/examples
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM f AS ARRAY OF STRING
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 8) = "pr feld " THEN f = SPLIT$(L[i], " ")
+NEXT
+DIM bild AS IMAGE : bild = LOADIMAGE("q.png")
+FUNCTION nah(c AS INTEGER, z AS INTEGER) AS BOOLEAN
+    RETURN ABS((c \ 65536) MOD 256 - (z \ 65536) MOD 256) < 40 AND ABS((c \ 256) MOD 256 - (z \ 256) MOD 256) < 40 AND ABS(c MOD 256 - z MOD 256) < 40
+END FUNCTION
+DIM nText AS INTEGER : nText = 0
+DIM nKopf AS INTEGER : nKopf = 0
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = VAL(f[3]) TO VAL(f[5])
+    FOR x = VAL(f[2]) TO VAL(f[4])
+        DIM c AS INTEGER : c = GETPIXEL(bild, x, y) BAND &HFFFFFF
+        IF nah(c, VAL(f[6])) THEN nText = nText + 1
+        IF nah(c, VAL(f[7])) THEN nKopf = nKopf + 1
+    NEXT
+NEXT
+PRINT "code " ; nText > 30
+PRINT "kopf " ; nKopf > 30
+--- erwartet
+code TRUE
+kopf TRUE

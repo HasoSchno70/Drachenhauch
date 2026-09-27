@@ -1,0 +1,150 @@
+' Knoepfe an den Codebloecken von GUI_RICHTEXT (2026-09-27): ein Klick
+' meldet ein Bild lang die Beschriftung und liefert den Code des Blocks.
+' Die Lage des Widgets sucht der Fall mit GUI_HIT_TEST; die Knoepfe stehen
+' rechtsbuendig in einem Streifen oben im Block.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein klick auf einen knopf meldet ihn und den code
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM rt AS GUI_WIDGET
+rt = GUI_RICHTEXT(w, 10, 10, 340, 220, "```" + NL + "PRINT 1" + NL + "PRINT 2" + NL + "```" + NL + NL + "Danach Text.")
+GUI_RICHTEXT_CODE_BUTTONS(rt, "A|B")
+DIM f AS INTEGER
+FOR f = 1 TO 60
+    GUI_UPDATE()
+    IF f = 2 THEN
+        DIM ax AS INTEGER : ax = -1
+        DIM ay AS INTEGER : ay = -1
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        FOR y = 0 TO 299
+            FOR x = 0 TO 399
+                IF ax < 0 AND GUI_HIT_TEST(x, y) = rt THEN ax = x : ay = y
+            NEXT
+        NEXT
+        ' Immer der RECHTE Knopf (seine Lage haengt nicht an Schriftbreiten):
+        ' erst B, dann -- umgestellt -- A, dann ein Klick in den Text darunter.
+        DIM ev AS STRING : ev = "c 12" + NL
+        ev = ev + "e 0 7 " + STR$(ax + 340 - 30) + " " + STR$(ay + 28) + " 0 0" + NL
+        ev = ev + "e 1 6 0 0 0 0" + NL + "e 3 5 0 0 0 0" + NL
+        ev = ev + "e 10 7 " + STR$(ax + 340 - 30) + " " + STR$(ay + 28) + " 0 0" + NL
+        ev = ev + "e 11 6 0 0 0 0" + NL + "e 13 5 0 0 0 0" + NL
+        ev = ev + "e 20 7 " + STR$(ax + 40) + " " + STR$(ay + 150) + " 0 0" + NL
+        ev = ev + "e 21 6 0 0 0 0" + NL + "e 23 5 0 0 0 0" + NL
+        ev = ev + "e 30 7 " + STR$(ax + 40) + " " + STR$(ay + 60) + " 0 0" + NL
+        ev = ev + "e 31 6 0 0 0 0" + NL + "e 33 5 0 0 0 0" + NL + NL
+        WRITEALL("ev.txt", ev)
+        AUTOMATION_PLAY("ev.txt")
+    END IF
+    IF f = 8 THEN GUI_RICHTEXT_CODE_BUTTONS(rt, "B|A")
+    DIM ak AS STRING : ak = GUI_RICHTEXT_CODE_ACTION$(rt)
+    IF ak <> "" THEN PRINT ak ; " [" ; REPLACE$(GUI_RICHTEXT_CODE$(rt), NL, "/") ; "]"
+    GUI_DRAW()
+    FLIP()
+NEXT
+' Ein Knopfdruck beginnt keine Auswahl.
+PRINT "auswahl [" ; GUI_RICHTEXT_SELECTION$(rt) ; "]"
+--- umgebung
+DHRT_FRAMES=62
+--- erwartet
+B [PRINT 1/PRINT 2/]
+A [PRINT 1/PRINT 2/]
+auswahl []
+
+=== ohne knoepfe meldet dieselbe stelle nichts
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM rt AS GUI_WIDGET
+rt = GUI_RICHTEXT(w, 10, 10, 340, 220, "```" + NL + "PRINT 1" + NL + "PRINT 2" + NL + "```" + NL + NL + "Danach Text.")
+DIM f AS INTEGER
+DIM n AS INTEGER : n = 0
+FOR f = 1 TO 30
+    GUI_UPDATE()
+    IF f = 2 THEN
+        DIM ax AS INTEGER : ax = -1
+        DIM ay AS INTEGER : ay = -1
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        FOR y = 0 TO 299
+            FOR x = 0 TO 399
+                IF ax < 0 AND GUI_HIT_TEST(x, y) = rt THEN ax = x : ay = y
+            NEXT
+        NEXT
+        DIM ev AS STRING : ev = "c 3" + NL
+        ev = ev + "e 0 7 " + STR$(ax + 340 - 30) + " " + STR$(ay + 28) + " 0 0" + NL
+        ev = ev + "e 1 6 0 0 0 0" + NL + "e 3 5 0 0 0 0" + NL + NL
+        WRITEALL("ev.txt", ev)
+        AUTOMATION_PLAY("ev.txt")
+    END IF
+    IF GUI_RICHTEXT_CODE_ACTION$(rt) <> "" THEN n = n + 1
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "meldungen " ; n
+--- umgebung
+DHRT_FRAMES=32
+--- erwartet
+meldungen 0
+
+=== der streifen fuer die knoepfe schiebt den text darunter
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM md AS STRING : md = "```" + NL + "PRINT 1" + NL + "```" + NL + NL + "## Danach" + NL + NL + "Text." + NL
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    md = md + NL + "Absatz " + STR$(i) + "." + NL
+NEXT
+DIM a AS GUI_WIDGET : a = GUI_RICHTEXT(w, 10, 10, 160, 220, md)
+DIM b AS GUI_WIDGET : b = GUI_RICHTEXT(w, 180, 10, 160, 220, md)
+GUI_RICHTEXT_CODE_BUTTONS(b, "Kopieren")
+GUI_UPDATE()
+GUI_RICHTEXT_GOTO_HEADING(a, 0)
+GUI_RICHTEXT_GOTO_HEADING(b, 0)
+' Beide rollen zur Ueberschrift -- beim Block mit Knoepfen liegt sie tiefer.
+PRINT GUI_RICHTEXT_SCROLL_GET(b) > GUI_RICHTEXT_SCROLL_GET(a)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE
+
+=== knoepfe gehen in die dhform und kommen zurueck
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 10, 10, 340, 220, "x")
+GUI_RICHTEXT_CODE_BUTTONS(rt, " Kopieren | Starten ")
+DIM j AS STRING : j = GUI_TO_JSON(w)
+PRINT INSTR(j, "code_knoepfe") >= 0 AND INSTR(j, "Kopieren|Starten") >= 0
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT INSTR(GUI_TO_JSON(w2), "Kopieren|Starten") >= 0
+GUI_RICHTEXT_CODE_BUTTONS(rt, "")
+PRINT INSTR(GUI_TO_JSON(w), "code_knoepfe") >= 0
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE
+TRUE
+FALSE
+
+=== die abfragen sind nur fuer gesetzten text
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "x", 10, 10, 80, 28)
+PRINT GUI_RICHTEXT_CODE_ACTION$(k)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+GUI_RICHTEXT_CODE_ACTION$

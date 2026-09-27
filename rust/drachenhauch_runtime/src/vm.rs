@@ -7674,6 +7674,9 @@ impl<'p> Vm<'p> {
                 for (i, (n, _)) in ue.into_iter().enumerate() { arr.cells.set(i, Value::Int(n as i64)); }
                 Value::Array(std::rc::Rc::new(std::cell::RefCell::new(arr)))
             }
+            "gui_richtext_code_buttons" => { self.gui.richtext_code_buttons(gi(a,0,"GUI_RICHTEXT_CODE_BUTTONS")?, &gs(a,1,"GUI_RICHTEXT_CODE_BUTTONS")?)?; Value::Nil }
+            "gui_richtext_code_action$" | "gui_richtext_code_action" => Value::str_rc(self.gui.richtext_code_action(gi(a,0,"GUI_RICHTEXT_CODE_ACTION$")?)?),
+            "gui_richtext_code$" | "gui_richtext_code" => Value::str_rc(self.gui.richtext_code(gi(a,0,"GUI_RICHTEXT_CODE$")?)?),
             "gui_richtext_goto_heading" => { self.gui.richtext_goto_heading(gi(a,0,"GUI_RICHTEXT_GOTO_HEADING")?, gi(a,1,"GUI_RICHTEXT_GOTO_HEADING")?)?; Value::Nil }
             "gui_richtext_heading_at" => Value::Int(self.gui.richtext_heading_at(gi(a,0,"GUI_RICHTEXT_HEADING_AT")?)?),
             "gui_richtext_scroll" => { self.gui.richtext_scroll(gi(a,0,"GUI_RICHTEXT_SCROLL")?, gi(a,1,"GUI_RICHTEXT_SCROLL")?)?; Value::Nil }
