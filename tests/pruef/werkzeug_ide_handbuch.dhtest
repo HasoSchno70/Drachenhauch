@@ -253,3 +253,288 @@ pr gesprungen TRUE 2
 pr doku bbb.md
 pr zurueck aaa.md TRUE
 pr vor bbb.md 0
+
+=== eine sprungmarke trifft die ueberschrift, nicht die erste erwaehnung
+' Der Titel "Zweiter Teil" steht schon im Inhaltsverzeichnis oben; die
+' Textsuche von frueher landete dort. Die Marke gehoert der Ueberschrift.
+DIM prN AS INTEGER : prN = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prN = prN + 1
+IF prN = 5 THEN handbuchZeigen("ccc.md", 1)
+IF prN = 10 THEN handbuchVerweis("#zweiter-teil")
+IF prN = 20 THEN protokoll("pr abschnitt " + STR$(GUI_RICHTEXT_HEADING_AT(rtHandbuch)))
+IF prN = 22 THEN handbuchVerweis("#sprite-atlas--batch-draw")
+IF prN = 32 THEN protokoll("pr abschnitt " + STR$(GUI_RICHTEXT_HEADING_AT(rtHandbuch))) : EXIT(0)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}/wurzel
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei wurzel/docs/ccc.md
+# Dokument
+
+Inhalt: [Zweiter Teil](#zweiter-teil) und [Sprite-Atlas + Batch-Draw](#sprite-atlas--batch-draw).
+
+## Erster Teil
+
+Absatz 0.
+
+Absatz 1.
+
+Absatz 2.
+
+Absatz 3.
+
+Absatz 4.
+
+Absatz 5.
+
+Absatz 6.
+
+Absatz 7.
+
+Absatz 8.
+
+Absatz 9.
+
+Absatz 10.
+
+Absatz 11.
+
+Absatz 12.
+
+Absatz 13.
+
+Absatz 14.
+
+Absatz 15.
+
+Absatz 16.
+
+Absatz 17.
+
+Absatz 18.
+
+Absatz 19.
+
+Absatz 20.
+
+Absatz 21.
+
+Absatz 22.
+
+Absatz 23.
+
+Absatz 24.
+
+Absatz 25.
+
+Absatz 26.
+
+Absatz 27.
+
+Absatz 28.
+
+Absatz 29.
+
+Absatz 30.
+
+Absatz 31.
+
+Absatz 32.
+
+Absatz 33.
+
+Absatz 34.
+
+Absatz 35.
+
+Absatz 36.
+
+Absatz 37.
+
+Absatz 38.
+
+Absatz 39.
+
+## Zweiter Teil
+
+Absatz 0.
+
+Absatz 1.
+
+Absatz 2.
+
+Absatz 3.
+
+Absatz 4.
+
+Absatz 5.
+
+Absatz 6.
+
+Absatz 7.
+
+Absatz 8.
+
+Absatz 9.
+
+Absatz 10.
+
+Absatz 11.
+
+Absatz 12.
+
+Absatz 13.
+
+Absatz 14.
+
+Absatz 15.
+
+Absatz 16.
+
+Absatz 17.
+
+Absatz 18.
+
+Absatz 19.
+
+Absatz 20.
+
+Absatz 21.
+
+Absatz 22.
+
+Absatz 23.
+
+Absatz 24.
+
+Absatz 25.
+
+Absatz 26.
+
+Absatz 27.
+
+Absatz 28.
+
+Absatz 29.
+
+Absatz 30.
+
+Absatz 31.
+
+Absatz 32.
+
+Absatz 33.
+
+Absatz 34.
+
+Absatz 35.
+
+Absatz 36.
+
+Absatz 37.
+
+Absatz 38.
+
+Absatz 39.
+
+## Sprite-Atlas + Batch-Draw
+
+Absatz 0.
+
+Absatz 1.
+
+Absatz 2.
+
+Absatz 3.
+
+Absatz 4.
+
+Absatz 5.
+
+Absatz 6.
+
+Absatz 7.
+
+Absatz 8.
+
+Absatz 9.
+
+Absatz 10.
+
+Absatz 11.
+
+Absatz 12.
+
+Absatz 13.
+
+Absatz 14.
+
+Absatz 15.
+
+Absatz 16.
+
+Absatz 17.
+
+Absatz 18.
+
+Absatz 19.
+
+Absatz 20.
+
+Absatz 21.
+
+Absatz 22.
+
+Absatz 23.
+
+Absatz 24.
+
+Absatz 25.
+
+Absatz 26.
+
+Absatz 27.
+
+Absatz 28.
+
+Absatz 29.
+
+Absatz 30.
+
+Absatz 31.
+
+Absatz 32.
+
+Absatz 33.
+
+Absatz 34.
+
+Absatz 35.
+
+Absatz 36.
+
+Absatz 37.
+
+Absatz 38.
+
+Absatz 39.
+
+--- verzeichnis wurzel/examples
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "hbmarke " THEN PRINT L[i]
+NEXT
+--- erwartet
+hbmarke zweiter-teil 2
+pr abschnitt 2
+hbmarke sprite-atlas--batch-draw 3
+pr abschnitt 3

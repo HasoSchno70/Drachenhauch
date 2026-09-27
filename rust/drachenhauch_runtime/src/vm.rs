@@ -6154,8 +6154,13 @@ impl<'p> Vm<'p> {
                 let liste: Vec<serde_json::Value> = crate::lsp::diagnose(&text, &basis).into_iter().map(|d| {
                     let zeile = d["range"]["start"]["line"].as_u64().unwrap_or(0) + 1;
                     let schwere = if d["severity"].as_u64() == Some(2) { "warnung" } else { "fehler" };
+                    // Spalte ab 1 und Laenge in Zeichen -- wo im Text die
+                    // Meldung hingehoert (lsp::fehler_bereich).
+                    let von = d["range"]["start"]["character"].as_u64().unwrap_or(0);
+                    let bis = d["range"]["end"]["character"].as_u64().unwrap_or(von + 1);
                     serde_json::json!({"zeile": zeile, "schwere": schwere,
-                                       "meldung": d["message"].as_str().unwrap_or("")})
+                                       "meldung": d["message"].as_str().unwrap_or(""),
+                                       "spalte": von + 1, "laenge": bis.saturating_sub(von).max(1)})
                 }).collect();
                 Value::str_rc(&serde_json::Value::Array(liste).to_string())
             }
@@ -7468,6 +7473,29 @@ impl<'p> Vm<'p> {
                 let n = "GUI_TEXTAREA_SPANS";
                 self.gui.textarea_spans(gi(a, 0, n)?, ganze(&a[1], n)?,
                                         ganze(&a[2], n)?, ganze(&a[3], n)?)?;
+                Value::Nil
+            }
+            "gui_textarea_squiggles" => {
+                fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
+                    match v {
+                        Value::Array(a) => {
+                            let a = a.borrow();
+                            let mut o = Vec::with_capacity(a.cells.len());
+                            for x in a.cells.iter() {
+                                match x {
+                                    Value::Int(i) => o.push(i),
+                                    Value::Float(f) => o.push(f as i64),
+                                    _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+                                }
+                            }
+                            Ok(o)
+                        }
+                        _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+                    }
+                }
+                let n = "GUI_TEXTAREA_SQUIGGLES";
+                self.gui.textarea_squiggles(gi(a, 0, n)?, ganze(&a[1], n)?,
+                                            ganze(&a[2], n)?, ganze(&a[3], n)?)?;
                 Value::Nil
             }
             "gui_set_enabled" => { self.gui.set_enabled(gi(a,0,"GUI_SET_ENABLED")?, gbool(a,1,"GUI_SET_ENABLED")?)?; Value::Nil }

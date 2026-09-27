@@ -78,7 +78,7 @@ PROCESS_START: 'gibt_es_nicht_xyz' laesst sich nicht starten
 PRINT CODE_CHECK$("PRINT 1" + CHR$(10) + "DIM x AS" + CHR$(10))
 PRINT CODE_CHECK$("PRINT 1")
 --- erwartet
-[{"zeile":2,"schwere":"fehler","meldung":"Erwartet Typ"}]
+[{"zeile":2,"schwere":"fehler","meldung":"Erwartet Typ","spalte":7,"laenge":2}]
 []
 
 === code check loest import am ordner auf
@@ -88,7 +88,7 @@ PRINT CODE_CHECK$("IMPORT " + CHR$(34) + "helfer.dh" + CHR$(34) + CHR$(10) + "gr
 SUB gruss()
 END SUB
 --- erwartet
-[{"zeile":3,"schwere":"fehler","meldung":"Erwartet Typ"}]
+[{"zeile":3,"schwere":"fehler","meldung":"Erwartet Typ","spalte":7,"laenge":2}]
 
 === code hover complete definition references
 DIM q AS STRING : q = REPLACE$("' Spieler-Klasse\n' Zweite Zeile.\nCLASS Player\n    SUB Init()\n    END SUB\nEND CLASS\nFUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER\n    RETURN a + b\nEND FUNCTION\nDIM r AS INTEGER\nr = add(1, 2)\nr = add(3, 4)\n", "\n", CHR$(10))

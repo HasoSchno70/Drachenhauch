@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1963,
+ "count": 1964,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -291,7 +291,7 @@
   "CLOUD_LOAD": "Lädt den gespeicherten String — leer, wenn noch nichts gespeichert wurde ODER bei einem Fehler",
   "CLOUD_SAVE": "Speichert data$ komplett (überschreibt einen vorherigen Stand)",
   "CLS": "Buffer mit color füllen (Default: schwarz)",
-  "CODE_CHECK$": "STRING (JSON) die Front-End-Kette wie dhrt --check: eine Liste von {zeile, schwere, meldung} mit schwere = fehler/warnung; basis$ = Ordner für IMPORT \"x.dh\" (Vorgabe: das Arbeitsverzeichnis). Zeilen sind die des Puffers, auch bei Importen",
+  "CODE_CHECK$": "STRING (JSON) die Front-End-Kette wie dhrt --check: eine Liste von {zeile, spalte, laenge, schwere, meldung} mit schwere = fehler/warnung; spalte (ab 1) und laenge sagen, wo in der Zeile die Meldung hingehört -- die Stelle eines Syntaxfehlers, sonst ein in der Meldung genannter Name, sonst die Zeile ohne Einrückung; basis$ = Ordner für IMPORT \"x.dh\" (Vorgabe: das Arbeitsverzeichnis). Zeilen sind …",
   "CODE_COMPLETE": "ARRAY OF STRING Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten",
   "CODE_DEFINITION": "TUPLE (zeile, spalte) wo das Wort definiert ist; (-1, -1) ohne Definition in diesem Text",
   "CODE_FORMAT$": "STRING — der Quelltext formatiert wie durch dhrt fmt: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit einruecken (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler)",
@@ -836,6 +836,7 @@
   "GUI_TEXTAREA_SET_MARKDOWN": "Text aus Markdown setzen (schaltet die Formate ein)",
   "GUI_TEXTAREA_SHARE": "zweite Ansicht auf denselben Text: ansicht zeigt, was in von steht (beide im selben Fenster), und was in einer der beiden geändert wird, steht nach GUI_UPDATE in der anderen. Jede behält Marke, Ausschnitt und Faltung; eine Marke hinter einer Änderung rückt mit. Der Verlauf liegt beim Besitzer — Strg+Z in der Ansicht nimmt dort zurück. -1 hebt die Verbindung auf",
   "GUI_TEXTAREA_SPANS": "Zeichen start … start+laenge in farbe zeichnen",
+  "GUI_TEXTAREA_SQUIGGLES": "Wellenlinien unter Zeichen-Abschnitten (Start ab 0, Laenge in Zeichen, 0 = ein kurzes Stueck an der Stelle) -- Fehler und Warnungen dort, wo sie stehen. Ersetzt alle bisherigen, leere Felder loeschen; eine Aenderung am Text nimmt sie weg wie die Farbabschnitte",
   "GUI_TEXTAREA_STYLE": "Stil auf die Auswahl setzen (an = TRUE, Vorgabe) oder wegnehmen; ohne Auswahl gilt er für das nächste Getippte",
   "GUI_TEXTAREA_SWATCHES": "Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht &H-Literale",
   "GUI_TEXTAREA_SWATCH_CLICKED": "welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie GUI_CLICKED, die Schreibmarke bleibt dabei stehen",
