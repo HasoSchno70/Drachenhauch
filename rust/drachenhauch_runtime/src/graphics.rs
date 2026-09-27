@@ -905,6 +905,11 @@ pub struct Graphics {
     zeiger_prog: Option<&'static str>,
     zeiger_gui: Option<&'static str>,
     zeiger_gesetzt: Option<&'static str>,
+    /// Zeiger aus Bildern (eingebaute und MOUSE_CURSOR_NEW), einmal bei GLFW
+    /// angelegt und dann wiederverwendet -- `GLFWcursor*`.
+    zeiger_glfw: std::collections::HashMap<&'static str, usize>,
+    /// Die Bilder der eigenen Zeiger: RGBA, Breite, Hoehe, Brennpunkt.
+    zeiger_eigene: std::collections::HashMap<&'static str, (Vec<u8>, i32, i32, (i32, i32))>,
     /// SPEAK bei laufendem Bildschirmleser ohne gui: die Ansage fuer den
     /// Baum, den FLIP ohne GUI_UPDATE schickt (wie `Gui::ansage`).
     ansage: String,
@@ -1553,6 +1558,7 @@ impl Graphics {
         let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
         crate::ime::einhaengen(unsafe { rl.get_window_handle() });
+        crate::systemzeiger::einhaengen(unsafe { rl.get_window_handle() });
         if !hidden {
             rl.clear_window_state(WindowState::default().set_window_hidden(true));
         }
@@ -1599,6 +1605,7 @@ impl Graphics {
             a11y, a11y_versorgt: false, sichtbar: !hidden, flips: 0,
             titel: title.to_string(), esc_ausdruecklich: false,
             zeiger_prog: None, zeiger_gui: None, zeiger_gesetzt: None,
+            zeiger_glfw: std::collections::HashMap::new(), zeiger_eigene: std::collections::HashMap::new(),
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), shader_textures: HashMap::new(),
@@ -4930,8 +4937,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         match zeiger_form(name) {
             Some(f) => { self.zeiger_prog = Some(f); Ok(()) }
             None => Err(format!(
-                "MOUSE_CURSOR: unbekannte Form '{}' -- erwartet default/ibeam/crosshair/\
-hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed oder auto", name)),
+                "MOUSE_CURSOR: unbekannte Form '{}' -- erwartet {} oder auto", name, ZEIGER_LISTE)),
         }
     }
     /// Die Form, die die gui fuer dieses Bild wuenscht (None = Pfeil).
@@ -4944,6 +4950,23 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed oder aut
         use raylib::consts::MouseCursor::*;
         let f = self.zeiger_jetzt();
         if self.zeiger_gesetzt == Some(f) { return; }
+        self.zeiger_gesetzt = Some(f);
+        // Echter Systemzeiger (Windows: warten/arbeitet/hilfe) -- sonst gibt
+        // der Subclass WM_SETCURSOR wieder an GLFW.
+        if crate::systemzeiger::hat(f) {
+            crate::systemzeiger::setzen(Some(f));
+            return;
+        }
+        crate::systemzeiger::setzen(None);
+        // Zeiger aus einem Bild: eingebaut oder vom Programm.
+        let bild = crate::zeigerbilder::bild(f).or_else(|| self.zeiger_eigene.get(f).cloned());
+        if let Some((px, w, h, (bx, by))) = bild {
+            if !self.zeiger_glfw.contains_key(f) {
+                if let Some(c) = glfw_zeiger_anlegen(&px, w, h, bx, by) { self.zeiger_glfw.insert(f, c); }
+            }
+            if let Some(&c) = self.zeiger_glfw.get(f) { glfw_zeiger_setzen(c); return; }
+            // GLFW hat keinen angelegt (Web): dann der Pfeil.
+        }
         let c = match f {
             "ibeam" => MOUSE_CURSOR_IBEAM,
             "crosshair" => MOUSE_CURSOR_CROSSHAIR,
@@ -4957,7 +4980,30 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed oder aut
             _ => MOUSE_CURSOR_DEFAULT,
         };
         self.rl.set_mouse_cursor(c);
-        self.zeiger_gesetzt = Some(f);
+    }
+
+    /// MOUSE_CURSOR_NEW(bild, bx, by): ein Zeiger aus einem Bild, Brennpunkt
+    /// (bx, by) in Bildpunkten. Liefert den Namen ("eigen1", ...), der dann
+    /// fuer MOUSE_CURSOR und GUI_SET_CURSOR gilt wie ein eingebauter. Das
+    /// Bild wird KOPIERT -- es spaeter zu aendern, aendert den Zeiger nicht.
+    pub fn zeiger_neu(&mut self, bild: i64, bx: i64, by: i64) -> Result<&'static str, String> {
+        const F: &str = "MOUSE_CURSOR_NEW";
+        if !self.tex_ok(bild) { return Err(self.tex_fehler(bild, F)); }
+        let mut kopie = self.textures[bild as usize].img.clone();
+        kopie.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        let (w, h) = (kopie.width, kopie.height);
+        if w < 1 || h < 1 || w > 256 || h > 256 {
+            return Err(format!("{}: das Bild ist {}x{} gross -- ein Zeiger darf hoechstens 256x256 sein (ueblich sind 32x32)", F, w, h));
+        }
+        if bx < 0 || by < 0 || bx >= w as i64 || by >= h as i64 {
+            return Err(format!("{}: der Brennpunkt {},{} liegt nicht im Bild ({}x{})", F, bx, by, w, h));
+        }
+        let n = (w * h * 4) as usize;
+        let px = unsafe { std::slice::from_raw_parts(kopie.data as *const u8, n) }.to_vec();
+        let name: &'static str = Box::leak(format!("eigen{}", self.zeiger_eigene.len() + 1).into_boxed_str());
+        self.zeiger_eigene.insert(name, (px, w, h, (bx as i32, by as i32)));
+        if let Ok(mut l) = EIGENE_ZEIGER.lock() { l.push(name); }
+        Ok(name)
     }
 
     /// JOYSTICK_HIT / JOYSTICK_RELEASED: Flanken analog zu JOYSTICK_BUTTON.
@@ -7241,11 +7287,56 @@ mod tests {
     }
 }
 
+/// Die Formen fuer Fehlermeldungen.
+pub const ZEIGER_LISTE: &str = "default/ibeam/crosshair/hand/resize_ew/resize_ns/resize_nwse/\
+resize_nesw/resize_all/not_allowed/warten/arbeitet/hilfe/kopieren/stift/pipette, ein Name aus MOUSE_CURSOR_NEW";
+
+/// Die Namen der Zeiger aus MOUSE_CURSOR_NEW -- hier, weil `zeiger_form`
+/// auch ohne Graphics gefragt wird (GUI_SET_CURSOR).
+static EIGENE_ZEIGER: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
+
+/// Einen GLFW-Zeiger aus RGBA-Punkten anlegen. raylib kennt nur die zehn
+/// Standardformen; GLFW, das in raylib steckt, kann Bilder.
+#[cfg(not(target_os = "emscripten"))]
+fn glfw_zeiger_anlegen(px: &[u8], w: i32, h: i32, bx: i32, by: i32) -> Option<usize> {
+    #[repr(C)]
+    struct GlfwBild { breite: i32, hoehe: i32, punkte: *const u8 }
+    unsafe extern "C" { fn glfwCreateCursor(bild: *const GlfwBild, x: i32, y: i32) -> *mut std::ffi::c_void; }
+    let b = GlfwBild { breite: w, hoehe: h, punkte: px.as_ptr() };
+    let c = unsafe { glfwCreateCursor(&b, bx, by) };
+    if c.is_null() { None } else { Some(c as usize) }
+}
+#[cfg(not(target_os = "emscripten"))]
+fn glfw_zeiger_setzen(c: usize) {
+    unsafe extern "C" {
+        fn glfwGetCurrentContext() -> *mut std::ffi::c_void;
+        fn glfwSetCursor(fenster: *mut std::ffi::c_void, zeiger: *mut std::ffi::c_void);
+    }
+    unsafe {
+        let f = glfwGetCurrentContext();
+        if !f.is_null() { glfwSetCursor(f, c as *mut std::ffi::c_void); }
+    }
+}
+#[cfg(target_os = "emscripten")]
+fn glfw_zeiger_anlegen(_px: &[u8], _w: i32, _h: i32, _bx: i32, _by: i32) -> Option<usize> { None }
+#[cfg(target_os = "emscripten")]
+fn glfw_zeiger_setzen(_c: usize) {}
+
 /// Name einer Zeigerform in ihrer Grundform (die Kurznamen und Gross/klein
 /// eingeschlossen), None = unbekannt. EINE Liste fuer MOUSE_CURSOR und
 /// GUI_SET_CURSOR.
 pub fn zeiger_form(name: &str) -> Option<&'static str> {
-    Some(match name.trim().to_ascii_lowercase().as_str() {
+    let klein = name.trim().to_ascii_lowercase();
+    if let Some(&n) = EIGENE_ZEIGER.lock().ok().and_then(|l| l.iter().find(|n| **n == klein).copied()).as_ref() {
+        return Some(n);
+    }
+    Some(match klein.as_str() {
+        "warten" | "wait" => "warten",
+        "arbeitet" | "progress" => "arbeitet",
+        "hilfe" | "help" => "hilfe",
+        "kopieren" | "copy" => "kopieren",
+        "stift" | "pencil" => "stift",
+        "pipette" | "picker" => "pipette",
         "default" | "arrow" => "default",
         "ibeam" | "text" => "ibeam",
         "crosshair" | "cross" => "crosshair",

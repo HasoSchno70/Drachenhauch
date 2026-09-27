@@ -113,6 +113,12 @@ mod gui;
 mod a11y;
 #[cfg(feature = "graphics")]
 mod ime;
+// Echte Systemzeiger (Windows: warten/arbeitet/hilfe) ueber einen Subclass.
+#[cfg(feature = "graphics")]
+mod systemzeiger;
+// Eingebaute Zeigerbilder (kopieren, stift, pipette ...): rein, mit Tests.
+#[cfg(any(test, feature = "graphics"))]
+mod zeigerbilder;
 // Dateien vom Finder (macOS): nur die Objective-C-Laufzeit, darum ungegatet --
 // so uebersetzt es jeder macOS-Lauf der CI mit.
 mod finder;

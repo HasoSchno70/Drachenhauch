@@ -797,8 +797,9 @@ Sampler bliebe schwarz.
 | `MOUSEWHEEL_X()`, `MOUSEWHEEL_Y()` → FLOAT | Rad in **beiden** Achsen und als Kommazahl; `MOUSEWHEEL()` kennt nur die senkrechte und rundet — feine Touchpad-Schritte fallen dort auf 0 |
 | `MOUSE_SET_POS(x, y)` | Zeiger an eine Stelle setzen |
 | `MOUSE_ON_SCREEN()` → BOOLEAN | ist der Zeiger überhaupt im Fenster? |
-| `MOUSE_CURSOR(form$)` | Zeigerform: `default`, `ibeam`, `crosshair`, `hand`, `resize_ew`, `resize_ns`, `resize_nwse`, `resize_nesw`, `resize_all`, `not_allowed`; bleibt stehen und hat Vorrang vor der gui, `auto` gibt den Zeiger an die gui zurück |
+| `MOUSE_CURSOR(form$)` | Zeigerform: `default`, `ibeam`, `crosshair`, `hand`, `resize_ew`, `resize_ns`, `resize_nwse`, `resize_nesw`, `resize_all`, `not_allowed`, dazu `warten`, `arbeitet`, `hilfe` (unter Windows die echten Systemzeiger, die Sanduhr dreht sich), `kopieren`, `stift`, `pipette` und eigene aus `MOUSE_CURSOR_NEW`; bleibt stehen und hat Vorrang vor der gui, `auto` gibt den Zeiger an die gui zurück |
 | `MOUSE_CURSOR_GET$()` | die Zeigerform, die gerade gilt (die des Programms, sonst die der gui, sonst `default`) |
+| `MOUSE_CURSOR_NEW(bild, bx, by)` | ein Zeiger aus einem Bild (bis 256x256, Brennpunkt `bx`,`by`); liefert den Namen (`eigen1` ...), der dann für `MOUSE_CURSOR` und `GUI_SET_CURSOR` gilt. Das Bild wird kopiert |
 | `KEY_ANY_HIT()` → INTEGER | Code der zuletzt gedrückten Taste, `-1` = keine — fuer Belegungsdialoge |
 | `KEY_NAME$(code)` → STRING | Anzeigename einer Taste (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
 | `INKEY$()` → STRING | zuletzt getipptes Zeichen oder `""` — wartet **nicht**, für Texteingabe im Spielablauf |

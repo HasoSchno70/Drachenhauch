@@ -128,3 +128,66 @@ PRINT MOUSE_CURSOR_GET$()
 --- erwartet
 crosshair
 default
+
+=== eingebaute formen und kurznamen
+SCREEN(100, 100, "zeiger")
+DIM f AS STRING
+FOR EACH f IN ["warten", "wait", "arbeitet", "progress", "hilfe", "help", "kopieren", "copy", "stift", "pencil", "pipette", "picker"]
+    MOUSE_CURSOR(f)
+    CLS(0)
+    FLIP()
+    PRINT f; "="; MOUSE_CURSOR_GET$()
+NEXT
+--- erwartet
+warten=warten
+wait=warten
+arbeitet=arbeitet
+progress=arbeitet
+hilfe=hilfe
+help=hilfe
+kopieren=kopieren
+copy=kopieren
+stift=stift
+pencil=stift
+pipette=pipette
+picker=pipette
+
+=== zeiger aus einem bild
+IMPORT "gui"
+IMPORT "imgfx"
+SCREEN(100, 100, "zeiger")
+DIM b AS IMAGE : b = IMAGE_NEW(32, 32, RGB(255, 0, 0))
+DIM a$ AS STRING : a$ = MOUSE_CURSOR_NEW(b, 3, 4)
+DIM c$ AS STRING : c$ = MOUSE_CURSOR_NEW(b, 0, 0)
+PRINT a$; " "; c$
+MOUSE_CURSOR(a$)
+CLS(0)
+FLIP()
+PRINT MOUSE_CURSOR_GET$()
+MOUSE_CURSOR(UPPER$(c$))
+PRINT MOUSE_CURSOR_GET$()
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("", 0, 0, 100, 100)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "x", 0, 0, 50, 20)
+GUI_SET_CURSOR(k, a$)
+PRINT GUI_GET_CURSOR$(k)
+GUI_SET_CURSOR(k, "stift")
+PRINT GUI_GET_CURSOR$(k)
+TRY
+    PRINT MOUSE_CURSOR_NEW(b, 32, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    MOUSE_CURSOR("eigen9")
+CATCH e
+    PRINT LEFT$(e, 40)
+END TRY
+--- erwartet
+eigen1 eigen2
+eigen1
+eigen2
+eigen1
+stift
+MOUSE_CURSOR_NEW: der Brennpunkt 32,0 liegt nicht im Bild (32x32)
+MOUSE_CURSOR: unbekannte Form 'eigen9' -

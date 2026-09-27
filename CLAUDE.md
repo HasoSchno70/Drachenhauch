@@ -1717,6 +1717,16 @@ Wechsel). `MOUSE_CURSOR` bleibt stehen und hat Vorrang, `"auto"` gibt an die
 gui zurueck; `GUI_SET_CURSOR(wdg, form$)`, `MOUSE_CURSOR_GET$()`. Neue Stellen
 bekommen ihren Zeiger aus derselben Geometrie wie Treffertest und Zeichnen.
 Tests `tests/pruef/gui_mauszeiger.dhtest`.
+**Eigene Zeigerbilder (Teil 3):** raylib kennt nur zehn Formen. Dazu kommen
+`warten`/`arbeitet`/`hilfe` -- unter Windows die echten Systemzeiger ueber
+einen Subclass, der `WM_SETCURSOR` vor GLFW beantwortet (`systemzeiger.rs`;
+per `SetCursor` gesetzt kaeme GLFW bei der naechsten Bewegung wieder durch) --,
+gezeichnete `kopieren`/`stift`/`pipette` (`zeigerbilder.rs`, 16er-Raster mit
+selbst gelegtem schwarzem Rand, doppelt vergroessert) und
+`MOUSE_CURSOR_NEW(bild, bx, by)` -> Name `eigen1` ... Bilder gehen ueber
+`glfwCreateCursor`/`glfwSetCursor` direkt an das GLFW in raylib, einmal
+angelegt und wiederverwendet. Nachgemessen am echten Windows-Zeiger
+(`GetCursorInfo`), die Gegenprobe ohne Abfangen zeigt den Pfeil.
 
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
