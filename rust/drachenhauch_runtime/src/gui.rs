@@ -1881,6 +1881,12 @@ struct RichState {
     // Farben der Codebloecke je Art (Kommentar, Text, Zahl, Schluessel,
     // Name, Operator); None = die Vorgabe passend zum Grund.
     code_farben: [Option<i64>; 6],
+    // --- Knoepfe an Codebloecken (GUI_RICHTEXT_CODE_BUTTONS) ---------------
+    code_knoepfe: Vec<String>,
+    /// Je Block: (y des Knopfstreifens, Knopfhoehe, Code, [(x, Breite)] je Knopf).
+    codebloecke: Vec<(i32, i32, String, Vec<(i32, i32)>)>,
+    code_aktion: String,   // in diesem Bild gedrueckter Knopf (transient)
+    code_text: String,     // der Code des Blocks dazu
 }
 
 /// Eine gesetzte Zeile. `grund` faerbt die ganze Zeile (Codeblock), `linie`
@@ -7539,6 +7545,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         Ok(())
     }
+    /// Knoepfe an jedem Codeblock ("Kopieren|Starten", leer = keine).
+    pub fn richtext_code_buttons(&mut self, h: i64, knoepfe: &str) -> Result<(), String> {
+        let r = self.rt_mut(h, "GUI_RICHTEXT_CODE_BUTTONS")?;
+        r.code_knoepfe = knoepfe.split('|').map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).collect();
+        r.stand = (usize::MAX, 0, 0, 0);
+        r.satz_aktuell = false;
+        Ok(())
+    }
+    /// Welcher Code-Knopf in diesem Bild gedrueckt wurde (leer = keiner).
+    pub fn richtext_code_action(&self, h: i64) -> Result<String, String> {
+        Ok(self.rt_ref(h, "GUI_RICHTEXT_CODE_ACTION$")?.code_aktion.clone())
+    }
+    /// Der Code des Blocks, an dem zuletzt ein Knopf gedrueckt wurde.
+    pub fn richtext_code(&self, h: i64) -> Result<String, String> {
+        Ok(self.rt_ref(h, "GUI_RICHTEXT_CODE$")?.code_text.clone())
+    }
     /// Die Ueberschriften des Dokuments (Titel ohne Auszeichnung). Aus der
     /// QUELLE gelesen, damit sie gleich nach GUI_RICHTEXT_SET_TEXT stimmen
     /// -- gesetzt wird erst beim naechsten GUI_UPDATE.
@@ -7896,6 +7918,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let mut i = 0usize;
         let mut im_code = false;
         let mut code_farbig = false;
+        let knoepfe = self.windows[wi].widgets[idx].rich.as_ref().unwrap().code_knoepfe.clone();
+        let kgr = (basis - 2).max(11);
+        let kh = kgr + self.sk(10);
+        let mut bloecke: Vec<(i32, i32, String, Vec<(i32, i32)>)> = Vec::new();
+        let mut block_y = 0i32;
+        let mut block_text = String::new();
         while i < roh.len() {
             let z = roh[i].trim_end();
             let t = z.trim_start();
@@ -7906,10 +7934,30 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     let sprache = t[3..].trim().to_lowercase();
                     code_farbig = matches!(sprache.as_str(), "" | "dh" | "basic" | "drachenhauch" | "gb" | "gamebasic" | "vb");
                     y += self.sk(4);
+                    block_y = y;
+                    block_text.clear();
                 }
-                zeilen.push(band(y, self.sk(6), 1, 0, 0));
-                y += self.sk(6);
-                if im_code { y += self.sk(4); }
+                // Mit Knoepfen bekommt der Block oben einen Streifen fuer sie --
+                // ueber der ersten Codezeile laegen sie auf dem Code.
+                let oben = if !im_code && !knoepfe.is_empty() { kh + self.sk(6) } else { self.sk(6) };
+                zeilen.push(band(y, oben, 1, 0, 0));
+                y += oben;
+                if im_code {
+                    if !knoepfe.is_empty() {
+                        // Rechtsbuendig, der erste Knopf ganz links.
+                        let mut rects: Vec<(i32, i32)> = Vec::new();
+                        let mut x = rand + innen - self.sk(8);
+                        for k in knoepfe.iter().rev() {
+                            let bw = breite_von(k, kgr, false, 0) + self.sk(18);
+                            x -= bw;
+                            rects.push((x, bw));
+                            x -= self.sk(6);
+                        }
+                        rects.reverse();
+                        bloecke.push((block_y + self.sk(3), kh, block_text.clone(), rects));
+                    }
+                    y += self.sk(4);
+                }
                 im_code = !im_code;
                 i += 1;
                 continue;
@@ -7917,6 +7965,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if im_code {
                 let gr = (basis - 1).max(8);
                 let zh = gr + self.sk(7);
+                block_text.push_str(roh[i]);
+                block_text.push('\n');
                 let text = z.replace('\t', "    ");
                 let x0 = rand + self.sk(12);
                 let mut zeile = RtZeile { y, h: zh, band: 1, balken: -1, ..Default::default() };
@@ -8098,6 +8148,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         r.zeilen = zeilen;
         r.ziele = ziele;
         r.ueberschriften = ues;
+        r.codebloecke = bloecke;
         r.satz_aktuell = true;
         let max = (r.inhalt_h - hoehe).max(0);
         // Ein Sprung zu einer Ueberschrift, der vor dem Satz verlangt wurde,
@@ -10663,6 +10714,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             // Breite, Schrift und Massstab und entsteht beim Laden neu.
             let mut rj = serde_json::json!({ "quelle": r.quelle });
             if r.basis > 0 { rj["groesse"] = serde_json::json!(r.basis); }
+            if !r.code_knoepfe.is_empty() { rj["code_knoepfe"] = serde_json::json!(r.code_knoepfe.join("|")); }
             o["rich"] = rj;
         }
         if !w.sinnbild.is_empty() { o["symbol"] = serde_json::json!(w.sinnbild); }
@@ -11020,6 +11072,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 quelle: rj.and_then(|r| r["quelle"].as_str()).unwrap_or("").to_string(),
                 basis: rj.and_then(|r| r["groesse"].as_i64()).unwrap_or(0) as i32,
                 code_font: -1,
+                code_knoepfe: rj.and_then(|r| r["code_knoepfe"].as_str()).unwrap_or("")
+                    .split('|').map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).collect(),
                 ..Default::default()
             }));
         }
@@ -11924,7 +11978,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     t.hover = -1; t.doppel = false; t.bearbeitet = None;
                     if let Some(d) = t.datei.as_mut() { d.aktiviert.clear(); }
                 }
-                if let Some(r) = wdg.rich.as_mut() { r.geklickt.clear(); }
+                if let Some(r) = wdg.rich.as_mut() { r.geklickt.clear(); r.code_aktion.clear(); }
                 if let Some(a) = wdg.akk.as_mut() { a.umgeschaltet = -1; }
                 if let Some(z) = wdg.wz.as_mut() { z.ereignis = 0; }
             }
@@ -15553,6 +15607,27 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             Kind::Tree => self.tree_press(win, i, mx, my),
             Kind::RichText => {
                 let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                // Ein Knopf an einem Codeblock? Dann ist es kein Beginn einer Auswahl.
+                let knopf = {
+                    let r = self.windows[win].widgets[i].rich.as_ref().unwrap();
+                    let (rx, ry) = (mx - ax, my - ay + r.scroll);
+                    let mut t = None;
+                    for (by, bh, code, rects) in &r.codebloecke {
+                        if ry < *by || ry >= by + bh { continue; }
+                        for (k, (bx, bw)) in rects.iter().enumerate() {
+                            if rx >= *bx && rx < bx + bw { t = Some((r.code_knoepfe.get(k).cloned().unwrap_or_default(), code.clone())); }
+                        }
+                    }
+                    t
+                };
+                if let Some((aktion, code)) = knopf {
+                    let r = self.windows[win].widgets[i].rich.as_mut().unwrap();
+                    r.code_aktion = aktion;
+                    r.code_text = code;
+                    let f = self.windows[win].widgets[i].on_click.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                    return;
+                }
                 let ziel = {
                     let r = self.windows[win].widgets[i].rich.as_ref().unwrap();
                     Self::rt_link_unter(r, mx - ax, my - ay + r.scroll)
@@ -19632,6 +19707,25 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     };
                     g.box_fill(ax + l.x, ly, ax + x1, ly + d - 1, (0x90i64 << 24) | (acc & 0xFF_FFFF));
                 }
+            }
+        }
+        // Knoepfe an den Codebloecken: kleine Flaechen im Kopfstreifen, mit
+        // Rahmen und in gedaempfter Schrift -- sie sollen da sein, aber nicht
+        // lauter als der Code.
+        let kgr = ((if r.basis > 0 { r.basis } else { self.wsize(g, wdg) }) - 2).max(11);
+        for (by, bh, _, rects) in &r.codebloecke {
+            let zy = ay + by - r.scroll;
+            if zy + bh < ay || zy > ay + h { continue; }
+            for (k, (bx, bw)) in rects.iter().enumerate() {
+                let x = ax + bx;
+                let grund = if hell { shade(code_grund, -10) } else { shade(code_grund, 16) };
+                let kante = if hell { shade(code_grund, -45) } else { shade(code_grund, 48) };
+                let leise = self.leise(grund);
+                g.box_fill(x, zy, x + bw - 1, zy + bh - 1, grund);
+                g.rect(x, zy, x + bw - 1, zy + bh - 1, kante);
+                let text = r.code_knoepfe.get(k).cloned().unwrap_or_default();
+                let tw = g.text_width_stil(&text, kgr, font, 0);
+                g.text_styled_stil(x + (bw - tw) / 2, zy + (bh - kgr) / 2, text, leise, font, kgr, 0);
             }
         }
         g.pop_clip();

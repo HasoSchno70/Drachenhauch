@@ -4161,6 +4161,24 @@
    "module": "gui"
   },
   {
+   "name": "GUI_RICHTEXT_CODE_BUTTONS",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_CODE_BUTTONS(rt, knoepfe$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_CODE_ACTION$",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_CODE_ACTION$(rt) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_CODE$",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_CODE$(rt) AS STRING",
+   "module": "gui"
+  },
+  {
    "name": "GUI_RICHTEXT_GOTO_HEADING",
    "kind": "core",
    "signature": "GUI_RICHTEXT_GOTO_HEADING(rt, nr)",

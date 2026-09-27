@@ -1151,18 +1151,22 @@ CONST HB_INHALT_B = 290
 DIM winHandbuch AS GUI_WINDOW : winHandbuch = GUI_WINDOW("Handbuch", HB_X, HB_Y, 1180, 780)
 GUI_WINDOW_CLOSABLE(winHandbuch, TRUE)
 GUI_WINDOW_RESIZABLE(winHandbuch, TRUE)
-GUI_WINDOW_SET_MIN_SIZE(winHandbuch, 900, 500)
+GUI_WINDOW_SET_MIN_SIZE(winHandbuch, 1000, 500)
 DIM btnHbRueck AS GUI_WIDGET : btnHbRueck = GUI_ICON_BUTTON(winHandbuch, 8, 8, 32, 28, "links")
 DIM btnHbVor AS GUI_WIDGET : btnHbVor = GUI_ICON_BUTTON(winHandbuch, 44, 8, 32, 28, "rechts")
 GUI_TOOLTIP(btnHbRueck, "Zurück zur vorigen Stelle (Alt+Links)")
 GUI_TOOLTIP(btnHbVor, "Vorwärts (Alt+Rechts)")
 DIM ddDoku AS GUI_WIDGET : ddDoku = GUI_DROPDOWN(winHandbuch, 84, 8, 340, 28, [])
-DIM tfHbSuche AS GUI_WIDGET : tfHbSuche = GUI_TEXTINPUT(winHandbuch, 432, 8, 260, 28, "")
+DIM tfHbSuche AS GUI_WIDGET : tfHbSuche = GUI_TEXTINPUT(winHandbuch, 432, 8, 180, 28, "")
 GUI_TOOLTIP(tfHbSuche, "Im Dokument suchen -- Enter: nächste Fundstelle")
-DIM btnHbZurueck AS GUI_WIDGET : btnHbZurueck = GUI_BUTTON(winHandbuch, "Vorige", 700, 8, 80, 28)
-DIM btnHbSuche AS GUI_WIDGET : btnHbSuche = GUI_BUTTON(winHandbuch, "Nächste", 788, 8, 80, 28)
+DIM btnHbZurueck AS GUI_WIDGET : btnHbZurueck = GUI_BUTTON(winHandbuch, "Vorige", 620, 8, 74, 28)
+DIM btnHbSuche AS GUI_WIDGET : btnHbSuche = GUI_BUTTON(winHandbuch, "Nächste", 700, 8, 74, 28)
+' Suche ueber ALLE Dokumente: die Treffer stehen in der Liste links, wo
+' sonst das Inhaltsverzeichnis steht; derselbe Knopf holt es zurueck.
+DIM btnHbAlle AS GUI_WIDGET : btnHbAlle = GUI_BUTTON(winHandbuch, "In allen", 780, 8, 96, 28)
 GUI_TOOLTIP(btnHbZurueck, "Vorige Fundstelle (Umschalt+Enter)")
 GUI_TOOLTIP(btnHbSuche, "Nächste Fundstelle (Enter)")
+GUI_TOOLTIP(btnHbAlle, "In allen Dokumenten des Handbuchs suchen -- die Treffer stehen links")
 DIM lstHbInhalt AS GUI_WIDGET : lstHbInhalt = GUI_LISTBOX(winHandbuch, 8, 46, HB_INHALT_B, 600, [])
 GUI_LISTBOX_PLACEHOLDER(lstHbInhalt, "Keine Überschriften")
 GUI_TOOLTIP(lstHbInhalt, "Inhalt -- ein Klick springt zum Abschnitt")
@@ -1192,7 +1196,19 @@ DIM probSpalte AS ARRAY OF INTEGER : probSpalte = []
 DIM probLaenge AS ARRAY OF INTEGER : probLaenge = []
 DIM probMeldung AS ARRAY OF STRING : probMeldung = []
 DIM hbGesetzt AS BOOLEAN : hbGesetzt = TRUE
+' Die Liste links zeigt Treffer statt Inhalt: je Eintrag Datei und Zeile
+' (0 = Kopf eines Dokuments).
+DIM hbTrModus AS BOOLEAN : hbTrModus = FALSE
+DIM hbTrDatei AS ARRAY OF STRING : hbTrDatei = []
+DIM hbTrZeile AS ARRAY OF INTEGER : hbTrZeile = []
+DIM hbTrWahl AS INTEGER : hbTrWahl = -1
+DIM hbTrNadel AS STRING : hbTrNadel = ""
+' Knoepfe an jedem Codeblock: ein Beispiel ausprobieren, ohne es abzutippen.
+GUI_RICHTEXT_CODE_BUTTONS(rtHandbuch, "Kopieren|In neuen Reiter|Starten")
 GUI_TEXTAREA_SET(taHandbuch, "umbruch", 1)
+' Der Quelltext in der Schrift des Editors -- Tabellen und Einrueckung
+' stehen dann, wie sie geschrieben sind.
+IF codeFont >= 0 THEN GUI_SET_FONT(taHandbuch, codeFont)
 GUI_WINDOW_VISIBLE(winHandbuch, FALSE)
 GUI_WINDOW_CLOSABLE(winProfil, TRUE)
 
@@ -8532,12 +8548,21 @@ FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
         END IF
     NEXT
     IF tgN > 0 THEN protokoll("vor start gesichert " + STR$(tgN))
+    RETURN prozessStartenDatei(art, tabPfade[aktiverTab])
+END FUNCTION
+
+' Eine Datei starten (run/debug/profile), ohne sie in einem Reiter zu haben.
+FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
+    IF prozess >= 0 THEN
+        GUI_SET_TEXT(lblStatus, "Es läuft noch ein Programm -- erst stoppen (Umschalt+F5).")
+        RETURN FALSE
+    END IF
     GUI_LISTBOX_CLEAR(lstAusgabe)
     ' Wer startet, will die Ausgabe sehen -- eine ausgeblendete untere
     ' Leiste kommt zurueck.
     IF NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
     ausgabeRest = "" : prozessRest = ""
-    prozessDatei = tabPfade[aktiverTab]
+    prozessDatei = datei
     prozessArt = art
     prozess = PROCESS_START("dhrt", art, prozessDatei)
     lichtstreif(900)
@@ -9472,6 +9497,202 @@ SUB handbuchLayout()
     GUI_SET_BOUNDS(btnHbAnsicht, b - 16 - 104, 8, 104, 28)
 END SUB
 
+' --- Suche ueber alle Dokumente -----------------------------------------
+' Ein Stueck der Zeile um die Fundstelle, ohne Markdown-Zeichen -- eine
+' Zeile aus einer Tabelle waere sonst vor allem Striche.
+FUNCTION hbAusschnitt$(zeile AS STRING, klein AS STRING) AS STRING
+    DIM t AS STRING : t = TRIM$(zeile)
+    ' In einer Tabellenzeile zaehlt die Zelle mit dem Treffer.
+    IF LEFT$(t, 1) = "|" THEN
+        DIM zelle AS STRING
+        FOR EACH zelle IN SPLIT$(t, "|")
+            IF INSTR(LOWER$(zelle), klein) >= 0 THEN t = TRIM$(zelle) : BREAK
+        NEXT
+    END IF
+    t = REPLACE$(REPLACE$(t, "`", ""), "**", "")
+    WHILE LEFT$(t, 1) = "#" OR LEFT$(t, 1) = ">" OR LEFT$(t, 1) = "-"
+        t = TRIM$(MID$(t, 1, LEN(t)))
+    WEND
+    ' Kurz genug fuer die Spalte -- rechts steht noch die Zeilennummer.
+    IF LEN(t) <= 34 THEN RETURN t
+    DIM p AS INTEGER : p = INSTR(LOWER$(t), klein)
+    DIM a AS INTEGER : a = MAX(0, p - 10)
+    IF a + 34 > LEN(t) THEN a = MAX(0, LEN(t) - 34)
+    DIM r AS STRING : r = MID$(t, a, 34)
+    IF a > 0 THEN r = "…" + r
+    IF a + 34 < LEN(t) THEN r = r + "…"
+    RETURN r
+END FUNCTION
+
+SUB hbSucheAlle()
+    DIM gesucht AS STRING : gesucht = TRIM$(GUI_TEXT(tfHbSuche))
+    IF gesucht = "" THEN GUI_SET_TEXT(lblHbStand, "Erst einen Suchtext eingeben.") : RETURN
+    handbuchDokumente()
+    DIM klein AS STRING : klein = LOWER$(gesucht)
+    DIM eintraege AS ARRAY OF STRING : eintraege = []
+    DIM details AS ARRAY OF STRING : details = []
+    hbTrDatei = [] : hbTrZeile = []
+    DIM treffer AS INTEGER : treffer = 0
+    DIM dokumente AS INTEGER : dokumente = 0
+    DIM voll AS BOOLEAN : voll = FALSE
+    DIM d AS STRING
+    FOR EACH d IN docNamen
+        IF voll THEN BREAK
+        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(docsOrdner, d))
+        DIM kopf AS BOOLEAN : kopf = FALSE
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            IF INSTR(LOWER$(zeilen[i]), klein) >= 0 THEN
+                IF NOT kopf THEN
+                    ARRAY_PUSH(eintraege, d) : ARRAY_PUSH(details, "")
+                    ARRAY_PUSH(hbTrDatei, d) : ARRAY_PUSH(hbTrZeile, 0)
+                    kopf = TRUE
+                    dokumente = dokumente + 1
+                END IF
+                ARRAY_PUSH(eintraege, "   " + hbAusschnitt$(zeilen[i], klein))
+                ARRAY_PUSH(details, STR$(i + 1))
+                ARRAY_PUSH(hbTrDatei, d) : ARRAY_PUSH(hbTrZeile, i + 1)
+                treffer = treffer + 1
+                ' Mehr liest niemand -- und die Liste bliebe bedienbar.
+                IF treffer >= 500 THEN
+                    voll = TRUE
+                    BREAK
+                END IF
+            END IF
+        NEXT
+    NEXT
+    hbTrModus = TRUE
+    hbTrNadel = gesucht
+    hbTrWahl = -1
+    GUI_SET_LISTBOX(lstHbInhalt, eintraege)
+    GUI_LISTBOX_SET_SELECTED(lstHbInhalt, -1)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(eintraege) - 1
+        IF hbTrZeile[k] = 0 THEN
+            GUI_LISTBOX_HEADER(lstHbInhalt, k, TRUE)
+        ELSE
+            GUI_LISTBOX_DETAIL(lstHbInhalt, k, details[k])
+            GUI_LISTBOX_TIP(lstHbInhalt, k, hbTrDatei[k] + ", Zeile " + details[k])
+        END IF
+    NEXT
+    GUI_LISTBOX_PLACEHOLDER(lstHbInhalt, "Kein Treffer")
+    GUI_SET_TEXT(btnHbAlle, "Inhalt")
+    GUI_TOOLTIP(btnHbAlle, "Zurück zum Inhaltsverzeichnis des Dokuments")
+    DIM st AS STRING : st = "'" + gesucht + "': " + STR$(treffer) + " Treffer in " + STR$(dokumente) + " Dokumenten"
+    IF voll THEN st = st + " (nach 500 abgebrochen)"
+    GUI_SET_TEXT(lblHbStand, st)
+    protokoll("hballe " + STR$(treffer) + " " + STR$(dokumente))
+END SUB
+
+' Zurueck zum Inhaltsverzeichnis des offenen Dokuments.
+SUB hbSucheAlleEnde()
+    hbTrModus = FALSE
+    GUI_LISTBOX_PLACEHOLDER(lstHbInhalt, "Keine Überschriften")
+    GUI_SET_TEXT(btnHbAlle, "In allen")
+    GUI_TOOLTIP(btnHbAlle, "In allen Dokumenten des Handbuchs suchen -- die Treffer stehen links")
+    hbInhaltFuellen()
+END SUB
+
+' --- Knoepfe an den Codebloecken ----------------------------------------
+' Kopieren, in einen neuen Reiter oder gleich starten. Gestartet wird eine
+' Datei neben der ide.json -- ein Reiter ohne Namen wuerde erst nach einem
+' Namen fragen, und ein Beispiel will man ausprobieren, nicht ablegen.
+SUB hbCodeAktion(aktion AS STRING, code AS STRING)
+    DIM n AS INTEGER : n = LEN(SPLIT$(RTRIM$(code), NL))
+    protokoll("hbcode " + aktion + " " + STR$(n))
+    IF aktion = "Kopieren" THEN
+        TRY
+            CLIPBOARD_SET(code)
+            GUI_SET_TEXT(lblHbStand, "Beispiel kopiert (" + STR$(n) + " Zeilen).")
+        CATCH e
+            GUI_SET_TEXT(lblHbStand, "Die Zwischenablage ist gerade belegt -- noch einmal versuchen.")
+        END TRY
+    ELSEIF aktion = "In neuen Reiter" THEN
+        DIM vorher AS INTEGER : vorher = tabAnzahl
+        tabOeffnen("", code)
+        ' Als ungesichert markieren -- sonst ginge es beim Schliessen wortlos weg.
+        IF tabAnzahl > vorher THEN tabGesichert[aktiverTab] = ""
+    ELSEIF aktion = "Starten" THEN
+        DIM pfad AS STRING : pfad = PATHJOIN(DIRNAME(konfigPfad), "handbuch_beispiel.dh")
+        TRY
+            WRITEALL(pfad, code)
+        CATCH e
+            GUI_SET_TEXT(lblHbStand, "Konnte das Beispiel nicht ablegen: " + e)
+            RETURN
+        END TRY
+        IF prozessStartenDatei("run", pfad) THEN protokoll("gestartet " + prozessDatei)
+    END IF
+END SUB
+
+' Die Quelltext-Ansicht eingefaerbt: Ueberschriften, Code, Verweise und
+' Auszeichnungen, Codebloecke wie im Editor. Einmal beim Laden -- der Text
+' aendert sich dort nicht.
+SUB hbQuelleFaerben()
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(taHandbuch), NL)
+    DIM s AS ARRAY OF INTEGER : s = []
+    DIM l AS ARRAY OF INTEGER : l = []
+    DIM f AS ARRAY OF INTEGER : f = []
+    DIM off AS INTEGER : off = 0
+    DIM imCode AS BOOLEAN : imCode = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
+        DIM t AS STRING : t = TRIM$(z)
+        DIM n AS INTEGER : n = LEN(z)
+        IF LEFT$(t, 3) = "```" THEN
+            ARRAY_PUSH(s, off) : ARRAY_PUSH(l, n) : ARRAY_PUSH(f, F_KOMMENTAR)
+            imCode = NOT imCode
+        ELSEIF imCode THEN
+            DIM cs AS ARRAY OF INTEGER
+            DIM cl AS ARRAY OF INTEGER
+            DIM ca AS ARRAY OF STRING
+            (cs, cl, ca) = SYNTAX_SPANS(z)
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(cs) - 1
+                ARRAY_PUSH(s, off + cs[k]) : ARRAY_PUSH(l, cl[k]) : ARRAY_PUSH(f, farbeFuer(ca[k]))
+            NEXT
+        ELSEIF LEFT$(t, 1) = "#" THEN
+            ARRAY_PUSH(s, off) : ARRAY_PUSH(l, n) : ARRAY_PUSH(f, F_SCHLUESSEL)
+        ELSE
+            ' Zeichen am Zeilenanfang: Aufzaehlung, Zitat, Tabelle.
+            DIM vorn AS INTEGER : vorn = n - LEN(LTRIM$(z))
+            IF LEFT$(t, 2) = "- " OR LEFT$(t, 2) = "* " OR LEFT$(t, 1) = ">" OR LEFT$(t, 1) = "|" THEN
+                ARRAY_PUSH(s, off + vorn) : ARRAY_PUSH(l, 1) : ARRAY_PUSH(f, F_OPERATOR)
+            END IF
+            ' Inline: `code`, **fett**, [Verweis](ziel), Tabellenstriche.
+            DIM p AS INTEGER : p = 0
+            WHILE p < n
+                DIM ch AS STRING : ch = MID$(z, p, 1)
+                IF ch = "`" THEN
+                    DIM e AS INTEGER : e = INSTR(MID$(z, p + 1, n), "`")
+                    IF e < 0 THEN BREAK
+                    ARRAY_PUSH(s, off + p) : ARRAY_PUSH(l, e + 2) : ARRAY_PUSH(f, F_TEXT)
+                    p = p + e + 2
+                ELSEIF ch = "*" AND MID$(z, p + 1, 1) = "*" THEN
+                    DIM e2 AS INTEGER : e2 = INSTR(MID$(z, p + 2, n), "**")
+                    IF e2 < 0 THEN p = p + 2 : CONTINUE
+                    ARRAY_PUSH(s, off + p) : ARRAY_PUSH(l, e2 + 4) : ARRAY_PUSH(f, F_ZAHL)
+                    p = p + e2 + 4
+                ELSEIF ch = "[" THEN
+                    DIM e3 AS INTEGER : e3 = INSTR(MID$(z, p, n), "](")
+                    DIM e4 AS INTEGER : e4 = -1
+                    IF e3 > 0 THEN e4 = INSTR(MID$(z, p + e3, n), ")")
+                    IF e3 <= 0 OR e4 < 0 THEN p = p + 1 : CONTINUE
+                    ARRAY_PUSH(s, off + p) : ARRAY_PUSH(l, e3 + e4 + 1) : ARRAY_PUSH(f, F_SCHLUESSEL)
+                    p = p + e3 + e4 + 1
+                ELSEIF ch = "|" THEN
+                    ARRAY_PUSH(s, off + p) : ARRAY_PUSH(l, 1) : ARRAY_PUSH(f, F_OPERATOR)
+                    p = p + 1
+                ELSE
+                    p = p + 1
+                END IF
+            WEND
+        END IF
+        off = off + n + 1
+    NEXT
+    GUI_TEXTAREA_SPANS(taHandbuch, s, l, f)
+END SUB
+
 ' Die Codebloecke im Handbuch in den Farben des Editors.
 SUB hbFarben()
     GUI_RICHTEXT_SET(rtHandbuch, "farbe_kommentar", F_KOMMENTAR)
@@ -9549,6 +9770,17 @@ SUB hbInhaltNachziehen()
     DIM mass AS STRING : mass = STR$(GUI_WINDOW_GET_W(winHandbuch)) + "x" + STR$(GUI_WINDOW_GET_H(winHandbuch))
     IF mass <> hbMassStand THEN handbuchLayout()
     DIM k AS INTEGER : k = GUI_LISTBOX_SELECTED(lstHbInhalt)
+    IF hbTrModus THEN
+        IF k >= 0 AND k <> hbTrWahl AND k < LEN(hbTrZeile) THEN
+            hbTrWahl = k
+            IF hbTrZeile[k] > 0 THEN
+                handbuchZeigen(hbTrDatei[k], hbTrZeile[k])
+                GUI_RICHTEXT_MARK_ALL(rtHandbuch, hbTrNadel)
+                protokoll("hbtreffer " + hbTrDatei[k] + " " + STR$(hbTrZeile[k]))
+            END IF
+        END IF
+        RETURN
+    END IF
     IF k >= 0 AND k <> hbInhaltWahl THEN
         hbMerken()
         GUI_RICHTEXT_GOTO_HEADING(rtHandbuch, k)
@@ -9594,7 +9826,8 @@ SUB handbuchLaden(datei AS STRING, zeile AS INTEGER)
     GUI_WINDOW_VISIBLE(winHandbuch, TRUE)
     GUI_TEXTAREA_GOTO(taHandbuch, MAX(zeile, 1), 1)
     GUI_RICHTEXT_SET_TEXT(rtHandbuch, GUI_TEXT(taHandbuch))
-    hbInhaltFuellen()
+    hbQuelleFaerben()
+    IF NOT hbTrModus THEN hbInhaltFuellen()
     ' Die gesetzte Ansicht kennt keine Zeilennummern: gerollt wird zu dem,
     ' was in der Zeile STEHT. Das trifft die Stelle genauer als jede
     ' Umrechnung Zeile -> Punkte, denn wie hoch eine Zeile gesetzt wird,
@@ -10761,6 +10994,7 @@ SUB befehl(k AS STRING)
             bereichsFarben()
             codeFarben(hell)
             hbFarben()
+            hbQuelleFaerben()
             wasserzeichenAlle()
             faerbSchluessel = "" : gliederungSchluessel = ""
             protokoll("codefarben " + COLOR_HEX$(F_SCHLUESSEL))
@@ -11152,11 +11386,20 @@ WHILE NOT beenden
     IF GUI_CLICKED(btnDruckWeg) THEN GUI_WINDOW_VISIBLE(winDruck, FALSE) : GUI_FOCUS(aktivesFeld())
     ' Handbuch: Klappliste wechselt das Dokument, Enter/Knopf sucht darin.
     IF GUI_DROPDOWN_SELECTED(ddDoku) <> docLetzteWahl AND GUI_DROPDOWN_SELECTED(ddDoku) >= 0 THEN
+        IF hbTrModus THEN hbTrModus = FALSE : GUI_SET_TEXT(btnHbAlle, "In allen")
         handbuchZeigen(docNamen[GUI_DROPDOWN_SELECTED(ddDoku)], 1)
     END IF
     IF GUI_ENTERED(tfHbSuche) THEN handbuchSuchen(NOT (KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT)))
     IF GUI_CLICKED(btnHbSuche) THEN handbuchSuchen(TRUE)
     IF GUI_CLICKED(btnHbZurueck) THEN handbuchSuchen(FALSE)
+    IF GUI_CLICKED(btnHbAlle) THEN
+        IF hbTrModus THEN
+            hbSucheAlleEnde()
+        ELSE
+            hbSucheAlle()
+        END IF
+    END IF
+    IF GUI_RICHTEXT_CODE_ACTION$(rtHandbuch) <> "" THEN hbCodeAktion(GUI_RICHTEXT_CODE_ACTION$(rtHandbuch), GUI_RICHTEXT_CODE$(rtHandbuch))
     IF GUI_CLICKED(btnHbAnsicht) THEN handbuchAnsicht(NOT hbGesetzt)
     IF GUI_CLICKED(btnHbRueck) THEN hbVerlauf(TRUE)
     IF GUI_CLICKED(btnHbVor) THEN hbVerlauf(FALSE)

@@ -1745,6 +1745,25 @@ Farben des Editors; Einstellungen "Schrift der Oberflaeche" (Vorgabe 18) und
 "Schriftzug hinter dem Code". Tests `tests/pruef/gui_gesetzter_text_gestaltung.dhtest`,
 `tests/pruef/werkzeug_ide_handbuch.dhtest`.
 
+**Codeknoepfe, Suche ueber alle Dokumente, farbiger Quelltext (2026-09-27):**
+`GUI_RICHTEXT_CODE_BUTTONS(rt, "Kopieren|Starten")` legt einen Streifen
+oben in jeden Codeblock mit rechtsbuendigen Knoepfen (`RichState::
+codebloecke` = je Block y, Hoehe, Code, Knopf-Rechtecke; eine Quelle fuer
+Zeichnen und Klick); ein Klick darauf beginnt KEINE Auswahl und meldet ein
+Bild lang `GUI_RICHTEXT_CODE_ACTION$` (+ on_click), der Code kommt aus
+`GUI_RICHTEXT_CODE$`; `.dhform` `code_knoepfe`. Die IDE: Kopieren / In neuen
+Reiter (ungesichert markiert) / Starten (`handbuch_beispiel.dh` neben der
+ide.json, ueber `prozessStartenDatei`, das aus `prozessStarten` geloest
+ist). "In allen" (`hbSucheAlle`) listet Treffer je Dokument in der
+Inhaltsliste (`hbTrModus`, Koepfe per `GUI_LISTBOX_HEADER`, Zeile als
+Detail); `handbuchLaden` fuellt das Inhaltsverzeichnis dann NICHT neu.
+Quelltext-Ansicht in `codeFont`, eingefaerbt von `hbQuelleFaerben`.
+**Testfalle:** "In neuen Reiter" holt das Hauptfenster nach vorn, danach
+treffen Klicks das Handbuch nicht mehr -- und Knopflagen haengen an
+Schriftbreiten; die Tests klicken darum immer den RECHTEN Knopf und stellen
+die Reihenfolge vorher um. Tests `tests/pruef/gui_richtext_codeknoepfe.dhtest`
+und drei Faelle in `werkzeug_ide_handbuch.dhtest`.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
