@@ -1872,6 +1872,15 @@ struct RichState {
     druck: (i32, i32),    // Druckpunkt relativ zum INHALT (mit Scroll)
     doppel: bool,         // der Druck war ein Doppelklick -> ein Wort waehlen
     nadel: String,        // GUI_RICHTEXT_MARK_ALL, klein geschrieben; leer = aus
+    // --- Ueberschriften: (Stufe, Titel, y im Satz) -- fuer ein
+    // Inhaltsverzeichnis und den Sprung dorthin.
+    ueberschriften: Vec<(u8, String, i32)>,
+    satz_aktuell: bool,        // der Satz gehoert zur jetzigen Quelle
+    ziel_ue: Option<usize>,    // Sprung, der auf den naechsten Satz wartet
+    ziel_suche: Option<(String, i64)>, // GUI_RICHTEXT_FIND vor dem Satz
+    // Farben der Codebloecke je Art (Kommentar, Text, Zahl, Schluessel,
+    // Name, Operator); None = die Vorgabe passend zum Grund.
+    code_farben: [Option<i64>; 6],
 }
 
 /// Eine gesetzte Zeile. `grund` faerbt die ganze Zeile (Codeblock), `linie`
@@ -1881,14 +1890,22 @@ struct RichState {
 struct RtZeile {
     y: i32,
     h: i32,
-    grund: bool,
+    /// Grund unter der Zeile: 0 keiner, 1 Codeblock, 2 Akzentband (unter
+    /// der Hauptueberschrift), 3 Tabellenkopf, 4 Tabellenzeile (Zebra),
+    /// 5 Zitat. `bx0..bx1` = Breite (bx1 = 0: die ganze Zeile).
+    band: u8,
+    bx0: i32,
+    bx1: i32,
     linie: bool,
     balken: i32,      // x des Zitatstrichs, -1 = keiner
     laeufe: Vec<RtLauf>,
 }
 
 /// Ein Stueck Text mit eigener Gestalt. `rolle`: 0 Text, 1 gedaempft,
-/// 2 Akzent (Ueberschrift/Verweis), 3 Code. `link` = Index in `ziele`, -1 = keiner.
+/// 2 Akzent (Verweis, Aufzaehlungspunkt), 3 Code im Text, 4..6 Ueberschrift
+/// der Stufe 1..3, 8 Codeblock (Farbe nach `art`). `link` = Index in
+/// `ziele`, -1 = keiner. `art` = Abschnittsart im Codeblock (1 Kommentar,
+/// 2 Text, 3 Zahl, 4 Schluessel, 5 Name, 6 Operator), 0 = Grundfarbe.
 #[derive(Default, Clone)]
 struct RtLauf {
     x: i32,
@@ -1900,6 +1917,18 @@ struct RtLauf {
     stil: u8,
     code: bool,
     link: i32,
+    art: u8,
+    /// Versatz nach unten (Code im Fliesstext ist kleiner und sitzt tiefer,
+    /// damit die Grundlinie mit dem Text davor stimmt).
+    dy: i32,
+}
+
+/// Code im Fliesstext etwas kleiner: eine dicktengleiche Schrift wirkt bei
+/// gleicher Pixelgroesse deutlich groesser als die Textschrift daneben.
+fn rt_code_gr(gr: i32, code: bool) -> (i32, i32) {
+    if !code { return (gr, 0); }
+    let k = (gr * 86 / 100).max(8);
+    (k, (gr - k) * 7 / 10)
 }
 
 /// Ein Wort mit seiner Gestalt -- die Zwischenform zwischen Auszeichnung und
@@ -1924,6 +1953,50 @@ struct RtWort {
 /// Fett und kursiv nehmen den echten Schnitt der Schrift, wenn es ihn als
 /// Datei gibt (`Graphics::schnitt`), sonst zeichnet die Laufzeit Fett
 /// doppelt und Kursiv geneigt -- sichtbar ist die Auszeichnung in jedem Fall.
+/// Ueberschrift-Stufe einer (links beschnittenen) Zeile: 1..3, 0 = keine.
+/// Zur ersten gesetzten Zeile unter `ab` rollen, die `nadel` (klein) enthaelt.
+fn rt_finden(r: &mut RichState, nadel: &str, ab: i64, hoehe: i32) -> Option<i32> {
+    let y = r.zeilen.iter().find(|z| {
+        z.y > ab as i32 && z.laeufe.iter().any(|l| l.text.to_lowercase().contains(nadel))
+    }).map(|z| z.y)?;
+    let max = (r.inhalt_h - hoehe).max(0);
+    r.scroll = (y - 20).clamp(0, max);
+    Some(y)
+}
+
+fn rt_stufe(t: &str) -> (u8, &str) {
+    if let Some(r) = t.strip_prefix("### ") { (3, r) }
+    else if let Some(r) = t.strip_prefix("## ") { (2, r) }
+    else if let Some(r) = t.strip_prefix("# ") { (1, r) }
+    else { (0, t) }
+}
+
+/// Der Titel einer Ueberschrift ohne Auszeichnung (`**`, `` ` ``, Verweise).
+fn rt_titel(rest: &str) -> String {
+    let mut ziele = Vec::new();
+    let mut s = String::new();
+    for w in rt_inline(rest, 0, &mut ziele) {
+        if !s.is_empty() && !w.kleben { s.push(' '); }
+        s.push_str(&w.text);
+    }
+    s
+}
+
+/// Die Ueberschriften einer Quelle, ohne zu setzen -- in derselben
+/// Reihenfolge, in der `rt_setzen` sie findet (Codebloecke zaehlen nicht).
+fn rt_ueberschriften_quelle(quelle: &str) -> Vec<(u8, String)> {
+    let mut raus = Vec::new();
+    let mut im_code = false;
+    for z in quelle.lines() {
+        let t = z.trim_end().trim_start();
+        if t.starts_with("```") { im_code = !im_code; continue; }
+        if im_code { continue; }
+        let (stufe, rest) = rt_stufe(t);
+        if stufe > 0 { raus.push((stufe, rt_titel(rest))); }
+    }
+    raus
+}
+
 fn rt_inline(z: &str, grund_rolle: u8, ziele: &mut Vec<String>) -> Vec<RtWort> {
     let zeichen: Vec<char> = z.chars().collect();
     let mut raus: Vec<RtWort> = Vec::new();
@@ -2513,6 +2586,10 @@ pub struct Widget {
     // Einrueckungslinien (nur TextArea): ein feiner senkrechter Strich je
     // Stufe, unter dem Text.
     einzugslinien: bool,
+    // Bild schwach im Hintergrund (nur TextArea), eingepasst in den
+    // Innenbereich; -1 = keins. Deckkraft 0..255.
+    hg_bild: i64,
+    hg_deckkraft: u8,
     // Wo ein Alt-Zug begonnen hat (logische Zeile, Spalte), (-1, -1) = keiner.
     // Daraus wird beim Ziehen die SPALTENauswahl gebaut.
     spalten_start: (i32, i32),
@@ -3631,7 +3708,7 @@ impl Gui {
         if let Some((fx, fbw)) = self.ta_falt_spalte(g, wd, ax, starts.len()) {
             if mx >= fx && mx < fx + fbw { return None; }
         }
-        let lh = self.ta_line_h(g);
+        let lh = self.ta_line_h(g, wd);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
         let row = wd.scroll + (my - ay - pad) / lh;
         if row < 0 || row as usize >= rows.len() { return None; }
@@ -3758,6 +3835,18 @@ impl Gui {
     /// EIN Setter mit Schluesselwort statt vier Builtins -- dasselbe Muster
     /// wie bei `chart` und der Tabelle. Ein unbekannter Schluessel zaehlt die
     /// gueltigen auf, statt still nichts zu tun.
+    /// Ein Bild schwach hinter den Text legen (GUI_TEXTAREA_BACKGROUND).
+    /// Es fuellt den Innenbereich eingepasst und rollt NICHT mit -- es ist
+    /// Grund, kein Inhalt. `bild` < 0 nimmt es weg.
+    pub fn textarea_background(&mut self, h: i64, bild: i64, deckkraft: i64) -> Result<(), String> {
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_BACKGROUND")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_BACKGROUND: erwartet einen Textbereich".into());
+        }
+        wd.hg_bild = if bild < 0 { -1 } else { bild };
+        wd.hg_deckkraft = deckkraft.clamp(0, 255) as u8;
+        Ok(())
+    }
     pub fn textarea_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let wd = self.wdg_mut(h, "GUI_TEXTAREA_SET")?;
         if wd.kind != Kind::TextArea {
@@ -3925,7 +4014,7 @@ impl Gui {
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
             farbfelder: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
             formatiert: false, paare: Vec::new(), teil_von: None, teil_stand: String::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
-            abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
+            abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false, hg_bild: -1, hg_deckkraft: 0,
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
@@ -7400,21 +7489,70 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Der Satz gehoert zum ALTEN Text -- `stand` zuruecksetzen heisst
         // "beim naechsten GUI_UPDATE neu setzen".
         r.stand = (usize::MAX, 0, 0, 0);
+        r.satz_aktuell = false;
+        r.ziel_ue = None;
+        r.ziel_suche = None;
         Ok(())
     }
     pub fn richtext_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
         let r = self.rt_mut(h, "GUI_RICHTEXT_SET")?;
-        match key.to_lowercase().as_str() {
+        const ARTEN: [&str; 6] = ["farbe_kommentar", "farbe_text", "farbe_zahl",
+                                  "farbe_schluessel", "farbe_name", "farbe_operator"];
+        let k = key.to_lowercase();
+        match k.as_str() {
             "groesse" | "size" => { r.basis = wert.max(0.0) as i32; r.stand = (usize::MAX, 0, 0, 0); }
             "codeschrift" | "code_font" => { r.code_font = wert as i64; r.stand = (usize::MAX, 0, 0, 0); }
+            _ if ARTEN.contains(&k.as_str()) => {
+                let n = ARTEN.iter().position(|a| *a == k).unwrap();
+                r.code_farben[n] = if wert < 0.0 { None } else { Some(wert as i64) };
+            }
             _ => return Err(format!(
-                "GUI_RICHTEXT_SET: unbekannte Einstellung '{}' (gueltig: groesse, codeschrift)", key)),
+                "GUI_RICHTEXT_SET: unbekannte Einstellung '{}' (gueltig: groesse, codeschrift, {})", key, ARTEN.join(", "))),
         }
         Ok(())
+    }
+    /// Die Ueberschriften des Dokuments (Titel ohne Auszeichnung). Aus der
+    /// QUELLE gelesen, damit sie gleich nach GUI_RICHTEXT_SET_TEXT stimmen
+    /// -- gesetzt wird erst beim naechsten GUI_UPDATE.
+    pub fn richtext_headings(&self, h: i64) -> Result<Vec<(u8, String)>, String> {
+        Ok(rt_ueberschriften_quelle(&self.rt_ref(h, "GUI_RICHTEXT_HEADINGS")?.quelle))
+    }
+    /// Zur Ueberschrift Nummer `k` rollen. Ist der Text noch nicht gesetzt,
+    /// geschieht es beim naechsten GUI_UPDATE.
+    pub fn richtext_goto_heading(&mut self, h: i64, k: i64) -> Result<(), String> {
+        let hoehe = self.wdg(h, "GUI_RICHTEXT_GOTO_HEADING")?.h;
+        let rand = self.sk(6);
+        let r = self.rt_mut(h, "GUI_RICHTEXT_GOTO_HEADING")?;
+        if k < 0 { return Ok(()); }
+        let k = k as usize;
+        if r.satz_aktuell {
+            if let Some(u) = r.ueberschriften.get(k) {
+                let max = (r.inhalt_h - hoehe).max(0);
+                r.scroll = (u.2 - rand).clamp(0, max);
+            }
+        } else {
+            r.ziel_ue = Some(k);
+        }
+        Ok(())
+    }
+    /// Die Ueberschrift, in deren Abschnitt der obere Rand gerade steht
+    /// (-1 = davor). Fuer ein Inhaltsverzeichnis, das mitgeht.
+    pub fn richtext_heading_at(&self, h: i64) -> Result<i64, String> {
+        let r = self.rt_ref(h, "GUI_RICHTEXT_HEADING_AT")?;
+        if !r.satz_aktuell { return Ok(-1); }
+        let oben = r.scroll + self.sk(40);
+        let mut k = -1i64;
+        for (i, u) in r.ueberschriften.iter().enumerate() {
+            if u.2 <= oben { k = i as i64; } else { break; }
+        }
+        Ok(k)
     }
     pub fn richtext_scroll(&mut self, h: i64, y: i64) -> Result<(), String> {
         let hoehe = self.wdg(h, "GUI_RICHTEXT_SCROLL")?.h;
         let r = self.rt_mut(h, "GUI_RICHTEXT_SCROLL")?;
+        // Vor dem Satz ist die Hoehe noch die des alten Texts: dann gilt
+        // der Wert, und der Satz klemmt ihn.
+        if !r.satz_aktuell { r.scroll = (y as i32).max(0); r.ziel_suche = None; r.ziel_ue = None; return Ok(()); }
         let max = (r.inhalt_h - hoehe).max(0);
         r.scroll = (y as i32).clamp(0, max);
         Ok(())
@@ -7437,17 +7575,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let r = self.rt_mut(h, "GUI_RICHTEXT_FIND")?;
         let nadel = text.to_lowercase();
         if nadel.is_empty() { return Ok(-1); }
-        let treffer = r.zeilen.iter().find(|z| {
-            z.y > ab as i32 && z.laeufe.iter().any(|l| l.text.to_lowercase().contains(&nadel))
-        }).map(|z| z.y);
-        match treffer {
-            Some(y) => {
-                let max = (r.inhalt_h - hoehe).max(0);
-                r.scroll = (y - 20).clamp(0, max);
-                Ok(y as i64)
-            }
-            None => Ok(-1),
-        }
+        // Direkt nach GUI_RICHTEXT_SET_TEXT gibt es noch keinen Satz des
+        // NEUEN Texts -- gesucht wuerde im alten, und gerollt an eine Stelle,
+        // die mit dem Dokument nichts zu tun hat. Dann wartet die Suche auf
+        // den Satz (0 = vorgemerkt).
+        if !r.satz_aktuell { r.ziel_suche = Some((nadel, ab)); return Ok(0); }
+        Ok(rt_finden(r, &nadel, ab, hoehe).map(|y| y as i64).unwrap_or(-1))
     }
 
     /// Die markierte Stelle als Text; Zeilen durch Umbruch getrennt.
@@ -7693,10 +7826,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let innen = (breite - rand * 2 - self.sk(8)).max(self.sk(40));
         let mut zeilen: Vec<RtZeile> = Vec::new();
         let mut ziele: Vec<String> = Vec::new();
+        let mut ues: Vec<(u8, String, i32)> = Vec::new();
         let mut y = rand;
         let (h1, h2, h3) = (basis + self.sk(12), basis + self.sk(7), basis + self.sk(3));
         let breite_von = |s: &str, gr: i32, code: bool, stil: u8| {
             g.text_width_stil(s, gr, if code && code_font >= 0 { code_font } else { font }, stil)
+        };
+        // Ein Band: eine Zeile ohne Text, die nur einen Grund legt (Codeblock,
+        // Tabellenkopf, Zebra, Zitat, Strich unter der Hauptueberschrift). Es
+        // steht VOR den Zeilen, die es unterlegt, und wird darum zuerst gemalt.
+        let band = |y: i32, h: i32, art: u8, bx0: i32, bx1: i32| RtZeile {
+            y, h, band: art, bx0, bx1, balken: -1, ..Default::default()
         };
         // Woerter zu Zeilen flechten -- die eine Stelle, an der umgebrochen
         // wird; Absatz, Aufzaehlung und Zitat gehen alle hier durch.
@@ -7704,20 +7844,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                           y: &mut i32, zeilen: &mut Vec<RtZeile>, balken: i32| {
             let zh = gr + self.sk(6);
             let leer = breite_von(" ", gr, false, 0);
-            let mut zeile = RtZeile { y: *y, h: zh, grund: false, linie: false, balken, laeufe: Vec::new() };
+            let neu = |y: i32| RtZeile { y, h: zh, balken, ..Default::default() };
+            let mut zeile = neu(*y);
             let mut x = x0;
             for w in woerter {
-                let bw = breite_von(&w.text, gr, w.code, w.stil);
+                let (wg, dy) = rt_code_gr(gr, w.code);
+                let bw = breite_von(&w.text, wg, w.code, w.stil);
                 let luecke = if zeile.laeufe.is_empty() || w.kleben { 0 } else { leer };
                 if x + luecke + bw > x0 + weite && !zeile.laeufe.is_empty() {
                     zeilen.push(zeile.clone());
                     *y += zh;
-                    zeile = RtZeile { y: *y, h: zh, grund: false, linie: false, balken, laeufe: Vec::new() };
+                    zeile = neu(*y);
                     x = x0;
                 }
                 let lx = x + if zeile.laeufe.is_empty() { 0 } else { luecke };
-                zeile.laeufe.push(RtLauf { x: lx, breite: bw, text: w.text.clone(), groesse: gr,
-                                           rolle: w.rolle, stil: w.stil, code: w.code, link: w.link });
+                zeile.laeufe.push(RtLauf { x: lx, breite: bw, text: w.text.clone(), groesse: wg,
+                                           rolle: w.rolle, stil: w.stil, code: w.code, link: w.link, art: 0, dy });
                 x = lx + bw;
             }
             if !zeile.laeufe.is_empty() { zeilen.push(zeile); *y += zh; }
@@ -7725,41 +7867,84 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let roh: Vec<&str> = quelle.lines().collect();
         let mut i = 0usize;
         let mut im_code = false;
+        let mut code_farbig = false;
         while i < roh.len() {
             let z = roh[i].trim_end();
             let t = z.trim_start();
             if t.starts_with("```") {
+                // Ein Codeblock bekommt oben und unten etwas Luft IN seinem
+                // Grund -- sonst klebt die erste Zeile am Rand.
+                if !im_code {
+                    let sprache = t[3..].trim().to_lowercase();
+                    code_farbig = matches!(sprache.as_str(), "" | "dh" | "basic" | "drachenhauch" | "gb" | "gamebasic" | "vb");
+                    y += self.sk(4);
+                }
+                zeilen.push(band(y, self.sk(6), 1, 0, 0));
+                y += self.sk(6);
+                if im_code { y += self.sk(4); }
                 im_code = !im_code;
-                y += self.sk(4);
                 i += 1;
                 continue;
             }
             if im_code {
                 let gr = (basis - 1).max(8);
                 let zh = gr + self.sk(7);
-                zeilen.push(RtZeile { y, h: zh, grund: true, linie: false, balken: -1,
-                    laeufe: vec![RtLauf { x: rand + self.sk(6), breite: breite_von(z, gr, true, 0),
-                        text: z.to_string(), groesse: gr, rolle: 3, stil: 0, code: true, link: -1 }] });
+                let text = z.replace('\t', "    ");
+                let x0 = rand + self.sk(12);
+                let mut zeile = RtZeile { y, h: zh, band: 1, balken: -1, ..Default::default() };
+                // Eingefaerbt wie im Editor: dieselben Abschnitte wie
+                // SYNTAX_SPANS. Die Stuecke liegen LUECKENLOS nebeneinander
+                // (Lage = Breite des Vorspanns), damit Kopieren den Text
+                // Zeichen fuer Zeichen zurueckgibt.
+                let zeichen: Vec<char> = text.chars().collect();
+                let mut stuecke: Vec<(usize, usize, u8)> = Vec::new();
+                let mut pos = 0usize;
+                if code_farbig {
+                    for (s, l, a) in crate::syntax::spans(&text) {
+                        if s > pos { stuecke.push((pos, s, 0)); }
+                        let art = match a {
+                            crate::syntax::Art::Kommentar => 1, crate::syntax::Art::Text => 2,
+                            crate::syntax::Art::Zahl => 3, crate::syntax::Art::Schluessel => 4,
+                            crate::syntax::Art::Name => 5, crate::syntax::Art::Operator => 6,
+                        };
+                        stuecke.push((s, (s + l).min(zeichen.len()), art));
+                        pos = s + l;
+                    }
+                }
+                if pos < zeichen.len() { stuecke.push((pos, zeichen.len(), 0)); }
+                for (von, bis, art) in stuecke {
+                    if bis <= von { continue; }
+                    let vor: String = zeichen[..von].iter().collect();
+                    let bis_t: String = zeichen[..bis].iter().collect();
+                    let a = breite_von(&vor, gr, true, 0);
+                    let b = breite_von(&bis_t, gr, true, 0);
+                    zeile.laeufe.push(RtLauf { x: x0 + a, breite: (b - a).max(0),
+                        text: zeichen[von..bis].iter().collect(), groesse: gr, rolle: 8,
+                        stil: 0, code: true, link: -1, art, dy: 0 });
+                }
+                zeilen.push(zeile);
                 y += zh;
                 i += 1;
                 continue;
             }
             if t.is_empty() { y += self.sk(8); i += 1; continue; }
             // Ueberschriften
-            let (stufe, rest) = if let Some(r) = t.strip_prefix("### ") { (3, r) }
-                                else if let Some(r) = t.strip_prefix("## ") { (2, r) }
-                                else if let Some(r) = t.strip_prefix("# ") { (1, r) }
-                                else { (0, t) };
+            let (stufe, rest) = rt_stufe(t);
             if stufe > 0 {
                 let gr = match stufe { 1 => h1, 2 => h2, _ => h3 };
-                y += self.sk(if stufe == 1 { 10 } else { 8 });
+                y += self.sk(if stufe == 1 { 12 } else { 10 });
+                ues.push((stufe, rt_titel(rest), y));
                 let mut w = rt_inline(rest, 2, &mut ziele);
-                for x in w.iter_mut() { x.stil |= crate::schnitt::FETT; x.rolle = 2; }
+                for x in w.iter_mut() { x.stil |= crate::schnitt::FETT; x.rolle = 3 + stufe; }
                 absatz(&w, rand, gr, innen, &mut y, &mut zeilen, -1);
-                // Ein Strich unter der zweiten Ebene -- er gliedert lange
+                // Unter der ersten Ebene ein Band in der Akzentfarbe, unter
+                // der zweiten ein feiner Strich -- das gliedert lange
                 // Dokumente, ohne dass man die Ueberschrift lesen muss.
-                if stufe <= 2 {
-                    zeilen.push(RtZeile { y, h: self.sk(6), grund: false, linie: true, balken: -1, laeufe: Vec::new() });
+                if stufe == 1 {
+                    zeilen.push(band(y + self.sk(1), self.sk(3), 2, rand, rand + innen));
+                    y += self.sk(8);
+                } else if stufe == 2 {
+                    zeilen.push(RtZeile { y, h: self.sk(6), linie: true, balken: -1, ..Default::default() });
                     y += self.sk(6);
                 }
                 y += self.sk(4);
@@ -7768,7 +7953,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             // Waagerechte Linie
             if t.len() >= 3 && t.chars().all(|c| c == '-' || c == '*' || c == '_') {
-                zeilen.push(RtZeile { y: y + self.sk(4), h: self.sk(12), grund: false, linie: true, balken: -1, laeufe: Vec::new() });
+                zeilen.push(RtZeile { y: y + self.sk(4), h: self.sk(12), linie: true, balken: -1, ..Default::default() });
                 y += self.sk(12);
                 i += 1;
                 continue;
@@ -7790,11 +7975,36 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 y += self.rt_tabelle(&roh_zeilen, rand, basis, innen, y, &mut zeilen, &mut ziele, &breite_von);
                 continue;
             }
-            // Zitat
-            if let Some(r) = t.strip_prefix("> ") {
-                let w = rt_inline(r, 1, &mut ziele);
-                absatz(&w, rand + self.sk(14), basis, innen - self.sk(14), &mut y, &mut zeilen, rand + self.sk(4));
-                i += 1;
+            // Zitat: aufeinander folgende `>`-Zeilen sind EIN Block, darin
+            // gelten dieselben Absatzregeln wie draussen (ein leeres `>`
+            // trennt). Zeile fuer Zeile gesetzt zerfiel ein Hinweis in
+            // einzelne Bruchstuecke mit Luecken im Strich.
+            if t.starts_with('>') {
+                let start_y = y;
+                let start_n = zeilen.len();
+                let mut absaetze: Vec<String> = vec![String::new()];
+                while i < roh.len() {
+                    let zz = roh[i].trim();
+                    if !zz.starts_with('>') { break; }
+                    let inhalt = zz.trim_start_matches('>').trim();
+                    if inhalt.is_empty() {
+                        if !absaetze.last().unwrap().is_empty() { absaetze.push(String::new()); }
+                    } else {
+                        let a = absaetze.last_mut().unwrap();
+                        if !a.is_empty() { a.push(' '); }
+                        a.push_str(inhalt);
+                    }
+                    i += 1;
+                }
+                y += self.sk(6);
+                for a in absaetze.iter().filter(|a| !a.is_empty()) {
+                    let w = rt_inline(a, 0, &mut ziele);
+                    absatz(&w, rand + self.sk(16), basis, innen - self.sk(24), &mut y, &mut zeilen, -1);
+                    y += self.sk(4);
+                }
+                y += self.sk(2);
+                zeilen.insert(start_n, band(start_y, y - start_y, 5, rand, rand + innen));
+                y += self.sk(6);
                 continue;
             }
             // Aufzaehlung (auch verschachtelt: je zwei Leerzeichen eine Stufe)
@@ -7813,13 +8023,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 absatz(&w, ein + mw + self.sk(6), basis, innen - (ein - rand) - mw - self.sk(6), &mut y, &mut zeilen, -1);
                 // Die Marke gehoert in die ERSTE Zeile des Eintrags -- der Rest
                 // rueckt darunter ein, sonst laeuft der Text um die Marke herum.
+                // Aufzaehlungspunkte in der Akzentfarbe: sie sind Gliederung.
+                let lauf = RtLauf { x: ein, breite: mw, text: marke, groesse: basis,
+                                    rolle: 2, stil: 0, code: false, link: -1, art: 0, dy: 0 };
                 if let Some(erste) = zeilen.get_mut(start) {
-                    erste.laeufe.insert(0, RtLauf { x: ein, breite: mw, text: marke, groesse: basis,
-                                                    rolle: 1, stil: 0, code: false, link: -1 });
+                    erste.laeufe.insert(0, lauf);
                 } else {
-                    zeilen.push(RtZeile { y, h: zh, grund: false, linie: false, balken: -1,
-                        laeufe: vec![RtLauf { x: ein, breite: mw, text: marke, groesse: basis,
-                            rolle: 1, stil: 0, code: false, link: -1 }] });
+                    zeilen.push(RtZeile { y, h: zh, balken: -1, laeufe: vec![lauf], ..Default::default() });
                     y += zh;
                 }
                 i += 1;
@@ -7836,7 +8046,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let mut absatz_text = String::new();
             while i < roh.len() {
                 let zz = roh[i].trim();
-                if zz.is_empty() || zz.starts_with("```") || zz.starts_with('|') || zz.starts_with("> ")
+                if zz.is_empty() || zz.starts_with("```") || zz.starts_with('|') || zz.starts_with('>')
                     || zz.starts_with("- ") || zz.starts_with("* ") || zz.starts_with("+ ")
                     || zz.starts_with('#')
                     || (zz.len() >= 3 && zz.chars().all(|c| c == '-' || c == '*' || c == '_'))
@@ -7853,11 +8063,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             absatz(&w, rand, basis, innen, &mut y, &mut zeilen, -1);
             y += self.sk(4);
         }
+        let hoehe = self.windows[wi].widgets[idx].h;
+        let sprung_rand = self.sk(6);
         let r = self.windows[wi].widgets[idx].rich.as_mut().unwrap();
         r.inhalt_h = y + rand;
         r.zeilen = zeilen;
         r.ziele = ziele;
-        let max = (r.inhalt_h - self.windows[wi].widgets[idx].h).max(0);
+        r.ueberschriften = ues;
+        r.satz_aktuell = true;
+        let max = (r.inhalt_h - hoehe).max(0);
+        // Ein Sprung zu einer Ueberschrift, der vor dem Satz verlangt wurde,
+        // wird jetzt eingeloest -- vorher gab es keine Lage, zu der er fuehren kann.
+        if let Some(k) = r.ziel_ue.take() {
+            if let Some(u) = r.ueberschriften.get(k) { r.scroll = u.2 - sprung_rand; }
+        }
+        if let Some((nadel, ab)) = r.ziel_suche.take() { rt_finden(r, &nadel, ab, hoehe); }
         let r = self.windows[wi].widgets[idx].rich.as_mut().unwrap();
         r.scroll = r.scroll.clamp(0, max);
     }
@@ -7865,7 +8085,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Eine Tabelle setzen: Spaltenbreiten aus dem Inhalt, dann Zelle fuer
     /// Zelle. Liefert die gebrauchte Hoehe.
     ///
-    /// Die erste Zeile ist der Kopf (fett). Passt die Tabelle nicht in die
+    /// Die erste Zeile ist der Kopf (fett, auf getoentem Grund), die
+    /// uebrigen wechseln sich im Grund ab. Passt die Tabelle nicht in die
     /// Breite, werden die Spalten ANTEILIG gestaucht -- sie abzuschneiden
     /// verstecke die letzte Spalte, und die traegt oft die Erklaerung.
     #[allow(clippy::too_many_arguments)]
@@ -7875,7 +8096,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if roh.is_empty() { return 0; }
         let spalten = roh.iter().map(|z| z.len()).max().unwrap_or(0);
         if spalten == 0 { return 0; }
-        let luecke = self.sk(10);
+        let luecke = self.sk(14);
+        let x0 = x0 + self.sk(6);
+        let innen = innen - self.sk(12);
         let mut breiten = vec![0i32; spalten];
         for z in roh {
             for (c, zelle) in z.iter().enumerate() {
@@ -7900,7 +8123,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let f = innen as f64 / summe as f64;
             for (c, b) in breiten.iter_mut().enumerate() { *b = ((*b as f64 * f) as i32).max(mindest[c]); }
         }
-        let mut y = y0 + self.sk(4);
+        let rechts = x0 + breiten.iter().sum::<i32>() + luecke * (spalten as i32 - 1);
+        let mut y = y0 + self.sk(8);
         for (ri, z) in roh.iter().enumerate() {
             let zeile_start = zeilen.len();
             let mut hoechste = y;
@@ -7910,21 +8134,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let mut w = rt_inline(zelle, 0, ziele);
                 if ri == 0 { for x2 in w.iter_mut() { x2.stil |= crate::schnitt::FETT; } }
                 let zh = basis + self.sk(6);
-                let mut zeile = RtZeile { y: yz, h: zh, grund: false, linie: false, balken: -1, laeufe: Vec::new() };
+                let neu = |y: i32| RtZeile { y, h: zh, balken: -1, ..Default::default() };
+                let mut zeile = neu(yz);
                 let mut cx = x;
                 let leer = breite_von(" ", basis, false, 0);
                 for wort in &w {
-                    let bw = breite_von(&wort.text, basis, wort.code, wort.stil);
+                    let (wg, dy) = rt_code_gr(basis, wort.code);
+                    let bw = breite_von(&wort.text, wg, wort.code, wort.stil);
                     let l = if zeile.laeufe.is_empty() || wort.kleben { 0 } else { leer };
                     if cx + l + bw > x + breiten[c] && !zeile.laeufe.is_empty() {
                         zeilen.push(zeile.clone());
                         yz += zh;
-                        zeile = RtZeile { y: yz, h: zh, grund: false, linie: false, balken: -1, laeufe: Vec::new() };
+                        zeile = neu(yz);
                         cx = x;
                     }
                     let lx = cx + if zeile.laeufe.is_empty() { 0 } else { l };
-                    zeile.laeufe.push(RtLauf { x: lx, breite: bw, text: wort.text.clone(), groesse: basis,
-                                               rolle: wort.rolle, stil: wort.stil, code: wort.code, link: wort.link });
+                    zeile.laeufe.push(RtLauf { x: lx, breite: bw, text: wort.text.clone(), groesse: wg,
+                                               rolle: wort.rolle, stil: wort.stil, code: wort.code, link: wort.link, art: 0, dy });
                     cx = lx + bw;
                 }
                 if !zeile.laeufe.is_empty() { zeilen.push(zeile); yz += zh; }
@@ -7934,14 +8160,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             // Die Zellen einer Zeile stehen als EIGENE Zeilen im Satz (jede
             // Spalte bricht fuer sich um); zusammengehalten werden sie
             // dadurch, dass die naechste Zeile erst unter der hoechsten
-            // beginnt.
-            let _ = zeile_start;
-            if ri == 0 {
-                zeilen.push(RtZeile { y: hoechste + self.sk(2), h: self.sk(4), grund: false,
-                                      linie: true, balken: -1, laeufe: Vec::new() });
-                hoechste += self.sk(6);
+            // beginnt -- und durch das Band darunter, das die ganze Zeile
+            // unterlegt, auch wenn eine Zelle mehrzeilig ist.
+            let art = if ri == 0 { 3 } else if ri % 2 == 0 { 4 } else { 0 };
+            if art > 0 {
+                zeilen.insert(zeile_start, RtZeile { y: y - self.sk(3), h: hoechste - y + self.sk(3),
+                    band: art, bx0: x0 - self.sk(6), bx1: rechts + self.sk(6), balken: -1, ..Default::default() });
             }
-            y = hoechste + self.sk(2);
+            if ri == 0 { hoechste += self.sk(4); }
+            y = hoechste + self.sk(3);
         }
         y + self.sk(6) - y0
     }
@@ -12718,7 +12945,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         v
     }
     /// Zeilenhoehe der TextArea (Schriftgroesse + etwas Durchschuss).
-    fn ta_line_h(&self, g: &Graphics) -> i32 { (self.ctext_height(g) + self.sk(5)).max(self.sk(10)) }
+    /// Zeilenhoehe eines Textbereichs -- aus SEINER Schriftgroesse, nicht aus
+    /// der aktiven. Mit der aktiven stimmten Zeilen und Text nicht mehr,
+    /// sobald ein Feld eine eigene Groesse hatte (gezoomtes Code-Feld,
+    /// groessere Oberflaechenschrift): die Zeilen ueberlappten oder klafften.
+    fn ta_line_h(&self, g: &Graphics, wdg: &Widget) -> i32 {
+        let gr = if wdg.font_size > 0 { self.sk(wdg.font_size) } else { self.ctext_height(g) };
+        (gr + self.sk(5)).max(self.sk(10))
+    }
 
     /// Breite, auf die ein Textbereich umbricht (0 = kein Umbruch).
     fn ta_breite(&self, g: &Graphics, wdg: &Widget, zeilen: usize) -> i32 {
@@ -12910,7 +13144,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let mut raus = Vec::new();
         if wdg.farbfelder.is_empty() { return raus; }
         let pad = 5;
-        let lh = self.ta_line_h(g);
+        let lh = self.ta_line_h(g, wdg);
         let gutter = self.ta_gutter(g, wdg, starts_len);
         let tx0 = ax + pad + gutter - wdg.scroll_x;
         let kante = (lh - self.sk(6)).max(self.sk(6));
@@ -13147,7 +13381,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Dieselbe Rechnung wie beim Zeichnen (pad = 5, ta_line_h) -- liefe
         // sie auseinander, faerbte das Programm einen anderen Ausschnitt, als
         // zu sehen ist.
-        let lh = self.ta_line_h(g);
+        let lh = self.ta_line_h(g, wd);
         let sicht = ((wd.h - 2 * 5) / lh).max(1);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
         let erste_row = wd.scroll.clamp(0, (rows.len() as i32 - 1).max(0)) as usize;
@@ -13217,7 +13451,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if !Self::in_rect(mx, my, (ax, ay, fw, fh)) { return Ok((0, 0)); }
         let pad = 5;
         if my < ay + pad { return Ok((0, 0)); }
-        let lh = self.ta_line_h(g);
+        let lh = self.ta_line_h(g, wd);
         let chars: Vec<char> = wd.text.chars().collect();
         let starts = Self::line_starts(&chars);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
@@ -13268,7 +13502,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let wd = self.ta_wdg(h, "GUI_TEXTAREA_GOTO")?;
         let chars: Vec<char> = wd.text.chars().collect();
         let starts = Self::line_starts(&chars);
-        let lh = self.ta_line_h(g);
+        let lh = self.ta_line_h(g, wd);
         let sicht = ((wd.h - 2 * 5) / lh).max(1);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
         let crow = Self::ta_row_of(&rows, wd.caret.max(0) as usize) as i32;
@@ -13401,7 +13635,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if w.formatiert { stile_abgleichen(w); }
         }
         let pad = 5;
-        let lh = self.ta_line_h(g);
+        let lh = self.ta_line_h(g, &self.windows[wi].widgets[i]);
         let (ax, ay, fw, fh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
         let scroll = self.windows[wi].widgets[i].scroll;
 
@@ -13846,7 +14080,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let wd = &self.windows[wi].widgets[i];
             let chars: Vec<char> = wd.text.chars().collect();
             let starts = Self::line_starts(&chars);
-            let lh = self.ta_line_h(g);
+            let lh = self.ta_line_h(g, wd);
             let n = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len())).len() as i32;
             (n, ((wd.h - 2 * 5) / lh).max(1))
         };
@@ -13869,7 +14103,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let wd = &self.windows[wi].widgets[i];
         if wd.kind != Kind::TextArea || !self.widget_shown(wi, wd) { return None; }
         let (ax, ay, w, h) = self.abs_rect(wi, wd);
-        let lh = self.ta_line_h(g).max(1);
+        let lh = self.ta_line_h(g, wd).max(1);
         let chars: Vec<char> = wd.text.chars().collect();
         let starts = Self::line_starts(&chars);
         let n = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len())).len() as i32;
@@ -13890,7 +14124,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let (ax, ay, fw, fh) = self.abs_rect(wi, wd);
         if !Self::in_rect(mx, my, (ax, ay, fw, fh)) { return None; }
         let pad = 5;
-        let lh = self.ta_line_h(g).max(1);
+        let lh = self.ta_line_h(g, wd).max(1);
         let chars: Vec<char> = wd.text.chars().collect();
         let starts = Self::line_starts(&chars);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
@@ -15878,7 +16112,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if mx < ax + self.ta_gutter(g, w, starts.len()) { return None; }
                 if !w.farbfelder.is_empty() {
                     let rows = self.ta_rows(g, w, &chars, &starts, self.ta_breite(g, w, starts.len()));
-                    let sicht = ((bh - 10) / self.ta_line_h(g)).max(1);
+                    let sicht = ((bh - 10) / self.ta_line_h(g, w)).max(1);
                     if self.ta_farbfeld_rects(g, w, ax, ay, &chars, &rows, starts.len(), sicht)
                         .into_iter().any(|(_, fx, fy, k)| Self::in_rect(mx, my, (fx, fy, k, k))) {
                         return Some("hand");
@@ -16640,7 +16874,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             Kind::TextArea => {
                 let pad = 5;
-                let lh = self.ta_line_h(g);
+                let lh = self.ta_line_h(g, wdg);
                 let (chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
                 let starts = Self::line_starts(&chars);
                 let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
@@ -18158,9 +18392,20 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let pad = 5;
-                let lh = self.ta_line_h(g);
+                let lh = self.ta_line_h(g, wdg);
                 let scroll = wdg.scroll;
                 g.push_clip(ax + 2, ay + 2, (w - 4).max(0), (h - 4).max(0));
+                // Das Hintergrundbild zuerst: eingepasst, mit etwas Rand,
+                // mittig -- unter Marken, Auswahl und Text.
+                if wdg.hg_bild >= 0 && wdg.hg_deckkraft > 0 {
+                    let (iw, ih) = (g.image_width(wdg.hg_bild).unwrap_or(0) as i32, g.image_height(wdg.hg_bild).unwrap_or(0) as i32);
+                    let (bw, bh) = ((w - 4) * 92 / 100, (h - 4) * 92 / 100);
+                    if iw > 0 && ih > 0 && bw > 0 && bh > 0 {
+                        let f = (bw as f64 / iw as f64).min(bh as f64 / ih as f64);
+                        let (dw, dh) = (((iw as f64 * f) as i32).max(1), ((ih as f64 * f) as i32).max(1));
+                        g.draw_image_rect_alpha(wdg.hg_bild, ax + (w - dw) / 2, ay + (h - dh) / 2, dw, dh, wdg.hg_deckkraft);
+                    }
+                }
                 if wdg.text.is_empty() && !focused && !wdg.placeholder.is_empty() {
                     self.wtext(g, wdg, ax + pad, ay + pad, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
                 } else {
@@ -19177,13 +19422,32 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn draw_richtext(&self, g: &mut Graphics, wi: usize, idx: usize) {
         let wdg = &self.windows[wi].widgets[idx];
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);
-        self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
-            self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
+        let bg = self.wcol(wdg, "bg", "widget_bg");
+        self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bg, self.wcol(wdg, "border", "widget_border"));
         let r = wdg.rich.as_ref().unwrap();
         let fg = self.txt_col(wdg);
         let leise = self.th("muted_fg");
         let acc = self.acc_col(wdg);
-        let code_grund = shade(self.wcol(wdg, "bg", "widget_bg"), 14);
+        // Heller Grund oder dunkler? Danach richten sich die Farben der
+        // Ueberschriften und des Codes -- auf Weiss braucht ein Gold mehr
+        // Tiefe als auf Anthrazit.
+        let hell = leuchtdichte(bg & 0xFF_FFFF) > 0.35;
+        let code_grund = if hell { shade(bg & 0xFF_FFFF, -12) } else { shade(bg & 0xFF_FFFF, 14) };
+        let (h2c, h3c, inline_c) = if hell { (0x9A5B00, 0x137A62, 0xB0381E) }
+                                   else { (0xF0B45A, 0x7FD6BE, 0xF4927A) };
+        let vorgabe: [i64; 6] = if hell {
+            [0x6A737D, 0x22863A, 0x005CC5, 0xB3245A, -1, 0x6F42C1]
+        } else {
+            [0x7F8C98, 0xE6C07B, 0xD19A66, 0xC678DD, -1, 0x56B6C2]
+        };
+        let code_farbe = |art: u8| -> i64 {
+            if art == 0 { return fg; }
+            let k = (art - 1) as usize;
+            match r.code_farben.get(k).copied().flatten() {
+                Some(c) => c,
+                None => if vorgabe[k] < 0 { fg } else { vorgabe[k] },
+            }
+        };
         let font = self.wfont(g, wdg);
         let cfont = if r.code_font >= 0 { r.code_font } else { font };
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
@@ -19191,8 +19455,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let zy = ay + z.y - r.scroll;
             if zy + z.h < ay { continue; }
             if zy > ay + h { break; }
-            if z.grund {
-                g.box_fill(ax + self.sk(6), zy - 1, ax + w - self.sk(7), zy + z.h - 2, code_grund);
+            let (bx0, bx1) = if z.bx1 > 0 { (ax + z.bx0, ax + z.bx1) } else { (ax + self.sk(6), ax + w - self.sk(7)) };
+            match z.band {
+                1 => {
+                    g.box_fill(bx0, zy - 1, bx1, zy + z.h - 2, code_grund);
+                    // Ein schmaler Akzentstreifen links sagt "Code", auch
+                    // wenn der Grund sich kaum vom Fenster abhebt.
+                    g.box_fill(bx0, zy - 1, bx0 + self.sk(3) - 1, zy + z.h - 2, (0x60i64 << 24) | (acc & 0xFF_FFFF));
+                }
+                2 => g.box_fill(bx0, zy, bx1, zy + z.h - 1, (0x90i64 << 24) | (acc & 0xFF_FFFF)),
+                3 => g.box_fill(bx0, zy, bx1, zy + z.h - 1, (0x3Ci64 << 24) | (acc & 0xFF_FFFF)),
+                4 => g.box_fill(bx0, zy, bx1, zy + z.h - 1, if hell { shade(bg & 0xFF_FFFF, -7) } else { shade(bg & 0xFF_FFFF, 8) }),
+                5 => {
+                    g.box_fill(bx0, zy, bx1, zy + z.h - 1, (0x1Ei64 << 24) | (acc & 0xFF_FFFF));
+                    g.box_fill(bx0, zy, bx0 + self.sk(3) - 1, zy + z.h - 1, acc);
+                }
+                _ => {}
             }
             if z.linie {
                 let ly = zy + z.h / 2;
@@ -19200,6 +19478,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             if z.balken >= 0 {
                 g.box_fill(ax + z.balken, zy, ax + z.balken + self.sk(2), zy + z.h - 1, acc);
+            }
+            // Code im Fliesstext bekommt einen eigenen Grund -- ueber die
+            // Luecke hinweg, wenn zwei Code-Woerter nebeneinander stehen,
+            // sonst saehe `DIM x` aus wie zwei Bausteine.
+            for (k, l) in z.laeufe.iter().enumerate() {
+                if l.rolle != 3 || l.link >= 0 { continue; }
+                let weiter = z.laeufe.get(k + 1).map(|n| n.rolle == 3 && n.link < 0).unwrap_or(false);
+                let x1 = if weiter { z.laeufe[k + 1].x } else { l.x + l.breite + self.sk(2) };
+                let x0 = if k > 0 && z.laeufe[k - 1].rolle == 3 && z.laeufe[k - 1].link < 0 { l.x } else { l.x - self.sk(2) };
+                g.box_fill(ax + x0, zy, ax + x1, zy + z.h - self.sk(3), code_grund);
             }
             // Fundstellen (schwach) und Auswahl (Akzent) UNTER den Text: je
             // Lauf der Teil, der in den Bereich faellt, an seinen Zeichen gemessen.
@@ -19249,13 +19537,30 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     }
                 }
             }
-            for l in z.laeufe.iter() {
-                let farbe = match l.rolle { 1 => leise, 2 => acc, 3 => shade(acc, 40), _ => fg };
+            for (k, l) in z.laeufe.iter().enumerate() {
+                let farbe = match l.rolle {
+                    1 => leise, 2 => acc, 3 => inline_c,
+                    4 => acc, 5 => h2c, 6 => h3c,
+                    8 => code_farbe(l.art),
+                    _ => fg,
+                };
+                let farbe = if l.link >= 0 { acc } else { farbe };
                 let f = if l.code { cfont } else { font };
-                // Ein Verweis traegt die Linie darunter -- dieselbe Linie wie
-                // `<u>`, nur in der Akzentfarbe des Verweises.
-                let stil = l.stil | if l.link >= 0 { crate::schnitt::UNTER } else { 0 };
-                g.text_styled_stil(ax + l.x, zy, l.text.clone(), farbe, f, l.groesse, stil);
+                // Kommentare im Code kursiv -- so liest man sie weg.
+                let stil = l.stil | if l.rolle == 8 && l.art == 1 { crate::schnitt::KURSIV } else { 0 };
+                g.text_styled_stil(ax + l.x, zy + l.dy, l.text.clone(), farbe, f, l.groesse, stil);
+                // Ein Verweis traegt seine Linie DURCHGEHEND: ueber mehrere
+                // Woerter hinweg, nicht als Strich je Wort mit Luecken dazwischen.
+                if l.link >= 0 {
+                    let (off, dicke) = crate::schnitt::linie_unter(l.groesse as f32);
+                    let ly = zy + l.dy + off.round() as i32;
+                    let d = (dicke.round() as i32).max(1);
+                    let x1 = match z.laeufe.get(k + 1) {
+                        Some(n) if n.link == l.link => n.x,
+                        _ => l.x + l.breite,
+                    };
+                    g.box_fill(ax + l.x, ly, ax + x1, ly + d - 1, (0x90i64 << 24) | (acc & 0xFF_FFFF));
+                }
             }
         }
         g.pop_clip();

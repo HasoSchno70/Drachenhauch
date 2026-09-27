@@ -311,7 +311,12 @@ DIM codeGroesse AS INTEGER : codeGroesse = SCHRIFT_NORMAL
 ' Gliederung, Ausgabe und Probleme lesen sich eine Stufe groesser als die
 ' Vorgabe der gui; das Handbuch hat seine eigene Groesse.
 CONST LISTEN_NORMAL = 18
-CONST HANDBUCH_NORMAL = 16
+CONST HANDBUCH_NORMAL = 18
+' Die Schrift der Oberflaeche (Menue, Reiter, Baum, Beschriftungen). 16 war
+' auf einem grossen Schirm zu klein; 18 passt noch in die festen Zeilen der
+' gui (Baum 22, Menue 26).
+CONST UI_NORMAL = 18
+DIM uiGroesse AS INTEGER : uiGroesse = UI_NORMAL
 DIM listenGroesse AS INTEGER : listenGroesse = LISTEN_NORMAL
 DIM handbuchGroesse AS INTEGER : handbuchGroesse = HANDBUCH_NORMAL
 DIM umbruchAn AS BOOLEAN : umbruchAn = FALSE
@@ -470,6 +475,14 @@ IF JSON_HAS(konfig, "vorspann") THEN vorspannAn = JSON_GET_BOOL(konfig, "vorspan
 ' ein neuer Drachenhauch. Abschalten in den Einstellungen (`glanz`).
 DIM glanzAn AS BOOLEAN : glanzAn = TRUE
 IF JSON_HAS(konfig, "glanz") THEN glanzAn = JSON_GET_BOOL(konfig, "glanz")
+' Der Schriftzug schwach hinter dem Code -- er fuellt das Feld, rollt aber
+' nicht mit: Grund, kein Inhalt.
+DIM wasserzeichenAn AS BOOLEAN : wasserzeichenAn = TRUE
+IF JSON_HAS(konfig, "wasserzeichen") THEN wasserzeichenAn = JSON_GET_BOOL(konfig, "wasserzeichen")
+DIM hgBild AS INTEGER : hgBild = -1
+IF FILEEXISTS(PATHJOIN(bilderOrdner, "schriftzug.png")) THEN hgBild = LOADIMAGE(PATHJOIN(bilderOrdner, "schriftzug.png"))
+IF JSON_HAS(konfig, "ui_schrift") THEN uiGroesse = MAX(12, MIN(22, JSON_GET_INT(konfig, "ui_schrift")))
+IF uiFont >= 0 THEN TEXT_SIZE(uiGroesse)
 ' Die Kaestchen im Projektbaum (Suche und Umbau auf eine Auswahl beschraenken)
 ' stehen nur auf Wunsch da -- immer sichtbar sahen sie aus wie etwas, das
 ' beim Anklicken etwas tun muesste (`baum_haken` in der ide.json).
@@ -1117,23 +1130,51 @@ GUI_WINDOW_VISIBLE(winHp, FALSE)
 DIM hpListeStand AS STRING : hpListeStand = "-"
 
 ' Handbuch: Klappliste der Dokumente, Suche im Dokument, Text mit Umbruch.
-DIM winHandbuch AS GUI_WINDOW : winHandbuch = GUI_WINDOW("Handbuch", 200, 60, 980, 720)
+' Seit 2026-09-27: links das Inhaltsverzeichnis (die Ueberschriften des
+' Dokuments, es geht beim Lesen mit), oben Vor/Zurueck wie im Browser, die
+' Zeile darunter ist weg -- sie wiederholte nur den Dateinamen aus der
+' Klappliste, und der Quelltext-Knopf lag halb ueber dem Text. Meldungen
+' stehen jetzt in einer Zeile UNTER dem Text. Die Masse setzt
+' `handbuchLayout`, das Fenster waechst mit dem Schirm.
+CONST HB_X = 120
+CONST HB_Y = 50
+CONST HB_INHALT_B = 250
+DIM winHandbuch AS GUI_WINDOW : winHandbuch = GUI_WINDOW("Handbuch", HB_X, HB_Y, 1180, 780)
 GUI_WINDOW_CLOSABLE(winHandbuch, TRUE)
-DIM ddDoku AS GUI_WIDGET : ddDoku = GUI_DROPDOWN(winHandbuch, 8, 8, 420, 26, [])
-DIM tfHbSuche AS GUI_WIDGET : tfHbSuche = GUI_TEXTINPUT(winHandbuch, 436, 8, 292, 26, "")
-DIM btnHbZurueck AS GUI_WIDGET : btnHbZurueck = GUI_BUTTON(winHandbuch, "Zurück", 736, 8, 80, 26)
-DIM btnHbSuche AS GUI_WIDGET : btnHbSuche = GUI_BUTTON(winHandbuch, "Weiter", 824, 8, 80, 26)
+GUI_WINDOW_RESIZABLE(winHandbuch, TRUE)
+GUI_WINDOW_SET_MIN_SIZE(winHandbuch, 900, 500)
+DIM btnHbRueck AS GUI_WIDGET : btnHbRueck = GUI_ICON_BUTTON(winHandbuch, 8, 8, 32, 28, "links")
+DIM btnHbVor AS GUI_WIDGET : btnHbVor = GUI_ICON_BUTTON(winHandbuch, 44, 8, 32, 28, "rechts")
+GUI_TOOLTIP(btnHbRueck, "Zurück zur vorigen Stelle (Alt+Links)")
+GUI_TOOLTIP(btnHbVor, "Vorwärts (Alt+Rechts)")
+DIM ddDoku AS GUI_WIDGET : ddDoku = GUI_DROPDOWN(winHandbuch, 84, 8, 340, 28, [])
+DIM tfHbSuche AS GUI_WIDGET : tfHbSuche = GUI_TEXTINPUT(winHandbuch, 432, 8, 260, 28, "")
+GUI_TOOLTIP(tfHbSuche, "Im Dokument suchen -- Enter: nächste Fundstelle")
+DIM btnHbZurueck AS GUI_WIDGET : btnHbZurueck = GUI_BUTTON(winHandbuch, "Vorige", 700, 8, 80, 28)
+DIM btnHbSuche AS GUI_WIDGET : btnHbSuche = GUI_BUTTON(winHandbuch, "Nächste", 788, 8, 80, 28)
 GUI_TOOLTIP(btnHbZurueck, "Vorige Fundstelle (Umschalt+Enter)")
 GUI_TOOLTIP(btnHbSuche, "Nächste Fundstelle (Enter)")
-DIM lblHbStand AS GUI_WIDGET : lblHbStand = GUI_LABEL(winHandbuch, "", 8, 40)
-DIM taHandbuch AS GUI_WIDGET : taHandbuch = GUI_TEXTAREA(winHandbuch, 8, 60, 964, 620)
+DIM lstHbInhalt AS GUI_WIDGET : lstHbInhalt = GUI_LISTBOX(winHandbuch, 8, 46, HB_INHALT_B, 600, [])
+GUI_LISTBOX_PLACEHOLDER(lstHbInhalt, "Keine Überschriften")
+GUI_TOOLTIP(lstHbInhalt, "Inhalt -- ein Klick springt zum Abschnitt")
+DIM lblHbStand AS GUI_WIDGET : lblHbStand = GUI_LABEL(winHandbuch, "", 8, 700)
+DIM taHandbuch AS GUI_WIDGET : taHandbuch = GUI_TEXTAREA(winHandbuch, HB_INHALT_B + 16, 46, 900, 620)
 ' Gesetzt statt roh: die Leinwand liegt auf derselben Flaeche wie das
 ' Textfeld, immer nur eine von beiden ist sichtbar.
 ' Gesetzt wird seit Stand 25 vom Widget der Laufzeit -- davor malte die IDE
 ' den Text selbst auf eine Zeichenflaeche und konnte dabei weder fett noch
 ' Tabellenspalten noch anklickbare Verweise.
-DIM rtHandbuch AS GUI_WIDGET : rtHandbuch = GUI_RICHTEXT(winHandbuch, 8, 60, 964, 620, "")
-DIM btnHbAnsicht AS GUI_WIDGET : btnHbAnsicht = GUI_BUTTON(winHandbuch, "Quelltext", 824, 40, 80, 22)
+DIM rtHandbuch AS GUI_WIDGET : rtHandbuch = GUI_RICHTEXT(winHandbuch, HB_INHALT_B + 16, 46, 900, 620, "")
+DIM btnHbAnsicht AS GUI_WIDGET : btnHbAnsicht = GUI_BUTTON(winHandbuch, "Quelltext", 1060, 8, 104, 28)
+GUI_TOOLTIP(btnHbAnsicht, "Zwischen gesetzter Ansicht und Markdown-Quelltext wechseln")
+' Verlauf wie im Browser: je Eintrag Dokument und Rollstand.
+DIM hbZurDatei AS ARRAY OF STRING : hbZurDatei = []
+DIM hbZurScroll AS ARRAY OF INTEGER : hbZurScroll = []
+DIM hbVorDatei AS ARRAY OF STRING : hbVorDatei = []
+DIM hbVorScroll AS ARRAY OF INTEGER : hbVorScroll = []
+DIM hbInhaltWahl AS INTEGER : hbInhaltWahl = -1   ' was die Liste zuletzt zeigte
+DIM hbInhaltHalt AS INTEGER : hbInhaltHalt = -1   ' Rollstand nach einem Klick; -2 = noch zu lesen
+DIM hbMassStand AS STRING : hbMassStand = ""
 DIM hbGesetzt AS BOOLEAN : hbGesetzt = TRUE
 GUI_TEXTAREA_SET(taHandbuch, "umbruch", 1)
 GUI_WINDOW_VISIBLE(winHandbuch, FALSE)
@@ -1166,6 +1207,9 @@ DIM btnVorspannSehen AS GUI_WIDGET : btnVorspannSehen = GUI_BUTTON(winEinst, "An
 GUI_TOOLTIP(btnVorspannSehen, "Den gewählten Vorspann jetzt abspielen (eine Taste oder ein Klick bricht ab)")
 DIM vorspannWahlStand AS INTEGER : vorspannWahlStand = 0
 DIM cbBaumHaken AS GUI_WIDGET : cbBaumHaken = GUI_CHECKBOX(winEinst, "Kästchen im Projektbaum (Suche/Umbau begrenzen)", 400, 210, FALSE)
+DIM cbWasser AS GUI_WIDGET : cbWasser = GUI_CHECKBOX(winEinst, "Schriftzug schwach hinter dem Code", 400, 244, TRUE)
+DIM lblUi AS GUI_WIDGET : lblUi = GUI_LABEL(winEinst, "Schrift der Oberfläche", 400, 290)
+DIM spUi AS GUI_WIDGET : spUi = GUI_SPINNER(winEinst, 600, 286, 90, 12, 22, 18)
 DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgröße", 16, 290)
 DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
 DIM lblListen AS GUI_WIDGET : lblListen = GUI_LABEL(winEinst, "Schrift der Listen", 16, 326)
@@ -1283,6 +1327,11 @@ DIM lblUmbau AS GUI_WIDGET : lblUmbau = GUI_LABEL(winUmbau, "", 8, 8)
 ' gemeint, und "alles oder nichts" heisst dann: von Hand nacharbeiten.
 DIM lstUmbau AS GUI_WIDGET : lstUmbau = GUI_LISTBOX(winUmbau, 8, 30, 220, 508, [])
 DIM taUmbau AS GUI_WIDGET : taUmbau = GUI_TEXTAREA(winUmbau, 236, 30, 656, 508)
+' Der Unterschied ist Code: dicktengleich und in fester Codegroesse, damit er
+' nicht mit der Schrift der Oberflaeche waechst (die Zeilen standen sonst
+' woanders, als man sie aus dem Code-Feld kennt).
+IF codeFont >= 0 THEN GUI_SET_FONT(taUmbau, codeFont)
+GUI_SET_FONT_SIZE(taUmbau, 16)
 DIM btnUmbauOk AS GUI_WIDGET : btnUmbauOk = GUI_BUTTON(winUmbau, "Übernehmen", 8, 546, 140, 30)
 GUI_BUTTON_VARIANT(btnUmbauOk, "primaer")
 DIM btnUmbauWeg AS GUI_WIDGET : btnUmbauWeg = GUI_BUTTON(winUmbau, "Abbrechen", 158, 546, 120, 30)
@@ -1546,6 +1595,8 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "vorspann", vorspannAn)
     JSON_SET_STRING(konfig, "vorspann_datei", vorspannDatei)
     JSON_SET_BOOL(konfig, "glanz", glanzAn)
+    JSON_SET_BOOL(konfig, "wasserzeichen", wasserzeichenAn)
+    JSON_SET_INT(konfig, "ui_schrift", uiGroesse)
     JSON_SET_BOOL(konfig, "baum_haken", baumHakenAn)
     JSON_SET_BOOL(konfig, "format_sichern", formatSichernAn)
     JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
@@ -1910,7 +1961,33 @@ SUB reiterNeuSetzen()
     IF aktiverTab >= 0 THEN GUI_SET_ACTIVE_TAB(win, aktiverTab)
 END SUB
 
+' Den Schriftzug hinter ein Code-Feld legen (oder wegnehmen). Auf dem
+' hellen Thema etwas kraeftiger, dort verschluckt der Grund mehr.
+SUB wasserzeichenSetzen(ta AS GUI_WIDGET)
+    IF wasserzeichenAn AND hgBild >= 0 THEN
+        GUI_TEXTAREA_BACKGROUND(ta, hgBild, IIF(hell, 34, 22))
+    ELSE
+        GUI_TEXTAREA_BACKGROUND(ta, -1)
+    END IF
+END SUB
+
+SUB wasserzeichenAlle()
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        wasserzeichenSetzen(tabFelder[i])
+    NEXT
+    IF taSpiegel >= 0 THEN wasserzeichenSetzen(taSpiegel)
+    protokoll("wasserzeichen " + IIF(wasserzeichenAn AND hgBild >= 0, "an", "aus"))
+END SUB
+
+SUB uiSchrift(groesse AS INTEGER)
+    uiGroesse = MAX(12, MIN(22, groesse))
+    IF uiFont >= 0 THEN TEXT_SIZE(uiGroesse)
+    protokoll("uischrift " + STR$(uiGroesse))
+END SUB
+
 SUB feldEinrichten(ta AS GUI_WIDGET)
+    wasserzeichenSetzen(ta)
     IF codeFont >= 0 THEN GUI_SET_FONT(ta, codeFont)
     GUI_SET_FONT_SIZE(ta, codeGroesse)
     GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
@@ -2155,6 +2232,8 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbVorspann, vorspannAn)
     GUI_SET_CHECKED(cbGlanz, glanzAn)
     GUI_SET_CHECKED(cbBaumHaken, baumHakenAn)
+    GUI_SET_CHECKED(cbWasser, wasserzeichenAn)
+    GUI_SET_VALUE(spUi, uiGroesse)
     vorspannAuswahlFuellen()
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spListen, listenGroesse)
@@ -2209,6 +2288,15 @@ SUB einstellungenNachziehen()
         END IF
     END IF
     IF GUI_CHECKED(cbBaumHaken) <> baumHakenAn THEN baumHakenSetzen(GUI_CHECKED(cbBaumHaken))
+    IF GUI_CHECKED(cbWasser) <> wasserzeichenAn THEN
+        wasserzeichenAn = GUI_CHECKED(cbWasser)
+        wasserzeichenAlle()
+        konfigSichern()
+    END IF
+    IF INT(GUI_VALUE(spUi)) <> uiGroesse THEN
+        uiSchrift(INT(GUI_VALUE(spUi)))
+        konfigSichern()
+    END IF
     IF GUI_CHECKED(cbGlanz) <> glanzAn THEN
         glanzAn = GUI_CHECKED(cbGlanz)
         konfigSichern()
@@ -9246,7 +9334,135 @@ SUB handbuchAnsicht(gesetzt AS BOOLEAN)
     protokoll("hbansicht " + IIF(gesetzt, "gesetzt", "quelltext"))
 END SUB
 
+' Die Masse des Handbuchfensters: es waechst mit dem Schirm (hoechstens
+' 1500 x 1000), die linke obere Ecke bleibt -- dann bleibt auch jede Lage im
+' Fenster gleich, egal wie gross der Schirm ist. Nach einem Ziehen am Griff
+' ruft die Bildschleife es mit der neuen Groesse.
+SUB handbuchLayout()
+    DIM b AS INTEGER : b = GUI_WINDOW_GET_W(winHandbuch)
+    DIM h AS INTEGER : h = GUI_WINDOW_GET_H(winHandbuch)
+    IF NOT GUI_WINDOW_SHOWN(winHandbuch) THEN
+        b = MAX(900, MIN(1500, SCREENWIDTH() - HB_X - 40))
+        h = MAX(500, MIN(1000, SCREENHEIGHT() - HB_Y - 40))
+        GUI_WINDOW_SET_BOUNDS(winHandbuch, HB_X, HB_Y, b, h)
+    END IF
+    hbMassStand = STR$(b) + "x" + STR$(h)
+    ' Inhaltshoehe: das Fenster ohne Titelleiste, abzueglich Kopfzeile (46)
+    ' und Meldungszeile (30).
+    DIM ih AS INTEGER : ih = h - 34 - 46 - 30
+    DIM tb AS INTEGER : tb = b - HB_INHALT_B - 32
+    GUI_SET_BOUNDS(lstHbInhalt, 8, 46, HB_INHALT_B, ih)
+    GUI_SET_BOUNDS(rtHandbuch, HB_INHALT_B + 16, 46, tb, ih)
+    GUI_SET_BOUNDS(taHandbuch, HB_INHALT_B + 16, 46, tb, ih)
+    GUI_SET_BOUNDS(lblHbStand, 8, 46 + ih + 6, b - 24, 22)
+    GUI_SET_BOUNDS(btnHbAnsicht, b - 16 - 104, 8, 104, 28)
+END SUB
+
+' Die Codebloecke im Handbuch in den Farben des Editors.
+SUB hbFarben()
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_kommentar", F_KOMMENTAR)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_text", F_TEXT)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_zahl", F_ZAHL)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_schluessel", F_SCHLUESSEL)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_operator", F_OPERATOR)
+    GUI_RICHTEXT_SET(rtHandbuch, "farbe_name", F_GRUND)
+END SUB
+
+' Das Inhaltsverzeichnis aus den Ueberschriften. Die erste Ebene in der
+' Akzentfarbe, die weiteren eingerueckt.
+SUB hbInhaltFuellen()
+    DIM titel AS ARRAY OF STRING : titel = GUI_RICHTEXT_HEADINGS(rtHandbuch)
+    DIM ebene AS ARRAY OF INTEGER : ebene = GUI_RICHTEXT_HEADING_LEVELS(rtHandbuch)
+    DIM eintraege AS ARRAY OF STRING : eintraege = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(titel) - 1
+        ARRAY_PUSH(eintraege, SPACE$((ebene[i] - 1) * 3) + titel[i])
+    NEXT
+    GUI_SET_LISTBOX(lstHbInhalt, eintraege)
+    ' Eine stehengebliebene Auswahl des vorigen Dokuments saehe im naechsten
+    ' Bild aus wie ein Klick -- und schriebe einen falschen Schritt in den Verlauf.
+    GUI_LISTBOX_SET_SELECTED(lstHbInhalt, -1)
+    FOR i = 0 TO LEN(titel) - 1
+        IF ebene[i] = 1 THEN GUI_LISTBOX_COLOR(lstHbInhalt, i, GUI_THEME_GET("accent"))
+    NEXT
+    hbInhaltWahl = -1
+    hbInhaltHalt = -1
+    protokoll("hbinhalt " + STR$(LEN(titel)))
+END SUB
+
+' Den jetzigen Ort vor einem Sprung merken; ein neuer Sprung loescht das
+' Vorwaerts, wie im Browser.
+SUB hbMerken()
+    IF docLetzteWahl < 0 OR docLetzteWahl >= LEN(docNamen) THEN RETURN
+    IF NOT GUI_WINDOW_SHOWN(winHandbuch) THEN RETURN
+    ARRAY_PUSH(hbZurDatei, docNamen[docLetzteWahl])
+    ARRAY_PUSH(hbZurScroll, GUI_RICHTEXT_SCROLL_GET(rtHandbuch))
+    hbVorDatei = [] : hbVorScroll = []
+END SUB
+
+' Zurueck (rueck = TRUE) oder vorwaerts im Verlauf.
+SUB hbVerlauf(rueck AS BOOLEAN)
+    IF rueck AND LEN(hbZurDatei) = 0 THEN RETURN
+    IF NOT rueck AND LEN(hbVorDatei) = 0 THEN RETURN
+    DIM jetzt AS STRING : jetzt = docNamen[docLetzteWahl]
+    DIM js AS INTEGER : js = GUI_RICHTEXT_SCROLL_GET(rtHandbuch)
+    DIM d AS STRING
+    DIM sc AS INTEGER
+    IF rueck THEN
+        d = hbZurDatei[LEN(hbZurDatei) - 1] : sc = hbZurScroll[LEN(hbZurScroll) - 1]
+        ARRAY_POP(hbZurDatei) : ARRAY_POP(hbZurScroll)
+        ARRAY_PUSH(hbVorDatei, jetzt) : ARRAY_PUSH(hbVorScroll, js)
+    ELSE
+        d = hbVorDatei[LEN(hbVorDatei) - 1] : sc = hbVorScroll[LEN(hbVorScroll) - 1]
+        ARRAY_POP(hbVorDatei) : ARRAY_POP(hbVorScroll)
+        ARRAY_PUSH(hbZurDatei, jetzt) : ARRAY_PUSH(hbZurScroll, js)
+    END IF
+    IF d <> jetzt THEN handbuchLaden(d, 1)
+    GUI_RICHTEXT_SCROLL(rtHandbuch, sc)
+    hbInhaltHalt = -1
+    protokoll("hbverlauf " + IIF(rueck, "zurueck ", "vor ") + d + " " + STR$(sc))
+END SUB
+
+' Inhaltsverzeichnis und Text gehen miteinander: ein Klick in die Liste
+' springt, und beim Lesen folgt die Markierung dem Abschnitt, in dem man
+' steht. Nach einem Klick bleibt die angeklickte Zeile markiert, bis der
+' Text wirklich gerollt wird -- am Ende eines Dokuments laege sonst der
+' obere Rand in einem frueheren Abschnitt, und die Markierung spraenge zurueck.
+SUB hbInhaltNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winHandbuch) THEN RETURN
+    DIM mass AS STRING : mass = STR$(GUI_WINDOW_GET_W(winHandbuch)) + "x" + STR$(GUI_WINDOW_GET_H(winHandbuch))
+    IF mass <> hbMassStand THEN handbuchLayout()
+    DIM k AS INTEGER : k = GUI_LISTBOX_SELECTED(lstHbInhalt)
+    IF k >= 0 AND k <> hbInhaltWahl THEN
+        hbMerken()
+        GUI_RICHTEXT_GOTO_HEADING(rtHandbuch, k)
+        hbInhaltWahl = k
+        hbInhaltHalt = -2
+        protokoll("hbinhalt sprung " + STR$(k))
+        RETURN
+    END IF
+    DIM sc AS INTEGER : sc = GUI_RICHTEXT_SCROLL_GET(rtHandbuch)
+    IF hbInhaltHalt = -2 THEN hbInhaltHalt = sc : RETURN
+    IF hbInhaltHalt >= 0 AND sc = hbInhaltHalt THEN RETURN
+    hbInhaltHalt = -1
+    DIM a AS INTEGER : a = GUI_RICHTEXT_HEADING_AT(rtHandbuch)
+    IF a <> hbInhaltWahl THEN
+        hbInhaltWahl = a
+        GUI_LISTBOX_SET_SELECTED(lstHbInhalt, a)
+        IF a >= 0 THEN GUI_LISTBOX_SCROLL_TO(lstHbInhalt, a)
+    END IF
+END SUB
+
 SUB handbuchZeigen(datei AS STRING, zeile AS INTEGER)
+    handbuchDokumente()
+    ' Ein anderes Dokument ist ein Schritt im Verlauf.
+    IF docLetzteWahl >= 0 AND docLetzteWahl < LEN(docNamen) THEN
+        IF docNamen[docLetzteWahl] <> datei THEN hbMerken()
+    END IF
+    handbuchLaden(datei, zeile)
+END SUB
+
+SUB handbuchLaden(datei AS STRING, zeile AS INTEGER)
     handbuchDokumente()
     DIM i AS INTEGER
     DIM k AS INTEGER : k = -1
@@ -9257,10 +9473,12 @@ SUB handbuchZeigen(datei AS STRING, zeile AS INTEGER)
     GUI_SET_TEXT(taHandbuch, dateiLesen(PATHJOIN(docsOrdner, datei)))
     GUI_DROPDOWN_SET_SELECTED(ddDoku, k)
     docLetzteWahl = k
-    GUI_SET_TEXT(lblHbStand, datei)
+    GUI_SET_TEXT(lblHbStand, "")
+    handbuchLayout()
     GUI_WINDOW_VISIBLE(winHandbuch, TRUE)
     GUI_TEXTAREA_GOTO(taHandbuch, MAX(zeile, 1), 1)
     GUI_RICHTEXT_SET_TEXT(rtHandbuch, GUI_TEXT(taHandbuch))
+    hbInhaltFuellen()
     ' Die gesetzte Ansicht kennt keine Zeilennummern: gerollt wird zu dem,
     ' was in der Zeile STEHT. Das trifft die Stelle genauer als jede
     ' Umrechnung Zeile -> Punkte, denn wie hoch eine Zeile gesetzt wird,
@@ -9329,6 +9547,7 @@ SUB handbuchVerweis(ziel AS STRING)
         ' Nur eine Marke: im selben Dokument suchen. Die Marken von Markdown
         ' sind kleingeschrieben und mit Strichen -- gesucht wird nach der
         ' Ueberschrift, also mit Leerzeichen.
+        hbMerken()
         GUI_RICHTEXT_FIND(rtHandbuch, REPLACE$(marke, "-", " "), -1)
         RETURN
     END IF
@@ -9537,15 +9756,21 @@ END SUB
 
 ' Strg+F1: alle Befehle mit Kuerzel im Handbuch-Fenster.
 SUB kuerzelZeigen()
-    DIM text AS STRING : text = "TASTENKUERZEL DER IDE" + NL + NL
+    ' Als Markdown-Tabelle: so steht sie auch in der gesetzten Ansicht da
+    ' (bis 2026-09-26 kam sie nur ins Quelltext-Feld und die gesetzte Ansicht
+    ' zeigte weiter das vorige Dokument).
+    DIM text AS STRING : text = "# Tastenkürzel der IDE" + NL + NL + "| Kürzel | Befehl |" + NL + "|---|---|" + NL
     DIM i AS INTEGER
     FOR i = 0 TO LEN(befehlNamen) - 1
-        IF befehlKuerzel[i] <> "" THEN text = text + LEFT$(befehlKuerzel[i] + "                    ", 20) + befehlNamen[i] + NL
+        IF befehlKuerzel[i] <> "" THEN text = text + "| `" + befehlKuerzel[i] + "` | " + befehlNamen[i] + " |" + NL
     NEXT
-    text = text + NL + "Im Code-Feld: Tab rückt bis zur nächsten Spalte ein, Strg+Z/Y nimmt zurück und wiederholt, Strg+A/C/V/X wie üblich, Pos1/Ende, Bild auf/ab." + NL
-    text = text + "Alle Befehle ohne Kürzel stehen in der Befehlspalette (Strg+Umschalt+P)." + NL
+    text = text + NL + "## Im Code-Feld" + NL + NL + "Tab rückt bis zur nächsten Spalte ein, Strg+Z/Y nimmt zurück und wiederholt, Strg+A/C/V/X wie üblich, Pos1/Ende, Bild auf/ab." + NL + NL
+    text = text + "Alle Befehle ohne Kürzel stehen in der Befehlspalette (`Strg+Umschalt+P`)." + NL
     GUI_SET_TEXT(taHandbuch, text)
+    GUI_RICHTEXT_SET_TEXT(rtHandbuch, text)
+    hbInhaltFuellen()
     GUI_SET_TEXT(lblHbStand, "Tastenkürzel")
+    handbuchLayout()
     GUI_WINDOW_VISIBLE(winHandbuch, TRUE)
     GUI_TEXTAREA_GOTO(taHandbuch, 1, 1)
     GUI_FOCUS(taHandbuch)
@@ -10379,6 +10604,8 @@ SUB befehl(k AS STRING)
             themaFeinschliff()
             bereichsFarben()
             codeFarben(hell)
+            hbFarben()
+            wasserzeichenAlle()
             faerbSchluessel = "" : gliederungSchluessel = ""
             protokoll("codefarben " + COLOR_HEX$(F_SCHLUESSEL))
             konfigSichern()
@@ -10532,6 +10759,8 @@ whFaellig = GET_TIME() + whTakt
 bereichsFarben()
 listenSchrift(listenGroesse)
 handbuchSchrift(handbuchGroesse)
+IF codeFont >= 0 THEN GUI_RICHTEXT_SET(rtHandbuch, "codeschrift", codeFont)
+hbFarben()
 protokoll("projekt " + projektOrdner)
 lichtstreif(1600)
 protokoll("bereit")
@@ -10773,6 +11002,13 @@ WHILE NOT beenden
     IF GUI_CLICKED(btnHbSuche) THEN handbuchSuchen(TRUE)
     IF GUI_CLICKED(btnHbZurueck) THEN handbuchSuchen(FALSE)
     IF GUI_CLICKED(btnHbAnsicht) THEN handbuchAnsicht(NOT hbGesetzt)
+    IF GUI_CLICKED(btnHbRueck) THEN hbVerlauf(TRUE)
+    IF GUI_CLICKED(btnHbVor) THEN hbVerlauf(FALSE)
+    IF GUI_WINDOW_AT(MOUSEX(), MOUSEY()) = winHandbuch AND (KEYPRESSED(KEY_LALT) OR KEYPRESSED(KEY_RALT)) THEN
+        IF KEYHIT(KEY_LEFT) THEN hbVerlauf(TRUE)
+        IF KEYHIT(KEY_RIGHT) THEN hbVerlauf(FALSE)
+    END IF
+    hbInhaltNachziehen()
     IF GUI_RICHTEXT_LINK$(rtHandbuch) <> "" THEN handbuchVerweis(GUI_RICHTEXT_LINK$(rtHandbuch))
     werkzeugeAufraeumen()
     ' GUI_TABLE_CLICKED liefert die Zeile oder -1 -- und -1 ist WAHR. Bis

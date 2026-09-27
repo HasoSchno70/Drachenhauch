@@ -4149,6 +4149,30 @@
    "module": "gui"
   },
   {
+   "name": "GUI_RICHTEXT_HEADINGS",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_HEADINGS(rt) AS ARRAY OF STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_HEADING_LEVELS",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_HEADING_LEVELS(rt) AS ARRAY OF INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_GOTO_HEADING",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_GOTO_HEADING(rt, nr)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_HEADING_AT",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_HEADING_AT(rt) AS INTEGER",
+   "module": "gui"
+  },
+  {
    "name": "GUI_RICHTEXT_CLEAR_SELECTION",
    "kind": "core",
    "signature": "GUI_RICHTEXT_CLEAR_SELECTION(rt)",
@@ -5094,6 +5118,12 @@
    "name": "GUI_TEXTAREA_SELECT_COLUMNS",
    "kind": "core",
    "signature": "GUI_TEXTAREA_SELECT_COLUMNS(ta, z1, s1, z2, s2)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_BACKGROUND",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_BACKGROUND(ta, bild, deckkraft = 24)",
    "module": "gui"
   },
   {

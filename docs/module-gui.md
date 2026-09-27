@@ -167,9 +167,13 @@ IMPORT "gui"
 | `GUI_TABCONTROL_REMOVE(tc, i)` | — | eine Seite entfernen; ihre Kinder bleiben als Widgets bestehen |
 | `GUI_RICHTEXT(win, x, y, w, h, text$ = "")` | GUI_WIDGET | **gesetzter Text**: Markdown wird gesetzt statt nur angezeigt |
 | `GUI_RICHTEXT_SET_TEXT(rt, text$)` | — | neuen Markdown-Quelltext setzen (`GUI_SET_TEXT` tut dasselbe) |
-| `GUI_RICHTEXT_SET(rt, key$, wert)` | — | `groesse` (Grundschrift) und `codeschrift` (FONT-Handle für Codeblöcke) |
+| `GUI_RICHTEXT_SET(rt, key$, wert)` | — | `groesse` (Grundschrift), `codeschrift` (FONT-Handle für Codeblöcke) und die Farben der Codeblöcke `farbe_kommentar`/`farbe_text`/`farbe_zahl`/`farbe_schluessel`/`farbe_name`/`farbe_operator` (-1 = Vorgabe passend zum Grund) |
+| `GUI_RICHTEXT_HEADINGS(rt)` | ARRAY OF STRING | die Überschriften (`#` bis `###`) ohne Auszeichnung, aus der Quelle -- stimmen gleich nach `SET_TEXT` |
+| `GUI_RICHTEXT_HEADING_LEVELS(rt)` | ARRAY OF INTEGER | ihre Stufen 1..3, in derselben Reihenfolge |
+| `GUI_RICHTEXT_GOTO_HEADING(rt, nr)` | — | zur Überschrift Nummer `nr` rollen; vor dem Satz wird der Sprung vorgemerkt |
+| `GUI_RICHTEXT_HEADING_AT(rt)` | INTEGER | in welchem Abschnitt der obere Rand steht (-1 = davor) -- für ein Inhaltsverzeichnis, das mitgeht |
 | `GUI_RICHTEXT_LINK$(rt)` | STRING | welcher Verweis in diesem Bild angeklickt wurde (leer = keiner) |
-| `GUI_RICHTEXT_FIND(rt, text$, ab = -1)` | INTEGER | zur ersten Fundstelle rollen; liefert deren y oder -1 |
+| `GUI_RICHTEXT_FIND(rt, text$, ab = -1)` | INTEGER | zur ersten Fundstelle rollen; liefert deren y oder -1 (0 = vorgemerkt: direkt nach `SET_TEXT` wird erst gesucht, wenn der neue Text gesetzt ist) |
 | `GUI_RICHTEXT_SCROLL(rt, y)` / `GUI_RICHTEXT_SCROLL_GET(rt)` | — / INTEGER | Blickversatz setzen und lesen |
 | `GUI_RICHTEXT_HEIGHT(rt)` | INTEGER | wie hoch der Satz geworden ist |
 | `GUI_RICHTEXT_SELECTION$(rt)` | STRING | der markierte Text, Zeilen durch Umbruch getrennt (leer = keine Auswahl) |
@@ -3167,6 +3171,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_INSERT(ta, text$)` | ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, `GUI_ON_CHANGE` feuert wie beim Tippen |
 | `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; wird im Feld bearbeitet, wandern sie mit ihrer Zeile |
 | `GUI_TEXTAREA_MARKS_GET(ta)` | die Zeilen der Marken, wie sie jetzt stehen (ARRAY OF INTEGER, in der Reihenfolge des Setzens) -- so erfährt ein Programm, wohin sein Haltepunkt beim Tippen gerutscht ist |
+| `GUI_TEXTAREA_BACKGROUND(ta, bild, deckkraft = 24)` | ein Bild schwach hinter den Text legen: eingepasst in den Innenbereich, mittig, rollt nicht mit. Deckkraft 0..255, `bild` < 0 nimmt es weg -- die IDE legt so den Schriftzug hinter den Code |
 | `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` | Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht `&H`-Literale |
 | `GUI_TEXTAREA_GUTTER_CLICKED(ta [, taste])` → INTEGER | welche Zeile (ab 1) in diesem Bild in der Nummernspalte angeklickt wurde, 0 = keine; `taste` 0 = links (Vorgabe), 1 = rechts. Gilt ein Bild lang wie `GUI_CLICKED`; ein Linksklick dort setzt die Schreibmarke NICHT, der Faltpfeil klappt weiter um. Fuer Haltepunkte und Lesezeichen |
 | `GUI_TEXTAREA_SWATCH_CLICKED(ta)` → INTEGER | welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie `GUI_CLICKED`, die Schreibmarke bleibt dabei stehen |

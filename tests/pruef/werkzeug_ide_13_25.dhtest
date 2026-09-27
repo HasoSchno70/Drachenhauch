@@ -7315,7 +7315,7 @@ mehr nicht offen TRUE
 a_spiel offen TRUE
 
 === ein verweis im handbuch oeffnet das dokument
-' F1 oeffnet aaa.md; der Verweis ist das zweite Wort der gesetzten Zeile.
+' F1 oeffnet aaa.md; der Verweis ist das zweite Wort der gesetzten Zeile (das Handbuch steht seit 2026-09-27 bei 120/50, der Text rechts vom Inhaltsverzeichnis).
 AUTOMATION_PLAY("ev.txt")
 --- programm ../../ide/ide.dh nach SETFPS(60)
 --- argumente
@@ -7335,8 +7335,8 @@ Das zweite Dokument.
 c 6
 e 40 2 290 0 0 0
 e 42 1 290 0 0 0
-e 90 7 260 162 0 0
-e 91 7 260 162 0 0
+e 90 7 440 146 0 0
+e 91 7 440 146 0 0
 e 91 6 0 0 0 0
 e 92 5 0 0 0 0
 
