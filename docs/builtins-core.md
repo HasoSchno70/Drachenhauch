@@ -1285,7 +1285,7 @@ Zeilen und Spalten zählen ab 1, in Zeichen.
 
 | Funktion | Rückgabe | Wirkung |
 |---|---|---|
-| `CODE_CHECK$(quelltext$[, basis$])` | STRING (JSON) | die Front-End-Kette wie `dhrt --check`: eine Liste von `{zeile, schwere, meldung}` mit `schwere` = `fehler`/`warnung`; `basis$` = Ordner für `IMPORT "x.dh"` (Vorgabe: das Arbeitsverzeichnis). Zeilen sind die des Puffers, auch bei Importen |
+| `CODE_CHECK$(quelltext$[, basis$])` | STRING (JSON) | die Front-End-Kette wie `dhrt --check`: eine Liste von `{zeile, spalte, laenge, schwere, meldung}` mit `schwere` = `fehler`/`warnung`; `spalte` (ab 1) und `laenge` sagen, wo in der Zeile die Meldung hingehört -- die Stelle eines Syntaxfehlers, sonst ein in der Meldung genannter Name, sonst die Zeile ohne Einrückung; `basis$` = Ordner für `IMPORT "x.dh"` (Vorgabe: das Arbeitsverzeichnis). Zeilen sind die des Puffers, auch bei Importen |
 | `CODE_HOVER$(quelltext$, zeile, spalte)` | STRING | Signatur und Beschreibung zum Wort an der Stelle als Markdown; leer, wenn dort kein Wort steht |
 | `CODE_COMPLETE(quelltext$, zeile, spalte)` | ARRAY OF STRING | Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten |
 | `CODE_DEFINITION(quelltext$, zeile, spalte)` | TUPLE (zeile, spalte) | wo das Wort definiert ist; `(-1, -1)` ohne Definition in diesem Text |

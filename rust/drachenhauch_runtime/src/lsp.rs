@@ -103,13 +103,70 @@ pub fn diagnose(text: &str, basis: &Path) -> Vec<Value> {
             }
         }
         let z0 = zeile.saturating_sub(1);
-        let ende = zeilen.get(z0).map(|l| l.chars().count()).unwrap_or(0).max(1);
+        let spalte = d.get("col").and_then(|c| c.as_u64()).unwrap_or(0) as usize;
+        let text_zeile = zeilen.get(z0).copied().unwrap_or("");
+        // Ein Fehler in einer importierten Datei steht an der IMPORT-Zeile --
+        // seine Spalte gehoert zur anderen Datei, also die ganze Zeile.
+        let importiert = meldung.starts_with("in ") && meldung.contains(" -> ");
+        let (von, bis) = if importiert {
+            (0, text_zeile.chars().count().max(1))
+        } else {
+            fehler_bereich(text_zeile, spalte, &meldung)
+        };
         let schwere = if d.get("severity").and_then(|s| s.as_str()) == Some("warning") { 2 } else { 1 };
         json!({
-            "range": {"start": {"line": z0, "character": 0}, "end": {"line": z0, "character": ende}},
+            "range": {"start": {"line": z0, "character": von}, "end": {"line": z0, "character": bis}},
             "severity": schwere, "source": "drachenhauch", "message": meldung,
         })
     }).collect()
+}
+
+/// Wo in der Zeile eine Meldung hingehoert, als Zeichen (von, bis).
+///
+/// Der Uebersetzer kennt bei Syntaxfehlern eine Spalte (ab 1), bei den
+/// meisten anderen nur die Zeile. Nennt die Meldung einen Namen in
+/// Hochkommas (`'zaehlr' wird hier beschrieben ...`), gilt das erste
+/// Vorkommen dieses Namens als ganzes Wort; sonst das Wort an der Spalte;
+/// sonst die Zeile ohne ihre Einrueckung. Eine Wellenlinie unter der ganzen
+/// Zeile sagt kaum mehr als die Marke am Rand -- darum so eng wie moeglich.
+pub fn fehler_bereich(zeile: &str, spalte: usize, meldung: &str) -> (usize, usize) {
+    let z: Vec<char> = zeile.chars().collect();
+    let wortzeichen = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
+    // Ein genannter Name, als ganzes Wort (Gross/klein egal).
+    let mut rest = meldung;
+    while let Some(a) = rest.find('\'') {
+        let nach = &rest[a + 1..];
+        let Some(b) = nach.find('\'') else { break };
+        let name: Vec<char> = nach[..b].to_lowercase().chars().collect();
+        if !name.is_empty() && name.iter().all(|&c| wortzeichen(c)) {
+            let klein: Vec<char> = zeile.to_lowercase().chars().collect();
+            if klein.len() == z.len() && klein.len() >= name.len() {
+                for i in 0..=(klein.len() - name.len()) {
+                    if klein[i..i + name.len()] == name[..]
+                        && (i == 0 || !wortzeichen(klein[i - 1]))
+                        && (i + name.len() == klein.len() || !wortzeichen(klein[i + name.len()])) {
+                        return (i, i + name.len());
+                    }
+                }
+            }
+        }
+        rest = &nach[b + 1..];
+    }
+    if spalte > 0 {
+        let s = (spalte - 1).min(z.len());
+        // Das Wort um die Spalte; steht sie am Ende oder auf einem Zeichen,
+        // das kein Wort ist, ein einzelnes Zeichen (am Ende: das letzte).
+        let (mut a, mut b) = (s, s);
+        while a > 0 && z.get(a - 1).map(|&c| wortzeichen(c)).unwrap_or(false) { a -= 1; }
+        while b < z.len() && wortzeichen(z[b]) { b += 1; }
+        if b > a { return (a, b); }
+        if s < z.len() { return (s, s + 1); }
+        let letzt = z.iter().rposition(|c| !c.is_whitespace()).map(|p| p + 1).unwrap_or(0);
+        return (letzt.saturating_sub(1), letzt.max(1));
+    }
+    let anfang = z.iter().position(|c| !c.is_whitespace()).unwrap_or(0);
+    let ende = z.iter().rposition(|c| !c.is_whitespace()).map(|p| p + 1).unwrap_or(anfang + 1);
+    (anfang, ende.max(anfang + 1))
 }
 
 // ---------------------------------------------------------------- Hover-Daten
@@ -463,6 +520,22 @@ pub fn serve() -> std::process::ExitCode {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn fehler_bereich_findet_die_stelle() {
+        // genannter Name, als ganzes Wort, nicht als Teil von "zaehlrx"
+        assert_eq!(super::fehler_bereich("  zaehlrx = zaehlr + 1", 0, "'zaehlr' wird hier beschrieben"), (12, 18));
+        // Spalte auf einem Wort: das ganze Wort
+        assert_eq!(super::fehler_bereich("PRINT foo bar", 8, "Erwartet"), (6, 9));
+        // Spalte am Zeilenende: das letzte Zeichen
+        assert_eq!(super::fehler_bereich("PRINT (1 +", 11, "endet mitten drin"), (9, 10));
+        // Spalte auf einem Satzzeichen: das Zeichen
+        assert_eq!(super::fehler_bereich("x = (1 + 2", 5, "Klammer"), (4, 5));
+        // nichts bekannt: die Zeile ohne Einrueckung
+        assert_eq!(super::fehler_bereich("    CLS(1, 2, 3)  ", 0, "zu viele Argumente"), (4, 16));
+        // leere Zeile: ein Zeichen
+        assert_eq!(super::fehler_bereich("", 0, "x"), (0, 1));
+    }
+
     use super::*;
 
     #[test]

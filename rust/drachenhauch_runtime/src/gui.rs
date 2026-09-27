@@ -2530,6 +2530,10 @@ pub struct Widget {
     // Abschnitte. Gezeichnet wird ein kleines Quadrat HINTER dem Stueck --
     // welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer.
     farbfelder: Vec<(u32, u32, i64)>,
+    // Wellenlinien (nur TextArea): (Start, Laenge, Farbe) in Zeichen, sortiert
+    // nach Start -- Fehler und Warnungen DORT, wo sie im Text stehen, statt nur
+    // als Marke am Rand. Laenge 0 = ein kurzes Stueck an der Stelle.
+    wellen: Vec<(u32, u32, i64)>,
     // Welches davon in diesem Bild angeklickt wurde (-1 = keins). Transient
     // wie `clicked`: ein Klick ist ein Ereignis, kein Zustand.
     farbfeld_klick: i32,
@@ -3510,6 +3514,30 @@ impl Gui {
         Ok(())
     }
 
+    /// Wellenlinien unter Zeichen-Abschnitten (ersetzt alle bisherigen; leere
+    /// Listen loeschen). Gezeichnet wird unter dem Text, gemessen wie die
+    /// Farbabschnitte ueber die Breite des Vorspanns -- sonst saesse die Linie
+    /// hinter dem ersten breiten Zeichen daneben.
+    pub fn textarea_squiggles(&mut self, h: i64, starts: Vec<i64>, laengen: Vec<i64>,
+                              farben: Vec<i64>) -> Result<(), String> {
+        if starts.len() != laengen.len() || starts.len() != farben.len() {
+            return Err(format!(
+                "GUI_TEXTAREA_SQUIGGLES: die drei Listen muessen gleich lang sein \
+                 ({} Starts, {} Laengen, {} Farben)",
+                starts.len(), laengen.len(), farben.len()));
+        }
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_SQUIGGLES")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_SQUIGGLES: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        wd.wellen = starts.iter().zip(&laengen).zip(&farben)
+            .filter(|((&s, &l), _)| s >= 0 && l >= 0)
+            .map(|((&s, &l), &c)| (s as u32, l as u32, c))
+            .collect();
+        wd.wellen.sort_by_key(|&(s, _, _)| s);
+        Ok(())
+    }
+
     /// Marken je Zeile setzen (ersetzt alle bisherigen; leere Listen loeschen).
     pub fn textarea_marks(&mut self, h: i64, zeilen: Vec<i64>, farben: Vec<i64>) -> Result<(), String> {
         if zeilen.len() != farben.len() {
@@ -4012,7 +4040,7 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
-            farbfelder: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
+            farbfelder: Vec::new(), wellen: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
             formatiert: false, paare: Vec::new(), teil_von: None, teil_stand: String::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false, hg_bild: -1, hg_deckkraft: 0,
             tab_meldet: false, tab_treffer: false,
@@ -9393,6 +9421,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // den neuen nach den Positionen des alten -- besser sichtbar farblos
         // als sichtbar falsch.
         w.spans.clear();
+        w.wellen.clear();
         // Der Verlauf gehoerte zum alten Text -- ein Strg+Z danach brachte
         // sonst etwas zurueck, das der Nutzer nie getippt hat.
         w.undo.clear(); w.redo.clear();
@@ -13569,6 +13598,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Self::falten_nachziehen(w, &before, &nachher, caret0);
         Self::falte_am_caret_oeffnen(w);
         w.spans.clear();
+        w.wellen.clear();
         if let Some(f) = w.on_change.clone() { self.pending.push(f); }
         Ok(())
     }
@@ -14285,6 +14315,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         w.undo.clear();
         w.redo.clear();
         w.spans.clear();
+        w.wellen.clear();
         w.gefaltet.clear();
         w.faltbar.clear();
         Ok(())
@@ -16847,6 +16878,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Self::undo_merken(w, &before, caret0, jetzt);
         w.text = text_neu;
         w.spans.clear();
+        w.wellen.clear();
         w.caret = lo + neu.len() as i32;
         w.sel_anchor = w.caret;
         w.vorschau.clear(); w.vorschau_marke = 0;
@@ -17614,6 +17646,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let n = neu.chars().count() as i32;
         w.text = neu;
         w.spans.clear();
+        w.wellen.clear();
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
         let f = w.on_change.clone();
         if let Some(f) = f { self.pending.push(f); }
@@ -18532,6 +18565,38 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                             let bx = tx0 + breite + self.sk(10);
                             g.box_fill(bx, y + 1, bx + bw, y + lh - 3, shade(self.wcol(wdg, "bg", "win_bg"), 26));
                             self.wtext(g, wdg, bx + self.sk(5), y, txt, self.th("muted_fg"));
+                        }
+                    }
+                    // Wellenlinien unter Fehlern und Warnungen: je sichtbare
+                    // Zeile der Teil, der in sie faellt, als Zickzack knapp
+                    // unter der Grundlinie.
+                    if !wdg.wellen.is_empty() {
+                        let zacke = self.sk(2).max(2);
+                        for r in 0..view_lines {
+                            let ri = scroll + r;
+                            if ri < 0 || ri as usize >= rows.len() { continue; }
+                            let (_, rs, re) = rows[ri as usize];
+                            let yb = ay + pad + r * lh + lh - self.sk(4);
+                            for &(s, l, c) in &wdg.wellen {
+                                let (s, e) = (s as usize, s as usize + l as usize);
+                                if s > re || e < rs || (l > 0 && e <= rs) { continue; }
+                                if l > 0 && s >= re && re > rs { continue; }
+                                let a = s.max(rs).min(re);
+                                let b = e.max(a).min(re);
+                                let x0 = tx0 + self.wtext_width(g, wdg, &chars[rs..a].iter().collect::<String>());
+                                let mut x1 = tx0 + self.wtext_width(g, wdg, &chars[rs..b].iter().collect::<String>());
+                                // Ohne Laenge (oder am Zeilenende) ein kurzes Stueck.
+                                if x1 < x0 + self.sk(8) { x1 = x0 + self.sk(8); }
+                                let mut x = x0;
+                                let mut oben = true;
+                                while x < x1 {
+                                    let nx = (x + zacke).min(x1);
+                                    let (y0, y1) = if oben { (yb, yb + zacke) } else { (yb + zacke, yb) };
+                                    g.line(x, y0, nx, y1, c);
+                                    x = nx;
+                                    oben = !oben;
+                                }
+                            }
                         }
                     }
                     // Farbfelder: ein kleines Quadrat hinter dem Stueck, mit

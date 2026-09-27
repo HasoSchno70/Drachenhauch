@@ -5127,6 +5127,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_SQUIGGLES",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SQUIGGLES(ta, starts, laengen, farben)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_SET",
    "kind": "core",
    "signature": "GUI_TEXTAREA_SET(ta, schluessel$, wert)",
