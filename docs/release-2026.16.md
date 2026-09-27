@@ -96,7 +96,7 @@ Oberfläche zurück.
 **Zahlen.** Die Befehlsreferenz wächst von 1993 auf **1997** Einträge; es
 bleiben 48 Module und 216 Beispiele. **4401 Fälle in 297 Prüfsammlungen**
 (vorher 3981 in 283) und **439 Rust-Testfunktionen** (vorher 431). Die Laufzeit
-braucht Rust 1.98.
+braucht Rust 1.98. Der Windows-Installer wächst von 54 auf **55 MB** (Cranelift).
 
 Wie der Maschinencode gebaut ist und welche Wege verworfen wurden, steht in
 `docs/entwurf-maschinencode.md`.
