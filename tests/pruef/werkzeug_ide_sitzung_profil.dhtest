@@ -1,0 +1,196 @@
+' Vier Fehler der IDE, gefunden 2026-09-27 (ide/ide.dh):
+' - das Profil zaehlte nach einem IMPORT falsche Zeilen und kannte nur eine Datei,
+' - vor dem Start wurde nur der vordere Reiter gesichert,
+' - Haltepunkte und Lesezeichen gingen beim Beenden verloren,
+' - ein Ordner als Startargument hiess "Gibt es nicht".
+' Getrieben ueber die Unterprogramme der IDE (Einschub in der Bildschleife).
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+--- langsam
+=== das profil zeigt zeilen der importierten datei und springt dorthin
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 30 THEN befehl("profil")
+IF prBild = 150 THEN
+    DIM prR AS INTEGER
+    DIM prZiel AS INTEGER : prZiel = -1
+    DIM prZeilen AS ARRAY OF STRING : prZeilen = []
+    FOR prR = 0 TO GUI_TABLE_ROW_COUNT(tblProfil) - 1
+        ARRAY_PUSH(prZeilen, GUI_TABLE_GET_CELL(tblProfil, prR, 0) + "=" + GUI_TABLE_GET_CELL(tblProfil, prR, 4))
+        IF LEFT$(GUI_TABLE_GET_CELL(tblProfil, prR, 0), 10) = "helfer.dh:" THEN prZiel = prR
+    NEXT
+    SORT(prZeilen)
+    protokoll("probe zeilen " + JOIN$(prZeilen, " | "))
+    GUI_TABLE_SET_SELECTED(tblProfil, prZiel)
+    profilAnspringen()
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+    protokoll("probe sprung " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(prZ))
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+IMPORT "helfer.dh"
+DIM x AS INTEGER
+x = 1
+hallo()
+--- datei helfer.dh
+' eine Hilfe
+SUB hallo()
+    PRINT "hallo"
+END SUB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " THEN PRINT MID$(L[i], 6, LEN(L[i]))
+NEXT
+--- erwartet
+zeilen 2=DIM x AS INTEGER | 3=x = 1 | 4=hallo() | helfer.dh:3=PRINT "hallo"
+sprung helfer.dh 3
+
+=== vor dem start werden alle geaenderten reiter gesichert
+' Die importierte Datei ist geaendert, aber nicht gesichert, und steht in
+' einem anderen Reiter -- der Lauf muss die neue Fassung sehen.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    dateiOeffnen(PATHJOIN(projektOrdner, "helfer.dh"))
+    GUI_SET_TEXT(tabFelder[aktiverTab], "SUB hallo()" + CHR$(10) + "    PRINT " + CHR$(34) + "neu" + CHR$(34) + CHR$(10) + "END SUB" + CHR$(10))
+    dateiOeffnen(PATHJOIN(projektOrdner, "spiel.dh"))
+    befehl("start")
+END IF
+IF prBild = 140 THEN
+    DIM prK AS INTEGER
+    FOR prK = 0 TO GUI_LISTBOX_COUNT(lstAusgabe) - 1
+        protokoll("probe ausgabe " + GUI_LISTBOX_ITEM(lstAusgabe, prK))
+    NEXT
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=170
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+IMPORT "helfer.dh"
+hallo()
+--- datei helfer.dh
+SUB hallo()
+    PRINT "alt"
+END SUB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 19) = "vor start gesichert" THEN PRINT L[i]
+NEXT
+--- erwartet
+vor start gesichert 1
+probe ausgabe neu
+
+=== haltepunkte und lesezeichen ueberleben den neustart
+' Erster Lauf setzt je einen (mit Bedingung), der zweite liest sie zurueck.
+IF NOT FILEEXISTS("zweiter.txt") THEN
+    haltepunktUmschaltenIn(tabPfade[aktiverTab], 2)
+    bedingungZeile = 3 : bedingungPfad = tabPfade[aktiverTab]
+    haltepunktBedingungSetzen("x > 1")
+    lzDateien = [tabPfade[aktiverTab]] : lzZeilen = [3]
+    WRITEALL("zweiter.txt", "ja")
+    ' Wie beim Beenden: die Einstellungen sichern.
+    konfigSichern()
+    EXIT(0)
+END IF
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(hpZeilen) - 1
+    protokoll("probe hp " + BASENAME(hpDateien[prI]) + " " + STR$(hpZeilen[prI]) + " [" + hpBedingungen[prI] + "]")
+NEXT
+FOR prI = 0 TO LEN(lzZeilen) - 1
+    protokoll("probe lz " + BASENAME(lzDateien[prI]) + " " + STR$(lzZeilen[prI]))
+NEXT
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM x AS INTEGER
+x = 1
+x = 2
+--- nochmal
+spiel.dh
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " THEN PRINT MID$(L[i], 6, LEN(L[i]))
+NEXT
+--- erwartet
+hp spiel.dh 2 []
+hp spiel.dh 3 [x > 1]
+lz spiel.dh 3
+
+=== ein ordner als startargument wird das projekt
+protokoll("probe projekt " + BASENAME(projektOrdner) + " tabs " + STR$(tabAnzahl))
+protokoll("probe status " + LEFT$(GUI_TEXT(lblStatus), 8))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+unterordner
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei unterordner/a.dh
+PRINT "a"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " THEN PRINT MID$(L[i], 6, LEN(L[i]))
+NEXT
+--- erwartet
+projekt unterordner tabs 0
+status Projekt:
+
+=== ausserhalb von git fragt der rand git gar nicht
+' Ausserhalb eines Repositorys faellt `git diff` in den Vergleich zweier
+' Dateien und schrieb bei jedem Sichern seine Hilfe auf die Konsole.
+gitRandNachziehen(TRUE)
+protokoll("probe repo " + STR$(gitRepo(projektOrdner)) + " " + STR$(gitRepo(wurzel)))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "a"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 8) = "git rand" THEN PRINT L[i]
+NEXT
+--- erwartet
+probe repo FALSE TRUE

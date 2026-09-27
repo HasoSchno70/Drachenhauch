@@ -379,6 +379,13 @@ DIM sucheZeilen AS ARRAY OF INTEGER : sucheZeilen = []
 
 ' Profil
 DIM profilZeilen AS ARRAY OF INTEGER : profilZeilen = []
+' Die Datei je Tabellenzeile -- mit IMPORT misst der Profiler auch Zeilen
+' anderer Dateien, und ein Klick muss dorthin.
+DIM profilDateien AS ARRAY OF STRING : profilDateien = []
+DIM profRohD AS ARRAY OF STRING : profRohD = []
+DIM profBerDatei AS ARRAY OF STRING : profBerDatei = []
+DIM profLeseDatei AS STRING : profLeseDatei = ""
+DIM profLeseZeilen AS ARRAY OF STRING : profLeseZeilen = []
 ' Die Messung selbst, nach Zeit absteigend -- die Tabelle zeigt sie je
 ' Zeile oder je Funktion, ohne neu zu messen.
 DIM profRohZ AS ARRAY OF INTEGER : profRohZ = []
@@ -566,6 +573,25 @@ IF JSON_HAS(konfig, "falten_pfade") AND JSON_HAS(konfig, "falten_zeilen") THEN
     FOR fk = 0 TO MIN(JSON_LEN(konfig, "falten_pfade"), JSON_LEN(konfig, "falten_zeilen")) - 1
         ARRAY_PUSH(faltPfade, JSON_GET_STRING(konfig, "falten_pfade." + STR$(fk)))
         ARRAY_PUSH(faltListe, JSON_GET_STRING(konfig, "falten_zeilen." + STR$(fk)))
+    NEXT
+END IF
+IF JSON_HAS(konfig, "haltepunkte") THEN
+    DIM hl AS INTEGER
+    FOR hl = 0 TO JSON_LEN(konfig, "haltepunkte") - 1
+        DIM hlP AS STRING : hlP = "haltepunkte." + STR$(hl)
+        IF NOT JSON_HAS(konfig, hlP + ".datei") OR NOT JSON_HAS(konfig, hlP + ".zeile") THEN CONTINUE
+        ARRAY_PUSH(hpDateien, JSON_GET_STRING(konfig, hlP + ".datei"))
+        ARRAY_PUSH(hpZeilen, JSON_GET_INT(konfig, hlP + ".zeile"))
+        IF JSON_HAS(konfig, hlP + ".bedingung") THEN ARRAY_PUSH(hpBedingungen, JSON_GET_STRING(konfig, hlP + ".bedingung")) ELSE ARRAY_PUSH(hpBedingungen, "")
+    NEXT
+END IF
+IF JSON_HAS(konfig, "lesezeichen") THEN
+    DIM ll AS INTEGER
+    FOR ll = 0 TO JSON_LEN(konfig, "lesezeichen") - 1
+        DIM llP AS STRING : llP = "lesezeichen." + STR$(ll)
+        IF NOT JSON_HAS(konfig, llP + ".datei") OR NOT JSON_HAS(konfig, llP + ".zeile") THEN CONTINUE
+        ARRAY_PUSH(lzDateien, JSON_GET_STRING(konfig, llP + ".datei"))
+        ARRAY_PUSH(lzZeilen, JSON_GET_INT(konfig, llP + ".zeile"))
     NEXT
 END IF
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
@@ -1492,6 +1518,24 @@ SUB konfigSichern()
     FOR i = 0 TO tabAnzahl - 1
         IF tabPfade[i] <> "" THEN JSON_APPEND_STRING(konfig, "sitzung", tabPfade[i])
         faltenMerken(i)
+    NEXT
+    ' Haltepunkte und Lesezeichen ueberleben den Neustart (bis 2026-09-27
+    ' musste man sie nach jedem Start neu setzen).
+    JSON_SET_JSON(konfig, "haltepunkte", JSON_NEW_ARRAY())
+    DIM hk AS INTEGER
+    FOR hk = 0 TO LEN(hpZeilen) - 1
+        DIM hpE AS JSON_HANDLE : hpE = JSON_NEW_OBJECT()
+        JSON_SET_STRING(hpE, "datei", hpDateien[hk])
+        JSON_SET_INT(hpE, "zeile", hpZeilen[hk])
+        IF hpBedingungen[hk] <> "" THEN JSON_SET_STRING(hpE, "bedingung", hpBedingungen[hk])
+        JSON_APPEND_JSON(konfig, "haltepunkte", hpE)
+    NEXT
+    JSON_SET_JSON(konfig, "lesezeichen", JSON_NEW_ARRAY())
+    FOR hk = 0 TO LEN(lzZeilen) - 1
+        DIM lzE AS JSON_HANDLE : lzE = JSON_NEW_OBJECT()
+        JSON_SET_STRING(lzE, "datei", lzDateien[hk])
+        JSON_SET_INT(lzE, "zeile", lzZeilen[hk])
+        JSON_APPEND_JSON(konfig, "lesezeichen", lzE)
     NEXT
     JSON_SET_JSON(konfig, "falten_pfade", JSON_PARSE("[]"))
     JSON_SET_JSON(konfig, "falten_zeilen", JSON_PARSE("[]"))
@@ -3673,6 +3717,29 @@ END SUB
 
 ' `git` fuer die aktive Datei laufen lassen -- leer, wenn es nicht geht.
 ' Synchron ueber SHELL_OUT$: eine Datei dauert Millisekunden.
+' Liegt ein Ordner in einem git-Repository? Einmal je Ordner gefragt und
+' gemerkt. Ausserhalb faellt `git diff` in den Vergleich zweier Dateien
+' und schreibt seine Hilfe auf die Konsole -- bei JEDEM Sichern.
+DIM gitRepoOrdner AS STRING : gitRepoOrdner = "-"
+DIM gitRepoJa AS BOOLEAN : gitRepoJa = FALSE
+FUNCTION gitRepo(ordner AS STRING) AS BOOLEAN
+    IF ordner = gitRepoOrdner THEN RETURN gitRepoJa
+    gitRepoOrdner = ordner
+    gitRepoJa = FALSE
+    ' Ohne Prozess: `.git` aufwaerts suchen (ein Ordner, oder in einem
+    ' Arbeitsbaum eine Datei).
+    DIM d AS STRING : d = ordner
+    DIM schritte AS INTEGER : schritte = 0
+    WHILE d <> "" AND schritte < 64
+        IF DIREXISTS(PATHJOIN(d, ".git")) OR FILEEXISTS(PATHJOIN(d, ".git")) THEN gitRepoJa = TRUE : EXIT WHILE
+        DIM oben AS STRING : oben = DIRNAME(d)
+        IF oben = d THEN EXIT WHILE
+        d = oben
+        schritte = schritte + 1
+    WEND
+    RETURN gitRepoJa
+END FUNCTION
+
 FUNCTION gitAusgabe$(erst AS STRING, zweit AS STRING, dritt AS STRING) AS STRING
     IF aktiverTab < 0 THEN RETURN ""
     DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
@@ -3774,6 +3841,10 @@ SUB gitRandNachziehen(erzwingen AS BOOLEAN)
     DIM stand AS STRING : stand = pfad + "|" + STR$(LEN(tabGesichert[aktiverTab]))
     IF NOT erzwingen AND stand = gitDateiStand THEN RETURN
     gitDateiStand = stand
+    IF NOT gitRepo(DIRNAME(pfad)) THEN
+        IF LEN(gitZeilen) > 0 THEN gitZeilen = [] : markenSchluessel = ""
+        RETURN
+    END IF
     DIM text AS STRING : text = gitAusgabe$("diff", "--no-color", "-U0")
     DIM neu AS ARRAY OF INTEGER : neu = []
     DIM z AS STRING
@@ -7985,6 +8056,20 @@ FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
     IF tabPfade[aktiverTab] = "" OR GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
         IF NOT sichern(aktiverTab, FALSE) THEN RETURN FALSE
     END IF
+    ' Auch die ANDEREN geaenderten Reiter: das Programm liest eine importierte
+    ' Datei von der Platte, und bis 2026-09-27 lief dann die alte Fassung --
+    ' im Debugger passten obendrein die Zeilen nicht zum Editor. Ein Reiter
+    ' ohne Namen gehoert zu keinem Programm und bleibt, wie er ist.
+    DIM tg AS INTEGER
+    DIM tgN AS INTEGER : tgN = 0
+    FOR tg = 0 TO tabAnzahl - 1
+        IF tg <> aktiverTab AND tabPfade[tg] <> "" THEN
+            IF GUI_TEXT(tabFelder[tg]) <> tabGesichert[tg] THEN
+                IF sichern(tg, FALSE) THEN tgN = tgN + 1
+            END IF
+        END IF
+    NEXT
+    IF tgN > 0 THEN protokoll("vor start gesichert " + STR$(tgN))
     GUI_LISTBOX_CLEAR(lstAusgabe)
     ' Wer startet, will die Ausgabe sehen -- eine ausgeblendete untere
     ' Leiste kommt zurueck.
@@ -8415,12 +8500,18 @@ SUB profilAnzeigen(zeile AS STRING)
     DIM zl[MAX(n, 1)] AS INTEGER
     DIM za[MAX(n, 1)] AS INTEGER
     DIM zt[MAX(n, 1)] AS FLOAT
+    DIM zd[MAX(n, 1)] AS STRING
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = "lines." + STR$(i)
         zl[i] = JSON_GET_INT(j, p + ".line")
         za[i] = JSON_GET_INT(j, p + ".count")
         zt[i] = JSON_GET_FLOAT(j, p + ".time")
+        ' Die Hauptdatei heisst wie beim Start, eine importierte kanonisch.
+        zd[i] = prozessDatei
+        IF JSON_HAS(j, p + ".file") THEN
+            IF JSON_GET_STRING(j, p + ".file") <> prozessDatei AND JSON_GET_STRING(j, p + ".file") <> "" THEN zd[i] = JSON_GET_STRING(j, p + ".file")
+        END IF
     NEXT
     ' Nach Zeit absteigend -- die teuerste Zeile zuerst.
     DIM k AS INTEGER
@@ -8433,6 +8524,7 @@ SUB profilAnzeigen(zeile AS STRING)
             DIM t1 AS INTEGER : t1 = zl[i] : zl[i] = zl[best] : zl[best] = t1
             t1 = za[i] : za[i] = za[best] : za[best] = t1
             DIM t2 AS FLOAT : t2 = zt[i] : zt[i] = zt[best] : zt[best] = t2
+            DIM t3 AS STRING : t3 = zd[i] : zd[i] = zd[best] : zd[best] = t3
         END IF
     NEXT
     ' Die Quelle zur Messung: der offene Reiter, sonst die Datei -- ohne sie
@@ -8448,10 +8540,11 @@ SUB profilAnzeigen(zeile AS STRING)
             quelle = []
         END TRY
     END IF
-    profRohZ = [] : profRohA = [] : profRohT = []
+    profRohZ = [] : profRohA = [] : profRohT = [] : profRohD = []
     FOR i = 0 TO n - 1
-        ARRAY_PUSH(profRohZ, zl[i]) : ARRAY_PUSH(profRohA, za[i]) : ARRAY_PUSH(profRohT, zt[i])
+        ARRAY_PUSH(profRohZ, zl[i]) : ARRAY_PUSH(profRohA, za[i]) : ARRAY_PUSH(profRohT, zt[i]) : ARRAY_PUSH(profRohD, zd[i])
     NEXT
+    profLeseDatei = ""
     profGesamt = gesamt
     profQuelle = quelle
     profilTabelleFuellen()
@@ -8461,10 +8554,16 @@ SUB profilAnzeigen(zeile AS STRING)
     profDatei = prozessDatei
     profZeilen = [] : profAnzahl = []
     FOR i = 0 TO n - 1
-        ARRAY_PUSH(profZeilen, zl[i]) : ARRAY_PUSH(profAnzahl, za[i])
+        IF zd[i] = prozessDatei THEN ARRAY_PUSH(profZeilen, zl[i]) : ARRAY_PUSH(profAnzahl, za[i])
     NEXT
     GUI_SET_TEXT(lblProfil, BASENAME(prozessDatei) + ": " + FORMAT$(gesamt * 1000.0, "%.2f") + " ms gesamt, " + STR$(n) + " Zeilen gemessen")
-    IF JSON_HAS(j, "error") THEN ausgabe("-- Fehler in Zeile " + STR$(JSON_GET_INT(j, "error_line")) + ": " + JSON_GET_STRING(j, "error"))
+    IF JSON_HAS(j, "error") THEN
+        DIM fd AS STRING : fd = prozessDatei
+        IF JSON_HAS(j, "error_file") THEN
+            IF JSON_GET_STRING(j, "error_file") <> "" THEN fd = JSON_GET_STRING(j, "error_file")
+        END IF
+        ausgabe("-- Fehler in " + BASENAME(fd) + ":" + STR$(JSON_GET_INT(j, "error_line")) + ": " + JSON_GET_STRING(j, "error"))
+    END IF
     GUI_WINDOW_VISIBLE(winProfil, TRUE)
     GUI_FOCUS(tblProfil)          ' holt das Fenster vor das Hauptfenster
     protokoll("profil " + STR$(n))
@@ -8482,40 +8581,66 @@ SUB profilTabelleFuellen()
     IF NOT GUI_CHECKED(cbProfilFunk) THEN
         GUI_TABLE_HEADERS(tblProfil, ["Zeile", "Anzahl", "ms", "Anteil", "Quelltext"])
         GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
+        DIM pd AS ARRAY OF STRING : pd = []
         FOR i = 0 TO MIN(n, 300) - 1
             DIM anteil AS STRING : anteil = "-"
             IF profGesamt > 0.0 THEN anteil = FORMAT$(profRohT[i] / profGesamt * 100.0, "%.1f") + " %"
-            DIM q AS STRING : q = ""
-            IF profRohZ[i] >= 1 AND profRohZ[i] <= LEN(profQuelle) THEN q = TRIM$(profQuelle[profRohZ[i] - 1])
-            GUI_TABLE_ADD_ROW(tblProfil, [STR$(profRohZ[i]), STR$(profRohA[i]), FORMAT$(profRohT[i] * 1000.0, "%.2f"), anteil, q])
-            ARRAY_PUSH(pz, profRohZ[i])
+            DIM q AS STRING : q = profZeileText$(profDatei$(i), profRohZ[i])
+            DIM zs AS STRING : zs = STR$(profRohZ[i])
+            IF profDatei$(i) <> prozessDatei THEN zs = BASENAME(profDatei$(i)) + ":" + zs
+            GUI_TABLE_ADD_ROW(tblProfil, [zs, STR$(profRohA[i]), FORMAT$(profRohT[i] * 1000.0, "%.2f"), anteil, q])
+            ARRAY_PUSH(pz, profRohZ[i]) : ARRAY_PUSH(pd, profDatei$(i))
         NEXT
-        profilZeilen = pz
+        profilZeilen = pz : profilDateien = pd
         protokoll("profiltabelle zeilen " + STR$(LEN(pz)))
         RETURN
     END IF
-    profBerName = [] : profBerVon = [] : profBerBis = []
-    DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "s" + CHR$(34) + ": " + CODE_SYMBOLS$(JOIN$(profQuelle, NL)) + "}")
-    profilBereiche(j, "s", "")
+    profBerName = [] : profBerVon = [] : profBerBis = [] : profBerDatei = []
+    ' Die Bereiche JEDER gemessenen Datei, je mit ihrer Datei gemerkt.
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    FOR i = 0 TO n - 1
+        IF ARRAY_INDEXOF(dateien, profDatei$(i)) < 0 THEN ARRAY_PUSH(dateien, profDatei$(i))
+    NEXT
+    DIM di AS INTEGER
+    FOR di = 0 TO LEN(dateien) - 1
+        DIM text AS STRING
+        IF dateien[di] = prozessDatei THEN
+            text = JOIN$(profQuelle, NL)
+        ELSE
+            TRY
+                text = dateiLesen(dateien[di])
+            CATCH e
+                text = ""
+            END TRY
+        END IF
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "s" + CHR$(34) + ": " + CODE_SYMBOLS$(text) + "}")
+        profilBereiche(j, "s", "")
+        WHILE LEN(profBerDatei) < LEN(profBerName)
+            ARRAY_PUSH(profBerDatei, dateien[di])
+        WEND
+    NEXT
     DIM gName AS ARRAY OF STRING : gName = []
+    DIM gDatei AS ARRAY OF STRING : gDatei = []
     DIM gVon AS ARRAY OF INTEGER : gVon = []
     DIM gZeilen AS ARRAY OF INTEGER : gZeilen = []
     DIM gZeit AS ARRAY OF FLOAT : gZeit = []
     FOR i = 0 TO n - 1
         DIM z AS INTEGER : z = profRohZ[i]
         DIM name AS STRING : name = "(Hauptprogramm)"
+        IF profDatei$(i) <> prozessDatei THEN name = "(" + BASENAME(profDatei$(i)) + ")"
         DIM von AS INTEGER : von = 1
         DIM spanne AS INTEGER : spanne = 2000000000
         DIM k AS INTEGER
         FOR k = 0 TO LEN(profBerName) - 1
-            IF z >= profBerVon[k] AND z <= profBerBis[k] AND profBerBis[k] - profBerVon[k] < spanne THEN
+            IF profBerDatei[k] = profDatei$(i) AND z >= profBerVon[k] AND z <= profBerBis[k] AND profBerBis[k] - profBerVon[k] < spanne THEN
                 spanne = profBerBis[k] - profBerVon[k]
                 name = profBerName[k] : von = profBerVon[k]
+                IF profDatei$(i) <> prozessDatei THEN name = BASENAME(profDatei$(i)) + ": " + name
             END IF
         NEXT
         DIM g AS INTEGER : g = ARRAY_INDEXOF(gName, name)
         IF g < 0 THEN
-            ARRAY_PUSH(gName, name) : ARRAY_PUSH(gVon, von) : ARRAY_PUSH(gZeilen, 0) : ARRAY_PUSH(gZeit, 0.0)
+            ARRAY_PUSH(gName, name) : ARRAY_PUSH(gVon, von) : ARRAY_PUSH(gZeilen, 0) : ARRAY_PUSH(gZeit, 0.0) : ARRAY_PUSH(gDatei, profDatei$(i))
             g = LEN(gName) - 1
         END IF
         gZeilen[g] = gZeilen[g] + 1
@@ -8534,6 +8659,7 @@ SUB profilTabelleFuellen()
             DIM t1 AS INTEGER : t1 = gVon[a] : gVon[a] = gVon[best] : gVon[best] = t1
             t1 = gZeilen[a] : gZeilen[a] = gZeilen[best] : gZeilen[best] = t1
             DIM t2 AS FLOAT : t2 = gZeit[a] : gZeit[a] = gZeit[best] : gZeit[best] = t2
+            DIM t3 AS STRING : t3 = gDatei[a] : gDatei[a] = gDatei[best] : gDatei[best] = t3
         END IF
     NEXT
     GUI_TABLE_HEADERS(tblProfil, ["Funktion", "ab Zeile", "Zeilen", "ms", "Anteil"])
@@ -8545,9 +8671,36 @@ SUB profilTabelleFuellen()
         ARRAY_PUSH(pz, gVon[a])
         protokoll("profiltabelle funktion " + gName[a] + " " + STR$(gZeilen[a]))
     NEXT
-    profilZeilen = pz
+    profilZeilen = pz : profilDateien = gDatei
     protokoll("profiltabelle funktionen " + STR$(m))
 END SUB
+
+' Die Datei einer Messzeile -- fehlt sie (Messung ohne Dateien), die
+' gestartete.
+FUNCTION profDatei$(i AS INTEGER) AS STRING
+    IF i < LEN(profRohD) THEN RETURN profRohD[i]
+    RETURN prozessDatei
+END FUNCTION
+
+' Der Quelltext einer gemessenen Zeile -- aus der Hauptdatei (so, wie sie
+' im Editor steht) oder aus einer importierten, die einmal gelesen und
+' behalten wird, solange die naechste Zeile aus derselben kommt.
+FUNCTION profZeileText$(datei AS STRING, z AS INTEGER) AS STRING
+    IF datei = prozessDatei THEN
+        IF z >= 1 AND z <= LEN(profQuelle) THEN RETURN TRIM$(profQuelle[z - 1])
+        RETURN ""
+    END IF
+    IF datei <> profLeseDatei THEN
+        profLeseDatei = datei
+        TRY
+            profLeseZeilen = SPLIT$(dateiLesen(datei), NL)
+        CATCH e
+            profLeseZeilen = []
+        END TRY
+    END IF
+    IF z >= 1 AND z <= LEN(profLeseZeilen) THEN RETURN TRIM$(profLeseZeilen[z - 1])
+    RETURN ""
+END FUNCTION
 
 ' Die Funktionsbereiche aus CODE_SYMBOLS$ einsammeln, Methoden als
 ' `Klasse.methode`.
@@ -8572,7 +8725,7 @@ END SUB
 SUB profilAnspringen()
     DIM r AS INTEGER : r = GUI_TABLE_SELECTED(tblProfil)
     IF r < 0 OR r >= LEN(profilZeilen) THEN RETURN
-    dateiOeffnen(prozessDatei)
+    IF r < LEN(profilDateien) THEN dateiOeffnen(profilDateien[r]) ELSE dateiOeffnen(prozessDatei)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, profilZeilen[r], 1) : GUI_FOCUS(ta)
 END SUB
@@ -9965,7 +10118,17 @@ IF ARGC() >= 1 THEN
     IF LEFT$(startDatei, 1) <> "/" AND LEFT$(startDatei, 1) <> "\" AND MID$(startDatei, 1, 1) <> ":" THEN
         startDatei = PATHJOIN(startOrdner, startDatei)
     END IF
-    IF FILEEXISTS(startDatei) THEN dateiOeffnen(startDatei) ELSE GUI_SET_TEXT(lblStatus, "Gibt es nicht: " + startDatei)
+    ' Ein ORDNER wird das Projekt -- wie beim Hineinziehen. FILEEXISTS kennt
+    ' nur Dateien; bis 2026-09-27 hiess es fuer einen Ordner "Gibt es nicht".
+    IF DIREXISTS(startDatei) THEN
+        projektOrdner = startDatei
+        baumFuellen()
+        GUI_SET_TEXT(lblStatus, "Projekt: " + startDatei)
+    ELSEIF FILEEXISTS(startDatei) THEN
+        dateiOeffnen(startDatei)
+    ELSE
+        GUI_SET_TEXT(lblStatus, "Gibt es nicht: " + startDatei)
+    END IF
 END IF
 ' Erst anbieten, DANN den eigenen Stand anlegen -- die Suche liesse ihn
 ' zwar aus (whKennung), aber so ist die Reihenfolge auch ohne das richtig.

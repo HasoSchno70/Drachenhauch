@@ -205,6 +205,8 @@ impl Karte {
     /// (Datei, Zeile) einer gemergten Zeile. Ausserhalb der Tabelle: die
     /// Hauptdatei mit der rohen Zahl (lieber etwas als nichts).
     pub fn stelle(&self, gemergt: u32) -> (String, u32) {
+        // 0 heisst "unbekannt" und bleibt es -- sonst waere es Zeile 1.
+        if gemergt == 0 { return (self.anzeige[0].clone(), 0); }
         match self.herkunft.get(gemergt.saturating_sub(1) as usize) {
             Some(&(nr, z)) => (self.anzeige[nr].clone(), z),
             None => (self.anzeige[0].clone(), gemergt),

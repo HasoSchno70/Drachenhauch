@@ -1530,8 +1530,16 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
     let (total, lines) = machine.take_profile();
     let err_line = machine.error_line();
     let output = machine.take_output();
+    // Wie der Debugger: Zeilen der DATEI samt `file` -- bis 2026-09-27 zaehlte
+    // der Profiler die gemergte Quelle, nach einem IMPORT stand jede Zeile
+    // der Hauptdatei um die Laenge der importierten verschoben.
+    let karte = zeilenkarte(&raw_source, &base, path, &abs, &prog);
+    let stelle = |g: u32| match &karte { Some(k) => k.stelle(g), None => (path.to_string(), g) };
     let lines_json: Vec<serde_json::Value> = lines.iter()
-        .map(|&(ln, c, t)| serde_json::json!({"line": ln, "count": c, "time": t}))
+        .map(|&(ln, c, t)| {
+            let (datei, zeile) = stelle(ln);
+            serde_json::json!({"line": zeile, "file": datei, "count": c, "time": t})
+        })
         .collect();
     let mut blob = serde_json::json!({
         "total_time": total, "output": output, "lines": lines_json, "stopped": stopped
@@ -1541,12 +1549,31 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
     // die richtige Antwort -- kein zweiter `was_stopped`-Aufruf noetig.
     if let Err(e) = &run_res {
         if !stopped && !selbst_beendet {
+            let (datei, zeile) = stelle(err_line);
             blob["error"] = serde_json::json!(e);
-            blob["error_line"] = serde_json::json!(err_line);
+            blob["error_line"] = serde_json::json!(zeile);
+            blob["error_file"] = serde_json::json!(datei);
         }
     }
     println!("{}", serde_json::to_string(&blob).unwrap_or_else(|_| "{}".into()));
     ExitCode::SUCCESS
+}
+
+/// Zeilenkarte fuer Debugger und Profiler: nach aussen (Datei, Zeile), nicht
+/// die Zeilen der gemergten Quelle (debugger.rs). Die Herkunft kommt aus
+/// einem zweiten Preprocess -- derselbe Text, dasselbe Ergebnis, und es spart
+/// einen Umbau der ganzen Uebersetzungskette fuer diese zwei Aufrufer.
+fn zeilenkarte(raw_source: &str, base: &std::path::Path, path: &str, abs: &std::path::Path,
+               prog: &model::Program) -> Option<debugger::Karte> {
+    preprocess::process(raw_source, base).ok().map(|(_, _, herkunft, _)| {
+        let h: Vec<(String, u32)> = herkunft.iter().map(|x| (x.pfad.clone(), x.zeile)).collect();
+        let mut aus = std::collections::BTreeSet::new();
+        let mut sammle = |f: &model::Func| for &l in &f.lines { if l != 0 { aus.insert(l); } };
+        sammle(&prog.main);
+        for f in &prog.functions { sammle(f); }
+        for c in prog.classes.values() { for m in c.methods.values() { sammle(m); } }
+        debugger::Karte::neu(path, &abs.display().to_string(), &h, aus)
+    })
 }
 
 /// `dhrt debug <datei.dh>` -- interaktiver Debugger. Spricht ein
@@ -1571,19 +1598,7 @@ fn debug_main(path: &str) -> ExitCode {
         Ok(p) => p,
         Err(e) => { eprintln!("Lade-Fehler: {}", e); return ExitCode::from(1); }
     };
-    // Zeilenkarte: der Debugger spricht nach aussen (Datei, Zeile), nicht die
-    // Zeilen der gemergten Quelle (debugger.rs). Die Herkunft kommt aus einem
-    // zweiten Preprocess -- derselbe Text, dasselbe Ergebnis, und es spart
-    // einen Umbau der ganzen Uebersetzungskette fuer diesen einen Aufrufer.
-    let karte = preprocess::process(&raw_source, &base).ok().map(|(_, _, herkunft, _)| {
-        let h: Vec<(String, u32)> = herkunft.iter().map(|x| (x.pfad.clone(), x.zeile)).collect();
-        let mut aus = std::collections::BTreeSet::new();
-        let mut sammle = |f: &model::Func| for &l in &f.lines { if l != 0 { aus.insert(l); } };
-        sammle(&prog.main);
-        for f in &prog.functions { sammle(f); }
-        for c in prog.classes.values() { for m in c.methods.values() { sammle(m); } }
-        debugger::Karte::neu(path, &abs.display().to_string(), &h, aus)
-    });
+    let karte = zeilenkarte(&raw_source, &base, path, &abs, &prog);
     let mut machine = vm::Vm::new(&prog);
     machine.enable_debug(karte);
     let res = machine.run();
