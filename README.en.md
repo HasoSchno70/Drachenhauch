@@ -73,7 +73,7 @@ Details in the [manual](docs/README.md); how it got there is in the
 
 ## Download
 
-**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 54 MB, currently version 2026.15.
+**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 54 MB, currently version 2026.16.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 175 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
@@ -284,7 +284,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 
 ## Architecture
 
-Pipeline: **source → preprocessor → lexer → parser → compiler → VM** — **all inside `dhrt`** (Rust). `dhrt run file.dh` is a self-contained end-to-end run with no Python involved. Correctness is guarded by the **test collections** (`tests/pruef/*.dhtest`, one `dhrt run` per case) plus Rust `#[test]`s.
+Pipeline: **source → preprocessor → lexer → parser → compiler → VM**; the VM compiles hot functions and loops to machine code while running (Cranelift, `DHRT_JIT=aus` turns it off) — **all inside `dhrt`** (Rust). `dhrt run file.dh` is a self-contained end-to-end run with no Python involved. Correctness is guarded by the **test collections** (`tests/pruef/*.dhtest`, one `dhrt run` per case) plus Rust `#[test]`s.
 
 > **History:** Programs used to also run through a Python **tree-walking interpreter** and two Python **bytecode VMs** (a plain Python VM and a Cython VM), guaranteeing "bit-identical output" across all three. As of **Stage B** the tree-walker and the entire Python toolchain (interpreter/compiler/vm/serialize) have been **removed** — `dhrt` is the only runtime and compiles the source itself.
 
