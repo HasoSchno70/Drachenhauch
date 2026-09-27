@@ -60,6 +60,7 @@ enum Cmd {
     TexturePart(usize, i32, i32, i32, i32, i32, i32, i32, i32), // tex, sx,sy,sw,sh, dx,dy, dw,dh
     TexturePartEx(usize, i32, i32, i32, i32, i32, i32, i32, i32), // +dw,dh (skaliert)
     TextureRect(usize, i32, i32, i32, i32),           // tex skaliert in dx,dy,dw,dh (bounds-safe)
+    TextureRectTint(usize, i32, i32, i32, i32, Color), // dasselbe mit Toenung/Deckkraft
     TextureFlipped(usize, i32, i32, i32, i32, bool, bool), // tex, x, y, dw, dh, flip_h, flip_v
     TextureRot(usize, i32, i32, f32, f32, Color),      // tex, cx, cy, winkel_grad, skala (inkl. cam_zoom), tint (um Zentrum)
     AtlasDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color), // tex, sx,sy,sw,sh, dx,dy, dw,dh, flip_h, flip_v, tint
@@ -4240,6 +4241,14 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let (w, h) = (self.ssize(w), self.ssize(h));
         self.emit(Cmd::TextureRect(idx as usize, x, y, w, h));
     }
+    /// Wie draw_image_rect, aber mit Deckkraft 0..255 (0 = unsichtbar) --
+    /// fuer ein Bild, das nur schwach im Hintergrund stehen soll.
+    pub fn draw_image_rect_alpha(&mut self, idx: i64, x: i32, y: i32, w: i32, h: i32, alpha: u8) {
+        if idx < 0 || alpha == 0 { return; }
+        let (x, y) = self.w2s(x, y);
+        let (w, h) = (self.ssize(w), self.ssize(h));
+        self.emit(Cmd::TextureRectTint(idx as usize, x, y, w, h, Color::new(255, 255, 255, alpha)));
+    }
     pub fn draw_image_part(&mut self, idx: i64, sx: i32, sy: i32, sw: i32, sh: i32, dx: i32, dy: i32) -> Result<(), String> {
         let i = idx as usize;
         if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAWIMAGEPART")); }
@@ -6583,6 +6592,13 @@ fn render_scene<D: RaylibDraw>(
                         let src = Rectangle::new(*sx as f32, *sy as f32, *sw as f32, *sh as f32);
                         let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
                         d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
+                    }
+                    Cmd::TextureRectTint(i, dx, dy, dw, dh, tint) => {
+                        if let Some(t) = textures.get(*i) {
+                            let src = Rectangle::new(0.0, 0.0, t.tex.width as f32, t.tex.height as f32);
+                            let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
+                            d.draw_texture_pro(&t.tex, src, dst, Vector2::zero(), 0.0, *tint);
+                        }
                     }
                     Cmd::TextureRect(i, dx, dy, dw, dh) => {
                         if let Some(t) = textures.get(*i) {

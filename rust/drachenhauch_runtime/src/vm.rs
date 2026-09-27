@@ -7435,6 +7435,12 @@ impl<'p> Vm<'p> {
                 self.gui.set_date(gi(a,0,"GUI_SET_DATE")?, &gs(a,1,"GUI_SET_DATE")?)?;
                 Value::Nil
             }
+            "gui_textarea_background" => {
+                self.gui.textarea_background(gi(a, 0, "GUI_TEXTAREA_BACKGROUND")?,
+                    gi(a, 1, "GUI_TEXTAREA_BACKGROUND")?,
+                    if a.len() > 2 { gi(a, 2, "GUI_TEXTAREA_BACKGROUND")? } else { 24 })?;
+                Value::Nil
+            }
             "gui_textarea_set" => {
                 self.gui.textarea_set(gi(a, 0, "GUI_TEXTAREA_SET")?,
                                       &gs(a, 1, "GUI_TEXTAREA_SET")?,
@@ -7628,6 +7634,20 @@ impl<'p> Vm<'p> {
                 if a.len() > 5 { gs(a,5,"GUI_RICHTEXT")? } else { String::new() })?),
             "gui_richtext_set_text" => { self.gui.richtext_set_text(gi(a,0,"GUI_RICHTEXT_SET_TEXT")?, gs(a,1,"GUI_RICHTEXT_SET_TEXT")?)?; Value::Nil }
             "gui_richtext_set" => { self.gui.richtext_set(gi(a,0,"GUI_RICHTEXT_SET")?, &gs(a,1,"GUI_RICHTEXT_SET")?, gnum(a,2,"GUI_RICHTEXT_SET")?)?; Value::Nil }
+            "gui_richtext_headings" => {
+                let ue = self.gui.richtext_headings(gi(a,0,"GUI_RICHTEXT_HEADINGS")?)?;
+                let mut arr = crate::value::DhArray::new("string".to_string(), vec![ue.len() as i64], || Value::str_rc(""));
+                for (i, (_, t)) in ue.into_iter().enumerate() { arr.cells.set(i, Value::str_rc(t)); }
+                Value::Array(std::rc::Rc::new(std::cell::RefCell::new(arr)))
+            }
+            "gui_richtext_heading_levels" => {
+                let ue = self.gui.richtext_headings(gi(a,0,"GUI_RICHTEXT_HEADING_LEVELS")?)?;
+                let mut arr = crate::value::DhArray::new("integer".to_string(), vec![ue.len() as i64], || Value::Int(0));
+                for (i, (n, _)) in ue.into_iter().enumerate() { arr.cells.set(i, Value::Int(n as i64)); }
+                Value::Array(std::rc::Rc::new(std::cell::RefCell::new(arr)))
+            }
+            "gui_richtext_goto_heading" => { self.gui.richtext_goto_heading(gi(a,0,"GUI_RICHTEXT_GOTO_HEADING")?, gi(a,1,"GUI_RICHTEXT_GOTO_HEADING")?)?; Value::Nil }
+            "gui_richtext_heading_at" => Value::Int(self.gui.richtext_heading_at(gi(a,0,"GUI_RICHTEXT_HEADING_AT")?)?),
             "gui_richtext_scroll" => { self.gui.richtext_scroll(gi(a,0,"GUI_RICHTEXT_SCROLL")?, gi(a,1,"GUI_RICHTEXT_SCROLL")?)?; Value::Nil }
             "gui_richtext_scroll_get" => Value::Int(self.gui.richtext_scroll_get(gi(a,0,"GUI_RICHTEXT_SCROLL_GET")?)?),
             "gui_richtext_height" => Value::Int(self.gui.richtext_height(gi(a,0,"GUI_RICHTEXT_HEIGHT")?)?),

@@ -1728,6 +1728,23 @@ selbst gelegtem schwarzem Rand, doppelt vergroessert) und
 angelegt und wiederverwendet. Nachgemessen am echten Windows-Zeiger
 (`GetCursorInfo`), die Gegenprobe ohne Abfangen zeigt den Pfeil.
 
+**Handbuch schoener, Schriftzug hinter dem Code (2026-09-27):**
+`GUI_RICHTEXT` setzt Codebloecke eingefaerbt (`syntax::spans` je Zeile, die
+Stuecke LUECKENLOS nach Breite des Vorspanns, sonst lieferte Kopieren
+Leerzeichen dazwischen; Farben per `GUI_RICHTEXT_SET "farbe_*"`), Code im
+Text kleiner auf eigenem Grund (`rt_code_gr`, `RtLauf::dy`), Ueberschriften
+in drei Farben, Tabellen mit Kopf- und Zebra-Band, Zitate als EIN Block,
+Verweise mit durchgehender Linie. Baender sind Zeilen ohne Text
+(`RtZeile::band`), die VOR ihrem Inhalt stehen. Neu `GUI_RICHTEXT_HEADINGS/
+HEADING_LEVELS/GOTO_HEADING/HEADING_AT` und `GUI_TEXTAREA_BACKGROUND(ta,
+bild, deckkraft)` (Cmd `TextureRectTint`). **Fund:** `GUI_RICHTEXT_FIND` und
+`_SCROLL` direkt nach `SET_TEXT` arbeiteten auf dem ALTEN Satz (gesetzt wird
+erst in GUI_UPDATE) -- jetzt vorgemerkt (`satz_aktuell`, `ziel_suche`),
+FIND liefert dann 0. Die IDE: Handbuch mit Inhaltsverzeichnis, Vor/Zurueck,
+Farben des Editors; Einstellungen "Schrift der Oberflaeche" (Vorgabe 18) und
+"Schriftzug hinter dem Code". Tests `tests/pruef/gui_gesetzter_text_gestaltung.dhtest`,
+`tests/pruef/werkzeug_ide_handbuch.dhtest`.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

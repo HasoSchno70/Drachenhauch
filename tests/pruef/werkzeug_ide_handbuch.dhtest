@@ -1,0 +1,255 @@
+' Das Handbuch der IDE (2026-09-27): Inhaltsverzeichnis links, Vor/Zurueck
+' wie im Browser. Die IDE wird direkt ueber ihre Unterprogramme bedient
+' (Einschub in der Bildschleife), protokolliert wird mit `pr ...`.
+
+=== inhaltsverzeichnis springt und der verlauf fuehrt zurueck
+' Ein Eintrag im Inhalt springt zum Abschnitt; ein Verweis oeffnet ein
+' anderes Dokument; Zurueck bringt Dokument UND Stelle wieder, Vor das andere.
+DIM prN AS INTEGER : prN = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prN = prN + 1
+IF prN = 5 THEN handbuchZeigen("aaa.md", 1)
+IF prN = 8 THEN protokoll("pr inhalt " + STR$(GUI_LISTBOX_COUNT(lstHbInhalt)) + " " + GUI_LISTBOX_ITEM(lstHbInhalt, 2))
+IF prN = 10 THEN GUI_LISTBOX_SET_SELECTED(lstHbInhalt, 2)
+IF prN = 20 THEN protokoll("pr gesprungen " + STR$(GUI_RICHTEXT_SCROLL_GET(rtHandbuch) > 300) + " " + STR$(GUI_RICHTEXT_HEADING_AT(rtHandbuch)))
+IF prN = 22 THEN handbuchVerweis("bbb.md")
+IF prN = 30 THEN protokoll("pr doku " + docNamen[docLetzteWahl]) : hbVerlauf(TRUE)
+IF prN = 40 THEN protokoll("pr zurueck " + docNamen[docLetzteWahl] + " " + STR$(GUI_RICHTEXT_SCROLL_GET(rtHandbuch) > 300)) : hbVerlauf(FALSE)
+IF prN = 50 THEN protokoll("pr vor " + docNamen[docLetzteWahl] + " " + STR$(LEN(hbVorDatei))) : EXIT(0)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}/wurzel
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei wurzel/docs/aaa.md
+# Erstes Dokument
+
+Absatz 0 unter Erstes Dokument.
+
+Absatz 1 unter Erstes Dokument.
+
+Absatz 2 unter Erstes Dokument.
+
+Absatz 3 unter Erstes Dokument.
+
+Absatz 4 unter Erstes Dokument.
+
+Absatz 5 unter Erstes Dokument.
+
+Absatz 6 unter Erstes Dokument.
+
+Absatz 7 unter Erstes Dokument.
+
+Absatz 8 unter Erstes Dokument.
+
+Absatz 9 unter Erstes Dokument.
+
+Absatz 10 unter Erstes Dokument.
+
+Absatz 11 unter Erstes Dokument.
+
+Absatz 12 unter Erstes Dokument.
+
+Absatz 13 unter Erstes Dokument.
+
+Absatz 14 unter Erstes Dokument.
+
+Absatz 15 unter Erstes Dokument.
+
+Absatz 16 unter Erstes Dokument.
+
+Absatz 17 unter Erstes Dokument.
+
+Absatz 18 unter Erstes Dokument.
+
+Absatz 19 unter Erstes Dokument.
+
+Absatz 20 unter Erstes Dokument.
+
+Absatz 21 unter Erstes Dokument.
+
+Absatz 22 unter Erstes Dokument.
+
+Absatz 23 unter Erstes Dokument.
+
+Absatz 24 unter Erstes Dokument.
+
+## Anfang
+
+Absatz 0 unter Anfang.
+
+Absatz 1 unter Anfang.
+
+Absatz 2 unter Anfang.
+
+Absatz 3 unter Anfang.
+
+Absatz 4 unter Anfang.
+
+Absatz 5 unter Anfang.
+
+Absatz 6 unter Anfang.
+
+Absatz 7 unter Anfang.
+
+Absatz 8 unter Anfang.
+
+Absatz 9 unter Anfang.
+
+Absatz 10 unter Anfang.
+
+Absatz 11 unter Anfang.
+
+Absatz 12 unter Anfang.
+
+Absatz 13 unter Anfang.
+
+Absatz 14 unter Anfang.
+
+Absatz 15 unter Anfang.
+
+Absatz 16 unter Anfang.
+
+Absatz 17 unter Anfang.
+
+Absatz 18 unter Anfang.
+
+Absatz 19 unter Anfang.
+
+Absatz 20 unter Anfang.
+
+Absatz 21 unter Anfang.
+
+Absatz 22 unter Anfang.
+
+Absatz 23 unter Anfang.
+
+Absatz 24 unter Anfang.
+
+## Mitte
+
+Absatz 0 unter Mitte.
+
+Absatz 1 unter Mitte.
+
+Absatz 2 unter Mitte.
+
+Absatz 3 unter Mitte.
+
+Absatz 4 unter Mitte.
+
+Absatz 5 unter Mitte.
+
+Absatz 6 unter Mitte.
+
+Absatz 7 unter Mitte.
+
+Absatz 8 unter Mitte.
+
+Absatz 9 unter Mitte.
+
+Absatz 10 unter Mitte.
+
+Absatz 11 unter Mitte.
+
+Absatz 12 unter Mitte.
+
+Absatz 13 unter Mitte.
+
+Absatz 14 unter Mitte.
+
+Absatz 15 unter Mitte.
+
+Absatz 16 unter Mitte.
+
+Absatz 17 unter Mitte.
+
+Absatz 18 unter Mitte.
+
+Absatz 19 unter Mitte.
+
+Absatz 20 unter Mitte.
+
+Absatz 21 unter Mitte.
+
+Absatz 22 unter Mitte.
+
+Absatz 23 unter Mitte.
+
+Absatz 24 unter Mitte.
+
+## Ende
+
+Absatz 0 unter Ende.
+
+Absatz 1 unter Ende.
+
+Absatz 2 unter Ende.
+
+Absatz 3 unter Ende.
+
+Absatz 4 unter Ende.
+
+Absatz 5 unter Ende.
+
+Absatz 6 unter Ende.
+
+Absatz 7 unter Ende.
+
+Absatz 8 unter Ende.
+
+Absatz 9 unter Ende.
+
+Absatz 10 unter Ende.
+
+Absatz 11 unter Ende.
+
+Absatz 12 unter Ende.
+
+Absatz 13 unter Ende.
+
+Absatz 14 unter Ende.
+
+Absatz 15 unter Ende.
+
+Absatz 16 unter Ende.
+
+Absatz 17 unter Ende.
+
+Absatz 18 unter Ende.
+
+Absatz 19 unter Ende.
+
+Absatz 20 unter Ende.
+
+Absatz 21 unter Ende.
+
+Absatz 22 unter Ende.
+
+Absatz 23 unter Ende.
+
+Absatz 24 unter Ende.
+
+--- datei wurzel/docs/bbb.md
+# Zweites Dokument
+
+Kurz.
+
+--- verzeichnis wurzel/examples
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr inhalt 4    Mitte
+pr gesprungen TRUE 2
+pr doku bbb.md
+pr zurueck aaa.md TRUE
+pr vor bbb.md 0
