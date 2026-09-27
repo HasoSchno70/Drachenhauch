@@ -32,6 +32,10 @@ rustc-hash = "2"
 # Schluesseln zu Kollisionen zu treiben. Steht ueber hashbrown ohnehin in der
 # Lockfile.
 foldhash = "0.2"
+# Die MAP (DhMap) als geordnete Hashtabelle: Eintraege dicht in
+# Einfuege-Reihenfolge, der Index haelt nur Positionen. Steht ohnehin in der
+# Lockfile.
+indexmap = "2"
 # COMPRESS$/DECOMPRESS$ (DEFLATE). Pure-Rust und ohnehin schon transitiv in der
 # Lockfile -> ungated, damit auch Konsolen-Programme ihre Savegames packen
 # koennen (raylibs CompressData haengt dagegen am graphics-Feature).

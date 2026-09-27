@@ -121,3 +121,21 @@ PRINT MAPKEYS(m)[0] + "," + MAPKEYS(m)[2999]
 3000
 k1,k3000
 
+
+=== ueberschreiben behaelt den platz
+DIM m AS MAP OF INTEGER
+DIM k AS STRING
+MAPPUT(m, "a", 1)
+MAPPUT(m, "b", 2)
+MAPPUT(m, "c", 3)
+MAPPUT(m, "a", 10)
+m["b"] = 20
+k = ""
+FOR EACH s IN MAPKEYS(m)
+    k = k + s + "=" + STR$(MAPGET(m, s)) + ","
+NEXT
+PRINT k
+PRINT MAPSIZE(m)
+--- erwartet
+a=10,b=20,c=3,
+3
