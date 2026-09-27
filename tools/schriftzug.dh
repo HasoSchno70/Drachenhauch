@@ -1,0 +1,64 @@
+' Den Drachenhauch-Schriftzug (daten/bilder/schriftzug.png) aus dem letzten
+' Bild des Vorspanns daten/video/vorspann_2.mp4 freistellen.
+'
+'   dhrt run tools/schriftzug.dh [-- video.mp4 ziel.png]
+'
+' Freigestellt wird mit einer weichen Maske ueber die Helligkeit (hellster
+' Kanal): unter 0,19 durchsichtig, ueber 0,33 deckend, dazwischen weich --
+' die Farben bleiben, wie sie sind. "Farbe zu Alpha" (IMAGE_COLOR_TO_ALPHA)
+' taugt hier nicht: es entmischt gegen den dunklen Grund, und die dunklen
+' Konturen der Buchstaben wuerden durchsichtig -- auf hellem Grund stuende
+' dann ein blasser Schriftzug. Gemessen: Grund und Dunst bis #0E1C2C,
+' Konturen ab #1E225E.
+IMPORT "video"
+IMPORT "imgfx"
+
+DIM quelle AS STRING : quelle = "../daten/video/vorspann_2.mp4"
+DIM ziel AS STRING : ziel = "../daten/bilder/schriftzug.png"
+IF ARGC() >= 1 THEN quelle = ARG$(0)
+IF ARGC() >= 2 THEN ziel = ARG$(1)
+CONST T0 = 0.19
+CONST T1 = 0.33
+' Ausschnitt um Schriftzug und Drachen im 1280x720-Bild.
+CONST X0 = 100
+CONST Y0 = 80
+CONST W = 1170
+CONST H = 530
+
+SCREEN(320, 200, "Schriftzug", 1)
+DIM v AS VIDEO : v = VIDEO_LOAD(quelle)
+VIDEO_PLAY(v)
+WHILE NOT VIDEO_DONE(v)
+    VIDEO_UPDATE(v)
+    CLS(0) : FLIP()
+WEND
+DIM b AS IMAGE : b = IMAGE_COPY(VIDEO_IMAGE(v))
+PRINT "letztes Bild "; VIDEO_FRAME(v) + 1; " von "; VIDEO_FRAMES(v)
+
+DIM f AS IMAGE : f = IMAGE_NEW(W, H)
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO H - 1
+    FOR x = 0 TO W - 1
+        DIM c AS INTEGER : c = GETPIXEL(b, X0 + x, Y0 + y)
+        DIM m AS INTEGER : m = MAX(MAX((c \ 65536) BAND 255, (c \ 256) BAND 255), c BAND 255)
+        DIM a AS FLOAT : a = (m / 255.0 - T0) / (T1 - T0)
+        IF a > 0.0 THEN
+            IF a > 1.0 THEN a = 1.0
+            a = a * a * (3.0 - 2.0 * a)
+            IMAGE_FILL_RECT(f, x, y, x + 1, y + 1, c BAND &HFFFFFF, INT(a * 255.0 + 0.5))
+        END IF
+    NEXT
+NEXT
+' Die zwei grauen schwebenden Quadrate und einzelne Staubpunkte des Videos
+' gehoeren nicht zum Schriftzug (Lage im Ausschnitt, von Hand gesucht).
+IMAGE_CLEAR(f, 660, 5, 75, 75)
+IMAGE_CLEAR(f, 272, 443, 48, 48)
+IMAGE_CLEAR(f, 168, 130, 18, 18)
+IMAGE_CLEAR(f, 202, 380, 18, 18)
+IMAGE_CLEAR(f, 775, 187, 18, 18)
+IMAGE_CLEAR(f, 561, 57, 18, 18)
+IMAGE_CLEAR(f, 435, 35, 20, 20)
+f = IMAGE_ALPHA_CROP(f, 0.05)
+IMAGE_SAVE(f, ziel)
+PRINT ziel; ": "; IMAGEWIDTH(f); "x"; IMAGEHEIGHT(f)

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1997,
+ "count": 2005,
  "builtins": [
   {
    "name": "ABS",
@@ -2226,6 +2226,18 @@
    "name": "DIRNAME",
    "kind": "core",
    "signature": "DIRNAME(p: STRING)",
+   "module": "core"
+  },
+  {
+   "name": "SAMEFILE",
+   "kind": "core",
+   "signature": "SAMEFILE(a$, b$)",
+   "module": "core"
+  },
+  {
+   "name": "REALPATH$",
+   "kind": "core",
+   "signature": "REALPATH$(pfad$)",
    "module": "core"
   },
   {
@@ -5055,6 +5067,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_MARKS_GET",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_MARKS_GET(ta)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_SELECT",
    "kind": "core",
    "signature": "GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)",
@@ -5655,6 +5673,30 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_GLOW",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GLOW(win [, farbe [, dauer_ms]])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_GLOW_SET",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GLOW_SET(win, schluessel$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_GLOW_STOP",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GLOW_STOP(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_GLOWING",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GLOWING(win)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_VISIBLE",
    "kind": "core",
    "signature": "GUI_WINDOW_VISIBLE(win, flag)",
@@ -6180,6 +6222,12 @@
    "name": "IMAGE_REPLACE_COLOR",
    "kind": "core",
    "signature": "IMAGE_REPLACE_COLOR(img, from: INTEGER, to: INTEGER)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_COLOR_TO_ALPHA",
+   "kind": "core",
+   "signature": "IMAGE_COLOR_TO_ALPHA(img, farbe [, schwelle])",
    "module": "imgfx"
   },
   {

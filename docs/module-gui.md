@@ -24,6 +24,10 @@ IMPORT "gui"
 | `GUI_WINDOW(titel$, x, y, w, h)` | GUI_WINDOW | Fenster anlegen |
 | `GUI_WINDOW_MOVABLE(win, an)` | — | per Titelleiste verschiebbar (Default: an) |
 | `GUI_WINDOW_TITLE(win, titel$)` | — | Titelleiste nachträglich beschriften (Name des Dokuments, „Befehle" / „Datei öffnen") |
+| `GUI_WINDOW_GLOW(win [, farbe [, dauer_ms]])` | — | ein Lichtstreif zieht über das Fenster (Vorgabe warm, 1200 ms, von links nach rechts) -- siehe [Lichtstreif](#lichtstreif) |
+| `GUI_WINDOW_GLOW_SET(win, schluessel$, wert)` | — | Lichtstreif einstellen: `farbe`, `dauer`, `pause` (ms bis zur Wiederkehr, 0 = einmal), `richtung` (rechts/links/unten/oben), `breite`, `staerke` (0..1), `rand` |
+| `GUI_WINDOW_GLOW_STOP(win)` | — | den Lichtstreif anhalten |
+| `GUI_WINDOW_GLOWING(win)` | BOOLEAN | läuft ein Lichtstreif (auch in der Pause zwischen zwei)? |
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | Schließen-Button anzeigen (Default: aus) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
 | `GUI_WINDOW_SHOWN(win)` | BOOLEAN | ist das Fenster gerade sichtbar? Das Gegenstueck zum Setzer -- ohne den Getter muesste ein Programm sich merken, was es selbst gesetzt hat, und laege daneben, sobald der Nutzer das Fenster ueber sein Kreuz schliesst |
@@ -3161,7 +3165,8 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SELECTION$(ta)` → STRING | der markierte Text |
 | `GUI_TEXTAREA_SELECTION_RANGE(ta)` → (z1, s1, z2, s2) | Anfang und Ende der Auswahl (ab 1, geordnet); ohne Auswahl steht die Marke an beiden Enden — damit weiß ein Editor, WELCHE Zeilen er einrücken oder auskommentieren soll |
 | `GUI_TEXTAREA_INSERT(ta, text$)` | ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, `GUI_ON_CHANGE` feuert wie beim Tippen |
-| `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text |
+| `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; wird im Feld bearbeitet, wandern sie mit ihrer Zeile |
+| `GUI_TEXTAREA_MARKS_GET(ta)` | die Zeilen der Marken, wie sie jetzt stehen (ARRAY OF INTEGER, in der Reihenfolge des Setzens) -- so erfährt ein Programm, wohin sein Haltepunkt beim Tippen gerutscht ist |
 | `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` | Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht `&H`-Literale |
 | `GUI_TEXTAREA_GUTTER_CLICKED(ta [, taste])` → INTEGER | welche Zeile (ab 1) in diesem Bild in der Nummernspalte angeklickt wurde, 0 = keine; `taste` 0 = links (Vorgabe), 1 = rechts. Gilt ein Bild lang wie `GUI_CLICKED`; ein Linksklick dort setzt die Schreibmarke NICHT, der Faltpfeil klappt weiter um. Fuer Haltepunkte und Lesezeichen |
 | `GUI_TEXTAREA_SWATCH_CLICKED(ta)` → INTEGER | welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie `GUI_CLICKED`, die Schreibmarke bleibt dabei stehen |
@@ -3529,3 +3534,26 @@ TEXT(GUI_GET_X(feld) * GUI_SCALE_GET(), y, "Pflichtfeld", ROT)
 > `GUI_RESET` neu auf.
 
 
+
+## Lichtstreif
+
+`GUI_WINDOW_GLOW(win)` lässt einen Lichtstreif über ein Fenster ziehen --
+ein weicher, warmer Schein mit einer hellen Linie in der Mitte, additiv
+über den Widgets (aber unter aufgeklappten Menüs und Klapplisten), und der
+Rahmen leuchtet auf, wo der Streif gerade ist. Er fährt weich an und aus
+und blendet an den Enden ein und aus, damit er nicht am Rand aufploppt.
+
+```basic
+GUI_WINDOW_GLOW(win)                          ' einmal, warm, 1,2 s
+GUI_WINDOW_GLOW(win, RGB(120, 200, 255), 800) ' kühl und schneller
+GUI_WINDOW_GLOW_SET(win, "richtung", "oben")  ' von unten nach oben
+GUI_WINDOW_GLOW_SET(win, "pause", 3000)       ' alle drei Sekunden wieder
+GUI_WINDOW_GLOW(win)
+```
+
+Farbe `-1` ist die Akzentfarbe des Themas. `breite` ist ein Anteil der
+Fensterbreite (bzw. -höhe bei `oben`/`unten`, Vorgabe 0,35), `staerke`
+0..1 (Vorgabe 0,55). Die Zeit läuft mit `DELTA()` -- ohne echte Uhr fest
+1/60 s --, ein Bild zeigt also immer dieselbe Stelle. Ein zweiter Aufruf
+von `GUI_WINDOW_GLOW` beginnt von vorn. Die IDE zeigt ihn beim Start und
+wenn ein Programm losgeht.

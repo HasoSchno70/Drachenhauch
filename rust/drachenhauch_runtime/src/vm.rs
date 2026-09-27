@@ -612,6 +612,11 @@ struct DebugState {
     watches: Vec<(String, Option<crate::ast::Node>)>,
     // "Bis hier laufen": ein Haltepunkt, der nach dem ersten Treffer vergeht.
     run_to: Option<u32>,
+    // Kommandos von stdin, gelesen von einem eigenen Faden (debugger.rs) --
+    // so kommen Haltepunkte auch an, waehrend das Programm laeuft.
+    kanal: crate::debugger::Kanal,
+    // Gemergte Zeile <-> (Datei, Zeile). None = ohne Karte (Zeilen roh).
+    karte: Option<crate::debugger::Karte>,
 }
 
 impl DebugState {
@@ -620,18 +625,29 @@ impl DebugState {
         // Breakpoints und schickt `continue`.
         DebugState { breakpoints: HashMap::new(), step: StepMode::Into,
                      step_depth: 0, out_sent: 0, stapel: Vec::new(),
-                     watches: Vec::new(), run_to: None }
+                     watches: Vec::new(), run_to: None,
+                     kanal: crate::debugger::Kanal::neu(), karte: None }
     }
-}
 
-/// Eine Zeile JSON-Kommando von stdin lesen (blockierend). None bei EOF.
-fn dbg_read_cmd() -> Option<serde_json::Value> {
-    use std::io::BufRead;
-    let mut line = String::new();
-    if std::io::stdin().lock().read_line(&mut line).unwrap_or(0) == 0 {
-        return None;
+    /// (Datei, Zeile) einer gemergten Zeile -- ohne Karte die Zeile selbst.
+    fn stelle(&self, gemergt: u32) -> (String, u32) {
+        match &self.karte {
+            Some(k) => k.stelle(gemergt),
+            None => (String::new(), gemergt),
+        }
     }
-    serde_json::from_str(line.trim()).ok()
+
+    /// Wo ein Haltepunkt in (datei, zeile) haelt: (gemergt, zeile in der Datei).
+    fn haltestelle(&self, datei: &str, zeile: u32) -> Option<(u32, u32)> {
+        match &self.karte {
+            Some(k) => k.haltestelle(datei, zeile),
+            None => Some((zeile, zeile)),
+        }
+    }
+
+    fn haupt(&self) -> String {
+        self.karte.as_ref().map(|k| k.haupt().to_string()).unwrap_or_default()
+    }
 }
 
 /// `DHRT_LIVE=1`: jede PRINT-Zeile sofort hinausschreiben. Gesetzt von
@@ -1232,6 +1248,48 @@ impl<'p> Vm<'p> {
         read_input_line()
     }
 
+    /// Eine INPUT-Zeile -- unter dem Debugger aus einem `input`-Kommando.
+    ///
+    /// Bis 2026-09-27 bekam INPUT unter dem Debugger immer "" (stdin gehoert
+    /// dort dem Protokoll), ein Programm mit einer Eingabe liess sich also
+    /// gar nicht sinnvoll debuggen. Jetzt meldet es `{"event":"input"}` und
+    /// wartet auf `{"cmd":"input","text":...}`; Haltepunkte und Ueberwachen
+    /// nimmt es dabei weiter an, `stop` beendet. Ist stdin zu: "" wie frueher.
+    fn eingabe_zeile(&mut self) -> R<String> {
+        let mut dbg = match self.dbg.take() {
+            Some(d) => d,
+            None => return Ok(self.read_input_line()),
+        };
+        if self.out.len() > dbg.out_sent {
+            let chunk = self.out[dbg.out_sent..].to_string();
+            dbg.out_sent = self.out.len();
+            dbg_emit(&serde_json::json!({"event":"output","text":chunk}));
+        }
+        let (datei, zeile) = dbg.stelle(self.cur_line);
+        dbg_emit(&serde_json::json!({"event":"input", "line": zeile, "file": datei}));
+        let r = loop {
+            for cmd in dbg.kanal.lebende() {
+                match crate::debugger::art(&cmd) {
+                    "set-breakpoints" => self.dbg_set_breakpoints(&mut dbg, &cmd),
+                    "set-watches" => Self::dbg_watches_setzen(&mut dbg, &cmd),
+                    "pause" => dbg.step = StepMode::Into,
+                    _ => {}
+                }
+            }
+            match dbg.kanal.eingabe() {
+                Ok(Some(t)) => break Ok(t),
+                Ok(None) => {}
+                Err(()) => {
+                    self.debug_stop_flag = true;
+                    break Err("__DEBUG_STOP__".to_string());
+                }
+            }
+            if !dbg.kanal.auf_neues_warten() { break Ok(String::new()); }
+        };
+        self.dbg = Some(dbg);
+        r
+    }
+
     /// Das FILE-Handle der Standardeingabe -- IMMER dasselbe.
     ///
     /// Zwei eigene Handles waeren zwei Lesepuffer auf derselben Leitung: das
@@ -1814,8 +1872,19 @@ impl<'p> Vm<'p> {
     }
 
     /// Debugging fuer den naechsten `run()` aktivieren (`dhrt debug`).
-    pub fn enable_debug(&mut self) {
-        self.dbg = Some(DebugState::new());
+    /// `karte`: gemergte Zeilen <-> (Datei, Zeile), siehe debugger.rs.
+    pub fn enable_debug(&mut self, karte: Option<crate::debugger::Karte>) {
+        let mut d = DebugState::new();
+        d.karte = karte;
+        self.dbg = Some(d);
+    }
+
+    /// (Datei, Zeile) einer gemergten Zeile fuer die Meldungen des Debuggers.
+    pub fn debug_stelle(&self, gemergt: u32) -> (String, u32) {
+        match &self.dbg {
+            Some(d) => d.stelle(gemergt),
+            None => (String::new(), gemergt),
+        }
     }
 
     /// Restlichen (noch nicht gesendeten) Programm-Output als output-Event
@@ -1844,6 +1913,15 @@ impl<'p> Vm<'p> {
     fn debug_cycle(&mut self, dbg: &mut DebugState, fn_: &Func, locals: &mut [Value]) -> R<()> {
         let line = self.cur_line;
         let depth = self.depth;
+        // Was waehrend des Laufens kam: Haltepunkte, Ueberwachen, Anhalten.
+        for cmd in dbg.kanal.lebende() {
+            match crate::debugger::art(&cmd) {
+                "set-breakpoints" => self.dbg_set_breakpoints(dbg, &cmd),
+                "set-watches" => Self::dbg_watches_setzen(dbg, &cmd),
+                "pause" => dbg.step = StepMode::Into,
+                _ => {}
+            }
+        }
         // Neue Ausgabe live nachschieben.
         if self.out.len() > dbg.out_sent {
             let chunk = self.out[dbg.out_sent..].to_string();
@@ -1872,8 +1950,9 @@ impl<'p> Vm<'p> {
         // Jeder Halt verbraucht "bis hier" -- auch einer an einem Haltepunkt
         // davor, sonst hielte das Programm spaeter unerwartet noch einmal.
         dbg.run_to = None;
+        let (datei, zeile) = dbg.stelle(line);
         dbg_emit(&serde_json::json!({
-            "event": "paused", "line": line, "depth": depth,
+            "event": "paused", "line": zeile, "file": datei, "depth": depth,
             "locals": self.dbg_locals_json(fn_, locals),
             "globals": self.dbg_globals_json(),
             "stack": Self::dbg_stack_json(dbg, line),
@@ -1881,7 +1960,7 @@ impl<'p> Vm<'p> {
         }));
         // Kommandos lesen bis continue/step/stop/EOF.
         loop {
-            let cmd = match dbg_read_cmd() {
+            let cmd = match dbg.kanal.naechstes() {
                 Some(c) => c,
                 None => { self.debug_stop_flag = true; return Err("__DEBUG_STOP__".into()); }
             };
@@ -1892,18 +1971,25 @@ impl<'p> Vm<'p> {
                 "step-out"  => { dbg.step = StepMode::Out; dbg.step_depth = depth; return Ok(()); }
                 "stop"      => { self.debug_stop_flag = true; return Err("__DEBUG_STOP__".into()); }
                 "set-breakpoints" => self.dbg_set_breakpoints(dbg, &cmd),
+                "pause" => {}
                 "run-to" => {
                     if let Some(ln) = cmd.get("line").and_then(|v| v.as_u64()) {
-                        dbg.run_to = Some(ln as u32);
-                        dbg.step = StepMode::Run;
-                        return Ok(());
+                        let datei = cmd.get("file").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        if let Some((g, _)) = dbg.haltestelle(&datei, ln as u32) {
+                            dbg.run_to = Some(g);
+                            dbg.step = StepMode::Run;
+                            return Ok(());
+                        }
+                        // Dort haelt nichts (fremde Datei, kein Code darunter):
+                        // sagen statt stumm stehen zu bleiben -- der Editor
+                        // wartete sonst auf ein Laufen, das nie kommt.
+                        dbg_emit(&serde_json::json!({"event": "run-to-error",
+                            "line": ln, "file": datei,
+                            "message": "dort und darunter steht kein Code dieses Programms"}));
                     }
                 }
                 "set-watches" => {
-                    dbg.watches = cmd.get("exprs").and_then(|v| v.as_array()).map(|a| a.iter()
-                        .filter_map(|e| e.as_str())
-                        .map(|src| (src.to_string(), crate::parser::parse_expression(src).ok()))
-                        .collect()).unwrap_or_default();
+                    Self::dbg_watches_setzen(dbg, &cmd);
                     // Gleich beantworten -- wer im Halt einen Ausdruck
                     // dazunimmt, will seinen Wert jetzt sehen, nicht erst beim
                     // naechsten Halt.
@@ -1943,10 +2029,18 @@ impl<'p> Vm<'p> {
         let n = dbg.stapel.len();
         let mut out = Vec::new();
         for k in (0..n).rev() {
-            let zeile = if k + 1 == n { line } else { dbg.stapel[k + 1].1 };
-            out.push(serde_json::json!({"name": dbg.stapel[k].0, "line": zeile}));
+            let gemergt = if k + 1 == n { line } else { dbg.stapel[k + 1].1 };
+            let (datei, zeile) = dbg.stelle(gemergt);
+            out.push(serde_json::json!({"name": dbg.stapel[k].0, "line": zeile, "file": datei}));
         }
         serde_json::Value::Array(out)
+    }
+
+    fn dbg_watches_setzen(dbg: &mut DebugState, cmd: &serde_json::Value) {
+        dbg.watches = cmd.get("exprs").and_then(|v| v.as_array()).map(|a| a.iter()
+            .filter_map(|e| e.as_str())
+            .map(|src| (src.to_string(), crate::parser::parse_expression(src).ok()))
+            .collect()).unwrap_or_default();
     }
 
     /// Die ueberwachten Ausdruecke, jeder fuer sich ausgewertet: ein Fehler
@@ -1992,22 +2086,58 @@ impl<'p> Vm<'p> {
         Err(format!("set: '{}' nicht gefunden", name))
     }
 
+    /// Haltepunkte ersetzen. Zwei Formen, auch gemischt: `lines` +
+    /// `conditions` meinen die HAUPTdatei (die alte Form), `breakpoints` ist
+    /// eine Liste von {file, line[, condition]} fuer jede Datei des
+    /// Programms. Jeder wird auf seine Haltestelle gelegt (Zeile ohne Code ->
+    /// die naechste mit), und die Antwort `breakpoints` sagt, wo er wirklich
+    /// haelt -- damit ein Editor den roten Punkt dorthin setzen kann.
     fn dbg_set_breakpoints(&self, dbg: &mut DebugState, cmd: &serde_json::Value) {
         dbg.breakpoints.clear();
+        let mut wuensche: Vec<(String, u32, Option<String>)> = Vec::new();
+        let bedingung_haupt = |ln: u64| cmd.get("conditions").and_then(|c| c.get(ln.to_string()))
+            .and_then(|v| v.as_str()).map(|s| s.to_string());
         if let Some(lines) = cmd.get("lines").and_then(|v| v.as_array()) {
             for l in lines {
-                if let Some(ln) = l.as_u64() { dbg.breakpoints.insert(ln as u32, None); }
+                if let Some(ln) = l.as_u64() { wuensche.push((String::new(), ln as u32, bedingung_haupt(ln))); }
             }
         }
+        // Eine Bedingung ohne Eintrag in `lines` (alte Form) gilt trotzdem.
         if let Some(conds) = cmd.get("conditions").and_then(|v| v.as_object()) {
-            for (k, expr) in conds {
-                if let (Ok(ln), Some(src)) = (k.parse::<u32>(), expr.as_str()) {
-                    // Bedingung vorab parsen; bei Parse-Fehler unbedingter BP.
-                    let node = crate::parser::parse_expression(src).ok();
-                    dbg.breakpoints.insert(ln, node);
+            for k in conds.keys() {
+                if let Ok(ln) = k.parse::<u32>() {
+                    if !wuensche.iter().any(|w| w.0.is_empty() && w.1 == ln) {
+                        wuensche.push((String::new(), ln, bedingung_haupt(ln as u64)));
+                    }
                 }
             }
         }
+        if let Some(bps) = cmd.get("breakpoints").and_then(|v| v.as_array()) {
+            for b in bps {
+                let datei = b.get("file").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let ln = match b.get("line").and_then(|v| v.as_u64()) { Some(l) => l as u32, None => continue };
+                let bed = b.get("condition").and_then(|v| v.as_str())
+                    .filter(|s| !s.trim().is_empty()).map(|s| s.to_string());
+                wuensche.push((datei, ln, bed));
+            }
+        }
+        let mut antwort = Vec::new();
+        for (datei, ln, bed) in wuensche {
+            let anzeige = if datei.is_empty() { dbg.haupt() } else { datei.clone() };
+            match dbg.haltestelle(&datei, ln) {
+                Some((g, echt)) => {
+                    // Bedingung vorab parsen; bei Parse-Fehler unbedingter BP.
+                    let node = bed.as_deref().and_then(|src| crate::parser::parse_expression(src).ok());
+                    // Zwei Wuensche auf derselben Haltestelle: einer ohne
+                    // Bedingung haelt immer, ein bedingter nimmt ihm das nicht.
+                    let alt_ohne = matches!(dbg.breakpoints.get(&g), Some(None));
+                    if !alt_ohne { dbg.breakpoints.insert(g, node); }
+                    antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": echt, "verified": true}));
+                }
+                None => antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": 0, "verified": false})),
+            }
+        }
+        dbg_emit(&serde_json::json!({"event": "breakpoints", "breakpoints": antwort}));
     }
 
     fn dbg_locals_json(&self, fn_: &Func, locals: &[Value]) -> serde_json::Value {
@@ -3735,7 +3865,7 @@ impl<'p> Vm<'p> {
                         input_prompt(&vm_pop(stack)?.fmt())
                     } else { "? ".to_string() };
                     self.flush_and_prompt(&prompt);
-                    let raw = self.read_input_line();
+                    let raw = self.eingabe_zeile()?;
                     let slot = self.globals.get(&name)
                         .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?){}", name, crate::umstieg::name_hinweis(&name)))?
                         .clone();
@@ -3752,7 +3882,7 @@ impl<'p> Vm<'p> {
                         input_prompt(&vm_pop(stack)?.fmt())
                     } else { "? ".to_string() };
                     self.flush_and_prompt(&prompt);
-                    let raw = self.read_input_line();
+                    let raw = self.eingabe_zeile()?;
                     let ty = fn_.local_types[slot_idx].clone();
                     locals[slot_idx] = coerce_input(&raw, &ty)?;
                 }
@@ -6423,6 +6553,29 @@ impl<'p> Vm<'p> {
                 gi(a,3,"GUI_WINDOW")? as i32, gi(a,4,"GUI_WINDOW")? as i32)),
             "gui_window_movable" => { self.gui.window_movable(gi(a,0,"GUI_WINDOW_MOVABLE")?, gbool(a,1,"GUI_WINDOW_MOVABLE")?)?; Value::Nil }
             "gui_window_title" => { self.gui.window_title(gi(a,0,"GUI_WINDOW_TITLE")?, &gs(a,1,"GUI_WINDOW_TITLE")?)?; Value::Nil }
+            // Lichtstreif ueber ein Fenster (docs/module-gui.md, Abschnitt Glanz).
+            "gui_window_glow" => {
+                let n = "GUI_WINDOW_GLOW";
+                if a.is_empty() || a.len() > 3 { return Err(format!("{}: erwartet (win [, farbe [, dauer_ms]])", n)); }
+                let farbe = if a.len() > 1 { Some(gi(a, 1, n)?) } else { None };
+                let dauer = if a.len() > 2 { Some(gnum(a, 2, n)?) } else { None };
+                self.gui.window_glow(gi(a, 0, n)?, farbe, dauer)?;
+                Value::Nil
+            }
+            "gui_window_glow_set" => {
+                let n = "GUI_WINDOW_GLOW_SET";
+                if a.len() != 3 { return Err(format!("{}: erwartet (win, schluessel$, wert)", n)); }
+                let (zahl, text) = match &a[2] {
+                    Value::Int(i) => (Some(*i as f64), i.to_string()),
+                    Value::Float(f) => (Some(*f), f.to_string()),
+                    Value::Bool(b) => (Some(if *b { 1.0 } else { 0.0 }), b.to_string()),
+                    v => (None, v.fmt()),
+                };
+                self.gui.window_glow_set(gi(a, 0, n)?, &gs(a, 1, n)?, zahl, &text)?;
+                Value::Nil
+            }
+            "gui_window_glow_stop" => { self.gui.window_glow_stop(gi(a, 0, "GUI_WINDOW_GLOW_STOP")?)?; Value::Nil }
+            "gui_window_glowing" => Value::Bool(self.gui.window_glowing(gi(a, 0, "GUI_WINDOW_GLOWING")?)?),
             "gui_window_closable" => { self.gui.window_closable(gi(a,0,"GUI_WINDOW_CLOSABLE")?, gbool(a,1,"GUI_WINDOW_CLOSABLE")?)?; Value::Nil }
             "gui_window_visible" => { self.gui.window_visible(gi(a,0,"GUI_WINDOW_VISIBLE")?, gbool(a,1,"GUI_WINDOW_VISIBLE")?)?; Value::Nil }
             "gui_window_shown" => Value::Bool(self.gui.window_shown(gi(a,0,"GUI_WINDOW_SHOWN")?)?),
@@ -7407,6 +7560,11 @@ impl<'p> Vm<'p> {
                 if a.len() != 3 { return Err(format!("{}: erwartet (ta, zeilen, farben)", n)); }
                 self.gui.textarea_marks(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
                 Value::Nil
+            }
+            "gui_textarea_marks_get" => {
+                let n = "GUI_TEXTAREA_MARKS_GET";
+                if a.len() != 1 { return Err(format!("{}: erwartet (ta)", n)); }
+                crate::builtins::new_int_array(self.gui.textarea_marks_get(gi(a, 0, n)?)?)
             }
             // ===== Faltung (docs/module-gui.md, Abschnitt Faltung) =====
             // Welche Zeilen einen Block bilden, sagt der Aufrufer -- die
@@ -9996,6 +10154,13 @@ wie viele Plaetze gelten", i + 1)),
             "image_contrast" => Value::Int(g!().image_contrast(gi(a,0,"IMAGE_CONTRAST")?, need_f(a,1,"IMAGE_CONTRAST")? as f32)?),
             "image_grayscale" => Value::Int(g!().image_grayscale(gi(a,0,"IMAGE_GRAYSCALE")?)?),
             "image_invert" => Value::Int(g!().image_invert(gi(a,0,"IMAGE_INVERT")?)?),
+            "image_color_to_alpha" => {
+                const F: &str = "IMAGE_COLOR_TO_ALPHA";
+                if a.len() != 2 && a.len() != 3 { return Err(format!("{}: erwartet (bild, farbe [, schwelle])", F)); }
+                let s = if a.len() == 3 { need_f(a, 2, F)? as f32 } else { 0.0 };
+                if !(0.0..1.0).contains(&s) { return Err(format!("{}: die Schwelle liegt zwischen 0 und 1 (nicht {})", F, s)); }
+                Value::Int(g!().image_color_to_alpha(gi(a, 0, F)?, gi(a, 1, F)?, s)?)
+            }
             "image_replace_color" => Value::Int(g!().image_replace_color(gi(a,0,"IMAGE_REPLACE_COLOR")?, gi(a,1,"IMAGE_REPLACE_COLOR")?, gi(a,2,"IMAGE_REPLACE_COLOR")?)?),
             "image_draw_line" => { g!().image_draw_line(gi(a,0,"IMAGE_DRAW_LINE")?, gi(a,1,"IMAGE_DRAW_LINE")? as i32, gi(a,2,"IMAGE_DRAW_LINE")? as i32, gi(a,3,"IMAGE_DRAW_LINE")? as i32, gi(a,4,"IMAGE_DRAW_LINE")? as i32, gi(a,5,"IMAGE_DRAW_LINE")?)?; Value::Nil }
             "image_draw_circle" => { g!().image_draw_circle(gi(a,0,"IMAGE_DRAW_CIRCLE")?, gi(a,1,"IMAGE_DRAW_CIRCLE")? as i32, gi(a,2,"IMAGE_DRAW_CIRCLE")? as i32, gi(a,3,"IMAGE_DRAW_CIRCLE")? as i32, gi(a,4,"IMAGE_DRAW_CIRCLE")?)?; Value::Nil }

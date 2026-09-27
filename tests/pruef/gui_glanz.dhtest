@@ -1,0 +1,161 @@
+' Der Lichtstreif ueber ein Fenster (GUI_WINDOW_GLOW): ein warmer Schein
+' zieht von einer Kante zur anderen, additiv ueber den Widgets. Die Zeit
+' laeuft mit DELTA() -- ohne echte Uhr fest 1/60 s --, ein Bild zeigt also
+' immer dieselbe Stelle.
+'
+' Geprueft am BILD: ein Punkt, ueber dem der Streif gerade steht, weicht
+' vom Fenstergrund daneben ab; ohne Streif, vor und nach ihm sind beide
+' gleich. Das Fenster ist 500 breit, der Streif 0,35 davon zu jeder Seite.
+' Format: docs/werkzeuge.md.
+
+=== ohne streif ist der fenstergrund quer gleich
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=37
+--- bild
+250 150 = 30 150
+450 150 = 30 150
+--- erwartet
+
+=== in der mitte des durchgangs leuchtet die mitte
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+GUI_WINDOW_GLOW(w, &HFFB050, 1200)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=37
+--- bild
+' Mitte hell, die Raender (ausserhalb des Streifs) unberuehrt.
+250 150 <> 30 150
+30 150 = 480 150
+--- erwartet
+
+=== nach dem durchgang ist nichts mehr zu sehen
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+GUI_WINDOW_GLOW(w, &HFFB050, 1200)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=90
+--- bild
+250 150 = 30 150
+--- erwartet
+
+=== nach rechts steht er am anfang links
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+GUI_WINDOW_GLOW(w, &HFFB050, 1200)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=20
+--- bild
+30 150 <> 250 150
+450 150 = 250 150
+--- erwartet
+
+=== nach links steht er am anfang rechts
+IMPORT "gui"
+SCREEN(500, 300, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+GUI_WINDOW_GLOW_SET(w, "richtung", "links")
+GUI_WINDOW_GLOW(w, &HFFB050, 1200)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=20
+--- bild
+450 150 <> 250 150
+30 150 = 250 150
+--- erwartet
+
+=== laeuft einmal oder kehrt wieder und laesst sich anhalten
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 140, 100)
+DIM b AS GUI_WINDOW : b = GUI_WINDOW("B", 150, 0, 140, 100)
+PRINT GUI_WINDOW_GLOWING(a)
+GUI_WINDOW_GLOW(a, -1, 500)
+GUI_WINDOW_GLOW_SET(b, "pause", 200)
+GUI_WINDOW_GLOW(b, -1, 500)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 10 THEN PRINT n; " "; GUI_WINDOW_GLOWING(a); " "; GUI_WINDOW_GLOWING(b)
+    IF n = 60 THEN PRINT n; " "; GUI_WINDOW_GLOWING(a); " "; GUI_WINDOW_GLOWING(b)
+    IF n = 61 THEN GUI_WINDOW_GLOW_STOP(b)
+    IF n = 62 THEN PRINT n; " "; GUI_WINDOW_GLOWING(b)
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=70
+--- erwartet
+FALSE
+10 TRUE TRUE
+60 FALSE TRUE
+62 FALSE
+
+=== falsche angaben sind ein fehler mit der liste
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 100, 100)
+TRY
+    GUI_WINDOW_GLOW_SET(w, "farbton", 1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_WINDOW_GLOW_SET(w, "richtung", "quer")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_WINDOW_GLOW(w, -1, 0)
+CATCH e
+    PRINT e
+END TRY
+GUI_WINDOW_GLOW_SET(w, "richtung", 2)
+GUI_WINDOW_GLOW_SET(w, "staerke", 5.0)
+GUI_WINDOW_GLOW_SET(w, "rand", FALSE)
+PRINT "ok"
+--- erwartet
+GUI_WINDOW_GLOW_SET: unbekannter Schluessel 'farbton' (bekannt: farbe, dauer, pause, richtung, breite, staerke, rand)
+GUI_WINDOW_GLOW_SET: richtung ist rechts, links, unten oder oben (nicht 'quer')
+GUI_WINDOW_GLOW: die Dauer muss groesser als 0 ms sein
+ok

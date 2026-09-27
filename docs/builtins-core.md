@@ -908,6 +908,8 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 | `PATHJOIN(a$, b$, …)` → STRING | Pfadteile mit `/` verbinden |
 | `BASENAME(pfad$)` → STRING | letzter Pfad-Bestandteil (Datei-/Ordnername) |
 | `DIRNAME(pfad$)` → STRING | Verzeichnis-Anteil (ohne letzten Bestandteil) |
+| `REALPATH$(pfad$)` → STRING | der volle, bereinigte Pfad: absolut, `.`/`..` aufgelöst, in der Schreibweise der Platte; gibt es die Datei nicht, nur absolut gemacht und bereinigt |
+| `SAMEFILE(a$, b$)` → BOOLEAN | meinen beide Pfade dieselbe Datei? Ein Textvergleich irrt bei `/` gegen `\`, bei einem `..` im Pfad, bei kurzen 8.3-Namen und (unter Windows) bei Groß/klein |
 
 ```basic
 ' Schreiben

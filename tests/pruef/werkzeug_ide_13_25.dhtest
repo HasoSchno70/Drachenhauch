@@ -7586,7 +7586,8 @@ drei treffer TRUE
 weiter und zurueck TRUE
 
 === haken im baum schraenken das projekt ein
-' Das Kaestchen steht GANZ LINKS im Baum (x = 14), vor dem Dreieck.
+' Das Kaestchen steht GANZ LINKS im Baum (x = 14), vor dem Dreieck. Seit
+' 2026-09-27 nur auf Wunsch -- die ide.json schaltet es ein.
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("winken")
 --- programm ../../ide/ide.dh nach SETFPS(60)
@@ -7597,6 +7598,8 @@ DHRT_FRAMES=380
 DH_IDE_LOG=ide.log
 DH_IDE_WURZEL={sammlung}/../..
 DH_IDE_KONFIG=ide.json
+--- datei _programm/ide.json
+{"baum_haken": true}
 --- datei a_eins.dh
 gruessen()
 --- datei b_zwei.dh

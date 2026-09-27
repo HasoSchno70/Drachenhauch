@@ -448,6 +448,46 @@ fn stil_vor(w: &Widget, k: usize) -> u8 {
     match chars.get(k) { Some(&c) if c != '\n' => w.stile.get(k).copied().unwrap_or(0), _ => 0 }
 }
 
+/// Marken (0-basierte Zeilen) von `alt` auf `neu` umrechnen. Gemeinsamer
+/// Anfang und gemeinsames Ende grenzen die Aenderung ein: eine Zeile, die
+/// HINTER ihr beginnt, rueckt um die Laengendifferenz mit (wer am Zeilenanfang
+/// Enter drueckt, schiebt sie also eine Zeile tiefer), eine davor bleibt, und
+/// eine, die IN der Aenderung begann (geloescht), landet an ihrem Anfang.
+fn zeilen_nachziehen(alt: &str, neu: &str, zeilen: &mut [usize]) {
+    let a_ch: Vec<char> = alt.chars().collect();
+    let n_ch: Vec<char> = neu.chars().collect();
+    let mut a = 0;
+    while a < a_ch.len() && a < n_ch.len() && a_ch[a] == n_ch[a] { a += 1; }
+    let mut e = 0;
+    while e < a_ch.len() - a && e < n_ch.len() - a
+        && a_ch[a_ch.len() - 1 - e] == n_ch[n_ch.len() - 1 - e] { e += 1; }
+    let ende_alt = a_ch.len() - e;
+    let delta = n_ch.len() as i64 - a_ch.len() as i64;
+    let mut starts = vec![0usize];
+    for (i, &c) in a_ch.iter().enumerate() { if c == '\n' { starts.push(i + 1); } }
+    let zeile_neu = |off: usize| n_ch[..off.min(n_ch.len())].iter().filter(|&&c| c == '\n').count();
+    for z in zeilen.iter_mut() {
+        let o = match starts.get(*z) { Some(&o) => o, None => continue };
+        if o >= ende_alt && o > a || (o == ende_alt && o == a && delta > 0) {
+            *z = zeile_neu((o as i64 + delta).max(0) as usize);
+        } else if o <= a {
+            // davor: bleibt
+        } else {
+            *z = zeile_neu(a);
+        }
+    }
+}
+
+/// Marken eines Textbereichs an seinen jetzigen Text anpassen (siehe
+/// `marken`). Billig, wenn sich nichts geaendert hat.
+fn marken_abgleichen(w: &mut Widget) {
+    if w.marken.is_empty() || w.marken_text == w.text { return; }
+    let mut z: Vec<usize> = w.marken.iter().map(|m| m.0).collect();
+    zeilen_nachziehen(&w.marken_text, &w.text, &mut z);
+    for (m, n) in w.marken.iter_mut().zip(z) { m.0 = n; }
+    w.marken_text = w.text.clone();
+}
+
 /// Stile an einen geaenderten Text anpassen: gemeinsamer Anfang und
 /// gemeinsames Ende behalten ihre Bits, das Neue dazwischen bekommt den
 /// Tippstil bzw. den Stil davor. Das deckt Tippen, Loeschen, Einfuegen und
@@ -2371,9 +2411,13 @@ pub struct Widget {
     spans: Vec<(u32, u32, i64)>,
     // Marken je ZEILE (0-basiert, Farbe): Haltepunkt, angehaltene Zeile,
     // Fehler -- ein Punkt in der Nummernspalte und ein Farbhauch ueber der
-    // Zeile. Sie haengen an der Zeilennummer, nicht am Text: GUI_SET_TEXT
-    // laesst sie stehen, das Programm setzt sie neu (GUI_TEXTAREA_MARKS).
+    // Zeile. GUI_SET_TEXT laesst sie stehen, das Programm setzt sie neu
+    // (GUI_TEXTAREA_MARKS). Wird im Feld BEARBEITET, wandern sie mit ihrer
+    // Zeile (`marken_abgleichen`) -- bis 2026-09-27 blieb ein Haltepunkt auf
+    // seiner NUMMER stehen, und eine eingefuegte Zeile darueber legte ihn
+    // still auf die Zeile davor. `marken_text` ist der Text, zu dem sie passen.
     marken: Vec<(usize, i64)>,
+    marken_text: String,
     // Nur TextArea: was aus einem Textfeld ein Code-Feld macht.
     // `scroll` ist dort die erste SICHTBARE ZEILE, `scroll_x` der waagerechte
     // Versatz in Pixeln -- ohne den waeren lange Zeilen einfach abgeschnitten.
@@ -2588,7 +2632,43 @@ pub struct Window {
     // Programm selbst mit KEYHIT nachbaute, ohne den Fokus zu beachten.
     default_btn: i32,
     cancel_btn: i32,
+    /// Lichtstreif ueber das Fenster (GUI_WINDOW_GLOW) -- "ein neuer
+    /// Drachenhauch zieht durch".
+    glanz: Glanz,
 }
+
+/// Ein Lichtstreif, der ueber ein Fenster zieht: ein weicher Schein, ein
+/// hellerer Kern und eine heisse Linie, additiv gemischt, dazu ein Aufleuchten
+/// des Rahmens, wo der Streif gerade ist. Die Zeit laeuft mit `g.delta()`
+/// (ohne Fenster fest 1/60 s), ein Bild zeigt also immer dieselbe Stelle.
+#[derive(Clone)]
+struct Glanz {
+    /// -1 = die Akzentfarbe des Themas.
+    farbe: i64,
+    /// Sekunden fuer einen Durchgang.
+    dauer: f32,
+    /// Sekunden zwischen zwei Durchgaengen; 0 = nur einmal.
+    pause: f32,
+    /// 0 nach rechts, 1 nach links, 2 nach unten, 3 nach oben.
+    richtung: u8,
+    /// Breite des Streifs als Anteil der Fensterbreite (bzw. -hoehe).
+    breite: f32,
+    /// Helligkeit 0..1.
+    staerke: f32,
+    /// Leuchtet der Rahmen mit?
+    rand: bool,
+    /// Sekunden seit Beginn des Durchgangs; < 0 = aus.
+    t: f32,
+}
+
+impl Glanz {
+    fn neu() -> Glanz {
+        Glanz { farbe: 0xFFB050, dauer: 1.2, pause: 0.0, richtung: 0,
+                breite: 0.35, staerke: 0.55, rand: true, t: -1.0 }
+    }
+}
+
+const GLANZ_SCHLUESSEL: &str = "farbe, dauer, pause, richtung, breite, staerke, rand";
 
 struct Menu {
     label: String,
@@ -3045,6 +3125,7 @@ impl Gui {
             scrollable: false, scroll_y: 0,
             tabs: Vec::new(), active_tab: 0, tabs_closable: false, tab_zu: -1,
             default_btn: -1, cancel_btn: -1,
+            glanz: Glanz::neu(),
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -3367,7 +3448,21 @@ impl Gui {
             .filter(|(&z, _)| z >= 1)
             .map(|(&z, &c)| ((z - 1) as usize, c))
             .collect();
+        wd.marken_text = wd.text.clone();
         Ok(())
+    }
+
+    /// Die Zeilen der Marken, wie sie JETZT stehen (GUI_TEXTAREA_MARKS_GET):
+    /// 1-basiert, in der Reihenfolge, in der sie gesetzt wurden. Hat der
+    /// Nutzer darueber Zeilen eingefuegt oder geloescht, sind sie mitgewandert
+    /// -- so erfaehrt ein Programm, wohin sein Haltepunkt gerutscht ist.
+    pub fn textarea_marks_get(&mut self, h: i64) -> Result<Vec<i64>, String> {
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_MARKS_GET")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_MARKS_GET: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        marken_abgleichen(wd);
+        Ok(wd.marken.iter().map(|&(z, _)| z as i64 + 1).collect())
     }
 
     /// Welche Bloecke sich falten lassen (GUI_TEXTAREA_FOLDABLE).
@@ -3821,7 +3916,7 @@ impl Gui {
             vorschau: String::new(), vorschau_marke: 0,
             tab_index: 0,
             spans: Vec::new(),
-            marken: Vec::new(),
+            marken: Vec::new(), marken_text: String::new(),
             scroll_x: 0, zeilennummern: false, aktive_zeile: false,
             tab_fuegt_ein: false, tabbreite: 4,
             faltbar: Vec::new(), gefaltet: Vec::new(), marken_zusatz: Vec::new(),
@@ -3897,6 +3992,61 @@ impl Gui {
     /// koennen, ohne neu gebaut zu werden.
     pub fn window_title(&mut self, h: i64, titel: &str) -> Result<(), String> {
         self.win_mut(h, "GUI_WINDOW_TITLE")?.title = titel.to_string(); Ok(())
+    }
+
+    /// GUI_WINDOW_GLOW(win [, farbe [, dauer_ms]]): einen Durchgang starten.
+    /// Farbe und Dauer bleiben fuer die naechsten gesetzt. Laeuft schon
+    /// einer, beginnt er von vorn.
+    pub fn window_glow(&mut self, h: i64, farbe: Option<i64>, dauer_ms: Option<f64>) -> Result<(), String> {
+        let w = self.win_mut(h, "GUI_WINDOW_GLOW")?;
+        if let Some(f) = farbe { w.glanz.farbe = f; }
+        if let Some(d) = dauer_ms {
+            if !(d > 0.0) { return Err("GUI_WINDOW_GLOW: die Dauer muss groesser als 0 ms sein".into()); }
+            w.glanz.dauer = (d / 1000.0) as f32;
+        }
+        w.glanz.t = 0.0;
+        Ok(())
+    }
+
+    pub fn window_glow_stop(&mut self, h: i64) -> Result<(), String> {
+        self.win_mut(h, "GUI_WINDOW_GLOW_STOP")?.glanz.t = -1.0; Ok(())
+    }
+
+    pub fn window_glowing(&mut self, h: i64) -> Result<bool, String> {
+        Ok(self.win_mut(h, "GUI_WINDOW_GLOWING")?.glanz.t >= 0.0)
+    }
+
+    /// GUI_WINDOW_GLOW_SET(win, schluessel$, wert). `zahl` ist der Wert als
+    /// Zahl (None, wenn er keine ist), `text` als Text.
+    pub fn window_glow_set(&mut self, h: i64, key: &str, zahl: Option<f64>, text: &str) -> Result<(), String> {
+        let n = "GUI_WINDOW_GLOW_SET";
+        let w = self.win_mut(h, n)?;
+        let brauche = |z: Option<f64>| z.ok_or_else(|| format!("{}: '{}' erwartet eine Zahl", n, key));
+        match key.to_lowercase().as_str() {
+            "farbe" | "color" => w.glanz.farbe = brauche(zahl)? as i64,
+            "dauer" | "duration" => {
+                let d = brauche(zahl)?;
+                if !(d > 0.0) { return Err(format!("{}: die Dauer muss groesser als 0 ms sein", n)); }
+                w.glanz.dauer = (d / 1000.0) as f32;
+            }
+            "pause" | "wiederholen" | "repeat" => w.glanz.pause = (brauche(zahl)?.max(0.0) / 1000.0) as f32,
+            "breite" | "width" => w.glanz.breite = brauche(zahl)?.clamp(0.05, 2.0) as f32,
+            "staerke" | "strength" | "intensity" => w.glanz.staerke = brauche(zahl)?.clamp(0.0, 1.0) as f32,
+            "rand" | "border" => w.glanz.rand = brauche(zahl)? != 0.0,
+            "richtung" | "direction" => {
+                let r = match (zahl, text.to_lowercase().as_str()) {
+                    (_, "rechts" | "right") => 0,
+                    (_, "links" | "left") => 1,
+                    (_, "unten" | "down") => 2,
+                    (_, "oben" | "up") => 3,
+                    (Some(z), _) if (0.0..=3.0).contains(&z) => z as u8,
+                    _ => return Err(format!("{}: richtung ist rechts, links, unten oder oben (nicht '{}')", n, text)),
+                };
+                w.glanz.richtung = r;
+            }
+            _ => return Err(format!("{}: unbekannter Schluessel '{}' (bekannt: {})", n, key, GLANZ_SCHLUESSEL)),
+        }
+        Ok(())
     }
     pub fn window_closable(&mut self, h: i64, f: bool) -> Result<(), String> {
         self.win_mut(h, "GUI_WINDOW_CLOSABLE")?.closable = f; Ok(())
@@ -11363,9 +11513,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         for win in self.windows.iter_mut() {
             for w in win.widgets.iter_mut() {
                 if w.formatiert { stile_abgleichen(w); }
+                if w.kind == Kind::TextArea { marken_abgleichen(w); }
             }
         }
         let dt = g.delta();
+        // Lichtstreifen der Fenster weiterschieben.
+        for win in self.windows.iter_mut() {
+            let gl = &mut win.glanz;
+            if gl.t < 0.0 { continue; }
+            gl.t += dt as f32;
+            if gl.t > gl.dauer {
+                if gl.pause > 0.0 {
+                    if gl.t > gl.dauer + gl.pause { gl.t = 0.0; }
+                } else {
+                    gl.t = -1.0;
+                }
+            }
+        }
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         let dauer = self.m("uebergang").max(0) as f32;
         let schritt = if dauer > 0.0 { (dt as f32 * 1000.0 / dauer).clamp(0.0, 1.0) } else { 1.0 };
@@ -17435,6 +17599,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(self.th("win_bg"), -10));
             g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 4, self.th("widget_border"), true);
         }
+        // Der Lichtstreif liegt ueber den Widgets, aber unter aufgeklappten
+        // Menues und Klapplisten -- die gehoeren nicht zum Fenster.
+        self.draw_glanz(g, wi);
         // Aufgeklapptes Menueleisten-Dropdown ueber den Widgets.
         if let Some((mw, mi)) = self.open_menu {
             if mw == wi {
@@ -17448,6 +17615,72 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 self.draw_dropdown_popup(g, wi, di);
             }
         }
+    }
+
+    /// Der Lichtstreif eines Fensters (siehe `Glanz`).
+    fn draw_glanz(&self, g: &mut Graphics, wi: usize) {
+        let win = &self.windows[wi];
+        let gl = &win.glanz;
+        if gl.t < 0.0 || gl.t > gl.dauer || gl.dauer <= 0.0 { return; }
+        let (x, y, w, h) = (win.x, win.y, win.w, win.h);
+        if w < 4 || h < 4 { return; }
+        let p = (gl.t / gl.dauer).clamp(0.0, 1.0);
+        // Weich anfahren und auslaufen, und am Anfang und Ende ausblenden --
+        // sonst ploppt der Streif am Rand auf.
+        let e = p * p * (3.0 - 2.0 * p);
+        let huelle = ((p * std::f32::consts::PI).sin() * 1.6).min(1.0);
+        let staerke = gl.staerke * huelle;
+        if staerke <= 0.004 { return; }
+        let farbe = (if gl.farbe < 0 { self.th("accent") } else { gl.farbe }) & 0xFFFFFF;
+        let heiss = mischen(farbe, 0xFFFFFF, 0.55) & 0xFFFFFF;
+        let senkrecht = gl.richtung >= 2;
+        let laenge = (if senkrecht { h } else { w }) as f32;
+        let bw = (laenge * gl.breite).max(8.0);
+        // Mitte des Streifs: von ganz ausserhalb bis ganz ausserhalb.
+        let mut c = -bw + e * (laenge + 2.0 * bw);
+        if gl.richtung == 1 || gl.richtung == 3 { c = laenge - c; }
+        let alpha = |f: f32| -> i64 { ((f * 255.0).round() as i64).clamp(1, 255) };
+        // Ein Band: zwei Verlaeufe von durchsichtig zur Farbe und zurueck.
+        // Alpha 0 hiesse DECKEND, darum beginnt "durchsichtig" bei 1.
+        let band = |g: &mut Graphics, mitte: f32, halb: f32, col: i64, a: i64, q0: i32, q1: i32| {
+            let halb = halb.max(1.0);
+            let voll = (a << 24) | col;
+            let leer = (1i64 << 24) | col;
+            let v0 = mitte - halb;
+            let v1 = mitte + halb;
+            if senkrecht {
+                let (a0, a1, a2) = (y + v0 as i32, y + mitte as i32, y + v1 as i32);
+                g.gradient_rect(q0, a0, q1, a1, leer, voll, true);
+                g.gradient_rect(q0, a1, q1, a2, voll, leer, true);
+            } else {
+                let (a0, a1, a2) = (x + v0 as i32, x + mitte as i32, x + v1 as i32);
+                g.gradient_rect(a0, q0, a1, q1, leer, voll, false);
+                g.gradient_rect(a1, q0, a2, q1, voll, leer, false);
+            }
+        };
+        let (q0, q1) = if senkrecht { (x + 1, x + w - 2) } else { (y + 1, y + h - 2) };
+        g.push_clip(x + 1, y + 1, (w - 2).max(0), (h - 2).max(0));
+        g.blend_mode(1);
+        // Mehrere Dreiecke uebereinander ergeben zusammen eine glockenfoermige
+        // Kurve -- mit zwei oder drei saehe man ihre Knicke als Stufen.
+        for (breite, anteil) in [(1.0, 0.10), (0.72, 0.10), (0.5, 0.12), (0.32, 0.14), (0.18, 0.16)] {
+            band(g, c, bw * breite, farbe, alpha(staerke * anteil), q0, q1);
+        }
+        band(g, c, (bw * 0.08).max(3.0), heiss, alpha(staerke * 0.35), q0, q1);   // heisser Kern
+        band(g, c, (bw * 0.025).max(1.5), heiss, alpha(staerke * 0.45), q0, q1);  // heisse Linie
+        if gl.rand {
+            // Der Rahmen leuchtet, wo der Streif ist: je zwei Punkte an den
+            // beiden Kanten quer zur Laufrichtung.
+            if senkrecht {
+                band(g, c, bw * 0.6, heiss, alpha(staerke), x + 1, x + 2);
+                band(g, c, bw * 0.6, heiss, alpha(staerke), x + w - 3, x + w - 2);
+            } else {
+                band(g, c, bw * 0.6, heiss, alpha(staerke), y + 1, y + 2);
+                band(g, c, bw * 0.6, heiss, alpha(staerke), y + h - 3, y + h - 2);
+            }
+        }
+        g.blend_mode(0);
+        g.pop_clip();
     }
 
     /// Die Eintraege einer Werkzeugleiste. Ein Knopf zeigt seine Flaeche nur,
@@ -20377,5 +20610,36 @@ mod formate_tests {
         assert_eq!(s[4], FETT);
         assert_eq!(s[15], KURSIV);
         assert_eq!(s[3], 0);
+    }
+}
+
+#[cfg(test)]
+mod marken_tests {
+    use super::zeilen_nachziehen;
+
+    fn nach(alt: &str, neu: &str, z: &[usize]) -> Vec<usize> {
+        let mut v = z.to_vec();
+        zeilen_nachziehen(alt, neu, &mut v);
+        v
+    }
+
+    #[test]
+    fn marken_wandern_mit_ihrer_zeile() {
+        let alt = "a\nb\nc\nd";
+        // Zeile darueber eingefuegt: alles ab dort eine tiefer.
+        assert_eq!(nach(alt, "a\nNEU\nb\nc\nd", &[0, 1, 3]), vec![0, 2, 4]);
+        // Enter am Anfang der markierten Zeile: sie rutscht mit.
+        assert_eq!(nach(alt, "a\n\nb\nc\nd", &[1]), vec![2]);
+        // In der Zeile getippt: bleibt.
+        assert_eq!(nach(alt, "a\nbx\nc\nd", &[1]), vec![1]);
+        assert_eq!(nach(alt, "a\nxb\nc\nd", &[1]), vec![1]);
+        // Zeile darueber geloescht: eine hoeher.
+        assert_eq!(nach(alt, "b\nc\nd", &[2]), vec![1]);
+        // Die markierte Zeile selbst geloescht: landet an der Stelle.
+        assert_eq!(nach(alt, "a\nc\nd", &[1, 2]), vec![1, 1]);
+        // Ruecktaste am Zeilenanfang (zusammengefuegt): eine hoeher.
+        assert_eq!(nach(alt, "a\nbc\nd", &[2]), vec![1]);
+        // Unveraendert.
+        assert_eq!(nach(alt, alt, &[3]), vec![3]);
     }
 }

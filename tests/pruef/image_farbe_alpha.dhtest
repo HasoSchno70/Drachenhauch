@@ -1,0 +1,36 @@
+' IMAGE_COLOR_TO_ALPHA: eine Hintergrundfarbe wird durchsichtig wie "Farbe
+' zu Alpha" in GIMP -- Mischungen werden halb durchsichtig und entmischt,
+' die Schwelle nimmt schwache Reste ganz weg.
+' Format: docs/werkzeuge.md.
+
+=== grund weg mischung halb farbe bleibt
+IMPORT "imgfx"
+SCREEN(100, 100, "T", 1)
+DIM b AS IMAGE : b = IMAGE_NEW(3, 1, &H000000)
+IMAGE_FILL_RECT(b, 1, 0, 2, 1, &HFFFFFF)
+IMAGE_FILL_RECT(b, 2, 0, 3, 1, &H808080)
+DIM f AS IMAGE : f = IMAGE_COLOR_TO_ALPHA(b, &H000000)
+PRINT GETALPHA(f, 0, 0); " "; GETALPHA(f, 1, 0); " "; ABS(GETALPHA(f, 2, 0) - 128) <= 1
+PRINT COLOR_HEX$(GETPIXEL(f, 1, 0)); " "; COLOR_HEX$(GETPIXEL(f, 2, 0))
+' Das Original bleibt unberuehrt.
+PRINT GETALPHA(b, 0, 0)
+--- erwartet
+0 255 TRUE
+#FFFFFF #FFFFFF
+255
+
+=== schwelle nimmt schwache reste weg
+IMPORT "imgfx"
+SCREEN(100, 100, "T", 1)
+DIM b AS IMAGE : b = IMAGE_NEW(2, 1, &H141414)
+IMAGE_FILL_RECT(b, 1, 0, 2, 1, &HFFFFFF)
+DIM f AS IMAGE : f = IMAGE_COLOR_TO_ALPHA(b, &H000000, 0.15)
+PRINT GETALPHA(f, 0, 0); " "; GETALPHA(f, 1, 0)
+TRY
+    f = IMAGE_COLOR_TO_ALPHA(b, &H000000, 1.5)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+0 255
+IMAGE_COLOR_TO_ALPHA: die Schwelle liegt zwischen 0 und 1 (nicht 1.5)

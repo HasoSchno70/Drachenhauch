@@ -110,3 +110,79 @@ PRINT "wieder an "; INSTR(k, CHR$(34) + "vorspann" + CHR$(34) + ":true") >= 0
 probe kaestchen aus
 vorspann an
 wieder an TRUE
+
+=== der gewaehlte vorspann laeuft
+' Welcher Vorspann laeuft, steht als `vorspann_datei` in der ide.json. Das
+' Bildlimit beendet ihn nach fuenf Bildern -- hier zaehlt nur, WELCHER lief.
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=5
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_VORSPANN=1
+--- datei _programm/ide.json
+{"vorspann_datei": "vorspann_2.mp4"}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 5) = "film " THEN PRINT L[i]
+NEXT
+--- erwartet
+film vorspann_2.mp4
+
+=== abwechselnd kommt bei jedem start der naechste
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=5
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DH_IDE_VORSPANN=1
+--- datei _programm/ide.json
+{"vorspann_datei": "abwechselnd"}
+--- nochmal
+--- nochmal
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 5) = "film " THEN PRINT L[i]
+NEXT
+--- erwartet
+film vorspann.mp4
+film vorspann_2.mp4
+film vorspann.mp4
+
+=== die einstellungen bieten jeden vorspann und merken die wahl
+einstellungenZeigen()
+DIM prI AS INTEGER
+FOR prI = 0 TO GUI_LISTBOX_COUNT(ddVorspann) - 1
+    protokoll("probe eintrag " + GUI_LISTBOX_ITEM(ddVorspann, prI))
+NEXT
+GUI_DROPDOWN_SET_SELECTED(ddVorspann, 1)
+einstellungenNachziehen()
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "probe " OR LEFT$(L[i], 13) = "vorspann wahl" THEN PRINT L[i]
+NEXT
+DIM k AS STRING : k = REPLACE$(JOIN$(READLINES("_programm/ide.json"), ""), " ", "")
+PRINT INSTR(k, CHR$(34) + "vorspann_datei" + CHR$(34) + ":" + CHR$(34) + "vorspann_2.mp4" + CHR$(34)) >= 0
+--- erwartet
+probe eintrag Vorspann
+probe eintrag Vorspann 2
+probe eintrag Abwechselnd
+vorspann wahl vorspann_2.mp4
+TRUE

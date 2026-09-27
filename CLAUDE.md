@@ -1737,6 +1737,41 @@ Cranelift macht Speicher per mprotect ausfuehrbar (kein MAP_JIT), dafuer
 braucht Hardened Runtime `allow-unsigned-executable-memory`, `allow-jit`
 reicht NICHT.
 
+## Debugger spricht (Datei, Zeile); Marken wandern; Lichtstreif (2026-09-27)
+
+**`dhrt debug` zaehlte Zeilen der GEMERGTEN Quelle** -- mit einem `IMPORT`
+am Anfang hielt er "in Zeile 7" statt 3, und kein Haltepunkt nach dem IMPORT
+traf je. `debugger.rs` hat jetzt eine `Karte` (aus `Herkunft`, die dafuer
+`pfad` = kanonischer Pfad bekam; `debug_main` preprocesst ein zweites Mal)
+und einen `Kanal`: stdin liest ein eigener Faden. Ereignisse tragen `file`
+(Hauptdatei wie beim Aufruf, Importe kanonisch), `set-breakpoints` nimmt
+zusaetzlich `breakpoints: [{file, line, condition}]` und antwortet mit
+`breakpoints` (`actual` = wo er haelt: eine Zeile ohne Code rutscht zur
+naechsten mit Code DERSELBEN Datei; `verified`). **Waehrend des Laufens
+wirken nur `pause` und `set-breakpoints`/`set-watches` mit `"now": true`**
+-- ohne den Schalter meint ein vorab geschicktes Kommando den naechsten
+Halt (so schreibt `_hilfen/debugsitzung.dh` seine Skripte). INPUT unter
+dem Debugger bekam frueher "" -- jetzt `{"event":"input"}` und
+`{"cmd":"input","text":...}`; `run-to` ohne Haltestelle meldet
+`run-to-error`. Die IDE schickt alle Haltepunkte aller Dateien, wartet nach
+dem ersten Halt auf die Antwort (`debugErstWarten`), oeffnet die Datei des
+Halts, F6 = Anhalten. **Marken im Code-Feld wandern mit ihrer Zeile**
+(`marken_abgleichen` gleicht am TEXT ab wie `stile_abgleichen`, also fuer
+jeden Aenderungsweg), `GUI_TEXTAREA_MARKS_GET` liest sie zurueck; die IDE
+zieht damit Haltepunkte und Lesezeichen nach (`markenZurueckholen`). Neu
+`REALPATH$`/`SAMEFILE` (Pfadvergleich ueber die Platte, die IDE vergleicht
+Debugger-Pfade damit) und **`GUI_WINDOW_GLOW`** (+ `_SET/_STOP/_GLOWING`):
+ein Lichtstreif ueber ein Fenster, additiv, aus sieben Dreiecks-Baendern
+(mit dreien sah man Stufen), Zeit ueber `g.delta()`; die IDE zeigt ihn
+beim Start und beim Starten eines Programms (`glanz` in der ide.json, unter
+`DHRT_FRAMES` nur mit `DH_IDE_GLANZ=1`). Tests `dhrt_debug.dhtest` (+8),
+`werkzeug_ide_haltepunkt.dhtest` (+4), `gui_glanz.dhtest`,
+`gui_marken_wandern.dhtest`, `dateisystem.dhtest` (+2); Gegenprobe gegen den
+Bau/die IDE davor: alle neuen Faelle fallen, der Fall "ohne now" nicht.
+**Falle beim Testschreiben:** ein Pfad aus `CWD$()` in einem JSON-Kommando
+braucht Schraegstriche -- ein Rueckstrich ist dort ein Escape, und die ganze
+Zeile wird still verworfen.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
