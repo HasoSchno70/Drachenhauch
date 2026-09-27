@@ -599,7 +599,7 @@ enum StepMode { Run, Over, Into, Out }
 
 struct DebugState {
     // Zeile -> optionale (bereits geparste) Bedingung.
-    breakpoints: HashMap<u32, Option<crate::ast::Node>>,
+    breakpoints: HashMap<u32, Haltepunkt>,
     step: StepMode,
     step_depth: u32,
     out_sent: usize,   // wie viel von vm.out schon als output-Event gesendet wurde
@@ -621,6 +621,20 @@ struct DebugState {
     // Zeile) -- ein CATCH wirft sie weg; kommt der Fehler oben an, haelt der
     // Debugger mit diesem Stand an (`debug_fehler_halt`).
     fehler_stand: Option<FehlerStand>,
+}
+
+/// Ein Haltepunkt an einer (gemergten) Zeile: Bedingung, Trefferzahl,
+/// Protokolltext -- und wie oft er schon getroffen wurde (nur gezaehlt, wenn
+/// die Bedingung stimmt).
+struct Haltepunkt {
+    bed: Option<crate::ast::Node>,
+    treffer: Option<(char, u32)>,
+    log: Option<String>,
+    zaehler: u32,
+}
+
+impl Haltepunkt {
+    fn schlicht(&self) -> bool { self.bed.is_none() && self.treffer.is_none() && self.log.is_none() }
 }
 
 struct FehlerStand {
@@ -733,7 +747,11 @@ fn dbg_binop(op: &str, a: &Value, b: &Value) -> R<Value> {
         ">" => Ok(Value::Bool(as_f64(a) > as_f64(b))),
         "<=" => Ok(Value::Bool(as_f64(a) <= as_f64(b))),
         ">=" => Ok(Value::Bool(as_f64(a) >= as_f64(b))),
-        _ => Err(format!("eval: Operator '{}' nicht unterstuetzt", op)),
+        // MOD, \, ^ ... mit denselben Regeln wie die Befehle der VM -- bis
+        // 2026-09-27 kannte der Debugger sie nicht, und eine Bedingung wie
+        // `i MOD 2 = 0` hielt dann bei JEDEM Durchlauf (fail-open).
+        _ => wert_rechnen(op, a, b)
+            .ok_or_else(|| format!("eval: Operator '{}' geht mit diesen Werten nicht", op)),
     }
 }
 
@@ -2021,6 +2039,21 @@ impl<'p> Vm<'p> {
         self.dbg = Some(dbg);
     }
 
+    /// Den Text eines Protokollpunkts bauen: `{ausdruck}` ausgewertet wie
+    /// ein `eval`, ein Fehler steht als `{? meldung}` im Text statt ihn zu
+    /// verschlucken.
+    fn dbg_log_text(&self, vorlage: &str, fn_: &Func, locals: &[Value]) -> String {
+        let mut out = String::new();
+        for (stueck, ausdruck) in crate::debugger::log_stuecke(vorlage) {
+            if !ausdruck { out.push_str(&stueck); continue; }
+            match crate::parser::parse_expression(&stueck).and_then(|n| self.eval_node(&n, fn_, locals)) {
+                Ok(v) => out.push_str(&self.dbg_anzeige(&v).1),
+                Err(e) => { out.push_str("{? "); out.push_str(&e); out.push('}'); }
+            }
+        }
+        out
+    }
+
     /// `eval` beantworten (im Halt und im Fehler-Halt).
     fn dbg_eval_antwort(&self, cmd: &serde_json::Value, fn_: &Func, locals: &mut [Value]) {
         let src = cmd.get("expr").and_then(|v| v.as_str()).unwrap_or("");
@@ -2117,15 +2150,34 @@ impl<'p> Vm<'p> {
             StepMode::Run  => false,
         };
         if dbg.run_to == Some(line) { pause = true; }
+        let mut protokoll: Option<String> = None;
         if !pause {
-            if let Some(cond) = dbg.breakpoints.get(&line) {
-                pause = match cond {
+            if let Some(hp) = dbg.breakpoints.get_mut(&line) {
+                // Bedingung: fail-open (bei Eval-Fehler trotzdem anhalten).
+                let bed_ok = match &hp.bed {
                     None => true,
-                    // Bedingung: fail-open (bei Eval-Fehler trotzdem anhalten).
                     Some(expr) => self.eval_node(expr, fn_, locals)
                         .map(|v| dbg_truthy(&v)).unwrap_or(true),
                 };
+                if bed_ok {
+                    hp.zaehler += 1;
+                    let treffer_ok = match hp.treffer {
+                        None => true,
+                        Some((art, n)) => crate::debugger::treffer_passt(art, n, hp.zaehler),
+                    };
+                    if treffer_ok {
+                        // Ein Protokollpunkt haelt nicht, er schreibt.
+                        match hp.log.clone() {
+                            Some(vorlage) => protokoll = Some(self.dbg_log_text(&vorlage, fn_, locals)),
+                            None => pause = true,
+                        }
+                    }
+                }
             }
+        }
+        if let Some(text) = protokoll {
+            let (datei, zeile) = dbg.stelle(line);
+            dbg_emit(&serde_json::json!({"event": "log", "text": text, "line": zeile, "file": datei}));
         }
         if !pause { return Ok(()); }
         // Jeder Halt verbraucht "bis hier" -- auch einer an einem Haltepunkt
@@ -2267,12 +2319,13 @@ impl<'p> Vm<'p> {
     /// haelt -- damit ein Editor den roten Punkt dorthin setzen kann.
     fn dbg_set_breakpoints(&self, dbg: &mut DebugState, cmd: &serde_json::Value) {
         dbg.breakpoints.clear();
-        let mut wuensche: Vec<(String, u32, Option<String>)> = Vec::new();
+        // (Datei, Zeile, Bedingung, Trefferzahl, Protokolltext)
+        let mut wuensche: Vec<(String, u32, Option<String>, Option<String>, Option<String>)> = Vec::new();
         let bedingung_haupt = |ln: u64| cmd.get("conditions").and_then(|c| c.get(ln.to_string()))
             .and_then(|v| v.as_str()).map(|s| s.to_string());
         if let Some(lines) = cmd.get("lines").and_then(|v| v.as_array()) {
             for l in lines {
-                if let Some(ln) = l.as_u64() { wuensche.push((String::new(), ln as u32, bedingung_haupt(ln))); }
+                if let Some(ln) = l.as_u64() { wuensche.push((String::new(), ln as u32, bedingung_haupt(ln), None, None)); }
             }
         }
         // Eine Bedingung ohne Eintrag in `lines` (alte Form) gilt trotzdem.
@@ -2280,7 +2333,7 @@ impl<'p> Vm<'p> {
             for k in conds.keys() {
                 if let Ok(ln) = k.parse::<u32>() {
                     if !wuensche.iter().any(|w| w.0.is_empty() && w.1 == ln) {
-                        wuensche.push((String::new(), ln, bedingung_haupt(ln as u64)));
+                        wuensche.push((String::new(), ln, bedingung_haupt(ln as u64), None, None));
                     }
                 }
             }
@@ -2289,22 +2342,27 @@ impl<'p> Vm<'p> {
             for b in bps {
                 let datei = b.get("file").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let ln = match b.get("line").and_then(|v| v.as_u64()) { Some(l) => l as u32, None => continue };
-                let bed = b.get("condition").and_then(|v| v.as_str())
+                let text = |k: &str| b.get(k).and_then(|v| v.as_str())
                     .filter(|s| !s.trim().is_empty()).map(|s| s.to_string());
-                wuensche.push((datei, ln, bed));
+                // `hits` darf auch eine Zahl sein.
+                let hits = text("hits").or_else(|| b.get("hits").and_then(|v| v.as_u64()).map(|n| n.to_string()));
+                wuensche.push((datei, ln, text("condition"), hits, text("log")));
             }
         }
         let mut antwort = Vec::new();
-        for (datei, ln, bed) in wuensche {
+        for (datei, ln, bed, hits, log) in wuensche {
             let anzeige = if datei.is_empty() { dbg.haupt() } else { datei.clone() };
             match dbg.haltestelle(&datei, ln) {
                 Some((g, echt)) => {
                     // Bedingung vorab parsen; bei Parse-Fehler unbedingter BP.
                     let node = bed.as_deref().and_then(|src| crate::parser::parse_expression(src).ok());
+                    let hp = Haltepunkt { bed: node,
+                        treffer: hits.as_deref().and_then(crate::debugger::treffer_lesen),
+                        log, zaehler: 0 };
                     // Zwei Wuensche auf derselben Haltestelle: einer ohne
                     // Bedingung haelt immer, ein bedingter nimmt ihm das nicht.
-                    let alt_ohne = matches!(dbg.breakpoints.get(&g), Some(None));
-                    if !alt_ohne { dbg.breakpoints.insert(g, node); }
+                    let alt_ohne = dbg.breakpoints.get(&g).map(|h| h.schlicht()).unwrap_or(false);
+                    if !alt_ohne { dbg.breakpoints.insert(g, hp); }
                     antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": echt, "verified": true}));
                 }
                 None => antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": 0, "verified": false})),
