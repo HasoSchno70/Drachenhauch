@@ -92,6 +92,11 @@ enum Cmd {
     /// Tacho-Bogen mit EINER Variante ab -- raylibs `draw_ring` kann alle drei.
     /// Winkel in Grad, 0 = rechts, wachsend im Uhrzeigersinn (Bildschirm-y).
     Ring(i32, i32, f32, f32, f32, f32, Color, bool),
+    /// Weicher Lichtfleck: Mitte, Halbachsen, Farbe (ihr Alpha = Deckkraft in
+    /// der Mitte). Nach aussen laeuft er glockenfoermig auf null aus -- EIN
+    /// Faecher aus Dreiecken mit Farbe je Ecke statt gestapelter Ellipsen,
+    /// deren Kanten man als Stufen saehe.
+    Lichtfleck(i32, i32, f32, f32, Color),
     BlendMode(i32),                                    // 0=alpha,1=additive,2=multiplied,4=subtract
     RtDraw(usize, i32, i32, f32, Color, bool),         // render-target idx, x, y, scale, tint, flip_v
 }
@@ -3128,6 +3133,13 @@ impl Graphics {
 
     // --- Blend-Modes (Batch 2) ---
     pub fn blend_mode(&mut self, mode: i32) { self.emit(Cmd::BlendMode(mode)); }
+    /// Ein weicher Lichtfleck (siehe `Cmd::Lichtfleck`); `c` mit Alpha wie
+    /// ueberall (0 = deckend).
+    pub fn lichtfleck(&mut self, cx: i32, cy: i32, rx: i32, ry: i32, c: i64) {
+        let (cx, cy) = self.w2s(cx, cy);
+        let (rx, ry) = (self.ssize(rx), self.ssize(ry));
+        self.emit(Cmd::Lichtfleck(cx, cy, rx as f32, ry as f32, col(c)));
+    }
 
     // --- Prozedurale Texturen (Batch 3): liefern ein IMAGE-Handle ---
 
@@ -6155,6 +6167,63 @@ fn zeichne_schraeg(f: &raylib::ffi::Font, txt: &str, x: f32, y: f32, size: f32, 
     cx - x
 }
 
+/// Deckkraft eines Lichtflecks bei Abstand `d` (0 = Mitte, 1 = Rand): wie
+/// der Kegel einer Lampe eine fast gleichmaessige helle Flaeche, die nach
+/// aussen weich (Kosinus) auf genau null auslaeuft -- nur ein leichter
+/// Abfall zur Mitte hin, sonst saehe er aus wie eine Leuchtkugel.
+pub fn lichtfleck_anteil(d: f32) -> f32 {
+    if d >= 1.0 { return 0.0; }
+    const INNEN: f32 = 0.35;
+    let flach = 1.0 - 0.15 * (d / INNEN).min(1.0);
+    if d <= INNEN { return flach; }
+    let t = (d - INNEN) / (1.0 - INNEN);
+    (flach * 0.5 * (1.0 + (std::f32::consts::PI * t).cos())).clamp(0.0, 1.0)
+}
+
+/// Den Lichtfleck als Ringe aus Dreiecken zeichnen, Farbe je Ecke.
+fn lichtfleck_zeichnen(cx: f32, cy: f32, rx: f32, ry: f32, col: Color) {
+    use raylib::ffi;
+    if rx < 1.0 || ry < 1.0 { return; }
+    const RINGE: usize = 14;
+    const SEG: usize = 72;
+    let a0 = col.a as f32;
+    let a_bei = |k: usize| -> u8 { (a0 * lichtfleck_anteil(k as f32 / RINGE as f32)).round().clamp(0.0, 255.0) as u8 };
+    let (sn, cs): (Vec<f32>, Vec<f32>) = (0..=SEG).map(|j| {
+        let w = j as f32 / SEG as f32 * std::f32::consts::TAU;
+        (w.sin(), w.cos())
+    }).unzip();
+    unsafe {
+        // Die Drehrichtung der Dreiecke soll nicht entscheiden, ob sie
+        // gezeichnet werden: Rueckseiten-Verwerfen fuer diesen Fleck aus. Der
+        // Stapel davor und der eigene muessen dafuer gezeichnet sein, sonst
+        // gilt die Einstellung fuer die falschen Dreiecke.
+        ffi::rlDrawRenderBatchActive();
+        ffi::rlDisableBackfaceCulling();
+        for k in 0..RINGE {
+            let (r0, r1) = (k as f32 / RINGE as f32, (k + 1) as f32 / RINGE as f32);
+            let (a_in, a_out) = (a_bei(k), a_bei(k + 1));
+            if a_in == 0 && a_out == 0 { continue; }
+            ffi::rlCheckRenderBatchLimit((SEG * 6) as i32);
+            ffi::rlBegin(ffi::RL_TRIANGLES as i32);
+            for j in 0..SEG {
+                let p = |r: f32, i: usize| (cx + cs[i] * rx * r, cy + sn[i] * ry * r);
+                let (i0, i1) = (p(r0, j), p(r0, j + 1));
+                let (o0, o1) = (p(r1, j), p(r1, j + 1));
+                // Gegen den Uhrzeigersinn, wie raylib es will.
+                ffi::rlColor4ub(col.r, col.g, col.b, a_in); ffi::rlVertex2f(i0.0, i0.1);
+                ffi::rlColor4ub(col.r, col.g, col.b, a_out); ffi::rlVertex2f(o1.0, o1.1);
+                ffi::rlColor4ub(col.r, col.g, col.b, a_out); ffi::rlVertex2f(o0.0, o0.1);
+                ffi::rlColor4ub(col.r, col.g, col.b, a_in); ffi::rlVertex2f(i0.0, i0.1);
+                ffi::rlColor4ub(col.r, col.g, col.b, a_in); ffi::rlVertex2f(i1.0, i1.1);
+                ffi::rlColor4ub(col.r, col.g, col.b, a_out); ffi::rlVertex2f(o1.0, o1.1);
+            }
+            ffi::rlEnd();
+        }
+        ffi::rlDrawRenderBatchActive();
+        ffi::rlEnableBackfaceCulling();
+    }
+}
+
 /// Breite eines Textes so, wie `zeichne_text` ihn setzt -- fuer die Linien
 /// unter bzw. durch den Text, die im Abspielen gemessen werden muessen.
 #[allow(clippy::too_many_arguments)]
@@ -6679,6 +6748,9 @@ fn render_scene<D: RaylibDraw>(
                         let seg = (((bis - von).abs() / 4.0).ceil() as i32).clamp(6, 180);
                         if *filled { d.draw_ring(mitte, ri, ro, *von, *bis, seg, *col); }
                         else { d.draw_ring_lines(mitte, ri, ro, *von, *bis, seg, *col); }
+                    }
+                    Cmd::Lichtfleck(cx, cy, rx, ry, col) => {
+                        lichtfleck_zeichnen((cx * s) as f32, (cy * s) as f32, rx * s as f32, ry * s as f32, *col);
                     }
                     Cmd::GradientRect(x1, y1, x2, y2, c1, c2, vertical) => {
                         let x = (*x1).min(*x2) * s; let y = (*y1).min(*y2) * s;

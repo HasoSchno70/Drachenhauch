@@ -290,7 +290,8 @@ danach nach. Pfade vergleicht sie mit `SAMEFILE` -- `helfer.dh` kann als
 `C:\...\helfer.dh` oder `C:/.../helfer.dh` ankommen.
 
 **Lichtstreif** (`GUI_WINDOW_GLOW`): beim Start und wenn ein Programm
-losgeht, zieht ein warmer Streif von links nach rechts über das Fenster.
+losgeht, streift ein warmes Licht schräg von rechts nach links über das
+Fenster, und die Rahmen blitzen auf, wo es sie kreuzt (Art `rahmen`).
 Abschaltbar in den Einstellungen (zweite Spalte, `glanz` in der ide.json);
 ein Testlauf mit `DHRT_FRAMES` zeigt ihn nur mit `DH_IDE_GLANZ=1`. Der Profiler
 (`dhrt profile`) liefert am Ende eine JSON-Zeile mit `total_time`, `lines`

@@ -25,7 +25,7 @@ IMPORT "gui"
 | `GUI_WINDOW_MOVABLE(win, an)` | — | per Titelleiste verschiebbar (Default: an) |
 | `GUI_WINDOW_TITLE(win, titel$)` | — | Titelleiste nachträglich beschriften (Name des Dokuments, „Befehle" / „Datei öffnen") |
 | `GUI_WINDOW_GLOW(win [, farbe [, dauer_ms]])` | — | ein Lichtstreif zieht über das Fenster (Vorgabe warm, 1200 ms, von links nach rechts) -- siehe [Lichtstreif](#lichtstreif) |
-| `GUI_WINDOW_GLOW_SET(win, schluessel$, wert)` | — | Lichtstreif einstellen: `farbe`, `dauer`, `pause` (ms bis zur Wiederkehr, 0 = einmal), `richtung` (rechts/links/unten/oben), `breite`, `staerke` (0..1), `rand` |
+| `GUI_WINDOW_GLOW_SET(win, schluessel$, wert)` | — | Lichtstreif einstellen: `farbe`, `dauer`, `pause` (ms bis zur Wiederkehr, 0 = einmal), `richtung` (rechts/links/unten/oben), `breite`, `staerke` (0..1), `rand`, `art` (`streif`, `lampe` oder `rahmen`) |
 | `GUI_WINDOW_GLOW_STOP(win)` | — | den Lichtstreif anhalten |
 | `GUI_WINDOW_GLOWING(win)` | BOOLEAN | läuft ein Lichtstreif (auch in der Pause zwischen zwei)? |
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | Schließen-Button anzeigen (Default: aus) |
@@ -3561,6 +3561,18 @@ GUI_WINDOW_GLOW_SET(win, "richtung", "oben")  ' von unten nach oben
 GUI_WINDOW_GLOW_SET(win, "pause", 3000)       ' alle drei Sekunden wieder
 GUI_WINDOW_GLOW(win)
 ```
+
+Drei **Arten** (`GUI_WINDOW_GLOW_SET(win, "art", ...)`):
+
+| Art | Wirkung |
+|---|---|
+| `streif` (Vorgabe) | ein Band quer über das Fenster, wie oben beschrieben |
+| `lampe` | wie eine Taschenlampe: das Fenster dunkelt leicht ab, ein warmer Lichtkegel mit weichem Rand zieht im flachen Bogen darüber, der Text darin wird heller |
+| `rahmen` | Streiflicht: eine schräge Lichtkante zieht flach darüber, und jede Kante, die sie kreuzt -- Fensterrahmen, Rahmen der Widgets --, blitzt kurz auf; der Inhalt bekommt nur einen schwachen Schimmer, abgedunkelt wird nichts |
+
+Der weiche Rand von Lampe und Rahmen ist ein eigener Zeichenbefehl der
+Laufzeit (ein Fächer aus Dreiecken mit Farbe je Ecke), darum ohne sichtbare
+Stufen.
 
 Farbe `-1` ist die Akzentfarbe des Themas. `breite` ist ein Anteil der
 Fensterbreite (bzw. -höhe bei `oben`/`unten`, Vorgabe 0,35), `staerke`
