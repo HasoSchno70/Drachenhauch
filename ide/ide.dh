@@ -471,8 +471,9 @@ END IF
 DIM vorspannAn AS BOOLEAN : vorspannAn = TRUE
 IF JSON_HAS(konfig, "vorspann") THEN vorspannAn = JSON_GET_BOOL(konfig, "vorspann")
 ' Der Lichtstreif (GUI_WINDOW_GLOW): beim Start und wenn ein Programm
-' losgeht, zieht ein warmer Streif von links nach rechts ueber das Fenster --
-' ein neuer Drachenhauch. Abschalten in den Einstellungen (`glanz`).
+' losgeht, streift ein warmes Licht schraeg von rechts nach links ueber das
+' Fenster, und die Rahmen blitzen auf, wo es sie kreuzt -- ein neuer
+' Drachenhauch. Abschalten in den Einstellungen (`glanz`).
 DIM glanzAn AS BOOLEAN : glanzAn = TRUE
 IF JSON_HAS(konfig, "glanz") THEN glanzAn = JSON_GET_BOOL(konfig, "glanz")
 ' Der Schriftzug schwach hinter dem Code -- er fuellt das Feld, rollt aber
@@ -2337,7 +2338,7 @@ SUB einstellungenNachziehen()
     IF GUI_CHECKED(cbGlanz) <> glanzAn THEN
         glanzAn = GUI_CHECKED(cbGlanz)
         konfigSichern()
-        IF glanzAn THEN lichtstreif(1200)
+        IF glanzAn THEN lichtstreif(1800)
         protokoll("glanz " + IIF(glanzAn, "an", "aus"))
     END IF
     IF GUI_CHECKED(cbVorschau) <> vorschauAn THEN
@@ -4473,6 +4474,8 @@ END SUB
 SUB lichtstreif(dauer AS INTEGER)
     IF NOT glanzAn THEN RETURN
     IF GETENV$("DHRT_FRAMES") <> "" AND GETENV$("DH_IDE_GLANZ") <> "1" THEN RETURN
+    GUI_WINDOW_GLOW_SET(win, "art", "rahmen")
+    GUI_WINDOW_GLOW_SET(win, "richtung", "links")
     GUI_WINDOW_GLOW(win, &HFFB050, dauer)
     IF GETENV$("DH_IDE_GLANZ") = "1" THEN protokoll("glanz " + STR$(dauer))
 END SUB
@@ -8565,7 +8568,7 @@ FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
     prozessDatei = datei
     prozessArt = art
     prozess = PROCESS_START("dhrt", art, prozessDatei)
-    lichtstreif(900)
+    lichtstreif(1500)
     GUI_SET_TEXT(lblAusgabe, "Ausgabe: " + BASENAME(prozessDatei) + " läuft ...")
     GUI_SET_TEXT(lblStatus, "Gestartet: " + prozessDatei)
     RETURN TRUE
@@ -11152,7 +11155,7 @@ handbuchSchrift(handbuchGroesse)
 IF codeFont >= 0 THEN GUI_RICHTEXT_SET(rtHandbuch, "codeschrift", codeFont)
 hbFarben()
 protokoll("projekt " + projektOrdner)
-lichtstreif(1600)
+lichtstreif(2200)
 protokoll("bereit")
 
 DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
