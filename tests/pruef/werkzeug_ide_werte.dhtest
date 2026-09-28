@@ -1,0 +1,53 @@
+' Werte im Code: haelt der Debugger, stehen hinter den Zeilen vom Kopf des
+' Unterprogramms bis zur Haltezeile die Variablen, die darin vorkommen, mit
+' ihrem Wert (GUI_TEXTAREA_HINTS). Beim Weiterlaufen verschwinden sie. Das
+' Protokoll nennt jede Zeile ("codewert N: ...").
+--- seriell
+
+--- langsam
+=== im halt stehen die werte hinter den zeilen
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 5, 1)
+    befehl("haltepunkt")
+    befehl("debug")
+END IF
+IF prBild = 200 THEN
+    protokoll("pr feld " + STR$(werteFeld >= 0))
+    befehl("weiter_d")
+    ' Gleich nach dem Befehl, nicht erst am Programmende (das raeumt auch).
+    protokoll("pr danach " + STR$(werteFeld))
+END IF
+IF prBild = 230 THEN EXIT(0)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM punkte AS INTEGER : punkte = 7
+SUB zaehlen(n AS INTEGER)
+    DIM summe AS INTEGER : summe = n * 2
+    ' punkte im Kommentar zaehlt nicht
+    PRINT(summe + punkte)
+END SUB
+zaehlen(5)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 9) = "codewert " OR LEFT$(L[i], 10) = "codewerte " OR LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 12) = "debug pause " THEN PRINT L[i]
+NEXT
+--- erwartet
+codewerte 3
+codewert 5: summe = 10   punkte = 7
+codewert 3: summe = 10   n = 5
+codewert 2: n = 5
+debug pause 5
+pr feld TRUE
+pr danach -1

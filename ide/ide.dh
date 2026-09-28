@@ -258,6 +258,8 @@ DIM prozessRest AS STRING : prozessRest = ""        ' halbe Zeile aus stdout
 
 ' Debugger
 DIM debugPause AS BOOLEAN : debugPause = FALSE
+' Das Feld, in dem die Werte des letzten Halts hinter den Zeilen stehen.
+DIM werteFeld AS GUI_WIDGET : werteFeld = -1
 DIM debugErst AS BOOLEAN : debugErst = FALSE
 DIM debugZeile AS INTEGER : debugZeile = 0
 ' Die Datei, in der er steht -- mit IMPORT nicht mehr immer die gestartete.
@@ -1202,6 +1204,7 @@ DIM probSpalte AS ARRAY OF INTEGER : probSpalte = []
 DIM probLaenge AS ARRAY OF INTEGER : probLaenge = []
 DIM probMeldung AS ARRAY OF STRING : probMeldung = []
 DIM probFehler AS ARRAY OF BOOLEAN : probFehler = []
+DIM probHinw AS ARRAY OF BOOLEAN : probHinw = []
 ' Je Meldung ihre Korrekturen als JSON-Text (leer = keine), aus CODE_CHECK$.
 DIM probKorr AS ARRAY OF STRING : probKorr = []
 DIM hbGesetzt AS BOOLEAN : hbGesetzt = TRUE
@@ -2694,6 +2697,7 @@ SUB minimapZeichnen()
     IF ta = probFeld THEN
         DIM pk AS INTEGER
         FOR pk = 0 TO LEN(probZeile) - 1
+            IF probHinw[pk] THEN CONTINUE
             DIM py AS INTEGER : py = cy + MIN(ch - 3, (probZeile[pk] - 1) \ proZeile)
             BOX(cx + cw - 5, py, cx + cw - 2, py + 2, IIF(probFehler[pk], &HE84848, &HE0B040))
         NEXT
@@ -3424,6 +3428,9 @@ END SUB
 
 ' --- Pruefen -----------------------------------------------------------
 DIM problemZeilen AS ARRAY OF INTEGER : problemZeilen = []
+' Je Eintrag: nur ein Hinweis (etwa eine unbenutzte Variable)? Hinweise stehen
+' grau in der Liste, zaehlen nicht als Problem und bekommen keine Marke.
+DIM problemHinweis AS ARRAY OF BOOLEAN : problemHinweis = []
 
 SUB pruefen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
@@ -3445,14 +3452,24 @@ SUB pruefen()
     DIM zeilen[MAX(n, 1)] AS INTEGER
     DIM i AS INTEGER
     DIM fehler AS INTEGER : fehler = 0
+    DIM hinweise AS INTEGER : hinweise = 0
+    problemHinweis = []
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = STR$(i)
         zeilen[i] = JSON_GET_INT(j, p + ".zeile")
         DIM art AS STRING : art = JSON_GET_STRING(j, p + ".schwere")
         IF art = "fehler" THEN fehler = fehler + 1
+        IF art = "hinweis" THEN hinweise = hinweise + 1
+        ARRAY_PUSH(problemHinweis, art = "hinweis")
         IF problemModus = 0 THEN
             GUI_LISTBOX_ADD(lstProbleme, "Zeile " + STR$(zeilen[i]) + ": " + JSON_GET_STRING(j, p + ".meldung"))
-            IF art = "fehler" THEN GUI_LISTBOX_COLOR(lstProbleme, i, &HE06060) ELSE GUI_LISTBOX_COLOR(lstProbleme, i, &HE0C060)
+            IF art = "fehler" THEN
+                GUI_LISTBOX_COLOR(lstProbleme, i, &HE06060)
+            ELSEIF art = "hinweis" THEN
+                GUI_LISTBOX_COLOR(lstProbleme, i, &H909CA8)
+            ELSE
+                GUI_LISTBOX_COLOR(lstProbleme, i, &HE0C060)
+            END IF
         END IF
     NEXT
     problemZeilen = zeilen
@@ -3461,10 +3478,14 @@ SUB pruefen()
         IF n = 0 THEN
             GUI_SET_TEXT(lblProbleme, "Probleme: keine")
         ELSE
-            GUI_SET_TEXT(lblProbleme, "Probleme: " + STR$(fehler) + " Fehler, " + STR$(n - fehler) + " Warnungen")
+            DIM zusatz AS STRING : zusatz = ""
+            IF hinweise > 0 THEN zusatz = ", " + STR$(hinweise) + IIF(hinweise = 1, " Hinweis", " Hinweise")
+            GUI_SET_TEXT(lblProbleme, "Probleme: " + STR$(fehler) + " Fehler, " + STR$(n - fehler - hinweise) + " Warnungen" + zusatz)
         END IF
     END IF
-    protokoll("geprueft " + STR$(n))
+    ' Gezaehlt werden Fehler und Warnungen; Hinweise sind kein Problem.
+    protokoll("geprueft " + STR$(n - hinweise))
+    IF hinweise > 0 THEN protokoll("hinweise " + STR$(hinweise))
     gliederungFuellen(GUI_TEXT(ta))
 END SUB
 
@@ -3486,7 +3507,7 @@ SUB wellenSetzen(ta AS GUI_WIDGET, j AS JSON_HANDLE, n AS INTEGER)
     DIM wl AS ARRAY OF INTEGER : wl = []
     DIM wf AS ARRAY OF INTEGER : wf = []
     probFeld = ta
-    probZeile = [] : probSpalte = [] : probLaenge = [] : probMeldung = [] : probFehler = [] : probKorr = []
+    probZeile = [] : probSpalte = [] : probLaenge = [] : probMeldung = [] : probFehler = [] : probKorr = [] : probHinw = []
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = STR$(i)
@@ -3497,10 +3518,12 @@ SUB wellenSetzen(ta AS GUI_WIDGET, j AS JSON_HANDLE, n AS INTEGER)
         IF z < 1 OR z > LEN(tz) THEN CONTINUE
         ARRAY_PUSH(ws, anfang[z - 1] + sp - 1)
         ARRAY_PUSH(wl, ln)
-        ARRAY_PUSH(wf, IIF(JSON_GET_STRING(j, p + ".schwere") = "fehler", &HE84848, &HE0B040))
+        DIM schw AS STRING : schw = JSON_GET_STRING(j, p + ".schwere")
+        ARRAY_PUSH(wf, IIF(schw = "fehler", &HE84848, IIF(schw = "hinweis", &H8894A0, &HE0B040)))
         ARRAY_PUSH(probZeile, z) : ARRAY_PUSH(probSpalte, sp) : ARRAY_PUSH(probLaenge, ln)
         ARRAY_PUSH(probMeldung, JSON_GET_STRING(j, p + ".meldung"))
         ARRAY_PUSH(probFehler, JSON_GET_STRING(j, p + ".schwere") = "fehler")
+        ARRAY_PUSH(probHinw, JSON_GET_STRING(j, p + ".schwere") = "hinweis")
         IF JSON_HAS(j, p + ".korrekturen") THEN
             ARRAY_PUSH(probKorr, JSON_STRINGIFY(JSON_GET_JSON(j, p + ".korrekturen")))
         ELSE
@@ -3569,8 +3592,10 @@ SUB korrekturAnwenden(kennung AS STRING)
         DIM q AS STRING : q = pfad + "." + STR$(a)
         DIM az AS INTEGER : az = JSON_GET_INT(j, q + ".zeile")
         DIM asp AS INTEGER : asp = JSON_GET_INT(j, q + ".spalte")
-        DIM al AS INTEGER : al = JSON_GET_INT(j, q + ".laenge")
-        GUI_TEXTAREA_SELECT(ta, az, asp, az, asp + al)
+        ' Bis wohin, auch ueber das Zeilenende (eine Zeile entfernen).
+        DIM bz AS INTEGER : bz = JSON_GET_INT(j, q + ".bis_zeile")
+        DIM bsp AS INTEGER : bsp = JSON_GET_INT(j, q + ".bis_spalte")
+        GUI_TEXTAREA_SELECT(ta, az, asp, bz, bsp)
         GUI_TEXTAREA_INSERT(ta, JSON_GET_STRING(j, q + ".text"))
     NEXT
     GUI_FOCUS(ta)
@@ -4657,6 +4682,9 @@ SUB markenNachziehen()
         END IF
     NEXT
     FOR i = 0 TO LEN(problemZeilen) - 1
+        IF i < LEN(problemHinweis) THEN
+            IF problemHinweis[i] THEN CONTINUE
+        END IF
         ARRAY_PUSH(zeilen, problemZeilen[i]) : ARRAY_PUSH(farben, &HD08040) : schl = schl + "f" + STR$(problemZeilen[i])
         ARRAY_PUSH(arten, "f") : ARRAY_PUSH(idx, i)
     NEXT
@@ -8825,6 +8853,7 @@ SUB debugSchritt(cmd AS STRING)
     END IF
     debugSenden(cmd)
     debugPause = FALSE
+    debugWerteLoeschen()
     GUI_SET_TEXT(lblDebug, "Debugger: läuft ...")
 END SUB
 
@@ -8984,9 +9013,78 @@ SUB debugHaltZeigen(j AS JSON_HANDLE)
     dateiOeffnen(debugDatei)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, debugZeile, 1)
+    IF ta >= 0 THEN debugWerteZeigen(ta, j)
     markenSchluessel = ""
     protokoll("debug pause " + STR$(debugZeile))
     IF NOT SAMEFILE(debugDatei, prozessDatei) THEN protokoll("debug datei " + BASENAME(debugDatei))
+END SUB
+
+' Werte im Code: hinter jede Zeile vom Kopf des Unterprogramms (oder
+' hoechstens 60 Zeilen davor) bis zur Haltezeile, welche Variablen darin
+' vorkommen und was sie gerade haben -- lokal vor global, wie das Programm
+' sie sieht. Kommentare und Zeichenketten zaehlen nicht; je Zeile hoechstens
+' vier, ein langer Wert wird gekuerzt.
+SUB debugWerteZeigen(ta AS GUI_WIDGET, j AS JSON_HANDLE)
+    debugWerteLoeschen()
+    DIM werte AS MAP OF STRING : werte = {}
+    DIM bereich AS STRING
+    FOR EACH bereich IN ("globals", "locals")
+        IF NOT JSON_HAS(j, bereich) THEN CONTINUE
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(j, bereich) - 1
+            DIM p AS STRING : p = bereich + "." + STR$(i)
+            DIM wert AS STRING : wert = JSON_GET_STRING(j, p + ".value")
+            IF LEN(wert) > 30 THEN wert = LEFT$(wert, 29) + "…"
+            MAPPUT(werte, LOWER$(JSON_GET_STRING(j, p + ".name")), wert)
+        NEXT
+    NEXT
+    IF MAPSIZE(werte) = 0 THEN RETURN
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM nr AS ARRAY OF INTEGER : nr = []
+    DIM txt AS ARRAY OF STRING : txt = []
+    DIM z AS INTEGER
+    FOR z = MIN(debugZeile, LEN(zeilen)) TO MAX(1, debugZeile - 60) STEP -1
+        DIM zeile AS STRING : zeile = zeilen[z - 1]
+        DIM teile AS ARRAY OF STRING : teile = []
+        DIM gesehen AS ARRAY OF STRING : gesehen = []
+        DIM wort AS STRING : wort = ""
+        DIM im_text AS BOOLEAN : im_text = FALSE
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(zeile)
+            DIM c AS STRING : c = ""
+            IF k < LEN(zeile) THEN c = MID$(zeile, k, 1)
+            IF c = CHR$(34) THEN im_text = NOT im_text
+            IF NOT im_text AND c = "'" THEN c = "" : k = LEN(zeile)
+            IF NOT im_text AND c <> "" AND wortzeichenAn(zeile, k) THEN
+                wort = wort + c
+            ELSE
+                IF wort <> "" THEN
+                    DIM klein AS STRING : klein = LOWER$(wort)
+                    IF MAPHAS(werte, klein) AND ARRAY_INDEXOF(gesehen, klein) < 0 AND LEN(teile) < 4 THEN
+                        ARRAY_PUSH(gesehen, klein)
+                        ARRAY_PUSH(teile, wort + " = " + MAPGET(werte, klein))
+                    END IF
+                END IF
+                wort = ""
+            END IF
+        NEXT
+        IF LEN(teile) > 0 THEN ARRAY_PUSH(nr, z) : ARRAY_PUSH(txt, JOIN$(teile, "   "))
+        DIM kopf AS STRING : kopf = UPPER$(LTRIM$(zeile))
+        IF LEFT$(kopf, 4) = "SUB " OR LEFT$(kopf, 9) = "FUNCTION " OR LEFT$(kopf, 9) = "PROPERTY " THEN BREAK
+    NEXT
+    GUI_TEXTAREA_HINTS(ta, nr, txt)
+    werteFeld = ta
+    protokoll("codewerte " + STR$(LEN(nr)))
+    DIM wi AS INTEGER
+    FOR wi = 0 TO LEN(nr) - 1
+        protokoll("codewert " + STR$(nr[wi]) + ": " + txt[wi])
+    NEXT
+END SUB
+
+SUB debugWerteLoeschen()
+    IF werteFeld < 0 THEN RETURN
+    GUI_TEXTAREA_HINTS(werteFeld, [], [])
+    werteFeld = -1
 END SUB
 
 ' Der Aufrufstapel: innen oben. Das Hauptprogramm heisst im Kind
@@ -9060,6 +9158,7 @@ SUB debugRunTo(zeile AS INTEGER)
     END IF
     PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("run-to") + "," + jsonText$("line") + ":" + STR$(zeile) + "," + jsonText$("file") + ":" + jsonText$(datei) + "}" + NL)
     debugPause = FALSE
+    debugWerteLoeschen()
     GUI_SET_TEXT(lblDebug, "Debugger: läuft bis Zeile " + STR$(zeile) + " ...")
     protokoll("bis zeile " + STR$(zeile))
 END SUB
@@ -9451,6 +9550,7 @@ SUB prozessNachsehen()
         prozess = -1
         IF prozessArt = "debug" THEN
             debugPause = FALSE : debugZeile = 0
+            debugWerteLoeschen()
             debugPanelZeigen(FALSE)
         END IF
         IF fertigNachStopp THEN
