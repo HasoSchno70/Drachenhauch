@@ -928,7 +928,7 @@
   "GUI_WINDOW_GET_Y": "INTEGER — Lage und Groesse des Fensters auf dem Bildschirm",
   "GUI_WINDOW_GLOW": "ein Lichtstreif zieht über das Fenster (Vorgabe warm, 1200 ms, von links nach rechts) -- siehe Lichtstreif",
   "GUI_WINDOW_GLOWING": "BOOLEAN — läuft ein Lichtstreif (auch in der Pause zwischen zwei)?",
-  "GUI_WINDOW_GLOW_SET": "Lichtstreif einstellen: farbe, dauer, pause (ms bis zur Wiederkehr, 0 = einmal), richtung (rechts/links/unten/oben), breite, staerke (0..1), rand",
+  "GUI_WINDOW_GLOW_SET": "Lichtstreif einstellen: farbe, dauer, pause (ms bis zur Wiederkehr, 0 = einmal), richtung (rechts/links/unten/oben), breite, staerke (0..1), rand, art (streif, lampe oder rahmen)",
   "GUI_WINDOW_GLOW_STOP": "den Lichtstreif anhalten",
   "GUI_WINDOW_MODAL": "ein eigenes Fenster modal schalten: alles andere liegt hinter dem Schleier und nimmt keine Eingabe an",
   "GUI_WINDOW_MOVABLE": "per Titelleiste verschiebbar (Default: an)",

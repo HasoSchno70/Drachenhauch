@@ -1830,6 +1830,22 @@ Bau/die IDE davor: alle neuen Faelle fallen, der Fall "ohne now" nicht.
 braucht Schraegstriche -- ein Rueckstrich ist dort ein Escape, und die ganze
 Zeile wird still verworfen.
 
+**Lichtstreif mit drei Arten (2026-09-28, Wunsch des Nutzers):** der
+Streif war ein Band, das ueber das Fenster lief. `GUI_WINDOW_GLOW_SET(win,
+"art", ...)`: `streif` (Vorgabe, wie bisher), `lampe` (Fenster multipliziert
+abgedunkelt, weicher Lichtkegel im flachen Bogen additiv darueber) und
+`rahmen` (Streiflicht: eine schraege Lichtkante, `draw_streiflicht`; wo sie
+Fensterrahmen oder Widget-Rahmen kreuzt, blitzt ein kurzes Stueck auf, der
+Inhalt bekommt nur einen Hauch, nichts wird dunkler). Die IDE nimmt
+`rahmen` von rechts nach links. Neuer Zeichenbefehl `Cmd::Lichtfleck` /
+`Graphics::lichtfleck`: Ringe aus Dreiecken mit Farbe je Ecke ueber rlgl
+(Profil `lichtfleck_anteil`: fast flach, Kosinus-Rand auf genau null),
+Rueckseiten-Verwerfen dafuer aus -- gestapelte Ellipsen zeigten Stufen.
+Tests zwei Faelle in `tests/pruef/gui_glanz.dhtest` (Bildvergleich gegen
+dasselbe Fenster ohne Licht; der Rahmen-Fall sucht die hellste Stelle je
+Kante statt fester Pixel -- die Lage haengt an der Bildzeit); Gegenproben
+ohne Lampen- bzw. Rahmen-Zweig fallen.
+
 ## Coroutines / YIELD
 
 Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.

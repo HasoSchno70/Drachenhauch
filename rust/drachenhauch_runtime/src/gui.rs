@@ -2744,6 +2744,13 @@ struct Glanz {
     staerke: f32,
     /// Leuchtet der Rahmen mit?
     rand: bool,
+    /// 0 = Streif (Baender quer ueber das Fenster), 1 = Lampe (das Fenster
+    /// dunkelt ein wenig ab, ein weicher Lichtkegel zieht im Bogen darueber
+    /// -- wie eine Taschenlampe, die jemand darueber schwenkt), 2 = Rahmen
+    /// (Streiflicht: eine schraege Lichtkante zieht darueber, und jede
+    /// Kante, die sie kreuzt -- Fensterrahmen, Rahmen der Widgets --, blitzt
+    /// auf; der Inhalt bekommt nur einen Hauch).
+    art: u8,
     /// Sekunden seit Beginn des Durchgangs; < 0 = aus.
     t: f32,
 }
@@ -2751,11 +2758,11 @@ struct Glanz {
 impl Glanz {
     fn neu() -> Glanz {
         Glanz { farbe: 0xFFB050, dauer: 1.2, pause: 0.0, richtung: 0,
-                breite: 0.35, staerke: 0.55, rand: true, t: -1.0 }
+                breite: 0.35, staerke: 0.55, rand: true, art: 0, t: -1.0 }
     }
 }
 
-const GLANZ_SCHLUESSEL: &str = "farbe, dauer, pause, richtung, breite, staerke, rand";
+const GLANZ_SCHLUESSEL: &str = "farbe, dauer, pause, richtung, breite, staerke, rand, art";
 
 struct Menu {
     label: String,
@@ -4160,6 +4167,15 @@ impl Gui {
             "breite" | "width" => w.glanz.breite = brauche(zahl)?.clamp(0.05, 2.0) as f32,
             "staerke" | "strength" | "intensity" => w.glanz.staerke = brauche(zahl)?.clamp(0.0, 1.0) as f32,
             "rand" | "border" => w.glanz.rand = brauche(zahl)? != 0.0,
+            "art" | "kind" | "style" => {
+                w.glanz.art = match (zahl, text.to_lowercase().as_str()) {
+                    (_, "streif" | "stripe" | "band") => 0,
+                    (_, "lampe" | "taschenlampe" | "licht" | "lamp" | "flashlight" | "spot") => 1,
+                    (_, "rahmen" | "kante" | "streiflicht" | "rim" | "edge") => 2,
+                    (Some(z), _) if z == 0.0 || z == 1.0 || z == 2.0 => z as u8,
+                    _ => return Err(format!("{}: art ist streif, lampe oder rahmen (nicht '{}')", n, text)),
+                };
+            }
             "richtung" | "direction" => {
                 let r = match (zahl, text.to_lowercase().as_str()) {
                     (_, "rechts" | "right") => 0,
@@ -18019,6 +18035,52 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let mut c = -bw + e * (laenge + 2.0 * bw);
         if gl.richtung == 1 || gl.richtung == 3 { c = laenge - c; }
         let alpha = |f: f32| -> i64 { ((f * 255.0).round() as i64).clamp(1, 255) };
+        if gl.art == 2 {
+            self.draw_streiflicht(g, wi, e, staerke, farbe, heiss);
+            return;
+        }
+        if gl.art == 1 {
+            // Die Lampe: erst das Fenster ein wenig abdunkeln (multipliziert,
+            // Farben bleiben, nur dunkler), dann den Lichtkegel additiv darueber
+            // -- ein Hof in der Farbe, der Kegel warm-weiss, ein heller Kern.
+            // Der Kegel zieht im flachen Bogen, wie ein geschwenkter Arm ihn
+            // fuehrt; Anfang und Ende liegen ganz ausserhalb.
+            let kurz = w.min(h) as f32;
+            let ry = (kurz * gl.breite * 1.5).max(12.0);
+            let rx = ry * 1.25;
+            let (lang, quer) = if senkrecht { (h as f32, w as f32) } else { (w as f32, h as f32) };
+            let reich = if senkrecht { ry } else { rx };
+            let mut entlang = -reich * 1.4 + e * (lang + 2.8 * reich);
+            if gl.richtung == 1 || gl.richtung == 3 { entlang = lang - entlang; }
+            let bogen = quer * (0.56 - 0.16 * (p * std::f32::consts::PI).sin());
+            let (cx, cy) = if senkrecht { (x + bogen as i32, y + entlang as i32) }
+                           else { (x + entlang as i32, y + bogen as i32) };
+            let warm = mischen(farbe, 0xFFFFFF, 0.72) & 0xFFFFFF;
+            g.push_clip(x + 1, y + 1, (w - 2).max(0), (h - 2).max(0));
+            let dunkel = (255.0 - 170.0 * staerke).round().clamp(110.0, 255.0) as i64;
+            if dunkel < 255 {
+                g.blend_mode(2);
+                g.box_fill(x + 1, y + 1, x + w - 2, y + h - 2, (dunkel << 16) | (dunkel << 8) | dunkel);
+            }
+            g.blend_mode(1);
+            g.lichtfleck(cx, cy, (rx * 1.7) as i32, (ry * 1.7) as i32, (alpha(staerke * 0.22) << 24) | farbe);
+            g.lichtfleck(cx, cy, rx as i32, ry as i32, (alpha(staerke * 0.55) << 24) | warm);
+            g.lichtfleck(cx, cy, (rx * 0.45) as i32, (ry * 0.45) as i32, (alpha(staerke * 0.25) << 24) | heiss);
+            if gl.rand {
+                // Wo das Licht die Kante streift, leuchtet sie auf.
+                let a = (alpha(staerke * 0.9) << 24) | heiss;
+                if senkrecht {
+                    g.lichtfleck(x + 1, cy, 3, (ry * 1.2) as i32, a);
+                    g.lichtfleck(x + w - 2, cy, 3, (ry * 1.2) as i32, a);
+                } else {
+                    g.lichtfleck(cx, y + 1, (rx * 1.2) as i32, 3, a);
+                    g.lichtfleck(cx, y + h - 2, (rx * 1.2) as i32, 3, a);
+                }
+            }
+            g.blend_mode(0);
+            g.pop_clip();
+            return;
+        }
         // Ein Band: zwei Verlaeufe von durchsichtig zur Farbe und zurueck.
         // Alpha 0 hiesse DECKEND, darum beginnt "durchsichtig" bei 1.
         let band = |g: &mut Graphics, mitte: f32, halb: f32, col: i64, a: i64, q0: i32, q1: i32| {
@@ -18056,6 +18118,83 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             } else {
                 band(g, c, bw * 0.6, heiss, alpha(staerke), y + 1, y + 2);
                 band(g, c, bw * 0.6, heiss, alpha(staerke), y + h - 3, y + h - 2);
+            }
+        }
+        g.blend_mode(0);
+        g.pop_clip();
+    }
+
+    /// Streiflicht (Art "rahmen"): eine schraege Lichtkante, die ueber das
+    /// Fenster zieht, als leuchte jemand flach von der Seite darueber. Hell
+    /// wird nur, was Kanten hat: wo die Linie den Fensterrahmen oder den
+    /// Rahmen eines Widgets kreuzt, blitzt ein kurzes Stueck auf; der Inhalt
+    /// bekommt einen schwachen schraegen Schimmer. `e` ist der Fortschritt
+    /// (0..1, weich), `staerke` schon mit der Huelle verrechnet.
+    fn draw_streiflicht(&self, g: &mut Graphics, wi: usize, e: f32, staerke: f32, farbe: i64, heiss: i64) {
+        let win = &self.windows[wi];
+        let gl = &win.glanz;
+        let (x, y, w, h) = (win.x, win.y, win.w, win.h);
+        let senkrecht = gl.richtung >= 2;
+        let (lang, quer) = if senkrecht { (h as f32, w as f32) } else { (w as f32, h as f32) };
+        // Die Neigung: oben liegt die Linie um `d` weiter vorn als unten.
+        let d = quer * 0.55;
+        let rand = lang * 0.08 + d;
+        let mut c = -rand + e * (lang + 2.0 * rand);
+        if gl.richtung == 1 || gl.richtung == 3 { c = lang - c; }
+        let vor = if gl.richtung == 1 || gl.richtung == 3 { -1.0 } else { 1.0 };
+        // u = entlang der Laufrichtung, v = quer dazu (0 = oben/links).
+        let u_bei = |v: f32| c + vor * d * (0.5 - v / quer.max(1.0));
+        let punkt = |u: f32, v: f32| -> (i32, i32) {
+            if senkrecht { (x + v as i32, y + u as i32) } else { (x + u as i32, y + v as i32) }
+        };
+        let alpha = |f: f32| -> i64 { ((f * 255.0).round() as i64).clamp(1, 255) };
+        // Ein Aufblitzen an einer Kante: laenglich entlang der Kante, ein Hof
+        // in der Farbe und ein heisser Kern.
+        let blitz = |g: &mut Graphics, u: f32, v: f32, laenge: f32, entlang_u: bool, st: f32| {
+            let (px, py) = punkt(u, v);
+            let (lx, ly) = if entlang_u != senkrecht { (laenge as i32, 3) } else { (3, laenge as i32) };
+            let (hx, hy) = if entlang_u != senkrecht { ((laenge * 1.8) as i32, 7) } else { (7, (laenge * 1.8) as i32) };
+            g.lichtfleck(px, py, hx, hy, (alpha(st * 0.35) << 24) | farbe);
+            g.lichtfleck(px, py, lx, ly, (alpha(st) << 24) | heiss);
+        };
+        g.push_clip(x, y, w.max(0), h.max(0));
+        g.blend_mode(1);
+        // Der Schimmer: Flecke entlang der Linie, die sich zu einem weichen
+        // schraegen Band ueberlagern.
+        let n = 12;
+        for k in 0..n {
+            let v = (k as f32 + 0.5) / n as f32 * quer;
+            let (px, py) = punkt(u_bei(v), v);
+            let (rx, ry) = (quer * 0.10, quer / n as f32 * 1.6);
+            let (ax, ay) = if senkrecht { (ry as i32, rx as i32) } else { (rx as i32, ry as i32) };
+            g.lichtfleck(px, py, ax, ay, (alpha(staerke * 0.07) << 24) | farbe);
+        }
+        // Der Fensterrahmen: oben und unten, und die Seiten, wenn die Linie
+        // sie gerade kreuzt.
+        let lg = (lang * 0.10).max(24.0);
+        blitz(g, u_bei(0.0), 1.0, lg, true, staerke);
+        blitz(g, u_bei(quer), quer - 2.0, lg, true, staerke);
+        for kante in [1.0, lang - 2.0] {
+            // u_bei(v) = kante  =>  v = quer * (0.5 - (kante - c) / (vor * d))
+            let v = quer * (0.5 - (kante - c) / (vor * d));
+            if v >= 0.0 && v <= quer { blitz(g, kante, v, (quer * 0.12).max(20.0), false, staerke); }
+        }
+        // Die Rahmen der Widgets, etwas leiser.
+        for wdg in &win.widgets {
+            if !self.widget_shown(wi, wdg) || wdg.w < 30 || wdg.h < 16 { continue; }
+            if matches!(wdg.kind, Kind::Label | Kind::Layout | Kind::Separator) { continue; }
+            let (ax, ay, aw, ah) = self.abs_rect(wi, wdg);
+            // Das Widget in u/v des Fensters.
+            let (u0, v0, ul, vl) = if senkrecht { ((ay - y) as f32, (ax - x) as f32, ah as f32, aw as f32) }
+                                   else { ((ax - x) as f32, (ay - y) as f32, aw as f32, ah as f32) };
+            let klein = (ul * 0.18).clamp(10.0, lg);
+            for vk in [v0, v0 + vl - 1.0] {
+                let u = u_bei(vk);
+                if u >= u0 && u <= u0 + ul { blitz(g, u, vk, klein, true, staerke * 0.7); }
+            }
+            for uk in [u0, u0 + ul - 1.0] {
+                let v = quer * (0.5 - (uk - c) / (vor * d));
+                if v >= v0 && v <= v0 + vl { blitz(g, uk, v, (vl * 0.25).clamp(8.0, 40.0), false, staerke * 0.7); }
             }
         }
         g.blend_mode(0);
