@@ -6158,9 +6158,22 @@ impl<'p> Vm<'p> {
                     // Meldung hingehoert (lsp::fehler_bereich).
                     let von = d["range"]["start"]["character"].as_u64().unwrap_or(0);
                     let bis = d["range"]["end"]["character"].as_u64().unwrap_or(von + 1);
-                    serde_json::json!({"zeile": zeile, "schwere": schwere,
+                    let mut e = serde_json::json!({"zeile": zeile, "schwere": schwere,
                                        "meldung": d["message"].as_str().unwrap_or(""),
-                                       "spalte": von + 1, "laenge": bis.saturating_sub(von).max(1)})
+                                       "spalte": von + 1, "laenge": bis.saturating_sub(von).max(1)});
+                    // Korrekturen ab 1 gezaehlt wie alles hier: je Aenderung
+                    // Zeile, Spalte, Laenge (0 = einfuegen) und der neue Text.
+                    if let Some(k) = d["data"]["korrekturen"].as_array() {
+                        e["korrekturen"] = serde_json::Value::Array(k.iter().map(|k| serde_json::json!({
+                            "titel": k["titel"],
+                            "aenderungen": k["aenderungen"].as_array().cloned().unwrap_or_default().iter().map(|a| {
+                                let (v, b) = (a["von"].as_u64().unwrap_or(0), a["bis"].as_u64().unwrap_or(0));
+                                serde_json::json!({"zeile": a["zeile"].as_u64().unwrap_or(0) + 1, "spalte": v + 1,
+                                                   "laenge": b.saturating_sub(v), "text": a["text"]})
+                            }).collect::<Vec<_>>(),
+                        })).collect());
+                    }
+                    e
                 }).collect();
                 Value::str_rc(&serde_json::Value::Array(liste).to_string())
             }
@@ -7838,6 +7851,11 @@ impl<'p> Vm<'p> {
                 let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_GOTO: vor SCREEN aufgerufen")?;
                 let spalte = if a.len() > 2 { gi(a, 2, "GUI_TEXTAREA_GOTO")? } else { 1 };
                 self.gui.textarea_goto(g, gi(a, 0, "GUI_TEXTAREA_GOTO")?, gi(a, 1, "GUI_TEXTAREA_GOTO")?, spalte)?;
+                Value::Nil
+            }
+            "gui_textarea_scroll" => {
+                let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_SCROLL: vor SCREEN aufgerufen")?;
+                self.gui.textarea_scroll(g, gi(a, 0, "GUI_TEXTAREA_SCROLL")?, gi(a, 1, "GUI_TEXTAREA_SCROLL")?)?;
                 Value::Nil
             }
             "gui_textarea_selection$" | "gui_textarea_selection" =>

@@ -1,0 +1,83 @@
+' GUI_TEXTAREA_SCROLL: den Ausschnitt rollen, ohne die Marke zu bewegen (fuer
+' die Uebersichtskarte der IDE). Gefragt wird ueber GUI_TEXTAREA_VIEW, dessen
+' erste Zeile ab 0 zaehlt.
+
+=== die zeile steht oben und die marke bleibt
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 0, 0, 380, 200)
+DIM t AS STRING : t = ""
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    t = t + "zeile " + STR$(i) + CHR$(10)
+NEXT
+GUI_SET_TEXT(ta, t)
+GUI_FOCUS(ta)
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+GUI_UPDATE()
+GUI_TEXTAREA_SCROLL(ta, 50)
+DIM f AS INTEGER
+' Mehrere Bilder: die Editierschleife darf den Ausschnitt nicht zur Marke
+' zurueckziehen.
+FOR f = 1 TO 5
+    GUI_UPDATE() : CLS(BLACK) : GUI_DRAW() : FLIP()
+NEXT
+DIM erste AS INTEGER
+DIM sicht AS INTEGER
+DIM von AS INTEGER
+DIM laenge AS INTEGER
+(erste, sicht, von, laenge) = GUI_TEXTAREA_VIEW(ta)
+PRINT "oben "; erste
+DIM z AS INTEGER
+DIM s AS INTEGER
+(z, s) = GUI_TEXTAREA_CURSOR(ta)
+PRINT "marke "; z; " "; s
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+oben 49
+marke 1 1
+
+=== hinter dem ende wird geklemmt, vor dem anfang auch
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 0, 0, 380, 200)
+DIM t AS STRING : t = "a"
+DIM i AS INTEGER
+FOR i = 2 TO 100
+    t = t + CHR$(10) + "zeile " + STR$(i)
+NEXT
+GUI_SET_TEXT(ta, t)
+GUI_UPDATE()
+DIM erste AS INTEGER
+DIM sicht AS INTEGER
+DIM von AS INTEGER
+DIM laenge AS INTEGER
+GUI_TEXTAREA_SCROLL(ta, 1000)
+(erste, sicht, von, laenge) = GUI_TEXTAREA_VIEW(ta)
+' Die letzte Zeile (Index 99) steht unten, kein leerer Platz darunter.
+PRINT "unten "; erste + sicht = 100
+GUI_TEXTAREA_SCROLL(ta, -5)
+(erste, sicht, von, laenge) = GUI_TEXTAREA_VIEW(ta)
+PRINT "anfang "; erste
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+unten TRUE
+anfang 0
+
+=== nur fuer textbereiche
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "x", 10, 10, 80, 28)
+GUI_TEXTAREA_SCROLL(k, 3)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+GUI_TEXTAREA_SCROLL

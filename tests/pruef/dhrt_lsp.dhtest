@@ -330,3 +330,29 @@ IMPORT "{sammlung}/_hilfen/lspklient.dh"
 --- erwartet
 vorher null, nachher null
 rueckgabe 0
+
+=== codeaction bietet die schnellkorrektur an
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+DIM NL AS STRING : NL = CHR$(10)
+lsOeffnen("file:///tmp/k.dh", "DIM zaehler AS INTEGER" + NL + "zaehlr = zaehler + 1" + NL)
+DIM q AS STRING : q = "{" + lsText$("textDocument") + ":{" + lsText$("uri") + ":" + lsText$("file:///tmp/k.dh") + "},"
+q = q + lsText$("range") + ":{" + lsText$("start") + ":{" + lsText$("line") + ":1," + lsText$("character") + ":0},"
+q = q + lsText$("end") + ":{" + lsText$("line") + ":1," + lsText$("character") + ":0}}," + lsText$("context") + ":{" + lsText$("diagnostics") + ":[]}}"
+DIM k AS INTEGER : k = lsFragen("textDocument/codeAction", q)
+lsEnde()
+DIM h AS JSON_HANDLE : h = lsAntwort(i)
+PRINT "faehig "; JSON_GET_BOOL(h, "result.capabilities.codeActionProvider")
+DIM a AS JSON_HANDLE : a = lsAntwort(k)
+DIM n AS INTEGER
+FOR n = 0 TO JSON_LEN(a, "result") - 1
+    DIM p AS STRING : p = "result." + STR$(n)
+    PRINT JSON_GET_STRING(a, p + ".title"); " / "; JSON_GET_STRING(a, p + ".kind")
+NEXT
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+--- erwartet
+faehig TRUE
+Ersetzen durch zaehler / quickfix
+DIM zaehlr AS INTEGER anlegen / quickfix

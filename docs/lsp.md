@@ -27,6 +27,7 @@ entfallen.
 | `definition` | zur Definition springen |
 | `references` | alle Vorkommen eines Symbols |
 | `documentSymbol` | Gliederung — Klassen mit Methoden und Properties verschachtelt, dazu ENUMs |
+| `codeAction` | Schnellkorrekturen (`quickfix`) zu den Meldungen der angefragten Zeilen: den vorgeschlagenen Namen einsetzen, ein fehlendes `DIM` anlegen, Klammern setzen, `!=` durch `<>` -- gelesen aus der Meldung selbst, darum tut die Korrektur, was die Meldung vorschlägt |
 
 **Diagnose im Hintergrund.** Jeder Tastendruck schickt das ganze Dokument;
 die Prüfung einer Datei mit 2 800 Zeilen kostet rund 90 ms. Damit Hover und
