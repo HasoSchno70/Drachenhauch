@@ -89,6 +89,31 @@ fn senden(s: &Sender, msg: Value) {
 /// ohne die Ruecknahme rutschten alle Marker um die Laenge des Inlinierten.
 /// Ein Fehler in einer importierten Datei landet in Zeile 1 mit Herkunft.
 pub fn diagnose(text: &str, basis: &Path) -> Vec<Value> {
+    let mut aus = diagnose_uebersetzer(text, basis);
+    let zeilen: Vec<&str> = text.split('\n').collect();
+    for (z0, name) in unbenutzte(text) {
+        let meldung = format!("'{}' wird angelegt, aber nie benutzt.", name);
+        let (von, bis) = fehler_bereich(zeilen.get(z0).copied().unwrap_or(""), 0, &meldung);
+        let mut d = json!({
+            "range": {"start": {"line": z0, "character": von}, "end": {"line": z0, "character": bis}},
+            "severity": 4, "source": "drachenhauch", "message": meldung, "tags": [1],
+        });
+        let k = korrekturen(text, z0, von, bis, &meldung);
+        if !k.is_empty() {
+            d["data"] = json!({"korrekturen": k.into_iter().map(|(titel, aend)| json!({
+                "titel": titel,
+                "aenderungen": aend.into_iter().map(|(z, a, b, t)| {
+                    if b == usize::MAX { json!({"zeile": z, "von": a, "bis_zeile": z + 1, "bis": 0, "text": t}) }
+                    else { json!({"zeile": z, "von": a, "bis_zeile": z, "bis": b, "text": t}) }
+                }).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>()});
+        }
+        aus.push(d);
+    }
+    aus
+}
+
+fn diagnose_uebersetzer(text: &str, basis: &Path) -> Vec<Value> {
     let roh = crate::check_source(text, basis, "<editor>");
     let herkunft = crate::preprocess::process(text, basis).ok().map(|r| r.2);
     let zeilen: Vec<&str> = text.split('\n').collect();
@@ -122,7 +147,11 @@ pub fn diagnose(text: &str, basis: &Path) -> Vec<Value> {
         if !k.is_empty() {
             let liste: Vec<Value> = k.into_iter().map(|(titel, aend)| json!({
                 "titel": titel,
-                "aenderungen": aend.into_iter().map(|(z, a, b, t)| json!({"zeile": z, "von": a, "bis": b, "text": t})).collect::<Vec<_>>(),
+                "aenderungen": aend.into_iter().map(|(z, a, b, t)| {
+                    // bis == usize::MAX: die ganze Zeile samt Umbruch.
+                    if b == usize::MAX { json!({"zeile": z, "von": a, "bis_zeile": z + 1, "bis": 0, "text": t}) }
+                    else { json!({"zeile": z, "von": a, "bis_zeile": z, "bis": b, "text": t}) }
+                }).collect::<Vec<_>>(),
             })).collect();
             aus["data"] = json!({"korrekturen": liste});
         }
@@ -183,6 +212,88 @@ pub fn fehler_bereich(zeile: &str, spalte: usize, meldung: &str) -> (usize, usiz
 /// Eine Aenderung am Text: Zeile (ab 0), Zeichen von..bis (ab 0), neuer Text.
 pub type Aenderung = (usize, usize, usize, String);
 
+/// Die Woerter, die einen Block schliessen, und woran man seinen Kopf
+/// erkennt (Zeile ohne Kommentar, gross geschrieben, ohne Einrueckung).
+fn blockkopf(schluss: &str, kopf: &str) -> bool {
+    let erstes = kopf.split_whitespace().next().unwrap_or("");
+    match schluss {
+        "END IF" => erstes == "IF" && kopf.ends_with("THEN"),
+        "NEXT" => erstes == "FOR",
+        "WEND" | "END WHILE" => erstes == "WHILE",
+        "LOOP" => erstes == "DO",
+        "END SELECT" => kopf.starts_with("SELECT CASE"),
+        "END SUB" => erstes == "SUB",
+        "END FUNCTION" => erstes == "FUNCTION",
+        "END PROPERTY" => erstes == "PROPERTY",
+        "END CLASS" => erstes == "CLASS",
+        "END STRUCT" => erstes == "STRUCT",
+        "END ENUM" => erstes == "ENUM" && !kopf.contains('='),
+        "END TRY" => erstes == "TRY",
+        "END WITH" => erstes == "WITH",
+        _ => false,
+    }
+}
+
+/// Wo ein fehlendes Blockende hingehoert: der letzte Kopf dieser Art, der
+/// noch nicht auf gleicher Einrueckung geschlossen ist; eingefuegt wird
+/// hinter der letzten Zeile seines (tiefer eingerueckten) Rumpfs, mit der
+/// Einrueckung des Kopfes. (Zeile, Einrueckung) oder None.
+fn blockende_stelle(zeilen: &[&str], schluss: &str) -> Option<(usize, String)> {
+    let einzug = |t: &str| t.chars().take_while(|c| c.is_whitespace()).count();
+    let rein = |t: &str| crate::symbole::ohne_inline_kommentar(t).trim().to_uppercase();
+    for k in (0..zeilen.len()).rev() {
+        let kopf = rein(zeilen[k]);
+        if !blockkopf(schluss, &kopf) { continue; }
+        let e = einzug(zeilen[k]);
+        let geschlossen = zeilen[k + 1..].iter().any(|t| {
+            let r = rein(t);
+            einzug(t) == e && (r == schluss || r.starts_with(&format!("{} ", schluss)))
+        });
+        if geschlossen { continue; }
+        let mut ende = k;
+        for (j, t) in zeilen.iter().enumerate().skip(k + 1) {
+            if t.trim().is_empty() { continue; }
+            if einzug(t) > e { ende = j; } else { break; }
+        }
+        return Some((ende, zeilen[k].chars().take(e).collect()));
+    }
+    None
+}
+
+/// Hinweise, die der Uebersetzer nicht gibt: eine Variable, die in einem
+/// Unterprogramm angelegt und dort nirgends benutzt wird. Nur dort -- eine
+/// globale kann eine andere Datei benutzen, die diese importiert. Als
+/// (Zeile ab 0, Name).
+pub fn unbenutzte(text: &str) -> Vec<(usize, String)> {
+    let zeilen: Vec<&str> = text.split('\n').collect();
+    let mut aus = Vec::new();
+    for b in crate::symbole::bereiche(text) {
+        if !matches!(b.art, "sub" | "function" | "property") { continue; }
+        let (von, bis) = (b.zeile, b.ende.min(zeilen.len()));    // Rumpf: Zeilen von..bis-1 (ab 0), ohne Kopf
+        if von >= bis { continue; }
+        let rumpf = zeilen[von..bis].join("\n");
+        for (i, t) in zeilen[von..bis].iter().enumerate() {
+            let Some(name) = einfaches_dim(t) else { continue };
+            // Nur ein Vorkommen im Rumpf (Kommentare und Texte zaehlen nicht).
+            if crate::symbole::fundstellen(&rumpf, &name).len() == 1 {
+                aus.push((von + i, name));
+            }
+        }
+    }
+    aus
+}
+
+/// `DIM name AS T` (auch `= wert`) mit genau einem Namen -> der Name.
+fn einfaches_dim(zeile: &str) -> Option<String> {
+    let t = crate::symbole::ohne_inline_kommentar(zeile).trim().to_string();
+    let gross = t.to_uppercase();
+    if !gross.starts_with("DIM ") || t.contains(',') { return None; }
+    let rest = t[4..].trim_start();
+    let name: String = rest.chars().take_while(|&c| c.is_alphanumeric() || c == '_' || c == '$').collect();
+    if name.is_empty() || !rest[name.len()..].trim_start().to_uppercase().starts_with("AS ") { return None; }
+    Some(name)
+}
+
 /// Vorschlaege zu einer Meldung: (Titel, Aenderungen). Gelesen wird die
 /// MELDUNG, nicht der Uebersetzer -- sie sagt schon, was gemeint war
 /// ("Meintest du ...", "heisst in Drachenhauch ...", "nirgends ... angelegt").
@@ -191,7 +302,8 @@ pub type Aenderung = (usize, usize, usize, String);
 /// lieber keine als eine, die etwas anderes aendert, als ihr Titel sagt.
 pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str) -> Vec<(String, Vec<Aenderung>)> {
     let zeilen: Vec<&str> = text.split('\n').collect();
-    let Some(&zeile) = zeilen.get(z0) else { return Vec::new() };
+    // Die Meldung am Programmende steht oft HINTER der letzten Zeile.
+    let zeile = zeilen.get(z0).copied().unwrap_or("");
     let z: Vec<char> = zeile.chars().collect();
     let wort: String = z.get(von..bis.min(z.len())).map(|s| s.iter().collect()).unwrap_or_default();
     let wortzeichen = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
@@ -246,6 +358,51 @@ pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str)
             let inhalt: String = z[a..ende].iter().collect();
             aus.push(("Klammern setzen".into(), vec![(z0, bis, ende, format!("({})", inhalt))]));
         }
+    }
+
+    // "END IF erwartet, Programmende erreicht" -- das Ende hinter den Rumpf.
+    // Drei Formen: am Programmende, mitten in einem anderen Block ("Erwartet
+    // IF nach END" -- ein END SUB kam, waehrend das IF noch offen war) und
+    // die WHILE-Schleife mit eigenem Satz.
+    let schluss: Option<String> = if let Some(p) = meldung.find(" erwartet, Programmende erreicht") {
+        Some(meldung[..p].trim().to_string())
+    } else if let Some(rest) = meldung.strip_prefix("Erwartet ") {
+        rest.strip_suffix(" nach END").map(|w| format!("END {}", w.trim()))
+    } else if meldung.starts_with("WEND (oder END WHILE) erwartet") {
+        Some("WEND".to_string())
+    } else { None };
+    if let Some(schluss) = schluss.as_deref() {
+        if let Some((ende, ein)) = blockende_stelle(&zeilen, schluss) {
+            let laenge = zeilen[ende].chars().count();
+            aus.push((format!("{} ergaenzen", schluss), vec![(ende, laenge, laenge, format!("\n{}{}", ein, schluss))]));
+        }
+    }
+
+    // "... IMPORT \"json\" fehlt" / "fehlt IMPORT \"vec2\"?" -- oben einfuegen,
+    // hinter die IMPORTs, die schon da sind, sonst hinter den Kopfkommentar.
+    if let Some(p) = meldung.find("IMPORT \"") {
+        let rest = &meldung[p + 8..];
+        if let Some(q) = rest.find('"') {
+            let modul = &rest[..q];
+            if !modul.is_empty() && modul.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                let mut ziel = 0;
+                let mut hinter_import = None;
+                for (k, t) in zeilen.iter().enumerate() {
+                    let r = t.trim().to_uppercase();
+                    if r.starts_with("IMPORT ") { hinter_import = Some(k + 1); continue; }
+                    if hinter_import.is_none() && (r.is_empty() || r.starts_with('\'') || r.starts_with("REM ")) { ziel = k + 1; continue; }
+                    break;
+                }
+                let ziel = hinter_import.unwrap_or(ziel).min(zeilen.len());
+                aus.push((format!("IMPORT \"{}\" einfuegen", modul), vec![(ziel, 0, 0, format!("IMPORT \"{}\"\n", modul))]));
+            }
+        }
+    }
+
+    // "'x' wird angelegt, aber nie benutzt" -- die Zeile weg, wenn dabei
+    // nichts verloren geht, was etwas tut (ein Aufruf in `= wert`).
+    if meldung.contains("wird angelegt, aber nie benutzt") && !zeile.contains('(') {
+        aus.push(("Zeile entfernen".into(), vec![(z0, 0, usize::MAX, String::new())]));
     }
 
     // "'x' wird hier beschrieben/gelesen, aber nirgends ... angelegt" --
@@ -333,7 +490,7 @@ pub fn schnellkorrekturen(text: &str, uri: &str, von: u64, bis: u64) -> Vec<Valu
         for k in liste {
             let edits: Vec<Value> = k["aenderungen"].as_array().cloned().unwrap_or_default().iter().map(|a| json!({
                 "range": {"start": {"line": a["zeile"], "character": a["von"]},
-                          "end": {"line": a["zeile"], "character": a["bis"]}},
+                          "end": {"line": a["bis_zeile"], "character": a["bis"]}},
                 "newText": a["text"],
             })).collect();
             let mut aenderung = serde_json::Map::new();
@@ -740,6 +897,40 @@ WEND";
                    vec![(0, 5, 7, "<>".to_string())]);
         // Eine Meldung ohne Vorschlag bleibt ohne Korrektur.
         assert!(korrekturen("PRINT(1)", 0, 0, 5, "Irgendwas").is_empty());
+    }
+
+    #[test]
+    fn blockende_import_und_unbenutzt() {
+        // END IF hinter den Rumpf, mit der Einrueckung des Kopfes -- nicht
+        // ans Dateiende hinter die Zeile, die schon wieder aussen steht.
+        let t = "SUB tu()\n    IF x > 1 THEN\n        PRINT(1)\n        PRINT(2)\n    PRINT(3)\nEND SUB";
+        let k = korrekturen(t, 6, 0, 1, "END IF erwartet, Programmende erreicht");
+        // Dieselbe Stelle, wenn ein END SUB kam, waehrend das IF offen war.
+        assert_eq!(korrekturen(t, 5, 4, 5, "Erwartet IF nach END")[0].1, vec![(3, 16, 16, "\n    END IF".to_string())]);
+        let tw = "SUB tu()\n    WHILE TRUE\n        PRINT(1)\nEND SUB";
+        assert_eq!(korrekturen(tw, 3, 4, 5, "WEND (oder END WHILE) erwartet -- hier endet noch die WHILE-Schleife")[0].1,
+                   vec![(2, 16, 16, "\n    WEND".to_string())]);
+        assert_eq!(k[0].0, "END IF ergaenzen");
+        assert_eq!(k[0].1, vec![(3, 16, 16, "\n    END IF".to_string())]);
+        // Ein schon geschlossener Block zaehlt nicht.
+        let t = "FOR i = 1 TO 2\nNEXT\nFOR j = 1 TO 3\n    PRINT(j)\n";
+        assert_eq!(korrekturen(t, 4, 0, 1, "NEXT erwartet, Programmende erreicht")[0].1,
+                   vec![(3, 12, 12, "\nNEXT".to_string())]);
+        // IMPORT hinter die vorhandenen, sonst hinter den Kopfkommentar.
+        let t = "' Kopf\n\nPRINT(JSON_STRINGIFY(x))";
+        let k = korrekturen(t, 2, 0, 5, "JSON_STRINGIFY gehoert zum Modul 'json', aber IMPORT \"json\" fehlt.");
+        assert_eq!(k[0].0, "IMPORT \"json\" einfuegen");
+        assert_eq!(k[0].1, vec![(2, 0, 0, "IMPORT \"json\"\n".to_string())]);
+        let t = "IMPORT \"gui\"\nDIM v AS VEC2";
+        assert_eq!(korrekturen(t, 1, 0, 3, "Unbekannter Typ 'vec2' -- fehlt IMPORT \"vec2\"?")[0].1,
+                   vec![(1, 0, 0, "IMPORT \"vec2\"\n".to_string())]);
+        // Unbenutzt: nur in Unterprogrammen, nur bei einem Vorkommen.
+        let t = "DIM g AS INTEGER\nSUB tu()\n    DIM a AS INTEGER\n    DIM b AS INTEGER ' b bleibt\n    PRINT(b)\nEND SUB";
+        assert_eq!(unbenutzte(t), vec![(2, "a".to_string())]);
+        let k = korrekturen(t, 2, 8, 9, "'a' wird angelegt, aber nie benutzt.");
+        assert_eq!(k[0].1, vec![(2, 0, usize::MAX, String::new())]);
+        // Mit einem Aufruf im Wert wird nicht angeboten, die Zeile zu loeschen.
+        assert!(korrekturen("    DIM a AS INTEGER = f()", 0, 8, 9, "'a' wird angelegt, aber nie benutzt.").is_empty());
     }
 
     #[test]

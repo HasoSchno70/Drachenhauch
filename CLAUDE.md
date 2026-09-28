@@ -1786,6 +1786,31 @@ ueber SELECT + INSERT von hinten. Tests `tests/pruef/gui_textarea_scroll.dhtest`
 Rust-Tests `korrekturen_aus_der_meldung`, `typ_raten_aus_dem_wert`,
 `punkt_und_komma`; sieben Verfaelschungen fallen je in ihrem Fall.
 
+**Mehr Schnellkorrekturen, Werte im Code (2026-09-28):** `lsp::korrekturen`
+kennt dazu fehlende Blockenden (drei Meldungsformen: "X erwartet,
+Programmende erreicht", "Erwartet IF nach END" -- ein END SUB kam, waehrend
+das IF offen war --, "WEND (oder END WHILE) erwartet"; `blockende_stelle`
+setzt es hinter den tiefer eingerueckten Rumpf des letzten offenen Kopfes,
+nicht ans Dateiende), einen fehlenden IMPORT (beide Satzformen; hinter die
+vorhandenen IMPORTs, sonst hinter den Kopfkommentar) und **unbenutzte
+Variablen**: neuer Hinweis (LSP-Schwere 4, `CODE_CHECK$` "hinweis", nur
+DIM in Unterprogrammen mit einem Vorkommen im Rumpf -- eine globale kann
+eine importierende Datei benutzen), Korrektur "Zeile entfernen" nur ohne
+Aufruf im Wert. Eine Aenderung kann jetzt ueber das Zeilenende gehen
+(`bis == usize::MAX` intern, `bis_zeile`/`bis_spalte` in `CODE_CHECK$`).
+Die IDE zeigt Hinweise grau, zaehlt sie nicht als Problem (`geprueft`
+bleibt Fehler+Warnungen, eigene Zeile `hinweise N`), keine Marke, nicht auf
+der Karte. **Werte im Code:** neu `GUI_TEXTAREA_HINTS(ta, zeilen, texte
+[, farbe])` -- Text hinter dem Zeilenende, folgt seiner Zeile wie eine
+Marke (`marken_abgleichen`), `GUI_SET_TEXT` loescht. Die IDE schreibt im
+Halt (`debugWerteZeigen`) hinter die Zeilen vom Kopf des Unterprogramms bis
+zur Haltezeile die vorkommenden Variablen (lokal vor global, ohne
+Kommentare/Texte, hoechstens vier je Zeile); `debugWerteLoeschen` beim
+Weiterlaufen und am Ende. Tests `gui_textarea_hints.dhtest`,
+`werkzeug_ide_werte.dhtest`, Faelle in `code_korrekturen.dhtest` und
+`werkzeug_ide_korrektur.dhtest`, Rust-Test `blockende_import_und_unbenutzt`;
+fuenf Verfaelschungen fallen je in ihrem Fall.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

@@ -21,13 +21,13 @@ entfallen.
 
 | LSP-Methode | Funktion |
 |---|---|
-| `publishDiagnostics` | Fehler und Warnungen der ganzen Kette (Preprocess → Lex → Parse → Namensraum → Compile), dieselben wie `dhrt --check`, auf die Zeilen des Puffers zurückgerechnet — ein Fehler in einer importierten Datei steht in Zeile 1 mit Herkunft |
+| `publishDiagnostics` | Fehler, Warnungen und Hinweise (unbenutzte Variablen in Unterprogrammen, Schwere 4, `unnecessary`) der ganzen Kette (Preprocess → Lex → Parse → Namensraum → Compile), dieselben wie `dhrt --check`, auf die Zeilen des Puffers zurückgerechnet — ein Fehler in einer importierten Datei steht in Zeile 1 mit Herkunft |
 | `completion` | Befehle aus dem Index, Schlüsselwörter, Konstanten (Farben, Tasten, `PI`, `TAU`) und die im Dokument definierten Symbole, nach dem Präfix links von der Marke gefiltert |
 | `hover` | Signatur und Beschreibung für Befehle (handgepflegte Texte vor den aus `docs/` erzeugten, sonst die Signatur aus dem Index) und für eigene `SUB`/`FUNCTION`/`CLASS`/… (der Kommentarblock über der Definition) |
 | `definition` | zur Definition springen |
 | `references` | alle Vorkommen eines Symbols |
 | `documentSymbol` | Gliederung — Klassen mit Methoden und Properties verschachtelt, dazu ENUMs |
-| `codeAction` | Schnellkorrekturen (`quickfix`) zu den Meldungen der angefragten Zeilen: den vorgeschlagenen Namen einsetzen, ein fehlendes `DIM` anlegen, Klammern setzen, `!=` durch `<>` -- gelesen aus der Meldung selbst, darum tut die Korrektur, was die Meldung vorschlägt |
+| `codeAction` | Schnellkorrekturen (`quickfix`) zu den Meldungen der angefragten Zeilen: den vorgeschlagenen Namen einsetzen, ein fehlendes `DIM` anlegen, Klammern setzen, `!=` durch `<>`, ein fehlendes Blockende, einen fehlenden `IMPORT`, eine unbenutzte Variable entfernen -- gelesen aus der Meldung selbst, darum tut die Korrektur, was die Meldung vorschlägt |
 
 **Diagnose im Hintergrund.** Jeder Tastendruck schickt das ganze Dokument;
 die Prüfung einer Datei mit 2 800 Zeilen kostet rund 90 ms. Damit Hover und

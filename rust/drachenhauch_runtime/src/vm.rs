@@ -6153,7 +6153,7 @@ impl<'p> Vm<'p> {
                             else { std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")) };
                 let liste: Vec<serde_json::Value> = crate::lsp::diagnose(&text, &basis).into_iter().map(|d| {
                     let zeile = d["range"]["start"]["line"].as_u64().unwrap_or(0) + 1;
-                    let schwere = if d["severity"].as_u64() == Some(2) { "warnung" } else { "fehler" };
+                    let schwere = match d["severity"].as_u64() { Some(2) => "warnung", Some(3) | Some(4) => "hinweis", _ => "fehler" };
                     // Spalte ab 1 und Laenge in Zeichen -- wo im Text die
                     // Meldung hingehoert (lsp::fehler_bereich).
                     let von = d["range"]["start"]["character"].as_u64().unwrap_or(0);
@@ -6168,8 +6168,11 @@ impl<'p> Vm<'p> {
                             "titel": k["titel"],
                             "aenderungen": k["aenderungen"].as_array().cloned().unwrap_or_default().iter().map(|a| {
                                 let (v, b) = (a["von"].as_u64().unwrap_or(0), a["bis"].as_u64().unwrap_or(0));
-                                serde_json::json!({"zeile": a["zeile"].as_u64().unwrap_or(0) + 1, "spalte": v + 1,
-                                                   "laenge": b.saturating_sub(v), "text": a["text"]})
+                                let (z, bz) = (a["zeile"].as_u64().unwrap_or(0), a["bis_zeile"].as_u64().unwrap_or(0));
+                                // laenge nur innerhalb einer Zeile; bis_zeile/bis_spalte immer.
+                                let laenge = if bz == z { b.saturating_sub(v) as i64 } else { -1 };
+                                serde_json::json!({"zeile": z + 1, "spalte": v + 1, "laenge": laenge,
+                                                   "bis_zeile": bz + 1, "bis_spalte": b + 1, "text": a["text"]})
                             }).collect::<Vec<_>>(),
                         })).collect());
                     }
@@ -7910,6 +7913,27 @@ impl<'p> Vm<'p> {
                 let n = "GUI_TEXTAREA_MARKS";
                 if a.len() != 3 { return Err(format!("{}: erwartet (ta, zeilen, farben)", n)); }
                 self.gui.textarea_marks(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
+                Value::Nil
+            }
+            "gui_textarea_hints" => {
+                let n = "GUI_TEXTAREA_HINTS";
+                if a.len() < 3 || a.len() > 4 { return Err(format!("{}: erwartet (ta, zeilen, texte [, farbe])", n)); }
+                let texte: Vec<String> = match &a[2] {
+                    Value::Array(arr) => {
+                        let arr = arr.borrow();
+                        let mut o = Vec::with_capacity(arr.cells.len());
+                        for x in arr.cells.iter() {
+                            match x {
+                                Value::Str(s) => o.push(s.to_string()),
+                                _ => return Err(format!("{}: texte muss ARRAY OF STRING sein", n)),
+                            }
+                        }
+                        o
+                    }
+                    _ => return Err(format!("{}: texte muss ein ARRAY sein", n)),
+                };
+                let farbe = if a.len() > 3 { gi(a, 3, n)? } else { -1 };
+                self.gui.textarea_hints(gi(a, 0, n)?, ganze(&a[1], n)?, texte, farbe)?;
                 Value::Nil
             }
             "gui_textarea_marks_get" => {

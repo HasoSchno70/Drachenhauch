@@ -481,6 +481,13 @@ fn zeilen_nachziehen(alt: &str, neu: &str, zeilen: &mut [usize]) {
 /// Marken eines Textbereichs an seinen jetzigen Text anpassen (siehe
 /// `marken`). Billig, wenn sich nichts geaendert hat.
 fn marken_abgleichen(w: &mut Widget) {
+    // Die Werte hinter den Zeilen (GUI_TEXTAREA_HINTS) wandern genauso mit.
+    if !w.hinweise.is_empty() && w.hinweise_text != w.text {
+        let mut z: Vec<usize> = w.hinweise.iter().map(|m| m.0).collect();
+        zeilen_nachziehen(&w.hinweise_text, &w.text, &mut z);
+        for (m, n) in w.hinweise.iter_mut().zip(z) { m.0 = n; }
+        w.hinweise_text = w.text.clone();
+    }
     if w.marken.is_empty() || w.marken_text == w.text { return; }
     let mut z: Vec<usize> = w.marken.iter().map(|m| m.0).collect();
     zeilen_nachziehen(&w.marken_text, &w.text, &mut z);
@@ -2540,6 +2547,12 @@ pub struct Widget {
     // nach Start -- Fehler und Warnungen DORT, wo sie im Text stehen, statt nur
     // als Marke am Rand. Laenge 0 = ein kurzes Stueck an der Stelle.
     wellen: Vec<(u32, u32, i64)>,
+    /// Text hinter dem Ende einer Zeile (GUI_TEXTAREA_HINTS), etwa die Werte
+    /// im Debugger-Halt: (Zeile ab 0, Text). Folgt seiner Zeile wie eine
+    /// Marke; `hinweise_farbe` -1 = gedaempft.
+    hinweise: Vec<(usize, String)>,
+    hinweise_text: String,
+    hinweise_farbe: i64,
     // Welches davon in diesem Bild angeklickt wurde (-1 = keins). Transient
     // wie `clicked`: ein Klick ist ein Ereignis, kein Zustand.
     farbfeld_klick: i32,
@@ -3555,6 +3568,27 @@ impl Gui {
         Ok(())
     }
 
+    /// GUI_TEXTAREA_HINTS(ta, zeilen, texte [, farbe]): Text hinter dem Ende
+    /// der Zeilen (ab 1), ersetzt alle bisherigen; leere Listen loeschen.
+    pub fn textarea_hints(&mut self, h: i64, zeilen: Vec<i64>, texte: Vec<String>, farbe: i64) -> Result<(), String> {
+        if zeilen.len() != texte.len() {
+            return Err(format!(
+                "GUI_TEXTAREA_HINTS: beide Listen muessen gleich lang sein ({} Zeilen, {} Texte)",
+                zeilen.len(), texte.len()));
+        }
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_HINTS")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_HINTS: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        wd.hinweise = zeilen.iter().zip(texte)
+            .filter(|(&z, t)| z >= 1 && !t.is_empty())
+            .map(|(&z, t)| ((z - 1) as usize, t.replace('\n', " ")))
+            .collect();
+        wd.hinweise_text = wd.text.clone();
+        wd.hinweise_farbe = farbe;
+        Ok(())
+    }
+
     /// Marken je Zeile setzen (ersetzt alle bisherigen; leere Listen loeschen).
     pub fn textarea_marks(&mut self, h: i64, zeilen: Vec<i64>, farben: Vec<i64>) -> Result<(), String> {
         if zeilen.len() != farben.len() {
@@ -4057,7 +4091,7 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
-            farbfelder: Vec::new(), wellen: Vec::new(), farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
+            farbfelder: Vec::new(), wellen: Vec::new(), hinweise: Vec::new(), hinweise_text: String::new(), hinweise_farbe: -1, farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
             formatiert: false, paare: Vec::new(), teil_von: None, teil_stand: String::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false, hg_bild: -1, hg_deckkraft: 0,
             tab_meldet: false, tab_treffer: false,
@@ -9492,7 +9526,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // den neuen nach den Positionen des alten -- besser sichtbar farblos
         // als sichtbar falsch.
         w.spans.clear();
-        w.wellen.clear();
+        w.wellen.clear(); w.hinweise.clear();
         // Der Verlauf gehoerte zum alten Text -- ein Strg+Z danach brachte
         // sonst etwas zurueck, das der Nutzer nie getippt hat.
         w.undo.clear(); w.redo.clear();
@@ -18804,12 +18838,29 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         // Zugeklappt: hinter der Kopfzeile steht, wie viele
                         // Zeilen darunter liegen. Ohne dieses Zeichen sieht
                         // eine gefaltete Datei aus wie eine lueckenhafte.
+                        let mut ende_x = tx0 + breite;
                         if let Some(&(_, b)) = wdg.gefaltet.iter().find(|&&(v, _)| v == li + 1) {
                             let txt = format!("... {} Zeilen", b - li - 1);
                             let bw = self.wtext_width(g, wdg, &txt) + self.sk(10);
                             let bx = tx0 + breite + self.sk(10);
                             g.box_fill(bx, y + 1, bx + bw, y + lh - 3, shade(self.wcol(wdg, "bg", "win_bg"), 26));
                             self.wtext(g, wdg, bx + self.sk(5), y, txt, self.th("muted_fg"));
+                            ende_x = bx + bw;
+                        }
+                        // Werte hinter der Zeile: nur an ihrer LETZTEN
+                        // sichtbaren Reihe (bei Umbruch), mit Abstand, in
+                        // gedaempfter Farbe auf einem Hauch Grund -- sie sind
+                        // Anzeige, nicht Text.
+                        let letzte = starts.get(li + 1).map(|&n| re + 1 >= n).unwrap_or(true);
+                        if letzte {
+                            if let Some((_, txt)) = wdg.hinweise.iter().find(|(z, _)| *z == li) {
+                                let bg = self.wcol(wdg, "bg", "win_bg");
+                                let farbe = if wdg.hinweise_farbe >= 0 { wdg.hinweise_farbe } else { self.leise(bg) };
+                                let bx = ende_x + self.sk(18);
+                                let bw = self.wtext_width(g, wdg, txt) + self.sk(12);
+                                g.box_fill(bx, y + 1, bx + bw, y + lh - 3, 0x60_000000 | (shade(bg, 14) & 0xFF_FFFF));
+                                self.wtext(g, wdg, bx + self.sk(6), y, txt.clone(), farbe);
+                            }
                         }
                     }
                     // Wellenlinien unter Fehlern und Warnungen: je sichtbare
