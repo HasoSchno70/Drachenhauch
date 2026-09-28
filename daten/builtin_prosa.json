@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1967,
+ "count": 1968,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -831,6 +831,7 @@
   "GUI_TEXTAREA_MARKS_GET": "die Zeilen der Marken, wie sie jetzt stehen (ARRAY OF INTEGER, in der Reihenfolge des Setzens) -- so erfährt ein Programm, wohin sein Haltepunkt beim Tippen gerutscht ist",
   "GUI_TEXTAREA_PAIRS": "Klammern beim Tippen schließen: je zwei Zeichen ein Paar (\"()[]{}\" plus zwei Anführungszeichen), leer = aus. Das öffnende setzt das schließende gleich dahinter, vor einem gleichen schließenden tritt man nur darüber, eine Auswahl wird umschlossen, die Rücktaste zwischen einem leeren Paar nimmt beide. Anführungszeichen paaren sich nicht hinter einem Wort und nicht in einer offenen Zeichenkette; vor …",
   "GUI_TEXTAREA_POS_AT": "welches Zeichen unter dem Bildschirmpunkt liegt (ab 1; dieselbe Rechnung wie der Klick). (0, 0) neben dem Text: ausserhalb, in der Nummernspalte, unter der letzten Zeile, hinter dem Zeilenende -- fuer Tooltips beim Ueberfahren und Strg+Klick",
+  "GUI_TEXTAREA_SCROLL": "den Ausschnitt rollen, sodass die Zeile oben steht -- ohne die Marke zu bewegen, wie das Mausrad (fuer eine Uebersichtskarte)",
   "GUI_TEXTAREA_SELECT": "einen Bereich markieren, Marke am Ende",
   "GUI_TEXTAREA_SELECTION$": "der markierte Text",
   "GUI_TEXTAREA_SELECTION_RANGE": "Anfang und Ende der Auswahl (ab 1, geordnet); ohne Auswahl steht die Marke an beiden Enden — damit weiß ein Editor, WELCHE Zeilen er einrücken oder auskommentieren soll",

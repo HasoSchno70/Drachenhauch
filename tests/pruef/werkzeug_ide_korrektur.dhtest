@@ -1,0 +1,124 @@
+' Schnellkorrektur in der IDE: Strg+. an einer unterstrichenen Stelle bietet
+' die Korrekturen der Meldung an (aus CODE_CHECK$), Enter wendet sie an, und
+' die naechste Pruefung findet nichts mehr. Getippt wird mit echten
+' Tastenereignissen; die Aufnahme schreibt der Einschub erst, wenn die
+' Pruefung gelaufen ist.
+' --- seriell
+
+=== tippfehler ersetzen
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 80 THEN
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 5)
+    GUI_FOCUS(tabFelder[aktiverTab])
+    DIM prEv AS STRING : prEv = "c 6" + NL
+    prEv = prEv + "e 0 2 341 0 0 0" + NL + "e 1 2 46 0 0 0" + NL + "e 3 1 46 0 0 0" + NL + "e 4 1 341 0 0 0" + NL
+    prEv = prEv + "e 20 2 257 0 0 0" + NL + "e 22 1 257 0 0 0" + NL + NL
+    WRITEALL("ev.txt", prEv)
+    AUTOMATION_PLAY("ev.txt")
+END IF
+IF prBild = 200 THEN
+    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=240
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM zaehler AS INTEGER
+  zaehlr = zaehler + 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM wellen AS STRING : wellen = ""
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 7) = "wellen " THEN wellen = L[i]
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 10) = "korrektur " THEN PRINT L[i]
+NEXT
+PRINT "zuletzt "; wellen
+--- erwartet
+korrektur angebot Ersetzen durch zaehler | DIM zaehlr AS INTEGER anlegen
+korrektur Ersetzen durch zaehler
+pr text DIM zaehler AS INTEGER/  zaehler = zaehler + 1
+zuletzt wellen 0
+
+=== dim anlegen
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 80 THEN
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 5)
+    GUI_FOCUS(tabFelder[aktiverTab])
+    DIM prEv AS STRING : prEv = "c 8" + NL
+    prEv = prEv + "e 0 2 341 0 0 0" + NL + "e 1 2 46 0 0 0" + NL + "e 3 1 46 0 0 0" + NL + "e 4 1 341 0 0 0" + NL
+    prEv = prEv + "e 20 2 264 0 0 0" + NL + "e 22 1 264 0 0 0" + NL
+    prEv = prEv + "e 30 2 257 0 0 0" + NL + "e 32 1 257 0 0 0" + NL + NL
+    WRITEALL("ev.txt", prEv)
+    AUTOMATION_PLAY("ev.txt")
+END IF
+IF prBild = 200 THEN
+    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=240
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM zaehler AS INTEGER
+  zaehlr = zaehler + 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM wellen AS STRING : wellen = ""
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 7) = "wellen " THEN wellen = L[i]
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 10) = "korrektur " THEN PRINT L[i]
+NEXT
+PRINT "zuletzt "; wellen
+--- erwartet
+korrektur angebot Ersetzen durch zaehler | DIM zaehlr AS INTEGER anlegen
+korrektur DIM zaehlr AS INTEGER anlegen
+pr text DIM zaehlr AS INTEGER/DIM zaehler AS INTEGER/  zaehlr = zaehler + 1
+zuletzt wellen 0
+
+=== ohne meldung gibt es nichts zu korrigieren
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 80 THEN
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 3)
+    befehl("korrektur")
+    protokoll("pr status " + GUI_TEXT(lblStatus))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=120
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM zaehler AS INTEGER
+  zaehlr = zaehler + 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 10) = "korrektur " THEN PRINT L[i]
+NEXT
+--- erwartet
+korrektur keine
+pr status Hier gibt es nichts zu korrigieren.

@@ -717,6 +717,7 @@ GUI_MENU_SEPARATOR(mBearb)
 DIM miVervoll AS INTEGER : miVervoll = GUI_MENU_ITEM(mBearb, "Vervollständigen", "Strg+Leer")
 DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, "Zur Definition", "F12")
 DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, "Umbenennen ...", "Umschalt+F6")
+DIM miKorrektur AS INTEGER : miKorrektur = GUI_MENU_ITEM(mBearb, "Schnellkorrektur ...", "Strg+.")
 DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, "Schnipsel einfügen ...", "Strg+J")
 DIM miMarken AS INTEGER : miMarken = GUI_MENU_ITEM(mBearb, "Marke auf jede Fundstelle des Wortes", "Strg+Umschalt+L")
 DIM miMarkeNaechste AS INTEGER : miMarkeNaechste = GUI_MENU_ITEM(mBearb, "Marke auf die nächste Fundstelle", "Strg+Umschalt+N")
@@ -1005,6 +1006,11 @@ DIM lblWkKuerzel AS GUI_WIDGET : lblWkKuerzel = GUI_LABEL(win, "F5 startet das P
 DIM lblSpur AS GUI_WIDGET : lblSpur = GUI_BREADCRUMB(win, 0, 0, 10, 20)
 DIM karte AS GUI_WIDGET : karte = GUI_CANVAS(win, 0, 0, 10, 10)
 GUI_SET_VISIBLE(karte, FALSE)
+GUI_SET_CURSOR(karte, "hand")
+GUI_TOOLTIP(karte, "Klicken oder ziehen: dorthin rollen")
+' Ein Zug ueber die Karte: solange die Taste haengt, folgt der Ausschnitt.
+DIM kartenZug AS BOOLEAN : kartenZug = FALSE
+DIM kartenZiel AS INTEGER : kartenZiel = -1
 DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "Ausgabe", 0, 0)
 DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "Probleme", 0, 0)
@@ -1195,6 +1201,9 @@ DIM probZeile AS ARRAY OF INTEGER : probZeile = []
 DIM probSpalte AS ARRAY OF INTEGER : probSpalte = []
 DIM probLaenge AS ARRAY OF INTEGER : probLaenge = []
 DIM probMeldung AS ARRAY OF STRING : probMeldung = []
+DIM probFehler AS ARRAY OF BOOLEAN : probFehler = []
+' Je Meldung ihre Korrekturen als JSON-Text (leer = keine), aus CODE_CHECK$.
+DIM probKorr AS ARRAY OF STRING : probKorr = []
 DIM hbGesetzt AS BOOLEAN : hbGesetzt = TRUE
 ' Die Liste links zeigt Treffer statt Inhalt: je Eintrag Datei und Zeile
 ' (0 = Kopf eines Dokuments).
@@ -2619,9 +2628,12 @@ END SUB
 
 ' --- Uebersichtskarte --------------------------------------------------
 ' Eine Zeile ist ein Strich, so breit wie sie lang ist; der sichtbare
-' Ausschnitt liegt als heller Kasten darueber. Ein Klick springt.
+' Ausschnitt liegt als heller Kasten darueber. Rechts am Rand stehen Fehler
+' (rot) und Warnungen (gelb), links die Zeile der Schreibmarke. Ein Klick
+' rollt die Stelle in die Mitte, Ziehen laesst den Ausschnitt folgen -- die
+' Marke bleibt dabei, wo sie ist, wie beim Mausrad.
 SUB minimapZeichnen()
-    IF NOT minimapAn THEN RETURN
+    IF NOT minimapAn THEN kartenZug = FALSE : RETURN
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
     DIM cx AS INTEGER : cx = GUI_CANVAS_X(karte)
@@ -2630,7 +2642,7 @@ SUB minimapZeichnen()
     DIM ch AS INTEGER : ch = GUI_CANVAS_H(karte)
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
     DIM n AS INTEGER : n = LEN(zeilen)
-    IF n = 0 THEN RETURN
+    IF n = 0 OR ch < 4 THEN RETURN
     ' So viele Zeilen wie Platz ist, sonst zusammengefasst: bei 3000 Zeilen
     ' und 600 Punkten Hoehe steht eine Zeile fuer fuenf.
     DIM proZeile AS INTEGER : proZeile = MAX(1, (n + ch - 1) \ ch)
@@ -2644,14 +2656,14 @@ SUB minimapZeichnen()
             ' Karte, WO in der Datei man ist -- ein gleichmaessiger Balken
             ' sieht ueberall gleich aus.
             DIM einzugX AS INTEGER : einzugX = MIN(cw \ 3, (LEN(zt) - LEN(roh)) * 2)
-            DIM x AS INTEGER : x = cx + 2 + einzugX
+            DIM x AS INTEGER : x = cx + 4 + einzugX
             DIM grund AS INTEGER : grund = &H60708A
             IF LEFT$(roh, 1) = "'" THEN grund = F_KOMMENTAR
             DIM wt AS STRING
             FOR EACH wt IN SPLIT$(roh, " ")
                 DIM bw AS INTEGER : bw = LEN(wt) * 2
-                IF wt <> "" AND x < cx + cw - 3 THEN
-                    BOX(x, cy + y, MIN(x + bw - 2, cx + cw - 3), cy + y, grund)
+                IF wt <> "" AND x < cx + cw - 7 THEN
+                    BOX(x, cy + y, MIN(x + bw - 2, cx + cw - 7), cy + y, grund)
                 END IF
                 x = x + bw + 2
             NEXT
@@ -2666,16 +2678,41 @@ SUB minimapZeichnen()
     DIM laenge AS INTEGER
     (erste, sicht, von, laenge) = GUI_TEXTAREA_VIEW(ta)
     DIM y0 AS INTEGER : y0 = cy + erste \ proZeile
-    DIM y1 AS INTEGER : y1 = cy + MIN(ch, (erste + sicht) \ proZeile)
-    BOX(cx + 1, y0, cx + cw - 2, y1, &H20FFFFFF)
+    DIM y1 AS INTEGER : y1 = cy + MIN(ch - 1, (erste + sicht) \ proZeile)
+    DIM ueber AS BOOLEAN
+    ueber = MOUSEX() >= cx AND MOUSEX() < cx + cw AND MOUSEY() >= cy AND MOUSEY() < cy + ch
+    ueber = ueber AND GUI_WINDOW_AT(MOUSEX(), MOUSEY()) = win
+    BOX(cx + 1, y0, cx + cw - 2, y1, IIF(ueber OR kartenZug, &H30FFFFFF, &H20FFFFFF))
     RECT(cx + 1, y0, cx + cw - 2, y1, &H60A8C8E0)
-    ' Klick: dorthin springen. Die Leinwand nimmt selbst keine Klicks an,
-    ' der Treffertest ist deshalb von Hand.
-    IF MOUSE_HIT(1) AND MOUSEX() >= cx AND MOUSEX() < cx + cw AND MOUSEY() >= cy AND MOUSEY() < cy + ch THEN
-        DIM ziel AS INTEGER : ziel = (MOUSEY() - cy) * proZeile + 1
-        GUI_TEXTAREA_GOTO(ta, MAX(1, MIN(n, ziel)), 1)
-        GUI_FOCUS(ta)
-        protokoll("karte sprung " + STR$(MAX(1, MIN(n, ziel))))
+    ' Die Zeile der Schreibmarke links, Fehler und Warnungen rechts am Rand
+    ' -- mindestens zwei Punkte hoch, sonst uebersieht man sie.
+    DIM mz AS INTEGER
+    DIM ms AS INTEGER
+    (mz, ms) = GUI_TEXTAREA_CURSOR(ta)
+    DIM my AS INTEGER : my = cy + MIN(ch - 2, (mz - 1) \ proZeile)
+    BOX(cx, my, cx + 2, my + 1, &HE0E0E0)
+    IF ta = probFeld THEN
+        DIM pk AS INTEGER
+        FOR pk = 0 TO LEN(probZeile) - 1
+            DIM py AS INTEGER : py = cy + MIN(ch - 3, (probZeile[pk] - 1) \ proZeile)
+            BOX(cx + cw - 5, py, cx + cw - 2, py + 2, IIF(probFehler[pk], &HE84848, &HE0B040))
+        NEXT
+    END IF
+    ' Klick und Zug. Die Leinwand nimmt selbst keine Klicks an, der
+    ' Treffertest ist von Hand -- und nur, wenn kein anderes Fenster (etwa
+    ' das Handbuch) darueber liegt.
+    IF MOUSE_HIT(0) AND ueber THEN kartenZug = TRUE : kartenZiel = -1
+    IF kartenZug THEN
+        DIM ziel AS INTEGER : ziel = MAX(1, MIN(n, (MOUSEY() - cy) * proZeile + 1))
+        IF ziel <> kartenZiel THEN
+            kartenZiel = ziel
+            ' Die Stelle in die MITTE: oben stuende sie am Rand der Ansicht.
+            GUI_TEXTAREA_SCROLL(ta, MAX(1, ziel - sicht \ 2))
+        END IF
+        IF NOT MOUSEBUTTON(0) THEN
+            kartenZug = FALSE
+            protokoll("karte sprung " + STR$(kartenZiel))
+        END IF
     END IF
 END SUB
 
@@ -3449,7 +3486,7 @@ SUB wellenSetzen(ta AS GUI_WIDGET, j AS JSON_HANDLE, n AS INTEGER)
     DIM wl AS ARRAY OF INTEGER : wl = []
     DIM wf AS ARRAY OF INTEGER : wf = []
     probFeld = ta
-    probZeile = [] : probSpalte = [] : probLaenge = [] : probMeldung = []
+    probZeile = [] : probSpalte = [] : probLaenge = [] : probMeldung = [] : probFehler = [] : probKorr = []
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = STR$(i)
@@ -3463,9 +3500,86 @@ SUB wellenSetzen(ta AS GUI_WIDGET, j AS JSON_HANDLE, n AS INTEGER)
         ARRAY_PUSH(wf, IIF(JSON_GET_STRING(j, p + ".schwere") = "fehler", &HE84848, &HE0B040))
         ARRAY_PUSH(probZeile, z) : ARRAY_PUSH(probSpalte, sp) : ARRAY_PUSH(probLaenge, ln)
         ARRAY_PUSH(probMeldung, JSON_GET_STRING(j, p + ".meldung"))
+        ARRAY_PUSH(probFehler, JSON_GET_STRING(j, p + ".schwere") = "fehler")
+        IF JSON_HAS(j, p + ".korrekturen") THEN
+            ARRAY_PUSH(probKorr, JSON_STRINGIFY(JSON_GET_JSON(j, p + ".korrekturen")))
+        ELSE
+            ARRAY_PUSH(probKorr, "")
+        END IF
     NEXT
     GUI_TEXTAREA_SQUIGGLES(ta, ws, wl, wf)
     protokoll("wellen " + STR$(LEN(ws)))
+END SUB
+
+' --- Schnellkorrektur (Strg+.) ---------------------------------------
+' Die Korrekturen der Meldungen in der Zeile der Marke. Steht die Marke auf
+' einer unterstrichenen Stelle, nur deren -- sonst alle der Zeile. Die
+' Vorschlaege rechnet die Laufzeit (CODE_CHECK$), dieselben bekommt VS Code.
+SUB korrekturZeigen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR ta <> probFeld THEN
+        GUI_SET_TEXT(lblStatus, "Hier gibt es nichts zu korrigieren.")
+        RETURN
+    END IF
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+    DIM genau AS BOOLEAN : genau = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(probZeile) - 1
+        IF probZeile[i] = z AND probKorr[i] <> "" AND sp >= probSpalte[i] AND sp <= probSpalte[i] + probLaenge[i] THEN genau = TRUE
+    NEXT
+    paletteNamen = [] : paletteKennungen = [] : paletteDetails = []
+    FOR i = 0 TO LEN(probZeile) - 1
+        IF probZeile[i] <> z OR probKorr[i] = "" THEN CONTINUE
+        IF genau AND (sp < probSpalte[i] OR sp > probSpalte[i] + probLaenge[i]) THEN CONTINUE
+        DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "k" + CHR$(34) + ":" + probKorr[i] + "}")
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(j, "k") - 1
+            ARRAY_PUSH(paletteNamen, JSON_GET_STRING(j, "k." + STR$(k) + ".titel"))
+            ARRAY_PUSH(paletteKennungen, STR$(i) + ":" + STR$(k))
+            DIM kurz AS STRING : kurz = probMeldung[i]
+            IF LEN(kurz) > 40 THEN kurz = LEFT$(kurz, 39) + "…"
+            ARRAY_PUSH(paletteDetails, kurz)
+        NEXT
+    NEXT
+    IF LEN(paletteNamen) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Hier gibt es nichts zu korrigieren.")
+        protokoll("korrektur keine")
+        RETURN
+    END IF
+    protokoll("korrektur angebot " + JOIN$(paletteNamen, " | "))
+    waehlerOeffnen("korrektur", "Schnellkorrektur")
+END SUB
+
+' Eine Korrektur ("meldung:korrektur") anwenden: jede Aenderung als Auswahl
+' + INSERT, von hinten nach vorn (sonst verschoebe die erste die Stellen der
+' folgenden). Das Feld prueft danach wie nach jedem Tippen neu.
+SUB korrekturAnwenden(kennung AS STRING)
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(kennung, ":")
+    IF LEN(teile) <> 2 THEN RETURN
+    DIM i AS INTEGER : i = INT(VAL(teile[0]))
+    DIM k AS INTEGER : k = INT(VAL(teile[1]))
+    IF i < 0 OR i >= LEN(probKorr) THEN RETURN
+    DIM ta AS GUI_WIDGET : ta = probFeld
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "k" + CHR$(34) + ":" + probKorr[i] + "}")
+    DIM pfad AS STRING : pfad = "k." + STR$(k) + ".aenderungen"
+    DIM a AS INTEGER
+    FOR a = JSON_LEN(j, pfad) - 1 TO 0 STEP -1
+        DIM q AS STRING : q = pfad + "." + STR$(a)
+        DIM az AS INTEGER : az = JSON_GET_INT(j, q + ".zeile")
+        DIM asp AS INTEGER : asp = JSON_GET_INT(j, q + ".spalte")
+        DIM al AS INTEGER : al = JSON_GET_INT(j, q + ".laenge")
+        GUI_TEXTAREA_SELECT(ta, az, asp, az, asp + al)
+        GUI_TEXTAREA_INSERT(ta, JSON_GET_STRING(j, q + ".text"))
+    NEXT
+    GUI_FOCUS(ta)
+    ' Die gemerkten Stellen gehoeren zum alten Text -- bis zur naechsten
+    ' Pruefung gilt nichts mehr davon.
+    probFeld = -1
+    DIM titel AS STRING : titel = JSON_GET_STRING(j, "k." + STR$(k) + ".titel")
+    GUI_SET_TEXT(lblStatus, titel)
+    protokoll("korrektur " + titel)
 END SUB
 
 ' Die Meldung zu einer Stelle (Zeile, Spalte ab 1) im gepruefenen Feld, leer
@@ -3478,6 +3592,7 @@ FUNCTION meldungBei$(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS STRING
         IF probZeile[i] = z AND s >= probSpalte[i] AND s <= probSpalte[i] + probLaenge[i] THEN
             IF raus <> "" THEN raus = raus + NL
             raus = raus + probMeldung[i]
+            IF probKorr[i] <> "" THEN raus = raus + NL + "Strg+. schlägt eine Korrektur vor."
         END IF
     NEXT
     RETURN raus
@@ -10437,6 +10552,7 @@ paletteEintrag("Bis zur Marke laufen", "bis_marke", "Strg+F10")
 paletteEintrag("Profil aufnehmen", "profil", "Strg+Umschalt+Y")
 paletteEintrag("Als eigenständiges Programm exportieren", "export", "Strg+F6")
 paletteEintrag("Umbenennen ...", "umbenennen", "Umschalt+F6")
+paletteEintrag("Schnellkorrektur ...", "korrektur", "Strg+.")
 paletteEintrag("Wer hat das geschrieben (git blame)", "blame", "Strg+Umschalt+B")
 paletteEintrag("Was habe ich geändert (git diff)", "diff", "Strg+Umschalt+D")
 paletteEintrag("Verlauf dieser Datei (git log)", "verlauf", "")
@@ -10600,6 +10716,8 @@ SUB paletteAusfuehren()
         ELSE
             verschiebenNach(paletteSichtbar[sel])
         END IF
+    ELSEIF paletteArt = "korrektur" THEN
+        korrekturAnwenden(paletteSichtbar[sel])
     ELSEIF paletteArt = "datei" THEN
         protokoll("schnell " + paletteSichtbar[sel])
         dateiOeffnen(paletteSichtbar[sel])
@@ -10962,6 +11080,7 @@ SUB befehl(k AS STRING)
             IF vervollOffen THEN GUI_FOCUS(lstVervoll) ELSE vervollstaendigen(TRUE)
         CASE "definition" : zurDefinition()
         CASE "umbenennen" : umbenennenFragen()
+        CASE "korrektur" : korrekturZeigen()
         CASE "schnipsel" : schnipselWaehlen()
         CASE "einstellungen" : einstellungenZeigen()
         CASE "befehle" : befehleZeigen()
@@ -11214,6 +11333,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miVervoll) THEN befehl("vervoll")
     IF GUI_CLICKED(miDefinition) THEN befehl("definition")
     IF GUI_CLICKED(miUmbenennen) THEN befehl("umbenennen")
+    IF GUI_CLICKED(miKorrektur) THEN befehl("korrektur")
     IF GUI_CLICKED(miSchnipsel) THEN befehl("schnipsel")
     IF GUI_CLICKED(miEinstellungen) THEN befehl("einstellungen")
     IF GUI_CLICKED(miBefehle) THEN befehl("befehle")

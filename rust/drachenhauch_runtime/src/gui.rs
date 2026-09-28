@@ -2845,7 +2845,9 @@ fn kuerzel_parsen(s: &str) -> Result<(u8, i64), String> {
             return Err(format!("Tastenkuerzel '{}': mehr als eine Taste", s));
         }
         let ch: Vec<char> = t.chars().collect();
-        if ch.len() == 1 && (ch[0].is_ascii_lowercase() || ch[0].is_ascii_digit()) {
+        // Punkt und Komma liegen auf der deutschen Tastatur dort, wo raylib
+        // (nach US-Lage benannt) sie sucht -- anders als Plus und Minus.
+        if ch.len() == 1 && (ch[0].is_ascii_lowercase() || ch[0].is_ascii_digit() || ch[0] == '.' || ch[0] == ',') {
             code = ch[0] as i64;
             continue;
         }
@@ -2865,6 +2867,8 @@ fn kuerzel_parsen(s: &str) -> Result<(u8, i64), String> {
             "rechts" | "right" => "key_right",
             "hoch" | "auf" | "up" => "key_up",
             "runter" | "ab" | "down" => "key_down",
+            "punkt" | "period" => { code = 46; continue; }
+            "komma" | "comma" => { code = 44; continue; }
             "plus" => { code = K_PLUS; continue; }
             "minus" | "-" => { code = K_MINUS; continue; }
             _ => {
@@ -2874,7 +2878,7 @@ fn kuerzel_parsen(s: &str) -> Result<(u8, i64), String> {
                 } else {
                     return Err(format!(
                         "Tastenkuerzel '{}': Taste '{}' unbekannt -- Buchstabe, Ziffer, F1..F12, Entf, Einfg, \
-                         Pos1, Ende, Bild auf/ab, Leer, Enter, Esc, Tab, Rueck, Links/Rechts/Hoch/Runter, Plus, Minus",
+                         Pos1, Ende, Bild auf/ab, Leer, Enter, Esc, Tab, Rueck, Links/Rechts/Hoch/Runter, Plus, Minus, Punkt, Komma",
                         s, teil.trim()));
                 }
             }
@@ -13617,6 +13621,33 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.ta_marke_zeigen(g, h)
     }
 
+    /// GUI_TEXTAREA_SCROLL(ta, zeile): den Ausschnitt so rollen, dass die
+    /// (logische) Zeile oben steht -- OHNE die Marke zu bewegen, wie das
+    /// Mausrad. Geklemmt, sodass unten kein leerer Platz entsteht; eine Zeile
+    /// in einem zugeklappten Block nimmt die Kopfzeile.
+    pub fn textarea_scroll(&mut self, g: &Graphics, h: i64, zeile: i64) -> Result<(), String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_SCROLL")?;
+        let chars: Vec<char> = wd.text.chars().collect();
+        let starts = Self::line_starts(&chars);
+        let lh = self.ta_line_h(g, wd).max(1);
+        let sicht = ((wd.h - 2 * 5) / lh).max(1);
+        let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
+        let ziel = (zeile - 1).max(0) as usize;
+        // Die letzte Reihe, die zu einer Zeile <= ziel gehoert -- so trifft
+        // eine verborgene Zeile die sichtbare Kopfzeile ihres Blocks.
+        let mut row = 0usize;
+        for (k, r) in rows.iter().enumerate() {
+            if r.0 <= ziel && (k == 0 || rows[k - 1].0 != r.0) { row = k; }
+            if r.0 > ziel { break; }
+        }
+        let max = (rows.len() as i32 - sicht).max(0);
+        let w = self.wdg_mut(h, "GUI_TEXTAREA_SCROLL")?;
+        w.scroll = (row as i32).clamp(0, max);
+        w.rad_ziel = None;
+        w.rad_stand = Some((w.caret, w.sel_anchor, w.text.chars().count()));
+        Ok(())
+    }
+
     /// GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2): Bereich markieren, Marke am Ende.
     pub fn textarea_select(&mut self, g: &Graphics, h: i64, z1: i64, s1: i64, z2: i64, s2: i64) -> Result<(), String> {
         let wd = self.ta_wdg(h, "GUI_TEXTAREA_SELECT")?;
@@ -20497,6 +20528,14 @@ mod kuerzel_tests {
         assert_eq!(kuerzel_parsen("Strg+-").unwrap(), (1, K_MINUS));
         assert_eq!(kuerzel_parsen("Strg+0").unwrap(), (1, '0' as i64));
         assert!(kuerzel_parsen("Strg+Plus+Minus").unwrap_err().contains("mehr als eine Taste"));
+    }
+
+    #[test]
+    fn punkt_und_komma() {
+        assert_eq!(kuerzel_parsen("Strg+.").unwrap(), (1, 46));
+        assert_eq!(kuerzel_parsen("Strg+Punkt").unwrap(), (1, 46));
+        assert_eq!(kuerzel_parsen("Strg+,").unwrap(), (1, 44));
+        assert_eq!(kuerzel_parsen("Strg+Komma").unwrap(), (1, 44));
     }
 }
 

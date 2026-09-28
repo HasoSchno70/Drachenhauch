@@ -1,0 +1,169 @@
+' Die Uebersichtskarte der IDE: ein Linksklick rollt die Stelle in die Mitte,
+' Ziehen laesst den Ausschnitt folgen -- die Schreibmarke bleibt, wo sie ist.
+' Bis 2026-09-28 fragte die Karte MOUSE_HIT(1), die RECHTE Taste; ein
+' Linksklick tat nichts. Die Lage der Karte steht erst zur Laufzeit fest,
+' darum schreibt der Einschub die Aufnahme selbst.
+' --- seriell
+
+=== ein klick rollt dorthin, die marke bleibt
+DIM prBild AS INTEGER : prBild = 0
+DIM prP AS INTEGER : prP = 1
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 60 THEN
+    DIM prCx AS INTEGER : prCx = GUI_CANVAS_X(karte)
+    DIM prCy AS INTEGER : prCy = GUI_CANVAS_Y(karte)
+    DIM prCh AS INTEGER : prCh = GUI_CANVAS_H(karte)
+    prP = MAX(1, (400 + prCh - 1) \ prCh)
+    protokoll("pr karte sichtbar " + STR$(GUI_VISIBLE(karte)))
+    DIM prEv AS STRING : prEv = "c 3" + NL
+    prEv = prEv + "e 0 7 " + STR$(prCx + 20) + " " + STR$(prCy + 60) + " 0 0" + NL
+    prEv = prEv + "e 2 6 0 0 0 0" + NL + "e 4 5 0 0 0 0" + NL + NL
+    WRITEALL("ev.txt", prEv)
+    AUTOMATION_PLAY("ev.txt")
+END IF
+IF prBild = 90 THEN
+    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prE AS INTEGER
+    DIM prS AS INTEGER
+    DIM prV AS INTEGER
+    DIM prL AS INTEGER
+    (prE, prS, prV, prL) = GUI_TEXTAREA_VIEW(prTa)
+    DIM prZiel AS INTEGER : prZiel = 60 * prP + 1
+    protokoll("ziel " + STR$(prZiel))
+    ' Die Stelle steht in der Mitte des Ausschnitts (erste zaehlt ab 0).
+    protokoll("pr mitte " + STR$(ABS((prE + 1) - (prZiel - prS \ 2)) <= 1))
+    DIM prZ AS INTEGER
+    DIM prSp AS INTEGER
+    (prZ, prSp) = GUI_TEXTAREA_CURSOR(prTa)
+    protokoll("pr marke " + STR$(prZ) + " " + STR$(prSp))
+    EXIT(0)
+END IF
+--- argumente
+lang.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ide.json
+{"karte": true}
+--- vorher
+DIM t AS STRING : t = ""
+DIM i AS INTEGER
+FOR i = 1 TO 400
+    t = t + "PRINT " + STR$(i) + CHR$(10)
+NEXT
+WRITEALL("lang.dh", t)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM ziel AS STRING : ziel = "?"
+DIM sprung AS STRING : sprung = "-"
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+    IF LEFT$(L[i], 5) = "ziel " THEN ziel = MID$(L[i], 5, 10)
+    IF LEFT$(L[i], 13) = "karte sprung " THEN sprung = MID$(L[i], 13, 10)
+NEXT
+PRINT "sprung stimmt "; sprung = ziel
+--- erwartet
+pr karte sichtbar TRUE
+pr mitte TRUE
+pr marke 1 1
+sprung stimmt TRUE
+
+=== ziehen laesst den ausschnitt folgen
+DIM prBild AS INTEGER : prBild = 0
+DIM prP AS INTEGER : prP = 1
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 60 THEN
+    DIM prCx AS INTEGER : prCx = GUI_CANVAS_X(karte)
+    DIM prCy AS INTEGER : prCy = GUI_CANVAS_Y(karte)
+    DIM prCh AS INTEGER : prCh = GUI_CANVAS_H(karte)
+    prP = MAX(1, (400 + prCh - 1) \ prCh)
+    DIM prEv AS STRING : prEv = "c 7" + NL
+    prEv = prEv + "e 0 7 " + STR$(prCx + 20) + " " + STR$(prCy + 10) + " 0 0" + NL
+    prEv = prEv + "e 2 6 0 0 0 0" + NL
+    prEv = prEv + "e 5 7 " + STR$(prCx + 20) + " " + STR$(prCy + 60) + " 0 0" + NL
+    prEv = prEv + "e 8 7 " + STR$(prCx + 20) + " " + STR$(prCy + 110) + " 0 0" + NL
+    prEv = prEv + "e 11 7 " + STR$(prCx + 20) + " " + STR$(prCy + 150) + " 0 0" + NL
+    prEv = prEv + "e 14 5 0 0 0 0" + NL
+    prEv = prEv + "e 16 7 " + STR$(prCx + 300) + " " + STR$(prCy + 10) + " 0 0" + NL + NL
+    WRITEALL("ev.txt", prEv)
+    AUTOMATION_PLAY("ev.txt")
+END IF
+IF prBild = 72 THEN
+    ' Mitten im Zug: der Ausschnitt ist schon unterwegs.
+    DIM prE1 AS INTEGER
+    DIM prS1 AS INTEGER
+    DIM prV1 AS INTEGER
+    DIM prL1 AS INTEGER
+    (prE1, prS1, prV1, prL1) = GUI_TEXTAREA_VIEW(tabFelder[aktiverTab])
+    protokoll("pr unterwegs " + STR$(prE1 > 0))
+END IF
+IF prBild = 100 THEN
+    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prE AS INTEGER
+    DIM prS AS INTEGER
+    DIM prV AS INTEGER
+    DIM prL AS INTEGER
+    (prE, prS, prV, prL) = GUI_TEXTAREA_VIEW(prTa)
+    DIM prZiel AS INTEGER : prZiel = 150 * prP + 1
+    ' Erst beim Loslassen steht der Sprung im Protokoll, mit der LETZTEN Stelle.
+    protokoll("pr ende " + STR$(ABS((prE + 1) - (prZiel - prS \ 2)) <= 1))
+    DIM prZ AS INTEGER
+    DIM prSp AS INTEGER
+    (prZ, prSp) = GUI_TEXTAREA_CURSOR(prTa)
+    protokoll("pr marke " + STR$(prZ) + " " + STR$(prSp))
+    ' Die Maus ist los und weg: sie zieht nicht weiter.
+    (prE, prS, prV, prL) = GUI_TEXTAREA_VIEW(prTa)
+    protokoll("pr steht " + STR$(prE))
+END IF
+IF prBild = 110 THEN
+    DIM prE2 AS INTEGER
+    DIM prS2 AS INTEGER
+    DIM prV2 AS INTEGER
+    DIM prL2 AS INTEGER
+    (prE2, prS2, prV2, prL2) = GUI_TEXTAREA_VIEW(tabFelder[aktiverTab])
+    protokoll("pr steht " + STR$(prE2))
+    EXIT(0)
+END IF
+--- argumente
+lang.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei _programm/ide.json
+{"karte": true}
+--- vorher
+DIM t AS STRING : t = ""
+DIM i AS INTEGER
+FOR i = 1 TO 400
+    t = t + "PRINT " + STR$(i) + CHR$(10)
+NEXT
+WRITEALL("lang.dh", t)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM sprung AS INTEGER : sprung = 0
+DIM steht AS STRING : steht = ""
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 13) = "karte sprung " THEN sprung = sprung + 1
+    IF LEFT$(L[i], 9) = "pr steht " THEN
+        IF steht = "" THEN steht = L[i] ELSE PRINT "pr steht gleich " ; steht = L[i]
+    ELSEIF LEFT$(L[i], 3) = "pr " THEN
+        PRINT L[i]
+    END IF
+NEXT
+PRINT "spruenge "; sprung
+--- erwartet
+pr unterwegs TRUE
+pr ende TRUE
+pr marke 1 1
+pr steht gleich TRUE
+spruenge 1

@@ -8,7 +8,7 @@
 //!
 //! Methoden: initialize/initialized/shutdown/exit, textDocument/didOpen,
 //! didChange, didClose, completion, hover, definition, references,
-//! documentSymbol. Voll-Sync. Alles Unbekannte mit `id` bekommt `null`.
+//! documentSymbol, codeAction (Schnellkorrekturen). Voll-Sync. Alles Unbekannte mit `id` bekommt `null`.
 //!
 //! **Diagnose laeuft im Hintergrund.** Jeder Tastendruck schickt ein
 //! volles didChange; die Pruefung einer 2 800-Zeilen-Datei kostet rund 90 ms.
@@ -114,10 +114,19 @@ pub fn diagnose(text: &str, basis: &Path) -> Vec<Value> {
             fehler_bereich(text_zeile, spalte, &meldung)
         };
         let schwere = if d.get("severity").and_then(|s| s.as_str()) == Some("warning") { 2 } else { 1 };
-        json!({
+        let mut aus = json!({
             "range": {"start": {"line": z0, "character": von}, "end": {"line": z0, "character": bis}},
             "severity": schwere, "source": "drachenhauch", "message": meldung,
-        })
+        });
+        let k = if importiert { Vec::new() } else { korrekturen(text, z0, von, bis, &meldung) };
+        if !k.is_empty() {
+            let liste: Vec<Value> = k.into_iter().map(|(titel, aend)| json!({
+                "titel": titel,
+                "aenderungen": aend.into_iter().map(|(z, a, b, t)| json!({"zeile": z, "von": a, "bis": b, "text": t})).collect::<Vec<_>>(),
+            })).collect();
+            aus["data"] = json!({"korrekturen": liste});
+        }
+        aus
     }).collect()
 }
 
@@ -167,6 +176,175 @@ pub fn fehler_bereich(zeile: &str, spalte: usize, meldung: &str) -> (usize, usiz
     let anfang = z.iter().position(|c| !c.is_whitespace()).unwrap_or(0);
     let ende = z.iter().rposition(|c| !c.is_whitespace()).map(|p| p + 1).unwrap_or(anfang + 1);
     (anfang, ende.max(anfang + 1))
+}
+
+// ---------------------------------------------------------- Schnellkorrektur
+
+/// Eine Aenderung am Text: Zeile (ab 0), Zeichen von..bis (ab 0), neuer Text.
+pub type Aenderung = (usize, usize, usize, String);
+
+/// Vorschlaege zu einer Meldung: (Titel, Aenderungen). Gelesen wird die
+/// MELDUNG, nicht der Uebersetzer -- sie sagt schon, was gemeint war
+/// ("Meintest du ...", "heisst in Drachenhauch ...", "nirgends ... angelegt").
+/// So bleibt es EINE Quelle: was die Meldung vorschlaegt, ist auch das, was
+/// die Korrektur tut. Nur Korrekturen, die sicher genau diese Stelle treffen;
+/// lieber keine als eine, die etwas anderes aendert, als ihr Titel sagt.
+pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str) -> Vec<(String, Vec<Aenderung>)> {
+    let zeilen: Vec<&str> = text.split('\n').collect();
+    let Some(&zeile) = zeilen.get(z0) else { return Vec::new() };
+    let z: Vec<char> = zeile.chars().collect();
+    let wort: String = z.get(von..bis.min(z.len())).map(|s| s.iter().collect()).unwrap_or_default();
+    let wortzeichen = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
+    let ist_wort = !wort.is_empty() && wort.chars().all(wortzeichen);
+    let mut aus: Vec<(String, Vec<Aenderung>)> = Vec::new();
+
+    // "Meintest du CIRCLE, CIRCLES?" / "Meintest du 'zaehler'?"
+    if let Some(p) = meldung.find("Meintest du ") {
+        if ist_wort {
+            let rest = &meldung[p + "Meintest du ".len()..];
+            let rest = rest.split('?').next().unwrap_or("");
+            for v in rest.split(',') {
+                let v = v.trim().trim_matches('\'');
+                if v.is_empty() || !v.chars().all(wortzeichen) || v.eq_ignore_ascii_case(&wort) { continue; }
+                aus.push((format!("Ersetzen durch {}", v), vec![(z0, von, bis, v.to_string())]));
+            }
+        }
+    }
+
+    // "heisst in Drachenhauch UPPER$(text)" -- nur die Form mit genau
+    // einem Namen vorne; "... bzw. ..." und Erklaerungen bleiben Text.
+    if let Some(p) = meldung.find("heisst in Drachenhauch ") {
+        let rest = &meldung[p + "heisst in Drachenhauch ".len()..];
+        let neu: String = rest.chars().take_while(|&c| wortzeichen(c)).collect();
+        let ein_name = rest[neu.len()..].starts_with('(') && !rest.contains(" bzw. ");
+        if ist_wort && ein_name && !neu.is_empty() {
+            aus.push((format!("Ersetzen durch {}", neu), vec![(z0, von, bis, neu)]));
+        }
+    }
+
+    // "Ungleich schreibt man in Drachenhauch <>" -- `!=` an der Stelle.
+    if meldung.starts_with("Ungleich schreibt man") {
+        let s: String = z.get(von..(von + 2).min(z.len())).map(|s| s.iter().collect()).unwrap_or_default();
+        if s == "!=" { aus.push(("Durch <> ersetzen".into(), vec![(z0, von, von + 2, "<>".into())])); }
+    }
+
+    // "Befehle und SUBs bekommen ihre Werte in Klammern: PRNT(...)" -- den
+    // Rest der Zeile (ohne Kommentar) einklammern.
+    if meldung.starts_with("Befehle und SUBs bekommen ihre Werte in Klammern") && ist_wort {
+        // Das Ende des Codes: das Kommentarzeichen ausserhalb einer
+        // Zeichenkette, sonst das Zeilenende.
+        let mut ende = z.len();
+        let mut in_text = false;
+        for (k, &c) in z.iter().enumerate() {
+            if c == '"' { in_text = !in_text; }
+            if !in_text && c == '\'' { ende = k; break; }
+        }
+        while ende > bis && z[ende - 1].is_whitespace() { ende -= 1; }
+        let mut a = bis;
+        while a < ende && z[a].is_whitespace() { a += 1; }
+        if a < ende && z[a] != '(' {
+            let inhalt: String = z[a..ende].iter().collect();
+            aus.push(("Klammern setzen".into(), vec![(z0, bis, ende, format!("({})", inhalt))]));
+        }
+    }
+
+    // "'x' wird hier beschrieben/gelesen, aber nirgends ... angelegt" --
+    // ein DIM davor. Im Unterprogramm gleich unter seinem Kopf, sonst vor dem
+    // Block auf oberster Ebene: ein DIM in einer Schleife setzte die Variable
+    // in jeder Runde zurueck.
+    if meldung.contains("aber nirgends im Programm mit DIM oder CONST angelegt") && ist_wort {
+        let rhs = zuweisung_rechts(zeile, &wort);
+        let typ = typ_raten(&wort, rhs.as_deref());
+        let einzug = |s: &str| s.chars().take_while(|c| c.is_whitespace()).collect::<String>();
+        let bereiche = crate::symbole::bereiche(text);
+        let ln = z0 + 1;
+        let umgebend = bereiche.iter()
+            .filter(|b| matches!(b.art, "sub" | "function" | "property") && b.zeile < ln && ln <= b.ende)
+            .max_by_key(|b| b.zeile);
+        let (ziel, ein) = if let Some(b) = umgebend {
+            // Unter den Kopf, eingerueckt wie die erste Zeile des Rumpfs.
+            let kopf = b.zeile - 1;
+            let rumpf = zeilen.get(kopf + 1..z0 + 1).unwrap_or(&[]).iter()
+                .find(|s| !s.trim().is_empty()).map(|s| einzug(s)).unwrap_or_default();
+            let ein = if rumpf.is_empty() { format!("{}    ", einzug(zeilen[kopf])) } else { rumpf };
+            (kopf + 1, ein)
+        } else {
+            let mut k = z0;
+            while k > 0 && (zeilen[k].trim().is_empty() || zeilen[k].starts_with(|c: char| c.is_whitespace())) { k -= 1; }
+            (k, String::new())
+        };
+        let zeile_neu = format!("{}DIM {} AS {}\n", ein, wort, typ);
+        aus.push((format!("DIM {} AS {} anlegen", wort, typ), vec![(ziel, 0, 0, zeile_neu)]));
+    }
+    aus
+}
+
+/// Die rechte Seite von `name = ...` in dieser Zeile, falls sie so beginnt.
+fn zuweisung_rechts(zeile: &str, name: &str) -> Option<String> {
+    let t = zeile.trim_start();
+    if t.len() < name.len() || !t[..name.len()].eq_ignore_ascii_case(name) { return None; }
+    let rest = t[name.len()..].trim_start();
+    let rest = rest.strip_prefix('=')?;
+    Some(crate::symbole::ohne_inline_kommentar(rest).trim().to_string())
+}
+
+/// Ein Typ fuer ein neues DIM, geraten aus Name und zugewiesenem Wert.
+fn typ_raten(name: &str, rechts: Option<&str>) -> &'static str {
+    if name.ends_with('$') { return "STRING"; }
+    let Some(r) = rechts else { return "INTEGER" };
+    let gross = r.to_ascii_uppercase();
+    if r.starts_with('"') || r.starts_with("f\"") || r.starts_with("!\"") || r.starts_with("f!\"") { return "STRING"; }
+    if gross == "TRUE" || gross == "FALSE" { return "BOOLEAN"; }
+    if r.parse::<i64>().is_ok() { return "INTEGER"; }
+    if r.parse::<f64>().is_ok() { return "FLOAT"; }
+    // Ein Aufruf eines Befehls mit bekanntem Ergebnis.
+    let kopf: String = r.chars().take_while(|&c| c.is_alphanumeric() || c == '_' || c == '$').collect();
+    if !kopf.is_empty() && r[kopf.len()..].trim_start().starts_with('(') {
+        match crate::typen::builtin_typ(&kopf.to_lowercase()) {
+            Some(crate::typen::Typ::Str) => return "STRING",
+            Some(crate::typen::Typ::Float) => return "FLOAT",
+            Some(crate::typen::Typ::Bool) => return "BOOLEAN",
+            Some(crate::typen::Typ::Int) => return "INTEGER",
+            _ => {}
+        }
+    }
+    // Ein Text in der Rechnung macht sie zum Text, eine Kommazahl oder `/`
+    // (liefert immer FLOAT) zur Kommazahl.
+    if r.contains('"') { return "STRING"; }
+    let ohne = crate::symbole::ohne_kommentare_und_texte(r);
+    if ohne.contains('/') { return "FLOAT"; }
+    let b: Vec<char> = ohne.chars().collect();
+    for k in 1..b.len().saturating_sub(1) {
+        if b[k] == '.' && b[k - 1].is_ascii_digit() && b[k + 1].is_ascii_digit() { return "FLOAT"; }
+    }
+    "INTEGER"
+}
+
+/// Die Korrekturen der Meldungen in den Zeilen von..bis als LSP-CodeActions
+/// (`quickfix`), je eine mit ihrer Meldung als Bezug. Die Diagnose laeuft
+/// dafuer frisch -- sie kostet Millisekunden, und ein zwischengespeicherter
+/// Stand koennte zu einem anderen Text gehoeren.
+pub fn schnellkorrekturen(text: &str, uri: &str, von: u64, bis: u64) -> Vec<Value> {
+    let mut aus = Vec::new();
+    for d in diagnose(text, &basis_von(uri)) {
+        let z = d["range"]["start"]["line"].as_u64().unwrap_or(0);
+        if z < von || z > bis { continue; }
+        let Some(liste) = d["data"]["korrekturen"].as_array() else { continue };
+        for k in liste {
+            let edits: Vec<Value> = k["aenderungen"].as_array().cloned().unwrap_or_default().iter().map(|a| json!({
+                "range": {"start": {"line": a["zeile"], "character": a["von"]},
+                          "end": {"line": a["zeile"], "character": a["bis"]}},
+                "newText": a["text"],
+            })).collect();
+            let mut aenderung = serde_json::Map::new();
+            aenderung.insert(uri.to_string(), Value::Array(edits));
+            aus.push(json!({
+                "title": k["titel"], "kind": "quickfix", "diagnostics": [d.clone()],
+                "edit": {"changes": aenderung},
+            }));
+        }
+    }
+    aus
 }
 
 // ---------------------------------------------------------------- Hover-Daten
@@ -423,6 +601,7 @@ impl Server {
                     "completionProvider": {"triggerCharacters": ["."]},
                     "hoverProvider": true, "definitionProvider": true,
                     "referencesProvider": true, "documentSymbolProvider": true,
+                    "codeActionProvider": true,
                 },
                 "serverInfo": {"name": NAME, "version": crate::fassung()},
             }),
@@ -465,6 +644,13 @@ impl Server {
                     "textDocument/definition" => definition(&text, &uri, z0, c0),
                     _ => fundstellen(&text, &uri, z0, c0),
                 }
+            }
+            "textDocument/codeAction" => {
+                let uri = params["textDocument"]["uri"].as_str().unwrap_or("").to_string();
+                let text = self.docs.get(&uri).cloned().unwrap_or_default();
+                let von = params["range"]["start"]["line"].as_u64().unwrap_or(0);
+                let bis = params["range"]["end"]["line"].as_u64().unwrap_or(von);
+                Value::Array(schnellkorrekturen(&text, &uri, von, bis))
             }
             "textDocument/documentSymbol" => {
                 let uri = params["textDocument"]["uri"].as_str().unwrap_or("");
@@ -520,6 +706,53 @@ pub fn serve() -> std::process::ExitCode {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn korrekturen_aus_der_meldung() {
+        let text = "DIM zaehler AS INTEGER
+SUB tu()
+    FOR i = 1 TO 3
+        zaehlr = zaehlr + 1
+    NEXT
+END SUB";
+        let m = "'zaehlr' wird hier gelesen, aber nirgends im Programm mit DIM oder CONST angelegt. Meintest du 'zaehler'?";
+        let k = korrekturen(text, 3, 8, 14, m);
+        assert_eq!(k[0].0, "Ersetzen durch zaehler");
+        assert_eq!(k[0].1, vec![(3, 8, 14, "zaehler".to_string())]);
+        // Das DIM kommt unter den Kopf der SUB, nicht in die Schleife.
+        assert_eq!(k[1].0, "DIM zaehlr AS INTEGER anlegen");
+        assert_eq!(k[1].1, vec![(2, 0, 0, "    DIM zaehlr AS INTEGER
+".to_string())]);
+        // Auf oberster Ebene vor den Block, mit geratenem Typ.
+        let t2 = "WHILE TRUE
+    s = \"a\"
+WEND";
+        let k = korrekturen(t2, 1, 4, 5, "'s' wird hier beschrieben, aber nirgends im Programm mit DIM oder CONST angelegt.");
+        assert_eq!(k[0].1, vec![(0, 0, 0, "DIM s AS STRING
+".to_string())]);
+        // Klammern, der Kommentar bleibt draussen.
+        let k = korrekturen("PRNT \"x\" ' hallo", 0, 0, 4, "Befehle und SUBs bekommen ihre Werte in Klammern: PRNT(...)");
+        assert_eq!(k[0].1, vec![(0, 4, 8, "(\"x\")".to_string())]);
+        // Umsteiger: nur eindeutige Namen.
+        let k = korrekturen("s = UCASE$(s)", 0, 4, 10, "'UCASE$' heisst in Drachenhauch UPPER$(text)");
+        assert_eq!(k[0].0, "Ersetzen durch UPPER$");
+        assert!(korrekturen("x = LEFT(s, 1)", 0, 4, 8, "heisst in Drachenhauch LEFT$(text, n) bzw. RIGHT$(text, n)").is_empty());
+        assert_eq!(korrekturen("IF a != b THEN", 0, 5, 6, "Ungleich schreibt man in Drachenhauch <>")[0].1,
+                   vec![(0, 5, 7, "<>".to_string())]);
+        // Eine Meldung ohne Vorschlag bleibt ohne Korrektur.
+        assert!(korrekturen("PRINT(1)", 0, 0, 5, "Irgendwas").is_empty());
+    }
+
+    #[test]
+    fn typ_raten_aus_dem_wert() {
+        assert_eq!(typ_raten("n", Some("3")), "INTEGER");
+        assert_eq!(typ_raten("n", Some("3.5")), "FLOAT");
+        assert_eq!(typ_raten("n", Some("a / 2")), "FLOAT");
+        assert_eq!(typ_raten("n", Some("TRUE")), "BOOLEAN");
+        assert_eq!(typ_raten("n", Some("UPPER$(x)")), "STRING");
+        assert_eq!(typ_raten("n$", None), "STRING");
+        assert_eq!(typ_raten("n", Some("\"a\" + b")), "STRING");
+    }
+
     #[test]
     fn fehler_bereich_findet_die_stelle() {
         // genannter Name, als ganzes Wort, nicht als Teil von "zaehlrx"

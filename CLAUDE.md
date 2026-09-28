@@ -1764,6 +1764,28 @@ Schriftbreiten; die Tests klicken darum immer den RECHTEN Knopf und stellen
 die Reihenfolge vorher um. Tests `tests/pruef/gui_richtext_codeknoepfe.dhtest`
 und drei Faelle in `werkzeug_ide_handbuch.dhtest`.
 
+**Karte zum Anklicken, Schnellkorrektur (2026-09-28):** die
+Uebersichtskarte der IDE fragte `MOUSE_HIT(1)` -- das ist die RECHTE Taste
+(0 = links), ein Linksklick tat seit Stand 5 nichts. Jetzt rollt ein Klick
+die Stelle in die Mitte, Ziehen folgt (`kartenZug`), die Marke bleibt: neu
+**`GUI_TEXTAREA_SCROLL(ta, zeile)`** (rollt wie das Rad, setzt `rad_stand`,
+sonst zoege die Editierschleife den Ausschnitt zur Marke zurueck). Die Karte
+zeigt dazu Fehler/Warnungen rechts und die Zeile der Marke links.
+**Schnellkorrektur**: `lsp::korrekturen` liest die MELDUNG ("Meintest du",
+"heisst in Drachenhauch X(", "nirgends ... angelegt", Klammern, `!=`) und
+liefert Aenderungen; `diagnose` haengt sie als `data.korrekturen` an,
+`CODE_CHECK$` gibt sie ab 1 gezaehlt als `korrekturen` heraus, `dhrt lsp`
+als `textDocument/codeAction` (quickfix). Ein fehlendes DIM kommt unter den
+Kopf des Unterprogramms bzw. vor den Block auf oberster Ebene -- in einer
+Schleife setzte es die Variable jede Runde zurueck; der Typ ist aus dem Wert
+geraten (`typ_raten`). Die IDE: Strg+. (Kuerzel `.`/`,` versteht
+`kuerzel_parsen` seither), Waehler `paletteArt = "korrektur"`, angewendet
+ueber SELECT + INSERT von hinten. Tests `tests/pruef/gui_textarea_scroll.dhtest`,
+`code_korrekturen.dhtest`, `werkzeug_ide_karte.dhtest`,
+`werkzeug_ide_korrektur.dhtest`, ein codeAction-Fall in `dhrt_lsp.dhtest`,
+Rust-Tests `korrekturen_aus_der_meldung`, `typ_raten_aus_dem_wert`,
+`punkt_und_komma`; sieben Verfaelschungen fallen je in ihrem Fall.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
