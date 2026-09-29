@@ -216,6 +216,20 @@ bekäme. Diese Bausteine kamen mit ihr:
   feiner Strich je Stufe, unter dem Text. Die Breite einer Stufe wird an
   `tabbreite` Leerzeichen gemessen, und eine leere Zeile nimmt die kleinere
   Tiefe ihrer Nachbarn — sonst risse die Linie in jedem Absatz auf.
+- **Neues Projekt aus Vorlage** (Datei → Neues Projekt aus Vorlage, Strg+Alt+N):
+  Spiel (Fenster mit Spielschleife, Figur aus `assets/figur.png`, bewegt mit
+  den Pfeiltasten und `DELTA()`), Formular-Anwendung (gui mit Textfeld,
+  Knopf und Liste), Konsolenprogramm (`main.dh` mit INPUT, `rechnen.dh`
+  und eine Prüfsammlung `tests.dhtest`) oder leer; jedes mit LIESMICH.md.
+  Name und Ort (Vorgabe: neben dem jetzigen Projekt, [Wählen ...] öffnet
+  den Ordnerdialog); ein belegter Ordner wird abgelehnt. Danach ist der
+  neue Ordner das Projekt und `main.dh` offen.
+- **Bilder und Klänge:** steht die Maus im Code auf einer Zeichenkette, die
+  ein vorhandenes Bild nennt (`LOADIMAGE("assets/figur.png")`), erscheint
+  es nach kurzer Ruhe neben dem Zeiger samt Maßen -- gesucht neben der
+  Datei, dann im Projekt. Ein Bild oder Klang aus dem Projektbaum öffnet
+  eine **Vorschau** in der IDE (Bild mit Maßen und Größe, Klang mit
+  [Abspielen]/[Stopp]); [Mit dem System öffnen] gibt es weiter.
 - **Quellcodeverwaltung** (Bearbeiten → Quellcodeverwaltung, Strg+Alt+G): die
   geänderten Dateien des git-Repositorys als Liste; das Kästchen merkt eine
   Datei für die nächste Übergabe vor (`git add`) oder nimmt sie zurück,

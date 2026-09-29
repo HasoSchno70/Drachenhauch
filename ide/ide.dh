@@ -688,6 +688,7 @@ GUI_WINDOW_MOVABLE(win, FALSE)
 ' Menue
 DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
 DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
+DIM miNeuProjekt AS INTEGER : miNeuProjekt = GUI_MENU_ITEM(mDatei, "Neues Projekt aus Vorlage ...", "Strg+Alt+N")
 DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Öffnen ...", "Strg+O")
 DIM miSchnell AS INTEGER : miSchnell = GUI_MENU_ITEM(mDatei, "Datei im Projekt öffnen ...", "Strg+Umschalt+O")
 DIM miBaumOeffnen AS INTEGER : miBaumOeffnen = GUI_MENU_ITEM(mDatei, "Gewählte Dateien öffnen", "Strg+Umschalt+E")
@@ -1388,6 +1389,44 @@ DIM btnTestsWahl AS GUI_WIDGET : btnTestsWahl = GUI_BUTTON(winTests, "Auswahl au
 DIM btnTestsFehl AS GUI_WIDGET : btnTestsFehl = GUI_BUTTON(winTests, "Fehlgeschlagene", 324, 484, 150, 28)
 DIM btnTestsNeu AS GUI_WIDGET : btnTestsNeu = GUI_BUTTON(winTests, "Neu einlesen", 482, 484, 130, 28)
 GUI_TOOLTIP(baumTests, "Doppelklick öffnet den Fall; grün bestanden, rot fehlgeschlagen, grau noch nicht gelaufen oder übersprungen")
+
+' --- Neues Projekt aus Vorlage -----------------------------------------
+DIM winNeuProj AS GUI_WINDOW : winNeuProj = GUI_WINDOW("Neues Projekt", 340, 140, 600, 420)
+GUI_WINDOW_VISIBLE(winNeuProj, FALSE)
+DIM lstVorlagen AS GUI_WIDGET : lstVorlagen = GUI_LISTBOX(winNeuProj, 12, 12, 200, 290, ["Spiel", "Formular-Anwendung", "Konsolenprogramm", "Leer"])
+DIM lblVorlage AS GUI_WIDGET : lblVorlage = GUI_LABEL(winNeuProj, "", 224, 12)
+GUI_SET_WRAP(lblVorlage, 360)
+DIM lblNpMeldung AS GUI_WIDGET : lblNpMeldung = GUI_LABEL(winNeuProj, "", 224, 280)
+DIM lblNpName AS GUI_WIDGET : lblNpName = GUI_LABEL(winNeuProj, "Name", 12, 326)
+DIM tfNpName AS GUI_WIDGET : tfNpName = GUI_TEXTINPUT(winNeuProj, 100, 322, 380, 28, "MeinProjekt")
+DIM btnNpAnlegen AS GUI_WIDGET : btnNpAnlegen = GUI_BUTTON(winNeuProj, "Anlegen", 488, 322, 100, 28)
+GUI_BUTTON_VARIANT(btnNpAnlegen, "primaer")
+DIM lblNpOrt AS GUI_WIDGET : lblNpOrt = GUI_LABEL(winNeuProj, "Ort", 12, 362)
+DIM tfNpOrt AS GUI_WIDGET : tfNpOrt = GUI_TEXTINPUT(winNeuProj, 100, 358, 380, 28, "")
+DIM btnNpOrt AS GUI_WIDGET : btnNpOrt = GUI_BUTTON(winNeuProj, "Wählen ...", 488, 358, 100, 28)
+GUI_WINDOW_DEFAULT(winNeuProj, btnNpAnlegen)
+DIM npWahl AS INTEGER : npWahl = -2
+
+' --- Bild beim Ueberfahren, Vorschau fuer Bilder und Klaenge ----------
+DIM winBildTipp AS GUI_WINDOW : winBildTipp = GUI_WINDOW("", 0, 0, 180, 200)
+GUI_WINDOW_CHROME(winBildTipp, FALSE)
+GUI_WINDOW_VISIBLE(winBildTipp, FALSE)
+DIM btLeer AS IMAGE : btLeer = IMAGE_NEW(1, 1)
+DIM imgBildTipp AS GUI_WIDGET : imgBildTipp = GUI_IMAGE(winBildTipp, 4, 4, 172, 172, btLeer)
+GUI_IMAGE_MODE(imgBildTipp, "einpassen")
+DIM lblBildTipp AS GUI_WIDGET : lblBildTipp = GUI_LABEL(winBildTipp, "", 6, 178)
+
+DIM winAsset AS GUI_WINDOW : winAsset = GUI_WINDOW("Vorschau", 380, 120, 560, 480)
+GUI_WINDOW_VISIBLE(winAsset, FALSE)
+GUI_WINDOW_RESIZABLE(winAsset, TRUE)
+DIM lblAsset AS GUI_WIDGET : lblAsset = GUI_LABEL(winAsset, "", 8, 8)
+DIM imgAsset AS GUI_WIDGET : imgAsset = GUI_IMAGE(winAsset, 8, 34, 544, 360, btLeer)
+GUI_IMAGE_MODE(imgAsset, "einpassen")
+GUI_SET_ANCHOR(imgAsset, "lrtb")
+DIM btnAssetSpielen AS GUI_WIDGET : btnAssetSpielen = GUI_BUTTON(winAsset, "Abspielen", 8, 404, 120, 28)
+DIM btnAssetStopp AS GUI_WIDGET : btnAssetStopp = GUI_BUTTON(winAsset, "Stopp", 136, 404, 100, 28)
+DIM btnAssetSystem AS GUI_WIDGET : btnAssetSystem = GUI_BUTTON(winAsset, "Mit dem System öffnen", 360, 404, 192, 28)
+GUI_SET_ANCHOR(btnAssetSpielen, "lb") : GUI_SET_ANCHOR(btnAssetStopp, "lb") : GUI_SET_ANCHOR(btnAssetSystem, "rb")
 
 ' --- Live-Vorschau ------------------------------------------------------
 DIM winLive AS GUI_WINDOW : winLive = GUI_WINDOW("Live-Vorschau", 760, 110, 520, 420)
@@ -2960,6 +2999,12 @@ SUB dateiOeffnen(pfad AS STRING)
         letzteForm = pfad
         werkzeugMit("197_form_designer.dh", pfad)
         GUI_SET_TEXT(lblStatus, "Im Form-Designer geöffnet: " + BASENAME(pfad) + " -- als Text: Befehlspalette, 'Formular als Text öffnen'")
+        RETURN
+    END IF
+    ' Bilder und Klaenge zeigt die IDE selbst -- man will sehen bzw. hoeren,
+    ' was das Programm laedt, ohne ein zweites Programm.
+    IF assetArt$(pfad) <> "" THEN
+        assetZeigen(pfad)
         RETURN
     END IF
     ' Was der Editor nicht bearbeiten kann, gibt er ans System weiter --
@@ -4912,6 +4957,351 @@ SUB testUebersichtNachziehen()
     END IF
 END SUB
 
+' --- Neues Projekt aus Vorlage: Logik ----------------------------------
+' Vier Vorlagen, jede ein lauffaehiges Programm (main.dh) samt LIESMICH.md;
+' das Spiel bringt ein Bild in assets/ mit, das Konsolenprogramm eine
+' zweite Datei und eine Pruefsammlung. Danach ist der Ordner das Projekt
+' und main.dh offen.
+FUNCTION npBeschreibung$(i AS INTEGER) AS STRING
+    SELECT CASE i
+        CASE 0 : RETURN "Ein Fenster mit Spielschleife: eine Figur aus assets/figur.png, die sich mit den Pfeiltasten bewegt -- gerechnet mit DELTA(), also gleich schnell bei jeder Bildrate."
+        CASE 1 : RETURN "Eine Anwendung mit gui: Textfeld, Knopf und Liste in einem Fenster; Enter im Feld drückt den Knopf."
+        CASE 2 : RETURN "Ein Konsolenprogramm mit INPUT und PRINT, eine Funktion in rechnen.dh und eine Prüfsammlung tests.dhtest dazu (Strg+Alt+F5)."
+        CASE 3 : RETURN "Nur main.dh mit einer Zeile -- für alles andere."
+    END SELECT
+    RETURN ""
+END FUNCTION
+
+SUB neuProjektZeigen()
+    GUI_LISTBOX_SET_SELECTED(lstVorlagen, 0)
+    npWahl = -2
+    IF TRIM$(GUI_TEXT(tfNpName)) = "" THEN GUI_SET_TEXT(tfNpName, "MeinProjekt")
+    IF TRIM$(GUI_TEXT(tfNpOrt)) = "" THEN
+        DIM ort AS STRING : ort = CWD$()
+        IF projektOrdner <> "" THEN ort = DIRNAME(projektOrdner)
+        GUI_SET_TEXT(tfNpOrt, ort)
+    END IF
+    GUI_SET_TEXT(lblNpMeldung, "")
+    GUI_WINDOW_VISIBLE(winNeuProj, TRUE)
+    GUI_FOCUS(tfNpName)
+    protokoll("neues projekt fenster")
+END SUB
+
+SUB neuProjektNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winNeuProj) THEN RETURN
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstVorlagen)
+    IF sel <> npWahl THEN
+        npWahl = sel
+        GUI_SET_TEXT(lblVorlage, npBeschreibung$(sel))
+    END IF
+    IF GUI_CLICKED(btnNpOrt) THEN
+        DIM w AS STRING : w = ""
+        TRY
+            w = FOLDER_DIALOG("Wo soll das Projekt liegen?")
+        CATCH e
+            w = ""
+        END TRY
+        IF w <> "" THEN GUI_SET_TEXT(tfNpOrt, w)
+    END IF
+    IF GUI_CLICKED(btnNpAnlegen) THEN
+        IF neuProjektAnlegen(sel, TRIM$(GUI_TEXT(tfNpName)), TRIM$(GUI_TEXT(tfNpOrt))) THEN
+            GUI_WINDOW_VISIBLE(winNeuProj, FALSE)
+        END IF
+    END IF
+END SUB
+
+FUNCTION npZeilen$(z AS ARRAY OF STRING) AS STRING
+    RETURN JOIN$(z, NL) + NL
+END FUNCTION
+
+' Legt das Projekt an; FALSE mit Meldung im Fenster, wenn es nicht geht.
+FUNCTION neuProjektAnlegen(art AS INTEGER, name AS STRING, ort AS STRING) AS BOOLEAN
+    IF name = "" OR NOT REGEX_TEST(name, "^[A-Za-z0-9_ äöüÄÖÜß-]+$") THEN
+        GUI_SET_TEXT(lblNpMeldung, "Der Name braucht Buchstaben, Ziffern, _ oder -.")
+        protokoll("neues projekt name ungueltig")
+        RETURN FALSE
+    END IF
+    IF ort = "" OR NOT DIREXISTS(ort) THEN
+        GUI_SET_TEXT(lblNpMeldung, "Den Ort gibt es nicht: " + ort)
+        protokoll("neues projekt ort fehlt")
+        RETURN FALSE
+    END IF
+    DIM ziel AS STRING : ziel = PATHJOIN(ort, name)
+    IF DIREXISTS(ziel) THEN
+        IF LEN(DIRLIST(ziel)) > 0 THEN
+            GUI_SET_TEXT(lblNpMeldung, "Den Ordner " + name + " gibt es schon, und er ist nicht leer.")
+            protokoll("neues projekt ordner belegt")
+            RETURN FALSE
+        END IF
+    ELSE
+        MKDIR(ziel)
+    END IF
+    DIM q AS STRING : q = CHR$(34)
+    DIM liesmich AS STRING
+    SELECT CASE art
+        CASE 0
+            MKDIR(PATHJOIN(ziel, "assets"))
+            DIM b AS IMAGE : b = IMAGE_NEW(32, 32)
+            IMAGE_FILL_ELLIPSE(b, 16.0, 16.0, 14.0, 14.0, &H40C0E0)
+            IMAGE_FILL_ELLIPSE(b, 11.0, 12.0, 3.0, 3.0, &H102030)
+            IMAGE_FILL_ELLIPSE(b, 21.0, 12.0, 3.0, 3.0, &H102030)
+            IMAGE_SAVE(b, PATHJOIN(ziel, "assets/figur.png"))
+            IMAGE_FREE(b)
+            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
+                "' " + name + " -- ein Spiel in Drachenhauch.", _
+                "' Pfeiltasten bewegen die Figur, ESC beendet.", _
+                "SCREEN(800, 600, " + q + name + q + ", 1)", _
+                "SETFPS(60)", _
+                "DIM figur AS IMAGE : figur = LOADIMAGE(" + q + "assets/figur.png" + q + ")", _
+                "DIM x AS FLOAT : x = 400.0", _
+                "DIM y AS FLOAT : y = 300.0", _
+                "CONST TEMPO = 240.0", _
+                "WHILE NOT QUITREQUESTED()", _
+                "    IF KEYPRESSED(KEY_LEFT) THEN x = x - TEMPO * DELTA()", _
+                "    IF KEYPRESSED(KEY_RIGHT) THEN x = x + TEMPO * DELTA()", _
+                "    IF KEYPRESSED(KEY_UP) THEN y = y - TEMPO * DELTA()", _
+                "    IF KEYPRESSED(KEY_DOWN) THEN y = y + TEMPO * DELTA()", _
+                "    CLS(RGB(20, 24, 40))", _
+                "    DRAWIMAGE(figur, INT(x) - 16, INT(y) - 16)", _
+                "    TEXT(10, 10, " + q + "Pfeiltasten bewegen die Figur" + q + ")", _
+                "    FLIP()", _
+                "WEND"]))
+            liesmich = "Ein Spiel: F5 startet es, die Figur liegt in assets/figur.png."
+        CASE 1
+            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
+                "' " + name + " -- eine Anwendung mit Fenster und Formular.", _
+                "IMPORT " + q + "gui" + q, _
+                "SCREEN(640, 420, " + q + name + q + ", 1)", _
+                "SETFPS(60)", _
+                "DIM win AS GUI_WINDOW : win = GUI_WINDOW(" + q + name + q + ", 0, 0, 640, 420)", _
+                "GUI_WINDOW_CHROME(win, FALSE)", _
+                "DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(win, " + q + "Name:" + q + ", 20, 24)", _
+                "DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(win, 100, 20, 300, 28, " + q + "Wie heißt du?" + q + ")", _
+                "DIM btn AS GUI_WIDGET : btn = GUI_BUTTON(win, " + q + "Hinzufügen" + q + ", 410, 20, 140, 28)", _
+                "DIM lst AS GUI_WIDGET : lst = GUI_LISTBOX(win, 20, 64, 530, 300, [])", _
+                "GUI_WINDOW_DEFAULT(win, btn)", _
+                "GUI_FOCUS(tf)", _
+                "WHILE NOT QUITREQUESTED()", _
+                "    GUI_UPDATE()", _
+                "    IF GUI_CLICKED(btn) AND TRIM$(GUI_TEXT(tf)) <> " + q + q + " THEN", _
+                "        GUI_LISTBOX_ADD(lst, TRIM$(GUI_TEXT(tf)))", _
+                "        GUI_SET_TEXT(tf, " + q + q + ")", _
+                "    END IF", _
+                "    CLS(BLACK)", _
+                "    GUI_DRAW()", _
+                "    FLIP()", _
+                "WEND"]))
+            liesmich = "Eine Anwendung mit Fenster: F5 startet sie. Das Formular lässt sich auch im Form-Designer bauen (Werkzeuge)."
+        CASE 2
+            WRITEALL(PATHJOIN(ziel, "rechnen.dh"), npZeilen$([ _
+                "' Rechnen -- eine Funktion, die tests.dhtest prueft.", _
+                "FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER", _
+                "    RETURN a * b", _
+                "END FUNCTION"]))
+            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
+                "' " + name + " -- ein Konsolenprogramm.", _
+                "IMPORT " + q + "rechnen.dh" + q, _
+                "DIM name AS STRING", _
+                "INPUT " + q + "Wie heißt du? " + q + ", name", _
+                "PRINT " + q + "Hallo, " + q + " + name + " + q + "! 6 mal 7 ist " + q + " + STR$(mal(6, 7)) + " + q + "." + q]))
+            WRITEALL(PATHJOIN(ziel, "tests.dhtest"), npZeilen$([ _
+                "' Pruefsammlung: in der IDE Strg+Alt+F5, sonst dhrt test tests.dhtest", _
+                "", _
+                "=== mal rechnet", _
+                "IMPORT " + q + "r.dh" + q, _
+                "PRINT mal(6, 7)", _
+                "--- datei r.dh", _
+                "IMPORT " + q + "{sammlung}/rechnen.dh" + q, _
+                "", _
+                "--- erwartet", _
+                "42"]))
+            liesmich = "Ein Konsolenprogramm: F5 startet es, Strg+Alt+F5 prüft rechnen.dh mit tests.dhtest."
+        CASE ELSE
+            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$(["' " + name, "PRINT " + q + "Hallo" + q]))
+            liesmich = "Ein leeres Projekt."
+    END SELECT
+    WRITEALL(PATHJOIN(ziel, "LIESMICH.md"), "# " + name + NL + NL + liesmich + NL)
+    projektOrdner = ziel
+    baumFuellen()
+    dateiOeffnen(PATHJOIN(ziel, "main.dh"))
+    GUI_SET_TEXT(lblStatus, "Neues Projekt: " + ziel)
+    protokoll("neues projekt " + STR$(art) + " " + name)
+    RETURN TRUE
+END FUNCTION
+
+' --- Bilder und Klaenge ------------------------------------------------
+' "bild" oder "klang" nach der Endung, sonst "".
+FUNCTION assetArt$(pfad AS STRING) AS STRING
+    DIM e AS STRING : e = LOWER$(pfad)
+    DIM k AS STRING
+    FOR EACH k IN (".png", ".jpg", ".jpeg", ".bmp", ".tga", ".gif")
+        IF RIGHT$(e, LEN(k)) = k THEN RETURN "bild"
+    NEXT
+    FOR EACH k IN (".wav", ".ogg", ".mp3", ".flac")
+        IF RIGHT$(e, LEN(k)) = k THEN RETURN "klang"
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Steht die Maus in einer Zeichenkette, die ein vorhandenes Bild nennt?
+' Gesucht wird neben der Datei im Reiter (so laedt das Programm), dann im
+' Projekt. Liefert den Weg oder "".
+FUNCTION bildPfadBei$(ta AS GUI_WIDGET, zeile AS STRING, spalte AS INTEGER) AS STRING
+    DIM i AS INTEGER : i = spalte - 1
+    IF i < 0 OR i >= LEN(zeile) THEN RETURN ""
+    DIM a AS INTEGER : a = -1
+    DIM k AS INTEGER
+    DIM drin AS BOOLEAN : drin = FALSE
+    FOR k = 0 TO LEN(zeile) - 1
+        DIM c AS STRING : c = MID$(zeile, k, 1)
+        IF c = "'" AND NOT drin THEN RETURN ""
+        IF c = CHR$(34) THEN
+            IF drin THEN
+                IF i > a AND i < k THEN
+                    DIM text AS STRING : text = MID$(zeile, a + 1, k - a - 1)
+                    IF assetArt$(text) <> "bild" THEN RETURN ""
+                    DIM basis AS STRING : basis = projektOrdner
+                    DIM t AS INTEGER
+                    FOR t = 0 TO tabAnzahl - 1
+                        IF (tabFelder[t] = ta OR ta = taSpiegel) AND t = aktiverTab AND tabPfade[t] <> "" THEN basis = DIRNAME(tabPfade[t])
+                    NEXT
+                    IF FILEEXISTS(PATHJOIN(basis, text)) THEN RETURN PATHJOIN(basis, text)
+                    IF projektOrdner <> "" AND FILEEXISTS(PATHJOIN(projektOrdner, text)) THEN RETURN PATHJOIN(projektOrdner, text)
+                    RETURN ""
+                END IF
+                drin = FALSE
+            ELSE
+                drin = TRUE
+                a = k
+            END IF
+        END IF
+    NEXT
+    RETURN ""
+END FUNCTION
+
+DIM btPfad AS STRING : btPfad = ""
+DIM btBild AS IMAGE : btBild = -1
+DIM btRuhe AS INTEGER : btRuhe = 0
+
+' Das Bild neben der Maus: erst nach einer kurzen Ruhe, weg, sobald die
+' Maus die Zeichenkette verlaesst. Unten rechts neben dem Zeiger, damit das
+' Fenster nicht unter der Maus liegt (sonst zaehlte das Code-Feld nicht
+' mehr als ueberfahren und das Bild verschwaende gleich wieder).
+SUB bildTippNachziehen(pfad AS STRING, mx AS INTEGER, my AS INTEGER)
+    IF pfad = "" THEN
+        IF GUI_WINDOW_SHOWN(winBildTipp) THEN GUI_WINDOW_VISIBLE(winBildTipp, FALSE)
+        btPfad = "" : btRuhe = 0
+        RETURN
+    END IF
+    IF pfad <> btPfad THEN
+        btPfad = pfad : btRuhe = 0
+        IF GUI_WINDOW_SHOWN(winBildTipp) THEN GUI_WINDOW_VISIBLE(winBildTipp, FALSE)
+        RETURN
+    END IF
+    btRuhe = btRuhe + 1
+    IF btRuhe <> TIPP_RUHE THEN RETURN
+    IF btBild >= 0 THEN IMAGE_FREE(btBild)
+    btBild = -1
+    TRY
+        btBild = LOADIMAGE(pfad)
+    CATCH e
+        btBild = -1
+    END TRY
+    IF btBild < 0 THEN RETURN
+    GUI_SET_IMAGE(imgBildTipp, btBild)
+    GUI_SET_TEXT(lblBildTipp, BASENAME(pfad) + "  " + STR$(IMAGEWIDTH(btBild)) + "x" + STR$(IMAGEHEIGHT(btBild)))
+    DIM x AS INTEGER : x = MIN(mx + 18, SCREENWIDTH() - 190)
+    DIM y AS INTEGER : y = my + 22
+    IF y + 210 > SCREENHEIGHT() THEN y = my - 222
+    GUI_WINDOW_SET_BOUNDS(winBildTipp, x, y, 180, 200)
+    GUI_WINDOW_VISIBLE(winBildTipp, TRUE)
+    protokoll("bildtipp " + BASENAME(pfad) + " " + STR$(IMAGEWIDTH(btBild)) + "x" + STR$(IMAGEHEIGHT(btBild)))
+END SUB
+
+' Die Vorschau eines Bildes oder Klangs aus dem Projekt.
+DIM assetPfad AS STRING : assetPfad = ""
+DIM assetBild AS IMAGE : assetBild = -1
+DIM assetKlang AS SOUND
+DIM assetKlangDa AS BOOLEAN : assetKlangDa = FALSE
+
+SUB assetZeigen(pfad AS STRING)
+    assetPfad = pfad
+    IF assetBild >= 0 THEN IMAGE_FREE(assetBild) : assetBild = -1
+    IF assetKlangDa THEN
+        TRY
+            STOPSOUND(assetKlang)
+        CATCH e
+        END TRY
+        assetKlangDa = FALSE
+    END IF
+    GUI_WINDOW_TITLE(winAsset, "Vorschau: " + BASENAME(pfad))
+    DIM art AS STRING : art = assetArt$(pfad)
+    DIM groesse AS STRING : groesse = STR$(FILESIZE(pfad)) + " Bytes"
+    IF FILESIZE(pfad) >= 1024 THEN groesse = STR$(INT(FILESIZE(pfad) / 1024.0 + 0.5)) + " KB"
+    IF art = "bild" THEN
+        TRY
+            assetBild = LOADIMAGE(pfad)
+        CATCH e
+            assetBild = -1
+        END TRY
+        IF assetBild >= 0 THEN
+            GUI_SET_IMAGE(imgAsset, assetBild)
+            GUI_SET_TEXT(lblAsset, BASENAME(pfad) + " -- " + STR$(IMAGEWIDTH(assetBild)) + " x " + _
+                         STR$(IMAGEHEIGHT(assetBild)) + " Punkte, " + groesse)
+            protokoll("vorschau bild " + BASENAME(pfad) + " " + STR$(IMAGEWIDTH(assetBild)) + "x" + STR$(IMAGEHEIGHT(assetBild)))
+        ELSE
+            GUI_SET_IMAGE(imgAsset, btLeer)
+            GUI_SET_TEXT(lblAsset, BASENAME(pfad) + " lässt sich nicht als Bild lesen.")
+            protokoll("vorschau bild fehler")
+        END IF
+    ELSE
+        GUI_SET_IMAGE(imgAsset, btLeer)
+        TRY
+            assetKlang = LOADSOUND(pfad)
+            assetKlangDa = TRUE
+        CATCH e
+            assetKlangDa = FALSE
+        END TRY
+        IF assetKlangDa THEN
+            GUI_SET_TEXT(lblAsset, BASENAME(pfad) + " -- Klang, " + groesse + ". [Abspielen] spielt ihn.")
+            protokoll("vorschau klang " + BASENAME(pfad))
+        ELSE
+            GUI_SET_TEXT(lblAsset, BASENAME(pfad) + " -- Klang, " + groesse + " (hier nicht abspielbar: keine Tonausgabe oder kein lesbares Format).")
+            protokoll("vorschau klang ohne ton")
+        END IF
+    END IF
+    GUI_SET_VISIBLE(btnAssetSpielen, art = "klang")
+    GUI_SET_VISIBLE(btnAssetStopp, art = "klang")
+    GUI_WINDOW_VISIBLE(winAsset, TRUE)
+    ' Ein Fenster ohne Fokus bliebe hinter dem Hauptfenster.
+    GUI_FOCUS(btnAssetSystem)
+END SUB
+
+SUB assetNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winAsset) THEN RETURN
+    IF GUI_CLICKED(btnAssetSpielen) AND assetKlangDa THEN
+        TRY
+            PLAYSOUND(assetKlang)
+            protokoll("vorschau spielt")
+        CATCH e
+            GUI_SET_TEXT(lblAsset, "Abspielen ging nicht: " + e)
+        END TRY
+    END IF
+    IF GUI_CLICKED(btnAssetStopp) AND assetKlangDa THEN
+        TRY
+            STOPSOUND(assetKlang)
+        CATCH e
+        END TRY
+    END IF
+    IF GUI_CLICKED(btnAssetSystem) AND assetPfad <> "" THEN
+        TRY
+            OPENDOC(assetPfad)
+        CATCH e
+            GUI_SET_TEXT(lblAsset, "Lässt sich nicht mit dem System öffnen.")
+        END TRY
+    END IF
+END SUB
+
 ' --- Ganzes Projekt pruefen --------------------------------------------
 ' Die Fehlerliste kennt nur die Datei im Reiter. Hier jede .dh des Projekts
 ' (samt Unterordnern, mit den Haken im Baum), offene Reiter mit dem Stand im
@@ -6051,10 +6441,15 @@ SUB mausNachziehen(ta AS GUI_WIDGET)
     IF NOT GUI_HOVERED(ta) THEN z = 0
     DIM wort AS STRING : wort = ""
     DIM anfang AS INTEGER : anfang = 0
+    DIM bildWeg AS STRING : bildWeg = ""
     IF z > 0 THEN
         DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-        IF z <= LEN(zeilen) THEN (wort, anfang) = wortBeiZeichen(zeilen[z - 1], s)
+        IF z <= LEN(zeilen) THEN
+            (wort, anfang) = wortBeiZeichen(zeilen[z - 1], s)
+            bildWeg = bildPfadBei$(ta, zeilen[z - 1], s)
+        END IF
     END IF
+    bildTippNachziehen(bildWeg, mx, my)
 
     ' Strg+Klick: gesprungen wird beim LOSLASSEN -- beim Druecken setzt der
     ' Textbereich selbst die Marke, und solange die Taste haengt, zieht er
@@ -11803,6 +12198,7 @@ paletteEintrag("Live-Vorschau", "live", "Strg+Alt+L")
 paletteEintrag("Prüfsammlung ausführen", "pruefsammlung", "Strg+Alt+F5")
 paletteEintrag("Diesen Prüffall ausführen", "prueffall", "Strg+Alt+Umschalt+F5")
 paletteEintrag("Prüfsammlungen im Überblick", "test_uebersicht", "Strg+Alt+T")
+paletteEintrag("Neues Projekt aus Vorlage", "neues_projekt", "Strg+Alt+N")
 paletteEintrag("Werkzeugleiste", "leiste", "")
 paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
 paletteEintrag("Gewählte Dateien öffnen", "baum_oeffnen", "Strg+Umschalt+E")
@@ -12287,6 +12683,7 @@ SUB befehl(k AS STRING)
         CASE "pruefsammlung" : pruefsammlungStarten(FALSE)
         CASE "prueffall" : pruefsammlungStarten(TRUE)
         CASE "test_uebersicht" : testUebersichtZeigen()
+        CASE "neues_projekt" : neuProjektZeigen()
         CASE "leiste"
             leisteAn = NOT leisteAn
             GUI_MENU_CHECK(miLeiste, leisteAn)
@@ -12592,6 +12989,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miPruefsammlung) THEN befehl("pruefsammlung")
     IF GUI_CLICKED(miPrueffall) THEN befehl("prueffall")
     IF GUI_CLICKED(miTestUebersicht) THEN befehl("test_uebersicht")
+    IF GUI_CLICKED(miNeuProjekt) THEN befehl("neues_projekt")
     IF GUI_CLICKED(miLeiste) THEN befehl("leiste")
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
     DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
@@ -12648,6 +13046,8 @@ WHILE NOT beenden
     qvNachziehen()
     liveNachziehen()
     testUebersichtNachziehen()
+    neuProjektNachziehen()
+    assetNachziehen()
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miHakenWeg) THEN befehl("haken_weg")
     IF GUI_CLICKED(miBaumHaken) THEN befehl("baum_haken")
@@ -13120,6 +13520,11 @@ WHILE NOT beenden
     ' waere sonst von ihr verdeckt -- GUI_DRAW zeichnet Fenster und
     ' Zeichenflaechen in EINEM Durchgang, das Gemalte kommt danach.
     IF GUI_WINDOW_SHOWN(winHandbuch) THEN GUI_DRAW_WINDOW(winHandbuch) : GUI_DRAW_TOP()
+    ' Das Bild neben der Maus gehoert ueber alles (es ist ein Tooltip).
+    IF GUI_WINDOW_SHOWN(winBildTipp) THEN GUI_DRAW_WINDOW(winBildTipp)
+    ' Die Live-Vorschau schwebt: sie bleibt sichtbar, waehrend man im Code
+    ' tippt (dabei hat das Hauptfenster den Fokus und laege sonst davor).
+    IF liveAn AND GUI_WINDOW_SHOWN(winLive) THEN GUI_DRAW_WINDOW(winLive)
     FLIP()
 WEND
 

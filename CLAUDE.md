@@ -1893,6 +1893,26 @@ Lauf zeigte einen alten Stand (grau), 30 Bilder spaeter stimmte er. Test
 behoben, keine mehr). Werte beim Ueberfahren und Protokollpunkte gab es
 schon (siehe Debugger in `docs/ide.md`).
 
+**Projekt aus Vorlage, Bild beim Ueberfahren, Asset-Vorschau
+(2026-09-29):** Strg+Alt+N (`neuProjektAnlegen(art, name, ort)`: Spiel mit
+erzeugtem `assets/figur.png`, Formular, Konsole mit `rechnen.dh` und
+`tests.dhtest`, leer; LIESMICH.md; belegter Ordner/krummer Name = FALSE
+mit Meldung). Bild beim Ueberfahren (`bildPfadBei$` sucht die
+Zeichenkette unter der Maus, `bildTippNachziehen` zeigt `winBildTipp` nach
+TIPP_RUHE Bildern neben dem Zeiger). `dateiOeffnen` gibt Bilder und Klaenge
+an `assetZeigen` (Vorschau-Fenster) statt an OPENDOC. **Der Fund dabei:**
+ein Fenster, das per `GUI_WINDOW_VISIBLE` erscheint, ohne dass ein Widget
+darin den Fokus bekommt, liegt HINTER dem Hauptfenster -- die Proben mit
+"gezeigt = TRUE" waren gruen, zu sehen war nichts. Der Bild-Tipp und die
+Live-Vorschau (aus #292, dort unbemerkt) werden darum nach `GUI_DRAW` mit
+`GUI_DRAW_WINDOW` noch einmal obenauf gezeichnet, die Asset-Vorschau holt
+sich den Fokus. Beide Proben lesen jetzt die Farbe vom BILDSCHIRMFOTO
+(einige Bilder nach dem Setzen -- im selben Bild zeigt es den alten
+Stand); ohne das Zeichnen obenauf fallen sie. Tests
+`werkzeug_ide_neues_projekt.dhtest` (uebersetzt jedes main.dh, laeuft die
+Pruefsammlung und das Konsolenprogramm), `werkzeug_ide_asset.dhtest`,
+`werkzeug_ide_live.dhtest` (Schirm-Probe dazu).
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

@@ -1,0 +1,62 @@
+' Bilder und Klaenge in der IDE: ueberfaehrt die Maus im Code eine
+' Zeichenkette, die ein vorhandenes Bild nennt, erscheint es nach kurzer
+' Ruhe neben dem Zeiger (samt Massen); ein Bild oder Klang aus dem Projekt
+' oeffnet eine Vorschau in der IDE statt des Systemprogramms. Der Klang
+' hier ist absichtlich kein lesbares WAV -- die Vorschau sagt es, statt
+' abzubrechen (eine Tonausgabe gibt es auf den Pruefrechnern ohnehin nicht).
+--- seriell
+
+=== bild beim ueberfahren, vorschau fuer bild und klang
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN prZiel(1, 35, FALSE, FALSE)
+IF prBild = 116 THEN SAVESCREENSHOT("tipp.png")
+IF prBild = 120 THEN
+    ' Nicht nur "gezeigt", sondern zu SEHEN: das rote Bild mitten im Tipp
+    ' (ohne GUI_DRAW_WINDOW lag das Fenster hinter dem Hauptfenster).
+    DIM prB AS IMAGE : prB = LOADIMAGE("tipp.png")
+    DIM prF AS INTEGER : prF = GETPIXEL(prB, GUI_WINDOW_GET_X(winBildTipp) + 90, GUI_WINDOW_GET_Y(winBildTipp) + 90)
+    protokoll("pr tipp rot " + STR$(((prF SHR 16) BAND 255) > 200 AND ((prF SHR 8) BAND 255) < 60))
+    dateiOeffnen(PATHJOIN(projektOrdner, "bild.png"))
+    protokoll("pr vorschau " + GUI_TEXT(lblAsset))
+    dateiOeffnen(PATHJOIN(projektOrdner, "ton.wav"))
+    protokoll("pr knopf " + STR$(GUI_VISIBLE(btnAssetSpielen)))
+    protokoll("pr reiter " + STR$(tabAnzahl))
+    EXIT(0)
+END IF
+--- einschub nach protokoll("bereit")
+IMPORT "hilfe.dh"
+--- argumente
+main.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei main.dh
+DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+PRINT "fertig"
+--- datei ton.wav
+kein wav
+--- datei _programm/hilfe.dh
+IMPORT "{sammlung}/_hilfen/idemaus.dh"
+--- vorher
+DIM b AS IMAGE : b = IMAGE_NEW(20, 10, RED)
+IMAGE_SAVE(b, "bild.png")
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 9) = "bildtipp " OR LEFT$(L[i], 9) = "vorschau " OR LEFT$(L[i], 5) = "ziel " THEN PRINT L[i]
+NEXT
+--- erwartet
+ziel gefunden
+bildtipp bild.png 20x10
+pr tipp rot TRUE
+vorschau bild bild.png 20x10
+pr vorschau bild.png -- 20 x 10 Punkte, 88 Bytes
+vorschau klang ohne ton
+pr knopf TRUE
+pr reiter 1
