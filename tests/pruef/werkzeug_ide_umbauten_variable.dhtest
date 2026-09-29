@@ -1,0 +1,185 @@
+' Weitere Umbauten: Auswahl als Variable einfuehren (Strg+Alt+V), Variable
+' einsetzen (Strg+Alt+I), SUB in FUNCTION umwandeln (Strg+Alt+U). Ohne
+' Vorschau (ide.json umbau_vorschau: false) landet der Umbau gleich im
+' Reiter; geprueft wird der Text und dass er laeuft. Jeder Umbau hat eine
+' Ablehnung, wo er die Bedeutung aendern wuerde.
+--- seriell
+
+=== auswahl als variable einfuehren
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    protokoll("pr typ " + typRaten$("breite * 2 + 1") + " " + typRaten$("x / 3") + " " + typRaten$("name$ + " + CHR$(34) + "!" + CHR$(34)) + " " + typRaten$("a > 3"))
+    ' ohne Auswahl: abgelehnt
+    einfuehrenFragen()
+    GUI_TEXTAREA_SELECT(prTa, 2, 7, 2, 21)
+    protokoll("pr auswahl " + GUI_TEXTAREA_SELECTION$(prTa))
+    einfuehrenFragen()
+    variableEinfuehren("summe AS INTEGER")
+    protokoll("pr text " + REPLACE$(GUI_TEXT(prTa), NL, " / "))
+    EXIT(0)
+END IF
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+DIM breite AS INTEGER : breite = 20
+PRINT(breite * 2 + 1)
+
+--- datei _programm/ide.json
+{"umbau_vorschau": false}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 11) = "einfuehren " OR LEFT$(L[i], 11) = "eingefuehrt" THEN PRINT L[i]
+NEXT
+--- erwartet
+pr typ INTEGER FLOAT STRING BOOLEAN
+einfuehren keine auswahl
+pr auswahl breite * 2 + 1
+eingefuehrt summe INTEGER 0
+pr text DIM breite AS INTEGER : breite = 20 / DIM summe AS INTEGER : summe = breite * 2 + 1 / PRINT(summe)
+
+=== variable einsetzen
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    ' zweimal belegt: nein
+    GUI_TEXTAREA_GOTO(prTa, 9, 9)
+    variableEinsetzen()
+    ' Aufruf im Ausdruck, zweimal gelesen: nein
+    GUI_TEXTAREA_GOTO(prTa, 14, 9)
+    variableEinsetzen()
+    ' geht
+    GUI_TEXTAREA_GOTO(prTa, 3, 9)
+    variableEinsetzen()
+    protokoll("pr text " + REPLACE$(GUI_TEXT(prTa), NL, " / "))
+    EXIT(0)
+END IF
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+SUB eins(a AS INTEGER)
+    DIM b AS INTEGER : b = 7
+    DIM x AS INTEGER : x = a + 1
+    PRINT(x * 2)
+    PRINT(x)
+END SUB
+SUB zwei()
+    DIM y AS INTEGER : y = 1
+    DIM x AS INTEGER : x = 2
+    x = 3
+    PRINT(x + y)
+END SUB
+SUB drei()
+    DIM x AS INTEGER : x = RND(10)
+    PRINT(x)
+    PRINT(x)
+END SUB
+eins(4)
+
+--- datei _programm/ide.json
+{"umbau_vorschau": false}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 10) = "einsetzen " OR LEFT$(L[i], 10) = "eingesetzt" THEN PRINT L[i]
+NEXT
+--- erwartet
+einsetzen nein x wird nicht genau einmal belegt
+einsetzen nein der Ausdruck ruft etwas auf und liefe dann 2-mal
+eingesetzt x 2 0
+pr text SUB eins(a AS INTEGER) /     DIM b AS INTEGER : b = 7 /     PRINT((a + 1) * 2) /     PRINT((a + 1)) / END SUB / SUB zwei() /     DIM y AS INTEGER : y = 1 /     DIM x AS INTEGER : x = 2 /     x = 3 /     PRINT(x + y) / END SUB / SUB drei() /     DIM x AS INTEGER : x = RND(10) /     PRINT(x) /     PRINT(x) / END SUB / eins(4)
+
+=== sub in function umwandeln, auch in anderen dateien
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    ' liest r, bevor es gesetzt wird: nein
+    GUI_TEXTAREA_GOTO(prTa, 12, 5)
+    subInFunction()
+    GUI_TEXTAREA_GOTO(prTa, 2, 5)
+    subInFunction()
+    ' Die Vorab-Pruefung sieht in other.dh einen Fehler, weil sie gegen das
+    ' main.dh auf der Platte prueft (noch die SUB) -- die Vorschau geht auf,
+    ' bestaetigt wird wie mit [Uebernehmen].
+    IF GUI_WINDOW_SHOWN(winUmbau) THEN umbauSchreiben()
+    protokoll("pr text " + REPLACE$(GUI_TEXT(prTa), NL, " / "))
+    befehl("sichern")
+    EXIT(0)
+END IF
+--- argumente
+main.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei main.dh
+SUB doppelt(n AS INTEGER, BYREF r AS INTEGER)
+    IF n < 0 THEN
+        r = 0
+        EXIT SUB
+    END IF
+    r = n * 2
+END SUB
+DIM x AS INTEGER
+doppelt(5, x)
+PRINT(x)
+SUB weiter(BYREF r AS INTEGER)
+    r = r + 1
+END SUB
+
+--- datei other.dh
+IMPORT "main.dh"
+DIM y AS INTEGER
+doppelt(3, y)
+PRINT(y)
+
+--- datei _programm/ide.json
+{"umbau_vorschau": false}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 12) = "subfunction " THEN PRINT L[i]
+NEXT
+PRINT "other "; JOIN$(READLINES("other.dh"), " / ")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "other.dh")
+DIM t AS STRING : t = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM s AS STRING : s = PROCESS_READ$(p)
+    IF s = "" AND NOT PROCESS_RUNNING(p) THEN
+        leer = leer + 1 : SLEEP(30)
+    ELSE
+        t = t + s
+    END IF
+WEND
+PRINT "lauf "; TRIM$(REPLACE$(REPLACE$(t, CHR$(13), ""), CHR$(10), " "))
+--- erwartet
+subfunction nein r wird gelesen, bevor es gesetzt wird (Zeile 12)
+subfunction doppelt 2
+pr text FUNCTION doppelt(n AS INTEGER) AS INTEGER /     DIM r AS INTEGER /     IF n < 0 THEN /         r = 0 /         RETURN r /     END IF /     r = n * 2 /     RETURN r / END FUNCTION / DIM x AS INTEGER / x = doppelt(5) / PRINT(x) / SUB weiter(BYREF r AS INTEGER) /     r = r + 1 / END SUB
+other IMPORT "main.dh" / DIM y AS INTEGER / y = doppelt(3) / PRINT(y)
+lauf 10 6

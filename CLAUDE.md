@@ -1913,6 +1913,28 @@ Stand); ohne das Zeichnen obenauf fallen sie. Tests
 Pruefsammlung und das Konsolenprogramm), `werkzeug_ide_asset.dhtest`,
 `werkzeug_ide_live.dhtest` (Schirm-Probe dazu).
 
+**Zweige, Beiseitelegen, Blame an der Zeile, Konflikte, drei Umbauten
+(2026-09-29):** Git-Fenster: `qvZweigeFuellen`/`qvWechseln`/
+`qvZweigAnlegen` (`git switch [-c]`), `qvBeiseite` (`stash push -u`/`pop`);
+beide nur mit gesicherten Reitern (`qvReiterSauber`), danach
+`qvReiterNachziehen` von der Platte. Blame an der Zeile der Marke
+(`blameFuer$`: `git blame --porcelain` einmal je Datei, gemerkt bis zum
+Sichern; Hinweise gehen jetzt zusammen mit den Aufrufzaehlern ueber
+`hinweiseZeigen`). `konfliktLoesen(1|2|3)` ersetzt den Block um die Marke in
+EINEM Schritt (SELECT + INSERT ganzer Zeilen). Umbauten: `variableEinfuehren`
+(Typ ueber `typRaten$`), `variableEinsetzen` (verweigert bei zweiter
+Belegung, BYREF-Uebergabe an ein EIGENES Unterprogramm -- `hatByref`; an
+PRINT & Co. uebergeben ist harmlos, die erste Fassung lehnte auch das ab --,
+Aufruf im Ausdruck bei mehreren Stellen, geaenderter Variable dazwischen;
+ersetzt ueber `wortErsetzen$`, weil CODE_RENAME$ keinen Ausdruck als neuen
+Namen nimmt), `subInFunction` (genau ein BYREF, nicht vor dem Setzen
+gelesen, keine Methode; Aufrufe als Anweisung im ganzen Projekt ueber
+`sfAufrufZeile$`). **Falle:** die stille Vorab-Pruefung ohne Vorschau
+prueft eine Datei, die eine andere umgebaute IMPORTiert, gegen deren
+ALTEN Stand auf der Platte -- dann geht die Vorschau mit einem Scheinfehler
+auf; die Probe bestaetigt dort. Tests `werkzeug_ide_umbauten_variable.dhtest`,
+`werkzeug_ide_git_zweige.dhtest`.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

@@ -1,0 +1,129 @@
+' Git in der IDE, zweiter Teil: Zweig anlegen und wechseln, Aenderungen
+' beiseitelegen und zurueckholen (offene Reiter ziehen von der Platte nach),
+' wer eine Zeile geschrieben hat (am Zeilenende der Marke), und ein
+' Konflikt unter der Marke: meine, ihre oder beide Fassungen.
+' Das Repository legt ein `--- vorher` an (Zweig "haupt").
+--- seriell
+
+=== zweige und beiseitelegen, blame an der zeile
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    blameZeileSetzen(TRUE)
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 1)
+END IF
+IF prBild = 44 THEN
+    befehl("git_fenster")
+    protokoll("pr zweige " + JOIN$(qvZweige, ","))
+    qvZweigAnlegen("thema/neu")
+    qvWechseln("haupt")
+    protokoll("pr jetzt " + GUI_DROPDOWN_TEXT(ddQvZweig))
+    ' eine gesicherte Aenderung im offenen Reiter
+    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT(99)")
+    befehl("sichern")
+    qvBeiseite(TRUE)
+    protokoll("pr nach beiseite " + GUI_TEXT(tabFelder[aktiverTab]))
+    qvBeiseite(FALSE)
+    protokoll("pr nach zurueck " + GUI_TEXT(tabFelder[aktiverTab]))
+    EXIT(0)
+END IF
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+FUNCTION git(a AS STRING, b AS STRING, c AS STRING, d AS STRING) AS INTEGER
+    DIM p AS INTEGER
+    IF d <> "" THEN
+        p = PROCESS_START("git", a, b, c, d)
+    ELSEIF c <> "" THEN
+        p = PROCESS_START("git", a, b, c)
+    ELSE
+        p = PROCESS_START("git", a, b)
+    END IF
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(p) AND MILLIS() < bis
+        SLEEP(20)
+    WEND
+    RETURN PROCESS_CODE(p)
+END FUNCTION
+WRITEALL(".gitignore", "_programm/" + CHR$(10) + "vorher.dh" + CHR$(10) + "nachher.dh" + CHR$(10))
+WRITEALL("a.dh", "PRINT(1)" + CHR$(10))
+IF git("init", "-q", "-b", "haupt") <> 0 THEN EXIT(3)
+IF git("config", "user.name", "Test", "") <> 0 THEN EXIT(4)
+IF git("config", "user.email", "t@t", "") <> 0 THEN EXIT(5)
+IF git("add", ".", "", "") <> 0 THEN EXIT(6)
+IF git("commit", "-q", "-m", "erster Stand") <> 0 THEN EXIT(7)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 3) = "qv " OR LEFT$(L[i], 12) = "blame zeile " THEN PRINT L[i]
+NEXT
+--- erwartet
+blame zeile an
+blame zeile 1 Test, heute: erster Stand
+qv 0 0
+pr zweige haupt
+qv 0 0
+qv zweig neu thema/neu
+qv 0 0
+qv zweig haupt
+pr jetzt haupt
+qv 0 0
+qv beiseite 1
+pr nach beiseite PRINT(1)
+qv 1 0
+qv zurueck 0
+pr nach zurueck PRINT(99)
+
+=== konflikt unter der marke
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prAlt AS STRING : prAlt = GUI_TEXT(prTa)
+    GUI_TEXTAREA_GOTO(prTa, 1, 1)
+    konfliktLoesen(1)
+    DIM prW AS STRING
+    DIM prArt AS INTEGER
+    FOR prArt = 1 TO 3
+        GUI_SET_TEXT(prTa, prAlt)
+        GUI_TEXTAREA_GOTO(prTa, 4, 1)
+        konfliktLoesen(prArt)
+        protokoll("pr " + STR$(prArt) + " " + REPLACE$(GUI_TEXT(prTa), NL, " / "))
+    NEXT
+    EXIT(0)
+END IF
+--- argumente
+k.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM t AS ARRAY OF STRING
+t = ["PRINT(0)", "<<<<<<< HEAD", "PRINT(1)", "PRINT(2)", "=======", "PRINT(3)", ">>>>>>> thema", "PRINT(9)"]
+WRITEALL("k.dh", JOIN$(t, CHR$(10)))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 9) = "konflikt " THEN PRINT L[i]
+NEXT
+--- erwartet
+konflikt keiner
+konflikt meine 2
+pr 1 PRINT(0) / PRINT(1) / PRINT(2) / PRINT(9)
+konflikt ihre 1
+pr 2 PRINT(0) / PRINT(3) / PRINT(9)
+konflikt beide 3
+pr 3 PRINT(0) / PRINT(1) / PRINT(2) / PRINT(3) / PRINT(9)
