@@ -153,9 +153,59 @@ pub fn spans(src: &str) -> Vec<(usize, usize, Art)> {
     out
 }
 
+/// Wie oft jeder Name im Quelltext vorkommt (CODE_NAMES): klein
+/// geschrieben, samt Typkennzeichen (`name$`), ohne Kommentare und
+/// Zeichenketten -- und ohne die Stelle, an der eine SUB/FUNCTION ihn
+/// DEFINIERT (der Name direkt hinter dem Schluesselwort). Was uebrig bleibt,
+/// sind die Benutzungen: Aufrufe, FUNCREFs, Methoden hinter einem Punkt.
+/// Namen in f-Strings zaehlen nicht (der Hervorheber sieht dort Text).
+pub fn namen_zaehlen(src: &str) -> Vec<(String, i64)> {
+    let z: Vec<char> = src.chars().collect();
+    let mut zahl: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    // Hinter SUB/FUNCTION in DERSELBEN Zeile steht die Definition; hinter
+    // `END SUB` / `EXIT SUB` (und einem Zeilenende) nicht.
+    let mut nach_def: Option<usize> = None;
+    let mut vorher_end = false;
+    for (s, l, art) in spans(src) {
+        let wort: String = z[s..s + l].iter().collect::<String>().to_lowercase();
+        match art {
+            Art::Schluessel => {
+                nach_def = if (wort == "sub" || wort == "function") && !vorher_end { Some(s + l) } else { None };
+                vorher_end = wort == "end" || wort == "exit" || wort == "declare";
+            }
+            Art::Name => {
+                let def = nach_def.map_or(false, |e| !z[e..s].contains(&'\n'));
+                if !def { *zahl.entry(wort).or_insert(0) += 1; }
+                nach_def = None;
+                vorher_end = false;
+            }
+            Art::Kommentar => {}
+            _ => { nach_def = None; vorher_end = false; }
+        }
+    }
+    let mut v: Vec<(String, i64)> = zahl.into_iter().collect();
+    v.sort();
+    v
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn namen_zaehlen_ohne_definition_kommentar_text() {
+        let q = "SUB malen()\n    PRINT(1)\nEND SUB\nmalen() ' malen()\nPRINT(\"malen\")\nf = Malen\nx = held.malen()\nFUNCTION wert$()\nEND FUNCTION\nPRINT(wert$())";
+        let v = namen_zaehlen(q);
+        let hole = |n: &str| v.iter().find(|(k, _)| k == n).map(|p| p.1).unwrap_or(0);
+        assert_eq!(hole("malen"), 3);
+        assert_eq!(hole("wert$"), 1);
+        assert_eq!(hole("held"), 1);
+        // EXIT SUB / END SUB davor: der Name dahinter ist ein Aufruf
+        let v2 = namen_zaehlen("SUB a()\n    EXIT SUB\nEND SUB : a()\nSUB b()\nEND SUB\nb()");
+        let hole2 = |n: &str| v2.iter().find(|(k, _)| k == n).map(|p| p.1).unwrap_or(0);
+        assert_eq!(hole2("a"), 1);
+        assert_eq!(hole2("b"), 1);
+    }
 
     fn arten(src: &str) -> Vec<(&'static str, String)> {
         let z: Vec<char> = src.chars().collect();

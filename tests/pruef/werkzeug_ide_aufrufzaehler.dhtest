@@ -1,0 +1,68 @@
+' Aufrufzaehler: hinter jeder SUB/FUNCTION steht, wie oft ihr Name im
+' Projekt vorkommt (GUI_TEXTAREA_HINTS) -- auch in anderen Dateien, als
+' FUNCREF, aber nicht im Kommentar, nicht in einer Zeichenkette und nicht
+' in der Kopfzeile selbst. Ein Klick auf den Zaehler zeigt die Aufrufer.
+' Ausgeschaltet verschwinden die Zaehler.
+--- seriell
+
+=== zaehlt ueber das projekt, klick zeigt die aufrufer
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 60 THEN pruefen()
+IF prBild = 62 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO LEN(zaehlZeilen) - 1
+        protokoll("pr zeile " + STR$(zaehlZeilen[prI]) + " " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
+    NEXT
+    zaehlerKlick(tabFelder[aktiverTab], 1)
+END IF
+IF prBild = 66 THEN
+    protokoll("pr fenster " + GUI_TEXT(lblAufruf))
+    befehl("aufrufzaehler")
+    protokoll("pr aus " + STR$(zaehlFeld))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB malen()
+    PRINT(1)
+END SUB
+FUNCTION doppelt(x AS INTEGER) AS INTEGER
+    RETURN x * 2
+END FUNCTION
+SUB nie()
+END SUB
+malen()
+' malen() im Kommentar zaehlt nicht
+PRINT("malen()")
+PRINT(doppelt(2))
+
+--- datei lib.dh
+malen()
+DIM f AS FUNCREF
+f = malen
+PRINT(DOPPELT(3))
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 20) = "aufrufzaehler klick " OR LEFT$(L[i], 9) = "aufrufer " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr zeile 1 malen: 3 Aufrufe
+pr zeile 4 doppelt: 2 Aufrufe
+pr zeile 7 nie: nicht aufgerufen
+aufrufzaehler klick malen
+aufrufer 3
+aufrufer baum 3
+pr fenster 3 Aufruf(e) unmittelbar, 3 Knoten im Baum. Ein Klick springt hin.
+pr aus -1

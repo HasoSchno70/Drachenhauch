@@ -913,7 +913,7 @@ fn bild_laden(_pfad: &std::path::Path) -> Result<pruefsammlung::Bild, BildFehler
 /// Eine Pruefsammlung laufen lassen: jeder Fall als eigener `dhrt run` in einem
 /// eigenen Verzeichnis, die Faelle parallel. Liefert (ok, fehl, uebersprungen,
 /// Meldungen der Fehlschlaege und Uebersprungenen).
-fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option<&str>)
+fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option<&str>, genau: bool)
     -> Result<(usize, usize, usize, Vec<String>), String>
 {
     use std::sync::{Arc, Mutex};
@@ -922,7 +922,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
     let seriell = sammlung.seriell;
     let faelle: Vec<pruefsammlung::Fall> = sammlung.faelle
         .into_iter()
-        .filter(|f| filter.map_or(true, |t| f.name.contains(t)))
+        .filter(|f| filter.map_or(true, |t| if genau { f.name == t } else { f.name.contains(t) }))
         .collect();
     if faelle.is_empty() { return Ok((0, 0, 0, Vec::new())); }
     let ohne_grafik = std::env::var("DHRT_OHNE_GRAFIK").is_ok();
@@ -1209,6 +1209,9 @@ fn test_main(args: &[String]) -> ExitCode {
     // `--filter text`: nur die Faelle einer Sammlung, deren Name den Text
     // enthaelt -- zum Nachstellen eines einzelnen Fehlschlags.
     let mut filter: Option<String> = None;
+    // `--fall name`: genau der Fall dieses Namens (die IDE: "diesen Fall
+    // ausfuehren" -- mit --filter liefe bei "geht" auch "geht nicht").
+    let mut genau = false;
     // `--schnell`: Sammlungen mit `--- langsam` im Kopf auslassen (Fenster in
     // Echtzeit, Durchlaeufe ueber das ganze Repo) -- fuer die Rueckmeldung
     // waehrend der Arbeit. Die volle Pruefung laeuft in der CI.
@@ -1217,6 +1220,7 @@ fn test_main(args: &[String]) -> ExitCode {
     let mut i = 0;
     while i < args.len() {
         if args[i] == "--filter" && i + 1 < args.len() { filter = Some(args[i + 1].clone()); i += 2; continue; }
+        if args[i] == "--fall" && i + 1 < args.len() { filter = Some(args[i + 1].clone()); genau = true; i += 2; continue; }
         if args[i] == "--schnell" { schnell = true; i += 1; continue; }
         pfade.push(args[i].clone());
         i += 1;
@@ -1258,7 +1262,7 @@ fn test_main(args: &[String]) -> ExitCode {
                 ausgelassen.push(name);
                 continue;
             }
-            match sammlung_laufen(&exe, d, filter.as_deref()) {
+            match sammlung_laufen(&exe, d, filter.as_deref(), genau) {
                 Ok((ok, fehl, ueber, meldungen)) => {
                     let dauer = t0.elapsed().as_secs_f64();
                     faelle_ok += ok; faelle_fehl += fehl; faelle_ueber += ueber;

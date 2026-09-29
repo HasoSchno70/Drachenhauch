@@ -6242,6 +6242,12 @@ impl<'p> Vm<'p> {
                 let neu = bi_str(a, 3, "CODE_RENAME$")?;
                 Value::str_rc(crate::lsp::umbenennen(text, z, s, neu).unwrap_or_default())
             }
+            "code_names" => {
+                let text = bi_str(a, 0, "CODE_NAMES")?;
+                let mut m = crate::value::DhMap::new("integer".to_string());
+                for (k, n) in crate::syntax::namen_zaehlen(text) { m.put(k, Value::Int(n)); }
+                Value::Map(std::rc::Rc::new(std::cell::RefCell::new(m)))
+            }
             "code_symbols$" | "code_symbols" => {
                 fn um(v: &serde_json::Value) -> serde_json::Value {
                     serde_json::json!({
@@ -7977,6 +7983,8 @@ impl<'p> Vm<'p> {
                 }
                 Value::Int(self.gui.textarea_gutter_clicked(gi(a, 0, "GUI_TEXTAREA_GUTTER_CLICKED")?, taste)?)
             }
+            "gui_textarea_hint_clicked" => Value::Int(
+                self.gui.textarea_hint_clicked(gi(a, 0, "GUI_TEXTAREA_HINT_CLICKED")?)?),
             "gui_textarea_swatch_clicked" => Value::Int(
                 self.gui.textarea_swatch_clicked(gi(a, 0, "GUI_TEXTAREA_SWATCH_CLICKED")?)?),
             "gui_textarea_abbrev" => {

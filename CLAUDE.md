@@ -1836,6 +1836,31 @@ zaehlen nicht. Protokoll `projekt geprueft F W betroffen dateien`. Test
 `tests/pruef/werkzeug_ide_projektpruefung.dhtest` (ohne das Entdoppeln
 faellt er).
 
+**Aufrufzaehler, Pruefsammlungen in der IDE (2026-09-29):** hinter jeder
+SUB/FUNCTION steht als Hinweis (`GUI_TEXTAREA_HINTS`), wie oft ihr Name im
+Projekt benutzt wird; ein Klick oeffnet "Wer ruft das auf?". Gezaehlt ueber
+neu **`CODE_NAMES(quelle$)` -> MAP OF INTEGER** (`syntax::namen_zaehlen`:
+Namen ohne Kommentare/Texte, ohne die Definition -- der Name hinter
+SUB/FUNCTION in DERSELBEN Zeile, nicht hinter END/EXIT SUB; die erste
+Fassung zaehlte `END SUB` + naechste Zeile als Definition). In
+Drachenhauch Zeichen fuer Zeichen gezaehlt kostete ide.dh 310 ms je
+Pruefung, ueber CODE_NAMES 22 ms; Dateien, die nicht offen sind, merkt
+sich die IDE als Text ";name=n;" bis zum naechsten Sichern (`zaehlCache`).
+Neu in der Laufzeit **`GUI_TEXTAREA_SET(ta, "hinweise_klickbar", 1)` +
+`GUI_TEXTAREA_HINT_CLICKED(ta)`** (Rechtecke aus EINER Quelle
+`ta_hinweis_rects` fuer Zeichnen, Klick, Zeiger). Im Debugger-Halt stehen
+die Werte dort, `debugWerteLoeschen` holt die Zaehler zurueck.
+**Pruefsammlungen:** Strg+Alt+F5 (`pruefsammlungStarten`, eigener Prozess
+`testProz` neben dem Programmlauf) laesst `dhrt test` ueber die .dhtest im
+Reiter oder den Projektordner laufen; FEHL-Zeilen kommen mit Datei und
+Zeile in die Liste (`problemModus = 1`; `problemAnspringen` nimmt jetzt
+auch absolute Wege). Strg+Alt+Umschalt+F5 nimmt den Fall unter der Marke
+ueber neu **`dhrt test --fall Name`** (genau dieser Name -- `--filter`
+sucht Teiltexte, "geht" traf auch "geht nicht"). Tests
+`werkzeug_ide_aufrufzaehler.dhtest`, `werkzeug_ide_pruefsammlung.dhtest`,
+ein Klick-Fall in `gui_textarea_hints.dhtest`, Rust-Test
+`namen_zaehlen_ohne_definition_kommentar_text`.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

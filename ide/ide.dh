@@ -355,6 +355,9 @@ DIM linienAn AS BOOLEAN : linienAn = TRUE
 ' Mitlaufender Blockkopf: SUB/IF/FOR, deren Kopf oben hinausgerollt ist,
 ' bleiben oben angeheftet (hoechstens drei).
 DIM kopfAn AS BOOLEAN : kopfAn = TRUE
+' Aufrufzaehler: hinter jeder SUB/FUNCTION steht, wie oft sie im Projekt
+' vorkommt; ein Klick darauf zeigt die Aufrufer.
+DIM zaehlerAn AS BOOLEAN : zaehlerAn = TRUE
 ' Das Geruest, das beim Tippen mitwaechst: `IF ... THEN` und Enter setzen
 ' das `END IF` gleich mit (GUI_TEXTAREA_CLOSE_WORDS).
 DIM geruestAn AS BOOLEAN : geruestAn = TRUE
@@ -591,6 +594,7 @@ IF JSON_HAS(konfig, "ganzes_wort") THEN ganzesWort = JSON_GET_BOOL(konfig, "ganz
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
 IF JSON_HAS(konfig, "blockkopf") THEN kopfAn = JSON_GET_BOOL(konfig, "blockkopf")
+IF JSON_HAS(konfig, "aufrufzaehler") THEN zaehlerAn = JSON_GET_BOOL(konfig, "aufrufzaehler")
 IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
 IF JSON_HAS(konfig, "klammern") THEN klammernAn = JSON_GET_BOOL(konfig, "klammern")
 IF JSON_HAS(konfig, "format_sichern") THEN formatSichernAn = JSON_GET_BOOL(konfig, "format_sichern")
@@ -785,6 +789,8 @@ DIM miStopp AS INTEGER : miStopp = GUI_MENU_ITEM(mLauf, "Stoppen", "Umschalt+F5"
 DIM miNeustart AS INTEGER : miNeustart = GUI_MENU_ITEM(mLauf, "Neu starten", "Strg+Umschalt+F5")
 DIM miPruefen AS INTEGER : miPruefen = GUI_MENU_ITEM(mLauf, "Prüfen", "Umschalt+F7")
 DIM miPrjPruefen AS INTEGER : miPrjPruefen = GUI_MENU_ITEM(mLauf, "Ganzes Projekt prüfen", "Strg+Umschalt+F7")
+DIM miPruefsammlung AS INTEGER : miPruefsammlung = GUI_MENU_ITEM(mLauf, "Prüfsammlung ausführen", "Strg+Alt+F5")
+DIM miPrueffall AS INTEGER : miPrueffall = GUI_MENU_ITEM(mLauf, "Diesen Prüffall ausführen", "Strg+Alt+Umschalt+F5")
 GUI_MENU_SEPARATOR(mLauf)
 DIM miDebug AS INTEGER : miDebug = GUI_MENU_ITEM(mLauf, "Debuggen", "F7")
 DIM miHaltepunkt AS INTEGER : miHaltepunkt = GUI_MENU_ITEM(mLauf, "Haltepunkt setzen/entfernen", "F9")
@@ -834,6 +840,8 @@ DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, "Einrückungslinien
 GUI_MENU_CHECK(miLinien, linienAn)
 DIM miKopf AS INTEGER : miKopf = GUI_MENU_ITEM(mAnsicht, "Mitlaufender Blockkopf")
 GUI_MENU_CHECK(miKopf, kopfAn)
+DIM miZaehler AS INTEGER : miZaehler = GUI_MENU_ITEM(mAnsicht, "Aufrufzähler über Unterprogrammen")
+GUI_MENU_CHECK(miZaehler, zaehlerAn)
 DIM miLeiste AS INTEGER : miLeiste = GUI_MENU_ITEM(mAnsicht, "Werkzeugleiste")
 DIM miSeiten AS INTEGER : miSeiten = GUI_MENU_ITEM(mAnsicht, "Seitenleiste", "Alt+1")
 DIM miUnten AS INTEGER : miUnten = GUI_MENU_ITEM(mAnsicht, "Untere Leiste", "Alt+2")
@@ -1643,6 +1651,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
     JSON_SET_BOOL(konfig, "linien", linienAn)
     JSON_SET_BOOL(konfig, "blockkopf", kopfAn)
+    JSON_SET_BOOL(konfig, "aufrufzaehler", zaehlerAn)
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
     JSON_SET_BOOL(konfig, "klammern", klammernAn)
     JSON_SET_BOOL(konfig, "vorspann", vorspannAn)
@@ -2055,6 +2064,7 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
     GUI_TEXTAREA_SET(ta, "umbruch", IIF(umbruchAn, 1, 0))
     GUI_TEXTAREA_SET(ta, "einzugslinien", IIF(linienAn, 1, 0))
     GUI_TEXTAREA_SET(ta, "kopfzeilen", IIF(kopfAn, 3, 0))
+    GUI_TEXTAREA_SET(ta, "hinweise_klickbar", 1)
     ' Einrueckung beim Umbruch: die Laufzeit uebernimmt die der laufenden
     ' Zeile, die Woerter der SPRACHE kommen von hier. `THEN` steht in der
     ' Ende-Liste, weil `IF x THEN y = 1` sonst auch einruecken wuerde.
@@ -2963,6 +2973,7 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
         END IF
     END IF
     tabGesichert[i] = text
+    zaehlCache = {}
     ' Die Datei endet mit einem Umbruch (dateiLesen laesst ihn weg, das Feld
     ' kennt ihn nicht) -- sonst verloere jede gesicherte Datei ihre letzte
     ' Zeile im Diff ("no newline at end of file"). Bis Stand 3 war das so.
@@ -3513,6 +3524,7 @@ SUB pruefen()
     protokoll("geprueft " + STR$(n - hinweise))
     IF hinweise > 0 THEN protokoll("hinweise " + STR$(hinweise))
     gliederungFuellen(GUI_TEXT(ta))
+    zaehlerSetzen_(ta)
 END SUB
 
 ' Fehler und Warnungen DORT unterstreichen, wo sie stehen (rot bzw. gelb),
@@ -3935,7 +3947,8 @@ SUB problemAnspringen()
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstProbleme)
     IF problemModus = 1 THEN
         IF sel < 0 OR sel >= LEN(sucheZeilen) THEN RETURN
-        dateiOeffnen(PATHJOIN(projektOrdner, sucheDateien[sel]))
+        DIM sd AS STRING : sd = sucheDateien[sel]
+        IF MID$(sd, 1, 1) = ":" OR LEFT$(sd, 1) = "/" THEN dateiOeffnen(sd) ELSE dateiOeffnen(PATHJOIN(projektOrdner, sd))
         DIM tf AS GUI_WIDGET : tf = aktivesFeld()
         IF tf >= 0 THEN GUI_TEXTAREA_GOTO(tf, sucheZeilen[sel], 1) : GUI_FOCUS(tf)
         RETURN
@@ -3982,6 +3995,289 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     IF zweitens <> "" THEN was = gesucht + "/" + zweitens
     GUI_SET_TEXT(lblProbleme, "Suche '" + was + "': " + STR$(treffer) + " Treffer in " + STR$(inDateien) + " Dateien -- Umschalt+F7 zeigt wieder die Probleme")
     protokoll("suche " + STR$(treffer))
+END SUB
+
+' --- Aufrufzaehler ------------------------------------------------------
+' Hinter jeder SUB/FUNCTION der Datei steht, wie oft ihr Name im Projekt
+' vorkommt ("3 Aufrufe"), gedaempft hinter dem Zeilenende
+' (GUI_TEXTAREA_HINTS); ein Klick darauf oeffnet "Wer ruft das auf?".
+' Gezaehlt wird jedes Vorkommen des Namens als ganzes Wort ausserhalb von
+' Kommentaren und Zeichenketten, ohne die Kopfzeilen selbst -- auch als
+' FUNCREF (`GUI_ON_CLICK(k, malen)`) und als Methode (`held.malen()`). Das
+' ist Text, keine Namensaufloesung: zwei Methoden gleichen Namens in zwei
+' Klassen zaehlen zusammen.
+'
+' Je Datei wird EINMAL gezaehlt (alle Woerter), fuer Dateien, die nicht
+' offen sind, gemerkt bis zum naechsten Sichern -- sonst laese jede
+' Pruefung das ganze Projekt neu.
+DIM zaehlCache AS MAP OF STRING
+DIM zaehlFeld AS GUI_WIDGET : zaehlFeld = -1
+DIM zaehlZeilen AS ARRAY OF INTEGER : zaehlZeilen = []
+DIM zaehlNamen AS ARRAY OF STRING : zaehlNamen = []
+DIM zaehlTexte AS ARRAY OF STRING : zaehlTexte = []
+
+SUB zaehlerSetzen(an AS BOOLEAN)
+    zaehlerAn = an
+    GUI_MENU_CHECK(miZaehler, an)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 THEN zaehlerSetzen_(ta)
+    GUI_SET_TEXT(lblStatus, IIF(an, "Aufrufzähler an.", "Aufrufzähler aus."))
+    protokoll("aufrufzaehler " + IIF(an, "an", "aus"))
+    konfigSichern()
+END SUB
+
+' Wie oft jeder Name in einer Quelle benutzt wird (CODE_NAMES: ohne
+' Kommentare, Zeichenketten und die Definition selbst), als Text
+' ";name=anzahl;..." -- ein Cache-Eintrag ist eine Zeichenkette, und
+' nachgeschlagen wird mit INSTR nach ";name=".
+FUNCTION woerterZaehlen$(quelle AS STRING) AS STRING
+    DIM m AS MAP OF INTEGER : m = CODE_NAMES(quelle)
+    DIM teile AS ARRAY OF STRING : teile = [";"]
+    DIM k AS STRING
+    DIM v AS INTEGER
+    FOR EACH k, v IN m
+        ARRAY_PUSH(teile, k + "=" + STR$(v) + ";")
+    NEXT
+    RETURN JOIN$(teile, "")
+END FUNCTION
+
+' Die Zaehlung einer Projektdatei -- aus dem Reiter frisch, von der
+' Platte ueber den Cache.
+FUNCTION zaehlungVon$(pfad AS STRING) AS STRING
+    IF tabMitPfad(pfad) >= 0 THEN RETURN woerterZaehlen$(GUI_TEXT(tabFelder[tabMitPfad(pfad)]))
+    DIM schl AS STRING : schl = LOWER$(wegGleich$(pfad))
+    IF MAPHAS(zaehlCache, schl) THEN RETURN MAPGET(zaehlCache, schl)
+    DIM q AS STRING : q = ""
+    TRY
+        q = dateiLesen(pfad)
+    CATCH e
+        q = ""
+    END TRY
+    DIM m AS STRING : m = woerterZaehlen$(q)
+    MAPPUT(zaehlCache, schl, m)
+    RETURN m
+END FUNCTION
+
+' Die Zaehler fuer das Feld setzen (oder wegnehmen). Waehrend der Debugger
+' dort Werte zeigt, bleiben die stehen.
+SUB zaehlerSetzen_(ta AS GUI_WIDGET)
+    IF ta < 0 OR ta = werteFeld THEN RETURN
+    IF NOT zaehlerAn THEN
+        IF zaehlFeld = ta THEN GUI_TEXTAREA_HINTS(ta, [], []) : zaehlFeld = -1
+        RETURN
+    END IF
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM zl AS ARRAY OF INTEGER : zl = []
+    DIM nm AS ARRAY OF STRING : nm = []
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM t AS STRING : t = TRIM$(zeilen[i])
+        DIM gross AS STRING : gross = UPPER$(t)
+        DIM ab AS INTEGER : ab = -1
+        IF LEFT$(gross, 4) = "SUB " THEN ab = 4
+        IF LEFT$(gross, 9) = "FUNCTION " THEN ab = 9
+        IF ab < 0 THEN CONTINUE
+        DIM rest AS STRING : rest = TRIM$(MID$(t, ab))
+        DIM kl AS INTEGER : kl = INSTR(rest, "(")
+        IF kl <= 0 THEN CONTINUE
+        ARRAY_PUSH(zl, i + 1)
+        ARRAY_PUSH(nm, TRIM$(LEFT$(rest, kl)))
+    NEXT
+    IF LEN(zl) = 0 THEN
+        IF zaehlFeld = ta THEN GUI_TEXTAREA_HINTS(ta, [], [])
+        zaehlFeld = -1 : zaehlZeilen = [] : zaehlNamen = []
+        RETURN
+    END IF
+    DIM summe AS MAP OF INTEGER : summe = {}
+    DIM n AS STRING
+    FOR EACH n IN nm
+        MAPPUT(summe, LOWER$(n), 0)
+    NEXT
+    ' Das eigene Feld zaehlt immer mit (auch eine noch nie gesicherte Datei).
+    DIM eigen AS STRING : eigen = ""
+    DIM t2 AS INTEGER
+    FOR t2 = 0 TO tabAnzahl - 1
+        IF tabFelder[t2] = ta THEN eigen = tabPfade[t2]
+    NEXT
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    IF projektOrdner <> "" THEN dateien = projektDateien("*.dh")
+    zaehlerAddieren(summe, woerterZaehlen$(quelle))
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        IF eigen <> "" AND wegGleich$(pfad) = wegGleich$(eigen) THEN CONTINUE
+        zaehlerAddieren(summe, zaehlungVon$(pfad))
+    NEXT
+    DIM texte AS ARRAY OF STRING : texte = []
+    FOR i = 0 TO LEN(nm) - 1
+        DIM k AS INTEGER : k = MAPGET(summe, LOWER$(nm[i]))
+        ARRAY_PUSH(texte, IIF(k = 0, "nicht aufgerufen", IIF(k = 1, "1 Aufruf", STR$(k) + " Aufrufe")))
+    NEXT
+    GUI_TEXTAREA_HINTS(ta, zl, texte)
+    zaehlFeld = ta : zaehlZeilen = zl : zaehlNamen = nm : zaehlTexte = texte
+    protokoll("aufrufzaehler " + STR$(LEN(zl)))
+END SUB
+
+SUB zaehlerAddieren(summe AS MAP OF INTEGER, zaehlung AS STRING)
+    DIM k AS STRING
+    FOR EACH k IN MAPKEYS(summe)
+        DIM p AS INTEGER : p = INSTR(zaehlung, ";" + k + "=")
+        IF p < 0 THEN CONTINUE
+        DIM a AS INTEGER : a = p + LEN(k) + 2
+        DIM e AS INTEGER : e = INSTR(MID$(zaehlung, a), ";")
+        MAPPUT(summe, k, MAPGET(summe, k) + INT(VAL(MID$(zaehlung, a, e))))
+    NEXT
+END SUB
+
+SUB zaehlerKlick(ta AS GUI_WIDGET, zeile AS INTEGER)
+    IF ta <> zaehlFeld THEN RETURN
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(zaehlZeilen, zeile)
+    IF i < 0 THEN RETURN
+    protokoll("aufrufzaehler klick " + zaehlNamen[i])
+    aufruferZeigenFuer(zaehlNamen[i])
+END SUB
+
+' --- Pruefsammlungen ----------------------------------------------------
+' Strg+Alt+F5 laesst `dhrt test` ueber die Sammlung im Reiter laufen (eine
+' .dhtest), sonst ueber den Projektordner; Strg+Alt+Umschalt+F5 nur den Fall
+' unter der Marke (`--fall` mit seinem Namen aus der `===`-Zeile darueber).
+' Ein eigener Prozess neben dem Programm-Lauf, die Ausgabe laeuft wie bei
+' einem Programm mit; jeder fehlgeschlagene Fall steht in der Liste unten
+' rechts mit Datei und Zeile, ein Klick springt zu ihm.
+DIM testProz AS INTEGER : testProz = -1
+DIM testRest AS STRING : testRest = ""
+DIM testDatei AS STRING : testDatei = ""
+DIM testBilanz AS STRING : testBilanz = ""
+DIM testFehl AS INTEGER : testFehl = 0
+
+' Der Name des Falls, in dem die Marke steht ("" = keiner).
+FUNCTION fallUnterMarke$(ta AS GUI_WIDGET) AS STRING
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM i AS INTEGER
+    FOR i = MIN(z, LEN(zeilen)) - 1 TO 0 STEP -1
+        IF LEFT$(zeilen[i], 4) = "=== " THEN RETURN TRIM$(MID$(zeilen[i], 4))
+    NEXT
+    RETURN ""
+END FUNCTION
+
+SUB pruefsammlungStarten(nurFall AS BOOLEAN)
+    IF testProz >= 0 THEN
+        GUI_SET_TEXT(lblStatus, "Es läuft noch eine Prüfsammlung.")
+        RETURN
+    END IF
+    DIM ziel AS STRING : ziel = ""
+    DIM filter AS STRING : filter = ""
+    DIM istSammlung AS BOOLEAN : istSammlung = FALSE
+    IF aktiverTab >= 0 THEN istSammlung = LOWER$(RIGHT$(tabPfade[aktiverTab], 7)) = ".dhtest"
+    IF istSammlung THEN
+        ' Geprueft wird die Datei auf der Platte -- also erst sichern.
+        IF GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
+            IF NOT sichern(aktiverTab, FALSE) THEN RETURN
+        END IF
+        ziel = tabPfade[aktiverTab]
+        IF nurFall THEN
+            filter = fallUnterMarke$(tabFelder[aktiverTab])
+            IF filter = "" THEN
+                GUI_SET_TEXT(lblStatus, "Die Marke steht in keinem Fall (=== Name darüber).")
+                RETURN
+            END IF
+        END IF
+    ELSE
+        IF nurFall THEN
+            GUI_SET_TEXT(lblStatus, "Diesen Prüffall ausführen: im Reiter ist keine .dhtest-Datei.")
+            RETURN
+        END IF
+        IF projektOrdner = "" THEN RETURN
+        ziel = projektOrdner
+    END IF
+    GUI_LISTBOX_CLEAR(lstAusgabe)
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    sucheDateien = []
+    sucheZeilen = []
+    problemModus = 1
+    testRest = "" : testDatei = "" : testBilanz = "" : testFehl = 0
+    IF filter = "" THEN
+        testProz = PROCESS_START("dhrt", "test", ziel)
+    ELSE
+        testProz = PROCESS_START("dhrt", "test", ziel, "--fall", filter)
+    END IF
+    GUI_SET_TEXT(lblAusgabe, "Ausgabe: Prüfsammlung läuft ...")
+    GUI_SET_TEXT(lblProbleme, "Prüfsammlung läuft ...")
+    protokoll("pruefsammlung start " + BASENAME(ziel) + IIF(filter <> "", " fall " + filter, ""))
+END SUB
+
+' Eine Zeile der Ausgabe von `dhrt test`: in die Ausgabe, und ein FEHL in
+' die Liste. Vor den FEHL-Zeilen einer Datei steht ihre FEHLER-Zeile.
+SUB testZeile(z AS STRING)
+    ausgabe(z)
+    DIM t AS STRING : t = TRIM$(z)
+    IF LEFT$(t, 8) = "FEHLER  " THEN
+        DIM r AS STRING : r = TRIM$(MID$(t, 8))
+        DIM kl AS INTEGER : kl = INSTR(r, "  (")
+        IF kl > 0 THEN r = LEFT$(r, kl)
+        testDatei = r
+    ELSEIF LEFT$(t, 11) = "FEHL  Zeile" THEN
+        DIM rest AS STRING : rest = MID$(t, 12)
+        DIM dp AS INTEGER : dp = INSTR(rest, ":")
+        IF dp > 0 AND testDatei <> "" THEN
+            DIM nr AS INTEGER : nr = INT(VAL(LEFT$(rest, dp)))
+            DIM d AS STRING : d = testDatei
+            ' relativ zum Projekt, wie die Suche (problemAnspringen haengt an)
+            DIM po AS STRING : po = wegGleich$(projektOrdner) + "/"
+            IF LOWER$(LEFT$(wegGleich$(d), LEN(po))) = LOWER$(po) THEN d = MID$(wegGleich$(d), LEN(po))
+            ARRAY_PUSH(sucheDateien, d)
+            ARRAY_PUSH(sucheZeilen, nr)
+            GUI_LISTBOX_ADD(lstProbleme, BASENAME(d) + ":" + STR$(nr) + ": " + TRIM$(MID$(rest, dp + 1)))
+            GUI_LISTBOX_COLOR(lstProbleme, LEN(sucheZeilen) - 1, &HE06060)
+            testFehl = testFehl + 1
+        END IF
+    ELSEIF INSTR(t, " Faelle, ") >= 0 THEN
+        DIM sc AS INTEGER : sc = INSTR(t, "; ")
+        testBilanz = IIF(sc >= 0, TRIM$(MID$(t, sc + 2)), t)
+    END IF
+END SUB
+
+SUB testVerteilen(text AS STRING)
+    IF text = "" THEN RETURN
+    testRest = testRest + text
+    WHILE INSTR(testRest, NL) >= 0
+        DIM p AS INTEGER : p = INSTR(testRest, NL)
+        testZeile(REPLACE$(LEFT$(testRest, p), CHR$(13), ""))
+        testRest = MID$(testRest, p + 1)
+    WEND
+END SUB
+
+SUB testNachsehen()
+    IF testProz < 0 THEN RETURN
+    testVerteilen(PROCESS_READ$(testProz))
+    DIM err AS STRING : err = PROCESS_ERR$(testProz)
+    IF err <> "" THEN testVerteilen(err)
+    IF PROCESS_RUNNING(testProz) THEN RETURN
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(testProz)
+        DIM e AS STRING : e = PROCESS_ERR$(testProz)
+        IF a = "" AND e = "" THEN
+            leer = leer + 1
+            SLEEP(10)
+        ELSE
+            testVerteilen(a + e)
+            leer = 0
+        END IF
+    WEND
+    IF testRest <> "" THEN testVerteilen(NL)
+    DIM code AS INTEGER : code = PROCESS_CODE(testProz)
+    PROCESS_CLOSE(testProz)
+    testProz = -1
+    DIM was AS STRING : was = IIF(testBilanz <> "", testBilanz, "beendet mit Code " + STR$(code))
+    GUI_SET_TEXT(lblAusgabe, "Ausgabe: Prüfsammlung " + was)
+    GUI_SET_TEXT(lblProbleme, "Prüfsammlung: " + was + " -- Umschalt+F7 zeigt wieder die Probleme der Datei")
+    GUI_SET_TEXT(lblStatus, "Prüfsammlung: " + was)
+    protokoll("pruefsammlung fertig " + STR$(testFehl) + " " + STR$(code))
 END SUB
 
 ' --- Ganzes Projekt pruefen --------------------------------------------
@@ -5226,6 +5522,8 @@ END SUB
 SUB randKlicksNachziehen()
     DIM t AS INTEGER
     FOR t = 0 TO tabAnzahl - 1
+        DIM hz AS INTEGER : hz = GUI_TEXTAREA_HINT_CLICKED(tabFelder[t])
+        IF hz > 0 THEN zaehlerKlick(tabFelder[t], hz)
         DIM z AS INTEGER : z = GUI_TEXTAREA_GUTTER_CLICKED(tabFelder[t])
         IF z > 0 THEN
             protokoll("rand klick " + STR$(z))
@@ -7224,7 +7522,10 @@ END FUNCTION
 SUB aufruferZeigen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
-    DIM name AS STRING : name = wortUnterMarke$()
+    aufruferZeigenFuer(wortUnterMarke$())
+END SUB
+
+SUB aufruferZeigenFuer(name AS STRING)
     IF name = "" THEN
         GUI_SET_TEXT(lblStatus, "Wer ruft das auf: unter der Marke steht kein Name.")
         protokoll("aufrufer 0")
@@ -9256,7 +9557,10 @@ END SUB
 SUB debugWerteLoeschen()
     IF werteFeld < 0 THEN RETURN
     GUI_TEXTAREA_HINTS(werteFeld, [], [])
+    DIM war AS GUI_WIDGET : war = werteFeld
     werteFeld = -1
+    ' Die Aufrufzaehler standen an derselben Stelle -- sie kommen zurueck.
+    zaehlerSetzen_(war)
 END SUB
 
 ' Der Aufrufstapel: innen oben. Das Hauptprogramm heisst im Kind
@@ -10861,6 +11165,9 @@ paletteEintrag("Leerraum am Zeilenende entfernen", "zl_rand", "")
 paletteEintrag("Andere Reiter schließen", "andere_zu", "Strg+Umschalt+W")
 paletteEintrag("Einrückungslinien", "linien", "")
 paletteEintrag("Mitlaufender Blockkopf", "blockkopf", "")
+paletteEintrag("Aufrufzähler über Unterprogrammen", "aufrufzaehler", "")
+paletteEintrag("Prüfsammlung ausführen", "pruefsammlung", "Strg+Alt+F5")
+paletteEintrag("Diesen Prüffall ausführen", "prueffall", "Strg+Alt+Umschalt+F5")
 paletteEintrag("Werkzeugleiste", "leiste", "")
 paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
 paletteEintrag("Gewählte Dateien öffnen", "baum_oeffnen", "Strg+Umschalt+E")
@@ -11339,6 +11646,9 @@ SUB befehl(k AS STRING)
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
         CASE "blockkopf" : kopfSetzen(NOT kopfAn)
+        CASE "aufrufzaehler" : zaehlerSetzen(NOT zaehlerAn)
+        CASE "pruefsammlung" : pruefsammlungStarten(FALSE)
+        CASE "prueffall" : pruefsammlungStarten(TRUE)
         CASE "leiste"
             leisteAn = NOT leisteAn
             GUI_MENU_CHECK(miLeiste, leisteAn)
@@ -11638,6 +11948,9 @@ WHILE NOT beenden
     IF GUI_CLICKED(miAndereZu) THEN befehl("andere_zu")
     IF GUI_CLICKED(miLinien) THEN befehl("linien")
     IF GUI_CLICKED(miKopf) THEN befehl("blockkopf")
+    IF GUI_CLICKED(miZaehler) THEN befehl("aufrufzaehler")
+    IF GUI_CLICKED(miPruefsammlung) THEN befehl("pruefsammlung")
+    IF GUI_CLICKED(miPrueffall) THEN befehl("prueffall")
     IF GUI_CLICKED(miLeiste) THEN befehl("leiste")
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
     DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
@@ -11690,6 +12003,7 @@ WHILE NOT beenden
     IF prjAktiv THEN
         IF KEYHIT(KEY_ESCAPE) THEN projektPruefenAbbrechen() ELSE projektPruefenSchritt()
     END IF
+    testNachsehen()
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miHakenWeg) THEN befehl("haken_weg")
     IF GUI_CLICKED(miBaumHaken) THEN befehl("baum_haken")

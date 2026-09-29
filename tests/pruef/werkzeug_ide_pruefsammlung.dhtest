@@ -1,0 +1,60 @@
+' Pruefsammlungen aus der IDE: Strg+Alt+F5 laesst `dhrt test` ueber die
+' .dhtest im Reiter laufen, jeder fehlgeschlagene Fall steht mit Zeile in
+' der Liste unten rechts, ein Klick springt hin. Strg+Alt+Umschalt+F5 nimmt
+' nur den Fall unter der Marke (--filter).
+--- seriell
+
+=== ganze sammlung, dann nur der fall unter der marke
+DIM prBild AS INTEGER : prBild = 0
+DIM prSchritt AS INTEGER : prSchritt = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN befehl("pruefsammlung") : prSchritt = 1
+IF prSchritt = 1 AND prBild > 42 AND testProz < 0 THEN
+    DIM prK AS INTEGER
+    FOR prK = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+        protokoll("pr eintrag " + GUI_LISTBOX_ITEM(lstProbleme, prK))
+    NEXT
+    GUI_LISTBOX_SET_SELECTED(lstProbleme, 0)
+    problemAnspringen()
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    protokoll("pr marke " + STR$(prZ))
+    ' Marke in den ersten (gruenen) Fall, nur ihn laufen lassen.
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 3, 1)
+    befehl("prueffall")
+    prSchritt = 2
+END IF
+IF prSchritt = 2 AND testProz < 0 THEN
+    protokoll("pr eintraege " + STR$(GUI_LISTBOX_COUNT(lstProbleme)))
+    EXIT(0)
+END IF
+--- argumente
+proben.dhtest
+--- umgebung
+DHRT_FRAMES=900
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+' Die Sammlung schreibt der Fall selbst: ihre Zeilen beginnen mit === und
+' ---, als Beilage hielte der Laeufer sie fuer seine eigenen.
+DIM t AS ARRAY OF STRING
+t = ["' zwei Faelle", "", "=== geht", "PRINT 1 + 1", "--- erwartet", "2", "", "=== geht nicht", "PRINT 2 + 2", "--- erwartet", "5", ""]
+WRITEALL("proben.dhtest", JOIN$(t, CHR$(10)))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 14) = "pruefsammlung " THEN PRINT L[i]
+NEXT
+--- erwartet
+pruefsammlung start proben.dhtest
+pruefsammlung fertig 1 1
+pr eintrag proben.dhtest:8: geht nicht: Ausgabezeile 1: erwartet '5', erhalten '4'
+pr marke 8
+pruefsammlung start proben.dhtest fall geht
+pruefsammlung fertig 0 0
+pr eintraege 0

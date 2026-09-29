@@ -1290,6 +1290,7 @@ Zeilen und Spalten zählen ab 1, in Zeichen.
 | `CODE_COMPLETE(quelltext$, zeile, spalte)` | ARRAY OF STRING | Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten |
 | `CODE_DEFINITION(quelltext$, zeile, spalte)` | TUPLE (zeile, spalte) | wo das Wort definiert ist; `(-1, -1)` ohne Definition in diesem Text |
 | `CODE_REFERENCES(quelltext$, zeile, spalte)` | ARRAY OF INTEGER | die Zeilen aller Vorkommen |
+| `CODE_NAMES(quelltext$)` | MAP OF INTEGER | wie oft jeder Name benutzt wird (klein, samt `$`): ohne Kommentare und Zeichenketten und ohne die Stelle, an der eine SUB/FUNCTION ihn definiert -- Aufrufe, FUNCREFs und Methoden hinter einem Punkt zählen |
 | `CODE_SYMBOLS$(quelltext$)` | STRING (JSON) | die Gliederung: `{name, art, von, bis, kinder}` — Klassen mit ihren Methoden |
 | `CODE_FORMAT$(quelltext$ [, einruecken])` | STRING | der Quelltext formatiert wie durch `dhrt fmt`: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit `einruecken` (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler) |
 | `CODE_RENAME$(quelltext$, zeile, spalte, neu$)` | STRING | der Quelltext mit dem Namen an dieser Stelle überall in `neu$` umbenannt — ganze Wörter, ohne Kommentare und Zeichenketten. Leer, wenn dort kein Name steht, es ein Schlüsselwort ist oder `neu$` keiner ist |
