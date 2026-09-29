@@ -1826,6 +1826,16 @@ unberuehrt. Die IDE: Ansicht -> Mitlaufender Blockkopf (ide.json
 `tests/pruef/gui_blockkopf.dhtest` (4, je mit Gegenprobe ohne Koepfe),
 `tests/pruef/werkzeug_ide_blockkopf.dhtest`.
 
+**Ganzes Projekt pruefen (2026-09-29):** Strg+Umschalt+F7 in der IDE
+(`projektPruefenStarten`/`-Schritt`, 8 Dateien je Bild, ESC bricht ab,
+Liste im Such-Modus `problemModus = 1` ueber `sucheDateien`/`sucheZeilen`).
+Eine Meldung "in lib.dh:2 -> ..." (Fehler in einer importierten Datei, von
+jeder importierenden gemeldet) wird auf ihre eigene Stelle umgeschrieben
+und ueber (kanonischer Pfad, Zeile, Meldung) nur einmal gezeigt; Hinweise
+zaehlen nicht. Protokoll `projekt geprueft F W betroffen dateien`. Test
+`tests/pruef/werkzeug_ide_projektpruefung.dhtest` (ohne das Entdoppeln
+faellt er).
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
