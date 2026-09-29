@@ -245,6 +245,13 @@ bekäme. Diese Bausteine kamen mit ihr:
   Ausgabe läuft mit; jeder fehlgeschlagene Fall steht mit Datei und Zeile in
   der Liste unten rechts, ein Klick springt zu ihm. Strg+Alt+Umschalt+F5
   nimmt nur den Fall unter der Marke (`dhrt test --fall Name`).
+  **Im Überblick** (Strg+Alt+T): alle `.dhtest` des Projekts als Baum, je
+  Fall ein Punkt -- grün bestanden, rot fehlgeschlagen, grau noch nicht
+  gelaufen oder übersprungen; eine Sammlung ist rot, sobald ein Fall darin
+  rot ist, und steht dann offen. [Alle ausführen], [Auswahl ausführen]
+  (eine Sammlung ganz oder einen Fall allein), [Fehlgeschlagene] (nur die
+  roten, je einer mit `--fall`), Doppelklick öffnet den Fall. Der Stand
+  gilt bis zum nächsten Lauf, auch über das Schließen des Fensters.
 - **Mitlaufender Blockkopf** (`GUI_TEXTAREA_SET(ta, "kopfzeilen", 3)`, Ansicht
   → Mitlaufender Blockkopf, an per Vorgabe): ist der Kopf einer SUB, einer
   Schleife oder eines IF oben hinausgerollt, der Block aber noch im Bild,

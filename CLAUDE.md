@@ -1878,6 +1878,21 @@ absolut (dieselbe Falle wie bei den Kachelbildern in Stufe 35). Tests
 `git add` faellt), `werkzeug_ide_live.dhtest` (Farbe des Bildes, Kopie
 danach weg, Meldung ohne Fenster).
 
+**Pruefsammlungen im Ueberblick (2026-09-29):** Strg+Alt+T,
+`testUebersichtZeigen`/`-Fuellen`: Baum aller .dhtest mit Punkt je Fall
+(IMAGE_FILL_ELLIPSE als Sinnbild). Der Stand kommt aus der Ausgabe von
+`dhrt test` (`testZeile`): eine `ok`/`FEHLER`-Zeile setzt alle gelaufenen
+Faelle der Datei auf bestanden, `FEHL`/`uebersprungen  Zeile N` nehmen es je
+Fall zurueck (Zeile N = die `===`-Zeile). Laeufe gehen jetzt ueber eine
+Warteschlange (`testLaufStarten(ziele, faelle)`, "Fehlgeschlagene" = je
+roter Fall ein `--fall`). **Falle:** `dhrt test` nennt den Weg, wie er ihm
+gegeben wurde, auch als 8.3-Kurzname -- der Schluessel geht ueber
+`REALPATH$`. Beim Nachsehen im Bild: ein SAVESCREENSHOT direkt nach dem
+Lauf zeigte einen alten Stand (grau), 30 Bilder spaeter stimmte er. Test
+`werkzeug_ide_testuebersicht.dhtest` (alle, Fehlgeschlagene, Fehler
+behoben, keine mehr). Werte beim Ueberfahren und Protokollpunkte gab es
+schon (siehe Debugger in `docs/ide.md`).
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt

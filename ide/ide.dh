@@ -792,6 +792,7 @@ DIM miPruefen AS INTEGER : miPruefen = GUI_MENU_ITEM(mLauf, "Prüfen", "Umschalt
 DIM miPrjPruefen AS INTEGER : miPrjPruefen = GUI_MENU_ITEM(mLauf, "Ganzes Projekt prüfen", "Strg+Umschalt+F7")
 DIM miPruefsammlung AS INTEGER : miPruefsammlung = GUI_MENU_ITEM(mLauf, "Prüfsammlung ausführen", "Strg+Alt+F5")
 DIM miPrueffall AS INTEGER : miPrueffall = GUI_MENU_ITEM(mLauf, "Diesen Prüffall ausführen", "Strg+Alt+Umschalt+F5")
+DIM miTestUebersicht AS INTEGER : miTestUebersicht = GUI_MENU_ITEM(mLauf, "Prüfsammlungen im Überblick ...", "Strg+Alt+T")
 GUI_MENU_SEPARATOR(mLauf)
 DIM miDebug AS INTEGER : miDebug = GUI_MENU_ITEM(mLauf, "Debuggen", "F7")
 DIM miHaltepunkt AS INTEGER : miHaltepunkt = GUI_MENU_ITEM(mLauf, "Haltepunkt setzen/entfernen", "F9")
@@ -1374,6 +1375,19 @@ DIM btnQvPull AS GUI_WIDGET : btnQvPull = GUI_BUTTON(winQv, "Holen (pull)", 560,
 DIM btnQvPush AS GUI_WIDGET : btnQvPush = GUI_BUTTON(winQv, "Senden (push)", 728, 484, 164, 28)
 DIM lblQvStatus AS GUI_WIDGET : lblQvStatus = GUI_LABEL(winQv, "", 8, 522)
 GUI_TOOLTIP(lstQv, "Kästchen: für die nächste Übergabe vormerken (git add) oder zurücknehmen")
+
+' --- Pruefsammlungen im Ueberblick -------------------------------------
+DIM winTests AS GUI_WINDOW : winTests = GUI_WINDOW("Prüfsammlungen", 300, 110, 620, 560)
+GUI_WINDOW_VISIBLE(winTests, FALSE)
+DIM lblTests AS GUI_WIDGET : lblTests = GUI_LABEL(winTests, "", 8, 8)
+DIM baumTests AS GUI_WIDGET : baumTests = GUI_TREE(winTests, 8, 34, 604, 440)
+GUI_TREE_PLACEHOLDER(baumTests, "Keine .dhtest-Datei im Projekt.")
+DIM btnTestsAlle AS GUI_WIDGET : btnTestsAlle = GUI_BUTTON(winTests, "Alle ausführen", 8, 484, 140, 28)
+GUI_BUTTON_VARIANT(btnTestsAlle, "primaer")
+DIM btnTestsWahl AS GUI_WIDGET : btnTestsWahl = GUI_BUTTON(winTests, "Auswahl ausführen", 156, 484, 160, 28)
+DIM btnTestsFehl AS GUI_WIDGET : btnTestsFehl = GUI_BUTTON(winTests, "Fehlgeschlagene", 324, 484, 150, 28)
+DIM btnTestsNeu AS GUI_WIDGET : btnTestsNeu = GUI_BUTTON(winTests, "Neu einlesen", 482, 484, 130, 28)
+GUI_TOOLTIP(baumTests, "Doppelklick öffnet den Fall; grün bestanden, rot fehlgeschlagen, grau noch nicht gelaufen oder übersprungen")
 
 ' --- Live-Vorschau ------------------------------------------------------
 DIM winLive AS GUI_WINDOW : winLive = GUI_WINDOW("Live-Vorschau", 760, 110, 520, 420)
@@ -4229,20 +4243,45 @@ SUB pruefsammlungStarten(nurFall AS BOOLEAN)
         IF projektOrdner = "" THEN RETURN
         ziel = projektOrdner
     END IF
+    testLaufStarten([ziel], [filter])
+END SUB
+
+' Eine Folge von Laeufen: je Ziel (Datei oder Ordner) ein `dhrt test`, mit
+' Fall-Namen nur dieser Fall. Ausgabe und Liste werden nur am Anfang
+' geleert -- die Fehlgeschlagenen aus drei Dateien sollen zusammen dastehen.
+DIM testZiele AS ARRAY OF STRING : testZiele = []
+DIM testFaelle AS ARRAY OF STRING : testFaelle = []
+DIM testFall AS STRING : testFall = ""
+DIM testFehlSumme AS INTEGER : testFehlSumme = 0
+DIM testOkSumme AS INTEGER : testOkSumme = 0
+
+SUB testLaufStarten(ziele AS ARRAY OF STRING, faelle AS ARRAY OF STRING)
+    IF testProz >= 0 OR LEN(ziele) = 0 THEN RETURN
     GUI_LISTBOX_CLEAR(lstAusgabe)
     GUI_LISTBOX_CLEAR(lstProbleme)
     sucheDateien = []
     sucheZeilen = []
     problemModus = 1
+    testFehlSumme = 0 : testOkSumme = 0
+    testZiele = ziele
+    testFaelle = faelle
+    testNaechster()
+END SUB
+
+SUB testNaechster()
+    DIM ziel AS STRING : ziel = testZiele[0]
+    testFall = testFaelle[0]
+    ARRAY_REMOVE_AT(testZiele, 0)
+    ARRAY_REMOVE_AT(testFaelle, 0)
     testRest = "" : testDatei = "" : testBilanz = "" : testFehl = 0
-    IF filter = "" THEN
+    IF testFall = "" THEN
         testProz = PROCESS_START("dhrt", "test", ziel)
     ELSE
-        testProz = PROCESS_START("dhrt", "test", ziel, "--fall", filter)
+        testProz = PROCESS_START("dhrt", "test", ziel, "--fall", testFall)
     END IF
     GUI_SET_TEXT(lblAusgabe, "Ausgabe: Prüfsammlung läuft ...")
     GUI_SET_TEXT(lblProbleme, "Prüfsammlung läuft ...")
-    protokoll("pruefsammlung start " + BASENAME(ziel) + IIF(filter <> "", " fall " + filter, ""))
+    protokoll("pruefsammlung start " + BASENAME(ziel) + IIF(testFall <> "", " fall " + testFall, ""))
 END SUB
 
 ' Eine Zeile der Ausgabe von `dhrt test`: in die Ausgabe, und ein FEHL in
@@ -4250,11 +4289,18 @@ END SUB
 SUB testZeile(z AS STRING)
     ausgabe(z)
     DIM t AS STRING : t = TRIM$(z)
-    IF LEFT$(t, 8) = "FEHLER  " THEN
+    IF LEFT$(t, 8) = "FEHLER  " OR LEFT$(t, 8) = "ok      " THEN
         DIM r AS STRING : r = TRIM$(MID$(t, 8))
         DIM kl AS INTEGER : kl = INSTR(r, "  (")
         IF kl > 0 THEN r = LEFT$(r, kl)
         testDatei = r
+        ' Erst gilt jeder gelaufene Fall der Datei als bestanden, die
+        ' FEHL-/uebersprungen-Zeilen danach nehmen es zurueck.
+        IF LOWER$(RIGHT$(r, 7)) = ".dhtest" THEN testDateiBestanden(r)
+    ELSEIF LEFT$(t, 20) = "uebersprungen  Zeile" THEN
+        DIM ru AS STRING : ru = MID$(t, 21)
+        DIM du AS INTEGER : du = INSTR(ru, ":")
+        IF du > 0 AND testDatei <> "" THEN testStatusSetzen(testDatei, INT(VAL(LEFT$(ru, du))), "ueber")
     ELSEIF LEFT$(t, 11) = "FEHL  Zeile" THEN
         DIM rest AS STRING : rest = MID$(t, 12)
         DIM dp AS INTEGER : dp = INSTR(rest, ":")
@@ -4269,6 +4315,7 @@ SUB testZeile(z AS STRING)
             GUI_LISTBOX_ADD(lstProbleme, BASENAME(d) + ":" + STR$(nr) + ": " + TRIM$(MID$(rest, dp + 1)))
             GUI_LISTBOX_COLOR(lstProbleme, LEN(sucheZeilen) - 1, &HE06060)
             testFehl = testFehl + 1
+            testStatusSetzen(testDatei, nr, "fehl")
         END IF
     ELSEIF INSTR(t, " Faelle, ") >= 0 THEN
         DIM sc AS INTEGER : sc = INSTR(t, "; ")
@@ -4308,6 +4355,13 @@ SUB testNachsehen()
     DIM code AS INTEGER : code = PROCESS_CODE(testProz)
     PROCESS_CLOSE(testProz)
     testProz = -1
+    testFehlSumme = testFehlSumme + testFehl
+    IF GUI_WINDOW_SHOWN(winTests) THEN testUebersichtFuellen()
+    IF LEN(testZiele) > 0 THEN
+        protokoll("pruefsammlung fertig " + STR$(testFehl) + " " + STR$(code))
+        testNaechster()
+        RETURN
+    END IF
     DIM was AS STRING : was = IIF(testBilanz <> "", testBilanz, "beendet mit Code " + STR$(code))
     GUI_SET_TEXT(lblAusgabe, "Ausgabe: Prüfsammlung " + was)
     GUI_SET_TEXT(lblProbleme, "Prüfsammlung: " + was + " -- Umschalt+F7 zeigt wieder die Probleme der Datei")
@@ -4676,6 +4730,186 @@ SUB liveNachziehen()
     PROCESS_CLOSE_INPUT(liveProz)
     GUI_SET_TEXT(lblLive, "Rechnet ...")
     protokoll("live start")
+END SUB
+
+' --- Pruefsammlungen im Ueberblick: Logik -------------------------------
+' Je Fall der Stand des letzten Laufs ("ok", "fehl", "ueber"), Schluessel
+' ist der Weg der Sammlung (klein, mit Schraegstrichen) und die Zeile ihres
+' "=== Name". Er bleibt ueber das Schliessen des Fensters hinaus.
+DIM testStatus AS MAP OF STRING
+DIM tuKnoten AS ARRAY OF INTEGER : tuKnoten = []
+DIM tuDatei AS ARRAY OF STRING : tuDatei = []
+DIM tuZeile AS ARRAY OF INTEGER : tuZeile = []
+DIM tuName AS ARRAY OF STRING : tuName = []
+DIM tuPunkte AS ARRAY OF IMAGE : tuPunkte = []
+
+' Kanonisch: `dhrt test` nennt den Weg, wie er ihm gegeben wurde -- auch in
+' der kurzen 8.3-Schreibweise (HANSGA~1), der Baum in der langen.
+FUNCTION testSchluessel$(pfad AS STRING, zeile AS INTEGER) AS STRING
+    DIM w AS STRING : w = pfad
+    TRY
+        w = REALPATH$(pfad)
+    CATCH e
+        w = pfad
+    END TRY
+    RETURN LOWER$(wegGleich$(w)) + "|" + STR$(zeile)
+END FUNCTION
+
+SUB testStatusSetzen(pfad AS STRING, zeile AS INTEGER, stand AS STRING)
+    MAPPUT(testStatus, testSchluessel$(pfad, zeile), stand)
+END SUB
+
+' Die Faelle einer Sammlung: (Zeilen, Namen) der "=== "-Zeilen.
+FUNCTION testFaelleVon(pfad AS STRING) AS TUPLE
+    DIM zl AS ARRAY OF INTEGER : zl = []
+    DIM nm AS ARRAY OF STRING : nm = []
+    DIM q AS STRING : q = ""
+    TRY
+        q = dateiLesen(pfad)
+    CATCH e
+        q = ""
+    END TRY
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        IF LEFT$(zeilen[i], 4) = "=== " THEN
+            ARRAY_PUSH(zl, i + 1)
+            ARRAY_PUSH(nm, TRIM$(REPLACE$(MID$(zeilen[i], 4), CHR$(13), "")))
+        END IF
+    NEXT
+    RETURN (zl, nm)
+END FUNCTION
+
+' Alle Faelle der Datei, die in diesem Lauf dran waren, als bestanden.
+SUB testDateiBestanden(pfad AS STRING)
+    DIM zl AS ARRAY OF INTEGER
+    DIM nm AS ARRAY OF STRING
+    (zl, nm) = testFaelleVon(pfad)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zl) - 1
+        IF testFall = "" OR nm[i] = testFall THEN testStatusSetzen(pfad, zl[i], "ok")
+    NEXT
+END SUB
+
+' Ein kleiner farbiger Punkt als Sinnbild -- grau, gruen, rot.
+FUNCTION testPunkt(farbe AS INTEGER) AS IMAGE
+    DIM b AS IMAGE : b = IMAGE_NEW(12, 12)
+    IMAGE_FILL_ELLIPSE(b, 6.0, 6.0, 4.5, 4.5, farbe)
+    RETURN b
+END FUNCTION
+
+SUB testUebersichtZeigen()
+    IF LEN(tuPunkte) = 0 THEN
+        ARRAY_PUSH(tuPunkte, testPunkt(&H808890))
+        ARRAY_PUSH(tuPunkte, testPunkt(&H40C060))
+        ARRAY_PUSH(tuPunkte, testPunkt(&HE05050))
+    END IF
+    testUebersichtFuellen()
+    GUI_WINDOW_VISIBLE(winTests, TRUE)
+    GUI_FOCUS(baumTests)
+END SUB
+
+SUB testUebersichtFuellen()
+    DIM wahlDatei AS STRING : wahlDatei = ""
+    DIM wahlZeile AS INTEGER : wahlZeile = -1
+    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baumTests)
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(tuKnoten, sel)
+    IF sel >= 0 AND k >= 0 THEN wahlDatei = tuDatei[k] : wahlZeile = tuZeile[k]
+    GUI_TREE_CLEAR(baumTests)
+    tuKnoten = [] : tuDatei = [] : tuZeile = [] : tuName = []
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    IF projektOrdner <> "" THEN dateien = projektDateien("*.dhtest")
+    DIM gesamt AS INTEGER : gesamt = 0
+    DIM gut AS INTEGER : gut = 0
+    DIM schlecht AS INTEGER : schlecht = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM zl AS ARRAY OF INTEGER
+        DIM nm AS ARRAY OF STRING
+        (zl, nm) = testFaelleVon(pfad)
+        DIM fk AS INTEGER : fk = GUI_TREE_ADD(baumTests, -1, d)
+        ARRAY_PUSH(tuKnoten, fk) : ARRAY_PUSH(tuDatei, pfad) : ARRAY_PUSH(tuZeile, 0) : ARRAY_PUSH(tuName, "")
+        DIM fOk AS INTEGER : fOk = 0
+        DIM fFehl AS INTEGER : fFehl = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zl) - 1
+            DIM stand AS STRING : stand = MAPGETOR(testStatus, testSchluessel$(pfad, zl[i]), "")
+            DIM kk AS INTEGER : kk = GUI_TREE_ADD(baumTests, fk, nm[i])
+            ARRAY_PUSH(tuKnoten, kk) : ARRAY_PUSH(tuDatei, pfad) : ARRAY_PUSH(tuZeile, zl[i]) : ARRAY_PUSH(tuName, nm[i])
+            DIM bild AS INTEGER : bild = 0
+            IF stand = "ok" THEN bild = 1 : fOk = fOk + 1
+            IF stand = "fehl" THEN bild = 2 : fFehl = fFehl + 1
+            IF LEN(tuPunkte) = 3 THEN GUI_TREE_ICON(baumTests, kk, tuPunkte[bild])
+            IF stand = "fehl" THEN GUI_TREE_COLOR(baumTests, kk, &HE06060)
+            IF wahlDatei = pfad AND wahlZeile = zl[i] THEN GUI_TREE_SET_SELECTED(baumTests, kk)
+        NEXT
+        DIM fb AS INTEGER : fb = 0
+        IF fFehl > 0 THEN
+            fb = 2
+            GUI_TREE_COLOR(baumTests, fk, &HE06060)
+        ELSEIF fOk = LEN(zl) AND LEN(zl) > 0 THEN
+            fb = 1
+        END IF
+        IF LEN(tuPunkte) = 3 THEN GUI_TREE_ICON(baumTests, fk, tuPunkte[fb])
+        ' Eine Datei mit Fehlschlag steht offen; die anderen nur, solange es
+        ' wenige Sammlungen sind -- sonst sucht man den roten Fall in einer
+        ' langen Liste gruener.
+        GUI_TREE_EXPAND(baumTests, fk, fFehl > 0 OR LEN(dateien) <= 5)
+        IF wahlDatei = pfad AND wahlZeile = 0 THEN GUI_TREE_SET_SELECTED(baumTests, fk)
+        gesamt = gesamt + LEN(zl) : gut = gut + fOk : schlecht = schlecht + fFehl
+    NEXT
+    GUI_SET_TEXT(lblTests, STR$(LEN(dateien)) + " Sammlung(en), " + STR$(gesamt) + " Fälle: " + _
+                 STR$(gut) + " bestanden, " + STR$(schlecht) + " fehlgeschlagen, " + _
+                 STR$(gesamt - gut - schlecht) + " offen")
+    protokoll("tests " + STR$(LEN(dateien)) + " " + STR$(gesamt) + " " + STR$(gut) + " " + STR$(schlecht))
+END SUB
+
+' Die gewaehlten Knoten als Laeufe: eine Datei ganz, ein Fall allein.
+SUB testAuswahlAusfuehren()
+    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baumTests)
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(tuKnoten, sel)
+    IF sel < 0 OR k < 0 THEN
+        GUI_SET_TEXT(lblTests, "Erst eine Sammlung oder einen Fall wählen.")
+        RETURN
+    END IF
+    testLaufStarten([tuDatei[k]], [tuName[k]])
+END SUB
+
+SUB testFehlgeschlageneAusfuehren()
+    DIM ziele AS ARRAY OF STRING : ziele = []
+    DIM faelle AS ARRAY OF STRING : faelle = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(tuKnoten) - 1
+        IF tuZeile[i] = 0 THEN CONTINUE
+        IF MAPGETOR(testStatus, testSchluessel$(tuDatei[i], tuZeile[i]), "") = "fehl" THEN
+            ARRAY_PUSH(ziele, tuDatei[i]) : ARRAY_PUSH(faelle, tuName[i])
+        END IF
+    NEXT
+    IF LEN(ziele) = 0 THEN
+        GUI_SET_TEXT(lblTests, "Kein fehlgeschlagener Fall.")
+        protokoll("tests keine fehlgeschlagenen")
+        RETURN
+    END IF
+    testLaufStarten(ziele, faelle)
+END SUB
+
+SUB testUebersichtNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winTests) THEN RETURN
+    IF GUI_CLICKED(btnTestsNeu) THEN testUebersichtFuellen()
+    IF testProz < 0 THEN
+        IF GUI_CLICKED(btnTestsAlle) AND projektOrdner <> "" THEN testLaufStarten([projektOrdner], [""])
+        IF GUI_CLICKED(btnTestsWahl) THEN testAuswahlAusfuehren()
+        IF GUI_CLICKED(btnTestsFehl) THEN testFehlgeschlageneAusfuehren()
+    END IF
+    IF GUI_DOUBLE_CLICKED(baumTests) THEN
+        DIM k AS INTEGER : k = ARRAY_INDEXOF(tuKnoten, GUI_TREE_SELECTED(baumTests))
+        IF k >= 0 THEN
+            dateiOeffnen(tuDatei[k])
+            IF tuZeile[k] > 0 AND aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), tuZeile[k], 1)
+            protokoll("tests sprung " + BASENAME(tuDatei[k]) + " " + STR$(tuZeile[k]))
+        END IF
+    END IF
 END SUB
 
 ' --- Ganzes Projekt pruefen --------------------------------------------
@@ -11568,6 +11802,7 @@ paletteEintrag("Quellcodeverwaltung (git)", "git_fenster", "Strg+Alt+G")
 paletteEintrag("Live-Vorschau", "live", "Strg+Alt+L")
 paletteEintrag("Prüfsammlung ausführen", "pruefsammlung", "Strg+Alt+F5")
 paletteEintrag("Diesen Prüffall ausführen", "prueffall", "Strg+Alt+Umschalt+F5")
+paletteEintrag("Prüfsammlungen im Überblick", "test_uebersicht", "Strg+Alt+T")
 paletteEintrag("Werkzeugleiste", "leiste", "")
 paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
 paletteEintrag("Gewählte Dateien öffnen", "baum_oeffnen", "Strg+Umschalt+E")
@@ -12051,6 +12286,7 @@ SUB befehl(k AS STRING)
         CASE "live" : liveSetzen(NOT liveAn)
         CASE "pruefsammlung" : pruefsammlungStarten(FALSE)
         CASE "prueffall" : pruefsammlungStarten(TRUE)
+        CASE "test_uebersicht" : testUebersichtZeigen()
         CASE "leiste"
             leisteAn = NOT leisteAn
             GUI_MENU_CHECK(miLeiste, leisteAn)
@@ -12355,6 +12591,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miLive) THEN befehl("live")
     IF GUI_CLICKED(miPruefsammlung) THEN befehl("pruefsammlung")
     IF GUI_CLICKED(miPrueffall) THEN befehl("prueffall")
+    IF GUI_CLICKED(miTestUebersicht) THEN befehl("test_uebersicht")
     IF GUI_CLICKED(miLeiste) THEN befehl("leiste")
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
     DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
@@ -12410,6 +12647,7 @@ WHILE NOT beenden
     testNachsehen()
     qvNachziehen()
     liveNachziehen()
+    testUebersichtNachziehen()
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miHakenWeg) THEN befehl("haken_weg")
     IF GUI_CLICKED(miBaumHaken) THEN befehl("baum_haken")

@@ -1,0 +1,62 @@
+' Pruefsammlungen im Ueberblick (Strg+Alt+T): alle .dhtest des Projekts
+' als Baum, je Fall der Stand des letzten Laufs (gruen/rot/grau). "Alle
+' ausfuehren" laeuft den Projektordner, "Fehlgeschlagene" nur die roten
+' Faelle (je einer mit --fall), danach stimmt der Stand wieder.
+' Die Sammlungen schreibt das `--- vorher` -- ihre Zeilen beginnen mit ===.
+--- seriell
+
+=== alle, dann nur die fehlgeschlagenen
+DIM prBild AS INTEGER : prBild = 0
+DIM prSchritt AS INTEGER : prSchritt = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    befehl("test_uebersicht")
+    testLaufStarten([projektOrdner], [""])
+    prSchritt = 1
+END IF
+IF prSchritt = 1 AND testProz < 0 AND LEN(testZiele) = 0 THEN
+    testFehlgeschlageneAusfuehren()
+    prSchritt = 2
+END IF
+IF prSchritt = 2 AND testProz < 0 AND LEN(testZiele) = 0 THEN
+    ' den Fehler beheben und die roten noch einmal laufen lassen
+    WRITEALL(PATHJOIN(projektOrdner, "eins.dhtest"), REPLACE$(dateiLesen(PATHJOIN(projektOrdner, "eins.dhtest")), "--- erwartet" + NL + "5", "--- erwartet" + NL + "4"))
+    testFehlgeschlageneAusfuehren()
+    prSchritt = 3
+END IF
+IF prSchritt = 3 AND testProz < 0 AND LEN(testZiele) = 0 THEN
+    testFehlgeschlageneAusfuehren()
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=1500
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM a AS ARRAY OF STRING
+a = ["=== geht", "PRINT 1 + 1", "--- erwartet", "2", "", "=== geht nicht", "PRINT 2 + 2", "--- erwartet", "5", ""]
+WRITEALL("eins.dhtest", JOIN$(a, CHR$(10)))
+DIM b AS ARRAY OF STRING
+b = ["=== auch", "PRINT 3", "--- erwartet", "3", ""]
+WRITEALL("zwei.dhtest", JOIN$(b, CHR$(10)))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 6) = "tests " OR LEFT$(L[i], 14) = "pruefsammlung " THEN PRINT L[i]
+NEXT
+--- erwartet
+tests 2 3 0 0
+pruefsammlung start fall_0
+tests 2 3 2 1
+pruefsammlung fertig 1 1
+pruefsammlung start eins.dhtest fall geht nicht
+tests 2 3 2 1
+pruefsammlung fertig 1 1
+pruefsammlung start eins.dhtest fall geht nicht
+tests 2 3 3 0
+pruefsammlung fertig 0 0
+tests keine fehlgeschlagenen
