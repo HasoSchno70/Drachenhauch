@@ -7,11 +7,19 @@
 === ein bild nach der pause, ein fehler ohne fenster
 DIM prBild AS INTEGER : prBild = 0
 DIM prSchritt AS INTEGER : prSchritt = 0
+DIM prWarte AS INTEGER : prWarte = 0
 --- programm ../../ide/ide.dh nach SETFPS(60)
 --- einschub nach hbInhaltNachziehen()
 prBild = prBild + 1
 IF prBild = 40 THEN befehl("live") : prSchritt = 1
-IF prSchritt = 1 AND liveBild >= 0 AND liveProz < 0 THEN
+IF prSchritt = 1 AND liveBild >= 0 AND liveProz < 0 THEN prSchritt = 5 : prWarte = prBild + 6
+IF prSchritt = 5 AND prBild = prWarte THEN SAVESCREENSHOT("live.png") : prSchritt = 4
+IF prSchritt = 4 AND prBild = prWarte + 1 THEN
+    ' Auf dem Schirm, nicht nur geladen: das Fenster schwebt ueber dem
+    ' Hauptfenster (GUI_DRAW_WINDOW), die Mitte des Bildes ist rot.
+    DIM prS AS IMAGE : prS = LOADIMAGE("live.png")
+    DIM prM AS INTEGER : prM = GETPIXEL(prS, GUI_WINDOW_GET_X(winLive) + 260, GUI_WINDOW_GET_Y(winLive) + 230)
+    protokoll("pr schirm rot " + STR$(((prM SHR 16) BAND 255) > 200 AND ((prM SHR 8) BAND 255) < 60))
     protokoll("pr kopie da " + STR$(FILEEXISTS(".dh_live_vorschau.dh") OR FILEEXISTS(PATHJOIN(projektOrdner, ".dh_live_vorschau.dh"))))
     DIM prF AS INTEGER : prF = GETPIXEL(liveBild, 20, 20)
     protokoll("pr farbe rot " + STR$(((prF SHR 16) BAND 255) > 200 AND ((prF SHR 8) BAND 255) < 60))
@@ -48,6 +56,7 @@ PRINT "kopie am ende "; FILEEXISTS(".dh_live_vorschau.dh")
 live an
 live start
 live bild 200x100
+pr schirm rot TRUE
 pr kopie da FALSE
 pr farbe rot TRUE
 live start
