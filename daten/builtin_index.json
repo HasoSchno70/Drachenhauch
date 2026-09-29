@@ -5127,6 +5127,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_LINE_COLORS",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_LINE_COLORS(ta, zeilen, farben)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_LINE_COLORS_GET",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_LINE_COLORS_GET(ta)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_MARKS_GET",
    "kind": "core",
    "signature": "GUI_TEXTAREA_MARKS_GET(ta)",

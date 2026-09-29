@@ -7942,6 +7942,17 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_hints(gi(a, 0, n)?, ganze(&a[1], n)?, texte, farbe)?;
                 Value::Nil
             }
+            "gui_textarea_line_colors" => {
+                let n = "GUI_TEXTAREA_LINE_COLORS";
+                if a.len() != 3 { return Err(format!("{}: erwartet (ta, zeilen, farben)", n)); }
+                self.gui.textarea_line_colors(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
+                Value::Nil
+            }
+            "gui_textarea_line_colors_get" => {
+                let n = "GUI_TEXTAREA_LINE_COLORS_GET";
+                if a.len() != 1 { return Err(format!("{}: erwartet (ta)", n)); }
+                crate::builtins::new_int_array(self.gui.textarea_line_colors_get(gi(a, 0, n)?)?)
+            }
             "gui_textarea_marks_get" => {
                 let n = "GUI_TEXTAREA_MARKS_GET";
                 if a.len() != 1 { return Err(format!("{}: erwartet (ta)", n)); }
