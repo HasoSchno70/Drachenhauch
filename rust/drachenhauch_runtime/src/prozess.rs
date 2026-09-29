@@ -17,6 +17,13 @@
 //! vererbt -- sonst stuerbe das aus der IDE gestartete Programm nach den N
 //! Bildern des IDE-Tests (dieselbe Regel wie bei `WINDOW_OPEN`). Beim Drop
 //! (Programmende der IDE) werden laufende Kinder beendet.
+//!
+//! `PROCESS_KILL` beendet den ganzen BAUM, nicht nur das Kind (seit
+//! 2026-09-29, gefunden am Terminal der IDE): `cmd /C ping ...` abgebrochen
+//! liess den `ping` weiterlaufen -- und der hielt unter Windows sogar die
+//! geerbten Leitungen offen, der Aufrufer wartete auf ihn. Windows ueber
+//! `taskkill /T` (VOR dem eigenen kill, der Baum haengt am Elternprozess),
+//! Unix ueber eine eigene Prozessgruppe je Kind.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -70,6 +77,11 @@ impl Prozess {
             use std::os::windows::process::CommandExt;
             cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW: kein Konsolenfenster hinter der IDE
         }
+        #[cfg(all(unix, not(target_os = "emscripten")))]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0); // eigene Gruppe: PROCESS_KILL trifft auch die Enkel
+        }
         let mut kind = cmd.spawn().map_err(|e| format!("PROCESS_START: '{}' laesst sich nicht starten: {}", programm, e))?;
         let stdout = Arc::new(Mutex::new(String::new()));
         let stderr = Arc::new(Mutex::new(String::new()));
@@ -118,12 +130,36 @@ impl Prozess {
 
     pub fn beenden(&mut self) {
         if self.code.is_none() {
+            if self.laeuft() { baum_beenden(self.kind.id()); }
             let _ = self.kind.kill();
             let _ = self.kind.wait();
             self.code = Some(-1);
         }
     }
 }
+
+/// Die Nachkommen eines Kindes beenden (das Kind selbst gleich mit).
+#[cfg(windows)]
+fn baum_beenden(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    let _ = Command::new("taskkill")
+        .args(["/T", "/F", "/PID", &pid.to_string()])
+        .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
+        .creation_flags(0x0800_0000)
+        .status();
+}
+
+#[cfg(all(unix, not(target_os = "emscripten")))]
+fn baum_beenden(pid: u32) {
+    // Die Gruppe traegt die Nummer des Kindes (process_group(0) beim Start).
+    let _ = Command::new("kill")
+        .args(["-KILL", "--", &format!("-{}", pid)])
+        .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
+        .status();
+}
+
+#[cfg(not(any(windows, all(unix, not(target_os = "emscripten")))))]
+fn baum_beenden(_pid: u32) {}
 
 impl Drop for Prozess {
     fn drop(&mut self) { self.beenden(); }
@@ -150,6 +186,25 @@ mod tests {
         assert!(aus.contains("hallo"), "{:?}", aus);
         assert_eq!(p.code(), 0);
         assert!(p.lesen().is_empty(), "zweiter Abruf liefert nichts Neues");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn kill_beendet_auch_die_enkel() {
+        // cmd startet ping als Enkel; ohne den Baum liefe er 20 s weiter und
+        // hielte die Leitung offen -- das Lesen bis zum Ende dauerte so lange.
+        let mut p = Prozess::starten("cmd", &["/C".into(), "ping -n 20 127.0.0.1".into()]).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let t = std::time::Instant::now();
+        p.beenden();
+        // Enkel weg: nach kurzer Zeit gibt es keinen ping mit dieser Leitung
+        // mehr -- geprueft an der Ausgabe, die sonst weiterliefe.
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        let vorher = p.lesen();
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        let nachher = p.lesen();
+        assert!(t.elapsed().as_secs() < 10);
+        assert!(nachher.is_empty(), "ping lief weiter: vorher {:?}, nachher {:?}", vorher, nachher);
     }
 
     #[test]

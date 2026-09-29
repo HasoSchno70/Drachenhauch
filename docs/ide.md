@@ -290,6 +290,37 @@ bekäme. Diese Bausteine kamen mit ihr:
   (eine Sammlung ganz oder einen Fall allein), [Fehlgeschlagene] (nur die
   roten, je einer mit `--fall`), Doppelklick öffnet den Fall. Der Stand
   gilt bis zum nächsten Lauf, auch über das Schließen des Fensters.
+- **Eigene Schnipsel** (Bearbeiten → Eigene Schnipsel bearbeiten): eine
+  Textdatei `schnipsel.txt` neben der `ide.json`. Jeder Schnipsel beginnt mit
+  `=== Name | kuerzel` und reicht bis zum nächsten; `|` im Text ist die
+  Stelle der Marke. Nach dem Sichern gilt die Datei sofort; ein eigenes
+  Kürzel, das es schon gibt, **ersetzt** den eingebauten Schnipsel (in Strg+J
+  steht dann „eigen, ersetzt"). Ein Kürzel, das kein Wort ist, bleibt weg —
+  der Schnipsel ist dann nur über Strg+J zu haben. **Auswahl als Schnipsel
+  sichern ...** hängt den markierten Code mit „Name | Kürzel" an die Datei.
+- **Eigene Tastenbelegung** (Hilfe → Tastenkürzel ändern ...): Befehl wählen,
+  neues Kürzel eintippen (leer = keins). Gespeichert wird in `tasten.json`
+  neben der `ide.json`, und zwar nur, was von der Vorgabe abweicht
+  (`{"neu": "Strg+Alt+N"}`); die Datei lässt sich auch von Hand bearbeiten
+  und gilt nach dem Sichern. Nimmt ein Kürzel einem anderen Befehl seine
+  Taste weg, verliert der sie — zwei Befehle auf einer Taste feuerten beide.
+  Unbekannte Befehle und Kürzel, die die IDE nicht kennt, stehen in der
+  Ausgabe. Zurücksetzen löscht die Datei. Dahinter steht **eine Tafel** aller
+  Menüpunkte mit Befehl und Vorgabe-Kürzel (`menueBefehl`); aus ihr feuern
+  auch die Klicks (vorher 136 einzelne Zeilen in der Bildschleife).
+  Umbelegen lässt sich, was einen Menüpunkt hat.
+- **Terminal** (Ansicht → Terminal, Alt+3, oder der Reiter „Terminal" über
+  der Ausgabe): die Eingabezeile unten schickt Befehle an `cmd` (Windows)
+  bzw. `sh`, die Ausgabe läuft mit, Fehler rot, ein Rückgabewert ungleich 0
+  steht dahinter. Jeder Befehl ist ein eigener Prozess im Ordner des
+  Terminals (zuerst der Projektordner); **`cd` wirkt** trotzdem, weil das
+  Skript am Ende seinen Ordner meldet. Eine mit `set` gesetzte Variable
+  gilt dagegen nur für den einen Befehl. Läuft ein Befehl, geht die
+  Eingabezeile an ihn (`set /p`, ein `INPUT`); **Abbrechen** beendet ihn
+  samt allem, was er gestartet hat. Pfeil hoch/runter blättert durch die
+  Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der
+  Bereich auf die Ausgabe zurück. Unter Windows kommen Umlaute richtig an
+  (`chcp 65001`).
 - **Mitlaufender Blockkopf** (`GUI_TEXTAREA_SET(ta, "kopfzeilen", 3)`, Ansicht
   → Mitlaufender Blockkopf, an per Vorgabe): ist der Kopf einer SUB, einer
   Schleife oder eines IF oben hinausgerollt, der Block aber noch im Bild,

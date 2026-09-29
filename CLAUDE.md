@@ -1861,6 +1861,33 @@ sucht Teiltexte, "geht" traf auch "geht nicht"). Tests
 ein Klick-Fall in `gui_textarea_hints.dhtest`, Rust-Test
 `namen_zaehlen_ohne_definition_kommentar_text`.
 
+**Eigene Schnipsel, eigene Tastenbelegung, Terminal (2026-09-29):** die
+136 Zeilen `IF GUI_CLICKED(miX) THEN befehl("k")` der Bildschleife sind EINE
+Tafel (`menueBefehl(mi, kennung, vorgabe[, klickt])`, `menueKlicks`) -- aus
+ihr liest auch die Tastenbelegung. `tasten.json` neben der ide.json haelt
+nur Abweichungen; `tastenAnwenden` stellt erst alles auf die Vorgabe, dann
+die Datei darueber, und nimmt einem anderen Befehl die Taste weg
+(`kuerzelForm$` vergleicht "Umschalt+Strg+O" = "strg+shift+o"). **Falle:**
+`Strg+Alt+N` gehoerte schon "Neues Projekt aus Vorlage" -- Konflikte sind
+kein Randfall. `schnipsel.txt` (`=== Name | kuerzel`, dann der Text) kommt
+zu den eingebauten, ein gleiches Kuerzel ersetzt; beide gelten nach dem
+Sichern im Reiter (Haken in `sichern`, der Projektordner wandert dabei
+nicht). `konfigOrdner$` gibt "." fuer eine ide.json ohne Ordner (die
+Tests). **Terminal** (Alt+3, Reiterknoepfe ueber der Ausgabe): je Befehl
+ein Skript (`cmd /Q /D /C x.cmd` bzw. `sh x.sh`) mit `cd` am Anfang und
+einer Marke `__DH_TERMINAL_ORT__` am Ende -- so wirkt `cd` ohne dauerhafte
+Shell (deren Eingabeaufforderung kaeme ohne Zeilenende). `chcp 65001` fuer
+Umlaute. **Fund in der Laufzeit:** `PROCESS_KILL` beendete nur das Kind --
+`cmd /C ping` abgebrochen liess den ping laufen, und der hielt die GEERBTEN
+Leitungen offen (der Testlaeufer wartete 20 s auf ihn). Jetzt `taskkill /T`
+unter Windows bzw. eigene Prozessgruppe (`process_group(0)`) + `kill -KILL
+-pgid` unter Unix (`prozess::baum_beenden`). **Testfalle:** eine Beilage mit
+`===`-Zeilen haelt der Laeufer fuer Faelle -- die schnipsel.txt schreibt ein
+`--- vorher`. Tests `werkzeug_ide_eigenes.dhtest` (6, darunter echte Tasten
+mit Gegenprobe), `werkzeug_ide_terminal.dhtest` (2, `--- system windows`),
+Rust-Test `kill_beendet_auch_die_enkel`; vier Verfaelschungen der IDE und
+eine der Laufzeit fallen je in ihrem Fall.
+
 **Quellcodeverwaltung und Live-Vorschau in der IDE (2026-09-29):**
 Strg+Alt+G (`qvZeigen`/`qvAuffrischen`/`qvNachziehen`): `git status
 --porcelain=v1 -b -uall` im Wurzelordner des Repositorys, das Kaestchen ist
