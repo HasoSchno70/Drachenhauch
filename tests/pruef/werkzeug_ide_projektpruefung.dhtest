@@ -1,0 +1,86 @@
+' Ganzes Projekt pruefen (Strg+Umschalt+F7): jede .dh des Projekts samt
+' Unterordnern durch CODE_CHECK$, in Schritten. Ein Fehler in einer
+' importierten Datei steht EINMAL in der Liste, an seiner eigenen Stelle --
+' nicht noch einmal bei jeder Datei, die sie importiert. Hinweise (eine
+' unbenutzte Variable) zaehlen nicht. Ein Klick auf einen Eintrag oeffnet
+' die Datei an der Zeile.
+--- seriell
+
+=== alle dateien, import-fehler einmal, klick oeffnet
+DIM prBild AS INTEGER : prBild = 0
+DIM prFertig AS INTEGER : prFertig = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 60 THEN befehl("projekt_pruefen")
+IF prBild > 60 AND prFertig = 0 AND NOT prjAktiv THEN
+    prFertig = prBild
+    DIM prK AS INTEGER
+    FOR prK = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+        protokoll("pr eintrag " + GUI_LISTBOX_ITEM(lstProbleme, prK))
+    NEXT
+    protokoll("pr titel " + GUI_TEXT(lblProbleme))
+    ' Den Eintrag aus sub/c.dh anspringen.
+    FOR prK = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+        IF INSTR(GUI_LISTBOX_ITEM(lstProbleme, prK), "c.dh:") >= 0 THEN
+            GUI_LISTBOX_SET_SELECTED(lstProbleme, prK)
+            problemAnspringen()
+        END IF
+    NEXT
+END IF
+IF prFertig > 0 AND prBild = prFertig + 5 THEN
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    protokoll("pr offen " + BASENAME(tabPfade[aktiverTab]) + " zeile " + STR$(prZ))
+    EXIT(0)
+END IF
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT("alles gut")
+
+--- datei b.dh
+DIM x AS INTEGER
+IF x = 1 THEN
+    PRINT(x)
+
+--- datei lib.dh
+SUB f()
+    PRINT(zz)
+END SUB
+
+--- datei haupt.dh
+IMPORT "lib.dh"
+f()
+
+--- datei hinweis.dh
+SUB g()
+    DIM unbenutzt AS INTEGER
+    PRINT(1)
+END SUB
+g()
+
+--- verzeichnis sub
+--- datei sub/c.dh
+PRINT(1)
+PRINT(nirgends)
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 17) = "projekt geprueft " THEN PRINT L[i]
+NEXT
+--- erwartet
+projekt geprueft 1 2 3 6
+pr eintrag b.dh:3: END IF erwartet, Programmende erreicht
+pr eintrag lib.dh:2: 'zz' wird hier gelesen, aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab ("Variable 'zz' nicht deklariert").
+pr eintrag sub/c.dh:2: 'nirgends' wird hier gelesen, aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab ("Variable 'nirgends' nicht deklariert").
+pr titel Projekt: 1 Fehler, 2 Warnungen in 3 von 6 Dateien -- Umschalt+F7 zeigt wieder die Probleme der Datei
+pr offen c.dh zeile 2

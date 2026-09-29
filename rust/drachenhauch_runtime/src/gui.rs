@@ -2609,6 +2609,10 @@ pub struct Widget {
     // Einrueckungslinien (nur TextArea): ein feiner senkrechter Strich je
     // Stufe, unter dem Text.
     einzugslinien: bool,
+    // Mitlaufende Blockkoepfe (nur TextArea): ist die Kopfzeile eines
+    // faltbaren Blocks oben hinausgerollt, der Block aber noch im Bild,
+    // steht sie oben angeheftet -- hoechstens so viele. 0 = aus.
+    kopfzeilen: i32,
     // Bild schwach im Hintergrund (nur TextArea), eingepasst in den
     // Innenbereich; -1 = keins. Deckkraft 0..255.
     hg_bild: i64,
@@ -3789,6 +3793,10 @@ impl Gui {
         }
         let lh = self.ta_line_h(g, wd);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
+        // Im angehefteten Kopf: der Klick meint den Kopf, nicht die Zeile
+        // darunter (die ist verdeckt) -- er springt, siehe edit_textarea.
+        let sicht = ((fh - 2 * pad) / lh).max(1);
+        if my < ay + pad + Self::ta_koepfe(wd, &rows, sicht, wd.scroll).len() as i32 * lh { return None; }
         let row = wd.scroll + (my - ay - pad) / lh;
         if row < 0 || row as usize >= rows.len() { return None; }
         Some(rows[row as usize].0 as i32 + 1)
@@ -3964,10 +3972,14 @@ impl Gui {
             // (GUI_TEXTAREA_TAB_HIT). Fuer Felder, in denen der Tabulator
             // mehrere Bedeutungen hat und der Aufrufer die Reihenfolge kennt.
             "tab_meldet" | "tab_reports" => wd.tab_meldet = n != 0,
+            // Mitlaufende Blockkoepfe, hoechstens n Zeilen. Welche Zeilen
+            // einen Block bilden, sagt GUI_TEXTAREA_FOLDABLE -- dieselben
+            // Bloecke, die sich falten lassen.
+            "kopfzeilen" | "sticky_headers" => wd.kopfzeilen = n.clamp(0, 10) as i32,
             other => return Err(format!(
                 "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, \
                  aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug, \
-                 einzugslinien, tab_meldet", other)),
+                 einzugslinien, tab_meldet, kopfzeilen", other)),
         }
         Ok(())
     }
@@ -4093,7 +4105,7 @@ impl Gui {
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
             farbfelder: Vec::new(), wellen: Vec::new(), hinweise: Vec::new(), hinweise_text: String::new(), hinweise_farbe: -1, farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
             formatiert: false, paare: Vec::new(), teil_von: None, teil_stand: String::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
-            abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false, hg_bild: -1, hg_deckkraft: 0,
+            abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false, kopfzeilen: 0, hg_bild: -1, hg_deckkraft: 0,
             tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
@@ -13495,6 +13507,31 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
     /// Zeile, in der die Schreibmarke steht: die letzte, deren Anfang nicht
     /// hinter ihr liegt -- am Umbruch gehoert die Marke damit zur NEUEN Zeile.
+    /// Die mitlaufenden Blockkoepfe (GUI_TEXTAREA_SET "kopfzeilen"): die
+    /// Kopfzeilen (logisch, ab 0) der faltbaren Bloecke, deren Kopf oben
+    /// hinausgerollt ist, die aber in der ersten Zeile UNTER den Koepfen
+    /// noch weitergehen -- aussen zuerst. Eine Quelle fuer Zeichnen, Klick,
+    /// Nummernspalte und Mitziehen der Marke. Die Koepfe verdecken selbst
+    /// Zeilen, darum wird wiederholt, bis sich die Liste nicht mehr aendert.
+    /// Mindestens eine Zeile Code bleibt frei.
+    fn ta_koepfe(wdg: &Widget, rows: &[(usize, usize, usize)], sicht: i32, scroll: i32) -> Vec<usize> {
+        if wdg.kopfzeilen <= 0 || wdg.faltbar.is_empty() || scroll <= 0 { return Vec::new(); }
+        let n = (wdg.kopfzeilen as usize).min((sicht.max(1) as usize).saturating_sub(1));
+        let mut liste: Vec<usize> = Vec::new();
+        for _ in 0..=n {
+            let ri = scroll as usize + liste.len();
+            let Some(&(li, _, _)) = rows.get(ri) else { break };
+            let oben = li + 1;
+            let mut neu: Vec<usize> = wdg.faltbar.iter()
+                .filter(|&&(v, b)| v < oben && b >= oben && !Self::zeile_verborgen(wdg, v))
+                .map(|&(v, _)| v - 1).collect();
+            neu.truncate(n);
+            if neu == liste { break; }
+            liste = neu;
+        }
+        liste
+    }
+
     fn ta_row_of(rows: &[(usize, usize, usize)], caret: usize) -> usize {
         rows.iter().rposition(|&(_, von, _)| von <= caret).unwrap_or(0)
     }
@@ -13598,6 +13635,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let chars: Vec<char> = wd.text.chars().collect();
         let starts = Self::line_starts(&chars);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
+        // Unter einem angehefteten Blockkopf ist der Text verdeckt.
+        let sicht = ((fh - 2 * pad) / lh.max(1)).max(1);
+        if my < ay + pad + Self::ta_koepfe(wd, &rows, sicht, wd.scroll).len() as i32 * lh { return Ok((0, 0)); }
         let row = wd.scroll + (my - ay - pad) / lh;
         if row < 0 || row as usize >= rows.len() { return Ok((0, 0)); }
         let (rli, lstart, lend) = rows[row as usize];
@@ -13837,6 +13877,24 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if let Some((k, _, _, _)) = treffer {
                     self.windows[wi].widgets[i].farbfeld_klick = k as i32;
                     self.windows[wi].widgets[i].farbfeld_zug = true;
+                    return;
+                }
+            }
+            // Klick auf einen angehefteten Blockkopf springt dorthin -- die
+            // Zeile darunter ist verdeckt, und der Kopf ist, was man sieht.
+            if !self.was_mouse_down && Self::in_rect(mx, my, (ax, ay, fw, fh)) {
+                let sicht = ((fh - 2 * pad) / lh).max(1);
+                let koepfe = Self::ta_koepfe(wref, &rows, sicht, scroll);
+                if !koepfe.is_empty() && my < ay + pad + koepfe.len() as i32 * lh {
+                    let k = ((my - ay - pad).max(0) / lh) as usize;
+                    let li = koepfe[k.min(koepfe.len() - 1)];
+                    let c = starts[li] as i32;
+                    let zrow = Self::ta_row_of(&rows, c as usize) as i32;
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.caret = c; w.sel_anchor = c; w.marken_zusatz.clear();
+                    w.scroll = zrow; w.rad_ziel = None;
+                    w.rad_stand = Some((c, c, chars.len()));
+                    w.farbfeld_zug = true;
                     return;
                 }
             }
@@ -14186,6 +14244,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             self.windows[wi].widgets[i].rad_stand = None;
             if crow < scroll { scroll = crow; }
             if crow >= scroll + view_lines { scroll = crow - view_lines + 1; }
+            // Unter einem angehefteten Kopf waere die Marke unsichtbar --
+            // dann rollt es zurueck, bis sie frei steht (die Koepfe werden
+            // dabei weniger).
+            let wref = &self.windows[wi].widgets[i];
+            while scroll > 0 && crow < scroll + Self::ta_koepfe(wref, &rows2, view_lines, scroll).len() as i32 {
+                scroll -= 1;
+            }
         }
         let max_scroll = (rows2.len() as i32 - view_lines).max(0);
         scroll = scroll.clamp(0, max_scroll);
@@ -14300,6 +14365,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let starts = Self::line_starts(&chars);
         let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
         if rows.is_empty() { return Some(0); }
+        // Unter einem angehefteten Kopf liegt verdeckter Text -- die Maus
+        // zeigt auf den Kopf, nicht auf ihn.
+        let sicht = ((fh - 2 * pad) / lh).max(1);
+        if my < ay + pad + Self::ta_koepfe(wd, &rows, sicht, wd.scroll).len() as i32 * lh { return None; }
         let row = (wd.scroll + ((my - ay - pad).max(0) / lh)).max(0) as usize;
         let (_, lstart, lend) = rows[row.min(rows.len() - 1)];
         let gut = self.ta_gutter(g, wd, starts.len());
@@ -18997,6 +19066,45 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if cy >= ay + 2 && cy + lh <= ay + h
                        && cx >= ax + 2 + self.ta_gutter(g, wdg, starts.len()) {
                         g.line(cx, cy, cx, cy + lh - 2, fg);
+                    }
+                }
+                // Mitlaufende Blockkoepfe, ueber allem: eigener Grund, die
+                // Nummer in der Spalte, der Kopf gefaerbt wie im Text, darunter
+                // eine Kante mit Schatten -- sonst hielte man ihn fuer eine
+                // Zeile, die dort wirklich steht.
+                if wdg.kopfzeilen > 0 && !wdg.faltbar.is_empty() && wdg.scroll > 0 {
+                    let (chars, _) = self.anzeige_mit_vorschau(wdg);
+                    let starts = Self::line_starts(&chars);
+                    let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
+                    let sicht = ((h - 2 * pad) / lh).max(1);
+                    let koepfe = Self::ta_koepfe(wdg, &rows, sicht, scroll);
+                    if !koepfe.is_empty() {
+                        let gutter = self.ta_gutter(g, wdg, starts.len());
+                        let bg = self.wcol(wdg, "bg", "win_bg");
+                        let grund = mischen(bg, fg, 0.07);
+                        let tx0 = ax + pad + gutter - wdg.scroll_x;
+                        for (k, &li) in koepfe.iter().enumerate() {
+                            let y = ay + pad + k as i32 * lh;
+                            let y0 = if k == 0 { ay + 2 } else { y };
+                            g.box_fill(ax + 2, y0, ax + w - 3, y + lh - 1, grund);
+                            if gutter > 0 {
+                                let nr = (li + 1).to_string();
+                                let nx = ax + pad + gutter - self.sk(9) - self.ta_faltbreite(wdg)
+                                         - self.wtext_width(g, wdg, &nr);
+                                self.wtext(g, wdg, nx, y, nr, self.th("muted_fg"));
+                            }
+                            let rs = starts[li];
+                            let re = rows.iter().find(|r| r.1 == rs).map(|r| r.2)
+                                .unwrap_or_else(|| starts.get(li + 1).map(|&n| n.saturating_sub(1)).unwrap_or(chars.len()));
+                            let zeile: String = chars[rs..re.max(rs)].iter().collect();
+                            g.push_clip(ax + 2 + gutter, y0, (w - 4 - gutter).max(0), (y + lh - y0).max(0));
+                            if wdg.spans.is_empty() { self.wtext(g, wdg, tx0, y, zeile, fg); }
+                            else { self.zeile_bunt(g, wdg, tx0, y, &zeile, rs, fg); }
+                            g.pop_clip();
+                        }
+                        let yb = ay + pad + koepfe.len() as i32 * lh - 1;
+                        g.line(ax + 2, yb, ax + w - 3, yb, self.wcol(wdg, "border", "widget_border"));
+                        g.box_fill(ax + 2, yb + 1, ax + w - 3, yb + self.sk(3), 0x28_000000);
                     }
                 }
                 g.pop_clip();

@@ -352,6 +352,9 @@ DIM zuGemacht AS ARRAY OF STRING : zuGemacht = []
 DIM vorschlagAn AS BOOLEAN : vorschlagAn = TRUE
 ' Einrueckungslinien im Code-Feld (ein Strich je Stufe).
 DIM linienAn AS BOOLEAN : linienAn = TRUE
+' Mitlaufender Blockkopf: SUB/IF/FOR, deren Kopf oben hinausgerollt ist,
+' bleiben oben angeheftet (hoechstens drei).
+DIM kopfAn AS BOOLEAN : kopfAn = TRUE
 ' Das Geruest, das beim Tippen mitwaechst: `IF ... THEN` und Enter setzen
 ' das `END IF` gleich mit (GUI_TEXTAREA_CLOSE_WORDS).
 DIM geruestAn AS BOOLEAN : geruestAn = TRUE
@@ -587,6 +590,7 @@ IF JSON_HAS(konfig, "gross_klein") THEN grossKlein = JSON_GET_BOOL(konfig, "gros
 IF JSON_HAS(konfig, "ganzes_wort") THEN ganzesWort = JSON_GET_BOOL(konfig, "ganzes_wort")
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
+IF JSON_HAS(konfig, "blockkopf") THEN kopfAn = JSON_GET_BOOL(konfig, "blockkopf")
 IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
 IF JSON_HAS(konfig, "klammern") THEN klammernAn = JSON_GET_BOOL(konfig, "klammern")
 IF JSON_HAS(konfig, "format_sichern") THEN formatSichernAn = JSON_GET_BOOL(konfig, "format_sichern")
@@ -780,6 +784,7 @@ DIM miStart AS INTEGER : miStart = GUI_MENU_ITEM(mLauf, "Starten", "F5")
 DIM miStopp AS INTEGER : miStopp = GUI_MENU_ITEM(mLauf, "Stoppen", "Umschalt+F5")
 DIM miNeustart AS INTEGER : miNeustart = GUI_MENU_ITEM(mLauf, "Neu starten", "Strg+Umschalt+F5")
 DIM miPruefen AS INTEGER : miPruefen = GUI_MENU_ITEM(mLauf, "Prüfen", "Umschalt+F7")
+DIM miPrjPruefen AS INTEGER : miPrjPruefen = GUI_MENU_ITEM(mLauf, "Ganzes Projekt prüfen", "Strg+Umschalt+F7")
 GUI_MENU_SEPARATOR(mLauf)
 DIM miDebug AS INTEGER : miDebug = GUI_MENU_ITEM(mLauf, "Debuggen", "F7")
 DIM miHaltepunkt AS INTEGER : miHaltepunkt = GUI_MENU_ITEM(mLauf, "Haltepunkt setzen/entfernen", "F9")
@@ -827,6 +832,8 @@ DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, "Zeilenumbruch", 
 GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, "Einrückungslinien")
 GUI_MENU_CHECK(miLinien, linienAn)
+DIM miKopf AS INTEGER : miKopf = GUI_MENU_ITEM(mAnsicht, "Mitlaufender Blockkopf")
+GUI_MENU_CHECK(miKopf, kopfAn)
 DIM miLeiste AS INTEGER : miLeiste = GUI_MENU_ITEM(mAnsicht, "Werkzeugleiste")
 DIM miSeiten AS INTEGER : miSeiten = GUI_MENU_ITEM(mAnsicht, "Seitenleiste", "Alt+1")
 DIM miUnten AS INTEGER : miUnten = GUI_MENU_ITEM(mAnsicht, "Untere Leiste", "Alt+2")
@@ -1635,6 +1642,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "ganzes_wort", ganzesWort)
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
     JSON_SET_BOOL(konfig, "linien", linienAn)
+    JSON_SET_BOOL(konfig, "blockkopf", kopfAn)
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
     JSON_SET_BOOL(konfig, "klammern", klammernAn)
     JSON_SET_BOOL(konfig, "vorspann", vorspannAn)
@@ -2046,6 +2054,7 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
     GUI_TEXTAREA_SET(ta, "tabbreite", 4)
     GUI_TEXTAREA_SET(ta, "umbruch", IIF(umbruchAn, 1, 0))
     GUI_TEXTAREA_SET(ta, "einzugslinien", IIF(linienAn, 1, 0))
+    GUI_TEXTAREA_SET(ta, "kopfzeilen", IIF(kopfAn, 3, 0))
     ' Einrueckung beim Umbruch: die Laufzeit uebernimmt die der laufenden
     ' Zeile, die Woerter der SPRACHE kommen von hier. `THEN` steht in der
     ' Ende-Liste, weil `IF x THEN y = 1` sonst auch einruecken wuerde.
@@ -2126,6 +2135,22 @@ SUB linienSetzen(an AS BOOLEAN)
     NEXT
     GUI_SET_TEXT(lblStatus, IIF(an, "Einrückungslinien an.", "Einrückungslinien aus."))
     protokoll("linien " + IIF(an, "an", "aus"))
+    konfigSichern()
+END SUB
+
+' Mitlaufender Blockkopf, wie die Linien fuer ALLE Reiter (und die
+' geteilte Ansicht). Welche Zeilen Bloecke sind, sagt dieselbe Liste wie
+' fuer die Faltung.
+SUB kopfSetzen(an AS BOOLEAN)
+    kopfAn = an
+    GUI_MENU_CHECK(miKopf, an)
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        GUI_TEXTAREA_SET(tabFelder[i], "kopfzeilen", IIF(an, 3, 0))
+    NEXT
+    IF taSpiegel >= 0 THEN GUI_TEXTAREA_SET(taSpiegel, "kopfzeilen", IIF(an, 3, 0))
+    GUI_SET_TEXT(lblStatus, IIF(an, "Mitlaufender Blockkopf an.", "Mitlaufender Blockkopf aus."))
+    protokoll("blockkopf " + IIF(an, "an", "aus"))
     konfigSichern()
 END SUB
 
@@ -3957,6 +3982,150 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     IF zweitens <> "" THEN was = gesucht + "/" + zweitens
     GUI_SET_TEXT(lblProbleme, "Suche '" + was + "': " + STR$(treffer) + " Treffer in " + STR$(inDateien) + " Dateien -- Umschalt+F7 zeigt wieder die Probleme")
     protokoll("suche " + STR$(treffer))
+END SUB
+
+' --- Ganzes Projekt pruefen --------------------------------------------
+' Die Fehlerliste kennt nur die Datei im Reiter. Hier jede .dh des Projekts
+' (samt Unterordnern, mit den Haken im Baum), offene Reiter mit dem Stand im
+' Editor. In Schritten wie ein Umbau -- bei zweihundert Dateien stuende die
+' IDE sonst Sekunden lang; ESC bricht ab, was schon da ist, bleibt stehen.
+'
+' Ein Fehler in einer importierten Datei meldet jede Datei, die sie
+' importiert ("in lib.dh:2 -> ..."). Er steht EINMAL in der Liste, an seiner
+' eigenen Stelle: der Schluessel ist (kanonischer Pfad, Zeile, Meldung).
+' Hinweise (unbenutzte Variablen) zaehlen nicht, wie in der Fehlerliste.
+CONST PRUEF_PRO_BILD = 8
+DIM prjAktiv AS BOOLEAN : prjAktiv = FALSE
+DIM prjDateien AS ARRAY OF STRING : prjDateien = []
+DIM prjIndex AS INTEGER : prjIndex = 0
+DIM prjFehler AS INTEGER : prjFehler = 0
+DIM prjWarn AS INTEGER : prjWarn = 0
+DIM prjGesehen AS MAP OF BOOLEAN
+DIM prjMitBefund AS MAP OF BOOLEAN
+
+SUB projektPruefenStarten()
+    prjDateien = projektDateien("*.dh")
+    IF LEN(prjDateien) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Projekt prüfen: keine .dh-Datei im Projekt.")
+        protokoll("projekt geprueft 0 0 0 0")
+        RETURN
+    END IF
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    sucheDateien = []
+    sucheZeilen = []
+    problemModus = 1
+    prjIndex = 0 : prjFehler = 0 : prjWarn = 0
+    prjGesehen = {}
+    prjMitBefund = {}
+    prjAktiv = TRUE
+    GUI_SET_TEXT(lblProbleme, "Projekt wird geprüft ...")
+    GUI_SET_TEXT(lblStatus, "Prüfe ... 0 von " + STR$(LEN(prjDateien)) + " Dateien (ESC bricht ab)")
+END SUB
+
+SUB projektPruefenAbbrechen()
+    prjAktiv = FALSE
+    projektPruefenBilanz(TRUE)
+END SUB
+
+' Eine Meldung in die Liste -- `d` relativ zum Projekt, wie in der Suche.
+SUB projektBefund(d AS STRING, zeile AS INTEGER, meldung AS STRING, art AS STRING)
+    DIM schluessel AS STRING : schluessel = LOWER$(wegGleich$(PATHJOIN(projektOrdner, d)))
+    TRY
+        schluessel = LOWER$(wegGleich$(REALPATH$(PATHJOIN(projektOrdner, d))))
+    CATCH e
+    END TRY
+    schluessel = schluessel + "|" + STR$(zeile) + "|" + meldung
+    IF MAPHAS(prjGesehen, schluessel) THEN RETURN
+    MAPPUT(prjGesehen, schluessel, TRUE)
+    MAPPUT(prjMitBefund, d, TRUE)
+    ARRAY_PUSH(sucheDateien, d)
+    ARRAY_PUSH(sucheZeilen, zeile)
+    GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(zeile) + ": " + meldung)
+    IF art = "fehler" THEN
+        GUI_LISTBOX_COLOR(lstProbleme, LEN(sucheZeilen) - 1, &HE06060)
+        prjFehler = prjFehler + 1
+    ELSE
+        GUI_LISTBOX_COLOR(lstProbleme, LEN(sucheZeilen) - 1, &HE0C060)
+        prjWarn = prjWarn + 1
+    END IF
+END SUB
+
+SUB projektPruefenSchritt()
+    IF NOT prjAktiv THEN RETURN
+    DIM bis AS INTEGER : bis = MIN(prjIndex + PRUEF_PRO_BILD, LEN(prjDateien))
+    DIM i AS INTEGER
+    FOR i = prjIndex TO bis - 1
+        DIM d AS STRING : d = prjDateien[i]
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM t AS INTEGER : t = tabMitPfad(pfad)
+        DIM quelle AS STRING : quelle = ""
+        IF t >= 0 THEN
+            quelle = GUI_TEXT(tabFelder[t])
+        ELSE
+            TRY
+                quelle = dateiLesen(pfad)
+            CATCH e
+                CONTINUE
+            END TRY
+        END IF
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CHECK$(quelle, DIRNAME(pfad)))
+        DIM n AS INTEGER : n = JSON_LEN(j, "")
+        DIM k AS INTEGER
+        FOR k = 0 TO n - 1
+            DIM p AS STRING : p = STR$(k)
+            DIM art AS STRING : art = JSON_GET_STRING(j, p + ".schwere")
+            IF art = "hinweis" THEN CONTINUE
+            DIM m AS STRING : m = JSON_GET_STRING(j, p + ".meldung")
+            DIM zeile AS INTEGER : zeile = JSON_GET_INT(j, p + ".zeile")
+            DIM wo AS STRING : wo = d
+            ' "in lib.dh:2 -> Meldung": an die Stelle in der importierten Datei.
+            DIM pf AS INTEGER : pf = INSTR(m, " -> ")
+            IF LEFT$(m, 3) = "in " AND pf > 3 THEN
+                DIM ort AS STRING : ort = MID$(m, 3, pf - 3)
+                DIM dp AS INTEGER : dp = -1
+                DIM q AS INTEGER
+                FOR q = LEN(ort) - 1 TO 0 STEP -1
+                    IF MID$(ort, q, 1) = ":" THEN dp = q : BREAK
+                NEXT
+                IF dp > 0 AND VAL(MID$(ort, dp + 1, 10)) > 0 THEN
+                    DIM rel AS STRING : rel = MID$(ort, 0, dp)
+                    IF DIRNAME(d) <> "" AND DIRNAME(d) <> "." THEN rel = PATHJOIN(DIRNAME(d), rel)
+                    wo = rel
+                    zeile = VAL(MID$(ort, dp + 1, 10))
+                    m = MID$(m, pf + 4, LEN(m))
+                END IF
+            END IF
+            projektBefund(wo, zeile, m, art)
+        NEXT
+    NEXT
+    prjIndex = bis
+    IF prjIndex < LEN(prjDateien) THEN
+        GUI_SET_TEXT(lblStatus, "Prüfe ... " + STR$(prjIndex) + " von " + STR$(LEN(prjDateien)) + _
+                     " Dateien (ESC bricht ab)")
+        RETURN
+    END IF
+    prjAktiv = FALSE
+    projektPruefenBilanz(FALSE)
+END SUB
+
+SUB projektPruefenBilanz(abgebrochen AS BOOLEAN)
+    DIM betroffen AS INTEGER : betroffen = 0
+    DIM kk AS STRING
+    FOR EACH kk IN prjMitBefund
+        betroffen = betroffen + 1
+    NEXT
+    DIM was AS STRING
+    IF prjFehler + prjWarn = 0 THEN
+        was = "Projekt: keine Probleme in " + STR$(prjIndex) + " Dateien"
+    ELSE
+        was = "Projekt: " + STR$(prjFehler) + " Fehler, " + STR$(prjWarn) + " Warnungen in " + _
+              STR$(betroffen) + " von " + STR$(prjIndex) + " Dateien"
+    END IF
+    IF abgebrochen THEN was = was + " (abgebrochen)"
+    GUI_SET_TEXT(lblProbleme, was + " -- Umschalt+F7 zeigt wieder die Probleme der Datei")
+    GUI_SET_TEXT(lblStatus, was + ".")
+    protokoll("projekt geprueft " + STR$(prjFehler) + " " + STR$(prjWarn) + " " + STR$(betroffen) + " " + _
+              STR$(prjIndex) + IIF(abgebrochen, " abgebrochen", ""))
 END SUB
 
 ' --- Alle Fundstellen eines Namens ------------------------------------
@@ -10647,6 +10816,7 @@ paletteEintrag("Ersetzen und weiter", "ersetzen_eins", "Strg+Umschalt+1")
 paletteEintrag("Alle ersetzen", "ersetzen_alle", "Strg+Alt+Enter")
 paletteEintrag("Geschlossenen Reiter wieder öffnen", "wiederauf", "Strg+Umschalt+T")
 paletteEintrag("Starten", "start", "F5") : paletteEintrag("Stoppen", "stopp", "Umschalt+F5") : paletteEintrag("Neu starten", "neustart", "Strg+Umschalt+F5") : paletteEintrag("Prüfen", "pruefen", "Umschalt+F7")
+paletteEintrag("Ganzes Projekt prüfen", "projekt_pruefen", "Strg+Umschalt+F7")
 paletteEintrag("Debuggen", "debug", "F7") : paletteEintrag("Haltepunkt setzen/entfernen", "haltepunkt", "F9")
 paletteEintrag("Bedingter Haltepunkt ...", "bedingung", "Umschalt+F9")
 paletteEintrag("Alle Haltepunkte", "hp_liste", "Strg+Umschalt+F9") : paletteEintrag("Anhalten", "anhalten", "F6") : paletteEintrag("Weiter", "weiter_d", "F8") : paletteEintrag("Schritt drüber", "drueber", "F10")
@@ -10690,6 +10860,7 @@ paletteEintrag("Doppelte Zeilen entfernen", "zl_doppelte", "")
 paletteEintrag("Leerraum am Zeilenende entfernen", "zl_rand", "")
 paletteEintrag("Andere Reiter schließen", "andere_zu", "Strg+Umschalt+W")
 paletteEintrag("Einrückungslinien", "linien", "")
+paletteEintrag("Mitlaufender Blockkopf", "blockkopf", "")
 paletteEintrag("Werkzeugleiste", "leiste", "")
 paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
 paletteEintrag("Gewählte Dateien öffnen", "baum_oeffnen", "Strg+Umschalt+E")
@@ -11167,6 +11338,7 @@ SUB befehl(k AS STRING)
             protokoll("format sichern " + IIF(formatSichernAn, "an", "aus"))
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
+        CASE "blockkopf" : kopfSetzen(NOT kopfAn)
         CASE "leiste"
             leisteAn = NOT leisteAn
             GUI_MENU_CHECK(miLeiste, leisteAn)
@@ -11198,6 +11370,7 @@ SUB befehl(k AS STRING)
         CASE "stopp" : stoppen()
         CASE "neustart" : neuStarten()
         CASE "pruefen" : problemModus = 0 : pruefen()
+        CASE "projekt_pruefen" : projektPruefenStarten()
         CASE "debug" : debuggen()
         CASE "haltepunkt" : haltepunktUmschalten()
         CASE "weiter_d" : debugSchritt("continue")
@@ -11464,6 +11637,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miZlRand) THEN befehl("zl_rand")
     IF GUI_CLICKED(miAndereZu) THEN befehl("andere_zu")
     IF GUI_CLICKED(miLinien) THEN befehl("linien")
+    IF GUI_CLICKED(miKopf) THEN befehl("blockkopf")
     IF GUI_CLICKED(miLeiste) THEN befehl("leiste")
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
     DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
@@ -11513,6 +11687,9 @@ WHILE NOT beenden
     IF laufArt <> "" THEN
         IF KEYHIT(KEY_ESCAPE) THEN laufAbbrechen() ELSE laufSchritt()
     END IF
+    IF prjAktiv THEN
+        IF KEYHIT(KEY_ESCAPE) THEN projektPruefenAbbrechen() ELSE projektPruefenSchritt()
+    END IF
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miHakenWeg) THEN befehl("haken_weg")
     IF GUI_CLICKED(miBaumHaken) THEN befehl("baum_haken")
@@ -11521,6 +11698,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miStart) THEN befehl("start")
     IF GUI_CLICKED(miStopp) THEN befehl("stopp")
     IF GUI_CLICKED(miPruefen) THEN befehl("pruefen")
+    IF GUI_CLICKED(miPrjPruefen) THEN befehl("projekt_pruefen")
     IF GUI_CLICKED(miDebug) THEN befehl("debug")
     IF GUI_CLICKED(miHaltepunkt) THEN befehl("haltepunkt")
     IF GUI_CLICKED(miWeiterD) OR GUI_CLICKED(btnWeiter) THEN befehl("weiter_d")

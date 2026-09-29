@@ -1,0 +1,136 @@
+' Hilfen fuer gui_blockkopf.dhtest: ein Code-Feld mit zwei verschachtelten
+' Bloecken (SUB 1..29, FOR 2..21) und 50 Zeilen, dazu Abfragen, die die
+' Lagen mit GUI_TEXTAREA_POS_AT suchen statt sie festzuschreiben.
+IMPORT "gui"
+IMPORT "imgfx"
+SCREEN(500, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("dark")
+DIM bkWin AS GUI_WINDOW : bkWin = GUI_WINDOW("T", 0, 0, 500, 300)
+GUI_WINDOW_CHROME(bkWin, FALSE)
+DIM bkTa AS GUI_WIDGET : bkTa = GUI_TEXTAREA(bkWin, 0, 0, 480, 240)
+DIM bkX AS INTEGER : bkX = -1
+DIM bkY[8] AS INTEGER
+
+SUB bkBilder(n AS INTEGER)
+    DIM f AS INTEGER
+    FOR f = 1 TO n
+        GUI_UPDATE() : CLS(BLACK) : GUI_DRAW() : FLIP()
+    NEXT
+END SUB
+
+SUB bkBauen()
+    GUI_TEXTAREA_SET(bkTa, "zeilennummern", 1)
+    DIM t AS STRING : t = "SUB a()" + CHR$(10) + "    FOR i = 1 TO 3"
+    DIM k AS INTEGER
+    FOR k = 3 TO 20
+        t = t + CHR$(10) + "        x = x + " + STR$(k)
+    NEXT
+    t = t + CHR$(10) + "    NEXT"
+    FOR k = 22 TO 28
+        t = t + CHR$(10) + "    y = " + STR$(k)
+    NEXT
+    t = t + CHR$(10) + "END SUB"
+    FOR k = 30 TO 50
+        t = t + CHR$(10) + "PRINT " + STR$(k)
+    NEXT
+    GUI_SET_TEXT(bkTa, t)
+    GUI_TEXTAREA_FOLDABLE(bkTa, [1, 2], [29, 21])
+    bkBilder(2)
+    ' Das x des ersten Zeichens und das y der ersten Zeilen, bei Zeile 1 oben.
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = 0 TO 239
+        FOR x = 0 TO 200
+            (z, s) = GUI_TEXTAREA_POS_AT(bkTa, x, y)
+            IF z >= 1 AND z <= 7 AND bkY[z] = 0 THEN bkY[z] = y + 4
+            IF s = 1 AND (bkX < 0 OR x < bkX) THEN bkX = x
+        NEXT
+    NEXT
+    bkX = bkX + 2
+END SUB
+
+' Die ersten vier Zeilen, die die Maus von oben nach unten trifft (0 =
+' kein Text), bei Zeile `oben` oben und `n` Koepfen.
+FUNCTION bkZeilen(oben AS INTEGER, n AS INTEGER) AS STRING
+    GUI_TEXTAREA_SET(bkTa, "kopfzeilen", n)
+    GUI_TEXTAREA_SCROLL(bkTa, oben)
+    bkBilder(2)
+    DIM r AS STRING : r = ""
+    DIM k AS INTEGER
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    FOR k = 1 TO 4
+        (z, s) = GUI_TEXTAREA_POS_AT(bkTa, bkX, bkY[k])
+        r = r + IIF(k > 1, " ", "") + STR$(z)
+    NEXT
+    RETURN r
+END FUNCTION
+
+FUNCTION bkOhneBloecke(oben AS INTEGER) AS STRING
+    GUI_TEXTAREA_FOLDABLE(bkTa, [], [])
+    RETURN bkZeilen(oben, 3)
+END FUNCTION
+
+' Klick in die Zeile `reihe` (ab 1) bei Zeile `oben` oben: wo steht die
+' Marke, welche Zeile ist danach oben?
+FUNCTION bkKlick(oben AS INTEGER, n AS INTEGER, reihe AS INTEGER) AS STRING
+    GUI_TEXTAREA_SET(bkTa, "kopfzeilen", n)
+    GUI_TEXTAREA_SCROLL(bkTa, oben)
+    bkBilder(2)
+    DIM a AS STRING : a = "c 4" + CHR$(10)
+    a = a + "e 0 7 " + STR$(bkX) + " " + STR$(bkY[reihe + 1]) + " 0" + CHR$(10)
+    a = a + "e 2 6 0 0 0" + CHR$(10) + "e 4 5 0 0 0" + CHR$(10)
+    a = a + "e 6 7 " + STR$(bkX) + " " + STR$(bkY[reihe + 1]) + " 0" + CHR$(10)
+    WRITEALL("ev.txt", a + CHR$(10))
+    AUTOMATION_PLAY("ev.txt")
+    bkBilder(20)
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(bkTa)
+    DIM e AS INTEGER
+    DIM v AS INTEGER
+    DIM st AS INTEGER
+    DIM l AS INTEGER
+    (e, v, st, l) = GUI_TEXTAREA_VIEW(bkTa)
+    RETURN "marke " + STR$(z) + " oben " + STR$(e + 1)
+END FUNCTION
+
+' Die Marke steht in Zeile `zeile`, Zeile `oben` oben (die Marke also
+' womoeglich unter einem Kopf, GUI_TEXTAREA_SCROLL bewegt sie nicht); dann
+' Pfeil hoch. Welche Zeile ist danach oben?
+FUNCTION bkMarke(oben AS INTEGER, zeile AS INTEGER, n AS INTEGER) AS INTEGER
+    GUI_TEXTAREA_SET(bkTa, "kopfzeilen", n)
+    GUI_TEXTAREA_SELECT(bkTa, zeile, 1, zeile, 1)
+    bkBilder(2)
+    GUI_TEXTAREA_SCROLL(bkTa, oben)
+    bkBilder(2)
+    WRITEALL("ev.txt", "c 2" + CHR$(10) + "e 0 2 265 0 0" + CHR$(10) + "e 3 1 265 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("ev.txt")
+    bkBilder(10)
+    DIM e AS INTEGER
+    DIM v AS INTEGER
+    DIM st AS INTEGER
+    DIM l AS INTEGER
+    (e, v, st, l) = GUI_TEXTAREA_VIEW(bkTa)
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(bkTa)
+    RETURN (z * 100) + e + 1
+END FUNCTION
+
+' Weicht der Grund rechts in der ersten Reihe von dem in der vierten ab?
+FUNCTION bkGrundAnders(oben AS INTEGER, n AS INTEGER) AS BOOLEAN
+    GUI_TEXTAREA_SET(bkTa, "kopfzeilen", n)
+    GUI_TEXTAREA_SCROLL(bkTa, oben)
+    bkBilder(2)
+    SAVESCREENSHOT("bild.png")
+    DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+    DIM c1 AS INTEGER : c1 = GETPIXEL(b, 440, bkY[1])
+    DIM c4 AS INTEGER : c4 = GETPIXEL(b, 440, bkY[4])
+    IMAGE_FREE(b)
+    DELETEFILE("bild.png")
+    RETURN c1 <> c4
+END FUNCTION
