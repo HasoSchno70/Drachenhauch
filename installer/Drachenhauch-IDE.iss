@@ -78,6 +78,8 @@ Source: "..\daten\bilder\*.png"; DestDir: "{app}\daten\bilder"; Flags: ignorever
 Source: "..\daten\video\*.mp4"; DestDir: "{app}\daten\video"; Flags: ignoreversion
 ; Die IDE selbst -- Quelltext, den der Nutzer lesen und aendern kann.
 Source: "..\ide\*.dh"; DestDir: "{app}\ide"; Flags: ignoreversion
+; Die englische Oberflaeche der IDE (Ansicht -> Language).
+Source: "..\ide\sprache\*.txt"; DestDir: "{app}\ide\sprache"; Flags: ignoreversion
 ; Das Handbuch: die IDE liest docs\ neben ide\ (F1 schlaegt dort nach).
 Source: "..\docs\*.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 ; Beispiele und Begleit-Editoren in die oeffentlichen Dokumente -- dort sind

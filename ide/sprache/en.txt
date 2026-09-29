@@ -1,0 +1,757 @@
+# Englische Oberflaeche der IDE: je Zeile der deutsche Text, ein Tabulator,
+# der englische. Leerzeichen am Anfang und Ende gehoeren dazu (Textstuecke
+# werden zusammengesetzt). Neue Texte in ide.dh: tr$("...") und hier eine Zeile;
+# tests/pruef/werkzeug_ide_englisch.dhtest meldet, was fehlt. Zeilen ohne
+# Tabulator (wie diese) sind Kommentare.
+Schreibmarke auf einen Befehl oder Namen stellen -- hier steht dann, was er tut und wie er aufgerufen wird.	Put the cursor on a command or name -- this shows what it does and how it is called.
+Drachenhauch	Drachenhauch
+Datei	File
+Neu	New
+Neues Projekt aus Vorlage ...	New project from template ...
+Öffnen ...	Open ...
+Datei im Projekt öffnen ...	Open file in project ...
+Gewählte Dateien öffnen	Open selected files
+Kästchen im Projektbaum zeigen	Show checkboxes in project tree
+Haken im Projektbaum entfernen	Clear checks in project tree
+Zuletzt geöffnet	Recently opened
+-	-
+Sichern	Save
+Sichern unter ...	Save as ...
+Listing drucken	Print listing
+Listing als PDF neben die Quelle	Listing as PDF next to the source
+Reiter schließen	Close tab
+Andere Reiter schließen	Close other tabs
+Geschlossenen Reiter wieder öffnen	Reopen closed tab
+Beenden	Quit
+Bearbeiten	Edit
+Suchen ...	Find ...
+Weitersuchen	Find next
+Rückwärts suchen	Find previous
+Ersetzen ...	Replace ...
+Ersetzen und weiter	Replace and next
+Alle ersetzen	Replace all
+Gehe zu Zeile ...	Go to line ...
+Im Projekt suchen ...	Find in project ...
+Vervollständigen	Complete
+Zur Definition	Go to definition
+Umbenennen ...	Rename ...
+Schnellkorrektur ...	Quick fix ...
+Schnipsel einfügen ...	Insert snippet ...
+Eigene Schnipsel bearbeiten	Edit own snippets
+Auswahl als Schnipsel sichern ...	Save selection as snippet ...
+Marke auf jede Fundstelle des Wortes	Cursor on every occurrence of the word
+Marke auf die nächste Fundstelle	Cursor on the next occurrence
+Marke an jedes Zeilenende der Auswahl	Cursor at every line end of the selection
+Auswahl in ein Unterprogramm herauslösen ...	Extract selection into a subroutine ...
+Auswahl als Variable einführen ...	Introduce selection as variable ...
+Variable einsetzen	Inline variable
+SUB in FUNCTION umwandeln	Convert SUB to FUNCTION
+Konflikt unter der Marke	Conflict at the cursor
+Meine Fassung nehmen	Take mine
+Ihre Fassung nehmen	Take theirs
+Beide nehmen	Take both
+Auswahl erweitern	Expand selection
+Auswahl verkleinern	Shrink selection
+Im ganzen Projekt umbenennen ...	Rename in whole project ...
+Parameter umsortieren ...	Reorder parameters ...
+Wer ruft das auf?	Who calls this?
+Alle Fundstellen im Projekt	All occurrences in project
+Unterprogramm verschieben ...	Move subroutine ...
+Letzten Umbau zurücknehmen	Undo last refactoring
+Zurückgenommenen Umbau wiederholen	Redo undone refactoring
+Letzten Umbau nachbessern	Revise last refactoring
+Zeilen	Lines
+Sortieren	Sort
+Doppelte entfernen	Remove duplicates
+Leerraum am Zeilenende entfernen	Remove trailing whitespace
+Im ganzen Projekt ersetzen ...	Replace in whole project ...
+Ausgabe durchsuchen ...	Search output ...
+Befehlspalette ...	Command palette ...
+Definition hier zeigen	Peek definition
+Symbol im Projekt suchen ...	Find symbol in project ...
+Einstellungen ...	Settings ...
+Kommentar umschalten	Toggle comment
+Zeile duplizieren	Duplicate line
+Zeile löschen	Delete line
+Zeilen nach oben	Move lines up
+Zeilen nach unten	Move lines down
+Einrücken	Indent
+Ausrücken	Outdent
+Dokument formatieren	Format document
+Lesezeichen setzen/entfernen	Toggle bookmark
+Nächstes Lesezeichen	Next bookmark
+Voriges Lesezeichen	Previous bookmark
+Alle Lesezeichen	All bookmarks
+Suchen mit regulärem Ausdruck	Search with regular expression
+Suchen: Groß/klein beachten	Search: match case
+Suchen: nur ganze Wörter	Search: whole words only
+TODO / FIXME im Projekt	TODO / FIXME in project
+Wer hat das geschrieben (git blame)	Who wrote this (git blame)
+Was habe ich geändert (git diff)	What did I change (git diff)
+Mit einer anderen Datei vergleichen ...	Compare with another file ...
+Zwei Reiter nebeneinander vergleichen	Compare two tabs side by side
+Verlauf dieser Datei (git log)	History of this file (git log)
+Quellcodeverwaltung (git) ...	Source control (git) ...
+Ausführen	Run
+Starten	Start
+Stoppen	Stop
+Neu starten	Restart
+Prüfen	Check
+Ganzes Projekt prüfen	Check whole project
+Prüfsammlung ausführen	Run test collection
+Diesen Prüffall ausführen	Run this test case
+Prüfsammlungen im Überblick ...	Test collections overview ...
+Debuggen	Debug
+Haltepunkt setzen/entfernen	Toggle breakpoint
+Bedingter Haltepunkt ...	Conditional breakpoint ...
+Alle Haltepunkte ...	All breakpoints ...
+Weiter	Continue
+Anhalten	Pause
+Schritt drüber	Step over
+Schritt hinein	Step into
+Schritt heraus	Step out
+Bis zur Marke laufen	Run to cursor
+Profil aufnehmen	Record profile
+Ausgabe leeren	Clear output
+Als eigenständiges Programm exportieren	Export as standalone program
+Werkzeuge	Tools
+SFX-Generator	SFX generator
+Partikel-Editor	Particle editor
+Tilemap-Editor	Tilemap editor
+Sprite-Editor	Sprite editor
+Tracker	Tracker
+Form-Designer	Form designer
+Anim-FSM-Editor	Anim FSM editor
+Notenblatt	Score editor
+Beispiele als Projekt öffnen	Open examples as project
+Beispiele nach Themen ...	Examples by topic ...
+Ausdruck im Debugger auswerten	Evaluate expression in debugger
+Ansicht	View
+Helles Thema	Light theme
+Vollbild	Full screen
+Geteilte Ansicht	Split view
+Dieselbe Datei nebeneinander	Same file side by side
+Übersichtskarte	Minimap
+Geänderte Zeilen am Rand	Changed lines in the margin
+Zeilenumbruch	Word wrap
+Einrückungslinien	Indent guides
+Mitlaufender Blockkopf	Sticky block header
+Profil im Code (nach Strg+Umschalt+Y)	Profile in code (after Ctrl+Shift+Y)
+Aufrufzähler über Unterprogrammen	Call counts above subroutines
+Live-Vorschau	Live preview
+Wer hat diese Zeile geschrieben (am Zeilenende)	Who wrote this line (at line end)
+Werkzeugleiste	Toolbar
+Seitenleiste	Side bar
+Untere Leiste	Bottom panel
+Terminal	Terminal
+Block zuklappen/aufklappen	Fold/unfold block
+Alles zuklappen	Fold all
+Alles aufklappen	Unfold all
+Schrift größer	Larger font
+Schrift kleiner	Smaller font
+Schrift normal	Normal font
+Hilfe	Help
+Handbuch (Wort unter der Marke)	Manual (word at cursor)
+Tastenkürzel	Keyboard shortcuts
+Tastenkürzel ändern ...	Change keyboard shortcuts ...
+Tastenkürzel zurücksetzen	Reset keyboard shortcuts
+Eingebaute Befehle nachschlagen ...	Look up built-in commands ...
+Über ...	About ...
+Showcase -- ein Klick öffnet das Beispiel	Showcase -- a click opens the example
+Projekt	Project
+Filter ...	Filter ...
+Nur Dateien, deren Name das enthält	Only files whose name contains this
+Gliederung	Outline
+Keine Unterprogramme	No subroutines
+Drachenhauch 	Drachenhauch 
+BASIC für Spiele -- mit Pascal-strikter Typisierung und OOP. Diese IDE ist selbst in Drachenhauch geschrieben.	BASIC for games -- with Pascal-strict typing and OOP. This IDE is itself written in Drachenhauch.
+Neue Datei	New file
+Datei öffnen ...	Open file ...
+Beispiele als Projekt	Examples as project
+Beispiele nach Themen	Examples by topic
+Zuletzt geöffnet -- Doppelklick öffnet	Recently opened -- double-click opens
+F5 startet das Programm, F7 debuggt es, Umschalt+F7 prüft. F1 schlägt das Wort unter der Marke im Handbuch nach, Strg+Umschalt+P öffnet die Befehlspalette, Strg+Umschalt+O eine Datei des Projekts. Alle Kürzel: Hilfe -> Tastenkürzel (Strg+F1).	F5 runs the program, F7 debugs it, Shift+F7 checks it. F1 looks up the word at the cursor in the manual, Ctrl+Shift+P opens the command palette, Ctrl+Shift+O a file of the project. All shortcuts: Help -> Keyboard shortcuts (Ctrl+F1).
+Klicken oder ziehen: dorthin rollen	Click or drag: scroll there
+Befehl unten eingeben, Enter führt ihn aus -- cd, dir/ls, git, dhrt ...	Type a command below, Enter runs it -- cd, dir/ls, git, dhrt ...
+Ausgabe	Output
+Terminal (Alt+3)	Terminal (Alt+3)
+Abbrechen	Cancel
+Probleme	Problems
+Keine Probleme gefunden	No problems found
+Hilfe zum Wort unter der Schreibmarke	Help for the word at the cursor
+Bereit.	Ready.
+Zeile 1, Spalte 1	Line 1, column 1
+Gehe zu Zeile (Strg+G)	Go to line (Ctrl+G)
+Umbruch aus	Wrap off
+Zeilenumbruch an/aus (Alt+Z)	Word wrap on/off (Alt+Z)
+Eingabe für das laufende Programm -- Enter schickt	Input for the running program -- Enter sends
+Senden	Send
+Weiter (F8)	Continue (F8)
+Drüber (F10)	Over (F10)
+Hinein (F11)	Into (F11)
+Heraus	Out
+Stopp	Stop
+Name	Name
+Typ	Type
+Wert	Value
+Bereich	Scope
+Doppelklick setzt einen neuen Wert -- das Dreieck klappt Felder und Objekte auf	Double-click sets a new value -- the triangle expands arrays and objects
+Bis Marke	To cursor
+Bis zur Zeile mit der Schreibmarke laufen (Strg+F10)	Run to the line with the cursor (Ctrl+F10)
+Aufrufstapel	Call stack
+Zeile	Line
+Überwachen	Watch
+Ausdruck, Enter ...	Expression, Enter ...
+Entfernen	Remove
+Profil	Profile
+Anzahl	Count
+Anteil	Share
+Quelltext	Source
+Nach Funktionen	By function
+Haltepunkte	Breakpoints
+Keine Haltepunkte -- F9 oder ein Klick in die Nummernspalte setzt einen.	No breakpoints -- F9 or a click in the line number column sets one.
+Springen	Jump
+Bedingung ...	Condition ...
+Alle an	All on
+Alle aus	All off
+Alle entfernen	Remove all
+Trefferzahl ...	Hit count ...
+5 = ab dem 5. Mal, =5 = genau beim 5. Mal, %5 = jedes 5. Mal; leer = immer	5 = from the 5th time, =5 = exactly the 5th time, %5 = every 5th time; empty = always
+Protokollpunkt ...	Logpoint ...
+Statt anzuhalten eine Zeile in die Ausgabe schreiben, z. B. i = {i}; leer = wieder anhalten	Write a line to the output instead of pausing, e.g. i = {i}; empty = pause again
+Handbuch	Manual
+Zurück zur vorigen Stelle (Alt+Links)	Back to the previous place (Alt+Left)
+Vorwärts (Alt+Rechts)	Forward (Alt+Right)
+Im Dokument suchen -- Enter: nächste Fundstelle	Search in document -- Enter: next match
+Vorige	Previous
+Nächste	Next
+In allen	In all
+Vorige Fundstelle (Umschalt+Enter)	Previous match (Shift+Enter)
+Nächste Fundstelle (Enter)	Next match (Enter)
+In allen Dokumenten des Handbuchs suchen -- die Treffer stehen links	Search all documents of the manual -- the matches are listed on the left
+Keine Überschriften	No headings
+Inhalt -- ein Klick springt zum Abschnitt	Contents -- a click jumps to the section
+Zwischen gesetzter Ansicht und Markdown-Quelltext wechseln	Switch between rendered view and Markdown source
+Einstellungen	Settings
+Suche mit regulärem Ausdruck	Search with regular expression
+Vorschlagsliste beim Tippen	Suggestions while typing
+Gerüst beim Tippen (END IF, NEXT ...)	Scaffold while typing (END IF, NEXT ...)
+Vorschau vor dem Umbau	Preview before refactoring
+Klammern und Anführungszeichen schließen	Close brackets and quotes
+Beim Sichern formatieren	Format on save
+Vorspann beim Start	Intro at start
+Lichtstreif beim Start und beim Starten	Light sweep at start and when running
+Welcher Vorspann	Which intro
+Ansehen	Watch
+Den gewählten Vorspann jetzt abspielen (eine Taste oder ein Klick bricht ab)	Play the chosen intro now (a key or a click stops it)
+Kästchen im Projektbaum (Suche/Umbau begrenzen)	Checkboxes in project tree (limit search/refactoring)
+Schriftzug schwach hinter dem Code	Faint logo behind the code
+Schrift der Oberfläche	Interface font
+Schriftgröße	Font size
+Schrift der Listen	List font
+Schrift des Handbuchs	Manual font
+Sichern nach ... s Ruhe (0 = nie)	Save after ... s idle (0 = never)
+Schließen	Close
+Filter: Wort aus der Beschreibung ...	Filter: word from the description ...
+Kein Beispiel passt.	No example matches.
+Öffnen	Open
+Öffnen und starten	Open and run
+Eingebaute Befehle	Built-in commands
+In den Code einfügen	Insert into code
+Definition	Definition
+Dorthin springen	Jump there
+Farbe	Colour
+Übernehmen	Apply
+Quellcodeverwaltung	Source control
+Wechseln	Switch
+Neu ...	New ...
+Die Zweige des Repositorys; [Wechseln] geht auf den gewählten	The branches of the repository; [Switch] checks out the chosen one
+Keine Änderungen.	No changes.
+Nachricht für die Übergabe	Commit message
+Übergeben	Commit
+Änderung verwerfen	Discard change
+Aktualisieren	Refresh
+Holen (pull)	Pull
+Beiseitelegen	Stash
+Zurückholen	Unstash
+Alle Änderungen beiseitelegen (git stash), der Stand ist danach wie bei der letzten Übergabe	Put all changes aside (git stash); afterwards the state is that of the last commit
+Das zuletzt Beiseitegelegte zurückholen (git stash pop)	Bring back what was last put aside (git stash pop)
+Senden (push)	Push
+Kästchen: für die nächste Übergabe vormerken (git add) oder zurücknehmen	Checkbox: stage for the next commit (git add) or unstage
+Prüfsammlungen	Test collections
+Keine .dhtest-Datei im Projekt.	No .dhtest file in the project.
+Alle ausführen	Run all
+Auswahl ausführen	Run selection
+Fehlgeschlagene	Failed ones
+Neu einlesen	Reload
+Doppelklick öffnet den Fall; grün bestanden, rot fehlgeschlagen, grau noch nicht gelaufen oder übersprungen	Double-click opens the case; green passed, red failed, grey not run yet or skipped
+Neues Projekt	New project
+MeinProjekt	MyProject
+Anlegen	Create
+Ort	Location
+Wählen ...	Choose ...
+Vorschau	Preview
+Abspielen	Play
+Mit dem System öffnen	Open with the system
+Parameter	Parameters
+Nach oben	Up
+Nach unten	Down
++ Parameter	+ Parameter
+- Parameter	- Parameter
+Aufrufer	Callers
+Block auslassen / aufnehmen	Skip / include block
+Befehle	Commands
+Suchen	Find
+Groß/klein	Match case
+Ganzes Wort	Whole word
+Ausdruck	Regex
+Ersetzen	Replace
+Alle	All
+Suchtext -- Enter: weiter, Umschalt+Enter: zurück, ESC schließt	Search text -- Enter: next, Shift+Enter: previous, ESC closes
+Voriger Treffer (Umschalt+F3)	Previous match (Shift+F3)
+Nächster Treffer (F3)	Next match (F3)
+Groß/klein beachten (Alt+C)	Match case (Alt+C)
+Nur ganze Wörter (Alt+W)	Whole words only (Alt+W)
+Regulärer Ausdruck	Regular expression
+Ersatz -- Enter ersetzt den markierten Treffer und geht zum nächsten	Replacement -- Enter replaces the selected match and moves to the next
+Den markierten Treffer ersetzen, dann weiter (Strg+Umschalt+1)	Replace the selected match, then next (Ctrl+Shift+1)
+Alle Treffer in dieser Datei ersetzen, ein Schritt für Strg+Z (Strg+Alt+Enter)	Replace all matches in this file, one step for Ctrl+Z (Ctrl+Alt+Enter)
+Drucker	Printer
+Kopien	Copies
+Schrift (pt)	Font (pt)
+Rand (mm)	Margin (mm)
+Zeilennummern	Line numbers
+Nur die Auswahl	Selection only
+Drucken	Print
+Als PDF neben die Quelle	As PDF next to the source
+Vorschau: 	Preview: 
+Vorschaubilder werden neu erzeugt ...	Regenerating preview images ...
+Schrift: 	Font: 
+ px	 px
+Showcase -- ein Klick öffnet das Beispiel  (Reihe 	Showcase -- a click opens the example  (row 
+ von 	 of 
+, Mausrad blättert)	, mouse wheel scrolls)
+Klammern schließen an.	Closing brackets on.
+Klammern schließen aus.	Closing brackets off.
+Gerüst beim Tippen an.	Scaffold while typing on.
+Gerüst beim Tippen aus.	Scaffold while typing off.
+Einrückungslinien an.	Indent guides on.
+Einrückungslinien aus.	Indent guides off.
+Mitlaufender Blockkopf an.	Sticky block header on.
+Mitlaufender Blockkopf aus.	Sticky block header off.
+Zeilenumbruch an.	Word wrap on.
+Zeilenumbruch aus.	Word wrap off.
+Umbruch an	Wrap on
+Über Drachenhauch	About Drachenhauch
+OK	OK
+Keine Definition zu '	No definition for '
+' -- auch nicht im Projekt.	' -- not in the project either.
+Zeile 	Line 
+Farbe: 	Colour: 
+Geteilte Ansicht: dafür braucht es zwei offene Dateien.	Split view: that needs two open files.
+Geteilt: links 	Split: left 
+Geteilte Ansicht aus.	Split view off.
+Dieselbe Datei nebeneinander: dafür braucht es eine offene Datei.	Same file side by side: that needs an open file.
+Dieselbe Datei nebeneinander: 	Same file side by side: 
+Zweite Ansicht aus.	Second view off.
+ Blöcke zugeklappt.	 blocks folded.
+Alles aufgeklappt.	Everything unfolded.
+Höchstens 	At most 
+ Reiter -- erst einen schließen.	 tabs -- close one first.
+Gibt es nicht: 	Does not exist: 
+Im Form-Designer geöffnet: 	Opened in the form designer: 
+ -- als Text: Befehlspalette, 'Formular als Text öffnen'	 -- as text: command palette, 'Open form as text'
+Mit dem Programm des Systems geöffnet: 	Opened with the system's program: 
+Lässt sich nicht öffnen: 	Cannot be opened: 
+Gesichert: 	Saved: 
+ Reiter geschlossen.	 tabs closed.
+ hat ungesicherte Änderungen.	 has unsaved changes.
+Kästchen im Projektbaum: was angehakt ist, begrenzt Projektsuche und Umbauten.	Checkboxes in project tree: what is checked limits project search and refactorings.
+Kästchen im Projektbaum ausgeblendet -- Suche und Umbau gelten wieder dem ganzen Projekt.	Checkboxes in project tree hidden -- search and refactoring apply to the whole project again.
+ -- Suche/Umbau nur in 	 -- search/refactoring only in 
+ angehakten	 checked
+Keine Datei gewählt -- Strg+Klick sammelt, Umschalt+Klick spannt.	No file selected -- Ctrl+click collects, Shift+click spans.
+ Datei(en) geöffnet.	 file(s) opened.
+ Haken entfernt -- der Umbau geht wieder über das ganze Projekt.	 checks removed -- refactoring covers the whole project again.
+Probleme: -- (	Problems: -- (
+Probleme: keine	Problems: none
+Probleme: 	Problems: 
+ Fehler, 	 errors, 
+ Warnungen	 warnings
+Hier gibt es nichts zu korrigieren.	Nothing to fix here.
+Schnellkorrektur	Quick fix
+Keine Symbole in 	No symbols in 
+Symbole im Projekt (	Symbols in project (
+Suche '	Search '
+ Treffer in 	 matches in 
+ Dateien -- Umschalt+F7 zeigt wieder die Probleme	 files -- Shift+F7 shows the problems again
+Aufrufzähler an.	Call counts on.
+Aufrufzähler aus.	Call counts off.
+Es läuft noch eine Prüfsammlung.	A test collection is still running.
+Die Marke steht in keinem Fall (=== Name darüber).	The cursor is in no case (=== name above it).
+Diesen Prüffall ausführen: im Reiter ist keine .dhtest-Datei.	Run this test case: the tab holds no .dhtest file.
+Ausgabe: Prüfsammlung läuft ...	Output: test collection running ...
+Prüfsammlung läuft ...	Test collection running ...
+Ausgabe: Prüfsammlung 	Output: test collection 
+Prüfsammlung: 	Test collection: 
+ -- Umschalt+F7 zeigt wieder die Probleme der Datei	 -- Shift+F7 shows the problems of the file again
+Quellcodeverwaltung: das Projekt liegt in keinem git-Verzeichnis.	Source control: the project is not in a git repository.
+Quellcodeverwaltung: git ist nicht zu starten.	Source control: git cannot be started.
+Zweig: 	Branch: 
+   in 	   in 
+ geänderte Datei(en), 	 changed file(s), 
+ vorgemerkt.	 staged.
+Erst eine Nachricht schreiben -- sie sagt später, was diese Übergabe wollte.	Write a message first -- it will later tell what this commit was for.
+Nichts vorgemerkt -- ein Kästchen links setzt eine Datei auf die Liste.	Nothing staged -- a checkbox on the left puts a file on the list.
+Übergeben.	Committed.
+git: 	git: 
+übergeben	committed
+Erst links eine Datei wählen.	Choose a file on the left first.
+ ist neu -- verwerfen hieße löschen, das tut die IDE nicht.	 is new -- discarding would mean deleting, which the IDE does not do.
+Alle Änderungen an 	All changes to 
+ ist im Reiter ungesichert -- erst sichern oder dort zurücknehmen.	 is unsaved in its tab -- save first or undo there.
+Verworfen: 	Discarded: 
+git 	git 
+: fertig.	: done.
+: fehlgeschlagen (Code 	: failed (code 
+) -- siehe Ausgabe.	) -- see output.
+Neuer Zweig	New branch
+Name des neuen Zweigs (er beginnt beim jetzigen Stand):	Name of the new branch (it starts at the current state):
+ läuft noch.	 is still running.
+ läuft ...	 running ...
+ ist ungesichert -- erst sichern.	 is unsaved -- save first.
+Auf Zweig 	On branch 
+Wechsel auf 	Switching to 
+ ging nicht -- geänderte Dateien, die der Zweig anders hat? Erst übergeben oder beiseitelegen.	 failed -- changed files that differ on that branch? Commit or stash first.
+Ein Zweigname braucht Buchstaben, Ziffern, . _ / oder -.	A branch name needs letters, digits, . _ / or -.
+Neuer Zweig 	New branch 
+, die Änderungen sind mitgekommen.	, the changes came along.
+Zweig 	Branch 
+ ließ sich nicht anlegen (gibt es ihn schon?).	 could not be created (does it exist already?).
+Beiseitegelegt	Stashed
+Zurückgeholt	Unstashed
+ Stand/Stände beiseite.	 stash(es) put aside.
+Blame an der Zeile der Marke an.	Blame at the cursor line on.
+Blame an der Zeile der Marke aus.	Blame at the cursor line off.
+Die Marke steht in keinem Konflikt (<<<<<<< ... >>>>>>>).	The cursor is in no conflict (<<<<<<< ... >>>>>>>).
+Die Marke steht in keinem vollständigen Konflikt.	The cursor is in no complete conflict.
+Konflikt gelöst (	Conflict resolved (
+ Zeilen). Strg+Z nimmt es zurück.	 lines). Ctrl+Z undoes it.
+Variable einführen: erst einen Ausdruck in einer Zeile markieren.	Introduce variable: select an expression within one line first.
+Variable einführen: in einer 	Introduce variable: not possible in an 
+-Zeile geht das nicht -- davor wäre ein anderer Zweig.	 line -- before it would be another branch.
+Variable einführen	Introduce variable
+Name und Typ für 	Name and type for 
+Variable einführen: '	Introduce variable: '
+' ist kein Name.	' is not a name.
+Variable einsetzen: die Marke steht auf keinem Namen.	Inline variable: the cursor is not on a name.
+Variable einsetzen geht nicht: 	Cannot inline variable: 
+SUB in FUNCTION geht nicht: 	Cannot convert SUB to FUNCTION: 
+Wartet auf eine Pause beim Tippen ...	Waiting for a pause in typing ...
+Live-Vorschau an.	Live preview on.
+Live-Vorschau aus.	Live preview off.
+Stand 	State 
+Kein Bild: 	No picture: 
+Nur für gesicherte .dh-Dateien.	Only for saved .dh files.
+Rechnet ...	Working ...
+ Sammlung(en), 	 collection(s), 
+ Fälle: 	 cases: 
+Erst eine Sammlung oder einen Fall wählen.	Choose a collection or a case first.
+Kein fehlgeschlagener Fall.	No failed case.
+Der Name braucht Buchstaben, Ziffern, _ oder -.	The name needs letters, digits, _ or -.
+Den Ort gibt es nicht: 	The location does not exist: 
+Den Ordner 	The folder 
+ gibt es schon, und er ist nicht leer.	 already exists and is not empty.
+Name:	Name:
+Wie heißt du?	What is your name?
+Hinzufügen	Add
+Neues Projekt: 	New project: 
+ lässt sich nicht als Bild lesen.	 cannot be read as an image.
+ -- Klang, 	 -- sound, 
+. [Abspielen] spielt ihn.	. [Play] plays it.
+ (hier nicht abspielbar: keine Tonausgabe oder kein lesbares Format).	 (cannot be played here: no audio output or unreadable format).
+Abspielen ging nicht: 	Playing failed: 
+Lässt sich nicht mit dem System öffnen.	Cannot be opened with the system.
+Projekt prüfen: keine .dh-Datei im Projekt.	Check project: no .dh file in the project.
+Projekt wird geprüft ...	Checking project ...
+Prüfe ... 0 von 	Checking ... 0 of 
+ Dateien (ESC bricht ab)	 files (ESC cancels)
+Prüfe ... 	Checking ... 
+Fundstellen: unter der Marke steht kein Name.	Occurrences: there is no name at the cursor.
+Fundstellen von '	Occurrences of '
+ in 	 in 
+ Fundstelle(n) von '	 occurrence(s) of '
+Git-Blame: die Datei ist noch nicht gesichert.	Git blame: the file is not saved yet.
+Git-Blame: keine Antwort -- liegt die Datei in einem git-Verzeichnis, und ist `git` da?	Git blame: no answer -- is the file in a git repository, and is `git` installed?
+git blame 	git blame 
+ Zeilen -- Umschalt+F7 zeigt wieder die Probleme	 lines -- Shift+F7 shows the problems again
+git: die Datei ist noch nicht gesichert.	git: the file is not saved yet.
+git diff: keine Änderungen an dieser Datei.	git diff: no changes to this file.
+git log: kein Verlauf -- liegt sie in einem git-Verzeichnis?	git log: no history -- is it in a git repository?
+Änderungen	Changes
+Verlauf	History
+ Zeilen	 lines
+Erst sichern -- Haltepunkte gehören zu einer Datei.	Save first -- breakpoints belong to a file.
+Bedingter Haltepunkt	Conditional breakpoint
+Halten in Zeile 	Pause in line 
+, wenn (leer = immer):	, if (empty = always):
+ Haltepunkt in 	 breakpoint in 
+ Haltepunkte in 	 breakpoints in 
+ Datei	 file
+ Dateien	 files
+ -- das Kästchen schaltet einen an und aus, Doppelklick springt hin	 -- the checkbox turns one on and off, double-click jumps there
+Trefferzahl: eine Zahl ab 1, davor wahlweise = oder % (	Hit count: a number from 1, optionally preceded by = or % (
+ passt nicht).	 does not fit).
+Trefferzahl	Hit count
+Halten in 	Pause in 
+ erst ... (5 = ab dem 5. Mal, =5 genau, %5 jedes 5. Mal, leer = immer):	 only ... (5 = from the 5th time, =5 exactly, %5 every 5th time, empty = always):
+Protokollpunkt	Logpoint
+Statt anzuhalten schreiben (Ausdrücke in {}, z. B. i = {i}; leer = anhalten):	Write instead of pausing (expressions in {}, e.g. i = {i}; empty = pause):
+Kein Lesezeichen gesetzt -- Strg+F2 setzt eins.	No bookmark set -- Ctrl+F2 sets one.
+Die Datei des Lesezeichens gibt es nicht mehr: 	The bookmark's file no longer exists: 
+ Lesezeichen -- Umschalt+F7 zeigt wieder die Probleme	 bookmarks -- Shift+F7 shows the problems again
+, Spalte 	, column 
+Projekt: 	Project: 
+Ungültiger Ausdruck: 	Invalid expression: 
+Nicht gefunden: 	Not found: 
+Suchen und ersetzen	Find and replace
+ mal ersetzt.	 replaced.
+Die Ausgabe ist leer.	The output is empty.
+Ausgabe, Zeile 	Output, line 
+Nicht in der Ausgabe: 	Not in the output: 
+ (ab Zeile 	 (from line 
+Diese Zeile nennt keine Stelle.	This line names no location.
+Unter der Marke steht kein Wort.	There is no word at the cursor.
+' steht nur an dieser einen Stelle.	' appears only at this one place.
+Jede Fundstelle von '	Every occurrence of '
+' hat eine Marke (	' has a cursor (
+ Marken auf '	 cursors on '
+Größer geht es nicht.	It cannot grow any further.
+Auswahl: 	Selection: 
+Nichts zum Zurückgehen -- erst erweitern.	Nothing to go back to -- expand first.
+Parameter umsortieren: erst auf ein SUB oder eine FUNCTION stellen.	Reorder parameters: put the cursor on a SUB or FUNCTION first.
+Parameter: bei '	Parameters: '
+' fehlt die schließende Klammer.	' is missing its closing parenthesis.
+Parameter von 	Parameters of 
+ Parameter (vorher 	 parameters (before 
+Neuer Parameter: bitte in der Form 'hp AS INTEGER = 0' -- 	New parameter: please in the form 'hp AS INTEGER = 0' -- 
+Der letzte Parameter bleibt -- ein Unterprogramm ganz ohne 	The last parameter stays -- a subroutine entirely without 
+Parameter umsortieren: nichts geändert.	Reorder parameters: nothing changed.
+Erst sichern: ein anderer Reiter hat ungesicherte Änderungen.	Save first: another tab has unsaved changes.
+Verschieben: diese Datei ist noch nicht gesichert.	Move: this file is not saved yet.
+Verschieben: erst in ein SUB, eine FUNCTION, eine CLASS 	Move: put the cursor into a SUB, FUNCTION, CLASS 
+Verschieben: hier steht kein Unterprogramm mit Namen.	Move: there is no named subroutine here.
+ verschieben nach ...	 move to ...
+Wer ruft das auf: unter der Marke steht kein Name.	Who calls this: there is no name at the cursor.
+Wer ruft 	Who calls 
+ auf?	?
+Vergleichen: dafür braucht es zwei offene Dateien.	Compare: that needs two open files.
+Vergleichen: rechts einen anderen Reiter wählen.	Compare: choose another tab on the right.
+ gegen 	 against 
+Erst mehrere Zeilen markieren.	Select several lines first.
+ Marken, je eine am Zeilenende.	 cursors, one at each line end.
+ Zeilen -> 	 lines -> 
+Sammle ... 0 von 	Collecting ... 0 of 
+Abgebrochen -- nichts geändert.	Cancelled -- nothing changed.
+Sammle ... 	Collecting ... 
+Erst sichern: ein Reiter hat ungesicherte Änderungen.	Save first: a tab has unsaved changes.
+Vergleichen: diese Datei ist noch nicht gesichert.	Compare: this file is not saved yet.
+Kein Unterschied zu 	No difference to 
+' -- tippen ändert alle, ESC räumt sie weg.	' -- typing changes all, ESC clears them.
+Auslassen: erst auf eine geänderte Zeile stellen.	Skip: put the cursor on a changed line first.
+: nichts zu tun.	: nothing to do.
+Kein Umbau zum Zurücknehmen.	No refactoring to undo.
+Nicht zurückgenommen: seit dem Umbau geändert -- 	Not undone: changed since the refactoring -- 
+. Strg+Z im Reiter nimmt die eigenen Änderungen zurück.	. Ctrl+Z in the tab undoes your own changes.
+Zurückgenommen: 	Undone: 
+ Datei(en), 	 file(s), 
+Kein zurückgenommener Umbau zum Wiederholen.	No undone refactoring to redo.
+Nicht wiederholt: seit dem Zurücknehmen geändert -- 	Not redone: changed since the undo -- 
+Wiederholt: 	Redone: 
+ Datei(en))	 file(s))
+Nachbessern: es liegt kein übernommener Umbau vor.	Revise: there is no applied refactoring.
+Nachbessern: 	Revise: 
+Umbau verworfen -- nichts geändert.	Refactoring discarded -- nothing changed.
+Alles abgewählt -- nichts geändert.	Everything deselected -- nothing changed.
+Umbenennen: unter der Marke steht kein Name.	Rename: there is no name at the cursor.
+Umbenennen	Rename
+' überall nennen in:	' everywhere to:
+Umbenennen: '	Rename: '
+' geht nicht -- ein Name fängt mit Buchstabe oder _ an, und Schlüsselwörter bleiben, wie sie sind.	' is not possible -- a name starts with a letter or _, and keywords stay as they are.
+Umbenennen: nichts zu tun.	Rename: nothing to do.
+Schnipsel: 	Snippet: 
+Schnipsel einfügen	Insert snippet
+Nicht formatiert: die Quelle lässt sich nicht lesen (Syntaxfehler, siehe Probleme).	Not formatted: the source cannot be read (syntax error, see problems).
+Schon formatiert.	Already formatted.
+Formatiert.	Formatted.
+Ein Export läuft noch.	An export is still running.
+Export läuft: 	Export running: 
+Exportiert nach 	Exported to 
+Export fehlgeschlagen (Code 	Export failed (code 
+Es läuft noch ein Programm -- erst stoppen (Umschalt+F5).	A program is still running -- stop it first (Shift+F5).
+Ausgabe: 	Output: 
+Gestartet: 	Started: 
+Debugger: läuft ...	Debugger: running ...
+Anhalten geht nur im Debugger -- F7 startet ihn.	Pausing only works in the debugger -- F7 starts it.
+Haltepunkt hält nie (dort und darunter steht kein Code): 	Breakpoint never pauses (no code there or below): 
+Der Debugger steht gerade nicht -- F7 startet ihn, F9 setzt einen Haltepunkt.	The debugger is not paused -- F7 starts it, F9 sets a breakpoint.
+Debugger steht in Zeile 	Debugger paused in line 
+Bis zur Marke: 	To cursor: 
+Debugger: das Programm wartet auf eine Eingabe (Zeile 	Debugger: the program is waiting for input (line 
+) -- unten eintippen, Enter	) -- type below, Enter
+Debugger steht in 	Debugger paused in 
+ (Tiefe 	 (depth 
+Fehler in 	Error in 
+  -- F8 beendet	  -- F8 ends
+Debugger: läuft bis Zeile 	Debugger: running to line 
+Der Debugger läuft gerade -- erst im Halt geht es bis zur Marke.	The debugger is running -- run to cursor only works while paused.
+Setzen geht nur für eine ganze Variable, nicht für ein Feld darin.	Setting only works for a whole variable, not for an element of it.
+Wert setzen	Set value
+Neuer Wert für 	New value for 
+ (ein Ausdruck):	 (an expression):
+ ms gesamt, 	 ms total, 
+ Zeilen gemessen	 lines measured
+Funktion	Function
+ab Zeile	from line
+Ausgabe: gestoppt	Output: stopped
+Ausgabe: beendet mit Code 	Output: ended with code 
+ geändert, während der Debugger läuft -- das Programm kennt noch die alten Zeilen. Strg+Umschalt+F5 startet neu.	 changed while the debugger is running -- the program still knows the old lines. Ctrl+Shift+F5 restarts.
+Gesetzt	Set
+Erst einen Suchtext eingeben.	Enter a search text first.
+Kein Treffer	No match
+Inhalt	Contents
+Zurück zum Inhaltsverzeichnis des Dokuments	Back to the table of contents of the document
+Beispiel kopiert (	Example copied (
+ Zeilen).	 lines).
+Die Zwischenablage ist gerade belegt -- noch einmal versuchen.	The clipboard is busy -- try again.
+Konnte das Beispiel nicht ablegen: 	Could not store the example: 
+Kein Handbuch gefunden in 	No manual found in 
+' steht in keinem Dokument.	' is in no document.
+Verweis: 	Link: 
+' nicht in diesem Dokument	' not in this document
+ Fundstellen	 matches
+ -- Zeile 	 -- line 
+Erst sichern -- die PDF kommt neben die Quelle.	Save first -- the PDF goes next to the source.
+PDF geschrieben: 	PDF written: 
+ Seiten)	 pages)
+Kein Drucker eingerichtet -- nimm 'Listing als PDF'.	No printer set up -- use 'Listing as PDF'.
+Gedruckt auf 	Printed on 
+ Seiten, 	 pages, 
+Drucken: 	Print: 
+# Tastenkürzel der IDE	# Keyboard shortcuts of the IDE
+| Kürzel | Befehl |	| Shortcut | Command |
+## Im Code-Feld	## In the code field
+Tab rückt bis zur nächsten Spalte ein, Strg+Z/Y nimmt zurück und wiederholt, Strg+A/C/V/X wie üblich, Pos1/Ende, Bild auf/ab.	Tab indents to the next column, Ctrl+Z/Y undoes and redoes, Ctrl+A/C/V/X as usual, Home/End, Page up/down.
+Alle Befehle ohne Kürzel stehen in der Befehlspalette (`Strg+Umschalt+P`).	All commands without a shortcut are in the command palette (`Ctrl+Shift+P`).
+Noch kein Formular geöffnet -- erst eine .dhform im Projektbaum wählen.	No form opened yet -- choose a .dhform in the project tree first.
+Keine Themenliste: 	No topic list: 
+ fehlt.	 is missing.
+ Beispiele in 	 examples in 
+ Themen	 topics
+Keine Beispiele in 	No examples in 
+Tastenbelegung: 	Key bindings: 
+ Hinweis(e) -- siehe Ausgabe.	 note(s) -- see output.
+Tastenkürzel ändern: Befehl wählen	Change shortcut: choose a command
+Neues Kürzel für 	New shortcut for 
+ (z. B. Strg+Alt+K; leer = keins):	 (e.g. Ctrl+Alt+K; empty = none):
+Alle Tastenkürzel wieder wie ausgeliefert.	All shortcuts back to default.
+Schnipsel 	Snippet 
+: das Kürzel 	: the abbreviation 
+ ist kein Wort -- nur über Strg+J erreichbar.	 is not a word -- only reachable via Ctrl+J.
+Eigene Schnipsel -- nach dem Sichern (Strg+S) gelten sie.	Own snippets -- they apply after saving (Ctrl+S).
+Erst den Code markieren, der zum Schnipsel werden soll.	Select the code that should become a snippet first.
+Auswahl als Schnipsel	Selection as snippet
+Name | Kürzel (das Kürzel plus Tabulator setzt ihn ein):	Name | abbreviation (the abbreviation plus Tab inserts it):
+Mein Schnipsel | mein	My snippet | mine
+Als Schnipsel gesichert: 	Saved as snippet: 
+Terminal: läuft -- Enter schickt eine Eingabe, [Abbrechen] beendet.	Terminal: running -- Enter sends input, [Cancel] ends it.
+Terminal: 	Terminal: 
+Im Terminal läuft nichts.	Nothing is running in the terminal.
+Profil im Code an -- es erscheint nach einer Messung (Strg+Umschalt+Y).	Profile in code on -- it appears after a measurement (Ctrl+Shift+Y).
+Profil im Code an.	Profile in code on.
+Profil im Code aus.	Profile in code off.
+Profil aus dem Code entfernt.	Profile removed from the code.
+Datei öffnen: 	Open file: 
+Wie soll sie heißen?	What should it be called?
+Kein Programm läuft.	No program is running.
+Der Debugger steht gerade nicht.	The debugger is not paused.
+Wiederherstellung kann nicht sichern: 	Recovery cannot save: 
+Wiederherstellen	Recover
+ ungesicherte Reiter aus einer Sitzung, die nicht sauber endete: 	 unsaved tabs from a session that did not end cleanly: 
+Wiederherstellen|Verwerfen|Später	Recover|Discard|Later
+ Reiter wiederhergestellt -- noch NICHT gesichert.	 tabs recovered -- NOT saved yet.
+Es gibt ungesicherte Änderungen.	There are unsaved changes.
+Alle sichern|Verwerfen|Abbrechen	Save all|Discard|Cancel
+Suche mit regulärem Ausdruck (z. B. ^SUB .*\\(\\)).	Search with regular expression (e.g. ^SUB .*\\(\\)).
+Suche als Teiltext.	Search as plain text.
+Kein geschlossener Reiter zum Wiederholen.	No closed tab to reopen.
+Gibt es nicht mehr: 	No longer exists: 
+Suche beachtet Groß/klein.	Search matches case.
+Suche ohne Rücksicht auf Groß/klein.	Search ignores case.
+Suche nur nach ganzen Wörtern.	Search whole words only.
+Suche auch mitten im Wort.	Search also inside words.
+Im ganzen Projekt ersetzen	Replace in whole project
+Wonach suchen?	What to search for?
+Ausgabe durchsuchen	Search output
+Wonach?	What?
+Kein Code-Feld offen.	No code field open.
+Herauslösen	Extract
+Im ganzen Projekt umbenennen	Rename in whole project
+Beim Sichern formatieren an.	Format on save on.
+Beim Sichern formatieren aus.	Format on save off.
+Gehe zu Zeile	Go to line
+Zeilennummer:	Line number:
+Im Projekt suchen	Find in project
+Wonach (alle .dh in 	What (all .dh in 
+Ausgabe geleert.	Output cleared.
+Der Debugger steht gerade nicht -- erst F7 und ein Halt.	The debugger is not paused -- first F7 and a pause.
+gui-Fenster mit Knopf	gui window with button
+Fenster	Window
+Los	Go
+Neuer Parameter	New parameter
+Ersetzen durch:	Replace with:
+Nicht im Projekt gefunden: 	Not found in project: 
+Nichts ersetzt.	Nothing replaced.
+Alle Haltepunkte	All breakpoints
+Gerüst beim Tippen	Scaffold while typing
+Klammern automatisch schließen	Close brackets automatically
+Zeilen sortieren	Sort lines
+Doppelte Zeilen entfernen	Remove duplicate lines
+Profil im Code ein/aus	Profile in code on/off
+Profil im Code entfernen	Remove profile from code
+Quellcodeverwaltung (git)	Source control (git)
+Prüfsammlungen im Überblick	Test collections overview
+Neues Projekt aus Vorlage	New project from template
+Auswahl als Variable einführen	Introduce selection as variable
+Konflikt: meine Fassung nehmen	Conflict: take mine
+Konflikt: ihre Fassung nehmen	Conflict: take theirs
+Konflikt: beide nehmen	Conflict: take both
+Vorschaubilder neu erzeugen	Regenerate preview images
+Kästchen im Projektbaum ein/aus	Checkboxes in project tree on/off
+Seitenleiste ein/aus	Side bar on/off
+Untere Leiste ein/aus	Bottom panel on/off
+Handbuch: gesetzt oder Quelltext	Manual: rendered or source
+Formular als Text öffnen	Open form as text
+Listing drucken ...	Print listing ...
+Werkzeug: SFX-Generator	Tool: SFX generator
+Werkzeug: Partikel-Editor	Tool: particle editor
+Werkzeug: Tilemap-Editor	Tool: tilemap editor
+Werkzeug: Sprite-Editor	Tool: sprite editor
+Werkzeug: Tracker	Tool: tracker
+Werkzeug: Form-Designer	Tool: form designer
+Werkzeug: Anim-FSM-Editor	Tool: anim FSM editor
+Werkzeug: Notenblatt	Tool: score editor
+Sprache der Oberfläche: Deutsch/English	Interface language: Deutsch/English
+Terminal ein/aus	Terminal on/off
+Terminal: laufenden Befehl abbrechen	Terminal: cancel running command
+Neue Datei (Strg+N)	New file (Ctrl+N)
+Öffnen (Strg+O)	Open (Ctrl+O)
+Sichern (Strg+S)	Save (Ctrl+S)
+Starten (F5)	Run (F5)
+Stoppen (Umschalt+F5)	Stop (Shift+F5)
+Debuggen (F7)	Debug (F7)
+Prüfen (Umschalt+F7)	Check (Shift+F7)
+Suchen (Strg+F)	Find (Ctrl+F)
+Zeilenumbruch (Alt+Z)	Word wrap (Alt+Z)
+Handbuch (F1)	Manual (F1)
+Einstellungen (Strg+U)	Settings (Ctrl+U)

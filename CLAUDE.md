@@ -1888,6 +1888,28 @@ mit Gegenprobe), `werkzeug_ide_terminal.dhtest` (2, `--- system windows`),
 Rust-Test `kill_beendet_auch_die_enkel`; vier Verfaelschungen der IDE und
 eine der Laufzeit fallen je in ihrem Fall.
 
+**Profil im Code, englische Oberflaeche (2026-09-29):** neu in der
+Laufzeit **`GUI_TEXTAREA_LINE_COLORS(ta, zeilen, farben)`** +
+`_GET` -- ein Band hinter ganzen Zeilen (Deckkraft im obersten Byte, ohne
+sie 0x40), getrennt von den Marken, wandert mit (`zeilenfarben` in
+`marken_abgleichen`), gezeichnet UNTER den Marken. Die IDE setzt es nach
+`profilAnzeigen` (`waermeFeld`/`waermeAnwenden`, gelb->rot nach Anteil an
+der teuersten Zeile, Zahlen an den 30 teuersten ueber `hinweiseZeigen`, das
+Aufrufzaehler, Blame und Profil zusammenfuehrt -- `zaehlerSetzen_` nimmt
+darum nicht mehr ALLE Hinweise weg). **Englisch:** jeder Anzeigetext geht
+durch `tr$("...")` (752 Texte, gewickelt per Skript je Aufrufart:
+Menuepunkt `tr$`+`kz$`, Palette/Werkzeugleiste in ihrer Hilfsroutine,
+sonst jeder Text in Anzeigezeilen); Kennungen aus Kleinbuchstaben und
+Code-Vorlagen sind ausgenommen. Tabelle `ide/sprache/en.txt` (TSV, **kein
+JSON** -- ein Punkt im Schluessel waere ein Pfad), Zeilen ohne Tabulator
+sind Kommentare (am `#` allein zu gehen verlor "# Tastenkuerzel der IDE").
+`kz$` schreibt Kuerzel englisch, `kuerzelForm$` kennt beide Namen.
+Gewechselt wird beim naechsten Start. Installer und Pakete nehmen
+`ide/sprache/*.txt` mit. Tests `gui_zeilenfarben.dhtest` (2, am Bild),
+`werkzeug_ide_profil_waerme.dhtest`, `werkzeug_ide_englisch.dhtest` (4, darunter
+Vollstaendigkeit der Tabelle und ein echtes Ctrl+N); vier Verfaelschungen
+fallen je in ihrem Fall.
+
 **Quellcodeverwaltung und Live-Vorschau in der IDE (2026-09-29):**
 Strg+Alt+G (`qvZeigen`/`qvAuffrischen`/`qvNachziehen`): `git status
 --porcelain=v1 -b -uall` im Wurzelordner des Repositorys, das Kaestchen ist

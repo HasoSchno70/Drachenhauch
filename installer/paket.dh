@@ -92,6 +92,8 @@ END FUNCTION
 SUB inhaltKopieren(wurzel AS STRING, laufzeit AS STRING, bin AS STRING, res AS STRING)
     dateiKopieren(laufzeit, PATHJOIN(bin, "dhrt"))
     PRINT "  ide/      "; ordnerKopieren(PATHJOIN(wurzel, "ide"), PATHJOIN(res, "ide"), "*.dh", FALSE); " Dateien"
+    ' Die englische Oberflaeche (ide/sprache/en.txt).
+    PRINT "  sprache/  "; ordnerKopieren(PATHJOIN(wurzel, "ide/sprache"), PATHJOIN(res, "ide/sprache"), "*.txt", FALSE); " Dateien"
     PRINT "  docs/     "; ordnerKopieren(PATHJOIN(wurzel, "docs"), PATHJOIN(res, "docs"), "*.md", FALSE); " Dateien"
     PRINT "  examples/ "; ordnerKopieren(PATHJOIN(wurzel, "examples"), PATHJOIN(res, "examples"), "*", TRUE); " Dateien"
     ' Logo und Schriftzug -- die IDE sucht sie unter daten/bilder neben ide/.
