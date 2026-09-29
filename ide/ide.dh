@@ -352,6 +352,9 @@ DIM zuGemacht AS ARRAY OF STRING : zuGemacht = []
 DIM vorschlagAn AS BOOLEAN : vorschlagAn = TRUE
 ' Einrueckungslinien im Code-Feld (ein Strich je Stufe).
 DIM linienAn AS BOOLEAN : linienAn = TRUE
+' Mitlaufender Blockkopf: SUB/IF/FOR, deren Kopf oben hinausgerollt ist,
+' bleiben oben angeheftet (hoechstens drei).
+DIM kopfAn AS BOOLEAN : kopfAn = TRUE
 ' Das Geruest, das beim Tippen mitwaechst: `IF ... THEN` und Enter setzen
 ' das `END IF` gleich mit (GUI_TEXTAREA_CLOSE_WORDS).
 DIM geruestAn AS BOOLEAN : geruestAn = TRUE
@@ -587,6 +590,7 @@ IF JSON_HAS(konfig, "gross_klein") THEN grossKlein = JSON_GET_BOOL(konfig, "gros
 IF JSON_HAS(konfig, "ganzes_wort") THEN ganzesWort = JSON_GET_BOOL(konfig, "ganzes_wort")
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
+IF JSON_HAS(konfig, "blockkopf") THEN kopfAn = JSON_GET_BOOL(konfig, "blockkopf")
 IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
 IF JSON_HAS(konfig, "klammern") THEN klammernAn = JSON_GET_BOOL(konfig, "klammern")
 IF JSON_HAS(konfig, "format_sichern") THEN formatSichernAn = JSON_GET_BOOL(konfig, "format_sichern")
@@ -827,6 +831,8 @@ DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, "Zeilenumbruch", 
 GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, "Einrückungslinien")
 GUI_MENU_CHECK(miLinien, linienAn)
+DIM miKopf AS INTEGER : miKopf = GUI_MENU_ITEM(mAnsicht, "Mitlaufender Blockkopf")
+GUI_MENU_CHECK(miKopf, kopfAn)
 DIM miLeiste AS INTEGER : miLeiste = GUI_MENU_ITEM(mAnsicht, "Werkzeugleiste")
 DIM miSeiten AS INTEGER : miSeiten = GUI_MENU_ITEM(mAnsicht, "Seitenleiste", "Alt+1")
 DIM miUnten AS INTEGER : miUnten = GUI_MENU_ITEM(mAnsicht, "Untere Leiste", "Alt+2")
@@ -1635,6 +1641,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "ganzes_wort", ganzesWort)
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
     JSON_SET_BOOL(konfig, "linien", linienAn)
+    JSON_SET_BOOL(konfig, "blockkopf", kopfAn)
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
     JSON_SET_BOOL(konfig, "klammern", klammernAn)
     JSON_SET_BOOL(konfig, "vorspann", vorspannAn)
@@ -2046,6 +2053,7 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
     GUI_TEXTAREA_SET(ta, "tabbreite", 4)
     GUI_TEXTAREA_SET(ta, "umbruch", IIF(umbruchAn, 1, 0))
     GUI_TEXTAREA_SET(ta, "einzugslinien", IIF(linienAn, 1, 0))
+    GUI_TEXTAREA_SET(ta, "kopfzeilen", IIF(kopfAn, 3, 0))
     ' Einrueckung beim Umbruch: die Laufzeit uebernimmt die der laufenden
     ' Zeile, die Woerter der SPRACHE kommen von hier. `THEN` steht in der
     ' Ende-Liste, weil `IF x THEN y = 1` sonst auch einruecken wuerde.
@@ -2126,6 +2134,22 @@ SUB linienSetzen(an AS BOOLEAN)
     NEXT
     GUI_SET_TEXT(lblStatus, IIF(an, "Einrückungslinien an.", "Einrückungslinien aus."))
     protokoll("linien " + IIF(an, "an", "aus"))
+    konfigSichern()
+END SUB
+
+' Mitlaufender Blockkopf, wie die Linien fuer ALLE Reiter (und die
+' geteilte Ansicht). Welche Zeilen Bloecke sind, sagt dieselbe Liste wie
+' fuer die Faltung.
+SUB kopfSetzen(an AS BOOLEAN)
+    kopfAn = an
+    GUI_MENU_CHECK(miKopf, an)
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        GUI_TEXTAREA_SET(tabFelder[i], "kopfzeilen", IIF(an, 3, 0))
+    NEXT
+    IF taSpiegel >= 0 THEN GUI_TEXTAREA_SET(taSpiegel, "kopfzeilen", IIF(an, 3, 0))
+    GUI_SET_TEXT(lblStatus, IIF(an, "Mitlaufender Blockkopf an.", "Mitlaufender Blockkopf aus."))
+    protokoll("blockkopf " + IIF(an, "an", "aus"))
     konfigSichern()
 END SUB
 
@@ -10690,6 +10714,7 @@ paletteEintrag("Doppelte Zeilen entfernen", "zl_doppelte", "")
 paletteEintrag("Leerraum am Zeilenende entfernen", "zl_rand", "")
 paletteEintrag("Andere Reiter schließen", "andere_zu", "Strg+Umschalt+W")
 paletteEintrag("Einrückungslinien", "linien", "")
+paletteEintrag("Mitlaufender Blockkopf", "blockkopf", "")
 paletteEintrag("Werkzeugleiste", "leiste", "")
 paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
 paletteEintrag("Gewählte Dateien öffnen", "baum_oeffnen", "Strg+Umschalt+E")
@@ -11167,6 +11192,7 @@ SUB befehl(k AS STRING)
             protokoll("format sichern " + IIF(formatSichernAn, "an", "aus"))
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
+        CASE "blockkopf" : kopfSetzen(NOT kopfAn)
         CASE "leiste"
             leisteAn = NOT leisteAn
             GUI_MENU_CHECK(miLeiste, leisteAn)
@@ -11464,6 +11490,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(miZlRand) THEN befehl("zl_rand")
     IF GUI_CLICKED(miAndereZu) THEN befehl("andere_zu")
     IF GUI_CLICKED(miLinien) THEN befehl("linien")
+    IF GUI_CLICKED(miKopf) THEN befehl("blockkopf")
     IF GUI_CLICKED(miLeiste) THEN befehl("leiste")
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
     DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)

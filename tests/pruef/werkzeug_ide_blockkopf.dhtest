@@ -1,0 +1,74 @@
+' Der mitlaufende Blockkopf in der IDE: sie gibt dem Code-Feld die
+' Bloecke (dieselben wie fuer die Faltung) und schaltet "kopfzeilen" ein.
+' Die Datei ist eine SUB ueber 80 Zeilen; mit Zeile 30 oben steht dort, wo
+' sonst Zeile 30 steht, der Kopf -- GUI_TEXTAREA_POS_AT trifft dort keinen
+' Text. Ausgeschaltet (Befehl "blockkopf") trifft derselbe Punkt Zeile 30,
+' und die ide.json merkt es sich.
+--- seriell
+
+=== der kopf verdeckt die erste zeile, ausgeschaltet nicht
+DIM prBild AS INTEGER : prBild = 0
+DIM prX AS INTEGER : prX = -1
+DIM prY AS INTEGER : prY = -1
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 60 THEN GUI_TEXTAREA_SCROLL(tabFelder[aktiverTab], 30)
+IF prBild = 64 THEN befehl("blockkopf")
+IF prBild = 68 THEN
+    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    DIM prYy AS INTEGER
+    DIM prXx AS INTEGER
+    FOR prYy = 0 TO 600 STEP 2
+        FOR prXx = 0 TO 900 STEP 20
+            (prZ, prS) = GUI_TEXTAREA_POS_AT(prTa, prXx, prYy)
+            IF prZ > 0 THEN
+                prX = prXx : prY = prYy + 4
+                EXIT FOR
+            END IF
+        NEXT
+        IF prX >= 0 THEN EXIT FOR
+    NEXT
+    (prZ, prS) = GUI_TEXTAREA_POS_AT(prTa, prX, prY)
+    protokoll("pr aus oben " + STR$(prZ))
+    befehl("blockkopf")
+END IF
+IF prBild = 72 THEN
+    (prZ, prS) = GUI_TEXTAREA_POS_AT(tabFelder[aktiverTab], prX, prY)
+    protokoll("pr an oben " + STR$(prZ))
+    befehl("blockkopf")
+    EXIT(0)
+END IF
+--- argumente
+lang.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM t AS STRING : t = "SUB lang()" + CHR$(10)
+DIM i AS INTEGER
+FOR i = 2 TO 80
+    t = t + "    PRINT " + STR$(i) + CHR$(10)
+NEXT
+t = t + "END SUB" + CHR$(10)
+WRITEALL("lang.dh", t)
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 10) = "blockkopf " THEN PRINT L[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt "; JSON_GET_BOOL(k, "blockkopf")
+--- erwartet
+blockkopf aus
+pr aus oben 30
+blockkopf an
+pr an oben 0
+blockkopf aus
+gemerkt FALSE

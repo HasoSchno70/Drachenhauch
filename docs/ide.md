@@ -216,6 +216,12 @@ bekäme. Diese Bausteine kamen mit ihr:
   feiner Strich je Stufe, unter dem Text. Die Breite einer Stufe wird an
   `tabbreite` Leerzeichen gemessen, und eine leere Zeile nimmt die kleinere
   Tiefe ihrer Nachbarn — sonst risse die Linie in jedem Absatz auf.
+- **Mitlaufender Blockkopf** (`GUI_TEXTAREA_SET(ta, "kopfzeilen", 3)`, Ansicht
+  → Mitlaufender Blockkopf, an per Vorgabe): ist der Kopf einer SUB, einer
+  Schleife oder eines IF oben hinausgerollt, der Block aber noch im Bild,
+  steht die Kopfzeile oben angeheftet — höchstens drei, außen zuerst, auf
+  eigenem Grund mit Kante. Ein Klick darauf springt hin. Die Blöcke sind
+  dieselben wie für die Faltung; die Marke rutscht nie unter einen Kopf.
 - **Abkürzungen am Tabulator** (`GUI_TEXTAREA_ABBREV` +
   `GUI_TEXTAREA_ABBREV_HIT`): steht eines der genannten Wörter links der
   Marke, meldet der Tabulator es, statt einzurücken. Was an seine Stelle

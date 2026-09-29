@@ -1,0 +1,84 @@
+' Mitlaufende Blockkoepfe im Code-Feld (GUI_TEXTAREA_SET "kopfzeilen", n):
+' ist die Kopfzeile eines faltbaren Blocks (GUI_TEXTAREA_FOLDABLE) oben
+' hinausgerollt, der Block aber noch im Bild, steht sie oben angeheftet.
+' Die Lagen kommen aus GUI_TEXTAREA_POS_AT: unter einem Kopf zeigt die Maus
+' auf keinen Text (0, 0), die erste freie Zeile darunter ist die, die sonst
+' dort stuende. Die Beilage baut das Feld: SUB (1..29) mit FOR (2..21),
+' dahinter Zeilen ohne Block.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== die koepfe verdecken die zeilen darunter, aussen zuerst
+IMPORT "bk.dh"
+bkBauen()
+PRINT "ohne 10: "; bkZeilen(10, 0)
+PRINT "drei 10: "; bkZeilen(10, 3)
+PRINT "eins 10: "; bkZeilen(10, 1)
+PRINT "nach dem for 23: "; bkZeilen(23, 3)
+PRINT "nach dem sub 31: "; bkZeilen(31, 3)
+PRINT "kopf oben 1: "; bkZeilen(1, 3)
+PRINT "ohne bloecke: "; bkOhneBloecke(10)
+--- datei bk.dh
+IMPORT "{sammlung}/_hilfen/blockkopf.dh"
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+ohne 10: 10 11 12 13
+drei 10: 0 0 12 13
+eins 10: 0 11 12 13
+nach dem for 23: 0 24 25 26
+nach dem sub 31: 31 32 33 34
+kopf oben 1: 1 2 3 4
+ohne bloecke: 10 11 12 13
+
+=== ein klick auf den kopf springt zu ihm
+' Ohne Kopf trifft derselbe Klick die Zeile darunter (Gegenprobe im
+' zweiten Lauf): Marke in 11, die Ansicht bleibt.
+IMPORT "bk.dh"
+bkBauen()
+GUI_FOCUS(bkTa)
+PRINT bkKlick(10, 3, 1)
+PRINT bkKlick(10, 0, 1)
+--- datei bk.dh
+IMPORT "{sammlung}/_hilfen/blockkopf.dh"
+
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+marke 2 oben 2
+marke 11 oben 10
+
+=== die marke bleibt nicht unter einem kopf
+' Zeile 12 oben, die Marke in 13 (unter dem zweiten Kopf), dann Pfeil hoch:
+' die Marke steht in 12, das Feld rollt zurueck, bis sie frei steht --
+' Zeile 10 oben, 12 in der dritten Reihe. Ausgabe: Marke * 100 + oben.
+IMPORT "bk.dh"
+bkBauen()
+GUI_FOCUS(bkTa)
+PRINT "mit "; bkMarke(12, 13, 3)
+PRINT "ohne "; bkMarke(12, 13, 0)
+--- datei bk.dh
+IMPORT "{sammlung}/_hilfen/blockkopf.dh"
+
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+mit 1210
+ohne 1212
+
+=== der kopf hat einen eigenen grund
+' Am Bild: rechts in der ersten Zeile (leer, nur Grund) weicht die Farbe
+' vom Grund einer Code-Zeile ab -- ohne Kopf nicht.
+IMPORT "bk.dh"
+bkBauen()
+PRINT "mit "; bkGrundAnders(10, 3)
+PRINT "ohne "; bkGrundAnders(10, 0)
+--- datei bk.dh
+IMPORT "{sammlung}/_hilfen/blockkopf.dh"
+
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+mit TRUE
+ohne FALSE

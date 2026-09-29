@@ -1811,6 +1811,21 @@ Weiterlaufen und am Ende. Tests `gui_textarea_hints.dhtest`,
 `werkzeug_ide_korrektur.dhtest`, Rust-Test `blockende_import_und_unbenutzt`;
 fuenf Verfaelschungen fallen je in ihrem Fall.
 
+**Mitlaufender Blockkopf (2026-09-29):** `GUI_TEXTAREA_SET(ta,
+"kopfzeilen", n)` -- ist die Kopfzeile eines Blocks aus
+`GUI_TEXTAREA_FOLDABLE` oben hinausgerollt, der Block aber noch im Bild,
+steht sie oben angeheftet (hoechstens n, aussen zuerst). EINE Quelle
+`Gui::ta_koepfe(wdg, rows, sicht, scroll)` fuer Zeichnen, Klick (springt
+hin), `GUI_TEXTAREA_POS_AT`/Tooltip-Treffer (unter einem Kopf: kein Text),
+Nummernspalte (kein Haltepunkt auf der verdeckten Zeile) und das Mitziehen
+der Marke (rollt zurueck, bis sie frei steht); die Koepfe verdecken selbst
+Zeilen, darum wird gerechnet, bis die Liste stehen bleibt.
+`GUI_TEXTAREA_SELECT`/`GOTO` zentrieren die Marke und sind davon
+unberuehrt. Die IDE: Ansicht -> Mitlaufender Blockkopf (ide.json
+`blockkopf`, an per Vorgabe, drei Koepfe). Tests
+`tests/pruef/gui_blockkopf.dhtest` (4, je mit Gegenprobe ohne Koepfe),
+`tests/pruef/werkzeug_ide_blockkopf.dhtest`.
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
