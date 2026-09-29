@@ -1,0 +1,56 @@
+' Live-Vorschau (Strg+Alt+L): nach einer Pause beim Tippen laeuft das
+' Programm im Reiter 30 Bilder lang ueber `dhrt bild`, das Bild steht im
+' Fenster. Die Kopie neben der Datei (.dh_live_vorschau.dh) ist danach
+' wieder weg. Ein Programm ohne Fenster meldet sich als Fehler.
+--- seriell
+
+=== ein bild nach der pause, ein fehler ohne fenster
+DIM prBild AS INTEGER : prBild = 0
+DIM prSchritt AS INTEGER : prSchritt = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN befehl("live") : prSchritt = 1
+IF prSchritt = 1 AND liveBild >= 0 AND liveProz < 0 THEN
+    protokoll("pr kopie da " + STR$(FILEEXISTS(".dh_live_vorschau.dh") OR FILEEXISTS(PATHJOIN(projektOrdner, ".dh_live_vorschau.dh"))))
+    DIM prF AS INTEGER : prF = GETPIXEL(liveBild, 20, 20)
+    protokoll("pr farbe rot " + STR$(((prF SHR 16) BAND 255) > 200 AND ((prF SHR 8) BAND 255) < 60))
+    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT(" + CHR$(34) + "ohne fenster" + CHR$(34) + ")" + NL + "LINE(0, 0, 10, 10, RED)" + NL)
+    prSchritt = 2
+END IF
+IF prSchritt = 2 AND liveProz >= 0 THEN prSchritt = 3
+IF prSchritt = 3 AND liveProz < 0 THEN
+    protokoll("pr text " + LEFT$(GUI_TEXT(lblLive), 9))
+    EXIT(0)
+END IF
+--- argumente
+bild.dh
+--- umgebung
+DHRT_FRAMES=1200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei bild.dh
+SCREEN(200, 100, "B", 1)
+WHILE NOT QUITREQUESTED()
+    CLS(RED)
+    FLIP()
+WEND
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 5) = "live " THEN PRINT L[i]
+NEXT
+PRINT "kopie am ende "; FILEEXISTS(".dh_live_vorschau.dh")
+--- erwartet
+live an
+live start
+live bild 200x100
+pr kopie da FALSE
+pr farbe rot TRUE
+live start
+live fehler Laufzeitfehler in bild.dh:2: LINE: es gibt noch kein Fenster -- vor dem ersten Zeichenbefehl SCREEN(breite, hoehe, "Titel") aufrufen
+pr text Kein Bild
+kopie am ende FALSE

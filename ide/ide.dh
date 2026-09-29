@@ -782,6 +782,7 @@ DIM miDiff AS INTEGER : miDiff = GUI_MENU_ITEM(mBearb, "Was habe ich geändert (
 DIM miVergleich AS INTEGER : miVergleich = GUI_MENU_ITEM(mBearb, "Mit einer anderen Datei vergleichen ...")
 DIM miReiterVgl AS INTEGER : miReiterVgl = GUI_MENU_ITEM(mBearb, "Zwei Reiter nebeneinander vergleichen")
 DIM miVerlauf AS INTEGER : miVerlauf = GUI_MENU_ITEM(mBearb, "Verlauf dieser Datei (git log)")
+DIM miQv AS INTEGER : miQv = GUI_MENU_ITEM(mBearb, "Quellcodeverwaltung (git) ...", "Strg+Alt+G")
 
 DIM mLauf AS INTEGER : mLauf = GUI_MENU(win, "Ausführen")
 DIM miStart AS INTEGER : miStart = GUI_MENU_ITEM(mLauf, "Starten", "F5")
@@ -791,6 +792,7 @@ DIM miPruefen AS INTEGER : miPruefen = GUI_MENU_ITEM(mLauf, "Prüfen", "Umschalt
 DIM miPrjPruefen AS INTEGER : miPrjPruefen = GUI_MENU_ITEM(mLauf, "Ganzes Projekt prüfen", "Strg+Umschalt+F7")
 DIM miPruefsammlung AS INTEGER : miPruefsammlung = GUI_MENU_ITEM(mLauf, "Prüfsammlung ausführen", "Strg+Alt+F5")
 DIM miPrueffall AS INTEGER : miPrueffall = GUI_MENU_ITEM(mLauf, "Diesen Prüffall ausführen", "Strg+Alt+Umschalt+F5")
+DIM miTestUebersicht AS INTEGER : miTestUebersicht = GUI_MENU_ITEM(mLauf, "Prüfsammlungen im Überblick ...", "Strg+Alt+T")
 GUI_MENU_SEPARATOR(mLauf)
 DIM miDebug AS INTEGER : miDebug = GUI_MENU_ITEM(mLauf, "Debuggen", "F7")
 DIM miHaltepunkt AS INTEGER : miHaltepunkt = GUI_MENU_ITEM(mLauf, "Haltepunkt setzen/entfernen", "F9")
@@ -842,6 +844,7 @@ DIM miKopf AS INTEGER : miKopf = GUI_MENU_ITEM(mAnsicht, "Mitlaufender Blockkopf
 GUI_MENU_CHECK(miKopf, kopfAn)
 DIM miZaehler AS INTEGER : miZaehler = GUI_MENU_ITEM(mAnsicht, "Aufrufzähler über Unterprogrammen")
 GUI_MENU_CHECK(miZaehler, zaehlerAn)
+DIM miLive AS INTEGER : miLive = GUI_MENU_ITEM(mAnsicht, "Live-Vorschau", "Strg+Alt+L")
 DIM miLeiste AS INTEGER : miLeiste = GUI_MENU_ITEM(mAnsicht, "Werkzeugleiste")
 DIM miSeiten AS INTEGER : miSeiten = GUI_MENU_ITEM(mAnsicht, "Seitenleiste", "Alt+1")
 DIM miUnten AS INTEGER : miUnten = GUI_MENU_ITEM(mAnsicht, "Untere Leiste", "Alt+2")
@@ -1349,6 +1352,52 @@ GUI_WINDOW_VISIBLE(winGit, FALSE)
 GUI_WINDOW_RESIZABLE(winGit, TRUE)
 DIM lblGit AS GUI_WIDGET : lblGit = GUI_LABEL(winGit, "", 8, 8)
 DIM taGit AS GUI_WIDGET : taGit = GUI_TEXTAREA(winGit, 8, 30, 884, 552)
+
+' --- Quellcodeverwaltung (git) -----------------------------------------
+' Links die geaenderten Dateien des Repositorys (Kaestchen = vorgemerkt fuer
+' die naechste Uebergabe), rechts der Unterschied der gewaehlten, unten die
+' Nachricht und die Knoepfe. Alles ueber `git` selbst -- die IDE fuehrt
+' keinen eigenen Stand.
+DIM winQv AS GUI_WINDOW : winQv = GUI_WINDOW("Quellcodeverwaltung", 250, 100, 900, 600)
+GUI_WINDOW_VISIBLE(winQv, FALSE)
+DIM lblQvZweig AS GUI_WIDGET : lblQvZweig = GUI_LABEL(winQv, "", 8, 8)
+DIM lstQv AS GUI_WIDGET : lstQv = GUI_LISTBOX(winQv, 8, 36, 330, 400, [])
+GUI_LISTBOX_SET(lstQv, "kaestchen", 1)
+GUI_LISTBOX_PLACEHOLDER(lstQv, "Keine Änderungen.")
+DIM taQvDiff AS GUI_WIDGET : taQvDiff = GUI_TEXTAREA(winQv, 346, 36, 546, 400)
+DIM tfQvNachricht AS GUI_WIDGET : tfQvNachricht = GUI_TEXTINPUT(winQv, 8, 446, 700, 28, "Nachricht für die Übergabe")
+DIM btnQvCommit AS GUI_WIDGET : btnQvCommit = GUI_BUTTON(winQv, "Übergeben", 716, 446, 176, 28)
+GUI_BUTTON_VARIANT(btnQvCommit, "primaer")
+DIM btnQvVerwerfen AS GUI_WIDGET : btnQvVerwerfen = GUI_BUTTON(winQv, "Änderung verwerfen", 8, 484, 180, 28)
+GUI_BUTTON_VARIANT(btnQvVerwerfen, "gefahr")
+DIM btnQvAuf AS GUI_WIDGET : btnQvAuf = GUI_BUTTON(winQv, "Aktualisieren", 196, 484, 140, 28)
+DIM btnQvPull AS GUI_WIDGET : btnQvPull = GUI_BUTTON(winQv, "Holen (pull)", 560, 484, 160, 28)
+DIM btnQvPush AS GUI_WIDGET : btnQvPush = GUI_BUTTON(winQv, "Senden (push)", 728, 484, 164, 28)
+DIM lblQvStatus AS GUI_WIDGET : lblQvStatus = GUI_LABEL(winQv, "", 8, 522)
+GUI_TOOLTIP(lstQv, "Kästchen: für die nächste Übergabe vormerken (git add) oder zurücknehmen")
+
+' --- Pruefsammlungen im Ueberblick -------------------------------------
+DIM winTests AS GUI_WINDOW : winTests = GUI_WINDOW("Prüfsammlungen", 300, 110, 620, 560)
+GUI_WINDOW_VISIBLE(winTests, FALSE)
+DIM lblTests AS GUI_WIDGET : lblTests = GUI_LABEL(winTests, "", 8, 8)
+DIM baumTests AS GUI_WIDGET : baumTests = GUI_TREE(winTests, 8, 34, 604, 440)
+GUI_TREE_PLACEHOLDER(baumTests, "Keine .dhtest-Datei im Projekt.")
+DIM btnTestsAlle AS GUI_WIDGET : btnTestsAlle = GUI_BUTTON(winTests, "Alle ausführen", 8, 484, 140, 28)
+GUI_BUTTON_VARIANT(btnTestsAlle, "primaer")
+DIM btnTestsWahl AS GUI_WIDGET : btnTestsWahl = GUI_BUTTON(winTests, "Auswahl ausführen", 156, 484, 160, 28)
+DIM btnTestsFehl AS GUI_WIDGET : btnTestsFehl = GUI_BUTTON(winTests, "Fehlgeschlagene", 324, 484, 150, 28)
+DIM btnTestsNeu AS GUI_WIDGET : btnTestsNeu = GUI_BUTTON(winTests, "Neu einlesen", 482, 484, 130, 28)
+GUI_TOOLTIP(baumTests, "Doppelklick öffnet den Fall; grün bestanden, rot fehlgeschlagen, grau noch nicht gelaufen oder übersprungen")
+
+' --- Live-Vorschau ------------------------------------------------------
+DIM winLive AS GUI_WINDOW : winLive = GUI_WINDOW("Live-Vorschau", 760, 110, 520, 420)
+GUI_WINDOW_VISIBLE(winLive, FALSE)
+GUI_WINDOW_RESIZABLE(winLive, TRUE)
+DIM lblLive AS GUI_WIDGET : lblLive = GUI_LABEL(winLive, "", 8, 6)
+DIM liveLeer AS IMAGE : liveLeer = IMAGE_NEW(1, 1)
+DIM imgLive AS GUI_WIDGET : imgLive = GUI_IMAGE(winLive, 8, 30, 504, 356, liveLeer)
+GUI_IMAGE_MODE(imgLive, "einpassen")
+GUI_SET_ANCHOR(imgLive, "lrtb")
 
 ' --- Parameter umsortieren --------------------------------------------
 DIM winParam AS GUI_WINDOW : winParam = GUI_WINDOW("Parameter", 420, 200, 460, 320)
@@ -4194,20 +4243,45 @@ SUB pruefsammlungStarten(nurFall AS BOOLEAN)
         IF projektOrdner = "" THEN RETURN
         ziel = projektOrdner
     END IF
+    testLaufStarten([ziel], [filter])
+END SUB
+
+' Eine Folge von Laeufen: je Ziel (Datei oder Ordner) ein `dhrt test`, mit
+' Fall-Namen nur dieser Fall. Ausgabe und Liste werden nur am Anfang
+' geleert -- die Fehlgeschlagenen aus drei Dateien sollen zusammen dastehen.
+DIM testZiele AS ARRAY OF STRING : testZiele = []
+DIM testFaelle AS ARRAY OF STRING : testFaelle = []
+DIM testFall AS STRING : testFall = ""
+DIM testFehlSumme AS INTEGER : testFehlSumme = 0
+DIM testOkSumme AS INTEGER : testOkSumme = 0
+
+SUB testLaufStarten(ziele AS ARRAY OF STRING, faelle AS ARRAY OF STRING)
+    IF testProz >= 0 OR LEN(ziele) = 0 THEN RETURN
     GUI_LISTBOX_CLEAR(lstAusgabe)
     GUI_LISTBOX_CLEAR(lstProbleme)
     sucheDateien = []
     sucheZeilen = []
     problemModus = 1
+    testFehlSumme = 0 : testOkSumme = 0
+    testZiele = ziele
+    testFaelle = faelle
+    testNaechster()
+END SUB
+
+SUB testNaechster()
+    DIM ziel AS STRING : ziel = testZiele[0]
+    testFall = testFaelle[0]
+    ARRAY_REMOVE_AT(testZiele, 0)
+    ARRAY_REMOVE_AT(testFaelle, 0)
     testRest = "" : testDatei = "" : testBilanz = "" : testFehl = 0
-    IF filter = "" THEN
+    IF testFall = "" THEN
         testProz = PROCESS_START("dhrt", "test", ziel)
     ELSE
-        testProz = PROCESS_START("dhrt", "test", ziel, "--fall", filter)
+        testProz = PROCESS_START("dhrt", "test", ziel, "--fall", testFall)
     END IF
     GUI_SET_TEXT(lblAusgabe, "Ausgabe: Prüfsammlung läuft ...")
     GUI_SET_TEXT(lblProbleme, "Prüfsammlung läuft ...")
-    protokoll("pruefsammlung start " + BASENAME(ziel) + IIF(filter <> "", " fall " + filter, ""))
+    protokoll("pruefsammlung start " + BASENAME(ziel) + IIF(testFall <> "", " fall " + testFall, ""))
 END SUB
 
 ' Eine Zeile der Ausgabe von `dhrt test`: in die Ausgabe, und ein FEHL in
@@ -4215,11 +4289,18 @@ END SUB
 SUB testZeile(z AS STRING)
     ausgabe(z)
     DIM t AS STRING : t = TRIM$(z)
-    IF LEFT$(t, 8) = "FEHLER  " THEN
+    IF LEFT$(t, 8) = "FEHLER  " OR LEFT$(t, 8) = "ok      " THEN
         DIM r AS STRING : r = TRIM$(MID$(t, 8))
         DIM kl AS INTEGER : kl = INSTR(r, "  (")
         IF kl > 0 THEN r = LEFT$(r, kl)
         testDatei = r
+        ' Erst gilt jeder gelaufene Fall der Datei als bestanden, die
+        ' FEHL-/uebersprungen-Zeilen danach nehmen es zurueck.
+        IF LOWER$(RIGHT$(r, 7)) = ".dhtest" THEN testDateiBestanden(r)
+    ELSEIF LEFT$(t, 20) = "uebersprungen  Zeile" THEN
+        DIM ru AS STRING : ru = MID$(t, 21)
+        DIM du AS INTEGER : du = INSTR(ru, ":")
+        IF du > 0 AND testDatei <> "" THEN testStatusSetzen(testDatei, INT(VAL(LEFT$(ru, du))), "ueber")
     ELSEIF LEFT$(t, 11) = "FEHL  Zeile" THEN
         DIM rest AS STRING : rest = MID$(t, 12)
         DIM dp AS INTEGER : dp = INSTR(rest, ":")
@@ -4234,6 +4315,7 @@ SUB testZeile(z AS STRING)
             GUI_LISTBOX_ADD(lstProbleme, BASENAME(d) + ":" + STR$(nr) + ": " + TRIM$(MID$(rest, dp + 1)))
             GUI_LISTBOX_COLOR(lstProbleme, LEN(sucheZeilen) - 1, &HE06060)
             testFehl = testFehl + 1
+            testStatusSetzen(testDatei, nr, "fehl")
         END IF
     ELSEIF INSTR(t, " Faelle, ") >= 0 THEN
         DIM sc AS INTEGER : sc = INSTR(t, "; ")
@@ -4273,11 +4355,561 @@ SUB testNachsehen()
     DIM code AS INTEGER : code = PROCESS_CODE(testProz)
     PROCESS_CLOSE(testProz)
     testProz = -1
+    testFehlSumme = testFehlSumme + testFehl
+    IF GUI_WINDOW_SHOWN(winTests) THEN testUebersichtFuellen()
+    IF LEN(testZiele) > 0 THEN
+        protokoll("pruefsammlung fertig " + STR$(testFehl) + " " + STR$(code))
+        testNaechster()
+        RETURN
+    END IF
     DIM was AS STRING : was = IIF(testBilanz <> "", testBilanz, "beendet mit Code " + STR$(code))
     GUI_SET_TEXT(lblAusgabe, "Ausgabe: Prüfsammlung " + was)
     GUI_SET_TEXT(lblProbleme, "Prüfsammlung: " + was + " -- Umschalt+F7 zeigt wieder die Probleme der Datei")
     GUI_SET_TEXT(lblStatus, "Prüfsammlung: " + was)
     protokoll("pruefsammlung fertig " + STR$(testFehl) + " " + STR$(code))
+END SUB
+
+' --- Quellcodeverwaltung: Logik ----------------------------------------
+DIM qvWurzel AS STRING : qvWurzel = ""
+DIM qvPfade AS ARRAY OF STRING : qvPfade = []
+DIM qvArten AS ARRAY OF STRING : qvArten = []
+DIM qvHaken AS ARRAY OF BOOLEAN : qvHaken = []
+DIM qvWahl AS INTEGER : qvWahl = -2
+DIM qvVorgemerkt AS INTEGER : qvVorgemerkt = 0
+DIM gitProz AS INTEGER : gitProz = -1
+DIM gitProzArt AS STRING : gitProzArt = ""
+DIM dlgQvVerwerfen AS GUI_WINDOW : dlgQvVerwerfen = 0
+DIM qvVerwerfenPfad AS STRING : qvVerwerfenPfad = ""
+
+FUNCTION qvGit$(a AS STRING, b AS STRING, c AS STRING, d AS STRING, e AS STRING) AS STRING
+    TRY
+        IF b = "" THEN RETURN SHELL_OUT$("git", "-C", qvWurzel, a)
+        IF c = "" THEN RETURN SHELL_OUT$("git", "-C", qvWurzel, a, b)
+        IF d = "" THEN RETURN SHELL_OUT$("git", "-C", qvWurzel, a, b, c)
+        IF e = "" THEN RETURN SHELL_OUT$("git", "-C", qvWurzel, a, b, c, d)
+        RETURN SHELL_OUT$("git", "-C", qvWurzel, a, b, c, d, e)
+    CATCH fehler
+        RETURN ""
+    END TRY
+END FUNCTION
+
+SUB qvZeigen()
+    DIM ordner AS STRING : ordner = projektOrdner
+    IF ordner = "" AND aktiverTab >= 0 AND tabPfade[aktiverTab] <> "" THEN ordner = DIRNAME(tabPfade[aktiverTab])
+    IF ordner = "" OR NOT gitRepo(ordner) THEN
+        GUI_SET_TEXT(lblStatus, "Quellcodeverwaltung: das Projekt liegt in keinem git-Verzeichnis.")
+        protokoll("qv kein repo")
+        RETURN
+    END IF
+    TRY
+        qvWurzel = TRIM$(REPLACE$(SHELL_OUT$("git", "-C", ordner, "rev-parse", "--show-toplevel"), CHR$(13), ""))
+    CATCH e
+        qvWurzel = ""
+    END TRY
+    IF qvWurzel = "" THEN
+        GUI_SET_TEXT(lblStatus, "Quellcodeverwaltung: git ist nicht zu starten.")
+        protokoll("qv kein git")
+        RETURN
+    END IF
+    qvAuffrischen()
+    GUI_WINDOW_VISIBLE(winQv, TRUE)
+    GUI_FOCUS(tfQvNachricht)
+END SUB
+
+' Den Stand von `git status` einlesen. Das Kaestchen ist die Spalte des
+' Index: steht dort etwas (nicht "?"), ist die Datei vorgemerkt.
+SUB qvAuffrischen()
+    DIM text AS STRING : text = REPLACE$(qvGit$("status", "--porcelain=v1", "-b", "-uall", ""), CHR$(13), "")
+    GUI_LISTBOX_CLEAR(lstQv)
+    qvPfade = [] : qvArten = [] : qvHaken = []
+    qvVorgemerkt = 0
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(text, NL)
+        IF LEFT$(z, 3) = "## " THEN
+            GUI_SET_TEXT(lblQvZweig, "Zweig: " + MID$(z, 3) + "   (" + qvWurzel + ")")
+            CONTINUE
+        END IF
+        IF LEN(z) < 4 THEN CONTINUE
+        DIM x AS STRING : x = MID$(z, 0, 1)
+        DIM y AS STRING : y = MID$(z, 1, 1)
+        DIM pfad AS STRING : pfad = MID$(z, 3)
+        DIM pf AS INTEGER : pf = INSTR(pfad, " -> ")
+        IF pf >= 0 THEN pfad = MID$(pfad, pf + 4)
+        IF LEFT$(pfad, 1) = CHR$(34) AND RIGHT$(pfad, 1) = CHR$(34) THEN pfad = MID$(pfad, 1, LEN(pfad) - 2)
+        DIM art AS STRING
+        IF x = "?" THEN
+            art = "neu"
+        ELSEIF x = "A" THEN
+            art = "hinzugefügt"
+        ELSEIF x = "D" OR y = "D" THEN
+            art = "gelöscht"
+        ELSEIF x = "R" THEN
+            art = "umbenannt"
+        ELSE
+            art = "geändert"
+        END IF
+        DIM vor AS BOOLEAN : vor = x <> " " AND x <> "?"
+        GUI_LISTBOX_ADD(lstQv, pfad)
+        DIM k AS INTEGER : k = GUI_LISTBOX_COUNT(lstQv) - 1
+        GUI_LISTBOX_DETAIL(lstQv, k, art)
+        GUI_LISTBOX_SET_CHECKED(lstQv, k, vor)
+        ARRAY_PUSH(qvPfade, pfad) : ARRAY_PUSH(qvArten, x + y) : ARRAY_PUSH(qvHaken, vor)
+        IF vor THEN qvVorgemerkt = qvVorgemerkt + 1
+    NEXT
+    qvWahl = -2
+    GUI_SET_TEXT(taQvDiff, "")
+    IF LEN(qvPfade) > 0 THEN GUI_LISTBOX_SET_SELECTED(lstQv, 0)
+    GUI_SET_TEXT(lblQvStatus, STR$(LEN(qvPfade)) + " geänderte Datei(en), " + STR$(qvVorgemerkt) + " vorgemerkt.")
+    protokoll("qv " + STR$(LEN(qvPfade)) + " " + STR$(qvVorgemerkt))
+END SUB
+
+SUB qvDiffZeigen(i AS INTEGER)
+    IF i < 0 OR i >= LEN(qvPfade) THEN GUI_SET_TEXT(taQvDiff, "") : RETURN
+    DIM text AS STRING
+    IF LEFT$(qvArten[i], 1) = "?" THEN
+        ' neu, noch nie vorgemerkt: der ganze Inhalt ist der Unterschied
+        DIM inhalt AS STRING : inhalt = ""
+        TRY
+            inhalt = dateiLesen(PATHJOIN(qvWurzel, qvPfade[i]))
+        CATCH e
+            inhalt = ""
+        END TRY
+        text = "+++ " + qvPfade[i] + " (neu)" + NL + "+" + REPLACE$(inhalt, NL, NL + "+")
+    ELSE
+        text = qvGit$("diff", "--no-color", "HEAD", "--", qvPfade[i])
+        IF TRIM$(text) = "" THEN text = qvGit$("diff", "--no-color", "--staged", "--", qvPfade[i])
+    END IF
+    GUI_SET_TEXT(taQvDiff, REPLACE$(text, CHR$(13), ""))
+    diffFaerben(taQvDiff)
+END SUB
+
+' Uebergeben, was vorgemerkt ist.
+SUB qvUebergeben()
+    DIM nachricht AS STRING : nachricht = TRIM$(GUI_TEXT(tfQvNachricht))
+    IF nachricht = "" THEN
+        GUI_SET_TEXT(lblQvStatus, "Erst eine Nachricht schreiben -- sie sagt später, was diese Übergabe wollte.")
+        protokoll("qv commit ohne nachricht")
+        RETURN
+    END IF
+    IF qvVorgemerkt = 0 THEN
+        GUI_SET_TEXT(lblQvStatus, "Nichts vorgemerkt -- ein Kästchen links setzt eine Datei auf die Liste.")
+        protokoll("qv commit leer")
+        RETURN
+    END IF
+    DIM aus AS STRING : aus = qvGit$("commit", "-m", nachricht, "", "")
+    GUI_SET_TEXT(tfQvNachricht, "")
+    qvAuffrischen()
+    DIM erste AS STRING : erste = TRIM$(SPLIT$(REPLACE$(aus, CHR$(13), ""), NL)[0])
+    GUI_SET_TEXT(lblQvStatus, IIF(erste = "", "Übergeben.", erste))
+    GUI_SET_TEXT(lblStatus, "git: " + IIF(erste = "", "übergeben", erste))
+    protokoll("qv commit " + nachricht)
+END SUB
+
+' Eine Aenderung verwerfen: nach Rueckfrage, und nur, wenn die Datei nicht
+' ungesichert in einem Reiter steht (sonst schriebe das naechste Sichern sie
+' wieder hin). Neue Dateien loescht die IDE nicht -- das tut man selbst.
+SUB qvVerwerfenFragen()
+    DIM i AS INTEGER : i = GUI_LISTBOX_SELECTED(lstQv)
+    IF i < 0 OR i >= LEN(qvPfade) THEN
+        GUI_SET_TEXT(lblQvStatus, "Erst links eine Datei wählen.")
+        RETURN
+    END IF
+    IF LEFT$(qvArten[i], 1) = "?" THEN
+        GUI_SET_TEXT(lblQvStatus, qvPfade[i] + " ist neu -- verwerfen hieße löschen, das tut die IDE nicht.")
+        RETURN
+    END IF
+    qvVerwerfenPfad = qvPfade[i]
+    dlgQvVerwerfen = GUI_DIALOG("Änderung verwerfen", "Alle Änderungen an " + qvPfade[i] + _
+        " seit der letzten Übergabe verwerfen? Das lässt sich nicht zurücknehmen.", "Verwerfen|Abbrechen")
+END SUB
+
+SUB qvVerwerfen(pfad AS STRING)
+    DIM voll AS STRING : voll = PATHJOIN(qvWurzel, pfad)
+    DIM t AS INTEGER : t = tabMitPfad(voll)
+    IF t >= 0 THEN
+        IF GUI_TEXT(tabFelder[t]) <> tabGesichert[t] THEN
+            GUI_SET_TEXT(lblQvStatus, pfad + " ist im Reiter ungesichert -- erst sichern oder dort zurücknehmen.")
+            protokoll("qv verwerfen ungesichert")
+            RETURN
+        END IF
+    END IF
+    DIM aus AS STRING : aus = qvGit$("restore", "--staged", "--worktree", "--", pfad)
+    IF t >= 0 THEN
+        DIM neu AS STRING : neu = ""
+        TRY
+            neu = dateiLesen(voll)
+        CATCH e
+            neu = ""
+        END TRY
+        feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), neu)
+        tabGesichert[t] = GUI_TEXT(tabFelder[t])
+    END IF
+    zaehlCache = {}
+    qvAuffrischen()
+    GUI_SET_TEXT(lblQvStatus, "Verworfen: " + pfad)
+    protokoll("qv verworfen " + pfad)
+END SUB
+
+SUB qvNachziehen()
+    IF gitProz >= 0 THEN
+        DIM a AS STRING : a = PROCESS_READ$(gitProz)
+        DIM e AS STRING : e = PROCESS_ERR$(gitProz)
+        IF a <> "" THEN ausgabeVerteilen(a)
+        IF e <> "" THEN ausgabeVerteilen(e)
+        IF NOT PROCESS_RUNNING(gitProz) THEN
+            DIM leer AS INTEGER : leer = 0
+            WHILE leer < 5
+                a = PROCESS_READ$(gitProz) : e = PROCESS_ERR$(gitProz)
+                IF a = "" AND e = "" THEN
+                    leer = leer + 1 : SLEEP(10)
+                ELSE
+                    ausgabeVerteilen(a + e) : leer = 0
+                END IF
+            WEND
+            IF ausgabeRest <> "" THEN ausgabe(ausgabeRest) : ausgabeRest = ""
+            DIM code AS INTEGER : code = PROCESS_CODE(gitProz)
+            PROCESS_CLOSE(gitProz)
+            gitProz = -1
+            GUI_SET_TEXT(lblQvStatus, "git " + gitProzArt + IIF(code = 0, ": fertig.", ": fehlgeschlagen (Code " + STR$(code) + ") -- siehe Ausgabe."))
+            protokoll("qv " + gitProzArt + " " + STR$(code))
+            IF GUI_WINDOW_SHOWN(winQv) THEN qvAuffrischen()
+        END IF
+    END IF
+    IF dlgQvVerwerfen <> 0 THEN
+        DIM ant AS INTEGER : ant = GUI_ANSWER(dlgQvVerwerfen)
+        IF ant = 1 THEN
+            dlgQvVerwerfen = 0
+            qvVerwerfen(qvVerwerfenPfad)
+        ELSEIF ant = 2 THEN
+            dlgQvVerwerfen = 0
+        END IF
+    END IF
+    IF NOT GUI_WINDOW_SHOWN(winQv) THEN RETURN
+    ' Ein Kaestchen umgelegt: vormerken bzw. zuruecknehmen.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(qvPfade) - 1
+        IF i >= GUI_LISTBOX_COUNT(lstQv) THEN EXIT FOR
+        DIM an AS BOOLEAN : an = GUI_LISTBOX_CHECKED(lstQv, i)
+        IF an <> qvHaken[i] THEN
+            DIM p AS STRING : p = qvPfade[i]
+            IF an THEN
+                qvGit$("add", "--", p, "", "")
+            ELSE
+                qvGit$("restore", "--staged", "--", p, "")
+            END IF
+            protokoll("qv " + IIF(an, "vorgemerkt ", "zurueck ") + p)
+            qvAuffrischen()
+            RETURN
+        END IF
+    NEXT
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstQv)
+    IF sel <> qvWahl THEN
+        qvWahl = sel
+        qvDiffZeigen(sel)
+    END IF
+    IF GUI_CLICKED(btnQvCommit) OR GUI_ENTERED(tfQvNachricht) THEN qvUebergeben()
+    IF GUI_CLICKED(btnQvAuf) THEN qvAuffrischen()
+    IF GUI_CLICKED(btnQvVerwerfen) THEN qvVerwerfenFragen()
+    IF GUI_CLICKED(btnQvPull) THEN qvFern("pull")
+    IF GUI_CLICKED(btnQvPush) THEN qvFern("push")
+END SUB
+
+' Holen und Senden dauern und koennen nach Zugangsdaten fragen -- ein
+' eigener Prozess, die Ausgabe laeuft unten mit.
+SUB qvFern(art AS STRING)
+    IF gitProz >= 0 THEN
+        GUI_SET_TEXT(lblQvStatus, "git " + gitProzArt + " läuft noch.")
+        RETURN
+    END IF
+    gitProzArt = art
+    GUI_LISTBOX_CLEAR(lstAusgabe)
+    ausgabe("git " + art + " in " + qvWurzel)
+    gitProz = PROCESS_START("git", "-C", qvWurzel, art)
+    PROCESS_CLOSE_INPUT(gitProz)
+    GUI_SET_TEXT(lblQvStatus, "git " + art + " läuft ...")
+    protokoll("qv " + art + " start")
+END SUB
+
+' --- Live-Vorschau: Logik ------------------------------------------------
+' Ist sie an, laeuft das Programm im Reiter nach jeder Pause beim Tippen
+' 30 Bilder lang ueber `dhrt bild` und das letzte Bild steht im Fenster.
+' Gerechnet wird eine Kopie des Textes NEBEN der Datei (relative Bilder und
+' IMPORTs finden sich so), versteckt als ".dh_live_vorschau.dh" und danach
+' geloescht; die Eingabe des Programms ist sofort zu (INPUT haengt nicht),
+' und nach 10 s wird abgebrochen.
+DIM liveAn AS BOOLEAN : liveAn = FALSE
+DIM liveProz AS INTEGER : liveProz = -1
+DIM liveStand AS STRING : liveStand = "-"
+DIM liveKandidat AS STRING : liveKandidat = "-"
+DIM liveFaellig AS FLOAT : liveFaellig = -1.0
+DIM liveStart AS FLOAT : liveStart = 0.0
+DIM liveKopie AS STRING : liveKopie = ""
+DIM liveDatei AS STRING : liveDatei = ""
+DIM liveBild AS IMAGE : liveBild = -1
+DIM liveFehler AS STRING : liveFehler = ""
+
+SUB liveSetzen(an AS BOOLEAN)
+    liveAn = an
+    GUI_MENU_CHECK(miLive, an)
+    GUI_WINDOW_VISIBLE(winLive, an)
+    IF an THEN
+        liveStand = "-" : liveKandidat = "-"
+        GUI_SET_TEXT(lblLive, "Wartet auf eine Pause beim Tippen ...")
+    END IF
+    GUI_SET_TEXT(lblStatus, IIF(an, "Live-Vorschau an.", "Live-Vorschau aus."))
+    protokoll("live " + IIF(an, "an", "aus"))
+END SUB
+
+' Absolut: `dhrt bild` wechselt in den Ordner des Programms, ein relativer
+' Vorschauordner (DH_IDE_KONFIG=ide.json) laege sonst dort.
+FUNCTION livePng$() AS STRING
+    DIM o AS STRING : o = vorschauOrdner
+    IF NOT (MID$(o, 1, 1) = ":" OR LEFT$(o, 1) = "/" OR LEFT$(o, 1) = "\") THEN o = PATHJOIN(CWD$(), o)
+    RETURN PATHJOIN(o, "live.png")
+END FUNCTION
+
+SUB liveNachziehen()
+    IF NOT liveAn THEN RETURN
+    IF NOT GUI_WINDOW_SHOWN(winLive) THEN liveSetzen(FALSE) : RETURN
+    IF liveProz >= 0 THEN
+        liveFehler = liveFehler + PROCESS_ERR$(liveProz)
+        DIM verwerfen AS STRING : verwerfen = PROCESS_READ$(liveProz)
+        IF PROCESS_RUNNING(liveProz) THEN
+            IF GET_TIME() - liveStart > 10.0 THEN
+                PROCESS_KILL(liveProz)
+                liveFehler = liveFehler + NL + "nach 10 s abgebrochen"
+            END IF
+            RETURN
+        END IF
+        SLEEP(20)
+        liveFehler = liveFehler + PROCESS_ERR$(liveProz)
+        DIM code AS INTEGER : code = PROCESS_CODE(liveProz)
+        PROCESS_CLOSE(liveProz)
+        liveProz = -1
+        IF liveKopie <> "" AND FILEEXISTS(liveKopie) THEN DELETEFILE(liveKopie)
+        IF code = 0 AND FILEEXISTS(livePng$()) THEN
+            IF liveBild >= 0 THEN IMAGE_FREE(liveBild)
+            liveBild = LOADIMAGE(livePng$())
+            GUI_SET_IMAGE(imgLive, liveBild)
+            GUI_SET_TEXT(lblLive, "Stand " + TIME$())
+            protokoll("live bild " + STR$(IMAGEWIDTH(liveBild)) + "x" + STR$(IMAGEHEIGHT(liveBild)))
+        ELSE
+            DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(TRIM$(REPLACE$(liveFehler, CHR$(13), "")), NL)
+            DIM letzte AS STRING : letzte = "kein Bild (Code " + STR$(code) + ")"
+            IF LEN(zeilen) > 0 AND TRIM$(zeilen[LEN(zeilen) - 1]) <> "" THEN letzte = TRIM$(zeilen[LEN(zeilen) - 1])
+            ' Die Meldung nennt die Kopie -- gemeint ist die Datei im Reiter.
+            letzte = REPLACE$(letzte, ".dh_live_vorschau.dh", liveDatei)
+            GUI_SET_TEXT(lblLive, "Kein Bild: " + letzte)
+            protokoll("live fehler " + letzte)
+        END IF
+        RETURN
+    END IF
+    IF aktiverTab < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    IF pfad = "" OR LOWER$(RIGHT$(pfad, 3)) <> ".dh" THEN
+        GUI_SET_TEXT(lblLive, "Nur für gesicherte .dh-Dateien.")
+        RETURN
+    END IF
+    DIM text AS STRING : text = GUI_TEXT(tabFelder[aktiverTab])
+    IF text = liveStand THEN RETURN
+    IF text <> liveKandidat THEN
+        liveKandidat = text
+        liveFaellig = GET_TIME() + 0.8
+        RETURN
+    END IF
+    IF GET_TIME() < liveFaellig THEN RETURN
+    liveStand = text
+    liveDatei = BASENAME(pfad)
+    liveKopie = PATHJOIN(DIRNAME(pfad), ".dh_live_vorschau.dh")
+    WRITEALL(liveKopie, text)
+    IF NOT DIREXISTS(DIRNAME(livePng$())) THEN MKDIR(DIRNAME(livePng$()))
+    IF FILEEXISTS(livePng$()) THEN DELETEFILE(livePng$())
+    liveFehler = ""
+    liveStart = GET_TIME()
+    liveProz = PROCESS_START("dhrt", "bild", liveKopie, livePng$(), "30")
+    PROCESS_CLOSE_INPUT(liveProz)
+    GUI_SET_TEXT(lblLive, "Rechnet ...")
+    protokoll("live start")
+END SUB
+
+' --- Pruefsammlungen im Ueberblick: Logik -------------------------------
+' Je Fall der Stand des letzten Laufs ("ok", "fehl", "ueber"), Schluessel
+' ist der Weg der Sammlung (klein, mit Schraegstrichen) und die Zeile ihres
+' "=== Name". Er bleibt ueber das Schliessen des Fensters hinaus.
+DIM testStatus AS MAP OF STRING
+DIM tuKnoten AS ARRAY OF INTEGER : tuKnoten = []
+DIM tuDatei AS ARRAY OF STRING : tuDatei = []
+DIM tuZeile AS ARRAY OF INTEGER : tuZeile = []
+DIM tuName AS ARRAY OF STRING : tuName = []
+DIM tuPunkte AS ARRAY OF IMAGE : tuPunkte = []
+
+' Kanonisch: `dhrt test` nennt den Weg, wie er ihm gegeben wurde -- auch in
+' der kurzen 8.3-Schreibweise (HANSGA~1), der Baum in der langen.
+FUNCTION testSchluessel$(pfad AS STRING, zeile AS INTEGER) AS STRING
+    DIM w AS STRING : w = pfad
+    TRY
+        w = REALPATH$(pfad)
+    CATCH e
+        w = pfad
+    END TRY
+    RETURN LOWER$(wegGleich$(w)) + "|" + STR$(zeile)
+END FUNCTION
+
+SUB testStatusSetzen(pfad AS STRING, zeile AS INTEGER, stand AS STRING)
+    MAPPUT(testStatus, testSchluessel$(pfad, zeile), stand)
+END SUB
+
+' Die Faelle einer Sammlung: (Zeilen, Namen) der "=== "-Zeilen.
+FUNCTION testFaelleVon(pfad AS STRING) AS TUPLE
+    DIM zl AS ARRAY OF INTEGER : zl = []
+    DIM nm AS ARRAY OF STRING : nm = []
+    DIM q AS STRING : q = ""
+    TRY
+        q = dateiLesen(pfad)
+    CATCH e
+        q = ""
+    END TRY
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        IF LEFT$(zeilen[i], 4) = "=== " THEN
+            ARRAY_PUSH(zl, i + 1)
+            ARRAY_PUSH(nm, TRIM$(REPLACE$(MID$(zeilen[i], 4), CHR$(13), "")))
+        END IF
+    NEXT
+    RETURN (zl, nm)
+END FUNCTION
+
+' Alle Faelle der Datei, die in diesem Lauf dran waren, als bestanden.
+SUB testDateiBestanden(pfad AS STRING)
+    DIM zl AS ARRAY OF INTEGER
+    DIM nm AS ARRAY OF STRING
+    (zl, nm) = testFaelleVon(pfad)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zl) - 1
+        IF testFall = "" OR nm[i] = testFall THEN testStatusSetzen(pfad, zl[i], "ok")
+    NEXT
+END SUB
+
+' Ein kleiner farbiger Punkt als Sinnbild -- grau, gruen, rot.
+FUNCTION testPunkt(farbe AS INTEGER) AS IMAGE
+    DIM b AS IMAGE : b = IMAGE_NEW(12, 12)
+    IMAGE_FILL_ELLIPSE(b, 6.0, 6.0, 4.5, 4.5, farbe)
+    RETURN b
+END FUNCTION
+
+SUB testUebersichtZeigen()
+    IF LEN(tuPunkte) = 0 THEN
+        ARRAY_PUSH(tuPunkte, testPunkt(&H808890))
+        ARRAY_PUSH(tuPunkte, testPunkt(&H40C060))
+        ARRAY_PUSH(tuPunkte, testPunkt(&HE05050))
+    END IF
+    testUebersichtFuellen()
+    GUI_WINDOW_VISIBLE(winTests, TRUE)
+    GUI_FOCUS(baumTests)
+END SUB
+
+SUB testUebersichtFuellen()
+    DIM wahlDatei AS STRING : wahlDatei = ""
+    DIM wahlZeile AS INTEGER : wahlZeile = -1
+    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baumTests)
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(tuKnoten, sel)
+    IF sel >= 0 AND k >= 0 THEN wahlDatei = tuDatei[k] : wahlZeile = tuZeile[k]
+    GUI_TREE_CLEAR(baumTests)
+    tuKnoten = [] : tuDatei = [] : tuZeile = [] : tuName = []
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    IF projektOrdner <> "" THEN dateien = projektDateien("*.dhtest")
+    DIM gesamt AS INTEGER : gesamt = 0
+    DIM gut AS INTEGER : gut = 0
+    DIM schlecht AS INTEGER : schlecht = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM zl AS ARRAY OF INTEGER
+        DIM nm AS ARRAY OF STRING
+        (zl, nm) = testFaelleVon(pfad)
+        DIM fk AS INTEGER : fk = GUI_TREE_ADD(baumTests, -1, d)
+        ARRAY_PUSH(tuKnoten, fk) : ARRAY_PUSH(tuDatei, pfad) : ARRAY_PUSH(tuZeile, 0) : ARRAY_PUSH(tuName, "")
+        DIM fOk AS INTEGER : fOk = 0
+        DIM fFehl AS INTEGER : fFehl = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zl) - 1
+            DIM stand AS STRING : stand = MAPGETOR(testStatus, testSchluessel$(pfad, zl[i]), "")
+            DIM kk AS INTEGER : kk = GUI_TREE_ADD(baumTests, fk, nm[i])
+            ARRAY_PUSH(tuKnoten, kk) : ARRAY_PUSH(tuDatei, pfad) : ARRAY_PUSH(tuZeile, zl[i]) : ARRAY_PUSH(tuName, nm[i])
+            DIM bild AS INTEGER : bild = 0
+            IF stand = "ok" THEN bild = 1 : fOk = fOk + 1
+            IF stand = "fehl" THEN bild = 2 : fFehl = fFehl + 1
+            IF LEN(tuPunkte) = 3 THEN GUI_TREE_ICON(baumTests, kk, tuPunkte[bild])
+            IF stand = "fehl" THEN GUI_TREE_COLOR(baumTests, kk, &HE06060)
+            IF wahlDatei = pfad AND wahlZeile = zl[i] THEN GUI_TREE_SET_SELECTED(baumTests, kk)
+        NEXT
+        DIM fb AS INTEGER : fb = 0
+        IF fFehl > 0 THEN
+            fb = 2
+            GUI_TREE_COLOR(baumTests, fk, &HE06060)
+        ELSEIF fOk = LEN(zl) AND LEN(zl) > 0 THEN
+            fb = 1
+        END IF
+        IF LEN(tuPunkte) = 3 THEN GUI_TREE_ICON(baumTests, fk, tuPunkte[fb])
+        ' Eine Datei mit Fehlschlag steht offen; die anderen nur, solange es
+        ' wenige Sammlungen sind -- sonst sucht man den roten Fall in einer
+        ' langen Liste gruener.
+        GUI_TREE_EXPAND(baumTests, fk, fFehl > 0 OR LEN(dateien) <= 5)
+        IF wahlDatei = pfad AND wahlZeile = 0 THEN GUI_TREE_SET_SELECTED(baumTests, fk)
+        gesamt = gesamt + LEN(zl) : gut = gut + fOk : schlecht = schlecht + fFehl
+    NEXT
+    GUI_SET_TEXT(lblTests, STR$(LEN(dateien)) + " Sammlung(en), " + STR$(gesamt) + " Fälle: " + _
+                 STR$(gut) + " bestanden, " + STR$(schlecht) + " fehlgeschlagen, " + _
+                 STR$(gesamt - gut - schlecht) + " offen")
+    protokoll("tests " + STR$(LEN(dateien)) + " " + STR$(gesamt) + " " + STR$(gut) + " " + STR$(schlecht))
+END SUB
+
+' Die gewaehlten Knoten als Laeufe: eine Datei ganz, ein Fall allein.
+SUB testAuswahlAusfuehren()
+    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baumTests)
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(tuKnoten, sel)
+    IF sel < 0 OR k < 0 THEN
+        GUI_SET_TEXT(lblTests, "Erst eine Sammlung oder einen Fall wählen.")
+        RETURN
+    END IF
+    testLaufStarten([tuDatei[k]], [tuName[k]])
+END SUB
+
+SUB testFehlgeschlageneAusfuehren()
+    DIM ziele AS ARRAY OF STRING : ziele = []
+    DIM faelle AS ARRAY OF STRING : faelle = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(tuKnoten) - 1
+        IF tuZeile[i] = 0 THEN CONTINUE
+        IF MAPGETOR(testStatus, testSchluessel$(tuDatei[i], tuZeile[i]), "") = "fehl" THEN
+            ARRAY_PUSH(ziele, tuDatei[i]) : ARRAY_PUSH(faelle, tuName[i])
+        END IF
+    NEXT
+    IF LEN(ziele) = 0 THEN
+        GUI_SET_TEXT(lblTests, "Kein fehlgeschlagener Fall.")
+        protokoll("tests keine fehlgeschlagenen")
+        RETURN
+    END IF
+    testLaufStarten(ziele, faelle)
+END SUB
+
+SUB testUebersichtNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winTests) THEN RETURN
+    IF GUI_CLICKED(btnTestsNeu) THEN testUebersichtFuellen()
+    IF testProz < 0 THEN
+        IF GUI_CLICKED(btnTestsAlle) AND projektOrdner <> "" THEN testLaufStarten([projektOrdner], [""])
+        IF GUI_CLICKED(btnTestsWahl) THEN testAuswahlAusfuehren()
+        IF GUI_CLICKED(btnTestsFehl) THEN testFehlgeschlageneAusfuehren()
+    END IF
+    IF GUI_DOUBLE_CLICKED(baumTests) THEN
+        DIM k AS INTEGER : k = ARRAY_INDEXOF(tuKnoten, GUI_TREE_SELECTED(baumTests))
+        IF k >= 0 THEN
+            dateiOeffnen(tuDatei[k])
+            IF tuZeile[k] > 0 AND aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), tuZeile[k], 1)
+            protokoll("tests sprung " + BASENAME(tuDatei[k]) + " " + STR$(tuZeile[k]))
+        END IF
+    END IF
 END SUB
 
 ' --- Ganzes Projekt pruefen --------------------------------------------
@@ -11166,8 +11798,11 @@ paletteEintrag("Andere Reiter schließen", "andere_zu", "Strg+Umschalt+W")
 paletteEintrag("Einrückungslinien", "linien", "")
 paletteEintrag("Mitlaufender Blockkopf", "blockkopf", "")
 paletteEintrag("Aufrufzähler über Unterprogrammen", "aufrufzaehler", "")
+paletteEintrag("Quellcodeverwaltung (git)", "git_fenster", "Strg+Alt+G")
+paletteEintrag("Live-Vorschau", "live", "Strg+Alt+L")
 paletteEintrag("Prüfsammlung ausführen", "pruefsammlung", "Strg+Alt+F5")
 paletteEintrag("Diesen Prüffall ausführen", "prueffall", "Strg+Alt+Umschalt+F5")
+paletteEintrag("Prüfsammlungen im Überblick", "test_uebersicht", "Strg+Alt+T")
 paletteEintrag("Werkzeugleiste", "leiste", "")
 paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
 paletteEintrag("Gewählte Dateien öffnen", "baum_oeffnen", "Strg+Umschalt+E")
@@ -11647,8 +12282,11 @@ SUB befehl(k AS STRING)
         CASE "linien" : linienSetzen(NOT linienAn)
         CASE "blockkopf" : kopfSetzen(NOT kopfAn)
         CASE "aufrufzaehler" : zaehlerSetzen(NOT zaehlerAn)
+        CASE "git_fenster" : qvZeigen()
+        CASE "live" : liveSetzen(NOT liveAn)
         CASE "pruefsammlung" : pruefsammlungStarten(FALSE)
         CASE "prueffall" : pruefsammlungStarten(TRUE)
+        CASE "test_uebersicht" : testUebersichtZeigen()
         CASE "leiste"
             leisteAn = NOT leisteAn
             GUI_MENU_CHECK(miLeiste, leisteAn)
@@ -11949,8 +12587,11 @@ WHILE NOT beenden
     IF GUI_CLICKED(miLinien) THEN befehl("linien")
     IF GUI_CLICKED(miKopf) THEN befehl("blockkopf")
     IF GUI_CLICKED(miZaehler) THEN befehl("aufrufzaehler")
+    IF GUI_CLICKED(miQv) THEN befehl("git_fenster")
+    IF GUI_CLICKED(miLive) THEN befehl("live")
     IF GUI_CLICKED(miPruefsammlung) THEN befehl("pruefsammlung")
     IF GUI_CLICKED(miPrueffall) THEN befehl("prueffall")
+    IF GUI_CLICKED(miTestUebersicht) THEN befehl("test_uebersicht")
     IF GUI_CLICKED(miLeiste) THEN befehl("leiste")
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
     DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
@@ -12004,6 +12645,9 @@ WHILE NOT beenden
         IF KEYHIT(KEY_ESCAPE) THEN projektPruefenAbbrechen() ELSE projektPruefenSchritt()
     END IF
     testNachsehen()
+    qvNachziehen()
+    liveNachziehen()
+    testUebersichtNachziehen()
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miHakenWeg) THEN befehl("haken_weg")
     IF GUI_CLICKED(miBaumHaken) THEN befehl("baum_haken")

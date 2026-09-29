@@ -1861,6 +1861,38 @@ sucht Teiltexte, "geht" traf auch "geht nicht"). Tests
 ein Klick-Fall in `gui_textarea_hints.dhtest`, Rust-Test
 `namen_zaehlen_ohne_definition_kommentar_text`.
 
+**Quellcodeverwaltung und Live-Vorschau in der IDE (2026-09-29):**
+Strg+Alt+G (`qvZeigen`/`qvAuffrischen`/`qvNachziehen`): `git status
+--porcelain=v1 -b -uall` im Wurzelordner des Repositorys, das Kaestchen ist
+die Index-Spalte (umgelegt = `git add` bzw. `git restore --staged`),
+Uebergeben mit `git commit -m`, Verwerfen mit `git restore --staged
+--worktree` nach Rueckfrage (nicht bei ungesichertem Reiter, nicht bei
+neuen Dateien), pull/push als Prozess `gitProz` mit Ausgabe. Strg+Alt+L
+(`liveNachziehen`): 0,8 s nach der letzten Aenderung `dhrt bild` ueber eine
+versteckte Kopie neben der Datei, Bild im Fenster `winLive`, Meldung mit
+dem echten Dateinamen statt der Kopie. **Falle:** der Vorschauordner ist
+bei relativem `DH_IDE_KONFIG` relativ, und `dhrt bild` wechselt in den
+Ordner des Programms -- das PNG kam dort an, `livePng$` macht den Weg
+absolut (dieselbe Falle wie bei den Kachelbildern in Stufe 35). Tests
+`werkzeug_ide_git.dhtest` (Repository im `--- vorher`, Gegenprobe ohne
+`git add` faellt), `werkzeug_ide_live.dhtest` (Farbe des Bildes, Kopie
+danach weg, Meldung ohne Fenster).
+
+**Pruefsammlungen im Ueberblick (2026-09-29):** Strg+Alt+T,
+`testUebersichtZeigen`/`-Fuellen`: Baum aller .dhtest mit Punkt je Fall
+(IMAGE_FILL_ELLIPSE als Sinnbild). Der Stand kommt aus der Ausgabe von
+`dhrt test` (`testZeile`): eine `ok`/`FEHLER`-Zeile setzt alle gelaufenen
+Faelle der Datei auf bestanden, `FEHL`/`uebersprungen  Zeile N` nehmen es je
+Fall zurueck (Zeile N = die `===`-Zeile). Laeufe gehen jetzt ueber eine
+Warteschlange (`testLaufStarten(ziele, faelle)`, "Fehlgeschlagene" = je
+roter Fall ein `--fall`). **Falle:** `dhrt test` nennt den Weg, wie er ihm
+gegeben wurde, auch als 8.3-Kurzname -- der Schluessel geht ueber
+`REALPATH$`. Beim Nachsehen im Bild: ein SAVESCREENSHOT direkt nach dem
+Lauf zeigte einen alten Stand (grau), 30 Bilder spaeter stimmte er. Test
+`werkzeug_ide_testuebersicht.dhtest` (alle, Fehlgeschlagene, Fehler
+behoben, keine mehr). Werte beim Ueberfahren und Protokollpunkte gab es
+schon (siehe Debugger in `docs/ide.md`).
+
 **Standard an (M5):** Maschinencode ist Vorgabe, `DHRT_JIT=aus` laesst
 alles in der VM; die CI faehrt beide Wege (Hauptlauf mit, zweiter Lauf
 `DHRT_JIT=aus`). **Wer einen Fall schreibt, der die VM allein meint, setzt
