@@ -13199,7 +13199,7 @@ SUB schnipselLaden()
                         ARRAY_POP(koerper)
                     WEND
                     IF LEN(koerper) = 0 THEN
-                        protokoll("schnipsel meldung leer " + name)
+                        protokoll("eigene schnipsel meldung leer " + name)
                         fehler = fehler + 1
                     ELSE
                         eigenerSchnipsel(name, abk, JOIN$(koerper, NL))
@@ -13219,7 +13219,7 @@ SUB schnipselLaden()
                     IF abk <> "" AND NOT REGEX_TEST(abk, "^[A-Za-z_][A-Za-z0-9_]*$") THEN
                         ' Das Kuerzel wird am Tabulator als WORT gelesen --
                         ' mit Leerzeichen oder Punkt traefe es nie.
-                        protokoll("schnipsel meldung kuerzel " + abk)
+                        protokoll("eigene schnipsel meldung kuerzel " + abk)
                         GUI_SET_TEXT(lblStatus, "Schnipsel " + CHR$(34) + name + CHR$(34) + ": das Kürzel " + CHR$(34) + abk + CHR$(34) + " ist kein Wort -- nur über Strg+J erreichbar.")
                         fehler = fehler + 1
                         abk = ""
@@ -13233,7 +13233,7 @@ SUB schnipselLaden()
             END IF
         NEXT
     END IF
-    protokoll("schnipsel eigene " + STR$(eigene) + " " + STR$(fehler))
+    protokoll("eigene schnipsel " + STR$(eigene) + " " + STR$(fehler))
 END SUB
 
 CONST SCHNIPSEL_VORLAGE = "' Eigene Schnipsel der IDE. Jeder beginnt mit einer Kopfzeile" + CHR$(10) + "'   === Name | kuerzel" + CHR$(10) + "' und reicht bis zur nächsten. Kürzel plus Tabulator klappt ihn im Code" + CHR$(10) + "' auf (wie for + Tab), Strg+J listet alle. Ein | im Text ist die Stelle," + CHR$(10) + "' an der danach die Schreibmarke steht. Ein eigenes Kürzel, das es schon" + CHR$(10) + "' gibt, ersetzt den eingebauten Schnipsel. Nach dem Sichern gilt die Datei." + CHR$(10) + CHR$(10)
@@ -13246,7 +13246,7 @@ SUB schnipselEigenOeffnen()
     END IF
     tabOeffnen(p, dateiLesen(p))
     GUI_SET_TEXT(lblStatus, "Eigene Schnipsel -- nach dem Sichern (Strg+S) gelten sie.")
-    protokoll("schnipsel datei")
+    protokoll("eigene schnipsel datei")
 END SUB
 
 SUB schnipselAuswahlFragen()
@@ -13285,7 +13285,7 @@ SUB schnipselAuswahlSichern(eingabe AS STRING)
         END IF
     NEXT
     GUI_SET_TEXT(lblStatus, "Als Schnipsel gesichert: " + TRIM$(eingabe))
-    protokoll("schnipsel gesichert " + TRIM$(eingabe))
+    protokoll("eigene schnipsel gesichert " + TRIM$(eingabe))
 END SUB
 
 ' --- Terminal (Alt+3) ------------------------------------------------------
