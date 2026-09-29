@@ -2553,6 +2553,11 @@ pub struct Widget {
     hinweise: Vec<(usize, String)>,
     hinweise_text: String,
     hinweise_farbe: i64,
+    /// Nimmt ein Hinweis Klicks an (GUI_TEXTAREA_SET "hinweise_klickbar")?
+    /// Dann Hand als Zeiger, die Marke bleibt stehen, und
+    /// GUI_TEXTAREA_HINT_CLICKED nennt die Zeile (ab 1) ein Bild lang.
+    hinweise_klickbar: bool,
+    hinweis_klick: i64,
     // Welches davon in diesem Bild angeklickt wurde (-1 = keins). Transient
     // wie `clicked`: ein Klick ist ein Ereignis, kein Zustand.
     farbfeld_klick: i32,
@@ -3763,6 +3768,12 @@ impl Gui {
         Ok(self.ta_wdg(h, "GUI_TEXTAREA_SWATCH_CLICKED")?.farbfeld_klick as i64)
     }
 
+    /// Welcher Hinweis wurde in diesem Bild angeklickt (GUI_TEXTAREA_HINT_CLICKED)?
+    /// Die Zeile (ab 1), 0 = keiner. Nur mit "hinweise_klickbar".
+    pub fn textarea_hint_clicked(&self, h: i64) -> Result<i64, String> {
+        Ok(self.ta_wdg(h, "GUI_TEXTAREA_HINT_CLICKED")?.hinweis_klick)
+    }
+
     /// Welche Zeile wurde in diesem Bild in der Nummernspalte angeklickt
     /// (GUI_TEXTAREA_GUTTER_CLICKED)? `taste` 0 = links, 1 = rechts.
     ///
@@ -3976,10 +3987,13 @@ impl Gui {
             // einen Block bilden, sagt GUI_TEXTAREA_FOLDABLE -- dieselben
             // Bloecke, die sich falten lassen.
             "kopfzeilen" | "sticky_headers" => wd.kopfzeilen = n.clamp(0, 10) as i32,
+            // Hinweise hinter dem Zeilenende nehmen Klicks an
+            // (GUI_TEXTAREA_HINT_CLICKED) -- etwa "3 Aufrufe" hinter einer SUB.
+            "hinweise_klickbar" | "hints_clickable" => wd.hinweise_klickbar = n != 0,
             other => return Err(format!(
                 "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, \
                  aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug, \
-                 einzugslinien, tab_meldet, kopfzeilen", other)),
+                 einzugslinien, tab_meldet, kopfzeilen, hinweise_klickbar", other)),
         }
         Ok(())
     }
@@ -4103,7 +4117,7 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
-            farbfelder: Vec::new(), wellen: Vec::new(), hinweise: Vec::new(), hinweise_text: String::new(), hinweise_farbe: -1, farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
+            farbfelder: Vec::new(), wellen: Vec::new(), hinweise: Vec::new(), hinweise_text: String::new(), hinweise_farbe: -1, hinweise_klickbar: false, hinweis_klick: 0, farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
             formatiert: false, paare: Vec::new(), teil_von: None, teil_stand: String::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false, kopfzeilen: 0, hg_bild: -1, hg_deckkraft: 0,
             tab_meldet: false, tab_treffer: false,
@@ -12037,7 +12051,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 wdg.zeile_jetzt = -1;
                 if let Some(s) = wdg.status.as_mut() { s.hover = -1; s.geklickt = -1; }
                 if let Some(p) = wdg.pfad.as_mut() { p.hover = -1; p.geklickt = -1; }
-                wdg.farbfeld_klick = -1; wdg.rand_klick = (0, -1); wdg.abk_treffer = -1; wdg.tab_treffer = false;
+                wdg.farbfeld_klick = -1; wdg.hinweis_klick = 0; wdg.rand_klick = (0, -1); wdg.abk_treffer = -1; wdg.tab_treffer = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; t.doppel = false; }
                 if let Some(t) = wdg.tree.as_mut() {
@@ -13292,6 +13306,40 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     ///
     /// EINE Quelle fuer Zeichnen und Treffertest -- liefen sie auseinander,
     /// oeffnete ein Klick neben dem Feld den Farbwaehler (oder gar keiner).
+    /// Die Rechtecke der Hinweise hinter dem Zeilenende (GUI_TEXTAREA_HINTS),
+    /// je (Zeile ab 0, x, y, b, h) -- EINE Quelle fuer Zeichnen, Klick und
+    /// Zeiger. Ein Hinweis steht an der LETZTEN sichtbaren Reihe seiner Zeile
+    /// (bei Umbruch), hinter dem Text und hinter der Faltmarke.
+    fn ta_hinweis_rects(&self, g: &Graphics, wdg: &Widget, ax: i32, ay: i32, chars: &[char],
+                        starts: &[usize], rows: &[(usize, usize, usize)], sicht: i32)
+                        -> Vec<(usize, i32, i32, i32, i32)> {
+        let mut v = Vec::new();
+        if wdg.hinweise.is_empty() { return v; }
+        let pad = 5;
+        let lh = self.ta_line_h(g, wdg);
+        let gutter = self.ta_gutter(g, wdg, starts.len());
+        let tx0 = ax + pad + gutter - wdg.scroll_x;
+        for r in 0..sicht {
+            let ri = wdg.scroll + r;
+            if ri < 0 || ri as usize >= rows.len() { continue; }
+            let (li, rs, re) = rows[ri as usize];
+            let letzte = starts.get(li + 1).map(|&n| re + 1 >= n).unwrap_or(true);
+            if !letzte { continue; }
+            let Some((_, txt)) = wdg.hinweise.iter().find(|(z, _)| *z == li) else { continue };
+            let zeile: String = chars[rs..re].iter().collect();
+            let breite = self.wtext_width(g, wdg, &zeile);
+            let mut ende_x = tx0 + breite;
+            if let Some(&(_, b)) = wdg.gefaltet.iter().find(|&&(v, _)| v == li + 1) {
+                let t = format!("... {} Zeilen", b - li - 1);
+                ende_x = tx0 + breite + self.sk(10) + self.wtext_width(g, wdg, &t) + self.sk(10);
+            }
+            let bx = ende_x + self.sk(18);
+            let bw = self.wtext_width(g, wdg, txt) + self.sk(12);
+            v.push((li, bx, ay + pad + r * lh + 1, bw, lh - 4));
+        }
+        v
+    }
+
     fn ta_farbfeld_rects(&self, g: &Graphics, wdg: &Widget, ax: i32, ay: i32,
                          chars: &[char], rows: &[(usize, usize, usize)],
                          starts_len: usize, view_lines: i32)
@@ -13876,6 +13924,22 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     .find(|&(_, fx, fy, kante)| Self::in_rect(mx, my, (fx, fy, kante, kante)));
                 if let Some((k, _, _, _)) = treffer {
                     self.windows[wi].widgets[i].farbfeld_klick = k as i32;
+                    self.windows[wi].widgets[i].farbfeld_zug = true;
+                    return;
+                }
+            }
+            // Klick auf einen Hinweis hinter dem Zeilenende: gemeldet, die
+            // Marke bleibt (wie beim Farbfeld).
+            if !self.was_mouse_down && wref.hinweise_klickbar && !wref.hinweise.is_empty()
+               && Self::in_rect(mx, my, (ax, ay, fw, fh)) {
+                let sicht = ((fh - 2 * pad) / lh).max(1);
+                let koepfe = Self::ta_koepfe(wref, &rows, sicht, scroll).len() as i32;
+                let treffer = self.ta_hinweis_rects(g, wref, ax, ay, &chars, &starts, &rows, sicht)
+                    .into_iter()
+                    .find(|&(_, hx, hy, hb, hh)| hy >= ay + pad + koepfe * lh
+                          && Self::in_rect(mx, my, (hx, hy, hb, hh)));
+                if let Some((li, _, _, _, _)) = treffer {
+                    self.windows[wi].widgets[i].hinweis_klick = li as i64 + 1;
                     self.windows[wi].widgets[i].farbfeld_zug = true;
                     return;
                 }
@@ -16372,6 +16436,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let chars: Vec<char> = w.text.chars().collect();
                 let starts = Self::line_starts(&chars);
                 if mx < ax + self.ta_gutter(g, w, starts.len()) { return None; }
+                if w.hinweise_klickbar && !w.hinweise.is_empty() {
+                    let rows = self.ta_rows(g, w, &chars, &starts, self.ta_breite(g, w, starts.len()));
+                    let sicht = ((bh - 10) / self.ta_line_h(g, w)).max(1);
+                    if self.ta_hinweis_rects(g, w, ax, ay, &chars, &starts, &rows, sicht)
+                        .into_iter().any(|(_, hx, hy, hb, hh)| Self::in_rect(mx, my, (hx, hy, hb, hh))) {
+                        return Some("hand");
+                    }
+                }
                 if !w.farbfelder.is_empty() {
                     let rows = self.ta_rows(g, w, &chars, &starts, self.ta_breite(g, w, starts.len()));
                     let sicht = ((bh - 10) / self.ta_line_h(g, w)).max(1);
@@ -18888,6 +18960,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                             }
                         }
                     }
+                    let hin_rects = self.ta_hinweis_rects(g, wdg, ax, ay, &chars, &starts, &rows, view_lines);
                     for r in 0..view_lines {
                         let ri = scroll + r;
                         if ri < 0 || ri as usize >= rows.len() { continue; }
@@ -18920,13 +18993,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         // sichtbaren Reihe (bei Umbruch), mit Abstand, in
                         // gedaempfter Farbe auf einem Hauch Grund -- sie sind
                         // Anzeige, nicht Text.
-                        let letzte = starts.get(li + 1).map(|&n| re + 1 >= n).unwrap_or(true);
-                        if letzte {
+                        let _ = (ende_x, re);
+                        if let Some(&(_, bx, _, bw, _)) = hin_rects.iter().find(|h| h.0 == li && h.2 == y + 1) {
                             if let Some((_, txt)) = wdg.hinweise.iter().find(|(z, _)| *z == li) {
                                 let bg = self.wcol(wdg, "bg", "win_bg");
                                 let farbe = if wdg.hinweise_farbe >= 0 { wdg.hinweise_farbe } else { self.leise(bg) };
-                                let bx = ende_x + self.sk(18);
-                                let bw = self.wtext_width(g, wdg, txt) + self.sk(12);
                                 g.box_fill(bx, y + 1, bx + bw, y + lh - 3, 0x60_000000 | (shade(bg, 14) & 0xFF_FFFF));
                                 self.wtext(g, wdg, bx + self.sk(6), y, txt.clone(), farbe);
                             }

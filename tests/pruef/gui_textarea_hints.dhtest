@@ -75,3 +75,70 @@ GUI_TEXTAREA_HINTS(ta, [1, 2], ["x"])
 DHRT_FRAMES=2
 --- fehler
 gleich lang
+
+=== ein klickbarer hinweis meldet seine zeile, die marke bleibt
+' Die Lage des Hinweises kommt aus dem Bild (heller Text rechts in Zeile 2).
+' Gegenprobe im zweiten Durchgang: ohne "hinweise_klickbar" meldet derselbe
+' Klick nichts und setzt die Marke.
+IMPORT "gui"
+IMPORT "imgfx"
+SCREEN(500, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 0, 0, 480, 180)
+GUI_SET_TEXT(ta, "a = 1" + CHR$(10) + "b = 2" + CHR$(10) + "c = 3")
+GUI_TEXTAREA_HINTS(ta, [2], ["3 Aufrufe"])
+GUI_FOCUS(ta)
+SUB bilder(n AS INTEGER)
+    DIM f AS INTEGER
+    FOR f = 1 TO n
+        GUI_UPDATE() : CLS(BLACK) : GUI_DRAW() : FLIP()
+    NEXT
+END SUB
+bilder(2)
+DIM y AS INTEGER : y = -1
+DIM yy AS INTEGER
+DIM zz AS INTEGER
+DIM ss AS INTEGER
+FOR yy = 2 TO 120
+    (zz, ss) = GUI_TEXTAREA_POS_AT(ta, 12, yy)
+    IF zz = 2 AND y < 0 THEN y = yy + 6
+NEXT
+SAVESCREENSHOT("bild.png")
+DIM b AS IMAGE : b = LOADIMAGE("bild.png")
+DIM x AS INTEGER : x = -1
+DIM xx AS INTEGER
+FOR xx = 470 TO 100 STEP -1
+    DIM c AS INTEGER : c = GETPIXEL(b, xx, y)
+    IF x < 0 AND ((c SHR 16) BAND 255) + ((c SHR 8) BAND 255) + (c BAND 255) > 250 THEN x = xx - 3
+NEXT
+IMAGE_FREE(b)
+PRINT "gefunden "; x > 100
+FUNCTION klick(klickbar AS INTEGER) AS STRING
+    GUI_TEXTAREA_SET(ta, "hinweise_klickbar", klickbar)
+    GUI_TEXTAREA_GOTO(ta, 1, 1)
+    bilder(2)
+    WRITEALL("ev.txt", "c 4" + CHR$(10) + "e 0 7 " + STR$(x) + " " + STR$(y) + " 0" + CHR$(10) + "e 2 6 0 0 0" + CHR$(10) + "e 4 5 0 0 0" + CHR$(10) + "e 6 7 " + STR$(x) + " " + STR$(y) + " 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("ev.txt")
+    DIM gemeldet AS INTEGER : gemeldet = 0
+    DIM f AS INTEGER
+    FOR f = 1 TO 12
+        GUI_UPDATE()
+        IF GUI_TEXTAREA_HINT_CLICKED(ta) > 0 THEN gemeldet = GUI_TEXTAREA_HINT_CLICKED(ta)
+        CLS(BLACK) : GUI_DRAW() : FLIP()
+    NEXT
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    RETURN "gemeldet " + STR$(gemeldet) + " marke " + STR$(z)
+END FUNCTION
+PRINT "klickbar "; klick(1)
+PRINT "nicht "; klick(0)
+--- umgebung
+DHRT_FRAMES=100
+--- erwartet
+gefunden TRUE
+klickbar gemeldet 2 marke 1
+nicht gemeldet 0 marke 2

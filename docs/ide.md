@@ -216,6 +216,19 @@ bekäme. Diese Bausteine kamen mit ihr:
   feiner Strich je Stufe, unter dem Text. Die Breite einer Stufe wird an
   `tabbreite` Leerzeichen gemessen, und eine leere Zeile nimmt die kleinere
   Tiefe ihrer Nachbarn — sonst risse die Linie in jedem Absatz auf.
+- **Aufrufzähler** (Ansicht → Aufrufzähler über Unterprogrammen, an per
+  Vorgabe): hinter jeder SUB/FUNCTION steht gedämpft, wie oft ihr Name im
+  Projekt benutzt wird ("3 Aufrufe", "nicht aufgerufen") -- auch in anderen
+  Dateien, als FUNCREF und als Methode, nicht im Kommentar, nicht in einer
+  Zeichenkette. Ein Klick darauf zeigt "Wer ruft das auf?". Gezählt wird
+  Text (`CODE_NAMES`), keine Namensauflösung: zwei Methoden gleichen Namens
+  zählen zusammen. Im Debugger-Halt stehen dort die Werte, danach wieder die
+  Zähler.
+- **Prüfsammlungen** (Ausführen → Prüfsammlung ausführen, Strg+Alt+F5): `dhrt
+  test` über die `.dhtest` im Reiter (sonst über den Projektordner), die
+  Ausgabe läuft mit; jeder fehlgeschlagene Fall steht mit Datei und Zeile in
+  der Liste unten rechts, ein Klick springt zu ihm. Strg+Alt+Umschalt+F5
+  nimmt nur den Fall unter der Marke (`dhrt test --fall Name`).
 - **Mitlaufender Blockkopf** (`GUI_TEXTAREA_SET(ta, "kopfzeilen", 3)`, Ansicht
   → Mitlaufender Blockkopf, an per Vorgabe): ist der Kopf einer SUB, einer
   Schleife oder eines IF oben hinausgerollt, der Block aber noch im Bild,

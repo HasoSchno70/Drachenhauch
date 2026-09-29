@@ -3161,7 +3161,7 @@ einem brauchbaren Code-Feld.
 
 | Funktion | Wirkung |
 |---|---|
-| `GUI_TEXTAREA_SET(ta, schluessel$, wert)` | `zeilennummern`, `aktive_zeile`, `tab_fuegt_ein`, `tabbreite`, `umbruch`, `auto_einzug`, `einzugslinien` (ein feiner Strich je Einrückungsstufe, unter dem Text; die erste Stufe bleibt frei, sie läge am linken Rand), `kopfzeilen` (mitlaufende Blockköpfe, höchstens n: ist die Kopfzeile eines Blocks aus `GUI_TEXTAREA_FOLDABLE` oben hinausgerollt, steht sie angeheftet; ein Klick springt hin, 0 = aus) |
+| `GUI_TEXTAREA_SET(ta, schluessel$, wert)` | `zeilennummern`, `aktive_zeile`, `tab_fuegt_ein`, `tabbreite`, `umbruch`, `auto_einzug`, `einzugslinien` (ein feiner Strich je Einrückungsstufe, unter dem Text; die erste Stufe bleibt frei, sie läge am linken Rand), `kopfzeilen` (mitlaufende Blockköpfe, höchstens n: ist die Kopfzeile eines Blocks aus `GUI_TEXTAREA_FOLDABLE` oben hinausgerollt, steht sie angeheftet; ein Klick springt hin, 0 = aus), `hinweise_klickbar` (Hinweise nehmen Klicks an, siehe `GUI_TEXTAREA_HINT_CLICKED`) |
 | `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` | Zeichen `start … start+laenge` in `farbe` zeichnen |
 | `SYNTAX_SPANS(quelltext$)` → (starts, laengen, arten) | Drachenhauch-Quelltext zerlegen |
 | `GUI_TEXTAREA_VIEW(ta)` → (erste_zeile, zeilen, start_zeichen, laenge_zeichen) | welcher Ausschnitt ist gerade zu sehen? |
@@ -3180,6 +3180,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SQUIGGLES(ta, starts, laengen, farben)` | Wellenlinien unter Zeichen-Abschnitten (Start ab 0, Laenge in Zeichen, 0 = ein kurzes Stueck an der Stelle) -- Fehler und Warnungen dort, wo sie stehen. Ersetzt alle bisherigen, leere Felder loeschen; eine Aenderung am Text nimmt sie weg wie die Farbabschnitte |
 | `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` | Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht `&H`-Literale |
 | `GUI_TEXTAREA_GUTTER_CLICKED(ta [, taste])` → INTEGER | welche Zeile (ab 1) in diesem Bild in der Nummernspalte angeklickt wurde, 0 = keine; `taste` 0 = links (Vorgabe), 1 = rechts. Gilt ein Bild lang wie `GUI_CLICKED`; ein Linksklick dort setzt die Schreibmarke NICHT, der Faltpfeil klappt weiter um. Fuer Haltepunkte und Lesezeichen |
+| `GUI_TEXTAREA_HINT_CLICKED(ta)` → INTEGER | welcher Hinweis (`GUI_TEXTAREA_HINTS`) in diesem Bild angeklickt wurde: seine Zeile ab 1, 0 = keiner; nur mit `GUI_TEXTAREA_SET(ta, "hinweise_klickbar", 1)` (dann Hand als Zeiger, die Marke bleibt stehen); gilt ein Bild lang |
 | `GUI_TEXTAREA_SWATCH_CLICKED(ta)` → INTEGER | welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie `GUI_CLICKED`, die Schreibmarke bleibt dabei stehen |
 | `GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` | drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück |
 | `GUI_TABS_CLOSABLE(win, an)` | jeder Reiter bekommt ein Kreuz. Geschlossen wird nichts — die Laufzeit meldet nur, welches getroffen wurde |
