@@ -216,6 +216,22 @@ bekäme. Diese Bausteine kamen mit ihr:
   feiner Strich je Stufe, unter dem Text. Die Breite einer Stufe wird an
   `tabbreite` Leerzeichen gemessen, und eine leere Zeile nimmt die kleinere
   Tiefe ihrer Nachbarn — sonst risse die Linie in jedem Absatz auf.
+- **Quellcodeverwaltung** (Bearbeiten → Quellcodeverwaltung, Strg+Alt+G): die
+  geänderten Dateien des git-Repositorys als Liste; das Kästchen merkt eine
+  Datei für die nächste Übergabe vor (`git add`) oder nimmt sie zurück,
+  rechts steht ihr Unterschied (eine neue Datei ganz). Darunter Nachricht
+  und **Übergeben** (Enter im Feld tut dasselbe), **Änderung verwerfen**
+  (mit Rückfrage; nicht, solange die Datei ungesichert in einem Reiter
+  steht, und keine neue Datei -- das hieße löschen), **Holen**/**Senden**
+  (`git pull`/`push` als eigener Prozess, die Ausgabe läuft unten mit).
+  Oben steht der Zweig samt Vorsprung/Rückstand.
+- **Live-Vorschau** (Ansicht → Live-Vorschau, Strg+Alt+L): nach jeder Pause
+  beim Tippen läuft das Programm im Reiter 30 Bilder lang über `dhrt bild`,
+  das letzte Bild steht in einem eigenen Fenster. Gerechnet wird eine
+  versteckte Kopie neben der Datei (`.dh_live_vorschau.dh`, damit relative
+  Bilder und IMPORTs gefunden werden), die danach wieder weg ist; die
+  Eingabe des Programms ist zu, nach 10 s wird abgebrochen. Ein Programm
+  ohne Fenster oder mit einem Fehler zeigt die Meldung statt eines Bildes.
 - **Aufrufzähler** (Ansicht → Aufrufzähler über Unterprogrammen, an per
   Vorgabe): hinter jeder SUB/FUNCTION steht gedämpft, wie oft ihr Name im
   Projekt benutzt wird ("3 Aufrufe", "nicht aufgerufen") -- auch in anderen

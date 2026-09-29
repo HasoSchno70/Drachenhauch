@@ -1,0 +1,99 @@
+' Quellcodeverwaltung in der IDE (Strg+Alt+G): git status als Liste mit
+' Kaestchen (vorgemerkt = im Index), Uebergeben mit Nachricht, Verwerfen
+' einer Aenderung. Das Repository legt ein `--- vorher` an; `_programm/`
+' (die IDE-Kopie) steht in der .gitignore.
+--- seriell
+
+=== vormerken, uebergeben, verwerfen
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN befehl("git_fenster")
+IF prBild = 42 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO LEN(qvPfade) - 1
+        protokoll("pr datei " + qvPfade[prI] + " " + GUI_LISTBOX_ITEM(lstQv, prI))
+        IF qvPfade[prI] = "a.dh" THEN GUI_LISTBOX_SET_CHECKED(lstQv, prI, TRUE)
+    NEXT
+END IF
+IF prBild = 46 THEN
+    qvUebergeben()
+    GUI_SET_TEXT(tfQvNachricht, "zweiter stand")
+    qvUebergeben()
+END IF
+IF prBild = 48 THEN qvVerwerfen("b.dh")
+IF prBild = 50 THEN EXIT(0)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+FUNCTION git(a AS STRING, b AS STRING, c AS STRING, d AS STRING) AS INTEGER
+    DIM p AS INTEGER
+    IF d <> "" THEN
+        p = PROCESS_START("git", a, b, c, d)
+    ELSEIF c <> "" THEN
+        p = PROCESS_START("git", a, b, c)
+    ELSE
+        p = PROCESS_START("git", a, b)
+    END IF
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(p) AND MILLIS() < bis
+        SLEEP(20)
+    WEND
+    RETURN PROCESS_CODE(p)
+END FUNCTION
+WRITEALL(".gitignore", "_programm/" + CHR$(10))
+WRITEALL("a.dh", "PRINT(1)" + CHR$(10))
+WRITEALL("b.dh", "PRINT(2)" + CHR$(10))
+IF git("init", "-q", "", "") <> 0 THEN EXIT(3)
+IF git("config", "user.name", "Test", "") <> 0 THEN EXIT(4)
+IF git("config", "user.email", "t@t", "") <> 0 THEN EXIT(5)
+IF git("add", ".", "", "") <> 0 THEN EXIT(6)
+IF git("commit", "-q", "-m", "erst") <> 0 THEN EXIT(7)
+WRITEALL("a.dh", "PRINT(10)" + CHR$(10))
+WRITEALL("b.dh", "PRINT(20)" + CHR$(10))
+WRITEALL("neu.dh", "PRINT(3)" + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 3) = "qv " THEN PRINT L[i]
+NEXT
+FUNCTION lauf$(a AS STRING, b AS STRING, c AS STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START("git", a, b, c)
+    DIM t AS STRING : t = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM s AS STRING : s = PROCESS_READ$(p)
+        IF s = "" AND NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1 : SLEEP(30)
+        ELSE
+            t = t + s
+        END IF
+    WEND
+    RETURN TRIM$(REPLACE$(t, CHR$(13), ""))
+END FUNCTION
+PRINT "letzte "; lauf$("log", "-1", "--pretty=%s")
+PRINT "status "; lauf$("status", "--porcelain", "-uall")
+PRINT "b "; TRIM$(READLINES("b.dh")[0])
+--- erwartet
+qv 3 0
+pr datei a.dh a.dh
+pr datei b.dh b.dh
+pr datei neu.dh neu.dh
+qv vorgemerkt a.dh
+qv 3 1
+qv commit ohne nachricht
+qv 2 0
+qv commit zweiter stand
+qv 1 0
+qv verworfen b.dh
+letzte zweiter stand
+status ?? nachher.dh
+?? neu.dh
+b PRINT(2)
