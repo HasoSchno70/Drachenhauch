@@ -238,7 +238,31 @@ bekäme. Diese Bausteine kamen mit ihr:
   (mit Rückfrage; nicht, solange die Datei ungesichert in einem Reiter
   steht, und keine neue Datei -- das hieße löschen), **Holen**/**Senden**
   (`git pull`/`push` als eigener Prozess, die Ausgabe läuft unten mit).
-  Oben steht der Zweig samt Vorsprung/Rückstand.
+  Oben steht der Zweig samt Vorsprung/Rückstand, daneben die Auswahl der
+  Zweige mit **Wechseln** und **Neu ...** (legt einen Zweig am jetzigen
+  Stand an, die Änderungen kommen mit). **Beiseitelegen**/**Zurückholen**
+  (`git stash push -u` / `pop`). Wechseln und Beiseitelegen verweigern sich,
+  solange ein Reiter ungesichert ist, und ziehen offene Reiter danach von
+  der Platte nach. Eine Datei mit Konflikt heißt in der Liste „Konflikt“;
+  **Bearbeiten → Konflikt unter der Marke** ersetzt den Block
+  `<<<<<<< … ======= … >>>>>>>` um die Marke durch meine, ihre oder beide
+  Fassungen (ein Schritt, Strg+Z nimmt ihn zurück). **Ansicht → Wer hat
+  diese Zeile geschrieben** zeigt gedämpft am Ende der Zeile mit der
+  Marke, wer sie zuletzt geändert hat, wann und mit welcher Nachricht
+  (`git blame`, nur für gesicherte Reiter).
+- **Variable einführen / einsetzen, SUB in FUNCTION** (Bearbeiten, Strg+Alt+V /
+  Strg+Alt+I / Strg+Alt+U): ein markierter Ausdruck wird eine Variable
+  (`DIM name AS TYP : name = …` vor der Anweisung, der Typ geraten und im
+  Kasten zu ändern); eine Variable, die genau einmal belegt wird,
+  verschwindet, und an jeder Lesestelle steht der Ausdruck -- verweigert,
+  wenn sie ein zweites Mal belegt, an ein Unterprogramm mit BYREF-Parameter
+  übergeben wird, der Ausdruck etwas aufruft und mehrfach gebraucht würde
+  oder sich eine seiner Variablen dazwischen ändert. Eine SUB mit genau einem
+  BYREF-Parameter wird eine FUNCTION: der Parameter wird lokal, `EXIT SUB`
+  wird `RETURN r`, und jeder Aufruf `name(a, x)` als Anweisung wird im
+  ganzen Projekt `x = name(a)` -- verweigert, wenn die SUB den
+  hineingegebenen Wert liest, bevor sie ihn setzt. Alle drei gehen durch die
+  Umbau-Vorschau.
 - **Live-Vorschau** (Ansicht → Live-Vorschau, Strg+Alt+L): nach jeder Pause
   beim Tippen läuft das Programm im Reiter 30 Bilder lang über `dhrt bild`,
   das letzte Bild steht in einem eigenen Fenster. Gerechnet wird eine
