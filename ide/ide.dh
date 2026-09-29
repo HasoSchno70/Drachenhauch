@@ -185,6 +185,7 @@ SUB bereichsFarben()
     GUI_SET_COLOR(lstGliederung, "bg", farbMisch(grund, TON_PROJEKT, anteil))
     GUI_SET_COLOR(lstWkZuletzt, "bg", farbMisch(grund, TON_PROJEKT, anteil))
     GUI_SET_COLOR(lstAusgabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
+    GUI_SET_COLOR(lstTerminal, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(tfEingabe, "bg", farbMisch(grund, TON_AUSGABE, anteil))
     GUI_SET_COLOR(lstProbleme, "bg", farbMisch(grund, TON_PROBLEME, anteil))
     GUI_SET_COLOR(tblVars, "bg", farbMisch(grund, TON_DEBUG, anteil))
@@ -650,6 +651,8 @@ DIM dlgTabZu AS GUI_WINDOW : dlgTabZu = 0
 DIM dlgParamNeu AS GUI_WINDOW : dlgParamNeu = 0
 ' Der Prompt fuer die neue Zieldatei beim Verschieben.
 DIM dlgVerschNeu AS GUI_WINDOW : dlgVerschNeu = 0
+DIM dlgTasten AS GUI_WINDOW : dlgTasten = 0
+DIM dlgSchnipsel AS GUI_WINDOW : dlgSchnipsel = 0
 DIM tabZuIndex AS INTEGER : tabZuIndex = -1
 DIM dlgProjekt AS GUI_WINDOW : dlgProjekt = 0
 DIM dlgBedingung AS GUI_WINDOW : dlgBedingung = 0
@@ -731,6 +734,8 @@ DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, "Zur Definiti
 DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, "Umbenennen ...", "Umschalt+F6")
 DIM miKorrektur AS INTEGER : miKorrektur = GUI_MENU_ITEM(mBearb, "Schnellkorrektur ...", "Strg+.")
 DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, "Schnipsel einfügen ...", "Strg+J")
+DIM miSchnipselEigen AS INTEGER : miSchnipselEigen = GUI_MENU_ITEM(mBearb, "Eigene Schnipsel bearbeiten")
+DIM miSchnipselAuswahl AS INTEGER : miSchnipselAuswahl = GUI_MENU_ITEM(mBearb, "Auswahl als Schnipsel sichern ...")
 DIM miMarken AS INTEGER : miMarken = GUI_MENU_ITEM(mBearb, "Marke auf jede Fundstelle des Wortes", "Strg+Umschalt+L")
 DIM miMarkeNaechste AS INTEGER : miMarkeNaechste = GUI_MENU_ITEM(mBearb, "Marke auf die nächste Fundstelle", "Strg+Umschalt+N")
 DIM miMarkeEnden AS INTEGER : miMarkeEnden = GUI_MENU_ITEM(mBearb, "Marke an jedes Zeilenende der Auswahl", "Strg+Umschalt+I")
@@ -857,6 +862,7 @@ DIM miBlameZeile AS INTEGER : miBlameZeile = GUI_MENU_ITEM(mAnsicht, "Wer hat di
 DIM miLeiste AS INTEGER : miLeiste = GUI_MENU_ITEM(mAnsicht, "Werkzeugleiste")
 DIM miSeiten AS INTEGER : miSeiten = GUI_MENU_ITEM(mAnsicht, "Seitenleiste", "Alt+1")
 DIM miUnten AS INTEGER : miUnten = GUI_MENU_ITEM(mAnsicht, "Untere Leiste", "Alt+2")
+DIM miTerminal AS INTEGER : miTerminal = GUI_MENU_ITEM(mAnsicht, "Terminal", "Alt+3")
 GUI_MENU_CHECK(miSeiten, seitenAn)
 GUI_MENU_CHECK(miUnten, untenAn)
 GUI_MENU_CHECK(miLeiste, leisteAn)
@@ -870,6 +876,8 @@ DIM miNormal AS INTEGER : miNormal = GUI_MENU_ITEM(mAnsicht, "Schrift normal", "
 DIM mHilfe AS INTEGER : mHilfe = GUI_MENU(win, "Hilfe")
 DIM miHandbuch AS INTEGER : miHandbuch = GUI_MENU_ITEM(mHilfe, "Handbuch (Wort unter der Marke)", "F1")
 DIM miKuerzel AS INTEGER : miKuerzel = GUI_MENU_ITEM(mHilfe, "Tastenkürzel", "Strg+F1")
+DIM miTasten AS INTEGER : miTasten = GUI_MENU_ITEM(mHilfe, "Tastenkürzel ändern ...")
+DIM miTastenZurueck AS INTEGER : miTastenZurueck = GUI_MENU_ITEM(mHilfe, "Tastenkürzel zurücksetzen")
 DIM miBefehle AS INTEGER : miBefehle = GUI_MENU_ITEM(mHilfe, "Eingebaute Befehle nachschlagen ...", "Strg+F3")
 DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Über ...")
 
@@ -1043,6 +1051,20 @@ DIM kartenZug AS BOOLEAN : kartenZug = FALSE
 DIM kartenZiel AS INTEGER : kartenZiel = -1
 DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "Ausgabe", 0, 0)
 DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+' Terminal (Alt+3): dieselbe Flaeche wie die Ausgabe, zwei Reiterknoepfe
+' darueber schalten um. Die Eingabezeile unten gehoert dann dem Terminal.
+DIM lstTerminal AS GUI_WIDGET : lstTerminal = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+GUI_LISTBOX_PLACEHOLDER(lstTerminal, "Befehl unten eingeben, Enter führt ihn aus -- cd, dir/ls, git, dhrt ...")
+GUI_SET_VISIBLE(lstTerminal, FALSE)
+DIM btnReiterAusgabe AS GUI_WIDGET : btnReiterAusgabe = GUI_BUTTON(win, "Ausgabe", 0, 0, 90, 20)
+DIM btnReiterTerminal AS GUI_WIDGET : btnReiterTerminal = GUI_BUTTON(win, "Terminal", 0, 0, 90, 20)
+GUI_TOOLTIP(btnReiterTerminal, "Terminal (Alt+3)")
+DIM btnTermStopp AS GUI_WIDGET : btnTermStopp = GUI_BUTTON(win, "Abbrechen", 0, 0, 90, 20)
+GUI_BUTTON_VARIANT(btnTermStopp, "gefahr")
+GUI_SET_VISIBLE(btnTermStopp, FALSE)
+' Hier oben, weil layout() sie liest -- es laeuft vor dem Terminal-Abschnitt.
+DIM terminalAn AS BOOLEAN : terminalAn = FALSE
+DIM termProz AS INTEGER : termProz = -1
 DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "Probleme", 0, 0)
 DIM lstProbleme AS GUI_WIDGET : lstProbleme = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 GUI_LISTBOX_PLACEHOLDER(lstProbleme, "Keine Probleme gefunden")
@@ -1902,6 +1924,7 @@ SUB listenSchrift(groesse AS INTEGER)
     listenGroesse = MAX(10, MIN(32, groesse))
     GUI_SET_FONT_SIZE(lstGliederung, listenGroesse)
     GUI_SET_FONT_SIZE(lstAusgabe, listenGroesse)
+    GUI_SET_FONT_SIZE(lstTerminal, listenGroesse)
     GUI_SET_FONT_SIZE(lstProbleme, listenGroesse)
     protokoll("listenschrift " + STR$(listenGroesse))
 END SUB
@@ -2083,9 +2106,16 @@ SUB layout()
     willkommenZeigen(tabAnzahl = 0)
     DIM uy AS INTEGER : uy = oben + mitteH + 4
     DIM halb AS INTEGER : halb = (w - 24) \ 2
-    GUI_SET_VISIBLE(lblAusgabe, untenAn) : GUI_SET_VISIBLE(lstAusgabe, untenAn)
-    GUI_SET_BOUNDS(lblAusgabe, 8, uy, 200, 18)
+    GUI_SET_VISIBLE(lblAusgabe, untenAn) : GUI_SET_VISIBLE(lstAusgabe, untenAn AND NOT terminalAn)
+    GUI_SET_VISIBLE(lstTerminal, untenAn AND terminalAn)
+    GUI_SET_VISIBLE(btnReiterAusgabe, untenAn) : GUI_SET_VISIBLE(btnReiterTerminal, untenAn)
+    GUI_SET_VISIBLE(btnTermStopp, untenAn AND terminalAn AND termProz >= 0)
+    GUI_SET_BOUNDS(btnReiterAusgabe, 8, uy - 1, 90, 20)
+    GUI_SET_BOUNDS(btnReiterTerminal, 102, uy - 1, 90, 20)
+    GUI_SET_BOUNDS(lblAusgabe, 200, uy, MAX(40, halb - 300), 18)
+    GUI_SET_BOUNDS(btnTermStopp, 8 + halb - 90, uy - 1, 90, 20)
     GUI_SET_BOUNDS(lstAusgabe, 8, uy + 20, halb, hoeheUnten - 20)
+    GUI_SET_BOUNDS(lstTerminal, 8, uy + 20, halb, hoeheUnten - 20)
     GUI_SET_BOUNDS(lblProbleme, 16 + halb, uy, halb, 18)
     GUI_SET_BOUNDS(lstProbleme, 16 + halb, uy + 20, halb, (hoeheUnten - 20) \ 2 - 4)
     GUI_SET_BOUNDS(lblHilfeKopf, 16 + halb, uy + 20 + (hoeheUnten - 20) \ 2, halb, 18)
@@ -3095,6 +3125,17 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     zuletztMerken(pfad)
     GUI_SET_TEXT(lblStatus, "Gesichert: " + pfad)
     protokoll("gesichert " + pfad)
+    ' Eigene Schnipsel und Tastenbelegung gelten, sobald sie gesichert sind --
+    ' und sie liegen neben der ide.json, nicht im Projekt: der Projektordner
+    ' bleibt, wo er war.
+    IF wegGleich$(pfad) = wegGleich$(schnipselPfad$()) THEN
+        schnipselLaden()
+        RETURN TRUE
+    END IF
+    IF wegGleich$(pfad) = wegGleich$(tastenPfad$()) THEN
+        tastenAnwenden()
+        RETURN TRUE
+    END IF
     IF DIRNAME(pfad) <> projektOrdner THEN
         projektOrdner = DIRNAME(pfad)
         baumFuellen()
@@ -10611,11 +10652,14 @@ DIM schnipselText AS ARRAY OF STRING : schnipselText = []
 ' meldet nur, DASS eines links der Marke steht (GUI_TEXTAREA_ABBREV) --
 ' was an seine Stelle kommt, steht hier.
 DIM schnipselAbk AS ARRAY OF STRING : schnipselAbk = []
+' "" = eingebaut, "eigen" = aus der eigenen Datei (steht in der Liste rechts).
+DIM schnipselHerkunft AS ARRAY OF STRING : schnipselHerkunft = []
 
 SUB schnipsel(name AS STRING, abk AS STRING, text AS STRING)
-    ARRAY_PUSH(schnipselNamen, name + "   [" + abk + "]")
+    ARRAY_PUSH(schnipselNamen, IIF(abk = "", name, name + "   [" + abk + "]"))
     ARRAY_PUSH(schnipselAbk, abk)
     ARRAY_PUSH(schnipselText, text)
+    ARRAY_PUSH(schnipselHerkunft, "")
 END SUB
 
 ' `weg` = so viele Zeichen links der Marke weichen (das getippte Kuerzel).
@@ -10680,7 +10724,7 @@ SUB schnipselWaehlen()
     paletteDetails = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(schnipselNamen) - 1
-        ARRAY_PUSH(paletteNamen, schnipselNamen[i]) : ARRAY_PUSH(paletteKennungen, STR$(i)) : ARRAY_PUSH(paletteDetails, "")
+        ARRAY_PUSH(paletteNamen, schnipselNamen[i]) : ARRAY_PUSH(paletteKennungen, STR$(i)) : ARRAY_PUSH(paletteDetails, schnipselHerkunft[i])
     NEXT
     waehlerOeffnen("schnipsel", "Schnipsel einfügen")
     ' Der Wortanfang links der Marke fuellt den Filter schon aus: wer `for`
@@ -10946,7 +10990,8 @@ FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
     END IF
     GUI_LISTBOX_CLEAR(lstAusgabe)
     ' Wer startet, will die Ausgabe sehen -- eine ausgeblendete untere
-    ' Leiste kommt zurueck.
+    ' Leiste kommt zurueck, und das Terminal macht ihr Platz.
+    IF terminalAn THEN terminalZeigen(FALSE)
     IF NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
     ausgabeRest = "" : prozessRest = ""
     prozessDatei = datei
@@ -12859,6 +12904,585 @@ SUB beispieleOeffnen()
     protokoll("projekt " + projektOrdner)
 END SUB
 
+' --- Menue und Befehl: EINE Tafel (seit 2026-09-29) -----------------------
+' Jeder Menuepunkt, der einen Befehl ruft, steht hier mit seiner Kennung und
+' dem Kuerzel, mit dem er angelegt wurde. Aus derselben Tafel feuern die
+' Klicks (menueKlicks) und liest die eigene Tastenbelegung, welcher
+' Menuepunkt zu einem Befehl gehoert -- bis dahin standen 136 einzelne
+' IF-Zeilen in der Bildschleife, und ein Kuerzel liess sich nur im
+' Quelltext aendern. `klickt` = FALSE: der Klick wird woanders abgefragt
+' (zusammen mit einem Knopf), der Punkt steht nur fuers Kuerzel hier.
+DIM menueItems AS ARRAY OF INTEGER : menueItems = []
+DIM menueKennung AS ARRAY OF STRING : menueKennung = []
+DIM menueVorgabe AS ARRAY OF STRING : menueVorgabe = []
+DIM menueJetzt AS ARRAY OF STRING : menueJetzt = []
+DIM menueKlickt AS ARRAY OF BOOLEAN : menueKlickt = []
+
+SUB menueBefehl(item AS INTEGER, kennung AS STRING, kuerzel AS STRING, klickt AS BOOLEAN = TRUE)
+    ARRAY_PUSH(menueItems, item)
+    ARRAY_PUSH(menueKennung, kennung)
+    ARRAY_PUSH(menueVorgabe, kuerzel)
+    ARRAY_PUSH(menueJetzt, kuerzel)
+    ARRAY_PUSH(menueKlickt, klickt)
+END SUB
+
+SUB menueKlicks()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(menueItems) - 1
+        IF menueKlickt[i] THEN
+            IF GUI_CLICKED(menueItems[i]) THEN befehl(menueKennung[i])
+        END IF
+    NEXT
+END SUB
+
+' --- Eigene Tastenbelegung (tasten.json neben der ide.json) --------------
+' Die Datei nennt nur, was ANDERS ist: {"kennung": "Strg+Alt+K", ...}, leer
+' heisst "kein Kuerzel". Geht ein Kuerzel an einen Befehl, der es nicht
+' hatte, verliert es der, dem es vorher gehoerte -- zwei Befehle auf einer
+' Taste feuerten beide, und welcher gewinnt, saehe man nicht.
+DIM befehlKuerzelVorgabe AS ARRAY OF STRING : befehlKuerzelVorgabe = []
+DIM tastenMeldungen AS ARRAY OF STRING : tastenMeldungen = []
+DIM tastenKennung AS STRING : tastenKennung = ""
+
+' Der Ordner der ide.json -- "." bei einem Pfad ohne Ordner (die Tests
+' setzen DH_IDE_KONFIG=ide.json), sonst liefe MKDIR("") in einen Fehler.
+FUNCTION konfigOrdner$() AS STRING
+    DIM d AS STRING : d = DIRNAME(konfigPfad)
+    IF d = "" THEN d = "."
+    IF NOT DIREXISTS(d) THEN MKDIR(d)
+    RETURN d
+END FUNCTION
+
+FUNCTION tastenPfad$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "tasten.json")
+END FUNCTION
+
+' Zwei Schreibweisen desselben Kuerzels ("Umschalt+Strg+K", "ctrl+shift+k")
+' sind dasselbe Kuerzel -- verglichen wird in dieser einen Form.
+FUNCTION kuerzelForm$(k AS STRING) AS STRING
+    DIM t AS STRING : t = LOWER$(REPLACE$(TRIM$(k), " ", ""))
+    IF t = "" THEN RETURN ""
+    IF RIGHT$(t, 2) = "++" THEN t = LEFT$(t, LEN(t) - 2) + "+plus"
+    IF t = "+" THEN t = "plus"
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(t, "+")
+    DIM taste AS STRING : taste = teile[LEN(teile) - 1]
+    IF taste = "-" THEN taste = "minus"
+    IF taste = "space" OR taste = "leertaste" THEN taste = "leer"
+    IF taste = "del" OR taste = "delete" THEN taste = "entf"
+    DIM strg AS BOOLEAN : strg = FALSE
+    DIM alt AS BOOLEAN : alt = FALSE
+    DIM ums AS BOOLEAN : ums = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 2
+        DIM m AS STRING : m = teile[i]
+        IF m = "strg" OR m = "ctrl" OR m = "control" THEN strg = TRUE
+        IF m = "alt" THEN alt = TRUE
+        IF m = "umschalt" OR m = "shift" THEN ums = TRUE
+    NEXT
+    RETURN IIF(strg, "strg+", "") + IIF(alt, "alt+", "") + IIF(ums, "umschalt+", "") + taste
+END FUNCTION
+
+SUB tastenMelden(m AS STRING)
+    ARRAY_PUSH(tastenMeldungen, m)
+    ausgabe("Tastenbelegung: " + m)
+    protokoll("tasten meldung " + m)
+END SUB
+
+' Alles auf die Vorgabe, dann die Datei darueber. Ohne das Zuruecksetzen
+' bliebe ein Kuerzel stehen, das aus der Datei gestrichen wurde.
+SUB tastenAnwenden()
+    tastenMeldungen = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(menueItems) - 1
+        IF menueJetzt[i] <> menueVorgabe[i] THEN
+            GUI_MENU_SHORTCUT(menueItems[i], menueVorgabe[i])
+            menueJetzt[i] = menueVorgabe[i]
+        END IF
+    NEXT
+    FOR i = 0 TO LEN(befehlKuerzel) - 1
+        befehlKuerzel[i] = befehlKuerzelVorgabe[i]
+    NEXT
+    DIM gesetzt AS INTEGER : gesetzt = 0
+    IF FILEEXISTS(tastenPfad$()) THEN
+        DIM j AS JSON_HANDLE
+        DIM gelesen AS BOOLEAN : gelesen = TRUE
+        TRY
+            j = JSON_LOAD(tastenPfad$())
+        CATCH e
+            gelesen = FALSE
+            tastenMelden("tasten.json lässt sich nicht lesen: " + e)
+        END TRY
+        IF gelesen THEN
+            DIM k AS STRING
+            FOR EACH k IN JSON_KEYS(j, "")
+                IF JSON_TYPE(j, k) <> "string" THEN
+                    tastenMelden(k + ": das Kürzel muss als Text stehen, z. B. " + CHR$(34) + "Strg+Alt+K" + CHR$(34))
+                ELSEIF tastenEins(k, TRIM$(JSON_GET_STRING(j, k))) THEN
+                    gesetzt = gesetzt + 1
+                END IF
+            NEXT
+        END IF
+    END IF
+    protokoll("tasten angewendet " + STR$(gesetzt) + " " + STR$(LEN(tastenMeldungen)))
+    IF LEN(tastenMeldungen) > 0 THEN GUI_SET_TEXT(lblStatus, "Tastenbelegung: " + STR$(LEN(tastenMeldungen)) + " Hinweis(e) -- siehe Ausgabe.")
+END SUB
+
+' Ein Eintrag der Datei. TRUE, wenn er gilt.
+FUNCTION tastenEins(k AS STRING, neu AS STRING) AS BOOLEAN
+    DIM idx AS INTEGER : idx = ARRAY_INDEXOF(befehlKennungen, k)
+    DIM i AS INTEGER
+    DIM treffer AS INTEGER : treffer = 0
+    FOR i = 0 TO LEN(menueItems) - 1
+        IF menueKennung[i] = k THEN
+            TRY
+                GUI_MENU_SHORTCUT(menueItems[i], neu)
+            CATCH e
+                tastenMelden(k + ": " + CHR$(34) + neu + CHR$(34) + " ist kein Kürzel, das die IDE kennt (" + e + ")")
+                RETURN FALSE
+            END TRY
+            menueJetzt[i] = neu
+            treffer = treffer + 1
+        END IF
+    NEXT
+    IF treffer = 0 THEN
+        IF idx < 0 THEN
+            tastenMelden(k + ": diesen Befehl gibt es nicht")
+        ELSE
+            tastenMelden(k + ": " + befehlNamen[idx] + " hat keinen Menüpunkt, sein Kürzel lässt sich nicht ändern")
+        END IF
+        RETURN FALSE
+    END IF
+    IF idx >= 0 THEN befehlKuerzel[idx] = neu
+    ' Wem gehoerte das Kuerzel vorher?
+    DIM form AS STRING : form = kuerzelForm$(neu)
+    IF form = "" THEN RETURN TRUE
+    FOR i = 0 TO LEN(menueItems) - 1
+        IF menueKennung[i] <> k AND kuerzelForm$(menueJetzt[i]) = form THEN
+            GUI_MENU_SHORTCUT(menueItems[i], "")
+            menueJetzt[i] = ""
+            DIM andere AS INTEGER : andere = ARRAY_INDEXOF(befehlKennungen, menueKennung[i])
+            DIM andererName AS STRING : andererName = menueKennung[i]
+            IF andere >= 0 THEN
+                befehlKuerzel[andere] = ""
+                andererName = befehlNamen[andere]
+            END IF
+            tastenMelden(neu + " gehörte vorher zu " + CHR$(34) + andererName + CHR$(34) + " -- der hat jetzt keins mehr")
+        END IF
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Hilfe -> Tastenkuerzel aendern: erst den Befehl waehlen (nur die mit
+' Menuepunkt -- die anderen haben keinen Ort fuer ein Kuerzel), dann fragen.
+SUB tastenWaehlen()
+    paletteNamen = []
+    paletteKennungen = []
+    paletteDetails = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(befehlNamen) - 1
+        IF ARRAY_INDEXOF(menueKennung, befehlKennungen[i]) >= 0 THEN
+            ARRAY_PUSH(paletteNamen, befehlNamen[i]) : ARRAY_PUSH(paletteKennungen, befehlKennungen[i]) : ARRAY_PUSH(paletteDetails, befehlKuerzel[i])
+        END IF
+    NEXT
+    waehlerOeffnen("tasten", "Tastenkürzel ändern: Befehl wählen")
+END SUB
+
+SUB tastenFragen(k AS STRING)
+    DIM idx AS INTEGER : idx = ARRAY_INDEXOF(befehlKennungen, k)
+    IF idx < 0 THEN RETURN
+    tastenKennung = k
+    dlgTasten = GUI_PROMPT("Tastenkürzel", "Neues Kürzel für " + CHR$(34) + befehlNamen[idx] + CHR$(34) + " (z. B. Strg+Alt+K; leer = keins):", befehlKuerzel[idx])
+END SUB
+
+' In die Datei schreiben und neu anwenden. Wer die Vorgabe zurueckstellt,
+' bekommt keinen Eintrag -- die Datei bleibt so klein wie die Abweichung.
+SUB tastenSetzen(k AS STRING, neu AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE("{}")
+    IF FILEEXISTS(tastenPfad$()) THEN
+        TRY
+            j = JSON_LOAD(tastenPfad$())
+        CATCH e
+            j = JSON_PARSE("{}")
+        END TRY
+    END IF
+    DIM idx AS INTEGER : idx = ARRAY_INDEXOF(befehlKennungen, k)
+    IF idx >= 0 AND kuerzelForm$(neu) = kuerzelForm$(befehlKuerzelVorgabe[idx]) THEN
+        IF JSON_HAS(j, k) THEN JSON_REMOVE(j, k)
+    ELSE
+        JSON_SET_STRING(j, k, neu)
+    END IF
+    WRITEALL(tastenPfad$(), JSON_STRINGIFY(j) + NL)
+    tastenAnwenden()
+    IF idx >= 0 THEN
+        DIM zeigen AS STRING : zeigen = befehlKuerzel[idx]
+        IF zeigen = "" THEN zeigen = "keins"
+        IF LEN(tastenMeldungen) = 0 THEN GUI_SET_TEXT(lblStatus, befehlNamen[idx] + ": " + zeigen)
+    END IF
+    protokoll("tasten gesetzt " + k + " " + neu)
+END SUB
+
+SUB tastenZuruecksetzen()
+    IF FILEEXISTS(tastenPfad$()) THEN DELETEFILE(tastenPfad$())
+    tastenAnwenden()
+    GUI_SET_TEXT(lblStatus, "Alle Tastenkürzel wieder wie ausgeliefert.")
+END SUB
+
+' --- Eigene Schnipsel (schnipsel.txt neben der ide.json) ------------------
+' Ein Textformat statt JSON: ein Schnipsel ist mehrzeiliger Code, und in
+' JSON stuende er als eine Zeile voller \n. Jeder beginnt mit
+'   === Name | kuerzel
+' und reicht bis zum naechsten. Ein eigenes Kuerzel, das es schon gibt,
+' ERSETZT den eingebauten Schnipsel -- wer "for" anders haben will, soll
+' nicht zwei Eintraege fuer dasselbe Wort bekommen.
+DIM schnipselEingebautNamen AS ARRAY OF STRING : schnipselEingebautNamen = []
+DIM schnipselEingebautAbk AS ARRAY OF STRING : schnipselEingebautAbk = []
+DIM schnipselEingebautText AS ARRAY OF STRING : schnipselEingebautText = []
+
+FUNCTION schnipselPfad$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "schnipsel.txt")
+END FUNCTION
+
+SUB schnipselEingebautMerken()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(schnipselNamen) - 1
+        ARRAY_PUSH(schnipselEingebautNamen, schnipselNamen[i])
+        ARRAY_PUSH(schnipselEingebautAbk, schnipselAbk[i])
+        ARRAY_PUSH(schnipselEingebautText, schnipselText[i])
+    NEXT
+END SUB
+
+SUB eigenerSchnipsel(name AS STRING, abk AS STRING, text AS STRING)
+    DIM anzeige AS STRING : anzeige = IIF(abk = "", name, name + "   [" + abk + "]")
+    DIM k AS INTEGER : k = -1
+    IF abk <> "" THEN k = ARRAY_INDEXOF(schnipselAbk, abk)
+    IF k >= 0 THEN
+        schnipselNamen[k] = anzeige
+        schnipselText[k] = text
+        schnipselHerkunft[k] = "eigen, ersetzt"
+    ELSE
+        ARRAY_PUSH(schnipselNamen, anzeige)
+        ARRAY_PUSH(schnipselAbk, abk)
+        ARRAY_PUSH(schnipselText, text)
+        ARRAY_PUSH(schnipselHerkunft, "eigen")
+    END IF
+END SUB
+
+SUB schnipselLaden()
+    schnipselNamen = [] : schnipselAbk = [] : schnipselText = [] : schnipselHerkunft = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(schnipselEingebautNamen) - 1
+        ARRAY_PUSH(schnipselNamen, schnipselEingebautNamen[i])
+        ARRAY_PUSH(schnipselAbk, schnipselEingebautAbk[i])
+        ARRAY_PUSH(schnipselText, schnipselEingebautText[i])
+        ARRAY_PUSH(schnipselHerkunft, "")
+    NEXT
+    DIM eigene AS INTEGER : eigene = 0
+    DIM fehler AS INTEGER : fehler = 0
+    IF FILEEXISTS(schnipselPfad$()) THEN
+        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(schnipselPfad$())
+        DIM name AS STRING : name = ""
+        DIM abk AS STRING : abk = ""
+        DIM koerper AS ARRAY OF STRING : koerper = []
+        DIM offen AS BOOLEAN : offen = FALSE
+        DIM nr AS INTEGER
+        FOR nr = 0 TO LEN(zeilen)
+            DIM z AS STRING : z = ""
+            DIM kopf AS BOOLEAN : kopf = TRUE
+            IF nr < LEN(zeilen) THEN
+                z = REPLACE$(zeilen[nr], CHR$(13), "")
+                kopf = LEFT$(z, 4) = "=== "
+            END IF
+            IF kopf THEN
+                ' den vorigen abschliessen: Leerzeilen am Ende gehoeren nicht dazu
+                IF offen THEN
+                    WHILE LEN(koerper) > 0 AND TRIM$(koerper[LEN(koerper) - 1]) = ""
+                        ARRAY_POP(koerper)
+                    WEND
+                    IF LEN(koerper) = 0 THEN
+                        protokoll("schnipsel meldung leer " + name)
+                        fehler = fehler + 1
+                    ELSE
+                        eigenerSchnipsel(name, abk, JOIN$(koerper, NL))
+                        eigene = eigene + 1
+                    END IF
+                END IF
+                offen = FALSE
+                IF nr < LEN(zeilen) THEN
+                    DIM k AS STRING : k = TRIM$(MID$(z, 4))
+                    DIM p AS INTEGER : p = INSTR(k, "|")
+                    abk = ""
+                    name = k
+                    IF p >= 0 THEN
+                        name = TRIM$(LEFT$(k, p))
+                        abk = TRIM$(MID$(k, p + 1))
+                    END IF
+                    IF abk <> "" AND NOT REGEX_TEST(abk, "^[A-Za-z_][A-Za-z0-9_]*$") THEN
+                        ' Das Kuerzel wird am Tabulator als WORT gelesen --
+                        ' mit Leerzeichen oder Punkt traefe es nie.
+                        protokoll("schnipsel meldung kuerzel " + abk)
+                        GUI_SET_TEXT(lblStatus, "Schnipsel " + CHR$(34) + name + CHR$(34) + ": das Kürzel " + CHR$(34) + abk + CHR$(34) + " ist kein Wort -- nur über Strg+J erreichbar.")
+                        fehler = fehler + 1
+                        abk = ""
+                    END IF
+                    IF name = "" THEN name = IIF(abk = "", "Schnipsel", abk)
+                    koerper = []
+                    offen = TRUE
+                END IF
+            ELSEIF offen THEN
+                ARRAY_PUSH(koerper, z)
+            END IF
+        NEXT
+    END IF
+    protokoll("schnipsel eigene " + STR$(eigene) + " " + STR$(fehler))
+END SUB
+
+CONST SCHNIPSEL_VORLAGE = "' Eigene Schnipsel der IDE. Jeder beginnt mit einer Kopfzeile" + CHR$(10) + "'   === Name | kuerzel" + CHR$(10) + "' und reicht bis zur nächsten. Kürzel plus Tabulator klappt ihn im Code" + CHR$(10) + "' auf (wie for + Tab), Strg+J listet alle. Ein | im Text ist die Stelle," + CHR$(10) + "' an der danach die Schreibmarke steht. Ein eigenes Kürzel, das es schon" + CHR$(10) + "' gibt, ersetzt den eingebauten Schnipsel. Nach dem Sichern gilt die Datei." + CHR$(10) + CHR$(10)
+
+SUB schnipselEigenOeffnen()
+    DIM p AS STRING : p = schnipselPfad$()
+    IF NOT FILEEXISTS(p) THEN
+        WRITEALL(p, SCHNIPSEL_VORLAGE + "=== Zähler hochzählen | zaehl" + NL + "zaehler = zaehler + |" + NL)
+        schnipselLaden()
+    END IF
+    tabOeffnen(p, dateiLesen(p))
+    GUI_SET_TEXT(lblStatus, "Eigene Schnipsel -- nach dem Sichern (Strg+S) gelten sie.")
+    protokoll("schnipsel datei")
+END SUB
+
+SUB schnipselAuswahlFragen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    IF GUI_TEXTAREA_SELECTION$(ta) = "" THEN
+        GUI_SET_TEXT(lblStatus, "Erst den Code markieren, der zum Schnipsel werden soll.")
+        RETURN
+    END IF
+    dlgSchnipsel = GUI_PROMPT("Auswahl als Schnipsel", "Name | Kürzel (das Kürzel plus Tabulator setzt ihn ein):", "Mein Schnipsel | mein")
+END SUB
+
+SUB schnipselAuswahlSichern(eingabe AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM text AS STRING : text = REPLACE$(GUI_TEXTAREA_SELECTION$(ta), CHR$(13), "")
+    IF TRIM$(text) = "" OR TRIM$(eingabe) = "" THEN RETURN
+    DIM p AS STRING : p = schnipselPfad$()
+    DIM alt AS STRING : alt = ""
+    IF FILEEXISTS(p) THEN
+        alt = JOIN$(READLINES(p), NL)
+        IF alt <> "" THEN alt = alt + NL
+    ELSE
+        alt = SCHNIPSEL_VORLAGE
+    END IF
+    IF RIGHT$(text, 1) = NL THEN text = LEFT$(text, LEN(text) - 1)
+    WRITEALL(p, alt + "=== " + TRIM$(eingabe) + NL + text + NL)
+    schnipselLaden()
+    ' Steht die Datei in einem Reiter, soll er nicht den alten Stand halten.
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF wegGleich$(tabPfade[i]) = wegGleich$(p) AND GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN
+            DIM neuT AS STRING : neuT = JOIN$(READLINES(p), NL)
+            GUI_SET_TEXT(tabFelder[i], neuT)
+            tabGesichert[i] = neuT
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblStatus, "Als Schnipsel gesichert: " + TRIM$(eingabe))
+    protokoll("schnipsel gesichert " + TRIM$(eingabe))
+END SUB
+
+' --- Terminal (Alt+3) ------------------------------------------------------
+' Jeder Befehl laeuft als eigener Prozess (cmd /C bzw. sh) im Ordner des
+' Terminals -- keine dauerhafte Shell: deren Eingabeaufforderung kaeme ohne
+' Zeilenende und bliebe in der zeilenweisen Lesung haengen. Das Skript
+' meldet am Ende den Ordner, in dem es stand; so wirkt `cd` wie gewohnt
+' (auch `cd ..`, `cd /d`), Umgebungsvariablen aus `set` dagegen nicht.
+CONST TERM_MARKE = "__DH_TERMINAL_ORT__"
+DIM termWindows AS BOOLEAN : termWindows = GETENV$("COMSPEC") <> ""
+DIM termOrt AS STRING : termOrt = ""
+DIM termRest AS STRING : termRest = ""
+DIM termFehlRest AS STRING : termFehlRest = ""
+DIM termSkript AS STRING : termSkript = ""
+' Abgebrochen: der Code (-1) sagt dann nichts, "[abgebrochen]" steht schon da.
+DIM termAbgebrochen AS BOOLEAN : termAbgebrochen = FALSE
+DIM termVerlauf AS ARRAY OF STRING : termVerlauf = []
+DIM termVerlaufPos AS INTEGER : termVerlaufPos = 0
+
+SUB terminalZeigen(an AS BOOLEAN)
+    terminalAn = an
+    IF an AND NOT untenAn THEN leistenSetzen(seitenAn, TRUE)
+    GUI_BUTTON_VARIANT(btnReiterAusgabe, IIF(an, "flach", "primaer"))
+    GUI_BUTTON_VARIANT(btnReiterTerminal, IIF(an, "primaer", "flach"))
+    GUI_MENU_CHECK(miTerminal, an)
+    layout()
+    IF an THEN
+        terminalOrtZeigen()
+        GUI_FOCUS(tfEingabe)
+    END IF
+    protokoll("terminal " + IIF(an, "an", "aus"))
+END SUB
+
+FUNCTION terminalOrt$() AS STRING
+    IF termOrt = "" OR NOT DIREXISTS(termOrt) THEN
+        termOrt = projektOrdner
+        IF termOrt = "" OR NOT DIREXISTS(termOrt) THEN termOrt = startOrdner
+    END IF
+    RETURN termOrt
+END FUNCTION
+
+SUB terminalOrtZeigen()
+    IF termProz >= 0 THEN
+        GUI_SET_TEXT(lblStatus, "Terminal: läuft -- Enter schickt eine Eingabe, [Abbrechen] beendet.")
+    ELSE
+        GUI_SET_TEXT(lblStatus, "Terminal: " + terminalOrt$())
+    END IF
+END SUB
+
+SUB terminalZeile(z AS STRING, farbe AS INTEGER)
+    GUI_LISTBOX_ADD(lstTerminal, z)
+    IF farbe <> -1 THEN GUI_LISTBOX_COLOR(lstTerminal, GUI_LISTBOX_COUNT(lstTerminal) - 1, farbe)
+    IF GUI_LISTBOX_COUNT(lstTerminal) > 3000 THEN GUI_LISTBOX_REMOVE(lstTerminal, 0)
+    GUI_LISTBOX_SET_SELECTED(lstTerminal, GUI_LISTBOX_COUNT(lstTerminal) - 1)
+    protokoll("terminal zeile " + z)
+END SUB
+
+' Einfache Anfuehrung fuer sh: ' wird zu '\''.
+FUNCTION shWort$(s AS STRING) AS STRING
+    RETURN "'" + REPLACE$(s, "'", "'\''") + "'"
+END FUNCTION
+
+SUB terminalEingabe(t AS STRING)
+    GUI_SET_TEXT(tfEingabe, "")
+    IF termProz >= 0 THEN
+        ' Ein laufender Befehl bekommt die Zeile als Eingabe.
+        PROCESS_WRITE(termProz, t + NL)
+        terminalZeile("< " + t, F_KOMMENTAR)
+        RETURN
+    END IF
+    DIM b AS STRING : b = TRIM$(t)
+    IF b = "" THEN RETURN
+    IF LEN(termVerlauf) = 0 THEN
+        ARRAY_PUSH(termVerlauf, b)
+    ELSEIF termVerlauf[LEN(termVerlauf) - 1] <> b THEN
+        ARRAY_PUSH(termVerlauf, b)
+    END IF
+    termVerlaufPos = LEN(termVerlauf)
+    terminalZeile(terminalOrt$() + "> " + b, F_SCHLUESSEL)
+    IF LOWER$(b) = "cls" OR LOWER$(b) = "clear" THEN
+        GUI_LISTBOX_CLEAR(lstTerminal)
+        RETURN
+    END IF
+    terminalStarten(b)
+END SUB
+
+SUB terminalStarten(b AS STRING)
+    DIM ordner AS STRING : ordner = konfigOrdner$()
+    ' Absolut und unter Windows mit Rueckstrichen: cmd /C nimmt "./x.cmd" nicht.
+    IF termSkript = "" THEN
+        termSkript = PATHJOIN(REALPATH$(ordner), "terminal_" + LEFT$(UUID4$(), 8) + IIF(termWindows, ".cmd", ".sh"))
+        IF termWindows THEN termSkript = REPLACE$(termSkript, "/", CHR$(92))
+    END IF
+    DIM text AS STRING
+    IF termWindows THEN
+        ' chcp 65001: sonst kaemen die Umlaute von dir & Co. in der
+        ' OEM-Codeseite an. errorlevel wird VOR dem Echo gemerkt.
+        DIM crlf AS STRING : crlf = CHR$(13) + CHR$(10)
+        text = "@echo off" + crlf + "chcp 65001 >nul" + crlf + "cd /d " + CHR$(34) + terminalOrt$() + CHR$(34) + crlf + b + crlf
+        text = text + "set __dh_e=%errorlevel%" + crlf + "echo " + TERM_MARKE + "%cd%" + crlf + "exit /b %__dh_e%" + crlf
+        WRITEALL(termSkript, text)
+        termProz = PROCESS_START("cmd", "/Q", "/D", "/C", termSkript)
+    ELSE
+        text = "cd " + shWort$(terminalOrt$()) + " || exit 1" + NL + b + NL
+        text = text + "__dh_e=$?" + NL + "echo " + TERM_MARKE + "$(pwd)" + NL + "exit $__dh_e" + NL
+        WRITEALL(termSkript, text)
+        termProz = PROCESS_START("sh", termSkript)
+    END IF
+    termRest = "" : termFehlRest = ""
+    protokoll("terminal start " + b)
+    layout()
+    terminalOrtZeigen()
+END SUB
+
+' Zeilen verteilen: die Marke setzt den Ort, alles andere kommt in die Liste.
+SUB termVerteilen(text AS STRING, fehler AS BOOLEAN, ende AS BOOLEAN)
+    DIM rest AS STRING : rest = IIF(fehler, termFehlRest, termRest) + text
+    WHILE INSTR(rest, NL) >= 0 OR (ende AND rest <> "")
+        DIM p AS INTEGER : p = INSTR(rest, NL)
+        DIM z AS STRING
+        IF p >= 0 THEN
+            z = LEFT$(rest, p)
+            rest = MID$(rest, p + 1)
+        ELSE
+            z = rest
+            rest = ""
+        END IF
+        z = REPLACE$(z, CHR$(13), "")
+        IF LEFT$(z, LEN(TERM_MARKE)) = TERM_MARKE THEN
+            termOrt = TRIM$(MID$(z, LEN(TERM_MARKE)))
+        ELSE
+            terminalZeile(z, IIF(fehler, F_ZAHL, -1))
+        END IF
+    WEND
+    IF fehler THEN termFehlRest = rest ELSE termRest = rest
+END SUB
+
+SUB terminalNachziehen()
+    IF termProz < 0 THEN RETURN
+    termVerteilen(PROCESS_READ$(termProz), FALSE, FALSE)
+    termVerteilen(PROCESS_ERR$(termProz), TRUE, FALSE)
+    IF PROCESS_RUNNING(termProz) THEN RETURN
+    ' Wie beim Programmlauf: lesen, bis fuenf Abfragen leer sind -- das Kind
+    ' kann fertig sein, bevor sein Lesefaden die letzte Zeile abgelegt hat.
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(termProz)
+        DIM f AS STRING : f = PROCESS_ERR$(termProz)
+        IF a = "" AND f = "" THEN
+            leer = leer + 1
+            SLEEP(10)
+        ELSE
+            termVerteilen(a, FALSE, FALSE)
+            termVerteilen(f, TRUE, FALSE)
+            leer = 0
+        END IF
+    WEND
+    termVerteilen("", FALSE, TRUE)
+    termVerteilen("", TRUE, TRUE)
+    DIM code AS INTEGER : code = PROCESS_CODE(termProz)
+    PROCESS_CLOSE(termProz)
+    termProz = -1
+    IF code <> 0 AND NOT termAbgebrochen THEN terminalZeile("[beendet mit Code " + STR$(code) + "]", F_ZAHL)
+    termAbgebrochen = FALSE
+    protokoll("terminal fertig " + STR$(code) + " " + BASENAME(termOrt))
+    layout()
+    IF terminalAn THEN terminalOrtZeigen()
+END SUB
+
+SUB terminalAbbrechen()
+    IF termProz < 0 THEN
+        GUI_SET_TEXT(lblStatus, "Im Terminal läuft nichts.")
+        RETURN
+    END IF
+    PROCESS_KILL(termProz)
+    termAbgebrochen = TRUE
+    terminalZeile("[abgebrochen]", F_ZAHL)
+    protokoll("terminal abgebrochen")
+END SUB
+
+' Pfeil hoch/runter in der Eingabezeile blaettert durch die Befehle.
+SUB terminalVerlaufTasten()
+    IF NOT terminalAn OR termProz >= 0 OR GUI_FOCUSED() <> tfEingabe THEN RETURN
+    IF LEN(termVerlauf) = 0 THEN RETURN
+    IF KEYHIT(KEY_UP) THEN
+        termVerlaufPos = MAX(0, termVerlaufPos - 1)
+        GUI_SET_TEXT(tfEingabe, termVerlauf[termVerlaufPos])
+    ELSEIF KEYHIT(KEY_DOWN) THEN
+        termVerlaufPos = MIN(LEN(termVerlauf), termVerlaufPos + 1)
+        IF termVerlaufPos >= LEN(termVerlauf) THEN
+            GUI_SET_TEXT(tfEingabe, "")
+        ELSE
+            GUI_SET_TEXT(tfEingabe, termVerlauf[termVerlaufPos])
+        END IF
+    END IF
+END SUB
+
 ' --- Befehlspalette und Datei-Waehler ------------------------------------
 ' EINE Liste aller Befehle mit Kuerzel: Palette, Tastenkuerzel-Uebersicht.
 SUB paletteEintrag(name AS STRING, kennung AS STRING, kuerzel AS STRING)
@@ -12976,6 +13600,9 @@ paletteEintrag("Werkzeug: SFX-Generator", "wz_sfx", "") : paletteEintrag("Werkze
 paletteEintrag("Werkzeug: Tilemap-Editor", "wz_tilemap", "") : paletteEintrag("Werkzeug: Sprite-Editor", "wz_sprite", "")
 paletteEintrag("Werkzeug: Tracker", "wz_tracker", "") : paletteEintrag("Werkzeug: Form-Designer", "wz_form", "") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim", "") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten", "") : paletteEintrag("Beispiele als Projekt öffnen", "beispiele", "") : paletteEintrag("Beispiele nach Themen ...", "beispiele_themen", "")
 paletteEintrag("Ausdruck im Debugger auswerten", "ausdruck", "Strg+E")
+paletteEintrag("Eigene Schnipsel bearbeiten", "schnipsel_eigen", "") : paletteEintrag("Auswahl als Schnipsel sichern ...", "schnipsel_auswahl", "")
+paletteEintrag("Tastenkürzel ändern ...", "tasten", "") : paletteEintrag("Tastenkürzel zurücksetzen", "tasten_zurueck", "")
+paletteEintrag("Terminal ein/aus", "terminal", "Alt+3") : paletteEintrag("Terminal: laufenden Befehl abbrechen", "terminal_stopp", "")
 
 ' Unscharfer Filter: der Text als Teil ODER seine Zeichen der Reihe nach
 ' ("spred" findet "189_sprite_editor.dh").
@@ -13079,6 +13706,8 @@ SUB paletteAusfuehren()
         ELSE
             verschiebenNach(paletteSichtbar[sel])
         END IF
+    ELSEIF paletteArt = "tasten" THEN
+        tastenFragen(paletteSichtbar[sel])
     ELSEIF paletteArt = "korrektur" THEN
         korrekturAnwenden(paletteSichtbar[sel])
     ELSEIF paletteArt = "datei" THEN
@@ -13092,6 +13721,10 @@ END SUB
 
 SUB eingabeSenden()
     DIM t AS STRING : t = GUI_TEXT(tfEingabe)
+    IF terminalAn THEN
+        terminalEingabe(t)
+        RETURN
+    END IF
     IF prozess < 0 THEN
         GUI_SET_TEXT(lblStatus, "Kein Programm läuft.")
         RETURN
@@ -13354,6 +13987,12 @@ SUB befehl(k AS STRING)
         CASE "kleiner" : schriftSetzen(codeGroesse - 2)
         CASE "schrift_normal" : schriftSetzen(SCHRIFT_NORMAL)
         CASE "kuerzel" : kuerzelZeigen()
+        CASE "schnipsel_eigen" : schnipselEigenOeffnen()
+        CASE "schnipsel_auswahl" : schnipselAuswahlFragen()
+        CASE "tasten" : tastenWaehlen()
+        CASE "tasten_zurueck" : tastenZuruecksetzen()
+        CASE "terminal" : terminalZeigen(NOT (terminalAn AND untenAn))
+        CASE "terminal_stopp" : terminalAbbrechen()
         CASE "sichern" : sichern(aktiverTab, FALSE)
         CASE "sichern_unter" : sichern(aktiverTab, TRUE)
         CASE "schliessen" : tabSchliessenFragen(aktiverTab)
@@ -13584,6 +14223,63 @@ schnipsel("Datei zeilenweise lesen", "readlines", "DIM zeilen AS ARRAY OF STRING
 schnipsel("gui-Fenster mit Knopf", "gui", "IMPORT " + CHR$(34) + "gui" + CHR$(34) + NL + "DIM win AS GUI_WINDOW" + NL + "win = GUI_WINDOW(" + CHR$(34) + "Fenster" + CHR$(34) + ", 60, 60, 320, 200)" + NL + "DIM knopf AS GUI_WIDGET" + NL + "knopf = GUI_BUTTON(win, " + CHR$(34) + "Los" + CHR$(34) + ", 20, 20, 100, 30)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    GUI_UPDATE()" + NL + "    IF GUI_CLICKED(knopf) THEN |" + NL + "    CLS(BLACK)" + NL + "    GUI_DRAW()" + NL + "    FLIP()" + NL + "WEND")
 schnipsel("Sprite mit Animation", "sprite", "DIM held AS SPRITE" + NL + "held = SPRITE_NEW(LOADIMAGE(|), 32, 32)" + NL + "SPRITE_ADD_ANIM(held, " + CHR$(34) + "lauf" + CHR$(34) + ", 0, 3, 8.0)" + NL + "SPRITE_PLAY(held, " + CHR$(34) + "lauf" + CHR$(34) + ")")
 
+' Die Tafel der Menuepunkte (siehe menueBefehl) -- hinter der Palette,
+' weil die Tastenbelegung die Vorgaben BEIDER braucht.
+menueBefehl(miNeu, "neu", "Strg+N") : menueBefehl(miOeffnen, "oeffnen", "Strg+O") : menueBefehl(miSichern, "sichern", "Strg+S")
+menueBefehl(miSichernAls, "sichern_unter", "") : menueBefehl(miSchliessen, "schliessen", "Strg+W") : menueBefehl(miBeenden, "beenden", "Strg+Q")
+menueBefehl(miSuchen, "suchen", "Strg+F") : menueBefehl(miWeiter, "weiter", "F3") : menueBefehl(miZurueckSuchen, "zurueck_suchen", "Umschalt+F3")
+menueBefehl(miErsetzen, "ersetzen", "Strg+H") : menueBefehl(miErsetzenEins, "ersetzen_eins", "Strg+Umschalt+1") : menueBefehl(miErsetzenAlle, "ersetzen_alle", "Strg+Alt+Enter")
+menueBefehl(miZeile, "zeile", "Strg+G") : menueBefehl(miProjekt, "projekt", "Strg+Umschalt+F") : menueBefehl(miVervoll, "vervoll", "Strg+Leer")
+menueBefehl(miDefinition, "definition", "F12") : menueBefehl(miUmbenennen, "umbenennen", "Umschalt+F6") : menueBefehl(miKorrektur, "korrektur", "Strg+.")
+menueBefehl(miSchnipsel, "schnipsel", "Strg+J") : menueBefehl(miEinstellungen, "einstellungen", "Strg+U") : menueBefehl(miBefehle, "befehle", "Strg+F3")
+menueBefehl(miPeek, "peek", "Alt+F12") : menueBefehl(miSymbole, "symbole", "Strg+Umschalt+S") : menueBefehl(miErsProjekt, "ersetzen_projekt", "Strg+Umschalt+H")
+menueBefehl(miAusgabeSuche, "ausgabe_suchen", "Strg+Umschalt+A") : menueBefehl(miMarkeNaechste, "marke_naechste", "Strg+Umschalt+N") : menueBefehl(miMarkeEnden, "marken_enden", "Strg+Umschalt+I")
+menueBefehl(miErweitern, "erweitern", "Strg+Umschalt+Hoch") : menueBefehl(miHerausloesen, "herausloesen", "Strg+Umschalt+R") : menueBefehl(miVerkleinern, "verkleinern", "Strg+Umschalt+Runter")
+menueBefehl(miUmbProjekt, "umb_projekt", "Strg+Umschalt+F6") : menueBefehl(miParameter, "parameter", "Strg+Umschalt+U") : menueBefehl(miAufrufer, "aufrufer", "Umschalt+F12")
+menueBefehl(miFundstellen, "fundstellen", "Strg+Umschalt+F12") : menueBefehl(miVerschieben, "verschieben", "Strg+Umschalt+V") : menueBefehl(miUmbauZur, "umbau_zurueck", "Strg+Umschalt+Z")
+menueBefehl(miUmbauWdh, "umbau_wieder", "") : menueBefehl(miUmbauNach, "umbau_nach", "Strg+Umschalt+G") : menueBefehl(miVergleich, "vergleichen", "")
+menueBefehl(miReiterVgl, "reiter_vergleich", "") : menueBefehl(miZlSort, "zl_sortieren", "") : menueBefehl(miZlDoppelt, "zl_doppelte", "")
+menueBefehl(miZlRand, "zl_rand", "") : menueBefehl(miAndereZu, "andere_zu", "Strg+Umschalt+W") : menueBefehl(miLinien, "linien", "")
+menueBefehl(miKopf, "blockkopf", "") : menueBefehl(miZaehler, "aufrufzaehler", "") : menueBefehl(miQv, "git_fenster", "Strg+Alt+G")
+menueBefehl(miLive, "live", "Strg+Alt+L") : menueBefehl(miPruefsammlung, "pruefsammlung", "Strg+Alt+F5") : menueBefehl(miPrueffall, "prueffall", "Strg+Alt+Umschalt+F5")
+menueBefehl(miTestUebersicht, "test_uebersicht", "Strg+Alt+T") : menueBefehl(miNeuProjekt, "neues_projekt", "Strg+Alt+N") : menueBefehl(miEinfuehren, "einfuehren", "Strg+Alt+V")
+menueBefehl(miEinsetzen, "einsetzen", "Strg+Alt+I") : menueBefehl(miSubFunc, "sub_function", "Strg+Alt+U") : menueBefehl(miKonfMeine, "konflikt_meine", "")
+menueBefehl(miKonfIhre, "konflikt_ihre", "") : menueBefehl(miKonfBeide, "konflikt_beide", "") : menueBefehl(miBlameZeile, "blame_zeile", "")
+menueBefehl(miLeiste, "leiste", "") : menueBefehl(miBaumOeffnen, "baum_oeffnen", "Strg+Umschalt+E") : menueBefehl(miHakenWeg, "haken_weg", "")
+menueBefehl(miBaumHaken, "baum_haken", "") : menueBefehl(miMarken, "marken", "Strg+Umschalt+L") : menueBefehl(miPalette, "palette", "Strg+Umschalt+P")
+menueBefehl(miStart, "start", "F5") : menueBefehl(miStopp, "stopp", "Umschalt+F5") : menueBefehl(miPruefen, "pruefen", "Umschalt+F7")
+menueBefehl(miPrjPruefen, "projekt_pruefen", "Strg+Umschalt+F7") : menueBefehl(miDebug, "debug", "F7") : menueBefehl(miHaltepunkt, "haltepunkt", "F9")
+menueBefehl(miAnhalten, "anhalten", "F6") : menueBefehl(miNeustart, "neustart", "Strg+Umschalt+F5") : menueBefehl(miHpListe, "hp_liste", "Strg+Umschalt+F9")
+menueBefehl(miProfil, "profil", "Strg+Umschalt+Y") : menueBefehl(miAusgabeLeer, "ausgabe_leeren", "") : menueBefehl(miThema, "thema", "")
+menueBefehl(miVollbild, "vollbild", "Alt+Enter") : menueBefehl(miUmbruch, "umbruch", "Alt+Z") : menueBefehl(miGeteilt, "geteilt", "Alt+G")
+menueBefehl(miSpiegel, "spiegel", "Alt+Umschalt+G") : menueBefehl(miSeiten, "seitenleiste", "Alt+1") : menueBefehl(miUnten, "untere_leiste", "Alt+2")
+menueBefehl(miMinimap, "minimap", "") : menueBefehl(miFalten, "falten", "F4") : menueBefehl(miFaltenAlle, "falten_alle", "Strg+F4")
+menueBefehl(miFaltenAuf, "falten_auf", "Umschalt+F4") : menueBefehl(miUeber, "ueber", "") : menueBefehl(miHandbuch, "handbuch", "F1")
+menueBefehl(miDrucken, "drucken", "Strg+P") : menueBefehl(miPdf, "pdf", "") : menueBefehl(miWzSfx, "wz_sfx", "")
+menueBefehl(miWzPartikel, "wz_partikel", "") : menueBefehl(miWzTilemap, "wz_tilemap", "") : menueBefehl(miWzSprite, "wz_sprite", "")
+menueBefehl(miWzTracker, "wz_tracker", "") : menueBefehl(miWzForm, "wz_form", "") : menueBefehl(miWzAnim, "wz_anim", "")
+menueBefehl(miWzNoten, "wz_noten", "") : menueBefehl(miBeispiele, "beispiele", "") : menueBefehl(miThemen, "beispiele_themen", "")
+menueBefehl(miAusdruck, "ausdruck", "Strg+E") : menueBefehl(miSchnell, "schnell", "Strg+Umschalt+O") : menueBefehl(miTodo, "todo", "Strg+Umschalt+M")
+menueBefehl(miBlame, "blame", "Strg+Umschalt+B") : menueBefehl(miDiff, "diff", "Strg+Umschalt+D") : menueBefehl(miVerlauf, "verlauf", "")
+menueBefehl(miGitRand, "git_rand", "") : menueBefehl(miKommentar, "kommentar", "Strg+K") : menueBefehl(miDuplizieren, "duplizieren", "Strg+D")
+menueBefehl(miZeileWeg, "zeile_weg", "Strg+Umschalt+K") : menueBefehl(miHoch, "hoch", "Alt+Hoch") : menueBefehl(miRunter, "runter", "Alt+Runter")
+menueBefehl(miEinruecken, "einruecken", "Alt+Rechts") : menueBefehl(miAusruecken, "ausruecken", "Alt+Links") : menueBefehl(miFormat, "format", "Umschalt+Alt+F")
+menueBefehl(miLesezeichen, "lesezeichen", "Strg+F2") : menueBefehl(miLzWeiter, "lz_weiter", "F2") : menueBefehl(miLzZurueck, "lz_zurueck", "Umschalt+F2")
+menueBefehl(miLzListe, "lz_liste", "Alt+F2") : menueBefehl(miRegex, "regex", "") : menueBefehl(miGross, "gross_klein", "Alt+C")
+menueBefehl(miWort, "ganzes_wort", "Alt+W") : menueBefehl(miWiederauf, "wiederauf", "Strg+Umschalt+T") : menueBefehl(miBedingung, "bedingung", "Umschalt+F9")
+menueBefehl(miExport, "export", "Strg+F6") : menueBefehl(miGroesser, "groesser", "Strg+Plus") : menueBefehl(miKleiner, "kleiner", "Strg+Minus")
+menueBefehl(miNormal, "schrift_normal", "Strg+0") : menueBefehl(miKuerzel, "kuerzel", "Strg+F1") : menueBefehl(miWeiterD, "weiter_d", "F8", FALSE)
+menueBefehl(miDrueber, "drueber", "F10", FALSE) : menueBefehl(miHinein, "hinein", "F11", FALSE) : menueBefehl(miHeraus, "heraus", "Umschalt+F11", FALSE)
+menueBefehl(miBisMarke, "bis_marke", "Strg+F10", FALSE) : menueBefehl(miSchnipselEigen, "schnipsel_eigen", "") : menueBefehl(miSchnipselAuswahl, "schnipsel_auswahl", "")
+menueBefehl(miTerminal, "terminal", "Alt+3") : menueBefehl(miTasten, "tasten", "") : menueBefehl(miTastenZurueck, "tasten_zurueck", "")
+DIM bkv AS INTEGER
+FOR bkv = 0 TO LEN(befehlKuerzel) - 1
+    ARRAY_PUSH(befehlKuerzelVorgabe, befehlKuerzel[bkv])
+NEXT
+schnipselEingebautMerken()
+schnipselLaden()
+tastenAnwenden()
+
 ' --- Start -------------------------------------------------------------
 layout()
 reiterNeuSetzen()
@@ -13695,67 +14391,12 @@ WHILE NOT beenden
     END IF
 
     ' --- Menue (Klick oder Kuerzel) ---
-    IF GUI_CLICKED(miNeu) THEN befehl("neu")
-    IF GUI_CLICKED(miOeffnen) THEN befehl("oeffnen")
-    IF GUI_CLICKED(miSichern) THEN befehl("sichern")
-    IF GUI_CLICKED(miSichernAls) THEN befehl("sichern_unter")
-    IF GUI_CLICKED(miSchliessen) THEN befehl("schliessen")
-    IF GUI_CLICKED(miBeenden) THEN befehl("beenden")
-    IF GUI_CLICKED(miSuchen) THEN befehl("suchen")
-    IF GUI_CLICKED(miWeiter) THEN befehl("weiter")
-    IF GUI_CLICKED(miZurueckSuchen) THEN befehl("zurueck_suchen")
-    IF GUI_CLICKED(miErsetzen) THEN befehl("ersetzen")
-    IF GUI_CLICKED(miErsetzenEins) THEN befehl("ersetzen_eins")
-    IF GUI_CLICKED(miErsetzenAlle) THEN befehl("ersetzen_alle")
-    IF GUI_CLICKED(miZeile) THEN befehl("zeile")
-    IF GUI_CLICKED(miProjekt) THEN befehl("projekt")
-    IF GUI_CLICKED(miVervoll) THEN befehl("vervoll")
-    IF GUI_CLICKED(miDefinition) THEN befehl("definition")
-    IF GUI_CLICKED(miUmbenennen) THEN befehl("umbenennen")
-    IF GUI_CLICKED(miKorrektur) THEN befehl("korrektur")
-    IF GUI_CLICKED(miSchnipsel) THEN befehl("schnipsel")
-    IF GUI_CLICKED(miEinstellungen) THEN befehl("einstellungen")
-    IF GUI_CLICKED(miBefehle) THEN befehl("befehle")
-    IF GUI_CLICKED(miPeek) THEN befehl("peek")
-    IF GUI_CLICKED(miSymbole) THEN befehl("symbole")
-    IF GUI_CLICKED(miErsProjekt) THEN befehl("ersetzen_projekt")
-    IF GUI_CLICKED(miAusgabeSuche) THEN befehl("ausgabe_suchen")
-    IF GUI_CLICKED(miMarkeNaechste) THEN befehl("marke_naechste")
-    IF GUI_CLICKED(miMarkeEnden) THEN befehl("marken_enden")
-    IF GUI_CLICKED(miErweitern) THEN befehl("erweitern")
-    IF GUI_CLICKED(miHerausloesen) THEN befehl("herausloesen")
-    IF GUI_CLICKED(miVerkleinern) THEN befehl("verkleinern")
-    IF GUI_CLICKED(miUmbProjekt) THEN befehl("umb_projekt")
-    IF GUI_CLICKED(miParameter) THEN befehl("parameter")
-    IF GUI_CLICKED(miAufrufer) THEN befehl("aufrufer")
-    IF GUI_CLICKED(miFundstellen) THEN befehl("fundstellen")
-    IF GUI_CLICKED(miVerschieben) THEN befehl("verschieben")
-    IF GUI_CLICKED(miUmbauZur) THEN befehl("umbau_zurueck")
-    IF GUI_CLICKED(miUmbauWdh) THEN befehl("umbau_wieder")
-    IF GUI_CLICKED(miUmbauNach) THEN befehl("umbau_nach")
-    IF GUI_CLICKED(miVergleich) THEN befehl("vergleichen")
-    IF GUI_CLICKED(miReiterVgl) THEN befehl("reiter_vergleich")
-    IF GUI_CLICKED(miZlSort) THEN befehl("zl_sortieren")
-    IF GUI_CLICKED(miZlDoppelt) THEN befehl("zl_doppelte")
-    IF GUI_CLICKED(miZlRand) THEN befehl("zl_rand")
-    IF GUI_CLICKED(miAndereZu) THEN befehl("andere_zu")
-    IF GUI_CLICKED(miLinien) THEN befehl("linien")
-    IF GUI_CLICKED(miKopf) THEN befehl("blockkopf")
-    IF GUI_CLICKED(miZaehler) THEN befehl("aufrufzaehler")
-    IF GUI_CLICKED(miQv) THEN befehl("git_fenster")
-    IF GUI_CLICKED(miLive) THEN befehl("live")
-    IF GUI_CLICKED(miPruefsammlung) THEN befehl("pruefsammlung")
-    IF GUI_CLICKED(miPrueffall) THEN befehl("prueffall")
-    IF GUI_CLICKED(miTestUebersicht) THEN befehl("test_uebersicht")
-    IF GUI_CLICKED(miNeuProjekt) THEN befehl("neues_projekt")
-    IF GUI_CLICKED(miEinfuehren) THEN befehl("einfuehren")
-    IF GUI_CLICKED(miEinsetzen) THEN befehl("einsetzen")
-    IF GUI_CLICKED(miSubFunc) THEN befehl("sub_function")
-    IF GUI_CLICKED(miKonfMeine) THEN befehl("konflikt_meine")
-    IF GUI_CLICKED(miKonfIhre) THEN befehl("konflikt_ihre")
-    IF GUI_CLICKED(miKonfBeide) THEN befehl("konflikt_beide")
-    IF GUI_CLICKED(miBlameZeile) THEN befehl("blame_zeile")
-    IF GUI_CLICKED(miLeiste) THEN befehl("leiste")
+    menueKlicks()
+    IF GUI_CLICKED(btnReiterAusgabe) THEN terminalZeigen(FALSE)
+    IF GUI_CLICKED(btnReiterTerminal) THEN terminalZeigen(TRUE)
+    IF GUI_CLICKED(btnTermStopp) THEN befehl("terminal_stopp")
+    terminalNachziehen()
+    terminalVerlaufTasten()
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
     DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
     IF wzc >= 0 THEN
@@ -13815,21 +14456,7 @@ WHILE NOT beenden
     assetNachziehen()
     einfuehrenNachziehen()
     blameZeileNachziehen()
-    IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
-    IF GUI_CLICKED(miHakenWeg) THEN befehl("haken_weg")
-    IF GUI_CLICKED(miBaumHaken) THEN befehl("baum_haken")
-    IF GUI_CLICKED(miMarken) THEN befehl("marken")
-    IF GUI_CLICKED(miPalette) THEN befehl("palette")
-    IF GUI_CLICKED(miStart) THEN befehl("start")
-    IF GUI_CLICKED(miStopp) THEN befehl("stopp")
-    IF GUI_CLICKED(miPruefen) THEN befehl("pruefen")
-    IF GUI_CLICKED(miPrjPruefen) THEN befehl("projekt_pruefen")
-    IF GUI_CLICKED(miDebug) THEN befehl("debug")
-    IF GUI_CLICKED(miHaltepunkt) THEN befehl("haltepunkt")
     IF GUI_CLICKED(miWeiterD) OR GUI_CLICKED(btnWeiter) THEN befehl("weiter_d")
-    IF GUI_CLICKED(miAnhalten) THEN befehl("anhalten")
-    IF GUI_CLICKED(miNeustart) THEN befehl("neustart")
-    IF GUI_CLICKED(miHpListe) THEN befehl("hp_liste")
     IF GUI_CLICKED(miDrueber) OR GUI_CLICKED(btnDrueber) THEN befehl("drueber")
     IF GUI_CLICKED(miHinein) OR GUI_CLICKED(btnHinein) THEN befehl("hinein")
     IF GUI_CLICKED(miHeraus) OR GUI_CLICKED(btnHeraus) THEN befehl("heraus")
@@ -13838,63 +14465,7 @@ WHILE NOT beenden
     haltepunkteListeNachziehen()
     debugAenderungNachsehen()
     debugPanelNachziehen()
-    IF GUI_CLICKED(miProfil) THEN befehl("profil")
-    IF GUI_CLICKED(miAusgabeLeer) THEN befehl("ausgabe_leeren")
     IF GUI_CLICKED(cbProfilFunk) THEN profilTabelleFuellen()
-    IF GUI_CLICKED(miThema) THEN befehl("thema")
-    IF GUI_CLICKED(miVollbild) THEN befehl("vollbild")
-    IF GUI_CLICKED(miUmbruch) THEN befehl("umbruch")
-    IF GUI_CLICKED(miGeteilt) THEN befehl("geteilt")
-    IF GUI_CLICKED(miSpiegel) THEN befehl("spiegel")
-    IF GUI_CLICKED(miSeiten) THEN befehl("seitenleiste")
-    IF GUI_CLICKED(miUnten) THEN befehl("untere_leiste")
-    IF GUI_CLICKED(miMinimap) THEN befehl("minimap")
-    IF GUI_CLICKED(miFalten) THEN befehl("falten")
-    IF GUI_CLICKED(miFaltenAlle) THEN befehl("falten_alle")
-    IF GUI_CLICKED(miFaltenAuf) THEN befehl("falten_auf")
-    IF GUI_CLICKED(miUeber) THEN befehl("ueber")
-    IF GUI_CLICKED(miHandbuch) THEN befehl("handbuch")
-    IF GUI_CLICKED(miDrucken) THEN befehl("drucken")
-    IF GUI_CLICKED(miPdf) THEN befehl("pdf")
-    IF GUI_CLICKED(miWzSfx) THEN befehl("wz_sfx")
-    IF GUI_CLICKED(miWzPartikel) THEN befehl("wz_partikel")
-    IF GUI_CLICKED(miWzTilemap) THEN befehl("wz_tilemap")
-    IF GUI_CLICKED(miWzSprite) THEN befehl("wz_sprite")
-    IF GUI_CLICKED(miWzTracker) THEN befehl("wz_tracker")
-    IF GUI_CLICKED(miWzForm) THEN befehl("wz_form")
-    IF GUI_CLICKED(miWzAnim) THEN befehl("wz_anim")
-    IF GUI_CLICKED(miWzNoten) THEN befehl("wz_noten")
-    IF GUI_CLICKED(miBeispiele) THEN befehl("beispiele")
-    IF GUI_CLICKED(miThemen) THEN befehl("beispiele_themen")
-    IF GUI_CLICKED(miAusdruck) THEN befehl("ausdruck")
-    IF GUI_CLICKED(miSchnell) THEN befehl("schnell")
-    IF GUI_CLICKED(miTodo) THEN befehl("todo")
-    IF GUI_CLICKED(miBlame) THEN befehl("blame")
-    IF GUI_CLICKED(miDiff) THEN befehl("diff")
-    IF GUI_CLICKED(miVerlauf) THEN befehl("verlauf")
-    IF GUI_CLICKED(miGitRand) THEN befehl("git_rand")
-    IF GUI_CLICKED(miKommentar) THEN befehl("kommentar")
-    IF GUI_CLICKED(miDuplizieren) THEN befehl("duplizieren")
-    IF GUI_CLICKED(miZeileWeg) THEN befehl("zeile_weg")
-    IF GUI_CLICKED(miHoch) THEN befehl("hoch")
-    IF GUI_CLICKED(miRunter) THEN befehl("runter")
-    IF GUI_CLICKED(miEinruecken) THEN befehl("einruecken")
-    IF GUI_CLICKED(miAusruecken) THEN befehl("ausruecken")
-    IF GUI_CLICKED(miFormat) THEN befehl("format")
-    IF GUI_CLICKED(miLesezeichen) THEN befehl("lesezeichen")
-    IF GUI_CLICKED(miLzWeiter) THEN befehl("lz_weiter")
-    IF GUI_CLICKED(miLzZurueck) THEN befehl("lz_zurueck")
-    IF GUI_CLICKED(miLzListe) THEN befehl("lz_liste")
-    IF GUI_CLICKED(miRegex) THEN befehl("regex")
-    IF GUI_CLICKED(miGross) THEN befehl("gross_klein")
-    IF GUI_CLICKED(miWort) THEN befehl("ganzes_wort")
-    IF GUI_CLICKED(miWiederauf) THEN befehl("wiederauf")
-    IF GUI_CLICKED(miBedingung) THEN befehl("bedingung")
-    IF GUI_CLICKED(miExport) THEN befehl("export")
-    IF GUI_CLICKED(miGroesser) THEN befehl("groesser")
-    IF GUI_CLICKED(miKleiner) THEN befehl("kleiner")
-    IF GUI_CLICKED(miNormal) THEN befehl("schrift_normal")
-    IF GUI_CLICKED(miKuerzel) THEN befehl("kuerzel")
     DIM zk AS INTEGER
     FOR zk = 0 TO ZULETZT_MAX - 1
         IF GUI_CLICKED(miZuletzt[zk]) AND zk < LEN(zuletzt) THEN dateiOeffnen(zuletzt[zk])
@@ -14094,6 +14665,26 @@ WHILE NOT beenden
             dlgSchliessen = 0 : beenden = TRUE
         ELSEIF a4 = 3 THEN
             dlgSchliessen = 0
+        END IF
+    END IF
+    IF dlgTasten <> 0 THEN
+        DIM atk AS INTEGER : atk = GUI_ANSWER(dlgTasten)
+        IF atk = 1 THEN
+            DIM tktext AS STRING : tktext = TRIM$(GUI_DIALOG_TEXT(dlgTasten))
+            dlgTasten = 0
+            tastenSetzen(tastenKennung, tktext)
+        ELSEIF atk <> 0 THEN
+            dlgTasten = 0
+        END IF
+    END IF
+    IF dlgSchnipsel <> 0 THEN
+        DIM asn AS INTEGER : asn = GUI_ANSWER(dlgSchnipsel)
+        IF asn = 1 THEN
+            DIM sntext AS STRING : sntext = GUI_DIALOG_TEXT(dlgSchnipsel)
+            dlgSchnipsel = 0
+            schnipselAuswahlSichern(sntext)
+        ELSEIF asn <> 0 THEN
+            dlgSchnipsel = 0
         END IF
     END IF
     IF dlgVerschNeu <> 0 THEN

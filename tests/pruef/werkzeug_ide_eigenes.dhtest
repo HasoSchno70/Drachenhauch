@@ -1,0 +1,248 @@
+' Eigene Schnipsel und eigene Tastenbelegung der IDE (2026-09-29). Beide
+' liegen neben der ide.json: schnipsel.txt (=== Name | kuerzel, dann der
+' Text) und tasten.json ({"kennung": "Kuerzel"}). Gesichert gelten sie
+' sofort. Gelesen wird ueber das Protokoll (DH_IDE_LOG).
+--- seriell
+--- langsam
+
+=== eigene schnipsel kommen dazu und ersetzen eingebaute
+' "zaehl" ist neu, "for" ersetzt den eingebauten, "a b" ist kein Wort (bleibt,
+' aber ohne Kuerzel), ein leerer Schnipsel faellt weg.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    DIM prK AS INTEGER : prK = ARRAY_INDEXOF(schnipselAbk, "zaehl")
+    protokoll("pr zaehl " + schnipselHerkunft[prK] + " " + schnipselNamen[prK])
+    prK = ARRAY_INDEXOF(schnipselAbk, "for")
+    protokoll("pr for " + schnipselHerkunft[prK] + " " + REPLACE$(schnipselText[prK], NL, "/"))
+    protokoll("pr leer " + STR$(ARRAY_INDEXOF(schnipselNamen, "Leer")))
+    prK = ARRAY_INDEXOF(schnipselNamen, "Kaputt")
+    protokoll("pr ohne kuerzel " + STR$(prK >= 0) + " [" + schnipselAbk[prK] + "]")
+    befehl("neu")
+    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "zaehl")
+    schnipselEinfuegen(ARRAY_INDEXOF(schnipselAbk, "zaehl"), 5)
+    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "1")
+    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    EXIT(0)
+END IF
+--- vorher
+' Die Beilage schreibt ein Programm: Zeilen mit === hielte der Laeufer
+' sonst fuer seine eigenen Faelle.
+IF NOT DIREXISTS("_programm") THEN MKDIR("_programm")
+DIM t AS ARRAY OF STRING : t = ["' Kommentar vor dem ersten Schnipsel zaehlt nicht", "=== Zaehler | zaehl", "DIM z AS INTEGER", "z = z + |", "", "", "=== Meine Schleife | for", "FOR k = 1 TO |", "NEXT", "=== Leer | leer", "", "=== Kaputt | a b", "PRINT 1"]
+WRITEALL("_programm/schnipsel.txt", JOIN$(t, CHR$(10)) + CHR$(10))
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 10) = "schnipsel " THEN PRINT L[i]
+NEXT
+--- erwartet
+schnipsel meldung leer Leer
+schnipsel meldung kuerzel a b
+schnipsel eigene 3 2
+pr zaehl eigen Zaehler   [zaehl]
+pr for eigen, ersetzt FOR k = 1 TO |/NEXT
+pr leer -1
+pr ohne kuerzel TRUE []
+schnipsel Zaehler   [zaehl]
+pr text DIM z AS INTEGER/z = z + 1
+
+=== auswahl als schnipsel sichern, datei bearbeiten laedt neu
+' Die Auswahl wird ein Schnipsel (Datei entsteht mit Vorlage), dann wird
+' die Datei im Reiter geaendert und gesichert: der neue gilt sofort, und
+' der Projektordner bleibt, wo er war.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    DIM prOrt AS STRING : prOrt = projektOrdner
+    befehl("neu")
+    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT 42")
+    GUI_TEXTAREA_SELECT(tabFelder[aktiverTab], 1, 1, 1, 100)
+    schnipselAuswahlSichern("Antwort | antwort")
+    protokoll("pr antwort " + STR$(ARRAY_INDEXOF(schnipselAbk, "antwort") >= 0))
+    befehl("schnipsel_eigen")
+    GUI_SET_TEXT(tabFelder[aktiverTab], GUI_TEXT(tabFelder[aktiverTab]) + NL + "=== Gruss | gruss" + NL + "PRINT " + CHR$(34) + "hallo" + CHR$(34) + NL)
+    protokoll("pr gruss vorher " + STR$(ARRAY_INDEXOF(schnipselAbk, "gruss")))
+    DIM prOk AS BOOLEAN : prOk = sichern(aktiverTab, FALSE)
+    protokoll("pr gruss nachher " + STR$(ARRAY_INDEXOF(schnipselAbk, "gruss") >= 0))
+    protokoll("pr projekt gleich " + STR$(projektOrdner = prOrt))
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+DIM S AS ARRAY OF STRING : S = READLINES("_programm/schnipsel.txt")
+FOR i = 0 TO LEN(S) - 1
+    IF LEFT$(S[i], 1) <> "'" THEN PRINT "|"; S[i]; "|"
+NEXT
+--- erwartet
+pr antwort TRUE
+pr gruss vorher -1
+pr gruss nachher TRUE
+pr projekt gleich TRUE
+||
+|=== Antwort | antwort|
+|PRINT 42|
+|=== Gruss | gruss|
+|PRINT "hallo"|
+
+=== tastenbelegung aus der datei, mit meldungen
+' neu bekommt Strg+Alt+N (das "Neues Projekt aus Vorlage" dafuer abgibt), zeile nimmt "Umschalt+Strg+O" -- dieselbe Taste
+' wie Strg+Umschalt+O von "Datei im Projekt oeffnen", das sie verliert.
+' Ein unbekannter Befehl und ein falsches Kuerzel werden gemeldet, suchen
+' behaelt dann Strg+F.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    DIM prW AS STRING
+    FOR EACH prW IN ["neu", "zeile", "schnell", "suchen", "sichern"]
+        protokoll("pr " + prW + " " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, prW)] + ".")
+    NEXT
+    EXIT(0)
+END IF
+--- datei _programm/tasten.json
+{"neu": "Strg+Alt+N", "zeile": "Umschalt+Strg+O", "gibtsnicht": "F2", "suchen": "Strg+Bogus"}
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 6) = "tasten" THEN PRINT L[i]
+NEXT
+--- erwartet
+tasten meldung Strg+Alt+N gehörte vorher zu "Neues Projekt aus Vorlage" -- der hat jetzt keins mehr
+tasten meldung Umschalt+Strg+O gehörte vorher zu "Datei im Projekt öffnen ..." -- der hat jetzt keins mehr
+tasten meldung gibtsnicht: diesen Befehl gibt es nicht
+tasten meldung suchen: "Strg+Bogus" ist kein Kürzel, das die IDE kennt (GUI_MENU_SHORTCUT: Tastenkuerzel 'Strg+Bogus': Taste 'Bogus' unbekannt -- Buchstabe, Ziffer, F1..F12, Entf, Einfg, Pos1, Ende, Bild auf/ab, Leer, Enter, Esc, Tab, Rueck, Links/Rechts/Hoch/Runter, Plus, Minus, Punkt, Komma)
+tasten angewendet 2 4
+pr neu Strg+Alt+N.
+pr zeile Umschalt+Strg+O.
+pr schnell .
+pr suchen Strg+F.
+pr sichern Strg+S.
+
+=== das neue kuerzel wirkt, das alte nicht mehr
+' Echte Tasten: Strg+N (frei geworden) legt keinen Reiter an, Strg+Alt+N
+' schon. Gegenprobe ohne tasten.json im naechsten Fall.
+AUTOMATION_PLAY("ev.txt")
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 OR prBild = 70 OR prBild = 120 THEN protokoll("pr reiter " + STR$(tabAnzahl))
+--- datei _programm/tasten.json
+{"neu": "Strg+Alt+N"}
+--- datei _programm/ev.txt
+c 9
+e 0 1 340 0 0 0
+e 40 2 341 0 0 0
+e 40 2 78 0 0 0
+e 42 1 78 0 0 0
+e 42 1 341 0 0 0
+e 90 2 341 0 0 0
+e 90 2 342 0 0 0
+e 90 2 78 0 0 0
+e 92 1 78 0 0 0
+
+--- umgebung
+DHRT_FRAMES=130
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr reiter 0
+pr reiter 0
+pr reiter 1
+
+=== gegenprobe ohne datei: strg+n legt an
+AUTOMATION_PLAY("ev.txt")
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 OR prBild = 70 THEN protokoll("pr reiter " + STR$(tabAnzahl))
+--- datei _programm/ev.txt
+c 5
+e 0 1 340 0 0 0
+e 40 2 341 0 0 0
+e 40 2 78 0 0 0
+e 42 1 78 0 0 0
+e 42 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=90
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr reiter 0
+pr reiter 1
+
+=== aendern schreibt die datei, vorgabe und zuruecksetzen raeumen auf
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    tastenSetzen("neu", "Strg+Alt+N")
+    tastenSetzen("zeile", "")
+    protokoll("pr datei " + JOIN$(READLINES(tastenPfad$()), ""))
+    tastenSetzen("neu", "strg+n")
+    protokoll("pr datei " + JOIN$(READLINES(tastenPfad$()), ""))
+    protokoll("pr zeile " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "zeile")] + ".")
+    tastenZuruecksetzen()
+    protokoll("pr zeile " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "zeile")] + " " + STR$(FILEEXISTS(tastenPfad$())))
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr datei {"neu":"Strg+Alt+N","zeile":""}
+pr datei {"zeile":""}
+pr zeile .
+pr zeile Strg+G FALSE

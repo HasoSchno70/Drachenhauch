@@ -1,0 +1,137 @@
+' Das Terminal der IDE (Alt+3, 2026-09-29): jeder Befehl laeuft als eigener
+' Prozess im Ordner des Terminals, `cd` wirkt ueber die Marke, die das
+' Skript am Ende schreibt. Die Befehle gibt ein Einschub nacheinander ein
+' und wartet, bis der vorige fertig ist; gelesen wird das Protokoll.
+' Die Befehle sind die von cmd -- darum nur unter Windows.
+--- seriell
+--- langsam
+
+=== befehle, cd, fehlercode, umlaute und eingabe
+DIM prBild AS INTEGER : prBild = 0
+DIM prSchritt AS INTEGER : prSchritt = 0
+DIM prBefehle AS ARRAY OF STRING
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    prBefehle = ["echo hallo", "cd unter", "cd", "echo Größe", "dir /b", "exit /b 3", "type gibtsnicht.txt"]
+    befehl("terminal")
+    protokoll("pr ausgabe sichtbar " + STR$(GUI_VISIBLE(lstAusgabe)) + " terminal " + STR$(GUI_VISIBLE(lstTerminal)))
+END IF
+IF prBild > 20 AND termProz < 0 THEN
+    IF prSchritt < LEN(prBefehle) THEN
+        GUI_SET_TEXT(tfEingabe, prBefehle[prSchritt])
+        eingabeSenden()
+        prSchritt = prSchritt + 1
+    ELSEIF prSchritt = LEN(prBefehle) THEN
+        ' ein Befehl, der auf eine Eingabe wartet: die Zeile geht an ihn
+        GUI_SET_TEXT(tfEingabe, "set /p x=& call echo bekam %%x%%")
+        eingabeSenden()
+        GUI_SET_TEXT(tfEingabe, "Drache")
+        eingabeSenden()
+        prSchritt = prSchritt + 1
+    ELSE
+        protokoll("pr ort " + BASENAME(termOrt))
+        EXIT(0)
+    END IF
+END IF
+--- system windows
+--- verzeichnis unter
+--- datei unter/a.txt
+eins
+--- umgebung
+DHRT_FRAMES=1200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM vorige AS STRING : vorige = ""
+FOR i = 0 TO LEN(L) - 1
+    DIM z AS STRING : z = L[i]
+    ' Die Meldung des Systems ist uebersetzt -- auf dem Laeufer englisch.
+    IF vorige = "terminal start type gibtsnicht.txt" AND LEFT$(z, 16) <> "terminal zeile [" THEN z = "terminal zeile (Meldung des Systems)"
+    ' Der volle Ordner steht vor jedem ">" -- nur das Ende zaehlt.
+    DIM p AS INTEGER : p = INSTR(z, "> ")
+    IF LEFT$(z, 15) = "terminal zeile " AND p > 0 THEN z = "terminal zeile ...\" + BASENAME(MID$(z, 15, p - 15)) + MID$(z, p)
+    IF LEFT$(z, 3) = "pr " OR LEFT$(z, 9) = "terminal " THEN
+        ' Der Ordner, den `cd` ausgibt, ebenso.
+        IF INSTR(z, ":\") > 0 AND INSTR(z, "> ") < 0 THEN z = "terminal zeile ...\" + BASENAME(MID$(z, 15))
+        PRINT z
+        vorige = z
+    END IF
+NEXT
+--- erwartet
+terminal an
+pr ausgabe sichtbar FALSE terminal TRUE
+terminal zeile ...\fall_0> echo hallo
+terminal start echo hallo
+terminal zeile hallo
+terminal fertig 0 fall_0
+terminal zeile ...\fall_0> cd unter
+terminal start cd unter
+terminal fertig 0 unter
+terminal zeile ...\unter> cd
+terminal start cd
+terminal zeile ...\unter
+terminal fertig 0 unter
+terminal zeile ...\unter> echo Größe
+terminal start echo Größe
+terminal zeile Größe
+terminal fertig 0 unter
+terminal zeile ...\unter> dir /b
+terminal start dir /b
+terminal zeile a.txt
+terminal fertig 0 unter
+terminal zeile ...\unter> exit /b 3
+terminal start exit /b 3
+terminal zeile [beendet mit Code 3]
+terminal fertig 3 unter
+terminal zeile ...\unter> type gibtsnicht.txt
+terminal start type gibtsnicht.txt
+terminal zeile (Meldung des Systems)
+terminal zeile [beendet mit Code 1]
+terminal fertig 1 unter
+terminal zeile ...\unter> set /p x=& call echo bekam %%x%%
+terminal start set /p x=& call echo bekam %%x%%
+terminal zeile < Drache
+terminal zeile bekam Drache
+terminal fertig 0 unter
+pr ort unter
+
+=== abbrechen beendet einen laufenden befehl
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    befehl("terminal")
+    GUI_SET_TEXT(tfEingabe, "ping -n 20 127.0.0.1 >nul")
+    eingabeSenden()
+    protokoll("pr knopf " + STR$(GUI_VISIBLE(btnTermStopp)))
+    prStart = MILLIS()
+END IF
+IF prBild = 40 THEN befehl("terminal_stopp")
+IF prBild > 40 AND termProz < 0 THEN
+    protokoll("pr knopf " + STR$(GUI_VISIBLE(btnTermStopp)) + " schnell " + STR$(MILLIS() - prStart < 8000))
+    EXIT(0)
+END IF
+--- system windows
+--- umgebung
+DHRT_FRAMES=900
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 16) = "terminal zeile [" OR L[i] = "terminal abgebrochen" THEN PRINT L[i]
+NEXT
+--- erwartet
+pr knopf TRUE
+terminal zeile [abgebrochen]
+terminal abgebrochen
+pr knopf FALSE schnell TRUE
