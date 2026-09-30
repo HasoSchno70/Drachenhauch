@@ -1,0 +1,207 @@
+' Kontextmenues der IDE und "Im Projektbaum zeigen":
+' (1) Rechtsklick ins Code-Feld: Ausschneiden/Kopieren/Einfuegen, Zur
+'     Definition, Wer ruft das auf?, Umbenennen, Schnellkorrektur,
+'     Haltepunkt, Im Projektbaum zeigen. Der Rechtsklick setzt die Marke.
+' (2) Rechtsklick auf einen Reiter: Schliessen, Andere schliessen, Rechts
+'     davon schliessen, Pfad kopieren, Im Projektbaum zeigen. Ein Reiter mit
+'     ungesicherten Aenderungen bleibt beim Sammel-Schliessen offen.
+' (3) Im Projektbaum zeigen (Strg+Alt+B): Ordner klappen auf, die Zeile
+'     wird gewaehlt, ohne die Datei ein zweites Mal zu oeffnen.
+' Getippte Buchstaben waehlen im offenen Menue den Eintrag, der so anfaengt
+' (eindeutig = gleich ausloesen).
+--- seriell
+--- langsam
+
+=== rechtsklick ins code-feld setzt einen haltepunkt an der stelle
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    ' Die Lage von Zeile 3, Spalte 2 suchen.
+    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    DIM prX AS INTEGER : prX = -1
+    DIM prY AS INTEGER : prY = -1
+    DIM prYY AS INTEGER
+    DIM prXX AS INTEGER
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    FOR prYY = 0 TO SCREENHEIGHT() - 1 STEP 2
+        FOR prXX = 0 TO SCREENWIDTH() - 1 STEP 4
+            IF prX < 0 THEN
+                (prZ, prS) = GUI_TEXTAREA_POS_AT(prTa, prXX, prYY)
+                IF prZ = 3 AND prS = 2 THEN prX = prXX + 2 : prY = prYY + 4
+            END IF
+        NEXT
+    NEXT
+    protokoll("pr stelle " + STR$(prX >= 0))
+    DIM prA AS STRING : prA = "e 0 7 " + STR$(prX) + " " + STR$(prY) + " 0" + CHR$(10)
+    prA = prA + "e 10 7 " + STR$(prX) + " " + STR$(prY) + " 0" + CHR$(10)
+    prA = prA + "e 12 6 1 0 0" + CHR$(10) + "e 13 5 1 0 0" + CHR$(10)
+    prA = prA + "e 18 2 72 0 0" + CHR$(10) + "e 19 1 72 0 0" + CHR$(10)
+    WRITEALL("prmaus.txt", "c 6" + CHR$(10) + prA + CHR$(10))
+    AUTOMATION_PLAY("prmaus.txt")
+END IF
+IF prBild = 70 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO LEN(hpZeilen) - 1
+        protokoll("pr haltepunkt " + BASENAME(hpDateien[prI]) + " " + STR$(hpZeilen[prI]))
+    NEXT
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "kontext " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr stelle TRUE
+kontext haltepunkt
+pr haltepunkt haupt.dh 3
+
+=== rechtsklick auf einen reiter schliesst die anderen, ungesicherte bleiben
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    dateiOeffnen(PATHJOIN(projektOrdner, "b_zwei.dh"))
+    dateiOeffnen(PATHJOIN(projektOrdner, "c_drei.dh"))
+    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT 33")
+    ' Wieder vorn: der erste Reiter, damit "andere" etwas zu tun hat.
+    aktiverTab = 0 : GUI_SET_ACTIVE_TAB(win, 0)
+    WRITEALL("prmaus.txt", "c 6" + CHR$(10) + "e 0 7 140 40 0" + CHR$(10) + "e 10 7 140 40 0" + CHR$(10) + _
+             "e 12 6 1 0 0" + CHR$(10) + "e 13 5 1 0 0" + CHR$(10) + "e 18 2 65 0 0" + CHR$(10) + "e 19 1 65 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prmaus.txt")
+END IF
+IF prBild = 60 THEN
+    DIM prI AS INTEGER
+    DIM prT AS STRING : prT = ""
+    FOR prI = 0 TO tabAnzahl - 1
+        prT = prT + " " + BASENAME(tabPfade[prI])
+    NEXT
+    protokoll("pr reiter" + prT + " vorn " + BASENAME(tabPfade[aktiverTab]))
+    EXIT(0)
+END IF
+--- argumente
+a_eins.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a_eins.dh
+PRINT 1
+--- datei b_zwei.dh
+PRINT 2
+--- datei c_drei.dh
+PRINT 3
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "kontext " OR LEFT$(L[i], 10) = "reiter zu " THEN PRINT L[i]
+NEXT
+--- erwartet
+kontext reiter_andere
+reiter zu 1 offen 1
+pr reiter b_zwei.dh c_drei.dh vorn b_zwei.dh
+
+=== rechts davon schliessen und im baum zeigen ueber den reiter
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    dateiOeffnen(PATHJOIN(projektOrdner, "tief/unten/b_zwei.dh"))
+    dateiOeffnen(PATHJOIN(projektOrdner, "c_drei.dh"))
+    aktiverTab = 0 : GUI_SET_ACTIVE_TAB(win, 0)
+    ' Den Baum zuklappen und etwas anderes waehlen.
+    GUI_FILETREE_EXPAND(baum, PATHJOIN(projektOrdner, "tief"), FALSE)
+    GUI_FILETREE_SELECT(baum, PATHJOIN(projektOrdner, "a_eins.dh"))
+    baumLetzteWahl = GUI_FILETREE_SELECTED$(baum)
+    DIM prA AS STRING : prA = ""
+    ' Reiter 2 (b_zwei): Im Projektbaum zeigen ("I")
+    prA = prA + "e 0 7 140 40 0" + CHR$(10) + "e 10 7 140 40 0" + CHR$(10)
+    prA = prA + "e 12 6 1 0 0" + CHR$(10) + "e 13 5 1 0 0" + CHR$(10)
+    prA = prA + "e 18 2 73 0 0" + CHR$(10) + "e 19 1 73 0 0" + CHR$(10)
+    ' Reiter 1 (a_eins): Rechts davon schliessen ("R")
+    prA = prA + "e 30 7 40 40 0" + CHR$(10) + "e 40 7 40 40 0" + CHR$(10)
+    prA = prA + "e 42 6 1 0 0" + CHR$(10) + "e 43 5 1 0 0" + CHR$(10)
+    prA = prA + "e 48 2 82 0 0" + CHR$(10) + "e 49 1 82 0 0" + CHR$(10)
+    WRITEALL("prmaus.txt", "c 12" + CHR$(10) + prA + CHR$(10))
+    AUTOMATION_PLAY("prmaus.txt")
+END IF
+IF prBild = 45 THEN
+    protokoll("pr baum " + BASENAME(GUI_FILETREE_SELECTED$(baum)) + " reiter " + STR$(tabAnzahl))
+END IF
+IF prBild = 90 THEN
+    protokoll("pr reiter " + STR$(tabAnzahl) + " " + BASENAME(tabPfade[0]))
+    EXIT(0)
+END IF
+--- argumente
+a_eins.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a_eins.dh
+PRINT 1
+--- datei tief/unten/b_zwei.dh
+PRINT 2
+--- datei c_drei.dh
+PRINT 3
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "kontext " OR LEFT$(L[i], 10) = "reiter zu " OR LEFT$(L[i], 8) = "im baum " THEN PRINT L[i]
+NEXT
+--- erwartet
+kontext reiter_im_baum
+im baum b_zwei.dh
+pr baum b_zwei.dh reiter 3
+kontext reiter_rechts
+reiter zu 2 offen 0
+pr reiter 1 a_eins.dh
+
+=== im projektbaum zeigen ausserhalb des projekts sagt es
+imBaumZeigen("C:/gibt/es/nicht/x.dh")
+protokoll("pr status " + GUI_TEXT(lblStatus))
+befehl("im_baum_zeigen")
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+a_eins.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a_eins.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "im baum " THEN PRINT L[i]
+NEXT
+--- erwartet
+im baum ausserhalb x.dh
+pr status x.dh liegt nicht im Projektordner.
+im baum a_eins.dh

@@ -149,7 +149,7 @@ IMPORT "gui"
 | `GUI_FILETREE_SET_ROOT(ft, pfad$)` / `GUI_FILETREE_ROOT$(ft)` | — / STRING | Wurzelordner setzen und lesen |
 | `GUI_FILETREE_REFRESH(ft)` | — | jetzt neu von der Platte lesen |
 | `GUI_FILETREE_SELECTED$(ft)` | STRING | voller Weg der Auswahl (leer = keine) |
-| `GUI_FILETREE_SELECT(ft, pfad$)` | — | einen Weg auswählen; die Ordner darüber klappen dafür auf |
+| `GUI_FILETREE_SELECT(ft, pfad$)` | — | einen Weg auswählen; die Ordner darüber klappen dafür auf, und die Zeile wird ins Bild gerollt |
 | `GUI_FILETREE_ACTIVATED$(ft)` | STRING | was in diesem Bild per Doppelklick oder Enter geöffnet wurde (leer = nichts) |
 | `GUI_FILETREE_IS_DIR(ft, pfad$ = "")` | BOOLEAN | ist das ein Ordner? Ohne Weg gilt die Auswahl |
 | `GUI_FILETREE_EXPAND(ft, pfad$, an)` | — | einen Ordner auf- oder zuklappen |
@@ -257,7 +257,9 @@ IMPORT "gui"
 |---|---|---|
 | `GUI_MENU(win, label$)` | Menü-Handle | Top-Level-Menü in der **Menüleiste** (z. B. „Datei") |
 | `GUI_CONTEXT(win)` | Menü-Handle | **Kontextmenü** (per Rechtsklick im Fenster) |
-| `GUI_CONTEXT_WIDGET(menu, wdg)` | — | Kontextmenü an ein Widget binden: es öffnet nur beim Rechtsklick darauf (Liste, Baum, Tabelle wählen dabei ihre Zeile); `-1` bindet es wieder ans Fenster |
+| `GUI_CONTEXT_TABS(menu)` | — | Kontextmenü an die Reiterleiste des Fensters binden: es öffnet beim Rechtsklick auf einen Reiter |
+| `GUI_TAB_CONTEXT(win)` | INTEGER | auf welchem Reiter das Kontextmenü der Reiterleiste zuletzt aufging (-1 = noch nie) |
+| `GUI_CONTEXT_WIDGET(menu, wdg)` | — | Kontextmenü an ein Widget binden: es öffnet nur beim Rechtsklick darauf (Liste, Baum, Tabelle wählen dabei ihre Zeile, ein Textbereich setzt die Marke; nicht in seiner Nummernspalte, die gehört `GUI_TEXTAREA_GUTTER_CLICKED`); `-1` bindet es wieder ans Fenster |
 | `GUI_SUBMENU(menu, label$)` | Menü-Handle | **Untermenü** — öffnet beim Überfahren rechts daneben, beliebig tief |
 | `GUI_MENU_ITEM(menu, label$[, kuerzel$])` | Item-Handle | Eintrag anhängen — Handle für `GUI_CLICKED`; `kuerzel$` z. B. `"Strg+S"` |
 | `GUI_MENU_SEPARATOR(menu)` | — | Trennlinie anhängen |
