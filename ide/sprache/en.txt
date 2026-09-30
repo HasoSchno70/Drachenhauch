@@ -37,6 +37,10 @@ Zur Definition	Go to definition
 Zurück zur vorigen Stelle	Back to previous location
 Vorwärts	Forward
 Im Projektbaum zeigen	Reveal in project tree
+Nächstes Problem	Next problem
+Voriges Problem	Previous problem
+Zur letzten Änderung	Go to last edit
+Mit gesicherter Fassung vergleichen ...	Compare with saved version ...
 Umbenennen ...	Rename ...
 Schnellkorrektur ...	Quick fix ...
 Schnipsel einfügen ...	Insert snippet ...
@@ -295,6 +299,8 @@ Definition	Definition
 Dorthin springen	Jump there
 Farbe	Colour
 Übernehmen	Apply
+Ungesicherte Änderungen	Unsaved changes
+Verwerfen	Discard
 Quellcodeverwaltung	Source control
 Wechseln	Switch
 Neu ...	New ...
@@ -632,9 +638,17 @@ Gestartet: 	Started:
 Keine vorige Stelle.	No previous location.
 Keine Stelle zum Vorwärtsgehen.	No location to go forward to.
 Gibt es nicht mehr: 	No longer exists: 
+Keine Fehler oder Warnungen.	No errors or warnings.
+Noch nichts geändert.	Nothing edited yet.
+ (gesichert)	 (saved)
+ (im Reiter)	 (in tab)
+Der Reiter hat noch keine Datei.	This tab has no file yet.
+: keine ungesicherten Änderungen.	: no unsaved changes.
+ Zeile(n) dazu, 	 line(s) added, 
+ weg (gegenüber der Datei auf der Platte)	 removed (compared with the file on disk)
+: Änderungen verworfen (Strg+Z holt sie zurück).	: changes discarded (Ctrl+Z brings them back).
 Zwischenablage nicht erreichbar.	Clipboard not available.
  mit ungesicherten Änderungen bleiben offen.	 with unsaved changes stay open.
-Der Reiter hat noch keine Datei.	This tab has no file yet.
  liegt nicht im Projektordner.	 is not in the project folder.
 Erst etwas markieren (oder die Marke auf ein Wort stellen).	Select something first (or put the cursor on a word).
 Keine Zeile darunter.	No line below.
