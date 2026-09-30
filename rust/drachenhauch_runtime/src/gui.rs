@@ -480,6 +480,22 @@ fn zeilen_nachziehen(alt: &str, neu: &str, zeilen: &mut [usize]) {
 
 /// Marken eines Textbereichs an seinen jetzigen Text anpassen (siehe
 /// `marken`). Billig, wenn sich nichts geaendert hat.
+/// Deckkraft einer Zeilenfarbe: 0 im obersten Byte wuerde den Text
+/// verdecken (0 = deckend), also dann ein Viertel.
+fn zeilenfarbe_deckkraft(c: i64) -> i64 {
+    if (c >> 24) & 0xFF == 0 { 0x40_000000 | (c & 0xFF_FFFF) } else { c & 0xFFFF_FFFF }
+}
+
+#[cfg(test)]
+mod zeilenfarben_tests {
+    use super::zeilenfarbe_deckkraft;
+    #[test]
+    fn ohne_deckkraft_ein_viertel() {
+        assert_eq!(zeilenfarbe_deckkraft(0xFF3030), 0x40FF3030);
+        assert_eq!(zeilenfarbe_deckkraft(0x80FF3030), 0x80FF3030);
+    }
+}
+
 fn marken_abgleichen(w: &mut Widget) {
     // Die Werte hinter den Zeilen (GUI_TEXTAREA_HINTS) wandern genauso mit.
     if !w.hinweise.is_empty() && w.hinweise_text != w.text {
@@ -487,6 +503,12 @@ fn marken_abgleichen(w: &mut Widget) {
         zeilen_nachziehen(&w.hinweise_text, &w.text, &mut z);
         for (m, n) in w.hinweise.iter_mut().zip(z) { m.0 = n; }
         w.hinweise_text = w.text.clone();
+    }
+    if !w.zeilenfarben.is_empty() && w.zeilenfarben_text != w.text {
+        let mut z: Vec<usize> = w.zeilenfarben.iter().map(|m| m.0).collect();
+        zeilen_nachziehen(&w.zeilenfarben_text, &w.text, &mut z);
+        for (m, n) in w.zeilenfarben.iter_mut().zip(z) { m.0 = n; }
+        w.zeilenfarben_text = w.text.clone();
     }
     if w.marken.is_empty() || w.marken_text == w.text { return; }
     let mut z: Vec<usize> = w.marken.iter().map(|m| m.0).collect();
@@ -2504,6 +2526,13 @@ pub struct Widget {
     // still auf die Zeile davor. `marken_text` ist der Text, zu dem sie passen.
     marken: Vec<(usize, i64)>,
     marken_text: String,
+    // Zeilenfarben (GUI_TEXTAREA_LINE_COLORS, seit 2026-09-29): ein Band
+    // hinter der ganzen Zeile in der Farbe samt Deckkraft des Aufrufers --
+    // fuer Wertungen je Zeile wie ein Profil ("wie heiss ist diese Zeile").
+    // Getrennt von den Marken, die Haltepunkten und Lesezeichen gehoeren;
+    // sie wandern wie diese mit ihrer Zeile (`marken_abgleichen`).
+    zeilenfarben: Vec<(usize, i64)>,
+    zeilenfarben_text: String,
     // Nur TextArea: was aus einem Textfeld ein Code-Feld macht.
     // `scroll` ist dort die erste SICHTBARE ZEILE, `scroll_x` der waagerechte
     // Versatz in Pixeln -- ohne den waeren lange Zeilen einfach abgeschnitten.
@@ -3617,6 +3646,39 @@ impl Gui {
         Ok(())
     }
 
+    /// Zeilenfarben setzen (ersetzt alle; leere Listen loeschen). Die Farbe
+    /// traegt ihre Deckkraft im obersten Byte; 0 (= deckend in der uebrigen
+    /// gui) hiesse hier, den Text zu verdecken -- dann gilt 0x40.
+    pub fn textarea_line_colors(&mut self, h: i64, zeilen: Vec<i64>, farben: Vec<i64>) -> Result<(), String> {
+        if zeilen.len() != farben.len() {
+            return Err(format!(
+                "GUI_TEXTAREA_LINE_COLORS: beide Listen muessen gleich lang sein ({} Zeilen, {} Farben)",
+                zeilen.len(), farben.len()));
+        }
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_LINE_COLORS")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_LINE_COLORS: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        wd.zeilenfarben = zeilen.iter().zip(&farben)
+            .filter(|(&z, _)| z >= 1)
+            .map(|(&z, &c)| ((z - 1) as usize, zeilenfarbe_deckkraft(c)))
+            .collect();
+        wd.zeilenfarben_text = wd.text.clone();
+        Ok(())
+    }
+
+    /// Die Zeilen der Zeilenfarben, wie sie JETZT stehen, in der Reihenfolge
+    /// des Setzens (GUI_TEXTAREA_LINE_COLORS_GET) -- wer zu jeder Zeile noch
+    /// etwas anderes zeigt (einen Hinweis), findet sie so nach dem Tippen.
+    pub fn textarea_line_colors_get(&mut self, h: i64) -> Result<Vec<i64>, String> {
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_LINE_COLORS_GET")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_LINE_COLORS_GET: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        marken_abgleichen(wd);
+        Ok(wd.zeilenfarben.iter().map(|&(z, _)| z as i64 + 1).collect())
+    }
+
     /// Die Zeilen der Marken, wie sie JETZT stehen (GUI_TEXTAREA_MARKS_GET):
     /// 1-basiert, in der Reihenfolge, in der sie gesetzt wurden. Hat der
     /// Nutzer darueber Zeilen eingefuegt oder geloescht, sind sie mitgewandert
@@ -4111,6 +4173,7 @@ impl Gui {
             tab_index: 0,
             spans: Vec::new(),
             marken: Vec::new(), marken_text: String::new(),
+            zeilenfarben: Vec::new(), zeilenfarben_text: String::new(),
             scroll_x: 0, zeilennummern: false, aktive_zeile: false,
             tab_fuegt_ein: false, tabbreite: 4,
             faltbar: Vec::new(), gefaltet: Vec::new(), marken_zusatz: Vec::new(),
@@ -18880,6 +18943,19 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     // Marken: ein Farbhauch ueber der ganzen Zeile, unter allem
                     // anderen. Nur die erste sichtbare Zeile eines umgebrochenen
                     // Absatzes traegt ihn, wie die Zeilennummer.
+                    // Zeilenfarben: unter den Marken, damit ein Haltepunkt
+                    // auf einer heissen Zeile sichtbar bleibt.
+                    if !wdg.zeilenfarben.is_empty() {
+                        for r in 0..view_lines {
+                            let ri = scroll + r;
+                            if ri < 0 || ri as usize >= rows.len() { continue; }
+                            let (li, _, _) = rows[ri as usize];
+                            if let Some(&(_, farbe)) = wdg.zeilenfarben.iter().find(|(z, _)| *z == li) {
+                                let y = ay + pad + r * lh;
+                                g.box_fill(ax + 2 + gutter, y, ax + w - 3, y + lh - 1, farbe);
+                            }
+                        }
+                    }
                     if !wdg.marken.is_empty() {
                         for r in 0..view_lines {
                             let ri = scroll + r;

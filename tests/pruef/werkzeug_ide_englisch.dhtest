@@ -1,0 +1,159 @@
+' Die IDE auf Englisch (2026-09-29): jeder Anzeigetext geht durch tr$(...),
+' die Tabelle steht in ide/sprache/en.txt. Geprueft wird, dass sie
+' vollstaendig ist, dass die Oberflaeche wirklich englisch wird (samt
+' Kuerzeln, die dann "Ctrl+..." heissen und trotzdem wirken) und dass die
+' deutsche unberuehrt bleibt.
+--- seriell
+--- langsam
+
+=== jeder eingewickelte text hat eine uebersetzung
+' Aus ide.dh: tr$("...") ausserhalb von Kommentaren, die Namen der Palette,
+' die Tipps der Werkzeugleiste und der Hinweis HILFE_LEER.
+DIM wurzel AS STRING : wurzel = ARG$(0)
+DIM tab AS MAP OF STRING : tab = {}
+DIM z AS STRING
+FOR EACH z IN READLINES(wurzel + "/ide/sprache/en.txt")
+    DIM t AS INTEGER : t = INSTR(z, CHR$(9))
+    IF t > 0 THEN MAPPUT(tab, LEFT$(z, t), MID$(z, t + 1))
+NEXT
+DIM gesehen AS INTEGER : gesehen = 0
+DIM fehlt AS INTEGER : fehlt = 0
+SUB pruefe(w AS STRING)
+    gesehen = gesehen + 1
+    IF NOT MAPHAS(tab, w) THEN
+        fehlt = fehlt + 1
+        PRINT "fehlt: "; w
+    END IF
+END SUB
+DIM muster AS ARRAY OF STRING : muster = ["tr\$\(" + CHR$(34) + "([^" + CHR$(34) + "]*)" + CHR$(34) + "\)", "paletteEintrag\(" + CHR$(34) + "([^" + CHR$(34) + "]*)" + CHR$(34), "wzKnopf\(" + CHR$(34) + "[^" + CHR$(34) + "]*" + CHR$(34) + ", " + CHR$(34) + "([^" + CHR$(34) + "]*)" + CHR$(34), "CONST HILFE_LEER = " + CHR$(34) + "([^" + CHR$(34) + "]*)" + CHR$(34)]
+FOR EACH z IN READLINES(wurzel + "/ide/ide.dh")
+    IF LEFT$(TRIM$(z), 1) = "'" THEN CONTINUE
+    DIM m AS STRING
+    FOR EACH m IN muster
+        DIM w AS STRING
+        FOR EACH w IN REGEX_FIND_ALL(z, m)
+            pruefe(w)
+        NEXT
+    NEXT
+NEXT
+PRINT "genug texte "; gesehen > 700
+PRINT "fehlt "; fehlt
+--- argumente
+{sammlung}/../..
+--- erwartet
+genug texte TRUE
+fehlt 0
+
+=== englisch: menue, palette, knoepfe, kuerzel
+AUTOMATION_PLAY("ev.txt")
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    protokoll("pr knopf " + GUI_TEXT(btnWkNeu))
+    DIM prI AS INTEGER : prI = ARRAY_INDEXOF(befehlKennungen, "sichern")
+    protokoll("pr palette " + befehlNamen[prI] + " | " + befehlKuerzel[prI])
+    protokoll("pr kuerzel " + kz$("Strg+Umschalt+Runter") + " " + kz$("Strg++") + " " + kz$("F5"))
+    protokoll("pr reiter " + STR$(tabAnzahl))
+END IF
+IF prBild = 80 THEN
+    ' Strg+N kam als Taste: der Menuepunkt heisst "Ctrl+N" und wirkt.
+    protokoll("pr reiter " + STR$(tabAnzahl))
+    protokoll("pr ohne uebersetzung " + STR$(sprachFehlt))
+    EXIT(0)
+END IF
+--- datei _programm/ide.json
+{"sprache": "en"}
+--- datei _programm/ev.txt
+c 5
+e 0 1 340 0 0 0
+e 40 2 341 0 0 0
+e 40 2 78 0 0 0
+e 42 1 78 0 0 0
+e 42 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr knopf New file
+pr palette Save | Ctrl+S
+pr kuerzel Ctrl+Shift+Down Ctrl++ F5
+pr reiter 0
+pr reiter 1
+pr ohne uebersetzung 0
+
+=== deutsch bleibt deutsch, der wechsel kommt beim naechsten start
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    protokoll("pr knopf " + GUI_TEXT(btnWkNeu))
+    DIM prI AS INTEGER : prI = ARRAY_INDEXOF(befehlKennungen, "sichern")
+    protokoll("pr palette " + befehlNamen[prI] + " | " + befehlKuerzel[prI])
+    befehl("sprache")
+    protokoll("pr jetzt noch " + GUI_TEXT(btnWkNeu))
+    EXIT(0)
+END IF
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 8) = "sprache " THEN PRINT L[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt "; JSON_GET_STRING(k, "sprache")
+--- erwartet
+pr knopf Neue Datei
+pr palette Sichern | Strg+S
+sprache en
+pr jetzt noch Neue Datei
+gemerkt en
+
+=== eine eigene tastenbelegung auf englisch geschrieben gilt
+' "Ctrl+Shift+O" ist dieselbe Taste wie die Vorgabe "Strg+Umschalt+O" von
+' "Open file in project" -- die verliert sie.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    protokoll("pr zeile " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "zeile")] + ".")
+    protokoll("pr schnell " + befehlKuerzel[ARRAY_INDEXOF(befehlKennungen, "schnell")] + ".")
+    EXIT(0)
+END IF
+--- datei _programm/ide.json
+{"sprache": "en"}
+--- datei _programm/tasten.json
+{"zeile": "Ctrl+Shift+O"}
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 15) = "tasten meldung " THEN PRINT L[i]
+NEXT
+--- erwartet
+tasten meldung Ctrl+Shift+O gehörte vorher zu "Open file in project ..." -- der hat jetzt keins mehr
+pr zeile Ctrl+Shift+O.
+pr schnell .

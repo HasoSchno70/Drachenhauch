@@ -321,6 +321,26 @@ bekäme. Diese Bausteine kamen mit ihr:
   Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der
   Bereich auf die Ausgabe zurück. Unter Windows kommen Umlaute richtig an
   (`chcp 65001`).
+- **Profil im Code** (Ansicht → Profil im Code, an per Vorgabe): nach
+  Ausführen → Profil aufnehmen (Strg+Umschalt+Y) liegt hinter jeder gemessenen
+  Zeile ein Farbband, blassgelb bei wenig Zeit bis kräftig rot bei der
+  teuersten Zeile, und an den 30 teuersten stehen die Zahlen am Zeilenende
+  (`0.42 ms  12.3 %  30000x`). Die Bänder wandern beim Tippen mit ihrer Zeile
+  (`GUI_TEXTAREA_LINE_COLORS`), auch in einem später geöffneten Reiter einer
+  gemessenen Datei. Gemessen ist, was gelaufen ist: nach größeren Änderungen
+  neu messen, oder Befehlspalette → „Profil im Code entfernen" (die Tabelle
+  im Profilfenster bleibt).
+- **Englische Oberfläche** (Ansicht → „Language: English (at next start)",
+  bzw. zurück „Sprache: Deutsch"): Menüs, Knöpfe, Befehlspalette, Tooltips,
+  Dialoge und Statuszeile sind englisch, Kürzel heißen dann `Ctrl+Shift+O`
+  (die Laufzeit versteht beide Schreibweisen, auch in `tasten.json`).
+  Gewechselt wird beim nächsten Start (`sprache` in der `ide.json`,
+  `DH_IDE_SPRACHE=en` übersteuert). Jeder Anzeigetext geht durch `tr$("...")`,
+  die Tabelle steht in `ide/sprache/en.txt` (je Zeile Deutsch, Tabulator,
+  Englisch); `tests/pruef/werkzeug_ide_englisch.dhtest` meldet jeden Text ohne
+  Übersetzung. Deutsch bleiben: das Handbuch, die Beschreibungen der
+  Beispiele, Meldungen in der Ausgabe (etwa zur Tastenbelegung) und die
+  Werkzeuge 183–199.
 - **Mitlaufender Blockkopf** (`GUI_TEXTAREA_SET(ta, "kopfzeilen", 3)`, Ansicht
   → Mitlaufender Blockkopf, an per Vorgabe): ist der Kopf einer SUB, einer
   Schleife oder eines IF oben hinausgerollt, der Block aber noch im Bild,

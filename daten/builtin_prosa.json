@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1971,
+ "count": 1973,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -829,6 +829,8 @@
   "GUI_TEXTAREA_HINT_CLICKED": "welcher Hinweis (GUI_TEXTAREA_HINTS) in diesem Bild angeklickt wurde: seine Zeile ab 1, 0 = keiner; nur mit GUI_TEXTAREA_SET(ta, \"hinweise_klickbar\", 1) (dann Hand als Zeiger, die Marke bleibt stehen); gilt ein Bild lang",
   "GUI_TEXTAREA_INDENT_WORDS": "drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück",
   "GUI_TEXTAREA_INSERT": "ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, GUI_ON_CHANGE feuert wie beim Tippen",
+  "GUI_TEXTAREA_LINE_COLORS": "ein Farbband hinter ganzen Zeilen (Zeilen ab 1, Farben mit Deckkraft im obersten Byte, ohne sie ein Viertel) -- etwa ein Profil als Wärme im Code; getrennt von den Marken, wandert mit seiner Zeile, leere Listen löschen",
+  "GUI_TEXTAREA_LINE_COLORS_GET": "die Zeilen der Zeilenfarben, wie sie jetzt stehen (in der Reihenfolge des Setzens)",
   "GUI_TEXTAREA_MARKDOWN$": "der Text samt Formaten als Markdown",
   "GUI_TEXTAREA_MARKS": "Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; wird im Feld bearbeitet, wandern sie mit ihrer Zeile",
   "GUI_TEXTAREA_MARKS_GET": "die Zeilen der Marken, wie sie jetzt stehen (ARRAY OF INTEGER, in der Reihenfolge des Setzens) -- so erfährt ein Programm, wohin sein Haltepunkt beim Tippen gerutscht ist",

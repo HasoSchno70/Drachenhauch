@@ -1,0 +1,78 @@
+' Profil im Code (2026-09-29): nach Strg+Umschalt+Y liegt hinter jeder
+' gemessenen Zeile ein Farbband (GUI_TEXTAREA_LINE_COLORS), die teuersten
+' tragen ihre Zahlen am Zeilenende. Die Baender wandern beim Tippen mit;
+' abgeschaltet und entfernt sind sie weg.
+--- seriell
+--- langsam
+
+=== messung faerbt die zeilen, sie wandern mit, aus ist aus
+DIM prBild AS INTEGER : prBild = 0
+DIM prSchritt AS INTEGER : prSchritt = 0
+FUNCTION prListe$(a AS ARRAY OF INTEGER) AS STRING
+    DIM t AS STRING : t = ""
+    SORT(a)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(a) - 1
+        t = t + IIF(k > 0, ",", "") + STR$(a[k])
+    NEXT
+    RETURN t
+END FUNCTION
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN befehl("profil") : prSchritt = 1
+IF prSchritt = 1 AND waermeDaten THEN
+    DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+    protokoll("pr baender " + prListe$(GUI_TEXTAREA_LINE_COLORS_GET(prTa)))
+    protokoll("pr heisseste in der schleife " + STR$(profRohZ[0] = 3 OR profRohZ[0] = 4))
+    DIM prZahlen AS INTEGER : prZahlen = 0
+    DIM prT AS STRING
+    FOR EACH prT IN waermeTexte
+        IF prT <> "" THEN prZahlen = prZahlen + 1
+    NEXT
+    protokoll("pr mit zahlen " + STR$(prZahlen) + " " + STR$(INSTR(waermeTexte[0], " ms  ") > 0))
+    ' eine Zeile oben einfuegen: alle Baender ruecken eine weiter
+    GUI_TEXTAREA_SELECT(prTa, 1, 1, 1, 1)
+    GUI_TEXTAREA_INSERT(prTa, "' neu" + NL)
+    protokoll("pr danach " + prListe$(GUI_TEXTAREA_LINE_COLORS_GET(prTa)))
+    befehl("profil_waerme")
+    protokoll("pr aus " + STR$(LEN(GUI_TEXTAREA_LINE_COLORS_GET(prTa))))
+    befehl("profil_waerme")
+    protokoll("pr wieder an " + STR$(LEN(GUI_TEXTAREA_LINE_COLORS_GET(prTa)) > 0))
+    befehl("profil_waerme_weg")
+    protokoll("pr entfernt " + STR$(LEN(GUI_TEXTAREA_LINE_COLORS_GET(prTa))) + " tabelle " + STR$(GUI_TABLE_ROW_COUNT(tblProfil) > 0))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- datei spiel.dh
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 30000
+    s = s + i MOD 7
+NEXT
+PRINT s
+--- umgebung
+DHRT_FRAMES=900
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 7) = "waerme " THEN PRINT L[i]
+NEXT
+--- erwartet
+waerme spiel.dh 5
+pr baender 1,2,3,4,6
+pr heisseste in der schleife TRUE
+pr mit zahlen 5 TRUE
+pr danach 2,3,4,5,7
+waerme aus
+pr aus 0
+waerme spiel.dh 5
+waerme an
+pr wieder an TRUE
+waerme entfernt
+pr entfernt 0 tabelle TRUE
