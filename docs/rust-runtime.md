@@ -163,7 +163,13 @@ Beide blockieren nicht (`severity:"warning"`), beide zeigen im Editor als Marker
   vorhandenen Slot zurück und verwirft den neuen Typ). Der Fehler platzt dann
   weit entfernt (`Array-Index muss INTEGER sein, erhalten FLOAT`) und ist dort
   seiner Ursache nicht mehr anzusehen. Gleicher Name **mit gleichem Typ**
-  bleibt still — `DIM` im Schleifenkörper ist gängig. Ein lokales `DIM`, das
+  meldet sich seit 2026-09-30 ebenfalls, aber nur, wenn es eine ZWEITE
+  `DIM`-Anweisung ist und der Block des ersten sie umschließt (beide oben,
+  oder das erste oben und das zweite in einem IF darunter) -- in der IDE
+  überschrieb so ein neues `DIM miGross` das alte, und dessen Kürzel löste
+  den falschen Menüpunkt aus. Still bleiben `DIM` im Schleifenkörper (eine
+  Anweisung) und `DIM` in zwei getrennten Blöcken (zwei IF hintereinander:
+  eine Hilfsvariable, `dim_noch_offen`). Ein lokales `DIM`, das
   ein Global verdeckt, ist ebenfalls kein Fall dafür (anderer
   Geltungsbereich). Vergleich ohne Rücksicht auf Groß-/Kleinschreibung, weil
   Drachenhauch sie nicht unterscheidet. Logik: `compiler.rs::warn_dim_typ_wechsel`
