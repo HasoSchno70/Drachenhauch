@@ -1888,6 +1888,24 @@ mit Gegenprobe), `werkzeug_ide_terminal.dhtest` (2, `--- system windows`),
 Rust-Test `kill_beendet_auch_die_enkel`; vier Verfaelschungen der IDE und
 eine der Laufzeit fallen je in ihrem Fall.
 
+**Parameternamen an Aufrufen, beim Einfuegen einruecken (2026-09-30):**
+`parameterSammeln` (in `pruefen`) sucht ueber SYNTAX_SPANS je Zeile den
+ersten `name(` mit festem Argument (`festesArgument`), Signatur ueber
+`signaturArgs(..., mitOptionalen = TRUE)` (CODE_HOVER$), gemerkt in
+`paramCache` bis zum Sichern, hoechstens 60 neue Namen je Pruefung.
+`einfuegenAnpassen` rueckt einen mehrzeiligen Block um (Bezug = kleinste
+Einrueckung der weiteren Zeilen), als eigener Undo-Schritt; Strg+V wird in
+der Aenderungs-Erkennung der Hauptschleife erkannt (Tastenflanke ODER
+`strgVBilder` -- die Erkennung laeuft vor GUI_UPDATE, der Text kommt ein
+Bild spaeter an). **Fund in der Laufzeit:** das Ausruecken von
+`GUI_TEXTAREA_INDENT_WORDS` (`aus`-Liste) griff auch nach einem
+EINGEFUEGTEN Block -- endete er mit `NEXT`/`END IF`, verlor die Zeile
+ihre Einrueckung (der Kommentar im Code behauptete das Gegenteil). Jetzt
+nicht bei mehrzeiligem Einfuegen (`eingefuegt` in gui.rs); ein einzelnes
+eingefuegtes Wort zaehlt weiter wie getippt, weil die Pruefsammlungen ueber
+Strg+V "tippen". Tests `werkzeug_ide_parameter_einfuegen.dhtest` (3), ein
+Fall in `gui_auto_einzug.dhtest`; fuenf Verfaelschungen der IDE fallen.
+
 **Naechstes Problem, letzte Aenderung, mit gesicherter Fassung vergleichen
 (2026-09-30):** nur IDE. `problemSpringen` ueber `probZeile/probSpalte`
 aus `wellenSetzen` (Hinweise ausgenommen, Umlauf), Alt+F8 -- F8 gehoert dem

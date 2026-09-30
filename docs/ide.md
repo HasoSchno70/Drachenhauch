@@ -321,6 +321,21 @@ bekäme. Diese Bausteine kamen mit ihr:
   Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der
   Bereich auf die Ausgabe zurück. Unter Windows kommen Umlaute richtig an
   (`chcp 65001`).
+- **Parameternamen an Aufrufen** (Ansicht, an per Vorgabe): hinter einer
+  Zeile mit einem Aufruf, dem ein festes Argument (Zahl, Text, TRUE/FALSE)
+  mitgegeben wird, steht gedämpft die Signatur -- `kreis(100, 50, 20)` →
+  `kreis(x, y, r)`, auch für eingebaute Befehle (`MID$(s, start, n)`,
+  optionale Parameter ohne Klammern). Ein Hinweis je Zeile (der erste
+  solche Aufruf). Die Signaturen merkt sich die IDE bis zum nächsten
+  Sichern.
+- **Beim Einfügen einrücken** (Ansicht, an per Vorgabe): ein mehrzeiliger
+  Block, eingefügt mit Strg+V oder über das Kontextmenü, bekommt die
+  Einrückung der Stelle, an der er landet; sein innerer Aufbau bleibt (der
+  Bezug ist die kleinste Einrückung der weiteren Zeilen -- so passt auch ein
+  Block, der ab seinem ersten Wort kopiert wurde). Mitten in einer Zeile
+  richten sich die weiteren Zeilen nach deren Einrückung. Das Anpassen ist
+  ein eigener Rückgängig-Schritt: Strg+Z holt zuerst den Block, wie er
+  kopiert wurde. Mit Tabulatoren wird nichts angefasst.
 - **Nächstes / voriges Problem** (Bearbeiten, Alt+F8 bzw. Umschalt+Alt+F8
 -- F8 allein gehört dem Debugger): die Marke springt zum nächsten Fehler
   bzw. zur nächsten Warnung der Datei (Hinweise nicht), am Ende wieder von

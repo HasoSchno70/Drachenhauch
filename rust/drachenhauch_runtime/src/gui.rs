@@ -14231,6 +14231,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Wurde in diesem Bild Text an den Marken eingesetzt? Danach wird
         // geprueft, ob die Zeile nun ausrueckt.
         let mut geschrieben = false;
+        // Ein eingefuegter BLOCK (mehrere Zeilen): das Ausruecken unten gilt
+        // ihm nicht -- dessen letzte Zeile ist nicht getippt, und wenn sie
+        // zufaellig `NEXT` oder `END IF` ist, verlor sie sonst ihre
+        // Einrueckung. Ein einzelnes eingefuegtes Wort zaehlt weiter wie
+        // getippt (so pruefen es die Tests, die ueber Strg+V "tippen").
+        let mut eingefuegt = false;
         if !ctrl {
             let typed: String = g.pop_text_input().chars().filter(|c| !c.is_control()).collect();
             if !typed.is_empty() {
@@ -14278,6 +14284,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     ((c.min(a)) as usize, (c.max(a)) as usize, ins.clone())
                 });
                 geschrieben = true;
+                eingefuegt = ins.contains('\n');
             }
         }
         // Ausruecken: steht in der Zeile jetzt NUR ein Wort aus der
@@ -14288,8 +14295,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Die Bedingung ist "die Zeile IST das Wort", nicht "faengt damit
         // an": so rueckt sie genau einmal aus, und was danach noch dazukommt
         // (`END IF`) aendert nichts mehr. Ein eingefuegter Block trifft sie
-        // aus demselben Grund nicht.
-        if geschrieben {
+        // aus demselben Grund nicht -- und ein eingefuegter Block (Strg+V
+        // mit mehreren Zeilen) bleibt ganz in Ruhe.
+        if geschrieben && !eingefuegt {
             let aus = self.windows[wi].widgets[i].einzug_aus.clone();
             let breite = self.windows[wi].widgets[i].tabbreite.max(1) as usize;
             if !aus.is_empty() {

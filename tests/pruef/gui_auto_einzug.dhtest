@@ -276,3 +276,42 @@ e 16 1 341 0 0 0 //
 DHRT_FRAMES=40
 --- erwartet
 [IF x THEN|    ENDEND]
+
+=== ein eingefuegter block rueckt seine letzte zeile nicht aus
+' Endet ein mehrzeiliger Block mit NEXT, behaelt die Zeile ihre
+' Einrueckung -- getippt ist sie nicht. Gegenprobe oben: ein eingefuegtes
+' einzelnes END rueckt weiter aus wie getippt.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FOR"], ["THEN"], ["END", "NEXT"])
+GUI_SET_TEXT(ta, "SUB a()" + CHR$(10) + "    ")
+GUI_TEXTAREA_GOTO(ta, 2, 5)
+GUI_FOCUS(ta)
+CLIPBOARD_SET("FOR i = 1 TO 2" + CHR$(10) + "        PRINT i" + CHR$(10) + "    NEXT")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Strg+V
+c 4
+e 4 2 341 0 0 0 // Strg runter
+e 4 2 86 0 0 0 // V runter
+e 6 1 86 0 0 0 // V hoch
+e 6 1 341 0 0 0 // Strg hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[SUB a()|    FOR i = 1 TO 2|        PRINT i|    NEXT]

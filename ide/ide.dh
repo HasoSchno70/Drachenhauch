@@ -393,6 +393,24 @@ DIM fehlerEndeAn AS BOOLEAN : fehlerEndeAn = TRUE
 ' Typ-Hinweise: hinter einer Zeile mit FOR EACH steht, was die Variable
 ' haelt (CODE_TYPES$) -- ihr Typ steht sonst nirgends.
 DIM typHinweiseAn AS BOOLEAN : typHinweiseAn = TRUE
+' Parameternamen an Aufrufen: hinter einer Zeile mit einem Aufruf, dem ein
+' festes Argument (Zahl, Text, TRUE/FALSE) mitgegeben wird, steht die
+' Signatur -- `kreis(100, 50, 20)` sagt sonst nicht, was 50 ist.
+DIM paramNamenAn AS BOOLEAN : paramNamenAn = TRUE
+DIM paramFeld AS GUI_WIDGET : paramFeld = -1
+DIM paramZeilen AS ARRAY OF INTEGER : paramZeilen = []
+DIM paramTexte AS ARRAY OF STRING : paramTexte = []
+' Signaturen je Name (klein), "" = keine. Eingebaute Befehle aendern sich nie,
+' fremde Dateien erst beim Sichern -- darum ueber die Pruefungen hinweg
+' gemerkt und beim Sichern geleert.
+DIM paramCache AS MAP OF STRING : paramCache = {}
+' Beim Einfuegen einruecken: ein mehrzeiliger Block bekommt die Einrueckung
+' der Stelle, an der er landet (sein innerer Aufbau bleibt).
+DIM einfuegenEinrueckenAn AS BOOLEAN : einfuegenEinrueckenAn = TRUE
+' Strg+V gesehen: die Aenderung kommt erst im naechsten Bild bei der
+' Erkennung an (die laeuft vor GUI_UPDATE) -- ein paar Bilder lang gilt sie
+' als eingefuegt.
+DIM strgVBilder AS INTEGER : strgVBilder = 0
 DIM typFeld AS GUI_WIDGET : typFeld = -1
 DIM typZeilen AS ARRAY OF INTEGER : typZeilen = []
 DIM typTexte AS ARRAY OF STRING : typTexte = []
@@ -721,6 +739,8 @@ IF JSON_HAS(konfig, "profil_waerme") THEN waermeAn = JSON_GET_BOOL(konfig, "prof
 IF JSON_HAS(konfig, "aufrufzaehler") THEN zaehlerAn = JSON_GET_BOOL(konfig, "aufrufzaehler")
 IF JSON_HAS(konfig, "fehler_am_ende") THEN fehlerEndeAn = JSON_GET_BOOL(konfig, "fehler_am_ende")
 IF JSON_HAS(konfig, "typ_hinweise") THEN typHinweiseAn = JSON_GET_BOOL(konfig, "typ_hinweise")
+IF JSON_HAS(konfig, "parameter_namen") THEN paramNamenAn = JSON_GET_BOOL(konfig, "parameter_namen")
+IF JSON_HAS(konfig, "einfuegen_einruecken") THEN einfuegenEinrueckenAn = JSON_GET_BOOL(konfig, "einfuegen_einruecken")
 IF JSON_HAS(konfig, "neustart_beim_sichern") THEN neustartSichernAn = JSON_GET_BOOL(konfig, "neustart_beim_sichern")
 IF JSON_HAS(konfig, "start") THEN
     DIM sk AS INTEGER
@@ -1016,6 +1036,10 @@ DIM miFehlerEnde AS INTEGER : miFehlerEnde = GUI_MENU_ITEM(mAnsicht, tr$("Fehler
 GUI_MENU_CHECK(miFehlerEnde, fehlerEndeAn)
 DIM miTypen AS INTEGER : miTypen = GUI_MENU_ITEM(mAnsicht, tr$("Typ-Hinweise"))
 GUI_MENU_CHECK(miTypen, typHinweiseAn)
+DIM miParamNamen AS INTEGER : miParamNamen = GUI_MENU_ITEM(mAnsicht, tr$("Parameternamen an Aufrufen"))
+GUI_MENU_CHECK(miParamNamen, paramNamenAn)
+DIM miEinfEinr AS INTEGER : miEinfEinr = GUI_MENU_ITEM(mAnsicht, tr$("Beim Einfügen einrücken"))
+GUI_MENU_CHECK(miEinfEinr, einfuegenEinrueckenAn)
 DIM miWaerme AS INTEGER : miWaerme = GUI_MENU_ITEM(mAnsicht, tr$("Profil im Code (nach Strg+Umschalt+Y)"))
 GUI_MENU_CHECK(miWaerme, waermeAn)
 DIM miZaehler AS INTEGER : miZaehler = GUI_MENU_ITEM(mAnsicht, tr$("Aufrufzähler über Unterprogrammen"))
@@ -2031,6 +2055,8 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "aufrufzaehler", zaehlerAn)
     JSON_SET_BOOL(konfig, "fehler_am_ende", fehlerEndeAn)
     JSON_SET_BOOL(konfig, "typ_hinweise", typHinweiseAn)
+    JSON_SET_BOOL(konfig, "parameter_namen", paramNamenAn)
+    JSON_SET_BOOL(konfig, "einfuegen_einruecken", einfuegenEinrueckenAn)
     JSON_SET_BOOL(konfig, "neustart_beim_sichern", neustartSichernAn)
     JSON_SET_JSON(konfig, "start", JSON_PARSE("[]"))
     DIM sti AS INTEGER
@@ -3380,6 +3406,7 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     END IF
     tabGesichert[i] = text
     zaehlCache = {}
+    paramCache = {}
     blameCache = {}
     blameMarkeZeile = -1
     ' Die Datei endet mit einem Umbruch (dateiLesen laesst ihn weg, das Feld
@@ -3992,6 +4019,7 @@ SUB pruefen()
     problemZeilen = zeilen
     wellenSetzen(ta, j, n)
     typenSammeln(ta, basis)
+    parameterSammeln(ta)
     DIM altF AS GUI_WIDGET : altF = fehlerFeld
     fehlerFeld = ta : fehlerZeilen = fz : fehlerTexte = ftx : fehlerFarben = ffa
     IF altF >= 0 AND altF <> ta THEN hinweiseZeigen(altF)
@@ -5324,6 +5352,17 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
     FOR i = 0 TO LEN(zl) - 1
         ARRAY_PUSH(farben, -1)
     NEXT
+    IF paramNamenAn AND ta = paramFeld THEN
+        FOR i = 0 TO LEN(paramZeilen) - 1
+            DIM pk AS INTEGER : pk = ARRAY_INDEXOF(zl, paramZeilen[i])
+            IF pk >= 0 THEN
+                tx[pk] = tx[pk] + "   ·   " + paramTexte[i]
+            ELSE
+                ARRAY_PUSH(zl, paramZeilen[i]) : ARRAY_PUSH(tx, paramTexte[i])
+                ARRAY_PUSH(farben, F_TYP)
+            END IF
+        NEXT
+    END IF
     IF typHinweiseAn AND ta = typFeld THEN
         FOR i = 0 TO LEN(typZeilen) - 1
             DIM tk AS INTEGER : tk = ARRAY_INDEXOF(zl, typZeilen[i])
@@ -8021,7 +8060,7 @@ DIM platzhalterAn AS BOOLEAN : platzhalterAn = FALSE
 ' Die Argumentnamen einer Signatur, oder ein leeres Feld.
 ' Optionales (alles ab `[`) faellt weg -- ein Platzhalter, den man meist
 ' wieder loescht, ist keiner.
-FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER) AS ARRAY OF STRING
+FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER, mitOptionalen AS BOOLEAN = FALSE) AS ARRAY OF STRING
     DIM leer AS ARRAY OF STRING : leer = []
     DIM md AS STRING : md = ""
     TRY
@@ -8044,7 +8083,13 @@ FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER) AS ARRAY OF 
     IF auf < 0 OR zu < auf THEN RETURN leer
     DIM innen AS STRING : innen = MID$(sig, auf + 1, zu - auf - 1)
     DIM opt AS INTEGER : opt = INSTR(innen, "[")
-    IF opt >= 0 THEN innen = LEFT$(innen, opt)
+    ' Fuer einen Hinweis zaehlen die optionalen mit (ohne Klammern) -- ein
+    ' Aufruf mit drei Argumenten und zwei Namen daneben fuehrte in die Irre.
+    IF mitOptionalen THEN
+        innen = REPLACE$(REPLACE$(innen, "[", ""), "]", "")
+    ELSEIF opt >= 0 THEN
+        innen = LEFT$(innen, opt)
+    END IF
     IF TRIM$(innen) = "" THEN RETURN leer
     ' `NAME(*args)` und `NAME(6..8 Argumente)` sind keine Namen.
     IF INSTR(innen, "*") >= 0 OR INSTR(innen, "Argumente") >= 0 THEN RETURN leer
@@ -11714,6 +11759,153 @@ SUB navGehen(zurueck AS BOOLEAN)
     protokoll(IIF(zurueck, "nav zurueck ", "nav vor ") + BASENAME(p) + " " + STR$(z))
 END SUB
 
+' --- Parameternamen an Aufrufen -------------------------------------------
+' Je Zeile der erste Aufruf `name(...)` mit mindestens einem festen Argument
+' (Zahl, Text, TRUE/FALSE) und einer bekannten Signatur; der Hinweis ist
+' die Signatur selbst. Kopfzeilen von SUB/FUNCTION zaehlen nicht, Texte und
+' Kommentare auch nicht (SYNTAX_SPANS).
+FUNCTION festesArgument(a AS STRING) AS BOOLEAN
+    DIM t AS STRING : t = TRIM$(a)
+    IF t = "" THEN RETURN FALSE
+    IF LEFT$(t, 1) = CHR$(34) OR LEFT$(t, 2) = "!" + CHR$(34) THEN RETURN TRUE
+    IF UPPER$(t) = "TRUE" OR UPPER$(t) = "FALSE" THEN RETURN TRUE
+    IF LEFT$(t, 1) = "-" THEN t = TRIM$(MID$(t, 1))
+    IF LEFT$(UPPER$(t), 2) = "&H" THEN RETURN TRUE
+    RETURN t <> "" AND REGEX_TEST(t, "^[0-9]+(\.[0-9]+)?$")
+END FUNCTION
+
+SUB parameterSammeln(ta AS GUI_WIDGET)
+    paramFeld = ta : paramZeilen = [] : paramTexte = []
+    IF NOT paramNamenAn THEN RETURN
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM anf AS ARRAY OF INTEGER : anf = []
+    DIM sum AS INTEGER : sum = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(zeilen) - 1
+        ARRAY_PUSH(anf, sum)
+        sum = sum + LEN(zeilen[k]) + 1
+    NEXT
+    DIM starts AS ARRAY OF INTEGER
+    DIM laengen AS ARRAY OF INTEGER
+    DIM arten AS ARRAY OF STRING
+    (starts, laengen, arten) = SYNTAX_SPANS(quelle)
+    DIM li AS INTEGER : li = 0
+    DIM erledigt AS INTEGER : erledigt = -1       ' Zeile mit Hinweis
+    DIM gefragt AS INTEGER : gefragt = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(starts) - 2
+        IF arten[i] <> "name" AND arten[i] <> "schluessel" THEN CONTINUE
+        IF arten[i + 1] <> "operator" OR laengen[i + 1] <> 1 THEN CONTINUE
+        DIM auf AS INTEGER : auf = starts[i + 1]
+        IF MID$(quelle, auf, 1) <> "(" OR auf <> starts[i] + laengen[i] THEN CONTINUE
+        WHILE li + 1 < LEN(anf) AND starts[i] >= anf[li + 1]
+            li = li + 1
+        WEND
+        IF li = erledigt THEN CONTINUE
+        DIM kopf AS STRING : kopf = UPPER$(LTRIM$(zeilen[li]))
+        IF LEFT$(kopf, 4) = "SUB " OR LEFT$(kopf, 9) = "FUNCTION " OR LEFT$(kopf, 9) = "PROPERTY " THEN CONTINUE
+        DIM name AS STRING : name = MID$(quelle, starts[i], laengen[i])
+        DIM von AS ARRAY OF INTEGER : von = []
+        DIM bis AS ARRAY OF INTEGER : bis = []
+        argsZerlegen(quelle, auf, von, bis)
+        IF LEN(von) = 0 THEN CONTINUE
+        DIM fest AS BOOLEAN : fest = FALSE
+        DIM a AS INTEGER
+        FOR a = 0 TO LEN(von) - 1
+            IF festesArgument(MID$(quelle, von[a], bis[a] - von[a])) THEN fest = TRUE
+        NEXT
+        IF NOT fest THEN CONTINUE
+        DIM sig AS STRING
+        IF MAPHAS(paramCache, LOWER$(name)) THEN
+            sig = MAPGET(paramCache, LOWER$(name))
+        ELSE
+            ' Hoechstens 60 neue Namen je Pruefung -- jede Frage uebersetzt
+            ' die Datei; der Rest kommt bei der naechsten Pruefung.
+            IF gefragt >= 60 THEN CONTINUE
+            gefragt = gefragt + 1
+            DIM namen AS ARRAY OF STRING
+            namen = signaturArgs(quelle, li + 1, starts[i] - anf[li] + 1, TRUE)
+            sig = ""
+            IF LEN(namen) > 0 THEN sig = name + "(" + JOIN$(namen, ", ") + ")"
+            MAPPUT(paramCache, LOWER$(name), sig)
+        END IF
+        IF sig = "" THEN CONTINUE
+        ARRAY_PUSH(paramZeilen, li + 1) : ARRAY_PUSH(paramTexte, sig)
+        erledigt = li
+    NEXT
+    IF LEN(paramZeilen) > 0 THEN protokoll("parameternamen " + STR$(LEN(paramZeilen)))
+END SUB
+
+' --- Beim Einfuegen einruecken --------------------------------------------
+' Der eingefuegte Block steht unmittelbar vor der Marke. Wird er an einer
+' Einrueckung eingefuegt (davor nur Leerzeichen), bekommt seine erste Zeile
+' genau diese und die weiteren behalten ihren Abstand zu ihr; mitten in einer
+' Zeile richten sich die weiteren Zeilen nach der Einrueckung dieser Zeile.
+' Bezug ist die kleinste Einrueckung der weiteren Zeilen (und der ersten,
+' wenn sie selbst mit Leerraum beginnt) -- so passt auch ein Block, der ab
+' seinem ersten Wort kopiert wurde. Mit Tabulatoren wird nichts angefasst.
+FUNCTION einzugVon(t AS STRING) AS INTEGER
+    RETURN LEN(t) - LEN(LTRIM$(t))
+END FUNCTION
+
+FUNCTION einfuegenAnpassen(ta AS GUI_WIDGET, clip AS STRING) AS BOOLEAN
+    IF NOT einfuegenEinrueckenAn OR ta < 0 THEN RETURN FALSE
+    IF INSTR(clip, CHR$(9)) >= 0 THEN RETURN FALSE
+    DIM L AS ARRAY OF STRING : L = SPLIT$(clip, NL)
+    DIM n AS INTEGER : n = LEN(L)
+    IF n < 2 THEN RETURN FALSE
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z2, s2) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM z1 AS INTEGER : z1 = z2 - (n - 1)
+    IF z1 < 1 OR z2 > LEN(zeilen) THEN RETURN FALSE
+    ' Steht der Block wirklich da? Sonst lieber nichts tun.
+    IF LEFT$(zeilen[z2 - 1], s2 - 1) <> L[n - 1] THEN RETURN FALSE
+    IF RIGHT$(zeilen[z1 - 1], LEN(L[0])) <> L[0] THEN RETURN FALSE
+    DIM k AS INTEGER
+    FOR k = 1 TO n - 2
+        IF zeilen[z1 - 1 + k] <> L[k] THEN RETURN FALSE
+    NEXT
+    DIM s1 AS INTEGER : s1 = LEN(zeilen[z1 - 1]) - LEN(L[0]) + 1
+    DIM vorne AS STRING : vorne = LEFT$(zeilen[z1 - 1], s1 - 1)
+    DIM bezug AS INTEGER : bezug = -1
+    FOR k = 1 TO n - 1
+        IF TRIM$(L[k]) = "" THEN CONTINUE
+        IF bezug < 0 OR einzugVon(L[k]) < bezug THEN bezug = einzugVon(L[k])
+    NEXT
+    IF einzugVon(L[0]) > 0 AND TRIM$(L[0]) <> "" THEN
+        IF bezug < 0 OR einzugVon(L[0]) < bezug THEN bezug = einzugVon(L[0])
+    END IF
+    IF bezug < 0 THEN RETURN FALSE
+    DIM ziel AS INTEGER
+    DIM neu AS ARRAY OF STRING : neu = []
+    IF TRIM$(vorne) = "" THEN
+        ziel = LEN(vorne)
+        ARRAY_PUSH(neu, LTRIM$(L[0]))
+        ' Die erste Zeile steht auf `ziel`; ihr eigener Abstand zum Bezug
+        ' zaehlt fuer die anderen mit.
+        ziel = ziel - MAX(0, einzugVon(L[0]) - bezug) * IIF(TRIM$(L[0]) = "", 0, 1)
+    ELSE
+        ziel = einzugVon(zeilen[z1 - 1])
+        ARRAY_PUSH(neu, L[0])
+    END IF
+    FOR k = 1 TO n - 1
+        IF TRIM$(L[k]) = "" THEN
+            ARRAY_PUSH(neu, "")
+        ELSE
+            ARRAY_PUSH(neu, SPACE$(MAX(0, ziel + einzugVon(L[k]) - bezug)) + LTRIM$(L[k]))
+        END IF
+    NEXT
+    DIM text AS STRING : text = JOIN$(neu, NL)
+    IF text = clip THEN RETURN FALSE
+    GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)
+    GUI_TEXTAREA_INSERT(ta, text)
+    protokoll("eingefuegt eingerueckt " + STR$(n) + " " + STR$(ziel))
+    RETURN TRUE
+END FUNCTION
+
 ' --- Naechstes / voriges Problem -----------------------------------------
 ' Die Fehler und Warnungen der letzten Pruefung (Hinweise nicht), sortiert
 ' nach Zeile und Spalte; vorwaerts die erste hinter der Marke, rueckwaerts
@@ -11978,7 +12170,9 @@ SUB codeZwischenablage(was AS STRING)
     IF ta < 0 THEN RETURN
     TRY
         IF was = "einfuegen" THEN
-            GUI_TEXTAREA_INSERT(ta, REPLACE$(CLIPBOARD_GET(), CHR$(13), ""))
+            DIM clip AS STRING : clip = REPLACE$(CLIPBOARD_GET(), CHR$(13), "")
+            GUI_TEXTAREA_INSERT(ta, clip)
+            einfuegenAnpassen(ta, clip)
         ELSE
             DIM sel AS STRING : sel = GUI_TEXTAREA_SELECTION$(ta)
             IF sel = "" THEN RETURN
@@ -15379,6 +15573,8 @@ paletteEintrag("Einrückungslinien", "linien", "")
 paletteEintrag("Mitlaufender Blockkopf", "blockkopf", "")
 paletteEintrag("Fehlertext am Zeilenende", "fehler_am_ende", "")
 paletteEintrag("Typ-Hinweise", "typ_hinweise", "")
+paletteEintrag("Parameternamen an Aufrufen", "parameter_namen", "")
+paletteEintrag("Beim Einfügen einrücken", "einfuegen_einruecken", "")
 paletteEintrag("Eigene Farben bearbeiten", "farben_eigen", "")
 paletteEintrag("Zurück zur vorigen Stelle", "nav_zurueck", "Strg+Alt+Links")
 paletteEintrag("Im Projektbaum zeigen", "im_baum_zeigen", "Strg+Alt+B")
@@ -16040,6 +16236,23 @@ SUB befehl(k AS STRING)
             konfigSichern()
         CASE "farben_eigen" : farbenEigenOeffnen()
         CASE "typ_hinweise" : typHinweiseSetzen(NOT typHinweiseAn)
+        CASE "parameter_namen"
+            paramNamenAn = NOT paramNamenAn
+            GUI_MENU_CHECK(miParamNamen, paramNamenAn)
+            IF paramNamenAn THEN
+                pruefen()
+            ELSEIF paramFeld >= 0 THEN
+                hinweiseZeigen(paramFeld)
+            END IF
+            GUI_SET_TEXT(lblStatus, IIF(paramNamenAn, tr$("Parameternamen an Aufrufen an."), tr$("Parameternamen an Aufrufen aus.")))
+            protokoll("parameter namen " + IIF(paramNamenAn, "an", "aus"))
+            konfigSichern()
+        CASE "einfuegen_einruecken"
+            einfuegenEinrueckenAn = NOT einfuegenEinrueckenAn
+            GUI_MENU_CHECK(miEinfEinr, einfuegenEinrueckenAn)
+            GUI_SET_TEXT(lblStatus, IIF(einfuegenEinrueckenAn, tr$("Beim Einfügen einrücken an."), tr$("Beim Einfügen einrücken aus.")))
+            protokoll("einfuegen einruecken " + IIF(einfuegenEinrueckenAn, "an", "aus"))
+            konfigSichern()
         CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
         CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
         CASE "geteilt" : geteiltSetzen(NOT geteilt)
@@ -16155,6 +16368,7 @@ menueBefehl(miReiterVgl, "reiter_vergleich", "") : menueBefehl(miZlVerbinden, "z
 menueBefehl(miKlFarben, "klammer_farben", "") : menueBefehl(miTrefferErs, "treffer_ersetzen", "")
 menueBefehl(miZlSort, "zl_sortieren", "") : menueBefehl(miZlDoppelt, "zl_doppelte", "")
 menueBefehl(miZlRand, "zl_rand", "") : menueBefehl(miAndereZu, "andere_zu", "Strg+Umschalt+W") : menueBefehl(miLinien, "linien", "")
+menueBefehl(miParamNamen, "parameter_namen", "") : menueBefehl(miEinfEinr, "einfuegen_einruecken", "")
 menueBefehl(miTypen, "typ_hinweise", "") : menueBefehl(miFarbenEigen, "farben_eigen", "")
 menueBefehl(miFehlerEnde, "fehler_am_ende", "") : menueBefehl(miKopf, "blockkopf", "") : menueBefehl(miWaerme, "profil_waerme", "") : menueBefehl(miZaehler, "aufrufzaehler", "") : menueBefehl(miQv, "git_fenster", "Strg+Alt+G")
 menueBefehl(miLive, "live", "Strg+Alt+L") : menueBefehl(miPruefsammlung, "pruefsammlung", "Strg+Alt+F5") : menueBefehl(miPrueffall, "prueffall", "Strg+Alt+Umschalt+F5")
@@ -16743,6 +16957,20 @@ WHILE NOT beenden
             ' Beim ersten Bild nach dem Oeffnen ist der gemerkte Text leer --
             ' das ist kein Bearbeiten.
             IF tabLetzterText[aktiverTab] <> "" AND tabPfade[aktiverTab] <> "" THEN aenderungMerken(tf, tabPfade[aktiverTab])
+            ' Strg+V hat das Feld selbst eingefuegt -- danach die Einrueckung
+            ' anpassen (ein eigener Rueckgaengig-Schritt).
+            DIM strgV AS BOOLEAN : strgV = strgVBilder > 0
+            IF KEYHIT(KEY_V) AND (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) THEN strgV = TRUE
+            IF strgV AND GUI_FOCUSED() = tf THEN
+                strgVBilder = 0
+                DIM clipV AS STRING : clipV = ""
+                TRY
+                    clipV = REPLACE$(CLIPBOARD_GET(), CHR$(13), "")
+                CATCH e
+                    clipV = ""
+                END TRY
+                IF einfuegenAnpassen(tf, clipV) THEN jetzt = GUI_TEXT(tf)
+            END IF
             tabLetzterText[aktiverTab] = jetzt
             pruefungFaellig = GET_TIME() + 0.6
             IF autoSichern > 0 THEN autoFaellig = GET_TIME() + autoSichern
@@ -16786,6 +17014,8 @@ WHILE NOT beenden
 
     abgelegteNachziehen()
     kontextNachziehen()
+    IF strgVBilder > 0 THEN strgVBilder = strgVBilder - 1
+    IF KEYHIT(KEY_V) AND (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) THEN strgVBilder = 3
     vergleichNachziehen()
     trefferNachziehen()
     navNachziehen()
