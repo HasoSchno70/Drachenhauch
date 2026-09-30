@@ -2769,6 +2769,9 @@ pub struct Window {
     // vorher fragen.
     tabs_closable: bool,
     tab_zu: i32,
+    /// Der Reiter, auf dem zuletzt das Kontextmenue der Reiterleiste
+    /// (GUI_CONTEXT_TABS) aufging, -1 = keiner.
+    tab_kontext: i32,
     // Standard-Knopf (Enter) und Abbrechen-Knopf (ESC) -- Widget-Index im
     // Fenster oder -1. Was jedes Formular braucht und was sonst jedes
     // Programm selbst mit KEYHIT nachbaute, ohne den Fokus zu beachten.
@@ -2831,7 +2834,8 @@ struct Menu {
     b: Blende,
     /// Kontextmenue eines Widgets (GUI_CONTEXT_WIDGET): oeffnet nur beim
     /// Rechtsklick auf dieses Widget (Index im Fenster), -1 = ueberall im
-    /// Fenster, wo kein gebundenes trifft.
+    /// Fenster, wo kein gebundenes trifft, -2 = auf einem Reiter der
+    /// Reiterleiste (GUI_CONTEXT_TABS).
     ziel: i64,
 }
 
@@ -3047,6 +3051,10 @@ pub struct Gui {
     liste_taste: bool,
     open_menu: Option<(usize, usize)>,       // offenes Menueleisten-Dropdown (win, menu)
     context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
+    /// Das Widget (Fenster, Index), dessen gebundenes Kontextmenue IN
+    /// DIESEM BILD aufging -- es bekommt seinen Rechtsklick trotzdem (ein
+    /// Textbereich setzt die Marke, bevor ein Befehl aus dem Menue sie liest).
+    kontext_neu: Option<(usize, usize)>,
     // Strg/Umschalt zum Zeitpunkt des Drucks -- handle_press hat kein `g`.
     tasten_mod: (bool, bool),
     // Hat in diesem Bild ein Menue-Kuerzel gefeuert? Dann gehoert die Taste
@@ -3167,7 +3175,7 @@ impl Gui {
             open_dropdown: None, dd_auf_t: 0.0, dd_auf_von: None, dd_mark: -1, dd_pfeil: false, dd_scroll: 0, dd_tipp: String::new(), dd_tipp_zeit: 0.0, schirm_h: 0, schirm_b: 0, listbar_zug: None, tabar_zug: None, liste_taste: false, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true,
             editing_table: None, last_click: None, dbl_click: false,
-            open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false),
+            open_menu: None, context_open: None, kontext_neu: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
             was_mouse_down: false, frame_count: 0,
@@ -3280,7 +3288,7 @@ impl Gui {
             close_clicked: false, alive: true, dlg: false, answer: 0,
             menus: Vec::new(),
             scrollable: false, scroll_y: 0,
-            tabs: Vec::new(), active_tab: 0, tabs_closable: false, tab_zu: -1,
+            tabs: Vec::new(), active_tab: 0, tabs_closable: false, tab_zu: -1, tab_kontext: -1,
             default_btn: -1, cancel_btn: -1,
             glanz: Glanz::neu(),
         });
@@ -6695,6 +6703,24 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         t.selected = k; t.anker = k;
         for s in t.sel.iter_mut() { *s = false; }
         if k >= 0 { t.sync(); t.sel[k as usize] = true; }
+        // Ins Bild rollen: eine Auswahl, die unter dem Rand liegt, sieht
+        // niemand. Steht sie schon im Bild, bleibt der Ausschnitt.
+        if k >= 0 {
+            let (wi, idx) = Self::dec_widget(h);
+            let zh = self.sk(TREE_ROW_H);
+            let hoehe = (self.abs_rect(wi, &self.windows[wi].widgets[idx]).3 - 2).max(zh);
+            let w = &mut self.windows[wi].widgets[idx];
+            w.rad_ziel = None;
+            let t = w.tree.as_mut().unwrap();
+            let vis = Self::tree_visible(t);
+            if let Some(r) = vis.iter().position(|&x| x as i32 == k) {
+                let y = r as i32 * zh;
+                if y < t.scroll || y + zh > t.scroll + hoehe {
+                    let max = (vis.len() as i32 * zh - hoehe).max(0);
+                    t.scroll = (y - (hoehe - zh) / 2).clamp(0, max);
+                }
+            }
+        }
         Ok(())
     }
     pub fn filetree_expand(&mut self, h: i64, pfad: &str, an: bool) -> Result<(), String> {
@@ -11616,6 +11642,20 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     ///
     /// Transient wie `GUI_CLICKED`: ein Klick ist ein Ereignis. Getroffen
     /// wird ueber das Kreuz oder die mittlere Maustaste.
+    /// GUI_CONTEXT_TABS(menu): das Kontextmenue gehoert der Reiterleiste
+    /// seines Fensters und oeffnet beim Rechtsklick auf einen Reiter.
+    pub fn context_tabs(&mut self, menu: i64) -> Result<(), String> {
+        let m = self.menu_mut(menu, "GUI_CONTEXT_TABS")?;
+        if m.in_bar || m.unter { return Err("GUI_CONTEXT_TABS: erwartet ein Menue aus GUI_CONTEXT".into()); }
+        m.ziel = -2;
+        Ok(())
+    }
+    /// GUI_TAB_CONTEXT(win): auf welchem Reiter das Kontextmenue der
+    /// Reiterleiste zuletzt aufging (-1 = noch nie).
+    pub fn tab_context(&self, win: i64) -> Result<i64, String> {
+        self.windows.get(win as usize).map(|w| w.tab_kontext as i64)
+            .ok_or("GUI_TAB_CONTEXT: erwartet GUI_WINDOW".into())
+    }
     pub fn tab_closed(&self, win: i64) -> Result<i64, String> {
         self.windows.get(win as usize).map(|w| w.tab_zu as i64)
             .ok_or("GUI_TAB_CLOSED: erwartet GUI_WINDOW".into())
@@ -12178,6 +12218,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
         // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
+        self.kontext_neu = None;
         let menu_consumed = if self.modal.is_some() { false }
                             else { self.menu_input(mx, my, just_pressed, right_just, g) };
         self.untermenues_folgen(g, mx, my);
@@ -12289,7 +12330,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         if right_just { self.liste_rechtsklick(top, i, k); }
                     }
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
-                    if kind == Kind::TextInput && right_just && !menu_consumed {
+                    let eigenes_menue = self.kontext_neu == Some((top, i));
+                    if kind == Kind::TextInput && right_just && (!menu_consumed || eigenes_menue) {
                         self.ti_rechtsklick(g, top, i, mx);
                     }
                     if kind == Kind::TextArea {
@@ -12314,7 +12356,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                                 }
                             }
                         }
-                        if right_just && !menu_consumed && self.tabar_zug.is_none() {
+                        if right_just && (!menu_consumed || eigenes_menue) && self.tabar_zug.is_none() {
                             self.ta_rechtsklick(g, top, i, mx, my);
                         }
                         if !menu_consumed && !tab_consumed && !scroll_consumed
@@ -12896,14 +12938,37 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 // Widget waehlt dabei trotzdem seine Zeile (Liste, Baum,
                 // Tabelle): der Rechtsklick erreicht es im selben Bild.
                 let mut wahl: Option<usize> = None;
+                // Auf einem Reiter: das Menue der Reiterleiste, und es merkt
+                // sich, welcher Reiter gemeint war.
+                if let Some(mi) = self.windows[wi].menus.iter().position(|m| !m.in_bar && !m.unter && m.ziel == -2) {
+                    let by = self.windows[wi].y
+                        + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
+                        + self.menubar_h(wi);
+                    if self.tabbar_h(wi) > 0 && my >= by && my < by + TABBAR_H {
+                        if let Some((ti, _, _)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
+                            self.windows[wi].tab_kontext = ti as i32;
+                            self.context_open = Some((wi, mi, mx, my));
+                            self.menu_cursor = None;
+                            return true;
+                        }
+                    }
+                }
                 for (mi, m) in self.windows[wi].menus.iter().enumerate() {
                     if m.in_bar || m.unter || m.ziel < 0 { continue; }
                     let Some(w) = self.windows[wi].widgets.get(m.ziel as usize) else { continue; };
                     if !w.alive || !self.widget_shown(wi, w) { continue; }
-                    if Self::in_rect(mx, my, self.abs_rect(wi, w)) { wahl = Some(mi); break; }
+                    // Die Nummernspalte eines Textbereichs gehoert ihrem eigenen
+                    // Rechtsklick (GUI_TEXTAREA_GUTTER_CLICKED, bei einer IDE die
+                    // Bedingung eines Haltepunkts) -- dort kein Menue.
+                    if w.kind == Kind::TextArea && self.ta_rand_zeile(g, wi, m.ziel as usize, mx, my).is_some() { continue; }
+                    if Self::in_rect(mx, my, self.abs_rect(wi, w)) {
+                        self.kontext_neu = Some((wi, m.ziel as usize));
+                        wahl = Some(mi);
+                        break;
+                    }
                 }
                 if wahl.is_none() {
-                    wahl = self.windows[wi].menus.iter().position(|m| !m.in_bar && !m.unter && m.ziel < 0);
+                    wahl = self.windows[wi].menus.iter().position(|m| !m.in_bar && !m.unter && m.ziel == -1);
                 }
                 if let Some(mi) = wahl {
                     self.context_open = Some((wi, mi, mx, my));

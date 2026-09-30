@@ -3207,6 +3207,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_CONTEXT_TABS",
+   "kind": "core",
+   "signature": "GUI_CONTEXT_TABS(menu)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TAB_CONTEXT",
+   "kind": "core",
+   "signature": "GUI_TAB_CONTEXT(win) AS INTEGER",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CONTEXT_WIDGET",
    "kind": "core",
    "signature": "GUI_CONTEXT_WIDGET(menu, wdg)",

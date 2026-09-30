@@ -36,6 +36,7 @@ Vervollständigen	Complete
 Zur Definition	Go to definition
 Zurück zur vorigen Stelle	Back to previous location
 Vorwärts	Forward
+Im Projektbaum zeigen	Reveal in project tree
 Umbenennen ...	Rename ...
 Schnellkorrektur ...	Quick fix ...
 Schnipsel einfügen ...	Insert snippet ...
@@ -170,6 +171,12 @@ Neue Datei ...	New file ...
 Neuer Ordner ...	New folder ...
 Löschen ...	Delete ...
 Pfad kopieren	Copy path
+Ausschneiden	Cut
+Kopieren	Copy
+Einfügen	Paste
+Schließen	Close
+Andere schließen	Close others
+Rechts davon schließen	Close to the right
 Projekt	Project
 Filter ...	Filter ...
 Nur Dateien, deren Name das enthält	Only files whose name contains this
@@ -267,7 +274,6 @@ Schriftgröße	Font size
 Schrift der Listen	List font
 Schrift des Handbuchs	Manual font
 Sichern nach ... s Ruhe (0 = nie)	Save after ... s idle (0 = never)
-Schließen	Close
 Filter: Wort aus der Beschreibung ...	Filter: word from the description ...
 Kein Beispiel passt.	No example matches.
 Öffnen	Open
@@ -615,6 +621,10 @@ Gestartet: 	Started:
 Keine vorige Stelle.	No previous location.
 Keine Stelle zum Vorwärtsgehen.	No location to go forward to.
 Gibt es nicht mehr: 	No longer exists: 
+Zwischenablage nicht erreichbar.	Clipboard not available.
+ mit ungesicherten Änderungen bleiben offen.	 with unsaved changes stay open.
+Der Reiter hat noch keine Datei.	This tab has no file yet.
+ liegt nicht im Projektordner.	 is not in the project folder.
 Kein Projektordner.	No project folder.
 Name der neuen Datei in 	Name of the new file in 
 Neuer Ordner	New folder
@@ -638,7 +648,6 @@ Löschen|Abbrechen	Delete|Cancel
 Löschen ging nicht: 	Delete failed: 
 Gelöscht: 	Deleted: 
 Pfad kopiert: 	Path copied: 
-Zwischenablage nicht erreichbar.	Clipboard not available.
 Ausgabe: alle Zeilen.	Output: all lines.
 Ausgabe gefiltert: 	Output filtered: 
  Zeilen.	 lines.

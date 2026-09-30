@@ -857,6 +857,7 @@ DIM miVervoll AS INTEGER : miVervoll = GUI_MENU_ITEM(mBearb, tr$("Vervollständi
 DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, tr$("Zur Definition"), kz$("F12"))
 DIM miNavZurueck AS INTEGER : miNavZurueck = GUI_MENU_ITEM(mBearb, tr$("Zurück zur vorigen Stelle"), kz$("Strg+Alt+Links"))
 DIM miNavVor AS INTEGER : miNavVor = GUI_MENU_ITEM(mBearb, tr$("Vorwärts"), kz$("Strg+Alt+Rechts"))
+DIM miImBaum AS INTEGER : miImBaum = GUI_MENU_ITEM(mBearb, tr$("Im Projektbaum zeigen"), kz$("Strg+Alt+B"))
 DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, tr$("Umbenennen ..."), kz$("Umschalt+F6"))
 DIM miKorrektur AS INTEGER : miKorrektur = GUI_MENU_ITEM(mBearb, tr$("Schnellkorrektur ..."), kz$("Strg+."))
 DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, tr$("Schnipsel einfügen ..."), kz$("Strg+J"))
@@ -1141,6 +1142,38 @@ DIM miBLoeschen AS INTEGER : miBLoeschen = GUI_MENU_ITEM(ctxBaum, tr$("Löschen 
 GUI_MENU_SEPARATOR(ctxBaum)
 DIM miBPfad AS INTEGER : miBPfad = GUI_MENU_ITEM(ctxBaum, tr$("Pfad kopieren"))
 GUI_CONTEXT_WIDGET(ctxBaum, baum)
+' Kontextmenues von Code-Feld und Reiterleiste. Ihre Eintraege rufen
+' vorhandene Befehle; sie laufen ueber eine eigene Liste statt ueber die
+' Menue-Tafel, damit ein Befehl nicht zweimal ein Kuerzel bekommt.
+DIM ctxItems AS ARRAY OF INTEGER : ctxItems = []
+DIM ctxKennung AS ARRAY OF STRING : ctxKennung = []
+SUB ctxEintrag(menu AS INTEGER, text AS STRING, kennung AS STRING)
+    ARRAY_PUSH(ctxItems, GUI_MENU_ITEM(menu, text))
+    ARRAY_PUSH(ctxKennung, kennung)
+END SUB
+' Das Code-Feld wechselt mit dem Reiter -- das Menue haengt je Bild an dem
+' Code-Feld, ueber dem die Maus steht (kontextNachziehen).
+DIM ctxCode AS INTEGER : ctxCode = GUI_CONTEXT(win)
+ctxEintrag(ctxCode, tr$("Ausschneiden"), "code_ausschneiden")
+ctxEintrag(ctxCode, tr$("Kopieren"), "code_kopieren")
+ctxEintrag(ctxCode, tr$("Einfügen"), "code_einfuegen")
+GUI_MENU_SEPARATOR(ctxCode)
+ctxEintrag(ctxCode, tr$("Zur Definition"), "definition")
+ctxEintrag(ctxCode, tr$("Wer ruft das auf?"), "aufrufer")
+ctxEintrag(ctxCode, tr$("Umbenennen ..."), "umbenennen")
+ctxEintrag(ctxCode, tr$("Schnellkorrektur ..."), "korrektur")
+GUI_MENU_SEPARATOR(ctxCode)
+ctxEintrag(ctxCode, tr$("Haltepunkt setzen/entfernen"), "haltepunkt")
+ctxEintrag(ctxCode, tr$("Im Projektbaum zeigen"), "im_baum_zeigen")
+DIM ctxCodeZiel AS GUI_WIDGET : ctxCodeZiel = -1
+DIM ctxReiter AS INTEGER : ctxReiter = GUI_CONTEXT(win)
+ctxEintrag(ctxReiter, tr$("Schließen"), "reiter_schliessen")
+ctxEintrag(ctxReiter, tr$("Andere schließen"), "reiter_andere")
+ctxEintrag(ctxReiter, tr$("Rechts davon schließen"), "reiter_rechts")
+GUI_MENU_SEPARATOR(ctxReiter)
+ctxEintrag(ctxReiter, tr$("Pfad kopieren"), "reiter_pfad")
+ctxEintrag(ctxReiter, tr$("Im Projektbaum zeigen"), "reiter_im_baum")
+GUI_CONTEXT_TABS(ctxReiter)
 ' Strg+Klick sammelt, Umschalt+Klick spannt -- damit sich mehrere Dateien
 ' auf einmal oeffnen lassen (Datei -> Gewaehlte Dateien oeffnen).
 GUI_FILETREE_SET(baum, "mehrfachauswahl", 1)
@@ -11572,6 +11605,100 @@ SUB navGehen(zurueck AS BOOLEAN)
     protokoll(IIF(zurueck, "nav zurueck ", "nav vor ") + BASENAME(p) + " " + STR$(z))
 END SUB
 
+' --- Kontextmenues von Code-Feld und Reiterleiste ------------------------
+SUB kontextNachziehen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ctxItems) - 1
+        IF GUI_CLICKED(ctxItems[i]) THEN
+            protokoll("kontext " + ctxKennung[i])
+            befehl(ctxKennung[i])
+        END IF
+    NEXT
+    ' Das Menue dem Code-Feld unter der Maus geben (nur wenn es wechselt).
+    DIM h AS INTEGER : h = GUI_HIT_TEST(MOUSEX(), MOUSEY())
+    IF h < 0 OR h = ctxCodeZiel THEN RETURN
+    DIM ist AS BOOLEAN : ist = taSpiegel >= 0 AND h = taSpiegel
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabFelder[i] = h THEN ist = TRUE
+    NEXT
+    IF NOT ist THEN RETURN
+    GUI_CONTEXT_WIDGET(ctxCode, h)
+    ctxCodeZiel = h
+END SUB
+
+' Ausschneiden/Kopieren/Einfuegen im Code-Feld -- dieselben Wege wie
+' Strg+X/C/V, nur fuer die Maus.
+SUB codeZwischenablage(was AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    TRY
+        IF was = "einfuegen" THEN
+            GUI_TEXTAREA_INSERT(ta, REPLACE$(CLIPBOARD_GET(), CHR$(13), ""))
+        ELSE
+            DIM sel AS STRING : sel = GUI_TEXTAREA_SELECTION$(ta)
+            IF sel = "" THEN RETURN
+            CLIPBOARD_SET(sel)
+            IF was = "ausschneiden" THEN GUI_TEXTAREA_INSERT(ta, "")
+        END IF
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Zwischenablage nicht erreichbar."))
+    END TRY
+END SUB
+
+' Alle Reiter ausser k (nur_rechts: nur die rechts von k) schliessen. Einer
+' mit ungesicherten Aenderungen bleibt offen -- das sagt die Statuszeile;
+' ungefragt verwerfen waere hier genau der Verlust, den Strg+W vermeidet.
+SUB reiterSchliessenAusser(k AS INTEGER, nurRechts AS BOOLEAN)
+    IF k < 0 OR k >= tabAnzahl THEN RETURN
+    DIM behalten AS GUI_WIDGET : behalten = tabFelder[k]
+    DIM weg AS INTEGER : weg = 0
+    DIM offen AS INTEGER : offen = 0
+    DIM i AS INTEGER
+    FOR i = tabAnzahl - 1 TO 0 STEP -1
+        IF i = k OR (nurRechts AND i < k) THEN CONTINUE
+        IF GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN
+            offen = offen + 1
+        ELSE
+            tabSchliessen(i)
+            weg = weg + 1
+        END IF
+    NEXT
+    ' Den behaltenen Reiter nach vorn holen.
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabFelder[i] = behalten THEN
+            aktiverTab = i
+            GUI_SET_ACTIVE_TAB(win, i)
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblStatus, STR$(weg) + tr$(" Reiter geschlossen.") + _
+                 IIF(offen > 0, " " + STR$(offen) + tr$(" mit ungesicherten Änderungen bleiben offen."), ""))
+    protokoll("reiter zu " + STR$(weg) + " offen " + STR$(offen))
+END SUB
+
+' Die Datei im Projektbaum zeigen: die Ordner darueber klappen auf, die
+' Zeile rollt ins Bild. Liegt sie nicht im Projekt, sagt es die Statuszeile.
+SUB imBaumZeigen(pfad AS STRING)
+    IF pfad = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Der Reiter hat noch keine Datei."))
+        RETURN
+    END IF
+    DIM p AS STRING : p = wegGleich$(pfad)
+    DIM wurzel AS STRING : wurzel = wegGleich$(projektOrdner)
+    IF RIGHT$(wurzel, 1) <> "/" THEN wurzel = wurzel + "/"
+    IF LOWER$(LEFT$(p, LEN(wurzel))) <> LOWER$(wurzel) THEN
+        GUI_SET_TEXT(lblStatus, BASENAME(pfad) + tr$(" liegt nicht im Projektordner."))
+        protokoll("im baum ausserhalb " + BASENAME(pfad))
+        RETURN
+    END IF
+    IF NOT seitenAn THEN leistenSetzen(TRUE, untenAn)
+    ' Die Auswahl selbst setzen und als bekannt merken -- sonst oeffnete
+    ' baumAbfragen die Datei noch einmal.
+    GUI_FILETREE_SELECT(baum, pfad)
+    baumLetzteWahl = GUI_FILETREE_SELECTED$(baum)
+    GUI_FOCUS(baum)
+    protokoll("im baum " + BASENAME(GUI_FILETREE_SELECTED$(baum)))
+END SUB
+
 ' --- Projektbaum: anlegen, umbenennen, loeschen -------------------------
 DIM dlgBaum AS GUI_WINDOW : dlgBaum = -1
 DIM dlgBaumLoeschen AS GUI_WINDOW : dlgBaumLoeschen = -1
@@ -14707,6 +14834,7 @@ paletteEintrag("Fehlertext am Zeilenende", "fehler_am_ende", "")
 paletteEintrag("Typ-Hinweise", "typ_hinweise", "")
 paletteEintrag("Eigene Farben bearbeiten", "farben_eigen", "")
 paletteEintrag("Zurück zur vorigen Stelle", "nav_zurueck", "Strg+Alt+Links")
+paletteEintrag("Im Projektbaum zeigen", "im_baum_zeigen", "Strg+Alt+B")
 paletteEintrag("Vorwärts", "nav_vor", "Strg+Alt+Rechts")
 paletteEintrag("Neue Datei im Projekt ...", "baum_neue_datei", "")
 paletteEintrag("Neuer Ordner im Projekt ...", "baum_neuer_ordner", "")
@@ -15238,6 +15366,28 @@ SUB befehl(k AS STRING)
         CASE "blockkopf" : kopfSetzen(NOT kopfAn)
         CASE "fehler_am_ende" : fehlerEndeSetzen(NOT fehlerEndeAn)
         CASE "nav_zurueck" : navGehen(TRUE)
+        CASE "im_baum_zeigen" : IF aktiverTab >= 0 THEN imBaumZeigen(tabPfade[aktiverTab])
+        CASE "code_ausschneiden" : codeZwischenablage("ausschneiden")
+        CASE "code_kopieren" : codeZwischenablage("kopieren")
+        CASE "code_einfuegen" : codeZwischenablage("einfuegen")
+        CASE "reiter_schliessen" : tabSchliessenFragen(GUI_TAB_CONTEXT(win))
+        CASE "reiter_andere" : reiterSchliessenAusser(GUI_TAB_CONTEXT(win), FALSE)
+        CASE "reiter_rechts" : reiterSchliessenAusser(GUI_TAB_CONTEXT(win), TRUE)
+        CASE "reiter_pfad"
+            DIM rpI AS INTEGER : rpI = GUI_TAB_CONTEXT(win)
+            IF rpI >= 0 AND rpI < tabAnzahl THEN
+                IF tabPfade[rpI] <> "" THEN
+                    TRY
+                        CLIPBOARD_SET(tabPfade[rpI])
+                        GUI_SET_TEXT(lblStatus, tr$("Pfad kopiert: ") + tabPfade[rpI])
+                    CATCH e
+                        GUI_SET_TEXT(lblStatus, tr$("Zwischenablage nicht erreichbar."))
+                    END TRY
+                END IF
+            END IF
+        CASE "reiter_im_baum"
+            DIM rbI AS INTEGER : rbI = GUI_TAB_CONTEXT(win)
+            IF rbI >= 0 AND rbI < tabAnzahl THEN imBaumZeigen(tabPfade[rbI])
         CASE "nav_vor" : navGehen(FALSE)
         CASE "baum_neue_datei" : baumFragen("datei")
         CASE "baum_neuer_ordner" : baumFragen("ordner")
@@ -15412,6 +15562,7 @@ menueBefehl(miSichernAls, "sichern_unter", "") : menueBefehl(miSchliessen, "schl
 menueBefehl(miSuchen, "suchen", "Strg+F") : menueBefehl(miWeiter, "weiter", "F3") : menueBefehl(miZurueckSuchen, "zurueck_suchen", "Umschalt+F3")
 menueBefehl(miErsetzen, "ersetzen", "Strg+H") : menueBefehl(miErsetzenEins, "ersetzen_eins", "Strg+Umschalt+1") : menueBefehl(miErsetzenAlle, "ersetzen_alle", "Strg+Alt+Enter")
 menueBefehl(miZeile, "zeile", "Strg+G") : menueBefehl(miProjekt, "projekt", "Strg+Umschalt+F") : menueBefehl(miVervoll, "vervoll", "Strg+Leer")
+menueBefehl(miImBaum, "im_baum_zeigen", "Strg+Alt+B")
 menueBefehl(miNavZurueck, "nav_zurueck", "Strg+Alt+Links") : menueBefehl(miNavVor, "nav_vor", "Strg+Alt+Rechts")
 menueBefehl(miBNeuDatei, "baum_neue_datei", "") : menueBefehl(miBNeuOrdner, "baum_neuer_ordner", "") : menueBefehl(miBUmbenennen, "baum_umbenennen", "")
 menueBefehl(miBLoeschen, "baum_loeschen", "") : menueBefehl(miBPfad, "baum_pfad", "")
@@ -16052,6 +16203,7 @@ WHILE NOT beenden
     END IF
 
     abgelegteNachziehen()
+    kontextNachziehen()
     navNachziehen()
     ausgabeFilterNachziehen()
     prozessNachsehen()

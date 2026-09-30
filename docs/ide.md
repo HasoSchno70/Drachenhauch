@@ -321,6 +321,21 @@ bekäme. Diese Bausteine kamen mit ihr:
   Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der
   Bereich auf die Ausgabe zurück. Unter Windows kommen Umlaute richtig an
   (`chcp 65001`).
+- **Rechtsklick ins Code-Feld:** Ausschneiden, Kopieren, Einfügen, Zur
+  Definition, Wer ruft das auf?, Umbenennen, Schnellkorrektur, Haltepunkt
+  setzen/entfernen, Im Projektbaum zeigen. Der Rechtsklick setzt vorher die
+  Marke an die Stelle (in einer Auswahl bleibt sie), die Befehle meinen also
+  das angeklickte Wort bzw. die angeklickte Zeile. In der Nummernspalte
+  bleibt der Rechtsklick der für die Bedingung eines Haltepunkts.
+- **Rechtsklick auf einen Reiter:** Schließen, Andere schließen, Rechts
+  davon schließen, Pfad kopieren, Im Projektbaum zeigen -- jeweils für den
+  angeklickten Reiter, nicht den vorderen. Beim Sammel-Schließen bleibt ein
+  Reiter mit ungesicherten Änderungen offen (die Statuszeile sagt, wie
+  viele).
+- **Im Projektbaum zeigen** (Bearbeiten, Strg+Alt+B): wählt die Datei des
+  vorderen Reiters im Projektbaum, klappt die Ordner darüber auf und rollt
+  die Zeile ins Bild; eine ausgeblendete Seitenleiste kommt zurück. Liegt
+  die Datei nicht im Projektordner, sagt es die Statuszeile.
 - **Typ-Hinweise** (Ansicht → Typ-Hinweise, an per Vorgabe): hinter einer
   Zeile mit `FOR EACH` steht gedämpft blau, was die Variable hält
   (`p: INTEGER`, bei einer MAP in der Paar-Form `k: STRING, v: FLOAT`) --

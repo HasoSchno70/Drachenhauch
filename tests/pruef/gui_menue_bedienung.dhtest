@@ -348,3 +348,104 @@ DIM c AS INTEGER : c = GUI_CONTEXT(w)
 GUI_CONTEXT_WIDGET(c, lb)
 --- fehler
 verschiedenen Fenstern
+
+=== das kontextmenue der reiterleiste nennt den reiter
+' GUI_CONTEXT_TABS: Rechtsklick auf einen Reiter oeffnet das Menue,
+' GUI_TAB_CONTEXT sagt welcher; der aktive Reiter bleibt. Ein Rechtsklick
+' in den Inhalt oeffnet nichts (es gibt kein Menue fuer das Fenster).
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 580, 380)
+GUI_TABS(w, ["eins", "zwei"])
+DIM c AS INTEGER : c = GUI_CONTEXT(w)
+DIM zu AS INTEGER : zu = GUI_MENU_ITEM(c, "Schliessen")
+GUI_CONTEXT_TABS(c)
+AUTOMATION_PLAY("ev.txt")
+PRINT "anfangs "; GUI_TAB_CONTEXT(w)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(zu) THEN PRINT "reiter "; GUI_TAB_CONTEXT(w); " aktiv "; GUI_ACTIVE_TAB(w)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei ev.txt
+c 20
+e 0 7 20 36 0 0
+e 2 6 1 0 0 0
+e 3 5 1 0 0 0
+e 5 2 264 0 0 0
+e 6 1 264 0 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+e 12 7 69 36 0 0
+e 13 6 1 0 0 0
+e 14 5 1 0 0 0
+e 16 2 264 0 0 0
+e 17 1 264 0 0 0
+e 19 2 257 0 0 0
+e 20 1 257 0 0 0
+e 23 7 200 200 0 0
+e 24 6 1 0 0 0
+e 25 5 1 0 0 0
+e 27 2 264 0 0 0
+e 28 1 264 0 0 0
+e 30 2 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+anfangs -1
+reiter 0 aktiv 0
+reiter 1 aktiv 0
+
+=== das menue eines textbereichs oeffnet nicht in der nummernspalte
+' Die Nummernspalte gehoert GUI_TEXTAREA_GUTTER_CLICKED: dort meldet der
+' Rechtsklick die Zeile und oeffnet kein Menue; im Text oeffnet es, und die
+' Marke steht dann auf der angeklickten Zeile (der Rechtsklick erreicht das
+' Feld trotz des Menues).
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 0, 0, 380, 280)
+GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+GUI_SET_TEXT(ta, "a = 1" + CHR$(10) + "b = 2")
+DIM c AS INTEGER : c = GUI_CONTEXT(w)
+DIM it AS INTEGER : it = GUI_MENU_ITEM(c, "Eintrag")
+GUI_CONTEXT_WIDGET(c, ta)
+AUTOMATION_PLAY("ev.txt")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TEXTAREA_GUTTER_CLICKED(ta, 1) > 0 THEN PRINT "rand "; GUI_TEXTAREA_GUTTER_CLICKED(ta, 1)
+    IF GUI_CLICKED(it) THEN
+        DIM z AS INTEGER
+        DIM sp AS INTEGER
+        (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "menue, marke in zeile "; z
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei ev.txt
+c 14
+e 0 7 8 12 0 0
+e 2 6 1 0 0 0
+e 3 5 1 0 0 0
+e 5 2 264 0 0 0
+e 6 1 264 0 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+e 12 7 200 30 0 0
+e 13 6 1 0 0 0
+e 14 5 1 0 0 0
+e 16 2 264 0 0 0
+e 17 1 264 0 0 0
+e 19 2 257 0 0 0
+e 20 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+rand 1
+menue, marke in zeile 2

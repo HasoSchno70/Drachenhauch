@@ -1888,6 +1888,24 @@ mit Gegenprobe), `werkzeug_ide_terminal.dhtest` (2, `--- system windows`),
 Rust-Test `kill_beendet_auch_die_enkel`; vier Verfaelschungen der IDE und
 eine der Laufzeit fallen je in ihrem Fall.
 
+**Kontextmenues fuer Code-Feld und Reiter, Im Projektbaum zeigen
+(2026-09-30):** neu **`GUI_CONTEXT_TABS(menu)`** + **`GUI_TAB_CONTEXT(win)`**
+(`Menu::ziel` = -2, `Window::tab_kontext`; im Rechtsklick-Zweig von
+`menu_input` zuerst geprueft, ueber `tab_slots`) -- und der Rueckfall aufs
+Fenstermenue nimmt jetzt nur `ziel == -1` (mit `< 0` oeffnete das
+Reiter-Menue ueberall im Fenster; vom Test gefunden). Ein gebundenes Menue
+eines Textbereichs oeffnet NICHT in der Nummernspalte (`ta_rand_zeile`), und
+das Widget bekommt seinen Rechtsklick trotzdem (`Gui::kontext_neu` --
+vorher setzte der Rechtsklick die Marke nicht, und "Haltepunkt" aus dem
+Menue traf die alte Zeile). `GUI_FILETREE_SELECT` rollt die Zeile ins Bild.
+Die IDE: `ctxCode` wandert je Bild an das Code-Feld unter der Maus
+(`kontextNachziehen`, GUI_HIT_TEST), Eintraege ueber eine eigene Liste
+(`ctxEintrag`) statt der Menue-Tafel; `reiterSchliessenAusser` laesst
+Ungesichertes offen; `imBaumZeigen` (Strg+Alt+B). Tests
+`werkzeug_ide_kontextmenues.dhtest` (4, echte Rechtsklicks, Menue per
+Anfangsbuchstabe), drei Faelle in `gui_menue_bedienung.dhtest`, einer in
+`gui_dateibaum.dhtest`; vier Verfaelschungen der IDE fallen je in ihrem Fall.
+
 **Typ-Hinweise und eigene Farben (2026-09-30):** neu **`CODE_TYPES$(quelle$
 [, basis$])`** -> JSON `[{zeile, name, typ}]` fuer Stellen ohne
 geschriebenen Typ -- die Variablen von FOR EACH (`DIM x = wert` ohne `AS`
