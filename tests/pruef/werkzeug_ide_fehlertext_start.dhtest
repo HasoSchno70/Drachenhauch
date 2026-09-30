@@ -1,0 +1,298 @@
+' Drei Handgriffe der IDE:
+' (1) Fehlertext am Zeilenende -- die Meldung von Pruefen steht farbig
+'     hinter ihrer Zeile (rot fuer Fehler, gelb fuer Warnungen), per
+'     Ansicht -> Fehlertext am Zeilenende abschaltbar. Geprueft am Bild:
+'     farbige Punkte rechts hinter dem Text der Zeile.
+' (2) Startargumente und Umgebung je Datei (Ausfuehren -> Startargumente /
+'     Umgebung fuer den Start), gemerkt in der ide.json; die Umgebung gilt
+'     nur fuer das gestartete Programm.
+' (3) Beim Sichern neu starten: laeuft ein Programm (F5), startet Strg+S es
+'     neu -- ausgeschaltet nicht.
+--- seriell
+--- langsam
+
+=== eine warnung steht gelb hinter ihrer zeile und laesst sich abschalten
+DIM prBild AS INTEGER : prBild = 0
+' Farbige Punkte hinter dem Ende der Zeile z (400 Punkte weit), gezaehlt im
+' letzten Bild. rot = TRUE: Fehlerfarbe, sonst Warnungsfarbe.
+FUNCTION prFarbig(z AS INTEGER, rot AS BOOLEAN) AS INTEGER
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    SAVESCREENSHOT("prbild.png")
+    DIM b AS IMAGE : b = LOADIMAGE("prbild.png")
+    DIM n AS INTEGER : n = 0
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    DIM zz AS INTEGER
+    DIM ss AS INTEGER
+    FOR y = 0 TO SCREENHEIGHT() - 1
+        DIM rechts AS INTEGER : rechts = -1
+        FOR x = 0 TO SCREENWIDTH() - 1 STEP 3
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF zz = z THEN rechts = x
+        NEXT
+        IF rechts < 0 THEN CONTINUE
+        FOR x = rechts + 24 TO MIN(rechts + 424, SCREENWIDTH() - 1)
+            DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+            DIM r AS INTEGER : r = (c SHR 16) BAND 255
+            DIM g AS INTEGER : g = (c SHR 8) BAND 255
+            DIM bl AS INTEGER : bl = c BAND 255
+            IF rot AND r > 170 AND g < 130 AND bl < 130 THEN n = n + 1
+            IF NOT rot AND r > 160 AND g > 120 AND bl < 110 AND r - bl > 80 THEN n = n + 1
+        NEXT
+    NEXT
+    IMAGE_FREE(b)
+    DELETEFILE("prbild.png")
+    RETURN n
+END FUNCTION
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN pruefen()
+IF prBild = 46 THEN
+    protokoll("pr zeile 3 gelb " + STR$(prFarbig(3, FALSE) > 20))
+    protokoll("pr zeile 2 gelb " + STR$(prFarbig(2, FALSE)))
+    befehl("fehler_am_ende")
+END IF
+IF prBild = 52 THEN
+    protokoll("pr aus zeile 3 gelb " + STR$(prFarbig(3, FALSE)))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+DIM a AS INTEGER
+a = 1
+zaehlr = a + 1
+PRINT a
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 12) = "fehlertexte " OR LEFT$(L[i], 15) = "fehler am ende " THEN PRINT L[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt "; JSON_GET_BOOL(k, "fehler_am_ende")
+--- erwartet
+fehlertexte 1
+fehlertexte 1
+pr zeile 3 gelb TRUE
+pr zeile 2 gelb 0
+fehler am ende aus
+pr aus zeile 3 gelb 0
+gemerkt FALSE
+
+=== ein fehler steht rot hinter seiner zeile
+DIM prBild AS INTEGER : prBild = 0
+FUNCTION prFarbig(z AS INTEGER, rot AS BOOLEAN) AS INTEGER
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    SAVESCREENSHOT("prbild.png")
+    DIM b AS IMAGE : b = LOADIMAGE("prbild.png")
+    DIM n AS INTEGER : n = 0
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    DIM zz AS INTEGER
+    DIM ss AS INTEGER
+    FOR y = 0 TO SCREENHEIGHT() - 1
+        DIM rechts AS INTEGER : rechts = -1
+        FOR x = 0 TO SCREENWIDTH() - 1 STEP 3
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF zz = z THEN rechts = x
+        NEXT
+        IF rechts < 0 THEN CONTINUE
+        FOR x = rechts + 24 TO MIN(rechts + 424, SCREENWIDTH() - 1)
+            DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+            DIM r AS INTEGER : r = (c SHR 16) BAND 255
+            DIM g AS INTEGER : g = (c SHR 8) BAND 255
+            DIM bl AS INTEGER : bl = c BAND 255
+            IF rot AND r > 170 AND g < 130 AND bl < 130 THEN n = n + 1
+            IF NOT rot AND r > 160 AND g > 120 AND bl < 110 AND r - bl > 80 THEN n = n + 1
+        NEXT
+    NEXT
+    IMAGE_FREE(b)
+    DELETEFILE("prbild.png")
+    RETURN n
+END FUNCTION
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN pruefen()
+IF prBild = 46 THEN
+    protokoll("pr zeile 3 rot " + STR$(prFarbig(3, TRUE) > 20))
+    protokoll("pr zeile 1 rot " + STR$(prFarbig(1, TRUE)))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+PRINT (2
+PRINT 3
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 12) = "fehlertexte " THEN PRINT L[i]
+NEXT
+--- erwartet
+fehlertexte 1
+fehlertexte 1
+pr zeile 3 rot TRUE
+pr zeile 1 rot 0
+
+=== startargumente und umgebung gehen an das programm
+' Die Argumente stehen schon da; der Dialog wird mit Enter bestaetigt
+' (dieselbe Zeile noch einmal) und schreibt sie in die ide.json. Die
+' Umgebung bekommt NUR das gestartete Programm.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    startWertSetzen(tabPfade[aktiverTab], FALSE, "eins " + CHR$(34) + "zwei drei" + CHR$(34))
+    startWertSetzen(tabPfade[aktiverTab], TRUE, "DH_PROBE_STUFE=7")
+    befehl("start_argumente")
+    WRITEALL("prtaste.txt", "c 3" + CHR$(10) + "e 0 1 340 0 0 0" + CHR$(10) + "e 4 2 257 0 0 0" + CHR$(10) + "e 8 1 257 0 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prtaste.txt")
+END IF
+IF prBild = 40 THEN befehl("start")
+IF prBild = 150 THEN
+    DIM prK AS INTEGER
+    FOR prK = 0 TO GUI_LISTBOX_COUNT(lstAusgabe) - 1
+        protokoll("pr ausgabe " + GUI_LISTBOX_ITEM(lstAusgabe, prK))
+    NEXT
+    protokoll("pr ide sieht [" + GETENV$("DH_PROBE_STUFE") + "]")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT ARGC(); " ["; ARG$(0); "] ["; ARG$(1); "]"
+PRINT "stufe "; GETENV$("DH_PROBE_STUFE")
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 16) = "start argumente " OR LEFT$(L[i], 9) = "start mit" THEN PRINT L[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt "; BASENAME(JSON_GET_STRING(k, "start.0.datei")); " | "; JSON_GET_STRING(k, "start.0.argumente"); " | "; JSON_GET_STRING(k, "start.0.umgebung")
+--- erwartet
+start argumente 2
+start mit 2 argumenten 1 umgebung
+pr ausgabe 2 [eins] [zwei drei]
+pr ausgabe stufe 7
+pr ide sieht []
+gemerkt haupt.dh | eins "zwei drei" | DH_PROBE_STUFE=7
+
+=== sichern startet ein laufendes programm neu
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    befehl("neustart_sichern")
+    befehl("start")
+END IF
+IF prBild = 80 THEN
+    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT " + CHR$(34) + "zweite fassung" + CHR$(34) + CHR$(10) + "WHILE TRUE : SLEEP(50) : WEND" + CHR$(10))
+    befehl("sichern")
+END IF
+IF prBild = 200 THEN
+    DIM prK AS INTEGER
+    FOR prK = 0 TO GUI_LISTBOX_COUNT(lstAusgabe) - 1
+        protokoll("pr ausgabe " + GUI_LISTBOX_ITEM(lstAusgabe, prK))
+    NEXT
+    protokoll("pr laeuft " + STR$(prozess >= 0))
+    stoppen()
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT "erste fassung"
+WHILE TRUE : SLEEP(50) : WEND
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 9) = "neustart " THEN PRINT L[i]
+    IF LEFT$(L[i], 10) = "gestartet " THEN PRINT "gestartet "; BASENAME(MID$(L[i], 10))
+NEXT
+--- erwartet
+neustart beim sichern an
+gestartet haupt.dh
+neustart beim sichern
+gestartet haupt.dh
+pr ausgabe zweite fassung
+pr laeuft TRUE
+
+=== ohne den schalter startet sichern nicht neu
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN befehl("start")
+IF prBild = 80 THEN
+    GUI_SET_TEXT(tabFelder[aktiverTab], "PRINT " + CHR$(34) + "zweite fassung" + CHR$(34) + CHR$(10) + "WHILE TRUE : SLEEP(50) : WEND" + CHR$(10))
+    befehl("sichern")
+END IF
+IF prBild = 200 THEN
+    DIM prK AS INTEGER
+    FOR prK = 0 TO GUI_LISTBOX_COUNT(lstAusgabe) - 1
+        protokoll("pr ausgabe " + GUI_LISTBOX_ITEM(lstAusgabe, prK))
+    NEXT
+    protokoll("pr laeuft " + STR$(prozess >= 0))
+    stoppen()
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT "erste fassung"
+WHILE TRUE : SLEEP(50) : WEND
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 9) = "neustart " THEN PRINT L[i]
+    IF LEFT$(L[i], 10) = "gestartet " THEN PRINT "gestartet "; BASENAME(MID$(L[i], 10))
+NEXT
+--- erwartet
+gestartet haupt.dh
+pr ausgabe erste fassung
+pr laeuft TRUE

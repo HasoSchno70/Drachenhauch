@@ -74,6 +74,34 @@ PROCESS_START("gibt_es_nicht_xyz")
 --- fehler
 PROCESS_START: 'gibt_es_nicht_xyz' laesst sich nicht starten
 
+=== prozess mit argumentfeld und umgebung
+' Ein Feld wird zu einzelnen Argumenten ausgebreitet, eine MAP ist die
+' Umgebung NUR dieses Kindes -- der eigene Prozess sieht sie nicht.
+DIM args AS ARRAY OF STRING : args = ["eins", "zwei drei"]
+DIM umg AS MAP OF STRING : umg = {"DH_PROBE_X": "gesetzt"}
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "kind.dh", "--", args, umg)
+DIM runden AS INTEGER : runden = 0
+WHILE PROCESS_RUNNING(p) AND runden < 400 : SLEEP(20) : runden = runden + 1 : WEND
+SLEEP(60)
+PRINT REPLACE$(PROCESS_READ$(p), CHR$(13), "");
+PRINT REPLACE$(PROCESS_READ$(p), CHR$(13), "");
+PRINT REPLACE$(PROCESS_READ$(p), CHR$(13), "");
+PRINT "hier "; GETENV$("DH_PROBE_X")
+--- datei kind.dh
+PRINT ARGC(); " "; ARG$(0)
+PRINT ARG$(1)
+PRINT GETENV$("DH_PROBE_X")
+--- erwartet
+2 eins
+zwei drei
+gesetzt
+hier 
+
+=== prozess feld mit zahl ist ein fehler
+PROCESS_START("dhrt", ["run", 3])
+--- fehler
+PROCESS_START: ein Feld von Argumenten muss aus Texten bestehen
+
 === code check meldet zeilen des puffers
 PRINT CODE_CHECK$("PRINT 1" + CHR$(10) + "DIM x AS" + CHR$(10))
 PRINT CODE_CHECK$("PRINT 1")

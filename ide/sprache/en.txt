@@ -101,6 +101,9 @@ Ganzes Projekt prüfen	Check whole project
 Prüfsammlung ausführen	Run test collection
 Diesen Prüffall ausführen	Run this test case
 Prüfsammlungen im Überblick ...	Test collections overview ...
+Startargumente ...	Start arguments ...
+Umgebung für den Start ...	Environment for start ...
+Beim Sichern neu starten	Restart on save
 Debuggen	Debug
 Haltepunkt setzen/entfernen	Toggle breakpoint
 Bedingter Haltepunkt ...	Conditional breakpoint ...
@@ -136,6 +139,7 @@ Geänderte Zeilen am Rand	Changed lines in the margin
 Zeilenumbruch	Word wrap
 Einrückungslinien	Indent guides
 Mitlaufender Blockkopf	Sticky block header
+Fehlertext am Zeilenende	Error text at line end
 Profil im Code (nach Strg+Umschalt+Y)	Profile in code (after Ctrl+Shift+Y)
 Aufrufzähler über Unterprogrammen	Call counts above subroutines
 Live-Vorschau	Live preview
@@ -433,6 +437,8 @@ Zurückgeholt	Unstashed
  Stand/Stände beiseite.	 stash(es) put aside.
 Blame an der Zeile der Marke an.	Blame at the cursor line on.
 Blame an der Zeile der Marke aus.	Blame at the cursor line off.
+Fehlertext am Zeilenende an.	Error text at line end on.
+Fehlertext am Zeilenende aus.	Error text at line end off.
 Die Marke steht in keinem Konflikt (<<<<<<< ... >>>>>>>).	The cursor is in no conflict (<<<<<<< ... >>>>>>>).
 Die Marke steht in keinem vollständigen Konflikt.	The cursor is in no complete conflict.
 Konflikt gelöst (	Conflict resolved (
@@ -591,6 +597,18 @@ Export fehlgeschlagen (Code 	Export failed (code
 Es läuft noch ein Programm -- erst stoppen (Umschalt+F5).	A program is still running -- stop it first (Shift+F5).
 Ausgabe: 	Output: 
 Gestartet: 	Started: 
+Erst sichern -- die Einstellung gehört zu einer Datei.	Save first -- the setting belongs to a file.
+Umgebung für den Start	Environment for start
+Umgebungsvariablen für 	Environment variables for 
+, etwa: STUFE=3 NAME=wert	, e.g.: LEVEL=3 NAME=value
+Startargumente	Start arguments
+Argumente für 	Arguments for 
+ (ARG$), getrennt durch Leerzeichen:	 (ARG$), separated by spaces:
+Umgebung für 	Environment for 
+keine	none
+Startargumente für 	Start arguments for 
+Beim Sichern neu starten: an.	Restart on save: on.
+Beim Sichern neu starten: aus.	Restart on save: off.
 Debugger: läuft ...	Debugger: running ...
 Anhalten geht nur im Debugger -- F7 startet ihn.	Pausing only works in the debugger -- F7 starts it.
 Haltepunkt hält nie (dort und darunter steht kein Code): 	Breakpoint never pauses (no code there or below): 

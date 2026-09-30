@@ -2582,6 +2582,10 @@ pub struct Widget {
     hinweise: Vec<(usize, String)>,
     hinweise_text: String,
     hinweise_farbe: i64,
+    /// Eine Farbe je Hinweis, gleich lang wie `hinweise` (leer = alle in
+    /// `hinweise_farbe`); -1 im Eintrag = gedaempft. Seit 2026-09-30: die IDE
+    /// zeigt Fehler rot und Aufrufzaehler gedaempft auf demselben Weg.
+    hinweise_farben: Vec<i64>,
     /// Nimmt ein Hinweis Klicks an (GUI_TEXTAREA_SET "hinweise_klickbar")?
     /// Dann Hand als Zeiger, die Marke bleibt stehen, und
     /// GUI_TEXTAREA_HINT_CLICKED nennt die Zeile (ab 1) ein Bild lang.
@@ -3608,20 +3612,30 @@ impl Gui {
 
     /// GUI_TEXTAREA_HINTS(ta, zeilen, texte [, farbe]): Text hinter dem Ende
     /// der Zeilen (ab 1), ersetzt alle bisherigen; leere Listen loeschen.
-    pub fn textarea_hints(&mut self, h: i64, zeilen: Vec<i64>, texte: Vec<String>, farbe: i64) -> Result<(), String> {
+    pub fn textarea_hints(&mut self, h: i64, zeilen: Vec<i64>, texte: Vec<String>, farbe: i64, farben: Vec<i64>) -> Result<(), String> {
         if zeilen.len() != texte.len() {
             return Err(format!(
                 "GUI_TEXTAREA_HINTS: beide Listen muessen gleich lang sein ({} Zeilen, {} Texte)",
                 zeilen.len(), texte.len()));
         }
+        if !farben.is_empty() && farben.len() != zeilen.len() {
+            return Err(format!(
+                "GUI_TEXTAREA_HINTS: je Hinweis eine Farbe ({} Zeilen, {} Farben)",
+                zeilen.len(), farben.len()));
+        }
         let wd = self.wdg_mut(h, "GUI_TEXTAREA_HINTS")?;
         if wd.kind != Kind::TextArea {
             return Err("GUI_TEXTAREA_HINTS: das Widget ist kein GUI_TEXTAREA".into());
         }
-        wd.hinweise = zeilen.iter().zip(texte)
-            .filter(|(&z, t)| z >= 1 && !t.is_empty())
-            .map(|(&z, t)| ((z - 1) as usize, t.replace('\n', " ")))
-            .collect();
+        let mut hin = Vec::new();
+        let mut fa = Vec::new();
+        for (i, (&z, t)) in zeilen.iter().zip(texte).enumerate() {
+            if z < 1 || t.is_empty() { continue; }
+            hin.push(((z - 1) as usize, t.replace('\n', " ")));
+            if !farben.is_empty() { fa.push(farben[i]); }
+        }
+        wd.hinweise = hin;
+        wd.hinweise_farben = fa;
         wd.hinweise_text = wd.text.clone();
         wd.hinweise_farbe = farbe;
         Ok(())
@@ -4180,7 +4194,7 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
-            farbfelder: Vec::new(), wellen: Vec::new(), hinweise: Vec::new(), hinweise_text: String::new(), hinweise_farbe: -1, hinweise_klickbar: false, hinweis_klick: 0, farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
+            farbfelder: Vec::new(), wellen: Vec::new(), hinweise: Vec::new(), hinweise_text: String::new(), hinweise_farbe: -1, hinweise_farben: Vec::new(), hinweise_klickbar: false, hinweis_klick: 0, farbfeld_klick: -1, rand_klick: (0, -1), farbfeld_zug: false, zeiger: None, rad_stand: None, klick_n: 0, klick_zeit: -10.0, klick_idx: -1, wort_zug: false,
             formatiert: false, paare: Vec::new(), teil_von: None, teil_stand: String::new(), stile: Vec::new(), stile_text: String::new(), tipp_stil: None,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false, kopfzeilen: 0, hg_bild: -1, hg_deckkraft: 0,
             tab_meldet: false, tab_treffer: false,
@@ -9615,7 +9629,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // den neuen nach den Positionen des alten -- besser sichtbar farblos
         // als sichtbar falsch.
         w.spans.clear();
-        w.wellen.clear(); w.hinweise.clear();
+        w.wellen.clear(); w.hinweise.clear(); w.hinweise_farben.clear();
         // Der Verlauf gehoerte zum alten Text -- ein Strg+Z danach brachte
         // sonst etwas zurueck, das der Nutzer nie getippt hat.
         w.undo.clear(); w.redo.clear();
@@ -19071,9 +19085,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         // Anzeige, nicht Text.
                         let _ = (ende_x, re);
                         if let Some(&(_, bx, _, bw, _)) = hin_rects.iter().find(|h| h.0 == li && h.2 == y + 1) {
-                            if let Some((_, txt)) = wdg.hinweise.iter().find(|(z, _)| *z == li) {
+                            if let Some(pos) = wdg.hinweise.iter().position(|(z, _)| *z == li) {
+                                let txt = &wdg.hinweise[pos].1;
                                 let bg = self.wcol(wdg, "bg", "win_bg");
-                                let farbe = if wdg.hinweise_farbe >= 0 { wdg.hinweise_farbe } else { self.leise(bg) };
+                                let eigene = wdg.hinweise_farben.get(pos).copied().unwrap_or(-1);
+                                let farbe = if eigene >= 0 { eigene } else if wdg.hinweise_farbe >= 0 { wdg.hinweise_farbe } else { self.leise(bg) };
                                 g.box_fill(bx, y + 1, bx + bw, y + lh - 3, 0x60_000000 | (shade(bg, 14) & 0xFF_FFFF));
                                 self.wtext(g, wdg, bx + self.sk(6), y, txt.clone(), farbe);
                             }

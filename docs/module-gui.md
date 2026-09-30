@@ -3168,7 +3168,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_CURSOR(ta)` → (zeile, spalte) | wo die Schreibmarke steht (ab 1, in Zeichen) |
 | `GUI_TEXTAREA_POS_AT(ta, x, y)` → (zeile, spalte) | welches Zeichen unter dem Bildschirmpunkt liegt (ab 1; dieselbe Rechnung wie der Klick). (0, 0) neben dem Text: ausserhalb, in der Nummernspalte, unter der letzten Zeile, hinter dem Zeilenende -- fuer Tooltips beim Ueberfahren und Strg+Klick |
 | `GUI_TEXTAREA_GOTO(ta, zeile[, spalte])` | Marke setzen, Auswahl aufheben, den Ausschnitt so rollen, dass die Zeile in der Mitte steht |
-| `GUI_TEXTAREA_HINTS(ta, zeilen, texte [, farbe])` | Text gedaempft hinter das Ende von Zeilen (ab 1) setzen, etwa die Werte der Variablen im Debugger-Halt; folgt seiner Zeile wie eine Marke, leere Listen loeschen, `GUI_SET_TEXT` auch |
+| `GUI_TEXTAREA_HINTS(ta, zeilen, texte [, farbe])` | Text gedaempft hinter das Ende von Zeilen (ab 1) setzen, etwa die Werte der Variablen im Debugger-Halt; folgt seiner Zeile wie eine Marke, leere Listen loeschen, `GUI_SET_TEXT` auch. `farbe` darf ein Feld sein, eine je Hinweis (`-1` = gedaempft) |
 | `GUI_TEXTAREA_SCROLL(ta, zeile)` | den Ausschnitt rollen, sodass die Zeile oben steht -- ohne die Marke zu bewegen, wie das Mausrad (fuer eine Uebersichtskarte) |
 | `GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)` | einen Bereich markieren, Marke am Ende |
 | `GUI_TEXTAREA_SELECTION$(ta)` → STRING | der markierte Text |

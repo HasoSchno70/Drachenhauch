@@ -57,6 +57,11 @@ fn sammler<R: Read + Send + 'static>(quelle: R, ziel: Arc<Mutex<String>>) {
 
 impl Prozess {
     pub fn starten(programm: &str, args: &[String]) -> Result<Prozess, String> {
+        Self::starten_mit(programm, args, &[])
+    }
+
+    /// Wie `starten`, mit zusaetzlicher Umgebung nur fuer dieses Kind.
+    pub fn starten_mit(programm: &str, args: &[String], umgebung: &[(String, String)]) -> Result<Prozess, String> {
         // "dhrt" meint diese Runtime -- so startet die IDE ein Programm, ohne
         // dass die Exe im PATH liegen muss.
         let exe = if programm.eq_ignore_ascii_case("dhrt") {
@@ -72,6 +77,7 @@ impl Prozess {
         // an einer Leitung kaeme seine Ausgabe sonst erst am Ende (vm.rs,
         // `live_ausgabe`).
         cmd.env("DHRT_LIVE", "1");
+        for (k, v) in umgebung { cmd.env(k, v); }
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;

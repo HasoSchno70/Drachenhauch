@@ -252,6 +252,7 @@ DIM fertigNachStopp AS BOOLEAN : fertigNachStopp = FALSE
 ' noch einmal -- mit derselben Art (Lauf, Debugger, Profil).
 DIM neustartArt AS STRING : neustartArt = ""
 DIM neustartDatei AS STRING : neustartDatei = ""
+DIM neustartVomSichern AS BOOLEAN : neustartVomSichern = FALSE
 ' Waehrend des Debuggens geaendert: einmal sagen, dass die Zeilen nicht mehr passen.
 DIM debugGeaendertGesagt AS BOOLEAN : debugGeaendertGesagt = FALSE
 DIM prozessArt AS STRING : prozessArt = ""          ' run / debug / profile
@@ -369,6 +370,22 @@ DIM waermeTexte AS ARRAY OF STRING : waermeTexte = []
 ' Aufrufzaehler: hinter jeder SUB/FUNCTION steht, wie oft sie im Projekt
 ' vorkommt; ein Klick darauf zeigt die Aufrufer.
 DIM zaehlerAn AS BOOLEAN : zaehlerAn = TRUE
+' Fehlertext am Zeilenende: die Meldung von Pruefen steht gedaempft rot bzw.
+' gelb hinter ihrer Zeile -- man liest sie, ohne die Maus hinzubewegen.
+DIM fehlerEndeAn AS BOOLEAN : fehlerEndeAn = TRUE
+DIM fehlerFeld AS GUI_WIDGET : fehlerFeld = -1
+DIM fehlerZeilen AS ARRAY OF INTEGER : fehlerZeilen = []
+DIM fehlerTexte AS ARRAY OF STRING : fehlerTexte = []
+DIM fehlerFarben AS ARRAY OF INTEGER : fehlerFarben = []
+' Beim Sichern neu starten: laeuft ein Programm (F5), startet Strg+S es neu.
+' Aus per Vorgabe -- ein Neustart wirft den Zustand des Programms weg.
+DIM neustartSichernAn AS BOOLEAN : neustartSichernAn = FALSE
+' Startargumente und Umgebung je Datei (ide.json `start`: Liste von
+' {datei, argumente, umgebung}). Eine Liste statt Pfad-Schluesseln, weil ein
+' Punkt im Schluessel fuer das json-Modul ein Pfad waere.
+DIM startDateien AS ARRAY OF STRING : startDateien = []
+DIM startArgs AS ARRAY OF STRING : startArgs = []
+DIM startUmg AS ARRAY OF STRING : startUmg = []
 ' Das Geruest, das beim Tippen mitwaechst: `IF ... THEN` und Enter setzen
 ' das `END IF` gleich mit (GUI_TEXTAREA_CLOSE_WORDS).
 DIM geruestAn AS BOOLEAN : geruestAn = TRUE
@@ -678,6 +695,18 @@ IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
 IF JSON_HAS(konfig, "blockkopf") THEN kopfAn = JSON_GET_BOOL(konfig, "blockkopf")
 IF JSON_HAS(konfig, "profil_waerme") THEN waermeAn = JSON_GET_BOOL(konfig, "profil_waerme")
 IF JSON_HAS(konfig, "aufrufzaehler") THEN zaehlerAn = JSON_GET_BOOL(konfig, "aufrufzaehler")
+IF JSON_HAS(konfig, "fehler_am_ende") THEN fehlerEndeAn = JSON_GET_BOOL(konfig, "fehler_am_ende")
+IF JSON_HAS(konfig, "neustart_beim_sichern") THEN neustartSichernAn = JSON_GET_BOOL(konfig, "neustart_beim_sichern")
+IF JSON_HAS(konfig, "start") THEN
+    DIM sk AS INTEGER
+    FOR sk = 0 TO JSON_LEN(konfig, "start") - 1
+        DIM skp AS STRING : skp = "start." + STR$(sk)
+        IF NOT JSON_HAS(konfig, skp + ".datei") THEN CONTINUE
+        ARRAY_PUSH(startDateien, JSON_GET_STRING(konfig, skp + ".datei"))
+        ARRAY_PUSH(startArgs, IIF(JSON_HAS(konfig, skp + ".argumente"), JSON_GET_STRING(konfig, skp + ".argumente"), ""))
+        ARRAY_PUSH(startUmg, IIF(JSON_HAS(konfig, skp + ".umgebung"), JSON_GET_STRING(konfig, skp + ".umgebung"), ""))
+    NEXT
+END IF
 IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
 IF JSON_HAS(konfig, "klammern") THEN klammernAn = JSON_GET_BOOL(konfig, "klammern")
 IF JSON_HAS(konfig, "format_sichern") THEN formatSichernAn = JSON_GET_BOOL(konfig, "format_sichern")
@@ -889,6 +918,11 @@ DIM miPruefsammlung AS INTEGER : miPruefsammlung = GUI_MENU_ITEM(mLauf, tr$("Pr�
 DIM miPrueffall AS INTEGER : miPrueffall = GUI_MENU_ITEM(mLauf, tr$("Diesen Prüffall ausführen"), kz$("Strg+Alt+Umschalt+F5"))
 DIM miTestUebersicht AS INTEGER : miTestUebersicht = GUI_MENU_ITEM(mLauf, tr$("Prüfsammlungen im Überblick ..."), kz$("Strg+Alt+T"))
 GUI_MENU_SEPARATOR(mLauf)
+DIM miStartArgs AS INTEGER : miStartArgs = GUI_MENU_ITEM(mLauf, tr$("Startargumente ..."))
+DIM miStartUmg AS INTEGER : miStartUmg = GUI_MENU_ITEM(mLauf, tr$("Umgebung für den Start ..."))
+DIM miNeustartSichern AS INTEGER : miNeustartSichern = GUI_MENU_ITEM(mLauf, tr$("Beim Sichern neu starten"))
+GUI_MENU_CHECK(miNeustartSichern, neustartSichernAn)
+GUI_MENU_SEPARATOR(mLauf)
 DIM miDebug AS INTEGER : miDebug = GUI_MENU_ITEM(mLauf, tr$("Debuggen"), kz$("F7"))
 DIM miHaltepunkt AS INTEGER : miHaltepunkt = GUI_MENU_ITEM(mLauf, tr$("Haltepunkt setzen/entfernen"), kz$("F9"))
 DIM miBedingung AS INTEGER : miBedingung = GUI_MENU_ITEM(mLauf, tr$("Bedingter Haltepunkt ..."), kz$("Umschalt+F9"))
@@ -937,6 +971,8 @@ DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, tr$("Einrückungsli
 GUI_MENU_CHECK(miLinien, linienAn)
 DIM miKopf AS INTEGER : miKopf = GUI_MENU_ITEM(mAnsicht, tr$("Mitlaufender Blockkopf"))
 GUI_MENU_CHECK(miKopf, kopfAn)
+DIM miFehlerEnde AS INTEGER : miFehlerEnde = GUI_MENU_ITEM(mAnsicht, tr$("Fehlertext am Zeilenende"))
+GUI_MENU_CHECK(miFehlerEnde, fehlerEndeAn)
 DIM miWaerme AS INTEGER : miWaerme = GUI_MENU_ITEM(mAnsicht, tr$("Profil im Code (nach Strg+Umschalt+Y)"))
 GUI_MENU_CHECK(miWaerme, waermeAn)
 DIM miZaehler AS INTEGER : miZaehler = GUI_MENU_ITEM(mAnsicht, tr$("Aufrufzähler über Unterprogrammen"))
@@ -1866,6 +1902,17 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "blockkopf", kopfAn)
     JSON_SET_BOOL(konfig, "profil_waerme", waermeAn)
     JSON_SET_BOOL(konfig, "aufrufzaehler", zaehlerAn)
+    JSON_SET_BOOL(konfig, "fehler_am_ende", fehlerEndeAn)
+    JSON_SET_BOOL(konfig, "neustart_beim_sichern", neustartSichernAn)
+    JSON_SET_JSON(konfig, "start", JSON_PARSE("[]"))
+    DIM sti AS INTEGER
+    FOR sti = 0 TO LEN(startDateien) - 1
+        DIM stE AS JSON_HANDLE : stE = JSON_NEW_OBJECT()
+        JSON_SET_STRING(stE, "datei", startDateien[sti])
+        JSON_SET_STRING(stE, "argumente", startArgs[sti])
+        JSON_SET_STRING(stE, "umgebung", startUmg[sti])
+        JSON_APPEND_JSON(konfig, "start", stE)
+    NEXT
     JSON_SET_BOOL(konfig, "geruest", geruestAn)
     JSON_SET_BOOL(konfig, "klammern", klammernAn)
     JSON_SET_BOOL(konfig, "vorspann", vorspannAn)
@@ -3214,6 +3261,17 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     zuletztMerken(pfad)
     GUI_SET_TEXT(lblStatus, tr$("Gesichert: ") + pfad)
     protokoll("gesichert " + pfad)
+    ' Beim Sichern neu starten: nur ein laufendes F5-Programm (Debugger und
+    ' Profil haben einen Zustand, den man nicht nebenbei wegwirft), nur fuer
+    ' Drachenhauch-Quelltext, nie beim automatischen Sichern.
+    IF neustartSichernAn AND prozess >= 0 AND prozessArt = "run" AND neustartArt = "" _
+       AND NOT sichernOhneFormat AND LOWER$(RIGHT$(pfad, 3)) = ".dh" THEN
+        neustartArt = "run"
+        neustartDatei = prozessDatei
+        neustartVomSichern = TRUE
+        protokoll("neustart beim sichern")
+        stoppen()
+    END IF
     ' Eigene Schnipsel und Tastenbelegung gelten, sobald sie gesichert sind --
     ' und sie liegen neben der ide.json, nicht im Projekt: der Projektordner
     ' bleibt, wo er war.
@@ -3733,10 +3791,14 @@ SUB pruefen()
     DIM fehler AS INTEGER : fehler = 0
     DIM hinweise AS INTEGER : hinweise = 0
     problemHinweis = []
+    DIM fz AS ARRAY OF INTEGER : fz = []
+    DIM ftx AS ARRAY OF STRING : ftx = []
+    DIM ffa AS ARRAY OF INTEGER : ffa = []
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = STR$(i)
         zeilen[i] = JSON_GET_INT(j, p + ".zeile")
         DIM art AS STRING : art = JSON_GET_STRING(j, p + ".schwere")
+        IF art <> "hinweis" THEN fehlerSammeln(fz, ftx, ffa, zeilen[i], JSON_GET_STRING(j, p + ".meldung"), art = "fehler")
         IF art = "fehler" THEN fehler = fehler + 1
         IF art = "hinweis" THEN hinweise = hinweise + 1
         ARRAY_PUSH(problemHinweis, art = "hinweis")
@@ -3753,6 +3815,11 @@ SUB pruefen()
     NEXT
     problemZeilen = zeilen
     wellenSetzen(ta, j, n)
+    DIM altF AS GUI_WIDGET : altF = fehlerFeld
+    fehlerFeld = ta : fehlerZeilen = fz : fehlerTexte = ftx : fehlerFarben = ffa
+    IF altF >= 0 AND altF <> ta THEN hinweiseZeigen(altF)
+    hinweiseZeigen(ta)
+    IF fehlerEndeAn AND LEN(fz) > 0 THEN protokoll("fehlertexte " + STR$(LEN(fz)))
     IF problemModus = 0 THEN
         IF n = 0 THEN
             GUI_SET_TEXT(lblProbleme, tr$("Probleme: keine"))
@@ -5059,7 +5126,53 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
             ARRAY_PUSH(zl, blameMarkeZeile) : ARRAY_PUSH(tx, blameText)
         END IF
     END IF
-    GUI_TEXTAREA_HINTS(ta, zl, tx)
+    ' Die Meldungen von Pruefen stehen VORN und faerben den ganzen Hinweis
+    ' ihrer Zeile -- ein roter Satz hinter einer Zeile mit Aufrufzaehler soll
+    ' nicht im Grau untergehen.
+    DIM farben AS ARRAY OF INTEGER : farben = []
+    FOR i = 0 TO LEN(zl) - 1
+        ARRAY_PUSH(farben, -1)
+    NEXT
+    IF fehlerEndeAn AND ta = fehlerFeld THEN
+        FOR i = 0 TO LEN(fehlerZeilen) - 1
+            DIM fk AS INTEGER : fk = ARRAY_INDEXOF(zl, fehlerZeilen[i])
+            IF fk >= 0 THEN
+                tx[fk] = fehlerTexte[i] + "   ·   " + tx[fk]
+                farben[fk] = fehlerFarben[i]
+            ELSE
+                ARRAY_PUSH(zl, fehlerZeilen[i]) : ARRAY_PUSH(tx, fehlerTexte[i])
+                ARRAY_PUSH(farben, fehlerFarben[i])
+            END IF
+        NEXT
+    END IF
+    GUI_TEXTAREA_HINTS(ta, zl, tx, farben)
+END SUB
+
+' Eine Meldung von Pruefen fuer ihre Zeile vormerken. Mehrere in derselben
+' Zeile kommen in EINEN Hinweis; ein Fehler faerbt ihn rot, auch wenn eine
+' Warnung zuerst kam. Lange Meldungen werden gekuerzt -- der ganze Satz
+' steht in der Liste und im Tooltip.
+SUB fehlerSammeln(fz AS ARRAY OF INTEGER, ftx AS ARRAY OF STRING, ffa AS ARRAY OF INTEGER, _
+                  zeile AS INTEGER, meldung AS STRING, istFehler AS BOOLEAN)
+    DIM m AS STRING : m = TRIM$(REPLACE$(meldung, NL, " "))
+    IF LEN(m) > 90 THEN m = LEFT$(m, 87) + "..."
+    DIM farbe AS INTEGER : farbe = IIF(istFehler, &HE06060, &HD8B048)
+    DIM k AS INTEGER : k = ARRAY_INDEXOF(fz, zeile)
+    IF k >= 0 THEN
+        ftx[k] = ftx[k] + "  ·  " + m
+        IF istFehler THEN ffa[k] = farbe
+    ELSE
+        ARRAY_PUSH(fz, zeile) : ARRAY_PUSH(ftx, m) : ARRAY_PUSH(ffa, farbe)
+    END IF
+END SUB
+
+SUB fehlerEndeSetzen(an AS BOOLEAN)
+    fehlerEndeAn = an
+    GUI_MENU_CHECK(miFehlerEnde, an)
+    IF fehlerFeld >= 0 THEN hinweiseZeigen(fehlerFeld)
+    GUI_SET_TEXT(lblStatus, IIF(an, tr$("Fehlertext am Zeilenende an."), tr$("Fehlertext am Zeilenende aus.")))
+    protokoll("fehler am ende " + IIF(an, "an", "aus"))
+    konfigSichern()
 END SUB
 
 SUB blameZeileNachziehen()
@@ -11105,7 +11218,19 @@ FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
     ausgabeRest = "" : prozessRest = ""
     prozessDatei = datei
     prozessArt = art
-    prozess = PROCESS_START("dhrt", art, prozessDatei)
+    ' Argumente und Umgebung dieser Datei (Ausfuehren -> Startargumente /
+    ' Umgebung). Die Umgebung gilt NUR fuer das Kind; SETENV bliebe fuer
+    ' jeden weiteren Start stehen.
+    DIM sa AS ARRAY OF STRING : sa = startWoerter(startWert$(datei, FALSE))
+    DIM su AS MAP OF STRING : su = startUmgebung(startWert$(datei, TRUE))
+    IF LEN(sa) > 0 THEN
+        prozess = PROCESS_START("dhrt", art, prozessDatei, "--", sa, su)
+    ELSE
+        prozess = PROCESS_START("dhrt", art, prozessDatei, su)
+    END IF
+    IF LEN(sa) > 0 OR LEN(MAPKEYS(su)) > 0 THEN
+        protokoll("start mit " + STR$(LEN(sa)) + " argumenten " + STR$(LEN(MAPKEYS(su))) + " umgebung")
+    END IF
     lichtstreif(1500)
     GUI_SET_TEXT(lblAusgabe, tr$("Ausgabe: ") + BASENAME(prozessDatei) + tr$(" läuft ..."))
     GUI_SET_TEXT(lblStatus, tr$("Gestartet: ") + prozessDatei)
@@ -11114,6 +11239,120 @@ END FUNCTION
 
 SUB starten()
     IF prozessStarten("run") THEN protokoll("gestartet " + prozessDatei)
+END SUB
+
+' Gemerkte Argumente (umgebung = FALSE) bzw. Umgebung einer Datei, "" = keine.
+FUNCTION startWert$(datei AS STRING, umgebung AS BOOLEAN) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(startDateien) - 1
+        IF wegGleich$(startDateien[i]) = wegGleich$(datei) THEN
+            RETURN IIF(umgebung, startUmg[i], startArgs[i])
+        END IF
+    NEXT
+    RETURN ""
+END FUNCTION
+
+SUB startWertSetzen(datei AS STRING, umgebung AS BOOLEAN, wert AS STRING)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(startDateien) - 1
+        IF wegGleich$(startDateien[i]) = wegGleich$(datei) THEN
+            IF umgebung THEN
+                startUmg[i] = wert
+            ELSE
+                startArgs[i] = wert
+            END IF
+            RETURN
+        END IF
+    NEXT
+    IF wert = "" THEN RETURN
+    ARRAY_PUSH(startDateien, datei)
+    ARRAY_PUSH(startArgs, IIF(umgebung, "", wert))
+    ARRAY_PUSH(startUmg, IIF(umgebung, wert, ""))
+END SUB
+
+' Eine Zeile in Woerter: getrennt an Leerraum, "in Anfuehrungszeichen" bleibt
+' zusammen (ohne die Zeichen selbst) -- wie in einer Shell, ohne deren Rest.
+FUNCTION startWoerter(zeile AS STRING) AS ARRAY OF STRING
+    DIM w AS ARRAY OF STRING : w = []
+    DIM akt AS STRING : akt = ""
+    DIM hat AS BOOLEAN : hat = FALSE
+    DIM inQ AS BOOLEAN : inQ = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeile) - 1
+        DIM c AS STRING : c = MID$(zeile, i, 1)
+        IF c = CHR$(34) THEN
+            inQ = NOT inQ : hat = TRUE
+        ELSEIF (c = " " OR c = CHR$(9)) AND NOT inQ THEN
+            IF hat THEN ARRAY_PUSH(w, akt)
+            akt = "" : hat = FALSE
+        ELSE
+            akt = akt + c : hat = TRUE
+        END IF
+    NEXT
+    IF hat THEN ARRAY_PUSH(w, akt)
+    RETURN w
+END FUNCTION
+
+' "NAME=wert NAME2="mit leer"" -> MAP. Ein Wort ohne = wird uebergangen.
+FUNCTION startUmgebung(zeile AS STRING) AS MAP OF STRING
+    DIM m AS MAP OF STRING : m = {}
+    DIM w AS STRING
+    FOR EACH w IN startWoerter(zeile)
+        DIM g AS INTEGER : g = INSTR(w, "=")
+        IF g > 0 THEN MAPPUT(m, LEFT$(w, g), MID$(w, g + 1))
+    NEXT
+    RETURN m
+END FUNCTION
+
+' Ausfuehren -> Startargumente / Umgebung fuer den Start: fuer die Datei im
+' vorderen Reiter, gemerkt in der ide.json. Leer = keine.
+DIM startFrageDlg AS GUI_WINDOW : startFrageDlg = -1
+DIM startFrageUmg AS BOOLEAN : startFrageUmg = FALSE
+DIM startFrageDatei AS STRING : startFrageDatei = ""
+SUB startEinstellungFragen(umgebung AS BOOLEAN)
+    IF aktiverTab < 0 THEN RETURN
+    IF tabPfade[aktiverTab] = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst sichern -- die Einstellung gehört zu einer Datei."))
+        RETURN
+    END IF
+    startFrageDatei = tabPfade[aktiverTab]
+    startFrageUmg = umgebung
+    IF umgebung THEN
+        startFrageDlg = GUI_PROMPT(tr$("Umgebung für den Start"), _
+            tr$("Umgebungsvariablen für ") + BASENAME(startFrageDatei) + tr$(", etwa: STUFE=3 NAME=wert"), _
+            startWert$(startFrageDatei, TRUE))
+    ELSE
+        startFrageDlg = GUI_PROMPT(tr$("Startargumente"), _
+            tr$("Argumente für ") + BASENAME(startFrageDatei) + tr$(" (ARG$), getrennt durch Leerzeichen:"), _
+            startWert$(startFrageDatei, FALSE))
+    END IF
+END SUB
+
+SUB startFrageNachziehen()
+    IF startFrageDlg < 0 THEN RETURN
+    DIM a AS INTEGER : a = GUI_ANSWER(startFrageDlg)
+    IF a = 0 THEN RETURN
+    IF a = 1 THEN
+        DIM wert AS STRING : wert = TRIM$(GUI_DIALOG_TEXT(startFrageDlg))
+        startWertSetzen(startFrageDatei, startFrageUmg, wert)
+        konfigSichern()
+        IF startFrageUmg THEN
+            protokoll("start umgebung " + STR$(LEN(MAPKEYS(startUmgebung(wert)))))
+            GUI_SET_TEXT(lblStatus, tr$("Umgebung für ") + BASENAME(startFrageDatei) + ": " + IIF(wert = "", tr$("keine"), wert))
+        ELSE
+            protokoll("start argumente " + STR$(LEN(startWoerter(wert))))
+            GUI_SET_TEXT(lblStatus, tr$("Startargumente für ") + BASENAME(startFrageDatei) + ": " + IIF(wert = "", tr$("keine"), wert))
+        END IF
+    END IF
+    startFrageDlg = -1
+END SUB
+
+SUB neustartSichernSetzen(an AS BOOLEAN)
+    neustartSichernAn = an
+    GUI_MENU_CHECK(miNeustartSichern, an)
+    GUI_SET_TEXT(lblStatus, IIF(an, tr$("Beim Sichern neu starten: an."), tr$("Beim Sichern neu starten: aus.")))
+    protokoll("neustart beim sichern " + IIF(an, "an", "aus"))
+    konfigSichern()
 END SUB
 
 SUB stoppen()
@@ -11986,6 +12225,14 @@ END SUB
 SUB neustartAusfuehren()
     DIM art AS STRING : art = neustartArt
     neustartArt = ""
+    ' Vom Sichern ausgeloest: dieselbe Datei wieder starten, ohne den
+    ' Reiter zu wechseln -- gesichert wurde vielleicht eine importierte Datei,
+    ' an der man weiterarbeiten will.
+    IF neustartVomSichern THEN
+        neustartVomSichern = FALSE
+        IF prozessStartenDatei("run", neustartDatei) THEN protokoll("gestartet " + prozessDatei)
+        RETURN
+    END IF
     IF neustartDatei <> "" THEN dateiOeffnen(neustartDatei)
     SELECT CASE art
         CASE "debug" : debuggen()
@@ -13790,6 +14037,10 @@ paletteEintrag("Leerraum am Zeilenende entfernen", "zl_rand", "")
 paletteEintrag("Andere Reiter schließen", "andere_zu", "Strg+Umschalt+W")
 paletteEintrag("Einrückungslinien", "linien", "")
 paletteEintrag("Mitlaufender Blockkopf", "blockkopf", "")
+paletteEintrag("Fehlertext am Zeilenende", "fehler_am_ende", "")
+paletteEintrag("Startargumente ...", "start_argumente", "")
+paletteEintrag("Umgebung für den Start ...", "start_umgebung", "")
+paletteEintrag("Beim Sichern neu starten", "neustart_sichern", "")
 paletteEintrag("Profil im Code ein/aus", "profil_waerme", "") : paletteEintrag("Profil im Code entfernen", "profil_waerme_weg", "")
 paletteEintrag("Aufrufzähler über Unterprogrammen", "aufrufzaehler", "")
 paletteEintrag("Quellcodeverwaltung (git)", "git_fenster", "Strg+Alt+G")
@@ -14308,6 +14559,10 @@ SUB befehl(k AS STRING)
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
         CASE "blockkopf" : kopfSetzen(NOT kopfAn)
+        CASE "fehler_am_ende" : fehlerEndeSetzen(NOT fehlerEndeAn)
+        CASE "start_argumente" : startEinstellungFragen(FALSE)
+        CASE "start_umgebung" : startEinstellungFragen(TRUE)
+        CASE "neustart_sichern" : neustartSichernSetzen(NOT neustartSichernAn)
         CASE "profil_waerme" : waermeSetzen(NOT waermeAn)
         CASE "profil_waerme_weg" : waermeEntfernen()
         CASE "aufrufzaehler" : zaehlerSetzen(NOT zaehlerAn)
@@ -14483,7 +14738,7 @@ menueBefehl(miFundstellen, "fundstellen", "Strg+Umschalt+F12") : menueBefehl(miV
 menueBefehl(miUmbauWdh, "umbau_wieder", "") : menueBefehl(miUmbauNach, "umbau_nach", "Strg+Umschalt+G") : menueBefehl(miVergleich, "vergleichen", "")
 menueBefehl(miReiterVgl, "reiter_vergleich", "") : menueBefehl(miZlSort, "zl_sortieren", "") : menueBefehl(miZlDoppelt, "zl_doppelte", "")
 menueBefehl(miZlRand, "zl_rand", "") : menueBefehl(miAndereZu, "andere_zu", "Strg+Umschalt+W") : menueBefehl(miLinien, "linien", "")
-menueBefehl(miKopf, "blockkopf", "") : menueBefehl(miWaerme, "profil_waerme", "") : menueBefehl(miZaehler, "aufrufzaehler", "") : menueBefehl(miQv, "git_fenster", "Strg+Alt+G")
+menueBefehl(miFehlerEnde, "fehler_am_ende", "") : menueBefehl(miKopf, "blockkopf", "") : menueBefehl(miWaerme, "profil_waerme", "") : menueBefehl(miZaehler, "aufrufzaehler", "") : menueBefehl(miQv, "git_fenster", "Strg+Alt+G")
 menueBefehl(miLive, "live", "Strg+Alt+L") : menueBefehl(miPruefsammlung, "pruefsammlung", "Strg+Alt+F5") : menueBefehl(miPrueffall, "prueffall", "Strg+Alt+Umschalt+F5")
 menueBefehl(miTestUebersicht, "test_uebersicht", "Strg+Alt+T") : menueBefehl(miNeuProjekt, "neues_projekt", "Strg+Alt+N") : menueBefehl(miEinfuehren, "einfuehren", "Strg+Alt+V")
 menueBefehl(miEinsetzen, "einsetzen", "Strg+Alt+I") : menueBefehl(miSubFunc, "sub_function", "Strg+Alt+U") : menueBefehl(miKonfMeine, "konflikt_meine", "")
@@ -14492,7 +14747,8 @@ menueBefehl(miLeiste, "leiste", "") : menueBefehl(miBaumOeffnen, "baum_oeffnen",
 menueBefehl(miBaumHaken, "baum_haken", "") : menueBefehl(miMarken, "marken", "Strg+Umschalt+L") : menueBefehl(miPalette, "palette", "Strg+Umschalt+P")
 menueBefehl(miStart, "start", "F5") : menueBefehl(miStopp, "stopp", "Umschalt+F5") : menueBefehl(miPruefen, "pruefen", "Umschalt+F7")
 menueBefehl(miPrjPruefen, "projekt_pruefen", "Strg+Umschalt+F7") : menueBefehl(miDebug, "debug", "F7") : menueBefehl(miHaltepunkt, "haltepunkt", "F9")
-menueBefehl(miAnhalten, "anhalten", "F6") : menueBefehl(miNeustart, "neustart", "Strg+Umschalt+F5") : menueBefehl(miHpListe, "hp_liste", "Strg+Umschalt+F9")
+menueBefehl(miAnhalten, "anhalten", "F6") : menueBefehl(miStartArgs, "start_argumente", "") : menueBefehl(miStartUmg, "start_umgebung", "") : menueBefehl(miNeustartSichern, "neustart_sichern", "")
+menueBefehl(miNeustart, "neustart", "Strg+Umschalt+F5") : menueBefehl(miHpListe, "hp_liste", "Strg+Umschalt+F9")
 menueBefehl(miProfil, "profil", "Strg+Umschalt+Y") : menueBefehl(miAusgabeLeer, "ausgabe_leeren", "") : menueBefehl(miThema, "thema", "")
 menueBefehl(miVollbild, "vollbild", "Alt+Enter") : menueBefehl(miUmbruch, "umbruch", "Alt+Z") : menueBefehl(miGeteilt, "geteilt", "Alt+G")
 menueBefehl(miSpiegel, "spiegel", "Alt+Umschalt+G") : menueBefehl(miSeiten, "seitenleiste", "Alt+1") : menueBefehl(miUnten, "untere_leiste", "Alt+2")
@@ -14791,6 +15047,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(btnParamWeg) THEN GUI_WINDOW_VISIBLE(winParam, FALSE) : GUI_FOCUS(aktivesFeld())
 
     ' --- Dialoge auswerten ---
+    startFrageNachziehen()
     IF dlgSuche <> 0 THEN
         DIM a AS INTEGER : a = GUI_ANSWER(dlgSuche)
         IF a = 1 THEN
