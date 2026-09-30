@@ -4106,7 +4106,9 @@ die Gegenprobe (eine Zeile im Beispiel umgestellt) laesst den Fall nach 25 s
 fallen.
 Dazu test_dhrt_check.py (pytest, 18 Tests) -> `tests/pruef/dhrt_check.dhtest`
 (9): die Diagnosen von `dhrt --check` samt Zeilennummern, die Warnungen
-(unbekanntes Builtin, Hardware-IMPORT, doppeltes DIM mit anderem Typ) und die
+(unbekanntes Builtin, Hardware-IMPORT, doppeltes DIM mit anderem Typ -- seit
+2026-09-30 auch mit gleichem Typ im selben Block, Faelle in
+`compiler_warnungen.dhtest`) und die
 DURCHLAEUFE ueber den Bestand -- alle Beispiele ohne Fehler und ohne
 "Unbekanntes Builtin", alle 390 `.dh` des Repos ohne Falschmeldung der
 "nirgends angelegt"-Warnung (26 s; `dlCheckViele` im Helfer buendelt sieben
