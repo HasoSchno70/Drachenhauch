@@ -102,6 +102,12 @@ Einträge, es bleiben 48 Module und 216 Beispiele.
   (dort bleibt der Rechtsklick der für die Haltepunkt-Bedingung), und der
   Rechtsklick setzt vorher die Marke.
 
+**Der Installer ist kleiner** (rund 43 MB statt 61 MB), weil er nur noch
+enthält, was im Repository steht: die Musik, die HDR-Umgebung und das
+3D-Modell einiger Beispiele (rund 21 MB) lagen bisher nur heruntergeladen
+auf dem Bau-Rechner und kamen so mit. Die Beispiele holen sie sich wie
+vorher über ihre Download-Programme (`examples/assets/download_*.dh`).
+
 ## Was offen bleibt
 
 * Auf einem echten Mac ist das Paket weiter nicht ausprobiert und nicht
