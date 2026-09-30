@@ -1888,6 +1888,22 @@ mit Gegenprobe), `werkzeug_ide_terminal.dhtest` (2, `--- system windows`),
 Rust-Test `kill_beendet_auch_die_enkel`; vier Verfaelschungen der IDE und
 eine der Laufzeit fallen je in ihrem Fall.
 
+**Gross/klein, Zeilen verbinden, Klammerpaare farbig, Suchtreffer einzeln
+ersetzen (2026-09-30):** alles in der IDE, ohne Laufzeit-Aenderung.
+`fallAendern` (Auswahl oder Wort, Auswahl danach auf der NEUEN Laenge --
+`UPPER$("ß")` ist "SS"), `zeilenVerbinden` (SELECT ganzer Zeilen + INSERT =
+ein Undo-Schritt). `klammernFaerben` in `faerben`: nur `operator`-Abschnitte
+der Laenge 1 aus SYNTAX_SPANS, Tiefe je Zeile neu ausser nach ` _`, drei
+Farben `F_KLAMMER1..3` (auch in farben.json); der Faerbe-Riegel kennt den
+Schalter. Suchtreffer: `projektSuchen` schaltet Haken an (nur ein Suchtext),
+`trefferNachziehen` nimmt sie weg, sobald die Liste etwas anderes zeigt
+(Zahl oder erste Zeile anders -- die vielen Stellen, die `lstProbleme`
+fuellen, muessen nichts davon wissen); `trefferErsetzen` baut je Datei den
+Text aus Reiter oder Platte, ersetzt nur in den gewaehlten Zeilen und geht
+durch `umbauVormerken`/`umbauStarten`. Tests
+`werkzeug_ide_text_klammern_treffer.dhtest` (4, Klammerfarben am Bild);
+fuenf Verfaelschungen fallen je in ihrem Fall.
+
 **Kontextmenues fuer Code-Feld und Reiter, Im Projektbaum zeigen
 (2026-09-30):** neu **`GUI_CONTEXT_TABS(menu)`** + **`GUI_TAB_CONTEXT(win)`**
 (`Menu::ziel` = -2, `Window::tab_kontext`; im Rechtsklick-Zweig von

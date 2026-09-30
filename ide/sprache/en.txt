@@ -67,7 +67,12 @@ Zeilen	Lines
 Sortieren	Sort
 Doppelte entfernen	Remove duplicates
 Leerraum am Zeilenende entfernen	Remove trailing whitespace
+Zeilen verbinden	Join lines
+GROSSBUCHSTABEN	UPPERCASE
+kleinbuchstaben	lowercase
+Anfangsbuchstaben Groß	Title Case
 Im ganzen Projekt ersetzen ...	Replace in whole project ...
+Angehakte Suchtreffer ersetzen ...	Replace checked search hits ...
 Ausgabe durchsuchen ...	Search output ...
 Befehlspalette ...	Command palette ...
 Definition hier zeigen	Peek definition
@@ -143,6 +148,7 @@ Geänderte Zeilen am Rand	Changed lines in the margin
 Zeilenumbruch	Word wrap
 Einrückungslinien	Indent guides
 Mitlaufender Blockkopf	Sticky block header
+Klammerpaare farbig	Coloured bracket pairs
 Fehlertext am Zeilenende	Error text at line end
 Typ-Hinweise	Type hints
 Profil im Code (nach Strg+Umschalt+Y)	Profile in code (after Ctrl+Shift+Y)
@@ -200,6 +206,11 @@ Ausgabe	Output
 Terminal (Alt+3)	Terminal (Alt+3)
 Abbrechen	Cancel
 Probleme	Problems
+Treffer anspringen	Go to hit
+Diesen Treffer ersetzen ...	Replace this hit ...
+Angehakte Treffer ersetzen ...	Replace checked hits ...
+Alle anhaken	Check all
+Keinen anhaken	Check none
 Keine Probleme gefunden	No problems found
 Hilfe zum Wort unter der Schreibmarke	Help for the word at the cursor
 Bereit.	Ready.
@@ -625,6 +636,15 @@ Zwischenablage nicht erreichbar.	Clipboard not available.
  mit ungesicherten Änderungen bleiben offen.	 with unsaved changes stay open.
 Der Reiter hat noch keine Datei.	This tab has no file yet.
  liegt nicht im Projektordner.	 is not in the project folder.
+Erst etwas markieren (oder die Marke auf ein Wort stellen).	Select something first (or put the cursor on a word).
+Keine Zeile darunter.	No line below.
+Erst im Projekt suchen (Strg+Umschalt+F) -- ersetzt wird in den Treffern.	Search the project first (Ctrl+Shift+F) -- replacing works on the hits.
+Suchtreffer ersetzen	Replace search hits
+Diesen Treffer von '	Replace this hit of '
+Die angehakten Treffer von '	Replace the checked hits of '
+' ersetzen durch:	' with:
+ Zeile(n) in 	 line(s) in 
+ Datei(en).	 file(s).
 Kein Projektordner.	No project folder.
 Name der neuen Datei in 	Name of the new file in 
 Neuer Ordner	New folder
@@ -774,6 +794,8 @@ Herauslösen	Extract
 Im ganzen Projekt umbenennen	Rename in whole project
 Beim Sichern formatieren an.	Format on save on.
 Beim Sichern formatieren aus.	Format on save off.
+Klammerpaare farbig an.	Coloured bracket pairs on.
+Klammerpaare farbig aus.	Coloured bracket pairs off.
 Ausgabe sichern	Save output
 Gehe zu Zeile	Go to line
 Zeilennummer:	Line number:
