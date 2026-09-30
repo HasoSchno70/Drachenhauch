@@ -3244,3 +3244,148 @@ k.zeige()
 
 --- erwartet
 eine meldung mit [kein einziges RETURN]: FALSE
+
+=== zweites dim desselben typs im selben bereich
+' Gefunden in der IDE: ein neues DIM miGross ueberschrieb das alte, und
+' dessen Kuerzel loeste danach den falschen Menuepunkt aus -- ohne Meldung.
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "migross: "; eine$("'migross'|im Hauptprogramm|noch einmal")
+PRINT "im if und darunter: "; wieviele("in w.dh:1 schon angelegt")
+PRINT "in der sub: "; eine$("'q'|noch einmal|in dieser Funktion")
+PRINT "gesamt: "; wieviele("noch einmal")
+--- datei w.dh
+DIM miGross AS INTEGER : miGross = 1
+DIM x AS INTEGER
+IF x = 0 THEN
+    DIM miGross AS INTEGER : miGross = 2
+END IF
+DIM miGross AS INTEGER : miGross = 3
+SUB a()
+    DIM q AS STRING
+    DIM q AS STRING
+END SUB
+
+--- erwartet
+migross: TRUE
+im if und darunter: 2
+in der sub: TRUE
+gesamt: 3
+
+=== dim in schleife oder getrennten bloecken bleibt still
+' Ein DIM im Schleifenkoerper ist EINE Anweisung; DIM in zwei getrennten
+' IF-Bloecken oder in zwei SUBs sind Hilfsvariablen; ein lokales DIM, das
+' eine globale verdeckt, ist ein eigener Bereich.
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "gesamt: "; wieviele("noch einmal")
+--- datei w.dh
+DIM x AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM y AS INTEGER : y = i
+NEXT
+WHILE x < 2
+    DIM w AS STRING : w = "a"
+    x = x + 1
+WEND
+IF x = 0 THEN
+    DIM z AS INTEGER : z = 1
+END IF
+IF x = 1 THEN
+    DIM z AS INTEGER : z = 2
+END IF
+SUB a()
+    DIM q AS STRING : q = "a"
+    DIM x AS INTEGER : x = 1
+END SUB
+SUB b()
+    DIM q AS STRING : q = "b"
+END SUB
+
+--- erwartet
+gesamt: 0

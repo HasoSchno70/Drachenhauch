@@ -199,6 +199,15 @@ struct Ctx {
     /// die Warnung bei einer zweiten Deklaration mit ANDEREM Typ -- ein
     /// eigener Ctx je Funktion, also stimmt der Geltungsbereich von selbst.
     dim_types: HashMap<String, (String, u32)>,
+    /// Je DIM-Name (klein) die Kette der Anweisungen, IN denen das erste DIM
+    /// steht (ohne das DIM selbst). Ein zweites DIM desselben Typs meldet sich
+    /// nur, wenn diese Kette ein Anfang seiner eigenen ist -- das erste DIM
+    /// also noch "offen" ist. Zwei DIM in getrennten Bloecken (zwei IF
+    /// hintereinander) bleiben still: dort ist der Name nur Hilfsvariable.
+    dim_pfade: HashMap<String, Vec<u32>>,
+    /// Die Anweisungen, in denen der Compiler gerade steht (je Node::Stmt
+    /// eine eindeutige Nummer).
+    stmt_pfad: Vec<u32>,
     is_main: bool,
     is_sub: bool,
     current_class: Option<String>,
@@ -214,7 +223,7 @@ impl Ctx {
               consts: vec![], const_index: HashMap::new(), break_patches: vec![], continue_patches: vec![],
               try_stack: vec![],
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
-              dim_types: HashMap::new(),
+              dim_types: HashMap::new(), dim_pfade: HashMap::new(), stmt_pfad: vec![],
               is_main: true, is_sub: true, current_class: None,
               return_type: String::new() }
     }
@@ -376,6 +385,8 @@ pub struct Compiler {
     // Quell-Zeile des Statements, dessen Kompilierung fehlschlug (Stufe B:
     // damit Compile-Fehler im Editor/--check eine Zeile bekommen). 0 = unbekannt.
     err_line: u32,
+    /// Zaehler fuer `Ctx::stmt_pfad` -- jede Anweisung bekommt eine eigene Nummer.
+    stmt_nr: u32,
     // Nicht-fatale Compile-Warnungen `(zeile, text)` -- z.B. Aufruf eines
     // Builtins, das dhrt gar nicht kennt (Tippfehler / nur Tree-Walker). Werden
     // von `--check` als severity:"warning" gemeldet, blockieren NICHT.
@@ -650,7 +661,7 @@ impl Compiler {
                    importierte_module,
                    gemeldete_module: std::collections::HashSet::new(),
                    enum_decls: HashMap::new(), global_types: HashMap::new(), konst_werte: HashMap::new(),
-                   ctx: Ctx::new(), err_line: 0,
+                   ctx: Ctx::new(), err_line: 0, stmt_nr: 0,
                    warnings: vec![] }
     }
 
@@ -918,7 +929,10 @@ impl Compiler {
         // alle folgenden emit() erben sie.
         if let Node::Stmt { line, body } = s {
             self.ctx.cur_line = *line;
+            self.stmt_nr += 1;
+            self.ctx.stmt_pfad.push(self.stmt_nr);
             let r = self.stmt(body);
+            self.ctx.stmt_pfad.pop();
             // Erste fehlschlagende Statement-Zeile fuer die Fehlermeldung merken.
             if r.is_err() && self.err_line == 0 { self.err_line = *line; }
             return r;
@@ -1165,8 +1179,9 @@ impl Compiler {
     /// vergeben -- fast immer ein Versehen, und der Fehler faellt erst weit
     /// entfernt auf ("Array-Index muss INTEGER sein, erhalten FLOAT").
     ///
-    /// Bewusst nur eine WARNUNG: dasselbe DIM mehrfach mit GLEICHEM Typ ist
-    /// gaengig (DIM im Schleifenkoerper) und bleibt still.
+    /// Bewusst nur eine WARNUNG. Mit GLEICHEM Typ meldet sich ein zweites DIM
+    /// nur, wenn es eine ANDERE Anweisung ist (ein DIM im Schleifenkoerper ist
+    /// eine) und der Block des ersten es umschliesst -- siehe `dim_noch_offen`.
     /// Der statische Typ eines Ausdrucks -- nur wo er ZWEIFELSFREI feststeht.
     ///
     /// Absichtlich lueckenhaft: `None` heisst "weiss ich nicht", und darauf
@@ -1725,8 +1740,40 @@ impl Compiler {
                     "'{}' wurde in {} schon als {} angelegt, hier als {}. {} nur EINE Variable dieses Namens (Gross-/Kleinschreibung zaehlt nicht) -- einer der beiden Verwendungszwecke bekommt den falschen Typ. Zweiten Namen vergeben.",
                     name, alt_stelle, Self::typ_klartext(&alt), Self::typ_klartext(eff_type), wo)));
             }
+            // Derselbe Typ in einer ANDEREN Zeile: zwei DIM-Anweisungen fuer
+            // eine Variable. Ein DIM im Schleifenkoerper ist EINE Anweisung
+            // (der Compiler sieht sie einmal) und meldet sich hier nicht.
+            // Gefunden in der IDE: ein neues `DIM miGross` fuer einen
+            // Menuepunkt ueberschrieb das alte, und dessen Kuerzel loeste
+            // danach den falschen Punkt aus -- ohne jede Meldung.
+            Some((_, alt_zeile)) if *alt_zeile != zeile && self.dim_noch_offen(&klein) => {
+                let alt_stelle = self.wo(*alt_zeile);
+                let wo = if self.ctx.is_main { "im Hauptprogramm" }
+                         else { "in dieser Funktion" };
+                self.warnings.push((zeile, format!(
+                    "'{}' wurde in {} schon angelegt, hier noch einmal (gleicher Typ {}). Beide DIM meinen {} DIESELBE Variable (Gross-/Kleinschreibung zaehlt nicht) -- was die erste Stelle darin ablegt, ueberschreibt die zweite still. Zweiten Namen vergeben oder das zweite DIM streichen.",
+                    name, alt_stelle, Self::typ_klartext(eff_type), wo)));
+            }
             Some(_) => {}
-            None => { self.ctx.dim_types.insert(klein, (eff_type.to_string(), zeile)); }
+            None => {
+                let pfad = self.umgebender_pfad().to_vec();
+                self.ctx.dim_pfade.insert(klein.clone(), pfad);
+                self.ctx.dim_types.insert(klein, (eff_type.to_string(), zeile));
+            }
+        }
+    }
+
+    /// Die Anweisungen um das DIM, das gerade uebersetzt wird (ohne es selbst).
+    fn umgebender_pfad(&self) -> &[u32] {
+        let p = &self.ctx.stmt_pfad;
+        &p[..p.len().saturating_sub(1)]
+    }
+
+    /// Umschliesst der Block des ersten DIM dieses Namens die jetzige Stelle?
+    fn dim_noch_offen(&self, klein: &str) -> bool {
+        match self.ctx.dim_pfade.get(klein) {
+            Some(alt) => self.umgebender_pfad().starts_with(alt),
+            None => false,
         }
     }
 
