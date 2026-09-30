@@ -1,0 +1,221 @@
+' Drei Handgriffe der IDE:
+' (1) GROSS/klein/Anfangsbuchstaben Gross auf der Auswahl (sonst dem Wort)
+'     und Zeilen verbinden (Einrueckung der ersten bleibt, " _" faellt weg).
+' (2) Klammerpaare farbig: jede Tiefe eine eigene Farbe, am Bild geprueft.
+' (3) Suchtreffer einzeln ersetzen: die Treffer der Projektsuche tragen
+'     Haken, ersetzt wird nur in den angehakten Zeilen.
+--- seriell
+--- langsam
+
+=== gross klein und anfangsbuchstaben auf auswahl und wort
+DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+DIM prZ1 AS INTEGER
+DIM prS1 AS INTEGER
+DIM prZ2 AS INTEGER
+DIM prS2 AS INTEGER
+GUI_TEXTAREA_SELECT(prTa, 1, 1, 1, 18)
+befehl("fall_gross")
+(prZ1, prS1, prZ2, prS2) = GUI_TEXTAREA_SELECTION_RANGE(prTa)
+protokoll("pr gross |" + SPLIT$(GUI_TEXT(prTa), NL)[0] + "| " + STR$(prS1) + "-" + STR$(prS2))
+befehl("fall_anfang")
+protokoll("pr anfang |" + SPLIT$(GUI_TEXT(prTa), NL)[0] + "|")
+befehl("fall_klein")
+protokoll("pr klein |" + SPLIT$(GUI_TEXT(prTa), NL)[0] + "|")
+' Ohne Auswahl: das Wort unter der Marke.
+GUI_TEXTAREA_GOTO(prTa, 2, 3)
+befehl("fall_gross")
+protokoll("pr wort |" + SPLIT$(GUI_TEXT(prTa), NL)[1] + "|")
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+hallo welt_neu x2
+zweite zeile
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr gross |HALLO WELT_NEU X2| 1-18
+pr anfang |Hallo Welt_neu X2|
+pr klein |hallo welt_neu x2|
+pr wort |ZWEITE zeile|
+
+=== zeilen verbinden
+DIM prTa AS GUI_WIDGET : prTa = tabFelder[aktiverTab]
+GUI_TEXTAREA_SELECT(prTa, 1, 3, 2, 2)
+befehl("zl_verbinden")
+' Ohne Auswahl: diese und die naechste (die leere faellt weg).
+GUI_TEXTAREA_GOTO(prTa, 2, 1)
+befehl("zl_verbinden")
+DIM prZ AS STRING
+FOR EACH prZ IN SPLIT$(GUI_TEXT(prTa), NL)
+    protokoll("pr zeile |" + prZ + "|")
+NEXT
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+    x = f(a, _
+          b)
+c
+
+d
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 16) = "zeilen verbunden" THEN PRINT L[i]
+NEXT
+--- erwartet
+zeilen verbunden 2
+zeilen verbunden 2
+pr zeile |    x = f(a, b)|
+pr zeile |c|
+pr zeile |d|
+
+=== klammern je tiefe farbig, abschaltbar
+DIM prBild AS INTEGER : prBild = 0
+' Punkte in Farbe f (+-25 je Kanal) in dem Zeichen von Zeile z, Spalte s.
+FUNCTION prFarbe(z AS INTEGER, s AS INTEGER, f AS INTEGER) AS INTEGER
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    SAVESCREENSHOT("prbild.png")
+    DIM b AS IMAGE : b = LOADIMAGE("prbild.png")
+    DIM n AS INTEGER : n = 0
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    DIM zz AS INTEGER
+    DIM ss AS INTEGER
+    FOR y = 0 TO SCREENHEIGHT() - 1
+        FOR x = 0 TO SCREENWIDTH() - 1
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF zz <> z OR ss <> s THEN CONTINUE
+            DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+            IF ABS(((c SHR 16) BAND 255) - ((f SHR 16) BAND 255)) < 25 AND ABS(((c SHR 8) BAND 255) - ((f SHR 8) BAND 255)) < 25 AND ABS((c BAND 255) - (f BAND 255)) < 25 THEN n = n + 1
+        NEXT
+    NEXT
+    IMAGE_FREE(b)
+    DELETEFILE("prbild.png")
+    RETURN n
+END FUNCTION
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+' Die Marke ans Ende von Zeile 2 -- sonst faerbt das Paar um die Marke mit.
+IF prBild = 20 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 3)
+IF prBild = 30 THEN
+    protokoll("pr aussen gold " + STR$(prFarbe(1, 6, F_KLAMMER1) > 3) + " violett " + STR$(prFarbe(1, 6, F_KLAMMER2)))
+    protokoll("pr innen violett " + STR$(prFarbe(1, 7, F_KLAMMER2) > 3) + " gold " + STR$(prFarbe(1, 7, F_KLAMMER1)))
+    protokoll("pr zu gold " + STR$(prFarbe(1, 10, F_KLAMMER1) > 3))
+    protokoll("pr im text " + STR$(prFarbe(1, 17, F_KLAMMER1)))
+    befehl("klammer_farben")
+END IF
+IF prBild = 36 THEN
+    protokoll("pr aus gold " + STR$(prFarbe(1, 6, F_KLAMMER1)))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+x = f((1)) + g("(")
+y
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 15) = "klammer farben " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr aussen gold TRUE violett 0
+pr innen violett TRUE gold 0
+pr zu gold TRUE
+pr im text 0
+klammer farben aus
+pr aus gold 0
+
+=== suchtreffer: nur die angehakten werden ersetzt
+vorschauAn = FALSE
+projektSuchen("alt", "")
+protokoll("pr treffer " + STR$(GUI_LISTBOX_COUNT(lstProbleme)) + " haken " + STR$(trefferAn))
+DIM prI AS INTEGER
+FOR prI = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+    protokoll("pr zeile " + GUI_LISTBOX_ITEM(lstProbleme, prI) + " " + STR$(GUI_LISTBOX_CHECKED(lstProbleme, prI)))
+NEXT
+' Den zweiten Treffer (a.dh Zeile 2) abhaken.
+GUI_LISTBOX_SET_CHECKED(lstProbleme, 1, FALSE)
+trefferErsetzen(FALSE, "neu")
+' a.dh ist offen: der Text steht im Reiter (ungesichert), b.dh auf der Platte.
+DIM prZ AS STRING
+FOR EACH prZ IN SPLIT$(GUI_TEXT(tabFelder[aktiverTab]), NL)
+    protokoll("pr reiter |" + prZ + "|")
+NEXT
+' Einzeln: nur der gewaehlte Treffer (die Suche liest die Platte, dort steht
+' "neu" nur in b.dh).
+projektSuchen("neu", "")
+GUI_LISTBOX_SET_SELECTED(lstProbleme, 0)
+trefferErsetzen(TRUE, "zurueck")
+' Eine andere Liste nimmt die Haken weg.
+problemModus = 0
+trefferNachziehen()
+protokoll("pr danach haken " + STR$(trefferAn))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+DIM alt AS INTEGER : alt = 1
+PRINT alt
+--- datei b.dh
+PRINT "alt"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 15) = "treffer ersetzt" THEN PRINT L[i]
+NEXT
+DIM z AS STRING
+FOR EACH z IN READLINES("a.dh")
+    PRINT "a |"; z
+NEXT
+FOR EACH z IN READLINES("b.dh")
+    PRINT "b |"; z
+NEXT
+--- erwartet
+pr treffer 3 haken TRUE
+pr zeile a.dh:1: DIM alt AS INTEGER : alt = 1 TRUE
+pr zeile a.dh:2: PRINT alt TRUE
+pr zeile b.dh:1: PRINT "alt" TRUE
+treffer ersetzt 2 2
+pr reiter |DIM neu AS INTEGER : neu = 1|
+pr reiter |PRINT alt|
+treffer ersetzt 1 1
+pr danach haken FALSE
+a |DIM alt AS INTEGER : alt = 1
+a |PRINT alt
+b |PRINT "zurueck"

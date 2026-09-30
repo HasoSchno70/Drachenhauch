@@ -130,6 +130,10 @@ DIM F_SCHLUESSEL AS INTEGER : F_SCHLUESSEL = &H2BC4E8
 DIM F_OPERATOR AS INTEGER : F_OPERATOR = &H9AA8B8
 DIM F_FUNDSTELLE AS INTEGER : F_FUNDSTELLE = &HFFD070      ' das Wort unter der Marke, ueberall
 DIM F_KLAMMER AS INTEGER : F_KLAMMER = &H70FFA0            ' das zusammengehoerende Klammernpaar
+' Klammerpaare nach Tiefe (drei Farben im Wechsel).
+DIM F_KLAMMER1 AS INTEGER : F_KLAMMER1 = &HF0C040
+DIM F_KLAMMER2 AS INTEGER : F_KLAMMER2 = &HD878E0
+DIM F_KLAMMER3 AS INTEGER : F_KLAMMER3 = &H40A8F8
 DIM F_SUCHTREFFER AS INTEGER : F_SUCHTREFFER = &HFF8AD0    ' die Treffer der offenen Suchleiste
 
 ' Typ-Hinweise hinter der Zeile (CODE_TYPES$), gedaempft blau.
@@ -145,6 +149,11 @@ SUB codeFarben(licht AS BOOLEAN)
         F_FUNDSTELLE = &HFFD070 : F_KLAMMER = &H70FFA0 : F_SUCHTREFFER = &HFF8AD0
     END IF
     F_TYP = IIF(licht, &H5A7A9A, &H7FA6C8)
+    IF licht THEN
+        F_KLAMMER1 = &HA86E00 : F_KLAMMER2 = &H9630A8 : F_KLAMMER3 = &H0B6BB0
+    ELSE
+        F_KLAMMER1 = &HF0C040 : F_KLAMMER2 = &HD878E0 : F_KLAMMER3 = &H40A8F8
+    END IF
     TON_PROJEKT = &H3B7BD8 : TON_AUSGABE = &H2E9E62 : TON_PROBLEME = &HD98B2B : TON_DEBUG = &H8C5BD6
 END SUB
 
@@ -363,6 +372,8 @@ DIM linienAn AS BOOLEAN : linienAn = TRUE
 ' Mitlaufender Blockkopf: SUB/IF/FOR, deren Kopf oben hinausgerollt ist,
 ' bleiben oben angeheftet (hoechstens drei).
 DIM kopfAn AS BOOLEAN : kopfAn = TRUE
+' Klammerpaare farbig: jede Tiefe eine eigene Farbe (drei im Wechsel).
+DIM klammerFarbenAn AS BOOLEAN : klammerFarbenAn = TRUE
 ' Profil im Code: nach einem Profillauf ein Farbband hinter jeder gemessenen
 ' Zeile (gelb bis rot nach Zeitanteil) und bei den teuersten die Zahlen am
 ' Zeilenende. Hier oben, weil die Einstellung sie beim Laden setzt.
@@ -705,6 +716,7 @@ IF JSON_HAS(konfig, "ganzes_wort") THEN ganzesWort = JSON_GET_BOOL(konfig, "ganz
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
 IF JSON_HAS(konfig, "blockkopf") THEN kopfAn = JSON_GET_BOOL(konfig, "blockkopf")
+IF JSON_HAS(konfig, "klammer_farben") THEN klammerFarbenAn = JSON_GET_BOOL(konfig, "klammer_farben")
 IF JSON_HAS(konfig, "profil_waerme") THEN waermeAn = JSON_GET_BOOL(konfig, "profil_waerme")
 IF JSON_HAS(konfig, "aufrufzaehler") THEN zaehlerAn = JSON_GET_BOOL(konfig, "aufrufzaehler")
 IF JSON_HAS(konfig, "fehler_am_ende") THEN fehlerEndeAn = JSON_GET_BOOL(konfig, "fehler_am_ende")
@@ -888,7 +900,13 @@ DIM mZeilenWz AS INTEGER : mZeilenWz = GUI_SUBMENU(mBearb, tr$("Zeilen"))
 DIM miZlSort AS INTEGER : miZlSort = GUI_MENU_ITEM(mZeilenWz, tr$("Sortieren"))
 DIM miZlDoppelt AS INTEGER : miZlDoppelt = GUI_MENU_ITEM(mZeilenWz, tr$("Doppelte entfernen"))
 DIM miZlRand AS INTEGER : miZlRand = GUI_MENU_ITEM(mZeilenWz, tr$("Leerraum am Zeilenende entfernen"))
+DIM miZlVerbinden AS INTEGER : miZlVerbinden = GUI_MENU_ITEM(mZeilenWz, tr$("Zeilen verbinden"))
+GUI_MENU_SEPARATOR(mZeilenWz)
+DIM miFallGross AS INTEGER : miFallGross = GUI_MENU_ITEM(mZeilenWz, tr$("GROSSBUCHSTABEN"))
+DIM miFallKlein AS INTEGER : miFallKlein = GUI_MENU_ITEM(mZeilenWz, tr$("kleinbuchstaben"))
+DIM miFallAnfang AS INTEGER : miFallAnfang = GUI_MENU_ITEM(mZeilenWz, tr$("Anfangsbuchstaben Groß"))
 DIM miErsProjekt AS INTEGER : miErsProjekt = GUI_MENU_ITEM(mBearb, tr$("Im ganzen Projekt ersetzen ..."), kz$("Strg+Umschalt+H"))
+DIM miTrefferErs AS INTEGER : miTrefferErs = GUI_MENU_ITEM(mBearb, tr$("Angehakte Suchtreffer ersetzen ..."))
 DIM miAusgabeSuche AS INTEGER : miAusgabeSuche = GUI_MENU_ITEM(mBearb, tr$("Ausgabe durchsuchen ..."), kz$("Strg+Umschalt+A"))
 DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mBearb, tr$("Befehlspalette ..."), kz$("Strg+Umschalt+P"))
 DIM miPeek AS INTEGER : miPeek = GUI_MENU_ITEM(mBearb, tr$("Definition hier zeigen"), kz$("Alt+F12"))
@@ -987,6 +1005,8 @@ GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, tr$("Einrückungslinien"))
 GUI_MENU_CHECK(miLinien, linienAn)
 DIM miKopf AS INTEGER : miKopf = GUI_MENU_ITEM(mAnsicht, tr$("Mitlaufender Blockkopf"))
+DIM miKlFarben AS INTEGER : miKlFarben = GUI_MENU_ITEM(mAnsicht, tr$("Klammerpaare farbig"))
+GUI_MENU_CHECK(miKlFarben, klammerFarbenAn)
 GUI_MENU_CHECK(miKopf, kopfAn)
 DIM miFehlerEnde AS INTEGER : miFehlerEnde = GUI_MENU_ITEM(mAnsicht, tr$("Fehlertext am Zeilenende"))
 GUI_MENU_CHECK(miFehlerEnde, fehlerEndeAn)
@@ -1265,6 +1285,16 @@ DIM terminalAn AS BOOLEAN : terminalAn = FALSE
 DIM termProz AS INTEGER : termProz = -1
 DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, tr$("Probleme"), 0, 0)
 DIM lstProbleme AS GUI_WIDGET : lstProbleme = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+' Rechtsklick auf die Liste der Suchtreffer (Strg+Umschalt+F): einzeln
+' ersetzen, die angehakten ersetzen, alle/keinen anhaken.
+DIM ctxProbleme AS INTEGER : ctxProbleme = GUI_CONTEXT(win)
+DIM miPTSpringen AS INTEGER : miPTSpringen = GUI_MENU_ITEM(ctxProbleme, tr$("Treffer anspringen"))
+DIM miPTEinzeln AS INTEGER : miPTEinzeln = GUI_MENU_ITEM(ctxProbleme, tr$("Diesen Treffer ersetzen ..."))
+DIM miPTAngehakt AS INTEGER : miPTAngehakt = GUI_MENU_ITEM(ctxProbleme, tr$("Angehakte Treffer ersetzen ..."))
+GUI_MENU_SEPARATOR(ctxProbleme)
+DIM miPTAlle AS INTEGER : miPTAlle = GUI_MENU_ITEM(ctxProbleme, tr$("Alle anhaken"))
+DIM miPTKeine AS INTEGER : miPTKeine = GUI_MENU_ITEM(ctxProbleme, tr$("Keinen anhaken"))
+GUI_CONTEXT_WIDGET(ctxProbleme, lstProbleme)
 GUI_LISTBOX_PLACEHOLDER(lstProbleme, tr$("Keine Probleme gefunden"))
 ' Unter den Problemen steht die Hilfe zum Wort unter der Schreibmarke. Leer
 ' sah der Streifen wie ein Lagefehler aus -- darum ein eigener Kopf und ein
@@ -1975,6 +2005,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
     JSON_SET_BOOL(konfig, "linien", linienAn)
     JSON_SET_BOOL(konfig, "blockkopf", kopfAn)
+    JSON_SET_BOOL(konfig, "klammer_farben", klammerFarbenAn)
     JSON_SET_BOOL(konfig, "profil_waerme", waermeAn)
     JSON_SET_BOOL(konfig, "aufrufzaehler", zaehlerAn)
     JSON_SET_BOOL(konfig, "fehler_am_ende", fehlerEndeAn)
@@ -3737,6 +3768,45 @@ SUB farbliteraleSuchen(stueck AS STRING, von AS INTEGER, s AS ARRAY OF INTEGER, 
     WEND
 END SUB
 
+' Klammern nach Tiefe faerben (drei Farben im Wechsel). Kommentare und
+' Zeichenketten zaehlen nicht mit -- dort sind die Klammern kein Code
+' (SYNTAX_SPANS liefert Klammern als "operator"). Die Tiefe beginnt je Zeile
+' neu, ausser die vorige endet mit " _" (Fortsetzung): eine Anweisung endet
+' an der Zeile, und eine offene Klammer faerbte sonst den Rest des
+' Ausschnitts um. Eine schliessende ohne oeffnende bleibt in der ersten Farbe.
+SUB klammernFaerben(stueck AS STRING, von AS INTEGER, starts AS ARRAY OF INTEGER, _
+                    laengen AS ARRAY OF INTEGER, arten AS ARRAY OF STRING, _
+                    s2 AS ARRAY OF INTEGER, l2 AS ARRAY OF INTEGER, f2 AS ARRAY OF INTEGER)
+    DIM farben AS ARRAY OF INTEGER : farben = [F_KLAMMER1, F_KLAMMER2, F_KLAMMER3]
+    DIM zl AS ARRAY OF STRING : zl = SPLIT$(stueck, NL)
+    DIM anf AS ARRAY OF INTEGER : anf = []
+    DIM sum AS INTEGER : sum = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(zl) - 1
+        ARRAY_PUSH(anf, sum)
+        sum = sum + LEN(zl[k]) + 1
+    NEXT
+    DIM li AS INTEGER : li = 0
+    DIM tiefe AS INTEGER : tiefe = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(starts) - 1
+        IF arten[i] <> "operator" OR laengen[i] <> 1 THEN CONTINUE
+        DIM p AS INTEGER : p = starts[i]
+        WHILE li + 1 < LEN(anf) AND p >= anf[li + 1]
+            IF RIGHT$(RTRIM$(zl[li]), 2) <> " _" THEN tiefe = 0
+            li = li + 1
+        WEND
+        DIM c AS STRING : c = MID$(stueck, p, 1)
+        IF c = "(" OR c = "[" OR c = "{" THEN
+            ARRAY_PUSH(s2, p + von) : ARRAY_PUSH(l2, 1) : ARRAY_PUSH(f2, farben[tiefe MOD 3])
+            tiefe = tiefe + 1
+        ELSEIF c = ")" OR c = "]" OR c = "}" THEN
+            tiefe = MAX(0, tiefe - 1)
+            ARRAY_PUSH(s2, p + von) : ARRAY_PUSH(l2, 1) : ARRAY_PUSH(f2, farben[tiefe MOD 3])
+        END IF
+    NEXT
+END SUB
+
 SUB faerben(ta AS GUI_WIDGET)
     DIM erste AS INTEGER
     DIM zeilen AS INTEGER
@@ -3752,7 +3822,7 @@ SUB faerben(ta AS GUI_WIDGET)
     ' Riegel liefen Einfaerbung UND Fundstellensuche in jedem Bild, auch
     ' wenn das Fenster nur dasteht.
     DIM schl AS STRING : schl = STR$(von) + ":" + STR$(cz) + ":" + STR$(cs) + ":" + _
-        IIF(sucheOffen, suchMuster$(suchtext), "") + ":" + stueck
+        IIF(sucheOffen, suchMuster$(suchtext), "") + ":" + IIF(klammerFarbenAn, "k", "") + ":" + stueck
     IF schl = faerbSchluessel THEN RETURN
     faerbSchluessel = schl
     DIM starts AS ARRAY OF INTEGER
@@ -3769,6 +3839,7 @@ SUB faerben(ta AS GUI_WIDGET)
         ARRAY_PUSH(s2, starts[i] + von) : ARRAY_PUSH(l2, laengen[i])
         ARRAY_PUSH(f2, farbeFuer(arten[i]))
     NEXT
+    IF klammerFarbenAn THEN klammernFaerben(stueck, von, starts, laengen, arten, s2, l2, f2)
     ' Das Wort unter der Marke ueberall im Ausschnitt. Erst ab zwei
     ' Zeichen: ein einzelnes `i` faerbte die halbe Datei.
     DIM wort AS STRING : wort = wortUnterMarke$()
@@ -4385,6 +4456,20 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     sucheDateien = sd
     sucheZeilen = sz
     problemModus = 1
+    ' Ein einzelner Suchtext laesst sich ersetzen: jeder Treffer bekommt
+    ' einen Haken (alle an), der Rechtsklick ersetzt die angehakten.
+    IF zweitens = "" AND treffer > 0 THEN
+        trefferKaestchen(TRUE)
+        trefferBegriff = gesucht
+        trefferAnzahl = treffer
+        trefferErster = GUI_LISTBOX_ITEM(lstProbleme, 0)
+        DIM tk AS INTEGER
+        FOR tk = 0 TO treffer - 1
+            GUI_LISTBOX_SET_CHECKED(lstProbleme, tk, TRUE)
+        NEXT
+    ELSE
+        trefferKaestchen(FALSE)
+    END IF
     DIM was AS STRING : was = gesucht
     IF zweitens <> "" THEN was = gesucht + "/" + zweitens
     GUI_SET_TEXT(lblProbleme, tr$("Suche '") + was + "': " + STR$(treffer) + tr$(" Treffer in ") + STR$(inDateien) + tr$(" Dateien -- Umschalt+F7 zeigt wieder die Probleme"))
@@ -5368,6 +5453,9 @@ SUB eigeneFarben(licht AS BOOLEAN)
             CASE "operator" : F_OPERATOR = f
             CASE "fundstelle" : F_FUNDSTELLE = f
             CASE "klammer" : F_KLAMMER = f
+            CASE "klammer1" : F_KLAMMER1 = f
+            CASE "klammer2" : F_KLAMMER2 = f
+            CASE "klammer3" : F_KLAMMER3 = f
             CASE "suchtreffer" : F_SUCHTREFFER = f
             CASE "typ" : F_TYP = f
             CASE "projekt" : TON_PROJEKT = f
@@ -5407,8 +5495,8 @@ END SUB
 FUNCTION farbVorlageTeil$(licht AS BOOLEAN) AS STRING
     codeFarben(licht)
     DIM q AS STRING : q = CHR$(34)
-    DIM namen AS ARRAY OF STRING : namen = ["grund", "kommentar", "text", "zahl", "schluessel", "operator", "fundstelle", "klammer", "suchtreffer", "typ", "projekt", "ausgabe", "probleme", "debugger"]
-    DIM werte AS ARRAY OF INTEGER : werte = [F_GRUND, F_KOMMENTAR, F_TEXT, F_ZAHL, F_SCHLUESSEL, F_OPERATOR, F_FUNDSTELLE, F_KLAMMER, F_SUCHTREFFER, F_TYP, TON_PROJEKT, TON_AUSGABE, TON_PROBLEME, TON_DEBUG]
+    DIM namen AS ARRAY OF STRING : namen = ["grund", "kommentar", "text", "zahl", "schluessel", "operator", "fundstelle", "klammer", "klammer1", "klammer2", "klammer3", "suchtreffer", "typ", "projekt", "ausgabe", "probleme", "debugger"]
+    DIM werte AS ARRAY OF INTEGER : werte = [F_GRUND, F_KOMMENTAR, F_TEXT, F_ZAHL, F_SCHLUESSEL, F_OPERATOR, F_FUNDSTELLE, F_KLAMMER, F_KLAMMER1, F_KLAMMER2, F_KLAMMER3, F_SUCHTREFFER, F_TYP, TON_PROJEKT, TON_AUSGABE, TON_PROBLEME, TON_DEBUG]
     DIM t AS STRING : t = "  " + q + IIF(licht, "hell", "dunkel") + q + ": {" + NL
     DIM i AS INTEGER
     FOR i = 0 TO LEN(namen) - 1
@@ -11699,6 +11787,202 @@ SUB imBaumZeigen(pfad AS STRING)
     protokoll("im baum " + BASENAME(GUI_FILETREE_SELECTED$(baum)))
 END SUB
 
+' --- Gross/klein und Zeilen verbinden ------------------------------------
+' Auf der Auswahl, ohne Auswahl auf dem Wort unter der Marke. Die Auswahl
+' bleibt danach auf dem geaenderten Text (auch wenn er laenger wurde:
+' GROSS aus "ß" ist "SS"). Ein Rueckgaengig-Schritt.
+FUNCTION anfangGross$(t AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM vorher AS BOOLEAN : vorher = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        DIM wz AS BOOLEAN : wz = UPPER$(c) <> LOWER$(c) OR (c >= "0" AND c <= "9") OR c = "_"
+        IF wz AND NOT vorher THEN r = r + UPPER$(c) ELSE r = r + LOWER$(c)
+        vorher = wz
+    NEXT
+    RETURN r
+END FUNCTION
+
+SUB fallAendern(art AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    IF z1 = z2 AND s1 = s2 THEN
+        DIM wort AS STRING : wort = wortUnterMarke$()
+        DIM anf AS INTEGER : anf = wortSpalte(ta)
+        IF wort = "" OR anf <= 0 THEN
+            GUI_SET_TEXT(lblStatus, tr$("Erst etwas markieren (oder die Marke auf ein Wort stellen)."))
+            RETURN
+        END IF
+        s1 = anf
+        GUI_TEXTAREA_SELECT(ta, z1, s1, z1, s1 + LEN(wort))
+    END IF
+    DIM alt AS STRING : alt = GUI_TEXTAREA_SELECTION$(ta)
+    DIM neu AS STRING
+    SELECT CASE art
+        CASE "gross" : neu = UPPER$(alt)
+        CASE "klein" : neu = LOWER$(alt)
+        CASE ELSE : neu = anfangGross$(alt)
+    END SELECT
+    IF neu <> alt THEN GUI_TEXTAREA_INSERT(ta, neu)
+    DIM nz AS ARRAY OF STRING : nz = SPLIT$(neu, NL)
+    IF LEN(nz) = 1 THEN
+        GUI_TEXTAREA_SELECT(ta, z1, s1, z1, s1 + LEN(neu))
+    ELSE
+        GUI_TEXTAREA_SELECT(ta, z1, s1, z1 + LEN(nz) - 1, LEN(nz[LEN(nz) - 1]) + 1)
+    END IF
+    GUI_FOCUS(ta)
+    protokoll("fall " + art + " " + STR$(LEN(neu)))
+END SUB
+
+' Die Zeilen der Auswahl zu einer verbinden (ohne Auswahl: diese und die
+' naechste). Die Einrueckung der ersten bleibt, die der anderen faellt weg,
+' dazwischen ein Leerzeichen -- nicht hinter "(" oder "[" und nicht vor
+' ")", "]" oder ",". Ein " _" am Ende (Fortsetzung) verschwindet mit.
+SUB zeilenVerbinden()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    IF z2 > z1 AND s2 = 1 THEN z2 = z2 - 1
+    IF z1 = z2 THEN z2 = z1 + 1
+    IF z2 > LEN(zeilen) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Keine Zeile darunter."))
+        RETURN
+    END IF
+    DIM erg AS STRING : erg = RTRIM$(zeilen[z1 - 1])
+    DIM k AS INTEGER
+    FOR k = z1 TO z2 - 1
+        IF RIGHT$(erg, 2) = " _" THEN erg = RTRIM$(LEFT$(erg, LEN(erg) - 1))
+        DIM teil AS STRING : teil = TRIM$(zeilen[k])
+        IF teil = "" THEN CONTINUE
+        DIM ohne AS BOOLEAN : ohne = TRIM$(erg) = ""
+        IF RIGHT$(erg, 1) = "(" OR RIGHT$(erg, 1) = "[" THEN ohne = TRUE
+        IF LEFT$(teil, 1) = ")" OR LEFT$(teil, 1) = "]" OR LEFT$(teil, 1) = "," THEN ohne = TRUE
+        erg = erg + IIF(ohne, "", " ") + teil
+    NEXT
+    GUI_TEXTAREA_SELECT(ta, z1, 1, z2, SPALTE_ENDE)
+    GUI_TEXTAREA_INSERT(ta, erg)
+    GUI_FOCUS(ta)
+    protokoll("zeilen verbunden " + STR$(z2 - z1 + 1))
+END SUB
+
+' --- Suchtreffer einzeln ersetzen ----------------------------------------
+DIM trefferAn AS BOOLEAN : trefferAn = FALSE
+DIM trefferBegriff AS STRING : trefferBegriff = ""
+DIM trefferAnzahl AS INTEGER : trefferAnzahl = 0
+DIM trefferErster AS STRING : trefferErster = ""
+DIM dlgTrefferErs AS GUI_WINDOW : dlgTrefferErs = -1
+DIM trefferNurEiner AS BOOLEAN : trefferNurEiner = FALSE
+
+SUB trefferKaestchen(an AS BOOLEAN)
+    trefferAn = an
+    GUI_LISTBOX_SET(lstProbleme, "kaestchen", IIF(an, 1, 0))
+END SUB
+
+' Zeigt die Liste etwas anderes als die Suchtreffer (Probleme, Aufrufer,
+' eine andere Suche), gehen die Haken weg -- sie gehoerten zur Suche.
+SUB trefferNachziehen()
+    IF NOT trefferAn THEN RETURN
+    DIM anders AS BOOLEAN : anders = problemModus <> 1 OR GUI_LISTBOX_COUNT(lstProbleme) <> trefferAnzahl
+    IF NOT anders AND trefferAnzahl > 0 THEN anders = GUI_LISTBOX_ITEM(lstProbleme, 0) <> trefferErster
+    IF anders THEN trefferKaestchen(FALSE)
+END SUB
+
+SUB trefferAlleAnhaken(an AS BOOLEAN)
+    IF NOT trefferAn THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+        GUI_LISTBOX_SET_CHECKED(lstProbleme, i, an)
+    NEXT
+END SUB
+
+SUB trefferErsetzenFragen(nurEiner AS BOOLEAN)
+    IF NOT trefferAn THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst im Projekt suchen (Strg+Umschalt+F) -- ersetzt wird in den Treffern."))
+        RETURN
+    END IF
+    IF nurEiner AND GUI_LISTBOX_SELECTED(lstProbleme) < 0 THEN RETURN
+    IF dlgTrefferErs >= 0 THEN RETURN
+    trefferNurEiner = nurEiner
+    dlgTrefferErs = GUI_PROMPT(tr$("Suchtreffer ersetzen"), _
+        IIF(nurEiner, tr$("Diesen Treffer von '"), tr$("Die angehakten Treffer von '")) + trefferBegriff + tr$("' ersetzen durch:"), trefferBegriff)
+END SUB
+
+SUB trefferDialogNachziehen()
+    IF dlgTrefferErs < 0 THEN RETURN
+    DIM a AS INTEGER : a = GUI_ANSWER(dlgTrefferErs)
+    IF a = 0 THEN RETURN
+    DIM ersatz AS STRING : ersatz = GUI_DIALOG_TEXT(dlgTrefferErs)
+    dlgTrefferErs = -1
+    IF a = 1 THEN trefferErsetzen(trefferNurEiner, ersatz)
+END SUB
+
+' Ersetzt wird nur in den gewaehlten Zeilen (der angehakten bzw. der einen),
+' mit demselben Muster wie die Suche; alles geht durch die Vorschau des
+' Umbaus und laesst sich zuruecknehmen. Eine Datei in einem Reiter bekommt
+' den Text dort (ungesichert), sonst auf die Platte.
+SUB trefferErsetzen(nurEiner AS BOOLEAN, ersatz AS STRING)
+    DIM m AS STRING : m = suchMuster$(trefferBegriff)
+    IF m = "" THEN RETURN
+    DIM r AS STRING : r = IIF(regexAn, ersatz, REPLACE$(ersatz, "\", "\\"))
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstProbleme)
+    DIM dateien AS ARRAY OF STRING : dateien = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(sucheDateien) - 1
+        IF ARRAY_INDEXOF(dateien, sucheDateien[i]) < 0 THEN ARRAY_PUSH(dateien, sucheDateien[i])
+    NEXT
+    umbauLeeren()
+    DIM zeilenZahl AS INTEGER : zeilenZahl = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM t AS INTEGER : t = tabVonWeg(pfad)
+        DIM text AS STRING
+        IF t >= 0 THEN
+            text = GUI_TEXT(tabFelder[t])
+        ELSE
+            TRY
+                text = JOIN$(READLINES(pfad), NL)
+            CATCH e
+                CONTINUE
+            END TRY
+        END IF
+        DIM zl AS ARRAY OF STRING : zl = SPLIT$(text, NL)
+        DIM geaendert AS BOOLEAN : geaendert = FALSE
+        FOR i = 0 TO LEN(sucheDateien) - 1
+            IF sucheDateien[i] <> d THEN CONTINUE
+            IF nurEiner AND i <> sel THEN CONTINUE
+            IF NOT nurEiner AND NOT GUI_LISTBOX_CHECKED(lstProbleme, i) THEN CONTINUE
+            DIM zn AS INTEGER : zn = sucheZeilen[i] - 1
+            IF zn < 0 OR zn >= LEN(zl) THEN CONTINUE
+            DIM neu AS STRING : neu = zl[zn]
+            TRY
+                neu = REGEX_REPLACE(zl[zn], m, r)
+            CATCH e2
+                neu = zl[zn]
+            END TRY
+            IF neu <> zl[zn] THEN
+                zl[zn] = neu
+                geaendert = TRUE
+                zeilenZahl = zeilenZahl + 1
+            END IF
+        NEXT
+        IF geaendert THEN umbauVormerken(t, pfad, JOIN$(zl, NL))
+    NEXT
+    umbauStarten(tr$("Suchtreffer ersetzen"), STR$(zeilenZahl) + tr$(" Zeile(n) in ") + STR$(LEN(umbauTexte)) + tr$(" Datei(en)."), _
+                 "treffer ersetzt " + STR$(zeilenZahl) + " " + STR$(LEN(umbauTexte)))
+END SUB
+
 ' --- Projektbaum: anlegen, umbenennen, loeschen -------------------------
 DIM dlgBaum AS GUI_WINDOW : dlgBaum = -1
 DIM dlgBaumLoeschen AS GUI_WINDOW : dlgBaumLoeschen = -1
@@ -14825,6 +15109,12 @@ paletteEintrag("Beim Sichern formatieren", "format_sichern", "")
 paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
 paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
 paletteEintrag("Zeilen sortieren", "zl_sortieren", "")
+paletteEintrag("Zeilen verbinden", "zl_verbinden", "")
+paletteEintrag("GROSSBUCHSTABEN", "fall_gross", "")
+paletteEintrag("kleinbuchstaben", "fall_klein", "")
+paletteEintrag("Anfangsbuchstaben Groß", "fall_anfang", "")
+paletteEintrag("Klammerpaare farbig", "klammer_farben", "")
+paletteEintrag("Angehakte Suchtreffer ersetzen ...", "treffer_ersetzen", "")
 paletteEintrag("Doppelte Zeilen entfernen", "zl_doppelte", "")
 paletteEintrag("Leerraum am Zeilenende entfernen", "zl_rand", "")
 paletteEintrag("Andere Reiter schließen", "andere_zu", "Strg+Umschalt+W")
@@ -15366,6 +15656,22 @@ SUB befehl(k AS STRING)
         CASE "blockkopf" : kopfSetzen(NOT kopfAn)
         CASE "fehler_am_ende" : fehlerEndeSetzen(NOT fehlerEndeAn)
         CASE "nav_zurueck" : navGehen(TRUE)
+        CASE "zl_verbinden" : zeilenVerbinden()
+        CASE "fall_gross" : fallAendern("gross")
+        CASE "fall_klein" : fallAendern("klein")
+        CASE "fall_anfang" : fallAendern("anfang")
+        CASE "klammer_farben"
+            klammerFarbenAn = NOT klammerFarbenAn
+            GUI_MENU_CHECK(miKlFarben, klammerFarbenAn)
+            faerbSchluessel = ""
+            GUI_SET_TEXT(lblStatus, IIF(klammerFarbenAn, tr$("Klammerpaare farbig an."), tr$("Klammerpaare farbig aus.")))
+            protokoll("klammer farben " + IIF(klammerFarbenAn, "an", "aus"))
+            konfigSichern()
+        CASE "treffer_ersetzen", "treffer_ersetzen_ctx" : trefferErsetzenFragen(FALSE)
+        CASE "treffer_einzeln" : trefferErsetzenFragen(TRUE)
+        CASE "treffer_springen" : problemAnspringen()
+        CASE "treffer_alle" : trefferAlleAnhaken(TRUE)
+        CASE "treffer_keine" : trefferAlleAnhaken(FALSE)
         CASE "im_baum_zeigen" : IF aktiverTab >= 0 THEN imBaumZeigen(tabPfade[aktiverTab])
         CASE "code_ausschneiden" : codeZwischenablage("ausschneiden")
         CASE "code_kopieren" : codeZwischenablage("kopieren")
@@ -15563,6 +15869,8 @@ menueBefehl(miSuchen, "suchen", "Strg+F") : menueBefehl(miWeiter, "weiter", "F3"
 menueBefehl(miErsetzen, "ersetzen", "Strg+H") : menueBefehl(miErsetzenEins, "ersetzen_eins", "Strg+Umschalt+1") : menueBefehl(miErsetzenAlle, "ersetzen_alle", "Strg+Alt+Enter")
 menueBefehl(miZeile, "zeile", "Strg+G") : menueBefehl(miProjekt, "projekt", "Strg+Umschalt+F") : menueBefehl(miVervoll, "vervoll", "Strg+Leer")
 menueBefehl(miImBaum, "im_baum_zeigen", "Strg+Alt+B")
+menueBefehl(miPTSpringen, "treffer_springen", "") : menueBefehl(miPTEinzeln, "treffer_einzeln", "") : menueBefehl(miPTAngehakt, "treffer_ersetzen_ctx", "")
+menueBefehl(miPTAlle, "treffer_alle", "") : menueBefehl(miPTKeine, "treffer_keine", "")
 menueBefehl(miNavZurueck, "nav_zurueck", "Strg+Alt+Links") : menueBefehl(miNavVor, "nav_vor", "Strg+Alt+Rechts")
 menueBefehl(miBNeuDatei, "baum_neue_datei", "") : menueBefehl(miBNeuOrdner, "baum_neuer_ordner", "") : menueBefehl(miBUmbenennen, "baum_umbenennen", "")
 menueBefehl(miBLoeschen, "baum_loeschen", "") : menueBefehl(miBPfad, "baum_pfad", "")
@@ -15575,7 +15883,9 @@ menueBefehl(miErweitern, "erweitern", "Strg+Umschalt+Hoch") : menueBefehl(miHera
 menueBefehl(miUmbProjekt, "umb_projekt", "Strg+Umschalt+F6") : menueBefehl(miParameter, "parameter", "Strg+Umschalt+U") : menueBefehl(miAufrufer, "aufrufer", "Umschalt+F12")
 menueBefehl(miFundstellen, "fundstellen", "Strg+Umschalt+F12") : menueBefehl(miVerschieben, "verschieben", "Strg+Umschalt+V") : menueBefehl(miUmbauZur, "umbau_zurueck", "Strg+Umschalt+Z")
 menueBefehl(miUmbauWdh, "umbau_wieder", "") : menueBefehl(miUmbauNach, "umbau_nach", "Strg+Umschalt+G") : menueBefehl(miVergleich, "vergleichen", "")
-menueBefehl(miReiterVgl, "reiter_vergleich", "") : menueBefehl(miZlSort, "zl_sortieren", "") : menueBefehl(miZlDoppelt, "zl_doppelte", "")
+menueBefehl(miReiterVgl, "reiter_vergleich", "") : menueBefehl(miZlVerbinden, "zl_verbinden", "") : menueBefehl(miFallGross, "fall_gross", "") : menueBefehl(miFallKlein, "fall_klein", "") : menueBefehl(miFallAnfang, "fall_anfang", "")
+menueBefehl(miKlFarben, "klammer_farben", "") : menueBefehl(miTrefferErs, "treffer_ersetzen", "")
+menueBefehl(miZlSort, "zl_sortieren", "") : menueBefehl(miZlDoppelt, "zl_doppelte", "")
 menueBefehl(miZlRand, "zl_rand", "") : menueBefehl(miAndereZu, "andere_zu", "Strg+Umschalt+W") : menueBefehl(miLinien, "linien", "")
 menueBefehl(miTypen, "typ_hinweise", "") : menueBefehl(miFarbenEigen, "farben_eigen", "")
 menueBefehl(miFehlerEnde, "fehler_am_ende", "") : menueBefehl(miKopf, "blockkopf", "") : menueBefehl(miWaerme, "profil_waerme", "") : menueBefehl(miZaehler, "aufrufzaehler", "") : menueBefehl(miQv, "git_fenster", "Strg+Alt+G")
@@ -15889,6 +16199,7 @@ WHILE NOT beenden
 
     ' --- Dialoge auswerten ---
     startFrageNachziehen()
+    trefferDialogNachziehen()
     baumDialogNachziehen()
     IF dlgSuche <> 0 THEN
         DIM a AS INTEGER : a = GUI_ANSWER(dlgSuche)
@@ -16204,6 +16515,7 @@ WHILE NOT beenden
 
     abgelegteNachziehen()
     kontextNachziehen()
+    trefferNachziehen()
     navNachziehen()
     ausgabeFilterNachziehen()
     prozessNachsehen()

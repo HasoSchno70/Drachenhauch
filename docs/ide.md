@@ -321,6 +321,27 @@ bekäme. Diese Bausteine kamen mit ihr:
   Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der
   Bereich auf die Ausgabe zurück. Unter Windows kommen Umlaute richtig an
   (`chcp 65001`).
+- **Groß/klein und Zeilen verbinden** (Bearbeiten → Zeilen, Palette):
+  GROSSBUCHSTABEN, kleinbuchstaben, Anfangsbuchstaben Groß auf der Auswahl
+  (ohne Auswahl auf dem Wort unter der Marke); die Auswahl bleibt auf dem
+  geänderten Text. **Zeilen verbinden** macht aus den Zeilen der Auswahl
+  (ohne Auswahl: diese und die nächste) eine: die Einrückung der ersten
+  bleibt, dazwischen ein Leerzeichen (nicht hinter `(`/`[`, nicht vor
+  `)`/`]`/`,`), leere Zeilen fallen weg, ein ` _` am Zeilenende
+  verschwindet mit. Jeweils ein Rückgängig-Schritt.
+- **Klammerpaare farbig** (Ansicht, an per Vorgabe): jede Klammertiefe hat
+  eine eigene Farbe (drei im Wechsel, in `farben.json` als `klammer1`..
+  `klammer3`). Klammern in Zeichenketten und Kommentaren zählen nicht; die
+  Tiefe beginnt je Zeile neu, außer die vorige endet mit ` _`.
+- **Suchtreffer einzeln ersetzen:** die Treffer von Im Projekt suchen
+  (Strg+Umschalt+F) tragen Haken, alle an. Rechtsklick auf die Liste:
+  Treffer anspringen, Diesen Treffer ersetzen ..., Angehakte Treffer
+  ersetzen ..., Alle/Keinen anhaken; auch Bearbeiten → Angehakte
+  Suchtreffer ersetzen .... Ersetzt wird nur in den gewählten Zeilen, mit
+  denselben Schaltern wie die Suche (Groß/klein, ganzes Wort, Ausdruck),
+  über die Vorschau des Umbaus und mit Zurücknehmen. Eine offene Datei
+  bekommt den Text in ihrem Reiter (ungesichert), die anderen auf der
+  Platte. Zeigt die Liste wieder Probleme, sind die Haken weg.
 - **Rechtsklick ins Code-Feld:** Ausschneiden, Kopieren, Einfügen, Zur
   Definition, Wer ruft das auf?, Umbenennen, Schnellkorrektur, Haltepunkt
   setzen/entfernen, Im Projektbaum zeigen. Der Rechtsklick setzt vorher die
