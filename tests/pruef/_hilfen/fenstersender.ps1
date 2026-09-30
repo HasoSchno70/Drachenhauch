@@ -35,6 +35,23 @@ if ($Nachricht -eq "esc") {
         [FensterSender]::PostMessage($h, 0x200, [IntPtr]0, $l) | Out-Null
         Start-Sleep -Milliseconds 15
     }
+} elseif ($Nachricht.StartsWith("klicks:")) {
+    # "klicks:N:MS" = N Linksklicks auf (150,100), zwischen Druecken und
+    # Loslassen MS Millisekunden (genau gewartet, Start-Sleep hat ~15 ms
+    # Raster). MS = 0 heisst: beide Nachrichten gleich hintereinander -- dann
+    # kommen sie im selben Bild an (flanken.rs).
+    $teile = $Nachricht.Split(":")
+    $n = [int]$teile[1]; $ms = [double]$teile[2]
+    $l = [IntPtr]((100 -shl 16) -bor 150)
+    for ($k = 0; $k -lt $n; $k++) {
+        [FensterSender]::PostMessage($h, 0x200, [IntPtr]0, $l) | Out-Null
+        Start-Sleep -Milliseconds 100
+        [FensterSender]::PostMessage($h, 0x201, [IntPtr]1, $l) | Out-Null
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        while ($sw.Elapsed.TotalMilliseconds -lt $ms) { }
+        [FensterSender]::PostMessage($h, 0x202, [IntPtr]0, $l) | Out-Null
+        Start-Sleep -Milliseconds 250
+    }
 } else {
     # Eine Folge, getrennt mit "|": "tippe:abc" = je Zeichen WM_CHAR (dieser
     # Weg fuellt raylibs Zeichenwarteschlange, eine Aufnahme tut es nicht),

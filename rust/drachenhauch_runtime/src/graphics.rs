@@ -1145,6 +1145,9 @@ pub struct Graphics {
     /// `KEY_ANY_HIT` die Demo-Tasten als Nutzereingabe, und ein Attract-Modus
     /// ("bei Tastendruck abbrechen") wuerde sich selbst sofort beenden.
     auto_injected_keys: Vec<i32>,
+    /// Maustasten, deren Klick ganz zwischen zwei Bildern lag (flanken.rs):
+    /// sie gelten ein Bild lang als gedrueckt, sonst saehe sie niemand.
+    maus_halt: [crate::flanken::Halt; crate::flanken::TASTEN],
     /// Das zuletzt abgespielte Positions-Ereignis der Wiedergabe. raylib
     /// zeichnet eine Mausposition NUR auf, wenn sie sich geaendert hat
     /// (`rcore.c`: "only saved if changed") -- zwischen zwei solchen
@@ -1561,6 +1564,9 @@ impl Graphics {
         // gleich darunter -- ausser der Aufrufer wollte es ohnehin versteckt.
         builder.hidden();
         let (mut rl, thread) = Graphics::fenster_bauen(builder)?;
+        // Klicks zwischen zwei Bildern mitzaehlen (flanken.rs).
+        crate::flanken::einhaengen();
+        let _ = crate::flanken::abholen();
         let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
         crate::ime::einhaengen(unsafe { rl.get_window_handle() });
@@ -1720,6 +1726,7 @@ impl Graphics {
             auto_play_frame: 0,
             auto_play_base: 0,
             auto_injected_keys: Vec::new(),
+            maus_halt: [crate::flanken::Halt::default(); crate::flanken::TASTEN],
             auto_maus: None,
             key_names: HashMap::new(),
         };
@@ -4686,7 +4693,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn mouse_x(&self) -> i64 { (self.rl.get_mouse_x() / self.scale) as i64 }
     pub fn mouse_y(&self) -> i64 { (self.rl.get_mouse_y() / self.scale) as i64 }
     pub fn mouse_button(&self, b: i64) -> bool {
-        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_down(x), None => false }
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_down(x) || self.halt(b).unten, None => false }
+    }
+    fn halt(&self, b: i64) -> crate::flanken::Halt {
+        self.maus_halt.get(b as usize).copied().unwrap_or_default()
     }
 
     // --- Eingabe-FLANKEN -----------------------------------------------------
@@ -4706,11 +4716,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     /// MOUSE_HIT(b): in DIESEM Frame gedrueckt worden?
     pub fn mouse_hit(&self, b: i64) -> bool {
-        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_pressed(x), None => false }
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_pressed(x) || self.halt(b).neu, None => false }
     }
     /// MOUSE_RELEASED(b): in DIESEM Frame losgelassen worden?
     pub fn mouse_released(&self, b: i64) -> bool {
-        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_released(x), None => false }
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_released(x) || self.halt(b).los, None => false }
     }
 
     /// Wie `key_down`, aber mit frei waehlbarem raylib-Test -- inklusive der
@@ -4897,6 +4907,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 self.auto_injected_keys.push(e.params()[0]);
             }
             e.play();
+            // Maustasten gehen an GLFW vorbei -- fuer flanken.rs mitzaehlen,
+            // sonst waere ein Klick im selben Bild der Aufnahme ein anderer
+            // als einer von aussen.
+            if typ == 6 { crate::flanken::zaehlen(e.params()[0], 1); }
+            if typ == 5 { crate::flanken::zaehlen(e.params()[0], 0); }
             // 7 = INPUT_MOUSE_POSITION (rcore.c). Merken, welches Ereignis die
             // Lage zuletzt gesetzt hat -- unten wird sie damit gehalten.
             if typ == 7 { self.auto_maus = Some(self.auto_play_idx); maus_neu = true; }
@@ -5976,6 +5991,18 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // Eingabe fuer den naechsten Frame schon eingelesen -- die eingespeisten
         // Werte ueberschreiben sie also und gelten fuer genau diesen Frame.
         self.automation_tick();
+
+        // Klicks, die ganz in der Luecke seit dem letzten Bild lagen:
+        // raylib sieht sie nicht (flanken.rs), also gelten sie jetzt ein Bild
+        // lang als gedrueckt.
+        let (druck, los) = crate::flanken::abholen();
+        for t in 0..crate::flanken::TASTEN {
+            let (unten, flanke) = match Self::mouse_btn(t as i64) {
+                Some(x) => (self.rl.is_mouse_button_down(x), self.rl.is_mouse_button_pressed(x)),
+                None => (false, false),
+            };
+            self.maus_halt[t] = crate::flanken::weiter(self.maus_halt[t], druck[t], los[t], unten, flanke);
+        }
 
         // Abgelegte Dateien fuer das naechste Bild: raylib (Hineinziehen) und
         // der Finder (finder.rs). `load_dropped_files` gibt die Liste bei
