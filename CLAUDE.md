@@ -1888,6 +1888,20 @@ mit Gegenprobe), `werkzeug_ide_terminal.dhtest` (2, `--- system windows`),
 Rust-Test `kill_beendet_auch_die_enkel`; vier Verfaelschungen der IDE und
 eine der Laufzeit fallen je in ihrem Fall.
 
+**Naechstes Problem, letzte Aenderung, mit gesicherter Fassung vergleichen
+(2026-09-30):** nur IDE. `problemSpringen` ueber `probZeile/probSpalte`
+aus `wellenSetzen` (Hinweise ausgenommen, Umlauf), Alt+F8 -- F8 gehoert dem
+Debugger. `aenderungMerken` haengt an der Aenderungs-Erkennung der
+Hauptschleife (nicht beim ersten Bild nach dem Oeffnen: da ist der gemerkte
+Text noch leer), `zurLetztenAenderung` legt die aktuelle Stelle auf den
+Zurueck-Stapel; Strg+Umschalt+Rueck, weil Strg+Alt+Buchstabe auf deutschen
+Tastaturen AltGr ist (Strg+Alt+E = €). `diffText$` = diff -U3 aus derselben
+LCS-Rechnung wie der Reiter-Vergleich, im Fenster `winVgl` mit
+`diffFaerben`; Verwerfen setzt den Text zurueck, gegen den verglichen wurde
+(`vglPlatte`), nicht `tabGesichert`. Tests
+`werkzeug_ide_problem_aenderung_vergleich.dhtest` (4, echte Tasten und Klicks);
+sechs Verfaelschungen fallen je in ihrem Fall.
+
 **Gross/klein, Zeilen verbinden, Klammerpaare farbig, Suchtreffer einzeln
 ersetzen (2026-09-30):** alles in der IDE, ohne Laufzeit-Aenderung.
 `fallAendern` (Auswahl oder Wort, Auswahl danach auf der NEUEN Laenge --

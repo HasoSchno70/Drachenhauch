@@ -870,6 +870,10 @@ DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, tr$("Zur Defi
 DIM miNavZurueck AS INTEGER : miNavZurueck = GUI_MENU_ITEM(mBearb, tr$("Zurück zur vorigen Stelle"), kz$("Strg+Alt+Links"))
 DIM miNavVor AS INTEGER : miNavVor = GUI_MENU_ITEM(mBearb, tr$("Vorwärts"), kz$("Strg+Alt+Rechts"))
 DIM miImBaum AS INTEGER : miImBaum = GUI_MENU_ITEM(mBearb, tr$("Im Projektbaum zeigen"), kz$("Strg+Alt+B"))
+DIM miProbVor AS INTEGER : miProbVor = GUI_MENU_ITEM(mBearb, tr$("Nächstes Problem"), kz$("Alt+F8"))
+DIM miProbZurueck AS INTEGER : miProbZurueck = GUI_MENU_ITEM(mBearb, tr$("Voriges Problem"), kz$("Umschalt+Alt+F8"))
+DIM miLetzteAend AS INTEGER : miLetzteAend = GUI_MENU_ITEM(mBearb, tr$("Zur letzten Änderung"), kz$("Strg+Umschalt+Rueck"))
+DIM miGesVergleich AS INTEGER : miGesVergleich = GUI_MENU_ITEM(mBearb, tr$("Mit gesicherter Fassung vergleichen ..."))
 DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, tr$("Umbenennen ..."), kz$("Umschalt+F6"))
 DIM miKorrektur AS INTEGER : miKorrektur = GUI_MENU_ITEM(mBearb, tr$("Schnellkorrektur ..."), kz$("Strg+."))
 DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, tr$("Schnipsel einfügen ..."), kz$("Strg+J"))
@@ -1192,6 +1196,7 @@ ctxEintrag(ctxReiter, tr$("Andere schließen"), "reiter_andere")
 ctxEintrag(ctxReiter, tr$("Rechts davon schließen"), "reiter_rechts")
 GUI_MENU_SEPARATOR(ctxReiter)
 ctxEintrag(ctxReiter, tr$("Pfad kopieren"), "reiter_pfad")
+ctxEintrag(ctxReiter, tr$("Mit gesicherter Fassung vergleichen ..."), "reiter_vergleichen")
 ctxEintrag(ctxReiter, tr$("Im Projektbaum zeigen"), "reiter_im_baum")
 GUI_CONTEXT_TABS(ctxReiter)
 ' Strg+Klick sammelt, Umschalt+Klick spannt -- damit sich mehrere Dateien
@@ -1611,6 +1616,22 @@ GUI_WINDOW_VISIBLE(winGit, FALSE)
 GUI_WINDOW_RESIZABLE(winGit, TRUE)
 DIM lblGit AS GUI_WIDGET : lblGit = GUI_LABEL(winGit, "", 8, 8)
 DIM taGit AS GUI_WIDGET : taGit = GUI_TEXTAREA(winGit, 8, 30, 884, 552)
+
+' --- Ungesicherte Aenderungen ansehen -----------------------------------
+' Der Unterschied zwischen dem Reiter und der Datei auf der Platte, gefaerbt
+' wie ein git diff; von hier aus sichern oder verwerfen.
+DIM winVgl AS GUI_WINDOW : winVgl = GUI_WINDOW(tr$("Ungesicherte Änderungen"), 260, 100, 880, 600)
+GUI_WINDOW_VISIBLE(winVgl, FALSE)
+DIM lblVgl AS GUI_WIDGET : lblVgl = GUI_LABEL(winVgl, "", 8, 8)
+DIM taVgl AS GUI_WIDGET : taVgl = GUI_TEXTAREA(winVgl, 8, 30, 864, 490)
+DIM btnVglSichern AS GUI_WIDGET : btnVglSichern = GUI_BUTTON(winVgl, tr$("Sichern"), 8, 530, 110, 30)
+GUI_BUTTON_VARIANT(btnVglSichern, "primaer")
+DIM btnVglVerwerfen AS GUI_WIDGET : btnVglVerwerfen = GUI_BUTTON(winVgl, tr$("Verwerfen"), 126, 530, 110, 30)
+GUI_BUTTON_VARIANT(btnVglVerwerfen, "gefahr")
+DIM btnVglZu AS GUI_WIDGET : btnVglZu = GUI_BUTTON(winVgl, tr$("Schließen"), 762, 530, 110, 30)
+GUI_WINDOW_CANCEL(winVgl, btnVglZu)
+DIM vglFeld AS GUI_WIDGET : vglFeld = -1
+DIM vglPlatte AS STRING : vglPlatte = ""
 
 ' --- Quellcodeverwaltung (git) -----------------------------------------
 ' Links die geaenderten Dateien des Repositorys (Kaestchen = vorgemerkt fuer
@@ -11693,6 +11714,242 @@ SUB navGehen(zurueck AS BOOLEAN)
     protokoll(IIF(zurueck, "nav zurueck ", "nav vor ") + BASENAME(p) + " " + STR$(z))
 END SUB
 
+' --- Naechstes / voriges Problem -----------------------------------------
+' Die Fehler und Warnungen der letzten Pruefung (Hinweise nicht), sortiert
+' nach Zeile und Spalte; vorwaerts die erste hinter der Marke, rueckwaerts
+' die letzte davor, am Ende wieder von vorn. Die Meldung steht in der
+' Statuszeile.
+SUB problemSpringen(vor AS BOOLEAN)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    IF probFeld <> ta THEN pruefen()
+    DIM cz AS INTEGER
+    DIM cs AS INTEGER
+    (cz, cs) = GUI_TEXTAREA_CURSOR(ta)
+    DIM marke AS INTEGER : marke = cz * 100000 + cs
+    DIM beste AS INTEGER : beste = -1
+    DIM rand AS INTEGER : rand = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(probZeile) - 1
+        IF probHinw[i] THEN CONTINUE
+        DIM st AS INTEGER : st = probZeile[i] * 100000 + probSpalte[i]
+        IF vor THEN
+            IF st > marke AND (beste < 0 OR st < probZeile[beste] * 100000 + probSpalte[beste]) THEN beste = i
+            IF rand < 0 OR st < probZeile[rand] * 100000 + probSpalte[rand] THEN rand = i
+        ELSE
+            IF st < marke AND (beste < 0 OR st > probZeile[beste] * 100000 + probSpalte[beste]) THEN beste = i
+            IF rand < 0 OR st > probZeile[rand] * 100000 + probSpalte[rand] THEN rand = i
+        END IF
+    NEXT
+    IF beste < 0 THEN beste = rand
+    IF beste < 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Keine Fehler oder Warnungen."))
+        protokoll("problem keins")
+        RETURN
+    END IF
+    GUI_TEXTAREA_GOTO(ta, probZeile[beste], probSpalte[beste])
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, tr$("Zeile ") + STR$(probZeile[beste]) + ": " + probMeldung[beste])
+    protokoll("problem " + STR$(probZeile[beste]) + " " + STR$(probSpalte[beste]))
+END SUB
+
+' --- Zur letzten Aenderung ------------------------------------------------
+' Gemerkt wird die Marke, wann immer sich der Text eines Reiters mit Datei
+' aendert; der Sprung dorthin legt die Stelle, an der man steht, auf den
+' Zurueck-Stapel (Strg+Alt+Links bringt einen wieder hin).
+DIM aendPfad AS STRING : aendPfad = ""
+DIM aendZeile AS INTEGER : aendZeile = 0
+DIM aendSpalte AS INTEGER : aendSpalte = 0
+SUB aenderungMerken(ta AS GUI_WIDGET, pfad AS STRING)
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+    aendPfad = pfad : aendZeile = z : aendSpalte = sp
+END SUB
+
+SUB zurLetztenAenderung()
+    IF aendPfad = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Noch nichts geändert."))
+        RETURN
+    END IF
+    IF NOT FILEEXISTS(aendPfad) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Gibt es nicht mehr: ") + aendPfad)
+        RETURN
+    END IF
+    IF navLetztPfad <> "" THEN navAblegen(navPfade, navZeilen, navSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
+    navSperre = TRUE
+    DIM schonDa AS BOOLEAN : schonDa = FALSE
+    IF aktiverTab >= 0 THEN schonDa = wegGleich$(tabPfade[aktiverTab]) = wegGleich$(aendPfad)
+    IF NOT schonDa THEN dateiOeffnen(aendPfad)
+    IF aktiverTab >= 0 THEN
+        GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], aendZeile, aendSpalte)
+        GUI_FOCUS(tabFelder[aktiverTab])
+    END IF
+    protokoll("letzte aenderung " + BASENAME(aendPfad) + " " + STR$(aendZeile))
+END SUB
+
+' --- Mit gesicherter Fassung vergleichen -----------------------------------
+' Ein Unterschied wie `git diff -U3`: Kopf, @@-Abschnitte mit drei Zeilen
+' Umfeld, "-" = nur auf der Platte, "+" = nur im Reiter. Dieselbe LCS-Rechnung
+' wie beim Reiter-Vergleich, aber als Schrittfolge.
+FUNCTION diffText$(alt AS ARRAY OF STRING, neu AS ARRAY OF STRING, name AS STRING) AS STRING
+    DIM n AS INTEGER : n = LEN(alt)
+    DIM m AS INTEGER : m = LEN(neu)
+    DIM opArt AS ARRAY OF INTEGER : opArt = []     ' 0 gleich, 1 weg, 2 neu
+    DIM opA AS ARRAY OF INTEGER : opA = []         ' Zeile alt (ab 0)
+    DIM opB AS ARRAY OF INTEGER : opB = []         ' Zeile neu (ab 0)
+    DIM i AS INTEGER : i = 0
+    DIM j AS INTEGER : j = 0
+    IF n > 1500 OR m > 1500 THEN
+        ' Zu gross fuer die Tabelle: Zeile fuer Zeile.
+        WHILE i < n OR j < m
+            IF i < n AND j < m THEN
+                IF alt[i] = neu[j] THEN
+                    ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                ELSE
+                    ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                    ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                END IF
+                i = i + 1 : j = j + 1
+            ELSEIF i < n THEN
+                ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : i = i + 1
+            ELSE
+                ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : j = j + 1
+            END IF
+        WEND
+    ELSE
+        DIM lcs[(n + 1) * (m + 1)] AS INTEGER
+        FOR i = n - 1 TO 0 STEP -1
+            FOR j = m - 1 TO 0 STEP -1
+                IF alt[i] = neu[j] THEN
+                    lcs[i * (m + 1) + j] = lcs[(i + 1) * (m + 1) + j + 1] + 1
+                ELSE
+                    lcs[i * (m + 1) + j] = MAX(lcs[(i + 1) * (m + 1) + j], lcs[i * (m + 1) + j + 1])
+                END IF
+            NEXT
+        NEXT
+        i = 0 : j = 0
+        WHILE i < n OR j < m
+            IF i < n AND j < m THEN
+                IF alt[i] = neu[j] THEN
+                    ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                    i = i + 1 : j = j + 1
+                ELSEIF lcs[(i + 1) * (m + 1) + j] >= lcs[i * (m + 1) + j + 1] THEN
+                    ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : i = i + 1
+                ELSE
+                    ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : j = j + 1
+                END IF
+            ELSEIF i < n THEN
+                ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : i = i + 1
+            ELSE
+                ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : j = j + 1
+            END IF
+        WEND
+    END IF
+    ' Abschnitte: jede Aenderung mit drei Zeilen Umfeld; nahe Abschnitte
+    ' fliessen zusammen.
+    DIM k AS INTEGER : k = LEN(opArt)
+    DIM zeigen[MAX(k, 1)] AS BOOLEAN
+    DIM a AS INTEGER
+    FOR a = 0 TO k - 1
+        IF opArt[a] <> 0 THEN
+            DIM b AS INTEGER
+            FOR b = MAX(0, a - 3) TO MIN(k - 1, a + 3)
+                zeigen[b] = TRUE
+            NEXT
+        END IF
+    NEXT
+    DIM aus AS ARRAY OF STRING : aus = ["--- " + name + tr$(" (gesichert)"), "+++ " + name + tr$(" (im Reiter)")]
+    a = 0
+    WHILE a < k
+        IF NOT zeigen[a] THEN
+            a = a + 1
+            CONTINUE
+        END IF
+        DIM e AS INTEGER : e = a
+        WHILE e < k AND zeigen[e]
+            e = e + 1
+        WEND
+        DIM na AS INTEGER : na = 0
+        DIM nb AS INTEGER : nb = 0
+        DIM x AS INTEGER
+        FOR x = a TO e - 1
+            IF opArt[x] <> 2 THEN na = na + 1
+            IF opArt[x] <> 1 THEN nb = nb + 1
+        NEXT
+        ARRAY_PUSH(aus, "@@ -" + STR$(opA[a] + 1) + "," + STR$(na) + " +" + STR$(opB[a] + 1) + "," + STR$(nb) + " @@")
+        FOR x = a TO e - 1
+            IF opArt[x] = 0 THEN ARRAY_PUSH(aus, " " + alt[opA[x]])
+            IF opArt[x] = 1 THEN ARRAY_PUSH(aus, "-" + alt[opA[x]])
+            IF opArt[x] = 2 THEN ARRAY_PUSH(aus, "+" + neu[opB[x]])
+        NEXT
+        a = e
+    WEND
+    RETURN JOIN$(aus, NL)
+END FUNCTION
+
+SUB gesichertVergleichen(k AS INTEGER)
+    IF k < 0 OR k >= tabAnzahl THEN RETURN
+    IF tabPfade[k] = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Der Reiter hat noch keine Datei."))
+        RETURN
+    END IF
+    DIM jetzt AS STRING : jetzt = GUI_TEXT(tabFelder[k])
+    DIM platte AS STRING : platte = ""
+    TRY
+        platte = dateiLesen(tabPfade[k])
+    CATCH e
+        platte = ""
+    END TRY
+    IF jetzt = platte THEN
+        GUI_SET_TEXT(lblStatus, BASENAME(tabPfade[k]) + tr$(": keine ungesicherten Änderungen."))
+        protokoll("vergleich gleich")
+        RETURN
+    END IF
+    DIM d AS STRING : d = diffText$(SPLIT$(platte, NL), SPLIT$(jetzt, NL), BASENAME(tabPfade[k]))
+    GUI_SET_TEXT(taVgl, d)
+    diffFaerben(taVgl)
+    GUI_TEXTAREA_GOTO(taVgl, 1, 1)
+    DIM plus AS INTEGER : plus = 0
+    DIM minus AS INTEGER : minus = 0
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(d, NL)
+        IF LEFT$(z, 1) = "+" AND LEFT$(z, 3) <> "+++" THEN plus = plus + 1
+        IF LEFT$(z, 1) = "-" AND LEFT$(z, 3) <> "---" THEN minus = minus + 1
+    NEXT
+    GUI_SET_TEXT(lblVgl, BASENAME(tabPfade[k]) + ": " + STR$(plus) + tr$(" Zeile(n) dazu, ") + STR$(minus) + tr$(" weg (gegenüber der Datei auf der Platte)"))
+    vglFeld = tabFelder[k] : vglPlatte = platte
+    GUI_WINDOW_VISIBLE(winVgl, TRUE)
+    GUI_FOCUS(btnVglZu)
+    protokoll("vergleich +" + STR$(plus) + " -" + STR$(minus))
+END SUB
+
+SUB vergleichNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winVgl) THEN RETURN
+    DIM k AS INTEGER : k = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabFelder[i] = vglFeld THEN k = i
+    NEXT
+    IF GUI_CLICKED(btnVglZu) OR k < 0 THEN
+        GUI_WINDOW_VISIBLE(winVgl, FALSE)
+        RETURN
+    END IF
+    IF GUI_CLICKED(btnVglSichern) THEN
+        GUI_WINDOW_VISIBLE(winVgl, FALSE)
+        IF sichern(k, FALSE) THEN protokoll("vergleich gesichert")
+    ELSEIF GUI_CLICKED(btnVglVerwerfen) THEN
+        GUI_WINDOW_VISIBLE(winVgl, FALSE)
+        ' Ein Rueckgaengig-Schritt: wer sich verklickt hat, holt es mit Strg+Z
+        ' zurueck.
+        feldAustauschen(tabFelder[k], GUI_TEXT(tabFelder[k]), vglPlatte)
+        tabGesichert[k] = vglPlatte
+        reiterNeuSetzen()
+        GUI_SET_TEXT(lblStatus, BASENAME(tabPfade[k]) + tr$(": Änderungen verworfen (Strg+Z holt sie zurück)."))
+        protokoll("vergleich verworfen")
+    END IF
+END SUB
+
 ' --- Kontextmenues von Code-Feld und Reiterleiste ------------------------
 SUB kontextNachziehen()
     DIM i AS INTEGER
@@ -15125,6 +15382,10 @@ paletteEintrag("Typ-Hinweise", "typ_hinweise", "")
 paletteEintrag("Eigene Farben bearbeiten", "farben_eigen", "")
 paletteEintrag("Zurück zur vorigen Stelle", "nav_zurueck", "Strg+Alt+Links")
 paletteEintrag("Im Projektbaum zeigen", "im_baum_zeigen", "Strg+Alt+B")
+paletteEintrag("Nächstes Problem", "problem_vor", "Alt+F8")
+paletteEintrag("Voriges Problem", "problem_zurueck", "Umschalt+Alt+F8")
+paletteEintrag("Zur letzten Änderung", "letzte_aenderung", "Strg+Umschalt+Rueck")
+paletteEintrag("Mit gesicherter Fassung vergleichen ...", "gesichert_vergleichen", "")
 paletteEintrag("Vorwärts", "nav_vor", "Strg+Alt+Rechts")
 paletteEintrag("Neue Datei im Projekt ...", "baum_neue_datei", "")
 paletteEintrag("Neuer Ordner im Projekt ...", "baum_neuer_ordner", "")
@@ -15673,6 +15934,11 @@ SUB befehl(k AS STRING)
         CASE "treffer_alle" : trefferAlleAnhaken(TRUE)
         CASE "treffer_keine" : trefferAlleAnhaken(FALSE)
         CASE "im_baum_zeigen" : IF aktiverTab >= 0 THEN imBaumZeigen(tabPfade[aktiverTab])
+        CASE "problem_vor" : problemSpringen(TRUE)
+        CASE "problem_zurueck" : problemSpringen(FALSE)
+        CASE "letzte_aenderung" : zurLetztenAenderung()
+        CASE "gesichert_vergleichen" : gesichertVergleichen(aktiverTab)
+        CASE "reiter_vergleichen" : gesichertVergleichen(GUI_TAB_CONTEXT(win))
         CASE "code_ausschneiden" : codeZwischenablage("ausschneiden")
         CASE "code_kopieren" : codeZwischenablage("kopieren")
         CASE "code_einfuegen" : codeZwischenablage("einfuegen")
@@ -15869,6 +16135,8 @@ menueBefehl(miSuchen, "suchen", "Strg+F") : menueBefehl(miWeiter, "weiter", "F3"
 menueBefehl(miErsetzen, "ersetzen", "Strg+H") : menueBefehl(miErsetzenEins, "ersetzen_eins", "Strg+Umschalt+1") : menueBefehl(miErsetzenAlle, "ersetzen_alle", "Strg+Alt+Enter")
 menueBefehl(miZeile, "zeile", "Strg+G") : menueBefehl(miProjekt, "projekt", "Strg+Umschalt+F") : menueBefehl(miVervoll, "vervoll", "Strg+Leer")
 menueBefehl(miImBaum, "im_baum_zeigen", "Strg+Alt+B")
+menueBefehl(miProbVor, "problem_vor", "Alt+F8") : menueBefehl(miProbZurueck, "problem_zurueck", "Umschalt+Alt+F8")
+menueBefehl(miLetzteAend, "letzte_aenderung", "Strg+Umschalt+Rueck") : menueBefehl(miGesVergleich, "gesichert_vergleichen", "")
 menueBefehl(miPTSpringen, "treffer_springen", "") : menueBefehl(miPTEinzeln, "treffer_einzeln", "") : menueBefehl(miPTAngehakt, "treffer_ersetzen_ctx", "")
 menueBefehl(miPTAlle, "treffer_alle", "") : menueBefehl(miPTKeine, "treffer_keine", "")
 menueBefehl(miNavZurueck, "nav_zurueck", "Strg+Alt+Links") : menueBefehl(miNavVor, "nav_vor", "Strg+Alt+Rechts")
@@ -16472,6 +16740,9 @@ WHILE NOT beenden
         DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]
         DIM jetzt AS STRING : jetzt = GUI_TEXT(tf)
         IF jetzt <> tabLetzterText[aktiverTab] THEN
+            ' Beim ersten Bild nach dem Oeffnen ist der gemerkte Text leer --
+            ' das ist kein Bearbeiten.
+            IF tabLetzterText[aktiverTab] <> "" AND tabPfade[aktiverTab] <> "" THEN aenderungMerken(tf, tabPfade[aktiverTab])
             tabLetzterText[aktiverTab] = jetzt
             pruefungFaellig = GET_TIME() + 0.6
             IF autoSichern > 0 THEN autoFaellig = GET_TIME() + autoSichern
@@ -16515,6 +16786,7 @@ WHILE NOT beenden
 
     abgelegteNachziehen()
     kontextNachziehen()
+    vergleichNachziehen()
     trefferNachziehen()
     navNachziehen()
     ausgabeFilterNachziehen()

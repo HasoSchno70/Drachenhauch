@@ -321,6 +321,18 @@ bekäme. Diese Bausteine kamen mit ihr:
   Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der
   Bereich auf die Ausgabe zurück. Unter Windows kommen Umlaute richtig an
   (`chcp 65001`).
+- **Nächstes / voriges Problem** (Bearbeiten, Alt+F8 bzw. Umschalt+Alt+F8
+-- F8 allein gehört dem Debugger): die Marke springt zum nächsten Fehler
+  bzw. zur nächsten Warnung der Datei (Hinweise nicht), am Ende wieder von
+  vorn; die Meldung steht in der Statuszeile.
+- **Zur letzten Änderung** (Bearbeiten, Strg+Umschalt+Rücktaste): zurück
+  an die Stelle, an der zuletzt getippt wurde, auch in einer anderen Datei;
+  Strg+Alt+Links führt wieder dorthin, wo man vorher war.
+- **Mit gesicherter Fassung vergleichen** (Bearbeiten, auch im
+  Kontextmenü eines Reiters): zeigt den Unterschied zwischen Reiter und
+  Datei auf der Platte als farbigen diff (drei Zeilen Umfeld); von dort
+  **Sichern** oder **Verwerfen** (ein Rückgängig-Schritt -- Strg+Z holt die
+  Änderungen zurück).
 - **Groß/klein und Zeilen verbinden** (Bearbeiten → Zeilen, Palette):
   GROSSBUCHSTABEN, kleinbuchstaben, Anfangsbuchstaben Groß auf der Auswahl
   (ohne Auswahl auf dem Wort unter der Marke); die Auswahl bleibt auf dem
