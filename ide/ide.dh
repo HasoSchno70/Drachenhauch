@@ -17041,6 +17041,9 @@ WHILE NOT beenden
     CLS(&H0B1119)
     GUI_DRAW()
     minimapZeichnen()
+    ' Die Karte wird ueber das Hauptfenster gemalt -- auch ueber die
+    ' Suchleiste, die oben rechts auf ihr liegt ("Alle" war halb verdeckt).
+    IF sucheOffen THEN GUI_DRAW_WINDOW(winSuche)
     ' Das Handbuch-Fenster liegt ueber der Leinwand des Hauptfensters und
     ' waere sonst von ihr verdeckt -- GUI_DRAW zeichnet Fenster und
     ' Zeichenflaechen in EINEM Durchgang, das Gemalte kommt danach.
