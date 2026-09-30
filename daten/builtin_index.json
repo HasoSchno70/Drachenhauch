@@ -1779,6 +1779,12 @@
    "module": "dhrt"
   },
   {
+   "name": "CODE_TYPES$",
+   "kind": "core",
+   "signature": "CODE_TYPES$(quelltext$[, basis$]) AS STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "CODE_COMPLETE",
    "kind": "core",
    "signature": "CODE_COMPLETE(quelltext$, zeile, spalte) AS ARRAY OF STRING",

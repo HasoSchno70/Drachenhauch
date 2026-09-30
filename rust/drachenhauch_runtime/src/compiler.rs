@@ -3161,6 +3161,27 @@ impl Compiler {
     /// FOR EACH var IN iterable -- Desugar zu einem Index-Loop ueber
     /// __comp_iter(iterable) (TUPLE), wie compiler._stmt_ForEach.
     fn stmt_foreach(&mut self, var: &str, var2: Option<&str>, iterable: &Node, body: &[Node]) -> CR {
+        // Typ-Hinweise fuer den Editor (CODE_TYPES$): eine FOR-EACH-Variable
+        // hat keinen geschriebenen Typ -- was sie haelt, sagt der Behaelter.
+        if TYP_HINWEISE.with(|h| h.borrow().is_some()) {
+            let beh = self.typ_von(iterable);
+            let (t1, t2) = match (&beh, var2.is_some()) {
+                (Typ::Feld(t), false) => ((**t).clone(), Typ::Unbekannt),
+                (Typ::Map(_), false) => (Typ::Str, Typ::Unbekannt),
+                (Typ::Map(t), true) => (Typ::Str, (**t).clone()),
+                (Typ::Str, false) => (Typ::Str, Typ::Unbekannt),
+                _ => (Typ::Unbekannt, Typ::Unbekannt),
+            };
+            let zeile = self.ctx.cur_line;
+            TYP_HINWEISE.with(|h| {
+                if let Some(l) = h.borrow_mut().as_mut() {
+                    if t1 != Typ::Unbekannt { l.push((zeile, var.to_string(), t1.to_string())); }
+                    if let Some(v2) = var2 {
+                        if t2 != Typ::Unbekannt { l.push((zeile, v2.to_string(), t2.to_string())); }
+                    }
+                }
+            });
+        }
         for name in [Some(var), var2].into_iter().flatten() {
             if self.ctx.is_main {
                 if !self.ctx.local_slots.contains_key(name) {
@@ -4321,6 +4342,23 @@ fn stmt_line(n: &Node) -> u32 {
 /// `dhrt --typen`: je Zeile die uebersetzten Ausdruecke mit ihrem Typ, nach
 /// Zeilen geordnet (uebersetzt wird Klassen, Funktionen, Hauptprogramm --
 /// nicht in Quelltext-Reihenfolge). `?` heisst: der Compiler weiss es nicht.
+thread_local! {
+    /// Sammelt Typ-Hinweise (Zeile der gemergten Quelle, Name, Typ), solange
+    /// `typ_hinweise_sammeln` laeuft -- fuer CODE_TYPES$. Ein Thread-Speicher
+    /// statt eines Compiler-Feldes, weil der Weg dorthin ueber check_source
+    /// geht, das keine Einstellungen durchreicht.
+    static TYP_HINWEISE: std::cell::RefCell<Option<Vec<(u32, String, String)>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Den Compiler `f` laufen lassen und die Typ-Hinweise einsammeln, die dabei
+/// anfallen (FOR-EACH-Variablen).
+pub(crate) fn typ_hinweise_sammeln(f: impl FnOnce()) -> Vec<(u32, String, String)> {
+    TYP_HINWEISE.with(|h| *h.borrow_mut() = Some(Vec::new()));
+    f();
+    TYP_HINWEISE.with(|h| h.borrow_mut().take()).unwrap_or_default()
+}
+
 fn typen_ausgeben(mut liste: Vec<(u32, String, String)>, herkunft: &[crate::preprocess::Herkunft],
                   haupt: &str) {
     liste.sort_by_key(|e| e.0);

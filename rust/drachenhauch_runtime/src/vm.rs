@@ -6268,6 +6268,14 @@ impl<'p> Vm<'p> {
                 let neu = bi_str(a, 3, "CODE_RENAME$")?;
                 Value::str_rc(crate::lsp::umbenennen(text, z, s, neu).unwrap_or_default())
             }
+            "code_types$" | "code_types" => {
+                let text = bi_str(a, 0, "CODE_TYPES$")?.to_string();
+                let basis = if a.len() > 1 { std::path::PathBuf::from(bi_str(a, 1, "CODE_TYPES$")?) }
+                            else { std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")) };
+                let liste: Vec<serde_json::Value> = crate::lsp::typ_hinweise(&text, &basis).into_iter()
+                    .map(|(z, n, t)| serde_json::json!({"zeile": z, "name": n, "typ": t})).collect();
+                Value::str_rc(serde_json::Value::Array(liste).to_string())
+            }
             "code_names" => {
                 let text = bi_str(a, 0, "CODE_NAMES")?;
                 let mut m = crate::value::DhMap::new("integer".to_string());

@@ -321,6 +321,22 @@ bekäme. Diese Bausteine kamen mit ihr:
   Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der
   Bereich auf die Ausgabe zurück. Unter Windows kommen Umlaute richtig an
   (`chcp 65001`).
+- **Typ-Hinweise** (Ansicht → Typ-Hinweise, an per Vorgabe): hinter einer
+  Zeile mit `FOR EACH` steht gedämpft blau, was die Variable hält
+  (`p: INTEGER`, bei einer MAP in der Paar-Form `k: STRING, v: FLOAT`) --
+  ihr Typ steht sonst nirgends. Was der Übersetzer nicht weiß (ein Tupel,
+  das Ergebnis von `SPLIT$`), steht nicht da. Die Hinweise kommen mit der
+  Prüfung (`CODE_TYPES$`).
+- **Eigene Farben** (Ansicht → Eigene Farben bearbeiten): öffnet
+  `farben.json` neben der `ide.json`, beim ersten Mal mit den Werten beider
+  Themen als Vorlage. Je Thema (`"dunkel"`, `"hell"`) stehen die
+  Code-Farben (`grund`, `kommentar`, `text`, `zahl`, `schluessel`,
+  `operator`, `fundstelle`, `klammer`, `suchtreffer`, `typ`), die Töne der
+  Bereiche (`projekt`, `ausgabe`, `probleme`, `debugger`) und unter
+  `"oberflaeche"` jeder Schlüssel von `GUI_THEME_SET` (`accent`,
+  `window_bg`, `widget_bg`, `text_fg` ...), Farben als `"#RRGGBB"`. Nur
+  was anders sein soll, muss drinstehen; nach dem Sichern (Strg+S) gilt die
+  Datei sofort. Unbekannte Namen und falsche Farben meldet die Ausgabe.
 - **Dateien im Projektbaum** (Rechtsklick auf eine Zeile): Neue Datei,
   Neuer Ordner (im gewählten Ordner bzw. im Ordner der gewählten Datei),
   Umbenennen, Löschen und Pfad kopieren; dieselben Befehle stehen in der
