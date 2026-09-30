@@ -1,0 +1,137 @@
+' Zwei Handgriffe der IDE:
+' (1) Parameternamen an Aufrufen: hinter einer Zeile mit einem Aufruf, dem
+'     ein festes Argument mitgegeben wird, steht die Signatur (eigene SUBs
+'     und eingebaute Befehle); abschaltbar.
+' (2) Beim Einfuegen einruecken: ein mehrzeiliger Block bekommt die
+'     Einrueckung der Stelle, an der er landet; Strg+Z nimmt erst das
+'     Einruecken zurueck; abschaltbar.
+--- seriell
+--- langsam
+
+=== parameternamen an aufrufen mit festen argumenten
+pruefen()
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(paramZeilen) - 1
+    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+NEXT
+befehl("parameter_namen")
+protokoll("pr aus " + STR$(paramNamenAn))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB kreis(x AS INTEGER, y AS INTEGER, r AS INTEGER)
+    PRINT x
+END SUB
+kreis(100, 50, 20)
+DIM a AS INTEGER : a = 1
+kreis(a, a, a)
+PRINT "kreis(1, 2, 3)"
+PRINT MID$("abc", 1, 1)
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 16) = "parameter namen " THEN PRINT L[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt "; JSON_GET_BOOL(k, "parameter_namen")
+--- erwartet
+pr param 4 kreis(x, y, r)
+pr param 8 MID$(s, start, n)
+parameter namen aus
+pr aus FALSE
+gemerkt FALSE
+
+=== strg v rueckt den block an seine stelle ein, strg z nimmt es zurueck
+DIM prBild AS INTEGER : prBild = 0
+FUNCTION prText$() AS STRING
+    RETURN REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/")
+END FUNCTION
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN
+    CLIPBOARD_SET("FOR i = 1 TO 3" + NL + "        PRINT i" + NL + "    NEXT")
+    ' Zeile 4 traegt acht Leerzeichen (eine Beilage verloere sie).
+    GUI_SET_TEXT(tabFelder[aktiverTab], "SUB s()" + NL + "    IF TRUE THEN" + NL + "        PRINT 1" + NL + "        " + NL + "    END IF" + NL + "END SUB")
+    GUI_FOCUS(tabFelder[aktiverTab])
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 4, 9)
+    ' Strg+V, spaeter Strg+Z
+    WRITEALL("prtaste.txt", "c 9" + CHR$(10) + "e 0 1 340 0 0" + CHR$(10) + _
+             "e 4 2 341 0 0" + CHR$(10) + "e 5 2 86 0 0" + CHR$(10) + "e 7 1 86 0 0" + CHR$(10) + "e 8 1 341 0 0" + CHR$(10) + _
+             "e 30 2 341 0 0" + CHR$(10) + "e 31 2 90 0 0" + CHR$(10) + "e 33 1 90 0 0" + CHR$(10) + "e 34 1 341 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prtaste.txt")
+END IF
+IF prBild = 40 THEN protokoll("pr eingefuegt |" + prText$() + "|")
+IF prBild = 70 THEN
+    protokoll("pr nach z |" + prText$() + "|")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB s()
+    IF TRUE THEN
+        PRINT 1
+
+    END IF
+END SUB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 22) = "eingefuegt eingerueckt" THEN PRINT L[i]
+NEXT
+--- erwartet
+eingefuegt eingerueckt 3 8
+pr eingefuegt |SUB s()/    IF TRUE THEN/        PRINT 1/        FOR i = 1 TO 3/            PRINT i/        NEXT/    END IF/END SUB|
+pr nach z |SUB s()/    IF TRUE THEN/        PRINT 1/        FOR i = 1 TO 3/        PRINT i/    NEXT/    END IF/END SUB|
+
+=== mitten in der zeile und abgeschaltet
+DIM prT AS GUI_WIDGET : prT = tabFelder[aktiverTab]
+CLIPBOARD_SET("a," + NL + "  b)")
+GUI_TEXTAREA_GOTO(prT, 1, 11)
+befehl("code_einfuegen")
+protokoll("pr mitten |" + REPLACE$(GUI_TEXT(prT), NL, "/") + "|")
+befehl("einfuegen_einruecken")
+GUI_TEXTAREA_GOTO(prT, 4, 11)
+befehl("code_einfuegen")
+protokoll("pr aus |" + REPLACE$(GUI_TEXT(prT), NL, "/") + "|")
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+    x = f(
+    y = 1
+    z = g(
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 22) = "eingefuegt eingerueckt" OR LEFT$(L[i], 20) = "einfuegen einruecken" THEN PRINT L[i]
+NEXT
+--- erwartet
+eingefuegt eingerueckt 2 4
+pr mitten |    x = f(a,/    b)/    y = 1/    z = g(|
+einfuegen einruecken aus
+pr aus |    x = f(a,/    b)/    y = 1/    z = g(a,/  b)|

@@ -155,6 +155,8 @@ Mitlaufender Blockkopf	Sticky block header
 Klammerpaare farbig	Coloured bracket pairs
 Fehlertext am Zeilenende	Error text at line end
 Typ-Hinweise	Type hints
+Parameternamen an Aufrufen	Parameter names at calls
+Beim Einfügen einrücken	Indent on paste
 Profil im Code (nach Strg+Umschalt+Y)	Profile in code (after Ctrl+Shift+Y)
 Aufrufzähler über Unterprogrammen	Call counts above subroutines
 Live-Vorschau	Live preview
@@ -815,6 +817,10 @@ Gehe zu Zeile	Go to line
 Zeilennummer:	Line number:
 Im Projekt suchen	Find in project
 Wonach (alle .dh in 	What (all .dh in 
+Parameternamen an Aufrufen an.	Parameter names at calls on.
+Parameternamen an Aufrufen aus.	Parameter names at calls off.
+Beim Einfügen einrücken an.	Indent on paste on.
+Beim Einfügen einrücken aus.	Indent on paste off.
 Ausgabe geleert.	Output cleared.
 Der Debugger steht gerade nicht -- erst F7 und ein Halt.	The debugger is not paused -- first F7 and a pause.
 gui-Fenster mit Knopf	gui window with button

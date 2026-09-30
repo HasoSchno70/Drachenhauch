@@ -831,7 +831,7 @@
   "GUI_TEXTAREA_GUTTER_CLICKED": "welche Zeile (ab 1) in diesem Bild in der Nummernspalte angeklickt wurde, 0 = keine; taste 0 = links (Vorgabe), 1 = rechts. Gilt ein Bild lang wie GUI_CLICKED; ein Linksklick dort setzt die Schreibmarke NICHT, der Faltpfeil klappt weiter um. Fuer Haltepunkte und Lesezeichen",
   "GUI_TEXTAREA_HINTS": "Text gedaempft hinter das Ende von Zeilen (ab 1) setzen, etwa die Werte der Variablen im Debugger-Halt; folgt seiner Zeile wie eine Marke, leere Listen loeschen, GUI_SET_TEXT auch. farbe darf ein Feld sein, eine je Hinweis (-1 = gedaempft)",
   "GUI_TEXTAREA_HINT_CLICKED": "welcher Hinweis (GUI_TEXTAREA_HINTS) in diesem Bild angeklickt wurde: seine Zeile ab 1, 0 = keiner; nur mit GUI_TEXTAREA_SET(ta, \"hinweise_klickbar\", 1) (dann Hand als Zeiger, die Marke bleibt stehen); gilt ein Bild lang",
-  "GUI_TEXTAREA_INDENT_WORDS": "drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück",
+  "GUI_TEXTAREA_INDENT_WORDS": "drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück (beim Tippen; ein eingefügter Block mit mehreren Zeilen bleibt, wie er ist)",
   "GUI_TEXTAREA_INSERT": "ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, GUI_ON_CHANGE feuert wie beim Tippen",
   "GUI_TEXTAREA_LINE_COLORS": "ein Farbband hinter ganzen Zeilen (Zeilen ab 1, Farben mit Deckkraft im obersten Byte, ohne sie ein Viertel) -- etwa ein Profil als Wärme im Code; getrennt von den Marken, wandert mit seiner Zeile, leere Listen löschen",
   "GUI_TEXTAREA_LINE_COLORS_GET": "die Zeilen der Zeilenfarben, wie sie jetzt stehen (in der Reihenfolge des Setzens)",
