@@ -1,0 +1,176 @@
+' Zwei Handgriffe der IDE:
+' (1) Typ-Hinweise (Ansicht, an per Vorgabe): hinter einer Zeile mit
+'     FOR EACH steht, was die Variable haelt (CODE_TYPES$).
+' (2) Eigene Farben: farben.json neben der ide.json ueberschreibt Code-
+'     Farben, Bereichstoene und Theme-Schluessel, je Thema; gilt nach dem
+'     Sichern sofort.
+--- seriell
+--- langsam
+
+=== typ hinweise stehen hinter der zeile und lassen sich abschalten
+DIM prBild AS INTEGER : prBild = 0
+' Punkte in der Farbe der Typ-Hinweise hinter dem Ende der Zeile z.
+FUNCTION prBlau(z AS INTEGER) AS INTEGER
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    SAVESCREENSHOT("prbild.png")
+    DIM b AS IMAGE : b = LOADIMAGE("prbild.png")
+    DIM n AS INTEGER : n = 0
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    DIM zz AS INTEGER
+    DIM ss AS INTEGER
+    FOR y = 0 TO SCREENHEIGHT() - 1
+        DIM rechts AS INTEGER : rechts = -1
+        FOR x = 0 TO SCREENWIDTH() - 1 STEP 3
+            (zz, ss) = GUI_TEXTAREA_POS_AT(ta, x, y)
+            IF zz = z THEN rechts = x
+        NEXT
+        IF rechts < 0 THEN CONTINUE
+        FOR x = rechts + 24 TO MIN(rechts + 424, SCREENWIDTH() - 1)
+            DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+            DIM r AS INTEGER : r = (c SHR 16) BAND 255
+            DIM bl AS INTEGER : bl = c BAND 255
+            IF bl > 140 AND bl - r > 45 THEN n = n + 1
+        NEXT
+    NEXT
+    IMAGE_FREE(b)
+    DELETEFILE("prbild.png")
+    RETURN n
+END FUNCTION
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN pruefen()
+IF prBild = 46 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO LEN(typZeilen) - 1
+        protokoll("pr typ " + STR$(typZeilen[prI]) + " " + typTexte[prI])
+    NEXT
+    protokoll("pr zeile 3 blau " + STR$(prBlau(3) > 20))
+    protokoll("pr zeile 2 blau " + STR$(prBlau(2)))
+    befehl("typ_hinweise")
+END IF
+IF prBild = 52 THEN
+    protokoll("pr aus zeile 3 blau " + STR$(prBlau(3)))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+DIM punkte AS ARRAY OF INTEGER : punkte = [3, 1, 2]
+DIM m AS MAP OF STRING : m = {"a": "b"}
+FOR EACH p IN punkte
+    PRINT p
+NEXT
+FOR EACH k, v IN m
+    PRINT k; v
+NEXT
+
+--- nachher
+IMPORT "json"
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 13) = "typ hinweise " THEN PRINT L[i]
+NEXT
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt "; JSON_GET_BOOL(k, "typ_hinweise")
+--- erwartet
+pr typ 3 p: INTEGER
+pr typ 6 k: STRING, v: STRING
+pr zeile 3 blau TRUE
+pr zeile 2 blau 0
+typ hinweise aus
+pr aus zeile 3 blau 0
+gemerkt FALSE
+
+=== eigene farben gelten je thema und melden fehler
+protokoll("pr dunkel " + COLOR_HEX$(F_SCHLUESSEL) + " " + COLOR_HEX$(TON_PROJEKT) + " " + COLOR_HEX$(GUI_THEME_GET("accent")) + " " + COLOR_HEX$(F_ZAHL))
+DIM prM AS STRING
+FOR EACH prM IN farbMeldungen
+    protokoll("pr meldung " + prM)
+NEXT
+befehl("thema")
+protokoll("pr hell " + COLOR_HEX$(F_SCHLUESSEL) + " " + COLOR_HEX$(TON_PROJEKT) + " " + COLOR_HEX$(F_KOMMENTAR))
+befehl("thema")
+protokoll("pr wieder dunkel " + COLOR_HEX$(F_SCHLUESSEL))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+--- datei _programm/farben.json
+{
+  "dunkel": {
+    "schluessel": "#FF0000",
+    "projekt": "#00FF00",
+    "quatsch": "#123456",
+    "zahl": "blau",
+    "oberflaeche": {"accent": "#123456", "gibtsnicht": "#000000"}
+  },
+  "hell": {
+    "kommentar": "#654321"
+  }
+}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 14) = "eigene farben " THEN PRINT L[i]
+NEXT
+--- erwartet
+eigene farben dunkel 3
+pr dunkel #FF0000 #00FF00 #123456 #D07070
+pr meldung dunkel: unbekannter Name quatsch
+pr meldung dunkel.zahl: blau ist keine Farbe
+pr meldung dunkel.oberflaeche: unbekannter Name gibtsnicht
+eigene farben hell 1
+pr hell #0B63A8 #3B7BD8 #654321
+eigene farben dunkel 3
+pr wieder dunkel #FF0000
+
+=== die vorlage traegt die werte des themas, gesichert gilt sie sofort
+befehl("farben_eigen")
+protokoll("pr reiter " + BASENAME(tabPfade[aktiverTab]))
+DIM prT AS STRING : prT = GUI_TEXT(tabFelder[aktiverTab])
+DIM prJ AS JSON_HANDLE : prJ = JSON_PARSE(prT)
+protokoll("pr vorlage " + JSON_GET_STRING(prJ, "dunkel.schluessel") + " " + JSON_GET_STRING(prJ, "hell.schluessel") + " " + STR$(LEN(JSON_KEYS(prJ, "dunkel"))))
+protokoll("pr vorher " + COLOR_HEX$(F_SCHLUESSEL))
+GUI_SET_TEXT(tabFelder[aktiverTab], REPLACE$(prT, JSON_GET_STRING(prJ, "dunkel.schluessel"), "#FF00FF"))
+befehl("sichern")
+protokoll("pr nachher " + COLOR_HEX$(F_SCHLUESSEL) + " meldungen " + STR$(LEN(farbMeldungen)))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 14) = "eigene farben " THEN PRINT L[i]
+NEXT
+--- erwartet
+eigene farben datei
+pr reiter farben.json
+pr vorlage #2BC4E8 #0B63A8 15
+pr vorher #2BC4E8
+eigene farben dunkel 14
+pr nachher #FF00FF meldungen 0

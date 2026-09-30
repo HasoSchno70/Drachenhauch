@@ -1888,6 +1888,22 @@ mit Gegenprobe), `werkzeug_ide_terminal.dhtest` (2, `--- system windows`),
 Rust-Test `kill_beendet_auch_die_enkel`; vier Verfaelschungen der IDE und
 eine der Laufzeit fallen je in ihrem Fall.
 
+**Typ-Hinweise und eigene Farben (2026-09-30):** neu **`CODE_TYPES$(quelle$
+[, basis$])`** -> JSON `[{zeile, name, typ}]` fuer Stellen ohne
+geschriebenen Typ -- die Variablen von FOR EACH (`DIM x = wert` ohne `AS`
+gibt es nicht). Gesammelt in `stmt_foreach` ueber einen Thread-Speicher
+`TYP_HINWEISE` (compiler.rs, `typ_hinweise_sammeln`), weil der Weg ueber
+`check_source` keine Einstellungen durchreicht; `lsp::typ_hinweise` rechnet
+auf Pufferzeilen um und laesst Importe weg. Elementtyp aus `typ_von` des
+Behaelters (Feld -> T, MAP -> STRING bzw. Paar STRING + T, Text -> STRING,
+sonst nichts). Die IDE haengt sie in `hinweiseZeigen` an (`F_TYP`,
+`typ_hinweise`). **Eigene Farben:** `farben.json` neben der ide.json, je
+Thema Code-Farben, Bereichstoene (`TON_*` sind dafuer Variablen) und
+`oberflaeche` = GUI_THEME_SET-Schluessel; `themaAnwenden` ist die EINE
+Stelle fuer Umschalten, Start und Sichern der Datei. Tests
+`werkzeug_ide_typen_farben.dhtest` (3), ein Fall in `ide_bausteine.dhtest`;
+fuenf Verfaelschungen der IDE fallen je in ihrem Fall.
+
 **Projektbaum-Dateien, Zurueck/Vorwaerts, Ausgabefilter (2026-09-30):**
 neu in der Laufzeit **`GUI_CONTEXT_WIDGET(menu, wdg)`** -- ein
 Kontextmenue gehoert einem Widget (`Menu::ziel`, -1 = Fenster) und oeffnet

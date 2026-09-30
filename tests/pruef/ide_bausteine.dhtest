@@ -270,3 +270,29 @@ DHRT_FRAMES=3
 --- fehler
 GUI_TEXTAREA_GOTO: das Widget ist kein GUI_TEXTAREA
 
+
+=== code types nennt die variablen von for each
+' Stellen ohne geschriebenen Typ: FOR EACH. Eine MAP liefert Schluessel als
+' Text, in der Paar-Form dazu den Werttyp; was der Uebersetzer nicht kennt
+' (ein Tupel, das Ergebnis von SPLIT$), fehlt; Stellen aus einer
+' importierten Datei auch.
+DIM q AS STRING : q = CHR$(34)
+DIM t AS STRING
+t = "IMPORT " + q + "lib.dh" + q + CHR$(10)
+t = t + "DIM a AS ARRAY OF INTEGER : a = [1, 2]" + CHR$(10)
+t = t + "FOR EACH x IN a : NEXT" + CHR$(10)
+t = t + "DIM m AS MAP OF FLOAT : m = {" + q + "k" + q + ": 1.5}" + CHR$(10)
+t = t + "FOR EACH k, v IN m : NEXT" + CHR$(10)
+t = t + "FOR EACH w IN SPLIT$(" + q + "a b" + q + ", " + q + " " + q + ") : NEXT" + CHR$(10)
+t = t + "FOR EACH u IN (1, 2) : NEXT" + CHR$(10)
+t = t + "SUB s(namen AS ARRAY OF STRING)" + CHR$(10)
+t = t + "    FOR EACH n IN namen : NEXT" + CHR$(10)
+t = t + "END SUB" + CHR$(10)
+PRINT CODE_TYPES$(t, CWD$())
+PRINT CODE_TYPES$("PRINT (", CWD$())
+--- datei lib.dh
+DIM b AS ARRAY OF STRING : b = ["x"]
+FOR EACH y IN b : NEXT
+--- erwartet
+[{"zeile":3,"name":"x","typ":"INTEGER"},{"zeile":5,"name":"k","typ":"STRING"},{"zeile":5,"name":"v","typ":"FLOAT"},{"zeile":9,"name":"n","typ":"STRING"}]
+[]

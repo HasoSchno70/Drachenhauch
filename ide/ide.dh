@@ -132,6 +132,8 @@ DIM F_FUNDSTELLE AS INTEGER : F_FUNDSTELLE = &HFFD070      ' das Wort unter der 
 DIM F_KLAMMER AS INTEGER : F_KLAMMER = &H70FFA0            ' das zusammengehoerende Klammernpaar
 DIM F_SUCHTREFFER AS INTEGER : F_SUCHTREFFER = &HFF8AD0    ' die Treffer der offenen Suchleiste
 
+' Typ-Hinweise hinter der Zeile (CODE_TYPES$), gedaempft blau.
+DIM F_TYP AS INTEGER : F_TYP = &H7FA6C8
 SUB codeFarben(licht AS BOOLEAN)
     IF licht THEN
         F_GRUND = &H1E2530 : F_KOMMENTAR = &H3D7A2E : F_TEXT = &HA5570A
@@ -142,6 +144,8 @@ SUB codeFarben(licht AS BOOLEAN)
         F_ZAHL = &HD07070 : F_SCHLUESSEL = &H2BC4E8 : F_OPERATOR = &H9AA8B8
         F_FUNDSTELLE = &HFFD070 : F_KLAMMER = &H70FFA0 : F_SUCHTREFFER = &HFF8AD0
     END IF
+    F_TYP = IIF(licht, &H5A7A9A, &H7FA6C8)
+    TON_PROJEKT = &H3B7BD8 : TON_AUSGABE = &H2E9E62 : TON_PROBLEME = &HD98B2B : TON_DEBUG = &H8C5BD6
 END SUB
 
 SCREEN(1280, 800, "Drachenhauch", 1)
@@ -172,10 +176,12 @@ FUNCTION farbMisch(a AS INTEGER, b AS INTEGER, t AS FLOAT) AS INTEGER
     RETURN (r SHL 16) BOR (gg SHL 8) BOR bb
 END FUNCTION
 
-CONST TON_PROJEKT = &H3B7BD8
-CONST TON_AUSGABE = &H2E9E62
-CONST TON_PROBLEME = &HD98B2B
-CONST TON_DEBUG = &H8C5BD6
+' Die Toene der Bereiche -- Variablen, weil eigene Farben (farben.json) sie
+' ueberschreiben duerfen; codeFarben setzt sie auf die Vorgabe zurueck.
+DIM TON_PROJEKT AS INTEGER : TON_PROJEKT = &H3B7BD8
+DIM TON_AUSGABE AS INTEGER : TON_AUSGABE = &H2E9E62
+DIM TON_PROBLEME AS INTEGER : TON_PROBLEME = &HD98B2B
+DIM TON_DEBUG AS INTEGER : TON_DEBUG = &H8C5BD6
 
 SUB bereichsFarben()
     DIM grund AS INTEGER : grund = GUI_THEME_GET("widget_bg")
@@ -373,6 +379,12 @@ DIM zaehlerAn AS BOOLEAN : zaehlerAn = TRUE
 ' Fehlertext am Zeilenende: die Meldung von Pruefen steht gedaempft rot bzw.
 ' gelb hinter ihrer Zeile -- man liest sie, ohne die Maus hinzubewegen.
 DIM fehlerEndeAn AS BOOLEAN : fehlerEndeAn = TRUE
+' Typ-Hinweise: hinter einer Zeile mit FOR EACH steht, was die Variable
+' haelt (CODE_TYPES$) -- ihr Typ steht sonst nirgends.
+DIM typHinweiseAn AS BOOLEAN : typHinweiseAn = TRUE
+DIM typFeld AS GUI_WIDGET : typFeld = -1
+DIM typZeilen AS ARRAY OF INTEGER : typZeilen = []
+DIM typTexte AS ARRAY OF STRING : typTexte = []
 DIM fehlerFeld AS GUI_WIDGET : fehlerFeld = -1
 DIM fehlerZeilen AS ARRAY OF INTEGER : fehlerZeilen = []
 DIM fehlerTexte AS ARRAY OF STRING : fehlerTexte = []
@@ -696,6 +708,7 @@ IF JSON_HAS(konfig, "blockkopf") THEN kopfAn = JSON_GET_BOOL(konfig, "blockkopf"
 IF JSON_HAS(konfig, "profil_waerme") THEN waermeAn = JSON_GET_BOOL(konfig, "profil_waerme")
 IF JSON_HAS(konfig, "aufrufzaehler") THEN zaehlerAn = JSON_GET_BOOL(konfig, "aufrufzaehler")
 IF JSON_HAS(konfig, "fehler_am_ende") THEN fehlerEndeAn = JSON_GET_BOOL(konfig, "fehler_am_ende")
+IF JSON_HAS(konfig, "typ_hinweise") THEN typHinweiseAn = JSON_GET_BOOL(konfig, "typ_hinweise")
 IF JSON_HAS(konfig, "neustart_beim_sichern") THEN neustartSichernAn = JSON_GET_BOOL(konfig, "neustart_beim_sichern")
 IF JSON_HAS(konfig, "start") THEN
     DIM sk AS INTEGER
@@ -957,6 +970,7 @@ DIM miAusdruck AS INTEGER : miAusdruck = GUI_MENU_ITEM(mWerkzeuge, tr$("Ausdruck
 
 DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, tr$("Ansicht"))
 DIM miThema AS INTEGER : miThema = GUI_MENU_ITEM(mAnsicht, tr$("Helles Thema"))
+DIM miFarbenEigen AS INTEGER : miFarbenEigen = GUI_MENU_ITEM(mAnsicht, tr$("Eigene Farben bearbeiten"))
 GUI_MENU_CHECK(miThema, hell)
 DIM miVollbild AS INTEGER : miVollbild = GUI_MENU_ITEM(mAnsicht, tr$("Vollbild"), kz$("Alt+Enter"))
 GUI_MENU_SEPARATOR(mAnsicht)
@@ -975,6 +989,8 @@ DIM miKopf AS INTEGER : miKopf = GUI_MENU_ITEM(mAnsicht, tr$("Mitlaufender Block
 GUI_MENU_CHECK(miKopf, kopfAn)
 DIM miFehlerEnde AS INTEGER : miFehlerEnde = GUI_MENU_ITEM(mAnsicht, tr$("Fehlertext am Zeilenende"))
 GUI_MENU_CHECK(miFehlerEnde, fehlerEndeAn)
+DIM miTypen AS INTEGER : miTypen = GUI_MENU_ITEM(mAnsicht, tr$("Typ-Hinweise"))
+GUI_MENU_CHECK(miTypen, typHinweiseAn)
 DIM miWaerme AS INTEGER : miWaerme = GUI_MENU_ITEM(mAnsicht, tr$("Profil im Code (nach Strg+Umschalt+Y)"))
 GUI_MENU_CHECK(miWaerme, waermeAn)
 DIM miZaehler AS INTEGER : miZaehler = GUI_MENU_ITEM(mAnsicht, tr$("Aufrufzähler über Unterprogrammen"))
@@ -1929,6 +1945,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "profil_waerme", waermeAn)
     JSON_SET_BOOL(konfig, "aufrufzaehler", zaehlerAn)
     JSON_SET_BOOL(konfig, "fehler_am_ende", fehlerEndeAn)
+    JSON_SET_BOOL(konfig, "typ_hinweise", typHinweiseAn)
     JSON_SET_BOOL(konfig, "neustart_beim_sichern", neustartSichernAn)
     JSON_SET_JSON(konfig, "start", JSON_PARSE("[]"))
     DIM sti AS INTEGER
@@ -3311,6 +3328,10 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
         tastenAnwenden()
         RETURN TRUE
     END IF
+    IF wegGleich$(pfad) = wegGleich$(farbenPfad$()) THEN
+        themaAnwenden()
+        RETURN TRUE
+    END IF
     IF DIRNAME(pfad) <> projektOrdner THEN
         projektOrdner = DIRNAME(pfad)
         baumFuellen()
@@ -3845,6 +3866,7 @@ SUB pruefen()
     NEXT
     problemZeilen = zeilen
     wellenSetzen(ta, j, n)
+    typenSammeln(ta, basis)
     DIM altF AS GUI_WIDGET : altF = fehlerFeld
     fehlerFeld = ta : fehlerZeilen = fz : fehlerTexte = ftx : fehlerFarben = ffa
     IF altF >= 0 AND altF <> ta THEN hinweiseZeigen(altF)
@@ -5163,6 +5185,17 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
     FOR i = 0 TO LEN(zl) - 1
         ARRAY_PUSH(farben, -1)
     NEXT
+    IF typHinweiseAn AND ta = typFeld THEN
+        FOR i = 0 TO LEN(typZeilen) - 1
+            DIM tk AS INTEGER : tk = ARRAY_INDEXOF(zl, typZeilen[i])
+            IF tk >= 0 THEN
+                tx[tk] = tx[tk] + "   ·   " + typTexte[i]
+            ELSE
+                ARRAY_PUSH(zl, typZeilen[i]) : ARRAY_PUSH(tx, typTexte[i])
+                ARRAY_PUSH(farben, F_TYP)
+            END IF
+        NEXT
+    END IF
     IF fehlerEndeAn AND ta = fehlerFeld THEN
         FOR i = 0 TO LEN(fehlerZeilen) - 1
             DIM fk AS INTEGER : fk = ARRAY_INDEXOF(zl, fehlerZeilen[i])
@@ -5194,6 +5227,176 @@ SUB fehlerSammeln(fz AS ARRAY OF INTEGER, ftx AS ARRAY OF STRING, ffa AS ARRAY O
     ELSE
         ARRAY_PUSH(fz, zeile) : ARRAY_PUSH(ftx, m) : ARRAY_PUSH(ffa, farbe)
     END IF
+END SUB
+
+' Die Typen, die der Uebersetzer fuer Stellen ohne geschriebenen Typ kennt
+' (FOR EACH), als Hinweise je Zeile: "x: INTEGER", mehrere mit Komma.
+SUB typenSammeln(ta AS GUI_WIDGET, basis AS STRING)
+    typFeld = ta : typZeilen = [] : typTexte = []
+    IF NOT typHinweiseAn THEN RETURN
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_TYPES$(GUI_TEXT(ta), basis))
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "") - 1
+        DIM z AS INTEGER : z = JSON_GET_INT(j, STR$(i) + ".zeile")
+        DIM t AS STRING : t = JSON_GET_STRING(j, STR$(i) + ".name") + ": " + JSON_GET_STRING(j, STR$(i) + ".typ")
+        DIM k AS INTEGER : k = ARRAY_INDEXOF(typZeilen, z)
+        IF k >= 0 THEN
+            typTexte[k] = typTexte[k] + ", " + t
+        ELSE
+            ARRAY_PUSH(typZeilen, z) : ARRAY_PUSH(typTexte, t)
+        END IF
+    NEXT
+    IF LEN(typZeilen) > 0 THEN protokoll("typen " + STR$(LEN(typZeilen)))
+END SUB
+
+SUB typHinweiseSetzen(an AS BOOLEAN)
+    typHinweiseAn = an
+    GUI_MENU_CHECK(miTypen, an)
+    IF an THEN
+        pruefen()
+    ELSEIF typFeld >= 0 THEN
+        hinweiseZeigen(typFeld)
+    END IF
+    GUI_SET_TEXT(lblStatus, IIF(an, tr$("Typ-Hinweise an."), tr$("Typ-Hinweise aus.")))
+    protokoll("typ hinweise " + IIF(an, "an", "aus"))
+    konfigSichern()
+END SUB
+
+' --- Eigene Farben (farben.json neben der ide.json) -----------------------
+' {"dunkel": {"schluessel": "#2BC4E8", ..., "oberflaeche": {"accent": ...}},
+'  "hell": {...}} -- nur, was ANDERS sein soll. Code-Farben und die Toene der
+' Bereiche haben feste Namen, unter "oberflaeche" steht jeder Schluessel von
+' GUI_THEME_SET. Gilt nach dem Sichern der Datei sofort.
+DIM farbMeldungen AS ARRAY OF STRING : farbMeldungen = []
+FUNCTION farbenPfad$() AS STRING
+    RETURN PATHJOIN(konfigOrdner$(), "farben.json")
+END FUNCTION
+
+SUB farbMelden(m AS STRING)
+    ARRAY_PUSH(farbMeldungen, m)
+    ausgabe("Farben: " + m)
+    protokoll("farben meldung " + m)
+END SUB
+
+' Eine Farbe aus der Datei, -1 = keine (dann gemeldet).
+FUNCTION farbWert(j AS JSON_HANDLE, pfad AS STRING) AS INTEGER
+    IF JSON_TYPE(j, pfad) <> "string" THEN
+        farbMelden(pfad + ": keine Farbe (#RRGGBB)")
+        RETURN -1
+    END IF
+    DIM f AS INTEGER : f = -1
+    TRY
+        f = COLOR_FROM_HEX(JSON_GET_STRING(j, pfad))
+    CATCH e
+        farbMelden(pfad + ": " + JSON_GET_STRING(j, pfad) + " ist keine Farbe")
+    END TRY
+    RETURN f
+END FUNCTION
+
+SUB eigeneFarben(licht AS BOOLEAN)
+    farbMeldungen = []
+    DIM p AS STRING : p = farbenPfad$()
+    IF NOT FILEEXISTS(p) THEN RETURN
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(p)
+    CATCH e
+        farbMelden("farben.json lässt sich nicht lesen: " + e)
+        RETURN
+    END TRY
+    DIM teil AS STRING : teil = IIF(licht, "hell", "dunkel")
+    IF NOT JSON_HAS(j, teil) THEN RETURN
+    DIM n AS INTEGER : n = 0
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(j, teil)
+        IF LOWER$(k) = "oberflaeche" THEN
+            DIM ok AS STRING
+            FOR EACH ok IN JSON_KEYS(j, teil + ".oberflaeche")
+                DIM fo AS INTEGER : fo = farbWert(j, teil + ".oberflaeche." + ok)
+                IF fo < 0 THEN CONTINUE
+                TRY
+                    GUI_THEME_SET(ok, fo)
+                    n = n + 1
+                CATCH e2
+                    farbMelden(teil + ".oberflaeche: unbekannter Name " + ok)
+                END TRY
+            NEXT
+            CONTINUE
+        END IF
+        DIM f AS INTEGER : f = farbWert(j, teil + "." + k)
+        IF f < 0 THEN CONTINUE
+        DIM bekannt AS BOOLEAN : bekannt = TRUE
+        SELECT CASE LOWER$(k)
+            CASE "grund" : F_GRUND = f
+            CASE "kommentar" : F_KOMMENTAR = f
+            CASE "text" : F_TEXT = f
+            CASE "zahl" : F_ZAHL = f
+            CASE "schluessel" : F_SCHLUESSEL = f
+            CASE "operator" : F_OPERATOR = f
+            CASE "fundstelle" : F_FUNDSTELLE = f
+            CASE "klammer" : F_KLAMMER = f
+            CASE "suchtreffer" : F_SUCHTREFFER = f
+            CASE "typ" : F_TYP = f
+            CASE "projekt" : TON_PROJEKT = f
+            CASE "ausgabe" : TON_AUSGABE = f
+            CASE "probleme" : TON_PROBLEME = f
+            CASE "debugger" : TON_DEBUG = f
+            CASE ELSE : bekannt = FALSE
+        END SELECT
+        IF bekannt THEN
+            n = n + 1
+        ELSE
+            farbMelden(teil + ": unbekannter Name " + k)
+        END IF
+    NEXT
+    protokoll("eigene farben " + teil + " " + STR$(n))
+END SUB
+
+' Thema an EINER Stelle: Vorlage, Feinschliff, Code-Farben, eigene Farben,
+' dann alles, was aus ihnen gerechnet ist.
+SUB themaAnwenden()
+    IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
+    themaFeinschliff()
+    codeFarben(hell)
+    eigeneFarben(hell)
+    bereichsFarben()
+    hbFarben()
+    hbQuelleFaerben()
+    wasserzeichenAlle()
+    faerbSchluessel = "" : gliederungSchluessel = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        hinweiseZeigen(tabFelder[i])
+    NEXT
+END SUB
+
+' Eine Zeile der Vorlage: die Werte des Themas, wie sie ohne eigene Farben sind.
+FUNCTION farbVorlageTeil$(licht AS BOOLEAN) AS STRING
+    codeFarben(licht)
+    DIM q AS STRING : q = CHR$(34)
+    DIM namen AS ARRAY OF STRING : namen = ["grund", "kommentar", "text", "zahl", "schluessel", "operator", "fundstelle", "klammer", "suchtreffer", "typ", "projekt", "ausgabe", "probleme", "debugger"]
+    DIM werte AS ARRAY OF INTEGER : werte = [F_GRUND, F_KOMMENTAR, F_TEXT, F_ZAHL, F_SCHLUESSEL, F_OPERATOR, F_FUNDSTELLE, F_KLAMMER, F_SUCHTREFFER, F_TYP, TON_PROJEKT, TON_AUSGABE, TON_PROBLEME, TON_DEBUG]
+    DIM t AS STRING : t = "  " + q + IIF(licht, "hell", "dunkel") + q + ": {" + NL
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        t = t + "    " + q + namen[i] + q + ": " + q + COLOR_HEX$(werte[i]) + q + "," + NL
+    NEXT
+    t = t + "    " + q + "oberflaeche" + q + ": {}" + NL + "  }"
+    RETURN t
+END FUNCTION
+
+SUB farbenEigenOeffnen()
+    DIM p AS STRING : p = farbenPfad$()
+    IF NOT FILEEXISTS(p) THEN
+        DIM t AS STRING : t = "{" + NL + farbVorlageTeil$(FALSE) + "," + NL + farbVorlageTeil$(TRUE) + NL + "}" + NL
+        codeFarben(hell)
+        eigeneFarben(hell)
+        IF NOT DIREXISTS(DIRNAME(p)) THEN MKDIR(DIRNAME(p))
+        WRITEALL(p, t)
+    END IF
+    tabOeffnen(p, dateiLesen(p))
+    GUI_SET_TEXT(lblStatus, tr$("Eigene Farben -- nach dem Sichern (Strg+S) gelten sie."))
+    protokoll("eigene farben datei")
 END SUB
 
 SUB fehlerEndeSetzen(an AS BOOLEAN)
@@ -14501,6 +14704,8 @@ paletteEintrag("Andere Reiter schließen", "andere_zu", "Strg+Umschalt+W")
 paletteEintrag("Einrückungslinien", "linien", "")
 paletteEintrag("Mitlaufender Blockkopf", "blockkopf", "")
 paletteEintrag("Fehlertext am Zeilenende", "fehler_am_ende", "")
+paletteEintrag("Typ-Hinweise", "typ_hinweise", "")
+paletteEintrag("Eigene Farben bearbeiten", "farben_eigen", "")
 paletteEintrag("Zurück zur vorigen Stelle", "nav_zurueck", "Strg+Alt+Links")
 paletteEintrag("Vorwärts", "nav_vor", "Strg+Alt+Rechts")
 paletteEintrag("Neue Datei im Projekt ...", "baum_neue_datei", "")
@@ -15108,16 +15313,11 @@ SUB befehl(k AS STRING)
         CASE "thema"
             hell = NOT hell
             GUI_MENU_CHECK(miThema, hell)
-            IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
-            themaFeinschliff()
-            bereichsFarben()
-            codeFarben(hell)
-            hbFarben()
-            hbQuelleFaerben()
-            wasserzeichenAlle()
-            faerbSchluessel = "" : gliederungSchluessel = ""
+            themaAnwenden()
             protokoll("codefarben " + COLOR_HEX$(F_SCHLUESSEL))
             konfigSichern()
+        CASE "farben_eigen" : farbenEigenOeffnen()
+        CASE "typ_hinweise" : typHinweiseSetzen(NOT typHinweiseAn)
         CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
         CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
         CASE "geteilt" : geteiltSetzen(NOT geteilt)
@@ -15226,6 +15426,7 @@ menueBefehl(miFundstellen, "fundstellen", "Strg+Umschalt+F12") : menueBefehl(miV
 menueBefehl(miUmbauWdh, "umbau_wieder", "") : menueBefehl(miUmbauNach, "umbau_nach", "Strg+Umschalt+G") : menueBefehl(miVergleich, "vergleichen", "")
 menueBefehl(miReiterVgl, "reiter_vergleich", "") : menueBefehl(miZlSort, "zl_sortieren", "") : menueBefehl(miZlDoppelt, "zl_doppelte", "")
 menueBefehl(miZlRand, "zl_rand", "") : menueBefehl(miAndereZu, "andere_zu", "Strg+Umschalt+W") : menueBefehl(miLinien, "linien", "")
+menueBefehl(miTypen, "typ_hinweise", "") : menueBefehl(miFarbenEigen, "farben_eigen", "")
 menueBefehl(miFehlerEnde, "fehler_am_ende", "") : menueBefehl(miKopf, "blockkopf", "") : menueBefehl(miWaerme, "profil_waerme", "") : menueBefehl(miZaehler, "aufrufzaehler", "") : menueBefehl(miQv, "git_fenster", "Strg+Alt+G")
 menueBefehl(miLive, "live", "Strg+Alt+L") : menueBefehl(miPruefsammlung, "pruefsammlung", "Strg+Alt+F5") : menueBefehl(miPrueffall, "prueffall", "Strg+Alt+Umschalt+F5")
 menueBefehl(miTestUebersicht, "test_uebersicht", "Strg+Alt+T") : menueBefehl(miNeuProjekt, "neues_projekt", "Strg+Alt+N") : menueBefehl(miEinfuehren, "einfuehren", "Strg+Alt+V")
@@ -15327,6 +15528,7 @@ END IF
 whAnbieten()
 whSchreiben(TRUE)
 whFaellig = GET_TIME() + whTakt
+eigeneFarben(hell)
 bereichsFarben()
 listenSchrift(listenGroesse)
 handbuchSchrift(handbuchGroesse)

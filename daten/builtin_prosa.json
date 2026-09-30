@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1974,
+ "count": 1975,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -300,6 +300,7 @@
   "CODE_REFERENCES": "ARRAY OF INTEGER die Zeilen aller Vorkommen",
   "CODE_RENAME$": "STRING — der Quelltext mit dem Namen an dieser Stelle überall in neu$ umbenannt — ganze Wörter, ohne Kommentare und Zeichenketten. Leer, wenn dort kein Name steht, es ein Schlüsselwort ist oder neu$ keiner ist",
   "CODE_SYMBOLS$": "STRING (JSON) die Gliederung: {name, art, von, bis, kinder} — Klassen mit ihren Methoden",
+  "CODE_TYPES$": "STRING (JSON) Typ-Hinweise für einen Editor: je Stelle ohne geschriebenen Typ -- heute die Variablen von FOR EACH -- {\"zeile\", \"name\", \"typ\"} (Zeile ab 1; MAP liefert Schlüssel als STRING, in der Paar-Form dazu den Wert); was der Übersetzer nicht weiß, fehlt",
   "COLLIDES": "AABB-Kollision zweier Rechtecke. Berührungen zählen nicht (Kanten gleich → FALSE).",
   "COLOR_FROM_HEX": "#RGB, #RRGGBB, #AARRGGBB — mit oder ohne #, auch 0x/&H",
   "COLOR_HEX$": "\"#RRGGBB\", mit Deckkraft \"#AARRGGBB\"",

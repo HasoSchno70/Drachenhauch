@@ -133,6 +133,7 @@ Beispiele nach Themen ...	Examples by topic ...
 Ausdruck im Debugger auswerten	Evaluate expression in debugger
 Ansicht	View
 Helles Thema	Light theme
+Eigene Farben bearbeiten	Edit custom colours
 Vollbild	Full screen
 Geteilte Ansicht	Split view
 Dieselbe Datei nebeneinander	Same file side by side
@@ -142,6 +143,7 @@ Zeilenumbruch	Word wrap
 Einrückungslinien	Indent guides
 Mitlaufender Blockkopf	Sticky block header
 Fehlertext am Zeilenende	Error text at line end
+Typ-Hinweise	Type hints
 Profil im Code (nach Strg+Umschalt+Y)	Profile in code (after Ctrl+Shift+Y)
 Aufrufzähler über Unterprogrammen	Call counts above subroutines
 Live-Vorschau	Live preview
@@ -447,6 +449,9 @@ Zurückgeholt	Unstashed
  Stand/Stände beiseite.	 stash(es) put aside.
 Blame an der Zeile der Marke an.	Blame at the cursor line on.
 Blame an der Zeile der Marke aus.	Blame at the cursor line off.
+Typ-Hinweise an.	Type hints on.
+Typ-Hinweise aus.	Type hints off.
+Eigene Farben -- nach dem Sichern (Strg+S) gelten sie.	Custom colours -- they apply after saving (Ctrl+S).
 Fehlertext am Zeilenende an.	Error text at line end on.
 Fehlertext am Zeilenende aus.	Error text at line end off.
 Die Marke steht in keinem Konflikt (<<<<<<< ... >>>>>>>).	The cursor is in no conflict (<<<<<<< ... >>>>>>>).

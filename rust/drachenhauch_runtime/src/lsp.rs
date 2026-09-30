@@ -113,6 +113,28 @@ pub fn diagnose(text: &str, basis: &Path) -> Vec<Value> {
     aus
 }
 
+/// Typ-Hinweise fuer den Editor: je Stelle ohne geschriebenen Typ (heute
+/// die Variablen von FOR EACH) Zeile (ab 1, im Puffer), Name und Typ.
+/// Stellen aus importierten Dateien fallen weg; was der Compiler nicht weiss,
+/// steht nicht darin.
+pub fn typ_hinweise(text: &str, basis: &Path) -> Vec<(u32, String, String)> {
+    let roh = crate::compiler::typ_hinweise_sammeln(|| { let _ = crate::check_source(text, basis, "<editor>"); });
+    let herkunft = crate::preprocess::process(text, basis).ok().map(|r| r.2);
+    let mut aus: Vec<(u32, String, String)> = Vec::new();
+    for (z, name, typ) in roh {
+        let zeile = match herkunft.as_ref().and_then(|h| h.get((z as usize).saturating_sub(1))) {
+            Some(h) if h.datei.is_empty() => h.zeile,
+            Some(_) => continue,
+            None => z,
+        };
+        if !aus.iter().any(|(a, b, _)| *a == zeile && b.eq_ignore_ascii_case(&name)) {
+            aus.push((zeile, name, typ));
+        }
+    }
+    aus.sort_by_key(|e| e.0);
+    aus
+}
+
 fn diagnose_uebersetzer(text: &str, basis: &Path) -> Vec<Value> {
     let roh = crate::check_source(text, basis, "<editor>");
     let herkunft = crate::preprocess::process(text, basis).ok().map(|r| r.2);
