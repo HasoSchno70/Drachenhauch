@@ -3201,6 +3201,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_CONTEXT_WIDGET",
+   "kind": "core",
+   "signature": "GUI_CONTEXT_WIDGET(menu, wdg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CURSORS",
    "kind": "core",
    "signature": "GUI_CURSORS(an)",

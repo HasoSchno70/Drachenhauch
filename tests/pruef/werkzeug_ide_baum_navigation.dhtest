@@ -1,0 +1,318 @@
+' Drei Handgriffe der IDE:
+' (1) Dateien im Projektbaum verwalten: Rechtsklick -> Neue Datei, Neuer
+'     Ordner, Umbenennen, Loeschen, Pfad kopieren (GUI_CONTEXT_WIDGET).
+'     Umbenennen zieht offene Reiter und jedes IMPORT im Projekt mit.
+' (2) Zurueck zur vorigen Stelle / Vorwaerts (Strg+Alt+Links/Rechts): jeder
+'     Sprung in eine andere Datei oder um mindestens acht Zeilen wird gemerkt.
+' (3) Ausgabe filtern und sichern.
+--- seriell
+--- langsam
+
+=== rechtsklick im baum waehlt ohne zu oeffnen und legt eine datei an
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    ' Die obere Kante des Baums suchen, dann in seine erste Zeile.
+    DIM prY AS INTEGER : prY = -1
+    DIM prX AS INTEGER : prX = -1
+    DIM prYY AS INTEGER
+    DIM prXX AS INTEGER
+    FOR prYY = 0 TO SCREENHEIGHT() - 1 STEP 2
+        FOR prXX = 10 TO 200 STEP 10
+            IF prY < 0 AND GUI_HIT_TEST(prXX, prYY) = baum THEN prY = prYY : prX = prXX + 30
+        NEXT
+    NEXT
+    protokoll("pr baum gefunden " + STR$(prY >= 0))
+    DIM prA AS STRING : prA = ""
+    prA = prA + "e 0 7 " + STR$(prX) + " " + STR$(prY + 10) + " 0" + CHR$(10)
+    prA = prA + "e 2 6 1 0 0" + CHR$(10) + "e 3 5 1 0 0" + CHR$(10)
+    prA = prA + "e 20 2 264 0 0" + CHR$(10) + "e 21 1 264 0 0" + CHR$(10)
+    prA = prA + "e 24 2 257 0 0" + CHR$(10) + "e 25 1 257 0 0" + CHR$(10)
+    prA = prA + "e 40 2 257 0 0" + CHR$(10) + "e 41 1 257 0 0" + CHR$(10)
+    WRITEALL("prmaus.txt", "c 9" + CHR$(10) + prA + CHR$(10))
+    AUTOMATION_PLAY("prmaus.txt")
+END IF
+IF prBild = 45 THEN
+    protokoll("pr gewaehlt " + BASENAME(GUI_FILETREE_SELECTED$(baum)) + " reiter " + STR$(tabAnzahl))
+END IF
+IF prBild = 110 THEN
+    protokoll("pr reiter " + STR$(tabAnzahl) + " vorn " + BASENAME(tabPfade[aktiverTab]))
+    EXIT(0)
+END IF
+--- argumente
+d.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei c.dh
+PRINT "c"
+--- datei d.dh
+PRINT "d"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 5) = "baum " THEN PRINT L[i]
+NEXT
+PRINT "neu.dh da "; FILEEXISTS("neu.dh")
+--- erwartet
+pr baum gefunden TRUE
+pr gewaehlt c.dh reiter 1
+baum neue datei neu.dh
+pr reiter 2 vorn neu.dh
+neu.dh da TRUE
+
+=== umbenennen zieht reiter und imports mit
+' haupt.dh ist offen und gesichert, andere.dh nicht offen: beide bekommen
+' den neuen Namen im IMPORT, der Kommentar nicht.
+baumUmbenennen(PATHJOIN(projektOrdner, "lib/helfer.dh"), "werkzeug.dh")
+protokoll("pr reiter " + BASENAME(tabPfade[aktiverTab]) + " sauber " + STR$(GUI_TEXT(tabFelder[aktiverTab]) = tabGesichert[aktiverTab]))
+dateiOeffnen(PATHJOIN(projektOrdner, "lib/werkzeug.dh"))
+protokoll("pr zweiter reiter " + BASENAME(tabPfade[aktiverTab]) + " reiter " + STR$(tabAnzahl))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+' IMPORT "lib/helfer.dh" bleibt im Kommentar stehen
+IMPORT "lib/helfer.dh"
+hallo()
+--- datei andere.dh
+IMPORT "lib/helfer.dh"
+hallo()
+--- datei lib/helfer.dh
+SUB hallo()
+    PRINT "hallo"
+END SUB
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 5) = "baum " THEN PRINT L[i]
+NEXT
+PRINT "alt da "; FILEEXISTS("lib/helfer.dh"); " neu da "; FILEEXISTS("lib/werkzeug.dh")
+DIM z AS STRING
+FOR EACH z IN READLINES("haupt.dh")
+    PRINT "haupt |"; z
+NEXT
+FOR EACH z IN READLINES("andere.dh")
+    PRINT "andere |"; z
+NEXT
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "andere.dh")
+DIM r AS INTEGER : r = 0
+WHILE PROCESS_RUNNING(p) AND r < 300 : SLEEP(20) : r = r + 1 : WEND
+SLEEP(50)
+PRINT "lauf "; TRIM$(REPLACE$(PROCESS_READ$(p), CHR$(13), ""))
+--- erwartet
+baum umbenannt helfer.dh werkzeug.dh imports 2
+pr reiter haupt.dh sauber TRUE
+pr zweiter reiter werkzeug.dh reiter 2
+alt da FALSE neu da TRUE
+haupt |' IMPORT "lib/helfer.dh" bleibt im Kommentar stehen
+haupt |IMPORT "lib/werkzeug.dh"
+haupt |hallo()
+andere |IMPORT "lib/werkzeug.dh"
+andere |hallo()
+lauf hallo
+
+=== loeschen schliesst den reiter, ordner mit inhalt
+baumLoeschen(PATHJOIN(projektOrdner, "weg.dh"))
+protokoll("pr reiter " + STR$(tabAnzahl))
+baumLoeschen(PATHJOIN(projektOrdner, "alt"))
+baumZiel = "" : dlgBaumLoeschen = -1
+' Das Projekt selbst loescht die IDE nicht.
+GUI_FILETREE_SELECT(baum, projektOrdner)
+baumLoeschenFragen()
+protokoll("pr dialog " + STR$(dlgBaumLoeschen >= 0))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+weg.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei weg.dh
+PRINT 1
+--- datei bleibt.dh
+PRINT 2
+--- datei alt/a.dh
+PRINT 3
+--- datei alt/b/c.dh
+PRINT 4
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 5) = "baum " THEN PRINT L[i]
+NEXT
+PRINT FILEEXISTS("weg.dh"); " "; DIREXISTS("alt"); " "; FILEEXISTS("bleibt.dh")
+--- erwartet
+baum geloescht weg.dh
+pr reiter 0
+baum geloescht alt
+pr dialog FALSE
+FALSE FALSE TRUE
+
+=== ungueltige namen und vorhandene dateien werden abgelehnt
+baumAktion = "datei" : baumZiel = projektOrdner
+baumAusfuehren("../raus.dh")
+protokoll("pr status " + GUI_TEXT(lblStatus))
+baumAusfuehren("da.dh")
+protokoll("pr status " + GUI_TEXT(lblStatus))
+baumAktion = "ordner"
+baumAusfuehren("unter")
+protokoll("pr ordner " + STR$(DIREXISTS(PATHJOIN(projektOrdner, "unter"))))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+da.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei da.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 5) = "baum " THEN PRINT L[i]
+NEXT
+PRINT FILEEXISTS("../raus.dh")
+--- erwartet
+pr status Kein gültiger Name: ../raus.dh
+pr status Gibt es schon: da.dh
+baum neuer ordner unter
+pr ordner TRUE
+FALSE
+
+=== zurueck und vorwaerts ueber spruenge und dateien
+DIM prBild AS INTEGER : prBild = 0
+FUNCTION prStelle$() AS STRING
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    RETURN BASENAME(tabPfade[aktiverTab]) + ":" + STR$(z)
+END FUNCTION
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 3, 1)
+' ein kleiner Schritt: kein Sprung
+IF prBild = 22 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 5, 1)
+IF prBild = 24 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 25, 1)
+IF prBild = 26 THEN dateiOeffnen(PATHJOIN(projektOrdner, "zwei.dh"))
+IF prBild = 28 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 1)
+IF prBild = 30 THEN protokoll("pr jetzt " + prStelle$()) : befehl("nav_zurueck")
+IF prBild = 32 THEN protokoll("pr nach 1 " + prStelle$()) : befehl("nav_zurueck")
+IF prBild = 34 THEN protokoll("pr nach 2 " + prStelle$()) : befehl("nav_zurueck")
+IF prBild = 36 THEN protokoll("pr nach 3 " + prStelle$()) : befehl("nav_zurueck")
+IF prBild = 38 THEN protokoll("pr nach 4 " + prStelle$()) : befehl("nav_vor")
+IF prBild = 40 THEN protokoll("pr vor 1 " + prStelle$()) : befehl("nav_vor")
+IF prBild = 42 THEN protokoll("pr vor 2 " + prStelle$())
+' Ein neuer Sprung nimmt die Vorwaerts-Liste weg.
+IF prBild = 44 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 20, 1)
+IF prBild = 46 THEN befehl("nav_vor") : protokoll("pr status " + GUI_TEXT(lblStatus))
+IF prBild = 48 THEN EXIT(0)
+--- argumente
+eins.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM t AS STRING : t = ""
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    t = t + "PRINT " + STR$(i) + CHR$(10)
+NEXT
+WRITEALL("eins.dh", t)
+WRITEALL("zwei.dh", t)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 4) = "nav " THEN PRINT L[i]
+NEXT
+--- erwartet
+nav gemerkt eins.dh 5
+nav gemerkt eins.dh 25
+pr jetzt zwei.dh:2
+nav zurueck eins.dh 25
+pr nach 1 eins.dh:25
+nav zurueck eins.dh 5
+pr nach 2 eins.dh:5
+pr nach 3 eins.dh:5
+pr nach 4 eins.dh:5
+nav vor eins.dh 25
+pr vor 1 eins.dh:25
+nav vor zwei.dh 2
+pr vor 2 zwei.dh:2
+nav gemerkt zwei.dh 2
+pr status Keine Stelle zum Vorwärtsgehen.
+
+=== die ausgabe laesst sich filtern und sichern
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN befehl("start")
+IF prBild = 100 THEN
+    GUI_SET_TEXT(tfAusgabeFilter, "APFEL")
+END IF
+IF prBild = 103 THEN
+    ausgabeSichernNach(PATHJOIN(projektOrdner, "gefiltert.txt"))
+    GUI_SET_TEXT(tfAusgabeFilter, "")
+END IF
+IF prBild = 106 THEN
+    ausgabeSichernNach(PATHJOIN(projektOrdner, "alles.txt"))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT "apfel 1"
+PRINT "birne 2"
+PRINT "Apfelkuchen 3"
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 15) = "ausgabe filter " OR LEFT$(L[i], 18) = "ausgabe gesichert " THEN PRINT L[i]
+NEXT
+DIM z AS STRING
+FOR EACH z IN READLINES("gefiltert.txt")
+    PRINT "gefiltert |"; z
+NEXT
+FOR EACH z IN READLINES("alles.txt")
+    PRINT "alles |"; z
+NEXT
+--- erwartet
+ausgabe filter [APFEL] 2
+ausgabe gesichert 2
+ausgabe filter [] 3
+ausgabe gesichert 3
+gefiltert |apfel 1
+gefiltert |Apfelkuchen 3
+alles |apfel 1
+alles |birne 2
+alles |Apfelkuchen 3

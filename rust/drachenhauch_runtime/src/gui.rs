@@ -2829,6 +2829,10 @@ struct Menu {
     /// das Popup offen ist; zu setzt beides zurueck.
     auf_t: f32,
     b: Blende,
+    /// Kontextmenue eines Widgets (GUI_CONTEXT_WIDGET): oeffnet nur beim
+    /// Rechtsklick auf dieses Widget (Index im Fenster), -1 = ueberall im
+    /// Fenster, wo kein gebundenes trifft.
+    ziel: i64,
 }
 
 struct MenuItem {
@@ -9389,7 +9393,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let wi = win as usize;
         let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: erwartet GUI_WINDOW", fn_))?;
         let mi = w.menus.len();
-        w.menus.push(Menu { label, in_bar, unter: false, items: Vec::new(), auf_t: 0.0, b: Blende::default() });
+        w.menus.push(Menu { label, in_bar, unter: false, items: Vec::new(), auf_t: 0.0, b: Blende::default(), ziel: -1 });
         Ok(enc_menu(wi, mi))
     }
     /// Top-Level-Menue in der Menueleiste (z.B. "Datei").
@@ -9431,7 +9435,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.menu_mut(menu, "GUI_SUBMENU")?;
         let w = &mut self.windows[wi];
         let smi = w.menus.len();
-        w.menus.push(Menu { label: label.clone(), in_bar: false, unter: true, items: Vec::new(), auf_t: 0.0, b: Blende::default() });
+        w.menus.push(Menu { label: label.clone(), in_bar: false, unter: true, items: Vec::new(), auf_t: 0.0, b: Blende::default(), ziel: -1 });
         let mut it = MenuItem::neu(label, false);
         it.sub = smi as i32;
         w.menus[mi].items.push(it);
@@ -10277,7 +10281,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
             if let Some(sub) = itj["items"].as_array() {
                 let smi = win.menus.len();
-                win.menus.push(Menu { label: it.label.clone(), in_bar: false, unter: true, items: Vec::new(), auf_t: 0.0, b: Blende::default() });
+                win.menus.push(Menu { label: it.label.clone(), in_bar: false, unter: true, items: Vec::new(), auf_t: 0.0, b: Blende::default(), ziel: -1 });
                 let sub_items = Self::menu_items_aus_json(win, sub);
                 win.menus[smi].items = sub_items;
                 it.sub = smi as i32;
@@ -11403,7 +11407,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 self.windows[wi].menus.push(Menu {
                     label: mj["label"].as_str().unwrap_or("").to_string(),
                     in_bar: mj["in_bar"].as_bool().unwrap_or(true),
-                    unter: false, items: Vec::new(), auf_t: 0.0, b: Blende::default(),
+                    unter: false, items: Vec::new(), auf_t: 0.0, b: Blende::default(), ziel: -1,
                 });
                 let items = match mj["items"].as_array() {
                     Some(its) => Self::menu_items_aus_json(&mut self.windows[wi], its),
@@ -12887,7 +12891,21 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         if right_just {
             if let Some(wi) = self.topmost_at(mx, my) {
-                if let Some(mi) = self.windows[wi].menus.iter().position(|m| !m.in_bar && !m.unter) {
+                // Ein an ein Widget gebundenes Kontextmenue gewinnt, wenn die
+                // Maus auf seinem Widget steht; sonst das des Fensters. Das
+                // Widget waehlt dabei trotzdem seine Zeile (Liste, Baum,
+                // Tabelle): der Rechtsklick erreicht es im selben Bild.
+                let mut wahl: Option<usize> = None;
+                for (mi, m) in self.windows[wi].menus.iter().enumerate() {
+                    if m.in_bar || m.unter || m.ziel < 0 { continue; }
+                    let Some(w) = self.windows[wi].widgets.get(m.ziel as usize) else { continue; };
+                    if !w.alive || !self.widget_shown(wi, w) { continue; }
+                    if Self::in_rect(mx, my, self.abs_rect(wi, w)) { wahl = Some(mi); break; }
+                }
+                if wahl.is_none() {
+                    wahl = self.windows[wi].menus.iter().position(|m| !m.in_bar && !m.unter && m.ziel < 0);
+                }
+                if let Some(mi) = wahl {
                     self.context_open = Some((wi, mi, mx, my));
                     self.menu_cursor = None;
                     return true;
@@ -12895,6 +12913,23 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             }
         }
         false
+    }
+
+    /// GUI_CONTEXT_WIDGET(menu, wdg): das Kontextmenue gehoert zu einem
+    /// Widget desselben Fensters und oeffnet nur beim Rechtsklick darauf.
+    /// wdg = -1 bindet es wieder ans ganze Fenster.
+    pub fn context_widget(&mut self, menu: i64, wdg: i64) -> Result<(), String> {
+        let (wi, _) = dec_menu(menu);
+        let ziel = if wdg < 0 { -1 } else {
+            let (ww, i) = Self::dec_widget(wdg);
+            self.wdg(wdg, "GUI_CONTEXT_WIDGET")?;
+            if ww != wi { return Err("GUI_CONTEXT_WIDGET: Menue und Widget liegen in verschiedenen Fenstern".into()); }
+            i as i64
+        };
+        let m = self.menu_mut(menu, "GUI_CONTEXT_WIDGET")?;
+        if m.in_bar || m.unter { return Err("GUI_CONTEXT_WIDGET: erwartet ein Menue aus GUI_CONTEXT".into()); }
+        m.ziel = ziel;
+        Ok(())
     }
 
     /// Zeichen-Index, dessen Caret-Position am naechsten an `target_px` liegt

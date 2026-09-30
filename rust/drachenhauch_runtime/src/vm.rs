@@ -7364,6 +7364,7 @@ impl<'p> Vm<'p> {
             "gui_clicked" => Value::Bool(self.gui.clicked(gi(a,0,"GUI_CLICKED")?)?),
             "gui_menu" => Value::Int(self.gui.add_menu(gi(a,0,"GUI_MENU")?, gs(a,1,"GUI_MENU")?.to_string())?),
             "gui_context" => Value::Int(self.gui.add_context(gi(a,0,"GUI_CONTEXT")?)?),
+            "gui_context_widget" => { self.gui.context_widget(gi(a,0,"GUI_CONTEXT_WIDGET")?, gi(a,1,"GUI_CONTEXT_WIDGET")?)?; Value::Nil }
             "gui_menu_item" => {
                 // GUI_MENU_ITEM(menu, label$[, kuerzel$])
                 let h = self.gui.add_menu_item(gi(a,0,"GUI_MENU_ITEM")?, gs(a,1,"GUI_MENU_ITEM")?.to_string())?;

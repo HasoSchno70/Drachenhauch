@@ -257,6 +257,7 @@ IMPORT "gui"
 |---|---|---|
 | `GUI_MENU(win, label$)` | Menü-Handle | Top-Level-Menü in der **Menüleiste** (z. B. „Datei") |
 | `GUI_CONTEXT(win)` | Menü-Handle | **Kontextmenü** (per Rechtsklick im Fenster) |
+| `GUI_CONTEXT_WIDGET(menu, wdg)` | — | Kontextmenü an ein Widget binden: es öffnet nur beim Rechtsklick darauf (Liste, Baum, Tabelle wählen dabei ihre Zeile); `-1` bindet es wieder ans Fenster |
 | `GUI_SUBMENU(menu, label$)` | Menü-Handle | **Untermenü** — öffnet beim Überfahren rechts daneben, beliebig tief |
 | `GUI_MENU_ITEM(menu, label$[, kuerzel$])` | Item-Handle | Eintrag anhängen — Handle für `GUI_CLICKED`; `kuerzel$` z. B. `"Strg+S"` |
 | `GUI_MENU_SEPARATOR(menu)` | — | Trennlinie anhängen |
