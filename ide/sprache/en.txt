@@ -34,6 +34,8 @@ Gehe zu Zeile ...	Go to line ...
 Im Projekt suchen ...	Find in project ...
 Vervollständigen	Complete
 Zur Definition	Go to definition
+Zurück zur vorigen Stelle	Back to previous location
+Vorwärts	Forward
 Umbenennen ...	Rename ...
 Schnellkorrektur ...	Quick fix ...
 Schnipsel einfügen ...	Insert snippet ...
@@ -162,6 +164,10 @@ Tastenkürzel zurücksetzen	Reset keyboard shortcuts
 Eingebaute Befehle nachschlagen ...	Look up built-in commands ...
 Über ...	About ...
 Showcase -- ein Klick öffnet das Beispiel	Showcase -- a click opens the example
+Neue Datei ...	New file ...
+Neuer Ordner ...	New folder ...
+Löschen ...	Delete ...
+Pfad kopieren	Copy path
 Projekt	Project
 Filter ...	Filter ...
 Nur Dateien, deren Name das enthält	Only files whose name contains this
@@ -176,6 +182,10 @@ Beispiele nach Themen	Examples by topic
 Zuletzt geöffnet -- Doppelklick öffnet	Recently opened -- double-click opens
 F5 startet das Programm, F7 debuggt es, Umschalt+F7 prüft. F1 schlägt das Wort unter der Marke im Handbuch nach, Strg+Umschalt+P öffnet die Befehlspalette, Strg+Umschalt+O eine Datei des Projekts. Alle Kürzel: Hilfe -> Tastenkürzel (Strg+F1).	F5 runs the program, F7 debugs it, Shift+F7 checks it. F1 looks up the word at the cursor in the manual, Ctrl+Shift+P opens the command palette, Ctrl+Shift+O a file of the project. All shortcuts: Help -> Keyboard shortcuts (Ctrl+F1).
 Klicken oder ziehen: dorthin rollen	Click or drag: scroll there
+Nur Zeilen der Ausgabe zeigen, die diesen Text enthalten	Only show output lines that contain this text
+Zeile kopieren	Copy line
+Angezeigte Zeilen kopieren	Copy shown lines
+Ausgabe sichern ...	Save output ...
 Befehl unten eingeben, Enter führt ihn aus -- cd, dir/ls, git, dhrt ...	Type a command below, Enter runs it -- cd, dir/ls, git, dhrt ...
 Ausgabe	Output
 Terminal (Alt+3)	Terminal (Alt+3)
@@ -597,6 +607,40 @@ Export fehlgeschlagen (Code 	Export failed (code
 Es läuft noch ein Programm -- erst stoppen (Umschalt+F5).	A program is still running -- stop it first (Shift+F5).
 Ausgabe: 	Output: 
 Gestartet: 	Started: 
+Keine vorige Stelle.	No previous location.
+Keine Stelle zum Vorwärtsgehen.	No location to go forward to.
+Gibt es nicht mehr: 	No longer exists: 
+Kein Projektordner.	No project folder.
+Name der neuen Datei in 	Name of the new file in 
+Neuer Ordner	New folder
+Name des neuen Ordners in 	Name of the new folder in 
+Erst im Projektbaum eine Datei oder einen Ordner wählen.	Select a file or folder in the project tree first.
+Neuer Name für 	New name for 
+Kein gültiger Name: 	Not a valid name: 
+Gibt es schon: 	Already exists: 
+Ordner angelegt: 	Folder created: 
+Umbenennen ging nicht: 	Rename failed: 
+Umbenannt: 	Renamed: 
+ Datei(en) mit IMPORT angepasst)	 file(s) with IMPORT updated)
+Den Projektordner selbst löscht die IDE nicht.	The IDE does not delete the project folder itself.
+Ordner endgültig löschen: 	Delete folder permanently: 
+ -- mit allem darin (	 -- with everything in it (
+ Einträge). Das lässt sich nicht rückgängig machen.	 entries). This cannot be undone.
+Datei endgültig löschen: 	Delete file permanently: 
+. Das lässt sich nicht rückgängig machen.	. This cannot be undone.
+Löschen	Delete
+Löschen|Abbrechen	Delete|Cancel
+Löschen ging nicht: 	Delete failed: 
+Gelöscht: 	Deleted: 
+Pfad kopiert: 	Path copied: 
+Zwischenablage nicht erreichbar.	Clipboard not available.
+Ausgabe: alle Zeilen.	Output: all lines.
+Ausgabe gefiltert: 	Output filtered: 
+ Zeilen.	 lines.
+Zeile kopiert.	Line copied.
+Ausgabe kopiert.	Output copied.
+Ausgabe gesichert: 	Output saved: 
+ Zeilen in 	 lines in 
 Erst sichern -- die Einstellung gehört zu einer Datei.	Save first -- the setting belongs to a file.
 Umgebung für den Start	Environment for start
 Umgebungsvariablen für 	Environment variables for 
@@ -703,7 +747,6 @@ Alle sichern|Verwerfen|Abbrechen	Save all|Discard|Cancel
 Suche mit regulärem Ausdruck (z. B. ^SUB .*\\(\\)).	Search with regular expression (e.g. ^SUB .*\\(\\)).
 Suche als Teiltext.	Search as plain text.
 Kein geschlossener Reiter zum Wiederholen.	No closed tab to reopen.
-Gibt es nicht mehr: 	No longer exists: 
 Suche beachtet Groß/klein.	Search matches case.
 Suche ohne Rücksicht auf Groß/klein.	Search ignores case.
 Suche nur nach ganzen Wörtern.	Search whole words only.
@@ -717,6 +760,7 @@ Herauslösen	Extract
 Im ganzen Projekt umbenennen	Rename in whole project
 Beim Sichern formatieren an.	Format on save on.
 Beim Sichern formatieren aus.	Format on save off.
+Ausgabe sichern	Save output
 Gehe zu Zeile	Go to line
 Zeilennummer:	Line number:
 Im Projekt suchen	Find in project
@@ -735,6 +779,11 @@ Gerüst beim Tippen	Scaffold while typing
 Klammern automatisch schließen	Close brackets automatically
 Zeilen sortieren	Sort lines
 Doppelte Zeilen entfernen	Remove duplicate lines
+Neue Datei im Projekt ...	New file in project ...
+Neuer Ordner im Projekt ...	New folder in project ...
+Datei im Projektbaum umbenennen ...	Rename file in project tree ...
+Datei im Projektbaum löschen ...	Delete file in project tree ...
+Angezeigte Zeilen der Ausgabe kopieren	Copy shown output lines
 Profil im Code ein/aus	Profile in code on/off
 Profil im Code entfernen	Remove profile from code
 Quellcodeverwaltung (git)	Source control (git)

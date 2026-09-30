@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1973,
+ "count": 1974,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -511,6 +511,7 @@
   "GUI_COLORPICKER_SET": "alpha (0/1) — Deckkraft-Streifen zeigen",
   "GUI_CONFIRM": "BOOLEAN — Rückfrage → TRUE bei Zustimmung",
   "GUI_CONTEXT": "Menü-Handle — Kontextmenü (per Rechtsklick im Fenster)",
+  "GUI_CONTEXT_WIDGET": "Kontextmenü an ein Widget binden: es öffnet nur beim Rechtsklick darauf (Liste, Baum, Tabelle wählen dabei ihre Zeile); -1 bindet es wieder ans Fenster",
   "GUI_CURSORS": "Zeigerformen je nach Stelle im Widget (Vorgabe an): Textstrich über Text, Hand über allem Anklickbaren, Doppelpfeil an Trennern, Spaltenkanten und am Fenstergriff",
   "GUI_DATE": "gewähltes Datum als JJJJ-MM-TT",
   "GUI_DATEPICKER": "Monatsgitter mit Blätterpfeilen",

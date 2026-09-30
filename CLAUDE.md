@@ -1888,6 +1888,25 @@ mit Gegenprobe), `werkzeug_ide_terminal.dhtest` (2, `--- system windows`),
 Rust-Test `kill_beendet_auch_die_enkel`; vier Verfaelschungen der IDE und
 eine der Laufzeit fallen je in ihrem Fall.
 
+**Projektbaum-Dateien, Zurueck/Vorwaerts, Ausgabefilter (2026-09-30):**
+neu in der Laufzeit **`GUI_CONTEXT_WIDGET(menu, wdg)`** -- ein
+Kontextmenue gehoert einem Widget (`Menu::ziel`, -1 = Fenster) und oeffnet
+nur beim Rechtsklick darauf; gebundene gewinnen vor dem des Fensters, und
+der Rechtsklick erreicht das Widget im selben Bild (Liste/Baum/Tabelle
+waehlen ihre Zeile -- `baumAbfragen` oeffnet darum bei `MOUSE_HIT(1)` nichts).
+Die IDE: Kontextmenue am Baum (`baumFragen`/`baumAusfuehren`/
+`baumUmbenennen`/`baumLoeschen`); Umbenennen sucht die IMPORTs VOR dem
+`RENAME` (`importsSuchen`, `SAMEFILE` fragt die Platte) und zieht
+Reiter/Haltepunkte/Lesezeichen/Startargumente ueber `wegUmziehen$` mit.
+**Zurueck/Vorwaerts** beobachtet die Marke je Bild (`navNachziehen`) statt
+an den ~30 Sprungstellen: Dateiwechsel oder >= 8 Zeilen bei gleicher
+Textlaenge, ohne Bild auf/ab/Pos1/Ende; `navSperre` haelt den eigenen
+Sprung heraus. Ausgabe: Filterfeld (`GUI_LISTBOX_FILTER`) und Kontextmenue;
+`ausgabeSichernNach` schreibt die ANGEZEIGTEN Zeilen. Tests
+`werkzeug_ide_baum_navigation.dhtest` (6, der erste mit echtem Rechtsklick
+und Menue per Tastatur), zwei Faelle in `gui_menue_bedienung.dhtest`; fuenf
+Verfaelschungen der IDE fallen je in ihrem Fall.
+
 **Fehlertext am Zeilenende, Start je Datei, Neustart beim Sichern
 (2026-09-30):** `GUI_TEXTAREA_HINTS(ta, zeilen, texte, farben)` nimmt als
 viertes Argument auch ein FELD (eine Farbe je Hinweis, -1 = die gedaempfte

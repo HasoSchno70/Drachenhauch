@@ -321,6 +321,27 @@ bekäme. Diese Bausteine kamen mit ihr:
   Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der
   Bereich auf die Ausgabe zurück. Unter Windows kommen Umlaute richtig an
   (`chcp 65001`).
+- **Dateien im Projektbaum** (Rechtsklick auf eine Zeile): Neue Datei,
+  Neuer Ordner (im gewählten Ordner bzw. im Ordner der gewählten Datei),
+  Umbenennen, Löschen und Pfad kopieren; dieselben Befehle stehen in der
+  Befehlspalette. Der Rechtsklick wählt die Zeile, öffnet sie aber nicht.
+  **Umbenennen** zieht offene Reiter, Haltepunkte, Lesezeichen und
+  Startargumente mit, und jedes `IMPORT "..."` im Projekt, das die Datei
+  meint, bekommt den neuen Namen (in einem offenen Reiter als eigener
+  Rückgängig-Schritt, auf der Platte sonst). **Löschen** fragt vorher,
+  löscht endgültig (einen Ordner samt Inhalt) und schließt die Reiter der
+  gelöschten Dateien; den Projektordner selbst löscht die IDE nicht.
+- **Zurück zur vorigen Stelle / Vorwärts** (Bearbeiten, Strg+Alt+Links /
+  Strg+Alt+Rechts, auch die Seitentasten der Maus): gemerkt wird jeder
+  Sprung in eine andere Datei oder um mindestens acht Zeilen, ohne dass sich
+  der Text geändert hat -- Zur Definition, Problemliste, Suche, Gliederung,
+  ein Klick weit weg. Bild auf/ab und Pos1/Ende zählen nicht. Höchstens 50
+  Stellen; ein neuer Sprung nimmt die Vorwärts-Liste weg.
+- **Ausgabe filtern und sichern:** das Feld „Filter ...“ über der Ausgabe
+  zeigt nur Zeilen, die den Text enthalten (Groß/klein egal, leer = alle);
+  Doppelklick auf eine Fehlerzeile springt weiter an ihre Stelle. Rechtsklick
+  in die Ausgabe: Zeile kopieren, Angezeigte Zeilen kopieren, Ausgabe
+  sichern ... (die angezeigten Zeilen als Textdatei), Ausgabe leeren.
 - **Fehlertext am Zeilenende** (Ansicht → Fehlertext am Zeilenende, an per
   Vorgabe): die Meldung von Prüfen steht hinter ihrer Zeile, rot bei einem
   Fehler, gelb bei einer Warnung -- lesbar, ohne die Maus hinzubewegen.

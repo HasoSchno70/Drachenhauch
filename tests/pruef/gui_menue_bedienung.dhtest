@@ -290,3 +290,61 @@ e 9 1 262 0 0 0
 DHRT_FRAMES=14
 --- bild
 150 35 nicht #18222E +-10
+
+=== ein an ein widget gebundenes kontextmenue oeffnet nur dort
+' GUI_CONTEXT_WIDGET: Rechtsklick auf die Liste oeffnet IHR Menue (und die
+' Liste waehlt dabei ihre Zeile), Rechtsklick daneben das des Fensters.
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 0, 0, 150, 300, ["null", "eins", "zwei", "drei"])
+DIM cl AS INTEGER : cl = GUI_CONTEXT(w)
+DIM li AS INTEGER : li = GUI_MENU_ITEM(cl, "Listeneintrag")
+GUI_CONTEXT_WIDGET(cl, lb)
+DIM cf AS INTEGER : cf = GUI_CONTEXT(w)
+DIM fi AS INTEGER : fi = GUI_MENU_ITEM(cf, "Fenstereintrag")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(li) THEN PRINT "liste "; GUI_LISTBOX_SELECTED(lb)
+    IF GUI_CLICKED(fi) THEN PRINT "fenster"
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+c 14
+e 0 7 5 295 0 0
+e 1 7 50 50 0 0
+e 2 6 1 0 0 0
+e 3 5 1 0 0 0
+e 5 2 264 0 0 0
+e 6 1 264 0 0 0
+e 8 2 257 0 0 0
+e 9 1 257 0 0 0
+e 12 7 220 50 0 0
+e 13 6 1 0 0 0
+e 14 5 1 0 0 0
+e 16 2 264 0 0 0
+e 17 1 264 0 0 0
+e 19 2 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=26
+--- erwartet
+liste 2
+fenster
+
+=== das gebundene menue verlangt ein widget im selben fenster
+IMPORT "gui"
+SCREEN(300, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 300)
+DIM w2 AS GUI_WINDOW : w2 = GUI_WINDOW("B", 0, 0, 300, 300)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w2, 0, 0, 150, 300, ["a"])
+DIM c AS INTEGER : c = GUI_CONTEXT(w)
+GUI_CONTEXT_WIDGET(c, lb)
+--- fehler
+verschiedenen Fenstern

@@ -842,6 +842,8 @@ DIM miProjekt AS INTEGER : miProjekt = GUI_MENU_ITEM(mBearb, tr$("Im Projekt suc
 GUI_MENU_SEPARATOR(mBearb)
 DIM miVervoll AS INTEGER : miVervoll = GUI_MENU_ITEM(mBearb, tr$("Vervollständigen"), kz$("Strg+Leer"))
 DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, tr$("Zur Definition"), kz$("F12"))
+DIM miNavZurueck AS INTEGER : miNavZurueck = GUI_MENU_ITEM(mBearb, tr$("Zurück zur vorigen Stelle"), kz$("Strg+Alt+Links"))
+DIM miNavVor AS INTEGER : miNavVor = GUI_MENU_ITEM(mBearb, tr$("Vorwärts"), kz$("Strg+Alt+Rechts"))
 DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, tr$("Umbenennen ..."), kz$("Umschalt+F6"))
 DIM miKorrektur AS INTEGER : miKorrektur = GUI_MENU_ITEM(mBearb, tr$("Schnellkorrektur ..."), kz$("Strg+."))
 DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, tr$("Schnipsel einfügen ..."), kz$("Strg+J"))
@@ -1111,6 +1113,18 @@ NEXT
 ' hier eine Buchfuehrung aus Dateiliste und Knoten-Nummern, die bei jedem
 ' Aufbau auseinanderlaufen konnte.
 DIM baum AS GUI_WIDGET : baum = GUI_FILETREE(win, 0, 0, 10, 10, ".")
+' Rechtsklick im Projektbaum: Dateien und Ordner anlegen, umbenennen,
+' loeschen. Das Menue gehoert nur dem Baum (GUI_CONTEXT_WIDGET), der
+' Rechtsklick waehlt dabei die Zeile darunter.
+DIM ctxBaum AS INTEGER : ctxBaum = GUI_CONTEXT(win)
+DIM miBNeuDatei AS INTEGER : miBNeuDatei = GUI_MENU_ITEM(ctxBaum, tr$("Neue Datei ..."))
+DIM miBNeuOrdner AS INTEGER : miBNeuOrdner = GUI_MENU_ITEM(ctxBaum, tr$("Neuer Ordner ..."))
+GUI_MENU_SEPARATOR(ctxBaum)
+DIM miBUmbenennen AS INTEGER : miBUmbenennen = GUI_MENU_ITEM(ctxBaum, tr$("Umbenennen ..."))
+DIM miBLoeschen AS INTEGER : miBLoeschen = GUI_MENU_ITEM(ctxBaum, tr$("Löschen ..."))
+GUI_MENU_SEPARATOR(ctxBaum)
+DIM miBPfad AS INTEGER : miBPfad = GUI_MENU_ITEM(ctxBaum, tr$("Pfad kopieren"))
+GUI_CONTEXT_WIDGET(ctxBaum, baum)
 ' Strg+Klick sammelt, Umschalt+Klick spannt -- damit sich mehrere Dateien
 ' auf einmal oeffnen lassen (Datei -> Gewaehlte Dateien oeffnen).
 GUI_FILETREE_SET(baum, "mehrfachauswahl", 1)
@@ -1174,6 +1188,18 @@ DIM kartenZug AS BOOLEAN : kartenZug = FALSE
 DIM kartenZiel AS INTEGER : kartenZiel = -1
 DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "", 0, 0)   ' der Reiterknopf sagt schon "Ausgabe"
 DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+' Nur passende Zeilen zeigen (Teiltext, Gross/klein egal); die Zeilen selbst
+' bleiben, leer zeigt wieder alle.
+DIM tfAusgabeFilter AS GUI_WIDGET : tfAusgabeFilter = GUI_TEXTINPUT(win, 0, 0, 10, 10, tr$("Filter ..."))
+GUI_TOOLTIP(tfAusgabeFilter, tr$("Nur Zeilen der Ausgabe zeigen, die diesen Text enthalten"))
+DIM ausgabeFilterAlt AS STRING : ausgabeFilterAlt = ""
+DIM ctxAusgabe AS INTEGER : ctxAusgabe = GUI_CONTEXT(win)
+DIM miAZeile AS INTEGER : miAZeile = GUI_MENU_ITEM(ctxAusgabe, tr$("Zeile kopieren"))
+DIM miAKopieren AS INTEGER : miAKopieren = GUI_MENU_ITEM(ctxAusgabe, tr$("Angezeigte Zeilen kopieren"))
+DIM miASichern AS INTEGER : miASichern = GUI_MENU_ITEM(ctxAusgabe, tr$("Ausgabe sichern ..."))
+GUI_MENU_SEPARATOR(ctxAusgabe)
+DIM miALeeren AS INTEGER : miALeeren = GUI_MENU_ITEM(ctxAusgabe, tr$("Ausgabe leeren"))
+GUI_CONTEXT_WIDGET(ctxAusgabe, lstAusgabe)
 ' Terminal (Alt+3): dieselbe Flaeche wie die Ausgabe, zwei Reiterknoepfe
 ' darueber schalten um. Die Eingabezeile unten gehoert dann dem Terminal.
 DIM lstTerminal AS GUI_WIDGET : lstTerminal = GUI_LISTBOX(win, 0, 0, 10, 10, [])
@@ -2247,7 +2273,9 @@ SUB layout()
     GUI_SET_VISIBLE(btnTermStopp, untenAn AND terminalAn AND termProz >= 0)
     GUI_SET_BOUNDS(btnReiterAusgabe, 8, uy - 1, 90, 20)
     GUI_SET_BOUNDS(btnReiterTerminal, 102, uy - 1, 90, 20)
-    GUI_SET_BOUNDS(lblAusgabe, 200, uy, MAX(40, halb - 300), 18)
+    GUI_SET_BOUNDS(lblAusgabe, 200, uy, MAX(40, halb - 390), 18)
+    GUI_SET_VISIBLE(tfAusgabeFilter, untenAn AND NOT terminalAn)
+    GUI_SET_BOUNDS(tfAusgabeFilter, 8 + halb - 180, uy - 1, 180, 20)
     GUI_SET_BOUNDS(btnTermStopp, 8 + halb - 90, uy - 1, 90, 20)
     GUI_SET_BOUNDS(lstAusgabe, 8, uy + 20, halb, hoeheUnten - 20)
     GUI_SET_BOUNDS(lstTerminal, 8, uy + 20, halb, hoeheUnten - 20)
@@ -3565,6 +3593,8 @@ SUB baumAbfragen()
     DIM weg AS STRING : weg = GUI_FILETREE_SELECTED$(baum)
     IF weg = "" OR weg = baumLetzteWahl THEN RETURN
     baumLetzteWahl = weg
+    ' Ein Rechtsklick waehlt nur (fuer das Kontextmenue), er oeffnet nichts.
+    IF MOUSE_HIT(1) THEN RETURN
     ' Ein Ordner ist kein Reiter -- ein Klick darauf klappt ihn auf, mehr
     ' soll er nicht tun.
     IF GUI_FILETREE_IS_DIR(baum) THEN RETURN
@@ -11241,6 +11271,439 @@ SUB starten()
     IF prozessStarten("run") THEN protokoll("gestartet " + prozessDatei)
 END SUB
 
+' --- Zurueck/Vorwaerts ---------------------------------------------------
+' Jeder Sprung wird gemerkt -- in eine andere Datei oder um mindestens acht
+' Zeilen, ohne dass sich der Text geaendert hat (F12, Problemliste, Suche,
+' Gliederung, Klick weit weg). Beobachtet wird die Marke je Bild statt an
+' jeder der dreissig Sprungstellen einzeln: eine neue Sprungstelle waere
+' sonst eine, die man vergisst. Bild auf/ab und Pos1/Ende sind Blaettern,
+' kein Sprung.
+DIM navPfade AS ARRAY OF STRING : navPfade = []
+DIM navZeilen AS ARRAY OF INTEGER : navZeilen = []
+DIM navSpalten AS ARRAY OF INTEGER : navSpalten = []
+DIM vorPfade AS ARRAY OF STRING : vorPfade = []
+DIM vorZeilen AS ARRAY OF INTEGER : vorZeilen = []
+DIM vorSpalten AS ARRAY OF INTEGER : vorSpalten = []
+DIM navLetztPfad AS STRING : navLetztPfad = ""
+DIM navLetztZeile AS INTEGER : navLetztZeile = 0
+DIM navLetztSpalte AS INTEGER : navLetztSpalte = 0
+DIM navLetztLaenge AS INTEGER : navLetztLaenge = -1
+DIM navSperre AS BOOLEAN : navSperre = FALSE
+CONST NAV_MAX = 50
+
+SUB navNachziehen()
+    IF MOUSE_HIT(3) THEN navGehen(TRUE)
+    IF MOUSE_HIT(4) THEN navGehen(FALSE)
+    IF aktiverTab < 0 THEN navLetztPfad = "" : RETURN
+    DIM p AS STRING : p = tabPfade[aktiverTab]
+    IF p = "" THEN navLetztPfad = "" : RETURN
+    DIM ta AS GUI_WIDGET : ta = tabFelder[aktiverTab]
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+    DIM laenge AS INTEGER : laenge = LEN(GUI_TEXT(ta))
+    IF navLetztPfad <> "" AND NOT navSperre THEN
+        DIM sprung AS BOOLEAN : sprung = FALSE
+        IF p <> navLetztPfad THEN
+            sprung = wegGleich$(p) <> wegGleich$(navLetztPfad)
+        ELSEIF ABS(z - navLetztZeile) >= 8 AND laenge = navLetztLaenge THEN
+            sprung = NOT (KEYHIT(KEY_PAGEUP) OR KEYHIT(KEY_PAGEDOWN) OR KEYHIT(KEY_HOME) OR KEYHIT(KEY_END))
+        END IF
+        IF sprung THEN
+            navAblegen(navPfade, navZeilen, navSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
+            vorPfade = [] : vorZeilen = [] : vorSpalten = []
+            protokoll("nav gemerkt " + BASENAME(navLetztPfad) + " " + STR$(navLetztZeile))
+        END IF
+    END IF
+    navSperre = FALSE
+    navLetztPfad = p : navLetztZeile = z : navLetztSpalte = sp : navLetztLaenge = laenge
+END SUB
+
+SUB navAblegen(ps AS ARRAY OF STRING, zs AS ARRAY OF INTEGER, ss AS ARRAY OF INTEGER, _
+               p AS STRING, z AS INTEGER, sp AS INTEGER)
+    DIM n AS INTEGER : n = LEN(ps)
+    IF n > 0 THEN
+        IF ps[n - 1] = p AND zs[n - 1] = z THEN RETURN
+    END IF
+    ARRAY_PUSH(ps, p) : ARRAY_PUSH(zs, z) : ARRAY_PUSH(ss, sp)
+    IF LEN(ps) > NAV_MAX THEN
+        ARRAY_REMOVE_AT(ps, 0) : ARRAY_REMOVE_AT(zs, 0) : ARRAY_REMOVE_AT(ss, 0)
+    END IF
+END SUB
+
+' zurueck = TRUE: zur vorigen Stelle, sonst wieder vorwaerts. Die Stelle, an
+' der man steht, kommt dabei auf den anderen Stapel.
+SUB navGehen(zurueck AS BOOLEAN)
+    IF zurueck AND LEN(navPfade) = 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Keine vorige Stelle."))
+        RETURN
+    END IF
+    IF NOT zurueck AND LEN(vorPfade) = 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Keine Stelle zum Vorwärtsgehen."))
+        RETURN
+    END IF
+    DIM p AS STRING
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    DIM n AS INTEGER
+    IF zurueck THEN
+        n = LEN(navPfade) - 1
+        p = navPfade[n] : z = navZeilen[n] : sp = navSpalten[n]
+        ARRAY_REMOVE_AT(navPfade, n) : ARRAY_REMOVE_AT(navZeilen, n) : ARRAY_REMOVE_AT(navSpalten, n)
+        IF navLetztPfad <> "" THEN navAblegen(vorPfade, vorZeilen, vorSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
+    ELSE
+        n = LEN(vorPfade) - 1
+        p = vorPfade[n] : z = vorZeilen[n] : sp = vorSpalten[n]
+        ARRAY_REMOVE_AT(vorPfade, n) : ARRAY_REMOVE_AT(vorZeilen, n) : ARRAY_REMOVE_AT(vorSpalten, n)
+        IF navLetztPfad <> "" THEN navAblegen(navPfade, navZeilen, navSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
+    END IF
+    IF NOT FILEEXISTS(p) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Gibt es nicht mehr: ") + p)
+        RETURN
+    END IF
+    navSperre = TRUE
+    DIM schonDa AS BOOLEAN : schonDa = FALSE
+    IF aktiverTab >= 0 THEN schonDa = wegGleich$(tabPfade[aktiverTab]) = wegGleich$(p)
+    IF NOT schonDa THEN dateiOeffnen(p)
+    IF aktiverTab >= 0 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], z, sp)
+    protokoll(IIF(zurueck, "nav zurueck ", "nav vor ") + BASENAME(p) + " " + STR$(z))
+END SUB
+
+' --- Projektbaum: anlegen, umbenennen, loeschen -------------------------
+DIM dlgBaum AS GUI_WINDOW : dlgBaum = -1
+DIM dlgBaumLoeschen AS GUI_WINDOW : dlgBaumLoeschen = -1
+DIM baumAktion AS STRING : baumAktion = ""
+DIM baumZiel AS STRING : baumZiel = ""
+
+' Der Weg, auf den sich ein Befehl aus dem Baum bezieht: die gewaehlte Zeile
+' (der Rechtsklick hat sie gewaehlt), sonst die Datei im vorderen Reiter.
+FUNCTION baumWahl$() AS STRING
+    DIM w AS STRING : w = GUI_FILETREE_SELECTED$(baum)
+    IF w <> "" THEN RETURN w
+    IF aktiverTab >= 0 THEN RETURN tabPfade[aktiverTab]
+    RETURN ""
+END FUNCTION
+
+' In welchen Ordner kommt etwas Neues: ein gewaehlter Ordner, sonst der
+' Ordner der gewaehlten Datei, sonst das Projekt.
+FUNCTION baumOrdner$() AS STRING
+    DIM w AS STRING : w = baumWahl$()
+    IF w = "" THEN RETURN projektOrdner
+    IF DIREXISTS(w) THEN RETURN w
+    RETURN DIRNAME(w)
+END FUNCTION
+
+SUB baumFragen(art AS STRING)
+    IF dlgBaum >= 0 THEN RETURN
+    baumAktion = art
+    IF art = "datei" THEN
+        baumZiel = baumOrdner$()
+        IF baumZiel = "" THEN GUI_SET_TEXT(lblStatus, tr$("Kein Projektordner.")) : RETURN
+        dlgBaum = GUI_PROMPT(tr$("Neue Datei"), tr$("Name der neuen Datei in ") + BASENAME(baumZiel) + ":", "neu.dh")
+    ELSEIF art = "ordner" THEN
+        baumZiel = baumOrdner$()
+        IF baumZiel = "" THEN GUI_SET_TEXT(lblStatus, tr$("Kein Projektordner.")) : RETURN
+        dlgBaum = GUI_PROMPT(tr$("Neuer Ordner"), tr$("Name des neuen Ordners in ") + BASENAME(baumZiel) + ":", "neu")
+    ELSE
+        baumZiel = baumWahl$()
+        IF baumZiel = "" OR NOT (FILEEXISTS(baumZiel) OR DIREXISTS(baumZiel)) THEN
+            GUI_SET_TEXT(lblStatus, tr$("Erst im Projektbaum eine Datei oder einen Ordner wählen."))
+            RETURN
+        END IF
+        dlgBaum = GUI_PROMPT(tr$("Umbenennen"), tr$("Neuer Name für ") + BASENAME(baumZiel) + ":", BASENAME(baumZiel))
+    END IF
+END SUB
+
+' Ein Name, kein Weg: nichts, was aus dem Ordner herausfuehrt.
+FUNCTION baumNameOk(name AS STRING) AS BOOLEAN
+    IF name = "" OR name = "." OR name = ".." THEN RETURN FALSE
+    DIM c AS STRING
+    FOR EACH c IN ["/", "\", ":", "*", "?", CHR$(34), "<", ">", "|"]
+        IF INSTR(name, c) >= 0 THEN RETURN FALSE
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+SUB baumDialogNachziehen()
+    IF dlgBaum >= 0 THEN
+        DIM a AS INTEGER : a = GUI_ANSWER(dlgBaum)
+        IF a <> 0 THEN
+            DIM name AS STRING : name = TRIM$(GUI_DIALOG_TEXT(dlgBaum))
+            dlgBaum = -1
+            IF a = 1 THEN baumAusfuehren(name)
+        END IF
+    END IF
+    IF dlgBaumLoeschen >= 0 THEN
+        DIM al AS INTEGER : al = GUI_ANSWER(dlgBaumLoeschen)
+        IF al <> 0 THEN
+            dlgBaumLoeschen = -1
+            IF al = 1 THEN baumLoeschen(baumZiel)
+        END IF
+    END IF
+END SUB
+
+SUB baumAusfuehren(name AS STRING)
+    IF NOT baumNameOk(name) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Kein gültiger Name: ") + name)
+        RETURN
+    END IF
+    IF baumAktion = "datei" THEN
+        DIM pd AS STRING : pd = PATHJOIN(baumZiel, name)
+        IF FILEEXISTS(pd) OR DIREXISTS(pd) THEN GUI_SET_TEXT(lblStatus, tr$("Gibt es schon: ") + name) : RETURN
+        WRITEALL(pd, "")
+        baumFuellen()
+        GUI_FILETREE_EXPAND(baum, baumZiel, TRUE)
+        protokoll("baum neue datei " + name)
+        dateiOeffnen(pd)
+    ELSEIF baumAktion = "ordner" THEN
+        DIM po AS STRING : po = PATHJOIN(baumZiel, name)
+        IF FILEEXISTS(po) OR DIREXISTS(po) THEN GUI_SET_TEXT(lblStatus, tr$("Gibt es schon: ") + name) : RETURN
+        MKDIR(po)
+        baumFuellen()
+        GUI_FILETREE_EXPAND(baum, baumZiel, TRUE)
+        GUI_SET_TEXT(lblStatus, tr$("Ordner angelegt: ") + name)
+        protokoll("baum neuer ordner " + name)
+    ELSE
+        baumUmbenennen(baumZiel, name)
+    END IF
+END SUB
+
+' Umbenennen (nicht verschieben: der Ordner bleibt). Offene Reiter,
+' Haltepunkte, Lesezeichen und Startargumente zeigen danach auf den neuen
+' Namen, und jedes IMPORT im Projekt, das die Datei meint, zieht mit --
+' sonst uebersetzte das Programm nach dem Umbenennen nicht mehr.
+SUB baumUmbenennen(alt AS STRING, name AS STRING)
+    DIM neu AS STRING : neu = PATHJOIN(DIRNAME(alt), name)
+    IF name = BASENAME(alt) THEN RETURN
+    IF (FILEEXISTS(neu) OR DIREXISTS(neu)) AND LOWER$(name) <> LOWER$(BASENAME(alt)) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Gibt es schon: ") + name)
+        RETURN
+    END IF
+    DIM istOrdner AS BOOLEAN : istOrdner = DIREXISTS(alt)
+    ' Die IMPORTs VOR dem Umbenennen suchen -- danach laesst sich nicht mehr
+    ' pruefen, ob ein Weg dieselbe Datei meint (SAMEFILE fragt die Platte).
+    DIM impDateien AS ARRAY OF STRING : impDateien = []
+    DIM impTexte AS ARRAY OF STRING : impTexte = []
+    IF NOT istOrdner AND LOWER$(RIGHT$(alt, 3)) = ".dh" THEN importsSuchen(alt, name, impDateien, impTexte)
+    TRY
+        RENAME(alt, neu)
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Umbenennen ging nicht: ") + e)
+        RETURN
+    END TRY
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        tabPfade[i] = wegUmziehen$(tabPfade[i], alt, neu, istOrdner)
+    NEXT
+    FOR i = 0 TO LEN(hpDateien) - 1
+        hpDateien[i] = wegUmziehen$(hpDateien[i], alt, neu, istOrdner)
+    NEXT
+    FOR i = 0 TO LEN(lzDateien) - 1
+        lzDateien[i] = wegUmziehen$(lzDateien[i], alt, neu, istOrdner)
+    NEXT
+    FOR i = 0 TO LEN(startDateien) - 1
+        startDateien[i] = wegUmziehen$(startDateien[i], alt, neu, istOrdner)
+    NEXT
+    ' Die gefundenen IMPORTs schreiben: in einen offenen Reiter als eigener
+    ' Rueckgaengig-Schritt (und gesichert, wenn er es vorher war), sonst auf
+    ' die Platte.
+    FOR i = 0 TO LEN(impDateien) - 1
+        DIM d AS STRING : d = wegUmziehen$(impDateien[i], alt, neu, FALSE)
+        DIM t AS INTEGER : t = tabVonWeg(d)
+        IF t >= 0 THEN
+            DIM warSauber AS BOOLEAN : warSauber = GUI_TEXT(tabFelder[t]) = tabGesichert[t]
+            feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), impTexte[i])
+            IF warSauber THEN
+                WRITEALL(d, impTexte[i] + IIF(RIGHT$(impTexte[i], 1) = NL, "", NL))
+                tabGesichert[t] = impTexte[i]
+            END IF
+        ELSE
+            WRITEALL(d, impTexte[i] + IIF(RIGHT$(impTexte[i], 1) = NL, "", NL))
+        END IF
+    NEXT
+    reiterNeuSetzen()
+    baumLetzteWahl = neu
+    baumFuellen()
+    GUI_FILETREE_SELECT(baum, neu)
+    konfigSichern()
+    GUI_SET_TEXT(lblStatus, tr$("Umbenannt: ") + BASENAME(alt) + " -> " + name + _
+                 IIF(LEN(impDateien) > 0, " (" + STR$(LEN(impDateien)) + tr$(" Datei(en) mit IMPORT angepasst)"), ""))
+    protokoll("baum umbenannt " + BASENAME(alt) + " " + name + " imports " + STR$(LEN(impDateien)))
+END SUB
+
+' Liegt `weg` bei `alt` (bzw. darin, wenn alt ein Ordner ist), dieselbe
+' Stelle unter `neu`.
+FUNCTION wegUmziehen$(weg AS STRING, alt AS STRING, neu AS STRING, ordner AS BOOLEAN) AS STRING
+    IF weg = "" THEN RETURN weg
+    IF wegGleich$(weg) = wegGleich$(alt) THEN RETURN neu
+    IF ordner THEN
+        DIM a AS STRING : a = wegGleich$(alt)
+        DIM w AS STRING : w = wegGleich$(weg)
+        IF LEFT$(w, LEN(a) + 1) = a + "/" THEN RETURN PATHJOIN(neu, MID$(REPLACE$(weg, "\", "/"), LEN(a) + 1))
+    END IF
+    RETURN weg
+END FUNCTION
+
+FUNCTION tabVonWeg(weg AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabPfade[i] <> "" AND wegGleich$(tabPfade[i]) = wegGleich$(weg) THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Alle .dh des Projekts, deren IMPORT "..." die Datei `alt` meint; je Datei
+' der Text mit dem neuen Namen. Der Text eines offenen Reiters zaehlt, nicht
+' der auf der Platte.
+SUB importsSuchen(alt AS STRING, name AS STRING, dateien AS ARRAY OF STRING, texte AS ARRAY OF STRING)
+    DIM altName AS STRING : altName = BASENAME(alt)
+    DIM d AS STRING
+    FOR EACH d IN projektDateien("*.dh")
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM t AS INTEGER : t = tabVonWeg(pfad)
+        DIM text AS STRING
+        IF t >= 0 THEN
+            text = GUI_TEXT(tabFelder[t])
+        ELSE
+            TRY
+                text = JOIN$(READLINES(pfad), NL)
+            CATCH e
+                CONTINUE
+            END TRY
+        END IF
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(text, NL)
+        DIM geaendert AS BOOLEAN : geaendert = FALSE
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(zeilen) - 1
+            DIM zt AS STRING : zt = TRIM$(zeilen[k])
+            IF UPPER$(LEFT$(zt, 8)) <> "IMPORT " + CHR$(34) THEN CONTINUE
+            DIM rest AS STRING : rest = MID$(zt, 8)
+            DIM ende AS INTEGER : ende = INSTR(rest, CHR$(34))
+            IF ende <= 0 THEN CONTINUE
+            DIM x AS STRING : x = LEFT$(rest, ende)
+            IF LOWER$(RIGHT$(x, LEN(altName))) <> LOWER$(altName) THEN CONTINUE
+            DIM gemeint AS STRING : gemeint = PATHJOIN(DIRNAME(pfad), x)
+            IF NOT FILEEXISTS(gemeint) THEN CONTINUE
+            IF NOT SAMEFILE(gemeint, alt) THEN CONTINUE
+            DIM neuX AS STRING : neuX = LEFT$(x, LEN(x) - LEN(altName)) + name
+            zeilen[k] = REPLACE$(zeilen[k], CHR$(34) + x + CHR$(34), CHR$(34) + neuX + CHR$(34))
+            geaendert = TRUE
+        NEXT
+        IF geaendert THEN
+            ARRAY_PUSH(dateien, pfad)
+            ARRAY_PUSH(texte, JOIN$(zeilen, NL))
+        END IF
+    NEXT
+END SUB
+
+SUB baumLoeschenFragen()
+    IF dlgBaumLoeschen >= 0 THEN RETURN
+    baumZiel = baumWahl$()
+    IF baumZiel = "" OR NOT (FILEEXISTS(baumZiel) OR DIREXISTS(baumZiel)) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Erst im Projektbaum eine Datei oder einen Ordner wählen."))
+        RETURN
+    END IF
+    IF wegGleich$(baumZiel) = wegGleich$(projektOrdner) THEN
+        GUI_SET_TEXT(lblStatus, tr$("Den Projektordner selbst löscht die IDE nicht."))
+        RETURN
+    END IF
+    DIM text AS STRING
+    IF DIREXISTS(baumZiel) THEN
+        DIM n AS INTEGER : n = LEN(DIRLIST_REC(baumZiel))
+        text = tr$("Ordner endgültig löschen: ") + BASENAME(baumZiel) + tr$(" -- mit allem darin (") + STR$(n) + tr$(" Einträge). Das lässt sich nicht rückgängig machen.")
+    ELSE
+        text = tr$("Datei endgültig löschen: ") + BASENAME(baumZiel) + tr$(". Das lässt sich nicht rückgängig machen.")
+    END IF
+    dlgBaumLoeschen = GUI_DIALOG(tr$("Löschen"), text, tr$("Löschen|Abbrechen"))
+END SUB
+
+SUB baumLoeschen(ziel AS STRING)
+    DIM istOrdner AS BOOLEAN : istOrdner = DIREXISTS(ziel)
+    TRY
+        IF istOrdner THEN
+            RMDIR(ziel, TRUE)
+        ELSE
+            DELETEFILE(ziel)
+        END IF
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Löschen ging nicht: ") + e)
+        RETURN
+    END TRY
+    ' Reiter der geloeschten Datei(en) zu -- von hinten, damit die Nummern
+    ' der uebrigen gelten.
+    DIM i AS INTEGER
+    FOR i = tabAnzahl - 1 TO 0 STEP -1
+        IF tabPfade[i] <> "" THEN
+            IF wegUmziehen$(tabPfade[i], ziel, "", istOrdner) <> tabPfade[i] THEN tabSchliessen(i)
+        END IF
+    NEXT
+    baumLetzteWahl = ""
+    baumFuellen()
+    GUI_SET_TEXT(lblStatus, tr$("Gelöscht: ") + BASENAME(ziel))
+    protokoll("baum geloescht " + BASENAME(ziel))
+END SUB
+
+SUB baumPfadKopieren()
+    DIM w AS STRING : w = baumWahl$()
+    IF w = "" THEN RETURN
+    TRY
+        CLIPBOARD_SET(w)
+        GUI_SET_TEXT(lblStatus, tr$("Pfad kopiert: ") + w)
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Zwischenablage nicht erreichbar."))
+    END TRY
+END SUB
+
+' --- Ausgabe: filtern, kopieren, sichern ---------------------------------
+SUB ausgabeFilterNachziehen()
+    DIM f AS STRING : f = GUI_TEXT(tfAusgabeFilter)
+    IF f = ausgabeFilterAlt THEN RETURN
+    ausgabeFilterAlt = f
+    GUI_LISTBOX_FILTER(lstAusgabe, f)
+    DIM n AS INTEGER : n = GUI_LISTBOX_VIEW_COUNT(lstAusgabe)
+    IF f = "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Ausgabe: alle Zeilen."))
+    ELSE
+        GUI_SET_TEXT(lblStatus, tr$("Ausgabe gefiltert: ") + STR$(n) + tr$(" von ") + STR$(GUI_LISTBOX_COUNT(lstAusgabe)) + tr$(" Zeilen."))
+    END IF
+    protokoll("ausgabe filter [" + f + "] " + STR$(n))
+END SUB
+
+' Die angezeigten Zeilen (mit Filter nur die passenden), als ein Text.
+FUNCTION ausgabeText$() AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_LISTBOX_VIEW_COUNT(lstAusgabe) - 1
+        ARRAY_PUSH(z, GUI_LISTBOX_ITEM(lstAusgabe, GUI_LISTBOX_VIEW_ROW(lstAusgabe, i)))
+    NEXT
+    RETURN JOIN$(z, NL)
+END FUNCTION
+
+SUB ausgabeKopieren(nurZeile AS BOOLEAN)
+    DIM t AS STRING
+    IF nurZeile THEN
+        DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstAusgabe)
+        IF sel < 0 THEN RETURN
+        t = GUI_LISTBOX_ITEM(lstAusgabe, sel)
+    ELSE
+        t = ausgabeText$()
+    END IF
+    TRY
+        CLIPBOARD_SET(t)
+        GUI_SET_TEXT(lblStatus, IIF(nurZeile, tr$("Zeile kopiert."), tr$("Ausgabe kopiert.")))
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Zwischenablage nicht erreichbar."))
+    END TRY
+END SUB
+
+SUB ausgabeSichernNach(pfad AS STRING)
+    DIM t AS STRING : t = ausgabeText$()
+    WRITEALL(pfad, t + IIF(t = "", "", NL))
+    DIM n AS INTEGER : n = GUI_LISTBOX_VIEW_COUNT(lstAusgabe)
+    GUI_SET_TEXT(lblStatus, tr$("Ausgabe gesichert: ") + STR$(n) + tr$(" Zeilen in ") + pfad)
+    protokoll("ausgabe gesichert " + STR$(n))
+END SUB
+
 ' Gemerkte Argumente (umgebung = FALSE) bzw. Umgebung einer Datei, "" = keine.
 FUNCTION startWert$(datei AS STRING, umgebung AS BOOLEAN) AS STRING
     DIM i AS INTEGER
@@ -14038,6 +14501,15 @@ paletteEintrag("Andere Reiter schließen", "andere_zu", "Strg+Umschalt+W")
 paletteEintrag("Einrückungslinien", "linien", "")
 paletteEintrag("Mitlaufender Blockkopf", "blockkopf", "")
 paletteEintrag("Fehlertext am Zeilenende", "fehler_am_ende", "")
+paletteEintrag("Zurück zur vorigen Stelle", "nav_zurueck", "Strg+Alt+Links")
+paletteEintrag("Vorwärts", "nav_vor", "Strg+Alt+Rechts")
+paletteEintrag("Neue Datei im Projekt ...", "baum_neue_datei", "")
+paletteEintrag("Neuer Ordner im Projekt ...", "baum_neuer_ordner", "")
+paletteEintrag("Datei im Projektbaum umbenennen ...", "baum_umbenennen", "")
+paletteEintrag("Datei im Projektbaum löschen ...", "baum_loeschen", "")
+paletteEintrag("Pfad kopieren", "baum_pfad", "")
+paletteEintrag("Ausgabe sichern ...", "ausgabe_sichern", "")
+paletteEintrag("Angezeigte Zeilen der Ausgabe kopieren", "ausgabe_kopieren", "")
 paletteEintrag("Startargumente ...", "start_argumente", "")
 paletteEintrag("Umgebung für den Start ...", "start_umgebung", "")
 paletteEintrag("Beim Sichern neu starten", "neustart_sichern", "")
@@ -14560,6 +15032,18 @@ SUB befehl(k AS STRING)
         CASE "linien" : linienSetzen(NOT linienAn)
         CASE "blockkopf" : kopfSetzen(NOT kopfAn)
         CASE "fehler_am_ende" : fehlerEndeSetzen(NOT fehlerEndeAn)
+        CASE "nav_zurueck" : navGehen(TRUE)
+        CASE "nav_vor" : navGehen(FALSE)
+        CASE "baum_neue_datei" : baumFragen("datei")
+        CASE "baum_neuer_ordner" : baumFragen("ordner")
+        CASE "baum_umbenennen" : baumFragen("umbenennen")
+        CASE "baum_loeschen" : baumLoeschenFragen()
+        CASE "baum_pfad" : baumPfadKopieren()
+        CASE "ausgabe_zeile_kopieren" : ausgabeKopieren(TRUE)
+        CASE "ausgabe_kopieren" : ausgabeKopieren(FALSE)
+        CASE "ausgabe_sichern"
+            DIM asPfad AS STRING : asPfad = FILE_SAVE_DIALOG(tr$("Ausgabe sichern"), "ausgabe.txt", "txt")
+            IF asPfad <> "" THEN ausgabeSichernNach(asPfad)
         CASE "start_argumente" : startEinstellungFragen(FALSE)
         CASE "start_umgebung" : startEinstellungFragen(TRUE)
         CASE "neustart_sichern" : neustartSichernSetzen(NOT neustartSichernAn)
@@ -14728,6 +15212,10 @@ menueBefehl(miSichernAls, "sichern_unter", "") : menueBefehl(miSchliessen, "schl
 menueBefehl(miSuchen, "suchen", "Strg+F") : menueBefehl(miWeiter, "weiter", "F3") : menueBefehl(miZurueckSuchen, "zurueck_suchen", "Umschalt+F3")
 menueBefehl(miErsetzen, "ersetzen", "Strg+H") : menueBefehl(miErsetzenEins, "ersetzen_eins", "Strg+Umschalt+1") : menueBefehl(miErsetzenAlle, "ersetzen_alle", "Strg+Alt+Enter")
 menueBefehl(miZeile, "zeile", "Strg+G") : menueBefehl(miProjekt, "projekt", "Strg+Umschalt+F") : menueBefehl(miVervoll, "vervoll", "Strg+Leer")
+menueBefehl(miNavZurueck, "nav_zurueck", "Strg+Alt+Links") : menueBefehl(miNavVor, "nav_vor", "Strg+Alt+Rechts")
+menueBefehl(miBNeuDatei, "baum_neue_datei", "") : menueBefehl(miBNeuOrdner, "baum_neuer_ordner", "") : menueBefehl(miBUmbenennen, "baum_umbenennen", "")
+menueBefehl(miBLoeschen, "baum_loeschen", "") : menueBefehl(miBPfad, "baum_pfad", "")
+menueBefehl(miAZeile, "ausgabe_zeile_kopieren", "") : menueBefehl(miAKopieren, "ausgabe_kopieren", "") : menueBefehl(miASichern, "ausgabe_sichern", "") : menueBefehl(miALeeren, "ausgabe_leeren", "")
 menueBefehl(miDefinition, "definition", "F12") : menueBefehl(miUmbenennen, "umbenennen", "Umschalt+F6") : menueBefehl(miKorrektur, "korrektur", "Strg+.")
 menueBefehl(miSchnipsel, "schnipsel", "Strg+J") : menueBefehl(miEinstellungen, "einstellungen", "Strg+U") : menueBefehl(miBefehle, "befehle", "Strg+F3")
 menueBefehl(miPeek, "peek", "Alt+F12") : menueBefehl(miSymbole, "symbole", "Strg+Umschalt+S") : menueBefehl(miErsProjekt, "ersetzen_projekt", "Strg+Umschalt+H")
@@ -15048,6 +15536,7 @@ WHILE NOT beenden
 
     ' --- Dialoge auswerten ---
     startFrageNachziehen()
+    baumDialogNachziehen()
     IF dlgSuche <> 0 THEN
         DIM a AS INTEGER : a = GUI_ANSWER(dlgSuche)
         IF a = 1 THEN
@@ -15361,6 +15850,8 @@ WHILE NOT beenden
     END IF
 
     abgelegteNachziehen()
+    navNachziehen()
+    ausgabeFilterNachziehen()
     prozessNachsehen()
     exportNachsehen()
 
