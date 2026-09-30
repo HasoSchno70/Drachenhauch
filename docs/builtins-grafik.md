@@ -811,7 +811,9 @@ eingespielter Klick, ein Programm, das gerade langsam läuft), gilt die Taste
 ein Bild lang als gedrückt: `MOUSE_HIT` und `MOUSEBUTTON` im einen,
 `MOUSE_RELEASED` im nächsten Bild, und ein gui-Knopf löst aus. Vorher sah
 niemand einen solchen Klick — raylib liest die Tasten nur einmal je Bild als
-Zustand.
+Zustand. Für die Tastatur gilt dasselbe (`KEYHIT`/`KEYPRESSED` im einen,
+`KEYRELEASED` im nächsten Bild); getippte Zeichen (`INKEY$`, Textfelder) waren
+nie betroffen.
 
 **Tasten-Konstanten** (`KEY_*`) sind eingebaut:
 

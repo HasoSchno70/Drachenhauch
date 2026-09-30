@@ -16,6 +16,11 @@
 //! Liegt ein ganzer Klick in der Luecke, meldet Graphics die Taste EIN Bild
 //! lang als gedrueckt und im naechsten als losgelassen -- so sieht jede
 //! Stelle, die nur "ist gedrueckt" fragt, einen gewoehnlichen kurzen Klick.
+//!
+//! Fuer die TASTATUR gilt dasselbe (raylibs KeyCallback schreibt ebenso nur
+//! `currentKeyState`), darum ein zweiter Satz Zaehler je GLFW-Tastencode und
+//! ein zweiter Rueckruf. Getippte ZEICHEN sind nicht betroffen, sie laufen
+//! ueber eine eigene Warteschlange.
 
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
@@ -25,6 +30,49 @@ static DRUCK: [AtomicU32; TASTEN] = [const { AtomicU32::new(0) }; TASTEN];
 static LOS: [AtomicU32; TASTEN] = [const { AtomicU32::new(0) }; TASTEN];
 /// Der Rueckruf, den raylib gesetzt hatte (0 = keiner).
 static VORHER: AtomicUsize = AtomicUsize::new(0);
+
+/// GLFW-Tastencodes gehen bis 348 (GLFW_KEY_LAST); raylibs KeyboardKey
+/// benutzt dieselben Nummern.
+pub const TASTATUR: usize = 349;
+static T_DRUCK: [AtomicU32; TASTATUR] = [const { AtomicU32::new(0) }; TASTATUR];
+static T_LOS: [AtomicU32; TASTATUR] = [const { AtomicU32::new(0) }; TASTATUR];
+static T_VORHER: AtomicUsize = AtomicUsize::new(0);
+
+type TastenRueckruf = unsafe extern "C" fn(*mut std::ffi::c_void, i32, i32, i32, i32);
+
+unsafe extern "C" fn tasten_rueckruf(fenster: *mut std::ffi::c_void, taste: i32, scan: i32, aktion: i32, mods: i32) {
+    taste_zaehlen(taste, aktion);
+    let v = T_VORHER.load(Ordering::SeqCst);
+    if v != 0 {
+        let f: TastenRueckruf = unsafe { std::mem::transmute::<usize, TastenRueckruf>(v) };
+        unsafe { f(fenster, taste, scan, aktion, mods) };
+    }
+}
+
+/// Wie `zaehlen`, fuer die Tastatur. Aktion 2 (Wiederholung beim Halten)
+/// zaehlt nicht -- die Taste ist dabei die ganze Zeit unten.
+pub fn taste_zaehlen(taste: i32, aktion: i32) {
+    if taste < 0 || taste as usize >= TASTATUR { return; }
+    let t = taste as usize;
+    match aktion {
+        1 => { T_DRUCK[t].fetch_add(1, Ordering::SeqCst); }
+        0 => { T_LOS[t].fetch_add(1, Ordering::SeqCst); }
+        _ => {}
+    }
+}
+
+/// Tasten, die seit dem letzten Abholen gedrueckt oder losgelassen wurden:
+/// (Code, Druecken, Loslassen). Meist leer oder sehr kurz -- darum eine
+/// Liste statt 349 Paaren je Bild.
+pub fn tasten_abholen() -> Vec<(usize, u32, u32)> {
+    let mut v = Vec::new();
+    for t in 0..TASTATUR {
+        let d = T_DRUCK[t].swap(0, Ordering::SeqCst);
+        let l = T_LOS[t].swap(0, Ordering::SeqCst);
+        if d > 0 || l > 0 { v.push((t, d, l)); }
+    }
+    v
+}
 
 type Rueckruf = unsafe extern "C" fn(*mut std::ffi::c_void, i32, i32, i32);
 
@@ -58,6 +106,7 @@ pub fn einhaengen() {
         unsafe extern "C" {
             fn glfwGetCurrentContext() -> *mut std::ffi::c_void;
             fn glfwSetMouseButtonCallback(fenster: *mut std::ffi::c_void, f: Option<Rueckruf>) -> Option<Rueckruf>;
+            fn glfwSetKeyCallback(fenster: *mut std::ffi::c_void, f: Option<TastenRueckruf>) -> Option<TastenRueckruf>;
         }
         let f = glfwGetCurrentContext();
         if f.is_null() { return; }
@@ -66,6 +115,10 @@ pub fn einhaengen() {
         // Schleife ohne Ende.
         if let Some(a) = alt {
             if a as usize != rueckruf as usize { VORHER.store(a as usize, Ordering::SeqCst); }
+        }
+        let alt = glfwSetKeyCallback(f, Some(tasten_rueckruf));
+        if let Some(a) = alt {
+            if a as usize != tasten_rueckruf as usize { T_VORHER.store(a as usize, Ordering::SeqCst); }
         }
     }
 }
@@ -141,6 +194,15 @@ mod tests {
         let h = weiter(Halt::default(), 1, 1, false, false);
         let h = weiter(h, 1, 1, false, false);
         assert!(h.unten && h.neu && h.los);
+    }
+
+    #[test]
+    fn tastenzaehler_liefert_nur_beruehrte() {
+        let _ = tasten_abholen();
+        taste_zaehlen(65, 1); taste_zaehlen(65, 0); taste_zaehlen(65, 2);
+        taste_zaehlen(348, 1); taste_zaehlen(349, 1); taste_zaehlen(-1, 1);
+        assert_eq!(tasten_abholen(), vec![(65, 1, 1), (348, 1, 0)]);
+        assert!(tasten_abholen().is_empty());
     }
 
     #[test]

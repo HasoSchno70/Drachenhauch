@@ -1148,6 +1148,8 @@ pub struct Graphics {
     /// Maustasten, deren Klick ganz zwischen zwei Bildern lag (flanken.rs):
     /// sie gelten ein Bild lang als gedrueckt, sonst saehe sie niemand.
     maus_halt: [crate::flanken::Halt; crate::flanken::TASTEN],
+    /// Dasselbe fuer die Tastatur, je GLFW-Tastencode.
+    tasten_halt: Vec<crate::flanken::Halt>,
     /// Das zuletzt abgespielte Positions-Ereignis der Wiedergabe. raylib
     /// zeichnet eine Mausposition NUR auf, wenn sie sich geaendert hat
     /// (`rcore.c`: "only saved if changed") -- zwischen zwei solchen
@@ -1567,6 +1569,7 @@ impl Graphics {
         // Klicks zwischen zwei Bildern mitzaehlen (flanken.rs).
         crate::flanken::einhaengen();
         let _ = crate::flanken::abholen();
+        let _ = crate::flanken::tasten_abholen();
         let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
         crate::ime::einhaengen(unsafe { rl.get_window_handle() });
@@ -1727,6 +1730,7 @@ impl Graphics {
             auto_play_base: 0,
             auto_injected_keys: Vec::new(),
             maus_halt: [crate::flanken::Halt::default(); crate::flanken::TASTEN],
+            tasten_halt: vec![crate::flanken::Halt::default(); crate::flanken::TASTATUR],
             auto_maus: None,
             key_names: HashMap::new(),
         };
@@ -4483,37 +4487,37 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // pruefen: US-Haupttaste, Ziffernblock und die dt.-Layout-Position
         // (auf DE liegt "+" an US "]", "-" an US "/").
         match code {
-            43 => return self.rl.is_key_down(KEY_EQUAL)
-                       || self.rl.is_key_down(KEY_KP_ADD)
-                       || self.rl.is_key_down(KEY_RIGHT_BRACKET),
-            45 => return self.rl.is_key_down(KEY_MINUS)
-                       || self.rl.is_key_down(KEY_KP_SUBTRACT)
-                       || self.rl.is_key_down(KEY_SLASH),
+            43 => return self.t_unten(KEY_EQUAL)
+                       || self.t_unten(KEY_KP_ADD)
+                       || self.t_unten(KEY_RIGHT_BRACKET),
+            45 => return self.t_unten(KEY_MINUS)
+                       || self.t_unten(KEY_KP_SUBTRACT)
+                       || self.t_unten(KEY_SLASH),
             _ => {}
         }
-        match map_key(code) { Some(k) => self.rl.is_key_down(k), None => false }
+        match map_key(code) { Some(k) => self.t_unten(k), None => false }
     }
 
     /// Flankengetriggert: ist die Taste in DIESEM Frame neu gedrueckt worden?
     /// (raylib is_key_pressed). Fuer Caret-Bewegung u.ae., damit ein Tastendruck
     /// nicht jeden Frame ausloest.
     pub fn key_pressed(&self, code: i64) -> bool {
-        match map_key(code) { Some(k) => self.rl.is_key_pressed(k), None => false }
+        match map_key(code) { Some(k) => self.t_neu(k), None => false }
     }
     /// Ist eine Shift-Taste gedrueckt? (fuer Text-Selektion via Shift+Pfeil)
     pub fn key_shift(&self) -> bool {
         use raylib::consts::KeyboardKey::*;
-        self.rl.is_key_down(KEY_LEFT_SHIFT) || self.rl.is_key_down(KEY_RIGHT_SHIFT)
+        self.t_unten(KEY_LEFT_SHIFT) || self.t_unten(KEY_RIGHT_SHIFT)
     }
     /// Ist eine Strg/Ctrl-Taste gedrueckt? (fuer Strg+A/C/V/X im Textfeld)
     pub fn key_ctrl(&self) -> bool {
         use raylib::consts::KeyboardKey::*;
-        self.rl.is_key_down(KEY_LEFT_CONTROL) || self.rl.is_key_down(KEY_RIGHT_CONTROL)
+        self.t_unten(KEY_LEFT_CONTROL) || self.t_unten(KEY_RIGHT_CONTROL)
     }
     /// Ist eine Alt-Taste gedrueckt? (fuer Menue-Kuerzel wie Alt+Enter)
     pub fn key_alt(&self) -> bool {
         use raylib::consts::KeyboardKey::*;
-        self.rl.is_key_down(KEY_LEFT_ALT) || self.rl.is_key_down(KEY_RIGHT_ALT)
+        self.t_unten(KEY_LEFT_ALT) || self.t_unten(KEY_RIGHT_ALT)
     }
 
     // --- Gamepad (Modul input: INPUT_JOY_*) ---
@@ -4698,6 +4702,15 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     fn halt(&self, b: i64) -> crate::flanken::Halt {
         self.maus_halt.get(b as usize).copied().unwrap_or_default()
     }
+    // Tastenabfragen samt Verlaengerung (flanken.rs): ein Druck, der ganz
+    // zwischen zwei Bildern lag, gilt ein Bild lang als gedrueckt. ALLE
+    // Tastenabfragen dieser Datei gehen hierueber, nicht an raylib vorbei.
+    fn t_halt(&self, k: raylib::consts::KeyboardKey) -> crate::flanken::Halt {
+        self.tasten_halt.get(k as usize).copied().unwrap_or_default()
+    }
+    fn t_unten(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_down(k) || self.t_halt(k).unten }
+    fn t_neu(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_pressed(k) || self.t_halt(k).neu }
+    fn t_los(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_released(k) || self.t_halt(k).los }
 
     // --- Eingabe-FLANKEN -----------------------------------------------------
     // `MOUSEBUTTON` und `KEYPRESSED` liefern beide "wird gehalten". Damit fehlte
@@ -4740,7 +4753,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// bleibt "gehalten" -- der Name ist historisch, ihn umzudeuten wuerde
     /// bestehende Programme still kaputtmachen.
     pub fn key_hit(&self, code: i64) -> bool {
-        self.key_test(code, |k| self.rl.is_key_pressed(k))
+        self.key_test(code, |k| self.t_neu(k))
     }
     /// Wurde in DIESEM Bild irgendeine Taste ausser Alt gedrueckt? Fuer
     /// "Alt allein oeffnet das Menue" (gui.rs) -- ein Alt+X darf es nicht.
@@ -4751,19 +4764,19 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         for code in 32..=348 {
             if let Some(k) = raylib::core::input::key_from_i32(code) {
                 if k == KEY_LEFT_ALT || k == KEY_RIGHT_ALT { continue; }
-                if self.rl.is_key_pressed(k) { return true; }
+                if self.t_neu(k) { return true; }
             }
         }
         false
     }
     /// KEYRELEASED(code): in DIESEM Frame losgelassen.
     pub fn key_released_edge(&self, code: i64) -> bool {
-        self.key_test(code, |k| self.rl.is_key_released(k))
+        self.key_test(code, |k| self.t_los(k))
     }
     /// KEYREPEAT(code): erster Druck ODER System-Auto-Repeat (Textcursor,
     /// Mengen-Eingabe) -- haelt man die Taste, feuert es wiederholt.
     pub fn key_repeat(&self, code: i64) -> bool {
-        self.key_test(code, |k| self.rl.is_key_pressed(k) || self.rl.is_key_pressed_repeat(k))
+        self.key_test(code, |k| self.t_neu(k) || self.rl.is_key_pressed_repeat(k))
     }
 
     /// Relative Mausbewegung seit dem letzten Frame -- Grundlage fuer
@@ -4912,6 +4925,8 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             // als einer von aussen.
             if typ == 6 { crate::flanken::zaehlen(e.params()[0], 1); }
             if typ == 5 { crate::flanken::zaehlen(e.params()[0], 0); }
+            if typ == 2 { crate::flanken::taste_zaehlen(e.params()[0], 1); }
+            if typ == 1 { crate::flanken::taste_zaehlen(e.params()[0], 0); }
             // 7 = INPUT_MOUSE_POSITION (rcore.c). Merken, welches Ereignis die
             // Lage zuletzt gesetzt hat -- unten wird sie damit gehalten.
             if typ == 7 { self.auto_maus = Some(self.auto_play_idx); maus_neu = true; }
@@ -6002,6 +6017,19 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 None => (false, false),
             };
             self.maus_halt[t] = crate::flanken::weiter(self.maus_halt[t], druck[t], los[t], unten, flanke);
+        }
+        // Dasselbe fuer Tasten: weitergeschaltet werden die beruehrten und
+        // die, deren Verlaengerung gerade laeuft oder endet.
+        let mut beruehrt: Vec<(usize, u32, u32)> = crate::flanken::tasten_abholen();
+        for (t, h) in self.tasten_halt.iter().enumerate() {
+            if (h.unten || h.los) && !beruehrt.iter().any(|b| b.0 == t) { beruehrt.push((t, 0, 0)); }
+        }
+        for (t, d, l) in beruehrt {
+            let (unten, flanke) = match raylib::core::input::key_from_i32(t as i32) {
+                Some(k) => (self.rl.is_key_down(k), self.rl.is_key_pressed(k)),
+                None => (false, false),
+            };
+            self.tasten_halt[t] = crate::flanken::weiter(self.tasten_halt[t], d, l, unten, flanke);
         }
 
         // Abgelegte Dateien fuer das naechste Bild: raylib (Hineinziehen) und

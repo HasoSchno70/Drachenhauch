@@ -52,6 +52,19 @@ if ($Nachricht -eq "esc") {
         [FensterSender]::PostMessage($h, 0x202, [IntPtr]0, $l) | Out-Null
         Start-Sleep -Milliseconds 250
     }
+} elseif ($Nachricht.StartsWith("tasten:")) {
+    # "tasten:N:MS" = N mal die Taste A (WM_KEYDOWN/WM_KEYUP; GLFW nimmt den
+    # Scancode 0x1E aus dem lParam), MS Millisekunden gehalten, genau
+    # gewartet. MS = 0: beide gleich hintereinander, also im selben Bild.
+    $teile = $Nachricht.Split(":")
+    $n = [int]$teile[1]; $ms = [double]$teile[2]
+    for ($k = 0; $k -lt $n; $k++) {
+        [FensterSender]::PostMessage($h, 0x100, [IntPtr]0x41, [IntPtr]0x001E0001) | Out-Null
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        while ($sw.Elapsed.TotalMilliseconds -lt $ms) { }
+        [FensterSender]::PostMessage($h, 0x101, [IntPtr]0x41, [IntPtr]0xC01E0001) | Out-Null
+        Start-Sleep -Milliseconds 250
+    }
 } else {
     # Eine Folge, getrennt mit "|": "tippe:abc" = je Zeichen WM_CHAR (dieser
     # Weg fuellt raylibs Zeichenwarteschlange, eine Aufnahme tut es nicht),
