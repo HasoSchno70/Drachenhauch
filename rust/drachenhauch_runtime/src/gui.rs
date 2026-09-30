@@ -14456,8 +14456,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 if !shift && lo != hi { c = hi; } else { c = (c + 1).min(len); }
                 if !shift { a = c; }
             }
-            if g.key_pressed(KEY_HOME) { c = rows[row].1 as i32; if !shift { a = c; } }
-            if g.key_pressed(KEY_END) { c = rows[row].2 as i32; if !shift { a = c; } }
+            // Mit Strg an den Anfang bzw. das Ende des ganzen Textes -- ohne
+            // das blieb Strg+Ende stehen und Strg+Pos1 ging nur in die Zeile.
+            if g.key_pressed(KEY_HOME) {
+                c = if ctrl { 0 } else { rows[row].1 as i32 };
+                if !shift { a = c; }
+            }
+            if g.key_pressed(KEY_END) {
+                c = if ctrl { len } else { rows[row].2 as i32 };
+                if !shift { a = c; }
+            }
             if g.key_pressed(KEY_UP) && row > 0 && !kuerzel_weg {
                 let (_, ps, pe) = rows[row - 1];
                 c = (ps as i32 + col).min(pe as i32);
