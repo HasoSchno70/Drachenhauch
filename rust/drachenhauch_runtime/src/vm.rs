@@ -6121,9 +6121,35 @@ impl<'p> Vm<'p> {
             "process_start" => {
                 if a.is_empty() { return Err("PROCESS_START: erwartet mind. 1 Argument (Programm)".into()); }
                 let prog = bi_str(a, 0, "PROCESS_START")?.to_string();
+                // Ein FELD von Texten wird ausgebreitet (eine variable Zahl von
+                // Argumenten liess sich vorher gar nicht uebergeben), eine MAP
+                // von Texten ist zusaetzliche Umgebung NUR fuer das Kind --
+                // SETENV in den Eltern haette sie allen spaeteren Kindern
+                // mitgegeben, und entfernen laesst sich eine Variable nicht.
                 let mut rest: Vec<String> = Vec::new();
-                for i in 1..a.len() { rest.push(bi_str(a, i, "PROCESS_START")?.to_string()); }
-                let p = crate::prozess::Prozess::starten(&prog, &rest)?;
+                let mut umgebung: Vec<(String, String)> = Vec::new();
+                for i in 1..a.len() {
+                    match &a[i] {
+                        Value::Array(arr) => {
+                            for x in arr.borrow().cells.iter() {
+                                match x {
+                                    Value::Str(s) => rest.push(s.to_string()),
+                                    _ => return Err("PROCESS_START: ein Feld von Argumenten muss aus Texten bestehen".into()),
+                                }
+                            }
+                        }
+                        Value::Map(m) => {
+                            for (k, v) in m.borrow().entries().iter() {
+                                match v {
+                                    Value::Str(s) => umgebung.push((k.clone(), s.to_string())),
+                                    _ => return Err(format!("PROCESS_START: die Umgebung muss aus Texten bestehen ('{}')", k)),
+                                }
+                            }
+                        }
+                        _ => rest.push(bi_str(a, i, "PROCESS_START")?.to_string()),
+                    }
+                }
+                let p = crate::prozess::Prozess::starten_mit(&prog, &rest, &umgebung)?;
                 self.prozesse.push(Some(p));
                 Value::Int((self.prozesse.len() - 1) as i64)
             }
@@ -7938,8 +7964,13 @@ impl<'p> Vm<'p> {
                     }
                     _ => return Err(format!("{}: texte muss ein ARRAY sein", n)),
                 };
-                let farbe = if a.len() > 3 { gi(a, 3, n)? } else { -1 };
-                self.gui.textarea_hints(gi(a, 0, n)?, ganze(&a[1], n)?, texte, farbe)?;
+                // farbe: eine fuer alle, oder ein Feld mit einer je Hinweis
+                let (farbe, farben) = match a.get(3) {
+                    None => (-1, Vec::new()),
+                    Some(Value::Array(_)) => (-1, ganze(&a[3], n)?),
+                    Some(_) => (gi(a, 3, n)?, Vec::new()),
+                };
+                self.gui.textarea_hints(gi(a, 0, n)?, ganze(&a[1], n)?, texte, farbe, farben)?;
                 Value::Nil
             }
             "gui_textarea_line_colors" => {

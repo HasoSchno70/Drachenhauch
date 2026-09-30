@@ -321,6 +321,23 @@ bekäme. Diese Bausteine kamen mit ihr:
   Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der
   Bereich auf die Ausgabe zurück. Unter Windows kommen Umlaute richtig an
   (`chcp 65001`).
+- **Fehlertext am Zeilenende** (Ansicht → Fehlertext am Zeilenende, an per
+  Vorgabe): die Meldung von Prüfen steht hinter ihrer Zeile, rot bei einem
+  Fehler, gelb bei einer Warnung -- lesbar, ohne die Maus hinzubewegen.
+  Mehrere Meldungen einer Zeile stehen in einem Hinweis, lange werden
+  gekürzt (der ganze Satz steht in der Problemliste und im Tooltip);
+  Aufrufzähler und Profilzahlen derselben Zeile folgen dahinter.
+- **Startargumente und Umgebung je Datei** (Ausführen → Startargumente ...
+  bzw. Umgebung für den Start ...): gilt für die Datei im vorderen Reiter,
+  für Starten, Debuggen und Profil, und bleibt in der `ide.json` (`start`).
+  Argumente werden an Leerzeichen getrennt, `"in Anführungszeichen"` bleibt
+  eins (`ARG$(0)` ...). Die Umgebung schreibt man `NAME=wert NAME2="mit
+  Leerzeichen"`; sie gilt nur für das gestartete Programm, nicht für die
+  IDE und nicht für den nächsten Start einer anderen Datei. Leer = keine.
+- **Beim Sichern neu starten** (Ausführen, aus per Vorgabe): läuft ein
+  Programm (F5), startet Strg+S es neu -- auch wenn eine importierte Datei
+  gesichert wurde, und ohne den Reiter zu wechseln. Debugger und Profil
+  bleiben unberührt, das automatische Sichern startet nie neu.
 - **Profil im Code** (Ansicht → Profil im Code, an per Vorgabe): nach
   Ausführen → Profil aufnehmen (Strg+Umschalt+Y) liegt hinter jeder gemessenen
   Zeile ein Farbband, blassgelb bei wenig Zeit bis kräftig rot bei der

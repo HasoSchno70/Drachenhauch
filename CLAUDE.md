@@ -1888,6 +1888,25 @@ mit Gegenprobe), `werkzeug_ide_terminal.dhtest` (2, `--- system windows`),
 Rust-Test `kill_beendet_auch_die_enkel`; vier Verfaelschungen der IDE und
 eine der Laufzeit fallen je in ihrem Fall.
 
+**Fehlertext am Zeilenende, Start je Datei, Neustart beim Sichern
+(2026-09-30):** `GUI_TEXTAREA_HINTS(ta, zeilen, texte, farben)` nimmt als
+viertes Argument auch ein FELD (eine Farbe je Hinweis, -1 = die gedaempfte
+Vorgabe; `Widget::hinweise_farben`), und `PROCESS_START` breitet ein Feld
+zu einzelnen Argumenten aus und nimmt eine MAP als Umgebung NUR des Kindes
+(`Prozess::starten_mit`) -- SETENV bliebe fuer jeden spaeteren Start
+stehen, ein "unset" gibt es nicht. Die IDE: `pruefen` sammelt Fehler und
+Warnungen je Zeile (`fehlerSammeln`, gekuerzt auf 90 Zeichen, ein Fehler
+faerbt rot), `hinweiseZeigen` stellt sie VOR Zaehler/Profil/Blame und gibt
+die Farben mit (`fehler_am_ende`); Argumente/Umgebung je Datei in der
+ide.json als Liste `start` (Pfad als Schluessel ginge wegen der
+Punkt-Notation nicht), zerlegt von `startWoerter`/`startUmgebung`, an
+`prozessStartenDatei`; `neustart_beim_sichern` stoppt in `sichern` ein
+laufendes F5-Programm und startet ueber `neustartVomSichern` DIESELBE Datei
+ohne Reiterwechsel (nicht beim Autosichern, nicht Debugger/Profil). Tests
+`werkzeug_ide_fehlertext_start.dhtest` (5, Farben am Bild), je zwei Faelle in
+`ide_bausteine.dhtest` und `gui_textarea_hints.dhtest`; vier Verfaelschungen
+der IDE fallen je in ihrem Fall.
+
 **Profil im Code, englische Oberflaeche (2026-09-29):** neu in der
 Laufzeit **`GUI_TEXTAREA_LINE_COLORS(ta, zeilen, farben)`** +
 `_GET` -- ein Band hinter ganzen Zeilen (Deckkraft im obersten Byte, ohne
