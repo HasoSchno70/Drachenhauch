@@ -120,3 +120,40 @@ DHRT_FRAMES=7
 --- erwartet
 vorher oben b FALSE
 nachher oben b TRUE fokus im feld TRUE
+
+=== die marke in ein wort setzen oeffnet keine liste
+' Bei der Handpruefung gefunden: ein Klick mitten in ein vorhandenes Wort
+' aendert den Wortanfang wie ein getippter Buchstabe -- die Liste ging bei
+' jedem Klick in ein Wort ab drei Buchstaben auf. Sie gehoert zum Tippen.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    GUI_FOCUS(tabFelder[aktiverTab])
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 6)
+END IF
+IF prBild = 60 THEN
+    protokoll("pr offen nach dem setzen " + STR$(vervollOffen))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+IMPORT "gui"
+DIM w AS INTEGER
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- system windows
+--- erwartet
+pr offen nach dem setzen FALSE
