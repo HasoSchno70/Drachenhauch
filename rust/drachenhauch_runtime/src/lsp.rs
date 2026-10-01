@@ -703,10 +703,13 @@ pub fn fundstellen(text: &str, uri: &str, z0: usize, c0: usize) -> Value {
 /// Gliederung: CLASS/STRUCT mit ihren Methoden und Properties verschachtelt
 /// (ueber die Zeilenbereiche), dazu SUB/FUNCTION und ENUMs oben.
 pub fn gliederung(text: &str) -> Value {
-    fn knoten(name: &str, art: i64, von: usize, bis: usize) -> Value {
+    // `detail` traegt die Art in Worten: die SymbolKind des Protokolls
+    // kennt keine SUB, und ohne das hiess in Gliederung und Pfadleiste der
+    // IDE jede SUB "function".
+    fn knoten(name: &str, art: i64, wort: &str, von: usize, bis: usize) -> Value {
         let r = json!({"start": {"line": von.saturating_sub(1), "character": 0},
                        "end": {"line": bis.saturating_sub(1), "character": 0}});
-        json!({"name": name, "kind": art, "range": r, "selectionRange": r, "children": []})
+        json!({"name": name, "detail": wort, "kind": art, "range": r, "selectionRange": r, "children": []})
     }
     let bereiche = symbole::bereiche(text);
     let mut wurzeln: Vec<Value> = Vec::new();
@@ -714,7 +717,7 @@ pub fn gliederung(text: &str) -> Value {
     let mut stapel: Vec<(symbole::Bereich, Vec<usize>)> = Vec::new();
     for b in bereiche {
         let art = match b.art { "class" => SK_CLASS, "struct" => SK_STRUCT, "property" => SK_PROPERTY, "enum" => SK_ENUM, _ => SK_FUNCTION };
-        let k = knoten(&b.name, art, b.zeile, b.ende);
+        let k = knoten(&b.name, art, b.art, b.zeile, b.ende);
         while let Some((oben, _)) = stapel.last() {
             if oben.zeile <= b.zeile && b.zeile <= oben.ende { break; }
             stapel.pop();

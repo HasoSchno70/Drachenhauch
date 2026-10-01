@@ -28,15 +28,23 @@ Formular, das beim ersten Sichern dorthin geschrieben wird.
 
 - **Links — Menü und Palette.** Die Palette listet **alle 32 Widget-Arten der
   Laufzeit** und dazu das **Gitter** (eine Tabelle im Zellmodus, alle Spalten
-  bearbeitbar). Eintrag anklicken („scharf"), dann auf die Form klicken =
-  ablegen, am 8-px-Raster. Unter der Palette steht die Statuszeile.
+  bearbeitbar), alle mit deutschem Namen (Knopf, Beschriftung, Kästchen,
+  Textfeld, Klappliste ...; der Name ist auch der Vorgabetext). Eintrag
+  anklicken („scharf"), dann auf die Form klicken = ablegen, am
+  8-px-Raster. Unter der Palette steht die Statuszeile.
 - **Mitte — die Form.** Sie ist ein **echtes `GUI_WINDOW` im Entwurfsmodus**
   (`GUI_WINDOW_DESIGN(win, TRUE)`): die Laufzeit zeichnet die Controls genau
   so, wie das Programm sie später bekommt, nimmt ihnen aber jede Eingabe; die
   Maus verwaltet der Designer selbst (`GUI_HIT_TEST` geht weiter). Eine
   nachgemalte Vorschau, die von der Laufzeit abweichen könnte, gibt es nicht.
   Klick = auswählen, ziehen = verschieben, an den **acht Griffen** ziehen =
-  Größe ändern — alles am Raster.
+  Größe ändern — alles am Raster. **Zoom** (Ansicht → Vergrößern,
+  Verkleinern, Originalgröße, oder `Strg`+Rad über der Form): 50 bis 300 %
+  in Stufen, gezeichnet über `GUI_WINDOW_ZOOM`. Vergrößert wird nur so weit,
+  wie die Form zwischen Palette und Inspektor passt (die Statuszeile sagt
+  es); die Maße im Formular bleiben unvergrößert, Ablegen, Ziehen und
+  Griffe rechnen die Maus in die Form zurück. Die Schrift ist vergrößert
+  etwas weich — die Fläche wird als Bild hochgezogen.
 - **Rechts — Inspektor.** Mit ausgewähltem Control: Name, X, Y, Breite, Höhe,
   Text, Tooltip, Anker (`lrtb`), `on_click`, `on_change`, `on_enter`,
   **Schriftstil** (`fett`, `kursiv`, `unterstrichen`, `durchgestrichen`,
@@ -60,6 +68,7 @@ Formular, das beim ersten Sichern dorthin geschrieben wird.
 | `Umschalt`/`Strg`+Klick | Control zur Auswahl dazu oder wieder weg |
 | Zug über leere Fläche | Auswahlrahmen: gewählt ist, was ganz darin liegt (mit `Umschalt` dazu) |
 | `Strg+A` | alle Controls wählen |
+| `Strg+Plus` / `Strg+Minus` / `Strg+0`, `Strg`+Rad | Zoom der Entwurfsfläche größer / kleiner / 100 % |
 | `Esc` | Palette entschärfen, Auswahl aufheben |
 | `Strg+Q` | beenden |
 

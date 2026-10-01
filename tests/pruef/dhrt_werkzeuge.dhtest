@@ -182,6 +182,9 @@ END IF
 dlStarten(["test", ziel])
 PRINT "rueckgabe "; dlCode
 PRINT "ohne fehler "; (INSTR(dlAus, "0 mit Fehlern") >= 0)
+' Faellt er, soll man sehen, WELCHES Programm -- am 2026-10-01 stand auf
+' macOS nur "rueckgabe 1" da.
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
 --- argumente
 {sammlung}/../../buch-tippspiel/code
 --- datei helfer.dh

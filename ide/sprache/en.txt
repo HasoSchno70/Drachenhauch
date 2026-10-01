@@ -195,7 +195,7 @@ Nur Dateien, deren Name das enthält	Only files whose name contains this
 Gliederung	Outline
 Keine Unterprogramme	No subroutines
 Drachenhauch 	Drachenhauch 
-BASIC für Spiele -- mit Pascal-strikter Typisierung und OOP. Diese IDE ist selbst in Drachenhauch geschrieben.	BASIC for games -- with Pascal-strict typing and OOP. This IDE is itself written in Drachenhauch.
+BASIC für Spiele und Anwendungen -- mit Pascal-strikter Typisierung und OOP. Diese IDE ist selbst in Drachenhauch geschrieben.	BASIC for games and applications -- with Pascal-strict typing and OOP. This IDE is itself written in Drachenhauch.
 Neue Datei	New file
 Datei öffnen ...	Open file ...
 Beispiele als Projekt	Examples as project
@@ -387,6 +387,8 @@ Umbruch an	Wrap on
 OK	OK
 Keine Definition zu '	No definition for '
 ' -- auch nicht im Projekt.	' -- not in the project either.
+Definition von '	Definition of '
+' in Zeile 	' on line 
 Zeile 	Line 
 Farbe: 	Colour: 
 Geteilte Ansicht: dafür braucht es zwei offene Dateien.	Split view: that needs two open files.

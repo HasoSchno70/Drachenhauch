@@ -1,0 +1,77 @@
+' GUI_WINDOW_ZOOM (2026-10-01, fuer den Form-Designer): ein Fenster im
+' Entwurfsmodus vergroessert zeichnen. Die Lage bleibt, die Flaeche
+' waechst; GUI_HIT_TEST und GUI_WINDOW_AT rechnen die Maus zurueck, die
+' Geometrie nach aussen bleibt unvergroessert.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== doppelt gross trifft und zeichnet doppelt gross
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("F", 20, 20, 150, 100)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "K", 10, 10, 60, 30)
+GUI_SET_COLOR(k, "bg", &HFF0000)
+GUI_WINDOW_DESIGN(w, TRUE)
+GUI_WINDOW_ZOOM(w, 2.0)
+PRINT "faktor "; GUI_WINDOW_GET_ZOOM(w)
+PRINT "breite "; GUI_WINDOW_GET_W(w); " knopf "; GUI_GET_W(k)
+' Logisch (75, 45) liegt neben dem Knopf; vergroessert ist es (20+110, 20+50).
+PRINT "treffer im knopf "; GUI_HIT_TEST(20 + 2 * 50, 20 + 2 * 30) = k
+PRINT "neben dem knopf "; GUI_HIT_TEST(20 + 2 * 75, 20 + 2 * 45) = -1
+PRINT "fenster rechts unten "; GUI_WINDOW_AT(20 + 290, 20 + 190) = w
+PRINT "dahinter nichts "; GUI_WINDOW_AT(20 + 310, 20 + 50) = -1
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+faktor 2.0
+breite 150 knopf 60
+treffer im knopf TRUE
+neben dem knopf TRUE
+fenster rechts unten TRUE
+dahinter nichts TRUE
+--- bild
+120 80 #FF0000 +-60
+150 75 #FF0000 +-60
+50 50 #FF0000 +-60
+
+=== ohne zoom liegt dort kein knopf
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("F", 20, 20, 150, 100)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "K", 10, 10, 60, 30)
+GUI_SET_COLOR(k, "bg", &HFF0000)
+GUI_WINDOW_DESIGN(w, TRUE)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=4
+--- erwartet
+--- bild
+120 80 nicht #FF0000 +-60
+50 50 #FF0000 +-60
+
+=== nur im entwurfsmodus
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("F", 20, 20, 150, 100)
+GUI_WINDOW_ZOOM(w, 2.0)
+--- fehler
+nur fuer ein Fenster im Entwurfsmodus
+
+=== faktor ausserhalb
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("F", 20, 20, 150, 100)
+GUI_WINDOW_DESIGN(w, TRUE)
+GUI_WINDOW_ZOOM(w, 5.0)
+--- fehler
+von 0.25 bis 4
