@@ -10,10 +10,20 @@
 DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "kind.dh")
 DIM gefunden AS BOOLEAN : gefunden = FALSE
 DIM i AS INTEGER
-FOR i = 1 TO 100
+DIM fehler AS STRING : fehler = ""
+FOR i = 1 TO 300
     IF PROCESS_FRONT(p) THEN gefunden = TRUE : BREAK
+    fehler = fehler + PROCESS_ERR$(p)
+    IF NOT PROCESS_RUNNING(p) THEN BREAK
     SLEEP(50)
 NEXT
+' Ein Rechner ohne OpenGL (die Windows-Laeufer der CI mal so, mal so) gibt
+' dem Kind kein Fenster -- dann ist hier nichts zu pruefen.
+fehler = fehler + PROCESS_ERR$(p)
+IF NOT gefunden AND INSTR(fehler, "Kein Fenster") >= 0 THEN
+    PRINT "UEBERSPRINGEN: das Kind bekommt kein Fenster"
+    END
+END IF
 PRINT "gefunden "; gefunden
 PROCESS_KILL(p)
 PRINT "nach dem ende "; PROCESS_FRONT(p)
