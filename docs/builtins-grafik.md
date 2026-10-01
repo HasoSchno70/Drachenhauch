@@ -805,6 +805,16 @@ Sampler bliebe schwarz.
 | `INKEY$()` → STRING | zuletzt getipptes Zeichen oder `""` — wartet **nicht**, für Texteingabe im Spielablauf |
 | `WAITKEY()` → INTEGER | **hält an**, bis eine Taste kommt, und liefert ihren Code (`-1`, wenn das Fenster geschlossen wird) |
 
+**Ein Klick zwischen zwei Bildern geht nicht verloren.** Kommen Drücken und
+Loslassen an, bevor das nächste Bild beginnt (Tippen aufs Touchpad, ein
+eingespielter Klick, ein Programm, das gerade langsam läuft), gilt die Taste
+ein Bild lang als gedrückt: `MOUSE_HIT` und `MOUSEBUTTON` im einen,
+`MOUSE_RELEASED` im nächsten Bild, und ein gui-Knopf löst aus. Vorher sah
+niemand einen solchen Klick — raylib liest die Tasten nur einmal je Bild als
+Zustand. Für die Tastatur gilt dasselbe (`KEYHIT`/`KEYPRESSED` im einen,
+`KEYRELEASED` im nächsten Bild); getippte Zeichen (`INKEY$`, Textfelder) waren
+nie betroffen.
+
 **Tasten-Konstanten** (`KEY_*`) sind eingebaut:
 
 ```basic
