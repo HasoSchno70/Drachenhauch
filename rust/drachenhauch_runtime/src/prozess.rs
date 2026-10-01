@@ -144,6 +144,71 @@ impl Prozess {
     }
 }
 
+impl Prozess {
+    /// PROCESS_FRONT: das sichtbare Fenster des Kindes nach vorn holen. Ein
+    /// Programm im Hintergrund darf sich unter Windows nicht selbst nach
+    /// vorn stellen (die Taskleiste blinkt nur) -- das darf nur, wer gerade
+    /// vorn ist. Darum holt der Aufrufer es: die IDE nach "Weiter" im
+    /// Debugger, sonst laege das Programm hinter ihr. TRUE, wenn das Kind
+    /// ein sichtbares Fenster hat (ob Windows es nach vorn laesst, sagt es
+    /// nicht), FALSE ohne Fenster oder wenn es nicht mehr laeuft.
+    pub fn nach_vorn(&mut self) -> bool {
+        if !self.laeuft() { return false; }
+        fenster_nach_vorn(self.kind.id())
+    }
+}
+
+#[cfg(windows)]
+fn fenster_nach_vorn(pid: u32) -> bool {
+    use windows::Win32::Foundation::{HWND, LPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        AllowSetForegroundWindow, EnumWindows, GetWindowThreadProcessId, IsIconic,
+        IsWindowVisible, SetForegroundWindow, ShowWindow, BringWindowToTop, SW_RESTORE,
+        GetWindow, GW_OWNER,
+    };
+    unsafe extern "system" fn suchen(h: HWND, l: LPARAM) -> windows::core::BOOL {
+        unsafe {
+            let ziel = &mut *(l.0 as *mut (u32, HWND));
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(h, Some(&mut pid));
+            let ohne_besitzer = GetWindow(h, GW_OWNER).map(|o| o.0.is_null()).unwrap_or(true);
+            if pid == ziel.0 && IsWindowVisible(h).as_bool() && ohne_besitzer {
+                ziel.1 = h;
+                return false.into();
+            }
+            true.into()
+        }
+    }
+    let mut ziel: (u32, HWND) = (pid, HWND(std::ptr::null_mut()));
+    unsafe {
+        // Die Erlaubnis zuerst: hat das Kind noch kein Fenster (es oeffnet
+        // es gleich), darf sein erstes dann vorn aufgehen.
+        let _ = AllowSetForegroundWindow(pid);
+        let _ = EnumWindows(Some(suchen), LPARAM(&mut ziel as *mut _ as isize));
+        if ziel.1.0.is_null() { return false; }
+        if IsIconic(ziel.1).as_bool() { let _ = ShowWindow(ziel.1, SW_RESTORE); }
+        let _ = BringWindowToTop(ziel.1);
+        // Ob Windows es zulaesst, entscheidet es selbst (der Aufrufer muss
+        // vorn sein); die Antwort sagt nur, ob es ein Fenster gab.
+        let _ = SetForegroundWindow(ziel.1);
+        true
+    }
+}
+
+#[cfg(not(windows))]
+fn fenster_nach_vorn(_pid: u32) -> bool { false }
+
+/// Beim Halt im Debugger: wer jetzt vorn ist (das Programm), gibt den
+/// Vordergrund frei, damit die IDE sich nach vorn holen darf.
+#[cfg(windows)]
+pub fn vordergrund_freigeben() {
+    use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY};
+    unsafe { let _ = AllowSetForegroundWindow(ASFW_ANY); }
+}
+
+#[cfg(not(windows))]
+pub fn vordergrund_freigeben() {}
+
 /// Die Nachkommen eines Kindes beenden (das Kind selbst gleich mit).
 #[cfg(windows)]
 fn baum_beenden(pid: u32) {

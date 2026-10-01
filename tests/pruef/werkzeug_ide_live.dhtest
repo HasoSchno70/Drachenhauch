@@ -63,3 +63,67 @@ live start
 live fehler Laufzeitfehler in bild.dh:2: LINE: es gibt noch kein Fenster -- vor dem ersten Zeichenbefehl SCREEN(breite, hoehe, "Titel") aufrufen
 pr text Kein Bild
 kopie am ende FALSE
+
+=== nach einem klick in den code laesst sie sich noch ziehen
+' Beim Dogfooding gefunden: ein Klick in den Code holte das Hauptfenster
+' nach vorn, die Vorschau lag gezeichnet obenauf, fuer die Maus aber
+' dahinter -- die Titelleiste nahm keinen Zug an.
+DIM prBild AS INTEGER : prBild = 0
+DIM prX0 AS INTEGER
+DIM prY0 AS INTEGER
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN befehl("live")
+IF prBild = 40 THEN
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 1)
+END IF
+IF prBild = 42 THEN
+    DIM prMx AS INTEGER
+    DIM prMy AS INTEGER
+    DIM prMh AS INTEGER
+    (prMx, prMy, prMh) = GUI_TEXTAREA_CARET_XY(tabFelder[aktiverTab])
+    prX0 = GUI_WINDOW_GET_X(winLive)
+    prY0 = GUI_WINDOW_GET_Y(winLive)
+    DIM prA AS STRING
+    prA = "c 9" + CHR$(10)
+    prA = prA + "e 0 7 " + STR$(prMx + 4) + " " + STR$(prMy + 4) + " 0" + CHR$(10)
+    prA = prA + "e 2 6 0 0 0" + CHR$(10)
+    prA = prA + "e 4 5 0 0 0" + CHR$(10)
+    prA = prA + "e 10 7 " + STR$(prX0 + 60) + " " + STR$(prY0 + 10) + " 0" + CHR$(10)
+    prA = prA + "e 13 6 0 0 0" + CHR$(10)
+    prA = prA + "e 16 7 " + STR$(prX0 + 20) + " " + STR$(prY0 + 50) + " 0" + CHR$(10)
+    prA = prA + "e 20 7 " + STR$(prX0 - 20) + " " + STR$(prY0 + 90) + " 0" + CHR$(10)
+    prA = prA + "e 24 5 0 0 0" + CHR$(10)
+    prA = prA + "e 26 7 " + STR$(prX0 - 20) + " " + STR$(prY0 + 90) + " 0" + CHR$(10) + CHR$(10)
+    WRITEALL("przug.txt", prA)
+    AUTOMATION_PLAY("przug.txt")
+END IF
+IF prBild = 90 THEN
+    protokoll("pr fokus im code " + STR$(GUI_FOCUSED() = tabFelder[aktiverTab]))
+    protokoll("pr verschoben " + STR$(GUI_WINDOW_GET_X(winLive) - prX0) + " " + STR$(GUI_WINDOW_GET_Y(winLive) - prY0))
+    EXIT(0)
+END IF
+--- argumente
+bild.dh
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei bild.dh
+SCREEN(200, 100, "B", 1)
+WHILE NOT QUITREQUESTED()
+    CLS(RED)
+    FLIP()
+WEND
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr fokus im code TRUE
+pr verschoben -80 80

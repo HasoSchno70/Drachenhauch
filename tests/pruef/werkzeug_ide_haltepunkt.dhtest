@@ -388,3 +388,48 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 haltepunkt nie spiel.dh:99
+
+=== nach weiter holt die ide das programmfenster nach vorn
+' Beim Dogfooding gefunden: nach "Weiter" (F8) lag das Programmfenster
+' hinter der IDE -- ein Programm im Hintergrund darf sich unter Windows
+' nicht selbst nach vorn holen. Die IDE holt es mit PROCESS_FRONT; ein
+' Einzelschritt tut das nicht (das Fenster sprang sonst bei jedem F10).
+' Beim ersten Weiter (zum Haltepunkt) gibt es noch kein Fenster: FALSE,
+' das Kind bekommt nur die Erlaubnis fuer sein erstes.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 3, 1)
+    haltepunktUmschalten()
+    WRITEALL("prtasten.txt", "c 6" + CHR$(10) + "e 0 2 296 0 0" + CHR$(10) + "e 2 1 296 0 0" + CHR$(10) + "e 100 2 299 0 0" + CHR$(10) + "e 102 1 299 0 0" + CHR$(10) + "e 160 2 297 0 0" + CHR$(10) + "e 162 1 297 0 0" + CHR$(10) + CHR$(10))
+    AUTOMATION_PLAY("prtasten.txt")
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=500
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SCREEN(160, 100, "Spiel", 1)
+SET_WINDOW_POS(-3000, -3000)
+PRINT "halt"
+PRINT "schritt"
+DIM i AS INTEGER
+FOR i = 1 TO 120
+    CLS(0) : FLIP()
+NEXT
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 12) = "debug pause " OR LEFT$(L[i], 14) = "programm vorn " THEN PRINT L[i]
+NEXT
+--- erwartet
+programm vorn FALSE
+debug pause 3
+debug pause 4
+programm vorn TRUE
