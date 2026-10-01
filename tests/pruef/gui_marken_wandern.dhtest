@@ -115,3 +115,25 @@ END TRY
 --- erwartet
 2
 GUI_TEXTAREA_MARKS_GET: das Widget ist kein GUI_TEXTAREA
+
+=== ein umbau ueber den ganzen text laesst die marke auf ihrer zeile
+' Stresstest 2026-10-01: ein Umbau (Umbenennen im Projekt) markiert alles
+' und setzt den neuen Text ein. Geaendert sind Zeile 2 und 4, und alles
+' dazwischen galt als EINE Aenderung -- der Haltepunkt in Zeile 4 fiel auf
+' Zeile 2. Gleich viele Zeilen vorher und nachher: er bleibt.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 380, 250, "")
+DIM nl AS STRING : nl = CHR$(10)
+GUI_SET_TEXT(ta, "kopf" + nl + "f quadrat" + nl + "x" + nl + "y = quadrat(1)" + nl + "fuss")
+GUI_TEXTAREA_MARKS(ta, [3, 4], [RGB(255, 0, 0), RGB(0, 0, 255)])
+GUI_UPDATE()
+GUI_TEXTAREA_SELECT(ta, 1, 1, 1000000, 1000000)
+GUI_TEXTAREA_INSERT(ta, "kopf" + nl + "f hoch2" + nl + "x" + nl + "y = hoch2(1)" + nl + "fuss")
+DIM m AS ARRAY OF INTEGER : m = GUI_TEXTAREA_MARKS_GET(ta)
+PRINT m[0]; " "; m[1]
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+3 4
