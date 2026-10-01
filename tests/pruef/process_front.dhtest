@@ -1,0 +1,42 @@
+' PROCESS_FRONT (2026-10-01, beim Dogfooding gefunden): nach "Weiter" im
+' Debugger lag das Programmfenster hinter der IDE -- ein Programm im
+' Hintergrund darf sich unter Windows nicht selbst nach vorn holen, das
+' darf nur, wer vorn ist. Ob Windows es zulaesst, haengt am Vordergrund
+' des Pruefenden und ist hier nicht festzustellen; geprueft wird, dass das
+' Fenster des Kindes gefunden wird (und ein Kind ohne Fenster nicht).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein kind mit fenster wird gefunden
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "kind.dh")
+DIM gefunden AS BOOLEAN : gefunden = FALSE
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    IF PROCESS_FRONT(p) THEN gefunden = TRUE : BREAK
+    SLEEP(50)
+NEXT
+PRINT "gefunden "; gefunden
+PROCESS_KILL(p)
+PRINT "nach dem ende "; PROCESS_FRONT(p)
+--- datei kind.dh
+SCREEN(160, 100, "Kind", 1)
+SET_WINDOW_POS(-3000, -3000)
+WHILE NOT QUITREQUESTED()
+    CLS(0) : FLIP()
+WEND
+
+--- system windows
+--- erwartet
+gefunden TRUE
+nach dem ende FALSE
+
+=== ein kind ohne fenster nicht
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "kind.dh")
+SLEEP(400)
+PRINT "gefunden "; PROCESS_FRONT(p)
+PROCESS_KILL(p)
+--- datei kind.dh
+SLEEP(3000)
+
+--- system windows
+--- erwartet
+gefunden FALSE

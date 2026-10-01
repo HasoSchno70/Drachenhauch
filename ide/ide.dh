@@ -6181,6 +6181,12 @@ END FUNCTION
 SUB liveNachziehen()
     IF NOT liveAn THEN RETURN
     IF NOT GUI_WINDOW_SHOWN(winLive) THEN liveSetzen(FALSE) : RETURN
+    ' Ueber dem Hauptfenster halten: ein Klick in den Code holt das
+    ' Hauptfenster nach vorn, und die Vorschau lag dann zwar gezeichnet
+    ' obenauf (GUI_DRAW_WINDOW unten), fuer die Maus aber DAHINTER -- ihre
+    ' Titelleiste liess sich nicht mehr ziehen. Liegt ein anderes Fenster
+    ' darueber (Einstellungen, Suche), bleibt es dort.
+    IF GUI_WINDOW_AT(GUI_WINDOW_GET_X(winLive) + 10, GUI_WINDOW_GET_Y(winLive) + 10) = win THEN GUI_WINDOW_FRONT(winLive)
     IF liveProz >= 0 THEN
         liveFehler = liveFehler + PROCESS_ERR$(liveProz)
         DIM verwerfen AS STRING : verwerfen = PROCESS_READ$(liveProz)
@@ -13035,6 +13041,17 @@ END SUB
 SUB debugSenden(cmd AS STRING)
     IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
     PROCESS_WRITE(prozess, "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + cmd + CHR$(34) + "}" + NL)
+    IF cmd = "continue" THEN programmNachVorn()
+END SUB
+
+' Laeuft das Programm wieder frei (Weiter, bis zur Marke), gehoert sein
+' Fenster nach vorn -- sonst lag es nach dem Halt hinter der IDE. Bei
+' einem Einzelschritt nicht: der haelt gleich wieder, und das Fenster
+' sprang bei jedem F10 hin und her. Ein Programm im Hintergrund darf sich
+' nicht selbst nach vorn holen, darum tut es die IDE.
+SUB programmNachVorn()
+    IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
+    protokoll("programm vorn " + STR$(PROCESS_FRONT(prozess)))
 END SUB
 
 ' Ein Text als JSON-Zeichenkette (mit Anfuehrungszeichen).
@@ -13292,6 +13309,10 @@ END SUB
 ' Ein Halt: Variablen, Stapel, Ueberwachen, und die Datei an der Zeile.
 SUB debugHaltZeigen(j AS JSON_HANDLE)
     debugPause = TRUE
+    ' Beim Halt gehoert die IDE nach vorn: man will die Zeile sehen, und
+    ' das Programmfenster lag sonst ueber dem Code. Das Programm gibt dafuer
+    ' beim Halt den Vordergrund frei (dhrt debug).
+    WINDOW_FOCUS()
     variablenZeigen(j)
     stapelZeigen(j)
     watchesZeigen(j)
@@ -13456,6 +13477,7 @@ SUB debugRunTo(zeile AS INTEGER)
         IF tabPfade[aktiverTab] <> "" THEN datei = tabPfade[aktiverTab]
     END IF
     PROCESS_WRITE(prozess, "{" + jsonText$("cmd") + ":" + jsonText$("run-to") + "," + jsonText$("line") + ":" + STR$(zeile) + "," + jsonText$("file") + ":" + jsonText$(datei) + "}" + NL)
+    programmNachVorn()
     debugPause = FALSE
     debugWerteLoeschen()
     GUI_SET_TEXT(lblDebug, tr$("Debugger: läuft bis Zeile ") + STR$(zeile) + " ...")
@@ -17176,7 +17198,11 @@ WHILE NOT beenden
     IF GUI_WINDOW_SHOWN(winBildTipp) THEN GUI_DRAW_WINDOW(winBildTipp)
     ' Die Live-Vorschau schwebt: sie bleibt sichtbar, waehrend man im Code
     ' tippt (dabei hat das Hauptfenster den Fokus und laege sonst davor).
-    IF liveAn AND GUI_WINDOW_SHOWN(winLive) THEN GUI_DRAW_WINDOW(winLive)
+    ' Nur wenn sie oben liegt -- sonst malte sie sich ueber ein Fenster,
+    ' das vor ihr steht.
+    IF liveAn AND GUI_WINDOW_SHOWN(winLive) THEN
+        IF GUI_WINDOW_AT(GUI_WINDOW_GET_X(winLive) + 10, GUI_WINDOW_GET_Y(winLive) + 10) = winLive THEN GUI_DRAW_WINDOW(winLive)
+    END IF
     FLIP()
 WEND
 

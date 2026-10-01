@@ -1257,6 +1257,7 @@ schicken — dafür gibt es Prozesse mit Leitung in beide Richtungen:
 | `PROCESS_CLOSE_INPUT(prozess)` | Eingabe schließen (Dateiende für das Kind) |
 | `PROCESS_RUNNING(prozess)` → BOOLEAN | läuft es noch? |
 | `PROCESS_CODE(prozess)` → INTEGER | Rückgabewert; `-1` solange es läuft oder wenn es abgebrochen wurde |
+| `PROCESS_FRONT(prozess)` | holt das sichtbare Fenster des Kindes nach vorn (Windows; TRUE, wenn es eines gab). Ein Programm im Hintergrund darf sich dort nicht selbst nach vorn holen, das darf nur, wer gerade vorn ist; ohne Fenster bekommt das Kind die Erlaubnis für sein erstes. Anderswo FALSE |
 | `PROCESS_KILL(prozess)`, `PROCESS_CLOSE(prozess)` | beenden (samt allem, was das Kind selbst gestartet hat — `cmd /C ping ...` beendet auch den `ping`) / den Platz freigeben |
 
 ```basic
