@@ -784,6 +784,57 @@ PRINT letzte$("suche ")
 --- erwartet
 suche 3
 
+=== tab geht vom suchfeld ins ersatzfeld
+' Beim Dogfooding gefunden: Tab ging vom Suchfeld erst durch Weiter,
+' Zurueck und die drei Schalter. Ohne Ersetzen-Zeile bleibt es beim Rest.
+DIM prBild AS INTEGER : prBild = 0
+FUNCTION prName$(f AS GUI_WIDGET) AS STRING
+    IF f = tfSuche THEN RETURN "suche"
+    IF f = tfErsatz THEN RETURN "ersatz"
+    IF f = btnSuErsetzen THEN RETURN "ersetzen"
+    IF f = btnSuAlle THEN RETURN "alle"
+    IF f = btnSuZurueck THEN RETURN "zurueck"
+    RETURN "anderes"
+END FUNCTION
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    befehl("ersetzen")
+    WRITEALL("prtab.txt", "c 6" + CHR$(10) + "e 0 2 258 0 0" + CHR$(10) + "e 2 1 258 0 0" + CHR$(10) + "e 10 2 258 0 0" + CHR$(10) + "e 12 1 258 0 0" + CHR$(10) + "e 20 2 258 0 0" + CHR$(10) + "e 22 1 258 0 0" + CHR$(10) + CHR$(10))
+END IF
+IF prBild = 34 THEN protokoll("pr fokus " + prName$(GUI_FOCUSED())) : AUTOMATION_PLAY("prtab.txt")
+IF prBild = 40 OR prBild = 50 OR prBild = 60 THEN protokoll("pr fokus " + prName$(GUI_FOCUSED()))
+IF prBild = 70 THEN
+    sucheSchliessen()
+    befehl("suchen")
+END IF
+IF prBild = 74 THEN AUTOMATION_PLAY("prtab.txt")
+IF prBild = 80 THEN protokoll("pr ohne ersetzen " + prName$(GUI_FOCUSED()))
+IF prBild = 90 THEN EXIT(0)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM hp AS INTEGER
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr fokus suche
+pr fokus ersatz
+pr fokus ersetzen
+pr fokus alle
+pr ohne ersetzen zurueck
+
 === die uebersichtskarte malt nicht ueber die suchleiste
 ' Beim Dogfooding 2026-09-30 gefunden: die Karte wird nach GUI_DRAW ueber das
 ' Hauptfenster gemalt und lag damit auch ueber der Suchleiste ("Alle" halb

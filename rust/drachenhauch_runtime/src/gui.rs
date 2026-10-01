@@ -4421,6 +4421,18 @@ impl Gui {
         let win = self.win_mut(h, "GUI_WINDOW_SET_MAX_SIZE")?;
         win.max_w = w.max(0); win.max_h = ht.max(0); Ok(())
     }
+    /// GUI_WINDOW_FRONT: ein Fenster nach vorn holen, OHNE ihm den Fokus zu
+    /// geben -- fuer Vorschlagslisten und Tooltips, die beim Tippen ueber dem
+    /// Code liegen sollen, waehrend die Tastatur im Code bleibt. Vorher kam
+    /// ein Fenster nur ueber einen Klick oder GUI_FOCUS nach vorn; per
+    /// GUI_WINDOW_VISIBLE eingeblendet lag es HINTER dem Fenster, das zuletzt
+    /// angeklickt war, und war unsichtbar (die Vervollstaendigung der IDE).
+    pub fn window_front(&mut self, h: i64) -> Result<(), String> {
+        self.win_mut(h, "GUI_WINDOW_FRONT")?;
+        self.bring_to_front(h as usize);
+        Ok(())
+    }
+
     pub fn window_visible(&mut self, h: i64, f: bool) -> Result<(), String> {
         let w = self.win_mut(h, "GUI_WINDOW_VISIBLE")?;
         w.visible = f; if f { w.close_clicked = false; }
@@ -14140,6 +14152,18 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             self.windows[wi].widgets[i].wort_zug = false;
             self.windows[wi].widgets[i].spalten_start = (-1, -1);
         }
+        // Ein Druck, der nicht IN diesem Feld beginnt -- daneben oder auf
+        // einem Fenster, das darueber liegt --, gehoert ihm nicht: das Feld
+        // hat den Fokus (eine Vorschlagsliste laesst ihn bewusst im Code),
+        // und ohne diese Sperre setzte ein Klick auf die Liste ueber dem
+        // Code auch die Marke darunter, und ein Zug an ihrer Titelleiste
+        // markierte Text. Der Zug wird wie beim Farbfeld ganz gesperrt.
+        if g.mouse_button(0) && !self.was_mouse_down {
+            let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+            if !Self::in_rect(mx, my, (ax, ay, fw, fh)) || self.topmost_at(mx, my) != Some(wi) {
+                self.windows[wi].widgets[i].farbfeld_zug = true;
+            }
+        }
         if g.mouse_button(0) && !self.windows[wi].widgets[i].farbfeld_zug {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let row = (scroll + ((my - ay - pad).max(0) / lh)).max(0);
@@ -17441,8 +17465,28 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// IME-Umwandlungsfenster (docs/entwurf-eingabemethoden.md, Weg B).
     pub fn schreibmarke(&self, g: &Graphics) -> Option<(i32, i32, i32)> {
         let (wi, i) = self.focus_widget?;
+        if self.focus_window != Some(wi) { return None; }
+        self.marke_von(g, wi, i)
+    }
+
+    /// GUI_TEXTAREA_CARET_XY: wo die Schreibmarke eines Textbereichs auf dem
+    /// Bildschirm steht -- (x, y, hoehe) in logischen Punkten wie
+    /// GUI_WINDOW_SET_BOUNDS, auch ohne Fokus. Fuer eine Vorschlagsliste an
+    /// der Marke statt an einer festen Stelle. (-1, -1, 0), wenn das Feld
+    /// nicht zu sehen ist.
+    pub fn textarea_caret_xy(&self, g: &Graphics, h: i64) -> Result<(i64, i64, i64), String> {
+        self.ta_wdg(h, "GUI_TEXTAREA_CARET_XY")?;
+        let (wi, i) = Self::dec_widget(h);
+        Ok(match self.marke_von(g, wi, i) {
+            Some((x, y, hh)) => (self.unsk(x) as i64, self.unsk(y) as i64, self.unsk(hh) as i64),
+            None => (-1, -1, 0),
+        })
+    }
+
+    /// Die Bildschirmlage der Marke in Widget (wi, i): (x, y, hoehe).
+    fn marke_von(&self, g: &Graphics, wi: usize, i: usize) -> Option<(i32, i32, i32)> {
         let win = self.windows.get(wi)?;
-        if !win.alive || !win.visible || self.focus_window != Some(wi) { return None; }
+        if !win.alive || !win.visible { return None; }
         let wdg = win.widgets.get(i)?;
         if !self.widget_shown(wi, wdg) { return None; }
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);

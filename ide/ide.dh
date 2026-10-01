@@ -1902,6 +1902,13 @@ GUI_TOOLTIP(tfErsatz, tr$("Ersatz -- Enter ersetzt den markierten Treffer und ge
 GUI_TOOLTIP(btnSuErsetzen, tr$("Den markierten Treffer ersetzen, dann weiter (Strg+Umschalt+1)"))
 GUI_TOOLTIP(btnSuAlle, tr$("Alle Treffer in dieser Datei ersetzen, ein Schritt für Strg+Z (Strg+Alt+Enter)"))
 GUI_BUTTON_VARIANT(btnSuErsetzen, "primaer")
+' Tab geht vom Suchfeld gleich ins Ersatzfeld und zu seinen Knoepfen, dann
+' erst durch Weiter/Zurueck und die Schalter -- nach der Anlege-Reihenfolge
+' kam man erst nach sechs Tabs ins Ersatzfeld.
+GUI_SET_TAB_INDEX(tfSuche, 1)
+GUI_SET_TAB_INDEX(tfErsatz, 2)
+GUI_SET_TAB_INDEX(btnSuErsetzen, 3)
+GUI_SET_TAB_INDEX(btnSuAlle, 4)
 GUI_WINDOW_VISIBLE(winSuche, FALSE)
 DIM sucheOffen AS BOOLEAN : sucheOffen = FALSE
 DIM sucheMitErsetzen AS BOOLEAN : sucheMitErsetzen = FALSE
@@ -8073,8 +8080,26 @@ SUB vervollstaendigen(fokus AS BOOLEAN)
     NEXT
     IF LEN(namen) = 0 THEN RETURN
     GUI_LISTBOX_SET_SELECTED(lstVervoll, 0)
-    GUI_WINDOW_SET_BOUNDS(winVervoll, breiteLinks + 40, 120, 320, 240)
+    ' An der Schreibmarke statt fest oben links: darunter, und wenn dort
+    ' kein Platz ist, darueber.
+    DIM vx AS INTEGER : vx = breiteLinks + 40
+    DIM vy AS INTEGER : vy = 120
+    DIM mx AS INTEGER
+    DIM my AS INTEGER
+    DIM mh AS INTEGER
+    (mx, my, mh) = GUI_TEXTAREA_CARET_XY(ta)
+    IF mx >= 0 THEN
+        vx = MAX(0, MIN(mx, SCREENWIDTH() - 330))
+        vy = my + mh + 2
+        IF vy + 240 > SCREENHEIGHT() THEN vy = MAX(0, my - 242)
+    END IF
+    GUI_WINDOW_SET_BOUNDS(winVervoll, vx, vy, 320, 240)
     GUI_WINDOW_VISIBLE(winVervoll, TRUE)
+    ' Nach vorn -- auch wenn der Fokus beim Tippen im Code bleibt. Ohne das
+    ' lag die Liste hinter dem Hauptfenster und ging nur mit Strg+Leer auf
+    ' (dort holt der Fokus sie nach vorn).
+    GUI_WINDOW_FRONT(winVervoll)
+    protokoll("vorschlag offen " + STR$(vx) + " " + STR$(vy))
     vervollOffen = TRUE
     vervollWort = wortAnfang$()
     IF fokus THEN GUI_FOCUS(lstVervoll)
@@ -8157,6 +8182,11 @@ FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER, mitOptionale
         IF LEFT$(UPPER$(t), 6) = "BYREF " THEN t = TRIM$(MID$(t, 6))
         DIM als AS INTEGER : als = INSTR(UPPER$(t), " AS ")
         IF als >= 0 THEN t = TRIM$(LEFT$(t, als))
+        ' Die gepflegten Texte schreiben `n: INTEGER` -- der Typ gehoert
+        ' nicht zum Namen (sonst stand `SETFPS(n: INTEGER)` neben
+        ' `GUI_LABEL(win, text$, ...)`).
+        DIM dp AS INTEGER : dp = INSTR(t, ":")
+        IF dp >= 0 THEN t = TRIM$(LEFT$(t, dp))
         DIM gl AS INTEGER : gl = INSTR(t, "=")
         IF gl >= 0 THEN t = TRIM$(LEFT$(t, gl))
         IF t = "" THEN RETURN leer
@@ -11840,10 +11870,14 @@ SUB navGehen(zurueck AS BOOLEAN)
 END SUB
 
 ' --- Parameternamen an Aufrufen -------------------------------------------
-' Je Zeile der erste Aufruf `name(...)` mit mindestens einem festen Argument
-' (Zahl, Text, TRUE/FALSE) und einer bekannten Signatur; der Hinweis ist
-' die Signatur selbst. Kopfzeilen von SUB/FUNCTION zaehlen nicht, Texte und
-' Kommentare auch nicht (SYNTAX_SPANS).
+' Je Zeile der erste Aufruf `name(...)` mit mindestens ZWEI Argumenten,
+' davon einem festen (Zahl, Text, TRUE/FALSE), und einer bekannten
+' Signatur. Der Hinweis nennt nur die Namen, und zwar so viele, wie
+' Argumente dastehen (`x, y, r` hinter `CIRCLE(100, 50, 20)`) -- die
+' ganze Signatur samt Befehlsname hinter fast jeder Zeile war unruhig, und
+' bei einem einzigen Argument sagt der Befehlsname schon alles.
+' Kopfzeilen von SUB/FUNCTION zaehlen nicht, Texte und Kommentare auch
+' nicht (SYNTAX_SPANS).
 FUNCTION festesArgument(a AS STRING) AS BOOLEAN
     DIM t AS STRING : t = TRIM$(a)
     IF t = "" THEN RETURN FALSE
@@ -11889,7 +11923,7 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
         DIM von AS ARRAY OF INTEGER : von = []
         DIM bis AS ARRAY OF INTEGER : bis = []
         argsZerlegen(quelle, auf, von, bis)
-        IF LEN(von) = 0 THEN CONTINUE
+        IF LEN(von) < 2 THEN CONTINUE
         DIM fest AS BOOLEAN : fest = FALSE
         DIM a AS INTEGER
         FOR a = 0 TO LEN(von) - 1
@@ -11906,12 +11940,19 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
             gefragt = gefragt + 1
             DIM namen AS ARRAY OF STRING
             namen = signaturArgs(quelle, li + 1, starts[i] - anf[li] + 1, TRUE)
-            sig = ""
-            IF LEN(namen) > 0 THEN sig = name + "(" + JOIN$(namen, ", ") + ")"
+            sig = JOIN$(namen, ",")
             MAPPUT(paramCache, LOWER$(name), sig)
         END IF
         IF sig = "" THEN CONTINUE
-        ARRAY_PUSH(paramZeilen, li + 1) : ARRAY_PUSH(paramTexte, sig)
+        ' So viele Namen wie Argumente; hat der Aufruf mehr (beliebig viele),
+        ' bleibt es bei den bekannten.
+        DIM alle AS ARRAY OF STRING : alle = SPLIT$(sig, ",")
+        DIM zeig AS STRING : zeig = ""
+        FOR a = 0 TO MIN(LEN(alle), LEN(von)) - 1
+            IF a > 0 THEN zeig = zeig + ", "
+            zeig = zeig + alle[a]
+        NEXT
+        ARRAY_PUSH(paramZeilen, li + 1) : ARRAY_PUSH(paramTexte, zeig)
         erledigt = li
     NEXT
     IF LEN(paramZeilen) > 0 THEN protokoll("parameternamen " + STR$(LEN(paramZeilen)))

@@ -1,7 +1,10 @@
 ' Zwei Handgriffe der IDE:
-' (1) Parameternamen an Aufrufen: hinter einer Zeile mit einem Aufruf, dem
-'     ein festes Argument mitgegeben wird, steht die Signatur (eigene SUBs
-'     und eingebaute Befehle); abschaltbar.
+' (1) Parameternamen an Aufrufen: hinter einer Zeile mit einem Aufruf mit
+'     mindestens zwei Argumenten, davon einem festen, stehen die Namen der
+'     Parameter (eigene SUBs und eingebaute Befehle) -- so viele, wie
+'     Argumente dastehen, ohne Typ (`APPENDFILE(p: STRING, ...)` im Index
+'     wird `p, text`); ein einziges Argument (SETFPS(60)) bekommt keinen
+'     Hinweis; abschaltbar.
 ' (2) Beim Einfuegen einruecken: ein mehrzeiliger Block bekommt die
 '     Einrueckung der Stelle, an der er landet; Strg+Z nimmt erst das
 '     Einruecken zurueck; abschaltbar.
@@ -34,6 +37,10 @@ DIM a AS INTEGER : a = 1
 kreis(a, a, a)
 PRINT "kreis(1, 2, 3)"
 PRINT MID$("abc", 1, 1)
+SETFPS(60)
+SCREEN(320, 200, "T")
+CIRCLE(10, 20, 5)
+APPENDFILE("a.txt", "x")
 
 --- nachher
 IMPORT "json"
@@ -45,8 +52,11 @@ NEXT
 DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
 PRINT "gemerkt "; JSON_GET_BOOL(k, "parameter_namen")
 --- erwartet
-pr param 4 kreis(x, y, r)
-pr param 8 MID$(s, start, n)
+pr param 4 x, y, r
+pr param 8 s, start, n
+pr param 10 w, h, titel
+pr param 11 x, y, r
+pr param 12 p, text
 parameter namen aus
 pr aus FALSE
 gemerkt FALSE

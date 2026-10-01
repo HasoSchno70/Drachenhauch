@@ -6956,6 +6956,7 @@ impl<'p> Vm<'p> {
             "gui_window_glow_stop" => { self.gui.window_glow_stop(gi(a, 0, "GUI_WINDOW_GLOW_STOP")?)?; Value::Nil }
             "gui_window_glowing" => Value::Bool(self.gui.window_glowing(gi(a, 0, "GUI_WINDOW_GLOWING")?)?),
             "gui_window_closable" => { self.gui.window_closable(gi(a,0,"GUI_WINDOW_CLOSABLE")?, gbool(a,1,"GUI_WINDOW_CLOSABLE")?)?; Value::Nil }
+            "gui_window_front" => { self.gui.window_front(gi(a,0,"GUI_WINDOW_FRONT")?)?; Value::Nil }
             "gui_window_visible" => { self.gui.window_visible(gi(a,0,"GUI_WINDOW_VISIBLE")?, gbool(a,1,"GUI_WINDOW_VISIBLE")?)?; Value::Nil }
             "gui_window_shown" => Value::Bool(self.gui.window_shown(gi(a,0,"GUI_WINDOW_SHOWN")?)?),
             "gui_window_resizable" => { self.gui.window_resizable(gi(a,0,"GUI_WINDOW_RESIZABLE")?, gbool(a,1,"GUI_WINDOW_RESIZABLE")?)?; Value::Nil }
@@ -7936,6 +7937,11 @@ impl<'p> Vm<'p> {
                 let spalte = if a.len() > 2 { gi(a, 2, "GUI_TEXTAREA_GOTO")? } else { 1 };
                 self.gui.textarea_goto(g, gi(a, 0, "GUI_TEXTAREA_GOTO")?, gi(a, 1, "GUI_TEXTAREA_GOTO")?, spalte)?;
                 Value::Nil
+            }
+            "gui_textarea_caret_xy" => {
+                let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_CARET_XY: vor SCREEN aufgerufen")?;
+                let (x, y, h) = self.gui.textarea_caret_xy(g, gi(a, 0, "GUI_TEXTAREA_CARET_XY")?)?;
+                Value::Tuple(Rc::new(vec![Value::Int(x), Value::Int(y), Value::Int(h)]))
             }
             "gui_textarea_scroll" => {
                 let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_SCROLL: vor SCREEN aufgerufen")?;
