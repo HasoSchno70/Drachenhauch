@@ -8204,6 +8204,13 @@ SUB vervollUebernehmen()
         DIM s AS INTEGER
         (z, s) = GUI_TEXTAREA_CURSOR(ta)
         DIM name AS STRING : name = GUI_LISTBOX_ITEM(lstVervoll, sel)
+        ' Hinter `AS` steht ein TYP: `DIM w AS GUI_WINDOW(title, ...)` waere
+        ' ein Fehler, obwohl es einen Befehl dieses Namens gibt. Folgt schon
+        ' eine Klammer, kaeme sie doppelt.
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        DIM vor AS STRING : vor = LEFT$(zeilen[z - 1], s - 1 - vervollPraefixLaenge)
+        DIM nach AS STRING : nach = MID$(zeilen[z - 1], s - 1, 1)
+        DIM ohneGeruest AS BOOLEAN : ohneGeruest = REGEX_TEST(vor, "(?i)\bAS\s+$") OR nach = "("
         GUI_TEXTAREA_SELECT(ta, z, s - vervollPraefixLaenge, z, s)
         GUI_TEXTAREA_INSERT(ta, name)
         protokoll("vervollstaendigt " + name)
@@ -8212,7 +8219,8 @@ SUB vervollUebernehmen()
         DIM nz AS INTEGER
         DIM ns AS INTEGER
         (nz, ns) = GUI_TEXTAREA_CURSOR(ta)
-        DIM args AS ARRAY OF STRING : args = signaturArgs(GUI_TEXT(ta), nz, MAX(1, ns - 1))
+        DIM args AS ARRAY OF STRING : args = []
+        IF NOT ohneGeruest THEN args = signaturArgs(GUI_TEXT(ta), nz, MAX(1, ns - 1))
         IF LEN(args) > 0 THEN
             GUI_TEXTAREA_INSERT(ta, "(" + JOIN$(args, ", ") + ")")
             GUI_TEXTAREA_SELECT(ta, nz, ns + 1, nz, ns + 1 + LEN(args[0]))
@@ -17033,6 +17041,9 @@ WHILE NOT beenden
     CLS(&H0B1119)
     GUI_DRAW()
     minimapZeichnen()
+    ' Die Karte wird ueber das Hauptfenster gemalt -- auch ueber die
+    ' Suchleiste, die oben rechts auf ihr liegt ("Alle" war halb verdeckt).
+    IF sucheOffen THEN GUI_DRAW_WINDOW(winSuche)
     ' Das Handbuch-Fenster liegt ueber der Leinwand des Hauptfensters und
     ' waere sonst von ihr verdeckt -- GUI_DRAW zeichnet Fenster und
     ' Zeichenflaechen in EINEM Durchgang, das Gemalte kommt danach.
