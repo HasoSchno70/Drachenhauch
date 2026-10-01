@@ -34,7 +34,8 @@ IMPORT "json"
 
 CONST RASTER = 8
 CONST LINKS = 0                 ' Maustaste
-CONST PAL_B = 230               ' Breite der Palette
+CONST PAL_B = 252               ' Breite der Palette -- so breit, dass die Menueleiste
+                                ' (Datei, Bearbeiten, Anordnen, Ansicht) hineinpasst
 CONST INSP_B = 330              ' Breite des Inspektors
 CONST NL = CHR$(10)
 
@@ -118,7 +119,10 @@ DIM auswahl AS INTEGER : auswahl = -1           ' Index in doc.widgets
 ' zuletzt angeklickte -- der Inspektor zeigt es, "Anordnen" richtet an ihm aus.
 DIM gewaehlt AS ARRAY OF INTEGER : gewaehlt = []
 DIM geaendert AS BOOLEAN : geaendert = FALSE
-DIM formX AS INTEGER : formX = PAL_B + 40        ' wo die Form auf dem Schirm liegt
+' Wo die Form auf dem Schirm liegt: fest bei x = 270, nicht an PAL_B gekoppelt
+' -- die Palette wurde fuer die Menueleiste breiter, die Form blieb, wo man
+' sie kennt (und wo die Klicklagen der Pruefungen sie suchen).
+DIM formX AS INTEGER : formX = 270
 DIM formY AS INTEGER : formY = 60
 ' Zoom der Entwurfsflaeche (GUI_WINDOW_ZOOM): `zoomWunsch` ist, was man
 ' eingestellt hat, `zoomF` der Faktor, mit dem gezeichnet wird -- er wird

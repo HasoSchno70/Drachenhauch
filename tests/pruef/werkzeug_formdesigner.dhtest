@@ -782,3 +782,38 @@ e 74 5 0 0 0 0
 zoom 125
 neu button 200 120
 bewegt 0 232 120 100 28
+
+=== die menueleiste passt in die palette
+' Bei der Handpruefung gefunden: mit "Ansicht" (Zoom) war die Menueleiste
+' breiter als die Palette, das letzte Menue stand halb abgeschnitten am
+' Rand. Geprueft am Bild: in den oberen Zeilen der Palette (dort steht die
+' Leiste) endet die helle Schrift deutlich vor dem rechten Rand.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- einschub nach     IF GUI_CLICKED(miZoomNull) THEN zoomStufe(0)
+prBild = prBild + 1
+IF prBild = 20 THEN SAVESCREENSHOT("menue.png")
+IF prBild = 23 THEN
+    DIM prB AS IMAGE : prB = LOADIMAGE("menue.png")
+    DIM prMax AS INTEGER : prMax = -1
+    DIM prX AS INTEGER
+    DIM prY AS INTEGER
+    FOR prY = 0 TO 40
+        FOR prX = 0 TO PAL_B + 20
+            DIM prF AS INTEGER : prF = GETPIXEL(prB, prX, prY)
+            IF ((prF SHR 16) BAND 255) > 150 AND ((prF SHR 8) BAND 255) > 150 AND (prF BAND 255) > 150 AND prX > prMax THEN prMax = prX
+        NEXT
+    NEXT
+    PRINT "schrift gefunden "; prMax > 100
+    PRINT "endet vor dem rand "; prMax < PAL_B - 6
+    PRINT "form an ihrer stelle "; formX = 270
+    EXIT(0)
+END IF
+--- argumente
+neu.dhform
+--- umgebung
+DHRT_FRAMES=200
+--- erwartet
+schrift gefunden TRUE
+endet vor dem rand TRUE
+form an ihrer stelle TRUE
