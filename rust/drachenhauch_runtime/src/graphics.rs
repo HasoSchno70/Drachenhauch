@@ -1770,12 +1770,23 @@ impl Graphics {
     }
 
     /// Welcher Font zeichnet diesen Text? Normalerweise der aktive. Steht
-    /// keiner (eingebaute Bitmapschrift) und enthaelt der Text Zeichen
-    /// jenseits von ASCII, springt der Ausweich-Font ein -- als Handle
+    /// keiner (eingebaute Bitmapschrift) und enthaelt der Text ein Zeichen,
+    /// das sie nicht hat (jenseits von Latin-1), springt der Ausweich-Font
+    /// ein -- als Handle
     /// `FONT_AUSWEICH`, das nicht in `fonts` steht.
+    /// Braucht dieser Text in der eingebauten Schrift den Ausweich-Font? Nur,
+    /// wenn ein Zeichen darin fehlt: raylibs Bitmapschrift hat 32..255 samt
+    /// Umlauten und ss (rtext.c, LoadFontDefault). Bis 2026-10-01 ging jeder
+    /// Text mit einem Zeichen ueber ASCII GANZ an den Ausweich-Font -- in
+    /// einer Oberflaeche stand "Loeschen" dann in einer anderen Schrift als
+    /// "Buchen" daneben.
+    fn braucht_ausweich(&self, s: &str) -> bool {
+        !self.ausweich.is_empty() && s.chars().any(|c| !self.font_hat(-1, c as u32))
+    }
+
     fn font_fuer(&self, s: &str) -> i64 {
         if self.active_font >= 0 { return self.active_font; }
-        if !self.ausweich.is_empty() && !s.is_ascii() { return FONT_AUSWEICH; }
+        if self.braucht_ausweich(&s) { return FONT_AUSWEICH; }
         -1
     }
 
@@ -3426,7 +3437,7 @@ impl Graphics {
     /// Breite nicht.
     pub fn text_width_stil(&self, s: &str, size: i32, font: i64, stil: u8) -> i32 {
         let size = size.max(1);
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() { FONT_AUSWEICH } else { font };
+        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         let (h, emu) = self.schnitt_da(font, stil);
         let mut b = self.breite_mit(h, s, size as f32);
         if emu & crate::schnitt::FETT != 0 && !s.is_empty() { b += crate::schnitt::fett_versatz(size as f32); }
@@ -3463,7 +3474,7 @@ impl Graphics {
         let (x, y) = self.w2s(x, y);
         // Auch hier ausweichen: ein Widget ohne eigene Schrift (font = -1)
         // zeigt sonst "K?ln" in der Tabelle.
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() {
+        let font = if font < 0 && self.braucht_ausweich(&s) {
             FONT_AUSWEICH
         } else { font };
         self.glyphen_pruefen(font, &s);
@@ -3475,7 +3486,7 @@ impl Graphics {
     pub fn text_styled_stil(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
         if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
         let (x, y) = self.w2s(x, y);
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() { FONT_AUSWEICH } else { font };
+        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         let sp = self.text_spacing;
         self.text_emit(x, y, s, size.max(1), c, font, sp, stil);
     }
@@ -3487,7 +3498,7 @@ impl Graphics {
     pub fn text_nachgebildet(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
         if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
         let (x, y) = self.w2s(x, y);
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() { FONT_AUSWEICH } else { font };
+        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         self.glyphen_pruefen(font, &s);
         let sp = self.text_spacing;
         self.emit(Cmd::TextStil(x, y, s, size.max(1), col(c), font, sp, stil));
@@ -3652,7 +3663,7 @@ impl Graphics {
     pub fn text_width_in(&self, s: &str, size: i32, font: i64) -> i32 {
         let size = size.max(1);
         // Gegenstueck zu text_styled, das bei Umlauten ebenfalls ausweicht.
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() {
+        let font = if font < 0 && self.braucht_ausweich(&s) {
             FONT_AUSWEICH
         } else { font };
         self.breite_mit(font, s, size as f32) as i32
