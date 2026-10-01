@@ -35,6 +35,8 @@ IMPORT "gui"
 | `GUI_WINDOW_SCROLLABLE(win, an)` | — | Inhalt scrollt, wenn er höher als das Fenster ist (Mausrad + Scrollbalken). Inhaltshöhe automatisch aus den Widgets. Default: aus |
 | `GUI_WINDOW_CHROME(win, an)` | — | Titelleiste/Rahmen/Buttons zeichnen? Aus = randlos, Inhalt ab oben (damit eine Form das OS-Fenster ausfüllen kann). Default: an |
 | `GUI_WINDOW_DESIGN(win, an)` | — | Entwurfsmodus: das Fenster wird gezeichnet, aber seine Widgets bekommen keine Eingabe (kein Hover, Klick, Fokus, Rückruf; auch kein Ziehen am Rahmen). Ein Form-Designer legt so echte Widgets auf die Fläche und verwaltet die Maus selbst — `GUI_HIT_TEST` und alle Setter gehen weiter. Default: aus |
+| `GUI_WINDOW_ZOOM(win, faktor)` | — | ein Fenster im Entwurfsmodus vergrößert zeichnen (0.25 bis 4): die Lage bleibt, die Fläche wächst. Geometrie nach außen bleibt unvergrößert, `GUI_HIT_TEST` und `GUI_WINDOW_AT` rechnen die Maus zurück. Gezeichnet wird über eine Zwischenfläche, die weich vergrößert wird — Schrift ist bei 150–200 % etwas weich. Außerhalb des Entwurfsmodus ein Fehler (das Fenster nähme Eingaben an, und die Maus träfe daneben) |
+| `GUI_WINDOW_GET_ZOOM(win)` | FLOAT | der Faktor von `GUI_WINDOW_ZOOM` |
 | `GUI_WINDOW_SET_MIN_SIZE(win, w, h)` | — | Mindestgröße beim Resizen (0 = keine) |
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | Maximalgröße beim Resizen (0 = keine) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | dekorative Trennlinie (horizontal) |
