@@ -1674,6 +1674,54 @@ PRINT "falten alle 0 " ; hat("falten alle 0")
 falten alle 2 TRUE
 falten alle 0 TRUE
 
+=== ein block nur aus der einrueckung kommt nach dem tippen dazu
+' Stresstest 2026-10-01: die faltbaren Bloecke wurden nur neu gesetzt, wenn
+' sich die GLIEDERUNG (SUB/FUNCTION) aenderte -- eine nachtraeglich
+' geschriebene FOR-Schleife liess sich nie falten, Strg+F4 meldete
+' "0 Bloecke". Erst Strg+F4 ohne Block (das setzt den Schluessel), dann
+' fuegt Strg+V die Schleife ein, Strg+F4 nach der naechsten Pruefung.
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("FOR i = 1 TO 3" + CHR$(10) + "    PRINT i" + CHR$(10) + "NEXT" + CHR$(10))
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 12
+e 60 2 341 0 0 0
+e 60 2 293 0 0 0
+e 62 1 293 0 0 0
+e 62 1 341 0 0 0
+e 100 2 341 0 0 0
+e 100 2 86 0 0 0
+e 102 1 86 0 0 0
+e 102 1 341 0 0 0
+e 200 2 341 0 0 0
+e 200 2 293 0 0 0
+e 202 1 293 0 0 0
+e 202 1 341 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "falten alle 0 " ; hat("falten alle 0")
+PRINT "falten alle 1 " ; hat("falten alle 1")
+--- erwartet
+falten alle 0 TRUE
+falten alle 1 TRUE
+
 === umbenennen laesst text und kommentar
 ' Umschalt+F6, neuer Name, Enter, Vorschau uebernehmen, Strg+S. Kommentar und
 ' Zeichenkette bleiben -- die Gegenprobe zu Suchen-und-Ersetzen.

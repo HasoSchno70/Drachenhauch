@@ -4257,10 +4257,13 @@ SUB gliederungFuellen(quelle AS STRING)
         NEXT
     NEXT
     ' Dieselben Bloecke sind die faltbaren -- die Laufzeit kennt keine
-    ' Sprache und erfaehrt sie nur so.
+    ' Sprache und erfaehrt sie nur so. Der Schluessel ist das FELD samt ALLEN Bloecken, nicht der Satz der
+    ' Symbole: mit dem allein bekam ein neuer Reiter mit gleicher Gliederung
+    ' (zwei Dateien ohne SUB, dieselbe Datei neu geoeffnet) gar keine
+    ' Bloecke, und eine neue FOR-Schleife -- ein Block nur aus der
+    ' Einrueckung -- liess sich nie falten.
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-    IF ta >= 0 AND schl <> faltSchluessel THEN
-        faltSchluessel = schl
+    IF ta >= 0 THEN
         DIM fv AS ARRAY OF INTEGER : fv = []
         DIM fb AS ARRAY OF INTEGER : fb = []
         FOR i = 0 TO n - 1
@@ -4273,10 +4276,18 @@ SUB gliederungFuellen(quelle AS STRING)
             NEXT
         NEXT
         einzugBloecke(quelle, fv, fb)
-        GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
-        faltenZurueck(ta)
-        blockVon = fv
-        blockBis = fb
+        DIM fschl AS STRING : fschl = STR$(ta) + "|"
+        DIM fi AS INTEGER
+        FOR fi = 0 TO LEN(fv) - 1
+            fschl = fschl + STR$(fv[fi]) + "-" + STR$(fb[fi]) + ","
+        NEXT
+        IF fschl <> faltSchluessel THEN
+            faltSchluessel = fschl
+            GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
+            faltenZurueck(ta)
+            blockVon = fv
+            blockBis = fb
+        END IF
     END IF
     IF schl = gliederungSchluessel THEN RETURN
     gliederungSchluessel = schl
