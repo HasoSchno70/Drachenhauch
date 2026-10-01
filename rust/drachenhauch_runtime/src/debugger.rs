@@ -315,10 +315,70 @@ pub fn klassen_namen(quelle: &str) -> HashMap<String, String> {
     m
 }
 
+/// Variablen- und Feldnamen, wie sie geschrieben wurden (klein -> Schreibweise).
+/// Die VM kennt sie nur klein; der Debugger zeigte `btnadd` statt `btnAdd`.
+/// Eine Deklaration (`DIM`, `CONST`) gewinnt, sonst das erste Vorkommen --
+/// Kommentare und Zeichenketten zaehlen nicht.
+pub fn variablen_namen(quelle: &str) -> HashMap<String, String> {
+    let mut m: HashMap<String, String> = HashMap::new();
+    let wort = |c: char| c.is_alphanumeric() || c == '_';
+    let zeilen: Vec<String> = quelle.lines().map(crate::symbole::ohne_kommentare_und_texte).collect();
+    // Erst die Deklarationen: DIM a AS T, b AS T / DIM a[3] / CONST x = 1.
+    for z in &zeilen {
+        for teil in z.split(':') {
+            let t = teil.trim_start();
+            let lt = t.to_lowercase();
+            let rest = if lt.starts_with("dim ") { &t[4..] }
+                       else if lt.starts_with("const ") { &t[6..] }
+                       else if lt.starts_with("static const ") { &t[13..] }
+                       else { continue };
+            for stueck in rest.split(',') {
+                let name: String = stueck.trim_start().chars().take_while(|&c| wort(c) || c == '$').collect();
+                if !name.is_empty() { m.entry(name.to_lowercase()).or_insert(name); }
+            }
+        }
+    }
+    // Dann alles andere (Parameter, FOR-Variablen, Felder ohne DIM ...).
+    for z in &zeilen {
+        let mut cs = z.chars().peekable();
+        let mut akt = String::new();
+        let mut davor = ' ';
+        while let Some(c) = cs.next() {
+            if wort(c) || (c == '$' && !akt.is_empty()) {
+                if akt.is_empty() && davor.is_ascii_digit() { davor = c; continue; }
+                akt.push(c);
+            } else {
+                if !akt.is_empty() && !akt.starts_with(|x: char| x.is_ascii_digit()) {
+                    m.entry(akt.to_lowercase()).or_insert(akt.clone());
+                }
+                akt.clear();
+            }
+            davor = c;
+        }
+        if !akt.is_empty() && !akt.starts_with(|x: char| x.is_ascii_digit()) {
+            m.entry(akt.to_lowercase()).or_insert(akt);
+        }
+    }
+    m
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn variablen_in_ihrer_schreibweise() {
+        let q = "' btnadd im Kommentar\nDIM btnAdd AS INTEGER, lSumme AS INTEGER\nPRINT \"BTNADD\"\nFOR iZeile = 1 TO 2 : NEXT\nlsumme = 1\nCONST MAX_HP = 3";
+        let m = variablen_namen(q);
+        assert_eq!(m["btnadd"], "btnAdd");
+        assert_eq!(m["lsumme"], "lSumme");
+        assert_eq!(m["izeile"], "iZeile");
+        assert_eq!(m["max_hp"], "MAX_HP");
+        // Die Deklaration gewinnt vor einem frueheren Vorkommen.
+        let m = variablen_namen("x = Wert\nDIM WERT AS INTEGER");
+        assert_eq!(m["wert"], "WERT");
+    }
 
     fn karte() -> Karte {
         // Hauptdatei: 1 IMPORT (Marker 1..3 mit Zeile 1), dann Zeilen 2..4.

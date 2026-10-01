@@ -505,7 +505,10 @@ Datei, kein Code darunter) -- das Programm steht dann weiter; `input` mit
 mit `name` und `value` (ein Ausdruck), `eval`, `input` mit `text`,
 `pause`, `stop`). Jede Variable in `locals`/`globals` kann `children` tragen
 (gleich aufgebaut: `name`, `type`, `value`, `children`), eine Instanz hat als
-`type` ihren Klassennamen. Ein nicht abgefangener Fehler meldet sich erst als
+`type` ihren Klassennamen. Namen stehen so da, wie sie im Programm geschrieben
+sind (`btnAdd`, nicht `btnadd`), und ein Handle -- zur Laufzeit eine Ganzzahl
+oder noch NIL -- trägt als `type` den angesagten Typ (`GUI_WIDGET`, `DB_CONN`,
+eine Klasse) statt `INTEGER`. Ein nicht abgefangener Fehler meldet sich erst als
 `paused` mit `reason: "error"` und `message` (an der Fehlerstelle, `eval` und
 `set-watches` gehen noch), dann nach dem nächsten Kommando als `error`.
 
