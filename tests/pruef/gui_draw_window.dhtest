@@ -233,3 +233,61 @@ e 0 7 60 105 0 0 // Event: test
 DHRT_FRAMES=45
 --- bild
 100 134 #000000
+
+=== was obenauf gezeichnet ist bekommt auch den klick
+' Stresstest 2026-10-01: die Suchleiste der IDE liegt ueber dem Code-Feld
+' und wird mit GUI_DRAW_WINDOW obenauf gezeichnet. Nach einem Klick ins
+' Hauptfenster (hier: der Fokus geht zurueck ins Feld) lag sie in der
+' REIHENFOLGE dahinter -- man sah den Knopf, der Klick traf ihn nicht.
+' Das Feld darunter darf ihn auch nicht bekommen: die Marke bleibt in 1.
+IMPORT "gui"
+SCREEN(900, 600, "R", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("H", 0, 0, 900, 600)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 0, 0, 900, 600)
+DIM t AS STRING : t = "z1"
+DIM k AS INTEGER
+FOR k = 2 TO 20 : t = t + CHR$(10) + "z" + STR$(k) : NEXT
+GUI_SET_TEXT(ta, t)
+DIM s AS GUI_WINDOW : s = GUI_WINDOW("S", 0, 0, 480, 146)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(s, 8, 8, 236, 26, "")
+DIM bt AS GUI_WIDGET : bt = GUI_BUTTON(s, "Alle", 356, 72, 70, 26)
+GUI_WINDOW_VISIBLE(s, FALSE)
+GUI_FOCUS(ta)
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+DIM f AS INTEGER
+FOR f = 1 TO 30
+    IF f = 3 THEN
+        GUI_WINDOW_SET_BOUNDS(s, 400, 104, 480, 146)
+        GUI_WINDOW_VISIBLE(s, TRUE)
+        GUI_FOCUS(tf)
+    END IF
+    IF f = 5 THEN GUI_FOCUS(ta)
+    GUI_UPDATE()
+    IF GUI_CLICKED(bt) THEN PRINT "knopf geklickt"
+    CLS(&H101820)
+    GUI_DRAW()
+    GUI_DRAW_WINDOW(s)
+    FLIP()
+NEXT
+DIM z AS INTEGER
+DIM sp AS INTEGER
+(z, sp) = GUI_TEXTAREA_CURSOR(ta)
+PRINT "marke zeile "; z
+--- datei ev.txt
+# Klick auf "Alle" (Fenster bei 400/104, Knopf bei 356/72 im Inhalt); das
+# Ereignis in Bild 0 setzt die Zeit, die Wiedergabe beginnt beim ersten.
+c 5
+e 0 7 10 590 0 0
+e 10 7 790 220 0 0
+e 11 7 790 220 0 0
+e 11 6 0 0 0 0
+e 13 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=34
+--- erwartet
+knopf geklickt
+marke zeile 1

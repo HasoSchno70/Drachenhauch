@@ -368,6 +368,27 @@ PRINT "[" + CODE_RENAME$(q, 1, 15, "x") + "]"
 []
 []
 
+=== CODE_RENAME laesst eingebaute namen in ruhe
+' Beim Stresstest gefunden: die Marke stand auf KEY_DOWN, und das
+' Umbenennen setzte ueberall einen unbekannten Namen ein. Ein eingebauter
+' Befehl oder eine vorbelegte Konstante, die das Programm nicht selbst
+' anlegt, bleibt; eine eigene Variable gleichen Namens (DIM red) gilt
+' weiter als umbenennbar.
+DIM q AS STRING
+q = "IF KEYHIT(KEY_DOWN) THEN x = RED" + CHR$(10) + "CIRCLE(1, 2, 3)"
+PRINT "[" + CODE_RENAME$(q, 1, 13, "taste") + "]"
+PRINT "[" + CODE_RENAME$(q, 1, 32, "farbe") + "]"
+PRINT "[" + CODE_RENAME$(q, 2, 2, "kreis") + "]"
+DIM r AS STRING
+r = "DIM red AS INTEGER" + CHR$(10) + "red = 5"
+PRINT CODE_RENAME$(r, 2, 2, "rot")
+--- erwartet
+[]
+[]
+[]
+DIM rot AS INTEGER
+rot = 5
+
 === CODE_RENAME trifft ganze woerter, nicht teile
 DIM q AS STRING
 q = "DIM hp AS INTEGER" + CHR$(10) + "hpmax = hp + 1" + CHR$(10) + "maxhp = hp"

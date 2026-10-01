@@ -13227,7 +13227,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
         Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift,
                                self.kuerzel_gefeuert);
-        let enter = g.key_pressed(KEY_ENTER);
+        // Hat ein Menue-Kuerzel die Taste genommen (Strg+Alt+Enter), ist es
+        // kein Abschicken des Feldes -- sonst taete eine Taste zwei Dinge.
+        let enter = g.key_pressed(KEY_ENTER) && !self.kuerzel_gefeuert;
 
         // --- Grenzen des Feldes ---
         // Ein gesperrtes Feld nimmt nichts an (Schreibmarke und Kopieren
@@ -13992,14 +13994,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Ok(())
     }
 
-    /// GUI_TEXTAREA_GOTO(ta, zeile[, spalte]): Marke setzen, Auswahl aufheben,
-    /// Ausschnitt nachziehen.
+    /// GUI_TEXTAREA_GOTO(ta, zeile[, spalte]): Marke setzen, Auswahl und
+    /// weitere Marken aufheben, Ausschnitt nachziehen.
     pub fn textarea_goto(&mut self, g: &Graphics, h: i64, zeile: i64, spalte: i64) -> Result<(), String> {
         let wd = self.ta_wdg(h, "GUI_TEXTAREA_GOTO")?;
         let chars: Vec<char> = wd.text.chars().collect();
         let idx = Self::ta_index(&chars, zeile, spalte) as i32;
         let w = self.wdg_mut(h, "GUI_TEXTAREA_GOTO")?;
-        w.caret = idx; w.sel_anchor = idx;
+        w.caret = idx; w.sel_anchor = idx; w.marken_zusatz.clear();
         // Ein Sprung in einen zugeklappten Block klappt ihn auf -- sonst
         // spraenge die Suche an eine Stelle, die man nicht sieht.
         Self::falte_am_caret_oeffnen(w);
@@ -14040,7 +14042,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let a = Self::ta_index(&chars, z1, s1) as i32;
         let b = Self::ta_index(&chars, z2, s2) as i32;
         let w = self.wdg_mut(h, "GUI_TEXTAREA_SELECT")?;
-        w.sel_anchor = a; w.caret = b;
+        w.sel_anchor = a; w.caret = b; w.marken_zusatz.clear();
         Self::falte_am_caret_oeffnen(w);
         self.ta_marke_zeigen(g, h)
     }
@@ -14262,7 +14264,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if alt && idx != caret && !zusatz.iter().any(|&(c, _)| c == idx) {
                         zusatz.push((idx, idx));
                     } else if !alt {
-                        caret = idx; anchor = idx;
+                        // Ein gewoehnlicher Klick meint EINE Stelle: die
+                        // weiteren Marken gehen weg (wie beim Rechtsklick
+                        // und bei Strg+A) -- sonst landete das naechste
+                        // Tippen auch dort, wo man nicht mehr hinsieht.
+                        caret = idx; anchor = idx; zusatz.clear();
                         // Doppelklick waehlt das Wort, Dreifachklick die Zeile
                         // (samt Umbruch) -- wie in jedem Editor. Gezaehlt wird
                         // an DIESER Stelle, in 0,4 s.
@@ -17086,7 +17092,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     ///
     /// Ein unsichtbares oder zerstoertes Fenster zeichnet nichts (kein
     /// Fehler) -- so darf der Aufruf unbedingt in der Bildschleife stehen.
-    pub fn draw_window_top(&self, g: &mut Graphics, h: i64) -> Result<(), String> {
+    ///
+    /// Das Fenster kommt dabei auch in der REIHENFOLGE nach vorn (ohne
+    /// Fokus): was obenauf zu sehen ist, muss auch die Klicks bekommen. Vorher
+    /// lag es nach einem Klick ins Hauptfenster dahinter -- man sah die
+    /// Suchleiste der IDE, aber ihre Knoepfe und Kaestchen taten nichts, und
+    /// das Code-Feld darunter bekam den Klick auch nicht (Stresstest
+    /// 2026-10-01).
+    pub fn draw_window_top(&mut self, g: &mut Graphics, h: i64) -> Result<(), String> {
         let wi = h as usize;
         let w = match self.windows.get(wi) {
             Some(w) if w.alive => w,
@@ -17096,6 +17109,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if !w.visible { return Ok(()); }
         if self.modal == Some(wi) { self.schleier(g); }
         self.draw_window_sicht(g, wi);
+        self.bring_to_front(wi);
         Ok(())
     }
 

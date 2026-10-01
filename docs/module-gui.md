@@ -292,7 +292,7 @@ Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schi
   links bzw. über der Maus statt aus dem Bild zu laufen, ein Untermenü klappt
   links vom Elternmenü auf, ein Leistenmenü rückt nach links.
 
-**Tastenkürzel** stehen rechts im Eintrag und werden jedes Bild geprüft — auch bei geschlossenem Menü, und **in allen sichtbaren Fenstern des Programms**: zuerst im Fenster mit Fokus, dann in den übrigen von oben nach unten. Ein Programm mit Werkzeugleiste links und Inspektor rechts hat ein Menü, und `Strg+S` sichert auch dann, wenn der letzte Klick in den Inspektor ging (bis 2026-09-07 galt ein Kürzel nur im Fenster mit Fokus — drei Editoren mussten sich nach jedem Knopf den Fokus zurückholen). Hat das Fokus-Fenster dasselbe Kürzel selbst, gewinnt es. Ein modales Fenster lässt nur seine eigenen Kürzel zu; ein Fenster im Entwurfsmodus (`GUI_WINDOW_DESIGN`) zählt nicht, seine Menüs sind Ansicht. Geschrieben werden sie, wie man sie liest: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; englische Namen (`Ctrl`, `Shift`, `Delete`, `PageDown`) gehen auch. **`Plus` und `Minus`** (auch `Strg++` und `Strg+-`) sind keine einzelne Taste: raylib benennt Tasten nach ihrer Lage im US-Layout, und das „+“ einer deutschen Tastatur liegt dort, wo die US-Tastatur „]“ hat, ihr „-“ auf „/“ -- ein solches Kürzel trifft darum die Taste beider Belegungen und den Ziffernblock (`Strg+Plus`, `Strg+Minus`, `Strg+0` für den Zoom). Die Modifier müssen **genau** passen: ein bloßes S ist kein Strg+S. **Ohne Strg oder Alt gehört eine Taste dem Textfeld mit Fokus** — ein `Entf`-Kürzel löscht dort ein Zeichen, statt den Menüpunkt auszulösen; ohne Textfokus löst es aus. **Ausgenommen sind F1 bis F12**: sie erzeugen nie Text und lösen auch aus dem Textfeld heraus aus (F5 startet in einer IDE aus dem Code-Feld). Ein gesperrter Eintrag hat kein Kürzel. Ein unbekannter Tastenname ist ein Fehler beim Anlegen, nicht ein Kürzel, das still nie feuert. **Ein Kürzel, das gefeuert hat, nimmt dem Textbereich die Taste weg** — sonst täte `Strg+Umschalt+Hoch` zwei Dinge: den Eintrag auslösen und die Auswahl eine Zeile hochschieben, und ein Befehl, der danach die Auswahl liest, sähe eine andere als die markierte.
+**Tastenkürzel** stehen rechts im Eintrag und werden jedes Bild geprüft — auch bei geschlossenem Menü, und **in allen sichtbaren Fenstern des Programms**: zuerst im Fenster mit Fokus, dann in den übrigen von oben nach unten. Ein Programm mit Werkzeugleiste links und Inspektor rechts hat ein Menü, und `Strg+S` sichert auch dann, wenn der letzte Klick in den Inspektor ging (bis 2026-09-07 galt ein Kürzel nur im Fenster mit Fokus — drei Editoren mussten sich nach jedem Knopf den Fokus zurückholen). Hat das Fokus-Fenster dasselbe Kürzel selbst, gewinnt es. Ein modales Fenster lässt nur seine eigenen Kürzel zu; ein Fenster im Entwurfsmodus (`GUI_WINDOW_DESIGN`) zählt nicht, seine Menüs sind Ansicht. Geschrieben werden sie, wie man sie liest: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; englische Namen (`Ctrl`, `Shift`, `Delete`, `PageDown`) gehen auch. **`Plus` und `Minus`** (auch `Strg++` und `Strg+-`) sind keine einzelne Taste: raylib benennt Tasten nach ihrer Lage im US-Layout, und das „+“ einer deutschen Tastatur liegt dort, wo die US-Tastatur „]“ hat, ihr „-“ auf „/“ -- ein solches Kürzel trifft darum die Taste beider Belegungen und den Ziffernblock (`Strg+Plus`, `Strg+Minus`, `Strg+0` für den Zoom). **Buchstaben gelten nach der Belegung**: `Strg+Z` ist die Taste, auf der das Z steht — auf einer deutschen Tastatur liegt sie dort, wo die US-Tastatur das Y hat (bis 2026-10-01 nahm darum Strg+Y zurück und Strg+Z wiederholte, in jedem Textfeld). Das gilt für Menü-Kürzel und die Tasten der Textfelder (Strg+A/C/V/X/Z/Y/B/I/U); `KEYHIT`/`KEYPRESSED` in Programmen bleiben bei der Lage, ein Spiel will WASD dort, wo die Finger liegen. Während eine Aufnahme läuft, gilt auch hier die Lage. Die Modifier müssen **genau** passen: ein bloßes S ist kein Strg+S. **Ohne Strg oder Alt gehört eine Taste dem Textfeld mit Fokus** — ein `Entf`-Kürzel löscht dort ein Zeichen, statt den Menüpunkt auszulösen; ohne Textfokus löst es aus. **Ausgenommen sind F1 bis F12**: sie erzeugen nie Text und lösen auch aus dem Textfeld heraus aus (F5 startet in einer IDE aus dem Code-Feld). Ein gesperrter Eintrag hat kein Kürzel. Ein unbekannter Tastenname ist ein Fehler beim Anlegen, nicht ein Kürzel, das still nie feuert. **Ein Kürzel, das gefeuert hat, nimmt dem Textbereich die Taste weg** — sonst täte `Strg+Umschalt+Hoch` zwei Dinge: den Eintrag auslösen und die Auswahl eine Zeile hochschieben, und ein Befehl, der danach die Auswahl liest, sähe eine andere als die markierte.
 
 ### Strg+Rad gehört dem Programm
 
@@ -1112,6 +1112,11 @@ FLIP()
 Ein unsichtbares oder zerstörtes Fenster zeichnet nichts (kein Fehler) — der
 Aufruf darf also unbedingt in der Bildschleife stehen. Ist das Fenster das
 modale, kommt sein Schleier mit.
+
+Das Fenster kommt dabei auch in der **Reihenfolge** nach vorn, ohne den Fokus
+zu nehmen: was obenauf zu sehen ist, bekommt im nächsten Bild auch die Klicks.
+Vorher lag es nach einem Klick ins Fenster darunter wieder dahinter -- man sah
+einen Knopf, und der Klick ging an das Fenster, das man nicht sah.
 
 **Kontextmenü und Tooltip** liegen über *allen* Fenstern und sind deshalb vom
 selben Problem betroffen — ein Tooltip folgt der Maus und landet also
@@ -2686,7 +2691,9 @@ nicht.
 
 ## Mehrere Schreibmarken im Textbereich
 
-**Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg; ein
+**Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg, ebenso
+ein gewöhnlicher Klick, ein Rechtsklick, Strg+A und `GUI_TEXTAREA_GOTO`/
+`GUI_TEXTAREA_SELECT` -- die meinen alle **eine** Stelle; ein
 Programm setzt sie mit `GUI_TEXTAREA_ADD_CARET`. Tippen, Enter, Rücktaste,
 Entf, Tabulator und Einfügen wirken dann an **jeder** Marke, und die Pfeile
 bewegen alle — blieben die weiteren stehen, liefen sie beim ersten

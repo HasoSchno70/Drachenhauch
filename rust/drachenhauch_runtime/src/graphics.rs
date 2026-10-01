@@ -1159,6 +1159,13 @@ pub struct Graphics {
     maus_halt: [crate::flanken::Halt; crate::flanken::TASTEN],
     /// Dasselbe fuer die Tastatur, je GLFW-Tastencode.
     tasten_halt: Vec<crate::flanken::Halt>,
+    /// Auf welcher Taste jeder Buchstabe NACH DER BELEGUNG liegt (Index 0 =
+    /// a): der dhrt-Code der Taste nach Lage (97..122). raylib/GLFW benennen
+    /// Tasten nach ihrer Lage auf einer US-Tastatur -- auf einer deutschen
+    /// liegt das Z dort, wo die US-Tastatur das Y hat. Ohne das bekam, wer
+    /// in der IDE Strg+Z drueckte, Wiederholen statt Rueckgaengig. Einmal je
+    /// Bild aufgefrischt (die Belegung laesst sich zur Laufzeit wechseln).
+    belegung: [i64; 26],
     /// Das zuletzt abgespielte Positions-Ereignis der Wiedergabe. raylib
     /// zeichnet eine Mausposition NUR auf, wenn sie sich geaendert hat
     /// (`rcore.c`: "only saved if changed") -- zwischen zwei solchen
@@ -1742,6 +1749,7 @@ impl Graphics {
             auto_injected_keys: Vec::new(),
             maus_halt: [crate::flanken::Halt::default(); crate::flanken::TASTEN],
             tasten_halt: vec![crate::flanken::Halt::default(); crate::flanken::TASTATUR],
+            belegung: std::array::from_fn(|i| 97 + i as i64),
             auto_maus: None,
             key_names: HashMap::new(),
         };
@@ -4555,8 +4563,27 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Flankengetriggert: ist die Taste in DIESEM Frame neu gedrueckt worden?
     /// (raylib is_key_pressed). Fuer Caret-Bewegung u.ae., damit ein Tastendruck
     /// nicht jeden Frame ausloest.
+    ///
+    /// Buchstaben gelten nach der BELEGUNG (siehe `belegung`): die gui fragt
+    /// hierueber ihre Kuerzel ab (Strg+Z, Strg+S, Menue-Kuerzel), und ein
+    /// Kuerzel meint die Taste, auf der der Buchstabe steht. KEYHIT und
+    /// KEYPRESSED fuer Programme bleiben bei der Lage -- ein Spiel will WASD
+    /// dort, wo die Finger liegen.
     pub fn key_pressed(&self, code: i64) -> bool {
+        let code = if (97..=122).contains(&code) { self.belegung[(code - 97) as usize] } else { code };
         match map_key(code) { Some(k) => self.t_neu(k), None => false }
+    }
+
+    /// Die Belegung neu lesen: je Buchstabentaste (nach Lage) der Buchstabe,
+    /// den sie schreibt. Waehrend eine Aufnahme laeuft, gilt die Lage -- eine
+    /// Aufnahme speichert Tasten nach Lage, und die Pruefsammlungen spielen
+    /// Strg+Z als die Taste an der US-Lage des Z ein.
+    fn belegung_auffrischen(&mut self) {
+        if self.auto_playing { self.belegung = std::array::from_fn(|i| 97 + i as i64); return; }
+        let namen: [Option<String>; 26] = std::array::from_fn(|i| {
+            map_key(97 + i as i64).and_then(|k| self.rl.get_key_name(k))
+        });
+        self.belegung = belegung_aus(&namen);
     }
     /// Ist eine Shift-Taste gedrueckt? (fuer Text-Selektion via Shift+Pfeil)
     pub fn key_shift(&self) -> bool {
@@ -6086,6 +6113,8 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             self.tasten_halt[t] = crate::flanken::weiter(self.tasten_halt[t], d, l, unten, flanke);
         }
 
+        self.belegung_auffrischen();
+
         // Abgelegte Dateien fuer das naechste Bild: raylib (Hineinziehen) und
         // der Finder (finder.rs). `load_dropped_files` gibt die Liste bei
         // raylib wieder frei -- darum genau EINMAL je Bild.
@@ -7118,6 +7147,70 @@ fn ecken_einzug(r: i32, h: i32, zeile: i32) -> i32 {
     }
     let k = ((r * r) as f32 - dy * dy).max(0.0).sqrt();
     ((r as f32 - k).round() as i32).clamp(0, r)
+}
+
+/// Aus den Namen der 26 Buchstabentasten (nach Lage, Index 0 = die Taste an
+/// der US-Lage des A) die Zuordnung Buchstabe -> Taste. Ein Buchstabe, den
+/// keine Taste schreibt (kyrillische Belegung, unbekannter Name), bleibt bei
+/// seiner Lage.
+fn belegung_aus(namen: &[Option<String>; 26]) -> [i64; 26] {
+    let mut b: [i64; 26] = std::array::from_fn(|i| 97 + i as i64);
+    let mut gesetzt = [false; 26];
+    for (lage, name) in namen.iter().enumerate() {
+        let Some(n) = name else { continue };
+        let mut zeichen = n.chars();
+        let (Some(c), None) = (zeichen.next(), zeichen.next()) else { continue };
+        let c = c.to_ascii_lowercase();
+        if !c.is_ascii_lowercase() { continue; }
+        let i = (c as u8 - b'a') as usize;
+        if !gesetzt[i] { b[i] = 97 + lage as i64; gesetzt[i] = true; }
+    }
+    b
+}
+
+#[cfg(test)]
+mod belegung_tests {
+    use super::belegung_aus;
+    fn namen(s: &str) -> [Option<String>; 26] {
+        // s = was die Tasten an den US-Lagen a..z schreiben
+        let v: Vec<char> = s.chars().collect();
+        std::array::from_fn(|i| Some(v[i].to_string()))
+    }
+    #[test]
+    fn us_bleibt_wie_es_ist() {
+        let b = belegung_aus(&namen("abcdefghijklmnopqrstuvwxyz"));
+        assert_eq!(b[(b'z' - b'a') as usize], 122);
+        assert_eq!(b[(b'y' - b'a') as usize], 121);
+    }
+    #[test]
+    fn deutsch_tauscht_z_und_y() {
+        // QWERTZ: an der US-Lage des Y steht Z, an der des Z steht Y.
+        let mut n = namen("abcdefghijklmnopqrstuvwxyz");
+        n[(b'y' - b'a') as usize] = Some("z".into());
+        n[(b'z' - b'a') as usize] = Some("y".into());
+        let b2 = belegung_aus(&n);
+        assert_eq!(b2[(b'z' - b'a') as usize], 121, "Z liegt auf der US-Lage des Y");
+        assert_eq!(b2[(b'y' - b'a') as usize], 122);
+        assert_eq!(b2[(b's' - b'a') as usize], 115, "S bleibt");
+    }
+    #[test]
+    fn franzoesisch_und_fremde_namen() {
+        // AZERTY: A/Q und Z/W getauscht, M auf der US-Lage des Semikolons
+        // (keine Buchstabentaste) -- die US-Lage des M schreibt ",".
+        let mut n = namen("abcdefghijklmnopqrstuvwxyz");
+        n[0] = Some("q".into()); n[(b'q' - b'a') as usize] = Some("a".into());
+        n[(b'w' - b'a') as usize] = Some("z".into()); n[(b'z' - b'a') as usize] = Some("w".into());
+        n[(b'm' - b'a') as usize] = Some(",".into());
+        let b = belegung_aus(&n);
+        assert_eq!(b[0], 97 + (b'q' - b'a') as i64, "A liegt auf der US-Lage des Q");
+        assert_eq!(b[(b'z' - b'a') as usize], 97 + (b'w' - b'a') as i64);
+        assert_eq!(b[(b'm' - b'a') as usize], 109, "M ohne Buchstabentaste bleibt bei der Lage");
+        // kyrillisch: kein Name passt -> alles bei der Lage
+        let k: [Option<String>; 26] = std::array::from_fn(|_| Some("ж".into()));
+        assert_eq!(belegung_aus(&k)[25], 122);
+        let leer: [Option<String>; 26] = std::array::from_fn(|_| None);
+        assert_eq!(belegung_aus(&leer)[0], 97);
+    }
 }
 
 fn map_key(code: i64) -> Option<KeyboardKey> {

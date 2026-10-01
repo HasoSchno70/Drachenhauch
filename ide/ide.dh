@@ -4258,10 +4258,13 @@ SUB gliederungFuellen(quelle AS STRING)
         NEXT
     NEXT
     ' Dieselben Bloecke sind die faltbaren -- die Laufzeit kennt keine
-    ' Sprache und erfaehrt sie nur so.
+    ' Sprache und erfaehrt sie nur so. Der Schluessel ist das FELD samt ALLEN Bloecken, nicht der Satz der
+    ' Symbole: mit dem allein bekam ein neuer Reiter mit gleicher Gliederung
+    ' (zwei Dateien ohne SUB, dieselbe Datei neu geoeffnet) gar keine
+    ' Bloecke, und eine neue FOR-Schleife -- ein Block nur aus der
+    ' Einrueckung -- liess sich nie falten.
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-    IF ta >= 0 AND schl <> faltSchluessel THEN
-        faltSchluessel = schl
+    IF ta >= 0 THEN
         DIM fv AS ARRAY OF INTEGER : fv = []
         DIM fb AS ARRAY OF INTEGER : fb = []
         FOR i = 0 TO n - 1
@@ -4274,10 +4277,18 @@ SUB gliederungFuellen(quelle AS STRING)
             NEXT
         NEXT
         einzugBloecke(quelle, fv, fb)
-        GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
-        faltenZurueck(ta)
-        blockVon = fv
-        blockBis = fb
+        DIM fschl AS STRING : fschl = STR$(ta) + "|"
+        DIM fi AS INTEGER
+        FOR fi = 0 TO LEN(fv) - 1
+            fschl = fschl + STR$(fv[fi]) + "-" + STR$(fb[fi]) + ","
+        NEXT
+        IF fschl <> faltSchluessel THEN
+            faltSchluessel = fschl
+            GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
+            faltenZurueck(ta)
+            blockVon = fv
+            blockBis = fb
+        END IF
     END IF
     IF schl = gliederungSchluessel THEN RETURN
     gliederungSchluessel = schl
@@ -4676,6 +4687,9 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     FOR t2 = 0 TO tabAnzahl - 1
         IF tabFelder[t2] = ta THEN eigen = tabPfade[t2]
     NEXT
+    ' Die zweite Ansicht (Alt+Umschalt+G) gehoert keinem Reiter, zeigt aber
+    ' die Datei des aktiven -- ohne das zaehlte die Platte noch einmal mit.
+    IF eigen = "" AND ta = taSpiegel AND aktiverTab >= 0 THEN eigen = tabPfade[aktiverTab]
     DIM dateien AS ARRAY OF STRING : dateien = []
     IF projektOrdner <> "" THEN dateien = projektDateien("*.dh")
     zaehlerAddieren(summe, woerterZaehlen$(quelle))
@@ -11392,7 +11406,7 @@ SUB umbenennenAusfuehren(neu AS STRING)
     DIM q AS STRING : q = GUI_TEXT(ta)
     DIM neuText AS STRING : neuText = CODE_RENAME$(q, umbenennZeile, umbenennSpalte, neu)
     IF neuText = "" THEN
-        GUI_SET_TEXT(lblStatus, tr$("Umbenennen: '") + neu + tr$("' geht nicht -- ein Name fängt mit Buchstabe oder _ an, und Schlüsselwörter bleiben, wie sie sind."))
+        GUI_SET_TEXT(lblStatus, tr$("Umbenennen: '") + neu + tr$("' geht nicht -- ein Name fängt mit Buchstabe oder _ an, und Schlüsselwörter und eingebaute Namen bleiben, wie sie sind."))
         RETURN
     END IF
     IF neuText = q THEN

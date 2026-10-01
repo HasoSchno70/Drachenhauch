@@ -625,7 +625,7 @@ Umbenennen: unter der Marke steht kein Name.	Rename: there is no name at the cur
 Umbenennen	Rename
 ' überall nennen in:	' everywhere to:
 Umbenennen: '	Rename: '
-' geht nicht -- ein Name fängt mit Buchstabe oder _ an, und Schlüsselwörter bleiben, wie sie sind.	' is not possible -- a name starts with a letter or _, and keywords stay as they are.
+' geht nicht -- ein Name fängt mit Buchstabe oder _ an, und Schlüsselwörter und eingebaute Namen bleiben, wie sie sind.	' is not possible -- a name starts with a letter or _, and keywords and built-in names stay as they are.
 Umbenennen: nichts zu tun.	Rename: nothing to do.
 Schnipsel: 	Snippet: 
 Schnipsel einfügen	Insert snippet
