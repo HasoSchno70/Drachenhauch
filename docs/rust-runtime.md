@@ -39,7 +39,7 @@ unten; bis 2026-09-21 gab es davor noch den Python-Starter `dhrun.py`).
 
 Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT`),
 **Game-Loop** (`DELTA`/`FPS`/`SETFPS`/`SET_FULLSCREEN`/`SETWINDOWTITLE`/
-`SAVESCREENSHOT`), **Shader/Post-Processing** (`SHADER_LOAD`/`SET`/`SET2`/`SET3`/
+`SAVESCREENSHOT`; raylibs eigenes Bildschirmfoto auf F12 ist abgeschaltet, F12 gehört dem Programm), **Shader/Post-Processing** (`SHADER_LOAD`/`SET`/`SET2`/`SET3`/
 `POSTFX`, CRT/Bloom/Vignette), **TTF-Fonts** (`LOADFONT`/`SETFONT`/
 `TEXT_SPACING`). Die native Runtime deckt damit ein komplettes
 2D/3D-Spiel mit Sound, Menüs/Tabellen und GPU-Effekten ab.

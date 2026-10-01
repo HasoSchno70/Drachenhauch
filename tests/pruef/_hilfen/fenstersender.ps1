@@ -69,7 +69,7 @@ if ($Nachricht -eq "esc") {
     # Eine Folge, getrennt mit "|": "tippe:abc" = je Zeichen WM_CHAR (dieser
     # Weg fuellt raylibs Zeichenwarteschlange, eine Aufnahme tut es nicht),
     # "anf" = ein Anfuehrungszeichen (auf der Befehlszeile schwer zu
-    # uebergeben), "rueck"/"links"/"rechts"/"auf"/"ab"/"enter"/"escape" = die
+    # uebergeben), "rueck"/"links"/"rechts"/"auf"/"ab"/"enter"/"escape"/"f12" = die
     # Taste gedrueckt und los ("esc" allein ist die Nachricht oben).
     foreach ($teil in $Nachricht.Split("|")) {
         if ($teil.StartsWith("tippe:")) {
@@ -79,10 +79,10 @@ if ($Nachricht -eq "esc") {
             }
         } elseif ($teil -eq "anf") {
             [FensterSender]::PostMessage($h, 0x102, [IntPtr]0x22, [IntPtr]1) | Out-Null
-        } elseif (@("rueck", "links", "rechts", "auf", "ab", "enter", "escape") -contains $teil) {
-            $vk = @{ "rueck" = 0x08; "links" = 0x25; "rechts" = 0x27; "auf" = 0x26; "ab" = 0x28; "enter" = 0x0D; "escape" = 0x1B }[$teil]
+        } elseif (@("rueck", "links", "rechts", "auf", "ab", "enter", "escape", "f12") -contains $teil) {
+            $vk = @{ "rueck" = 0x08; "links" = 0x25; "rechts" = 0x27; "auf" = 0x26; "ab" = 0x28; "enter" = 0x0D; "escape" = 0x1B; "f12" = 0x7B }[$teil]
             # GLFW nimmt die Taste aus dem SCANCODE im lParam, nicht aus dem vk.
-            $ext = @{ "rueck" = 0x000E0001; "links" = 0x014B0001; "rechts" = 0x014D0001; "auf" = 0x01480001; "ab" = 0x01500001; "enter" = 0x001C0001; "escape" = 0x00010001 }[$teil]
+            $ext = @{ "rueck" = 0x000E0001; "links" = 0x014B0001; "rechts" = 0x014D0001; "auf" = 0x01480001; "ab" = 0x01500001; "enter" = 0x001C0001; "escape" = 0x00010001; "f12" = 0x00580001 }[$teil]
             [FensterSender]::PostMessage($h, 0x100, [IntPtr]$vk, [IntPtr]$ext) | Out-Null
             # 160 statt 80 ms: kommen runter UND hoch im selben Bild an (ein
             # langsames Bild unter Last), sieht raylib gar keinen Druck.

@@ -1,0 +1,76 @@
+' Ein Druck auf ein Fenster UEBER einem Textbereich (2026-10-01, bei der
+' Handpruefung gefunden): der Textbereich hat den Fokus -- eine
+' Vorschlagsliste laesst ihn bewusst im Code --, und er fragte beim Druck
+' nur, ob die Maus in seinem Rechteck liegt, nicht ob sein Fenster dort
+' oben liegt. Ein Klick auf das Fenster darueber setzte deshalb auch die
+' Marke darunter, und ein Zug an dessen Titelleiste markierte Text.
+' Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein zug an einem fenster darueber laesst die marke stehen
+IMPORT "gui"
+SCREEN(480, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 480, 320)
+GUI_WINDOW_CHROME(a, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(a, 10, 10, 460, 300)
+GUI_SET_TEXT(ta, "erste zeile mit text" + CHR$(10) + "zweite zeile mit text" + CHR$(10) + "dritte zeile mit text" + CHR$(10) + "vierte zeile mit text" + CHR$(10) + "fuenfte zeile mit text")
+GUI_FOCUS(ta)
+DIM b AS GUI_WINDOW : b = GUI_WINDOW("B", 40, 20, 200, 120)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 3 THEN
+        GUI_TEXTAREA_GOTO(ta, 5, 1)
+        WRITEALL("ev.txt", "c 6" + CHR$(10) + "e 0 7 120 30 0" + CHR$(10) + "e 2 6 0 0 0" + CHR$(10) + "e 6 7 200 80 0" + CHR$(10) + "e 10 7 280 130 0" + CHR$(10) + "e 14 5 0 0 0" + CHR$(10) + "e 16 7 280 130 0" + CHR$(10) + CHR$(10))
+        AUTOMATION_PLAY("ev.txt")
+    END IF
+    GUI_UPDATE()
+    IF bild = 40 THEN
+        DIM z AS INTEGER
+        DIM s AS INTEGER
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "marke "; z; " "; s
+        PRINT "auswahl leer "; GUI_TEXTAREA_SELECTION$(ta) = ""
+        PRINT "fenster gezogen "; GUI_WINDOW_GET_X(b) - 40; " "; GUI_WINDOW_GET_Y(b) - 20
+        PRINT "fokus im text "; GUI_FOCUSED() = ta
+        EXIT(0)
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- erwartet
+marke 5 1
+auswahl leer TRUE
+fenster gezogen 160 100
+fokus im text TRUE
+
+=== ohne fenster darueber setzt derselbe klick die marke
+' Gegenprobe: dieselbe Stelle ohne Fenster B trifft den Textbereich.
+IMPORT "gui"
+SCREEN(480, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM a AS GUI_WINDOW : a = GUI_WINDOW("A", 0, 0, 480, 320)
+GUI_WINDOW_CHROME(a, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(a, 10, 10, 460, 300)
+GUI_SET_TEXT(ta, "erste zeile mit text" + CHR$(10) + "zweite zeile mit text" + CHR$(10) + "dritte zeile mit text" + CHR$(10) + "vierte zeile mit text" + CHR$(10) + "fuenfte zeile mit text")
+GUI_FOCUS(ta)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 3 THEN
+        GUI_TEXTAREA_GOTO(ta, 5, 1)
+        WRITEALL("ev.txt", "c 3" + CHR$(10) + "e 0 7 120 30 0" + CHR$(10) + "e 2 6 0 0 0" + CHR$(10) + "e 4 5 0 0 0" + CHR$(10) + CHR$(10))
+        AUTOMATION_PLAY("ev.txt")
+    END IF
+    GUI_UPDATE()
+    IF bild = 30 THEN
+        DIM z AS INTEGER
+        DIM s AS INTEGER
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "marke versetzt "; z <> 5
+        EXIT(0)
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- erwartet
+marke versetzt TRUE

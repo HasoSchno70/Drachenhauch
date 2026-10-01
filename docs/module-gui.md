@@ -251,6 +251,8 @@ IMPORT "gui"
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent, bei Knöpfen auch hover/pressed; -1 entfernt) |
 | `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
 
+**Ein Druck gehört dem Fenster, das oben liegt:** ein Textbereich mit Fokus reagiert nur auf einen Druck, der in ihm beginnt und dessen Fenster dort oben liegt — eine Liste über dem Code lässt sich anklicken und ziehen, ohne dass darunter die Marke springt oder Text markiert wird.
+
 **Tooltips:** `GUI_TOOLTIP(widget, text$)` hängt einem beliebigen Widget einen Hilfetext an. Er erscheint automatisch, sobald die Maus ~0,5 s ruhig über dem Widget verweilt (nur im obersten Fenster; liegt ein modales Fenster davor, zeigt nur dieses Tipps), und folgt dem Cursor am Bildschirmrand abgeklemmt. `\n` macht mehrere Zeilen; `""` entfernt den Tooltip wieder. Bewegung oder ein Mausklick setzt die Verweilzeit zurück.
 
 ### Menüs

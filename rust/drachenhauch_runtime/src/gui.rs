@@ -14140,6 +14140,18 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             self.windows[wi].widgets[i].wort_zug = false;
             self.windows[wi].widgets[i].spalten_start = (-1, -1);
         }
+        // Ein Druck, der nicht IN diesem Feld beginnt -- daneben oder auf
+        // einem Fenster, das darueber liegt --, gehoert ihm nicht: das Feld
+        // hat den Fokus (eine Vorschlagsliste laesst ihn bewusst im Code),
+        // und ohne diese Sperre setzte ein Klick auf die Liste ueber dem
+        // Code auch die Marke darunter, und ein Zug an ihrer Titelleiste
+        // markierte Text. Der Zug wird wie beim Farbfeld ganz gesperrt.
+        if g.mouse_button(0) && !self.was_mouse_down {
+            let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+            if !Self::in_rect(mx, my, (ax, ay, fw, fh)) || self.topmost_at(mx, my) != Some(wi) {
+                self.windows[wi].widgets[i].farbfeld_zug = true;
+            }
+        }
         if g.mouse_button(0) && !self.windows[wi].widgets[i].farbfeld_zug {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let row = (scroll + ((my - ay - pad).max(0) / lh)).max(0);

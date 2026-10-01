@@ -87,7 +87,54 @@ getrandom = "0.2"
 # Grafik ist optional: der pure VM-Kern baut ohne C-Toolchain. Mit
 # `--features graphics` wird raylib eingebunden (braucht cmake + C-Compiler +
 # libclang fuer bindgen -- siehe rust/build_runtime.py).
-raylib = { version = "6.0", optional = true, features = ["SUPPORT_IMAGE_GENERATION", "SUPPORT_FILEFORMAT_JPG", "SUPPORT_FILEFORMAT_BMP"] }
+# Die Vorgaben von raylib-rs OHNE SUPPORT_SCREEN_CAPTURE: damit speicherte
+# raylib bei JEDEM F12 ein screenshotNNN.png in den Arbeitsordner -- in der
+# IDE ist F12 "Zur Definition", und jedes Spiel, das F12 benutzt, haette
+# still Bilder hinterlassen. SAVESCREENSHOT (TakeScreenshot) bleibt.
+# Dazu JPG/BMP (sonst "Data format not supported").
+raylib = { version = "6.0", optional = true, default-features = false, features = [
+    "GLFW_BUILD_X11",
+    "USE_AUDIO",
+    "SUPPORT_MODULE_RSHAPES",
+    "SUPPORT_MODULE_RTEXTURES",
+    "SUPPORT_MODULE_RTEXT",
+    "SUPPORT_MODULE_RMODELS",
+    "SUPPORT_MODULE_RAUDIO",
+    "SUPPORT_CAMERA_SYSTEM",
+    "SUPPORT_GESTURES_SYSTEM",
+    "SUPPORT_RPRAND_GENERATOR",
+    "SUPPORT_MOUSE_GESTURES",
+    "SUPPORT_SSH_KEYBOARD_RPI",
+    "SUPPORT_WINMM_HIGHRES_TIMER",
+    "SUPPORT_COMPRESSION_API",
+    "SUPPORT_AUTOMATION_EVENTS",
+    "SUPPORT_CLIPBOARD_IMAGE",
+    "SUPPORT_QUADS_DRAW_MODE",
+    "SUPPORT_FILEFORMAT_PNG",
+    "SUPPORT_FILEFORMAT_GIF",
+    "SUPPORT_FILEFORMAT_QOI",
+    "SUPPORT_FILEFORMAT_DDS",
+    "SUPPORT_IMAGE_EXPORT",
+    "SUPPORT_IMAGE_GENERATION",
+    "SUPPORT_FILEFORMAT_TTF",
+    "SUPPORT_FILEFORMAT_FNT",
+    "SUPPORT_FILEFORMAT_OBJ",
+    "SUPPORT_FILEFORMAT_MTL",
+    "SUPPORT_FILEFORMAT_IQM",
+    "SUPPORT_FILEFORMAT_GLTF",
+    "SUPPORT_FILEFORMAT_VOX",
+    "SUPPORT_FILEFORMAT_M3D",
+    "SUPPORT_MESH_GENERATION",
+    "SUPPORT_FILEFORMAT_WAV",
+    "SUPPORT_FILEFORMAT_OGG",
+    "SUPPORT_FILEFORMAT_MP3",
+    "SUPPORT_FILEFORMAT_QOA",
+    "SUPPORT_FILEFORMAT_XM",
+    "SUPPORT_FILEFORMAT_MOD",
+    "SUPPORT_TRACELOG",
+    "SUPPORT_FILEFORMAT_JPG",
+    "SUPPORT_FILEFORMAT_BMP",
+] }
 # db-Modul: SQLite (bundled = eigenes sqlite3.c, kein System-SQLite noetig).
 rusqlite = { version = "0.31", features = ["bundled"], optional = true }
 # html-Modul: blockierender HTTP-Client (rustls-TLS fuer https).
