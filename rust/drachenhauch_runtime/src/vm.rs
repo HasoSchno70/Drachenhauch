@@ -672,6 +672,10 @@ impl DebugState {
         }
     }
 
+    fn gehoert_dazu(&self, datei: &str) -> bool {
+        self.karte.as_ref().map(|k| k.gehoert_dazu(datei)).unwrap_or(true)
+    }
+
     fn haupt(&self) -> String {
         self.karte.as_ref().map(|k| k.haupt().to_string()).unwrap_or_default()
     }
@@ -870,6 +874,8 @@ pub struct Vm<'p> {
     // Klassennamen, wie sie im Quelltext stehen (klein -> wie geschrieben),
     // fuer die Anzeige im Debugger; leer ohne Debugger.
     dbg_klassen: HashMap<String, String>,
+    /// Variablen- und Feldnamen, wie sie geschrieben wurden (debugger.rs).
+    dbg_namen: HashMap<String, String>,
     depth: u32,
     // `dhrt call`: die Ausgabe der Funktion wird GESAMMELT und als Feld
     // `ausgabe` der JSON-Zeile geliefert. Ohne dieses Flag schriebe ein von
@@ -1068,6 +1074,7 @@ impl<'p> Vm<'p> {
             stop: None,
             dbg: None,
             dbg_klassen: HashMap::new(),
+            dbg_namen: HashMap::new(),
             sammeln: false,
             depth: 0,
             #[cfg(feature = "graphics")]
@@ -1908,11 +1915,18 @@ impl<'p> Vm<'p> {
 
     /// Debugging fuer den naechsten `run()` aktivieren (`dhrt debug`).
     /// `karte`: gemergte Zeilen <-> (Datei, Zeile), siehe debugger.rs.
-    pub fn enable_debug(&mut self, karte: Option<crate::debugger::Karte>, klassen: HashMap<String, String>) {
+    pub fn enable_debug(&mut self, karte: Option<crate::debugger::Karte>, klassen: HashMap<String, String>,
+                        namen: HashMap<String, String>) {
         let mut d = DebugState::new();
         d.karte = karte;
         self.dbg = Some(d);
         self.dbg_klassen = klassen;
+        self.dbg_namen = namen;
+    }
+
+    /// Ein Name, wie er im Quelltext steht (die VM kennt ihn nur klein).
+    fn dbg_name(&self, n: &str) -> String {
+        self.dbg_namen.get(&n.to_lowercase()).cloned().unwrap_or_else(|| n.to_string())
     }
 
     /// Wie ein Wert im Debugger dasteht: (Typ, Wert). Eine Instanz traegt
@@ -1974,6 +1988,9 @@ impl<'p> Vm<'p> {
             if *budget == 0 { break; }
             *budget -= 1;
             let (typ, wert) = self.dbg_anzeige(&w);
+            // Feldnamen einer Instanz wie geschrieben; `[3]` und MAP-Schluessel
+            // bleiben, wie sie sind (keiner davon steht klein im Programm).
+            let name = if matches!(v, Value::Instance(_)) { self.dbg_name(&name) } else { name };
             let mut e = serde_json::json!({"name": name, "type": typ, "value": wert});
             if let Some(k) = self.dbg_kinder(&w, tiefe + 1, budget) { e["children"] = k; }
             out.push(e);
@@ -1985,9 +2002,21 @@ impl<'p> Vm<'p> {
     }
 
     /// Ein Eintrag der Variablenliste samt Kindern.
-    fn dbg_var_json(&self, name: &str, v: &Value) -> serde_json::Value {
-        let (typ, wert) = self.dbg_anzeige(v);
-        let mut e = serde_json::json!({"name": name, "type": typ, "value": wert});
+    /// `decl` = der angesagte Typ. Ein Handle (GUI_WIDGET, DB_CONN, IMAGE ...)
+    /// ist zur Laufzeit eine Ganzzahl -- angezeigt wird, was im DIM steht,
+    /// statt eines INTEGER, das niemand geschrieben hat (bei NIL ebenso).
+    fn dbg_var_json(&self, name: &str, v: &Value, decl: Option<&str>) -> serde_json::Value {
+        let (mut typ, wert) = self.dbg_anzeige(v);
+        // Auch bei NIL: ein noch nicht belegtes `DIM w AS GUI_WIDGET` oder
+        // `DIM p AS Held` sagt mehr mit dem Typ, der dasteht.
+        if let (Value::Int(_) | Value::Nil, Some(d)) = (v, decl) {
+            let d = d.trim().to_lowercase();
+            if !d.is_empty() && !matches!(d.as_str(), "any" | "int" | "integer" | "num" | "float")
+                && d.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                typ = self.dbg_klassen.get(&d).cloned().unwrap_or_else(|| d.to_uppercase());
+            }
+        }
+        let mut e = serde_json::json!({"name": self.dbg_name(name), "type": typ, "value": wert});
         let mut budget = 400usize;
         if let Some(k) = self.dbg_kinder(v, 0, &mut budget) { e["children"] = k; }
         e
@@ -2365,7 +2394,10 @@ impl<'p> Vm<'p> {
                     if !alt_ohne { dbg.breakpoints.insert(g, hp); }
                     antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": echt, "verified": true}));
                 }
-                None => antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": 0, "verified": false})),
+                // `in_program`: haelt er nie, weil darunter kein Code steht
+                // (ein Befund) -- oder weil die Datei gar nicht dazugehoert?
+                None => antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": 0, "verified": false,
+                                                        "in_program": dbg.gehoert_dazu(&datei)})),
             }
         }
         dbg_emit(&serde_json::json!({"event": "breakpoints", "breakpoints": antwort}));
@@ -2377,7 +2409,8 @@ impl<'p> Vm<'p> {
             // Compiler-Zwischenwerte ueberspringen (namenlos oder __-Praefix).
             if nm.is_empty() || nm.starts_with("__") { continue; }
             if let Some(v) = locals.get(i) {
-                out.push(self.dbg_var_json(nm, v));
+                let decl = fn_.local_types.get(i).map(|s| s.as_str());
+                out.push(self.dbg_var_json(nm, v, decl));
             }
         }
         serde_json::Value::Array(out)
@@ -2389,9 +2422,11 @@ impl<'p> Vm<'p> {
             if name.starts_with("__") { continue; }
             let s = slot.borrow();
             if s.is_const { continue; }      // Baseline-Konstanten (Farben/Keys/PI) ausblenden
-            out.push(self.dbg_var_json(name, &s.value));
+            out.push(self.dbg_var_json(name, &s.value, Some(&s.ty)));
         }
-        out.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+        // Ohne Ruecksicht auf Gross/klein -- die Namen stehen in ihrer
+        // Schreibweise da, und `MAX_HP` gehoert nicht vor `alpha`.
+        out.sort_by_key(|e| e["name"].as_str().unwrap_or("").to_lowercase());
         serde_json::Value::Array(out)
     }
 

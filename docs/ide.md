@@ -493,7 +493,9 @@ als JSON-Zeilen auf stdout (`paused` mit `line`, `file`, Tiefe, `locals`,
 `watches` -- je `expr` und `value` oder `error`; `watches` als eigenes
 Ereignis nach `set-watches`; `breakpoints` als Antwort auf
 `set-breakpoints`, je `file`, `line`, `actual` (wo er wirklich hält) und
-`verified`; `run-to-error`, wenn `run-to` nirgends halten kann (fremde
+`verified`, bei einem, der nie hält, dazu `in_program` (FALSE: die Datei
+gehört gar nicht zum Programm -- die IDE schickt die Haltepunkte aller
+Dateien und meldet nur die mit TRUE); `run-to-error`, wenn `run-to` nirgends halten kann (fremde
 Datei, kein Code darunter) -- das Programm steht dann weiter; `input` mit
 `line`, wenn das Programm in einem `INPUT` wartet;
 `set-result`/`set-error`; `eval-result`/`eval-error`; `output`;
@@ -503,7 +505,10 @@ Datei, kein Code darunter) -- das Programm steht dann weiter; `input` mit
 mit `name` und `value` (ein Ausdruck), `eval`, `input` mit `text`,
 `pause`, `stop`). Jede Variable in `locals`/`globals` kann `children` tragen
 (gleich aufgebaut: `name`, `type`, `value`, `children`), eine Instanz hat als
-`type` ihren Klassennamen. Ein nicht abgefangener Fehler meldet sich erst als
+`type` ihren Klassennamen. Namen stehen so da, wie sie im Programm geschrieben
+sind (`btnAdd`, nicht `btnadd`), und ein Handle -- zur Laufzeit eine Ganzzahl
+oder noch NIL -- trägt als `type` den angesagten Typ (`GUI_WIDGET`, `DB_CONN`,
+eine Klasse) statt `INTEGER`. Ein nicht abgefangener Fehler meldet sich erst als
 `paused` mit `reason: "error"` und `message` (an der Fehlerstelle, `eval` und
 `set-watches` gehen noch), dann nach dem nächsten Kommando als `error`.
 

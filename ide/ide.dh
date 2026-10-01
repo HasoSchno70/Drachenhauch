@@ -12971,7 +12971,14 @@ SUB haltepunkteBestaetigt(j AS JSON_HANDLE)
         DIM datei AS STRING : datei = JSON_GET_STRING(j, p + ".file")
         DIM z AS INTEGER : z = JSON_GET_INT(j, p + ".line")
         IF NOT JSON_GET_BOOL(j, p + ".verified") THEN
-            ARRAY_PUSH(nie, BASENAME(datei) + ":" + STR$(z))
+            ' Ein Haltepunkt in einer Datei, die das Programm gar nicht
+            ' enthaelt (ein anderes Projekt, eine nicht importierte Datei),
+            ' haelt natuerlich nie -- das ist kein Befund. Geschickt werden
+            ' die Haltepunkte ALLER Dateien, weil erst der Debugger weiss,
+            ' was importiert ist.
+            DIM dazu AS BOOLEAN : dazu = TRUE
+            IF JSON_HAS(j, p + ".in_program") THEN dazu = JSON_GET_BOOL(j, p + ".in_program")
+            IF dazu THEN ARRAY_PUSH(nie, BASENAME(datei) + ":" + STR$(z))
             CONTINUE
         END IF
         DIM echt AS INTEGER : echt = JSON_GET_INT(j, p + ".actual")
@@ -12991,7 +12998,10 @@ SUB haltepunkteBestaetigt(j AS JSON_HANDLE)
             END IF
         NEXT
     NEXT
-    IF LEN(nie) > 0 THEN GUI_SET_TEXT(lblStatus, tr$("Haltepunkt hält nie (dort und darunter steht kein Code): ") + JOIN$(nie, ", "))
+    IF LEN(nie) > 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Haltepunkt hält nie (dort und darunter steht kein Code): ") + JOIN$(nie, ", "))
+        protokoll("haltepunkt nie " + JOIN$(nie, ", "))
+    END IF
     IF debugErstWarten THEN
         debugErstWarten = FALSE
         ' Steht schon ein Haltepunkt HIER, bleibt es stehen; gibt es gar
