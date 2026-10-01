@@ -381,10 +381,13 @@ Dinge:
   nicht, zeichnet raylib dort ein `?`; eine Pixel-Schrift für ein Retro-Spiel
   hat oft keine Umlaute.
 - **Ohne eigene Schrift springt eine Ausweich-Schrift ein.** Die eingebaute
-  raylib-Schrift kennt nur ASCII. Kommt ein Zeichen darüber hinaus vor,
+  raylib-Schrift kennt ASCII und Latin-1 (Zeichen 32 bis 255, also auch
+  `äöüÄÖÜß`). Kommt ein Zeichen darüber hinaus vor (etwa `€` oder Kanji),
   zeichnet die Runtime diesen Text mit einer Systemschrift (Windows: Segoe
-  UI, macOS: SF/Helvetica, Linux: DejaVu/Liberation). Reiner ASCII-Text geht
-  weiterhin durch die eingebaute Schrift.
+  UI, macOS: SF/Helvetica, Linux: DejaVu/Liberation). Deutscher Text mit
+  Umlauten bleibt in der eingebauten Schrift -- bis 2026-10-01 wich jeder
+  Text mit einem Zeichen über ASCII aus, und in einer Oberfläche stand
+  „Löschen“ in einer anderen Schrift als „Buchen“ daneben.
 - **Glyphen auf Zuruf.** Steht ein Zeichen in keiner geladenen Schrift
   (Kanji, Hangul, Emoji, Arabisch, Hebräisch, Thai), merkt sich die Runtime
   es beim Zeichnen oder Messen und backt es beim nächsten `FLIP` aus der
