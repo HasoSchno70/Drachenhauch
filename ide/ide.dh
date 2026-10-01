@@ -1359,6 +1359,7 @@ DIM vervollOffen AS BOOLEAN : vervollOffen = FALSE
 ' Was beim Tippen von selbst aufgeht: der Wortanfang, zu dem die Liste
 ' zuletzt gezeigt wurde, und der, zu dem sie WEGgeschickt wurde (ESC).
 DIM vervollWort AS STRING : vervollWort = ""
+DIM vervollGetippt AS BOOLEAN : vervollGetippt = FALSE   ' in diesem Bild hat sich der Text geaendert
 DIM vervollAus AS STRING : vervollAus = "-"
 
 ' Der Wortanfang links der Marke -- so viel wird beim Uebernehmen ersetzt.
@@ -8115,6 +8116,11 @@ END SUB
 ' Beim Tippen von selbst: ab drei Zeichen zeigt die Liste, was passt. Der
 ' Fokus bleibt im Code-Feld -- die Liste ist ein Vorschlag, keine Sperre.
 SUB vervollNachziehen()
+    ' Nur beim TIPPEN: ein Klick mitten in ein vorhandenes Wort (oder ein
+    ' Pfeil dorthin) aendert den Wortanfang auch -- und oeffnete die Liste
+    ' bei jedem Klick in ein Wort ab drei Buchstaben, seit sie sichtbar ist.
+    DIM getippt AS BOOLEAN : getippt = vervollGetippt
+    vervollGetippt = FALSE
     IF NOT vorschlagAn OR aktiverTab < 0 OR paletteOffen THEN RETURN
     DIM wort AS STRING : wort = wortAnfang$()
     IF wort = vervollAus THEN RETURN
@@ -8124,6 +8130,12 @@ SUB vervollNachziehen()
         RETURN
     END IF
     IF wort = vervollWort THEN RETURN
+    IF NOT getippt THEN
+        ' Die Marke steht jetzt woanders -- eine offene Liste gehoerte zum
+        ' vorigen Wort.
+        vervollSchliessen()
+        RETURN
+    END IF
     IF GUI_FOCUSED() <> aktivesFeld() THEN RETURN
     vervollstaendigen(FALSE)
 END SUB
@@ -17091,6 +17103,10 @@ WHILE NOT beenden
         DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]
         DIM jetzt AS STRING : jetzt = GUI_TEXT(tf)
         IF jetzt <> tabLetzterText[aktiverTab] THEN
+            ' Getippt heisst: genau ein Zeichen kam dazu. Ein eingefuegter
+            ' Block oder ein Umbau aendert den Text auch -- danach ging die
+            ' Liste mit dem Wort an der Marke auf (beim Stresstest gefunden).
+            IF LEN(jetzt) = LEN(tabLetzterText[aktiverTab]) + 1 THEN vervollGetippt = TRUE
             ' Beim ersten Bild nach dem Oeffnen ist der gemerkte Text leer --
             ' das ist kein Bearbeiten.
             IF tabLetzterText[aktiverTab] <> "" AND tabPfade[aktiverTab] <> "" THEN aenderungMerken(tf, tabPfade[aktiverTab])
