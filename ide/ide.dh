@@ -7700,13 +7700,33 @@ FUNCTION signaturHilfe$(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS STRING
     RETURN erste + "   -- Argument " + STR$(arg + 1)
 END FUNCTION
 
+' Eine Meldung in der Statusleiste verschwindet nach einer Weile von selbst.
+' Sie blieb sonst stehen, bis die naechste kam -- "Keine Definition zu
+' 'AS'" stand noch da, als der naechste Sprung laengst geklappt hatte.
+CONST STATUS_DAUER = 12.0
+DIM statusAlt AS STRING : statusAlt = ""
+DIM statusZeit AS FLOAT : statusZeit = 0.0
+SUB statusNachziehen()
+    DIM t AS STRING : t = GUI_TEXT(lblStatus)
+    IF t <> statusAlt THEN
+        statusAlt = t
+        statusZeit = GET_TIME()
+    ELSEIF t <> "" AND GET_TIME() - statusZeit > STATUS_DAUER THEN
+        GUI_SET_TEXT(lblStatus, "")
+        statusAlt = ""
+    END IF
+END SUB
+
 SUB hilfeNachziehen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
-    DIM marke AS STRING : marke = STR$(z) + ":" + STR$(s)
+    ' Nicht nur die Stelle: auch das Feld und die Textlaenge -- sonst blieb
+    ' nach einem Reiterwechsel (Marke in beiden in 1:1) oder nach Tippen und
+    ' Rueckgaengig an derselben Stelle die Hilfe zum vorigen Wort stehen.
+    DIM marke AS STRING : marke = STR$(ta) + ":" + STR$(z) + ":" + STR$(s) + ":" + STR$(LEN(GUI_TEXT(ta)))
     IF marke = letzteMarke THEN RETURN
     letzteMarke = marke
     GUI_STATUSBAR_SET(lblStatus, sfPos, tr$("Zeile ") + STR$(z) + tr$(", Spalte ") + STR$(s))
@@ -8573,6 +8593,9 @@ SUB zurDefinition()
         GUI_SET_TEXT(lblStatus, tr$("Keine Definition zu '") + wortUnterMarke$() + tr$("' -- auch nicht im Projekt."))
         RETURN
     END IF
+    ' Auch der Erfolg sagt es -- sonst stuende die Meldung eines vorigen
+    ' Fehlschlags noch da und behauptete das Gegenteil.
+    GUI_SET_TEXT(lblStatus, tr$("Definition von '") + wortUnterMarke$() + tr$("' in Zeile ") + STR$(dz) + ".")
     GUI_TEXTAREA_GOTO(ta, dz, ds)
 END SUB
 
@@ -13663,7 +13686,7 @@ SUB profilBereiche(j AS JSON_HANDLE, pfad AS STRING, vor AS STRING)
         DIM p AS STRING : p = pfad + "." + STR$(i)
         DIM art AS STRING : art = JSON_GET_STRING(j, p + ".art")
         DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
-        IF art = "function" THEN
+        IF art = "function" OR art = "sub" THEN
             ARRAY_PUSH(profBerName, vor + name)
             ARRAY_PUSH(profBerVon, JSON_GET_INT(j, p + ".von"))
             ARRAY_PUSH(profBerBis, JSON_GET_INT(j, p + ".bis"))
@@ -16967,6 +16990,7 @@ WHILE NOT beenden
 
     spiegelNachziehen()
     baumFilterNachziehen()
+    statusNachziehen()
     ' --- Aenderungen im aktiven Feld: einfaerben, Pruefung vormerken ---
     IF aktiverTab >= 0 THEN
         DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]
