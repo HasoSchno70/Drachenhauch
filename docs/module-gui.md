@@ -249,7 +249,7 @@ IMPORT "gui"
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent, bei Knöpfen auch hover/pressed; -1 entfernt) |
 | `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
 
-**Tooltips:** `GUI_TOOLTIP(widget, text$)` hängt einem beliebigen Widget einen Hilfetext an. Er erscheint automatisch, sobald die Maus ~0,5 s ruhig über dem Widget verweilt (nur im obersten Fenster), und folgt dem Cursor am Bildschirmrand abgeklemmt. `\n` macht mehrere Zeilen; `""` entfernt den Tooltip wieder. Bewegung oder ein Mausklick setzt die Verweilzeit zurück.
+**Tooltips:** `GUI_TOOLTIP(widget, text$)` hängt einem beliebigen Widget einen Hilfetext an. Er erscheint automatisch, sobald die Maus ~0,5 s ruhig über dem Widget verweilt (nur im obersten Fenster; liegt ein modales Fenster davor, zeigt nur dieses Tipps), und folgt dem Cursor am Bildschirmrand abgeklemmt. `\n` macht mehrere Zeilen; `""` entfernt den Tooltip wieder. Bewegung oder ein Mausklick setzt die Verweilzeit zurück.
 
 ### Menüs
 

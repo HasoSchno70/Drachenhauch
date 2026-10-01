@@ -6285,8 +6285,9 @@ impl<'p> Vm<'p> {
             "code_symbols$" | "code_symbols" => {
                 fn um(v: &serde_json::Value) -> serde_json::Value {
                     serde_json::json!({
-                        "name": v["name"], "art": match v["kind"].as_i64() {
-                            Some(5) => "class", Some(23) => "struct", Some(7) => "property", Some(10) => "enum", _ => "function" },
+                        "name": v["name"], "art": match (v["kind"].as_i64(), v["detail"].as_str()) {
+                            (Some(5), _) => "class", (Some(23), _) => "struct", (Some(7), _) => "property", (Some(10), _) => "enum",
+                            (_, Some("sub")) => "sub", _ => "function" },
                         "von": v["range"]["start"]["line"].as_u64().unwrap_or(0) + 1,
                         "bis": v["range"]["end"]["line"].as_u64().unwrap_or(0) + 1,
                         "kinder": v["children"].as_array().map(|k| k.iter().map(um).collect::<Vec<_>>()).unwrap_or_default(),

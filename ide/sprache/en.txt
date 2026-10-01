@@ -387,6 +387,8 @@ Umbruch an	Wrap on
 OK	OK
 Keine Definition zu '	No definition for '
 ' -- auch nicht im Projekt.	' -- not in the project either.
+Definition von '	Definition of '
+' in Zeile 	' on line 
 Zeile 	Line 
 Farbe: 	Colour: 
 Geteilte Ansicht: dafür braucht es zwei offene Dateien.	Split view: that needs two open files.

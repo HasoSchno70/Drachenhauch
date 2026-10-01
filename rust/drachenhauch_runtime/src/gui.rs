@@ -12449,7 +12449,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         self.cursor_pass(g, mx, my);
         // Tooltip-Dwell: oberstes Widget mit Hilfetext unter der Maus bestimmen.
         // Bei Wechsel/Bewegung/gedrueckter Maus startet der Verweil-Timer neu.
-        let tip_cur = self.topmost_at(mx, my).and_then(|top| {
+        // Liegt ein modales Fenster obenauf, hat alles dahinter keinen Tipp:
+        // es nimmt keine Klicks an, und ein Tooltip ueber dem Schleier
+        // sah aus, als liesse es sich noch bedienen.
+        let modal = self.modal;
+        let tip_cur = self.topmost_at(mx, my).filter(|&top| modal.map_or(true, |m| m == top)).and_then(|top| {
             let mut found = None;
             for i in 0..self.windows[top].widgets.len() {
                 let w = &self.windows[top].widgets[i];
@@ -17057,6 +17061,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let (wi, i) = self.tip_fokus?;
             if self.frame_count - self.tip_fokus_frame < TOOLTIP_DELAY { return None; }
             if self.focus_widget != Some((wi, i)) { return None; }
+            if self.modal.is_some_and(|m| m != wi) { return None; }
             let w = self.windows.get(wi)?.widgets.get(i)?;
             if !self.widget_shown(wi, w) { return None; }
             let (x, y, _, h) = self.abs_rect(wi, w);
