@@ -17090,7 +17090,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     ///
     /// Ein unsichtbares oder zerstoertes Fenster zeichnet nichts (kein
     /// Fehler) -- so darf der Aufruf unbedingt in der Bildschleife stehen.
-    pub fn draw_window_top(&self, g: &mut Graphics, h: i64) -> Result<(), String> {
+    ///
+    /// Das Fenster kommt dabei auch in der REIHENFOLGE nach vorn (ohne
+    /// Fokus): was obenauf zu sehen ist, muss auch die Klicks bekommen. Vorher
+    /// lag es nach einem Klick ins Hauptfenster dahinter -- man sah die
+    /// Suchleiste der IDE, aber ihre Knoepfe und Kaestchen taten nichts, und
+    /// das Code-Feld darunter bekam den Klick auch nicht (Stresstest
+    /// 2026-10-01).
+    pub fn draw_window_top(&mut self, g: &mut Graphics, h: i64) -> Result<(), String> {
         let wi = h as usize;
         let w = match self.windows.get(wi) {
             Some(w) if w.alive => w,
@@ -17100,6 +17107,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if !w.visible { return Ok(()); }
         if self.modal == Some(wi) { self.schleier(g); }
         self.draw_window_sicht(g, wi);
+        self.bring_to_front(wi);
         Ok(())
     }
 

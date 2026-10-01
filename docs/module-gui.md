@@ -1113,6 +1113,11 @@ Ein unsichtbares oder zerstörtes Fenster zeichnet nichts (kein Fehler) — der
 Aufruf darf also unbedingt in der Bildschleife stehen. Ist das Fenster das
 modale, kommt sein Schleier mit.
 
+Das Fenster kommt dabei auch in der **Reihenfolge** nach vorn, ohne den Fokus
+zu nehmen: was obenauf zu sehen ist, bekommt im nächsten Bild auch die Klicks.
+Vorher lag es nach einem Klick ins Fenster darunter wieder dahinter -- man sah
+einen Knopf, und der Klick ging an das Fenster, das man nicht sah.
+
 **Kontextmenü und Tooltip** liegen über *allen* Fenstern und sind deshalb vom
 selben Problem betroffen — ein Tooltip folgt der Maus und landet also
 regelmäßig über einer Zeichenfläche. Für sie gibt es `GUI_DRAW_TOP()`, und
