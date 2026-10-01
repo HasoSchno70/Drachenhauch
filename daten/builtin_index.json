@@ -8787,6 +8787,12 @@
    "module": "dhrt"
   },
   {
+   "name": "PROCESS_FRONT",
+   "kind": "core",
+   "signature": "PROCESS_FRONT(prozess) AS BOOLEAN",
+   "module": "dhrt"
+  },
+  {
    "name": "PROCESS_KILL",
    "kind": "core",
    "signature": "PROCESS_KILL(prozess)",

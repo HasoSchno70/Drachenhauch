@@ -2042,6 +2042,7 @@ impl<'p> Vm<'p> {
         let mut locals = stand.locals;
         dbg.stapel = stand.stapel;
         let (datei, zeile) = dbg.stelle(stand.zeile);
+        crate::prozess::vordergrund_freigeben();
         dbg_emit(&serde_json::json!({
             "event": "paused", "reason": "error", "message": meldung,
             "line": zeile, "file": datei, "depth": dbg.stapel.len(),
@@ -2213,6 +2214,9 @@ impl<'p> Vm<'p> {
         // davor, sonst hielte das Programm spaeter unerwartet noch einmal.
         dbg.run_to = None;
         let (datei, zeile) = dbg.stelle(line);
+        // Das Programm ist womoeglich gerade vorn -- die IDE darf sich nur
+        // nach vorn holen, wenn es den Vordergrund freigibt.
+        crate::prozess::vordergrund_freigeben();
         dbg_emit(&serde_json::json!({
             "event": "paused", "line": zeile, "file": datei, "depth": depth,
             "locals": self.dbg_locals_json(fn_, locals),
@@ -6199,6 +6203,7 @@ impl<'p> Vm<'p> {
             "process_running" => Value::Bool(self.prozess(a, "PROCESS_RUNNING")?.laeuft()),
             "process_code" => Value::Int(self.prozess(a, "PROCESS_CODE")?.code()),
             "process_kill" => { self.prozess(a, "PROCESS_KILL")?.beenden(); Value::Nil }
+            "process_front" => Value::Bool(self.prozess(a, "PROCESS_FRONT")?.nach_vorn()),
             "process_close" => {
                 let id = bi_int(a, 0, "PROCESS_CLOSE")?;
                 if id >= 0 { if let Some(platz) = self.prozesse.get_mut(id as usize) { *platz = None; } }
