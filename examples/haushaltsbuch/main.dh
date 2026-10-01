@@ -1,0 +1,127 @@
+' haushaltsbuch -- Einnahmen und Ausgaben, gespeichert in SQLite.
+IMPORT "gui"
+IMPORT "db"
+
+CONST BREITE = 760
+CONST HOEHE = 520
+
+DIM kasse AS DB_CONN
+kasse = DB_OPEN("haushalt.db")
+DB_EXEC(kasse, "CREATE TABLE IF NOT EXISTS buchung (id INTEGER PRIMARY KEY, datum TEXT, text TEXT, cent INTEGER)")
+
+' die ids der Tabellenzeilen, in Datenzeilen-Reihenfolge
+DIM ids AS ARRAY OF INTEGER
+ids = []
+DIM bearbeitId AS INTEGER   ' 0 = neue Buchung, sonst die id der bearbeiteten
+
+FUNCTION inCent(t AS STRING) AS INTEGER
+    DIM s AS STRING
+    s = REPLACE$(TRIM$(t), ",", ".")
+    RETURN ROUND(VAL(s) * 100)
+END FUNCTION
+
+FUNCTION geld$(cent AS INTEGER) AS STRING
+    DIM vz AS STRING
+    vz = ""
+    IF cent < 0 THEN vz = "-"
+    DIM a AS INTEGER
+    a = ABS(cent)
+    RETURN vz + STR$(a \ 100) + "," + RIGHT$("0" + STR$(a MOD 100), 2) + " EUR"
+END FUNCTION
+SCREEN(BREITE, HOEHE, "Haushaltsbuch", 1)
+SETFPS(60)
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Haushaltsbuch", 0, 0, BREITE, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM lDatum AS GUI_WIDGET : lDatum = GUI_LABEL(win, "Datum:", 20, 24)
+DIM dpDatum AS GUI_WIDGET : dpDatum = GUI_DATEPICKER(win, 80, 16, 240, 200)
+DIM lText AS GUI_WIDGET : lText = GUI_LABEL(win, "Text:", 340, 24)
+DIM tfText AS GUI_WIDGET : tfText = GUI_TEXTINPUT(win, 400, 20, 340, 28, "wofür?")
+DIM lBetrag AS GUI_WIDGET : lBetrag = GUI_LABEL(win, "Euro:", 330, 64)
+DIM tfBetrag AS GUI_WIDGET : tfBetrag = GUI_TEXTINPUT(win, 400, 60, 140, 28, "0,00")
+DIM cbAusgabe AS GUI_WIDGET : cbAusgabe = GUI_CHECKBOX(win, "Ausgabe", 560, 64, TRUE)
+DIM btnAdd AS GUI_WIDGET : btnAdd = GUI_BUTTON(win, "Buchen", 400, 104, 160, 30)
+DIM btnDel AS GUI_WIDGET : btnDel = GUI_BUTTON(win, "Löschen", 580, 104, 160, 30)
+DIM tbl AS GUI_WIDGET : tbl = GUI_TABLE(win, 20, 230, 720, 240, ["Datum", "Text", "Betrag"], [])
+DIM lSumme AS GUI_WIDGET : lSumme = GUI_LABEL(win, "Summe: 0,00 EUR", 20, 484)
+GUI_WINDOW_DEFAULT(win, btnAdd)
+GUI_FOCUS(tfText)
+
+SUB laden()
+    GUI_TABLE_CLEAR(tbl)
+    ids = []
+    DIM summe AS INTEGER
+    summe = 0
+    DIM r AS DB_RESULT
+    r = DB_QUERY(kasse, "SELECT id, datum, text, cent FROM buchung ORDER BY datum, id")
+    WHILE DB_NEXT(r)
+        DIM cent AS INTEGER
+        cent = DB_GET_INT(r, 3)
+        ARRAY_PUSH(ids, DB_GET_INT(r, 0))
+        DIM z AS INTEGER
+        z = GUI_TABLE_ADD_ROW(tbl, [DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), geld$(cent)])
+        IF cent < 0 THEN GUI_TABLE_CELL_COLOR(tbl, z, 2, RGB(230, 90, 90), -1)
+        summe = summe + cent
+    WEND
+    DB_CLOSE_RESULT(r)
+    GUI_SET_TEXT(lSumme, "Summe: " + geld$(summe))
+END SUB
+
+SUB buchen()
+    DIM t AS STRING
+    t = TRIM$(GUI_TEXT(tfText))
+    IF t = "" THEN
+        GUI_FOCUS(tfText)
+        RETURN
+    END IF
+    DIM cent AS INTEGER
+    cent = inCent(GUI_TEXT(tfBetrag))
+    IF GUI_CHECKED(cbAusgabe) THEN cent = -cent
+    IF bearbeitId > 0 THEN
+        DB_EXEC(kasse, "UPDATE buchung SET datum = ?, text = ?, cent = ? WHERE id = ?", GUI_DATE(dpDatum), t, cent, bearbeitId)
+        bearbeitId = 0
+        GUI_SET_TEXT(btnAdd, "Buchen")
+    ELSE
+        DB_EXEC(kasse, "INSERT INTO buchung (datum, text, cent) VALUES (?, ?, ?)", GUI_DATE(dpDatum), t, cent)
+    END IF
+    GUI_SET_TEXT(tfText, "")
+    GUI_SET_TEXT(tfBetrag, "")
+    GUI_FOCUS(tfText)
+    laden()
+END SUB
+
+SUB loeschen()
+    DIM z AS INTEGER
+    z = GUI_TABLE_SELECTED(tbl)
+    IF z < 0 THEN RETURN
+    DB_EXEC(kasse, "DELETE FROM buchung WHERE id = ?", ids[z])
+    laden()
+END SUB
+SUB bearbeiten()
+    DIM z AS INTEGER
+    z = GUI_TABLE_SELECTED(tbl)
+    IF z < 0 THEN RETURN
+    DIM r AS DB_RESULT
+    r = DB_QUERY(kasse, "SELECT datum, text, cent FROM buchung WHERE id = ?", ids[z])
+    IF DB_NEXT(r) THEN
+        DIM cent AS INTEGER
+        cent = DB_GET_INT(r, 2)
+        GUI_SET_DATE(dpDatum, DB_GET_STRING(r, 0))
+        GUI_SET_TEXT(tfText, DB_GET_STRING(r, 1))
+        GUI_SET_TEXT(tfBetrag, MID$(geld$(ABS(cent)), 0, LEN(geld$(ABS(cent))) - 4))
+        GUI_SET_CHECKED(cbAusgabe, cent < 0)
+        bearbeitId = ids[z]
+        GUI_SET_TEXT(btnAdd, "Ändern")
+    END IF
+    DB_CLOSE_RESULT(r)
+END SUB
+laden()
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(btnAdd) THEN buchen()
+    IF GUI_CLICKED(btnDel) THEN loeschen()
+    IF GUI_DOUBLE_CLICKED(tbl) THEN bearbeiten()
+    CLS(BLACK)
+    GUI_DRAW()
+    FLIP()
+WEND
+DB_CLOSE(kasse)

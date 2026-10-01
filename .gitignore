@@ -62,6 +62,10 @@ target/
 # bleibt aber liegen, wenn die Demo abstuerzt.
 examples/tabelle_sqlite_arbeitskopie.db
 
+# Haushaltsbuch: die Buchungen legt das Programm beim ersten Start an --
+# Daten des Nutzers, kein Quelltext.
+examples/haushaltsbuch/*.db*
+
 # Tippspiel-Buch: jeder Kapitelstand legt seine SQLite-Datei beim ersten Start
 # selbst an (tippspiel.db, kapNN.db, kapNN_sicherung.db, dazu -wal/-shm).
 # Das sind die Daten des Lesers, nicht der Quelltext des Buchs.
