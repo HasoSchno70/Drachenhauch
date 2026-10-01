@@ -4498,3 +4498,72 @@ PRINT "geteilt " ; erste$("geteilt 0 ") <> ""
 reiter vergleich 1 1 TRUE
 geteilt TRUE
 
+=== im ganzen projekt umbenennen erreicht den reiter in anderer schreibweise
+' Stresstest 2026-10-01: der Reiter traegt den Weg, wie er geoeffnet wurde
+' (hier mit "unter/.."), das Projekt nennt dieselbe Datei ohne. Am Text
+' verglichen fand der Umbau den Reiter nicht, schrieb nur die Platte und
+' liess im Reiter den alten Text stehen -- unveraendert markiert, das
+' naechste Sichern haette den Umbau zurueckgenommen.
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("winken")
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 260 THEN
+    protokoll("pr reiter " + REPLACE$(GUI_TEXT(tabFelder[0]), CHR$(10), "|"))
+    protokoll("pr gesichert " + STR$(GUI_TEXT(tabFelder[0]) = tabGesichert[0]))
+END IF
+--- argumente
+unter/../spiel.dh
+--- umgebung
+DHRT_FRAMES=280
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+gruessen()
+--- datei helfer.dh
+SUB gruessen()
+    PRINT 1
+END SUB
+--- datei unter/leer.txt
+x
+--- datei _programm/ev.txt
+c 22
+e 30 2 269 0 0 0
+e 32 1 269 0 0 0
+e 45 2 263 0 0 0
+e 47 1 263 0 0 0
+e 51 2 263 0 0 0
+e 53 1 263 0 0 0
+e 57 2 263 0 0 0
+e 59 1 263 0 0 0
+e 75 2 341 0 0 0
+e 75 2 340 0 0 0
+e 75 2 295 0 0 0
+e 77 1 295 0 0 0
+e 77 1 341 0 0 0
+e 77 1 340 0 0 0
+e 110 2 341 0 0 0
+e 110 2 86 0 0 0
+e 112 1 86 0 0 0
+e 112 1 341 0 0 0
+e 140 2 257 0 0 0
+e 142 1 257 0 0 0
+e 180 2 257 0 0 0
+e 182 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 17) = "projekt umbenannt" THEN PRINT L[i]
+NEXT
+DIM z AS ARRAY OF STRING : z = READLINES("spiel.dh")
+PRINT "platte " + z[0]
+--- erwartet
+projekt umbenannt 2
+pr reiter winken()
+pr gesichert TRUE
+platte winken()

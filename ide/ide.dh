@@ -466,6 +466,7 @@ DIM autoFaellig AS FLOAT : autoFaellig = -1.0
 ' was zuletzt gemeldet wurde -- ohne ihn ginge bei jedem Pruefen ein Feld
 ' durch die Bruecke, obwohl sich nichts geaendert hat.
 DIM faltSchluessel AS STRING : faltSchluessel = "-"
+DIM echteWege AS MAP OF STRING        ' echterWeg$: Schreibweise -> Weg der Platte
 ' Dieselben Bloecke bleiben stehen: die Auswahl waechst an ihnen entlang,
 ' und das Herausloesen fragt, in welchem Unterprogramm die Marke steht.
 DIM blockVon AS ARRAY OF INTEGER : blockVon = []
@@ -1404,7 +1405,7 @@ GUI_TOOLTIP(btnBisMarke, tr$("Bis zur Zeile mit der Schreibmarke laufen (Strg+F1
 ' neu ausgewertet, auch ueber mehrere Laeufe hinweg.
 DIM tblStapel AS GUI_WIDGET : tblStapel = GUI_TABLE(win, 0, 0, 10, 10)
 GUI_TABLE_HEADERS(tblStapel, [tr$("Aufrufstapel"), tr$("Zeile")])
-GUI_TABLE_COL_WIDTHS(tblStapel, [170, 60])
+GUI_TABLE_COL_WIDTHS(tblStapel, [150, 120])
 DIM tblWatch AS GUI_WIDGET : tblWatch = GUI_TABLE(win, 0, 0, 10, 10)
 GUI_TABLE_HEADERS(tblWatch, [tr$("Überwachen"), tr$("Wert")])
 GUI_TABLE_COL_WIDTHS(tblWatch, [130, 160])
@@ -3320,18 +3321,15 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
         NEXT
         ' Derselbe Weg anders geschrieben: der Debugger meldet den langen
         ' Namen ("Hans Gaming"), das Projekt kennt vielleicht den kurzen
-        ' (HANSGA~1), oder ein Weg traegt "..". Erst die Platte weiss, ob es
-        ' dieselbe Datei ist -- sonst stand sie zweimal als Reiter da.
-        FOR i = 0 TO tabAnzahl - 1
-            IF tabPfade[i] <> "" THEN
-                IF SAMEFILE(tabPfade[i], pfad) THEN
-                    aktiverTab = i
-                    reiterNeuSetzen()
-                    GUI_FOCUS(tabFelder[i])
-                    RETURN
-                END IF
-            END IF
-        NEXT
+        ' (HANSGA~1), oder ein Weg traegt "..". tabMitPfad fragt die Platte
+        ' -- sonst stand die Datei zweimal als Reiter da.
+        i = tabMitPfad(pfad)
+        IF i >= 0 THEN
+            aktiverTab = i
+            reiterNeuSetzen()
+            GUI_FOCUS(tabFelder[i])
+            RETURN
+        END IF
     END IF
     DIM ta AS GUI_WIDGET
     ta = GUI_TEXTAREA(win, 0, 0, 10, 10)
@@ -3406,8 +3404,8 @@ END SUB
 FUNCTION imProjekt(pfad AS STRING) AS BOOLEAN
     IF projektOrdner = "" THEN RETURN FALSE
     IF LEFT$(wegGleich$(pfad), LEN(wegGleich$(projektOrdner))) = wegGleich$(projektOrdner) THEN RETURN TRUE
-    DIM o AS STRING : o = LOWER$(wegGleich$(REALPATH$(projektOrdner)))
-    DIM d AS STRING : d = LOWER$(wegGleich$(REALPATH$(pfad)))
+    DIM o AS STRING : o = wegGleich$(REALPATH$(projektOrdner))
+    DIM d AS STRING : d = wegGleich$(REALPATH$(pfad))
     IF o = "" OR d = "" THEN RETURN FALSE
     IF RIGHT$(o, 1) <> "/" THEN o = o + "/"
     RETURN LEFT$(d, LEN(o)) = o
@@ -4351,7 +4349,32 @@ FUNCTION tabMitPfad(pfad AS STRING) AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
         IF wegGleich$(tabPfade[i]) = wegGleich$(pfad) THEN RETURN i
     NEXT
+    ' Derselbe Weg anders geschrieben: kurzer und langer Name (HANSGA~1
+    ' gegen "Hans Gaming"), ".." im Weg. Erst die Platte weiss es -- am
+    ' Text allein schrieb ein Umbau nur die Datei und liess den offenen
+    ' Reiter mit dem alten Text stehen, und das naechste Sichern machte den
+    ' Umbau rueckgaengig.
+    IF pfad = "" THEN RETURN -1
+    DIM e AS STRING : e = echterWeg$(pfad)
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabPfade[i] <> "" THEN
+            IF echterWeg$(tabPfade[i]) = e THEN RETURN i
+        END IF
+    NEXT
     RETURN -1
+END FUNCTION
+
+' Der Weg, wie die Platte ihn nennt (REALPATH$), gemerkt je Schreibweise:
+' tabMitPfad laeuft in der Aufrufzaehlung fuer jede Projektdatei, und die
+' Platte je Datei und Reiter zu fragen kostete bei vielen Dateien spuerbar.
+' Eine Datei, die es (noch) nicht gibt, behaelt ihren Text.
+FUNCTION echterWeg$(pfad AS STRING) AS STRING
+    DIM schl AS STRING : schl = wegGleich$(pfad)
+    IF MAPHAS(echteWege, schl) THEN RETURN MAPGET(echteWege, schl)
+    DIM e AS STRING : e = wegGleich$(REALPATH$(pfad))
+    IF e = "" THEN RETURN schl
+    MAPPUT(echteWege, schl, e)
+    RETURN e
 END FUNCTION
 
 SUB symbolMerken(pfad AS STRING, anzeige AS STRING, name AS STRING, zeile AS INTEGER)
@@ -13483,7 +13506,9 @@ SUB stapelZeigen(j AS JSON_HANDLE)
         ARRAY_PUSH(stapelDateien, sdatei)
         ARRAY_PUSH(stapelZeilen, JSON_GET_INT(j, p + ".line"))
         DIM szeile AS STRING : szeile = STR$(JSON_GET_INT(j, p + ".line"))
-        IF NOT SAMEFILE(sdatei, prozessDatei) THEN szeile = BASENAME(sdatei) + ":" + szeile
+        ' Die Zeile zuerst: in der schmalen Spalte schnitt "mathe.dh:10" genau
+        ' die Zahl ab, um die es geht.
+        IF NOT SAMEFILE(sdatei, prozessDatei) THEN szeile = szeile + "  " + BASENAME(sdatei)
         GUI_TABLE_ADD_ROW(tblStapel, [name, szeile])
         ARRAY_PUSH(teile, name + ":" + STR$(JSON_GET_INT(j, p + ".line")))
     NEXT
