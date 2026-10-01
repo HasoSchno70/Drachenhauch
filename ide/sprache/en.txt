@@ -602,6 +602,8 @@ Erst mehrere Zeilen markieren.	Select several lines first.
 Sammle ... 0 von 	Collecting ... 0 of 
 Abgebrochen -- nichts geändert.	Cancelled -- nothing changed.
 Sammle ... 	Collecting ... 
+Gesammelt: 	Collected: 
+ Datei(en) betroffen.	 file(s) affected.
 Erst sichern: ein Reiter hat ungesicherte Änderungen.	Save first: a tab has unsaved changes.
 Vergleichen: diese Datei ist noch nicht gesichert.	Compare: this file is not saved yet.
 Kein Unterschied zu 	No difference to 

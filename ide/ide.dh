@@ -10546,7 +10546,9 @@ SUB laufSchritt()
                      STR$(LEN(laufDateien)) + " Dateien (ESC bricht ab)")
         RETURN
     END IF
-    ' Fertig gesammelt -- ab hier wie bisher.
+    ' Fertig gesammelt -- ab hier wie bisher. Die Statuszeile sagt es, sonst
+    ' stand dort neben der Vorschau weiter "Sammle ... 0 von 2 Dateien".
+    GUI_SET_TEXT(lblStatus, tr$("Gesammelt: ") + STR$(LEN(umbauTexte)) + tr$(" Datei(en) betroffen."))
     DIM art AS STRING : art = laufArt
     laufArt = ""
     IF art = "parameter" THEN
