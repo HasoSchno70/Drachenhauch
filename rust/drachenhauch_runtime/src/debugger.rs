@@ -225,6 +225,11 @@ impl Karte {
         self.kanon.iter().position(|k| *k == v)
     }
 
+    /// Gehoert diese Datei zum Programm (Hauptdatei oder IMPORT)? Ein
+    /// Haltepunkt in einer fremden Datei haelt nie, ist aber kein Befund --
+    /// die IDE schickt die Haltepunkte ALLER Dateien, die sie kennt.
+    pub fn gehoert_dazu(&self, datei: &str) -> bool { self.datei_nr(datei).is_some() }
+
     /// Wo ein Haltepunkt in (datei, zeile) wirklich haelt: die gemergte
     /// Zeile und die Zeile in der Datei -- auf einer Zeile ohne Code die
     /// naechste darunter, die Code hat (in derselben Datei). None = die

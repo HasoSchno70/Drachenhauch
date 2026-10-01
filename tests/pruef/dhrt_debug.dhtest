@@ -752,3 +752,39 @@ ab 3: 3 4 5 6 7
 genau 2: 2
 jedes 3: 3 6
 gerade, ab 2: 4 6
+
+=== ein haltepunkt in einer fremden datei ist kein befund
+' Die IDE schickt die Haltepunkte ALLER Dateien, die sie kennt. Einer in
+' einer Datei, die das Programm nicht enthaelt, haelt nie -- `in_program`
+' FALSE, die IDE meldet ihn nicht. Einer ohne Code darunter in einer Datei
+' des Programms ist ein Befund (`in_program` TRUE).
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+DIM fremd AS STRING : fremd = REPLACE$(CWD$(), "\", "/") + "/anders.dh"
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "breakpoints" + q + ":[{" + q + "file" + q + ":" + q + fremd + q + "," + q + "line" + q + ":1},{" + q + "line" + q + ":99}]}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "breakpoints" THEN
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(ereignisse[i])
+        DIM b AS INTEGER
+        FOR b = 0 TO JSON_LEN(j, "breakpoints") - 1
+            DIM p AS STRING : p = "breakpoints." + STR$(b)
+            PRINT BASENAME(JSON_GET_STRING(j, p + ".file")); " "; JSON_GET_INT(j, p + ".line"); " "; JSON_GET_BOOL(j, p + ".verified"); " "; JSON_GET_BOOL(j, p + ".in_program")
+        NEXT
+    END IF
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+x = 5
+PRINT x
+
+--- datei anders.dh
+PRINT "gehoert nicht dazu"
+
+--- erwartet
+anders.dh 1 FALSE FALSE
+d.dh 99 FALSE TRUE

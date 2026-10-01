@@ -672,6 +672,10 @@ impl DebugState {
         }
     }
 
+    fn gehoert_dazu(&self, datei: &str) -> bool {
+        self.karte.as_ref().map(|k| k.gehoert_dazu(datei)).unwrap_or(true)
+    }
+
     fn haupt(&self) -> String {
         self.karte.as_ref().map(|k| k.haupt().to_string()).unwrap_or_default()
     }
@@ -2365,7 +2369,10 @@ impl<'p> Vm<'p> {
                     if !alt_ohne { dbg.breakpoints.insert(g, hp); }
                     antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": echt, "verified": true}));
                 }
-                None => antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": 0, "verified": false})),
+                // `in_program`: haelt er nie, weil darunter kein Code steht
+                // (ein Befund) -- oder weil die Datei gar nicht dazugehoert?
+                None => antwort.push(serde_json::json!({"file": anzeige, "line": ln, "actual": 0, "verified": false,
+                                                        "in_program": dbg.gehoert_dazu(&datei)})),
             }
         }
         dbg_emit(&serde_json::json!({"event": "breakpoints", "breakpoints": antwort}));

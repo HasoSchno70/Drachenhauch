@@ -493,7 +493,9 @@ als JSON-Zeilen auf stdout (`paused` mit `line`, `file`, Tiefe, `locals`,
 `watches` -- je `expr` und `value` oder `error`; `watches` als eigenes
 Ereignis nach `set-watches`; `breakpoints` als Antwort auf
 `set-breakpoints`, je `file`, `line`, `actual` (wo er wirklich hält) und
-`verified`; `run-to-error`, wenn `run-to` nirgends halten kann (fremde
+`verified`, bei einem, der nie hält, dazu `in_program` (FALSE: die Datei
+gehört gar nicht zum Programm -- die IDE schickt die Haltepunkte aller
+Dateien und meldet nur die mit TRUE); `run-to-error`, wenn `run-to` nirgends halten kann (fremde
 Datei, kein Code darunter) -- das Programm steht dann weiter; `input` mit
 `line`, wenn das Programm in einem `INPUT` wartet;
 `set-result`/`set-error`; `eval-result`/`eval-error`; `output`;
