@@ -46,12 +46,15 @@ PRINT TEXT_WIDTH("???")
 36
 
 === umlaute mit eingebauter schrift
-' Ohne eigenen Font springt der Ausweich-Font ein. Auf einem System
+' Die eingebaute Bitmapschrift hat Umlaute (Zeichen 32..255) -- der Text
+' bleibt in ihr und misst auf jedem System gleich. Bis 2026-10-01 sprang hier
+' der Ausweich-Font ein (24 Punkte, abhaengig von der Systemschrift), und in
+' einer Oberflaeche stand "Loeschen" in einer anderen Schrift als "Buchen".
 SCREEN(320, 120, "t")
 PRINT TEXT_WIDTH("äöü")
 PRINT TEXT_WIDTH("???")
 --- erwartet
-24
+34
 40
 
 === reiner ascii text misst wie die eingebaute schrift
