@@ -1289,6 +1289,29 @@ Details: docs/rust-runtime.md.
   sie nicht) — zusammen mit dem allgemeinen Typtest `x IS Typname`, siehe
   Abschnitt „Laufzeit-Typtest". `IS_NIL(x)` bleibt gleichwertig.
 
+## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
+
+raylib liest Maus- und Tastentasten als ZUSTAND (Rueckruf schreibt
+`current...State`, einmal je Bild nach `previous` kopiert). Kamen Druecken
+UND Loslassen vor dem naechsten Bild an, sah niemand den Klick -- gemessen
+mit echten Fensternachrichten: zusammen geschickt 0 von 20, bei 60 Bildern
+je Sekunde unter ~16 ms ein grosser Teil, bei 15 Bildern je Sekunde noch
+40 ms (Touchpad-Tippen, langsame Programme). `flanken.rs` haengt eigene
+GLFW-Rueckrufe (Maus UND Tastatur) vor die von raylib und zaehlt; FLIP holt
+die Zaehler nach `automation_tick` ab (`flanken::weiter`). Lag ein ganzer
+Druck in der Luecke, gilt die Taste EIN Bild lang als gedrueckt und im
+naechsten als losgelassen -- so sehen MOUSEBUTTON/MOUSE_HIT/KEYHIT und die gui
+ihn ohne Aenderung. **Regel:** jede Tastenabfrage in graphics.rs geht ueber
+`t_unten/t_neu/t_los` bzw. `mouse_button/mouse_hit/mouse_released`, nie direkt
+an `self.rl.is_*` (Ausnahme: das Abholen im FLIP selbst). Die Wiedergabe
+zaehlt ihre Maus- und Tastenereignisse mit, damit ein Druck im selben Bild
+der Aufnahme dasselbe ist wie einer von aussen. Bekannte Grenze: zwei
+verschluckte Klicks in DIREKT aufeinanderfolgenden Bildern sieht die gui als
+einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
+(9; gegen 2026.18 fallen die 5 neuen, die 4 Gegenproben nicht; echte
+Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
+Rust-Tests in flanken.rs.
+
 ## Zeichenketten anhaengen ist linear (2026-09-24)
 
 `Value::Str` ist `Rc<String>` (vorher `Rc<str>`, jedes Anhaengen kopierte:

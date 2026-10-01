@@ -2744,7 +2744,8 @@ Der Textbereich war ein Code-Feld: lange Zeilen rollen waagerecht. Für
 Notizen und Briefe schaltet `GUI_TEXTAREA_SET(ta, "umbruch", 1)` den Umbruch
 an Wortgrenzen ein (ein Wort, das allein nicht passt, bricht im Zeichen).
 Pos1, Ende und die Pfeile bewegen sich dann in **sichtbaren** Zeilen, wie in
-jedem Editor; Zeilennummern stehen nur an der ersten Zeile eines Absatzes;
+jedem Editor (`Strg+Pos1`/`Strg+Ende` gehen immer an den Anfang bzw. das
+Ende des ganzen Textes); Zeilennummern stehen nur an der ersten Zeile eines Absatzes;
 `GUI_TEXTAREA_VIEW` zählt weiter logische Zeilen. Mit Umbruch gibt es keinen
 waagerechten Versatz. In der `.dhform`: `wrap_text`.
 
