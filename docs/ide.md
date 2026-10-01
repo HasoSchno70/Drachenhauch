@@ -335,7 +335,9 @@ bekäme. Diese Bausteine kamen mit ihr:
   Block, der ab seinem ersten Wort kopiert wurde). Mitten in einer Zeile
   richten sich die weiteren Zeilen nach deren Einrückung. Das Anpassen ist
   ein eigener Rückgängig-Schritt: Strg+Z holt zuerst den Block, wie er
-  kopiert wurde. Mit Tabulatoren wird nichts angefasst.
+  kopiert wurde. Mit Tabulatoren wird nichts angefasst, und in **Spalte 0**
+  auch nicht -- dort sagt nichts, wohin der Block gehört, er bleibt, wie er
+  kopiert wurde (vorher rückte er auf 0 und verlor seine Einrückung).
 - **Nächstes / voriges Problem** (Bearbeiten, Alt+F8 bzw. Umschalt+Alt+F8
 -- F8 allein gehört dem Debugger): die Marke springt zum nächsten Fehler
   bzw. zur nächsten Warnung der Datei (Hinweise nicht), am Ende wieder von
