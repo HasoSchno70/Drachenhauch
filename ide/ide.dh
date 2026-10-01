@@ -17098,7 +17098,10 @@ WHILE NOT beenden
         DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]
         DIM jetzt AS STRING : jetzt = GUI_TEXT(tf)
         IF jetzt <> tabLetzterText[aktiverTab] THEN
-            vervollGetippt = TRUE
+            ' Getippt heisst: genau ein Zeichen kam dazu. Ein eingefuegter
+            ' Block oder ein Umbau aendert den Text auch -- danach ging die
+            ' Liste mit dem Wort an der Marke auf (beim Stresstest gefunden).
+            IF LEN(jetzt) = LEN(tabLetzterText[aktiverTab]) + 1 THEN vervollGetippt = TRUE
             ' Beim ersten Bild nach dem Oeffnen ist der gemerkte Text leer --
             ' das ist kein Bearbeiten.
             IF tabLetzterText[aktiverTab] <> "" AND tabPfade[aktiverTab] <> "" THEN aenderungMerken(tf, tabPfade[aktiverTab])
