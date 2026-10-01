@@ -2686,7 +2686,9 @@ nicht.
 
 ## Mehrere Schreibmarken im Textbereich
 
-**Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg; ein
+**Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg, ebenso
+ein gewöhnlicher Klick, ein Rechtsklick, Strg+A und `GUI_TEXTAREA_GOTO`/
+`GUI_TEXTAREA_SELECT` -- die meinen alle **eine** Stelle; ein
 Programm setzt sie mit `GUI_TEXTAREA_ADD_CARET`. Tippen, Enter, Rücktaste,
 Entf, Tabulator und Einfügen wirken dann an **jeder** Marke, und die Pfeile
 bewegen alle — blieben die weiteren stehen, liefen sie beim ersten

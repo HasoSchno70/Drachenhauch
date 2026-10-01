@@ -13992,14 +13992,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         Ok(())
     }
 
-    /// GUI_TEXTAREA_GOTO(ta, zeile[, spalte]): Marke setzen, Auswahl aufheben,
-    /// Ausschnitt nachziehen.
+    /// GUI_TEXTAREA_GOTO(ta, zeile[, spalte]): Marke setzen, Auswahl und
+    /// weitere Marken aufheben, Ausschnitt nachziehen.
     pub fn textarea_goto(&mut self, g: &Graphics, h: i64, zeile: i64, spalte: i64) -> Result<(), String> {
         let wd = self.ta_wdg(h, "GUI_TEXTAREA_GOTO")?;
         let chars: Vec<char> = wd.text.chars().collect();
         let idx = Self::ta_index(&chars, zeile, spalte) as i32;
         let w = self.wdg_mut(h, "GUI_TEXTAREA_GOTO")?;
-        w.caret = idx; w.sel_anchor = idx;
+        w.caret = idx; w.sel_anchor = idx; w.marken_zusatz.clear();
         // Ein Sprung in einen zugeklappten Block klappt ihn auf -- sonst
         // spraenge die Suche an eine Stelle, die man nicht sieht.
         Self::falte_am_caret_oeffnen(w);
@@ -14040,7 +14040,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let a = Self::ta_index(&chars, z1, s1) as i32;
         let b = Self::ta_index(&chars, z2, s2) as i32;
         let w = self.wdg_mut(h, "GUI_TEXTAREA_SELECT")?;
-        w.sel_anchor = a; w.caret = b;
+        w.sel_anchor = a; w.caret = b; w.marken_zusatz.clear();
         Self::falte_am_caret_oeffnen(w);
         self.ta_marke_zeigen(g, h)
     }
@@ -14262,7 +14262,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     if alt && idx != caret && !zusatz.iter().any(|&(c, _)| c == idx) {
                         zusatz.push((idx, idx));
                     } else if !alt {
-                        caret = idx; anchor = idx;
+                        // Ein gewoehnlicher Klick meint EINE Stelle: die
+                        // weiteren Marken gehen weg (wie beim Rechtsklick
+                        // und bei Strg+A) -- sonst landete das naechste
+                        // Tippen auch dort, wo man nicht mehr hinsieht.
+                        caret = idx; anchor = idx; zusatz.clear();
                         // Doppelklick waehlt das Wort, Dreifachklick die Zeile
                         // (samt Umbruch) -- wie in jedem Editor. Gezaehlt wird
                         // an DIESER Stelle, in 0,4 s.
