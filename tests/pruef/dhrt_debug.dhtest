@@ -752,3 +752,87 @@ ab 3: 3 4 5 6 7
 genau 2: 2
 jedes 3: 3 6
 gerade, ab 2: 4 6
+
+=== variablen heissen wie geschrieben und handles tragen ihren typ
+' Beim Dogfooding 2026-09-30: die Variablenliste zeigte `btnadd` statt
+' `btnAdd` und GUI_WIDGET/DB_CONN als INTEGER -- ein Handle ist zur Laufzeit
+' eine Ganzzahl, angezeigt wird jetzt der angesagte Typ. Feldnamen einer
+' Instanz ebenso. Sortiert wird ohne Ruecksicht auf Gross/klein.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[11]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM h AS INTEGER : h = ersteMit("paused", 11)
+DIM k AS JSON_HANDLE : k = JSON_PARSE(ereignisse[h])
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(k, "globals") - 1
+    DIM p AS STRING : p = "globals." + STR$(i)
+    DIM z AS STRING : z = "g " + JSON_GET_STRING(k, p + ".name") + " " + JSON_GET_STRING(k, p + ".type")
+    IF JSON_HAS(k, p + ".children") THEN z = z + " | " + JSON_GET_STRING(k, p + ".children.0.name")
+    PRINT z
+NEXT
+FOR i = 0 TO JSON_LEN(k, "locals") - 1
+    PRINT "l "; JSON_GET_STRING(k, "locals." + STR$(i) + ".name"); " "; JSON_GET_STRING(k, "locals." + STR$(i) + ".type")
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+IMPORT "gui"
+CLASS Posten
+    DIM betragCent AS INTEGER
+END CLASS
+DIM btnAdd AS GUI_WIDGET
+DIM lSumme AS INTEGER : lSumme = 3
+DIM einPosten AS Posten : einPosten = NEW Posten()
+DIM keinPosten AS Posten
+SUB zeigen(nr AS INTEGER)
+    DIM zeileNr AS INTEGER : zeileNr = nr
+    PRINT zeileNr
+END SUB
+zeigen(4)
+
+--- erwartet
+g btnAdd GUI_WIDGET
+g einPosten Posten | betragCent
+g keinPosten Posten
+g lSumme INTEGER
+l nr INTEGER
+l zeileNr INTEGER
+
+=== ein haltepunkt in einer fremden datei ist kein befund
+' Die IDE schickt die Haltepunkte ALLER Dateien, die sie kennt. Einer in
+' einer Datei, die das Programm nicht enthaelt, haelt nie -- `in_program`
+' FALSE, die IDE meldet ihn nicht. Einer ohne Code darunter in einer Datei
+' des Programms ist ein Befund (`in_program` TRUE).
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+DIM fremd AS STRING : fremd = REPLACE$(CWD$(), "\", "/") + "/anders.dh"
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "breakpoints" + q + ":[{" + q + "file" + q + ":" + q + fremd + q + "," + q + "line" + q + ":1},{" + q + "line" + q + ":99}]}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "breakpoints" THEN
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(ereignisse[i])
+        DIM b AS INTEGER
+        FOR b = 0 TO JSON_LEN(j, "breakpoints") - 1
+            DIM p AS STRING : p = "breakpoints." + STR$(b)
+            PRINT BASENAME(JSON_GET_STRING(j, p + ".file")); " "; JSON_GET_INT(j, p + ".line"); " "; JSON_GET_BOOL(j, p + ".verified"); " "; JSON_GET_BOOL(j, p + ".in_program")
+        NEXT
+    END IF
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+x = 5
+PRINT x
+
+--- datei anders.dh
+PRINT "gehoert nicht dazu"
+
+--- erwartet
+anders.dh 1 FALSE FALSE
+d.dh 99 FALSE TRUE

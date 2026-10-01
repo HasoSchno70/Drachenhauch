@@ -359,3 +359,25 @@ rueckgabe 0
 geschrieben TRUE
 kein bild fehlt TRUE
 docx da TRUE
+
+=== abruf_pruefung ohne netz meldet sich als uebersprungen
+' Der Wackler vom 2026-10-01: abruf_pruefung.dh geht ins Netz und laeuft
+' wegen seiner Endung in `dhrt test` mit; ein Netzaussetzer auf dem
+' macOS-Rechner der CI brach es ab und liess den ganzen Lauf fallen. Jetzt
+' sagt es "uebersprungen" und endet mit 0. Der Server wird dafuer auf einen
+' Namen umgebogen, den es nicht gibt (.invalid, RFC 6761).
+--- programm ../../buch-tippspiel/code/abruf_pruefung.dh
+--- ersetzen CONST URL AS STRING = "https://api.openligadb.de/getmatchdata/bl1/2026"
+CONST URL AS STRING = "https://api.openligadb.invalid/getmatchdata/bl1/2026"
+--- enthaelt
+UEBERSPRUNGEN -- OpenLigaDB nicht erreichbar:
+
+=== abruf_pruefung verschluckt keinen fehler aus dem programm
+' Gegenprobe: nur ein Fehler VOM NETZ heisst uebersprungen. Ein falsch
+' benutztes HTTP_RESULT (kein Abruf mit dieser Nummer) bricht weiter ab --
+' sonst wuerde das TRY jeden echten Fehler unsichtbar machen.
+--- programm ../../buch-tippspiel/code/abruf_pruefung.dh
+--- ersetzen DIM antwort AS STRING : antwort = HTTP_GET(URL)
+DIM antwort AS STRING : antwort = HTTP_RESULT(99)
+--- fehler
+HTTP_RESULT: Abruf 99 ist nicht fertig

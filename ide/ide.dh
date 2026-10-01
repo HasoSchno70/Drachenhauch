@@ -1263,7 +1263,7 @@ IF wkSchriftzug THEN
     GUI_SET_VISIBLE(lblWkTitel, FALSE)
     protokoll("schriftzug")
 END IF
-DIM lblWkUnter AS GUI_WIDGET : lblWkUnter = GUI_LABEL(win, tr$("BASIC für Spiele -- mit Pascal-strikter Typisierung und OOP. Diese IDE ist selbst in Drachenhauch geschrieben."), 0, 0)
+DIM lblWkUnter AS GUI_WIDGET : lblWkUnter = GUI_LABEL(win, tr$("BASIC für Spiele und Anwendungen -- mit Pascal-strikter Typisierung und OOP. Diese IDE ist selbst in Drachenhauch geschrieben."), 0, 0)
 DIM btnWkNeu AS GUI_WIDGET : btnWkNeu = GUI_BUTTON(win, tr$("Neue Datei"), 0, 0, 130, 30)
 GUI_BUTTON_VARIANT(btnWkNeu, "primaer")
 DIM btnWkOeffnen AS GUI_WIDGET : btnWkOeffnen = GUI_BUTTON(win, tr$("Datei öffnen ..."), 0, 0, 150, 30)
@@ -1799,6 +1799,12 @@ btnUmbauBlock = GUI_BUTTON(winUmbau, tr$("Block auslassen / aufnehmen"), 288, 54
 DIM btnUmbauPruef AS GUI_WIDGET
 btnUmbauPruef = GUI_BUTTON(winUmbau, tr$("Prüfen"), 528, 546, 110, 30)
 GUI_LISTBOX_SET(lstUmbau, "kaestchen", 1)
+' Beim Ziehen am Griff waechst der Unterschied mit (vorher blieb der Inhalt
+' stehen, das Fenster war nur scheinbar groessenveraenderbar).
+GUI_SET_ANCHOR(lstUmbau, "ltb")
+GUI_SET_ANCHOR(taUmbau, "lrtb")
+GUI_SET_ANCHOR(btnUmbauOk, "lb") : GUI_SET_ANCHOR(btnUmbauWeg, "lb")
+GUI_SET_ANCHOR(btnUmbauBlock, "lb") : GUI_SET_ANCHOR(btnUmbauPruef, "lb")
 GUI_WINDOW_DEFAULT(winUmbau, btnUmbauOk)
 GUI_WINDOW_CANCEL(winUmbau, btnUmbauWeg)
 ' Der anstehende Umbau: je Eintrag ein Reiter ODER eine Datei auf der Platte.
@@ -7700,13 +7706,33 @@ FUNCTION signaturHilfe$(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS STRING
     RETURN erste + "   -- Argument " + STR$(arg + 1)
 END FUNCTION
 
+' Eine Meldung in der Statusleiste verschwindet nach einer Weile von selbst.
+' Sie blieb sonst stehen, bis die naechste kam -- "Keine Definition zu
+' 'AS'" stand noch da, als der naechste Sprung laengst geklappt hatte.
+CONST STATUS_DAUER = 12.0
+DIM statusAlt AS STRING : statusAlt = ""
+DIM statusZeit AS FLOAT : statusZeit = 0.0
+SUB statusNachziehen()
+    DIM t AS STRING : t = GUI_TEXT(lblStatus)
+    IF t <> statusAlt THEN
+        statusAlt = t
+        statusZeit = GET_TIME()
+    ELSEIF t <> "" AND GET_TIME() - statusZeit > STATUS_DAUER THEN
+        GUI_SET_TEXT(lblStatus, "")
+        statusAlt = ""
+    END IF
+END SUB
+
 SUB hilfeNachziehen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
-    DIM marke AS STRING : marke = STR$(z) + ":" + STR$(s)
+    ' Nicht nur die Stelle: auch das Feld und die Textlaenge -- sonst blieb
+    ' nach einem Reiterwechsel (Marke in beiden in 1:1) oder nach Tippen und
+    ' Rueckgaengig an derselben Stelle die Hilfe zum vorigen Wort stehen.
+    DIM marke AS STRING : marke = STR$(ta) + ":" + STR$(z) + ":" + STR$(s) + ":" + STR$(LEN(GUI_TEXT(ta)))
     IF marke = letzteMarke THEN RETURN
     letzteMarke = marke
     GUI_STATUSBAR_SET(lblStatus, sfPos, tr$("Zeile ") + STR$(z) + tr$(", Spalte ") + STR$(s))
@@ -8204,6 +8230,13 @@ SUB vervollUebernehmen()
         DIM s AS INTEGER
         (z, s) = GUI_TEXTAREA_CURSOR(ta)
         DIM name AS STRING : name = GUI_LISTBOX_ITEM(lstVervoll, sel)
+        ' Hinter `AS` steht ein TYP: `DIM w AS GUI_WINDOW(title, ...)` waere
+        ' ein Fehler, obwohl es einen Befehl dieses Namens gibt. Folgt schon
+        ' eine Klammer, kaeme sie doppelt.
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        DIM vor AS STRING : vor = LEFT$(zeilen[z - 1], s - 1 - vervollPraefixLaenge)
+        DIM nach AS STRING : nach = MID$(zeilen[z - 1], s - 1, 1)
+        DIM ohneGeruest AS BOOLEAN : ohneGeruest = REGEX_TEST(vor, "(?i)\bAS\s+$") OR nach = "("
         GUI_TEXTAREA_SELECT(ta, z, s - vervollPraefixLaenge, z, s)
         GUI_TEXTAREA_INSERT(ta, name)
         protokoll("vervollstaendigt " + name)
@@ -8212,7 +8245,8 @@ SUB vervollUebernehmen()
         DIM nz AS INTEGER
         DIM ns AS INTEGER
         (nz, ns) = GUI_TEXTAREA_CURSOR(ta)
-        DIM args AS ARRAY OF STRING : args = signaturArgs(GUI_TEXT(ta), nz, MAX(1, ns - 1))
+        DIM args AS ARRAY OF STRING : args = []
+        IF NOT ohneGeruest THEN args = signaturArgs(GUI_TEXT(ta), nz, MAX(1, ns - 1))
         IF LEN(args) > 0 THEN
             GUI_TEXTAREA_INSERT(ta, "(" + JOIN$(args, ", ") + ")")
             GUI_TEXTAREA_SELECT(ta, nz, ns + 1, nz, ns + 1 + LEN(args[0]))
@@ -8565,6 +8599,9 @@ SUB zurDefinition()
         GUI_SET_TEXT(lblStatus, tr$("Keine Definition zu '") + wortUnterMarke$() + tr$("' -- auch nicht im Projekt."))
         RETURN
     END IF
+    ' Auch der Erfolg sagt es -- sonst stuende die Meldung eines vorigen
+    ' Fehlschlags noch da und behauptete das Gegenteil.
+    GUI_SET_TEXT(lblStatus, tr$("Definition von '") + wortUnterMarke$() + tr$("' in Zeile ") + STR$(dz) + ".")
     GUI_TEXTAREA_GOTO(ta, dz, ds)
 END SUB
 
@@ -10602,6 +10639,16 @@ END FUNCTION
 
 ' Die Anzeige neu bauen -- und mit ihr die Texte, die geschrieben wuerden.
 ' Beides aus derselben Quelle: was man sieht, ist was man bekommt.
+' So breit, wie der Schirm es zulaesst: 900 Punkte schnitten jede laengere
+' Zeile ab, und den Unterschied liest man ja gerade am Zeilenende. Die
+' linke obere Ecke und die Hoehe bleiben, damit die Knoepfe dort stehen,
+' wo man sie kennt.
+SUB umbauFensterSetzen()
+    DIM b AS INTEGER : b = MAX(900, SCREENWIDTH() - 280)
+    GUI_WINDOW_SET_BOUNDS(winUmbau, 240, 90, b, 620)
+    protokoll("umbau fenster " + STR$(b) + " text " + STR$(GUI_GET_W(taUmbau)))
+END SUB
+
 SUB umbauAnzeigeBauen()
     DIM zeilen AS ARRAY OF STRING : zeilen = []
     zeigHunk = []
@@ -10736,6 +10783,7 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
     NEXT
     umbauAnzeigeBauen()
     GUI_WINDOW_TITLE(winUmbau, tr$("Vorschau: ") + titel)
+    umbauFensterSetzen()
     GUI_WINDOW_VISIBLE(winUmbau, TRUE)
     GUI_FOCUS(btnUmbauOk)
     DIM pm AS INTEGER : pm = 0
@@ -10928,6 +10976,7 @@ SUB umbauNachbessern()
     NEXT
     umbauAnzeigeBauen()
     GUI_WINDOW_TITLE(winUmbau, tr$("Nachbessern: ") + umbauNachWas)
+    umbauFensterSetzen()
     GUI_WINDOW_VISIBLE(winUmbau, TRUE)
     GUI_FOCUS(btnUmbauOk)
     protokoll("umbau nachbessern " + STR$(LEN(umbauTexte)))
@@ -12963,7 +13012,14 @@ SUB haltepunkteBestaetigt(j AS JSON_HANDLE)
         DIM datei AS STRING : datei = JSON_GET_STRING(j, p + ".file")
         DIM z AS INTEGER : z = JSON_GET_INT(j, p + ".line")
         IF NOT JSON_GET_BOOL(j, p + ".verified") THEN
-            ARRAY_PUSH(nie, BASENAME(datei) + ":" + STR$(z))
+            ' Ein Haltepunkt in einer Datei, die das Programm gar nicht
+            ' enthaelt (ein anderes Projekt, eine nicht importierte Datei),
+            ' haelt natuerlich nie -- das ist kein Befund. Geschickt werden
+            ' die Haltepunkte ALLER Dateien, weil erst der Debugger weiss,
+            ' was importiert ist.
+            DIM dazu AS BOOLEAN : dazu = TRUE
+            IF JSON_HAS(j, p + ".in_program") THEN dazu = JSON_GET_BOOL(j, p + ".in_program")
+            IF dazu THEN ARRAY_PUSH(nie, BASENAME(datei) + ":" + STR$(z))
             CONTINUE
         END IF
         DIM echt AS INTEGER : echt = JSON_GET_INT(j, p + ".actual")
@@ -12983,7 +13039,10 @@ SUB haltepunkteBestaetigt(j AS JSON_HANDLE)
             END IF
         NEXT
     NEXT
-    IF LEN(nie) > 0 THEN GUI_SET_TEXT(lblStatus, tr$("Haltepunkt hält nie (dort und darunter steht kein Code): ") + JOIN$(nie, ", "))
+    IF LEN(nie) > 0 THEN
+        GUI_SET_TEXT(lblStatus, tr$("Haltepunkt hält nie (dort und darunter steht kein Code): ") + JOIN$(nie, ", "))
+        protokoll("haltepunkt nie " + JOIN$(nie, ", "))
+    END IF
     IF debugErstWarten THEN
         debugErstWarten = FALSE
         ' Steht schon ein Haltepunkt HIER, bleibt es stehen; gibt es gar
@@ -13645,7 +13704,7 @@ SUB profilBereiche(j AS JSON_HANDLE, pfad AS STRING, vor AS STRING)
         DIM p AS STRING : p = pfad + "." + STR$(i)
         DIM art AS STRING : art = JSON_GET_STRING(j, p + ".art")
         DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
-        IF art = "function" THEN
+        IF art = "function" OR art = "sub" THEN
             ARRAY_PUSH(profBerName, vor + name)
             ARRAY_PUSH(profBerVon, JSON_GET_INT(j, p + ".von"))
             ARRAY_PUSH(profBerBis, JSON_GET_INT(j, p + ".bis"))
@@ -16949,6 +17008,7 @@ WHILE NOT beenden
 
     spiegelNachziehen()
     baumFilterNachziehen()
+    statusNachziehen()
     ' --- Aenderungen im aktiven Feld: einfaerben, Pruefung vormerken ---
     IF aktiverTab >= 0 THEN
         DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]
@@ -17033,6 +17093,9 @@ WHILE NOT beenden
     CLS(&H0B1119)
     GUI_DRAW()
     minimapZeichnen()
+    ' Die Karte wird ueber das Hauptfenster gemalt -- auch ueber die
+    ' Suchleiste, die oben rechts auf ihr liegt ("Alle" war halb verdeckt).
+    IF sucheOffen THEN GUI_DRAW_WINDOW(winSuche)
     ' Das Handbuch-Fenster liegt ueber der Leinwand des Hauptfensters und
     ' waere sonst von ihr verdeckt -- GUI_DRAW zeichnet Fenster und
     ' Zeichenflaechen in EINEM Durchgang, das Gemalte kommt danach.

@@ -1,0 +1,48 @@
+' Umlaute in der eingebauten Schrift (2026-10-01, beim Dogfooding gefunden).
+'
+' raylibs Bitmapschrift hat die Zeichen 32..255, also auch ae oe ue und ss
+' (rtext.c, LoadFontDefault). Die Laufzeit schickte aber jeden Text mit
+' einem Zeichen ueber ASCII GANZ an den Ausweich-Font: in einer Oberflaeche
+' stand "Loeschen" in einer anderen Schrift als "Buchen" daneben. Jetzt
+' weicht ein Text nur noch aus, wenn ihm die eingebaute Schrift ein Zeichen
+' nicht bieten kann (etwa das Euro-Zeichen). Gemessen wird an der Breite:
+' "Loschen" und "Löschen" sind in derselben Schrift gleich breit.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== umlaute bleiben in der eingebauten schrift
+SCREEN(100, 50, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+PRINT "gleich breit "; TEXT_WIDTH("Loschen") = TEXT_WIDTH("Löschen")
+PRINT "eszett ist ein zeichen "; TEXT_WIDTH("Strasze") > 0 AND TEXT_WIDTH("Straße") < TEXT_WIDTH("Strasze")
+' Gegenprobe: das Euro-Zeichen hat die Bitmapschrift nicht -- dieser Text
+' geht weiter an den Ausweich-Font, also in eine andere Breite.
+PRINT "euro weicht aus "; TEXT_WIDTH("Preis 5 E") <> TEXT_WIDTH("Preis 5 €")
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+gleich breit TRUE
+eszett ist ein zeichen TRUE
+euro weicht aus TRUE
+
+=== ein gui-knopf mit umlaut steht in derselben schrift wie die anderen
+' Ein Label, das sich nach seinem Text misst (GUI_AUTOSIZE), ist bei
+' "Loschen" und "Löschen" gleich breit -- vorher kam das zweite aus der
+' glatten Ausweichschrift und war deutlich schmaler.
+IMPORT "gui"
+SCREEN(300, 100, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 100)
+DIM a AS GUI_WIDGET : a = GUI_LABEL(w, "Loschen", 10, 10)
+DIM b AS GUI_WIDGET : b = GUI_LABEL(w, "Löschen", 10, 40)
+GUI_AUTOSIZE(a) : GUI_AUTOSIZE(b)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 3 THEN PRINT "gleich breit "; GUI_GET_W(a) = GUI_GET_W(b)
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+gleich breit TRUE

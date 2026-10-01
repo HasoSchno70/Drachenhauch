@@ -65,10 +65,13 @@ unterschiede ueber 30 TRUE
 
 === ein zeichen ohne schrift bleibt ein fragezeichen
 ' Gegenprobe zum Fall davor: U+E000 (Privatbereich) hat keine Schrift -- dann
-' ist das Fragezeichen richtig, und beide Bilder sind gleich.
+' ist das Fragezeichen richtig, und beide Bilder sind gleich. Das Euro-Zeichen
+' steht in BEIDEN Texten, damit beide in der Ausweichschrift stehen: Umlaute
+' allein bleiben seit 2026-10-01 in der eingebauten Schrift, dann verglichen
+' die Bilder zwei Schriften.
 IMPORT "helfer.dh"
-foto("pua", "", "    TEXT(10, 10, " + CHR$(34) + "ä  b" + CHR$(34) + ")" + CHR$(10))
-foto("frage", "", "    TEXT(10, 10, " + CHR$(34) + "ä ? b" + CHR$(34) + ")" + CHR$(10))
+foto("pua", "", "    TEXT(10, 10, " + CHR$(34) + "€ ä  b" + CHR$(34) + ")" + CHR$(10))
+foto("frage", "", "    TEXT(10, 10, " + CHR$(34) + "€ ä ? b" + CHR$(34) + ")" + CHR$(10))
 PRINT "unterschiede "; unterschiede("pua.png", "frage.png")
 --- datei helfer.dh
 IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"

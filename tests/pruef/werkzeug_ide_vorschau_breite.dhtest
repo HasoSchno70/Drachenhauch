@@ -1,0 +1,56 @@
+' Die Vorschau eines Umbaus (2026-10-01, beim Dogfooding gefunden): 900
+' Punkte breit, ein Unterschied mit langen Zeilen war rechts abgeschnitten;
+' das Fenster liess sich am Griff ziehen, der Inhalt blieb aber gleich
+' gross. Jetzt ist sie so breit wie der Schirm es zulaesst, und Liste,
+' Unterschied und Knoepfe haengen an ihren Kanten.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+--- langsam
+=== die vorschau ist breit und waechst mit dem fenster
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 40 THEN
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 1, 2)
+    umbenennenFragen()
+    umbenennenAusfuehren("summe_mit_einem_langen_namen")
+END IF
+IF prBild = 44 THEN
+    protokoll("pr offen " + STR$(GUI_WINDOW_SHOWN(winUmbau)))
+    protokoll("pr breiter als vorher " + STR$(GUI_WINDOW_GET_W(winUmbau) > 900 AND GUI_GET_W(taUmbau) > 656))
+    protokoll("pr rechts buendig " + STR$(GUI_WINDOW_GET_W(winUmbau) - GUI_GET_X(taUmbau) - GUI_GET_W(taUmbau) < 20))
+    protokoll("pr knopf y " + STR$(GUI_GET_Y(btnUmbauOk)))
+    GUI_WINDOW_SET_BOUNDS(winUmbau, 240, 90, 1000, 720)
+END IF
+IF prBild = 48 THEN
+    protokoll("pr hoeher " + STR$(GUI_GET_H(taUmbau)) + " " + STR$(GUI_GET_H(lstUmbau)))
+    protokoll("pr knopf y " + STR$(GUI_GET_Y(btnUmbauOk)))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+zaehler = 1
+zaehler = zaehler + 1
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- system windows
+--- erwartet
+pr offen TRUE
+pr breiter als vorher TRUE
+pr rechts buendig TRUE
+pr knopf y 546
+pr hoeher 608 608
+pr knopf y 646

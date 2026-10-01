@@ -381,10 +381,13 @@ Dinge:
   nicht, zeichnet raylib dort ein `?`; eine Pixel-Schrift für ein Retro-Spiel
   hat oft keine Umlaute.
 - **Ohne eigene Schrift springt eine Ausweich-Schrift ein.** Die eingebaute
-  raylib-Schrift kennt nur ASCII. Kommt ein Zeichen darüber hinaus vor,
+  raylib-Schrift kennt ASCII und Latin-1 (Zeichen 32 bis 255, also auch
+  `äöüÄÖÜß`). Kommt ein Zeichen darüber hinaus vor (etwa `€` oder Kanji),
   zeichnet die Runtime diesen Text mit einer Systemschrift (Windows: Segoe
-  UI, macOS: SF/Helvetica, Linux: DejaVu/Liberation). Reiner ASCII-Text geht
-  weiterhin durch die eingebaute Schrift.
+  UI, macOS: SF/Helvetica, Linux: DejaVu/Liberation). Deutscher Text mit
+  Umlauten bleibt in der eingebauten Schrift -- bis 2026-10-01 wich jeder
+  Text mit einem Zeichen über ASCII aus, und in einer Oberfläche stand
+  „Löschen“ in einer anderen Schrift als „Buchen“ daneben.
 - **Glyphen auf Zuruf.** Steht ein Zeichen in keiner geladenen Schrift
   (Kanji, Hangul, Emoji, Arabisch, Hebräisch, Thai), merkt sich die Runtime
   es beim Zeichnen oder Messen und backt es beim nächsten `FLIP` aus der
@@ -804,6 +807,16 @@ Sampler bliebe schwarz.
 | `KEY_NAME$(code)` → STRING | Anzeigename einer Taste (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
 | `INKEY$()` → STRING | zuletzt getipptes Zeichen oder `""` — wartet **nicht**, für Texteingabe im Spielablauf |
 | `WAITKEY()` → INTEGER | **hält an**, bis eine Taste kommt, und liefert ihren Code (`-1`, wenn das Fenster geschlossen wird) |
+
+**Ein Klick zwischen zwei Bildern geht nicht verloren.** Kommen Drücken und
+Loslassen an, bevor das nächste Bild beginnt (Tippen aufs Touchpad, ein
+eingespielter Klick, ein Programm, das gerade langsam läuft), gilt die Taste
+ein Bild lang als gedrückt: `MOUSE_HIT` und `MOUSEBUTTON` im einen,
+`MOUSE_RELEASED` im nächsten Bild, und ein gui-Knopf löst aus. Vorher sah
+niemand einen solchen Klick — raylib liest die Tasten nur einmal je Bild als
+Zustand. Für die Tastatur gilt dasselbe (`KEYHIT`/`KEYPRESSED` im einen,
+`KEYRELEASED` im nächsten Bild); getippte Zeichen (`INKEY$`, Textfelder) waren
+nie betroffen.
 
 **Tasten-Konstanten** (`KEY_*`) sind eingebaut:
 

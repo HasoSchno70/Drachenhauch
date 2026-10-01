@@ -351,3 +351,40 @@ NEXT
 PRINT a; " "; n
 --- erwartet
 TRUE 2
+
+=== ein haltepunkt in einer fremden datei meldet nicht haelt nie
+' Beim Dogfooding 2026-09-30: die Statuszeile sagte "Haltepunkt haelt nie
+' ... test.dh:5" -- ein Haltepunkt aus einem ganz anderen Projekt. Die IDE
+' schickt alle Haltepunkte; einer in einer Datei, die das Programm nicht
+' enthaelt, ist kein Befund (`in_program` FALSE). Einer ohne Code darunter in
+' der eigenen Datei bleibt es.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    hpNeu(PATHJOIN(projektOrdner, "anders.dh"), 1, "")
+    hpNeu(tabPfade[aktiverTab], 99, "")
+    befehl("debug")
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "a"
+PRINT "b"
+PRINT "c"
+--- datei anders.dh
+PRINT "gehoert nicht dazu"
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 15) = "haltepunkt nie " THEN PRINT L[i]
+NEXT
+--- erwartet
+haltepunkt nie spiel.dh:99

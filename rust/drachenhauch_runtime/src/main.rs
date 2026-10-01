@@ -116,6 +116,9 @@ mod ime;
 // Echte Systemzeiger (Windows: warten/arbeitet/hilfe) ueber einen Subclass.
 #[cfg(feature = "graphics")]
 mod systemzeiger;
+// Klicks, die ganz zwischen zwei Bildern liegen (Zaehler + Regel, mit Tests).
+#[cfg(any(test, feature = "graphics"))]
+mod flanken;
 // Eingebaute Zeigerbilder (kopieren, stift, pipette ...): rein, mit Tests.
 #[cfg(any(test, feature = "graphics"))]
 mod zeigerbilder;
@@ -1603,10 +1606,11 @@ fn debug_main(path: &str) -> ExitCode {
         Err(e) => { eprintln!("Lade-Fehler: {}", e); return ExitCode::from(1); }
     };
     let karte = zeilenkarte(&raw_source, &base, path, &abs, &prog);
-    let klassen = preprocess::process(&raw_source, &base).ok()
-        .map(|(quelle, _, _, _)| debugger::klassen_namen(&quelle)).unwrap_or_default();
+    let gemergt = preprocess::process(&raw_source, &base).ok().map(|(quelle, _, _, _)| quelle);
+    let klassen = gemergt.as_deref().map(debugger::klassen_namen).unwrap_or_default();
+    let namen = gemergt.as_deref().map(debugger::variablen_namen).unwrap_or_default();
     let mut machine = vm::Vm::new(&prog);
-    machine.enable_debug(karte, klassen);
+    machine.enable_debug(karte, klassen, namen);
     let res = machine.run();
     machine.debug_flush_output();
     // Review-Fund: verglich frueher den Fehlertext gegen "__DEBUG_STOP__" --

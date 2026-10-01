@@ -81,3 +81,17 @@ NEXT
 --- erwartet
 bereichsfarben #375453
 bereichsfarben #DAEDE5
+
+=== der satz unter dem namen nennt spiele und anwendungen
+' Beim Dogfooding gefunden: dort stand noch "BASIC fuer Spiele" -- seit
+' Langem ist Drachenhauch auch fuer Anwendungen mit Formularen, Tabellen,
+' Datenbank und Drucken gedacht.
+PRINT "anwendungen "; INSTR(GUI_TEXT(lblWkUnter), "Anwendungen") >= 0
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- erwartet
+anwendungen TRUE

@@ -1,0 +1,290 @@
+' Klicks, die ganz zwischen zwei Bildern liegen (flanken.rs, 2026-09-30).
+'
+' raylib liest die Maustasten als Zustand: kommen Druecken UND Loslassen vor
+' dem naechsten Bild an, steht vorher wie jetzt "los", und der Klick hat nie
+' stattgefunden -- gemessen beim Dogfooding der IDE (Tippen aufs Touchpad,
+' eingespielte Klicks, langsame Bilder). Jetzt gilt so ein Klick ein Bild
+' lang als gedrueckt: MOUSE_HIT und MOUSEBUTTON im einen, MOUSE_RELEASED im
+' naechsten Bild, und ein gui-Knopf loest aus.
+'
+' Die ersten Faelle spielen eine Aufnahme ab, in der Druecken und Loslassen
+' im SELBEN Bild stehen (die Wiedergabe zaehlt dafuer mit). Die letzten
+' schicken ECHTE Fensternachrichten (WM_LBUTTONDOWN/UP gleich hintereinander,
+' fenstersender.ps1 "klicks:N:MS") -- das ist der Weg ueber GLFW.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ein klick im selben bild ist ein bild lang gedrueckt
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 50, 50, 200, 100)
+DIM bild AS INTEGER
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN AUTOMATION_PLAY("ev.txt")
+    IF GUI_CLICKED(b) THEN n = n + 1 : PRINT "knopf"
+    IF MOUSE_HIT(0) THEN PRINT "hit"
+    IF MOUSEBUTTON(0) THEN PRINT "unten"
+    IF MOUSE_RELEASED(0) THEN PRINT "los"
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "klicks "; n
+--- datei ev.txt
+c 3
+e 0 7 150 100 0 0
+e 5 6 0 0 0 0
+e 5 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+hit
+unten
+knopf
+los
+klicks 1
+
+=== ein gewoehnlicher klick bleibt einer
+' Gegenprobe: Druecken und Loslassen in verschiedenen Bildern -- raylib sieht
+' beides selbst, die Verlaengerung darf nichts dazutun.
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 50, 50, 200, 100)
+DIM bild AS INTEGER
+DIM n AS INTEGER
+DIM h AS INTEGER
+DIM u AS INTEGER
+DIM l AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN AUTOMATION_PLAY("ev.txt")
+    IF GUI_CLICKED(b) THEN n = n + 1
+    IF MOUSE_HIT(0) THEN h = h + 1
+    IF MOUSEBUTTON(0) THEN u = u + 1
+    IF MOUSE_RELEASED(0) THEN l = l + 1
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "knopf "; n; " hit "; h; " unten "; u; " los "; l
+--- datei ev.txt
+c 3
+e 0 7 150 100 0 0
+e 5 6 0 0 0 0
+e 8 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+knopf 1 hit 1 unten 3 los 1
+
+=== zwei klicks im selben bild mit abstand sind zwei
+IMPORT "gui"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 50, 50, 200, 100)
+DIM bild AS INTEGER
+DIM n AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    IF bild = 2 THEN AUTOMATION_PLAY("ev.txt")
+    IF GUI_CLICKED(b) THEN n = n + 1
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+PRINT "klicks "; n
+--- datei ev.txt
+c 5
+e 0 7 150 100 0 0
+e 5 6 0 0 0 0
+e 5 5 0 0 0 0
+e 12 6 0 0 0 0
+e 12 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+klicks 2
+
+=== echte nachrichten gleich hintereinander kommen alle an
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "knopf.dh", "klicks:10:0", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei knopf.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+SETFPS(60)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 50, 50, 200, 100)
+DIM n AS INTEGER
+DIM h AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 7000
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN n = n + 1
+    IF MOUSE_HIT(0) THEN h = h + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "knopf "; n; " hit "; h
+--- system windows
+--- erwartet
+gesendet
+knopf 10 hit 10
+
+=== echte nachrichten mit 40 ms abstand bleiben je einer
+' Gegenprobe ueber GLFW: ein gewoehnlich langer Klick zaehlt weiter einmal.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "knopf.dh", "klicks:10:40", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei knopf.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+SETFPS(60)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Los", 50, 50, 200, 100)
+DIM n AS INTEGER
+DIM h AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 7000
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN n = n + 1
+    IF MOUSE_HIT(0) THEN h = h + 1
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "knopf "; n; " hit "; h
+--- system windows
+--- erwartet
+gesendet
+knopf 10 hit 10
+
+=== eine taste im selben bild ist ein bild lang gedrueckt
+' Dasselbe fuer die Tastatur: Taste A runter und hoch im selben Bild der
+' Aufnahme (2 = KEY_DOWN, 1 = KEY_UP, 65 = GLFW-Code von A).
+SCREEN(200, 100, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 2 THEN AUTOMATION_PLAY("ev.txt")
+    IF KEYHIT(KEY_A) THEN PRINT "hit"
+    IF KEYPRESSED(KEY_A) THEN PRINT "unten"
+    IF KEYRELEASED(KEY_A) THEN PRINT "los"
+    CLS(0)
+    FLIP()
+WEND
+PRINT "ende"
+--- datei ev.txt
+c 2
+e 5 2 65 0 0 0
+e 5 1 65 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+hit
+unten
+los
+ende
+
+=== eine gewoehnliche taste bleibt eine
+' Gegenprobe: runter und hoch in verschiedenen Bildern.
+SCREEN(200, 100, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM bild AS INTEGER
+DIM h AS INTEGER
+DIM u AS INTEGER
+DIM l AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 2 THEN AUTOMATION_PLAY("ev.txt")
+    IF KEYHIT(KEY_A) THEN h = h + 1
+    IF KEYPRESSED(KEY_A) THEN u = u + 1
+    IF KEYRELEASED(KEY_A) THEN l = l + 1
+    CLS(0)
+    FLIP()
+WEND
+PRINT "hit "; h; " unten "; u; " los "; l
+--- datei ev.txt
+c 2
+e 5 2 65 0 0 0
+e 8 1 65 0 0 0
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+hit 1 unten 3 los 1
+
+=== echte tastennachrichten gleich hintereinander kommen alle an
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "taste.dh", "tasten:10:0", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei taste.dh
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+SETFPS(60)
+DIM h AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    IF KEYHIT(KEY_A) THEN h = h + 1
+    CLS(0) : FLIP()
+WEND
+PRINT "hit "; h
+--- system windows
+--- erwartet
+gesendet
+hit 10
+
+=== echte tastennachrichten mit 40 ms abstand bleiben je eine
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "taste.dh", "tasten:10:40", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei taste.dh
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+SETFPS(60)
+DIM h AS INTEGER
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 5000
+    IF KEYHIT(KEY_A) THEN h = h + 1
+    CLS(0) : FLIP()
+WEND
+PRINT "hit "; h
+--- system windows
+--- erwartet
+gesendet
+hit 10
