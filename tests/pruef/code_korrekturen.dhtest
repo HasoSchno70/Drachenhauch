@@ -23,6 +23,7 @@ NEXT
 4 9
   Ersetzen durch zaehler @4:9+6 [zaehler]
   DIM zaehlr AS INTEGER anlegen @3:1+0 [    DIM zaehlr AS INTEGER/]
+  DIM zaehlr AS INTEGER global anlegen (oben in der Datei) @1:1+0 [DIM zaehlr AS INTEGER/]
 
 === befehl und klammern
 IMPORT "json"
@@ -80,3 +81,48 @@ fehler 2
   IMPORT "vec2" einfuegen @2:1-2:1 [IMPORT "vec2"/]
 hinweis 2
   Zeile entfernen @2:1-3:1 []
+
+=== im unterprogramm gibt es auch das globale dim
+' Beim Dogfooding 2026-09-30: fuer einen Wert, der den Aufruf ueberleben soll
+' (welcher Eintrag wird bearbeitet), half das lokale DIM nicht. Die globale
+' Variante kommt oben hinter die IMPORTs; angewendet laeuft das Programm, und
+' der Wert ist nach dem Aufruf noch da.
+IMPORT "json"
+DIM NL AS STRING : NL = CHR$(10)
+DIM q AS STRING : q = "' Kopf" + NL + "IMPORT " + CHR$(34) + "json" + CHR$(34) + NL + NL + "SUB merken()" + NL + "    bearbeitId = 7" + NL + "END SUB" + NL + "merken()" + NL + "PRINT 1"
+DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "d" + CHR$(34) + ":" + CODE_CHECK$(q) + "}")
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM z AS ARRAY OF STRING : z = SPLIT$(q, NL)
+FOR i = 0 TO JSON_LEN(j, "d") - 1
+    DIM p AS STRING : p = "d." + STR$(i)
+    IF NOT JSON_HAS(j, p + ".korrekturen") THEN CONTINUE
+    FOR k = 0 TO JSON_LEN(j, p + ".korrekturen") - 1
+        DIM t AS STRING : t = JSON_GET_STRING(j, p + ".korrekturen." + STR$(k) + ".titel")
+        PRINT t
+        IF INSTR(t, "global") >= 0 THEN
+            DIM a AS STRING : a = p + ".korrekturen." + STR$(k) + ".aenderungen.0"
+            ARRAY_INSERT(z, JSON_GET_INT(j, a + ".zeile") - 1, REPLACE$(JSON_GET_STRING(j, a + ".text"), NL, ""))
+        END IF
+    NEXT
+NEXT
+' angewendet: oben das DIM, und hinten liest das Hauptprogramm den Wert
+DIM neu AS STRING : neu = REPLACE$(JOIN$(z, NL), "PRINT 1", "PRINT bearbeitId")
+PRINT REPLACE$(neu, NL, "/")
+PRINT "befund "; CODE_CHECK$(neu)
+WRITEALL("neu.dh", neu)
+DIM pr AS INTEGER : pr = PROCESS_START("dhrt", "run", "neu.dh")
+DIM aus AS STRING : aus = ""
+DIM still AS INTEGER : still = 0
+WHILE still < 5
+    DIM zz AS STRING : zz = PROCESS_READ$(pr)
+    IF zz <> "" THEN aus = aus + TRIM$(zz) : still = 0
+    IF zz = "" AND NOT PROCESS_RUNNING(pr) THEN still = still + 1 : SLEEP(30)
+WEND
+PRINT "lauf "; aus
+--- erwartet
+DIM bearbeitId AS INTEGER anlegen
+DIM bearbeitId AS INTEGER global anlegen (oben in der Datei)
+' Kopf/IMPORT "json"/DIM bearbeitId AS INTEGER//SUB merken()/    bearbeitId = 7/END SUB/merken()/PRINT bearbeitId
+befund []
+lauf 7
