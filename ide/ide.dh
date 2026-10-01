@@ -11991,6 +11991,11 @@ FUNCTION einfuegenAnpassen(ta AS GUI_WIDGET, clip AS STRING) AS BOOLEAN
     NEXT
     DIM s1 AS INTEGER : s1 = LEN(zeilen[z1 - 1]) - LEN(L[0]) + 1
     DIM vorne AS STRING : vorne = LEFT$(zeilen[z1 - 1], s1 - 1)
+    ' In Spalte 0 sagt nichts, wohin der Block gehoert -- er bleibt, wie er
+    ' kopiert wurde (wie in VS Code). Sonst rueckte er auf 0 und verlor seine
+    ' Einrueckung: wer eine ganze Zeile markiert (Ende, Umschalt+Pos1) und
+    ' einen eingerueckten Block darueber setzt, hatte IF/ELSE/END IF ganz links.
+    IF vorne = "" THEN RETURN FALSE
     DIM bezug AS INTEGER : bezug = -1
     FOR k = 1 TO n - 1
         IF TRIM$(L[k]) = "" THEN CONTINUE
