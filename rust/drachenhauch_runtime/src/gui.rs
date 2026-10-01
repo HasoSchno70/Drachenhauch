@@ -13227,7 +13227,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
 
         Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift,
                                self.kuerzel_gefeuert);
-        let enter = g.key_pressed(KEY_ENTER);
+        // Hat ein Menue-Kuerzel die Taste genommen (Strg+Alt+Enter), ist es
+        // kein Abschicken des Feldes -- sonst taete eine Taste zwei Dinge.
+        let enter = g.key_pressed(KEY_ENTER) && !self.kuerzel_gefeuert;
 
         // --- Grenzen des Feldes ---
         // Ein gesperrtes Feld nimmt nichts an (Schreibmarke und Kopieren

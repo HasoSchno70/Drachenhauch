@@ -599,6 +599,43 @@ DHRT_FRAMES=22
 kuerzel
 zeile 3
 
+=== ein kuerzel mit enter meldet im textfeld kein enter
+' Stresstest 2026-10-01: Strg+Alt+Enter ("Alle ersetzen") feuerte den
+' Eintrag, und das Ersatzfeld der Suchleiste meldete DASSELBE Enter noch
+' als GUI_ENTERED -- die IDE ersetzte danach noch einmal einzeln und schrieb
+' "Nicht gefunden" ueber "6 mal ersetzt".
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM m AS INTEGER : m = GUI_MENU(w, "Bearbeiten")
+DIM a AS INTEGER : a = GUI_MENU_ITEM(m, "Alle ersetzen", "Strg+Alt+Enter")
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 10, 40, 200, 26, "x")
+GUI_FOCUS(tf)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_CLICKED(a) THEN PRINT "kuerzel"
+    IF GUI_ENTERED(tf) THEN PRINT "enter im feld"
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Strg+Alt+Enter
+c 6
+e 3 2 341 0 0 0 // Strg
+e 3 2 342 0 0 0 // Alt
+e 3 2 257 0 0 0 // Enter
+e 5 1 257 0 0 0 //
+e 5 1 342 0 0 0 //
+e 5 1 341 0 0 0 //
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+kuerzel
+
 === ein gefeuertes kuerzel nimmt dem feld auch die zwischenablage
 ' Strg+Umschalt+V als Menue-Kuerzel: das Feld darf daneben NICHT einfuegen.
 ' Vorher tat es beides -- der Befehl machte sein Fenster auf, und im Text
