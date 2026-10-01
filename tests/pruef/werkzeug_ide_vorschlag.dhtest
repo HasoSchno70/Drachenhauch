@@ -14,6 +14,52 @@
 ' Format: docs/werkzeuge.md, dhrt test.
 --- seriell
 
+--- langsam
+=== die liste liegt beim tippen oben und unter der marke
+SETWINDOWTITLE(ARG$(1))
+GUI_FOCUS(tabFelder[0])
+GUI_TEXTAREA_GOTO(tabFelder[0], 2, 100)
+DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "tippe:GUI_WI")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- einschub nach     trefferNachziehen()
+    IF vervollOffen AND NOT prGesehen THEN
+        prGesehen = TRUE
+        DIM prMx AS INTEGER
+        DIM prMy AS INTEGER
+        DIM prMh AS INTEGER
+        (prMx, prMy, prMh) = GUI_TEXTAREA_CARET_XY(tabFelder[0])
+        DIM prWx AS INTEGER : prWx = GUI_WINDOW_GET_X(winVervoll)
+        DIM prWy AS INTEGER : prWy = GUI_WINDOW_GET_Y(winVervoll)
+        protokoll("pr oben " + STR$(GUI_WINDOW_AT(prWx + 50, prWy + 60) = winVervoll))
+        protokoll("pr unter der marke " + STR$(prWy >= prMy + prMh AND prWy <= prMy + prMh + 10))
+        protokoll("pr fokus im code " + STR$(GUI_FOCUSED() = tabFelder[0]))
+    END IF
+--- einschub nach SETFPS(60)
+DIM prGesehen AS BOOLEAN : prGesehen = FALSE
+--- argumente
+spiel.dh
+DH-IDE-Vorschlag
+{sammlung}/_hilfen/fenstersender.ps1
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+IMPORT "gui"
+DIM w AS 
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- system windows
+--- erwartet
+pr oben TRUE
+pr unter der marke TRUE
+pr fokus im code TRUE
+
 === caret xy liegt unter dem zeichen an der marke
 ' GUI_TEXTAREA_CARET_XY spricht dieselbe Lage wie GUI_TEXTAREA_POS_AT: der
 ' Punkt mitten in der Markenhoehe, ein Stueck rechts der Marke, trifft das
