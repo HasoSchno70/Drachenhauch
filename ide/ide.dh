@@ -1424,7 +1424,7 @@ DIM winProfil AS GUI_WINDOW : winProfil = GUI_WINDOW(tr$("Profil"), 600, 60, 640
 DIM lblProfil AS GUI_WIDGET : lblProfil = GUI_LABEL(winProfil, "", 8, 6)
 DIM tblProfil AS GUI_WIDGET : tblProfil = GUI_TABLE(winProfil, 8, 30, 624, 396)
 GUI_TABLE_HEADERS(tblProfil, [tr$("Zeile"), tr$("Anzahl"), "ms", tr$("Anteil"), tr$("Quelltext")])
-GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
+GUI_TABLE_COL_WIDTHS(tblProfil, [110, 70, 70, 70, 300])
 GUI_TABLE_SET(tblProfil, "sortierbar", 1)
 ' Seit Stand 30 ein Gitter: Zellen und Bereiche waehlen, Strg+C kopiert sie als
 ' Tabulator-Text -- das Profil laesst sich so in eine Tabellenkalkulation holen.
@@ -13764,14 +13764,16 @@ SUB profilTabelleFuellen()
     DIM i AS INTEGER
     IF NOT GUI_CHECKED(cbProfilFunk) THEN
         GUI_TABLE_HEADERS(tblProfil, [tr$("Zeile"), tr$("Anzahl"), "ms", tr$("Anteil"), tr$("Quelltext")])
-        GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
+        GUI_TABLE_COL_WIDTHS(tblProfil, [110, 70, 70, 70, 300])
         DIM pd AS ARRAY OF STRING : pd = []
         FOR i = 0 TO MIN(n, 300) - 1
             DIM anteil AS STRING : anteil = "-"
             IF profGesamt > 0.0 THEN anteil = FORMAT$(profRohT[i] / profGesamt * 100.0, "%.1f") + " %"
             DIM q AS STRING : q = profZeileText$(profDatei$(i), profRohZ[i])
             DIM zs AS STRING : zs = STR$(profRohZ[i])
-            IF profDatei$(i) <> prozessDatei THEN zs = BASENAME(profDatei$(i)) + ":" + zs
+            ' Die Zeile zuerst, wie im Aufrufstapel: "mathe.dh:10" verlor in
+            ' der schmalen Spalte genau die Zahl.
+            IF NOT gleicherWeg(profDatei$(i), prozessDatei) THEN zs = zs + "  " + BASENAME(profDatei$(i))
             GUI_TABLE_ADD_ROW(tblProfil, [zs, STR$(profRohA[i]), FORMAT$(profRohT[i] * 1000.0, "%.2f"), anteil, q])
             ARRAY_PUSH(pz, profRohZ[i]) : ARRAY_PUSH(pd, profDatei$(i))
         NEXT
