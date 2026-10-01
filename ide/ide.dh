@@ -3447,7 +3447,7 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
         END IF
     END IF
     tabGesichert[i] = text
-    zaehlCache = {}
+    zaehlCache = {} : echteWege = {}
     paramCache = {}
     blameCache = {}
     blameMarkeZeile = -1
@@ -3474,15 +3474,15 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     ' Eigene Schnipsel und Tastenbelegung gelten, sobald sie gesichert sind --
     ' und sie liegen neben der ide.json, nicht im Projekt: der Projektordner
     ' bleibt, wo er war.
-    IF wegGleich$(pfad) = wegGleich$(schnipselPfad$()) THEN
+    IF gleicherWeg(pfad, schnipselPfad$()) THEN
         schnipselLaden()
         RETURN TRUE
     END IF
-    IF wegGleich$(pfad) = wegGleich$(tastenPfad$()) THEN
+    IF gleicherWeg(pfad, tastenPfad$()) THEN
         tastenAnwenden()
         RETURN TRUE
     END IF
-    IF wegGleich$(pfad) = wegGleich$(farbenPfad$()) THEN
+    IF gleicherWeg(pfad, farbenPfad$()) THEN
         themaAnwenden()
         RETURN TRUE
     END IF
@@ -3678,7 +3678,7 @@ SUB baumFuellen()
     ' suchen soll. Ein Wurzelwechsel raeumt Auswahl und offene Aeste weg,
     ' ein Auffrischen laesst beide stehen: sonst verloere man beim Oeffnen
     ' einer Datei gerade die Mehrfachauswahl, die man einsammelt.
-    IF wegGleich$(GUI_FILETREE_ROOT$(baum)) <> wegGleich$(projektOrdner) THEN
+    IF NOT gleicherWeg(GUI_FILETREE_ROOT$(baum), projektOrdner) THEN
         GUI_FILETREE_SET_ROOT(baum, projektOrdner)
         baumLetzteWahl = ""
     ELSE
@@ -4368,6 +4368,17 @@ END FUNCTION
 ' tabMitPfad laeuft in der Aufrufzaehlung fuer jede Projektdatei, und die
 ' Platte je Datei und Reiter zu fragen kostete bei vielen Dateien spuerbar.
 ' Eine Datei, die es (noch) nicht gibt, behaelt ihren Text.
+' Meinen zwei Wege dieselbe Datei bzw. denselben Ordner? Erst am Text,
+' dann ueber die Platte (echterWeg$): derselbe Weg kommt als kurzer und
+' als langer Name an (HANSGA~1 gegen "Hans Gaming"), oder mit "..". Am
+' Text allein zaehlte die Aufrufzaehlung die eigene Datei doppelt, und
+' ein Umbau verfehlte den offenen Reiter.
+FUNCTION gleicherWeg(a AS STRING, b AS STRING) AS BOOLEAN
+    IF wegGleich$(a) = wegGleich$(b) THEN RETURN TRUE
+    IF a = "" OR b = "" THEN RETURN FALSE
+    RETURN echterWeg$(a) = echterWeg$(b)
+END FUNCTION
+
 FUNCTION echterWeg$(pfad AS STRING) AS STRING
     DIM schl AS STRING : schl = wegGleich$(pfad)
     IF MAPHAS(echteWege, schl) THEN RETURN MAPGET(echteWege, schl)
@@ -4745,7 +4756,7 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     DIM d AS STRING
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        IF eigen <> "" AND wegGleich$(pfad) = wegGleich$(eigen) THEN CONTINUE
+        IF eigen <> "" AND gleicherWeg(pfad, eigen) THEN CONTINUE
         zaehlerAddieren(summe, zaehlungVon$(pfad))
     NEXT
     DIM texte AS ARRAY OF STRING : texte = []
@@ -5137,7 +5148,7 @@ SUB qvVerwerfen(pfad AS STRING)
         feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), neu)
         tabGesichert[t] = GUI_TEXT(tabFelder[t])
     END IF
-    zaehlCache = {}
+    zaehlCache = {} : echteWege = {}
     qvAuffrischen()
     GUI_SET_TEXT(lblQvStatus, tr$("Verworfen: ") + pfad)
     protokoll("qv verworfen " + pfad)
@@ -5288,7 +5299,7 @@ SUB qvReiterNachziehen()
             tabGesichert[t] = GUI_TEXT(tabFelder[t])
         END IF
     NEXT
-    zaehlCache = {}
+    zaehlCache = {} : echteWege = {}
     blameCache = {}
     baumFuellen()
 END SUB
@@ -6183,7 +6194,7 @@ SUB subInFunction()
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh")
         DIM pf AS STRING : pf = PATHJOIN(projektOrdner, d)
-        IF tabPfade[aktiverTab] <> "" AND wegGleich$(pf) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+        IF tabPfade[aktiverTab] <> "" AND gleicherWeg(pf, tabPfade[aktiverTab]) THEN CONTINUE
         DIM q AS STRING : q = projektQuelle$(pf)
         IF q = "" OR INSTR(LOWER$(q), LOWER$(name)) < 0 THEN CONTINUE
         DIM qz AS ARRAY OF STRING : qz = SPLIT$(q, NL)
@@ -9878,7 +9889,7 @@ SUB verschiebenFragen()
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+        IF gleicherWeg(pfad, tabPfade[aktiverTab]) THEN CONTINUE
         ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, pfad) : ARRAY_PUSH(paletteDetails, "")
     NEXT
     waehlerOeffnen("verschieben", verschName + tr$(" verschieben nach ..."))
@@ -10144,7 +10155,7 @@ END SUB
 ' "". Ohne Profillauf steht nichts da; eine Null waere eine Aussage, die
 ' niemand gemessen hat.
 FUNCTION laufZahl$(pfad AS STRING, zeile AS INTEGER) AS STRING
-    IF profDatei = "" OR wegGleich$(pfad) <> wegGleich$(profDatei) THEN RETURN ""
+    IF profDatei = "" OR NOT gleicherWeg(pfad, profDatei) THEN RETURN ""
     DIM i AS INTEGER
     FOR i = 0 TO LEN(profZeilen) - 1
         IF profZeilen[i] = zeile THEN RETURN "  [" + STR$(profAnzahl[i]) + "x]"
@@ -10516,7 +10527,7 @@ SUB laufSchritt()
         IF laufArt = "parameter" THEN
             ' Die eigene Datei ist schon vorgemerkt (dort steht der Stand
             ' AUS DEM REITER, nicht der von der Platte).
-            IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+            IF gleicherWeg(pfad, tabPfade[aktiverTab]) THEN CONTINUE
             IF INSTR(alt, paramName) < 0 THEN CONTINUE
             DIM z2 AS ARRAY OF INTEGER : z2 = []
             frisch = parameterInText$(alt, paramName, paramFolge, paramNeuDecl, paramNeuWert, _
@@ -10524,8 +10535,8 @@ SUB laufSchritt()
             laufGeaendert = laufGeaendert + z2[0]
             laufUebergangen = laufUebergangen + z2[1]
         ELSEIF laufArt = "verschieben" THEN
-            IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
-            IF wegGleich$(pfad) = wegGleich$(laufZiel) THEN CONTINUE
+            IF gleicherWeg(pfad, tabPfade[aktiverTab]) THEN CONTINUE
+            IF gleicherWeg(pfad, laufZiel) THEN CONTINUE
             IF NOT benutztWort(alt, verschName) THEN CONTINUE
             frisch = mitImport$(alt, BASENAME(laufZiel))
             IF frisch <> alt THEN laufGeaendert = laufGeaendert + 1
@@ -10612,7 +10623,7 @@ SUB dateienVergleichen()
     ' auch wenn die Antwort schon dasteht, ist einer zu viel.
     DIM anderer AS STRING : anderer = GUI_FILETREE_SELECTED$(baum)
     IF anderer <> "" AND GUI_FILETREE_IS_DIR(baum) THEN anderer = ""
-    IF anderer <> "" AND wegGleich$(anderer) = wegGleich$(tabPfade[aktiverTab]) THEN anderer = ""
+    IF anderer <> "" AND gleicherWeg(anderer, tabPfade[aktiverTab]) THEN anderer = ""
     IF anderer = "" THEN anderer = FILE_OPEN_DIALOG("Womit vergleichen?", "dh")
     IF anderer = "" THEN RETURN
     DIM meiner AS STRING : meiner = tabPfade[aktiverTab]
@@ -11888,7 +11899,7 @@ SUB navNachziehen()
     IF navLetztPfad <> "" AND NOT navSperre THEN
         DIM sprung AS BOOLEAN : sprung = FALSE
         IF p <> navLetztPfad THEN
-            sprung = wegGleich$(p) <> wegGleich$(navLetztPfad)
+            sprung = NOT gleicherWeg(p, navLetztPfad)
         ELSEIF ABS(z - navLetztZeile) >= 8 AND laenge = navLetztLaenge THEN
             sprung = NOT (KEYHIT(KEY_PAGEUP) OR KEYHIT(KEY_PAGEDOWN) OR KEYHIT(KEY_HOME) OR KEYHIT(KEY_END))
         END IF
@@ -11946,7 +11957,7 @@ SUB navGehen(zurueck AS BOOLEAN)
     END IF
     navSperre = TRUE
     DIM schonDa AS BOOLEAN : schonDa = FALSE
-    IF aktiverTab >= 0 THEN schonDa = wegGleich$(tabPfade[aktiverTab]) = wegGleich$(p)
+    IF aktiverTab >= 0 THEN schonDa = gleicherWeg(tabPfade[aktiverTab], p)
     IF NOT schonDa THEN dateiOeffnen(p)
     IF aktiverTab >= 0 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], z, sp)
     protokoll(IIF(zurueck, "nav zurueck ", "nav vor ") + BASENAME(p) + " " + STR$(z))
@@ -12180,7 +12191,7 @@ SUB zurLetztenAenderung()
     IF navLetztPfad <> "" THEN navAblegen(navPfade, navZeilen, navSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
     navSperre = TRUE
     DIM schonDa AS BOOLEAN : schonDa = FALSE
-    IF aktiverTab >= 0 THEN schonDa = wegGleich$(tabPfade[aktiverTab]) = wegGleich$(aendPfad)
+    IF aktiverTab >= 0 THEN schonDa = gleicherWeg(tabPfade[aktiverTab], aendPfad)
     IF NOT schonDa THEN dateiOeffnen(aendPfad)
     IF aktiverTab >= 0 THEN
         GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], aendZeile, aendSpalte)
@@ -12747,6 +12758,7 @@ END SUB
 ' Namen, und jedes IMPORT im Projekt, das die Datei meint, zieht mit --
 ' sonst uebersetzte das Programm nach dem Umbenennen nicht mehr.
 SUB baumUmbenennen(alt AS STRING, name AS STRING)
+    echteWege = {}   ' die Wege auf der Platte aendern sich
     DIM neu AS STRING : neu = PATHJOIN(DIRNAME(alt), name)
     IF name = BASENAME(alt) THEN RETURN
     IF (FILEEXISTS(neu) OR DIREXISTS(neu)) AND LOWER$(name) <> LOWER$(BASENAME(alt)) THEN
@@ -12809,7 +12821,7 @@ END SUB
 ' Stelle unter `neu`.
 FUNCTION wegUmziehen$(weg AS STRING, alt AS STRING, neu AS STRING, ordner AS BOOLEAN) AS STRING
     IF weg = "" THEN RETURN weg
-    IF wegGleich$(weg) = wegGleich$(alt) THEN RETURN neu
+    IF gleicherWeg(weg, alt) THEN RETURN neu
     IF ordner THEN
         DIM a AS STRING : a = wegGleich$(alt)
         DIM w AS STRING : w = wegGleich$(weg)
@@ -12821,7 +12833,7 @@ END FUNCTION
 FUNCTION tabVonWeg(weg AS STRING) AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF tabPfade[i] <> "" AND wegGleich$(tabPfade[i]) = wegGleich$(weg) THEN RETURN i
+        IF tabPfade[i] <> "" AND gleicherWeg(tabPfade[i], weg) THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
@@ -12877,7 +12889,7 @@ SUB baumLoeschenFragen()
         GUI_SET_TEXT(lblStatus, tr$("Erst im Projektbaum eine Datei oder einen Ordner wählen."))
         RETURN
     END IF
-    IF wegGleich$(baumZiel) = wegGleich$(projektOrdner) THEN
+    IF gleicherWeg(baumZiel, projektOrdner) THEN
         GUI_SET_TEXT(lblStatus, tr$("Den Projektordner selbst löscht die IDE nicht."))
         RETURN
     END IF
@@ -12892,6 +12904,7 @@ SUB baumLoeschenFragen()
 END SUB
 
 SUB baumLoeschen(ziel AS STRING)
+    echteWege = {}   ' die Wege auf der Platte aendern sich
     DIM istOrdner AS BOOLEAN : istOrdner = DIREXISTS(ziel)
     TRY
         IF istOrdner THEN
@@ -12982,7 +12995,7 @@ END SUB
 FUNCTION startWert$(datei AS STRING, umgebung AS BOOLEAN) AS STRING
     DIM i AS INTEGER
     FOR i = 0 TO LEN(startDateien) - 1
-        IF wegGleich$(startDateien[i]) = wegGleich$(datei) THEN
+        IF gleicherWeg(startDateien[i], datei) THEN
             RETURN IIF(umgebung, startUmg[i], startArgs[i])
         END IF
     NEXT
@@ -12992,7 +13005,7 @@ END FUNCTION
 SUB startWertSetzen(datei AS STRING, umgebung AS BOOLEAN, wert AS STRING)
     DIM i AS INTEGER
     FOR i = 0 TO LEN(startDateien) - 1
-        IF wegGleich$(startDateien[i]) = wegGleich$(datei) THEN
+        IF gleicherWeg(startDateien[i], datei) THEN
             IF umgebung THEN
                 startUmg[i] = wert
             ELSE
@@ -15416,7 +15429,7 @@ SUB schnipselAuswahlSichern(eingabe AS STRING)
     ' Steht die Datei in einem Reiter, soll er nicht den alten Stand halten.
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF wegGleich$(tabPfade[i]) = wegGleich$(p) AND GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN
+        IF gleicherWeg(tabPfade[i], p) AND GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN
             DIM neuT AS STRING : neuT = JOIN$(READLINES(p), NL)
             GUI_SET_TEXT(tabFelder[i], neuT)
             tabGesichert[i] = neuT
@@ -15665,7 +15678,7 @@ SUB waermeFeld(t AS INTEGER)
         NEXT
         ' profRoh* ist nach Zeit absteigend: die ersten 30 bekommen Zahlen.
         FOR i = 0 TO LEN(profRohZ) - 1
-            IF wegGleich$(profDatei$(i)) <> wegGleich$(pfad) THEN CONTINUE
+            IF NOT gleicherWeg(profDatei$(i), pfad) THEN CONTINUE
             IF profRohT[i] <= 0.0 OR hoechst <= 0.0 THEN CONTINUE
             ARRAY_PUSH(zl, profRohZ[i])
             ARRAY_PUSH(fa, waermeFarbe(profRohT[i] / hoechst))
