@@ -8080,8 +8080,26 @@ SUB vervollstaendigen(fokus AS BOOLEAN)
     NEXT
     IF LEN(namen) = 0 THEN RETURN
     GUI_LISTBOX_SET_SELECTED(lstVervoll, 0)
-    GUI_WINDOW_SET_BOUNDS(winVervoll, breiteLinks + 40, 120, 320, 240)
+    ' An der Schreibmarke statt fest oben links: darunter, und wenn dort
+    ' kein Platz ist, darueber.
+    DIM vx AS INTEGER : vx = breiteLinks + 40
+    DIM vy AS INTEGER : vy = 120
+    DIM mx AS INTEGER
+    DIM my AS INTEGER
+    DIM mh AS INTEGER
+    (mx, my, mh) = GUI_TEXTAREA_CARET_XY(ta)
+    IF mx >= 0 THEN
+        vx = MAX(0, MIN(mx, SCREENWIDTH() - 330))
+        vy = my + mh + 2
+        IF vy + 240 > SCREENHEIGHT() THEN vy = MAX(0, my - 242)
+    END IF
+    GUI_WINDOW_SET_BOUNDS(winVervoll, vx, vy, 320, 240)
     GUI_WINDOW_VISIBLE(winVervoll, TRUE)
+    ' Nach vorn -- auch wenn der Fokus beim Tippen im Code bleibt. Ohne das
+    ' lag die Liste hinter dem Hauptfenster und ging nur mit Strg+Leer auf
+    ' (dort holt der Fokus sie nach vorn).
+    GUI_WINDOW_FRONT(winVervoll)
+    protokoll("vorschlag offen " + STR$(vx) + " " + STR$(vy))
     vervollOffen = TRUE
     vervollWort = wortAnfang$()
     IF fokus THEN GUI_FOCUS(lstVervoll)

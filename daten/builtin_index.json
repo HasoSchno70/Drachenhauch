@@ -5037,6 +5037,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_CARET_XY",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_CARET_XY(ta)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_POS_AT",
    "kind": "graphics",
    "signature": "GUI_TEXTAREA_POS_AT(ta, x, y)",
@@ -5820,6 +5826,12 @@
    "name": "GUI_WINDOW_GLOWING",
    "kind": "core",
    "signature": "GUI_WINDOW_GLOWING(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_FRONT",
+   "kind": "core",
+   "signature": "GUI_WINDOW_FRONT(win)",
    "module": "gui"
   },
   {
