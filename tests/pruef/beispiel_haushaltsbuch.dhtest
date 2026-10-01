@@ -1,0 +1,60 @@
+' Das Beispiel examples/haushaltsbuch/main.dh (2026-10-01, beim Ausprobieren
+' der IDE entstanden): Buchungen in SQLite, Tabelle mit Summe. Der Einschub
+' steht hinter dem Aufbau des Fensters, fuellt die Felder, ruft die SUBs des
+' Programms und liest danach die Datenbank, die das Programm im eigenen
+' Ordner anlegt.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== buchen, summe und loeschen
+GUI_SET_DATE(dpDatum, "2026-09-30")
+GUI_SET_TEXT(tfText, "Gehalt")
+GUI_SET_TEXT(tfBetrag, "1000,50")
+GUI_SET_CHECKED(cbAusgabe, FALSE)
+buchen()
+GUI_SET_DATE(dpDatum, "2026-10-01")
+GUI_SET_TEXT(tfText, "Einkauf")
+GUI_SET_TEXT(tfBetrag, "12,30")
+GUI_SET_CHECKED(cbAusgabe, TRUE)
+buchen()
+' ein leerer Text bucht nichts
+GUI_SET_TEXT(tfText, "   ")
+GUI_SET_TEXT(tfBetrag, "5")
+buchen()
+PRINT "zeilen "; GUI_TABLE_ROW_COUNT(tbl)
+PRINT GUI_TABLE_GET_CELL(tbl, 0, 0); " | "; GUI_TABLE_GET_CELL(tbl, 0, 1); " | "; GUI_TABLE_GET_CELL(tbl, 0, 2)
+PRINT GUI_TABLE_GET_CELL(tbl, 1, 0); " | "; GUI_TABLE_GET_CELL(tbl, 1, 1); " | "; GUI_TABLE_GET_CELL(tbl, 1, 2)
+PRINT GUI_TEXT(lSumme)
+DIM prR AS DB_RESULT
+prR = DB_QUERY(kasse, "SELECT text, cent FROM buchung ORDER BY id")
+WHILE DB_NEXT(prR)
+    PRINT "db "; DB_GET_STRING(prR, 0); " "; DB_GET_INT(prR, 1)
+WEND
+DB_CLOSE_RESULT(prR)
+' die Ausgabe loeschen: ueber ihre id, wie der Knopf es tut
+DB_EXEC(kasse, "DELETE FROM buchung WHERE id = ?", ids[1])
+laden()
+PRINT "nach dem loeschen "; GUI_TABLE_ROW_COUNT(tbl); " "; GUI_TEXT(lSumme)
+DB_CLOSE(kasse)
+EXIT(0)
+--- programm ../../examples/haushaltsbuch/main.dh nach GUI_FOCUS(tfText)
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+zeilen 2
+2026-09-30 | Gehalt | 1000,50 EUR
+2026-10-01 | Einkauf | -12,30 EUR
+Summe: 988,20 EUR
+db Gehalt 100050
+db Einkauf -1230
+nach dem loeschen 1 Summe: 1000,50 EUR
+
+=== geld rechnet in cent
+PRINT inCent("19,99"); " "; inCent("0.1"); " "; inCent("1000")
+PRINT geld$(5); " | "; geld$(-1230); " | "; geld$(100000)
+EXIT(0)
+--- programm ../../examples/haushaltsbuch/main.dh nach GUI_FOCUS(tfText)
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+1999 10 100000
+0,05 EUR | -12,30 EUR | 1000,00 EUR

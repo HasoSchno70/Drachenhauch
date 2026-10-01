@@ -321,6 +321,10 @@ DIM exportDatei AS STRING : exportDatei = ""
 
 ' Gliederung (SUB/FUNCTION/CLASS der aktiven Datei, links unten)
 DIM gliederungZeilen AS ARRAY OF INTEGER : gliederungZeilen = []
+' Der Klick in die Gliederung (gliederungNachziehen): ob der Druck in ihr
+' begann, und welcher Eintrag zuletzt gewaehlt war.
+DIM glDruck AS BOOLEAN : glDruck = FALSE
+DIM glSelAlt AS INTEGER : glSelAlt = -1
 DIM gliederungSchluessel AS STRING : gliederungSchluessel = ""
 
 DIM hell AS BOOLEAN : hell = FALSE
@@ -4454,13 +4458,40 @@ SUB pfadAnspringen(zeile AS INTEGER)
     protokoll("pfad sprung " + STR$(zeile))
 END SUB
 
-SUB gliederungAnspringen()
+' `fokus`: das Code-Feld bekommt die Tastatur (Klick, Enter). Ohne -- beim
+' Blaettern mit den Pfeilen -- bleibt sie in der Liste, das Feld laeuft mit.
+SUB gliederungAnspringen(fokus AS BOOLEAN)
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstGliederung)
     IF sel < 0 OR sel >= LEN(gliederungZeilen) THEN RETURN
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
     GUI_TEXTAREA_GOTO(ta, gliederungZeilen[sel], 1)
-    GUI_FOCUS(ta)
+    IF fokus THEN GUI_FOCUS(ta)
+    protokoll("gliederung sprung " + STR$(gliederungZeilen[sel]) + IIF(fokus, "", " vorschau"))
+END SUB
+
+' Ein Klick springt -- beim LOSLASSEN. Frueher sprang erst der Doppelklick,
+' und der feuert beim zweiten DRUECKEN: das Code-Feld bekam den Fokus mit
+' gehaltener Taste und markierte von der Sprungstelle bis zum Mauszeiger.
+' Nicht bei einem Klick in den Rollbalken der Liste (rechter Rand).
+SUB gliederungNachziehen()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstGliederung)
+    DIM ueber AS BOOLEAN : ueber = GUI_HIT_TEST(MOUSEX(), MOUSEY()) = lstGliederung
+    DIM randX AS INTEGER : randX = GUI_GET_X(lstGliederung) + GUI_GET_W(lstGliederung) - 16
+    IF MOUSE_HIT(0) THEN glDruck = ueber AND MOUSEX() < randX
+    IF MOUSE_RELEASED(0) THEN
+        IF glDruck AND ueber THEN gliederungAnspringen(TRUE)
+        glDruck = FALSE
+    ELSEIF GUI_FOCUSED() = lstGliederung AND NOT MOUSEBUTTON(0) THEN
+        ' Tastatur: Enter springt (die Liste meldet es als Doppelklick),
+        ' ein Pfeil laesst das Feld mitlaufen.
+        IF GUI_DOUBLE_CLICKED(lstGliederung) THEN
+            gliederungAnspringen(TRUE)
+        ELSEIF sel <> glSelAlt THEN
+            gliederungAnspringen(FALSE)
+        END IF
+    END IF
+    glSelAlt = sel
 END SUB
 
 SUB problemAnspringen()
@@ -16685,7 +16716,7 @@ WHILE NOT beenden
     IF GUI_CLICKED(btnWkBeispiele) THEN befehl("beispiele")
     IF GUI_CLICKED(btnWkThemen) THEN befehl("beispiele_themen")
     IF GUI_DOUBLE_CLICKED(lstWkZuletzt) AND GUI_LISTBOX_SELECTED(lstWkZuletzt) >= 0 AND GUI_LISTBOX_SELECTED(lstWkZuletzt) < LEN(zuletzt) THEN dateiOeffnen(zuletzt[GUI_LISTBOX_SELECTED(lstWkZuletzt)])
-    IF GUI_DOUBLE_CLICKED(lstGliederung) THEN gliederungAnspringen()
+    gliederungNachziehen()
     ' Druckdialog
     IF GUI_CLICKED(btnDruckOk) THEN druckenAusfuehren()
     IF GUI_CLICKED(btnDruckPdf) THEN GUI_WINDOW_VISIBLE(winDruck, FALSE) : druckOptionenLesen() : listingAlsPdf()

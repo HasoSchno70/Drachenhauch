@@ -1,0 +1,115 @@
+' Die Gliederung springt mit EINEM Klick (2026-09-30, Hinweis des Nutzers).
+' Vorher sprang erst der Doppelklick -- und der feuert beim zweiten DRUECKEN:
+' das Code-Feld bekam den Fokus mit gehaltener Taste und markierte von der
+' Sprungstelle bis zum Mauszeiger. Jetzt springt der Klick beim Loslassen,
+' Pfeile in der Liste lassen das Feld mitlaufen (Fokus bleibt in der Liste),
+' Enter springt. Die Lage des ersten Eintrags sucht der Einschub mit
+' GUI_HIT_TEST; geklickt wird ueber eine Aufnahme, die er selbst schreibt.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+--- langsam
+=== ein klick springt ohne zu markieren
+DIM prBild AS INTEGER
+SUB prKlicks(n AS INTEGER)
+    ' erster Eintrag: oben links in der Liste (Bildschirmlage, gesucht)
+    DIM x AS INTEGER : x = -1
+    DIM y AS INTEGER : y = -1
+    DIM sx AS INTEGER
+    DIM sy AS INTEGER
+    FOR sy = 0 TO SCREENHEIGHT() - 1 STEP 2
+        FOR sx = 0 TO 400 STEP 2
+            IF y < 0 AND GUI_HIT_TEST(sx, sy) = lstGliederung THEN x = sx + 30 : y = sy + 12
+        NEXT
+    NEXT
+    DIM a AS STRING : a = "e 0 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        a = a + "e " + STR$(2 + 6 * i) + " 6 0 0 0 0" + CHR$(10) + "e " + STR$(5 + 6 * i) + " 5 0 0 0 0" + CHR$(10)
+    NEXT
+    WRITEALL("prk.txt", "c " + STR$(1 + 2 * n) + CHR$(10) + a + CHR$(10))
+    AUTOMATION_PLAY("prk.txt")
+END SUB
+SUB prStand(was AS STRING)
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+    PRINT was ; " zeile " ; z ; " markiert [" ; GUI_TEXTAREA_SELECTION$(aktivesFeld()) ; "] fokus feld " ; GUI_FOCUSED() = aktivesFeld()
+END SUB
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     trefferNachziehen()
+    ' erst zaehlen, wenn die Gliederung gefuellt ist (0,6 s nach dem Laden)
+    IF prBild > 0 OR GUI_LISTBOX_COUNT(lstGliederung) = 2 THEN prBild = prBild + 1
+    IF prBild = 1 THEN prStand("vorher")
+    IF prBild = 2 THEN prKlicks(1)
+    IF prBild = 30 THEN prStand("klick")
+    IF prBild = 31 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), 1, 1) : prKlicks(2)
+    IF prBild = 70 THEN prStand("doppelklick")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+' eine Datei mit zwei Unterprogrammen
+DIM x AS INTEGER
+x = 1
+
+SUB erstes()
+    PRINT 1
+END SUB
+
+SUB zweites()
+    PRINT 2
+END SUB
+--- erwartet
+vorher zeile 1 markiert [] fokus feld TRUE
+klick zeile 5 markiert [] fokus feld TRUE
+doppelklick zeile 5 markiert [] fokus feld TRUE
+
+=== pfeile in der liste lassen das feld mitlaufen, enter springt
+DIM prBild AS INTEGER
+SUB prStand(was AS STRING)
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+    PRINT was ; " zeile " ; z ; " fokus liste " ; GUI_FOCUSED() = lstGliederung ; " fokus feld " ; GUI_FOCUSED() = aktivesFeld()
+END SUB
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     trefferNachziehen()
+    IF prBild > 0 OR GUI_LISTBOX_COUNT(lstGliederung) = 2 THEN prBild = prBild + 1
+    IF prBild = 1 THEN GUI_FOCUS(lstGliederung) : GUI_LISTBOX_SET_SELECTED(lstGliederung, 0)
+    IF prBild = 3 THEN AUTOMATION_PLAY("ev.txt")
+    IF prBild = 20 THEN prStand("pfeil")
+    IF prBild = 50 THEN prStand("enter")
+--- datei _programm/ev.txt
+c 4
+e 5 2 264 0 0 0
+e 8 1 264 0 0 0
+e 30 2 257 0 0 0
+e 33 1 257 0 0 0
+
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+' eine Datei mit zwei Unterprogrammen
+DIM x AS INTEGER
+x = 1
+
+SUB erstes()
+    PRINT 1
+END SUB
+
+SUB zweites()
+    PRINT 2
+END SUB
+--- erwartet
+pfeil zeile 9 fokus liste TRUE fokus feld FALSE
+enter zeile 9 fokus liste FALSE fokus feld TRUE
