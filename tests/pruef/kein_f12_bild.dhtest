@@ -1,0 +1,44 @@
+' F12 legt kein Bild ab (2026-10-01, bei der Handpruefung gefunden):
+' raylibs SUPPORT_SCREEN_CAPTURE speicherte bei JEDEM F12 ein
+' screenshotNNN.png in den Arbeitsordner -- in der IDE ist F12 "Zur
+' Definition", und jedes Spiel, das F12 benutzt, hinterliess still Bilder.
+' dhrt baut raylib jetzt ohne das Flag. SAVESCREENSHOT geht weiter.
+'
+' Gedrueckt wird mit einer ECHTEN Fensternachricht
+' (_hilfen/fenstersender.ps1 "f12"): raylib prueft F12 in EndDrawing gleich
+' nach dem Einlesen der Ereignisse, eine Aufnahme speist ihre Tasten erst
+' danach ein -- mit ihr waere der Fall auch mit dem alten raylib gruen.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== f12 schreibt nichts, savescreenshot schon
+SCREEN(160, 100, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM sender AS INTEGER : sender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(1), ARG$(0), "f12|f12")
+DIM gesehen AS INTEGER : gesehen = 0
+DIM nach AS INTEGER : nach = -1
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF KEYHIT(KEY_F12) THEN gesehen = gesehen + 1
+    CLS(&H203040) : FLIP()
+    IF nach < 0 AND NOT PROCESS_RUNNING(sender) THEN nach = bild
+    IF nach > 0 AND bild = nach + 10 THEN
+        PRINT "f12 kam an "; gesehen >= 1
+        PRINT "screenshot000 "; FILEEXISTS("screenshot000.png")
+        SAVESCREENSHOT("eigen.png")
+    END IF
+    IF nach > 0 AND bild = nach + 13 THEN
+        PRINT "savescreenshot "; FILEEXISTS("eigen.png")
+        EXIT(0)
+    END IF
+    IF bild > 1500 THEN PRINT "zeit um" : EXIT(1)
+WEND
+--- argumente
+DH-Kein-F12
+{sammlung}/_hilfen/fenstersender.ps1
+--- system windows
+--- erwartet
+f12 kam an TRUE
+screenshot000 FALSE
+savescreenshot TRUE
