@@ -1263,7 +1263,7 @@ IF wkSchriftzug THEN
     GUI_SET_VISIBLE(lblWkTitel, FALSE)
     protokoll("schriftzug")
 END IF
-DIM lblWkUnter AS GUI_WIDGET : lblWkUnter = GUI_LABEL(win, tr$("BASIC für Spiele -- mit Pascal-strikter Typisierung und OOP. Diese IDE ist selbst in Drachenhauch geschrieben."), 0, 0)
+DIM lblWkUnter AS GUI_WIDGET : lblWkUnter = GUI_LABEL(win, tr$("BASIC für Spiele und Anwendungen -- mit Pascal-strikter Typisierung und OOP. Diese IDE ist selbst in Drachenhauch geschrieben."), 0, 0)
 DIM btnWkNeu AS GUI_WIDGET : btnWkNeu = GUI_BUTTON(win, tr$("Neue Datei"), 0, 0, 130, 30)
 GUI_BUTTON_VARIANT(btnWkNeu, "primaer")
 DIM btnWkOeffnen AS GUI_WIDGET : btnWkOeffnen = GUI_BUTTON(win, tr$("Datei öffnen ..."), 0, 0, 150, 30)
