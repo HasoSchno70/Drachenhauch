@@ -634,6 +634,13 @@ fn ort(uri: &str, zeile: usize, spalte: usize, spalte_ende: usize) -> Value {
 /// Ersetzt wird ueber `symbole::fundstellen`, also ohne Kommentare und
 /// Zeichenketten (die Ausdruecke in f-Strings zaehlen mit). Von hinten nach
 /// vorn je Zeile, damit die Spalten der noch offenen Treffer stimmen.
+/// Ein Name, den die Laufzeit selbst mitbringt: ein Befehl aus dem
+/// Befehlsverzeichnis oder eine vorbelegte Konstante.
+fn eingebaut(wort: &str) -> bool {
+    crate::vm::ist_vorbelegter_name(&wort.to_lowercase())
+        || crate::compiler::builtin_eintraege().iter().any(|(n, _, _)| n.eq_ignore_ascii_case(wort))
+}
+
 pub fn umbenennen(text: &str, z0: usize, c0: usize, neu: &str) -> Option<String> {
     let (wort, _, _) = symbole::wort_bei(text, z0, c0);
     if wort.is_empty() { return None; }
@@ -642,6 +649,13 @@ pub fn umbenennen(text: &str, z0: usize, c0: usize, neu: &str) -> Option<String>
     // tun. Builtins bleiben erlaubt -- eine eigene Variable darf seit
     // 2026-09-04 heissen wie eines, und die will man umbenennen koennen.
     if crate::lexer::keyword(&wort.to_lowercase()).is_some() { return None; }
+    // Ein EINGEBAUTER Name (Befehl oder vorbelegte Konstante wie KEY_DOWN,
+    // RED, PI), den das Programm nirgends selbst anlegt: umbenannt stuende
+    // danach ein unbekannter Name da, wo der Befehl stand. Heisst eine
+    // eigene Variable so (DIM red), gilt das Umbenennen weiter ihr.
+    if eingebaut(&wort) && !symbole::definitionen(text).iter().any(|d| d.name.eq_ignore_ascii_case(&wort)) {
+        return None;
+    }
     let mut n = neu.chars();
     match n.next() {
         Some(c) if c.is_ascii_alphabetic() || c == '_' => {}

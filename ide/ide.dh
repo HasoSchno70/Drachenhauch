@@ -11374,7 +11374,7 @@ SUB umbenennenAusfuehren(neu AS STRING)
     DIM q AS STRING : q = GUI_TEXT(ta)
     DIM neuText AS STRING : neuText = CODE_RENAME$(q, umbenennZeile, umbenennSpalte, neu)
     IF neuText = "" THEN
-        GUI_SET_TEXT(lblStatus, tr$("Umbenennen: '") + neu + tr$("' geht nicht -- ein Name fängt mit Buchstabe oder _ an, und Schlüsselwörter bleiben, wie sie sind."))
+        GUI_SET_TEXT(lblStatus, tr$("Umbenennen: '") + neu + tr$("' geht nicht -- ein Name fängt mit Buchstabe oder _ an, und Schlüsselwörter und eingebaute Namen bleiben, wie sie sind."))
         RETURN
     END IF
     IF neuText = q THEN
