@@ -5703,6 +5703,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_ZOOM",
+   "kind": "core",
+   "signature": "GUI_WINDOW_ZOOM(win, faktor)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_GET_ZOOM",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GET_ZOOM(win) AS FLOAT",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_DESIGN",
    "kind": "core",
    "signature": "GUI_WINDOW_DESIGN(win, flag)",

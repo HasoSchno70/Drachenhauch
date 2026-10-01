@@ -150,7 +150,7 @@ TRUE
 DIM q AS STRING : q = REPLACE$("' Spieler-Klasse\n' Zweite Zeile.\nCLASS Player\n    SUB Init()\n    END SUB\nEND CLASS\nFUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER\n    RETURN a + b\nEND FUNCTION\nDIM r AS INTEGER\nr = add(1, 2)\nr = add(3, 4)\n", "\n", CHR$(10))
 PRINT CODE_SYMBOLS$(q)
 --- erwartet
-[{"name":"Player","art":"class","von":3,"bis":6,"kinder":[{"name":"Init","art":"function","von":4,"bis":5,"kinder":[]}]},{"name":"add","art":"function","von":7,"bis":9,"kinder":[]}]
+[{"name":"Player","art":"class","von":3,"bis":6,"kinder":[{"name":"Init","art":"sub","von":4,"bis":5,"kinder":[]}]},{"name":"add","art":"function","von":7,"bis":9,"kinder":[]}]
 
 === textbereich marke auswahl suchen
 ' Nach SET_TEXT steht die Marke am Ende; GOTO klemmt; eine rueckwaerts

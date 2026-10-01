@@ -9,10 +9,11 @@
 '  die fertige Tabelle. Gehen sie auseinander, rechnet einer
 '  falsch, und man weiss, dass man nachsehen muss.
 '
-'  Dieses Programm braucht das NETZ und laeuft deshalb nicht in
-'  der Testsuite mit -- wie abruf_pruefung.dh. Es braucht keine
-'  vorhandene Datenbank: es holt die Spiele selbst und legt sie
-'  in eine Datenbank im Speicher.
+'  Dieses Programm braucht das NETZ. In `dhrt test` laeuft es
+'  wegen seiner Endung trotzdem mit -- ist OpenLigaDB nicht
+'  erreichbar, sagt es das und endet mit 0 (wie abruf_pruefung.dh).
+'  Es braucht keine vorhandene Datenbank: es holt die Spiele
+'  selbst und legt sie in eine Datenbank im Speicher.
 '
 '  Start:  dhrt run buch-tippspiel/code/tabellen_pruefung.dh
 '

@@ -412,3 +412,48 @@ if defined ATTRAPPE_SIGN_FEHLT exit /b 5
 rueckgabe 1
 iscc lief FALSE
 gemeldet TRUE
+
+=== jede verknuepfung auf dhrt.exe hat ihre eigene app-kennung
+' Beim Dogfooding gefunden: alle Verknuepfungen zeigen auf dieselbe
+' dhrt.exe, Windows hielt sie ohne eigene AppUserModelID fuer EINE App --
+' "Drachenhauch IDE" im Startmenue startete den Form-Designer. Geprueft
+' wird die .iss: jede Zeile im Abschnitt [Icons], die dhrt.exe startet,
+' nennt eine Kennung, und im Startmenue ({group}) kommt keine zweimal vor;
+' die Verknuepfung auf dem Schreibtisch teilt die der IDE.
+DIM L AS ARRAY OF STRING : L = READLINES(ARG$(0))
+DIM inIcons AS BOOLEAN : inIcons = FALSE
+DIM gesehen AS MAP OF INTEGER : gesehen = {}
+DIM ohne AS INTEGER : ohne = 0
+DIM doppelt AS INTEGER : doppelt = 0
+DIM zahl AS INTEGER : zahl = 0
+DIM desktop AS STRING : desktop = ""
+DIM ide AS STRING : ide = ""
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    DIM z AS STRING : z = TRIM$(L[i])
+    IF LEFT$(z, 1) = "[" THEN inIcons = (z = "[Icons]")
+    IF NOT inIcons OR INSTR(z, "dhrt.exe") < 0 OR LEFT$(z, 5) <> "Name:" THEN CONTINUE
+    zahl = zahl + 1
+    DIM k AS INTEGER : k = INSTR(z, "AppUserModelID: " + CHR$(34))
+    IF k < 0 THEN ohne = ohne + 1 : CONTINUE
+    DIM rest AS STRING : rest = MID$(z, k + 17)
+    DIM kennung AS STRING : kennung = LEFT$(rest, INSTR(rest, CHR$(34)))
+    IF INSTR(z, "{autodesktop}") >= 0 THEN
+        desktop = kennung
+    ELSE
+        IF MAPHAS(gesehen, kennung) THEN doppelt = doppelt + 1
+        MAPPUT(gesehen, kennung, 1)
+        IF INSTR(z, "Drachenhauch IDE" + CHR$(34)) >= 0 THEN ide = kennung
+    END IF
+NEXT
+PRINT "verknuepfungen "; zahl
+PRINT "ohne kennung "; ohne
+PRINT "doppelt "; doppelt
+PRINT "schreibtisch wie die ide "; desktop = ide AND ide <> ""
+--- argumente
+{sammlung}/../../installer/Drachenhauch-IDE.iss
+--- erwartet
+verknuepfungen 10
+ohne kennung 0
+doppelt 0
+schreibtisch wie die ide TRUE

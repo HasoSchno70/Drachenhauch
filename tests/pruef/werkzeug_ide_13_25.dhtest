@@ -1078,6 +1078,93 @@ PRINT "erstes argument " ; LEFT$(inhalt$("spiel.dh"), LEN("CIRCLE(10, y, r)")) =
 platzhalter 1 von 3 TRUE
 erstes argument TRUE
 
+=== hinter AS setzt die vervollstaendigung nur den typ
+' Beim Dogfooding 2026-09-30 gefunden: `DIM w AS GUI_WIN` + Strg+Leer
+' setzte `GUI_WINDOW(title, x, y, w, h)` -- ein Typ nimmt keine Argumente.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+IMPORT "gui"
+DIM w AS GUI_WIN
+--- datei _programm/ev.txt
+c 14
+e 20 2 264 0 0 0
+e 22 1 264 0 0 0
+e 30 2 269 0 0 0
+e 32 1 269 0 0 0
+e 50 2 341 0 0 0
+e 50 2 32 0 0 0
+e 52 1 32 0 0 0
+e 52 1 341 0 0 0
+e 80 2 257 0 0 0
+e 82 1 257 0 0 0
+e 110 2 341 0 0 0
+e 110 2 83 0 0 0
+e 112 1 83 0 0 0
+e 112 1 341 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM ph AS BOOLEAN : ph = FALSE
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 12) = "platzhalter " THEN ph = TRUE
+NEXT
+DIM z AS ARRAY OF STRING : z = READLINES("spiel.dh")
+PRINT "|" + z[1] + "|"
+PRINT "platzhalter " ; ph
+--- erwartet
+|DIM w AS GUI_WINDOW|
+platzhalter FALSE
+
+=== folgt schon eine klammer kommt keine zweite dazu
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+CIRC(1, 2, 3)
+--- datei _programm/ev.txt
+c 20
+e 20 2 268 0 0 0
+e 22 1 268 0 0 0
+e 26 2 262 0 0 0
+e 28 1 262 0 0 0
+e 30 2 262 0 0 0
+e 32 1 262 0 0 0
+e 34 2 262 0 0 0
+e 36 1 262 0 0 0
+e 38 2 262 0 0 0
+e 40 1 262 0 0 0
+e 50 2 341 0 0 0
+e 50 2 32 0 0 0
+e 52 1 32 0 0 0
+e 52 1 341 0 0 0
+e 80 2 257 0 0 0
+e 82 1 257 0 0 0
+e 110 2 341 0 0 0
+e 110 2 83 0 0 0
+e 112 1 83 0 0 0
+e 112 1 341 0 0 0
+
+--- nachher
+DIM z AS ARRAY OF STRING : z = READLINES("spiel.dh")
+PRINT "|" + z[0] + "|"
+--- erwartet
+|CIRCLE(1, 2, 3)|
+
 === der tabulator geht zum naechsten platzhalter
 AUTOMATION_PLAY("ev.txt")
 CLIPBOARD_SET("20")

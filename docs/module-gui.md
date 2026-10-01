@@ -36,6 +36,8 @@ IMPORT "gui"
 | `GUI_WINDOW_SCROLLABLE(win, an)` | — | Inhalt scrollt, wenn er höher als das Fenster ist (Mausrad + Scrollbalken). Inhaltshöhe automatisch aus den Widgets. Default: aus |
 | `GUI_WINDOW_CHROME(win, an)` | — | Titelleiste/Rahmen/Buttons zeichnen? Aus = randlos, Inhalt ab oben (damit eine Form das OS-Fenster ausfüllen kann). Default: an |
 | `GUI_WINDOW_DESIGN(win, an)` | — | Entwurfsmodus: das Fenster wird gezeichnet, aber seine Widgets bekommen keine Eingabe (kein Hover, Klick, Fokus, Rückruf; auch kein Ziehen am Rahmen). Ein Form-Designer legt so echte Widgets auf die Fläche und verwaltet die Maus selbst — `GUI_HIT_TEST` und alle Setter gehen weiter. Default: aus |
+| `GUI_WINDOW_ZOOM(win, faktor)` | — | ein Fenster im Entwurfsmodus vergrößert zeichnen (0.25 bis 4): die Lage bleibt, die Fläche wächst. Geometrie nach außen bleibt unvergrößert, `GUI_HIT_TEST` und `GUI_WINDOW_AT` rechnen die Maus zurück. Gezeichnet wird über eine Zwischenfläche, die weich vergrößert wird — Schrift ist bei 150–200 % etwas weich. Außerhalb des Entwurfsmodus ein Fehler (das Fenster nähme Eingaben an, und die Maus träfe daneben) |
+| `GUI_WINDOW_GET_ZOOM(win)` | FLOAT | der Faktor von `GUI_WINDOW_ZOOM` |
 | `GUI_WINDOW_SET_MIN_SIZE(win, w, h)` | — | Mindestgröße beim Resizen (0 = keine) |
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | Maximalgröße beim Resizen (0 = keine) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | dekorative Trennlinie (horizontal) |
@@ -250,7 +252,7 @@ IMPORT "gui"
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent, bei Knöpfen auch hover/pressed; -1 entfernt) |
 | `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
 
-**Tooltips:** `GUI_TOOLTIP(widget, text$)` hängt einem beliebigen Widget einen Hilfetext an. Er erscheint automatisch, sobald die Maus ~0,5 s ruhig über dem Widget verweilt (nur im obersten Fenster), und folgt dem Cursor am Bildschirmrand abgeklemmt. `\n` macht mehrere Zeilen; `""` entfernt den Tooltip wieder. Bewegung oder ein Mausklick setzt die Verweilzeit zurück.
+**Tooltips:** `GUI_TOOLTIP(widget, text$)` hängt einem beliebigen Widget einen Hilfetext an. Er erscheint automatisch, sobald die Maus ~0,5 s ruhig über dem Widget verweilt (nur im obersten Fenster; liegt ein modales Fenster davor, zeigt nur dieses Tipps), und folgt dem Cursor am Bildschirmrand abgeklemmt. `\n` macht mehrere Zeilen; `""` entfernt den Tooltip wieder. Bewegung oder ein Mausklick setzt die Verweilzeit zurück.
 
 ### Menüs
 
@@ -2745,7 +2747,8 @@ Der Textbereich war ein Code-Feld: lange Zeilen rollen waagerecht. Für
 Notizen und Briefe schaltet `GUI_TEXTAREA_SET(ta, "umbruch", 1)` den Umbruch
 an Wortgrenzen ein (ein Wort, das allein nicht passt, bricht im Zeichen).
 Pos1, Ende und die Pfeile bewegen sich dann in **sichtbaren** Zeilen, wie in
-jedem Editor; Zeilennummern stehen nur an der ersten Zeile eines Absatzes;
+jedem Editor (`Strg+Pos1`/`Strg+Ende` gehen immer an den Anfang bzw. das
+Ende des ganzen Textes); Zeilennummern stehen nur an der ersten Zeile eines Absatzes;
 `GUI_TEXTAREA_VIEW` zählt weiter logische Zeilen. Mit Umbruch gibt es keinen
 waagerechten Versatz. In der `.dhform`: `wrap_text`.
 
