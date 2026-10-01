@@ -340,7 +340,11 @@ pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str)
             for v in rest.split(',') {
                 let v = v.trim().trim_matches('\'');
                 if v.is_empty() || !v.chars().all(wortzeichen) || v.eq_ignore_ascii_case(&wort) { continue; }
-                aus.push((format!("Ersetzen durch {}", v), vec![(z0, von, bis, v.to_string())]));
+                // Der Compiler kennt Variablen nur klein ("lsumme"); geschrieben
+                // wird der Name so, wie er im Programm steht ("lSumme").
+                let v = crate::symbole::fundstellen(text, v).into_iter().next()
+                    .map(|f| f.name).unwrap_or_else(|| v.to_string());
+                aus.push((format!("Ersetzen durch {}", v), vec![(z0, von, bis, v)]));
             }
         }
     }
@@ -407,15 +411,7 @@ pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str)
         if let Some(q) = rest.find('"') {
             let modul = &rest[..q];
             if !modul.is_empty() && modul.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-                let mut ziel = 0;
-                let mut hinter_import = None;
-                for (k, t) in zeilen.iter().enumerate() {
-                    let r = t.trim().to_uppercase();
-                    if r.starts_with("IMPORT ") { hinter_import = Some(k + 1); continue; }
-                    if hinter_import.is_none() && (r.is_empty() || r.starts_with('\'') || r.starts_with("REM ")) { ziel = k + 1; continue; }
-                    break;
-                }
-                let ziel = hinter_import.unwrap_or(ziel).min(zeilen.len());
+                let ziel = kopf_ende(&zeilen);
                 aus.push((format!("IMPORT \"{}\" einfuegen", modul), vec![(ziel, 0, 0, format!("IMPORT \"{}\"\n", modul))]));
             }
         }
@@ -454,8 +450,32 @@ pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str)
         };
         let zeile_neu = format!("{}DIM {} AS {}\n", ein, wort, typ);
         aus.push((format!("DIM {} AS {} anlegen", wort, typ), vec![(ziel, 0, 0, zeile_neu)]));
+        // Im Unterprogramm ist das DIM dort lokal -- der Wert ist nach dem
+        // Aufruf weg. Wer ihn behalten will (ein Zustand wie "welcher
+        // Eintrag wird bearbeitet"), braucht ihn global: oben in der Datei,
+        // nicht vor der SUB -- liefe das Hauptprogramm vorher, waere der
+        // Platz beim ersten Aufruf noch leer.
+        if umgebend.is_some() {
+            let oben = kopf_ende(&zeilen);
+            aus.push((format!("DIM {} AS {} global anlegen (oben in der Datei)", wort, typ),
+                      vec![(oben, 0, 0, format!("DIM {} AS {}\n", wort, typ))]));
+        }
     }
     aus
+}
+
+/// Wo oben in der Datei etwas Neues hingehoert: hinter die IMPORTs, die schon
+/// da sind, sonst hinter den Kopfkommentar.
+fn kopf_ende(zeilen: &[&str]) -> usize {
+    let mut ziel = 0;
+    let mut hinter_import = None;
+    for (k, t) in zeilen.iter().enumerate() {
+        let r = t.trim().to_uppercase();
+        if r.starts_with("IMPORT ") { hinter_import = Some(k + 1); continue; }
+        if hinter_import.is_none() && (r.is_empty() || r.starts_with('\'') || r.starts_with("REM ")) { ziel = k + 1; continue; }
+        break;
+    }
+    hinter_import.unwrap_or(ziel).min(zeilen.len())
 }
 
 /// Die rechte Seite von `name = ...` in dieser Zeile, falls sie so beginnt.
@@ -919,6 +939,26 @@ WEND";
                    vec![(0, 5, 7, "<>".to_string())]);
         // Eine Meldung ohne Vorschlag bleibt ohne Korrektur.
         assert!(korrekturen("PRINT(1)", 0, 0, 5, "Irgendwas").is_empty());
+    }
+
+    #[test]
+    fn schreibweise_und_globales_dim() {
+        // Der Compiler schlaegt "lsumme" vor; eingesetzt wird "lSumme".
+        let t = "IMPORT \"gui\"\nDIM lSumme AS INTEGER\nPRINT summ";
+        let k = korrekturen(t, 2, 6, 10, "'summ' wird hier gelesen, aber nirgends im Programm mit DIM oder CONST angelegt. Meintest du 'lsumme'?");
+        assert_eq!(k[0].0, "Ersetzen durch lSumme");
+        assert_eq!(k[0].1, vec![(2, 6, 10, "lSumme".to_string())]);
+        // Im Unterprogramm: lokal unter den Kopf UND global oben hinter die
+        // IMPORTs (nicht vor die SUB -- das Hauptprogramm kann vorher laufen).
+        let t = "' Kopf\nIMPORT \"gui\"\n\nSUB s()\n    id = 5\nEND SUB";
+        let m = "'id' wird hier beschrieben, aber nirgends im Programm mit DIM oder CONST angelegt.";
+        let k = korrekturen(t, 4, 4, 6, m);
+        assert_eq!(k[0].1, vec![(4, 0, 0, "    DIM id AS INTEGER\n".to_string())]);
+        assert_eq!(k[1].0, "DIM id AS INTEGER global anlegen (oben in der Datei)");
+        assert_eq!(k[1].1, vec![(2, 0, 0, "DIM id AS INTEGER\n".to_string())]);
+        // Auf oberster Ebene gibt es nur die eine.
+        let k = korrekturen("x = 1", 0, 0, 1, "'x' wird hier beschrieben, aber nirgends im Programm mit DIM oder CONST angelegt.");
+        assert_eq!(k.len(), 1);
     }
 
     #[test]
