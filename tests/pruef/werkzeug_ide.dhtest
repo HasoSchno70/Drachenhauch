@@ -2637,3 +2637,51 @@ marken 3 TRUE
 |Xhp = Xhp + 1|
 |hpmax = 9|
 
+
+=== dieselbe datei in anderer schreibweise oeffnet keinen zweiten reiter
+' Stresstest 2026-10-01: der Debugger meldet eine importierte Datei mit
+' ihrem langen Namen, das Projekt kennt den kurzen (HANSGA~1). Am Text
+' verglichen stand die Datei danach zweimal als Reiter da, und das Projekt
+' zog in den Ordner der importierten Datei um. Hier traegt der zweite Weg
+' ein "..", und der Projektordner ein "lib/.." -- beides dieselben Orte.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    DIM prWurzel AS STRING : prWurzel = projektOrdner
+    dateiOeffnen(PATHJOIN(prWurzel, "lib/mathe.dh"))
+    protokoll("pr reiter " + STR$(tabAnzahl))
+    dateiOeffnen(PATHJOIN(prWurzel, "lib/../lib/mathe.dh"))
+    protokoll("pr reiter " + STR$(tabAnzahl))
+    projektOrdner = PATHJOIN(prWurzel, "lib/..")
+    dateiOeffnen(PATHJOIN(prWurzel, "lib/mathe.dh"))
+    protokoll("pr projekt bleibt " + STR$(projektOrdner = PATHJOIN(prWurzel, "lib/..")))
+    protokoll("pr reiter " + STR$(tabAnzahl))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+IMPORT "lib/mathe.dh"
+PRINT quadrat(3)
+--- datei lib/mathe.dh
+FUNCTION quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr reiter 2
+pr reiter 2
+pr projekt bleibt TRUE
+pr reiter 2

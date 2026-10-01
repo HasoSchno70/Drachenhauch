@@ -3318,6 +3318,20 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
                 RETURN
             END IF
         NEXT
+        ' Derselbe Weg anders geschrieben: der Debugger meldet den langen
+        ' Namen ("Hans Gaming"), das Projekt kennt vielleicht den kurzen
+        ' (HANSGA~1), oder ein Weg traegt "..". Erst die Platte weiss, ob es
+        ' dieselbe Datei ist -- sonst stand sie zweimal als Reiter da.
+        FOR i = 0 TO tabAnzahl - 1
+            IF tabPfade[i] <> "" THEN
+                IF SAMEFILE(tabPfade[i], pfad) THEN
+                    aktiverTab = i
+                    reiterNeuSetzen()
+                    GUI_FOCUS(tabFelder[i])
+                    RETURN
+                END IF
+            END IF
+        NEXT
     END IF
     DIM ta AS GUI_WIDGET
     ta = GUI_TEXTAREA(win, 0, 0, 10, 10)
@@ -3379,13 +3393,25 @@ SUB dateiOeffnen(pfad AS STRING)
     ' Der Projektordner wandert NUR, wenn die Datei ausserhalb liegt. Sonst
     ' machte ein Klick auf `lib/mehr.dh` den Unterordner zum Projekt, und
     ' der Baum zeigte danach die halbe Arbeit nicht mehr.
-    IF LEFT$(wegGleich$(pfad), LEN(wegGleich$(projektOrdner))) <> wegGleich$(projektOrdner) THEN
-        projektOrdner = DIRNAME(pfad)
-    END IF
+    IF NOT imProjekt(pfad) THEN projektOrdner = DIRNAME(pfad)
     baumFuellen()
     zuletztMerken(pfad)
     GUI_SET_TEXT(lblStatus, pfad)
 END SUB
+
+' Liegt die Datei im Projektordner? Erst am Text, dann ueber die Platte:
+' derselbe Ordner kommt als kurzer und als langer Name an (der Debugger
+' meldet den langen), und am Text allein zog das Projekt beim ersten Halt
+' in einer importierten Datei in deren Ordner um.
+FUNCTION imProjekt(pfad AS STRING) AS BOOLEAN
+    IF projektOrdner = "" THEN RETURN FALSE
+    IF LEFT$(wegGleich$(pfad), LEN(wegGleich$(projektOrdner))) = wegGleich$(projektOrdner) THEN RETURN TRUE
+    DIM o AS STRING : o = LOWER$(wegGleich$(REALPATH$(projektOrdner)))
+    DIM d AS STRING : d = LOWER$(wegGleich$(REALPATH$(pfad)))
+    IF o = "" OR d = "" THEN RETURN FALSE
+    IF RIGHT$(o, 1) <> "/" THEN o = o + "/"
+    RETURN LEFT$(d, LEN(o)) = o
+END FUNCTION
 
 FUNCTION aktivesFeld() AS GUI_WIDGET
     IF aktiverTab < 0 THEN RETURN -1
