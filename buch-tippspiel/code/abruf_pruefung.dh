@@ -4,12 +4,26 @@
 '  Zeigt schwarz auf weiss, was der Unterschied ist: waehrend
 '  ein Abruf laeuft, zaehlt die Schleife weiter. Genau diese
 '  Schleife ist im Fenster das Neuzeichnen.
+'
+'  Das Programm braucht das NETZ. Es laeuft trotzdem in
+'  `dhrt test` mit (die Endung _pruefung.dh): ist OpenLigaDB
+'  nicht erreichbar oder antwortet mit einem Fehler, meldet es
+'  sich als uebersprungen und endet mit 0 -- ein kurzer
+'  Netzaussetzer auf einem CI-Rechner ist kein Fehler im Code.
 ' ============================================================
 IMPORT "html"
 
 DIM fehler AS INTEGER : fehler = 0
 CONST URL AS STRING = "https://api.openligadb.de/getmatchdata/bl1/2026"
 
+' Ein Fehler, der vom Netz kommt (Server nicht erreichbar: "HTTP-Fehler:
+' ...", Server antwortet mit einem Fehler: "HTTP 503 ...") -- nicht einer
+' aus dem Programm ("HTTP_RESULT: ... nicht fertig").
+FUNCTION netzfehler(meldung AS STRING) AS BOOLEAN
+    RETURN LEFT$(meldung, 5) = "HTTP-" OR LEFT$(meldung, 5) = "HTTP "
+END FUNCTION
+
+SUB pruefen()
 PRINT "=== 1. Blockierend (HTTP_GET) ==="
 DIM t0 AS INTEGER : t0 = MILLIS()
 DIM antwort AS STRING : antwort = HTTP_GET(URL)
@@ -37,7 +51,10 @@ PRINT "    Dabei lief die Schleife "; runden; " Mal durch -- so viele Bilder"
 PRINT "    haette das Fenster in derselben Zeit zeichnen koennen."
 PRINT "    Status: "; HTTP_STATUS()
 
-IF runden > 5 THEN
+' Wie viele Runden moeglich sind, haengt an der Dauer: ein Abruf, der in
+' wenigen Millisekunden zurueck ist (die zweite Anfrage an dieselbe Adresse,
+' ueber eine noch offene Verbindung), laesst kaum Runden zu.
+IF runden > 5 OR gesamt < 30 THEN
     PRINT "  ok    Die Schleife lief waehrend des Abrufs weiter"
 ELSE
     PRINT "  FEHLER Die Schleife stand -- der Abruf blockiert doch"
@@ -107,6 +124,17 @@ ELSE
     fehler = fehler + 1
 END IF
 HTTP_CANCEL(b2) : HTTP_CANCEL(b3)
+END SUB
+
+TRY
+    pruefen()
+CATCH e
+    IF NOT netzfehler(e) THEN THROW e
+    PRINT ""
+    PRINT "UEBERSPRUNGEN -- OpenLigaDB nicht erreichbar:"
+    PRINT "  "; e
+    EXIT(0)
+END TRY
 
 PRINT ""
 IF fehler = 0 THEN

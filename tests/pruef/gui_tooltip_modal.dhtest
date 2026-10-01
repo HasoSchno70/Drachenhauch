@@ -1,0 +1,60 @@
+' Tooltip unter einem modalen Fenster (2026-10-01, beim Dogfooding
+' gefunden): die gui zeigte den Tipp des Widgets unter der Maus auch dann,
+' wenn ein modaler Dialog davor lag -- das Widget nimmt dort keine Klicks
+' an, der Tipp ueber dem Schleier sah aber aus, als liesse es sich noch
+' bedienen. Geprueft am Bild: liegt an der Stelle des Tipps seine Farbe?
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ohne dialog steht der tipp
+IMPORT "gui"
+SCREEN(480, 320, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 480, 320)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 10, 10, 120, 30)
+GUI_TOOLTIP(k, "Hilfe zum Knopf mit langem Text")
+WRITEALL("ev.txt", "c 1" + CHR$(10) + "e 0 7 30 24 0" + CHR$(10) + CHR$(10))
+AUTOMATION_PLAY("ev.txt")
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+    IF bild = 90 THEN
+        SAVESCREENSHOT("s.png")
+        DIM b AS IMAGE : b = LOADIMAGE("s.png")
+        PRINT "tipp "; GETPIXEL(b, 70, 52) = (GUI_THEME_GET("widget_bg") BAND &HFFFFFF)
+        EXIT(0)
+    END IF
+WEND
+--- erwartet
+tipp TRUE
+
+=== unter einem modalen dialog nicht
+IMPORT "gui"
+SCREEN(480, 320, "T", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("A", 0, 0, 480, 320)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM k AS GUI_WIDGET : k = GUI_BUTTON(w, "Knopf", 10, 10, 120, 30)
+GUI_TOOLTIP(k, "Hilfe zum Knopf mit langem Text")
+WRITEALL("ev.txt", "c 1" + CHR$(10) + "e 0 7 30 24 0" + CHR$(10) + CHR$(10))
+AUTOMATION_PLAY("ev.txt")
+DIM d AS GUI_WINDOW
+DIM bild AS INTEGER
+WHILE NOT QUITREQUESTED()
+    bild = bild + 1
+    IF bild = 5 THEN d = GUI_DIALOG("Frage", "Wirklich?")
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+    IF bild = 90 THEN
+        PRINT "dialog modal "; GUI_MODAL()
+        PRINT "maus im dialog "; GUI_WINDOW_AT(30, 24) = d
+        SAVESCREENSHOT("s.png")
+        DIM b AS IMAGE : b = LOADIMAGE("s.png")
+        PRINT "tipp "; GETPIXEL(b, 70, 52) = (GUI_THEME_GET("widget_bg") BAND &HFFFFFF)
+        EXIT(0)
+    END IF
+WEND
+--- erwartet
+dialog modal TRUE
+maus im dialog FALSE
+tipp FALSE

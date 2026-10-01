@@ -99,6 +99,9 @@ enum Cmd {
     Lichtfleck(i32, i32, f32, f32, Color),
     BlendMode(i32),                                    // 0=alpha,1=additive,2=multiplied,4=subtract
     RtDraw(usize, i32, i32, f32, Color, bool),         // render-target idx, x, y, scale, tint, flip_v
+    /// Ein Ausschnitt eines Render-Targets, vergroessert gestempelt (GUI_WINDOW_ZOOM):
+    /// idx, Quelle (x, y, b, h) und Ziel (x, y, b, h) in logischen Punkten.
+    RtDrawTeil(usize, [f32; 4], [f32; 4]),
 }
 
 /// 3D-Zeichenbefehle (Modul `g3d`). Werden beim FLIP in einem
@@ -937,6 +940,12 @@ pub struct Graphics {
     // Render-Targets (RENDERTARGET_*): leben ueber Frames; active_rt lenkt `emit`
     // um, solange ein Target via RENDERTARGET_BEGIN aktiv ist.
     render_targets: Vec<RenderTarget>,
+    /// Die Zeichenflaeche fuer vergroesserte gui-Fenster (GUI_WINDOW_ZOOM):
+    /// (Index in render_targets, Breite, Hoehe) -- so gross wie der Schirm,
+    /// das Fenster wird an seiner echten Lage hineingezeichnet und der
+    /// Ausschnitt vergroessert gestempelt. Dazu das Ziel, das vorher galt.
+    zoom_rt: Option<(usize, i32, i32)>,
+    zoom_vorher: Option<Option<usize>>,
     active_rt: Option<usize>,
     clear_color: Color,
     // Transparenter Fenster-Framebuffer (SCREEN_TRANSPARENT): der Desktop scheint
@@ -1145,6 +1154,11 @@ pub struct Graphics {
     /// `KEY_ANY_HIT` die Demo-Tasten als Nutzereingabe, und ein Attract-Modus
     /// ("bei Tastendruck abbrechen") wuerde sich selbst sofort beenden.
     auto_injected_keys: Vec<i32>,
+    /// Maustasten, deren Klick ganz zwischen zwei Bildern lag (flanken.rs):
+    /// sie gelten ein Bild lang als gedrueckt, sonst saehe sie niemand.
+    maus_halt: [crate::flanken::Halt; crate::flanken::TASTEN],
+    /// Dasselbe fuer die Tastatur, je GLFW-Tastencode.
+    tasten_halt: Vec<crate::flanken::Halt>,
     /// Das zuletzt abgespielte Positions-Ereignis der Wiedergabe. raylib
     /// zeichnet eine Mausposition NUR auf, wenn sie sich geaendert hat
     /// (`rcore.c`: "only saved if changed") -- zwischen zwei solchen
@@ -1561,6 +1575,10 @@ impl Graphics {
         // gleich darunter -- ausser der Aufrufer wollte es ohnehin versteckt.
         builder.hidden();
         let (mut rl, thread) = Graphics::fenster_bauen(builder)?;
+        // Klicks zwischen zwei Bildern mitzaehlen (flanken.rs).
+        crate::flanken::einhaengen();
+        let _ = crate::flanken::abholen();
+        let _ = crate::flanken::tasten_abholen();
         let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
         crate::ime::einhaengen(unsafe { rl.get_window_handle() });
@@ -1621,6 +1639,8 @@ impl Graphics {
             layer_names,
             active: 0,
             render_targets: Vec::new(),
+            zoom_rt: None,
+            zoom_vorher: None,
             active_rt: None,
             // Transparente Fenster starten voll durchsichtig (Alpha 0), normale deckend schwarz.
             clear_color: if transparent { Color::new(0, 0, 0, 0) } else { Color::BLACK },
@@ -1720,6 +1740,8 @@ impl Graphics {
             auto_play_frame: 0,
             auto_play_base: 0,
             auto_injected_keys: Vec::new(),
+            maus_halt: [crate::flanken::Halt::default(); crate::flanken::TASTEN],
+            tasten_halt: vec![crate::flanken::Halt::default(); crate::flanken::TASTATUR],
             auto_maus: None,
             key_names: HashMap::new(),
         };
@@ -1759,12 +1781,23 @@ impl Graphics {
     }
 
     /// Welcher Font zeichnet diesen Text? Normalerweise der aktive. Steht
-    /// keiner (eingebaute Bitmapschrift) und enthaelt der Text Zeichen
-    /// jenseits von ASCII, springt der Ausweich-Font ein -- als Handle
+    /// keiner (eingebaute Bitmapschrift) und enthaelt der Text ein Zeichen,
+    /// das sie nicht hat (jenseits von Latin-1), springt der Ausweich-Font
+    /// ein -- als Handle
     /// `FONT_AUSWEICH`, das nicht in `fonts` steht.
+    /// Braucht dieser Text in der eingebauten Schrift den Ausweich-Font? Nur,
+    /// wenn ein Zeichen darin fehlt: raylibs Bitmapschrift hat 32..255 samt
+    /// Umlauten und ss (rtext.c, LoadFontDefault). Bis 2026-10-01 ging jeder
+    /// Text mit einem Zeichen ueber ASCII GANZ an den Ausweich-Font -- in
+    /// einer Oberflaeche stand "Loeschen" dann in einer anderen Schrift als
+    /// "Buchen" daneben.
+    fn braucht_ausweich(&self, s: &str) -> bool {
+        !self.ausweich.is_empty() && s.chars().any(|c| !self.font_hat(-1, c as u32))
+    }
+
     fn font_fuer(&self, s: &str) -> i64 {
         if self.active_font >= 0 { return self.active_font; }
-        if !self.ausweich.is_empty() && !s.is_ascii() { return FONT_AUSWEICH; }
+        if self.braucht_ausweich(&s) { return FONT_AUSWEICH; }
         -1
     }
 
@@ -1963,6 +1996,38 @@ impl Graphics {
         Ok(())
     }
     pub fn rendertarget_end(&mut self) { self.active_rt = None; }
+
+    /// GUI_WINDOW_ZOOM: ab jetzt in die Zoom-Flaeche zeichnen. FALSE, wenn
+    /// es keine gibt (dann zeichnet der Aufrufer unvergroessert).
+    pub fn zoom_beginnen(&mut self) -> bool {
+        let (sw, sh) = (self.screen_width().max(1) as i32, self.screen_height().max(1) as i32);
+        let neu = match self.zoom_rt { Some((_, w, h)) => w != sw || h != sh, None => true };
+        if neu {
+            let rt = match self.rl.load_render_texture(&self.thread, sw as u32, sh as u32) { Ok(rt) => rt, Err(_) => return false };
+            // Weich vergroessert -- mit dem Vorgabefilter (naechster Punkt)
+            // waeren Schrift und Linien bei 150 % treppig.
+            unsafe { raylib::ffi::SetTextureFilter(rt.texture, 1 /*BILINEAR*/); }
+            match self.zoom_rt {
+                Some((i, _, _)) => self.render_targets[i] = RenderTarget { rt, cmds: Vec::new(), behalten: false },
+                None => self.render_targets.push(RenderTarget { rt, cmds: Vec::new(), behalten: false }),
+            }
+            let i = match self.zoom_rt { Some((i, _, _)) => i, None => self.render_targets.len() - 1 };
+            self.zoom_rt = Some((i, sw, sh));
+        }
+        self.zoom_vorher = Some(self.active_rt);
+        self.active_rt = self.zoom_rt.map(|z| z.0);
+        true
+    }
+    /// Zurueck zum vorigen Ziel und den Ausschnitt (x, y, b, h) mit Faktor
+    /// `z` an (x, y) stempeln.
+    pub fn zoom_beenden(&mut self, x: i32, y: i32, b: i32, h: i32, z: f32) {
+        self.active_rt = self.zoom_vorher.take().unwrap_or(None);
+        if let Some((i, _, _)) = self.zoom_rt {
+            let q = [x as f32, y as f32, b as f32, h as f32];
+            let d = [x as f32, y as f32, b as f32 * z, h as f32 * z];
+            self.emit(Cmd::RtDrawTeil(i, q, d));
+        }
+    }
     /// Zeichnet das Target (seine Textur) an Position x,y, skaliert + getoent.
     pub fn rendertarget_draw(&mut self, idx: i64, x: i32, y: i32, scale: f64, tint: Option<i64>, flip_v: bool) -> Result<(), String> {
         let i = self.check_rt(idx, "RENDERTARGET_DRAW")?;
@@ -3415,7 +3480,7 @@ impl Graphics {
     /// Breite nicht.
     pub fn text_width_stil(&self, s: &str, size: i32, font: i64, stil: u8) -> i32 {
         let size = size.max(1);
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() { FONT_AUSWEICH } else { font };
+        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         let (h, emu) = self.schnitt_da(font, stil);
         let mut b = self.breite_mit(h, s, size as f32);
         if emu & crate::schnitt::FETT != 0 && !s.is_empty() { b += crate::schnitt::fett_versatz(size as f32); }
@@ -3452,7 +3517,7 @@ impl Graphics {
         let (x, y) = self.w2s(x, y);
         // Auch hier ausweichen: ein Widget ohne eigene Schrift (font = -1)
         // zeigt sonst "K?ln" in der Tabelle.
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() {
+        let font = if font < 0 && self.braucht_ausweich(&s) {
             FONT_AUSWEICH
         } else { font };
         self.glyphen_pruefen(font, &s);
@@ -3464,7 +3529,7 @@ impl Graphics {
     pub fn text_styled_stil(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
         if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
         let (x, y) = self.w2s(x, y);
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() { FONT_AUSWEICH } else { font };
+        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         let sp = self.text_spacing;
         self.text_emit(x, y, s, size.max(1), c, font, sp, stil);
     }
@@ -3476,7 +3541,7 @@ impl Graphics {
     pub fn text_nachgebildet(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
         if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
         let (x, y) = self.w2s(x, y);
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() { FONT_AUSWEICH } else { font };
+        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         self.glyphen_pruefen(font, &s);
         let sp = self.text_spacing;
         self.emit(Cmd::TextStil(x, y, s, size.max(1), col(c), font, sp, stil));
@@ -3641,7 +3706,7 @@ impl Graphics {
     pub fn text_width_in(&self, s: &str, size: i32, font: i64) -> i32 {
         let size = size.max(1);
         // Gegenstueck zu text_styled, das bei Umlauten ebenfalls ausweicht.
-        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() {
+        let font = if font < 0 && self.braucht_ausweich(&s) {
             FONT_AUSWEICH
         } else { font };
         self.breite_mit(font, s, size as f32) as i32
@@ -4476,37 +4541,37 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // pruefen: US-Haupttaste, Ziffernblock und die dt.-Layout-Position
         // (auf DE liegt "+" an US "]", "-" an US "/").
         match code {
-            43 => return self.rl.is_key_down(KEY_EQUAL)
-                       || self.rl.is_key_down(KEY_KP_ADD)
-                       || self.rl.is_key_down(KEY_RIGHT_BRACKET),
-            45 => return self.rl.is_key_down(KEY_MINUS)
-                       || self.rl.is_key_down(KEY_KP_SUBTRACT)
-                       || self.rl.is_key_down(KEY_SLASH),
+            43 => return self.t_unten(KEY_EQUAL)
+                       || self.t_unten(KEY_KP_ADD)
+                       || self.t_unten(KEY_RIGHT_BRACKET),
+            45 => return self.t_unten(KEY_MINUS)
+                       || self.t_unten(KEY_KP_SUBTRACT)
+                       || self.t_unten(KEY_SLASH),
             _ => {}
         }
-        match map_key(code) { Some(k) => self.rl.is_key_down(k), None => false }
+        match map_key(code) { Some(k) => self.t_unten(k), None => false }
     }
 
     /// Flankengetriggert: ist die Taste in DIESEM Frame neu gedrueckt worden?
     /// (raylib is_key_pressed). Fuer Caret-Bewegung u.ae., damit ein Tastendruck
     /// nicht jeden Frame ausloest.
     pub fn key_pressed(&self, code: i64) -> bool {
-        match map_key(code) { Some(k) => self.rl.is_key_pressed(k), None => false }
+        match map_key(code) { Some(k) => self.t_neu(k), None => false }
     }
     /// Ist eine Shift-Taste gedrueckt? (fuer Text-Selektion via Shift+Pfeil)
     pub fn key_shift(&self) -> bool {
         use raylib::consts::KeyboardKey::*;
-        self.rl.is_key_down(KEY_LEFT_SHIFT) || self.rl.is_key_down(KEY_RIGHT_SHIFT)
+        self.t_unten(KEY_LEFT_SHIFT) || self.t_unten(KEY_RIGHT_SHIFT)
     }
     /// Ist eine Strg/Ctrl-Taste gedrueckt? (fuer Strg+A/C/V/X im Textfeld)
     pub fn key_ctrl(&self) -> bool {
         use raylib::consts::KeyboardKey::*;
-        self.rl.is_key_down(KEY_LEFT_CONTROL) || self.rl.is_key_down(KEY_RIGHT_CONTROL)
+        self.t_unten(KEY_LEFT_CONTROL) || self.t_unten(KEY_RIGHT_CONTROL)
     }
     /// Ist eine Alt-Taste gedrueckt? (fuer Menue-Kuerzel wie Alt+Enter)
     pub fn key_alt(&self) -> bool {
         use raylib::consts::KeyboardKey::*;
-        self.rl.is_key_down(KEY_LEFT_ALT) || self.rl.is_key_down(KEY_RIGHT_ALT)
+        self.t_unten(KEY_LEFT_ALT) || self.t_unten(KEY_RIGHT_ALT)
     }
 
     // --- Gamepad (Modul input: INPUT_JOY_*) ---
@@ -4686,8 +4751,20 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn mouse_x(&self) -> i64 { (self.rl.get_mouse_x() / self.scale) as i64 }
     pub fn mouse_y(&self) -> i64 { (self.rl.get_mouse_y() / self.scale) as i64 }
     pub fn mouse_button(&self, b: i64) -> bool {
-        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_down(x), None => false }
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_down(x) || self.halt(b).unten, None => false }
     }
+    fn halt(&self, b: i64) -> crate::flanken::Halt {
+        self.maus_halt.get(b as usize).copied().unwrap_or_default()
+    }
+    // Tastenabfragen samt Verlaengerung (flanken.rs): ein Druck, der ganz
+    // zwischen zwei Bildern lag, gilt ein Bild lang als gedrueckt. ALLE
+    // Tastenabfragen dieser Datei gehen hierueber, nicht an raylib vorbei.
+    fn t_halt(&self, k: raylib::consts::KeyboardKey) -> crate::flanken::Halt {
+        self.tasten_halt.get(k as usize).copied().unwrap_or_default()
+    }
+    fn t_unten(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_down(k) || self.t_halt(k).unten }
+    fn t_neu(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_pressed(k) || self.t_halt(k).neu }
+    fn t_los(&self, k: raylib::consts::KeyboardKey) -> bool { self.rl.is_key_released(k) || self.t_halt(k).los }
 
     // --- Eingabe-FLANKEN -----------------------------------------------------
     // `MOUSEBUTTON` und `KEYPRESSED` liefern beide "wird gehalten". Damit fehlte
@@ -4706,11 +4783,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     /// MOUSE_HIT(b): in DIESEM Frame gedrueckt worden?
     pub fn mouse_hit(&self, b: i64) -> bool {
-        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_pressed(x), None => false }
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_pressed(x) || self.halt(b).neu, None => false }
     }
     /// MOUSE_RELEASED(b): in DIESEM Frame losgelassen worden?
     pub fn mouse_released(&self, b: i64) -> bool {
-        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_released(x), None => false }
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_released(x) || self.halt(b).los, None => false }
     }
 
     /// Wie `key_down`, aber mit frei waehlbarem raylib-Test -- inklusive der
@@ -4730,7 +4807,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// bleibt "gehalten" -- der Name ist historisch, ihn umzudeuten wuerde
     /// bestehende Programme still kaputtmachen.
     pub fn key_hit(&self, code: i64) -> bool {
-        self.key_test(code, |k| self.rl.is_key_pressed(k))
+        self.key_test(code, |k| self.t_neu(k))
     }
     /// Wurde in DIESEM Bild irgendeine Taste ausser Alt gedrueckt? Fuer
     /// "Alt allein oeffnet das Menue" (gui.rs) -- ein Alt+X darf es nicht.
@@ -4741,19 +4818,19 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         for code in 32..=348 {
             if let Some(k) = raylib::core::input::key_from_i32(code) {
                 if k == KEY_LEFT_ALT || k == KEY_RIGHT_ALT { continue; }
-                if self.rl.is_key_pressed(k) { return true; }
+                if self.t_neu(k) { return true; }
             }
         }
         false
     }
     /// KEYRELEASED(code): in DIESEM Frame losgelassen.
     pub fn key_released_edge(&self, code: i64) -> bool {
-        self.key_test(code, |k| self.rl.is_key_released(k))
+        self.key_test(code, |k| self.t_los(k))
     }
     /// KEYREPEAT(code): erster Druck ODER System-Auto-Repeat (Textcursor,
     /// Mengen-Eingabe) -- haelt man die Taste, feuert es wiederholt.
     pub fn key_repeat(&self, code: i64) -> bool {
-        self.key_test(code, |k| self.rl.is_key_pressed(k) || self.rl.is_key_pressed_repeat(k))
+        self.key_test(code, |k| self.t_neu(k) || self.rl.is_key_pressed_repeat(k))
     }
 
     /// Relative Mausbewegung seit dem letzten Frame -- Grundlage fuer
@@ -4897,6 +4974,13 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 self.auto_injected_keys.push(e.params()[0]);
             }
             e.play();
+            // Maustasten gehen an GLFW vorbei -- fuer flanken.rs mitzaehlen,
+            // sonst waere ein Klick im selben Bild der Aufnahme ein anderer
+            // als einer von aussen.
+            if typ == 6 { crate::flanken::zaehlen(e.params()[0], 1); }
+            if typ == 5 { crate::flanken::zaehlen(e.params()[0], 0); }
+            if typ == 2 { crate::flanken::taste_zaehlen(e.params()[0], 1); }
+            if typ == 1 { crate::flanken::taste_zaehlen(e.params()[0], 0); }
             // 7 = INPUT_MOUSE_POSITION (rcore.c). Merken, welches Ereignis die
             // Lage zuletzt gesetzt hat -- unten wird sie damit gehalten.
             if typ == 7 { self.auto_maus = Some(self.auto_play_idx); maus_neu = true; }
@@ -5977,6 +6061,31 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // Werte ueberschreiben sie also und gelten fuer genau diesen Frame.
         self.automation_tick();
 
+        // Klicks, die ganz in der Luecke seit dem letzten Bild lagen:
+        // raylib sieht sie nicht (flanken.rs), also gelten sie jetzt ein Bild
+        // lang als gedrueckt.
+        let (druck, los) = crate::flanken::abholen();
+        for t in 0..crate::flanken::TASTEN {
+            let (unten, flanke) = match Self::mouse_btn(t as i64) {
+                Some(x) => (self.rl.is_mouse_button_down(x), self.rl.is_mouse_button_pressed(x)),
+                None => (false, false),
+            };
+            self.maus_halt[t] = crate::flanken::weiter(self.maus_halt[t], druck[t], los[t], unten, flanke);
+        }
+        // Dasselbe fuer Tasten: weitergeschaltet werden die beruehrten und
+        // die, deren Verlaengerung gerade laeuft oder endet.
+        let mut beruehrt: Vec<(usize, u32, u32)> = crate::flanken::tasten_abholen();
+        for (t, h) in self.tasten_halt.iter().enumerate() {
+            if (h.unten || h.los) && !beruehrt.iter().any(|b| b.0 == t) { beruehrt.push((t, 0, 0)); }
+        }
+        for (t, d, l) in beruehrt {
+            let (unten, flanke) = match raylib::core::input::key_from_i32(t as i32) {
+                Some(k) => (self.rl.is_key_down(k), self.rl.is_key_pressed(k)),
+                None => (false, false),
+            };
+            self.tasten_halt[t] = crate::flanken::weiter(self.tasten_halt[t], d, l, unten, flanke);
+        }
+
         // Abgelegte Dateien fuer das naechste Bild: raylib (Hineinziehen) und
         // der Finder (finder.rs). `load_dropped_files` gibt die Liste bei
         // raylib wieder frei -- darum genau EINMAL je Bild.
@@ -6809,6 +6918,17 @@ fn render_scene<D: RaylibDraw>(
                             let dst = Rectangle::new((x * s) as f32, (y * s) as f32,
                                 tw * scale * s as f32, th * scale * s as f32);
                             d.draw_texture_pro(tex, src, dst, Vector2::zero(), 0.0, *tint);
+                        }
+                    }
+                    Cmd::RtDrawTeil(i, q, z) => {
+                        if let Some(rtgt) = render_targets.get(*i) {
+                            let tex = rtgt.rt.texture();
+                            let th = tex.height as f32;
+                            // Die Textur steht auf dem Kopf: Zeile r liegt bei th-1-r.
+                            let src = Rectangle::new(q[0], th - q[1] - q[3], q[2], -q[3]);
+                            let sf = s as f32;
+                            let dst = Rectangle::new(z[0] * sf, z[1] * sf, z[2] * sf, z[3] * sf);
+                            d.draw_texture_pro(tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
                         }
                     }
                     Cmd::ScissorPush(x, y, w, h) => {

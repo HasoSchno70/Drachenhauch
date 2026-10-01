@@ -834,3 +834,67 @@ pr fokus ersatz
 pr fokus ersetzen
 pr fokus alle
 pr ohne ersetzen zurueck
+
+=== die uebersichtskarte malt nicht ueber die suchleiste
+' Beim Dogfooding 2026-09-30 gefunden: die Karte wird nach GUI_DRAW ueber das
+' Hauptfenster gemalt und lag damit auch ueber der Suchleiste ("Alle" halb
+' verdeckt). Zwei Bilder derselben Leiste, einmal mit, einmal ohne Karte:
+' im Streifen der Karte muessen sie gleich sein.
+DIM prBild AS INTEGER
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     trefferNachziehen()
+    prBild = prBild + 1
+    IF prBild = 5 THEN minimapSetzen(TRUE)
+    IF prBild = 10 THEN befehl("ersetzen")
+    IF prBild = 30 THEN
+        DIM prX AS INTEGER
+        DIM prY AS INTEGER
+        DIM prX1 AS INTEGER : prX1 = 99999
+        DIM prY1 AS INTEGER : prY1 = 99999
+        DIM prX2 AS INTEGER : prX2 = -1
+        DIM prY2 AS INTEGER : prY2 = -1
+        FOR prY = 0 TO SCREENHEIGHT() - 1 STEP 2
+            FOR prX = SCREENWIDTH() - 600 TO SCREENWIDTH() - 1 STEP 2
+                IF GUI_WINDOW_AT(prX, prY) = winSuche THEN
+                    prX1 = MIN(prX1, prX) : prY1 = MIN(prY1, prY)
+                    prX2 = MAX(prX2, prX) : prY2 = MAX(prY2, prY)
+                END IF
+            NEXT
+        NEXT
+        ' nur der Streifen, in dem die Karte liegt -- weiter links blinkt die Schreibmarke
+        WRITEALL("rect.txt", STR$(MAX(prX1, SCREENWIDTH() - 96)) + " " + STR$(prY1 + 2) + " " + STR$(prX2 - 2) + " " + STR$(prY2 - 2))
+    END IF
+    IF prBild = 40 THEN SAVESCREENSHOT("mit.png")
+    IF prBild = 45 THEN minimapSetzen(FALSE)
+    IF prBild = 60 THEN SAVESCREENSHOT("ohne.png")
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=70
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+' eine lange Zeile, damit die Karte etwas zu zeigen hat ...................................
+PRINT "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+PRINT "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+PRINT "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+--- nachher
+DIM r AS ARRAY OF STRING : r = SPLIT$(READLINES("_programm/rect.txt")[0], " ")
+DIM a AS IMAGE : a = LOADIMAGE("_programm/mit.png")
+DIM b AS IMAGE : b = LOADIMAGE("_programm/ohne.png")
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM n AS INTEGER : n = 0
+DIM anders AS INTEGER : anders = 0
+FOR y = VAL(r[1]) TO VAL(r[3]) STEP 2
+    FOR x = VAL(r[0]) TO VAL(r[2]) STEP 2
+        n = n + 1
+        IF GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN anders = anders + 1
+    NEXT
+NEXT
+PRINT "gemessen " ; n > 100
+PRINT "anders " ; anders
+--- erwartet
+gemessen TRUE
+anders 0
