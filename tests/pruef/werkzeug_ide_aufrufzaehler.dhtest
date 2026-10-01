@@ -66,3 +66,48 @@ aufrufer 3
 aufrufer baum 3
 pr fenster 3 Aufruf(e) unmittelbar, 3 Knoten im Baum. Ein Klick springt hin.
 pr aus -1
+
+=== die zweite ansicht derselben datei zaehlt nicht doppelt
+' Stresstest 2026-10-01: in der linken Ansicht (Alt+Umschalt+G) stand jeder
+' Zaehler doppelt -- sie gehoert keinem Reiter, also zaehlte neben ihrem
+' eigenen Text auch noch die gesicherte Datei auf der Platte.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 50 THEN befehl("spiegel")
+IF prBild = 60 THEN
+    zaehlerSetzen_(taSpiegel)
+    DIM prI AS INTEGER
+    FOR prI = 0 TO LEN(zaehlZeilen) - 1
+        protokoll("pr links " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
+    NEXT
+    zaehlerSetzen_(tabFelder[aktiverTab])
+    FOR prI = 0 TO LEN(zaehlZeilen) - 1
+        protokoll("pr rechts " + zaehlNamen[prI] + ": " + zaehlTexte[prI])
+    NEXT
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB malen()
+    PRINT(1)
+END SUB
+malen()
+malen()
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr links malen: 2 Aufrufe
+pr rechts malen: 2 Aufrufe

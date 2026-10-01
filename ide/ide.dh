@@ -4687,6 +4687,9 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     FOR t2 = 0 TO tabAnzahl - 1
         IF tabFelder[t2] = ta THEN eigen = tabPfade[t2]
     NEXT
+    ' Die zweite Ansicht (Alt+Umschalt+G) gehoert keinem Reiter, zeigt aber
+    ' die Datei des aktiven -- ohne das zaehlte die Platte noch einmal mit.
+    IF eigen = "" AND ta = taSpiegel AND aktiverTab >= 0 THEN eigen = tabPfade[aktiverTab]
     DIM dateien AS ARRAY OF STRING : dateien = []
     IF projektOrdner <> "" THEN dateien = projektDateien("*.dh")
     zaehlerAddieren(summe, woerterZaehlen$(quelle))
