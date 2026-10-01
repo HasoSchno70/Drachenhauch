@@ -99,6 +99,9 @@ enum Cmd {
     Lichtfleck(i32, i32, f32, f32, Color),
     BlendMode(i32),                                    // 0=alpha,1=additive,2=multiplied,4=subtract
     RtDraw(usize, i32, i32, f32, Color, bool),         // render-target idx, x, y, scale, tint, flip_v
+    /// Ein Ausschnitt eines Render-Targets, vergroessert gestempelt (GUI_WINDOW_ZOOM):
+    /// idx, Quelle (x, y, b, h) und Ziel (x, y, b, h) in logischen Punkten.
+    RtDrawTeil(usize, [f32; 4], [f32; 4]),
 }
 
 /// 3D-Zeichenbefehle (Modul `g3d`). Werden beim FLIP in einem
@@ -937,6 +940,12 @@ pub struct Graphics {
     // Render-Targets (RENDERTARGET_*): leben ueber Frames; active_rt lenkt `emit`
     // um, solange ein Target via RENDERTARGET_BEGIN aktiv ist.
     render_targets: Vec<RenderTarget>,
+    /// Die Zeichenflaeche fuer vergroesserte gui-Fenster (GUI_WINDOW_ZOOM):
+    /// (Index in render_targets, Breite, Hoehe) -- so gross wie der Schirm,
+    /// das Fenster wird an seiner echten Lage hineingezeichnet und der
+    /// Ausschnitt vergroessert gestempelt. Dazu das Ziel, das vorher galt.
+    zoom_rt: Option<(usize, i32, i32)>,
+    zoom_vorher: Option<Option<usize>>,
     active_rt: Option<usize>,
     clear_color: Color,
     // Transparenter Fenster-Framebuffer (SCREEN_TRANSPARENT): der Desktop scheint
@@ -1621,6 +1630,8 @@ impl Graphics {
             layer_names,
             active: 0,
             render_targets: Vec::new(),
+            zoom_rt: None,
+            zoom_vorher: None,
             active_rt: None,
             // Transparente Fenster starten voll durchsichtig (Alpha 0), normale deckend schwarz.
             clear_color: if transparent { Color::new(0, 0, 0, 0) } else { Color::BLACK },
@@ -1963,6 +1974,38 @@ impl Graphics {
         Ok(())
     }
     pub fn rendertarget_end(&mut self) { self.active_rt = None; }
+
+    /// GUI_WINDOW_ZOOM: ab jetzt in die Zoom-Flaeche zeichnen. FALSE, wenn
+    /// es keine gibt (dann zeichnet der Aufrufer unvergroessert).
+    pub fn zoom_beginnen(&mut self) -> bool {
+        let (sw, sh) = (self.screen_width().max(1) as i32, self.screen_height().max(1) as i32);
+        let neu = match self.zoom_rt { Some((_, w, h)) => w != sw || h != sh, None => true };
+        if neu {
+            let rt = match self.rl.load_render_texture(&self.thread, sw as u32, sh as u32) { Ok(rt) => rt, Err(_) => return false };
+            // Weich vergroessert -- mit dem Vorgabefilter (naechster Punkt)
+            // waeren Schrift und Linien bei 150 % treppig.
+            unsafe { raylib::ffi::SetTextureFilter(rt.texture, 1 /*BILINEAR*/); }
+            match self.zoom_rt {
+                Some((i, _, _)) => self.render_targets[i] = RenderTarget { rt, cmds: Vec::new(), behalten: false },
+                None => self.render_targets.push(RenderTarget { rt, cmds: Vec::new(), behalten: false }),
+            }
+            let i = match self.zoom_rt { Some((i, _, _)) => i, None => self.render_targets.len() - 1 };
+            self.zoom_rt = Some((i, sw, sh));
+        }
+        self.zoom_vorher = Some(self.active_rt);
+        self.active_rt = self.zoom_rt.map(|z| z.0);
+        true
+    }
+    /// Zurueck zum vorigen Ziel und den Ausschnitt (x, y, b, h) mit Faktor
+    /// `z` an (x, y) stempeln.
+    pub fn zoom_beenden(&mut self, x: i32, y: i32, b: i32, h: i32, z: f32) {
+        self.active_rt = self.zoom_vorher.take().unwrap_or(None);
+        if let Some((i, _, _)) = self.zoom_rt {
+            let q = [x as f32, y as f32, b as f32, h as f32];
+            let d = [x as f32, y as f32, b as f32 * z, h as f32 * z];
+            self.emit(Cmd::RtDrawTeil(i, q, d));
+        }
+    }
     /// Zeichnet das Target (seine Textur) an Position x,y, skaliert + getoent.
     pub fn rendertarget_draw(&mut self, idx: i64, x: i32, y: i32, scale: f64, tint: Option<i64>, flip_v: bool) -> Result<(), String> {
         let i = self.check_rt(idx, "RENDERTARGET_DRAW")?;
@@ -6809,6 +6852,17 @@ fn render_scene<D: RaylibDraw>(
                             let dst = Rectangle::new((x * s) as f32, (y * s) as f32,
                                 tw * scale * s as f32, th * scale * s as f32);
                             d.draw_texture_pro(tex, src, dst, Vector2::zero(), 0.0, *tint);
+                        }
+                    }
+                    Cmd::RtDrawTeil(i, q, z) => {
+                        if let Some(rtgt) = render_targets.get(*i) {
+                            let tex = rtgt.rt.texture();
+                            let th = tex.height as f32;
+                            // Die Textur steht auf dem Kopf: Zeile r liegt bei th-1-r.
+                            let src = Rectangle::new(q[0], th - q[1] - q[3], q[2], -q[3]);
+                            let sf = s as f32;
+                            let dst = Rectangle::new(z[0] * sf, z[1] * sf, z[2] * sf, z[3] * sf);
+                            d.draw_texture_pro(tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
                         }
                     }
                     Cmd::ScissorPush(x, y, w, h) => {

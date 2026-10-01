@@ -73,32 +73,32 @@ SUB palette(art AS STRING, name AS STRING, b AS INTEGER, h AS INTEGER, hatText A
     ARRAY_PUSH(palB, b) : ARRAY_PUSH(palH, h) : ARRAY_PUSH(palText, hatText)
 END SUB
 
-palette("button", "Button", 100, 28, TRUE)
-palette("label", "Label", 80, 16, TRUE)
-palette("checkbox", "Checkbox", 16, 16, TRUE)
-palette("radio", "RadioButton", 16, 16, TRUE)
-palette("slider", "Slider", 160, 14, FALSE)
-palette("textinput", "TextInput", 180, 26, FALSE)
-palette("dropdown", "Dropdown", 160, 24, FALSE)
-palette("listbox", "ListBox", 160, 96, FALSE)
-palette("progress", "ProgressBar", 180, 18, FALSE)
-palette("image", "Image", 96, 96, FALSE)
+palette("button", "Knopf", 100, 28, TRUE)
+palette("label", "Beschriftung", 80, 16, TRUE)
+palette("checkbox", "Kästchen", 16, 16, TRUE)
+palette("radio", "Optionsfeld", 16, 16, TRUE)
+palette("slider", "Regler", 160, 14, FALSE)
+palette("textinput", "Textfeld", 180, 26, FALSE)
+palette("dropdown", "Klappliste", 160, 24, FALSE)
+palette("listbox", "Liste", 160, 96, FALSE)
+palette("progress", "Fortschrittsbalken", 180, 18, FALSE)
+palette("image", "Bild", 96, 96, FALSE)
 palette("table", "Tabelle", 320, 140, FALSE)
 palette("grid", "Gitter", 320, 140, FALSE)      ' eine Tabelle im Zellmodus
-palette("canvas", "Canvas", 200, 150, FALSE)
-palette("panel", "Panel", 160, 100, TRUE)
-palette("groupbox", "GroupBox", 160, 100, TRUE)
-palette("separator", "Separator", 160, 8, FALSE)
-palette("textarea", "TextArea", 220, 90, FALSE)
+palette("canvas", "Zeichenfläche", 200, 150, FALSE)
+palette("panel", "Bereich", 160, 100, TRUE)
+palette("groupbox", "Gruppe", 160, 100, TRUE)
+palette("separator", "Trennlinie", 160, 8, FALSE)
+palette("textarea", "Textbereich", 220, 90, FALSE)
 palette("spinner", "Zahlenfeld", 120, 24, FALSE)
 palette("knob", "Drehknopf", 48, 48, FALSE)
 palette("toggle", "Umschalter", 46, 22, TRUE)
 palette("tree", "Baum", 180, 140, FALSE)
-palette("layout", "Layout", 200, 120, FALSE)
+palette("layout", "Layout-Behälter", 200, 120, FALSE)
 palette("toolbar", "Werkzeugleiste", 240, 32, FALSE)
 palette("splitter", "Trenner", 160, 6, FALSE)
-palette("colorpicker", "Farbwaehler", 200, 150, FALSE)
-palette("datepicker", "Datumswaehler", 200, 180, FALSE)
+palette("colorpicker", "Farbwähler", 200, 150, FALSE)
+palette("datepicker", "Datumswähler", 200, 180, FALSE)
 palette("richtext", "Gesetzter Text", 240, 140, TRUE)
 palette("timepicker", "Uhrzeit", 150, 28, FALSE)
 palette("tabcontrol", "Reiterwerk", 280, 180, FALSE)
@@ -120,6 +120,21 @@ DIM gewaehlt AS ARRAY OF INTEGER : gewaehlt = []
 DIM geaendert AS BOOLEAN : geaendert = FALSE
 DIM formX AS INTEGER : formX = PAL_B + 40        ' wo die Form auf dem Schirm liegt
 DIM formY AS INTEGER : formY = 60
+' Zoom der Entwurfsflaeche (GUI_WINDOW_ZOOM): `zoomWunsch` ist, was man
+' eingestellt hat, `zoomF` der Faktor, mit dem gezeichnet wird -- er wird
+' nur so gross, dass die Form zwischen Palette und Inspektor passt; daneben
+' laege sie ueber dem Inspektor, und der waere nicht mehr anzuklicken.
+' Alles, was die Form in Bildschirmlagen braucht, rechnet ueber `zSchirm`,
+' alles was von der Maus kommt ueber `zForm` -- im Dokument bleiben die
+' Masse unvergroessert.
+DIM zoomWunsch AS FLOAT : zoomWunsch = 1.0
+DIM zoomF AS FLOAT : zoomF = 1.0
+FUNCTION zSchirm(v AS INTEGER) AS INTEGER
+    RETURN INT(v * zoomF + 0.5)
+END FUNCTION
+FUNCTION zForm(v AS INTEGER) AS INTEGER
+    RETURN INT(v / zoomF)
+END FUNCTION
 
 ' Rueckgaengig: ein JSON-Text je Stand, ein Zeiger darauf.
 DIM staende AS ARRAY OF STRING : staende = []
@@ -294,6 +309,7 @@ SUB ansichtBauen()
     GUI_WINDOW_MOVABLE(frm, FALSE)
     GUI_WINDOW_RESIZABLE(frm, FALSE)
     GUI_WINDOW_SET_BOUNDS(frm, formX, formY, JSON_GET_INT(doc, "w"), JSON_GET_INT(doc, "h"))
+    zoomAnwenden()
     GUI_WINDOW_VISIBLE(frm, TRUE)
     IF fokus >= 0 THEN GUI_FOCUS(fokus) ELSE GUI_FOCUS(lstPalette)
 END SUB
@@ -371,6 +387,10 @@ DIM miGleichG AS INTEGER : miGleichG = GUI_MENU_ITEM(mAnord, "Gleiche Groesse")
 GUI_MENU_SEPARATOR(mAnord)
 DIM miVertW AS INTEGER : miVertW = GUI_MENU_ITEM(mAnord, "Waagerecht verteilen")
 DIM miVertS AS INTEGER : miVertS = GUI_MENU_ITEM(mAnord, "Senkrecht verteilen")
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(winPal, "Ansicht")
+DIM miZoomPlus AS INTEGER : miZoomPlus = GUI_MENU_ITEM(mAnsicht, "Vergrößern", "Strg+Plus")
+DIM miZoomMinus AS INTEGER : miZoomMinus = GUI_MENU_ITEM(mAnsicht, "Verkleinern", "Strg+Minus")
+DIM miZoomNull AS INTEGER : miZoomNull = GUI_MENU_ITEM(mAnsicht, "Originalgröße", "Strg+0")
 
 DIM lblPalette AS GUI_WIDGET : lblPalette = GUI_LABEL(winPal, "Palette -- anklicken, dann auf die Form", 8, 34)
 ' Die Liste laesst unten Platz fuer zwei Zeilen Status -- eine Meldung mit
@@ -1436,7 +1456,41 @@ FUNCTION indexVonHandle(h AS GUI_WIDGET) AS INTEGER
     RETURN -1
 END FUNCTION
 
-' Griff unter der Maus (Bildschirmkoordinaten), -1 = keiner.
+' Den eingestellten Zoom auf die Flaeche bringen (so weit sie passt).
+SUB zoomAnwenden()
+    DIM fw AS INTEGER : fw = MAX(1, JSON_GET_INT(doc, "w"))
+    DIM fh AS INTEGER : fh = MAX(1, JSON_GET_INT(doc, "h"))
+    DIM platzB AS INTEGER : platzB = GUI_WINDOW_GET_X(winInsp) - formX - 16
+    DIM platzH AS INTEGER : platzH = SCREENHEIGHT() - formY - 16
+    DIM z AS FLOAT : z = zoomWunsch
+    IF z > 1.0 THEN z = MAX(1.0, MIN(z, MIN(platzB / fw, platzH / fh)))
+    zoomF = z
+    IF frm >= 0 THEN GUI_WINDOW_ZOOM(frm, zoomF)
+END SUB
+
+' Zoom in Stufen: 50, 75, 100, 125, 150, 200, 250, 300 %.
+SUB zoomStufe(richtung AS INTEGER)
+    DIM stufen AS ARRAY OF FLOAT : stufen = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
+    DIM k AS INTEGER
+    IF richtung = 0 THEN
+        zoomWunsch = 1.0
+    ELSEIF richtung > 0 THEN
+        FOR k = 0 TO LEN(stufen) - 1
+            IF stufen[k] > zoomF + 0.01 THEN zoomWunsch = stufen[k] : BREAK
+        NEXT
+    ELSE
+        FOR k = LEN(stufen) - 1 TO 0 STEP -1
+            IF stufen[k] < zoomF - 0.01 THEN zoomWunsch = stufen[k] : BREAK
+        NEXT
+    END IF
+    zoomAnwenden()
+    DIM satz AS STRING : satz = "Zoom " + STR$(INT(zoomF * 100 + 0.5)) + " %"
+    IF zoomF < zoomWunsch - 0.01 THEN satz = satz + " (mehr passt nicht zwischen Palette und Inspektor)"
+    GUI_SET_TEXT(lblStatus, satz + ".")
+    protokoll("zoom " + STR$(INT(zoomF * 100 + 0.5)))
+END SUB
+
+' Griff unter der Maus (Formlage wie in mausAufForm), -1 = keiner.
 FUNCTION griffBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
     ' Griffe gibt es nur bei EINEM gewaehlten Control -- eine Groesse fuer
     ' mehrere steht im Menue Anordnen.
@@ -1450,19 +1504,24 @@ FUNCTION griffBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
     gx[0] = x : gy[0] = y : gx[1] = x + w \ 2 : gy[1] = y : gx[2] = x + w : gy[2] = y
     gx[3] = x + w : gy[3] = y + h \ 2 : gx[4] = x + w : gy[4] = y + h : gx[5] = x + w \ 2 : gy[5] = y + h
     gx[6] = x : gy[6] = y + h : gx[7] = x : gy[7] = y + h \ 2
+    ' Fuenf Punkte auf dem SCHIRM -- in Formlage also weniger, wenn
+    ' vergroessert ist.
+    DIM fang AS INTEGER : fang = MAX(2, zForm(5))
     DIM i AS INTEGER
     FOR i = 0 TO 7
-        IF ABS(mx - gx[i]) <= 5 AND ABS(my - gy[i]) <= 5 THEN RETURN i
+        IF ABS(mx - gx[i]) <= fang AND ABS(my - gy[i]) <= fang THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
 
 SUB griffeZeichnen()
     IF rahmenAn THEN
-        DIM rx1 AS INTEGER : rx1 = MIN(startMx, MOUSEX())
-        DIM ry1 AS INTEGER : ry1 = MIN(startMy, MOUSEY())
-        DIM rx2 AS INTEGER : rx2 = MAX(startMx, MOUSEX())
-        DIM ry2 AS INTEGER : ry2 = MAX(startMy, MOUSEY())
+        DIM sx0 AS INTEGER : sx0 = formX + zSchirm(startMx - formX)
+        DIM sy0 AS INTEGER : sy0 = formY + zSchirm(startMy - formY)
+        DIM rx1 AS INTEGER : rx1 = MIN(sx0, MOUSEX())
+        DIM ry1 AS INTEGER : ry1 = MIN(sy0, MOUSEY())
+        DIM rx2 AS INTEGER : rx2 = MAX(sx0, MOUSEX())
+        DIM ry2 AS INTEGER : ry2 = MAX(sy0, MOUSEY())
         RECT(rx1, ry1, rx2, ry2, &H4FC3F7)
     END IF
     IF auswahl < 0 OR auswahl >= anzahl() THEN RETURN
@@ -1473,17 +1532,19 @@ SUB griffeZeichnen()
             IF j < 0 OR j >= anzahl() THEN CONTINUE
             DIM farbe AS INTEGER : farbe = &H2F7F9F
             IF j = auswahl THEN farbe = &H9FE7FF
-            DIM jx AS INTEGER : jx = formX + feldZahl(j, "x")
-            DIM jy AS INTEGER : jy = formY + feldZahl(j, "y")
-            RECT(jx - 1, jy - 1, jx + feldZahl(j, "w"), jy + feldZahl(j, "h"), farbe)
-            IF j = auswahl THEN RECT(jx - 2, jy - 2, jx + feldZahl(j, "w") + 1, jy + feldZahl(j, "h") + 1, farbe)
+            DIM jx AS INTEGER : jx = formX + zSchirm(feldZahl(j, "x"))
+            DIM jy AS INTEGER : jy = formY + zSchirm(feldZahl(j, "y"))
+            DIM jw AS INTEGER : jw = zSchirm(feldZahl(j, "w"))
+            DIM jh AS INTEGER : jh = zSchirm(feldZahl(j, "h"))
+            RECT(jx - 1, jy - 1, jx + jw, jy + jh, farbe)
+            IF j = auswahl THEN RECT(jx - 2, jy - 2, jx + jw + 1, jy + jh + 1, farbe)
         NEXT
         RETURN
     END IF
-    DIM x AS INTEGER : x = formX + feldZahl(auswahl, "x")
-    DIM y AS INTEGER : y = formY + feldZahl(auswahl, "y")
-    DIM w AS INTEGER : w = feldZahl(auswahl, "w")
-    DIM h AS INTEGER : h = feldZahl(auswahl, "h")
+    DIM x AS INTEGER : x = formX + zSchirm(feldZahl(auswahl, "x"))
+    DIM y AS INTEGER : y = formY + zSchirm(feldZahl(auswahl, "y"))
+    DIM w AS INTEGER : w = zSchirm(feldZahl(auswahl, "w"))
+    DIM h AS INTEGER : h = zSchirm(feldZahl(auswahl, "h"))
     RECT(x - 1, y - 1, x + w, y + h, &H4FC3F7)
     DIM gx AS INTEGER
     DIM gy AS INTEGER
@@ -1593,8 +1654,18 @@ SUB anordnen(was AS STRING)
 END SUB
 
 SUB mausAufForm()
-    DIM mx AS INTEGER : mx = MOUSEX()
-    DIM my AS INTEGER : my = MOUSEY()
+    ' Die Maus in FORMlage (unvergroessert, aber ab formX/formY gezaehlt):
+    ' Zuege, Raster und Ablegen rechnen damit, nur GUI_HIT_TEST bekommt die
+    ' echte Lage -- die Laufzeit rechnet den Zoom dort selbst zurueck.
+    DIM smx AS INTEGER : smx = MOUSEX()
+    DIM smy AS INTEGER : smy = MOUSEY()
+    IF (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) AND MOUSEWHEEL_Y() <> 0.0 THEN
+        IF smx >= formX AND smy >= formY AND smx < formX + zSchirm(JSON_GET_INT(doc, "w")) AND smy < formY + zSchirm(JSON_GET_INT(doc, "h")) THEN
+            zoomStufe(IIF(MOUSEWHEEL_Y() > 0.0, 1, -1))
+        END IF
+    END IF
+    DIM mx AS INTEGER : mx = formX + zForm(smx - formX)
+    DIM my AS INTEGER : my = formY + zForm(smy - formY)
     DIM fw AS INTEGER : fw = JSON_GET_INT(doc, "w")
     DIM fh AS INTEGER : fh = JSON_GET_INT(doc, "h")
     DIM drin AS BOOLEAN : drin = mx >= formX AND my >= formY AND mx < formX + fw AND my < formY + fh
@@ -1609,7 +1680,7 @@ SUB mausAufForm()
         IF griff >= 0 THEN
             modus = 2
         ELSE
-            DIM h AS GUI_WIDGET : h = GUI_HIT_TEST(mx, my)
+            DIM h AS GUI_WIDGET : h = GUI_HIT_TEST(smx, smy)
             DIM i AS INTEGER : i = indexVonHandle(h)
             DIM dazu AS BOOLEAN : dazu = KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT) OR KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
             IF i >= 0 AND dazu THEN
@@ -1833,6 +1904,9 @@ WHILE NOT beenden
     IF GUI_CLICKED(miGleichG) THEN anordnen("groesse")
     IF GUI_CLICKED(miVertW) THEN anordnen("vert_w")
     IF GUI_CLICKED(miVertS) THEN anordnen("vert_s")
+    IF GUI_CLICKED(miZoomPlus) THEN zoomStufe(1)
+    IF GUI_CLICKED(miZoomMinus) THEN zoomStufe(-1)
+    IF GUI_CLICKED(miZoomNull) THEN zoomStufe(0)
     IF dlgSchliessen <> 0 THEN
         DIM a AS INTEGER : a = GUI_ANSWER(dlgSchliessen)
         IF a = 1 THEN
@@ -1899,9 +1973,13 @@ WHILE NOT beenden
     ' Rahmen und Titel der Form -- die Form selbst ist randlos
     DIM fw2 AS INTEGER : fw2 = JSON_GET_INT(doc, "w")
     DIM fh2 AS INTEGER : fh2 = JSON_GET_INT(doc, "h")
-    BOX(formX - 1, formY - 28, formX + fw2, formY - 1, &H1F2A38)
-    TEXT(formX + 8, formY - 22, JSON_GET_STRING(doc, "title") + "   " + STR$(fw2) + " x " + STR$(fh2), &HD8E4F0)
-    RECT(formX - 1, formY - 28, formX + fw2, formY + fh2, &H3A4A5C)
+    DIM zw2 AS INTEGER : zw2 = zSchirm(fw2)
+    DIM zh2 AS INTEGER : zh2 = zSchirm(fh2)
+    BOX(formX - 1, formY - 28, formX + zw2, formY - 1, &H1F2A38)
+    DIM ztext AS STRING : ztext = ""
+    IF zoomF <> 1.0 THEN ztext = "   " + STR$(INT(zoomF * 100 + 0.5)) + " %"
+    TEXT(formX + 8, formY - 22, JSON_GET_STRING(doc, "title") + "   " + STR$(fw2) + " x " + STR$(fh2) + ztext, &HD8E4F0)
+    RECT(formX - 1, formY - 28, formX + zw2, formY + zh2, &H3A4A5C)
     GUI_DRAW()
     griffeZeichnen()
     FLIP()

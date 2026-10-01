@@ -24,7 +24,7 @@ neu.dhform
 DHRT_FRAMES=120
 DH_FORM_LOG=fd.log
 --- datei _programm/ev.txt
-# Palette 'Button', auf die Form bei (250,180) -> Raster 248,184, Strg+S
+# Palette 'Knopf', auf die Form bei (250,180) -> Raster 248,184, Strg+S
 c 12
 e 20 7 60 95 0 0
 e 21 7 60 95 0 0
@@ -50,7 +50,7 @@ gesichert
 "y": 184
 "w": 100
 "h": 28
-"text": "Button"
+"text": "Knopf"
 
 === verschieben und zweimal rueckgaengig
 AUTOMATION_PLAY("ev.txt")
@@ -738,3 +738,47 @@ EXIT(0)
 --- programm ../../examples/197_form_designer.dh nach DIM ersetzenMit AS STRING : ersetzenMit = ""
 --- erwartet
 frage FALSE controls 0
+
+=== mit zoom legt die maus in formlage ab und zieht
+' Zoom der Entwurfsflaeche (Ansicht -> Vergroessern, Strg+Rad): die Form
+' wird groesser gezeichnet (GUI_WINDOW_ZOOM), abgelegt und gezogen wird in
+' Formlage. Die Form ist hier 300 x 200, damit 125 % auch auf einem kleinen
+' Schirm zwischen Palette und Inspektor passen. Bei 125 % liegt Formlage
+' (200, 120) auf dem Schirm bei (270 + 250, 60 + 150); ein Zug um 40 Punkte
+' auf dem Schirm sind 32 in der Form.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- einschub nach     IF GUI_CLICKED(miZoomNull) THEN zoomStufe(0)
+prBild = prBild + 1
+IF prBild = 5 THEN
+    JSON_SET_INT(doc, "w", 300) : JSON_SET_INT(doc, "h", 200)
+    ansichtBauen()
+    zoomStufe(1)
+    AUTOMATION_PLAY("ev.txt")
+END IF
+--- argumente
+neu.dhform
+--- umgebung
+DHRT_FRAMES=150
+DH_FORM_LOG=fd.log
+--- datei _programm/ev.txt
+c 14
+e 10 7 60 95 0 0
+e 11 7 60 95 0 0
+e 11 6 0 0 0 0
+e 13 5 0 0 0 0
+e 30 7 520 210 0 0
+e 31 7 520 210 0 0
+e 31 6 0 0 0 0
+e 33 5 0 0 0 0
+e 60 7 582 227 0 0
+e 61 7 582 227 0 0
+e 61 6 0 0 0 0
+e 65 7 602 227 0 0
+e 70 7 622 227 0 0
+e 74 5 0 0 0 0
+
+--- inhalt _programm/fd.log
+zoom 125
+neu button 200 120
+bewegt 0 232 120 100 28

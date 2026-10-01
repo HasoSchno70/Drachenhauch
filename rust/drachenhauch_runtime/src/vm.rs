@@ -6932,6 +6932,8 @@ impl<'p> Vm<'p> {
             "gui_tab_closed" => Value::Int(self.gui.tab_closed(gi(a,0,"GUI_TAB_CLOSED")?)?),
             "gui_set_active_tab" => { self.gui.set_active_tab(gi(a,0,"GUI_SET_ACTIVE_TAB")?, gi(a,1,"GUI_SET_ACTIVE_TAB")? as i32)?; Value::Nil }
             "gui_window_chrome" => { self.gui.window_chrome(gi(a,0,"GUI_WINDOW_CHROME")?, gbool(a,1,"GUI_WINDOW_CHROME")?)?; Value::Nil }
+            "gui_window_zoom" => { self.gui.window_zoom(gi(a,0,"GUI_WINDOW_ZOOM")?, gnum(a,1,"GUI_WINDOW_ZOOM")?)?; Value::Nil }
+            "gui_window_get_zoom" => Value::Float(self.gui.window_get_zoom(gi(a,0,"GUI_WINDOW_GET_ZOOM")?)?),
             "gui_window_design" => { self.gui.window_design(gi(a,0,"GUI_WINDOW_DESIGN")?, gbool(a,1,"GUI_WINDOW_DESIGN")?)?; Value::Nil }
             "gui_window_set_min_size" => { self.gui.window_min_size(gi(a,0,"GUI_WINDOW_SET_MIN_SIZE")?, gi(a,1,"GUI_WINDOW_SET_MIN_SIZE")? as i32, gi(a,2,"GUI_WINDOW_SET_MIN_SIZE")? as i32)?; Value::Nil }
             "gui_window_set_max_size" => { self.gui.window_max_size(gi(a,0,"GUI_WINDOW_SET_MAX_SIZE")?, gi(a,1,"GUI_WINDOW_SET_MAX_SIZE")? as i32, gi(a,2,"GUI_WINDOW_SET_MAX_SIZE")? as i32)?; Value::Nil }

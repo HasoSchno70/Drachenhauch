@@ -2738,6 +2738,10 @@ pub struct Window {
     /// Fokus, keine Rueckrufe. Ein Form-Designer legt so echte Widgets auf
     /// die Flaeche und verwaltet die Maus selbst (GUI_HIT_TEST geht weiter).
     entwurf: bool,
+    /// Vergroesserung beim Zeichnen (GUI_WINDOW_ZOOM), nur im Entwurfsmodus:
+    /// das Fenster bekommt dort keine Eingabe, also muss nur GUI_HIT_TEST
+    /// (und wo ein Fenster liegt) die Mauslage zurueckrechnen.
+    zoom: f32,
     chrome: bool,                    // Titelleiste + Rahmen + Buttons? (aus = randlos,
                                      //   z.B. wenn die Form das OS-Fenster fuellt)
     min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
@@ -3282,7 +3286,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, entwurf: false,
+            movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
@@ -4351,6 +4355,55 @@ impl Gui {
     pub fn window_chrome(&mut self, h: i64, f: bool) -> Result<(), String> {
         self.win_mut(h, "GUI_WINDOW_CHROME")?.chrome = f; Ok(())
     }
+    /// GUI_WINDOW_ZOOM(win, faktor): ein Fenster im Entwurfsmodus
+    /// vergroessert zeichnen (0.25..4) -- fuer einen Form-Designer, dessen
+    /// Flaeche sonst so klein ist wie die Form. Die Lage (x, y) bleibt, die
+    /// Groesse waechst; Geometrie nach aussen bleibt UNvergroessert,
+    /// GUI_HIT_TEST rechnet die Maus zurueck.
+    pub fn window_zoom(&mut self, h: i64, f: f64) -> Result<(), String> {
+        if !(0.25..=4.0).contains(&f) { return Err("GUI_WINDOW_ZOOM: der Faktor geht von 0.25 bis 4".into()); }
+        let w = self.win_mut(h, "GUI_WINDOW_ZOOM")?;
+        if !w.entwurf { return Err("GUI_WINDOW_ZOOM: nur fuer ein Fenster im Entwurfsmodus (GUI_WINDOW_DESIGN) -- es nimmt sonst Eingaben an, und die Maus traefe daneben".into()); }
+        w.zoom = f as f32;
+        Ok(())
+    }
+    pub fn window_get_zoom(&self, h: i64) -> Result<f64, String> {
+        let w = self.windows.get(h as usize).ok_or("GUI_WINDOW_GET_ZOOM: ungueltiges GUI_WINDOW-Handle")?;
+        Ok(w.zoom as f64)
+    }
+    /// Der Faktor, mit dem ein Fenster gerade gezeichnet wird (1 ohne Zoom
+    /// oder ausserhalb des Entwurfsmodus).
+    fn zoom_von(&self, wi: usize) -> f32 {
+        let w = &self.windows[wi];
+        if w.entwurf { w.zoom } else { 1.0 }
+    }
+    /// Das Rechteck, das ein Fenster auf dem Schirm einnimmt.
+    fn sicht_rect(&self, wi: usize) -> (i32, i32, i32, i32) {
+        let w = &self.windows[wi];
+        let z = self.zoom_von(wi);
+        if z == 1.0 { return (w.x, w.y, w.w, w.h); }
+        (w.x, w.y, (w.w as f32 * z).round() as i32, (w.h as f32 * z).round() as i32)
+    }
+    /// Ein Schirmpunkt in die (unvergroesserten) Koordinaten des Fensters.
+    fn ins_fenster(&self, wi: usize, mx: i32, my: i32) -> (i32, i32) {
+        let z = self.zoom_von(wi);
+        if z == 1.0 { return (mx, my); }
+        let w = &self.windows[wi];
+        (w.x + ((mx - w.x) as f32 / z).floor() as i32, w.y + ((my - w.y) as f32 / z).floor() as i32)
+    }
+    /// Ein Fenster zeichnen -- vergroessert ueber die Zoom-Flaeche, wenn es
+    /// einen Faktor hat.
+    fn draw_window_sicht(&self, g: &mut Graphics, wi: usize) {
+        let z = self.zoom_von(wi);
+        if z != 1.0 && g.zoom_beginnen() {
+            self.draw_window(g, wi);
+            let w = &self.windows[wi];
+            g.zoom_beenden(w.x, w.y, w.w, w.h, z);
+        } else {
+            self.draw_window(g, wi);
+        }
+    }
+
     pub fn window_design(&mut self, h: i64, f: bool) -> Result<(), String> {
         let wi = h as usize;
         self.win_mut(h, "GUI_WINDOW_DESIGN")?.entwurf = f;
@@ -9947,7 +10000,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         for &wi in self.z_order.iter().rev() {
             let win = &self.windows[wi];
             if !win.alive || !win.visible { continue; }
-            if Self::in_rect(mx, my, (win.x, win.y, win.w, win.h)) { return wi as i64; }
+            if Self::in_rect(mx, my, self.sicht_rect(wi)) { return wi as i64; }
         }
         -1
     }
@@ -9956,7 +10009,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         for &wi in self.z_order.iter().rev() {
             let win = &self.windows[wi];
             if !win.alive || !win.visible { continue; }
-            if !Self::in_rect(mx, my, (win.x, win.y, win.w, win.h)) { continue; }
+            if !Self::in_rect(mx, my, self.sicht_rect(wi)) { continue; }
+            let (mx, my) = self.ins_fenster(wi, mx, my);
             // innerhalb des Fensters: spaeter gezeichnete Widgets liegen oben.
             // Review-Fund: pruefte bisher nur alive+visible, nicht die
             // Tab-Seite -- GUI_HIT_TEST fand auf einem getabbten Fenster
@@ -11702,7 +11756,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn topmost_at(&self, mx: i32, my: i32) -> Option<usize> {
         for &wi in self.z_order.iter().rev() {
             let w = &self.windows[wi];
-            if w.alive && w.visible && Self::in_rect(mx, my, (w.x, w.y, w.w, w.h)) { return Some(wi); }
+            if w.alive && w.visible && Self::in_rect(mx, my, self.sicht_rect(wi)) { return Some(wi); }
         }
         None
     }
@@ -16185,7 +16239,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     pub fn draw(&self, g: &mut Graphics, obenauf: bool) {
         for &wi in &self.z_order {
             if self.modal == Some(wi) { self.schleier(g); }
-            if self.windows[wi].alive && self.windows[wi].visible { self.draw_window(g, wi); }
+            if self.windows[wi].alive && self.windows[wi].visible { self.draw_window_sicht(g, wi); }
         }
         if obenauf { self.draw_top(g); }
     }
@@ -17005,7 +17059,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         };
         if !w.visible { return Ok(()); }
         if self.modal == Some(wi) { self.schleier(g); }
-        self.draw_window(g, wi);
+        self.draw_window_sicht(g, wi);
         Ok(())
     }
 
