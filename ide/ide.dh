@@ -1799,6 +1799,12 @@ btnUmbauBlock = GUI_BUTTON(winUmbau, tr$("Block auslassen / aufnehmen"), 288, 54
 DIM btnUmbauPruef AS GUI_WIDGET
 btnUmbauPruef = GUI_BUTTON(winUmbau, tr$("Prüfen"), 528, 546, 110, 30)
 GUI_LISTBOX_SET(lstUmbau, "kaestchen", 1)
+' Beim Ziehen am Griff waechst der Unterschied mit (vorher blieb der Inhalt
+' stehen, das Fenster war nur scheinbar groessenveraenderbar).
+GUI_SET_ANCHOR(lstUmbau, "ltb")
+GUI_SET_ANCHOR(taUmbau, "lrtb")
+GUI_SET_ANCHOR(btnUmbauOk, "lb") : GUI_SET_ANCHOR(btnUmbauWeg, "lb")
+GUI_SET_ANCHOR(btnUmbauBlock, "lb") : GUI_SET_ANCHOR(btnUmbauPruef, "lb")
 GUI_WINDOW_DEFAULT(winUmbau, btnUmbauOk)
 GUI_WINDOW_CANCEL(winUmbau, btnUmbauWeg)
 ' Der anstehende Umbau: je Eintrag ein Reiter ODER eine Datei auf der Platte.
@@ -10602,6 +10608,16 @@ END FUNCTION
 
 ' Die Anzeige neu bauen -- und mit ihr die Texte, die geschrieben wuerden.
 ' Beides aus derselben Quelle: was man sieht, ist was man bekommt.
+' So breit, wie der Schirm es zulaesst: 900 Punkte schnitten jede laengere
+' Zeile ab, und den Unterschied liest man ja gerade am Zeilenende. Die
+' linke obere Ecke und die Hoehe bleiben, damit die Knoepfe dort stehen,
+' wo man sie kennt.
+SUB umbauFensterSetzen()
+    DIM b AS INTEGER : b = MAX(900, SCREENWIDTH() - 280)
+    GUI_WINDOW_SET_BOUNDS(winUmbau, 240, 90, b, 620)
+    protokoll("umbau fenster " + STR$(b) + " text " + STR$(GUI_GET_W(taUmbau)))
+END SUB
+
 SUB umbauAnzeigeBauen()
     DIM zeilen AS ARRAY OF STRING : zeilen = []
     zeigHunk = []
@@ -10736,6 +10752,7 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
     NEXT
     umbauAnzeigeBauen()
     GUI_WINDOW_TITLE(winUmbau, tr$("Vorschau: ") + titel)
+    umbauFensterSetzen()
     GUI_WINDOW_VISIBLE(winUmbau, TRUE)
     GUI_FOCUS(btnUmbauOk)
     DIM pm AS INTEGER : pm = 0
@@ -10928,6 +10945,7 @@ SUB umbauNachbessern()
     NEXT
     umbauAnzeigeBauen()
     GUI_WINDOW_TITLE(winUmbau, tr$("Nachbessern: ") + umbauNachWas)
+    umbauFensterSetzen()
     GUI_WINDOW_VISIBLE(winUmbau, TRUE)
     GUI_FOCUS(btnUmbauOk)
     protokoll("umbau nachbessern " + STR$(LEN(umbauTexte)))
