@@ -13266,13 +13266,19 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
     fn caret_index_at(g: &Graphics, chars: &[char], target_px: i32, ms: Mass) -> i32 {
         if target_px <= 0 { return 0; }
-        for n in 1..=chars.len() {
-            let prev: String = chars[..n - 1].iter().collect();
-            let cur: String = chars[..n].iter().collect();
-            let mid = (ms.breite(g, &prev) + ms.breite(g, &cur)) / 2;
-            if target_px < mid { return (n - 1) as i32; }
+        // Gesucht ist das erste n, bei dem der Punkt vor der Mitte des n-ten
+        // Zeichens liegt. Die Mitte waechst mit n -- also binaer statt Zeichen
+        // fuer Zeichen mit jeweils neu gemessenem Vorspann: das war quadratisch,
+        // ein Klick in Spalte 20000 einer langen Zeile mass 400 Millionen
+        // Zeichen (Stresstest 2026-10-02).
+        let breite = |n: usize| -> i32 { let t: String = chars[..n].iter().collect(); ms.breite(g, &t) };
+        let (mut lo, mut hi) = (1usize, chars.len() + 1);
+        while lo < hi {
+            let n = (lo + hi) / 2;
+            let mid = (breite(n - 1) + breite(n)) / 2;
+            if target_px < mid { hi = n; } else { lo = n + 1; }
         }
-        chars.len() as i32
+        (lo - 1) as i32
     }
 
     /// Volles Editieren des fokussierten TextInputs: Zeichen einfuegen, Backspace/
@@ -14123,9 +14129,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let pad = 5;
         if my < ay + pad { return Ok((0, 0)); }
         let lh = self.ta_line_h(g, wd);
-        let chars: Vec<char> = wd.text.chars().collect();
-        let starts = Self::line_starts(&chars);
-        let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
+        let z = self.ta_zerlegt(h, &wd.text);
+        let (chars, starts) = (&z.0, &z.1);
+        let rows = self.ta_rows(g, wd, chars, starts, self.ta_breite(g, wd, starts.len()));
         // Unter einem angehefteten Blockkopf ist der Text verdeckt.
         let sicht = ((fh - 2 * pad) / lh.max(1)).max(1);
         if my < ay + pad + Self::ta_koepfe(wd, &rows, sicht, wd.scroll).len() as i32 * lh { return Ok((0, 0)); }
@@ -14136,13 +14142,18 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if mx < ax + pad + gut { return Ok((0, 0)); }
         let target = mx - (ax + pad + gut - wd.scroll_x);
         let ms = self.mass(g, wd);
-        let sub: Vec<char> = chars[lstart..lend].to_vec();
-        for n in 1..=sub.len() {
-            let bis: String = sub[..n].iter().collect();
-            if target < ms.breite(g, &bis) {
-                let spalte = (lstart + n - 1) - starts[rli] + 1;
-                return Ok((rli as i64 + 1, spalte as i64));
-            }
+        let sub = &chars[lstart..lend];
+        // Das erste n, dessen Vorspann breiter ist als der Abstand -- binaer,
+        // wie in caret_index_at (die Breite waechst mit n).
+        let breite = |n: usize| -> i32 { let t: String = sub[..n].iter().collect(); ms.breite(g, &t) };
+        let (mut lo, mut hi) = (1usize, sub.len() + 1);
+        while lo < hi {
+            let n = (lo + hi) / 2;
+            if target < breite(n) { hi = n; } else { lo = n + 1; }
+        }
+        if lo <= sub.len() {
+            let spalte = (lstart + lo - 1) - starts[rli] + 1;
+            return Ok((rli as i64 + 1, spalte as i64));
         }
         Ok((0, 0))
     }

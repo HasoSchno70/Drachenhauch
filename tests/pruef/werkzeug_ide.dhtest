@@ -3199,3 +3199,62 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 pr probleme 5000 flott TRUE hinweise 5000
+
+=== datei oeffnen in einem projekt mit 20000 dateien bleibt beim tippen flott
+' Stresstest 2026-10-02: der Waehler "Datei im Projekt oeffnen" filterte je
+' Tastendruck alle Namen zweimal, mit sieben REPLACE$ je Name und Durchgang
+' und einer Buchstabe-fuer-Buchstabe-Suche mit MID$ -- bei 20000 Dateien
+' hakte jeder Tastendruck um 0,3 s. Jetzt werden die Namen beim Oeffnen
+' einmal vorbereitet, und die unscharfe Suche ist ein Ausdruck. Geprueft:
+' dieselben Treffer in derselben Reihenfolge wie vorher (am Stueck zuerst,
+' dann unscharf), und flott (grob: 0,2 s je Tastendruck; hier 0,07 s).
+DIM prT AS FLOAT
+schnellOeffnen()
+DIM prF AS STRING
+DIM prMax AS FLOAT : prMax = 0.0
+FOR EACH prF IN ("m", "m1", "m12", "m123", "z9", "ae", "xq")
+    prT = GET_TIME()
+    paletteFuellen(prF)
+    IF GET_TIME() - prT > prMax THEN prMax = GET_TIME() - prT
+    DIM prErst AS STRING : prErst = ""
+    IF GUI_LISTBOX_COUNT(lstPalette) > 0 THEN prErst = GUI_LISTBOX_ITEM(lstPalette, 0)
+    DIM prLetzt AS STRING : prLetzt = ""
+    IF GUI_LISTBOX_COUNT(lstPalette) > 0 THEN prLetzt = GUI_LISTBOX_ITEM(lstPalette, GUI_LISTBOX_COUNT(lstPalette) - 1)
+    protokoll("pr " + TRIM$(prF + " " + STR$(GUI_LISTBOX_COUNT(lstPalette)) + " " + prErst + " " + prLetzt))
+NEXT
+protokoll("pr flott " + STR$(prMax < 0.2))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM d AS INTEGER
+DIM i AS INTEGER
+FOR d = 0 TO 19
+    MKDIR("abschnitt_teil" + STR$(d))
+    FOR i = 0 TO 999
+        WRITEALL("abschnitt_teil" + STR$(d) + "/modul_datei_nummer_m" + STR$(i) + ".dh", "")
+    NEXT
+NEXT
+WRITEALL("haupt.dh", "PRINT 1" + CHR$(10))
+WRITEALL("Ärger.dh", "")
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr m 20000 abschnitt_teil0/modul_datei_nummer_m0.dh abschnitt_teil9/modul_datei_nummer_m999.dh
+pr m1 5420 abschnitt_teil0/modul_datei_nummer_m1.dh abschnitt_teil9/modul_datei_nummer_m991.dh
+pr m12 560 abschnitt_teil0/modul_datei_nummer_m12.dh abschnitt_teil9/modul_datei_nummer_m912.dh
+pr m123 20 abschnitt_teil0/modul_datei_nummer_m123.dh abschnitt_teil9/modul_datei_nummer_m123.dh
+pr z9 0
+pr ae 20001 Ärger.dh abschnitt_teil9/modul_datei_nummer_m999.dh
+pr xq 0
+pr flott TRUE

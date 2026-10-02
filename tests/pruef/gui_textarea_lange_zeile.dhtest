@@ -122,3 +122,60 @@ zeichen TRUE
 font anfang flott TRUE
 font rechts flott TRUE
 eingebaut anfang flott TRUE
+
+=== zeichen unter der maus und klick weit rechts in einer langen zeile
+' GUI_TEXTAREA_POS_AT und der Klick fanden die Stelle Zeichen fuer Zeichen
+' und massen dabei jedes Mal den ganzen Vorspann neu -- quadratisch in der
+' Spalte. Die IDE fragt POS_AT in jedem Bild fuer die Maus; weit rechts in
+' einer Zeile mit 20000 Zeichen kostete das je Frage Sekunden, und ein
+' Klick dorthin genauso (Stresstest 2026-10-02). Jetzt binaer. Geprueft:
+' Zeile und Spalte stimmen (der Klick setzt die Marke vor oder hinter das
+' Zeichen unter der Maus), und beides geht flott (grob: 0,1 s).
+IMPORT "gui"
+SCREEN(900, 200, "t", 1)
+DIM font AS INTEGER : font = LOADFONT(ARG$(0), 20)
+DIM z AS STRING : z = ""
+DIM i AS INTEGER
+FOR i = 1 TO 4000
+    z = z + "w" + STR$(i) + ", "
+NEXT
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 900, 200)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(win, 10, 10, 860, 120)
+GUI_SET_FONT(ta, font)
+GUI_SET_TEXT(ta, z)
+GUI_FOCUS(ta)
+DIM n AS INTEGER : n = 0
+DIM zl AS INTEGER : DIM sp AS INTEGER
+DIM pz AS INTEGER : DIM ps AS INTEGER
+DIM laengste AS FLOAT : laengste = 0.0
+DIM letzt AS FLOAT : letzt = GET_TIME()
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 2 THEN GUI_TEXTAREA_GOTO(ta, 1, 25000)
+    IF n = 4 THEN
+        DIM t0 AS FLOAT : t0 = GET_TIME()
+        (pz, ps) = GUI_TEXTAREA_POS_AT(ta, 800, 25)
+        PRINT "pos zeile "; pz; " weit rechts "; ps > 24000; " flott "; GET_TIME() - t0 < 0.1
+        DIM a AS STRING
+        a = "c 3" + CHR$(10) + "e 0 7 800 25 0" + CHR$(10)
+        a = a + "e 2 6 0 0 0" + CHR$(10) + "e 4 5 0 0 0" + CHR$(10)
+        WRITEALL("ev.txt", a + CHR$(10))
+        AUTOMATION_PLAY("ev.txt")
+        laengste = 0.0
+    END IF
+    IF n = 14 THEN
+        (zl, sp) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "klick zeile "; zl; " an der stelle "; sp = ps OR sp = ps + 1; " flott "; laengste < 0.1
+        EXIT(0)
+    END IF
+    CLS(BLACK) : GUI_DRAW() : FLIP()
+    IF n > 4 AND GET_TIME() - letzt > laengste THEN laengste = GET_TIME() - letzt
+    letzt = GET_TIME()
+WEND
+--- argumente
+{sammlung}/../../circuitrunner/assets/font.ttf
+--- erwartet
+pos zeile 1 weit rechts TRUE flott TRUE
+klick zeile 1 an der stelle TRUE flott TRUE
