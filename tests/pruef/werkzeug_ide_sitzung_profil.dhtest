@@ -246,3 +246,67 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 pr zeilen 20002 absteigend TRUE flott TRUE
+
+=== das profil nach funktionen bei 2000 unterprogrammen
+' Stresstest 2026-10-02: die Ansicht "nach Funktionen" ging fuer jede
+' gemessene Zeile alle Bereiche durch, suchte die Gruppe mit ARRAY_INDEXOF
+' und sortierte per Auswahl -- bei 2000 Unterprogrammen 2,9 s. Jetzt eine
+' Zuordnung Zeile -> innerster Bereich, eine MAP fuer die Gruppen und SORT.
+' Geprueft: jede SUB ist eine Gruppe mit ihren zwei Rumpfzeilen, die
+' Gruppen stehen absteigend nach Zeit, und es geht flott (grob: 2 s).
+DIM prBild AS INTEGER : prBild = 0
+DIM prEnde AS INTEGER : prEnde = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN befehl("profil")
+IF prBild > 35 AND prozess < 0 AND prEnde = 0 THEN
+    prEnde = prBild
+    GUI_SET_CHECKED(cbProfilFunk, TRUE)
+    DIM prT AS FLOAT : prT = GET_TIME()
+    profilTabelleFuellen()
+    DIM prD AS FLOAT : prD = GET_TIME() - prT
+    DIM prSub AS INTEGER : prSub = 0
+    DIM prZwei AS INTEGER : prZwei = 0
+    DIM prK AS INTEGER
+    FOR prK = 0 TO GUI_TABLE_ROW_COUNT(tblProfil) - 1
+        IF LEFT$(GUI_TABLE_GET_CELL(tblProfil, prK, 0), 1) = "t" THEN
+            prSub = prSub + 1
+            IF GUI_TABLE_GET_CELL(tblProfil, prK, 2) = "2" THEN prZwei = prZwei + 1
+        END IF
+    NEXT
+    DIM prAb AS BOOLEAN : prAb = TRUE
+    FOR prK = 1 TO GUI_TABLE_ROW_COUNT(tblProfil) - 1
+        IF VAL(GUI_TABLE_GET_CELL(tblProfil, prK, 3)) > VAL(GUI_TABLE_GET_CELL(tblProfil, prK - 1, 3)) THEN prAb = FALSE
+    NEXT
+    protokoll("pr subs " + STR$(prSub) + " mit zwei zeilen " + STR$(prZwei) + " absteigend " + STR$(prAb) + " flott " + STR$(prD < 2.0))
+    EXIT(0)
+END IF
+--- argumente
+f.dh
+--- umgebung
+DHRT_FRAMES=6000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM t AS ARRAY OF STRING : t = []
+DIM i AS INTEGER
+FOR i = 0 TO 1999
+    ARRAY_PUSH(t, "SUB t" + STR$(i) + "(x AS INTEGER)")
+    ARRAY_PUSH(t, "    DIM y AS INTEGER : y = x * 2")
+    ARRAY_PUSH(t, "    y = y + 1")
+    ARRAY_PUSH(t, "END SUB")
+NEXT
+FOR i = 0 TO 1999
+    ARRAY_PUSH(t, "t" + STR$(i) + "(1)")
+NEXT
+WRITEALL("f.dh", JOIN$(t, CHR$(10)) + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr subs 2000 mit zwei zeilen 2000 absteigend TRUE flott TRUE
