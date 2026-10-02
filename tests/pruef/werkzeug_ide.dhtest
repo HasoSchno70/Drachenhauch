@@ -3075,3 +3075,42 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 pr laeuft weiter, marke 3 dialog 0
+
+=== klammerpaar und signaturhilfe haben eine reichweite
+' Stresstest 2026-10-02: hinter der ] einer Datenzeile mit 270000 Zeichen
+' suchte klammerPartner Zeichen fuer Zeichen bis zur [ am Zeilenanfang (2 s
+' in einem Bild), und aufrufUmDieMarke zaehlte bei jedem Tastendruck die
+' Anfuehrungszeichen ab dem Zeilenanfang. Jetzt sucht das Klammerpaar
+' hoechstens 20000 Zeichen weit, und jenseits von Spalte 5000 gibt es keine
+' Signaturhilfe. Nahe Paare und Aufrufe gehen wie bisher.
+DIM prS AS STRING : prS = "[" + REPEAT$("1", 30000) + "]"
+protokoll("pr weit " + STR$(klammerPartner(prS, LEN(prS) - 1)))
+DIM prN AS STRING : prN = "[" + REPEAT$("1", 100) + "]"
+protokoll("pr nah " + STR$(klammerPartner(prN, LEN(prN) - 1)))
+DIM prA AS STRING
+DIM prSp AS INTEGER
+DIM prArg AS INTEGER
+DIM prZ AS STRING : prZ = REPEAT$(" ", 6000) + "CIRCLE(1, "
+(prA, prSp, prArg) = aufrufUmDieMarke(prZ, LEN(prZ) + 1)
+protokoll("pr weit rechts [" + prA + "]")
+prZ = "CIRCLE(1, "
+(prA, prSp, prArg) = aufrufUmDieMarke(prZ, LEN(prZ) + 1)
+protokoll("pr vorn [" + prA + "] argument " + STR$(prArg))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr weit -1
+pr nah 0
+pr weit rechts []
+pr vorn [CIRCLE] argument 1
