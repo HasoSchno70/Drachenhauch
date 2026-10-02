@@ -2960,3 +2960,118 @@ PRINT "neu da "; FILEEXISTS("neu.dh")
 pr status Umbenannt: lib.dh -> neu.dh Nicht geschrieben: haupt.dh
 pr laeuft weiter
 neu da TRUE
+
+=== eine ide.json mit werten vom falschen typ haelt den start nicht auf
+' Stresstest 2026-10-02: die Einstellungen wurden mit JSON_GET_BOOL/INT/
+' STRING gelesen, und die werfen bei einem Wert vom falschen Typ. Eine
+' von Hand geaenderte ide.json ("hell": 1 statt true, "schrift": 17.5)
+' liess die IDE bei JEDEM Start abbrechen, bis jemand die Datei fand und
+' loeschte. Jetzt gilt fuer einen solchen Wert die Vorgabe; eine Zahl
+' geht als Wahrheitswert durch, eine Kommazahl als ganze Zahl.
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+protokoll("pr hell " + STR$(hell) + " schrift " + STR$(codeGroesse) + " umbruch " + STR$(umbruchAn))
+protokoll("pr zuletzt " + STR$(LEN(zuletzt)) + " haltepunkte " + STR$(LEN(hpDateien)) + " sprache " + sprache)
+EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 0
+--- datei _programm/ide.json
+{"hell": 1, "schrift": 17.5, "umbruch": "ja", "sprache": 5, "zuletzt": "x", "haltepunkte": [{"datei": 3, "zeile": "zwei"}, {"datei": "a.dh", "zeile": 4}]}
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 16) = "konfig uebergang" THEN PRINT L[i]
+NEXT
+--- erwartet
+konfig uebergangen sprache, zuletzt, umbruch, haltepunkte.0.datei, haltepunkte.0.zeile
+pr hell TRUE schrift 17 umbruch FALSE
+pr zuletzt 1 haltepunkte 1 sprache de
+
+=== farben.json und tasten.json in falscher form halten den start nicht auf
+' Stresstest 2026-10-02: eigene Farben und Tastenbelegung lasen ihre
+' Abschnitte mit JSON_KEYS, und das wirft, wenn dort kein Objekt steht --
+' {"dunkel": "blau"} oder eine tasten.json mit einer Liste beendeten die
+' IDE schon beim Start. Jetzt steht es bei den Meldungen der Datei.
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+protokoll("pr farben " + STR$(LEN(farbMeldungen)) + " tasten " + STR$(LEN(tastenMeldungen)))
+befehl("thema")
+protokoll("pr hell " + STR$(hell) + " farben " + STR$(LEN(farbMeldungen)))
+EXIT(0)
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 0
+--- datei _programm/farben.json
+{"dunkel": "blau", "hell": {"oberflaeche": 5, "kommentar": "#808080"}}
+--- datei _programm/tasten.json
+[1, 2]
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr farben 1 tasten 1
+pr hell TRUE farben 1
+
+=== eine riesige zeilennummer laesst int nicht ueberlaufen
+' Stresstest 2026-10-02: "Gehe zu Zeile" mit 99999999999999999999 und eine
+' Zeile der Ausgabe wie "haupt.dh:99999999999999999999" gingen durch
+' INT(VAL(...)) -- INT laeuft ueber (64 Bit) und beendete die IDE. Jetzt
+' wird vorher begrenzt.
+AUTOMATION_PLAY("ev.txt")
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 10 THEN
+    ausgabe("Laufzeitfehler in haupt.dh:99999999999999999999: zu gross")
+    dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeile:", "99999999999999999999")
+END IF
+IF prBild = 60 THEN
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    protokoll("pr laeuft weiter, marke " + STR$(prZ) + " dialog " + STR$(dlgZeile))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+PRINT 2
+PRINT 3
+--- datei _programm/ev.txt
+c 3
+e 0 1 340 0 0 0
+e 30 2 257 0 0 0
+e 33 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr laeuft weiter, marke 3 dialog 0

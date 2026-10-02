@@ -472,10 +472,16 @@ fn zeilen_nachziehen(alt: &str, neu: &str, zeilen: &mut [usize]) {
     let mut starts = vec![0usize];
     for (i, &c) in a_ch.iter().enumerate() { if c == '\n' { starts.push(i + 1); } }
     let zeile_neu = |off: usize| n_ch[..off.min(n_ch.len())].iter().filter(|&&c| c == '\n').count();
+    // Alles hinter der Aenderung rueckt um dieselbe Zahl Zeilen: Umbrueche im
+    // neuen Stueck minus Umbrueche im alten. EINMAL gerechnet -- je Marke von
+    // vorn gezaehlt kostete ein Tastendruck bei 2000 Hinweisen (Aufrufzaehler
+    // der IDE) in einer Datei mit 20000 Zeilen rund 10 ms.
+    let umbrueche = |ch: &[char]| ch.iter().filter(|&&c| c == '\n').count() as i64;
+    let zeilen_delta = umbrueche(&n_ch[a..n_ch.len() - e]) - umbrueche(&a_ch[a..ende_alt]);
     for z in zeilen.iter_mut() {
         let o = match starts.get(*z) { Some(&o) => o, None => continue };
         if o >= ende_alt && o > a || (o == ende_alt && o == a && delta > 0) {
-            *z = zeile_neu((o as i64 + delta).max(0) as usize);
+            *z = (*z as i64 + zeilen_delta).max(0) as usize;
         } else if o <= a {
             // davor: bleibt
         } else {
@@ -21888,6 +21894,46 @@ mod marken_tests {
         assert_eq!(nach(alt, "a\nbc\nd", &[2]), vec![1]);
         // Unveraendert.
         assert_eq!(nach(alt, alt, &[3]), vec![3]);
+    }
+
+    #[test]
+    fn marken_hinter_der_aenderung_wie_von_vorn_gezaehlt() {
+        // Die Verschiebung wird einmal gerechnet statt je Marke von vorn
+        // gezaehlt -- an vielen zufaelligen Aenderungen muss sie dasselbe
+        // ergeben wie das Zaehlen von vorn (die Fassung bis 2026-10-02).
+        let mut zufall: u64 = 12345;
+        let mut naechste = |n: usize| { zufall = zufall.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); ((zufall >> 33) as usize) % n.max(1) };
+        let stuecke = ["ab", "\n", "x\ny", "\n\n", "", "zz"];
+        for _ in 0..500 {
+            let mut alt = String::new();
+            for _ in 0..(5 + naechste(20)) { alt.push_str(stuecke[naechste(stuecke.len())]); alt.push('\n'); }
+            let a: Vec<char> = alt.chars().collect();
+            let von = naechste(a.len());
+            let bis = von + naechste(a.len() - von + 1);
+            let mut neu: String = a[..von].iter().collect();
+            neu.push_str(stuecke[naechste(stuecke.len())]);
+            neu.extend(a[bis..].iter());
+            let zahl = alt.matches('\n').count() + 1;
+            let marken: Vec<usize> = (0..zahl).collect();
+            let ist = nach(&alt, &neu, &marken);
+            // Von vorn gezaehlt fuer jede Marke hinter der Aenderung.
+            let n_ch: Vec<char> = neu.chars().collect();
+            let mut p = 0;
+            while p < a.len() && p < n_ch.len() && a[p] == n_ch[p] { p += 1; }
+            let mut e = 0;
+            while e < a.len() - p && e < n_ch.len() - p && a[a.len() - 1 - e] == n_ch[n_ch.len() - 1 - e] { e += 1; }
+            let ende_alt = a.len() - e;
+            let delta = n_ch.len() as i64 - a.len() as i64;
+            let mut starts = vec![0usize];
+            for (i, &c) in a.iter().enumerate() { if c == '\n' { starts.push(i + 1); } }
+            for (z, &o) in starts.iter().enumerate() {
+                if o >= ende_alt && o > p || (o == ende_alt && o == p && delta > 0) {
+                    let off = ((o as i64 + delta).max(0) as usize).min(n_ch.len());
+                    let erwartet = n_ch[..off].iter().filter(|&&c| c == '\n').count();
+                    assert_eq!(ist[z], erwartet, "alt {:?} neu {:?} zeile {}", alt, neu, z);
+                }
+            }
+        }
     }
 
     #[test]

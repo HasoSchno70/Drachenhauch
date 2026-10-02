@@ -260,6 +260,11 @@ DIM profZeilen AS ARRAY OF INTEGER : profZeilen = []
 DIM profAnzahl AS ARRAY OF INTEGER : profAnzahl = []
 DIM pruefungFaellig AS FLOAT : pruefungFaellig = -1.0
 DIM letzteMarke AS STRING : letzteMarke = ""
+DIM hilfeKandidat AS STRING : hilfeKandidat = ""
+DIM vervollWartet AS BOOLEAN : vervollWartet = FALSE
+DIM vervollKandidat AS STRING : vervollKandidat = ""
+DIM vervollFaellig AS FLOAT : vervollFaellig = 0.0
+DIM hilfeFaellig AS FLOAT : hilfeFaellig = 0.0
 DIM suchtext AS STRING : suchtext = ""
 DIM ersatztext AS STRING : ersatztext = ""
 DIM fertigNachStopp AS BOOLEAN : fertigNachStopp = FALSE
@@ -542,6 +547,49 @@ IF FILEEXISTS(konfigPfad) THEN
     END TRY
 END IF
 
+' Einstellungen lesen, ohne an einem Wert vom falschen Typ zu scheitern.
+' JSON_GET_BOOL/INT/STRING werfen dann, und eine von Hand geaenderte
+' ide.json ("hell": 1, "schrift": 17.5) liess die IDE bei JEDEM Start
+' abbrechen, bis jemand die Datei fand und loeschte. Jetzt gilt die
+' Vorgabe; eine Zahl geht als Wahrheitswert durch (0 = aus), eine
+' Kommazahl als ganze Zahl. Was uebergangen wurde, steht nach dem Start im
+' Protokoll -- protokoll() selbst geht hier oben noch nicht.
+DIM konfigUebergangen AS STRING : konfigUebergangen = ""
+SUB konfigFalsch(pfad AS STRING)
+    konfigUebergangen = konfigUebergangen + IIF(konfigUebergangen = "", "", ", ") + pfad
+END SUB
+FUNCTION kBool(pfad AS STRING, vorgabe AS BOOLEAN) AS BOOLEAN
+    IF NOT JSON_HAS(konfig, pfad) THEN RETURN vorgabe
+    SELECT CASE JSON_TYPE(konfig, pfad)
+        CASE "boolean" : RETURN JSON_GET_BOOL(konfig, pfad)
+        CASE "number" : RETURN JSON_GET_FLOAT(konfig, pfad) <> 0.0
+    END SELECT
+    konfigFalsch(pfad)
+    RETURN vorgabe
+END FUNCTION
+FUNCTION kInt(pfad AS STRING, vorgabe AS INTEGER) AS INTEGER
+    IF NOT JSON_HAS(konfig, pfad) THEN RETURN vorgabe
+    IF JSON_TYPE(konfig, pfad) = "number" THEN
+        DIM f AS FLOAT : f = JSON_GET_FLOAT(konfig, pfad)
+        IF ABS(f) < 1000000000.0 THEN RETURN INT(f)
+    END IF
+    konfigFalsch(pfad)
+    RETURN vorgabe
+END FUNCTION
+FUNCTION kText(pfad AS STRING, vorgabe AS STRING) AS STRING
+    IF NOT JSON_HAS(konfig, pfad) THEN RETURN vorgabe
+    IF JSON_TYPE(konfig, pfad) = "string" THEN RETURN JSON_GET_STRING(konfig, pfad)
+    konfigFalsch(pfad)
+    RETURN vorgabe
+END FUNCTION
+' Laenge einer Liste; keine Liste (fehlt oder falscher Typ) = 0.
+FUNCTION kLen(pfad AS STRING) AS INTEGER
+    IF NOT JSON_HAS(konfig, pfad) THEN RETURN 0
+    IF JSON_TYPE(konfig, pfad) = "array" THEN RETURN JSON_LEN(konfig, pfad)
+    konfigFalsch(pfad)
+    RETURN 0
+END FUNCTION
+
 ' --- Sprache der Oberflaeche (seit 2026-09-29) ---------------------------
 ' Jeder Anzeigetext geht durch tr$("..."): auf Deutsch kommt er unveraendert
 ' zurueck, auf Englisch aus ide/sprache/en.txt (je Zeile Deutsch, Tabulator,
@@ -551,7 +599,7 @@ END IF
 ' tests/pruef/werkzeug_ide_englisch.dhtest prueft, dass keiner fehlt.
 ' Gewechselt wird beim naechsten Start: die Fenster sind dann schon gebaut.
 DIM sprache AS STRING : sprache = "de"
-IF JSON_HAS(konfig, "sprache") THEN sprache = JSON_GET_STRING(konfig, "sprache")
+sprache = kText("sprache", sprache)
 IF GETENV$("DH_IDE_SPRACHE") <> "" THEN sprache = GETENV$("DH_IDE_SPRACHE")
 DIM englisch AS BOOLEAN : englisch = LOWER$(sprache) = "en"
 DIM uebersetzung AS MAP OF STRING : uebersetzung = {}
@@ -622,35 +670,35 @@ END FUNCTION
 ' DH_IDE_VORSPANN=1. Fehlt die Datei oder kann dieser Bau keine Videos,
 ' startet die IDE ohne.
 DIM vorspannAn AS BOOLEAN : vorspannAn = TRUE
-IF JSON_HAS(konfig, "vorspann") THEN vorspannAn = JSON_GET_BOOL(konfig, "vorspann")
+vorspannAn = kBool("vorspann", vorspannAn)
 ' Der Lichtstreif (GUI_WINDOW_GLOW): beim Start und wenn ein Programm
 ' losgeht, streift ein warmes Licht schraeg von rechts nach links ueber das
 ' Fenster, und die Rahmen blitzen auf, wo es sie kreuzt -- ein neuer
 ' Drachenhauch. Abschalten in den Einstellungen (`glanz`).
 DIM glanzAn AS BOOLEAN : glanzAn = TRUE
-IF JSON_HAS(konfig, "glanz") THEN glanzAn = JSON_GET_BOOL(konfig, "glanz")
+glanzAn = kBool("glanz", glanzAn)
 ' Der Schriftzug schwach hinter dem Code -- er fuellt das Feld, rollt aber
 ' nicht mit: Grund, kein Inhalt.
 DIM wasserzeichenAn AS BOOLEAN : wasserzeichenAn = TRUE
-IF JSON_HAS(konfig, "wasserzeichen") THEN wasserzeichenAn = JSON_GET_BOOL(konfig, "wasserzeichen")
+wasserzeichenAn = kBool("wasserzeichen", wasserzeichenAn)
 DIM hgBild AS INTEGER : hgBild = -1
 IF FILEEXISTS(PATHJOIN(bilderOrdner, "schriftzug.png")) THEN hgBild = LOADIMAGE(PATHJOIN(bilderOrdner, "schriftzug.png"))
-IF JSON_HAS(konfig, "ui_schrift") THEN uiGroesse = MAX(12, MIN(22, JSON_GET_INT(konfig, "ui_schrift")))
+uiGroesse = MAX(12, MIN(22, kInt("ui_schrift", uiGroesse)))
 IF uiFont >= 0 THEN TEXT_SIZE(uiGroesse)
 ' Die Kaestchen im Projektbaum (Suche und Umbau auf eine Auswahl beschraenken)
 ' stehen nur auf Wunsch da -- immer sichtbar sahen sie aus wie etwas, das
 ' beim Anklicken etwas tun muesste (`baum_haken` in der ide.json).
 DIM baumHakenAn AS BOOLEAN : baumHakenAn = FALSE
-IF JSON_HAS(konfig, "baum_haken") THEN baumHakenAn = JSON_GET_BOOL(konfig, "baum_haken")
+baumHakenAn = kBool("baum_haken", baumHakenAn)
 ' Welcher Vorspann: jede .mp4 in daten/video steht in den Einstellungen zur
 ' Wahl (`vorspann_datei` in der ide.json), dazu "abwechselnd" -- dann kommt
 ' bei jedem Start der naechste (`vorspann_zuletzt`). Eine gewaehlte Datei,
 ' die es nicht mehr gibt, faellt auf die erste zurueck.
 DIM vorspannOrdner AS STRING : vorspannOrdner = PATHJOIN(wurzel, "daten/video")
 DIM vorspannDatei AS STRING : vorspannDatei = "vorspann.mp4"
-IF JSON_HAS(konfig, "vorspann_datei") THEN vorspannDatei = JSON_GET_STRING(konfig, "vorspann_datei")
+vorspannDatei = kText("vorspann_datei", vorspannDatei)
 DIM vorspannZuletzt AS INTEGER : vorspannZuletzt = -1
-IF JSON_HAS(konfig, "vorspann_zuletzt") THEN vorspannZuletzt = JSON_GET_INT(konfig, "vorspann_zuletzt")
+vorspannZuletzt = kInt("vorspann_zuletzt", vorspannZuletzt)
 DIM vorspannPfad AS STRING : vorspannPfad = ""
 DIM vorspannSchluss AS BOOLEAN : vorspannSchluss = FALSE
 IF (GETENV$("DHRT_FRAMES") = "" OR GETENV$("DH_IDE_VORSPANN") = "1") AND vorspannAn THEN
@@ -691,7 +739,7 @@ IF vorspannSchluss THEN END
 DIM whOrdner AS STRING : whOrdner = PATHJOIN(DIRNAME(konfigPfad), "wiederherstellung")
 DIM whKennung AS STRING : whKennung = UUID4$()
 DIM whTakt AS INTEGER : whTakt = 30
-IF JSON_HAS(konfig, "wiederherstellung_s") THEN whTakt = MAX(1, MIN(600, JSON_GET_INT(konfig, "wiederherstellung_s")))
+whTakt = MAX(1, MIN(600, kInt("wiederherstellung_s", whTakt)))
 DIM whFaellig AS FLOAT : whFaellig = 0.0
 DIM whFremd AS ARRAY OF STRING : whFremd = []     ' verwaiste Staende, die angeboten werden
 DIM whGewarnt AS BOOLEAN : whGewarnt = FALSE
@@ -706,97 +754,106 @@ DIM projDateien AS ARRAY OF STRING : projDateien = []     ' Pfade, mit | getrenn
 DIM projAktiv AS ARRAY OF INTEGER : projAktiv = []
 IF JSON_HAS(konfig, "projekte") THEN
     DIM pj AS INTEGER
-    FOR pj = 0 TO JSON_LEN(konfig, "projekte") - 1
+    FOR pj = 0 TO kLen("projekte") - 1
         DIM pp AS STRING : pp = "projekte." + STR$(pj)
         DIM pfl AS ARRAY OF STRING : pfl = []
         DIM pd AS INTEGER
-        FOR pd = 0 TO JSON_LEN(konfig, pp + ".sitzung") - 1
-            ARRAY_PUSH(pfl, JSON_GET_STRING(konfig, pp + ".sitzung." + STR$(pd)))
+        FOR pd = 0 TO kLen(pp + ".sitzung") - 1
+            DIM pdw AS STRING : pdw = kText(pp + ".sitzung." + STR$(pd), "")
+            IF pdw <> "" THEN ARRAY_PUSH(pfl, pdw)
         NEXT
-        ARRAY_PUSH(projOrdner, JSON_GET_STRING(konfig, pp + ".ordner"))
+        DIM pord AS STRING : pord = kText(pp + ".ordner", "")
+        IF pord = "" THEN CONTINUE
+        ARRAY_PUSH(projOrdner, pord)
         ARRAY_PUSH(projDateien, JOIN$(pfl, "|"))
-        ARRAY_PUSH(projAktiv, JSON_GET_INT(konfig, pp + ".aktiv"))
+        ARRAY_PUSH(projAktiv, kInt(pp + ".aktiv", 0))
     NEXT
 END IF
 
 DIM zuletzt AS ARRAY OF STRING : zuletzt = []
 IF JSON_HAS(konfig, "zuletzt") THEN
     DIM kz AS INTEGER
-    FOR kz = 0 TO JSON_LEN(konfig, "zuletzt") - 1
-        ARRAY_PUSH(zuletzt, JSON_GET_STRING(konfig, "zuletzt." + STR$(kz)))
+    FOR kz = 0 TO kLen("zuletzt") - 1
+        DIM kzw AS STRING : kzw = kText("zuletzt." + STR$(kz), "")
+        IF kzw <> "" THEN ARRAY_PUSH(zuletzt, kzw)
     NEXT
 END IF
-IF JSON_HAS(konfig, "hell") THEN hell = JSON_GET_BOOL(konfig, "hell")
-IF JSON_HAS(konfig, "schrift") THEN codeGroesse = MAX(10, MIN(32, JSON_GET_INT(konfig, "schrift")))
-IF JSON_HAS(konfig, "listen_schrift") THEN listenGroesse = MAX(10, MIN(32, JSON_GET_INT(konfig, "listen_schrift")))
-IF JSON_HAS(konfig, "handbuch_schrift") THEN handbuchGroesse = MAX(10, MIN(32, JSON_GET_INT(konfig, "handbuch_schrift")))
-IF JSON_HAS(konfig, "umbruch") THEN umbruchAn = JSON_GET_BOOL(konfig, "umbruch")
-IF JSON_HAS(konfig, "karte") THEN minimapAn = JSON_GET_BOOL(konfig, "karte")
-IF JSON_HAS(konfig, "git_rand") THEN gitRandAn = JSON_GET_BOOL(konfig, "git_rand")
-IF JSON_HAS(konfig, "regex") THEN regexAn = JSON_GET_BOOL(konfig, "regex")
-IF JSON_HAS(konfig, "gross_klein") THEN grossKlein = JSON_GET_BOOL(konfig, "gross_klein")
-IF JSON_HAS(konfig, "ganzes_wort") THEN ganzesWort = JSON_GET_BOOL(konfig, "ganzes_wort")
-IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
-IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
-IF JSON_HAS(konfig, "blockkopf") THEN kopfAn = JSON_GET_BOOL(konfig, "blockkopf")
-IF JSON_HAS(konfig, "klammer_farben") THEN klammerFarbenAn = JSON_GET_BOOL(konfig, "klammer_farben")
-IF JSON_HAS(konfig, "profil_waerme") THEN waermeAn = JSON_GET_BOOL(konfig, "profil_waerme")
-IF JSON_HAS(konfig, "aufrufzaehler") THEN zaehlerAn = JSON_GET_BOOL(konfig, "aufrufzaehler")
-IF JSON_HAS(konfig, "fehler_am_ende") THEN fehlerEndeAn = JSON_GET_BOOL(konfig, "fehler_am_ende")
-IF JSON_HAS(konfig, "typ_hinweise") THEN typHinweiseAn = JSON_GET_BOOL(konfig, "typ_hinweise")
-IF JSON_HAS(konfig, "parameter_namen") THEN paramNamenAn = JSON_GET_BOOL(konfig, "parameter_namen")
-IF JSON_HAS(konfig, "einfuegen_einruecken") THEN einfuegenEinrueckenAn = JSON_GET_BOOL(konfig, "einfuegen_einruecken")
-IF JSON_HAS(konfig, "neustart_beim_sichern") THEN neustartSichernAn = JSON_GET_BOOL(konfig, "neustart_beim_sichern")
+hell = kBool("hell", hell)
+codeGroesse = MAX(10, MIN(32, kInt("schrift", codeGroesse)))
+listenGroesse = MAX(10, MIN(32, kInt("listen_schrift", listenGroesse)))
+handbuchGroesse = MAX(10, MIN(32, kInt("handbuch_schrift", handbuchGroesse)))
+umbruchAn = kBool("umbruch", umbruchAn)
+minimapAn = kBool("karte", minimapAn)
+gitRandAn = kBool("git_rand", gitRandAn)
+regexAn = kBool("regex", regexAn)
+grossKlein = kBool("gross_klein", grossKlein)
+ganzesWort = kBool("ganzes_wort", ganzesWort)
+vorschlagAn = kBool("vorschlag", vorschlagAn)
+linienAn = kBool("linien", linienAn)
+kopfAn = kBool("blockkopf", kopfAn)
+klammerFarbenAn = kBool("klammer_farben", klammerFarbenAn)
+waermeAn = kBool("profil_waerme", waermeAn)
+zaehlerAn = kBool("aufrufzaehler", zaehlerAn)
+fehlerEndeAn = kBool("fehler_am_ende", fehlerEndeAn)
+typHinweiseAn = kBool("typ_hinweise", typHinweiseAn)
+paramNamenAn = kBool("parameter_namen", paramNamenAn)
+einfuegenEinrueckenAn = kBool("einfuegen_einruecken", einfuegenEinrueckenAn)
+neustartSichernAn = kBool("neustart_beim_sichern", neustartSichernAn)
 IF JSON_HAS(konfig, "start") THEN
     DIM sk AS INTEGER
-    FOR sk = 0 TO JSON_LEN(konfig, "start") - 1
+    FOR sk = 0 TO kLen("start") - 1
         DIM skp AS STRING : skp = "start." + STR$(sk)
-        IF NOT JSON_HAS(konfig, skp + ".datei") THEN CONTINUE
-        ARRAY_PUSH(startDateien, JSON_GET_STRING(konfig, skp + ".datei"))
-        ARRAY_PUSH(startArgs, IIF(JSON_HAS(konfig, skp + ".argumente"), JSON_GET_STRING(konfig, skp + ".argumente"), ""))
-        ARRAY_PUSH(startUmg, IIF(JSON_HAS(konfig, skp + ".umgebung"), JSON_GET_STRING(konfig, skp + ".umgebung"), ""))
+        DIM skd AS STRING : skd = kText(skp + ".datei", "")
+        IF skd = "" THEN CONTINUE
+        ARRAY_PUSH(startDateien, skd)
+        ARRAY_PUSH(startArgs, kText(skp + ".argumente", ""))
+        ARRAY_PUSH(startUmg, kText(skp + ".umgebung", ""))
     NEXT
 END IF
-IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
-IF JSON_HAS(konfig, "klammern") THEN klammernAn = JSON_GET_BOOL(konfig, "klammern")
-IF JSON_HAS(konfig, "format_sichern") THEN formatSichernAn = JSON_GET_BOOL(konfig, "format_sichern")
-IF JSON_HAS(konfig, "umbau_vorschau") THEN vorschauAn = JSON_GET_BOOL(konfig, "umbau_vorschau")
-IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
-IF JSON_HAS(konfig, "seitenleiste") THEN seitenAn = JSON_GET_BOOL(konfig, "seitenleiste")
-IF JSON_HAS(konfig, "untere_leiste") THEN untenAn = JSON_GET_BOOL(konfig, "untere_leiste")
-IF JSON_HAS(konfig, "druck_groesse") THEN druckGroesse = MAX(6, MIN(16, JSON_GET_INT(konfig, "druck_groesse")))
-IF JSON_HAS(konfig, "druck_rand") THEN druckRand = MAX(10, MIN(40, JSON_GET_INT(konfig, "druck_rand")))
-IF JSON_HAS(konfig, "druck_nummern") THEN druckNummern = JSON_GET_BOOL(konfig, "druck_nummern")
+geruestAn = kBool("geruest", geruestAn)
+klammernAn = kBool("klammern", klammernAn)
+formatSichernAn = kBool("format_sichern", formatSichernAn)
+vorschauAn = kBool("umbau_vorschau", vorschauAn)
+leisteAn = kBool("leiste", leisteAn)
+seitenAn = kBool("seitenleiste", seitenAn)
+untenAn = kBool("untere_leiste", untenAn)
+druckGroesse = MAX(6, MIN(16, kInt("druck_groesse", druckGroesse)))
+druckRand = MAX(10, MIN(40, kInt("druck_rand", druckRand)))
+druckNummern = kBool("druck_nummern", druckNummern)
 IF JSON_HAS(konfig, "falten_pfade") AND JSON_HAS(konfig, "falten_zeilen") THEN
     DIM fk AS INTEGER
-    FOR fk = 0 TO MIN(JSON_LEN(konfig, "falten_pfade"), JSON_LEN(konfig, "falten_zeilen")) - 1
-        ARRAY_PUSH(faltPfade, JSON_GET_STRING(konfig, "falten_pfade." + STR$(fk)))
-        ARRAY_PUSH(faltListe, JSON_GET_STRING(konfig, "falten_zeilen." + STR$(fk)))
+    FOR fk = 0 TO MIN(kLen("falten_pfade"), kLen("falten_zeilen")) - 1
+        ARRAY_PUSH(faltPfade, kText("falten_pfade." + STR$(fk), ""))
+        ARRAY_PUSH(faltListe, kText("falten_zeilen." + STR$(fk), ""))
     NEXT
 END IF
 IF JSON_HAS(konfig, "haltepunkte") THEN
     DIM hl AS INTEGER
-    FOR hl = 0 TO JSON_LEN(konfig, "haltepunkte") - 1
+    FOR hl = 0 TO kLen("haltepunkte") - 1
         DIM hlP AS STRING : hlP = "haltepunkte." + STR$(hl)
-        IF NOT JSON_HAS(konfig, hlP + ".datei") OR NOT JSON_HAS(konfig, hlP + ".zeile") THEN CONTINUE
-        ARRAY_PUSH(hpDateien, JSON_GET_STRING(konfig, hlP + ".datei"))
-        ARRAY_PUSH(hpZeilen, JSON_GET_INT(konfig, hlP + ".zeile"))
-        IF JSON_HAS(konfig, hlP + ".bedingung") THEN ARRAY_PUSH(hpBedingungen, JSON_GET_STRING(konfig, hlP + ".bedingung")) ELSE ARRAY_PUSH(hpBedingungen, "")
-        IF JSON_HAS(konfig, hlP + ".aktiv") THEN ARRAY_PUSH(hpAktiv, JSON_GET_BOOL(konfig, hlP + ".aktiv")) ELSE ARRAY_PUSH(hpAktiv, TRUE)
-        IF JSON_HAS(konfig, hlP + ".treffer") THEN ARRAY_PUSH(hpTreffer, JSON_GET_STRING(konfig, hlP + ".treffer")) ELSE ARRAY_PUSH(hpTreffer, "")
-        IF JSON_HAS(konfig, hlP + ".log") THEN ARRAY_PUSH(hpLog, JSON_GET_STRING(konfig, hlP + ".log")) ELSE ARRAY_PUSH(hpLog, "")
+        DIM hlD AS STRING : hlD = kText(hlP + ".datei", "")
+        DIM hlZ AS INTEGER : hlZ = kInt(hlP + ".zeile", 0)
+        IF hlD = "" OR hlZ < 1 THEN CONTINUE
+        ARRAY_PUSH(hpDateien, hlD)
+        ARRAY_PUSH(hpZeilen, hlZ)
+        ARRAY_PUSH(hpBedingungen, kText(hlP + ".bedingung", ""))
+        ARRAY_PUSH(hpAktiv, kBool(hlP + ".aktiv", TRUE))
+        ARRAY_PUSH(hpTreffer, kText(hlP + ".treffer", ""))
+        ARRAY_PUSH(hpLog, kText(hlP + ".log", ""))
     NEXT
 END IF
 IF JSON_HAS(konfig, "lesezeichen") THEN
     DIM ll AS INTEGER
-    FOR ll = 0 TO JSON_LEN(konfig, "lesezeichen") - 1
+    FOR ll = 0 TO kLen("lesezeichen") - 1
         DIM llP AS STRING : llP = "lesezeichen." + STR$(ll)
-        IF NOT JSON_HAS(konfig, llP + ".datei") OR NOT JSON_HAS(konfig, llP + ".zeile") THEN CONTINUE
-        ARRAY_PUSH(lzDateien, JSON_GET_STRING(konfig, llP + ".datei"))
-        ARRAY_PUSH(lzZeilen, JSON_GET_INT(konfig, llP + ".zeile"))
+        DIM llD AS STRING : llD = kText(llP + ".datei", "")
+        DIM llZ AS INTEGER : llZ = kInt(llP + ".zeile", 0)
+        IF llD = "" OR llZ < 1 THEN CONTINUE
+        ARRAY_PUSH(lzDateien, llD)
+        ARRAY_PUSH(lzZeilen, llZ)
     NEXT
 END IF
-IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
+autoSichern = MAX(0, MIN(120, kInt("autosichern", autoSichern)))
 IF hell THEN GUI_THEME_PRESET("glas_hell") : themaFeinschliff()
 codeFarben(hell)
 
@@ -1363,6 +1420,22 @@ DIM vervollWort AS STRING : vervollWort = ""
 DIM vervollGetippt AS BOOLEAN : vervollGetippt = FALSE   ' in diesem Bild hat sich der Text geaendert
 DIM vervollAus AS STRING : vervollAus = "-"
 
+' Eine Zeile des Felds (ab 1), "" ausserhalb. Die Zerlegung wird gemerkt,
+' solange der Text derselbe ist: wortAnfang$ laeuft in JEDEM Bild, und den
+' ganzen Text dafuer jedesmal in Zeilen zu zerlegen kostete bei 20000
+' Zeilen fast 2 ms je Bild (Stresstest 2026-10-02).
+DIM zvText AS STRING : zvText = ""
+DIM zvZeilen AS ARRAY OF STRING : zvZeilen = []
+FUNCTION zeileVon$(ta AS GUI_WIDGET, z AS INTEGER) AS STRING
+    DIM t AS STRING : t = GUI_TEXT(ta)
+    IF t <> zvText OR LEN(zvZeilen) = 0 THEN
+        zvText = t
+        zvZeilen = SPLIT$(t, NL)
+    END IF
+    IF z < 1 OR z > LEN(zvZeilen) THEN RETURN ""
+    RETURN zvZeilen[z - 1]
+END FUNCTION
+
 ' Der Wortanfang links der Marke -- so viel wird beim Uebernehmen ersetzt.
 FUNCTION wortAnfang$() AS STRING
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
@@ -1370,9 +1443,7 @@ FUNCTION wortAnfang$() AS STRING
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
-    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
-    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM zeile AS STRING : zeile = zeileVon$(ta, z)
     DIM a AS INTEGER : a = s - 1
     WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
     RETURN MID$(zeile, a, s - 1 - a)
@@ -5669,11 +5740,21 @@ SUB eigeneFarben(licht AS BOOLEAN)
     END TRY
     DIM teil AS STRING : teil = IIF(licht, "hell", "dunkel")
     IF NOT JSON_HAS(j, teil) THEN RETURN
+    ' JSON_KEYS wirft, wo kein Objekt steht -- {"dunkel": "blau"} beendete
+    ' die IDE schon beim Start.
+    IF JSON_TYPE(j, teil) <> "object" THEN
+        farbMelden(teil + ": erwartet { Name: Farbe, ... }")
+        RETURN
+    END IF
     DIM n AS INTEGER : n = 0
     DIM k AS STRING
     FOR EACH k IN JSON_KEYS(j, teil)
         IF LOWER$(k) = "oberflaeche" THEN
             DIM ok AS STRING
+            IF JSON_TYPE(j, teil + ".oberflaeche") <> "object" THEN
+                farbMelden(teil + ".oberflaeche: erwartet { Name: Farbe, ... }")
+                CONTINUE
+            END IF
             FOR EACH ok IN JSON_KEYS(j, teil + ".oberflaeche")
                 DIM fo AS INTEGER : fo = farbWert(j, teil + ".oberflaeche." + ok)
                 IF fo < 0 THEN CONTINUE
@@ -7892,12 +7973,10 @@ END FUNCTION
 
 ' Signatur des Aufrufs, in dem die Marke steht -- "" wenn keiner.
 FUNCTION signaturHilfe$(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS STRING
-    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
     DIM name AS STRING
     DIM spalte AS INTEGER
     DIM arg AS INTEGER
-    (name, spalte, arg) = aufrufUmDieMarke(zeilen[z - 1], s)
+    (name, spalte, arg) = aufrufUmDieMarke(zeileVon$(ta, z), s)
     IF name = "" THEN RETURN ""
     DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, spalte)
     IF md = "" THEN RETURN ""
@@ -7935,8 +8014,22 @@ SUB hilfeNachziehen()
     ' Nicht nur die Stelle: auch das Feld und die Textlaenge -- sonst blieb
     ' nach einem Reiterwechsel (Marke in beiden in 1:1) oder nach Tippen und
     ' Rueckgaengig an derselben Stelle die Hilfe zum vorigen Wort stehen.
-    DIM marke AS STRING : marke = STR$(ta) + ":" + STR$(z) + ":" + STR$(s) + ":" + STR$(LEN(GUI_TEXT(ta)))
+    DIM laenge AS INTEGER : laenge = LEN(GUI_TEXT(ta))
+    DIM marke AS STRING : marke = STR$(ta) + ":" + STR$(z) + ":" + STR$(s) + ":" + STR$(laenge)
     IF marke = letzteMarke THEN RETURN
+    ' In einer grossen Datei erst, wenn die Marke kurz ruht: CODE_HOVER$
+    ' liest den ganzen Text, bei 20000 Zeilen gut 10 ms -- bei JEDEM Zeichen
+    ' getippt halbierte das die Bildrate (Stresstest 2026-10-02). Die
+    ' Stelle in der Statusleiste geht sofort.
+    IF laenge > 50000 THEN
+        IF marke <> hilfeKandidat THEN
+            hilfeKandidat = marke
+            hilfeFaellig = GET_TIME() + 0.25
+            GUI_STATUSBAR_SET(lblStatus, sfPos, tr$("Zeile ") + STR$(z) + tr$(", Spalte ") + STR$(s))
+            RETURN
+        END IF
+        IF GET_TIME() < hilfeFaellig THEN RETURN
+    END IF
     letzteMarke = marke
     GUI_STATUSBAR_SET(lblStatus, sfPos, tr$("Zeile ") + STR$(z) + tr$(", Spalte ") + STR$(s))
     ' Steht die Marke in einer Argumentliste, gilt die Signatur des Aufrufs:
@@ -8287,6 +8380,28 @@ SUB vervollNachziehen()
     vervollGetippt = FALSE
     IF NOT vorschlagAn OR aktiverTab < 0 OR paletteOffen THEN RETURN
     DIM wort AS STRING : wort = wortAnfang$()
+    ' Grosse Datei: die Liste kommt erst, wenn das Wort kurz ruht --
+    ' CODE_COMPLETE liest den ganzen Text, bei 20000 Zeilen gut 10 ms je
+    ' getipptem Zeichen (Stresstest 2026-10-02). Weitergetippt = neu warten,
+    ' die Marke woanders hin = nicht mehr warten.
+    DIM freigegeben AS BOOLEAN : freigegeben = FALSE
+    IF vervollWartet THEN
+        IF getippt THEN
+            vervollKandidat = wort
+            vervollFaellig = GET_TIME() + 0.25
+            RETURN
+        END IF
+        IF wort <> vervollKandidat THEN
+            vervollWartet = FALSE
+        ELSEIF GET_TIME() < vervollFaellig THEN
+            RETURN
+        ELSE
+            vervollWartet = FALSE
+            getippt = TRUE
+            freigegeben = TRUE
+            vervollWort = ""
+        END IF
+    END IF
     IF wort = vervollAus THEN RETURN
     vervollAus = "-"
     IF LEN(wort) < 3 THEN
@@ -8301,6 +8416,12 @@ SUB vervollNachziehen()
         RETURN
     END IF
     IF GUI_FOCUSED() <> aktivesFeld() THEN RETURN
+    IF NOT freigegeben AND LEN(GUI_TEXT(aktivesFeld())) > 50000 THEN
+        vervollWartet = TRUE
+        vervollKandidat = wort
+        vervollFaellig = GET_TIME() + 0.25
+        RETURN
+    END IF
     vervollstaendigen(FALSE)
 END SUB
 
@@ -8905,6 +9026,16 @@ END SUB
 ' steht beliebiger Text: genommen wird das LAENGSTE Stueck vor ".dh:", das
 ' es als Datei gibt -- gesucht neben dem gelaufenen Programm (dhrt wechselt
 ' dorthin, seine Meldungen sind relativ dazu), dann im Projekt.
+' Eine Zahl aus Text als INTEGER, begrenzt: INT laeuft bei mehr als 64 Bit
+' ueber und bricht ab -- "Gehe zu Zeile" mit 99999999999999999999 oder so
+' eine Zeilennummer in der Ausgabe beendeten die IDE.
+FUNCTION ganzeZahl(t AS STRING) AS INTEGER
+    DIM v AS FLOAT : v = VAL(t)
+    IF v > 1000000000.0 THEN RETURN 1000000000
+    IF v < -1000000000.0 THEN RETURN -1000000000
+    RETURN INT(v)
+END FUNCTION
+
 FUNCTION ausgabeOrt(zeile AS STRING) AS TUPLE
     DIM p AS INTEGER : p = INSTR(LOWER$(zeile), ".dh:")
     WHILE p >= 0
@@ -8914,7 +9045,7 @@ FUNCTION ausgabeOrt(zeile AS STRING) AS TUPLE
             ziffern = ziffern + 1
         WEND
         IF ziffern > 0 THEN
-            DIM nr AS INTEGER : nr = INT(VAL(LEFT$(rest, ziffern)))
+            DIM nr AS INTEGER : nr = ganzeZahl(LEFT$(rest, ziffern))
             DIM vorn AS STRING : vorn = LEFT$(zeile, p) + ".dh"
             DIM teile AS ARRAY OF STRING : teile = SPLIT$(vorn, " ")
             DIM gefunden AS STRING : gefunden = ""
@@ -14195,9 +14326,7 @@ FUNCTION wortUnterMarke$() AS STRING
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
-    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
-    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM zeile AS STRING : zeile = zeileVon$(ta, z)
     ' Spalte ist 1-basiert und steht HINTER dem Zeichen links der Marke.
     DIM a AS INTEGER : a = s - 1
     DIM e AS INTEGER : e = s - 1
@@ -15309,6 +15438,14 @@ SUB tastenAnwenden()
             gelesen = FALSE
             tastenMelden("tasten.json lässt sich nicht lesen: " + e)
         END TRY
+        ' Oben muss ein Objekt stehen -- JSON_KEYS wirft sonst, und eine
+        ' Liste in der tasten.json beendete die IDE beim Start.
+        IF gelesen THEN
+            IF JSON_TYPE(j, "") <> "object" THEN
+                gelesen = FALSE
+                tastenMelden("tasten.json: erwartet { Befehl: Kuerzel, ... }")
+            END IF
+        END IF
         IF gelesen THEN
             DIM k AS STRING
             FOR EACH k IN JSON_KEYS(j, "")
@@ -16859,10 +16996,11 @@ ELSEIF NOT JSON_HAS(konfig, "projekte") AND JSON_HAS(konfig, "sitzung") THEN
     ' fuer alles. Sobald es Projekte gibt, faengt ein unbekannter Ordner
     ' LEER an -- sonst schleppte man die Reiter des letzten Projekts mit.
     DIM sz AS INTEGER
-    FOR sz = 0 TO JSON_LEN(konfig, "sitzung") - 1
-        ARRAY_PUSH(sitzDateien, JSON_GET_STRING(konfig, "sitzung." + STR$(sz)))
+    FOR sz = 0 TO kLen("sitzung") - 1
+        DIM szw AS STRING : szw = kText("sitzung." + STR$(sz), "")
+        IF szw <> "" THEN ARRAY_PUSH(sitzDateien, szw)
     NEXT
-    IF JSON_HAS(konfig, "aktiv") THEN sitzAktiv = JSON_GET_INT(konfig, "aktiv")
+    sitzAktiv = kInt("aktiv", sitzAktiv)
 END IF
 DIM sd AS STRING
 FOR EACH sd IN sitzDateien
@@ -16908,6 +17046,7 @@ IF codeFont >= 0 THEN GUI_RICHTEXT_SET(rtHandbuch, "codeschrift", codeFont)
 hbFarben()
 protokoll("projekt " + projektOrdner)
 lichtstreif(2200)
+IF konfigUebergangen <> "" THEN protokoll("konfig uebergangen " + konfigUebergangen)
 protokoll("bereit")
 
 DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
@@ -17208,7 +17347,7 @@ WHILE NOT beenden
             DIM zt AS STRING : zt = GUI_DIALOG_TEXT(dlgZeile)
             dlgZeile = 0
             DIM ta2 AS GUI_WIDGET : ta2 = aktivesFeld()
-            IF ta2 >= 0 AND VAL(zt) >= 1 THEN GUI_TEXTAREA_GOTO(ta2, INT(VAL(zt)), 1) : GUI_FOCUS(ta2)
+            IF ta2 >= 0 AND VAL(zt) >= 1 THEN GUI_TEXTAREA_GOTO(ta2, ganzeZahl(zt), 1) : GUI_FOCUS(ta2)
         ELSEIF a3 = 2 THEN
             dlgZeile = 0
         END IF
