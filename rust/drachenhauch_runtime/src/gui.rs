@@ -869,6 +869,11 @@ pub struct TableState {
     /// Kinder hat -- fuer Einzug, Dreieck und Treffertest.
     ebene: Vec<i32>,
     hat_kinder: Vec<bool>,
+    /// So viele Elternangaben (von vorn) sind schon geprueft. Gueltig
+    /// halten sie Anhaengen, Entfernen und GUI_TREETABLE_SET_PARENT selbst;
+    /// neu geprueft wird nur, was dazukam -- jedes Mal alle zu pruefen machte
+    /// das Fuellen einer Baumtabelle quadratisch.
+    eltern_geprueft: usize,
 }
 
 impl Default for TableState {
@@ -894,6 +899,7 @@ impl Default for TableState {
             zeilen_anhaengen: false, col_typ: vec![], col_wahl: vec![], wahl_pos: -1,
             sicht_holen: false,
             baum: false, eltern: vec![], offen: vec![], ebene: vec![], hat_kinder: vec![],
+            eltern_geprueft: 0,
         }
     }
 }
@@ -985,16 +991,59 @@ impl TableState {
         if self.sort_desc { ord.reverse() } else { ord }
     }
 
+    /// Die zuletzt angehaengte Zeile in die Ansicht nehmen, ohne sie ganz
+    /// neu zu bauen, wo das Ergebnis feststeht: flach (unsortiert ans Ende,
+    /// sortiert per Binaersuche an ihre Stelle -- beides nur, wenn sie zum
+    /// Filter passt), im Baum ohne Filter und Sortierung eine
+    /// neue Wurzel (ans Ende) oder ein Kind unter einem ZUgeklappten Knoten
+    /// (unsichtbar, nur das Dreieck erscheint). Sonst der volle Neubau. Jede
+    /// Zeile neu zu bauen machte das Fuellen quadratisch: 120000 Zeilen in
+    /// eine Baumtabelle dauerten 38 s, die Variablenliste des Debuggers hielt
+    /// die IDE bei einem grossen Programm 2 s fest (Stresstest 2026-10-02).
+    fn zeile_angehaengt(&mut self) {
+        let r = self.rows.len() - 1;
+        if self.sort_col >= 0 {
+            if self.baum { return self.rebuild_view(); }
+            // Sortiert: per Binaersuche an ihre Stelle -- hinter alle
+            // gleichen, wie die stabile Sortierung im Neubau sie stellt.
+            if !self.passt(r) { return; }
+            let pos = self.view.partition_point(|&x| self.vergleiche(x, r) != std::cmp::Ordering::Greater);
+            self.view.insert(pos, r);
+            return;
+        }
+        if !self.baum {
+            if self.passt(r) { self.view.push(r); }
+            return;
+        }
+        if self.filters.iter().any(|f| !f.is_empty()) { return self.rebuild_baum(); }
+        self.baum_sync();
+        // Nur wenn die Baum-Angaben zum Stand vor der Zeile passen.
+        if self.hat_kinder.len() != r || self.ebene.len() != r { return self.rebuild_baum(); }
+        let e = self.eltern[r];
+        if e < 0 {
+            self.view.push(r);
+        } else if !self.offen[e as usize] {
+            self.hat_kinder[e as usize] = true;
+        } else {
+            return self.rebuild_baum();
+        }
+        self.ebene.push(0);
+        self.hat_kinder.push(false);
+    }
+
     /// Baumzustand so lang wie die Daten halten. Neue Zeilen haengen oben
     /// und sind zu; eine Elternangabe, die ins Leere zeigt, gilt als oben.
     fn baum_sync(&mut self) {
         let n = self.rows.len();
+        // Kuerzer geworden: alles pruefen (geladen ist der Stand frisch, 0).
+        if self.eltern.len() > n || self.eltern_geprueft > n { self.eltern_geprueft = 0; }
         self.eltern.resize(n, -1);
         self.offen.resize(n, false);
-        for r in 0..n {
+        for r in self.eltern_geprueft..n {
             let e = self.eltern[r];
             if e >= n as i32 || e == r as i32 { self.eltern[r] = -1; }
         }
+        self.eltern_geprueft = n;
     }
 
     /// `view` als Baum: Tiefensuche von den Wurzeln, Kinder nur unter
@@ -6089,7 +6138,7 @@ impl Gui {
         t.rows.push(zellen.into_iter().map(Cell::text).collect());
         t.row_fg.push(-1);
         t.row_bg.push(-1);
-        t.rebuild_view();
+        t.zeile_angehaengt();
         Ok(t.rows.len() as i64 - 1)
     }
     pub fn table_remove_row(&mut self, h: i64, r: i64) -> Result<(), String> {
@@ -7393,7 +7442,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         t.offen.push(false);
         t.row_fg.push(-1);
         t.row_bg.push(-1);
-        t.rebuild_view();
+        t.zeile_angehaengt();
         Ok((t.rows.len() - 1) as i64)
     }
     pub fn treetable_expand(&mut self, h: i64, r: i64, an: bool) -> Result<(), String> {
@@ -21863,6 +21912,59 @@ mod formate_tests {
         assert_eq!(s[4], FETT);
         assert_eq!(s[15], KURSIV);
         assert_eq!(s[3], 0);
+    }
+}
+
+#[cfg(test)]
+mod tabelle_anhaengen_tests {
+    use super::{Cell, TableState};
+
+    // Nach jedem Anhaengen muss die Ansicht dieselbe sein wie nach dem
+    // vollen Neubau -- flach und als Baum, mit und ohne Filter/Sortierung,
+    // mit auf- und zugeklappten Knoten.
+    #[test]
+    fn anhaengen_wie_neu_gebaut() {
+        let mut zufall: u64 = 99;
+        let mut naechste = |n: usize| { zufall = zufall.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); ((zufall >> 33) as usize) % n.max(1) };
+        for runde in 0..60 {
+            let mut t = TableState::default();
+            t.baum = runde % 2 == 0;
+            if runde % 5 == 1 { t.filters = vec!["a".to_string()]; }
+            if runde % 7 == 3 { t.sort_col = 0; t.sort_desc = runde % 3 == 0; }
+            for _ in 0..80 {
+                let n = t.rows.len();
+                let text = ["a1", "b2", "ab", "c"][naechste(4)].to_string();
+                t.rows.push(vec![Cell::text(text)]);
+                t.row_fg.push(-1);
+                t.row_bg.push(-1);
+                if t.baum {
+                    let e = if n > 0 && naechste(3) > 0 { naechste(n) as i32 } else { -1 };
+                    t.eltern.push(e);
+                    t.offen.push(false);
+                }
+                t.zeile_angehaengt();
+                // ab und zu einen Knoten auf- oder zuklappen (voller Neubau)
+                if t.baum && n > 0 && naechste(5) == 0 {
+                    let k = naechste(n + 1);
+                    t.offen[k] = !t.offen[k];
+                    t.rebuild_view();
+                }
+                let mut neu = TableState::default();
+                neu.rows = t.rows.clone();
+                neu.baum = t.baum;
+                neu.filters = t.filters.clone();
+                neu.sort_col = t.sort_col;
+                neu.sort_desc = t.sort_desc;
+                neu.eltern = t.eltern.clone();
+                neu.offen = t.offen.clone();
+                neu.rebuild_view();
+                assert_eq!(t.view, neu.view, "runde {}", runde);
+                if t.baum {
+                    assert_eq!(t.hat_kinder, neu.hat_kinder, "runde {}", runde);
+                    for &r in &t.view { assert_eq!(t.ebene[r], neu.ebene[r], "runde {}", runde); }
+                }
+            }
+        }
     }
 }
 

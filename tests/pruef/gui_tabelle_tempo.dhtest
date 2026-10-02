@@ -1,0 +1,45 @@
+' Tabellen fuellen in linearer Zeit (Stresstest 2026-10-02).
+'
+' GUI_TABLE_ADD_ROW und GUI_TREETABLE_ADD bauten bei JEDER Zeile die ganze
+' Ansicht neu (Filter, Sortierung, Baum) und prueften alle Elternangaben:
+' 120000 Baumzeilen dauerten 38 s, 5000 Zeilen in eine sortierte Tabelle
+' 2,9 s -- die Variablenliste des Debuggers hielt die IDE so bei einem
+' grossen Programm 2 s fest. Jetzt nimmt das Anhaengen die Zeile selbst in
+' die Ansicht, wo das Ergebnis feststeht (Rust-Test
+' `anhaengen_wie_neu_gebaut` vergleicht mit dem Neubau). Die Grenzen sind
+' grob: jetzt Millisekunden, vorher Dutzende Sekunden.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== baumtabelle und sortierte tabelle fuellen
+IMPORT "gui"
+SCREEN(400, 300, "t", 1)
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET : b = GUI_TREETABLE(win, 0, 0, 380, 280, ["Name", "Wert"])
+DIM t0 AS FLOAT : t0 = GET_TIME()
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM e AS INTEGER
+DIM r AS INTEGER
+FOR i = 0 TO 299
+    e = GUI_TREETABLE_ADD(b, -1, ["v" + STR$(i), "ARRAY"])
+    FOR k = 0 TO 399
+        r = GUI_TREETABLE_ADD(b, e, ["[" + STR$(k) + "]", STR$(k)])
+    NEXT
+NEXT
+PRINT "baum zeilen "; GUI_TABLE_ROW_COUNT(b); " sichtbar "; GUI_TABLE_VIEW_COUNT(b); " flott "; GET_TIME() - t0 < 5.0
+GUI_TREETABLE_EXPAND(b, 0, TRUE)
+PRINT "aufgeklappt sichtbar "; GUI_TABLE_VIEW_COUNT(b)
+DIM s AS GUI_WIDGET : s = GUI_TABLE(win, 0, 0, 380, 280)
+GUI_TABLE_HEADERS(s, ["A"])
+GUI_TABLE_SORT(s, 0, FALSE)
+t0 = GET_TIME()
+FOR i = 1 TO 20000
+    r = GUI_TABLE_ADD_ROW(s, [STR$((i * 7919) MOD 20000)])
+NEXT
+PRINT "sortiert flott "; GET_TIME() - t0 < 5.0
+PRINT "erste "; GUI_TABLE_GET_CELL(s, GUI_TABLE_VIEW_ROW(s, 0), 0); " letzte "; GUI_TABLE_GET_CELL(s, GUI_TABLE_VIEW_ROW(s, 19999), 0)
+--- erwartet
+baum zeilen 120300 sichtbar 300 flott TRUE
+aufgeklappt sichtbar 700
+sortiert flott TRUE
+erste 0 letzte 19999
