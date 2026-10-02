@@ -3096,6 +3096,13 @@ struct TGeom {
 
 pub struct Gui {
     windows: Vec<Window>,        // stabile Indizes (Handles!)
+    // Zeichen und Zeilenanfaenge eines Textbereichs, je Handle, solange sein
+    // Text derselbe ist (verglichen wird der Text selbst -- es gibt viele
+    // Wege, ihn zu aendern, und ein Zaehler muesste an jedem stehen). Ein
+    // Programm fragt GUI_TEXTAREA_CURSOR und _VIEW mehrmals je Bild; bei
+    // 100000 Zeilen kostete jede Frage 2 ms fuer das Zerlegen, der
+    // Vergleich kostet einen Bruchteil davon (Stresstest 2026-10-02).
+    ta_zerlegung: std::cell::RefCell<HashMap<i64, (String, std::rc::Rc<(Vec<char>, Vec<usize>)>)>>,
     z_order: Vec<usize>,         // Zeichen-/Hit-Reihenfolge (umordbar)
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
@@ -3269,6 +3276,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             windows: Vec::new(), z_order: Vec::new(),
+            ta_zerlegung: std::cell::RefCell::new(HashMap::new()),
             focus_window: None, focus_widget: None, modal: None, cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
@@ -13965,8 +13973,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if wd.kind != Kind::TextArea {
             return Err("GUI_TEXTAREA_VIEW: das Widget ist kein GUI_TEXTAREA".into());
         }
-        let chars: Vec<char> = wd.text.chars().collect();
-        let starts = Self::line_starts(&chars);
+        let z = self.ta_zerlegt(h, &wd.text);
+        let (chars, starts) = (&z.0, &z.1);
         // Dieselbe Rechnung wie beim Zeichnen (pad = 5, ta_line_h) -- liefe
         // sie auseinander, faerbte das Programm einen anderen Ausschnitt, als
         // zu sehen ist.
@@ -14015,11 +14023,29 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         (starts[z] + (spalte.max(1) as usize - 1)).min(ende)
     }
 
+    /// Zeichen und Zeilenanfaenge des Texts -- aus `ta_zerlegung`, wenn der
+    /// Text sich seit der letzten Frage nicht geaendert hat.
+    fn ta_zerlegt(&self, h: i64, text: &str) -> std::rc::Rc<(Vec<char>, Vec<usize>)> {
+        let mut c = self.ta_zerlegung.borrow_mut();
+        if let Some((t, z)) = c.get(&h) {
+            if t == text { return z.clone(); }
+        }
+        let chars: Vec<char> = text.chars().collect();
+        let starts = Self::line_starts(&chars);
+        let z = std::rc::Rc::new((chars, starts));
+        c.insert(h, (text.to_string(), z.clone()));
+        z
+    }
+
     /// GUI_TEXTAREA_CURSOR: Zeile und Spalte der Schreibmarke.
     pub fn textarea_cursor(&self, h: i64) -> Result<(i64, i64), String> {
         let wd = self.ta_wdg(h, "GUI_TEXTAREA_CURSOR")?;
-        let chars: Vec<char> = wd.text.chars().collect();
-        Ok(Self::ta_zeile_spalte(&chars, wd.caret.max(0) as usize))
+        let z = self.ta_zerlegt(h, &wd.text);
+        let (chars, starts) = (&z.0, &z.1);
+        let idx = (wd.caret.max(0) as usize).min(chars.len());
+        // Binaer statt `rposition`: die Zeilenanfaenge sind aufsteigend.
+        let zl = starts.partition_point(|&s| s <= idx).saturating_sub(1);
+        Ok((zl as i64 + 1, (idx - starts[zl]) as i64 + 1))
     }
 
     /// GUI_TEXTAREA_POS_AT: welches Zeichen liegt unter dem Bildschirmpunkt

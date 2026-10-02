@@ -12476,22 +12476,34 @@ SUB parameterSammeln(ta AS GUI_WIDGET)
         IF arten[i] <> "name" AND arten[i] <> "schluessel" THEN CONTINUE
         IF arten[i + 1] <> "operator" OR laengen[i + 1] <> 1 THEN CONTINUE
         DIM auf AS INTEGER : auf = starts[i + 1]
-        IF MID$(quelle, auf, 1) <> "(" OR auf <> starts[i] + laengen[i] THEN CONTINUE
+        IF auf <> starts[i] + laengen[i] THEN CONTINUE
         WHILE li + 1 < LEN(anf) AND starts[i] >= anf[li + 1]
             li = li + 1
         WEND
+        ' Auf der ZEILE rechnen, nicht im ganzen Text: MID$ kostet so viel wie
+        ' die Stelle weit hinten liegt, und bei 100000 Zeilen hielt das Pruefen
+        ' die IDE 2,7 s fest (Stresstest 2026-10-02). Geht ein Aufruf ueber
+        ' das Zeilenende hinaus, wie frueher im ganzen Text.
+        DIM zl AS STRING : zl = zeilen[li]
+        DIM sp AS INTEGER : sp = auf - anf[li]
+        IF MID$(zl, sp, 1) <> "(" THEN CONTINUE
         IF li = erledigt THEN CONTINUE
-        DIM kopf AS STRING : kopf = UPPER$(LTRIM$(zeilen[li]))
+        DIM kopf AS STRING : kopf = UPPER$(LTRIM$(zl))
         IF LEFT$(kopf, 4) = "SUB " OR LEFT$(kopf, 9) = "FUNCTION " OR LEFT$(kopf, 9) = "PROPERTY " THEN CONTINUE
-        DIM name AS STRING : name = MID$(quelle, starts[i], laengen[i])
+        DIM name AS STRING : name = MID$(zl, starts[i] - anf[li], laengen[i])
         DIM von AS ARRAY OF INTEGER : von = []
         DIM bis AS ARRAY OF INTEGER : bis = []
-        argsZerlegen(quelle, auf, von, bis)
+        DIM argText AS STRING : argText = zl
+        IF argsZerlegen(zl, sp, von, bis) < 0 THEN
+            von = [] : bis = []
+            argText = quelle
+            argsZerlegen(quelle, auf, von, bis)
+        END IF
         IF LEN(von) < 2 THEN CONTINUE
         DIM fest AS BOOLEAN : fest = FALSE
         DIM a AS INTEGER
         FOR a = 0 TO LEN(von) - 1
-            IF festesArgument(MID$(quelle, von[a], bis[a] - von[a])) THEN fest = TRUE
+            IF festesArgument(MID$(argText, von[a], bis[a] - von[a])) THEN fest = TRUE
         NEXT
         IF NOT fest THEN CONTINUE
         DIM sig AS STRING
