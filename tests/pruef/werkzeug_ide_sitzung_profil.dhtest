@@ -194,3 +194,55 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 probe repo FALSE TRUE
+
+=== ein profil mit 20000 zeilen zeigt sich ohne stillstand
+' Stresstest 2026-10-02: profilAnzeigen sortierte die Messung mit einer
+' Auswahlsortierung -- 200 Millionen Vergleiche bei 20000 Zeilen, die IDE
+' stand 13,7 s in einem Bild. Jetzt SORT ueber die Indizes. Geprueft: die
+' Rohdaten stehen absteigend nach Zeit (bei gleicher Zeit in Zeilenfolge),
+' und das Anzeigen dauert keine Sekunden (Grenze grob: 5 s).
+DIM prBild AS INTEGER : prBild = 0
+DIM prMax AS FLOAT : prMax = 0.0
+DIM prLetzt AS FLOAT : prLetzt = 0.0
+DIM prEnde AS INTEGER : prEnde = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+DIM prJ AS FLOAT : prJ = GET_TIME()
+IF prBild > 31 AND prJ - prLetzt > prMax THEN prMax = prJ - prLetzt
+prLetzt = prJ
+IF prBild = 30 THEN befehl("profil")
+IF prBild > 35 AND prozess < 0 AND prEnde = 0 THEN
+    prEnde = prBild
+    DIM prOk AS BOOLEAN : prOk = TRUE
+    DIM prK AS INTEGER
+    FOR prK = 1 TO LEN(profRohT) - 1
+        IF profRohT[prK] > profRohT[prK - 1] THEN prOk = FALSE
+        IF profRohT[prK] = profRohT[prK - 1] AND profRohZ[prK] < profRohZ[prK - 1] THEN prOk = FALSE
+    NEXT
+    protokoll("pr zeilen " + STR$(LEN(profRohT)) + " absteigend " + STR$(prOk) + " flott " + STR$(prMax < 5.0))
+    EXIT(0)
+END IF
+--- argumente
+p.dh
+--- umgebung
+DHRT_FRAMES=6000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM t AS ARRAY OF STRING : t = ["DIM s AS INTEGER : s = 0"]
+DIM i AS INTEGER
+FOR i = 0 TO 19999
+    ARRAY_PUSH(t, "s = s + " + STR$(i MOD 7))
+NEXT
+ARRAY_PUSH(t, "PRINT s")
+WRITEALL("p.dh", JOIN$(t, CHR$(10)) + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr zeilen 20002 absteigend TRUE flott TRUE

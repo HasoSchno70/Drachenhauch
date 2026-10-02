@@ -14162,6 +14162,15 @@ SUB profilAufnehmen()
     IF prozessStarten("profile") THEN protokoll("profil gestartet")
 END SUB
 
+' Vergleich fuer SORT in profilAnzeigen: teurer zuerst, bei gleicher Zeit
+' die fruehere Zeile (es gibt keine Closures, daher das Feld daneben).
+DIM profSortZeit AS ARRAY OF FLOAT : profSortZeit = []
+FUNCTION profVergleich(a AS INTEGER, b AS INTEGER) AS INTEGER
+    IF profSortZeit[b] > profSortZeit[a] THEN RETURN 1
+    IF profSortZeit[b] < profSortZeit[a] THEN RETURN -1
+    RETURN a - b
+END FUNCTION
+
 SUB profilAnzeigen(zeile AS STRING)
     DIM j AS JSON_HANDLE : j = JSON_PARSE(zeile)
     ausgabeVerteilen(JSON_GET_STRING(j, "output"))
@@ -14183,19 +14192,26 @@ SUB profilAnzeigen(zeile AS STRING)
             IF JSON_GET_STRING(j, p + ".file") <> prozessDatei AND JSON_GET_STRING(j, p + ".file") <> "" THEN zd[i] = JSON_GET_STRING(j, p + ".file")
         END IF
     NEXT
-    ' Nach Zeit absteigend -- die teuerste Zeile zuerst.
-    DIM k AS INTEGER
-    FOR i = 0 TO n - 2
-        DIM best AS INTEGER : best = i
-        FOR k = i + 1 TO n - 1
-            IF zt[k] > zt[best] THEN best = k
-        NEXT
-        IF best <> i THEN
-            DIM t1 AS INTEGER : t1 = zl[i] : zl[i] = zl[best] : zl[best] = t1
-            t1 = za[i] : za[i] = za[best] : za[best] = t1
-            DIM t2 AS FLOAT : t2 = zt[i] : zt[i] = zt[best] : zt[best] = t2
-            DIM t3 AS STRING : t3 = zd[i] : zd[i] = zd[best] : zd[best] = t3
-        END IF
+    ' Nach Zeit absteigend -- die teuerste Zeile zuerst. Mit SORT ueber die
+    ' Indizes: die Auswahlsortierung davor war quadratisch, ein Programm mit
+    ' 20000 Zeilen hielt die IDE beim Anzeigen 13,7 s fest (Stresstest
+    ' 2026-10-02).
+    profSortZeit = []
+    DIM folge AS ARRAY OF INTEGER : folge = []
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(profSortZeit, zt[i])
+        ARRAY_PUSH(folge, i)
+    NEXT
+    SORT(folge, profVergleich)
+    DIM sl[MAX(n, 1)] AS INTEGER
+    DIM sa[MAX(n, 1)] AS INTEGER
+    DIM st[MAX(n, 1)] AS FLOAT
+    DIM sd[MAX(n, 1)] AS STRING
+    FOR i = 0 TO n - 1
+        sl[i] = zl[folge[i]] : sa[i] = za[folge[i]] : st[i] = zt[folge[i]] : sd[i] = zd[folge[i]]
+    NEXT
+    FOR i = 0 TO n - 1
+        zl[i] = sl[i] : za[i] = sa[i] : zt[i] = st[i] : zd[i] = sd[i]
     NEXT
     ' Die Quelle zur Messung: der offene Reiter, sonst die Datei -- ohne sie
     ' gaebe es weder den Quelltext je Zeile noch die Funktionen.
