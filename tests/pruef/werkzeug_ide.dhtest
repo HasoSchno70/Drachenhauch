@@ -3028,3 +3028,50 @@ NEXT
 --- erwartet
 pr farben 1 tasten 1
 pr hell TRUE farben 1
+
+=== eine riesige zeilennummer laesst int nicht ueberlaufen
+' Stresstest 2026-10-02: "Gehe zu Zeile" mit 99999999999999999999 und eine
+' Zeile der Ausgabe wie "haupt.dh:99999999999999999999" gingen durch
+' INT(VAL(...)) -- INT laeuft ueber (64 Bit) und beendete die IDE. Jetzt
+' wird vorher begrenzt.
+AUTOMATION_PLAY("ev.txt")
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 10 THEN
+    ausgabe("Laufzeitfehler in haupt.dh:99999999999999999999: zu gross")
+    dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeile:", "99999999999999999999")
+END IF
+IF prBild = 60 THEN
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    protokoll("pr laeuft weiter, marke " + STR$(prZ) + " dialog " + STR$(dlgZeile))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+PRINT 2
+PRINT 3
+--- datei _programm/ev.txt
+c 3
+e 0 1 340 0 0 0
+e 30 2 257 0 0 0
+e 33 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr laeuft weiter, marke 3 dialog 0

@@ -8967,6 +8967,16 @@ END SUB
 ' steht beliebiger Text: genommen wird das LAENGSTE Stueck vor ".dh:", das
 ' es als Datei gibt -- gesucht neben dem gelaufenen Programm (dhrt wechselt
 ' dorthin, seine Meldungen sind relativ dazu), dann im Projekt.
+' Eine Zahl aus Text als INTEGER, begrenzt: INT laeuft bei mehr als 64 Bit
+' ueber und bricht ab -- "Gehe zu Zeile" mit 99999999999999999999 oder so
+' eine Zeilennummer in der Ausgabe beendeten die IDE.
+FUNCTION ganzeZahl(t AS STRING) AS INTEGER
+    DIM v AS FLOAT : v = VAL(t)
+    IF v > 1000000000.0 THEN RETURN 1000000000
+    IF v < -1000000000.0 THEN RETURN -1000000000
+    RETURN INT(v)
+END FUNCTION
+
 FUNCTION ausgabeOrt(zeile AS STRING) AS TUPLE
     DIM p AS INTEGER : p = INSTR(LOWER$(zeile), ".dh:")
     WHILE p >= 0
@@ -8976,7 +8986,7 @@ FUNCTION ausgabeOrt(zeile AS STRING) AS TUPLE
             ziffern = ziffern + 1
         WEND
         IF ziffern > 0 THEN
-            DIM nr AS INTEGER : nr = INT(VAL(LEFT$(rest, ziffern)))
+            DIM nr AS INTEGER : nr = ganzeZahl(LEFT$(rest, ziffern))
             DIM vorn AS STRING : vorn = LEFT$(zeile, p) + ".dh"
             DIM teile AS ARRAY OF STRING : teile = SPLIT$(vorn, " ")
             DIM gefunden AS STRING : gefunden = ""
@@ -17280,7 +17290,7 @@ WHILE NOT beenden
             DIM zt AS STRING : zt = GUI_DIALOG_TEXT(dlgZeile)
             dlgZeile = 0
             DIM ta2 AS GUI_WIDGET : ta2 = aktivesFeld()
-            IF ta2 >= 0 AND VAL(zt) >= 1 THEN GUI_TEXTAREA_GOTO(ta2, INT(VAL(zt)), 1) : GUI_FOCUS(ta2)
+            IF ta2 >= 0 AND VAL(zt) >= 1 THEN GUI_TEXTAREA_GOTO(ta2, ganzeZahl(zt), 1) : GUI_FOCUS(ta2)
         ELSEIF a3 = 2 THEN
             dlgZeile = 0
         END IF
