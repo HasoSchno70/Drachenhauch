@@ -317,7 +317,9 @@ bekäme. Diese Bausteine kamen mit ihr:
   steht dahinter. Jeder Befehl ist ein eigener Prozess im Ordner des
   Terminals (zuerst der Projektordner); **`cd` wirkt** trotzdem, weil das
   Skript am Ende seinen Ordner meldet. Eine mit `set` gesetzte Variable
-  gilt dagegen nur für den einen Befehl. Läuft ein Befehl, geht die
+  gilt dagegen nur für den einen Befehl. Schleifen schreibt man wie in der
+  Eingabeaufforderung (`for %f in (*.dh) do echo %f`, auch `%~nf`) -- das
+  Terminal verdoppelt das `%` für die Skriptdatei. Läuft ein Befehl, geht die
   Eingabezeile an ihn (`set /p`, ein `INPUT`); **Abbrechen** beendet ihn
   samt allem, was er gestartet hat. Pfeil hoch/runter blättert durch die
   Befehle, `cls`/`clear` leert. Startet man ein Programm (F5), schaltet der

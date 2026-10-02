@@ -4901,7 +4901,15 @@ SUB pruefsammlungStarten(nurFall AS BOOLEAN)
         END IF
         IF projektOrdner = "" THEN RETURN
         ziel = projektOrdner
+        ' Auch der Reiter selbst: er ist vermutlich der Code, den die
+        ' Sammlungen pruefen.
+        IF aktiverTab >= 0 THEN
+            IF tabPfade[aktiverTab] <> "" AND GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
+                IF NOT sichern(aktiverTab, FALSE) THEN RETURN
+            END IF
+        END IF
     END IF
+    andereSichern()
     testLaufStarten([ziel], [filter])
 END SUB
 
@@ -11063,6 +11071,7 @@ FUNCTION gleichesEnde(a AS STRING, b AS STRING) AS BOOLEAN
     RETURN a = b
 END FUNCTION
 
+DIM standAbgelehnt AS STRING
 SUB umbauStandSetzen(tab AS INTEGER, pfad AS STRING, text AS STRING)
     DIM t AS INTEGER : t = umbauReiter(tab, pfad)
     IF t >= 0 THEN
@@ -11076,7 +11085,14 @@ SUB umbauStandSetzen(tab AS INTEGER, pfad AS STRING, text AS STRING)
         RETURN
     END IF
     IF pfad = "" THEN RETURN
-    WRITEALL(pfad, text + NL)
+    ' Abgelehnt (schreibgeschuetzt, Ordner weg): genannt statt die IDE zu
+    ' beenden; die Aufrufer haengen `standAbgelehnt` an ihre Meldung.
+    TRY
+        WRITEALL(pfad, text + NL)
+    CATCH e
+        standAbgelehnt = standAbgelehnt + IIF(standAbgelehnt = "", "", ", ") + BASENAME(pfad)
+        protokoll("umbau nicht geschrieben " + BASENAME(pfad))
+    END TRY
 END SUB
 
 ' Die Dateien einer Gruppe (ab `ab`, `n` Stueck), die seit dem Stand
@@ -11116,6 +11132,7 @@ SUB umbauZurueck()
         RETURN
     END IF
     DIM k AS INTEGER
+    standAbgelehnt = ""
     FOR k = ab TO ab + n - 1
         umbauStandSetzen(zurTabs[k], zurPfade[k], zurTexte[k])
         ARRAY_PUSH(wdhTabs, zurTabs[k]) : ARRAY_PUSH(wdhPfade, zurPfade[k])
@@ -11129,7 +11146,7 @@ SUB umbauZurueck()
     reiterNeuSetzen()
     symSchluessel = "-"
     GUI_SET_TEXT(lblStatus, tr$("Zurückgenommen: ") + zurWas + " (" + STR$(n) + tr$(" Datei(en), ") + _
-                 STR$(LEN(zurAnzahl)) + " weitere im Vorrat)")
+                 STR$(LEN(zurAnzahl)) + " weitere im Vorrat)" + IIF(standAbgelehnt = "", "", tr$(" Nicht geschrieben: ") + standAbgelehnt))
     protokoll("umbau zurueck " + STR$(n))
     IF aktivesFeld() >= 0 THEN
         IF mz > 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), mz, ms)
@@ -11157,6 +11174,7 @@ SUB umbauWiederholen()
         RETURN
     END IF
     DIM k AS INTEGER
+    standAbgelehnt = ""
     FOR k = ab TO ab + n - 1
         umbauStandSetzen(wdhTabs[k], wdhPfade[k], wdhNachher[k])
         ARRAY_PUSH(zurTabs, wdhTabs[k]) : ARRAY_PUSH(zurPfade, wdhPfade[k])
@@ -11169,7 +11187,7 @@ SUB umbauWiederholen()
     ARRAY_POP(wdhAnzahl) : ARRAY_POP(wdhNamen)
     reiterNeuSetzen()
     symSchluessel = "-"
-    GUI_SET_TEXT(lblStatus, tr$("Wiederholt: ") + was + " (" + STR$(n) + tr$(" Datei(en))"))
+    GUI_SET_TEXT(lblStatus, tr$("Wiederholt: ") + was + " (" + STR$(n) + tr$(" Datei(en))") + IIF(standAbgelehnt = "", "", tr$(" Nicht geschrieben: ") + standAbgelehnt))
     protokoll("umbau wieder " + STR$(n))
 END SUB
 
@@ -11903,10 +11921,17 @@ FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
     IF tabPfade[aktiverTab] = "" OR GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
         IF NOT sichern(aktiverTab, FALSE) THEN RETURN FALSE
     END IF
-    ' Auch die ANDEREN geaenderten Reiter: das Programm liest eine importierte
-    ' Datei von der Platte, und bis 2026-09-27 lief dann die alte Fassung --
-    ' im Debugger passten obendrein die Zeilen nicht zum Editor. Ein Reiter
-    ' ohne Namen gehoert zu keinem Programm und bleibt, wie er ist.
+    andereSichern()
+    RETURN prozessStartenDatei(art, tabPfade[aktiverTab])
+END FUNCTION
+
+' Die ANDEREN geaenderten Reiter sichern, bevor etwas von der Platte liest:
+' ein Programm liest eine importierte Datei von dort, und bis 2026-09-27
+' lief dann die alte Fassung -- im Debugger passten obendrein die Zeilen
+' nicht zum Editor. Dasselbe galt bis 2026-10-02 fuer Strg+Alt+F5: die
+' Sammlung meldete gruen fuer Code, der im Editor laengst falsch war. Ein
+' Reiter ohne Namen gehoert zu keinem Programm und bleibt, wie er ist.
+SUB andereSichern()
     DIM tg AS INTEGER
     DIM tgN AS INTEGER : tgN = 0
     FOR tg = 0 TO tabAnzahl - 1
@@ -11917,8 +11942,7 @@ FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
         END IF
     NEXT
     IF tgN > 0 THEN protokoll("vor start gesichert " + STR$(tgN))
-    RETURN prozessStartenDatei(art, tabPfade[aktiverTab])
-END FUNCTION
+END SUB
 
 ' Eine Datei starten (run/debug/profile), ohne sie in einem Reiter zu haben.
 FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
@@ -12899,18 +12923,25 @@ SUB baumUmbenennen(alt AS STRING, name AS STRING)
     ' Die gefundenen IMPORTs schreiben: in einen offenen Reiter als eigener
     ' Rueckgaengig-Schritt (und gesichert, wenn er es vorher war), sonst auf
     ' die Platte.
+    ' Eine Datei, die sich nicht schreiben laesst (schreibgeschuetzt), wird
+    ' genannt -- ohne TRY beendete sie die IDE, NACHDEM schon umbenannt war.
+    DIM abgelehnt AS STRING : abgelehnt = ""
     FOR i = 0 TO LEN(impDateien) - 1
         DIM d AS STRING : d = wegUmziehen$(impDateien[i], alt, neu, FALSE)
         DIM t AS INTEGER : t = tabVonWeg(d)
+        DIM schreiben AS BOOLEAN : schreiben = TRUE
         IF t >= 0 THEN
-            DIM warSauber AS BOOLEAN : warSauber = GUI_TEXT(tabFelder[t]) = tabGesichert[t]
+            schreiben = GUI_TEXT(tabFelder[t]) = tabGesichert[t]
             feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), impTexte[i])
-            IF warSauber THEN
+        END IF
+        IF schreiben THEN
+            TRY
                 WRITEALL(d, impTexte[i] + IIF(RIGHT$(impTexte[i], 1) = NL, "", NL))
-                tabGesichert[t] = impTexte[i]
-            END IF
-        ELSE
-            WRITEALL(d, impTexte[i] + IIF(RIGHT$(impTexte[i], 1) = NL, "", NL))
+                IF t >= 0 THEN tabGesichert[t] = impTexte[i]
+            CATCH e2
+                abgelehnt = abgelehnt + IIF(abgelehnt = "", "", ", ") + BASENAME(d)
+                protokoll("baum import nicht geschrieben " + BASENAME(d))
+            END TRY
         END IF
     NEXT
     reiterNeuSetzen()
@@ -12919,7 +12950,8 @@ SUB baumUmbenennen(alt AS STRING, name AS STRING)
     GUI_FILETREE_SELECT(baum, neu)
     konfigSichern()
     GUI_SET_TEXT(lblStatus, tr$("Umbenannt: ") + BASENAME(alt) + " -> " + name + _
-                 IIF(LEN(impDateien) > 0, " (" + STR$(LEN(impDateien)) + tr$(" Datei(en) mit IMPORT angepasst)"), ""))
+                 IIF(LEN(impDateien) > 0 AND abgelehnt = "", " (" + STR$(LEN(impDateien)) + tr$(" Datei(en) mit IMPORT angepasst)"), "") + _
+                 IIF(abgelehnt = "", "", tr$(" Nicht geschrieben: ") + abgelehnt))
     protokoll("baum umbenannt " + BASENAME(alt) + " " + name + " imports " + STR$(LEN(impDateien)))
 END SUB
 
@@ -13091,7 +13123,13 @@ END SUB
 
 SUB ausgabeSichernNach(pfad AS STRING)
     DIM t AS STRING : t = ausgabeText$()
-    WRITEALL(pfad, t + IIF(t = "", "", NL))
+    TRY
+        WRITEALL(pfad, t + IIF(t = "", "", NL))
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Sichern ging nicht: ") + e)
+        protokoll("ausgabe nicht gesichert")
+        RETURN
+    END TRY
     DIM n AS INTEGER : n = GUI_LISTBOX_VIEW_COUNT(lstAusgabe)
     GUI_SET_TEXT(lblStatus, tr$("Ausgabe gesichert: ") + STR$(n) + tr$(" Zeilen in ") + pfad)
     protokoll("ausgabe gesichert " + STR$(n))
@@ -15631,6 +15669,39 @@ SUB terminalEingabe(t AS STRING)
     terminalStarten(b)
 END SUB
 
+' Schleifenvariablen der Eingabeaufforderung fuer die .cmd-Datei
+' verdoppeln: interaktiv heisst es `for %f in (*) do echo %f`, in einer
+' Skriptdatei `%%f` -- sonst bricht cmd ab ("f" kann syntaktisch an
+' dieser Stelle nicht verarbeitet werden). Verdoppelt wird nur ein `%`
+' vor EINEM Buchstaben, hinter dem kein Wortzeichen und kein `%` steht;
+' `%PATH%` und ein bewusst geschriebenes `%%x%%` bleiben, wie sie sind.
+FUNCTION cmdSchleifenvariablen$(b AS STRING) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM n AS INTEGER : n = LEN(b)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM c AS STRING : c = MID$(b, i, 1)
+        aus = aus + c
+        IF c <> "%" THEN CONTINUE
+        IF i > 0 THEN
+            IF MID$(b, i - 1, 1) = "%" THEN CONTINUE
+        END IF
+        IF i + 1 >= n THEN CONTINUE
+        DIM buch AS STRING : buch = MID$(b, i + 1, 1)
+        ' %~nxf (Teile des Namens) ist immer eine Schleifenvariable.
+        IF buch = "~" THEN
+            aus = aus + "%"
+            CONTINUE
+        END IF
+        IF NOT REGEX_TEST(buch, "^[A-Za-z]$") THEN CONTINUE
+        IF i + 2 < n THEN
+            IF REGEX_TEST(MID$(b, i + 2, 1), "^[A-Za-z0-9_%]$") THEN CONTINUE
+        END IF
+        aus = aus + "%"
+    NEXT
+    RETURN aus
+END FUNCTION
+
 SUB terminalStarten(b AS STRING)
     DIM ordner AS STRING : ordner = konfigOrdner$()
     ' Absolut und unter Windows mit Rueckstrichen: cmd /C nimmt "./x.cmd" nicht.
@@ -15643,7 +15714,7 @@ SUB terminalStarten(b AS STRING)
         ' chcp 65001: sonst kaemen die Umlaute von dir & Co. in der
         ' OEM-Codeseite an. errorlevel wird VOR dem Echo gemerkt.
         DIM crlf AS STRING : crlf = CHR$(13) + CHR$(10)
-        text = "@echo off" + crlf + "chcp 65001 >nul" + crlf + "cd /d " + CHR$(34) + terminalOrt$() + CHR$(34) + crlf + b + crlf
+        text = "@echo off" + crlf + "chcp 65001 >nul" + crlf + "cd /d " + CHR$(34) + terminalOrt$() + CHR$(34) + crlf + cmdSchleifenvariablen$(b) + crlf
         text = text + "set __dh_e=%errorlevel%" + crlf + "echo " + TERM_MARKE + "%cd%" + crlf + "exit /b %__dh_e%" + crlf
         WRITEALL(termSkript, text)
         termProz = PROCESS_START("cmd", "/Q", "/D", "/C", termSkript)

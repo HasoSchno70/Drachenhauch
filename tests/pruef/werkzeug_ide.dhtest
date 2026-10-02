@@ -2868,3 +2868,95 @@ pr status Umbau fertig. Nicht geschrieben: b.dh
 pr laeuft weiter
 a PRINT 2
 c PRINT 2
+
+=== zuruecknehmen und ausgabe sichern, die die platte ablehnt
+' Stresstest 2026-10-02: auch das Zuruecknehmen eines Umbaus und "Ausgabe
+' sichern unter" schrieben ohne TRY -- ein Ziel ohne Schreibrecht (hier:
+' ein Ordner an der Stelle der Datei bzw. ein Ordner, den es nicht gibt)
+' beendete die IDE.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    MKDIR(PATHJOIN(projektOrdner, "ordner.dh"))
+    standAbgelehnt = ""
+    umbauStandSetzen(-1, PATHJOIN(projektOrdner, "ordner.dh"), "PRINT 1")
+    protokoll("pr zurueck " + standAbgelehnt)
+    ausgabeSichernNach(PATHJOIN(projektOrdner, "weg/ausgabe.txt"))
+    protokoll("pr ausgabe " + LEFT$(GUI_STATUSBAR_TEXT$(lblStatus, 0), 19))
+END IF
+IF prBild = 50 THEN
+    protokoll("pr laeuft weiter")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 0
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr zurueck ordner.dh
+pr ausgabe Sichern ging nicht:
+pr laeuft weiter
+
+=== umbenennen mit einer schreibgeschuetzten importierenden datei
+' Stresstest 2026-10-02: beim Umbenennen im Projektbaum schreibt die IDE
+' die IMPORT-Zeilen der Dateien nach, die die umbenannte einbinden -- ohne
+' TRY. Eine schreibgeschuetzte (hier echt: attrib +r) beendete die IDE,
+' NACHDEM die Datei schon umbenannt war. Jetzt nennt die Statuszeile sie.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    baumUmbenennen(PATHJOIN(projektOrdner, "lib.dh"), "neu.dh")
+    protokoll("pr status " + GUI_STATUSBAR_TEXT$(lblStatus, 0))
+END IF
+IF prBild = 50 THEN
+    protokoll("pr laeuft weiter")
+    EXIT(0)
+END IF
+--- vorher
+DIM p AS INTEGER : p = PROCESS_START("attrib", "+r", "haupt.dh")
+WHILE PROCESS_RUNNING(p) : SLEEP(20) : WEND
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT 0
+--- datei haupt.dh
+IMPORT "lib.dh"
+PRINT eins()
+--- datei lib.dh
+FUNCTION eins() AS INTEGER
+    RETURN 1
+END FUNCTION
+--- system windows
+--- nachher
+DIM p AS INTEGER : p = PROCESS_START("attrib", "-r", "haupt.dh")
+WHILE PROCESS_RUNNING(p) : SLEEP(20) : WEND
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+PRINT "neu da "; FILEEXISTS("neu.dh")
+--- erwartet
+pr status Umbenannt: lib.dh -> neu.dh Nicht geschrieben: haupt.dh
+pr laeuft weiter
+neu da TRUE
