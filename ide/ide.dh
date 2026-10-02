@@ -3409,12 +3409,12 @@ SUB faltenZurueck(ta AS GUI_WIDGET)
     protokoll("falten wieder " + STR$(n))
 END SUB
 
+DIM reiterPlatz AS STRING : reiterPlatz = ""
 SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
-    IF tabAnzahl >= MAX_TABS THEN
-        GUI_SET_TEXT(lblStatus, tr$("Höchstens ") + STR$(MAX_TABS) + tr$(" Reiter -- erst einen schließen."))
-        RETURN
-    END IF
-    ' Schon offen? Dann nur hin.
+    ' Schon offen? Dann nur hin -- auch bei vollen Reitern. Die Grenze stand
+    ' bis 2026-10-02 VOR dieser Frage: bei 12 Reitern meldete ein Sprung in
+    ' eine offene Datei (Baum, Problemliste, Ausgabe, Debugger, F12)
+    ' "Hoechstens 12", und der Aufrufer setzte die Marke im falschen Feld.
     DIM i AS INTEGER
     IF pfad <> "" THEN
         FOR i = 0 TO tabAnzahl - 1
@@ -3436,6 +3436,22 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
             GUI_FOCUS(tabFelder[i])
             RETURN
         END IF
+    END IF
+    IF tabAnzahl >= MAX_TABS THEN
+        ' Platz machen: der erste Reiter ohne ungesicherte Aenderungen, der
+        ' nicht vorn ist (Strg+Umschalt+T holt ihn zurueck). Sind alle
+        ' geaendert, bleibt es bei der Meldung.
+        DIM frei AS INTEGER : frei = -1
+        FOR i = 0 TO tabAnzahl - 1
+            IF frei < 0 AND i <> aktiverTab AND GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN frei = i
+        NEXT
+        IF frei < 0 THEN
+            GUI_SET_TEXT(lblStatus, tr$("Höchstens ") + STR$(MAX_TABS) + tr$(" Reiter -- erst einen schließen."))
+            RETURN
+        END IF
+        reiterPlatz = IIF(tabPfade[frei] = "", tr$("(neu)"), BASENAME(tabPfade[frei]))
+        protokoll("reiter platz " + reiterPlatz)
+        tabSchliessen(frei)
     END IF
     DIM ta AS GUI_WIDGET
     ta = GUI_TEXTAREA(win, 0, 0, 10, 10)
@@ -3501,13 +3517,19 @@ SUB dateiOeffnen(pfad AS STRING)
     END IF
     DIM kodierung AS STRING : kodierung = leseKodierung
     tabOeffnen(pfad, inhalt)
+    ' Kein Platz (alle Reiter geaendert): die Meldung bleibt stehen, und
+    ' nichts tut so, als waere die Datei offen.
+    IF tabMitPfad(pfad) < 0 THEN RETURN
     ' Der Projektordner wandert NUR, wenn die Datei ausserhalb liegt. Sonst
     ' machte ein Klick auf `lib/mehr.dh` den Unterordner zum Projekt, und
     ' der Baum zeigte danach die halbe Arbeit nicht mehr.
     IF NOT imProjekt(pfad) THEN projektOrdner = DIRNAME(pfad)
     baumFuellen()
     zuletztMerken(pfad)
-    IF kodierung = "utf8" THEN
+    IF reiterPlatz <> "" THEN
+        GUI_SET_TEXT(lblStatus, pfad + "  --  " + tr$("Höchstens ") + STR$(MAX_TABS) + tr$(" Reiter, geschlossen: ") + reiterPlatz)
+        reiterPlatz = ""
+    ELSEIF kodierung = "utf8" THEN
         GUI_SET_TEXT(lblStatus, pfad)
     ELSE
         GUI_SET_TEXT(lblStatus, tr$("Kein UTF-8, als ") + kodierung + tr$(" gelesen -- Sichern schreibt UTF-8: ") + pfad)
@@ -4834,7 +4856,11 @@ SUB suchSchritt()
     ELSE
         trefferKaestchen(FALSE)
     END IF
-    GUI_SET_TEXT(lblProbleme, tr$("Suche '") + was + "': " + STR$(treffer) + tr$(" Treffer in ") + STR$(suchLaufInDateien) + tr$(" Dateien -- Umschalt+F7 zeigt wieder die Probleme"))
+    ' Bei 500 hoert die Suche auf -- das muss dastehen, sonst sehen 500
+    ' Treffer aus wie alle.
+    DIM mehr AS STRING : mehr = ""
+    IF treffer >= 500 THEN mehr = tr$(" (bei 500 abgebrochen, weitere nicht gezeigt)")
+    GUI_SET_TEXT(lblProbleme, tr$("Suche '") + was + "': " + STR$(treffer) + tr$(" Treffer in ") + STR$(suchLaufInDateien) + tr$(" Dateien") + mehr + tr$(" -- Umschalt+F7 zeigt wieder die Probleme"))
     protokoll("suche " + STR$(treffer))
 END SUB
 

@@ -1,0 +1,57 @@
+' Lange Eintraege in einer Liste (Stresstest 2026-10-02).
+'
+' Eine Liste zeichnete jeden Eintrag ganz und liess ihn nur vom Clip
+' beschneiden -- eine Ausgabezeile mit 300000 Zeichen kostete die IDE so
+' jedes Bild bis zu 72 ms. Jetzt kommt nur vorne so viel in den Zeichner,
+' wie in die Zeile passen KANN (kein Zeichen ist schmaler als ein Punkt).
+' Geprueft: der lange Eintrag fuellt seine Zeile bis an den rechten Rand
+' (wird zu frueh abgeschnitten, endet der Text vorher -- ein Vergleich mit
+' demselben Eintrag gekuerzt saehe das nicht, der wuerde genauso
+' abgeschnitten), auch mit farbigen Abschnitten, und das Zeichnen ist
+' flott.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein eintrag mit einer million zeichen
+IMPORT "gui"
+SCREEN(700, 200, "t", 1)
+DIM lang AS STRING : lang = REPEAT$("Zeile mit Text ", 70000)
+FUNCTION bild(text AS STRING, datei AS STRING, bunt AS BOOLEAN) AS FLOAT
+    DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 700, 200)
+    GUI_WINDOW_CHROME(win, FALSE)
+    DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(win, 10, 10, 660, 150, ["kurz", text])
+    IF bunt THEN GUI_LISTBOX_SPANS(lb, 1, [0, 20, 40], [5, 5, 5], [&HFF0000, &H00FF00, &H0000FF])
+    GUI_UPDATE()
+    DIM t0 AS FLOAT : t0 = GET_TIME()
+    DIM b AS INTEGER
+    FOR b = 1 TO 4
+        CLS(BLACK) : GUI_DRAW() : FLIP()
+    NEXT
+    DIM d AS FLOAT : d = (GET_TIME() - t0) / 4.0
+    SAVESCREENSHOT(datei)
+    GUI_WINDOW_DESTROY(win)
+    RETURN d
+END FUNCTION
+' Die Spalte des rechtesten hellen Punkts in der Liste -- nur der lange
+' Eintrag reicht so weit ("kurz" endet links).
+FUNCTION rechtsAussen(datei AS STRING) AS INTEGER
+    DIM a AS IMAGE : a = LOADIMAGE(datei)
+    DIM r AS INTEGER : r = -1
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 12 TO 158
+        FOR x = 12 TO 668
+            DIM p AS INTEGER : p = GETPIXEL(a, x, y)
+            IF ((p SHR 16) BAND 255) > 150 OR ((p SHR 8) BAND 255) > 150 OR (p BAND 255) > 150 THEN
+                IF x > r THEN r = x
+            END IF
+        NEXT
+    NEXT
+    RETURN r
+END FUNCTION
+DIM dl AS FLOAT : dl = bild(lang, "lang.png", FALSE)
+PRINT "zeichen "; LEN(lang); " bis an den rand "; rechtsAussen("lang.png") > 620; " flott "; dl < 0.05
+DIM bl AS FLOAT : bl = bild(lang, "blang.png", TRUE)
+PRINT "bunt bis an den rand "; rechtsAussen("blang.png") > 620; " flott "; bl < 0.05
+--- erwartet
+zeichen 1050000 bis an den rand TRUE flott TRUE
+bunt bis an den rand TRUE flott TRUE

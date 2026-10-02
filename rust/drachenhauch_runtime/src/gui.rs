@@ -19759,6 +19759,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         // er gliedert, er ist kein Eintrag.
                         let ty = iy + (ih - self.wsize(g, wdg)).max(0) / 2;
                         let kc = mischen(acc, fg, 0.35);
+                        let it = &Self::sichtbar_vorn(it, wz);
                         self.wtext(g, wdg, ax + pad, ty, it.clone(), kc);
                         self.wtext(g, wdg, ax + pad + 1, ty, it.clone(), kc);
                         let tw = self.wtext_width(g, wdg, it) + self.sk(8);
@@ -19821,7 +19822,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                             // Laeufe ueber die Breite des VORSPANNS setzen, nicht
                             // Laufbreiten addieren -- wie im Textbereich, sonst
                             // klebten die Woerter an der Farbgrenze zusammen.
-                            let zeichen: Vec<char> = it.chars().collect();
+                            let zeichen: Vec<char> = Self::sichtbar_vorn(it, rechts - tx).chars().collect();
                             let mut pos = 0usize;
                             let mut laeufe: Vec<(usize, usize, i64)> = Vec::new();
                             for &(s, n, c) in sp.iter() {
@@ -19840,7 +19841,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                                 self.wtext(g, wdg, x, ty, teil, c);
                             }
                         }
-                        _ => self.wtext(g, wdg, tx, ty, it.clone(), farbe),
+                        _ => self.wtext(g, wdg, tx, ty, Self::sichtbar_vorn(it, rechts - tx), farbe),
                     }
                     g.pop_clip();
                 }
@@ -20201,6 +20202,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     ///
     /// `zeilen_start` ist der Zeichen-Index des Zeilenanfangs im GESAMTEN
     /// Text; die Abschnitte zaehlen von dort.
+    /// Vorne so viel von `s`, wie in `px` Punkte passen KANN: kein Zeichen ist
+    /// schmaler als ein Punkt. Eine Liste zeichnete einen Eintrag sonst ganz
+    /// und liess ihn nur vom Clip beschneiden -- eine Ausgabezeile mit 300000
+    /// Zeichen kostete so jedes Bild bis zu 72 ms (Stresstest 2026-10-02).
+    fn sichtbar_vorn(s: &str, px: i32) -> String {
+        let cap = px.max(0) as usize + 8;
+        if s.len() <= cap { return s.to_string(); }
+        s.chars().take(cap).collect()
+    }
+
     fn zeile_bunt(&self, g: &mut Graphics, wdg: &Widget, x: i32, y: i32,
                   zeile: &str, zeilen_start: usize, grund: i64, links: i32, rechts: i32) {
         let z: Vec<char> = zeile.chars().collect();
