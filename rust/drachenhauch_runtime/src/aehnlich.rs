@@ -67,7 +67,10 @@ pub fn vorschlaege<'a>(name: &str, kandidaten: impl Iterator<Item = &'a str>) ->
     if gesucht.is_empty() { return Vec::new(); }
     let grenze = schranke(gesucht.chars().count());
     let mut treffer: Vec<(usize, String)> = Vec::new();
-    for k in kandidaten {
+    // Die Kandidaten werden fuer den Rueckfall unten ein zweites Mal
+    // gebraucht -- der Iterator laesst sich nur einmal ablaufen.
+    let kandidaten_kopie: Vec<&str> = kandidaten.collect();
+    for &k in kandidaten_kopie.iter() {
         let kl = k.to_lowercase();
         if kl == gesucht { continue; }
         // Der Abstand kann die Schranke nie unterbieten, wenn schon die
@@ -86,6 +89,26 @@ pub fn vorschlaege<'a>(name: &str, kandidaten: impl Iterator<Item = &'a str>) ->
             treffer.push((2, k.to_string()));
         }
     }
+    // Nichts gefunden: vielleicht ein ueberzaehliges SET_/GET_, wie es
+    // andere Sprachen fuer Setter gewohnt sind (GUI_TABLE_SET_HEADERS fuer
+    // GUI_TABLE_HEADERS). Ein beliebiges Wort zu viel bleibt ein anderer
+    // Befehl -- nur diese beiden Fuellwoerter fallen weg.
+    if treffer.is_empty() {
+        let teile: Vec<&str> = gesucht.split('_').collect();
+        for (i, t) in teile.iter().enumerate() {
+            if *t != "set" && *t != "get" || teile.len() < 3 { continue; }
+            let ohne: Vec<&str> = teile.iter().enumerate().filter(|(j, _)| *j != i).map(|(_, t)| *t).collect();
+            let ohne = ohne.join("_");
+            for k in kandidaten_kopie.iter() {
+                let kl = k.to_lowercase();
+                if kl == ohne { treffer.push((1, k.to_string())); }
+                else if teile_passen(&ohne, &kl) { treffer.push((2, k.to_string())); }
+            }
+        }
+    }
+    // Jeder Name einmal, mit seinem besten Wert.
+    treffer.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
+    treffer.dedup_by(|a, b| a.1 == b.1);
     treffer.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
     treffer.truncate(3);
     treffer.into_iter().map(|(_, n)| n).collect()
@@ -119,6 +142,7 @@ mod tests {
         "CIRCLE", "CIRCLEF", "CLS", "BOX", "RND", "AND", "MKDIR", "RMDIR",
         "PARTICLE_SYSTEM_NEW", "PARTICLE_EMIT", "PARTICLE_DRAW", "SPRITE_ADD_ANIM", "SPRITE_NEW",
         "IMAGE_NEW", "IMAGE_DRAW_IMAGE", "AUDIO_MUSIC_PLAY", "AUDIO_PLAY",
+        "GUI_TABLE_HEADERS", "GUI_SET_TEXT",
     ];
 
     fn v(name: &str) -> Vec<String> { vorschlaege(name, NAMEN.iter().copied()) }
@@ -139,6 +163,21 @@ mod tests {
         // ... aber nicht in die andere Richtung: AUDIO_MUSIC_PLAY hat ein
         // Wort MEHR als AUDIO_PLAY, das ist ein anderer Befehl.
         assert!(!v("AUDIO_PLAY_MUSIC").iter().any(|s| s == "AUDIO_PLAY"));
+    }
+
+    #[test]
+    fn ueberzaehliges_set_oder_get() {
+        // Aus anderen Sprachen gewohnt: ein Setter heisst SET_... -- hier
+        // heisst er oft ohne (GUI_TABLE_HEADERS). Ohne das Fuellwort wird
+        // noch einmal verglichen (Stresstest 2026-10-02: es kam KEIN
+        // Vorschlag).
+        assert_eq!(v("GUI_TABLE_SET_HEADERS"), vec!["GUI_TABLE_HEADERS"]);
+        assert_eq!(v("GUI_TABLE_GET_HEADERS"), vec!["GUI_TABLE_HEADERS"]);
+        assert_eq!(v("GUI_SET_HEADERS"), vec!["GUI_TABLE_HEADERS"]);
+        // Ein echtes Wort zu viel bleibt ein anderer Befehl.
+        assert!(!v("AUDIO_PLAY_MUSIC").iter().any(|s| s == "AUDIO_PLAY"));
+        // Wer das SET schon richtig hat, bekommt keinen Umweg vorgeschlagen.
+        assert!(!v("GUI_SET_TEXTE").iter().any(|s| s == "GUI_TABLE_HEADERS"));
     }
 
     #[test]
