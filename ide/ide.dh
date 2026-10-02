@@ -1951,6 +1951,7 @@ DIM paletteNamen AS ARRAY OF STRING : paletteNamen = []
 DIM paletteKennungen AS ARRAY OF STRING : paletteKennungen = []
 ' Zusatztext je Eintrag (Kuerzel, Ordner) -- rechts in der Liste, nicht an den Namen gehaengt.
 DIM paletteDetails AS ARRAY OF STRING : paletteDetails = []
+DIM paletteNorm AS ARRAY OF STRING : paletteNorm = []   ' ohne Umlaute, je Oeffnen (paletteFuellen)
 DIM paletteSichtbar AS ARRAY OF STRING : paletteSichtbar = []
 
 ' --- Suchleiste: ein Fenster, das offen bleibt (siehe sucheOeffnen) ---
@@ -16654,11 +16655,25 @@ SUB paletteFuellen(filter AS STRING)
     DIM i AS INTEGER
     DIM gang AS INTEGER
     DIM ff AS STRING : ff = ohneUmlaute$(klein)
+    ' Die Namen ohne Umlaute einmal je Oeffnen statt je Tastendruck und
+    ' Durchgang, und "Buchstabe fuer Buchstabe" als Ausdruck (a.*b.*c) statt
+    ' einer MID$-Schleife: bei 20000 Dateien hakte jeder Tastendruck
+    ' (Stresstest 2026-10-02). Dieselbe Frage wie passtUnscharf.
+    IF LEN(paletteNorm) <> LEN(paletteNamen) THEN
+        paletteNorm = []
+        FOR i = 0 TO LEN(paletteNamen) - 1
+            ARRAY_PUSH(paletteNorm, ohneUmlaute$(paletteNamen[i] + " " + paletteDetails[i]))
+        NEXT
+    END IF
+    DIM muster AS STRING : muster = "(?s)"
+    FOR i = 0 TO LEN(ff) - 1
+        IF i > 0 THEN muster = muster + ".*"
+        muster = muster + REGEX_ESCAPE$(MID$(ff, i, 1))
+    NEXT
     FOR gang = 1 TO 2
         FOR i = 0 TO LEN(paletteNamen) - 1
-            DIM volltext AS STRING : volltext = paletteNamen[i] + " " + paletteDetails[i]
-            DIM amStueck AS BOOLEAN : amStueck = INSTR(ohneUmlaute$(volltext), ff) >= 0
-            IF (gang = 1 AND amStueck) OR (gang = 2 AND NOT amStueck AND passtUnscharf(volltext, klein)) THEN
+            DIM amStueck AS BOOLEAN : amStueck = INSTR(paletteNorm[i], ff) >= 0
+            IF (gang = 1 AND amStueck) OR (gang = 2 AND NOT amStueck AND REGEX_TEST(paletteNorm[i], muster)) THEN
                 DIM pz AS INTEGER : pz = GUI_LISTBOX_ADD(lstPalette, paletteNamen[i])
                 IF paletteDetails[i] <> "" THEN GUI_LISTBOX_DETAIL(lstPalette, pz, paletteDetails[i])
                 ARRAY_PUSH(sichtbar, paletteKennungen[i])
@@ -16671,6 +16686,7 @@ END SUB
 
 SUB waehlerOeffnen(art AS STRING, titel AS STRING)
     paletteArt = art
+    paletteNorm = []
     GUI_WINDOW_TITLE(winPalette, titel)
     GUI_SET_TEXT(tfPalette, "")
     paletteLetzterFilter = "-"
