@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2029,
+ "count": 2040,
  "builtins": [
   {
    "name": "ABS",
@@ -12175,6 +12175,72 @@
    "kind": "graphics",
    "signature": "MOUSE_CURSOR_NEW(bild, bx, by) AS STRING",
    "module": "core"
+  },
+  {
+   "name": "PIE",
+   "kind": "graphics",
+   "signature": "PIE(x, y, r, von_grad, bis_grad[, farbe])",
+   "module": "core"
+  },
+  {
+   "name": "PIEOUTLINE",
+   "kind": "graphics",
+   "signature": "PIEOUTLINE(x, y, r, von_grad, bis_grad[, farbe])",
+   "module": "core"
+  },
+  {
+   "name": "CIRCLE_GRADIENT",
+   "kind": "graphics",
+   "signature": "CIRCLE_GRADIENT(x, y, r, innen, aussen)",
+   "module": "core"
+  },
+  {
+   "name": "BOXROT",
+   "kind": "graphics",
+   "signature": "BOXROT(x, y, breite, hoehe, winkel[, farbe])",
+   "module": "core"
+  },
+  {
+   "name": "GRADIENT4",
+   "kind": "graphics",
+   "signature": "GRADIENT4(x1, y1, x2, y2, oben_links, oben_rechts, unten_rechts, unten_links)",
+   "module": "core"
+  },
+  {
+   "name": "NGON",
+   "kind": "graphics",
+   "signature": "NGON(x, y, ecken, r, winkel[, farbe])",
+   "module": "core"
+  },
+  {
+   "name": "NGONOUTLINE",
+   "kind": "graphics",
+   "signature": "NGONOUTLINE(x, y, ecken, r, winkel[, farbe[, breite]])",
+   "module": "core"
+  },
+  {
+   "name": "LINEDASHED",
+   "kind": "graphics",
+   "signature": "LINEDASHED(x1, y1, x2, y2, strich, luecke[, farbe])",
+   "module": "core"
+  },
+  {
+   "name": "DRAWIMAGE9",
+   "kind": "graphics",
+   "signature": "DRAWIMAGE9(bild, x, y, breite, hoehe, links, oben, rechts, unten[, farbe])",
+   "module": "core"
+  },
+  {
+   "name": "IMAGE_FROM_BUFFER",
+   "kind": "core",
+   "signature": "IMAGE_FROM_BUFFER(puffer) AS IMAGE",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_TO_BUFFER",
+   "kind": "core",
+   "signature": "IMAGE_TO_BUFFER(bild [, mit_alpha]) AS BUFFER",
+   "module": "imgfx"
   }
  ]
 }

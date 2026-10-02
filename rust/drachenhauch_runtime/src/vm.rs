@@ -8893,6 +8893,87 @@ impl<'p> Vm<'p> {
                 let width = if a.len() >= 8 { Some(need_f(a, 7, "ARC")?) } else { None };
                 g!().arc(gi(a,0,"ARC")? as i32, gi(a,1,"ARC")? as i32, gi(a,2,"ARC")? as i32, gi(a,3,"ARC")? as i32, start, end, width, c); Value::Nil
             }
+            // Kuchenstueck: derselbe Kreisring wie das chart-Modul, mit Innenradius 0.
+            "pie" | "pieoutline" => {
+                let n = if name == "pie" { "PIE" } else { "PIEOUTLINE" };
+                if a.len() < 5 || a.len() > 6 {
+                    return Err(format!("{}: erwartet (x, y, r, von_grad, bis_grad[, farbe]), erhalten {} Argumente", n, a.len()));
+                }
+                let c = if a.len() == 6 { gi(a, 5, n)? } else { 0xFFFFFF };
+                g!().ring(gi(a,0,n)? as i32, gi(a,1,n)? as i32, 0, gi(a,2,n)? as i32,
+                          need_f(a,3,n)?, need_f(a,4,n)?, c, name == "pie");
+                Value::Nil
+            }
+            "circle_gradient" => {
+                if a.len() != 5 {
+                    return Err(format!("CIRCLE_GRADIENT: erwartet (x, y, r, innen, aussen), erhalten {} Argumente", a.len()));
+                }
+                g!().circle_gradient(gi(a,0,"CIRCLE_GRADIENT")? as i32, gi(a,1,"CIRCLE_GRADIENT")? as i32,
+                    gi(a,2,"CIRCLE_GRADIENT")? as i32, gi(a,3,"CIRCLE_GRADIENT")?, gi(a,4,"CIRCLE_GRADIENT")?);
+                Value::Nil
+            }
+            "boxrot" => {
+                if a.len() < 5 || a.len() > 6 {
+                    return Err(format!("BOXROT: erwartet (x, y, breite, hoehe, winkel[, farbe]), erhalten {} Argumente", a.len()));
+                }
+                let c = if a.len() == 6 { gi(a, 5, "BOXROT")? } else { 0xFFFFFF };
+                g!().box_rot(gi(a,0,"BOXROT")? as i32, gi(a,1,"BOXROT")? as i32, gi(a,2,"BOXROT")? as i32,
+                    gi(a,3,"BOXROT")? as i32, need_f(a,4,"BOXROT")?, c);
+                Value::Nil
+            }
+            "gradient4" => {
+                if a.len() != 8 {
+                    return Err(format!("GRADIENT4: erwartet (x1, y1, x2, y2, oben_links, oben_rechts, unten_rechts, unten_links), erhalten {} Argumente", a.len()));
+                }
+                g!().gradient4(gi(a,0,"GRADIENT4")? as i32, gi(a,1,"GRADIENT4")? as i32, gi(a,2,"GRADIENT4")? as i32,
+                    gi(a,3,"GRADIENT4")? as i32,
+                    [gi(a,4,"GRADIENT4")?, gi(a,5,"GRADIENT4")?, gi(a,6,"GRADIENT4")?, gi(a,7,"GRADIENT4")?]);
+                Value::Nil
+            }
+            "ngon" | "ngonoutline" => {
+                let n = if name == "ngon" { "NGON" } else { "NGONOUTLINE" };
+                let max = if name == "ngon" { 6 } else { 7 };
+                if a.len() < 5 || a.len() > max {
+                    return Err(if name == "ngon" {
+                        format!("NGON: erwartet (x, y, ecken, r, winkel[, farbe]), erhalten {} Argumente", a.len())
+                    } else {
+                        format!("NGONOUTLINE: erwartet (x, y, ecken, r, winkel[, farbe[, breite]]), erhalten {} Argumente", a.len())
+                    });
+                }
+                let ecken = gi(a, 2, n)?;
+                if ecken < 3 { return Err(format!("{}: ein Vieleck hat mindestens 3 Ecken, nicht {}", n, ecken)); }
+                if ecken > 1000 { return Err(format!("{}: hoechstens 1000 Ecken, nicht {}", n, ecken)); }
+                let c = if a.len() >= 6 { gi(a, 5, n)? } else { 0xFFFFFF };
+                let breite = if name == "ngon" { None }
+                             else if a.len() == 7 { Some(need_f(a, 6, n)?) } else { Some(1.0) };
+                g!().ngon(gi(a,0,n)? as i32, gi(a,1,n)? as i32, ecken as i32, gi(a,3,n)? as i32,
+                          need_f(a,4,n)?, c, breite);
+                Value::Nil
+            }
+            "linedashed" => {
+                if a.len() < 6 || a.len() > 7 {
+                    return Err(format!("LINEDASHED: erwartet (x1, y1, x2, y2, strich, luecke[, farbe]), erhalten {} Argumente", a.len()));
+                }
+                let (st, lu) = (gi(a,4,"LINEDASHED")?, gi(a,5,"LINEDASHED")?);
+                if st < 1 || lu < 1 {
+                    return Err(format!("LINEDASHED: Strich und Luecke muessen mindestens 1 sein, nicht {} und {}", st, lu));
+                }
+                let c = if a.len() == 7 { gi(a, 6, "LINEDASHED")? } else { 0xFFFFFF };
+                g!().line_dashed(gi(a,0,"LINEDASHED")? as i32, gi(a,1,"LINEDASHED")? as i32, gi(a,2,"LINEDASHED")? as i32,
+                    gi(a,3,"LINEDASHED")? as i32, st as i32, lu as i32, c);
+                Value::Nil
+            }
+            "drawimage9" => {
+                if a.len() < 9 || a.len() > 10 {
+                    return Err(format!("DRAWIMAGE9: erwartet (bild, x, y, breite, hoehe, links, oben, rechts, unten[, farbe]), erhalten {} Argumente", a.len()));
+                }
+                let tint = if a.len() == 10 { Some(gi(a, 9, "DRAWIMAGE9")?) } else { None };
+                g!().draw_image_9(gi(a,0,"DRAWIMAGE9")?, gi(a,1,"DRAWIMAGE9")? as i32, gi(a,2,"DRAWIMAGE9")? as i32,
+                    gi(a,3,"DRAWIMAGE9")? as i32, gi(a,4,"DRAWIMAGE9")? as i32,
+                    [gi(a,5,"DRAWIMAGE9")? as i32, gi(a,6,"DRAWIMAGE9")? as i32,
+                     gi(a,7,"DRAWIMAGE9")? as i32, gi(a,8,"DRAWIMAGE9")? as i32], tint)?;
+                Value::Nil
+            }
             "polygon" | "polygonoutline" => {
                 let filled = name == "polygon";
                 let pts: Vec<i32> = match a.get(0) {
@@ -10525,6 +10606,24 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
                 g!().image_save(gi(a,0,"IMAGE_SAVE")?, gs(a,1,"IMAGE_SAVE")?, ohne_alpha)?; Value::Nil
             }
             "image_free" => { g!().image_free(gi(a,0,"IMAGE_FREE")?)?; Value::Nil }
+            "image_from_buffer" => {
+                if a.len() != 1 {
+                    return Err(format!("IMAGE_FROM_BUFFER: erwartet (puffer), erhalten {} Argumente", a.len()));
+                }
+                let bytes = crate::builtins::buf_h(&a[0], "IMAGE_FROM_BUFFER")?.borrow().clone();
+                Value::Int(g!().image_from_buffer(&bytes)?)
+            }
+            "image_to_buffer" => {
+                if a.is_empty() || a.len() > 2 {
+                    return Err(format!("IMAGE_TO_BUFFER: erwartet (bild[, mit_alpha]), erhalten {} Argumente", a.len()));
+                }
+                let ohne_alpha = match a.get(1) {
+                    None => false,
+                    Some(Value::Bool(b)) => !*b,
+                    Some(_) => return Err("IMAGE_TO_BUFFER: zweites Argument ist ein Wahrheitswert (mit Deckkraft-Kanal?)".into()),
+                };
+                crate::builtins::neuer_buffer(g!().image_to_buffer(gi(a,0,"IMAGE_TO_BUFFER")?, ohne_alpha)?)
+            }
             "image_save_gif" => {
                 // Die Bildnummern kommen als ARRAY OF IMAGE (so haelt ein
                 // Programm seine Einzelbilder ohnehin) oder als TUPLE.
@@ -11217,6 +11316,8 @@ pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
         | "plot" | "plots" | "line" | "lines" | "linew" | "box" | "boxes"
         | "rect" | "boxround" | "rectround" | "circle" | "circles"
         | "triangle" | "polygon" | "spline" | "gradientv" | "gradienth"
+        | "pie" | "pieoutline" | "circle_gradient" | "boxrot" | "gradient4"
+        | "ngon" | "ngonoutline" | "linedashed" | "drawimage9"
         | "text"
         | "drawimage" | "drawimagerot" | "drawimageflipped"
         | "drawimagepart" | "drawimagepartex" | "drawtilemap"

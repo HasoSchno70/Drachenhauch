@@ -26,6 +26,35 @@ extern "C" {
 use raylib::core::shaders::RaylibShader;   // get_shader_location auf Shader
 use raylib::core::texture::RaylibRenderTexture2D;   // .texture() auf RenderTexture2D
 
+/// Das Format einer Bilddatei an ihren ersten Bytes, als Endung fuer
+/// raylibs LoadImageFromMemory. None = keins, das dhrt laden kann.
+fn bildformat(b: &[u8]) -> Option<&'static str> {
+    if b.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) { Some(".png") }
+    else if b.starts_with(&[0xFF, 0xD8, 0xFF]) { Some(".jpg") }
+    else if b.starts_with(b"BM") && b.len() > 14 { Some(".bmp") }
+    else if b.starts_with(b"GIF87a") || b.starts_with(b"GIF89a") { Some(".gif") }
+    else if b.starts_with(b"qoif") { Some(".qoi") }
+    else if b.starts_with(b"DDS ") { Some(".dds") }
+    else { None }
+}
+
+#[cfg(test)]
+mod bildformat_tests {
+    use super::bildformat;
+    #[test]
+    fn erkennt_die_formate_an_den_ersten_bytes() {
+        assert_eq!(bildformat(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0]), Some(".png"));
+        assert_eq!(bildformat(&[0xFF, 0xD8, 0xFF, 0xE0]), Some(".jpg"));
+        assert_eq!(bildformat(b"BM\x36\x00\x00\x00\x00\x00\x00\x00\x36\x00\x00\x00\x28"), Some(".bmp"));
+        assert_eq!(bildformat(b"GIF89a.."), Some(".gif"));
+        assert_eq!(bildformat(b"qoif...."), Some(".qoi"));
+        assert_eq!(bildformat(b"DDS |..."), Some(".dds"));
+        assert_eq!(bildformat(b"BM"), None);
+        assert_eq!(bildformat(b"hallo welt"), None);
+        assert_eq!(bildformat(&[]), None);
+    }
+}
+
 #[derive(Clone)]
 enum Cmd {
     Clear(Color),
@@ -97,6 +126,25 @@ enum Cmd {
     /// Faecher aus Dreiecken mit Farbe je Ecke statt gestapelter Ellipsen,
     /// deren Kanten man als Stufen saehe.
     Lichtfleck(i32, i32, f32, f32, Color),
+    /// Kreis mit Verlauf von der Mitte (innen) zum Rand (aussen): cx, cy, r.
+    CircleGradient(i32, i32, f32, Color, Color),
+    /// Rechteck um seine Mitte gedreht: cx, cy, breite, hoehe, winkel (Grad).
+    RectPro(i32, i32, i32, i32, f32, Color),
+    /// Rechteck mit je einer Farbe in jeder Ecke: x1,y1,x2,y2 und die Farben
+    /// oben links, oben rechts, unten rechts, unten links (im Uhrzeigersinn).
+    Gradient4(i32, i32, i32, i32, [Color; 4]),
+    /// Regelmaessiges Vieleck: cx, cy, ecken, radius, winkel (Grad), Farbe,
+    /// Strichbreite (0 = gefuellt).
+    Ngon(i32, i32, i32, f32, f32, Color, f32),
+    /// Gestrichelte Linie: x1,y1,x2,y2, Strich- und Lueckenlaenge, Farbe.
+    LineDashed(i32, i32, i32, i32, i32, i32, Color),
+    /// 9-Slice: ein Bild in ein Rechteck gestreckt, die Ecken in ihrer Groesse,
+    /// die Raender nur in einer Richtung. tex, Ziel (x, y, b, h), Raender in
+    /// der QUELLE (links, oben, rechts, unten) und dieselben im Ziel (mit dem
+    /// Kamera-Zoom), Toenung. Neun DrawTexturePro statt DrawTextureNPatch:
+    /// raylib zeichnet die Ecken dort in Quellpixeln, sie passten dann weder
+    /// zur SCREEN-Skala noch zum Zoom.
+    NinePatch(usize, [i32; 4], [i32; 4], [i32; 4], Color),
     BlendMode(i32),                                    // 0=alpha,1=additive,2=multiplied,4=subtract
     RtDraw(usize, i32, i32, f32, Color, bool),         // render-target idx, x, y, scale, tint, flip_v
     /// Ein Ausschnitt eines Render-Targets, vergroessert gestempelt (GUI_WINDOW_ZOOM):
@@ -3202,6 +3250,111 @@ impl Graphics {
         let (cx, cy) = self.w2s(cx, cy);
         let (ri, ro) = (self.ssize(r_in), self.ssize(r_out));
         self.emit(Cmd::Ring(cx, cy, ri as f32, ro as f32, von as f32, bis as f32, col(c), filled));
+    }
+
+    /// CIRCLE_GRADIENT: Kreis mit Verlauf von der Mitte zum Rand.
+    pub fn circle_gradient(&mut self, x: i32, y: i32, r: i32, innen: i64, aussen: i64) {
+        let (x, y) = self.w2s(x, y);
+        let r = self.ssize(r);
+        self.emit(Cmd::CircleGradient(x, y, r as f32, col(innen), col(aussen)));
+    }
+    /// BOXROT: gefuelltes Rechteck, um seine Mitte gedreht (Grad, im
+    /// Uhrzeigersinn wie DRAWIMAGEROT).
+    #[allow(clippy::too_many_arguments)]
+    pub fn box_rot(&mut self, cx: i32, cy: i32, w: i32, h: i32, winkel: f64, c: i64) {
+        let (cx, cy) = self.w2s(cx, cy);
+        let (w, h) = (self.ssize(w), self.ssize(h));
+        self.emit(Cmd::RectPro(cx, cy, w, h, winkel as f32, col(c)));
+    }
+    /// GRADIENT4: Rechteck mit je einer Farbe in jeder Ecke, im Uhrzeigersinn
+    /// ab oben links.
+    pub fn gradient4(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, f: [i64; 4]) {
+        let (x1, y1) = self.w2s(x1, y1);
+        let (x2, y2) = self.w2s(x2, y2);
+        self.emit(Cmd::Gradient4(x1, y1, x2, y2, [col(f[0]), col(f[1]), col(f[2]), col(f[3])]));
+    }
+    /// NGON / NGONOUTLINE: regelmaessiges Vieleck um (x, y). `breite` None =
+    /// gefuellt; als Umriss wie LINEW mit dem Kamera-Zoom.
+    #[allow(clippy::too_many_arguments)]
+    pub fn ngon(&mut self, x: i32, y: i32, ecken: i32, r: i32, winkel: f64, c: i64, breite: Option<f64>) {
+        let (x, y) = self.w2s(x, y);
+        let r = self.ssize(r);
+        let dicke = match breite { Some(b) => (b * self.cam_zoom).max(1.0) as f32, None => 0.0 };
+        self.emit(Cmd::Ngon(x, y, ecken, r as f32, winkel as f32, col(c), dicke));
+    }
+    /// LINEDASHED: gestrichelte Linie; Strich und Luecke folgen dem Zoom.
+    #[allow(clippy::too_many_arguments)]
+    pub fn line_dashed(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, strich: i32, luecke: i32, c: i64) {
+        let (x1, y1) = self.w2s(x1, y1);
+        let (x2, y2) = self.w2s(x2, y2);
+        let (st, lu) = (self.ssize(strich).max(1), self.ssize(luecke).max(1));
+        self.emit(Cmd::LineDashed(x1, y1, x2, y2, st, lu, col(c)));
+    }
+    /// DRAWIMAGE9: 9-Slice -- das Bild in (x, y, b, h) gestreckt, die Ecken
+    /// in ihrer Groesse, die Raender nur in einer Richtung, die Mitte in
+    /// beiden. Raender in Pixeln des Bildes. Passen die Ecken nicht ins Ziel,
+    /// werden sie im Verhaeltnis kleiner (wie raylibs NPatch).
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_image_9(&mut self, idx: i64, x: i32, y: i32, w: i32, h: i32,
+                        rand: [i32; 4], tint: Option<i64>) -> Result<(), String> {
+        let i = idx as usize;
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAWIMAGE9")); }
+        let (tw, th) = (self.textures[i].tex.width, self.textures[i].tex.height);
+        let [l, o, r, u] = rand;
+        if l < 0 || o < 0 || r < 0 || u < 0 {
+            return Err("DRAWIMAGE9: die Raender duerfen nicht negativ sein".into());
+        }
+        if l + r > tw || o + u > th {
+            return Err(format!(
+                "DRAWIMAGE9: Raender {} + {} bzw. {} + {} sind groesser als das Bild ({}x{})",
+                l, r, o, u, tw, th));
+        }
+        let (x, y) = self.w2s(x, y);
+        let (w, h) = (self.ssize(w), self.ssize(h));
+        let mut ziel = [self.ssize(l), self.ssize(o), self.ssize(r), self.ssize(u)];
+        // Ecken im Verhaeltnis verkleinern, wenn das Ziel zu klein ist.
+        if ziel[0] + ziel[2] > w && ziel[0] + ziel[2] > 0 {
+            let f = w as f64 / (ziel[0] + ziel[2]) as f64;
+            ziel[0] = (ziel[0] as f64 * f) as i32;
+            ziel[2] = w - ziel[0];
+        }
+        if ziel[1] + ziel[3] > h && ziel[1] + ziel[3] > 0 {
+            let f = h as f64 / (ziel[1] + ziel[3]) as f64;
+            ziel[1] = (ziel[1] as f64 * f) as i32;
+            ziel[3] = h - ziel[1];
+        }
+        let c = tint.map(col).unwrap_or(Color::WHITE);
+        self.emit(Cmd::NinePatch(i, [x, y, w, h], rand, ziel, c));
+        Ok(())
+    }
+
+    /// IMAGE_FROM_BUFFER: ein Bild aus den Bytes einer Bilddatei (PNG, JPG,
+    /// BMP, GIF -- das erste Bild --, QOI, DDS). Das Format steht in den
+    /// ersten Bytes; raylib braucht es als Endung, sonst laedt es nichts.
+    pub fn image_from_buffer(&mut self, bytes: &[u8]) -> Result<i64, String> {
+        let art = bildformat(bytes).ok_or_else(|| {
+            "IMAGE_FROM_BUFFER: die Bytes sind kein bekanntes Bildformat (PNG, JPG, BMP, GIF, QOI, DDS)".to_string()
+        })?;
+        let img = Image::load_image_from_mem(art, bytes)
+            .map_err(|e| format!("IMAGE_FROM_BUFFER: {} liess sich nicht lesen ({})", &art[1..], e))?;
+        if img.width <= 0 || img.height <= 0 {
+            return Err(format!("IMAGE_FROM_BUFFER: {} liess sich nicht lesen", &art[1..]));
+        }
+        self.push_tex_from_image(img)
+    }
+
+    /// IMAGE_TO_BUFFER: das Bild als PNG-Bytes (raylib schreibt in den
+    /// Speicher nur PNG). `ohne_alpha` wie bei IMAGE_SAVE.
+    pub fn image_to_buffer(&mut self, idx: i64, ohne_alpha: bool) -> Result<Vec<u8>, String> {
+        let mut img = self.src_image(idx, "IMAGE_TO_BUFFER")?;
+        let ziel = if ohne_alpha { raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8 }
+                   else { raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 };
+        // ExportImageToMemory kennt nur die unkomprimierten 8-Bit-Formate.
+        img.set_format(ziel);
+        let daten = img.export_image_to_memory(".png")
+            .map_err(|e| format!("IMAGE_TO_BUFFER: {}", e))?;
+        if daten.is_empty() { return Err("IMAGE_TO_BUFFER: raylib hat nichts geschrieben".into()); }
+        Ok(daten.to_vec())
     }
 
     // --- Blend-Modes (Batch 2) ---
@@ -6898,6 +7051,52 @@ fn render_scene<D: RaylibDraw>(
                         let seg = (((bis - von).abs() / 4.0).ceil() as i32).clamp(6, 180);
                         if *filled { d.draw_ring(mitte, ri, ro, *von, *bis, seg, *col); }
                         else { d.draw_ring_lines(mitte, ri, ro, *von, *bis, seg, *col); }
+                    }
+                    Cmd::CircleGradient(cx, cy, r, innen, aussen) => {
+                        d.draw_circle_gradient(cx * s, cy * s, r * s as f32, *innen, *aussen);
+                    }
+                    Cmd::RectPro(cx, cy, w, h, winkel, col) => {
+                        let (w, h) = ((w * s) as f32, (h * s) as f32);
+                        let rec = Rectangle::new((cx * s) as f32, (cy * s) as f32, w, h);
+                        d.draw_rectangle_pro(rec, Vector2::new(w / 2.0, h / 2.0), *winkel, *col);
+                    }
+                    Cmd::Gradient4(x1, y1, x2, y2, f) => {
+                        let x = (*x1).min(*x2) * s;
+                        let y = (*y1).min(*y2) * s;
+                        let w = ((x2 - x1).abs() + 1) * s;
+                        let h = ((y2 - y1).abs() + 1) * s;
+                        let rec = Rectangle::new(x as f32, y as f32, w as f32, h as f32);
+                        // raylib: oben links, unten links, unten rechts, oben rechts.
+                        d.draw_rectangle_gradient_ex(rec, f[0], f[3], f[2], f[1]);
+                    }
+                    Cmd::Ngon(cx, cy, ecken, r, winkel, col, dicke) => {
+                        let m = Vector2::new((cx * s) as f32, (cy * s) as f32);
+                        if *dicke <= 0.0 { d.draw_poly(m, *ecken, r * s as f32, *winkel, *col); }
+                        else { d.draw_poly_lines_ex(m, *ecken, r * s as f32, *winkel, dicke * s as f32, *col); }
+                    }
+                    Cmd::LineDashed(x1, y1, x2, y2, st, lu, col) => {
+                        d.draw_line_dashed(Vector2::new((x1 * s) as f32, (y1 * s) as f32),
+                            Vector2::new((x2 * s) as f32, (y2 * s) as f32), st * s, lu * s, *col);
+                    }
+                    Cmd::NinePatch(i, z, q, zr, tint) => {
+                        let t = &textures[*i].tex;
+                        let (tw, th) = (t.width, t.height);
+                        // Spalten und Zeilen in Quelle und Ziel: links, Mitte, rechts.
+                        let qx = [0, q[0], tw - q[2], tw];
+                        let qy = [0, q[1], th - q[3], th];
+                        let zx = [z[0], z[0] + zr[0], z[0] + z[2] - zr[2], z[0] + z[2]];
+                        let zy = [z[1], z[1] + zr[1], z[1] + z[3] - zr[3], z[1] + z[3]];
+                        for zi in 0..3 {
+                            for si in 0..3 {
+                                let (qw, qh) = (qx[si + 1] - qx[si], qy[zi + 1] - qy[zi]);
+                                let (zw, zh) = (zx[si + 1] - zx[si], zy[zi + 1] - zy[zi]);
+                                if qw <= 0 || qh <= 0 || zw <= 0 || zh <= 0 { continue; }
+                                let src = Rectangle::new(qx[si] as f32, qy[zi] as f32, qw as f32, qh as f32);
+                                let dst = Rectangle::new((zx[si] * s) as f32, (zy[zi] * s) as f32,
+                                                         (zw * s) as f32, (zh * s) as f32);
+                                d.draw_texture_pro(t, src, dst, Vector2::zero(), 0.0, *tint);
+                            }
+                        }
                     }
                     Cmd::Lichtfleck(cx, cy, rx, ry, col) => {
                         lichtfleck_zeichnen((cx * s) as f32, (cy * s) as f32, rx * s as f32, ry * s as f32, *col);

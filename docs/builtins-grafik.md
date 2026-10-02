@@ -210,8 +210,16 @@ Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r,
 | `RECTROUND(x1, y1, x2, y2, radius[, color])` | Rechteck-Rahmen mit runden Ecken |
 | `GRADIENTV(x1, y1, x2, y2, farbe1, farbe2)` | Rechteck mit **vertikalem** Farbverlauf (oben→unten) |
 | `GRADIENTH(x1, y1, x2, y2, farbe1, farbe2)` | Rechteck mit **horizontalem** Farbverlauf (links→rechts) |
+| `GRADIENT4(x1, y1, x2, y2, oben_links, oben_rechts, unten_rechts, unten_links)` | Rechteck mit je einer Farbe in jeder Ecke, im Uhrzeigersinn ab oben links; dazwischen wird gemischt |
+| `BOXROT(x, y, breite, hoehe, winkel[, farbe])` | gefülltes Rechteck **zentriert** auf (x, y), um seine Mitte gedreht (Grad, im Uhrzeigersinn wie `DRAWIMAGEROT`) |
 | `CIRCLE(x, y, r[, color])` | gefüllter Kreis |
 | `CIRCLEOUTLINE(x, y, r[, color])` | Kreis nur als Kontur (Gegenstück zu `CIRCLE`) |
+| `CIRCLE_GRADIENT(x, y, r, innen, aussen)` | Kreis mit Verlauf von der Mitte (`innen`) zum Rand (`aussen`); mit `RGBA` als Randfarbe ein weicher Schein |
+| `PIE(x, y, r, von_grad, bis_grad[, farbe])` | gefülltes Kreisstück (Tortenstück); Winkel in **Grad**, 0 = rechts, im Uhrzeigersinn |
+| `PIEOUTLINE(x, y, r, von_grad, bis_grad[, farbe])` | Kreisstück nur als Kontur, mit beiden Radien |
+| `NGON(x, y, ecken, r, winkel[, farbe])` | gefülltes regelmäßiges Vieleck (3..1000 Ecken) um (x, y), Radius bis zu den Ecken, um `winkel` Grad gedreht |
+| `NGONOUTLINE(x, y, ecken, r, winkel[, farbe[, breite]])` | regelmäßiges Vieleck nur als Kontur; `breite` wie bei `LINEW` |
+| `LINEDASHED(x1, y1, x2, y2, strich, luecke[, farbe])` | gestrichelte Linie, Strich- und Lückenlänge in Punkten |
 | `SPLINE(xs, ys[, color[, breite]])` | weiche Catmull-Rom-Kurve durch die Punkte; `xs`/`ys` sind `ARRAY OF INTEGER` gleicher Länge |
 | `TRIANGLE(x1, y1, x2, y2, x3, y3[, color])` | gefülltes Dreieck |
 | `TRIANGLEOUTLINE(x1, y1, x2, y2, x3, y3[, color[, width]])` | Dreieck nur als Kontur |
@@ -455,6 +463,7 @@ wie getippt über die Tipp-Warteschlange, die 256 Zeichen je Bild fasst
 | `DRAWIMAGEPART(img, sx, sy, sw, sh, x, y)` | Sub-Rechteck aus Sheet zeichnen |
 | `DRAWIMAGEFLIPPED(img, x, y[, flipX[, flipY]])` | mit Spiegelung |
 | `DRAWIMAGEROT(img, x, y, winkel[, skala[, tint]])` | **zentriert** auf (x,y), um `winkel` **Grad** gedreht (um die Mitte), optional skaliert + getönt. Ideal für rotierte Sprites / `physics2d` (`winkel = DEG(PHYS2D_BODY_ANGLE(...))`). Camera-aware. |
+| `DRAWIMAGE9(img, x, y, breite, hoehe, links, oben, rechts, unten[, tint])` | **9-Slice**: das Bild in das Rechteck gestreckt, die vier Ecken in ihrer Größe, die Ränder nur in einer Richtung, die Mitte in beiden — für Rahmen, Panels und Knöpfe, die beliebig groß werden, ohne zu verzerren. Ränder in Pixeln des Bildes; passt das Ziel nicht, werden die Ecken im Verhältnis kleiner. Camera-aware. |
 
 ```basic
 SCREEN(320, 240, "Bilder", 2)
