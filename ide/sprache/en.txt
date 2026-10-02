@@ -882,3 +882,4 @@ Suchen (Strg+F)	Find (Ctrl+F)
 Zeilenumbruch (Alt+Z)	Word wrap (Alt+Z)
 Handbuch (F1)	Manual (F1)
 Einstellungen (Strg+U)	Settings (Ctrl+U)
+Anlegen ging nicht: 	Could not create it: 

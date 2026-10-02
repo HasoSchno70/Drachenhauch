@@ -6579,94 +6579,102 @@ FUNCTION neuProjektAnlegen(art AS INTEGER, name AS STRING, ort AS STRING) AS BOO
             protokoll("neues projekt ordner belegt")
             RETURN FALSE
         END IF
-    ELSE
-        MKDIR(ziel)
     END IF
-    DIM q AS STRING : q = CHR$(34)
-    DIM liesmich AS STRING
-    SELECT CASE art
-        CASE 0
-            MKDIR(PATHJOIN(ziel, "assets"))
-            DIM b AS IMAGE : b = IMAGE_NEW(32, 32)
-            IMAGE_FILL_ELLIPSE(b, 16.0, 16.0, 14.0, 14.0, &H40C0E0)
-            IMAGE_FILL_ELLIPSE(b, 11.0, 12.0, 3.0, 3.0, &H102030)
-            IMAGE_FILL_ELLIPSE(b, 21.0, 12.0, 3.0, 3.0, &H102030)
-            IMAGE_SAVE(b, PATHJOIN(ziel, "assets/figur.png"))
-            IMAGE_FREE(b)
-            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
-                "' " + name + " -- ein Spiel in Drachenhauch.", _
-                "' Pfeiltasten bewegen die Figur, ESC beendet.", _
-                "SCREEN(800, 600, " + q + name + q + ", 1)", _
-                "SETFPS(60)", _
-                "DIM figur AS IMAGE : figur = LOADIMAGE(" + q + "assets/figur.png" + q + ")", _
-                "DIM x AS FLOAT : x = 400.0", _
-                "DIM y AS FLOAT : y = 300.0", _
-                "CONST TEMPO = 240.0", _
-                "WHILE NOT QUITREQUESTED()", _
-                "    IF KEYPRESSED(KEY_LEFT) THEN x = x - TEMPO * DELTA()", _
-                "    IF KEYPRESSED(KEY_RIGHT) THEN x = x + TEMPO * DELTA()", _
-                "    IF KEYPRESSED(KEY_UP) THEN y = y - TEMPO * DELTA()", _
-                "    IF KEYPRESSED(KEY_DOWN) THEN y = y + TEMPO * DELTA()", _
-                "    CLS(RGB(20, 24, 40))", _
-                "    DRAWIMAGE(figur, INT(x) - 16, INT(y) - 16)", _
-                "    TEXT(10, 10, " + q + "Pfeiltasten bewegen die Figur" + q + ")", _
-                "    FLIP()", _
-                "WEND"]))
-            liesmich = "Ein Spiel: F5 startet es, die Figur liegt in assets/figur.png."
-        CASE 1
-            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
-                "' " + name + " -- eine Anwendung mit Fenster und Formular.", _
-                "IMPORT " + q + "gui" + q, _
-                "SCREEN(640, 420, " + q + name + q + ", 1)", _
-                "SETFPS(60)", _
-                "DIM win AS GUI_WINDOW : win = GUI_WINDOW(" + q + name + q + ", 0, 0, 640, 420)", _
-                "GUI_WINDOW_CHROME(win, FALSE)", _
-                "DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(win, " + q + tr$("Name:") + q + ", 20, 24)", _
-                "DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(win, 100, 20, 300, 28, " + q + tr$("Wie heißt du?") + q + ")", _
-                "DIM btn AS GUI_WIDGET : btn = GUI_BUTTON(win, " + q + tr$("Hinzufügen") + q + ", 410, 20, 140, 28)", _
-                "DIM lst AS GUI_WIDGET : lst = GUI_LISTBOX(win, 20, 64, 530, 300, [])", _
-                "GUI_WINDOW_DEFAULT(win, btn)", _
-                "GUI_FOCUS(tf)", _
-                "WHILE NOT QUITREQUESTED()", _
-                "    GUI_UPDATE()", _
-                "    IF GUI_CLICKED(btn) AND TRIM$(GUI_TEXT(tf)) <> " + q + q + " THEN", _
-                "        GUI_LISTBOX_ADD(lst, TRIM$(GUI_TEXT(tf)))", _
-                "        GUI_SET_TEXT(tf, " + q + q + ")", _
-                "    END IF", _
-                "    CLS(BLACK)", _
-                "    GUI_DRAW()", _
-                "    FLIP()", _
-                "WEND"]))
-            liesmich = "Eine Anwendung mit Fenster: F5 startet sie. Das Formular lässt sich auch im Form-Designer bauen (Werkzeuge)."
-        CASE 2
-            WRITEALL(PATHJOIN(ziel, "rechnen.dh"), npZeilen$([ _
-                "' Rechnen -- eine Funktion, die tests.dhtest prueft.", _
-                "FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER", _
-                "    RETURN a * b", _
-                "END FUNCTION"]))
-            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
-                "' " + name + " -- ein Konsolenprogramm.", _
-                "IMPORT " + q + "rechnen.dh" + q, _
-                "DIM name AS STRING", _
-                "INPUT " + q + "Wie heißt du? " + q + ", name", _
-                "PRINT " + q + "Hallo, " + q + " + name + " + q + "! 6 mal 7 ist " + q + " + STR$(mal(6, 7)) + " + q + "." + q]))
-            WRITEALL(PATHJOIN(ziel, "tests.dhtest"), npZeilen$([ _
-                "' Pruefsammlung: in der IDE Strg+Alt+F5, sonst dhrt test tests.dhtest", _
-                "", _
-                "=== mal rechnet", _
-                "IMPORT " + q + "r.dh" + q, _
-                "PRINT mal(6, 7)", _
-                "--- datei r.dh", _
-                "IMPORT " + q + "{sammlung}/rechnen.dh" + q, _
-                "", _
-                "--- erwartet", _
-                "42"]))
-            liesmich = "Ein Konsolenprogramm: F5 startet es, Strg+Alt+F5 prüft rechnen.dh mit tests.dhtest."
-        CASE ELSE
-            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$(["' " + name, "PRINT " + q + "Hallo" + q]))
-            liesmich = "Ein leeres Projekt."
-    END SELECT
-    WRITEALL(PATHJOIN(ziel, "LIESMICH.md"), "# " + name + NL + NL + liesmich + NL)
+    ' Anlegen kann an der Platte scheitern: kein Schreibrecht am Ort, ein
+    ' Name, den Windows nicht nimmt (con, nul, aux ...). Ohne TRY beendete
+    ' der Fehler die ganze IDE samt ungesicherter Arbeit.
+    TRY
+        IF NOT DIREXISTS(ziel) THEN MKDIR(ziel)
+        DIM q AS STRING : q = CHR$(34)
+        DIM liesmich AS STRING
+        SELECT CASE art
+            CASE 0
+                MKDIR(PATHJOIN(ziel, "assets"))
+                DIM b AS IMAGE : b = IMAGE_NEW(32, 32)
+                IMAGE_FILL_ELLIPSE(b, 16.0, 16.0, 14.0, 14.0, &H40C0E0)
+                IMAGE_FILL_ELLIPSE(b, 11.0, 12.0, 3.0, 3.0, &H102030)
+                IMAGE_FILL_ELLIPSE(b, 21.0, 12.0, 3.0, 3.0, &H102030)
+                IMAGE_SAVE(b, PATHJOIN(ziel, "assets/figur.png"))
+                IMAGE_FREE(b)
+                WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
+                    "' " + name + " -- ein Spiel in Drachenhauch.", _
+                    "' Pfeiltasten bewegen die Figur, ESC beendet.", _
+                    "SCREEN(800, 600, " + q + name + q + ", 1)", _
+                    "SETFPS(60)", _
+                    "DIM figur AS IMAGE : figur = LOADIMAGE(" + q + "assets/figur.png" + q + ")", _
+                    "DIM x AS FLOAT : x = 400.0", _
+                    "DIM y AS FLOAT : y = 300.0", _
+                    "CONST TEMPO = 240.0", _
+                    "WHILE NOT QUITREQUESTED()", _
+                    "    IF KEYPRESSED(KEY_LEFT) THEN x = x - TEMPO * DELTA()", _
+                    "    IF KEYPRESSED(KEY_RIGHT) THEN x = x + TEMPO * DELTA()", _
+                    "    IF KEYPRESSED(KEY_UP) THEN y = y - TEMPO * DELTA()", _
+                    "    IF KEYPRESSED(KEY_DOWN) THEN y = y + TEMPO * DELTA()", _
+                    "    CLS(RGB(20, 24, 40))", _
+                    "    DRAWIMAGE(figur, INT(x) - 16, INT(y) - 16)", _
+                    "    TEXT(10, 10, " + q + "Pfeiltasten bewegen die Figur" + q + ")", _
+                    "    FLIP()", _
+                    "WEND"]))
+                liesmich = "Ein Spiel: F5 startet es, die Figur liegt in assets/figur.png."
+            CASE 1
+                WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
+                    "' " + name + " -- eine Anwendung mit Fenster und Formular.", _
+                    "IMPORT " + q + "gui" + q, _
+                    "SCREEN(640, 420, " + q + name + q + ", 1)", _
+                    "SETFPS(60)", _
+                    "DIM win AS GUI_WINDOW : win = GUI_WINDOW(" + q + name + q + ", 0, 0, 640, 420)", _
+                    "GUI_WINDOW_CHROME(win, FALSE)", _
+                    "DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(win, " + q + tr$("Name:") + q + ", 20, 24)", _
+                    "DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(win, 100, 20, 300, 28, " + q + tr$("Wie heißt du?") + q + ")", _
+                    "DIM btn AS GUI_WIDGET : btn = GUI_BUTTON(win, " + q + tr$("Hinzufügen") + q + ", 410, 20, 140, 28)", _
+                    "DIM lst AS GUI_WIDGET : lst = GUI_LISTBOX(win, 20, 64, 530, 300, [])", _
+                    "GUI_WINDOW_DEFAULT(win, btn)", _
+                    "GUI_FOCUS(tf)", _
+                    "WHILE NOT QUITREQUESTED()", _
+                    "    GUI_UPDATE()", _
+                    "    IF GUI_CLICKED(btn) AND TRIM$(GUI_TEXT(tf)) <> " + q + q + " THEN", _
+                    "        GUI_LISTBOX_ADD(lst, TRIM$(GUI_TEXT(tf)))", _
+                    "        GUI_SET_TEXT(tf, " + q + q + ")", _
+                    "    END IF", _
+                    "    CLS(BLACK)", _
+                    "    GUI_DRAW()", _
+                    "    FLIP()", _
+                    "WEND"]))
+                liesmich = "Eine Anwendung mit Fenster: F5 startet sie. Das Formular lässt sich auch im Form-Designer bauen (Werkzeuge)."
+            CASE 2
+                WRITEALL(PATHJOIN(ziel, "rechnen.dh"), npZeilen$([ _
+                    "' Rechnen -- eine Funktion, die tests.dhtest prueft.", _
+                    "FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER", _
+                    "    RETURN a * b", _
+                    "END FUNCTION"]))
+                WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
+                    "' " + name + " -- ein Konsolenprogramm.", _
+                    "IMPORT " + q + "rechnen.dh" + q, _
+                    "DIM name AS STRING", _
+                    "INPUT " + q + "Wie heißt du? " + q + ", name", _
+                    "PRINT " + q + "Hallo, " + q + " + name + " + q + "! 6 mal 7 ist " + q + " + STR$(mal(6, 7)) + " + q + "." + q]))
+                WRITEALL(PATHJOIN(ziel, "tests.dhtest"), npZeilen$([ _
+                    "' Pruefsammlung: in der IDE Strg+Alt+F5, sonst dhrt test tests.dhtest", _
+                    "", _
+                    "=== mal rechnet", _
+                    "IMPORT " + q + "r.dh" + q, _
+                    "PRINT mal(6, 7)", _
+                    "--- datei r.dh", _
+                    "IMPORT " + q + "{sammlung}/rechnen.dh" + q, _
+                    "", _
+                    "--- erwartet", _
+                    "42"]))
+                liesmich = "Ein Konsolenprogramm: F5 startet es, Strg+Alt+F5 prüft rechnen.dh mit tests.dhtest."
+            CASE ELSE
+                WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$(["' " + name, "PRINT " + q + "Hallo" + q]))
+                liesmich = "Ein leeres Projekt."
+        END SELECT
+        WRITEALL(PATHJOIN(ziel, "LIESMICH.md"), "# " + name + NL + NL + liesmich + NL)
+    CATCH e
+        GUI_SET_TEXT(lblNpMeldung, tr$("Anlegen ging nicht: ") + e)
+        protokoll("neues projekt fehler")
+        RETURN FALSE
+    END TRY
     projektOrdner = ziel
     baumFuellen()
     dateiOeffnen(PATHJOIN(ziel, "main.dh"))
