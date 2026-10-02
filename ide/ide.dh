@@ -3949,7 +3949,14 @@ FUNCTION klammerPartner(s AS STRING, pos AS INTEGER) AS INTEGER
     END IF
     DIM tiefe AS INTEGER : tiefe = 0
     DIM i AS INTEGER : i = pos
-    WHILE i >= 0 AND i < LEN(s)
+    ' Hoechstens 20000 Zeichen weit: hinter der ] einer Datenzeile mit
+    ' 270000 Zeichen lief die Suche bis zur [ am Zeilenanfang zurueck, 2 s in
+    ' einem Bild (Stresstest 2026-10-02). Weiter weg hebt sie nichts hervor.
+    DIM schritte AS INTEGER : schritte = 0
+    DIM n AS INTEGER : n = LEN(s)
+    WHILE i >= 0 AND i < n
+        schritte = schritte + 1
+        IF schritte > 20000 THEN RETURN -1
         DIM d AS STRING : d = MID$(s, i, 1)
         IF d = c THEN
             tiefe = tiefe + 1
@@ -8097,6 +8104,10 @@ FUNCTION aufrufUmDieMarke(zeile AS STRING, spalte AS INTEGER) AS TUPLE
     ' Erst zaehlen, wie viele Anfuehrungszeichen links von ihr stehen -- eine
     ' ungerade Zahl heisst: die Marke steht in einer Zeichenkette, und dort
     ' ist jede Klammer nur ein Zeichen.
+    ' Jenseits von Spalte 5000 keine Signaturhilfe: das Zaehlen ab dem
+    ' Zeilenanfang kostete in einer Datenzeile mit 270000 Zeichen bei jedem
+    ' Tastendruck Zeit, und so weit rechts tippt niemand einen Aufruf.
+    IF spalte > 5000 THEN RETURN ("", 0, 0)
     DIM q AS INTEGER : q = 0
     DIM k AS INTEGER
     FOR k = 0 TO spalte - 2

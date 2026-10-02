@@ -11941,6 +11941,19 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
     }
 
+    /// Groesse und Font, mit denen `wtext_width` dieses Widget misst -- aber
+    /// nur, wenn der Font fest ist (geladen, ohne Stil): dann laesst sich eine
+    /// Zeile stueckweise vermessen (`Graphics::text_breite_fest`).
+    fn wtext_fest(&self, g: &Graphics, w: &Widget) -> Option<(i32, i64)> {
+        if w.stil != 0 { return None; }
+        let (size, font) = if w.font == -1 && w.font_size == 0 && self.scale == 1.0 {
+            (g.text_height(), g.active_font())
+        } else {
+            (self.wsize(g, w), self.wfont(g, w))
+        };
+        if font < 0 { None } else { Some((size, font)) }
+    }
+
     /// Schrift, mit der DIESES Widget zeichnet.
     ///
     /// Ohne eigene Schrift gilt die global gesetzte -- NICHT die eingebaute
@@ -19396,7 +19409,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                             self.wtext(g, wdg, tx0, y, zeile.clone(), fg);
                             self.wtext_width(g, wdg, &zeile)
                         } else {
-                            self.zeile_bunt(g, wdg, tx0, y, &zeile, rs, fg);
+                            self.zeile_bunt(g, wdg, tx0, y, &zeile, rs, fg, ax + 2 + gutter, ax + w - 2);
                             self.wtext_width(g, wdg, &zeile)
                         };
                         // Zugeklappt: hinter der Kopfzeile steht, wie viele
@@ -19594,7 +19607,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                             let zeile: String = chars[rs..re.max(rs)].iter().collect();
                             g.push_clip(ax + 2 + gutter, y0, (w - 4 - gutter).max(0), (y + lh - y0).max(0));
                             if wdg.spans.is_empty() { self.wtext(g, wdg, tx0, y, zeile, fg); }
-                            else { self.zeile_bunt(g, wdg, tx0, y, &zeile, rs, fg); }
+                            else { self.zeile_bunt(g, wdg, tx0, y, &zeile, rs, fg, ax + 2 + gutter, ax + w - 2); }
                             g.pop_clip();
                         }
                         let yb = ay + pad + koepfe.len() as i32 * lh - 1;
@@ -20189,7 +20202,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// `zeilen_start` ist der Zeichen-Index des Zeilenanfangs im GESAMTEN
     /// Text; die Abschnitte zaehlen von dort.
     fn zeile_bunt(&self, g: &mut Graphics, wdg: &Widget, x: i32, y: i32,
-                  zeile: &str, zeilen_start: usize, grund: i64) {
+                  zeile: &str, zeilen_start: usize, grund: i64, links: i32, rechts: i32) {
         let z: Vec<char> = zeile.chars().collect();
         if z.is_empty() { return; }
         let mut farbe = vec![grund; z.len()];
@@ -20221,21 +20234,71 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Abstand, und die Woerter kleben aneinander. Ausserdem rechnen
         // Schreibmarke und Auswahl schon ueber den Vorspann -- zwei
         // Konventionen im selben Feld liefen unweigerlich auseinander.
-        let mut lauf = 0usize;
-        while lauf < z.len() {
+        //
+        // Gemessen wird nur, was SICHTBAR ist (`links`..`rechts`): jeder Lauf
+        // misst seinen ganzen Vorspann, und ueber alle Laeufe einer langen
+        // Zeile war das quadratisch -- eine Zeile mit 11000 Zeichen kostete
+        // 850 ms je Bild, eine mit 270000 haengte die IDE (Stresstest
+        // 2026-10-02). Der erste sichtbare Lauf kommt per Binaersuche ueber
+        // die Laufanfaenge, gezeichnet wird bis zum rechten Rand.
+        let mut anfaenge: Vec<usize> = Vec::new();
+        let mut a = 0usize;
+        while a < z.len() {
+            anfaenge.push(a);
+            let (c, st) = (farbe[a], stil(a));
+            let mut b = a + 1;
+            while b < z.len() && farbe[b] == c && stil(b) == st { b += 1; }
+            a = b;
+        }
+        // Mit festem Font: einmal von links, Stueck fuer Stueck aufaddiert
+        // (additiv, siehe text_breite_fest) -- eine Zeile mit 270000 Zeichen
+        // kostete sonst je sichtbarem Lauf den ganzen Vorspann.
+        if let (Some((sz, font)), false) = (self.wtext_fest(g, wdg), geformt) {
+            let abstand = g.zeichenabstand() as f64;
+            let mut summe = 0f64;
+            for k in 0..anfaenge.len() {
+                let lauf = anfaenge[k];
+                let bis = anfaenge.get(k + 1).copied().unwrap_or(z.len());
+                let stueck: String = z[lauf..bis].iter().collect();
+                let breite = g.text_breite_fest(&stueck, sz, font).unwrap_or(0.0) as f64;
+                // Vorspann = Breite der Laeufe davor + Abstand ZWISCHEN ihnen
+                // (k - 1 Mal) -- genau wie wtext_width(z[..lauf]) es misst.
+                let px = if k == 0 { x } else { x + summe as i32 };
+                if px > rechts { break; }
+                if px + breite as i32 + 1 >= links { self.wtext(g, wdg, px, y, stueck, farbe[lauf]); }
+                summe = if k == 0 { breite } else { summe + abstand + breite };
+            }
+            return;
+        }
+        let px_bei = |g: &Graphics, k: usize| -> i32 {
+            if k == 0 { return x; }
+            let vorspann: String = z[..k].iter().collect();
+            x + self.wtext_width(g, wdg, &vorspann)
+        };
+        // Erster Lauf, dessen ENDE rechts von `links` liegt.
+        let mut erster = 0usize;
+        if x < links {
+            let (mut lo, mut hi) = (0usize, anfaenge.len());
+            while lo < hi {
+                let mitte = (lo + hi) / 2;
+                let ende = anfaenge.get(mitte + 1).copied().unwrap_or(z.len());
+                if px_bei(g, ende) <= links { lo = mitte + 1; } else { hi = mitte; }
+            }
+            erster = lo;
+        }
+        for k in erster..anfaenge.len() {
+            let lauf = anfaenge[k];
+            let bis = anfaenge.get(k + 1).copied().unwrap_or(z.len());
             let c = farbe[lauf];
             let st = stil(lauf);
-            let mut bis = lauf + 1;
-            while bis < z.len() && farbe[bis] == c && stil(bis) == st { bis += 1; }
-            let vorspann: String = z[..lauf].iter().collect();
-            let px = x + self.wtext_width(g, wdg, &vorspann);
+            let px = px_bei(g, lauf);
+            if px > rechts { break; }
             let stueck: String = z[lauf..bis].iter().collect();
             if st == 0 { self.wtext(g, wdg, px, y, stueck, c); }
             else {
                 let (sz, basis) = (self.wsize(g, wdg), font_wahl(wdg.font, g.active_font()));
                 g.text_nachgebildet(px, y, stueck, c, basis, sz, st);
             }
-            lauf = bis;
         }
     }
 

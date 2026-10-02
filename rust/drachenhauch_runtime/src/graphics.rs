@@ -3720,6 +3720,18 @@ impl Graphics {
         self.breite_mit(font, s, size as f32) as i32
     }
 
+    /// Breite als Kommazahl mit einem FESTEN, geladenen Font. So gemessen ist
+    /// sie additiv -- Breite(a + b) = Breite(a) + Abstand + Breite(b), wie
+    /// raylib misst (Summe der Zeichen, Abstand zwischen ihnen) --, und eine
+    /// lange Zeile laesst sich Stueck fuer Stueck vermessen statt je Stueck
+    /// ihren ganzen Vorspann. `None`, wenn der Font vom Text abhinge
+    /// (eingebaute Schrift: Ausweich bei Umlauten) oder ein Stil anders misst.
+    pub fn text_breite_fest(&self, s: &str, size: i32, font: i64) -> Option<f32> {
+        if font < 0 || self.text_stil & crate::schnitt::SCHNITT != 0 { return None; }
+        Some(self.breite_mit(font, s, size.max(1) as f32))
+    }
+    pub fn zeichenabstand(&self) -> f32 { self.text_spacing }
+
     pub fn text_width_at(&self, s: &str, size: i32) -> i32 {
         let size = size.max(1);
         self.breite_mit(self.font_fuer(s), s, size as f32) as i32
