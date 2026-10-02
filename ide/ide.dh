@@ -3568,6 +3568,7 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     ' Zeile im Diff ("no newline at end of file"). Bis Stand 3 war das so.
     DIM inhalt AS STRING : inhalt = text
     IF inhalt <> "" AND RIGHT$(inhalt, 1) <> NL THEN inhalt = inhalt + NL
+    DIM warDa AS BOOLEAN : warDa = FILEEXISTS(pfad)
     ' Die Platte kann ablehnen (schreibgeschuetzt, Ordner weg, kein Recht).
     ' Ohne TRY beendete das die ganze IDE samt der ungesicherten Arbeit in
     ' ALLEN Reitern. Erst nach dem Schreiben gilt der Reiter als gesichert
@@ -3581,7 +3582,12 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     END TRY
     tabPfade[i] = pfad
     tabGesichert[i] = text
-    zaehlCache = {} : echteWege = {}
+    ' Nur der Eintrag DIESER Datei ist veraltet -- den ganzen Zaehl-Cache zu
+    ' leeren hiess, dass in einem Projekt mit 2000 Dateien jedes Strg+S beim
+    ' naechsten Pruefen alle neu las (0,8 s Stillstand, Stresstest
+    ' 2026-10-02). Eine NEUE Datei aendert die Dateiliste.
+    zaehlVergessen(pfad)
+    IF NOT warDa THEN zaehlDateienAlt = TRUE
     paramCache = {}
     blameCache = {}
     blameMarkeZeile = -1
@@ -3803,6 +3809,9 @@ FUNCTION istText(pfad AS STRING) AS BOOLEAN
 END FUNCTION
 
 SUB baumFuellen()
+    ' Gerufen nach allem, was Dateien anlegt, umbenennt oder loescht -- die
+    ' gemerkte Dateiliste der Aufrufzaehlung gilt dann nicht mehr.
+    zaehlDateienAlt = TRUE
     ' Der Baum holt sich die Namen selbst -- hier steht nur noch, WO er
     ' suchen soll. Ein Wurzelwechsel raeumt Auswahl und offene Aeste weg,
     ' ein Auffrischen laesst beide stehen: sonst verloere man beim Oeffnen
@@ -4484,6 +4493,18 @@ FUNCTION tabMitPfad(pfad AS STRING) AS INTEGER
     ' Reiter mit dem alten Text stehen, und das naechste Sichern machte den
     ' Umbau rueckgaengig.
     IF pfad = "" THEN RETURN -1
+    ' Heisst kein Reiter so (auch nicht in der kurzen 8.3-Form mit ~), kann
+    ' es keiner sein -- das spart die Frage an die Platte fuer jede Datei
+    ' eines grossen Projekts (Aufrufzaehlung).
+    DIM name AS STRING : name = LOWER$(BASENAME(pfad))
+    DIM moeglich AS BOOLEAN : moeglich = FALSE
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabPfade[i] <> "" THEN
+            DIM tn AS STRING : tn = LOWER$(BASENAME(tabPfade[i]))
+            IF tn = name OR INSTR(tn, "~") >= 0 OR INSTR(name, "~") >= 0 THEN moeglich = TRUE
+        END IF
+    NEXT
+    IF NOT moeglich THEN RETURN -1
     DIM e AS STRING : e = echterWeg$(pfad)
     FOR i = 0 TO tabAnzahl - 1
         IF tabPfade[i] <> "" THEN
@@ -4721,40 +4742,82 @@ END SUB
 
 ' --- Suche im Projekt --------------------------------------------------
 ' `zweitens` ist ein zweiter Suchtext (ODER) -- fuer die TODO/FIXME-Liste.
+' Die Suche laeuft in Schritten (SUCH_PRO_BILD Dateien je Bild): ueber
+' 2000 Dateien stand die IDE sonst 0,6 s und mehr in einem Bild, ohne dass
+' man abbrechen konnte (Stresstest 2026-10-02). ESC bricht ab. Eine offene
+' Datei wird aus ihrem Reiter gelesen -- vorher fand die Suche nur, was auf
+' der Platte stand, waehrend "Treffer ersetzen" den Reiter nahm.
+CONST SUCH_PRO_BILD = 100
+DIM suchLauf AS BOOLEAN : suchLauf = FALSE
+DIM suchLaufDateien AS ARRAY OF STRING : suchLaufDateien = []
+DIM suchLaufIndex AS INTEGER : suchLaufIndex = 0
+DIM suchLaufGesucht AS STRING : suchLaufGesucht = ""
+DIM suchLaufZweitens AS STRING : suchLaufZweitens = ""
+DIM suchLaufTreffer AS INTEGER : suchLaufTreffer = 0
+DIM suchLaufInDateien AS INTEGER : suchLaufInDateien = 0
+DIM suchLaufSd AS ARRAY OF STRING : suchLaufSd = []
+DIM suchLaufSz AS ARRAY OF INTEGER : suchLaufSz = []
+
 SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     IF gesucht = "" THEN RETURN
     GUI_LISTBOX_CLEAR(lstProbleme)
-    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
-    DIM sd AS ARRAY OF STRING : sd = []
-    DIM sz AS ARRAY OF INTEGER : sz = []
-    DIM klein AS STRING : klein = LOWER$(gesucht)
-    DIM klein2 AS STRING : klein2 = LOWER$(zweitens)
-    DIM treffer AS INTEGER : treffer = 0
-    DIM inDateien AS INTEGER : inDateien = 0
-    DIM d AS STRING
-    FOR EACH d IN dateien
-        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(projektOrdner, d))
-        DIM vorher AS INTEGER : vorher = treffer
+    suchLaufDateien = projektDateien("*.dh")
+    suchLaufIndex = 0
+    suchLaufGesucht = gesucht
+    suchLaufZweitens = zweitens
+    suchLaufTreffer = 0
+    suchLaufInDateien = 0
+    suchLaufSd = []
+    suchLaufSz = []
+    suchLauf = TRUE
+    problemModus = 1
+    trefferKaestchen(FALSE)
+    suchSchritt()
+END SUB
+
+SUB suchSchritt()
+    IF NOT suchLauf THEN RETURN
+    DIM bis AS INTEGER : bis = MIN(suchLaufIndex + SUCH_PRO_BILD, LEN(suchLaufDateien))
+    DIM k AS INTEGER
+    FOR k = suchLaufIndex TO bis - 1
+        DIM d AS STRING : d = suchLaufDateien[k]
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM zeilen AS ARRAY OF STRING
+        DIM t AS INTEGER : t = tabMitPfad(pfad)
+        IF t >= 0 THEN
+            zeilen = SPLIT$(GUI_TEXT(tabFelder[t]), NL)
+        ELSE
+            zeilen = zeilenLesen(pfad)
+        END IF
+        DIM vorher AS INTEGER : vorher = suchLaufTreffer
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zeilen) - 1
-            IF treffer >= 500 THEN BREAK
-            IF passtSuche(zeilen[i], gesucht) OR (zweitens <> "" AND passtSuche(zeilen[i], zweitens)) THEN
-                ARRAY_PUSH(sd, d)
-                ARRAY_PUSH(sz, i + 1)
+            IF suchLaufTreffer >= 500 THEN BREAK
+            IF passtSuche(zeilen[i], suchLaufGesucht) OR (suchLaufZweitens <> "" AND passtSuche(zeilen[i], suchLaufZweitens)) THEN
+                ARRAY_PUSH(suchLaufSd, d)
+                ARRAY_PUSH(suchLaufSz, i + 1)
                 GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
-                treffer = treffer + 1
+                suchLaufTreffer = suchLaufTreffer + 1
             END IF
         NEXT
-        IF treffer > vorher THEN inDateien = inDateien + 1
+        IF suchLaufTreffer > vorher THEN suchLaufInDateien = suchLaufInDateien + 1
     NEXT
-    sucheDateien = sd
-    sucheZeilen = sz
-    problemModus = 1
+    suchLaufIndex = bis
+    DIM was AS STRING : was = suchLaufGesucht
+    IF suchLaufZweitens <> "" THEN was = suchLaufGesucht + "/" + suchLaufZweitens
+    IF suchLaufIndex < LEN(suchLaufDateien) AND suchLaufTreffer < 500 THEN
+        GUI_SET_TEXT(lblProbleme, tr$("Suche '") + was + "': " + STR$(suchLaufIndex) + " / " + STR$(LEN(suchLaufDateien)) + tr$(" Dateien ... (ESC bricht ab)"))
+        RETURN
+    END IF
+    suchLauf = FALSE
+    sucheDateien = suchLaufSd
+    sucheZeilen = suchLaufSz
     ' Ein einzelner Suchtext laesst sich ersetzen: jeder Treffer bekommt
     ' einen Haken (alle an), der Rechtsklick ersetzt die angehakten.
-    IF zweitens = "" AND treffer > 0 THEN
+    DIM treffer AS INTEGER : treffer = suchLaufTreffer
+    IF suchLaufZweitens = "" AND treffer > 0 THEN
         trefferKaestchen(TRUE)
-        trefferBegriff = gesucht
+        trefferBegriff = suchLaufGesucht
         trefferAnzahl = treffer
         trefferErster = GUI_LISTBOX_ITEM(lstProbleme, 0)
         DIM tk AS INTEGER
@@ -4764,10 +4827,17 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     ELSE
         trefferKaestchen(FALSE)
     END IF
-    DIM was AS STRING : was = gesucht
-    IF zweitens <> "" THEN was = gesucht + "/" + zweitens
-    GUI_SET_TEXT(lblProbleme, tr$("Suche '") + was + "': " + STR$(treffer) + tr$(" Treffer in ") + STR$(inDateien) + tr$(" Dateien -- Umschalt+F7 zeigt wieder die Probleme"))
+    GUI_SET_TEXT(lblProbleme, tr$("Suche '") + was + "': " + STR$(treffer) + tr$(" Treffer in ") + STR$(suchLaufInDateien) + tr$(" Dateien -- Umschalt+F7 zeigt wieder die Probleme"))
     protokoll("suche " + STR$(treffer))
+END SUB
+
+SUB suchAbbrechen()
+    IF NOT suchLauf THEN RETURN
+    suchLauf = FALSE
+    sucheDateien = suchLaufSd
+    sucheZeilen = suchLaufSz
+    GUI_SET_TEXT(lblProbleme, tr$("Suche abgebrochen nach ") + STR$(suchLaufIndex) + " / " + STR$(LEN(suchLaufDateien)) + tr$(" Dateien: ") + STR$(suchLaufTreffer) + tr$(" Treffer"))
+    protokoll("suche abgebrochen " + STR$(suchLaufIndex))
 END SUB
 
 ' --- Aufrufzaehler ------------------------------------------------------
@@ -4784,6 +4854,83 @@ END SUB
 ' offen sind, gemerkt bis zum naechsten Sichern -- sonst laese jede
 ' Pruefung das ganze Projekt neu.
 DIM zaehlCache AS MAP OF STRING
+' Dateizeit je Cache-Eintrag: kommt die IDE wieder nach vorn (Git, ein
+' anderer Editor), prueft zaehlNachsehen stueckweise, was sich auf der
+' Platte geaendert hat.
+DIM zaehlZeit AS MAP OF INTEGER
+DIM zaehlWeg AS MAP OF STRING        ' Schluessel -> Weg, wie er gelesen wurde
+DIM zaehlPruefListe AS ARRAY OF STRING : zaehlPruefListe = []
+' Die Dateiliste fuer die Zaehlung, gemerkt: DIRLIST_REC kostet bei 2000
+' Dateien 130 ms, und gezaehlt wird bei jedem Pruefen. Neu gelesen wird
+' nach Dateioperationen (baumFuellen), beim Sichern einer NEUEN Datei, bei
+' anderem Projektordner oder anderen Haken im Baum und wenn die IDE wieder
+' nach vorn kommt (zaehlNachsehen).
+DIM zaehlDateien AS ARRAY OF STRING : zaehlDateien = []
+DIM zaehlDateienOrdner AS STRING : zaehlDateienOrdner = ""
+DIM zaehlDateienHaken AS INTEGER : zaehlDateienHaken = -1
+DIM zaehlDateienAlt AS BOOLEAN : zaehlDateienAlt = TRUE
+
+SUB zaehlVergessen(pfad AS STRING)
+    DIM schl AS STRING : schl = LOWER$(wegGleich$(pfad))
+    IF MAPHAS(zaehlCache, schl) THEN MAPREMOVE(zaehlCache, schl)
+    IF MAPHAS(zaehlZeit, schl) THEN MAPREMOVE(zaehlZeit, schl)
+    IF MAPHAS(zaehlWeg, schl) THEN MAPREMOVE(zaehlWeg, schl)
+    DIM e AS STRING : e = wegGleich$(pfad)
+    IF MAPHAS(echteWege, e) THEN MAPREMOVE(echteWege, e)
+END SUB
+
+FUNCTION zaehlProjektDateien() AS ARRAY OF STRING
+    DIM haken AS INTEGER : haken = GUI_FILETREE_CHECKED_COUNT(baum)
+    IF zaehlDateienAlt OR zaehlDateienOrdner <> projektOrdner OR zaehlDateienHaken <> haken THEN
+        zaehlDateien = projektDateien("*.dh")
+        zaehlDateienOrdner = projektOrdner
+        zaehlDateienHaken = haken
+        zaehlDateienAlt = FALSE
+    END IF
+    RETURN zaehlDateien
+END FUNCTION
+
+' Wieder nach vorn gekommen: die gemerkten Zaehlungen gegen die Platte
+' pruefen -- 50 je Bild, nicht alle auf einmal (2000 Dateizeiten kosten
+' 250 ms). Eine geaenderte Datei faellt aus dem Cache und wird beim
+' naechsten Pruefen neu gelesen.
+DIM zaehlFokusVorher AS BOOLEAN : zaehlFokusVorher = TRUE
+' Hoechstens so viele Dateien liest die Zaehlung je Bild von der Platte;
+' der Rest kommt im naechsten Bild (zaehlNochmal). Beim ersten Pruefen in
+' einem Projekt mit 2000 Dateien stand die IDE sonst bis zu 2 s.
+CONST ZAEHL_JE_BILD = 60
+DIM zaehlGelesen AS INTEGER : zaehlGelesen = 0
+DIM zaehlGelesenGesamt AS INTEGER : zaehlGelesenGesamt = 0     ' fuer die Pruefsammlung
+DIM zaehlNochmal AS GUI_WIDGET : zaehlNochmal = -1
+SUB zaehlNachsehen()
+    DIM fokus AS BOOLEAN : fokus = WINDOW_FOCUSED()
+    IF fokus AND NOT zaehlFokusVorher THEN
+        zaehlPruefListe = MAPKEYS(zaehlZeit)
+        zaehlDateienAlt = TRUE
+        echteWege = {}
+    END IF
+    zaehlFokusVorher = fokus
+    DIM n AS INTEGER : n = 0
+    WHILE LEN(zaehlPruefListe) > 0 AND n < 50
+        DIM schl AS STRING : schl = zaehlPruefListe[LEN(zaehlPruefListe) - 1]
+        ARRAY_POP(zaehlPruefListe)
+        n = n + 1
+        IF NOT MAPHAS(zaehlZeit, schl) THEN CONTINUE
+        DIM jetzt AS INTEGER : jetzt = -1
+        DIM weg AS STRING : weg = schl
+        IF MAPHAS(zaehlWeg, schl) THEN weg = MAPGET(zaehlWeg, schl)
+        TRY
+            IF FILEEXISTS(weg) THEN jetzt = FILETIME(weg)
+        CATCH e
+            jetzt = -1
+        END TRY
+        IF jetzt <> MAPGET(zaehlZeit, schl) THEN
+            IF MAPHAS(zaehlCache, schl) THEN MAPREMOVE(zaehlCache, schl)
+            MAPREMOVE(zaehlZeit, schl)
+            protokoll("zaehlung veraltet " + BASENAME(weg))
+        END IF
+    WEND
+END SUB
 DIM zaehlFeld AS GUI_WIDGET : zaehlFeld = -1
 DIM zaehlZeilen AS ARRAY OF INTEGER : zaehlZeilen = []
 DIM zaehlNamen AS ARRAY OF STRING : zaehlNamen = []
@@ -4826,8 +4973,18 @@ FUNCTION zaehlungVon$(pfad AS STRING) AS STRING
     CATCH e
         q = ""
     END TRY
+    zaehlGelesen = zaehlGelesen + 1
+    zaehlGelesenGesamt = zaehlGelesenGesamt + 1
     DIM m AS STRING : m = woerterZaehlen$(q)
     MAPPUT(zaehlCache, schl, m)
+    DIM zeit AS INTEGER : zeit = -1
+    TRY
+        IF FILEEXISTS(pfad) THEN zeit = FILETIME(pfad)
+    CATCH e2
+        zeit = -1
+    END TRY
+    MAPPUT(zaehlZeit, schl, zeit)
+    MAPPUT(zaehlWeg, schl, pfad)
     RETURN m
 END FUNCTION
 
@@ -4880,12 +5037,20 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     ' die Datei des aktiven -- ohne das zaehlte die Platte noch einmal mit.
     IF eigen = "" AND ta = taSpiegel AND aktiverTab >= 0 THEN eigen = tabPfade[aktiverTab]
     DIM dateien AS ARRAY OF STRING : dateien = []
-    IF projektOrdner <> "" THEN dateien = projektDateien("*.dh")
+    IF projektOrdner <> "" THEN dateien = zaehlProjektDateien()
     zaehlerAddieren(summe, woerterZaehlen$(quelle))
     DIM d AS STRING
+    zaehlGelesen = 0
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
         IF eigen <> "" AND gleicherWeg(pfad, eigen) THEN CONTINUE
+        ' Genug gelesen fuer dieses Bild: im naechsten weiter (die schon
+        ' gelesenen stehen dann im Cache). Bis dahin bleiben die alten
+        ' Hinweise stehen -- halb gezaehlt hiesse "nicht aufgerufen".
+        IF zaehlGelesen >= ZAEHL_JE_BILD THEN
+            zaehlNochmal = ta
+            RETURN
+        END IF
         zaehlerAddieren(summe, zaehlungVon$(pfad))
     NEXT
     DIM texte AS ARRAY OF STRING : texte = []
@@ -5283,7 +5448,7 @@ SUB qvVerwerfen(pfad AS STRING)
         feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), neu)
         tabGesichert[t] = GUI_TEXT(tabFelder[t])
     END IF
-    zaehlCache = {} : echteWege = {}
+    zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
     qvAuffrischen()
     GUI_SET_TEXT(lblQvStatus, tr$("Verworfen: ") + pfad)
     protokoll("qv verworfen " + pfad)
@@ -5434,7 +5599,7 @@ SUB qvReiterNachziehen()
             tabGesichert[t] = GUI_TEXT(tabFelder[t])
         END IF
     NEXT
-    zaehlCache = {} : echteWege = {}
+    zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
     blameCache = {}
     baumFuellen()
 END SUB
@@ -10729,12 +10894,9 @@ SUB laufSchritt()
     DIM i AS INTEGER
     FOR i = laufIndex TO bis - 1
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, laufDateien[i])
-        DIM alt AS STRING : alt = ""
-        TRY
-            alt = JOIN$(READLINES(pfad), NL)
-        CATCH e
-            alt = ""
-        END TRY
+        ' Ueber zeilenLesen: eine Datei in cp1252 fiel mit READLINES still
+        ' heraus -- ein Umbenennen ueber das Projekt liess sie unbemerkt aus.
+        DIM alt AS STRING : alt = dateiLesen(pfad)
         IF alt = "" THEN CONTINUE
         DIM frisch AS STRING : frisch = alt
         IF laufArt = "parameter" THEN
@@ -17604,6 +17766,15 @@ WHILE NOT beenden
     END IF
 
     abgelegteNachziehen()
+    IF suchLauf THEN
+        IF KEYHIT(KEY_ESCAPE) THEN suchAbbrechen() ELSE suchSchritt()
+    END IF
+    zaehlNachsehen()
+    IF zaehlNochmal >= 0 THEN
+        DIM zn AS GUI_WIDGET : zn = zaehlNochmal
+        zaehlNochmal = -1
+        zaehlerSetzen_(zn)
+    END IF
     kontextNachziehen()
     IF strgVBilder > 0 THEN strgVBilder = strgVBilder - 1
     IF KEYHIT(KEY_V) AND (KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)) THEN strgVBilder = 3

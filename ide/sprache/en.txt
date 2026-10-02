@@ -888,3 +888,7 @@ Lässt sich nicht lesen: 	Cannot be read:
 Kein UTF-8, als 	Not UTF-8, read as 
  gelesen -- Sichern schreibt UTF-8: 	 -- saving writes UTF-8: 
  Nicht geschrieben: 	 Not written: 
+Suche abgebrochen nach 	Search cancelled after 
+ Dateien: 	 files: 
+ Dateien ... (ESC bricht ab)	 files ... (Esc cancels)
+ Treffer	 matches

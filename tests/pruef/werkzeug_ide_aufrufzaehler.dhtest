@@ -151,3 +151,72 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 pr rechnen: 1 Aufruf
+
+=== ein projekt mit 2000 dateien zaehlt stueckweise und haelt beim sichern still
+' Stresstest 2026-10-02: in einem Projekt mit 2000 Dateien stand die IDE
+' beim ersten Pruefen bis zu 2,3 s (alle Dateien in einem Bild gelesen), und
+' jedes Sichern leerte den Zaehl-Cache -- beim naechsten Tippen 0,8 s
+' Stillstand. Jetzt liest die Zaehlung hoechstens 60 Dateien je Bild, das
+' Sichern wirft nur den eigenen Eintrag weg, und eine Aenderung von aussen
+' findet zaehlNachsehen, wenn die IDE wieder nach vorn kommt (hier
+' nachgestellt ueber zaehlFokusVorher). Die Grenze von 600 ms ist grob.
+DIM prBild AS INTEGER : prBild = 0
+DIM prMax AS FLOAT : prMax = 0.0
+DIM prLetzt AS FLOAT : prLetzt = 0.0
+DIM prGelesen AS INTEGER : prGelesen = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+DIM prJ AS FLOAT : prJ = GET_TIME()
+IF prBild > 2 AND prJ - prLetzt > prMax THEN prMax = prJ - prLetzt
+prLetzt = prJ
+IF prBild = 160 THEN
+    protokoll("pr erst " + zaehlTexte[0] + " flott " + STR$(prMax < 0.6))
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 4, 1)
+    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' x" + NL)
+    sichern(aktiverTab, FALSE)
+    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' y" + NL)
+    prMax = 0.0
+    prGelesen = zaehlGelesenGesamt
+END IF
+IF prBild = 260 THEN
+    protokoll("pr nach sichern " + zaehlTexte[0] + " flott " + STR$(prMax < 0.6) + " neu gelesen " + STR$(zaehlGelesenGesamt - prGelesen))
+    ' von aussen: ein weiterer Aufruf in einer Datei, die nicht offen ist
+    WRITEALL(PATHJOIN(projektOrdner, "teil0/m1.dh"), "gruss()" + NL + "gruss()" + NL)
+    zaehlFokusVorher = FALSE
+END IF
+IF prBild = 300 THEN GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' z" + NL)
+IF prBild = 400 THEN
+    protokoll("pr von aussen " + zaehlTexte[0])
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=800
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM d AS INTEGER
+DIM i AS INTEGER
+FOR d = 0 TO 19
+    MKDIR("teil" + STR$(d))
+    FOR i = 0 TO 99
+        DIM t AS STRING : t = "SUB hilfe_" + STR$(d) + "_" + STR$(i) + "()" + CHR$(10) + "    PRINT " + STR$(i) + CHR$(10) + "END SUB" + CHR$(10)
+        IF i = 0 THEN t = t + "gruss()" + CHR$(10)
+        WRITEALL("teil" + STR$(d) + "/m" + STR$(i) + ".dh", t)
+    NEXT
+NEXT
+WRITEALL("haupt.dh", "SUB gruss()" + CHR$(10) + "    PRINT 1" + CHR$(10) + "END SUB" + CHR$(10) + "gruss()" + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 17) = "zaehlung veraltet" THEN PRINT L[i]
+NEXT
+--- erwartet
+pr erst 21 Aufrufe flott TRUE
+pr nach sichern 21 Aufrufe flott TRUE neu gelesen 0
+zaehlung veraltet m1.dh
+pr von aussen 23 Aufrufe
