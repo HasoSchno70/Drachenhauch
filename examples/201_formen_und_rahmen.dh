@@ -1,0 +1,53 @@
+' 201_formen_und_rahmen.dh -- Formen und Rahmen aus raylib: Kreisstueck als
+' Uhr, Verlaufskreis als Schein, gedrehtes Rechteck, Vielecke, gestrichelte
+' Linie, ein 9-Slice-Rahmen, der mitwaechst, und ein Bild, das ueber den
+' Speicher (PNG-Bytes) zurueckkommt.
+
+IMPORT "imgfx"
+
+SCREEN(640, 400, "Formen und Rahmen", 1)
+
+' Vorlage fuer den Rahmen: 30x30, Rand 8 Punkte, Ecken heller.
+DIM rahmen AS IMAGE : rahmen = IMAGE_NEW(30, 30, RGB(70, 90, 140))
+IMAGE_FILL_RECT(rahmen, 8, 8, 21, 21, RGB(24, 28, 44))
+IMAGE_FILL_RECT(rahmen, 0, 0, 7, 7, RGB(120, 150, 210))
+IMAGE_FILL_RECT(rahmen, 22, 0, 29, 7, RGB(120, 150, 210))
+IMAGE_FILL_RECT(rahmen, 0, 22, 7, 29, RGB(120, 150, 210))
+IMAGE_FILL_RECT(rahmen, 22, 22, 29, 29, RGB(120, 150, 210))
+
+' Dasselbe Bild als PNG-Bytes und zurueck -- so kaeme es auch aus einer
+' Datenbank oder von HTTP_BYTES().
+DIM png AS BUFFER : png = IMAGE_TO_BUFFER(rahmen)
+DIM kopie AS IMAGE : kopie = IMAGE_FROM_BUFFER(png)
+
+DIM t AS FLOAT : t = 0.0
+WHILE NOT QUITREQUESTED()
+    t = t + DELTA()
+    GRADIENT4(0, 0, 639, 399, RGB(30, 20, 60), RGB(20, 50, 70), RGB(10, 20, 30), RGB(40, 20, 40))
+
+    ' Eine Uhr: das Kreisstueck waechst jede Sekunde um 6 Grad.
+    DIM sek AS FLOAT : sek = t - INT(t / 60.0) * 60.0
+    CIRCLE(100, 100, 62, RGB(20, 24, 36))
+    PIE(100, 100, 60, -90, -90 + sek * 6.0, RGB(240, 170, 50))
+    PIEOUTLINE(100, 100, 60, -90, 270, RGB(200, 200, 220))
+
+    ' Ein Schein, der pulsiert.
+    DIM r AS INTEGER : r = 50 + INT(12.0 * SIN(t * 3.0))
+    CIRCLE_GRADIENT(250, 100, r, RGB(255, 250, 220), RGBA(255, 160, 40, 1))
+
+    ' Gedrehtes Rechteck und Vielecke, die sich drehen.
+    BOXROT(400, 100, 110, 36, t * 60.0, RGB(80, 200, 140))
+    NGON(540, 100, 6, 45, t * 40.0, RGB(170, 90, 220))
+    NGONOUTLINE(540, 100, 3, 60, -t * 25.0, WHITE, 3)
+
+    ' Ein gestrichelter Weg.
+    LINEDASHED(40, 200, 600, 200, 12, 8, RGB(200, 200, 220))
+
+    ' Der Rahmen waechst und schrumpft -- Ecken und Raender bleiben scharf.
+    DIM b AS INTEGER : b = 260 + INT(160.0 * (0.5 + 0.5 * SIN(t)))
+    DIM h AS INTEGER : h = 110 + INT(40.0 * (0.5 + 0.5 * COS(t * 1.3)))
+    DRAWIMAGE9(kopie, 320 - b \ 2, 300 - h \ 2, b, h, 8, 8, 8, 8)
+    TEXT(320 - b \ 2 + 20, 300 - h \ 2 + 18, "9-Slice: " + STR$(b) + " x " + STR$(h), WHITE)
+    TEXT(320 - b \ 2 + 20, 300 - h \ 2 + 42, STR$(BUFFER_LEN(png)) + " Bytes PNG", RGB(160, 180, 220))
+    FLIP()
+WEND
