@@ -5063,12 +5063,10 @@ END SUB
 
 SUB testVerteilen(text AS STRING)
     IF text = "" THEN RETURN
-    testRest = testRest + text
-    WHILE INSTR(testRest, NL) >= 0
-        DIM p AS INTEGER : p = INSTR(testRest, NL)
-        testZeile(REPLACE$(LEFT$(testRest, p), CHR$(13), ""))
-        testRest = MID$(testRest, p + 1)
-    WEND
+    DIM z AS STRING
+    FOR EACH z IN zeilenAbtrennen(testRest, text)
+        testZeile(z)
+    NEXT
 END SUB
 
 SUB testNachsehen()
@@ -12009,6 +12007,7 @@ SUB exportNachsehen()
 END SUB
 
 ' --- Ausfuehren --------------------------------------------------------
+CONST AUSGABE_MAX = 2000
 SUB ausgabe(zeile AS STRING)
     GUI_LISTBOX_ADD(lstAusgabe, zeile)
     ' Zeilen mit einer Stelle sind anklickbar -- das sieht man an der Farbe.
@@ -12023,22 +12022,37 @@ SUB ausgabe(zeile AS STRING)
             GUI_LISTBOX_COLOR(lstAusgabe, GUI_LISTBOX_COUNT(lstAusgabe) - 1, farbe)
         END IF
     END IF
-    IF GUI_LISTBOX_COUNT(lstAusgabe) > 2000 THEN GUI_LISTBOX_REMOVE(lstAusgabe, 0)
+    IF GUI_LISTBOX_COUNT(lstAusgabe) > AUSGABE_MAX THEN GUI_LISTBOX_REMOVE(lstAusgabe, 0)
     GUI_LISTBOX_SET_SELECTED(lstAusgabe, GUI_LISTBOX_COUNT(lstAusgabe) - 1)
 END SUB
 
 DIM ausgabeRest AS STRING : ausgabeRest = ""
 
+' Die vollstaendigen Zeilen aus Rest + neuem Text; was hinter dem letzten
+' Umbruch steht, bleibt als Rest. EINMAL zerlegt -- vorher kopierte MID$
+' fuer jede Zeile den ganzen Rest, und 200000 Zeilen Ausgabe hielten die IDE
+' 29 Sekunden in einem Bild fest (das Programm allein brauchte 1,3 s).
+FUNCTION zeilenAbtrennen(BYREF rest AS STRING, text AS STRING) AS ARRAY OF STRING
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(REPLACE$(rest + text, CHR$(13), ""), NL)
+    rest = teile[LEN(teile) - 1]
+    ARRAY_POP(teile)
+    RETURN teile
+END FUNCTION
+
 SUB ausgabeVerteilen(text AS STRING)
     IF text = "" THEN RETURN
-    ausgabeRest = ausgabeRest + text
-    WHILE INSTR(ausgabeRest, NL) >= 0
-        DIM p AS INTEGER : p = INSTR(ausgabeRest, NL)
-        DIM z AS STRING : z = LEFT$(ausgabeRest, p)
-        z = REPLACE$(z, CHR$(13), "")
-        ausgabe(z)
-        ausgabeRest = MID$(ausgabeRest, p + 1)
-    WEND
+    DIM zeilen AS ARRAY OF STRING : zeilen = zeilenAbtrennen(ausgabeRest, text)
+    ' Mehr Zeilen, als die Liste behaelt: nur die letzten -- die davor
+    ' fielen beim Einsetzen gleich wieder heraus.
+    DIM ab AS INTEGER : ab = 0
+    IF LEN(zeilen) >= AUSGABE_MAX THEN
+        GUI_LISTBOX_CLEAR(lstAusgabe)
+        ab = LEN(zeilen) - AUSGABE_MAX
+    END IF
+    DIM i AS INTEGER
+    FOR i = ab TO LEN(zeilen) - 1
+        ausgabe(zeilen[i])
+    NEXT
 END SUB
 
 ' Ein Programm starten -- als Lauf, im Debugger oder unter dem Profiler.
@@ -14196,11 +14210,8 @@ END SUB
 SUB stdoutVerteilen(text AS STRING)
     IF text = "" THEN RETURN
     IF prozessArt = "run" THEN ausgabeVerteilen(text) : RETURN
-    prozessRest = prozessRest + text
-    WHILE INSTR(prozessRest, NL) >= 0
-        DIM p AS INTEGER : p = INSTR(prozessRest, NL)
-        DIM z AS STRING : z = REPLACE$(LEFT$(prozessRest, p), CHR$(13), "")
-        prozessRest = MID$(prozessRest, p + 1)
+    DIM z AS STRING
+    FOR EACH z IN zeilenAbtrennen(prozessRest, text)
         IF prozessArt = "debug" THEN
             debugEreignis(z)
         ELSEIF LEFT$(z, 1) = "{" AND INSTR(z, CHR$(34) + "total_time" + CHR$(34)) >= 0 THEN
@@ -14210,7 +14221,7 @@ SUB stdoutVerteilen(text AS STRING)
         ELSE
             ausgabe(z)
         END IF
-    WEND
+    NEXT
 END SUB
 
 SUB prozessNachsehen()
@@ -15772,7 +15783,7 @@ END SUB
 SUB terminalZeile(z AS STRING, farbe AS INTEGER)
     GUI_LISTBOX_ADD(lstTerminal, z)
     IF farbe <> -1 THEN GUI_LISTBOX_COLOR(lstTerminal, GUI_LISTBOX_COUNT(lstTerminal) - 1, farbe)
-    IF GUI_LISTBOX_COUNT(lstTerminal) > 3000 THEN GUI_LISTBOX_REMOVE(lstTerminal, 0)
+    IF GUI_LISTBOX_COUNT(lstTerminal) > TERMINAL_MAX THEN GUI_LISTBOX_REMOVE(lstTerminal, 0)
     GUI_LISTBOX_SET_SELECTED(lstTerminal, GUI_LISTBOX_COUNT(lstTerminal) - 1)
     protokoll("terminal zeile " + z)
 END SUB
@@ -15868,25 +15879,32 @@ SUB terminalStarten(b AS STRING)
 END SUB
 
 ' Zeilen verteilen: die Marke setzt den Ort, alles andere kommt in die Liste.
+' Einmal zerlegt (zeilenAbtrennen) -- je Zeile den Rest zu kopieren hielt
+' die IDE bei 200000 Zeilen 25 Sekunden in einem Bild fest. Mehr Zeilen,
+' als die Liste behaelt: nur die letzten; die Marke mit dem Ordner wird
+' trotzdem gelesen, sie steht ohnehin am Ende.
+CONST TERMINAL_MAX = 3000
 SUB termVerteilen(text AS STRING, fehler AS BOOLEAN, ende AS BOOLEAN)
-    DIM rest AS STRING : rest = IIF(fehler, termFehlRest, termRest) + text
-    WHILE INSTR(rest, NL) >= 0 OR (ende AND rest <> "")
-        DIM p AS INTEGER : p = INSTR(rest, NL)
-        DIM z AS STRING
-        IF p >= 0 THEN
-            z = LEFT$(rest, p)
-            rest = MID$(rest, p + 1)
-        ELSE
-            z = rest
-            rest = ""
-        END IF
-        z = REPLACE$(z, CHR$(13), "")
+    DIM rest AS STRING : rest = IIF(fehler, termFehlRest, termRest)
+    DIM zeilen AS ARRAY OF STRING : zeilen = zeilenAbtrennen(rest, text)
+    IF ende AND rest <> "" THEN
+        ARRAY_PUSH(zeilen, rest)
+        rest = ""
+    END IF
+    DIM ab AS INTEGER : ab = 0
+    IF LEN(zeilen) > TERMINAL_MAX THEN
+        GUI_LISTBOX_CLEAR(lstTerminal)
+        ab = LEN(zeilen) - TERMINAL_MAX
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
         IF LEFT$(z, LEN(TERM_MARKE)) = TERM_MARKE THEN
             termOrt = TRIM$(MID$(z, LEN(TERM_MARKE)))
-        ELSE
+        ELSEIF i >= ab THEN
             terminalZeile(z, IIF(fehler, F_ZAHL, -1))
         END IF
-    WEND
+    NEXT
     IF fehler THEN termFehlRest = rest ELSE termRest = rest
 END SUB
 

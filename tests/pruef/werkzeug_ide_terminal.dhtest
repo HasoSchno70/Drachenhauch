@@ -179,3 +179,48 @@ NEXT
 terminal zeile datei a.txt
 terminal zeile name a
 terminal zeile Windows_NT
+
+=== viel ausgabe im terminal haelt die ide nicht fest
+' Stresstest 2026-10-02: 200000 Zeilen Ausgabe eines Befehls hielten die
+' IDE 25 Sekunden in einem Bild fest -- termVerteilen kopierte je Zeile den
+' ganzen Rest. Jetzt einmal zerlegt, nur die letzten 3000 Zeilen in die
+' Liste. Ohne Protokoll (DH_IDE_LOG schriebe jede Zeile in eine Datei und
+' verfaelschte die Zeit); das Ergebnis geht ueber PRINT hinaus.
+DIM prBild AS INTEGER : prBild = 0
+DIM prMax AS FLOAT : prMax = 0.0
+DIM prLetzt AS FLOAT : prLetzt = 0.0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN befehl("terminal")
+IF prBild = 30 THEN
+    GUI_SET_TEXT(tfEingabe, CHR$(34) + EXEPATH$() + CHR$(34) + " run viel.dh")
+    eingabeSenden()
+    prLetzt = GET_TIME()
+END IF
+IF prBild > 30 THEN
+    DIM prJ AS FLOAT : prJ = GET_TIME()
+    IF prJ - prLetzt > prMax THEN prMax = prJ - prLetzt
+    prLetzt = prJ
+    IF termProz < 0 AND prBild > 35 THEN
+        DIM prN AS INTEGER : prN = GUI_LISTBOX_COUNT(lstTerminal)
+        PRINT "zeilen "; prN
+        PRINT "letzte "; GUI_LISTBOX_ITEM(lstTerminal, prN - 1)
+        PRINT "flott "; prMax < 5.0
+        EXIT(0)
+    END IF
+END IF
+--- system windows
+--- umgebung
+DHRT_FRAMES=6000
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei viel.dh
+DIM i AS INTEGER
+FOR i = 1 TO 200000
+    PRINT "Zeile "; i; " mit etwas Text dahinter"
+NEXT
+--- erwartet
+zeilen 3000
+letzte Zeile 200000 mit etwas Text dahinter
+flott TRUE
