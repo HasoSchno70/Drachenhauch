@@ -145,6 +145,9 @@ enum Cmd {
     /// raylib zeichnet die Ecken dort in Quellpixeln, sie passten dann weder
     /// zur SCREEN-Skala noch zum Zoom.
     NinePatch(usize, [i32; 4], [i32; 4], [i32; 4], Color),
+    /// Kurven aus raylibs Spline-Familie: Art (0 B-Spline, 1 Bezier
+    /// quadratisch, 2 Bezier kubisch), Punkte, Strichbreite, Farbe.
+    Kurve(u8, Vec<(i32, i32)>, f32, Color),
     BlendMode(i32),                                    // 0=alpha,1=additive,2=multiplied,4=subtract
     RtDraw(usize, i32, i32, f32, Color, bool),         // render-target idx, x, y, scale, tint, flip_v
     /// Ein Ausschnitt eines Render-Targets, vergroessert gestempelt (GUI_WINDOW_ZOOM):
@@ -180,6 +183,23 @@ enum Cmd3D {
     ModelInstanced(usize, Rc<Vec<[f32; 16]>>, Color),
     // Billboard: Textur (Index), die immer zur Kamera zeigt. idx, x,y,z, size, tint
     Billboard(usize, f32, f32, f32, f32, Color),
+    /// Kapsel zwischen zwei Punkten: Anfang, Ende, Radius, Farbe, nur Kanten.
+    Capsule([f32; 6], f32, Color, bool),
+    /// Zylinder (Kegel) zwischen zwei Punkten: Anfang, Ende, Radien, Farbe.
+    CylinderEx([f32; 6], f32, f32, Color),
+    /// Zylinder als Kanten, wie Cylinder.
+    CylinderWires(f32, f32, f32, f32, f32, f32, Color),
+    /// Freies Dreieck, von beiden Seiten sichtbar.
+    Triangle3D([f32; 9], Color),
+    /// Kreislinie flach auf dem Boden (Ebene y = konstant): Mitte, Radius.
+    Circle3D(f32, f32, f32, f32, Color),
+    /// Quader als Kanten zwischen zwei Ecken (min, max).
+    BBox([f32; 6], Color),
+    /// Billboard aus einem Ausschnitt (Sprite-Blatt): idx, Quelle, Mitte,
+    /// Hoehe (die Breite folgt dem Seitenverhaeltnis der Quelle), Toenung.
+    BillboardPart(usize, [f32; 4], f32, f32, f32, f32, Color),
+    /// Billboard mit Breite, Hoehe und Drehung um seine Mitte.
+    BillboardEx(usize, f32, f32, f32, f32, f32, f32, Color),
 }
 
 struct Layer {
@@ -2491,6 +2511,64 @@ impl Graphics {
         Ok(())
     }
 
+    /// CAPSULE / CAPSULE_WIRES: Kapsel zwischen zwei Punkten.
+    pub fn capsule(&mut self, p: [f32; 6], r: f32, col_: i64, wires: bool) {
+        self.emit3d(Cmd3D::Capsule(p, r, col(col_), wires));
+    }
+    /// CYLINDER_EX: Zylinder (oder Kegel) von Punkt zu Punkt.
+    pub fn cylinder_ex(&mut self, p: [f32; 6], r1: f32, r2: f32, col_: i64) {
+        self.emit3d(Cmd3D::CylinderEx(p, r1, r2, col(col_)));
+    }
+    /// CYLINDER_WIRES: wie CYLINDER, nur die Kanten.
+    #[allow(clippy::too_many_arguments)]
+    pub fn cylinder_wires(&mut self, x: f32, y: f32, z: f32, rt: f32, rb: f32, h: f32, col_: i64) {
+        self.emit3d(Cmd3D::CylinderWires(x, y, z, rt, rb, h, col(col_)));
+    }
+    /// TRIANGLE3D: ein freies Dreieck im Raum.
+    pub fn triangle3d(&mut self, p: [f32; 9], col_: i64) {
+        self.emit3d(Cmd3D::Triangle3D(p, col(col_)));
+    }
+    /// CIRCLE3D: Kreislinie flach auf dem Boden.
+    pub fn circle3d(&mut self, x: f32, y: f32, z: f32, r: f32, col_: i64) {
+        self.emit3d(Cmd3D::Circle3D(x, y, z, r, col(col_)));
+    }
+    /// BBOX_WIRES: Quader als Kanten zwischen zwei Ecken; die Reihenfolge der
+    /// Ecken ist egal.
+    pub fn bbox_wires(&mut self, p: [f32; 6], col_: i64) {
+        let q = [p[0].min(p[3]), p[1].min(p[4]), p[2].min(p[5]),
+                 p[0].max(p[3]), p[1].max(p[4]), p[2].max(p[5])];
+        self.emit3d(Cmd3D::BBox(q, col(col_)));
+    }
+    /// MODEL_BBOX: der Huellquader eines Modells in seinen eigenen
+    /// Koordinaten (ohne Lage und Skalierung beim Zeichnen).
+    pub fn model_bbox(&self, idx: i64) -> Result<[f32; 6], String> {
+        use raylib::core::models::RaylibModel;
+        let i = self.check_model(idx, "MODEL_BBOX")?;
+        let b = self.models[i].get_model_bounding_box();
+        Ok([b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z])
+    }
+    /// BILLBOARD_PART: ein Ausschnitt eines Bildes (Einzelbild eines
+    /// Sprite-Blatts) als Billboard.
+    #[allow(clippy::too_many_arguments)]
+    pub fn billboard_part(&mut self, tex_idx: i64, quelle: [f32; 4], x: f32, y: f32, z: f32,
+                          groesse: f32, col_: i64) -> Result<(), String> {
+        if !self.tex_ok(tex_idx) { return Err(self.tex_fehler(tex_idx, "BILLBOARD_PART")); }
+        if quelle[2] <= 0.0 || quelle[3] <= 0.0 {
+            return Err("BILLBOARD_PART: Breite und Hoehe des Ausschnitts muessen groesser als 0 sein".into());
+        }
+        self.emit3d(Cmd3D::BillboardPart(tex_idx as usize, quelle, x, y, z, groesse, col(col_)));
+        Ok(())
+    }
+    /// BILLBOARD_EX: Billboard mit eigener Breite und Hoehe, um seine Mitte
+    /// gedreht (Grad).
+    #[allow(clippy::too_many_arguments)]
+    pub fn billboard_ex(&mut self, tex_idx: i64, x: f32, y: f32, z: f32, w: f32, h: f32,
+                        winkel: f32, col_: i64) -> Result<(), String> {
+        if !self.tex_ok(tex_idx) { return Err(self.tex_fehler(tex_idx, "BILLBOARD_EX")); }
+        self.emit3d(Cmd3D::BillboardEx(tex_idx as usize, x, y, z, w, h, winkel, col(col_)));
+        Ok(())
+    }
+
     /// Billboard: eine Textur (LOADIMAGE-Handle), die im 3D-Raum immer zur
     /// Kamera zeigt -- ideal fuer Baeume/Sprites/Funken in 3D.
     pub fn billboard(&mut self, tex_idx: i64, x: f32, y: f32, z: f32, size: f32, col_: i64) -> Result<(), String> {
@@ -3250,6 +3328,15 @@ impl Graphics {
         let (cx, cy) = self.w2s(cx, cy);
         let (ri, ro) = (self.ssize(r_in), self.ssize(r_out));
         self.emit(Cmd::Ring(cx, cy, ri as f32, ro as f32, von as f32, bis as f32, col(c), filled));
+    }
+
+    /// BEZIER / BEZIER3 / SPLINE_BASIS / SPLINE_BEZIER: Kurve aus Punkten.
+    /// Art 0 B-Spline (weich, laeuft NICHT durch die Punkte), 1 Bezier
+    /// quadratisch (Anfang, Kontrolle, Ende, ...), 2 kubisch (Anfang, zwei
+    /// Kontrollpunkte, Ende, ...). Die Zahl der Punkte prueft der Aufrufer.
+    pub fn kurve(&mut self, art: u8, xs: &[i32], ys: &[i32], w: f64, c: i64) {
+        let pts: Vec<(i32, i32)> = xs.iter().zip(ys).map(|(&x, &y)| self.w2s(x, y)).collect();
+        self.emit(Cmd::Kurve(art, pts, (w * self.cam_zoom).max(1.0) as f32, col(c)));
     }
 
     /// CIRCLE_GRADIENT: Kreis mit Verlauf von der Mitte zum Rand.
@@ -6783,6 +6870,47 @@ fn render_scene<D: RaylibDraw>(
                                 d3.draw_billboard(cam3d, &t.tex, Vector3::new(*x, *y, *z), *size, *col);
                             }
                         }
+                        Cmd3D::Capsule(p, r, col, wires) => {
+                            let (a, b) = (Vector3::new(p[0], p[1], p[2]), Vector3::new(p[3], p[4], p[5]));
+                            if *wires { d3.draw_capsule_wires(a, b, *r, 16, 8, *col); }
+                            else { d3.draw_capsule(a, b, *r, 16, 8, *col); }
+                        }
+                        Cmd3D::CylinderEx(p, r1, r2, col) =>
+                            d3.draw_cylinder_ex(Vector3::new(p[0], p[1], p[2]), Vector3::new(p[3], p[4], p[5]),
+                                                *r1, *r2, 16, *col),
+                        Cmd3D::CylinderWires(x, y, z, rt, rb, h, col) =>
+                            d3.draw_cylinder_wires(Vector3::new(*x, *y, *z), *rt, *rb, *h, 16, *col),
+                        Cmd3D::Triangle3D(p, col) => {
+                            let (a, b, c) = (Vector3::new(p[0], p[1], p[2]), Vector3::new(p[3], p[4], p[5]),
+                                             Vector3::new(p[6], p[7], p[8]));
+                            // Beide Umlaufrichtungen: raylib verwirft Rueckseiten, ein
+                            // Dreieck waere sonst nur von einer Seite zu sehen.
+                            d3.draw_triangle3D(a, b, c, *col);
+                            d3.draw_triangle3D(a, c, b, *col);
+                        }
+                        Cmd3D::Circle3D(x, y, z, r, col) =>
+                            // raylibs Kreis liegt in der x-y-Ebene; um x gedreht liegt er flach.
+                            d3.draw_circle3D(Vector3::new(*x, *y, *z), *r, Vector3::new(1.0, 0.0, 0.0), 90.0, *col),
+                        Cmd3D::BBox(p, col) =>
+                            d3.draw_bounding_box(raylib::ffi::BoundingBox {
+                                min: Vector3::new(p[0], p[1], p[2]).into(),
+                                max: Vector3::new(p[3], p[4], p[5]).into(),
+                            }, *col),
+                        Cmd3D::BillboardPart(i, q, x, y, z, groesse, col) => {
+                            if let Some(t) = textures.get(*i) {
+                                let w = groesse * q[2] / q[3];
+                                d3.draw_billboard_rec(cam3d, &t.tex, Rectangle::new(q[0], q[1], q[2], q[3]),
+                                                      Vector3::new(*x, *y, *z), Vector2::new(w, *groesse), *col);
+                            }
+                        }
+                        Cmd3D::BillboardEx(i, x, y, z, w, h, winkel, col) => {
+                            if let Some(t) = textures.get(*i) {
+                                let src = Rectangle::new(0.0, 0.0, t.tex.width as f32, t.tex.height as f32);
+                                d3.draw_billboard_pro(cam3d, *t.tex.as_ref(), src, Vector3::new(*x, *y, *z),
+                                                      Vector3::new(0.0, 1.0, 0.0), Vector2::new(*w, *h),
+                                                      Vector2::new(w / 2.0, h / 2.0), *winkel, *col);
+                            }
+                        }
                     }
                 }
             }
@@ -7051,6 +7179,16 @@ fn render_scene<D: RaylibDraw>(
                         let seg = (((bis - von).abs() / 4.0).ceil() as i32).clamp(6, 180);
                         if *filled { d.draw_ring(mitte, ri, ro, *von, *bis, seg, *col); }
                         else { d.draw_ring_lines(mitte, ri, ro, *von, *bis, seg, *col); }
+                    }
+                    Cmd::Kurve(art, pts, thick, col) => {
+                        let v: Vec<Vector2> = pts.iter()
+                            .map(|p| Vector2::new((p.0 * s) as f32, (p.1 * s) as f32)).collect();
+                        let dicke = thick * s as f32;
+                        match art {
+                            0 => d.draw_spline_basis(&v, dicke, *col),
+                            1 => d.draw_spline_bezier_quadratic(&v, dicke, *col),
+                            _ => d.draw_spline_bezier_cubic(&v, dicke, *col),
+                        }
                     }
                     Cmd::CircleGradient(cx, cy, r, innen, aussen) => {
                         d.draw_circle_gradient(cx * s, cy * s, r * s as f32, *innen, *aussen);

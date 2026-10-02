@@ -1,0 +1,205 @@
+' raylib ausgereizt, Etappe 2 (2026-10-02): Bezierkurven und B-Spline,
+' 3D-Formen, Huellquader eines Modells, Billboards mit Ausschnitt und
+' Drehung. Die 3D-Faelle zaehlen Punkte je Farbe im Bildschirmfoto statt
+' einzelne Punkte zu treffen -- dort haengt jede Lage an der Projektion.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== bezier quadratisch und kubisch
+' Quadratisch von (20,40) nach (220,40), Kontrollpunkt (120,160): bei t = 0.5
+' liegt die Kurve bei (120,100) -- eine gerade Linie laege bei y = 40.
+' Kubisch: B(0.5) = (p0 + 3 k1 + 3 k2 + p3) / 8 = (330, 65).
+SCREEN(640, 480, "t")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 20, 30))
+    BEZIER(20, 40, 120, 160, 220, 40, WHITE, 3)
+    BEZIER3(240, 40, 280, 180, 380, -60, 420, 120, YELLOW, 3)
+    FLIP()
+WEND
+--- bild
+120 100 #FFFFFF +-60
+120 40 #14141E +-12
+330 65 #FFFF00 +-60
+330 40 #14141E +-12
+
+=== bezierkette laeuft durch anfang mitte und ende
+' 7 Punkte = zwei kubische Segmente: Anfang (20,400), Mitte (220,400),
+' Ende (420,400), dazwischen je zwei Kontrollpunkte. Genau auf der Naht
+' zweier Segmente laesst raylib einen Punkt aus -- geprueft wird daneben.
+SCREEN(640, 480, "t")
+DIM xs AS ARRAY OF INTEGER : xs = [20, 80, 160, 220, 280, 360, 420]
+DIM ys AS ARRAY OF INTEGER : ys = [400, 300, 470, 400, 330, 470, 400]
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 20, 30))
+    SPLINE_BEZIER(xs, ys, RGB(80, 200, 255), 4)
+    FLIP()
+WEND
+--- bild
+217 402 #50C8FF +-40
+223 396 #50C8FF +-40
+418 400 #50C8FF +-40
+80 300 #14141E +-12
+
+=== b-spline laeuft nicht durch die punkte
+' Ein B-Spline beginnt bei (p0 + 4 p1 + p2) / 6 = (83, 345), nicht bei p0.
+SCREEN(640, 480, "t")
+DIM xs AS ARRAY OF INTEGER : xs = [20, 80, 160, 220, 280, 360, 420]
+DIM ys AS ARRAY OF INTEGER : ys = [400, 300, 470, 400, 330, 470, 400]
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 20, 30))
+    SPLINE_BASIS(xs, ys, RGB(255, 120, 120), 4)
+    FLIP()
+WEND
+--- bild
+84 345 #FF7878 +-50
+20 400 #14141E +-12
+
+=== 3d formen zeigen sich
+' Je Form eine eigene Farbe. Das zweite Dreieck ist im umgekehrten Umlauf
+' angegeben: raylib verwirft Rueckseiten, ohne die zweite Seite fehlte es.
+' Der Kreis liegt flach: breiter als hoch (senkrecht stuende er hoch).
+IMPORT "g3d"
+SCREEN(640, 480, "t")
+WHILE NOT QUITREQUESTED()
+    CLS(BLACK)
+    CAMERA3D(6, 5, 8, 0, 0, 0, 45)
+    CAPSULE(-3, 0, 0, -3, 2, 0, 0.5, RGB(240, 160, 40))
+    CAPSULE_WIRES(-1.5, 0, 0, -1.5, 2, 0, 0.5, CYAN)
+    CYLINDER_EX(0, 0, 0, 2, 2, 0, 0.4, 0.1, RGB(60, 200, 120))
+    CYLINDER_WIRES(3, 0, 0, 0.5, 0.5, 1.5, MAGENTA)
+    TRIANGLE3D(0, 0, 2, 2, 0, 2, 1, 2, 2, RGB(180, 80, 220))
+    TRIANGLE3D(-3, 0, 2.5, -2, 2, 2.5, -1, 0, 2.5, RGB(40, 120, 255))
+    CIRCLE3D(0, 0, 0, 2.5, YELLOW)
+    BBOX_WIRES(1, 0, -4, -1, 1, -3, RGB(255, 80, 80))
+    FLIP()
+WEND
+--- umgebung
+DHRT_SCREENSHOT={fall}/s.png
+DHRT_FRAMES=3
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("s.png")
+DIM n AS INTEGER
+DIM x0 AS INTEGER : DIM x1 AS INTEGER : DIM y0 AS INTEGER : DIM y1 AS INTEGER
+SUB zaehl(farbe AS INTEGER)
+    n = 0 : x0 = 9999 : x1 = -1 : y0 = 9999 : y1 = -1
+    DIM x AS INTEGER : DIM y AS INTEGER
+    FOR y = 0 TO 479
+        FOR x = 0 TO 639
+            IF GETPIXEL(b, x, y) = farbe THEN
+                n = n + 1
+                x0 = MIN(x0, x) : x1 = MAX(x1, x) : y0 = MIN(y0, y) : y1 = MAX(y1, y)
+            END IF
+        NEXT
+    NEXT
+END SUB
+zaehl(&HF0A028) : PRINT "kapsel "; n > 3000
+zaehl(&H00FFFF) : PRINT "kapsel kanten "; n > 1000
+zaehl(&H3CC878) : PRINT "zylinder zwischen punkten "; n > 1500; " schraeg "; x1 - x0 > 60 AND y1 - y0 > 60
+zaehl(&HFF00FF) : PRINT "zylinder kanten "; n > 500
+zaehl(&HB450DC) : PRINT "dreieck "; n > 3000
+zaehl(&H2878FF) : PRINT "dreieck rueckseite "; n > 1000
+zaehl(&HFFFF00) : PRINT "kreis "; n > 200; " flach "; x1 - x0 > 2 * (y1 - y0)
+zaehl(&HFF5050) : PRINT "quader kanten "; n > 200
+--- erwartet
+kapsel TRUE
+kapsel kanten TRUE
+zylinder zwischen punkten TRUE schraeg TRUE
+zylinder kanten TRUE
+dreieck TRUE
+dreieck rueckseite TRUE
+kreis TRUE flach TRUE
+quader kanten TRUE
+
+=== billboards mit ausschnitt und drehung
+' BILLBOARD_PART zeigt nur das rechte Feld des Blatts (blau), nie das linke
+' (rot). BILLBOARD_EX mit 2 x 1 und 90 Grad steht hoch statt breit.
+IMPORT "imgfx"
+IMPORT "g3d"
+SCREEN(640, 480, "t")
+DIM blatt AS IMAGE : blatt = GENTEX_CHECKED(64, 32, 32, 32, RED, BLUE)
+DIM gruen AS IMAGE : gruen = GENTEX_COLOR(32, 16, GREEN)
+WHILE NOT QUITREQUESTED()
+    CLS(BLACK)
+    CAMERA3D(0, 0, 10, 0, 0, 0, 45)
+    BILLBOARD_PART(blatt, 32, 0, 32, 32, -2, 0, 0, 1.5, WHITE)
+    BILLBOARD_EX(gruen, 2, 0, 0, 2, 1, 90, WHITE)
+    FLIP()
+WEND
+--- umgebung
+DHRT_SCREENSHOT={fall}/s.png
+DHRT_FRAMES=3
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("s.png")
+DIM n AS INTEGER
+DIM x0 AS INTEGER : DIM x1 AS INTEGER : DIM y0 AS INTEGER : DIM y1 AS INTEGER
+SUB zaehl(farbe AS INTEGER)
+    n = 0 : x0 = 9999 : x1 = -1 : y0 = 9999 : y1 = -1
+    DIM x AS INTEGER : DIM y AS INTEGER
+    FOR y = 0 TO 479
+        FOR x = 0 TO 639
+            IF GETPIXEL(b, x, y) = farbe THEN
+                n = n + 1
+                x0 = MIN(x0, x) : x1 = MAX(x1, x) : y0 = MIN(y0, y) : y1 = MAX(y1, y)
+            END IF
+        NEXT
+    NEXT
+END SUB
+zaehl(&H0000FF) : PRINT "ausschnitt blau "; n > 1000; " quadratisch "; ABS((x1 - x0) - (y1 - y0)) <= 2
+zaehl(&HFF0000) : PRINT "linkes feld "; n
+zaehl(&H00FF00) : PRINT "gedreht "; n > 1000; " hoch "; y1 - y0 > (x1 - x0) * 3 \ 2
+--- erwartet
+ausschnitt blau TRUE quadratisch TRUE
+linkes feld 0
+gedreht TRUE hoch TRUE
+
+=== huellquader eines modells
+IMPORT "g3d"
+' Die Zahlen kommen ohne das Rauschen der 32-Bit-Rechnung: 1.2, nicht
+' 1.2000000476837158.
+DIM m AS INTEGER : m = MESH_CUBE(2, 1, 4)
+DIM q AS TUPLE : q = MODEL_BBOX(m)
+PRINT q
+DIM z AS INTEGER : z = MESH_CYLINDER(0.6, 2.5, 16)
+DIM r AS TUPLE : r = MODEL_BBOX(z)
+PRINT r[3] - r[0]; " "; r[4]
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+(-1.0, -0.5, -2.0, 1.0, 0.5, 2.0)
+1.2 2.5
+
+=== falsche angaben sind fehler mit der form des befehls
+FUNCTION probe$(n AS INTEGER) AS STRING
+    TRY
+        SELECT CASE n
+            CASE 1
+                DIM a AS ARRAY OF INTEGER : a = [1, 2, 3, 4, 5]
+                SPLINE_BEZIER(a, a)
+            CASE 2
+                DIM c AS ARRAY OF INTEGER : c = [1, 2, 3]
+                SPLINE_BASIS(c, c)
+            CASE 3 : BEZIER(0, 0, 10, 10)
+            CASE 4 : CAPSULE(0, 0, 0, 1, 1, 1, 0.5)
+            CASE 5 : DIM q AS TUPLE : q = MODEL_BBOX(99)
+            CASE 6
+                DIM v AS IMAGE : v = GENTEX_COLOR(8, 8, RED)
+                BILLBOARD_PART(v, 0, 0, 0, 8, 0, 0, 0, 1, WHITE)
+        END SELECT
+        RETURN "kein fehler"
+    CATCH e
+        RETURN e
+    END TRY
+END FUNCTION
+SCREEN(100, 100, "t")
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    PRINT probe$(i)
+NEXT
+--- umgebung
+DHRT_FRAMES=2
+--- enthaelt
+SPLINE_BEZIER: braucht 4, 7, 10 ... Punkte (Anfang, dann je zwei Kontrollpunkte und ein Ende), nicht 5
+SPLINE_BASIS: braucht mindestens 4 Punkte, nicht 3
+BEZIER: erwartet (x1, y1, kx, ky, x2, y2[, farbe[, breite]])
+CAPSULE: erwartet (x1, y1, z1, x2, y2, z2, r, farbe)
+MODEL_BBOX: ungueltiges MODEL-Handle 99
+BILLBOARD_PART: Breite und Hoehe des Ausschnitts muessen groesser als 0 sein
