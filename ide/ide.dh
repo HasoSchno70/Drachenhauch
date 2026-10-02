@@ -10686,52 +10686,188 @@ DIM diffTabR AS INTEGER : diffTabR = -1
 SUB zeilenVergleichen(a AS ARRAY OF STRING, b AS ARRAY OF STRING)
     diffLinks = []
     diffRechts = []
-    DIM n AS INTEGER : n = LEN(a)
-    DIM m AS INTEGER : m = LEN(b)
-    IF n > 1500 OR m > 1500 THEN
-        ' Die Tabelle waere n*m Zellen gross -- bei grossen Dateien lieber
-        ' Zeile fuer Zeile vergleichen als minutenlang rechnen.
-        DIM k AS INTEGER
-        FOR k = 0 TO MAX(n, m) - 1
-            DIM az AS STRING : az = IIF(k < n, a[k], "")
-            DIM bz AS STRING : bz = IIF(k < m, b[k], "")
-            IF az <> bz THEN
-                IF k < n THEN ARRAY_PUSH(diffLinks, k + 1)
-                IF k < m THEN ARRAY_PUSH(diffRechts, k + 1)
+    DIM opArt AS ARRAY OF INTEGER : opArt = []
+    DIM opA AS ARRAY OF INTEGER : opA = []
+    DIM opB AS ARRAY OF INTEGER : opB = []
+    zeilenSchritte(a, b, opArt, opA, opB)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(opArt) - 1
+        IF opArt[k] = 1 THEN ARRAY_PUSH(diffLinks, opA[k] + 1)
+        IF opArt[k] = 2 THEN ARRAY_PUSH(diffRechts, opB[k] + 1)
+    NEXT
+END SUB
+
+' Die Mitte nach Myers ("An O(ND) Difference Algorithm"): Zeit (n + m) * D
+' und Platz D * D bei D Unterschieden -- fuer eine grosse Datei mit wenigen
+' Aenderungen genau richtig, wo die Tabelle n * m Zellen braeuchte. Mehr als
+' MYERS_MAX Unterschiede: FALSE, nichts angehaengt (dann Zeile fuer Zeile).
+' Der Rueckweg braucht V jeder Runde; Runde d belegt die Plaetze ab d * d
+' in `spur` (k von -d bis d).
+CONST MYERS_MAX = 2000
+
+FUNCTION myersSchritte(alt AS ARRAY OF STRING, neu AS ARRAY OF STRING, vorn AS INTEGER, _
+                       n AS INTEGER, m AS INTEGER, opArt AS ARRAY OF INTEGER, _
+                       opA AS ARRAY OF INTEGER, opB AS ARRAY OF INTEGER) AS BOOLEAN
+    DIM off AS INTEGER : off = MYERS_MAX + 1
+    DIM v[2 * MYERS_MAX + 3] AS INTEGER
+    DIM spur AS ARRAY OF INTEGER : spur = []
+    DIM d AS INTEGER
+    DIM k AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM fertig AS INTEGER : fertig = -1
+    FOR d = 0 TO MIN(MYERS_MAX, n + m)
+        FOR k = -d TO d STEP 2
+            IF k = -d THEN
+                x = v[off + k + 1]
+            ELSEIF k <> d AND v[off + k - 1] < v[off + k + 1] THEN
+                x = v[off + k + 1]
+            ELSE
+                x = v[off + k - 1] + 1
             END IF
+            y = x - k
+            WHILE x < n AND y < m
+                IF alt[vorn + x] <> neu[vorn + y] THEN BREAK
+                x = x + 1 : y = y + 1
+            WEND
+            v[off + k] = x
+            IF x >= n AND y >= m THEN fertig = d
         NEXT
-        RETURN
-    END IF
-    ' lcs[i][j] = Laenge der laengsten gemeinsamen Teilfolge ab i bzw. j.
-    DIM lcs[(n + 1) * (m + 1)] AS INTEGER
+        FOR k = -d TO d
+            ARRAY_PUSH(spur, v[off + k])
+        NEXT
+        IF fertig >= 0 THEN BREAK
+    NEXT
+    IF fertig < 0 THEN RETURN FALSE
+    ' Rueckweg von (n, m), die Schritte rueckwaerts gesammelt.
+    DIM rArt AS ARRAY OF INTEGER : rArt = []
+    DIM rA AS ARRAY OF INTEGER : rA = []
+    DIM rB AS ARRAY OF INTEGER : rB = []
+    x = n : y = m
+    FOR d = fertig TO 1 STEP -1
+        k = x - y
+        ' V der Runde d - 1: k' liegt bei spur[(d - 1) * (d - 1) + k' + d - 1].
+        DIM basis AS INTEGER : basis = (d - 1) * (d - 1) + d - 1
+        DIM vk AS INTEGER
+        IF k = -d THEN
+            vk = k + 1
+        ELSEIF k <> d AND spur[basis + k - 1] < spur[basis + k + 1] THEN
+            vk = k + 1
+        ELSE
+            vk = k - 1
+        END IF
+        DIM vx AS INTEGER : vx = spur[basis + vk]
+        DIM vy AS INTEGER : vy = vx - vk
+        WHILE x > vx AND y > vy
+            ARRAY_PUSH(rArt, 0) : ARRAY_PUSH(rA, vorn + x - 1) : ARRAY_PUSH(rB, vorn + y - 1)
+            x = x - 1 : y = y - 1
+        WEND
+        IF x = vx THEN
+            ARRAY_PUSH(rArt, 2) : ARRAY_PUSH(rA, vorn + x) : ARRAY_PUSH(rB, vorn + y - 1)
+        ELSE
+            ARRAY_PUSH(rArt, 1) : ARRAY_PUSH(rA, vorn + x - 1) : ARRAY_PUSH(rB, vorn + y)
+        END IF
+        x = vx : y = vy
+    NEXT
+    WHILE x > 0 AND y > 0
+        ARRAY_PUSH(rArt, 0) : ARRAY_PUSH(rA, vorn + x - 1) : ARRAY_PUSH(rB, vorn + y - 1)
+        x = x - 1 : y = y - 1
+    WEND
+    DIM q AS INTEGER
+    FOR q = LEN(rArt) - 1 TO 0 STEP -1
+        ARRAY_PUSH(opArt, rArt[q]) : ARRAY_PUSH(opA, rA[q]) : ARRAY_PUSH(opB, rB[q])
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Die Schritte von `alt` nach `neu`: 0 gleich, 1 nur alt, 2 nur neu, mit
+' den Zeilen (ab 0) in opA/opB. Die laengste gemeinsame Teilfolge braucht
+' eine Tabelle mit n*m Zellen -- darum fallen gemeinsamer Anfang und
+' gemeinsames Ende vorher weg, gerechnet wird nur ueber die Mitte. Vorher
+' ueber die ganzen Dateien und ab 1500 Zeilen Zeile fuer Zeile: eine einzige
+' eingefuegte Zeile oben liess in einer grossen Datei ALLES darunter als
+' geaendert erscheinen (Stresstest 2026-10-02). Zeile fuer Zeile geht es
+' jetzt nur noch, wenn die Mitte selbst so gross ist.
+SUB zeilenSchritte(alt AS ARRAY OF STRING, neu AS ARRAY OF STRING, opArt AS ARRAY OF INTEGER, _
+                   opA AS ARRAY OF INTEGER, opB AS ARRAY OF INTEGER)
+    DIM n AS INTEGER : n = LEN(alt)
+    DIM m AS INTEGER : m = LEN(neu)
+    DIM vorn AS INTEGER : vorn = 0
+    WHILE vorn < n AND vorn < m
+        IF alt[vorn] <> neu[vorn] THEN BREAK
+        vorn = vorn + 1
+    WEND
+    DIM hinten AS INTEGER : hinten = 0
+    WHILE hinten < n - vorn AND hinten < m - vorn
+        IF alt[n - 1 - hinten] <> neu[m - 1 - hinten] THEN BREAK
+        hinten = hinten + 1
+    WEND
     DIM i AS INTEGER
     DIM j AS INTEGER
-    FOR i = n - 1 TO 0 STEP -1
-        FOR j = m - 1 TO 0 STEP -1
-            IF a[i] = b[j] THEN
-                lcs[i * (m + 1) + j] = lcs[(i + 1) * (m + 1) + j + 1] + 1
-            ELSE
-                lcs[i * (m + 1) + j] = MAX(lcs[(i + 1) * (m + 1) + j], lcs[i * (m + 1) + j + 1])
-            END IF
-        NEXT
+    FOR i = 0 TO vorn - 1
+        ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, i)
     NEXT
-    i = 0
-    j = 0
-    WHILE i < n AND j < m
-        IF a[i] = b[j] THEN
-            i = i + 1 : j = j + 1
-        ELSEIF lcs[(i + 1) * (m + 1) + j] >= lcs[i * (m + 1) + j + 1] THEN
-            ARRAY_PUSH(diffLinks, i + 1) : i = i + 1
-        ELSE
-            ARRAY_PUSH(diffRechts, j + 1) : j = j + 1
-        END IF
-    WEND
-    WHILE i < n
-        ARRAY_PUSH(diffLinks, i + 1) : i = i + 1
-    WEND
-    WHILE j < m
-        ARRAY_PUSH(diffRechts, j + 1) : j = j + 1
-    WEND
+    ' Die Mitte: alt[vorn .. ea), neu[vorn .. eb).
+    DIM ea AS INTEGER : ea = n - hinten
+    DIM eb AS INTEGER : eb = m - hinten
+    DIM n2 AS INTEGER : n2 = ea - vorn
+    DIM m2 AS INTEGER : m2 = eb - vorn
+    i = vorn : j = vorn
+    IF (n2 > 1500 OR m2 > 1500) AND myersSchritte(alt, neu, vorn, n2, m2, opArt, opA, opB) THEN
+        ' erledigt
+    ELSEIF n2 > 1500 OR m2 > 1500 THEN
+        ' Zu viele Unterschiede auch fuer Myers: Zeile fuer Zeile.
+        WHILE i < ea OR j < eb
+            IF i < ea AND j < eb THEN
+                IF alt[i] = neu[j] THEN
+                    ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                ELSE
+                    ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                    ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
+                END IF
+                i = i + 1 : j = j + 1
+            ELSEIF i < ea THEN
+                ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : i = i + 1
+            ELSE
+                ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : j = j + 1
+            END IF
+        WEND
+    ELSE
+        ' lcs[x * (m2 + 1) + y] = Laenge der laengsten gemeinsamen Teilfolge
+        ' ab alt[vorn + x] bzw. neu[vorn + y].
+        DIM lcs[(n2 + 1) * (m2 + 1)] AS INTEGER
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        FOR x = n2 - 1 TO 0 STEP -1
+            FOR y = m2 - 1 TO 0 STEP -1
+                IF alt[vorn + x] = neu[vorn + y] THEN
+                    lcs[x * (m2 + 1) + y] = lcs[(x + 1) * (m2 + 1) + y + 1] + 1
+                ELSE
+                    lcs[x * (m2 + 1) + y] = MAX(lcs[(x + 1) * (m2 + 1) + y], lcs[x * (m2 + 1) + y + 1])
+                END IF
+            NEXT
+        NEXT
+        x = 0 : y = 0
+        WHILE x < n2 OR y < m2
+            IF x < n2 AND y < m2 THEN
+                IF alt[vorn + x] = neu[vorn + y] THEN
+                    ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y)
+                    x = x + 1 : y = y + 1
+                ELSEIF lcs[(x + 1) * (m2 + 1) + y] >= lcs[x * (m2 + 1) + y + 1] THEN
+                    ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y) : x = x + 1
+                ELSE
+                    ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y) : y = y + 1
+                END IF
+            ELSEIF x < n2 THEN
+                ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y) : x = x + 1
+            ELSE
+                ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, vorn + x) : ARRAY_PUSH(opB, vorn + y) : y = y + 1
+            END IF
+        WEND
+    END IF
+    FOR i = 0 TO hinten - 1
+        ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, ea + i) : ARRAY_PUSH(opB, eb + i)
+    NEXT
 END SUB
 
 SUB reiterVergleichen()
@@ -12716,59 +12852,10 @@ END SUB
 ' Umfeld, "-" = nur auf der Platte, "+" = nur im Reiter. Dieselbe LCS-Rechnung
 ' wie beim Reiter-Vergleich, aber als Schrittfolge.
 FUNCTION diffText$(alt AS ARRAY OF STRING, neu AS ARRAY OF STRING, name AS STRING) AS STRING
-    DIM n AS INTEGER : n = LEN(alt)
-    DIM m AS INTEGER : m = LEN(neu)
     DIM opArt AS ARRAY OF INTEGER : opArt = []     ' 0 gleich, 1 weg, 2 neu
     DIM opA AS ARRAY OF INTEGER : opA = []         ' Zeile alt (ab 0)
     DIM opB AS ARRAY OF INTEGER : opB = []         ' Zeile neu (ab 0)
-    DIM i AS INTEGER : i = 0
-    DIM j AS INTEGER : j = 0
-    IF n > 1500 OR m > 1500 THEN
-        ' Zu gross fuer die Tabelle: Zeile fuer Zeile.
-        WHILE i < n OR j < m
-            IF i < n AND j < m THEN
-                IF alt[i] = neu[j] THEN
-                    ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
-                ELSE
-                    ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
-                    ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
-                END IF
-                i = i + 1 : j = j + 1
-            ELSEIF i < n THEN
-                ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : i = i + 1
-            ELSE
-                ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : j = j + 1
-            END IF
-        WEND
-    ELSE
-        DIM lcs[(n + 1) * (m + 1)] AS INTEGER
-        FOR i = n - 1 TO 0 STEP -1
-            FOR j = m - 1 TO 0 STEP -1
-                IF alt[i] = neu[j] THEN
-                    lcs[i * (m + 1) + j] = lcs[(i + 1) * (m + 1) + j + 1] + 1
-                ELSE
-                    lcs[i * (m + 1) + j] = MAX(lcs[(i + 1) * (m + 1) + j], lcs[i * (m + 1) + j + 1])
-                END IF
-            NEXT
-        NEXT
-        i = 0 : j = 0
-        WHILE i < n OR j < m
-            IF i < n AND j < m THEN
-                IF alt[i] = neu[j] THEN
-                    ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j)
-                    i = i + 1 : j = j + 1
-                ELSEIF lcs[(i + 1) * (m + 1) + j] >= lcs[i * (m + 1) + j + 1] THEN
-                    ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : i = i + 1
-                ELSE
-                    ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : j = j + 1
-                END IF
-            ELSEIF i < n THEN
-                ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : i = i + 1
-            ELSE
-                ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opA, i) : ARRAY_PUSH(opB, j) : j = j + 1
-            END IF
-        WEND
-    END IF
+    zeilenSchritte(alt, neu, opArt, opA, opB)
     ' Abschnitte: jede Aenderung mit drei Zeilen Umfeld; nahe Abschnitte
     ' fliessen zusammen.
     DIM k AS INTEGER : k = LEN(opArt)

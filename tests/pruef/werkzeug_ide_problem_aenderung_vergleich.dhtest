@@ -249,3 +249,126 @@ NEXT
 vergleich +1 -1
 vergleich gesichert
 datei |neu
+
+=== eine zeile oben in einer grossen datei ist ein schritt
+' Stresstest 2026-10-02: beide Vergleiche (Reiter gegen Platte, zwei Reiter)
+' rechneten die laengste gemeinsame Teilfolge ueber die GANZEN Dateien und
+' wichen ab 1500 Zeilen auf Zeile-fuer-Zeile aus -- eine eingefuegte Zeile
+' oben liess dann alles darunter als geaendert erscheinen. Jetzt fallen
+' gemeinsamer Anfang und gemeinsames Ende vorher weg. Geprueft an 5000
+' Zeilen, und an 300 zufaelligen kleinen Aenderungen: die Schritte ergeben
+' beide Texte wieder, und es sind so viele gleiche Zeilen wie die volle
+' Tabelle findet (der Wegfall kostet nichts an Genauigkeit).
+DIM prAlt AS ARRAY OF STRING : prAlt = []
+DIM prI AS INTEGER
+FOR prI = 1 TO 5000
+    ARRAY_PUSH(prAlt, "zeile " + STR$(prI))
+NEXT
+DIM prNeu AS ARRAY OF STRING : prNeu = ["NEU"]
+FOR prI = 0 TO LEN(prAlt) - 1
+    ARRAY_PUSH(prNeu, prAlt[prI])
+NEXT
+prNeu[2500] = "mitte geaendert"
+DIM prD AS ARRAY OF STRING : prD = SPLIT$(diffText$(prAlt, prNeu, "x.dh"), NL)
+DIM prPlus AS INTEGER : prPlus = 0
+DIM prMinus AS INTEGER : prMinus = 0
+FOR prI = 2 TO LEN(prD) - 1
+    IF LEFT$(prD[prI], 1) = "+" THEN prPlus = prPlus + 1
+    IF LEFT$(prD[prI], 1) = "-" THEN prMinus = prMinus + 1
+NEXT
+protokoll("pr diff plus " + STR$(prPlus) + " minus " + STR$(prMinus))
+FUNCTION prListe$(v AS ARRAY OF INTEGER) AS STRING
+    DIM r AS STRING : r = ""
+    DIM q AS INTEGER
+    FOR q = 0 TO LEN(v) - 1
+        IF q > 0 THEN r = r + ","
+        r = r + STR$(v[q])
+    NEXT
+    RETURN r
+END FUNCTION
+zeilenVergleichen(prAlt, prNeu)
+protokoll("pr links " + prListe$(diffLinks) + " rechts " + prListe$(diffRechts))
+' Zufallsprobe gegen die volle Tabelle.
+FUNCTION prLcs(a AS ARRAY OF STRING, b AS ARRAY OF STRING) AS INTEGER
+    DIM n AS INTEGER : n = LEN(a)
+    DIM m AS INTEGER : m = LEN(b)
+    DIM t[(n + 1) * (m + 1)] AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = n - 1 TO 0 STEP -1
+        FOR y = m - 1 TO 0 STEP -1
+            IF a[x] = b[y] THEN
+                t[x * (m + 1) + y] = t[(x + 1) * (m + 1) + y + 1] + 1
+            ELSE
+                t[x * (m + 1) + y] = MAX(t[(x + 1) * (m + 1) + y], t[x * (m + 1) + y + 1])
+            END IF
+        NEXT
+    NEXT
+    RETURN t[0]
+END FUNCTION
+RANDOMIZE(7)
+DIM prFalsch AS INTEGER : prFalsch = 0
+DIM prMyers AS INTEGER : prMyers = 0
+DIM prR AS INTEGER
+FOR prR = 1 TO 300
+    DIM pa AS ARRAY OF STRING : pa = []
+    DIM pb AS ARRAY OF STRING : pb = []
+    DIM pk AS INTEGER
+    FOR pk = 1 TO INT(RND() * 12)
+        ARRAY_PUSH(pa, CHR$(97 + INT(RND() * 3)))
+    NEXT
+    FOR pk = 0 TO LEN(pa) - 1
+        DIM pw AS FLOAT : pw = RND()
+        IF pw < 0.15 THEN
+            ARRAY_PUSH(pb, CHR$(97 + INT(RND() * 3)))
+        ELSEIF pw < 0.25 THEN
+            CONTINUE
+        END IF
+        ARRAY_PUSH(pb, pa[pk])
+    NEXT
+    IF RND() < 0.3 THEN ARRAY_PUSH(pb, "a")
+    DIM oArt AS ARRAY OF INTEGER : oArt = []
+    DIM oA AS ARRAY OF INTEGER : oA = []
+    DIM oB AS ARRAY OF INTEGER : oB = []
+    zeilenSchritte(pa, pb, oArt, oA, oB)
+    DIM ra AS ARRAY OF STRING : ra = []
+    DIM rb AS ARRAY OF STRING : rb = []
+    DIM gleich AS INTEGER : gleich = 0
+    FOR pk = 0 TO LEN(oArt) - 1
+        IF oArt[pk] <> 2 THEN ARRAY_PUSH(ra, pa[oA[pk]])
+        IF oArt[pk] <> 1 THEN ARRAY_PUSH(rb, pb[oB[pk]])
+        IF oArt[pk] = 0 THEN gleich = gleich + 1
+    NEXT
+    IF JOIN$(ra, "|") <> JOIN$(pa, "|") OR JOIN$(rb, "|") <> JOIN$(pb, "|") OR gleich <> prLcs(pa, pb) THEN prFalsch = prFalsch + 1
+    ' Dasselbe fuer Myers, das sonst erst bei grossen Mitten rechnet.
+    oArt = [] : oA = [] : oB = [] : ra = [] : rb = [] : gleich = 0
+    IF NOT myersSchritte(pa, pb, 0, LEN(pa), LEN(pb), oArt, oA, oB) THEN prMyers = prMyers + 1
+    FOR pk = 0 TO LEN(oArt) - 1
+        IF oArt[pk] <> 2 THEN ARRAY_PUSH(ra, pa[oA[pk]])
+        IF oArt[pk] <> 1 THEN ARRAY_PUSH(rb, pb[oB[pk]])
+        IF oArt[pk] = 0 THEN gleich = gleich + 1
+    NEXT
+    IF JOIN$(ra, "|") <> JOIN$(pa, "|") OR JOIN$(rb, "|") <> JOIN$(pb, "|") OR gleich <> prLcs(pa, pb) THEN prMyers = prMyers + 1
+NEXT
+protokoll("pr zufall falsch " + STR$(prFalsch) + " myers falsch " + STR$(prMyers))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr diff plus 2 minus 1
+pr links 2500 rechts 1,2501
+pr zufall falsch 0 myers falsch 0
