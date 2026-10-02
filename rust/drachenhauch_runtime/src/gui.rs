@@ -536,6 +536,62 @@ fn zeilenfarbe_deckkraft(c: i64) -> i64 {
     if (c >> 24) & 0xFF == 0 { 0x40_000000 | (c & 0xFF_FFFF) } else { c & 0xFFFF_FFFF }
 }
 
+/// Hoechstens so viele Schritte im Rueckgaengig-Verlauf ...
+const VERLAUF_SCHRITTE: usize = 100;
+/// ... und hoechstens so viele Bytes darin. Jeder Schritt haelt den GANZEN
+/// Text vorher; 100 Schritte an einer Datei mit 2,7 MB waren 270 MB, an
+/// einer mit 30 MB drei Gigabyte (Stresstest 2026-10-02). Der juengste
+/// Schritt bleibt immer, auch wenn er allein groesser ist -- sonst liesse
+/// sich gerade das grosse Einfuegen nicht zuruecknehmen.
+const VERLAUF_BYTES: usize = 64 * 1024 * 1024;
+
+/// Die aeltesten Schritte weg, bis Zahl und Groesse passen.
+fn verlauf_kuerzen(v: &mut Vec<(String, i32, Vec<u8>)>) {
+    let mut summe: usize = v.iter().map(|s| s.0.len() + s.2.len()).sum();
+    let mut weg = 0;
+    while v.len() - weg > 1 && (v.len() - weg > VERLAUF_SCHRITTE || summe > VERLAUF_BYTES) {
+        summe -= v[weg].0.len() + v[weg].2.len();
+        weg += 1;
+    }
+    if weg > 0 { v.drain(..weg); }
+}
+
+#[cfg(test)]
+mod verlauf_tests {
+    use super::{verlauf_kuerzen, VERLAUF_BYTES, VERLAUF_SCHRITTE};
+
+    #[test]
+    fn kleine_texte_behalten_hundert_schritte() {
+        let mut v: Vec<(String, i32, Vec<u8>)> = Vec::new();
+        for i in 0..150 { v.push((format!("t{}", i), i, Vec::new())); verlauf_kuerzen(&mut v); }
+        assert_eq!(v.len(), VERLAUF_SCHRITTE);
+        assert_eq!(v[0].0, "t50");
+        assert_eq!(v.last().unwrap().0, "t149");
+    }
+
+    #[test]
+    fn grosse_texte_halten_das_budget() {
+        let gross = "x".repeat(10 * 1024 * 1024);
+        let mut v: Vec<(String, i32, Vec<u8>)> = Vec::new();
+        for i in 0..20 { v.push((gross.clone(), i, Vec::new())); verlauf_kuerzen(&mut v); }
+        let summe: usize = v.iter().map(|s| s.0.len()).sum();
+        assert!(summe <= VERLAUF_BYTES);
+        assert_eq!(v.len(), VERLAUF_BYTES / gross.len());
+        // Die juengsten bleiben.
+        assert_eq!(v.last().unwrap().1, 19);
+    }
+
+    #[test]
+    fn ein_riesiger_schritt_bleibt_allein() {
+        let riesig = "y".repeat(VERLAUF_BYTES + 1);
+        let mut v: Vec<(String, i32, Vec<u8>)> = vec![("a".into(), 0, Vec::new())];
+        v.push((riesig, 1, Vec::new()));
+        verlauf_kuerzen(&mut v);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].1, 1);
+    }
+}
+
 #[cfg(test)]
 mod zeilenfarben_tests {
     use super::zeilenfarbe_deckkraft;
@@ -10417,7 +10473,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             // Bits zu kennen) waeren sie zum falschen Text gemerkt.
             let st = if w.formatiert && w.stile_text == before { w.stile.clone() } else { Vec::new() };
             w.undo.push((before.to_string(), caret, st));
-            if w.undo.len() > 100 { w.undo.remove(0); }
+            verlauf_kuerzen(&mut w.undo);
         }
         w.undo_zeit = jetzt;
         w.redo.clear();
@@ -10431,7 +10487,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         stile_abgleichen(w);
         let st_jetzt = if w.formatiert { w.stile.clone() } else { Vec::new() };
         let jetzt_stand = (w.text.clone(), w.caret, st_jetzt);
-        if wieder { w.undo.push(jetzt_stand); } else { w.redo.push(jetzt_stand); }
+        if wieder { w.undo.push(jetzt_stand); verlauf_kuerzen(&mut w.undo); } else { w.redo.push(jetzt_stand); }
         let n = t.chars().count() as i32;
         w.text = t;
         if w.formatiert {

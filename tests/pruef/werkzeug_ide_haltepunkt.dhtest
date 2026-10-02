@@ -433,3 +433,58 @@ programm vorn FALSE
 debug pause 3
 debug pause 4
 programm vorn TRUE
+
+=== ein halt 900 aufrufe tief bleibt flott
+' Stresstest 2026-10-02: der Aufrufstapel fragte je Eintrag mit SAMEFILE die
+' Platte, ob er in der Hauptdatei liegt -- 900 Eintraege kosteten 140 ms je
+' Halt, und die Marken fragten es in jedem Bild noch einmal. Jetzt merkt
+' sich die IDE die Antwort fuer den Halt (gleicheDatei). Geprueft: der echte
+' Debugger haelt 900 Aufrufe tief und der Stapel hat alle Eintraege; und ein
+' Stapel mit 900 Eintraegen ist flott gezeigt (grob: 50 ms, vorher 140).
+DIM prBild AS INTEGER : prBild = 0
+DIM prFertig AS BOOLEAN : prFertig = FALSE
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 20 THEN haltepunktUmschaltenIn(tabPfade[aktiverTab], 4) : befehl("debug")
+IF prBild > 20 AND NOT prFertig AND debugPause AND debugZeile = 4 THEN
+    prFertig = TRUE
+    protokoll("pr stapel " + STR$(GUI_TABLE_ROW_COUNT(tblStapel)) + " oben " + GUI_TABLE_GET_CELL(tblStapel, 0, 0))
+    DIM prT AS ARRAY OF STRING : prT = []
+    DIM prI AS INTEGER
+    FOR prI = 1 TO 900
+        ARRAY_PUSH(prT, "{" + jsonText$("name") + ":" + jsonText$("tief") + "," + jsonText$("line") + ":" + STR$(prI) + "," + jsonText$("file") + ":" + jsonText$(prozessDatei) + "}")
+    NEXT
+    DIM prJ AS JSON_HANDLE : prJ = JSON_PARSE("{" + jsonText$("stack") + ":[" + JOIN$(prT, ",") + "]}")
+    DIM prZ AS FLOAT : prZ = GET_TIME()
+    stapelZeigen(prJ)
+    protokoll("pr flott " + STR$(GET_TIME() - prZ < 0.05) + " zeilen " + STR$(GUI_TABLE_ROW_COUNT(tblStapel)))
+    befehl("stopp")
+END IF
+IF prBild = 400 OR (prFertig AND prozess < 0) THEN EXIT(0)
+--- argumente
+tief.dh
+--- umgebung
+DHRT_FRAMES=2000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei tief.dh
+FUNCTION tief(n AS INTEGER) AS INTEGER
+    IF n = 0 THEN
+        DIM unten AS INTEGER : unten = 1
+        PRINT "unten"
+        RETURN 0
+    END IF
+    RETURN tief(n - 1) + 1
+END FUNCTION
+PRINT tief(900)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr stapel 902 oben tief
+pr flott TRUE zeilen 900
