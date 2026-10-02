@@ -4983,7 +4983,7 @@ END SUB
 ' Wie oft jeder Name in einer Quelle benutzt wird (CODE_NAMES: ohne
 ' Kommentare, Zeichenketten und die Definition selbst), als Text
 ' ";name=anzahl;..." -- ein Cache-Eintrag ist eine Zeichenkette, und
-' nachgeschlagen wird mit INSTR nach ";name=".
+' zerlegt wird sie in zaehlerAddieren.
 FUNCTION woerterZaehlen$(quelle AS STRING) AS STRING
     DIM m AS MAP OF INTEGER : m = CODE_NAMES(quelle)
     DIM teile AS ARRAY OF STRING : teile = [";"]
@@ -5097,14 +5097,17 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     protokoll("aufrufzaehler " + STR$(LEN(zl)))
 END SUB
 
+' Ueber die Eintraege der Zaehlung, nicht je gesuchtem Namen mit INSTR
+' durch die ganze Zaehlung: das war Namen mal Laenge, und das je Datei des
+' Projekts -- eine Datei mit 20000 Unterprogrammen stand beim Pruefen
+' sekundenlang (Stresstest 2026-10-02).
 SUB zaehlerAddieren(summe AS MAP OF INTEGER, zaehlung AS STRING)
-    DIM k AS STRING
-    FOR EACH k IN MAPKEYS(summe)
-        DIM p AS INTEGER : p = INSTR(zaehlung, ";" + k + "=")
-        IF p < 0 THEN CONTINUE
-        DIM a AS INTEGER : a = p + LEN(k) + 2
-        DIM e AS INTEGER : e = INSTR(MID$(zaehlung, a), ";")
-        MAPPUT(summe, k, MAPGET(summe, k) + INT(VAL(MID$(zaehlung, a, e))))
+    DIM teil AS STRING
+    FOR EACH teil IN SPLIT$(zaehlung, ";")
+        DIM g AS INTEGER : g = INSTR(teil, "=")
+        IF g <= 0 THEN CONTINUE
+        DIM k AS STRING : k = LEFT$(teil, g)
+        IF MAPHAS(summe, k) THEN MAPPUT(summe, k, MAPGET(summe, k) + INT(VAL(MID$(teil, g + 1))))
     NEXT
 END SUB
 
