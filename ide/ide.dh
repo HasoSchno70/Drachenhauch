@@ -5401,21 +5401,50 @@ SUB qvAuffrischen()
     protokoll("qv " + STR$(LEN(qvPfade)) + " " + STR$(qvVorgemerkt))
 END SUB
 
+' Wie viel der Unterschied hoechstens zeigt. Beim Oeffnen des Fensters
+' steht die erste Datei schon gewaehlt -- eine 20-MB-Protokolldatei ganz
+' oben hielt die IDE sekundenlang fest, und jedes Bild danach zerlegte den
+' ganzen Text (Stresstest 2026-10-02). Ganz zeigt ihn git selbst.
+CONST QV_ZEIGEN_MAX = 512000
+
 SUB qvDiffZeigen(i AS INTEGER)
     IF i < 0 OR i >= LEN(qvPfade) THEN GUI_SET_TEXT(taQvDiff, "") : RETURN
     DIM text AS STRING
     IF LEFT$(qvArten[i], 1) = "?" THEN
         ' neu, noch nie vorgemerkt: der ganze Inhalt ist der Unterschied
-        DIM inhalt AS STRING : inhalt = ""
+        DIM weg AS STRING : weg = PATHJOIN(qvWurzel, qvPfade[i])
+        DIM groesse AS INTEGER : groesse = 0
         TRY
-            inhalt = dateiLesen(PATHJOIN(qvWurzel, qvPfade[i]))
+            groesse = FILESIZE(weg)
         CATCH e
-            inhalt = ""
+            groesse = 0
         END TRY
-        text = "+++ " + qvPfade[i] + " (neu)" + NL + "+" + REPLACE$(inhalt, NL, NL + "+")
+        IF groesse > QV_ZEIGEN_MAX THEN
+            text = "+++ " + qvPfade[i] + tr$(" (neu, ") + STR$(groesse \ 1024) + tr$(" KB -- zu groß zum Anzeigen)")
+        ELSE
+            DIM inhalt AS STRING : inhalt = ""
+            TRY
+                inhalt = dateiLesen(weg)
+            CATCH e
+                inhalt = ""
+            END TRY
+            IF INSTR(inhalt, CHR$(0)) >= 0 THEN
+                text = "+++ " + qvPfade[i] + tr$(" (neu, binär)")
+            ELSE
+                text = "+++ " + qvPfade[i] + " (neu)" + NL + "+" + REPLACE$(inhalt, NL, NL + "+")
+            END IF
+        END IF
     ELSE
         text = qvGit$("diff", "--no-color", "HEAD", "--", qvPfade[i])
         IF TRIM$(text) = "" THEN text = qvGit$("diff", "--no-color", "--staged", "--", qvPfade[i])
+    END IF
+    IF LEN(text) > QV_ZEIGEN_MAX THEN
+        ' An einer Zeilengrenze kuerzen -- eine halbe Zeile saehe aus wie
+        ' ein Teil des Unterschieds.
+        DIM ganz AS INTEGER : ganz = LEN(text)
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(LEFT$(text, QV_ZEIGEN_MAX), NL)
+        IF LEN(teile) > 1 THEN ARRAY_POP(teile)
+        text = JOIN$(teile, NL) + NL + tr$("~ gekürzt: der Unterschied ist ") + STR$(ganz \ 1024) + tr$(" KB lang, ganz zeigt ihn git diff")
     END IF
     GUI_SET_TEXT(taQvDiff, REPLACE$(text, CHR$(13), ""))
     diffFaerben(taQvDiff)
