@@ -4742,40 +4742,82 @@ END SUB
 
 ' --- Suche im Projekt --------------------------------------------------
 ' `zweitens` ist ein zweiter Suchtext (ODER) -- fuer die TODO/FIXME-Liste.
+' Die Suche laeuft in Schritten (SUCH_PRO_BILD Dateien je Bild): ueber
+' 2000 Dateien stand die IDE sonst 0,6 s und mehr in einem Bild, ohne dass
+' man abbrechen konnte (Stresstest 2026-10-02). ESC bricht ab. Eine offene
+' Datei wird aus ihrem Reiter gelesen -- vorher fand die Suche nur, was auf
+' der Platte stand, waehrend "Treffer ersetzen" den Reiter nahm.
+CONST SUCH_PRO_BILD = 100
+DIM suchLauf AS BOOLEAN : suchLauf = FALSE
+DIM suchLaufDateien AS ARRAY OF STRING : suchLaufDateien = []
+DIM suchLaufIndex AS INTEGER : suchLaufIndex = 0
+DIM suchLaufGesucht AS STRING : suchLaufGesucht = ""
+DIM suchLaufZweitens AS STRING : suchLaufZweitens = ""
+DIM suchLaufTreffer AS INTEGER : suchLaufTreffer = 0
+DIM suchLaufInDateien AS INTEGER : suchLaufInDateien = 0
+DIM suchLaufSd AS ARRAY OF STRING : suchLaufSd = []
+DIM suchLaufSz AS ARRAY OF INTEGER : suchLaufSz = []
+
 SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     IF gesucht = "" THEN RETURN
     GUI_LISTBOX_CLEAR(lstProbleme)
-    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
-    DIM sd AS ARRAY OF STRING : sd = []
-    DIM sz AS ARRAY OF INTEGER : sz = []
-    DIM klein AS STRING : klein = LOWER$(gesucht)
-    DIM klein2 AS STRING : klein2 = LOWER$(zweitens)
-    DIM treffer AS INTEGER : treffer = 0
-    DIM inDateien AS INTEGER : inDateien = 0
-    DIM d AS STRING
-    FOR EACH d IN dateien
-        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(projektOrdner, d))
-        DIM vorher AS INTEGER : vorher = treffer
+    suchLaufDateien = projektDateien("*.dh")
+    suchLaufIndex = 0
+    suchLaufGesucht = gesucht
+    suchLaufZweitens = zweitens
+    suchLaufTreffer = 0
+    suchLaufInDateien = 0
+    suchLaufSd = []
+    suchLaufSz = []
+    suchLauf = TRUE
+    problemModus = 1
+    trefferKaestchen(FALSE)
+    suchSchritt()
+END SUB
+
+SUB suchSchritt()
+    IF NOT suchLauf THEN RETURN
+    DIM bis AS INTEGER : bis = MIN(suchLaufIndex + SUCH_PRO_BILD, LEN(suchLaufDateien))
+    DIM k AS INTEGER
+    FOR k = suchLaufIndex TO bis - 1
+        DIM d AS STRING : d = suchLaufDateien[k]
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM zeilen AS ARRAY OF STRING
+        DIM t AS INTEGER : t = tabMitPfad(pfad)
+        IF t >= 0 THEN
+            zeilen = SPLIT$(GUI_TEXT(tabFelder[t]), NL)
+        ELSE
+            zeilen = zeilenLesen(pfad)
+        END IF
+        DIM vorher AS INTEGER : vorher = suchLaufTreffer
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zeilen) - 1
-            IF treffer >= 500 THEN BREAK
-            IF passtSuche(zeilen[i], gesucht) OR (zweitens <> "" AND passtSuche(zeilen[i], zweitens)) THEN
-                ARRAY_PUSH(sd, d)
-                ARRAY_PUSH(sz, i + 1)
+            IF suchLaufTreffer >= 500 THEN BREAK
+            IF passtSuche(zeilen[i], suchLaufGesucht) OR (suchLaufZweitens <> "" AND passtSuche(zeilen[i], suchLaufZweitens)) THEN
+                ARRAY_PUSH(suchLaufSd, d)
+                ARRAY_PUSH(suchLaufSz, i + 1)
                 GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
-                treffer = treffer + 1
+                suchLaufTreffer = suchLaufTreffer + 1
             END IF
         NEXT
-        IF treffer > vorher THEN inDateien = inDateien + 1
+        IF suchLaufTreffer > vorher THEN suchLaufInDateien = suchLaufInDateien + 1
     NEXT
-    sucheDateien = sd
-    sucheZeilen = sz
-    problemModus = 1
+    suchLaufIndex = bis
+    DIM was AS STRING : was = suchLaufGesucht
+    IF suchLaufZweitens <> "" THEN was = suchLaufGesucht + "/" + suchLaufZweitens
+    IF suchLaufIndex < LEN(suchLaufDateien) AND suchLaufTreffer < 500 THEN
+        GUI_SET_TEXT(lblProbleme, tr$("Suche '") + was + "': " + STR$(suchLaufIndex) + " / " + STR$(LEN(suchLaufDateien)) + tr$(" Dateien ... (ESC bricht ab)"))
+        RETURN
+    END IF
+    suchLauf = FALSE
+    sucheDateien = suchLaufSd
+    sucheZeilen = suchLaufSz
     ' Ein einzelner Suchtext laesst sich ersetzen: jeder Treffer bekommt
     ' einen Haken (alle an), der Rechtsklick ersetzt die angehakten.
-    IF zweitens = "" AND treffer > 0 THEN
+    DIM treffer AS INTEGER : treffer = suchLaufTreffer
+    IF suchLaufZweitens = "" AND treffer > 0 THEN
         trefferKaestchen(TRUE)
-        trefferBegriff = gesucht
+        trefferBegriff = suchLaufGesucht
         trefferAnzahl = treffer
         trefferErster = GUI_LISTBOX_ITEM(lstProbleme, 0)
         DIM tk AS INTEGER
@@ -4785,10 +4827,17 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     ELSE
         trefferKaestchen(FALSE)
     END IF
-    DIM was AS STRING : was = gesucht
-    IF zweitens <> "" THEN was = gesucht + "/" + zweitens
-    GUI_SET_TEXT(lblProbleme, tr$("Suche '") + was + "': " + STR$(treffer) + tr$(" Treffer in ") + STR$(inDateien) + tr$(" Dateien -- Umschalt+F7 zeigt wieder die Probleme"))
+    GUI_SET_TEXT(lblProbleme, tr$("Suche '") + was + "': " + STR$(treffer) + tr$(" Treffer in ") + STR$(suchLaufInDateien) + tr$(" Dateien -- Umschalt+F7 zeigt wieder die Probleme"))
     protokoll("suche " + STR$(treffer))
+END SUB
+
+SUB suchAbbrechen()
+    IF NOT suchLauf THEN RETURN
+    suchLauf = FALSE
+    sucheDateien = suchLaufSd
+    sucheZeilen = suchLaufSz
+    GUI_SET_TEXT(lblProbleme, tr$("Suche abgebrochen nach ") + STR$(suchLaufIndex) + " / " + STR$(LEN(suchLaufDateien)) + tr$(" Dateien: ") + STR$(suchLaufTreffer) + tr$(" Treffer"))
+    protokoll("suche abgebrochen " + STR$(suchLaufIndex))
 END SUB
 
 ' --- Aufrufzaehler ------------------------------------------------------
@@ -10845,12 +10894,9 @@ SUB laufSchritt()
     DIM i AS INTEGER
     FOR i = laufIndex TO bis - 1
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, laufDateien[i])
-        DIM alt AS STRING : alt = ""
-        TRY
-            alt = JOIN$(READLINES(pfad), NL)
-        CATCH e
-            alt = ""
-        END TRY
+        ' Ueber zeilenLesen: eine Datei in cp1252 fiel mit READLINES still
+        ' heraus -- ein Umbenennen ueber das Projekt liess sie unbemerkt aus.
+        DIM alt AS STRING : alt = dateiLesen(pfad)
         IF alt = "" THEN CONTINUE
         DIM frisch AS STRING : frisch = alt
         IF laufArt = "parameter" THEN
@@ -17720,6 +17766,9 @@ WHILE NOT beenden
     END IF
 
     abgelegteNachziehen()
+    IF suchLauf THEN
+        IF KEYHIT(KEY_ESCAPE) THEN suchAbbrechen() ELSE suchSchritt()
+    END IF
     zaehlNachsehen()
     IF zaehlNochmal >= 0 THEN
         DIM zn AS GUI_WIDGET : zn = zaehlNochmal

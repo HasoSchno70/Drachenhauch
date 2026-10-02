@@ -898,3 +898,63 @@ PRINT "anders " ; anders
 --- erwartet
 gemessen TRUE
 anders 0
+
+=== die projektsuche laeuft in schritten und findet ungesichertes im reiter
+' Stresstest 2026-10-02: die Projektsuche las alle Dateien in EINEM Bild
+' (2000 Dateien: 0,6 s Stillstand, nicht abbrechbar) und immer von der
+' Platte -- was im offenen Reiter ungesichert dazukam, fand sie nicht,
+' waehrend "Treffer ersetzen" den Reiter nahm. Jetzt 100 Dateien je Bild,
+' ESC bricht ab, und eine offene Datei kommt aus ihrem Reiter.
+DIM prBild AS INTEGER : prBild = 0
+DIM prFertig AS INTEGER : prFertig = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 1)
+    GUI_TEXTAREA_INSERT(tabFelder[aktiverTab], "' drachenwort ungesichert" + NL)
+    projektSuchen("drachenwort", "")
+    protokoll("pr gleich fertig " + STR$(NOT suchLauf))
+END IF
+IF prBild > 30 AND prFertig = 0 AND NOT suchLauf THEN
+    prFertig = prBild
+    protokoll("pr treffer " + STR$(GUI_LISTBOX_COUNT(lstProbleme)) + " mehrere bilder " + STR$(prFertig - 30 >= 3))
+    DIM prK AS INTEGER
+    FOR prK = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+        protokoll("pr eintrag " + GUI_LISTBOX_ITEM(lstProbleme, prK))
+    NEXT
+    projektSuchen("PRINT", "")
+END IF
+IF prFertig > 0 AND prBild = prFertig + 2 THEN suchAbbrechen()
+IF prFertig > 0 AND prBild = prFertig + 4 THEN
+    protokoll("pr nach abbruch laeuft " + STR$(suchLauf) + " " + LEFT$(GUI_TEXT(lblProbleme), 22))
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=600
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM i AS INTEGER
+MKDIR("teile")
+FOR i = 0 TO 999
+    WRITEALL("teile/m" + STR$(i) + ".dh", "PRINT " + STR$(i) + CHR$(10) + IIF(i = 500, "' drachen" + "wort auf der platte" + CHR$(10), ""))
+NEXT
+WRITEALL("haupt.dh", "PRINT 1" + CHR$(10) + "PRINT 2" + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 6) = "suche " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr gleich fertig FALSE
+suche 2
+pr treffer 2 mehrere bilder TRUE
+pr eintrag haupt.dh:2: ' drachenwort ungesichert
+pr eintrag teile/m500.dh:2: ' drachenwort auf der platte
+suche abgebrochen 300
+pr nach abbruch laeuft FALSE Suche abgebrochen nach

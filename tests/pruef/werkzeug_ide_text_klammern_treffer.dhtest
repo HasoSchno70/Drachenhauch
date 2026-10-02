@@ -170,10 +170,14 @@ DIM prZ AS STRING
 FOR EACH prZ IN SPLIT$(GUI_TEXT(tabFelder[aktiverTab]), NL)
     protokoll("pr reiter |" + prZ + "|")
 NEXT
-' Einzeln: nur der gewaehlte Treffer (die Suche liest die Platte, dort steht
-' "neu" nur in b.dh).
+' Einzeln: nur der gewaehlte Treffer. Die Suche liest eine offene Datei
+' aus ihrem Reiter (seit 2026-10-02), "neu" steht also in a.dh (Reiter)
+' UND in b.dh -- gewaehlt wird der Treffer in b.dh.
 projektSuchen("neu", "")
-GUI_LISTBOX_SET_SELECTED(lstProbleme, 0)
+DIM prB AS INTEGER
+FOR prB = 0 TO GUI_LISTBOX_COUNT(lstProbleme) - 1
+    IF LEFT$(GUI_LISTBOX_ITEM(lstProbleme, prB), 5) = "b.dh:" THEN GUI_LISTBOX_SET_SELECTED(lstProbleme, prB)
+NEXT
 trefferErsetzen(TRUE, "zurueck")
 ' Eine andere Liste nimmt die Haken weg.
 problemModus = 0
