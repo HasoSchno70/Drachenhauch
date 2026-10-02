@@ -159,3 +159,54 @@ FOR i = 0 TO LEN(L) - 1
 NEXT
 --- erwartet
 probe spiel.dh 1 keine stelle
+
+=== viel ausgabe haelt die ide nicht fest
+' Stresstest 2026-10-02: 200000 Zeilen Ausgabe hielten die IDE 29 Sekunden
+' in EINEM Bild fest -- ausgabeVerteilen kopierte je Zeile den ganzen Rest
+' (MID$), und jede Zeile ging einzeln in die Liste und gleich wieder hinaus.
+' Jetzt wird einmal zerlegt, und nur die letzten 2000 Zeilen kommen in die
+' Liste (mehr behaelt sie ohnehin nicht). Die Grenze von 5 s ist grob --
+' vorher waren es 29, jetzt unter einer.
+DIM prBild AS INTEGER : prBild = 0
+DIM prMax AS FLOAT : prMax = 0.0
+DIM prLetzt AS FLOAT : prLetzt = 0.0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN befehl("start") : prLetzt = GET_TIME()
+IF prBild > 30 THEN
+    DIM prJ AS FLOAT : prJ = GET_TIME()
+    IF prJ - prLetzt > prMax THEN prMax = prJ - prLetzt
+    prLetzt = prJ
+    IF prozess < 0 AND prBild > 35 THEN
+        DIM prN AS INTEGER : prN = GUI_LISTBOX_COUNT(lstAusgabe)
+        protokoll("pr zeilen " + STR$(prN))
+        protokoll("pr erste " + GUI_LISTBOX_ITEM(lstAusgabe, 0))
+        protokoll("pr letzte " + GUI_LISTBOX_ITEM(lstAusgabe, prN - 1))
+        protokoll("pr flott " + STR$(prMax < 5.0))
+        EXIT(0)
+    END IF
+END IF
+--- argumente
+viel.dh
+--- umgebung
+DHRT_FRAMES=6000
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei viel.dh
+DIM i AS INTEGER
+FOR i = 1 TO 200000
+    PRINT "Zeile "; i; " mit etwas Text dahinter"
+NEXT
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr zeilen 2000
+pr erste Zeile 198001 mit etwas Text dahinter
+pr letzte Zeile 200000 mit etwas Text dahinter
+pr flott TRUE

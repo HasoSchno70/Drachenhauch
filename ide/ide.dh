@@ -12009,6 +12009,7 @@ SUB exportNachsehen()
 END SUB
 
 ' --- Ausfuehren --------------------------------------------------------
+CONST AUSGABE_MAX = 2000
 SUB ausgabe(zeile AS STRING)
     GUI_LISTBOX_ADD(lstAusgabe, zeile)
     ' Zeilen mit einer Stelle sind anklickbar -- das sieht man an der Farbe.
@@ -12023,22 +12024,37 @@ SUB ausgabe(zeile AS STRING)
             GUI_LISTBOX_COLOR(lstAusgabe, GUI_LISTBOX_COUNT(lstAusgabe) - 1, farbe)
         END IF
     END IF
-    IF GUI_LISTBOX_COUNT(lstAusgabe) > 2000 THEN GUI_LISTBOX_REMOVE(lstAusgabe, 0)
+    IF GUI_LISTBOX_COUNT(lstAusgabe) > AUSGABE_MAX THEN GUI_LISTBOX_REMOVE(lstAusgabe, 0)
     GUI_LISTBOX_SET_SELECTED(lstAusgabe, GUI_LISTBOX_COUNT(lstAusgabe) - 1)
 END SUB
 
 DIM ausgabeRest AS STRING : ausgabeRest = ""
 
+' Die vollstaendigen Zeilen aus Rest + neuem Text; was hinter dem letzten
+' Umbruch steht, bleibt als Rest. EINMAL zerlegt -- vorher kopierte MID$
+' fuer jede Zeile den ganzen Rest, und 200000 Zeilen Ausgabe hielten die IDE
+' 29 Sekunden in einem Bild fest (das Programm allein brauchte 1,3 s).
+FUNCTION zeilenAbtrennen(BYREF rest AS STRING, text AS STRING) AS ARRAY OF STRING
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(REPLACE$(rest + text, CHR$(13), ""), NL)
+    rest = teile[LEN(teile) - 1]
+    ARRAY_POP(teile)
+    RETURN teile
+END FUNCTION
+
 SUB ausgabeVerteilen(text AS STRING)
     IF text = "" THEN RETURN
-    ausgabeRest = ausgabeRest + text
-    WHILE INSTR(ausgabeRest, NL) >= 0
-        DIM p AS INTEGER : p = INSTR(ausgabeRest, NL)
-        DIM z AS STRING : z = LEFT$(ausgabeRest, p)
-        z = REPLACE$(z, CHR$(13), "")
-        ausgabe(z)
-        ausgabeRest = MID$(ausgabeRest, p + 1)
-    WEND
+    DIM zeilen AS ARRAY OF STRING : zeilen = zeilenAbtrennen(ausgabeRest, text)
+    ' Mehr Zeilen, als die Liste behaelt: nur die letzten -- die davor
+    ' fielen beim Einsetzen gleich wieder heraus.
+    DIM ab AS INTEGER : ab = 0
+    IF LEN(zeilen) >= AUSGABE_MAX THEN
+        GUI_LISTBOX_CLEAR(lstAusgabe)
+        ab = LEN(zeilen) - AUSGABE_MAX
+    END IF
+    DIM i AS INTEGER
+    FOR i = ab TO LEN(zeilen) - 1
+        ausgabe(zeilen[i])
+    NEXT
 END SUB
 
 ' Ein Programm starten -- als Lauf, im Debugger oder unter dem Profiler.
@@ -14196,11 +14212,8 @@ END SUB
 SUB stdoutVerteilen(text AS STRING)
     IF text = "" THEN RETURN
     IF prozessArt = "run" THEN ausgabeVerteilen(text) : RETURN
-    prozessRest = prozessRest + text
-    WHILE INSTR(prozessRest, NL) >= 0
-        DIM p AS INTEGER : p = INSTR(prozessRest, NL)
-        DIM z AS STRING : z = REPLACE$(LEFT$(prozessRest, p), CHR$(13), "")
-        prozessRest = MID$(prozessRest, p + 1)
+    DIM z AS STRING
+    FOR EACH z IN zeilenAbtrennen(prozessRest, text)
         IF prozessArt = "debug" THEN
             debugEreignis(z)
         ELSEIF LEFT$(z, 1) = "{" AND INSTR(z, CHR$(34) + "total_time" + CHR$(34)) >= 0 THEN
@@ -14210,7 +14223,7 @@ SUB stdoutVerteilen(text AS STRING)
         ELSE
             ausgabe(z)
         END IF
-    WEND
+    NEXT
 END SUB
 
 SUB prozessNachsehen()
