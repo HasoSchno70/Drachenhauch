@@ -1,0 +1,199 @@
+' raylib ausgereizt, Etappe 1 (2026-10-02): Formen, 9-Slice und Bilder im
+' Speicher. Jede Probe ist so gelegt, dass sie ohne den Befehl (oder mit
+' falscher Reihenfolge, falschem Winkelsinn) fiele: Winkel im Uhrzeigersinn,
+' Ecken im Uhrzeigersinn ab oben links, Raender in ihrer Groesse.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== kreisstueck, verlaufskreis, gedrehtes rechteck, vier ecken
+' PIE 0..120 Grad liegt rechts UNTEN (Uhrzeigersinn): bei 60 Grad orange,
+' bei -60 Grad (oben rechts) nichts. PIEOUTLINE ist innen leer.
+SCREEN(640, 360, "t")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 20, 30))
+    PIE(70, 70, 50, 0, 120, RGB(240, 160, 40))
+    PIEOUTLINE(70, 70, 50, 150, 300, WHITE)
+    CIRCLE_GRADIENT(200, 70, 50, WHITE, RGB(0, 0, 255))
+    BOXROT(330, 70, 90, 40, 30, RGB(60, 200, 120))
+    GRADIENT4(400, 20, 520, 120, RED, GREEN, BLUE, YELLOW)
+    FLIP()
+WEND
+--- bild
+85 96 #F0A028 +-20
+85 44 #141E1E +-12
+42 60 #14141E +-12
+200 70 #FFFFFF +-20
+246 70 #0000FF +-90
+200 70 <> 246 70
+364 90 #3CC878 +-20
+330 40 #14141E +-12
+285 70 #14141E +-12
+403 23 #FF0000 +-50
+517 23 #00FF00 +-50
+517 117 #0000FF +-50
+403 117 #FFFF00 +-50
+
+=== vielecke und gestrichelte linie
+' NGON mit 6 Ecken und Winkel 0: eine Ecke rechts, die Oberkante flach bei
+' y = 220 - 50 * sin(60) = 176.7. Das Fuenfeck mit Winkel 90 zeigt nach
+' unten, seine Oberkante liegt bei y = 180. Strich 10, Luecke 6 ab x = 280.
+SCREEN(640, 360, "t")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 20, 30))
+    NGON(70, 220, 6, 50, 0, RGB(180, 80, 220))
+    NGONOUTLINE(200, 220, 5, 50, 90, WHITE, 3)
+    LINEDASHED(280, 300, 620, 300, 10, 6, WHITE)
+    FLIP()
+WEND
+--- bild
+110 220 #B450DC +-20
+70 182 #B450DC +-20
+70 172 #14141E +-12
+200 220 #14141E +-12
+200 180 #FFFFFF +-80
+284 300 #FFFFFF +-40
+293 300 #14141E +-12
+300 300 #FFFFFF +-40
+
+=== neun teile: ecken und raender in ihrer groesse
+' Vorlage 24x24: roter Rand 6, blaue Mitte, gelbe Ecke oben links (0..5).
+' Gestreckt auf 300x120 bleibt der Rand 6 breit und die Ecke 6x6 -- ein
+' gewoehnlich gestrecktes Bild haette einen 75 breiten Rand.
+IMPORT "imgfx"
+SCREEN(640, 360, "t")
+DIM v AS IMAGE : v = IMAGE_NEW(24, 24, RGB(200, 40, 40))
+IMAGE_FILL_RECT(v, 6, 6, 17, 17, RGB(40, 80, 200))
+IMAGE_FILL_RECT(v, 0, 0, 5, 5, RGB(250, 220, 40))
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 20, 30))
+    DRAWIMAGE9(v, 300, 200, 300, 120, 6, 6, 6, 6)
+    FLIP()
+WEND
+--- bild
+450 260 #2850C8 +-20
+303 260 #C82828 +-20
+309 260 #2850C8 +-20
+596 260 #C82828 +-20
+590 260 #2850C8 +-20
+450 202 #C82828 +-20
+450 317 #C82828 +-20
+302 202 #FADC28 +-20
+309 202 #C82828 +-20
+
+=== neun teile folgen dem zoom der kamera
+' Mit Zoom 2 wird auch der Rand doppelt so breit (12 Punkte) -- raylibs
+' DrawTextureNPatch zeichnete die Ecken in Quellpixeln, also 6.
+IMPORT "imgfx"
+SCREEN(320, 200, "t")
+DIM v AS IMAGE : v = IMAGE_NEW(24, 24, RGB(200, 40, 40))
+IMAGE_FILL_RECT(v, 6, 6, 17, 17, RGB(40, 80, 200))
+CAMERA_SET(0, 0, 2.0)
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 20, 30))
+    DRAWIMAGE9(v, 10, 10, 100, 60, 6, 6, 6, 6)
+    FLIP()
+WEND
+--- bild
+22 60 #C82828 +-20
+30 60 #C82828 +-20
+36 60 #2850C8 +-20
+
+=== bilder in den speicher und zurueck
+' Ueber IMAGE_TO_BUFFER/IMAGE_FROM_BUFFER kommt Punkt fuer Punkt dasselbe
+' Bild zurueck, samt Durchsichtigkeit. Ohne Deckkraft-Kanal ist das PNG
+' Farbart 2 (RGB), mit ihm 6 (RGBA). JPG und BMP gehen ueber eine Datei,
+' die das Programm selbst schreibt und liest.
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(16, 12)
+IMAGE_FILL_RECT(b, 2, 2, 9, 7, RGB(10, 200, 30))
+IMAGE_FILL_RECT(b, 10, 3, 14, 10, RGB(250, 20, 90), 128)
+DIM p AS BUFFER : p = IMAGE_TO_BUFFER(b)
+PRINT "png "; BUFFER_GET(p, 1) = 80 AND BUFFER_GET(p, 2) = 78 AND BUFFER_GET(p, 3) = 71; " farbart "; BUFFER_GET(p, 25)
+DIM z AS IMAGE : z = IMAGE_FROM_BUFFER(p)
+PRINT "masse "; IMAGEWIDTH(z); "x"; IMAGEHEIGHT(z)
+DIM gleich AS BOOLEAN : gleich = TRUE
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 11
+    FOR x = 0 TO 15
+        IF GETALPHA(b, x, y) <> GETALPHA(z, x, y) THEN gleich = FALSE
+        IF GETALPHA(b, x, y) > 0 AND GETPIXEL(b, x, y) <> GETPIXEL(z, x, y) THEN gleich = FALSE
+    NEXT
+NEXT
+PRINT "punkt fuer punkt "; gleich; " durchsichtig "; GETALPHA(z, 0, 0); " halb "; GETALPHA(z, 12, 5)
+DIM q AS BUFFER : q = IMAGE_TO_BUFFER(b, FALSE)
+PRINT "ohne alpha farbart "; BUFFER_GET(q, 25)
+IMAGE_SAVE(b, "b.jpg")
+IMAGE_SAVE(b, "b.bmp")
+DIM j AS IMAGE : j = IMAGE_FROM_BUFFER(READALL_BYTES("b.jpg"))
+DIM m AS IMAGE : m = IMAGE_FROM_BUFFER(READALL_BYTES("b.bmp"))
+PRINT "jpg "; IMAGEWIDTH(j); "x"; IMAGEHEIGHT(j); " bmp "; IMAGEWIDTH(m); "x"; IMAGEHEIGHT(m); " "; HEX$(GETPIXEL(m, 4, 4))
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+png TRUE farbart 6
+masse 16x12
+punkt fuer punkt TRUE durchsichtig 0 halb 128
+ohne alpha farbart 2
+jpg 16x12 bmp 16x12 AC81E
+
+=== kein bildformat ist ein fehler
+IMPORT "imgfx"
+DIM p AS BUFFER : p = BUFFER_FROM_STRING("das ist kein bild")
+DIM z AS IMAGE : z = IMAGE_FROM_BUFFER(p)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+IMAGE_FROM_BUFFER: die Bytes sind kein bekanntes Bildformat
+
+=== ein kaputtes png ist ein fehler
+' Die Kennung stimmt, der Rest nicht.
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, RED)
+DIM p AS BUFFER : p = BUFFER_SLICE(IMAGE_TO_BUFFER(b), 0, 20)
+DIM z AS IMAGE : z = IMAGE_FROM_BUFFER(p)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+IMAGE_FROM_BUFFER: png liess sich nicht lesen
+
+=== falsche angaben sind fehler mit der form des befehls
+FUNCTION probe$(n AS INTEGER) AS STRING
+    TRY
+        SELECT CASE n
+            CASE 1 : NGON(10, 10, 2, 5, 0)
+            CASE 2 : LINEDASHED(0, 0, 10, 10, 0, 3)
+            CASE 3 : PIE(10, 10, 5, 0)
+            CASE 4 : GRADIENT4(0, 0, 10, 10, RED, GREEN, BLUE)
+            CASE 5
+                DIM v AS IMAGE : v = IMAGE_NEW(10, 10, RED)
+                DRAWIMAGE9(v, 0, 0, 50, 50, 6, 6, 6, 6)
+            CASE 6
+                DIM w AS IMAGE : w = IMAGE_NEW(10, 10, RED)
+                DRAWIMAGE9(w, 0, 0, 50, 50, -1, 2, 2, 2)
+        END SELECT
+        RETURN "kein fehler"
+    CATCH e
+        RETURN e
+    END TRY
+END FUNCTION
+SCREEN(100, 100, "t")
+DIM i AS INTEGER
+FOR i = 1 TO 6
+    PRINT probe$(i)
+NEXT
+--- umgebung
+DHRT_FRAMES=2
+--- enthaelt
+NGON: ein Vieleck hat mindestens 3 Ecken, nicht 2
+LINEDASHED: Strich und Luecke muessen mindestens 1 sein
+PIE: erwartet (x, y, r, von_grad, bis_grad[, farbe])
+GRADIENT4: erwartet (x1, y1, x2, y2, oben_links, oben_rechts, unten_rechts, unten_links)
+DRAWIMAGE9: Raender 6 + 6 bzw. 6 + 6 sind groesser als das Bild (10x10)
+DRAWIMAGE9: die Raender duerfen nicht negativ sein
+
+=== zeichnen ohne screen ist ein fehler
+PIE(10, 10, 5, 0, 90)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+PIE: es gibt noch kein Fenster

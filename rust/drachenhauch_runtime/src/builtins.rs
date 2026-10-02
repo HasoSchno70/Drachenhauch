@@ -5654,11 +5654,11 @@ fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<DhFile>>, String
 /// sinnvoll im Speicher haelt, und immer noch eine klare Ansage.
 const MAX_BUFFER: i64 = 1 << 30;
 
-fn buf_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<Vec<u8>>>, String> {
+pub(crate) fn buf_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<Vec<u8>>>, String> {
     match v { Value::Buffer(b) => Ok(b), _ => Err(format!("{} erwartet BUFFER", fn_)) }
 }
 
-fn neuer_buffer(bytes: Vec<u8>) -> Value {
+pub(crate) fn neuer_buffer(bytes: Vec<u8>) -> Value {
     Value::Buffer(Rc::new(RefCell::new(bytes)))
 }
 
