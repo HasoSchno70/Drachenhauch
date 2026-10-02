@@ -88,10 +88,10 @@ Und was falsch war, ohne abzustürzen:
 
 ## Unter der Haube
 
-**Zahlen.** Die Befehlsreferenz wächst von 2024 auf **ZAHL_BEFEHLE**
-Einträge, es bleiben 48 Module und ZAHL_BEISPIELE Beispiele.
-**ZAHL_FAELLE Fälle in ZAHL_SAMMLUNGEN Prüfsammlungen** (vorher 4571 in
-340) und **ZAHL_RUST Rust-Testfunktionen** (vorher 458).
+**Zahlen.** Die Befehlsreferenz wächst von 2024 auf **2029**
+Einträge, es bleiben 48 Module und 216 Beispiele.
+**4673 Fälle in 356 Prüfsammlungen** (vorher 4571 in
+340) und **476 Rust-Testfunktionen** (vorher 458).
 
 * Die gui merkt sich die Zerlegung eines Textbereichs, solange sein Text
   derselbe ist: `GUI_TEXTAREA_CURSOR`, `_VIEW` und `_POS_AT` fragen bei
