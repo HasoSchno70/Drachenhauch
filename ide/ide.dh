@@ -4206,6 +4206,7 @@ SUB pruefen()
     DIM fz AS ARRAY OF INTEGER : fz = []
     DIM ftx AS ARRAY OF STRING : ftx = []
     DIM ffa AS ARRAY OF INTEGER : ffa = []
+    fehlerSammelNr = {}
     FOR i = 0 TO n - 1
         DIM p AS STRING : p = STR$(i)
         zeilen[i] = JSON_GET_INT(j, p + ".zeile")
@@ -5767,9 +5768,13 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
     DIM zl AS ARRAY OF INTEGER : zl = []
     DIM tx AS ARRAY OF STRING : tx = []
     DIM i AS INTEGER
+    ' Zeile -> Eintrag, damit jeder weitere Hinweis seine Zeile ohne
+    ' ARRAY_INDEXOF findet (bei tausenden Meldungen quadratisch).
+    DIM zlNr AS MAP OF INTEGER : zlNr = {}
     IF ta = zaehlFeld THEN
         FOR i = 0 TO LEN(zaehlZeilen) - 1
             ARRAY_PUSH(zl, zaehlZeilen[i]) : ARRAY_PUSH(tx, zaehlTexte[i])
+            IF NOT MAPHAS(zlNr, STR$(zaehlZeilen[i])) THEN MAPPUT(zlNr, STR$(zaehlZeilen[i]), LEN(zl) - 1)
         NEXT
     END IF
     ' Die Profilzahlen: an den Zeilen, an denen ihre Farben JETZT stehen
@@ -5780,21 +5785,21 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
             IF LEN(wz) = 0 THEN wz = GUI_TEXTAREA_LINE_COLORS_GET(ta)
             DIM wk AS INTEGER : wk = waermeNr[i]
             IF waermeTexte[i] <> "" AND wk < LEN(wz) THEN
-                DIM wi AS INTEGER : wi = ARRAY_INDEXOF(zl, wz[wk])
+                DIM wi AS INTEGER : wi = IIF(MAPHAS(zlNr, STR$(wz[wk])), MAPGET(zlNr, STR$(wz[wk])), -1)
                 IF wi >= 0 THEN
                     tx[wi] = tx[wi] + "   ·   " + waermeTexte[i]
                 ELSE
-                    ARRAY_PUSH(zl, wz[wk]) : ARRAY_PUSH(tx, waermeTexte[i])
+                    ARRAY_PUSH(zl, wz[wk]) : MAPPUT(zlNr, STR$(wz[wk]), LEN(zl) - 1) : ARRAY_PUSH(tx, waermeTexte[i])
                 END IF
             END IF
         END IF
     NEXT
     IF ta = blameFeld AND blameText <> "" AND blameMarkeZeile > 0 THEN
-        DIM k AS INTEGER : k = ARRAY_INDEXOF(zl, blameMarkeZeile)
+        DIM k AS INTEGER : k = IIF(MAPHAS(zlNr, STR$(blameMarkeZeile)), MAPGET(zlNr, STR$(blameMarkeZeile)), -1)
         IF k >= 0 THEN
             tx[k] = tx[k] + "   ·   " + blameText
         ELSE
-            ARRAY_PUSH(zl, blameMarkeZeile) : ARRAY_PUSH(tx, blameText)
+            ARRAY_PUSH(zl, blameMarkeZeile) : MAPPUT(zlNr, STR$(blameMarkeZeile), LEN(zl) - 1) : ARRAY_PUSH(tx, blameText)
         END IF
     END IF
     ' Die Meldungen von Pruefen stehen VORN und faerben den ganzen Hinweis
@@ -5806,34 +5811,34 @@ SUB hinweiseZeigen(ta AS GUI_WIDGET)
     NEXT
     IF paramNamenAn AND ta = paramFeld THEN
         FOR i = 0 TO LEN(paramZeilen) - 1
-            DIM pk AS INTEGER : pk = ARRAY_INDEXOF(zl, paramZeilen[i])
+            DIM pk AS INTEGER : pk = IIF(MAPHAS(zlNr, STR$(paramZeilen[i])), MAPGET(zlNr, STR$(paramZeilen[i])), -1)
             IF pk >= 0 THEN
                 tx[pk] = tx[pk] + "   ·   " + paramTexte[i]
             ELSE
-                ARRAY_PUSH(zl, paramZeilen[i]) : ARRAY_PUSH(tx, paramTexte[i])
+                ARRAY_PUSH(zl, paramZeilen[i]) : MAPPUT(zlNr, STR$(paramZeilen[i]), LEN(zl) - 1) : ARRAY_PUSH(tx, paramTexte[i])
                 ARRAY_PUSH(farben, F_TYP)
             END IF
         NEXT
     END IF
     IF typHinweiseAn AND ta = typFeld THEN
         FOR i = 0 TO LEN(typZeilen) - 1
-            DIM tk AS INTEGER : tk = ARRAY_INDEXOF(zl, typZeilen[i])
+            DIM tk AS INTEGER : tk = IIF(MAPHAS(zlNr, STR$(typZeilen[i])), MAPGET(zlNr, STR$(typZeilen[i])), -1)
             IF tk >= 0 THEN
                 tx[tk] = tx[tk] + "   ·   " + typTexte[i]
             ELSE
-                ARRAY_PUSH(zl, typZeilen[i]) : ARRAY_PUSH(tx, typTexte[i])
+                ARRAY_PUSH(zl, typZeilen[i]) : MAPPUT(zlNr, STR$(typZeilen[i]), LEN(zl) - 1) : ARRAY_PUSH(tx, typTexte[i])
                 ARRAY_PUSH(farben, F_TYP)
             END IF
         NEXT
     END IF
     IF fehlerEndeAn AND ta = fehlerFeld THEN
         FOR i = 0 TO LEN(fehlerZeilen) - 1
-            DIM fk AS INTEGER : fk = ARRAY_INDEXOF(zl, fehlerZeilen[i])
+            DIM fk AS INTEGER : fk = IIF(MAPHAS(zlNr, STR$(fehlerZeilen[i])), MAPGET(zlNr, STR$(fehlerZeilen[i])), -1)
             IF fk >= 0 THEN
                 tx[fk] = fehlerTexte[i] + "   ·   " + tx[fk]
                 farben[fk] = fehlerFarben[i]
             ELSE
-                ARRAY_PUSH(zl, fehlerZeilen[i]) : ARRAY_PUSH(tx, fehlerTexte[i])
+                ARRAY_PUSH(zl, fehlerZeilen[i]) : MAPPUT(zlNr, STR$(fehlerZeilen[i]), LEN(zl) - 1) : ARRAY_PUSH(tx, fehlerTexte[i])
                 ARRAY_PUSH(farben, fehlerFarben[i])
             END IF
         NEXT
@@ -5845,17 +5850,22 @@ END SUB
 ' Zeile kommen in EINEN Hinweis; ein Fehler faerbt ihn rot, auch wenn eine
 ' Warnung zuerst kam. Lange Meldungen werden gekuerzt -- der ganze Satz
 ' steht in der Liste und im Tooltip.
+DIM fehlerSammelNr AS MAP OF INTEGER
 SUB fehlerSammeln(fz AS ARRAY OF INTEGER, ftx AS ARRAY OF STRING, ffa AS ARRAY OF INTEGER, _
                   zeile AS INTEGER, meldung AS STRING, istFehler AS BOOLEAN)
     DIM m AS STRING : m = TRIM$(REPLACE$(meldung, NL, " "))
     IF LEN(m) > 90 THEN m = LEFT$(m, 87) + "..."
     DIM farbe AS INTEGER : farbe = IIF(istFehler, &HE06060, &HD8B048)
-    DIM k AS INTEGER : k = ARRAY_INDEXOF(fz, zeile)
+    ' Ueber eine MAP statt ARRAY_INDEXOF: bei 5000 Meldungen war das
+    ' Suchen quadratisch (Stresstest 2026-10-02). pruefen leert sie.
+    DIM k AS INTEGER : k = -1
+    IF MAPHAS(fehlerSammelNr, STR$(zeile)) THEN k = MAPGET(fehlerSammelNr, STR$(zeile))
     IF k >= 0 THEN
         ftx[k] = ftx[k] + "  ·  " + m
         IF istFehler THEN ffa[k] = farbe
     ELSE
         ARRAY_PUSH(fz, zeile) : ARRAY_PUSH(ftx, m) : ARRAY_PUSH(ffa, farbe)
+        MAPPUT(fehlerSammelNr, STR$(zeile), LEN(fz) - 1)
     END IF
 END SUB
 
@@ -14162,6 +14172,15 @@ SUB profilAufnehmen()
     IF prozessStarten("profile") THEN protokoll("profil gestartet")
 END SUB
 
+' Vergleich fuer SORT in profilAnzeigen: teurer zuerst, bei gleicher Zeit
+' die fruehere Zeile (es gibt keine Closures, daher das Feld daneben).
+DIM profSortZeit AS ARRAY OF FLOAT : profSortZeit = []
+FUNCTION profVergleich(a AS INTEGER, b AS INTEGER) AS INTEGER
+    IF profSortZeit[b] > profSortZeit[a] THEN RETURN 1
+    IF profSortZeit[b] < profSortZeit[a] THEN RETURN -1
+    RETURN a - b
+END FUNCTION
+
 SUB profilAnzeigen(zeile AS STRING)
     DIM j AS JSON_HANDLE : j = JSON_PARSE(zeile)
     ausgabeVerteilen(JSON_GET_STRING(j, "output"))
@@ -14183,19 +14202,26 @@ SUB profilAnzeigen(zeile AS STRING)
             IF JSON_GET_STRING(j, p + ".file") <> prozessDatei AND JSON_GET_STRING(j, p + ".file") <> "" THEN zd[i] = JSON_GET_STRING(j, p + ".file")
         END IF
     NEXT
-    ' Nach Zeit absteigend -- die teuerste Zeile zuerst.
-    DIM k AS INTEGER
-    FOR i = 0 TO n - 2
-        DIM best AS INTEGER : best = i
-        FOR k = i + 1 TO n - 1
-            IF zt[k] > zt[best] THEN best = k
-        NEXT
-        IF best <> i THEN
-            DIM t1 AS INTEGER : t1 = zl[i] : zl[i] = zl[best] : zl[best] = t1
-            t1 = za[i] : za[i] = za[best] : za[best] = t1
-            DIM t2 AS FLOAT : t2 = zt[i] : zt[i] = zt[best] : zt[best] = t2
-            DIM t3 AS STRING : t3 = zd[i] : zd[i] = zd[best] : zd[best] = t3
-        END IF
+    ' Nach Zeit absteigend -- die teuerste Zeile zuerst. Mit SORT ueber die
+    ' Indizes: die Auswahlsortierung davor war quadratisch, ein Programm mit
+    ' 20000 Zeilen hielt die IDE beim Anzeigen 13,7 s fest (Stresstest
+    ' 2026-10-02).
+    profSortZeit = []
+    DIM folge AS ARRAY OF INTEGER : folge = []
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(profSortZeit, zt[i])
+        ARRAY_PUSH(folge, i)
+    NEXT
+    SORT(folge, profVergleich)
+    DIM sl[MAX(n, 1)] AS INTEGER
+    DIM sa[MAX(n, 1)] AS INTEGER
+    DIM st[MAX(n, 1)] AS FLOAT
+    DIM sd[MAX(n, 1)] AS STRING
+    FOR i = 0 TO n - 1
+        sl[i] = zl[folge[i]] : sa[i] = za[folge[i]] : st[i] = zt[folge[i]] : sd[i] = zd[folge[i]]
+    NEXT
+    FOR i = 0 TO n - 1
+        zl[i] = sl[i] : za[i] = sa[i] : zt[i] = st[i] : zd[i] = sd[i]
     NEXT
     ' Die Quelle zur Messung: der offene Reiter, sonst die Datei -- ohne sie
     ' gaebe es weder den Quelltext je Zeile noch die Funktionen.
@@ -14298,44 +14324,68 @@ SUB profilTabelleFuellen()
     DIM gVon AS ARRAY OF INTEGER : gVon = []
     DIM gZeilen AS ARRAY OF INTEGER : gZeilen = []
     DIM gZeit AS ARRAY OF FLOAT : gZeit = []
+    ' Zeile -> innerster Bereich, EINMAL aufgebaut: die groessten Bereiche
+    ' zuerst, jeder kleinere ueberschreibt seine Zeilen. Vorher ging jede
+    ' gemessene Zeile alle Bereiche durch und suchte ihre Gruppe mit
+    ' ARRAY_INDEXOF, sortiert wurde per Auswahl -- bei 2000 Unterprogrammen
+    ' 2,9 s in einem Bild (Stresstest 2026-10-02).
+    DIM innen AS MAP OF INTEGER : innen = {}
+    profSortZeit = []
+    DIM folgeB AS ARRAY OF INTEGER : folgeB = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(profBerName) - 1
+        ARRAY_PUSH(profSortZeit, profBerBis[k] - profBerVon[k])
+        ARRAY_PUSH(folgeB, k)
+    NEXT
+    SORT(folgeB, profVergleich)
+    FOR EACH k IN folgeB
+        DIM zz AS INTEGER
+        FOR zz = profBerVon[k] TO profBerBis[k]
+            MAPPUT(innen, profBerDatei[k] + "|" + STR$(zz), k)
+        NEXT
+    NEXT
+    DIM gNr AS MAP OF INTEGER : gNr = {}
     FOR i = 0 TO n - 1
         DIM z AS INTEGER : z = profRohZ[i]
         DIM name AS STRING : name = "(Hauptprogramm)"
         IF profDatei$(i) <> prozessDatei THEN name = "(" + BASENAME(profDatei$(i)) + ")"
         DIM von AS INTEGER : von = 1
-        DIM spanne AS INTEGER : spanne = 2000000000
-        DIM k AS INTEGER
-        FOR k = 0 TO LEN(profBerName) - 1
-            IF profBerDatei[k] = profDatei$(i) AND z >= profBerVon[k] AND z <= profBerBis[k] AND profBerBis[k] - profBerVon[k] < spanne THEN
-                spanne = profBerBis[k] - profBerVon[k]
-                name = profBerName[k] : von = profBerVon[k]
-                IF profDatei$(i) <> prozessDatei THEN name = BASENAME(profDatei$(i)) + ": " + name
-            END IF
-        NEXT
-        DIM g AS INTEGER : g = ARRAY_INDEXOF(gName, name)
+        DIM schl AS STRING : schl = profDatei$(i) + "|" + STR$(z)
+        IF MAPHAS(innen, schl) THEN
+            k = MAPGET(innen, schl)
+            name = profBerName[k] : von = profBerVon[k]
+            IF profDatei$(i) <> prozessDatei THEN name = BASENAME(profDatei$(i)) + ": " + name
+        END IF
+        DIM g AS INTEGER : g = -1
+        IF MAPHAS(gNr, name) THEN g = MAPGET(gNr, name)
         IF g < 0 THEN
             ARRAY_PUSH(gName, name) : ARRAY_PUSH(gVon, von) : ARRAY_PUSH(gZeilen, 0) : ARRAY_PUSH(gZeit, 0.0) : ARRAY_PUSH(gDatei, profDatei$(i))
             g = LEN(gName) - 1
+            MAPPUT(gNr, name, g)
         END IF
         gZeilen[g] = gZeilen[g] + 1
         gZeit[g] = gZeit[g] + profRohT[i]
     NEXT
-    ' Nach Zeit absteigend.
+    ' Nach Zeit absteigend (bei gleicher Zeit in der Folge des Auftretens).
     DIM m AS INTEGER : m = LEN(gName)
+    profSortZeit = []
+    DIM folgeG AS ARRAY OF INTEGER : folgeG = []
     DIM a AS INTEGER
-    FOR a = 0 TO m - 2
-        DIM best AS INTEGER : best = a
-        FOR k = a + 1 TO m - 1
-            IF gZeit[k] > gZeit[best] THEN best = k
-        NEXT
-        IF best <> a THEN
-            DIM t0 AS STRING : t0 = gName[a] : gName[a] = gName[best] : gName[best] = t0
-            DIM t1 AS INTEGER : t1 = gVon[a] : gVon[a] = gVon[best] : gVon[best] = t1
-            t1 = gZeilen[a] : gZeilen[a] = gZeilen[best] : gZeilen[best] = t1
-            DIM t2 AS FLOAT : t2 = gZeit[a] : gZeit[a] = gZeit[best] : gZeit[best] = t2
-            DIM t3 AS STRING : t3 = gDatei[a] : gDatei[a] = gDatei[best] : gDatei[best] = t3
-        END IF
+    FOR a = 0 TO m - 1
+        ARRAY_PUSH(profSortZeit, gZeit[a])
+        ARRAY_PUSH(folgeG, a)
     NEXT
+    SORT(folgeG, profVergleich)
+    DIM sName AS ARRAY OF STRING : sName = []
+    DIM sDatei AS ARRAY OF STRING : sDatei = []
+    DIM sVon AS ARRAY OF INTEGER : sVon = []
+    DIM sZeilen AS ARRAY OF INTEGER : sZeilen = []
+    DIM sZeit AS ARRAY OF FLOAT : sZeit = []
+    FOR EACH a IN folgeG
+        ARRAY_PUSH(sName, gName[a]) : ARRAY_PUSH(sDatei, gDatei[a]) : ARRAY_PUSH(sVon, gVon[a])
+        ARRAY_PUSH(sZeilen, gZeilen[a]) : ARRAY_PUSH(sZeit, gZeit[a])
+    NEXT
+    gName = sName : gDatei = sDatei : gVon = sVon : gZeilen = sZeilen : gZeit = sZeit
     GUI_TABLE_HEADERS(tblProfil, [tr$("Funktion"), tr$("ab Zeile"), tr$("Zeilen"), "ms", tr$("Anteil")])
     GUI_TABLE_COL_WIDTHS(tblProfil, [240, 80, 70, 90, 80])
     FOR a = 0 TO m - 1

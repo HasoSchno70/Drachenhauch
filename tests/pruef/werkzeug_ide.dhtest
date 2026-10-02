@@ -3166,3 +3166,36 @@ pr offen 12
 pr gewechselt d3.dh 12
 pr neu neu.dh 12 haupt noch da FALSE
 pr alle geaendert TRUE 12 Höchstens
+
+=== pruefen mit 5000 warnungen bleibt bedienbar
+' Stresstest 2026-10-02: eine Datei mit 5000 Warnungen kostete je Pruefen
+' 7,3 s -- CODE_CHECK$ zerlegte je Meldung den ganzen Text, und die IDE
+' suchte jede Meldung mit ARRAY_INDEXOF in den bisherigen (fehlerSammeln,
+' hinweiseZeigen). Jetzt rund 0,2 s. Grenze grob: 2 s.
+DIM prT AS FLOAT : prT = GET_TIME()
+pruefen()
+protokoll("pr probleme " + STR$(GUI_LISTBOX_COUNT(lstProbleme)) + " flott " + STR$(GET_TIME() - prT < 2.0) + " hinweise " + STR$(LEN(fehlerZeilen)))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+warn.dh
+--- umgebung
+DHRT_FRAMES=100
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM z AS ARRAY OF STRING : z = ["DIM a AS INTEGER"]
+DIM i AS INTEGER
+FOR i = 0 TO 4999
+    ARRAY_PUSH(z, "a = unbekannt" + STR$(i) + " + 1")
+NEXT
+WRITEALL("warn.dh", JOIN$(z, CHR$(10)) + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr probleme 5000 flott TRUE hinweise 5000

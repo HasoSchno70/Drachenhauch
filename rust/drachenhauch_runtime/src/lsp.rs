@@ -89,8 +89,9 @@ fn senden(s: &Sender, msg: Value) {
 /// ohne die Ruecknahme rutschten alle Marker um die Laenge des Inlinierten.
 /// Ein Fehler in einer importierten Datei landet in Zeile 1 mit Herkunft.
 pub fn diagnose(text: &str, basis: &Path) -> Vec<Value> {
-    let mut aus = diagnose_uebersetzer(text, basis);
-    let zeilen: Vec<&str> = text.split('\n').collect();
+    let kx = KorrKontext::neu(text);
+    let mut aus = diagnose_uebersetzer(text, basis, &kx);
+    let zeilen: &[&str] = &kx.zeilen;
     for (z0, name) in unbenutzte(text) {
         let meldung = format!("'{}' wird angelegt, aber nie benutzt.", name);
         let (von, bis) = fehler_bereich(zeilen.get(z0).copied().unwrap_or(""), 0, &meldung);
@@ -98,7 +99,7 @@ pub fn diagnose(text: &str, basis: &Path) -> Vec<Value> {
             "range": {"start": {"line": z0, "character": von}, "end": {"line": z0, "character": bis}},
             "severity": 4, "source": "drachenhauch", "message": meldung, "tags": [1],
         });
-        let k = korrekturen(text, z0, von, bis, &meldung);
+        let k = korrekturen_mit(&kx, z0, von, bis, &meldung);
         if !k.is_empty() {
             d["data"] = json!({"korrekturen": k.into_iter().map(|(titel, aend)| json!({
                 "titel": titel,
@@ -135,7 +136,7 @@ pub fn typ_hinweise(text: &str, basis: &Path) -> Vec<(u32, String, String)> {
     aus
 }
 
-fn diagnose_uebersetzer(text: &str, basis: &Path) -> Vec<Value> {
+fn diagnose_uebersetzer(text: &str, basis: &Path, kx: &KorrKontext) -> Vec<Value> {
     let roh = crate::check_source(text, basis, "<editor>");
     let herkunft = crate::preprocess::process(text, basis).ok().map(|r| r.2);
     let zeilen: Vec<&str> = text.split('\n').collect();
@@ -165,7 +166,7 @@ fn diagnose_uebersetzer(text: &str, basis: &Path) -> Vec<Value> {
             "range": {"start": {"line": z0, "character": von}, "end": {"line": z0, "character": bis}},
             "severity": schwere, "source": "drachenhauch", "message": meldung,
         });
-        let k = if importiert { Vec::new() } else { korrekturen(text, z0, von, bis, &meldung) };
+        let k = if importiert { Vec::new() } else { korrekturen_mit(kx, z0, von, bis, &meldung) };
         if !k.is_empty() {
             let liste: Vec<Value> = k.into_iter().map(|(titel, aend)| json!({
                 "titel": titel,
@@ -322,8 +323,45 @@ fn einfaches_dim(zeile: &str) -> Option<String> {
 /// So bleibt es EINE Quelle: was die Meldung vorschlaegt, ist auch das, was
 /// die Korrektur tut. Nur Korrekturen, die sicher genau diese Stelle treffen;
 /// lieber keine als eine, die etwas anderes aendert, als ihr Titel sagt.
+/// Was `korrekturen` ueber den ganzen Text braucht -- EINMAL je Pruefung
+/// gerechnet. Je Meldung neu zerlegt (Zeilen, Bereiche, Fundstellen) war das
+/// Pruefen quadratisch in der Zahl der Meldungen: eine Datei mit 5000
+/// Warnungen kostete je CODE_CHECK$ 6,6 s, und die IDE prueft nach jeder
+/// Tipp-Pause (Stresstest 2026-10-02).
+pub struct KorrKontext<'a> {
+    text: &'a str,
+    zeilen: Vec<&'a str>,
+    bereiche: std::cell::OnceCell<Vec<crate::symbole::Bereich>>,
+    kopf: std::cell::OnceCell<usize>,
+    namen: std::cell::RefCell<std::collections::HashMap<String, String>>,
+}
+
+impl<'a> KorrKontext<'a> {
+    pub fn neu(text: &'a str) -> Self {
+        KorrKontext {
+            text, zeilen: text.split('\n').collect(),
+            bereiche: std::cell::OnceCell::new(), kopf: std::cell::OnceCell::new(),
+            namen: std::cell::RefCell::new(std::collections::HashMap::new()),
+        }
+    }
+    fn bereiche(&self) -> &[crate::symbole::Bereich] { self.bereiche.get_or_init(|| crate::symbole::bereiche(self.text)) }
+    fn kopf(&self) -> usize { *self.kopf.get_or_init(|| kopf_ende(&self.zeilen)) }
+    /// Der Name so, wie er im Programm steht ("lSumme" statt "lsumme").
+    fn schreibweise(&self, v: &str) -> String {
+        if let Some(n) = self.namen.borrow().get(v) { return n.clone(); }
+        let n = crate::symbole::fundstellen(self.text, v).into_iter().next()
+            .map(|f| f.name).unwrap_or_else(|| v.to_string());
+        self.namen.borrow_mut().insert(v.to_string(), n.clone());
+        n
+    }
+}
+
 pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str) -> Vec<(String, Vec<Aenderung>)> {
-    let zeilen: Vec<&str> = text.split('\n').collect();
+    korrekturen_mit(&KorrKontext::neu(text), z0, von, bis, meldung)
+}
+
+pub fn korrekturen_mit(kx: &KorrKontext, z0: usize, von: usize, bis: usize, meldung: &str) -> Vec<(String, Vec<Aenderung>)> {
+    let zeilen: &[&str] = &kx.zeilen;
     // Die Meldung am Programmende steht oft HINTER der letzten Zeile.
     let zeile = zeilen.get(z0).copied().unwrap_or("");
     let z: Vec<char> = zeile.chars().collect();
@@ -342,8 +380,7 @@ pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str)
                 if v.is_empty() || !v.chars().all(wortzeichen) || v.eq_ignore_ascii_case(&wort) { continue; }
                 // Der Compiler kennt Variablen nur klein ("lsumme"); geschrieben
                 // wird der Name so, wie er im Programm steht ("lSumme").
-                let v = crate::symbole::fundstellen(text, v).into_iter().next()
-                    .map(|f| f.name).unwrap_or_else(|| v.to_string());
+                let v = kx.schreibweise(v);
                 aus.push((format!("Ersetzen durch {}", v), vec![(z0, von, bis, v)]));
             }
         }
@@ -398,7 +435,7 @@ pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str)
         Some("WEND".to_string())
     } else { None };
     if let Some(schluss) = schluss.as_deref() {
-        if let Some((ende, ein)) = blockende_stelle(&zeilen, schluss) {
+        if let Some((ende, ein)) = blockende_stelle(zeilen, schluss) {
             let laenge = zeilen[ende].chars().count();
             aus.push((format!("{} ergaenzen", schluss), vec![(ende, laenge, laenge, format!("\n{}{}", ein, schluss))]));
         }
@@ -411,7 +448,7 @@ pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str)
         if let Some(q) = rest.find('"') {
             let modul = &rest[..q];
             if !modul.is_empty() && modul.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-                let ziel = kopf_ende(&zeilen);
+                let ziel = kx.kopf();
                 aus.push((format!("IMPORT \"{}\" einfuegen", modul), vec![(ziel, 0, 0, format!("IMPORT \"{}\"\n", modul))]));
             }
         }
@@ -431,7 +468,7 @@ pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str)
         let rhs = zuweisung_rechts(zeile, &wort);
         let typ = typ_raten(&wort, rhs.as_deref());
         let einzug = |s: &str| s.chars().take_while(|c| c.is_whitespace()).collect::<String>();
-        let bereiche = crate::symbole::bereiche(text);
+        let bereiche = kx.bereiche();
         let ln = z0 + 1;
         let umgebend = bereiche.iter()
             .filter(|b| matches!(b.art, "sub" | "function" | "property") && b.zeile < ln && ln <= b.ende)
@@ -456,7 +493,7 @@ pub fn korrekturen(text: &str, z0: usize, von: usize, bis: usize, meldung: &str)
         // nicht vor der SUB -- liefe das Hauptprogramm vorher, waere der
         // Platz beim ersten Aufruf noch leer.
         if umgebend.is_some() {
-            let oben = kopf_ende(&zeilen);
+            let oben = kx.kopf();
             aus.push((format!("DIM {} AS {} global anlegen (oben in der Datei)", wort, typ),
                       vec![(oben, 0, 0, format!("DIM {} AS {}\n", wort, typ))]));
         }
