@@ -1,0 +1,124 @@
+' Lange Zeilen im Code-Feld (Stresstest 2026-10-02).
+'
+' Farbabschnitte setzt das Feld ueber die Breite ihres Vorspanns -- und mass
+' den fuer JEDEN Lauf neu. Ueber eine Zeile war das quadratisch: 11000
+' Zeichen kosteten 850 ms je Bild, eine Datenzeile mit 270000 Zeichen
+' haengte die IDE. Jetzt wird nur das Sichtbare gemessen, und mit festem
+' (geladenem) Font Stueck fuer Stueck aufaddiert. Geprueft wird beides:
+' farbig gezeichnet (abwechselnd gelb und cyan, also viele Laeufe) steht der
+' Text auf DENSELBEN Punkten wie ungefaerbt (am Zeilenanfang und weit
+' rechts gerollt), und eine lange Zeile zeichnet flott.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== farbig und ungefaerbt auf denselben punkten
+IMPORT "gui"
+SCREEN(900, 200, "t", 1)
+DIM font AS INTEGER : font = LOADFONT(ARG$(0), 20)
+DIM z AS STRING : z = ""
+DIM i AS INTEGER
+FOR i = 1 TO 1500
+    z = z + "wert" + STR$(i) + ", "
+NEXT
+FUNCTION vergleich(mitFont AS BOOLEAN, spalte AS INTEGER) AS STRING
+    DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 900, 200)
+    GUI_WINDOW_CHROME(win, FALSE)
+    DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(win, 10, 10, 860, 120)
+    IF mitFont THEN GUI_SET_FONT(ta, font)
+    GUI_SET_COLOR(ta, "fg", &HFFFF00)
+    GUI_SET_TEXT(ta, z)
+    GUI_TEXTAREA_GOTO(ta, 1, spalte)
+    DIM st AS ARRAY OF INTEGER : st = []
+    DIM le AS ARRAY OF INTEGER : le = []
+    DIM fa AS ARRAY OF INTEGER : fa = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(z) - 1 STEP 3
+        ARRAY_PUSH(st, k) : ARRAY_PUSH(le, 2) : ARRAY_PUSH(fa, &H00FFFF)
+    NEXT
+    DIM b AS INTEGER
+    FOR b = 1 TO 4
+        GUI_UPDATE()
+        CLS(BLACK) : GUI_DRAW() : FLIP()
+    NEXT
+    SAVESCREENSHOT("ohne.png")
+    GUI_TEXTAREA_SPANS(ta, st, le, fa)
+    FOR b = 1 TO 4
+        GUI_UPDATE()
+        CLS(BLACK) : GUI_DRAW() : FLIP()
+    NEXT
+    SAVESCREENSHOT("mit.png")
+    GUI_WINDOW_DESTROY(win)
+    DIM a AS IMAGE : a = LOADIMAGE("ohne.png")
+    DIM m AS IMAGE : m = LOADIMAGE("mit.png")
+    DIM anders AS INTEGER : anders = 0
+    DIM gelb AS INTEGER : gelb = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 14 TO 40
+        FOR x = 14 TO 860
+            ' Gelb (255,255,0) und Cyan (0,255,255) teilen den Gruenanteil:
+            ' gleich ist er genau dann, wenn die Buchstaben auf denselben
+            ' Punkten stehen.
+            IF ((GETPIXEL(a, x, y) SHR 8) BAND 255) <> ((GETPIXEL(m, x, y) SHR 8) BAND 255) THEN anders = anders + 1
+            IF (GETPIXEL(a, x, y) BAND &HFFFF00) = &HFFFF00 THEN gelb = gelb + 1
+        NEXT
+    NEXT
+    IMAGE_FREE(a) : IMAGE_FREE(m)
+    RETURN "anders " + STR$(anders) + " text da " + STR$(gelb > 200)
+END FUNCTION
+PRINT "font anfang "; vergleich(TRUE, 1)
+PRINT "font rechts "; vergleich(TRUE, 9000)
+' Die eingebaute Schrift misst ganzzahlig (raylibs MeasureText): ein
+' farbiger Lauf beginnt dort auf dem abgeschnittenen Pixel, ungefaerbter
+' Text auf Kommastellen -- weniger als ein Punkt, ohne Aufsummieren, und so
+' schon mit 2026.18. Verglichen wird darum nur mit geladener Schrift (dem
+' Weg, der aufaddiert, und dem des Code-Felds der IDE).
+--- argumente
+{sammlung}/../../circuitrunner/assets/font.ttf
+--- erwartet
+font anfang anders 0 text da TRUE
+font rechts anders 0 text da TRUE
+
+=== eine lange zeile mit vielen abschnitten zeichnet flott
+IMPORT "gui"
+SCREEN(900, 200, "t", 1)
+DIM font AS INTEGER : font = LOADFONT(ARG$(0), 20)
+DIM z AS STRING : z = ""
+DIM i AS INTEGER
+FOR i = 1 TO 4000
+    z = z + "w" + STR$(i) + ", "
+NEXT
+DIM st AS ARRAY OF INTEGER : st = []
+DIM le AS ARRAY OF INTEGER : le = []
+DIM fa AS ARRAY OF INTEGER : fa = []
+DIM k AS INTEGER
+FOR k = 0 TO LEN(z) - 1 STEP 3
+    ARRAY_PUSH(st, k) : ARRAY_PUSH(le, 2) : ARRAY_PUSH(fa, &H00FF00)
+NEXT
+FUNCTION dauer(mitFont AS BOOLEAN, spalte AS INTEGER) AS FLOAT
+    DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 900, 200)
+    DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(win, 10, 10, 860, 120)
+    IF mitFont THEN GUI_SET_FONT(ta, font)
+    GUI_SET_TEXT(ta, z)
+    GUI_TEXTAREA_SPANS(ta, st, le, fa)
+    GUI_TEXTAREA_GOTO(ta, 1, spalte)
+    GUI_UPDATE()
+    DIM t0 AS FLOAT : t0 = GET_TIME()
+    DIM b AS INTEGER
+    FOR b = 1 TO 5
+        CLS(BLACK) : GUI_DRAW() : FLIP()
+    NEXT
+    DIM d AS FLOAT : d = (GET_TIME() - t0) / 5.0
+    GUI_WINDOW_DESTROY(win)
+    RETURN d
+END FUNCTION
+PRINT "zeichen "; LEN(z) > 25000
+PRINT "font anfang flott "; dauer(TRUE, 1) < 0.3
+PRINT "font rechts flott "; dauer(TRUE, 25000) < 0.3
+PRINT "eingebaut anfang flott "; dauer(FALSE, 1) < 0.3
+--- argumente
+{sammlung}/../../circuitrunner/assets/font.ttf
+--- erwartet
+zeichen TRUE
+font anfang flott TRUE
+font rechts flott TRUE
+eingebaut anfang flott TRUE
