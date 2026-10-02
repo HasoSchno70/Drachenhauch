@@ -8765,6 +8765,50 @@ impl<'p> Vm<'p> {
                 let c = if a.len() >= 3 { gi(a, 2, "SPLINE")? } else { 0xFFFFFF };
                 g!().spline(&xs, &ys, w, c); Value::Nil
             }
+            // Einzelne Bezier-Segmente: quadratisch (ein Kontrollpunkt) und
+            // kubisch (zwei).
+            "bezier" | "bezier3" => {
+                let (n, punkte) = if name == "bezier" { ("BEZIER", 3) } else { ("BEZIER3", 4) };
+                let k = punkte * 2;
+                if a.len() < k || a.len() > k + 2 {
+                    return Err(if name == "bezier" {
+                        format!("BEZIER: erwartet (x1, y1, kx, ky, x2, y2[, farbe[, breite]]), erhalten {} Argumente", a.len())
+                    } else {
+                        format!("BEZIER3: erwartet (x1, y1, k1x, k1y, k2x, k2y, x2, y2[, farbe[, breite]]), erhalten {} Argumente", a.len())
+                    });
+                }
+                let mut xs = Vec::with_capacity(punkte);
+                let mut ys = Vec::with_capacity(punkte);
+                for i in 0..punkte {
+                    xs.push(gi(a, 2 * i, n)? as i32);
+                    ys.push(gi(a, 2 * i + 1, n)? as i32);
+                }
+                let c = if a.len() > k { gi(a, k, n)? } else { 0xFFFFFF };
+                let w = if a.len() > k + 1 { need_f(a, k + 1, n)? } else { 1.0 };
+                g!().kurve(if name == "bezier" { 1 } else { 2 }, &xs, &ys, w, c);
+                Value::Nil
+            }
+            "spline_basis" | "spline_bezier" => {
+                let n = if name == "spline_basis" { "SPLINE_BASIS" } else { "SPLINE_BEZIER" };
+                if a.len() < 2 || a.len() > 4 {
+                    return Err(format!("{}: erwartet (xs, ys[, farbe[, breite]]), erhalten {} Argumente", n, a.len()));
+                }
+                let xs = arr_i32(&a[0], n)?;
+                let ys = arr_i32(&a[1], n)?;
+                if xs.len() != ys.len() { return Err(format!("{}: xs und ys muessen gleich lang sein", n)); }
+                if name == "spline_basis" && xs.len() < 4 {
+                    return Err(format!("SPLINE_BASIS: braucht mindestens 4 Punkte, nicht {}", xs.len()));
+                }
+                if name == "spline_bezier" && (xs.len() < 4 || (xs.len() - 1) % 3 != 0) {
+                    return Err(format!(
+                        "SPLINE_BEZIER: braucht 4, 7, 10 ... Punkte (Anfang, dann je zwei Kontrollpunkte und ein Ende), nicht {}",
+                        xs.len()));
+                }
+                let c = if a.len() >= 3 { gi(a, 2, n)? } else { 0xFFFFFF };
+                let w = if a.len() >= 4 { need_f(a, 3, n)? } else { 1.0 };
+                g!().kurve(if name == "spline_basis" { 0 } else { 2 }, &xs, &ys, w, c);
+                Value::Nil
+            }
             // --- Blend-Modes (Batch 2) ---
             "blend_mode" => {
                 let s = gs(a, 0, "BLEND_MODE")?.to_lowercase();
@@ -9562,6 +9606,92 @@ impl<'p> Vm<'p> {
                 g!().billboard(gi(a,0,"BILLBOARD")?, need_f(a,1,"BILLBOARD")? as f32, need_f(a,2,"BILLBOARD")? as f32,
                                need_f(a,3,"BILLBOARD")? as f32, need_f(a,4,"BILLBOARD")? as f32, gi(a,5,"BILLBOARD")?)?;
                 Value::Nil
+            }
+            "billboard_part" => {
+                if a.len() != 10 {
+                    return Err(format!("BILLBOARD_PART: erwartet (bild, sx, sy, sb, sh, x, y, z, groesse, farbe), erhalten {} Argumente", a.len()));
+                }
+                let f = "BILLBOARD_PART";
+                g!().billboard_part(gi(a,0,f)?,
+                    [need_f(a,1,f)? as f32, need_f(a,2,f)? as f32, need_f(a,3,f)? as f32, need_f(a,4,f)? as f32],
+                    need_f(a,5,f)? as f32, need_f(a,6,f)? as f32, need_f(a,7,f)? as f32,
+                    need_f(a,8,f)? as f32, gi(a,9,f)?)?;
+                Value::Nil
+            }
+            "billboard_ex" => {
+                if a.len() != 8 {
+                    return Err(format!("BILLBOARD_EX: erwartet (bild, x, y, z, breite, hoehe, winkel, farbe), erhalten {} Argumente", a.len()));
+                }
+                let f = "BILLBOARD_EX";
+                g!().billboard_ex(gi(a,0,f)?, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32, need_f(a,3,f)? as f32,
+                    need_f(a,4,f)? as f32, need_f(a,5,f)? as f32, need_f(a,6,f)? as f32, gi(a,7,f)?)?;
+                Value::Nil
+            }
+            "capsule" | "capsule_wires" => {
+                let f = if name == "capsule" { "CAPSULE" } else { "CAPSULE_WIRES" };
+                if a.len() != 8 {
+                    return Err(format!("{}: erwartet (x1, y1, z1, x2, y2, z2, r, farbe), erhalten {} Argumente", f, a.len()));
+                }
+                let mut p = [0f32; 6];
+                for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
+                g!().capsule(p, need_f(a,6,f)? as f32, gi(a,7,f)?, name == "capsule_wires");
+                Value::Nil
+            }
+            "cylinder_ex" => {
+                let f = "CYLINDER_EX";
+                if a.len() != 9 {
+                    return Err(format!("CYLINDER_EX: erwartet (x1, y1, z1, x2, y2, z2, r_anfang, r_ende, farbe), erhalten {} Argumente", a.len()));
+                }
+                let mut p = [0f32; 6];
+                for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
+                g!().cylinder_ex(p, need_f(a,6,f)? as f32, need_f(a,7,f)? as f32, gi(a,8,f)?);
+                Value::Nil
+            }
+            "cylinder_wires" => {
+                let f = "CYLINDER_WIRES";
+                if a.len() != 7 {
+                    return Err(format!("CYLINDER_WIRES: erwartet (x, y, z, r_oben, r_unten, hoehe, farbe), erhalten {} Argumente", a.len()));
+                }
+                g!().cylinder_wires(need_f(a,0,f)? as f32, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32,
+                    need_f(a,3,f)? as f32, need_f(a,4,f)? as f32, need_f(a,5,f)? as f32, gi(a,6,f)?);
+                Value::Nil
+            }
+            "triangle3d" => {
+                let f = "TRIANGLE3D";
+                if a.len() != 10 {
+                    return Err(format!("TRIANGLE3D: erwartet (x1, y1, z1, x2, y2, z2, x3, y3, z3, farbe), erhalten {} Argumente", a.len()));
+                }
+                let mut p = [0f32; 9];
+                for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
+                g!().triangle3d(p, gi(a,9,f)?);
+                Value::Nil
+            }
+            "circle3d" => {
+                let f = "CIRCLE3D";
+                if a.len() != 5 {
+                    return Err(format!("CIRCLE3D: erwartet (x, y, z, r, farbe), erhalten {} Argumente", a.len()));
+                }
+                g!().circle3d(need_f(a,0,f)? as f32, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32,
+                    need_f(a,3,f)? as f32, gi(a,4,f)?);
+                Value::Nil
+            }
+            "bbox_wires" => {
+                let f = "BBOX_WIRES";
+                if a.len() != 7 {
+                    return Err(format!("BBOX_WIRES: erwartet (x1, y1, z1, x2, y2, z2, farbe), erhalten {} Argumente", a.len()));
+                }
+                let mut p = [0f32; 6];
+                for (i, v) in p.iter_mut().enumerate() { *v = need_f(a, i, f)? as f32; }
+                g!().bbox_wires(p, gi(a,6,f)?);
+                Value::Nil
+            }
+            "model_bbox" => {
+                let b = g!().model_bbox(gi(a,0,"MODEL_BBOX")?)?;
+                // raylib rechnet in f32: 1.2 kaeme als 1.2000000476837158 an.
+                // Ueber die kuerzeste Darstellung der f32 gewandelt bleibt es 1.2.
+                Value::Tuple(Rc::new(b.iter()
+                    .map(|&v| Value::Float(v.to_string().parse::<f64>().unwrap_or(v as f64)))
+                    .collect()))
             }
             "ray_hit_box" => Value::Float(g!().ray_hit_box(
                 need_f(a,0,"RAY_HIT_BOX")? as f32, need_f(a,1,"RAY_HIT_BOX")? as f32, need_f(a,2,"RAY_HIT_BOX")? as f32,
@@ -11318,6 +11448,7 @@ pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
         | "triangle" | "polygon" | "spline" | "gradientv" | "gradienth"
         | "pie" | "pieoutline" | "circle_gradient" | "boxrot" | "gradient4"
         | "ngon" | "ngonoutline" | "linedashed" | "drawimage9"
+        | "bezier" | "bezier3" | "spline_basis" | "spline_bezier"
         | "text"
         | "drawimage" | "drawimagerot" | "drawimageflipped"
         | "drawimagepart" | "drawimagepartex" | "drawtilemap"

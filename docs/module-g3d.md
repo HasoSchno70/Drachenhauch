@@ -39,11 +39,20 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `SPHERE(x, y, z, radius, farbe)` | Kugel um einen Mittelpunkt |
 | `SPHERE_WIRES(x, y, z, radius, farbe)` | Kugel als Drahtgitter |
 | `CYLINDER(x, y, z, r_oben, r_unten, hoehe, farbe)` | Zylinder — mit `r_oben = 0` wird ein Kegel daraus |
+| `CYLINDER_WIRES(x, y, z, r_oben, r_unten, hoehe, farbe)` | derselbe als Drahtgitter |
+| `CYLINDER_EX(x1, y1, z1, x2, y2, z2, r_anfang, r_ende, farbe)` | Zylinder (oder Kegel) von einem Punkt zum anderen, in jeder Richtung — Rohre, Äste, Strahlen |
+| `CAPSULE(x1, y1, z1, x2, y2, z2, r, farbe)` | Kapsel zwischen zwei Punkten (Zylinder mit Halbkugeln) — die übliche Form für Figuren und ihre Kollision |
+| `CAPSULE_WIRES(x1, y1, z1, x2, y2, z2, r, farbe)` | dieselbe als Drahtgitter |
+| `TRIANGLE3D(x1, y1, z1, x2, y2, z2, x3, y3, z3, farbe)` | freies Dreieck im Raum, von beiden Seiten sichtbar |
+| `CIRCLE3D(x, y, z, r, farbe)` | Kreislinie flach auf dem Boden — Zielmarke, Reichweite, Schattenrand |
+| `BBOX_WIRES(x1, y1, z1, x2, y2, z2, farbe)` | Quader als Kanten zwischen zwei Ecken (die Reihenfolge ist egal); mit `MODEL_BBOX` der Rahmen um ein Modell |
 | `PLANE(x, y, z, size_x, size_z, farbe)` | flache Ebene in der XZ-Fläche (Boden) |
 | `LINE3D(x1, y1, z1, x2, y2, z2, farbe)` | Linie zwischen zwei Punkten |
 | `POINT3D(x, y, z, farbe)` | einzelner Punkt |
 | `GRID3D(linien, abstand)` | Bodenraster — hilft ungemein beim Einschätzen von Entfernungen |
 | `BILLBOARD(bild, x, y, z, groesse, farbe)` | Bild im Raum, das sich immer zur Kamera dreht (Bäume, Funken, Beschriftungen) |
+| `BILLBOARD_PART(bild, sx, sy, sb, sh, x, y, z, groesse, farbe)` | nur ein Ausschnitt des Bildes — ein Einzelbild aus einem Sprite-Blatt, so laufen Figuren in 3D; `groesse` ist die Höhe, die Breite folgt dem Ausschnitt |
+| `BILLBOARD_EX(bild, x, y, z, breite, hoehe, winkel, farbe)` | mit eigener Breite und Höhe, um seine Mitte gedreht (Grad) — Funken, die sich drehen, gestreckte Strahlen |
 
 ### Modelle
 
@@ -60,6 +69,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `MODEL(modell, x, y, z, skala, farbe)` | — | zeichnen |
 | `MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad, skala, farbe)` | — | zeichnen und um eine Achse drehen |
 | `MODEL_WIRES(modell, x, y, z, skala, farbe)` | — | als Drahtgitter zeichnen |
+| `MODEL_BBOX(modell)` | TUPLE | Hüllquader `(min_x, min_y, min_z, max_x, max_y, max_z)` in den eigenen Koordinaten des Modells (ohne Lage und Skala beim Zeichnen) — für Kollisionen und um ein Modell auf den Boden zu stellen |
 | `MODEL_TEXTURE(modell, bild)` | — | ein Bild als Oberfläche auflegen |
 | `MODEL_TEXTURE_NORMAL(modell, bild)` | — | Normal-Map für Oberflächenstruktur (wirkt nur mit `MODEL_LIT`) |
 

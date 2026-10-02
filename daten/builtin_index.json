@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2040,
+ "count": 2054,
  "builtins": [
   {
    "name": "ABS",
@@ -12241,6 +12241,90 @@
    "kind": "core",
    "signature": "IMAGE_TO_BUFFER(bild [, mit_alpha]) AS BUFFER",
    "module": "imgfx"
+  },
+  {
+   "name": "BEZIER",
+   "kind": "graphics",
+   "signature": "BEZIER(x1, y1, kx, ky, x2, y2[, farbe[, breite]])",
+   "module": "core"
+  },
+  {
+   "name": "BEZIER3",
+   "kind": "graphics",
+   "signature": "BEZIER3(x1, y1, k1x, k1y, k2x, k2y, x2, y2[, farbe[, breite]])",
+   "module": "core"
+  },
+  {
+   "name": "SPLINE_BASIS",
+   "kind": "graphics",
+   "signature": "SPLINE_BASIS(xs, ys[, farbe[, breite]])",
+   "module": "core"
+  },
+  {
+   "name": "SPLINE_BEZIER",
+   "kind": "graphics",
+   "signature": "SPLINE_BEZIER(xs, ys[, farbe[, breite]])",
+   "module": "core"
+  },
+  {
+   "name": "CAPSULE",
+   "kind": "graphics",
+   "signature": "CAPSULE(x1, y1, z1, x2, y2, z2, r, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "CAPSULE_WIRES",
+   "kind": "graphics",
+   "signature": "CAPSULE_WIRES(x1, y1, z1, x2, y2, z2, r, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "CYLINDER_EX",
+   "kind": "graphics",
+   "signature": "CYLINDER_EX(x1, y1, z1, x2, y2, z2, r_anfang, r_ende, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "CYLINDER_WIRES",
+   "kind": "graphics",
+   "signature": "CYLINDER_WIRES(x, y, z, r_oben, r_unten, hoehe, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "TRIANGLE3D",
+   "kind": "graphics",
+   "signature": "TRIANGLE3D(x1, y1, z1, x2, y2, z2, x3, y3, z3, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "CIRCLE3D",
+   "kind": "graphics",
+   "signature": "CIRCLE3D(x, y, z, r, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "BBOX_WIRES",
+   "kind": "graphics",
+   "signature": "BBOX_WIRES(x1, y1, z1, x2, y2, z2, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "MODEL_BBOX",
+   "kind": "graphics",
+   "signature": "MODEL_BBOX(modell) AS TUPLE",
+   "module": "g3d"
+  },
+  {
+   "name": "BILLBOARD_PART",
+   "kind": "graphics",
+   "signature": "BILLBOARD_PART(bild, sx, sy, sb, sh, x, y, z, groesse, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "BILLBOARD_EX",
+   "kind": "graphics",
+   "signature": "BILLBOARD_EX(bild, x, y, z, breite, hoehe, winkel, farbe)",
+   "module": "g3d"
   }
  ]
 }

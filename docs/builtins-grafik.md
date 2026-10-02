@@ -221,6 +221,10 @@ Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r,
 | `NGONOUTLINE(x, y, ecken, r, winkel[, farbe[, breite]])` | regelmäßiges Vieleck nur als Kontur; `breite` wie bei `LINEW` |
 | `LINEDASHED(x1, y1, x2, y2, strich, luecke[, farbe])` | gestrichelte Linie, Strich- und Lückenlänge in Punkten |
 | `SPLINE(xs, ys[, color[, breite]])` | weiche Catmull-Rom-Kurve durch die Punkte; `xs`/`ys` sind `ARRAY OF INTEGER` gleicher Länge |
+| `SPLINE_BASIS(xs, ys[, farbe[, breite]])` | B-Spline: noch weicher als `SPLINE`, läuft aber **nicht** durch die Punkte, sondern wird von ihnen gezogen (mindestens 4) |
+| `SPLINE_BEZIER(xs, ys[, farbe[, breite]])` | Kette kubischer Bézierkurven: Anfang, dann je zwei Kontrollpunkte und ein Ende (4, 7, 10 … Punkte) — so wie Zeichenprogramme Pfade speichern |
+| `BEZIER(x1, y1, kx, ky, x2, y2[, farbe[, breite]])` | quadratische Bézierkurve von (x1, y1) nach (x2, y2), zum Kontrollpunkt (kx, ky) hin gebogen |
+| `BEZIER3(x1, y1, k1x, k1y, k2x, k2y, x2, y2[, farbe[, breite]])` | kubische Bézierkurve mit zwei Kontrollpunkten (S-Kurven, Verbindungslinien zwischen Knoten) |
 | `TRIANGLE(x1, y1, x2, y2, x3, y3[, color])` | gefülltes Dreieck |
 | `TRIANGLEOUTLINE(x1, y1, x2, y2, x3, y3[, color[, width]])` | Dreieck nur als Kontur |
 | `POLYGON(points[, color])` | gefülltes Polygon — `points` ist ein `ARRAY OF INTEGER` mit `[x1, y1, x2, y2, …]` (mind. 3 Punkte) |
