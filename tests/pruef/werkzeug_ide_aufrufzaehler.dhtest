@@ -220,3 +220,58 @@ pr erst 21 Aufrufe flott TRUE
 pr nach sichern 21 Aufrufe flott TRUE neu gelesen 0
 zaehlung veraltet m1.dh
 pr von aussen 23 Aufrufe
+
+=== eine datei mit 20000 unterprogrammen zaehlt ohne stillstand
+' Stresstest 2026-10-02: zaehlerAddieren suchte jeden Namen mit INSTR durch
+' die ganze Zaehlung einer Datei -- Namen mal Laenge, und das fuer jede
+' Datei des Projekts. Jetzt geht es ueber die Eintraege der Zaehlung.
+' Geprueft: die Zaehler stimmen (aus der eigenen Datei und fuenf weiteren),
+' und es geht flott (grob: 1,2 s; hier 0,4 s, vorher 1,9 s).
+DIM prT AS FLOAT : prT = GET_TIME()
+zaehlerSetzen_(tabFelder[aktiverTab])
+DIM prD AS FLOAT : prD = GET_TIME() - prT
+DIM prK AS INTEGER
+FOR prK = 0 TO LEN(zaehlNamen) - 1
+    IF zaehlNamen[prK] = "s0" OR zaehlNamen[prK] = "s7" OR zaehlNamen[prK] = "s19999" THEN protokoll("pr " + zaehlNamen[prK] + " " + zaehlTexte[prK])
+NEXT
+protokoll("pr flott " + STR$(prD < 1.2))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+viele.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM z AS ARRAY OF STRING : z = []
+DIM i AS INTEGER
+FOR i = 0 TO 19999
+    ARRAY_PUSH(z, "SUB s" + STR$(i) + "()")
+    IF i < 19999 THEN ARRAY_PUSH(z, "    s" + STR$(i + 1) + "()")
+    ARRAY_PUSH(z, "END SUB")
+NEXT
+WRITEALL("viele.dh", JOIN$(z, CHR$(10)) + CHR$(10))
+WRITEALL("andere.dh", "s7()" + CHR$(10) + "s7()" + CHR$(10) + "s19999()" + CHR$(10))
+' Vier Dateien, die jedes Unterprogramm einmal rufen: ihre Zaehlungen sind
+' so lang wie die der Hauptdatei.
+DIM w AS ARRAY OF STRING : w = []
+FOR i = 0 TO 19999
+    ARRAY_PUSH(w, "s" + STR$(i) + "()")
+NEXT
+DIM f AS INTEGER
+FOR f = 1 TO 4
+    WRITEALL("ruft" + STR$(f) + ".dh", JOIN$(w, CHR$(10)) + CHR$(10))
+NEXT
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr s0 4 Aufrufe
+pr s7 7 Aufrufe
+pr s19999 6 Aufrufe
+pr flott TRUE
