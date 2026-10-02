@@ -126,3 +126,23 @@ DIM bearbeitId AS INTEGER global anlegen (oben in der Datei)
 ' Kopf/IMPORT "json"/DIM bearbeitId AS INTEGER//SUB merken()/    bearbeitId = 7/END SUB/merken()/PRINT bearbeitId
 befund []
 lauf 7
+
+=== viele meldungen kosten linear viel
+' Stresstest 2026-10-02: korrekturen zerlegte fuer JEDE Meldung den ganzen
+' Text neu (Zeilen, Bereiche, Fundstellen) -- 2000 Meldungen kosteten
+' 1,1 s, 5000 je CODE_CHECK$ 6,6 s, und die IDE prueft nach jeder
+' Tipp-Pause. Jetzt rechnet ein Kontext das einmal je Pruefung. Die
+' Korrektur bleibt dieselbe; die Grenze ist grob (vorher ~4 s).
+DIM z AS ARRAY OF STRING : z = ["DIM a AS INTEGER"]
+DIM i AS INTEGER
+FOR i = 0 TO 3999
+    ARRAY_PUSH(z, "a = unbekannt" + STR$(i) + " + 1")
+NEXT
+DIM t0 AS FLOAT : t0 = GET_TIME()
+DIM r AS STRING : r = CODE_CHECK$(JOIN$(z, CHR$(10)), ".")
+DIM d AS FLOAT : d = GET_TIME() - t0
+PRINT "flott "; d < 1.0
+PRINT "korrektur da "; INSTR(r, "DIM unbekannt3999 AS INTEGER anlegen") >= 0
+--- erwartet
+flott TRUE
+korrektur da TRUE
