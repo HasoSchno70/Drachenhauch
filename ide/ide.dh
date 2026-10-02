@@ -260,6 +260,11 @@ DIM profZeilen AS ARRAY OF INTEGER : profZeilen = []
 DIM profAnzahl AS ARRAY OF INTEGER : profAnzahl = []
 DIM pruefungFaellig AS FLOAT : pruefungFaellig = -1.0
 DIM letzteMarke AS STRING : letzteMarke = ""
+DIM hilfeKandidat AS STRING : hilfeKandidat = ""
+DIM vervollWartet AS BOOLEAN : vervollWartet = FALSE
+DIM vervollKandidat AS STRING : vervollKandidat = ""
+DIM vervollFaellig AS FLOAT : vervollFaellig = 0.0
+DIM hilfeFaellig AS FLOAT : hilfeFaellig = 0.0
 DIM suchtext AS STRING : suchtext = ""
 DIM ersatztext AS STRING : ersatztext = ""
 DIM fertigNachStopp AS BOOLEAN : fertigNachStopp = FALSE
@@ -1415,6 +1420,22 @@ DIM vervollWort AS STRING : vervollWort = ""
 DIM vervollGetippt AS BOOLEAN : vervollGetippt = FALSE   ' in diesem Bild hat sich der Text geaendert
 DIM vervollAus AS STRING : vervollAus = "-"
 
+' Eine Zeile des Felds (ab 1), "" ausserhalb. Die Zerlegung wird gemerkt,
+' solange der Text derselbe ist: wortAnfang$ laeuft in JEDEM Bild, und den
+' ganzen Text dafuer jedesmal in Zeilen zu zerlegen kostete bei 20000
+' Zeilen fast 2 ms je Bild (Stresstest 2026-10-02).
+DIM zvText AS STRING : zvText = ""
+DIM zvZeilen AS ARRAY OF STRING : zvZeilen = []
+FUNCTION zeileVon$(ta AS GUI_WIDGET, z AS INTEGER) AS STRING
+    DIM t AS STRING : t = GUI_TEXT(ta)
+    IF t <> zvText OR LEN(zvZeilen) = 0 THEN
+        zvText = t
+        zvZeilen = SPLIT$(t, NL)
+    END IF
+    IF z < 1 OR z > LEN(zvZeilen) THEN RETURN ""
+    RETURN zvZeilen[z - 1]
+END FUNCTION
+
 ' Der Wortanfang links der Marke -- so viel wird beim Uebernehmen ersetzt.
 FUNCTION wortAnfang$() AS STRING
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
@@ -1422,9 +1443,7 @@ FUNCTION wortAnfang$() AS STRING
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
-    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
-    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM zeile AS STRING : zeile = zeileVon$(ta, z)
     DIM a AS INTEGER : a = s - 1
     WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
     RETURN MID$(zeile, a, s - 1 - a)
@@ -7954,12 +7973,10 @@ END FUNCTION
 
 ' Signatur des Aufrufs, in dem die Marke steht -- "" wenn keiner.
 FUNCTION signaturHilfe$(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS STRING
-    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
     DIM name AS STRING
     DIM spalte AS INTEGER
     DIM arg AS INTEGER
-    (name, spalte, arg) = aufrufUmDieMarke(zeilen[z - 1], s)
+    (name, spalte, arg) = aufrufUmDieMarke(zeileVon$(ta, z), s)
     IF name = "" THEN RETURN ""
     DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, spalte)
     IF md = "" THEN RETURN ""
@@ -7997,8 +8014,22 @@ SUB hilfeNachziehen()
     ' Nicht nur die Stelle: auch das Feld und die Textlaenge -- sonst blieb
     ' nach einem Reiterwechsel (Marke in beiden in 1:1) oder nach Tippen und
     ' Rueckgaengig an derselben Stelle die Hilfe zum vorigen Wort stehen.
-    DIM marke AS STRING : marke = STR$(ta) + ":" + STR$(z) + ":" + STR$(s) + ":" + STR$(LEN(GUI_TEXT(ta)))
+    DIM laenge AS INTEGER : laenge = LEN(GUI_TEXT(ta))
+    DIM marke AS STRING : marke = STR$(ta) + ":" + STR$(z) + ":" + STR$(s) + ":" + STR$(laenge)
     IF marke = letzteMarke THEN RETURN
+    ' In einer grossen Datei erst, wenn die Marke kurz ruht: CODE_HOVER$
+    ' liest den ganzen Text, bei 20000 Zeilen gut 10 ms -- bei JEDEM Zeichen
+    ' getippt halbierte das die Bildrate (Stresstest 2026-10-02). Die
+    ' Stelle in der Statusleiste geht sofort.
+    IF laenge > 50000 THEN
+        IF marke <> hilfeKandidat THEN
+            hilfeKandidat = marke
+            hilfeFaellig = GET_TIME() + 0.25
+            GUI_STATUSBAR_SET(lblStatus, sfPos, tr$("Zeile ") + STR$(z) + tr$(", Spalte ") + STR$(s))
+            RETURN
+        END IF
+        IF GET_TIME() < hilfeFaellig THEN RETURN
+    END IF
     letzteMarke = marke
     GUI_STATUSBAR_SET(lblStatus, sfPos, tr$("Zeile ") + STR$(z) + tr$(", Spalte ") + STR$(s))
     ' Steht die Marke in einer Argumentliste, gilt die Signatur des Aufrufs:
@@ -8349,6 +8380,28 @@ SUB vervollNachziehen()
     vervollGetippt = FALSE
     IF NOT vorschlagAn OR aktiverTab < 0 OR paletteOffen THEN RETURN
     DIM wort AS STRING : wort = wortAnfang$()
+    ' Grosse Datei: die Liste kommt erst, wenn das Wort kurz ruht --
+    ' CODE_COMPLETE liest den ganzen Text, bei 20000 Zeilen gut 10 ms je
+    ' getipptem Zeichen (Stresstest 2026-10-02). Weitergetippt = neu warten,
+    ' die Marke woanders hin = nicht mehr warten.
+    DIM freigegeben AS BOOLEAN : freigegeben = FALSE
+    IF vervollWartet THEN
+        IF getippt THEN
+            vervollKandidat = wort
+            vervollFaellig = GET_TIME() + 0.25
+            RETURN
+        END IF
+        IF wort <> vervollKandidat THEN
+            vervollWartet = FALSE
+        ELSEIF GET_TIME() < vervollFaellig THEN
+            RETURN
+        ELSE
+            vervollWartet = FALSE
+            getippt = TRUE
+            freigegeben = TRUE
+            vervollWort = ""
+        END IF
+    END IF
     IF wort = vervollAus THEN RETURN
     vervollAus = "-"
     IF LEN(wort) < 3 THEN
@@ -8363,6 +8416,12 @@ SUB vervollNachziehen()
         RETURN
     END IF
     IF GUI_FOCUSED() <> aktivesFeld() THEN RETURN
+    IF NOT freigegeben AND LEN(GUI_TEXT(aktivesFeld())) > 50000 THEN
+        vervollWartet = TRUE
+        vervollKandidat = wort
+        vervollFaellig = GET_TIME() + 0.25
+        RETURN
+    END IF
     vervollstaendigen(FALSE)
 END SUB
 
@@ -14267,9 +14326,7 @@ FUNCTION wortUnterMarke$() AS STRING
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
-    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
-    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
-    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM zeile AS STRING : zeile = zeileVon$(ta, z)
     ' Spalte ist 1-basiert und steht HINTER dem Zeichen links der Marke.
     DIM a AS INTEGER : a = s - 1
     DIM e AS INTEGER : e = s - 1
