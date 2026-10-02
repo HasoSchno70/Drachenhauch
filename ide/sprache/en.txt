@@ -892,3 +892,8 @@ Suche abgebrochen nach 	Search cancelled after
  Dateien: 	 files: 
  Dateien ... (ESC bricht ab)	 files ... (Esc cancels)
  Treffer	 matches
+ Reiter, geschlossen: 	 tabs, closed: 
+(neu)	(new)
+ Dateien	 files
+ (bei 500 abgebrochen, weitere nicht gezeigt)	 (stopped at 500, more not shown)
+ -- Umschalt+F7 zeigt wieder die Probleme	 -- Shift+F7 shows the problems again
