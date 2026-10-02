@@ -16289,19 +16289,25 @@ SUB termVerteilen(text AS STRING, fehler AS BOOLEAN, ende AS BOOLEAN)
         ARRAY_PUSH(zeilen, rest)
         rest = ""
     END IF
-    DIM ab AS INTEGER : ab = 0
-    IF LEN(zeilen) > TERMINAL_MAX THEN
-        GUI_LISTBOX_CLEAR(lstTerminal)
-        ab = LEN(zeilen) - TERMINAL_MAX
-    END IF
+    ' Erst die Ortsmarke heraus, dann kuerzen: sie steht nicht in der Liste,
+    ' und mitgezaehlt blieben von einem grossen Stueck, das mit ihr endet,
+    ' nur TERMINAL_MAX - 1 Zeilen stehen (gefunden im Prueflauf zu 2026.19).
+    DIM zeig AS ARRAY OF STRING : zeig = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(zeilen) - 1
-        DIM z AS STRING : z = zeilen[i]
-        IF LEFT$(z, LEN(TERM_MARKE)) = TERM_MARKE THEN
-            termOrt = TRIM$(MID$(z, LEN(TERM_MARKE)))
-        ELSEIF i >= ab THEN
-            terminalZeile(z, IIF(fehler, F_ZAHL, -1))
+        IF LEFT$(zeilen[i], LEN(TERM_MARKE)) = TERM_MARKE THEN
+            termOrt = TRIM$(MID$(zeilen[i], LEN(TERM_MARKE)))
+        ELSE
+            ARRAY_PUSH(zeig, zeilen[i])
         END IF
+    NEXT
+    DIM ab AS INTEGER : ab = 0
+    IF LEN(zeig) > TERMINAL_MAX THEN
+        GUI_LISTBOX_CLEAR(lstTerminal)
+        ab = LEN(zeig) - TERMINAL_MAX
+    END IF
+    FOR i = ab TO LEN(zeig) - 1
+        terminalZeile(zeig[i], IIF(fehler, F_ZAHL, -1))
     NEXT
     IF fehler THEN termFehlRest = rest ELSE termRest = rest
 END SUB
