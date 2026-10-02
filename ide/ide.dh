@@ -8066,7 +8066,7 @@ SUB markenNachziehen()
     ' Reihenfolge = Vorrang: die angehaltene Zeile vor dem Haltepunkt vor dem
     ' Fehler vor dem Lesezeichen. Ein bedingter Haltepunkt ist violett.
     IF prozessArt = "debug" AND debugPause AND debugZeile > 0 AND pfad <> "" THEN
-        IF SAMEFILE(debugDatei, pfad) THEN
+        IF gleicheDatei(debugDatei, pfad) THEN
             ARRAY_PUSH(zeilen, debugZeile) : ARRAY_PUSH(farben, &HFFD040) : schl = schl + "p" + STR$(debugZeile)
             ARRAY_PUSH(arten, "p") : ARRAY_PUSH(idx, 0)
         END IF
@@ -8345,7 +8345,7 @@ DIM tippDoku AS STRING : tippDoku = ""
 FUNCTION debugWertMoeglich() AS BOOLEAN
     IF prozessArt <> "debug" OR NOT debugPause OR prozess < 0 OR aktiverTab < 0 THEN RETURN FALSE
     IF tabPfade[aktiverTab] = "" THEN RETURN FALSE
-    RETURN SAMEFILE(debugDatei, tabPfade[aktiverTab])
+    RETURN gleicheDatei(debugDatei, tabPfade[aktiverTab])
 END FUNCTION
 
 ' Das Wort samt davorstehender Mitglieds-Kette: bei `spieler.hp` unter der
@@ -13633,8 +13633,24 @@ END SUB
 
 ' --- Debugger: Client von `dhrt debug` (JSON-Zeilen: stdin Kommandos,
 ' stdout Ereignisse). Kommandos nimmt das Kind nur an, solange es steht.
+' Ob zwei Wege dieselbe Datei meinen -- SAMEFILE fragt die Platte (0,15 ms
+' je Frage), und der Debugger fragt das je Stapeleintrag und je Bild: bei
+' 900 Stapeleintraegen kostete ein Halt 150 ms (Stresstest 2026-10-02).
+' Die Antworten gelten fuer einen Halt; jeder neue Halt und jeder Start
+' fangen neu an, damit eine umbenannte Datei nicht alt beantwortet wird.
+DIM sfMerk AS MAP OF BOOLEAN : sfMerk = {}
+
+FUNCTION gleicheDatei(a AS STRING, b AS STRING) AS BOOLEAN
+    DIM schl AS STRING : schl = a + "|" + b
+    IF MAPHAS(sfMerk, schl) THEN RETURN MAPGET(sfMerk, schl)
+    DIM ja AS BOOLEAN : ja = SAMEFILE(a, b)
+    MAPPUT(sfMerk, schl, ja)
+    RETURN ja
+END FUNCTION
+
 SUB debuggen()
     IF NOT prozessStarten("debug") THEN RETURN
+    sfMerk = {}
     debugPause = FALSE : debugErst = TRUE : debugZeile = 0
     debugDatei = prozessDatei : debugErstWarten = FALSE : debugEingabe = FALSE
     GUI_SET_TEXT(lblDebug, tr$("Debugger: läuft ..."))
@@ -13720,7 +13736,7 @@ SUB haltepunkteBestaetigt(j AS JSON_HANDLE)
         IF echt = z THEN CONTINUE
         DIM i AS INTEGER
         FOR i = 0 TO LEN(hpZeilen) - 1
-            IF hpZeilen[i] = z AND SAMEFILE(hpDateien[i], datei) THEN
+            IF hpZeilen[i] = z AND gleicheDatei(hpDateien[i], datei) THEN
                 IF haltepunktIndex(hpDateien[i], echt) >= 0 THEN
                     ' Dort steht schon einer: dieser faellt weg.
                     hpEntfernen(i)
@@ -13747,7 +13763,7 @@ SUB haltepunkteBestaetigt(j AS JSON_HANDLE)
             DIM q AS STRING : q = "breakpoints." + STR$(k)
             IF JSON_GET_BOOL(j, q + ".verified") THEN
                 gueltig = gueltig + 1
-                IF JSON_GET_INT(j, q + ".actual") = debugZeile AND SAMEFILE(JSON_GET_STRING(j, q + ".file"), debugDatei) THEN hier = TRUE
+                IF JSON_GET_INT(j, q + ".actual") = debugZeile AND gleicheDatei(JSON_GET_STRING(j, q + ".file"), debugDatei) THEN hier = TRUE
             END IF
         NEXT
         IF gueltig > 0 AND NOT hier THEN
@@ -13914,6 +13930,7 @@ END SUB
 ' Ein Halt: Variablen, Stapel, Ueberwachen, und die Datei an der Zeile.
 SUB debugHaltZeigen(j AS JSON_HANDLE)
     debugPause = TRUE
+    sfMerk = {}
     ' Beim Halt gehoert die IDE nach vorn: man will die Zeile sehen, und
     ' das Programmfenster lag sonst ueber dem Code. Das Programm gibt dafuer
     ' beim Halt den Vordergrund frei (dhrt debug).
@@ -13922,7 +13939,7 @@ SUB debugHaltZeigen(j AS JSON_HANDLE)
     stapelZeigen(j)
     watchesZeigen(j)
     DIM wo AS STRING : wo = "Zeile " + STR$(debugZeile)
-    IF NOT SAMEFILE(debugDatei, prozessDatei) THEN wo = BASENAME(debugDatei) + ", " + wo
+    IF NOT gleicheDatei(debugDatei, prozessDatei) THEN wo = BASENAME(debugDatei) + ", " + wo
     GUI_SET_TEXT(lblDebug, tr$("Debugger steht in ") + wo + tr$(" (Tiefe ") + STR$(JSON_GET_INT(j, "depth")) + ")")
     ' Ein Halt am FEHLER: Variablen so, wie sie beim Fehler waren; weiter
     ' geht es nicht mehr, F8 beendet.
@@ -13938,7 +13955,7 @@ SUB debugHaltZeigen(j AS JSON_HANDLE)
     IF ta >= 0 THEN debugWerteZeigen(ta, j)
     markenSchluessel = ""
     protokoll("debug pause " + STR$(debugZeile))
-    IF NOT SAMEFILE(debugDatei, prozessDatei) THEN protokoll("debug datei " + BASENAME(debugDatei))
+    IF NOT gleicheDatei(debugDatei, prozessDatei) THEN protokoll("debug datei " + BASENAME(debugDatei))
 END SUB
 
 ' Werte im Code: hinter jede Zeile vom Kopf des Unterprogramms (oder
@@ -14033,7 +14050,7 @@ SUB stapelZeigen(j AS JSON_HANDLE)
         DIM szeile AS STRING : szeile = STR$(JSON_GET_INT(j, p + ".line"))
         ' Die Zeile zuerst: in der schmalen Spalte schnitt "mathe.dh:10" genau
         ' die Zahl ab, um die es geht.
-        IF NOT SAMEFILE(sdatei, prozessDatei) THEN szeile = szeile + "  " + BASENAME(sdatei)
+        IF NOT gleicheDatei(sdatei, prozessDatei) THEN szeile = szeile + "  " + BASENAME(sdatei)
         GUI_TABLE_ADD_ROW(tblStapel, [name, szeile])
         ARRAY_PUSH(teile, name + ":" + STR$(JSON_GET_INT(j, p + ".line")))
     NEXT
@@ -14161,7 +14178,7 @@ SUB debugPanelNachziehen()
             DIM zl AS INTEGER : zl = stapelZeilen[sr]
             ' Die Zeile gehoert zu IHRER Datei -- ein Aufruf aus einer
             ' importierten Datei steht nicht im Reiter, der gerade vorn ist.
-            IF NOT SAMEFILE(stapelDateien[sr], tabPfade[aktiverTab]) THEN dateiOeffnen(stapelDateien[sr])
+            IF NOT gleicheDatei(stapelDateien[sr], tabPfade[aktiverTab]) THEN dateiOeffnen(stapelDateien[sr])
             DIM ta AS GUI_WIDGET : ta = aktivesFeld()
             IF ta >= 0 AND zl > 0 THEN GUI_TEXTAREA_GOTO(ta, zl, 1)
             protokoll("stapel sprung " + STR$(zl))
