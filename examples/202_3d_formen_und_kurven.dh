@@ -1,0 +1,63 @@
+' 202_3d_formen_und_kurven.dh -- 3D-Formen aus raylib: eine Figur aus einer
+' Kapsel mit laufendem Sprite darueber, Rohre zwischen Punkten, ein Modell,
+' das mit seinem Huellquader auf dem Boden steht, ein Funke, der sich dreht,
+' und oben eine Bezierkurve als Weg.
+
+IMPORT "g3d"
+IMPORT "imgfx"
+
+SCREEN(800, 500, "3D-Formen und Kurven", 1)
+
+' Ein Sprite-Blatt mit vier Bildern, je 32x32: ein Kreis, der springt.
+DIM blatt AS IMAGE : blatt = IMAGE_NEW(128, 32)
+DIM k AS INTEGER
+FOR k = 0 TO 3
+    IMAGE_FILL_ELLIPSE(blatt, k * 32 + 16, 26 - k * 4, 9, 9, RGB(255, 200, 60))
+NEXT
+DIM funke AS IMAGE : funke = GENTEX_RADIAL(32, 32, RGB(255, 255, 255), RGB(255, 120, 0))
+
+' Ein Modell, das mit seiner Unterkante auf dem Boden stehen soll.
+DIM turm AS INTEGER : turm = MESH_CYLINDER(0.6, 2.5, 16)
+DIM hq AS TUPLE : hq = MODEL_BBOX(turm)
+
+' Der Weg oben: eine Kette aus zwei kubischen Bezierkurven.
+DIM wx AS ARRAY OF INTEGER : wx = [40, 120, 200, 280, 360, 440, 520]
+DIM wy AS ARRAY OF INTEGER : wy = [60, 10, 110, 60, 10, 110, 60]
+
+DIM t AS FLOAT : t = 0.0
+WHILE NOT QUITREQUESTED()
+    t = t + DELTA()
+    CLS(RGB(18, 22, 34))
+    CAMERA3D(9.0 * COS(t * 0.3), 6, 9.0 * SIN(t * 0.3), 0, 1, 0, 45)
+    GRID3D(14, 1)
+
+    ' Die Figur: Kapsel, Ring auf dem Boden, darueber das laufende Sprite.
+    DIM fx AS FLOAT : fx = 2.5 * COS(t)
+    DIM fz AS FLOAT : fz = 2.5 * SIN(t)
+    CAPSULE(fx, 0.4, fz, fx, 1.6, fz, 0.4, RGB(80, 160, 255))
+    CIRCLE3D(fx, 0.01, fz, 0.7, YELLOW)
+    DIM bild AS INTEGER : bild = INT(t * 8.0) MOD 4
+    BILLBOARD_PART(blatt, bild * 32, 0, 32, 32, fx, 2.6, fz, 0.8, WHITE)
+
+    ' Rohre von der Mitte zu drei Punkten, eines laeuft spitz zu.
+    CYLINDER_EX(0, 0, 0, -3, 2, -2, 0.15, 0.15, RGB(150, 150, 170))
+    CYLINDER_EX(0, 0, 0, 3, 1, -3, 0.15, 0.02, RGB(150, 150, 170))
+    CAPSULE_WIRES(-3, 2, -2, -3, 3, -2, 0.3, RGB(120, 220, 160))
+
+    ' Der Turm steht auf dem Boden: um -min_y angehoben, Rahmen drumherum.
+    MODEL(turm, -3, -hq[1], 2, 1.0, RGB(200, 120, 90))
+    BBOX_WIRES(hq[0] - 3, 0, hq[2] + 2, hq[3] - 3, hq[4] - hq[1], hq[5] + 2, RGB(255, 80, 80))
+    CYLINDER_WIRES(3, 0, 2, 0.5, 0.2, 1.2, WHITE)
+    TRIANGLE3D(1, 0, 3.5, 2.5, 0, 3.5, 1.75, 1.5, 3.5, RGB(190, 90, 230))
+
+    ' Ein Funke, der sich dreht und pulsiert.
+    DIM g AS FLOAT : g = 0.8 + 0.3 * SIN(t * 5.0)
+    BILLBOARD_EX(funke, 0, 3.2, 0, g * 1.6, g * 0.6, t * 120.0, WHITE)
+
+    ' Oben die Kurven: Bezierkette durch drei Punkte, der B-Spline daneben.
+    SPLINE_BEZIER(wx, wy, RGB(90, 200, 255), 3)
+    SPLINE_BASIS(wx, wy, RGB(255, 120, 120), 2)
+    BEZIER3(560, 60, 620, -20, 700, 140, 760, 60, YELLOW, 3)
+    TEXT(20, 470, "Turm: " + FORMAT$(hq[3] - hq[0], "%.1f") + " breit, " + FORMAT$(hq[4] - hq[1], "%.1f") + " hoch", WHITE)
+    FLIP()
+WEND
