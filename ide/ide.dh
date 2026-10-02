@@ -5063,12 +5063,10 @@ END SUB
 
 SUB testVerteilen(text AS STRING)
     IF text = "" THEN RETURN
-    testRest = testRest + text
-    WHILE INSTR(testRest, NL) >= 0
-        DIM p AS INTEGER : p = INSTR(testRest, NL)
-        testZeile(REPLACE$(LEFT$(testRest, p), CHR$(13), ""))
-        testRest = MID$(testRest, p + 1)
-    WEND
+    DIM z AS STRING
+    FOR EACH z IN zeilenAbtrennen(testRest, text)
+        testZeile(z)
+    NEXT
 END SUB
 
 SUB testNachsehen()
@@ -15785,7 +15783,7 @@ END SUB
 SUB terminalZeile(z AS STRING, farbe AS INTEGER)
     GUI_LISTBOX_ADD(lstTerminal, z)
     IF farbe <> -1 THEN GUI_LISTBOX_COLOR(lstTerminal, GUI_LISTBOX_COUNT(lstTerminal) - 1, farbe)
-    IF GUI_LISTBOX_COUNT(lstTerminal) > 3000 THEN GUI_LISTBOX_REMOVE(lstTerminal, 0)
+    IF GUI_LISTBOX_COUNT(lstTerminal) > TERMINAL_MAX THEN GUI_LISTBOX_REMOVE(lstTerminal, 0)
     GUI_LISTBOX_SET_SELECTED(lstTerminal, GUI_LISTBOX_COUNT(lstTerminal) - 1)
     protokoll("terminal zeile " + z)
 END SUB
@@ -15881,25 +15879,32 @@ SUB terminalStarten(b AS STRING)
 END SUB
 
 ' Zeilen verteilen: die Marke setzt den Ort, alles andere kommt in die Liste.
+' Einmal zerlegt (zeilenAbtrennen) -- je Zeile den Rest zu kopieren hielt
+' die IDE bei 200000 Zeilen 25 Sekunden in einem Bild fest. Mehr Zeilen,
+' als die Liste behaelt: nur die letzten; die Marke mit dem Ordner wird
+' trotzdem gelesen, sie steht ohnehin am Ende.
+CONST TERMINAL_MAX = 3000
 SUB termVerteilen(text AS STRING, fehler AS BOOLEAN, ende AS BOOLEAN)
-    DIM rest AS STRING : rest = IIF(fehler, termFehlRest, termRest) + text
-    WHILE INSTR(rest, NL) >= 0 OR (ende AND rest <> "")
-        DIM p AS INTEGER : p = INSTR(rest, NL)
-        DIM z AS STRING
-        IF p >= 0 THEN
-            z = LEFT$(rest, p)
-            rest = MID$(rest, p + 1)
-        ELSE
-            z = rest
-            rest = ""
-        END IF
-        z = REPLACE$(z, CHR$(13), "")
+    DIM rest AS STRING : rest = IIF(fehler, termFehlRest, termRest)
+    DIM zeilen AS ARRAY OF STRING : zeilen = zeilenAbtrennen(rest, text)
+    IF ende AND rest <> "" THEN
+        ARRAY_PUSH(zeilen, rest)
+        rest = ""
+    END IF
+    DIM ab AS INTEGER : ab = 0
+    IF LEN(zeilen) > TERMINAL_MAX THEN
+        GUI_LISTBOX_CLEAR(lstTerminal)
+        ab = LEN(zeilen) - TERMINAL_MAX
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
         IF LEFT$(z, LEN(TERM_MARKE)) = TERM_MARKE THEN
             termOrt = TRIM$(MID$(z, LEN(TERM_MARKE)))
-        ELSE
+        ELSEIF i >= ab THEN
             terminalZeile(z, IIF(fehler, F_ZAHL, -1))
         END IF
-    WEND
+    NEXT
     IF fehler THEN termFehlRest = rest ELSE termRest = rest
 END SUB
 
