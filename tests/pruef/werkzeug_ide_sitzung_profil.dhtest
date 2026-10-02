@@ -20,7 +20,7 @@ IF prBild = 150 THEN
     DIM prZeilen AS ARRAY OF STRING : prZeilen = []
     FOR prR = 0 TO GUI_TABLE_ROW_COUNT(tblProfil) - 1
         ARRAY_PUSH(prZeilen, GUI_TABLE_GET_CELL(tblProfil, prR, 0) + "=" + GUI_TABLE_GET_CELL(tblProfil, prR, 4))
-        IF LEFT$(GUI_TABLE_GET_CELL(tblProfil, prR, 0), 10) = "helfer.dh:" THEN prZiel = prR
+        IF RIGHT$(GUI_TABLE_GET_CELL(tblProfil, prR, 0), 9) = "helfer.dh" THEN prZiel = prR
     NEXT
     SORT(prZeilen)
     protokoll("probe zeilen " + JOIN$(prZeilen, " | "))
@@ -55,7 +55,7 @@ FOR i = 0 TO LEN(L) - 1
     IF LEFT$(L[i], 6) = "probe " THEN PRINT MID$(L[i], 6, LEN(L[i]))
 NEXT
 --- erwartet
-zeilen 2=DIM x AS INTEGER | 3=x = 1 | 4=hallo() | helfer.dh:3=PRINT "hallo"
+zeilen 2=DIM x AS INTEGER | 3  helfer.dh=PRINT "hallo" | 3=x = 1 | 4=hallo()
 sprung helfer.dh 3
 
 === vor dem start werden alle geaenderten reiter gesichert

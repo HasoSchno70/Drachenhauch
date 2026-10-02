@@ -466,6 +466,7 @@ DIM autoFaellig AS FLOAT : autoFaellig = -1.0
 ' was zuletzt gemeldet wurde -- ohne ihn ginge bei jedem Pruefen ein Feld
 ' durch die Bruecke, obwohl sich nichts geaendert hat.
 DIM faltSchluessel AS STRING : faltSchluessel = "-"
+DIM echteWege AS MAP OF STRING        ' echterWeg$: Schreibweise -> Weg der Platte
 ' Dieselben Bloecke bleiben stehen: die Auswahl waechst an ihnen entlang,
 ' und das Herausloesen fragt, in welchem Unterprogramm die Marke steht.
 DIM blockVon AS ARRAY OF INTEGER : blockVon = []
@@ -1404,7 +1405,7 @@ GUI_TOOLTIP(btnBisMarke, tr$("Bis zur Zeile mit der Schreibmarke laufen (Strg+F1
 ' neu ausgewertet, auch ueber mehrere Laeufe hinweg.
 DIM tblStapel AS GUI_WIDGET : tblStapel = GUI_TABLE(win, 0, 0, 10, 10)
 GUI_TABLE_HEADERS(tblStapel, [tr$("Aufrufstapel"), tr$("Zeile")])
-GUI_TABLE_COL_WIDTHS(tblStapel, [170, 60])
+GUI_TABLE_COL_WIDTHS(tblStapel, [150, 120])
 DIM tblWatch AS GUI_WIDGET : tblWatch = GUI_TABLE(win, 0, 0, 10, 10)
 GUI_TABLE_HEADERS(tblWatch, [tr$("Überwachen"), tr$("Wert")])
 GUI_TABLE_COL_WIDTHS(tblWatch, [130, 160])
@@ -1423,7 +1424,7 @@ DIM winProfil AS GUI_WINDOW : winProfil = GUI_WINDOW(tr$("Profil"), 600, 60, 640
 DIM lblProfil AS GUI_WIDGET : lblProfil = GUI_LABEL(winProfil, "", 8, 6)
 DIM tblProfil AS GUI_WIDGET : tblProfil = GUI_TABLE(winProfil, 8, 30, 624, 396)
 GUI_TABLE_HEADERS(tblProfil, [tr$("Zeile"), tr$("Anzahl"), "ms", tr$("Anteil"), tr$("Quelltext")])
-GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
+GUI_TABLE_COL_WIDTHS(tblProfil, [110, 70, 70, 70, 300])
 GUI_TABLE_SET(tblProfil, "sortierbar", 1)
 ' Seit Stand 30 ein Gitter: Zellen und Bereiche waehlen, Strg+C kopiert sie als
 ' Tabulator-Text -- das Profil laesst sich so in eine Tabellenkalkulation holen.
@@ -3231,9 +3232,44 @@ SUB faltenAlle(zu AS BOOLEAN)
 END SUB
 
 FUNCTION dateiLesen(pfad AS STRING) AS STRING
-    DIM zeilen AS ARRAY OF STRING
-    zeilen = READLINES(pfad)
-    RETURN JOIN$(zeilen, NL)
+    RETURN JOIN$(zeilenLesen(pfad), NL)
+END FUNCTION
+
+' Die EINE Stelle, an der die IDE Textdateien liest. READLINES verlangt
+' UTF-8 und wirft sonst -- und ohne TRY beendete eine einzige Datei aus
+' einem alten Windows-Programm (cp1252) die ganze IDE: beim Oeffnen, bei
+' der Suche im Projekt und schon beim Zaehlen der Aufrufe, das jede
+' Projektdatei liest. Kein UTF-8: cp1252, notfalls latin1 (nimmt jedes
+' Byte). Laesst sich die Datei gar nicht lesen (weg, gesperrt), kommt eine
+' leere Liste, und `leseFehler` sagt warum -- wer daraus einen Reiter
+' macht, muss das fragen, sonst ueberschriebe ein Sichern die Datei mit
+' nichts. `leseKodierung` nennt, wie zuletzt gelesen wurde.
+DIM leseFehler AS STRING
+DIM leseKodierung AS STRING
+FUNCTION zeilenLesen(pfad AS STRING) AS ARRAY OF STRING
+    DIM z AS ARRAY OF STRING : z = []
+    leseFehler = ""
+    leseKodierung = "utf8"
+    TRY
+        z = READLINES(pfad)
+        RETURN z
+    CATCH e
+        IF INSTR(e, "UTF-8") < 0 THEN
+            leseFehler = e
+            RETURN z
+        END IF
+    END TRY
+    DIM k AS STRING
+    FOR EACH k IN ("cp1252", "latin1")
+        TRY
+            z = READLINES(pfad, k)
+            leseKodierung = k
+            RETURN z
+        CATCH e2
+            leseFehler = e2
+        END TRY
+    NEXT
+    RETURN []
 END FUNCTION
 
 ' Derselbe Weg, EINE Schreibweise. Von der Kommandozeile kommt er mit
@@ -3318,6 +3354,17 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
                 RETURN
             END IF
         NEXT
+        ' Derselbe Weg anders geschrieben: der Debugger meldet den langen
+        ' Namen ("Hans Gaming"), das Projekt kennt vielleicht den kurzen
+        ' (HANSGA~1), oder ein Weg traegt "..". tabMitPfad fragt die Platte
+        ' -- sonst stand die Datei zweimal als Reiter da.
+        i = tabMitPfad(pfad)
+        IF i >= 0 THEN
+            aktiverTab = i
+            reiterNeuSetzen()
+            GUI_FOCUS(tabFelder[i])
+            RETURN
+        END IF
     END IF
     DIM ta AS GUI_WIDGET
     ta = GUI_TEXTAREA(win, 0, 0, 10, 10)
@@ -3375,17 +3422,41 @@ SUB dateiOeffnen(pfad AS STRING)
         protokoll("extern " + BASENAME(pfad))
         RETURN
     END IF
-    tabOeffnen(pfad, dateiLesen(pfad))
+    DIM inhalt AS STRING : inhalt = dateiLesen(pfad)
+    IF leseFehler <> "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Lässt sich nicht lesen: ") + leseFehler)
+        protokoll("nicht lesbar " + BASENAME(pfad))
+        RETURN
+    END IF
+    DIM kodierung AS STRING : kodierung = leseKodierung
+    tabOeffnen(pfad, inhalt)
     ' Der Projektordner wandert NUR, wenn die Datei ausserhalb liegt. Sonst
     ' machte ein Klick auf `lib/mehr.dh` den Unterordner zum Projekt, und
     ' der Baum zeigte danach die halbe Arbeit nicht mehr.
-    IF LEFT$(wegGleich$(pfad), LEN(wegGleich$(projektOrdner))) <> wegGleich$(projektOrdner) THEN
-        projektOrdner = DIRNAME(pfad)
-    END IF
+    IF NOT imProjekt(pfad) THEN projektOrdner = DIRNAME(pfad)
     baumFuellen()
     zuletztMerken(pfad)
-    GUI_SET_TEXT(lblStatus, pfad)
+    IF kodierung = "utf8" THEN
+        GUI_SET_TEXT(lblStatus, pfad)
+    ELSE
+        GUI_SET_TEXT(lblStatus, tr$("Kein UTF-8, als ") + kodierung + tr$(" gelesen -- Sichern schreibt UTF-8: ") + pfad)
+        protokoll("gelesen als " + kodierung)
+    END IF
 END SUB
+
+' Liegt die Datei im Projektordner? Erst am Text, dann ueber die Platte:
+' derselbe Ordner kommt als kurzer und als langer Name an (der Debugger
+' meldet den langen), und am Text allein zog das Projekt beim ersten Halt
+' in einer importierten Datei in deren Ordner um.
+FUNCTION imProjekt(pfad AS STRING) AS BOOLEAN
+    IF projektOrdner = "" THEN RETURN FALSE
+    IF LEFT$(wegGleich$(pfad), LEN(wegGleich$(projektOrdner))) = wegGleich$(projektOrdner) THEN RETURN TRUE
+    DIM o AS STRING : o = wegGleich$(REALPATH$(projektOrdner))
+    DIM d AS STRING : d = wegGleich$(REALPATH$(pfad))
+    IF o = "" OR d = "" THEN RETURN FALSE
+    IF RIGHT$(o, 1) <> "/" THEN o = o + "/"
+    RETURN LEFT$(d, LEN(o)) = o
+END FUNCTION
 
 FUNCTION aktivesFeld() AS GUI_WIDGET
     IF aktiverTab < 0 THEN RETURN -1
@@ -3403,7 +3474,6 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     IF pfad = "" OR alsNeu THEN
         pfad = FILE_SAVE_DIALOG("Sichern unter", "programm.dh", "dh")
         IF pfad = "" THEN RETURN FALSE
-        tabPfade[i] = pfad
     END IF
     DIM text AS STRING : text = GUI_TEXT(tabFelder[i])
     ' Formatieren beim Sichern: nur Drachenhauch-Quelltext, nie beim
@@ -3422,16 +3492,28 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
             END IF
         END IF
     END IF
-    tabGesichert[i] = text
-    zaehlCache = {}
-    paramCache = {}
-    blameCache = {}
-    blameMarkeZeile = -1
     ' Die Datei endet mit einem Umbruch (dateiLesen laesst ihn weg, das Feld
     ' kennt ihn nicht) -- sonst verloere jede gesicherte Datei ihre letzte
     ' Zeile im Diff ("no newline at end of file"). Bis Stand 3 war das so.
-    IF text <> "" AND RIGHT$(text, 1) <> NL THEN text = text + NL
-    WRITEALL(pfad, text)
+    DIM inhalt AS STRING : inhalt = text
+    IF inhalt <> "" AND RIGHT$(inhalt, 1) <> NL THEN inhalt = inhalt + NL
+    ' Die Platte kann ablehnen (schreibgeschuetzt, Ordner weg, kein Recht).
+    ' Ohne TRY beendete das die ganze IDE samt der ungesicherten Arbeit in
+    ' ALLEN Reitern. Erst nach dem Schreiben gilt der Reiter als gesichert
+    ' und traegt den neuen Weg.
+    TRY
+        WRITEALL(pfad, inhalt)
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Sichern ging nicht: ") + e)
+        protokoll("sichern fehlgeschlagen " + pfad)
+        RETURN FALSE
+    END TRY
+    tabPfade[i] = pfad
+    tabGesichert[i] = text
+    zaehlCache = {} : echteWege = {}
+    paramCache = {}
+    blameCache = {}
+    blameMarkeZeile = -1
     reiterNeuSetzen()
     zuletztMerken(pfad)
     GUI_SET_TEXT(lblStatus, tr$("Gesichert: ") + pfad)
@@ -3450,15 +3532,15 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     ' Eigene Schnipsel und Tastenbelegung gelten, sobald sie gesichert sind --
     ' und sie liegen neben der ide.json, nicht im Projekt: der Projektordner
     ' bleibt, wo er war.
-    IF wegGleich$(pfad) = wegGleich$(schnipselPfad$()) THEN
+    IF gleicherWeg(pfad, schnipselPfad$()) THEN
         schnipselLaden()
         RETURN TRUE
     END IF
-    IF wegGleich$(pfad) = wegGleich$(tastenPfad$()) THEN
+    IF gleicherWeg(pfad, tastenPfad$()) THEN
         tastenAnwenden()
         RETURN TRUE
     END IF
-    IF wegGleich$(pfad) = wegGleich$(farbenPfad$()) THEN
+    IF gleicherWeg(pfad, farbenPfad$()) THEN
         themaAnwenden()
         RETURN TRUE
     END IF
@@ -3654,7 +3736,7 @@ SUB baumFuellen()
     ' suchen soll. Ein Wurzelwechsel raeumt Auswahl und offene Aeste weg,
     ' ein Auffrischen laesst beide stehen: sonst verloere man beim Oeffnen
     ' einer Datei gerade die Mehrfachauswahl, die man einsammelt.
-    IF wegGleich$(GUI_FILETREE_ROOT$(baum)) <> wegGleich$(projektOrdner) THEN
+    IF NOT gleicherWeg(GUI_FILETREE_ROOT$(baum), projektOrdner) THEN
         GUI_FILETREE_SET_ROOT(baum, projektOrdner)
         baumLetzteWahl = ""
     ELSE
@@ -4325,7 +4407,43 @@ FUNCTION tabMitPfad(pfad AS STRING) AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
         IF wegGleich$(tabPfade[i]) = wegGleich$(pfad) THEN RETURN i
     NEXT
+    ' Derselbe Weg anders geschrieben: kurzer und langer Name (HANSGA~1
+    ' gegen "Hans Gaming"), ".." im Weg. Erst die Platte weiss es -- am
+    ' Text allein schrieb ein Umbau nur die Datei und liess den offenen
+    ' Reiter mit dem alten Text stehen, und das naechste Sichern machte den
+    ' Umbau rueckgaengig.
+    IF pfad = "" THEN RETURN -1
+    DIM e AS STRING : e = echterWeg$(pfad)
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabPfade[i] <> "" THEN
+            IF echterWeg$(tabPfade[i]) = e THEN RETURN i
+        END IF
+    NEXT
     RETURN -1
+END FUNCTION
+
+' Der Weg, wie die Platte ihn nennt (REALPATH$), gemerkt je Schreibweise:
+' tabMitPfad laeuft in der Aufrufzaehlung fuer jede Projektdatei, und die
+' Platte je Datei und Reiter zu fragen kostete bei vielen Dateien spuerbar.
+' Eine Datei, die es (noch) nicht gibt, behaelt ihren Text.
+' Meinen zwei Wege dieselbe Datei bzw. denselben Ordner? Erst am Text,
+' dann ueber die Platte (echterWeg$): derselbe Weg kommt als kurzer und
+' als langer Name an (HANSGA~1 gegen "Hans Gaming"), oder mit "..". Am
+' Text allein zaehlte die Aufrufzaehlung die eigene Datei doppelt, und
+' ein Umbau verfehlte den offenen Reiter.
+FUNCTION gleicherWeg(a AS STRING, b AS STRING) AS BOOLEAN
+    IF wegGleich$(a) = wegGleich$(b) THEN RETURN TRUE
+    IF a = "" OR b = "" THEN RETURN FALSE
+    RETURN echterWeg$(a) = echterWeg$(b)
+END FUNCTION
+
+FUNCTION echterWeg$(pfad AS STRING) AS STRING
+    DIM schl AS STRING : schl = wegGleich$(pfad)
+    IF MAPHAS(echteWege, schl) THEN RETURN MAPGET(echteWege, schl)
+    DIM e AS STRING : e = wegGleich$(REALPATH$(pfad))
+    IF e = "" THEN RETURN schl
+    MAPPUT(echteWege, schl, e)
+    RETURN e
 END FUNCTION
 
 SUB symbolMerken(pfad AS STRING, anzeige AS STRING, name AS STRING, zeile AS INTEGER)
@@ -4544,7 +4662,7 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     DIM inDateien AS INTEGER : inDateien = 0
     DIM d AS STRING
     FOR EACH d IN dateien
-        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(projektOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(projektOrdner, d))
         DIM vorher AS INTEGER : vorher = treffer
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zeilen) - 1
@@ -4696,7 +4814,7 @@ SUB zaehlerSetzen_(ta AS GUI_WIDGET)
     DIM d AS STRING
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        IF eigen <> "" AND wegGleich$(pfad) = wegGleich$(eigen) THEN CONTINUE
+        IF eigen <> "" AND gleicherWeg(pfad, eigen) THEN CONTINUE
         zaehlerAddieren(summe, zaehlungVon$(pfad))
     NEXT
     DIM texte AS ARRAY OF STRING : texte = []
@@ -4783,7 +4901,15 @@ SUB pruefsammlungStarten(nurFall AS BOOLEAN)
         END IF
         IF projektOrdner = "" THEN RETURN
         ziel = projektOrdner
+        ' Auch der Reiter selbst: er ist vermutlich der Code, den die
+        ' Sammlungen pruefen.
+        IF aktiverTab >= 0 THEN
+            IF tabPfade[aktiverTab] <> "" AND GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
+                IF NOT sichern(aktiverTab, FALSE) THEN RETURN
+            END IF
+        END IF
     END IF
+    andereSichern()
     testLaufStarten([ziel], [filter])
 END SUB
 
@@ -5088,7 +5214,7 @@ SUB qvVerwerfen(pfad AS STRING)
         feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), neu)
         tabGesichert[t] = GUI_TEXT(tabFelder[t])
     END IF
-    zaehlCache = {}
+    zaehlCache = {} : echteWege = {}
     qvAuffrischen()
     GUI_SET_TEXT(lblQvStatus, tr$("Verworfen: ") + pfad)
     protokoll("qv verworfen " + pfad)
@@ -5239,7 +5365,7 @@ SUB qvReiterNachziehen()
             tabGesichert[t] = GUI_TEXT(tabFelder[t])
         END IF
     NEXT
-    zaehlCache = {}
+    zaehlCache = {} : echteWege = {}
     blameCache = {}
     baumFuellen()
 END SUB
@@ -6134,7 +6260,7 @@ SUB subInFunction()
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh")
         DIM pf AS STRING : pf = PATHJOIN(projektOrdner, d)
-        IF tabPfade[aktiverTab] <> "" AND wegGleich$(pf) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+        IF tabPfade[aktiverTab] <> "" AND gleicherWeg(pf, tabPfade[aktiverTab]) THEN CONTINUE
         DIM q AS STRING : q = projektQuelle$(pf)
         IF q = "" OR INSTR(LOWER$(q), LOWER$(name)) < 0 THEN CONTINUE
         DIM qz AS ARRAY OF STRING : qz = SPLIT$(q, NL)
@@ -6252,9 +6378,19 @@ SUB liveNachziehen()
     liveStand = text
     liveDatei = BASENAME(pfad)
     liveKopie = PATHJOIN(DIRNAME(pfad), ".dh_live_vorschau.dh")
-    WRITEALL(liveKopie, text)
-    IF NOT DIREXISTS(DIRNAME(livePng$())) THEN MKDIR(DIRNAME(livePng$()))
-    IF FILEEXISTS(livePng$()) THEN DELETEFILE(livePng$())
+    ' Die Kopie muss NEBEN die Datei (relative Bild- und IMPORT-Wege) --
+    ' in einem Ordner ohne Schreibrecht geht das nicht, und ohne TRY
+    ' beendete das die ganze IDE.
+    TRY
+        WRITEALL(liveKopie, text)
+        IF NOT DIREXISTS(DIRNAME(livePng$())) THEN MKDIR(DIRNAME(livePng$()))
+        IF FILEEXISTS(livePng$()) THEN DELETEFILE(livePng$())
+    CATCH e
+        liveKopie = ""
+        GUI_SET_TEXT(lblLive, tr$("Kein Bild: ") + e)
+        protokoll("live fehler schreiben")
+        RETURN
+    END TRY
     liveFehler = ""
     liveStart = GET_TIME()
     liveProz = PROCESS_START("dhrt", "bild", liveKopie, livePng$(), "30")
@@ -6519,94 +6655,102 @@ FUNCTION neuProjektAnlegen(art AS INTEGER, name AS STRING, ort AS STRING) AS BOO
             protokoll("neues projekt ordner belegt")
             RETURN FALSE
         END IF
-    ELSE
-        MKDIR(ziel)
     END IF
-    DIM q AS STRING : q = CHR$(34)
-    DIM liesmich AS STRING
-    SELECT CASE art
-        CASE 0
-            MKDIR(PATHJOIN(ziel, "assets"))
-            DIM b AS IMAGE : b = IMAGE_NEW(32, 32)
-            IMAGE_FILL_ELLIPSE(b, 16.0, 16.0, 14.0, 14.0, &H40C0E0)
-            IMAGE_FILL_ELLIPSE(b, 11.0, 12.0, 3.0, 3.0, &H102030)
-            IMAGE_FILL_ELLIPSE(b, 21.0, 12.0, 3.0, 3.0, &H102030)
-            IMAGE_SAVE(b, PATHJOIN(ziel, "assets/figur.png"))
-            IMAGE_FREE(b)
-            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
-                "' " + name + " -- ein Spiel in Drachenhauch.", _
-                "' Pfeiltasten bewegen die Figur, ESC beendet.", _
-                "SCREEN(800, 600, " + q + name + q + ", 1)", _
-                "SETFPS(60)", _
-                "DIM figur AS IMAGE : figur = LOADIMAGE(" + q + "assets/figur.png" + q + ")", _
-                "DIM x AS FLOAT : x = 400.0", _
-                "DIM y AS FLOAT : y = 300.0", _
-                "CONST TEMPO = 240.0", _
-                "WHILE NOT QUITREQUESTED()", _
-                "    IF KEYPRESSED(KEY_LEFT) THEN x = x - TEMPO * DELTA()", _
-                "    IF KEYPRESSED(KEY_RIGHT) THEN x = x + TEMPO * DELTA()", _
-                "    IF KEYPRESSED(KEY_UP) THEN y = y - TEMPO * DELTA()", _
-                "    IF KEYPRESSED(KEY_DOWN) THEN y = y + TEMPO * DELTA()", _
-                "    CLS(RGB(20, 24, 40))", _
-                "    DRAWIMAGE(figur, INT(x) - 16, INT(y) - 16)", _
-                "    TEXT(10, 10, " + q + "Pfeiltasten bewegen die Figur" + q + ")", _
-                "    FLIP()", _
-                "WEND"]))
-            liesmich = "Ein Spiel: F5 startet es, die Figur liegt in assets/figur.png."
-        CASE 1
-            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
-                "' " + name + " -- eine Anwendung mit Fenster und Formular.", _
-                "IMPORT " + q + "gui" + q, _
-                "SCREEN(640, 420, " + q + name + q + ", 1)", _
-                "SETFPS(60)", _
-                "DIM win AS GUI_WINDOW : win = GUI_WINDOW(" + q + name + q + ", 0, 0, 640, 420)", _
-                "GUI_WINDOW_CHROME(win, FALSE)", _
-                "DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(win, " + q + tr$("Name:") + q + ", 20, 24)", _
-                "DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(win, 100, 20, 300, 28, " + q + tr$("Wie heißt du?") + q + ")", _
-                "DIM btn AS GUI_WIDGET : btn = GUI_BUTTON(win, " + q + tr$("Hinzufügen") + q + ", 410, 20, 140, 28)", _
-                "DIM lst AS GUI_WIDGET : lst = GUI_LISTBOX(win, 20, 64, 530, 300, [])", _
-                "GUI_WINDOW_DEFAULT(win, btn)", _
-                "GUI_FOCUS(tf)", _
-                "WHILE NOT QUITREQUESTED()", _
-                "    GUI_UPDATE()", _
-                "    IF GUI_CLICKED(btn) AND TRIM$(GUI_TEXT(tf)) <> " + q + q + " THEN", _
-                "        GUI_LISTBOX_ADD(lst, TRIM$(GUI_TEXT(tf)))", _
-                "        GUI_SET_TEXT(tf, " + q + q + ")", _
-                "    END IF", _
-                "    CLS(BLACK)", _
-                "    GUI_DRAW()", _
-                "    FLIP()", _
-                "WEND"]))
-            liesmich = "Eine Anwendung mit Fenster: F5 startet sie. Das Formular lässt sich auch im Form-Designer bauen (Werkzeuge)."
-        CASE 2
-            WRITEALL(PATHJOIN(ziel, "rechnen.dh"), npZeilen$([ _
-                "' Rechnen -- eine Funktion, die tests.dhtest prueft.", _
-                "FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER", _
-                "    RETURN a * b", _
-                "END FUNCTION"]))
-            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
-                "' " + name + " -- ein Konsolenprogramm.", _
-                "IMPORT " + q + "rechnen.dh" + q, _
-                "DIM name AS STRING", _
-                "INPUT " + q + "Wie heißt du? " + q + ", name", _
-                "PRINT " + q + "Hallo, " + q + " + name + " + q + "! 6 mal 7 ist " + q + " + STR$(mal(6, 7)) + " + q + "." + q]))
-            WRITEALL(PATHJOIN(ziel, "tests.dhtest"), npZeilen$([ _
-                "' Pruefsammlung: in der IDE Strg+Alt+F5, sonst dhrt test tests.dhtest", _
-                "", _
-                "=== mal rechnet", _
-                "IMPORT " + q + "r.dh" + q, _
-                "PRINT mal(6, 7)", _
-                "--- datei r.dh", _
-                "IMPORT " + q + "{sammlung}/rechnen.dh" + q, _
-                "", _
-                "--- erwartet", _
-                "42"]))
-            liesmich = "Ein Konsolenprogramm: F5 startet es, Strg+Alt+F5 prüft rechnen.dh mit tests.dhtest."
-        CASE ELSE
-            WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$(["' " + name, "PRINT " + q + "Hallo" + q]))
-            liesmich = "Ein leeres Projekt."
-    END SELECT
-    WRITEALL(PATHJOIN(ziel, "LIESMICH.md"), "# " + name + NL + NL + liesmich + NL)
+    ' Anlegen kann an der Platte scheitern: kein Schreibrecht am Ort, ein
+    ' Name, den Windows nicht nimmt (con, nul, aux ...). Ohne TRY beendete
+    ' der Fehler die ganze IDE samt ungesicherter Arbeit.
+    TRY
+        IF NOT DIREXISTS(ziel) THEN MKDIR(ziel)
+        DIM q AS STRING : q = CHR$(34)
+        DIM liesmich AS STRING
+        SELECT CASE art
+            CASE 0
+                MKDIR(PATHJOIN(ziel, "assets"))
+                DIM b AS IMAGE : b = IMAGE_NEW(32, 32)
+                IMAGE_FILL_ELLIPSE(b, 16.0, 16.0, 14.0, 14.0, &H40C0E0)
+                IMAGE_FILL_ELLIPSE(b, 11.0, 12.0, 3.0, 3.0, &H102030)
+                IMAGE_FILL_ELLIPSE(b, 21.0, 12.0, 3.0, 3.0, &H102030)
+                IMAGE_SAVE(b, PATHJOIN(ziel, "assets/figur.png"))
+                IMAGE_FREE(b)
+                WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
+                    "' " + name + " -- ein Spiel in Drachenhauch.", _
+                    "' Pfeiltasten bewegen die Figur, ESC beendet.", _
+                    "SCREEN(800, 600, " + q + name + q + ", 1)", _
+                    "SETFPS(60)", _
+                    "DIM figur AS IMAGE : figur = LOADIMAGE(" + q + "assets/figur.png" + q + ")", _
+                    "DIM x AS FLOAT : x = 400.0", _
+                    "DIM y AS FLOAT : y = 300.0", _
+                    "CONST TEMPO = 240.0", _
+                    "WHILE NOT QUITREQUESTED()", _
+                    "    IF KEYPRESSED(KEY_LEFT) THEN x = x - TEMPO * DELTA()", _
+                    "    IF KEYPRESSED(KEY_RIGHT) THEN x = x + TEMPO * DELTA()", _
+                    "    IF KEYPRESSED(KEY_UP) THEN y = y - TEMPO * DELTA()", _
+                    "    IF KEYPRESSED(KEY_DOWN) THEN y = y + TEMPO * DELTA()", _
+                    "    CLS(RGB(20, 24, 40))", _
+                    "    DRAWIMAGE(figur, INT(x) - 16, INT(y) - 16)", _
+                    "    TEXT(10, 10, " + q + "Pfeiltasten bewegen die Figur" + q + ")", _
+                    "    FLIP()", _
+                    "WEND"]))
+                liesmich = "Ein Spiel: F5 startet es, die Figur liegt in assets/figur.png."
+            CASE 1
+                WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
+                    "' " + name + " -- eine Anwendung mit Fenster und Formular.", _
+                    "IMPORT " + q + "gui" + q, _
+                    "SCREEN(640, 420, " + q + name + q + ", 1)", _
+                    "SETFPS(60)", _
+                    "DIM win AS GUI_WINDOW : win = GUI_WINDOW(" + q + name + q + ", 0, 0, 640, 420)", _
+                    "GUI_WINDOW_CHROME(win, FALSE)", _
+                    "DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(win, " + q + tr$("Name:") + q + ", 20, 24)", _
+                    "DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(win, 100, 20, 300, 28, " + q + tr$("Wie heißt du?") + q + ")", _
+                    "DIM btn AS GUI_WIDGET : btn = GUI_BUTTON(win, " + q + tr$("Hinzufügen") + q + ", 410, 20, 140, 28)", _
+                    "DIM lst AS GUI_WIDGET : lst = GUI_LISTBOX(win, 20, 64, 530, 300, [])", _
+                    "GUI_WINDOW_DEFAULT(win, btn)", _
+                    "GUI_FOCUS(tf)", _
+                    "WHILE NOT QUITREQUESTED()", _
+                    "    GUI_UPDATE()", _
+                    "    IF GUI_CLICKED(btn) AND TRIM$(GUI_TEXT(tf)) <> " + q + q + " THEN", _
+                    "        GUI_LISTBOX_ADD(lst, TRIM$(GUI_TEXT(tf)))", _
+                    "        GUI_SET_TEXT(tf, " + q + q + ")", _
+                    "    END IF", _
+                    "    CLS(BLACK)", _
+                    "    GUI_DRAW()", _
+                    "    FLIP()", _
+                    "WEND"]))
+                liesmich = "Eine Anwendung mit Fenster: F5 startet sie. Das Formular lässt sich auch im Form-Designer bauen (Werkzeuge)."
+            CASE 2
+                WRITEALL(PATHJOIN(ziel, "rechnen.dh"), npZeilen$([ _
+                    "' Rechnen -- eine Funktion, die tests.dhtest prueft.", _
+                    "FUNCTION mal(a AS INTEGER, b AS INTEGER) AS INTEGER", _
+                    "    RETURN a * b", _
+                    "END FUNCTION"]))
+                WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$([ _
+                    "' " + name + " -- ein Konsolenprogramm.", _
+                    "IMPORT " + q + "rechnen.dh" + q, _
+                    "DIM name AS STRING", _
+                    "INPUT " + q + "Wie heißt du? " + q + ", name", _
+                    "PRINT " + q + "Hallo, " + q + " + name + " + q + "! 6 mal 7 ist " + q + " + STR$(mal(6, 7)) + " + q + "." + q]))
+                WRITEALL(PATHJOIN(ziel, "tests.dhtest"), npZeilen$([ _
+                    "' Pruefsammlung: in der IDE Strg+Alt+F5, sonst dhrt test tests.dhtest", _
+                    "", _
+                    "=== mal rechnet", _
+                    "IMPORT " + q + "r.dh" + q, _
+                    "PRINT mal(6, 7)", _
+                    "--- datei r.dh", _
+                    "IMPORT " + q + "{sammlung}/rechnen.dh" + q, _
+                    "", _
+                    "--- erwartet", _
+                    "42"]))
+                liesmich = "Ein Konsolenprogramm: F5 startet es, Strg+Alt+F5 prüft rechnen.dh mit tests.dhtest."
+            CASE ELSE
+                WRITEALL(PATHJOIN(ziel, "main.dh"), npZeilen$(["' " + name, "PRINT " + q + "Hallo" + q]))
+                liesmich = "Ein leeres Projekt."
+        END SELECT
+        WRITEALL(PATHJOIN(ziel, "LIESMICH.md"), "# " + name + NL + NL + liesmich + NL)
+    CATCH e
+        GUI_SET_TEXT(lblNpMeldung, tr$("Anlegen ging nicht: ") + e)
+        protokoll("neues projekt fehler")
+        RETURN FALSE
+    END TRY
     projektOrdner = ziel
     baumFuellen()
     dateiOeffnen(PATHJOIN(ziel, "main.dh"))
@@ -8913,7 +9057,7 @@ FUNCTION projektErsetzenZaehlen(gesucht AS STRING) AS TUPLE
     DIM wieViele AS INTEGER : wieViele = 0
     DIM d AS STRING
     FOR EACH d IN dateien
-        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(projektOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(projektOrdner, d))
         DIM hier AS INTEGER : hier = 0
         DIM z AS STRING
         FOR EACH z IN zeilen
@@ -9829,7 +9973,7 @@ SUB verschiebenFragen()
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+        IF gleicherWeg(pfad, tabPfade[aktiverTab]) THEN CONTINUE
         ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, pfad) : ARRAY_PUSH(paletteDetails, "")
     NEXT
     waehlerOeffnen("verschieben", verschName + tr$(" verschieben nach ..."))
@@ -10095,7 +10239,7 @@ END SUB
 ' "". Ohne Profillauf steht nichts da; eine Null waere eine Aussage, die
 ' niemand gemessen hat.
 FUNCTION laufZahl$(pfad AS STRING, zeile AS INTEGER) AS STRING
-    IF profDatei = "" OR wegGleich$(pfad) <> wegGleich$(profDatei) THEN RETURN ""
+    IF profDatei = "" OR NOT gleicherWeg(pfad, profDatei) THEN RETURN ""
     DIM i AS INTEGER
     FOR i = 0 TO LEN(profZeilen) - 1
         IF profZeilen[i] = zeile THEN RETURN "  [" + STR$(profAnzahl[i]) + "x]"
@@ -10467,7 +10611,7 @@ SUB laufSchritt()
         IF laufArt = "parameter" THEN
             ' Die eigene Datei ist schon vorgemerkt (dort steht der Stand
             ' AUS DEM REITER, nicht der von der Platte).
-            IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+            IF gleicherWeg(pfad, tabPfade[aktiverTab]) THEN CONTINUE
             IF INSTR(alt, paramName) < 0 THEN CONTINUE
             DIM z2 AS ARRAY OF INTEGER : z2 = []
             frisch = parameterInText$(alt, paramName, paramFolge, paramNeuDecl, paramNeuWert, _
@@ -10475,8 +10619,8 @@ SUB laufSchritt()
             laufGeaendert = laufGeaendert + z2[0]
             laufUebergangen = laufUebergangen + z2[1]
         ELSEIF laufArt = "verschieben" THEN
-            IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
-            IF wegGleich$(pfad) = wegGleich$(laufZiel) THEN CONTINUE
+            IF gleicherWeg(pfad, tabPfade[aktiverTab]) THEN CONTINUE
+            IF gleicherWeg(pfad, laufZiel) THEN CONTINUE
             IF NOT benutztWort(alt, verschName) THEN CONTINUE
             frisch = mitImport$(alt, BASENAME(laufZiel))
             IF frisch <> alt THEN laufGeaendert = laufGeaendert + 1
@@ -10497,7 +10641,9 @@ SUB laufSchritt()
                      STR$(LEN(laufDateien)) + " Dateien (ESC bricht ab)")
         RETURN
     END IF
-    ' Fertig gesammelt -- ab hier wie bisher.
+    ' Fertig gesammelt -- ab hier wie bisher. Die Statuszeile sagt es, sonst
+    ' stand dort neben der Vorschau weiter "Sammle ... 0 von 2 Dateien".
+    GUI_SET_TEXT(lblStatus, tr$("Gesammelt: ") + STR$(LEN(umbauTexte)) + tr$(" Datei(en) betroffen."))
     DIM art AS STRING : art = laufArt
     laufArt = ""
     IF art = "parameter" THEN
@@ -10561,7 +10707,7 @@ SUB dateienVergleichen()
     ' auch wenn die Antwort schon dasteht, ist einer zu viel.
     DIM anderer AS STRING : anderer = GUI_FILETREE_SELECTED$(baum)
     IF anderer <> "" AND GUI_FILETREE_IS_DIR(baum) THEN anderer = ""
-    IF anderer <> "" AND wegGleich$(anderer) = wegGleich$(tabPfade[aktiverTab]) THEN anderer = ""
+    IF anderer <> "" AND gleicherWeg(anderer, tabPfade[aktiverTab]) THEN anderer = ""
     IF anderer = "" THEN anderer = FILE_OPEN_DIALOG("Womit vergleichen?", "dh")
     IF anderer = "" THEN RETURN
     DIM meiner AS STRING : meiner = tabPfade[aktiverTab]
@@ -10925,6 +11071,7 @@ FUNCTION gleichesEnde(a AS STRING, b AS STRING) AS BOOLEAN
     RETURN a = b
 END FUNCTION
 
+DIM standAbgelehnt AS STRING
 SUB umbauStandSetzen(tab AS INTEGER, pfad AS STRING, text AS STRING)
     DIM t AS INTEGER : t = umbauReiter(tab, pfad)
     IF t >= 0 THEN
@@ -10938,7 +11085,14 @@ SUB umbauStandSetzen(tab AS INTEGER, pfad AS STRING, text AS STRING)
         RETURN
     END IF
     IF pfad = "" THEN RETURN
-    WRITEALL(pfad, text + NL)
+    ' Abgelehnt (schreibgeschuetzt, Ordner weg): genannt statt die IDE zu
+    ' beenden; die Aufrufer haengen `standAbgelehnt` an ihre Meldung.
+    TRY
+        WRITEALL(pfad, text + NL)
+    CATCH e
+        standAbgelehnt = standAbgelehnt + IIF(standAbgelehnt = "", "", ", ") + BASENAME(pfad)
+        protokoll("umbau nicht geschrieben " + BASENAME(pfad))
+    END TRY
 END SUB
 
 ' Die Dateien einer Gruppe (ab `ab`, `n` Stueck), die seit dem Stand
@@ -10978,6 +11132,7 @@ SUB umbauZurueck()
         RETURN
     END IF
     DIM k AS INTEGER
+    standAbgelehnt = ""
     FOR k = ab TO ab + n - 1
         umbauStandSetzen(zurTabs[k], zurPfade[k], zurTexte[k])
         ARRAY_PUSH(wdhTabs, zurTabs[k]) : ARRAY_PUSH(wdhPfade, zurPfade[k])
@@ -10991,7 +11146,7 @@ SUB umbauZurueck()
     reiterNeuSetzen()
     symSchluessel = "-"
     GUI_SET_TEXT(lblStatus, tr$("Zurückgenommen: ") + zurWas + " (" + STR$(n) + tr$(" Datei(en), ") + _
-                 STR$(LEN(zurAnzahl)) + " weitere im Vorrat)")
+                 STR$(LEN(zurAnzahl)) + " weitere im Vorrat)" + IIF(standAbgelehnt = "", "", tr$(" Nicht geschrieben: ") + standAbgelehnt))
     protokoll("umbau zurueck " + STR$(n))
     IF aktivesFeld() >= 0 THEN
         IF mz > 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), mz, ms)
@@ -11019,6 +11174,7 @@ SUB umbauWiederholen()
         RETURN
     END IF
     DIM k AS INTEGER
+    standAbgelehnt = ""
     FOR k = ab TO ab + n - 1
         umbauStandSetzen(wdhTabs[k], wdhPfade[k], wdhNachher[k])
         ARRAY_PUSH(zurTabs, wdhTabs[k]) : ARRAY_PUSH(zurPfade, wdhPfade[k])
@@ -11031,7 +11187,7 @@ SUB umbauWiederholen()
     ARRAY_POP(wdhAnzahl) : ARRAY_POP(wdhNamen)
     reiterNeuSetzen()
     symSchluessel = "-"
-    GUI_SET_TEXT(lblStatus, tr$("Wiederholt: ") + was + " (" + STR$(n) + tr$(" Datei(en))"))
+    GUI_SET_TEXT(lblStatus, tr$("Wiederholt: ") + was + " (" + STR$(n) + tr$(" Datei(en))") + IIF(standAbgelehnt = "", "", tr$(" Nicht geschrieben: ") + standAbgelehnt))
     protokoll("umbau wieder " + STR$(n))
 END SUB
 
@@ -11204,6 +11360,10 @@ SUB umbauSchreiben()
         NEXT
         ARRAY_REMOVE_AT(zurAnzahl, 0) : ARRAY_REMOVE_AT(zurNamen, 0)
     WEND
+    ' Abgelehnte Dateien (schreibgeschuetzt, Ordner weg) werden genannt, die
+    ' uebrigen trotzdem geschrieben. Ohne TRY beendete die erste abgelehnte
+    ' die IDE mitten im Umbau.
+    DIM abgelehnt AS STRING : abgelehnt = ""
     DIM k AS INTEGER
     FOR k = 0 TO LEN(umbauTexte) - 1
         IF umbauTabs[k] >= 0 THEN
@@ -11215,7 +11375,15 @@ SUB umbauSchreiben()
             GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
             GUI_TEXTAREA_INSERT(ta, umbauTexte[k])
         ELSE
-            WRITEALL(umbauPfade[k], umbauTexte[k] + NL)
+            DIM geschrieben AS BOOLEAN : geschrieben = TRUE
+            TRY
+                WRITEALL(umbauPfade[k], umbauTexte[k] + NL)
+            CATCH e
+                geschrieben = FALSE
+                abgelehnt = abgelehnt + IIF(abgelehnt = "", "", ", ") + BASENAME(umbauPfade[k])
+                protokoll("umbau nicht geschrieben " + BASENAME(umbauPfade[k]))
+            END TRY
+            IF NOT geschrieben THEN CONTINUE
             DIM t AS INTEGER : t = tabMitPfad(umbauPfade[k])
             IF t >= 0 THEN
                 GUI_SET_TEXT(tabFelder[t], umbauTexte[k])
@@ -11260,7 +11428,11 @@ SUB umbauSchreiben()
         ARRAY_PUSH(umbauNachTabs, umbauTabs[nk])
         ARRAY_PUSH(umbauNachPfade, umbauPfade[nk])
     NEXT
-    GUI_SET_TEXT(lblStatus, umbauMeldung)
+    IF abgelehnt = "" THEN
+        GUI_SET_TEXT(lblStatus, umbauMeldung)
+    ELSE
+        GUI_SET_TEXT(lblStatus, umbauMeldung + tr$(" Nicht geschrieben: ") + abgelehnt)
+    END IF
     IF umbauProt <> "" THEN protokoll(umbauProt)
     umbauLeeren()
 END SUB
@@ -11749,10 +11921,17 @@ FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
     IF tabPfade[aktiverTab] = "" OR GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
         IF NOT sichern(aktiverTab, FALSE) THEN RETURN FALSE
     END IF
-    ' Auch die ANDEREN geaenderten Reiter: das Programm liest eine importierte
-    ' Datei von der Platte, und bis 2026-09-27 lief dann die alte Fassung --
-    ' im Debugger passten obendrein die Zeilen nicht zum Editor. Ein Reiter
-    ' ohne Namen gehoert zu keinem Programm und bleibt, wie er ist.
+    andereSichern()
+    RETURN prozessStartenDatei(art, tabPfade[aktiverTab])
+END FUNCTION
+
+' Die ANDEREN geaenderten Reiter sichern, bevor etwas von der Platte liest:
+' ein Programm liest eine importierte Datei von dort, und bis 2026-09-27
+' lief dann die alte Fassung -- im Debugger passten obendrein die Zeilen
+' nicht zum Editor. Dasselbe galt bis 2026-10-02 fuer Strg+Alt+F5: die
+' Sammlung meldete gruen fuer Code, der im Editor laengst falsch war. Ein
+' Reiter ohne Namen gehoert zu keinem Programm und bleibt, wie er ist.
+SUB andereSichern()
     DIM tg AS INTEGER
     DIM tgN AS INTEGER : tgN = 0
     FOR tg = 0 TO tabAnzahl - 1
@@ -11763,8 +11942,7 @@ FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
         END IF
     NEXT
     IF tgN > 0 THEN protokoll("vor start gesichert " + STR$(tgN))
-    RETURN prozessStartenDatei(art, tabPfade[aktiverTab])
-END FUNCTION
+END SUB
 
 ' Eine Datei starten (run/debug/profile), ohne sie in einem Reiter zu haben.
 FUNCTION prozessStartenDatei(art AS STRING, datei AS STRING) AS BOOLEAN
@@ -11837,7 +12015,7 @@ SUB navNachziehen()
     IF navLetztPfad <> "" AND NOT navSperre THEN
         DIM sprung AS BOOLEAN : sprung = FALSE
         IF p <> navLetztPfad THEN
-            sprung = wegGleich$(p) <> wegGleich$(navLetztPfad)
+            sprung = NOT gleicherWeg(p, navLetztPfad)
         ELSEIF ABS(z - navLetztZeile) >= 8 AND laenge = navLetztLaenge THEN
             sprung = NOT (KEYHIT(KEY_PAGEUP) OR KEYHIT(KEY_PAGEDOWN) OR KEYHIT(KEY_HOME) OR KEYHIT(KEY_END))
         END IF
@@ -11895,7 +12073,7 @@ SUB navGehen(zurueck AS BOOLEAN)
     END IF
     navSperre = TRUE
     DIM schonDa AS BOOLEAN : schonDa = FALSE
-    IF aktiverTab >= 0 THEN schonDa = wegGleich$(tabPfade[aktiverTab]) = wegGleich$(p)
+    IF aktiverTab >= 0 THEN schonDa = gleicherWeg(tabPfade[aktiverTab], p)
     IF NOT schonDa THEN dateiOeffnen(p)
     IF aktiverTab >= 0 THEN GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], z, sp)
     protokoll(IIF(zurueck, "nav zurueck ", "nav vor ") + BASENAME(p) + " " + STR$(z))
@@ -12129,7 +12307,7 @@ SUB zurLetztenAenderung()
     IF navLetztPfad <> "" THEN navAblegen(navPfade, navZeilen, navSpalten, navLetztPfad, navLetztZeile, navLetztSpalte)
     navSperre = TRUE
     DIM schonDa AS BOOLEAN : schonDa = FALSE
-    IF aktiverTab >= 0 THEN schonDa = wegGleich$(tabPfade[aktiverTab]) = wegGleich$(aendPfad)
+    IF aktiverTab >= 0 THEN schonDa = gleicherWeg(tabPfade[aktiverTab], aendPfad)
     IF NOT schonDa THEN dateiOeffnen(aendPfad)
     IF aktiverTab >= 0 THEN
         GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], aendZeile, aendSpalte)
@@ -12673,7 +12851,15 @@ SUB baumAusfuehren(name AS STRING)
     IF baumAktion = "datei" THEN
         DIM pd AS STRING : pd = PATHJOIN(baumZiel, name)
         IF FILEEXISTS(pd) OR DIREXISTS(pd) THEN GUI_SET_TEXT(lblStatus, tr$("Gibt es schon: ") + name) : RETURN
-        WRITEALL(pd, "")
+        ' Die Platte kann ablehnen (kein Schreibrecht im Ordner) -- ohne TRY
+        ' beendete das die IDE.
+        TRY
+            WRITEALL(pd, "")
+        CATCH e
+            GUI_SET_TEXT(lblStatus, tr$("Anlegen ging nicht: ") + e)
+            protokoll("baum anlegen fehler")
+            RETURN
+        END TRY
         baumFuellen()
         GUI_FILETREE_EXPAND(baum, baumZiel, TRUE)
         protokoll("baum neue datei " + name)
@@ -12681,7 +12867,13 @@ SUB baumAusfuehren(name AS STRING)
     ELSEIF baumAktion = "ordner" THEN
         DIM po AS STRING : po = PATHJOIN(baumZiel, name)
         IF FILEEXISTS(po) OR DIREXISTS(po) THEN GUI_SET_TEXT(lblStatus, tr$("Gibt es schon: ") + name) : RETURN
-        MKDIR(po)
+        TRY
+            MKDIR(po)
+        CATCH e2
+            GUI_SET_TEXT(lblStatus, tr$("Anlegen ging nicht: ") + e2)
+            protokoll("baum anlegen fehler")
+            RETURN
+        END TRY
         baumFuellen()
         GUI_FILETREE_EXPAND(baum, baumZiel, TRUE)
         GUI_SET_TEXT(lblStatus, tr$("Ordner angelegt: ") + name)
@@ -12696,6 +12888,7 @@ END SUB
 ' Namen, und jedes IMPORT im Projekt, das die Datei meint, zieht mit --
 ' sonst uebersetzte das Programm nach dem Umbenennen nicht mehr.
 SUB baumUmbenennen(alt AS STRING, name AS STRING)
+    echteWege = {}   ' die Wege auf der Platte aendern sich
     DIM neu AS STRING : neu = PATHJOIN(DIRNAME(alt), name)
     IF name = BASENAME(alt) THEN RETURN
     IF (FILEEXISTS(neu) OR DIREXISTS(neu)) AND LOWER$(name) <> LOWER$(BASENAME(alt)) THEN
@@ -12730,18 +12923,25 @@ SUB baumUmbenennen(alt AS STRING, name AS STRING)
     ' Die gefundenen IMPORTs schreiben: in einen offenen Reiter als eigener
     ' Rueckgaengig-Schritt (und gesichert, wenn er es vorher war), sonst auf
     ' die Platte.
+    ' Eine Datei, die sich nicht schreiben laesst (schreibgeschuetzt), wird
+    ' genannt -- ohne TRY beendete sie die IDE, NACHDEM schon umbenannt war.
+    DIM abgelehnt AS STRING : abgelehnt = ""
     FOR i = 0 TO LEN(impDateien) - 1
         DIM d AS STRING : d = wegUmziehen$(impDateien[i], alt, neu, FALSE)
         DIM t AS INTEGER : t = tabVonWeg(d)
+        DIM schreiben AS BOOLEAN : schreiben = TRUE
         IF t >= 0 THEN
-            DIM warSauber AS BOOLEAN : warSauber = GUI_TEXT(tabFelder[t]) = tabGesichert[t]
+            schreiben = GUI_TEXT(tabFelder[t]) = tabGesichert[t]
             feldAustauschen(tabFelder[t], GUI_TEXT(tabFelder[t]), impTexte[i])
-            IF warSauber THEN
+        END IF
+        IF schreiben THEN
+            TRY
                 WRITEALL(d, impTexte[i] + IIF(RIGHT$(impTexte[i], 1) = NL, "", NL))
-                tabGesichert[t] = impTexte[i]
-            END IF
-        ELSE
-            WRITEALL(d, impTexte[i] + IIF(RIGHT$(impTexte[i], 1) = NL, "", NL))
+                IF t >= 0 THEN tabGesichert[t] = impTexte[i]
+            CATCH e2
+                abgelehnt = abgelehnt + IIF(abgelehnt = "", "", ", ") + BASENAME(d)
+                protokoll("baum import nicht geschrieben " + BASENAME(d))
+            END TRY
         END IF
     NEXT
     reiterNeuSetzen()
@@ -12750,7 +12950,8 @@ SUB baumUmbenennen(alt AS STRING, name AS STRING)
     GUI_FILETREE_SELECT(baum, neu)
     konfigSichern()
     GUI_SET_TEXT(lblStatus, tr$("Umbenannt: ") + BASENAME(alt) + " -> " + name + _
-                 IIF(LEN(impDateien) > 0, " (" + STR$(LEN(impDateien)) + tr$(" Datei(en) mit IMPORT angepasst)"), ""))
+                 IIF(LEN(impDateien) > 0 AND abgelehnt = "", " (" + STR$(LEN(impDateien)) + tr$(" Datei(en) mit IMPORT angepasst)"), "") + _
+                 IIF(abgelehnt = "", "", tr$(" Nicht geschrieben: ") + abgelehnt))
     protokoll("baum umbenannt " + BASENAME(alt) + " " + name + " imports " + STR$(LEN(impDateien)))
 END SUB
 
@@ -12758,7 +12959,7 @@ END SUB
 ' Stelle unter `neu`.
 FUNCTION wegUmziehen$(weg AS STRING, alt AS STRING, neu AS STRING, ordner AS BOOLEAN) AS STRING
     IF weg = "" THEN RETURN weg
-    IF wegGleich$(weg) = wegGleich$(alt) THEN RETURN neu
+    IF gleicherWeg(weg, alt) THEN RETURN neu
     IF ordner THEN
         DIM a AS STRING : a = wegGleich$(alt)
         DIM w AS STRING : w = wegGleich$(weg)
@@ -12770,7 +12971,7 @@ END FUNCTION
 FUNCTION tabVonWeg(weg AS STRING) AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF tabPfade[i] <> "" AND wegGleich$(tabPfade[i]) = wegGleich$(weg) THEN RETURN i
+        IF tabPfade[i] <> "" AND gleicherWeg(tabPfade[i], weg) THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
@@ -12826,7 +13027,7 @@ SUB baumLoeschenFragen()
         GUI_SET_TEXT(lblStatus, tr$("Erst im Projektbaum eine Datei oder einen Ordner wählen."))
         RETURN
     END IF
-    IF wegGleich$(baumZiel) = wegGleich$(projektOrdner) THEN
+    IF gleicherWeg(baumZiel, projektOrdner) THEN
         GUI_SET_TEXT(lblStatus, tr$("Den Projektordner selbst löscht die IDE nicht."))
         RETURN
     END IF
@@ -12841,6 +13042,7 @@ SUB baumLoeschenFragen()
 END SUB
 
 SUB baumLoeschen(ziel AS STRING)
+    echteWege = {}   ' die Wege auf der Platte aendern sich
     DIM istOrdner AS BOOLEAN : istOrdner = DIREXISTS(ziel)
     TRY
         IF istOrdner THEN
@@ -12921,7 +13123,13 @@ END SUB
 
 SUB ausgabeSichernNach(pfad AS STRING)
     DIM t AS STRING : t = ausgabeText$()
-    WRITEALL(pfad, t + IIF(t = "", "", NL))
+    TRY
+        WRITEALL(pfad, t + IIF(t = "", "", NL))
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Sichern ging nicht: ") + e)
+        protokoll("ausgabe nicht gesichert")
+        RETURN
+    END TRY
     DIM n AS INTEGER : n = GUI_LISTBOX_VIEW_COUNT(lstAusgabe)
     GUI_SET_TEXT(lblStatus, tr$("Ausgabe gesichert: ") + STR$(n) + tr$(" Zeilen in ") + pfad)
     protokoll("ausgabe gesichert " + STR$(n))
@@ -12931,7 +13139,7 @@ END SUB
 FUNCTION startWert$(datei AS STRING, umgebung AS BOOLEAN) AS STRING
     DIM i AS INTEGER
     FOR i = 0 TO LEN(startDateien) - 1
-        IF wegGleich$(startDateien[i]) = wegGleich$(datei) THEN
+        IF gleicherWeg(startDateien[i], datei) THEN
             RETURN IIF(umgebung, startUmg[i], startArgs[i])
         END IF
     NEXT
@@ -12941,7 +13149,7 @@ END FUNCTION
 SUB startWertSetzen(datei AS STRING, umgebung AS BOOLEAN, wert AS STRING)
     DIM i AS INTEGER
     FOR i = 0 TO LEN(startDateien) - 1
-        IF wegGleich$(startDateien[i]) = wegGleich$(datei) THEN
+        IF gleicherWeg(startDateien[i], datei) THEN
             IF umgebung THEN
                 startUmg[i] = wert
             ELSE
@@ -13457,7 +13665,9 @@ SUB stapelZeigen(j AS JSON_HANDLE)
         ARRAY_PUSH(stapelDateien, sdatei)
         ARRAY_PUSH(stapelZeilen, JSON_GET_INT(j, p + ".line"))
         DIM szeile AS STRING : szeile = STR$(JSON_GET_INT(j, p + ".line"))
-        IF NOT SAMEFILE(sdatei, prozessDatei) THEN szeile = BASENAME(sdatei) + ":" + szeile
+        ' Die Zeile zuerst: in der schmalen Spalte schnitt "mathe.dh:10" genau
+        ' die Zahl ab, um die es geht.
+        IF NOT SAMEFILE(sdatei, prozessDatei) THEN szeile = szeile + "  " + BASENAME(sdatei)
         GUI_TABLE_ADD_ROW(tblStapel, [name, szeile])
         ARRAY_PUSH(teile, name + ":" + STR$(JSON_GET_INT(j, p + ".line")))
     NEXT
@@ -13698,14 +13908,16 @@ SUB profilTabelleFuellen()
     DIM i AS INTEGER
     IF NOT GUI_CHECKED(cbProfilFunk) THEN
         GUI_TABLE_HEADERS(tblProfil, [tr$("Zeile"), tr$("Anzahl"), "ms", tr$("Anteil"), tr$("Quelltext")])
-        GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
+        GUI_TABLE_COL_WIDTHS(tblProfil, [110, 70, 70, 70, 300])
         DIM pd AS ARRAY OF STRING : pd = []
         FOR i = 0 TO MIN(n, 300) - 1
             DIM anteil AS STRING : anteil = "-"
             IF profGesamt > 0.0 THEN anteil = FORMAT$(profRohT[i] / profGesamt * 100.0, "%.1f") + " %"
             DIM q AS STRING : q = profZeileText$(profDatei$(i), profRohZ[i])
             DIM zs AS STRING : zs = STR$(profRohZ[i])
-            IF profDatei$(i) <> prozessDatei THEN zs = BASENAME(profDatei$(i)) + ":" + zs
+            ' Die Zeile zuerst, wie im Aufrufstapel: "mathe.dh:10" verlor in
+            ' der schmalen Spalte genau die Zahl.
+            IF NOT gleicherWeg(profDatei$(i), prozessDatei) THEN zs = zs + "  " + BASENAME(profDatei$(i))
             GUI_TABLE_ADD_ROW(tblProfil, [zs, STR$(profRohA[i]), FORMAT$(profRohT[i] * 1000.0, "%.2f"), anteil, q])
             ARRAY_PUSH(pz, profRohZ[i]) : ARRAY_PUSH(pd, profDatei$(i))
         NEXT
@@ -14115,7 +14327,7 @@ SUB hbSucheAlle()
     DIM d AS STRING
     FOR EACH d IN docNamen
         IF voll THEN BREAK
-        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(docsOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(docsOrdner, d))
         DIM kopf AS BOOLEAN : kopf = FALSE
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zeilen) - 1
@@ -14428,7 +14640,7 @@ SUB handbuch()
     DIM besteZahl AS INTEGER : besteZahl = 0
     DIM d AS STRING
     FOR EACH d IN docNamen
-        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(docsOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(docsOrdner, d))
         DIM zahl AS INTEGER : zahl = 0
         DIM erste AS INTEGER : erste = 0
         DIM i AS INTEGER
@@ -15363,7 +15575,7 @@ SUB schnipselAuswahlSichern(eingabe AS STRING)
     ' Steht die Datei in einem Reiter, soll er nicht den alten Stand halten.
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF wegGleich$(tabPfade[i]) = wegGleich$(p) AND GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN
+        IF gleicherWeg(tabPfade[i], p) AND GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN
             DIM neuT AS STRING : neuT = JOIN$(READLINES(p), NL)
             GUI_SET_TEXT(tabFelder[i], neuT)
             tabGesichert[i] = neuT
@@ -15457,6 +15669,39 @@ SUB terminalEingabe(t AS STRING)
     terminalStarten(b)
 END SUB
 
+' Schleifenvariablen der Eingabeaufforderung fuer die .cmd-Datei
+' verdoppeln: interaktiv heisst es `for %f in (*) do echo %f`, in einer
+' Skriptdatei `%%f` -- sonst bricht cmd ab ("f" kann syntaktisch an
+' dieser Stelle nicht verarbeitet werden). Verdoppelt wird nur ein `%`
+' vor EINEM Buchstaben, hinter dem kein Wortzeichen und kein `%` steht;
+' `%PATH%` und ein bewusst geschriebenes `%%x%%` bleiben, wie sie sind.
+FUNCTION cmdSchleifenvariablen$(b AS STRING) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM n AS INTEGER : n = LEN(b)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM c AS STRING : c = MID$(b, i, 1)
+        aus = aus + c
+        IF c <> "%" THEN CONTINUE
+        IF i > 0 THEN
+            IF MID$(b, i - 1, 1) = "%" THEN CONTINUE
+        END IF
+        IF i + 1 >= n THEN CONTINUE
+        DIM buch AS STRING : buch = MID$(b, i + 1, 1)
+        ' %~nxf (Teile des Namens) ist immer eine Schleifenvariable.
+        IF buch = "~" THEN
+            aus = aus + "%"
+            CONTINUE
+        END IF
+        IF NOT REGEX_TEST(buch, "^[A-Za-z]$") THEN CONTINUE
+        IF i + 2 < n THEN
+            IF REGEX_TEST(MID$(b, i + 2, 1), "^[A-Za-z0-9_%]$") THEN CONTINUE
+        END IF
+        aus = aus + "%"
+    NEXT
+    RETURN aus
+END FUNCTION
+
 SUB terminalStarten(b AS STRING)
     DIM ordner AS STRING : ordner = konfigOrdner$()
     ' Absolut und unter Windows mit Rueckstrichen: cmd /C nimmt "./x.cmd" nicht.
@@ -15469,7 +15714,7 @@ SUB terminalStarten(b AS STRING)
         ' chcp 65001: sonst kaemen die Umlaute von dir & Co. in der
         ' OEM-Codeseite an. errorlevel wird VOR dem Echo gemerkt.
         DIM crlf AS STRING : crlf = CHR$(13) + CHR$(10)
-        text = "@echo off" + crlf + "chcp 65001 >nul" + crlf + "cd /d " + CHR$(34) + terminalOrt$() + CHR$(34) + crlf + b + crlf
+        text = "@echo off" + crlf + "chcp 65001 >nul" + crlf + "cd /d " + CHR$(34) + terminalOrt$() + CHR$(34) + crlf + cmdSchleifenvariablen$(b) + crlf
         text = text + "set __dh_e=%errorlevel%" + crlf + "echo " + TERM_MARKE + "%cd%" + crlf + "exit /b %__dh_e%" + crlf
         WRITEALL(termSkript, text)
         termProz = PROCESS_START("cmd", "/Q", "/D", "/C", termSkript)
@@ -15612,7 +15857,7 @@ SUB waermeFeld(t AS INTEGER)
         NEXT
         ' profRoh* ist nach Zeit absteigend: die ersten 30 bekommen Zahlen.
         FOR i = 0 TO LEN(profRohZ) - 1
-            IF wegGleich$(profDatei$(i)) <> wegGleich$(pfad) THEN CONTINUE
+            IF NOT gleicherWeg(profDatei$(i), pfad) THEN CONTINUE
             IF profRohT[i] <= 0.0 OR hoechst <= 0.0 THEN CONTINUE
             ARRAY_PUSH(zl, profRohZ[i])
             ARRAY_PUSH(fa, waermeFarbe(profRohT[i] / hoechst))

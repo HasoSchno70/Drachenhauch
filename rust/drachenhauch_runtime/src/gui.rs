@@ -452,7 +452,13 @@ fn stil_vor(w: &Widget, k: usize) -> u8 {
 /// Anfang und gemeinsames Ende grenzen die Aenderung ein: eine Zeile, die
 /// HINTER ihr beginnt, rueckt um die Laengendifferenz mit (wer am Zeilenanfang
 /// Enter drueckt, schiebt sie also eine Zeile tiefer), eine davor bleibt, und
-/// eine, die IN der Aenderung begann (geloescht), landet an ihrem Anfang.
+/// eine, die IN der Aenderung begann, wird ueber die ZEILEN abgeglichen:
+/// hat die Aenderung vorher und nachher gleich viele Zeilen (Umbenennen
+/// ueber die ganze Datei), bleibt sie auf ihrer Zeile; sonst sucht eine
+/// gemeinsame Teilfolge der Zeilen ihre neue Stelle, und erst eine Zeile,
+/// die es nicht mehr gibt, landet am Anfang der Aenderung. Vorher fiel
+/// JEDE Marke im Bereich auf den Anfang -- ein Umbau, der den ganzen Text
+/// ersetzt, zog so einen Haltepunkt aus Zeile 10 auf Zeile 2.
 fn zeilen_nachziehen(alt: &str, neu: &str, zeilen: &mut [usize]) {
     let a_ch: Vec<char> = alt.chars().collect();
     let n_ch: Vec<char> = neu.chars().collect();
@@ -473,9 +479,47 @@ fn zeilen_nachziehen(alt: &str, neu: &str, zeilen: &mut [usize]) {
         } else if o <= a {
             // davor: bleibt
         } else {
-            *z = zeile_neu(a);
+            *z = in_der_aenderung(&a_ch, &n_ch, a, ende_alt, n_ch.len() - e, *z)
+                .unwrap_or_else(|| zeile_neu(a));
         }
     }
+}
+
+/// Neue Zeile einer Marke, deren Zeile in der Aenderung `a..ende_alt` (im
+/// neuen Text `a..ende_neu`) lag; `None` = die Zeile gibt es nicht mehr.
+fn in_der_aenderung(a_ch: &[char], n_ch: &[char], a: usize, ende_alt: usize,
+                    ende_neu: usize, z: usize) -> Option<usize> {
+    let zeile_von = |ch: &[char], off: usize| ch[..off.min(ch.len())].iter().filter(|&&c| c == '\n').count();
+    let erste = zeile_von(a_ch, a);
+    let letzte_alt = zeile_von(a_ch, ende_alt);
+    let letzte_neu = zeile_von(n_ch, ende_neu);
+    if z < erste || z > letzte_alt { return None; }
+    // Gleich viele Zeilen: jede Zeile wurde an ihrem Platz geaendert.
+    if letzte_alt == letzte_neu { return Some(z); }
+    let zeilen = |ch: &[char], von: usize, bis: usize| -> Vec<String> {
+        let ganz: String = ch.iter().collect();
+        ganz.split('\n').skip(von).take(bis - von + 1).map(|t| t.trim().to_string()).collect()
+    };
+    let alt = zeilen(a_ch, erste, letzte_alt);
+    let neu = zeilen(n_ch, erste, letzte_neu);
+    let (n, m) = (alt.len(), neu.len());
+    if n * m > 4_000_000 { return None; }
+    // Laengste gemeinsame Teilfolge, von hinten gerechnet.
+    let mut t = vec![0u32; (n + 1) * (m + 1)];
+    for i in (0..n).rev() {
+        for j in (0..m).rev() {
+            t[i * (m + 1) + j] = if alt[i] == neu[j] { t[(i + 1) * (m + 1) + j + 1] + 1 }
+                else { t[(i + 1) * (m + 1) + j].max(t[i * (m + 1) + j + 1]) };
+        }
+    }
+    let (mut i, mut j) = (0, 0);
+    while i < n && j < m {
+        if alt[i] == neu[j] {
+            if erste + i == z { return Some(erste + j); }
+            i += 1; j += 1;
+        } else if t[(i + 1) * (m + 1) + j] >= t[i * (m + 1) + j + 1] { i += 1; } else { j += 1; }
+    }
+    None
 }
 
 /// Marken eines Textbereichs an seinen jetzigen Text anpassen (siehe
@@ -21844,5 +21888,24 @@ mod marken_tests {
         assert_eq!(nach(alt, "a\nbc\nd", &[2]), vec![1]);
         // Unveraendert.
         assert_eq!(nach(alt, alt, &[3]), vec![3]);
+    }
+
+    #[test]
+    fn marken_in_einer_grossen_aenderung() {
+        // Umbenennen ueber die ganze Datei: Zeile 1 und 4 aendern sich, der
+        // Bereich dazwischen gilt als geaendert. Die Marke auf Zeile 3
+        // bleibt (vorher fiel sie auf Zeile 1).
+        let alt = "kopf\nf quadrat\nx\ny = quadrat(1)\nfuss";
+        let neu = "kopf\nf hoch2\nx\ny = hoch2(1)\nfuss";
+        assert_eq!(nach(alt, neu, &[3, 2, 4]), vec![3, 2, 4]);
+        // Zeilen kommen dazu UND aendern sich: die gemeinsame Teilfolge
+        // findet die markierte Zeile wieder.
+        let alt = "a\nquadrat\nb\nc\nquadrat\nd";
+        let neu = "a\nhoch2\nNEU\nb\nc\nhoch2\nd";
+        assert_eq!(nach(alt, neu, &[3]), vec![4]);
+        // Die markierte Zeile gibt es nicht mehr: Anfang der Aenderung.
+        let alt = "a\nx1\nweg\nx2\nz";
+        let neu = "a\ny1\ny2\nneu\nmehr\nz";
+        assert_eq!(nach(alt, neu, &[2]), vec![1]);
     }
 }
