@@ -119,16 +119,23 @@ pub fn diagnose(text: &str, basis: &Path) -> Vec<Value> {
 /// Stellen aus importierten Dateien fallen weg; was der Compiler nicht weiss,
 /// steht nicht darin.
 pub fn typ_hinweise(text: &str, basis: &Path) -> Vec<(u32, String, String)> {
+    // Hinweise gibt es nur fuer FOR EACH, und die stehen im Puffer selbst
+    // (Importe fallen unten weg). Ohne das Wort lohnt kein Uebersetzen --
+    // bei 100000 Zeilen kostete es 0,5 s je Pruefung (Stresstest 2026-10-02).
+    if !text.as_bytes().windows(4).any(|w| w.eq_ignore_ascii_case(b"each")) { return Vec::new(); }
     let roh = crate::compiler::typ_hinweise_sammeln(|| { let _ = crate::check_source(text, basis, "<editor>"); });
     let herkunft = crate::preprocess::process(text, basis).ok().map(|r| r.2);
     let mut aus: Vec<(u32, String, String)> = Vec::new();
+    let mut gesehen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
     for (z, name, typ) in roh {
         let zeile = match herkunft.as_ref().and_then(|h| h.get((z as usize).saturating_sub(1))) {
             Some(h) if h.datei.is_empty() => h.zeile,
             Some(_) => continue,
             None => z,
         };
-        if !aus.iter().any(|(a, b, _)| *a == zeile && b.eq_ignore_ascii_case(&name)) {
+        // Ueber eine Menge, nicht `aus.iter().any`: das waere quadratisch in
+        // der Zahl der Schleifen.
+        if gesehen.insert((zeile, name.to_ascii_lowercase())) {
             aus.push((zeile, name, typ));
         }
     }

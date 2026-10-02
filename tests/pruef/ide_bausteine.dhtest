@@ -296,3 +296,23 @@ FOR EACH y IN b : NEXT
 --- erwartet
 [{"zeile":3,"name":"x","typ":"INTEGER"},{"zeile":5,"name":"k","typ":"STRING"},{"zeile":5,"name":"v","typ":"FLOAT"},{"zeile":9,"name":"n","typ":"STRING"}]
 []
+
+=== code types bei 100000 zeilen ohne for each uebersetzt nicht erst
+' Stresstest 2026-10-02: CODE_TYPES$ uebersetzte jedes Mal das ganze
+' Programm -- 0,5 s bei 100000 Zeilen, und die IDE fragt nach jedem
+' Pruefen. Hinweise gibt es nur fuer FOR EACH; ohne das Wort im Text ist die
+' Antwort leer, ohne zu uebersetzen. Mit dem Wort (in jeder Schreibweise)
+' wie bisher, und eine Variable steht je Zeile einmal.
+DIM zl AS ARRAY OF STRING : zl = ["DIM x AS INTEGER"]
+DIM i AS INTEGER
+FOR i = 1 TO 100000
+    ARRAY_PUSH(zl, "x = x + " + STR$(i))
+NEXT
+DIM t AS FLOAT : t = GET_TIME()
+PRINT CODE_TYPES$(JOIN$(zl, CHR$(10)), CWD$())
+PRINT "flott "; GET_TIME() - t < 0.2
+PRINT CODE_TYPES$("DIM a AS ARRAY OF INTEGER : a = [1]" + CHR$(10) + "for each e in a : next : For Each E in a : Next", CWD$())
+--- erwartet
+[]
+flott TRUE
+[{"zeile":2,"name":"e","typ":"INTEGER"}]

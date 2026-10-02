@@ -41,6 +41,8 @@ SETFPS(60)
 SCREEN(320, 200, "T")
 CIRCLE(10, 20, 5)
 APPENDFILE("a.txt", "x")
+kreis(5, _
+      6, 7)
 
 --- nachher
 IMPORT "json"
@@ -57,9 +59,58 @@ pr param 8 s, start, n
 pr param 10 w, h, titel
 pr param 11 x, y, r
 pr param 12 p, text
+pr param 13 x, y, r
 parameter namen aus
 pr aus FALSE
 gemerkt FALSE
+
+=== parameternamen in einer datei mit 100000 zeilen ohne stillstand
+' Stresstest 2026-10-02: das Sammeln las jede Klammer, jeden Namen und jedes
+' Argument mit MID$ aus dem GANZEN Text -- MID$ kostet so viel, wie die
+' Stelle weit hinten liegt, also quadratisch: 100000 eingefuegte Zeilen
+' hielten die IDE beim naechsten Pruefen 1,8 s fest, nur hierfuer. Jetzt auf
+' der Zeile. Geprueft: die Hinweise ganz hinten stimmen (auch ein Aufruf
+' ueber zwei Zeilen), und es geht flott (grob: 1 s).
+DIM prT AS FLOAT : prT = GET_TIME()
+parameterSammeln(tabFelder[aktiverTab])
+DIM prD AS FLOAT : prD = GET_TIME() - prT
+DIM prI AS INTEGER
+FOR prI = 0 TO LEN(paramZeilen) - 1
+    protokoll("pr param " + STR$(paramZeilen[prI]) + " " + paramTexte[prI])
+NEXT
+protokoll("pr flott " + STR$(prD < 1.0))
+EXIT(0)
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+gross.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM t AS ARRAY OF STRING : t = []
+ARRAY_PUSH(t, "SUB kreis(x AS INTEGER, y AS INTEGER, r AS INTEGER)")
+ARRAY_PUSH(t, "END SUB")
+ARRAY_PUSH(t, "DIM x AS INTEGER")
+DIM i AS INTEGER
+FOR i = 1 TO 100000
+    ARRAY_PUSH(t, "x = x + " + STR$(i))
+NEXT
+ARRAY_PUSH(t, "kreis(1, 2, 3)")
+ARRAY_PUSH(t, "kreis(7, _")
+ARRAY_PUSH(t, "      4, x)")
+WRITEALL("gross.dh", JOIN$(t, CHR$(10)) + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr param 100004 x, y, r
+pr param 100005 x, y, r
+pr flott TRUE
 
 === strg v rueckt den block an seine stelle ein, strg z nimmt es zurueck
 DIM prBild AS INTEGER : prBild = 0

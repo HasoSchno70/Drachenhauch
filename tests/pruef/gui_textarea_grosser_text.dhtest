@@ -1,0 +1,96 @@
+' Grosse Texte im Code-Feld (Stresstest 2026-10-02).
+'
+' GUI_TEXTAREA_CURSOR und GUI_TEXTAREA_VIEW zerlegten bei JEDER Frage den
+' ganzen Text in Zeichen und Zeilenanfaenge -- die IDE fragt mehrmals je
+' Bild, bei 100000 Zeilen waren das 2,4 ms je Frage und zusammen gut 12 ms
+' je Bild. Jetzt merkt sich die gui die Zerlegung, solange der Text derselbe
+' ist. Geprueft wird, dass die Antworten nach jeder Art Aenderung stimmen
+' (der Merkplatz darf nie einen alten Text meinen), dass zwei Felder mit
+' verschiedenem Text sich nicht vermischen, und dass es flott geht.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die marke stimmt nach jeder art aenderung
+IMPORT "gui"
+SCREEN(600, 300, "t", 1)
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 600, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(win, 10, 10, 500, 200)
+DIM z AS INTEGER : DIM s AS INTEGER
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei")
+GUI_TEXTAREA_GOTO(ta, 2, 3)
+(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z; " "; s
+' Eine Zeile vorn eingesetzt: die Marke steht hinter dem Eingesetzten, die
+' Zeilen darunter ruecken eine tiefer.
+GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 1)
+GUI_TEXTAREA_INSERT(ta, "neu" + CHR$(10))
+(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z; " "; s
+GUI_TEXTAREA_GOTO(ta, 3, 2)
+(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z; " "; s
+' Ganz neuer Text gleicher Laenge, aber mit den Umbruechen woanders.
+GUI_SET_TEXT(ta, "e" + CHR$(10) + "inszweiz" + CHR$(10) + "wedreix")
+GUI_TEXTAREA_GOTO(ta, 2, 5)
+(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z; " "; s
+DIM erste AS INTEGER : DIM zeilen AS INTEGER : DIM von AS INTEGER : DIM laenge AS INTEGER
+(erste, zeilen, von, laenge) = GUI_TEXTAREA_VIEW(ta)
+PRINT erste; " "; von; " "; laenge
+' Ohne Umbruch: eine Zeile.
+GUI_SET_TEXT(ta, "abcdef")
+GUI_TEXTAREA_GOTO(ta, 1, 4)
+(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z; " "; s
+(erste, zeilen, von, laenge) = GUI_TEXTAREA_VIEW(ta)
+PRINT erste; " "; von; " "; laenge
+--- erwartet
+2 3
+2 1
+3 2
+2 5
+0 0 18
+1 4
+0 0 6
+
+=== zwei felder mit verschiedenem text vermischen sich nicht
+IMPORT "gui"
+SCREEN(600, 300, "t", 1)
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 600, 300)
+DIM a AS GUI_WIDGET : a = GUI_TEXTAREA(win, 10, 10, 250, 200)
+DIM b AS GUI_WIDGET : b = GUI_TEXTAREA(win, 300, 10, 250, 200)
+GUI_SET_TEXT(a, "x" + CHR$(10) + "y" + CHR$(10) + "z")
+GUI_SET_TEXT(b, "langezeile")
+GUI_TEXTAREA_GOTO(a, 3, 1)
+GUI_TEXTAREA_GOTO(b, 1, 8)
+DIM z AS INTEGER : DIM s AS INTEGER
+DIM k AS INTEGER
+FOR k = 1 TO 2
+    (z, s) = GUI_TEXTAREA_CURSOR(a) : PRINT "a "; z; " "; s
+    (z, s) = GUI_TEXTAREA_CURSOR(b) : PRINT "b "; z; " "; s
+NEXT
+--- erwartet
+a 3 1
+b 1 8
+a 3 1
+b 1 8
+
+=== bei 100000 zeilen kostet die frage nach der marke fast nichts
+IMPORT "gui"
+SCREEN(600, 300, "t", 1)
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("w", 0, 0, 600, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(win, 10, 10, 500, 200)
+DIM zl AS ARRAY OF STRING : zl = []
+DIM i AS INTEGER
+FOR i = 1 TO 100000
+    ARRAY_PUSH(zl, "    x = x + " + STR$(i))
+NEXT
+GUI_SET_TEXT(ta, JOIN$(zl, CHR$(10)))
+GUI_TEXTAREA_GOTO(ta, 77777, 5)
+DIM z AS INTEGER : DIM s AS INTEGER
+DIM t AS FLOAT : t = GET_TIME()
+DIM k AS INTEGER
+FOR k = 1 TO 200
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+NEXT
+DIM d AS FLOAT : d = GET_TIME() - t
+PRINT z; " "; s
+' Vorher 200 x 2,4 ms; grob: 0,2 s.
+PRINT "flott "; d < 0.2
+--- erwartet
+77777 5
+flott TRUE
