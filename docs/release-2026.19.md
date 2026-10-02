@@ -78,6 +78,8 @@ Und was falsch war, ohne abzustürzen:
 * Mit **zwölf offenen Reitern** meldete ein Sprung in eine schon offene
   Datei „Höchstens 12 Reiter“.
 * **Strg+Alt+F5** sicherte nur die Prüfsammlung, nicht den geprüften Code.
+* Das **Terminal** zeigte nach einer sehr langen Ausgabe 2999 statt 3000
+  Zeilen (gefunden im Prüflauf zu dieser Fassung).
 
 ### Neue Befehle
 
