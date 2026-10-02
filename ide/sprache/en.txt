@@ -883,3 +883,8 @@ Zeilenumbruch (Alt+Z)	Word wrap (Alt+Z)
 Handbuch (F1)	Manual (F1)
 Einstellungen (Strg+U)	Settings (Ctrl+U)
 Anlegen ging nicht: 	Could not create it: 
+Sichern ging nicht: 	Saving failed: 
+Lässt sich nicht lesen: 	Cannot be read: 
+Kein UTF-8, als 	Not UTF-8, read as 
+ gelesen -- Sichern schreibt UTF-8: 	 -- saving writes UTF-8: 
+ Nicht geschrieben: 	 Not written: 

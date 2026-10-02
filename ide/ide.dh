@@ -3232,9 +3232,44 @@ SUB faltenAlle(zu AS BOOLEAN)
 END SUB
 
 FUNCTION dateiLesen(pfad AS STRING) AS STRING
-    DIM zeilen AS ARRAY OF STRING
-    zeilen = READLINES(pfad)
-    RETURN JOIN$(zeilen, NL)
+    RETURN JOIN$(zeilenLesen(pfad), NL)
+END FUNCTION
+
+' Die EINE Stelle, an der die IDE Textdateien liest. READLINES verlangt
+' UTF-8 und wirft sonst -- und ohne TRY beendete eine einzige Datei aus
+' einem alten Windows-Programm (cp1252) die ganze IDE: beim Oeffnen, bei
+' der Suche im Projekt und schon beim Zaehlen der Aufrufe, das jede
+' Projektdatei liest. Kein UTF-8: cp1252, notfalls latin1 (nimmt jedes
+' Byte). Laesst sich die Datei gar nicht lesen (weg, gesperrt), kommt eine
+' leere Liste, und `leseFehler` sagt warum -- wer daraus einen Reiter
+' macht, muss das fragen, sonst ueberschriebe ein Sichern die Datei mit
+' nichts. `leseKodierung` nennt, wie zuletzt gelesen wurde.
+DIM leseFehler AS STRING
+DIM leseKodierung AS STRING
+FUNCTION zeilenLesen(pfad AS STRING) AS ARRAY OF STRING
+    DIM z AS ARRAY OF STRING : z = []
+    leseFehler = ""
+    leseKodierung = "utf8"
+    TRY
+        z = READLINES(pfad)
+        RETURN z
+    CATCH e
+        IF INSTR(e, "UTF-8") < 0 THEN
+            leseFehler = e
+            RETURN z
+        END IF
+    END TRY
+    DIM k AS STRING
+    FOR EACH k IN ("cp1252", "latin1")
+        TRY
+            z = READLINES(pfad, k)
+            leseKodierung = k
+            RETURN z
+        CATCH e2
+            leseFehler = e2
+        END TRY
+    NEXT
+    RETURN []
 END FUNCTION
 
 ' Derselbe Weg, EINE Schreibweise. Von der Kommandozeile kommt er mit
@@ -3387,14 +3422,26 @@ SUB dateiOeffnen(pfad AS STRING)
         protokoll("extern " + BASENAME(pfad))
         RETURN
     END IF
-    tabOeffnen(pfad, dateiLesen(pfad))
+    DIM inhalt AS STRING : inhalt = dateiLesen(pfad)
+    IF leseFehler <> "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Lässt sich nicht lesen: ") + leseFehler)
+        protokoll("nicht lesbar " + BASENAME(pfad))
+        RETURN
+    END IF
+    DIM kodierung AS STRING : kodierung = leseKodierung
+    tabOeffnen(pfad, inhalt)
     ' Der Projektordner wandert NUR, wenn die Datei ausserhalb liegt. Sonst
     ' machte ein Klick auf `lib/mehr.dh` den Unterordner zum Projekt, und
     ' der Baum zeigte danach die halbe Arbeit nicht mehr.
     IF NOT imProjekt(pfad) THEN projektOrdner = DIRNAME(pfad)
     baumFuellen()
     zuletztMerken(pfad)
-    GUI_SET_TEXT(lblStatus, pfad)
+    IF kodierung = "utf8" THEN
+        GUI_SET_TEXT(lblStatus, pfad)
+    ELSE
+        GUI_SET_TEXT(lblStatus, tr$("Kein UTF-8, als ") + kodierung + tr$(" gelesen -- Sichern schreibt UTF-8: ") + pfad)
+        protokoll("gelesen als " + kodierung)
+    END IF
 END SUB
 
 ' Liegt die Datei im Projektordner? Erst am Text, dann ueber die Platte:
@@ -3427,7 +3474,6 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     IF pfad = "" OR alsNeu THEN
         pfad = FILE_SAVE_DIALOG("Sichern unter", "programm.dh", "dh")
         IF pfad = "" THEN RETURN FALSE
-        tabPfade[i] = pfad
     END IF
     DIM text AS STRING : text = GUI_TEXT(tabFelder[i])
     ' Formatieren beim Sichern: nur Drachenhauch-Quelltext, nie beim
@@ -3446,16 +3492,28 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
             END IF
         END IF
     END IF
+    ' Die Datei endet mit einem Umbruch (dateiLesen laesst ihn weg, das Feld
+    ' kennt ihn nicht) -- sonst verloere jede gesicherte Datei ihre letzte
+    ' Zeile im Diff ("no newline at end of file"). Bis Stand 3 war das so.
+    DIM inhalt AS STRING : inhalt = text
+    IF inhalt <> "" AND RIGHT$(inhalt, 1) <> NL THEN inhalt = inhalt + NL
+    ' Die Platte kann ablehnen (schreibgeschuetzt, Ordner weg, kein Recht).
+    ' Ohne TRY beendete das die ganze IDE samt der ungesicherten Arbeit in
+    ' ALLEN Reitern. Erst nach dem Schreiben gilt der Reiter als gesichert
+    ' und traegt den neuen Weg.
+    TRY
+        WRITEALL(pfad, inhalt)
+    CATCH e
+        GUI_SET_TEXT(lblStatus, tr$("Sichern ging nicht: ") + e)
+        protokoll("sichern fehlgeschlagen " + pfad)
+        RETURN FALSE
+    END TRY
+    tabPfade[i] = pfad
     tabGesichert[i] = text
     zaehlCache = {} : echteWege = {}
     paramCache = {}
     blameCache = {}
     blameMarkeZeile = -1
-    ' Die Datei endet mit einem Umbruch (dateiLesen laesst ihn weg, das Feld
-    ' kennt ihn nicht) -- sonst verloere jede gesicherte Datei ihre letzte
-    ' Zeile im Diff ("no newline at end of file"). Bis Stand 3 war das so.
-    IF text <> "" AND RIGHT$(text, 1) <> NL THEN text = text + NL
-    WRITEALL(pfad, text)
     reiterNeuSetzen()
     zuletztMerken(pfad)
     GUI_SET_TEXT(lblStatus, tr$("Gesichert: ") + pfad)
@@ -4604,7 +4662,7 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     DIM inDateien AS INTEGER : inDateien = 0
     DIM d AS STRING
     FOR EACH d IN dateien
-        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(projektOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(projektOrdner, d))
         DIM vorher AS INTEGER : vorher = treffer
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zeilen) - 1
@@ -6312,9 +6370,19 @@ SUB liveNachziehen()
     liveStand = text
     liveDatei = BASENAME(pfad)
     liveKopie = PATHJOIN(DIRNAME(pfad), ".dh_live_vorschau.dh")
-    WRITEALL(liveKopie, text)
-    IF NOT DIREXISTS(DIRNAME(livePng$())) THEN MKDIR(DIRNAME(livePng$()))
-    IF FILEEXISTS(livePng$()) THEN DELETEFILE(livePng$())
+    ' Die Kopie muss NEBEN die Datei (relative Bild- und IMPORT-Wege) --
+    ' in einem Ordner ohne Schreibrecht geht das nicht, und ohne TRY
+    ' beendete das die ganze IDE.
+    TRY
+        WRITEALL(liveKopie, text)
+        IF NOT DIREXISTS(DIRNAME(livePng$())) THEN MKDIR(DIRNAME(livePng$()))
+        IF FILEEXISTS(livePng$()) THEN DELETEFILE(livePng$())
+    CATCH e
+        liveKopie = ""
+        GUI_SET_TEXT(lblLive, tr$("Kein Bild: ") + e)
+        protokoll("live fehler schreiben")
+        RETURN
+    END TRY
     liveFehler = ""
     liveStart = GET_TIME()
     liveProz = PROCESS_START("dhrt", "bild", liveKopie, livePng$(), "30")
@@ -8981,7 +9049,7 @@ FUNCTION projektErsetzenZaehlen(gesucht AS STRING) AS TUPLE
     DIM wieViele AS INTEGER : wieViele = 0
     DIM d AS STRING
     FOR EACH d IN dateien
-        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(projektOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(projektOrdner, d))
         DIM hier AS INTEGER : hier = 0
         DIM z AS STRING
         FOR EACH z IN zeilen
@@ -11274,6 +11342,10 @@ SUB umbauSchreiben()
         NEXT
         ARRAY_REMOVE_AT(zurAnzahl, 0) : ARRAY_REMOVE_AT(zurNamen, 0)
     WEND
+    ' Abgelehnte Dateien (schreibgeschuetzt, Ordner weg) werden genannt, die
+    ' uebrigen trotzdem geschrieben. Ohne TRY beendete die erste abgelehnte
+    ' die IDE mitten im Umbau.
+    DIM abgelehnt AS STRING : abgelehnt = ""
     DIM k AS INTEGER
     FOR k = 0 TO LEN(umbauTexte) - 1
         IF umbauTabs[k] >= 0 THEN
@@ -11285,7 +11357,15 @@ SUB umbauSchreiben()
             GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
             GUI_TEXTAREA_INSERT(ta, umbauTexte[k])
         ELSE
-            WRITEALL(umbauPfade[k], umbauTexte[k] + NL)
+            DIM geschrieben AS BOOLEAN : geschrieben = TRUE
+            TRY
+                WRITEALL(umbauPfade[k], umbauTexte[k] + NL)
+            CATCH e
+                geschrieben = FALSE
+                abgelehnt = abgelehnt + IIF(abgelehnt = "", "", ", ") + BASENAME(umbauPfade[k])
+                protokoll("umbau nicht geschrieben " + BASENAME(umbauPfade[k]))
+            END TRY
+            IF NOT geschrieben THEN CONTINUE
             DIM t AS INTEGER : t = tabMitPfad(umbauPfade[k])
             IF t >= 0 THEN
                 GUI_SET_TEXT(tabFelder[t], umbauTexte[k])
@@ -11330,7 +11410,11 @@ SUB umbauSchreiben()
         ARRAY_PUSH(umbauNachTabs, umbauTabs[nk])
         ARRAY_PUSH(umbauNachPfade, umbauPfade[nk])
     NEXT
-    GUI_SET_TEXT(lblStatus, umbauMeldung)
+    IF abgelehnt = "" THEN
+        GUI_SET_TEXT(lblStatus, umbauMeldung)
+    ELSE
+        GUI_SET_TEXT(lblStatus, umbauMeldung + tr$(" Nicht geschrieben: ") + abgelehnt)
+    END IF
     IF umbauProt <> "" THEN protokoll(umbauProt)
     umbauLeeren()
 END SUB
@@ -12743,7 +12827,15 @@ SUB baumAusfuehren(name AS STRING)
     IF baumAktion = "datei" THEN
         DIM pd AS STRING : pd = PATHJOIN(baumZiel, name)
         IF FILEEXISTS(pd) OR DIREXISTS(pd) THEN GUI_SET_TEXT(lblStatus, tr$("Gibt es schon: ") + name) : RETURN
-        WRITEALL(pd, "")
+        ' Die Platte kann ablehnen (kein Schreibrecht im Ordner) -- ohne TRY
+        ' beendete das die IDE.
+        TRY
+            WRITEALL(pd, "")
+        CATCH e
+            GUI_SET_TEXT(lblStatus, tr$("Anlegen ging nicht: ") + e)
+            protokoll("baum anlegen fehler")
+            RETURN
+        END TRY
         baumFuellen()
         GUI_FILETREE_EXPAND(baum, baumZiel, TRUE)
         protokoll("baum neue datei " + name)
@@ -12751,7 +12843,13 @@ SUB baumAusfuehren(name AS STRING)
     ELSEIF baumAktion = "ordner" THEN
         DIM po AS STRING : po = PATHJOIN(baumZiel, name)
         IF FILEEXISTS(po) OR DIREXISTS(po) THEN GUI_SET_TEXT(lblStatus, tr$("Gibt es schon: ") + name) : RETURN
-        MKDIR(po)
+        TRY
+            MKDIR(po)
+        CATCH e2
+            GUI_SET_TEXT(lblStatus, tr$("Anlegen ging nicht: ") + e2)
+            protokoll("baum anlegen fehler")
+            RETURN
+        END TRY
         baumFuellen()
         GUI_FILETREE_EXPAND(baum, baumZiel, TRUE)
         GUI_SET_TEXT(lblStatus, tr$("Ordner angelegt: ") + name)
@@ -14191,7 +14289,7 @@ SUB hbSucheAlle()
     DIM d AS STRING
     FOR EACH d IN docNamen
         IF voll THEN BREAK
-        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(docsOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(docsOrdner, d))
         DIM kopf AS BOOLEAN : kopf = FALSE
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zeilen) - 1
@@ -14504,7 +14602,7 @@ SUB handbuch()
     DIM besteZahl AS INTEGER : besteZahl = 0
     DIM d AS STRING
     FOR EACH d IN docNamen
-        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(docsOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(docsOrdner, d))
         DIM zahl AS INTEGER : zahl = 0
         DIM erste AS INTEGER : erste = 0
         DIM i AS INTEGER

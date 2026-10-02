@@ -2685,3 +2685,186 @@ pr reiter 2
 pr reiter 2
 pr projekt bleibt TRUE
 pr reiter 2
+
+=== sichern, das die platte ablehnt, beendet die ide nicht
+' Stresstest 2026-10-02: WRITEALL beim Sichern lief ohne TRY. Eine Datei,
+' die die Platte nicht schreiben laesst (schreibgeschuetzt, Ordner weg,
+' hier: ein ORDNER an ihrer Stelle), beendete die ganze IDE -- samt der
+' ungesicherten Arbeit in allen Reitern. Jetzt bleibt der Reiter
+' ungesichert markiert und die Statuszeile sagt es.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    GUI_TEXTAREA_INSERT(tabFelder[0], "' neu" + CHR$(10))
+    DELETEFILE(tabPfade[0])
+    MKDIR(tabPfade[0])
+    protokoll("pr gesichert " + STR$(sichern(0, FALSE)))
+    protokoll("pr ungesichert " + STR$(GUI_TEXT(tabFelder[0]) <> tabGesichert[0]))
+    protokoll("pr status " + LEFT$(GUI_STATUSBAR_TEXT$(lblStatus, 0), 19))
+END IF
+IF prBild = 50 THEN
+    protokoll("pr laeuft weiter")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr gesichert FALSE
+pr ungesichert TRUE
+pr status Sichern ging nicht:
+pr laeuft weiter
+
+=== eine datei in cp1252 laesst sich oeffnen und durchsuchen
+' Stresstest 2026-10-02: READLINES verlangt UTF-8, und eine Datei aus
+' einem alten Windows-Programm (cp1252) beendete die IDE -- beim Oeffnen,
+' bei der Suche im Projekt und schon beim Zaehlen der Aufrufe, das jede
+' Projektdatei liest. Jetzt wird sie als cp1252 gelesen, und die
+' Statuszeile sagt, dass das Sichern UTF-8 schreibt.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    dateiOeffnen(PATHJOIN(projektOrdner, "alt.dh"))
+    protokoll("pr reiter " + STR$(tabAnzahl) + " " + SPLIT$(GUI_TEXT(tabFelder[aktiverTab]), CHR$(10))[0])
+    protokoll("pr status " + STR$(INSTR(GUI_STATUSBAR_TEXT$(lblStatus, 0), "cp1252") >= 0))
+    projektSuchen("Grüße", "")
+END IF
+IF prBild = 80 THEN
+    protokoll("pr laeuft weiter")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+SUB gruss()
+    PRINT "hallo"
+END SUB
+--- datei alt.dh base64
+JyBHcvzfZSBhdXMgY3AxMjUyCmdydXNzKCkK
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 6) = "suche " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr reiter 2 ' Grüße aus cp1252
+pr status TRUE
+suche 1
+pr laeuft weiter
+
+=== neue datei und neuer ordner im baum, die die platte ablehnt
+' Stresstest 2026-10-02: WRITEALL und MKDIR im Kontextmenue des
+' Projektbaums liefen ohne TRY -- ein Ordner ohne Schreibrecht (hier: ein
+' Ziel, das eine DATEI ist) beendete die IDE.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    baumZiel = PATHJOIN(projektOrdner, "haupt.dh")
+    baumAktion = "datei"
+    baumAusfuehren("neu.dh")
+    protokoll("pr datei " + LEFT$(GUI_STATUSBAR_TEXT$(lblStatus, 0), 19))
+    baumAktion = "ordner"
+    baumAusfuehren("neu")
+    protokoll("pr ordner " + LEFT$(GUI_STATUSBAR_TEXT$(lblStatus, 0), 19))
+END IF
+IF prBild = 50 THEN
+    protokoll("pr laeuft weiter")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr datei Anlegen ging nicht:
+pr ordner Anlegen ging nicht:
+pr laeuft weiter
+
+=== ein umbau, dessen datei die platte ablehnt, schreibt die uebrigen
+' Stresstest 2026-10-02: der Umbau schrieb seine Dateien ohne TRY; eine,
+' die die Platte ablehnt (hier ein ORDNER an ihrer Stelle), beendete die
+' IDE mitten im Umbau -- die Dateien davor geschrieben, die danach nicht.
+' Jetzt werden die uebrigen geschrieben, und die Statuszeile nennt die
+' abgelehnte.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN
+    DELETEFILE(PATHJOIN(projektOrdner, "b.dh"))
+    MKDIR(PATHJOIN(projektOrdner, "b.dh"))
+    umbauLeeren()
+    umbauVormerken(-1, PATHJOIN(projektOrdner, "a.dh"), "PRINT 2")
+    umbauVormerken(-1, PATHJOIN(projektOrdner, "b.dh"), "PRINT 2")
+    umbauVormerken(-1, PATHJOIN(projektOrdner, "c.dh"), "PRINT 2")
+    umbauMeldung = "Umbau fertig."
+    umbauSchreiben()
+    protokoll("pr status " + GUI_STATUSBAR_TEXT$(lblStatus, 0))
+END IF
+IF prBild = 50 THEN
+    protokoll("pr laeuft weiter")
+    EXIT(0)
+END IF
+--- argumente
+haupt.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei haupt.dh
+PRINT 0
+--- datei a.dh
+PRINT 1
+--- datei b.dh
+PRINT 1
+--- datei c.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+PRINT "a "; READLINES("a.dh")[0]
+PRINT "c "; READLINES("c.dh")[0]
+--- erwartet
+pr status Umbau fertig. Nicht geschrieben: b.dh
+pr laeuft weiter
+a PRINT 2
+c PRINT 2
