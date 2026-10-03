@@ -311,6 +311,10 @@ Erweiterungen *(nur native Runtime)*:
 | `CONTAINS(s, teil)` → BOOLEAN | Teilstring enthalten? (Funktionsform von `teil IN s`) |
 | `COUNT(s, teil)` → INTEGER | Anzahl nicht-überlappender Vorkommen von `teil` |
 | `TITLE$(s)` | Anfangsbuchstabe jedes Wortes groß, Rest klein |
+| `CAMEL$(s)`, `SNAKE$(s)`, `PASCAL$(s)` | Schreibweisen für Bezeichner: aus `"max hp"`, `"MaxHp"`, `"max_hp"` oder `"max-hp"` wird `maxHp`, `max_hp`, `MaxHp`. Wörter trennen Leerraum, `_`, `-`, `.`, der Wechsel von klein auf groß und das Ende einer Abkürzung (`HTTPServer` → `http_server`) |
+| `BETWEEN$(text, links, rechts[, ab])` | was zwischen dem ersten `links` (ab Zeichen `ab`, 0-basiert wie `MID$`) und dem nächsten `rechts` steht; `""`, wenn eins fehlt |
+| `REPLACE_BETWEEN$(text, links, rechts, neu)` | jedes Stück zwischen `links` und `rechts` durch `neu` ersetzen, die Markierungen bleiben (`"{{name}}"` → `"{{?}}"`) |
+| `NOSPACES$(s)` | jeden Leerraum entfernen (Leerzeichen, Tabulator, Umbruch) — für Eingaben wie `"DE89 3704 0044"` |
 | `BIN$(n)`, `OCT$(n)` | INTEGER als Binär-/Oktalstring (mit Vorzeichen) |
 | `ISNUMERIC(s)` → BOOLEAN | als Zahl parsebar? |
 | `TRYVAL(s, default)` → INTEGER/FLOAT | robustes `VAL`: bei Parse-Fehler `default` statt still `0` |
