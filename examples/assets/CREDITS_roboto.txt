@@ -1,0 +1,15 @@
+Schrift fuer examples/204_scharfe_schrift.dh
+============================================
+
+Datei:   roboto_medium.ttf (dieselbe Datei wie circuitrunner/assets/font.ttf)
+Schrift: Roboto Medium, Version 2.137
+Autor:   Christian Robertson / Google
+Quelle:  https://fonts.google.com/specimen/Roboto
+Lizenz:  Apache License, Version 2.0
+         https://www.apache.org/licenses/LICENSE-2.0
+
+Copyright 2011 Google Inc. All Rights Reserved.
+Roboto is a trademark of Google.
+
+Die Datei ist unveraendert. Die Apache-Lizenz erlaubt Weitergabe und
+Veraenderung, verlangt aber, dass dieser Hinweis und die Lizenz mitgehen.

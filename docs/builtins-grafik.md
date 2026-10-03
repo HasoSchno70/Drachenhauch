@@ -43,6 +43,7 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `WINDOW_RENDER_WIDTH()` / `WINDOW_RENDER_HEIGHT()` → INTEGER | die echte Pixelgröße des Fensters — auf einem HiDPI-Schirm größer als `SCREENWIDTH()`/`SCREENHEIGHT()` |
 | `WINDOW_WAIT_EVENTS(sekunden)` | `FLIP` wartet auf eine Eingabe, höchstens so lange — ein Werkzeug, das nur auf Klicks reagiert, braucht dann kaum Rechenzeit; `0` schaltet ab |
 | `FPS()` → INTEGER | gemessene Bilder je Sekunde |
+| `DRAWFPS(x, y[, farbe])` | die Bildrate als „60 FPS“ in der eingebauten Schrift zeigen, in Bildschirmkoordinaten (die Kamera gilt nicht); ohne Farbe grün, unter 30 orange, unter 15 rot |
 | `SETFPS(n)` | Ziel-Bildrate; `0` = so schnell wie möglich |
 | `FILES_DROPPED()` → INTEGER | wie viele Dateien wurden in diesem Bild ins Fenster gezogen oder (macOS) vom Finder übergeben? Gilt genau ein Bild, beliebig oft abfragbar |
 | `FILE_DROPPED(i)` → STRING | Pfad der `i`-ten davon |
@@ -335,6 +336,10 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `FONT_STYLE(font, stil$)` → FONT | der echte fette/kursive Schnitt einer geladenen Schrift (sucht die Datei daneben, z. B. `segoeuib.ttf` zu `segoeui.ttf`); gibt es keinen, kommt `font` selbst zurück |
 | `FONT_HAS_STYLE(font, stil$)` | TRUE, wenn es diesen Schnitt als Datei gibt -- sonst bildet die Laufzeit ihn nach |
 | `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `zeichen$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen |
+| `LOADFONT_SDF(pfad$, groesse[, zeichen$])` → FONT | eine Schrift, die bei **jeder** Größe scharf bleibt: gebacken als Abstandsfeld, gezeichnet mit einem Shader, der die Kante einen Punkt weich hält. Eine gewöhnliche Schrift verschwimmt, sobald sie größer gezeichnet wird, als sie gebacken wurde (Titel, Kamera-Zoom). Ohne `zeichen$` ASCII und Latin-1 samt €; das Backen kostet je Zeichen mehr als bei `LOADFONT` (rund 130 ms für diese Auswahl) |
+| `FONT_HAS_GLYPH(font, zeichen$)` → BOOLEAN | hat die Schrift selbst ein Zeichen dafür? Wenn nicht, zeichnet `TEXT` es mit der Ausweich-Schrift; `-1` = eingebaute Schrift |
+| `FONT_GLYPH_WIDTH(font, zeichen$, groesse)` → FLOAT | wie weit `TEXT` nach diesem Zeichen weiterrückt, bei `groesse` Punkten — gemessen wie `TEXT_WIDTH`, ohne die aktive Schrift umzustellen |
+| `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | die Zeichen `erstes`..`letztes` (Vorgabe 32..126, höchstens 256) als Bild im Format von `LOADFONT_IMAGE`: jedes Zeichen weiß in einem durchsichtigen Feld, Magenta (`&HFF00FF`) außen und dazwischen. So wird aus einer Vektorschrift eine Pixelschrift, die man nachbearbeiten und mit `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` wieder laden kann |
 | `SETFONT(font)` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font |
 | `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
 | `TEXT_LINE_SPACING(px)` | Zeilenabstand für mehrzeiligen Text |

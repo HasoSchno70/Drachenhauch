@@ -9072,6 +9072,44 @@ impl<'p> Vm<'p> {
                 }
             }
             "setfont" => { g!().set_font(gi(a,0,"SETFONT")?)?; Value::Nil }
+            "loadfont_sdf" => {
+                if a.len() < 2 || a.len() > 3 { return Err("LOADFONT_SDF: erwartet (pfad$, groesse[, zeichen$])".into()); }
+                let z = if a.len() == 3 { Some(gs(a,2,"LOADFONT_SDF")?) } else { None };
+                Value::Int(g!().load_font_sdf(gs(a,0,"LOADFONT_SDF")?, gi(a,1,"LOADFONT_SDF")? as i32, z.as_deref())?)
+            }
+            "font_has_glyph" | "font_glyph_width" => {
+                let f = if name == "font_has_glyph" { "FONT_HAS_GLYPH" } else { "FONT_GLYPH_WIDTH" };
+                let z = gs(a, 1, f)?;
+                let mut zeichen = z.chars();
+                let c = match (zeichen.next(), zeichen.next()) {
+                    (Some(c), None) => c,
+                    _ => return Err(format!("{}: erwartet genau ein Zeichen, nicht \"{}\"", f, z)),
+                };
+                let h = gi(a, 0, f)?;
+                if name == "font_has_glyph" { Value::Bool(g!().font_has_glyph(h, c)?) }
+                else {
+                    let size = need_f(a, 2, f)?;
+                    if !size.is_finite() || size <= 0.0 {
+                        return Err(format!("FONT_GLYPH_WIDTH: die Groesse muss groesser als 0 sein, nicht {}", size));
+                    }
+                    Value::Float(g!().font_glyph_width(h, c, size as f32)?)
+                }
+            }
+            "font_to_image" => {
+                if a.is_empty() || a.len() > 3 { return Err("FONT_TO_IMAGE: erwartet (font[, erstes[, letztes]])".into()); }
+                let erstes = if a.len() > 1 { gi(a,1,"FONT_TO_IMAGE")? } else { 32 };
+                let letztes = if a.len() > 2 { gi(a,2,"FONT_TO_IMAGE")? } else if a.len() > 1 { erstes.max(126) } else { 126 };
+                if erstes < 0 || letztes < 0 || erstes > 0x10FFFF || letztes > 0x10FFFF {
+                    return Err(format!("FONT_TO_IMAGE: Zeichennummern gehen von 0 bis &H10FFFF, nicht {} und {}", erstes, letztes));
+                }
+                Value::Int(g!().font_to_image(gi(a,0,"FONT_TO_IMAGE")?, erstes as u32, letztes as u32)?)
+            }
+            "drawfps" => {
+                if a.len() != 2 && a.len() != 3 { return Err("DRAWFPS: erwartet (x, y[, farbe])".into()); }
+                let farbe = if a.len() == 3 { Some(gi(a,2,"DRAWFPS")?) } else { None };
+                g!().draw_fps(gi(a,0,"DRAWFPS")? as i32, gi(a,1,"DRAWFPS")? as i32, farbe);
+                Value::Nil
+            }
             "text_spacing" => { g!().set_text_spacing(gi(a,0,"TEXT_SPACING")? as i32); Value::Nil }
             "loadimage" => Value::Int(g!().load_texture(gs(a,0,"LOADIMAGE")?)?),
             "drawimage" => {
@@ -11481,7 +11519,7 @@ pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
         | "pie" | "pieoutline" | "circle_gradient" | "boxrot" | "gradient4"
         | "ngon" | "ngonoutline" | "linedashed" | "drawimage9"
         | "bezier" | "bezier3" | "spline_basis" | "spline_bezier"
-        | "text"
+        | "text" | "drawfps"
         | "drawimage" | "drawimagerot" | "drawimageflipped"
         | "drawimagepart" | "drawimagepartex" | "drawtilemap"
         | "atlas_draw" | "atlas_draw_flipped" | "batch_draw")
