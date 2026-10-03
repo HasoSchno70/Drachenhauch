@@ -393,6 +393,61 @@ mod glsl_kopf_tests {
     }
 }
 
+/// Fragment-Shader fuer SDF-Schriften (LOADFONT_SDF): der Atlas traegt im
+/// Alphakanal den Abstand zur Kante (0.5 = auf der Kante). `fwidth` sagt,
+/// wie viel davon ein Bildpunkt ausmacht -- so ist die Kante bei JEDER
+/// Groesse genau einen Punkt weich, statt mit der Vergroesserung mitzuwachsen.
+const SDF_FS: &str = r#"#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform sampler2D texture0;
+out vec4 finalColor;
+void main() {
+    float d = texture(texture0, fragTexCoord).a - 0.5;
+    float w = max(length(vec2(dFdx(d), dFdy(d))), 0.0001);
+    float a = smoothstep(-w, w, d);
+    finalColor = vec4(fragColor.rgb, fragColor.a * a);
+}
+"#;
+
+/// Welche Font-Nummern ein Abstandsfeld tragen, und der Shader dazu. Ein
+/// Merker im Faden statt eines weiteren Parameters durch alle Zeichenwege
+/// (render_scene, zeichne_text, die Stil-Nachbildung, gedrehter Text) --
+/// gezeichnet wird ohnehin nur im Hauptfaden.
+mod sdf {
+    use std::cell::RefCell;
+    thread_local! {
+        static STAND: RefCell<(Option<raylib::ffi::Shader>, Vec<bool>)> = const { RefCell::new((None, Vec::new())) };
+    }
+    /// Font `nr` als SDF-Schrift anmelden.
+    pub fn anmelden(shader: raylib::ffi::Shader, nr: usize) {
+        STAND.with(|s| {
+            let mut s = s.borrow_mut();
+            s.0 = Some(shader);
+            if s.1.len() <= nr { s.1.resize(nr + 1, false); }
+            s.1[nr] = true;
+        });
+    }
+    pub fn ist(h: i64) -> bool {
+        h >= 0 && STAND.with(|s| s.borrow().1.get(h as usize).copied().unwrap_or(false))
+    }
+    /// `f` ausfuehren, bei einer SDF-Schrift mit ihrem Shader. raylib leert
+    /// beim Wechsel des Shaders den Stapel selbst (rlSetShader), davor
+    /// Gezeichnetes bleibt also beim alten.
+    pub fn mit<R>(h: i64, f: impl FnOnce() -> R) -> R {
+        let sh = if ist(h) { STAND.with(|s| s.borrow().0) } else { None };
+        match sh {
+            Some(sh) => unsafe {
+                raylib::ffi::BeginShaderMode(sh);
+                let r = f();
+                raylib::ffi::EndShaderMode();
+                r
+            },
+            None => f(),
+        }
+    }
+}
+
 /// Eingebetteter Lighting-Vertex-Shader (raylib rlights, GLSL 330).
 const LIGHT_VS: &str = r#"#version 330
 in vec3 vertexPosition;
@@ -1179,6 +1234,9 @@ pub struct Graphics {
     /// Groesse mit denselben Zeichen nachzuladen. Leerer Pfad = kein Schnitt
     /// moeglich (Bitmap-Schrift aus einem Bild).
     font_herkunft: Vec<(String, String, i32)>,
+    /// Shader fuer SDF-Schriften, beim ersten LOADFONT_SDF angelegt. Hier
+    /// gehalten, damit er lebt; gezeichnet wird ueber den Merker in `sdf`.
+    sdf_shader: Option<Shader>,
     /// (Font, Schnitt-Bits) -> (Handle des Schnitts, nachzubildende Bits).
     /// Einmal gesucht, auch erfolglos -- sonst stuende jedes Bild am
     /// Dateisystem an.
@@ -1523,16 +1581,22 @@ fn ttc_erste_schrift(daten: &[u8]) -> Option<Vec<u8>> {
 /// alles laeuft ueber `LoadFontFromMemory`. EINE Stelle fuer LOADFONT, die
 /// Standardschrift (DHRT_FONT) und die Ausweich-Schriften.
 fn schrift_laden(rl: &mut RaylibHandle, thread: &RaylibThread, pfad: &str, groesse: i32, zeichen: &str) -> Result<Font, String> {
+    let (daten, art) = schrift_daten(pfad)?;
+    ohne_warnungen(|| rl.load_font_from_memory(thread, art, &daten, groesse.max(4), Some(zeichen)))
+        .map_err(|e| format!("'{}': {}", pfad, e))
+}
+
+/// Die Bytes einer Schriftdatei, Sammlungen (.ttc) auf ihre erste Schrift
+/// verkleinert, dazu die Endung, unter der raylib sie lesen soll.
+fn schrift_daten(pfad: &str) -> Result<(Vec<u8>, &'static str), String> {
     let daten = std::fs::read(pfad).map_err(|e| format!("'{}': {}", pfad, e))?;
-    let (daten, art) = match ttc_erste_schrift(&daten) {
+    Ok(match ttc_erste_schrift(&daten) {
         Some(erste) => (erste, ".ttf"),
         None => {
             let art = if daten.starts_with(b"OTTO") { ".otf" } else { ".ttf" };
             (daten, art)
         }
-    };
-    ohne_warnungen(|| rl.load_font_from_memory(thread, art, &daten, groesse.max(4), Some(zeichen)))
-        .map_err(|e| format!("'{}': {}", pfad, e))
+    })
 }
 
 /// Fuehrt `f` aus, waehrend raylib nur Fehler meldet.
@@ -1831,7 +1895,7 @@ impl Graphics {
             text_size: 20,
             fonts: Vec::new(),
             font_sizes: Vec::new(),
-            font_herkunft: Vec::new(), schnitte: HashMap::new(), text_stil: 0,
+            font_herkunft: Vec::new(), sdf_shader: None, schnitte: HashMap::new(), text_stil: 0,
             active_font: -1,
             ausweich: Vec::new(), font_glyphs: Vec::new(),
             glyphen_fehlend: std::cell::RefCell::new(std::collections::HashSet::new()),
@@ -3783,6 +3847,16 @@ impl Graphics {
     }
     pub fn set_text_size(&mut self, sz: i32) { self.text_size = sz.max(1); }
 
+    /// DRAWFPS: die Bildrate als "60 FPS" in der eingebauten Schrift, 20
+    /// Punkte gross, in Bildschirmkoordinaten (die Kamera gilt nicht -- es
+    /// ist eine Anzeige ueber dem Spiel). Ohne Farbe wie bei raylib gruen,
+    /// unter 30 orange, unter 15 rot.
+    pub fn draw_fps(&mut self, x: i32, y: i32, farbe: Option<i64>) {
+        let fps = self.fps();
+        let c = farbe.unwrap_or(if fps < 15 { 0xE62937 } else if fps < 30 { 0xFFA100 } else { 0x009E2F });
+        self.emit(Cmd::Text(x, y, format!("{} FPS", fps), 20, col(c), -1, 2.0));
+    }
+
     /// TEXT_STYLE(stil$): Stil fuer die folgenden TEXT-Aufrufe.
     pub fn set_text_stil(&mut self, bits: u8) { self.text_stil = bits; }
     pub fn text_stil(&self) -> u8 { self.text_stil }
@@ -4142,11 +4216,169 @@ impl Graphics {
         // Nearest lassen: Pixel-Schrift soll pixelig bleiben (anders als bei
         // LOADFONT, wo bilinear die skalierte TTF-Schrift glaettet).
         let size = f.baseSize.max(4);
+        // Die Zeichenliste laeuft parallel zu `fonts` -- fehlte sie hier,
+        // zeigte jede spaeter geladene Schrift auf die Liste ihres Vorgaengers.
+        self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
         self.font_herkunft.push((String::new(), String::new(), 0));
         self.font_sizes.push(size);
         Ok((self.fonts.len() - 1) as i64)
     }
+    /// LOADFONT_SDF: die Schrift als Abstandsfeld backen. Gezeichnet wird sie
+    /// mit einem Shader, der die Kante bei jeder Groesse scharf haelt --
+    /// eine gewoehnliche Schrift verschwimmt, sobald sie groesser gezeichnet
+    /// wird, als sie gebacken wurde (Titel, Kamera-Zoom).
+    /// Ohne `zeichen` ASCII und Latin-1 samt Euro: das Backen kostet je
+    /// Zeichen deutlich mehr als bei LOADFONT; was fehlt, kommt wie immer
+    /// aus der Ausweich-Schrift (dann ohne Abstandsfeld).
+    pub fn load_font_sdf(&mut self, path: &str, size: i32, zeichen: Option<&str>) -> Result<i64, String> {
+        let chars = match zeichen {
+            Some(z) => zeichen_aus_namen(z)?,
+            None => (32u32..127).chain(0xA0..=0xFF).filter_map(char::from_u32)
+                .chain("€–—„“”‘’…•".chars()).collect(),
+        };
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let path = resolved.as_str();
+        crate::builtins::datei_da(path, "LOADFONT_SDF")?;
+        let (daten, _) = schrift_daten(path).map_err(|e| format!("LOADFONT_SDF: Font nicht ladbar: {}", e))?;
+        let size = size.clamp(8, 256);
+        let cps: Vec<i32> = chars.chars().map(|c| c as i32).collect();
+        let roh = unsafe {
+            use raylib::ffi;
+            let mut n = 0i32;
+            let glyphen = ohne_warnungen(|| ffi::LoadFontData(daten.as_ptr(), daten.len() as i32, size,
+                cps.as_ptr(), cps.len() as i32, 2 /*FONT_SDF*/, &mut n));
+            if glyphen.is_null() || n <= 0 {
+                return Err(format!("LOADFONT_SDF: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)", path));
+            }
+            let mut recs: *mut ffi::Rectangle = std::ptr::null_mut();
+            // Kein Rand im Atlas: die Glyphen tragen ihn schon (FONT_SDF_CHAR_PADDING).
+            let atlas = ffi::GenImageFontAtlas(glyphen, &mut recs, n, size, 0, 1);
+            let tex = ffi::LoadTextureFromImage(atlas);
+            ffi::UnloadImage(atlas);
+            ffi::SetTextureFilter(tex, 1 /*BILINEAR*/);
+            ffi::Font { baseSize: size, glyphCount: n, glyphPadding: 0, texture: tex, recs, glyphs: glyphen }
+        };
+        let f = unsafe { Font::from_raw(roh) };
+        if self.sdf_shader.is_none() {
+            let fs = fuer_ziel_uebersetzen(SDF_FS);
+            let sh = self.rl.load_shader_from_memory(&self.thread, None, Some(&fs));
+            if !sh.is_shader_valid() || sh.id == unsafe { raylib::ffi::rlGetShaderIdDefault() } {
+                return Err("LOADFONT_SDF: der Schrift-Shader liess sich nicht uebersetzen".into());
+            }
+            self.sdf_shader = Some(sh);
+        }
+        let nr = self.fonts.len();
+        if let Some(sh) = &self.sdf_shader { sdf::anmelden(*sh.as_ref(), nr); }
+        self.font_glyphs.push(glyph_menge(&f));
+        self.fonts.push(f);
+        self.font_sizes.push(size);
+        // Kein Pfad: ein fetter Schnitt waere eine gewoehnliche Schrift und
+        // saehe gross gezeichnet verschwommen aus; nachgebildet wird er ueber
+        // denselben Shader.
+        self.font_herkunft.push((String::new(), String::new(), 0));
+        Ok(nr as i64)
+    }
+
+    /// Handle pruefen: -1 = eingebaute Schrift, sonst eine geladene.
+    fn font_handle_ok(&self, h: i64, fn_: &str) -> Result<(), String> {
+        if h < -1 || h >= self.fonts.len() as i64 {
+            return Err(format!("{}: ungueltiges FONT-Handle {}", fn_, h));
+        }
+        Ok(())
+    }
+
+    /// FONT_HAS_GLYPH: hat die Schrift selbst ein Zeichen dafuer? Dieselbe
+    /// Frage, mit der das Zeichnen entscheidet, ob es die Ausweich-Schrift
+    /// nimmt.
+    pub fn font_has_glyph(&self, h: i64, c: char) -> Result<bool, String> {
+        self.font_handle_ok(h, "FONT_HAS_GLYPH")?;
+        Ok(self.font_hat(h, c as u32))
+    }
+
+    /// FONT_GLYPH_WIDTH: Vorschub eines Zeichens bei `size` Punkten -- so weit
+    /// rueckt TEXT nach diesem Zeichen weiter (ohne den Abstand zum naechsten).
+    /// Gemessen wie TEXT_WIDTH, also auch ueber die Ausweich-Schrift.
+    pub fn font_glyph_width(&self, h: i64, c: char, size: f32) -> Result<f64, String> {
+        self.font_handle_ok(h, "FONT_GLYPH_WIDTH")?;
+        let w = self.breite_mit(h, &c.to_string(), size);
+        Ok(((w as f64) * 1000.0).round() / 1000.0)
+    }
+
+    /// FONT_TO_IMAGE: die Zeichen `erstes`..`letztes` als Bild im Format von
+    /// LOADFONT_IMAGE -- jedes in seinem Feld (Breite = Vorschub, Hoehe =
+    /// Grundgroesse) auf durchsichtigem Grund, getrennt und umrandet von
+    /// Magenta (&HFF00FF). So wird aus einer Vektorschrift eine Pixelschrift,
+    /// die man nachbearbeiten und mit LOADFONT_IMAGE(bild, &HFF00FF, erstes)
+    /// wieder laden kann.
+    pub fn font_to_image(&mut self, h: i64, erstes: u32, letztes: u32) -> Result<i64, String> {
+        use raylib::ffi;
+        self.font_handle_ok(h, "FONT_TO_IMAGE")?;
+        if erstes > letztes || letztes - erstes >= 256 || char::from_u32(erstes).is_none() {
+            return Err(format!("FONT_TO_IMAGE: die Zeichen {}..{} gehen nicht -- hoechstens 256, das erste nicht nach dem letzten (so viele liest LOADFONT_IMAGE)", erstes, letztes));
+        }
+        let f: ffi::Font = match self.font_von(h) {
+            Some(f) => *f.as_ref(),
+            None => unsafe { ffi::GetFontDefault() },
+        };
+        let ist_sdf = sdf::ist(h);
+        let hoehe = f.baseSize.max(1);
+        let atlas = unsafe { ffi::LoadImageFromTexture(f.texture) };
+        let (aw, ah) = (atlas.width, atlas.height);
+        let quelle: Vec<ffi::Color> = unsafe {
+            let p = ffi::LoadImageColors(atlas);
+            let v = std::slice::from_raw_parts(p, (aw * ah).max(0) as usize).to_vec();
+            ffi::UnloadImageColors(p);
+            ffi::UnloadImage(atlas);
+            v
+        };
+        // Je Zeichen: Feldbreite und wohin aus dem Atlas.
+        let mut felder = Vec::new();
+        for cp in erstes..=letztes {
+            let i = unsafe { ffi::GetGlyphIndex(f, cp as i32) }.max(0) as usize;
+            let (g, r) = unsafe { (*f.glyphs.add(i), *f.recs.add(i)) };
+            let vorschub = if g.advanceX > 0 { g.advanceX } else { r.width as i32 };
+            felder.push((vorschub.max(1), g, r));
+        }
+        // Zeilen bis etwa 1024 Punkte breit, 1 Punkt Magenta dazwischen.
+        let mut zeilen: Vec<Vec<usize>> = vec![Vec::new()];
+        let mut x = 1;
+        for (k, (w, _, _)) in felder.iter().enumerate() {
+            if x + w + 1 > 1024 && !zeilen.last().unwrap().is_empty() { zeilen.push(Vec::new()); x = 1; }
+            zeilen.last_mut().unwrap().push(k);
+            x += w + 1;
+        }
+        let breite = zeilen.iter().map(|z| 1 + z.iter().map(|&k| felder[k].0 + 1).sum::<i32>()).max().unwrap_or(2);
+        let gesamt_h = 1 + zeilen.len() as i32 * (hoehe + 1);
+        let mut px = vec![[255u8, 0, 255, 255]; (breite * gesamt_h) as usize];
+        for (zi, zeile) in zeilen.iter().enumerate() {
+            let y0 = 1 + zi as i32 * (hoehe + 1);
+            let mut x0 = 1;
+            for &k in zeile {
+                let (w, g, r) = felder[k];
+                for yy in 0..hoehe { for xx in 0..w { px[((y0 + yy) * breite + x0 + xx) as usize] = [0, 0, 0, 0]; } }
+                for sy in 0..r.height as i32 {
+                    for sx in 0..r.width as i32 {
+                        let (dx, dy) = (g.offsetX + sx, g.offsetY + sy);
+                        if dx < 0 || dy < 0 || dx >= w || dy >= hoehe { continue; }   // im eigenen Feld bleiben
+                        let (qx, qy) = (r.x as i32 + sx, r.y as i32 + sy);
+                        if qx < 0 || qy < 0 || qx >= aw || qy >= ah { continue; }
+                        let q = quelle[(qy * aw + qx) as usize];
+                        let a = if ist_sdf { ((q.a as i32 - 128) * 4 + 128).clamp(0, 255) as u8 } else { q.a };
+                        if a == 0 { continue; }
+                        let (rr, gg, bb) = if ist_sdf { (255, 255, 255) } else { (q.r, q.g, q.b) };
+                        px[((y0 + dy) * breite + x0 + dx) as usize] = [rr, gg, bb, a];
+                    }
+                }
+                x0 += w + 1;
+            }
+        }
+        let mut img = Image::gen_image_color(breite, gesamt_h, Color::new(0, 0, 0, 0));
+        let bytes: Vec<u8> = px.into_iter().flatten().collect();
+        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), img.data as *mut u8, bytes.len()); }
+        self.push_tex_from_image(img)
+    }
+
     /// TEXT_LINE_SPACING(px): Zeilenabstand fuer mehrzeiligen Text.
     pub fn text_line_spacing(&mut self, px: i64) {
         self.rl.set_text_line_spacing(px.clamp(0, 4096) as i32);
@@ -6633,7 +6865,7 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
         None => { d.draw_text(txt, x as i32, y as i32, size as i32, col); return; }
     };
     if txt.is_ascii() || ausweich.is_empty() {
-        d.draw_text_ex(basis, txt, Vector2::new(x, y), size, spacing, col);
+        sdf::mit(h, || d.draw_text_ex(basis, txt, Vector2::new(x, y), size, spacing, col));
         return;
     }
     let basis_hat = |c: u32| -> bool {
@@ -6647,7 +6879,7 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
         let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
         if !erster { cx += spacing; }
         erster = false;
-        d.draw_text_ex(f, &lauf, Vector2::new(cx, y), size, spacing, col);
+        sdf::mit(if fi == 0 { h } else { -1 }, || d.draw_text_ex(f, &lauf, Vector2::new(cx, y), size, spacing, col));
         cx += f.measure_text(&lauf, size, spacing).x;
     }
 }
@@ -6811,7 +7043,7 @@ fn zeichne_text_stil<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32
                 }
                 Some(basis) => {
                     if txt.is_ascii() || ausweich.is_empty() {
-                        zeichne_schraeg(basis, txt, x0, y, size, spacing, col, grund);
+                        sdf::mit(h, || zeichne_schraeg(basis, txt, x0, y, size, spacing, col, grund));
                     } else {
                         let basis_hat = |c: u32| -> bool {
                             if h == FONT_AUSWEICH { ausweich.first().map_or(false, |a| a.hat.contains(&c)) }
@@ -6823,7 +7055,8 @@ fn zeichne_text_stil<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32
                             let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
                             if !erster { cx += spacing; }
                             erster = false;
-                            cx += zeichne_schraeg(f, &lauf, cx, y, size, spacing, col, grund);
+                            cx += sdf::mit(if fi == 0 { h } else { -1 },
+                                           || zeichne_schraeg(f, &lauf, cx, y, size, spacing, col, grund));
                         }
                     }
                 }
@@ -7203,8 +7436,8 @@ fn render_scene<D: RaylibDraw>(
                             Some(f) => {
                                 let fspacing = spacing * s as f32 * scl;
                                 let m = f.measure_text(txt, fsize, fspacing);
-                                d.draw_text_pro(f, txt, pos, Vector2::new(m.x / 2.0, m.y / 2.0),
-                                                *ang, fsize, fspacing, *col);
+                                sdf::mit(*font, || d.draw_text_pro(f, txt, pos, Vector2::new(m.x / 2.0, m.y / 2.0),
+                                                                   *ang, fsize, fspacing, *col));
                             }
                             _ => {
                                 // Default-Font: raylib-Spacing-Konvention = Groesse/10 (wie

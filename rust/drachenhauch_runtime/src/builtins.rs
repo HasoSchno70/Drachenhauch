@@ -194,6 +194,39 @@ fn zeichen_stelle(s: &str, n: usize) -> usize {
     s.char_indices().nth(n).map_or(s.len(), |(b, _)| b)
 }
 
+/// Woerter eines Bezeichners fuer CAMEL$/SNAKE$/PASCAL$: getrennt an Leerraum,
+/// `_`, `-` und `.`, am Wechsel von klein (oder Ziffer) auf gross und vor dem
+/// letzten Grossbuchstaben einer Abkuerzung ("HTTPServer" -> HTTP, Server).
+fn woerter_fuer_bezeichner(s: &str) -> Vec<String> {
+    let mut woerter = Vec::new();
+    let mut akt = String::new();
+    let z: Vec<char> = s.chars().collect();
+    for (i, &c) in z.iter().enumerate() {
+        if c.is_whitespace() || c == '_' || c == '-' || c == '.' {
+            if !akt.is_empty() { woerter.push(std::mem::take(&mut akt)); }
+            continue;
+        }
+        if c.is_uppercase() && !akt.is_empty() {
+            let vorher = z[i - 1];
+            let danach_klein = z.get(i + 1).is_some_and(|n| n.is_lowercase());
+            if vorher.is_lowercase() || vorher.is_ascii_digit() || (vorher.is_uppercase() && danach_klein) {
+                woerter.push(std::mem::take(&mut akt));
+            }
+        }
+        akt.push(c);
+    }
+    if !akt.is_empty() { woerter.push(akt); }
+    woerter
+}
+
+/// Erstes `links` ab Byte-Stelle `ab` und das naechste `rechts` danach:
+/// (Anfang, Ende) des Stuecks dazwischen als Byte-Stellen.
+fn zwischen(s: &str, ab: usize, links: &str, rechts: &str) -> Option<(usize, usize)> {
+    let von = ab + s.get(ab..)?.find(links)? + links.len();
+    let bis = von + s[von..].find(rechts)?;
+    Some((von, bis))
+}
+
 /// Zeichenzahl eines Textes -- bei reinem ASCII die Bytezahl, ohne Zaehlen.
 fn zeichen_zahl(s: &str) -> usize {
     if s.is_ascii() { s.len() } else { s.chars().count() }
@@ -2128,6 +2161,71 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
             }
             Ok(Value::str_rc(&out))
+        }
+        "camel$" | "camel" | "snake$" | "snake" | "pascal$" | "pascal" => {
+            // Schreibweisen fuer Bezeichner: aus "hallo welt", "HalloWelt",
+            // "hallo_welt" oder "hallo-welt" wird helloWelt / hallo_welt /
+            // HalloWelt. Woerter trennen Leerraum, _ und -, dazu der Wechsel
+            // von klein auf gross und das Ende einer Abkuerzung (HTTPServer).
+            arity!(1);
+            let art = name.trim_end_matches('$');
+            let f = match art { "camel" => "CAMEL$", "snake" => "SNAKE$", _ => "PASCAL$" };
+            let woerter = woerter_fuer_bezeichner(need_str(&a[0], f)?);
+            let gross = |w: &str| -> String {
+                let mut c = w.chars();
+                match c.next() {
+                    Some(e) => e.to_uppercase().chain(c.flat_map(|x| x.to_lowercase())).collect(),
+                    None => String::new(),
+                }
+            };
+            let out: String = match art {
+                "snake" => woerter.iter().map(|w| w.to_lowercase()).collect::<Vec<_>>().join("_"),
+                "pascal" => woerter.iter().map(|w| gross(w)).collect(),
+                _ => woerter.iter().enumerate()
+                    .map(|(i, w)| if i == 0 { w.to_lowercase() } else { gross(w) }).collect(),
+            };
+            Ok(Value::str_rc(out))
+        }
+        "between$" | "between" => {
+            // BETWEEN$(text$, links$, rechts$ [, ab]) -> was zwischen dem ersten
+            // `links` (ab Zeichen `ab`, 0-basiert wie MID$) und dem naechsten
+            // `rechts` danach steht; "" wenn eins fehlt.
+            if a.len() < 3 || a.len() > 4 { return Err("BETWEEN$: erwartet (text$, links$, rechts$[, ab])".into()); }
+            let s = need_str(&a[0], "BETWEEN$")?;
+            let (l, r) = (need_str(&a[1], "BETWEEN$")?, need_str(&a[2], "BETWEEN$")?);
+            if l.is_empty() || r.is_empty() { return Err("BETWEEN$: die Markierungen duerfen nicht leer sein".into()); }
+            let ab = if a.len() == 4 { need_int(&a[3], "BETWEEN$")?.max(0) as usize } else { 0 };
+            let start = zeichen_stelle(s, ab);
+            Ok(Value::str_rc(match zwischen(s, start, l, r) {
+                Some((von, bis)) => &s[von..bis],
+                None => "",
+            }))
+        }
+        "replace_between$" | "replace_between" => {
+            // REPLACE_BETWEEN$(text$, links$, rechts$, neu$) -> jedes Stueck
+            // zwischen links und rechts ersetzt; die Markierungen bleiben.
+            arity!(4);
+            let s = need_str(&a[0], "REPLACE_BETWEEN$")?;
+            let (l, r) = (need_str(&a[1], "REPLACE_BETWEEN$")?, need_str(&a[2], "REPLACE_BETWEEN$")?);
+            let neu = need_str(&a[3], "REPLACE_BETWEEN$")?;
+            if l.is_empty() || r.is_empty() { return Err("REPLACE_BETWEEN$: die Markierungen duerfen nicht leer sein".into()); }
+            let mut out = String::with_capacity(s.len());
+            let mut pos = 0;
+            while let Some((von, bis)) = zwischen(s, pos, l, r) {
+                out.push_str(&s[pos..von]);
+                out.push_str(neu);
+                out.push_str(r);
+                pos = bis + r.len();
+            }
+            out.push_str(&s[pos..]);
+            Ok(Value::str_rc(out))
+        }
+        "nospaces$" | "nospaces" => {
+            // NOSPACES$(s$) -> ohne jeden Leerraum (Leerzeichen, Tabulator,
+            // Umbruch) -- fuer Eingaben wie "12 34 56" oder "DE89 3704 ...".
+            arity!(1);
+            let s = need_str(&a[0], "NOSPACES$")?;
+            Ok(Value::str_rc(s.chars().filter(|c| !c.is_whitespace()).collect::<String>()))
         }
         "bin$" | "bin" => {
             arity!(1);

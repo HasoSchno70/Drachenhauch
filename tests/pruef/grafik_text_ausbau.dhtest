@@ -1,0 +1,220 @@
+' raylib ausgereizt, Etappe 4 (2026-10-03): Text. SDF-Schriften, die bei
+' jeder Groesse scharf bleiben, Fragen an eine Schrift, eine Schrift als
+' Bild fuer LOADFONT_IMAGE, die Bildrate, und drei Textbefehle.
+' Die Schriftdatei kommt aus circuitrunner/assets (versioniert).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== schreibweisen fuer bezeichner
+PRINT CAMEL$("hallo welt"); " "; CAMEL$("hallo_welt"); " "; CAMEL$("HalloWelt"); " "; CAMEL$("hallo-welt")
+PRINT SNAKE$("HTTPServerFehler"); " "; SNAKE$("spieler2Punkte"); " "; SNAKE$("  max   hp  ")
+PRINT PASCAL$("max-hp_wert"); " "; PASCAL$("XMLDatei.lesen"); " "; CAMEL$("Größe der Ü-Tür")
+PRINT "["; CAMEL$(""); "] ["; SNAKE$("___"); "]"
+--- erwartet
+halloWelt halloWelt halloWelt halloWelt
+http_server_fehler spieler2_punkte max_hp
+MaxHpWert XmlDateiLesen größeDerÜTür
+[] []
+
+=== text zwischen markierungen
+DIM s AS STRING : s = "<b>fett</b> und <b>mehr</b>"
+PRINT "["; BETWEEN$(s, "<b>", "</b>"); "] ["; BETWEEN$(s, "<b>", "</b>", 5); "] ["; BETWEEN$(s, "<i>", "</i>"); "] ["; BETWEEN$("a(b", "(", ")"); "]"
+' ab zaehlt Zeichen wie MID$, auch hinter einem Umlaut
+PRINT "["; BETWEEN$("ä[1] ö[2]", "[", "]", 2); "]"
+PRINT REPLACE_BETWEEN$("a[1] b[22] c[", "[", "]", "x"); " "; REPLACE_BETWEEN$("{{n}} hat {{p}}", "{{", "}}", "?")
+PRINT NOSPACES$(" DE89 3704" + CHR$(9) + " 0044 " + CHR$(10)); " "; NOSPACES$("ohne")
+--- erwartet
+[fett] [mehr] [] []
+[2]
+a[x] b[x] c[ {{?}} hat {{?}}
+DE8937040044 ohne
+
+=== sdf-schrift bleibt gross gezeichnet scharf
+' Beide Schriften sind mit 16 Punkten gebacken und werden mit 120 gezeichnet.
+' Die gewoehnliche verschwimmt (viele graue Punkte am Rand), die SDF-Schrift
+' hat eine Kante von gut einem Punkt. Die gewoehnliche steht NACH der
+' SDF-Schrift im selben Bild: bliebe ihr Shader an, waere sie auch scharf.
+DIM pfad AS STRING : pfad = ARG$(0)
+SCREEN(400, 200, "t")
+DIM sdf AS INTEGER : sdf = LOADFONT_SDF(pfad, 16)
+DIM normal AS INTEGER : normal = LOADFONT(pfad, 16)
+DIM k AS INTEGER
+FOR k = 1 TO 3
+    CLS(BLACK)
+    SETFONT(sdf) : TEXT_SIZE(120) : TEXT(10, 20, "Ho", WHITE)
+    SETFONT(normal) : TEXT_SIZE(120) : TEXT(210, 20, "Ho", WHITE)
+    FLIP()
+NEXT
+SAVESCREENSHOT("s.png")
+FLIP()
+DIM b AS IMAGE : b = LOADIMAGE("s.png")
+FUNCTION zaehle(b AS IMAGE, x0 AS INTEGER, grau AS BOOLEAN) AS INTEGER
+    DIM x AS INTEGER : DIM y AS INTEGER : DIM n AS INTEGER : n = 0
+    FOR y = 20 TO 180
+        FOR x = x0 TO x0 + 180
+            DIM g AS INTEGER : g = GETPIXEL(b, x, y) BAND 255
+            IF grau THEN
+                IF g > 40 AND g < 215 THEN n = n + 1
+            ELSE
+                IF g >= 215 THEN n = n + 1
+            END IF
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+DIM sw AS INTEGER : sw = zaehle(b, 10, FALSE)
+DIM sg AS INTEGER : sg = zaehle(b, 10, TRUE)
+DIM nw AS INTEGER : nw = zaehle(b, 210, FALSE)
+DIM ng AS INTEGER : ng = zaehle(b, 210, TRUE)
+PRINT "beide gezeichnet "; sw + sg > 2000 AND nw + ng > 2000
+PRINT "sdf scharf "; sg * 3 < ng
+PRINT "gewoehnliche verschwimmt "; ng > 1500
+--- argumente
+{sammlung}/../../circuitrunner/assets/font.ttf
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+beide gezeichnet TRUE
+sdf scharf TRUE
+gewoehnliche verschwimmt TRUE
+
+=== fragen an die schrift
+' Das Bild-Font zuerst: LOADFONT_IMAGE fuehrte seine Zeichenliste nicht mit,
+' danach zeigte jede spaeter geladene Schrift auf die Liste ihres Vorgaengers
+' -- die TTF-Schrift hatte dann kein ä, die Bildschrift eins.
+DIM pfad AS STRING : pfad = ARG$(0)
+SCREEN(200, 100, "t")
+DIM bild AS INTEGER : bild = LOADFONT_IMAGE(FONT_TO_IMAGE(-1), &HFF00FF, 32)
+DIM n AS INTEGER : n = LOADFONT(pfad, 24)
+PRINT "ttf "; FONT_HAS_GLYPH(n, "A"); " "; FONT_HAS_GLYPH(n, "ä"); " "; FONT_HAS_GLYPH(n, "あ")
+PRINT "bild "; FONT_HAS_GLYPH(bild, "A"); " "; FONT_HAS_GLYPH(bild, "ä")
+PRINT "eingebaut "; FONT_HAS_GLYPH(-1, "~"); " "; FONT_HAS_GLYPH(-1, "é"); " "; FONT_HAS_GLYPH(-1, "€")
+DIM s AS INTEGER : s = LOADFONT_SDF(pfad, 32)
+PRINT "sdf "; FONT_HAS_GLYPH(s, "ä"); " "; FONT_HAS_GLYPH(s, "Ж")
+' Die Breite eines Zeichens ist die, die TEXT_WIDTH misst.
+SETFONT(n) : TEXT_SIZE(24)
+PRINT "breite "; INT(FONT_GLYPH_WIDTH(n, "W", 24) + 0.5) = TEXT_WIDTH("W"); " "; FONT_GLYPH_WIDTH(n, "W", 24) > FONT_GLYPH_WIDTH(n, "i", 24); " "; FONT_GLYPH_WIDTH(n, "W", 48) = 2 * FONT_GLYPH_WIDTH(n, "W", 24)
+SETFONT(-1) : TEXT_SIZE(20)
+PRINT "eingebaut "; INT(FONT_GLYPH_WIDTH(-1, "W", 20) + 0.5) = TEXT_WIDTH("W")
+--- argumente
+{sammlung}/../../circuitrunner/assets/font.ttf
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+ttf TRUE TRUE FALSE
+bild TRUE FALSE
+eingebaut TRUE TRUE FALSE
+sdf TRUE FALSE
+breite TRUE TRUE TRUE
+eingebaut TRUE
+
+=== schrift als bild und wieder zurueck
+' Das Bild hat das Format von LOADFONT_IMAGE: Magenta aussen und zwischen den
+' Feldern, die Felder durchsichtig, die Zeichen weiss. Wieder geladen misst
+' ein Text genauso breit wie mit der Schrift, aus der es kam.
+DIM pfad AS STRING : pfad = ARG$(0)
+SCREEN(200, 100, "t")
+DIM n AS INTEGER : n = LOADFONT(pfad, 24)
+DIM b AS IMAGE : b = FONT_TO_IMAGE(n)
+PRINT "rand "; HEX$(GETPIXEL(b, 0, 0)); " feld "; GETALPHA(b, 1, 1)
+DIM x AS INTEGER : DIM y AS INTEGER : DIM weiss AS INTEGER : weiss = 0
+FOR y = 0 TO IMAGEHEIGHT(b) - 1
+    FOR x = 0 TO IMAGEWIDTH(b) - 1
+        IF GETPIXEL(b, x, y) = &HFFFFFF AND GETALPHA(b, x, y) = 255 THEN weiss = weiss + 1
+    NEXT
+NEXT
+PRINT "zeichen weiss "; weiss > 500
+DIM w AS INTEGER : w = LOADFONT_IMAGE(b, &HFF00FF, 32)
+SETFONT(n) : TEXT_SIZE(24) : DIM b1 AS INTEGER : b1 = TEXT_WIDTH("Hallo, Welt! 0123")
+SETFONT(w) : TEXT_SIZE(24) : DIM b2 AS INTEGER : b2 = TEXT_WIDTH("Hallo, Welt! 0123")
+PRINT "gleich breit "; b1 = b2; " "; b1 > 100
+' Nur ein Ausschnitt: A bis F.
+DIM af AS INTEGER : af = LOADFONT_IMAGE(FONT_TO_IMAGE(n, 65, 70), &HFF00FF, 65)
+PRINT "ausschnitt "; FONT_HAS_GLYPH(af, "A"); " "; FONT_HAS_GLYPH(af, "F"); " "; FONT_HAS_GLYPH(af, "G")
+' ... und es sind wirklich A bis F, nicht die ersten sechs Zeichen ab 32.
+PRINT "dieselben zeichen "; FONT_GLYPH_WIDTH(af, "A", 24) = FONT_GLYPH_WIDTH(n, "A", 24); " "; FONT_GLYPH_WIDTH(af, "F", 24) = FONT_GLYPH_WIDTH(n, "F", 24)
+' Eine SDF-Schrift wird dabei zu einer gewoehnlichen: weisse Zeichen mit
+' kurzer Kante, kein Abstandsfeld im Feld.
+DIM sb AS IMAGE : sb = FONT_TO_IMAGE(LOADFONT_SDF(pfad, 32), 72, 72)
+DIM halb AS INTEGER : DIM voll AS INTEGER : halb = 0 : voll = 0
+FOR y = 1 TO IMAGEHEIGHT(sb) - 2
+    FOR x = 1 TO IMAGEWIDTH(sb) - 2
+        DIM a AS INTEGER : a = GETALPHA(sb, x, y)
+        IF a = 255 THEN voll = voll + 1
+        IF a > 0 AND a < 255 THEN halb = halb + 1
+    NEXT
+NEXT
+PRINT "sdf als bild "; voll > 100; " "; halb < voll
+--- argumente
+{sammlung}/../../circuitrunner/assets/font.ttf
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+rand FF00FF feld 0
+zeichen weiss TRUE
+gleich breit TRUE TRUE
+ausschnitt TRUE TRUE FALSE
+dieselben zeichen TRUE TRUE
+sdf als bild TRUE TRUE
+
+=== bildrate anzeigen
+' In der gewuenschten Farbe an der Stelle, auch wenn die Kamera verschoben
+' ist -- es ist eine Anzeige ueber dem Spiel, keine Welt-Koordinate.
+SCREEN(300, 120, "t")
+CAMERA_SET(500, 500)
+DIM k AS INTEGER
+FOR k = 1 TO 3
+    CLS(BLACK)
+    DRAWFPS(20, 20, RGB(255, 0, 255))
+    DRAWFPS(20, 70)
+    FLIP()
+NEXT
+SAVESCREENSHOT("f.png")
+FLIP()
+DIM b AS IMAGE : b = LOADIMAGE("f.png")
+DIM x AS INTEGER : DIM y AS INTEGER : DIM m AS INTEGER : DIM g AS INTEGER : m = 0 : g = 0
+FOR y = 15 TO 110
+    FOR x = 15 TO 200
+        DIM p AS INTEGER : p = GETPIXEL(b, x, y)
+        IF y < 50 AND p = &HFF00FF THEN m = m + 1
+        IF y >= 60 AND p <> 0 THEN g = g + 1
+    NEXT
+NEXT
+PRINT "eigene farbe "; m > 30; " vorgabe "; g > 30
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+eigene farbe TRUE vorgabe TRUE
+
+=== falsche angaben sind fehler
+FUNCTION probe$(n AS INTEGER) AS STRING
+    TRY
+        SELECT CASE n
+            CASE 1 : PRINT FONT_HAS_GLYPH(-1, "ab")
+            CASE 2 : PRINT FONT_HAS_GLYPH(7, "a")
+            CASE 3 : PRINT FONT_GLYPH_WIDTH(-1, "a", 0)
+            CASE 4 : DIM b AS IMAGE : b = FONT_TO_IMAGE(-1, 70, 65)
+            CASE 5 : DIM c AS IMAGE : c = FONT_TO_IMAGE(-1, 0, 300)
+            CASE 6 : DIM f AS INTEGER : f = LOADFONT_SDF("gibtsnicht.ttf", 32)
+            CASE 7 : PRINT BETWEEN$("a", "", "b")
+        END SELECT
+        RETURN "kein fehler"
+    CATCH e
+        RETURN e
+    END TRY
+END FUNCTION
+SCREEN(100, 100, "t")
+DIM i AS INTEGER
+FOR i = 1 TO 7
+    PRINT probe$(i)
+NEXT
+--- umgebung
+DHRT_FRAMES=2
+--- enthaelt
+FONT_HAS_GLYPH: erwartet genau ein Zeichen, nicht "ab"
+FONT_HAS_GLYPH: ungueltiges FONT-Handle 7
+FONT_GLYPH_WIDTH: die Groesse muss groesser als 0 sein, nicht 0
+FONT_TO_IMAGE: die Zeichen 70..65 gehen nicht
+FONT_TO_IMAGE: die Zeichen 0..300 gehen nicht
+LOADFONT_SDF
+gibtsnicht.ttf
+BETWEEN$: die Markierungen duerfen nicht leer sein
