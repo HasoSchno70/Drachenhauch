@@ -613,7 +613,7 @@ FOR i = 0 TO LEN(P) - 1
     IF LEFT$(P[i], 7) = "themen " THEN PRINT P[i]
 NEXT
 --- erwartet
-themen 16 beispiele 206
+themen 16 beispiele 207
 themen filter [tracker] 2
 
 === ein beispiel aus der themenliste oeffnen

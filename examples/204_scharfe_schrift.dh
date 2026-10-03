@@ -1,0 +1,58 @@
+' 204_scharfe_schrift.dh -- Schriften, die bei jeder Groesse scharf bleiben.
+' Oben pulsiert ein Titel zwischen klein und riesig: links als SDF-Schrift
+' (LOADFONT_SDF), rechts als gewoehnliche Schrift aus derselben Datei, beide
+' mit nur 24 Punkten gebacken -- rechts verschwimmt er, links nicht.
+' Unten eine Pixelschrift, die das Programm selbst aus der Vektorschrift
+' macht (FONT_TO_IMAGE -> LOADFONT_IMAGE), und Bezeichner in drei
+' Schreibweisen.
+
+IMPORT "imgfx"
+
+SCREEN(900, 520, "Scharfe Schrift", 1)
+SETFPS(60)
+
+DIM datei AS STRING : datei = "assets/roboto_medium.ttf"
+DIM sdf AS INTEGER : sdf = LOADFONT_SDF(datei, 24)
+DIM normal AS INTEGER : normal = LOADFONT(datei, 24)
+
+' Aus der Vektorschrift eine Pixelschrift machen: als Bild ausgeben und
+' wieder laden. Die Zeichen im Bild sind weiss, TEXT faerbt sie ein.
+DIM klein AS INTEGER : klein = LOADFONT(datei, 12)
+DIM blatt AS IMAGE : blatt = FONT_TO_IMAGE(klein)
+DIM pixel AS INTEGER : pixel = LOADFONT_IMAGE(blatt, &HFF00FF, 32)
+
+DIM namen AS ARRAY OF STRING
+namen = ["max hp", "spielerPunkte", "HTTPServer fehler", "naechste-welle"]
+
+DIM t AS FLOAT : t = 0.0
+WHILE NOT QUITREQUESTED()
+    t = t + DELTA()
+    CLS(RGB(20, 24, 36))
+    ' Der Titel: 20 bis 160 Punkte.
+    DIM groesse AS INTEGER : groesse = 20 + INT(70.0 * (1.0 + SIN(t * 1.2)))
+    SETFONT(sdf) : TEXT_SIZE(groesse)
+    TEXT(20, 40, "Abc", RGB(255, 210, 90))
+    SETFONT(normal) : TEXT_SIZE(groesse)
+    TEXT(460, 40, "Abc", RGB(255, 210, 90))
+    SETFONT(sdf) : TEXT_SIZE(18)
+    TEXT(20, 250, "LOADFONT_SDF -- " + STR$(groesse) + " Punkte", WHITE)
+    TEXT(460, 250, "LOADFONT -- " + STR$(groesse) + " Punkte", WHITE)
+    IF FONT_HAS_GLYPH(sdf, "€") THEN TEXT(20, 275, "hat ein Euro-Zeichen: €", RGB(160, 200, 255))
+
+    ' Die selbst gemachte Pixelschrift, doppelt so gross gezeichnet.
+    SETFONT(pixel) : TEXT_SIZE(24)
+    TEXT(20, 330, "PIXELSCHRIFT AUS FONT_TO_IMAGE", RGB(120, 230, 140))
+
+    ' Bezeichner in drei Schreibweisen.
+    SETFONT(sdf) : TEXT_SIZE(18)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(namen) - 1
+        DIM y AS INTEGER : y = 380 + k * 28
+        TEXT(20, y, namen[k], RGB(200, 200, 210))
+        TEXT(260, y, CAMEL$(namen[k]), RGB(255, 180, 120))
+        TEXT(480, y, SNAKE$(namen[k]), RGB(140, 220, 255))
+        TEXT(700, y, PASCAL$(namen[k]), RGB(220, 160, 255))
+    NEXT
+    DRAWFPS(800, 10)
+    FLIP()
+WEND
