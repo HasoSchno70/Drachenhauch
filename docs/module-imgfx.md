@@ -136,6 +136,7 @@ und ueberhaupt nichts speichern.
 | `IMAGE_FREE(bild)` | das Bild und seine Grafikspeicher-Textur freigeben |
 | `IMAGE_FROM_BUFFER(puffer)` | IMAGE — ein Bild aus den Bytes einer Bilddatei (PNG, JPG, BMP, GIF, QOI, DDS), etwa aus `HTTP_BYTES` oder `BUFFER_FROM_BASE64`; das Format steht in den ersten Bytes (core, kein IMPORT noetig) |
 | `IMAGE_TO_BUFFER(bild [, mit_alpha])` | BUFFER — das Bild als PNG-Bytes, ohne Umweg über eine Datei; mit `FALSE` ohne Deckkraft-Kanal wie bei `IMAGE_SAVE` (core, kein IMPORT noetig) |
+| `IMAGE_MIPMAPS(bild)` | INTEGER — verkleinerte Stufen für die Textur anlegen und trilinear filtern: ein feines Muster auf einer fernen 3D-Fläche flimmert dann nicht mehr. Liefert die Zahl der Stufen; nach `IMAGE_DRAW_*` werden sie nachgezogen |
 | `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` | mehrere Bilder als **bewegtes GIF** schreiben |
 
 ```basic

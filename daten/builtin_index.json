@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2054,
+ "count": 2065,
  "builtins": [
   {
    "name": "ABS",
@@ -12325,6 +12325,72 @@
    "kind": "graphics",
    "signature": "BILLBOARD_EX(bild, x, y, z, breite, hoehe, winkel, farbe)",
    "module": "g3d"
+  },
+  {
+   "name": "MESH_CONE",
+   "kind": "graphics",
+   "signature": "MESH_CONE(radius, hoehe, segmente) AS INTEGER",
+   "module": "g3d"
+  },
+  {
+   "name": "MESH_HEMISPHERE",
+   "kind": "graphics",
+   "signature": "MESH_HEMISPHERE(radius, ringe, segmente) AS INTEGER",
+   "module": "g3d"
+  },
+  {
+   "name": "MESH_POLY",
+   "kind": "graphics",
+   "signature": "MESH_POLY(seiten, radius) AS INTEGER",
+   "module": "g3d"
+  },
+  {
+   "name": "MESH_CUBICMAP",
+   "kind": "graphics",
+   "signature": "MESH_CUBICMAP(bild, breite, hoehe, tiefe) AS INTEGER",
+   "module": "g3d"
+  },
+  {
+   "name": "SKYBOX_IMAGE",
+   "kind": "graphics",
+   "signature": "SKYBOX_IMAGE(bild)",
+   "module": "g3d"
+  },
+  {
+   "name": "IMAGE_MIPMAPS",
+   "kind": "graphics",
+   "signature": "IMAGE_MIPMAPS(bild) AS INTEGER",
+   "module": "imgfx"
+  },
+  {
+   "name": "WINDOW_RENDER_WIDTH",
+   "kind": "graphics",
+   "signature": "WINDOW_RENDER_WIDTH() -> INTEGER",
+   "module": "core"
+  },
+  {
+   "name": "WINDOW_RENDER_HEIGHT",
+   "kind": "graphics",
+   "signature": "WINDOW_RENDER_HEIGHT() -> INTEGER",
+   "module": "core"
+  },
+  {
+   "name": "WINDOW_WAIT_EVENTS",
+   "kind": "graphics",
+   "signature": "WINDOW_WAIT_EVENTS(sekunden)",
+   "module": "core"
+  },
+  {
+   "name": "MOUSE_OFFSET",
+   "kind": "graphics",
+   "signature": "MOUSE_OFFSET(x, y)",
+   "module": "core"
+  },
+  {
+   "name": "MOUSE_SCALE",
+   "kind": "graphics",
+   "signature": "MOUSE_SCALE(sx, sy)",
+   "module": "core"
   }
  ]
 }
