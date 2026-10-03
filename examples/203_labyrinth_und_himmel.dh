@@ -1,0 +1,90 @@
+' 203_labyrinth_und_himmel.dh -- ein Labyrinth aus einer kleinen Karte
+' (MESH_CUBICMAP: jeder helle Punkt ein Wuerfel), ein Himmel aus einem
+' selbst gemalten Bild (SKYBOX_IMAGE), ein karierter Boden, der in der
+' Ferne dank IMAGE_MIPMAPS nicht flimmert, und ein paar neue Grundkoerper:
+' Kegel als Baeume, Halbkugeln als Kuppeln, ein Sechseck als Ziel.
+' Taste M schaltet die Mipmaps um -- in der Ferne sieht man den Unterschied.
+
+IMPORT "g3d"
+IMPORT "imgfx"
+
+SCREEN(900, 560, "Labyrinth und Himmel", 1)
+
+' Ohne Licht haetten Wandseiten, Wandkanten und Gangboden dieselbe flache
+' Farbe -- das Labyrinth saehe aus wie eine Platte.
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.35)
+DIM sonne AS INTEGER : sonne = LIGHT_DIRECTIONAL(-0.4, -1.0, -0.6, &HFFF0D8)
+
+' Die Karte: # = Wand, alles andere frei. Ein Punkt je Zeichen.
+DIM plan AS ARRAY OF STRING
+plan = ["###########", "#.....#...#", "#.###.#.#.#", "#.#...#.#.#", "#.#.###.#.#", "#...#...#.#", "###.#.###.#", "#...#.....#", "###########"]
+DIM breite AS INTEGER : breite = LEN(plan[0])
+DIM tiefe AS INTEGER : tiefe = LEN(plan)
+DIM karte AS IMAGE : karte = IMAGE_NEW(breite, tiefe, BLACK)
+DIM x AS INTEGER
+DIM z AS INTEGER
+FOR z = 0 TO tiefe - 1
+    FOR x = 0 TO breite - 1
+        IF MID$(plan[z], x, 1) = "#" THEN IMAGE_FILL_RECT(karte, x, z, x, z, WHITE)
+    NEXT
+NEXT
+DIM mauern AS INTEGER : mauern = MESH_CUBICMAP(karte, 1, 1.4, 1)
+
+' Der Himmel: sechs Felder nebeneinander (+X, -X, +Y, -Y, +Z, -Z). Die Seiten
+' bekommen einen Verlauf mit Horizont, oben ist es tiefblau, unten grasgruen.
+DIM himmel AS IMAGE : himmel = IMAGE_NEW(6 * 64, 64)
+DIM k AS INTEGER
+FOR k = 0 TO 5
+    DIM x0 AS INTEGER : x0 = k * 64
+    IF k = 2 THEN
+        IMAGE_FILL_RECT(himmel, x0, 0, x0 + 63, 63, RGB(40, 80, 170))
+    ELSEIF k = 3 THEN
+        IMAGE_FILL_RECT(himmel, x0, 0, x0 + 63, 63, RGB(50, 90, 40))
+    ELSE
+        IMAGE_GRADIENT(himmel, x0, 0, x0 + 63, 39, RGB(40, 80, 170), RGB(170, 200, 235), TRUE)
+        IMAGE_FILL_RECT(himmel, x0, 40, x0 + 63, 63, RGB(60, 100, 50))
+        ' ein paar Wolken je Seite
+        IMAGE_FILL_ELLIPSE(himmel, x0 + 16 + k * 5, 14 + k, 9, 3, RGB(240, 240, 250))
+        IMAGE_FILL_ELLIPSE(himmel, x0 + 44 - k * 3, 22, 7, 2, RGB(230, 235, 245))
+    END IF
+NEXT
+SKYBOX_IMAGE(himmel)
+
+' Der Boden: ein feines Karomuster, weit ueber das Labyrinth hinaus.
+DIM karo AS IMAGE : karo = GENTEX_CHECKED(256, 256, 4, 4, RGB(200, 190, 160), RGB(120, 110, 90))
+DIM boden AS INTEGER : boden = MESH_PLANE(80, 80, 1, 1)
+MODEL_TEXTURE(boden, karo)
+DIM mip AS BOOLEAN : mip = FALSE
+DIM stufen AS INTEGER : stufen = 0
+
+' Die Grundkoerper fuer Baeume, Kuppeln und das Ziel.
+DIM baum AS INTEGER : baum = MESH_CONE(0.35, 1.2, 12)
+DIM kuppel AS INTEGER : kuppel = MESH_HEMISPHERE(0.4, 8, 16)
+DIM ziel AS INTEGER : ziel = MESH_POLY(6, 0.4)
+MODEL_LIT(mauern) : MODEL_LIT(boden) : MODEL_LIT(baum) : MODEL_LIT(kuppel) : MODEL_LIT(ziel)
+
+DIM t AS FLOAT : t = 0.0
+WHILE NOT QUITREQUESTED()
+    t = t + DELTA()
+    IF KEYHIT(KEY_M) AND NOT mip THEN
+        mip = TRUE
+        stufen = IMAGE_MIPMAPS(karo)
+    END IF
+    CLS(BLACK)
+    DIM mx AS FLOAT : mx = breite / 2.0 - 0.5
+    DIM mz AS FLOAT : mz = tiefe / 2.0 - 0.5
+    CAMERA3D(mx + 12.0 * COS(t * 0.25), 5.0, mz + 12.0 * SIN(t * 0.25), mx, 0.5, mz, 55)
+    MODEL(boden, mx, -0.01, mz, 1.0, WHITE)
+    MODEL(mauern, 0, 0, 0, 1.0, RGB(170, 120, 90))
+    ' Baeume ausserhalb, Kuppeln in zwei Ecken, das Ziel unten rechts.
+    FOR k = 0 TO 7
+        DIM w AS FLOAT : w = k * 0.785
+        MODEL(baum, mx + 8.5 * COS(w), 0, mz + 7.5 * SIN(w), 1.0, RGB(40, 140, 60))
+    NEXT
+    MODEL(kuppel, 1, 0, 1, 1.0, RGB(220, 200, 120))
+    MODEL(kuppel, breite - 2, 0, 1, 1.0, RGB(220, 200, 120))
+    MODEL(ziel, breite - 2, 0.02 + 0.05 * SIN(t * 4.0), tiefe - 2, 1.0, RGB(255, 80, 80))
+    TEXT(16, 16, IIF(mip, "Mipmaps an (" + STR$(stufen) + " Stufen)", "Mipmaps aus -- Taste M"), WHITE)
+    FLIP()
+WEND

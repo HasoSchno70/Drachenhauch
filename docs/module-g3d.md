@@ -69,7 +69,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `MESH_CONE(radius, hoehe, segmente)` | INTEGER | Kegel, der auf dem Boden steht (y von 0 bis `hoehe`) |
 | `MESH_HEMISPHERE(radius, ringe, segmente)` | INTEGER | obere Hälfte einer Kugel, unten offen — Kuppeln, Hügel |
 | `MESH_POLY(seiten, radius)` | INTEGER | flaches regelmäßiges Vieleck auf dem Boden (3 bis 256 Seiten) |
-| `MESH_CUBICMAP(bild, breite, hoehe, tiefe)` | INTEGER | Labyrinth aus einem Bild: jeder helle Punkt wird ein Würfel der Größe `breite` x `hoehe` x `tiefe`, Punkt (x, y) liegt bei x·breite, y·tiefe |
+| `MESH_CUBICMAP(bild, breite, hoehe, tiefe)` | INTEGER | Labyrinth aus einem Bild: jeder weiße Punkt wird ein Würfel der Größe `breite` x `hoehe` x `tiefe`, jeder schwarze bekommt Boden und eine Decke, die man von innen sieht; andere Farben bleiben leer. Punkt (x, y) liegt bei x·breite, y·tiefe. Mit `MODEL_LIT` und einem Licht, sonst sehen Wände und Gänge gleich aus |
 | `MODEL(modell, x, y, z, skala, farbe)` | — | zeichnen |
 | `MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad, skala, farbe)` | — | zeichnen und um eine Achse drehen |
 | `MODEL_WIRES(modell, x, y, z, skala, farbe)` | — | als Drahtgitter zeichnen |

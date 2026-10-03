@@ -1209,7 +1209,7 @@
   "MD5_FILE$": "dasselbe für eine Datei, blockweise gelesen",
   "MESH_CONE": "INTEGER — Kegel, der auf dem Boden steht (y von 0 bis hoehe)",
   "MESH_CUBE": "INTEGER — Quader als Modell — ohne Datei",
-  "MESH_CUBICMAP": "INTEGER — Labyrinth aus einem Bild: jeder helle Punkt wird ein Würfel der Größe breite x hoehe x tiefe, Punkt (x, y) liegt bei x·breite, y·tiefe",
+  "MESH_CUBICMAP": "INTEGER — Labyrinth aus einem Bild: jeder weiße Punkt wird ein Würfel der Größe breite x hoehe x tiefe, jeder schwarze bekommt Boden und eine Decke, die man von innen sieht; andere Farben bleiben leer. Punkt (x, y) liegt bei x·breite, y·tiefe. Mit MODEL_LIT und einem Licht, sonst sehen Wände und Gänge gleich aus",
   "MESH_CYLINDER": "INTEGER — Zylinder",
   "MESH_HEIGHTMAP": "INTEGER — Gelände aus einem Graustufenbild: hell = hoch, groesse_y bestimmt wie hoch",
   "MESH_HEMISPHERE": "INTEGER — obere Hälfte einer Kugel, unten offen — Kuppeln, Hügel",
