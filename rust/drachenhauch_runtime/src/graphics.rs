@@ -26,6 +26,32 @@ extern "C" {
 use raylib::core::shaders::RaylibShader;   // get_shader_location auf Shader
 use raylib::core::texture::RaylibRenderTexture2D;   // .texture() auf RenderTexture2D
 
+/// Der Faden hinter WINDOW_WAIT_EVENTS: weckt ein wartendes Fenster
+/// spaetestens nach der eingestellten Dauer (glfwPostEmptyEvent ist von
+/// jedem Faden aus erlaubt). Einmal gestartet, schlaeft er bei 0 nur.
+mod warten {
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    static MS: AtomicU64 = AtomicU64::new(0);
+    static LAEUFT: AtomicBool = AtomicBool::new(false);
+    unsafe extern "C" {
+        fn glfwPostEmptyEvent();
+    }
+    pub fn setzen(ms: u64) {
+        MS.store(ms, Ordering::SeqCst);
+        if ms > 0 && !LAEUFT.swap(true, Ordering::SeqCst) {
+            std::thread::spawn(|| loop {
+                let ms = MS.load(Ordering::SeqCst);
+                std::thread::sleep(std::time::Duration::from_millis(if ms > 0 { ms } else { 100 }));
+                if MS.load(Ordering::SeqCst) > 0 {
+                    unsafe { glfwPostEmptyEvent(); }
+                }
+            });
+        }
+    }
+    /// Beim Abraeumen des Fensters: nicht mehr wecken.
+    pub fn aus() { MS.store(0, Ordering::SeqCst); }
+}
+
 /// Das Format einer Bilddatei an ihren ersten Bytes, als Endung fuer
 /// raylibs LoadImageFromMemory. None = keins, das dhrt laden kann.
 fn bildformat(b: &[u8]) -> Option<&'static str> {
@@ -878,11 +904,12 @@ void main()
 const SKYBOX_FS: &str = r#"#version 330
 in vec3 fragPosition;
 uniform samplerCube environmentMap;   // Texture-Unit 0
+uniform int ldr;                      // 1 = Cubemap aus einem Bild (schon sRGB)
 out vec4 finalColor;
 void main()
 {
     vec3 color = texture(environmentMap, fragPosition).rgb;
-    color = pow(color, vec3(1.0/2.2));   // linear -> sRGB
+    if (ldr == 0) color = pow(color, vec3(1.0/2.2));   // HDR linear -> sRGB
     finalColor = vec4(color, 1.0);
 }
 "#;
@@ -954,6 +981,12 @@ fn web_leinwand_groesse(w: i32, h: i32) {
     if let Ok(ziel) = std::ffi::CString::new("#canvas") {
         unsafe { emscripten_set_canvas_element_size(ziel.as_ptr(), w, h); }
     }
+}
+
+/// Ein wartendes Fenster nicht mehr wecken, sobald es abgeraeumt ist
+/// (glfwPostEmptyEvent nach glfwTerminate meldete einen GLFW-Fehler).
+impl Drop for Graphics {
+    fn drop(&mut self) { warten::aus(); }
 }
 
 pub struct Graphics {
@@ -1091,6 +1124,13 @@ pub struct Graphics {
     // env-Cubemap (LDR) -- fuer die Skybox aufbewahrt (sonst nach IBL-Gen frei).
     ibl_env: u32,
     skybox_enabled: bool,
+    /// SKYBOX_IMAGE: eine Cubemap aus einem gewoehnlichen Bild; hat Vorrang
+    /// vor der HDR-Umgebung. Dazu der Ort des ldr-Schalters im Shader.
+    skybox_bild: Option<Texture2D>,
+    skybox_loc_ldr: i32,
+    /// IMAGE_MIPMAPS: Bilder, deren Textur Mipmaps hat -- nach jedem Hochladen
+    /// neu erzeugt, sonst zeigten die kleineren Stufen den alten Inhalt.
+    tex_mipmaps: std::collections::HashSet<usize>,
     skybox_shader: Option<Shader>,
     skybox_loc_proj: i32,
     skybox_loc_view: i32,
@@ -1749,6 +1789,9 @@ impl Graphics {
             ibl_brdf: 0,
             ibl_env: 0,
             skybox_enabled: false,
+            skybox_bild: None,
+            skybox_loc_ldr: -1,
+            tex_mipmaps: std::collections::HashSet::new(),
             skybox_shader: None,
             skybox_loc_proj: -1,
             skybox_loc_view: -1,
@@ -2427,6 +2470,41 @@ impl Graphics {
             res_x.clamp(1, Self::MAX_MESH_SEGMENTS), res_z.clamp(1, Self::MAX_MESH_SEGMENTS));
         self.push_model_from_mesh(mesh, "MESH_PLANE")
     }
+    pub fn mesh_cone(&mut self, r: f32, h: f32, slices: i32) -> Result<i64, String> {
+        Self::check_mesh_dim("MESH_CONE", "r", r)?;
+        Self::check_mesh_dim("MESH_CONE", "h", h)?;
+        let mesh = Mesh::gen_mesh_cone(&self.thread, r, h, slices.clamp(3, Self::MAX_MESH_SEGMENTS));
+        self.push_model_from_mesh(mesh, "MESH_CONE")
+    }
+    pub fn mesh_hemisphere(&mut self, r: f32, rings: i32, slices: i32) -> Result<i64, String> {
+        Self::check_mesh_dim("MESH_HEMISPHERE", "r", r)?;
+        let mesh = Mesh::gen_mesh_hemisphere(&self.thread, r,
+            rings.clamp(3, Self::MAX_MESH_SEGMENTS), slices.clamp(3, Self::MAX_MESH_SEGMENTS));
+        self.push_model_from_mesh(mesh, "MESH_HEMISPHERE")
+    }
+    pub fn mesh_poly(&mut self, sides: i32, r: f32) -> Result<i64, String> {
+        Self::check_mesh_dim("MESH_POLY", "r", r)?;
+        let mesh = Mesh::gen_mesh_poly(&self.thread, sides.clamp(3, Self::MAX_MESH_SEGMENTS), r);
+        self.push_model_from_mesh(mesh, "MESH_POLY")
+    }
+    /// MESH_CUBICMAP: aus einem Bild ein Gebaeude aus Wuerfeln -- jeder
+    /// helle Punkt wird ein Wuerfel der Groesse (b, h, t), jeder dunkle bleibt
+    /// frei. So entsteht ein begehbares Labyrinth aus einer kleinen Karte.
+    pub fn mesh_cubicmap(&mut self, tex_idx: i64, b: f32, h: f32, t: f32) -> Result<i64, String> {
+        if !self.tex_ok(tex_idx) { return Err(self.tex_fehler(tex_idx, "MESH_CUBICMAP")); }
+        Self::check_mesh_dim("MESH_CUBICMAP", "breite", b)?;
+        Self::check_mesh_dim("MESH_CUBICMAP", "hoehe", h)?;
+        Self::check_mesh_dim("MESH_CUBICMAP", "tiefe", t)?;
+        let (w, hh) = (self.textures[tex_idx as usize].img.width, self.textures[tex_idx as usize].img.height);
+        if (w as i64) * (hh as i64) > 1_000_000 {
+            return Err(format!("MESH_CUBICMAP: eine Karte von {}x{} Punkten ist zu gross (hoechstens eine Million)", w, hh));
+        }
+        let mesh = {
+            let img = &self.textures[tex_idx as usize].img;
+            Mesh::gen_mesh_cubicmap(&self.thread, img, Vector3::new(b, h, t))
+        };
+        self.push_model_from_mesh(mesh, "MESH_CUBICMAP")
+    }
     /// Terrain-Mesh aus einer (Graustufen-)Image (LOADIMAGE-Handle): Helligkeit
     /// = Hoehe. size = (Breite, Hoehenskalierung, Tiefe) in Welt-Einheiten.
     pub fn mesh_heightmap(&mut self, tex_idx: i64, sx: f32, sy: f32, sz: f32) -> Result<i64, String> {
@@ -3019,9 +3097,68 @@ impl Graphics {
                 Some(&fuer_ziel_uebersetzen(SKYBOX_VS)), Some(&fuer_ziel_uebersetzen(SKYBOX_FS)));
             self.skybox_loc_proj = sh.get_shader_location("matProjection");
             self.skybox_loc_view = sh.get_shader_location("matView");
+            self.skybox_loc_ldr = sh.get_shader_location("ldr");
             self.skybox_shader = Some(sh);
         }
         self.skybox_enabled = on;
+    }
+
+    /// SKYBOX_IMAGE: eine Cubemap aus einem Bild als Himmel. raylib erkennt
+    /// die Anordnung: ein Kreuz (4x3 oder 3x4 Felder) oder ein Streifen
+    /// (6x1 oder 1x6, Reihenfolge +X, -X, +Y, -Y, +Z, -Z).
+    pub fn skybox_image(&mut self, idx: i64) -> Result<(), String> {
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "SKYBOX_IMAGE")); }
+        let (w, h) = (self.textures[idx as usize].img.width, self.textures[idx as usize].img.height);
+        let passt = (w * 3 == h * 4) || (w * 4 == h * 3) || (w == h * 6) || (h == w * 6);
+        if !passt {
+            return Err(format!(
+                "SKYBOX_IMAGE: ein Bild von {}x{} ist keine Cubemap -- erwartet ein Kreuz (4:3 oder 3:4) oder einen Streifen aus sechs Feldern (6:1 oder 1:6)",
+                w, h));
+        }
+        let t = self.rl.load_texture_cubemap(&self.thread, &self.textures[idx as usize].img,
+                    raylib::consts::CubemapLayout::CUBEMAP_LAYOUT_AUTO_DETECT)
+            .map_err(|e| format!("SKYBOX_IMAGE: {}", e))?;
+        self.skybox_bild = Some(t);
+        self.skybox(true);
+        Ok(())
+    }
+
+    /// IMAGE_MIPMAPS: verkleinerte Stufen der Textur erzeugen und trilinear
+    /// filtern -- eine fein gemusterte Textur flimmert in der Ferne sonst.
+    /// Liefert die Zahl der Stufen.
+    pub fn image_mipmaps(&mut self, idx: i64) -> Result<i64, String> {
+        use raylib::core::texture::RaylibTexture2D;
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_MIPMAPS")); }
+        let i = idx as usize;
+        self.textures[i].tex.gen_texture_mipmaps();
+        self.textures[i].tex.set_texture_filter(&self.thread, raylib::consts::TextureFilter::TEXTURE_FILTER_TRILINEAR);
+        self.tex_mipmaps.insert(i);
+        Ok(self.textures[i].tex.mipmaps as i64)
+    }
+
+    /// WINDOW_RENDER_WIDTH/HEIGHT: die echte Pixelgroesse der Zeichenflaeche
+    /// (bei einem HiDPI-Schirm groesser als SCREENWIDTH/SCREENHEIGHT).
+    pub fn render_size(&self) -> (i64, i64) {
+        (self.rl.get_render_width() as i64, self.rl.get_render_height() as i64)
+    }
+
+    /// MOUSE_OFFSET / MOUSE_SCALE: Mauskoordinaten = (roh + Versatz) * Massstab,
+    /// fuer Spiele, die in eine kleinere Pixel-Aufloesung zeichnen und sie
+    /// vergroessert (mit Rand) zeigen.
+    pub fn mouse_offset(&mut self, x: i32, y: i32) { self.rl.set_mouse_offset(Vector2::new(x as f32, y as f32)); }
+    pub fn mouse_scale(&mut self, sx: f32, sy: f32) { self.rl.set_mouse_scale(sx, sy); }
+
+    /// WINDOW_WAIT_EVENTS(sekunden): FLIP wartet auf eine Eingabe, hoechstens
+    /// so lange -- eine Anwendung, die nur auf den Benutzer reagiert, braucht
+    /// dann keine Rechenzeit, waehrend nichts passiert. 0 schaltet ab.
+    /// raylibs EnableEventWaiting wartet unbegrenzt; die Hoechstdauer kommt
+    /// aus einem Faden, der das Fenster mit glfwPostEmptyEvent weckt.
+    pub fn wait_events(&mut self, sekunden: f64) {
+        let ms = if sekunden > 0.0 { (sekunden * 1000.0).round().max(1.0) as u64 } else { 0 };
+        warten::setzen(ms);
+        unsafe {
+            if ms > 0 { raylib::ffi::EnableEventWaiting(); } else { raylib::ffi::DisableEventWaiting(); }
+        }
     }
 
     pub fn light_ambient(&mut self, col_: i64, intensity: f64) {
@@ -4297,11 +4434,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // ein In-Place-Update der BESTEHENDEN Textur via UpdateTexture (GL-ID
         // bleibt unveraendert bestehen) ist daher moeglich und vermeidet den
         // Unload+Reload-Zyklus komplett.
+        let mip = self.tex_mipmaps.contains(&i);
         let t = &mut self.textures[i];
         let size = t.img.get_pixel_data_size();
         let bytes: &[u8] = unsafe { std::slice::from_raw_parts(t.img.data as *const u8, size) };
         t.tex.update_texture(bytes)
-            .map_err(|e| format!("IMAGE_DRAW: Textur-Update fehlgeschlagen: {:?}", e))
+            .map_err(|e| format!("IMAGE_DRAW: Textur-Update fehlgeschlagen: {:?}", e))?;
+        if mip {
+            use raylib::core::texture::RaylibTexture2D;
+            t.tex.gen_texture_mipmaps();
+        }
+        Ok(())
     }
     pub fn image_draw_line(&mut self, idx: i64, x1: i32, y1: i32, x2: i32, y2: i32, color: i64) -> Result<(), String> {
         let i = idx as usize;
@@ -6243,8 +6386,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // binden, damit die Bindung sicher bis zum Modell-Draw steht.
         let ibl = (self.use_ibl_maps, self.ibl_irradiance, self.ibl_prefilter, self.ibl_brdf);
         // Skybox-Info (Shader-ID + Locs + env-Cubemap), falls aktiv + HDR geladen.
-        let skybox = if self.skybox_enabled && self.ibl_env != 0 {
-            self.skybox_shader.as_ref().map(|s| (s.id, self.skybox_loc_proj, self.skybox_loc_view, self.ibl_env))
+        let sky_env = match &self.skybox_bild { Some(t) => (t.id, 1), None => (self.ibl_env, 0) };
+        let skybox = if self.skybox_enabled && sky_env.0 != 0 {
+            self.skybox_shader.as_ref().map(|s| (s.id, self.skybox_loc_proj, self.skybox_loc_view, sky_env.0,
+                                                 self.skybox_loc_ldr, sky_env.1))
         } else { None };
         // m3d-Kamera-Overrides vor dem (borrowenden) Destructure kopieren (Copy).
         let cam_view = self.cam3d_view;
@@ -6713,7 +6858,7 @@ fn render_scene<D: RaylibDraw>(
     emissive_params: &std::collections::HashMap<usize, (f32, f32, f32, f32)>,
     ibl: (bool, u32, u32, u32),
     render_targets: &[RenderTarget],
-    skybox: Option<(u32, i32, i32, u32)>,   // (shader_id, loc_proj, loc_view, env_cubemap)
+    skybox: Option<(u32, i32, i32, u32, i32, i32)>,   // (shader_id, loc_proj, loc_view, env_cubemap, loc_ldr, ldr)
     cam_view: Option<[f32; 16]>,            // m3d CAMERA3D_VIEW-Override (column-major)
     cam_proj: Option<[f32; 16]>,            // m3d CAMERA3D_PROJECTION-Override
     inst_shader: Option<raylib::ffi::Shader>,   // m3d MODEL_INSTANCED (DrawMeshInstanced)
@@ -6763,13 +6908,18 @@ fn render_scene<D: RaylibDraw>(
                 }
                 // Skybox ganz zuerst (Hintergrund): env-Cubemap in Blickrichtung,
                 // ohne Depth-Write (Modelle zeichnen darueber), Cube von innen.
-                if let Some((sid, lproj, lview, env)) = skybox {
+                if let Some((sid, lproj, lview, env, lldr, ldr)) = skybox {
                     unsafe {
                         let view = raylib::ffi::rlGetMatrixModelview();
                         let proj = raylib::ffi::rlGetMatrixProjection();
                         raylib::ffi::rlDisableBackfaceCulling();
                         raylib::ffi::rlDisableDepthMask();
                         raylib::ffi::rlEnableShader(sid);
+                        if lldr >= 0 {
+                            let v: i32 = ldr;
+                            raylib::ffi::rlSetUniform(lldr, &v as *const i32 as *const std::ffi::c_void,
+                                raylib::ffi::rlShaderUniformDataType::RL_SHADER_UNIFORM_INT as i32, 1);
+                        }
                         raylib::ffi::rlSetUniformMatrix(lproj, proj);
                         raylib::ffi::rlSetUniformMatrix(lview, view);
                         raylib::ffi::rlActiveTextureSlot(0);

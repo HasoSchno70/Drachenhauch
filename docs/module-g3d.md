@@ -66,6 +66,10 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `MESH_KNOT(radius, dicke, rad_seg, seiten)` | INTEGER | Kleeblattknoten |
 | `MESH_PLANE(breite, laenge, res_x, res_z)` | INTEGER | Ebene mit Unterteilung |
 | `MESH_HEIGHTMAP(bild, groesse_x, groesse_y, groesse_z)` | INTEGER | Gelände aus einem Graustufenbild: hell = hoch, `groesse_y` bestimmt wie hoch |
+| `MESH_CONE(radius, hoehe, segmente)` | INTEGER | Kegel, der auf dem Boden steht (y von 0 bis `hoehe`) |
+| `MESH_HEMISPHERE(radius, ringe, segmente)` | INTEGER | obere Hälfte einer Kugel, unten offen — Kuppeln, Hügel |
+| `MESH_POLY(seiten, radius)` | INTEGER | flaches regelmäßiges Vieleck auf dem Boden (3 bis 256 Seiten) |
+| `MESH_CUBICMAP(bild, breite, hoehe, tiefe)` | INTEGER | Labyrinth aus einem Bild: jeder weiße Punkt wird ein Würfel der Größe `breite` x `hoehe` x `tiefe`, jeder schwarze bekommt Boden und eine Decke, die man von innen sieht; andere Farben bleiben leer. Punkt (x, y) liegt bei x·breite, y·tiefe. Mit `MODEL_LIT` und einem Licht, sonst sehen Wände und Gänge gleich aus |
 | `MODEL(modell, x, y, z, skala, farbe)` | — | zeichnen |
 | `MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad, skala, farbe)` | — | zeichnen und um eine Achse drehen |
 | `MODEL_WIRES(modell, x, y, z, skala, farbe)` | — | als Drahtgitter zeichnen |
@@ -107,6 +111,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `LIGHT_ENV(himmel, boden, intensitaet)` | — | Umgebungslicht aus zwei Farben — Metalle spiegeln es |
 | `LIGHT_ENV_HDR(pfad$ [, intensitaet])` | — | echtes Panorama aus einer `.hdr`-Datei statt der Zwei-Farben-Näherung |
 | `SKYBOX(an)` | — | das Panorama auch als Hintergrund zeigen (braucht `LIGHT_ENV_HDR`) |
+| `SKYBOX_IMAGE(bild)` | — | Himmel aus einem gewöhnlichen Bild statt einer `.hdr`-Datei: sechs Felder als Streifen (6:1 oder 1:6) oder als Kreuz (4:3 oder 3:4), Reihenfolge +X, −X, +Y, −Y, +Z, −Z; zeigt ihn gleich an, `SKYBOX(FALSE)` blendet ihn aus |
 | `SHADOW_ENABLE([aufloesung])` | — | Schattenwurf einschalten; das erste gerichtete Licht wirft ihn |
 | `SHADOW_AREA(groesse, dist)` | — | welcher Ausschnitt Schatten bekommt — klein = scharf, groß = deckt mehr ab |
 | `SHADOW_TARGET(x, y, z)` | — | worauf dieser Ausschnitt zentriert ist (meist die Spielfigur) |

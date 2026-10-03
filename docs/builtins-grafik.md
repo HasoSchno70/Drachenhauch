@@ -40,6 +40,8 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `WINDOW_MINIMIZED()` / `WINDOW_MAXIMIZED()` / `WINDOW_HIDDEN()` → BOOLEAN | Zustand des Fensters abfragen |
 | `WINDOW_FOCUS()` | das eigene Fenster nach vorne holen |
 | `WINDOW_DPI_X()` / `WINDOW_DPI_Y()` → FLOAT | Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI) — ohne sie weiß ein Programm nicht, ob seine Pixelgrößen auf dem Zielgerät winzig herauskommen |
+| `WINDOW_RENDER_WIDTH()` / `WINDOW_RENDER_HEIGHT()` → INTEGER | die echte Pixelgröße des Fensters — auf einem HiDPI-Schirm größer als `SCREENWIDTH()`/`SCREENHEIGHT()` |
+| `WINDOW_WAIT_EVENTS(sekunden)` | `FLIP` wartet auf eine Eingabe, höchstens so lange — ein Werkzeug, das nur auf Klicks reagiert, braucht dann kaum Rechenzeit; `0` schaltet ab |
 | `FPS()` → INTEGER | gemessene Bilder je Sekunde |
 | `SETFPS(n)` | Ziel-Bildrate; `0` = so schnell wie möglich |
 | `FILES_DROPPED()` → INTEGER | wie viele Dateien wurden in diesem Bild ins Fenster gezogen oder (macOS) vom Finder übergeben? Gilt genau ein Bild, beliebig oft abfragbar |
@@ -812,6 +814,8 @@ Sampler bliebe schwarz.
 | `MOUSE_DELTA_X()`, `MOUSE_DELTA_Y()` → FLOAT | wie weit sich die Maus seit dem letzten Bild bewegt hat — bei `MOUSE_LOCK` stehen `MOUSEX`/`MOUSEY` still, nur das hier bewegt sich noch |
 | `MOUSEWHEEL_X()`, `MOUSEWHEEL_Y()` → FLOAT | Rad in **beiden** Achsen und als Kommazahl; `MOUSEWHEEL()` kennt nur die senkrechte und rundet — feine Touchpad-Schritte fallen dort auf 0 |
 | `MOUSE_SET_POS(x, y)` | Zeiger an eine Stelle setzen |
+| `MOUSE_OFFSET(x, y)` | Versatz, der auf die Mauslage addiert wird, bevor `MOUSE_SCALE` gilt — wenn das Bild versetzt im Fenster liegt |
+| `MOUSE_SCALE(sx, sy)` | Massstab für die Mauslage: `MOUSEX()` = (roh + Versatz) · sx — wenn ein kleines Bild vergrößert gezeigt wird; 1 = wie vorher |
 | `MOUSE_ON_SCREEN()` → BOOLEAN | ist der Zeiger überhaupt im Fenster? |
 | `MOUSE_CURSOR(form$)` | Zeigerform: `default`, `ibeam`, `crosshair`, `hand`, `resize_ew`, `resize_ns`, `resize_nwse`, `resize_nesw`, `resize_all`, `not_allowed`, dazu `warten`, `arbeitet`, `hilfe` (unter Windows die echten Systemzeiger, die Sanduhr dreht sich), `kopieren`, `stift`, `pipette` und eigene aus `MOUSE_CURSOR_NEW`; bleibt stehen und hat Vorrang vor der gui, `auto` gibt den Zeiger an die gui zurück |
 | `MOUSE_CURSOR_GET$()` | die Zeigerform, die gerade gilt (die des Programms, sonst die der gui, sonst `default`) |

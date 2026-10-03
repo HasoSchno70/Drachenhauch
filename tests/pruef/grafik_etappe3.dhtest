@@ -1,0 +1,223 @@
+' raylib ausgereizt, Etappe 3 (2026-10-03): neue Grundkoerper, Labyrinth
+' aus einem Bild, Himmel aus einem Bild, Mipmaps, Warten auf Eingabe,
+' Pixelgroesse und Maus-Massstab.
+' Nacheinander: das Warten auf Eingabe wacht bei JEDEM Ereignis auf, und
+' parallel erscheinende Fenster der anderen Faelle sind welche.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== grundkoerper und labyrinth an ihren huellquadern
+' Der Kegel steht auf dem Boden (y 0..h), die Halbkugel ist die obere
+' Haelfte (y 0..r, die Kugel reicht von -r bis r), das Vieleck ist flach.
+' Die Karte 4x3 mit hellen Punkten bei (0,0) und (3,2) wird zu zwei
+' Wuerfeln -- je einer genau auf seinem Punkt.
+IMPORT "g3d"
+IMPORT "imgfx"
+FUNCTION q$(m AS INTEGER) AS STRING
+    DIM b AS TUPLE : b = MODEL_BBOX(m)
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO 5
+        r = r + FORMAT$(b[i], "%.2f") + IIF(i < 5, " ", "")
+    NEXT
+    RETURN r
+END FUNCTION
+SCREEN(320, 200, "t")
+DIM kegel AS INTEGER : kegel = MESH_CONE(1, 2, 16)
+PRINT "kegel "; q$(kegel)
+' Ein waagerechter Strahl knapp unter der Spitze (y = 1.8, Abstand 0.5 von
+' der Achse) verfehlt den Kegel -- ein Zylinder haette denselben
+' Huellquader, aber dort Wand. Bei y = 0.2 trifft er.
+PRINT "spitz "; RAY_HIT_MODEL(kegel, -5, 1.8, 0.5, 1, 0, 0, 0, 0, 0) < 0; " breit "; RAY_HIT_MODEL(kegel, -5, 0.2, 0.5, 1, 0, 0, 0, 0, 0) > 0
+PRINT "halbkugel "; q$(MESH_HEMISPHERE(1, 8, 16))
+PRINT "vieleck "; q$(MESH_POLY(6, 1))
+DIM karte AS IMAGE : karte = IMAGE_NEW(4, 3, BLACK)
+IMAGE_FILL_RECT(karte, 0, 0, 0, 0, WHITE)
+IMAGE_FILL_RECT(karte, 3, 2, 3, 2, WHITE)
+PRINT "labyrinth "; q$(MESH_CUBICMAP(karte, 1, 2, 1))
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+kegel -1.00 -0.00 -1.00 1.00 2.00 1.00
+spitz TRUE breit TRUE
+halbkugel -1.00 -0.00 -1.00 1.00 1.00 1.00
+vieleck -0.87 0.00 -1.00 0.87 0.00 1.00
+labyrinth -0.50 0.00 -0.50 3.50 2.00 2.50
+
+=== himmel aus einem bild in allen sechs richtungen
+' Ein Streifen aus sechs Feldern (+X, -X, +Y, -Y, +Z, -Z) in mittleren
+' Farben: in jeder Richtung genau die Farbe des Feldes. Mittlere Toene, weil
+' die Umrechnung linear -> sRGB, die der HDR-Himmel braucht, sie aufhellte.
+IMPORT "g3d"
+IMPORT "imgfx"
+SCREEN(320, 200, "t")
+DIM f AS ARRAY OF INTEGER : f = [&H806040, &H408060, &H604080, &H206020, &H802020, &H202080]
+DIM s AS IMAGE : s = IMAGE_NEW(96, 16)
+DIM k AS INTEGER
+FOR k = 0 TO 5
+    IMAGE_FILL_RECT(s, k * 16, 0, k * 16 + 15, 15, f[k])
+NEXT
+SKYBOX_IMAGE(s)
+DIM ziel AS ARRAY OF FLOAT : ziel = [1, 0, 0, -1, 0, 0, 0, 1, 0.01, 0, -1, 0.01, 0, 0, 1, 0, 0, -1]
+DIM n AS INTEGER
+FOR k = 0 TO 5
+    FOR n = 1 TO 3
+        CLS(BLACK)
+        CAMERA3D(0, 0, 0, ziel[k * 3], ziel[k * 3 + 1], ziel[k * 3 + 2], 60)
+        FLIP()
+    NEXT
+    SAVESCREENSHOT("sky" + STR$(k) + ".png")
+    FLIP()
+    DIM b AS IMAGE : b = LOADIMAGE("sky" + STR$(k) + ".png")
+    PRINT HEX$(GETPIXEL(b, 160, 100)) = HEX$(f[k])
+NEXT
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+
+=== mipmaps lassen ein feines muster in der ferne nicht flimmern
+' Eine fein karierte Ebene (2-Punkt-Felder) bis zum Horizont: ohne Mipmaps
+' sind die fernen Punkte rein schwarz oder weiss (gemessen 3856 von 3856),
+' mit ihnen grau.
+IMPORT "g3d"
+IMPORT "imgfx"
+SCREEN(320, 200, "t")
+FUNCTION schwarzweiss(mip AS BOOLEAN) AS INTEGER
+    DIM t AS IMAGE : t = GENTEX_CHECKED(256, 256, 2, 2, WHITE, BLACK)
+    IF mip THEN PRINT "stufen "; IMAGE_MIPMAPS(t)
+    DIM e AS INTEGER : e = MESH_PLANE(40, 40, 1, 1)
+    MODEL_TEXTURE(e, t)
+    DIM n AS INTEGER
+    FOR n = 1 TO 3
+        CLS(BLACK)
+        CAMERA3D(0, 1, 10, 0, 0, -10, 60)
+        MODEL(e, 0, 0, 0, 1, WHITE)
+        FLIP()
+    NEXT
+    DIM datei AS STRING : datei = IIF(mip, "mit.png", "ohne.png")
+    SAVESCREENSHOT(datei)
+    FLIP()
+    DIM b AS IMAGE : b = LOADIMAGE(datei)
+    DIM x AS INTEGER : DIM y AS INTEGER : DIM r AS INTEGER : r = 0
+    FOR y = 100 TO 115
+        FOR x = 40 TO 280
+            DIM g AS INTEGER : g = GETPIXEL(b, x, y) BAND 255
+            IF g < 40 OR g > 215 THEN r = r + 1
+        NEXT
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT "ohne "; schwarzweiss(FALSE) > 2000
+PRINT "mit "; schwarzweiss(TRUE) < 200
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+ohne TRUE
+stufen 9
+mit TRUE
+
+=== mipmaps bleiben nach dem zeichnen ins bild
+' Ein IMAGE_DRAW_* laedt die Textur neu hoch; die kleineren Stufen werden
+' dabei nachgezogen -- sonst zeigte die Ferne den alten Inhalt. Hier wird
+' das Muster nach IMAGE_MIPMAPS ganz weiss uebermalt: die ferne Ebene muss
+' weiss werden, nicht grau bleiben.
+IMPORT "g3d"
+IMPORT "imgfx"
+SCREEN(320, 200, "t")
+DIM t AS IMAGE : t = GENTEX_CHECKED(256, 256, 2, 2, WHITE, BLACK)
+DIM st AS INTEGER : st = IMAGE_MIPMAPS(t)
+IMAGE_FILL_RECT(t, 0, 0, 255, 255, WHITE)
+DIM e AS INTEGER : e = MESH_PLANE(40, 40, 1, 1)
+MODEL_TEXTURE(e, t)
+DIM n AS INTEGER
+FOR n = 1 TO 3
+    CLS(BLACK)
+    CAMERA3D(0, 1, 10, 0, 0, -10, 60)
+    MODEL(e, 0, 0, 0, 1, WHITE)
+    FLIP()
+NEXT
+SAVESCREENSHOT("w.png")
+FLIP()
+DIM b AS IMAGE : b = LOADIMAGE("w.png")
+PRINT "ferne "; (GETPIXEL(b, 160, 108) BAND 255) > 230
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+ferne TRUE
+
+=== warten auf eingabe macht die bilder langsam, bis es aus ist
+' Ohne Eingabe wartet FLIP bis zu 0,2 s; gemessen im Mittel rund 0,14 s
+' (der Weckfaden laeuft unabhaengig vom Bild). Abgeschaltet wieder ~16 ms.
+SCREEN(320, 200, "t")
+DIM i AS INTEGER
+DIM t0 AS FLOAT
+FOR i = 1 TO 3 : FLIP() : NEXT
+WINDOW_WAIT_EVENTS(0.2)
+FLIP()
+t0 = GET_TIME()
+FOR i = 1 TO 5 : FLIP() : NEXT
+PRINT "mit warten langsam "; (GET_TIME() - t0) / 5.0 > 0.08
+WINDOW_WAIT_EVENTS(0)
+FLIP()
+t0 = GET_TIME()
+FOR i = 1 TO 5 : FLIP() : NEXT
+PRINT "ohne warten schnell "; (GET_TIME() - t0) / 5.0 < 0.06
+--- umgebung
+DHRT_FRAMES=100
+--- erwartet
+mit warten langsam TRUE
+ohne warten schnell TRUE
+
+=== echte pixelgroesse und maus-massstab
+' Die Pixelgroesse ist die logische mal die Bildschirm-Skalierung. Mit
+' MOUSE_OFFSET(-40, 0) und MOUSE_SCALE(0.5, 0.5) wird aus einer Maus bei
+' (200, 100) die (80, 50): (roh + Versatz) * Massstab.
+SCREEN(320, 200, "t")
+PRINT "pixel "; WINDOW_RENDER_WIDTH() = INT(SCREENWIDTH() * WINDOW_DPI_X() + 0.5); " "; WINDOW_RENDER_HEIGHT() = INT(SCREENHEIGHT() * WINDOW_DPI_Y() + 0.5)
+MOUSE_OFFSET(-40, 0)
+MOUSE_SCALE(0.5, 0.5)
+WRITEALL("ev.txt", "c 1" + CHR$(10) + "e 0 7 200 100 0" + CHR$(10) + CHR$(10))
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER
+FOR n = 1 TO 4 : FLIP() : NEXT
+PRINT "maus "; MOUSEX(); " "; MOUSEY()
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+pixel TRUE TRUE
+maus 80 50
+
+=== falsche angaben sind fehler
+FUNCTION probe$(n AS INTEGER) AS STRING
+    TRY
+        SELECT CASE n
+            CASE 1
+                DIM b AS IMAGE : b = IMAGE_NEW(10, 10, RED)
+                SKYBOX_IMAGE(b)
+            CASE 2 : WINDOW_WAIT_EVENTS(-1)
+            CASE 3 : MOUSE_SCALE(0, 1)
+            CASE 4 : DIM m AS INTEGER : m = MESH_CONE(0, 1, 8)
+        END SELECT
+        RETURN "kein fehler"
+    CATCH e
+        RETURN e
+    END TRY
+END FUNCTION
+SCREEN(100, 100, "t")
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    PRINT probe$(i)
+NEXT
+--- umgebung
+DHRT_FRAMES=2
+--- enthaelt
+SKYBOX_IMAGE: ein Bild von 10x10 ist keine Cubemap
+WINDOW_WAIT_EVENTS: die Dauer in Sekunden muss 0 oder groesser sein, nicht -1
+MOUSE_SCALE: der Massstab muss groesser als 0 sein, nicht 0 und 1
+MESH_CONE: 'r' muss eine endliche Zahl > 0 sein

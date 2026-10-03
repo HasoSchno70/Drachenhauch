@@ -9188,6 +9188,28 @@ impl<'p> Vm<'p> {
             "automation_count" => Value::Int(g!().automation_count()),
             "joystick_mappings" => Value::Int(g!().joystick_mappings(gs(a,0,"JOYSTICK_MAPPINGS")?)),
             "window_dpi_x" => Value::Float(g!().window_dpi_x()),
+            "window_render_width" => Value::Int(g!().render_size().0),
+            "window_render_height" => Value::Int(g!().render_size().1),
+            "window_wait_events" => {
+                let s = need_f(a, 0, "WINDOW_WAIT_EVENTS")?;
+                if !s.is_finite() || s < 0.0 {
+                    return Err(format!("WINDOW_WAIT_EVENTS: die Dauer in Sekunden muss 0 oder groesser sein, nicht {}", s));
+                }
+                g!().wait_events(s);
+                Value::Nil
+            }
+            "mouse_offset" => {
+                g!().mouse_offset(gi(a, 0, "MOUSE_OFFSET")? as i32, gi(a, 1, "MOUSE_OFFSET")? as i32);
+                Value::Nil
+            }
+            "mouse_scale" => {
+                let (sx, sy) = (need_f(a, 0, "MOUSE_SCALE")?, need_f(a, 1, "MOUSE_SCALE")?);
+                if !(sx.is_finite() && sy.is_finite()) || sx <= 0.0 || sy <= 0.0 {
+                    return Err(format!("MOUSE_SCALE: der Massstab muss groesser als 0 sein, nicht {} und {}", sx, sy));
+                }
+                g!().mouse_scale(sx as f32, sy as f32);
+                Value::Nil
+            }
             "window_dpi_y" => Value::Float(g!().window_dpi_y()),
             "screenwidth" => Value::Int(self.gfx.as_ref().map(|g| g.screen_width()).unwrap_or(0)),
             "screenheight" => Value::Int(self.gfx.as_ref().map(|g| g.screen_height()).unwrap_or(0)),
@@ -9463,6 +9485,14 @@ impl<'p> Vm<'p> {
                 need_f(a,0,"MESH_KNOT")? as f32, need_f(a,1,"MESH_KNOT")? as f32, gi(a,2,"MESH_KNOT")? as i32, gi(a,3,"MESH_KNOT")? as i32)?),
             "mesh_plane" => Value::Int(g!().mesh_plane(
                 need_f(a,0,"MESH_PLANE")? as f32, need_f(a,1,"MESH_PLANE")? as f32, gi(a,2,"MESH_PLANE")? as i32, gi(a,3,"MESH_PLANE")? as i32)?),
+            "mesh_cone" => Value::Int(g!().mesh_cone(need_f(a,0,"MESH_CONE")? as f32,
+                need_f(a,1,"MESH_CONE")? as f32, gi(a,2,"MESH_CONE")? as i32)?),
+            "mesh_hemisphere" => Value::Int(g!().mesh_hemisphere(need_f(a,0,"MESH_HEMISPHERE")? as f32,
+                gi(a,1,"MESH_HEMISPHERE")? as i32, gi(a,2,"MESH_HEMISPHERE")? as i32)?),
+            "mesh_poly" => Value::Int(g!().mesh_poly(gi(a,0,"MESH_POLY")? as i32, need_f(a,1,"MESH_POLY")? as f32)?),
+            "mesh_cubicmap" => Value::Int(g!().mesh_cubicmap(gi(a,0,"MESH_CUBICMAP")?,
+                need_f(a,1,"MESH_CUBICMAP")? as f32, need_f(a,2,"MESH_CUBICMAP")? as f32,
+                need_f(a,3,"MESH_CUBICMAP")? as f32)?),
             "mesh_heightmap" => Value::Int(g!().mesh_heightmap(
                 gi(a,0,"MESH_HEIGHTMAP")?, need_f(a,1,"MESH_HEIGHTMAP")? as f32, need_f(a,2,"MESH_HEIGHTMAP")? as f32, need_f(a,3,"MESH_HEIGHTMAP")? as f32)?),
             "model" => {
@@ -9788,6 +9818,8 @@ impl<'p> Vm<'p> {
                 g!().light_env_hdr(&path, intensity)?; Value::Nil
             }
             "skybox" => { g!().skybox(gb(a, 0)); Value::Nil }
+            "skybox_image" => { g!().skybox_image(gi(a, 0, "SKYBOX_IMAGE")?)?; Value::Nil }
+            "image_mipmaps" => Value::Int(g!().image_mipmaps(gi(a, 0, "IMAGE_MIPMAPS")?)?),
             "light_directional" => Value::Int(g!().light_add(
                 0, need_f(a,0,"LIGHT_DIRECTIONAL")? as f32, need_f(a,1,"LIGHT_DIRECTIONAL")? as f32,
                 need_f(a,2,"LIGHT_DIRECTIONAL")? as f32, gi(a,3,"LIGHT_DIRECTIONAL")?)),
