@@ -2355,6 +2355,18 @@ impl Graphics {
         };
         self.cam3d.update_camera(m);
     }
+    /// CAMERA3D_MOVE: die 3D-Kamera vom Programm aus bewegen (vor, rechts,
+    /// hoch in Einheiten, auf der Bodenebene) und drehen (gieren nach rechts,
+    /// neigen nach oben, in Grad; steiler als 89 Grad wird nicht geneigt).
+    /// `zoom` aendert den Abstand zum Ziel (positiv = weiter weg). Gilt ab
+    /// der Lage, die CAMERA3D zuletzt gesetzt hat -- wer bewegt, ruft
+    /// CAMERA3D nicht in jedem Bild neu.
+    #[allow(clippy::too_many_arguments)]
+    pub fn camera3d_move(&mut self, vor: f32, rechts: f32, hoch: f32, gieren: f32, neigen: f32, zoom: f32) {
+        // raylib: positives rotation.x dreht nach rechts, positives
+        // rotation.y neigt nach UNTEN (wie die Maus) -- darum das Minus.
+        self.cam3d.update_camera_pro(Vector3::new(vor, rechts, hoch), Vector3::new(gieren, -neigen, 0.0), zoom);
+    }
     pub fn cam3d_pos(&self) -> (f64, f64, f64) {
         (self.cam3d.position.x as f64, self.cam3d.position.y as f64, self.cam3d.position.z as f64)
     }
@@ -2683,6 +2695,35 @@ impl Graphics {
     }
     /// MODEL_BBOX: der Huellquader eines Modells in seinen eigenen
     /// Koordinaten (ohne Lage und Skalierung beim Zeichnen).
+    /// MODEL_SAVE: alle Netze des Modells als Wavefront-OBJ (siehe
+    /// objschreiber.rs) -- ohne Material, Textur und Animation.
+    pub fn model_save(&self, idx: i64, pfad: &str) -> Result<(), String> {
+        let i = self.check_model(idx, "MODEL_SAVE")?;
+        if !pfad.to_lowercase().ends_with(".obj") {
+            return Err(format!("MODEL_SAVE: geschrieben wird Wavefront-OBJ, der Name muss auf .obj enden, nicht '{}'", pfad));
+        }
+        let m: &raylib::ffi::Model = self.models[i].as_ref();
+        let mut netze = Vec::new();
+        for k in 0..m.meshCount.max(0) as usize {
+            let mesh = unsafe { *m.meshes.add(k) };
+            let nv = mesh.vertexCount.max(0) as usize;
+            if mesh.vertices.is_null() || nv == 0 { continue; }
+            let teil = |p: *mut f32, je: usize| -> Option<Vec<f32>> {
+                if p.is_null() { None } else { Some(unsafe { std::slice::from_raw_parts(p, nv * je) }.to_vec()) }
+            };
+            let indizes = if mesh.indices.is_null() { None } else {
+                Some(unsafe { std::slice::from_raw_parts(mesh.indices, mesh.triangleCount.max(0) as usize * 3) }.to_vec())
+            };
+            netze.push(crate::objschreiber::Netz {
+                punkte: teil(mesh.vertices, 3).unwrap_or_default(),
+                uv: teil(mesh.texcoords, 2), normalen: teil(mesh.normals, 3), indizes,
+            });
+        }
+        if netze.is_empty() { return Err("MODEL_SAVE: das Modell hat keine Eckpunkte".into()); }
+        std::fs::write(pfad, crate::objschreiber::obj_text(&netze))
+            .map_err(|e| format!("MODEL_SAVE: '{}': {}", pfad, e))
+    }
+
     pub fn model_bbox(&self, idx: i64) -> Result<[f32; 6], String> {
         use raylib::core::models::RaylibModel;
         let i = self.check_model(idx, "MODEL_BBOX")?;
@@ -4699,6 +4740,105 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         t.img.draw_rectangle(x, y, w.max(0), h.max(0), col(color));
         self.reupload_tex(i)
     }
+    /// Text als eigenes Bild, so gross wie der Text (Grundlage fuer
+    /// IMAGE_TEXT und IMAGE_DRAW_TEXT mit Schrift). Eine SDF-Schrift geht
+    /// nicht: im Bild stuende ihr Abstandsfeld statt der Zeichen.
+    fn text_bild(&self, font: i64, text: &str, size: i32, color: i64, fn_: &str) -> Result<Image, String> {
+        use raylib::ffi;
+        self.font_handle_ok(font, fn_)?;
+        if sdf::ist(font) {
+            return Err(format!("{}: eine SDF-Schrift (LOADFONT_SDF) laesst sich nicht in ein Bild schreiben -- dort waere ihr Abstandsfeld zu sehen; dieselbe Datei mit LOADFONT laden", fn_));
+        }
+        if text.is_empty() { return Err(format!("{}: der Text ist leer", fn_)); }
+        let (f, groesse, abstand) = match self.font_von(font) {
+            Some(f) => (*f.as_ref(), size.max(1) as f32, self.text_spacing),
+            // Wie raylibs ImageText: die eingebaute Schrift mindestens 10
+            // Punkte, Abstand Groesse/10 (ganzzahlig).
+            None => { let g = size.max(10); (unsafe { ffi::GetFontDefault() }, g as f32, (g / 10) as f32) }
+        };
+        let c = std::ffi::CString::new(text).map_err(|_| format!("{}: der Text enthaelt ein Nullzeichen", fn_))?;
+        let roh = unsafe { ffi::ImageTextEx(f, c.as_ptr(), groesse, abstand, col(color).into()) };
+        if roh.data.is_null() || roh.width <= 0 || roh.height <= 0 {
+            if !roh.data.is_null() { unsafe { ffi::UnloadImage(roh) }; }
+            return Err(format!("{}: der Text ergibt kein Bild", fn_));
+        }
+        let mut img = unsafe { Image::from_raw(roh) };
+        img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        Ok(img)
+    }
+
+    /// IMAGE_TEXT: ein neues Bild, genau so gross wie der Text -- fuer
+    /// Schilder, Beschriftungen auf Texturen, Billboards mit Text.
+    pub fn image_text(&mut self, text: &str, size: i32, color: i64, font: i64) -> Result<i64, String> {
+        let img = self.text_bild(font, text, size, color, "IMAGE_TEXT")?;
+        self.push_tex_from_image(img)
+    }
+
+    /// IMAGE_DRAW_TEXT mit Schrift: der Text wird als eigenes Bild gesetzt
+    /// und dann selbst eingemischt (wie IMAGE_DRAW_IMAGE) -- raylibs
+    /// ImageDraw mischt ueber halbdurchsichtigem Grund falsch.
+    #[allow(clippy::too_many_arguments)]
+    pub fn image_draw_text_font(&mut self, idx: i64, x: i32, y: i32, text: &str, size: i32, color: i64, font: i64) -> Result<(), String> {
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_DRAW_TEXT")); }
+        if text.is_empty() { return Ok(()); }
+        let img = self.text_bild(font, text, size, color, "IMAGE_DRAW_TEXT")?;
+        let (sw, sh) = (img.width, img.height);
+        let n = (sw as usize) * (sh as usize) * 4;
+        let bytes: Vec<u8> = unsafe { std::slice::from_raw_parts(img.data as *const u8, n) }.to_vec();
+        self.image_leinwand(idx, "IMAGE_DRAW_TEXT", |l| {
+            l.bild_ueber(&bytes, sw, sh, (0, 0, sw, sh), x, y, [255, 255, 255, 255]);
+        })
+    }
+
+    /// IMAGE_LOAD_GIF: alle Einzelbilder eines GIFs als eigene Bilder (raylib
+    /// setzt sie schon zusammen, auch wenn ein Bild nur einen Teil erneuert).
+    /// Eine Datei, die kein GIF ist, ergibt ein einziges Bild.
+    pub fn image_load_gif(&mut self, pfad: &str) -> Result<Vec<i64>, String> {
+        use raylib::ffi;
+        let resolved = crate::builtins::resolve_asset_path(pfad);
+        let pfad = resolved.as_str();
+        crate::builtins::datei_da(pfad, "IMAGE_LOAD_GIF")?;
+        let c = std::ffi::CString::new(pfad).map_err(|_| "IMAGE_LOAD_GIF: der Pfad enthaelt ein Nullzeichen".to_string())?;
+        let mut n = 0i32;
+        let roh = ohne_warnungen(|| unsafe { ffi::LoadImageAnim(c.as_ptr(), &mut n) });
+        if roh.data.is_null() || roh.width <= 0 || roh.height <= 0 || n < 1 {
+            if !roh.data.is_null() { unsafe { ffi::UnloadImage(roh) }; }
+            return Err(format!("IMAGE_LOAD_GIF: '{}' liess sich nicht als Bild lesen", pfad));
+        }
+        if n == 1 {
+            let mut img = unsafe { Image::from_raw(roh) };
+            img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+            return Ok(vec![self.push_tex_from_image(img)?]);
+        }
+        // Mehrere Bilder liegen in RGBA8 hintereinander in EINEM Speicher.
+        let (w, h) = (roh.width, roh.height);
+        let groesse = (w as usize) * (h as usize) * 4;
+        let alles: Vec<u8> = unsafe { std::slice::from_raw_parts(roh.data as *const u8, groesse * n as usize) }.to_vec();
+        unsafe { ffi::UnloadImage(roh) };
+        let mut handles = Vec::with_capacity(n as usize);
+        for k in 0..n as usize {
+            let img = Image::gen_image_color(w, h, Color::new(0, 0, 0, 0));
+            unsafe { std::ptr::copy_nonoverlapping(alles[k * groesse..].as_ptr(), img.data as *mut u8, groesse); }
+            handles.push(self.push_tex_from_image(img)?);
+        }
+        Ok(handles)
+    }
+
+    /// IMAGE_CHANNEL: ein Kanal (0 rot, 1 gruen, 2 blau, 3 Deckkraft) als
+    /// Graustufenbild -- etwa die Deckkraft als Maske sehen und bearbeiten.
+    pub fn image_channel(&mut self, idx: i64, kanal: i64) -> Result<i64, String> {
+        if !(0..=3).contains(&kanal) {
+            return Err(format!("IMAGE_CHANNEL: der Kanal ist 0 (rot), 1 (gruen), 2 (blau) oder 3 (Deckkraft), nicht {}", kanal));
+        }
+        let mut src = self.src_image(idx, "IMAGE_CHANNEL")?;
+        src.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        let roh = unsafe { raylib::ffi::ImageFromChannel(*src.as_ref(), kanal as i32) };
+        if roh.data.is_null() { return Err("IMAGE_CHANNEL: raylib hat kein Bild geliefert".into()); }
+        let mut img = unsafe { Image::from_raw(roh) };
+        img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        self.push_tex_from_image(img)
+    }
+
     pub fn image_draw_text(&mut self, idx: i64, x: i32, y: i32, text: &str, size: i32, color: i64) -> Result<(), String> {
         let i = idx as usize;
         if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_DRAW_TEXT")); }
@@ -6230,6 +6370,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn monitor_width(&self, i: i64) -> i64 { get_monitor_width(i as i32) as i64 }
     /// Native Hoehe des Monitors `i` in Pixeln.
     pub fn monitor_height(&self, i: i64) -> i64 { get_monitor_height(i as i32) as i64 }
+    /// Breite und Hoehe des Monitors `i` in Millimetern, wie er sie meldet
+    /// (0, wenn er es nicht tut).
+    pub fn monitor_mm(&self, i: i64) -> (i64, i64) {
+        unsafe { (raylib::ffi::GetMonitorPhysicalWidth(i as i32) as i64, raylib::ffi::GetMonitorPhysicalHeight(i as i32) as i64) }
+    }
     /// Bildwiederholrate (Hz) des Monitors `i`.
     pub fn monitor_refresh(&self, i: i64) -> i64 { get_monitor_refresh_rate(i as i32) as i64 }
     /// Anzeigename des Monitors `i` (leer, wenn nicht ermittelbar).

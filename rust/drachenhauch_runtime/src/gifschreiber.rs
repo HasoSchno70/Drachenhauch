@@ -164,9 +164,40 @@ pub fn schreiben(pfad: &str, bilder: &[Bild], verzoegerungen: &[u16],
     Ok(())
 }
 
+/// Die Dauer jedes Einzelbilds eines GIFs in Millisekunden (IMAGE_GIF_DELAYS)
+/// -- das Gegenstueck zum Feld, das `schreiben` nimmt. raylib liest die
+/// Bilder (`LoadImageAnim`), wirft die Zeiten aber weg; ohne sie liefe eine
+/// gelesene Animation im falschen Takt.
+pub fn dauern(daten: &[u8]) -> Result<Vec<i64>, String> {
+    let mut opt = gif::DecodeOptions::new();
+    opt.set_color_output(gif::ColorOutput::Indexed);
+    let mut leser = opt.read_info(daten).map_err(|e| std::format!("kein lesbares GIF ({})", e))?;
+    let mut v = Vec::new();
+    while let Some(bild) = leser.read_next_frame().map_err(|e| std::format!("GIF beschaedigt ({})", e))? {
+        v.push(bild.delay as i64 * 10);
+    }
+    Ok(v)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dauern_kommen_so_zurueck_wie_geschrieben() {
+        let pfad = std::env::temp_dir().join(std::format!("dh_gifdauer_{}.gif", std::process::id()));
+        let p = pfad.to_string_lossy().to_string();
+        let bild = |c: u8| Bild { breite: 2, hoehe: 1, rgba: vec![c, 0, 0, 255, 0, c, 0, 255] };
+        schreiben(&p, &[bild(200), bild(100), bild(50)], &[10, 30, 7], false).unwrap();
+        let d = dauern(&std::fs::read(&p).unwrap()).unwrap();
+        let _ = std::fs::remove_file(&p);
+        assert_eq!(d, vec![100, 300, 70]);
+    }
+
+    #[test]
+    fn kein_gif_ist_ein_fehler() {
+        assert!(dauern(b"\x89PNG\r\n").is_err());
+    }
 
     fn rgba(punkte: &[[u8; 4]]) -> Vec<u8> {
         punkte.iter().flat_map(|p| p.iter().copied()).collect()

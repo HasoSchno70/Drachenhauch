@@ -43,6 +43,8 @@ mod xlsx;
 mod gifschreiber;
 #[allow(dead_code)]
 mod leinwand;
+#[allow(dead_code)]
+mod objschreiber;
 mod schnitt;
 mod geld;
 mod httpd;

@@ -9382,6 +9382,8 @@ impl<'p> Vm<'p> {
             "current_monitor" => Value::Int(g!().current_monitor()),
             "monitor_width" => Value::Int(g!().monitor_width(gi(a, 0, "MONITOR_WIDTH")?)),
             "monitor_height" => Value::Int(g!().monitor_height(gi(a, 0, "MONITOR_HEIGHT")?)),
+            "monitor_physical_width" => Value::Int(g!().monitor_mm(gi(a, 0, "MONITOR_PHYSICAL_WIDTH")?).0),
+            "monitor_physical_height" => Value::Int(g!().monitor_mm(gi(a, 0, "MONITOR_PHYSICAL_HEIGHT")?).1),
             "monitor_refresh" => Value::Int(g!().monitor_refresh(gi(a, 0, "MONITOR_REFRESH")?)),
             "monitor_name" => { let s = g!().monitor_name(gi(a, 0, "MONITOR_NAME")?); Value::str_rc(&s) }
             "monitor_x" => Value::Int(g!().monitor_x(gi(a, 0, "MONITOR_X")?)),
@@ -9827,6 +9829,18 @@ impl<'p> Vm<'p> {
 
             // --- Kamera-Modi (raylib UpdateCamera) ---
             "camera3d_update" => { g!().camera3d_update(gi(a,0,"CAMERA3D_UPDATE")?); Value::Nil }
+            "camera3d_move" => {
+                if a.len() != 5 && a.len() != 6 { return Err("CAMERA3D_MOVE: erwartet (vor, rechts, hoch, gieren, neigen[, zoom])".into()); }
+                let mut v = [0f32; 6];
+                for (i, w) in v.iter_mut().enumerate().take(a.len()) {
+                    let x = need_f(a, i, "CAMERA3D_MOVE")?;
+                    if !x.is_finite() { return Err(format!("CAMERA3D_MOVE: Argument {} muss eine endliche Zahl sein, nicht {}", i + 1, x)); }
+                    *w = x as f32;
+                }
+                g!().camera3d_move(v[0], v[1], v[2], v[3], v[4], v[5]);
+                Value::Nil
+            }
+            "model_save" => { g!().model_save(gi(a,0,"MODEL_SAVE")?, gs(a,1,"MODEL_SAVE")?)?; Value::Nil }
             // m3d: View-/Projektions-Matrix-Override (Ortho, Custom-Frustum, Gizmos).
             // CAMERA3D(...) setzt beide zurueck auf Standard-Perspektive.
             "camera3d_view" => {
@@ -11023,10 +11037,29 @@ wie viele Plaetze gelten", i + 1)),
                 g!().image_leinwand(gi(a,0,F)?, F, |l| l.verlauf(x0, y0, x1, y1, c1, c2, senkrecht))?; Value::Nil
             }
             "image_draw_text" => {
+                if a.len() != 6 && a.len() != 7 { return Err("IMAGE_DRAW_TEXT: erwartet (bild, x, y, text$, groesse, farbe[, font])".into()); }
                 let txt = gs(a,3,"IMAGE_DRAW_TEXT")?.to_string();
-                g!().image_draw_text(gi(a,0,"IMAGE_DRAW_TEXT")?, gi(a,1,"IMAGE_DRAW_TEXT")? as i32, gi(a,2,"IMAGE_DRAW_TEXT")? as i32, &txt, gi(a,4,"IMAGE_DRAW_TEXT")? as i32, gi(a,5,"IMAGE_DRAW_TEXT")?)?;
+                let (b, x, y) = (gi(a,0,"IMAGE_DRAW_TEXT")?, gi(a,1,"IMAGE_DRAW_TEXT")? as i32, gi(a,2,"IMAGE_DRAW_TEXT")? as i32);
+                let (sz, c) = (gi(a,4,"IMAGE_DRAW_TEXT")? as i32, gi(a,5,"IMAGE_DRAW_TEXT")?);
+                // Ohne Schrift der alte Weg, damit bestehende Bilder gleich bleiben.
+                if a.len() == 7 { g!().image_draw_text_font(b, x, y, &txt, sz, c, gi(a,6,"IMAGE_DRAW_TEXT")?)?; }
+                else { g!().image_draw_text(b, x, y, &txt, sz, c)?; }
                 Value::Nil
             }
+            "image_text" => {
+                if a.len() != 3 && a.len() != 4 { return Err("IMAGE_TEXT: erwartet (text$, groesse, farbe[, font])".into()); }
+                let txt = gs(a,0,"IMAGE_TEXT")?.to_string();
+                let font = if a.len() == 4 { gi(a,3,"IMAGE_TEXT")? } else { -1 };
+                Value::Int(g!().image_text(&txt, gi(a,1,"IMAGE_TEXT")? as i32, gi(a,2,"IMAGE_TEXT")?, font)?)
+            }
+            "image_load_gif" => {
+                let handles = g!().image_load_gif(gs(a,0,"IMAGE_LOAD_GIF")?)?;
+                let n = handles.len() as i64;
+                let mut arr = DhArray::new("image".to_string(), vec![n], || Value::Int(0));
+                for (i, h) in handles.into_iter().enumerate() { arr.cells.set(i, Value::Int(h)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "image_channel" => Value::Int(g!().image_channel(gi(a,0,"IMAGE_CHANNEL")?, gi(a,1,"IMAGE_CHANNEL")?)?),
 
             // --- Modul: ui (Immediate-Mode) ---
             "ui_label" => {
