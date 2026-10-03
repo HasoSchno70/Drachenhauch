@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2076,
+ "count": 2086,
  "builtins": [
   {
    "name": "ABS",
@@ -6275,7 +6275,7 @@
   {
    "name": "IMAGE_DRAW_TEXT",
    "kind": "core",
-   "signature": "IMAGE_DRAW_TEXT(img, x, y, text$, size, color)",
+   "signature": "IMAGE_DRAW_TEXT(img, x, y, text$, size, color[, font])",
    "module": "imgfx"
   },
   {
@@ -12457,6 +12457,66 @@
    "kind": "core",
    "signature": "NOSPACES$(s$)",
    "module": "core"
+  },
+  {
+   "name": "IMAGE_TEXT",
+   "kind": "graphics",
+   "signature": "IMAGE_TEXT(text$, groesse, farbe[, font]) AS IMAGE",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_LOAD_GIF",
+   "kind": "graphics",
+   "signature": "IMAGE_LOAD_GIF(pfad$) -> ARRAY OF IMAGE",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_GIF_DELAYS",
+   "kind": "core",
+   "signature": "IMAGE_GIF_DELAYS(pfad$) -> ARRAY OF INTEGER",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_CHANNEL",
+   "kind": "graphics",
+   "signature": "IMAGE_CHANNEL(bild, kanal) AS IMAGE",
+   "module": "imgfx"
+  },
+  {
+   "name": "MODEL_SAVE",
+   "kind": "graphics",
+   "signature": "MODEL_SAVE(modell, pfad$)",
+   "module": "g3d"
+  },
+  {
+   "name": "CAMERA3D_MOVE",
+   "kind": "graphics",
+   "signature": "CAMERA3D_MOVE(vor, rechts, hoch, gieren, neigen[, zoom])",
+   "module": "g3d"
+  },
+  {
+   "name": "MONITOR_PHYSICAL_WIDTH",
+   "kind": "graphics",
+   "signature": "MONITOR_PHYSICAL_WIDTH(i: INTEGER) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "MONITOR_PHYSICAL_HEIGHT",
+   "kind": "graphics",
+   "signature": "MONITOR_PHYSICAL_HEIGHT(i: INTEGER) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "CURVE_BSPLINE",
+   "kind": "core",
+   "signature": "CURVE_BSPLINE(t, p0, p1, p2, p3)",
+   "module": "curves"
+  },
+  {
+   "name": "CURVE_BSPLINE2",
+   "kind": "core",
+   "signature": "CURVE_BSPLINE2(t, x0, y0, x1, y1, x2, y2, x3, y3)",
+   "module": "curves"
   }
  ]
 }

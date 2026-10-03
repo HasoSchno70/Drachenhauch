@@ -24,6 +24,7 @@ Für die Mathematik dahinter (Vektoren, Quaternionen, Matrizen) gibt es das Modu
 |---|---|---|
 | `CAMERA3D(px, py, pz, tx, ty, tz, fovy)` | — | Kamera setzen: Standort, Blickziel, Öffnungswinkel in Grad (üblich 45). Oben ist +Y |
 | `CAMERA3D_UPDATE(modus)` | — | raylib die Kamera bewegen lassen: `1` frei, `2` umkreisend, `3` Ego, `4` Verfolger — liest selbst Maus und WASD |
+| `CAMERA3D_MOVE(vor, rechts, hoch, gieren, neigen[, zoom])` | — | die Kamera vom Programm aus bewegen (in Einheiten, vor/rechts auf der Bodenebene) und drehen (Grad: gieren nach rechts, neigen nach oben, höchstens 89 Grad); `zoom` ändert den Abstand zum Ziel (positiv = weiter weg). Für eigene Tastenbelegung, Gamepad oder Kamerafahrten; gilt ab der Lage, die `CAMERA3D` zuletzt gesetzt hat — `CAMERA3D` also nicht in jedem Bild neu aufrufen |
 | `CAMERA3D_X()` / `CAMERA3D_Y()` / `CAMERA3D_Z()` | FLOAT | wo steht die Kamera gerade? |
 | `CAMERA3D_TARGET_X()` / `CAMERA3D_TARGET_Y()` / `CAMERA3D_TARGET_Z()` | FLOAT | worauf blickt sie? |
 
@@ -74,6 +75,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad, skala, farbe)` | — | zeichnen und um eine Achse drehen |
 | `MODEL_WIRES(modell, x, y, z, skala, farbe)` | — | als Drahtgitter zeichnen |
 | `MODEL_BBOX(modell)` | TUPLE | Hüllquader `(min_x, min_y, min_z, max_x, max_y, max_z)` in den eigenen Koordinaten des Modells (ohne Lage und Skala beim Zeichnen) — für Kollisionen und um ein Modell auf den Boden zu stellen |
+| `MODEL_SAVE(modell, pfad$)` | — | alle Teile des Modells als Wavefront-OBJ schreiben (`.obj`) — ein Labyrinth aus `MESH_CUBICMAP` oder ein Gelände in Blender weiterbearbeiten, mit `LOADMODEL` zurückholen. Ohne Material, Textur und Animation; die Texturkoordinaten werden so geschrieben, dass sie nach `LOADMODEL` wieder richtig herum stehen |
 | `MODEL_TEXTURE(modell, bild)` | — | ein Bild als Oberfläche auflegen |
 | `MODEL_TEXTURE_NORMAL(modell, bild)` | — | Normal-Map für Oberflächenstruktur (wirkt nur mit `MODEL_LIT`) |
 

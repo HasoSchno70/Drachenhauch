@@ -203,7 +203,7 @@ module.exports = (H) => [
       'PRINT RED(GETPIXEL(canvas, 2, 2)); " "; GREEN(GETPIXEL(canvas, 2, 2)); " "; BLUE(GETPIXEL(canvas, 2, 2))',
     ],
     { out: ["255 255 0", "255 0 0", "0 0 255"] }),
-  H.cmd("IMAGE_DRAW_TEXT", 'IMAGE_DRAW_TEXT(img, x, y, text$, groesse, farbe)',
+  H.cmd("IMAGE_DRAW_TEXT", 'IMAGE_DRAW_TEXT(img, x, y, text$, groesse, farbe[, font])',
     "Schreibt Text direkt in die Pixel des Bildes – etwa um eine Beschriftung fest in ein generiertes Icon oder eine Karte einzubrennen.",
     [
       'IMPORT "imgfx"',
