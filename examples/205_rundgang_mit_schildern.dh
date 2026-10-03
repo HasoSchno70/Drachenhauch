@@ -1,0 +1,108 @@
+' 205_rundgang_mit_schildern.dh -- ein kleiner Rundgang in 3D mit eigener
+' Steuerung: W/S vor und zurueck, A/D seitwaerts, Pfeile drehen und neigen
+' (CAMERA3D_MOVE statt CAMERA3D_UPDATE -- die Belegung bestimmt das
+' Programm). Die Schilder sind Bilder, die das Programm mit einer Schrift
+' beschreibt (IMAGE_TEXT, IMAGE_DRAW_TEXT). Das flackernde Feuer ist ein
+' bewegtes GIF, das das Programm beim Start schreibt und wieder liest --
+' mit der Dauer jedes Einzelbilds (IMAGE_LOAD_GIF, IMAGE_GIF_DELAYS).
+' Taste O sichert die Mauern als rundgang.obj (MODEL_SAVE).
+
+IMPORT "g3d"
+IMPORT "imgfx"
+
+SCREEN(900, 540, "Rundgang mit Schildern", 1)
+SETFPS(60)
+DIM schrift AS INTEGER : schrift = LOADFONT("assets/roboto_medium.ttf", 32)
+
+' Die Mauern: ein kleiner Hof aus einer Karte.
+DIM plan AS ARRAY OF STRING
+plan = ["#########", "#.......#", "#.##.##.#", "#.......#", "#.##.##.#", "#.......#", "####.####"]
+DIM karte AS IMAGE : karte = IMAGE_NEW(LEN(plan[0]), LEN(plan), BLACK)
+DIM x AS INTEGER
+DIM z AS INTEGER
+FOR z = 0 TO LEN(plan) - 1
+    FOR x = 0 TO LEN(plan[0]) - 1
+        IF MID$(plan[z], x, 1) = "#" THEN IMAGE_FILL_RECT(karte, x, z, x, z, WHITE)
+    NEXT
+NEXT
+DIM mauern AS INTEGER : mauern = MESH_CUBICMAP(karte, 1, 1.6, 1)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.4)
+DIM sonne AS INTEGER : sonne = LIGHT_DIRECTIONAL(-0.3, -1.0, -0.5, &HFFF0D8)
+MODEL_LIT(mauern)
+
+' Schilder: ein Holzbrett mit eingebranntem Text.
+FUNCTION schild(text AS STRING) AS IMAGE
+    DIM t AS IMAGE : t = IMAGE_TEXT(text, 32, RGB(250, 240, 210), schrift)
+    DIM b AS IMAGE : b = IMAGE_NEW(IMAGEWIDTH(t) + 24, IMAGEHEIGHT(t) + 16, RGB(120, 80, 40))
+    IMAGE_FRAME(b, 0, 0, IMAGEWIDTH(b) - 1, IMAGEHEIGHT(b) - 1, 3, RGB(70, 45, 20))
+    IMAGE_DRAW_IMAGE(b, t, 12, 8)
+    RETURN b
+END FUNCTION
+DIM schilder[3] AS IMAGE
+schilder[0] = schild("Eingang")
+schilder[1] = schild("Feuerstelle")
+schilder[2] = schild("Werkstatt")
+' Ein Schild mit IMAGE_DRAW_TEXT: der Text kommt in ein vorhandenes Bild.
+IMAGE_DRAW_TEXT(schilder[2], 12, IMAGEHEIGHT(schilder[2]) - 14, "offen", 12, RGB(140, 230, 140), schrift)
+
+' Das Feuer: sechs Einzelbilder mit unterschiedlicher Dauer als GIF
+' schreiben und wieder lesen.
+DIM flammen[6] AS IMAGE
+DIM dauer AS ARRAY OF INTEGER : dauer = [90, 60, 120, 70, 100, 80]
+DIM k AS INTEGER
+FOR k = 0 TO 5
+    flammen[k] = IMAGE_NEW(32, 48)
+    DIM hoch AS INTEGER : hoch = 30 + (k * 7) MOD 14
+    IMAGE_FILL_ELLIPSE(flammen[k], 16, 46 - hoch / 2, 11, hoch / 2, RGB(230, 90, 20))
+    IMAGE_FILL_ELLIPSE(flammen[k], 16 + (k MOD 3) - 1, 46 - hoch / 3, 6, hoch / 3, RGB(255, 210, 60))
+NEXT
+DIM gif AS STRING : gif = TEMPFILE$("feuer", ".gif")
+IMAGE_SAVE_GIF(flammen, gif, dauer)
+DIM feuer AS ARRAY OF IMAGE : feuer = IMAGE_LOAD_GIF(gif)
+DIM feuer_ms AS ARRAY OF INTEGER : feuer_ms = IMAGE_GIF_DELAYS(gif)
+DELETEFILE(gif)
+DIM bild AS INTEGER : bild = 0
+DIM uhr AS FLOAT : uhr = 0.0
+
+CAMERA3D(4, 0.8, 7.8, 4, 0.8, 3, 60)
+DIM meldung AS STRING : meldung = "W/S/A/D gehen, Pfeile drehen und neigen, O sichert die Mauern"
+WHILE NOT QUITREQUESTED()
+    DIM dt AS FLOAT : dt = DELTA()
+    DIM vor AS FLOAT : vor = 0.0
+    DIM seit AS FLOAT : seit = 0.0
+    IF KEYPRESSED(KEY_W) THEN vor = vor + 2.5 * dt
+    IF KEYPRESSED(KEY_S) THEN vor = vor - 2.5 * dt
+    IF KEYPRESSED(KEY_D) THEN seit = seit + 2.5 * dt
+    IF KEYPRESSED(KEY_A) THEN seit = seit - 2.5 * dt
+    DIM gieren AS FLOAT : gieren = 0.0
+    DIM neigen AS FLOAT : neigen = 0.0
+    IF KEYPRESSED(KEY_RIGHT) THEN gieren = 90.0 * dt
+    IF KEYPRESSED(KEY_LEFT) THEN gieren = -90.0 * dt
+    IF KEYPRESSED(KEY_UP) THEN neigen = 60.0 * dt
+    IF KEYPRESSED(KEY_DOWN) THEN neigen = -60.0 * dt
+    CAMERA3D_MOVE(vor, seit, 0, gieren, neigen)
+    IF KEYHIT(KEY_O) THEN
+        MODEL_SAVE(mauern, "rundgang.obj")
+        meldung = "rundgang.obj geschrieben"
+    END IF
+
+    ' Das Feuer laeuft im Takt seiner Einzelbilder.
+    uhr = uhr + dt * 1000.0
+    WHILE uhr >= feuer_ms[bild]
+        uhr = uhr - feuer_ms[bild]
+        bild = (bild + 1) MOD LEN(feuer)
+    WEND
+
+    CLS(RGB(30, 34, 48))
+    GRID3D(20, 1)
+    MODEL(mauern, 0, 0, 0, 1.0, RGB(170, 150, 130))
+    ' Die Schilder haengen unter der Decke (der Hof ist 1.6 hoch). Die
+    ' Groesse ist bei BILLBOARD die HOEHE, die Breite folgt dem Bild.
+    BILLBOARD(schilder[0], 4, 1.3, 5.6, 0.22, WHITE)
+    BILLBOARD(schilder[1], 4, 1.2, 3.4, 0.22, WHITE)
+    BILLBOARD(schilder[2], 1, 1.2, 1, 0.25, WHITE)
+    BILLBOARD(feuer[bild], 4, 0.45, 3, 0.9, WHITE)
+    TEXT(16, 16, meldung, WHITE)
+    FLIP()
+WEND

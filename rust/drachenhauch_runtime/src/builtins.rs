@@ -977,6 +977,8 @@ fn builtin_signature(name: &str) -> Option<&'static str> {
         "curve_bezier"       => "CURVE_BEZIER(t, p0, p1, p2, p3)",
         "curve_bezier2"      => "CURVE_BEZIER2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
         "curve_catmull"      => "CURVE_CATMULL(t, p0, p1, p2, p3)",
+        "curve_bspline"      => "CURVE_BSPLINE(t, p0, p1, p2, p3)",
+        "curve_bspline2"     => "CURVE_BSPLINE2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
         "curve_catmull2"     => "CURVE_CATMULL2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
         "curve_hermite"      => "CURVE_HERMITE(t, p0, p1, m0, m1)",
         "numfmt$" | "numfmt" => "NUMFMT$(zahl[, nachkommastellen])",
@@ -2375,6 +2377,26 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let x = catmull_1d(t, need_num(&a[1], "CURVE_CATMULL2")?, need_num(&a[3], "CURVE_CATMULL2")?, need_num(&a[5], "CURVE_CATMULL2")?, need_num(&a[7], "CURVE_CATMULL2")?);
             let y = catmull_1d(t, need_num(&a[2], "CURVE_CATMULL2")?, need_num(&a[4], "CURVE_CATMULL2")?, need_num(&a[6], "CURVE_CATMULL2")?, need_num(&a[8], "CURVE_CATMULL2")?);
             Ok(Value::Tuple(Rc::new(vec![Value::Float(x), Value::Float(y)])))
+        }
+        "curve_bspline" => {
+            arity!(5);
+            Ok(Value::Float(bspline_1d(need_num(&a[0], "CURVE_BSPLINE")?, need_num(&a[1], "CURVE_BSPLINE")?, need_num(&a[2], "CURVE_BSPLINE")?, need_num(&a[3], "CURVE_BSPLINE")?, need_num(&a[4], "CURVE_BSPLINE")?)))
+        }
+        "curve_bspline2" => {
+            arity!(9); let t = need_num(&a[0], "CURVE_BSPLINE2")?;
+            let x = bspline_1d(t, need_num(&a[1], "CURVE_BSPLINE2")?, need_num(&a[3], "CURVE_BSPLINE2")?, need_num(&a[5], "CURVE_BSPLINE2")?, need_num(&a[7], "CURVE_BSPLINE2")?);
+            let y = bspline_1d(t, need_num(&a[2], "CURVE_BSPLINE2")?, need_num(&a[4], "CURVE_BSPLINE2")?, need_num(&a[6], "CURVE_BSPLINE2")?, need_num(&a[8], "CURVE_BSPLINE2")?);
+            Ok(Value::Tuple(Rc::new(vec![Value::Float(x), Value::Float(y)])))
+        }
+        "image_gif_delays" => {
+            // IMAGE_GIF_DELAYS(pfad$) -> Dauer je Einzelbild in ms, in der
+            // Reihenfolge, in der IMAGE_LOAD_GIF die Bilder liefert.
+            arity!(1);
+            let pfad = resolve_asset_path(need_str(&a[0], "IMAGE_GIF_DELAYS")?);
+            datei_da(&pfad, "IMAGE_GIF_DELAYS")?;
+            let daten = std::fs::read(&pfad).map_err(|e| format!("IMAGE_GIF_DELAYS: '{}': {}", pfad, e))?;
+            let d = crate::gifschreiber::dauern(&daten).map_err(|e| format!("IMAGE_GIF_DELAYS: '{}' ist {}", pfad, e))?;
+            Ok(new_int_array(d))
         }
         "curve_hermite" => {
             arity!(5); let t = need_num(&a[0], "CURVE_HERMITE")?; let p0 = need_num(&a[1], "CURVE_HERMITE")?; let p1 = need_num(&a[2], "CURVE_HERMITE")?; let m0 = need_num(&a[3], "CURVE_HERMITE")?; let m1 = need_num(&a[4], "CURVE_HERMITE")?;
@@ -6214,6 +6236,14 @@ fn nums(a: &[Value], fn_: &str) -> Result<Vec<f64>, String> {
 fn bezier_1d(t: f64, p0: f64, p1: f64, p2: f64, p3: f64) -> f64 {
     let u = 1.0 - t;
     u * u * u * p0 + 3.0 * u * u * t * p1 + 3.0 * u * t * t * p2 + t * t * t * p3
+}
+
+/// Gleichmaessiger kubischer B-Spline: laeuft NICHT durch die Punkte, sondern
+/// glatt an ihnen vorbei (wie SPLINE_BASIS, dieselbe Formel wie raylibs
+/// GetSplinePointBasis).
+fn bspline_1d(t: f64, p0: f64, p1: f64, p2: f64, p3: f64) -> f64 {
+    let t2 = t * t; let t3 = t2 * t;
+    ((1.0 - t).powi(3) * p0 + (3.0 * t3 - 6.0 * t2 + 4.0) * p1 + (-3.0 * t3 + 3.0 * t2 + 3.0 * t + 1.0) * p2 + t3 * p3) / 6.0
 }
 
 fn catmull_1d(t: f64, p0: f64, p1: f64, p2: f64, p3: f64) -> f64 {

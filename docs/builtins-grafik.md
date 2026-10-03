@@ -106,6 +106,7 @@ Display-Infos und das Platzieren des Programmfensters auf dem Desktop. Monitor-I
 | `MONITOR_COUNT()` → INTEGER | Anzahl angeschlossener Monitore |
 | `CURRENT_MONITOR()` → INTEGER | Index des Monitors, auf dem das Fenster gerade überwiegend liegt |
 | `MONITOR_WIDTH(i)` → INTEGER | native Breite von Monitor `i` (px) |
+| `MONITOR_PHYSICAL_WIDTH(i)` / `MONITOR_PHYSICAL_HEIGHT(i)` → INTEGER | Größe von Monitor `i` in Millimetern, wie er sie meldet (0, wenn nicht) — mit `MONITOR_WIDTH` die echte Punktdichte |
 | `MONITOR_HEIGHT(i)` → INTEGER | native Höhe von Monitor `i` (px) |
 | `MONITOR_REFRESH(i)` → INTEGER | Bildwiederholrate von Monitor `i` (Hz) |
 | `MONITOR_NAME(i)` → STRING | Anzeigename von Monitor `i` |

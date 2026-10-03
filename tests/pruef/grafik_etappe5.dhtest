@@ -1,0 +1,234 @@
+' raylib ausgereizt, Etappe 5 (2026-10-03): Text mit Schrift in Bilder,
+' bewegte GIFs lesen, Modelle als OBJ speichern, die 3D-Kamera vom Programm
+' aus bewegen, dazu Farbkanal, Bildschirm in Millimetern, B-Spline-Punkte.
+' Die Schriftdatei kommt aus circuitrunner/assets (versioniert).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== text mit schrift als bild und ins bild
+' Das Bild ist so breit, wie TEXT_WIDTH den Text misst. Ins Bild wird er
+' selbst eingemischt, Punkt fuer Punkt wie IMAGE_DRAW_IMAGE -- raylibs
+' eigenes Mischen rechnet ueber halbdurchsichtigem Grund an den Raendern
+' der Zeichen andere Farben.
+IMPORT "imgfx"
+DIM pfad AS STRING : pfad = ARG$(0)
+SCREEN(200, 100, "t")
+DIM f AS INTEGER : f = LOADFONT(pfad, 24)
+DIM b AS IMAGE : b = IMAGE_TEXT("Hallo", 24, RED, f)
+SETFONT(f) : TEXT_SIZE(24)
+PRINT "breite "; IMAGEWIDTH(b) = TEXT_WIDTH("Hallo"); " hoehe "; IMAGEHEIGHT(b)
+DIM x AS INTEGER : DIM y AS INTEGER : DIM rot AS INTEGER : DIM leer AS INTEGER : rot = 0 : leer = 0
+FOR y = 0 TO IMAGEHEIGHT(b) - 1
+    FOR x = 0 TO IMAGEWIDTH(b) - 1
+        IF GETALPHA(b, x, y) = 0 THEN leer = leer + 1
+        IF GETALPHA(b, x, y) = 255 AND GETPIXEL(b, x, y) = &HFF0000 THEN rot = rot + 1
+    NEXT
+NEXT
+PRINT "rot "; rot > 40; " durchsichtig "; leer > 300
+DIM grund AS INTEGER : grund = RGBA(0, 0, 255, 128)
+DIM c AS IMAGE : c = IMAGE_NEW(100, 40, grund)
+IMAGE_DRAW_TEXT(c, 5, 5, "Ab", 24, RGB(255, 128, 0), f)
+DIM c2 AS IMAGE : c2 = IMAGE_NEW(100, 40, grund)
+IMAGE_DRAW_IMAGE(c2, IMAGE_TEXT("Ab", 24, RGB(255, 128, 0), f), 5, 5)
+DIM orange AS INTEGER : DIM anders AS INTEGER : DIM rand AS INTEGER : orange = 0 : anders = 0 : rand = 0
+FOR y = 0 TO 39
+    FOR x = 0 TO 99
+        DIM p AS INTEGER : p = GETPIXEL(c, x, y)
+        IF p <> GETPIXEL(c2, x, y) OR GETALPHA(c, x, y) <> GETALPHA(c2, x, y) THEN anders = anders + 1
+        IF p = &HFF8000 AND GETALPHA(c, x, y) = 255 THEN orange = orange + 1
+        IF p <> &HFF8000 AND p <> &HFF THEN rand = rand + 1
+    NEXT
+NEXT
+PRINT "orange "; orange > 40; " randpunkte "; rand > 10; " anders als IMAGE_DRAW_IMAGE "; anders
+PRINT "rest "; HEX$(GETPIXEL(c, 95, 35)); " "; GETALPHA(c, 95, 35)
+' Ohne Schrift bleibt es beim alten Befehl.
+IMAGE_DRAW_TEXT(c, 5, 5, "x", 10, WHITE)
+--- argumente
+{sammlung}/../../circuitrunner/assets/font.ttf
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+breite TRUE hoehe 24
+rot TRUE durchsichtig TRUE
+orange TRUE randpunkte TRUE anders als IMAGE_DRAW_IMAGE 0
+rest FF 128
+
+=== bewegtes gif lesen
+' Drei Bilder mit eigener Dauer schreiben und lesen: Zahl, Farben und Zeiten
+' kommen so zurueck. Ein PNG ergibt ein einziges Bild.
+IMPORT "imgfx"
+SCREEN(100, 100, "t")
+DIM fr[3] AS IMAGE
+fr[0] = IMAGE_NEW(6, 4, RED) : fr[1] = IMAGE_NEW(6, 4, GREEN) : fr[2] = IMAGE_NEW(6, 4, BLUE)
+IMAGE_FILL_RECT(fr[1], 0, 0, 2, 3, YELLOW)
+IMAGE_SAVE_GIF(fr, "a.gif", [100, 250, 40])
+DIM g AS ARRAY OF IMAGE : g = IMAGE_LOAD_GIF("a.gif")
+PRINT "bilder "; LEN(g); " "; IMAGEWIDTH(g[0]); "x"; IMAGEHEIGHT(g[0])
+PRINT HEX$(GETPIXEL(g[0], 4, 1)); " "; HEX$(GETPIXEL(g[1], 1, 1)); " "; HEX$(GETPIXEL(g[1], 4, 1)); " "; HEX$(GETPIXEL(g[2], 4, 1))
+DIM d AS ARRAY OF INTEGER : d = IMAGE_GIF_DELAYS("a.gif")
+PRINT "dauern "; LEN(d); " "; d[0]; " "; d[1]; " "; d[2]
+IMAGE_SAVE(fr[2], "b.png")
+DIM e AS ARRAY OF IMAGE : e = IMAGE_LOAD_GIF("b.png")
+PRINT "png "; LEN(e); " "; HEX$(GETPIXEL(e[0], 0, 0))
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+bilder 3 6x4
+FF0000 FFFF00 FF00 FF
+dauern 3 100 250 40
+png 1 FF
+
+=== modell als obj und wieder zurueck
+' Derselbe Huellquader nach dem Laden, auch bei mehreren Teilen (Labyrinth).
+IMPORT "g3d"
+IMPORT "imgfx"
+SCREEN(100, 100, "t")
+DIM w AS INTEGER : w = MESH_CUBE(1, 2, 3)
+MODEL_SAVE(w, "w.obj")
+PRINT MODEL_BBOX(w) = MODEL_BBOX(LOADMODEL("w.obj"))
+DIM karte AS IMAGE : karte = IMAGE_NEW(5, 4, BLACK)
+IMAGE_FILL_RECT(karte, 0, 0, 4, 0, WHITE)
+IMAGE_FILL_RECT(karte, 2, 0, 2, 3, WHITE)
+DIM lab AS INTEGER : lab = MESH_CUBICMAP(karte, 1, 2, 1)
+MODEL_SAVE(lab, "lab.obj")
+PRINT MODEL_BBOX(lab) = MODEL_BBOX(LOADMODEL("lab.obj"))
+DIM z AS ARRAY OF STRING : z = READLINES("w.obj")
+PRINT z[0]; " / "; LEN(z) > 30
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE
+TRUE
+# Drachenhauch MODEL_SAVE / TRUE
+
+=== die textur steht nach dem speichern nicht auf dem kopf
+' Eine Ebene mit oben roter, unten blauer Textur, einmal wie erzeugt und
+' einmal gespeichert und geladen, von oben gesehen: dieselben Farben an
+' denselben Stellen. raylibs Lader kippt die Texturkoordinaten beim Lesen;
+' wer beim Schreiben nicht ebenfalls kippt, bekommt sie vertauscht.
+IMPORT "g3d"
+IMPORT "imgfx"
+SCREEN(240, 120, "t")
+DIM t AS IMAGE : t = IMAGE_NEW(16, 16, BLUE)
+IMAGE_FILL_RECT(t, 0, 0, 15, 7, RED)
+DIM a AS INTEGER : a = MESH_PLANE(4, 4, 1, 1)
+MODEL_TEXTURE(a, t)
+MODEL_SAVE(a, "e.obj")
+DIM b AS INTEGER : b = LOADMODEL("e.obj")
+MODEL_TEXTURE(b, t)
+DIM k AS INTEGER
+FOR k = 1 TO 3
+    CLS(BLACK)
+    CAMERA3D(0, 12, 0.01, 0, 0, 0, 45)
+    MODEL(a, -2.5, 0, 0, 1.0, WHITE)
+    MODEL(b, 2.5, 0, 0, 1.0, WHITE)
+    FLIP()
+NEXT
+SAVESCREENSHOT("s.png")
+FLIP()
+DIM s AS IMAGE : s = LOADIMAGE("s.png")
+' Je Ebene ein Punkt im oberen und im unteren Viertel.
+DIM xa AS INTEGER : xa = 90 : DIM xb AS INTEGER : xb = 150
+PRINT HEX$(GETPIXEL(s, xa, 45)) = HEX$(GETPIXEL(s, xb, 45)); " "; HEX$(GETPIXEL(s, xa, 75)) = HEX$(GETPIXEL(s, xb, 75))
+PRINT "zwei farben "; HEX$(GETPIXEL(s, xa, 45)) <> HEX$(GETPIXEL(s, xa, 75))
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+TRUE TRUE
+zwei farben TRUE
+
+=== kamera vom programm aus bewegen
+' Von (0, 1, 0) mit Blick nach -Z: zwei vor, dann um 90 Grad nach rechts
+' drehen (Blick nach +X), einen nach rechts (also nach +Z), nach oben
+' neigen, zuletzt weiter weg vom Ziel.
+IMPORT "g3d"
+SCREEN(100, 100, "t")
+FUNCTION lage$() AS STRING
+    RETURN FORMAT$(CAMERA3D_X(), "%.2f") + " " + FORMAT$(CAMERA3D_Y(), "%.2f") + " " + FORMAT$(CAMERA3D_Z(), "%.2f")
+END FUNCTION
+FUNCTION blick$() AS STRING
+    RETURN FORMAT$(CAMERA3D_TARGET_X() - CAMERA3D_X(), "%.2f") + " " + FORMAT$(CAMERA3D_TARGET_Y() - CAMERA3D_Y(), "%.2f") + " " + FORMAT$(CAMERA3D_TARGET_Z() - CAMERA3D_Z(), "%.2f")
+END FUNCTION
+CAMERA3D(0, 1, 0, 0, 1, -1, 60)
+CAMERA3D_MOVE(2, 0, 0, 0, 0)
+PRINT "vor "; lage$(); " | "; blick$()
+CAMERA3D_MOVE(0, 0, 0, 90, 0)
+PRINT "rechts gedreht "; lage$(); " | "; blick$()
+CAMERA3D_MOVE(0, 1, 0, 0, 0)
+PRINT "seitwaerts "; lage$()
+CAMERA3D_MOVE(0, 0, 0.5, 0, 0)
+PRINT "hoch "; lage$()
+CAMERA3D_MOVE(0, 0, 0, 0, 45)
+PRINT "geneigt "; blick$()
+CAMERA3D_MOVE(0, 0, 0, 0, 0, 2)
+PRINT "abstand "; FORMAT$(SQR((CAMERA3D_TARGET_X() - CAMERA3D_X()) ^ 2 + (CAMERA3D_TARGET_Y() - CAMERA3D_Y()) ^ 2 + (CAMERA3D_TARGET_Z() - CAMERA3D_Z()) ^ 2), "%.2f")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+vor 0.00 1.00 -2.00 | 0.00 0.00 -1.00
+rechts gedreht 0.00 1.00 -2.00 | 1.00 0.00 0.00
+seitwaerts 0.00 1.00 -1.00
+hoch 0.00 1.50 -1.00
+geneigt 0.71 0.71 0.00
+abstand 3.00
+
+=== kleine helfer
+' B-Spline wie SPLINE_BASIS (geht an den Punkten vorbei, nicht durch),
+' Farbkanaele als Graustufen, Bildschirm in Millimetern.
+IMPORT "imgfx"
+PRINT CURVE_BSPLINE(0, 0, 6, 12, 18); " "; CURVE_BSPLINE(0.5, 0, 6, 12, 18); " "; CURVE_BSPLINE(1, 0, 6, 12, 18); " "; CURVE_BSPLINE(0, 0, 10, 0, 10)
+PRINT CURVE_BSPLINE2(0, 0, 0, 6, 12, 12, 0, 18, 6)
+SCREEN(100, 100, "t")
+DIM c AS IMAGE : c = IMAGE_NEW(2, 1, RGBA(10, 20, 30, 40))
+DIM k AS INTEGER
+DIM kan AS STRING : kan = ""
+FOR k = 0 TO 3
+    kan = kan + IIF(k > 0, " ", "") + HEX$(GETPIXEL(IMAGE_CHANNEL(c, k), 0, 0))
+NEXT
+PRINT kan
+PRINT "mm "; MONITOR_PHYSICAL_WIDTH(0) >= 0 AND MONITOR_PHYSICAL_HEIGHT(0) >= 0
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+6.0 9.0 12.0 6.666666666666667
+(6.0, 8.0)
+A0A0A 141414 1E1E1E 282828
+mm TRUE
+
+=== falsche angaben sind fehler
+IMPORT "imgfx"
+IMPORT "g3d"
+FUNCTION probe$(n AS INTEGER) AS STRING
+    TRY
+        SELECT CASE n
+            CASE 1 : DIM s AS INTEGER : s = LOADFONT_SDF(ARG$(0), 24) : DIM b AS IMAGE : b = IMAGE_TEXT("a", 24, RED, s)
+            CASE 2 : DIM c AS IMAGE : c = IMAGE_TEXT("", 24, RED)
+            CASE 3 : DIM d AS ARRAY OF IMAGE : d = IMAGE_LOAD_GIF("fehlt.gif")
+            CASE 4 : WRITEALL("kaputt.gif", "GIF89a nix") : DIM dd AS ARRAY OF INTEGER : dd = IMAGE_GIF_DELAYS("kaputt.gif")
+            CASE 5 : MODEL_SAVE(MESH_CUBE(1, 1, 1), "w.stl")
+            CASE 6 : DIM k AS IMAGE : k = IMAGE_CHANNEL(IMAGE_NEW(2, 2), 4)
+            CASE 7 : CAMERA3D_MOVE(1, 0, 0, 0)
+            CASE 8 : DIM m AS IMAGE : m = IMAGE_TEXT("a", 24, RED, 9)
+        END SELECT
+        RETURN "kein fehler"
+    CATCH e
+        RETURN e
+    END TRY
+END FUNCTION
+SCREEN(100, 100, "t")
+DIM i AS INTEGER
+FOR i = 1 TO 8
+    PRINT probe$(i)
+NEXT
+--- argumente
+{sammlung}/../../circuitrunner/assets/font.ttf
+--- umgebung
+DHRT_FRAMES=2
+--- enthaelt
+IMAGE_TEXT: eine SDF-Schrift (LOADFONT_SDF) laesst sich nicht in ein Bild schreiben
+IMAGE_TEXT: der Text ist leer
+IMAGE_LOAD_GIF: Datei 'fehlt.gif' nicht gefunden
+IMAGE_GIF_DELAYS: 'kaputt.gif' ist
+MODEL_SAVE: geschrieben wird Wavefront-OBJ, der Name muss auf .obj enden
+IMAGE_CHANNEL: der Kanal ist 0 (rot), 1 (gruen), 2 (blau) oder 3 (Deckkraft), nicht 4
+CAMERA3D_MOVE: erwartet (vor, rechts, hoch, gieren, neigen[, zoom])
+IMAGE_TEXT: ungueltiges FONT-Handle 9

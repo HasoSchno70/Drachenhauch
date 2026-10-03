@@ -73,12 +73,14 @@ nebeneinander braucht, braucht zwei Bilder (`IMAGE_COPY`).
 | `IMAGE_DRAW_LINE(img, x1, y1, x2, y2, color)` | Linie ins Image |
 | `IMAGE_DRAW_CIRCLE(img, cx, cy, r, color)` | gefüllter Kreis ins Image |
 | `IMAGE_DRAW_RECT(img, x, y, w, h, color)` | gefülltes Rechteck ins Image |
-| `IMAGE_DRAW_TEXT(img, x, y, text$, size, color)` | Text (Standard-Font) ins Image |
+| `IMAGE_DRAW_TEXT(img, x, y, text$, size, color[, font])` | Text ins Image; ohne `font` die eingebaute Schrift wie bisher, mit `font` eine per `LOADFONT` oder `LOADFONT_IMAGE` geladene (über halbdurchsichtigem Grund richtig gemischt wie `IMAGE_DRAW_IMAGE`; eine SDF-Schrift geht nicht) |
+| `IMAGE_TEXT(text$, groesse, farbe[, font])` | IMAGE — ein neues Bild, genau so groß wie der Text (so breit, wie `TEXT_WIDTH` ihn misst), auf durchsichtigem Grund — für Schilder, Beschriftungen auf Texturen, Billboards mit Text |
 | `IMAGE_ALPHA_MASK(bild, maske)` | IMAGE — Deckkraft aus einem zweiten Bild übernehmen (weiche Ränder) |
 | `IMAGE_ALPHA_CROP(bild, schwelle)` | IMAGE — durchsichtigen Rand wegschneiden; `schwelle` sagt, ab welcher Deckkraft ein Pixel zählt |
 | `IMAGE_ALPHA_PREMULTIPLY(bild)` | IMAGE — Farbe mit der Deckkraft vorab verrechnen; verhindert dunkle Säume beim Skalieren |
 | `IMAGE_DITHER(bild, r, g, b, a)` | IMAGE — Farbtiefe senken und den Fehler verteilen. **Nur 5,6,5,0 / 5,5,5,1 / 4,4,4,4** — alles andere wird abgelehnt, weil raylib sonst ein unbrauchbares Format liefert |
 | `IMAGE_PALETTE(bild, max)` | ARRAY OF INTEGER — die häufigsten Farben des Bildes |
+| `IMAGE_CHANNEL(bild, kanal)` | IMAGE — ein Kanal (`0` rot, `1` grün, `2` blau, `3` Deckkraft) als Graustufenbild, etwa die Deckkraft als Maske sehen und bearbeiten |
 
 ### Formen mit Kommazahlen und Deckkraft
 
@@ -138,6 +140,8 @@ und ueberhaupt nichts speichern.
 | `IMAGE_TO_BUFFER(bild [, mit_alpha])` | BUFFER — das Bild als PNG-Bytes, ohne Umweg über eine Datei; mit `FALSE` ohne Deckkraft-Kanal wie bei `IMAGE_SAVE` (core, kein IMPORT noetig) |
 | `IMAGE_MIPMAPS(bild)` | INTEGER — verkleinerte Stufen für die Textur anlegen und trilinear filtern: ein feines Muster auf einer fernen 3D-Fläche flimmert dann nicht mehr. Liefert die Zahl der Stufen; nach `IMAGE_DRAW_*` werden sie nachgezogen |
 | `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` | mehrere Bilder als **bewegtes GIF** schreiben |
+| `IMAGE_LOAD_GIF(pfad$)` | ARRAY OF IMAGE — alle Einzelbilder eines bewegten GIFs, schon zusammengesetzt (auch wenn ein Bild nur einen Teil erneuert); eine Datei, die kein GIF ist, ergibt ein einziges Bild |
+| `IMAGE_GIF_DELAYS(pfad$)` | ARRAY OF INTEGER — die Dauer jedes Einzelbilds in Millisekunden, in derselben Reihenfolge; das Gegenstück zum Feld, das `IMAGE_SAVE_GIF` nimmt (core, kein Fenster nötig) |
 
 ```basic
 IMPORT "imgfx"

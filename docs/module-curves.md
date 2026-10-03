@@ -17,6 +17,8 @@ IMPORT "curves"
 | `CURVE_BEZIER2(t, x0,y0, x1,y1, x2,y2, x3,y3)` | TUPLE (x, y) | Cubic Bezier 2D |
 | `CURVE_CATMULL(t, p0, p1, p2, p3)` | FLOAT | Catmull-Rom 1D |
 | `CURVE_CATMULL2(t, x0,y0, x1,y1, x2,y2, x3,y3)` | TUPLE (x, y) | Catmull-Rom 2D |
+| `CURVE_BSPLINE(t, p0, p1, p2, p3)` | FLOAT | kubischer B-Spline: geht glatt an den Punkten vorbei statt durch sie (wie `SPLINE_BASIS`) |
+| `CURVE_BSPLINE2(t, x0,y0, x1,y1, x2,y2, x3,y3)` | TUPLE (x, y) | B-Spline 2D |
 | `CURVE_HERMITE(t, p0, p1, m0, m1)` | FLOAT | Cubic Hermite mit Tangenten |
 
 ## Konzept
