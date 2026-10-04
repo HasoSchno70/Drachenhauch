@@ -164,6 +164,10 @@ Abgedeckt durch Bestehendes (nicht neu): `ARRAY_FIND`→`ARRAY_INDEXOF`,
 `ARRAY_CONTAINS`→`IN`, `ARRAY_MAP/FILTER`→Comprehensions, `ARRAY_SLICE`→`a[i:j]`,
 `ASC`=`ORD`, `SLEEP`, `DELETEFILE`, `URL_ENCODE/DECODE` (Modul `html`),
 `LTRIM$/RTRIM$/STARTSWITH/ENDSWITH/CONTAINS/REVERSE$/BIN$/OCT$`.
+*Nachtrag 2026-10-04:* mit den Lambdas gibt es `ARRAY_MAP/FILTER/REDUCE/FIND`
+doch -- eine Funktion als WERT laesst sich weiterreichen (das kann eine
+Comprehension nicht), und `ARRAY_FIND` sucht nach einer Bedingung statt nach
+einem Wert.
 
 ## Nachtrag 2 — PRINT-Trenner + Komfort-Aliase (2026-06-06)
 

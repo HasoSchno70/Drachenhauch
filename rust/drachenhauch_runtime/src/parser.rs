@@ -1484,6 +1484,40 @@ impl Parser {
         r
     }
 
+    /// `FUNCTION(a, b AS INTEGER) ausdruck` bzw. `SUB(x) anweisung`. Ein
+    /// Parameter ohne AS nimmt jeden Wert. Kein Vorgabewert, kein BYREF,
+    /// kein `...` -- wer das braucht, schreibt eine benannte FUNCTION.
+    fn lambda(&mut self) -> R<Node> {
+        let ist_sub = self.tt(0) == Tt::Sub;
+        self.pos += 1;
+        self.expect(Tt::Lparen, "")?;
+        let mut params = Vec::new();
+        if !self.check(Tt::Rparen) {
+            loop {
+                if self.check(Tt::Byref) || self.check(Tt::Ellipsis) {
+                    return self.err("Ein Lambda nimmt nur einfache Parameter (kein BYREF, kein ...) -- dafuer eine benannte FUNCTION schreiben");
+                }
+                let name = sval(&self.expect(Tt::Ident, "Erwartet Parametername")?);
+                let type_name = if self.matches(Tt::As) { self.parse_type()? } else { "any".to_string() };
+                if self.check(Tt::Eq) {
+                    return self.err("Ein Lambda hat keine Vorgabewerte -- dafuer eine benannte FUNCTION schreiben");
+                }
+                params.push(Param { name, type_name, default: None, by_ref: false, is_variadic: false });
+                if !self.matches(Tt::Comma) { break; }
+            }
+        }
+        self.expect(Tt::Rparen, "Erwartet ')' am Ende der Lambda-Parameter")?;
+        if self.checks(&[Tt::Newline, Tt::Colon]) || self.at_end() {
+            return self.err(if ist_sub {
+                "Ein Lambda ist EINE Anweisung in derselben Zeile: SUB() zaehler += 1 -- fuer mehr eine benannte SUB schreiben"
+            } else {
+                "Ein Lambda ist EIN Ausdruck in derselben Zeile: FUNCTION(x) x * 2 -- fuer mehr eine benannte FUNCTION schreiben"
+            });
+        }
+        let body = if ist_sub { self.inline_statement()? } else { self.expression()? };
+        Ok(Node::Lambda { params, body: Box::new(body), ist_sub })
+    }
+
     fn sub_decl(&mut self) -> R<Node> {
         self.expect(Tt::Sub, "")?;
         if self.check(Tt::New) {
@@ -1950,6 +1984,8 @@ impl Parser {
                 Ok(Node::Identifier(sval(&tok)))
             }
             Tt::New => self.new_expr(),
+            // Lambda wie in VB.NET: `FUNCTION(x) x * 2`, `SUB() zaehler += 1`.
+            Tt::Function | Tt::Sub if self.tt(1) == Tt::Lparen => self.lambda(),
             Tt::Lbracket => {
                 self.pos += 1;
                 // Leeres Array-Literal `[]`: erlaubt. Den Elementtyp gibt der

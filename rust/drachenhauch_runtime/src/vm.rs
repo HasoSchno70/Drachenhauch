@@ -30,6 +30,12 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+/// Zahl der kopierten Locals eines Lambdas aus seinem Namen
+/// (`__lambda_<nr>_<kopien>`, vergeben in compiler::expr_lambda).
+fn lambda_kopien(name: &str) -> Option<usize> {
+    name.strip_prefix("__lambda_")?.rsplit('_').next()?.parse().ok()
+}
+
 /// Sentinel-"Fehler", mit dem ein externes Stop-Signal (`dhrt profile`,
 /// Editor-Stop-Button) die Dispatch-Schleife sauber abwickelt -- darf wie
 /// `__DEBUG_STOP__` NICHT von TRY/CATCH gefangen werden.
@@ -207,6 +213,12 @@ fn bind_params<I: ExactSizeIterator<Item = Value>>(fn_: &Func, args: I, mut loca
         // deshalb nicht betroffen).
         let n_required = fn_.n_required;
         if args.len() < n_required || args.len() > fn_.n_params {
+            // Ein Lambda heisst intern `__lambda_<nr>_<kopien>`; die Kopien
+            // zaehlen nach aussen nicht mit, und der Name sagt niemandem etwas.
+            if let Some(k) = lambda_kopien(&fn_.name) {
+                return Err(format!("Lambda: erwartet {} Argument(e), erhalten {}",
+                    fn_.n_params.saturating_sub(k), args.len().saturating_sub(k)));
+            }
             return Err(format!("{}: erwartet {}..{} Argument(e), erhalten {}",
                 fn_.name.to_uppercase(), n_required, fn_.n_params, args.len()));
         }
@@ -1474,8 +1486,24 @@ impl<'p> Vm<'p> {
     /// Einen parameterlosen Rueckruf ausfuehren (GUI_UPDATE, TIMER_UPDATE).
     fn rueckruf_rufen(&mut self, cb: &crate::value::Rueckruf, kontext: &str) -> R<()> {
         let (f, empf) = self.rueckruf_aufloesen(cb, kontext)?;
-        self.exec(f, Vec::new(), empf)?;
+        self.rueckruf_exec(cb, f, &empf, Vec::new())?;
         Ok(())
+    }
+
+    /// Einen aufgeloesten Rueckruf mit Argumenten ausfuehren -- bei einem
+    /// Lambda kommen seine kopierten Locals VOR die Argumente.
+    fn rueckruf_exec(&mut self, cb: &crate::value::Rueckruf, f: &'p Func, empf: &Option<Value>,
+                     args: Vec<Value>) -> R<Value> {
+        if cb.vorab.is_empty() { return self.exec(f, args, empf.clone()); }
+        let mut alle = cb.vorab.clone();
+        alle.extend(args);
+        self.exec(f, alle, empf.clone())
+    }
+
+    /// Wie viele Werte nimmt dieser Rueckruf von aussen? (`None` = beliebig
+    /// viele.) Fuer eine Meldung, bevor ARRAY_MAP & Co. ins Leere rufen.
+    fn rueckruf_stellen(cb: &crate::value::Rueckruf, f: &Func) -> Option<usize> {
+        if f.is_variadic { None } else { Some(f.n_params.saturating_sub(cb.vorab.len())) }
     }
 
     // ---------------------------------------------------------------- OOP
@@ -2795,11 +2823,90 @@ impl<'p> Vm<'p> {
     /// Aktuell nur `SORT(arr, comparator)`. Andere SORT-Formen macht builtins.rs.
     fn try_array_hof(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if name == "sort" && a.len() == 2 {
-            if matches!(&a[1], Value::FuncRef(_) | Value::BoundMethod(_)) {
+            if matches!(&a[1], Value::FuncRef(_) | Value::BoundMethod(_) | Value::Closure(_)) {
                 return Ok(Some(self.sort_with_comparator(&a[0], &a[1])?));
             }
         }
+        if matches!(name, "array_map" | "array_filter" | "array_reduce" | "array_find") {
+            return self.array_mit_funktion(name, a).map(Some);
+        }
         Ok(None)
+    }
+
+    /// ARRAY_MAP / ARRAY_FILTER / ARRAY_REDUCE / ARRAY_FIND: die Funktion
+    /// (FUNCREF, gebundene Methode oder Lambda) je Element. Das Feld bleibt
+    /// unveraendert -- MAP und FILTER liefern ein neues.
+    fn array_mit_funktion(&mut self, name: &str, a: &[Value]) -> R<Value> {
+        let gross = name.to_uppercase();
+        let (soll, form) = match name {
+            "array_reduce" => (3, "ARRAY_REDUCE(feld, funktion, start)"),
+            "array_map" => (2, "ARRAY_MAP(feld, funktion)"),
+            "array_filter" => (2, "ARRAY_FILTER(feld, funktion)"),
+            _ => (2, "ARRAY_FIND(feld, funktion)"),
+        };
+        if a.len() != soll {
+            return Err(format!("{}: erwartet {} Argumente, erhalten {} -- Aufruf: {}", gross, soll, a.len(), form));
+        }
+        let arr = match &a[0] {
+            Value::Array(x) => x.clone(),
+            andere => return Err(format!("{}: erwartet ARRAY, erhalten {}", gross, andere.type_name())),
+        };
+        if arr.borrow().dims.len() != 1 {
+            return Err(format!("{}: nur eindimensionale Felder", gross));
+        }
+        let cb = crate::value::Rueckruf::aus_wert(&a[1]).ok_or_else(|| format!(
+            "{}: erwartet eine Funktion als zweites Argument, erhalten {} -- z.B. {}(feld, FUNCTION(x) x * 2)",
+            gross, a[1].type_name(), gross))?;
+        let (f, empf) = self.rueckruf_aufloesen(&cb, &gross)?;
+        let stellen = if name == "array_reduce" { 2 } else { 1 };
+        if let Some(n) = Self::rueckruf_stellen(&cb, f) {
+            if n != stellen {
+                return Err(format!("{}: die Funktion nimmt {} Wert(e), {} gibt ihr {}{}", gross, n, gross, stellen,
+                    if name == "array_reduce" { " (bisheriges Ergebnis, Element)" } else { " (das Element)" }));
+            }
+        }
+        // Werte vorher herausziehen: die Funktion darf das Feld anfassen.
+        let werte: Vec<Value> = arr.borrow().cells.to_values();
+        match name {
+            "array_map" => {
+                let mut aus = Vec::with_capacity(werte.len());
+                for v in werte { aus.push(self.rueckruf_exec(&cb, f, &empf, vec![v])?); }
+                Ok(array_literal(aus))
+            }
+            "array_filter" => {
+                let mut aus = Vec::new();
+                for v in werte {
+                    match self.rueckruf_exec(&cb, f, &empf, vec![v.clone()])? {
+                        Value::Bool(true) => aus.push(v),
+                        Value::Bool(false) => {}
+                        andere => return Err(format!(
+                            "ARRAY_FILTER: die Funktion muss TRUE oder FALSE liefern, lieferte {} -- ein Vergleich wie x > 0 ist ein BOOLEAN",
+                            andere.type_name())),
+                    }
+                }
+                // Der Elementtyp bleibt der des Feldes (auch wenn nichts uebrig ist).
+                let typ = arr.borrow().element_type.clone();
+                let mut neu = DhArray::new(typ.clone(), vec![aus.len() as i64], || self.element_default(&typ));
+                for (i, v) in aus.into_iter().enumerate() { neu.cells.set(i, v); }
+                Ok(Value::Array(Rc::new(RefCell::new(neu))))
+            }
+            "array_reduce" => {
+                let mut akku = a[2].clone();
+                for v in werte { akku = self.rueckruf_exec(&cb, f, &empf, vec![akku, v])?; }
+                Ok(akku)
+            }
+            _ => {
+                for (i, v) in werte.into_iter().enumerate() {
+                    match self.rueckruf_exec(&cb, f, &empf, vec![v])? {
+                        Value::Bool(true) => return Ok(Value::Int(i as i64)),
+                        Value::Bool(false) => {}
+                        andere => return Err(format!(
+                            "ARRAY_FIND: die Funktion muss TRUE oder FALSE liefern, lieferte {}", andere.type_name())),
+                    }
+                }
+                Ok(Value::Int(-1))
+            }
+        }
     }
 
     /// SORT(arr, comparator-FUNCREF): stabil sortieren, wobei `comparator(x, y)`
@@ -2821,7 +2928,7 @@ impl<'p> Vm<'p> {
         let mut error: Option<String> = None;
         vals.sort_by(|x, y| {
             if error.is_some() { return Ordering::Equal; }
-            match self.exec(func, vec![x.clone(), y.clone()], empf.clone()) {
+            match self.rueckruf_exec(&cb, func, &empf, vec![x.clone(), y.clone()]) {
                 Ok(Value::Int(i)) => i.cmp(&0),
                 Ok(Value::Float(f)) => f.partial_cmp(&0.0).unwrap_or(Ordering::Equal),
                 Ok(other) => {
@@ -3967,6 +4074,15 @@ impl<'p> Vm<'p> {
                                 let ret = self.exec(tgt, call_args, Some(recv))?;
                                 if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                             }
+                        }
+                        // Lambda mit Kopien: die Kopien vor die Argumente.
+                        Value::Closure(c) => {
+                            let tgt = self.prog.func(c.0.as_ref())
+                                .ok_or_else(|| format!("FUNCREF: Funktion '{}' existiert nicht (mehr)", c.0))?;
+                            let mut alle = c.1.clone();
+                            alle.extend(call_args);
+                            let ret = self.exec(tgt, alle, None)?;
+                            if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                         }
                         other => return Err(format!(
                             "'{}' ist eine Variable vom Typ {} und kann nicht wie eine Funktion \
@@ -6430,6 +6546,12 @@ impl<'p> Vm<'p> {
                     Value::BoundMethod(b) => return Err(format!(
                         "TASK_START: '{}' ist an ein Objekt gebunden. Ein Auftrag laeuft in einem eigenen Prozess und sieht dieses Objekt nicht -- nimm eine freie FUNCTION und gib ihr die Werte als Argumente mit.",
                         b.1)),
+                    // Ein Lambda mit Kopien ebenso: die Werte gehoeren zu
+                    // diesem Prozess. Ohne Kopien ist es eine gewoehnliche
+                    // Funktion -- der Auftrag uebersetzt dieselbe Datei und
+                    // findet sie unter demselben Namen.
+                    Value::Closure(_) => return Err(
+                        "TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit, und ein Auftrag laeuft in einem eigenen Prozess -- gib sie ihm als Argumente: TASK_START(FUNCTION(a, b) ..., a, b)".into()),
                     Value::FuncRef(n) => n.to_string(),
                     Value::Str(s) => s.to_string(),
                     andere => return Err(format!(
@@ -12392,7 +12514,7 @@ pub(crate) fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
             _ => Err(format!("{}: Erwartet TUPLE, erhalten {}", ctx, value.type_name())),
         },
         "funcref" => match value {
-            Value::FuncRef(_) | Value::BoundMethod(_) | Value::Nil => Ok(value),
+            Value::FuncRef(_) | Value::BoundMethod(_) | Value::Closure(_) | Value::Nil => Ok(value),
             _ => Err(format!("{}: Erwartet FUNCREF, erhalten {}", ctx, value.type_name())),
         },
         // GELD ist streng, anders als die uebrigen Modul-Typen: eine Zahl

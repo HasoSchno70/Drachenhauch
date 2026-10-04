@@ -32,6 +32,10 @@ pub enum Value {
     /// Der Methodenname liegt kleingeschrieben vor -- so legt der Compiler
     /// die Methoden-Schluessel ab (`resolve_method` sucht damit).
     BoundMethod(Rc<(Value, Rc<str>)>),
+    /// Ein Lambda mit kopierten Locals (`FUNCTION(x) x > grenze`): der Name
+    /// der erzeugten Funktion (`__lambda_N`) und die Werte, die beim Aufruf
+    /// VOR die Argumente kommen. Nach aussen ein FUNCREF wie die anderen.
+    Closure(Rc<(Rc<str>, Vec<Value>)>),
     CompMarker,
     Array(Rc<RefCell<DhArray>>),
     Map(Rc<RefCell<DhMap>>),
@@ -665,6 +669,9 @@ impl Instance {
 pub struct Rueckruf {
     pub name: Rc<str>,
     pub empfaenger: Option<Value>,
+    /// Die kopierten Locals eines Lambdas -- sie kommen beim Aufruf VOR die
+    /// Argumente. Leer bei FUNCREF und gebundener Methode.
+    pub vorab: Vec<Value>,
 }
 
 impl Rueckruf {
@@ -672,22 +679,27 @@ impl Rueckruf {
     /// `None`, wenn es weder FUNCREF noch gebundene Methode ist.
     pub fn aus_wert(v: &Value) -> Option<Rueckruf> {
         match v {
-            Value::FuncRef(n) => Some(Rueckruf { name: n.clone(), empfaenger: None }),
+            Value::FuncRef(n) => Some(Rueckruf { name: n.clone(), empfaenger: None, vorab: Vec::new() }),
             Value::BoundMethod(b) =>
-                Some(Rueckruf { name: b.1.clone(), empfaenger: Some(b.0.clone()) }),
+                Some(Rueckruf { name: b.1.clone(), empfaenger: Some(b.0.clone()), vorab: Vec::new() }),
+            Value::Closure(c) => Some(Rueckruf { name: c.0.clone(), empfaenger: None, vorab: c.1.clone() }),
             _ => None,
         }
     }
 
     /// Nur fuer das Wiederherstellen aus einer Datei (dort steht bloss ein Name).
     pub fn benannt(name: &str) -> Rueckruf {
-        Rueckruf { name: Rc::from(name), empfaenger: None }
+        Rueckruf { name: Rc::from(name), empfaenger: None, vorab: Vec::new() }
     }
 
     /// Ist der Rueckruf an eine Instanz gebunden? Solche lassen sich nicht in
     /// eine `.dhform` schreiben -- die Instanz gibt es beim Laden nicht.
+    ///
+    /// Ebenso ein Lambda: sein Name (`__lambda_3`) haengt an der Stelle im
+    /// Quelltext und verschiebt sich mit jeder Aenderung davor -- in einer
+    /// Datei zeigte er bald auf ein anderes Lambda.
     pub fn ist_gebunden(&self) -> bool {
-        self.empfaenger.is_some()
+        self.empfaenger.is_some() || !self.vorab.is_empty() || self.name.starts_with("__lambda_")
     }
 }
 
@@ -708,6 +720,7 @@ impl Value {
                 Value::Instance(i) => format!("<FUNCREF {}.{}>", i.borrow().class_name, b.1),
                 other => format!("<FUNCREF {}.{}>", other.type_name(), b.1),
             },
+            Value::Closure(_) => "<FUNCREF lambda>".to_string(),
             Value::CompMarker => "<COMP-MARKER>".to_string(),
             Value::Array(a) => {
                 let a = a.borrow();
@@ -811,6 +824,7 @@ impl Value {
             // Bewusst ebenfalls "FUNCREF": eine gebundene Methode ist fuer den
             // Aufrufer dasselbe Ding wie eine freie Funktion.
             Value::BoundMethod(_) => "FUNCREF",
+            Value::Closure(_) => "FUNCREF",
             Value::CompMarker => "COMP_MARKER",
             Value::Array(_) => "ARRAY",
             Value::Map(_) => "MAP",
@@ -924,6 +938,9 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
         // Eine gebundene Methode ist NIE gleich einer freien Funktion, auch
         // wenn die Namen zufaellig uebereinstimmen.
         (Value::BoundMethod(_), Value::FuncRef(_)) | (Value::FuncRef(_), Value::BoundMethod(_)) => false,
+        // Ein Lambda mit Kopien ist nur sich selbst gleich: zwei Anlagen
+        // derselben Stelle tragen womoeglich verschiedene Werte.
+        (Value::Closure(x), Value::Closure(y)) => Rc::ptr_eq(x, y),
         (Value::CompMarker, Value::CompMarker) => true,
         _ if is_num(a) && is_num(b) => as_f64(a) == as_f64(b),
         _ => false,

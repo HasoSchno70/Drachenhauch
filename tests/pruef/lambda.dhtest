@@ -1,0 +1,240 @@
+' Lambdas (2026-10-04): `FUNCTION(x) x * 2` ist ein Ausdruck, `SUB() ...`
+' eine einzelne Anweisung -- die Schreibweise von VB.NET. Der Compiler macht
+' daraus eine eigene Funktion; an der Stelle steht ein FUNCREF. Lokale
+' Variablen, die das Lambda benutzt, werden beim Anlegen KOPIERT (dann ist
+' es eine Closure), Globals sieht es lebendig. Dazu ARRAY_MAP, ARRAY_FILTER,
+' ARRAY_REDUCE und ARRAY_FIND, die eine Funktion je Element rufen.
+'
+' Doku: docs/sprache.md (Lambdas), docs/builtins-core.md (Arrays).
+
+=== ein lambda als wert
+DIM doppelt AS FUNCREF : doppelt = FUNCTION(x) x * 2
+DIM mal AS FUNCREF : mal = FUNCTION(a AS INTEGER, b AS INTEGER) a * b
+PRINT doppelt(21); " "; mal(6, 7); " "; TYPEOF(doppelt)
+--- erwartet
+42 42 FUNCREF
+
+=== map filter reduce find
+SUB zeige(a AS ARRAY OF INTEGER)
+    DIM t AS STRING : t = ""
+    DIM x AS INTEGER
+    FOR EACH x IN a : t = t + STR$(x) + " " : NEXT
+    PRINT TRIM$(t)
+END SUB
+DIM a AS ARRAY OF INTEGER : a = [5, 3, 9, 1]
+zeige(ARRAY_MAP(a, FUNCTION(x) x * 10))
+zeige(ARRAY_FILTER(a, FUNCTION(x) x > 3))
+PRINT ARRAY_REDUCE(a, FUNCTION(summe, x) summe + x, 100)
+PRINT ARRAY_FIND(a, FUNCTION(x) x > 6); " "; ARRAY_FIND(a, FUNCTION(x) x > 60)
+' Das Feld selbst bleibt, wie es war.
+zeige(a)
+--- erwartet
+50 30 90 10
+5 9
+118
+2 -1
+5 3 9 1
+
+=== map liefert den passenden elementtyp
+DIM a AS ARRAY OF INTEGER : a = [1, 2]
+DIM t AS ARRAY OF STRING : t = ARRAY_MAP(a, FUNCTION(x) "#" + STR$(x))
+PRINT t[0]; t[1]
+DIM leer AS ARRAY OF INTEGER : leer = ARRAY_FILTER(a, FUNCTION(x) x > 99)
+PRINT LEN(leer); " "; ARRAY_MAP(a, FUNCTION(x) x / 2)
+--- erwartet
+#1#2
+0 <ARRAY[2] OF FLOAT>
+
+=== sort mit lambda
+DIM w AS ARRAY OF STRING : w = ["Birne", "Kiwi", "Apfelsine", "Ei"]
+SORT(w, FUNCTION(a, b) LEN(a) - LEN(b))
+PRINT w[0]; " "; w[1]; " "; w[2]; " "; w[3]
+--- erwartet
+Ei Kiwi Birne Apfelsine
+
+=== lokale variablen werden beim anlegen kopiert
+FUNCTION addierer(n AS INTEGER) AS FUNCREF
+    DIM f AS FUNCREF : f = FUNCTION(x) x + n
+    n = 1000
+    RETURN f
+END FUNCTION
+DIM plus5 AS FUNCREF : plus5 = addierer(5)
+DIM plus7 AS FUNCREF : plus7 = addierer(7)
+PRINT plus5(1); " "; plus7(1)
+SUB filtern(grenze AS INTEGER)
+    DIM a AS ARRAY OF INTEGER : a = [1, 5, 10, 20]
+    PRINT LEN(ARRAY_FILTER(a, FUNCTION(x) x >= grenze))
+END SUB
+filtern(5)
+--- erwartet
+6 8
+3
+
+=== globals sieht ein lambda lebendig
+' Ein GUI-Rueckruf soll den Spielstand von JETZT zeigen, nicht den beim
+' Anlegen.
+DIM punkte AS INTEGER : punkte = 1
+DIM zeige AS FUNCREF : zeige = FUNCTION() punkte * 10
+punkte = 4
+PRINT zeige()
+DIM erhoehe AS FUNCREF : erhoehe = SUB() punkte += 1
+erhoehe() : erhoehe()
+PRINT punkte
+--- erwartet
+40
+6
+
+=== ein lambda im lambda
+DIM addiere AS FUNCREF : addiere = FUNCTION(a) FUNCTION(b) a + b
+DIM plus3 AS FUNCREF : plus3 = addiere(3)
+PRINT plus3(4); " "; addiere(10)(5)
+--- erwartet
+7 15
+
+=== in einer methode ueber self
+CLASS Liste
+    DIM werte AS ARRAY OF INTEGER
+    DIM faktor AS INTEGER
+    SUB Init()
+        Self.werte = [1, 2, 3]
+        Self.faktor = 10
+    END SUB
+    FUNCTION summe() AS INTEGER
+        RETURN ARRAY_REDUCE(Self.werte, FUNCTION(s, x) s + x * Self.faktor, 0)
+    END FUNCTION
+END CLASS
+DIM l AS Liste : l = NEW Liste()
+PRINT l.summe()
+--- erwartet
+60
+
+=== timer mit kopie
+IMPORT "timer"
+SUB planen(text AS STRING)
+    TIMER_AFTER(0, SUB() PRINT "timer: "; text)
+END SUB
+planen("eins")
+planen("zwei")
+TIMER_UPDATE()
+--- erwartet
+timer: eins
+timer: zwei
+
+=== gui-knopf ruft ein lambda
+IMPORT "gui"
+SCREEN(320, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM klicks AS INTEGER : klicks = 0
+SUB bauen(w AS GUI_WINDOW, schritt AS INTEGER)
+    DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "ok", 10, 10, 80, 24)
+    GUI_ON_CLICK(b, SUB() klicks += schritt)
+END SUB
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 10, 10, 200, 100)
+bauen(w, 5)
+AUTOMATION_PLAY("klick.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 7
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT klicks
+' In einer .dhform steht kein Lambda: sein Name haengt an der Stelle im
+' Quelltext, die Kopien gibt es beim Laden nicht.
+PRINT INSTR(GUI_TO_JSON(w), "on_click") >= 0
+--- datei klick.txt
+# Test-Aufnahme
+c 3
+e 0 7 60 54 0 0 // Event: test
+e 1 6 0 0 0 0 // Event: test
+e 2 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=10
+--- erwartet
+5
+FALSE
+
+=== auftrag mit lambda ohne kopien
+' TASK_START uebersetzt dieselbe Datei noch einmal -- das Lambda heisst dort
+' genauso und wird gefunden.
+DIM a AS INTEGER : a = TASK_START(FUNCTION(x AS INTEGER) x * 2, 21)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- erwartet
+42
+
+=== auftrag mit kopien ist ein fehler
+SUB starten(n AS INTEGER)
+    DIM a AS INTEGER : a = TASK_START(FUNCTION() n * 2)
+END SUB
+starten(3)
+--- fehler
+TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit
+
+=== zuweisung an eine kopie ist ein fehler
+SUB s()
+    DIM n AS INTEGER
+    DIM f AS FUNCREF : f = SUB() n = n + 1
+END SUB
+--- fehler
+Im Lambda ist 'n' eine Kopie
+
+=== ein feld braucht self
+CLASS K
+    DIM wert AS INTEGER
+    FUNCTION f() AS FUNCREF
+        RETURN FUNCTION() wert
+    END FUNCTION
+END CLASS
+--- fehler
+Im Lambda heisst das Feld 'wert' Self.wert
+
+=== ein lambda geht nicht ueber mehrere zeilen
+DIM f AS FUNCREF : f = FUNCTION(x)
+    PRINT x
+--- fehler
+Ein Lambda ist EIN Ausdruck in derselben Zeile
+
+=== kein yield im lambda
+DIM f AS FUNCREF : f = FUNCTION() YIELD 1
+--- fehler
+Ein Lambda kann kein YIELD enthalten
+
+=== falsche zahl der werte
+DIM g AS FUNCREF : g = FUNCTION(x, y) x + y
+TRY
+    PRINT ARRAY_MAP([1, 2], g)
+CATCH m
+    PRINT m
+END TRY
+TRY
+    PRINT g(1)
+CATCH m
+    PRINT m
+END TRY
+--- erwartet
+ARRAY_MAP: die Funktion nimmt 2 Wert(e), ARRAY_MAP gibt ihr 1 (das Element)
+Lambda: erwartet 2 Argument(e), erhalten 1
+
+=== filter will einen wahrheitswert
+PRINT ARRAY_FILTER([1, 2], FUNCTION(x) x)
+--- fehler
+ARRAY_FILTER: die Funktion muss TRUE oder FALSE liefern, lieferte INTEGER
+
+=== benannte funktion und gebundene methode gehen auch
+FUNCTION gerade(x AS INTEGER) AS BOOLEAN
+    RETURN x MOD 2 = 0
+END FUNCTION
+CLASS Regel
+    DIM grenze AS INTEGER
+    FUNCTION passt(x AS INTEGER) AS BOOLEAN
+        RETURN x > Self.grenze
+    END FUNCTION
+END CLASS
+DIM r AS Regel : r = NEW Regel() : r.grenze = 2
+PRINT LEN(ARRAY_FILTER([1, 2, 3, 4], gerade)); " "; ARRAY_FIND([1, 2, 3, 4], r.passt)
+--- erwartet
+2 2
