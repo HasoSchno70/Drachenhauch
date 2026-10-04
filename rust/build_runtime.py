@@ -16,6 +16,8 @@ Aufruf:
     python rust\\build_runtime.py --no-graphics
     python rust\\build_runtime.py --debug
     python rust\\build_runtime.py --hardware  # + serial/usb/bt/wifi/midi
+    python rust\\build_runtime.py --laufzeiten  # + die zwei kleinen Laufzeiten
+                                              #   fuer `dhrt --export --schlank`
 
 Ohne Grafik (`--no-graphics`) baut der pure VM-Kern ganz ohne C-Toolchain.
 
@@ -32,7 +34,7 @@ import platform
 import subprocess
 import sys
 from pathlib import Path
-from shutil import which
+from shutil import copy2, which
 
 HERE = Path(__file__).resolve().parent
 CRATE = HERE / "drachenhauch_runtime"
@@ -143,6 +145,9 @@ def main() -> int:
         # `dialogs` (rfd, native OS-Dateidialoge) ist davon GETRENNT, weil es
         # den WASM-Build blockiert -- auf dem Desktop gehoert es aber dazu.
         feats += ["graphics", "dialogs", "video"]
+    # PDF und Physik gehoeren zum vollen Bau; nur die kleinen Laufzeiten
+    # (LAUFZEITEN unten) lassen sie weg.
+    feats += ["pdf", "physik"]
     if "--no-data" not in args:
         feats += ["db", "net", "http", "smtp", "jit"]
     if "--hardware" in args:
@@ -155,7 +160,46 @@ def main() -> int:
         cmd += ["--features", " ".join(feats)]
 
     print("->", " ".join(cmd))
-    return subprocess.run(cmd, cwd=str(CRATE), env=env).returncode
+    rc = subprocess.run(cmd, cwd=str(CRATE), env=env).returncode
+    if rc != 0 or "--laufzeiten" not in args or "--test" in args:
+        return rc
+    return laufzeiten_bauen(env, release)
+
+
+# Die kleinen Laufzeiten fuer `dhrt --export --schlank`: der Export nimmt die
+# kleinste, deren Module (`dhrt --version`, Zeile "dabei:") alles abdecken,
+# was das Programm benutzt. Der Maschinencode bleibt in beiden -- ohne ihn
+# rechneten Programme bis zu hundertmal langsamer.
+LAUFZEITEN = [
+    ("konsole", ["db", "net", "http", "smtp", "jit"]),
+    ("spiel", ["graphics", "dialogs", "physik", "jit"]),
+]
+
+
+def laufzeiten_bauen(env: dict, release: bool) -> int:
+    """Baut jede kleine Laufzeit in ein eigenes Zielverzeichnis (sonst
+    ueberschriebe sie die volle) und legt sie als
+    <ziel>/release/laufzeiten/dhrt-<name>[.exe] neben die volle Laufzeit."""
+    ziel = Path(env.get("CARGO_TARGET_DIR") or (CRATE / "target"))
+    profil = "release" if release else "debug"
+    endung = ".exe" if platform.system() == "Windows" else ""
+    ablage = ziel / profil / "laufzeiten"
+    ablage.mkdir(parents=True, exist_ok=True)
+    for name, feats in LAUFZEITEN:
+        eigen = dict(env)
+        eigen["CARGO_TARGET_DIR"] = str(ziel / ("laufzeit-" + name))
+        cmd = ["cargo", "build", "--locked", "--features", " ".join(feats)]
+        if release:
+            cmd.append("--release")
+        print("-> [" + name + "]", " ".join(cmd))
+        rc = subprocess.run(cmd, cwd=str(CRATE), env=eigen).returncode
+        if rc != 0:
+            print("FEHLER: die Laufzeit '" + name + "' liess sich nicht bauen")
+            return rc
+        quelle = Path(eigen["CARGO_TARGET_DIR"]) / profil / ("dhrt" + endung)
+        copy2(quelle, ablage / ("dhrt-" + name + endung))
+        print("   " + str(ablage / ("dhrt-" + name + endung)))
+    return 0
 
 
 if __name__ == "__main__":

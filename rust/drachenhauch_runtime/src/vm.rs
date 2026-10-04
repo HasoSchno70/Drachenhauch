@@ -920,6 +920,7 @@ pub struct Vm<'p> {
     /// Modul `pdf` -- offene Dokumente. Sie halten alle Seiten im
     /// Speicher, bis PDF_SAVE sie schreibt; ein Bericht mit hundert
     /// Seiten ist trotzdem nur ein paar hundert Kilobyte Text.
+    #[cfg(feature = "pdf")]
     pdf_dok: Vec<Option<crate::pdf::Dokument>>,
     /// Modul `xlsx` -- offene Mappen (dasselbe Tombstone-Muster).
     xlsx_mappe: Vec<Option<crate::xlsx::Mappe>>,
@@ -1100,6 +1101,7 @@ impl<'p> Vm<'p> {
             #[cfg(feature = "net")]
             mqtt_clients: Vec::new(),
             httpd_server: Vec::new(),
+            #[cfg(feature = "pdf")]
             pdf_dok: Vec::new(),
             xlsx_mappe: Vec::new(),
             #[cfg(feature = "smtp")]
@@ -4839,6 +4841,18 @@ impl<'p> Vm<'p> {
     /// Webserver daneben).
     fn try_pdf(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("pdf_") { return Ok(None); }
+        #[cfg(feature = "pdf")]
+        { return self.try_pdf_impl(name, a); }
+        #[allow(unreachable_code)]
+        {
+            let _ = a;
+            Err(format!("{}: diese Fassung von dhrt ist ohne das Feature `pdf` gebaut",
+                        name.to_uppercase()))
+        }
+    }
+
+    #[cfg(feature = "pdf")]
+    fn try_pdf_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::pdf;
         let v = match name {
             "pdf_new" => {
@@ -4988,6 +5002,7 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
+    #[cfg(feature = "pdf")]
     fn pdf_d(&mut self, idx: i64) -> R<&mut crate::pdf::Dokument> {
         Self::handle_get_mut(&mut self.pdf_dok, idx, "PDF", "ungueltiges/geschlossenes PDF-Handle")
     }
@@ -9206,6 +9221,45 @@ impl<'p> Vm<'p> {
             "window_opacity" => { let v = need_f(a,0,"WINDOW_OPACITY")?;
                                   g!().window_opacity(v); Value::Nil }
             "window_icon" => { let i = gi(a,0,"WINDOW_ICON")?; g!().window_icon(i)?; Value::Nil }
+            "window_hide" => { g!().window_hide(true); Value::Nil }
+            "window_show" => { g!().window_hide(false); Value::Nil }
+            "tray_show" => {
+                if a.len() > 2 { return Err("TRAY_SHOW: erwartet ([bild[, hinweis$]])".into()); }
+                // Ein Bild ist ein Handle (Zahl); ein Text allein ist der Hinweis.
+                let (bild, tipp) = match (a.first(), a.get(1)) {
+                    (Some(Value::Str(s)), None) => (None, Some(s.to_string())),
+                    (Some(_), t) => (Some(gi(a,0,"TRAY_SHOW")?), match t { Some(_) => Some(gs(a,1,"TRAY_SHOW")?.to_string()), None => None }),
+                    (None, _) => (None, None),
+                };
+                g!().tray_show(bild, tipp.as_deref())?;
+                Value::Nil
+            }
+            "tray_hide" => { let _ = g!(); crate::tray::weg(); Value::Nil }
+            "tray_tooltip" => {
+                let t = gs(a,0,"TRAY_TOOLTIP")?.to_string();
+                let _ = g!();
+                crate::tray::tipp(&t).map_err(|e| format!("TRAY_TOOLTIP: {}", e))?;
+                Value::Nil
+            }
+            "tray_menu" => {
+                let t = gs(a,0,"TRAY_MENU")?;
+                let eintraege: Vec<String> = t.split('|').map(|e| e.trim().to_string()).filter(|e| !e.is_empty()).collect();
+                if eintraege.len() > 64 { return Err(format!("TRAY_MENU: hoechstens 64 Eintraege, nicht {}", eintraege.len())); }
+                let _ = g!();
+                crate::tray::menue(eintraege);
+                Value::Nil
+            }
+            "tray_shown" => { let _ = g!(); Value::Bool(crate::tray::sichtbar()) }
+            "tray_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().klick) }
+            "tray_double_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().doppel) }
+            "tray_menu_clicked$" | "tray_menu_clicked" => { let _ = g!(); Value::str_rc(crate::tray::bild().menue.unwrap_or_default()) }
+            "notify" => {
+                let (titel, text) = (gs(a,0,"NOTIFY")?.to_string(), if a.len() > 1 { gs(a,1,"NOTIFY")?.to_string() } else { String::new() });
+                if a.len() > 2 { return Err("NOTIFY: erwartet (titel$[, text$])".into()); }
+                g!().notify(&titel, &text)?;
+                Value::Nil
+            }
+            "notify_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().mitteilung) }
             "get_time" => Value::Float(g!().get_time()),
             "openurl" => { let u = gs(a,0,"OPENURL")?.to_string(); g!().open_url(&u)?; Value::Nil }
             // Graceful ohne SCREEN (0 / 0) -- wie der Tree-Walker (_buf_size=(0,0),
@@ -11563,11 +11617,25 @@ pub(crate) fn ist_schirmbefehl(name: &str) -> bool {
 /// Objekt mit der Deklaration, darum ist das die haeufigste NIL-Quelle.
 const NIL_NEW: &str = " -- die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())";
 
+/// Sagt diese Meldung "den Befehl hat dieser Bau nicht" (statt "falsche
+/// Argumente")? Fuer `dhrt --fehlende`, das die kleinen Laufzeiten fragt.
+/// Muss jede Form von `unknown_builtin_msg` und der Feature-Huellen treffen.
+pub(crate) fn fehlt_im_bau(meldung: &str) -> bool {
+    meldung.contains("noch nicht verfuegbar")
+        || meldung.contains("ist ohne das Feature")
+        || meldung.contains("das in diesem dhrt-Build fehlt")
+        || meldung.starts_with("Unbekannter Befehl")
+}
+
 fn unknown_builtin_msg(name: &str) -> String {
     // Hardware-/IoT-Module sind hinter Cargo-Features (serial/usb/bt/wifi) und im
     // Default-Build NICHT enthalten -- der Dispatch faellt dann hierher durch. Das
     // Builtin EXISTIERT (in dhrt implementiert), es fehlt nur im aktuellen Build.
     // Klare, handlungsleitende Meldung statt "noch nicht verfuegbar".
+    if name.starts_with("phys2d_") || name.starts_with("phys3d_") {
+        return format!("{}: diese Fassung von dhrt ist ohne das Feature `physik` gebaut",
+                       name.to_uppercase());
+    }
     let hw_feature = if name.starts_with("serial_") { Some("serial") }
         else if name.starts_with("usb_") { Some("usb") }
         else if name.starts_with("bt_") { Some("bt") }

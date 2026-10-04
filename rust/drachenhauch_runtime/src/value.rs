@@ -94,8 +94,10 @@ pub enum Value {
     /// Modul `physics`: Broadphase-Kollision (PHYSICS_BROAD_*, Referenz-Typ).
     PhysicsBroad(Rc<RefCell<crate::physics::BroadPhase>>),
     /// Modul `physics3d`: Rapier3D-Starrkoerper-Welt (PHYS3D_*, Referenz-Typ).
+    #[cfg(feature = "physik")]
     Phys3d(Rc<RefCell<crate::physics3d::Phys3dWorld>>),
     /// Modul `physics2d`: Rapier2D-Starrkoerper-Welt (PHYS2D_*, Referenz-Typ).
+    #[cfg(feature = "physik")]
     Phys2d(Rc<RefCell<crate::physics2d::Phys2dWorld>>),
     /// Modul `animfsm`: Animations-State-Machine (ANIM_FSM_*, Referenz-Typ).
     AnimFsm(Rc<RefCell<crate::animfsm::AnimFsmObj>>),
@@ -775,7 +777,9 @@ impl Value {
                 let b = b.borrow();
                 format!("<BroadPhase {} entities, {} pairs>", b.count(), b.pair_count())
             }
+            #[cfg(feature = "physik")]
             Value::Phys3d(w) => format!("<PHYS_WORLD {} bodies>", w.borrow().count()),
+            #[cfg(feature = "physik")]
             Value::Phys2d(w) => format!("<PHYS2D_WORLD {} bodies>", w.borrow().count()),
             Value::AnimFsm(f) => {
                 let f = f.borrow();
@@ -832,7 +836,9 @@ impl Value {
             Value::Tiled(_) => "TILED_MAP",
             Value::CharController(_) => "CHAR_CONTROLLER",
             Value::PhysicsBroad(_) => "PHYSICS_BROAD",
+            #[cfg(feature = "physik")]
             Value::Phys3d(_) => "PHYS_WORLD",
+            #[cfg(feature = "physik")]
             Value::Phys2d(_) => "PHYS2D_WORLD",
             Value::AnimFsm(_) => "ANIM_FSM",
             Value::Chart(_) => "CHART",
@@ -899,7 +905,9 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
         (Value::Coroutine(x), Value::Coroutine(y)) => Rc::ptr_eq(x, y),
         (Value::CharController(x), Value::CharController(y)) => Rc::ptr_eq(x, y),
         (Value::PhysicsBroad(x), Value::PhysicsBroad(y)) => Rc::ptr_eq(x, y),
+        #[cfg(feature = "physik")]
         (Value::Phys3d(x), Value::Phys3d(y)) => Rc::ptr_eq(x, y),
+        #[cfg(feature = "physik")]
         (Value::Phys2d(x), Value::Phys2d(y)) => Rc::ptr_eq(x, y),
         (Value::AnimFsm(x), Value::AnimFsm(y)) => Rc::ptr_eq(x, y),
         (Value::Namespace(x), Value::Namespace(y)) => Rc::ptr_eq(x, y),

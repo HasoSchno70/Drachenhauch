@@ -974,8 +974,30 @@ Bis 2026-09-21 gab es daneben die Python-Fassung `drachenhauch/export.py`
 dhrt --export examples/89_heightmap.dh [ausgabe-ordner]
 ```
 Default-Ausgabe: `<quelle>_dist/`. In der **IDE** (`dhrt run ide/ide.dh`):
-**Strg+F6** bündelt die aktive Datei nach `<name>_dist/` neben der Quelle; die
-Ausgabe des Exports läuft unten links mit (siehe [ide.md](ide.md)).
+**Strg+F6** bündelt die aktive Datei nach `<name>_dist/` neben der Quelle, schlank
+(siehe unten); die Ausgabe des Exports läuft unten links mit (siehe [ide.md](ide.md)).
+
+**Schlanker Export** (`--schlank`): Die volle Laufzeit trägt alles mit (Grafik,
+Ton, PDF mit eingebetteten Schriften, Datenbank, Netz, Video, Hardware) und ist
+rund 33 MB groß. Neben ihr liegen zwei kleinere in `laufzeiten/`:
+`dhrt-konsole` (Daten, Netz, Mail, Maschinencode; 16 MB) und `dhrt-spiel`
+(Grafik, Ton, Dialoge, Physik, Maschinencode; 21 MB). Mit `--schlank` nimmt der
+Export die kleinste, der keiner der Befehle fehlt, die das Programm aufruft --
+auch in einem Unterprogramm, das nie läuft. **Gefragt werden die Laufzeiten
+selbst** (`dhrt-konsole --fehlende name …`: jeder Name wird mit absichtlich
+unsinnigen Argumenten gerufen; ein vorhandener Befehl scheitert an ihnen, ein
+fehlender sagt, dass er fehlt), nicht eine Liste -- eine Liste wäre beim
+nächsten neuen Befehl still falsch, und das Programm bräche erst beim Kunden ab.
+Der Export sagt, welche er genommen hat (`Schlank: dhrt-konsole (16,1 MB statt
+32,9 MB)`), und wenn keine passt, warum (`dhrt-konsole fehlt PDF_NEW`). Der
+Maschinencode bleibt in beiden: ohne ihn rechneten Programme bis zu hundertmal
+langsamer. Gebaut werden die kleinen mit `python rust/build_runtime.py
+--laufzeiten`; der Installer und die Pakete für macOS und Linux bringen sie mit.
+Geprüft in [tests/pruef/export_schlank.dhtest](../tests/pruef/export_schlank.dhtest).
+
+```
+dhrt --export werkzeug.dh --schlank
+```
 
 Verifiziert: `89_heightmap.dh` exportiert (~3.7 MB Exe), die Exe **ohne
 Argumente aus fremdem Verzeichnis** gestartet, lädt das mitkopierte

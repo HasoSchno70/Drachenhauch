@@ -45,14 +45,14 @@ miniz_oxide = "0.8"
 # vorher standen hier 440 Zeilen Handarbeit, die nur die vierzehn
 # Standardschriften und cp1252 konnten. Pure-Rust. `simple-text` bringt die
 # Textformung (rustybuzz); Bilder brauchen wir (noch) nicht.
-krilla = { version = "0.8.2", default-features = false, features = ["simple-text"] }
+krilla = { version = "0.8.2", default-features = false, features = ["simple-text"], optional = true }
 # Die eingebauten Schriften des PDF-Moduls: DejaVu Sans/Serif/Sans Mono in je
 # vier Schnitten (freie Lizenz, deckt Latein, Griechisch, Kyrillisch und viele
 # Zeichen wie Pfeile und Haken ab). Der Linker nimmt nur die zwoelf benutzten.
-dejavu = "2.37"
+dejavu = { version = "2.37", optional = true }
 # Dieselbe Textformung wie krillas draw_text -- damit PDF_TEXT_WIDTH genau
 # das misst, was gezeichnet wird (samt Unterschneidung).
-rustybuzz = "0.20"
+rustybuzz = { version = "0.20", optional = true }
 # Animierte GIFs schreiben (IMAGE_SAVE_GIF). raylib kann sie nur LESEN.
 # Pure-Rust (LZW ueber weezl, Farbreduktion ueber color_quant), keine
 # C-Toolchain -> ungated wie die anderen reinen Rust-Crates.
@@ -64,9 +64,9 @@ rustybuzz = "0.20"
 gif = "0.13"
 # physics3d-Modul (PHYS3D_*): echte 3D-Starrkoerper-Physik. Pure-Rust (nalgebra),
 # keine C-Toolchain -> ungated immer dabei.
-rapier3d = "0.22"
+rapier3d = { version = "0.22", optional = true }
 # physics2d-Modul (PHYS2D_*): echte 2D-Starrkoerper-Physik. Ebenfalls pure-Rust.
-rapier2d = "0.22"
+rapier2d = { version = "0.22", optional = true }
 # Pruefsummen und Identitaet (WP D: SHA256$/SHA1$/MD5$/HMAC_SHA256$/UUID4$/
 # RANDOM_BYTES). Alles RustCrypto bzw. pure-Rust, keine C-Toolchain -> ungated:
 # ein Konsolenprogramm, das eine Pruefsumme bildet, soll nicht ausgerechnet das
@@ -249,6 +249,12 @@ video = ["dep:openh264", "dep:mp4"]
 # src/jit.rs). Seit M5 an per Vorgabe, DHRT_JIT=aus laesst alles in der VM.
 jit = ["dep:cranelift-codegen", "dep:cranelift-frontend", "dep:cranelift-jit", "dep:cranelift-module", "dep:cranelift-native"]
 db = ["dep:rusqlite"]
+# PDF-Modul (krilla, eingebettete DejaVu-Schriften, Textformung) -- gut 6 MB
+# der Laufzeit; ein Programm, das kein PDF schreibt, braucht es nicht
+# (schlanker Export, docs/entwurf-anwendungen-und-tempo.md).
+pdf = ["dep:krilla", "dep:dejavu", "dep:rustybuzz"]
+# 2D/3D-Starrkoerper-Physik (rapier) -- rund 1 MB.
+physik = ["dep:rapier2d", "dep:rapier3d"]
 net = []                       # nur std::net -- Gate dient dem Opt-out
 http = ["dep:ureq"]
 smtp = ["dep:rustls", "dep:webpki-roots"]
@@ -258,7 +264,7 @@ midi = ["dep:midir"]
 wifi = []                      # nur std::process (netsh) -- Gate fuer Opt-out
 bt = ["dep:btleplug", "dep:tokio", "dep:futures"]
 hardware = ["serial", "usb", "wifi", "bt", "midi"]
-full = ["graphics", "dialogs", "video", "db", "net", "http", "smtp", "hardware"]
+full = ["graphics", "dialogs", "video", "db", "net", "http", "smtp", "pdf", "physik", "hardware"]
 
 [profile.release]
 opt-level = 3

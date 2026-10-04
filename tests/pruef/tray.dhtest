@@ -1,0 +1,162 @@
+' Tray-Symbol und Mitteilungen (tray.rs). Das Symbol meldet sich mit
+' WM_TRAY = 0x802D = 32813 (lParam = die Maus-Nachricht: 514 Loslassen der
+' linken Taste, 515 Doppelklick, 1029 Klick auf eine Mitteilung); eine
+' Menuewahl kommt als WM_COMMAND = 273 mit 0x7100 = 28928 plus Platz. Die
+' Faelle schicken genau diese Nachrichten als ECHTE Fensternachrichten
+' (fenstersender.ps1, roh:), so wie das Symbol selbst es taete.
+' Das ECHTE Kontextmenue (rechte Taste -> TrackPopupMenu -> Pfeil, Enter)
+' steht hier nicht: es braucht das Recht, das Fenster nach vorn zu holen,
+' und das gibt Windows einer Nachricht von aussen nur manchmal (im Lauf der
+' ganzen Datei 3 von 5, einzeln 5 von 5). Ein echter Rechtsklick bekommt es.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== klick und doppelklick gelten je ein bild
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "kind.dh", "roh:32813:1:514;roh:32813:1:515;roh:32813:1:514", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei kind.dh
+SCREEN(200, 100, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+TRAY_SHOW("Probe")
+PRINT "gezeigt "; TRAY_SHOWN()
+DIM klicks AS INTEGER : DIM doppel AS INTEGER : klicks = 0 : doppel = 0
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE MILLIS() - t0 < 5000 AND klicks + doppel < 3
+    IF TRAY_CLICKED() THEN klicks = klicks + 1
+    IF TRAY_DOUBLE_CLICKED() THEN doppel = doppel + 1
+    CLS(0) : FLIP()
+WEND
+' Noch ein paar Bilder: ein Ereignis darf nur in EINEM Bild gelten.
+DIM n AS INTEGER
+FOR n = 1 TO 20
+    IF TRAY_CLICKED() THEN klicks = klicks + 1
+    CLS(0) : FLIP()
+NEXT
+PRINT "klicks "; klicks; " doppel "; doppel
+TRAY_HIDE()
+PRINT "weg "; TRAY_SHOWN()
+--- system windows
+--- erwartet
+gesendet
+gezeigt TRUE
+klicks 2 doppel 1
+weg FALSE
+
+=== menuewahl kommt mit ihrem text
+' Platz 0 "Oeffnen", 1 Trenner, 2 "Beenden": der Trenner und ein Platz
+' hinter dem Ende melden nichts.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "kind.dh", "roh:273:28929:0;roh:273:28935:0;roh:273:28930:0;roh:273:28928:0", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei kind.dh
+SCREEN(200, 100, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+TRAY_SHOW()
+TRAY_MENU("Oeffnen | - | Beenden")
+DIM gewaehlt AS STRING : gewaehlt = ""
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE MILLIS() - t0 < 5000 AND LEN(gewaehlt) < 15
+    DIM m AS STRING : m = TRAY_MENU_CLICKED$()
+    IF m <> "" THEN gewaehlt = gewaehlt + m + ";"
+    CLS(0) : FLIP()
+WEND
+PRINT gewaehlt
+--- system windows
+--- erwartet
+gesendet
+Beenden;Oeffnen;
+
+=== mitteilung und klick darauf
+' NOTIFY legt ohne Symbol eins an (mit dem Fenstertitel als Hinweis).
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "kind.dh", "roh:32813:1:1029", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei kind.dh
+SCREEN(200, 100, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+PRINT "vorher "; TRAY_SHOWN()
+NOTIFY("Drachenhauch-Pruefung", "Diese Mitteilung kommt aus tests/pruef/tray.dhtest")
+PRINT "danach "; TRAY_SHOWN()
+DIM geklickt AS BOOLEAN : geklickt = FALSE
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE MILLIS() - t0 < 5000 AND NOT geklickt
+    IF NOTIFY_CLICKED() THEN geklickt = TRUE
+    CLS(0) : FLIP()
+WEND
+PRINT "geklickt "; geklickt
+--- system windows
+--- erwartet
+gesendet
+vorher FALSE
+danach TRUE
+geklickt TRUE
+
+=== eigenes symbol, hinweis und fenster verstecken
+SCREEN(200, 100, "t", 1)
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(48, 48, RGB(200, 40, 40))
+TRAY_SHOW(b, "Eigenes Symbol")
+TRAY_TOOLTIP("Neuer Hinweis")
+PRINT "gezeigt "; TRAY_SHOWN()
+WINDOW_HIDE()
+FLIP()
+PRINT "versteckt "; WINDOW_HIDDEN()
+WINDOW_SHOW()
+FLIP()
+PRINT "wieder da "; WINDOW_HIDDEN()
+' Mit WINDOW_ICON nimmt TRAY_SHOW() dessen Bild.
+WINDOW_ICON(IMAGE_NEW(16, 16, RGB(40, 200, 40)))
+TRAY_HIDE()
+TRAY_SHOW()
+PRINT "mit fenstersymbol "; TRAY_SHOWN()
+--- umgebung
+DHRT_FRAMES=10
+--- system windows
+--- erwartet
+gezeigt TRUE
+versteckt TRUE
+wieder da FALSE
+mit fenstersymbol TRUE
+
+=== falsche angaben sind fehler
+FUNCTION probe$(n AS INTEGER) AS STRING
+    TRY
+        SELECT CASE n
+            CASE 1
+                DIM viele AS STRING : viele = ""
+                DIM k AS INTEGER
+                FOR k = 1 TO 65 : viele = viele + "e" + STR$(k) + "|" : NEXT
+                TRAY_MENU(viele)
+            CASE 2 : TRAY_SHOW(9999)
+            CASE 3 : TRAY_SHOW(1, 2, 3)
+        END SELECT
+        RETURN "kein fehler"
+    CATCH e
+        RETURN e
+    END TRY
+END FUNCTION
+SCREEN(100, 100, "t", 1)
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    PRINT probe$(i)
+NEXT
+--- umgebung
+DHRT_FRAMES=2
+--- system windows
+--- enthaelt
+TRAY_MENU: hoechstens 64 Eintraege, nicht 65
+TRAY_SHOW
+TRAY_SHOW: erwartet ([bild[, hinweis$]])

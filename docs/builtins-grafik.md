@@ -39,6 +39,15 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `WINDOW_FOCUSED()` → BOOLEAN | ist das Fenster im Vordergrund? — damit pausiert man, wenn der Nutzer wegklickt |
 | `WINDOW_MINIMIZED()` / `WINDOW_MAXIMIZED()` / `WINDOW_HIDDEN()` → BOOLEAN | Zustand des Fensters abfragen |
 | `WINDOW_FOCUS()` | das eigene Fenster nach vorne holen |
+| `WINDOW_HIDE()` / `WINDOW_SHOW()` | das Fenster verschwinden lassen, auch aus der Taskleiste, und zurückholen — für Werkzeuge, die im Tray leben |
+| `TRAY_SHOW([bild[, hinweis$]])` | ein Symbol im Infobereich der Taskleiste zeigen (Windows); ohne Bild das aus `WINDOW_ICON`, sonst das Standardsymbol; der Hinweis erscheint beim Darüberfahren (Vorgabe: der Fenstertitel) |
+| `TRAY_HIDE()` / `TRAY_SHOWN()` → BOOLEAN | das Symbol entfernen; steht es gerade da? Beim Programmende verschwindet es von selbst |
+| `TRAY_TOOLTIP(hinweis$)` | den Hinweis ändern (etwa einen Fortschritt) |
+| `TRAY_MENU(eintraege$)` | das Menü der rechten Maustaste; die Einträge stehen durch senkrechte Striche getrennt in einem Text, ein einzelnes `-` ist ein Trenner, höchstens 64 Einträge |
+| `TRAY_CLICKED()` / `TRAY_DOUBLE_CLICKED()` → BOOLEAN | wurde das Symbol in diesem Bild angeklickt? Gilt genau ein Bild, wie `GUI_CLICKED` |
+| `TRAY_MENU_CLICKED$()` → STRING | der Text des Menüeintrags, der in diesem Bild gewählt wurde, sonst `""` |
+| `NOTIFY(titel$[, text$])` | eine Mitteilung des Systems — unter Windows am Tray-Symbol (ohne Symbol legt sie eins an), unter macOS über `osascript`, unter Linux über `notify-send` |
+| `NOTIFY_CLICKED()` → BOOLEAN | wurde die Mitteilung in diesem Bild angeklickt? (Windows) |
 | `WINDOW_DPI_X()` / `WINDOW_DPI_Y()` → FLOAT | Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI) — ohne sie weiß ein Programm nicht, ob seine Pixelgrößen auf dem Zielgerät winzig herauskommen |
 | `WINDOW_RENDER_WIDTH()` / `WINDOW_RENDER_HEIGHT()` → INTEGER | die echte Pixelgröße des Fensters — auf einem HiDPI-Schirm größer als `SCREENWIDTH()`/`SCREENHEIGHT()` |
 | `WINDOW_WAIT_EVENTS(sekunden)` | `FLIP` wartet auf eine Eingabe, höchstens so lange — ein Werkzeug, das nur auf Klicks reagiert, braucht dann kaum Rechenzeit; `0` schaltet ab |

@@ -38,6 +38,7 @@ mod csv;
 mod kodierung;
 mod ini;
 mod xml;
+#[cfg(feature = "pdf")]
 mod pdf;
 mod xlsx;
 mod gifschreiber;
@@ -118,6 +119,8 @@ mod ime;
 // Echte Systemzeiger (Windows: warten/arbeitet/hilfe) ueber einen Subclass.
 #[cfg(feature = "graphics")]
 mod systemzeiger;
+#[cfg(feature = "graphics")]
+mod tray;
 // Klicks, die ganz zwischen zwei Bildern liegen (Zaehler + Regel, mit Tests).
 #[cfg(any(test, feature = "graphics"))]
 mod flanken;
@@ -130,7 +133,9 @@ mod finder;
 mod lexer;
 mod model;
 mod physics;
+#[cfg(feature = "physik")]
 mod physics2d;
+#[cfg(feature = "physik")]
 mod physics3d;
 mod preprocess;
 mod debugger;
@@ -258,6 +263,8 @@ fn eingebaut() -> String {
         ("http", cfg!(feature = "http")),
         ("mail", cfg!(feature = "smtp")),
         ("maschinencode", cfg!(feature = "jit")),
+        ("pdf", cfg!(feature = "pdf")),
+        ("physik", cfg!(feature = "physik")),
         ("seriell", cfg!(feature = "serial")),
         ("usb", cfg!(feature = "usb")),
         ("bluetooth", cfg!(feature = "bt")),
@@ -528,8 +535,14 @@ fn main() -> ExitCode {
             // Ausgabeverzeichnis -- sonst landete das Bundle in einem Ordner
             // namens "--mit-daten".
             let mit_daten = raw.iter().any(|a| a == "--mit-daten");
+            let schlank = raw.iter().any(|a| a == "--schlank");
             let out = raw.iter().skip(3).find(|a| !a.starts_with("--")).map(|s| s.as_str());
-            return export_main(&raw[2], out, mit_daten);
+            return export_main(&raw[2], out, mit_daten, schlank);
+        }
+        // `dhrt --fehlende name ...`: welche dieser Befehle hat DIESER Bau
+        // nicht? So fragt `--export --schlank` die kleinen Laufzeiten.
+        if raw.len() >= 2 && raw[1] == "--fehlende" {
+            return fehlende_main(&raw[2..]);
         }
     }
 
@@ -1901,7 +1914,111 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
 /// .dhc und haengt den Payload (gbc + Footer `[u64 len][DHRTPAY1]`) an eine
 /// Kopie der EIGENEN Runtime-Exe. `assets/` neben der Quelle wird mitkopiert.
 /// Pendant zu drachenhauch/export.py.
-fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool) -> ExitCode {
+/// Alle Befehle, die ein uebersetztes Programm aufruft (CALL_BUILTIN mit
+/// dem Namen als Argument), ohne die internen (`__...`).
+fn gerufene_befehle(json: &serde_json::Value) -> std::collections::BTreeSet<String> {
+    let mut namen = std::collections::BTreeSet::new();
+    fn gehen(v: &serde_json::Value, namen: &mut std::collections::BTreeSet<String>) {
+        match v {
+            serde_json::Value::Array(a) => {
+                if a.len() == 2 && a[0].as_i64() == Some(model::op::CALL_BUILTIN as i64) {
+                    if let Some(n) = a[1].as_array().and_then(|x| x.first()).and_then(|x| x.as_str()) {
+                        if !n.starts_with("__") { namen.insert(n.to_string()); }
+                    }
+                }
+                for x in a { gehen(x, namen); }
+            }
+            serde_json::Value::Object(o) => for x in o.values() { gehen(x, namen); },
+            _ => {}
+        }
+    }
+    gehen(json, &mut namen);
+    namen
+}
+
+/// `dhrt --fehlende name ...`: jeder Name wird mit absichtlich unsinnigen
+/// Argumenten (40 x NIL) gerufen. Ein Befehl, den dieser Bau hat, scheitert
+/// an den Argumenten; einer, den er nicht hat, meldet das (`fehlt_im_bau`).
+/// Gedruckt werden die fehlenden, eine Zeile je Name. Zwei Befehle warten im
+/// Grafik-Bau auf eine Taste und werden darum nicht gerufen, sondern nach
+/// dem Bau entschieden.
+fn fehlende_main(namen: &[String]) -> ExitCode {
+    // Ein Grafik-Befehl legt ein verstecktes Fenster an; DHRT_ABSEITS haelt
+    // es auch dann aus dem Blick, wenn einer davon es zeigen will.
+    unsafe { std::env::set_var("DHRT_ABSEITS", "1"); }
+    let prog = match compile_source_programm("", std::path::Path::new("."), "fehlende") {
+        Ok(p) => p,
+        Err(code) => return code,
+    };
+    let mut machine = vm::Vm::new(&prog);
+    let unsinn = vec![value::Value::Nil; 40];
+    let alter_haken = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    for roh in namen {
+        let n = roh.to_lowercase();
+        let fehlt = if matches!(n.as_str(), "waitkey" | "inkey$" | "inkey") {
+            !cfg!(feature = "graphics")
+        } else {
+            let merk = std::cell::Cell::new(0u8);
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| machine.builtin_rufen(&n, &unsinn, &merk))) {
+                Ok(Err(e)) => vm::fehlt_im_bau(&e),
+                _ => false,
+            }
+        };
+        if fehlt { println!("{}", n); }
+    }
+    std::panic::set_hook(alter_haken);
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    ExitCode::SUCCESS
+}
+
+/// Die kleinen Laufzeiten neben der eigenen (`laufzeiten/dhrt-*`), die
+/// kleinste zuerst.
+fn kleine_laufzeiten(exe: &std::path::Path) -> Vec<(std::path::PathBuf, u64)> {
+    let mut v = Vec::new();
+    let ordner = match exe.parent() { Some(p) => p.join("laufzeiten"), None => return v };
+    if let Ok(eintraege) = std::fs::read_dir(&ordner) {
+        for e in eintraege.flatten() {
+            let p = e.path();
+            let name = p.file_name().map(|s| s.to_string_lossy().to_lowercase()).unwrap_or_default();
+            if !name.starts_with("dhrt-") { continue; }
+            if cfg!(windows) && !name.ends_with(".exe") { continue; }
+            if let Ok(m) = p.metadata() { if m.is_file() { v.push((p, m.len())); } }
+        }
+    }
+    v.sort_by_key(|(_, g)| *g);
+    v
+}
+
+/// Fragt eine kleine Laufzeit, welche der Befehle ihr fehlen. None = sie
+/// liess sich nicht fragen (startet nicht, haengt) -- dann gilt sie als
+/// unpassend.
+fn laufzeit_fehlende(laufzeit: &std::path::Path, namen: &[String]) -> Option<Vec<String>> {
+    use std::io::Read;
+    let mut kind = std::process::Command::new(laufzeit).arg("--fehlende").args(namen)
+        .stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::null())
+        .stdin(std::process::Stdio::null()).spawn().ok()?;
+    let start = std::time::Instant::now();
+    loop {
+        match kind.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() { return None; }
+                let mut s = String::new();
+                kind.stdout.take()?.read_to_string(&mut s).ok()?;
+                return Some(s.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect());
+            }
+            Ok(None) if start.elapsed() < std::time::Duration::from_secs(30) => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            _ => { let _ = kind.kill(); return None; }
+        }
+    }
+}
+
+fn mb(bytes: u64) -> String { format!("{:.1}", bytes as f64 / (1024.0 * 1024.0)).replace('.', ",") }
+
+fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool) -> ExitCode {
     let abs = std::fs::canonicalize(path)
         .unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf())
@@ -1928,14 +2045,45 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool) -> ExitCode {
         Ok(s) => s.into_bytes(),
         Err(e) => { eprintln!("Kann .dhc nicht serialisieren: {}", e); return ExitCode::from(1); }
     };
-    // 2) Eigene Exe lesen + Payload anhaengen.
+    // 2) Eigene Exe lesen + Payload anhaengen. Mit --schlank die kleinste
+    // Laufzeit, der keiner der gerufenen Befehle fehlt.
     let exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => { eprintln!("current_exe: {}", e); return ExitCode::from(1); }
     };
-    let mut bundle = match std::fs::read(&exe) {
+    let mut laufzeit = exe.clone();
+    if schlank {
+        let namen: Vec<String> = gerufene_befehle(&json).into_iter().collect();
+        let eigene = exe.metadata().map(|m| m.len()).unwrap_or(0);
+        let kandidaten = kleine_laufzeiten(&exe);
+        let mut gruende: Vec<String> = Vec::new();
+        for (k, groesse) in &kandidaten {
+            let name = k.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            match laufzeit_fehlende(k, &namen) {
+                Some(f) if f.is_empty() => {
+                    println!("Schlank: {} ({} MB statt {} MB)", name, mb(*groesse), mb(eigene));
+                    laufzeit = k.clone();
+                    break;
+                }
+                Some(f) => {
+                    let liste: Vec<String> = f.iter().take(4).map(|s| s.to_uppercase()).collect();
+                    gruende.push(format!("{} fehlt {}{}", name, liste.join(", "), if f.len() > 4 { " ..." } else { "" }));
+                }
+                None => gruende.push(format!("{} liess sich nicht fragen", name)),
+            }
+        }
+        if laufzeit == exe {
+            if kandidaten.is_empty() {
+                println!("Schlank: keine kleinen Laufzeiten gefunden (erwartet in {}) -- die volle wird genommen",
+                         exe.parent().map(|p| p.join("laufzeiten").display().to_string()).unwrap_or_default());
+            } else {
+                println!("Schlank: keine kleine Laufzeit passt ({}) -- die volle wird genommen", gruende.join("; "));
+            }
+        }
+    }
+    let mut bundle = match std::fs::read(&laufzeit) {
         Ok(b) => b,
-        Err(e) => { eprintln!("Kann Runtime '{}' nicht lesen: {}", exe.display(), e); return ExitCode::from(1); }
+        Err(e) => { eprintln!("Kann Runtime '{}' nicht lesen: {}", laufzeit.display(), e); return ExitCode::from(1); }
     };
     bundle.extend_from_slice(&gbc_bytes);
     bundle.extend_from_slice(&(gbc_bytes.len() as u64).to_le_bytes());

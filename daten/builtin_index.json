@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2086,
+ "count": 2098,
  "builtins": [
   {
    "name": "ABS",
@@ -12517,6 +12517,78 @@
    "kind": "core",
    "signature": "CURVE_BSPLINE2(t, x0, y0, x1, y1, x2, y2, x3, y3)",
    "module": "curves"
+  },
+  {
+   "name": "TRAY_SHOW",
+   "kind": "graphics",
+   "signature": "TRAY_SHOW([bild[, hinweis$]])",
+   "module": "core"
+  },
+  {
+   "name": "TRAY_HIDE",
+   "kind": "graphics",
+   "signature": "TRAY_HIDE()",
+   "module": "core"
+  },
+  {
+   "name": "TRAY_TOOLTIP",
+   "kind": "graphics",
+   "signature": "TRAY_TOOLTIP(hinweis$)",
+   "module": "core"
+  },
+  {
+   "name": "TRAY_MENU",
+   "kind": "graphics",
+   "signature": "TRAY_MENU(eintraege$)",
+   "module": "core"
+  },
+  {
+   "name": "TRAY_SHOWN",
+   "kind": "graphics",
+   "signature": "TRAY_SHOWN() AS BOOLEAN",
+   "module": "core"
+  },
+  {
+   "name": "TRAY_CLICKED",
+   "kind": "graphics",
+   "signature": "TRAY_CLICKED() AS BOOLEAN",
+   "module": "core"
+  },
+  {
+   "name": "TRAY_DOUBLE_CLICKED",
+   "kind": "graphics",
+   "signature": "TRAY_DOUBLE_CLICKED() AS BOOLEAN",
+   "module": "core"
+  },
+  {
+   "name": "TRAY_MENU_CLICKED$",
+   "kind": "graphics",
+   "signature": "TRAY_MENU_CLICKED$() AS STRING",
+   "module": "core"
+  },
+  {
+   "name": "NOTIFY",
+   "kind": "graphics",
+   "signature": "NOTIFY(titel$[, text$])",
+   "module": "core"
+  },
+  {
+   "name": "NOTIFY_CLICKED",
+   "kind": "graphics",
+   "signature": "NOTIFY_CLICKED() AS BOOLEAN",
+   "module": "core"
+  },
+  {
+   "name": "WINDOW_HIDE",
+   "kind": "graphics",
+   "signature": "WINDOW_HIDE()",
+   "module": "core"
+  },
+  {
+   "name": "WINDOW_SHOW",
+   "kind": "graphics",
+   "signature": "WINDOW_SHOW()",
+   "module": "core"
   }
  ]
 }

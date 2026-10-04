@@ -68,6 +68,12 @@ Type: filesandordirs; Name: "{commondocs}\Drachenhauch\examples\screenshots"
 
 [Files]
 Source: "{#DhrtQuelle}"; DestDir: "{app}"; DestName: "dhrt.exe"; Flags: ignoreversion
+; Die kleinen Laufzeiten fuer `dhrt --export --schlank` (Konsole, Spiel) --
+; der Export sucht sie in laufzeiten\ neben dhrt.exe. bauen.dh gibt den Ordner
+; an, wenn es sie gibt.
+#ifdef Laufzeiten
+Source: "{#Laufzeiten}\dhrt-*.exe"; DestDir: "{app}\laufzeiten"; Flags: ignoreversion
+#endif
 ; Das Drachen-Symbol fuer Verknuepfungen, .dh-Dateien und die Deinstallation --
 ; dhrt.exe selbst traegt keins (ein exportiertes Spiel ist eine Kopie davon).
 Source: "Drachenhauch.ico"; DestDir: "{app}"; DestName: "drachenhauch.ico"; Flags: ignoreversion

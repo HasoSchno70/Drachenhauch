@@ -59,7 +59,21 @@ jobs:
 
       - name: dhrt bauen (mit Grafik)
         working-directory: rust/drachenhauch_runtime
-        run: cargo build --release --locked --features "graphics dialogs video db net http smtp jit"
+        run: cargo build --release --locked --features "graphics dialogs video db net http smtp pdf physik jit"
+
+      # Die kleinen Laufzeiten fuer `dhrt --export --schlank` -- dieselben
+      # Features wie LAUFZEITEN in rust/build_runtime.py. Jede in ein eigenes
+      # Zielverzeichnis, sonst ueberschriebe sie die volle.
+      - name: Kleine Laufzeiten bauen
+        working-directory: rust/drachenhauch_runtime
+        run: |
+          set -e
+          mkdir -p target/release/laufzeiten
+          CARGO_TARGET_DIR=target/laufzeit-konsole cargo build --release --locked --features "db net http smtp jit"
+          cp target/laufzeit-konsole/release/dhrt target/release/laufzeiten/dhrt-konsole
+          CARGO_TARGET_DIR=target/laufzeit-spiel cargo build --release --locked --features "graphics dialogs physik jit"
+          cp target/laufzeit-spiel/release/dhrt target/release/laufzeiten/dhrt-spiel
+          ls -l target/release/laufzeiten
 
       - name: Laufzeit ansehen
         run: rust/drachenhauch_runtime/target/release/dhrt --version

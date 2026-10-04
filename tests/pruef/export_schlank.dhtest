@@ -1,0 +1,139 @@
+' Schlanker Export (`dhrt --export datei.dh ziel --schlank`): die kleinste
+' Laufzeit aus laufzeiten/ neben dhrt, der keiner der gerufenen Befehle
+' fehlt. Gefragt werden die Laufzeiten selbst (`--fehlende`), nicht eine
+' Liste -- die waere beim naechsten neuen Befehl still falsch.
+' Ohne laufzeiten/ (rust/build_runtime.py ohne --laufzeiten) ueberspringen
+' sich die Faelle.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== die kleinen laufzeiten sagen, was ihnen fehlt
+IMPORT "lauf.dh"
+pruefen()
+DIM namen AS ARRAY OF STRING : namen = ["--fehlende", "len", "db_open", "screen", "pdf_new", "phys2d_new", "midi_note_name$", "waitkey", "gui_window", "audio_play"]
+PRINT "konsole: "; REPLACE$(TRIM$(lauf$(konsole$(), namen)), CHR$(10), " ")
+PRINT "spiel: "; REPLACE$(TRIM$(lauf$(spiel$(), namen)), CHR$(10), " ")
+PRINT "voll: ["; TRIM$(lauf$(EXEPATH$(), namen)); "]"
+--- datei lauf.dh
+IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+--- erwartet
+konsole: screen pdf_new phys2d_new waitkey gui_window audio_play
+spiel: db_open pdf_new
+voll: []
+
+=== ein konsolenprogramm bekommt die konsolen-laufzeit
+' Und laeuft damit: Datenbank im Speicher, Ausgabe wie mit dhrt.
+IMPORT "lauf.dh"
+pruefen()
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "prog.dh", "ziel", "--schlank"])
+PRINT zeile$(aus, "Schlank:") <> ""; " "; INSTR(zeile$(aus, "Schlank:"), "dhrt-konsole") >= 0
+DIM exe AS STRING : exe = PATHJOIN(CWD$(), "ziel/prog" + endung)
+PRINT "kleiner "; FILESIZE(exe) < FILESIZE(EXEPATH$()) * 6 \ 10
+PRINT TRIM$(lauf$(exe, [""]))
+--- datei prog.dh
+IMPORT "db"
+DIM d AS DB_CONN : d = DB_OPEN(":memory:")
+DB_EXEC(d, "CREATE TABLE t (x INTEGER)")
+DB_EXEC(d, "INSERT INTO t VALUES (41)")
+DIM r AS DB_RESULT : r = DB_QUERY(d, "SELECT x + 1 FROM t")
+IF DB_NEXT(r) THEN PRINT "antwort "; DB_GET_INT(r, 0)
+--- datei lauf.dh
+IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+--- erwartet
+TRUE TRUE
+kleiner TRUE
+antwort 42
+
+=== passt es in beide, nimmt er die kleinere
+IMPORT "lauf.dh"
+pruefen()
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "hallo.dh", "ziel", "--schlank"])
+PRINT INSTR(zeile$(aus, "Schlank:"), "dhrt-konsole") >= 0
+--- datei hallo.dh
+PRINT "hallo"
+--- datei lauf.dh
+IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+--- erwartet
+TRUE
+
+=== ein spiel bekommt die spiel-laufzeit
+' Gezaehlt wird auch ein Befehl in einer SUB, die nie laeuft: zur Laufzeit
+' koennte sie laufen, und dann fehlte er.
+IMPORT "lauf.dh"
+pruefen()
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "spiel.dh", "ziel", "--schlank"])
+PRINT INSTR(zeile$(aus, "Schlank:"), "dhrt-spiel") >= 0
+DIM exe AS STRING : exe = PATHJOIN(CWD$(), "ziel/spiel" + endung)
+PRINT "kleiner "; FILESIZE(exe) < FILESIZE(EXEPATH$()) * 7 \ 10
+PRINT TRIM$(lauf$(exe, [""]))
+--- datei spiel.dh
+IMPORT "physics2d"
+SUB nie()
+    DIM w AS PHYS2D_WORLD : w = PHYS2D_NEW()
+END SUB
+SCREEN(100, 60, "t")
+SET_WINDOW_POS(-3000, -3000)
+DIM n AS INTEGER
+FOR n = 1 TO 3
+    CLS(BLUE) : FLIP()
+NEXT
+PRINT "bilder "; n - 1
+--- datei lauf.dh
+IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+--- erwartet
+TRUE
+kleiner TRUE
+bilder 3
+
+=== ein befehl in einer nie gerufenen sub zaehlt
+' Das Hauptprogramm braucht nur die Konsole; die SUB oeffnet ein Fenster.
+' Liefe sie einmal, fehlte SCREEN -- also muss es die Spiel-Laufzeit sein.
+IMPORT "lauf.dh"
+pruefen()
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "werkzeug.dh", "ziel", "--schlank"])
+PRINT INSTR(zeile$(aus, "Schlank:"), "dhrt-spiel") >= 0
+--- datei werkzeug.dh
+SUB fenster()
+    SCREEN(100, 60, "t")
+END SUB
+PRINT "nur konsole"
+--- datei lauf.dh
+IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+--- erwartet
+TRUE
+
+=== ein pdf-programm bekommt die volle laufzeit und den grund
+IMPORT "lauf.dh"
+pruefen()
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "beleg.dh", "ziel", "--schlank"])
+DIM z AS STRING : z = zeile$(aus, "Schlank:")
+PRINT INSTR(z, "keine kleine Laufzeit passt") >= 0; " "; INSTR(z, "dhrt-konsole fehlt PDF_NEW") >= 0; " "; INSTR(z, "dhrt-spiel fehlt") >= 0
+DIM exe AS STRING : exe = PATHJOIN(CWD$(), "ziel/beleg" + endung)
+PRINT "voll "; FILESIZE(exe) > FILESIZE(EXEPATH$())
+PRINT TRIM$(lauf$(exe, [""]))
+--- datei beleg.dh
+IMPORT "pdf"
+DIM p AS PDF : p = PDF_NEW()
+PDF_TEXT(p, 20, 20, "Beleg")
+PDF_SAVE(p, "beleg.pdf")
+PRINT "pdf "; FILEEXISTS("beleg.pdf")
+--- datei lauf.dh
+IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+--- erwartet
+TRUE TRUE TRUE
+voll TRUE
+pdf TRUE
+
+=== ohne --schlank bleibt es bei der vollen laufzeit
+IMPORT "lauf.dh"
+pruefen()
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "prog.dh", "ziel"])
+PRINT "ohne meldung "; zeile$(aus, "Schlank:") = ""
+PRINT "voll "; FILESIZE(PATHJOIN(CWD$(), "ziel/prog" + endung)) > FILESIZE(EXEPATH$())
+--- datei prog.dh
+PRINT "hallo"
+--- datei lauf.dh
+IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+--- erwartet
+ohne meldung TRUE
+voll TRUE

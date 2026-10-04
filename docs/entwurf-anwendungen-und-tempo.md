@@ -229,9 +229,9 @@ schreiben will, trotzdem vermisst:
 | **Fehlermeldungen nur auf Deutsch** | Wer außerhalb des deutschen Sprachraums sucht, scheitert an der ersten Meldung. Ein Katalog (`DHRT_LANG=en`) nach dem Muster von `i18n/en.json` im Buch | mittel |
 | **Handbuch überwiegend Deutsch** | README und Buch gibt es englisch, `docs/` nicht | groß |
 | ~~**`DIM a AS INTEGER, b AS INTEGER`** geht nicht~~ | erledigt 2026-09-24: Gruppen mit je eigenem Typ und Startwert; `DIM a, i, z AS INTEGER` ging schon | — |
-| **Anwendungsgröße 27,5 MB** | jede exportierte Exe trägt die volle Laufzeit (3D, Audio, PDF-Schriften). Ein Export ohne ungenutzte Module (`--export --schlank`) | mittel |
+| ~~**Anwendungsgröße 27,5 MB**~~ | erledigt 2026-10-04: `--export --schlank` nimmt die kleinste von drei Laufzeiten (Konsole 16 MB, Spiel 21 MB, voll 33 MB), die alle Befehle des Programms hat | — |
 | **Installer nicht signiert, macOS nicht beglaubigt** | SmartScreen/Gatekeeper warnen — für Anwendungen an Kunden ein Ausschlussgrund. Die Wege sind gebaut (`DH_SIGN_*`, `DH_MAC_SIGNATUR`), es fehlt das Zertifikat | Geld, kein Code |
-| **Kein Tray-Symbol, keine System-Benachrichtigung** | typisch für Werkzeuge, die im Hintergrund laufen | klein |
+| ~~**Kein Tray-Symbol, keine System-Benachrichtigung**~~ | erledigt 2026-10-04: `TRAY_*`, `NOTIFY`, `WINDOW_HIDE`/`SHOW`; das Symbol bisher nur unter Windows, Mitteilungen auf allen drei Systemen | — |
 | **Oberfläche ist selbst gezeichnet** | sieht auf jedem System gleich aus, aber nicht „nativ“; dafür gibt es Themen und Maßstab. Kein Handlungsbedarf, aber ehrlich sagen | — |
 | **Kein Paketverzeichnis** | Bibliotheken gehen über `IMPORT "datei.dh"` und `DH_PATH`; ein `dhrt paket hole <url>` würde Teilen erleichtern | mittel |
 | **Keine anonymen Funktionen** | gebundene Methoden decken Rückrufe ab; für `SORT`/Filter wären kurze Lambdas bequemer | mittel |
@@ -244,7 +244,7 @@ schreiben will, trotzdem vermisst:
    Merkplatz je Aufrufstelle.
 3. ~~Mehrere Variablen in einem `DIM`~~ (erledigt 2026-09-24), globale
    Felder über Plätze (1e, Punkt 1), englische Fehlermeldungen.
-4. Schlanker Export, Tray/Benachrichtigung.
+4. ~~Schlanker Export, Tray/Benachrichtigung~~ — erledigt 2026-10-04.
 5. Aufrufe ohne Zwischen-`Vec` (1c), danach bei Bedarf ein Frame-Stapel.
 
 Jeder Tempo-Punkt bekommt eine eigene Messung in `tests/pruef/` mit einer

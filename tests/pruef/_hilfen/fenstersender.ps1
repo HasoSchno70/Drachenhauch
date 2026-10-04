@@ -21,7 +21,16 @@ for ($i = 0; $i -lt 150 -and $h -eq [IntPtr]::Zero; $i++) {
 if ($h -eq [IntPtr]::Zero) { "kein Fenster"; exit 2 }
 # Das Fenster ist da, bevor die Bildschleife laeuft -- etwas warten.
 Start-Sleep -Milliseconds 700
-if ($Nachricht -eq "esc") {
+if ($Nachricht.StartsWith("roh:")) {
+    # roh:msg:wparam:lparam (Zahlen dezimal oder 0x...) -- eine beliebige
+    # Nachricht, etwa die eines Tray-Symbols (tray.rs: WM_TRAY = 0x802D).
+    # Mehrere mit ";" getrennt, je 300 ms Abstand (jede soll ihr eigenes Bild haben).
+    foreach ($teil in $Nachricht.Split(";")) {
+        $t = $teil.Split(":")
+        [FensterSender]::PostMessage($h, [uint32]$t[1], [IntPtr][int64]$t[2], [IntPtr][int64]$t[3]) | Out-Null
+        Start-Sleep -Milliseconds 300
+    }
+} elseif ($Nachricht -eq "esc") {
     [FensterSender]::PostMessage($h, 0x100, [IntPtr]0x1B, [IntPtr]0x00010001) | Out-Null
     Start-Sleep -Milliseconds 80
     [FensterSender]::PostMessage($h, 0x101, [IntPtr]0x1B, [IntPtr]0xC0010001) | Out-Null
