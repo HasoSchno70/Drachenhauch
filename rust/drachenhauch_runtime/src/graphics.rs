@@ -1041,7 +1041,9 @@ fn web_leinwand_groesse(w: i32, h: i32) {
 /// Ein wartendes Fenster nicht mehr wecken, sobald es abgeraeumt ist
 /// (glfwPostEmptyEvent nach glfwTerminate meldete einen GLFW-Fehler).
 impl Drop for Graphics {
-    fn drop(&mut self) { warten::aus(); }
+    // Ein Tray-Symbol bliebe sonst als Geist stehen, bis jemand mit der Maus
+    // darueberfaehrt.
+    fn drop(&mut self) { warten::aus(); crate::tray::weg(); }
 }
 
 pub struct Graphics {
@@ -1061,6 +1063,8 @@ pub struct Graphics {
     /// Befehle und spielt sie erst beim FLIP ab) -- am Programmende ein Satz.
     pub flips: u64,
     titel: String,
+    /// Das Bild aus WINDOW_ICON -- TRAY_SHOW ohne Bild nimmt es.
+    fenster_symbol: Option<i64>,
     /// Hat das Programm `WINDOW_ESC_QUIT` selbst aufgerufen? Dann bleibt die
     /// ESC-Taste, wie es sie gesetzt hat -- auch wenn es die gui benutzt
     /// (`esc_der_gui`).
@@ -1762,6 +1766,7 @@ impl Graphics {
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
         crate::ime::einhaengen(unsafe { rl.get_window_handle() });
         crate::systemzeiger::einhaengen(unsafe { rl.get_window_handle() });
+        crate::tray::einhaengen(unsafe { rl.get_window_handle() });
         if !hidden {
             rl.clear_window_state(WindowState::default().set_window_hidden(true));
         }
@@ -1806,7 +1811,7 @@ impl Graphics {
         let mut g = Graphics {
             rl, thread, width, height, scale,
             a11y, a11y_versorgt: false, sichtbar: !hidden, flips: 0,
-            titel: title.to_string(), esc_ausdruecklich: false,
+            titel: title.to_string(), fenster_symbol: None, esc_ausdruecklich: false,
             zeiger_prog: None, zeiger_gui: None, zeiger_gesetzt: None,
             zeiger_glfw: std::collections::HashMap::new(), zeiger_eigene: std::collections::HashMap::new(),
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
@@ -6327,6 +6332,44 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     /// WINDOW_ICON(bild): Fenster-/Taskleisten-Symbol setzen. Ohne das trug
     /// JEDES exportierte Spiel das raylib-Standardsymbol.
+    /// TRAY_SHOW: das Symbol im Infobereich zeigen. Ohne Bild das Bild aus
+    /// WINDOW_ICON, sonst das Standardsymbol von Windows. Das Bild wird auf
+    /// 32x32 gebracht -- so gross zeichnet Windows es hoechstens.
+    pub fn tray_show(&mut self, img: Option<i64>, tipp: Option<&str>) -> Result<(), String> {
+        let quelle = img.or(self.fenster_symbol);
+        let punkte = match quelle {
+            Some(i) => {
+                let mut b = self.src_image(i, "TRAY_SHOW")?;
+                b.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+                b.resize(32, 32);
+                let n = 32 * 32 * 4;
+                Some(unsafe { std::slice::from_raw_parts(b.data as *const u8, n) }.to_vec())
+            }
+            None => None,
+        };
+        let titel = self.titel.clone();
+        let tipp = tipp.map(|t| t.to_string()).or_else(|| if crate::tray::sichtbar() { None } else { Some(titel) });
+        crate::tray::zeigen(punkte.as_deref().map(|p| (p, 32, 32)), tipp.as_deref())
+            .map_err(|e| format!("TRAY_SHOW: {}", e))
+    }
+    /// WINDOW_HIDE/WINDOW_SHOW: das Fenster verschwinden lassen (auch aus der
+    /// Taskleiste) und zurueckholen -- fuer Werkzeuge, die im Tray leben.
+    pub fn window_hide(&mut self, an: bool) {
+        unsafe {
+            if an { raylib::ffi::SetWindowState(raylib::consts::ConfigFlags::FLAG_WINDOW_HIDDEN as u32); }
+            else { raylib::ffi::ClearWindowState(raylib::consts::ConfigFlags::FLAG_WINDOW_HIDDEN as u32); }
+        }
+    }
+    /// NOTIFY: Mitteilung des Systems; unter Windows am Tray-Symbol (ohne
+    /// Symbol legt sie eins an, mit dem Fenstertitel als Hinweis).
+    pub fn notify(&mut self, titel: &str, text: &str) -> Result<(), String> {
+        if !crate::tray::sichtbar() && self.fenster_symbol.is_some() {
+            self.tray_show(None, None)?;
+        }
+        let tipp = self.titel.clone();
+        crate::tray::mitteilen(titel, text, &tipp).map_err(|e| format!("NOTIFY: {}", e))
+    }
+
     pub fn window_icon(&mut self, img: i64) -> Result<(), String> {
         let t = self.textures.get(img.max(0) as usize)
             .ok_or_else(|| self.tex_fehler(img, "WINDOW_ICON"))?;
@@ -6335,6 +6378,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let mut copy = t.img.clone();
         copy.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
         self.rl.set_window_icon(&copy);
+        self.fenster_symbol = Some(img);
         Ok(())
     }
     /// GET_TIME(): Sekunden seit Programmstart (monoton, unabhaengig von DELTA).
@@ -6861,6 +6905,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // Eingabe fuer den naechsten Frame schon eingelesen -- die eingespeisten
         // Werte ueberschreiben sie also und gelten fuer genau diesen Frame.
         self.automation_tick();
+
+        // Was am Tray-Symbol geschah, gilt jetzt ein Bild lang (tray.rs).
+        crate::tray::abholen();
 
         // Klicks, die ganz in der Luecke seit dem letzten Bild lagen:
         // raylib sieht sie nicht (flanken.rs), also gelten sie jetzt ein Bild

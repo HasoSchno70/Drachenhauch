@@ -9206,6 +9206,45 @@ impl<'p> Vm<'p> {
             "window_opacity" => { let v = need_f(a,0,"WINDOW_OPACITY")?;
                                   g!().window_opacity(v); Value::Nil }
             "window_icon" => { let i = gi(a,0,"WINDOW_ICON")?; g!().window_icon(i)?; Value::Nil }
+            "window_hide" => { g!().window_hide(true); Value::Nil }
+            "window_show" => { g!().window_hide(false); Value::Nil }
+            "tray_show" => {
+                if a.len() > 2 { return Err("TRAY_SHOW: erwartet ([bild[, hinweis$]])".into()); }
+                // Ein Bild ist ein Handle (Zahl); ein Text allein ist der Hinweis.
+                let (bild, tipp) = match (a.first(), a.get(1)) {
+                    (Some(Value::Str(s)), None) => (None, Some(s.to_string())),
+                    (Some(_), t) => (Some(gi(a,0,"TRAY_SHOW")?), match t { Some(_) => Some(gs(a,1,"TRAY_SHOW")?.to_string()), None => None }),
+                    (None, _) => (None, None),
+                };
+                g!().tray_show(bild, tipp.as_deref())?;
+                Value::Nil
+            }
+            "tray_hide" => { let _ = g!(); crate::tray::weg(); Value::Nil }
+            "tray_tooltip" => {
+                let t = gs(a,0,"TRAY_TOOLTIP")?.to_string();
+                let _ = g!();
+                crate::tray::tipp(&t).map_err(|e| format!("TRAY_TOOLTIP: {}", e))?;
+                Value::Nil
+            }
+            "tray_menu" => {
+                let t = gs(a,0,"TRAY_MENU")?;
+                let eintraege: Vec<String> = t.split('|').map(|e| e.trim().to_string()).filter(|e| !e.is_empty()).collect();
+                if eintraege.len() > 64 { return Err(format!("TRAY_MENU: hoechstens 64 Eintraege, nicht {}", eintraege.len())); }
+                let _ = g!();
+                crate::tray::menue(eintraege);
+                Value::Nil
+            }
+            "tray_shown" => { let _ = g!(); Value::Bool(crate::tray::sichtbar()) }
+            "tray_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().klick) }
+            "tray_double_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().doppel) }
+            "tray_menu_clicked$" | "tray_menu_clicked" => { let _ = g!(); Value::str_rc(crate::tray::bild().menue.unwrap_or_default()) }
+            "notify" => {
+                let (titel, text) = (gs(a,0,"NOTIFY")?.to_string(), if a.len() > 1 { gs(a,1,"NOTIFY")?.to_string() } else { String::new() });
+                if a.len() > 2 { return Err("NOTIFY: erwartet (titel$[, text$])".into()); }
+                g!().notify(&titel, &text)?;
+                Value::Nil
+            }
+            "notify_clicked" => { let _ = g!(); Value::Bool(crate::tray::bild().mitteilung) }
             "get_time" => Value::Float(g!().get_time()),
             "openurl" => { let u = gs(a,0,"OPENURL")?.to_string(); g!().open_url(&u)?; Value::Nil }
             // Graceful ohne SCREEN (0 / 0) -- wie der Tree-Walker (_buf_size=(0,0),

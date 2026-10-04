@@ -118,6 +118,8 @@ mod ime;
 // Echte Systemzeiger (Windows: warten/arbeitet/hilfe) ueber einen Subclass.
 #[cfg(feature = "graphics")]
 mod systemzeiger;
+#[cfg(feature = "graphics")]
+mod tray;
 // Klicks, die ganz zwischen zwei Bildern liegen (Zaehler + Regel, mit Tests).
 #[cfg(any(test, feature = "graphics"))]
 mod flanken;
