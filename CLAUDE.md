@@ -1307,10 +1307,14 @@ Meldung AENDERT, die im Katalog steht, zieht die Vorlage mit --
 meldet eine Vorlage, deren feste Stuecke in keinem Literal mehr stehen.
 Setzt sich eine Meldung aus mehreren Literalen zusammen, markiert `[[wort]]`
 (ganzes eigenes Literal) bzw. `[[]]` (Naht) die Stelle -- ohne die
-strenge Regel fand die Pruefung im ganzen Quelltext fast alles. Erste Runde:
-Lexer/Parser/Compiler/IMPORT/Umsteiger/allgemeine Laufzeitfehler, 405 von
-555 Meldungen der Fehlerfaelle; Module folgen. Doku `docs/rust-runtime.md`
-(Meldungen auf Englisch).
+strenge Regel fand die Pruefung im ganzen Quelltext fast alles. Zwei Runden:
+Sprache und allgemeine Laufzeitfehler, dann Befehle und Module -- 530 von 562
+Meldungen der Fehlerfaelle; offen gui/Grafik/Ton (`dhrt pruef meldungen
+--offen` listet, was noch fehlt, 457 Stuecke, die meisten dort). **Gewaehlt
+wird nach dem GESAMTgewicht** (feste Zeichen aller beteiligten Vorlagen,
+`meldung::tief`), nicht nach der obersten Vorlage -- sonst schnitt `{} -- {}`
+"TASK: Zugriff auf eine globale Variable ..." an der falschen Stelle durch.
+Doku `docs/rust-runtime.md` (Meldungen auf Englisch).
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
