@@ -2046,7 +2046,7 @@ impl<'p> Vm<'p> {
         let (datei, zeile) = dbg.stelle(stand.zeile);
         crate::prozess::vordergrund_freigeben();
         dbg_emit(&serde_json::json!({
-            "event": "paused", "reason": "error", "message": meldung,
+            "event": "paused", "reason": "error", "message": crate::meldung::t(&meldung),
             "line": zeile, "file": datei, "depth": dbg.stapel.len(),
             "locals": self.dbg_locals_json(fn_, &locals),
             "globals": self.dbg_globals_json(),

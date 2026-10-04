@@ -1,0 +1,160 @@
+' Meldungen auf Englisch (2026-10-04): mit DHRT_LANG=en uebersetzt dhrt seine
+' Meldungen an der Grenze zum Menschen -- Konsole, `--check`, Sprachserver,
+' CODE_CHECK$, Debugger. Der Katalog liegt in daten/meldungen.en.txt (je
+' Zeile eine deutsche Vorlage, Tabulator, die englische Fassung; was ein
+' Platzhalter einfaengt, wird seinerseits uebersetzt). Was keine Vorlage
+' trifft, bleibt deutsch, und was ein PROGRAMM sieht (CATCH), bleibt es immer.
+'
+' Gegenprobe beim Bau: ohne die Uebersetzung an den Ausgabestellen fallen die
+' Faelle mit englischer Erwartung; ohne das Abstreifen von DHRT_LANG im
+' Laeufer faellt "der laeufer nimmt den faellen die sprache".
+
+=== syntaxfehler auf englisch
+IF x > 0 THEN
+    PRINT 1
+--- umgebung
+DHRT_LANG=en
+--- fehler
+Parse error (12): Expected END IF, reached the end of the program
+
+=== ohne die variable bleibt es deutsch
+IF x > 0 THEN
+    PRINT 1
+--- fehler
+Parse-Fehler (12): END IF erwartet, Programmende erreicht
+
+=== laufzeitfehler mit rahmen und meldung
+DIM a AS INTEGER : a = 0
+PRINT 7 \ a
+--- umgebung
+DHRT_LANG=en
+--- fehler
+Runtime error in fall.dh:2: Integer division by zero
+
+=== zusammengesetzt: hinweis hinter dem strich
+' "Variable '...' nicht deklariert (DIM fehlt?)" plus ein Anhang aus
+' umstieg.rs -- beide Teile kommen aus eigenen Vorlagen.
+PRINT this.x
+--- umgebung
+DHRT_LANG=en
+--- fehler
+the own instance is called Self in Drachenhauch (Self.x = 3)
+
+=== zusammengesetzt: argumentzahl mit aufrufform
+PRINT ABS()
+--- umgebung
+DHRT_LANG=en
+--- fehler
+ABS: expected 1 argument(s), got 0 -- usage: ABS(
+
+=== eine warnung vor dem lauf
+DIM zaehler AS INTEGER
+zaehlr = 1
+--- umgebung
+DHRT_LANG=en
+--- stderr
+fall.dh:2: Warning: 'zaehlr' is written here, but is not declared anywhere in the program with DIM or CONST. When the program runs this line stops it ("Variable 'zaehlr' is not declared"). Did you mean 'zaehler'?
+--- fehler
+Runtime error in fall.dh:2: Variable 'zaehlr' is not declared (missing DIM?)
+
+=== was keine vorlage trifft bleibt deutsch
+' Die Meldungen der Module sind (noch) nicht im Katalog -- dann lieber der
+' richtige deutsche Satz als eine geratene Uebersetzung. Der Rahmen ist
+' trotzdem englisch.
+DIM b AS BUFFER : b = BUFFER_NEW(-1)
+--- umgebung
+DHRT_LANG=en
+--- fehler
+Runtime error in fall.dh:4: BUFFER_NEW: Groesse -1 ist negativ
+
+=== catch bekommt den deutschen text
+' Ein Programm, das eine Meldung vergleicht, darf sich nicht nach einer
+' Umgebungsvariable anders verhalten.
+TRY
+    PRINT 1 \ 0
+CATCH m
+    PRINT m
+END TRY
+--- umgebung
+DHRT_LANG=en
+--- erwartet
+Integer-Division durch 0
+
+=== check als json
+IMPORT "helfer.dh"
+WRITEALL("probe.dh", "DIM x AS INTEGER" + CHR$(10) + "x = " + CHR$(34) + "a" + CHR$(34) + CHR$(10))
+dlStarten(["--check", "probe.dh"])
+PRINT "deutsch "; (INSTR(dlAus, "ist als INTEGER angesagt") >= 0)
+SETENV("DHRT_LANG", "en")
+dlStarten(["--check", "probe.dh"])
+PRINT "englisch "; (INSTR(dlAus, "'x' is declared as INTEGER, the right side is STRING. That stops the program when it runs ('expected INTEGER, got STRING'). Convert to a number with VAL().") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+deutsch TRUE
+englisch TRUE
+
+=== code_check uebersetzt, die korrektur bleibt
+' Die Schnellkorrekturen lesen den DEUTSCHEN Satz ("Meintest du ...") --
+' uebersetzt wird erst danach. Mit der Variable kommt die Korrektur also
+' genauso, nur ihr Titel ist englisch.
+IMPORT "json"
+DIM quelle AS STRING : quelle = "DIM zaehler AS INTEGER" + CHR$(10) + "zaehlr = 1" + CHR$(10)
+SUB zeige(j AS JSON_HANDLE)
+    PRINT JSON_GET_STRING(j, "0.meldung")
+    PRINT JSON_GET_STRING(j, "0.korrekturen.0.titel")
+END SUB
+zeige(JSON_PARSE(CODE_CHECK$(quelle)))
+SETENV("DHRT_LANG", "en")
+zeige(JSON_PARSE(CODE_CHECK$(quelle)))
+--- erwartet
+'zaehlr' wird hier beschrieben, aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab ("Variable 'zaehlr' nicht deklariert"). Meintest du 'zaehler'?
+Ersetzen durch zaehler
+'zaehlr' is written here, but is not declared anywhere in the program with DIM or CONST. When the program runs this line stops it ("Variable 'zaehlr' is not declared"). Did you mean 'zaehler'?
+Replace with zaehler
+
+=== der laeufer nimmt den faellen die sprache
+' Die Erwartungen der Pruefsammlungen stehen deutsch da. Startet jemand die
+' Pruefung aus der englischen IDE (die DHRT_LANG setzt), duerfen sie nicht
+' kippen -- ein Fall, der Englisch will, sagt es in `--- umgebung`.
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "=== deutsch erwartet")
+ARRAY_PUSH(z, "PRINT 1 \ 0")
+ARRAY_PUSH(z, "--- fehler")
+ARRAY_PUSH(z, "Integer-Division durch 0")
+ARRAY_PUSH(z, "=== englisch verlangt")
+ARRAY_PUSH(z, "PRINT 1 \ 0")
+ARRAY_PUSH(z, "--- umgebung")
+ARRAY_PUSH(z, "DHRT_LANG=en")
+ARRAY_PUSH(z, "--- fehler")
+ARRAY_PUSH(z, "Integer division by zero")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+SETENV("DHRT_LANG", "en")
+dlStarten(["test", "s.dhtest"])
+PRINT "rueckgabe "; dlCode
+IF dlCode <> 0 THEN PRINT dlAus
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+
+=== der katalog passt zum quelltext
+' Jede deutsche Vorlage steht (in ihren festen Stuecken) noch im Quelltext,
+' die Platzhalter passen, keine steht doppelt. Eine Vorlage, deren Meldung
+' es nicht mehr gibt, uebersetzt nichts -- und die geaenderte Meldung bliebe
+' still deutsch.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0))
+dlStarten(["pruef", "meldungen"])
+DIM alles AS STRING : alles = dlAus + dlErr
+PRINT "ueber 400 vorlagen "; (VAL(alles) > 400)
+IF dlCode <> 0 THEN PRINT alles
+PRINT "rueckgabe "; dlCode
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+ueber 400 vorlagen TRUE
+rueckgabe 0

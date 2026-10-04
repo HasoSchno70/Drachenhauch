@@ -9,6 +9,7 @@
 //!   dhrt pruef konstanten [ordner]   jede Tasten-Konstante steht in der Doku
 //!   dhrt pruef pfade [ordner] [--nur datei ...]   Pfade und Links zeigen auf Dateien, die es gibt
 //!   dhrt pruef beispiele [repo]      Zahl der versionierten Beispiele (Hilfsausgabe)
+//!   dhrt pruef meldungen             daten/meldungen.en.txt gegen den Quelltext
 //!
 //! Rueckgabe 0 = sauber, 1 = mindestens ein Befund, 2 = kein Repo.
 //!
@@ -370,6 +371,7 @@ dhrt pruef konstanten [ordner]  jede Tasten-Konstante steht in der Doku
 dhrt pruef pfade [ordner] [--nur datei ...]
                                 Pfade und Links zeigen auf Dateien, die es gibt
 dhrt pruef beispiele [repo]     Zahl der versionierten Beispiele
+dhrt pruef meldungen            den englischen Katalog gegen den Quelltext pruefen
   Rueckgabe 0 = sauber, 1 = Befund";
 
 pub fn main(args: &[String]) -> ExitCode {
@@ -406,6 +408,11 @@ pub fn main(args: &[String]) -> ExitCode {
             println!("{} {}", n, woher);
             ExitCode::SUCCESS
         }
+        Some("meldungen") => {
+            let (n, f) = meldungen(&wurzel);
+            println!("{} englische Vorlagen geprueft -- {} Befund(e)", n, f.len());
+            ausgeben(&f); code(&f)
+        }
         Some("--help") | Some("-h") => { println!("{}", HILFE); ExitCode::SUCCESS }
         Some(x) => { eprintln!("dhrt pruef: unbekannt: {}\n{}", x, HILFE); ExitCode::from(2) }
         None => {
@@ -419,6 +426,7 @@ pub fn main(args: &[String]) -> ExitCode {
             funde.extend(pfade(&wurzel, &docs, None));
             funde.extend(namen(&wurzel, &wurzel, Some(&claude)));
             funde.extend(pfade(&wurzel, &wurzel, Some(&claude)));
+            funde.extend(meldungen(&wurzel).1);
             println!("{} Codebloecke geprueft; Doku-Aussagen geprueft -- {} Befund(e)", n, funde.len());
             ausgeben(&funde);
             println!("\n({} Namen und {} Pfade geduldet, siehe GEDULDET/GEDULDETE_PFADE in pruef.rs)",
@@ -428,9 +436,200 @@ pub fn main(args: &[String]) -> ExitCode {
     }
 }
 
+/// Die Zeichenketten-Literale eines Rust-Quelltexts, entschluesselt
+/// (`\"` -> `"`, Zeilenfortsetzung mit `\` weg) -- so, wie die Meldung
+/// spaeter dasteht. Zeichen-Literale werden uebersprungen, damit ein `'"'`
+/// nicht den Rest der Datei verschiebt; Kommentare ebenso.
+fn rust_literale(text: &str) -> Vec<String> {
+    let z: Vec<char> = text.chars().collect();
+    let mut aus = Vec::new();
+    let mut i = 0;
+    while i < z.len() {
+        let c = z[i];
+        if c == '/' && z.get(i + 1) == Some(&'/') {
+            while i < z.len() && z[i] != '\n' { i += 1; }
+            continue;
+        }
+        // Rohe Zeichenkette r"..." / r#"..."#: kein Rueckstrich-Escape, und
+        // ein " darin endet sie nicht -- sonst verrutscht der Rest der Datei.
+        if c == 'r' && matches!(z.get(i + 1), Some('"') | Some('#'))
+            && (i == 0 || !(z[i - 1].is_alphanumeric() || z[i - 1] == '_')) {
+            let mut j = i + 1;
+            let mut rauten = 0;
+            while z.get(j) == Some(&'#') { rauten += 1; j += 1; }
+            if z.get(j) == Some(&'"') {
+                let mut s = String::new();
+                j += 1;
+                while j < z.len() {
+                    if z[j] == '"' && (1..=rauten).all(|k| z.get(j + k) == Some(&'#')) { break; }
+                    s.push(z[j]);
+                    j += 1;
+                }
+                aus.push(s);
+                i = j + 1 + rauten;
+                continue;
+            }
+        }
+        if c == '\'' {
+            // Zeichen-Literal ('x', '\n', '\'') -- aber kein Lebensdauer-Name ('a).
+            if z.get(i + 1) == Some(&'\\') && z.get(i + 3) == Some(&'\'') { i += 4; continue; }
+            if z.get(i + 2) == Some(&'\'') { i += 3; continue; }
+            i += 1;
+            continue;
+        }
+        if c == '"' {
+            let mut s = String::new();
+            i += 1;
+            while i < z.len() && z[i] != '"' {
+                if z[i] == '\\' && i + 1 < z.len() {
+                    match z[i + 1] {
+                        'n' => s.push('\n'),
+                        't' => s.push('\t'),
+                        '\n' | '\r' => {
+                            i += 1;
+                            while i < z.len() && z[i].is_whitespace() { i += 1; }
+                            continue;
+                        }
+                        x => s.push(x),
+                    }
+                    i += 2;
+                    continue;
+                }
+                s.push(z[i]);
+                i += 1;
+            }
+            aus.push(s);
+            i += 1;
+            continue;
+        }
+        i += 1;
+    }
+    aus
+}
+
+/// Die Bruchstuecke eines Literals zwischen seinen Format-Platzhaltern
+/// (`{}`, `{:?}`, `{name}`), `{{`/`}}` entschluesselt.
+fn format_stuecke(lit: &str) -> Vec<String> {
+    let z: Vec<char> = lit.chars().collect();
+    let mut aus = vec![String::new()];
+    let mut i = 0;
+    while i < z.len() {
+        match z[i] {
+            '{' if z.get(i + 1) == Some(&'{') => { aus.last_mut().unwrap().push('{'); i += 2; }
+            '}' if z.get(i + 1) == Some(&'}') => { aus.last_mut().unwrap().push('}'); i += 2; }
+            '{' => match z[i..].iter().position(|&c| c == '}') {
+                Some(p) if z[i + 1..i + p].iter().all(|c| c.is_alphanumeric() || matches!(c, '_' | ':' | '?' | '.')) => {
+                    aus.push(String::new());
+                    i += p + 1;
+                }
+                _ => { aus.last_mut().unwrap().push('{'); i += 1; }
+            },
+            c => { aus.last_mut().unwrap().push(c); i += 1; }
+        }
+    }
+    aus
+}
+
+/// Steht dieses feste Stueck einer Vorlage im Quelltext? Es muss in EINEM
+/// Bruchstueck eines Literals stehen -- zusammengesetzt aus beliebigen
+/// Teilen fand sich im ganzen Quelltext fast alles. Wo eine Meldung wirklich
+/// aus mehreren Literalen entsteht (`concat!`, ein eingesetztes Wort), sagt
+/// der Katalog es: `[[wort]]` ist ein ganzes eigenes Literal, `[[]]` nur die
+/// Naht dazwischen.
+fn stueck_belegt(stueck: &str, korpus: &str, ganze: &HashSet<String>) -> bool {
+    let mut rest = stueck;
+    loop {
+        let (draussen, drinnen, weiter) = match rest.find("[[") {
+            Some(a) => match rest[a..].find("]]") {
+                Some(e) => (&rest[..a], Some(&rest[a + 2..a + e]), &rest[a + e + 2..]),
+                None => (rest, None, ""),
+            },
+            None => (rest, None, ""),
+        };
+        let d = draussen.trim();
+        if d.chars().count() >= 3 && !korpus.contains(draussen) && !korpus.contains(d) { return false; }
+        if let Some(w) = drinnen {
+            if !w.trim().is_empty() && !ganze.contains(w.trim()) { return false; }
+        }
+        if drinnen.is_none() { return true; }
+        rest = weiter;
+    }
+}
+
+/// `dhrt pruef meldungen`: jede deutsche Vorlage aus daten/meldungen.en.txt
+/// muss (in ihren festen Stuecken) noch im Quelltext stehen -- sonst
+/// uebersetzt sie eine Meldung, die es nicht mehr gibt, und die geaenderte
+/// bleibt still deutsch. Dazu: passende Platzhalter, keine Doppelten.
+pub fn meldungen(wurzel: &Path) -> (usize, Vec<Befund>) {
+    let mut funde: Vec<Befund> = Vec::new();
+    let datei = wurzel.join("daten").join("meldungen.en.txt");
+    let name = "daten/meldungen.en.txt".to_string();
+    let Ok(katalog) = std::fs::read_to_string(&datei) else {
+        return (0, vec![(name, 0, "fehlt".into(), "Katalog nicht lesbar".into())]);
+    };
+    let mut literale: Vec<String> = Vec::new();
+    if let Ok(eintraege) = std::fs::read_dir(wurzel.join("rust/drachenhauch_runtime/src")) {
+        let mut pfade: Vec<PathBuf> = eintraege.flatten().map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|x| x == "rs") && !p.ends_with("meldung.rs"))
+            .collect();
+        pfade.sort();
+        for p in pfade {
+            if let Ok(t) = std::fs::read_to_string(&p) { literale.extend(rust_literale(&t)); }
+        }
+    }
+    // Jedes Literal zweimal: wie es dasteht und in seinen Bruchstuecken
+    // zwischen den Platzhaltern. Getrennt durch \0, damit kein Stueck ueber
+    // zwei Literale hinweg passt.
+    let mut korpus = String::new();
+    let mut ganze: HashSet<String> = HashSet::new();
+    for l in &literale {
+        korpus.push('\u{0}'); korpus.push_str(l);
+        ganze.insert(l.trim().to_string());
+        for f in format_stuecke(l) {
+            korpus.push('\u{0}'); korpus.push_str(&f);
+            ganze.insert(f.trim().to_string());
+        }
+    }
+    let zeilen = crate::meldung::katalog_zeilen(&katalog);
+    let mut gesehen: HashSet<String> = HashSet::new();
+    for (de, en, n) in &zeilen {
+        if !gesehen.insert(de.clone()) {
+            funde.push((name.clone(), *n, de.clone(), "doppelt -- die erste gewinnt".into()));
+        }
+        let teile = crate::meldung::stuecke(de);
+        let deutsch = teile.len() - 1;
+        let (leer, groesste) = crate::meldung::platzhalter_englisch(en);
+        if (groesste == 0 && leer != deutsch) || (groesste > 0 && (leer > 0 || groesste > deutsch)) {
+            funde.push((name.clone(), *n, de.clone(),
+                        format!("{} Platzhalter deutsch, englisch {}", deutsch, leer.max(groesste))));
+        }
+        for t in &crate::meldung::stuecke_roh(de) {
+            let t = t.trim();
+            if t.chars().count() < 3 { continue; }
+            if !stueck_belegt(t, &korpus, &ganze) {
+                funde.push((name.clone(), *n, de.clone(), format!("steht nicht mehr im Quelltext: \"{}\"", t)));
+                break;
+            }
+        }
+    }
+    (zeilen.len(), funde)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn literale_und_stuecke() {
+        let l = rust_literale("let c = '\"'; f(\"a \\\"b\\\"\"); g(\"lang \\\n     weiter\"); // \"nicht\"");
+        assert_eq!(l, vec!["a \"b\"".to_string(), "lang weiter".to_string()]);
+        let k = "\u{0}Die Klasse kuendigt \u{0}eine Methode\u{0} an, ohne sie";
+        let g: HashSet<String> = ["eine Methode".to_string(), "Zahl".to_string()].into_iter().collect();
+        assert!(stueck_belegt("Die Klasse kuendigt [[eine Methode]] an, ohne sie", k, &g));
+        assert!(!stueck_belegt("Die Klasse kuendigt eine Methode an, ohne sie", k, &g));
+        assert!(!stueck_belegt("Die Klasse kuendigt [[keine Methode]] an, ohne sie", k, &g));
+        assert_eq!(format_stuecke("a {} b {:?} c {{x}} {name}"), vec!["a ", " b ", " c {x} ", ""]);
+    }
 
     #[test]
     fn notation_wird_erkannt() {
