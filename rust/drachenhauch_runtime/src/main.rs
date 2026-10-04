@@ -79,6 +79,7 @@ mod kalender;
 mod syntax;
 mod symbole;
 mod lsp;
+mod paket;
 mod meldung;
 mod doku;
 mod pruef;
@@ -298,6 +299,7 @@ dhrt -- die Drachenhauch-Runtime
   dhrt lsp                     Sprachserver (LSP ueber stdin/stdout, fuer VS Code)
   dhrt doku <prosa|grammatik|referenz>  Doku-Werkzeuge (dhrt doku fuer die Uebersicht)
   dhrt pruef [bloecke|namen|zaehlungen|konstanten|pfade]  Doku gegen die Wirklichkeit
+  dhrt paket <hole|entferne|liste|neu>  Bibliotheken holen und teilen (dhrt paket fuer die Uebersicht)
   dhrt bild <datei> <ziel.png> [bilder]
                                ein Bild vom laufenden Programm sichern
   dhrt --version               Fassung und eingebaute Bestandteile
@@ -451,6 +453,10 @@ fn main() -> ExitCode {
         // `dhrt pruef ...` -- die Doku-Pruefer.
         if raw.len() >= 2 && raw[1] == "pruef" {
             return pruef::main(&raw[2..]);
+        }
+        // `dhrt paket ...` -- Bibliotheken holen und teilen.
+        if raw.len() >= 2 && raw[1] == "paket" {
+            return paket::main(&raw[2..]);
         }
         if raw.len() >= 3 && raw[1] == "run" {
             // `--bilder N`: nach N Bildern hoert das Programm von selbst auf --

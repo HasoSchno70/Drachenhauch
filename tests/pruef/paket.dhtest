@@ -1,0 +1,231 @@
+' Pakete (2026-10-04): `dhrt paket hole <quelle>` legt eine Bibliothek in
+' pakete/<name>/ neben der paket.json ab, merkt sie dort und in
+' paket.lock.json (mit SHA-256), und IMPORT findet sie -- von der
+' importierenden Datei aus nach oben in jedem pakete/. Entwurf:
+' docs/entwurf-pakete.md.
+'
+' Jeder Fall baut sich seine Bibliotheken selbst (Ordner, ZIP) und ruft
+' dhrt als Kind; das Projekt ist der Unterordner "projekt".
+
+=== aus einem ordner holen und importieren
+IMPORT "helfer.dh"
+datei("libs/spielkiste/rechnen.dh", "FUNCTION doppelt(x AS INTEGER) AS INTEGER" + NL + "    RETURN x * 2" + NL + "END FUNCTION")
+datei("projekt/main.dh", "IMPORT " + Q + "spielkiste/rechnen.dh" + Q + NL + "PRINT doppelt(21)")
+CHDIR("projekt")
+dlStarten(["paket", "hole", "../libs/spielkiste"])
+PRINT TRIM$(dlAus); " / "; dlCode
+dlStarten(["main.dh"])
+PRINT "laeuft: "; TRIM$(dlAus)
+IMPORT "json"
+DIM w AS JSON_HANDLE : w = JSON_LOAD("paket.json")
+PRINT "wunsch: "; JSON_GET_STRING(w, "pakete.spielkiste")
+DIM s AS JSON_HANDLE : s = JSON_LOAD("paket.lock.json")
+PRINT "sperre: "; JSON_GET_STRING(s, "pakete.spielkiste.quelle"); " "; LEN(JSON_GET_STRING(s, "pakete.spielkiste.sha256")); " Zeichen"
+' Die Sperrdatei gehoert ins Repository -- kein Pfad dieses Rechners darin.
+PRINT "ohne eigenen pfad: "; INSTR(READALL$(OPENFILE("paket.lock.json", "r")), CWD$()) < 0
+dlStarten(["paket", "liste"])
+PRINT LEFT$(TRIM$(dlAus), 30)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+geholt spielkiste  (../libs/spielkiste) / 0
+laeuft: 42
+wunsch: ../libs/spielkiste
+sperre: ../libs/spielkiste 64 Zeichen
+ohne eigenen pfad: TRUE
+spielkiste  ../libs/spielkiste
+
+=== geaenderter inhalt ist ein fehler, --erneuern nimmt ihn an
+IMPORT "helfer.dh"
+datei("libs/kiste/a.dh", "PRINT 1")
+CHDIR("libs")
+CHDIR("..")
+MKDIR("projekt")
+CHDIR("projekt")
+dlStarten(["paket", "hole", "../libs/kiste"])
+datei("../libs/kiste/a.dh", "PRINT 2")
+dlStarten(["paket", "hole"])
+PRINT dlCode; " "; INSTR(dlErr, "angekommen ist etwas anderes als beim letzten Mal") >= 0; " "; INSTR(dlErr, "dhrt paket hole --erneuern") >= 0
+' Das alte Paket bleibt stehen, wenn das neue nicht passt.
+PRINT "alt: "; READLINES("pakete/kiste/a.dh")[0]
+dlStarten(["paket", "hole", "--erneuern"])
+PRINT dlCode; " neu: "; READLINES("pakete/kiste/a.dh")[0]
+dlStarten(["paket", "hole"])
+PRINT "danach wieder ruhig: "; dlCode
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+1 TRUE TRUE
+alt: PRINT 1
+0 neu: PRINT 2
+danach wieder ruhig: 0
+
+=== neu gepackt mit gleichem inhalt ist kein fehler
+' Die Pruefsumme geht ueber den INHALT, nicht ueber die Bytes des ZIPs --
+' GitHub hat seine Archive 2023 neu gepackt, ohne dass sich etwas aenderte.
+IMPORT "helfer.dh"
+ZIP_WRITE("kiste.zip", ["a.dh", "b.dh"], ["PRINT 1", "PRINT 2"])
+DIM vorher AS STRING : vorher = SHA256_FILE$("kiste.zip")
+MKDIR("projekt")
+CHDIR("projekt")
+dlStarten(["paket", "hole", "../kiste.zip"])
+CHDIR("..")
+ZIP_WRITE("kiste.zip", ["b.dh", "a.dh"], ["PRINT 2", "PRINT 1"])
+PRINT "andere bytes: "; SHA256_FILE$("kiste.zip") <> vorher
+CHDIR("projekt")
+dlStarten(["paket", "hole"])
+PRINT "gleicher inhalt: "; dlCode
+CHDIR("..")
+ZIP_WRITE("kiste.zip", ["a.dh", "b.dh"], ["PRINT 1", "PRINT 3"])
+CHDIR("projekt")
+dlStarten(["paket", "hole"])
+PRINT "anderer inhalt: "; dlCode
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+andere bytes: TRUE
+gleicher inhalt: 0
+anderer inhalt: 1
+
+=== zip mit oberordner und einzelne datei ueber http
+' GitHub liefert sein ZIP mit einem Oberordner (spielkiste-1.2/) -- der
+' faellt weg. Eine einzelne .dh-Datei landet unter ihrem Namen.
+IMPORT "helfer.dh"
+MKDIR("srv")
+ZIP_WRITE("srv/spielkiste.zip", ["spielkiste-1.2/rechnen.dh", "spielkiste-1.2/LIESMICH.md"], _
+          ["FUNCTION dreifach(x AS INTEGER) AS INTEGER" + NL + "    RETURN x * 3" + NL + "END FUNCTION", "Hallo"])
+datei("srv/hilfe.dh", "FUNCTION gruss$() AS STRING" + NL + "    RETURN " + Q + "hallo" + Q + NL + "END FUNCTION")
+CHDIR("srv")
+DIM srv AS INTEGER : srv = PROCESS_START("dhrt", "run", ARG$(0), "--", "dateien", "0", "-", CWD$() + "/port.txt")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - t0 < 15000
+    SLEEP(10)
+WEND
+SLEEP(50)
+DIM basis AS STRING : basis = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0])
+CHDIR("..")
+datei("projekt/main.dh", "IMPORT " + Q + "spielkiste/rechnen.dh" + Q + NL + "IMPORT " + Q + "hilfe/hilfe.dh" + Q + NL + "PRINT dreifach(14); gruss$()")
+CHDIR("projekt")
+dlStarten(["paket", "hole", basis + "/spielkiste.zip"])
+PRINT dlCode; " "; FILEEXISTS("pakete/spielkiste/rechnen.dh"); " "; FILEEXISTS("pakete/spielkiste/spielkiste-1.2")
+dlStarten(["paket", "hole", basis + "/hilfe.dh"])
+PRINT dlCode
+dlStarten(["main.dh"])
+PRINT TRIM$(dlAus)
+dlStarten(["paket", "hole", basis + "/gibtsnicht.zip"])
+PRINT "404: "; dlCode; " "; INSTR(dlErr, "gibtsnicht.zip") >= 0
+PROCESS_KILL(srv)
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+0 TRUE FALSE
+0
+42hallo
+404: 1 TRUE
+
+=== ein paket bringt seine eigenen pakete mit
+' Die Abhaengigkeiten eines Pakets kommen in SEIN pakete/, und es findet sie
+' dort zuerst -- auch wenn das Projekt eine andere Fassung desselben Pakets hat.
+IMPORT "helfer.dh"
+datei("libs/basis1/b.dh", "FUNCTION fassung$() AS STRING" + NL + "    RETURN " + Q + "eins" + Q + NL + "END FUNCTION")
+datei("libs/basis2/b.dh", "FUNCTION fassung$() AS STRING" + NL + "    RETURN " + Q + "zwei" + Q + NL + "END FUNCTION")
+datei("libs/oben/oben.dh", "IMPORT " + Q + "basis/b.dh" + Q + NL + "FUNCTION oben$() AS STRING" + NL + "    RETURN " + Q + "oben mit " + Q + " + fassung$()" + NL + "END FUNCTION")
+datei("libs/oben/paket.json", "{" + Q + "name" + Q + ": " + Q + "oben" + Q + ", " + Q + "pakete" + Q + ": {" + Q + "basis" + Q + ": " + Q + "../basis1" + Q + "}}")
+MKDIR("projekt")
+CHDIR("projekt")
+dlStarten(["paket", "hole", "../libs/oben"])
+PRINT REPLACE$(TRIM$(REPLACE$(dlAus, CHR$(13), "")), NL, " | ")
+PRINT "eigenes paket: "; FILEEXISTS("pakete/oben/pakete/basis/b.dh")
+datei("main.dh", "IMPORT " + Q + "oben/oben.dh" + Q + NL + "PRINT oben$()")
+dlStarten(["main.dh"])
+PRINT TRIM$(dlAus)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+geholt oben  (../libs/oben) | geholt basis  (../basis1)
+eigenes paket: TRUE
+oben mit eins
+
+=== eine datei neben dem programm schlaegt das paket
+IMPORT "helfer.dh"
+datei("libs/kiste/k.dh", "FUNCTION woher$() AS STRING" + NL + "    RETURN " + Q + "paket" + Q + NL + "END FUNCTION")
+datei("projekt/kiste/k.dh", "FUNCTION woher$() AS STRING" + NL + "    RETURN " + Q + "daneben" + Q + NL + "END FUNCTION")
+datei("projekt/main.dh", "IMPORT " + Q + "kiste/k.dh" + Q + NL + "PRINT woher$()")
+CHDIR("projekt")
+dlStarten(["paket", "hole", "../libs/kiste"])
+dlStarten(["main.dh"])
+PRINT TRIM$(dlAus)
+DELETEFILE("kiste/k.dh")
+dlStarten(["main.dh"])
+PRINT TRIM$(dlAus)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+daneben
+paket
+
+=== ein kreis ist ein fehler
+IMPORT "helfer.dh"
+datei("libs/a/a.dh", "PRINT 1")
+datei("libs/a/paket.json", "{" + Q + "pakete" + Q + ": {" + Q + "b" + Q + ": " + Q + "../b" + Q + "}}")
+datei("libs/b/b.dh", "PRINT 2")
+datei("libs/b/paket.json", "{" + Q + "pakete" + Q + ": {" + Q + "a" + Q + ": " + Q + "../a" + Q + "}}")
+MKDIR("projekt")
+CHDIR("projekt")
+dlStarten(["paket", "hole", "../libs/a"])
+PRINT dlCode; " "; INSTR(dlErr, "Kreis in den Abhaengigkeiten") >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+1 TRUE
+
+=== ein zip kommt nicht aus seinem ordner heraus
+IMPORT "helfer.dh"
+MKDIR("projekt")
+ZIP_WRITE("boese.zip", ["../../raus.dh", "gut.dh"], ["PRINT 1", "PRINT 2"])
+CHDIR("projekt")
+dlStarten(["paket", "hole", "../boese.zip"])
+PRINT dlCode; " "; FILEEXISTS("pakete/boese/gut.dh"); " "; FILEEXISTS("../raus.dh"); " "; FILEEXISTS("raus.dh")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+0 TRUE FALSE FALSE
+
+=== entfernen und fehler beim aufruf
+IMPORT "helfer.dh"
+datei("libs/kiste/k.dh", "PRINT 1")
+MKDIR("projekt")
+CHDIR("projekt")
+dlStarten(["paket", "hole"])
+PRINT "ohne paket.json: "; dlCode; " "; INSTR(dlErr, "hier gibt es keine paket.json") >= 0
+dlStarten(["paket", "hole", "github:hans/spielkiste"])
+PRINT "ohne stand: "; dlCode; " "; INSTR(dlErr, "der Stand fehlt") >= 0
+dlStarten(["paket", "hole", "../libs/kiste", "--als", "a b"])
+PRINT "krummer name: "; dlCode; " "; INSTR(dlErr, "taugt nicht als Paketname") >= 0
+dlStarten(["paket", "hole", "../libs/kiste", "--als", "werkzeug"])
+PRINT "als: "; dlCode; " "; FILEEXISTS("pakete/werkzeug/k.dh")
+dlStarten(["paket", "entferne", "werkzeug"])
+IMPORT "json"
+PRINT "entfernt: "; dlCode; " "; DIREXISTS("pakete/werkzeug"); " "; JSON_HAS(JSON_LOAD("paket.json"), "pakete.werkzeug"); " "; JSON_HAS(JSON_LOAD("paket.lock.json"), "pakete.werkzeug")
+dlStarten(["paket", "entferne", "werkzeug"])
+PRINT "zweimal: "; dlCode
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+ohne paket.json: 1 TRUE
+ohne stand: 1 TRUE
+krummer name: 1 TRUE
+als: 0 TRUE
+entfernt: 0 FALSE FALSE FALSE
+zweimal: 1

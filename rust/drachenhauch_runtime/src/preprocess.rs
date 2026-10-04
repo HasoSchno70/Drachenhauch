@@ -220,6 +220,7 @@ pub fn hardware_missing_msg(module: &str) -> String {
 ///    Aufrufer) -- die eigene Kopie eines Projekts gewinnt IMMER. Wer eine
 ///    Datei danebenlegt, will genau die, und keine, die irgendwo auf dem
 ///    Rechner liegt und sich unbemerkt aendert.
+/// 1b. `pakete/` von dort nach oben (`paketpfade`, die Pakete des Projekts).
 /// 2. `DH_PATH` -- wie `PYTHONPATH`, mehrere Ordner mit dem Trenner des
 ///    Betriebssystems (`;` unter Windows, sonst `:`). Getrennt wird mit
 ///    `std::env::split_paths`, nicht von Hand: unter Windows ist der
@@ -233,6 +234,16 @@ pub fn hardware_missing_msg(module: &str) -> String {
 /// (fuer die Zeilen-Herkunft), und der weiss nicht, wo die Exe liegt. Zwei
 /// Antworten auf "wo liegt die Bibliothek" waeren schlimmer als eine, die
 /// einen Ort weniger kennt.
+/// Die `pakete/`-Ordner von der importierenden Datei aus nach oben -- der
+/// Schritt zwischen "neben der Datei" und `DH_PATH` (`dhrt paket`, siehe
+/// docs/entwurf-pakete.md). Von innen nach aussen wie bei `node_modules`:
+/// braucht ein Paket selbst ein Paket, liegt es in seinem eigenen `pakete/`
+/// und wird dort zuerst gefunden, auch wenn das Projekt eine andere Fassung
+/// desselben Pakets hat.
+pub fn paketpfade(base: &std::path::Path) -> Vec<std::path::PathBuf> {
+    base.ancestors().map(|d| d.join("pakete")).filter(|d| d.is_dir()).collect()
+}
+
 pub fn bibliothekspfade() -> Vec<std::path::PathBuf> {
     let mut raus: Vec<std::path::PathBuf> = Vec::new();
     if let Some(p) = std::env::var_os("DH_PATH") {
@@ -387,7 +398,7 @@ fn process_inner(
         let mut joined = base.join(&rel);
         let mut gesucht: Vec<String> = vec![joined.display().to_string()];
         if !joined.is_file() && !ist_builtin {
-            for lib in bibliothekspfade() {
+            for lib in paketpfade(base).into_iter().chain(bibliothekspfade()) {
                 let kandidat = lib.join(&rel);
                 gesucht.push(kandidat.display().to_string());
                 if kandidat.is_file() { joined = kandidat; break; }
