@@ -511,3 +511,23 @@ IN bei STRING: linke Seite muss STRING sein, erhalten {}	IN with STRING: the lef
 IN bei MAP: Key muss STRING sein, erhalten {}	IN with MAP: the key must be a STRING, got {}
 IN: rechte Seite ist NIL	IN: the right side is NIL
 IN: rechte Seite muss STRING, TUPLE, ARRAY oder MAP sein, erhalten {}	IN: the right side must be STRING, TUPLE, ARRAY or MAP, got {}
+
+# ---------------------------------------------------------------- Lambdas
+Ein Lambda nimmt nur einfache Parameter (kein BYREF, kein ...) -- dafuer eine benannte FUNCTION schreiben	A lambda only takes simple parameters (no BYREF, no ...) -- write a named FUNCTION for that
+Ein Lambda hat keine Vorgabewerte -- dafuer eine benannte FUNCTION schreiben	A lambda has no default values -- write a named FUNCTION for that
+Erwartet ')' am Ende der Lambda-Parameter	Expected ')' at the end of the lambda parameters
+Ein Lambda ist EINE Anweisung in derselben Zeile: SUB() zaehler += 1 -- fuer mehr eine benannte SUB schreiben	A lambda is ONE statement on the same line: SUB() counter += 1 -- for more, write a named SUB
+Ein Lambda ist EIN Ausdruck in derselben Zeile: FUNCTION(x) x * 2 -- fuer mehr eine benannte FUNCTION schreiben	A lambda is ONE expression on the same line: FUNCTION(x) x * 2 -- for more, write a named FUNCTION
+Ein Lambda kann kein YIELD enthalten -- fuer eine Coroutine eine benannte FUNCTION schreiben	A lambda cannot contain YIELD -- write a named FUNCTION for a coroutine
+Im Lambda heisst das Feld '{}' Self.{} -- ein Lambda ist keine Methode und sieht die Felder nur ueber Self	In a lambda the field '{}' is written Self.{} -- a lambda is not a method and only sees the fields through Self
+Im Lambda ist '{}' eine Kopie -- eine Zuweisung daran wirkte nach aussen nicht. Fuer einen Wert, der bleibt, eine globale Variable oder ein Feld (Self.feld) nehmen	In a lambda '{}' is a copy -- assigning to it would have no effect outside. For a value that stays, use a global variable or a field (Self.field)
+Benannte Argumente gehen nur bei SUB/FUNCTION/NEW, nicht beim Aufruf eines Wertes	Named arguments only work with SUB/FUNCTION/NEW, not when calling a value
+Lambda: erwartet {} Argument(e), erhalten {}	Lambda: expected {} argument(s), got {}
+{}: erwartet ARRAY, erhalten {}	{}: expected ARRAY, got {}
+{}: nur eindimensionale Felder	{}: only one-dimensional arrays
+{}: erwartet eine Funktion als zweites Argument, erhalten {} -- z.B. {}(feld, FUNCTION(x) x * 2)	{}: expected a function as the second argument, got {} -- e.g. {}(array, FUNCTION(x) x * 2)
+{}: die Funktion nimmt {} Wert(e), {} gibt ihr {} (das Element)	{}: the function takes {} value(s), {} gives it {} (the element)
+{}: die Funktion nimmt {} Wert(e), {} gibt ihr {} (bisheriges Ergebnis, Element)	{}: the function takes {} value(s), {} gives it {} (result so far, element)
+ARRAY_FILTER: die Funktion muss TRUE oder FALSE liefern, lieferte {} -- ein Vergleich wie x > 0 ist ein BOOLEAN	ARRAY_FILTER: the function must return TRUE or FALSE, it returned {} -- a comparison like x > 0 is a BOOLEAN
+ARRAY_FIND: die Funktion muss TRUE oder FALSE liefern, lieferte {}	ARRAY_FIND: the function must return TRUE or FALSE, it returned {}
+TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit, und ein Auftrag laeuft in einem eigenen Prozess -- gib sie ihm als Argumente: TASK_START(FUNCTION(a, b) ..., a, b)	TASK_START: this lambda carries values from its surroundings, and a task runs in its own process -- pass them as arguments: TASK_START(FUNCTION(a, b) ..., a, b)

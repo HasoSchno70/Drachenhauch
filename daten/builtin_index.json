@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2098,
+ "count": 2102,
  "builtins": [
   {
    "name": "ABS",
@@ -139,6 +139,30 @@
    "kind": "core",
    "signature": "ARRAY_FILL(arr, wert)",
    "module": "dhrt"
+  },
+  {
+   "name": "ARRAY_FILTER",
+   "kind": "core",
+   "signature": "ARRAY_FILTER(arr: ?, funktion: FUNCREF) AS ARRAY",
+   "module": "core"
+  },
+  {
+   "name": "ARRAY_FIND",
+   "kind": "core",
+   "signature": "ARRAY_FIND(arr: ?, funktion: FUNCREF) AS INTEGER",
+   "module": "core"
+  },
+  {
+   "name": "ARRAY_MAP",
+   "kind": "core",
+   "signature": "ARRAY_MAP(arr: ?, funktion: FUNCREF) AS ARRAY",
+   "module": "core"
+  },
+  {
+   "name": "ARRAY_REDUCE",
+   "kind": "core",
+   "signature": "ARRAY_REDUCE(arr: ?, funktion: FUNCREF, start: ?)",
+   "module": "core"
   },
   {
    "name": "ARRAY_INDEXOF",

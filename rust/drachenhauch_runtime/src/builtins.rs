@@ -1829,6 +1829,15 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // Eine MAP liefert ihre PAARE (nicht die Schluessel wie bei einer
         // Variablen) -- alles andere geht unveraendert weiter, damit auch
         // ein Tupel/Array aus 2-Tupeln passt.
+        // Ein Lambda mit kopierten Locals: Name der erzeugten Funktion, dann
+        // die Werte (der Compiler emittiert den Aufruf, siehe expr_lambda).
+        "__closure" => {
+            let name = match a.first() {
+                Some(Value::Str(n)) => Rc::from(n.as_str()),
+                _ => return err("__closure: erwartet den Funktionsnamen".to_string()),
+            };
+            Ok(Value::Closure(Rc::new((name, a[1..].to_vec()))))
+        }
         "__paare" => {
             arity!(1);
             if matches!(&a[0], Value::Map(_)) { return call_inner("mapitems", a); }

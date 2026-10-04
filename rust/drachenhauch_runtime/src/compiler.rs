@@ -352,6 +352,10 @@ pub struct Compiler {
     herkunft: Vec<crate::preprocess::Herkunft>,
     haupt: String,
     compiled_fns: Vec<(String, FuncTeile)>,
+    /// Laufende Nummer der Lambdas (`__lambda_1`, ...) -- in Uebersetzungs-
+    /// Reihenfolge, also bei derselben Quelle immer dieselbe (ein Auftrag
+    /// ueber TASK_START uebersetzt die Datei noch einmal und muss sie treffen).
+    lambda_zaehler: usize,
     classes: HashMap<String, ClassInfo>,
     struct_names: std::collections::HashSet<String>,
     /// Externe Typen importierter Module (lowercase) -- gueltige DIM-Typen
@@ -655,6 +659,7 @@ impl Compiler {
                    class_lines: HashMap::new(),
                    herkunft: vec![], haupt: String::new(),
                    compiled_fns: vec![],
+                   lambda_zaehler: 0,
                    classes: HashMap::new(),
                    struct_names: std::collections::HashSet::new(),
                    external_types, builtin_aliases,
@@ -2613,6 +2618,7 @@ impl Compiler {
                 Ok(())
             }
             Node::UnaryOp { op, operand } => self.expr_unary(op, operand),
+            Node::Lambda { params, body, ist_sub } => self.expr_lambda(params, body, *ist_sub),
             Node::BinaryOp { op, left, right } => self.expr_binary(op, left, right),
             Node::Call { callee, args } => self.expr_call(callee, args),
             Node::IndexAccess { target, indices } => {
@@ -2847,7 +2853,17 @@ impl Compiler {
         }
         let name = match callee {
             Node::Identifier(n) => n.clone(),
-            _ => return Err("Stufe 3e: aufrufbare Werte noch nicht unterstuetzt".into()),
+            // Der Aufruf eines WERTES: `addiere(10)(5)`, `aktionen[i]()`,
+            // `(FUNCTION(x) x * 2)(21)`. Derselbe Weg wie eine FUNCREF-Variable.
+            _ => {
+                if args.iter().any(|a| matches!(a, Node::NamedArg { .. })) {
+                    return Err("Benannte Argumente gehen nur bei SUB/FUNCTION/NEW, nicht beim Aufruf eines Wertes".into());
+                }
+                self.expr(callee)?;
+                for a in args { self.expr(a)?; }
+                self.ctx.emit(oc::CALL_VALUE, json!([ausdruck_kurz(callee), args.len()]));
+                return Ok(());
+            }
         };
         let has_named = args.iter().any(|a| matches!(a, Node::NamedArg { .. }));
         let is_local = self.ctx.local_slots.contains_key(&name);
@@ -3905,9 +3921,153 @@ impl Compiler {
         Ok(())
     }
 
+    /// Ein Lambda (`FUNCTION(x) x * 2`, `SUB() zaehler += 1`): der Rumpf wird
+    /// eine eigene Funktion `__lambda_N`, an der Stelle steht ein FUNCREF.
+    ///
+    /// **Lokale Variablen werden KOPIERT**, beim Anlegen des Lambdas: die
+    /// Funktion bekommt sie als zusaetzliche Parameter vorn, und der Wert an
+    /// der Stelle ist eine Closure (`__closure(name, werte...)`). Eine
+    /// Kopie und kein Verweis, weil ein Lambda laenger leben kann als der
+    /// Aufruf, der es angelegt hat (ein GUI-Rueckruf, ein Timer) -- und dann
+    /// gibt es dessen Locals nicht mehr. Globals sieht das Lambda direkt.
+    /// Eine Zuweisung an eine kopierte Variable waere still wirkungslos
+    /// nach aussen; sie ist darum ein Fehler.
+    fn expr_lambda(&mut self, params: &[crate::ast::Param], body: &Node, ist_sub: bool) -> CR {
+        // Namen im Rumpf: gelesen, zugewiesen; dazu YIELD (ein Lambda ist
+        // keine Coroutine) und Felder ohne `Self.` (die sieht es nicht).
+        let mut gelesen: Vec<String> = Vec::new();
+        let mut zugewiesen: Vec<String> = Vec::new();
+        let mut yield_drin = false;
+        let mut gebunden: std::collections::HashSet<String> =
+            params.iter().map(|p| p.name.clone()).collect();
+        lambda_namen(&body.to_json(), &mut gebunden, &mut gelesen, &mut zugewiesen, &mut yield_drin);
+        if yield_drin {
+            return Err("Ein Lambda kann kein YIELD enthalten -- fuer eine Coroutine eine benannte FUNCTION schreiben".into());
+        }
+        let mut kopien: Vec<String> = Vec::new();
+        for n in &gelesen {
+            if kopien.contains(n) { continue; }
+            if self.ctx.local_slots.contains_key(n.as_str())
+                || (n == "self" && self.ctx.current_class.is_some()) {
+                kopien.push(n.clone());
+            } else if self.ctx.current_class.is_some() && self.is_field(n) {
+                return Err(format!(
+                    "Im Lambda heisst das Feld '{}' Self.{} -- ein Lambda ist keine Methode und sieht die Felder nur ueber Self", n, n));
+            }
+        }
+        if let Some(z) = zugewiesen.iter().find(|z| kopien.contains(z)) {
+            return Err(format!(
+                "Im Lambda ist '{}' eine Kopie -- eine Zuweisung daran wirkte nach aussen nicht. Fuer einen Wert, der bleibt, eine globale Variable oder ein Feld (Self.feld) nehmen", z));
+        }
+        self.lambda_zaehler += 1;
+        // Die Zahl der Kopien steht im Namen: die VM zieht sie in ihrer
+        // Meldung zur Argumentzahl ab (vm::lambda_kopien).
+        let name = format!("__lambda_{}_{}", self.lambda_zaehler, kopien.len());
+        let mut ctx = Ctx::new();
+        ctx.is_main = false;
+        ctx.is_sub = ist_sub;
+        ctx.cur_line = self.ctx.cur_line;
+        let mut param_names: Vec<String> = Vec::new();
+        for k in &kopien {
+            let typ = if k == "self" && !self.ctx.local_slots.contains_key("self") {
+                self.ctx.current_class.clone().unwrap_or_default().to_lowercase()
+            } else {
+                self.ctx.local_types[self.ctx.local_slots[k.as_str()]].clone()
+            };
+            let slot = ctx.local_types.len();
+            ctx.local_slots.insert(k.clone(), slot);
+            ctx.local_types.push(typ.clone());
+            ctx.local_defaults.push(type_default(&typ));
+            param_names.push(k.clone());
+        }
+        for p in params {
+            let slot = ctx.local_types.len();
+            ctx.local_slots.insert(p.name.clone(), slot);
+            ctx.local_types.push(p.type_name.clone());
+            ctx.local_defaults.push(type_default(&p.type_name));
+            param_names.push(p.name.clone());
+        }
+        let saved = std::mem::replace(&mut self.ctx, ctx);
+        let (alt_bereich, mein_bereich) = self.bereich_beginnen();
+        let r = (|| {
+            if ist_sub {
+                self.stmt(body)?;
+                self.ctx.emit(oc::RETURN_VOID, Value::Null);
+            } else {
+                self.expr(body)?;
+                self.ctx.emit(oc::RETURN, Value::Null);
+            }
+            Ok::<(), String>(())
+        })();
+        let fn_ctx = std::mem::replace(&mut self.ctx, saved);
+        self.bereich_beenden(alt_bereich, mein_bereich, &fn_ctx);
+        r?;
+        let n = param_names.len();
+        let fnj = build_func(fn_ctx, &name, false, ist_sub, n, n, false, false, "",
+                             &vec![None; n], &param_names, &vec![false; n], &vec![false; n]);
+        self.compiled_fns.push((name.clone(), fnj));
+        let idx = self.ctx.add_const(json!(name));
+        if kopien.is_empty() {
+            self.ctx.emit(oc::LOAD_FUNCREF, json!(idx));
+        } else {
+            self.ctx.emit(oc::LOAD_CONST, json!(idx));
+            for k in &kopien { self.load_var(k); }
+            self.ctx.emit(oc::CALL_BUILTIN, json!(["__closure", kopien.len() + 1]));
+        }
+        Ok(())
+    }
+
     fn resolve_named_args<'a>(&self, name: &str, args: &'a [Node])
         -> Result<Vec<RArg<'a>>, String> {
         resolve_args_with_sig(&self.fn_sigs[name], name, args)
+    }
+}
+
+/// Die Namen im Rumpf eines Lambdas, ueber die JSON-Form des Baums (dieselbe
+/// wie `dhrt --ast`) -- so braucht es keinen eigenen Durchlauf je Knotenart.
+/// `gebunden` sind Parameter und Laufvariablen, die NICHT von aussen kommen.
+fn lambda_namen(v: &Value, gebunden: &mut std::collections::HashSet<String>,
+                gelesen: &mut Vec<String>, zugewiesen: &mut Vec<String>, yield_drin: &mut bool) {
+    match v {
+        Value::Array(a) => for x in a { lambda_namen(x, gebunden, gelesen, zugewiesen, yield_drin); },
+        Value::Object(o) => {
+            let art = o.get("_").and_then(|t| t.as_str()).unwrap_or("");
+            let name = |k: &str| o.get(k).and_then(|n| n.as_str()).map(str::to_string);
+            match art {
+                "Identifier" => {
+                    if let Some(n) = name("name") {
+                        if !gebunden.contains(&n) { gelesen.push(n); }
+                    }
+                    return;
+                }
+                "Assign" => if let Some(n) = name("name") {
+                    if !gebunden.contains(&n) { zugewiesen.push(n.clone()); gelesen.push(n); }
+                },
+                "TupleAssign" => if let Some(ts) = o.get("targets").and_then(|t| t.as_array()) {
+                    for t in ts {
+                        if t.get("_").and_then(|x| x.as_str()) == Some("Identifier") {
+                            if let Some(n) = t.get("name").and_then(|n| n.as_str()) {
+                                if !gebunden.contains(n) { zugewiesen.push(n.to_string()); }
+                            }
+                        }
+                    }
+                },
+                "Yield" => *yield_drin = true,
+                // Ein Lambda im Lambda: seine Parameter gelten nur dort.
+                "Lambda" | "ListComp" | "SetComp" | "DictComp" => {
+                    let mut innen = gebunden.clone();
+                    if let Some(ps) = o.get("params").and_then(|p| p.as_array()) {
+                        for p in ps { if let Some(n) = p.get("name").and_then(|n| n.as_str()) { innen.insert(n.to_string()); } }
+                    }
+                    for k in ["var", "key_var", "value_var"] { if let Some(n) = name(k) { innen.insert(n); } }
+                    for (k, x) in o { if k != "_" { lambda_namen(x, &mut innen, gelesen, zugewiesen, yield_drin); } }
+                    return;
+                }
+                _ => {}
+            }
+            for (k, x) in o { if k != "_" { lambda_namen(x, gebunden, gelesen, zugewiesen, yield_drin); } }
+        }
+        _ => {}
     }
 }
 
@@ -4518,6 +4678,7 @@ fn node_name(n: &Node) -> &'static str {
         Node::IsTyp { .. } => "IsTyp",
         Node::MapLit { .. } => "MapLit",
         Node::TernaryExpr { .. } => "TernaryExpr", Node::Return(_) => "Return",
+        Node::Lambda { .. } => "Lambda",
         _ => "?",
     }
 }

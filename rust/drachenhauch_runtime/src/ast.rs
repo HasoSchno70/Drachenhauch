@@ -158,6 +158,10 @@ pub enum Node {
     MemberAssign { target: Box<Node>, name: String, value: Box<Node> },
     With { var_name: String, target: Box<Node>, body: Vec<Node> },
     Program { statements: Vec<Node> },
+    /// Ein Lambda: `FUNCTION(x) x * 2` (Ausdruck) bzw. `SUB() zaehler += 1`
+    /// (eine Anweisung). Der Compiler macht daraus eine eigene Funktion und
+    /// an der Stelle einen FUNCREF (mit kopierten Locals: eine Closure).
+    Lambda { params: Vec<Param>, body: Box<Node>, ist_sub: bool },
 }
 
 fn opt(o: &Option<Node>) -> Value {
@@ -320,6 +324,9 @@ impl Node {
             With { var_name, target, body } => obj("With", vec![
                 ("var_name", json!(var_name)), ("target", target.to_json()), ("body", vecj(body))]),
             Program { statements } => obj("Program", vec![("statements", vecj(statements))]),
+            Lambda { params, body, ist_sub } => obj("Lambda", vec![
+                ("params", Value::Array(params.iter().map(|p| p.to_json()).collect())),
+                ("body", body.to_json()), ("ist_sub", json!(ist_sub))]),
         }
     }
 }
