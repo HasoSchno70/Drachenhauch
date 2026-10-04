@@ -97,12 +97,12 @@ pub fn diagnose(text: &str, basis: &Path) -> Vec<Value> {
         let (von, bis) = fehler_bereich(zeilen.get(z0).copied().unwrap_or(""), 0, &meldung);
         let mut d = json!({
             "range": {"start": {"line": z0, "character": von}, "end": {"line": z0, "character": bis}},
-            "severity": 4, "source": "drachenhauch", "message": meldung, "tags": [1],
+            "severity": 4, "source": "drachenhauch", "message": crate::meldung::t(&meldung), "tags": [1],
         });
         let k = korrekturen_mit(&kx, z0, von, bis, &meldung);
         if !k.is_empty() {
             d["data"] = json!({"korrekturen": k.into_iter().map(|(titel, aend)| json!({
-                "titel": titel,
+                "titel": crate::meldung::t(&titel),
                 "aenderungen": aend.into_iter().map(|(z, a, b, t)| {
                     if b == usize::MAX { json!({"zeile": z, "von": a, "bis_zeile": z + 1, "bis": 0, "text": t}) }
                     else { json!({"zeile": z, "von": a, "bis_zeile": z, "bis": b, "text": t}) }
@@ -151,10 +151,18 @@ fn diagnose_uebersetzer(text: &str, basis: &Path, kx: &KorrKontext) -> Vec<Value
         let phase = d.get("phase").and_then(|p| p.as_str()).unwrap_or("compile").to_string();
         let mut zeile = d.get("line").and_then(|l| l.as_u64()).unwrap_or(0).max(1) as usize;
         let mut meldung = d.get("message").and_then(|m| m.as_str()).unwrap_or("").to_string();
+        // Was der Mensch liest -- uebersetzt VOR dem Vorsatz "in datei:zeile ->",
+        // der zu keiner Vorlage gehoert. Gerechnet (Bereich, Korrekturen) wird
+        // weiter mit dem deutschen Satz.
+        let mut anzeige = crate::meldung::t(&meldung);
         if matches!(phase.as_str(), "lex" | "parse" | "compile" | "namensraum") {
             if let Some(h) = herkunft.as_ref().and_then(|h| h.get(zeile - 1)) {
                 if h.datei.is_empty() { zeile = h.zeile as usize; }
-                else { meldung = format!("in {}:{} -> {}", h.datei, h.zeile, meldung); zeile = 1; }
+                else {
+                    meldung = format!("in {}:{} -> {}", h.datei, h.zeile, meldung);
+                    anzeige = format!("in {}:{} -> {}", h.datei, h.zeile, anzeige);
+                    zeile = 1;
+                }
             }
         }
         let z0 = zeile.saturating_sub(1);
@@ -171,12 +179,12 @@ fn diagnose_uebersetzer(text: &str, basis: &Path, kx: &KorrKontext) -> Vec<Value
         let schwere = if d.get("severity").and_then(|s| s.as_str()) == Some("warning") { 2 } else { 1 };
         let mut aus = json!({
             "range": {"start": {"line": z0, "character": von}, "end": {"line": z0, "character": bis}},
-            "severity": schwere, "source": "drachenhauch", "message": meldung,
+            "severity": schwere, "source": "drachenhauch", "message": anzeige,
         });
         let k = if importiert { Vec::new() } else { korrekturen_mit(kx, z0, von, bis, &meldung) };
         if !k.is_empty() {
             let liste: Vec<Value> = k.into_iter().map(|(titel, aend)| json!({
-                "titel": titel,
+                "titel": crate::meldung::t(&titel),
                 "aenderungen": aend.into_iter().map(|(z, a, b, t)| {
                     // bis == usize::MAX: die ganze Zeile samt Umbruch.
                     if b == usize::MAX { json!({"zeile": z, "von": a, "bis_zeile": z + 1, "bis": 0, "text": t}) }

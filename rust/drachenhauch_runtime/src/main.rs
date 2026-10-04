@@ -79,6 +79,7 @@ mod kalender;
 mod syntax;
 mod symbole;
 mod lsp;
+mod meldung;
 mod doku;
 mod pruef;
 mod pruefsammlung;
@@ -1051,7 +1052,11 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         // Laeufers an Bildzahl oder Foto vorgibt, gilt nicht fuer ihn.
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
                         .env_remove("DHRT_CONTACT").env_remove("DHRT_CONTACT_MAX")
-                        .env_remove("DHRT_CONTACT_COLS").env_remove("DHRT_CONTACT_EVERY");
+                        .env_remove("DHRT_CONTACT_COLS").env_remove("DHRT_CONTACT_EVERY")
+                        // Die Erwartungen stehen deutsch da -- eine englische
+                        // IDE, aus der die Pruefung startet, darf sie nicht kippen.
+                        // Ein Fall, der Englisch will, sagt es in `--- umgebung`.
+                        .env_remove("DHRT_LANG");
                     if let Some(b) = &f.bild {
                         if b.datei.is_none() {
                             cmd.env("DHRT_SCREENSHOT", dir.join("bild.png"));
@@ -1070,6 +1075,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .current_dir(&dir)
                         .stdin(std::process::Stdio::null())
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
+                        .env_remove("DHRT_LANG")
                         .output().map_err(|e| format!("{}: Start fehlgeschlagen: {}", name, e))?;
                     Ok((o.status.code().unwrap_or(-1),
                         String::from_utf8_lossy(&o.stdout).into_owned(), String::from_utf8_lossy(&o.stderr).into_owned()))
@@ -1303,6 +1309,7 @@ fn test_main(args: &[String]) -> ExitCode {
         let r = std::process::Command::new(&exe)
             .arg("run").arg(d)
             .stdin(std::process::Stdio::null())
+            .env_remove("DHRT_LANG")
             .output();
         let dauer = t0.elapsed().as_secs_f64();
         let name = d.display().to_string();
@@ -1365,7 +1372,7 @@ fn tokens_main(path: &str) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(e) => {
-            eprintln!("Lexer-Fehler {}:{}: {}", e.line, e.col, e.msg);
+            eprintln!("{} {}:{}: {}", meldung::wort("Lexer-Fehler", "Lexer error"), e.line, e.col, meldung::t(&e.msg));
             ExitCode::from(2)
         }
     }
@@ -1437,7 +1444,7 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
     // `(\S+\.dh):(\d+)`) die Zeile und macht sie klickbar (wie bei Laufzeitfehlern).
     let (source, imports, herkunft, namensraeume) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
-        Err(e) => { eprintln!("{}:{}: Preprocess-Fehler: {}", label, e.line, e.msg); return Err(ExitCode::from(2)); }
+        Err(e) => { eprintln!("{}:{}: {}: {}", label, e.line, meldung::wort("Preprocess-Fehler", "Preprocess error"), meldung::t(&e.msg)); return Err(ExitCode::from(2)); }
     };
     // WP I.4: alle Meldungen der Uebersetzungs-Phasen zeigen auf die Datei und
     // Zeile, die der Nutzer VOR SICH HAT -- nicht auf die gemergte Quelle.
@@ -1449,22 +1456,22 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
     // die Meldung ist nicht fatal, der Lauf geht weiter (der eigentliche Aufruf
     // wirft dann wie gehabt, falls das Modul wirklich genutzt wird).
     for m in preprocess::missing_hardware_modules(&imports) {
-        eprintln!("{}: Warnung: {}", label, preprocess::hardware_missing_msg(m));
+        eprintln!("{}: {}: {}", label, meldung::wort("Warnung", "Warning"), meldung::t(&preprocess::hardware_missing_msg(m)));
     }
     let toks = match lexer::Lexer::new(&source).tokenize() {
         Ok(t) => t,
-        Err(e) => { eprintln!("{}: Lexer-Fehler ({}): {}", wo(e.line as u32), e.col, e.msg); return Err(ExitCode::from(2)); }
+        Err(e) => { eprintln!("{}: {} ({}): {}", wo(e.line as u32), meldung::wort("Lexer-Fehler", "Lexer error"), e.col, meldung::t(&e.msg)); return Err(ExitCode::from(2)); }
     };
     let mut p = parser::Parser::new(toks);
     let mut ast = match p.parse() {
         Ok(a) => a,
-        Err(e) => { eprintln!("{}: Parse-Fehler ({}): {}", wo(e.line as u32), e.col, e.msg); return Err(ExitCode::from(2)); }
+        Err(e) => { eprintln!("{}: {} ({}): {}", wo(e.line as u32), meldung::wort("Parse-Fehler", "Parse error"), e.col, meldung::t(&e.msg)); return Err(ExitCode::from(2)); }
     };
     // WP I.1: `IMPORT "x.dh" AS x` -- Top-Level-Namen der Datei bekommen ein
     // Praefix, `x.Name` an der Aufrufstelle wird darauf abgebildet. Ohne ein
     // solches IMPORT kehrt der Durchgang sofort zurueck.
     if let Err((zeile, msg)) = namensraum::anwenden(&mut ast, &herkunft, &namensraeume, p.private_namen()) {
-        eprintln!("{}: Namensraum-Fehler: {}", wo(zeile), msg);
+        eprintln!("{}: {}: {}", wo(zeile), meldung::wort("Namensraum-Fehler", "Namespace error"), meldung::t(&msg));
         return Err(ExitCode::from(3));
     }
     match uebersetze(&ast, &ext_types, &aliases, &module, &herkunft, label) {
@@ -1473,14 +1480,15 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
             // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
             // beim Aufruf fehl.
             for (line, msg) in warns {
-                eprintln!("{}: Warnung: {}", wo(line), namensraum::lesbar_text(&msg));
+                eprintln!("{}: {}: {}", wo(line), meldung::wort("Warnung", "Warning"), meldung::t(&namensraum::lesbar_text(&msg)));
             }
             Ok(j)
         }
         Err((line, msg)) => {
-            let msg = namensraum::lesbar_text(&msg);
-            if line > 0 { eprintln!("{}: Compile-Fehler: {}", wo(line), msg); }
-            else { eprintln!("{}: Compile-Fehler: {}", label, msg); }
+            let msg = meldung::t(&namensraum::lesbar_text(&msg));
+            let art = meldung::wort("Compile-Fehler", "Compile error");
+            if line > 0 { eprintln!("{}: {}: {}", wo(line), art, msg); }
+            else { eprintln!("{}: {}: {}", label, art, msg); }
             Err(ExitCode::from(3))
         }
     }
@@ -1644,7 +1652,7 @@ fn debug_main(path: &str) -> ExitCode {
             // Erst an der Fehlerstelle anhalten (Variablen ansehen), dann melden.
             machine.debug_fehler_halt(e);
             let (datei, zeile) = machine.debug_stelle(machine.error_line());
-            serde_json::json!({"event": "error", "line": zeile, "file": datei, "message": e })
+            serde_json::json!({"event": "error", "line": zeile, "file": datei, "message": meldung::t(&e) })
         }
     };
     println!("{}", serde_json::to_string(&ev).unwrap_or_default());
@@ -1684,7 +1692,7 @@ fn check_main(pfade: &[String]) -> ExitCode {
                     "datei": pfad,
                     "probleme": [{"line": 1, "col": 1, "severity": "error",
                                   "phase": "datei",
-                                  "message": format!("nicht lesbar: {}", e)}]}));
+                                  "message": meldung::t(&format!("nicht lesbar: {}", e))}]}));
                 continue;
             }
         };
@@ -1696,7 +1704,16 @@ fn check_main(pfade: &[String]) -> ExitCode {
         let label = std::path::Path::new(pfad).file_name()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| pfad.to_string());
-        let diags = check_source(&raw_source, &base, &label);
+        let mut diags = check_source(&raw_source, &base, &label);
+        // Erst hier uebersetzen: check_source liefert auch dem Sprachserver
+        // zu, und dessen Schnellkorrekturen lesen den deutschen Satz.
+        if meldung::englisch() {
+            for d in diags.iter_mut() {
+                if let Some(m) = d.get("message").and_then(|m| m.as_str()) {
+                    d["message"] = serde_json::Value::String(meldung::uebersetzen(m));
+                }
+            }
+        }
         if einzeln {
             println!("{}", serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into()));
         } else {
@@ -2303,7 +2320,7 @@ fn run_program(prog: model::Program, source_label: &str) -> ExitCode {
     let mut machine = vm::Vm::new(&prog);
     match machine.run() {
         Ok(()) => {
-            if let Some(h) = machine.hinweis_ohne_flip() { eprintln!("{}", h); }
+            if let Some(h) = machine.hinweis_ohne_flip() { eprintln!("{}", meldung::t(&h)); }
             let out = machine.take_output();
             // stdout schreiben (Output wird gepuffert, damit es genau einmal
             // und ohne Zwischen-Flush-Artefakte erscheint).
@@ -2330,11 +2347,12 @@ fn run_program(prog: model::Program, source_label: &str) -> ExitCode {
             if let Some(code) = exit {
                 return ExitCode::from(code as u8);
             }
-            let e = crate::vm::mit_signatur(&e);
+            let e = meldung::t(&crate::vm::mit_signatur(&e));
+            let art = meldung::wort("Laufzeitfehler in", "Runtime error in");
             if line != 0 {
-                eprintln!("Laufzeitfehler in {}:{}: {}", source_label, line, e);
+                eprintln!("{} {}:{}: {}", art, source_label, line, e);
             } else {
-                eprintln!("Laufzeitfehler in {}: {}", source_label, e);
+                eprintln!("{} {}: {}", art, source_label, e);
             }
             ExitCode::from(2)
         }

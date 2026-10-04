@@ -56,6 +56,10 @@ IF prBild = 20 THEN
     protokoll("pr palette " + befehlNamen[prI] + " | " + befehlKuerzel[prI])
     protokoll("pr kuerzel " + kz$("Strg+Umschalt+Runter") + " " + kz$("Strg++") + " " + kz$("F5"))
     protokoll("pr reiter " + STR$(tabAnzahl))
+    ' Die Meldungen der Laufzeit folgen der Oberflaeche (DHRT_LANG).
+    protokoll("pr dhrt_lang [" + GETENV$("DHRT_LANG") + "]")
+    DIM prJ AS JSON_HANDLE : prJ = JSON_PARSE(CODE_CHECK$("IF x THEN" + CHR$(10)))
+    protokoll("pr pruefen " + JSON_GET_STRING(prJ, "0.meldung"))
 END IF
 IF prBild = 80 THEN
     ' Strg+N kam als Taste: der Menuepunkt heisst "Ctrl+N" und wirkt.
@@ -89,6 +93,8 @@ pr knopf New file
 pr palette Save | Ctrl+S
 pr kuerzel Ctrl+Shift+Down Ctrl++ F5
 pr reiter 0
+pr dhrt_lang [en]
+pr pruefen Expected END IF, reached the end of the program
 pr reiter 1
 pr ohne uebersetzung 0
 
@@ -101,6 +107,7 @@ IF prBild = 20 THEN
     protokoll("pr knopf " + GUI_TEXT(btnWkNeu))
     DIM prI AS INTEGER : prI = ARRAY_INDEXOF(befehlKennungen, "sichern")
     protokoll("pr palette " + befehlNamen[prI] + " | " + befehlKuerzel[prI])
+    protokoll("pr dhrt_lang [" + GETENV$("DHRT_LANG") + "]")
     befehl("sprache")
     protokoll("pr jetzt noch " + GUI_TEXT(btnWkNeu))
     EXIT(0)
@@ -122,6 +129,7 @@ PRINT "gemerkt "; JSON_GET_STRING(k, "sprache")
 --- erwartet
 pr knopf Neue Datei
 pr palette Sichern | Strg+S
+pr dhrt_lang []
 sprache en
 pr jetzt noch Neue Datei
 gemerkt en

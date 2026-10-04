@@ -463,9 +463,13 @@ bekäme. Diese Bausteine kamen mit ihr:
   `DH_IDE_SPRACHE=en` übersteuert). Jeder Anzeigetext geht durch `tr$("...")`,
   die Tabelle steht in `ide/sprache/en.txt` (je Zeile Deutsch, Tabulator,
   Englisch); `tests/pruef/werkzeug_ide_englisch.dhtest` meldet jeden Text ohne
-  Übersetzung. Deutsch bleiben: das Handbuch, die Beschreibungen der
-  Beispiele, Meldungen in der Ausgabe (etwa zur Tastenbelegung) und die
-  Werkzeuge 183–199.
+  Übersetzung. Die Meldungen der Laufzeit folgen: die IDE setzt
+  `DHRT_LANG=en`, also kommen Prüfmeldungen, Hinweise und die Fehler
+  gestarteter Programme englisch, soweit der Katalog sie kennt (siehe
+  [rust-runtime.md](rust-runtime.md), „Meldungen auf Englisch"). Deutsch
+  bleiben: das Handbuch, die Beschreibungen der Beispiele, eigene Meldungen
+  der IDE in der Ausgabe (etwa zur Tastenbelegung) und die Werkzeuge
+  183–199.
 - **Mitlaufender Blockkopf** (`GUI_TEXTAREA_SET(ta, "kopfzeilen", 3)`, Ansicht
   → Mitlaufender Blockkopf, an per Vorgabe): ist der Kopf einer SUB, einer
   Schleife oder eines IF oben hinausgerollt, der Block aber noch im Bild,

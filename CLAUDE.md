@@ -1289,6 +1289,29 @@ Details: docs/rust-runtime.md.
   sie nicht) — zusammen mit dem allgemeinen Typtest `x IS Typname`, siehe
   Abschnitt „Laufzeit-Typtest". `IS_NIL(x)` bleibt gleichwertig.
 
+## Meldungen auf Englisch (2026-10-04)
+
+`DHRT_LANG=en` uebersetzt Meldungen an der AUSGABE (`meldung.rs`): Konsole
+(`dhrt run`), `--check`, `dhrt lsp`, `CODE_CHECK$`, `dhrt debug`. Im Code
+bleiben sie deutsch -- die Pruefsammlungen und die Schnellkorrekturen
+(`lsp::korrekturen` liest "Meintest du ...") haengen daran; im Sprachserver
+wird darum erst NACH den Korrekturen uebersetzt. Katalog
+`daten/meldungen.en.txt` (eingebettet): Vorlage TAB Englisch, `{}` = Stueck
+(englisch auch `{2}`), eingefangene Stuecke werden rekursiv uebersetzt, die
+Vorlage mit den meisten festen Zeichen gewinnt, ein fuehrendes "-- " und ein
+Schlusspunkt gehoeren zur Fuge. CATCH-Werte bleiben deutsch. `dhrt test`
+streift `DHRT_LANG` ab (die IDE setzt es bei englischer Oberflaeche).
+**Regel fuer neue Meldungen:** deutsch schreiben wie bisher; wer eine
+Meldung AENDERT, die im Katalog steht, zieht die Vorlage mit --
+`dhrt pruef meldungen` (in `meldungen_englisch.dhtest` und `dhrt pruef`)
+meldet eine Vorlage, deren feste Stuecke in keinem Literal mehr stehen.
+Setzt sich eine Meldung aus mehreren Literalen zusammen, markiert `[[wort]]`
+(ganzes eigenes Literal) bzw. `[[]]` (Naht) die Stelle -- ohne die
+strenge Regel fand die Pruefung im ganzen Quelltext fast alles. Erste Runde:
+Lexer/Parser/Compiler/IMPORT/Umsteiger/allgemeine Laufzeitfehler, 405 von
+555 Meldungen der Fehlerfaelle; Module folgen. Doku `docs/rust-runtime.md`
+(Meldungen auf Englisch).
+
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
 raylib liest Maus- und Tastentasten als ZUSTAND (Rueckruf schreibt

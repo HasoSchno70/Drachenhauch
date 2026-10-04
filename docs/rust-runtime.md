@@ -281,6 +281,48 @@ entstehen — Parser-Fehler wie Übersetzungsfehler (z. B. eine doppelt
 deklarierte SUB). `dhrt --check datei.dh` meldet sie als JSON, ohne das
 Programm zu starten.
 
+### Meldungen auf Englisch (`DHRT_LANG=en`)
+
+Mit `DHRT_LANG=en` (auch `en_US` usw.) schreibt dhrt seine Meldungen
+englisch:
+
+```
+Runtime error in game.dh:42: Index 10 outside [0..2] in dimension 0
+game.dh:3: Parse error (12): Expected END IF, reached the end of the program
+```
+
+Die Meldungen entstehen im Code weiter deutsch; übersetzt wird erst dort, wo
+sie den Menschen erreichen: Konsole (`dhrt run`), `dhrt --check`, Sprachserver
+(`dhrt lsp`), `CODE_CHECK$` und Debugger (`dhrt debug`). Der Katalog
+[`daten/meldungen.en.txt`](../daten/meldungen.en.txt) hat je Zeile eine
+deutsche Vorlage, einen Tabulator und die englische Fassung; `{}` steht für
+ein eingesetztes Stück (im Englischen auch `{2}` für eine andere
+Reihenfolge). Was ein Platzhalter einfängt, wird seinerseits übersetzt —
+darum genügen für zusammengesetzte Meldungen die Teile (`{} -- Aufruf: {}`,
+`{} Meintest du {}?`, die Umsteiger-Hinweise). Die genaueste Vorlage gewinnt.
+
+- **Was keine Vorlage trifft, bleibt deutsch** — der richtige deutsche Satz
+  ist besser als eine geratene Übersetzung. Die erste Runde deckt Lexer,
+  Parser, Compiler, IMPORT, die Umsteiger-Hinweise und die allgemeinen
+  Laufzeitfehler (Typen, Division, Index, Variablen, Objekte, Argumente) ab;
+  gemessen an den 555 Fehlermeldungen der Prüfsammlungen kommen 405 (73 %)
+  englisch an. Die Meldungen der einzelnen Module (BUFFER, JSON, SET …)
+  folgen.
+- **Was ein Programm sieht, bleibt deutsch**: der Wert einer `CATCH`-Variable
+  hängt nicht an einer Umgebungsvariable.
+- **Schnellkorrekturen** lesen weiter den deutschen Satz; nur ihr Titel wird
+  übersetzt.
+- **`dhrt test`** nimmt seinen Fällen `DHRT_LANG` weg (ihre Erwartungen
+  stehen deutsch da); ein Fall, der Englisch will, setzt es in
+  `--- umgebung`.
+- **`dhrt pruef meldungen`** prüft den Katalog gegen den Quelltext: jede
+  deutsche Vorlage muss in ihren festen Stücken noch in einem Literal stehen,
+  die Platzhalter müssen passen. Wo eine Meldung aus mehreren Literalen
+  zusammengesetzt wird, markiert `[[wort]]` (ein ganzes eigenes Literal) bzw.
+  `[[]]` (nur die Naht) die Stelle.
+
+Die IDE setzt `DHRT_LANG=en`, wenn ihre Oberfläche englisch ist.
+
 ## Schritt 1: `.dhc`-Serialisierung
 
 Ein übersetztes Programm ist eine selbstbeschreibende JSON-Datei (`.dhc`).

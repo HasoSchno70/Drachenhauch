@@ -620,6 +620,11 @@ IF englisch THEN
         englisch = FALSE
     END IF
 END IF
+' Die Meldungen der Laufzeit in derselben Sprache: Pruefen und Hinweise
+' (CODE_CHECK$ laeuft in diesem Prozess) und jedes gestartete Programm, das
+' die Variable erbt. Eine Pruefsammlung (`dhrt test`) nimmt sie ihren
+' Faellen wieder weg -- deren Erwartungen stehen deutsch da.
+IF englisch AND GETENV$("DHRT_LANG") = "" THEN SETENV("DHRT_LANG", "en")
 
 FUNCTION tr$(t AS STRING) AS STRING
     IF NOT englisch THEN RETURN t
@@ -12397,8 +12402,8 @@ SUB ausgabe(zeile AS STRING)
         (ortP, ortZ) = ausgabeOrt(zeile)
         IF ortP <> "" THEN
             DIM farbe AS INTEGER : farbe = &H60A0E0
-            IF INSTR(zeile, "Warnung") >= 0 THEN farbe = &HE0C060
-            IF INSTR(LOWER$(zeile), "fehler") >= 0 THEN farbe = &HE06060
+            IF INSTR(zeile, "Warnung") >= 0 OR INSTR(zeile, "Warning") >= 0 THEN farbe = &HE0C060
+            IF INSTR(LOWER$(zeile), "fehler") >= 0 OR INSTR(LOWER$(zeile), "error") >= 0 THEN farbe = &HE06060
             GUI_LISTBOX_COLOR(lstAusgabe, GUI_LISTBOX_COUNT(lstAusgabe) - 1, farbe)
         END IF
     END IF

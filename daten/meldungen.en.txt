@@ -1,0 +1,513 @@
+# Englische Fassung der Meldungen von dhrt (DHRT_LANG=en).
+#
+# Je Zeile: deutsche Vorlage, TABULATOR, englische Fassung. Zeilen ohne
+# Tabulator oder mit # vorn sind Kommentare.
+#
+# {} steht fuer ein eingesetztes Stueck. Im Englischen der Reihe nach, oder
+# gezielt mit {1}, {2} ... (ab 1), wenn die Reihenfolge wechselt. {{ und }}
+# sind geschweifte Klammern. Was ein Platzhalter einfaengt, wird seinerseits
+# uebersetzt -- darum genuegen fuer zusammengesetzte Meldungen die Teile.
+#
+# Die genaueste Vorlage gewinnt (die mit den meisten festen Zeichen). Was
+# keine trifft, bleibt deutsch. `dhrt pruef meldungen` prueft, dass jede
+# deutsche Vorlage noch im Quelltext steht.
+
+# ---------------------------------------------------------------- Bausteine
+# Anhaenge, die an viele Meldungen kommen. Ein Teil vor und nach dem Strich
+# wird je fuer sich uebersetzt.
+{} -- {}	{} -- {}
+{} -- Aufruf: {}	{} -- usage: {}
+{} Meintest du {}?	{} Did you mean {}?
+Meintest du {}?	Did you mean {}?
+in {}: (Zeile {}) {}	in {}: (line {}) {}
+
+# ---------------------------------------------------------------- Lexer
+{}-Literal zu gross (INTEGER ist 64-bit)	{} literal too large (INTEGER is 64-bit)
+Erwartet H oder B nach '&' (Hex-/Binaer-Literal)	Expected H or B after '&' (hex/binary literal)
+Zeichenkette endet mitten in einer Escape-Folge	String ends in the middle of an escape sequence
+\u braucht genau vier Hexziffern (z. B. \u00E4)	\u needs exactly four hex digits (e.g. \u00E4)
+\u{} ist kein gueltiges Zeichen	\u{} is not a valid character
+Unbekannte Escape-Folge '\{}' in !"..." (erlaubt: \n \t \r \\ \" \0 \e \uXXXX)	Unknown escape sequence '\{}' in !"..." (allowed: \n \t \r \\ \" \0 \e \uXXXX)
+Unterminierter String	Unterminated string
+Zeilenumbruch im String nicht erlaubt -- das Anfuehrungszeichen am Ende fehlt; mehrere Zeilen: !"a\nb" oder "a" + CHR$(10) + "b"	Line break in a string is not allowed -- the closing quote is missing; several lines: !"a\nb" or "a" + CHR$(10) + "b"
+Unterminierter f-String	Unterminated f-string
+Zeilenumbruch im f-String nicht erlaubt	Line break in an f-string is not allowed
+Unbekanntes Zeichen: {}	Unknown character: {}
+'&' verbindet hier keine Texte -- das macht +: "a" + "b" (&H/&B leiten Hex-/Binaerzahlen ein)	'&' does not join strings here -- + does that: "a" + "b" (&H/&B start hex/binary numbers)
+Typ-Zeichen wie {} hinter einem Namen gibt es nicht -- den Typ sagt DIM: DIM x AS INTEGER (oder FLOAT, STRING)	There are no type characters like {} after a name -- DIM gives the type: DIM x AS INTEGER (or FLOAT, STRING)
+Den Rest einer Division liefert MOD: 7 MOD 3 (ein %-Zeichen gibt es nicht)	MOD gives the remainder of a division: 7 MOD 3 (there is no % sign)
+'#' kommt in Drachenhauch nicht vor -- Kommentare beginnen mit ' (Hochkomma), und Dateien haben keine Nummern (f = OPENFILE("name.txt", "w"))	'#' does not occur in Drachenhauch -- comments start with ' (apostrophe), and files have no numbers (f = OPENFILE("name.txt", "w"))
+Ungleich schreibt man in Drachenhauch <> -- IF a <> b THEN	Not-equal is written <> in Drachenhauch -- IF a <> b THEN
+Verglichen wird mit EINEM =: IF a = b THEN (== gibt es nicht)	Comparison uses ONE =: IF a = b THEN (there is no ==)
+Kommentare beginnen in Drachenhauch mit ' (Hochkomma) oder REM, nicht mit //	Comments in Drachenhauch start with ' (apostrophe) or REM, not with //
+Ganzzahl-Literal zu gross (INTEGER ist 64-bit)	Integer literal too large (INTEGER is 64-bit)
+Hex-Literal &H ohne Ziffern	Hex literal &H without digits
+Binaer-Literal &B ohne Ziffern	Binary literal &B without digits
+Einzelnes '}' im f-String (verwende '}}}}')	Single '}' in an f-string (use '}}}}')
+Leerer f-String-Ausdruck {{}}	Empty f-string expression {{}}
+Unterminierter Ausdruck im f-String	Unterminated expression in an f-string
+Zeilenumbruch im f-String-Ausdruck nicht erlaubt	Line break in an f-string expression is not allowed
+
+# ---------------------------------------------------------------- Parser
+Erwartet {}	Expected {}
+Erwartet Zeilenende	Expected end of line
+Unerwartetes Token {}	Unexpected token {}
+GOTO und GOSUB gibt es in Drachenhauch nicht. Wiederholen: WHILE, DO ... LOOP oder FOR; ein benanntes Stueck Code: SUB name() ... END SUB, aufgerufen mit name()	There is no GOTO or GOSUB in Drachenhauch. To repeat: WHILE, DO ... LOOP or FOR; a named piece of code: SUB name() ... END SUB, called with name()
+REDIM gibt es nicht. Ein Feld ohne feste Groesse (DIM a AS ARRAY OF INTEGER) waechst mit ARRAY_PUSH(a, wert); fuer eine neue Groesse: DIM a[n] AS INTEGER noch einmal	There is no REDIM. An array without a fixed size (DIM a AS ARRAY OF INTEGER) grows with ARRAY_PUSH(a, value); for a new size: DIM a[n] AS INTEGER again
+TYPE ... END TYPE heisst in Drachenhauch STRUCT ... END STRUCT, die Felder mit DIM: STRUCT Punkt / DIM x AS INTEGER / END STRUCT	TYPE ... END TYPE is called STRUCT ... END STRUCT in Drachenhauch, fields with DIM: STRUCT Point / DIM x AS INTEGER / END STRUCT
+DEF FN gibt es nicht -- FUNCTION name(x AS INTEGER) AS INTEGER ... RETURN wert ... END FUNCTION	There is no DEF FN -- FUNCTION name(x AS INTEGER) AS INTEGER ... RETURN value ... END FUNCTION
+ON ERROR / ON ... GOTO gibt es nicht. Fehler faengt TRY ... CATCH meldung ... END TRY, Verzweigen nach einer Zahl SELECT CASE	There is no ON ERROR / ON ... GOTO. Errors are caught by TRY ... CATCH message ... END TRY, branching on a number is SELECT CASE
+LINE INPUT gibt es nicht -- INPUT liest schon die ganze Zeile, wenn die Variable ein STRING ist	There is no LINE INPUT -- INPUT already reads the whole line when the variable is a STRING
+OPEN ... AS #1 gibt es nicht. Dateien: f = OPENFILE("name.txt", "w") (r/w/a), WRITELINE(f, text), READLINE(f), CLOSEFILE(f) -- oder alles auf einmal mit WRITEALL/READLINES	There is no OPEN ... AS #1. Files: f = OPENFILE("name.txt", "w") (r/w/a), WRITELINE(f, text), READLINE(f), CLOSEFILE(f) -- or all at once with WRITEALL/READLINES
+END IF schreibt man in zwei Woertern	END IF is written as two words
+END WHILE (oder WEND) schreibt man in zwei Woertern	END WHILE (or WEND) is written as two words
+END SUB schreibt man in zwei Woertern	END SUB is written as two words
+END FUNCTION schreibt man in zwei Woertern	END FUNCTION is written as two words
+END SELECT schreibt man in zwei Woertern	END SELECT is written as two words
+END {} schreibt man in zwei Woertern	END {} is written as two words
+Bildschirmmodi wie SCREEN 12 gibt es nicht -- ein Fenster oeffnet SCREEN(breite, hoehe, "Titel")	There are no screen modes like SCREEN 12 -- a window is opened with SCREEN(width, height, "Title")
+LINE (x1, y1)-(x2, y2) heisst hier LINE(x1, y1, x2, y2, farbe); ein Rechteck: RECT(...) bzw. gefuellt BOX(...)	LINE (x1, y1)-(x2, y2) is written LINE(x1, y1, x2, y2, color) here; a rectangle: RECT(...), filled BOX(...)
+Die Koordinaten stehen mit in der Klammer: CIRCLE(x, y, radius, farbe), PLOT(x, y, farbe)	The coordinates go inside the parentheses: CIRCLE(x, y, radius, color), PLOT(x, y, color)
+MID$ kann nichts ersetzen, nur lesen. Stattdessen den Text neu zusammensetzen: s = LEFT$(s, i) + neu + MID$(s, i + LEN(neu)) (MID$ zaehlt ab 0)	MID$ cannot replace, only read. Put the text together again instead: s = LEFT$(s, i) + new + MID$(s, i + LEN(new)) (MID$ counts from 0)
+{} gibt es nicht -- fuer Bits BXOR, fuer Wahrheitswerte a <> b (entweder-oder)	There is no {} -- for bits use BXOR, for truth values a <> b (either-or)
+Ein Anfuehrungszeichen IN einer Zeichenkette braucht ein ! davor: !"{\"a\": 1}" -- sonst endet die Zeichenkette am \" (der Rueckstrich bleibt woertlich)	A quote INSIDE a string needs a ! in front: !"{\"a\": 1}" -- otherwise the string ends at the \" (the backslash stays literal)
+Zeilennummern gibt es in Drachenhauch nicht -- die Zeile beginnt direkt mit dem Befehl	There are no line numbers in Drachenhauch -- the line starts directly with the statement
+PRINT USING gibt es nicht -- PRINT FORMAT$(wert, "%6.2f") oder f"{wert:.2f}"	There is no PRINT USING -- PRINT FORMAT$(value, "%6.2f") or f"{value:.2f}"
+Befehle und SUBs bekommen ihre Werte in Klammern: {}(...) -- ohne Klammern ist '{}' nur ein Name	Commands and SUBs get their values in parentheses: {}(...) -- without parentheses '{}' is just a name
+PRIVATE steht vor SUB, FUNCTION, DIM oder CONST	PRIVATE goes before SUB, FUNCTION, DIM or CONST
+EXIT {} steht in keinem Unterprogramm	EXIT {} is not inside a subroutine
+EXIT FUNCTION gibt es in Drachenhauch nicht -- eine FUNCTION liefert ihren Wert mit RETURN wert	There is no EXIT FUNCTION in Drachenhauch -- a FUNCTION returns its value with RETURN value
+EXIT {} steht in einer {} -- das passt nicht zusammen	EXIT {} is inside a {} -- that does not fit
+EXIT {} -- die innerste Schleife ist aber eine {}-Schleife. BREAK verlaesst immer die innerste	EXIT {} -- but the innermost loop is a {} loop. BREAK always leaves the innermost one
+EXIT {} steht in keiner {}-Schleife	EXIT {} is not inside a {} loop
+SWAP a, b: erwartet ',' zwischen den beiden Variablen	SWAP a, b: expected ',' between the two variables
+IMPORT braucht Anfuehrungszeichen: IMPORT "{}" (eigene Datei mit Endung: IMPORT "{}.dh")	IMPORT needs quotes: IMPORT "{}" (your own file with its extension: IMPORT "{}.dh")
+'=' als Anweisung -- meintest du eine Zuweisung?	'=' as a statement -- did you mean an assignment?
+Tupel-Destructuring erwartet mindestens 2 Ziele	Tuple destructuring needs at least 2 targets
+Erwartet '=' nach Tupel-Zielen	Expected '=' after the tuple targets
+Erwartet Variablenname als Tupel-Ziel	Expected a variable name as tuple target
+Erwartet ']'	Expected ']'
+Ein Startwert gilt fuer genau eine Variable -- DIM a AS INTEGER = 1, b AS INTEGER = 2	An initial value belongs to exactly one variable -- DIM a AS INTEGER = 1, b AS INTEGER = 2
+'{}' ist ein reserviertes Wort und kann kein Variablenname sein - waehle einen anderen Namen	'{}' is a reserved word and cannot be a variable name - choose another name
+DIM SHARED gibt es in Drachenhauch nicht -- was oben im Programm mit DIM angelegt ist, sehen alle SUBs und FUNCTIONs ohnehin	There is no DIM SHARED in Drachenhauch -- what is declared with DIM at the top of the program is visible to all SUBs and FUNCTIONs anyway
+Erwartet Variablenname nach DIM	Expected a variable name after DIM
+Felder werden mit eckigen Klammern angelegt: DIM {}[10] AS INTEGER (Index 0 bis 9)	Arrays are declared with square brackets: DIM {}[10] AS INTEGER (index 0 to 9)
+Erwartet AS nach Variablenname -- jede Variable braucht einen Typ: DIM {} AS {}{}	Expected AS after the variable name -- every variable needs a type: DIM {} AS {}{}
+ (oder FLOAT, STRING, BOOLEAN)	 (or FLOAT, STRING, BOOLEAN)
+Erwartet AS nach Variablenname	Expected AS after the variable name
+Texte haben in Drachenhauch keine feste Laenge -- DIM s AS STRING; auf eine Breite bringen mit LEFT$(s, n) oder PADR$(s, n)	Strings have no fixed length in Drachenhauch -- DIM s AS STRING; bring them to a width with LEFT$(s, n) or PADR$(s, n)
+Ein Feld bekommt keinen Startwert in der DIM-Zeile -- setze ihn in SUB Init(), z.B. Self.hp = 100	A field gets no initial value in the DIM line -- set it in SUB Init(), e.g. Self.hp = 100
+Erwartet Konstantenname nach CONST	Expected a constant name after CONST
+Erwartet '=' nach CONST-Name	Expected '=' after the CONST name
+Erwartet Member-Name in ENUM	Expected a member name in ENUM
+Erwartet Membername nach '.'	Expected a member name after '.'
+Erwartet ENUM-Name	Expected an ENUM name
+END ENUM erwartet	Expected END ENUM
+Erwartet ENUM nach END	Expected ENUM after END
+ENUM: mindestens ein Member erforderlich	ENUM: at least one member required
+ENUM: Member doppelt deklariert	ENUM: member declared twice
+END WITH erwartet, Programmende erreicht	Expected END WITH, reached the end of the program
+Erwartet WITH nach END	Expected WITH after END
+Leeres `.` in WITH-Block (erwartet `.member`)	Empty `.` in WITH block (expected `.member`)
+CATCH, FINALLY oder END TRY erwartet	Expected CATCH, FINALLY or END TRY
+CATCH meldung -- ohne AS: die Meldung ist immer ein STRING, und es gibt nur EIN CATCH je TRY	CATCH message -- without AS: the message is always a STRING, and there is only ONE CATCH per TRY
+FINALLY oder END TRY erwartet	Expected FINALLY or END TRY
+END TRY erwartet	Expected END TRY
+Erwartet TRY nach END	Expected TRY after END
+Erwartet OF nach ARRAY	Expected OF after ARRAY
+Erwartet OF nach MAP	Expected OF after MAP
+MAP-Schluessel muessen STRING sein (Phase 5a)	MAP keys must be STRING (phase 5a)
+Erwartet Typ	Expected a type
+Slice-Zuweisung (`x[a:b] = ...`) ist nicht unterstuetzt -- nutze eine Schleife.	Slice assignment (`x[a:b] = ...`) is not supported -- use a loop.
+Ungueltige Linksseite fuer ++/--	Invalid left side for ++/--
+Erwartet '=' oder Compound-Operator	Expected '=' or a compound operator
+Ungueltige Zuweisungs-Linksseite	Invalid left side of assignment
+Nach Prompt-String erwartet ',' (oder ';') und Variable	After the prompt string expected ',' (or ';') and a variable
+Erwartet Variable nach INPUT	Expected a variable after INPUT
+Erwartet THEN nach Bedingung	Expected THEN after the condition
+ELSEIF geht nur im mehrzeiligen IF -- IF ... THEN, dann jeder Zweig auf eigenen Zeilen, am Ende END IF	ELSEIF only works in a multi-line IF -- IF ... THEN, then each branch on its own lines, END IF at the end
+END IF erwartet, Programmende erreicht	Expected END IF, reached the end of the program
+ELSE IF: in Drachenhauch in EINEM Wort -- ELSEIF bedingung THEN	ELSE IF: in Drachenhauch it is ONE word -- ELSEIF condition THEN
+Erwartet END IF	Expected END IF
+Erwartet IF nach END	Expected IF after END
+Erwartet CASE nach SELECT	Expected CASE after SELECT
+END SELECT erwartet	Expected END SELECT
+Erwartet CASE oder END SELECT	Expected CASE or END SELECT
+CASE nach CASE ELSE - ELSE muss letzter Fall sein	CASE after CASE ELSE - ELSE must be the last case
+Erwartet END SELECT	Expected END SELECT
+Erwartet SELECT nach END	Expected SELECT after END
+CASE IS: Erwartet Vergleichsoperator (=, <>, <, >, <=, >=)	CASE IS: expected a comparison operator (=, <>, <, >, <=, >=)
+WEND erwartet, Programmende erreicht	Expected WEND, reached the end of the program
+WEND (oder END WHILE) erwartet -- hier endet noch die WHILE-Schleife	Expected WEND (or END WHILE) -- the WHILE loop still ends here
+UNTIL erwartet, Programmende erreicht	Expected UNTIL, reached the end of the program
+LOOP erwartet, Programmende erreicht	Expected LOOP, reached the end of the program
+DO: die Bedingung gehoert entweder nach oben (DO WHILE/UNTIL) oder nach unten (LOOP WHILE/UNTIL), nicht an beide Stellen	DO: the condition goes either at the top (DO WHILE/UNTIL) or at the bottom (LOOP WHILE/UNTIL), not in both places
+DATA: nach Minus erwartet eine Zahl	DATA: expected a number after the minus
+DATA: Erwartet Literal (Zahl, String, TRUE, FALSE)	DATA: expected a literal (number, string, TRUE, FALSE)
+READ: Erwartet Variable als Ziel	READ: expected a variable as target
+Erwartet Iterationsvariable nach FOR EACH	Expected a loop variable after FOR EACH
+Erwartet zweite Iterationsvariable nach dem Komma	Expected a second loop variable after the comma
+Erwartet IN nach FOR EACH <var>	Expected IN after FOR EACH <var>
+NEXT erwartet, Programmende erreicht	Expected NEXT, reached the end of the program
+Erwartet Schleifenvariable	Expected a loop variable
+Erwartet TO	Expected TO
+Variadic-Parameter (`...args`) muss der letzte Parameter sein	A variadic parameter (`...args`) must be the last parameter
+Parameter ohne Default folgt auf einen Parameter mit Default	A parameter without a default follows a parameter with a default
+Erwartet Variadic-Parametername nach '...'	Expected a variadic parameter name after '...'
+OPTIONAL gibt es nicht -- ein Parameter mit Vorgabewert ist optional: x AS INTEGER = 0	There is no OPTIONAL -- a parameter with a default value is optional: x AS INTEGER = 0
+Erwartet Parametername	Expected a parameter name
+Erwartet AS nach Parametername	Expected AS after the parameter name
+BYREF-Parameter koennen keinen Default-Wert haben	BYREF parameters cannot have a default value
+SUB New gibt es nicht -- der Konstruktor einer Klasse heisst SUB Init(...), NEW Klasse(...) ruft ihn	There is no SUB New -- the constructor of a class is called SUB Init(...), NEW Class(...) calls it
+Erwartet SUB-Name	Expected a SUB name
+END SUB erwartet, Programmende erreicht	Expected END SUB, reached the end of the program
+Erwartet SUB nach END	Expected SUB after END
+Erwartet FUNCTION-Name	Expected a FUNCTION name
+Erwartet AS <Rueckgabetyp> nach Parameterliste	Expected AS <return type> after the parameter list
+END FUNCTION erwartet, Programmende erreicht	Expected END FUNCTION, reached the end of the program
+Erwartet FUNCTION nach END	Expected FUNCTION after END
+OPERATOR: erwartet einen der Operatoren + - * / MOD = <> < > <= >=	OPERATOR: expected one of the operators + - * / MOD = <> < > <= >=
+OPERATOR: erwartet genau 1 Parameter (other)	OPERATOR: expected exactly 1 parameter (other)
+OPERATOR: Parameter darf nicht BYREF sein	OPERATOR: the parameter must not be BYREF
+OPERATOR: Parameter darf nicht variadic sein	OPERATOR: the parameter must not be variadic
+Erwartet AS <Rueckgabetyp> nach OPERATOR-Parameter	Expected AS <return type> after the OPERATOR parameter
+END OPERATOR erwartet, Programmende erreicht	Expected END OPERATOR, reached the end of the program
+Erwartet OPERATOR nach END	Expected OPERATOR after END
+Erwartet GET oder SET nach PROPERTY	Expected GET or SET after PROPERTY
+Erwartet Property-Name	Expected a property name
+Erwartet AS <Rueckgabetyp> nach PROPERTY GET-Parametern	Expected AS <return type> after the PROPERTY GET parameters
+END PROPERTY erwartet, Programmende erreicht	Expected END PROPERTY, reached the end of the program
+Erwartet PROPERTY nach END	Expected PROPERTY after END
+PROPERTY GET nimmt keine Parameter	PROPERTY GET takes no parameters
+PROPERTY SET muss genau einen Parameter haben (den neuen Wert)	PROPERTY SET must have exactly one parameter (the new value)
+Erwartet Klassenname nach CLASS	Expected a class name after CLASS
+Erwartet Elternklassen-Name nach EXTENDS	Expected a parent class name after EXTENDS
+Eine Klasse erbt mit EXTENDS: CLASS Hund EXTENDS Tier	A class inherits with EXTENDS: CLASS Dog EXTENDS Animal
+END CLASS erwartet, Programmende erreicht	Expected END CLASS, reached the end of the program
+Erwartet CONST nach STATIC im CLASS-Body	Expected CONST after STATIC in the CLASS body
+{} gibt es nicht -- alle Felder und Methoden einer Klasse sind von aussen erreichbar; das Wort einfach weglassen	There is no {} -- all fields and methods of a class can be reached from outside; just leave the word out
+PRIVATE gibt es in einer Klasse nicht -- nur vor SUB/FUNCTION/DIM/CONST auf oberster Ebene einer Datei	There is no PRIVATE inside a class -- only before SUB/FUNCTION/DIM/CONST at the top level of a file
+Felder werden mit DIM angelegt: DIM {} AS ...	Fields are declared with DIM: DIM {} AS ...
+Unerwartet im CLASS-Body (erlaubt: DIM, SUB, FUNCTION, OPERATOR, STATIC CONST, PROPERTY)	Unexpected in the CLASS body (allowed: DIM, SUB, FUNCTION, OPERATOR, STATIC CONST, PROPERTY)
+Erwartet CLASS nach END	Expected CLASS after END
+Erwartet SUB-Name nach ABSTRACT	Expected a SUB name after ABSTRACT
+Erwartet FUNCTION-Name nach ABSTRACT	Expected a FUNCTION name after ABSTRACT
+Erwartet Name nach STRUCT	Expected a name after STRUCT
+END STRUCT erwartet, Programmende erreicht	Expected END STRUCT, reached the end of the program
+Im STRUCT-Body sind nur DIM-Felder erlaubt	Only DIM fields are allowed in the STRUCT body
+Erwartet STRUCT nach END	Expected STRUCT after END
+Erwartet Klassenname nach NEW	Expected a class name after NEW
+IS: Erwartet einen Typnamen, z.B. `x IS Gegner` oder `x IS NIL`	IS: expected a type name, e.g. `x IS Enemy` or `x IS NIL`
+Erwartet Membername nach '.' im WITH-Block	Expected a member name after '.' in the WITH block
+Erwartet ',' nach IIF-Bedingung	Expected ',' after the IIF condition
+Erwartet ',' nach IIF-Then-Wert	Expected ',' after the IIF then-value
+Erwartet ')' am Ende von IIF	Expected ')' at the end of IIF
+Erwartet Iter-Variablenname nach FOR	Expected a loop variable name after FOR
+Erwartet IN nach Iter-Variable	Expected IN after the loop variable
+Erwartet ']' am Ende der Comprehension	Expected ']' at the end of the comprehension
+Erwartet ']' am Ende des Array-Literals	Expected ']' at the end of the array literal
+Erwartet ':' zwischen Schluessel und Wert	Expected ':' between key and value
+Erwartet '}' am Ende des MAP-Literals	Expected '}' at the end of the MAP literal
+Erwartet '}' am Ende der Dict-Comprehension	Expected '}' at the end of the dict comprehension
+Erwartet ':' (Dict-Comp) oder FOR (Set-Comp) im `{...}`-Block	Expected ':' (dict comprehension) or FOR (set comprehension) in the `{...}` block
+Erwartet '}' am Ende der Set-Comprehension	Expected '}' at the end of the set comprehension
+Unerwartetes Token NEWLINE -- i++ und i-- gehen nur als eigene Anweisung, nicht in einem Ausdruck: erst i++, dann j = i	Unexpected token NEWLINE -- i++ and i-- only work as a statement of their own, not inside an expression: first i++, then j = i
+Der Ausdruck endet mitten drin -- geht er in der naechsten Zeile weiter, die Zeile mit _ beenden	The expression ends in the middle -- if it continues on the next line, end the line with _
+
+# ---------------------------------------------------------------- IMPORT
+IMPORT: Datei nicht gefunden: {} (gesucht: {})	IMPORT: file not found: {} (searched: {})
+IMPORT: Lesefehler bei {}: {}	IMPORT: error reading {}: {}
+Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module '{}' is not included in this dhrt build -- calls will fail at run time. Rebuild with: python rust\build_runtime.py --hardware
+{} kennt keine Klasse {}.	{} has no class {}.
+{} kennt keinen Namen {}.	{} has no name {}.
+{} kommt aus dem Hauptprogramm. Eine mit AS importierte Datei [[]]sieht dessen Globals nicht -- reiche den Wert als Parameter [[]]herein oder deklariere ihn in der Datei selbst.	{} comes from the main program. A file imported with AS does not see its globals -- pass the value in as a parameter or declare it in the file itself.
+{}.{} ist eine Klasse. Zum Erzeugen `NEW {}.{}(...)`, als Typ `DIM x AS {}.{}`.	{}.{} is a class. To create one `NEW {}.{}(...)`, as a type `DIM x AS {}.{}`.
+{}.{} ist PRIVATE und nur innerhalb der eigenen Datei verwendbar.	{}.{} is PRIVATE and can only be used inside its own file.
+
+# ---------------------------------------------------------------- Compiler
+RETURN nur in SUB/FUNCTION	RETURN only inside SUB/FUNCTION
+SUB darf RETURN nicht mit Wert verwenden	A SUB must not use RETURN with a value
+FUNCTION braucht einen Wert bei RETURN	A FUNCTION needs a value with RETURN
+{} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- SUB, FUNCTION, CLASS, STRUCT und ENUM gehoeren auf die oberste Ebene des Programms	{} must not be inside a subroutine or block -- SUB, FUNCTION, CLASS, STRUCT and ENUM belong at the top level of the program
+Lokale Variable '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name ab hier die Variable, nicht die Konstante.	Local variable '{}' hides the constant of the same name -- Drachenhauch ignores upper/lower case. Inside this function the name means the variable from here on, not the constant.
+Der Index ist eine Kommazahl -- das bricht beim Laufen ab ('Array-Index muss INTEGER sein').{}	The index is a decimal number -- that stops the program when it runs ('Array index must be INTEGER').{}
+`/` liefert immer FLOAT; ganzzahlig teilt `\`.	`/` always gives a FLOAT; `\` divides as integers.
+Mit INT() abschneiden oder ROUND() runden.	Cut off with INT() or round with ROUND().
+Fuer ganzzahlige Division `\` statt `/` nehmen.	For integer division use `\` instead of `/`.
+'{}' ist als INTEGER angesagt, rechts steht eine Kommazahl. Das bricht beim Laufen ab, sobald der Wert nicht ganzzahlig ist ('passt nicht verlustfrei in INTEGER').{}	'{}' is declared as INTEGER, the right side is a decimal number. That stops the program as soon as the value is not a whole number ('does not fit into INTEGER without loss').{}
+Mit STR$() in Text umwandeln.	Convert to text with STR$().
+Mit VAL() in eine Zahl umwandeln.	Convert to a number with VAL().
+Ein Vergleich wie `x > 0` liefert einen BOOLEAN.	A comparison like `x > 0` gives a BOOLEAN.
+BOOLEAN ist in Drachenhauch keine Zahl -- mit IIF(b, 1, 0) umwandeln.	BOOLEAN is not a number in Drachenhauch -- convert with IIF(b, 1, 0).
+'{}' ist als {} angesagt, rechts steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}	'{}' is declared as {}, the right side is {}. That stops the program when it runs ('expected {}, got {}').{}
+{} hat kein Mitglied '{}' -- weder {} selbst noch eine ihrer Eltern- oder Kindklassen. [[Diese Methode]] gibt es nicht, der Zugriff bricht beim Laufen ab.{}	{1} has no member '{2}' -- neither {3} itself nor one of its parent or child classes. This method does not exist, the access stops the program when it runs.{4}
+{} hat kein Mitglied '{}' -- weder {} selbst noch eine ihrer Eltern- oder Kindklassen. [[Dieses Feld]] gibt es nicht, der Zugriff bricht beim Laufen ab.{}	{1} has no member '{2}' -- neither {3} itself nor one of its parent or child classes. This field does not exist, the access stops the program when it runs.{4}
+Meintest du '{}'?	Did you mean '{}'?
+Diese Funktion ist als {} angesagt, hier steht {} hinter RETURN. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}	This function is declared as {}, here RETURN is followed by {}. That stops the program when it runs ('expected {}, got {}').{}
+'{}' ist als {} angesagt, hat aber kein einziges RETURN mit Wert. Die Funktion liefert damit still NIL -- und NIL ist kein {}. Der Fehler faellt erst beim Aufrufer auf.	'{}' is declared as {}, but has not a single RETURN with a value. So the function silently returns NIL -- and NIL is not a {}. The error only shows up at the caller.
+{}: Parameter '{}' ist als {} angesagt, hier steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}	{}: parameter '{}' is declared as {}, here it is {}. That stops the program when it runs ('expected {}, got {}').{}
+'{}' wurde in {} schon als {} angelegt, hier als {}. [[Das Hauptprogramm kennt]] nur EINE Variable dieses Namens (Gross-/Kleinschreibung zaehlt nicht) -- einer der beiden Verwendungszwecke bekommt den falschen Typ. Zweiten Namen vergeben.	'{}' was already declared in {} as {}, here as {}. The main program knows only ONE variable of this name (upper/lower case does not count) -- one of the two uses gets the wrong type. Choose a second name.
+'{}' wurde in {} schon als {} angelegt, hier als {}. [[Diese Funktion kennt]] nur EINE Variable dieses Namens (Gross-/Kleinschreibung zaehlt nicht) -- einer der beiden Verwendungszwecke bekommt den falschen Typ. Zweiten Namen vergeben.	'{}' was already declared in {} as {}, here as {}. This function knows only ONE variable of this name (upper/lower case does not count) -- one of the two uses gets the wrong type. Choose a second name.
+'{}' wurde in {} schon angelegt, hier noch einmal (gleicher Typ {}). Beide DIM meinen [[im Hauptprogramm]] DIESELBE Variable (Gross-/Kleinschreibung zaehlt nicht) -- was die erste Stelle darin ablegt, ueberschreibt die zweite still. Zweiten Namen vergeben oder das zweite DIM streichen.	'{}' was already declared in {}, here once more (same type {}). In the main program both DIMs mean THE SAME variable (upper/lower case does not count) -- the second place silently overwrites what the first stores there. Choose a second name or remove the second DIM.
+'{}' wurde in {} schon angelegt, hier noch einmal (gleicher Typ {}). Beide DIM meinen [[in dieser Funktion]] DIESELBE Variable (Gross-/Kleinschreibung zaehlt nicht) -- was die erste Stelle darin ablegt, ueberschreibt die zweite still. Zweiten Namen vergeben oder das zweite DIM streichen.	'{}' was already declared in {}, here once more (same type {}). In this function both DIMs mean THE SAME variable (upper/lower case does not count) -- the second place silently overwrites what the first stores there. Choose a second name or remove the second DIM.
+Klasse '{}' nicht gefunden	Class '{}' not found
+NEW {}: die Klasse kuendigt [[eine Methode]] an, ohne sie auszufuellen ({}). [[]]Entweder eine Unterklasse nehmen, die sie ausschreibt, oder [[]]die Methode in {} mit einem Rumpf versehen.	NEW {}: the class announces a method without filling it in ({}). Either use a subclass that writes it out, or give the method in {} a body.
+NEW {}: die Klasse kuendigt [[Methoden]] an, ohne sie auszufuellen ({}). [[]]Entweder eine Unterklasse nehmen, die sie ausschreibt, oder [[]]die Methode in {} mit einem Rumpf versehen.	NEW {}: the class announces methods without filling them in ({}). Either use a subclass that writes them out, or give the methods in {} a body.
+NEW {} mit Named-Args, aber keine Init-Methode	NEW {} with named arguments, but there is no Init method
+ENUM {}.{}: Wert muss Integer-Literal sein	ENUM {}.{}: the value must be an integer literal
+ENUM {}: Name ist bereits anderweitig vergeben	ENUM {}: the name is already taken
+Klasse '{}' hat keine Methode '{}'	Class '{}' has no method '{}'
+READ kann nur in eine Variable oder ein Array-Element lesen, nicht direkt in ein Objekt-/Struct-Feld. Lies in eine Hilfsvariable und weise sie dem Feld zu.	READ can only read into a variable or an array element, not directly into an object/struct field. Read into a helper variable and assign it to the field.
+FOR {} ... STEP 0 kommt nie ans Ende -- die Schrittweite muss groesser oder kleiner als 0 sein	FOR {} ... STEP 0 never reaches the end -- the step must be greater or less than 0
+FOR {} ... STEP {}: eine Kommazahl als Schritt braucht eine FLOAT-Laufvariable -- DIM {} AS FLOAT vor der Schleife	FOR {} ... STEP {}: a decimal step needs a FLOAT loop variable -- DIM {} AS FLOAT before the loop
+BREAK ausserhalb einer Schleife	BREAK outside a loop
+CONTINUE ausserhalb einer Schleife	CONTINUE outside a loop
+'{}' wird hier [[gelesen]], ist an dieser Stelle aber nicht sichtbar -- den Namen gibt es nur als lokale Variable einer anderen SUB/FUNCTION. Beim Laufen bricht diese Zeile ab ("Variable '{}' nicht deklariert"). Wer ihn an beiden Stellen braucht, legt ihn mit DIM auf oberster Ebene an.	'{}' is read here, but is not visible at this place -- the name only exists as a local variable of another SUB/FUNCTION. When the program runs this line stops it ("Variable '{}' is not declared"). If you need it in both places, declare it with DIM at the top level.
+'{}' wird hier [[beschrieben]], ist an dieser Stelle aber nicht sichtbar -- den Namen gibt es nur als lokale Variable einer anderen SUB/FUNCTION. Beim Laufen bricht diese Zeile ab ("Variable '{}' nicht deklariert"). Wer ihn an beiden Stellen braucht, legt ihn mit DIM auf oberster Ebene an.	'{}' is written here, but is not visible at this place -- the name only exists as a local variable of another SUB/FUNCTION. When the program runs this line stops it ("Variable '{}' is not declared"). If you need it in both places, declare it with DIM at the top level.
+'{}' wird hier [[gelesen]], aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab ("Variable '{}' nicht deklariert").{}	'{}' is read here, but is not declared anywhere in the program with DIM or CONST. When the program runs this line stops it ("Variable '{}' is not declared").{}
+'{}' wird hier [[beschrieben]], aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab ("Variable '{}' nicht deklariert").{}	'{}' is written here, but is not declared anywhere in the program with DIM or CONST. When the program runs this line stops it ("Variable '{}' is not declared").{}
+YIELD nur in SUB/FUNCTION erlaubt	YIELD is only allowed inside SUB/FUNCTION
+Unbekannter unaerer Operator: {}	Unknown unary operator: {}
+'{}' vergleicht [[Zahl]] mit [[Text]] -- das ist immer {}, weil nichts umgewandelt wird: [[VAL(text) oder STR$(zahl) macht beide gleich]].	'{}' compares a number with text -- that is always {}, because nothing is converted: VAL(text) or STR$(number) makes them the same.
+'{}' vergleicht [[Text]] mit [[Zahl]] -- das ist immer {}, weil nichts umgewandelt wird: [[VAL(text) oder STR$(zahl) macht beide gleich]].	'{}' compares text with a number -- that is always {}, because nothing is converted: VAL(text) or STR$(number) makes them the same.
+'{}' vergleicht [[Text]] mit [[Wahrheitswert]] -- das ist immer {}, weil nichts umgewandelt wird: [[VAL(text) oder STR$(zahl) macht beide gleich]].	'{}' compares text with a truth value -- that is always {}, because nothing is converted.
+'{}' vergleicht [[Wahrheitswert]] mit [[Text]] -- das ist immer {}, weil nichts umgewandelt wird: [[VAL(text) oder STR$(zahl) macht beide gleich]].	'{}' compares a truth value with text -- that is always {}, because nothing is converted.
+'{}' vergleicht [[Zahl]] mit [[Wahrheitswert]] -- das ist immer {}, weil nichts umgewandelt wird: [[ein Wahrheitswert ist keine Zahl -- direkt fragen: IF fertig THEN]].	'{}' compares a number with a truth value -- that is always {}, because nothing is converted: a truth value is not a number -- ask directly: IF done THEN.
+'{}' vergleicht [[Wahrheitswert]] mit [[Zahl]] -- das ist immer {}, weil nichts umgewandelt wird: [[ein Wahrheitswert ist keine Zahl -- direkt fragen: IF fertig THEN]].	'{}' compares a truth value with a number -- that is always {}, because nothing is converted: a truth value is not a number -- ask directly: IF done THEN.
+[[AND]] verknuepft hier zwei Ganzzahlen. In Drachenhauch ist [[AND]] logisch und liefert einen der beiden Werte ([[6 AND 3 ergibt 3, nicht 2]]) -- fuer Bits [[BAND]] nehmen, fuer Wahrheitswerte vergleichen (x <> 0).	AND combines two integers here. In Drachenhauch AND is logical and gives one of the two values (6 AND 3 gives 3, not 2) -- for bits use BAND, for truth values compare (x <> 0).
+[[OR]] verknuepft hier zwei Ganzzahlen. In Drachenhauch ist [[OR]] logisch und liefert einen der beiden Werte ([[6 OR 1 ergibt 6, nicht 7]]) -- fuer Bits [[BOR]] nehmen, fuer Wahrheitswerte vergleichen (x <> 0).	OR combines two integers here. In Drachenhauch OR is logical and gives one of the two values (6 OR 1 gives 6, not 7) -- for bits use BOR, for truth values compare (x <> 0).
+Unbekannter Operator: {}	Unknown operator: {}
+'{}' ist eine SUB und liefert keinen Wert -- fuer ein Ergebnis FUNCTION {}(...) AS <Typ> mit RETURN	'{}' is a SUB and returns no value -- for a result use FUNCTION {}(...) AS <type> with RETURN
+{}: Named-Args nur bei SUB/FUNCTION/NEW	{}: named arguments only for SUB/FUNCTION/NEW
+SUPER geht nur in einer Methode	SUPER only works inside a method
+SUPER.{}: Klasse {} hat keine Elternklasse (kein EXTENDS)	SUPER.{}: class {} has no parent class (no EXTENDS)
+SUPER.{}: {} und ihre Elternklassen haben keine Methode '{}'	SUPER.{}: {} and its parent classes have no method '{}'
+Namens-Kollision: '{}' ist zugleich eine Variable/ein Parameter und eine Methode dieser Klasse -- beim Aufruf verdeckt die Variable die Methode. Benenne eines von beiden um.	Name collision: '{}' is both a variable/parameter and a method of this class -- when called, the variable hides the method. Rename one of them.
+{}: Named-Args bei Methoden-Call nicht unterstuetzt	{}: named arguments are not supported for method calls
+Namens-Kollision: '{}' ist zugleich eine Variable und eine SUB/FUNCTION -- beim Aufruf verdeckt die Variable die Funktion. Benenne eines von beiden um.	Name collision: '{}' is both a variable and a SUB/FUNCTION -- when called, the variable hides the function. Rename one of them.
+{}: keine Named-Args bei variadic	{}: no named arguments with variadic parameters
+{}: BYREF-Parameter '{}' braucht ein zuweisbares Argument	{}: BYREF parameter '{}' needs an assignable argument
+{}: Named-Args nur bei SUB/FUNCTION	{}: named arguments only for SUB/FUNCTION
+Unbekanntes Builtin '{}' -- dhrt kennt es nicht (Tippfehler? oder veraltet/entfernt). Der Aufruf schlaegt sonst erst zur Laufzeit fehl.{}	Unknown builtin '{}' -- dhrt does not know it (typo? or outdated/removed). Otherwise the call only fails at run time.{}
+{}: {} Argumente uebergeben, erwartet werden {} -- die ueberzaehligen weglassen (viele Builtins brechen sonst zur Laufzeit ab).	{}: {} arguments given, {} expected -- leave out the extra ones (many builtins stop the program at run time otherwise).
+{}: nur {} Argument(e) uebergeben, erwartet werden {}.	{}: only {} argument(s) given, {} expected.
+{} gehoert zum Modul '{}', aber IMPORT "{}" fehlt. Das Programm laeuft trotzdem -- dhrt kennt die Module nativ, der Preprocessor macht aus der Zeile einen Kommentar. Ohne sie ist aber `DIM x AS <Modultyp>` ein Fehler, und man sieht dem Quelltext nicht an, worauf er aufbaut.	{} belongs to the module '{}', but IMPORT "{}" is missing. The program runs anyway -- dhrt knows the modules natively, the preprocessor turns the line into a comment. Without it, however, `DIM x AS <module type>` is an error, and the source does not show what it builds on.
+BYREF-Parameter braucht eine zuweisbare Variable (Identifier, Member oder Index-Access)	A BYREF parameter needs an assignable variable (identifier, member or index access)
+CASE IS: unbekannter Operator '{}'	CASE IS: unknown operator '{}'
+Ungueltiges Tupel-Assignment-Ziel	Invalid tuple assignment target
+'{}' ist schon deklariert	'{}' is already declared
+'{}' ist schon in {} deklariert -- eines von beiden umbenennen	'{}' is already declared in {} -- rename one of them
+Klasse '{}' ist schon deklariert	Class '{}' is already declared
+Klasse '{}' ist schon in {} deklariert -- eine von beiden umbenennen	Class '{}' is already declared in {} -- rename one of them
+Array-Feld '{}' braucht konstante INTEGER-Groesse	Array field '{}' needs a constant INTEGER size
+Klasse '{}': Methode/Property '{}' ist mehrfach deklariert	Class '{}': method/property '{}' is declared more than once
+STATIC CONST {}.{}: doppelt deklariert	STATIC CONST {}.{}: declared twice
+In FUNCTION {} steht eine Zuweisung an '{}' -- in Drachenhauch liefert eine FUNCTION ihren Wert mit RETURN: RETURN ergebnis (statt {} = ergebnis)	FUNCTION {} contains an assignment to '{}' -- in Drachenhauch a FUNCTION returns its value with RETURN: RETURN result (instead of {} = result)
+{}: zu viele Argumente (max {})	{}: too many arguments (at most {})
+{}: positional Argument nach Named-Arg	{}: positional argument after a named argument
+{}: kein Parameter '{}'	{}: no parameter '{}'
+{}: Parameter '{}' doppelt belegt	{}: parameter '{}' given twice
+{}: Parameter '{}' fehlt	{}: parameter '{}' is missing
+BYREF-Parameter werden bei Coroutinen (Funktionen/Subs mit YIELD) nicht unterstuetzt -- die finalen Werte stehen erst nach dem Abschluss der Coroutine fest, nicht direkt beim Aufruf.	BYREF parameters are not supported for coroutines (functions/subs with YIELD) -- the final values are only known when the coroutine has finished, not right at the call.
+Default-Parameter muessen Literale sein (VM-Pfad)	Default parameters must be literals (VM path)
+DATA: '-' nur auf Zahlen	DATA: '-' only on numbers
+DATA: ungueltiges Literal	DATA: invalid literal
+IS: unbekannter Typ '{}' (keine Klasse, kein Werttyp)	IS: unknown type '{}' (not a class, not a value type)
+IS: unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})	IS: unknown type '{}' -- is an IMPORT missing? (e.g. {})
+Unbekannter Typ '{}' (keine Klasse, kein Werttyp, kein importiertes Modul)	Unknown type '{}' (not a class, not a value type, not an imported module)
+Unbekannter Typ '{}' -- fehlt IMPORT "{}"?	Unknown type '{}' -- is IMPORT "{}" missing?
+Unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})	Unknown type '{}' -- is an IMPORT missing? (e.g. {})
+Namens-Kollision: '{}' ist zugleich {} und {} -- das geht nicht, weil Drachenhauch Gross-/Kleinschreibung ignoriert. Benenne eines um.	Name collision: '{}' is both {} and {} -- that does not work, because Drachenhauch ignores upper/lower case. Rename one.
+Namens-Kollision: Klasse '{}' hat STATIC-Member, aber '{}' ist bereits als globale Variable/CONST/ENUM belegt -- benenne eines von beiden um.	Name collision: class '{}' has STATIC members, but '{}' is already taken as a global variable/CONST/ENUM -- rename one of them.
+Zyklische Vererbung: '{}' erscheint zweimal in der EXTENDS-Kette ab Klasse '{}'	Cyclic inheritance: '{}' appears twice in the EXTENDS chain starting at class '{}'
+Struct '{}' referenziert sich selbst (direkt oder ueber andere Structs) -- unendliche Groesse	Struct '{}' refers to itself (directly or through other structs) -- infinite size
+eine Variable	a variable
+eine CONST	a CONST
+ein ENUM	an ENUM
+Eine FUNCTION	A FUNCTION
+Eine SUB	A SUB
+Eine CLASS	A CLASS
+Diese Deklaration	This declaration
+
+# ---------------------------------------------------------------- Umsteiger
+'{}' heisst in Drachenhauch {}	'{}' is called {} in Drachenhauch
+heisst in Drachenhauch {}	is called {} in Drachenhauch
+heisst in Drachenhauch REPEAT$(text, anzahl) -- oder "*" * 3	is called REPEAT$(text, count) in Drachenhauch -- or "*" * 3
+heisst in Drachenhauch MID$(text, start, laenge) -- start zaehlt ab 0	is called MID$(text, start, length) in Drachenhauch -- start counts from 0
+heisst in Drachenhauch RND() (0 bis unter 1) -- ganze Zahl 1..6: INT(RND() * 6) + 1	is called RND() in Drachenhauch (0 to below 1) -- whole number 1..6: INT(RND() * 6) + 1
+heisst in Drachenhauch LEFT$(text, n) bzw. RIGHT$(text, n)	is called LEFT$(text, n) or RIGHT$(text, n) in Drachenhauch
+heisst in Drachenhauch RTRIM$(text) bzw. LTRIM$(text)	is called RTRIM$(text) or LTRIM$(text) in Drachenhauch
+heisst GUI_WINDOW(titel$, x, y, breite, hoehe)	is called GUI_WINDOW(title$, x, y, width, height)
+Felder beginnen immer bei 0 -- LBOUND ist also 0	Arrays always start at 0 -- so LBOUND is 0
+der letzte Index ist LEN(feld) - 1 (Felder beginnen bei 0)	the last index is LEN(array) - 1 (arrays start at 0)
+INT rundet ab (INT(-3.7) = -4); in Richtung 0: IIF(x < 0, -INT(-x), INT(x))	INT rounds down (INT(-3.7) = -4); toward 0: IIF(x < 0, -INT(-x), INT(x))
+INT(x) rundet ab; Richtung 0: IIF(x < 0, -INT(-x), INT(x))	INT(x) rounds down; toward 0: IIF(x < 0, -INT(-x), INT(x))
+Umwandeln: INT(x) oder ROUND(x) fuer Ganzzahlen, FLT(x) fuer Kommazahlen, VAL(text) aus Text	Converting: INT(x) or ROUND(x) for integers, FLT(x) for decimals, VAL(text) from text
+Ausgabe mit der Anweisung PRINT: PRINT "Hallo"; x	Output with the PRINT statement: PRINT "Hello"; x
+Texte vergleicht man direkt: IF a = b THEN, a < b sortiert	Strings are compared directly: IF a = b THEN, a < b sorts
+ans Feld anhaengen: ARRAY_PUSH(feld, wert)	append to an array: ARRAY_PUSH(array, value)
+ist in Drachenhauch der Operator BAND: a BAND b	is the operator BAND in Drachenhauch: a BAND b
+ist in Drachenhauch der Operator BOR: a BOR b	is the operator BOR in Drachenhauch: a BOR b
+ist in Drachenhauch der Operator BXOR: a BXOR b	is the operator BXOR in Drachenhauch: a BXOR b
+ist in Drachenhauch der Operator BNOT: BNOT a	is the operator BNOT in Drachenhauch: BNOT a
+gibt es als Befehl nicht -- Tabulator: CHR$(9), feste Breite: PADR$(text, n)	does not exist as a command -- tab: CHR$(9), fixed width: PADR$(text, n)
+eine Farbe ist ein Argument jedes Zeichenbefehls: BOX(x1, y1, x2, y2, RED), TEXT(x, y, text$, YELLOW)	a color is an argument of every drawing command: BOX(x1, y1, x2, y2, RED), TEXT(x, y, text$, YELLOW)
+gehalten: KEYPRESSED(KEY_A), gerade gedrueckt: KEYHIT(KEY_A)	held: KEYPRESSED(KEY_A), just pressed: KEYHIT(KEY_A)
+Text an eine Stelle: TEXT(x, y, text$) im Fenster	text at a position: TEXT(x, y, text$) in the window
+ein Teil einer Zeit kommt aus ZEIT_TEIL(zeit, "jahr") -- oder ZEIT_FORMAT$(zeit, muster$)	a part of a time comes from ZEIT_TEIL(time, "jahr") -- or ZEIT_FORMAT$(time, pattern$)
+das Programm beenden: END (allein auf der Zeile) oder EXIT(0)	end the program: END (alone on the line) or EXIT(0)
+Kommazahlen heissen in Drachenhauch FLOAT (immer 64 Bit)	decimal numbers are called FLOAT in Drachenhauch (always 64 bits)
+ganze Zahlen heissen in Drachenhauch INTEGER (immer 64 Bit)	whole numbers are called INTEGER in Drachenhauch (always 64 bits)
+Text heisst in Drachenhauch STRING	text is called STRING in Drachenhauch
+einen Typ fuer alles gibt es nicht -- einen festen Typ waehlen (INTEGER, FLOAT, STRING, BOOLEAN, eine Klasse)	there is no type for everything -- choose a fixed type (INTEGER, FLOAT, STRING, BOOLEAN, a class)
+Listen sind Felder: DIM a AS ARRAY OF INTEGER (waechst mit ARRAY_PUSH)	lists are arrays: DIM a AS ARRAY OF INTEGER (grows with ARRAY_PUSH)
+Woerterbuecher sind MAPs: DIM m AS MAP OF INTEGER	dictionaries are MAPs: DIM m AS MAP OF INTEGER
+Felder von Feldern gibt es nicht -- zweidimensional: DIM g[3, 4] AS INTEGER	there are no arrays of arrays -- two-dimensional: DIM g[3, 4] AS INTEGER
+{} ist ein Befehl -- aufgerufen wird er mit Klammern: {}()	{} is a command -- it is called with parentheses: {}()
+'kein Wert' heisst in Drachenhauch NIL	'no value' is called NIL in Drachenhauch
+die eigene Instanz heisst in Drachenhauch Self (Self.x = 3)	the own instance is called Self in Drachenhauch (Self.x = 3)
+ein Dateiname ist noch kein [[Bild]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not an image yet: first `x = {}("{}")`, then `{}(x, ...)`
+ein Dateiname ist noch kein [[Klang]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not a sound yet: first `x = {}("{}")`, then `{}(x, ...)`
+ein Dateiname ist noch kein [[Schrift]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not a font yet: first `x = {}("{}")`, then `{}(x, ...)`
+eine Taste ist eine ZAHL: {}(ASC("{}")) oder die Konstante KEY_{}	a key is a NUMBER: {}(ASC("{}")) or the constant KEY_{}
+eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX("{}"); im Quelltext geht auch &H{}	a color from hex text comes from COLOR_FROM_HEX("{}"); in the source &H{} works too
+
+# ---------------------------------------------------------------- Laufzeit: Typen und Werte
+{}: Erwartet {}, erhalten {}	{}: expected {}, got {}
+{}: Erwartet {}, erhalten ARRAY OF {}	{}: expected {}, got ARRAY OF {}
+{}: FLOAT {} passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden	{}: FLOAT {} does not fit into INTEGER without loss -- use \ instead of / for integer division, otherwise round with INT()/ROUND()
+Zuweisung an '{}'	assignment to '{}'
+Zuweisung an {}.{}	assignment to {}.{}
+Zuweisung an Feld {}	assignment to field {}
+Zuweisung an global	assignment to a global
+Lokale Variable	local variable
+Array-Element	array element
+Feld verbinden	joining arrays
+Default-Parameter	default parameter
+Ganzzahl-Ueberlauf bei '{}' (INTEGER ist 64-bit; Wertebereich ueberschritten)	Integer overflow in '{}' (INTEGER is 64-bit; range exceeded)
+Division durch 0	Division by zero
+Integer-Division durch 0	Integer division by zero
+Operator '{}' erwartet Zahlen, erhalten {} / {}	Operator '{}' expects numbers, got {} / {}
+Operator '{}': '{}' ist eine FUNCTION ohne Klammern, also nur ihr Name -- aufrufen mit {}()	Operator '{}': '{}' is a FUNCTION without parentheses, so only its name -- call it with {}()
+\ erwartet INTEGER, erhalten {} / {}	\ expects INTEGER, got {} / {}
+Unaeres '-' erwartet Zahl	Unary '-' expects a number
+Vergleich nicht moeglich: {} / {}	Cannot compare: {} / {}
+Vergleich mit NaN	Comparison with NaN
+'+' verbindet nur eindimensionale Felder	'+' only joins one-dimensional arrays
+'+' verbindet nur Felder mit gleichem Elementtyp -- hier ARRAY OF {} und ARRAY OF {}	'+' only joins arrays with the same element type -- here ARRAY OF {} and ARRAY OF {}
+* : String-Wiederholung zu gross (max. {} Zeichen)	* : string repetition too large (at most {} characters)
+Eingabe '{}' passt nicht zu INTEGER	Input '{}' does not fit INTEGER
+Eingabe '{}' passt nicht zu FLOAT	Input '{}' does not fit FLOAT
+kein endlicher Wert (NAN oder unendlich)	not a finite value (NAN or infinite)
+
+# ---------------------------------------------------------------- Laufzeit: Variablen, Felder, Objekte
+Variable '{}' nicht deklariert (DIM fehlt?){}	Variable '{}' is not declared (missing DIM?){}
+CONST '{}' kann nicht ueberschrieben werden	CONST '{}' cannot be overwritten
+CONST kann nicht ueberschrieben werden	A CONST cannot be overwritten
+'{}' ist eine Variable vom Typ {} und kann nicht wie eine Funktion aufgerufen werden. Falls du den eingebauten Befehl '{}' meinst: benenne die Variable um -- eine Variable mit festem Wert-Typ (INTEGER, FLOAT, STRING ...) verdeckt einen Befehl nicht, eine FUNCREF schon.	'{}' is a variable of type {} and cannot be called like a function. If you mean the built-in command '{}': rename the variable -- a variable with a fixed value type (INTEGER, FLOAT, STRING ...) does not hide a command, a FUNCREF does.
+Array-Index muss INTEGER sein, erhalten {}	Array index must be INTEGER, got {}
+String-Index muss INTEGER sein, erhalten {}	String index must be INTEGER, got {}
+Tupel-Index muss INTEGER sein, erhalten {}	Tuple index must be INTEGER, got {}
+Slice-Index muss INTEGER sein, erhalten {}	Slice index must be INTEGER, got {}
+Index {} ausserhalb [0..{}] in Dimension {}{}	Index {} outside [0..{}] in dimension {}{}
+Felder zaehlen ab 0: DIM a[{}] hat a[0] bis a[{}]	arrays count from 0: DIM a[{}] has a[0] to a[{}]
+String-Index {} ausserhalb des Bereichs (Laenge {})	String index {} out of range (length {})
+Tupel-Index {} ausserhalb des Bereichs (Laenge {})	Tuple index {} out of range (length {})
+Array hat {} Dimension(en), erhalten {} Index/-e	The array has {} dimension(s), got {} index(es)
+{}: Index {} ausserhalb [0..{}]	{}: index {} outside [0..{}]
+MAP-Schluessel muss STRING sein, erhalten {}	MAP key must be STRING, got {}
+Schluessel '{}' nicht in der MAP -- vorher mit MAPHAS(m, "{}") fragen oder MAPGETOR(m, "{}", vorgabe) nehmen	Key '{}' is not in the MAP -- ask first with MAPHAS(m, "{}") or use MAPGETOR(m, "{}", default)
+Index-Zugriff auf NIL	Index access on NIL
+Index-Zugriff auf Nicht-Array ({})	Index access on a non-array ({})
+Index-Zuweisung an einen Text: Texte lassen sich nicht stellenweise aendern -- neu zusammensetzen, z.B. s = LEFT$(s, i) + "x" + MID$(s, i + 1)	Index assignment to a string: strings cannot be changed in place -- put them together again, e.g. s = LEFT$(s, i) + "x" + MID$(s, i + 1)
+Slicing nur fuer 1D-Arrays	Slicing only for 1D arrays
+Slice-Zugriff: Erwartet STRING oder ARRAY, erhalten {}	Slice access: expected STRING or ARRAY, got {}
+Array-Groesse muss INTEGER >= 0 sein	Array size must be INTEGER >= 0
+Array-Groesse zu gross ({} Elemente, max. {})	Array size too large ({} elements, at most {})
+Zugriff auf '.{}' bei NIL-Referenz{}	Access to '.{}' on a NIL reference{}
+Zugriff auf '.{}' bei nicht-Objekt ({})	Access to '.{}' on a non-object ({})
+Zuweisung an '.{}' bei NIL-Referenz{}	Assignment to '.{}' on a NIL reference{}
+Zuweisung an '.{}' bei nicht-Objekt ({})	Assignment to '.{}' on a non-object ({})
+Methodenaufruf '.{}' bei NIL-Referenz{}	Method call '.{}' on a NIL reference{}
+Methodenaufruf '.{}' bei nicht-Objekt ({})	Method call '.{}' on a non-object ({})
+die Variable ist noch NIL: eine Klasse muss mit NEW angelegt werden (p = NEW Klasse())	the variable is still NIL: a class has to be created with NEW (p = NEW Class())
+Feld '{}' existiert nicht in {}	Field '{}' does not exist in {}
+Feld '{}' existiert nicht	Field '{}' does not exist
+Methode '{}' existiert nicht in {}	Method '{}' does not exist in {}
+SUPER.{}: Methode existiert nicht in {}	SUPER.{}: method does not exist in {}
+Klasse {} hat keine SUB Init - Argumente bei NEW nicht moeglich	Class {} has no SUB Init - arguments with NEW are not possible
+Maximale Aufruftiefe ({}) ueberschritten -- unendliche Rekursion?	Maximum call depth ({}) exceeded -- infinite recursion?
+YIELD ausserhalb einer Coroutine	YIELD outside a coroutine
+CORO_RESUME/SEND auf bereits beendeter Coroutine	CORO_RESUME/SEND on a coroutine that has already finished
+CORO_RESUME/SEND: Coroutine ist bereits aktiv (re-entranter Aufruf)	CORO_RESUME/SEND: the coroutine is already running (re-entrant call)
+Comprehension: nur 1D-Arrays	Comprehension: only 1D arrays
+Comprehension: nicht iterierbar ({})	Comprehension: not iterable ({})
+Zugriff auf eine globale Variable, die noch nicht gesetzt ist. [[]]Laeuft das hier als Auftrag (`dhrt call` / TASK_START)? Dann ist das [[]]erwartet: das Hauptprogramm laeuft dabei NICHT, also ist kein Global [[]]gesetzt -- auch keine CONST, deren Wert erst beim Laufen feststeht (eine [[]]mit festem Wert wie `CONST BREITE = 640` setzt der Compiler ein). Gib der Funktion als [[]]Parameter mit, was sie braucht.{}	Access to a global variable that has not been set yet. Is this running as a task (`dhrt call` / TASK_START)? Then that is expected: the main program does NOT run then, so no global is set -- not even a CONST whose value is only known at run time (one with a fixed value like `CONST WIDTH = 640` is inserted by the compiler). Pass the function what it needs as parameters.{}
+Im gewoehnlichen Lauf heisst das: das DIM von '{}' ist noch nicht gelaufen -- steht es weiter unten im Programm als die Stelle, die es benutzt?	In a normal run this means: the DIM of '{}' has not run yet -- is it further down in the program than the place that uses it?
+
+# ---------------------------------------------------------------- Laufzeit: Befehle
+{} erwartet STRING, erhalten {}	{} expects STRING, got {}
+{} erwartet INTEGER, erhalten {}	{} expects INTEGER, got {}
+{} erwartet INTEGER, erhalten STRING{}	{} expects INTEGER, got STRING{}
+{} erwartet Zahl, erhalten {}	{} expects a number, got {}
+{} erwartet BOOLEAN, erhalten {}	{} expects BOOLEAN, got {}
+{} erwartet eine Zahl, erhalten {}	{} expects a number, got {}
+{} erwartet eine endliche Zahl	{} expects a finite number
+{} erwartet BOOLEAN oder Zahl (Flag), erhalten {}	{} expects BOOLEAN or a number (flag), got {}
+{}: erwartet INTEGER, erhalten {}	{}: expected INTEGER, got {}
+{}: erwartet STRING, erhalten {}	{}: expected STRING, got {}
+{}: erwartet Zahl, erhalten {}	{}: expected a number, got {}
+{}: erwartet BOOLEAN, erhalten {}	{}: expected BOOLEAN, got {}
+{}: fehlendes Argument {}	{}: missing argument {}
+{}: Wert {} liegt ausserhalb {}..{}	{}: value {} is outside {}..{}
+{}: es gibt noch kein Fenster -- vor dem ersten Zeichenbefehl SCREEN(breite, hoehe, "Titel") aufrufen	{}: there is no window yet -- call SCREEN(width, height, "Title") before the first drawing command
+{}: vor SCREEN aufgerufen	{}: called before SCREEN
+Grafik-Builtin vor SCREEN aufgerufen	Graphics builtin called before SCREEN
+UI-Builtin vor SCREEN aufgerufen	UI builtin called before SCREEN
+Unbekannter Befehl '{}' -- dhrt kennt ihn nicht (Tippfehler?){}	Unknown command '{}' -- dhrt does not know it (typo?){}
+Builtin '{}' gehoert zum Hardware-Modul '{}', das in diesem dhrt-Build fehlt. Neu bauen mit: python rust\build_runtime.py --hardware	Builtin '{}' belongs to the hardware module '{}', which is missing in this dhrt build. Rebuild with: python rust\build_runtime.py --hardware
+Grafik-Builtin '{}' im Rust-Kern noch nicht verfuegbar (Schritt 4)	Graphics builtin '{}' is not available in this build
+Builtin '{}' im Rust-Kern noch nicht verfuegbar	Builtin '{}' is not available in this build
+{}: diese Fassung von dhrt ist ohne das Feature `{}` gebaut	{}: this version of dhrt is built without the feature `{}`
+ASSERT fehlgeschlagen: {}	ASSERT failed: {}
+Bedingung nicht erfuellt	condition not met
+Kein Fenster moeglich[[]] -- das System stellt kein passendes OpenGL (3.3) bereit (Einzelheiten in den GLFW-Warnungen davor, falls es welche gibt).[[]] Ein Fenster brauchen SCREEN und alle Zeichen-, Bild- und gui-Befehle; PRINT, Dateien, Netz und Datenbank gehen ohne.	No window possible -- the system does not provide a suitable OpenGL (3.3) (details in the GLFW warnings before, if there are any). SCREEN and all drawing, image and gui commands need a window; PRINT, files, network and database work without one.
+Kein Fenster moeglich[[]] -- es gibt keinen Bildschirm (weder DISPLAY noch WAYLAND_DISPLAY ist gesetzt). Auf einem Rechner ohne Bildschirm etwa ueber `xvfb-run` starten.[[]] Ein Fenster brauchen SCREEN und alle Zeichen-, Bild- und gui-Befehle; PRINT, Dateien, Netz und Datenbank gehen ohne.	No window possible -- there is no display (neither DISPLAY nor WAYLAND_DISPLAY is set). On a computer without a display, start through `xvfb-run`, for example. SCREEN and all drawing, image and gui commands need a window; PRINT, files, network and database work without one.
+{}: {}	{}: {}
+Hinweis: Das Fenster ist leer geblieben -- es wurde gezeichnet, aber FLIP() fehlt. [[]]dhrt sammelt die Zeichenbefehle und zeigt sie erst beim FLIP(); [[]]in einer Bildschleife steht es am Ende jedes Durchlaufs.	Note: the window stayed empty -- something was drawn, but FLIP() is missing. dhrt collects the drawing commands and only shows them at FLIP(); in a frame loop it goes at the end of every pass.
+
+# ---------------------------------------------------------------- Kommandozeile
+Kann '{}' nicht lesen: {}	Cannot read '{}': {}
+Kann {} nicht lesen: {}	Cannot read {}: {}
+nicht lesbar: {}	not readable: {}
+run: keine Datei angegeben	run: no file given
+run --bilder: erwartet eine Zahl	run --bilder: expected a number
+profile: keine Datei angegeben	profile: no file given
+dhrt fmt: {}: laesst sich nicht lesen (Syntaxfehler?) -- unveraendert gelassen	dhrt fmt: {}: cannot be read (syntax error?) -- left unchanged
+
+# ---------------------------------------------------------------- Sprachserver
+'{}' wird angelegt, aber nie benutzt.	'{}' is declared but never used.
+Ersetzen durch {}	Replace with {}
+Durch <> ersetzen	Replace with <>
+Klammern setzen	Add parentheses
+{} ergaenzen	Add {}
+IMPORT "{}" einfuegen	Insert IMPORT "{}"
+Zeile entfernen	Remove the line
+DIM {} AS {} anlegen	Declare DIM {} AS {}
+DIM {} AS {} global anlegen (oben in der Datei)	Declare DIM {} AS {} globally (at the top of the file)
+
+# ---------------------------------------------------------------- Argumente und Operatoren
+{}: erwartet {} Argument(e), erhalten {}	{}: expected {} argument(s), got {}
+{}: erwartet {} bis {} Argument(e), erhalten {}	{}: expected {} to {} argument(s), got {}
+{}: erwartet {} Argumente, erhalten {}	{}: expected {} arguments, got {}
+{}: erwartet mind. {} Argument(e), erhalten {}	{}: expected at least {} argument(s), got {}
+{}: erwartet mind. {} Argumente, erhalten {}	{}: expected at least {} arguments, got {}
+{}: mind. 1 Argument	{}: at least 1 argument
+{}: erwartet mind. 1 Argument (Programm)	{}: expected at least 1 argument (the program)
+{} hat keine Methode '{}'	{} has no method '{}'
+{}: Array ist leer	{}: the array is empty
+{}: Schiebeweite muss 0..63 sein, erhalten {}	{}: shift width must be 0..63, got {}
+IN bei STRING: linke Seite muss STRING sein, erhalten {}	IN with STRING: the left side must be a STRING, got {}
+IN bei MAP: Key muss STRING sein, erhalten {}	IN with MAP: the key must be a STRING, got {}
+IN: rechte Seite ist NIL	IN: the right side is NIL
+IN: rechte Seite muss STRING, TUPLE, ARRAY oder MAP sein, erhalten {}	IN: the right side must be STRING, TUPLE, ARRAY or MAP, got {}
