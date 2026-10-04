@@ -1316,6 +1316,28 @@ wird nach dem GESAMTgewicht** (feste Zeichen aller beteiligten Vorlagen,
 "TASK: Zugriff auf eine globale Variable ..." an der falschen Stelle durch.
 Doku `docs/rust-runtime.md` (Meldungen auf Englisch).
 
+## Pakete: `dhrt paket` (2026-10-04)
+
+`paket.rs`, Entwurf `docs/entwurf-pakete.md`, Handbuch `docs/pakete.md`.
+Kein eigener Server (Entscheidung des Nutzers): Quellen sind
+`github:nutzer/repo@stand` (-> `https://github.com/.../archive/<stand>.zip`),
+https-ZIP, einzelne https-`.dh`, lokaler Ordner/ZIP; ohne `@stand` ein Fehler.
+Pakete gehoeren zum Projekt (Entscheidung des Nutzers): `pakete/<name>/`
+neben `paket.json`; `paket.lock.json` mit SHA-256 **ueber den entpackten
+Inhalt** (`ordner_summe`, nicht ueber die ZIP-Bytes -- GitHub hat 2023 neu
+gepackt). `IMPORT` sucht nach "neben der Datei" in `pakete/` von der
+importierenden Datei aus nach oben (`preprocess::paketpfade`, wie
+node_modules) -- so findet ein Paket SEINE Abhaengigkeit zuerst. Geholt wird
+in `pakete/.neu-<name>`, erst nach der Pruefsumme umbenannt (ein falscher
+Download laesst das alte stehen); `--erneuern` nimmt neuen Inhalt an. Lokale
+Pfade in der `paket.json` eines Pakets gelten ab seinem HERKUNFTSordner;
+Kreise erkennt der aufgeloeste Ort (`schluessel`). Beim Holen wird nichts
+ausgefuehrt, entpackt ueber `zipdatei::entpacke` (Zip-Slip-Schutz). Die
+Ausgaben von `dhrt paket` sind deutsch wie die anderen CLI-Werkzeuge. Tests
+`tests/pruef/paket.dhtest` (9; HTTP ueber `gegenserver.dh` Modus `dateien`,
+der von `DHRT_START_DIR` aus liefert, weil `dhrt run` in den Ordner der
+Quelle wechselt). Offen: IDE-Menue, Pakete im Projektbaum.
+
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
 raylib liest Maus- und Tastentasten als ZUSTAND (Rueckruf schreibt

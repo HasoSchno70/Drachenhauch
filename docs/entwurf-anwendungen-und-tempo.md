@@ -233,7 +233,7 @@ schreiben will, trotzdem vermisst:
 | **Installer nicht signiert, macOS nicht beglaubigt** | SmartScreen/Gatekeeper warnen — für Anwendungen an Kunden ein Ausschlussgrund. Die Wege sind gebaut (`DH_SIGN_*`, `DH_MAC_SIGNATUR`), es fehlt das Zertifikat | Geld, kein Code |
 | ~~**Kein Tray-Symbol, keine System-Benachrichtigung**~~ | erledigt 2026-10-04: `TRAY_*`, `NOTIFY`, `WINDOW_HIDE`/`SHOW`; das Symbol bisher nur unter Windows, Mitteilungen auf allen drei Systemen | — |
 | **Oberfläche ist selbst gezeichnet** | sieht auf jedem System gleich aus, aber nicht „nativ“; dafür gibt es Themen und Maßstab. Kein Handlungsbedarf, aber ehrlich sagen | — |
-| **Kein Paketverzeichnis** | Bibliotheken gehen über `IMPORT "datei.dh"` und `DH_PATH`; ein `dhrt paket hole <url>` würde Teilen erleichtern | mittel |
+| ~~**Kein Paketverzeichnis**~~ | erledigt 2026-10-04: `dhrt paket hole github:nutzer/repo@stand` (auch https, lokal), Pakete in `pakete/` des Projekts, `paket.lock.json` mit SHA-256 -- [pakete.md](pakete.md) | — |
 | ~~**Keine anonymen Funktionen**~~ | erledigt 2026-10-04: Lambdas `FUNCTION(x) x * 2` / `SUB() ...` mit kopierten Locals, dazu `ARRAY_MAP/FILTER/REDUCE/FIND` | — |
 | **Kein Aufruf fremder DLLs/.so** | ein eigenes FFI (`LIB_LOAD`/`LIB_CALL`) öffnet vorhandene C-Bibliotheken | groß, heikel |
 
