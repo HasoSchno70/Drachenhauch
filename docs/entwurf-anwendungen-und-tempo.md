@@ -226,7 +226,7 @@ schreiben will, trotzdem vermisst:
 
 | Lücke | Warum es zählt | Aufwand |
 |---|---|---|
-| ~~**Fehlermeldungen nur auf Deutsch**~~ | erste Runde erledigt 2026-10-04: `DHRT_LANG=en` übersetzt an der Ausgabe über `daten/meldungen.en.txt` (Lexer, Parser, Compiler, allgemeine Laufzeitfehler); die Meldungen der Module folgen | — |
+| ~~**Fehlermeldungen nur auf Deutsch**~~ | erledigt 2026-10-04 (zwei Runden): `DHRT_LANG=en` übersetzt an der Ausgabe über `daten/meldungen.en.txt` -- Sprache, Laufzeit, Befehle und Module, 94 % der Fehlermeldungen der Prüfsammlungen; offen sind gui, Grafik und Ton | — |
 | **Handbuch überwiegend Deutsch** | README und Buch gibt es englisch, `docs/` nicht | groß |
 | ~~**`DIM a AS INTEGER, b AS INTEGER`** geht nicht~~ | erledigt 2026-09-24: Gruppen mit je eigenem Typ und Startwert; `DIM a, i, z AS INTEGER` ging schon | — |
 | ~~**Anwendungsgröße 27,5 MB**~~ | erledigt 2026-10-04: `--export --schlank` nimmt die kleinste von drei Laufzeiten (Konsole 16 MB, Spiel 21 MB, voll 33 MB), die alle Befehle des Programms hat | — |

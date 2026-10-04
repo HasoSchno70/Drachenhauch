@@ -302,12 +302,14 @@ darum genügen für zusammengesetzte Meldungen die Teile (`{} -- Aufruf: {}`,
 `{} Meintest du {}?`, die Umsteiger-Hinweise). Die genaueste Vorlage gewinnt.
 
 - **Was keine Vorlage trifft, bleibt deutsch** — der richtige deutsche Satz
-  ist besser als eine geratene Übersetzung. Die erste Runde deckt Lexer,
+  ist besser als eine geratene Übersetzung. Die erste Runde deckte Lexer,
   Parser, Compiler, IMPORT, die Umsteiger-Hinweise und die allgemeinen
-  Laufzeitfehler (Typen, Division, Index, Variablen, Objekte, Argumente) ab;
-  gemessen an den 555 Fehlermeldungen der Prüfsammlungen kommen 405 (73 %)
-  englisch an. Die Meldungen der einzelnen Module (BUFFER, JSON, SET …)
-  folgen.
+  Laufzeitfehler ab, die zweite die Befehle und Module (Felder, Maps, Text,
+  Zahlen, Dateien, Puffer, JSON, XML, Datenbank, Netz, Mail, Prozesse, PDF,
+  Tiled, Hardware …). Gemessen an den 562 Fehlermeldungen der
+  Prüfsammlungen kommen 530 (94 %) englisch an. Offen sind gui, Grafik und
+  Ton; die Fehlertexte, die das Betriebssystem selbst liefert („Das System
+  kann die angegebene Datei nicht finden“), bleiben in dessen Sprache.
 - **Was ein Programm sieht, bleibt deutsch**: der Wert einer `CATCH`-Variable
   hängt nicht an einer Umgebungsvariable.
 - **Schnellkorrekturen** lesen weiter den deutschen Satz; nur ihr Titel wird
@@ -319,7 +321,13 @@ darum genügen für zusammengesetzte Meldungen die Teile (`{} -- Aufruf: {}`,
   deutsche Vorlage muss in ihren festen Stücken noch in einem Literal stehen,
   die Platzhalter müssen passen. Wo eine Meldung aus mehreren Literalen
   zusammengesetzt wird, markiert `[[wort]]` (ein ganzes eigenes Literal) bzw.
-  `[[]]` (nur die Naht) die Stelle.
+  `[[]]` (nur die Naht) die Stelle. `dhrt pruef meldungen --offen` listet
+  umgekehrt, welche Meldungen im Quelltext noch keine Vorlage haben (je
+  Datei gezählt; Stücke zusammengesetzter Meldungen erscheinen dort auch,
+  wenn das Ganze übersetzt wird).
+- **Die beste Übersetzung gewinnt, nicht die oberste Vorlage**: gezählt
+  werden die festen Zeichen ALLER Vorlagen, die greifen. Sonst schnitte eine
+  allgemeine Fuge wie `{} -- {}` einen Satz an der falschen Stelle durch.
 
 Die IDE setzt `DHRT_LANG=en`, wenn ihre Oberfläche englisch ist.
 

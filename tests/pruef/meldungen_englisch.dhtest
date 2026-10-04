@@ -58,14 +58,43 @@ fall.dh:2: Warning: 'zaehlr' is written here, but is not declared anywhere in th
 Runtime error in fall.dh:2: Variable 'zaehlr' is not declared (missing DIM?)
 
 === was keine vorlage trifft bleibt deutsch
-' Die Meldungen der Module sind (noch) nicht im Katalog -- dann lieber der
-' richtige deutsche Satz als eine geratene Uebersetzung. Der Rahmen ist
-' trotzdem englisch.
-DIM b AS BUFFER : b = BUFFER_NEW(-1)
+' Was keine Vorlage trifft, bleibt, wie es ist -- lieber der richtige Satz als
+' eine geratene Uebersetzung. Ein eigener THROW-Text trifft nie eine; der
+' Rahmen ist trotzdem englisch.
+THROW "Die Zahl passt nicht"
 --- umgebung
 DHRT_LANG=en
 --- fehler
-Runtime error in fall.dh:4: BUFFER_NEW: Groesse -1 ist negativ
+Runtime error in fall.dh:4: Die Zahl passt nicht
+
+=== meldungen der befehle (runde 2)
+' Die zweite Runde: Felder, Maps, Puffer, Text, JSON -- je ein Fehler,
+' abgefangen und ausgegeben. CATCH bekommt den deutschen Text; englisch wird
+' erst die Meldung, die den Menschen erreicht. Darum laufen die Befehle hier
+' einzeln als eigenes Programm, und gezeigt wird dessen Fehlerausgabe.
+IMPORT "helfer.dh"
+SETENV("DHRT_LANG", "en")
+DIM proben AS ARRAY OF STRING
+proben = ["DIM b AS BUFFER : b = BUFFER_NEW(-1)", _
+          "DIM m AS MAP OF INTEGER : m = {} : PRINT MAPGET(m, " + CHR$(34) + "x" + CHR$(34) + ")", _
+          "DIM a AS ARRAY OF INTEGER : a = [] : PRINT ARRAY_POP(a)", _
+          "PRINT FORMAT$(1, " + CHR$(34) + "%q" + CHR$(34) + ")", _
+          "PRINT REPEAT$(" + CHR$(34) + "a" + CHR$(34) + ")"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(proben) - 1
+    WRITEALL("p.dh", proben[i] + CHR$(10))
+    dlStarten(["p.dh"])
+    PRINT TRIM$(REPLACE$(dlErr, CHR$(13), ""))
+NEXT
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+Runtime error in p.dh:1: BUFFER_NEW: size -1 is negative
+Runtime error in p.dh:1: MAPGET: key 'x' is not in the map
+Runtime error in p.dh:1: ARRAY_POP: the array is empty
+Runtime error in p.dh:1: FORMAT$: unknown specifier %q
+p.dh:1: Warning: REPEAT$: only 1 argument(s) given, 2 expected.
+Runtime error in p.dh:1: REPEAT$: expected 2 argument(s), got 1 -- usage: REPEAT$(s, n)
 
 === catch bekommt den deutschen text
 ' Ein Programm, das eine Meldung vergleicht, darf sich nicht nach einer

@@ -70,8 +70,17 @@ pub fn uebersetzen(text: &str) -> String {
 }
 
 fn uebersetzen_tief(text: &str, tiefe: usize) -> String {
+    tief(text, tiefe).0
+}
+
+/// Uebersetzung samt ihrem GESAMTgewicht: die festen Zeichen aller Vorlagen,
+/// die dabei greifen. Nach diesem Gewicht wird gewaehlt, nicht nach dem der
+/// obersten Vorlage -- sonst schnitte eine allgemeine Fuge wie `{} -- {}`
+/// einen Satz an der falschen Stelle durch, nur weil sie auf der obersten
+/// Ebene mehr feste Zeichen hat als `{}: {}`, und der Rest bliebe deutsch.
+fn tief(text: &str, tiefe: usize) -> (String, usize) {
     if tiefe > TIEFE || text.trim().is_empty() {
-        return text.to_string();
+        return (text.to_string(), 0);
     }
     // Ein Leerraum vorn oder hinten gehoert nicht zur Vorlage -- Anhaenge wie
     // " -- 'kein Wert' heisst ..." bringen ihn mit.
@@ -83,29 +92,38 @@ fn uebersetzen_tief(text: &str, tiefe: usize) -> String {
     if let Some(r) = kern.strip_prefix("-- ") { vorn += 3; kern = r; }
     // Ein Hinweis, der als Satz angehaengt wird, bringt seinen Punkt mit
     // (" BITAND: ist in Drachenhauch der Operator BAND: a BAND b."). Ohne den
-    // Punkt passt dann eine genauere Vorlage als die allgemeine `{}: {}` --
-    // die genauere gewinnt.
+    // Punkt passt womoeglich eine genauere Vorlage.
     let mit = treffer(kern, tiefe);
     let ohne = kern.strip_suffix('.').and_then(|k| treffer(k, tiefe));
     match (mit, ohne) {
-        (Some((g1, t)), Some((g2, _))) if g1 >= g2 => format!("{}{}{}", &text[..vorn], t, &text[hinten..]),
-        (_, Some((_, t))) => format!("{}{}.{}", &text[..vorn], t, &text[hinten..]),
-        (Some((_, t)), None) => format!("{}{}{}", &text[..vorn], t, &text[hinten..]),
-        (None, None) => text.to_string(),
+        (Some((g1, t)), Some((g2, _))) if g1 >= g2 => (format!("{}{}{}", &text[..vorn], t, &text[hinten..]), g1),
+        (_, Some((g, t))) => (format!("{}{}.{}", &text[..vorn], t, &text[hinten..]), g),
+        (Some((g, t)), None) => (format!("{}{}{}", &text[..vorn], t, &text[hinten..]), g),
+        (None, None) => (text.to_string(), 0),
     }
 }
 
-/// Die genaueste Vorlage fuer genau diesen Text: (ihr Gewicht, englisch).
+/// Die beste Vorlage fuer genau diesen Text: (Gesamtgewicht, englisch). Bei
+/// Gleichstand gewinnt die zuerst gefundene -- die mit mehr eigenen festen
+/// Zeichen (die Liste ist danach sortiert).
 fn treffer(kern: &str, tiefe: usize) -> Option<(usize, String)> {
+    let mut best: Option<(usize, String)> = None;
     for v in vorlagen() {
         if !kern.contains(v.anker.as_str()) { continue; }
         let Some(c) = v.muster.captures(kern) else { continue };
+        let mut gewicht = v.gewicht;
         let stuecke: Vec<String> = (1..c.len())
-            .map(|i| uebersetzen_tief(c.get(i).map_or("", |m| m.as_str()), tiefe + 1))
+            .map(|i| {
+                let (t, g) = tief(c.get(i).map_or("", |m| m.as_str()), tiefe + 1);
+                gewicht += g;
+                t
+            })
             .collect();
-        return Some((v.gewicht, einsetzen(&v.englisch, &stuecke)));
+        if best.as_ref().is_none_or(|(b, _)| gewicht > *b) {
+            best = Some((gewicht, einsetzen(&v.englisch, &stuecke)));
+        }
     }
-    None
+    best
 }
 
 /// `{}` der Reihe nach, `{2}` gezielt (ab 1) -- das Englische stellt Teile
@@ -239,6 +257,23 @@ mod tests {
         assert_eq!(uebersetzen(de), "Variable 'x' is not declared (missing DIM?) Did you mean XY?");
         let de = "CIRCLE: erwartet Zahl, erhalten STRING -- Aufruf: CIRCLE(x, y, r [, farbe])";
         assert_eq!(uebersetzen(de), "CIRCLE: expected a number, got STRING -- usage: CIRCLE(x, y, r [, farbe])");
+    }
+
+    #[test]
+    fn die_ganze_uebersetzung_zaehlt_nicht_die_oberste_vorlage() {
+        // `{} -- {}` hat oben mehr feste Zeichen als `{}: {}`, schnitte den
+        // Satz aber hinter "auch keine CONST" durch -- der Rest bliebe deutsch.
+        let de = "TASK: Zugriff auf eine globale Variable, die noch nicht gesetzt ist. Laeuft das hier als \
+                  Auftrag (`dhrt call` / TASK_START)? Dann ist das erwartet: das Hauptprogramm laeuft dabei \
+                  NICHT, also ist kein Global gesetzt -- auch keine CONST, deren Wert erst beim Laufen \
+                  feststeht (eine mit festem Wert wie `CONST BREITE = 640` setzt der Compiler ein). Gib der \
+                  Funktion als Parameter mit, was sie braucht.";
+        assert!(uebersetzen(de).starts_with("TASK: Access to a global variable"), "{}", uebersetzen(de));
+        // Der Hinweis hinter "Unbekanntes Builtin" kommt mit seinem Punkt.
+        let de = "Unbekanntes Builtin 'BITAND' -- dhrt kennt es nicht (Tippfehler? oder veraltet/entfernt). \
+                  Der Aufruf schlaegt sonst erst zur Laufzeit fehl. BITAND: ist in Drachenhauch der Operator \
+                  BAND: a BAND b.";
+        assert!(uebersetzen(de).ends_with("BITAND: is the operator BAND in Drachenhauch: a BAND b."), "{}", uebersetzen(de));
     }
 
     #[test]

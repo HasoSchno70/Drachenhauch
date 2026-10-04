@@ -372,6 +372,7 @@ dhrt pruef pfade [ordner] [--nur datei ...]
                                 Pfade und Links zeigen auf Dateien, die es gibt
 dhrt pruef beispiele [repo]     Zahl der versionierten Beispiele
 dhrt pruef meldungen            den englischen Katalog gegen den Quelltext pruefen
+dhrt pruef meldungen --offen    Meldungen im Quelltext, die noch deutsch bleiben
   Rueckgabe 0 = sauber, 1 = Befund";
 
 pub fn main(args: &[String]) -> ExitCode {
@@ -406,6 +407,17 @@ pub fn main(args: &[String]) -> ExitCode {
             let repo = rest.first().map(PathBuf::from).unwrap_or(wurzel);
             let (n, woher) = beispiele(&repo);
             println!("{} {}", n, woher);
+            ExitCode::SUCCESS
+        }
+        Some("meldungen") if rest.iter().any(|a| a == "--offen") => {
+            let offen = meldungen_offen(&wurzel);
+            let mut je_datei: std::collections::BTreeMap<String, usize> = Default::default();
+            for (d, z, t) in &offen {
+                println!("{}:{}\t{}", d, z, t);
+                *je_datei.entry(d.clone()).or_default() += 1;
+            }
+            println!("\n{} Meldung(en) ohne englische Vorlage:", offen.len());
+            for (d, n) in je_datei { println!("  {:5}  {}", n, d); }
             ExitCode::SUCCESS
         }
         Some("meldungen") => {
@@ -613,6 +625,75 @@ pub fn meldungen(wurzel: &Path) -> (usize, Vec<Befund>) {
         }
     }
     (zeilen.len(), funde)
+}
+
+/// Woerter, an denen eine deutsche Meldung zu erkennen ist -- in einer
+/// englischen Uebersetzung kommt keines davon vor.
+const DEUTSCHE_WOERTER: &[&str] = &[" nicht", "erwartet", "Erwartet", " ist ", " fehlt", " kein",
+    " muss ", "ungueltig", "Ungueltig", "unbekannt", "Unbekannt", "ausserhalb", " gibt es",
+    " darf ", " zu gross", "erhalten", " oder ", " und ", " nur ", " noch ", " wird ", " werden "];
+
+/// `dhrt pruef meldungen --offen`: jedes Literal im Quelltext, das nach
+/// einer deutschen Meldung aussieht, mit Platzhaltern gefuellt durch den
+/// Uebersetzer -- was danach noch deutsche Woerter traegt, steht in der
+/// Liste. Eine Hilfe fuer die Katalogarbeit, keine Pruefung: ein Stueck
+/// einer zusammengesetzten Meldung steht hier auch dann, wenn das Ganze
+/// uebersetzt wird.
+pub fn meldungen_offen(wurzel: &Path) -> Vec<(String, usize, String)> {
+    let mut aus = Vec::new();
+    let ordner = wurzel.join("rust/drachenhauch_runtime/src");
+    let Ok(eintraege) = std::fs::read_dir(&ordner) else { return aus };
+    let mut pfade: Vec<PathBuf> = eintraege.flatten().map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "rs")).collect();
+    pfade.sort();
+    let auslassen = ["meldung.rs", "pruef.rs", "doku.rs", "pruefsammlung.rs"];
+    for p in pfade {
+        let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        if auslassen.contains(&name.as_str()) { continue; }
+        let Ok(mut text) = std::fs::read_to_string(&p) else { continue };
+        if let Some(i) = text.find("#[cfg(test)]\nmod tests") { text.truncate(i); }
+        let mut gesehen: HashSet<String> = HashSet::new();
+        for (zeile, lit) in rust_literale_mit_zeile(&text) {
+            if lit.contains('\n') || lit.chars().count() < 12 || !lit.contains(' ') { continue; }
+            if !DEUTSCHE_WOERTER.iter().any(|w| lit.contains(w)) { continue; }
+            if !gesehen.insert(lit.clone()) { continue; }
+            // Platzhalter mit Woertern fuellen, die keine Vorlage zufaellig
+            // trifft und die selbst nicht deutsch aussehen.
+            let teile = format_stuecke(&lit);
+            let mut probe = String::new();
+            for (i, t) in teile.iter().enumerate() {
+                if i > 0 { probe.push_str(&format!("X{}", i)); }
+                probe.push_str(t);
+            }
+            let en = crate::meldung::uebersetzen(&probe);
+            if DEUTSCHE_WOERTER.iter().any(|w| en.contains(w)) {
+                aus.push((name.clone(), zeile, lit));
+            }
+        }
+    }
+    aus
+}
+
+/// Wie `rust_literale`, mit der Zeile, in der das Literal beginnt.
+fn rust_literale_mit_zeile(text: &str) -> Vec<(usize, String)> {
+    // Die Zeile jedes Literals: der Text wird zeilenweise zerlegt, aber ein
+    // Literal kann ueber eine Zeile hinaus gehen -- darum ueber die Lage im
+    // Text, nicht ueber die Zeilen selbst.
+    let mut aus = Vec::new();
+    let mut zeile = 1;
+    let mut rest = text;
+    let mut verbraucht = 0usize;
+    for lit in rust_literale(text) {
+        // Das naechste Vorkommen des Anfangs suchen (grob, fuer die Anzeige).
+        let anfang: String = lit.chars().take(12).collect();
+        if let Some(i) = rest.find(&anfang) {
+            zeile += rest[..i].matches('\n').count();
+            verbraucht += i;
+            rest = &text[verbraucht..];
+        }
+        aus.push((zeile, lit));
+    }
+    aus
 }
 
 #[cfg(test)]

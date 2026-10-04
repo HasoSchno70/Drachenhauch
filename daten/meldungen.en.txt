@@ -531,3 +531,671 @@ Lambda: erwartet {} Argument(e), erhalten {}	Lambda: expected {} argument(s), go
 ARRAY_FILTER: die Funktion muss TRUE oder FALSE liefern, lieferte {} -- ein Vergleich wie x > 0 ist ein BOOLEAN	ARRAY_FILTER: the function must return TRUE or FALSE, it returned {} -- a comparison like x > 0 is a BOOLEAN
 ARRAY_FIND: die Funktion muss TRUE oder FALSE liefern, lieferte {}	ARRAY_FIND: the function must return TRUE or FALSE, it returned {}
 TASK_START: dieses Lambda traegt Werte aus seiner Umgebung mit, und ein Auftrag laeuft in einem eigenen Prozess -- gib sie ihm als Argumente: TASK_START(FUNCTION(a, b) ..., a, b)	TASK_START: this lambda carries values from its surroundings, and a task runs in its own process -- pass them as arguments: TASK_START(FUNCTION(a, b) ..., a, b)
+
+# ================================================================ Runde 2
+# ---------------------------------------------------------------- Befehle: Typen der Argumente
+{} erwartet ARRAY	{} expects ARRAY
+{} erwartet MAP	{} expects MAP
+{} erwartet BUFFER	{} expects BUFFER
+{} erwartet CHART	{} expects CHART
+{} erwartet TWEEN	{} expects TWEEN
+{} erwartet TILED_MAP	{} expects TILED_MAP
+{} erwartet ASTAR_GRID	{} expects ASTAR_GRID
+{} erwartet ECS_WORLD	{} expects ECS_WORLD
+{} erwartet CHAR_CONTROLLER	{} expects CHAR_CONTROLLER
+{} erwartet PARTICLE_SYSTEM	{} expects PARTICLE_SYSTEM
+{} erwartet PHYS2D_WORLD	{} expects PHYS2D_WORLD
+{} erwartet PHYS_WORLD	{} expects PHYS_WORLD
+{} erwartet PHYSICS_BROAD	{} expects PHYSICS_BROAD
+{} erwartet ARRAY OF STRING	{} expects ARRAY OF STRING
+{} erwartet ANIM_FSM, erhalten {}	{} expects ANIM_FSM, got {}
+{} erwartet SPRITE, erhalten {}	{} expects SPRITE, got {}
+{} erwartet JSON-Handle (aus JSON_PARSE)	{} expects a JSON handle (from JSON_PARSE)
+{} erwartet SAVE_HANDLE (aus SAVE_NEW/SAVE_LOAD)	{} expects a SAVE_HANDLE (from SAVE_NEW/SAVE_LOAD)
+{} erwartet ein XML_HANDLE (aus XML_PARSE/XML_LOAD/XML_FIND)	{} expects an XML_HANDLE (from XML_PARSE/XML_LOAD/XML_FIND)
+{} erwartet eine MAP (INI ist eine MAP OF STRING mit Punkt-Schluesseln)	{} expects a MAP (INI is a MAP OF STRING with dotted keys)
+{} erwartet Lese-FILE	{} expects a FILE opened for reading
+{} erwartet Zahl	{} expects a number
+{} erwartet Zahlen	{} expects numbers
+{} erwartet zwei ARRAYs	{} expects two ARRAYs
+{} erwartet nicht-leeren STRING	{} expects a non-empty STRING
+{} erwartet positives INTEGER	{} expects a positive INTEGER
+{} erwartet value (INTEGER)	{} expects value (INTEGER)
+{} erwartet STRING, TUPLE, ARRAY oder MAP	{} expects STRING, TUPLE, ARRAY or MAP
+{} erwartet STRING, TUPLE, ARRAY oder MAP -- die Stellen einer Zahl: LEN(STR$(zahl))	{} expects STRING, TUPLE, ARRAY or MAP -- the digits of a number: LEN(STR$(number))
+{} auf NIL -- die Variable hat noch keinen Wert	{} on NIL -- the variable has no value yet
+{}: erwartet 1D-ARRAY	{}: expected a 1D ARRAY
+{}: erwartet 1D-ARRAY von Zahlen	{}: expected a 1D ARRAY of numbers
+{}: erwartet ein 1D- oder 2D-ARRAY, bekommen {}D	{}: expected a 1D or 2D ARRAY, got {}D
+{}: erwartet ein ARRAY OF STRING	{}: expected an ARRAY OF STRING
+{}: erwartet ein ENUM als erstes Argument, bekommen {}	{}: expected an ENUM as the first argument, got {}
+{}: erwartet INTEGER als Wert, bekommen {}	{}: expected INTEGER as the value, got {}
+{}: erwartet STRING oder BUFFER, erhalten {}	{}: expected STRING or BUFFER, got {}
+{}: erwartet BOOLEAN als 3. Argument	{}: expected BOOLEAN as the 3rd argument
+{}: erwartet eine Datei aus OPENFILE, erhalten {}	{}: expected a file from OPENFILE, got {}
+{}: erwartet eine MAP OF INTEGER als Menge	{}: expected a MAP OF INTEGER as a set
+{}: Arg {} muss Zahl sein	{}: argument {} must be a number
+{}: Argument muss INTEGER sein	{}: the argument must be INTEGER
+{}: der Wert muss BOOLEAN, INTEGER, FLOAT oder STRING sein	{}: the value must be BOOLEAN, INTEGER, FLOAT or STRING
+{}: das Symbol muss ein STRING sein, erhalten {}	{}: the symbol must be a STRING, got {}
+{}: 2. Argument muss BOOLEAN (absteigend) oder FUNCREF (Comparator) sein	{}: the 2nd argument must be BOOLEAN (descending) or FUNCREF (comparator)
+{}: 2. Argument muss BOOLEAN sein (Inhalt mitloeschen?)	{}: the 2nd argument must be BOOLEAN (delete the contents too?)
+{}: kein BOOLEAN	{}: not a BOOLEAN
+{}: kein Boolean	{}: not a boolean
+{}: kein INTEGER	{}: not an INTEGER
+{}: kein Integer	{}: not an integer
+{}: kein STRING	{}: not a STRING
+{}: keine Zahl	{}: not a number
+{}: Component ist nicht BOOLEAN	{}: the component is not BOOLEAN
+{}: Component ist nicht INTEGER	{}: the component is not INTEGER
+{}: Component ist nicht STRING	{}: the component is not STRING
+{}: Component ist nicht Zahl	{}: the component is not a number
+{}: weder Array, Objekt noch String	{}: neither array, object nor string
+{}: Elemente sind INTEGER oder STRING, nicht {}	{}: elements are INTEGER or STRING, not {}
+
+# ---------------------------------------------------------------- Befehle: Argumentzahl
+{}: erwartet {} oder {} Argument(e), erhalten {}	{}: expected {} or {} argument(s), got {}
+{}: erwartet {} oder {} Argumente	{}: expected {} or {} arguments
+{}: erwartet {} Argumente, bekam {}	{}: expected {} arguments, got {}
+{}: erwartet {} bis {} Argumente	{}: expected {} to {} arguments
+{}: erwartet 1..2 Argumente (puffer [, "zlib"/"roh"]), erhalten {}	{}: expected 1..2 arguments (buffer [, "zlib"/"roh"]), got {}
+{}: erwartet 2..3 Argumente (puffer, position [, "le"/"be"]), erhalten {}	{}: expected 2..3 arguments (buffer, position [, "le"/"be"]), got {}
+{}: erwartet 3..4 Argumente (puffer, position, wert [, "le"/"be"]), erhalten {}	{}: expected 3..4 arguments (buffer, position, value [, "le"/"be"]), got {}
+{}: erwartet (text$, links$, rechts$[, ab])	{}: expected (text$, left$, right$[, from])
+{}: erwartet (text, pattern [, ab])	{}: expected (text, pattern [, from])
+{}: erwartet 3 Zahlen (r, g, b){}	{}: expected 3 numbers (r, g, b){}
+
+# ---------------------------------------------------------------- Felder, Maps, Mengen
+{}: nur 1D-Arrays	{}: only 1D arrays
+{}: nur 1D	{}: only 1D
+{}: nur ARRAY OF INTEGER/FLOAT	{}: only ARRAY OF INTEGER/FLOAT
+{}: nur ARRAY OF INTEGER/FLOAT/STRING	{}: only ARRAY OF INTEGER/FLOAT/STRING
+{}: nicht-INTEGER-Element	{}: an element that is not an INTEGER
+{}: Dimension {} ausserhalb	{}: dimension {} out of range
+{}: Index ausserhalb	{}: index out of range
+{}: Index {} ausserhalb (0..{})	{}: index {} out of range (0..{})
+{}: Index {} liegt ausserhalb (Laenge {})	{}: index {} is out of range (length {})
+{}: Groesse darf nicht negativ sein	{}: the size must not be negative
+{}: Schluessel '{}' nicht in Map	{}: key '{}' is not in the map
+{}: werte und gewichte muessen gleich lang sein	{}: values and weights must have the same length
+{}: Summe der Gewichte muss > 0 sein	{}: the sum of the weights must be > 0
+{}: lo darf nicht groesser als hi sein	{}: lo must not be greater than hi
+{}: step darf nicht 0 sein	{}: step must not be 0
+{}: xs und ys muessen gleich lang sein	{}: xs and ys must have the same length
+__SET_DEDUP erwartet TUPLE	__SET_DEDUP expects TUPLE
+__DICT_FROM_PAIRS erwartet TUPLE	__DICT_FROM_PAIRS expects TUPLE
+__DICT_FROM_PAIRS: erwartet 2-Tupel	__DICT_FROM_PAIRS: expected 2-tuples
+__closure: erwartet den Funktionsnamen	__closure: expected the function name
+
+# ---------------------------------------------------------------- Zahlen und Text
+{}: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)	{}: integer overflow (INTEGER is 64-bit; range exceeded)
+{}: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)	{}: integer overflow (INTEGER is 64-bit)
+{}: {},{} ist zu gross (INTEGER ist 64-bit)	{}: {},{} is too large (INTEGER is 64-bit)
+{}: {} passt nicht in eine ganze Zahl	{}: {} does not fit into a whole number
+{}: FLOAT {} kann nicht ohne Verlust nach INTEGER (nutze INT())	{}: FLOAT {} cannot be turned into INTEGER without loss (use INT())
+{}: Argument muss > 0 sein	{}: the argument must be > 0
+{}: Argument muss in [-1, 1] liegen	{}: the argument must be in [-1, 1]
+{}: Basis muss > 0 und <> 1 sein	{}: the base must be > 0 and <> 1
+{}: decimals muss >= 0 sein	{}: decimals must be >= 0
+{}: default muss eine Zahl sein	{}: default must be a number
+{}: in_lo und in_hi duerfen nicht gleich sein	{}: in_lo and in_hi must not be equal
+{}: mehr als 15 Nachkommastellen kann eine FLOAT-Zahl nicht halten	{}: a FLOAT cannot hold more than 15 decimal places
+{}: Matrix nicht invertierbar (Determinante 0)	{}: the matrix cannot be inverted (determinant 0)
+{}: row/col muss 0..3 sein	{}: row/col must be 0..3
+{}: erwartet GANZE CENT, keine Kommazahl -- aus {} macht CENT({}) die Zahl {}	{}: expected WHOLE CENTS, not a decimal -- CENT({}) turns {} into the number {}
+{} ist kein Betrag -- erlaubt sind Ziffern, ein Vorzeichen und ein Komma (oder Punkt)	{} is not an amount -- allowed are digits, a sign and a comma (or point)
+unerwartete Zahlendarstellung {}	unexpected number format {}
+{}: Breite zu gross (max. {})	{}: width too large (at most {})
+{}: Genauigkeit zu gross (max. {})	{}: precision too large (at most {})
+{}: %{} erwartet Zahl	{}: %{} expects a number
+{}: unbekannter Spezifizierer %{}	{}: unknown specifier %{}
+{}: ungueltiger Codepoint {}	{}: invalid code point {}
+{}: die Markierungen duerfen nicht leer sein	{}: the markers must not be empty
+{}: die Startstelle steht in Drachenhauch HINTEN -- INSTR(text, suche, start), und gezaehlt wird ab 0 (nicht gefunden = -1)	{}: in Drachenhauch the start position comes LAST -- INSTR(text, search, start), and counting starts at 0 (not found = -1)
+Ungueltige Regex '{}': {}	Invalid regex '{}': {}
+{}: '{}' ist keine Farbe -- erwartet #RGB, #RRGGBB oder #AARRGGBB	{}: '{}' is not a color -- expected #RGB, #RRGGBB or #AARRGGBB
+{}: '{}' hat {} Stellen -- erlaubt sind 3, 6 oder 8	{}: '{}' has {} digits -- allowed are 3, 6 or 8
+{}: '{}' liess sich nicht lesen	{}: '{}' could not be read
+{}: '{}' ist keine Hex-Ziffer	{}: '{}' is not a hex digit
+{}: dekodierte Bytes sind kein gueltiges UTF-8	{}: the decoded bytes are not valid UTF-8
+{}: entpackte Bytes sind kein gueltiges UTF-8	{}: the unpacked bytes are not valid UTF-8
+{}: Daten sind nicht mit COMPRESS$ gepackt	{}: the data was not packed with COMPRESS$
+{}: Farbe muss 0..0xFFFFFF sein	{}: the color must be 0..0xFFFFFF
+{}: Farbliste ist leer	{}: the color list is empty
+{}: ungueltiger Name '{}' (leer, '=' oder Null-Byte)	{}: invalid name '{}' (empty, '=' or null byte)
+{}: Wert darf kein Null-Byte enthalten	{}: the value must not contain a null byte
+{}: ungueltige Laenge	{}: invalid length
+{}: ungueltiges Zeichen	{}: invalid character
+
+# ---------------------------------------------------------------- Dateien und Puffer
+{}: Datei '{}' nicht gefunden	{}: file '{}' not found
+{}: Datei '{}' nicht gefunden (gesucht relativ zu {})	{}: file '{}' not found (searched relative to {})
+{}: Datei ist geschlossen	{}: the file is closed
+{}: Datei wurde nicht im Lese-Modus geoeffnet	{}: the file was not opened for reading
+{}: Datei wurde nicht im Schreib-Modus geoeffnet	{}: the file was not opened for writing
+{}: die Datei ist nicht geoeffnet -- f = OPENFILE("name.txt", "w")	{}: the file is not open -- f = OPENFILE("name.txt", "w")
+{}: ungueltiger Modus '{}' (erlaubt: r, w, a)	{}: invalid mode '{}' (allowed: r, w, a)
+{}: die Standardeingabe kennt keine Position	{}: standard input has no position
+{}: die Standardeingabe laesst sich nicht zurueckspulen -- was gelesen ist, ist gelesen	{}: standard input cannot be rewound -- what has been read is read
+{}: Position {} ist negativ	{}: position {} is negative
+{}: Groesse {} ist negativ	{}: size {} is negative
+{}: Anzahl {} ist negativ	{}: count {} is negative
+{}: 64-mal keinen freien Namen gefunden	{}: found no free name in 64 tries
+{}: keine Zufallsquelle	{}: no source of randomness
+{}: Zufallsquelle des Systems nicht verfuegbar: {}	{}: the system's source of randomness is not available: {}
+{}: Schluessel nicht verwendbar: {}	{}: the key cannot be used: {}
+{}: Byte {} ist kein gueltiges UTF-8 -- der Puffer enthaelt keinen Text (fuer Binaerdaten BUFFER_TO_HEX$ nehmen)	{}: byte {} is not valid UTF-8 -- the buffer does not contain text (use BUFFER_TO_HEX$ for binary data)
+{}: Byte-Reihenfolge '{}' unbekannt (erlaubt: "le" = little-endian, "be" = big-endian)	{}: unknown byte order '{}' (allowed: "le" = little-endian, "be" = big-endian)
+{}: Byte-Reihenfolge erwartet STRING ("le" oder "be")	{}: the byte order expects a STRING ("le" or "be")
+{}: Byte-Wert {} liegt ausserhalb 0..255	{}: byte value {} is outside 0..255
+{}: {} Byte(s) ab Position {} liegen ausserhalb des Puffers (Laenge {})	{}: {} byte(s) from position {} are outside the buffer (length {})
+{}: unbekanntes Format "{}" (erlaubt: "zlib", "roh")	{}: unknown format "{}" (allowed: "zlib", "roh")
+{}: keine gueltigen {}-Daten	{}: not valid {} data
+
+# ---------------------------------------------------------------- JSON, XML, Speicherstaende
+{}: '{}' ist kein gueltiges JSON ({})	{}: '{}' is not valid JSON ({})
+{}: Pfad '{}' nicht aufloesbar	{}: path '{}' cannot be resolved
+{}: Pfad '{}' ist kein String	{}: path '{}' is not a string
+{}: '{}' ist {}, kein Array	{}: '{}' is {}, not an array
+{}: '{}' ist {}, kein Objekt	{}: '{}' is {}, not an object
+{}: '{}' ist {} -- da laesst sich kein Feld setzen	{}: '{}' is {} -- no field can be set there
+{}: '{}' ist {} -- da laesst sich nichts hineinschreiben	{}: '{}' is {} -- nothing can be written into it
+{}: '{}' ist ein Array, '{}' ist kein Index	{}: '{}' is an array, '{}' is not an index
+{}: Ziel ist ein Array, '{}' ist kein Index	{}: the target is an array, '{}' is not an index
+{}: '{}' gibt es nicht -- ein Array entsteht mit JSON_SET_JSON(..., JSON_NEW_ARRAY())	{}: '{}' does not exist -- an array is created with JSON_SET_JSON(..., JSON_NEW_ARRAY())
+{}: '{}' gibt es noch nicht, und '{}' ist eine Zahl -- meintest du ein Array? Dann zuerst anlegen ({}), danach mit JSON_APPEND_* fuellen. Ein Objekt-Schluessel darf keine reine Zahl sein.	{}: '{}' does not exist yet, and '{}' is a number -- did you mean an array? Then create it first ({}), then fill it with JSON_APPEND_*. An object key must not be a pure number.
+{}: Index {} liegt ausserhalb (Laenge {}) -- zum Anhaengen JSON_APPEND_* nehmen	{}: index {} is out of range (length {}) -- use JSON_APPEND_* to append
+{}: Index {} liegt ausserhalb von '{}' (Laenge {})	{}: index {} is outside '{}' (length {})
+{}: leerer Pfad -- das Dokument selbst laesst sich nicht entfernen	{}: empty path -- the document itself cannot be removed
+{}: leerer Pfad -- das Dokument selbst laesst sich nicht ersetzen	{}: empty path -- the document itself cannot be replaced
+{}: '{}' gibt es unter <{}> nicht -- mit XML_HAS vorher fragen	{}: '{}' does not exist under <{}> -- ask first with XML_HAS
+{}: '{}' gibt es {}-mal, gefragt war Nummer {}	{}: '{}' exists {} time(s), number {} was asked for
+{}: Key '{}' nicht im Save	{}: key '{}' is not in the save
+{}: Save-Datei muss ein JSON-Objekt sein	{}: the save file must be a JSON object
+{}: '{}' ist {}	{}: '{}' is {}
+
+# ---------------------------------------------------------------- Spiele-Module (Tiled, Sprites, Raster, Physik)
+{}: Layer '{}' nicht gefunden	{}: layer '{}' not found
+{}: Layer '{}' ist kein Object-Layer	{}: layer '{}' is not an object layer
+{}: Layer {} ('{}') ist kein Tile-Layer	{}: layer {} ('{}') is not a tile layer
+{}: Layer-Index {} ausserhalb [0..{}]	{}: layer index {} outside [0..{}]
+{}: Object-Index {} ausserhalb [0..{}]	{}: object index {} outside [0..{}]
+{}: ({}, {}) ausserhalb des Grids [{}x{}]	{}: ({}, {}) outside the grid [{}x{}]
+{}: Grid zu gross ({}x{} Zellen, max. {})	{}: grid too large ({}x{} cells, at most {})
+{}: cost muss > 0 sein (erhalten {})	{}: cost must be > 0 (got {})
+{}: unbekannte Heuristik '{}' (erlaubt: chebyshev, euclid, manhattan)	{}: unknown heuristic '{}' (allowed: chebyshev, euclid, manhattan)
+{}: w und h muessen > 0 sein	{}: w and h must be > 0
+{}: Breite und Hoehe muessen > 0 sein	{}: width and height must be > 0
+{}: Breite und Hoehe muessen > 0 sein (erhalten {}x{})	{}: width and height must be > 0 (got {}x{})
+{}: Breite/Hoehe zu gross ({}/{})	{}: width/height too large ({}/{})
+{}: frame_w und frame_h muessen > 0 sein	{}: frame_w and frame_h must be > 0
+{}: Skalierung muss > 0 sein	{}: the scale must be > 0
+{}: name muss nicht-leerer STRING sein	{}: name must be a non-empty STRING
+{}: first >= 0 und last >= first noetig	{}: first >= 0 and last >= first are required
+{}: fps muss >= 0 sein	{}: fps must be >= 0
+{}: idx muss >= 0 sein	{}: idx must be >= 0
+{}: dt_ms muss >= 0 sein	{}: dt_ms must be >= 0
+{}: dauer_ms muss >= 0 sein	{}: dauer_ms must be >= 0
+{}: count muss >= 0 sein	{}: count must be >= 0
+{}: Radius muss >= 0 sein	{}: the radius must be >= 0
+{}: max muss >= min sein	{}: max must be >= min
+{}: min >= 1 und max >= min noetig	{}: min >= 1 and max >= min are required
+{}: ms_min >= 0 und ms_max >= ms_min noetig	{}: ms_min >= 0 and ms_max >= ms_min are required
+{}: Sekunden duerfen nicht negativ sein	{}: seconds must not be negative
+{}: unbekanntes easing '{}'	{}: unknown easing '{}'
+{}: unbekannter Modus '{}'	{}: unknown mode '{}'
+{}: unbekannte Art '{}' (gueltig: kuchen, balken, linie, tacho)	{}: unknown kind '{}' (valid: kuchen, balken, linie, tacho)
+{}: unbekannte Kennzahl '{}' (gueltig: anzahl, summe, mittel, min, max)	{}: unknown statistic '{}' (valid: anzahl, summe, mittel, min, max)
+{}: unbekanntes Thema '{}' (gueltig: {})	{}: unknown theme '{}' (valid: {})
+{}: Ebene {} gibt es nicht	{}: layer {} does not exist
+{}: Reihe {} gibt es nicht	{}: series {} does not exist
+{}: Punkt {} gibt es nicht	{}: point {} does not exist
+{}: Reihe darf nicht negativ sein	{}: the series must not be negative
+{}: Reihe und Punkt duerfen nicht negativ sein	{}: series and point must not be negative
+{}: dauer_ms muss > 0 sein	{}: dauer_ms must be > 0
+
+# ---------------------------------------------------------------- Laufzeit: allgemeine Formen
+# Die Parameterliste in der Klammer bleibt, wie sie in der Signatur steht.
+{}: erwartet ({}), erhalten {} Argumente	{}: expected ({}), got {} arguments
+{}: erwartet ({})	{}: expected ({})
+{}: erwartet ({}), optional dahinter ({}) und eine Faerbung	{}: expected ({}), optionally followed by ({}) and a tint
+{}: erwartet {} Argumente ({}), erhalten {}	{}: expected {} arguments ({}), got {}
+{}: erwartet {} Argumente ({})	{}: expected {} arguments ({})
+{}: erwartet {} Argumente (gilt fuer den zuletzt abgeholten Auftrag)	{}: expected {} arguments (applies to the task fetched last)
+{}: erwartet 0 Argumente	{}: expected 0 arguments
+{}: erwartet keine Argumente	{}: expected no arguments
+{}: erwartet 1 Argument, erhalten {}	{}: expected 1 argument, got {}
+{}: erwartet 1 Argument -- Aufruf: {}	{}: expected 1 argument -- usage: {}
+{}: erwartet {} Zahlen, erhalten {}	{}: expected {} numbers, got {}
+{}: erwartet 1D ARRAY OF {}	{}: expected a 1D ARRAY OF {}
+{}: erwartet 2D ARRAY OF {}	{}: expected a 2D ARRAY OF {}
+{}: erwartet 2D ARRAY OF INTEGER [{}, {}]	{}: expected a 2D ARRAY OF INTEGER [{}, {}]
+{}: erwartet ARRAY OF {}	{}: expected ARRAY OF {}
+{}: erwartet ARRAY OF INTEGER oder NIL	{}: expected ARRAY OF INTEGER or NIL
+{}: erwartet BUFFER, erhalten {}	{}: expected BUFFER, got {}
+{}: erwartet BOOLEAN (Arg {})	{}: expected BOOLEAN (argument {})
+{}: erwartet FUNCREF (Arg {})	{}: expected FUNCREF (argument {})
+{}: erwartet INTEGER (Arg {})	{}: expected INTEGER (argument {})
+{}: erwartet STRING (Arg {})	{}: expected STRING (argument {})
+{}: erwartet Zahl (Arg {})	{}: expected a number (argument {})
+{}: erwartet einen Zeitwert (INTEGER, Arg {})	{}: expected a time value (INTEGER, argument {})
+{}: erwartet den Namen eines Sinnbilds (STRING) oder ein Bild (Arg {})	{}: expected the name of a symbol (STRING) or an image (argument {})
+{}: erwartet INTEGER (Rueckgabewert)	{}: expected INTEGER (return value)
+{}: erwartet STRING	{}: expected STRING
+{}: erwartet STRING (Kodierung)	{}: expected STRING (encoding)
+{}: erwartet MAT4 (Modul m3d)	{}: expected MAT4 (module m3d)
+{}: erwartet Text oder Zahl, erhalten {}	{}: expected text or a number, got {}
+{}: erwartet eine MAP mit den Werten	{}: expected a MAP with the values
+{}: erwartet genau ein Zeichen, nicht "{}"	{}: expected exactly one character, not "{}"
+{}: erwartet Action + mind. 1 Key	{}: expected an action + at least 1 key
+{}: erwartet GELD, erhalten {} -- mit GELD_NEU() einen Betrag daraus machen	{}: expected GELD, got {} -- turn it into an amount with GELD_NEU()
+{}: erwartet die Programmdatei, z.B. WINDOW_OPEN("palette.dh")	{}: expected the program file, e.g. WINDOW_OPEN("palette.dh")
+{}: erwartet eine Funktion als erstes Argument, bekommen {}. Schreib den Namen ohne Klammern: TASK_START(Rechne, 42)	{}: expected a function as the first argument, got {}. Write the name without parentheses: TASK_START(Calc, 42)
+{}: erwartet eine Funktion, z.B. TASK_START(Rechne, 42)	{}: expected a function, e.g. TASK_START(Calc, 42)
+erhalten {}, erwartet {}	got {}, expected {}
+{}: Argument {} muss Zahl sein	{}: argument {} must be a number
+{}: Argument {} muss eine Farbe sein	{}: argument {} must be a color
+{}: Argument {} muss eine endliche Zahl sein, nicht {}	{}: argument {} must be a finite number, not {}
+{}: Argument {} ist NIL -- die Variable hat noch keinen Wert (Bild/Klang vorher laden, z.B. b = LOADIMAGE("bild.png"))	{}: argument {} is NIL -- the variable has no value yet (load the image/sound first, e.g. b = LOADIMAGE("picture.png"))
+{}: Arg 1 muss MAT4 sein	{}: argument 1 must be MAT4
+{}: Arg 2 muss MAT4 sein	{}: argument 2 must be MAT4
+{}: Arg 2 muss ein ARRAY OF MAT4 sein	{}: argument 2 must be an ARRAY OF MAT4
+{}: Arg 2 muss ein 1D-ARRAY OF MAT4 sein	{}: argument 2 must be a 1D ARRAY OF MAT4
+{}: Arg 2 muss ARRAY OF MAT4 oder TUPLE von MAT4 sein	{}: argument 2 must be an ARRAY OF MAT4 or a TUPLE of MAT4
+{}: Element {} ist kein MAT4 (sondern {})	{}: element {} is not a MAT4 (but {})
+{}: 3. Argument muss BOOLEAN sein	{}: the 3rd argument must be BOOLEAN
+{}: 4. Argument muss BOOLEAN sein	{}: the 4th argument must be BOOLEAN
+{}: value muss BOOLEAN sein	{}: value must be BOOLEAN
+{}: value muss INTEGER sein	{}: value must be INTEGER
+{}: value muss STRING sein	{}: value must be STRING
+{}: value muss Zahl sein	{}: value must be a number
+{}: start muss Zahl sein	{}: start must be a number
+{}: end muss Zahl sein	{}: end must be a number
+{}: id muss STRING sein	{}: id must be a STRING
+{}: handler muss FUNCREF sein	{}: handler must be a FUNCREF
+{}: color muss INTEGER oder ARRAY sein	{}: color must be INTEGER or ARRAY
+{}: texte muss ARRAY OF STRING sein	{}: texte must be an ARRAY OF STRING
+{}: texte muss ein ARRAY sein	{}: texte must be an ARRAY
+{}: options muss ARRAY OF STRING sein	{}: options must be an ARRAY OF STRING
+{}: map muss ARRAY OF INTEGER sein	{}: map must be an ARRAY OF INTEGER
+{}: map muss 2D sein (zeilen x spalten)	{}: map must be 2D (rows x columns)
+{}: {} muss >= {} sein	{}: {} must be >= {}
+{}: {} muss > {} sein	{}: {} must be > {}
+{}: {} muss {}..{} sein	{}: {} must be {}..{}
+{}: {} muss >= {} sein (war {})	{}: {} must be >= {} (was {})
+{}: Position muss >= 0 sein (war {})	{}: the position must be >= 0 (was {})
+{}: Wert muss >= 1 sein	{}: the value must be >= 1
+{}: {} {} ist negativ	{}: {} {} is negative
+{}: anzahl darf nicht negativ sein	{}: anzahl must not be negative
+{}: anzahl muss eine ganze Zahl sein	{}: anzahl must be a whole number
+{}: Breite und Hoehe duerfen nicht negativ sein	{}: width and height must not be negative
+{}: Frequenz darf nicht negativ sein	{}: the frequency must not be negative
+{}: Halbtoene muss -120..120 sein	{}: semitones must be -120..120
+{}: Schriftgroesse {} ist nicht positiv	{}: font size {} is not positive
+{}: Strich und Luecke muessen mindestens 1 sein, nicht {} und {}	{}: dash and gap must be at least 1, not {} and {}
+{}: Zeichennummern gehen von 0 bis &H10FFFF, nicht {} und {}	{}: character numbers go from 0 to &H10FFFF, not {} and {}
+{}: Zeit {} ist keine Zahl	{}: time {} is not a number
+{}: Zeit {} ist {} ms -- muss > 0 sein	{}: time {} is {} ms -- must be > 0
+{}: die Dauer in Sekunden muss 0 oder groesser sein, nicht {}	{}: the duration in seconds must be 0 or more, not {}
+{}: die Deckkraft muss 0..255 sein, war {}	{}: the opacity must be 0..255, was {}
+{}: die Deckkraft muss eine Zahl sein	{}: the opacity must be a number
+{}: die Frist muss groesser als 0 sein	{}: the timeout must be greater than 0
+{}: die Groesse muss groesser als 0 sein, nicht {}	{}: the size must be greater than 0, not {}
+{}: der Massstab muss groesser als 0 sein, nicht {} und {}	{}: the scale must be greater than 0, not {} and {}
+{}: die Schwelle liegt zwischen 0 und 1 (nicht {})	{}: the threshold is between 0 and 1 (not {})
+{}: das Statusbyte muss zwischen 128 und 255 liegen, war {}	{}: the status byte must be between 128 and 255, was {}
+{}: Rueckgabewert {} liegt ausserhalb 0..255	{}: return value {} is outside 0..255
+{}: {} Sekunden liegen ausserhalb 1..600	{}: {} seconds are outside 1..600
+{}: {} ist keine Portnummer	{}: {} is not a port number
+{}: xs und ys muessen gleich lang sein ({} gegen {})	{}: xs and ys must have the same length ({} against {})
+{}: hoechstens 1000 Ecken, nicht {}	{}: at most 1000 corners, not {}
+{}: hoechstens 64 Eintraege, nicht {}	{}: at most 64 entries, not {}
+{}: ein Vieleck hat mindestens 3 Ecken, nicht {}	{}: a polygon has at least 3 corners, not {}
+{}: braucht mindestens 4 Punkte, nicht {}	{}: needs at least 4 points, not {}
+{}: braucht 4, 7, 10 ... Punkte (Anfang, dann je zwei Kontrollpunkte und ein Ende), nicht {}	{}: needs 4, 7, 10 ... points (start, then two control points and an end each), not {}
+{}: colors-Array muss mindestens so lang wie die Stueckzahl sein	{}: the colors array must be at least as long as the count
+{}: tint-Array braucht INTEGER-Farben (erhalten {})	{}: the tint array needs INTEGER colors (got {})
+{}: tint-Array ist kuerzer als die Matrizen ({} < {})	{}: the tint array is shorter than the matrices ({} < {})
+{}: tint-Array muss 1D sein	{}: the tint array must be 1D
+{}: {} Bilder, aber nur {} Zeiten -- je Bild eine Dauer in Millisekunden	{}: {} images, but only {} times -- one duration in milliseconds per image
+{}: Platz {} ist leer -- mit `anzahl` sagen, wie viele Plaetze gelten	{}: slot {} is empty -- say with `anzahl` how many slots count
+{}: zweites Argument ist ein Wahrheitswert (mit Deckkraft-Kanal?)	{}: the second argument is a truth value (with an opacity channel?)
+{}: drittes Argument ist ein Wahrheitswert (mit Deckkraft-Kanal?)	{}: the third argument is a truth value (with an opacity channel?)
+{}: entweder nur das Bild oder Bild, x, y, b, h	{}: either just the image or image, x, y, w, h
+{}: taste ist 0 (links) oder 1 (rechts)	{}: taste is 0 (left) or 1 (right)
+{}: bits muss 1..16 sein	{}: bits must be 1..16
+{}: vol muss 0..4 sein	{}: vol must be 0..4
+
+# ---------------------------------------------------------------- Laufzeit: Handles, Stapel, Zustand
+ungueltiges/geschlossenes {}-Handle	invalid/closed {} handle
+ungueltiges/geschlossenes {}	invalid/closed {}
+ungueltiges/gestopptes HTTPD-Handle	invalid/stopped HTTPD handle
+ungueltiges/getrenntes BT_HANDLE	invalid/disconnected BT_HANDLE
+{}: ungueltiges DB_RESULT-Handle {}	{}: invalid DB_RESULT handle {}
+{}: ungueltiges oder freigegebenes VIDEO {}	{}: invalid or freed VIDEO {}
+{}: Stack ist bereits leer	{}: the stack is already empty
+{}: der Stapel ist leer -- zu jedem AUDIO_POP gehoert ein AUDIO_PUSH	{}: the stack is empty -- every AUDIO_POP needs an AUDIO_PUSH
+{}: der Stapel ist leer -- zu jedem GFX_POP gehoert ein GFX_PUSH	{}: the stack is empty -- every GFX_POP needs a GFX_PUSH
+{}: es ist kein Clip offen -- zu jedem SCISSOR_END gehoert ein SCISSOR	{}: no clip is open -- every SCISSOR_END needs a SCISSOR
+Scene-Stack ist leer - SCENE_PUSH oder SCENE_SWITCH zuerst	the scene stack is empty - SCENE_PUSH or SCENE_SWITCH first
+{}: Key '{}' nicht in Scene	{}: key '{}' is not in the scene
+Action '{}' nicht gebunden	action '{}' is not bound
+{}: Action '{}' nicht gebunden	{}: action '{}' is not bound
+{}: keine DATA-Werte mehr (benutze RESTORE zum Reset)	{}: no more DATA values (use RESTORE to reset)
+{}: Coroutine ist noch nicht beendet	{}: the coroutine has not finished yet
+{}: Comparator muss FUNCREF sein	{}: the comparator must be a FUNCREF
+{}: Comparator muss INTEGER liefern, erhielt {}	{}: the comparator must return INTEGER, it returned {}
+{}: Funktion '{}' existiert nicht	{}: function '{}' does not exist
+{}: Funktion '{}' existiert nicht (mehr)	{}: function '{}' does not exist (any more)
+{}: Methode '{}' existiert nicht (mehr) in {}	{}: method '{}' does not exist (any more) in {}
+{}: Rueckruf ist an {} gebunden, nicht an ein Objekt	{}: the callback is bound to {}, not to an object
+{}: '{}' ist an {} gebunden, nicht an ein Objekt	{}: '{}' is bound to {}, not to an object
+{}: '{}' ist an ein Objekt gebunden. Ein Auftrag laeuft in einem eigenen Prozess und sieht dieses Objekt nicht -- nimm eine freie FUNCTION und gib ihr die Werte als Argumente mit.	{}: '{}' is bound to an object. A task runs in its own process and does not see this object -- take a free FUNCTION and pass it the values as arguments.
+{}: Argument {} geht ueber eine Prozessgrenze und muss eine Zahl, ein Text oder BOOLEAN sein, nicht {}. Fuer alles andere reich JSON durch.	{}: argument {} crosses a process boundary and must be a number, a text or BOOLEAN, not {}. For anything else pass JSON.
+{}: Auftrag {} ist noch nicht fertig -- erst TASK_READY({}) fragen	{}: task {} is not finished yet -- ask TASK_READY({}) first
+{}: Auftrag {} ist nicht fertig (oder schon abgeholt) -- erst {}({}) abfragen	{}: task {} is not finished (or already fetched) -- ask {}({}) first
+{}: Abruf {} ist nicht fertig (oder schon abgeholt) -- erst HTTP_READY({}) abfragen	{}: request {} is not finished (or already fetched) -- ask HTTP_READY({}) first
+{}: die laufende Datei ist unbekannt -- Auftraege gibt es nur bei `dhrt run <datei.dh>`	{}: the running file is unknown -- tasks only exist with `dhrt run <file.dh>`
+{}: eigenen Programmpfad nicht gefunden: {}	{}: own program path not found: {}
+{}: '{}' laesst sich nicht starten: {}	{}: '{}' cannot be started: {}
+{}: Prozess {} gibt es nicht (nie gestartet oder schon PROCESS_CLOSE)	{}: process {} does not exist (never started or already PROCESS_CLOSE)
+{}: ein Feld von Argumenten muss aus Texten bestehen	{}: an array of arguments must consist of texts
+{}: die Umgebung muss aus Texten bestehen ('{}')	{}: the environment must consist of texts ('{}')
+{}: dieses Programm wurde nicht mit WINDOW_OPEN gestartet -- es hat keine Eltern (PARENT_ALIVE() sagt das ohne Fehler)	{}: this program was not started with WINDOW_OPEN -- it has no parent (PARENT_ALIVE() tells that without an error)
+{}: die Standardeingabe wurde in diesem Programm schon mit einer anderen Kodierung geoeffnet -- es gibt nur EIN Handle dafuer (sonst laesen zwei Puffer an derselben Leitung)	{}: standard input was already opened with a different encoding in this program -- there is only ONE handle for it (otherwise two buffers would read the same pipe)
+{}: Text konnte nicht in die Zwischenablage gelegt werden -- ein anderes Programm haelt sie offen, oder der Text enthaelt ein Nullbyte	{}: the text could not be put into the clipboard -- another program holds it open, or the text contains a null byte
+{} muss die ERSTE Grafik-Anweisung sein (vor LOADIMAGE/SCREEN/... -- Transparenz kann nicht nachtraeglich gesetzt werden)	{} must be the FIRST graphics statement (before LOADIMAGE/SCREEN/... -- transparency cannot be set afterwards)
+{}: braucht ein Fenster (SCREEN) -- die Vorschau ist ein IMAGE	{}: needs a window (SCREEN) -- the preview is an IMAGE
+{}: dieser Bau hat keine Grafik	{}: this build has no graphics
+{}: in diesem Build nicht verfuegbar -- native OS-Dialoge gibt es nur auf dem Desktop (Feature `dialogs`), nicht im Browser.	{}: not available in this build -- native OS dialogs only exist on the desktop (feature `dialogs`), not in the browser.
+{}: diese Fassung von dhrt ist ohne das Feature `smtp` gebaut (verschluesselte Verbindungen fehlen dann)	{}: this version of dhrt is built without the feature `smtp` (encrypted connections are missing then)
+httpd: dieser dhrt-Build hat das Netz-Feature nicht (neu bauen mit python rust/build_runtime.py)	httpd: this dhrt build does not have the network feature (rebuild with python rust/build_runtime.py)
+GUI_FORM_LOAD/SAVE: dieser Bau hat kein db-Modul	GUI_FORM_LOAD/SAVE: this build has no db module
+{}: CLOUD_CONFIGURE(base_url, api_key) muss zuerst aufgerufen werden	{}: CLOUD_CONFIGURE(base_url, api_key) must be called first
+{}: es liegt keine Anfrage an -- erst HTTPD_ACCEPT abfragen	{}: there is no pending request -- ask HTTPD_ACCEPT first
+{}: Kopfzeilen erwarten MAP OF STRING, erhalten {}	{}: headers expect a MAP OF STRING, got {}
+{}: Rumpf erwartet STRING oder BUFFER, erhalten {}	{}: the body expects STRING or BUFFER, got {}
+{}: die Sicherheit muss ein STRING sein ("starttls", "tls", "keine")	{}: the security must be a STRING ("starttls", "tls", "keine")
+403 -- Pfad nicht erlaubt	403 -- path not allowed
+404 -- nicht gefunden	404 -- not found
+{}: im Formular '{}' ist kein Widget gebunden (GUI_BIND)	{}: no widget is bound in the form '{}' (GUI_BIND)
+{}: '{}' ist kein Tabellenname (Buchstaben, Ziffern, _)	{}: '{}' is not a table name (letters, digits, _)
+{}: '{}' ist kein Feld -- moeglich sind {}	{}: '{}' is not a field -- possible are {}
+{}: '{}' braucht von und bis	{}: '{}' needs from and to
+{}: '{}' ist kein Stil -- moeglich sind "ok" (Vorgabe) und "janein"	{}: '{}' is not a style -- possible are "ok" (default) and "janein"
+{}: '{}' ist kein Stil -- moeglich sind "ok" (Vorgabe), "janein" oder eigene Knoepfe mit | getrennt ("Speichern|Verwerfen|Abbrechen")	{}: '{}' is not a style -- possible are "ok" (default), "janein" or your own buttons separated by | ("Save|Discard|Cancel")
+{}: '{}' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)	{}: '{}' is not a point in time -- expected 'YYYY-MM-DD hh:mm:ss' (also with T, without seconds or just the date)
+{}: '{}' kenne ich nicht -- "hoch" oder "quer"	{}: '{}' is unknown -- "hoch" (portrait) or "quer" (landscape)
+{}: 2. Argument ist "hoch" oder "quer"	{}: the 2nd argument is "hoch" (portrait) or "quer" (landscape)
+{}: Seitengroesse '{}' kenne ich nicht -- a3, a4, a5, a6, letter, legal	{}: unknown page size '{}' -- a3, a4, a5, a6, letter, legal
+{}: Seite {} gibt es nicht (1..{})	{}: page {} does not exist (1..{})
+{}: 0 bis 4 Nachkommastellen (mehr haelt ein Betrag nicht)	{}: 0 to 4 decimal places (an amount holds no more)
+{}: Betrag zu gross	{}: amount too large
+{} : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau dafuer gibt es den Typ. Entweder GELD_NEU(zahl) daraus machen oder mit GELD_ZAHL(betrag) bewusst herausgehen.	{} : GELD and an ordinary number do not mix -- that is exactly what the type is for. Either make one with GELD_NEU(number) or deliberately leave with GELD_ZAHL(amount).
+* : GELD mal GELD ergibt keinen Betrag (Euro mal Euro waeren Quadrat-Euro). Mit einer Zahl multiplizieren.	* : GELD times GELD is not an amount (euro times euro would be square euros). Multiply by a number.
+/ : Zahl durch GELD ergibt keinen Betrag	/ : a number divided by GELD is not an amount
++ : inkompatible Vektor-Operanden (gleicher Vektor-Typ erwartet)	+ : incompatible vector operands (same vector type expected)
+- : inkompatible Vektor-Operanden (gleicher Vektor-Typ erwartet)	- : incompatible vector operands (same vector type expected)
+* : nicht unterstuetzte Operanden (Vektor*Zahl, QUAT*QUAT, MAT4*MAT4/VEC4/VEC3)	* : unsupported operands (vector*number, QUAT*QUAT, MAT4*MAT4/VEC4/VEC3)
+/ : erwartet Vektor / Zahl	/ : expected vector / number
+{}: unbekannter Bus '{}' (sfx, music, master)	{}: unknown bus '{}' (sfx, music, master)
+{}: unbekannter Bus '{}' (sfx, music, master, speech)	{}: unknown bus '{}' (sfx, music, master, speech)
+{}: unbekannter Schluessel '{}'	{}: unknown key '{}'
+{}: unbekannte Achse '{}' (erlaubt: left_x, left_y, right_x, right_y, lt, rt)	{}: unknown axis '{}' (allowed: left_x, left_y, right_x, right_y, lt, rt)
+{}: unbekannter Modus '{}' (alpha/add/mult/subtract)	{}: unknown mode '{}' (alpha/add/mult/subtract)
+{}: unbekanntes Easing '{}' (linear, in, out, inout)	{}: unknown easing '{}' (linear, in, out, inout)
+{}: unbekanntes Preset '{}'	{}: unknown preset '{}'
+{}: der Anzeigename muss ein STRING sein	{}: the display name must be a STRING
+{}: entweder ohne Daten oder mit headers UND cells aufrufen	{}: call either without data or with headers AND cells
+{}: headers fehlt	{}: headers is missing
+{}: headers darf nicht leer sein	{}: headers must not be empty
+{}: headers muss ARRAY OF STRING sein	{}: headers must be an ARRAY OF STRING
+{}: headers muss 1D ARRAY OF STRING sein	{}: headers must be a 1D ARRAY OF STRING
+{}: cells fehlt	{}: cells is missing
+{}: cells muss 2D ARRAY OF STRING sein	{}: cells must be a 2D ARRAY OF STRING
+{}: col_widths muss ARRAY OF INTEGER sein	{}: col_widths must be an ARRAY OF INTEGER
+{}: col_widths muss 1D ARRAY OF INTEGER ({}) sein	{}: col_widths must be a 1D ARRAY OF INTEGER ({})
+{}: self ist keine Instanz	{}: self is not an instance
+{} '{}' ausserhalb Methodenkontext	{} '{}' outside a method context
+{} (Self) ausserhalb Methodenkontext	{} (Self) outside a method context
+{} hat keinen Member '{}'	{} has no member '{}'
+{} '{}' nicht gefunden	{} '{}' not found
+{} erwartet INTEGER	{} expects INTEGER
+{} erwartet SPRITE	{} expects SPRITE
+Property '{}' in {} hat keinen Getter	property '{}' in {} has no getter
+Property '{}' in {} hat keinen Setter (read-only)	property '{}' in {} has no setter (read-only)
+Funktion '{}' gibt es nicht. Bekannt: {}	function '{}' does not exist. Known: {}
+Unbekannte Funktion: {}	unknown function: {}
+Unbekannter Typ: {}	unknown type: {}
+{}: kein COMP_MARKER	{}: not a COMP_MARKER
+{}: interner Fehler -- Typname fehlt	{}: internal error -- type name missing
+Opcode {} im Rust-VM noch nicht implementiert (ip={})	opcode {} is not implemented in the VM (ip={})
+dhrt: Maschinencode nicht moeglich -- {}	dhrt: machine code not possible -- {}
+Typpruefung (DHRT_TYPEN_PRUEFEN): der Compiler sagt {}, der Wert ist {} ({}) -- ein Fehler in compiler.rs typ_von	type check (DHRT_TYPEN_PRUEFEN): the compiler says {}, the value is {} ({}) -- a bug in compiler.rs typ_von
+
+# ---------------------------------------------------------------- Debugger
+eval: '{}' nicht gefunden	eval: '{}' not found
+eval: Ausdruck nicht unterstuetzt (nur Namen, Literale, Operatoren, Felder und Indizes -- keine Aufrufe)	eval: expression not supported (only names, literals, operators, fields and indexes -- no calls)
+eval: Index {} ausserhalb	eval: index {} out of range
+eval: Operator '{}' geht mit diesen Werten nicht	eval: operator '{}' does not work with these values
+eval: Schluessel '{}' fehlt	eval: key '{}' is missing
+eval: ein Feld-Index muss INTEGER sein	eval: an array index must be INTEGER
+eval: unaerer Operator '{}' nicht unterstuetzt	eval: unary operator '{}' not supported
+eval: {} hat kein Feld '{}' (eine PROPERTY wertet der Debugger nicht aus)	eval: {} has no field '{}' (the debugger does not evaluate a PROPERTY)
+eval: {} hat keine Mitglieder	eval: {} has no members
+eval: {} laesst sich so nicht indizieren	eval: {} cannot be indexed like this
+set: '{}' nicht gefunden	set: '{}' not found
+set: kein Name	set: no name
+set: '{}' ist eine Konstante	set: '{}' is a constant
+set: nach einem Fehler laeuft das Programm nicht weiter	set: after an error the program does not continue
+dort und darunter steht kein Code dieses Programms	there is no code of this program there or below
+
+# ---------------------------------------------------------------- Animation, Sprites, Tiled, ECS
+ANIM_FSM_LOAD: JSON muss ein Object sein	ANIM_FSM_LOAD: the JSON must be an object
+ANIM_FSM_LOAD: 'params' muss ein Array sein	ANIM_FSM_LOAD: 'params' must be an array
+ANIM_FSM_LOAD: unbekannter Parameter-Typ '{}'	ANIM_FSM_LOAD: unknown parameter type '{}'
+ANIM_FSM_LOAD: 'states' (Array) fehlt	ANIM_FSM_LOAD: 'states' (array) is missing
+ANIM_FSM_LOAD: State '{}' hat ungueltige first/last ({}/{}) -- first muss >= 0 und <= last sein	ANIM_FSM_LOAD: state '{}' has invalid first/last ({}/{}) -- first must be >= 0 and <= last
+ANIM_FSM_LOAD: default-State '{}' existiert nicht	ANIM_FSM_LOAD: default state '{}' does not exist
+ANIM_FSM_LOAD: 'transitions' muss ein Array sein	ANIM_FSM_LOAD: 'transitions' must be an array
+ANIM_FSM_LOAD: Transition zu unbekanntem State '{}'	ANIM_FSM_LOAD: transition to unknown state '{}'
+ANIM_FSM_LOAD: Transition von unbekanntem State '{}'	ANIM_FSM_LOAD: transition from unknown state '{}'
+ANIM_FSM_LOAD: Condition referenziert unbekannten Parameter '{}'	ANIM_FSM_LOAD: condition refers to unknown parameter '{}'
+ANIM_FSM_LOAD: unbekannter Operator '{}'	ANIM_FSM_LOAD: unknown operator '{}'
+ANIM_FSM: unbekannter Parameter '{}'	ANIM_FSM: unknown parameter '{}'
+ANIM_FSM_FORCE: unbekannter State '{}'	ANIM_FSM_FORCE: unknown state '{}'
+SPRITE: unbekannte Animation '{}' (definiert: {})	SPRITE: unknown animation '{}' (defined: {})
+{}: Entity {} nicht in World	{}: entity {} is not in the world
+{}: Component '{}' fehlt bei Entity {}	{}: component '{}' is missing on entity {}
+TILED_LOAD: base64-codierte Tile-Daten werden nicht unterstuetzt. In Tiled: Edit -> Preferences -> 'Store tile layer data as: CSV' und Map neu speichern.	TILED_LOAD: base64-encoded tile data is not supported. In Tiled: Edit -> Preferences -> 'Store tile layer data as: CSV' and save the map again.
+TILED_LOAD: Layer '{}' hat {} Tile(s), erwartet {}x{}={}	TILED_LOAD: layer '{}' has {} tile(s), expected {}x{}={}
+TILED_LOAD: Datei nicht gefunden: {}	TILED_LOAD: file not found: {}
+TILED_LOAD: Manifest muss JSON-Object sein	TILED_LOAD: the manifest must be a JSON object
+TILED_LOAD: erwartet eine Tiled-Map (type='map'), erhalten type='{}'	TILED_LOAD: expected a Tiled map (type='map'), got type='{}'
+TILED_LOAD: External-Tileset '{}' nicht ladbar: {}	TILED_LOAD: external tileset '{}' cannot be loaded: {}
+TILED_NEW: Breite, Hoehe und Kachelmasse muessen >= 1 sein	TILED_NEW: width, height and tile size must be >= 1
+{}: '{}' gibt es schon	{}: '{}' already exists
+{}: der Name darf nicht leer sein	{}: the name must not be empty
+TILED_MOVE_LAYER: Stelle {} gibt es nicht (0..{})	TILED_MOVE_LAYER: position {} does not exist (0..{})
+{}: '{}' ist keine Objekt-Ebene	{}: '{}' is not an object layer
+{}: Objekt {} gibt es in '{}' nicht	{}: object {} does not exist in '{}'
+{}: der Schluessel darf nicht leer sein	{}: the key must not be empty
+{}: zu GID {} gibt es kein Tileset	{}: there is no tileset for GID {}
+{}: GID {} liegt ausserhalb des Tilesets (0..{})	{}: GID {} is outside the tileset (0..{})
+TILED_SAVE: '{}' liess sich nicht schreiben -- {}	TILED_SAVE: '{}' could not be written -- {}
+
+# ---------------------------------------------------------------- Diagramme
+{}: unbekannte Eigenschaft '{}' (gueltig: {})	{}: unknown property '{}' (valid: {})
+CHART_SET: {} erwartet {}, nicht '{}'	CHART_SET: {} expects {}, not '{}'
+
+# ---------------------------------------------------------------- Dateien, Kodierung, ZIP, XML, Excel, CSV
+{}: Kodierung '{}' kenne ich nicht -- moeglich sind: {}	{}: unknown encoding '{}' -- possible are: {}
+{}: {}Zeile {} ist kein UTF-8 (Byte 0x{} an Stelle {}). Kommt die Datei aus Excel oder einem alten Windows-Programm, ist sie meist cp1252 -- dann als letztes Argument "cp1252" mitgeben. Moeglich sind: {}	{}: {}line {} is not UTF-8 (byte 0x{} at position {}). If the file comes from Excel or an old Windows program, it is usually cp1252 -- then pass "cp1252" as the last argument. Possible are: {}
+{}: das Zeichen '{}' (U+{}) gibt es in {} nicht -- die Datei in utf8 schreiben oder das Zeichen ersetzen	{}: the character '{}' (U+{}) does not exist in {} -- write the file in utf8 or replace the character
+{}: das Trennzeichen muss genau ein Zeichen sein (bekommen: {})	{}: the separator must be exactly one character (got: {})
+{}: kein lesbares ZIP: {}	{}: not a readable ZIP: {}
+{}: kein Eintrag namens {}	{}: no entry named {}
+ZIP_CREATE: {} hat keinen Dateinamen	ZIP_CREATE: {} has no file name
+kein Element gefunden -- ist das wirklich XML?	no element found -- is this really XML?
+Blattname ist leer	the sheet name is empty
+Blattname '{}' ist laenger als 31 Zeichen -- mehr nimmt Excel nicht	sheet name '{}' is longer than 31 characters -- Excel takes no more
+Blattname '{}' enthaelt '{}' -- Excel erlaubt kein []:*?/\	sheet name '{}' contains '{}' -- Excel does not allow []:*?/\
+Blattname '{}' darf nicht mit einem Apostroph anfangen oder enden	sheet name '{}' must not start or end with an apostrophe
+Es gibt schon ein Blatt '{}' -- Excel unterscheidet die Namen nicht nach Gross- und Kleinschreibung	there is already a sheet '{}' -- Excel does not tell names apart by upper and lower case
+
+# ---------------------------------------------------------------- Datenbank, Netz, HTTP, Cloud, MQTT, Mail
+{}: Spalten-Index {} ausserhalb [0..{}]	{}: column index {} outside [0..{}]
+DB_GET_INT: Spalte {} ist {}, nicht INTEGER	DB_GET_INT: column {} is {}, not INTEGER
+DB_GET_FLOAT: Spalte {} ist {}, nicht Zahl	DB_GET_FLOAT: column {} is {}, not a number
+DB_GET_BOOL: Spalte {} ist {}, nicht 0/1	DB_GET_BOOL: column {} is {}, not 0/1
+{}: Parameter-Typ {} nicht unterstuetzt (erlaubt: INTEGER, FLOAT, STRING, BOOLEAN, NIL)	{}: parameter type {} not supported (allowed: INTEGER, FLOAT, STRING, BOOLEAN, NIL)
+{}: Host '{}' nicht aufloesbar	{}: host '{}' cannot be resolved
+HTTP: Kopfzeilen-Name '{}' enthaelt unerlaubte Zeichen (erlaubt ist sichtbares ASCII ohne ':')	HTTP: header name '{}' contains characters that are not allowed (allowed is visible ASCII without ':')
+HTTP_REQUEST: unbekannte Methode '{}' (erlaubt: {})	HTTP_REQUEST: unknown method '{}' (allowed: {})
+HTTP_DOWNLOAD: Datei nicht schreibbar: {}	HTTP_DOWNLOAD: file not writable: {}
+HTTPD_SET_HEADER: ungueltiger Name '{}' (erlaubt: Buchstaben, Ziffern, - und _)	HTTPD_SET_HEADER: invalid name '{}' (allowed: letters, digits, - and _)
+HTTPD_SET_HEADER: der Wert darf keinen Zeilenumbruch enthalten	HTTPD_SET_HEADER: the value must not contain a line break
+HTTPD_START: Port {} nicht belegbar: {}	HTTPD_START: port {} cannot be used: {}
+Anfrage zu gross	request too large
+Rumpf zu gross	body too large
+HTTPD_SEND: es liegt keine Anfrage an (erst HTTPD_ACCEPT)	HTTPD_SEND: there is no pending request (HTTPD_ACCEPT first)
+{}: Antwort nicht lesbar: {}	{}: response not readable: {}
+{}: Antwort ist kein gueltiges JSON: {}	{}: the response is not valid JSON: {}
+MQTT_CONNECT: Port {} ausserhalb 0..65535	MQTT_CONNECT: port {} outside 0..65535
+MQTT_CONNECT: Adresse {} nicht aufloesbar	MQTT_CONNECT: address {} cannot be resolved
+MQTT_PUBLISH: nicht verbunden	MQTT_PUBLISH: not connected
+MQTT_SUBSCRIBE: nicht verbunden	MQTT_SUBSCRIBE: not connected
+unbekannte Sicherheit {} -- erlaubt sind "starttls", "tls", "keine"	unknown security {} -- allowed are "starttls", "tls", "keine"
+{} enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{} contains a line break -- that would be an extra header line and is therefore not allowed
+{} {} sieht nicht wie eine Adresse aus (erwartet wird name@beispiel.de)	{} {} does not look like an address (expected is name@example.com)
+{} {} enthaelt ein Zeichen, das in einer Adresse nicht vorkommt (< > oder Leerzeichen). Der Anzeigename ist ein EIGENES Argument	{} {} contains a character that does not occur in an address (< > or a space). The display name is a SEPARATE argument
+es fehlt der Absender (SMTP_FROM)	the sender is missing (SMTP_FROM)
+es fehlt ein Empfaenger (SMTP_TO)	a recipient is missing (SMTP_TO)
+die Nachricht ist leer (SMTP_TEXT, SMTP_HTML oder SMTP_ATTACH)	the message is empty (SMTP_TEXT, SMTP_HTML or SMTP_ATTACH)
+die Verbindung ist bereits verschluesselt	the connection is already encrypted
+TLS liess sich nicht einrichten: {}	TLS could not be set up: {}
+{} ist kein gueltiger Servername fuer TLS	{} is not a valid server name for TLS
+es fehlt der Server (SMTP_SERVER)	the server is missing (SMTP_SERVER)
+SMTP_SEND: Anmeldung ohne Verschluesselung an {} -- das Kennwort ginge im Klartext ueber das Netz. Nimm "starttls" (Port 587) oder "tls" (Port 465); ohne Verschluesselung geht eine Anmeldung nur an den eigenen Rechner	SMTP_SEND: login without encryption to {} -- the password would cross the network in plain text. Use "starttls" (port 587) or "tls" (port 465); without encryption a login only works with your own computer
+SMTP_SEND: {} ist nicht auffindbar ({})	SMTP_SEND: {} cannot be found ({})
+SMTP_SEND: {} liefert keine Adresse	SMTP_SEND: {} returns no address
+SMTP_SEND: keine Verbindung zu {}:{} ({})	SMTP_SEND: no connection to {}:{} ({})
+SMTP_SEND: {}:{} bietet kein STARTTLS an. Entweder ist der Port falsch (Einlieferung laeuft meist ueber 587, TLS-von-Anfang-an ueber 465) oder der Server kann keine Verschluesselung -- dann braucht es "keine", und zwar bewusst	SMTP_SEND: {}:{} does not offer STARTTLS. Either the port is wrong (submission usually runs over 587, TLS from the start over 465) or the server cannot encrypt -- then it needs "keine", and deliberately so
+SMTP_SEND: der Server nimmt die Nachricht nicht an: {} {}	SMTP_SEND: the server does not accept the message: {} {}
+SMTP_SEND: der Server bietet gar keine Anmeldung an. Entweder braucht er keine (dann SMTP_LOGIN weglassen), oder es fehlt die Verschluesselung -- viele Server nennen AUTH erst nach STARTTLS	SMTP_SEND: the server offers no login at all. Either it needs none (then leave out SMTP_LOGIN), or the encryption is missing -- many servers only announce AUTH after STARTTLS
+SMTP_SEND: der Server bietet nur {} an; unterstuetzt werden PLAIN und LOGIN	SMTP_SEND: the server only offers {}; PLAIN and LOGIN are supported
+
+# ---------------------------------------------------------------- Drucken, PDF, Geld, GIF
+OPENDOC: '{}' gibt es nicht (oder ist keine Datei)	OPENDOC: '{}' does not exist (or is not a file)
+OPENDOC: '.{}' wird nicht geoeffnet -- erlaubt sind Dokumente und Bilder ({}). Fuer Programme gibt es SHELL, mit Absicht getrennt.	OPENDOC: '.{}' is not opened -- documents and images are allowed ({}). For programs there is SHELL, separate on purpose.
+OPENDOC: Windows konnte '{}' nicht oeffnen (Code {})	OPENDOC: Windows could not open '{}' (code {})
+PDF_PRINT: Kopien 1..99, nicht {}	PDF_PRINT: copies 1..99, not {}
+PDF_PRINT: kein Drucker -- es gibt keinen Standarddrucker, und keiner wurde genannt (PRINTERS() zeigt, was da ist)	PDF_PRINT: no printer -- there is no default printer, and none was named (PRINTERS() shows what is there)
+PRINTERS: Windows liefert die Druckerliste nicht	PRINTERS: Windows does not return the list of printers
+PDF_PRINT: Drucker '{}' laesst sich nicht oeffnen (PRINTERS() zeigt die Namen)	PDF_PRINT: printer '{}' cannot be opened (PRINTERS() shows the names)
+PDF_PRINT: der Drucker nimmt den Auftrag nicht an (StartDoc) -- ist er eingeschaltet, und wenn er in eine Datei schreibt: ist der Pfad beschreibbar?	PDF_PRINT: the printer does not accept the job (StartDoc) -- is it switched on, and if it writes to a file: is the path writable?
+PDF_PRINT: 'lp' (CUPS) laesst sich nicht starten: {} -- ohne CUPS gibt es hier keinen Drucker	PDF_PRINT: 'lp' (CUPS) cannot be started: {} -- without CUPS there is no printer here
+die Schrift laesst sich nicht lesen	the font cannot be read
+die Schrift '{}' hat kein Zeichen '{}' (U+{})	the font '{}' has no character '{}' (U+{})
+Schrift '{}' gibt es nicht. Eingebaut sind {} (helvetica, times und courier meinen sans, serif und mono); eine eigene laedt PDF_FONT_LOAD	font '{}' does not exist. Built in are {} (helvetica, times and courier mean sans, serif and mono); PDF_FONT_LOAD loads your own
+der Name der Schrift darf nicht leer sein	the name of the font must not be empty
+eine Schrift '{}' gibt es schon	a font '{}' already exists
+'{}' ist keine lesbare TrueType- oder OpenType-Schrift	'{}' is not a readable TrueType or OpenType font
+Seitengroesse {} x {} mm ist ungueltig	page size {} x {} mm is invalid
+die Schrift '{}' laesst sich nicht einbetten	the font '{}' cannot be embedded
+das PDF liess sich nicht schreiben: {}	the PDF could not be written: {}
+Faktor {} ist zu gross	factor {} is too large
+{}: der Betrag ist zu gross (GELD reicht bis rund 922 Billionen Euro)	{}: the amount is too large (GELD reaches up to about 922 trillion euros)
+GELD_TEILEN: die Anzahl muss groesser als 0 sein	GELD_TEILEN: the count must be greater than 0
+IMAGE_SAVE_GIF: keine Bilder	IMAGE_SAVE_GIF: no images
+IMAGE_SAVE_GIF: Bild {} ist {}x{}, das erste {}x{} -- ein GIF hat EINE Leinwand	IMAGE_SAVE_GIF: image {} is {}x{}, the first {}x{} -- a GIF has ONE canvas
+unbekannter Schriftstil '{}' (erlaubt: normal, fett, kursiv, unterstrichen, durchgestrichen -- verbunden mit + oder Komma)	unknown font style '{}' (allowed: normal, fett, kursiv, unterstrichen, durchgestrichen -- joined with + or comma)
+
+# ---------------------------------------------------------------- Prozesse, Fenster, Tray, Sprache, Video
+PROCESS_START: eigener Pfad unbekannt: {}	PROCESS_START: own path unknown: {}
+PROCESS_WRITE: die Eingabe von '{}' ist geschlossen	PROCESS_WRITE: the input of '{}' is closed
+PROCESS_WRITE: '{}' nimmt nichts mehr an: {}	PROCESS_WRITE: '{}' accepts nothing more: {}
+{}: eine Nachricht ist EINE Zeile -- kein Zeilenumbruch darin (schick zwei Nachrichten oder JSON)	{}: a message is ONE line -- no line break in it (send two messages or JSON)
+{}: die Gegenseite ist weg	{}: the other side is gone
+WINDOW_OPEN: Datei '{}' nicht gefunden (Pfad relativ zum laufenden Programm)	WINDOW_OPEN: file '{}' not found (path relative to the running program)
+WINDOW_OPEN: kein freier Port auf 127.0.0.1: {}	WINDOW_OPEN: no free port on 127.0.0.1: {}
+{}: ungueltiges Fenster {}	{}: invalid window {}
+{}: Fenster {} gibt es nicht (mehr)	{}: window {} does not exist (any more)
+Windows hat das Symbol nicht angenommen	Windows did not accept the icon
+Windows hat die Mitteilung nicht angenommen	Windows did not accept the notification
+ein Tray-Symbol gibt es bisher nur unter Windows	a tray icon only exists on Windows so far
+osascript laesst sich nicht starten ({})	osascript cannot be started ({})
+notify-send laesst sich nicht starten ({}) -- unter Debian/Ubuntu im Paket libnotify-bin	notify-send cannot be started ({}) -- on Debian/Ubuntu it is in the package libnotify-bin
+SPEAK_RATE: faktor muss 0.5 .. 2.0 sein (ist {})	SPEAK_RATE: faktor must be 0.5 .. 2.0 (is {})
+SPEAK: die Sprachausgabe lieferte keinen Klang	SPEAK: the speech output returned no sound
+SPEAK: die Sprachausgabe lieferte kein WAV	SPEAK: the speech output returned no WAV
+SPEAK: WAV-Format {} mit {} Bit nicht lesbar	SPEAK: WAV format {} with {} bits not readable
+SPEAK: 'say' nicht gefunden ({})	SPEAK: 'say' not found ({})
+SPEAK: say schrieb keine Datei ({})	SPEAK: say wrote no file ({})
+SPEAK: im Web-Bau keine Sprachausgabe	SPEAK: no speech output in the web build
+Stimmen nicht lesbar	voices not readable
+Stimme nicht lesbar	voice not readable
+Stimme nicht setzbar	voice cannot be set
+Tempo nicht setzbar	rate cannot be set
+Strom nicht lesbar	stream not readable
+Video: Decoder laesst sich nicht anlegen ({})	video: the decoder cannot be created ({})
+VIDEO_LOAD: '{}' laesst sich nicht oeffnen ({})	VIDEO_LOAD: '{}' cannot be opened ({})
+VIDEO_LOAD: '{}' ist kein lesbares MP4 ({})	VIDEO_LOAD: '{}' is not a readable MP4 ({})
+VIDEO_LOAD: '{}' hat keine Bildspur	VIDEO_LOAD: '{}' has no video track
+VIDEO_LOAD: '{}' ist {} -- abspielen kann Drachenhauch nur H.264 (AVC)	VIDEO_LOAD: '{}' is {} -- Drachenhauch can only play H.264 (AVC)
+VIDEO_LOAD: '{}': unbekanntes Bildformat ({})	VIDEO_LOAD: '{}': unknown picture format ({})
+VIDEO_LOAD: '{}' hat keine Bilder	VIDEO_LOAD: '{}' has no frames
+Video: Bild {} laesst sich nicht lesen ({})	video: frame {} cannot be read ({})
+Video: Ende laesst sich nicht lesen ({})	video: the end cannot be read ({})
+unbekannter Fehler	unknown error
+
+# ---------------------------------------------------------------- Hardware (MIDI, USB, Bluetooth, WLAN, Firmata)
+MIDI_IN_NAME$: es gibt keinen Eingang {} (vorhanden: {})	MIDI_IN_NAME$: there is no input {} (available: {})
+MIDI_OUT_NAME$: es gibt keinen Ausgang {} (vorhanden: {})	MIDI_OUT_NAME$: there is no output {} (available: {})
+MIDI_IN_OPEN: es gibt keinen Eingang {} (vorhanden: {})	MIDI_IN_OPEN: there is no input {} (available: {})
+MIDI_OUT_OPEN: es gibt keinen Ausgang {} (vorhanden: {})	MIDI_OUT_OPEN: there is no output {} (available: {})
+{}: {} muss zwischen 0 und 127 liegen, war {}	{}: {} must be between 0 and 127, was {}
+{}: Kanal muss zwischen 1 und 16 liegen, war {}	{}: the channel must be between 1 and 16, was {}
+{}: {} {} ausserhalb {}..{}	{}: {} {} outside {}..{}
+USB: hidapi nicht verfuegbar	USB: hidapi not available
+USB_OPEN: VID/PID muessen 0..0xFFFF sein (erhalten {}:{})	USB_OPEN: VID/PID must be 0..0xFFFF (got {}:{})
+USB_OPEN: {}:{} nicht gefunden oder belegt ({})	USB_OPEN: {}:{} not found or busy ({})
+USB_OPEN_PATH: ungueltiger Pfad	USB_OPEN_PATH: invalid path
+USB_OPEN_PATH: '{}' nicht erreichbar ({})	USB_OPEN_PATH: '{}' not reachable ({})
+BT: kein Bluetooth-Adapter gefunden	BT: no Bluetooth adapter found
+{}: Zeitueberschreitung nach {}s (Geraet nicht erreichbar?)	{}: timeout after {}s (device not reachable?)
+BT_SCAN: Timeout muss eine endliche Zahl zwischen 0 und {} sein	BT_SCAN: the timeout must be a finite number between 0 and {}
+BT_CONNECT: '{}' nicht gefunden - erst BT_SCAN aufrufen	BT_CONNECT: '{}' not found - call BT_SCAN first
+BT_CONNECT: Konnte {} nicht verbinden	BT_CONNECT: could not connect {}
+WIFI: '{}' hat nach {}s nicht geantwortet	WIFI: '{}' did not answer after {}s
+WIFI: 'netsh' hat nach {}s nicht geantwortet	WIFI: 'netsh' did not answer after {}s
+WIFI: 'nmcli' hat nach {}s nicht geantwortet	WIFI: 'nmcli' did not answer after {}s
+WIFI_CONNECT: SSID darf nicht leer sein	WIFI_CONNECT: the SSID must not be empty
+WIFI_DELETE_PROFILE: Name darf nicht leer sein	WIFI_DELETE_PROFILE: the name must not be empty
+WIFI: 'nmcli' nicht gefunden (NetworkManager installiert?)	WIFI: 'nmcli' not found (is NetworkManager installed?)
+WIFI: '{}' nicht ausfuehrbar: {}	WIFI: '{}' cannot be run: {}
+WIFI: kein Wi-Fi-Hardware-Port gefunden	WIFI: no Wi-Fi hardware port found
+Modul WIFI: nur unter Windows/Linux/macOS unterstuetzt.	module WIFI: only supported on Windows/Linux/macOS.
+OpenAL: kein Ausgabegeraet	OpenAL: no output device
+OpenAL: kein Kontext	OpenAL: no context
+
+# ---------------------------------------------------------------- Nachtraege aus der Messung
+Unbekannter Typ '{}' -- {}	Unknown type '{}' -- {}
+(oder FLOAT, STRING, BOOLEAN)	(or FLOAT, STRING, BOOLEAN)
+mit GELD_NEU({}) einen Betrag daraus machen	turn it into an amount with GELD_NEU({})
+{}: die Datei ist nicht geoeffnet -- f = OPENFILE("name.txt", "w") [[]]("r" zum Lesen, "a" zum Anhaengen) muss davor stehen	{}: the file is not open -- f = OPENFILE("name.txt", "w") ("r" to read, "a" to append) must come first
+Zeile {}: {}	line {}: {}
+</{}> schliesst <{}> -- die Namen muessen zusammenpassen	</{}> closes <{}> -- the names must match
+{}: Groesse {} ueberschreitet die Obergrenze von {} Bytes	{}: size {} exceeds the limit of {} bytes
+{}: Anzahl {} ueberschreitet die Obergrenze von {} Bytes	{}: count {} exceeds the limit of {} bytes
+{}: diese Menge enthaelt [[Zahlen]], hier kam [[ein Text]]. Eine Menge fuehrt eine Elementart -- die erste Aufnahme legt sie fest.	{}: this set contains numbers, a text came here. A set holds one kind of element -- the first one added decides.
+{}: diese Menge enthaelt [[Texte]], hier kam [[eine Zahl]]. Eine Menge fuehrt eine Elementart -- die erste Aufnahme legt sie fest.	{}: this set contains texts, a number came here. A set holds one kind of element -- the first one added decides.
+{}: {} Namen, aber {} Inhalte -- die Arrays muessen gleich lang sein	{}: {} names, but {} contents -- the arrays must have the same length
+{}: Joystick-Index {} - kein Gamepad angeschlossen	{}: joystick index {} - no gamepad connected
+{}: der Puffer ist leer	{}: the buffer is empty
+HTTP: der Wert der Kopfzeile '{}' enthaelt einen Zeilenumbruch -- damit liessen sich weitere Kopfzeilen einschmuggeln	HTTP: the value of the header '{}' contains a line break -- that would allow smuggling in more headers
+Erwartet AS nach Variablenname -- jede Variable braucht einen Typ: DIM {} AS {} [[]](oder FLOAT, STRING, BOOLEAN)	Expected AS after the variable name -- every variable needs a type: DIM {} AS {} (or FLOAT, STRING, BOOLEAN)
+SPRITE: unbekannte Animation '{}' (definiert: [[keine]])	SPRITE: unknown animation '{}' (defined: none)
+{}: der Betreff[[]] enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{}: the subject contains a line break -- that would be an extra header line and is therefore not allowed
+{}: der Anzeigename[[]] enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{}: the display name contains a line break -- that would be an extra header line and is therefore not allowed
+{}: der Dateiname[[]] enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{}: the file name contains a line break -- that would be an extra header line and is therefore not allowed
