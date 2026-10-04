@@ -226,7 +226,7 @@ schreiben will, trotzdem vermisst:
 
 | Lücke | Warum es zählt | Aufwand |
 |---|---|---|
-| **Fehlermeldungen nur auf Deutsch** | Wer außerhalb des deutschen Sprachraums sucht, scheitert an der ersten Meldung. Ein Katalog (`DHRT_LANG=en`) nach dem Muster von `i18n/en.json` im Buch | mittel |
+| ~~**Fehlermeldungen nur auf Deutsch**~~ | erste Runde erledigt 2026-10-04: `DHRT_LANG=en` übersetzt an der Ausgabe über `daten/meldungen.en.txt` (Lexer, Parser, Compiler, allgemeine Laufzeitfehler); die Meldungen der Module folgen | — |
 | **Handbuch überwiegend Deutsch** | README und Buch gibt es englisch, `docs/` nicht | groß |
 | ~~**`DIM a AS INTEGER, b AS INTEGER`** geht nicht~~ | erledigt 2026-09-24: Gruppen mit je eigenem Typ und Startwert; `DIM a, i, z AS INTEGER` ging schon | — |
 | ~~**Anwendungsgröße 27,5 MB**~~ | erledigt 2026-10-04: `--export --schlank` nimmt die kleinste von drei Laufzeiten (Konsole 16 MB, Spiel 21 MB, voll 33 MB), die alle Befehle des Programms hat | — |
@@ -243,7 +243,8 @@ schreiben will, trotzdem vermisst:
 2. ~~Builtin-Aufruf ohne Suche (1b)~~ — erledigt 2026-09-24 über den
    Merkplatz je Aufrufstelle.
 3. ~~Mehrere Variablen in einem `DIM`~~ (erledigt 2026-09-24), globale
-   Felder über Plätze (1e, Punkt 1), englische Fehlermeldungen.
+   Felder über Plätze (1e, Punkt 1), ~~englische Fehlermeldungen~~
+   (erste Runde erledigt 2026-10-04).
 4. ~~Schlanker Export, Tray/Benachrichtigung~~ — erledigt 2026-10-04.
 5. Aufrufe ohne Zwischen-`Vec` (1c), danach bei Bedarf ein Frame-Stapel.
 
