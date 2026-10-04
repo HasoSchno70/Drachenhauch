@@ -24,6 +24,7 @@ Wer aus einem anderen BASIC oder aus Python kommt: [Umstieg](umstieg.md) listet,
 - [Statement-Trenner](#statement-trenner)
 - [Funktionen: SUB und FUNCTION](#funktionen-sub-und-function)
 - [Named Arguments](#named-arguments)
+- [Funktionen als Werte: FUNCREF und Lambdas](#funktionen-als-werte-funcref-und-lambdas)
 - [Coroutines: YIELD](#coroutines-yield)
 - [Arrays](#arrays)
 - [Maps](#maps)
@@ -852,6 +853,76 @@ Fuer die meisten Aufgaben reicht das weit. Wo es knapp wird -- ein rekursiver
 Flood-Fill deckt so ein Feld bis rund 31x31 Kacheln ab -- schreibt man die
 Rekursion in eine Schleife mit eigener Warteschlange um: statt sich selbst
 aufzurufen, legt man die naechste Aufgabe in ein ARRAY und arbeitet es ab.
+
+## Funktionen als Werte: FUNCREF und Lambdas
+
+Eine Funktion ist auch ein Wert vom Typ `FUNCREF`. Drei Arten, einen zu
+bekommen:
+
+```basic
+FUNCTION quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+DIM f AS FUNCREF
+f = quadrat                       ' eine benannte Funktion (Name ohne Klammern)
+f = spieler.tick                  ' eine Methode, an ihr Objekt gebunden
+f = FUNCTION(x) x * x             ' ein Lambda
+PRINT f(7)                        ' 49
+```
+
+Aufgerufen wird ein FUNCREF wie eine Funktion, auch direkt aus einem
+Ausdruck: `aktionen[i]()`, `addiere(10)(5)`. Annehmen tun ihn `SORT(feld,
+f)`, `ARRAY_MAP/FILTER/REDUCE/FIND`, `GUI_ON_CLICK` und die anderen
+`GUI_ON_*`, `TIMER_AFTER/EVERY`, `TASK_START` und jeder eigene Parameter
+`AS FUNCREF`.
+
+### Lambdas
+
+Die Schreibweise ist die von VB.NET:
+
+```basic
+DIM doppelt AS FUNCREF : doppelt = FUNCTION(x) x * 2
+DIM mal AS FUNCREF : mal = FUNCTION(a AS INTEGER, b AS INTEGER) a * b
+GUI_ON_CLICK(knopf, SUB() zaehler += 1)
+
+DIM a AS ARRAY OF INTEGER : a = [5, 3, 9, 1]
+SORT(a, FUNCTION(x, y) y - x)                         ' absteigend
+DIM gross AS ARRAY OF INTEGER : gross = ARRAY_FILTER(a, FUNCTION(x) x > 3)
+PRINT ARRAY_REDUCE(a, FUNCTION(summe, x) summe + x, 0) ' 18
+```
+
+- `FUNCTION(parameter) ausdruck` liefert den Wert des Ausdrucks,
+  `SUB(parameter) anweisung` führt eine Anweisung aus. Beides steht in EINER
+  Zeile -- für mehr schreibt man eine benannte FUNCTION/SUB.
+- Ein Parameter ohne `AS` nimmt jeden Wert; mit `AS` wird geprüft wie bei
+  jeder Funktion. Vorgabewerte, `BYREF` und `...` gibt es im Lambda nicht.
+- **Lokale Variablen werden beim Anlegen kopiert.** Ein Lambda kann länger
+  leben als der Aufruf, der es angelegt hat (ein Rückruf, ein Timer) --
+  dann gibt es dessen Variablen nicht mehr:
+
+  ```basic
+  FUNCTION addierer(n AS INTEGER) AS FUNCREF
+      RETURN FUNCTION(x) x + n      ' n wird hier kopiert
+  END FUNCTION
+  DIM plus5 AS FUNCREF : plus5 = addierer(5)
+  PRINT plus5(1)                    ' 6
+  ```
+
+  Eine Zuweisung an eine kopierte Variable wäre nach außen wirkungslos und
+  ist darum ein Übersetzungsfehler.
+- **Globale Variablen sieht ein Lambda lebendig** -- ein Rückruf soll den
+  Stand von JETZT zeigen. Die Folge: ein Lambda, das im Hauptprogramm in
+  einer Schleife entsteht, sieht die Laufvariable mit ihrem LETZTEN Wert.
+  Soll jedes seinen eigenen bekommen, legt man es in einer SUB an, die den
+  Wert als Parameter bekommt (dort ist er lokal und wird kopiert).
+- In einer Methode erreicht ein Lambda Felder und Methoden über `Self`
+  (`FUNCTION(x) x * Self.faktor`); ein Feld ohne `Self.` ist ein Fehler --
+  ein Lambda ist keine Methode.
+- Kein `YIELD` im Lambda, und `TASK_START` nimmt nur Lambdas ohne Kopien
+  (ein Auftrag läuft in einem eigenen Prozess).
+- In einer `.dhform` steht kein Lambda als Rückruf: sein Name hängt an
+  der Stelle im Quelltext.
 
 ## Coroutines: YIELD
 

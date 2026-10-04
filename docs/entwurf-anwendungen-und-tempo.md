@@ -234,7 +234,7 @@ schreiben will, trotzdem vermisst:
 | ~~**Kein Tray-Symbol, keine System-Benachrichtigung**~~ | erledigt 2026-10-04: `TRAY_*`, `NOTIFY`, `WINDOW_HIDE`/`SHOW`; das Symbol bisher nur unter Windows, Mitteilungen auf allen drei Systemen | — |
 | **Oberfläche ist selbst gezeichnet** | sieht auf jedem System gleich aus, aber nicht „nativ“; dafür gibt es Themen und Maßstab. Kein Handlungsbedarf, aber ehrlich sagen | — |
 | **Kein Paketverzeichnis** | Bibliotheken gehen über `IMPORT "datei.dh"` und `DH_PATH`; ein `dhrt paket hole <url>` würde Teilen erleichtern | mittel |
-| **Keine anonymen Funktionen** | gebundene Methoden decken Rückrufe ab; für `SORT`/Filter wären kurze Lambdas bequemer | mittel |
+| ~~**Keine anonymen Funktionen**~~ | erledigt 2026-10-04: Lambdas `FUNCTION(x) x * 2` / `SUB() ...` mit kopierten Locals, dazu `ARRAY_MAP/FILTER/REDUCE/FIND` | — |
 | **Kein Aufruf fremder DLLs/.so** | ein eigenes FFI (`LIB_LOAD`/`LIB_CALL`) öffnet vorhandene C-Bibliotheken | groß, heikel |
 
 ## 3. Empfohlene Reihenfolge
@@ -242,11 +242,14 @@ schreiben will, trotzdem vermisst:
 1. ~~Zeichenketten anhängen linear (1a)~~ — erledigt 2026-09-24.
 2. ~~Builtin-Aufruf ohne Suche (1b)~~ — erledigt 2026-09-24 über den
    Merkplatz je Aufrufstelle.
-3. ~~Mehrere Variablen in einem `DIM`~~ (erledigt 2026-09-24), globale
-   Felder über Plätze (1e, Punkt 1), ~~englische Fehlermeldungen~~
-   (erste Runde erledigt 2026-10-04).
+3. ~~Mehrere Variablen in einem `DIM`~~ (erledigt 2026-09-24), ~~globale
+   Felder über Plätze~~ (1e, Punkt 1, erledigt 2026-09-24),
+   ~~englische Fehlermeldungen~~ (erste Runde erledigt 2026-10-04).
 4. ~~Schlanker Export, Tray/Benachrichtigung~~ — erledigt 2026-10-04.
-5. Aufrufe ohne Zwischen-`Vec` (1c), danach bei Bedarf ein Frame-Stapel.
+5. ~~Aufrufe ohne Zwischen-`Vec` (1c)~~ (erledigt 2026-09-24), ~~danach
+   ein Frame-Stapel~~ (erledigt 2026-09-25, M2 in
+   [entwurf-maschinencode.md](entwurf-maschinencode.md)).
+6. ~~Lambdas~~ — erledigt 2026-10-04.
 
 Jeder Tempo-Punkt bekommt eine eigene Messung in `tests/pruef/` mit einer
 Obergrenze, die großzügig genug für die CI-Rechner ist, aber den

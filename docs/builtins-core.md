@@ -384,6 +384,10 @@ Siehe auch [Sprachreferenz → Arrays](sprache.md#arrays).
 | `SORT(arr, absteigend)` | mit BOOLEAN-Flag absteigend sortieren *(nur native Runtime)* |
 | `SORT(arr, comparator)` | mit FUNCREF-Comparator `cmp(a, b)` → INTEGER (<0/0/>0) sortieren, stabil. Auch eine gebundene Methode (`regel.cmp`) ist erlaubt *(nur native Runtime)* |
 | `ARRAY_INDEXOF(arr, v)` → INTEGER | erster Index von v, sonst -1 |
+| `ARRAY_MAP(arr, funktion)` → ARRAY | neues Feld mit `funktion(x)` je Element, z.B. `ARRAY_MAP(a, FUNCTION(x) x * 2)` |
+| `ARRAY_FILTER(arr, funktion)` → ARRAY | neues Feld mit den Elementen, für die `funktion(x)` TRUE liefert (gleicher Elementtyp) |
+| `ARRAY_REDUCE(arr, funktion, start)` | faltet das Feld: `funktion(bisher, x)` je Element, beginnend mit `start` |
+| `ARRAY_FIND(arr, funktion)` → INTEGER | Index des ersten Elements, für das `funktion(x)` TRUE liefert, sonst -1 |
 
 **Aggregate** (1D `ARRAY OF INTEGER`/`FLOAT`) und Helfer:
 

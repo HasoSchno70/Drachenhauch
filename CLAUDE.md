@@ -2455,9 +2455,28 @@ Nach aussen ist das ein ganz normales FUNCREF (`TYPEOF` sagt `FUNCREF`,
   Helfer `Vm::rueckruf_rufen`. Tests: `tests/pruef/gebundene_methoden.dhtest`
   (inkl. echtem GUI-Klick per Automation-Wiedergabe).
 
-**Anonyme Funktionen/Closures gibt es NICHT** -- der Body einer FUNCREF sieht
-nur Parameter und Globals/CONST. Wer Zustand braucht, nimmt eine gebundene
-Methode (oben) oder uebergibt die Werte explizit als Parameter.
+**Lambdas** (seit 2026-10-04, Schreibweise von VB.NET): `FUNCTION(x) x * 2`
+(ein Ausdruck) und `SUB() zaehler += 1` (eine Anweisung), beide in EINER
+Zeile; Parameter ohne `AS` sind `any`. Der Compiler (`expr_lambda`) macht
+daraus eine eigene Funktion `__lambda_<nr>_<kopien>` (die Nummer in
+Uebersetzungsreihenfolge -- TASK_START uebersetzt dieselbe Datei und trifft
+sie; die Kopienzahl zieht `vm::lambda_kopien` in der Argument-Meldung ab).
+**Lokale Variablen werden beim Anlegen KOPIERT** (zusaetzliche Parameter
+vorn; an der Stelle `__closure(name, werte...)` -> `Value::Closure`), weil
+ein Lambda laenger leben kann als sein Aufruf; eine Zuweisung an eine Kopie
+ist ein Uebersetzungsfehler. **Globals sieht es lebendig** (ein Rueckruf
+soll den Stand von JETZT zeigen) -- Folge: im Hauptprogramm in einer
+Schleife angelegt, sieht es die Laufvariable mit ihrem letzten Wert. Die
+freien Namen sammelt `lambda_namen` ueber die JSON-Form des Baums (es gibt
+keinen allgemeinen Durchlauf). In einer Methode nur ueber `Self` (der
+Kontext des Lambdas hat keine `current_class`; ein nacktes Feld ist ein
+Fehler). `Rueckruf::vorab` traegt die Kopien zu GUI/TIMER/SORT,
+`Vm::rueckruf_exec` setzt sie vor die Argumente; `ist_gebunden` gilt auch
+fuer Lambdas (kein `.dhform`-Eintrag). Dazu `ARRAY_MAP/FILTER/REDUCE/FIND`
+(`Vm::array_mit_funktion`, Familie `try_array_hof`) und der Aufruf eines
+WERTES (`a[i]()`, `f(1)(2)`, CALL_VALUE). Schleifen mit Lambdas bleiben in
+der VM (der Maschinencode kennt CALL_VALUE nicht). Doku `docs/sprache.md`
+(Funktionen als Werte), Tests `tests/pruef/lambda.dhtest`.
 
 **Implementierung:**
 - Type-Token `FUNCREF`. AST braucht keinen neuen Node -- bare Identifier
