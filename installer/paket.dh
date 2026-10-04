@@ -91,6 +91,19 @@ END FUNCTION
 ' Linux derselbe Ordner, im .app-Bundle zwei verschiedene).
 SUB inhaltKopieren(wurzel AS STRING, laufzeit AS STRING, bin AS STRING, res AS STRING)
     dateiKopieren(laufzeit, PATHJOIN(bin, "dhrt"))
+    ' Die kleinen Laufzeiten fuer `dhrt --export --schlank`: der Export sucht
+    ' sie in laufzeiten/ neben dhrt. Ohne sie nimmt er die volle.
+    DIM lz AS STRING : lz = PATHJOIN(DIRNAME(laufzeit), "laufzeiten")
+    IF DIREXISTS(lz) THEN
+        DIM lzName AS STRING
+        FOR EACH lzName IN DIRLIST(lz)
+            IF LEFT$(lzName, 5) = "dhrt-" THEN
+                dateiKopieren(PATHJOIN(lz, lzName), PATHJOIN(bin, "laufzeiten/" + lzName))
+                ausfuehrbar([PATHJOIN(bin, "laufzeiten/" + lzName)])
+            END IF
+        NEXT
+        PRINT "  laufzeiten/ "; LEN(DIRLIST(PATHJOIN(bin, "laufzeiten"))); " kleine"
+    END IF
     PRINT "  ide/      "; ordnerKopieren(PATHJOIN(wurzel, "ide"), PATHJOIN(res, "ide"), "*.dh", FALSE); " Dateien"
     ' Die englische Oberflaeche (ide/sprache/en.txt).
     PRINT "  sprache/  "; ordnerKopieren(PATHJOIN(wurzel, "ide/sprache"), PATHJOIN(res, "ide/sprache"), "*.txt", FALSE); " Dateien"
@@ -273,6 +286,16 @@ SUB macosPaket(wurzel AS STRING, laufzeit AS STRING, vorlagen AS STRING, ausgabe
         PRINT "Signatur: ad hoc (DH_MAC_SIGNATUR fehlt)"
     ELSE
         PRINT "Signatur: "; ident
+    END IF
+    ' Eingebettete Programme zuerst: codesign signiert ein Bundle nicht, in
+    ' dem ein unsigniertes Programm liegt. Die kleinen Laufzeiten brauchen
+    ' dieselben Rechte wie dhrt (Maschinencode).
+    DIM lzOrdner AS STRING : lzOrdner = PATHJOIN(app, "Contents/MacOS/laufzeiten")
+    IF DIREXISTS(lzOrdner) THEN
+        DIM lzDatei AS STRING
+        FOR EACH lzDatei IN DIRLIST(lzOrdner)
+            macosSignieren(PATHJOIN(lzOrdner, lzDatei), ident, TRUE, PATHJOIN(vorlagen, "dhrt.entitlements"))
+        NEXT
     END IF
     macosSignieren(app, ident, TRUE, PATHJOIN(vorlagen, "dhrt.entitlements"))
     ' Der Verweis macht aus dem geoeffneten Abbild ein "hierher ziehen".

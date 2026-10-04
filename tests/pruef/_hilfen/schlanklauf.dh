@@ -1,0 +1,41 @@
+' Pfade der kleinen Laufzeiten und ein Starter, der die Ausgabe sammelt.
+DIM endung AS STRING : endung = IIF(RIGHT$(LOWER$(EXEPATH$()), 4) = ".exe", ".exe", "")
+FUNCTION konsole$() AS STRING
+    RETURN PATHJOIN(DIRNAME(EXEPATH$()), "laufzeiten/dhrt-konsole" + endung)
+END FUNCTION
+FUNCTION spiel$() AS STRING
+    RETURN PATHJOIN(DIRNAME(EXEPATH$()), "laufzeiten/dhrt-spiel" + endung)
+END FUNCTION
+SUB pruefen()
+    IF NOT FILEEXISTS(konsole$()) OR NOT FILEEXISTS(spiel$()) THEN
+        PRINT "UEBERSPRINGEN: keine kleinen Laufzeiten neben dhrt (build_runtime.py --laufzeiten)"
+        EXIT(0)
+    END IF
+END SUB
+DIM laufCode AS INTEGER
+FUNCTION lauf$(exe AS STRING, args AS ARRAY OF STRING) AS STRING
+    DIM p AS INTEGER : p = PROCESS_START(exe, args)
+    DIM s AS STRING : s = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE leer < 5 AND MILLIS() - t0 < 60000
+        DIM z AS STRING : z = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF z = "" THEN
+            IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+            SLEEP(30)
+        ELSE
+            s = s + z
+        END IF
+    WEND
+    laufCode = PROCESS_CODE(p)
+    PROCESS_CLOSE(p)
+    RETURN s
+END FUNCTION
+FUNCTION zeile$(text AS STRING, anfang AS STRING) AS STRING
+    DIM l AS ARRAY OF STRING : l = SPLIT$(text, CHR$(10))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(l) - 1
+        IF LEFT$(TRIM$(l[i]), LEN(anfang)) = anfang THEN RETURN TRIM$(l[i])
+    NEXT
+    RETURN ""
+END FUNCTION

@@ -2569,10 +2569,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
 
         // ===== Modul: physics3d (Rapier3D-Starrkoerper) =====
+        #[cfg(feature = "physik")]
         "phys3d_new" => {
             arity!(0);
             Ok(Value::Phys3d(Rc::new(RefCell::new(crate::physics3d::Phys3dWorld::new()))))
         }
+        #[cfg(feature = "physik")]
         "phys3d_set_gravity" => {
             arity!(4);
             phys3d_h(&a[0], "PHYS3D_SET_GRAVITY")?.borrow_mut().set_gravity(
@@ -2581,6 +2583,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[3], "PHYS3D_SET_GRAVITY")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys3d_add_box" => {
             arity!(9);
             let idx = phys3d_h(&a[0], "PHYS3D_ADD_BOX")?.borrow_mut().add_box(
@@ -2590,6 +2593,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_flag(&a[7], "PHYS3D_ADD_BOX")?, need_num(&a[8], "PHYS3D_ADD_BOX")? as f32);
             Ok(Value::Int(idx))
         }
+        #[cfg(feature = "physik")]
         "phys3d_add_sphere" => {
             arity!(7);
             let idx = phys3d_h(&a[0], "PHYS3D_ADD_SPHERE")?.borrow_mut().add_sphere(
@@ -2598,23 +2602,27 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_flag(&a[5], "PHYS3D_ADD_SPHERE")?, need_num(&a[6], "PHYS3D_ADD_SPHERE")? as f32);
             Ok(Value::Int(idx))
         }
+        #[cfg(feature = "physik")]
         "phys3d_step" => {
             arity!(2);
             phys3d_h(&a[0], "PHYS3D_STEP")?.borrow_mut().step(need_num(&a[1], "PHYS3D_STEP")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys3d_body_x" | "phys3d_body_y" | "phys3d_body_z" => {
             arity!(2);
             let p = phys3d_h(&a[0], "PHYS3D_BODY")?.borrow().pos(need_int(&a[1], "PHYS3D_BODY")?);
             let v = match name { "phys3d_body_x" => p.0, "phys3d_body_y" => p.1, _ => p.2 };
             Ok(Value::Float(v as f64))
         }
+        #[cfg(feature = "physik")]
         "phys3d_body_qx" | "phys3d_body_qy" | "phys3d_body_qz" | "phys3d_body_qw" => {
             arity!(2);
             let q = phys3d_h(&a[0], "PHYS3D_BODY")?.borrow().rot(need_int(&a[1], "PHYS3D_BODY")?);
             let v = match name { "phys3d_body_qx" => q.0, "phys3d_body_qy" => q.1, "phys3d_body_qz" => q.2, _ => q.3 };
             Ok(Value::Float(v as f64))
         }
+        #[cfg(feature = "physik")]
         "phys3d_set_vel" => {
             arity!(5);
             phys3d_h(&a[0], "PHYS3D_SET_VEL")?.borrow_mut().set_vel(
@@ -2623,6 +2631,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[4], "PHYS3D_SET_VEL")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys3d_apply_impulse" => {
             arity!(5);
             phys3d_h(&a[0], "PHYS3D_APPLY_IMPULSE")?.borrow_mut().apply_impulse(
@@ -2631,6 +2640,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[4], "PHYS3D_APPLY_IMPULSE")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys3d_set_pos" => {
             arity!(5);
             phys3d_h(&a[0], "PHYS3D_SET_POS")?.borrow_mut().set_pos(
@@ -2639,21 +2649,25 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[4], "PHYS3D_SET_POS")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys3d_remove" => {
             arity!(2);
             phys3d_h(&a[0], "PHYS3D_REMOVE")?.borrow_mut().remove(need_int(&a[1], "PHYS3D_REMOVE")?);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys3d_count" => {
             arity!(1);
             Ok(Value::Int(phys3d_h(&a[0], "PHYS3D_COUNT")?.borrow().count()))
         }
 
         // ===== Modul: physics2d (echte 2D-Starrkoerper-Physik via Rapier2D) =====
+        #[cfg(feature = "physik")]
         "phys2d_new" => {
             arity!(0);
             Ok(Value::Phys2d(Rc::new(RefCell::new(crate::physics2d::Phys2dWorld::new()))))
         }
+        #[cfg(feature = "physik")]
         "phys2d_set_gravity" => {
             arity!(3);
             phys2d_h(&a[0], "PHYS2D_SET_GRAVITY")?.borrow_mut().set_gravity(
@@ -2661,6 +2675,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[2], "PHYS2D_SET_GRAVITY")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys2d_add_box" => {
             arity!(7);
             let idx = phys2d_h(&a[0], "PHYS2D_ADD_BOX")?.borrow_mut().add_box(
@@ -2669,6 +2684,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_flag(&a[5], "PHYS2D_ADD_BOX")?, need_num(&a[6], "PHYS2D_ADD_BOX")? as f32);
             Ok(Value::Int(idx))
         }
+        #[cfg(feature = "physik")]
         "phys2d_add_circle" => {
             arity!(6);
             let idx = phys2d_h(&a[0], "PHYS2D_ADD_CIRCLE")?.borrow_mut().add_circle(
@@ -2677,26 +2693,31 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_flag(&a[4], "PHYS2D_ADD_CIRCLE")?, need_num(&a[5], "PHYS2D_ADD_CIRCLE")? as f32);
             Ok(Value::Int(idx))
         }
+        #[cfg(feature = "physik")]
         "phys2d_step" => {
             arity!(2);
             phys2d_h(&a[0], "PHYS2D_STEP")?.borrow_mut().step(need_num(&a[1], "PHYS2D_STEP")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys2d_body_x" | "phys2d_body_y" => {
             arity!(2);
             let p = phys2d_h(&a[0], "PHYS2D_BODY")?.borrow().pos(need_int(&a[1], "PHYS2D_BODY")?);
             Ok(Value::Float((if name == "phys2d_body_x" { p.0 } else { p.1 }) as f64))
         }
+        #[cfg(feature = "physik")]
         "phys2d_body_angle" => {
             arity!(2);
             let ang = phys2d_h(&a[0], "PHYS2D_BODY_ANGLE")?.borrow().angle(need_int(&a[1], "PHYS2D_BODY_ANGLE")?);
             Ok(Value::Float(ang as f64))
         }
+        #[cfg(feature = "physik")]
         "phys2d_body_vx" | "phys2d_body_vy" => {
             arity!(2);
             let v = phys2d_h(&a[0], "PHYS2D_BODY")?.borrow().vel(need_int(&a[1], "PHYS2D_BODY")?);
             Ok(Value::Float((if name == "phys2d_body_vx" { v.0 } else { v.1 }) as f64))
         }
+        #[cfg(feature = "physik")]
         "phys2d_set_vel" => {
             arity!(4);
             phys2d_h(&a[0], "PHYS2D_SET_VEL")?.borrow_mut().set_vel(
@@ -2704,6 +2725,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[2], "PHYS2D_SET_VEL")? as f32, need_num(&a[3], "PHYS2D_SET_VEL")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys2d_apply_impulse" => {
             arity!(4);
             phys2d_h(&a[0], "PHYS2D_APPLY_IMPULSE")?.borrow_mut().apply_impulse(
@@ -2711,6 +2733,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[2], "PHYS2D_APPLY_IMPULSE")? as f32, need_num(&a[3], "PHYS2D_APPLY_IMPULSE")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys2d_set_pos" => {
             arity!(4);
             phys2d_h(&a[0], "PHYS2D_SET_POS")?.borrow_mut().set_pos(
@@ -2718,6 +2741,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[2], "PHYS2D_SET_POS")? as f32, need_num(&a[3], "PHYS2D_SET_POS")? as f32);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys2d_set_dynamic" => {
             arity!(3);
             phys2d_h(&a[0], "PHYS2D_SET_DYNAMIC")?.borrow_mut().set_dynamic(
@@ -2725,11 +2749,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_flag(&a[2], "PHYS2D_SET_DYNAMIC")?);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys2d_is_dynamic" => {
             arity!(2);
             Ok(Value::Bool(phys2d_h(&a[0], "PHYS2D_IS_DYNAMIC")?.borrow()
                 .is_dynamic(need_int(&a[1], "PHYS2D_IS_DYNAMIC")?)))
         }
+        #[cfg(feature = "physik")]
         "phys2d_lock_rotation" => {
             arity!(3);
             phys2d_h(&a[0], "PHYS2D_LOCK_ROTATION")?.borrow_mut().lock_rotation(
@@ -2737,11 +2763,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_flag(&a[2], "PHYS2D_LOCK_ROTATION")?);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys2d_remove" => {
             arity!(2);
             phys2d_h(&a[0], "PHYS2D_REMOVE")?.borrow_mut().remove(need_int(&a[1], "PHYS2D_REMOVE")?);
             Ok(Value::Nil)
         }
+        #[cfg(feature = "physik")]
         "phys2d_count" => {
             arity!(1);
             Ok(Value::Int(phys2d_h(&a[0], "PHYS2D_COUNT")?.borrow().count()))
@@ -5337,10 +5365,12 @@ fn broad_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics:
     match v { Value::PhysicsBroad(b) => Ok(b), _ => Err(format!("{} erwartet PHYSICS_BROAD", fn_)) }
 }
 
+#[cfg(feature = "physik")]
 fn phys3d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics3d::Phys3dWorld>>, String> {
     match v { Value::Phys3d(w) => Ok(w), _ => Err(format!("{} erwartet PHYS_WORLD", fn_)) }
 }
 
+#[cfg(feature = "physik")]
 fn phys2d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics2d::Phys2dWorld>>, String> {
     match v { Value::Phys2d(w) => Ok(w), _ => Err(format!("{} erwartet PHYS2D_WORLD", fn_)) }
 }

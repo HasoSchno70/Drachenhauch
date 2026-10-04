@@ -241,6 +241,28 @@ IF FILEEXISTS(dhrtKopie) THEN DELETEFILE(dhrtKopie)
 COPYFILE(runtime, dhrtKopie)
 IF NOT signieren(dhrtKopie) THEN EXIT(1)
 
+' Die kleinen Laufzeiten fuer `dhrt --export --schlank` (build_runtime.py
+' --laufzeiten legt sie in laufzeiten/ neben die volle). Ohne sie geht der
+' Export weiter, nur nimmt er dann immer die volle Laufzeit.
+DIM lzQuelle AS STRING : lzQuelle = DIRNAME(runtime) + "/laufzeiten"
+DIM lzStufe AS STRING : lzStufe = ""
+IF DIREXISTS(lzQuelle) THEN
+    lzStufe = stufe + "/laufzeiten"
+    MKDIR(lzStufe)
+    DIM lzName AS STRING
+    DIM lzZahl AS INTEGER : lzZahl = 0
+    FOR EACH lzName IN DIRLIST(lzQuelle)
+        IF LEFT$(LOWER$(lzName), 5) = "dhrt-" THEN
+            IF FILEEXISTS(lzStufe + "/" + lzName) THEN DELETEFILE(lzStufe + "/" + lzName)
+            COPYFILE(lzQuelle + "/" + lzName, lzStufe + "/" + lzName)
+            IF NOT signieren(lzStufe + "/" + lzName) THEN EXIT(1)
+            lzZahl = lzZahl + 1
+        END IF
+    NEXT
+    PRINT "Kleine Laufzeiten: "; lzZahl
+END IF
+IF lzStufe = "" THEN PRINT "Hinweis: keine kleinen Laufzeiten (rust/build_runtime.py --laufzeiten) -- `dhrt --export --schlank` nimmt dann die volle."
+
 DIM iscc AS STRING : iscc = isccFinden$()
 IF iscc = "" THEN
     PRINT "Inno Setup (ISCC.exe) nicht gefunden -- die Lizenzdatei ist trotzdem fertig."
@@ -250,7 +272,11 @@ END IF
 PRINT "Inno Setup: "; iscc
 CHDIR(installer)
 DIM ic AS INTEGER
-ic = PROCESS_START(iscc, "/DAppVersion=" + fassung, "/DDhrtQuelle=" + REPLACE$(dhrtKopie, "/", CHR$(92)), "/O" + REPLACE$(ausgabeOrdner, "/", CHR$(92)), installer + "/Drachenhauch-IDE.iss")
+IF lzStufe <> "" THEN
+    ic = PROCESS_START(iscc, "/DAppVersion=" + fassung, "/DDhrtQuelle=" + REPLACE$(dhrtKopie, "/", CHR$(92)), "/DLaufzeiten=" + REPLACE$(lzStufe, "/", CHR$(92)), "/O" + REPLACE$(ausgabeOrdner, "/", CHR$(92)), installer + "/Drachenhauch-IDE.iss")
+ELSE
+    ic = PROCESS_START(iscc, "/DAppVersion=" + fassung, "/DDhrtQuelle=" + REPLACE$(dhrtKopie, "/", CHR$(92)), "/O" + REPLACE$(ausgabeOrdner, "/", CHR$(92)), installer + "/Drachenhauch-IDE.iss")
+END IF
 IF lauf(ic, FALSE) <> 0 THEN
     PRINT "ISCC ist fehlgeschlagen."
     EXIT(1)

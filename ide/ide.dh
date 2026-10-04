@@ -12360,7 +12360,9 @@ SUB exportieren()
         IF NOT sichern(aktiverTab, FALSE) THEN RETURN
     END IF
     exportDatei = tabPfade[aktiverTab]
-    exportProzess = PROCESS_START("dhrt", "--export", exportDatei)
+    ' --schlank: die kleinste Laufzeit, die alle Befehle des Programms hat
+    ' (welche, steht in der Ausgabe); ohne passende die volle.
+    exportProzess = PROCESS_START("dhrt", "--export", exportDatei, "--schlank")
     GUI_SET_TEXT(lblStatus, tr$("Export läuft: ") + BASENAME(exportDatei) + " ...")
     protokoll("export " + exportDatei)
 END SUB

@@ -4908,6 +4908,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// `breite_px` breit, Hoehe nach Seitenverhaeltnis. Text in raylibs
     /// Standardschrift: eine Vorschau, kein Belichter. Die Lage stimmt, die
     /// Buchstaben sind nicht Helvetica.
+    #[cfg(feature = "pdf")]
     pub fn pdf_vorschau(&mut self, ops: &[crate::pdf::Op], breite_mm: f64, hoehe_mm: f64, breite_px: i32) -> Result<i64, String> {
         use crate::pdf::Op;
         let breite_px = breite_px.clamp(32, 4096);

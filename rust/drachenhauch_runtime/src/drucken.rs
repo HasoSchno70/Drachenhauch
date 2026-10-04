@@ -28,6 +28,7 @@
 //! Was hier NICHT ist: ein Renderer fuer fremde PDFs und ein nachgebauter
 //! Druckdialog. Beides waere der Anfang von Weg D.
 
+#[cfg(feature = "pdf")]
 use crate::pdf::{Dokument, Op};
 
 /// Endungen, die `OPENDOC` oeffnet -- Dokumente und Bilder, nichts, was laeuft.
@@ -61,6 +62,7 @@ pub fn standard_drucker() -> Result<String, String> { plattform::standard_drucke
 
 /// PDF_PRINT: das Dokument drucken. `drucker` leer = Standarddrucker;
 /// `zieldatei` fuer Drucker, die in eine Datei schreiben.
+#[cfg(feature = "pdf")]
 pub fn drucken(doc: &Dokument, drucker: &str, kopien: i64, zieldatei: &str) -> Result<(), String> {
     if !(1..=99).contains(&kopien) {
         return Err(format!("PDF_PRINT: Kopien 1..99, nicht {}", kopien));
@@ -73,6 +75,7 @@ pub fn drucken(doc: &Dokument, drucker: &str, kopien: i64, zieldatei: &str) -> R
 }
 
 /// GDI-Schrift zu einer Standardschrift des pdf-Moduls: (Name, fett, kursiv).
+#[cfg_attr(not(feature = "pdf"), allow(dead_code))]
 pub fn gdi_schrift(programmname: &str) -> (&'static str, bool, bool) {
     let n = programmname.to_ascii_lowercase();
     // Die eingebauten Schriften sind DejaVu; auf dem Drucker nehmen ihre
@@ -86,6 +89,7 @@ pub fn gdi_schrift(programmname: &str) -> (&'static str, bool, bool) {
 
 // ================================================================ Windows: GDI + winspool
 #[cfg(windows)]
+#[cfg_attr(not(feature = "pdf"), allow(unused_imports))]
 mod plattform {
     use super::*;
     use windows::core::PCWSTR;
@@ -137,11 +141,13 @@ mod plattform {
         Ok(namen)
     }
 
+    #[cfg(feature = "pdf")]
     fn farbe(f: (f64, f64, f64)) -> COLORREF {
         let k = |x: f64| (x.clamp(0.0, 1.0) * 255.0).round() as u32;
         COLORREF(k(f.0) | (k(f.1) << 8) | (k(f.2) << 16))
     }
 
+    #[cfg(feature = "pdf")]
     pub fn drucken(doc: &Dokument, drucker: &str, kopien: u32, zieldatei: &str) -> Result<(), String> {
         let name = wide(drucker);
         let hdc = unsafe { CreateDCW(PCWSTR::null(), PCWSTR(name.as_ptr()), PCWSTR::null(), None) };
@@ -153,6 +159,7 @@ mod plattform {
         ergebnis
     }
 
+    #[cfg(feature = "pdf")]
     unsafe fn seiten_drucken(hdc: HDC, doc: &Dokument, kopien: u32, zieldatei: &str) -> Result<(), String> {
         let dpi_x = GetDeviceCaps(Some(hdc), LOGPIXELSX) as f64;
         let dpi_y = GetDeviceCaps(Some(hdc), LOGPIXELSY) as f64;
@@ -260,6 +267,7 @@ mod plattform {
         Ok(s.split(':').nth(1).map(|n| n.trim().to_string()).unwrap_or_default())
     }
 
+    #[cfg(feature = "pdf")]
     pub fn drucken(doc: &Dokument, drucker: &str, kopien: u32, zieldatei: &str) -> Result<(), String> {
         let bytes = doc.bauen().map_err(|e| format!("PDF_PRINT: {}", e))?;
         if !zieldatei.is_empty() {
