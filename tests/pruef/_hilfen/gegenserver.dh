@@ -10,6 +10,7 @@
 '   langsam  antwortet nach der Verzoegerung mit "spaet aber da"
 '   echo     spiegelt Methode, Pfad, Kopfzeilen und Rumpf als JSON; /rohe-bytes
 '   cloud    der REST-Vertrag von cloudserver/server.dh (Speicherstaende, Bestenliste)
+'   dateien  liefert die Datei unter dem Pfad aus dem Arbeitsordner (fuer dhrt paket)
 IMPORT "net"
 IMPORT "json"
 
@@ -180,6 +181,15 @@ SUB antworten(c AS NET_SOCKET, kopfteil AS STRING, rumpf AS BUFFER)
         END IF
     ELSEIF modus = "cloud" THEN
         cloud(c, methode, pfad, query, kopfteil, rumpf)
+    ELSEIF modus = "dateien" THEN
+        ' Vom Ort des Aufrufers aus -- dhrt run wechselt in den Ordner des Servers.
+        DIM datei AS STRING : datei = MID$(pfad, 1, LEN(pfad))
+        IF datei <> "" AND INSTR(datei, "..") < 0 THEN datei = PATHJOIN(GETENV$("DHRT_START_DIR"), datei)
+        IF datei <> "" AND INSTR(datei, "..") < 0 AND FILEEXISTS(datei) THEN
+            senden(c, 200, "Content-Type: application/octet-stream" + CRLF, READALL_BYTES(datei))
+        ELSE
+            senden(c, 404, "", BUFFER_NEW(0))
+        END IF
     END IF
 END SUB
 

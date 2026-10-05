@@ -1,0 +1,9 @@
+' Kleine Helfer fuer paket.dhtest: eine Datei samt Ordnern schreiben.
+DIM NL AS STRING : NL = CHR$(10)
+DIM Q AS STRING : Q = CHR$(34)
+
+SUB datei(pfad AS STRING, text AS STRING)
+    DIM d AS STRING : d = DIRNAME(pfad)
+    IF d <> "" AND d <> "." THEN MKDIR(d)
+    WRITEALL(pfad, text + NL)
+END SUB

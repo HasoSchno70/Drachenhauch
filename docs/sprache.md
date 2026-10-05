@@ -1402,9 +1402,13 @@ PRINT Distance(0.0, 0.0, 3.0, 4.0)    ' 5.0 - aus mathlib.dh
 
 1. **Neben der importierenden Datei.** Die eigene Kopie eines Projekts
    gewinnt immer — wer eine Datei danebenlegt, will genau die.
-2. **Jeder Ordner aus `DH_PATH`**, in der angegebenen Reihenfolge (wie
+2. **`pakete/` von dort aus nach oben** — die Pakete des Projekts, die
+   `dhrt paket hole` ablegt (siehe [Pakete](pakete.md)). Braucht ein Paket
+   selbst ein Paket, liegt das in seinem eigenen `pakete/` und wird zuerst
+   gefunden.
+3. **Jeder Ordner aus `DH_PATH`**, in der angegebenen Reihenfolge (wie
    `PATH` und `PYTHONPATH`; Trenner ist `;` unter Windows, sonst `:`).
-3. **`<Benutzerordner>/.drachenhauch/bibliothek`** — der Ort für Dinge, die
+4. **`<Benutzerordner>/.drachenhauch/bibliothek`** — der Ort für Dinge, die
    auf diesem Rechner allen Projekten zur Verfügung stehen sollen. Er
    entsteht nicht von selbst; wer ihn anlegt, hat ihn gemeint.
 

@@ -90,6 +90,7 @@ entworfen, empfohlen; entschieden ist nichts davon.
 
 ### Werkzeug
 
+- **[Pakete](pakete.md)** — `dhrt paket hole github:nutzer/repo@stand`: Bibliotheken holen, festhalten und teilen
 - **[Die Werkzeuge um die Sprache](werkzeuge.md)** — `dhrt --version`, `dhrt test` (Prüfprogramme laufen lassen), `dhrt fmt` (einheitlich schreiben), `dhrt --check`, `dhrt doku referenz` (Referenz aus dem Quelltext)
 - **[IDE](ide.md)** — die Entwicklungsumgebung, geschrieben in Drachenhauch: Reiter, Projektbaum, Debugger, Profil, Suche im Projekt, Umbauten
 - **[Sprite-Editor](sprite-editor.md)** (`examples/189_sprite_editor.dh`) — Pixel-Art mit Einzelbildern, Ebenen, Auswahlmaske, GIF, Atlas-Export
@@ -118,6 +119,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Python abbauen](entwurf-python-abbau.md)** — 110 000 Zeilen Python gemessen (58 % Tests, 32 000 IDE und Editoren, zwei Drittel des Installers); Wege Werkzeugkette/LSP nach dhrt, IDE und Editoren in Drachenhauch, Tests als `dhrt test`; Empfehlung: Werkzeugkette zuerst, dann die IDE
 - **[Entwurf: Anwendungen und Tempo](entwurf-anwendungen-und-tempo.md)** — gemessen gegen Python: Zeichenketten-Anhängen ist quadratisch, Builtins werden am Namen gesucht; was einer GUI-Anwendung noch fehlt, und in welcher Reihenfolge
 - **[Entwurf: Maschinencode](entwurf-maschinencode.md)** — wie Drachenhauch als übersetzte Sprache richtig schnell wird: getypte Zwischenstufe, getypte VM, dann Cranelift-JIT mit der VM als Referenz
+- **[Entwurf: Pakete](entwurf-pakete.md)** — Bibliotheken holen und teilen ohne eigenen Server: Quellen, Ablage im Projekt, Sperrdatei mit Prüfsumme; gebaut als `dhrt paket`
 - **[Entwurf: SPEAK](entwurf-speak.md)** — Sprachausgabe fuer Spiele ohne gui: WinRT liefert die besseren Stimmen und einen Klang statt eines Lautsprecherausgangs (12–35 ms je Satz, gemessen); Empfehlung: Synthese zu PCM durch Kira, Bildschirmleser zuerst
 - **[Entwurf: Eingabemethoden (IME)](entwurf-eingabemethoden.md)** — gemessen: der Speicher ist Unicode, die Anzeige Latin-1 (das Euro-Zeichen ist ein Fragezeichen); Wege Zeichenvorrat, Umwandlungsfenster, Preedit, SDL; Empfehlung: erst sehen, dann tippen
 - **[Entwurf: Barrierefreiheit](entwurf-barrierefreiheit.md)** — der UIA-Baum eines dhrt-Fensters ist leer, gemessen; AccessKit, Sprachausgabe und Handwerk als Wege; Empfehlung: Handwerk sofort, dann AccessKit mit Windows zuerst
