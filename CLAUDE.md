@@ -1307,10 +1307,18 @@ Meldung AENDERT, die im Katalog steht, zieht die Vorlage mit --
 meldet eine Vorlage, deren feste Stuecke in keinem Literal mehr stehen.
 Setzt sich eine Meldung aus mehreren Literalen zusammen, markiert `[[wort]]`
 (ganzes eigenes Literal) bzw. `[[]]` (Naht) die Stelle -- ohne die
-strenge Regel fand die Pruefung im ganzen Quelltext fast alles. Zwei Runden:
-Sprache und allgemeine Laufzeitfehler, dann Befehle und Module -- 530 von 562
-Meldungen der Fehlerfaelle; offen gui/Grafik/Ton (`dhrt pruef meldungen
---offen` listet, was noch fehlt, 457 Stuecke, die meisten dort). **Gewaehlt
+strenge Regel fand die Pruefung im ganzen Quelltext fast alles. Drei Runden:
+Sprache und allgemeine Laufzeitfehler, dann Befehle und Module (530 von 562
+Meldungen der Fehlerfaelle), dann gui/Grafik/Ton (2026-10-05, 350 Vorlagen).
+`dhrt pruef meldungen --offen` listet danach 121 Stuecke -- mit Absicht
+deutsch sind die CLI-Werkzeuge (main.rs, paket.rs), die Gruende des
+Maschinencodes (jit.rs) und innere Formatfehler (model.rs); der Rest sind
+Bruchstuecke zusammengesetzter Meldungen, die als Ganzes uebersetzt sind
+(`--offen` uebersetzt jedes Literal fuer sich). **Platzhalter im Englischen
+sind nur `{}` und `{Zahl}`** (`meldung::einsetzen`) -- vorher fiel ein
+Beispiel wie `f"{value:.2f}"` still weg. Dabei fiel eine kaputte Meldung
+auf: `GUI_SCALE` trug mitten im Text 25 Leerzeichen aus einem Zeilenumbruch
+im Quelltext. **Gewaehlt
 wird nach dem GESAMTgewicht** (feste Zeichen aller beteiligten Vorlagen,
 `meldung::tief`), nicht nach der obersten Vorlage -- sonst schnitt `{} -- {}`
 "TASK: Zugriff auf eine globale Variable ..." an der falschen Stelle durch.

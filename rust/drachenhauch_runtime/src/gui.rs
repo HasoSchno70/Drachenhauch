@@ -3407,7 +3407,7 @@ impl Gui {
             return Err("GUI_SCALE: Faktor muss zwischen 0.5 und 4.0 liegen".into());
         }
         if !self.windows.is_empty() {
-            return Err("GUI_SCALE: erst den Massstab setzen, dann Fenster und                         Widgets anlegen (bereits angelegte werden nicht                         umgerechnet)".into());
+            return Err("GUI_SCALE: erst den Massstab setzen, dann Fenster und Widgets anlegen (bereits angelegte werden nicht umgerechnet)".into());
         }
         self.scale = f;
         Ok(())

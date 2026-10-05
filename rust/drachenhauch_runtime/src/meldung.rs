@@ -139,6 +139,10 @@ fn einsetzen(vorlage: &str, stuecke: &[String]) -> String {
             '}' if z.get(i + 1) == Some(&'}') => { aus.push('}'); i += 2; }
             '{' => {
                 let ende = z[i..].iter().position(|&c| c == '}').map(|p| i + p);
+                // Platzhalter sind nur {} und {Zahl} -- `{wert:.2f}` oder
+                // `{...}` in einem Beispiel sind Text (bis 2026-10-05 fielen
+                // sie im Englischen still weg).
+                let ende = ende.filter(|&e| z[i + 1..e].iter().all(|c| c.is_ascii_digit()));
                 match ende {
                     Some(e) => {
                         let innen: String = z[i + 1..e].iter().collect();
@@ -288,6 +292,9 @@ mod tests {
         assert_eq!(einsetzen("{2} vor {1}", &s), "b vor a");
         assert_eq!(einsetzen("{{x}} {}", &s), "{x} a");
         assert_eq!(stuecke("ab{}c{{d}}"), vec!["ab".to_string(), "c{d}".to_string()]);
+        // Nur {} und {Zahl} sind Platzhalter; ein Beispiel wie f"{value:.2f}"
+        // bleibt stehen.
+        assert_eq!(einsetzen("{} or f\"{value:.2f}\" in `{...}`", &s), "a or f\"{value:.2f}\" in `{...}`");
     }
 
     #[test]
