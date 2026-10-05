@@ -334,6 +334,7 @@ dhrt paket hole <quelle> [--als name]  ein Paket dazunehmen
 dhrt paket entferne <name>             ein Paket wieder herausnehmen
 dhrt paket liste                       was das Projekt hat
 dhrt paket neu [name]                  eine paket.json anlegen
+dhrt paket -C <ordner> ...             wie oben, als stuende man in <ordner>
 
 Quellen: github:nutzer/repo@stand, https://.../paket.zip, https://.../datei.dh,
          ein lokaler Ordner oder ein lokales ZIP.
@@ -344,6 +345,20 @@ Code, der beim Laufen alles darf, was ein Programm darf.";
 
 pub fn main(args: &[String]) -> ExitCode {
     let mut melden = |t: &str| println!("{}", t);
+    // `-C ordner` wie bei git: so arbeitet ein Aufrufer (die IDE) in einem
+    // Projekt, ohne seinen eigenen Arbeitsordner umzustellen.
+    let mut args = args;
+    if args.first().map(String::as_str) == Some("-C") {
+        let Some(ordner) = args.get(1) else {
+            eprintln!("dhrt paket: -C braucht einen Ordner");
+            return ExitCode::from(1);
+        };
+        if let Err(e) = std::env::set_current_dir(ordner) {
+            eprintln!("dhrt paket: {}: {}", ordner, e);
+            return ExitCode::from(1);
+        }
+        args = &args[2..];
+    }
     let r = match args.first().map(String::as_str) {
         Some("hole") => hole(&args[1..], &mut melden),
         Some("entferne") => entferne(&args[1..], &mut melden),

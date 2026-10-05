@@ -229,3 +229,25 @@ krummer name: 1 TRUE
 als: 0 TRUE
 entfernt: 0 FALSE FALSE FALSE
 zweimal: 1
+
+=== -C arbeitet in einem anderen ordner
+IMPORT "helfer.dh"
+datei("libs/kiste/k.dh", "PRINT 1")
+MKDIR("projekt")
+' Die IDE ruft dhrt paket so auf: ihr eigener Arbeitsordner bleibt, wo er ist.
+dlStarten(["paket", "-C", "projekt", "hole", "../libs/kiste"])
+PRINT "geholt: "; dlCode; " "; FILEEXISTS("projekt/pakete/kiste/k.dh"); " "; FILEEXISTS("projekt/paket.json"); " "; FILEEXISTS("paket.json")
+dlStarten(["paket", "-C", "projekt", "liste"])
+PRINT "liste: "; LEFT$(dlAus, 20)
+dlStarten(["paket", "-C", "gibts-nicht", "liste"])
+PRINT "fehlt: "; dlCode; " "; INSTR(dlErr, "gibts-nicht") >= 0
+dlStarten(["paket", "-C"])
+PRINT "ohne ordner: "; dlCode; " "; INSTR(dlErr, "-C braucht einen Ordner") >= 0
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/pakete.dh"
+--- erwartet
+geholt: 0 TRUE TRUE FALSE
+liste: kiste  ../libs/kiste
+fehlt: 1 TRUE
+ohne ordner: 1 TRUE
