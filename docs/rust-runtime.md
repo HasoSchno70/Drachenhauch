@@ -307,9 +307,15 @@ darum genügen für zusammengesetzte Meldungen die Teile (`{} -- Aufruf: {}`,
   Laufzeitfehler ab, die zweite die Befehle und Module (Felder, Maps, Text,
   Zahlen, Dateien, Puffer, JSON, XML, Datenbank, Netz, Mail, Prozesse, PDF,
   Tiled, Hardware …). Gemessen an den 562 Fehlermeldungen der
-  Prüfsammlungen kommen 530 (94 %) englisch an. Offen sind gui, Grafik und
-  Ton; die Fehlertexte, die das Betriebssystem selbst liefert („Das System
-  kann die angegebene Datei nicht finden“), bleiben in dessen Sprache.
+  Prüfsammlungen kamen danach 530 (94 %) englisch an. Die dritte Runde nahm
+  gui, Grafik und Ton dazu (350 Vorlagen). Deutsch bleiben mit Absicht die
+  Ausgaben der Werkzeuge auf der Kommandozeile (`dhrt test`, `dhrt paket`,
+  der Export), die inneren Gründe des Maschinencodes (`dhrt --jit`) und die
+  Fehlertexte, die das Betriebssystem selbst liefert („Das System kann die
+  angegebene Datei nicht finden“).
+- **Platzhalter sind nur `{}` und `{Zahl}`.** Ein Beispiel mit geschweiften
+  Klammern in der englischen Fassung (`f"{value:.2f}"`, `` `{...}` ``) bleibt
+  Text -- bis zur dritten Runde fiel es still weg.
 - **Was ein Programm sieht, bleibt deutsch**: der Wert einer `CATCH`-Variable
   hängt nicht an einer Umgebungsvariable.
 - **Schnellkorrekturen** lesen weiter den deutschen Satz; nur ihr Titel wird
