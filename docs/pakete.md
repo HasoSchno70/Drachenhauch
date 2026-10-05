@@ -93,7 +93,16 @@ genau dasselbe wieder.
 | `dhrt paket neu [name]` | eine leere `paket.json` anlegen |
 
 Das Projekt ist der nächste Ordner mit `paket.json`, vom Arbeitsordner aus
-nach oben gesucht.
+nach oben gesucht. Mit `dhrt paket -C <ordner> ...` gilt `<ordner>` als
+Arbeitsordner (wie bei git) -- so ruft die IDE es auf.
+
+## In der IDE
+
+**Datei → Pakete des Projekts** (Strg+Alt+P) zeigt, was das Projekt hat, und
+holt, erneuert und entfernt Pakete über dieselben Befehle. Umbauten über das
+ganze Projekt (Umbenennen, Ersetzen) und die Projektsuche lassen `pakete/`
+aus: was dort liegt, überschreibt das nächste Holen. Einzelheiten im
+[Handbuch der IDE](ide.md).
 
 ## Ein eigenes Paket anbieten
 

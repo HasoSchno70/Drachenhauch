@@ -1336,7 +1336,23 @@ ausgefuehrt, entpackt ueber `zipdatei::entpacke` (Zip-Slip-Schutz). Die
 Ausgaben von `dhrt paket` sind deutsch wie die anderen CLI-Werkzeuge. Tests
 `tests/pruef/paket.dhtest` (9; HTTP ueber `gegenserver.dh` Modus `dateien`,
 der von `DHRT_START_DIR` aus liefert, weil `dhrt run` in den Ordner der
-Quelle wechselt). Offen: IDE-Menue, Pakete im Projektbaum.
+Quelle wechselt).
+**In der IDE (2026-10-05):** Fenster `winPak` (Datei -> Pakete des
+Projekts, Strg+Alt+P): Liste aus `dhrt paket liste` (per `SHELL_OUT$
+(EXEPATH$(), "paket", "-C", ordner, "liste")`, zerlegt an zwei
+Leerzeichen), Holen/Alle/Erneuern/Entfernen als Prozess `pakProz` ueber
+**`dhrt paket -C <ordner>`** (neu, wie git; die IDE stellt ihren eigenen
+Arbeitsordner nicht um), danach `pakFertig`: Baum, Symbolverzeichnis
+(`symSchluessel = ""`), Zaehler und `pruefen()` neu. **`projektDateien`
+laesst `pakete/` aus** (Umbauten, Projektsuche, Projekt pruefen schreiben
+bzw. meinen nur eigenen Code -- das naechste Holen ueberschriebe Aenderungen
+dort); lesende Stellen fragen `projektDateien(muster, TRUE)`
+(Symbolverzeichnis, `hatByref`, `klassenLesen`, Datei im Projekt oeffnen).
+Eine geoeffnete Paketdatei sagt das in der Statuszeile (`paketVon$`). Tests
+`tests/pruef/werkzeug_ide_pakete.dhtest` (3; die Paketquelle liegt unter
+`_quelle/`, sonst faende das Symbolverzeichnis die Funktion auch ohne Paket
+-- so blieb die erste Gegenprobe gruen), ein `-C`-Fall in `paket.dhtest`;
+sechs Verfaelschungen der IDE fallen je in ihrem Fall.
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
