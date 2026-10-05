@@ -230,6 +230,22 @@ bekäme. Diese Bausteine kamen mit ihr:
   Datei, dann im Projekt. Ein Bild oder Klang aus dem Projektbaum öffnet
   eine **Vorschau** in der IDE (Bild mit Maßen und Größe, Klang mit
   [Abspielen]/[Stopp]); [Mit dem System öffnen] gibt es weiter.
+- **Pakete** (Datei → Pakete des Projekts, Strg+Alt+P): die Bibliotheken aus
+  `paket.json` als Liste, je Zeile Name und Quelle, die Prüfsumme im
+  Tooltip; ein Paket, das im Ordner `pakete/` fehlt, steht rot.
+  **Paket holen ...** fragt nach der Quelle (`github:nutzer/repo@stand`,
+  eine https-Adresse oder ein Ordner, wahlweise mit `--als name`), **Alle
+  holen** holt alles gegen `paket.lock.json`, **Erneuern** nimmt neuen
+  Inhalt an, **Entfernen** fragt nach. Dahinter läuft `dhrt paket -C
+  <projekt>` als eigener Prozess, die Ausgabe unten mit; danach sind
+  Projektbaum, Symbolverzeichnis und die Prüfung der Datei vorn neu -- ein
+  `IMPORT` in ein eben geholtes Paket ist dann kein Fehler mehr. Die Pakete
+  stehen im Projektbaum unter `pakete/`. **Umbauten über das ganze
+  Projekt, Projektsuche und Projekt prüfen lassen `pakete/` aus** (fremder
+  Code, den das nächste Holen überschreibt); Zur Definition, Datei im
+  Projekt öffnen und die Vererbungsprüfung sehen die Pakete. Wer eine
+  Datei aus einem Paket öffnet, liest in der Statuszeile, dass Änderungen
+  beim nächsten Holen verloren gehen.
 - **Quellcodeverwaltung** (Bearbeiten → Quellcodeverwaltung, Strg+Alt+G): die
   geänderten Dateien des git-Repositorys als Liste; das Kästchen merkt eine
   Datei für die nächste Übergabe vor (`git add`) oder nimmt sie zurück,

@@ -902,3 +902,31 @@ Suche abgebrochen nach 	Search cancelled after
  (neu, binär)	 (new, binary)
 ~ gekürzt: der Unterschied ist 	~ cut short: the difference is 
  KB lang, ganz zeigt ihn git diff	 KB long, git diff shows all of it
+# Pakete (dhrt paket)
+ -- Änderungen gehen beim nächsten Holen verloren: 	 -- changes are lost the next time packages are fetched: 
+ aus paket.json, paket.lock.json und pakete/ nehmen?	 from paket.json, paket.lock.json and pakete/?
+Alle Pakete holen	Fetch all packages
+Alle holen	Fetch all
+Alles aus paket.json holen, geprüft gegen paket.lock.json	Fetch everything in paket.json, checked against paket.lock.json
+Alles neu holen und den Inhalt annehmen, der jetzt ankommt	Fetch everything again and accept the content that arrives now
+Das Paket 	Remove the package 
+Das Projekt hat noch keine Pakete.	The project has no packages yet.
+Das gewählte Paket aus dem Projekt nehmen	Remove the selected package from the project
+Datei aus dem Paket 	File from the package 
+Ein Paket dazunehmen: github:nutzer/repo@stand, eine https-Adresse oder ein Ordner	Add a package: github:user/repo@version, an https address or a folder
+Erneuern	Renew
+Erst ein Paket in der Liste wählen.	Select a package in the list first.
+Fehlt im Ordner pakete/ -- [Alle holen] holt es.	Missing from pakete/ -- [Fetch all] fetches it.
+Kein Projekt geöffnet.	No project open.
+Noch keine paket.json -- [Paket holen] legt sie an in 	No paket.json yet -- [Fetch package] creates it in 
+Paket entfernen	Remove package
+Paket holen	Fetch package
+Paket holen ...	Fetch package ...
+Pakete	Packages
+Pakete des Projekts	Project packages
+Pakete des Projekts ...	Project packages ...
+Prüfsumme 	Checksum 
+Quelle (github:nutzer/repo@stand, https-Adresse oder Ordner), dahinter wahlweise --als name:	Source (github:user/repo@version, https address or folder), optionally followed by --als name:
+dhrt paket 	dhrt paket 
+dhrt paket ist nicht zu starten: 	dhrt paket cannot be started: 
+dhrt paket läuft noch.	dhrt paket is still running.

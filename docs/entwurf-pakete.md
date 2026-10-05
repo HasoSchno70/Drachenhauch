@@ -153,6 +153,8 @@ nach oben gesucht; `hole` ohne `paket.json` legt sie im Arbeitsordner an.
 
 ## Spaeter
 
-- In der IDE: Menue „Paket holen …“, Pakete im Projektbaum.
+- ~~In der IDE: Menue „Paket holen …“, Pakete im Projektbaum.~~ Gebaut am
+  2026-10-05: Fenster „Pakete des Projekts“ (Strg+Alt+P), die Pakete stehen
+  im Projektbaum unter `pakete/`, Umbauten ueber das Projekt lassen sie aus.
 - `DH_PATH` und die Benutzerbibliothek bleiben wie sie sind -- fuer Dinge,
   die man ueberall will und nicht versioniert.
