@@ -921,6 +921,7 @@ DIM miBaumOeffnen AS INTEGER : miBaumOeffnen = GUI_MENU_ITEM(mDatei, tr$("Gewäh
 DIM miBaumHaken AS INTEGER : miBaumHaken = GUI_MENU_ITEM(mDatei, tr$("Kästchen im Projektbaum zeigen"))
 GUI_MENU_CHECK(miBaumHaken, baumHakenAn)
 DIM miHakenWeg AS INTEGER : miHakenWeg = GUI_MENU_ITEM(mDatei, tr$("Haken im Projektbaum entfernen"))
+DIM miPakete AS INTEGER : miPakete = GUI_MENU_ITEM(mDatei, tr$("Pakete des Projekts ..."), kz$("Strg+Alt+P"))
 ' Zuletzt geoeffnet: acht feste Eintraege, die Texte wechseln -- ein Menue
 ' kann Eintraege nicht wieder loswerden, also werden freie gesperrt.
 CONST ZULETZT_MAX = 8
@@ -1769,6 +1770,27 @@ GUI_TOOLTIP(btnQvStashPop, tr$("Das zuletzt Beiseitegelegte zurückholen (git st
 DIM btnQvPush AS GUI_WIDGET : btnQvPush = GUI_BUTTON(winQv, tr$("Senden (push)"), 728, 484, 164, 28)
 DIM lblQvStatus AS GUI_WIDGET : lblQvStatus = GUI_LABEL(winQv, "", 8, 522)
 GUI_TOOLTIP(lstQv, tr$("Kästchen: für die nächste Übergabe vormerken (git add) oder zurücknehmen"))
+
+' --- Pakete (dhrt paket) ---------------------------------------------------
+' Was das Projekt an Bibliotheken holt. Die Wahrheit liegt in paket.json und
+' paket.lock.json; das Fenster zeigt `dhrt paket liste` und ruft dhrt paket
+' selbst auf -- eine zweite Buchfuehrung in der IDE liefe auseinander.
+DIM winPak AS GUI_WINDOW : winPak = GUI_WINDOW(tr$("Pakete"), 300, 120, 640, 440)
+GUI_WINDOW_VISIBLE(winPak, FALSE)
+DIM lblPak AS GUI_WIDGET : lblPak = GUI_LABEL(winPak, "", 8, 8)
+DIM lstPak AS GUI_WIDGET : lstPak = GUI_LISTBOX(winPak, 8, 34, 624, 300, [])
+GUI_LISTBOX_PLACEHOLDER(lstPak, tr$("Das Projekt hat noch keine Pakete."))
+DIM btnPakHolen AS GUI_WIDGET : btnPakHolen = GUI_BUTTON(winPak, tr$("Paket holen ..."), 8, 344, 150, 28)
+GUI_BUTTON_VARIANT(btnPakHolen, "primaer")
+DIM btnPakAlle AS GUI_WIDGET : btnPakAlle = GUI_BUTTON(winPak, tr$("Alle holen"), 166, 344, 120, 28)
+DIM btnPakErneuern AS GUI_WIDGET : btnPakErneuern = GUI_BUTTON(winPak, tr$("Erneuern"), 294, 344, 120, 28)
+DIM btnPakEntfernen AS GUI_WIDGET : btnPakEntfernen = GUI_BUTTON(winPak, tr$("Entfernen"), 502, 344, 130, 28)
+GUI_BUTTON_VARIANT(btnPakEntfernen, "gefahr")
+DIM lblPakStatus AS GUI_WIDGET : lblPakStatus = GUI_LABEL(winPak, "", 8, 382)
+GUI_TOOLTIP(btnPakHolen, tr$("Ein Paket dazunehmen: github:nutzer/repo@stand, eine https-Adresse oder ein Ordner"))
+GUI_TOOLTIP(btnPakAlle, tr$("Alles aus paket.json holen, geprüft gegen paket.lock.json"))
+GUI_TOOLTIP(btnPakErneuern, tr$("Alles neu holen und den Inhalt annehmen, der jetzt ankommt"))
+GUI_TOOLTIP(btnPakEntfernen, tr$("Das gewählte Paket aus dem Projekt nehmen"))
 
 ' --- Pruefsammlungen im Ueberblick -------------------------------------
 DIM winTests AS GUI_WINDOW : winTests = GUI_WINDOW(tr$("Prüfsammlungen"), 300, 110, 620, 560)
@@ -3535,6 +3557,9 @@ SUB dateiOeffnen(pfad AS STRING)
     IF reiterPlatz <> "" THEN
         GUI_SET_TEXT(lblStatus, pfad + "  --  " + tr$("Höchstens ") + STR$(MAX_TABS) + tr$(" Reiter, geschlossen: ") + reiterPlatz)
         reiterPlatz = ""
+    ELSEIF paketVon$(pfad) <> "" THEN
+        GUI_SET_TEXT(lblStatus, tr$("Datei aus dem Paket ") + paketVon$(pfad) + tr$(" -- Änderungen gehen beim nächsten Holen verloren: ") + pfad)
+        protokoll("paketdatei " + paketVon$(pfad))
     ELSEIF kodierung = "utf8" THEN
         GUI_SET_TEXT(lblStatus, pfad)
     ELSE
@@ -3731,7 +3756,13 @@ DIM hakenStand AS INTEGER : hakenStand = 0
 ' `.` oder `_` anfangen, dazu `target` und `__pycache__`: dort liegt
 ' Erzeugtes, kein Quelltext, und ein Bau-Ordner kann zehntausend Dateien
 ' haben.
-FUNCTION projektDateien(muster AS STRING) AS ARRAY OF STRING
+'
+' Auch `pakete/` gehoert nicht dazu: dort liegt fremder Code, den
+' `dhrt paket hole` beim naechsten Mal ueberschreibt -- ein Umbau ueber das
+' ganze Projekt darf da nicht hineinschreiben, und Projektsuche und
+' Projekt-Pruefung meinen die eigene Arbeit. Wer nur LIEST (Zur Definition,
+' Datei oeffnen, Vererbung), fragt mit `mitPaketen` = TRUE.
+FUNCTION projektDateien(muster AS STRING, mitPaketen AS BOOLEAN = FALSE) AS ARRAY OF STRING
     DIM roh AS ARRAY OF STRING : roh = []
     TRY
         roh = DIRLIST_REC(projektOrdner, muster)
@@ -3749,6 +3780,7 @@ FUNCTION projektDateien(muster AS STRING) AS ARRAY OF STRING
             teil = teile[ti]
             IF LEFT$(teil, 1) = "." OR LEFT$(teil, 1) = "_" THEN gut = FALSE
             IF teil = "target" OR teil = "__pycache__" THEN gut = FALSE
+            IF teil = "pakete" AND NOT mitPaketen THEN gut = FALSE
         NEXT
         IF gut THEN ARRAY_PUSH(raus, d)
     NEXT
@@ -4603,7 +4635,7 @@ SUB symbolEinerDatei(pfad AS STRING, kurz AS STRING, quelle AS STRING)
 END SUB
 
 SUB symbolIndexBauen(erzwingen AS BOOLEAN)
-    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh", TRUE)
     DIM schl AS STRING : schl = projektOrdner + "|" + STR$(LEN(dateien))
     IF NOT erzwingen AND schl = symSchluessel THEN RETURN
     symSchluessel = schl
@@ -5622,6 +5654,205 @@ SUB qvFern(art AS STRING)
     protokoll("qv " + art + " start")
 END SUB
 
+' --- Pakete --------------------------------------------------------------
+DIM pakProz AS INTEGER : pakProz = -1
+DIM pakArt AS STRING : pakArt = ""
+DIM pakNamen AS ARRAY OF STRING : pakNamen = []
+DIM dlgPakQuelle AS GUI_WINDOW : dlgPakQuelle = 0
+DIM dlgPakEntfernen AS GUI_WINDOW : dlgPakEntfernen = 0
+DIM pakEntfernenName AS STRING : pakEntfernenName = ""
+
+' Wo dhrt paket arbeiten soll: der Projektordner, ohne Projekt der Ordner
+' der Datei vorn. dhrt sucht von dort selbst nach oben nach der paket.json.
+FUNCTION pakOrdner$() AS STRING
+    IF projektOrdner <> "" THEN RETURN projektOrdner
+    IF aktiverTab >= 0 AND tabAnzahl > 0 THEN
+        IF tabPfade[aktiverTab] <> "" THEN RETURN DIRNAME(tabPfade[aktiverTab])
+    END IF
+    RETURN ""
+END FUNCTION
+
+' Der Ordner mit der paket.json, gesucht wie dhrt paket es tut -- nur fuer
+' die Anzeige, welche Datei gemeint ist.
+FUNCTION pakJsonWeg$() AS STRING
+    DIM d AS STRING : d = pakOrdner$()
+    DIM n AS INTEGER : n = 0
+    WHILE d <> "" AND n < 40
+        IF FILEEXISTS(PATHJOIN(d, "paket.json")) THEN RETURN PATHJOIN(d, "paket.json")
+        DIM o AS STRING : o = DIRNAME(d)
+        IF o = d THEN RETURN ""
+        d = o : n = n + 1
+    WEND
+    RETURN ""
+END FUNCTION
+
+' Die Liste aus `dhrt paket liste`: je Zeile "name  quelle  pruefsumme",
+' dahinter "  -- fehlt, ..." fuer ein Paket, das nicht im Ordner liegt.
+SUB pakFuellen()
+    pakNamen = []
+    GUI_LISTBOX_CLEAR(lstPak)
+    DIM ordner AS STRING : ordner = pakOrdner$()
+    IF ordner = "" THEN
+        GUI_SET_TEXT(lblPak, tr$("Kein Projekt geöffnet."))
+        RETURN
+    END IF
+    DIM pj AS STRING : pj = pakJsonWeg$()
+    IF pj = "" THEN
+        GUI_SET_TEXT(lblPak, tr$("Noch keine paket.json -- [Paket holen] legt sie an in ") + ordner)
+        protokoll("pak liste ohne paket.json")
+        RETURN
+    END IF
+    GUI_SET_TEXT(lblPak, pj)
+    DIM roh AS STRING : roh = ""
+    TRY
+        roh = SHELL_OUT$(EXEPATH$(), "paket", "-C", ordner, "liste")
+    CATCH e
+        GUI_SET_TEXT(lblPakStatus, tr$("dhrt paket ist nicht zu starten: ") + e)
+        RETURN
+    END TRY
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(roh, CHR$(13), ""), CHR$(10))
+        IF TRIM$(z) = "" OR LEFT$(z, 4) = "hier" THEN CONTINUE
+        DIM t AS ARRAY OF STRING : t = SPLIT$(z, "  ")
+        IF LEN(t) < 3 THEN CONTINUE
+        DIM i AS INTEGER : i = LEN(pakNamen)
+        ARRAY_PUSH(pakNamen, t[0])
+        GUI_LISTBOX_ADD(lstPak, t[0])
+        GUI_LISTBOX_DETAIL(lstPak, i, t[1])
+        IF LEN(t) > 3 THEN
+            GUI_LISTBOX_TIP(lstPak, i, tr$("Fehlt im Ordner pakete/ -- [Alle holen] holt es."))
+            GUI_LISTBOX_COLOR(lstPak, i, &HE05050)
+        ELSE
+            GUI_LISTBOX_TIP(lstPak, i, tr$("Prüfsumme ") + t[2])
+        END IF
+    NEXT
+    protokoll("pak liste " + STR$(LEN(pakNamen)) + IIF(LEN(pakNamen) > 0, " " + JOIN$(pakNamen, ","), ""))
+END SUB
+
+SUB pakZeigen()
+    pakFuellen()
+    GUI_WINDOW_VISIBLE(winPak, TRUE)
+    GUI_FOCUS(lstPak)
+END SUB
+
+' dhrt paket als eigener Prozess: Holen dauert (Netz), die Ausgabe laeuft
+' unten mit wie bei git.
+SUB pakStarten(art AS STRING, mehr AS ARRAY OF STRING)
+    IF pakProz >= 0 THEN
+        GUI_SET_TEXT(lblPakStatus, tr$("dhrt paket läuft noch."))
+        RETURN
+    END IF
+    DIM ordner AS STRING : ordner = pakOrdner$()
+    IF ordner = "" THEN
+        GUI_SET_TEXT(lblPakStatus, tr$("Kein Projekt geöffnet."))
+        RETURN
+    END IF
+    DIM a AS ARRAY OF STRING : a = ["paket", "-C", ordner, art]
+    DIM m AS STRING
+    FOR EACH m IN mehr
+        ARRAY_PUSH(a, m)
+    NEXT
+    pakArt = art
+    GUI_LISTBOX_CLEAR(lstAusgabe)
+    ausgabe("dhrt " + JOIN$(a, " "))
+    pakProz = PROCESS_START("dhrt", a)
+    PROCESS_CLOSE_INPUT(pakProz)
+    GUI_SET_TEXT(lblPakStatus, tr$("dhrt paket ") + art + tr$(" läuft ..."))
+    protokoll("pak " + art + " start " + JOIN$(mehr, " "))
+END SUB
+
+' Was nach dem Holen gilt: neue Dateien im Baum, ein IMPORT, der eben noch
+' ins Leere zeigte, ist kein Fehler mehr -- also Baum, Symbolverzeichnis und
+' die Pruefung der Datei vorn neu.
+SUB pakFertig(code AS INTEGER)
+    GUI_SET_TEXT(lblPakStatus, tr$("dhrt paket ") + pakArt + IIF(code = 0, tr$(": fertig."), tr$(": fehlgeschlagen (Code ") + STR$(code) + tr$(") -- siehe Ausgabe.")))
+    protokoll("pak " + pakArt + " " + STR$(code))
+    GUI_FILETREE_REFRESH(baum)
+    symSchluessel = ""
+    zaehlCache = {} : zaehlZeit = {} : zaehlWeg = {} : echteWege = {} : zaehlDateienAlt = TRUE
+    pakFuellen()
+    pruefen()
+END SUB
+
+SUB pakNachziehen()
+    IF pakProz >= 0 THEN
+        DIM a AS STRING : a = PROCESS_READ$(pakProz)
+        DIM e AS STRING : e = PROCESS_ERR$(pakProz)
+        IF a <> "" THEN ausgabeVerteilen(a)
+        IF e <> "" THEN ausgabeVerteilen(e)
+        IF NOT PROCESS_RUNNING(pakProz) THEN
+            DIM leer AS INTEGER : leer = 0
+            WHILE leer < 5
+                a = PROCESS_READ$(pakProz) : e = PROCESS_ERR$(pakProz)
+                IF a = "" AND e = "" THEN
+                    leer = leer + 1 : SLEEP(10)
+                ELSE
+                    ausgabeVerteilen(a + e) : leer = 0
+                END IF
+            WEND
+            IF ausgabeRest <> "" THEN ausgabe(ausgabeRest) : ausgabeRest = ""
+            DIM code AS INTEGER : code = PROCESS_CODE(pakProz)
+            PROCESS_CLOSE(pakProz)
+            pakProz = -1
+            pakFertig(code)
+        END IF
+    END IF
+    IF dlgPakQuelle <> 0 THEN
+        DIM aq AS INTEGER : aq = GUI_ANSWER(dlgPakQuelle)
+        IF aq = 1 THEN
+            DIM q AS STRING : q = TRIM$(GUI_DIALOG_TEXT(dlgPakQuelle))
+            dlgPakQuelle = 0
+            ' "quelle --als name" geht so weiter, wie man es tippt.
+            DIM teile AS ARRAY OF STRING : teile = []
+            DIM w AS STRING
+            FOR EACH w IN SPLIT$(q, " ")
+                IF w <> "" THEN ARRAY_PUSH(teile, w)
+            NEXT
+            IF LEN(teile) > 0 THEN pakStarten("hole", teile)
+        ELSEIF aq <> 0 THEN
+            dlgPakQuelle = 0
+        END IF
+    END IF
+    IF dlgPakEntfernen <> 0 THEN
+        DIM ae AS INTEGER : ae = GUI_ANSWER(dlgPakEntfernen)
+        IF ae = 1 THEN
+            dlgPakEntfernen = 0
+            pakStarten("entferne", [pakEntfernenName])
+        ELSEIF ae <> 0 THEN
+            dlgPakEntfernen = 0
+        END IF
+    END IF
+    IF GUI_CLICKED(btnPakHolen) THEN pakHolenFragen()
+    IF GUI_CLICKED(btnPakAlle) THEN pakStarten("hole", [])
+    IF GUI_CLICKED(btnPakErneuern) THEN pakStarten("hole", ["--erneuern"])
+    IF GUI_CLICKED(btnPakEntfernen) THEN pakEntfernenFragen()
+END SUB
+
+SUB pakHolenFragen()
+    dlgPakQuelle = GUI_PROMPT(tr$("Paket holen"), tr$("Quelle (github:nutzer/repo@stand, https-Adresse oder Ordner), dahinter wahlweise --als name:"), "github:")
+END SUB
+
+SUB pakEntfernenFragen()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstPak)
+    IF sel < 0 OR sel >= LEN(pakNamen) THEN
+        GUI_SET_TEXT(lblPakStatus, tr$("Erst ein Paket in der Liste wählen."))
+        RETURN
+    END IF
+    pakEntfernenName = pakNamen[sel]
+    dlgPakEntfernen = GUI_DIALOG(tr$("Paket entfernen"), tr$("Das Paket ") + pakEntfernenName + tr$(" aus paket.json, paket.lock.json und pakete/ nehmen?"), "janein")
+END SUB
+
+' Eine Datei aus pakete/ ist fremder Code: wer sie bearbeitet, verliert das
+' beim naechsten Holen. Das gehoert gesagt, wenn sie aufgeht.
+FUNCTION paketVon$(pfad AS STRING) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(wegGleich$(pfad), "/")
+    DIM i AS INTEGER
+    FOR i = LEN(teile) - 3 TO 0 STEP -1
+        IF teile[i] = "pakete" THEN RETURN teile[i + 1]
+    NEXT
+    RETURN ""
+END FUNCTION
+
 ' --- Git: Zweige und Beiseitelegen --------------------------------------
 DIM dlgQvZweig AS GUI_WINDOW : dlgQvZweig = 0
 DIM qvZweige AS ARRAY OF STRING : qvZweige = []
@@ -6437,7 +6668,7 @@ FUNCTION hatByref(name AS STRING) AS BOOLEAN
     DIM texte AS ARRAY OF STRING : texte = []
     IF aktiverTab >= 0 THEN ARRAY_PUSH(texte, GUI_TEXT(tabFelder[aktiverTab]))
     DIM d AS STRING
-    FOR EACH d IN projektDateien("*.dh")
+    FOR EACH d IN projektDateien("*.dh", TRUE)
         ARRAY_PUSH(texte, projektQuelle$(PATHJOIN(projektOrdner, d)))
     NEXT
     DIM q AS STRING
@@ -11963,7 +12194,7 @@ DIM klsMethoden AS ARRAY OF STRING : klsMethoden = []
 SUB klassenLesen()
     klsName = [] : klsBasis = [] : klsDatei = [] : klsMethoden = []
     DIM d AS STRING
-    FOR EACH d IN projektDateien("*.dh")
+    FOR EACH d IN projektDateien("*.dh", TRUE)
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
         DIM quelle AS STRING : quelle = projektQuelle$(pfad)
         IF quelle = "" THEN CONTINUE
@@ -16591,6 +16822,9 @@ paletteEintrag("Beim Sichern neu starten", "neustart_sichern", "")
 paletteEintrag("Profil im Code ein/aus", "profil_waerme", "") : paletteEintrag("Profil im Code entfernen", "profil_waerme_weg", "")
 paletteEintrag("Aufrufzähler über Unterprogrammen", "aufrufzaehler", "")
 paletteEintrag("Quellcodeverwaltung (git)", "git_fenster", "Strg+Alt+G")
+paletteEintrag("Pakete des Projekts", "pakete", "Strg+Alt+P")
+paletteEintrag("Paket holen ...", "paket_holen", "")
+paletteEintrag("Alle Pakete holen", "pakete_holen", "")
 paletteEintrag("Live-Vorschau", "live", "Strg+Alt+L")
 paletteEintrag("Prüfsammlung ausführen", "pruefsammlung", "Strg+Alt+F5")
 paletteEintrag("Diesen Prüffall ausführen", "prueffall", "Strg+Alt+Umschalt+F5")
@@ -16727,7 +16961,7 @@ SUB schnellOeffnen()
     paletteKennungen = []
     paletteDetails = []
     DIM d AS STRING
-    FOR EACH d IN projektDateien("*.dh")
+    FOR EACH d IN projektDateien("*.dh", TRUE)
         ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, PATHJOIN(projektOrdner, d)) : ARRAY_PUSH(paletteDetails, "")
     NEXT
     FOR EACH d IN zuletzt
@@ -17184,6 +17418,9 @@ SUB befehl(k AS STRING)
         CASE "profil_waerme_weg" : waermeEntfernen()
         CASE "aufrufzaehler" : zaehlerSetzen(NOT zaehlerAn)
         CASE "git_fenster" : qvZeigen()
+        CASE "pakete" : pakZeigen()
+        CASE "paket_holen" : pakHolenFragen()
+        CASE "pakete_holen" : pakStarten("hole", [])
         CASE "live" : liveSetzen(NOT liveAn)
         CASE "pruefsammlung" : pruefsammlungStarten(FALSE)
         CASE "prueffall" : pruefsammlungStarten(TRUE)
@@ -17380,7 +17617,7 @@ menueBefehl(miZlSort, "zl_sortieren", "") : menueBefehl(miZlDoppelt, "zl_doppelt
 menueBefehl(miZlRand, "zl_rand", "") : menueBefehl(miAndereZu, "andere_zu", "Strg+Umschalt+W") : menueBefehl(miLinien, "linien", "")
 menueBefehl(miParamNamen, "parameter_namen", "") : menueBefehl(miEinfEinr, "einfuegen_einruecken", "")
 menueBefehl(miTypen, "typ_hinweise", "") : menueBefehl(miFarbenEigen, "farben_eigen", "")
-menueBefehl(miFehlerEnde, "fehler_am_ende", "") : menueBefehl(miKopf, "blockkopf", "") : menueBefehl(miWaerme, "profil_waerme", "") : menueBefehl(miZaehler, "aufrufzaehler", "") : menueBefehl(miQv, "git_fenster", "Strg+Alt+G")
+menueBefehl(miFehlerEnde, "fehler_am_ende", "") : menueBefehl(miKopf, "blockkopf", "") : menueBefehl(miWaerme, "profil_waerme", "") : menueBefehl(miZaehler, "aufrufzaehler", "") : menueBefehl(miQv, "git_fenster", "Strg+Alt+G") : menueBefehl(miPakete, "pakete", "Strg+Alt+P")
 menueBefehl(miLive, "live", "Strg+Alt+L") : menueBefehl(miPruefsammlung, "pruefsammlung", "Strg+Alt+F5") : menueBefehl(miPrueffall, "prueffall", "Strg+Alt+Umschalt+F5")
 menueBefehl(miTestUebersicht, "test_uebersicht", "Strg+Alt+T") : menueBefehl(miNeuProjekt, "neues_projekt", "Strg+Alt+N") : menueBefehl(miEinfuehren, "einfuehren", "Strg+Alt+V")
 menueBefehl(miEinsetzen, "einsetzen", "Strg+Alt+I") : menueBefehl(miSubFunc, "sub_function", "Strg+Alt+U") : menueBefehl(miKonfMeine, "konflikt_meine", "")
@@ -17594,6 +17831,7 @@ WHILE NOT beenden
     END IF
     testNachsehen()
     qvNachziehen()
+    pakNachziehen()
     liveNachziehen()
     testUebersichtNachziehen()
     neuProjektNachziehen()

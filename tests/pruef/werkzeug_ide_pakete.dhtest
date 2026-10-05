@@ -1,0 +1,149 @@
+' Pakete in der IDE (Datei -> Pakete des Projekts, Strg+Alt+P): das Fenster
+' zeigt `dhrt paket liste` und ruft `dhrt paket -C <projekt>` als Prozess;
+' danach sind Baum, Symbolverzeichnis und Pruefung neu, ein IMPORT in ein
+' gerade geholtes Paket ist also kein Fehler mehr. Umbauten ueber das ganze
+' Projekt, Projektsuche und Projekt-Pruefung lassen `pakete/` aus (fremder
+' Code, den das naechste Holen ueberschreibt); Zur Definition und Datei
+' oeffnen sehen die Pakete weiter. Die Quelle ist ein lokaler Ordner, damit
+' der Fall ohne Netz laeuft -- unter `_quelle/`, das die IDE auslaesst; sonst
+' faende das Symbolverzeichnis die Funktion auch ohne das Paket.
+--- seriell
+--- langsam
+
+=== holen, liste, pruefung, entfernen
+DIM prBild AS INTEGER : prBild = 0
+DIM prSchritt AS INTEGER : prSchritt = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prSchritt = 0 AND prBild = 30 THEN
+    befehl("pakete")
+    pruefen()
+    prSchritt = 1
+ELSEIF prSchritt = 1 AND prBild = 34 THEN
+    pakStarten("hole", ["_quelle/werkzeug", "--als", "wz"])
+    prSchritt = 2
+ELSEIF prSchritt = 2 AND pakProz < 0 THEN
+    protokoll("pr eigene " + JOIN$(projektDateien("*.dh"), ","))
+    protokoll("pr lesend " + JOIN$(projektDateien("*.dh", TRUE), ","))
+    symbolIndexBauen(TRUE)
+    protokoll("pr symbol " + STR$(ARRAY_INDEXOF(symNamen, "verdopple") >= 0))
+    dateiOeffnen(PATHJOIN(projektOrdner, "pakete/wz/helfer.dh"))
+    ' Zurueck zu main.dh: nach dem Entfernen zeigt der IMPORT wieder ins Leere.
+    dateiOeffnen(PATHJOIN(projektOrdner, "main.dh"))
+    pakEntfernenName = "wz"
+    pakStarten("entferne", ["wz"])
+    prSchritt = 3
+ELSEIF prSchritt = 3 AND pakProz < 0 THEN
+    protokoll("pr ordner " + STR$(DIREXISTS(PATHJOIN(projektOrdner, "pakete/wz"))))
+    EXIT(0)
+END IF
+--- argumente
+main.dh
+--- umgebung
+DHRT_FRAMES=900
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+MKDIR("_quelle")
+MKDIR("_quelle/werkzeug")
+WRITEALL("_quelle/werkzeug/helfer.dh", "FUNCTION verdopple(x AS INTEGER) AS INTEGER" + CHR$(10) + "    RETURN x * 2" + CHR$(10) + "END FUNCTION" + CHR$(10))
+WRITEALL("main.dh", "IMPORT " + CHR$(34) + "wz/helfer.dh" + CHR$(34) + CHR$(10) + "PRINT verdopple(21)" + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+' Die Pruefung laeuft auch von selbst (0,6 s nach dem Oeffnen) -- gezaehlt
+' wird nur die erste nach einer Liste: die des Falls und die aus pakFertig.
+DIM nachListe AS BOOLEAN : nachListe = FALSE
+FOR i = 0 TO LEN(L) - 1
+    DIM z AS STRING : z = L[i]
+    IF LEFT$(z, 9) = "geprueft " THEN
+        IF nachListe THEN PRINT z
+        nachListe = FALSE
+    ELSEIF LEFT$(z, 3) = "pr " OR LEFT$(z, 4) = "pak " OR LEFT$(z, 10) = "paketdatei" THEN
+        PRINT z
+        nachListe = LEFT$(z, 9) = "pak liste"
+    END IF
+NEXT
+PRINT "lock " + STR$(FILEEXISTS("paket.lock.json"))
+--- erwartet
+pak liste ohne paket.json
+geprueft 1
+pak hole start _quelle/werkzeug --als wz
+pak hole 0
+pak liste 1 wz
+geprueft 0
+pr eigene main.dh,vorher.dh
+pr lesend main.dh,pakete/wz/helfer.dh,vorher.dh
+pr symbol TRUE
+paketdatei wz
+pak entferne start wz
+pak entferne 0
+pak liste 0
+geprueft 1
+pr ordner FALSE
+lock TRUE
+
+=== ohne paket.json sagt das fenster, wo sie hinkommt
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN befehl("pakete")
+IF prBild = 32 THEN
+    protokoll("pr titel " + STR$(INSTR(GUI_TEXT(lblPak), "paket.json") >= 0) + " " + STR$(GUI_WINDOW_SHOWN(winPak)))
+    protokoll("pr zeilen " + STR$(GUI_LISTBOX_COUNT(lstPak)))
+    pakEntfernenFragen()
+    protokoll("pr status " + GUI_TEXT(lblPakStatus))
+    EXIT(0)
+END IF
+--- argumente
+main.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+WRITEALL("main.dh", "PRINT 1" + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " THEN PRINT L[i]
+NEXT
+--- erwartet
+pr titel TRUE TRUE
+pr zeilen 0
+pr status Erst ein Paket in der Liste wählen.
+
+=== ein paket aus paket.json steht in der liste, auch wenn es fehlt
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 30 THEN befehl("pakete")
+IF prBild = 32 THEN
+    protokoll("pr detail " + GUI_LISTBOX_ITEM(lstPak, 0))
+    EXIT(0)
+END IF
+--- argumente
+main.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+WRITEALL("main.dh", "PRINT 1" + CHR$(10))
+WRITEALL("paket.json", "{" + CHR$(34) + "name" + CHR$(34) + ": " + CHR$(34) + "x" + CHR$(34) + ", " + CHR$(34) + "pakete" + CHR$(34) + ": {" + CHR$(34) + "kiste" + CHR$(34) + ": " + CHR$(34) + "github:a/kiste@1.0" + CHR$(34) + "}}")
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 9) = "pak liste" THEN PRINT L[i]
+NEXT
+--- erwartet
+pak liste 1 kiste
+pr detail kiste
