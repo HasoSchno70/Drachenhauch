@@ -3,8 +3,8 @@ name = "drachenhauch_runtime"
 # Die EINZIGE Stelle, die die Fassung nennt (bis 2026-09-21 standen
 # pyproject.toml und drachenhauch/__init__.py daneben). `dhrt --version`
 # und VERSION$() geben sie aus, tests/pruef/dhrt_werkzeuge.dhtest prueft
-# das. (Cargo verlangt drei Stellen, das Projekt nennt sich "2026.20".)
-version = "2026.20.0"
+# das. (Cargo verlangt drei Stellen, das Projekt nennt sich "2026.21".)
+version = "2026.21.0"
 edition = "2021"
 description = "Drachenhauch runtime (Rust): compiles and runs Drachenhauch programs -- games, GUI applications and command-line tools."
 
