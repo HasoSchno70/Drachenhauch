@@ -6,6 +6,12 @@ Stand 2026-10-05. Punkt „Kein Aufruf fremder DLLs/.so“ aus
 festhalten. Die Syntax unten steht darum in Textblöcken; sie übersetzt
 heute nicht.
 
+**Entschieden am 2026-10-05** (alle vier Fragen wie empfohlen):
+`DECLARE … LIB` statt Befehlen; deutsche Typnamen (`ZEIGER`, `TEXT`,
+`WTEXT`) mit den C-nahen (`PTR`, `CSTR`, `WSTR`) als zweiter Schreibweise;
+Rückrufe erst bei Bedarf (Stufe 3); als Schutz der deutliche Hinweis plus
+`TASK_START` für unsichere Bibliotheken, kein Schalter zum Verbieten.
+
 ## Worum es geht
 
 Drachenhauch bringt viel selbst mit (Grafik, Ton, Datenbank, Netz, PDF,
@@ -208,7 +214,7 @@ wenn ein echter Bedarf da ist.
 
 Zu jeder Stufe ein Kapitel im Lehrbuch und ein Beispiel.
 
-## Was ich dich fragen würde
+## Die Fragen dazu (entschieden, siehe oben)
 
 1. **`DECLARE … LIB`** (empfohlen) oder Befehle wie ctypes?
 2. **Typnamen:** deutsch (`ZEIGER`, `TEXT`, `WTEXT`) mit C-nahen als zweiter
