@@ -179,8 +179,12 @@ jobs:
           grep -Eq 'flags=0x[0-9a-f]+\([^)]*runtime' "$RUNNER_TEMP/signatur.txt"
           plutil -lint "$APP/Contents/Info.plist"
           test -x "$APP/Contents/MacOS/dhrt"
-          # dhrt IST das Hauptprogramm, ein Skript gibt es nicht mehr.
-          test "$(ls "$APP/Contents/MacOS")" = "dhrt"
+          # dhrt IST das Hauptprogramm, ein Skript gibt es nicht mehr. Daneben
+          # liegt nur der Ordner laufzeiten/ (die kleinen Laufzeiten fuer
+          # `dhrt --export --schlank`, seit 2026.21) -- keine weitere Datei.
+          test "$(find "$APP/Contents/MacOS" -maxdepth 1 -type f)" = "$APP/Contents/MacOS/dhrt"
+          test -x "$APP/Contents/MacOS/laufzeiten/dhrt-konsole"
+          test -x "$APP/Contents/MacOS/laufzeiten/dhrt-spiel"
           if [ -n "$DH_MAC_SIGNATUR" ]; then
             spctl --assess --type execute -vv "$APP"
             xcrun stapler validate "$DMG"
