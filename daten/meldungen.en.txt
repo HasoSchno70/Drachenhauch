@@ -1199,3 +1199,360 @@ SPRITE: unbekannte Animation '{}' (definiert: [[keine]])	SPRITE: unknown animati
 {}: der Betreff[[]] enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{}: the subject contains a line break -- that would be an extra header line and is therefore not allowed
 {}: der Anzeigename[[]] enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{}: the display name contains a line break -- that would be an extra header line and is therefore not allowed
 {}: der Dateiname[[]] enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{}: the file name contains a line break -- that would be an extra header line and is therefore not allowed
+
+# ---------------------------------------------------------------- Ton (Runde 3)
+{}: unbekannte Loop-Art '{}' (erlaubt: vorwaerts, pingpong)	{}: unknown loop kind '{}' (allowed: vorwaerts, pingpong)
+Audio-Geraet konnte nicht initialisiert werden: {}	Audio device could not be initialized: {}
+SFX-Bus konnte nicht angelegt werden: {}	SFX bus could not be created: {}
+Musik-Bus konnte nicht angelegt werden: {}	Music bus could not be created: {}
+Sprach-Bus konnte nicht angelegt werden: {}	Speech bus could not be created: {}
+{}: ungueltiges Handle {}	{}: invalid handle {}
+{}: ungueltiges oder entferntes Uhr-Handle {}	{}: invalid or removed clock handle {}
+AUDIO_LFO: unbekannte Wellenform '{}' -- erwartet sine/triangle/saw/pulse	AUDIO_LFO: unknown waveform '{}' -- expected sine/triangle/saw/pulse
+{}: ungueltiges AUDIO_MOD-Handle	{}: invalid AUDIO_MOD handle
+AUDIO_LFO_SET: dieses Handle ist ein Tweener, kein LFO	AUDIO_LFO_SET: this handle is a tweener, not an LFO
+AUDIO_LFO_WAVEFORM: dieses Handle ist ein Tweener, kein LFO	AUDIO_LFO_WAVEFORM: this handle is a tweener, not an LFO
+AUDIO_TWEENER_TO: dieses Handle ist ein LFO, kein Tweener -- ein LFO schwingt von selbst und faehrt nicht zu einem Ziel	AUDIO_TWEENER_TO: this handle is an LFO, not a tweener -- an LFO oscillates by itself and does not move to a target
+AUDIO_MOD_REMOVE: ungueltiges AUDIO_MOD-Handle	AUDIO_MOD_REMOVE: invalid AUDIO_MOD handle
+AUDIO_MODULATE: ungueltiges AUDIO_MOD-Handle	AUDIO_MODULATE: invalid AUDIO_MOD handle
+AUDIO_MODULATE: unbekannter Bus '{}' -- erwartet sfx/music/master	AUDIO_MODULATE: unknown bus '{}' -- expected sfx/music/master
+AUDIO_MODULATE: unbekanntes Ziel '{}' -- erwartet volume/pan/filter/resonance/reverb/distortion	AUDIO_MODULATE: unknown target '{}' -- expected volume/pan/filter/resonance/reverb/distortion
+AUDIO_CLOCK_NEW: Uhr konnte nicht angelegt werden (Limit erreicht?): {}	AUDIO_CLOCK_NEW: clock could not be created (limit reached?): {}
+AUDIO_CLOCK_REMOVE: ungueltiges Uhr-Handle {}	AUDIO_CLOCK_REMOVE: invalid clock handle {}
+{}: ungueltiges oder entferntes Listener-Handle {}	{}: invalid or removed listener handle {}
+{}: ungueltiges oder entferntes Emitter-Handle {}	{}: invalid or removed emitter handle {}
+AUDIO_LISTENER_NEW: Listener konnte nicht angelegt werden (Limit erreicht?): {}	AUDIO_LISTENER_NEW: listener could not be created (limit reached?): {}
+AUDIO_LISTENER_REMOVE: ungueltiges Listener-Handle {}	AUDIO_LISTENER_REMOVE: invalid listener handle {}
+AUDIO_EMITTER_NEW: Emitter konnte nicht angelegt werden (Limit erreicht?): {}	AUDIO_EMITTER_NEW: emitter could not be created (limit reached?): {}
+AUDIO_EMITTER_REMOVE: ungueltiges Emitter-Handle {}	AUDIO_EMITTER_REMOVE: invalid emitter handle {}
+AUDIO_TONE: unbekannte Waveform '{}' (erlaubt: sine, square, saw, triangle, noise)	AUDIO_TONE: unknown waveform '{}' (allowed: sine, square, saw, triangle, noise)
+AUDIO_NOTE: unbekannte Waveform '{}' (erlaubt: sine, square, saw, triangle, noise)	AUDIO_NOTE: unknown waveform '{}' (allowed: sine, square, saw, triangle, noise)
+AUDIO_NOTE: release_ms muss <= 60000 sein	AUDIO_NOTE: release_ms must be <= 60000
+AUDIO_SOUND_MIX: ziel und quelle sind derselbe Klang	AUDIO_SOUND_MIX: target and source are the same sound
+AUDIO_SOUND_NORMALIZE: spitze muss > 0 und <= 1 sein	AUDIO_SOUND_NORMALIZE: peak must be > 0 and <= 1
+AUDIO_SFX: unbekannte Waveform '{}' (erlaubt: sine, square, saw, triangle, noise)	AUDIO_SFX: unknown waveform '{}' (allowed: sine, square, saw, triangle, noise)
+AUDIO_SOUND_WAVE: anzahl muss zwischen 1 und 100000 liegen	AUDIO_SOUND_WAVE: count must be between 1 and 100000
+AUDIO_SOUND_WAVE: ungueltiges SOUND-Handle {}	AUDIO_SOUND_WAVE: invalid SOUND handle {}
+AUDIO_SAVE_WAV: bits muss 8 oder 16 sein	AUDIO_SAVE_WAV: bits must be 8 or 16
+AUDIO_SAVE_WAV: ungueltiges SOUND-Handle {}	AUDIO_SAVE_WAV: invalid SOUND handle {}
+AUDIO_SAVE_WAV: '{}' liess sich nicht schreiben -- {}	AUDIO_SAVE_WAV: '{}' could not be written -- {}
+SAMPLE_LOAD: Sample ist leer	SAMPLE_LOAD: sample is empty
+SAMPLE_SET_LOOP: ungueltiges SAMPLE-Handle {}	SAMPLE_SET_LOOP: invalid SAMPLE handle {}
+SAMPLE_NOTE: ungueltiges SAMPLE-Handle {}	SAMPLE_NOTE: invalid SAMPLE handle {}
+SAMPLE_NOTE: release_ms muss <= 60000 sein	SAMPLE_NOTE: release_ms must be <= 60000
+SAMPLE_LEN: ungueltiges SAMPLE-Handle {}	SAMPLE_LEN: invalid SAMPLE handle {}
+SAMPLE_PLAY: ungueltiges SAMPLE-Handle {}	SAMPLE_PLAY: invalid SAMPLE handle {}
+SAMPLE_PLAY: ungueltige Tonhoehe	SAMPLE_PLAY: invalid pitch
+AUDIO_MUSIC_PLAY: Modul konnte nicht gestartet werden	AUDIO_MUSIC_PLAY: module could not be started
+AUDIO_MUSIC_SEEK: MOD-/XM-Musik laesst sich nicht auf eine Sekunde setzen (ihre Zeitachse sind Pattern und Zeilen)	AUDIO_MUSIC_SEEK: MOD/XM music cannot be set to a second (its time axis is patterns and rows)
+AUDIO_MUSIC_SEEK: es laeuft keine Musik -- erst AUDIO_MUSIC_PLAY()	AUDIO_MUSIC_SEEK: no music is playing -- call AUDIO_MUSIC_PLAY() first
+
+# ---------------------------------------------------------------- Grafik (Runde 3)
+LOADFONT: unbekannter Schriftblock '{}' -- bekannt sind {} (oder eine Zeichenkette mit den gewuenschten Zeichen)	LOADFONT: unknown font block '{}' -- known are {} (or a string with the characters you want)
+{}: ungueltiges RENDERTARGET-Handle {}	{}: invalid RENDERTARGET handle {}
+LOADMODEL: '{}' nicht ladbar: {}	LOADMODEL: '{}' cannot be loaded: {}
+MODEL_LOAD_ANIMS: '{}' enthaelt keine Animationen	MODEL_LOAD_ANIMS: '{}' contains no animations
+{}: ungueltiges ANIM_SET-Handle {}	{}: invalid ANIM_SET handle {}
+MODEL_ANIM_COUNT: ungueltiges ANIM_SET-Handle {}	MODEL_ANIM_COUNT: invalid ANIM_SET handle {}
+{}: '{}' muss eine endliche Zahl > 0 sein, erhalten {}	{}: '{}' must be a finite number > 0, got {}
+MESH_CUBICMAP: eine Karte von {}x{} Punkten ist zu gross (hoechstens eine Million)	MESH_CUBICMAP: a map of {}x{} pixels is too large (at most one million)
+{}: ungueltiges MODEL-Handle {}	{}: invalid MODEL handle {}
+MODEL_TEXTURE: Modell hat kein Material	MODEL_TEXTURE: model has no material
+MODEL_SAVE: geschrieben wird Wavefront-OBJ, der Name muss auf .obj enden, nicht '{}'	MODEL_SAVE: the file is written as Wavefront OBJ, the name must end in .obj, not '{}'
+MODEL_SAVE: das Modell hat keine Eckpunkte	MODEL_SAVE: the model has no vertices
+BILLBOARD_PART: Breite und Hoehe des Ausschnitts muessen groesser als 0 sein	BILLBOARD_PART: width and height of the section must be greater than 0
+LIGHT_ENV_HDR: Cubemap-Shader nicht ladbar (auf dieser Grafik-Schnittstelle nicht uebersetzbar, z.B. WebGL)	LIGHT_ENV_HDR: cubemap shader cannot be loaded (does not compile on this graphics interface, e.g. WebGL)
+LIGHT_ENV_HDR: Prefilter-Shader nicht ladbar	LIGHT_ENV_HDR: prefilter shader cannot be loaded
+LIGHT_ENV_HDR: BRDF-Shader nicht ladbar	LIGHT_ENV_HDR: BRDF shader cannot be loaded
+SKYBOX_IMAGE: ein Bild von {}x{} ist keine Cubemap -- erwartet ein Kreuz (4:3 oder 3:4) oder einen Streifen aus sechs Feldern (6:1 oder 1:6)	SKYBOX_IMAGE: an image of {}x{} is not a cubemap -- expected a cross (4:3 or 3:4) or a strip of six faces (6:1 or 1:6)
+LIGHT_SET_POS: ungueltiger Licht-Index	LIGHT_SET_POS: invalid light index
+LIGHT_SET_COLOR: ungueltiger Licht-Index	LIGHT_SET_COLOR: invalid light index
+LIGHT_SET_ENABLED: ungueltiger Licht-Index	LIGHT_SET_ENABLED: invalid light index
+DRAWIMAGE9: die Raender duerfen nicht negativ sein	DRAWIMAGE9: the borders must not be negative
+IMAGE_FROM_BUFFER: die Bytes sind kein bekanntes Bildformat (PNG, JPG, BMP, GIF, QOI, DDS)	IMAGE_FROM_BUFFER: the bytes are not a known image format (PNG, JPG, BMP, GIF, QOI, DDS)
+IMAGE_FROM_BUFFER: {} liess sich nicht lesen ({})	IMAGE_FROM_BUFFER: {} could not be read ({})
+IMAGE_FROM_BUFFER: {} liess sich nicht lesen	IMAGE_FROM_BUFFER: {} could not be read
+IMAGE_TO_BUFFER: raylib hat nichts geschrieben	IMAGE_TO_BUFFER: raylib wrote nothing
+{}: Breite*Hoehe ueberschreitet das Limit von {} Pixeln (erhalten {}x{})	{}: width*height exceeds the limit of {} pixels (got {}x{})
+FONT_STYLE: ungueltiges FONT-Handle {}	FONT_STYLE: invalid FONT handle {}
+LOADFONT: Font nicht ladbar: {}	LOADFONT: font cannot be loaded: {}
+LOADFONT: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
+DHRT_FONT nicht ladbar: {}	DHRT_FONT cannot be loaded: {}
+SETFONT: ungueltiges FONT-Handle {}	SETFONT: invalid FONT handle {}
+LOADFONT_SDF: Font nicht ladbar: {}	LOADFONT_SDF: font cannot be loaded: {}
+LOADFONT_SDF: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT_SDF: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
+LOADFONT_SDF: der Schrift-Shader liess sich nicht uebersetzen	LOADFONT_SDF: the font shader could not be compiled
+{}: ungueltiges FONT-Handle {}	{}: invalid FONT handle {}
+FONT_TO_IMAGE: die Zeichen {}..{} gehen nicht -- hoechstens 256, das erste nicht nach dem letzten (so viele liest LOADFONT_IMAGE)	FONT_TO_IMAGE: the characters {}..{} do not work -- at most 256, the first not after the last (that is how many LOADFONT_IMAGE reads)
+{}: ungueltiges IMAGE-Handle {}	{}: invalid IMAGE handle {}
+IMAGE_CONVOLVE: Kern muss quadratisch sein (9 = 3x3, 25 = 5x5, ...), hat aber {} Werte	IMAGE_CONVOLVE: the kernel must be square (9 = 3x3, 25 = 5x5, ...), but has {} values
+IMAGE_CONVOLVE: Kern-Seitenlaenge muss ungerade sein (3, 5, 7, ...), ist {}	IMAGE_CONVOLVE: the kernel side must be odd (3, 5, 7, ...), is {}
+IMAGE_DITHER: nur 5,6,5,0 (RGB565) / 5,5,5,1 (RGB5551) / 4,4,4,4 (RGBA4444) moeglich -- bekam {},{},{},{}	IMAGE_DITHER: only 5,6,5,0 (RGB565) / 5,5,5,1 (RGB5551) / 4,4,4,4 (RGBA4444) are possible -- got {},{},{},{}
+{}: eine SDF-Schrift (LOADFONT_SDF) laesst sich nicht in ein Bild schreiben -- dort waere ihr Abstandsfeld zu sehen; dieselbe Datei mit LOADFONT laden	{}: an SDF font (LOADFONT_SDF) cannot be written into an image -- its distance field would show; load the same file with LOADFONT
+{}: der Text ist leer	{}: the text is empty
+{}: der Text ergibt kein Bild	{}: the text gives no image
+IMAGE_LOAD_GIF: '{}' liess sich nicht als Bild lesen	IMAGE_LOAD_GIF: '{}' could not be read as an image
+IMAGE_CHANNEL: der Kanal ist 0 (rot), 1 (gruen), 2 (blau) oder 3 (Deckkraft), nicht {}	IMAGE_CHANNEL: the channel is 0 (red), 1 (green), 2 (blue) or 3 (opacity), not {}
+IMAGE_CHANNEL: raylib hat kein Bild geliefert	IMAGE_CHANNEL: raylib returned no image
+IMAGE_DRAW_IMAGE: Quellbreite und -hoehe muessen > 0 sein	IMAGE_DRAW_IMAGE: source width and height must be > 0
+IMAGE_SAVE_GIF: Bildgroesse {}x{} geht nicht	IMAGE_SAVE_GIF: image size {}x{} does not work
+IMAGE_SAVE: '{}' liess sich nicht schreiben (Verzeichnis vorhanden? schreibbar?)	IMAGE_SAVE: '{}' could not be written (does the folder exist? is it writable?)
+LOAD_ASSETS: Manifest nicht gefunden: {}	LOAD_ASSETS: manifest not found: {}
+LOAD_ASSETS: Pfad muss STRING sein	LOAD_ASSETS: path must be a STRING
+ATLAS_LOAD: Manifest nicht gefunden: {}	ATLAS_LOAD: manifest not found: {}
+ATLAS_LOAD: 'image' fehlt im Manifest	ATLAS_LOAD: 'image' is missing from the manifest
+ATLAS_LOAD: rect muss [x,y,w,h] sein	ATLAS_LOAD: rect must be [x,y,w,h]
+ATLAS_DRAW: ungueltiges Atlas-Handle	ATLAS_DRAW: invalid atlas handle
+ATLAS_DRAW: Sprite '{}' nicht im Atlas	ATLAS_DRAW: sprite '{}' is not in the atlas
+AUTOMATION_RECORD: Dateiname fehlt	AUTOMATION_RECORD: file name is missing
+AUTOMATION_STOP: '{}' nicht schreibbar	AUTOMATION_STOP: '{}' is not writable
+AUTOMATION_PLAY: laeuft noch eine Aufnahme (erst AUTOMATION_STOP)	AUTOMATION_PLAY: a recording is still running (call AUTOMATION_STOP first)
+MOUSE_CURSOR: unbekannte Form '{}' -- erwartet {} oder auto	MOUSE_CURSOR: unknown shape '{}' -- expected {} or auto
+{}: das Bild ist {}x{} gross -- ein Zeiger darf hoechstens 256x256 sein (ueblich sind 32x32)	{}: the image is {}x{} -- a pointer may be at most 256x256 (32x32 is usual)
+{}: der Brennpunkt {},{} liegt nicht im Bild ({}x{})	{}: the hot spot {},{} is not inside the image ({}x{})
+OPENURL: nur http:// und https:// erlaubt (bekam '{}')	OPENURL: only http:// and https:// are allowed (got '{}')
+SHADER_SET_ARRAY: Werte-Array ist leer	SHADER_SET_ARRAY: the value array is empty
+SHADER_SET_ARRAY: ungueltiges SHADER-Handle	SHADER_SET_ARRAY: invalid SHADER handle
+SHADER_SET_TEXTURE: ungueltiges SHADER-Handle	SHADER_SET_TEXTURE: invalid SHADER handle
+SHADER_SET_MATRIX: ungueltiges SHADER-Handle	SHADER_SET_MATRIX: invalid SHADER handle
+unerwartetes Ende im Header	unexpected end in the header
+unerwartete Aufloesungszeile '{}'	unexpected resolution line '{}'
+Hoehe ungueltig	invalid height
+Breite ungueltig	invalid width
+ungueltige Dimension	invalid dimension
+
+# ---------------------------------------------------------------- gui (Runde 3)
+Die Eingabe hat nicht das erwartete Format	The input does not have the expected format
+GUI_RULE: ungueltiges Muster '{}': {}	GUI_RULE: invalid pattern '{}': {}
+{}: Sinnbild '{}' gibt es nicht -- bekannt sind: {}	{}: there is no icon '{}' -- known are: {}
+Tastenkuerzel '{}': Taste '{}' unbekannt -- Buchstabe, Ziffer, F1..F12, Entf, Einfg, Pos1, Ende, Bild auf/ab, Leer, Enter, Esc, Tab, Rueck, Links/Rechts/Hoch/Runter, Plus, Minus, Punkt, Komma	Shortcut '{}': key '{}' unknown -- letter, digit, F1..F12, Del, Ins, Home, End, PgUp/PgDn, Space, Enter, Esc, Tab, Backspace, Left/Right/Up/Down, Plus, Minus, Period, Comma
+Tastenkuerzel '{}': Taste '{}' unbekannt	Shortcut '{}': key '{}' unknown
+Tastenkuerzel '{}': keine Taste angegeben	Shortcut '{}': no key given
+GUI_SCALE: Faktor muss zwischen 0.5 und 4.0 liegen	GUI_SCALE: the factor must be between 0.5 and 4.0
+GUI_SCALE: erst den Massstab setzen, dann Fenster und Widgets anlegen (bereits angelegte werden nicht umgerechnet)	GUI_SCALE: set the scale first, then create windows and widgets (existing ones are not converted)
+{}: ungueltiges GUI_WINDOW-Handle	{}: invalid GUI_WINDOW handle
+{}: ungueltiges GUI_WIDGET-Handle	{}: invalid GUI_WIDGET handle
+GUI_DIALOG_TEXT: ungueltiges GUI_WINDOW-Handle	GUI_DIALOG_TEXT: invalid GUI_WINDOW handle
+GUI_DIALOG_TEXT: das Fenster ist kein Dialog (GUI_PROMPT)	GUI_DIALOG_TEXT: the window is not a dialog (GUI_PROMPT)
+GUI_DIALOG_TEXT: dieser Dialog hat kein Eingabefeld (nur GUI_PROMPT)	GUI_DIALOG_TEXT: this dialog has no input field (only GUI_PROMPT)
+GUI_WINDOW_MODAL: ungueltiges Fenster-Handle {}	GUI_WINDOW_MODAL: invalid window handle {}
+GUI_WINDOW_MODAL: ein Dialog ist schon modal	GUI_WINDOW_MODAL: a dialog is already modal
+GUI_ANSWER: ungueltiges GUI_WINDOW-Handle	GUI_ANSWER: invalid GUI_WINDOW handle
+GUI_ANSWER: das Fenster ist kein Dialog (GUI_DIALOG/GUI_PROMPT)	GUI_ANSWER: the window is not a dialog (GUI_DIALOG/GUI_PROMPT)
+GUI_PICKED_COLOR: das Widget ist kein GUI_COLORPICKER	GUI_PICKED_COLOR: the widget is not a GUI_COLORPICKER
+GUI_SET_PICKED_COLOR: das Widget ist kein GUI_COLORPICKER	GUI_SET_PICKED_COLOR: the widget is not a GUI_COLORPICKER
+GUI_COLORPICKER_SET: das Widget ist kein GUI_COLORPICKER	GUI_COLORPICKER_SET: the widget is not a GUI_COLORPICKER
+GUI_COLORPICKER_SET: '{}' unbekannt -- moeglich ist alpha	GUI_COLORPICKER_SET: '{}' unknown -- possible is alpha
+GUI_DATEPICKER_SET: das Widget ist kein GUI_DATEPICKER	GUI_DATEPICKER_SET: the widget is not a GUI_DATEPICKER
+GUI_DATEPICKER_SET: '{}' unbekannt -- moeglich ist wochenbeginn	GUI_DATEPICKER_SET: '{}' unknown -- possible is wochenbeginn
+GUI_DATE_RANGE: {} '{}' ist kein Datum -- erwartet JJJJ-MM-TT	GUI_DATE_RANGE: {} '{}' is not a date -- expected YYYY-MM-DD
+GUI_DATE_RANGE: das Widget ist kein GUI_DATEPICKER	GUI_DATE_RANGE: the widget is not a GUI_DATEPICKER
+GUI_DATE: das Widget ist kein GUI_DATEPICKER	GUI_DATE: the widget is not a GUI_DATEPICKER
+GUI_SET_DATE: '{}' ist kein Datum -- erwartet JJJJ-MM-TT (wie DATE$())	GUI_SET_DATE: '{}' is not a date -- expected YYYY-MM-DD (like DATE$())
+GUI_SET_DATE: das Widget ist kein GUI_DATEPICKER	GUI_SET_DATE: the widget is not a GUI_DATEPICKER
+{}: das Widget ist kein GUI_TEXTAREA	{}: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_SPANS: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_SPANS: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_SQUIGGLES: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_SQUIGGLES: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_HINTS: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_HINTS: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_MARKS: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_MARKS: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_LINE_COLORS: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_LINE_COLORS: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_LINE_COLORS_GET: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_LINE_COLORS_GET: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_MARKS_GET: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_MARKS_GET: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_FOLDABLE: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_FOLDABLE: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_FOLD: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_FOLD: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_FOLD_ALL: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_FOLD_ALL: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_FOLDED: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_FOLDED: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_FOLDS: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_FOLDS: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_SWATCHES: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_SWATCHES: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_ABBREV: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_ABBREV: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_INDENT_WORDS: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_INDENT_WORDS: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_CLOSE_WORDS: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_CLOSE_WORDS: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_BACKGROUND: erwartet einen Textbereich	GUI_TEXTAREA_BACKGROUND: expects a text area
+GUI_TEXTAREA_SET: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_SET: the widget is not a GUI_TEXTAREA
+GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug, einzugslinien, tab_meldet, kopfzeilen, hinweise_klickbar	GUI_TEXTAREA_SET: '{}' unknown -- possible are zeilennummern, aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug, einzugslinien, tab_meldet, kopfzeilen, hinweise_klickbar
+{}: erwartet GUI_WINDOW	{}: expects a GUI_WINDOW
+GUI_WINDOW_GLOW: die Dauer muss groesser als 0 ms sein	GUI_WINDOW_GLOW: the duration must be greater than 0 ms
+{}: '{}' erwartet eine Zahl	{}: '{}' expects a number
+{}: die Dauer muss groesser als 0 ms sein	{}: the duration must be greater than 0 ms
+{}: art ist streif, lampe oder rahmen (nicht '{}')	{}: art is streif, lampe or rahmen (not '{}')
+{}: richtung ist rechts, links, unten oder oben (nicht '{}')	{}: richtung is rechts, links, unten or oben (not '{}')
+{}: unbekannter Schluessel '{}' (bekannt: {})	{}: unknown key '{}' (known: {})
+GUI_WINDOW_ZOOM: nur fuer ein Fenster im Entwurfsmodus (GUI_WINDOW_DESIGN) -- es nimmt sonst Eingaben an, und die Maus traefe daneben	GUI_WINDOW_ZOOM: only for a window in design mode (GUI_WINDOW_DESIGN) -- otherwise it takes input, and the mouse would miss
+GUI_WINDOW_GET_ZOOM: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_GET_ZOOM: invalid GUI_WINDOW handle
+GUI_WINDOW_CLOSED: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_CLOSED: invalid GUI_WINDOW handle
+GUI_SPLITTER: orientation muss "v"/"vertical" oder "h"/"horizontal" sein	GUI_SPLITTER: orientation must be "v"/"vertical" or "h"/"horizontal"
+GUI_RADIO_SELECTED: Widget ist kein radio	GUI_RADIO_SELECTED: widget is not a radio button
+GUI_SET_IMAGE: Widget ist kein image und keine Kachel	GUI_SET_IMAGE: widget is neither an image nor a card
+GUI_CARD_SET_TEXT: Widget ist keine Kachel (GUI_CARD)	GUI_CARD_SET_TEXT: widget is not a card (GUI_CARD)
+GUI_CARD_TEXT$: Widget ist keine Kachel (GUI_CARD)	GUI_CARD_TEXT$: widget is not a card (GUI_CARD)
+GUI_SET_ICON: Widget ist kein button	GUI_SET_ICON: widget is not a button
+{}: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	{}: widget is not a toolbar (GUI_TOOLBAR)
+{}: Eintrag {} gibt es nicht ({} Eintraege)	{}: there is no entry {} ({} entries)
+GUI_TOOLBAR_CHECKABLE: Eintrag {} ist kein Knopf	GUI_TOOLBAR_CHECKABLE: entry {} is not a button
+GUI_TOOLBAR_SET_CHECKED: Eintrag {} ist nicht kippbar (erst GUI_TOOLBAR_CHECKABLE)	GUI_TOOLBAR_SET_CHECKED: entry {} cannot be toggled (call GUI_TOOLBAR_CHECKABLE first)
+GUI_TOOLBAR_SET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse	GUI_TOOLBAR_SET: unknown setting '{}' -- known are: beschriftung, symbolgroesse
+GUI_TOOLBAR_ITEM_X: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	GUI_TOOLBAR_ITEM_X: widget is not a toolbar (GUI_TOOLBAR)
+GUI_TOOLBAR_ITEM_X: Eintrag {} gibt es nicht	GUI_TOOLBAR_ITEM_X: there is no entry {}
+GUI_TOOLBAR_OVERFLOW: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)	GUI_TOOLBAR_OVERFLOW: widget is not a toolbar (GUI_TOOLBAR)
+{}: Widget ist keine Statusleiste (GUI_STATUSBAR)	{}: widget is not a status bar (GUI_STATUSBAR)
+{}: Feld {} gibt es nicht ({} Felder)	{}: there is no field {} ({} fields)
+{}: Ausrichtung '{}' gibt es nicht -- links, mitte, rechts	{}: there is no alignment '{}' -- links, mitte, rechts
+GUI_STATUSBAR_ADD: Breite muss >= 0 sein (0 = teilt sich den Rest)	GUI_STATUSBAR_ADD: width must be >= 0 (0 = shares the rest)
+GUI_STATUSBAR_FIELD_X: Widget ist keine Statusleiste (GUI_STATUSBAR)	GUI_STATUSBAR_FIELD_X: widget is not a status bar (GUI_STATUSBAR)
+GUI_STATUSBAR_FIELD_X: Feld {} gibt es nicht	GUI_STATUSBAR_FIELD_X: there is no field {}
+{}: Widget ist keine Pfadleiste (GUI_BREADCRUMB)	{}: widget is not a breadcrumb bar (GUI_BREADCRUMB)
+{}: Teil {} gibt es nicht ({} Teile)	{}: there is no part {} ({} parts)
+GUI_BREADCRUMB_FIRST_VISIBLE: Widget ist keine Pfadleiste (GUI_BREADCRUMB)	GUI_BREADCRUMB_FIRST_VISIBLE: widget is not a breadcrumb bar (GUI_BREADCRUMB)
+GUI_CANVAS_*: Widget ist kein canvas	GUI_CANVAS_*: widget is not a canvas
+{}: Widget ist kein dropdown/listbox	{}: widget is not a dropdown/listbox
+{}: das Widget ist keine Liste (GUI_LISTBOX)	{}: the widget is not a list (GUI_LISTBOX)
+{}: Eintrag {} gibt es nicht (die Liste hat {})	{}: there is no entry {} (the list has {})
+GUI_DOUBLE_CLICKED: nur fuer Listen, Tabellen und Baeume (GUI_LISTBOX, GUI_TABLE, GUI_TREE)	GUI_DOUBLE_CLICKED: only for lists, tables and trees (GUI_LISTBOX, GUI_TABLE, GUI_TREE)
+{}: starts, laengen und farben muessen gleich lang sein ({}, {}, {})	{}: starts, lengths and colors must have the same length ({}, {}, {})
+{}: ein Dateibaum benennt keine Dateien um -- das Programm tut es (RENAME) und der Baum zeigt es	{}: a file tree does not rename files -- the program does it (RENAME) and the tree shows it
+{}: Knoten {} gibt es nicht	{}: there is no node {}
+{}: Knoten {} ist zugeklappt -- erst GUI_TREE_EXPAND auf seine Eltern	{}: node {} is collapsed -- call GUI_TREE_EXPAND on its parents first
+GUI_BUTTON_VARIANT: Knopfart '{}' gibt es nicht -- bekannt sind: {}	GUI_BUTTON_VARIANT: there is no button kind '{}' -- known are: {}
+GUI_BUTTON_VARIANT: Widget ist kein Knopf	GUI_BUTTON_VARIANT: widget is not a button
+{}: Widget ist keine Tabelle	{}: widget is not a table
+{}: Zeile {} gibt es nicht (0..{})	{}: there is no row {} (0..{})
+{}: Spalte {} gibt es nicht (0..{})	{}: there is no column {} (0..{})
+GUI_TABLE_CELL_ALIGN: '{}' unbekannt -- links, mitte oder rechts	GUI_TABLE_CELL_ALIGN: '{}' unknown -- links, mitte or rechts
+GUI_TABLE_ROW_COLOR: Zeile {} gibt es nicht (0..{})	GUI_TABLE_ROW_COLOR: there is no row {} (0..{})
+GUI_TABLE_CELL_KIND: '{}' unbekannt -- text, bild, haken, balken, knopf	GUI_TABLE_CELL_KIND: '{}' unknown -- text, bild, haken, balken, knopf
+GUI_TABLE_COL_ALIGN: '{}' unbekannt -- links, mitte oder rechts	GUI_TABLE_COL_ALIGN: '{}' unknown -- links, mitte or rechts
+GUI_TABLE_COL_ALIGN: Spalte darf nicht negativ sein	GUI_TABLE_COL_ALIGN: column must not be negative
+GUI_TABLE_REMOVE_ROW: Zeile {} gibt es nicht (0..{})	GUI_TABLE_REMOVE_ROW: there is no row {} (0..{})
+GUI_TABLE_SET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, zellmodus, zeilen_anhaengen	GUI_TABLE_SET: '{}' unknown -- zeilenhoehe, kopfhoehe, zebra, gitter, filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, zellmodus, zeilen_anhaengen
+{}: Zelle ({}, {}) gibt es nicht -- {} Zeilen, {} Spalten	{}: there is no cell ({}, {}) -- {} rows, {} columns
+GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl	GUI_TABLE_COL_TYPE: '{}' unknown -- text, ganz, zahl, auswahl
+GUI_TABLE_GET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, zellmodus, zeilen_anhaengen, spalten	GUI_TABLE_GET: '{}' unknown -- zeilenhoehe, kopfhoehe, zebra, gitter, filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, zellmodus, zeilen_anhaengen, spalten
+GUI_TABLE_MOVE_COL: Position ausserhalb 0..{}	GUI_TABLE_MOVE_COL: position outside 0..{}
+GUI_TABLE_SELECT: Zeile {} gibt es nicht (0..{})	GUI_TABLE_SELECT: there is no row {} (0..{})
+GUI_TABLE_COL_EDIT: Spalte darf nicht negativ sein	GUI_TABLE_COL_EDIT: column must not be negative
+GUI_TABLE_FILTER: Spalte darf nicht negativ sein	GUI_TABLE_FILTER: column must not be negative
+{}: Widget ist kein Baum	{}: widget is not a tree
+GUI_TREE_ADD: ungueltiger parent {}	GUI_TREE_ADD: invalid parent {}
+GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl, kaestchen, bearbeitbar)	GUI_TREE_SET: unknown setting '{}' (valid: mehrfachauswahl, kaestchen, bearbeitbar)
+GUI_TREE_SELECT: ungueltige Knoten-id {}	GUI_TREE_SELECT: invalid node id {}
+GUI_TREE_LABEL: ungueltige Knoten-id {}	GUI_TREE_LABEL: invalid node id {}
+GUI_TREE_EXPAND: ungueltige Knoten-id {}	GUI_TREE_EXPAND: invalid node id {}
+GUI_TREE_CHECKED: ungueltige Knoten-id {}	GUI_TREE_CHECKED: invalid node id {}
+GUI_TREE_SET_CHECKED: ungueltige Knoten-id {}	GUI_TREE_SET_CHECKED: invalid node id {}
+{}: Widget ist kein Dateibaum (GUI_FILETREE)	{}: widget is not a file tree (GUI_FILETREE)
+GUI_FILETREE_SET: unbekannte Einstellung '{}' (gueltig: ordner_zuerst, verborgene, nur_ordner, mehrfachauswahl, kaestchen, auffrischen)	GUI_FILETREE_SET: unknown setting '{}' (valid: ordner_zuerst, verborgene, nur_ordner, mehrfachauswahl, kaestchen, auffrischen)
+{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)	{}: widget is not a tab control (GUI_TABCONTROL)
+GUI_TABCONTROL_SET_PAGE: Seite {} gibt es nicht	GUI_TABCONTROL_SET_PAGE: there is no page {}
+GUI_TABCONTROL_SET_TITLE: Seite {} gibt es nicht	GUI_TABCONTROL_SET_TITLE: there is no page {}
+GUI_TABCONTROL_ADD_WIDGET: das Reiterwerk kann nicht sein eigenes Kind sein	GUI_TABCONTROL_ADD_WIDGET: the tab control cannot be its own child
+GUI_TABCONTROL_ADD_WIDGET: Seite {} gibt es nicht (erst GUI_TABCONTROL_ADD)	GUI_TABCONTROL_ADD_WIDGET: there is no page {} (call GUI_TABCONTROL_ADD first)
+GUI_TABCONTROL_REMOVE: Seite {} gibt es nicht	GUI_TABCONTROL_REMOVE: there is no page {}
+{}: Widget ist kein Akkordeon (GUI_ACCORDION)	{}: widget is not an accordion (GUI_ACCORDION)
+{}: Abschnitt {} gibt es nicht (erst GUI_ACCORDION_ADD)	{}: there is no section {} (call GUI_ACCORDION_ADD first)
+{}: das Akkordeon kann nicht sein eigenes Kind sein	{}: the accordion cannot be its own child
+{}: das Kind muss NACH dem Akkordeon angelegt sein, sonst zeichnet es darunter	{}: the child must be created AFTER the accordion, otherwise it is drawn underneath
+GUI_ACCORDION_SET: unbekannter Schluessel '{}' (erlaubt: mehrere)	GUI_ACCORDION_SET: unknown key '{}' (allowed: mehrere)
+{}: Widget ist kein Assistent (GUI_WIZARD)	{}: widget is not a wizard (GUI_WIZARD)
+GUI_WIZARD_SET_STEP: Schritt {} gibt es nicht	GUI_WIZARD_SET_STEP: there is no step {}
+{}: der Assistent kann nicht sein eigenes Kind sein	{}: the wizard cannot be its own child
+{}: Schritt {} gibt es nicht (erst GUI_WIZARD_ADD)	{}: there is no step {} (call GUI_WIZARD_ADD first)
+GUI_WIZARD_SET: unbekannter Schluessel '{}' (erlaubt: pruefen)	GUI_WIZARD_SET: unknown key '{}' (allowed: pruefen)
+{}: Tabelle ist kein Baum (GUI_TREETABLE oder GUI_TABLE_SET(t, "baum", 1))	{}: the table is not a tree (GUI_TREETABLE or GUI_TABLE_SET(t, "baum", 1))
+{}: Zeile {} gibt es nicht	{}: there is no row {}
+{}: Zeile {} kann nicht unter sich selbst oder ihren Nachkommen haengen	{}: row {} cannot hang under itself or its descendants
+{}: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)	{}: widget is not a time picker (GUI_TIMEPICKER)
+GUI_TIME: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)	GUI_TIME: widget is not a time picker (GUI_TIMEPICKER)
+GUI_SET_TIME: '{}' ist keine Uhrzeit (HH:MM oder HH:MM:SS)	GUI_SET_TIME: '{}' is not a time of day (HH:MM or HH:MM:SS)
+GUI_SET_TIME: '{}' liegt ausserhalb von 00:00:00 bis 23:59:59	GUI_SET_TIME: '{}' is outside 00:00:00 to 23:59:59
+GUI_TIMEPICKER_SET: unbekannte Einstellung '{}' (gueltig: sekunden, schritt)	GUI_TIMEPICKER_SET: unknown setting '{}' (valid: sekunden, schritt)
+{}: Widget ist kein gesetzter Text (GUI_RICHTEXT)	{}: widget is not a rich text (GUI_RICHTEXT)
+GUI_RICHTEXT_SET: unbekannte Einstellung '{}' (gueltig: groesse, codeschrift, {})	GUI_RICHTEXT_SET: unknown setting '{}' (valid: groesse, codeschrift, {})
+{}: erwartet GUI_MENU/GUI_CONTEXT	{}: expects GUI_MENU/GUI_CONTEXT
+{}: ungueltiges Menue-Handle	{}: invalid menu handle
+{}: erwartet einen Menue-Eintrag (von GUI_MENU_ITEM)	{}: expects a menu item (from GUI_MENU_ITEM)
+{}: ungueltiges Eintrags-Handle	{}: invalid item handle
+GUI_MENU_ENABLE: eine Trennlinie laesst sich nicht schalten	GUI_MENU_ENABLE: a separator cannot be switched
+GUI_MENU_CHECKED: erwartet einen Menue-Eintrag	GUI_MENU_CHECKED: expects a menu item
+GUI_MENU_CHECKED: ungueltiges Eintrags-Handle	GUI_MENU_CHECKED: invalid item handle
+GUI_CHECKED: Widget ist keine checkbox/radio/toggle	GUI_CHECKED: widget is not a checkbox/radio/toggle
+GUI_VALUE: Widget ist kein slider/progress/spinner/splitter/knob	GUI_VALUE: widget is not a slider/progress/spinner/splitter/knob
+GUI_SET_CHECKED: Widget ist keine checkbox/radio/toggle	GUI_SET_CHECKED: widget is not a checkbox/radio/toggle
+GUI_SET_VALUE: Widget ist kein slider/progress/spinner/splitter	GUI_SET_VALUE: widget is not a slider/progress/spinner/splitter
+GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree	GUI_ON_CHANGE: only for slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter or tree
+GUI_SKIN: unbekannte Widget-Art '{}'	GUI_SKIN: unknown widget kind '{}'
+GUI_SET_COLOR: role muss bg/fg/border/accent/hover/pressed sein	GUI_SET_COLOR: role must be bg/fg/border/accent/hover/pressed
+GUI_STYLE_SET: prop muss bg/fg/border/accent/hover/pressed/font/font_size sein	GUI_STYLE_SET: prop must be bg/fg/border/accent/hover/pressed/font/font_size
+GUI_APPLY_STYLE: unbekannter Style '{}'	GUI_APPLY_STYLE: unknown style '{}'
+GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_GET_*: invalid GUI_WINDOW handle
+GUI_WINDOW_WIDGET_COUNT: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET_COUNT: invalid GUI_WINDOW handle
+GUI_WINDOW_WIDGET: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET: invalid GUI_WINDOW handle
+GUI_SET_ALIGN: '{}' unbekannt -- links, mitte oder rechts	GUI_SET_ALIGN: '{}' unknown -- links, mitte or rechts
+GUI_SET_ALIGN: nur Beschriftung, Knopf und Textfeld haben eine Ausrichtung	GUI_SET_ALIGN: only labels, buttons and text fields have an alignment
+GUI_SET_WRAP: breite muss >= 0 sein (0 = aus)	GUI_SET_WRAP: width must be >= 0 (0 = off)
+GUI_SET_WRAP: nur eine Beschriftung (GUI_LABEL) kann umbrechen	GUI_SET_WRAP: only a label (GUI_LABEL) can wrap
+GUI_TEXTINPUT_SET: das Widget ist kein GUI_TEXTINPUT	GUI_TEXTINPUT_SET: the widget is not a GUI_TEXTINPUT
+GUI_TEXTINPUT_SET: maxlaenge muss >= 0 sein (0 = frei)	GUI_TEXTINPUT_SET: maxlaenge must be >= 0 (0 = unlimited)
+GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl) oder 2 (Kommazahl)	GUI_TEXTINPUT_SET: zahlen is 0 (any), 1 (whole number) or 2 (decimal number)
+GUI_ON_ENTER: nur ein Textfeld (GUI_TEXTINPUT) meldet Enter	GUI_ON_ENTER: only a text field (GUI_TEXTINPUT) reports Enter
+{}: ungueltiges Fenster-Handle {}	{}: invalid window handle {}
+{}: ungueltiges Widget-Handle {}	{}: invalid widget handle {}
+{}: nur ein Knopf (GUI_BUTTON) kann Standard- oder Abbrechen-Knopf sein	{}: only a button (GUI_BUTTON) can be the default or cancel button
+GUI_LAYOUT: '{}' ist keine Art -- zeile, spalte oder raster:N	GUI_LAYOUT: '{}' is not a kind -- zeile, spalte or raster:N
+{}: das Widget ist kein Layout (GUI_LAYOUT)	{}: the widget is not a layout (GUI_LAYOUT)
+GUI_LAYOUT_ADD: ein Layout kann sich nicht selbst aufnehmen	GUI_LAYOUT_ADD: a layout cannot contain itself
+GUI_LAYOUT_ADD: das Widget ist ein Behaelter, in dem dieses Layout schon steckt	GUI_LAYOUT_ADD: the widget is a container this layout is already in
+GUI_LAYOUT_SET: ausrichtung ist 0 (Anfang), 1 (Mitte) oder 2 (Ende)	GUI_LAYOUT_SET: ausrichtung is 0 (start), 1 (middle) or 2 (end)
+GUI_LAYOUT_MIN_W: Widget ist kein Layout-Behaelter	GUI_LAYOUT_MIN_W: widget is not a layout container
+GUI_LOAD: unbekannter Widget-Typ '{}'	GUI_LOAD: unknown widget type '{}'
+GUI_SAVE/GUI_TO_JSON: ungueltiges GUI_WINDOW-Handle	GUI_SAVE/GUI_TO_JSON: invalid GUI_WINDOW handle
+GUI_LOAD: ungueltiges JSON: {}	GUI_LOAD: invalid JSON: {}
+GUI_TABS: erwartet GUI_WINDOW	GUI_TABS: expects a GUI_WINDOW
+GUI_WINDOW_SHOWN: erwartet GUI_WINDOW	GUI_WINDOW_SHOWN: expects a GUI_WINDOW
+GUI_ACTIVE_TAB: erwartet GUI_WINDOW	GUI_ACTIVE_TAB: expects a GUI_WINDOW
+GUI_TABS_CLOSABLE: erwartet GUI_WINDOW	GUI_TABS_CLOSABLE: expects a GUI_WINDOW
+GUI_CONTEXT_TABS: erwartet ein Menue aus GUI_CONTEXT	GUI_CONTEXT_TABS: expects a menu from GUI_CONTEXT
+GUI_TAB_CONTEXT: erwartet GUI_WINDOW	GUI_TAB_CONTEXT: expects a GUI_WINDOW
+GUI_TAB_CLOSED: erwartet GUI_WINDOW	GUI_TAB_CLOSED: expects a GUI_WINDOW
+GUI_SET_ACTIVE_TAB: erwartet GUI_WINDOW	GUI_SET_ACTIVE_TAB: expects a GUI_WINDOW
+GUI_WINDOW_SCROLLABLE: erwartet GUI_WINDOW	GUI_WINDOW_SCROLLABLE: expects a GUI_WINDOW
+GUI_CONTEXT_WIDGET: Menue und Widget liegen in verschiedenen Fenstern	GUI_CONTEXT_WIDGET: menu and widget are in different windows
+GUI_CONTEXT_WIDGET: erwartet ein Menue aus GUI_CONTEXT	GUI_CONTEXT_WIDGET: expects a menu from GUI_CONTEXT
+GUI_TEXTAREA_VIEW: das Widget ist kein GUI_TEXTAREA	GUI_TEXTAREA_VIEW: the widget is not a GUI_TEXTAREA
+{}: der Textbereich ist nicht formatiert -- erst GUI_TEXTAREA_SET(ta, "formatiert", 1)	{}: the text area is not formatted -- call GUI_TEXTAREA_SET(ta, "formatiert", 1) first
+GUI_TEXTAREA_PAIRS: erwartet je zwei Zeichen, oeffnend und schliessend (z. B. "()[]")	GUI_TEXTAREA_PAIRS: expects two characters each, opening and closing (e.g. "()[]")
+GUI_TEXTAREA_SHARE: ein Textbereich kann keine Ansicht auf sich selbst sein	GUI_TEXTAREA_SHARE: a text area cannot be a view of itself
+GUI_TEXTAREA_SHARE: `von` ist selbst eine Ansicht -- nimm dessen Besitzer	GUI_TEXTAREA_SHARE: `von` is itself a view -- take its owner
+GUI_DROPDOWN_SET: Widget ist keine Klappliste (GUI_DROPDOWN)	GUI_DROPDOWN_SET: widget is not a dropdown (GUI_DROPDOWN)
+GUI_DROPDOWN_SET: unbekannter Schluessel '{}' (bekannt: bearbeitbar)	GUI_DROPDOWN_SET: unknown key '{}' (known: bearbeitbar)
+GUI_DROPDOWN_PLACEHOLDER: Widget ist keine Klappliste (GUI_DROPDOWN)	GUI_DROPDOWN_PLACEHOLDER: widget is not a dropdown (GUI_DROPDOWN)
+GUI_BIND: der Schluessel darf nur Buchstaben, Ziffern und _ enthalten -- er wird ein Spaltenname	GUI_BIND: the key may only contain letters, digits and _ -- it becomes a column name
+GUI_BIND: dieses Widget traegt keinen Wert (Textfeld, Kaestchen, Klappliste, Regler, Datum, Farbe)	GUI_BIND: this widget carries no value (text field, check box, dropdown, slider, date, color)
+GUI_FORM_GET: erwartet GUI_WINDOW	GUI_FORM_GET: expects a GUI_WINDOW
+GUI_FORM_SAVE: erwartet GUI_WINDOW	GUI_FORM_SAVE: expects a GUI_WINDOW
+GUI_FORM_SET: erwartet GUI_WINDOW	GUI_FORM_SET: expects a GUI_WINDOW
+GUI_FORM_CLEAR: erwartet GUI_WINDOW	GUI_FORM_CLEAR: expects a GUI_WINDOW
+GUI_FORM_CLEAN: erwartet GUI_WINDOW	GUI_FORM_CLEAN: expects a GUI_WINDOW
+GUI_FORM_CHANGED: erwartet GUI_WINDOW	GUI_FORM_CHANGED: expects a GUI_WINDOW
+GUI_FORM_LOAD: erwartet GUI_WINDOW	GUI_FORM_LOAD: expects a GUI_WINDOW
+GUI_RULE: '{}' ist keine Regel -- pflicht, zahl, ganz, bereich, laenge, email, datum oder muster	GUI_RULE: '{}' is not a rule -- pflicht, zahl, ganz, bereich, laenge, email, datum or muster
+GUI_RULE: bereich -- von muss <= bis sein	GUI_RULE: bereich -- from must be <= to
+GUI_RULE: laenge -- min muss zwischen 0 und max liegen	GUI_RULE: laenge -- min must be between 0 and max
+GUI_RULE: an Klappliste und Kaestchen geht nur 'pflicht'	GUI_RULE: dropdowns and check boxes only take 'pflicht'
+GUI_RULE: Regeln gehen an Textfeld, Textbereich, Klappliste und Kaestchen	GUI_RULE: rules apply to text fields, text areas, dropdowns and check boxes
+GUI_ERROR_LABEL: das zweite Widget muss eine Beschriftung sein	GUI_ERROR_LABEL: the second widget must be a label
+GUI_ERROR_LABEL: Feld und Beschriftung liegen in verschiedenen Fenstern	GUI_ERROR_LABEL: field and label are in different windows
+GUI_PROGRESS_SET: Widget ist kein Fortschrittsbalken	GUI_PROGRESS_SET: widget is not a progress bar
+GUI_PROGRESS_SET: unbekannter Schluessel '{}' -- erwartet unbestimmt	GUI_PROGRESS_SET: unknown key '{}' -- expected unbestimmt
+GUI_IMAGE_MODE: '{}' ist kein Modus -- strecken, einpassen, fuellen, mitte oder kacheln	GUI_IMAGE_MODE: '{}' is not a mode -- strecken, einpassen, fuellen, mitte or kacheln
+GUI_IMAGE_MODE: Widget ist kein image und keine Kachel	GUI_IMAGE_MODE: widget is neither an image nor a card
+GUI_SET_CURSOR: unbekannte Form '{}' -- erwartet {} oder auto	GUI_SET_CURSOR: unknown shape '{}' -- expected {} or auto
+GUI_TREE_ICON: ungueltige Knoten-id {}	GUI_TREE_ICON: invalid node id {}
+GUI_TREE_COLOR: ungueltige Knoten-id {}	GUI_TREE_COLOR: invalid node id {}
+{}: Widget ist kein Panel	{}: widget is not a panel
+GUI_PANEL_ADD: ungueltiges GUI_WIDGET-Handle	GUI_PANEL_ADD: invalid GUI_WIDGET handle
+GUI_PANEL_ADD: ein Panel kann sich nicht selbst aufnehmen	GUI_PANEL_ADD: a panel cannot contain itself
+GUI_PANEL_ADD: ein rollendes Panel in einem rollenden Panel gibt es nicht	GUI_PANEL_ADD: there is no scrolling panel inside a scrolling panel
+GUI_PANEL_SCROLL: das Panel rollt nichts -- erst GUI_PANEL_ADD	GUI_PANEL_SCROLL: the panel scrolls nothing -- call GUI_PANEL_ADD first
+GUI_DRAW_WINDOW: ungueltiges GUI_WINDOW-Handle	GUI_DRAW_WINDOW: invalid GUI_WINDOW handle
+GUI_SET_TAB_INDEX: der Index ist 0 (Anlege-Reihenfolge) oder groesser	GUI_SET_TAB_INDEX: the index is 0 (creation order) or greater
+{} Im gewoehnlichen Lauf heisst das: das DIM von '{}' ist noch nicht gelaufen -- steht es weiter unten im Programm als die Stelle, die es benutzt?	{} In a normal run this means: the DIM of '{}' has not run yet -- is it further down in the program than the place that uses it?
