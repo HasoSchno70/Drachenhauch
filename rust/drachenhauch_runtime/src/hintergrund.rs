@@ -149,6 +149,23 @@ pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
     // `dhrt call` antwortet mit genau einer JSON-Zeile -- auch im Fehlerfall.
     // Die letzte nehmen, falls doch etwas davor landet.
     let zeile = roh.lines().rev().find(|z| !z.trim().is_empty()).unwrap_or("");
+    // Ohne jede Antwort und mit einem Rueckgabewert, den `dhrt call` nie
+    // setzt: der Prozess ist abgestuerzt -- etwa in einer fremden Bibliothek
+    // (DECLARE ... LIB). Genau dafuer laesst man so etwas als Auftrag laufen.
+    if zeile.is_empty() && !out.status.success() {
+        #[cfg(unix)]
+        let signal = std::os::unix::process::ExitStatusExt::signal(&out.status);
+        #[cfg(not(unix))]
+        let signal: Option<i32> = None;
+        let code = match (out.status.code(), signal) {
+            (Some(c), _) => format!(" (Rueckgabe {})", c),
+            (None, Some(s)) => format!(" (Signal {})", s),
+            _ => String::new(),
+        };
+        return Err(format!(
+            "TASK: der Auftrag ist abgestuerzt{} -- er hat keine Antwort mehr geschickt; das Hauptprogramm laeuft weiter",
+            code));
+    }
     let v: serde_json::Value = serde_json::from_str(zeile).map_err(|_| {
         let err = String::from_utf8_lossy(&out.stderr);
         format!("TASK_START: unverstaendliche Antwort des Auftrags: {}",

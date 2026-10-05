@@ -189,6 +189,8 @@ cranelift-frontend = { version = "0.136", optional = true }
 cranelift-jit = { version = "0.136", optional = true }
 cranelift-module = { version = "0.136", optional = true }
 cranelift-native = { version = "0.136", optional = true }
+# Fremde Bibliotheken laden (DECLARE ... LIB, src/ffi.rs).
+libloading = { version = "0.8", optional = true }
 
 # --- Web-Build (emscripten): wasm-bindgen-Familie festnageln ---------------
 # Kira zieht cpal fuer JEDES wasm32-Ziel mit dem Feature `wasm-bindgen` herein
@@ -248,6 +250,9 @@ video = ["dep:openh264", "dep:mp4"]
 # Maschinencode fuer reine Zahlenfunktionen (M3, docs/entwurf-maschinencode.md,
 # src/jit.rs). Seit M5 an per Vorgabe, DHRT_JIT=aus laesst alles in der VM.
 jit = ["dep:cranelift-codegen", "dep:cranelift-frontend", "dep:cranelift-jit", "dep:cranelift-module", "dep:cranelift-native"]
+# Fremde Bibliotheken aufrufen (DECLARE ... LIB, docs/entwurf-ffi.md): die
+# Uebergaenge baut Cranelift, darum haengt es an jit.
+ffi = ["jit", "dep:libloading"]
 db = ["dep:rusqlite"]
 # PDF-Modul (krilla, eingebettete DejaVu-Schriften, Textformung) -- gut 6 MB
 # der Laufzeit; ein Programm, das kein PDF schreibt, braucht es nicht
@@ -264,7 +269,7 @@ midi = ["dep:midir"]
 wifi = []                      # nur std::process (netsh) -- Gate fuer Opt-out
 bt = ["dep:btleplug", "dep:tokio", "dep:futures"]
 hardware = ["serial", "usb", "wifi", "bt", "midi"]
-full = ["graphics", "dialogs", "video", "db", "net", "http", "smtp", "pdf", "physik", "hardware"]
+full = ["graphics", "dialogs", "video", "db", "net", "http", "smtp", "pdf", "physik", "ffi", "hardware"]
 
 [profile.release]
 opt-level = 3

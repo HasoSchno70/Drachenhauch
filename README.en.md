@@ -63,6 +63,7 @@ happen *next to* a game — tools, reports, small services:
 | **Network** | `HTTP_GET`/`POST` with headers and JSON, TLS, plus `SHA256$`, `HMAC_SHA256$` and `UUID4$` for authenticated services |
 | **Data** | SQLite, CSV per RFC 4180, ZIP, JSON, regex, `BUFFER` for binary files |
 | **Larger programs** | namespaces (`IMPORT "math.dh" AS math`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` with error codes, inheritance with `SUPER` and `ABSTRACT`, `ASSERT_EQ` |
+| **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly ([more, in German](docs/ffi.md)) |
 | **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
 
 None of it needs a window. A Drachenhauch program can be a console
@@ -92,7 +93,7 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # all che
 
 ## The textbook
 
-**[Drachenhauch — The Handbook](buch-referenz/buch/)** is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. Seven parts, 84 chapters, every code sample verified against `dhrt --check`.
+**[Drachenhauch — The Handbook](buch-referenz/buch/)** is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. Seven parts, 85 chapters, every code sample verified against `dhrt --check`.
 
 | Edition | For printing (A4) | For e-readers |
 |---|---|---|

@@ -421,6 +421,8 @@ impl Parser {
             Tt::Throw => self.throw_stmt(),
             Tt::With => self.with_stmt(),
             Tt::Dot if !self.with_stack.is_empty() => self.dot_assign_in_with(),
+            Tt::Ident if sval(self.peek(0)) == "declare" && matches!(self.tt(1), Tt::Sub | Tt::Function)
+                => self.declare_lib(),
             Tt::Ident if self.ist_do_schleife() => self.do_loop(),
             Tt::Ident if self.is_assignment_lookahead() => self.assign(),
             Tt::Lparen if self.is_tuple_assign_lookahead() => self.tuple_assign(),
@@ -1531,6 +1533,96 @@ impl Parser {
         self.expect(Tt::Sub, "Erwartet SUB nach END")?;
         self.consume_terminator()?;
         Ok(Node::SubDecl { name, params, body })
+    }
+
+    /// `DECLARE SUB|FUNCTION name LIB "bib" [ALIAS "c_name"] (...) [AS typ]`
+    /// -- eine Funktion aus einer fremden Bibliothek (docs/entwurf-ffi.md).
+    /// `DECLARE`, `LIB` und `ALIAS` sind keine Schluesselwoerter: sie zaehlen
+    /// nur hier. Die Typwoerter (`LONG`, `ZEIGER`, `TEXT` ...) gibt es nur in
+    /// dieser Zeile, `ffi::typ_zeichen` prueft sie.
+    fn declare_lib(&mut self) -> R<Node> {
+        self.pos += 1;                                  // DECLARE
+        let ist_sub = self.check(Tt::Sub);
+        self.pos += 1;                                  // SUB | FUNCTION
+        let tok = self.expect(Tt::Ident, "Erwartet den Namen nach DECLARE SUB/FUNCTION")?;
+        let name = sval(&tok);
+        // Ohne ALIAS ist der Name zugleich der in der Bibliothek -- dort mit
+        // der Schreibweise aus dem Quelltext.
+        let c_name = tok.orig.as_deref().map(str::to_string).unwrap_or_else(|| name.clone());
+        if !(self.check(Tt::Ident) && sval(self.peek(0)) == "lib") {
+            return self.err(&format!(
+                "DECLARE braucht man in Drachenhauch nur fuer fremde Bibliotheken: DECLARE {} {} LIB \"bibliothek\" (...) -- eine eigene SUB/FUNCTION darf vor oder nach ihrem Aufruf stehen, ohne DECLARE",
+                if ist_sub { "SUB" } else { "FUNCTION" }, name));
+        }
+        self.pos += 1;                                  // LIB
+        if !self.check(Tt::Str) {
+            return self.err("Erwartet den Namen der Bibliothek in Anfuehrungszeichen nach LIB, z.B. LIB \"user32\"");
+        }
+        let lib = sval(self.peek(0));
+        self.pos += 1;
+        if lib.trim().is_empty() { return self.err("Der Name der Bibliothek ist leer"); }
+        let anzeige = c_name.clone();
+        // Der Name in der Bibliothek steht IMMER fest -- ein Namensraum
+        // (`IMPORT "x.dh" AS m`) benennt `name` spaeter um, der C-Name bleibt.
+        let mut alias = Some(c_name);
+        if self.check(Tt::Ident) && sval(self.peek(0)) == "alias" {
+            self.pos += 1;
+            if !self.check(Tt::Str) {
+                return self.err("Erwartet den Namen in der Bibliothek in Anfuehrungszeichen nach ALIAS");
+            }
+            alias = Some(sval(self.peek(0)));
+            self.pos += 1;
+        }
+        let mut params = Vec::new();
+        if self.matches(Tt::Lparen) {
+            if !self.check(Tt::Rparen) {
+                loop {
+                    let by_ref = self.matches(Tt::Byref);
+                    if !by_ref && self.check(Tt::Ident) && sval(self.peek(0)) == "byval" && self.tt(1) == Tt::Ident {
+                        self.pos += 1;
+                    }
+                    let pname = sval(&self.expect(Tt::Ident, "Erwartet Parametername")?);
+                    self.expect(Tt::As, "Erwartet AS nach Parametername")?;
+                    let wort = self.ffi_typwort()?;
+                    if by_ref && matches!(wort.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer") {
+                        self.pos -= 1;
+                        return self.err(&format!(
+                            "BYREF geht nur bei Zahlen und ZEIGER -- {} ist schon ein Zeiger; Text, den die Bibliothek schreibt, kommt ueber einen BUFFER",
+                            wort.to_uppercase()));
+                    }
+                    params.push((pname, wort, by_ref));
+                    if !self.matches(Tt::Comma) { break; }
+                }
+            }
+            self.expect(Tt::Rparen, "Erwartet ')'")?;
+        }
+        let ret = if ist_sub {
+            if self.check(Tt::As) {
+                return self.err("Eine SUB gibt nichts zurueck -- mit Rueckgabe heisst es DECLARE FUNCTION");
+            }
+            None
+        } else {
+            self.expect(Tt::As, "Erwartet AS <Rueckgabetyp> -- ohne Rueckgabe heisst es DECLARE SUB")?;
+            let wort = self.ffi_typwort()?;
+            if wort == "buffer" {
+                self.pos -= 1;
+                return self.err("BUFFER geht nur als Parameter -- liefert die Bibliothek Speicher, ist die Rueckgabe ein ZEIGER");
+            }
+            Some(wort)
+        };
+        self.consume_terminator()?;
+        Ok(Node::DeclareLib { name, anzeige, lib, alias, params, ret })
+    }
+
+    /// Ein Typwort der DECLARE-Zeile (klein); sonst ein Fehler mit Vorschlag.
+    fn ffi_typwort(&mut self) -> R<String> {
+        let w = sval(self.peek(0)).to_lowercase();
+        if w.is_empty() || crate::ffi::typ_zeichen(&w).is_none() {
+            if w.is_empty() { return self.err("Erwartet einen Typ (LONG, ZEIGER, TEXT ...)"); }
+            return self.err(&crate::ffi::typ_hinweis(&w));
+        }
+        self.pos += 1;
+        Ok(w)
     }
 
     fn function_decl(&mut self) -> R<Node> {

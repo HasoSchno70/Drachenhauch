@@ -123,6 +123,7 @@ fn sammeln(
                 if datei.is_empty() {
                     match body {
                         Node::FunctionDecl { name, .. } | Node::SubDecl { name, .. }
+                        | Node::DeclareLib { name, .. }
                         | Node::Dim { name, .. } | Node::Const { name, .. } => {
                             haupt.insert(name.to_lowercase());
                         }
@@ -141,7 +142,8 @@ fn sammeln(
         };
         let eintrag = module.entry(alias).or_default();
         match body {
-            Node::FunctionDecl { name, .. } | Node::SubDecl { name, .. } => {
+            Node::FunctionDecl { name, .. } | Node::SubDecl { name, .. }
+            | Node::DeclareLib { name, .. } => {
                 eintrag.namen.insert(name.to_lowercase());
             }
             Node::Dim { name, .. } | Node::Const { name, .. } => {
@@ -437,6 +439,8 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
             let ps = params.clone();
             mit_lokalen(l, &ps, body);
         }
+        // Nur der Name im Programm; der in der Bibliothek (`alias`) bleibt.
+        DeclareLib { name, .. } => l.namen(name),
 
         // --- alles Uebrige: nur durchreichen ------------------------------
         Program { statements } => { for s in statements { knoten(l, s); } }

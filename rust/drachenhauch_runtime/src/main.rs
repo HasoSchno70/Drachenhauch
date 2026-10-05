@@ -96,6 +96,8 @@ mod midi;
 mod video;
 #[cfg(feature = "jit")]
 mod jit;
+#[cfg_attr(not(feature = "ffi"), allow(dead_code))]
+mod ffi;
 #[cfg(feature = "serial")]
 mod serial;
 #[cfg(feature = "serial")]
@@ -265,6 +267,7 @@ fn eingebaut() -> String {
         ("http", cfg!(feature = "http")),
         ("mail", cfg!(feature = "smtp")),
         ("maschinencode", cfg!(feature = "jit")),
+        ("ffi", cfg!(feature = "ffi")),
         ("pdf", cfg!(feature = "pdf")),
         ("physik", cfg!(feature = "physik")),
         ("seriell", cfg!(feature = "serial")),
@@ -667,8 +670,10 @@ fn ist_schluesselwort(t: lexer::Tt) -> bool {
 /// vereinheitlichen, nicht den Wortschatz.
 fn schluesselwoerter_gross(quelle: &str, toks: &[lexer::Token]) -> Vec<String> {
     let mut zeilen: Vec<Vec<char>> = quelle.lines().map(|z| z.chars().collect()).collect();
-    for t in toks {
-        if !ist_schluesselwort(t.tt) { continue; }
+    let declare = declare_woerter(toks);
+    for (i, t) in toks.iter().enumerate() {
+        let kontext = declare.contains(&i);
+        if !ist_schluesselwort(t.tt) && !kontext { continue; }
         let Some(zeile) = zeilen.get_mut(t.line.saturating_sub(1)) else { continue };
         let start = t.col.saturating_sub(1);        // col ist 1-basiert
         // Das Wort an dieser Stelle abgreifen (Buchstaben/Ziffern/Unterstrich)
@@ -687,7 +692,12 @@ fn schluesselwoerter_gross(quelle: &str, toks: &[lexer::Token]) -> Vec<String> {
         // Position des `f`. Ohne diese Probe wurde daraus `F"..."` -- in
         // 108_skeletal_anim.dh beim ersten Lauf ueber den Bestand
         // tatsaechlich passiert.
-        if lexer::keyword(&wort.to_lowercase()) != Some(t.tt) { continue; }
+        let passt = if kontext {
+            matches!(&t.val, lexer::Val::Str(v) if *v == wort.to_lowercase())
+        } else {
+            lexer::keyword(&wort.to_lowercase()) == Some(t.tt)
+        };
+        if !passt { continue; }
         let gross: Vec<char> = wort.to_uppercase().chars().collect();
         // Nur ersetzen, wenn die Laenge stimmt: bei Sonderzeichen kann
         // to_uppercase laenger werden (das deutsche Eszett), und dann waere
@@ -698,6 +708,42 @@ fn schluesselwoerter_gross(quelle: &str, toks: &[lexer::Token]) -> Vec<String> {
         zeile[start..ende].copy_from_slice(&gross);
     }
     zeilen.into_iter().map(|z| z.into_iter().collect()).collect()
+}
+
+/// Die Woerter einer `DECLARE ... LIB`-Zeile, die gross gehoeren, obwohl sie
+/// keine Schluesselwoerter sind (Indizes in `toks`): DECLARE, LIB, ALIAS,
+/// BYVAL und die Typwoerter hinter AS (`LONG`, `ZEIGER`, `TEXT` ...).
+fn declare_woerter(toks: &[lexer::Token]) -> std::collections::HashSet<usize> {
+    use lexer::Tt;
+    let wert = |t: &lexer::Token| match &t.val { lexer::Val::Str(v) => v.clone(), _ => String::new() };
+    let mut aus = std::collections::HashSet::new();
+    let mut i = 0;
+    while i < toks.len() {
+        let zeilenanfang = i == 0 || matches!(toks[i - 1].tt, Tt::Newline | Tt::Colon);
+        if zeilenanfang && toks[i].tt == Tt::Ident && wert(&toks[i]) == "declare"
+            && toks.get(i + 1).is_some_and(|t| matches!(t.tt, Tt::Sub | Tt::Function)) {
+            aus.insert(i);
+            let mut j = i + 2;
+            while j < toks.len() && !matches!(toks[j].tt, Tt::Newline | Tt::Eof) {
+                if toks[j].tt == Tt::Ident {
+                    let w = wert(&toks[j]);
+                    let nach_as = toks[j - 1].tt == Tt::As;
+                    // LIB/ALIAS nur vor ihrem Text, BYVAL nur vor einem Namen --
+                    // ein Parameter darf `lib` heissen.
+                    let folgt = toks.get(j + 1).map(|t| t.tt);
+                    if (matches!(w.as_str(), "lib" | "alias") && folgt == Some(Tt::Str))
+                        || (w == "byval" && folgt == Some(Tt::Ident))
+                        || (nach_as && ffi::typ_zeichen(&w).is_some()) {
+                        aus.insert(j);
+                    }
+                }
+                j += 1;
+            }
+            i = j;
+        }
+        i += 1;
+    }
+    aus
 }
 
 /// Neu einruecken -- nur auf ausdrueckliche Anforderung (`--einruecken`).

@@ -1203,6 +1203,7 @@ dependencies = [
  "indexmap",
  "kira",
  "krilla",
+ "libloading 0.8.9",
  "md-5",
  "midir",
  "miniz_oxide",

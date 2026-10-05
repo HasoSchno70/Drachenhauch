@@ -36,6 +36,7 @@ Diese Formen aus anderen BASICs versteht Drachenhauch so, wie man sie kennt:
 | `CALL meineSub(1)`, `SUB s(BYVAL x AS INTEGER)` | `CALL` und `BYVAL` werden übergangen (übergeben wird ohnehin als Wert) |
 | `WHILE NOT EOF(f)` | `EOF(f)` sagt, ob die Datei zu Ende ist — `READLINE` liefert dort `""` wie bei einer leeren Zeile |
 | `READALL$("datei.txt")` | die ganze Datei auf einmal, ohne sie vorher zu öffnen |
+| `DECLARE FUNCTION f LIB "user32" ALIAS "X" (ByVal h AS LONG) AS LONG` | wie in VB: eine Funktion aus einer DLL (Typwörter siehe [Fremde Bibliotheken](ffi.md)); ein `DECLARE` für eigene SUBs braucht es nicht |
 
 ## Was anders heißt
 

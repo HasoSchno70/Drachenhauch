@@ -122,9 +122,13 @@ fn spalte(zeile: &str, byte: usize) -> usize { zeile[..byte].chars().count() + 1
 struct Muster { re: &'static Regex, art: &'static str }
 
 fn definitions_muster() -> Vec<Muster> {
-    static S: [OnceLock<Regex>; 9] = [const { OnceLock::new() }; 9];
+    static S: [OnceLock<Regex>; 11] = [const { OnceLock::new() }; 11];
     const IDENT: &str = r"([A-Za-z_][A-Za-z0-9_]*)";
-    let q: [(&'static str, &'static str); 9] = [
+    let q: [(&'static str, &'static str); 11] = [
+        // Funktionen aus fremden Bibliotheken (DECLARE ... LIB) -- fuer
+        // Springen, Hover (die Zeile ist die Signatur) und Vervollstaendigung.
+        (r"(?i)^\s*DECLARE\s+SUB\s+", "sub"),
+        (r"(?i)^\s*DECLARE\s+FUNCTION\s+", "function"),
         (r"(?i)^\s*(?:PRIVATE\s+)?SUB\s+", "sub"),
         (r"(?i)^\s*(?:PRIVATE\s+)?FUNCTION\s+", "function"),
         (r"(?i)^\s*CLASS\s+", "class"),
@@ -458,6 +462,21 @@ mod tests {
         assert_eq!(d2[0].name, "x");
         assert_eq!(definition(SRC, "ADD").map(|d| d.zeile), Some(8));
         assert!(definition("PRINT 1\n", "x").is_none());
+    }
+
+    #[test]
+    fn declare_lib_ist_eine_definition() {
+        let q = "DECLARE FUNCTION MulDiv LIB \"kernel32\" (a AS LONG, b AS LONG, c AS LONG) AS LONG
+                 DECLARE SUB GetSystemTime LIB \"kernel32\" (z AS BUFFER)
+PRINT MulDiv(1, 2, 3)
+";
+        let d = definitionen(q);
+        let namen: Vec<(&str, &str, usize)> = d.iter().map(|x| (x.art, x.name.as_str(), x.zeile)).collect();
+        // Die Parameter einer DECLARE-Zeile sind keine Variablen.
+        assert_eq!(namen, [("function", "MulDiv", 1), ("sub", "GetSystemTime", 2)]);
+        assert_eq!(nutzer_doku(q, "muldiv").map(|x| x.0.starts_with("DECLARE FUNCTION MulDiv")), Some(true));
+        // Kein Block: es gibt kein END dazu.
+        assert!(bereiche(q).is_empty());
     }
 
     #[test]

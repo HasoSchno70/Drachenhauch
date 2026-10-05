@@ -1556,3 +1556,42 @@ GUI_PANEL_SCROLL: das Panel rollt nichts -- erst GUI_PANEL_ADD	GUI_PANEL_SCROLL:
 GUI_DRAW_WINDOW: ungueltiges GUI_WINDOW-Handle	GUI_DRAW_WINDOW: invalid GUI_WINDOW handle
 GUI_SET_TAB_INDEX: der Index ist 0 (Anlege-Reihenfolge) oder groesser	GUI_SET_TAB_INDEX: the index is 0 (creation order) or greater
 {} Im gewoehnlichen Lauf heisst das: das DIM von '{}' ist noch nicht gelaufen -- steht es weiter unten im Programm als die Stelle, die es benutzt?	{} In a normal run this means: the DIM of '{}' has not run yet -- is it further down in the program than the place that uses it?
+# ---------------------------------------------------------------- Fremde Bibliotheken (DECLARE ... LIB)
+Erwartet den Namen nach DECLARE SUB/FUNCTION	Expected a name after DECLARE SUB/FUNCTION
+DECLARE braucht man in Drachenhauch nur fuer fremde Bibliotheken: DECLARE {} {} LIB "bibliothek" (...) -- eine eigene SUB/FUNCTION darf vor oder nach ihrem Aufruf stehen, ohne DECLARE	In Drachenhauch DECLARE is only needed for foreign libraries: DECLARE {} {} LIB "library" (...) -- your own SUB/FUNCTION may stand before or after its call, without DECLARE
+Erwartet den Namen der Bibliothek in Anfuehrungszeichen nach LIB, z.B. LIB "user32"	Expected the library name in quotes after LIB, e.g. LIB "user32"
+Der Name der Bibliothek ist leer	The library name is empty
+Erwartet den Namen in der Bibliothek in Anfuehrungszeichen nach ALIAS	Expected the name inside the library in quotes after ALIAS
+BYREF geht nur bei Zahlen und ZEIGER -- {} ist schon ein Zeiger; Text, den die Bibliothek schreibt, kommt ueber einen BUFFER	BYREF only works for numbers and ZEIGER -- {} is already a pointer; text the library writes comes through a BUFFER
+Eine SUB gibt nichts zurueck -- mit Rueckgabe heisst es DECLARE FUNCTION	A SUB returns nothing -- with a return value it is DECLARE FUNCTION
+Erwartet AS <Rueckgabetyp> -- ohne Rueckgabe heisst es DECLARE SUB	Expected AS <return type> -- without a return value it is DECLARE SUB
+BUFFER geht nur als Parameter -- liefert die Bibliothek Speicher, ist die Rueckgabe ein ZEIGER	BUFFER only works as a parameter -- if the library returns memory, the return type is ZEIGER
+Erwartet einen Typ (LONG, ZEIGER, TEXT ...)	Expected a type (LONG, ZEIGER, TEXT ...)
+'{}' ist kein Typ fuer fremde Bibliotheken -- hier heisst das {} (moeglich: {})	'{}' is not a type for foreign libraries -- here it is called {} (possible: {})
+'{}' ist kein Typ fuer fremde Bibliotheken (moeglich: {})	'{}' is not a type for foreign libraries (possible: {})
+DECLARE ... LIB gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block	DECLARE ... LIB belongs at the top level of the program, not inside a subroutine or a block
+'{}' ist schon in {} deklariert -- eines von beiden umbenennen (mit ALIAS "c_name" darf der Name hier anders heissen als in der Bibliothek)	'{}' is already declared in {} -- rename one of them (with ALIAS "c_name" the name here may differ from the one in the library)
+'{}' ist zugleich eine eigene SUB/FUNCTION ({}) und eine Funktion aus "{}" -- mit ALIAS "{}" darf die fremde hier anders heissen	'{}' is both your own SUB/FUNCTION ({}) and a function from "{}" -- with ALIAS "{}" the foreign one may have a different name here
+Namens-Kollision: '{}' ist zugleich eine Variable und eine Funktion aus einer Bibliothek (DECLARE in {}) -- benenne eines von beiden um.	Name collision: '{}' is both a variable and a function from a library (DECLARE in {}) -- rename one of them.
+{}: benannte Argumente gehen bei Funktionen aus Bibliotheken nicht	{}: named arguments do not work with functions from libraries
+{}: erwartet {} Argument(e), erhalten {} (DECLARE in {})	{}: expects {} argument(s), got {} (DECLARE in {})
+{}: ein BYREF-Parameter braucht eine Variable (oder ein Feld-/Objektelement), in die das Ergebnis zurueckgeschrieben wird	{}: a BYREF parameter needs a variable (or an array/object element) the result is written back to
+{}: Argument {} ({} AS {}) bekommt {} -- beim Laufen bricht diese Zeile ab	{}: argument {} ({} AS {}) gets {} -- this line stops the program when it runs
+{}: Argument {} ({} AS {}): {}	{}: argument {} ({} AS {}): {}
+{} passt nicht in {} ({} bis {})	{} does not fit into {} ({} to {})
+erwartet eine Zahl ({}), erhalten {}	expects a number ({}), got {}
+erwartet einen Wahrheitswert (BOOLEAN), erhalten {}	expects a truth value (BOOLEAN), got {}
+erwartet einen Zeiger (ZEIGER, eine ganze Zahl), erhalten {}	expects a pointer (ZEIGER, a whole number), got {}
+erwartet eine ganze Zahl ({}), erhalten {}	expects a whole number ({}), got {}
+erwartet einen Text (STRING), erhalten {}	expects a text (STRING), got {}
+erwartet einen BUFFER, erhalten {}	expects a BUFFER, got {}
+ein Nullzeichen mitten im Text -- C saehe nur den Anfang	a null character inside the text -- C would only see the beginning
+Bibliothek "{}" nicht gefunden (versucht: {} -- neben dem Programm, neben dhrt und wo das System sucht)	library "{}" not found (tried: {} -- next to the program, next to dhrt and where the system looks)
+die Funktion '{}' gibt es in "{}" nicht (Gross/klein zaehlt{})	there is no function '{}' in "{}" (upper/lower case matters{})
+; Text-Funktionen der Windows-API heissen ...A oder ...W	; text functions of the Windows API are called ...A or ...W
+fremde Funktion: kaputte Signatur	foreign function: broken signature
+fremde Funktion: Signatur fehlt	foreign function: signature missing
+{}: fremde Bibliotheken (DECLARE ... LIB) gibt es im Browser nicht	{}: there are no foreign libraries (DECLARE ... LIB) in the browser
+{}: fremde Bibliotheken (DECLARE ... LIB) gehen in diesem Bau nicht -- er ist ohne das Feature ffi gebaut	{}: foreign libraries (DECLARE ... LIB) do not work in this build -- it was built without the ffi feature
+TASK: der Auftrag ist abgestuerzt{} -- er hat keine Antwort mehr geschickt; das Hauptprogramm laeuft weiter	TASK: the task crashed{} -- it sent no answer any more; the main program keeps running
+ (Rueckgabe {})	 (exit code {})

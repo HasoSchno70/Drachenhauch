@@ -136,6 +136,10 @@ pub struct Token {
     pub val: Val,
     pub line: usize,
     pub col: usize,
+    /// Die Schreibweise im Quelltext, wenn sie von der kleingeschriebenen
+    /// abweicht -- nur fuer Bezeichner. Gebraucht von `DECLARE ... LIB`:
+    /// in einer Bibliothek zaehlt Gross/klein (`GetTickCount64`).
+    pub orig: Option<Box<str>>,
 }
 
 pub struct LexError {
@@ -184,7 +188,7 @@ impl Lexer {
     }
 
     fn push(&mut self, tt: Tt, val: Val, line: usize, col: usize) {
-        self.toks.push(Token { tt, val, line, col });
+        self.toks.push(Token { tt, val, line, col, orig: None });
     }
 
     fn err(&self, msg: &str, line: usize, col: usize) -> LexError {
@@ -445,7 +449,11 @@ impl Lexer {
             Some(Tt::True) => self.push(Tt::True, Val::Bool(true), line, col),
             Some(Tt::False) => self.push(Tt::False, Val::Bool(false), line, col),
             Some(tt) => self.push(tt, Val::Str(text), line, col),
-            None => self.push(Tt::Ident, Val::Str(text), line, col),
+            None => {
+                let anders = s != text;
+                self.push(Tt::Ident, Val::Str(text), line, col);
+                if anders { if let Some(t) = self.toks.last_mut() { t.orig = Some(s.into_boxed_str()); } }
+            }
         }
         Ok(())
     }

@@ -144,6 +144,12 @@ pub enum Node {
     Data { values: Vec<Node> },
     Read { targets: Vec<Node> },
     EnumDecl { name: String, members: Vec<(String, Option<Node>)> },
+    /// `DECLARE FUNCTION name LIB "bib" [ALIAS "c_name"] (p AS LONG, ...) AS typ`
+    /// -- eine Funktion aus einer fremden Bibliothek (docs/entwurf-ffi.md).
+    /// `params` = (Name, Typwort klein, BYREF); `ret` = None bei SUB.
+    /// `anzeige` = der Name in der Schreibweise des Quelltexts (fuer Meldungen).
+    DeclareLib { name: String, anzeige: String, lib: String, alias: Option<String>,
+                 params: Vec<(String, String, bool)>, ret: Option<String> },
     ExprStmt { expr: Box<Node> },
     SubDecl { name: String, params: Vec<Param>, body: Vec<Node> },
     FunctionDecl { name: String, params: Vec<Param>, return_type: String, body: Vec<Node> },
@@ -300,6 +306,11 @@ impl Node {
                     .collect();
                 obj("EnumDecl", vec![("name", json!(name)), ("members", Value::Array(ms))])
             }
+            DeclareLib { name, lib, alias, params, ret, .. } => obj("DeclareLib", vec![
+                ("name", json!(name)), ("lib", json!(lib)), ("alias", json!(alias)),
+                ("params", Value::Array(params.iter()
+                    .map(|(n, t, b)| json!({"name": n, "type": t, "by_ref": b})).collect())),
+                ("ret", json!(ret))]),
             ExprStmt { expr } => obj("ExprStmt", vec![("expr", expr.to_json())]),
             SubDecl { name, params, body } => obj("SubDecl", vec![
                 ("name", json!(name)),

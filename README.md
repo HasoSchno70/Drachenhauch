@@ -64,6 +64,7 @@ schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
 | **Daten** | SQLite, CSV nach RFC 4180, ZIP, JSON, Regex, `BUFFER` für Binärdateien |
 | **Größere Programme** | Namensräume (`IMPORT "mathe.dh" AS mathe`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` mit Fehler-Codes, Vererbung mit `SUPER` und `ABSTRACT`, Typtest zur Laufzeit (`x IS Hund`, `TYPEOF`), `ASSERT_EQ` |
 | **Objekte als Rückrufe** | `obj.methode` ist eine `FUNCREF`, die ihre Instanz mitträgt — `GUI_ON_CLICK(knopf, spieler.klick)`, `TIMER_EVERY(500, gegner.zucken)`, `SORT(zahlen, regel.cmp)` |
+| **Fremde Bibliotheken** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — Windows-API, C-Bibliothek, Gerätetreiber direkt aufrufen ([mehr](docs/ffi.md)) |
 | **Nebenher** | HTTP, Datenbank, fremde Programme und **eigene Funktionen** im Hintergrund (`TASK_START`) — die Hauptschleife läuft weiter |
 
 Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine
@@ -93,7 +94,7 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # alle Pr
 
 ## Das Lehrbuch
 
-**[Drachenhauch — Das Lehrbuch](buch-referenz/buch/)** ist beides zugleich: ein Kurs, der vom ersten schwarzen Fenster bis zu Klassen, Modulen und fertigen Spielen führt, und ein Nachschlagewerk, in dem **jeder einzelne Befehl** mit einem lauffähigen Beispielprogramm erklärt wird. Sieben Teile, 84 Kapitel, alle Codebeispiele gegen `dhrt --check` verifiziert.
+**[Drachenhauch — Das Lehrbuch](buch-referenz/buch/)** ist beides zugleich: ein Kurs, der vom ersten schwarzen Fenster bis zu Klassen, Modulen und fertigen Spielen führt, und ein Nachschlagewerk, in dem **jeder einzelne Befehl** mit einem lauffähigen Beispielprogramm erklärt wird. Sieben Teile, 85 Kapitel, alle Codebeispiele gegen `dhrt --check` verifiziert.
 
 | Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
 |---|---|---|

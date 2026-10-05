@@ -31,6 +31,7 @@ Wer aus einem anderen BASIC oder aus Python kommt: [Umstieg](umstieg.md) listet,
 - [Klassen und Strukturen](#klassen-und-strukturen)
 - [Try / Catch / Throw](#try--catch--throw)
 - [Import](#import)
+- [Fremde Bibliotheken: DECLARE … LIB](#fremde-bibliotheken-declare--lib)
 - [Kommentare](#kommentare)
 
 ## Variablen und Konstanten
@@ -1522,6 +1523,21 @@ IMPORT "camera"
 Liste aller Module: siehe [README](README.md#module).
 
 Die Auflösungs-Reihenfolge: erst wird `<name>.dh` im aktuellen Verzeichnis gesucht; existiert sie nicht, dann `drachenhauch/modules/<name>.py`. So kann ein eigenes `json.dh` Vorrang vor dem Built-in haben.
+
+## Fremde Bibliotheken: DECLARE … LIB
+
+Eine Funktion aus einer DLL, `.so` oder `.dylib` wird einmal deklariert und
+dann aufgerufen wie eine eigene:
+
+```basic
+DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
+PRINT strlen("Drachenhauch")        ' 12
+```
+
+Die Typwörter der Zeile (`LONG`, `ZEIGER`, `TEXT`, `BUFFER`, `BYREF` ...)
+sagen, wie breit ein Wert in C ist; die Bibliothek wird beim ersten Aufruf
+geladen. Ein Absturz in fremdem Code ist nicht abzufangen. Alles Weitere:
+[Fremde Bibliotheken](ffi.md).
 
 ## Kommentare
 

@@ -1362,6 +1362,39 @@ Eine geoeffnete Paketdatei sagt das in der Statuszeile (`paketVon$`). Tests
 -- so blieb die erste Gegenprobe gruen), ein `-C`-Fall in `paket.dhtest`;
 sechs Verfaelschungen der IDE fallen je in ihrem Fall.
 
+## Fremde Bibliotheken: `DECLARE … LIB` (2026-10-05, Stufe 1)
+
+`ffi.rs`, Entwurf `docs/entwurf-ffi.md`, Handbuch `docs/ffi.md`, Feature
+`ffi` (haengt an `jit`, in allen drei Laufzeiten). Parser: `declare_lib`
+(kontextuelle Woerter DECLARE/LIB/ALIAS, Typwoerter nur in dieser Zeile ueber
+`ffi::typ_zeichen`, Knoten `Node::DeclareLib`). **Der Lexer schreibt
+Bezeichner klein, in einer Bibliothek zaehlt Gross/klein** -- `Token::orig`
+traegt die Schreibweise des Quelltexts, ohne ALIAS gilt sie. Compiler:
+`register_ffi` (nach den SUB/FUNCTION-Stubs, vor den Rumpfen), ein Aufruf
+wird `CALL_BUILTIN "__ffi"` mit der Signatur als erstem Wert
+(`ffi::signatur_text`); mit BYREF liefert `__ffi` ein Tupel (Ergebnis,
+letzter, ..., erster BYREF-Wert), `UNPACK_TUPLE` + `emit_byref_writeback`
+schreiben zurueck. Die Argumentzahl ist ein Uebersetzungsfehler, ein
+sicher falscher Typ eine Warnung. Laufzeit: Befehlsfamilie 28
+(`BUILTIN_FAMILIEN` = 29), Bibliothek beim ERSTEN Aufruf (`libloading`,
+neben Programm/Exe/System, `ffi::dateinamen`: "c"/"m" plattformneutral),
+je Signatur ein Cranelift-Uebergang `fn(ziel, args: *const u64, rueck: *mut
+u64)` (`uebergang::Bauer`, eigenes JITModule). Kleine Ganzzahlen tragen
+sext/uext in der Signatur; ein Wert, der nicht passt, ist ein Fehler
+(`zahl_platz`). Maschinencode-Bereiche nehmen `__ffi` nicht auf
+(`befehl_im_bereich`). Ein Absturz im Auftrag (TASK_START) meldet jetzt
+"der Auftrag ist abgestuerzt (Rueckgabe N|Signal N)" statt "unverstaendliche
+Antwort". `symbole.rs` kennt die Zeile als Definition (Hover, Springen,
+Vervollstaendigung). **Gegenproben:** eine Verfaelschung der Rueckgabe-
+Erweiterung oder SINGLE-als-FLOAT IM Uebergang faellt unter x86-64 nicht
+(das Register haelt die unteren Bits richtig) -- geprueft wird an
+`zahl_platz`/`platz_wert` und in den Rust-Tests. Tests
+`tests/pruef/ffi.dhtest` (21; Windows kernel32/user32, sonst die C-Bibliothek
+auf allen drei Systemen), Rust-Tests in ffi.rs und symbole.rs, Beispiel
+`examples/206_fremde_bibliotheken.dh`, Lehrbuch `79c_bibliotheken.js`.
+Offen: Stufe 2 (Zeiger lesen, Export der Bibliothek neben dem Programm),
+Stufe 3 (Rueckrufe).
+
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
 raylib liest Maus- und Tastentasten als ZUSTAND (Rueckruf schreibt

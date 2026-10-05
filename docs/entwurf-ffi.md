@@ -2,9 +2,9 @@
 
 Stand 2026-10-05. Punkt „Kein Aufruf fremder DLLs/.so“ aus
 [entwurf-anwendungen-und-tempo.md](entwurf-anwendungen-und-tempo.md).
-**Noch nicht gebaut** -- dieser Entwurf soll die Entscheidungen vorher
-festhalten. Die Syntax unten steht darum in Textblöcken; sie übersetzt
-heute nicht.
+**Stufe 1 ist gebaut (2026-10-05)** -- Handbuch [ffi.md](ffi.md). Die
+Syntax unten steht weiter in Textblöcken, weil es die Fassung des Entwurfs
+ist.
 
 **Entschieden am 2026-10-05** (alle vier Fragen wie empfohlen):
 `DECLARE … LIB` statt Befehlen; deutsche Typnamen (`ZEIGER`, `TEXT`,
@@ -213,6 +213,19 @@ wenn ein echter Bedarf da ist.
 3. **Rückrufe**, wenn gewollt; geprüft mit `qsort` und `EnumWindows`.
 
 Zu jeder Stufe ein Kapitel im Lehrbuch und ein Beispiel.
+
+**Stand Stufe 1 (2026-10-05):** wie oben, mit drei Ergänzungen aus dem Bau.
+(1) Der Lexer schreibt Bezeichner klein, in einer Bibliothek zählt aber
+Groß/klein -- das Token trägt darum seine Schreibweise mit (`Token::orig`),
+und ohne `ALIAS` gilt sie. (2) Gemessen, wie ein Absturz im Auftrag
+ankommt: vorher als "unverstaendliche Antwort des Auftrags" mit leerem
+Text, jetzt als "der Auftrag ist abgestuerzt (Rueckgabe N)" bzw.
+"(Signal N)"; das Hauptprogramm lief in beiden Fällen weiter. (3) `WTEXT`
+ist außerhalb von Windows `wchar_t` mit 32 Bit (UTF-32). Zwei Gegenproben
+am Übergang selbst (Erweiterung der Rückgabe, SINGLE als FLOAT geladen)
+fallen unter x86-64 nicht, weil das Register die unteren Bits ohnehin
+richtig hält; die Prüfung sitzt darum an den Stellen davor und danach
+(`zahl_platz`, `platz_wert`) und in den Rust-Tests mit 8/16-Bit-Werten.
 
 ## Die Fragen dazu (entschieden, siehe oben)
 
