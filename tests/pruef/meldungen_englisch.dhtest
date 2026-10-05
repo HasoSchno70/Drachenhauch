@@ -102,6 +102,14 @@ Runtime error in p.dh:1: REPEAT$: expected 2 argument(s), got 1 -- usage: REPEAT
 ' {...} als Platzhalter galt; und das noch nicht gesetzte Global haengt den
 ' Namen an den Grundtext -- beide Teile aus eigenen Vorlagen.
 IMPORT "helfer.dh"
+' Ohne Grafik (die Laeufe auf Linux und macOS) gibt es die gui nicht -- und
+' die Meldung darueber kaeme hier englisch an, der Laeufer erkennt sie nur
+' deutsch. Also selbst fragen.
+dlStarten(["--version"])
+IF INSTR(LEFT$(dlAus, INSTR(dlAus + CHR$(10) + "fehlt:", "fehlt:")), "grafik") < 0 THEN
+    PRINT "UEBERSPRINGEN: dieser Bau hat keine Grafik"
+    END
+END IF
 SETENV("DHRT_LANG", "en")
 DIM q AS STRING : q = CHR$(34)
 DIM proben AS ARRAY OF STRING
