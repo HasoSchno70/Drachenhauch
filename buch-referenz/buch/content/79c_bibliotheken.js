@@ -96,6 +96,25 @@ module.exports = (H) => [
   H.bullet("Ein Struct ist ein BUFFER, also eine Referenz: b = a teilt die Bytes. Umgekehrt liest du jeden Puffer durch eine Lage, indem du ihn einer Struct-Variable zuweist."),
   H.p("Texte, die eine Funktion schreibt, kommen genauso zurück: GetComputerNameW füllt einen Puffer mit UTF-16-Zeichen und nennt die Länge über BYREF. Das ganze Programm steht in den Beispielen als 206_fremde_bibliotheken.dh."),
 
+  H.h2("Structs als Wert"),
+  H.p("Ein Parameter AS Punkt ist in C ein Punkt* – die Funktion bekommt die Adresse deiner Bytes. Manche Funktionen wollen den Struct aber selbst, als Wert, oder geben einen zurück. Dafür steht BYVAL vor dem Parameter, und die Rückgabe heißt einfach wie der Struct. Die komplexen Zahlen der C-Bibliothek sind so ein Fall:"),
+  H.code([
+    'STRUCT Komplex LAYOUT C',
+    '    re AS FLOAT',
+    '    im AS FLOAT',
+    'END STRUCT',
+    'DECLARE FUNCTION csqrt LIB "m" (BYVAL z AS Komplex) AS Komplex',
+    '',
+    'DIM z AS Komplex',
+    'z.re = -4',
+    'DIM w AS Komplex',
+    'w = csqrt(z)',
+    'PRINT w.re, w.im',
+  ]),
+  H.code(["0.0 2.0"], { out: true }),
+  H.bullet("Die Funktion bekommt eine Kopie; was sie daran ändert, siehst du nicht. Die Rückgabe ist ein neuer Struct, den du einer Variable seines Typs zuweist."),
+  H.bullet("Wie ein Struct als Wert reist – in Registern, auf dem Stapel oder als Zeiger auf eine Kopie –, legt jedes System anders fest. Drachenhauch hält sich an die Regeln von Windows, Linux und macOS; im Programm siehst du davon nichts."),
+
   H.h2("Zeiger, die eine Bibliothek liefert"),
   H.p("Manche Funktionen geben keinen Wert zurück, sondern einen Zeiger auf Speicher, der der Bibliothek gehört – einen Text, den du danach freigeben sollst, oder ein Stück Bytes. Den Zeiger nimmst du als ZEIGER entgegen; drei Befehle machen daraus etwas, mit dem Drachenhauch arbeiten kann:"),
   H.table([
@@ -207,5 +226,5 @@ module.exports = (H) => [
 
   H.h2("Unsichere Bibliotheken"),
   H.p("Einer Bibliothek, die abstürzen könnte, gibst du einen eigenen Prozess: Du rufst sie in einem Auftrag mit TASK_START auf (Kapitel „Programme, Aufträge & Umgebung“). Stürzt der Auftrag ab, bekommt dein Programm beim Abholen mit TASK_RESULT$ einen Fehler – „der Auftrag ist abgestuerzt“ – und läuft weiter."),
-  H.note("Noch nicht dabei sind Structs als Wert und Funktionen mit va_list wie vprintf. Im Browser gibt es keine fremden Bibliotheken."),
+  H.note("Noch nicht dabei sind Bitfelder, ein Struct als Wert in einem Rückruf und Funktionen mit va_list wie vprintf. Im Browser gibt es keine fremden Bibliotheken."),
 ];

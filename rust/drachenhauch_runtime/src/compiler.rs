@@ -3955,12 +3955,32 @@ impl Compiler {
                     return Err(crate::ffi::typ_hinweis(sname).replace("(moeglich: ", "(moeglich: ein STRUCT ... LAYOUT C oder "));
                 }
                 "p".to_string()
+            } else if let Some(sname) = t.strip_prefix('~') {
+                // BYVAL: der Struct als Wert -- die Signatur traegt seine Lage,
+                // die Laufzeit zerlegt ihn nach den Regeln des Systems.
+                if !self.lagen.contains_key(sname) {
+                    self.err_line = zeile;
+                    return Err(crate::ffi::typ_hinweis(sname).replace("(moeglich: ", "(moeglich: ein STRUCT ... LAYOUT C oder "));
+                }
+                format!("x{}", crate::cstruct::wert_text(sname, &self.lagen))
             } else {
                 crate::ffi::typ_zeichen(t).unwrap_or('q').to_string()
             };
             ps.push((typ, *b, n.clone()));
         }
-        let rz = ret.as_deref().and_then(crate::ffi::typ_zeichen).unwrap_or('v');
+        // Die Rueckgabe: ein Typwort oder ein Struct als Wert (`~name`).
+        let rueck_text = match ret.as_deref() {
+            Some(r) if r.starts_with('~') => {
+                let sname = &r[1..];
+                if !self.lagen.contains_key(sname) {
+                    self.err_line = zeile;
+                    return Err(crate::ffi::typ_hinweis(sname).replace("(moeglich: ", "(moeglich: ein STRUCT ... LAYOUT C oder "));
+                }
+                format!("x{}", crate::cstruct::wert_text(sname, &self.lagen))
+            }
+            r => r.and_then(crate::ffi::typ_zeichen).unwrap_or('v').to_string(),
+        };
+        let rz = rueck_text.chars().next().unwrap_or('v');
         let c_name = alias.clone().unwrap_or_else(|| name.clone());
         // `LIB GTK`: der Text der CONST.
         let lib = match lib.strip_prefix(crate::ffi::LIB_CONST) {
@@ -3974,7 +3994,7 @@ impl Compiler {
                 }
             },
         };
-        let signatur = crate::ffi::signatur_text(&lib, &c_name, anzeige, rz, &ps);
+        let signatur = crate::ffi::signatur_text(&lib, &c_name, anzeige, &rueck_text, &ps);
         let rueck = if rz == 'v' { String::new() } else { crate::ffi::dh_typ(rz).to_string() };
         self.ffi_decls.insert(low, FfiDecl { signatur, anzeige: anzeige.clone(),
             arten: ps.iter().map(|p| p.0.chars().next().unwrap_or('q')).collect(),
@@ -4009,14 +4029,14 @@ impl Compiler {
                 't' | 'w' => matches!(t, Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
                 'f' | 'd' => matches!(t, Typ::Str | Typ::Bool),
                 'o' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl),
-                'p' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
+                'p' | 'x' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
                 'r' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
                 _ => matches!(t, Typ::Str | Typ::Bool | Typ::Float),
             };
             if falsch {
                 self.warnings.push((self.ctx.cur_line, format!(
                     "{}: Argument {} ({} AS {}) bekommt {} -- beim Laufen bricht diese Zeile ab",
-                    name, i + 1, d.pnamen[i], crate::ffi::typ_name(art), t)));
+                    name, i + 1, d.pnamen[i], ffi_typ_anzeige(d, i), t)));
             }
         }
         let c = self.ctx.add_const(json!(d.signatur));
@@ -5267,4 +5287,17 @@ mod arity_tests {
         assert_eq!(parse_arity("BILLBOARD(*args)"), None);      // absichtlich offen
         assert_eq!(parse_arity("kein_klammer_paar"), None);
     }
+}
+
+/// Der Typ eines DECLARE-Parameters fuer Meldungen: das Typwort, bei einem
+/// Struct als Wert sein Name.
+fn ffi_typ_anzeige(d: &FfiDecl, i: usize) -> String {
+    if d.arten.get(i) == Some(&'x') {
+        if let Ok(sig) = crate::ffi::signatur_lesen(&d.signatur) {
+            if let Some(s) = sig.params.get(i).and_then(|p| crate::ffi::struct_lesen(&p.rr)) {
+                return s.name.to_uppercase();
+            }
+        }
+    }
+    crate::ffi::typ_name(d.arten.get(i).copied().unwrap_or('q')).to_string()
 }

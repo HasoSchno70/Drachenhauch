@@ -49,7 +49,8 @@ DECLARE SUB name LIB "bibliothek" [ALIAS "c_name"] (parameter)
 
 Wer aus VB oder QBasic kommt: ein `DECLARE` für eigene SUBs braucht es hier
 nicht, die Meldung sagt das. `ByVal` vor einem Parameter wird übergangen
-(es ist die Vorgabe).
+(es ist die Vorgabe) -- außer vor einem Struct, dort heißt es „als Wert“
+(siehe [Structs als Wert](#structs-als-wert)).
 
 ## Die Typen
 
@@ -347,6 +348,53 @@ Auch ein Element, das eine Bibliothek per Zeiger übergibt -- etwa die zwei
 Elemente im Vergleich von `qsort` --, liest man durch die Lage:
 `DIM a AS Punkt : a = BUFFER_AUS_ZEIGER(zeiger, SIZEOF(Punkt))`.
 
+### Structs als Wert
+
+Manche C-Funktion nimmt einen Struct nicht als Zeiger (`Punkt*`), sondern
+als Wert (`Punkt`), oder sie gibt einen zurück -- `div` liefert ein `div_t`,
+Grafik-Bibliotheken nehmen Punkte und Farben so. Dafür steht **`BYVAL`** vor
+dem Parameter, und die Rückgabe heißt einfach wie der Struct:
+
+```basic
+STRUCT Komplex LAYOUT C
+    re AS FLOAT
+    im AS FLOAT
+END STRUCT
+DECLARE FUNCTION csqrt LIB "m" (BYVAL z AS Komplex) AS Komplex
+DECLARE FUNCTION cabs LIB "m" (BYVAL z AS Komplex) AS FLOAT
+
+DIM z AS Komplex
+z.re = -4
+DIM w AS Komplex
+w = csqrt(z)
+PRINT w.re, w.im, cabs(z)     ' 0.0  2.0  4.0
+```
+
+* **Ohne `BYVAL` bleibt es ein Zeiger** -- so wie bisher; `p AS Punkt` heißt
+  in C `Punkt*`, `BYVAL p AS Punkt` heißt `Punkt`. Die C-Deklaration sagt,
+  welches gemeint ist.
+* **Die Funktion bekommt eine Kopie.** Was sie daran ändert, sieht das
+  Programm nicht; der Puffer muss mindestens so lang sein wie der Struct.
+* **Eine Rückgabe ist ein neuer Struct** (ein BUFFER in seiner Größe), den
+  man einer Variable des Typs zuweist. Liefert die Bibliothek einen
+  *Zeiger* auf einen Struct, ist die Rückgabe weiter `ZEIGER`.
+* **Wie der Struct reist, entscheidet das System**, und Drachenhauch hält
+  sich an dessen Regeln: unter Windows x64 geht ein Struct mit 1, 2, 4 oder
+  8 Bytes in einem Register, jeder andere als Zeiger auf eine Kopie; unter
+  Linux und macOS auf Intel (System V) gehen bis zu 16 Bytes in Registern
+  -- Kommazahlen in den SSE-, alles andere in den Ganzzahl-Registern --,
+  Größeres auf dem Stapel; auf ARM (Linux und Apple) gehen bis zu vier
+  gleiche Kommazahlen in Gleitkomma-Registern, sonst bis zu 16 Bytes in
+  Ganzzahl-Registern und Größeres als Zeiger. Im Programm sieht man davon
+  nichts.
+* **Komplexe Zahlen** (`double complex`, `_Dcomplex`) behandelt C genau wie
+  einen Struct aus zwei Kommazahlen -- `csqrt`, `cexp` und Co. aus der
+  C-Bibliothek gehen damit wie oben.
+* Nicht (noch) als Wert: ein Struct in einem **Rückruf** (er kommt dort als
+  `ZEIGER` an) und in einer Funktion mit **`...`**; auf ARM ein Struct aus
+  Kommazahlen, für den hinter acht Kommazahl-Argumenten kein Register mehr
+  frei ist. Alle drei sind eine Meldung, kein stiller Fehler.
+
 ## GTK
 
 [GTK](https://www.gtk.org/) ist die Bibliothek, mit der unter Linux die
@@ -593,7 +641,8 @@ END TRY
 
 ## Was es (noch) nicht gibt
 
-* **Structs als Wert** übergeben (nur über einen Zeiger) und Bitfelder.
+* Bitfelder in einem Struct; ein Struct als Wert in einem Rückruf oder
+  hinter `...` (siehe [Structs als Wert](#structs-als-wert)).
 * C++-Namen, COM, `va_list`-Funktionen (`vprintf`). Eine C++-Bibliothek wie
   Qt geht über einen Umweg mit C-Schnittstelle -- etwa
   [Python einbetten](#python-einbetten) mit PySide6.
