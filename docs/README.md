@@ -121,13 +121,14 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Anwendungen und Tempo](entwurf-anwendungen-und-tempo.md)** — gemessen gegen Python: Zeichenketten-Anhängen ist quadratisch, Builtins werden am Namen gesucht; was einer GUI-Anwendung noch fehlt, und in welcher Reihenfolge
 - **[Entwurf: Maschinencode](entwurf-maschinencode.md)** — wie Drachenhauch als übersetzte Sprache richtig schnell wird: getypte Zwischenstufe, getypte VM, dann Cranelift-JIT mit der VM als Referenz
 - **[Entwurf: Pakete](entwurf-pakete.md)** — Bibliotheken holen und teilen ohne eigenen Server: Quellen, Ablage im Projekt, Sperrdatei mit Prüfsumme; gebaut als `dhrt paket`
-- **[Entwurf: Fremde Bibliotheken](entwurf-ffi.md)** — `DECLARE FUNCTION … LIB` wie in VB6/FreeBASIC: Typen, Laden, Aufruf über Cranelift, Structs über BUFFER, was heikel bleibt; noch nicht gebaut
+- **[Entwurf: Fremde Bibliotheken](entwurf-ffi.md)** — `DECLARE FUNCTION … LIB` wie in VB6/FreeBASIC: Typen, Laden, Aufruf über Cranelift, Structs über BUFFER, was heikel bleibt; gebaut samt Rückrufen, Struct-Lage und variabler Argumentzahl
 - **[Entwurf: SPEAK](entwurf-speak.md)** — Sprachausgabe fuer Spiele ohne gui: WinRT liefert die besseren Stimmen und einen Klang statt eines Lautsprecherausgangs (12–35 ms je Satz, gemessen); Empfehlung: Synthese zu PCM durch Kira, Bildschirmleser zuerst
 - **[Entwurf: Eingabemethoden (IME)](entwurf-eingabemethoden.md)** — gemessen: der Speicher ist Unicode, die Anzeige Latin-1 (das Euro-Zeichen ist ein Fragezeichen); Wege Zeichenvorrat, Umwandlungsfenster, Preedit, SDL; Empfehlung: erst sehen, dann tippen
 - **[Entwurf: Barrierefreiheit](entwurf-barrierefreiheit.md)** — der UIA-Baum eines dhrt-Fensters ist leer, gemessen; AccessKit, Sprachausgabe und Handwerk als Wege; Empfehlung: Handwerk sofort, dann AccessKit mit Windows zuerst
 - **[Entwurf: Drucken](entwurf-drucken.md)** — kein raylib fuers Papier: geprüfte Bausteine, vier Wege; Empfehlung: die Seite selbst zeichnen (GDI/CUPS als Ziele des pdf-Moduls), dazu ein Befehl, der eine Datei öffnet
-- **[Release 2026.22](release-2026.22.md)** — was in dieser Fassung neu ist
-- **[Release 2026.21](release-2026.21.md)** — die Fassung davor
+- **[Release 2026.23](release-2026.23.md)** — was in dieser Fassung neu ist
+- **[Release 2026.22](release-2026.22.md)** — die Fassung davor
+- **[Release 2026.21](release-2026.21.md)** — und die davor
 - **[Release 2026.20](release-2026.20.md)** — und die davor
 - **[Release 2026.19](release-2026.19.md)** — und die davor
 - **[Release 2026.18](release-2026.18.md)** — und die davor
