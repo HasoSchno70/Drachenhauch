@@ -1555,10 +1555,16 @@ impl Parser {
                 if ist_sub { "SUB" } else { "FUNCTION" }, name));
         }
         self.pos += 1;                                  // LIB
-        if !self.check(Tt::Str) {
-            return self.err("Erwartet den Namen der Bibliothek in Anfuehrungszeichen nach LIB, z.B. LIB \"user32\"");
-        }
-        let lib = sval(self.peek(0));
+        // Der Name als Text oder als CONST mit festem Text (`LIB GTK`) --
+        // eine CONST traegt die Namen aller Systeme einmal statt je Zeile.
+        // Der Compiler setzt sie ein; hier steht sie mit einem Vorsatz.
+        let lib = if self.check(Tt::Str) {
+            sval(self.peek(0))
+        } else if self.check(Tt::Ident) {
+            format!("{}{}", crate::ffi::LIB_CONST, sval(self.peek(0)))
+        } else {
+            return self.err("Erwartet den Namen der Bibliothek in Anfuehrungszeichen nach LIB, z.B. LIB \"user32\" -- oder eine CONST mit dem Namen");
+        };
         self.pos += 1;
         if lib.trim().is_empty() { return self.err("Der Name der Bibliothek ist leer"); }
         let anzeige = c_name.clone();

@@ -41,6 +41,10 @@ use std::rc::Rc;
 
 use crate::value::Value;
 
+/// Vorsatz fuer `LIB name`: der Name einer CONST statt eines Textes
+/// (der Parser schreibt ihn, der Compiler setzt den Wert ein).
+pub const LIB_CONST: char = '\u{1}';
+
 /// Trenner zwischen den Teilen der Signatur (ASCII Unit Separator) -- kommt
 /// in keinem Bibliotheks- oder Funktionsnamen vor.
 pub const TRENNER: char = '\u{1f}';
@@ -166,8 +170,20 @@ pub fn signatur_lesen(s: &str) -> Result<Signatur, String> {
 
 /// Die Dateinamen, unter denen eine Bibliothek gesucht wird -- in dieser
 /// Reihenfolge, jeder erst neben dem Programm, dann neben dhrt, dann wo das
-/// System sucht. Ein Name mit Pfad oder Endung gilt woertlich.
+/// System sucht. Ein Name mit Pfad oder Endung gilt woertlich. Mehrere Namen
+/// stehen durch `|` getrennt (`"libgtk-3-0.dll|libgtk-3.so.0"`) -- so traegt
+/// EINE DECLARE-Zeile die Namen aller Systeme; der erste, der sich laden
+/// laesst, gilt.
 pub fn dateinamen(name: &str, system: &str) -> Vec<String> {
+    if name.contains('|') {
+        let mut alle: Vec<String> = Vec::new();
+        for teil in name.split('|').map(str::trim).filter(|t| !t.is_empty()) {
+            for n in dateinamen(teil, system) {
+                if !alle.contains(&n) { alle.push(n); }
+            }
+        }
+        return alle;
+    }
     let low = name.to_lowercase();
     let woertlich = name.contains('/') || name.contains('\\')
         || low.ends_with(".dll") || low.ends_with(".dylib") || low.ends_with(".so")
@@ -657,7 +673,9 @@ fn bibliothek(name: &str) -> Result<Rc<libloading::Library>, String> {
     if let Some(d) = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf())) {
         if !orte.contains(&d) { orte.push(d); }
     }
-    let mut letzter = String::new();
+    // Lag eine Datei da und liess sich nur nicht laden, ist das ein anderer
+    // Fehler als "nicht gefunden" -- meist fehlt ihr selbst eine Bibliothek.
+    let mut nicht_ladbar: Option<(String, String)> = None;
     for n in &namen {
         let pfad = std::path::Path::new(n);
         let mut kandidaten: Vec<std::path::PathBuf> = Vec::new();
@@ -669,15 +687,36 @@ fn bibliothek(name: &str) -> Result<Rc<libloading::Library>, String> {
         }
         kandidaten.push(pfad.to_path_buf());
         for k in kandidaten {
-            match unsafe { libloading::Library::new(&k) } {
+            match unsafe { laden(&k) } {
                 Ok(l) => return Ok(Rc::new(l)),
-                Err(e) => letzter = e.to_string(),
+                Err(e) => if k.is_file() && nicht_ladbar.is_none() {
+                    nicht_ladbar = Some((k.display().to_string(), e.to_string()));
+                },
             }
         }
     }
-    let _ = letzter;
+    if let Some((datei, grund)) = nicht_ladbar {
+        return Err(format!("Bibliothek \"{}\" liegt als {} da, laesst sich aber nicht laden -- fehlt ihr selbst eine Bibliothek, oder passt sie nicht zu diesem System (64 Bit)? Das System sagt: {}",
+                           name, datei, grund));
+    }
     Err(format!("Bibliothek \"{}\" nicht gefunden (versucht: {} -- neben dem Programm, neben dhrt und wo das System sucht)",
                 name, namen.join(", ")))
+}
+
+/// Eine Bibliothek laden. Unter Windows sucht ein voller Pfad ihre eigenen
+/// Abhaengigkeiten zuerst in IHREM Ordner (`LOAD_WITH_ALTERED_SEARCH_PATH`)
+/// -- sonst faende `C:/.../libgtk-3-0.dll` die `libglib` daneben nicht, und
+/// man muesste den Ordner in den PATH legen.
+#[cfg(feature = "ffi")]
+unsafe fn laden(pfad: &std::path::Path) -> Result<libloading::Library, libloading::Error> {
+    // Die Suche im eigenen Ordner geht nur mit Rueckstrichen im Pfad.
+    #[cfg(windows)]
+    if pfad.is_absolute() {
+        let mit_rueckstrich = pfad.to_string_lossy().replace('/', "\\");
+        return libloading::os::windows::Library::load_with_flags(
+            &mit_rueckstrich, libloading::os::windows::LOAD_WITH_ALTERED_SEARCH_PATH).map(Into::into);
+    }
+    libloading::Library::new(pfad)
 }
 
 #[cfg(feature = "ffi")]
@@ -921,6 +960,13 @@ mod tests {
         assert_eq!(s.params[3], Param { art: 'r', byref: false, name: "cmp".into(), rr: "lzz".into() });
         let leer = signatur_lesen(&signatur_text("c", "getpid", "getpid", 'l', &[])).unwrap();
         assert!(leer.params.is_empty());
+    }
+
+    #[test]
+    fn mehrere_namen_in_lib() {
+        assert_eq!(dateinamen("libgtk-3-0.dll|libgtk-3.so.0", "linux"), ["libgtk-3-0.dll", "libgtk-3.so.0"]);
+        assert_eq!(dateinamen("user32 | c", "windows"), ["user32.dll", "ucrtbase.dll", "msvcrt.dll"]);
+        assert_eq!(dateinamen("sqlite3|sqlite3", "macos"), dateinamen("sqlite3", "macos"));
     }
 
     #[test]

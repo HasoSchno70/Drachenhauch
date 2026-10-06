@@ -440,7 +440,15 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
             mit_lokalen(l, &ps, body);
         }
         // Nur der Name im Programm; der in der Bibliothek (`alias`) bleibt.
-        DeclareLib { name, .. } => l.namen(name),
+        DeclareLib { name, lib, .. } => {
+            l.namen(name);
+            // `LIB GTK`: die CONST gehoert zur Datei wie jeder andere Name.
+            if let Some(c) = lib.strip_prefix(crate::ffi::LIB_CONST) {
+                let mut n = c.to_string();
+                l.namen(&mut n);
+                *lib = format!("{}{}", crate::ffi::LIB_CONST, n);
+            }
+        }
 
         // --- alles Uebrige: nur durchreichen ------------------------------
         Program { statements } => { for s in statements { knoten(l, s); } }

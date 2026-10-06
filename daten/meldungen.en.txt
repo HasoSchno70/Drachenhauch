@@ -1559,7 +1559,7 @@ GUI_SET_TAB_INDEX: der Index ist 0 (Anlege-Reihenfolge) oder groesser	GUI_SET_TA
 # ---------------------------------------------------------------- Fremde Bibliotheken (DECLARE ... LIB)
 Erwartet den Namen nach DECLARE SUB/FUNCTION	Expected a name after DECLARE SUB/FUNCTION
 DECLARE braucht man in Drachenhauch nur fuer fremde Bibliotheken: DECLARE {} {} LIB "bibliothek" (...) -- eine eigene SUB/FUNCTION darf vor oder nach ihrem Aufruf stehen, ohne DECLARE	In Drachenhauch DECLARE is only needed for foreign libraries: DECLARE {} {} LIB "library" (...) -- your own SUB/FUNCTION may stand before or after its call, without DECLARE
-Erwartet den Namen der Bibliothek in Anfuehrungszeichen nach LIB, z.B. LIB "user32"	Expected the library name in quotes after LIB, e.g. LIB "user32"
+Erwartet den Namen der Bibliothek in Anfuehrungszeichen nach LIB, z.B. LIB "user32" -- oder eine CONST mit dem Namen	Expected the library name in quotes after LIB, e.g. LIB "user32" -- or a CONST with the name
 Der Name der Bibliothek ist leer	The library name is empty
 Erwartet den Namen in der Bibliothek in Anfuehrungszeichen nach ALIAS	Expected the name inside the library in quotes after ALIAS
 BYREF geht nur bei Zahlen und ZEIGER -- {} ist schon ein Zeiger; Text, den die Bibliothek schreibt, kommt ueber einen BUFFER	BYREF only works for numbers and ZEIGER -- {} is already a pointer; text the library writes comes through a BUFFER
@@ -1655,5 +1655,7 @@ SIZEOF: '{}' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER ..
 {} ist ein Feld von {} Elementen -- mit Index: {}[0]	{} is an array of {} elements -- with an index: {}[0]
 {} ist ein Struct -- lies und schreib seine Felder ({}.feld); seine Bytes liegen im Puffer ab OFFSETOF	{} is a struct -- read and write its fields ({}.field); its bytes lie in the buffer from OFFSETOF
 (moeglich: ein STRUCT ... LAYOUT C oder 	(possible: a STRUCT ... LAYOUT C or 
+LIB {}: erwartet eine CONST mit festem Text (CONST {} = "libname.so|name.dll") oder den Namen in Anfuehrungszeichen	LIB {}: expects a CONST with a fixed text (CONST {} = "libname.so|name.dll") or the name in quotes
+Bibliothek "{}" liegt als {} da, laesst sich aber nicht laden -- fehlt ihr selbst eine Bibliothek, oder passt sie nicht zu diesem System (64 Bit)? Das System sagt: {}	library "{}" is there as {} but cannot be loaded -- is a library it needs missing, or does it not fit this system (64 bit)? The system says: {}
 TASK: der Auftrag ist abgestuerzt{} -- er hat keine Antwort mehr geschickt; das Hauptprogramm laeuft weiter	TASK: the task crashed{} -- it sent no answer any more; the main program keeps running
  (Rueckgabe {})	 (exit code {})

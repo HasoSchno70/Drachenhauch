@@ -3960,7 +3960,19 @@ impl Compiler {
         }
         let rz = ret.as_deref().and_then(crate::ffi::typ_zeichen).unwrap_or('v');
         let c_name = alias.clone().unwrap_or_else(|| name.clone());
-        let signatur = crate::ffi::signatur_text(lib, &c_name, anzeige, rz, &ps);
+        // `LIB GTK`: der Text der CONST.
+        let lib = match lib.strip_prefix(crate::ffi::LIB_CONST) {
+            None => lib.clone(),
+            Some(k) => match self.konst_werte.get(&k.to_lowercase()) {
+                Some(Some(crate::value::Value::Str(t))) if !t.trim().is_empty() => t.to_string(),
+                _ => {
+                    self.err_line = zeile;
+                    return Err(format!("LIB {}: erwartet eine CONST mit festem Text (CONST {} = \"libname.so|name.dll\") oder den Namen in Anfuehrungszeichen",
+                                       k.to_uppercase(), k.to_uppercase()));
+                }
+            },
+        };
+        let signatur = crate::ffi::signatur_text(&lib, &c_name, anzeige, rz, &ps);
         let rueck = if rz == 'v' { String::new() } else { crate::ffi::dh_typ(rz).to_string() };
         self.ffi_decls.insert(low, FfiDecl { signatur, anzeige: anzeige.clone(),
             arten: ps.iter().map(|p| p.0.chars().next().unwrap_or('q')).collect(),
