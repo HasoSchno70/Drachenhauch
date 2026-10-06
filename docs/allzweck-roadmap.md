@@ -467,7 +467,7 @@ Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,
 > Fragen, die zu entscheiden waren — **alle vier beantwortet**, siehe
 > Abschnitt 6 dort. Gebaut sind **I.1** (`IMPORT "x.dh" AS x`, `PRIVATE`,
 > Abschottung gegen die Globals des Hauptprogramms) und **I.4**
-> (Meldungen mit Datei und Zeile). Seit I.2 auch Klassen und Structs als Typ und hinter `NEW`.
+> (Meldungen mit Datei und Zeile). Seit I.2 auch Klassen und Structs als Typ und hinter `NEW`, seit I.3 ENUMs (`mathe.Farbe.ROT`).
 > Offen: I.3 (ENUMs).
 >
 > **Stufe I.4 ist gebaut (2026-08-17):** Namenskollisionen nennen jetzt

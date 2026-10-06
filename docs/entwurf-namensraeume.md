@@ -1,6 +1,9 @@
 # Entwurf: Namensräume (WP I)
 
-> **Status: Entwurf, nichts davon ist gebaut.** Dieses Papier ist zum Lesen und
+> **Status: gebaut (2026-08-17 bis 2026-08-19), alle vier Stufen I.1 bis
+> I.4** -- `IMPORT "x.dh" AS x`, `PRIVATE`, Klassen, Structs und ENUMs aus
+> dem Namensraum; Handbuch in [sprache.md](sprache.md) (Namensraum). Der Text
+> unten ist die Fassung des Entwurfs und steht als Protokoll. Er war zum Lesen und
 > Entscheiden da. WP I ist der einzige Punkt der [Allzweck-Roadmap](allzweck-roadmap.md),
 > der auf **bestehenden** Code zurückwirkt — deshalb erst der Entwurf, dann
 > Code.
@@ -207,8 +210,8 @@ Meldungen.
 | Stufe | Inhalt | Risiko |
 |---|---|---|
 | **I.1** | `IMPORT … AS` für `SUB`/`FUNCTION`/`CONST`/`DIM` auf Top-Level, plus `PRIVATE`. Klassen/Enums/Structs aus einem Namensraum: klarer Fehler „noch nicht erreichbar". | gering — nichts Bestehendes ändert sich |
-| **I.2** | Klassen und Structs: `DIM p AS mathe.Punkt`, `NEW mathe.Punkt(...)`. Berührt die Typauflösung (`is_value_type`, `unknown_dim_type_msg`). | mittel |
-| **I.3** | Enums: `mathe.Farbe.ROT` — zwei Punkte hintereinander. Braucht eine Entscheidung, ob das lesbar genug ist. | mittel |
+| **I.2** | ✅ **erledigt** (2026-08-19) — Klassen und Structs: `DIM p AS mathe.Punkt`, `NEW mathe.Punkt(...)`. Berührt die Typauflösung (`is_value_type`, `unknown_dim_type_msg`). | mittel |
+| **I.3** | ✅ **erledigt** (2026-08-19) — Enums: `mathe.Farbe.ROT` — zwei Punkte hintereinander. | mittel |
 | **I.4** | ✅ **erledigt** — Kollisionen nennen **beide** Dateien und Zeilen, und alle Meldungen der Übersetzungs-Phasen zeigen auf die Datei des Nutzers (behebt (a) und (d)). Brachte nebenbei Schritt 1 des Bauwegs mit: die Herkunftstabelle. | gering |
 
 **I.4 ist gebaut** (2026-08-17) — klein, hilft sofort auch ohne Namensräume,
@@ -233,8 +236,9 @@ Alle vier Fragen sind beantwortet, jeweils wie vorgeschlagen:
 4. **Wie tief?** → I.1 + I.4. Klassen und ENUMs bleiben flach; `alias.Typ`
    bekommt eine eigene Meldung, die auf I.2 verweist.
 
-**I.1 ist damit gebaut** (2026-08-19, `namensraum.rs`, 16 Golden-Tests). Offen
-bleiben I.2 (Typen) und I.3 (ENUMs) — beide erst, wenn sie jemand braucht.
+**I.1 ist damit gebaut** (2026-08-19, `namensraum.rs`, 16 Golden-Tests).
+Am selben Tag kamen entgegen Antwort 4 auch I.2 (Klassen und Structs) und
+I.3 (ENUMs) dazu -- WP I ist vollständig.
 
 Der ursprüngliche Wortlaut der Fragen, als Protokoll:
 

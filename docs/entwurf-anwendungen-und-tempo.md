@@ -235,7 +235,7 @@ schreiben will, trotzdem vermisst:
 | **Oberfläche ist selbst gezeichnet** | sieht auf jedem System gleich aus, aber nicht „nativ“; dafür gibt es Themen und Maßstab. Kein Handlungsbedarf, aber ehrlich sagen | — |
 | ~~**Kein Paketverzeichnis**~~ | erledigt 2026-10-04: `dhrt paket hole github:nutzer/repo@stand` (auch https, lokal), Pakete in `pakete/` des Projekts, `paket.lock.json` mit SHA-256 -- [pakete.md](pakete.md) | — |
 | ~~**Keine anonymen Funktionen**~~ | erledigt 2026-10-04: Lambdas `FUNCTION(x) x * 2` / `SUB() ...` mit kopierten Locals, dazu `ARRAY_MAP/FILTER/REDUCE/FIND` | — |
-| **Kein Aufruf fremder DLLs/.so** | ein eigenes FFI (`LIB_LOAD`/`LIB_CALL`) öffnet vorhandene C-Bibliotheken | groß, heikel |
+| ~~**Kein Aufruf fremder DLLs/.so**~~ | erledigt 2026-10-05/06 (Fassung 2026.22): `DECLARE … LIB` mit eigenen Typwörtern, `BYREF`, Zeigern, Structs über `BUFFER` und Rückrufen; Export nimmt die Bibliothek mit -- [ffi.md](ffi.md) | — |
 
 ## 3. Empfohlene Reihenfolge
 
