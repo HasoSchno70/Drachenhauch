@@ -75,7 +75,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 ## Herunterladen
 
-**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 52 MB, aktuell Fassung 2026.22.
+**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 52 MB, aktuell Fassung 2026.23.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 223 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
@@ -98,8 +98,8 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # alle Pr
 
 | Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
 |---|---|---|
-| **Deutsch** — 533 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
-| **English** — 526 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 535 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 528 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
 
 Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): die Renderer bekommen ein `H`, das jede Zeichenkette vorher durch den Katalog `i18n/en.json` schickt. Ein zweiter Satz englischer Kapiteldateien wäre binnen eines Monats vom deutschen abgedriftet — so kann er es nicht. Fehlt ein Eintrag, bleibt der deutsche Satz stehen und das Buch baut trotzdem; `node fehlend.js en` zählt, wo noch welche fehlen.
 
