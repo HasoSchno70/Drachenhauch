@@ -69,6 +69,7 @@ Drachenhauch-Typen sagen nicht, wie breit eine Zahl in C ist.
 | `TEXT` (auch `CSTR`) | `const char*`, UTF-8 | STRING |
 | `WTEXT` (auch `WSTR`) | `const wchar_t*` (Windows: UTF-16, sonst UTF-32) | STRING |
 | `BUFFER` | `void*` auf die Bytes des Puffers | BUFFER |
+| `FUNCTION(...) AS typ`, `SUB(...)` | Funktionszeiger (Rückruf) | FUNCREF |
 
 * **Ein Wert, der nicht passt, ist ein Fehler**: `LONG` mit 2^40 bricht ab,
   statt still abgeschnitten zu werden; eine Kommazahl für `LONG` ebenso.
@@ -227,6 +228,65 @@ sie lehnt die Funktion ab. Auf Linux und macOS hat `struct utsname` (für
 `uname`) Felder fester Breite, 65 Bytes unter Linux und 256 unter macOS --
 die Lage eines Feldes hängt also am System.
 
+## Rückrufe
+
+Manche Bibliotheken rufen zurück: `qsort` fragt für jedes Paar, welches
+Element zuerst kommt, `EnumWindows` meldet jedes Fenster einzeln. Der
+Parameter dafür heißt in der `DECLARE`-Zeile so, wie der Rückruf aussieht
+-- die Schreibweise von FreeBASIC:
+
+```basic
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, _
+                           vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+
+FUNCTION zahlBei(z AS INTEGER) AS INTEGER
+    RETURN BUFFER_GET_I32(BUFFER_AUS_ZEIGER(z, 4), 0)
+END FUNCTION
+
+FUNCTION vergleiche(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN SGN(zahlBei(a) - zahlBei(b))
+END FUNCTION
+
+DIM b AS BUFFER
+b = BUFFER_NEW(12)
+BUFFER_SET_I32(b, 0, 42)
+BUFFER_SET_I32(b, 4, -7)
+BUFFER_SET_I32(b, 8, 13)
+qsort(b, 3, 4, vergleiche)                                  ' -7 13 42
+qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
+```
+
+* **Die Klammern nennen die C-Typen**, die der Rückruf bekommt, mit oder
+  ohne Namen (`FUNCTION(ZEIGER, ZEIGER) AS LONG`). Erlaubt sind die
+  Zahltypen, `ZEIGER`, `BOOLEAN` und `TEXT`/`WTEXT` (kommt als STRING an);
+  kein `BUFFER` (Speicher der Bibliothek ist ein `ZEIGER`) und kein `BYREF`.
+  Zurück gibt ein Rückruf eine Zahl, einen `ZEIGER` oder `BOOLEAN`, oder als
+  `SUB(...)` nichts.
+* **Übergeben wird eine Funktion**: ihr Name ohne Klammern, eine gebundene
+  Methode (`zaehler.eins` -- das Objekt kommt mit) oder ein Lambda. `NIL`
+  übergibt einen Nullzeiger. Passt die Zahl ihrer Parameter nicht, ist das
+  ein Fehler, bevor die Bibliothek überhaupt gerufen wird.
+* **Ein Fehler im Rückruf** kommt beim Aufruf der Bibliothek an, sobald sie
+  zurückkehrt -- als gewöhnlicher Laufzeitfehler, abfangbar mit `CATCH`.
+  Durch die Bibliothek hindurch abbrechen kann er nicht; ab dem Fehler
+  liefert jeder weitere Rückruf dieses Aufrufs 0, und die Bibliothek
+  arbeitet mit diesen Antworten zu Ende. Dasselbe gilt für einen Wert vom
+  falschen Typ (eine BOOLEAN-Funktion, wo `LONG` verlangt ist).
+* **Ein Rückruf darf selbst Bibliotheken rufen**, auch dieselbe.
+* **Nur auf dem Faden des Programms.** Ruft eine Bibliothek aus einem eigenen
+  Faden zurück (`CreateThread`, `pthread_create`, manche Treiber), wird der
+  Rückruf nicht ausgeführt -- er liefert 0, und der nächste Aufruf einer
+  Bibliothek, der zurückkehrt, meldet es. Das kann schon der sein, der den
+  Faden gestartet hat (sein Ergebnis geht dann verloren); unter Windows
+  hilft `CREATE_SUSPENDED` und ein eigenes `ResumeThread`. Die VM ist nicht
+  für mehrere Fäden gebaut.
+* **Ein Rückruf bleibt gültig, bis das Programm endet** -- die Bibliothek
+  darf ihn behalten und später rufen. Für dieselbe Funktion bekommt sie
+  immer denselben Einstieg; ein Lambda, das in einer Schleife jedes Mal neu
+  entsteht, bekommt jedes Mal einen neuen (wenige Bytes, die bis zum Ende
+  bleiben). Ein Fehler in einem Rückruf, den die Bibliothek außerhalb eines
+  Aufrufs ruft, meldet sich beim nächsten Aufruf einer Bibliothek.
+
 ## Export
 
 `dhrt --export` nimmt jede Bibliothek mit, die **neben dem Programm** liegt,
@@ -273,8 +333,6 @@ END TRY
 
 ## Was es (noch) nicht gibt
 
-* **Rückrufe** -- eine Bibliothek, die eine Funktion des Programms aufruft
-  (`qsort`, `EnumWindows`). Kommt, wenn es gebraucht wird.
 * **Structs als Wert**, nur über einen Zeiger (`BUFFER`); die Lage der
   Felder samt Ausrichtung rechnet man selbst.
 * **Variable Argumentzahl** (`printf`), C++-Namen, COM.
@@ -288,7 +346,9 @@ Richtigkeit.
 ## Unter der Haube
 
 Der Compiler macht aus jedem Aufruf den internen Befehl `__ffi` und gibt ihm
-die Deklaration mit. Die Laufzeit lädt die Bibliothek beim ersten Aufruf
+die Deklaration mit. Für jeden Rückruf baut die Laufzeit einen Einstieg mit
+der C-Signatur, der die Argumente einsammelt und die Funktion über die VM
+ruft. Die Laufzeit lädt die Bibliothek beim ersten Aufruf
 (`libloading`) und baut je Signatur einmal einen kleinen Übergang mit
 Cranelift -- derselben Bibliothek, die auch den Maschinencode erzeugt; er
 legt die Argumente nach der C-Aufrufkonvention des Systems ab. Entwurf und

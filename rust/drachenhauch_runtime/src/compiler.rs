@@ -3742,13 +3742,18 @@ impl Compiler {
             return Err(format!("'{}' ist zugleich eine eigene SUB/FUNCTION ({}) und eine Funktion aus \"{}\" -- mit ALIAS \"{}\" darf die fremde hier anders heissen",
                                name, self.wo(z), lib, name));
         }
-        let ps: Vec<(char, bool, String)> = params.iter()
-            .map(|(n, t, b)| (crate::ffi::typ_zeichen(t).unwrap_or('q'), *b, n.clone())).collect();
+        // Ein Rueckruf kommt vom Parser als "@" + Rueckgabe + Parameter.
+        let ps: Vec<(String, bool, String)> = params.iter()
+            .map(|(n, t, b)| (match t.strip_prefix('@') {
+                Some(rr) => format!("r{}", rr),
+                None => crate::ffi::typ_zeichen(t).unwrap_or('q').to_string(),
+            }, *b, n.clone())).collect();
         let rz = ret.as_deref().and_then(crate::ffi::typ_zeichen).unwrap_or('v');
         let c_name = alias.clone().unwrap_or_else(|| name.clone());
         let signatur = crate::ffi::signatur_text(lib, &c_name, anzeige, rz, &ps);
         let rueck = if rz == 'v' { String::new() } else { crate::ffi::dh_typ(rz).to_string() };
-        self.ffi_decls.insert(low, FfiDecl { signatur, anzeige: anzeige.clone(), arten: ps.iter().map(|p| p.0).collect(),
+        self.ffi_decls.insert(low, FfiDecl { signatur, anzeige: anzeige.clone(),
+            arten: ps.iter().map(|p| p.0.chars().next().unwrap_or('q')).collect(),
             pnamen: ps.iter().map(|p| p.2.clone()).collect(), byref: ps.iter().map(|p| p.1).collect(), rueck, zeile });
         Ok(())
     }
@@ -3774,6 +3779,7 @@ impl Compiler {
                 'f' | 'd' => matches!(t, Typ::Str | Typ::Bool),
                 'o' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl),
                 'p' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
+                'r' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
                 _ => matches!(t, Typ::Str | Typ::Bool | Typ::Float),
             };
             if falsch {

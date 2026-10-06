@@ -1,4 +1,4 @@
-' Fremde Bibliotheken aufrufen: DECLARE ... LIB (docs/entwurf-ffi.md, Stufen 1 und 2).
+' Fremde Bibliotheken aufrufen: DECLARE ... LIB (docs/entwurf-ffi.md, Stufen 1 bis 3).
 ' Geprueft wird gegen Bibliotheken, die ueberall da sind: unter Windows
 ' kernel32/user32, sonst und auch unter Windows die C-Bibliothek ("c", "m" --
 ' ucrtbase, glibc, libSystem). Jeder Typ der DECLARE-Zeile kommt mindestens
@@ -340,6 +340,266 @@ export 0
 mitgekommen ist die des systems: TRUE
 anzahl 1
 ungenutzt nicht dabei TRUE
+
+=== qsort ruft eine drachenhauch-funktion zurueck
+' Stufe 3: ein Parameter AS FUNCTION(...) AS typ bekommt eine Funktion des
+' Programms. qsort gibt es in jeder C-Bibliothek; die Elemente kommen als
+' Zeiger an, BUFFER_AUS_ZEIGER liest sie.
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, _
+                           vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+FUNCTION zahlBei(z AS INTEGER) AS INTEGER
+    RETURN BUFFER_GET_I32(BUFFER_AUS_ZEIGER(z, 4), 0)
+END FUNCTION
+DIM vergleiche_zaehler AS INTEGER
+FUNCTION vergleiche(a AS INTEGER, b AS INTEGER) AS INTEGER
+    vergleiche_zaehler = vergleiche_zaehler + 1
+    RETURN SGN(zahlBei(a) - zahlBei(b))
+END FUNCTION
+SUB zeigen(b AS BUFFER)
+    DIM t AS STRING
+    FOR i = 0 TO BUFFER_LEN(b) \ 4 - 1
+        t = t + STR$(BUFFER_GET_I32(b, i * 4)) + " "
+    NEXT
+    PRINT TRIM$(t)
+END SUB
+DIM b AS BUFFER
+b = BUFFER_NEW(24)
+DIM w[6] AS INTEGER
+w[0] = 42 : w[1] = -7 : w[2] = 13 : w[3] = 0 : w[4] = 99 : w[5] = -100000
+FOR i = 0 TO 5
+    BUFFER_SET_I32(b, i * 4, w[i])
+NEXT
+qsort(b, 6, 4, vergleiche)
+zeigen(b)
+PRINT vergleiche_zaehler > 0
+' absteigend, mit einem Lambda
+qsort(b, 6, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))
+zeigen(b)
+--- erwartet
+-100000 -7 0 13 42 99
+TRUE
+99 42 13 0 -7 -100000
+
+=== ein rueckruf darf selbst eine bibliothek rufen
+' Im Vergleich steckt ein weiterer Aufruf der C-Bibliothek (abs) -- der
+' innere Aufruf laeuft, waehrend qsort auf seine Antwort wartet.
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, _
+                           vergleich AS FUNCTION(ZEIGER, ZEIGER) AS LONG)
+DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
+FUNCTION nachBetrag(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM x AS INTEGER
+    x = abs(BUFFER_GET_I32(BUFFER_AUS_ZEIGER(a, 4), 0))
+    DIM y AS INTEGER
+    y = abs(BUFFER_GET_I32(BUFFER_AUS_ZEIGER(b, 4), 0))
+    RETURN SGN(x - y)
+END FUNCTION
+DIM b AS BUFFER
+b = BUFFER_NEW(16)
+BUFFER_SET_I32(b, 0, -9)
+BUFFER_SET_I32(b, 4, 3)
+BUFFER_SET_I32(b, 8, -1)
+BUFFER_SET_I32(b, 12, 5)
+qsort(b, 4, 4, nachBetrag)
+PRINT BUFFER_GET_I32(b, 0), BUFFER_GET_I32(b, 4), BUFFER_GET_I32(b, 8), BUFFER_GET_I32(b, 12)
+--- erwartet
+-1 3 5 -9
+
+=== enumwindows mit funktion und gebundener methode
+' Der Rueckruf beendet die Aufzaehlung, sobald er FALSE liefert. Eine
+' gebundene Methode traegt ihr Objekt mit.
+DECLARE FUNCTION EnumWindows LIB "user32" (rueckruf AS FUNCTION(hwnd AS ZEIGER, extra AS ZEIGER) AS BOOLEAN, _
+                                           extra AS ZEIGER) AS BOOLEAN
+DECLARE FUNCTION IsWindow LIB "user32" (hwnd AS ZEIGER) AS BOOLEAN
+DIM gesehen AS INTEGER
+DIM echt AS BOOLEAN
+echt = TRUE
+FUNCTION zaehle(hwnd AS INTEGER, extra AS INTEGER) AS BOOLEAN
+    gesehen = gesehen + 1
+    IF NOT IsWindow(hwnd) OR extra <> 4711 THEN echt = FALSE
+    RETURN gesehen < 3
+END FUNCTION
+PRINT EnumWindows(zaehle, 4711), gesehen, echt
+CLASS Sammler
+    DIM n AS INTEGER
+    FUNCTION eins(hwnd AS INTEGER, extra AS INTEGER) AS BOOLEAN
+        Self.n = Self.n + 1
+        RETURN TRUE
+    END FUNCTION
+END CLASS
+DIM s AS Sammler
+s = NEW Sammler()
+PRINT EnumWindows(s.eins, 0), s.n > 3
+--- system windows
+--- erwartet
+FALSE 3 TRUE
+TRUE TRUE
+
+=== ein fehler im rueckruf kommt beim aufruf an
+' Der Fehler darf nicht durch die Rahmen der C-Bibliothek laufen: er wird
+' gemerkt, jeder weitere Rueckruf liefert 0, und qsort meldet ihn, sobald es
+' zurueckkehrt -- abfangbar mit CATCH. Danach geht alles weiter.
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, _
+                           vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+DIM runden AS INTEGER
+FUNCTION kaputt(a AS INTEGER, b AS INTEGER) AS INTEGER
+    runden = runden + 1
+    RETURN 1 \ 0
+END FUNCTION
+FUNCTION falsch(a AS INTEGER, b AS INTEGER) AS BOOLEAN
+    RETURN TRUE
+END FUNCTION
+FUNCTION einer(a AS INTEGER) AS INTEGER
+    RETURN 0
+END FUNCTION
+DIM b AS BUFFER
+b = BUFFER_NEW(40)
+TRY
+    qsort(b, 10, 4, kaputt)
+CATCH e
+    PRINT e
+END TRY
+PRINT "runden "; runden
+TRY
+    qsort(b, 10, 4, falsch)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    qsort(b, 10, 4, einer)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    qsort(b, 10, 4, 5)
+CATCH e
+    PRINT e
+END TRY
+qsort(b, 10, 4, FUNCTION(a, b) 0)
+PRINT "weiter"
+--- erwartet
+qsort: Fehler im Rueckruf kaputt: Integer-Division durch 0
+runden 1
+qsort: der Rueckruf falsch soll LONG liefern: erwartet eine ganze Zahl (LONG), erhalten BOOLEAN
+qsort: Argument 4 (vergleich AS FUNCTION): die Funktion einer nimmt 1 Wert(e), der Rueckruf uebergibt 2
+qsort: Argument 4 (vergleich AS FUNCTION): erwartet eine Funktion (FUNCREF, z.B. den Namen einer FUNCTION ohne Klammern), erhalten INTEGER
+weiter
+
+=== ein rueckruf aus einem anderen faden wird nicht ausgefuehrt
+' CreateThread ruft die Funktion auf einem neuen Faden -- die VM laeuft nur
+' auf dem des Programms. Der Rueckruf liefert 0, und der naechste Aufruf
+' einer Bibliothek, der zurueckkehrt, meldet es. Welcher das ist, haengt
+' am Zufall der Faeden (ResumeThread oder das Warten); der Faden startet
+' darum angehalten (CREATE_SUSPENDED = 4), sonst ginge mit einer Meldung aus
+' CreateThread selbst das Handle verloren.
+DECLARE FUNCTION CreateThread LIB "kernel32" (attr AS ZEIGER, stapel AS ZEIGER, _
+    start AS FUNCTION(p AS ZEIGER) AS ULONG, p AS ZEIGER, flags AS ULONG, id AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION ResumeThread LIB "kernel32" (h AS ZEIGER) AS ULONG
+DECLARE FUNCTION WaitForSingleObject LIB "kernel32" (h AS ZEIGER, ms AS ULONG) AS ULONG
+DECLARE FUNCTION GetExitCodeThread LIB "kernel32" (h AS ZEIGER, BYREF code AS ULONG) AS BOOLEAN
+DIM gelaufen AS BOOLEAN
+FUNCTION faden(p AS INTEGER) AS INTEGER
+    gelaufen = TRUE
+    RETURN 7
+END FUNCTION
+DIM h AS INTEGER
+h = CreateThread(0, 0, faden, 0, 4, 0)
+PRINT h <> 0
+DIM meldung AS STRING
+TRY
+    ResumeThread(h)
+CATCH e
+    meldung = e
+END TRY
+TRY
+    WaitForSingleObject(h, 5000)
+CATCH e
+    meldung = e
+END TRY
+PRINT MID$(meldung, INSTR(meldung, ":") + 2)
+DIM code AS INTEGER
+PRINT GetExitCodeThread(h, code), code, gelaufen
+--- system windows
+--- erwartet
+TRUE
+ein Rueckruf kam aus einem anderen Faden und wurde nicht ausgefuehrt -- Drachenhauch-Code laeuft nur auf dem Faden des Programms
+TRUE 0 FALSE
+
+=== ein rueckruf aus einem anderen faden auf linux und macos
+' Wie oben; pthread_create kennt kein Anhalten, also kann schon sein eigener
+' Aufruf die Meldung bringen -- der Faden steht dann trotzdem im Puffer.
+DECLARE FUNCTION pthread_create LIB "c" (faden AS BUFFER, attr AS ZEIGER, _
+    start AS FUNCTION(p AS ZEIGER) AS ZEIGER, p AS ZEIGER) AS LONG
+DECLARE FUNCTION pthread_join LIB "c" (faden AS ZEIGER, ergebnis AS ZEIGER) AS LONG
+DIM gelaufen AS BOOLEAN
+FUNCTION faden(p AS INTEGER) AS INTEGER
+    gelaufen = TRUE
+    RETURN 7
+END FUNCTION
+DIM t AS BUFFER
+t = BUFFER_NEW(16)
+DIM meldung AS STRING
+TRY
+    pthread_create(t, 0, faden, 0)
+CATCH e
+    meldung = e
+END TRY
+TRY
+    pthread_join(BUFFER_GET_I64(t, 0), 0)
+CATCH e
+    meldung = e
+END TRY
+PRINT MID$(meldung, INSTR(meldung, ":") + 2)
+PRINT gelaufen
+--- system posix
+--- erwartet
+ein Rueckruf kam aus einem anderen Faden und wurde nicht ausgefuehrt -- Drachenhauch-Code laeuft nur auf dem Faden des Programms
+FALSE
+
+=== ein rueckruf nennt seine typen, und was nicht geht, sagt der parser
+IMPORT "json"
+DIM p AS INTEGER
+SUB pruefe(text AS STRING)
+    WRITEALL("probe.dh", text)
+    p = PROCESS_START("dhrt", "--check", "probe.dh")
+    DIM aus AS STRING
+    DIM leer AS INTEGER
+    WHILE leer < 5
+        DIM z AS STRING
+        z = PROCESS_READ$(p)
+        IF z = "" THEN
+            IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+            SLEEP(30)
+        ELSE
+            aus = aus + z
+        END IF
+    WEND
+    DIM j AS JSON_HANDLE
+    j = JSON_PARSE("{" + CHR$(34) + "m" + CHR$(34) + ":" + aus + "}")
+    IF JSON_LEN(j, "m") = 0 THEN
+        PRINT "ok"
+    ELSE
+        PRINT JSON_GET_STRING(j, "m.0.message")
+    END IF
+END SUB
+DIM q AS STRING
+q = "DECLARE SUB q LIB " + CHR$(34) + "c" + CHR$(34) + " (cmp AS "
+pruefe(q + "FUNCTION(ZEIGER, a AS LONG) AS LONG)")
+pruefe(q + "SUB(ZEIGER))")
+pruefe(q + "FUNCTION(a AS ZEIGER) AS TEXT)")
+pruefe(q + "FUNCTION(a AS BUFFER) AS LONG)")
+pruefe(q + "SUB(a AS ZEIGER) AS LONG)")
+pruefe(q + "FUNCTION(a AS ZEIGER))")
+pruefe("DECLARE SUB q LIB " + CHR$(34) + "c" + CHR$(34) + " (BYREF cmp AS SUB(ZEIGER))")
+pruefe(q + "SUB(ZEIGER))" + CHR$(10) + "q(" + CHR$(34) + "x" + CHR$(34) + ")")
+--- erwartet
+ok
+ok
+Ein Rueckruf liefert eine Zahl, einen ZEIGER oder BOOLEAN -- keinen Text und keinen BUFFER (wem gehoerte der Speicher danach?)
+Ein Rueckruf bekommt keinen BUFFER -- Speicher der Bibliothek kommt als ZEIGER an, BUFFER_AUS_ZEIGER liest ihn
+Ein Rueckruf mit SUB gibt nichts zurueck -- mit Rueckgabe heisst es FUNCTION(...) AS typ
+Erwartet AS <Rueckgabetyp> nach FUNCTION(...) -- ohne Rueckgabe heisst es SUB(...)
+BYREF geht nicht bei einem Rueckruf -- die Bibliothek bekommt ohnehin einen Zeiger auf die Funktion
+q: Argument 1 (cmp AS FUNCTION) bekommt STRING -- beim Laufen bricht diese Zeile ab
 
 === eine deklarierte funktion verdeckt den eingebauten befehl
 DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
