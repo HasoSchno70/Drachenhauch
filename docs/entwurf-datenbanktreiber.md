@@ -1,5 +1,19 @@
 # Untersuchung: PostgreSQL und MySQL als Module
 
+> **Stand 2026-10-06: gebaut, beide** -- nicht als eigene Module, sondern im
+> Modul `db`: `DB_OPEN("postgres://...")` bzw. `DB_OPEN("mysql://...")`,
+> alles andere wie bei SQLite ([module-db.md](module-db.md#server-postgresql-und-mysql)).
+> Der Grund gegen MySQL ist weggefallen: `mysql` 28 hat den Schalter
+> `rustls-tls-ring`, TLS laeuft damit ueber dasselbe rustls+ring wie bei
+> PostgreSQL, smtp und ureq -- kein `aws-lc-sys`, kein cmake. Gemessen:
+> `cargo tree` zeigt weder aws-lc noch cmake noch OpenSSL. Die vier Punkte
+> unten sind so geloest: Platzhalter `?` ueberall (fuer PostgreSQL zu `$n`
+> uebersetzt), Werte im Textformat gebunden (der Server wandelt) und
+> binaer gelesen (`numeric`/`DECIMAL` genau als Text), `DB_PING` fuer die
+> Verbindung, und `DB_QUERY_START` nimmt dasselbe Ziel. Geprueft gegen
+> echte Server (`tests/pruef/db_server.dhtest`, jeder Ablauf gegen beide mit
+> derselben Erwartung; die CI startet sie auf dem Linux-Laeufer).
+
 *Untersuchung, keine Umsetzung.* Drachenhauch spricht heute genau eine
 Datenbank: SQLite, über das Modul [`db`](module-db.md). Für ein Programm auf
 einem Rechner reicht das vollständig. Sobald aber **zwei Leute gleichzeitig**

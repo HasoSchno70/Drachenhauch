@@ -327,7 +327,7 @@ fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> {
     }
 }
 #[cfg(feature = "db")]
-fn db_params(args: &[Value], fn_: &str) -> R<Vec<rusqlite::types::Value>> {
+fn db_params(args: &[Value], fn_: &str) -> R<Vec<crate::db::Param>> {
     args.iter().map(|v| crate::db::dh_to_sql(v, fn_)).collect()
 }
 
@@ -907,7 +907,7 @@ pub struct Vm<'p> {
     sprecher: crate::sprache::Sprecher,
     // Modul db (SQLite): Verbindungen + (eager geladene) Resultsets, INTEGER-Handles.
     #[cfg(feature = "db")]
-    db_conns: Vec<Option<rusqlite::Connection>>,
+    db_conns: Vec<Option<crate::db::Verbindung>>,
     #[cfg(feature = "db")]
     db_results: Vec<crate::db::DbResult>,
     // WP H: Abfragen, die im Hintergrund laufen. Eigene Verbindung je Auftrag
@@ -4440,8 +4440,8 @@ impl<'p> Vm<'p> {
     }
 
     #[cfg(feature = "db")]
-    fn db_conn(&self, idx: i64) -> R<&rusqlite::Connection> {
-        Self::handle_get(&self.db_conns, idx, "DB", "ungueltiges/geschlossenes DB_CONN-Handle")
+    fn db_conn(&mut self, idx: i64) -> R<&mut crate::db::Verbindung> {
+        Self::handle_get_mut(&mut self.db_conns, idx, "DB", "ungueltiges/geschlossenes DB_CONN-Handle")
     }
     #[cfg(feature = "db")]
     fn db_res(&self, idx: i64) -> R<&crate::db::DbResult> {
@@ -4472,16 +4472,18 @@ impl<'p> Vm<'p> {
                 if let Some(s) = self.db_conns.get_mut(i) { *s = None; }
                 Value::Nil
             }
-            "db_last_rowid" => Value::Int(self.db_conn(bi_int(a, 0, "DB_LAST_ROWID")?)?.last_insert_rowid()),
+            "db_last_rowid" => Value::Int(self.db_conn(bi_int(a, 0, "DB_LAST_ROWID")?)?.letzte_id()?),
+            "db_kind$" => Value::str_rc(self.db_conn(bi_int(a, 0, "DB_KIND$")?)?.art()),
+            "db_ping" => Value::Bool(self.db_conn(bi_int(a, 0, "DB_PING")?)?.lebt()),
             "db_exec" => {
                 let params = db_params(a.get(2..).unwrap_or(&[]), "DB_EXEC")?;
                 let sql = bi_str(a, 1, "DB_EXEC")?.to_string();
-                Value::Int(db::exec(self.db_conn(bi_int(a, 0, "DB_EXEC")?)?, &sql, &params)?)
+                Value::Int(self.db_conn(bi_int(a, 0, "DB_EXEC")?)?.exec(&sql, &params, "DB_EXEC")?)
             }
             "db_query" => {
                 let params = db_params(a.get(2..).unwrap_or(&[]), "DB_QUERY")?;
                 let sql = bi_str(a, 1, "DB_QUERY")?.to_string();
-                let res = { let c = self.db_conn(bi_int(a, 0, "DB_QUERY")?)?; db::query(c, &sql, &params)? };
+                let res = self.db_conn(bi_int(a, 0, "DB_QUERY")?)?.query(&sql, &params, "DB_QUERY")?;
                 self.db_results.push(res);
                 Value::Int((self.db_results.len() - 1) as i64)
             }
@@ -4506,9 +4508,9 @@ impl<'p> Vm<'p> {
             "db_get_int" => { let i1 = bi_int(a, 1, "DB_GET_INT")?; Value::Int(self.db_res(bi_int(a, 0, "DB_GET_INT")?)?.get_int(i1)?) }
             "db_get_float" => { let i1 = bi_int(a, 1, "DB_GET_FLOAT")?; Value::Float(self.db_res(bi_int(a, 0, "DB_GET_FLOAT")?)?.get_float(i1)?) }
             "db_get_bool" => { let i1 = bi_int(a, 1, "DB_GET_BOOL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_GET_BOOL")?)?.get_bool(i1)?) }
-            "db_begin" => { self.db_conn(bi_int(a, 0, "DB_BEGIN")?)?.execute_batch("BEGIN").map_err(|e| format!("DB_BEGIN: {}", e))?; Value::Nil }
-            "db_commit" => { self.db_conn(bi_int(a, 0, "DB_COMMIT")?)?.execute_batch("COMMIT").map_err(|e| format!("DB_COMMIT: {}", e))?; Value::Nil }
-            "db_rollback" => { self.db_conn(bi_int(a, 0, "DB_ROLLBACK")?)?.execute_batch("ROLLBACK").map_err(|e| format!("DB_ROLLBACK: {}", e))?; Value::Nil }
+            "db_begin" => { self.db_conn(bi_int(a, 0, "DB_BEGIN")?)?.befehl("BEGIN", "DB_BEGIN")?; Value::Nil }
+            "db_commit" => { self.db_conn(bi_int(a, 0, "DB_COMMIT")?)?.befehl("COMMIT", "DB_COMMIT")?; Value::Nil }
+            "db_rollback" => { self.db_conn(bi_int(a, 0, "DB_ROLLBACK")?)?.befehl("ROLLBACK", "DB_ROLLBACK")?; Value::Nil }
             _ => return Ok(None),
         };
         Ok(Some(v))
@@ -6686,9 +6688,10 @@ impl<'p> Vm<'p> {
                 let params = db_params(a.get(2..).unwrap_or(&[]), "DB_QUERY_START")?;
                 let kurz = sql.chars().take(40).collect::<String>();
                 Value::Int(self.db_auftraege.start(&kurz, move || {
-                    let conn = rusqlite::Connection::open(&datei)
-                        .map_err(|e| format!("DB_QUERY_START: {} ({})", e, datei))?;
-                    crate::db::query(&conn, &sql, &params)
+                    // Eine eigene Verbindung -- zur Datei oder zum Server.
+                    let mut conn = crate::db::open(&datei)
+                        .map_err(|e| e.replacen("DB_OPEN", "DB_QUERY_START", 1))?;
+                    conn.query(&sql, &params, "DB_QUERY_START")
                 }))
             }
             "db_query_ready" => Value::Bool(self.db_auftraege.fertig(bi_int(a, 0, "DB_QUERY_READY")?)?),
@@ -7408,7 +7411,7 @@ impl<'p> Vm<'p> {
                     }
                     if name == "gui_form_load" {
                         let sql = format!("SELECT {} FROM {} WHERE id = ?", keys.join(", "), tabelle);
-                        let res = { let c = self.db_conn(conn_idx)?; crate::db::query(c, &sql, &[rusqlite::types::Value::Integer(id)])? };
+                        let res = self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?;
                         match res.rows.first() {
                             None => Value::Bool(false),
                             Some(row) => {
@@ -7416,7 +7419,7 @@ impl<'p> Vm<'p> {
                                     crate::db::DbVal::Null => Value::str_rc(""),
                                     crate::db::DbVal::Int(n) => Value::Int(*n),
                                     crate::db::DbVal::Real(f) => Value::Float(*f),
-                                    crate::db::DbVal::Text(t) => Value::str_rc(t),
+                                    crate::db::DbVal::Text(t) | crate::db::DbVal::Zahl(t) => Value::str_rc(t),
                                     crate::db::DbVal::Blob(b) => Value::str_rc(String::from_utf8_lossy(b).into_owned()),
                                 })).collect();
                                 self.gui.form_set(win, &form, &werte)?;
@@ -7425,20 +7428,17 @@ impl<'p> Vm<'p> {
                         }
                     } else {
                         let werte = self.gui.form_get_typisiert(win, &form)?;
-                        let mut params: Vec<rusqlite::types::Value> = Vec::new();
+                        let mut params: Vec<crate::db::Param> = Vec::new();
                         for (_, wv) in &werte { params.push(crate::db::dh_to_sql(wv, fn_)?); }
                         let neue_id = if id < 0 {
                             let sql = format!("INSERT INTO {} ({}) VALUES ({})", tabelle, keys.join(", "),
                                               keys.iter().map(|_| "?").collect::<Vec<_>>().join(", "));
-                            let c = self.db_conn(conn_idx)?;
-                            crate::db::exec(c, &sql, &params)?;
-                            c.last_insert_rowid()
+                            self.db_conn(conn_idx)?.einfuegen(&sql, &params, fn_)?
                         } else {
                             let sql = format!("UPDATE {} SET {} WHERE id = ?", tabelle,
                                               keys.iter().map(|k| format!("{} = ?", k)).collect::<Vec<_>>().join(", "));
-                            params.push(rusqlite::types::Value::Integer(id));
-                            let c = self.db_conn(conn_idx)?;
-                            crate::db::exec(c, &sql, &params)?;
+                            params.push(crate::db::Param::Int(id));
+                            self.db_conn(conn_idx)?.exec(&sql, &params, fn_)?;
                             id
                         };
                         self.gui.form_clean(win, &form)?;

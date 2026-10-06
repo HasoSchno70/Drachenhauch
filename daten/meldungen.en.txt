@@ -1048,7 +1048,7 @@ Es gibt schon ein Blatt '{}' -- Excel unterscheidet die Namen nicht nach Gross- 
 DB_GET_INT: Spalte {} ist {}, nicht INTEGER	DB_GET_INT: column {} is {}, not INTEGER
 DB_GET_FLOAT: Spalte {} ist {}, nicht Zahl	DB_GET_FLOAT: column {} is {}, not a number
 DB_GET_BOOL: Spalte {} ist {}, nicht 0/1	DB_GET_BOOL: column {} is {}, not 0/1
-{}: Parameter-Typ {} nicht unterstuetzt (erlaubt: INTEGER, FLOAT, STRING, BOOLEAN, NIL)	{}: parameter type {} not supported (allowed: INTEGER, FLOAT, STRING, BOOLEAN, NIL)
+{}: Parameter-Typ {} nicht unterstuetzt (erlaubt: INTEGER, FLOAT, STRING, BOOLEAN, BUFFER, NIL)	{}: parameter type {} not supported (allowed: INTEGER, FLOAT, STRING, BOOLEAN, BUFFER, NIL)
 {}: Host '{}' nicht aufloesbar	{}: host '{}' cannot be resolved
 HTTP: Kopfzeilen-Name '{}' enthaelt unerlaubte Zeichen (erlaubt ist sichtbares ASCII ohne ':')	HTTP: header name '{}' contains characters that are not allowed (allowed is visible ASCII without ':')
 HTTP_REQUEST: unbekannte Methode '{}' (erlaubt: {})	HTTP_REQUEST: unknown method '{}' (allowed: {})
@@ -1666,3 +1666,16 @@ Vor ... braucht es mindestens einen festen Parameter (in C wie printf(format, ..
 erwartet eine Zahl, einen Text, einen BUFFER oder NIL, erhalten {}	expects a number, a text, a BUFFER or NIL, got {}
 TASK: der Auftrag ist abgestuerzt{} -- er hat keine Antwort mehr geschickt; das Hauptprogramm laeuft weiter	TASK: the task crashed{} -- it sent no answer any more; the main program keeps running
  (Rueckgabe {})	 (exit code {})
+DB_GET_INT: Spalte {} ist die Dezimalzahl {}, nicht ganz	DB_GET_INT: column {} is the decimal {}, not a whole number
+DB_GET_FLOAT: Spalte {} ist {}, keine Zahl	DB_GET_FLOAT: column {} is {}, not a number
+DB_OPEN: PostgreSQL ist in diesem Bau nicht dabei (Feature pg)	DB_OPEN: PostgreSQL is not part of this build (feature pg)
+DB_OPEN: MySQL ist in diesem Bau nicht dabei (Feature mysql)	DB_OPEN: MySQL is not part of this build (feature mysql)
+DB_OPEN: {} -- erwartet postgres://nutzer:kennwort@host:5432/datenbank	DB_OPEN: {} -- expected postgres://user:password@host:5432/database
+DB_OPEN: {} -- erwartet mysql://nutzer:kennwort@host:3306/datenbank	DB_OPEN: {} -- expected mysql://user:password@host:3306/database
+DB_OPEN: sslmode={} gibt es nicht (disable, prefer, require, verify-full)	DB_OPEN: there is no sslmode={} (disable, prefer, require, verify-full)
+DB_OPEN: TLS liess sich nicht einrichten: {}	DB_OPEN: TLS could not be set up: {}
+DB_LAST_ROWID: {} -- in dieser Verbindung wurde noch keine Kennung vergeben; mit RETURNING id am INSERT bekommt man sie sicher	DB_LAST_ROWID: {} -- no id has been assigned in this connection yet; RETURNING id on the INSERT gets it reliably
+die Abfrage hat {} Platzhalter, uebergeben sind {} Werte	the query has {} placeholders, {} values were passed
+den Typ {} liest Drachenhauch (noch) nicht -- in der Abfrage mit ::text umwandeln	Drachenhauch cannot read the type {} (yet) -- convert it with ::text in the query
+ein Nullzeichen im Text -- PostgreSQL nimmt es nicht	a null character in the text -- PostgreSQL does not accept it
+Spalte {} ({}): {}	column {} ({}): {}

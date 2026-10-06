@@ -1,0 +1,25 @@
+' Helfer fuer tests/pruef/db_server.dhtest: das Ziel eines Testservers aus
+' der Umgebung (DH_TEST_PG, DH_TEST_MYSQL) -- ohne sie ueberspringt sich der
+' Fall -- und eine Tabelle mit eigenem Namen, damit Faelle, die gleichzeitig
+' laufen, einander nichts wegnehmen.
+
+FUNCTION dbZiel$(art AS STRING) AS STRING
+    DIM ziel AS STRING
+    IF art = "pg" THEN ziel = GETENV$("DH_TEST_PG") ELSE ziel = GETENV$("DH_TEST_MYSQL")
+    IF ziel = "" THEN
+        PRINT "UEBERSPRINGEN: kein Testserver (DH_TEST_PG / DH_TEST_MYSQL)"
+        END
+    END IF
+    RETURN ziel
+END FUNCTION
+
+FUNCTION dbTabelle$(c AS DB_CONN) AS STRING
+    DIM t AS STRING
+    t = "t_" + LEFT$(REPLACE$(UUID4$(), "-", ""), 16)
+    IF DB_KIND$(c) = "postgres" THEN
+        DB_EXEC(c, "CREATE TABLE " + t + " (id SERIAL PRIMARY KEY, name TEXT, preis NUMERIC(10,2), menge INTEGER, wert DOUBLE PRECISION, aktiv BOOLEAN, tag DATE, zeit TIMESTAMP, daten BYTEA)")
+    ELSE
+        DB_EXEC(c, "CREATE TABLE " + t + " (id INTEGER PRIMARY KEY AUTO_INCREMENT, name TEXT, preis DECIMAL(10,2), menge INTEGER, wert DOUBLE, aktiv BOOLEAN, tag DATE, zeit DATETIME, daten BLOB)")
+    END IF
+    RETURN t
+END FUNCTION
