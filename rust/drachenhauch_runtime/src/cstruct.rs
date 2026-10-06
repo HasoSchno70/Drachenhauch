@@ -137,6 +137,37 @@ pub fn lagen_rechnen(roh: &[(String, Option<u32>, Vec<RohFeld>)]) -> Result<Hash
     Ok(fertig)
 }
 
+/// Die Lage eines Structs fuer die Signatur einer fremden Funktion, die ihn
+/// als Wert nimmt oder liefert (`ffi::struct_lesen`): Name, Groesse,
+/// Ausrichtung und jede Zahl darin mit ihrer Stelle -- eingebettete Structs
+/// und Felder aufgeloest, Text fester Breite als Bereich von Ganzzahlen.
+pub fn wert_text(name: &str, lagen: &HashMap<String, Lage>) -> String {
+    fn glieder(l: &Lage, lagen: &HashMap<String, Lage>, basis: usize, aus: &mut Vec<String>) {
+        for f in &l.felder {
+            let n = f.anzahl.max(1) as usize;
+            let stelle = basis + f.offset;
+            match f.art {
+                '#' => if let Some(u) = lagen.get(&f.unter) {
+                    for k in 0..n { glieder(u, lagen, stelle + k * f.groesse, aus); }
+                },
+                't' | 'w' => {
+                    let b = breite(f.art).unwrap_or(1);
+                    aus.push(format!("i{}*{}@{}", b, f.zeichen as usize * n, stelle));
+                }
+                'f' => aus.push(format!("f4*{}@{}", n, stelle)),
+                'd' => aus.push(format!("f8*{}@{}", n, stelle)),
+                c => aus.push(format!("i{}*{}@{}", breite(c).unwrap_or(8), n, stelle)),
+            }
+        }
+    }
+    let Some(l) = lagen.get(&name.to_lowercase()) else { return String::new() };
+    let mut aus = Vec::new();
+    glieder(l, lagen, 0, &mut aus);
+    let mut text = format!("{};{};{}", name.to_lowercase(), l.groesse, l.ausrichtung);
+    for g in aus { text.push(';'); text.push_str(&g); }
+    text
+}
+
 // ------------------------------------------------------------------ Laufzeit
 
 fn buf<'a>(v: &'a Value, wo: &str) -> Result<&'a std::rc::Rc<std::cell::RefCell<Vec<u8>>>, String> {
@@ -285,6 +316,19 @@ mod tests {
         // Ein Feld von Zahlen.
         let l = lagen_rechnen(&[roh("w", None, &[("n", "long", 0), ("w", "float", 3)])]).unwrap();
         assert_eq!((l["w"].feld("w").unwrap().offset, l["w"].groesse), (8, 32));
+    }
+
+    #[test]
+    fn lage_als_wert_fuer_die_signatur() {
+        let l = lagen_rechnen(&[
+            roh("linie", None, &[("n", "ubyte", 0), ("p", "#punkt", 2), ("t", "text*3", 0)]),
+            roh("punkt", None, &[("x", "single", 0), ("y", "float", 0)]),
+        ]).unwrap();
+        // punkt: x@0 (4), y@8 (8) -- 16 Bytes; linie: n@0, p@8 und @24, t@40.
+        assert_eq!(wert_text("Punkt", &l), "punkt;16;8;f4*1@0;f8*1@8");
+        assert_eq!(wert_text("linie", &l), "linie;48;8;i1*1@0;f4*1@8;f8*1@16;f4*1@24;f8*1@32;i1*3@40");
+        let s = crate::ffi::struct_lesen(&wert_text("linie", &l)).unwrap();
+        assert_eq!((s.groesse, s.glieder.len()), (48, 6));
     }
 
     #[test]

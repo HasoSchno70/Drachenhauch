@@ -1442,6 +1442,25 @@ das Sprungbrett `sprungbrett` (`global_asm!`, setzt `al = 8`), Apple-ARM
 fuellt die acht X-Register mit Nullen (Rest auf den Stapel). Typ der
 weiteren Werte aus dem Wert. Unter Windows liegt `sprintf` in `msvcrt`, nicht
 in ucrtbase (`LIB "msvcrt|c"`). Faelle `variadisch:` in ffi.dhtest.
+**Structs als Wert (2026-10-06):** `BYVAL p AS Punkt` (ohne BYVAL bleibt es
+der Zeiger, wie bisher) und `DECLARE FUNCTION f(...) AS Punkt`. Der Parser
+schreibt `~name`, der Compiler `x` + `cstruct::wert_text` (Lage mit allen
+Zahlen samt Stelle) in die Signatur. `ffi::plan(Konvention, ...)` zerlegt je
+System -- Win64 (1/2/4/8 Bytes als I64, sonst Zeiger auf eine Kopie;
+Rueckgabe RAX oder versteckte Adresse), SysV (Achtergruppen INTEGER/SSE,
+MEMORY = `StructArgument`, zaehlt freie Register: passt er nicht ganz, geht
+er auf den Stapel und die Register bleiben fuer spaetere Argumente), Aapcs
+(HFA in V-Registern, bis 16 Bytes in X-Registern, sonst Zeiger; passt ein
+X-Struct nicht ganz, fuellen Nullwerte die Register; Rueckgabe ueber X8 =
+`StructReturn`) -- in `Stelle`n (`Laden::Platz/Ueber/Kopie/Null/Versteckt`),
+aus denen `Bauer::holen_plan` den Uebergang baut. Kopien in `Vec<u64>` (8
+ausgerichtet, Laden ueber das Ende eines 12-Byte-Structs bleibt im
+Speicher). Nicht: in Rueckrufen, hinter `...`, HFA ohne freie V-Register
+(alles eine Meldung). Rust-Tests rufen `extern "C"`-Funktionen mit
+`#[repr(C)]`-Structs auf (Rust haelt die C-Konvention -- der Vergleich auf
+allen drei CI-Systemen), `plaene_je_konvention` prueft alle drei Plaene auf
+jedem System; Sammlung `tests/pruef/ffi_struct_wert.dhtest` (div/lldiv,
+csqrt/cabs(f), PtInRect, CoreGraphics).
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 

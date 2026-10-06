@@ -74,6 +74,7 @@ pub fn typ_name(c: char) -> &'static str {
         'f' => "SINGLE", 'd' => "FLOAT", 'o' => "BOOLEAN",
         't' => "TEXT", 'w' => "WTEXT", 'p' => "BUFFER",
         'r' => "FUNCTION",
+        'x' => "STRUCT",
         '*' => "...",
         _ => "?",
     }
@@ -85,7 +86,7 @@ pub fn dh_typ(c: char) -> &'static str {
         'f' | 'd' => "float",
         'o' => "boolean",
         't' | 'w' => "string",
-        'p' => "buffer",
+        'p' | 'x' => "buffer",
         'r' => "funcref",
         _ => "integer",
     }
@@ -123,8 +124,9 @@ pub fn typ_hinweis(wort: &str) -> String {
 /// Bibliothek, C-Name, Drachenhauch-Name, Rueckgabe (`v` = SUB) und die
 /// Parameter als `[&]typ:name`, durch Komma getrennt. `typ` ist ein Zeichen,
 /// bei einem Rueckruf `r`, dann seine Rueckgabe und seine Parameter
-/// (`rlzz` = FUNCTION(ZEIGER, ZEIGER) AS LONG).
-pub fn signatur_text(lib: &str, c_name: &str, name: &str, rueck: char,
+/// (`rlzz` = FUNCTION(ZEIGER, ZEIGER) AS LONG). Ein Struct als Wert ist
+/// `x` und seine Lage (`struct_lesen`) -- als Parameter wie als Rueckgabe.
+pub fn signatur_text(lib: &str, c_name: &str, name: &str, rueck: &str,
                      params: &[(String, bool, String)]) -> String {
     let ps: Vec<String> = params.iter()
         .map(|(c, br, n)| format!("{}{}:{}", if *br { "&" } else { "" }, c, n)).collect();
@@ -137,6 +139,7 @@ pub struct Param {
     pub byref: bool,
     pub name: String,
     /// Bei einem Rueckruf (`art` = 'r'): Rueckgabe, dann die Parameter.
+    /// Bei einem Struct als Wert (`art` = 'x'): seine Lage.
     pub rr: String,
 }
 
@@ -146,6 +149,8 @@ pub struct Signatur {
     pub c_name: String,
     pub name: String,
     pub rueck: char,
+    /// Bei `rueck` = 'x': die Lage des Structs.
+    pub rueck_rr: String,
     pub params: Vec<Param>,
 }
 
@@ -153,6 +158,8 @@ pub fn signatur_lesen(s: &str) -> Result<Signatur, String> {
     let teile: Vec<&str> = s.split(TRENNER).collect();
     if teile.len() != 5 { return Err("fremde Funktion: kaputte Signatur".into()); }
     let rueck = teile[3].chars().next().unwrap_or('v');
+    let rueck_rr = teile[3][rueck.len_utf8().min(teile[3].len())..].to_string();
+    if rueck == 'x' && struct_lesen(&rueck_rr).is_none() { return Err("fremde Funktion: kaputte Signatur".into()); }
     let mut params = Vec::new();
     if !teile[4].is_empty() {
         for p in teile[4].split(',') {
@@ -162,11 +169,242 @@ pub fn signatur_lesen(s: &str) -> Result<Signatur, String> {
             let art = typ.chars().next().ok_or("fremde Funktion: kaputte Signatur")?;
             let rr = typ[art.len_utf8()..].to_string();
             if art == 'r' && rr.is_empty() { return Err("fremde Funktion: kaputte Signatur".into()); }
+            if art == 'x' && struct_lesen(&rr).is_none() { return Err("fremde Funktion: kaputte Signatur".into()); }
             let name = it.next().unwrap_or("").to_string();
             params.push(Param { art, byref, name, rr });
         }
     }
-    Ok(Signatur { lib: teile[0].into(), c_name: teile[1].into(), name: teile[2].into(), rueck, params })
+    Ok(Signatur { lib: teile[0].into(), c_name: teile[1].into(), name: teile[2].into(), rueck, rueck_rr, params })
+}
+
+// ------------------------------------------------------------------ Structs als Wert
+
+/// Eine Zahl in einem Struct, wie die Aufrufkonvention sie sieht: Ganzzahl
+/// (auch Zeiger und Zeichen) oder Kommazahl in einer der zwei Breiten.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Glied { Ganz, F32, F64 }
+
+/// Ein Struct, der als Wert uebergeben oder zurueckgegeben wird -- so, wie
+/// der Compiler ihn in die Signatur schreibt (`cstruct::wert_text`):
+/// `name;groesse;ausrichtung;glied;...` mit `glied` = `i4*2@0` (Art,
+/// Breite eines Elements, Zahl, Stelle; `i` ganz, `f` Kommazahl).
+/// Eingebettete Structs und Felder sind darin schon aufgeloest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StructWert {
+    pub name: String,
+    pub groesse: u32,
+    pub ausrichtung: u32,
+    /// (Art, Breite eines Elements, Zahl der Elemente, Stelle)
+    pub glieder: Vec<(Glied, u32, u32, u32)>,
+}
+
+pub fn struct_lesen(s: &str) -> Option<StructWert> {
+    let mut it = s.split(';');
+    let name = it.next()?.to_string();
+    let groesse: u32 = it.next()?.parse().ok()?;
+    let ausrichtung: u32 = it.next()?.parse().ok()?;
+    let mut glieder = Vec::new();
+    for g in it {
+        let art = g.chars().next()?;
+        let (breite, rest) = g[1..].split_once('*')?;
+        let (zahl, stelle) = rest.split_once('@')?;
+        let breite: u32 = breite.parse().ok()?;
+        let glied = match (art, breite) {
+            ('i', _) => Glied::Ganz,
+            ('f', 4) => Glied::F32,
+            ('f', 8) => Glied::F64,
+            _ => return None,
+        };
+        glieder.push((glied, breite, zahl.parse().ok()?, stelle.parse().ok()?));
+    }
+    if groesse == 0 || name.is_empty() { return None; }
+    Some(StructWert { name, groesse, ausrichtung, glieder })
+}
+
+/// Welche Regeln fuer Structs als Wert gelten.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Konvention {
+    /// Windows x64: 1, 2, 4 oder 8 Bytes in einem Ganzzahl-Register, sonst
+    /// ein Zeiger auf eine Kopie; Rueckgabe ebenso in RAX oder ueber eine
+    /// versteckte Adresse als erstes Argument.
+    Win64,
+    /// System V x86-64 (Linux, macOS Intel): bis 16 Bytes in Achtergruppen,
+    /// je nach Inhalt in Ganzzahl- oder SSE-Registern; groesser, schief
+    /// gepackt oder ohne freie Register auf dem Stapel.
+    SysV,
+    /// AAPCS64 (ARM, auch Apple): bis vier gleiche Kommazahlen (HFA) in
+    /// V-Registern, bis 16 Bytes in X-Registern, sonst ein Zeiger auf eine
+    /// Kopie; die versteckte Rueckgabe-Adresse steht in X8.
+    Aapcs,
+}
+
+pub fn konvention() -> Konvention {
+    if cfg!(target_arch = "aarch64") { Konvention::Aapcs }
+    else if cfg!(windows) { Konvention::Win64 }
+    else { Konvention::SysV }
+}
+
+/// Woher eine Stelle des Uebergangs ihren Wert nimmt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Laden {
+    /// Der Wert im 8-Byte-Platz k.
+    Platz(usize),
+    /// Im Platz k steht ein Zeiger (auf die Kopie eines Structs); der Wert
+    /// liegt dort an dieser Stelle.
+    Ueber(usize, u32),
+    /// Im Platz k steht ein Zeiger; so viele Bytes kommen als Ganzes auf den
+    /// Stapel (System V, Klasse MEMORY).
+    Kopie(usize, u32),
+    /// Ein Fuellwert 0 -- er belegt ein Register, damit das naechste auf den
+    /// Stapel kommt (AAPCS64: ein Struct, der nicht mehr ganz in die
+    /// Register passt, geht ganz auf den Stapel).
+    Null,
+    /// Die Adresse, an die die Funktion ihren Struct schreibt.
+    Versteckt,
+}
+
+/// Eine Stelle der C-Signatur.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Stelle { pub art: Art, pub laden: Laden }
+
+/// Was nach dem Aufruf zurueckkommt.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Rueckform {
+    Nichts,
+    Wert(Art),
+    /// Ein Struct in Registern: jeder Wert an seine Stelle im Rueckgabe-Platz.
+    Teile(Vec<(Art, u32)>),
+}
+
+/// Was ein Parameter (oder die Rueckgabe) ist.
+#[derive(Clone, Copy, Debug)]
+pub enum Form<'a> { Skalar(Art), Struct(&'a StructWert) }
+
+fn rund8(n: u32) -> u32 { n.div_ceil(8) * 8 }
+
+/// Alle Elemente eines Structs einzeln: (Art, Breite, Stelle).
+fn elemente(s: &StructWert) -> Vec<(Glied, u32, u32)> {
+    s.glieder.iter().flat_map(|&(g, b, n, o)| (0..n.max(1)).map(move |k| (g, b, o + k * b))).collect()
+}
+
+/// System V: die Klasse jeder Achtergruppe (`true` = SSE), oder `None`, wenn
+/// der Struct im Speicher reist (groesser als 16 Bytes oder schief gepackt).
+fn sysv_klassen(s: &StructWert) -> Option<Vec<bool>> {
+    if s.groesse > 16 { return None; }
+    let n = s.groesse.div_ceil(8) as usize;
+    let mut ganz = vec![false; n];
+    for (g, b, o) in elemente(s) {
+        if b == 0 || o % b != 0 { return None; }
+        if g == Glied::Ganz {
+            // Ein Bereich von Zeichen kann ueber eine Grenze gehen.
+            for e in (o / 8)..=((o + b - 1) / 8) { if (e as usize) < n { ganz[e as usize] = true; } }
+        }
+    }
+    Some(ganz.into_iter().map(|g| !g).collect())
+}
+
+/// AAPCS64: ein Struct aus ein bis vier Kommazahlen derselben Breite (HFA).
+fn hfa(s: &StructWert) -> Option<(Art, Vec<u32>)> {
+    let el = elemente(s);
+    if el.is_empty() || el.len() > 4 { return None; }
+    let g = el[0].0;
+    if g == Glied::Ganz || el.iter().any(|e| e.0 != g) { return None; }
+    Some((if g == Glied::F32 { Art::F32 } else { Art::F64 }, el.iter().map(|e| e.2).collect()))
+}
+
+/// Ein Struct, der in Registern zurueckkommt: die Teile; `None` = ueber eine
+/// versteckte Adresse.
+fn rueck_teile(k: Konvention, s: &StructWert) -> Option<Vec<(Art, u32)>> {
+    match k {
+        Konvention::Win64 => matches!(s.groesse, 1 | 2 | 4 | 8).then(|| vec![(Art::I64, 0)]),
+        Konvention::SysV => sysv_klassen(s).map(|kl| kl.iter().enumerate()
+            .map(|(j, sse)| (if *sse { Art::F64 } else { Art::I64 }, j as u32 * 8)).collect()),
+        Konvention::Aapcs => match hfa(s) {
+            Some((a, stellen)) => Some(stellen.into_iter().map(|o| (a, o)).collect()),
+            None if s.groesse <= 16 => Some((0..s.groesse.div_ceil(8)).map(|j| (Art::I64, j * 8)).collect()),
+            None => None,
+        },
+    }
+}
+
+/// Der Plan eines Aufrufs: welche Werte in welcher Reihenfolge an die
+/// C-Funktion gehen und wie das Ergebnis zurueckkommt. Ohne Structs ist es
+/// Platz fuer Platz die Signatur; ein Struct als Wert wird nach den Regeln
+/// des Systems zerlegt (`Konvention`). Platz k gehoert immer zu Parameter k
+/// -- bei einem Struct steht dort der Zeiger auf seine Kopie.
+pub fn plan(k: Konvention, params: &[Form], rueck: Form) -> Result<(Vec<Stelle>, Rueckform), String> {
+    let mut st: Vec<Stelle> = Vec::new();
+    // Freie Register je Klasse (Windows: jeder Parameter hat seinen Platz,
+    // es muss nicht gezaehlt werden).
+    let (mut ganz, mut komma) = match k { Konvention::Win64 => (usize::MAX, usize::MAX),
+                                          Konvention::SysV => (6, 8), Konvention::Aapcs => (8, 8) };
+    let rf = match rueck {
+        Form::Skalar(Art::Nichts) => Rueckform::Nichts,
+        Form::Skalar(a) => Rueckform::Wert(a),
+        Form::Struct(s) => match rueck_teile(k, s) {
+            Some(t) => Rueckform::Teile(t),
+            None => {
+                st.push(Stelle { art: Art::Zeiger, laden: Laden::Versteckt });
+                // Unter AAPCS64 steht die Adresse in X8, nicht in X0..X7.
+                if k != Konvention::Aapcs { ganz = ganz.saturating_sub(1); }
+                Rueckform::Nichts
+            }
+        },
+    };
+    for (i, p) in params.iter().enumerate() {
+        match *p {
+            Form::Skalar(a) => {
+                if matches!(a, Art::F32 | Art::F64) { komma = komma.saturating_sub(1); } else { ganz = ganz.saturating_sub(1); }
+                st.push(Stelle { art: a, laden: Laden::Platz(i) });
+            }
+            Form::Struct(s) => match k {
+                Konvention::Win64 => {
+                    if matches!(s.groesse, 1 | 2 | 4 | 8) {
+                        st.push(Stelle { art: Art::I64, laden: Laden::Ueber(i, 0) });
+                    } else {
+                        st.push(Stelle { art: Art::Zeiger, laden: Laden::Platz(i) });
+                    }
+                }
+                Konvention::SysV => {
+                    let kl = sysv_klassen(s).filter(|kl| {
+                        let sse = kl.iter().filter(|x| **x).count();
+                        sse <= komma && kl.len() - sse <= ganz
+                    });
+                    match kl {
+                        Some(kl) => for (j, sse) in kl.iter().enumerate() {
+                            if *sse { komma -= 1; } else { ganz -= 1; }
+                            st.push(Stelle { art: if *sse { Art::F64 } else { Art::I64 }, laden: Laden::Ueber(i, j as u32 * 8) });
+                        },
+                        None => st.push(Stelle { art: Art::Zeiger, laden: Laden::Kopie(i, rund8(s.groesse)) }),
+                    }
+                }
+                Konvention::Aapcs => {
+                    if let Some((a, stellen)) = hfa(s) {
+                        if stellen.len() > komma {
+                            return Err(format!("der Struct {} (Argument {}) passt nicht mehr in die Register fuer Kommazahlen -- so viele Kommazahlen davor gehen hier (noch) nicht",
+                                               s.name.to_uppercase(), i + 1));
+                        }
+                        komma -= stellen.len();
+                        for o in stellen { st.push(Stelle { art: a, laden: Laden::Ueber(i, o) }); }
+                    } else if s.groesse > 16 {
+                        ganz = ganz.saturating_sub(1);
+                        st.push(Stelle { art: Art::Zeiger, laden: Laden::Platz(i) });
+                    } else {
+                        let n = s.groesse.div_ceil(8) as usize;
+                        if n > ganz {
+                            // Passt er nicht mehr ganz hinein, geht er ganz auf den Stapel,
+                            // und kein Ganzzahl-Register wird danach noch benutzt.
+                            while ganz > 0 { st.push(Stelle { art: Art::I64, laden: Laden::Null }); ganz -= 1; }
+                        } else {
+                            ganz -= n;
+                        }
+                        for j in 0..n { st.push(Stelle { art: Art::I64, laden: Laden::Ueber(i, j as u32 * 8) }); }
+                    }
+                }
+            },
+        }
+    }
+    Ok((st, rf))
 }
 
 /// Die Dateinamen, unter denen eine Bibliothek gesucht wird -- in dieser
@@ -324,8 +562,8 @@ unsafe fn text_aus(p: u64, breit: bool) -> String {
 
 #[cfg(feature = "ffi")]
 mod uebergang {
-    use super::Art;
-    use cranelift_codegen::ir::{types, AbiParam, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, Type, UserFuncName};
+    use super::{Art, Laden, Rueckform, Stelle};
+    use cranelift_codegen::ir::{types, AbiParam, ArgumentPurpose, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, Type, UserFuncName};
     use cranelift_codegen::settings::Configurable;
     use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
     use cranelift_jit::{JITBuilder, JITModule};
@@ -337,7 +575,7 @@ mod uebergang {
     pub struct Bauer {
         modul: JITModule,
         fctx: FunctionBuilderContext,
-        fertig: HashMap<(Vec<Art>, Art), Einstieg>,
+        fertig: HashMap<(Vec<Stelle>, Rueckform), Einstieg>,
         rueckrufe: usize,
     }
 
@@ -375,15 +613,35 @@ mod uebergang {
             Ok(Bauer { modul, fctx: FunctionBuilderContext::new(), fertig: HashMap::new(), rueckrufe: 0 })
         }
 
+        /// Der Uebergang fuer Werte, die schlicht Platz fuer Platz liegen.
         pub fn holen(&mut self, params: &[Art], rueck: Art) -> Result<Einstieg, String> {
-            let schluessel = (params.to_vec(), rueck);
+            let stellen: Vec<Stelle> = params.iter().enumerate()
+                .map(|(i, a)| Stelle { art: *a, laden: Laden::Platz(i) }).collect();
+            let rf = if rueck == Art::Nichts { Rueckform::Nichts } else { Rueckform::Wert(rueck) };
+            self.holen_plan(&stellen, &rf)
+        }
+
+        /// Der Uebergang nach einem Plan (`super::plan`) -- mit Structs als
+        /// Wert. Eine Rueckgabe in Teilen kommt an ihre Stellen ab `rueck`.
+        pub fn holen_plan(&mut self, stellen: &[Stelle], rueck: &Rueckform) -> Result<Einstieg, String> {
+            let schluessel = (stellen.to_vec(), rueck.clone());
             if let Some(e) = self.fertig.get(&schluessel) { return Ok(*e); }
             let zt = self.modul.target_config().pointer_type();
             let mut sig = self.modul.make_signature();
             for _ in 0..3 { sig.params.push(AbiParam::new(zt)); }
             let mut ziel_sig = self.modul.make_signature();
-            for a in params { ziel_sig.params.push(abi(*a, zt)); }
-            if rueck != Art::Nichts { ziel_sig.returns.push(abi(rueck, zt)); }
+            for s in stellen {
+                ziel_sig.params.push(match s.laden {
+                    Laden::Kopie(_, n) => AbiParam::special(zt, ArgumentPurpose::StructArgument(n)),
+                    Laden::Versteckt => AbiParam::special(zt, ArgumentPurpose::StructReturn),
+                    _ => abi(s.art, zt),
+                });
+            }
+            match rueck {
+                Rueckform::Nichts => {}
+                Rueckform::Wert(a) => ziel_sig.returns.push(abi(*a, zt)),
+                Rueckform::Teile(t) => for (a, _) in t { ziel_sig.returns.push(AbiParam::new(typ(*a, zt))); },
+            }
             let nr = self.fertig.len();
             let id = self.modul.declare_function(&format!("ffi_{}", nr), Linkage::Local, &sig)
                 .map_err(|e| format!("Cranelift: {:?}", e))?;
@@ -397,20 +655,43 @@ mod uebergang {
                 fb.append_block_params_for_function_params(b);
                 fb.switch_to_block(b);
                 let p = fb.block_params(b).to_vec();
-                let mut args = Vec::with_capacity(params.len());
-                for (i, a) in params.iter().enumerate() {
-                    args.push(fb.ins().load(typ(*a, zt), MemFlagsData::trusted(), p[1], (i * 8) as i32));
+                let mut args = Vec::with_capacity(stellen.len());
+                for s in stellen {
+                    let t = typ(s.art, zt);
+                    args.push(match s.laden {
+                        Laden::Platz(k) => fb.ins().load(t, MemFlagsData::trusted(), p[1], (k * 8) as i32),
+                        Laden::Ueber(k, o) => {
+                            let z = fb.ins().load(zt, MemFlagsData::trusted(), p[1], (k * 8) as i32);
+                            fb.ins().load(t, MemFlagsData::trusted(), z, o as i32)
+                        }
+                        Laden::Kopie(k, _) => fb.ins().load(zt, MemFlagsData::trusted(), p[1], (k * 8) as i32),
+                        Laden::Null => match s.art {
+                            Art::F32 => fb.ins().f32const(0.0),
+                            Art::F64 => fb.ins().f64const(0.0),
+                            _ => fb.ins().iconst(t, 0),
+                        },
+                        Laden::Versteckt => p[2],
+                    });
                 }
                 let sref = fb.import_signature(ziel_sig);
                 let ruf = fb.ins().call_indirect(sref, p[0], &args);
-                if rueck != Art::Nichts {
-                    let w = fb.inst_results(ruf)[0];
-                    let w = match rueck {
-                        Art::I8 | Art::I16 | Art::I32 => fb.ins().sextend(types::I64, w),
-                        Art::U8 | Art::U16 | Art::U32 => fb.ins().uextend(types::I64, w),
-                        _ => w,
-                    };
-                    fb.ins().store(MemFlagsData::trusted(), w, p[2], 0);
+                match rueck {
+                    Rueckform::Nichts => {}
+                    Rueckform::Wert(a) => {
+                        let w = fb.inst_results(ruf)[0];
+                        let w = match a {
+                            Art::I8 | Art::I16 | Art::I32 => fb.ins().sextend(types::I64, w),
+                            Art::U8 | Art::U16 | Art::U32 => fb.ins().uextend(types::I64, w),
+                            _ => w,
+                        };
+                        fb.ins().store(MemFlagsData::trusted(), w, p[2], 0);
+                    }
+                    Rueckform::Teile(t) => {
+                        let ws = fb.inst_results(ruf).to_vec();
+                        for ((_, o), w) in t.iter().zip(ws) {
+                            fb.ins().store(MemFlagsData::trusted(), w, p[2], *o as i32);
+                        }
+                    }
                 }
                 fb.ins().return_(&[]);
                 fb.seal_all_blocks();
@@ -496,6 +777,10 @@ struct Aufruf {
     sig: Signatur,
     ziel: *const u8,
     einstieg: uebergang::Einstieg,
+    /// Je Parameter seine Lage, wenn er ein Struct als Wert ist.
+    structs: Vec<Option<StructWert>>,
+    /// Die Lage des Structs, den die Funktion als Wert liefert.
+    rueck_struct: Option<StructWert>,
 }
 
 #[cfg(feature = "ffi")]
@@ -740,18 +1025,32 @@ fn aufruf(text: &str) -> Result<Rc<Aufruf>, String> {
                                          if cfg!(windows) { "; Text-Funktionen der Windows-API heissen ...A oder ...W" } else { "" })),
         }
     };
+    let a = Rc::new(aufruf_bauen(sig, ziel)?);
+    ZUSTAND.with(|z| z.borrow_mut().aufrufe.insert(text.to_string(), a.clone()));
+    Ok(a)
+}
+
+/// Plan und Uebergang fuer eine Signatur, deren Ziel schon feststeht.
+#[cfg(feature = "ffi")]
+fn aufruf_bauen(sig: Signatur, ziel: *const u8) -> Result<Aufruf, String> {
     // Bei `...` steht der Uebergang fuer die festen Parameter; jeder Aufruf
     // mit weiteren Werten holt sich seinen eigenen (`variadisch_rufen`).
-    let arten: Vec<Art> = sig.params.iter().filter(|p| p.art != '*').map(|p| art_von(p.art, p.byref)).collect();
-    let rueck = art_von(sig.rueck, false);
+    let structs: Vec<Option<StructWert>> = sig.params.iter()
+        .map(|p| if p.art == 'x' { struct_lesen(&p.rr) } else { None }).collect();
+    let rueck_struct = if sig.rueck == 'x' { struct_lesen(&sig.rueck_rr) } else { None };
+    if (structs.iter().any(Option::is_some) || rueck_struct.is_some()) && sig.params.iter().any(|p| p.art == '*') {
+        return Err("ein Struct als Wert geht (noch) nicht in einer Funktion mit ... -- uebergib ihn dort als Zeiger (ohne BYVAL)".into());
+    }
+    let formen: Vec<Form> = sig.params.iter().zip(&structs).filter(|(p, _)| p.art != '*')
+        .map(|(p, s)| match s { Some(s) => Form::Struct(s), None => Form::Skalar(art_von(p.art, p.byref)) }).collect();
+    let rueck = match &rueck_struct { Some(s) => Form::Struct(s), None => Form::Skalar(art_von(sig.rueck, false)) };
+    let (stellen, rf) = plan(konvention(), &formen, rueck)?;
     let einstieg = ZUSTAND.with(|z| -> Result<_, String> {
         let mut z = z.borrow_mut();
         if z.bauer.is_none() { z.bauer = Some(uebergang::Bauer::neu()?); }
-        z.bauer.as_mut().unwrap().holen(&arten, rueck)
+        z.bauer.as_mut().unwrap().holen_plan(&stellen, &rf)
     })?;
-    let a = Rc::new(Aufruf { sig, ziel, einstieg });
-    ZUSTAND.with(|z| z.borrow_mut().aufrufe.insert(text.to_string(), a.clone()));
-    Ok(a)
+    Ok(Aufruf { sig, ziel, einstieg, structs, rueck_struct })
 }
 
 /// Der Befehl `__ffi(signatur, argumente...)`. Ohne BYREF das Ergebnis,
@@ -949,8 +1248,29 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     let mut texte: Vec<std::ffi::CString> = Vec::new();
     let mut breite: Vec<Vec<WZeichen>> = Vec::new();
     let mut ref_plaetze = vec![0u64; n.max(1)];
+    let mut kopien: Vec<Vec<u64>> = Vec::new();
     for (i, (p, v)) in sig.params[..fest].iter().zip(args).enumerate() {
-        let fehler = |e: String| format!("{}: Argument {} ({} AS {}): {}", sig.name, i + 1, p.name, typ_name(p.art), e);
+        let typname = match &auf.structs[i] { Some(s) => s.name.to_uppercase(), None => typ_name(p.art).to_string() };
+        let fehler = |e: String| format!("{}: Argument {} ({} AS {}): {}", sig.name, i + 1, p.name, typname, e);
+        if let Some(s) = &auf.structs[i] {
+            // Als Wert: die Funktion bekommt eine Kopie -- was sie daran
+            // aendert, sieht das Programm nicht. In 8-Byte-Worten, damit jedes
+            // Laden (auch ueber das Ende eines Structs mit 12 Bytes hinaus)
+            // im Speicher bleibt und die Kopie ausgerichtet ist.
+            let b = match v {
+                Value::Buffer(b) => b.borrow(),
+                Value::Nil => return Err(fehler("der Struct ist NIL -- er bekommt seinen Speicher mit DIM".into())),
+                _ => return Err(fehler(format!("erwartet einen Struct {} (einen BUFFER), erhalten {}", s.name.to_uppercase(), v.type_name()))),
+            };
+            if b.len() < s.groesse as usize {
+                return Err(fehler(format!("der Puffer ist {} Bytes lang, der Struct braucht {}", b.len(), s.groesse)));
+            }
+            let mut k = vec![0u64; (s.groesse as usize).div_ceil(8).max(2)];
+            unsafe { std::ptr::copy_nonoverlapping(b.as_ptr(), k.as_mut_ptr() as *mut u8, s.groesse as usize); }
+            plaetze[i] = k.as_ptr() as u64;
+            kopien.push(k);
+            continue;
+        }
         if p.byref {
             ref_plaetze[i] = zahl_platz(p.art, v).map_err(fehler)?;
             plaetze[i] = (&mut ref_plaetze[i] as *mut u64) as u64;
@@ -1019,16 +1339,28 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
         plaetze[fest + i] = platz;
         weitere.push(if komma && KOMMA_IN_FP_REGISTER { Art::F64 } else { Art::I64 });
     }
-    let mut rueck = 0u64;
+    // Der Platz fuer die Rueckgabe: ein Wert, die Teile eines Structs aus
+    // den Registern oder der ganze Struct, den die Funktion selbst schreibt.
+    let worte = auf.rueck_struct.as_ref().map(|s| (s.groesse as usize).div_ceil(8)).unwrap_or(0).max(4);
+    let mut rueck_platz = vec![0u64; worte];
     if variadisch {
-        variadisch_rufen(auf, fest, &plaetze[..n], &weitere, &mut rueck)?;
+        let mut r = 0u64;
+        variadisch_rufen(auf, fest, &plaetze[..n], &weitere, &mut r)?;
+        rueck_platz[0] = r;
     } else {
-        unsafe { (auf.einstieg)(auf.ziel, plaetze.as_ptr(), &mut rueck) };
+        unsafe { (auf.einstieg)(auf.ziel, plaetze.as_ptr(), rueck_platz.as_mut_ptr()) };
     }
     drop(texte);
     drop(breite);
+    drop(kopien);
     if let Some(e) = rueckruf_fehler() { return Err(format!("{}: {}", sig.name, e)); }
+    let rueck = rueck_platz[0];
     let ergebnis = match sig.rueck {
+        'x' => {
+            let g = auf.rueck_struct.as_ref().map(|s| s.groesse as usize).unwrap_or(0);
+            let bytes = unsafe { std::slice::from_raw_parts(rueck_platz.as_ptr() as *const u8, g) }.to_vec();
+            crate::builtins::neuer_buffer(bytes)
+        }
         't' => Value::str_rc(unsafe { text_aus(rueck, false) }),
         'w' => Value::str_rc(unsafe { text_aus(rueck, true) }),
         c => platz_wert(c, rueck),
@@ -1047,7 +1379,7 @@ mod tests {
 
     #[test]
     fn signatur_hin_und_zurueck() {
-        let t = signatur_text("user32", "MessageBoxW", "box", 'l',
+        let t = signatur_text("user32", "MessageBoxW", "box", "l",
                               &[("z".into(), false, "f".into()), ("w".into(), false, "t".into()), ("l".into(), true, "n".into()),
                                 ("rlzz".into(), false, "cmp".into())]);
         let s = signatur_lesen(&t).unwrap();
@@ -1058,7 +1390,7 @@ mod tests {
         assert!(s.params[2].byref);
         assert_eq!(s.params[1], Param { art: 'w', byref: false, name: "t".into(), rr: String::new() });
         assert_eq!(s.params[3], Param { art: 'r', byref: false, name: "cmp".into(), rr: "lzz".into() });
-        let leer = signatur_lesen(&signatur_text("c", "getpid", "getpid", 'l', &[])).unwrap();
+        let leer = signatur_lesen(&signatur_text("c", "getpid", "getpid", "l", &[])).unwrap();
         assert!(leer.params.is_empty());
     }
 
@@ -1120,6 +1452,72 @@ mod tests {
         assert!(typ_hinweis("dword").contains("ULONG"));
     }
 
+    #[test]
+    fn lage_in_der_signatur() {
+        let s = struct_lesen("vec3;12;4;f4*3@0").unwrap();
+        assert_eq!((s.name.as_str(), s.groesse, s.ausrichtung, s.glieder.len()), ("vec3", 12, 4, 1));
+        assert_eq!(s.glieder[0], (Glied::F32, 4, 3, 0));
+        assert!(struct_lesen("x;12;4;f2*1@0").is_none());
+        assert!(struct_lesen("x;0;4;i4*1@0").is_none());
+        let sig = signatur_lesen(&signatur_text("m", "csqrt", "csqrt", "xkomplex;16;8;f8*2@0",
+            &[("xkomplex;16;8;f8*2@0".into(), false, "z".into())])).unwrap();
+        assert_eq!((sig.rueck, sig.rueck_rr.as_str(), sig.params[0].art), ('x', "komplex;16;8;f8*2@0", 'x'));
+        assert!(signatur_lesen(&signatur_text("m", "f", "f", "xkaputt", &[])).is_err());
+    }
+
+    /// Wie jedes System einen Struct zerlegt -- unabhaengig davon, auf
+    /// welchem die Pruefung laeuft.
+    #[test]
+    fn plaene_je_konvention() {
+        use Konvention::*;
+        let l = |s: &str| struct_lesen(s).unwrap();
+        let (p2f, f3, d4, i3, mix, b3) = (l("p;8;4;f4*2@0"), l("f;12;4;f4*3@0"), l("d;32;8;f8*4@0"),
+                                          l("i;24;8;i8*3@0"), l("m;16;8;f8*1@0;i8*1@8"), l("b;3;1;i1*3@0"));
+        let st = |a, laden| Stelle { art: a, laden };
+        // Windows: 8 Bytes im Register, sonst ein Zeiger; Rueckgabe ueber RAX
+        // oder die versteckte Adresse als erstes Argument.
+        assert_eq!(plan(Win64, &[Form::Struct(&p2f)], Form::Struct(&p2f)).unwrap(),
+                   (vec![st(Art::I64, Laden::Ueber(0, 0))], Rueckform::Teile(vec![(Art::I64, 0)])));
+        assert_eq!(plan(Win64, &[Form::Struct(&f3)], Form::Struct(&b3)).unwrap(),
+                   (vec![st(Art::Zeiger, Laden::Versteckt), st(Art::Zeiger, Laden::Platz(0))], Rueckform::Nichts));
+        // System V: zwei Kommazahlen teilen sich ein SSE-Register; ganz und
+        // Komma in einer Achtergruppe ist ganz; ueber 16 Bytes auf den Stapel.
+        assert_eq!(plan(SysV, &[Form::Struct(&p2f), Form::Struct(&mix)], Form::Struct(&f3)).unwrap(),
+                   (vec![st(Art::F64, Laden::Ueber(0, 0)), st(Art::F64, Laden::Ueber(1, 0)), st(Art::I64, Laden::Ueber(1, 8))],
+                    Rueckform::Teile(vec![(Art::F64, 0), (Art::F64, 8)])));
+        assert_eq!(plan(SysV, &[Form::Struct(&i3)], Form::Struct(&i3)).unwrap(),
+                   (vec![st(Art::Zeiger, Laden::Versteckt), st(Art::Zeiger, Laden::Kopie(0, 24))], Rueckform::Nichts));
+        // Sind die Register voll, geht der Struct auf den Stapel -- und ein
+        // spaeteres Ganzzahl-Argument nimmt trotzdem das letzte freie.
+        let zwei = l("z;16;8;i8*2@0");
+        let mut f: Vec<Form> = vec![Form::Skalar(Art::I64); 5];
+        f.push(Form::Struct(&zwei));
+        f.push(Form::Skalar(Art::I64));
+        let (p, _) = plan(SysV, &f, Form::Skalar(Art::Nichts)).unwrap();
+        assert_eq!(&p[5..], &[st(Art::Zeiger, Laden::Kopie(5, 16)), st(Art::I64, Laden::Platz(6))]);
+        // ... waehrend ein gemischter noch passt (ein Ganzzahl-, ein SSE-Register).
+        f[5] = Form::Struct(&mix);
+        let (p, _) = plan(SysV, &f, Form::Skalar(Art::Nichts)).unwrap();
+        assert_eq!(&p[5..7], &[st(Art::F64, Laden::Ueber(5, 0)), st(Art::I64, Laden::Ueber(5, 8))]);
+        // AAPCS64: HFA in V-Registern, die versteckte Adresse in X8 zaehlt
+        // nicht mit, ein halb passender Struct geht ganz auf den Stapel.
+        assert_eq!(plan(Aapcs, &[Form::Struct(&f3)], Form::Struct(&d4)).unwrap(),
+                   (vec![st(Art::F32, Laden::Ueber(0, 0)), st(Art::F32, Laden::Ueber(0, 4)), st(Art::F32, Laden::Ueber(0, 8))],
+                    Rueckform::Teile(vec![(Art::F64, 0), (Art::F64, 8), (Art::F64, 16), (Art::F64, 24)])));
+        assert_eq!(plan(Aapcs, &[Form::Struct(&i3)], Form::Struct(&i3)).unwrap(),
+                   (vec![st(Art::Zeiger, Laden::Versteckt), st(Art::Zeiger, Laden::Platz(0))], Rueckform::Nichts));
+        let mut f: Vec<Form> = vec![Form::Skalar(Art::I64); 7];
+        f.push(Form::Struct(&mix));
+        let (p, _) = plan(Aapcs, &f, Form::Skalar(Art::Nichts)).unwrap();
+        assert_eq!(&p[7..], &[st(Art::I64, Laden::Null), st(Art::I64, Laden::Ueber(7, 0)), st(Art::I64, Laden::Ueber(7, 8))]);
+        let f: Vec<Form> = [vec![Form::Skalar(Art::F64); 7], vec![Form::Struct(&d4)]].concat();
+        assert!(plan(Aapcs, &f, Form::Skalar(Art::Nichts)).unwrap_err().contains("Kommazahlen"));
+        // Schief gepackt (PACK 1): unter System V immer im Speicher.
+        let schief = l("s;12;1;i1*1@0;i8*1@1;i1*3@9");
+        assert_eq!(plan(SysV, &[Form::Struct(&schief)], Form::Skalar(Art::Nichts)).unwrap().0,
+                   vec![st(Art::Zeiger, Laden::Kopie(0, 16))]);
+    }
+
     #[cfg(feature = "ffi")]
     mod aufrufe {
         use super::super::*;
@@ -1147,7 +1545,9 @@ mod tests {
             let mut bauer = uebergang::Bauer::neu().unwrap();
             let einstieg = bauer.holen(&arten, art_von(rueck, false)).unwrap();
             std::mem::forget(bauer); // der Code muss leben bleiben
-            Aufruf { sig: Signatur { lib: "test".into(), c_name: "t".into(), name: "t".into(), rueck, params }, ziel, einstieg }
+            let structs = vec![None; params.len()];
+            Aufruf { sig: Signatur { lib: "test".into(), c_name: "t".into(), name: "t".into(), rueck, rueck_rr: String::new(), params },
+                     ziel, einstieg, structs, rueck_struct: None }
         }
 
         #[test]
@@ -1239,6 +1639,166 @@ mod tests {
             let leer = Rc::new(RefCell::new(Vec::new()));
             assert!(matches!(z("buffer_zeiger", &[Value::Buffer(leer)]).unwrap(), Value::Int(0)));
             assert!(fehler(z("buffer_zeiger", &[Value::Int(3)])).contains("BUFFER"));
+        }
+
+        // ---------------------------------------------- Structs als Wert
+        // Rust haelt sich bei `extern "C"` an die Aufrufkonvention des Systems;
+        // jede dieser Funktionen ist damit ein Vergleich fuer den Uebergang --
+        // die CI faehrt sie unter Windows x64, System V und Apple-ARM.
+
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct P2f { x: f32, y: f32 }
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct P2d { x: f64, y: f64 }
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct P2i { x: i32, y: i32 }
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct Mix { d: f64, i: i64 }
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct Ganz8 { a: i32, f: f32 }
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct B3 { a: i8, b: i8, c: i8 }
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct F3 { v: [f32; 3] }
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct I3 { v: [i64; 3] }
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct D4 { v: [f64; 4] }
+
+        extern "C" fn p2f_tauschen(p: P2f) -> P2f { P2f { x: p.y, y: p.x } }
+        extern "C" fn p2d_summe(a: P2d, b: P2d) -> P2d { P2d { x: a.x + b.x, y: a.y + b.y } }
+        extern "C" fn p2i_mal(p: P2i, k: i32) -> P2i { P2i { x: p.x * k, y: p.y * k } }
+        extern "C" fn mix_rechnen(a: i32, m: Mix, b: f64) -> Mix { Mix { d: m.d * 2.0 + b, i: m.i + a as i64 } }
+        extern "C" fn ganz8(g: Ganz8) -> Ganz8 { Ganz8 { a: g.a + 1, f: g.f * 3.0 } }
+        extern "C" fn b3_drehen(b: B3) -> B3 { B3 { a: b.c, b: b.a, c: b.b } }
+        extern "C" fn f3_skalieren(f: F3, k: f32) -> F3 { F3 { v: [f.v[0] * k, f.v[1] * k, f.v[2] * k] } }
+        extern "C" fn i3_summe(x: I3, y: I3) -> I3 { I3 { v: [x.v[0] + y.v[0], x.v[1] + y.v[1], x.v[2] + y.v[2]] } }
+        extern "C" fn d4_mal(x: D4, k: f64) -> D4 { D4 { v: x.v.map(|e| e * k) } }
+        extern "C" fn d4_spur(x: D4) -> f64 { x.v.iter().sum() }
+        #[allow(clippy::too_many_arguments)]
+        extern "C" fn viele_ganz(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, p: P2i, m: Mix, g: i64) -> i64 {
+            a + b + c + d + e + f + p.x as i64 * 100 + p.y as i64 * 1000 + m.i * 10000 + m.d as i64 * 100000 + g * 1000000
+        }
+        #[repr(C)] #[derive(Clone, Copy, Debug, PartialEq)] struct Z2 { a: i64, b: i64 }
+        #[allow(clippy::too_many_arguments)]
+        extern "C" fn fuenf_und_zwei(a: i64, b: i64, c: i64, d: i64, e: i64, z: Z2, g: i64) -> i64 {
+            a + b + c + d + e + z.a * 100 + z.b * 1000 + g * 10000
+        }
+        #[allow(clippy::too_many_arguments)]
+        extern "C" fn viele_komma(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64, g: f64, h: f64, q: Mix, z: i64) -> f64 {
+            a + b + c + d + e + f + g + h + q.d * 10.0 + q.i as f64 * 100.0 + z as f64 * 1000.0
+        }
+
+        /// Die Lage in der Form, die der Compiler schreibt.
+        fn lage(name: &str, groesse: usize, ausr: usize, glieder: &str) -> String {
+            format!("x{};{};{};{}", name, groesse, ausr, glieder)
+        }
+        fn als_puffer<T>(x: &T) -> Value {
+            let b = unsafe { std::slice::from_raw_parts(x as *const T as *const u8, std::mem::size_of::<T>()) };
+            crate::builtins::neuer_buffer(b.to_vec())
+        }
+        fn aus_puffer<T: Copy>(v: Value) -> T {
+            match v {
+                Value::Buffer(b) => {
+                    let b = b.borrow();
+                    assert_eq!(b.len(), std::mem::size_of::<T>());
+                    unsafe { std::ptr::read_unaligned(b.as_ptr() as *const T) }
+                }
+                v => panic!("BUFFER erwartet, erhalten {}", v.type_name()),
+            }
+        }
+        fn rufe(ziel: *const u8, rueck: &str, params: &[String], args: &[Value]) -> Result<Value, String> {
+            let ps: Vec<(String, bool, String)> = params.iter().enumerate()
+                .map(|(i, p)| (p.clone(), false, format!("a{}", i))).collect();
+            let sig = signatur_lesen(&signatur_text("test", "t", "t", rueck, &ps))?;
+            let a = aufruf_bauen(sig, ziel)?;
+            rufen_mit(&a, args)
+        }
+
+        #[test]
+        fn structs_als_wert() {
+            let p2f = lage("p2f", 8, 4, "f4*2@0");
+            let p2d = lage("p2d", 16, 8, "f8*2@0");
+            let p2i = lage("p2i", 8, 4, "i4*2@0");
+            let mix = lage("mix", 16, 8, "f8*1@0;i8*1@8");
+            let g8 = lage("g8", 8, 4, "i4*1@0;f4*1@4");
+            let b3 = lage("b3", 3, 1, "i1*3@0");
+            let f3 = lage("f3", 12, 4, "f4*3@0");
+            let i3 = lage("i3", 24, 8, "i8*3@0");
+            let d4 = lage("d4", 32, 8, "f8*4@0");
+
+            let r: P2f = aus_puffer(rufe(p2f_tauschen as *const u8, &p2f, std::slice::from_ref(&p2f),
+                                         &[als_puffer(&P2f { x: 1.5, y: -2.25 })]).unwrap());
+            assert_eq!(r, P2f { x: -2.25, y: 1.5 });
+            let r: P2d = aus_puffer(rufe(p2d_summe as *const u8, &p2d, &[p2d.clone(), p2d.clone()],
+                                         &[als_puffer(&P2d { x: 1.0, y: 2.0 }), als_puffer(&P2d { x: 0.5, y: 10.0 })]).unwrap());
+            assert_eq!(r, P2d { x: 1.5, y: 12.0 });
+            let r: P2i = aus_puffer(rufe(p2i_mal as *const u8, &p2i, &[p2i.clone(), "l".into()],
+                                         &[als_puffer(&P2i { x: 3, y: -4 }), Value::Int(5)]).unwrap());
+            assert_eq!(r, P2i { x: 15, y: -20 });
+            let r: Mix = aus_puffer(rufe(mix_rechnen as *const u8, &mix, &["l".into(), mix.clone(), "d".into()],
+                                         &[Value::Int(7), als_puffer(&Mix { d: 1.25, i: 1 << 40 }), Value::Float(0.5)]).unwrap());
+            assert_eq!(r, Mix { d: 3.0, i: (1 << 40) + 7 });
+            let r: Ganz8 = aus_puffer(rufe(ganz8 as *const u8, &g8, std::slice::from_ref(&g8),
+                                           &[als_puffer(&Ganz8 { a: 41, f: 1.5 })]).unwrap());
+            assert_eq!(r, Ganz8 { a: 42, f: 4.5 });
+            let r: B3 = aus_puffer(rufe(b3_drehen as *const u8, &b3, std::slice::from_ref(&b3),
+                                        &[als_puffer(&B3 { a: 1, b: -2, c: 3 })]).unwrap());
+            assert_eq!(r, B3 { a: 3, b: 1, c: -2 });
+            let r: F3 = aus_puffer(rufe(f3_skalieren as *const u8, &f3, &[f3.clone(), "f".into()],
+                                        &[als_puffer(&F3 { v: [1.0, 2.0, -3.0] }), Value::Float(2.5)]).unwrap());
+            assert_eq!(r, F3 { v: [2.5, 5.0, -7.5] });
+            let r: I3 = aus_puffer(rufe(i3_summe as *const u8, &i3, &[i3.clone(), i3.clone()],
+                                        &[als_puffer(&I3 { v: [1, 2, 3] }), als_puffer(&I3 { v: [10, 20, -30] })]).unwrap());
+            assert_eq!(r, I3 { v: [11, 22, -27] });
+            let r: D4 = aus_puffer(rufe(d4_mal as *const u8, &d4, &[d4.clone(), "d".into()],
+                                        &[als_puffer(&D4 { v: [1.0, 2.0, 3.0, 4.0] }), Value::Float(-0.5)]).unwrap());
+            assert_eq!(r, D4 { v: [-0.5, -1.0, -1.5, -2.0] });
+            let r = rufe(d4_spur as *const u8, "d", std::slice::from_ref(&d4),
+                         &[als_puffer(&D4 { v: [1.0, 2.0, 3.0, 4.5] })]).unwrap();
+            assert!(matches!(r, Value::Float(f) if f == 10.5));
+            // Die Kopie gehoert der Funktion: der Puffer des Programms bleibt.
+            let orig = als_puffer(&P2f { x: 1.0, y: 2.0 });
+            rufe(p2f_tauschen as *const u8, &p2f, std::slice::from_ref(&p2f), std::slice::from_ref(&orig)).unwrap();
+            assert_eq!(aus_puffer::<P2f>(orig), P2f { x: 1.0, y: 2.0 });
+        }
+
+        #[test]
+        fn structs_hinter_vollen_registern() {
+            // Sechs Ganzzahlen davor: unter System V sind die Register voll,
+            // beide Structs gehen auf den Stapel; unter AAPCS64 passt der
+            // erste noch, der zweite nicht mehr ganz.
+            let p2i = lage("p2i", 8, 4, "i4*2@0");
+            let mix = lage("mix", 16, 8, "f8*1@0;i8*1@8");
+            let mut ps: Vec<String> = vec!["q".into(); 6];
+            ps.push(p2i.clone());
+            ps.push(mix.clone());
+            ps.push("q".into());
+            let mut args: Vec<Value> = (1..=6).map(Value::Int).collect();
+            args.push(als_puffer(&P2i { x: 2, y: 3 }));
+            args.push(als_puffer(&Mix { d: 4.0, i: 5 }));
+            args.push(Value::Int(6));
+            let r = rufe(viele_ganz as *const u8, "q", &ps, &args).unwrap();
+            assert!(matches!(r, Value::Int(i) if i == 21 + 200 + 3000 + 50000 + 400000 + 6000000));
+            // Fuenf davor: unter System V geht der Struct auf den Stapel, die
+            // Ganzzahl dahinter nimmt das letzte freie Register.
+            let mut ps: Vec<String> = vec!["q".into(); 5];
+            ps.push(lage("z2", 16, 8, "i8*2@0"));
+            ps.push("q".into());
+            let mut args: Vec<Value> = (1..=5).map(Value::Int).collect();
+            args.push(als_puffer(&Z2 { a: 2, b: 3 }));
+            args.push(Value::Int(4));
+            let r = rufe(fuenf_und_zwei as *const u8, "q", &ps, &args).unwrap();
+            assert!(matches!(r, Value::Int(i) if i == 15 + 200 + 3000 + 40000));
+            // Acht Kommazahlen davor.
+            let mut ps: Vec<String> = vec!["d".into(); 8];
+            ps.push(mix.clone());
+            ps.push("q".into());
+            let mut args: Vec<Value> = (1..=8).map(|i| Value::Float(i as f64)).collect();
+            args.push(als_puffer(&Mix { d: 2.0, i: 3 }));
+            args.push(Value::Int(4));
+            let r = rufe(viele_komma as *const u8, "d", &ps, &args).unwrap();
+            assert!(matches!(r, Value::Float(f) if f == 36.0 + 20.0 + 300.0 + 4000.0));
+        }
+
+        #[test]
+        fn falscher_struct_wert() {
+            let p2f = lage("p2f", 8, 4, "f4*2@0");
+            let kurz = crate::builtins::neuer_buffer(vec![0u8; 4]);
+            assert!(fehler(rufe(p2f_tauschen as *const u8, &p2f, std::slice::from_ref(&p2f), &[kurz])).contains("braucht 8"));
+            assert!(fehler(rufe(p2f_tauschen as *const u8, &p2f, std::slice::from_ref(&p2f), &[Value::Int(3)])).contains("P2F"));
+            assert!(fehler(rufe(p2f_tauschen as *const u8, &p2f, std::slice::from_ref(&p2f), &[Value::Nil])).contains("NIL"));
         }
     }
 }
