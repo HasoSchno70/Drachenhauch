@@ -185,6 +185,9 @@ pub fn dateinamen(name: &str, system: &str) -> Vec<String> {
         }
         return alle;
     }
+    // `$NAME` setzt erst `namen_einsetzen` beim Laden ein; hier (Export)
+    // gibt es dafuer keine Datei.
+    if name.starts_with('$') { return Vec::new(); }
     let low = name.to_lowercase();
     let woertlich = name.contains('/') || name.contains('\\')
         || low.ends_with(".dll") || low.ends_with(".dylib") || low.ends_with(".so")
@@ -200,6 +203,33 @@ pub fn dateinamen(name: &str, system: &str) -> Vec<String> {
                              format!("{n}.framework/{n}", n = name)],
         _ => vec![format!("lib{}.so", name), format!("{}.so", name)],
     }
+}
+
+/// `$NAME` in einem Bibliotheksnamen steht fuer den Inhalt der
+/// Umgebungsvariablen NAME, gelesen beim ERSTEN Aufruf -- so kann ein
+/// Programm den Ort einer Bibliothek erst zur Laufzeit festlegen
+/// (`SETENV("DH_PYTHON_DLL", pfad)` vor dem ersten Aufruf), etwa die DLL des
+/// Pythons, das auf diesem Rechner liegt. Der Inhalt darf selbst mehrere
+/// Namen mit `|` tragen; eine leere oder fehlende Variable faellt weg, und
+/// bleibt gar nichts, ist das ein Fehler, der sie nennt.
+pub fn namen_einsetzen(name: &str, umgebung: impl Fn(&str) -> Option<String>) -> Result<String, String> {
+    if !name.contains('$') { return Ok(name.to_string()); }
+    let mut teile: Vec<String> = Vec::new();
+    let mut fehlend: Vec<String> = Vec::new();
+    for teil in name.split('|').map(str::trim).filter(|t| !t.is_empty()) {
+        match teil.strip_prefix('$') {
+            Some(var) => match umgebung(var).map(|w| w.trim().to_string()).filter(|w| !w.is_empty()) {
+                Some(w) => teile.push(w),
+                None => fehlend.push(var.to_string()),
+            },
+            None => teile.push(teil.to_string()),
+        }
+    }
+    if teile.is_empty() {
+        return Err(format!("Bibliothek \"{}\": die Umgebungsvariable {} ist nicht gesetzt -- vor dem ersten Aufruf mit SETENV den Pfad der Bibliothek eintragen",
+                           name, fehlend.join(", ")));
+    }
+    Ok(teile.join("|"))
 }
 
 pub fn system() -> &'static str {
@@ -668,7 +698,8 @@ fn rueckruf_fehler() -> Option<String> {
 
 #[cfg(feature = "ffi")]
 fn bibliothek(name: &str) -> Result<Rc<libloading::Library>, String> {
-    let namen = dateinamen(name, system());
+    let echt = namen_einsetzen(name, |v| std::env::var(v).ok())?;
+    let namen = dateinamen(&echt, system());
     let mut orte: Vec<std::path::PathBuf> = Vec::new();
     if let Ok(d) = std::env::current_dir() { orte.push(d); }
     if let Some(d) = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf())) {
@@ -717,6 +748,15 @@ unsafe fn laden(pfad: &std::path::Path) -> Result<libloading::Library, libloadin
         return libloading::os::windows::Library::load_with_flags(
             &mit_rueckstrich, libloading::os::windows::LOAD_WITH_ALTERED_SEARCH_PATH).map(Into::into);
     }
+    // Unter Linux und macOS GLOBAL: eine eingebettete Sprache (Python) laedt
+    // spaeter eigene Erweiterungen, die die Zeichen der Bibliothek erwarten,
+    // ohne gegen sie gelinkt zu sein -- mit RTLD_LOCAL fehlten sie dort.
+    #[cfg(unix)]
+    {
+        use libloading::os::unix::{Library, RTLD_GLOBAL, RTLD_LAZY};
+        return Library::open(Some(pfad), RTLD_LAZY | RTLD_GLOBAL).map(Into::into);
+    }
+    #[cfg(not(unix))]
     libloading::Library::new(pfad)
 }
 
@@ -1067,6 +1107,24 @@ mod tests {
         assert_eq!(dateinamen("libgtk-3-0.dll|libgtk-3.so.0", "linux"), ["libgtk-3-0.dll", "libgtk-3.so.0"]);
         assert_eq!(dateinamen("user32 | c", "windows"), ["user32.dll", "ucrtbase.dll", "msvcrt.dll"]);
         assert_eq!(dateinamen("sqlite3|sqlite3", "macos"), dateinamen("sqlite3", "macos"));
+    }
+
+    #[test]
+    fn namen_aus_der_umgebung() {
+        let umg = |v: &str| match v {
+            "DH_A" => Some("C:/x/python314.dll".to_string()),
+            "DH_LEER" => Some("  ".to_string()),
+            "DH_MEHR" => Some("msvcrt|c".to_string()),
+            _ => None,
+        };
+        assert_eq!(namen_einsetzen("kernel32", umg).unwrap(), "kernel32");
+        assert_eq!(namen_einsetzen("$DH_A", umg).unwrap(), "C:/x/python314.dll");
+        assert_eq!(namen_einsetzen("$DH_FEHLT|python3", umg).unwrap(), "python3");
+        assert_eq!(namen_einsetzen("$DH_MEHR", umg).unwrap(), "msvcrt|c");
+        let e = namen_einsetzen("$DH_LEER|$DH_FEHLT", umg).unwrap_err();
+        assert!(e.contains("DH_LEER, DH_FEHLT"), "{}", e);
+        assert!(dateinamen("$DH_A", "windows").is_empty());
+        assert_eq!(dateinamen("$DH_A|kernel32", "windows"), vec!["kernel32.dll".to_string()]);
     }
 
     #[test]

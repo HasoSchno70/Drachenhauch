@@ -1009,3 +1009,28 @@ declare = 1
 DECLARE FUNCTION Bytes LIB "kernel32" ALIAS "lstrlenA" (BYVAL s AS CSTR, BYREF lib AS LONG) AS LONG
 DIM declare AS INTEGER
 declare = 1
+
+=== lib aus der umgebung: gelesen beim ersten aufruf
+' LIB "$NAME" nimmt den Inhalt der Umgebungsvariablen NAME, und zwar beim
+' ERSTEN Aufruf -- ein Programm kann den Ort einer Bibliothek also zur
+' Laufzeit festlegen (so findet python.dh die DLL des installierten Pythons).
+' Der Inhalt darf mehrere Namen mit | tragen.
+DECLARE FUNCTION strlen LIB "$DH_PRUEF_LIB" (t AS TEXT) AS ZEIGER
+SETENV("DH_PRUEF_LIB", "msvcrt|c")
+PRINT strlen("Drache")
+--- erwartet
+6
+
+=== lib aus der umgebung: fehlt die variable, sagt die meldung welche
+DECLARE FUNCTION strlen LIB "$DH_PRUEF_FEHLT" (t AS TEXT) AS ZEIGER
+TRY
+    PRINT strlen("x")
+CATCH e
+    PRINT e
+END TRY
+' Mit einem zweiten Namen dahinter faellt die leere Variable weg.
+DECLARE FUNCTION strlen2 LIB "$DH_PRUEF_FEHLT|msvcrt|c" ALIAS "strlen" (t AS TEXT) AS ZEIGER
+PRINT strlen2("Drache")
+--- erwartet
+strlen: Bibliothek "$DH_PRUEF_FEHLT": die Umgebungsvariable DH_PRUEF_FEHLT ist nicht gesetzt -- vor dem ersten Aufruf mit SETENV den Pfad der Bibliothek eintragen
+6

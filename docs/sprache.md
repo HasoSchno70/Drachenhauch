@@ -1542,7 +1542,9 @@ PRINT strlen("Drachenhauch")        ' 12
 
 Die Typwörter der Zeile (`LONG`, `ZEIGER`, `TEXT`, `BUFFER`, `BYREF` ...)
 sagen, wie breit ein Wert in C ist; die Bibliothek wird beim ersten Aufruf
-geladen. Ein Absturz in fremdem Code ist nicht abzufangen. Alles Weitere:
+geladen; `LIB "$NAME"` nimmt den Namen dann aus einer Umgebungsvariablen.
+Ein Absturz in fremdem Code ist nicht abzufangen. Alles Weitere --
+auch Python einbetten (numpy, Qt über PySide6) -- in
 [Fremde Bibliotheken](ffi.md).
 
 ## Kommentare

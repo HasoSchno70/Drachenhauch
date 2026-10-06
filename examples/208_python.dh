@@ -1,0 +1,87 @@
+' 208 -- Python einbetten: Drachenhauch erzeugt ein Signal, Python rechnet
+' sein Spektrum, Drachenhauch zeichnet beides.
+'
+' Die Bibliothek python/python.dh holt das Python dieses Rechners ins
+' Programm (ueber DECLARE ... LIB, siehe docs/ffi.md). Ist numpy da, rechnet
+' es die Fourier-Transformation, sonst eine Zeile reines Python -- dasselbe
+' Bild, nur langsamer. Ohne Python sagt das Programm das und endet.
+'
+' Leertaste: neue Frequenzen. Die Werte gehen als Bytes hin und zurueck --
+' ein BUFFER aus Kommazahlen ist fuer numpy ein Feld.
+
+IMPORT "python/python.dh"
+
+CONST N = 256
+CONST B = 900
+CONST H = 520
+
+IF NOT pythonVorhanden() THEN
+    PRINT "Kein Python gefunden -- dieses Beispiel braucht eins."
+    PRINT "Python installieren oder den Pfad zum Programm in DH_PYTHON eintragen."
+    END
+END IF
+
+' Der Teil in Python: aus den Bytes ein Spektrum (Betrag je Frequenz),
+' zurueck als Bytes. Einmal am Anfang definiert, danach nur gerufen.
+pythonAusfuehren(!"import struct, math, cmath\n" + _
+    !"try:\n" + _
+    !"    import numpy as np\n" + _
+    !"    weg = 'numpy ' + np.__version__\n" + _
+    !"    def spektrum(roh):\n" + _
+    !"        x = np.frombuffer(roh, '<f8')\n" + _
+    !"        return (np.abs(np.fft.rfft(x)) * 2 / len(x)).astype('<f8').tobytes()\n" + _
+    !"except ImportError:\n" + _
+    !"    weg = 'reines Python'\n" + _
+    !"    def spektrum(roh):\n" + _
+    !"        n = len(roh) // 8\n" + _
+    !"        x = struct.unpack('<%dd' % n, roh)\n" + _
+    !"        s = [abs(sum(x[k] * cmath.exp(-2j * math.pi * f * k / n) for k in range(n))) * 2 / n for f in range(n // 2 + 1)]\n" + _
+    !"        return struct.pack('<%dd' % len(s), *s)\n")
+
+DIM signal AS BUFFER : signal = BUFFER_NEW(N * 8)
+DIM spek AS BUFFER : spek = BUFFER_NEW(0)
+DIM f1 AS INTEGER
+DIM f2 AS INTEGER
+DIM dauer AS FLOAT
+
+SUB neuesSignal()
+    f1 = 3 + INT(RND() * 20)
+    f2 = 30 + INT(RND() * 60)
+    DIM k AS INTEGER
+    FOR k = 0 TO N - 1
+        DIM t AS FLOAT : t = k / N
+        BUFFER_SET_F64(signal, k * 8, SIN(2 * PI * f1 * t) + 0.5 * SIN(2 * PI * f2 * t) + (RND() - 0.5) * 0.4)
+    NEXT
+    DIM t0 AS FLOAT : t0 = GET_TIME()
+    pythonSetzeBytes("roh", signal)
+    spek = pythonBytes("spektrum(roh)")
+    dauer = (GET_TIME() - t0) * 1000
+END SUB
+
+RANDOMIZE(7)
+neuesSignal()
+DIM wie AS STRING : wie = pythonText$("weg") + ", Python " + pythonText$("__import__('sys').version.split()[0]")
+
+SCREEN(B, H, "Python einbetten")
+WHILE NOT QUITREQUESTED()
+    IF KEYHIT(KEY_SPACE) THEN neuesSignal()
+    CLS(RGB(18, 22, 30))
+    TEXT(20, 14, "Signal aus Drachenhauch", RGB(150, 200, 255))
+    TEXT(20, 250, "Spektrum aus Python (" + wie + ", " + FORMAT$(dauer, "%.1f") + " ms)", RGB(255, 200, 120))
+    TEXT(20, H - 26, "Frequenzen " + STR$(f1) + " und " + STR$(f2) + " -- Leertaste: neue", RGB(140, 140, 150))
+    ' Signal: oben, Mitte bei y = 135
+    DIM k AS INTEGER
+    FOR k = 1 TO N - 1
+        DIM x0 AS INTEGER : x0 = 20 + (k - 1) * (B - 40) \ (N - 1)
+        DIM x1 AS INTEGER : x1 = 20 + k * (B - 40) \ (N - 1)
+        LINE(x0, 135 - INT(BUFFER_GET_F64(signal, (k - 1) * 8) * 60), x1, 135 - INT(BUFFER_GET_F64(signal, k * 8) * 60), RGB(120, 190, 255))
+    NEXT
+    ' Spektrum: unten, Balken je Frequenz
+    DIM m AS INTEGER : m = BUFFER_LEN(spek) \ 8
+    DIM w AS INTEGER : w = (B - 40) \ m
+    FOR k = 0 TO m - 1
+        DIM hoehe AS INTEGER : hoehe = INT(BUFFER_GET_F64(spek, k * 8) * 180)
+        IF hoehe > 0 THEN BOX(20 + k * w, 470 - hoehe, 20 + k * w + w - 1, 470, RGB(255, 170, 80))
+    NEXT
+    FLIP()
+WEND
