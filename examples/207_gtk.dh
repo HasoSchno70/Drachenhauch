@@ -44,6 +44,10 @@ DECLARE SUB gtk_main_quit LIB GTK ()
 DECLARE FUNCTION signal LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+'' Eigenschaften setzt g_object_set: Paare aus Name und Wert, beliebig viele,
+' am Ende NIL -- eine Funktion mit ... (variadisch).
+DECLARE SUB g_object_set LIB GOBJECT (objekt AS ZEIGER, name AS TEXT, ...)
+DECLARE FUNCTION gtk_widget_get_tooltip_text LIB GTK (w AS ZEIGER) AS TEXT
 DECLARE FUNCTION g_timeout_add LIB GLIB _
     (ms AS ULONG, rueckruf AS FUNCTION(daten AS ZEIGER) AS BOOLEAN, daten AS ZEIGER) AS ULONG
 
@@ -81,6 +85,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
         CASE 2
             gtk_button_clicked(gruss)
             PRINT gtk_label_get_text(ausgabe)
+            PRINT "Tooltip: "; gtk_widget_get_tooltip_text(gruss)
         CASE ELSE
             gtk_button_clicked(ende)
             RETURN FALSE
@@ -118,6 +123,7 @@ gtk_box_pack_start(spalte, ausgabe, TRUE, TRUE, 0)
 gtk_box_pack_start(spalte, zeile, FALSE, FALSE, 0)
 gtk_box_pack_start(spalte, ende, FALSE, FALSE, 0)
 gtk_container_add(fenster, spalte)
+g_object_set(gruss, "tooltip-text", "Sagt Hallo", "can-default", TRUE, NIL)
 
 signal(gruss, "clicked", grussen, 0, 0, 0)
 signal(ende, "clicked", beenden, 0, 0, 0)

@@ -1583,6 +1583,18 @@ impl Parser {
         if self.matches(Tt::Lparen) {
             if !self.check(Tt::Rparen) {
                 loop {
+                    // `...` am Ende: beliebig viele weitere Argumente (printf).
+                    if self.matches(Tt::Ellipsis) {
+                        if self.check(Tt::Ident) { self.pos += 1; }     // `...rest` -- der Name zaehlt nicht
+                        if !self.check(Tt::Rparen) {
+                            return self.err("... steht am Ende der Parameter -- danach kommt nichts mehr");
+                        }
+                        if params.is_empty() {
+                            return self.err("Vor ... braucht es mindestens einen festen Parameter (in C wie printf(format, ...))");
+                        }
+                        params.push(("...".to_string(), "*".to_string(), false));
+                        break;
+                    }
                     let by_ref = self.matches(Tt::Byref);
                     if !by_ref && self.check(Tt::Ident) && sval(self.peek(0)) == "byval" && self.tt(1) == Tt::Ident {
                         self.pos += 1;

@@ -1433,6 +1433,15 @@ mit Schraegstrichen findet Windows die Abhaengigkeiten nicht), und eine
 vorhandene, nicht ladbare Datei hat eine eigene Meldung. Beispiel
 `examples/207_gtk.dh`, Faelle in `ffi.dhtest` (GTK-Faelle ueberspringen sich
 ohne GTK; lokal ueber das GTK von Inkscape).
+**Variable Argumentzahl (2026-10-06):** `...` als letzter DECLARE-Parameter
+(Signatur `*`, `--check` zaehlt die festen). Cranelift kann keine
+variadischen Aufrufe -- `ffi::variadisch_rufen` baut je Aufruf eine
+gewoehnliche Signatur nach den Regeln des Systems: Windows x64 Kommazahlen als
+Bitmuster in Ganzzahl-Plaetzen (`KOMMA_IN_FP_REGISTER`), System V x86-64 ueber
+das Sprungbrett `sprungbrett` (`global_asm!`, setzt `al = 8`), Apple-ARM
+fuellt die acht X-Register mit Nullen (Rest auf den Stapel). Typ der
+weiteren Werte aus dem Wert. Unter Windows liegt `sprintf` in `msvcrt`, nicht
+in ucrtbase (`LIB "msvcrt|c"`). Faelle `variadisch:` in ffi.dhtest.
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 

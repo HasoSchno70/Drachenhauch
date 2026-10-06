@@ -179,6 +179,21 @@ module.exports = (H) => [
   H.bullet("Ein Rückruf bleibt gültig, bis das Programm endet; die Bibliothek darf ihn sich merken und später rufen."),
   H.tip("Ruft eine Bibliothek aus einem eigenen Faden zurück (CreateThread, pthread_create, manche Treiber), läuft deine Funktion nicht: Drachenhauch-Code läuft nur auf dem Faden des Programms. Der Rückruf liefert dann 0, und der nächste Aufruf einer Bibliothek meldet es.", "Nur ein Faden"),
 
+  H.h2("Beliebig viele Argumente: ..."),
+  H.p("Manche C-Funktionen nehmen beliebig viele Werte – printf und seine Geschwister, g_object_set in GTK. In der DECLARE-Zeile steht dafür ... am Ende der Parameter; welcher C-Typ ein weiterer Wert ist, ergibt sich aus dem Wert selbst:"),
+  H.code([
+    'DECLARE FUNCTION sprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, ...) AS LONG',
+    '',
+    'DIM b AS BUFFER',
+    'b = BUFFER_NEW(128)',
+    'sprintf(b, "%d Drachen, %.1f Meter, %s", 3, 4.5, "feuerrot")',
+    'PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))',
+  ]),
+  H.code(["3 Drachen, 4.5 Meter, feuerrot"], { out: true }),
+  H.bullet("INTEGER und BOOLEAN gehen als ganze Zahl, FLOAT als double, ein Text als char*, ein BUFFER als Zeiger und NIL als Nullzeiger."),
+  H.bullet("Unter Windows liegt die printf-Familie in msvcrt und nicht in der C-Bibliothek ucrtbase – daher die zwei Namen \"msvcrt|c\"."),
+  H.bullet("Ob die Werte zum Format passen, prüft niemand: ein %s für eine Zahl ist einer der Abstürze vom Anfang des Kapitels."),
+
   H.h2("Eine ganze Oberfläche: GTK"),
   H.p("Mit DECLARE und Rückrufen lässt sich sogar GTK benutzen, die Bibliothek, mit der unter Linux die meisten Programme ihre Fenster zeichnen. Fenster, Knöpfe und Eingabefelder sind ZEIGER; ein Signal wie \"clicked\" verbindest du mit g_signal_connect_data und einer SUB deines Programms, und gtk_main dreht die Schleife von GTK, bis gtk_main_quit kommt. Das Beispiel 207_gtk.dh zeigt ein Fenster mit Eingabefeld, zwei Knöpfen und einer Beschriftung."),
   H.tip("g_signal_connect, wie es in jeder GTK-Anleitung steht, ist in C nur ein Makro. Gerufen wird g_signal_connect_data – und weil jedes Signal einen anderen Rückruf hat, bekommt jede Form eine eigene DECLARE-Zeile mit ALIAS auf dieselbe C-Funktion.", "Makros gibt es nicht"),
@@ -188,5 +203,5 @@ module.exports = (H) => [
 
   H.h2("Unsichere Bibliotheken"),
   H.p("Einer Bibliothek, die abstürzen könnte, gibst du einen eigenen Prozess: Du rufst sie in einem Auftrag mit TASK_START auf (Kapitel „Programme, Aufträge & Umgebung“). Stürzt der Auftrag ab, bekommt dein Programm beim Abholen mit TASK_RESULT$ einen Fehler – „der Auftrag ist abgestuerzt“ – und läuft weiter."),
-  H.note("Noch nicht dabei sind Structs als Wert und Funktionen mit variabler Argumentzahl wie printf. Im Browser gibt es keine fremden Bibliotheken."),
+  H.note("Noch nicht dabei sind Structs als Wert und Funktionen mit va_list wie vprintf. Im Browser gibt es keine fremden Bibliotheken."),
 ];

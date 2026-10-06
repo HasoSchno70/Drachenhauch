@@ -695,7 +695,86 @@ CONST BEISPIEL = "{sammlung}/../../examples/207_gtk.dh"
 --- erwartet
 rueckgabe 0
 Hallo, Drache! (2. Gruss)
+Tooltip: Sagt Hallo
 Gruesse: 2
+
+=== variadisch: sprintf mit allen arten von werten
+' `...` am Ende der Parameter nimmt beliebig viele weitere Werte; ihr Typ
+' kommt aus dem Wert (INTEGER, FLOAT, Text, BUFFER, NIL). Unter Windows
+' liegt die printf-Familie in msvcrt, nicht in ucrtbase -- daher "msvcrt|c".
+' Elf Werte gemischt: einige reisen auf dem Stapel statt in Registern.
+DECLARE FUNCTION sprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, ...) AS LONG
+DIM b AS BUFFER
+b = BUFFER_NEW(256)
+PRINT sprintf(b, "%d|%s|%.2f|%lld|%c|%x", 42, "Drache", 3.14159, 1234567890123, 65, 255)
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+PRINT sprintf(b, "%d %d %d %d %d %.1f %.1f %.1f %d %s %.3f", 1, 2, 3, 4, 5, 6.5, 7.5, 8.5, 9, "zehn", 11.25)
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+PRINT sprintf(b, "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f", 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5)
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+PRINT sprintf(b, "ohne weitere")
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+--- erwartet
+33
+42|Drache|3.14|1234567890123|A|ff
+35
+1 2 3 4 5 6.5 7.5 8.5 9 zehn 11.250
+40
+1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5 9.5 10.5
+12
+ohne weitere
+
+=== variadisch: sscanf schreibt ueber zeiger zurueck
+DECLARE FUNCTION sscanf LIB "msvcrt|c" (text AS TEXT, format AS TEXT, ...) AS LONG
+DIM aus AS BUFFER
+aus = BUFFER_NEW(16)
+PRINT sscanf("12 3.5", "%d %lf", BUFFER_ZEIGER(aus), BUFFER_ZEIGER(aus) + 8)
+PRINT BUFFER_GET_I32(aus, 0), BUFFER_GET_F64(aus, 8)
+--- erwartet
+2
+12 3.5
+
+=== variadisch: wsprintfa aus user32
+DECLARE FUNCTION wsprintfA LIB "user32" (ziel AS BUFFER, format AS TEXT, ...) AS LONG
+DIM b AS BUFFER
+b = BUFFER_NEW(64)
+PRINT wsprintfA(b, "%d-%s-%u", -7, "x", 4000000000)
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+--- system windows
+--- erwartet
+15
+-7-x-4000000000
+
+=== variadisch: was nicht geht
+DECLARE FUNCTION sprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, ...) AS LONG
+DIM b AS BUFFER
+b = BUFFER_NEW(64)
+DIM m AS MAP OF INTEGER
+TRY
+    PRINT sprintf(b, "%d", m)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT sprintf(b, "%s", "a" + CHR$(0) + "b")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+sprintf: Argument 3 (hinter ...): erwartet eine Zahl, einen Text, einen BUFFER oder NIL, erhalten MAP
+sprintf: Argument 3 (hinter ...): ein Nullzeichen mitten im Text -- C saehe nur den Anfang
+
+=== variadisch: zu wenige feste argumente sagt der uebersetzer
+DECLARE FUNCTION sprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, ...) AS LONG
+DIM b AS BUFFER
+PRINT sprintf(b)
+--- fehler
+sprintf: erwartet mindestens 2 Argument(e), erhalten 1
+
+=== variadisch: ... steht am ende
+DECLARE FUNCTION f LIB "c" (a AS LONG, ..., b AS LONG) AS LONG
+--- fehler
+... steht am Ende der Parameter
 
 === eine deklarierte funktion verdeckt den eingebauten befehl
 DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
