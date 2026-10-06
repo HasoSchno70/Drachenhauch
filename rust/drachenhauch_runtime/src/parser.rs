@@ -1596,8 +1596,12 @@ impl Parser {
                         break;
                     }
                     let by_ref = self.matches(Tt::Byref);
+                    // BYVAL ist fuer Zahlen die Vorgabe; vor einem Struct heisst es:
+                    // als Wert, nicht als Zeiger auf seine Bytes.
+                    let mut by_val = false;
                     if !by_ref && self.check(Tt::Ident) && sval(self.peek(0)) == "byval" && self.tt(1) == Tt::Ident {
                         self.pos += 1;
+                        by_val = true;
                     }
                     let pname = sval(&self.expect(Tt::Ident, "Erwartet Parametername")?);
                     self.expect(Tt::As, "Erwartet AS nach Parametername")?;
@@ -1614,7 +1618,7 @@ impl Parser {
                         if by_ref {
                             return self.err("BYREF braucht ein Struct nicht -- die Bibliothek bekommt ohnehin einen Zeiger auf seine Bytes");
                         }
-                        let w = format!("#{}", sval(self.peek(0)).to_lowercase());
+                        let w = format!("{}{}", if by_val { '~' } else { '#' }, sval(self.peek(0)).to_lowercase());
                         self.pos += 1;
                         w
                     } else {
@@ -1639,6 +1643,15 @@ impl Parser {
             None
         } else {
             self.expect(Tt::As, "Erwartet AS <Rueckgabetyp> -- ohne Rueckgabe heisst es DECLARE SUB")?;
+            // Ein STRUCT ... LAYOUT C kommt als Wert zurueck (liefert die
+            // Bibliothek einen Zeiger auf einen, ist die Rueckgabe ZEIGER).
+            if self.check(Tt::Ident) && crate::ffi::typ_zeichen(&sval(self.peek(0))).is_none()
+                && crate::ffi::typ_vorschlag(&sval(self.peek(0))).is_none() {
+                let w = format!("~{}", sval(self.peek(0)).to_lowercase());
+                self.pos += 1;
+                self.consume_terminator()?;
+                return Ok(Node::DeclareLib { name, anzeige, lib, alias, params, ret: Some(w) });
+            }
             let wort = self.ffi_typwort()?;
             if wort == "buffer" {
                 self.pos -= 1;
@@ -1666,6 +1679,11 @@ impl Parser {
                 }
                 // Der Name ist freiwillig: `a AS ZEIGER` oder nur `ZEIGER`.
                 if self.check(Tt::Ident) && self.tt(1) == Tt::As { self.pos += 2; }
+                if self.check(Tt::Ident) && crate::ffi::typ_zeichen(&sval(self.peek(0))).is_none()
+                    && crate::ffi::typ_vorschlag(&sval(self.peek(0))).is_none() {
+                    let h = crate::ffi::typ_hinweis(&sval(self.peek(0)));
+                    return self.err(&format!("{} -- ein Struct geht in einem Rueckruf (noch) nicht: einen Zeiger darauf bekommt er als ZEIGER, BUFFER_AUS_ZEIGER liest ihn", h));
+                }
                 let w = self.ffi_typwort()?;
                 if w == "buffer" {
                     self.pos -= 1;
