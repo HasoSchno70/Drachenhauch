@@ -63,7 +63,7 @@ happen *next to* a game — tools, reports, small services:
 | **Network** | `HTTP_GET`/`POST` with headers and JSON, TLS, plus `SHA256$`, `HMAC_SHA256$` and `UUID4$` for authenticated services |
 | **Data** | SQLite, CSV per RFC 4180, ZIP, JSON, regex, `BUFFER` for binary files |
 | **Larger programs** | namespaces (`IMPORT "math.dh" AS math`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` with error codes, inheritance with `SUPER` and `ABSTRACT`, `ASSERT_EQ` |
-| **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly ([more, in German](docs/ffi.md)) |
+| **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks ([more, in German](docs/ffi.md)) |
 | **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
 
 None of it needs a window. A Drachenhauch program can be a console
@@ -97,8 +97,8 @@ rust\drachenhauch_runtime\target\release\dhrt test tests\pruef         # all che
 
 | Edition | For printing (A4) | For e-readers |
 |---|---|---|
-| **English** — 520 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
-| **Deutsch** — 527 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 526 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
+| **Deutsch** — 533 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
 
 Both languages come out of the **same** chapter sources (`content/NN_*.js`): the renderers are handed an `H` that puts every string through the catalogue `i18n/en.json` first. A second set of English chapter files would have drifted from the German inside a month — this way it cannot. If an entry is missing, the German sentence stays and the book still builds; `node fehlend.js en` counts what is still outstanding.
 
