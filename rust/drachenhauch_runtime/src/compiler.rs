@@ -331,6 +331,21 @@ struct ClassInfo {
     compiled: Vec<(String, FuncTeile)>,    // method-name -> fertige Methode
 }
 
+/// Ein Feld eines `STRUCT ... LAYOUT C` an einer Stelle des Programms:
+/// die Variable, die feste Stelle darin und die Indizes, die erst zur
+/// Laufzeit dazukommen (je Index: Ausdruck, Zahl der Elemente, Groesse).
+struct StructOrt {
+    basis: Node,
+    wo: String,
+    fest: usize,
+    dyn_: Vec<(Node, u32, usize)>,
+    art: char,
+    unter: String,
+    anzahl: u32,
+    zeichen: u32,
+    groesse: usize,
+}
+
 /// Eine Funktion aus einer fremden Bibliothek. Der Aufruf gibt `signatur`
 /// (ffi::signatur_text) dem internen Befehl `__ffi` als ersten Wert mit.
 #[derive(Clone)]
@@ -364,6 +379,8 @@ pub struct Compiler {
     /// `DECLARE ... LIB` (klein geschriebener Name): Funktionen aus fremden
     /// Bibliotheken, docs/entwurf-ffi.md.
     ffi_decls: HashMap<String, FfiDecl>,
+    /// Die Lagen aller `STRUCT ... LAYOUT C` (cstruct.rs), klein geschrieben.
+    lagen: HashMap<String, crate::cstruct::Lage>,
     class_lines: HashMap<String, u32>,
     /// Zeilen-Herkunft der gemergten Quelle + Name der Hauptdatei, um in
     /// Meldungen auf eine ANDERE Stelle zu verweisen (`mathe.dh:5`).
@@ -673,7 +690,7 @@ impl Compiler {
                    global_slots: HashMap::new(),
                    global_consts: std::collections::HashSet::new(),
                    global_vars: std::collections::HashSet::new(),
-                   fn_sigs: HashMap::new(), fn_lines: HashMap::new(), ffi_decls: HashMap::new(),
+                   fn_sigs: HashMap::new(), fn_lines: HashMap::new(), ffi_decls: HashMap::new(), lagen: HashMap::new(),
                    class_lines: HashMap::new(),
                    herkunft: vec![], haupt: String::new(),
                    compiled_fns: vec![],
@@ -1098,6 +1115,8 @@ impl Compiler {
                 Ok(())
             }
             Node::IndexAssign { target, indices, value } => {
+                let ziel = Node::IndexAccess { target: target.clone(), indices: indices.clone() };
+                if let Some(o) = self.struct_ort(&ziel) { return self.struct_schreiben(o?, value); }
                 self.index_pruefen(indices);
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
@@ -1106,6 +1125,8 @@ impl Compiler {
                 Ok(())
             }
             Node::MemberAssign { target, name, value } => {
+                let ziel = Node::MemberAccess { target: target.clone(), name: name.clone() };
+                if let Some(o) = self.struct_ort(&ziel) { return self.struct_schreiben(o?, value); }
                 self.pruefe_feld_zuweisung(target, name, value);
                 self.expr(target)?;
                 self.expr(value)?;
@@ -1151,6 +1172,8 @@ impl Compiler {
             Node::TupleAssign { targets, value } => self.stmt_tuple_assign(targets, value),
             Node::DeclareLib { .. } => Err(
                 "DECLARE ... LIB gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block".into()),
+            Node::StructLayout { .. } => Err(
+                "STRUCT ... LAYOUT C gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block".into()),
             Node::FunctionDecl { .. } | Node::SubDecl { .. } | Node::ClassDecl { .. }
             | Node::EnumDecl { .. } => Err(format!(
                 "{} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- \
@@ -1820,6 +1843,14 @@ impl Compiler {
         let eff = if array_dims.is_some() { format!("array:{}", type_name) }
                   else { type_name.to_string() };
         self.warn_dim_typ_wechsel(name, &eff);
+        // Ein Feld von Structs gibt es nicht: ihre Bytes muessten
+        // hintereinander liegen, ein ARRAY haelt einzelne Werte.
+        let elem = type_name.strip_prefix("array:").unwrap_or(if array_dims.is_some() { type_name } else { "" });
+        if let Some(l) = self.lagen.get(elem) {
+            return Err(format!(
+                "Ein Feld von {} gibt es nicht -- ein STRUCT ... LAYOUT C mit einem Feld davon schon: STRUCT Liste LAYOUT C / e[10] AS {} / END STRUCT",
+                l.name, l.name));
+        }
         // Sized-Array: `DIM x[10, 20] AS T` -- type_name = Element-Typ.
         if let Some(dims) = array_dims {
             if !self.known_elem(type_name) {
@@ -1871,6 +1902,26 @@ impl Compiler {
                 self.ctx.local_defaults.push(CVal::Nil);
                 self.ctx.emit(oc::DECLARE_STRUCT_LOCAL, json!([slot, type_name]));
             }
+            return Ok(());
+        }
+        // STRUCT ... LAYOUT C: ein BUFFER in seiner Groesse, voller Nullen.
+        if let Some(groesse) = self.lagen.get(type_name).map(|l| l.groesse) {
+            if self.ctx.is_main {
+                let name_idx = self.ctx.add_const(json!(name));
+                let type_idx = self.ctx.add_const(json!(type_name));
+                let default_idx = self.ctx.add_const(Value::Null);
+                if let Some(&slot) = self.global_slots.get(name) {
+                    self.ctx.emit(oc::DECLARE_GLOBAL_SLOT, json!([slot as i64, name_idx, type_idx, default_idx]));
+                } else {
+                    self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                }
+            } else {
+                self.ctx.declare_local(name, type_name);
+            }
+            let c = self.ctx.add_const(json!(groesse));
+            self.ctx.emit(oc::LOAD_CONST, json!(c));
+            self.ctx.emit(oc::CALL_BUILTIN, json!(["__struct_neu", 1]));
+            self.store_var(name);
             return Ok(());
         }
         // Skalar: Werttyp/externer Modul-Typ (Default je Typ) oder Klasse (NIL).
@@ -2645,6 +2696,7 @@ impl Compiler {
             Node::BinaryOp { op, left, right } => self.expr_binary(op, left, right),
             Node::Call { callee, args } => self.expr_call(callee, args),
             Node::IndexAccess { target, indices } => {
+                if let Some(o) = self.struct_ort(e) { return self.struct_lesen(o?); }
                 self.index_pruefen(indices);
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
@@ -2652,6 +2704,7 @@ impl Compiler {
                 Ok(())
             }
             Node::MemberAccess { target, name } => {
+                if let Some(o) = self.struct_ort(e) { return self.struct_lesen(o?); }
                 self.warn_unbekanntes_mitglied(target, name, false);
                 self.expr(target)?;
                 let idx = self.ctx.add_const(json!(name));
@@ -2833,6 +2886,16 @@ impl Compiler {
     }
 
     fn expr_call(&mut self, callee: &Node, args: &[Node]) -> CR {
+        // SIZEOF(typ) / OFFSETOF(struct, feld): feste Zahlen beim Uebersetzen.
+        if let Node::Identifier(f) = callee {
+            if (f == "sizeof" || f == "offsetof") && !self.ctx.local_slots.contains_key(f.as_str())
+                && !self.fn_sigs.contains_key(f.as_str()) {
+                let wert = self.groesse_oder_lage(f, args)?;
+                let c = self.ctx.add_const(json!(wert));
+                self.ctx.emit(oc::LOAD_CONST, json!(c));
+                return Ok(());
+            }
+        }
         // Methoden-Aufruf obj.method(...) (auch Container-Methoden wie .length()).
         if let Node::MemberAccess { target, name } = callee {
             if args.iter().any(|a| matches!(a, Node::NamedArg { .. })) {
@@ -3484,7 +3547,13 @@ impl Compiler {
     /// WITH expr / body / END WITH -- Ziel in anonymen Slot, `.member` im
     /// Body wurde vom Parser zu `<var_name>.member` desugart.
     fn stmt_with(&mut self, var_name: &str, target: &Node, body: &[Node]) -> CR {
-        let slot = self.ctx.alloc_anon_slot("any");
+        // Ist das Ziel ein STRUCT ... LAYOUT C, traegt die Hilfsvariable
+        // seinen Typ -- sonst kennt `.feld` die Lage nicht.
+        let typ = match target {
+            Node::Identifier(n) => self.angesagter_typ(n).filter(|t| self.lagen.contains_key(t)),
+            _ => None,
+        };
+        let slot = self.ctx.alloc_anon_slot(typ.as_deref().unwrap_or("any"));
         self.expr(target)?;
         self.ctx.emit(oc::STORE_LOCAL, json!(slot));
         self.ctx.local_slots.insert(var_name.to_string(), slot);
@@ -3725,6 +3794,136 @@ impl Compiler {
         Ok(())
     }
 
+    /// `SIZEOF(typ)` und `OFFSETOF(struct, feld)`.
+    fn groesse_oder_lage(&self, f: &str, args: &[Node]) -> Result<usize, String> {
+        let gross = f.to_uppercase();
+        let name = |n: &Node| match n { Node::Identifier(x) => Some(x.to_lowercase()), _ => None };
+        if f == "sizeof" {
+            let t = (args.len() == 1).then(|| name(&args[0])).flatten().ok_or_else(||
+                "SIZEOF: erwartet einen Typ -- SIZEOF(SYSTEMTIME) fuer einen STRUCT ... LAYOUT C oder SIZEOF(LONG) fuer ein Typwort".to_string())?;
+            if let Some(l) = self.lagen.get(&t) { return Ok(l.groesse); }
+            if let Some(b) = crate::ffi::typ_zeichen(&t).and_then(crate::cstruct::breite) { return Ok(b); }
+            return Err(format!("SIZEOF: '{}' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER ...)", t.to_uppercase()));
+        }
+        let (Some(t), Some(feld)) = ((args.len() == 2).then(|| name(&args[0])).flatten(),
+                                      args.get(1).and_then(name)) else {
+            return Err(format!("{}: erwartet einen Struct und ein Feld -- OFFSETOF(SYSTEMTIME, monat)", gross));
+        };
+        let l = self.lagen.get(&t).ok_or_else(|| format!("{}: '{}' ist kein STRUCT ... LAYOUT C", gross, t.to_uppercase()))?;
+        l.feld(&feld).map(|x| x.offset)
+            .ok_or_else(|| format!("{}: {} hat kein Feld '{}' (Felder: {})", gross, l.name, feld, l.feldnamen()))
+    }
+
+    /// Steht hier ein Feld eines `STRUCT ... LAYOUT C` (`st.monat`,
+    /// `st.punkte[i].x`)? `None` = nein, dann ist es ein gewoehnlicher
+    /// Zugriff. Der Wert ist zur Laufzeit ein BUFFER, die Lage kennt nur der
+    /// Compiler.
+    fn struct_ort(&self, n: &Node) -> Option<Result<StructOrt, String>> {
+        match n {
+            Node::Identifier(name) => {
+                let t = self.angesagter_typ(name)?;
+                let l = self.lagen.get(&t)?;
+                Some(Ok(StructOrt { basis: n.clone(), wo: name.clone(), fest: 0, dyn_: vec![], art: '#',
+                                    unter: t.clone(), anzahl: 0, zeichen: 0, groesse: l.groesse }))
+            }
+            Node::MemberAccess { target, name } => {
+                let mut o = match self.struct_ort(target)? { Ok(o) => o, Err(e) => return Some(Err(e)) };
+                if o.anzahl > 0 {
+                    return Some(Err(format!("{} ist ein Feld von {} Elementen -- erst ein Index: {}[0].{}", o.wo, o.anzahl, o.wo, name)));
+                }
+                if o.art != '#' {
+                    return Some(Err(format!("{} ist kein Struct, es hat kein Feld '{}'", o.wo, name)));
+                }
+                let l = &self.lagen[&o.unter];
+                let Some(f) = l.feld(name) else {
+                    return Some(Err(format!("{} hat kein Feld '{}' (Felder: {})", l.name, name, l.feldnamen())));
+                };
+                o.fest += f.offset;
+                o.wo = format!("{}.{}", o.wo, f.name);
+                o.art = f.art;
+                o.unter = f.unter.clone();
+                o.anzahl = f.anzahl;
+                o.zeichen = f.zeichen;
+                o.groesse = f.groesse;
+                Some(Ok(o))
+            }
+            Node::IndexAccess { target, indices } => {
+                let mut o = match self.struct_ort(target)? { Ok(o) => o, Err(e) => return Some(Err(e)) };
+                if o.anzahl == 0 {
+                    return Some(Err(format!("{} ist kein Feld von Elementen -- ohne Index", o.wo)));
+                }
+                if indices.len() != 1 {
+                    return Some(Err(format!("{}: ein Feld im Struct hat genau einen Index", o.wo)));
+                }
+                o.dyn_.push((indices[0].clone(), o.anzahl, o.groesse));
+                o.wo = format!("{}[]", o.wo);
+                o.anzahl = 0;
+                Some(Ok(o))
+            }
+            _ => None,
+        }
+    }
+
+    /// Die Stelle im Puffer auf den Stapel: fest + Index * Groesse ...
+    fn struct_stelle(&mut self, o: &StructOrt) -> CR {
+        let c = self.ctx.add_const(json!(o.fest));
+        self.ctx.emit(oc::LOAD_CONST, json!(c));
+        for (ix, anzahl, faktor) in &o.dyn_ {
+            self.expr(ix)?;
+            let a = self.ctx.add_const(json!(anzahl));
+            self.ctx.emit(oc::LOAD_CONST, json!(a));
+            let w = self.ctx.add_const(json!(o.wo));
+            self.ctx.emit(oc::LOAD_CONST, json!(w));
+            self.ctx.emit(oc::CALL_BUILTIN, json!(["__struct_index", 3]));
+            let f = self.ctx.add_const(json!(faktor));
+            self.ctx.emit(oc::LOAD_CONST, json!(f));
+            self.ctx.emit(oc::MUL, Value::Null);
+            self.ctx.emit(oc::ADD, Value::Null);
+        }
+        Ok(())
+    }
+
+    /// Ein ganzer Struct oder ein ganzes Feld von Elementen ist kein Wert.
+    fn struct_einzelwert(o: &StructOrt) -> CR {
+        if o.anzahl > 0 {
+            return Err(format!("{} ist ein Feld von {} Elementen -- mit Index: {}[0]", o.wo, o.anzahl, o.wo));
+        }
+        if o.art == '#' {
+            return Err(format!("{} ist ein Struct -- lies und schreib seine Felder ({}.feld); seine Bytes liegen im Puffer ab OFFSETOF", o.wo, o.wo));
+        }
+        Ok(())
+    }
+
+    fn struct_lesen(&mut self, o: StructOrt) -> CR {
+        Self::struct_einzelwert(&o)?;
+        self.expr(&o.basis.clone())?;
+        let w = self.ctx.add_const(json!(o.wo));
+        self.ctx.emit(oc::LOAD_CONST, json!(w));
+        self.struct_stelle(&o)?;
+        let a = self.ctx.add_const(json!(o.art.to_string()));
+        self.ctx.emit(oc::LOAD_CONST, json!(a));
+        let z = self.ctx.add_const(json!(o.zeichen));
+        self.ctx.emit(oc::LOAD_CONST, json!(z));
+        self.ctx.emit(oc::CALL_BUILTIN, json!(["__struct_get", 5]));
+        Ok(())
+    }
+
+    fn struct_schreiben(&mut self, o: StructOrt, wert: &Node) -> CR {
+        Self::struct_einzelwert(&o)?;
+        self.expr(&o.basis.clone())?;
+        let w = self.ctx.add_const(json!(o.wo));
+        self.ctx.emit(oc::LOAD_CONST, json!(w));
+        self.struct_stelle(&o)?;
+        let a = self.ctx.add_const(json!(o.art.to_string()));
+        self.ctx.emit(oc::LOAD_CONST, json!(a));
+        let z = self.ctx.add_const(json!(o.zeichen));
+        self.ctx.emit(oc::LOAD_CONST, json!(z));
+        self.expr(wert)?;
+        self.ctx.emit(oc::CALL_BUILTIN, json!(["__struct_set", 6]));
+        self.ctx.emit(oc::POP, Value::Null);
+        Ok(())
+    }
+
     /// `DECLARE ... LIB`: Signatur fuer die Aufrufe festhalten. Die Bibliothek
     /// wird erst beim ersten Aufruf geladen (ffi.rs) -- beim Uebersetzen muss
     /// es sie nicht geben.
@@ -3743,11 +3942,22 @@ impl Compiler {
                                name, self.wo(z), lib, name));
         }
         // Ein Rueckruf kommt vom Parser als "@" + Rueckgabe + Parameter.
-        let ps: Vec<(String, bool, String)> = params.iter()
-            .map(|(n, t, b)| (match t.strip_prefix('@') {
-                Some(rr) => format!("r{}", rr),
-                None => crate::ffi::typ_zeichen(t).unwrap_or('q').to_string(),
-            }, *b, n.clone())).collect();
+        let mut ps: Vec<(String, bool, String)> = Vec::new();
+        for (n, t, b) in params {
+            let typ = if let Some(rr) = t.strip_prefix('@') {
+                format!("r{}", rr)
+            } else if let Some(sname) = t.strip_prefix('#') {
+                // Ein STRUCT ... LAYOUT C geht als Zeiger auf seine Bytes.
+                if !self.lagen.contains_key(sname) {
+                    self.err_line = zeile;
+                    return Err(crate::ffi::typ_hinweis(sname).replace("(moeglich: ", "(moeglich: ein STRUCT ... LAYOUT C oder "));
+                }
+                "p".to_string()
+            } else {
+                crate::ffi::typ_zeichen(t).unwrap_or('q').to_string()
+            };
+            ps.push((typ, *b, n.clone()));
+        }
         let rz = ret.as_deref().and_then(crate::ffi::typ_zeichen).unwrap_or('v');
         let c_name = alias.clone().unwrap_or_else(|| name.clone());
         let signatur = crate::ffi::signatur_text(lib, &c_name, anzeige, rz, &ps);
@@ -3826,6 +4036,12 @@ impl Compiler {
         let mut field_infos = Vec::new();
         for f in fields {
             if let Node::Dim { name: fname, type_name, array_dims } = f {
+                if let Some(l) = self.lagen.get(type_name) {
+                    self.err_line = zeile;
+                    return Err(format!(
+                        "{}.{}: ein STRUCT ... LAYOUT C kann (noch) kein Feld einer Klasse sein -- er lebt in einer Variable oder einem Parameter (DIM {} AS {}), oder das Feld ist ein BUFFER mit BUFFER_NEW(SIZEOF({}))",
+                        name, fname, fname, l.name, l.name));
+                }
                 let dims: Vec<i64> = match array_dims {
                     None => vec![],
                     Some(des) => {
@@ -4837,6 +5053,7 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
     let mut fn_decls: Vec<(&Node, u32)> = vec![];
     let mut cls_decls: Vec<(&Node, u32)> = vec![];
     let mut ffi_decls: Vec<(&Node, u32)> = vec![];
+    let mut lage_decls: Vec<(&Node, u32)> = vec![];
     let mut main_stmts: Vec<&Node> = vec![];
     for s in stmts {
         // Top-Level-Decls sind in Stmt gewrappt -> fuer fn/cls den inneren Knoten
@@ -4847,6 +5064,7 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
                 fn_decls.push((unwrap_stmt(s), stmt_line(s))),
             Node::ClassDecl { .. } => cls_decls.push((unwrap_stmt(s), stmt_line(s))),
             Node::DeclareLib { .. } => ffi_decls.push((unwrap_stmt(s), stmt_line(s))),
+            Node::StructLayout { .. } => lage_decls.push((unwrap_stmt(s), stmt_line(s))),
             _ => main_stmts.push(s),
         }
     }
@@ -4866,6 +5084,31 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
     // collect_data laufen erst danach auf dem Ok-Pfad.
     let mut data = Vec::new();
     let outcome: Result<(), String> = (|| {
+        // Die Lagen zuerst: DIM, Parameter und DECLARE-Zeilen nennen sie.
+        if !lage_decls.is_empty() {
+            let roh: Vec<(String, Option<u32>, Vec<crate::cstruct::RohFeld>)> = lage_decls.iter()
+                .filter_map(|(n, _)| match n {
+                    Node::StructLayout { name, pack, felder } => Some((name.clone(), *pack, felder.clone())),
+                    _ => None,
+                }).collect();
+            for (i, (n, _, _)) in roh.iter().enumerate() {
+                let klasse = cls_decls.iter().any(|(cd, _)| matches!(cd, Node::ClassDecl { name, .. } if name.eq_ignore_ascii_case(n)));
+                if roh[..i].iter().any(|(m, _, _)| m.eq_ignore_ascii_case(n)) || klasse {
+                    c.err_line = lage_decls[i].1;
+                    return Err(format!("STRUCT {} ist zweimal deklariert -- eines von beiden umbenennen", n));
+                }
+            }
+            match crate::cstruct::lagen_rechnen(&roh) {
+                Ok(l) => c.lagen = l,
+                Err(e) => {
+                    // Die Zeile des Structs, den die Meldung nennt.
+                    c.err_line = lage_decls.iter().zip(&roh)
+                        .find(|(_, (n, _, _))| e.contains(&format!("STRUCT {} ", n)) || e.contains(&format!("STRUCT {}:", n)))
+                        .map(|((_, z), _)| *z).unwrap_or(lage_decls[0].1);
+                    return Err(e);
+                }
+            }
+        }
         c.collect_globals(&main_owned)?;
         // Klassen-Statics bekommen einen Slot.
         for (cd, _) in &cls_decls {

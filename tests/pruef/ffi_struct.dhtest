@@ -1,0 +1,389 @@
+' STRUCT name LAYOUT C -- C-Structs ueber BUFFER (docs/ffi.md, Abschnitt
+' Struct-Lage; cstruct.rs). Eine Variable dieses Typs ist ein BUFFER in der
+' Groesse des Structs, der Compiler kennt die Lage jedes Feldes. Die Lagen
+' selbst pruefen die Rust-Tests in cstruct.rs; hier geht es um Sprache,
+' Laufzeit und die Wege zu echten Bibliotheken.
+
+=== die lage folgt den regeln von c
+STRUCT Gemischt LAYOUT C
+    a AS BYTE
+    d AS FLOAT
+    s AS SHORT
+END STRUCT
+STRUCT Dicht LAYOUT C PACK 1
+    a AS BYTE
+    d AS FLOAT
+    s AS SHORT
+END STRUCT
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+STRUCT Linie LAYOUT C
+    n AS UBYTE
+    p[2] AS Punkt
+    name AS TEXT * 8
+    w[3] AS FLOAT
+    z AS ZEIGER
+END STRUCT
+PRINT SIZEOF(Gemischt), OFFSETOF(Gemischt, d), OFFSETOF(Gemischt, s)
+PRINT SIZEOF(Dicht), OFFSETOF(Dicht, d), OFFSETOF(Dicht, s)
+PRINT SIZEOF(Linie), OFFSETOF(Linie, p), OFFSETOF(Linie, name), OFFSETOF(Linie, w), OFFSETOF(Linie, z)
+PRINT SIZEOF(LONG), SIZEOF(USHORT), SIZEOF(FLOAT), SIZEOF(ZEIGER)
+' Die Variable ist ein BUFFER in genau dieser Groesse, voller Nullen.
+DIM l AS Linie
+PRINT TYPEOF(l), BUFFER_LEN(l), BUFFER_GET(l, 0)
+--- erwartet
+24 8 16
+11 1 9
+64 4 20 32 56
+4 2 8 8
+BUFFER 64 0
+
+=== felder lesen und schreiben, auch verschachtelt und als feld von elementen
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+STRUCT Linie LAYOUT C
+    n AS BYTE
+    p[2] AS Punkt
+    name AS TEXT * 8
+    w[3] AS FLOAT
+    flag AS BOOLEAN
+END STRUCT
+DIM l AS Linie
+l.n = -3
+l.p[1].x = 42
+l.p[0].y = 7
+l.name = "Drache"
+l.w[2] = 2.5
+l.flag = TRUE
+PRINT l.n, l.p[1].x, l.p[0].y, l.name, l.w[2], l.flag
+' Die Bytes liegen dort, wo C sie erwartet: p[1].x bei 4 + 8.
+PRINT BUFFER_GET_I32(l, 12), BUFFER_GET(l, 0), BUFFER_GET_F64(l, 32 + 16)
+FOR i = 0 TO 1
+    l.p[i].x = l.p[i].x + i * 10
+NEXT
+l.p[0].x += 5
+PRINT l.p[0].x, l.p[1].x
+WITH l
+    .n = 9
+    PRINT .n + 1
+END WITH
+--- erwartet
+-3 42 7 Drache 2.5 TRUE
+42 253 2.5
+5 52
+10
+
+=== als parameter, als rueckgabe und als sicht auf einen puffer
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+FUNCTION summe(p AS Punkt) AS INTEGER
+    RETURN p.x + p.y
+END FUNCTION
+FUNCTION neu(x AS INTEGER, y AS INTEGER) AS Punkt
+    DIM p AS Punkt
+    p.x = x
+    p.y = y
+    RETURN p
+END FUNCTION
+DIM a AS Punkt
+a = neu(3, 4)
+PRINT summe(a)
+' Ein Struct ist ein BUFFER: Zuweisen teilt die Bytes, BUFFER_SLICE kopiert.
+DIM b AS Punkt
+b = a
+b.x = 100
+DIM c AS Punkt
+c = BUFFER_SLICE(a, 0, SIZEOF(Punkt))
+c.y = -1
+PRINT a.x, a.y, c.x, c.y
+' Ein beliebiger Puffer laesst sich durch die Lage lesen.
+DIM roh AS BUFFER
+roh = BUFFER_NEW(8)
+BUFFER_SET_I32(roh, 4, 77)
+DIM sicht AS Punkt
+sicht = roh
+PRINT sicht.y
+--- erwartet
+7
+100 4 100 -1
+77
+
+=== was nicht passt, bricht beim laufen ab
+STRUCT S LAYOUT C
+    b AS BYTE
+    werte[3] AS USHORT
+    t AS TEXT * 4
+    l AS LONG
+END STRUCT
+DIM s AS S
+TRY
+    s.b = 200
+CATCH e
+    PRINT e
+END TRY
+TRY
+    s.werte[3] = 1
+CATCH e
+    PRINT e
+END TRY
+TRY
+    s.t = "Drache"
+CATCH e
+    PRINT e
+END TRY
+TRY
+    s.l = 1.5
+CATCH e
+    PRINT e
+END TRY
+s.t = "abcd"
+PRINT s.t
+DIM kurz AS S
+kurz = BUFFER_NEW(4)
+TRY
+    PRINT kurz.l
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+s.b: 200 passt nicht in BYTE (-128 bis 127)
+s.werte[]: Index 3 liegt ausserhalb 0..2
+s.t: der Text braucht 6 Bytes in UTF-8, im Feld ist Platz fuer 4
+s.l: erwartet eine ganze Zahl (LONG), erhalten FLOAT
+abcd
+kurz.l: der Puffer ist 4 Bytes lang, das Feld liegt bei 12..16 -- ist es ein Puffer des richtigen Structs?
+
+=== windows-structs mit namen statt stellen
+' Dieselben Aufrufe wie in ffi.dhtest, nur ohne ausgerechnete Stellen:
+' MEMORYSTATUSEX will seine Groesse im ersten Feld, FILETIME geht weiter an
+' FileTimeToSystemTime.
+STRUCT MEMORYSTATUSEX LAYOUT C
+    laenge AS ULONG
+    auslastung AS ULONG
+    gesamt AS INTEGER
+    frei AS INTEGER
+    seiten_gesamt AS INTEGER
+    seiten_frei AS INTEGER
+    virtuell_gesamt AS INTEGER
+    virtuell_frei AS INTEGER
+    erweitert_frei AS INTEGER
+END STRUCT
+STRUCT FILETIME LAYOUT C
+    unten AS ULONG
+    oben AS ULONG
+END STRUCT
+STRUCT SYSTEMTIME LAYOUT C
+    jahr AS USHORT
+    monat AS USHORT
+    wochentag AS USHORT
+    tag AS USHORT
+    stunde AS USHORT
+    minute AS USHORT
+    sekunde AS USHORT
+    ms AS USHORT
+END STRUCT
+DECLARE FUNCTION GlobalMemoryStatusEx LIB "kernel32" (m AS MEMORYSTATUSEX) AS BOOLEAN
+DECLARE SUB GetSystemTimeAsFileTime LIB "kernel32" (ft AS FILETIME)
+DECLARE FUNCTION FileTimeToSystemTime LIB "kernel32" (ft AS FILETIME, st AS SYSTEMTIME) AS BOOLEAN
+DIM m AS MEMORYSTATUSEX
+m.laenge = SIZEOF(MEMORYSTATUSEX)
+PRINT SIZEOF(MEMORYSTATUSEX), GlobalMemoryStatusEx(m)
+PRINT m.auslastung <= 100, m.gesamt > m.frei, m.frei > 0
+DIM ft AS FILETIME
+GetSystemTimeAsFileTime(ft)
+DIM st AS SYSTEMTIME
+PRINT FileTimeToSystemTime(ft, st), st.jahr >= 2026, st.monat >= 1 AND st.monat <= 12
+--- system windows
+--- erwartet
+64 TRUE
+TRUE TRUE TRUE
+TRUE TRUE TRUE
+
+=== uname und gettimeofday auf linux und macos
+' struct utsname hat Felder fester Breite: 65 Zeichen unter Linux, 256 unter
+' macOS. Der Aufruf bekommt den groesseren Struct; dieselben Bytes liest
+' danach die Lage des Systems.
+STRUCT UtsMac LAYOUT C
+    sysname AS TEXT * 256
+    nodename AS TEXT * 256
+    release AS TEXT * 256
+    version AS TEXT * 256
+    machine AS TEXT * 256
+END STRUCT
+STRUCT UtsLinux LAYOUT C
+    sysname AS TEXT * 65
+    nodename AS TEXT * 65
+    release AS TEXT * 65
+    version AS TEXT * 65
+    machine AS TEXT * 65
+    domainname AS TEXT * 65
+END STRUCT
+STRUCT timeval LAYOUT C
+    sek AS INTEGER
+    usek AS LONG
+END STRUCT
+DECLARE FUNCTION uname LIB "c" (u AS UtsMac) AS LONG
+DECLARE FUNCTION gettimeofday LIB "c" (tv AS timeval, tz AS ZEIGER) AS LONG
+DECLARE FUNCTION time LIB "c" (z AS ZEIGER) AS INTEGER
+DIM u AS UtsMac
+PRINT uname(u)
+DIM rel AS STRING
+IF u.sysname = "Linux" THEN
+    DIM l AS UtsLinux
+    l = u
+    rel = l.release
+ELSE
+    rel = u.release
+END IF
+PRINT u.sysname = "Linux" OR u.sysname = "Darwin", LEN(rel) > 0
+DIM tv AS timeval
+PRINT SIZEOF(timeval), gettimeofday(tv, 0)
+PRINT ABS(tv.sek - time(0)) <= 2, tv.usek >= 0 AND tv.usek < 1000000
+--- system posix
+--- erwartet
+0
+TRUE TRUE
+16 0
+TRUE TRUE
+
+=== qsort sortiert ein feld von structs
+' Ein Feld von Structs ist selbst ein Struct; der Vergleich bekommt Zeiger
+' auf zwei Elemente und liest sie durch die Lage.
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+STRUCT Punkte LAYOUT C
+    e[4] AS Punkt
+END STRUCT
+DECLARE SUB qsort LIB "c" (feld AS Punkte, n AS ZEIGER, groesse AS ZEIGER, _
+                           vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+FUNCTION nachX(za AS INTEGER, zb AS INTEGER) AS INTEGER
+    DIM a AS Punkt
+    a = BUFFER_AUS_ZEIGER(za, SIZEOF(Punkt))
+    DIM b AS Punkt
+    b = BUFFER_AUS_ZEIGER(zb, SIZEOF(Punkt))
+    RETURN SGN(a.x - b.x)
+END FUNCTION
+DIM ps AS Punkte
+DIM xs[4] AS INTEGER
+xs[0] = 30 : xs[1] = -5 : xs[2] = 12 : xs[3] = 0
+FOR i = 0 TO 3
+    ps.e[i].x = xs[i]
+    ps.e[i].y = i
+NEXT
+qsort(ps, 4, SIZEOF(Punkt), nachX)
+DIM t AS STRING
+FOR i = 0 TO 3
+    t = t + STR$(ps.e[i].x) + "/" + STR$(ps.e[i].y) + " "
+NEXT
+PRINT TRIM$(t)
+--- erwartet
+-5/1 0/3 12/2 30/0
+
+=== in einer importierten datei, auch mit namensraum
+IMPORT "geo.dh" AS geo
+DIM p AS Punkt
+p.x = 2
+p.y = 5
+PRINT geo.summe(p), SIZEOF(Punkt)
+--- datei geo.dh
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+FUNCTION summe(p AS Punkt) AS INTEGER
+    RETURN p.x + p.y
+END FUNCTION
+--- erwartet
+7 8
+
+=== was nicht geht, sagt der uebersetzer
+IMPORT "json"
+DIM p AS INTEGER
+SUB pruefe(text AS STRING)
+    WRITEALL("probe.dh", text)
+    p = PROCESS_START("dhrt", "--check", "probe.dh")
+    DIM aus AS STRING
+    DIM leer AS INTEGER
+    WHILE leer < 5
+        DIM z AS STRING
+        z = PROCESS_READ$(p)
+        IF z = "" THEN
+            IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+            SLEEP(30)
+        ELSE
+            aus = aus + z
+        END IF
+    WEND
+    DIM j AS JSON_HANDLE
+    j = JSON_PARSE("{" + CHR$(34) + "m" + CHR$(34) + ":" + aus + "}")
+    IF JSON_LEN(j, "m") = 0 THEN
+        PRINT "ok"
+    ELSE
+        PRINT JSON_GET_STRING(j, "m.0.message")
+    END IF
+END SUB
+DIM nl AS STRING
+nl = CHR$(10)
+DIM kopf AS STRING
+kopf = "STRUCT Punkt LAYOUT C" + nl + "  x AS LONG" + nl + "  w[2] AS LONG" + nl + "END STRUCT" + nl + "DIM p AS Punkt" + nl
+pruefe(kopf + "PRINT p.x + p.w[1]")
+pruefe(kopf + "PRINT p.z")
+pruefe(kopf + "PRINT p.w")
+pruefe(kopf + "PRINT p.x[1]")
+pruefe(kopf + "PRINT SIZEOF(Gibts)")
+pruefe(kopf + "PRINT OFFSETOF(Punkt, z)")
+pruefe(kopf + "DIM ps[3] AS Punkt")
+pruefe(kopf + "CLASS K" + nl + "  DIM p AS Punkt" + nl + "END CLASS")
+pruefe(kopf + "DECLARE SUB f LIB " + CHR$(34) + "c" + CHR$(34) + " (a AS Gibts)")
+pruefe("STRUCT A LAYOUT C" + nl + "  b AS A" + nl + "END STRUCT")
+pruefe("STRUCT A LAYOUT C PACK 3" + nl + "  b AS LONG" + nl + "END STRUCT")
+pruefe("STRUCT A LAYOUT C" + nl + "  b AS TEXT" + nl + "END STRUCT")
+pruefe("STRUCT A LAYOUT C" + nl + "  b AS LONG" + nl + "END STRUCT" + nl + "STRUCT A" + nl + "  DIM x AS INTEGER" + nl + "END STRUCT")
+--- erwartet
+ok
+Punkt hat kein Feld 'z' (Felder: x, w)
+p.w ist ein Feld von 2 Elementen -- mit Index: p.w[0]
+p.x ist kein Feld von Elementen -- ohne Index
+SIZEOF: 'GIBTS' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER ...)
+OFFSETOF: Punkt hat kein Feld 'z' (Felder: x, w)
+Ein Feld von Punkt gibt es nicht -- ein STRUCT ... LAYOUT C mit einem Feld davon schon: STRUCT Liste LAYOUT C / e[10] AS Punkt / END STRUCT
+k.p: ein STRUCT ... LAYOUT C kann (noch) kein Feld einer Klasse sein -- er lebt in einer Variable oder einem Parameter (DIM p AS Punkt), oder das Feld ist ein BUFFER mit BUFFER_NEW(SIZEOF(Punkt))
+'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER)
+STRUCT A LAYOUT C enthaelt sich selbst (ueber a) -- ein Struct kann sich nicht einbetten, nur einen ZEIGER auf sich haben
+Erwartet 1, 2, 4, 8 oder 16 nach PACK
+Ein Text im Struct hat eine feste Laenge: TEXT * 32 (Zeichen) -- ein Zeiger auf Text ist ZEIGER
+STRUCT A ist zweimal deklariert -- eines von beiden umbenennen
+
+=== dhrt fmt schreibt die woerter des structs gross
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "fmt", "probe.dh")
+WHILE PROCESS_RUNNING(p)
+    SLEEP(20)
+WEND
+DIM z AS ARRAY OF STRING
+z = READLINES("probe.dh")
+FOR i = 0 TO LEN(z) - 1
+    PRINT z[i]
+NEXT
+--- datei probe.dh
+struct uts layout c pack 1
+    dim sysname as text * 65
+    n[2] as ushort
+    p as zeiger
+end struct
+dim long as integer
+--- erwartet
+STRUCT uts LAYOUT C PACK 1
+    DIM sysname AS TEXT * 65
+    n[2] AS USHORT
+    p AS ZEIGER
+END STRUCT
+DIM long AS INTEGER

@@ -1588,6 +1588,17 @@ impl Parser {
                             return self.err("BYREF geht nicht bei einem Rueckruf -- die Bibliothek bekommt ohnehin einen Zeiger auf die Funktion");
                         }
                         self.ffi_rueckruf()?
+                    } else if self.check(Tt::Ident) && !sval(self.peek(0)).is_empty()
+                        && crate::ffi::typ_zeichen(&sval(self.peek(0))).is_none()
+                        && crate::ffi::typ_vorschlag(&sval(self.peek(0))).is_none() {
+                        // Ein STRUCT ... LAYOUT C -- ob es ihn gibt, weiss erst
+                        // der Compiler (er darf weiter unten stehen).
+                        if by_ref {
+                            return self.err("BYREF braucht ein Struct nicht -- die Bibliothek bekommt ohnehin einen Zeiger auf seine Bytes");
+                        }
+                        let w = format!("#{}", sval(self.peek(0)).to_lowercase());
+                        self.pos += 1;
+                        w
                     } else {
                         self.ffi_typwort()?
                     };
@@ -1852,7 +1863,12 @@ impl Parser {
 
     fn struct_decl(&mut self) -> R<Node> {
         self.expect(Tt::Struct, "")?;
-        let name = sval(&self.expect(Tt::Ident, "Erwartet Name nach STRUCT")?);
+        let tok = self.expect(Tt::Ident, "Erwartet Name nach STRUCT")?;
+        let name = sval(&tok);
+        if self.check(Tt::Ident) && sval(self.peek(0)) == "layout" {
+            // Fuer Meldungen die Schreibweise des Quelltexts (`SYSTEMTIME`).
+            return self.struct_layout(tok.orig.as_deref().map(str::to_string).unwrap_or(name));
+        }
         self.consume_terminator()?;
         let mut fields = Vec::new();
         while !self.check(Tt::End) {
@@ -1867,6 +1883,77 @@ impl Parser {
         Ok(Node::ClassDecl { name, parent: None, fields, methods: vec![],
                              is_struct: true, statics: vec![], properties: vec![],
                              abstracts: vec![] })
+    }
+
+    /// `STRUCT name LAYOUT C [PACK n]`: Felder `name[ [n] ] AS typ`, mit oder
+    /// ohne DIM davor. Typen sind die der DECLARE-Zeile (ohne BUFFER), dazu
+    /// `TEXT * n`/`WTEXT * n` und ein anderer solcher Struct.
+    fn struct_layout(&mut self, name: String) -> R<Node> {
+        self.pos += 1;                                  // LAYOUT
+        if !(self.check(Tt::Ident) && sval(self.peek(0)) == "c") {
+            return self.err("Erwartet C nach LAYOUT -- STRUCT name LAYOUT C legt die Felder wie ein C-Compiler");
+        }
+        self.pos += 1;
+        let mut pack = None;
+        if self.check(Tt::Ident) && sval(self.peek(0)) == "pack" {
+            self.pos += 1;
+            let n = match &self.peek(0).val { Val::Int(n) if self.check(Tt::Number) => *n, _ => 0 };
+            if !matches!(n, 1 | 2 | 4 | 8 | 16) {
+                return self.err("Erwartet 1, 2, 4, 8 oder 16 nach PACK");
+            }
+            self.pos += 1;
+            pack = Some(n as u32);
+        }
+        self.consume_terminator()?;
+        let mut felder = Vec::new();
+        while !self.check(Tt::End) {
+            if self.at_end() { return self.err("END STRUCT erwartet, Programmende erreicht"); }
+            if self.check(Tt::Newline) { self.pos += 1; continue; }
+            self.matches(Tt::Dim);
+            let ftok = self.expect(Tt::Ident, "Erwartet ein Feld: name AS typ")?;
+            let fname = ftok.orig.as_deref().map(str::to_string).unwrap_or_else(|| sval(&ftok));
+            let mut anzahl = 0u32;
+            if self.matches(Tt::Lbracket) {
+                let n = match &self.peek(0).val { Val::Int(n) if self.check(Tt::Number) => *n, _ => 0 };
+                if n < 1 { return self.err("Erwartet die Zahl der Elemente als feste Zahl ab 1, etwa werte[4] AS LONG"); }
+                self.pos += 1;
+                self.expect(Tt::Rbracket, "Erwartet ']'")?;
+                anzahl = n as u32;
+            }
+            self.expect(Tt::As, "Erwartet AS nach dem Feldnamen")?;
+            let w = sval(self.peek(0)).to_lowercase();
+            if w.is_empty() {
+                return self.err("Erwartet einen Typ (LONG, ZEIGER, TEXT * 32, ein anderer STRUCT ... LAYOUT C)");
+            }
+            self.pos += 1;
+            let typ = if matches!(w.as_str(), "text" | "cstr" | "wtext" | "wstr") {
+                if !self.matches(Tt::StarT) {
+                    self.pos -= 1;
+                    return self.err("Ein Text im Struct hat eine feste Laenge: TEXT * 32 (Zeichen) -- ein Zeiger auf Text ist ZEIGER");
+                }
+                let n = match &self.peek(0).val { Val::Int(n) if self.check(Tt::Number) => *n, _ => 0 };
+                if n < 1 { return self.err("Erwartet die Zahl der Zeichen nach TEXT *"); }
+                self.pos += 1;
+                format!("{}*{}", if w.starts_with('w') { "wtext" } else { "text" }, n)
+            } else if w == "buffer" {
+                self.pos -= 1;
+                return self.err("Ein BUFFER kann kein Feld sein -- ein Zeiger darauf ist ZEIGER (BUFFER_ZEIGER), ein Struct darin ist ein anderer STRUCT ... LAYOUT C");
+            } else if crate::ffi::typ_zeichen(&w).is_some() {
+                w
+            } else if crate::ffi::typ_vorschlag(&w).is_some() {
+                self.pos -= 1;
+                return self.err(&crate::ffi::typ_hinweis(&w));
+            } else {
+                format!("#{}", w)
+            };
+            felder.push((fname, typ, anzahl));
+            self.consume_terminator()?;
+        }
+        self.expect(Tt::End, "")?;
+        self.expect(Tt::Struct, "Erwartet STRUCT nach END")?;
+        self.consume_terminator()?;
+        if felder.is_empty() { return self.err("Ein STRUCT ... LAYOUT C braucht mindestens ein Feld"); }
+        Ok(Node::StructLayout { name, pack, felder })
     }
 
     fn new_expr(&mut self) -> R<Node> {
@@ -2103,6 +2190,15 @@ impl Parser {
                 }
                 _ => return self.err("Erwartet Membername nach '.' im WITH-Block"),
             }
+        }
+        // SIZEOF(INTEGER) / SIZEOF(FLOAT) / SIZEOF(BOOLEAN): das Typwort ist
+        // hier ein Schluesselwort und kein Ausdruck -- als Name weitergeben.
+        if t == Tt::Ident && sval(&tok) == "sizeof" && self.tt(1) == Tt::Lparen
+            && matches!(self.tt(2), Tt::Integer | Tt::Float | Tt::Boolean) && self.tt(3) == Tt::Rparen {
+            let wort = sval(self.peek(2)).to_lowercase();
+            self.pos += 4;
+            return Ok(Node::Call { callee: Box::new(Node::Identifier("sizeof".into())),
+                                   args: vec![Node::Identifier(wort)] });
         }
         match t {
             Tt::Number => { self.pos += 1; Ok(Node::NumberLit(num_of(&tok))) }

@@ -126,20 +126,30 @@ END TRY
 
 ## Beispiele
 
-**Windows-API** -- Zahlen hin und zurück, ein Struct über `BUFFER`, ein
-Ausgabeparameter über `BYREF`:
+**Windows-API** -- Zahlen hin und zurück, ein Struct (siehe
+[Struct-Lage](#struct-lage)), ein Ausgabeparameter über `BYREF`:
 
 ```basic
+STRUCT SYSTEMTIME LAYOUT C
+    jahr AS USHORT
+    monat AS USHORT
+    wochentag AS USHORT
+    tag AS USHORT
+    stunde AS USHORT
+    minute AS USHORT
+    sekunde AS USHORT
+    ms AS USHORT
+END STRUCT
+
 DECLARE FUNCTION GetTickCount64 LIB "kernel32" () AS INTEGER
-DECLARE SUB GetSystemTime LIB "kernel32" (zeit AS BUFFER)
+DECLARE SUB GetSystemTime LIB "kernel32" (zeit AS SYSTEMTIME)
 DECLARE FUNCTION GetComputerNameW LIB "kernel32" (puffer AS BUFFER, BYREF laenge AS ULONG) AS BOOLEAN
 
 PRINT "seit dem Start: "; GetTickCount64() \ 1000; " s"
 
-DIM st AS BUFFER
-st = BUFFER_NEW(16)                 ' SYSTEMTIME: acht WORD
+DIM st AS SYSTEMTIME
 GetSystemTime(st)
-PRINT "Jahr "; BUFFER_GET_U16(st, 0); ", Monat "; BUFFER_GET_U16(st, 2)
+PRINT "Jahr "; st.jahr; ", Monat "; st.monat
 
 DIM n AS INTEGER
 n = 64                              ' hinein: Platz in Zeichen, heraus: Länge
@@ -204,29 +214,117 @@ free(z)                                    ' der Speicher gehört der Bibliothek
   Leere. Die Bibliothek darf den Zeiger nur so lange halten, wie das Programm
   den Puffer unverändert lässt.
 
-### Structs mit Zeigern
+## Struct-Lage
 
-Ein Feld vom Typ `char*` oder `void*` ist in einem Struct acht Bytes breit
-(auf 64-Bit-Systemen) und steht auf einer durch acht teilbaren Stelle. Mit
-`BUFFER_ZEIGER` und `BUFFER_SET_I64` setzt man es, mit `BUFFER_GET_I64` und
-`TEXT_AUS_ZEIGER$` liest man es:
+Ein C-Struct ist ein Stück Speicher mit Feldern an festen Stellen. Mit
+`STRUCT name LAYOUT C` beschreibt man es mit denselben Typwörtern wie in der
+`DECLARE`-Zeile -- die Stellen samt Ausrichtung rechnet Drachenhauch aus:
 
 ```basic
-' struct { const char* name; int32_t laenge; }   -- 16 Bytes mit Ausrichtung
-DIM name AS BUFFER
-name = BUFFER_CONCAT(BUFFER_FROM_STRING("Drache"), BUFFER_NEW(1))   ' mit der Null
-DIM s AS BUFFER
-s = BUFFER_NEW(16)
-BUFFER_SET_I64(s, 0, BUFFER_ZEIGER(name))
-BUFFER_SET_I32(s, 8, 6)
-PRINT TEXT_AUS_ZEIGER$(BUFFER_GET_I64(s, 0))   ' Drache
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+
+STRUCT Linie LAYOUT C
+    farbe AS UBYTE
+    ende[2] AS Punkt          ' ein Feld von zwei eingebetteten Structs
+    name AS TEXT * 16         ' 16 Zeichen fester Breite
+    gewicht AS FLOAT
+END STRUCT
+
+DIM l AS Linie                ' ein BUFFER in genau dieser Groesse, voller Nullen
+l.ende[1].x = 40
+l.name = "Diagonale"
+PRINT l.ende[1].x, l.name     ' 40  Diagonale
+PRINT SIZEOF(Linie), OFFSETOF(Linie, name)   ' 48  20
 ```
 
+* **Eine Variable dieses Typs ist ein BUFFER** (`TYPEOF` sagt `BUFFER`) --
+  sie geht ohne Umweg an eine `DECLARE`-Funktion, deren Parameter `AS BUFFER`
+  oder gleich `AS Linie` heißt, und die Bibliothek schreibt hinein.
+* **Felder:** die Typwörter der `DECLARE`-Zeile außer `BUFFER`; `BOOLEAN` ist
+  4 Bytes wie `int` (ein C-`bool` mit einem Byte ist `UBYTE`). Dazu
+  `name[n] AS typ` für ein Feld von Elementen, `TEXT * n` bzw. `WTEXT * n`
+  für Zeichen fester Breite (gelesen bis zum Nullzeichen; ein zu langer Text
+  ist ein Fehler) und ein anderer `STRUCT … LAYOUT C` -- er darf auch
+  weiter unten stehen, sich aber nicht selbst enthalten. Ein Zeiger auf Text
+  oder einen anderen Puffer ist ein `ZEIGER`-Feld (siehe unten). `DIM` vor
+  dem Feld ist erlaubt, nicht nötig.
+* **Die Regeln sind die von C:** jedes Feld liegt auf einer Stelle, die
+  durch seine Größe teilbar ist (ein Struct durch die seines strengsten
+  Feldes), und der Struct ist so lang, dass ein zweiter direkt dahinter
+  passte. **`PACK n`** (`STRUCT Kopf LAYOUT C PACK 1`) begrenzt die
+  Ausrichtung wie `#pragma pack(n)` -- für Dateiformate und die wenigen APIs,
+  die gepackt sind.
+* **`SIZEOF(typ)`** und **`OFFSETOF(struct, feld)`** sind feste Zahlen beim
+  Übersetzen; `SIZEOF` kennt auch die Typwörter (`SIZEOF(ZEIGER)` ist 8).
+* **Lesen und Schreiben prüfen** wie die `DECLARE`-Zeile: ein Wert, der
+  nicht in das Feld passt, ist ein Fehler, ebenso ein Index außerhalb oder
+  ein Puffer, der kürzer ist als der Struct.
+* **Ein Struct ist ein BUFFER, also eine Referenz:** `b = a` teilt die Bytes,
+  eine Kopie macht `BUFFER_SLICE(a, 0, SIZEOF(Punkt))`. Umgekehrt lässt sich
+  jeder Puffer durch eine Lage lesen (`DIM p AS Punkt : p = roh`).
+* Ein Struct lebt in einer Variable, einem Parameter oder einer Rückgabe;
+  als Feld einer Klasse, in `ARRAY OF` oder `DIM x[n]` geht er (noch) nicht
+  -- ein Feld von Structs ist ein Struct mit einem Feld davon
+  (`e[10] AS Punkt`). Struct-Namen gelten im ganzen Programm, auch aus
+  einer Datei mit Namensraum.
+
+| Befehl | was es tut |
+|---|---|
+| `SIZEOF(typ)` | Größe eines `STRUCT … LAYOUT C` oder eines Typworts in Bytes, beim Übersetzen gerechnet |
+| `OFFSETOF(struct, feld)` | Stelle eines Feldes im Struct in Bytes, beim Übersetzen gerechnet |
+
 Manche Structs wollen vor dem Aufruf ihre eigene Größe im ersten Feld --
-unter Windows etwa `MEMORYSTATUSEX` (64) für `GlobalMemoryStatusEx`; ohne
-sie lehnt die Funktion ab. Auf Linux und macOS hat `struct utsname` (für
-`uname`) Felder fester Breite, 65 Bytes unter Linux und 256 unter macOS --
-die Lage eines Feldes hängt also am System.
+unter Windows etwa `MEMORYSTATUSEX` für `GlobalMemoryStatusEx`:
+
+```basic
+STRUCT MEMORYSTATUSEX LAYOUT C
+    laenge AS ULONG
+    auslastung AS ULONG
+    gesamt AS INTEGER
+    frei AS INTEGER
+    seiten_gesamt AS INTEGER
+    seiten_frei AS INTEGER
+    virtuell_gesamt AS INTEGER
+    virtuell_frei AS INTEGER
+    erweitert_frei AS INTEGER
+END STRUCT
+DECLARE FUNCTION GlobalMemoryStatusEx LIB "kernel32" (m AS MEMORYSTATUSEX) AS BOOLEAN
+
+DIM m AS MEMORYSTATUSEX
+m.laenge = SIZEOF(MEMORYSTATUSEX)
+IF GlobalMemoryStatusEx(m) THEN PRINT "frei: "; m.frei \ 1048576; " MB"
+```
+
+Auf Linux und macOS hat `struct utsname` (für `uname`) Felder fester Breite,
+65 Bytes unter Linux und 256 unter macOS -- die Lage hängt dort am System.
+Man gibt der Funktion den größeren Struct und liest danach durch die Lage
+des Systems (`tests/pruef/ffi_struct.dhtest` zeigt es).
+
+### Structs mit Zeigern
+
+Ein Feld vom Typ `char*` oder `void*` ist ein `ZEIGER`. Gesetzt wird es mit
+`BUFFER_ZEIGER`, gelesen mit `TEXT_AUS_ZEIGER$` bzw. `BUFFER_AUS_ZEIGER`:
+
+```basic
+STRUCT Eintrag LAYOUT C
+    name AS ZEIGER            ' const char*
+    laenge AS LONG
+END STRUCT
+
+DIM name AS BUFFER
+name = BUFFER_CONCAT(BUFFER_FROM_STRING("Drache"), BUFFER_NEW(1))   ' mit der Null
+DIM e AS Eintrag
+e.name = BUFFER_ZEIGER(name)
+e.laenge = 6
+PRINT TEXT_AUS_ZEIGER$(e.name), SIZEOF(Eintrag)   ' Drache  16
+```
+
+Auch ein Element, das eine Bibliothek per Zeiger übergibt -- etwa die zwei
+Elemente im Vergleich von `qsort` --, liest man durch die Lage:
+`DIM a AS Punkt : a = BUFFER_AUS_ZEIGER(zeiger, SIZEOF(Punkt))`.
 
 ## Rückrufe
 
@@ -333,8 +431,7 @@ END TRY
 
 ## Was es (noch) nicht gibt
 
-* **Structs als Wert**, nur über einen Zeiger (`BUFFER`); die Lage der
-  Felder samt Ausrichtung rechnet man selbst.
+* **Structs als Wert** übergeben (nur über einen Zeiger) und Bitfelder.
 * **Variable Argumentzahl** (`printf`), C++-Namen, COM.
 * **Im Browser** gibt es keine fremden Bibliotheken; ein Aufruf ist dort ein
   Fehler mit diesem Satz.

@@ -1292,6 +1292,12 @@ PRINT p.x, p.y
 
 Innerhalb einer Methode greift man auf eigene Felder einfach per Name zu (kein `this.` oder `self.`).
 
+**`STRUCT name LAYOUT C`** ist etwas anderes: ein Stück Speicher mit Feldern
+an festen Stellen, wie ein C-Compiler sie legt -- für fremde Bibliotheken und
+Dateiformate. Die Felder tragen Typwörter wie `LONG`, `USHORT` oder
+`TEXT * 16`, die Variable ist ein `BUFFER`. Mehr in
+[Fremde Bibliotheken](ffi.md#struct-lage).
+
 ## Try / Catch / Throw
 
 ```basic

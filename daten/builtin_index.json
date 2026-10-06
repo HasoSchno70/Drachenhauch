@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2105,
+ "count": 2107,
  "builtins": [
   {
    "name": "ABS",
@@ -1158,6 +1158,18 @@
    "name": "BUFFER_ZEIGER",
    "kind": "core",
    "signature": "BUFFER_ZEIGER(puffer) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "SIZEOF",
+   "kind": "core",
+   "signature": "SIZEOF(typ) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "OFFSETOF",
+   "kind": "core",
+   "signature": "OFFSETOF(struct, feld) AS INTEGER",
    "module": "dhrt"
   },
   {

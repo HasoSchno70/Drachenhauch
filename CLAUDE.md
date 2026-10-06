@@ -1412,6 +1412,18 @@ Rueckrufe liefern 0, `rufen_mit` meldet ihn nach der Rueckkehr. **Fremder
 Faden** (`HAUPTFADEN`): nicht ausgefuehrt, 0, gemeldet beim naechsten
 Aufruf. Tests in `ffi.dhtest` (qsort, EnumWindows, CreateThread,
 pthread_create, Parserfehler), Rust-Test `rueckruf_einstieg_legt_plaetze_ab`.
+**Struct-Lage (2026-10-06):** `STRUCT name LAYOUT C [PACK n]` (Parser
+`struct_layout`, Knoten `Node::StructLayout`, Lagen in `cstruct.rs` nach den
+Regeln von C). Eine Variable dieses Typs ist ein BUFFER (DIM:
+`__struct_neu`); der angesagte Typ ist der Struct-Name, und
+`Compiler::struct_ort` macht aus `st.a[i].b` einen Zugriff mit fester Stelle
+(`__struct_get`/`__struct_set`, Index ueber `__struct_index`, alle in
+`cstruct::befehl`, reine Familie, ohne Feature ffi). `SIZEOF`/`OFFSETOF`
+faltet `groesse_oder_lage` beim Uebersetzen (`SIZEOF(FLOAT)` faengt der
+Parser ab, FLOAT ist ein Schluesselwort). DECLARE-Parameter `AS name` ->
+BUFFER (`#name` vom Parser). WITH uebernimmt den Typ. Nicht: Klassenfeld,
+ARRAY OF/DIM x[n] eines Structs (beides eine Meldung). Tests
+`tests/pruef/ffi_struct.dhtest`, Rust-Tests in cstruct.rs.
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 

@@ -22,7 +22,18 @@ DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, _
 
 ' --- die Windows-API
 DECLARE FUNCTION GetTickCount64 LIB "kernel32" () AS INTEGER
-DECLARE SUB GetSystemTime LIB "kernel32" (zeit AS BUFFER)
+' Ein Struct: die Felder heissen, ihre Stellen rechnet Drachenhauch aus.
+STRUCT SYSTEMTIME LAYOUT C
+    jahr AS USHORT
+    monat AS USHORT
+    wochentag AS USHORT
+    tag AS USHORT
+    stunde AS USHORT
+    minute AS USHORT
+    sekunde AS USHORT
+    ms AS USHORT
+END STRUCT
+DECLARE SUB GetSystemTime LIB "kernel32" (zeit AS SYSTEMTIME)
 DECLARE FUNCTION GetComputerNameW LIB "kernel32" (puffer AS BUFFER, BYREF laenge AS ULONG) AS BOOLEAN
 DECLARE FUNCTION Bytes LIB "kernel32" ALIAS "lstrlenA" (s AS TEXT) AS LONG
 DECLARE FUNCTION GetCommandLineW LIB "kernel32" () AS ZEIGER
@@ -86,12 +97,11 @@ PRINT "== Windows-API"
 TRY
     PRINT "Rechner laeuft seit "; GetTickCount64() \ 60000; " Minuten"
 
-    ' Ein Struct ist ein Stueck Speicher: SYSTEMTIME sind acht WORD.
-    DIM st AS BUFFER
-    st = BUFFER_NEW(16)
+    ' DIM legt den Struct an -- ein BUFFER in seiner Groesse (SIZEOF).
+    DIM st AS SYSTEMTIME
     GetSystemTime(st)
-    PRINT "UTC: "; BUFFER_GET_U16(st, 0); "-"; BUFFER_GET_U16(st, 2); "-"; BUFFER_GET_U16(st, 6); _
-          " "; BUFFER_GET_U16(st, 8); ":"; PADL$(STR$(BUFFER_GET_U16(st, 10)), 2, "0")
+    PRINT "UTC: "; st.jahr; "-"; st.monat; "-"; st.tag; " "; st.stunde; ":"; PADL$(STR$(st.minute), 2, "0"); _
+          " ("; SIZEOF(SYSTEMTIME); " Bytes)"
 
     ' Hinein geht der Platz im Puffer (in Zeichen), heraus die Laenge.
     DIM n AS INTEGER
