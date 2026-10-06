@@ -1597,6 +1597,11 @@ DIM probFehler AS ARRAY OF BOOLEAN : probFehler = []
 DIM probHinw AS ARRAY OF BOOLEAN : probHinw = []
 ' Je Meldung ihre Korrekturen als JSON-Text (leer = keine), aus CODE_CHECK$.
 DIM probKorr AS ARRAY OF STRING : probKorr = []
+' Die angebotenen Korrekturen der offenen Auswahl (je eine als JSON) und der
+' Text, zu dem sie gehoeren: probKorr baut jede Pruefung neu, und eine
+' Nummer dort zeigte nach einer Aenderung auf eine andere Meldung.
+DIM korrAngebote AS ARRAY OF STRING : korrAngebote = []
+DIM korrText AS STRING : korrText = ""
 DIM hbGesetzt AS BOOLEAN : hbGesetzt = TRUE
 ' Die Liste links zeigt Treffer statt Inhalt: je Eintrag Datei und Zeile
 ' (0 = Kopf eines Dokuments).
@@ -4353,6 +4358,7 @@ SUB korrekturZeigen()
         IF probZeile[i] = z AND probKorr[i] <> "" AND sp >= probSpalte[i] AND sp <= probSpalte[i] + probLaenge[i] THEN genau = TRUE
     NEXT
     paletteNamen = [] : paletteKennungen = [] : paletteDetails = []
+    korrAngebote = [] : korrText = GUI_TEXT(ta)
     FOR i = 0 TO LEN(probZeile) - 1
         IF probZeile[i] <> z OR probKorr[i] = "" THEN CONTINUE
         IF genau AND (sp < probSpalte[i] OR sp > probSpalte[i] + probLaenge[i]) THEN CONTINUE
@@ -4360,7 +4366,8 @@ SUB korrekturZeigen()
         DIM k AS INTEGER
         FOR k = 0 TO JSON_LEN(j, "k") - 1
             ARRAY_PUSH(paletteNamen, JSON_GET_STRING(j, "k." + STR$(k) + ".titel"))
-            ARRAY_PUSH(paletteKennungen, STR$(i) + ":" + STR$(k))
+            ARRAY_PUSH(paletteKennungen, STR$(LEN(korrAngebote)))
+            ARRAY_PUSH(korrAngebote, JSON_STRINGIFY(JSON_GET_JSON(j, "k." + STR$(k))))
             DIM kurz AS STRING : kurz = probMeldung[i]
             IF LEN(kurz) > 40 THEN kurz = LEFT$(kurz, 39) + "…"
             ARRAY_PUSH(paletteDetails, kurz)
@@ -4375,21 +4382,25 @@ SUB korrekturZeigen()
     waehlerOeffnen("korrektur", tr$("Schnellkorrektur"))
 END SUB
 
-' Eine Korrektur ("meldung:korrektur") anwenden: jede Aenderung als Auswahl
-' + INSERT, von hinten nach vorn (sonst verschoebe die erste die Stellen der
-' folgenden). Das Feld prueft danach wie nach jedem Tippen neu.
+' Eine angebotene Korrektur (Nummer in korrAngebote) anwenden: jede Aenderung
+' als Auswahl + INSERT, von hinten nach vorn (sonst verschoebe die erste die
+' Stellen der folgenden). Hat sich der Text seit dem Angebot geaendert, passen
+' die Stellen nicht mehr -- dann nichts tun und es sagen (vorher brach die IDE
+' hier mit einem JSON-Fehler ab). Das Feld prueft danach wie nach jedem
+' Tippen neu.
 SUB korrekturAnwenden(kennung AS STRING)
-    DIM teile AS ARRAY OF STRING : teile = SPLIT$(kennung, ":")
-    IF LEN(teile) <> 2 THEN RETURN
-    DIM i AS INTEGER : i = INT(VAL(teile[0]))
-    DIM k AS INTEGER : k = INT(VAL(teile[1]))
-    IF i < 0 OR i >= LEN(probKorr) THEN RETURN
+    DIM n AS INTEGER : n = INT(VAL(kennung))
+    IF n < 0 OR n >= LEN(korrAngebote) THEN RETURN
     DIM ta AS GUI_WIDGET : ta = probFeld
-    DIM j AS JSON_HANDLE : j = JSON_PARSE("{" + CHR$(34) + "k" + CHR$(34) + ":" + probKorr[i] + "}")
-    DIM pfad AS STRING : pfad = "k." + STR$(k) + ".aenderungen"
+    IF ta < 0 OR GUI_TEXT(ta) <> korrText THEN
+        GUI_SET_TEXT(lblStatus, tr$("Der Text hat sich seit dem Vorschlag geändert -- Strg+. noch einmal."))
+        protokoll("korrektur veraltet")
+        RETURN
+    END IF
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(korrAngebote[n])
     DIM a AS INTEGER
-    FOR a = JSON_LEN(j, pfad) - 1 TO 0 STEP -1
-        DIM q AS STRING : q = pfad + "." + STR$(a)
+    FOR a = JSON_LEN(j, "aenderungen") - 1 TO 0 STEP -1
+        DIM q AS STRING : q = "aenderungen." + STR$(a)
         DIM az AS INTEGER : az = JSON_GET_INT(j, q + ".zeile")
         DIM asp AS INTEGER : asp = JSON_GET_INT(j, q + ".spalte")
         ' Bis wohin, auch ueber das Zeilenende (eine Zeile entfernen).
@@ -4402,7 +4413,8 @@ SUB korrekturAnwenden(kennung AS STRING)
     ' Die gemerkten Stellen gehoeren zum alten Text -- bis zur naechsten
     ' Pruefung gilt nichts mehr davon.
     probFeld = -1
-    DIM titel AS STRING : titel = JSON_GET_STRING(j, "k." + STR$(k) + ".titel")
+    korrAngebote = []
+    DIM titel AS STRING : titel = JSON_GET_STRING(j, "titel")
     GUI_SET_TEXT(lblStatus, titel)
     protokoll("korrektur " + titel)
 END SUB

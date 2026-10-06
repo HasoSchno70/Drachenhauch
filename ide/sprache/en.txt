@@ -422,6 +422,7 @@ Probleme: 	Problems:
  Fehler, 	 errors, 
  Warnungen	 warnings
 Hier gibt es nichts zu korrigieren.	Nothing to fix here.
+Der Text hat sich seit dem Vorschlag geändert -- Strg+. noch einmal.	The text has changed since the suggestion -- press Ctrl+. again.
 Schnellkorrektur	Quick fix
 Keine Symbole in 	No symbols in 
 Symbole im Projekt (	Symbols in project (

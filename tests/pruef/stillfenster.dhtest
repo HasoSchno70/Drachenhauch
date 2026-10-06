@@ -1,0 +1,61 @@
+' Fenster unter `dhrt test` nehmen keine echte Eingabe an (stillfenster.rs):
+' der Laeufer setzt DHRT_OHNE_EINGABE, das Fenster geht ohne Fokus auf und
+' laesst die Maus durch. Vorher schrieb, wer waehrend eines Laufs tippte, in
+' die IDE eines Falls ("BSCREEN" statt "SCREEN"), und eine Maus ueber dem
+' Fenster nahm einem Fall seinen Tooltip. Gefragt wird ein fremder Leser
+' (Win32 aus PowerShell): liegt das Fenster vorn, trifft ein Punkt in seiner
+' Mitte es? Aufnahmen und nachgeschickte Nachrichten brauchen beides nicht --
+' das zeigen die uebrigen Sammlungen.
+--- seriell
+
+=== ein testfenster liegt nicht vorn und laesst die maus durch
+DIM titel AS STRING : titel = "stillprobe " + UUID4$()
+SCREEN(320, 200, titel)
+DIM p AS INTEGER : p = -1
+DIM n AS INTEGER : n = 0
+DIM leer AS INTEGER : leer = 0
+WHILE NOT QUITREQUESTED()
+    n = n + 1
+    CLS(RED)
+    IF n = 5 THEN p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(0), titel)
+    IF p >= 0 THEN
+        DIM z AS STRING : z = PROCESS_READ$(p)
+        IF z <> "" THEN PRINT TRIM$(z) : leer = 0
+        IF z = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        IF leer > 5 THEN EXIT WHILE
+    END IF
+    FLIP()
+WEND
+--- argumente
+{sammlung}/_hilfen/fensterlage.ps1
+--- system windows
+--- erwartet
+vorn False
+treffer False
+durchlaessig True
+
+=== gegenprobe: ohne den schalter ist das fenster nicht durchlaessig
+DIM titel AS STRING : titel = "stillprobe " + UUID4$()
+SCREEN(320, 200, titel)
+DIM p AS INTEGER : p = -1
+DIM n AS INTEGER : n = 0
+DIM leer AS INTEGER : leer = 0
+WHILE NOT QUITREQUESTED()
+    n = n + 1
+    CLS(RED)
+    IF n = 5 THEN p = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(0), titel)
+    IF p >= 0 THEN
+        DIM z AS STRING : z = PROCESS_READ$(p)
+        IF z <> "" THEN PRINT TRIM$(z) : leer = 0
+        IF z = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        IF leer > 5 THEN EXIT WHILE
+    END IF
+    FLIP()
+WEND
+--- argumente
+{sammlung}/_hilfen/fensterlage.ps1
+--- system windows
+--- umgebung
+DHRT_OHNE_EINGABE=0
+--- enthaelt
+durchlaessig False
