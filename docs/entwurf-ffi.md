@@ -307,6 +307,22 @@ da ist, sich aber nicht laden lässt, samt Grund des Systems. Beispiel
 `examples/207_gtk.dh` (mit `--probe` drückt es sich selbst). Offen bleibt
 die variable Argumentzahl (`g_object_set`).
 
+**Stand variable Argumentzahl (2026-10-06):** `...` als letzter Parameter
+(`params` = `("...", "*")`, Signatur `*`). Cranelift kennt keine variadischen
+Aufrufe -- jeder Aufruf mit weiteren Werten bekommt eine gewöhnliche
+Signatur, die das System genauso aufruft (`variadisch_rufen`): Windows x64
+nimmt Kommazahlen als Bitmuster in Ganzzahl-Plätzen (die gerufene Funktion
+liest aus der Registersicherung), Linux ARM gewöhnlich, Linux/macOS x86-64
+gewöhnlich über ein Sprungbrett in `global_asm!`, das `al = 8` setzt und zum
+Ziel springt (`sprungbrett::ZIEL`), Apple-ARM füllt die acht
+Ganzzahl-Register mit Nullen auf, damit die weiteren Werte auf dem Stapel
+landen. Der Typ der weiteren Werte kommt aus dem Wert. Geprüft unter
+Windows (sprintf aus msvcrt mit elf gemischten Werten, nur Kommazahlen,
+sscanf, wsprintfA) -- Linux x86-64 und macOS ARM nur durch die CI; Linux
+ARM nicht. Gegenprobe: Kommazahlen unter Windows in Gleitkomma-Registern
+lassen den Fall mit zehn Kommazahlen fallen. Das GTK-Beispiel setzt jetzt
+einen Tooltip mit `g_object_set`.
+
 ## Die Fragen dazu (entschieden, siehe oben)
 
 1. **`DECLARE … LIB`** (empfohlen) oder Befehle wie ctypes?

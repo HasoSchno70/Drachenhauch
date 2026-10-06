@@ -3944,7 +3944,9 @@ impl Compiler {
         // Ein Rueckruf kommt vom Parser als "@" + Rueckgabe + Parameter.
         let mut ps: Vec<(String, bool, String)> = Vec::new();
         for (n, t, b) in params {
-            let typ = if let Some(rr) = t.strip_prefix('@') {
+            let typ = if t == "*" {
+                "*".to_string()
+            } else if let Some(rr) = t.strip_prefix('@') {
                 format!("r{}", rr)
             } else if let Some(sname) = t.strip_prefix('#') {
                 // Ein STRUCT ... LAYOUT C geht als Zeiger auf seine Bytes.
@@ -3987,13 +3989,20 @@ impl Compiler {
         if args.iter().any(|a| matches!(a, Node::NamedArg { .. })) {
             return Err(format!("{}: benannte Argumente gehen bei Funktionen aus Bibliotheken nicht", name));
         }
-        if args.len() != d.byref.len() {
+        // Mit `...` am Ende: mindestens die festen, danach beliebig viele.
+        let variadisch = d.arten.last() == Some(&'*');
+        let fest = if variadisch { d.arten.len() - 1 } else { d.arten.len() };
+        if variadisch && args.len() < fest {
+            return Err(format!("{}: erwartet mindestens {} Argument(e), erhalten {} (DECLARE in {})",
+                               name, fest, args.len(), self.wo(d.zeile)));
+        }
+        if !variadisch && args.len() != fest {
             return Err(format!("{}: erwartet {} Argument(e), erhalten {} (DECLARE in {})",
                                name, d.byref.len(), args.len(), self.wo(d.zeile)));
         }
         // Was sicher nicht passt, meldet schon --check (zur Laufzeit waere es
         // ein Fehler in genau dieser Zeile).
-        for (i, a) in args.iter().enumerate() {
+        for (i, a) in args.iter().enumerate().take(fest) {
             let art = d.arten[i];
             let t = self.typ_von(a);
             let falsch = match art {
@@ -4013,7 +4022,8 @@ impl Compiler {
         let c = self.ctx.add_const(json!(d.signatur));
         self.ctx.emit(oc::LOAD_CONST, json!(c));
         let mut caps: Vec<ByrefCap> = Vec::new();
-        for (a, &br) in args.iter().zip(&d.byref) {
+        for (i, a) in args.iter().enumerate() {
+            let br = i < fest && d.byref[i];
             if br {
                 caps.push(self.emit_byref_capture_and_load(a).map_err(|_| format!(
                     "{}: ein BYREF-Parameter braucht eine Variable (oder ein Feld-/Objektelement), in die das Ergebnis zurueckgeschrieben wird", name))?);

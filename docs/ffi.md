@@ -392,8 +392,38 @@ END IF
 * GTK muss auf dem Rechner sein: unter Linux fast immer, unter macOS über
   Homebrew, unter Windows über MSYS2 oder aus einem Programm, das es
   mitbringt (das Beispiel versucht das von Inkscape).
-* Funktionen mit variabler Argumentzahl (`g_object_set`, `g_object_new`)
-  gehen nicht; meist gibt es feste Gegenstücke (`gtk_widget_set_size_request`).
+* Eigenschaften setzt `g_object_set` -- eine Funktion mit `...`, siehe
+  [Variable Argumentzahl](#variable-argumentzahl):
+  `g_object_set(knopf, "tooltip-text", "Sagt Hallo", NIL)`.
+
+## Variable Argumentzahl
+
+`...` am Ende der Parameter nimmt beliebig viele weitere Werte, wie bei
+`printf` in C:
+
+```basic
+DECLARE FUNCTION sprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, ...) AS LONG
+
+DIM b AS BUFFER
+b = BUFFER_NEW(128)
+sprintf(b, "%d Drachen, %.1f Meter, %s", 3, 4.5, "feuerrot")
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))      ' 3 Drachen, 4.5 Meter, feuerrot
+```
+
+* **Der Typ der weiteren Werte kommt aus dem Wert:** INTEGER und BOOLEAN als
+  ganze Zahl (64 Bit -- für `%d` wie für `%lld`), FLOAT als `double`, ein Text
+  als `const char*` (UTF-8, kopiert), ein BUFFER als Zeiger auf seine Bytes,
+  `NIL` als Nullzeiger (der Abschluss von `g_object_set`). Mehr kennt C
+  hinter `...` ohnehin nicht -- kleinere Zahlen und `float` werden dort zu
+  `int` bzw. `double`.
+* Vor `...` steht mindestens ein fester Parameter; `--check` zählt die festen.
+* Was die Funktion mit den Werten macht, entscheidet allein ihr Format --
+  ein `%s` für eine Zahl ist einer der Abstürze von oben.
+* **Unter Windows** liegt die `printf`-Familie in `msvcrt`, nicht in der
+  C-Bibliothek `ucrtbase` -- daher `LIB "msvcrt|c"`.
+* Jedes System ruft solche Funktionen etwas anders (unter Linux auf x86-64
+  setzt ein kleines Sprungbrett das Register `al`, auf Apple-ARM liegen die
+  weiteren Werte auf dem Stapel) -- das übernimmt dhrt.
 
 ## Rückrufe
 
@@ -501,7 +531,7 @@ END TRY
 ## Was es (noch) nicht gibt
 
 * **Structs als Wert** übergeben (nur über einen Zeiger) und Bitfelder.
-* **Variable Argumentzahl** (`printf`), C++-Namen, COM.
+* C++-Namen, COM, `va_list`-Funktionen (`vprintf`).
 * **Im Browser** gibt es keine fremden Bibliotheken; ein Aufruf ist dort ein
   Fehler mit diesem Satz.
 

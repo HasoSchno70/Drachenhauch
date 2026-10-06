@@ -74,6 +74,7 @@ pub fn typ_name(c: char) -> &'static str {
         'f' => "SINGLE", 'd' => "FLOAT", 'o' => "BOOLEAN",
         't' => "TEXT", 'w' => "WTEXT", 'p' => "BUFFER",
         'r' => "FUNCTION",
+        '*' => "...",
         _ => "?",
     }
 }
@@ -739,7 +740,9 @@ fn aufruf(text: &str) -> Result<Rc<Aufruf>, String> {
                                          if cfg!(windows) { "; Text-Funktionen der Windows-API heissen ...A oder ...W" } else { "" })),
         }
     };
-    let arten: Vec<Art> = sig.params.iter().map(|p| art_von(p.art, p.byref)).collect();
+    // Bei `...` steht der Uebergang fuer die festen Parameter; jeder Aufruf
+    // mit weiteren Werten holt sich seinen eigenen (`variadisch_rufen`).
+    let arten: Vec<Art> = sig.params.iter().filter(|p| p.art != '*').map(|p| art_von(p.art, p.byref)).collect();
     let rueck = art_von(sig.rueck, false);
     let einstieg = ZUSTAND.with(|z| -> Result<_, String> {
         let mut z = z.borrow_mut();
@@ -863,11 +866,81 @@ fn zeiger_rufen(gross: &str, a: &[Value]) -> Result<Value, String> {
     }
 }
 
+/// Ob eine Kommazahl hinter `...` in einem Gleitkomma-Register reist. Unter
+/// Windows x64 liest die gerufene Funktion sie aus dem Speicher, in den sie
+/// die Ganzzahl-Register sichert, und auf Apple-ARM liegt alles hinter `...`
+/// auf dem Stapel -- dort genuegt ihr Bitmuster als Ganzzahl.
+#[cfg(feature = "ffi")]
+const KOMMA_IN_FP_REGISTER: bool = !cfg!(any(windows, all(target_os = "macos", target_arch = "aarch64")));
+
+/// Ein Aufruf mit Werten hinter `...`. Cranelift kennt keine variadischen
+/// Aufrufe; jedes System bekommt darum eine gewoehnliche Signatur, die
+/// genauso aufgerufen wird:
+///
+/// * Windows x64, Linux ARM: die weiteren Werte als gewoehnliche Parameter.
+/// * Linux/macOS x86-64: dasselbe, aber ueber das Sprungbrett, das `al`
+///   setzt (System V verlangt dort die Zahl der Vektor-Register).
+/// * macOS ARM: die festen in die Register, die restlichen der acht
+///   Ganzzahl-Register mit Nullen auffuellen -- dann landen die weiteren
+///   Werte auf dem Stapel, wo Apple sie hinter `...` erwartet.
+#[cfg(feature = "ffi")]
+fn variadisch_rufen(auf: &Aufruf, fest: usize, plaetze: &[u64], weitere: &[Art], rueck: &mut u64) -> Result<(), String> {
+    let sig = &auf.sig;
+    let mut arten: Vec<Art> = sig.params[..fest].iter().map(|p| art_von(p.art, p.byref)).collect();
+    let mut werte: Vec<u64> = plaetze[..fest].to_vec();
+    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        let ganz = arten.iter().filter(|a| !matches!(a, Art::F32 | Art::F64)).count();
+        for _ in ganz..8 { arten.push(Art::I64); werte.push(0); }
+    }
+    arten.extend_from_slice(weitere);
+    werte.extend_from_slice(&plaetze[fest..]);
+    let einstieg = ZUSTAND.with(|z| -> Result<_, String> {
+        let mut z = z.borrow_mut();
+        if z.bauer.is_none() { z.bauer = Some(uebergang::Bauer::neu()?); }
+        z.bauer.as_mut().unwrap().holen(&arten, art_von(sig.rueck, false))
+    })?;
+    let ziel = sprungbrett::ziel(auf.ziel);
+    unsafe { einstieg(ziel, werte.as_ptr(), rueck) };
+    Ok(())
+}
+
+/// System V x86-64: vor einem variadischen Aufruf steht in `al` eine obere
+/// Grenze fuer die benutzten Vektor-Register (0..8) -- die gerufene Funktion
+/// sichert danach ihre XMM-Register. Cranelift setzt `al` nicht; das
+/// Sprungbrett setzt 8 (immer erlaubt) und springt zum eigentlichen Ziel,
+/// das kurz vorher in `ZIEL` steht (ein Faden, darum genuegt eine Stelle).
+#[cfg(all(feature = "ffi", target_arch = "x86_64", not(windows)))]
+mod sprungbrett {
+    pub static mut ZIEL: usize = 0;
+    #[cfg(target_os = "macos")]
+    std::arch::global_asm!(".text", ".globl _dh_vararg_sprung", "_dh_vararg_sprung:",
+                           "mov al, 8", "jmp qword ptr [rip + {z}]", z = sym ZIEL);
+    #[cfg(not(target_os = "macos"))]
+    std::arch::global_asm!(".text", ".globl dh_vararg_sprung", "dh_vararg_sprung:",
+                           "mov al, 8", "jmp qword ptr [rip + {z}]", z = sym ZIEL);
+    extern "C" { fn dh_vararg_sprung(); }
+
+    pub fn ziel(echt: *const u8) -> *const u8 {
+        unsafe { *std::ptr::addr_of_mut!(ZIEL) = echt as usize; }
+        dh_vararg_sprung as *const u8
+    }
+}
+
+#[cfg(all(feature = "ffi", not(all(target_arch = "x86_64", not(windows)))))]
+mod sprungbrett {
+    pub fn ziel(echt: *const u8) -> *const u8 { echt }
+}
+
 #[cfg(feature = "ffi")]
 fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     let sig = &auf.sig;
-    if args.len() != sig.params.len() {
-        return Err(format!("{}: erwartet {} Argument(e), erhalten {}", sig.name, sig.params.len(), args.len()));
+    let variadisch = sig.params.last().map(|p| p.art == '*').unwrap_or(false);
+    let fest = if variadisch { sig.params.len() - 1 } else { sig.params.len() };
+    if variadisch && args.len() < fest {
+        return Err(format!("{}: erwartet mindestens {} Argument(e), erhalten {}", sig.name, fest, args.len()));
+    }
+    if !variadisch && args.len() != fest {
+        return Err(format!("{}: erwartet {} Argument(e), erhalten {}", sig.name, fest, args.len()));
     }
     let n = args.len();
     let mut plaetze = vec![0u64; n.max(1)];
@@ -876,7 +949,7 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     let mut texte: Vec<std::ffi::CString> = Vec::new();
     let mut breite: Vec<Vec<WZeichen>> = Vec::new();
     let mut ref_plaetze = vec![0u64; n.max(1)];
-    for (i, (p, v)) in sig.params.iter().zip(args).enumerate() {
+    for (i, (p, v)) in sig.params[..fest].iter().zip(args).enumerate() {
         let fehler = |e: String| format!("{}: Argument {} ({} AS {}): {}", sig.name, i + 1, p.name, typ_name(p.art), e);
         if p.byref {
             ref_plaetze[i] = zahl_platz(p.art, v).map_err(fehler)?;
@@ -923,8 +996,35 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
             c => zahl_platz(c, v).map_err(fehler)?,
         };
     }
+    // Die weiteren Werte hinter `...`: ihr Typ kommt aus dem Wert -- C kennt
+    // dort ohnehin nur int/long, double und Zeiger.
+    let mut weitere: Vec<Art> = Vec::new();
+    for (i, v) in args[fest..].iter().enumerate() {
+        let fehler = |e: String| format!("{}: Argument {} (hinter ...): {}", sig.name, fest + i + 1, e);
+        let (platz, komma) = match v {
+            Value::Int(x) => (*x as u64, false),
+            Value::Float(f) => (f.to_bits(), true),
+            Value::Bool(b) => (*b as u64, false),
+            Value::Nil => (0, false),
+            Value::Str(s) => {
+                let c = std::ffi::CString::new(s.as_bytes())
+                    .map_err(|_| fehler("ein Nullzeichen mitten im Text -- C saehe nur den Anfang".into()))?;
+                let z = c.as_ptr() as u64;
+                texte.push(c);
+                (z, false)
+            }
+            Value::Buffer(b) => (unsafe { (*b.as_ptr()).as_mut_ptr() as u64 }, false),
+            _ => return Err(fehler(format!("erwartet eine Zahl, einen Text, einen BUFFER oder NIL, erhalten {}", v.type_name()))),
+        };
+        plaetze[fest + i] = platz;
+        weitere.push(if komma && KOMMA_IN_FP_REGISTER { Art::F64 } else { Art::I64 });
+    }
     let mut rueck = 0u64;
-    unsafe { (auf.einstieg)(auf.ziel, plaetze.as_ptr(), &mut rueck) };
+    if variadisch {
+        variadisch_rufen(auf, fest, &plaetze[..n], &weitere, &mut rueck)?;
+    } else {
+        unsafe { (auf.einstieg)(auf.ziel, plaetze.as_ptr(), &mut rueck) };
+    }
     drop(texte);
     drop(breite);
     if let Some(e) = rueckruf_fehler() { return Err(format!("{}: {}", sig.name, e)); }
