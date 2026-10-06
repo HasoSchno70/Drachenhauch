@@ -1500,6 +1500,26 @@ impl<'p> Vm<'p> {
         self.exec(f, alle, empf.clone())
     }
 
+    /// Fuer Rueckrufe aus einer fremden Bibliothek (ffi.rs): einen
+    /// Funktionswert (FUNCREF, gebundene Methode, Lambda) mit Argumenten rufen.
+    #[cfg_attr(not(feature = "ffi"), allow(dead_code))]
+    pub(crate) fn wert_rufen(&mut self, wert: &Value, args: Vec<Value>, kontext: &str) -> R<Value> {
+        let cb = crate::value::Rueckruf::aus_wert(wert)
+            .ok_or_else(|| format!("{}: erwartet eine Funktion, erhalten {}", kontext, wert.type_name()))?;
+        let (f, empf) = self.rueckruf_aufloesen(&cb, kontext)?;
+        self.rueckruf_exec(&cb, f, &empf, args)
+    }
+
+    /// Wie viele Werte nimmt ein Funktionswert von aussen (`None` = beliebig
+    /// viele)? Fuer ffi.rs, bevor ein Rueckruf an eine Bibliothek geht.
+    #[cfg_attr(not(feature = "ffi"), allow(dead_code))]
+    pub(crate) fn wert_stellen(&self, wert: &Value, kontext: &str) -> R<Option<usize>> {
+        let cb = crate::value::Rueckruf::aus_wert(wert)
+            .ok_or_else(|| format!("{}: erwartet eine Funktion, erhalten {}", kontext, wert.type_name()))?;
+        let (f, _) = self.rueckruf_aufloesen(&cb, kontext)?;
+        Ok(Self::rueckruf_stellen(&cb, f))
+    }
+
     /// Wie viele Werte nimmt dieser Rueckruf von aussen? (`None` = beliebig
     /// viele.) Fuer eine Meldung, bevor ARRAY_MAP & Co. ins Leere rufen.
     fn rueckruf_stellen(cb: &crate::value::Rueckruf, f: &Func) -> Option<usize> {
@@ -1915,7 +1935,7 @@ impl<'p> Vm<'p> {
             25 => self.try_video(name, a),
             26 => self.try_gui(name, a),
             27 => self.try_graphics(name, a),
-            28 => if name == "__ffi" { crate::ffi::rufen(a).map(Some) }
+            28 => if name == "__ffi" { crate::ffi::vm_setzen(self); crate::ffi::rufen(a).map(Some) }
                   else { crate::ffi::zeiger_befehl(name, a).transpose() },
             _ => match safe_call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),

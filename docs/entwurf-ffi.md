@@ -2,7 +2,7 @@
 
 Stand 2026-10-05. Punkt „Kein Aufruf fremder DLLs/.so“ aus
 [entwurf-anwendungen-und-tempo.md](entwurf-anwendungen-und-tempo.md).
-**Stufe 1 ist gebaut (2026-10-05), Stufe 2 am 2026-10-06** -- Handbuch [ffi.md](ffi.md). Die
+**Stufe 1 ist gebaut (2026-10-05), Stufen 2 und 3 am 2026-10-06** -- Handbuch [ffi.md](ffi.md). Die
 Syntax unten steht weiter in Textblöcken, weil es die Fassung des Entwurfs
 ist.
 
@@ -245,6 +245,29 @@ mit. Kopiert wird die Datei unter dem Namen des exportierenden Systems
 Hinweis. Unter Windows belegt mit einer umbenannten Kopie von
 `ucrtbase.dll`, die die exportierte Exe aus ihrem Ordner laedt, nachdem die
 Kopie neben der Quelle geloescht ist.
+
+**Stand Stufe 3 (2026-10-06):** Rückrufe in der Schreibweise von
+FreeBASIC -- der Typ des Parameters IST die Signatur des Rückrufs:
+`vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG` bzw. `AS SUB(...)`.
+Verworfen wurde eine eigene Deklaration (`DECLARE CALLBACK name ...`, wie
+VB.NETs Delegates): sie bräuchte einen neuen Knoten, eine Regel für
+Namensräume und eine Reihenfolge; so bleibt alles in der einen Zeile.
+Übergeben wird jede Funktion (FUNCREF, gebundene Methode, Lambda). Für jede
+baut Cranelift einen Einstieg mit der C-Signatur, der die Argumente in
+8-Byte-Plätze legt und `eingang(nummer, plaetze, rueck)` ruft; die VM kennt
+ffi.rs über einen Zeiger, der vor jedem `__ffi` gesetzt wird (wie
+`Kontext::vm` im Maschinencode). Drei Regeln, die der Bau festgelegt hat:
+(1) Ein Fehler im Rückruf darf nicht durch die C-Rahmen laufen (ein Panic
+durch `extern "C"` bricht ab) -- er wird gemerkt, weitere Rückrufe liefern
+0, und der Aufruf meldet ihn nach der Rückkehr. (2) Ein Rückruf aus einem
+fremden Faden wird nicht ausgeführt, er liefert 0 und meldet sich beim
+nächsten Aufruf -- geprüft mit `CreateThread` bzw. `pthread_create`.
+(3) Einstiege bleiben bis zum Ende, je (Signatur, Funktion) einer -- eine
+Bibliothek darf sie behalten. Geprüft mit `qsort` (FUNCREF, Lambda, ein
+Rückruf, der selbst die C-Bibliothek ruft) und `EnumWindows` (mit
+gebundener Methode). Gegenproben: ohne die Antwort des Rückrufs und ohne
+das Melden des Fehlers fallen die vier Fälle; der Einstieg selbst hat einen
+Rust-Test mit allen Breiten.
 
 ## Die Fragen dazu (entschieden, siehe oben)
 

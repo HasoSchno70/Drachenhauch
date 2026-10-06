@@ -469,11 +469,13 @@ mod tests {
         let q = "DECLARE FUNCTION MulDiv LIB \"kernel32\" (a AS LONG, b AS LONG, c AS LONG) AS LONG
                  DECLARE SUB GetSystemTime LIB \"kernel32\" (z AS BUFFER)
 PRINT MulDiv(1, 2, 3)
+DECLARE SUB qsort LIB \"c\" (f AS BUFFER, n AS ZEIGER, g AS ZEIGER, cmp AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
 ";
         let d = definitionen(q);
         let namen: Vec<(&str, &str, usize)> = d.iter().map(|x| (x.art, x.name.as_str(), x.zeile)).collect();
         // Die Parameter einer DECLARE-Zeile sind keine Variablen.
-        assert_eq!(namen, [("function", "MulDiv", 1), ("sub", "GetSystemTime", 2)]);
+        // Der Rueckruf in den Klammern (AS FUNCTION(...)) ist keine Definition.
+        assert_eq!(namen, [("function", "MulDiv", 1), ("sub", "GetSystemTime", 2), ("sub", "qsort", 4)]);
         assert_eq!(nutzer_doku(q, "muldiv").map(|x| x.0.starts_with("DECLARE FUNCTION MulDiv")), Some(true));
         // Kein Block: es gibt kein END dazu.
         assert!(bereiche(q).is_empty());

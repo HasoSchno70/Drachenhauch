@@ -724,10 +724,21 @@ fn declare_woerter(toks: &[lexer::Token]) -> std::collections::HashSet<usize> {
             && toks.get(i + 1).is_some_and(|t| matches!(t.tt, Tt::Sub | Tt::Function)) {
             aus.insert(i);
             let mut j = i + 2;
+            // In den Klammern eines Rueckrufs (`AS FUNCTION(ZEIGER, LONG)`)
+            // darf ein Typwort auch ohne Namen und AS stehen.
+            let mut im_rueckruf = false;
             while j < toks.len() && !matches!(toks[j].tt, Tt::Newline | Tt::Eof) {
+                match toks[j].tt {
+                    Tt::Lparen if j >= 2 && matches!(toks[j - 1].tt, Tt::Function | Tt::Sub)
+                        && toks[j - 2].tt == Tt::As => im_rueckruf = true,
+                    Tt::Rparen => im_rueckruf = false,
+                    _ => {}
+                }
                 if toks[j].tt == Tt::Ident {
                     let w = wert(&toks[j]);
-                    let nach_as = toks[j - 1].tt == Tt::As;
+                    let nach_as = toks[j - 1].tt == Tt::As
+                        || (im_rueckruf && matches!(toks[j - 1].tt, Tt::Lparen | Tt::Comma)
+                            && toks.get(j + 1).map(|t| t.tt) != Some(Tt::As));
                     // LIB/ALIAS nur vor ihrem Text, BYVAL nur vor einem Namen --
                     // ein Parameter darf `lib` heissen.
                     let folgt = toks.get(j + 1).map(|t| t.tt);

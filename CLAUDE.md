@@ -1389,7 +1389,7 @@ Vervollstaendigung). **Gegenproben:** eine Verfaelschung der Rueckgabe-
 Erweiterung oder SINGLE-als-FLOAT IM Uebergang faellt unter x86-64 nicht
 (das Register haelt die unteren Bits richtig) -- geprueft wird an
 `zahl_platz`/`platz_wert` und in den Rust-Tests. Tests
-`tests/pruef/ffi.dhtest` (32; Windows kernel32/user32, sonst die C-Bibliothek
+`tests/pruef/ffi.dhtest` (39; Windows kernel32/user32, sonst die C-Bibliothek
 auf allen drei Systemen), Rust-Tests in ffi.rs und symbole.rs, Beispiel
 `examples/206_fremde_bibliotheken.dh`, Lehrbuch `79c_bibliotheken.js`.
 **Stufe 2 (2026-10-06):** `TEXT_AUS_ZEIGER$(z [, breit])`,
@@ -1399,7 +1399,19 @@ ein Fehler "ohne das Feature"). `BUFFER_ZEIGER` gilt nur, solange der Puffer
 seine Groesse behaelt. **Export** (`bibliotheken_mitnehmen` in main.rs): die
 Bibliotheken stehen als Signatur in den Konstanten des .dhc -- nur gerufene
 kommen mit, unter dem Dateinamen DIESES Systems; "c"/"m" nie, Fehlendes als
-Hinweis. Offen: Stufe 3 (Rueckrufe).
+Hinweis. **Stufe 3 (2026-10-06): Rueckrufe** in FreeBASIC-Schreibweise --
+`cmp AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG` bzw. `AS SUB(...)`; der
+Parser macht daraus `@` + Rueckgabe + Parameter (`ffi_rueckruf`), die
+Signatur `r...` (`Param::rr`). Uebergeben wird jede Funktion (FUNCREF,
+gebundene Methode, Lambda); je (Signatur, Funktion) EIN Einstieg
+(`uebergang::Bauer::rueckruf`, Cranelift, bleibt bis zum Ende), der ueber
+`eingang` -> `Vm::wert_rufen` laeuft (VM-Zeiger per `ffi::vm_setzen` vor
+jedem `__ffi`). **Ein Fehler im Rueckruf darf nicht durch die C-Rahmen**
+(Panic durch `extern "C"` bricht ab): gemerkt in `RR_FEHLER`, weitere
+Rueckrufe liefern 0, `rufen_mit` meldet ihn nach der Rueckkehr. **Fremder
+Faden** (`HAUPTFADEN`): nicht ausgefuehrt, 0, gemeldet beim naechsten
+Aufruf. Tests in `ffi.dhtest` (qsort, EnumWindows, CreateThread,
+pthread_create, Parserfehler), Rust-Test `rueckruf_einstieg_legt_plaetze_ab`.
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
