@@ -90,8 +90,8 @@ Fenster eines Prüffalls -- im Code eines Falls stand dann „BSCREEN“ statt
 222). **4832 Fälle in 370 Prüfsammlungen** (vorher 4807 in 368) und
 **509 Rust-Testfunktionen** (vorher 503).
 
-* Das Lehrbuch wächst um die neuen Abschnitte auf 535 Seiten (englisch
-  528).
+* Der Installer bleibt bei **52 MB**; das Lehrbuch wächst um die neuen
+  Abschnitte auf 535 Seiten (englisch 528).
 * Cranelift kennt keine Aufrufe mit variabler Argumentzahl. dhrt baut für
   jeden solchen Aufruf eine gewöhnliche Signatur nach den Regeln des
   Systems: unter Windows reisen Kommazahlen als Bitmuster in
