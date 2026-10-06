@@ -124,6 +124,9 @@ mod ime;
 // Echte Systemzeiger (Windows: warten/arbeitet/hilfe) ueber einen Subclass.
 #[cfg(feature = "graphics")]
 mod systemzeiger;
+// Fenster unter `dhrt test` nehmen keine echte Tastatur/Maus an.
+#[cfg(feature = "graphics")]
+mod stillfenster;
 #[cfg(feature = "graphics")]
 mod tray;
 // Klicks, die ganz zwischen zwei Bildern liegen (Zaehler + Regel, mit Tests).
@@ -1137,7 +1140,10 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         // Die Erwartungen stehen deutsch da -- eine englische
                         // IDE, aus der die Pruefung startet, darf sie nicht kippen.
                         // Ein Fall, der Englisch will, sagt es in `--- umgebung`.
-                        .env_remove("DHRT_LANG");
+                        .env_remove("DHRT_LANG")
+                        // Fenster ohne echte Tastatur/Maus (stillfenster.rs): wer
+                        // waehrend des Laufs tippt, schreibt sonst in einen Fall.
+                        .env("DHRT_OHNE_EINGABE", "1");
                     if let Some(b) = &f.bild {
                         if b.datei.is_none() {
                             cmd.env("DHRT_SCREENSHOT", dir.join("bild.png"));
@@ -1156,7 +1162,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         .current_dir(&dir)
                         .stdin(std::process::Stdio::null())
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
-                        .env_remove("DHRT_LANG")
+                        .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
                         .output().map_err(|e| format!("{}: Start fehlgeschlagen: {}", name, e))?;
                     Ok((o.status.code().unwrap_or(-1),
                         String::from_utf8_lossy(&o.stdout).into_owned(), String::from_utf8_lossy(&o.stderr).into_owned()))
@@ -1390,7 +1396,7 @@ fn test_main(args: &[String]) -> ExitCode {
         let r = std::process::Command::new(&exe)
             .arg("run").arg(d)
             .stdin(std::process::Stdio::null())
-            .env_remove("DHRT_LANG")
+            .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
             .output();
         let dauer = t0.elapsed().as_secs_f64();
         let name = d.display().to_string();

@@ -1766,6 +1766,7 @@ impl Graphics {
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
         crate::ime::einhaengen(unsafe { rl.get_window_handle() });
         crate::systemzeiger::einhaengen(unsafe { rl.get_window_handle() });
+        crate::stillfenster::einrichten(unsafe { rl.get_window_handle() });
         crate::tray::einhaengen(unsafe { rl.get_window_handle() });
         if !hidden {
             rl.clear_window_state(WindowState::default().set_window_hidden(true));
@@ -6319,7 +6320,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     // --- Fenster-Zustand + Politur ------------------------------------------
     /// WINDOW_FOCUSED(): hat das Fenster den Tastaturfokus? Damit laesst sich
     /// ein Spiel pausieren, sobald der Nutzer wegklickt.
-    pub fn window_focused(&self) -> bool { self.rl.is_window_focused() }
+    /// Unter `dhrt test` (stillfenster.rs) gilt ein Fenster fuer das Programm
+    /// als vorn, obwohl es keine echte Eingabe annimmt -- sonst stuende ein
+    /// Spiel, das ohne Fokus pausiert, im Test still, und was am Fokus
+    /// haengt, hinge davon ab, wohin der Nutzer gerade geklickt hat.
+    pub fn window_focused(&self) -> bool { crate::stillfenster::an() || self.rl.is_window_focused() }
     pub fn window_minimized(&self) -> bool { self.rl.is_window_minimized() }
     pub fn window_maximized(&self) -> bool { self.rl.is_window_maximized() }
     pub fn window_hidden(&self) -> bool { self.rl.is_window_hidden() }
@@ -6787,6 +6792,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
 
     pub fn flip(&mut self) {
         self.zeiger_anwenden();
+        crate::stillfenster::zurueckgeben(unsafe { self.rl.get_window_handle() });
         self.flips += 1;
         // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
         // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.

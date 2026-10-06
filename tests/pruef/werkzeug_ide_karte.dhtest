@@ -3,7 +3,7 @@
 ' Bis 2026-09-28 fragte die Karte MOUSE_HIT(1), die RECHTE Taste; ein
 ' Linksklick tat nichts. Die Lage der Karte steht erst zur Laufzeit fest,
 ' darum schreibt der Einschub die Aufnahme selbst.
-' --- seriell
+--- seriell
 
 === ein klick rollt dorthin, die marke bleibt
 DIM prBild AS INTEGER : prBild = 0

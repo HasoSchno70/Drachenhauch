@@ -691,6 +691,13 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
             if zeile.trim() == "--- seriell" { seriell = true; }
             else if zeile.trim() == "--- langsam" { langsam = true; }
             else if zeile.starts_with("--- ") { return Err(format!("Zeile {}: vor dem ersten Fall ist nur '--- seriell' oder '--- langsam' erlaubt", nr + 1)); }
+            // Als Kommentar geschrieben gilt der Schalter nicht -- zwei
+            // Sammlungen liefen so stillschweigend parallel.
+            else if let Some(w) = zeile.trim().strip_prefix('\'').map(str::trim) {
+                if w == "--- seriell" || w == "--- langsam" {
+                    return Err(format!("Zeile {}: '{}' steht als Kommentar da und gilt so nicht -- ohne das ' davor schreiben", nr + 1, w));
+                }
+            }
             continue;
         }
         if let Some(rest) = zeile.strip_prefix("--- ") {
@@ -983,6 +990,25 @@ mod tests {
     use super::*;
 
     const BEISPIEL: &str = "' Kopf\n=== eins\nPRINT 1\n--- erwartet\n1\n=== zwei\nPRINT 1 \\ 0\n--- fehler\nDivision\n=== drei\nPRINT \"a\"\nPRINT \"b\"\n--- enthaelt\nb\n--- datei karte.json\n{\"x\": 1}\n--- umgebung\nDHRT_FRAMES=1\n";
+
+    #[test]
+    fn schalter_als_kommentar_ist_ein_fehler() {
+        let e = sammlung_parsen("' Kopf
+' --- seriell
+=== a
+PRINT 1
+--- erwartet
+1
+").err().unwrap();
+        assert!(e.contains("als Kommentar"), "{}", e);
+        assert!(sammlung_parsen("' Kopf
+--- seriell
+=== a
+PRINT 1
+--- erwartet
+1
+").unwrap().seriell);
+    }
 
     #[test]
     fn vorher_zwischen_nochmal_in_ihrer_reihenfolge() {

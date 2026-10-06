@@ -1466,6 +1466,25 @@ einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
 
+## Testfenster ohne echte Eingabe (2026-10-06)
+
+Die "wackelnden" IDE-Faelle waren nicht Last (fuenf Runden unter 16
+Rechenprozessen gruen), sondern ECHTE Eingaben: wer waehrend eines Laufs
+tippte, schrieb in das Fenster eines Falls ("BSCREEN" statt "SCREEN", ein
+neuer Reiter mit nur "e"), eine Maus ueber dem Fenster nahm einem Fall den
+Tooltip. `dhrt test` setzt jetzt jedem Kind `DHRT_OHNE_EINGABE=1`
+(`stillfenster.rs`): GLFW_FOCUS_ON_SHOW aus, GLFW_MOUSE_PASSTHROUGH an
+(nachgeschickte Nachrichten kommen trotzdem an), und unter Windows gibt
+FLIP den Vordergrund an das Fenster zurueck, das ihn beim Anlegen hatte
+(Maximieren und WINDOW_FOCUS aktivieren sonst). "0" schaltet ab. Nebenfund:
+die Schnellkorrektur der IDE merkte sich eine NUMMER in `probKorr`, die jede
+Pruefung neu baut -- aenderte sich der Text bei offener Auswahl, brach Enter
+mit einem JSON-Fehler ab; jetzt gilt ein Angebot nur fuer seinen Text
+(`korrAngebote`/`korrText`). Tests `tests/pruef/stillfenster.dhtest`
+(fremder Leser: Vordergrund, Treffer in der Mitte, WS_EX_TRANSPARENT; die
+Vordergrund-Frage schwankt ohne den Schalter, darum die Gegenprobe am Stil)
+und ein Fall in `werkzeug_ide_korrektur.dhtest`.
+
 ## Zeichenketten anhaengen ist linear (2026-09-24)
 
 `Value::Str` ist `Rc<String>` (vorher `Rc<str>`, jedes Anhaengen kopierte:

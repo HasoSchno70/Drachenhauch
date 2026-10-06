@@ -167,6 +167,17 @@ sie auch in einer JSON-Beilage gültig bleiben. Für ein Werkzeug, das einen
 absoluten Pfad braucht (`DH_IDE_WURZEL`, das Sprite-Blatt einer `.dhanim`),
 oder für einen Fall, der eine Datei des Projekts liest.
 
+**Fenster ohne echte Eingabe:** jedes Programm, das `dhrt test` startet
+(Fall, Hilfsprogramm, Prüfprogramm, und was diese wiederum starten), bekommt
+`DHRT_OHNE_EINGABE=1`. Ein Fenster geht dann ohne Fokus auf, lässt die Maus
+auf das Fenster darunter durch und gibt den Vordergrund zurück, wenn es ihn
+doch bekommt (Maximieren, `WINDOW_FOCUS`). Aufnahmen (`AUTOMATION_PLAY`) und
+nachgeschickte Fensternachrichten (`_hilfen/fenstersender.ps1`) kommen
+weiter an -- man kann also während eines Laufs weiterarbeiten, ohne in einen
+Fall zu tippen. Vorher stand dann „BSCREEN“ statt „SCREEN“ in der IDE eines
+Falls, und eine Maus über dem Fenster nahm einem Fall seinen Tooltip.
+`DHRT_OHNE_EINGABE=0` in `--- umgebung` schaltet es für einen Fall ab.
+
 **Werkzeuge ohne Python prüfen** (seit Stufe 32): so laufen die Tests des
 Form-Designers in `tests/pruef/werkzeug_formdesigner.dhtest`. Zwei Wege
 nebeneinander — echte Klicks über eine Aufnahme (Einschub
@@ -264,7 +275,7 @@ Fälle laufen, deren Name den Text enthält, `--fall Name` genau den einen diese
 `--- langsam` vor dem ersten Fall lässt `dhrt test --schnell` aus (die
 Werkzeuge, die IDE und alles, was echte Fenster in Echtzeit bedient) — die
 Bilanz nennt jede ausgelassene Datei mit `langsam <name>`, damit niemand
-einen schnellen Lauf für einen vollen hält. Die CI läuft immer alles. Ein Fall, der an einer Maschine
+einen schnellen Lauf für einen vollen hält. Beide Schalter sind eigene Zeilen ohne `'` davor -- als Kommentar geschrieben (`' --- seriell`) gälten sie nicht, darum ist das ein Fehler. Die CI läuft immer alles. Ein Fall, der an einer Maschine
 ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
 falsch (erkannt an der Meldung „Kein Fenster moeglich“, die `dhrt` dann
 statt eines Absturzes ausgibt; `DHRT_KEIN_FENSTER=1` täuscht genau diesen

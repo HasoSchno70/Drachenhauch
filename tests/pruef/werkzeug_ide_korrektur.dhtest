@@ -3,7 +3,7 @@
 ' die naechste Pruefung findet nichts mehr. Getippt wird mit echten
 ' Tastenereignissen; die Aufnahme schreibt der Einschub erst, wenn die
 ' Pruefung gelaufen ist.
-' --- seriell
+--- seriell
 
 === tippfehler ersetzen
 DIM prBild AS INTEGER : prBild = 0
@@ -209,3 +209,50 @@ korrektur angebot Zeile entfernen
 korrektur Zeile entfernen
 pr text SUB tu()/    PRINT(1)/END SUB/tu()
 zuerst geprueft 0
+
+=== ein angebot gilt nur fuer den text, zu dem es gehoert
+' Geht der Text weiter, waehrend die Auswahl offen ist, passen die Stellen
+' der Korrektur nicht mehr. Vorher zeigte die gemerkte Nummer in die Liste
+' der NEUEN Pruefung -- je nach Text tat Enter nichts, etwas Falsches oder
+' brach die IDE mit "JSON_LEN: Pfad 'k.1.aenderungen' nicht aufloesbar" ab.
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach hbInhaltNachziehen()
+prBild = prBild + 1
+IF prBild = 80 THEN
+    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], 2, 5)
+    GUI_FOCUS(tabFelder[aktiverTab])
+    befehl("korrektur")
+END IF
+IF prBild = 84 THEN GUI_SET_TEXT(tabFelder[aktiverTab], "DIM zaehler AS INTEGER" + NL + "  zaehler = zaehler + 1" + NL)
+IF prBild = 170 THEN
+    DIM prEv AS STRING : prEv = "c 2" + NL + "e 0 2 257 0 0 0" + NL + "e 2 1 257 0 0 0" + NL + NL
+    WRITEALL("ev.txt", prEv)
+    AUTOMATION_PLAY("ev.txt")
+END IF
+IF prBild = 220 THEN
+    protokoll("pr text " + REPLACE$(GUI_TEXT(tabFelder[aktiverTab]), NL, "/"))
+    protokoll("pr status " + GUI_TEXT(lblStatus))
+    EXIT(0)
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM zaehler AS INTEGER
+  zaehlr = zaehler + 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 3) = "pr " OR LEFT$(L[i], 10) = "korrektur " THEN PRINT L[i]
+NEXT
+--- erwartet
+korrektur angebot Ersetzen durch zaehler | DIM zaehlr AS INTEGER anlegen
+korrektur veraltet
+pr text DIM zaehler AS INTEGER/  zaehler = zaehler + 1/
+pr status Der Text hat sich seit dem Vorschlag geändert -- Strg+. noch einmal.
