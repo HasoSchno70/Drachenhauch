@@ -487,9 +487,13 @@ weiter
 === ein rueckruf aus einem anderen faden wird nicht ausgefuehrt
 ' CreateThread ruft die Funktion auf einem neuen Faden -- die VM laeuft nur
 ' auf dem des Programms. Der Rueckruf liefert 0, und der naechste Aufruf
-' einer Bibliothek (hier das Warten) meldet es.
+' einer Bibliothek, der zurueckkehrt, meldet es. Welcher das ist, haengt
+' am Zufall der Faeden (ResumeThread oder das Warten); der Faden startet
+' darum angehalten (CREATE_SUSPENDED = 4), sonst ginge mit einer Meldung aus
+' CreateThread selbst das Handle verloren.
 DECLARE FUNCTION CreateThread LIB "kernel32" (attr AS ZEIGER, stapel AS ZEIGER, _
     start AS FUNCTION(p AS ZEIGER) AS ULONG, p AS ZEIGER, flags AS ULONG, id AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION ResumeThread LIB "kernel32" (h AS ZEIGER) AS ULONG
 DECLARE FUNCTION WaitForSingleObject LIB "kernel32" (h AS ZEIGER, ms AS ULONG) AS ULONG
 DECLARE FUNCTION GetExitCodeThread LIB "kernel32" (h AS ZEIGER, BYREF code AS ULONG) AS BOOLEAN
 DIM gelaufen AS BOOLEAN
@@ -498,20 +502,31 @@ FUNCTION faden(p AS INTEGER) AS INTEGER
     RETURN 7
 END FUNCTION
 DIM h AS INTEGER
-h = CreateThread(0, 0, faden, 0, 0, 0)
+h = CreateThread(0, 0, faden, 0, 4, 0)
+PRINT h <> 0
+DIM meldung AS STRING
 TRY
-    PRINT WaitForSingleObject(h, 5000)
+    ResumeThread(h)
 CATCH e
-    PRINT e
+    meldung = e
 END TRY
+TRY
+    WaitForSingleObject(h, 5000)
+CATCH e
+    meldung = e
+END TRY
+PRINT MID$(meldung, INSTR(meldung, ":") + 2)
 DIM code AS INTEGER
 PRINT GetExitCodeThread(h, code), code, gelaufen
 --- system windows
 --- erwartet
-WaitForSingleObject: ein Rueckruf kam aus einem anderen Faden und wurde nicht ausgefuehrt -- Drachenhauch-Code laeuft nur auf dem Faden des Programms
+TRUE
+ein Rueckruf kam aus einem anderen Faden und wurde nicht ausgefuehrt -- Drachenhauch-Code laeuft nur auf dem Faden des Programms
 TRUE 0 FALSE
 
 === ein rueckruf aus einem anderen faden auf linux und macos
+' Wie oben; pthread_create kennt kein Anhalten, also kann schon sein eigener
+' Aufruf die Meldung bringen -- der Faden steht dann trotzdem im Puffer.
 DECLARE FUNCTION pthread_create LIB "c" (faden AS BUFFER, attr AS ZEIGER, _
     start AS FUNCTION(p AS ZEIGER) AS ZEIGER, p AS ZEIGER) AS LONG
 DECLARE FUNCTION pthread_join LIB "c" (faden AS ZEIGER, ergebnis AS ZEIGER) AS LONG
@@ -522,17 +537,22 @@ FUNCTION faden(p AS INTEGER) AS INTEGER
 END FUNCTION
 DIM t AS BUFFER
 t = BUFFER_NEW(16)
-PRINT pthread_create(t, 0, faden, 0)
+DIM meldung AS STRING
 TRY
-    PRINT pthread_join(BUFFER_GET_I64(t, 0), 0)
+    pthread_create(t, 0, faden, 0)
 CATCH e
-    PRINT e
+    meldung = e
 END TRY
+TRY
+    pthread_join(BUFFER_GET_I64(t, 0), 0)
+CATCH e
+    meldung = e
+END TRY
+PRINT MID$(meldung, INSTR(meldung, ":") + 2)
 PRINT gelaufen
 --- system posix
 --- erwartet
-0
-pthread_join: ein Rueckruf kam aus einem anderen Faden und wurde nicht ausgefuehrt -- Drachenhauch-Code laeuft nur auf dem Faden des Programms
+ein Rueckruf kam aus einem anderen Faden und wurde nicht ausgefuehrt -- Drachenhauch-Code laeuft nur auf dem Faden des Programms
 FALSE
 
 === ein rueckruf nennt seine typen, und was nicht geht, sagt der parser
