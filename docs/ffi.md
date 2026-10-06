@@ -276,7 +276,10 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
 * **Nur auf dem Faden des Programms.** Ruft eine Bibliothek aus einem eigenen
   Faden zurück (`CreateThread`, `pthread_create`, manche Treiber), wird der
   Rückruf nicht ausgeführt -- er liefert 0, und der nächste Aufruf einer
-  Bibliothek meldet es. Die VM ist nicht für mehrere Fäden gebaut.
+  Bibliothek, der zurückkehrt, meldet es. Das kann schon der sein, der den
+  Faden gestartet hat (sein Ergebnis geht dann verloren); unter Windows
+  hilft `CREATE_SUSPENDED` und ein eigenes `ResumeThread`. Die VM ist nicht
+  für mehrere Fäden gebaut.
 * **Ein Rückruf bleibt gültig, bis das Programm endet** -- die Bibliothek
   darf ihn behalten und später rufen. Für dieselbe Funktion bekommt sie
   immer denselben Einstieg; ein Lambda, das in einer Schleife jedes Mal neu
