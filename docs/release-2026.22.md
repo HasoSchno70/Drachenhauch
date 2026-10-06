@@ -74,6 +74,8 @@ bleiben 48 Module; **222** Beispiele (vorher 221). **4807 Fälle in 368
 Prüfsammlungen** (vorher 4768 in 367) und **503 Rust-Testfunktionen**
 (vorher 493).
 
+* Der Installer bleibt bei **52 MB**; das Lehrbuch wächst um ein Kapitel
+  auf 533 Seiten (englisch 526).
 * Der Aufruf braucht keine C-Bibliothek wie libffi: je Signatur baut
   Cranelift -- dasselbe, das den Maschinencode erzeugt -- einen kleinen
   Übergang, je Rückruf einen Einstieg mit der C-Signatur. Geladen wird über
