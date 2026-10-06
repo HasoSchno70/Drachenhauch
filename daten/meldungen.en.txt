@@ -1666,3 +1666,9 @@ Vor ... braucht es mindestens einen festen Parameter (in C wie printf(format, ..
 erwartet eine Zahl, einen Text, einen BUFFER oder NIL, erhalten {}	expects a number, a text, a BUFFER or NIL, got {}
 TASK: der Auftrag ist abgestuerzt{} -- er hat keine Antwort mehr geschickt; das Hauptprogramm laeuft weiter	TASK: the task crashed{} -- it sent no answer any more; the main program keeps running
  (Rueckgabe {})	 (exit code {})
+der Struct ist NIL -- er bekommt seinen Speicher mit DIM	the struct is NIL -- it gets its memory with DIM
+erwartet einen Struct {} (einen BUFFER), erhalten {}	expected a struct {} (a BUFFER), got {}
+der Puffer ist {} Bytes lang, der Struct braucht {}	the buffer is {} bytes long, the struct needs {}
+ein Struct als Wert geht (noch) nicht in einer Funktion mit ... -- uebergib ihn dort als Zeiger (ohne BYVAL)	a struct by value does not work (yet) in a function with ... -- pass it as a pointer there (without BYVAL)
+der Struct {} (Argument {}) passt nicht mehr in die Register fuer Kommazahlen -- so viele Kommazahlen davor gehen hier (noch) nicht	the struct {} (argument {}) no longer fits into the floating-point registers -- that many floating-point arguments before it do not work here (yet)
+{} -- ein Struct geht in einem Rueckruf (noch) nicht: einen Zeiger darauf bekommt er als ZEIGER, BUFFER_AUS_ZEIGER liest ihn	{} -- a struct does not work in a callback (yet): it receives a pointer to it as ZEIGER, BUFFER_AUS_ZEIGER reads it

@@ -323,6 +323,24 @@ ARM nicht. Gegenprobe: Kommazahlen unter Windows in Gleitkomma-Registern
 lassen den Fall mit zehn Kommazahlen fallen. Das GTK-Beispiel setzt jetzt
 einen Tooltip mit `g_object_set`.
 
+**Stand Structs als Wert (2026-10-06):** `BYVAL p AS Punkt` übergibt den
+Struct als Wert (ohne `BYVAL` bleibt es der Zeiger), eine Rückgabe
+`AS Punkt` liefert ihn als Wert. Die Signatur trägt die Lage mit jeder Zahl
+samt Stelle (`cstruct::wert_text`); `ffi::plan` zerlegt sie nach der Regel
+des Systems in Stellen des Übergangs: Windows x64 (1/2/4/8 Bytes als
+Ganzzahl, sonst Zeiger auf eine Kopie, Rückgabe RAX oder versteckte Adresse),
+System V (Achtergruppen INTEGER/SSE, MEMORY über Cranelifts
+`StructArgument`, mit Zählung der freien Register), AAPCS64 (HFA in
+V-Registern, bis 16 Bytes in X-Registern, sonst Zeiger, Rückgabe über X8 mit
+`StructReturn`). Die Rust-Tests rufen `extern "C"`-Funktionen mit
+`#[repr(C)]`-Structs -- Rust hält sich an die C-Konvention, darum sind sie
+auf jedem CI-System der Vergleich --, dazu `tests/pruef/ffi_struct_wert.dhtest`
+mit `div`/`lldiv`, `csqrt`/`cabs` (komplexe Zahlen reisen wie ein Struct aus
+zwei Kommazahlen), `PtInRect` und CoreGraphics. Gegenprobe: unter Windows
+jeden Struct als Zeiger -- drei Rust-Tests und zwei Fälle fallen. Nicht:
+Struct als Wert in Rückrufen und hinter `...`, eine HFA ohne freie
+V-Register.
+
 ## Die Fragen dazu (entschieden, siehe oben)
 
 1. **`DECLARE … LIB`** (empfohlen) oder Befehle wie ctypes?
