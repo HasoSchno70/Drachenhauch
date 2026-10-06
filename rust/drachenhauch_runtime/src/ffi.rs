@@ -22,6 +22,15 @@
 //!
 //! **Ein Absturz in fremdem Code ist nicht abzufangen** -- dafuer gibt es
 //! keine Sicherung, nur den Hinweis in der Doku und TASK_START.
+//!
+//! **Rueckrufe (Stufe 3):** ein Parameter `AS FUNCTION(...) AS typ` bekommt
+//! eine Drachenhauch-Funktion (FUNCREF, gebundene Methode, Lambda). Fuer
+//! jede bekommt die Bibliothek einen eigenen Einstieg mit der C-Signatur
+//! (`uebergang::Bauer::rueckruf`), der die Argumente in 8-Byte-Plaetze legt
+//! und `eingang` ruft; der ruft die Funktion ueber die VM. Ein Fehler darin
+//! darf nicht durch die C-Rahmen laufen -- er wird gemerkt, jeder weitere
+//! Rueckruf liefert 0, und der Aufruf der Bibliothek meldet ihn, sobald sie
+//! zurueckkehrt.
 
 #[cfg(feature = "ffi")]
 use std::cell::RefCell;
@@ -60,6 +69,7 @@ pub fn typ_name(c: char) -> &'static str {
         'l' => "LONG", 'L' => "ULONG", 'q' => "INTEGER", 'z' => "ZEIGER",
         'f' => "SINGLE", 'd' => "FLOAT", 'o' => "BOOLEAN",
         't' => "TEXT", 'w' => "WTEXT", 'p' => "BUFFER",
+        'r' => "FUNCTION",
         _ => "?",
     }
 }
@@ -71,6 +81,7 @@ pub fn dh_typ(c: char) -> &'static str {
         'o' => "boolean",
         't' | 'w' => "string",
         'p' => "buffer",
+        'r' => "funcref",
         _ => "integer",
     }
 }
@@ -99,9 +110,11 @@ pub fn typ_hinweis(wort: &str) -> String {
 
 /// Die Signatur als Text, wie der Compiler sie dem Aufruf mitgibt:
 /// Bibliothek, C-Name, Drachenhauch-Name, Rueckgabe (`v` = SUB) und die
-/// Parameter als `[&]zeichen:name`, durch Komma getrennt.
+/// Parameter als `[&]typ:name`, durch Komma getrennt. `typ` ist ein Zeichen,
+/// bei einem Rueckruf `r`, dann seine Rueckgabe und seine Parameter
+/// (`rlzz` = FUNCTION(ZEIGER, ZEIGER) AS LONG).
 pub fn signatur_text(lib: &str, c_name: &str, name: &str, rueck: char,
-                     params: &[(char, bool, String)]) -> String {
+                     params: &[(String, bool, String)]) -> String {
     let ps: Vec<String> = params.iter()
         .map(|(c, br, n)| format!("{}{}:{}", if *br { "&" } else { "" }, c, n)).collect();
     format!("{lib}{t}{c_name}{t}{name}{t}{rueck}{t}{}", ps.join(","), t = TRENNER)
@@ -112,6 +125,8 @@ pub struct Param {
     pub art: char,
     pub byref: bool,
     pub name: String,
+    /// Bei einem Rueckruf (`art` = 'r'): Rueckgabe, dann die Parameter.
+    pub rr: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -132,9 +147,12 @@ pub fn signatur_lesen(s: &str) -> Result<Signatur, String> {
         for p in teile[4].split(',') {
             let (byref, rest) = match p.strip_prefix('&') { Some(r) => (true, r), None => (false, p) };
             let mut it = rest.splitn(2, ':');
-            let art = it.next().and_then(|a| a.chars().next()).ok_or("fremde Funktion: kaputte Signatur")?;
+            let typ = it.next().unwrap_or("");
+            let art = typ.chars().next().ok_or("fremde Funktion: kaputte Signatur")?;
+            let rr = typ[art.len_utf8()..].to_string();
+            if art == 'r' && rr.is_empty() { return Err("fremde Funktion: kaputte Signatur".into()); }
             let name = it.next().unwrap_or("").to_string();
-            params.push(Param { art, byref, name });
+            params.push(Param { art, byref, name, rr });
         }
     }
     Ok(Signatur { lib: teile[0].into(), c_name: teile[1].into(), name: teile[2].into(), rueck, params })
@@ -284,7 +302,7 @@ unsafe fn text_aus(p: u64, breit: bool) -> String {
 #[cfg(feature = "ffi")]
 mod uebergang {
     use super::Art;
-    use cranelift_codegen::ir::{types, AbiParam, InstBuilder, MemFlagsData, Type, UserFuncName};
+    use cranelift_codegen::ir::{types, AbiParam, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, Type, UserFuncName};
     use cranelift_codegen::settings::Configurable;
     use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
     use cranelift_jit::{JITBuilder, JITModule};
@@ -297,6 +315,7 @@ mod uebergang {
         modul: JITModule,
         fctx: FunctionBuilderContext,
         fertig: HashMap<(Vec<Art>, Art), Einstieg>,
+        rueckrufe: usize,
     }
 
     fn typ(a: Art, zeiger: Type) -> Type {
@@ -330,7 +349,7 @@ mod uebergang {
                 .finish(cranelift_codegen::settings::Flags::new(flags))
                 .map_err(|e| format!("Cranelift: {:?}", e))?;
             let modul = JITModule::new(JITBuilder::with_isa(isa, default_libcall_names()));
-            Ok(Bauer { modul, fctx: FunctionBuilderContext::new(), fertig: HashMap::new() })
+            Ok(Bauer { modul, fctx: FunctionBuilderContext::new(), fertig: HashMap::new(), rueckrufe: 0 })
         }
 
         pub fn holen(&mut self, params: &[Art], rueck: Art) -> Result<Einstieg, String> {
@@ -382,6 +401,68 @@ mod uebergang {
             self.fertig.insert(schluessel, e);
             Ok(e)
         }
+
+        /// Ein Einstieg fuer die Bibliothek: eine Funktion mit der C-Signatur
+        /// des Rueckrufs, die ihre Argumente in 8-Byte-Plaetze legt und
+        /// `eingang(nummer, plaetze, rueck)` ruft. Jeder Rueckruf bekommt
+        /// seinen eigenen (die Nummer steht als Konstante darin); er bleibt
+        /// bis zum Ende des Programms -- die Bibliothek darf ihn behalten.
+        pub fn rueckruf(&mut self, params: &[Art], rueck: Art, nummer: u64, eingang: usize)
+            -> Result<*const u8, String> {
+            let zt = self.modul.target_config().pointer_type();
+            let mut sig = self.modul.make_signature();
+            for a in params { sig.params.push(abi(*a, zt)); }
+            if rueck != Art::Nichts { sig.returns.push(abi(rueck, zt)); }
+            let mut ein_sig = self.modul.make_signature();
+            for _ in 0..3 { ein_sig.params.push(AbiParam::new(zt)); }
+            self.rueckrufe += 1;
+            let id = self.modul.declare_function(&format!("rr_{}", self.rueckrufe), Linkage::Local, &sig)
+                .map_err(|e| format!("Cranelift: {:?}", e))?;
+            let tc = self.modul.target_config();
+            let mut ctx = self.modul.make_context();
+            ctx.func.signature = sig;
+            ctx.func.name = UserFuncName::user(3, id.as_u32());
+            {
+                let mut fb = FunctionBuilder::new(&mut ctx.func, &mut self.fctx);
+                let b = fb.create_block();
+                fb.append_block_params_for_function_params(b);
+                fb.switch_to_block(b);
+                let p = fb.block_params(b).to_vec();
+                // Platz n = Rueckgabe, davor die Argumente.
+                let groesse = ((params.len() + 1) * 8) as u32;
+                let slot = fb.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, groesse, 3));
+                let null = fb.ins().iconst(types::I64, 0);
+                fb.ins().stack_store(zt, null, slot, (params.len() * 8) as i32);
+                for (i, a) in params.iter().enumerate() {
+                    // Ganzzahlen auf 64 Bit erweitert -- `platz_wert` liest
+                    // die unteren Bytes, die Erweiterung schadet nicht.
+                    let w = match a {
+                        Art::I8 | Art::I16 | Art::I32 => fb.ins().sextend(types::I64, p[i]),
+                        Art::U8 | Art::U16 | Art::U32 => fb.ins().uextend(types::I64, p[i]),
+                        _ => p[i],
+                    };
+                    fb.ins().stack_store(zt, w, slot, (i * 8) as i32);
+                }
+                let plaetze = fb.ins().stack_addr(zt, slot, 0);
+                let rueckplatz = fb.ins().stack_addr(zt, slot, (params.len() * 8) as i32);
+                let nr = fb.ins().iconst(zt, nummer as i64);
+                let ziel = fb.ins().iconst(zt, eingang as i64);
+                let sref = fb.import_signature(ein_sig);
+                fb.ins().call_indirect(sref, ziel, &[nr, plaetze, rueckplatz]);
+                if rueck != Art::Nichts {
+                    let w = fb.ins().load(typ(rueck, zt), MemFlagsData::trusted(), rueckplatz, 0);
+                    fb.ins().return_(&[w]);
+                } else {
+                    fb.ins().return_(&[]);
+                }
+                fb.seal_all_blocks();
+                fb.finalize(tc);
+            }
+            self.modul.define_function(id, &mut ctx).map_err(|e| format!("Cranelift: {:?}", e))?;
+            self.modul.clear_context(&mut ctx);
+            self.modul.finalize_definitions().map_err(|e| format!("Cranelift: {:?}", e))?;
+            Ok(self.modul.get_finalized_function(id))
+        }
     }
 }
 
@@ -402,11 +483,164 @@ struct Zustand {
     /// zum Ende geladen -- ein Zeiger in sie hinein darf nie ins Leere zeigen.
     libs: HashMap<String, Rc<libloading::Library>>,
     aufrufe: HashMap<String, Rc<Aufruf>>,
+    /// Die Rueckrufe, die je einer Bibliothek gegeben wurden; die Nummer im
+    /// Einstieg ist der Platz hier. Nie entfernt -- die Bibliothek darf den
+    /// Einstieg behalten, und der Wert haelt die Funktion (samt Objekt) am
+    /// Leben.
+    rueckrufe: Vec<Rc<Rueckruf>>,
+}
+
+#[cfg(feature = "ffi")]
+struct Rueckruf {
+    /// Rueckgabe, dann die Parameter (wie `Param::rr`).
+    sig: String,
+    wert: Value,
+    /// Der Name fuer Meldungen.
+    name: String,
+    einstieg: usize,
 }
 
 #[cfg(feature = "ffi")]
 thread_local! {
     static ZUSTAND: RefCell<Zustand> = RefCell::new(Zustand::default());
+    /// Die VM, die die Funktionen der Rueckrufe ausfuehrt -- gesetzt vor
+    /// jedem Aufruf einer Bibliothek (wie `Kontext::vm` im Maschinencode).
+    static VM: std::cell::Cell<*mut crate::vm::Vm<'static>> = const { std::cell::Cell::new(std::ptr::null_mut()) };
+    /// Der Fehler eines Rueckrufs, bis der Aufruf der Bibliothek ihn meldet.
+    static RR_FEHLER: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
+/// Der Faden des Programms. Ein Rueckruf aus einem anderen wird nicht
+/// ausgefuehrt (die VM ist nicht fuer mehrere Faeden gebaut) -- er liefert 0,
+/// und der naechste Aufruf einer Bibliothek meldet es.
+#[cfg(feature = "ffi")]
+static HAUPTFADEN: std::sync::OnceLock<std::thread::ThreadId> = std::sync::OnceLock::new();
+#[cfg(feature = "ffi")]
+static FREMDER_FADEN: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Die VM fuer die Rueckrufe merken (vor jedem `__ffi`).
+pub fn vm_setzen(vm: *mut crate::vm::Vm<'_>) {
+    #[cfg(feature = "ffi")]
+    {
+        let _ = HAUPTFADEN.get_or_init(|| std::thread::current().id());
+        VM.with(|v| v.set(vm as *mut crate::vm::Vm<'static>));
+    }
+    #[cfg(not(feature = "ffi"))]
+    let _ = vm;
+}
+
+/// Dieselbe Funktion wie ein schon vergebener Rueckruf? Dann bekommt die
+/// Bibliothek denselben Einstieg -- `qsort` in einer Schleife baut nicht je
+/// Runde einen neuen. Ein Lambda, das jedes Mal neu entsteht, ist jedes Mal
+/// ein anderes.
+#[cfg(feature = "ffi")]
+fn gleiche_funktion(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::FuncRef(x), Value::FuncRef(y)) => x == y,
+        (Value::Closure(x), Value::Closure(y)) => Rc::ptr_eq(x, y),
+        (Value::BoundMethod(x), Value::BoundMethod(y)) => x.1 == y.1 && match (&x.0, &y.0) {
+            (Value::Instance(i), Value::Instance(j)) => Rc::ptr_eq(i, j),
+            _ => Rc::ptr_eq(x, y),
+        },
+        _ => false,
+    }
+}
+
+#[cfg(feature = "ffi")]
+fn funktionsname(v: &Value) -> String {
+    match v {
+        Value::FuncRef(n) => n.to_string(),
+        Value::BoundMethod(b) => b.1.to_string(),
+        _ => "lambda".into(),
+    }
+}
+
+/// Der Einstieg fuer einen Rueckruf-Parameter: einmal je (Signatur, Funktion).
+#[cfg(feature = "ffi")]
+fn rueckruf_einstieg(rr: &str, wert: &Value) -> Result<u64, String> {
+    if let Some(e) = ZUSTAND.with(|z| z.borrow().rueckrufe.iter()
+            .find(|r| r.sig == rr && gleiche_funktion(&r.wert, wert)).map(|r| r.einstieg)) {
+        return Ok(e as u64);
+    }
+    let mut zeichen = rr.chars();
+    let rueck = zeichen.next().unwrap_or('v');
+    let params: Vec<char> = zeichen.collect();
+    // Passt die Zahl der Parameter? Vorher fragen -- im Rueckruf waere es ein
+    // Fehler, den die Bibliothek erst nach der ganzen Arbeit zurueckgibt.
+    let vm = VM.with(|v| v.get());
+    if !vm.is_null() {
+        if let Some(n) = unsafe { (*vm).wert_stellen(wert, &funktionsname(wert))? } {
+            if n != params.len() {
+                return Err(format!("die Funktion {} nimmt {} Wert(e), der Rueckruf uebergibt {}",
+                                   funktionsname(wert), n, params.len()));
+            }
+        }
+    }
+    let arten: Vec<Art> = params.iter().map(|c| art_von(*c, false)).collect();
+    let nummer = ZUSTAND.with(|z| z.borrow().rueckrufe.len()) as u64;
+    let einstieg = ZUSTAND.with(|z| -> Result<_, String> {
+        let mut z = z.borrow_mut();
+        if z.bauer.is_none() { z.bauer = Some(uebergang::Bauer::neu()?); }
+        z.bauer.as_mut().unwrap().rueckruf(&arten, art_von(rueck, false), nummer, eingang as usize)
+    })? as usize;
+    ZUSTAND.with(|z| z.borrow_mut().rueckrufe.push(Rc::new(Rueckruf {
+        sig: rr.to_string(), wert: wert.clone(), name: funktionsname(wert), einstieg })));
+    Ok(einstieg as u64)
+}
+
+/// Hierher springt jeder Einstieg. Kein Fehler und kein Panic darf durch
+/// die Rahmen der Bibliothek zurueck -- beides wird gemerkt.
+#[cfg(feature = "ffi")]
+extern "C" fn eingang(nummer: u64, plaetze: *const u64, rueck: *mut u64) {
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe { eingang_innen(nummer, plaetze, rueck) }));
+    if r.is_err() {
+        unsafe { *rueck = 0; }
+        RR_FEHLER.with(|f| { f.borrow_mut().get_or_insert_with(|| "interner Fehler im Rueckruf".into()); });
+    }
+}
+
+#[cfg(feature = "ffi")]
+unsafe fn eingang_innen(nummer: u64, plaetze: *const u64, rueck: *mut u64) {
+    *rueck = 0;
+    if HAUPTFADEN.get() != Some(&std::thread::current().id()) {
+        if let Ok(mut f) = FREMDER_FADEN.lock() {
+            f.get_or_insert_with(|| "ein Rueckruf kam aus einem anderen Faden und wurde nicht ausgefuehrt -- Drachenhauch-Code laeuft nur auf dem Faden des Programms".into());
+        }
+        return;
+    }
+    if RR_FEHLER.with(|f| f.borrow().is_some()) { return; }
+    let Some(rr) = ZUSTAND.with(|z| z.borrow().rueckrufe.get(nummer as usize).cloned()) else { return; };
+    let setze = |m: String| RR_FEHLER.with(|f| *f.borrow_mut() = Some(m));
+    let vm = VM.with(|v| v.get());
+    if vm.is_null() { setze(format!("Rueckruf {}: keine laufende VM", rr.name)); return; }
+    let mut zeichen = rr.sig.chars();
+    let r = zeichen.next().unwrap_or('v');
+    let werte: Vec<Value> = zeichen.enumerate().map(|(i, c)| {
+        let p = *plaetze.add(i);
+        match c {
+            't' => Value::str_rc(text_aus(p, false)),
+            'w' => Value::str_rc(text_aus(p, true)),
+            c => platz_wert(c, p),
+        }
+    }).collect();
+    match (*vm).wert_rufen(&rr.wert, werte, &rr.name) {
+        Ok(v) => {
+            if r != 'v' {
+                match zahl_platz(r, &v) {
+                    Ok(p) => *rueck = p,
+                    Err(e) => setze(format!("der Rueckruf {} soll {} liefern: {}", rr.name, typ_name(r), e)),
+                }
+            }
+        }
+        Err(e) => setze(format!("Fehler im Rueckruf {}: {}", rr.name, e)),
+    }
+}
+
+/// Nach dem Aufruf einer Bibliothek: hat ein Rueckruf einen Fehler gemerkt?
+#[cfg(feature = "ffi")]
+fn rueckruf_fehler() -> Option<String> {
+    if let Some(e) = RR_FEHLER.with(|f| f.borrow_mut().take()) { return Some(e); }
+    FREMDER_FADEN.lock().ok().and_then(|mut f| f.take())
 }
 
 #[cfg(feature = "ffi")]
@@ -634,6 +868,13 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
                 Value::Nil => 0,
                 _ => return Err(fehler(format!("erwartet einen BUFFER, erhalten {}", v.type_name()))),
             },
+            'r' => match v {
+                Value::FuncRef(_) | Value::BoundMethod(_) | Value::Closure(_) =>
+                    rueckruf_einstieg(&p.rr, v).map_err(fehler)?,
+                Value::Nil => 0,
+                _ => return Err(fehler(format!("erwartet eine Funktion (FUNCREF, z.B. den Namen einer FUNCTION ohne Klammern), erhalten {}",
+                                               v.type_name()))),
+            },
             c => zahl_platz(c, v).map_err(fehler)?,
         };
     }
@@ -641,6 +882,7 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     unsafe { (auf.einstieg)(auf.ziel, plaetze.as_ptr(), &mut rueck) };
     drop(texte);
     drop(breite);
+    if let Some(e) = rueckruf_fehler() { return Err(format!("{}: {}", sig.name, e)); }
     let ergebnis = match sig.rueck {
         't' => Value::str_rc(unsafe { text_aus(rueck, false) }),
         'w' => Value::str_rc(unsafe { text_aus(rueck, true) }),
@@ -661,14 +903,16 @@ mod tests {
     #[test]
     fn signatur_hin_und_zurueck() {
         let t = signatur_text("user32", "MessageBoxW", "box", 'l',
-                              &[('z', false, "f".into()), ('w', false, "t".into()), ('l', true, "n".into())]);
+                              &[("z".into(), false, "f".into()), ("w".into(), false, "t".into()), ("l".into(), true, "n".into()),
+                                ("rlzz".into(), false, "cmp".into())]);
         let s = signatur_lesen(&t).unwrap();
         assert_eq!(s.lib, "user32");
         assert_eq!(s.c_name, "MessageBoxW");
         assert_eq!(s.rueck, 'l');
-        assert_eq!(s.params.len(), 3);
+        assert_eq!(s.params.len(), 4);
         assert!(s.params[2].byref);
-        assert_eq!(s.params[1], Param { art: 'w', byref: false, name: "t".into() });
+        assert_eq!(s.params[1], Param { art: 'w', byref: false, name: "t".into(), rr: String::new() });
+        assert_eq!(s.params[3], Param { art: 'r', byref: false, name: "cmp".into(), rr: "lzz".into() });
         let leer = signatur_lesen(&signatur_text("c", "getpid", "getpid", 'l', &[])).unwrap();
         assert!(leer.params.is_empty());
     }
@@ -746,7 +990,7 @@ mod tests {
         fn fehler(r: Result<Value, String>) -> String { match r { Err(e) => e, Ok(_) => panic!("Fehler erwartet") } }
 
         fn auf(ziel: *const u8, rueck: char, ps: &[(char, bool)]) -> Aufruf {
-            let params: Vec<Param> = ps.iter().map(|(a, b)| Param { art: *a, byref: *b, name: "x".into() }).collect();
+            let params: Vec<Param> = ps.iter().map(|(a, b)| Param { art: *a, byref: *b, name: "x".into(), rr: String::new() }).collect();
             let arten: Vec<Art> = params.iter().map(|p| art_von(p.art, p.byref)).collect();
             let mut bauer = uebergang::Bauer::neu().unwrap();
             let einstieg = bauer.holen(&arten, art_von(rueck, false)).unwrap();
@@ -786,6 +1030,34 @@ mod tests {
             rufen_mit(&f, &[Value::Buffer(puf.clone()), Value::Int(4)]).unwrap();
             assert_eq!(*puf.borrow(), vec![1, 2, 3, 4]);
             assert!(fehler(rufen_mit(&f, &[Value::Buffer(puf), Value::Int(1 << 40)])).contains("Argument 2"));
+        }
+
+        /// Der Einstieg eines Rueckrufs, ohne VM: an seiner Stelle ein
+        /// Eingang, der die Plaetze mitschreibt und eine Antwort hinterlegt.
+        #[test]
+        fn rueckruf_einstieg_legt_plaetze_ab() {
+            use std::sync::Mutex;
+            static GESEHEN: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+            extern "C" fn test_eingang(nummer: u64, plaetze: *const u64, rueck: *mut u64) {
+                let mut g = GESEHEN.lock().unwrap();
+                g.clear();
+                g.push(nummer);
+                for i in 0..5 { g.push(unsafe { *plaetze.add(i) }); }
+                unsafe { *rueck = (-12345i32) as u32 as u64; }
+            }
+            let mut bauer = uebergang::Bauer::neu().unwrap();
+            let z = bauer.rueckruf(&[Art::I8, Art::U16, Art::F32, Art::F64, Art::I64], Art::I32, 77,
+                                   test_eingang as usize).unwrap();
+            std::mem::forget(bauer);
+            let f: extern "C" fn(i8, u16, f32, f64, i64) -> i32 = unsafe { std::mem::transmute(z) };
+            assert_eq!(f(-5, 60000, 1.5, -2.25, 1 << 40), -12345);
+            let g = GESEHEN.lock().unwrap().clone();
+            assert_eq!(g[0], 77);
+            assert!(matches!(platz_wert('b', g[1]), Value::Int(-5)));
+            assert!(matches!(platz_wert('S', g[2]), Value::Int(60000)));
+            assert!(matches!(platz_wert('f', g[3]), Value::Float(x) if x == 1.5));
+            assert!(matches!(platz_wert('d', g[4]), Value::Float(x) if x == -2.25));
+            assert!(matches!(platz_wert('q', g[5]), Value::Int(x) if x == 1 << 40));
         }
 
         #[test]

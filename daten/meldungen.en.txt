@@ -1601,5 +1601,21 @@ fremde Funktion: Signatur fehlt	foreign function: signature missing
 {}: Laenge {} ueberschreitet die Obergrenze von {} Bytes	{}: length {} exceeds the limit of {} bytes
 {}: der Zeiger ist 0 (NULL) -- dort liegen keine {} Bytes	{}: the pointer is 0 (NULL) -- there are no {} bytes there
 {}: erwartet einen BUFFER, erhalten {}	{}: expects a BUFFER, got {}
+BYREF geht nicht bei einem Rueckruf -- die Bibliothek bekommt ohnehin einen Zeiger auf die Funktion	BYREF does not work for a callback -- the library gets a pointer to the function anyway
+Erwartet '(' -- ein Rueckruf nennt seine Parameter: FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG	Expected '(' -- a callback names its parameters: FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG
+BYREF gibt es in einem Rueckruf nicht -- was die Bibliothek als Zeiger uebergibt, kommt als ZEIGER an	There is no BYREF in a callback -- what the library passes as a pointer arrives as ZEIGER
+Ein Rueckruf bekommt keinen BUFFER -- Speicher der Bibliothek kommt als ZEIGER an, BUFFER_AUS_ZEIGER liest ihn	A callback does not get a BUFFER -- memory of the library arrives as ZEIGER, BUFFER_AUS_ZEIGER reads it
+Erwartet ')' am Ende der Parameter des Rueckrufs	Expected ')' at the end of the callback's parameters
+Ein Rueckruf mit SUB gibt nichts zurueck -- mit Rueckgabe heisst es FUNCTION(...) AS typ	A callback with SUB returns nothing -- with a return value it is FUNCTION(...) AS type
+Erwartet AS <Rueckgabetyp> nach FUNCTION(...) -- ohne Rueckgabe heisst es SUB(...)	Expected AS <return type> after FUNCTION(...) -- without a return value it is SUB(...)
+Ein Rueckruf liefert eine Zahl, einen ZEIGER oder BOOLEAN -- keinen Text und keinen BUFFER (wem gehoerte der Speicher danach?)	A callback returns a number, a ZEIGER or BOOLEAN -- no text and no BUFFER (who would own the memory afterwards?)
+erwartet eine Funktion (FUNCREF, z.B. den Namen einer FUNCTION ohne Klammern), erhalten {}	expects a function (FUNCREF, e.g. the name of a FUNCTION without parentheses), got {}
+die Funktion {} nimmt {} Wert(e), der Rueckruf uebergibt {}	the function {} takes {} value(s), the callback passes {}
+{}: erwartet eine Funktion, erhalten {}	{}: expects a function, got {}
+interner Fehler im Rueckruf	internal error in the callback
+ein Rueckruf kam aus einem anderen Faden und wurde nicht ausgefuehrt -- Drachenhauch-Code laeuft nur auf dem Faden des Programms	a callback came from another thread and was not run -- Drachenhauch code only runs on the program's thread
+Rueckruf {}: keine laufende VM	callback {}: no running VM
+der Rueckruf {} soll {} liefern: {}	the callback {} should return {}: {}
+Fehler im Rueckruf {}: {}	error in the callback {}: {}
 TASK: der Auftrag ist abgestuerzt{} -- er hat keine Antwort mehr geschickt; das Hauptprogramm laeuft weiter	TASK: the task crashed{} -- it sent no answer any more; the main program keeps running
  (Rueckgabe {})	 (exit code {})

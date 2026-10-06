@@ -1583,7 +1583,14 @@ impl Parser {
                     }
                     let pname = sval(&self.expect(Tt::Ident, "Erwartet Parametername")?);
                     self.expect(Tt::As, "Erwartet AS nach Parametername")?;
-                    let wort = self.ffi_typwort()?;
+                    let wort = if self.check(Tt::Function) || self.check(Tt::Sub) {
+                        if by_ref {
+                            return self.err("BYREF geht nicht bei einem Rueckruf -- die Bibliothek bekommt ohnehin einen Zeiger auf die Funktion");
+                        }
+                        self.ffi_rueckruf()?
+                    } else {
+                        self.ffi_typwort()?
+                    };
                     if by_ref && matches!(wort.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer") {
                         self.pos -= 1;
                         return self.err(&format!(
@@ -1612,6 +1619,49 @@ impl Parser {
         };
         self.consume_terminator()?;
         Ok(Node::DeclareLib { name, anzeige, lib, alias, params, ret })
+    }
+
+    /// Ein Rueckruf als Typ eines Parameters: `FUNCTION(a AS typ, ...) AS typ`
+    /// oder `SUB(...)` -- die Schreibweise von FreeBASIC. Ergebnis fuer den
+    /// Compiler: "@" + Rueckgabe-Zeichen + Parameter-Zeichen (`@lzz`).
+    fn ffi_rueckruf(&mut self) -> R<String> {
+        let ist_sub = self.check(Tt::Sub);
+        self.pos += 1;                                  // FUNCTION | SUB
+        self.expect(Tt::Lparen,
+            "Erwartet '(' -- ein Rueckruf nennt seine Parameter: FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG")?;
+        let mut zeichen = String::new();
+        if !self.check(Tt::Rparen) {
+            loop {
+                if self.check(Tt::Byref) {
+                    return self.err("BYREF gibt es in einem Rueckruf nicht -- was die Bibliothek als Zeiger uebergibt, kommt als ZEIGER an");
+                }
+                // Der Name ist freiwillig: `a AS ZEIGER` oder nur `ZEIGER`.
+                if self.check(Tt::Ident) && self.tt(1) == Tt::As { self.pos += 2; }
+                let w = self.ffi_typwort()?;
+                if w == "buffer" {
+                    self.pos -= 1;
+                    return self.err("Ein Rueckruf bekommt keinen BUFFER -- Speicher der Bibliothek kommt als ZEIGER an, BUFFER_AUS_ZEIGER liest ihn");
+                }
+                zeichen.push(crate::ffi::typ_zeichen(&w).unwrap_or('q'));
+                if !self.matches(Tt::Comma) { break; }
+            }
+        }
+        self.expect(Tt::Rparen, "Erwartet ')' am Ende der Parameter des Rueckrufs")?;
+        let rueck = if ist_sub {
+            if self.check(Tt::As) {
+                return self.err("Ein Rueckruf mit SUB gibt nichts zurueck -- mit Rueckgabe heisst es FUNCTION(...) AS typ");
+            }
+            'v'
+        } else {
+            self.expect(Tt::As, "Erwartet AS <Rueckgabetyp> nach FUNCTION(...) -- ohne Rueckgabe heisst es SUB(...)")?;
+            let w = self.ffi_typwort()?;
+            if matches!(w.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer") {
+                self.pos -= 1;
+                return self.err("Ein Rueckruf liefert eine Zahl, einen ZEIGER oder BOOLEAN -- keinen Text und keinen BUFFER (wem gehoerte der Speicher danach?)");
+            }
+            crate::ffi::typ_zeichen(&w).unwrap_or('q')
+        };
+        Ok(format!("@{}{}", rueck, zeichen))
     }
 
     /// Ein Typwort der DECLARE-Zeile (klein); sonst ein Fehler mit Vorschlag.
