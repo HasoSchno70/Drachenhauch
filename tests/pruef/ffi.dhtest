@@ -1,0 +1,322 @@
+' Fremde Bibliotheken aufrufen: DECLARE ... LIB (docs/entwurf-ffi.md, Stufe 1).
+' Geprueft wird gegen Bibliotheken, die ueberall da sind: unter Windows
+' kernel32/user32, sonst und auch unter Windows die C-Bibliothek ("c", "m" --
+' ucrtbase, glibc, libSystem). Jeder Typ der DECLARE-Zeile kommt mindestens
+' einmal vor; die Breiten im Einzelnen pruefen die Rust-Tests in ffi.rs.
+
+=== kernel32 rechnet mit LONG und liefert ULONG und INTEGER
+DECLARE FUNCTION GetCurrentProcessId LIB "kernel32" () AS ULONG
+DECLARE FUNCTION MulDiv LIB "kernel32" (zahl AS LONG, mal AS LONG, durch AS LONG) AS LONG
+DECLARE FUNCTION GetTickCount64 LIB "kernel32" () AS INTEGER
+DECLARE FUNCTION GetSystemMetrics LIB "user32" (n AS LONG) AS LONG
+PRINT GetCurrentProcessId() > 0
+PRINT MulDiv(10, 6, 4)
+' MulDiv rundet weg von der Null -- ein falsch erweitertes Vorzeichen gaebe
+' hier eine riesige Zahl.
+PRINT MulDiv(-7, 3, 2)
+PRINT GetTickCount64() > 0
+PRINT TYPEOF(GetSystemMetrics(0)), GetSystemMetrics(0) >= 0
+--- system windows
+--- erwartet
+TRUE
+15
+-11
+TRUE
+INTEGER TRUE
+
+=== wtext ist utf-16 und text ist utf-8
+DECLARE FUNCTION lstrlenW LIB "kernel32" (s AS WTEXT) AS LONG
+DECLARE FUNCTION Bytes LIB "kernel32" ALIAS "lstrlenA" (s AS CSTR) AS LONG
+' Fuenf Zeichen, aber sieben Bytes in UTF-8.
+PRINT lstrlenW("Grüße"), Bytes("Grüße")
+PRINT lstrlenW(""), Bytes("abc")
+--- system windows
+--- erwartet
+5 7
+0 3
+
+=== buffer und byref schreiben zurueck
+DECLARE SUB GetSystemTime LIB "kernel32" (zeit AS BUFFER)
+DECLARE FUNCTION QueryPerformanceFrequency LIB "kernel32" (BYREF f AS INTEGER) AS BOOLEAN
+DECLARE FUNCTION GetComputerNameW LIB "kernel32" (puffer AS BUFFER, BYREF laenge AS ULONG) AS BOOLEAN
+DIM st AS BUFFER
+st = BUFFER_NEW(16)
+GetSystemTime(st)
+PRINT BUFFER_GET_U16(st, 0) >= 2026, BUFFER_GET_U16(st, 2) >= 1 AND BUFFER_GET_U16(st, 2) <= 12
+DIM f AS INTEGER
+PRINT QueryPerformanceFrequency(f), f > 0
+' Ein und aus: hinein geht die Groesse des Puffers in Zeichen, heraus die
+' Laenge des Namens -- hier in einem Feldelement statt einer Variable.
+DIM n[1] AS INTEGER
+n[0] = 64
+DIM b AS BUFFER
+b = BUFFER_NEW(128)
+PRINT GetComputerNameW(b, n[0])
+DIM name AS STRING
+FOR i = 0 TO n[0] - 1
+    name = name + CHR$(BUFFER_GET_U16(b, i * 2))
+NEXT
+PRINT name = GETENV$("COMPUTERNAME"), n[0] > 0
+--- system windows
+--- erwartet
+TRUE TRUE
+TRUE TRUE
+TRUE
+TRUE TRUE
+
+=== die c-bibliothek auf jedem system
+DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
+DECLARE FUNCTION pow LIB "m" (x AS FLOAT, y AS FLOAT) AS FLOAT
+DECLARE FUNCTION hypot LIB "m" (x AS FLOAT, y AS FLOAT) AS FLOAT
+DECLARE FUNCTION powf LIB "m" (x AS SINGLE, y AS SINGLE) AS SINGLE
+DECLARE FUNCTION getenv LIB "c" (name AS TEXT) AS TEXT
+DECLARE FUNCTION strtod LIB "c" (s AS TEXT, BYREF ende AS ZEIGER) AS FLOAT
+DECLARE FUNCTION isdigit LIB "c" (zeichen AS LONG) AS BOOLEAN
+PRINT strlen("Drachenhauch"), strlen("Grüße")
+PRINT pow(2, 10), hypot(3.0, 4.0), powf(1.5, 2.0)
+PRINT getenv("DH_FFI_PROBE"), "[" + getenv("DH_FFI_GIBT_ES_NICHT") + "]"
+DIM ende AS INTEGER
+PRINT strtod("2.5x", ende), ende <> 0
+PRINT isdigit(ASC("7")), isdigit(ASC("x"))
+--- umgebung
+DH_FFI_PROBE=hallo
+--- erwartet
+12 7
+1024.0 5.0 2.25
+hallo []
+2.5 TRUE
+TRUE FALSE
+
+=== eine deklarierte funktion verdeckt den eingebauten befehl
+DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
+' ABS der Laufzeit liefert fuer -5.5 eine Kommazahl; die aus der Bibliothek
+' nimmt nur LONG -- der Aufruf meint also sie.
+PRINT abs(-5)
+TRY
+    PRINT abs(-5.5)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+5
+abs: Argument 1 (x AS LONG): erwartet eine ganze Zahl (LONG), erhalten FLOAT
+
+=== in einer schleife und in einer funktion
+' Die Schleife laeuft sonst als Maschinencode; der Aufruf bleibt in der VM
+' und muss dasselbe ergeben.
+DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
+FUNCTION laenge(s AS STRING) AS INTEGER
+    RETURN strlen(s)
+END FUNCTION
+DIM summe AS INTEGER
+FOR i = 1 TO 2000
+    summe = summe + strlen("abc") + laenge("de")
+NEXT
+PRINT summe
+--- erwartet
+10000
+
+=== in einem namensraum
+' IMPORT ... AS benennt die Funktion im Programm um -- der Name in der
+' Bibliothek bleibt strlen (hier ganz klein geschrieben, also ohne eigene
+' Schreibweise im Quelltext).
+IMPORT "bib.dh" AS b
+PRINT b.laenge("abc")
+PRINT b.strlen("abcd")
+--- datei bib.dh
+DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
+FUNCTION laenge(s AS STRING) AS INTEGER
+    RETURN strlen(s)
+END FUNCTION
+--- erwartet
+3
+4
+
+=== die bibliothek wird erst beim aufruf geladen
+DECLARE FUNCTION Nichts LIB "gibt_es_nicht_123" () AS LONG
+PRINT "ohne Aufruf laeuft es"
+TRY
+    PRINT Nichts()
+CATCH e
+    PRINT INSTR(e, !"Bibliothek \"gibt_es_nicht_123\" nicht gefunden") >= 0
+    PRINT INSTR(e, "Nichts:") = 0
+END TRY
+--- erwartet
+ohne Aufruf laeuft es
+TRUE
+TRUE
+
+=== eine funktion, die es nicht gibt
+DECLARE FUNCTION GibtsNicht LIB "c" () AS LONG
+GibtsNicht()
+--- fehler
+die Funktion 'GibtsNicht' gibt es in "c" nicht
+
+=== ein wert, der nicht passt, bricht ab
+DECLARE FUNCTION isdigit LIB "c" (zeichen AS LONG) AS BOOLEAN
+PRINT isdigit(2 ^ 40)
+--- fehler
+isdigit: Argument 1 (zeichen AS LONG): 1099511627776 passt nicht in LONG (-2147483648 bis 2147483647)
+
+=== ein nullzeichen im text bricht ab
+DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
+PRINT strlen("a" + CHR$(0) + "b")
+--- fehler
+strlen: Argument 1 (s AS TEXT): ein Nullzeichen mitten im Text
+
+=== die zahl der argumente prueft schon der compiler
+DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
+PRINT "nie"
+PRINT strlen("a", "b")
+--- fehler
+strlen: erwartet 1 Argument(e), erhalten 2 (DECLARE in
+
+=== ein typwort aus c bekommt einen vorschlag
+DECLARE FUNCTION pow LIB "m" (x AS DOUBLE, y AS DOUBLE) AS DOUBLE
+--- fehler
+'DOUBLE' ist kein Typ fuer fremde Bibliotheken -- hier heisst das FLOAT
+
+=== byref geht nicht bei text
+DECLARE SUB f LIB "c" (BYREF s AS TEXT)
+--- fehler
+BYREF geht nur bei Zahlen und ZEIGER
+
+=== declare ohne lib sagt, dass es ohne geht
+DECLARE SUB zeichne (x AS INTEGER)
+--- fehler
+DECLARE braucht man in Drachenhauch nur fuer fremde Bibliotheken
+
+=== declare gehoert auf die oberste ebene
+SUB s()
+    DECLARE FUNCTION strlen LIB "c" (t AS TEXT) AS ZEIGER
+END SUB
+--- fehler
+DECLARE ... LIB gehoert auf die oberste Ebene
+
+=== zweimal derselbe name
+DECLARE FUNCTION strlen LIB "c" (t AS TEXT) AS ZEIGER
+DECLARE FUNCTION strlen LIB "c" (t AS TEXT) AS ZEIGER
+--- fehler
+'strlen' ist schon in
+
+=== eine eigene funktion gleichen namens
+DECLARE FUNCTION strlen LIB "c" (t AS TEXT) AS ZEIGER
+FUNCTION strlen(t AS STRING) AS INTEGER
+    RETURN 0
+END FUNCTION
+--- fehler
+ist zugleich eine eigene SUB/FUNCTION
+
+=== byref braucht eine variable
+DECLARE FUNCTION strtod LIB "c" (s AS TEXT, BYREF ende AS ZEIGER) AS FLOAT
+PRINT strtod("1", 5)
+--- fehler
+ein BYREF-Parameter braucht eine Variable
+
+=== check warnt vor einem argument vom falschen typ
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "--check", "probe.dh")
+DIM aus AS STRING
+DIM leer AS INTEGER
+WHILE leer < 5
+    DIM z AS STRING
+    z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        aus = aus + z
+    END IF
+WEND
+PRINT INSTR(aus, "strlen: Argument 1 (s AS TEXT) bekommt INTEGER") >= 0
+PRINT INSTR(aus, !"\"line\":3") >= 0
+--- datei probe.dh
+DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
+PRINT strlen("ok")
+PRINT strlen(5)
+--- erwartet
+TRUE
+TRUE
+
+=== hover und definition kennen die declare-zeile
+DIM q AS STRING
+q = "' Laenge eines C-Texts" + CHR$(10) + "DECLARE FUNCTION strlen LIB " + CHR$(34) + "c" + CHR$(34) + " (s AS TEXT) AS ZEIGER" + CHR$(10) + "PRINT strlen(" + CHR$(34) + "x" + CHR$(34) + ")" + CHR$(10)
+DIM h AS STRING
+h = CODE_HOVER$(q, 3, 8)
+PRINT INSTR(h, "DECLARE FUNCTION strlen") >= 0, INSTR(h, "Laenge eines C-Texts") >= 0
+PRINT CODE_DEFINITION(q, 3, 8)
+--- erwartet
+TRUE TRUE
+(2, 18)
+
+=== ein absturz im auftrag laesst das hauptprogramm leben
+' Der Weg fuer unsichere Bibliotheken: der Aufruf laeuft als eigener Prozess.
+DECLARE SUB abort LIB "c" ()
+DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
+FUNCTION arbeit(s AS STRING) AS STRING
+    IF s = "kaputt" THEN abort()
+    RETURN STR$(strlen(s))
+END FUNCTION
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = TASK_START(arbeit, "hallo")
+b = TASK_START(arbeit, "kaputt")
+WHILE NOT (TASK_READY(a) AND TASK_READY(b))
+    SLEEP(10)
+WEND
+PRINT TASK_RESULT$(a)
+TRY
+    PRINT TASK_RESULT$(b)
+CATCH e
+    PRINT INSTR(e, "der Auftrag ist abgestuerzt") >= 0
+END TRY
+PRINT "lebt"
+--- erwartet
+5
+TRUE
+lebt
+
+=== die probe fuer den schlanken export kennt den aufruf
+' `dhrt --export --schlank` fragt die kleinen Laufzeiten mit --fehlende, ob
+' ihnen ein Befehl fehlt. Ein Bau MIT ffi darf __ffi nicht nennen (ohne ffi
+' nennt er es, weil die Meldung "ist ohne das Feature" sagt).
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "--fehlende", "__ffi", "gibt_es_nicht_123")
+DIM aus AS STRING
+DIM leer AS INTEGER
+WHILE leer < 5
+    DIM z AS STRING
+    z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        aus = aus + TRIM$(z) + ";"
+    END IF
+WEND
+PRINT aus
+--- erwartet
+gibt_es_nicht_123;
+
+=== dhrt fmt schreibt die woerter der declare-zeile gross
+' DECLARE, LIB, ALIAS und die Typwoerter sind keine Schluesselwoerter --
+' gross werden sie trotzdem, sonst saehe die Zeile neben IF und SUB fremd
+' aus. Der Name in der Bibliothek und die Parameternamen bleiben.
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "fmt", "probe.dh")
+WHILE PROCESS_RUNNING(p)
+    SLEEP(20)
+WEND
+DIM z AS ARRAY OF STRING
+z = READLINES("probe.dh")
+FOR i = 0 TO LEN(z) - 1
+    PRINT z[i]
+NEXT
+--- datei probe.dh
+declare function Bytes lib "kernel32" alias "lstrlenA" (byval s as cstr, byref lib as long) as long
+dim declare as integer
+declare = 1
+--- erwartet
+DECLARE FUNCTION Bytes LIB "kernel32" ALIAS "lstrlenA" (BYVAL s AS CSTR, BYREF lib AS LONG) AS LONG
+DIM declare AS INTEGER
+declare = 1

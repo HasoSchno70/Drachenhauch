@@ -331,6 +331,21 @@ struct ClassInfo {
     compiled: Vec<(String, FuncTeile)>,    // method-name -> fertige Methode
 }
 
+/// Eine Funktion aus einer fremden Bibliothek. Der Aufruf gibt `signatur`
+/// (ffi::signatur_text) dem internen Befehl `__ffi` als ersten Wert mit.
+#[derive(Clone)]
+struct FfiDecl {
+    signatur: String,
+    anzeige: String,
+    /// Typzeichen je Parameter (ffi::TYPWOERTER) und ihre Namen.
+    arten: Vec<char>,
+    pnamen: Vec<String>,
+    byref: Vec<bool>,
+    /// Der Drachenhauch-Typ der Rueckgabe (leer bei SUB).
+    rueck: String,
+    zeile: u32,
+}
+
 pub struct Compiler {
     /// `DHRT_TYPEN_PRUEFEN=1`: hinter jeden getypten Ausdruck eine Probe.
     typen_pruefen: bool,
@@ -346,6 +361,9 @@ pub struct Compiler {
     /// Wo eine freie SUB/FUNCTION deklariert wurde (gemergte Zeile) -- damit
     /// eine Kollision BEIDE Stellen nennen kann (WP I.4).
     fn_lines: HashMap<String, u32>,
+    /// `DECLARE ... LIB` (klein geschriebener Name): Funktionen aus fremden
+    /// Bibliotheken, docs/entwurf-ffi.md.
+    ffi_decls: HashMap<String, FfiDecl>,
     class_lines: HashMap<String, u32>,
     /// Zeilen-Herkunft der gemergten Quelle + Name der Hauptdatei, um in
     /// Meldungen auf eine ANDERE Stelle zu verweisen (`mathe.dh:5`).
@@ -655,7 +673,7 @@ impl Compiler {
                    global_slots: HashMap::new(),
                    global_consts: std::collections::HashSet::new(),
                    global_vars: std::collections::HashSet::new(),
-                   fn_sigs: HashMap::new(), fn_lines: HashMap::new(),
+                   fn_sigs: HashMap::new(), fn_lines: HashMap::new(), ffi_decls: HashMap::new(),
                    class_lines: HashMap::new(),
                    herkunft: vec![], haupt: String::new(),
                    compiled_fns: vec![],
@@ -1131,6 +1149,8 @@ impl Compiler {
             }
             Node::With { var_name, target, body } => self.stmt_with(var_name, target, body),
             Node::TupleAssign { targets, value } => self.stmt_tuple_assign(targets, value),
+            Node::DeclareLib { .. } => Err(
+                "DECLARE ... LIB gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block".into()),
             Node::FunctionDecl { .. } | Node::SubDecl { .. } | Node::ClassDecl { .. }
             | Node::EnumDecl { .. } => Err(format!(
                 "{} darf nicht innerhalb eines Unterprogramms oder Blocks stehen -- \
@@ -1355,6 +1375,9 @@ impl Compiler {
                         if self.resolve_method(k, f) || self.resolve_method(k, &low) {
                             return self.methode_rueckgabe(k, f);
                         }
+                    }
+                    if let Some(d) = self.ffi_decls.get(&low) {
+                        return if d.rueck.is_empty() { Typ::Unbekannt } else { angabe(&d.rueck) };
                     }
                     match self.fn_sigs.get(f.as_str()).or_else(|| self.fn_sigs.get(&low)) {
                         Some(sig) if sig.is_coroutine || sig.return_type.is_empty() => Typ::Unbekannt,
@@ -2901,6 +2924,13 @@ impl Compiler {
                 return Ok(());
             }
         }
+        if let Some(d) = self.ffi_decls.get(&name.to_lowercase()).cloned() {
+            if is_local || is_global {
+                return Err(format!(
+                    "Namens-Kollision: '{}' ist zugleich eine Variable und eine Funktion aus einer Bibliothek (DECLARE in {}) -- benenne eines von beiden um.", name, self.wo(d.zeile)));
+            }
+            return self.emit_ffi_call(&d.anzeige.clone(), &d, args);
+        }
         // Namens-Kollision: eine Variable verdeckt eine gleichnamige SUB/FUNCTION
         // (case-insensitiv). Beim Aufruf gewinnt die Variable -> sonst kryptisches
         // "nicht aufrufbar" zur Laufzeit. Klare Meldung schon beim Kompilieren.
@@ -3692,6 +3722,82 @@ impl Compiler {
         let sig = make_sig(decl)?;
         self.fn_sigs.insert(name.to_string(), sig);
         self.fn_lines.insert(name.to_string(), zeile);
+        Ok(())
+    }
+
+    /// `DECLARE ... LIB`: Signatur fuer die Aufrufe festhalten. Die Bibliothek
+    /// wird erst beim ersten Aufruf geladen (ffi.rs) -- beim Uebersetzen muss
+    /// es sie nicht geben.
+    fn register_ffi(&mut self, decl: &Node, zeile: u32) -> Result<(), String> {
+        let Node::DeclareLib { name, anzeige, lib, alias, params, ret } = decl else { return Ok(()) };
+        let low = name.to_lowercase();
+        if let Some(erste) = self.ffi_decls.get(&low).map(|d| d.zeile) {
+            self.err_line = zeile;
+            return Err(format!("'{}' ist schon in {} deklariert -- eines von beiden umbenennen (mit ALIAS \"c_name\" darf der Name hier anders heissen als in der Bibliothek)",
+                               name, self.wo(erste)));
+        }
+        if self.fn_sigs.contains_key(name.as_str()) || self.fn_sigs.contains_key(&low) {
+            let z = self.fn_lines.get(name.as_str()).or_else(|| self.fn_lines.get(&low)).copied().unwrap_or(0);
+            self.err_line = zeile;
+            return Err(format!("'{}' ist zugleich eine eigene SUB/FUNCTION ({}) und eine Funktion aus \"{}\" -- mit ALIAS \"{}\" darf die fremde hier anders heissen",
+                               name, self.wo(z), lib, name));
+        }
+        let ps: Vec<(char, bool, String)> = params.iter()
+            .map(|(n, t, b)| (crate::ffi::typ_zeichen(t).unwrap_or('q'), *b, n.clone())).collect();
+        let rz = ret.as_deref().and_then(crate::ffi::typ_zeichen).unwrap_or('v');
+        let c_name = alias.clone().unwrap_or_else(|| name.clone());
+        let signatur = crate::ffi::signatur_text(lib, &c_name, anzeige, rz, &ps);
+        let rueck = if rz == 'v' { String::new() } else { crate::ffi::dh_typ(rz).to_string() };
+        self.ffi_decls.insert(low, FfiDecl { signatur, anzeige: anzeige.clone(), arten: ps.iter().map(|p| p.0).collect(),
+            pnamen: ps.iter().map(|p| p.2.clone()).collect(), byref: ps.iter().map(|p| p.1).collect(), rueck, zeile });
+        Ok(())
+    }
+
+    /// Aufruf einer Funktion aus einer fremden Bibliothek. Mit BYREF liefert
+    /// `__ffi` ein Tupel (Ergebnis, letzter, ..., erster BYREF-Wert); nach
+    /// UNPACK_TUPLE liegt es so, wie `emit_byref_writeback` es erwartet.
+    fn emit_ffi_call(&mut self, name: &str, d: &FfiDecl, args: &[Node]) -> CR {
+        if args.iter().any(|a| matches!(a, Node::NamedArg { .. })) {
+            return Err(format!("{}: benannte Argumente gehen bei Funktionen aus Bibliotheken nicht", name));
+        }
+        if args.len() != d.byref.len() {
+            return Err(format!("{}: erwartet {} Argument(e), erhalten {} (DECLARE in {})",
+                               name, d.byref.len(), args.len(), self.wo(d.zeile)));
+        }
+        // Was sicher nicht passt, meldet schon --check (zur Laufzeit waere es
+        // ein Fehler in genau dieser Zeile).
+        for (i, a) in args.iter().enumerate() {
+            let art = d.arten[i];
+            let t = self.typ_von(a);
+            let falsch = match art {
+                't' | 'w' => matches!(t, Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
+                'f' | 'd' => matches!(t, Typ::Str | Typ::Bool),
+                'o' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl),
+                'p' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
+                _ => matches!(t, Typ::Str | Typ::Bool | Typ::Float),
+            };
+            if falsch {
+                self.warnings.push((self.ctx.cur_line, format!(
+                    "{}: Argument {} ({} AS {}) bekommt {} -- beim Laufen bricht diese Zeile ab",
+                    name, i + 1, d.pnamen[i], crate::ffi::typ_name(art), t)));
+            }
+        }
+        let c = self.ctx.add_const(json!(d.signatur));
+        self.ctx.emit(oc::LOAD_CONST, json!(c));
+        let mut caps: Vec<ByrefCap> = Vec::new();
+        for (a, &br) in args.iter().zip(&d.byref) {
+            if br {
+                caps.push(self.emit_byref_capture_and_load(a).map_err(|_| format!(
+                    "{}: ein BYREF-Parameter braucht eine Variable (oder ein Feld-/Objektelement), in die das Ergebnis zurueckgeschrieben wird", name))?);
+            } else {
+                self.expr(a)?;
+            }
+        }
+        self.ctx.emit(oc::CALL_BUILTIN, json!(["__ffi", args.len() + 1]));
+        if !caps.is_empty() {
+            self.ctx.emit(oc::UNPACK_TUPLE, json!(caps.len() + 1));
+            self.emit_byref_writeback(&caps);
+        }
         Ok(())
     }
 
@@ -4724,6 +4830,7 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
     // Meldung, um BEIDE Stellen nennen zu koennen (WP I.4).
     let mut fn_decls: Vec<(&Node, u32)> = vec![];
     let mut cls_decls: Vec<(&Node, u32)> = vec![];
+    let mut ffi_decls: Vec<(&Node, u32)> = vec![];
     let mut main_stmts: Vec<&Node> = vec![];
     for s in stmts {
         // Top-Level-Decls sind in Stmt gewrappt -> fuer fn/cls den inneren Knoten
@@ -4733,6 +4840,7 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
             Node::SubDecl { .. } | Node::FunctionDecl { .. } =>
                 fn_decls.push((unwrap_stmt(s), stmt_line(s))),
             Node::ClassDecl { .. } => cls_decls.push((unwrap_stmt(s), stmt_line(s))),
+            Node::DeclareLib { .. } => ffi_decls.push((unwrap_stmt(s), stmt_line(s))),
             _ => main_stmts.push(s),
         }
     }
@@ -4822,6 +4930,7 @@ fn uebersetzen(ast: &Node, external_types: &std::collections::HashSet<String>,
         }
         // Phase 2/3: Funktions-Stubs + -Bodies (Forward-Refs/Rekursion).
         for (d, line) in &fn_decls { c.register_stub(d, *line)?; }
+        for (d, line) in &ffi_decls { c.register_ffi(d, *line)?; }
         for (d, _) in &fn_decls { c.compile_function(d)?; }
         // Phase 4: Methoden kompilieren.
         for (cd, _) in &cls_decls { c.compile_class_methods(cd)?; }

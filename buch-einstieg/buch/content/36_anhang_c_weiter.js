@@ -56,7 +56,7 @@ module.exports = (H) => {
   H.p("Wer den Vokabeltrainer gebaut hat, erkennt fast alles wieder — Reiter, Datenbank, Netzabruf, drei Schichten von Daten bis Anzeige. Nur mit einer Frage mehr, die dort im Mittelpunkt steht: Wo leben die Daten, und wer darf sie ändern?"),
 
   H.table([
-    ["Das Lehrbuch", "nachschlagen", "alle Befehle, die ganze Sprache, 84 Kapitel"],
+    ["Das Lehrbuch", "nachschlagen", "alle Befehle, die ganze Sprache, 85 Kapitel"],
     ["Galaga", "ein Spiel", "Arcade-Shooter in 13 Kapiteln, eigene Sprites"],
     ["Tippspiel", "eine Anwendung", "Datenbank, Netz, Rangliste in 13 Kapiteln"],
   ], { headers: ["Band", "Wofür", "Was drinsteht"], widths: [2000, 2000, 5026] }),

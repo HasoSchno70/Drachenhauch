@@ -1,0 +1,61 @@
+' Fremde Bibliotheken aufrufen: DECLARE ... LIB
+'
+' Eine Funktion aus einer DLL (Windows), .so (Linux) oder .dylib (macOS)
+' wird einmal deklariert und dann aufgerufen wie eine eigene. Die Typwoerter
+' der Zeile sagen, wie breit ein Wert in C ist -- mehr in docs/ffi.md.
+'
+' Der erste Teil laeuft auf jedem System (die C-Bibliothek ist ueberall da),
+' der zweite nur unter Windows. Dort, wo es kernel32 nicht gibt, faengt CATCH
+' den Fehler ab: geladen wird erst beim ersten Aufruf.
+
+' --- die C-Bibliothek des Systems ("c") und ihre Mathematik ("m")
+DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
+DECLARE FUNCTION getenv LIB "c" (name AS TEXT) AS TEXT
+DECLARE FUNCTION strtod LIB "c" (s AS TEXT, BYREF ende AS ZEIGER) AS FLOAT
+DECLARE FUNCTION hypot LIB "m" (x AS FLOAT, y AS FLOAT) AS FLOAT
+
+' --- die Windows-API
+DECLARE FUNCTION GetTickCount64 LIB "kernel32" () AS INTEGER
+DECLARE SUB GetSystemTime LIB "kernel32" (zeit AS BUFFER)
+DECLARE FUNCTION GetComputerNameW LIB "kernel32" (puffer AS BUFFER, BYREF laenge AS ULONG) AS BOOLEAN
+DECLARE FUNCTION Bytes LIB "kernel32" ALIAS "lstrlenA" (s AS TEXT) AS LONG
+
+PRINT "== C-Bibliothek"
+PRINT "strlen(""Drachenhauch"") = "; strlen("Drachenhauch")
+' TEXT ist UTF-8: fuenf Zeichen, aber sieben Bytes.
+PRINT "strlen(""Grüße"")        = "; strlen("Grüße")
+PRINT "hypot(3, 4)            = "; hypot(3.0, 4.0)
+DIM ende AS INTEGER
+PRINT "strtod(""2.5 Meter"")    = "; strtod("2.5 Meter", ende)
+DIM pfad AS STRING
+pfad = getenv("PATH")
+PRINT "PATH hat "; LEN(pfad); " Zeichen"
+
+PRINT
+PRINT "== Windows-API"
+TRY
+    PRINT "Rechner laeuft seit "; GetTickCount64() \ 60000; " Minuten"
+
+    ' Ein Struct ist ein Stueck Speicher: SYSTEMTIME sind acht WORD.
+    DIM st AS BUFFER
+    st = BUFFER_NEW(16)
+    GetSystemTime(st)
+    PRINT "UTC: "; BUFFER_GET_U16(st, 0); "-"; BUFFER_GET_U16(st, 2); "-"; BUFFER_GET_U16(st, 6); _
+          " "; BUFFER_GET_U16(st, 8); ":"; PADL$(STR$(BUFFER_GET_U16(st, 10)), 2, "0")
+
+    ' Hinein geht der Platz im Puffer (in Zeichen), heraus die Laenge.
+    DIM n AS INTEGER
+    n = 64
+    DIM b AS BUFFER
+    b = BUFFER_NEW(128)
+    IF GetComputerNameW(b, n) THEN
+        DIM name AS STRING
+        FOR i = 0 TO n - 1
+            name = name + CHR$(BUFFER_GET_U16(b, i * 2))
+        NEXT
+        PRINT "Rechnername: "; name
+    END IF
+    PRINT "lstrlenA(""Grüße"") = "; Bytes("Grüße")
+CATCH e
+    PRINT "(nicht unter Windows: "; e; ")"
+END TRY

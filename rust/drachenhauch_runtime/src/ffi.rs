@@ -1,0 +1,712 @@
+//! Fremde Bibliotheken aufrufen: `DECLARE FUNCTION name LIB "bib" (...)`.
+//!
+//! Entwurf: docs/entwurf-ffi.md (Stufe 1). Der Compiler macht aus jedem
+//! Aufruf einer deklarierten Funktion den internen Befehl `__ffi` und gibt
+//! ihm die Deklaration als ersten Wert mit (`signatur_text`). Hier wird sie
+//! einmal zerlegt, die Bibliothek beim ERSTEN Aufruf geladen (ein Programm,
+//! das den Zweig nie nimmt, laeuft auch ohne sie) und je Signatur ein
+//! Uebergang mit Cranelift gebaut -- dieselbe Bibliothek, die auch den
+//! Maschinencode erzeugt; libffi braeuchte eine C-Bibliothek im Bau.
+//!
+//! Der Uebergang hat immer dieselbe Form, damit Rust ihn ohne Wissen ueber
+//! die Signatur rufen kann:
+//!
+//! ```text
+//! extern "C" fn(ziel: *const u8, args: *const u64, rueck: *mut u64)
+//! ```
+//!
+//! Jedes Argument steht in einem 8-Byte-Platz (kleine Ganzzahlen und
+//! SINGLE in den unteren Bytes -- alle Ziele sind little-endian), der
+//! Uebergang laedt sie in der Breite der Signatur, ruft `ziel` nach der
+//! C-Aufrufkonvention des Systems und legt das Ergebnis nach `rueck`.
+//!
+//! **Ein Absturz in fremdem Code ist nicht abzufangen** -- dafuer gibt es
+//! keine Sicherung, nur den Hinweis in der Doku und TASK_START.
+
+#[cfg(feature = "ffi")]
+use std::cell::RefCell;
+#[cfg(feature = "ffi")]
+use std::collections::HashMap;
+#[cfg(feature = "ffi")]
+use std::rc::Rc;
+
+use crate::value::Value;
+
+/// Trenner zwischen den Teilen der Signatur (ASCII Unit Separator) -- kommt
+/// in keinem Bibliotheks- oder Funktionsnamen vor.
+pub const TRENNER: char = '\u{1f}';
+
+/// Die Typwoerter einer `DECLARE`-Zeile, mit ihrem Kurzzeichen.
+/// Gross/klein egal; die C-nahen Namen sind zweite Schreibweisen.
+pub const TYPWOERTER: &[(&str, char)] = &[
+    ("byte", 'b'), ("ubyte", 'B'), ("short", 's'), ("ushort", 'S'),
+    ("long", 'l'), ("ulong", 'L'), ("integer", 'q'),
+    ("zeiger", 'z'), ("ptr", 'z'),
+    ("single", 'f'), ("float", 'd'), ("boolean", 'o'),
+    ("text", 't'), ("cstr", 't'), ("wtext", 'w'), ("wstr", 'w'),
+    ("buffer", 'p'),
+];
+
+/// Kurzzeichen eines Typworts (`None` = gibt es nicht).
+pub fn typ_zeichen(wort: &str) -> Option<char> {
+    let w = wort.to_lowercase();
+    TYPWOERTER.iter().find(|(n, _)| *n == w).map(|(_, c)| *c)
+}
+
+/// Der Name, unter dem ein Kurzzeichen in Meldungen erscheint.
+pub fn typ_name(c: char) -> &'static str {
+    match c {
+        'b' => "BYTE", 'B' => "UBYTE", 's' => "SHORT", 'S' => "USHORT",
+        'l' => "LONG", 'L' => "ULONG", 'q' => "INTEGER", 'z' => "ZEIGER",
+        'f' => "SINGLE", 'd' => "FLOAT", 'o' => "BOOLEAN",
+        't' => "TEXT", 'w' => "WTEXT", 'p' => "BUFFER",
+        _ => "?",
+    }
+}
+
+/// Der Drachenhauch-Typ, den ein Kurzzeichen auf dieser Seite hat.
+pub fn dh_typ(c: char) -> &'static str {
+    match c {
+        'f' | 'd' => "float",
+        'o' => "boolean",
+        't' | 'w' => "string",
+        'p' => "buffer",
+        _ => "integer",
+    }
+}
+
+/// Hinweis zu einem Wort, das kein Typwort einer `DECLARE`-Zeile ist.
+pub fn typ_hinweis(wort: &str) -> String {
+    let w = wort.to_lowercase();
+    let vorschlag = match w.as_str() {
+        "string" => Some("TEXT (UTF-8, const char*) oder WTEXT (wchar_t*)"),
+        "double" => Some("FLOAT"),
+        "int" | "int32" | "dword" | "bool" => Some(if w == "dword" { "ULONG" } else { "LONG" }),
+        "uint" | "uint32" => Some("ULONG"),
+        "char" | "int8" => Some("BYTE"),
+        "word" | "uint16" => Some("USHORT"),
+        "int16" => Some("SHORT"),
+        "int64" | "longlong" => Some("INTEGER"),
+        "handle" | "hwnd" | "void" | "size_t" | "pointer" => Some("ZEIGER"),
+        _ => None,
+    };
+    let liste = "BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER";
+    match vorschlag {
+        Some(v) => format!("'{}' ist kein Typ fuer fremde Bibliotheken -- hier heisst das {} (moeglich: {})", wort.to_uppercase(), v, liste),
+        None => format!("'{}' ist kein Typ fuer fremde Bibliotheken (moeglich: {})", wort.to_uppercase(), liste),
+    }
+}
+
+/// Die Signatur als Text, wie der Compiler sie dem Aufruf mitgibt:
+/// Bibliothek, C-Name, Drachenhauch-Name, Rueckgabe (`v` = SUB) und die
+/// Parameter als `[&]zeichen:name`, durch Komma getrennt.
+pub fn signatur_text(lib: &str, c_name: &str, name: &str, rueck: char,
+                     params: &[(char, bool, String)]) -> String {
+    let ps: Vec<String> = params.iter()
+        .map(|(c, br, n)| format!("{}{}:{}", if *br { "&" } else { "" }, c, n)).collect();
+    format!("{lib}{t}{c_name}{t}{name}{t}{rueck}{t}{}", ps.join(","), t = TRENNER)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Param {
+    pub art: char,
+    pub byref: bool,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Signatur {
+    pub lib: String,
+    pub c_name: String,
+    pub name: String,
+    pub rueck: char,
+    pub params: Vec<Param>,
+}
+
+pub fn signatur_lesen(s: &str) -> Result<Signatur, String> {
+    let teile: Vec<&str> = s.split(TRENNER).collect();
+    if teile.len() != 5 { return Err("fremde Funktion: kaputte Signatur".into()); }
+    let rueck = teile[3].chars().next().unwrap_or('v');
+    let mut params = Vec::new();
+    if !teile[4].is_empty() {
+        for p in teile[4].split(',') {
+            let (byref, rest) = match p.strip_prefix('&') { Some(r) => (true, r), None => (false, p) };
+            let mut it = rest.splitn(2, ':');
+            let art = it.next().and_then(|a| a.chars().next()).ok_or("fremde Funktion: kaputte Signatur")?;
+            let name = it.next().unwrap_or("").to_string();
+            params.push(Param { art, byref, name });
+        }
+    }
+    Ok(Signatur { lib: teile[0].into(), c_name: teile[1].into(), name: teile[2].into(), rueck, params })
+}
+
+/// Die Dateinamen, unter denen eine Bibliothek gesucht wird -- in dieser
+/// Reihenfolge, jeder erst neben dem Programm, dann neben dhrt, dann wo das
+/// System sucht. Ein Name mit Pfad oder Endung gilt woertlich.
+pub fn dateinamen(name: &str, system: &str) -> Vec<String> {
+    let low = name.to_lowercase();
+    let woertlich = name.contains('/') || name.contains('\\')
+        || low.ends_with(".dll") || low.ends_with(".dylib") || low.ends_with(".so")
+        || low.contains(".so.") || low.contains(".framework");
+    if woertlich { return vec![name.to_string()]; }
+    match (low.as_str(), system) {
+        ("c" | "m", "windows") => vec!["ucrtbase.dll".into(), "msvcrt.dll".into()],
+        ("c", "macos") | ("m", "macos") => vec!["/usr/lib/libSystem.B.dylib".into()],
+        ("c", _) => vec!["libc.so.6".into(), "libc.so".into()],
+        ("m", _) => vec!["libm.so.6".into(), "libm.so".into()],
+        (_, "windows") => vec![format!("{}.dll", name)],
+        (_, "macos") => vec![format!("lib{}.dylib", name), format!("{}.dylib", name),
+                             format!("{n}.framework/{n}", n = name)],
+        _ => vec![format!("lib{}.so", name), format!("{}.so", name)],
+    }
+}
+
+fn system() -> &'static str {
+    if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" }
+}
+
+/// Wie ein Wert im Platz des Uebergangs liegt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Art { I8, U8, I16, U16, I32, U32, I64, Zeiger, F32, F64, Nichts }
+
+pub fn art_von(c: char, byref: bool) -> Art {
+    if byref { return Art::Zeiger; }
+    match c {
+        'b' => Art::I8, 'B' => Art::U8, 's' => Art::I16, 'S' => Art::U16,
+        'l' | 'o' => Art::I32, 'L' => Art::U32, 'q' => Art::I64,
+        'f' => Art::F32, 'd' => Art::F64,
+        'v' => Art::Nichts,
+        _ => Art::Zeiger,
+    }
+}
+
+/// Grenzen einer Ganzzahl-Art.
+fn grenzen(c: char) -> Option<(i64, i64)> {
+    Some(match c {
+        'b' => (i8::MIN as i64, i8::MAX as i64),
+        'B' => (0, u8::MAX as i64),
+        's' => (i16::MIN as i64, i16::MAX as i64),
+        'S' => (0, u16::MAX as i64),
+        'l' => (i32::MIN as i64, i32::MAX as i64),
+        'L' => (0, u32::MAX as i64),
+        _ => return None,
+    })
+}
+
+/// Eine Zahl, Kommazahl oder ein Wahrheitswert in den 8-Byte-Platz, wie C
+/// ihn erwartet. Ein Wert, der nicht passt, ist ein Fehler -- still
+/// abgeschnitten saehe die Bibliothek eine andere Zahl.
+pub fn zahl_platz(c: char, v: &Value) -> Result<u64, String> {
+    match c {
+        'f' | 'd' => {
+            let x = match v {
+                Value::Float(f) => *f,
+                Value::Int(i) => *i as f64,
+                _ => return Err(format!("erwartet eine Zahl ({}), erhalten {}", typ_name(c), v.type_name())),
+            };
+            Ok(if c == 'f' { (x as f32).to_bits() as u64 } else { x.to_bits() })
+        }
+        'o' => match v {
+            Value::Bool(b) => Ok(*b as u64),
+            _ => Err(format!("erwartet einen Wahrheitswert (BOOLEAN), erhalten {}", v.type_name())),
+        },
+        'z' => match v {
+            Value::Int(i) => Ok(*i as u64),
+            Value::Nil => Ok(0),
+            _ => Err(format!("erwartet einen Zeiger (ZEIGER, eine ganze Zahl), erhalten {}", v.type_name())),
+        },
+        _ => {
+            let i = match v {
+                Value::Int(i) => *i,
+                _ => return Err(format!("erwartet eine ganze Zahl ({}), erhalten {}", typ_name(c), v.type_name())),
+            };
+            if let Some((lo, hi)) = grenzen(c) {
+                if i < lo || i > hi {
+                    return Err(format!("{} passt nicht in {} ({} bis {})", i, typ_name(c), lo, hi));
+                }
+            }
+            Ok(i as u64)
+        }
+    }
+}
+
+/// Der Platz nach dem Aufruf zurueck in einen Wert (Rueckgabe und BYREF).
+pub fn platz_wert(c: char, p: u64) -> Value {
+    match c {
+        'b' => Value::Int(p as u8 as i8 as i64),
+        'B' => Value::Int(p as u8 as i64),
+        's' => Value::Int(p as u16 as i16 as i64),
+        'S' => Value::Int(p as u16 as i64),
+        'l' => Value::Int(p as u32 as i32 as i64),
+        'L' => Value::Int(p as u32 as i64),
+        'o' => Value::Bool(p as u32 != 0),
+        'f' => Value::Float(f32::from_bits(p as u32) as f64),
+        'd' => Value::Float(f64::from_bits(p)),
+        'v' => Value::Nil,
+        _ => Value::Int(p as i64),
+    }
+}
+
+/// `wchar_t` ist unter Windows 16 Bit breit (UTF-16), sonst 32 Bit.
+#[cfg(windows)]
+type WZeichen = u16;
+#[cfg(not(windows))]
+type WZeichen = u32;
+
+fn breit_kodieren(s: &str) -> Vec<WZeichen> {
+    #[cfg(windows)]
+    let mut v: Vec<WZeichen> = s.encode_utf16().collect();
+    #[cfg(not(windows))]
+    let mut v: Vec<WZeichen> = s.chars().map(|c| c as u32).collect();
+    v.push(0);
+    v
+}
+
+/// Text aus einem Zeiger der Bibliothek (NULL = leer). Kopiert, gibt nichts frei.
+unsafe fn text_aus(p: u64, breit: bool) -> String {
+    if p == 0 { return String::new(); }
+    if breit {
+        let z = p as *const WZeichen;
+        let mut n = 0usize;
+        while *z.add(n) != 0 { n += 1; }
+        let s = std::slice::from_raw_parts(z, n);
+        #[cfg(windows)]
+        { String::from_utf16_lossy(s) }
+        #[cfg(not(windows))]
+        { s.iter().map(|&c| char::from_u32(c).unwrap_or('\u{fffd}')).collect() }
+    } else {
+        std::ffi::CStr::from_ptr(p as *const std::ffi::c_char).to_string_lossy().into_owned()
+    }
+}
+
+// ------------------------------------------------------------------ Uebergang
+
+#[cfg(feature = "ffi")]
+mod uebergang {
+    use super::Art;
+    use cranelift_codegen::ir::{types, AbiParam, InstBuilder, MemFlagsData, Type, UserFuncName};
+    use cranelift_codegen::settings::Configurable;
+    use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
+    use cranelift_jit::{JITBuilder, JITModule};
+    use cranelift_module::{default_libcall_names, Linkage, Module};
+    use std::collections::HashMap;
+
+    pub type Einstieg = unsafe extern "C" fn(*const u8, *const u64, *mut u64);
+
+    pub struct Bauer {
+        modul: JITModule,
+        fctx: FunctionBuilderContext,
+        fertig: HashMap<(Vec<Art>, Art), Einstieg>,
+    }
+
+    fn typ(a: Art, zeiger: Type) -> Type {
+        match a {
+            Art::I8 | Art::U8 => types::I8,
+            Art::I16 | Art::U16 => types::I16,
+            Art::I32 | Art::U32 => types::I32,
+            Art::I64 => types::I64,
+            Art::Zeiger | Art::Nichts => zeiger,
+            Art::F32 => types::F32,
+            Art::F64 => types::F64,
+        }
+    }
+
+    /// Kleine Ganzzahlen tragen ihre Erweiterung in der Signatur -- unter
+    /// System V und auf Apple-ARM verlaesst sich der Gerufene darauf.
+    fn abi(a: Art, zeiger: Type) -> AbiParam {
+        let p = AbiParam::new(typ(a, zeiger));
+        match a {
+            Art::I8 | Art::I16 | Art::I32 => p.sext(),
+            Art::U8 | Art::U16 | Art::U32 => p.uext(),
+            _ => p,
+        }
+    }
+
+    impl Bauer {
+        pub fn neu() -> Result<Bauer, String> {
+            let mut flags = cranelift_codegen::settings::builder();
+            flags.set("opt_level", "speed").map_err(|e| format!("Cranelift: {:?}", e))?;
+            let isa = cranelift_native::builder().map_err(|e| format!("Cranelift: {}", e))?
+                .finish(cranelift_codegen::settings::Flags::new(flags))
+                .map_err(|e| format!("Cranelift: {:?}", e))?;
+            let modul = JITModule::new(JITBuilder::with_isa(isa, default_libcall_names()));
+            Ok(Bauer { modul, fctx: FunctionBuilderContext::new(), fertig: HashMap::new() })
+        }
+
+        pub fn holen(&mut self, params: &[Art], rueck: Art) -> Result<Einstieg, String> {
+            let schluessel = (params.to_vec(), rueck);
+            if let Some(e) = self.fertig.get(&schluessel) { return Ok(*e); }
+            let zt = self.modul.target_config().pointer_type();
+            let mut sig = self.modul.make_signature();
+            for _ in 0..3 { sig.params.push(AbiParam::new(zt)); }
+            let mut ziel_sig = self.modul.make_signature();
+            for a in params { ziel_sig.params.push(abi(*a, zt)); }
+            if rueck != Art::Nichts { ziel_sig.returns.push(abi(rueck, zt)); }
+            let nr = self.fertig.len();
+            let id = self.modul.declare_function(&format!("ffi_{}", nr), Linkage::Local, &sig)
+                .map_err(|e| format!("Cranelift: {:?}", e))?;
+            let tc = self.modul.target_config();
+            let mut ctx = self.modul.make_context();
+            ctx.func.signature = sig;
+            ctx.func.name = UserFuncName::user(2, id.as_u32());
+            {
+                let mut fb = FunctionBuilder::new(&mut ctx.func, &mut self.fctx);
+                let b = fb.create_block();
+                fb.append_block_params_for_function_params(b);
+                fb.switch_to_block(b);
+                let p = fb.block_params(b).to_vec();
+                let mut args = Vec::with_capacity(params.len());
+                for (i, a) in params.iter().enumerate() {
+                    args.push(fb.ins().load(typ(*a, zt), MemFlagsData::trusted(), p[1], (i * 8) as i32));
+                }
+                let sref = fb.import_signature(ziel_sig);
+                let ruf = fb.ins().call_indirect(sref, p[0], &args);
+                if rueck != Art::Nichts {
+                    let w = fb.inst_results(ruf)[0];
+                    let w = match rueck {
+                        Art::I8 | Art::I16 | Art::I32 => fb.ins().sextend(types::I64, w),
+                        Art::U8 | Art::U16 | Art::U32 => fb.ins().uextend(types::I64, w),
+                        _ => w,
+                    };
+                    fb.ins().store(MemFlagsData::trusted(), w, p[2], 0);
+                }
+                fb.ins().return_(&[]);
+                fb.seal_all_blocks();
+                fb.finalize(tc);
+            }
+            self.modul.define_function(id, &mut ctx).map_err(|e| format!("Cranelift: {:?}", e))?;
+            self.modul.clear_context(&mut ctx);
+            self.modul.finalize_definitions().map_err(|e| format!("Cranelift: {:?}", e))?;
+            let z = self.modul.get_finalized_function(id);
+            let e: Einstieg = unsafe { std::mem::transmute::<*const u8, Einstieg>(z) };
+            self.fertig.insert(schluessel, e);
+            Ok(e)
+        }
+    }
+}
+
+// ------------------------------------------------------------------ Laden
+
+#[cfg(feature = "ffi")]
+struct Aufruf {
+    sig: Signatur,
+    ziel: *const u8,
+    einstieg: uebergang::Einstieg,
+}
+
+#[cfg(feature = "ffi")]
+#[derive(Default)]
+struct Zustand {
+    bauer: Option<uebergang::Bauer>,
+    /// Geladene Bibliotheken, je Name in der DECLARE-Zeile. Sie bleiben bis
+    /// zum Ende geladen -- ein Zeiger in sie hinein darf nie ins Leere zeigen.
+    libs: HashMap<String, Rc<libloading::Library>>,
+    aufrufe: HashMap<String, Rc<Aufruf>>,
+}
+
+#[cfg(feature = "ffi")]
+thread_local! {
+    static ZUSTAND: RefCell<Zustand> = RefCell::new(Zustand::default());
+}
+
+#[cfg(feature = "ffi")]
+fn bibliothek(name: &str) -> Result<Rc<libloading::Library>, String> {
+    let namen = dateinamen(name, system());
+    let mut orte: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(d) = std::env::current_dir() { orte.push(d); }
+    if let Some(d) = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf())) {
+        if !orte.contains(&d) { orte.push(d); }
+    }
+    let mut letzter = String::new();
+    for n in &namen {
+        let pfad = std::path::Path::new(n);
+        let mut kandidaten: Vec<std::path::PathBuf> = Vec::new();
+        if pfad.is_relative() {
+            for o in &orte {
+                let k = o.join(pfad);
+                if k.exists() { kandidaten.push(k); }
+            }
+        }
+        kandidaten.push(pfad.to_path_buf());
+        for k in kandidaten {
+            match unsafe { libloading::Library::new(&k) } {
+                Ok(l) => return Ok(Rc::new(l)),
+                Err(e) => letzter = e.to_string(),
+            }
+        }
+    }
+    let _ = letzter;
+    Err(format!("Bibliothek \"{}\" nicht gefunden (versucht: {} -- neben dem Programm, neben dhrt und wo das System sucht)",
+                name, namen.join(", ")))
+}
+
+#[cfg(feature = "ffi")]
+fn aufruf(text: &str) -> Result<Rc<Aufruf>, String> {
+    if let Some(a) = ZUSTAND.with(|z| z.borrow().aufrufe.get(text).cloned()) { return Ok(a); }
+    let sig = signatur_lesen(text)?;
+    let lib = match ZUSTAND.with(|z| z.borrow().libs.get(&sig.lib.to_lowercase()).cloned()) {
+        Some(l) => l,
+        None => {
+            let l = bibliothek(&sig.lib)?;
+            ZUSTAND.with(|z| z.borrow_mut().libs.insert(sig.lib.to_lowercase(), l.clone()));
+            l
+        }
+    };
+    let ziel: *const u8 = unsafe {
+        match lib.get::<unsafe extern "C" fn()>(sig.c_name.as_bytes()) {
+            Ok(f) => *f as *const u8,
+            Err(_) => return Err(format!("die Funktion '{}' gibt es in \"{}\" nicht (Gross/klein zaehlt{})",
+                                         sig.c_name, sig.lib,
+                                         if cfg!(windows) { "; Text-Funktionen der Windows-API heissen ...A oder ...W" } else { "" })),
+        }
+    };
+    let arten: Vec<Art> = sig.params.iter().map(|p| art_von(p.art, p.byref)).collect();
+    let rueck = art_von(sig.rueck, false);
+    let einstieg = ZUSTAND.with(|z| -> Result<_, String> {
+        let mut z = z.borrow_mut();
+        if z.bauer.is_none() { z.bauer = Some(uebergang::Bauer::neu()?); }
+        z.bauer.as_mut().unwrap().holen(&arten, rueck)
+    })?;
+    let a = Rc::new(Aufruf { sig, ziel, einstieg });
+    ZUSTAND.with(|z| z.borrow_mut().aufrufe.insert(text.to_string(), a.clone()));
+    Ok(a)
+}
+
+/// Der Befehl `__ffi(signatur, argumente...)`. Ohne BYREF das Ergebnis,
+/// mit BYREF ein Tupel `(ergebnis, letzter_byref, ..., erster_byref)` --
+/// so legt `UNPACK_TUPLE` die Werte in der Reihenfolge auf den Stapel, die
+/// das Zurueckschreiben des Compilers erwartet.
+pub fn rufen(a: &[Value]) -> Result<Value, String> {
+    // Ohne das Feature zuerst DAS sagen, vor jeder anderen Pruefung: die
+    // Probe von `--export --schlank` (`--fehlende`, 40 x NIL) erkennt einen
+    // fehlenden Befehl an "ist ohne das Feature" (vm::fehlt_im_bau).
+    #[cfg(not(feature = "ffi"))]
+    {
+        let name = match a.first() {
+            Some(Value::Str(t)) => signatur_lesen(t).map(|s| s.name).unwrap_or_default(),
+            _ => String::new(),
+        };
+        if cfg!(target_os = "emscripten") {
+            return Err(format!("{}: fremde Bibliotheken (DECLARE ... LIB) gibt es im Browser nicht", name));
+        }
+        return Err(format!("{}: fremde Bibliotheken (DECLARE ... LIB) gehen in diesem Bau nicht -- er ist ohne das Feature ffi gebaut", name));
+    }
+    #[cfg(feature = "ffi")]
+    {
+        let Some(Value::Str(text)) = a.first() else { return Err("fremde Funktion: Signatur fehlt".into()); };
+        let auf = match aufruf(text) {
+            Ok(x) => x,
+            Err(e) => {
+                let name = signatur_lesen(text).map(|s| s.name).unwrap_or_default();
+                return Err(format!("{}: {}", name, e));
+            }
+        };
+        rufen_mit(&auf, &a[1..])
+    }
+}
+
+#[cfg(feature = "ffi")]
+fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
+    let sig = &auf.sig;
+    if args.len() != sig.params.len() {
+        return Err(format!("{}: erwartet {} Argument(e), erhalten {}", sig.name, sig.params.len(), args.len()));
+    }
+    let n = args.len();
+    let mut plaetze = vec![0u64; n.max(1)];
+    // Was fuer die Dauer des Aufrufs leben muss: kopierte Texte und die
+    // Plaetze der BYREF-Werte (feste Groesse, damit ihre Adressen halten).
+    let mut texte: Vec<std::ffi::CString> = Vec::new();
+    let mut breite: Vec<Vec<WZeichen>> = Vec::new();
+    let mut ref_plaetze = vec![0u64; n.max(1)];
+    for (i, (p, v)) in sig.params.iter().zip(args).enumerate() {
+        let fehler = |e: String| format!("{}: Argument {} ({} AS {}): {}", sig.name, i + 1, p.name, typ_name(p.art), e);
+        if p.byref {
+            ref_plaetze[i] = zahl_platz(p.art, v).map_err(fehler)?;
+            plaetze[i] = (&mut ref_plaetze[i] as *mut u64) as u64;
+            continue;
+        }
+        plaetze[i] = match p.art {
+            't' => match v {
+                Value::Str(s) => {
+                    let c = std::ffi::CString::new(s.as_bytes())
+                        .map_err(|_| fehler("ein Nullzeichen mitten im Text -- C saehe nur den Anfang".into()))?;
+                    let z = c.as_ptr() as u64;
+                    texte.push(c);
+                    z
+                }
+                Value::Nil => 0,
+                _ => return Err(fehler(format!("erwartet einen Text (STRING), erhalten {}", v.type_name()))),
+            },
+            'w' => match v {
+                Value::Str(s) => {
+                    if s.contains('\0') {
+                        return Err(fehler("ein Nullzeichen mitten im Text -- C saehe nur den Anfang".into()));
+                    }
+                    let w = breit_kodieren(s);
+                    let z = w.as_ptr() as u64;
+                    breite.push(w);
+                    z
+                }
+                Value::Nil => 0,
+                _ => return Err(fehler(format!("erwartet einen Text (STRING), erhalten {}", v.type_name()))),
+            },
+            'p' => match v {
+                Value::Buffer(b) => unsafe { (*b.as_ptr()).as_mut_ptr() as u64 },
+                Value::Nil => 0,
+                _ => return Err(fehler(format!("erwartet einen BUFFER, erhalten {}", v.type_name()))),
+            },
+            c => zahl_platz(c, v).map_err(fehler)?,
+        };
+    }
+    let mut rueck = 0u64;
+    unsafe { (auf.einstieg)(auf.ziel, plaetze.as_ptr(), &mut rueck) };
+    drop(texte);
+    drop(breite);
+    let ergebnis = match sig.rueck {
+        't' => Value::str_rc(unsafe { text_aus(rueck, false) }),
+        'w' => Value::str_rc(unsafe { text_aus(rueck, true) }),
+        c => platz_wert(c, rueck),
+    };
+    if !sig.params.iter().any(|p| p.byref) { return Ok(ergebnis); }
+    let mut tupel = vec![ergebnis];
+    for (i, p) in sig.params.iter().enumerate().rev() {
+        if p.byref { tupel.push(platz_wert(p.art, ref_plaetze[i])); }
+    }
+    Ok(Value::Tuple(Rc::new(tupel)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn signatur_hin_und_zurueck() {
+        let t = signatur_text("user32", "MessageBoxW", "box", 'l',
+                              &[('z', false, "f".into()), ('w', false, "t".into()), ('l', true, "n".into())]);
+        let s = signatur_lesen(&t).unwrap();
+        assert_eq!(s.lib, "user32");
+        assert_eq!(s.c_name, "MessageBoxW");
+        assert_eq!(s.rueck, 'l');
+        assert_eq!(s.params.len(), 3);
+        assert!(s.params[2].byref);
+        assert_eq!(s.params[1], Param { art: 'w', byref: false, name: "t".into() });
+        let leer = signatur_lesen(&signatur_text("c", "getpid", "getpid", 'l', &[])).unwrap();
+        assert!(leer.params.is_empty());
+    }
+
+    #[test]
+    fn dateinamen_je_system() {
+        assert_eq!(dateinamen("user32", "windows"), vec!["user32.dll"]);
+        assert_eq!(dateinamen("c", "windows"), vec!["ucrtbase.dll", "msvcrt.dll"]);
+        assert_eq!(dateinamen("c", "linux")[0], "libc.so.6");
+        assert_eq!(dateinamen("m", "linux")[0], "libm.so.6");
+        assert_eq!(dateinamen("sqlite3", "linux"), vec!["libsqlite3.so", "sqlite3.so"]);
+        assert_eq!(dateinamen("sqlite3", "macos")[0], "libsqlite3.dylib");
+        assert_eq!(dateinamen("c", "macos"), vec!["/usr/lib/libSystem.B.dylib"]);
+        // Mit Endung oder Pfad woertlich.
+        assert_eq!(dateinamen("libfoo.so.6", "linux"), vec!["libfoo.so.6"]);
+        assert_eq!(dateinamen("lib/x.dll", "windows"), vec!["lib/x.dll"]);
+        assert_eq!(dateinamen("Mein.DLL", "windows"), vec!["Mein.DLL"]);
+    }
+
+    #[test]
+    fn zahlen_muessen_passen() {
+        assert_eq!(zahl_platz('l', &Value::Int(-1)).unwrap() as i64, -1);
+        assert!(zahl_platz('l', &Value::Int(1 << 40)).err().unwrap().contains("passt nicht in LONG"));
+        assert!(zahl_platz('L', &Value::Int(-1)).is_err());
+        assert_eq!(zahl_platz('L', &Value::Int(4294967295)).unwrap(), 4294967295);
+        assert!(zahl_platz('B', &Value::Int(256)).is_err());
+        assert!(zahl_platz('l', &Value::Float(1.0)).is_err());
+        assert!(zahl_platz('o', &Value::Int(1)).is_err());
+        assert_eq!(zahl_platz('d', &Value::Int(2)).unwrap(), 2.0f64.to_bits());
+        assert_eq!(zahl_platz('f', &Value::Float(1.5)).unwrap(), 1.5f32.to_bits() as u64);
+        assert_eq!(zahl_platz('z', &Value::Nil).unwrap(), 0);
+    }
+
+    #[test]
+    fn plaetze_zurueck() {
+        assert!(matches!(platz_wert('b', 0xff), Value::Int(-1)));
+        assert!(matches!(platz_wert('B', 0x1ff), Value::Int(255)));
+        assert!(matches!(platz_wert('l', 0xffff_ffff), Value::Int(-1)));
+        assert!(matches!(platz_wert('L', 0xffff_ffff), Value::Int(4294967295)));
+        assert!(matches!(platz_wert('o', 2), Value::Bool(true)));
+        assert!(matches!(platz_wert('f', 2.5f32.to_bits() as u64), Value::Float(x) if x == 2.5));
+    }
+
+    #[test]
+    fn typwoerter_und_hinweise() {
+        assert_eq!(typ_zeichen("ZEIGER"), Some('z'));
+        assert_eq!(typ_zeichen("ptr"), Some('z'));
+        assert_eq!(typ_zeichen("CStr"), Some('t'));
+        assert_eq!(typ_zeichen("wstr"), Some('w'));
+        assert_eq!(typ_zeichen("double"), None);
+        assert!(typ_hinweis("double").contains("FLOAT"));
+        assert!(typ_hinweis("string").contains("TEXT"));
+        assert!(typ_hinweis("dword").contains("ULONG"));
+    }
+
+    #[cfg(feature = "ffi")]
+    mod aufrufe {
+        use super::super::*;
+
+        extern "C" fn mischen(a: i8, b: u16, c: i32, d: f32, e: f64, f: i64) -> f64 {
+            a as f64 + b as f64 + c as f64 + d as f64 + e + f as f64
+        }
+        extern "C" fn neg8(x: i8) -> i8 { x.wrapping_neg() }
+        extern "C" fn verdoppeln(x: *mut i32) { unsafe { *x *= 2 } }
+        extern "C" fn laenge(s: *const std::ffi::c_char) -> usize {
+            unsafe { std::ffi::CStr::from_ptr(s).to_bytes().len() }
+        }
+        extern "C" fn hallo() -> *const std::ffi::c_char { b"hallo\0".as_ptr() as *const _ }
+        extern "C" fn breit(s: *const WZeichen) -> i32 {
+            let mut n = 0; unsafe { while *s.add(n) != 0 { n += 1; } } n as i32
+        }
+        extern "C" fn fuellen(p: *mut u8, n: i32) { for i in 0..n as usize { unsafe { *p.add(i) = i as u8 + 1; } } }
+        extern "C" fn ist_wahr(b: i32) -> i32 { (b != 0) as i32 * 7 }
+
+        fn fehler(r: Result<Value, String>) -> String { match r { Err(e) => e, Ok(_) => panic!("Fehler erwartet") } }
+
+        fn auf(ziel: *const u8, rueck: char, ps: &[(char, bool)]) -> Aufruf {
+            let params: Vec<Param> = ps.iter().map(|(a, b)| Param { art: *a, byref: *b, name: "x".into() }).collect();
+            let arten: Vec<Art> = params.iter().map(|p| art_von(p.art, p.byref)).collect();
+            let mut bauer = uebergang::Bauer::neu().unwrap();
+            let einstieg = bauer.holen(&arten, art_von(rueck, false)).unwrap();
+            std::mem::forget(bauer); // der Code muss leben bleiben
+            Aufruf { sig: Signatur { lib: "test".into(), c_name: "t".into(), name: "t".into(), rueck, params }, ziel, einstieg }
+        }
+
+        #[test]
+        fn zahlen_aller_breiten() {
+            let a = auf(mischen as *const u8, 'd', &[('b', false), ('S', false), ('l', false), ('f', false), ('d', false), ('q', false)]);
+            let r = rufen_mit(&a, &[Value::Int(-3), Value::Int(60000), Value::Int(-100000), Value::Float(0.5),
+                                    Value::Float(0.25), Value::Int(1 << 40)]).unwrap();
+            let soll = -3.0 + 60000.0 - 100000.0 + 0.5 + 0.25 + (1u64 << 40) as f64;
+            assert!(matches!(r, Value::Float(x) if x == soll));
+            let n = auf(neg8 as *const u8, 'b', &[('b', false)]);
+            assert!(matches!(rufen_mit(&n, &[Value::Int(5)]).unwrap(), Value::Int(-5)));
+            assert!(matches!(rufen_mit(&n, &[Value::Int(-128)]).unwrap(), Value::Int(-128)));
+            let w = auf(ist_wahr as *const u8, 'l', &[('o', false)]);
+            assert!(matches!(rufen_mit(&w, &[Value::Bool(true)]).unwrap(), Value::Int(7)));
+        }
+
+        #[test]
+        fn byref_text_und_buffer() {
+            let a = auf(verdoppeln as *const u8, 'v', &[('l', true)]);
+            let r = rufen_mit(&a, &[Value::Int(21)]).unwrap();
+            match r { Value::Tuple(t) => { assert!(matches!(t[0], Value::Nil)); assert!(matches!(t[1], Value::Int(42))); }
+                      _ => panic!("Tupel erwartet") }
+            let l = auf(laenge as *const u8, 'z', &[('t', false)]);
+            assert!(matches!(rufen_mit(&l, &[Value::str_rc("Drachenhauch")]).unwrap(), Value::Int(12)));
+            assert!(fehler(rufen_mit(&l, &[Value::str_rc("a\0b")])).contains("Nullzeichen"));
+            let h = auf(hallo as *const u8, 't', &[]);
+            assert!(matches!(rufen_mit(&h, &[]).unwrap(), Value::Str(s) if s.as_str() == "hallo"));
+            let b = auf(breit as *const u8, 'l', &[('w', false)]);
+            assert!(matches!(rufen_mit(&b, &[Value::str_rc("Grüße")]).unwrap(), Value::Int(5)));
+            let f = auf(fuellen as *const u8, 'v', &[('p', false), ('l', false)]);
+            let puf = Rc::new(RefCell::new(vec![0u8; 4]));
+            rufen_mit(&f, &[Value::Buffer(puf.clone()), Value::Int(4)]).unwrap();
+            assert_eq!(*puf.borrow(), vec![1, 2, 3, 4]);
+            assert!(fehler(rufen_mit(&f, &[Value::Buffer(puf), Value::Int(1 << 40)])).contains("Argument 2"));
+        }
+    }
+}

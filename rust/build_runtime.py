@@ -149,7 +149,7 @@ def main() -> int:
     # (LAUFZEITEN unten) lassen sie weg.
     feats += ["pdf", "physik"]
     if "--no-data" not in args:
-        feats += ["db", "net", "http", "smtp", "jit"]
+        feats += ["db", "net", "http", "smtp", "jit", "ffi"]
     if "--hardware" in args:
         feats += ["serial", "usb", "bt", "wifi", "midi"]
         if system != "Windows" and "wifi" in feats:
@@ -171,8 +171,8 @@ def main() -> int:
 # was das Programm benutzt. Der Maschinencode bleibt in beiden -- ohne ihn
 # rechneten Programme bis zu hundertmal langsamer.
 LAUFZEITEN = [
-    ("konsole", ["db", "net", "http", "smtp", "jit"]),
-    ("spiel", ["graphics", "dialogs", "physik", "jit"]),
+    ("konsole", ["db", "net", "http", "smtp", "jit", "ffi"]),
+    ("spiel", ["graphics", "dialogs", "physik", "jit", "ffi"]),
 ]
 
 

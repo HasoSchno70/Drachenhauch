@@ -552,7 +552,7 @@ fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
 /// damit ein Tippfehler im DH-Programm NICHT die Runtime abstuerzen laesst,
 /// sondern einen klaren Laufzeitfehler liefert.
 /// Zahl der Befehlsfamilien in `Vm::familie_rufen`; die letzte sind die reinen.
-pub(crate) const BUILTIN_FAMILIEN: u8 = 28;
+pub(crate) const BUILTIN_FAMILIEN: u8 = 29;
 
 fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
     use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -1915,6 +1915,7 @@ impl<'p> Vm<'p> {
             25 => self.try_video(name, a),
             26 => self.try_gui(name, a),
             27 => self.try_graphics(name, a),
+            28 => if name == "__ffi" { crate::ffi::rufen(a).map(Some) } else { Ok(None) },
             _ => match safe_call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),
                 Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),
