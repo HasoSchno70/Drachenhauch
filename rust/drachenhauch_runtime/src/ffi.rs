@@ -86,10 +86,11 @@ pub fn dh_typ(c: char) -> &'static str {
     }
 }
 
-/// Hinweis zu einem Wort, das kein Typwort einer `DECLARE`-Zeile ist.
-pub fn typ_hinweis(wort: &str) -> String {
+/// Das Typwort, das jemand mit einem C- oder BASIC-Namen meint (`int` ->
+/// LONG); `None`, wenn das Wort keinem bekannten Namen entspricht.
+pub fn typ_vorschlag(wort: &str) -> Option<&'static str> {
     let w = wort.to_lowercase();
-    let vorschlag = match w.as_str() {
+    match w.as_str() {
         "string" => Some("TEXT (UTF-8, const char*) oder WTEXT (wchar_t*)"),
         "double" => Some("FLOAT"),
         "int" | "int32" | "dword" | "bool" => Some(if w == "dword" { "ULONG" } else { "LONG" }),
@@ -100,7 +101,12 @@ pub fn typ_hinweis(wort: &str) -> String {
         "int64" | "longlong" => Some("INTEGER"),
         "handle" | "hwnd" | "void" | "size_t" | "pointer" => Some("ZEIGER"),
         _ => None,
-    };
+    }
+}
+
+/// Hinweis zu einem Wort, das kein Typwort einer `DECLARE`-Zeile ist.
+pub fn typ_hinweis(wort: &str) -> String {
+    let vorschlag = typ_vorschlag(wort);
     let liste = "BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER";
     match vorschlag {
         Some(v) => format!("'{}' ist kein Typ fuer fremde Bibliotheken -- hier heisst das {} (moeglich: {})", wort.to_uppercase(), v, liste),

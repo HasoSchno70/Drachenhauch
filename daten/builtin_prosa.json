@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2058,
+ "count": 2060,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1360,6 +1360,7 @@
   "NOTIFY_CLICKED": "wurde die Mitteilung in diesem Bild angeklickt? (Windows)",
   "NUMFMT$": "grosse Zahlen kurz schreiben (1.2K, 3.4M) — für Punktestände und Idle-Spiele",
   "OCT$": "INTEGER als Binär-/Oktalstring (mit Vorzeichen)",
+  "OFFSETOF": "Stelle eines Feldes im Struct in Bytes, beim Übersetzen gerechnet",
   "OPENDOC": "Öffnet eine lokale Datei mit ihrem Standardprogramm – die geschriebene PDF im Betrachter, die Tabelle in der Tabellenkalkulation.",
   "OPENFILE": "Modi: \"r\" lesen, \"w\" neu schreiben, \"a\" anhängen",
   "OPENURL": "Öffnet eine Adresse im Standardbrowser – etwa die Anleitung oder die Seite des Spiels.",
@@ -1680,6 +1681,7 @@
   "SHUFFLE": "mischt ein 1D-Array IN PLACE (Fisher-Yates)",
   "SIGN": "-1, 0 oder 1",
   "SIN": "Trigonometrie (x in Radiant)",
+  "SIZEOF": "Größe eines STRUCT … LAYOUT C oder eines Typworts in Bytes, beim Übersetzen gerechnet",
   "SKYBOX": "das Panorama auch als Hintergrund zeigen (braucht LIGHT_ENV_HDR)",
   "SKYBOX_IMAGE": "Himmel aus einem gewöhnlichen Bild statt einer .hdr-Datei: sechs Felder als Streifen (6:1 oder 1:6) oder als Kreuz (4:3 oder 3:4), Reihenfolge +X, −X, +Y, −Y, +Z, −Z; zeigt ihn gleich an, SKYBOX(FALSE) blendet ihn aus",
   "SLEEP": "wartet ms Millisekunden, ohne dass das Fenster einfriert",

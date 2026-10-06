@@ -958,6 +958,10 @@ fn char_h(v: &Value, fn_: &str) -> Result<Rc<RefCell<crate::controller::CharCont
 }
 
 pub fn call_builtin(name: &str, args: &[Value]) -> Option<R> {
+    // Felder von `STRUCT ... LAYOUT C` (cstruct.rs) -- nur der Compiler setzt sie ein.
+    if name.starts_with("__struct_") {
+        if let Some(r) = crate::cstruct::befehl(name, args) { return Some(r); }
+    }
     Some(call_inner(name, args))
 }
 

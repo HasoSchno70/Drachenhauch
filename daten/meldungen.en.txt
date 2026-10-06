@@ -1617,5 +1617,43 @@ ein Rueckruf kam aus einem anderen Faden und wurde nicht ausgefuehrt -- Drachenh
 Rueckruf {}: keine laufende VM	callback {}: no running VM
 der Rueckruf {} soll {} liefern: {}	the callback {} should return {}: {}
 Fehler im Rueckruf {}: {}	error in the callback {}: {}
+STRUCT {} LAYOUT C enthaelt sich selbst (ueber {}) -- ein Struct kann sich nicht einbetten, nur einen ZEIGER auf sich haben	STRUCT {} LAYOUT C contains itself (via {}) -- a struct cannot embed itself, only hold a ZEIGER to itself
+STRUCT {}: das Feld '{}' steht zweimal da	STRUCT {}: the field '{}' appears twice
+STRUCT {}: '{}' ist weder ein Typwort noch ein STRUCT ... LAYOUT C	STRUCT {}: '{}' is neither a type word nor a STRUCT ... LAYOUT C
+STRUCT {}: {} geht in einem Struct nicht	STRUCT {}: {} does not work in a struct
+{}: der Struct ist NIL -- er bekommt seinen Speicher mit DIM	{}: the struct is NIL -- it gets its memory with DIM
+{}: der Puffer ist {} Bytes lang, das Feld liegt bei {}..{} -- ist es ein Puffer des richtigen Structs?	{}: the buffer is {} bytes long, the field lies at {}..{} -- is it a buffer of the right struct?
+{}: Index {} liegt ausserhalb 0..{}	{}: index {} is outside 0..{}
+{}: der Index muss INTEGER sein, erhalten {}	{}: the index must be an INTEGER, got {}
+{}: der Text braucht {} Bytes in UTF-8, im Feld ist Platz fuer {}	{}: the text needs {} bytes in UTF-8, the field has room for {}
+{}: der Text braucht {} Zeichen, im Feld ist Platz fuer {}	{}: the text needs {} characters, the field has room for {}
+Erwartet C nach LAYOUT -- STRUCT name LAYOUT C legt die Felder wie ein C-Compiler	Expected C after LAYOUT -- STRUCT name LAYOUT C lays out the fields like a C compiler
+Erwartet 1, 2, 4, 8 oder 16 nach PACK	Expected 1, 2, 4, 8 or 16 after PACK
+Erwartet ein Feld: name AS typ	Expected a field: name AS type
+Erwartet die Zahl der Elemente als feste Zahl ab 1, etwa werte[4] AS LONG	Expected the number of elements as a fixed number from 1, e.g. werte[4] AS LONG
+Erwartet AS nach dem Feldnamen	Expected AS after the field name
+Erwartet einen Typ (LONG, ZEIGER, TEXT * 32, ein anderer STRUCT ... LAYOUT C)	Expected a type (LONG, ZEIGER, TEXT * 32, another STRUCT ... LAYOUT C)
+Ein Text im Struct hat eine feste Laenge: TEXT * 32 (Zeichen) -- ein Zeiger auf Text ist ZEIGER	A text in a struct has a fixed length: TEXT * 32 (characters) -- a pointer to text is ZEIGER
+Erwartet die Zahl der Zeichen nach TEXT *	Expected the number of characters after TEXT *
+Ein BUFFER kann kein Feld sein -- ein Zeiger darauf ist ZEIGER (BUFFER_ZEIGER), ein Struct darin ist ein anderer STRUCT ... LAYOUT C	A BUFFER cannot be a field -- a pointer to it is ZEIGER (BUFFER_ZEIGER), a struct inside is another STRUCT ... LAYOUT C
+Ein STRUCT ... LAYOUT C braucht mindestens ein Feld	A STRUCT ... LAYOUT C needs at least one field
+BYREF braucht ein Struct nicht -- die Bibliothek bekommt ohnehin einen Zeiger auf seine Bytes	A struct does not need BYREF -- the library gets a pointer to its bytes anyway
+STRUCT {} ist zweimal deklariert -- eines von beiden umbenennen	STRUCT {} is declared twice -- rename one of them
+STRUCT ... LAYOUT C gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block	STRUCT ... LAYOUT C belongs at the top level of the program, not inside a subroutine or a block
+Ein Feld von {} gibt es nicht -- ein STRUCT ... LAYOUT C mit einem Feld davon schon: STRUCT Liste LAYOUT C / e[10] AS {} / END STRUCT	There is no array of {} -- but a STRUCT ... LAYOUT C with an array field of it: STRUCT Liste LAYOUT C / e[10] AS {} / END STRUCT
+{}.{}: ein STRUCT ... LAYOUT C kann (noch) kein Feld einer Klasse sein -- er lebt in einer Variable oder einem Parameter (DIM {} AS {}), oder das Feld ist ein BUFFER mit BUFFER_NEW(SIZEOF({}))	{}.{}: a STRUCT ... LAYOUT C cannot be a class field (yet) -- it lives in a variable or parameter (DIM {} AS {}), or the field is a BUFFER with BUFFER_NEW(SIZEOF({}))
+SIZEOF: erwartet einen Typ -- SIZEOF(SYSTEMTIME) fuer einen STRUCT ... LAYOUT C oder SIZEOF(LONG) fuer ein Typwort	SIZEOF: expects a type -- SIZEOF(SYSTEMTIME) for a STRUCT ... LAYOUT C or SIZEOF(LONG) for a type word
+SIZEOF: '{}' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER ...)	SIZEOF: '{}' is neither a STRUCT ... LAYOUT C nor a type word (LONG, ZEIGER ...)
+{}: erwartet einen Struct und ein Feld -- OFFSETOF(SYSTEMTIME, monat)	{}: expects a struct and a field -- OFFSETOF(SYSTEMTIME, monat)
+{}: '{}' ist kein STRUCT ... LAYOUT C	{}: '{}' is not a STRUCT ... LAYOUT C
+{}: {} hat kein Feld '{}' (Felder: {})	{}: {} has no field '{}' (fields: {})
+{} hat kein Feld '{}' (Felder: {})	{} has no field '{}' (fields: {})
+{} ist ein Feld von {} Elementen -- erst ein Index: {}[0].{}	{} is an array of {} elements -- index it first: {}[0].{}
+{} ist kein Struct, es hat kein Feld '{}'	{} is not a struct, it has no field '{}'
+{} ist kein Feld von Elementen -- ohne Index	{} is not an array -- without an index
+{}: ein Feld im Struct hat genau einen Index	{}: an array in a struct has exactly one index
+{} ist ein Feld von {} Elementen -- mit Index: {}[0]	{} is an array of {} elements -- with an index: {}[0]
+{} ist ein Struct -- lies und schreib seine Felder ({}.feld); seine Bytes liegen im Puffer ab OFFSETOF	{} is a struct -- read and write its fields ({}.field); its bytes lie in the buffer from OFFSETOF
+(moeglich: ein STRUCT ... LAYOUT C oder 	(possible: a STRUCT ... LAYOUT C or 
 TASK: der Auftrag ist abgestuerzt{} -- er hat keine Antwort mehr geschickt; das Hauptprogramm laeuft weiter	TASK: the task crashed{} -- it sent no answer any more; the main program keeps running
  (Rueckgabe {})	 (exit code {})

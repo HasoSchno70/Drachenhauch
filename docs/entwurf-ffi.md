@@ -2,7 +2,7 @@
 
 Stand 2026-10-05. Punkt „Kein Aufruf fremder DLLs/.so“ aus
 [entwurf-anwendungen-und-tempo.md](entwurf-anwendungen-und-tempo.md).
-**Stufe 1 ist gebaut (2026-10-05), Stufen 2 und 3 am 2026-10-06** -- Handbuch [ffi.md](ffi.md). Die
+**Stufe 1 ist gebaut (2026-10-05), Stufen 2 und 3 am 2026-10-06, die Struct-Lage am selben Tag** -- Handbuch [ffi.md](ffi.md). Die
 Syntax unten steht weiter in Textblöcken, weil es die Fassung des Entwurfs
 ist.
 
@@ -162,7 +162,8 @@ PRINT BUFFER_GET_U16(st, 0)                     ' das Jahr
 
 Die Lage der Felder (Ausrichtung!) rechnet man selbst. Ein eigenes
 `STRUCT … LAYOUT C` wäre bequemer, aber eine eigene Baustelle -- erst, wenn
-sich zeigt, dass man es oft braucht.
+sich zeigt, dass man es oft braucht. *(Gebaut am 2026-10-06, siehe „Stand
+Struct-Lage“ unten.)*
 
 ### 6. Rückrufe (offen: ob in der ersten Fassung)
 
@@ -268,6 +269,28 @@ Rückruf, der selbst die C-Bibliothek ruft) und `EnumWindows` (mit
 gebundener Methode). Gegenproben: ohne die Antwort des Rückrufs und ohne
 das Melden des Fehlers fallen die vier Fälle; der Einstieg selbst hat einen
 Rust-Test mit allen Breiten.
+
+**Stand Struct-Lage (2026-10-06):** `STRUCT name LAYOUT C [PACK n]` mit
+Feldern `name[ [n] ] AS typ` (DIM davor erlaubt). Typen sind die der
+DECLARE-Zeile ohne `BUFFER`, dazu `TEXT * n`/`WTEXT * n` und ein anderer
+solcher Struct (beliebige Reihenfolge, kein Kreis). **Zur Laufzeit gibt es
+keinen neuen Werttyp:** eine Variable dieses Typs ist ein BUFFER in der
+Größe des Structs (`DIM` legt ihn an, voller Nullen); der Compiler kennt die
+Lage (`cstruct::lagen_rechnen`, Regeln von C, `PACK` wie `#pragma pack`)
+und übersetzt `st.feld`, `st.a[i].b` und Zuweisungen daran in die internen
+Befehle `__struct_get`/`__struct_set` mit fester Stelle; ein Laufzeit-Index
+geht über `__struct_index` (Grenze). Lesen und Schreiben prüfen wie die
+DECLARE-Zeile (`zahl_platz`/`platz_wert`), dazu die Länge des Puffers. Der
+Typname steht als angesagter Typ der Variable (`angesagter_typ`), die VM
+reicht ihn durch wie jeden unbekannten. `SIZEOF(typ)`/`OFFSETOF(struct,
+feld)` werden beim Übersetzen zu Zahlen. Ein DECLARE-Parameter `AS name`
+geht als BUFFER. **Nicht** (noch): Struct als Feld einer Klasse, `ARRAY OF`
+Struct und `DIM x[n] AS` Struct (ein Feld von Structs ist ein Struct mit
+einem Feld davon), Bitfelder, Struct als Wert übergeben. Das Modul braucht
+das Feature `ffi` nicht -- es fasst nur den eigenen Puffer an und taugt so
+auch für Dateiformate. Geprüft in `tests/pruef/ffi_struct.dhtest` (10) und
+mit Rust-Tests der Lage; Gegenproben ohne Ausrichtung bzw. ohne
+Laufzeit-Index lassen vier Fälle fallen.
 
 ## Die Fragen dazu (entschieden, siehe oben)
 

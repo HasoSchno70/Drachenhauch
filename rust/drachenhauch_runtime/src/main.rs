@@ -98,6 +98,7 @@ mod video;
 mod jit;
 #[cfg_attr(not(feature = "ffi"), allow(dead_code))]
 mod ffi;
+mod cstruct;
 #[cfg(feature = "serial")]
 mod serial;
 #[cfg(feature = "serial")]
@@ -747,6 +748,22 @@ fn declare_woerter(toks: &[lexer::Token]) -> std::collections::HashSet<usize> {
                         || (nach_as && ffi::typ_zeichen(&w).is_some()) {
                         aus.insert(j);
                     }
+                }
+                j += 1;
+            }
+            i = j;
+        }
+        // `STRUCT name LAYOUT C [PACK n]` bis `END STRUCT`: LAYOUT, C, PACK
+        // und die Typwoerter hinter AS (auch TEXT/WTEXT vor `* n`).
+        if zeilenanfang && i < toks.len() && toks[i].tt == Tt::Struct
+            && toks.get(i + 2).is_some_and(|t| t.tt == Tt::Ident && wert(t) == "layout") {
+            aus.insert(i + 2);
+            let mut j = i + 3;
+            if toks.get(j).is_some_and(|t| t.tt == Tt::Ident && wert(t) == "c") { aus.insert(j); j += 1; }
+            if toks.get(j).is_some_and(|t| t.tt == Tt::Ident && wert(t) == "pack") { aus.insert(j); }
+            while j < toks.len() && !(toks[j].tt == Tt::End && toks.get(j + 1).is_some_and(|t| t.tt == Tt::Struct)) {
+                if toks[j].tt == Tt::Ident && toks[j - 1].tt == Tt::As && ffi::typ_zeichen(&wert(&toks[j])).is_some() {
+                    aus.insert(j);
                 }
                 j += 1;
             }

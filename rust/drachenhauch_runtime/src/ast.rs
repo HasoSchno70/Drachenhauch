@@ -150,6 +150,11 @@ pub enum Node {
     /// `anzeige` = der Name in der Schreibweise des Quelltexts (fuer Meldungen).
     DeclareLib { name: String, anzeige: String, lib: String, alias: Option<String>,
                  params: Vec<(String, String, bool)>, ret: Option<String> },
+    /// `STRUCT name LAYOUT C [PACK n]` -- ein C-Struct ueber BUFFER
+    /// (cstruct.rs). `felder` = (Name, Typ, Anzahl): Typ ist ein Typwort
+    /// (klein), `text*n`/`wtext*n` oder `#name` (ein anderer solcher Struct);
+    /// Anzahl 0 = einzeln.
+    StructLayout { name: String, pack: Option<u32>, felder: Vec<(String, String, u32)> },
     ExprStmt { expr: Box<Node> },
     SubDecl { name: String, params: Vec<Param>, body: Vec<Node> },
     FunctionDecl { name: String, params: Vec<Param>, return_type: String, body: Vec<Node> },
@@ -306,6 +311,12 @@ impl Node {
                     .collect();
                 obj("EnumDecl", vec![("name", json!(name)), ("members", Value::Array(ms))])
             }
+            StructLayout { name, pack, felder } => obj("StructLayout", vec![
+                ("name", Value::String(name.clone())),
+                ("pack", pack.map(|p| Value::from(p)).unwrap_or(Value::Null)),
+                ("felder", Value::Array(felder.iter().map(|(n, t, a)| Value::Array(vec![
+                    Value::String(n.clone()), Value::String(t.clone()), Value::from(*a)])).collect())),
+            ]),
             DeclareLib { name, lib, alias, params, ret, .. } => obj("DeclareLib", vec![
                 ("name", json!(name)), ("lib", json!(lib)), ("alias", json!(alias)),
                 ("params", Value::Array(params.iter()
