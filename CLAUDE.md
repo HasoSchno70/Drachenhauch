@@ -1476,7 +1476,11 @@ Tooltip. `dhrt test` setzt jetzt jedem Kind `DHRT_OHNE_EINGABE=1`
 (`stillfenster.rs`): GLFW_FOCUS_ON_SHOW aus, GLFW_MOUSE_PASSTHROUGH an
 (nachgeschickte Nachrichten kommen trotzdem an), und unter Windows gibt
 FLIP den Vordergrund an das Fenster zurueck, das ihn beim Anlegen hatte
-(Maximieren und WINDOW_FOCUS aktivieren sonst). "0" schaltet ab. Nebenfund:
+(Maximieren und WINDOW_FOCUS aktivieren sonst). "0" schaltet ab.
+`WINDOW_FOCUSED()` liefert dann TRUE -- ein Fall der IDE (Aufrufzaehler) hing
+am echten Fokus und waere schon vorher gefallen, haette jemand woanders
+hingeklickt. Ein `' --- seriell` als KOMMENTAR galt nie (`werkzeug_ide_karte`
+und `_korrektur` liefen so parallel) und ist jetzt ein Fehler. Nebenfund:
 die Schnellkorrektur der IDE merkte sich eine NUMMER in `probKorr`, die jede
 Pruefung neu baut -- aenderte sich der Text bei offener Auswahl, brach Enter
 mit einem JSON-Fehler ab; jetzt gilt ein Angebot nur fuer seinen Text
