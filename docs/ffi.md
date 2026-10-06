@@ -110,6 +110,19 @@ Ein Name mit Endung oder Pfad gilt wörtlich (`"libsqlite3.so.0"`,
 `"lib/messgeraet.dll"`). Gesucht wird **neben dem Programm, neben `dhrt`
 (bzw. der exportierten Exe), dann wo das System sucht.**
 
+* **Mehrere Namen** stehen durch `|` getrennt: `LIB "libgtk-3-0.dll|libgtk-3.so.0"`.
+  Der erste, der sich laden lässt, gilt -- so trägt eine Zeile die Namen
+  aller Systeme, wo eine Bibliothek nicht überall gleich heißt.
+* **Statt des Textes eine CONST:** `CONST GTK = "libgtk-3-0.dll|libgtk-3.so.0"`
+  und dann `LIB GTK` in jeder Zeile. Die CONST braucht einen festen Text;
+  in einer Datei mit Namensraum gehört sie dieser Datei.
+* **Abhängigkeiten unter Windows:** Bei einem Pfad (`LIB "C:/Programme/X/x.dll"`)
+  sucht Windows die Bibliotheken, die diese DLL selbst braucht, zuerst in
+  ihrem Ordner -- der muss nicht im PATH stehen.
+* Liegt eine Datei unter dem Namen da, lässt sich aber nicht laden, sagt
+  die Meldung das samt dem Grund des Systems: meist fehlt ihr selbst eine
+  Bibliothek, oder sie ist für 32 Bit gebaut.
+
 **Geladen wird beim ersten Aufruf**, nicht beim Start: ein Programm, das den
 Zweig nie nimmt, läuft auch ohne die Bibliothek. Fehlt sie oder die Funktion
 darin, ist das ein gewöhnlicher Laufzeitfehler mit den versuchten Namen --
@@ -325,6 +338,62 @@ PRINT TEXT_AUS_ZEIGER$(e.name), SIZEOF(Eintrag)   ' Drache  16
 Auch ein Element, das eine Bibliothek per Zeiger übergibt -- etwa die zwei
 Elemente im Vergleich von `qsort` --, liest man durch die Lage:
 `DIM a AS Punkt : a = BUFFER_AUS_ZEIGER(zeiger, SIZEOF(Punkt))`.
+
+## GTK
+
+[GTK](https://www.gtk.org/) ist die Bibliothek, mit der unter Linux die
+meisten Programme ihre Fenster zeichnen. Mit `DECLARE … LIB` und Rückrufen
+lässt sie sich direkt benutzen -- das Beispiel `207_gtk.dh` baut ein Fenster
+mit Eingabefeld, Knöpfen und einer Beschriftung:
+
+```basic
+CONST GTK = "libgtk-3-0.dll|libgtk-3.so.0|libgtk-3.0.dylib"
+CONST GOBJECT = "libgobject-2.0-0.dll|libgobject-2.0.so.0|libgobject-2.0.0.dylib"
+
+DECLARE FUNCTION gtk_init_check LIB GTK (argc AS ZEIGER, argv AS ZEIGER) AS BOOLEAN
+DECLARE FUNCTION gtk_window_new LIB GTK (art AS LONG) AS ZEIGER
+DECLARE FUNCTION gtk_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
+DECLARE SUB gtk_container_add LIB GTK (behaelter AS ZEIGER, kind AS ZEIGER)
+DECLARE SUB gtk_widget_show_all LIB GTK (w AS ZEIGER)
+DECLARE SUB gtk_main LIB GTK ()
+DECLARE SUB gtk_main_quit LIB GTK ()
+DECLARE FUNCTION signal LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+
+SUB geklickt(knopf AS INTEGER, daten AS INTEGER)
+    PRINT "geklickt"
+END SUB
+
+SUB zu(fenster AS INTEGER, daten AS INTEGER)
+    gtk_main_quit()
+END SUB
+
+IF gtk_init_check(0, 0) THEN
+    DIM fenster AS INTEGER
+    fenster = gtk_window_new(0)
+    DIM knopf AS INTEGER
+    knopf = gtk_button_new_with_label("Klick mich")
+    gtk_container_add(fenster, knopf)
+    signal(knopf, "clicked", geklickt, 0, 0, 0)
+    signal(fenster, "destroy", zu, 0, 0, 0)
+    gtk_widget_show_all(fenster)
+    gtk_main()                     ' die Schleife von GTK; Rueckrufe kommen von hier
+END IF
+```
+
+* **`g_signal_connect` ist in C nur ein Makro** -- gerufen wird
+  `g_signal_connect_data`. Weil jede Signalart einen anderen Rückruf hat,
+  bekommt jede Form eine eigene `DECLARE`-Zeile mit `ALIAS` auf dieselbe
+  C-Funktion.
+* `gtk_main` blockiert, bis `gtk_main_quit` gerufen wird; die Rückrufe laufen
+  auf dem Faden des Programms. Ein raylib-Fenster daneben gibt es nicht --
+  ein Programm nimmt GTK oder die eigene gui.
+* GTK muss auf dem Rechner sein: unter Linux fast immer, unter macOS über
+  Homebrew, unter Windows über MSYS2 oder aus einem Programm, das es
+  mitbringt (das Beispiel versucht das von Inkscape).
+* Funktionen mit variabler Argumentzahl (`g_object_set`, `g_object_new`)
+  gehen nicht; meist gibt es feste Gegenstücke (`gtk_widget_set_size_request`).
 
 ## Rückrufe
 

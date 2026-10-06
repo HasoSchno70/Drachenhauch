@@ -744,6 +744,7 @@ fn declare_woerter(toks: &[lexer::Token]) -> std::collections::HashSet<usize> {
                     // ein Parameter darf `lib` heissen.
                     let folgt = toks.get(j + 1).map(|t| t.tt);
                     if (matches!(w.as_str(), "lib" | "alias") && folgt == Some(Tt::Str))
+                        || (w == "lib" && j == i + 3 && folgt == Some(Tt::Ident))
                         || (w == "byval" && folgt == Some(Tt::Ident))
                         || (nach_as && ffi::typ_zeichen(&w).is_some()) {
                         aus.insert(j);

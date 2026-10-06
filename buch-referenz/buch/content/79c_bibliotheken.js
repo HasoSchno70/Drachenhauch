@@ -16,6 +16,7 @@ module.exports = (H) => [
   H.p("\"c\" ist die C-Bibliothek des Systems, \"m\" ihre Mathematik – beide gibt es unter Windows, Linux und macOS, das Beispiel läuft also überall. Andere Namen werden zur Datei des Systems: \"user32\" wird user32.dll, \"sqlite3\" unter Linux libsqlite3.so und unter macOS libsqlite3.dylib. Gesucht wird neben dem Programm, neben dhrt und dann dort, wo das System sucht."),
   H.bullet("Ohne ALIAS ist der Name zugleich der in der Bibliothek – mit der Schreibweise aus deinem Quelltext, denn in einer Bibliothek zählt Groß/klein: GetTickCount64, nicht gettickcount64."),
   H.bullet("Mit ALIAS darf die Funktion im Programm anders heißen: DECLARE FUNCTION Bytes LIB \"kernel32\" ALIAS \"lstrlenA\" (s AS TEXT) AS LONG."),
+  H.bullet("Heißt die Bibliothek nicht überall gleich, stehen mehrere Namen durch | getrennt: LIB \"libgtk-3-0.dll|libgtk-3.so.0\" – der erste, der sich laden lässt, gilt. Damit nicht jede Zeile die ganze Liste trägt, darf hinter LIB auch eine CONST stehen: CONST GTK = \"…\" und dann LIB GTK."),
   H.bullet("Eine SUB ohne Rückgabe heißt DECLARE SUB. Die Zeile gehört auf die oberste Ebene des Programms; wo genau, ist egal."),
   H.bullet("--check zählt die Argumente schon beim Übersetzen und warnt vor einem Argument, dessen Typ sicher nicht passt. Hover und Zur Definition kennen die Zeile."),
 
@@ -177,6 +178,10 @@ module.exports = (H) => [
   H.bullet("Ein Fehler in deiner Funktion kommt beim Aufruf der Bibliothek an, sobald sie fertig ist – abfangbar mit CATCH. Bis dahin bekommt sie von jedem weiteren Rückruf eine 0."),
   H.bullet("Ein Rückruf bleibt gültig, bis das Programm endet; die Bibliothek darf ihn sich merken und später rufen."),
   H.tip("Ruft eine Bibliothek aus einem eigenen Faden zurück (CreateThread, pthread_create, manche Treiber), läuft deine Funktion nicht: Drachenhauch-Code läuft nur auf dem Faden des Programms. Der Rückruf liefert dann 0, und der nächste Aufruf einer Bibliothek meldet es.", "Nur ein Faden"),
+
+  H.h2("Eine ganze Oberfläche: GTK"),
+  H.p("Mit DECLARE und Rückrufen lässt sich sogar GTK benutzen, die Bibliothek, mit der unter Linux die meisten Programme ihre Fenster zeichnen. Fenster, Knöpfe und Eingabefelder sind ZEIGER; ein Signal wie \"clicked\" verbindest du mit g_signal_connect_data und einer SUB deines Programms, und gtk_main dreht die Schleife von GTK, bis gtk_main_quit kommt. Das Beispiel 207_gtk.dh zeigt ein Fenster mit Eingabefeld, zwei Knöpfen und einer Beschriftung."),
+  H.tip("g_signal_connect, wie es in jeder GTK-Anleitung steht, ist in C nur ein Makro. Gerufen wird g_signal_connect_data – und weil jedes Signal einen anderen Rückruf hat, bekommt jede Form eine eigene DECLARE-Zeile mit ALIAS auf dieselbe C-Funktion.", "Makros gibt es nicht"),
 
   H.h2("Das Programm weitergeben"),
   H.p("dhrt --export nimmt jede Bibliothek mit, die neben dem Programm liegt, und legt sie neben die exportierte Exe – dort sucht die Laufzeit zuerst. Für eine Systembibliothek wie kernel32 oder die C-Bibliothek ist das nicht nötig; eine fremde, die nicht daneben liegt, nennt der Export als Hinweis, damit du sie selbst mitgibst."),

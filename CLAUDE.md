@@ -1424,6 +1424,15 @@ Parser ab, FLOAT ist ein Schluesselwort). DECLARE-Parameter `AS name` ->
 BUFFER (`#name` vom Parser). WITH uebernimmt den Typ. Nicht: Klassenfeld,
 ARRAY OF/DIM x[n] eines Structs (beides eine Meldung). Tests
 `tests/pruef/ffi_struct.dhtest`, Rust-Tests in cstruct.rs.
+**GTK (2026-10-06):** `LIB "a.dll|liba.so.0"` (mehrere Namen, `dateinamen`
+zerlegt an `|`), `LIB name` mit einer CONST (Vorsatz `ffi::LIB_CONST`,
+eingesetzt in `register_ffi` aus `konst_werte`, umbenannt in
+`namensraum.rs`), unter Windows laedt ein voller Pfad mit
+`LOAD_WITH_ALTERED_SEARCH_PATH` (`ffi::laden`; **nur mit Rueckstrichen** --
+mit Schraegstrichen findet Windows die Abhaengigkeiten nicht), und eine
+vorhandene, nicht ladbare Datei hat eine eigene Meldung. Beispiel
+`examples/207_gtk.dh`, Faelle in `ffi.dhtest` (GTK-Faelle ueberspringen sich
+ohne GTK; lokal ueber das GTK von Inkscape).
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 

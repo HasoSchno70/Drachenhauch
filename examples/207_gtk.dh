@@ -1,0 +1,130 @@
+' Eine GTK-Oberflaeche aus Drachenhauch: DECLARE ... LIB mit Rueckrufen
+'
+' Fenster, Eingabefeld, zwei Knoepfe und eine Beschriftung -- gebaut mit GTK 3,
+' der Bibliothek, mit der unter Linux die meisten Programme ihre Fenster
+' zeichnen. Die Signale ("clicked", "destroy") rufen Funktionen dieses
+' Programms (Rueckrufe, docs/ffi.md); die Schleife ist die von GTK.
+'
+' GTK muss da sein: unter Linux fast immer, unter macOS ueber Homebrew
+' (brew install gtk+3), unter Windows ueber MSYS2 -- oder aus einem Programm,
+' das es mitbringt (Inkscape). Die drei CONSTs nennen die Namen aller Systeme
+' durch | getrennt; der erste, der sich laden laesst, gilt.
+'
+' Mit --probe drueckt sich das Programm selbst und endet (fuer Pruefungen).
+
+' Die Namen der Bibliotheken auf allen Systemen, je einmal.
+CONST GTK = "libgtk-3-0.dll|C:/Program Files/Inkscape/bin/libgtk-3-0.dll|libgtk-3.so.0|libgtk-3.0.dylib|/opt/homebrew/lib/libgtk-3.0.dylib"
+CONST GOBJECT = "libgobject-2.0-0.dll|libgobject-2.0.so.0|libgobject-2.0.0.dylib|/opt/homebrew/lib/libgobject-2.0.0.dylib"
+CONST GLIB = "libglib-2.0-0.dll|libglib-2.0.so.0|libglib-2.0.0.dylib|/opt/homebrew/lib/libglib-2.0.0.dylib"
+
+DECLARE FUNCTION gtk_init_check LIB GTK (argc AS ZEIGER, argv AS ZEIGER) AS BOOLEAN
+DECLARE FUNCTION gtk_window_new LIB GTK (art AS LONG) AS ZEIGER
+DECLARE SUB gtk_window_set_title LIB GTK (fenster AS ZEIGER, titel AS TEXT)
+DECLARE SUB gtk_window_set_default_size LIB GTK (fenster AS ZEIGER, b AS LONG, h AS LONG)
+DECLARE SUB gtk_container_set_border_width LIB GTK (behaelter AS ZEIGER, rand AS ULONG)
+DECLARE FUNCTION gtk_box_new LIB GTK (richtung AS LONG, abstand AS LONG) AS ZEIGER
+DECLARE SUB gtk_box_pack_start LIB GTK (box AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, fuellen AS BOOLEAN, rand AS ULONG)
+DECLARE FUNCTION gtk_label_new LIB GTK (text AS TEXT) AS ZEIGER
+DECLARE SUB gtk_label_set_text LIB GTK (label AS ZEIGER, text AS TEXT)
+DECLARE FUNCTION gtk_label_get_text LIB GTK (label AS ZEIGER) AS TEXT
+DECLARE FUNCTION gtk_entry_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_entry_set_text LIB GTK (feld AS ZEIGER, text AS TEXT)
+DECLARE FUNCTION gtk_entry_get_text LIB GTK (feld AS ZEIGER) AS TEXT
+DECLARE FUNCTION gtk_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
+DECLARE SUB gtk_button_clicked LIB GTK (knopf AS ZEIGER)
+DECLARE SUB gtk_container_add LIB GTK (behaelter AS ZEIGER, kind AS ZEIGER)
+DECLARE SUB gtk_widget_show_all LIB GTK (w AS ZEIGER)
+DECLARE SUB gtk_widget_destroy LIB GTK (w AS ZEIGER)
+DECLARE SUB gtk_main LIB GTK ()
+DECLARE SUB gtk_main_quit LIB GTK ()
+
+' g_signal_connect ist in C nur ein Makro -- gerufen wird g_signal_connect_data.
+' Ein Signal hat je nach Art einen anderen Rueckruf; hier passt EINE Form:
+' (das Objekt, die mitgegebenen Daten), ohne Rueckgabe.
+DECLARE FUNCTION signal LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+DECLARE FUNCTION g_timeout_add LIB GLIB _
+    (ms AS ULONG, rueckruf AS FUNCTION(daten AS ZEIGER) AS BOOLEAN, daten AS ZEIGER) AS ULONG
+
+DIM fenster AS INTEGER
+DIM feld AS INTEGER
+DIM gruss AS INTEGER
+DIM ende AS INTEGER
+DIM ausgabe AS INTEGER
+DIM gruesse AS INTEGER
+
+SUB grussen(knopf AS INTEGER, daten AS INTEGER)
+    DIM name AS STRING
+    name = TRIM$(gtk_entry_get_text(feld))
+    IF name = "" THEN name = "Welt"
+    gruesse = gruesse + 1
+    gtk_label_set_text(ausgabe, "Hallo, " + name + "! (" + STR$(gruesse) + ". Gruss)")
+END SUB
+
+SUB beenden(knopf AS INTEGER, daten AS INTEGER)
+    gtk_widget_destroy(fenster)         ' loest "destroy" aus
+END SUB
+
+SUB fenster_zu(objekt AS INTEGER, daten AS INTEGER)
+    gtk_main_quit()
+END SUB
+
+' Fuer --probe: einen Namen eintragen, zweimal gruessen, beenden.
+DIM schritt AS INTEGER
+FUNCTION probe(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    SELECT CASE schritt
+        CASE 1
+            gtk_entry_set_text(feld, "Drache")
+            gtk_button_clicked(gruss)
+        CASE 2
+            gtk_button_clicked(gruss)
+            PRINT gtk_label_get_text(ausgabe)
+        CASE ELSE
+            gtk_button_clicked(ende)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+DIM bereit AS BOOLEAN
+TRY
+    bereit = gtk_init_check(0, 0)
+CATCH e
+    PRINT "GTK nicht gefunden -- unter Linux das Paket libgtk-3-0, unter macOS brew install gtk+3, unter Windows GTK aus MSYS2 in den PATH."
+    END
+END TRY
+IF NOT bereit THEN
+    PRINT "GTK ist da, findet aber keinen Bildschirm."
+    END
+END IF
+
+fenster = gtk_window_new(0)
+gtk_window_set_title(fenster, "Drachenhauch + GTK")
+gtk_window_set_default_size(fenster, 360, 160)
+gtk_container_set_border_width(fenster, 12)
+DIM spalte AS INTEGER
+spalte = gtk_box_new(1, 8)
+DIM zeile AS INTEGER
+zeile = gtk_box_new(0, 8)
+feld = gtk_entry_new()
+gruss = gtk_button_new_with_label("Grüßen")
+ende = gtk_button_new_with_label("Beenden")
+ausgabe = gtk_label_new("Wie heißt du?")
+gtk_box_pack_start(zeile, feld, TRUE, TRUE, 0)
+gtk_box_pack_start(zeile, gruss, FALSE, FALSE, 0)
+gtk_box_pack_start(spalte, ausgabe, TRUE, TRUE, 0)
+gtk_box_pack_start(spalte, zeile, FALSE, FALSE, 0)
+gtk_box_pack_start(spalte, ende, FALSE, FALSE, 0)
+gtk_container_add(fenster, spalte)
+
+signal(gruss, "clicked", grussen, 0, 0, 0)
+signal(ende, "clicked", beenden, 0, 0, 0)
+signal(fenster, "destroy", fenster_zu, 0, 0, 0)
+gtk_widget_show_all(fenster)
+IF ARGC() > 0 THEN
+    IF ARG$(0) = "--probe" THEN g_timeout_add(200, probe, 0)
+END IF
+gtk_main()
+PRINT "Gruesse: "; gruesse

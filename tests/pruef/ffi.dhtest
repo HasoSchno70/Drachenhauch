@@ -601,6 +601,102 @@ Erwartet AS <Rueckgabetyp> nach FUNCTION(...) -- ohne Rueckgabe heisst es SUB(..
 BYREF geht nicht bei einem Rueckruf -- die Bibliothek bekommt ohnehin einen Zeiger auf die Funktion
 q: Argument 1 (cmp AS FUNCTION) bekommt STRING -- beim Laufen bricht diese Zeile ab
 
+=== mehrere namen in lib: der erste, der sich laden laesst, gilt
+' Eine DECLARE-Zeile fuer alle Systeme: die Namen durch | getrennt. Fehlt
+' jeder, nennt die Meldung alle versuchten Dateien.
+DECLARE FUNCTION strlen LIB "gibt_es_nicht_123|c" (s AS TEXT) AS ZEIGER
+DECLARE FUNCTION fehlt LIB "gibt_es_nicht_a|gibt_es_nicht_b" () AS LONG
+PRINT strlen("Drache")
+TRY
+    PRINT fehlt()
+CATCH e
+    PRINT INSTR(e, "gibt_es_nicht_a") >= 0, INSTR(e, "gibt_es_nicht_b") >= 0, INSTR(e, "nicht gefunden") >= 0
+END TRY
+--- erwartet
+6
+TRUE TRUE TRUE
+
+=== lib mit einer const
+' Die Namen stehen einmal in einer CONST, jede Zeile nennt nur sie -- auch
+' in einer Datei mit Namensraum, wo die CONST ihr gehoert.
+CONST CLIB = "gibt_es_nicht_123|c"
+DECLARE FUNCTION strlen LIB CLIB (s AS TEXT) AS ZEIGER
+IMPORT "bib.dh" AS bib
+PRINT strlen("Drachenhauch"), bib.laenge("abc")
+--- datei bib.dh
+CONST MEINE = "c"
+DECLARE FUNCTION strlen LIB MEINE (s AS TEXT) AS ZEIGER
+FUNCTION laenge(s AS STRING) AS INTEGER
+    RETURN strlen(s)
+END FUNCTION
+--- erwartet
+12 3
+
+=== lib mit einem namen, der keine const ist
+DIM kein AS STRING
+DECLARE FUNCTION f LIB kein () AS LONG
+--- fehler
+LIB KEIN: erwartet eine CONST mit festem Text
+
+=== eine datei, die da ist und sich nicht laden laesst
+' Liegt eine Datei unter dem Namen da, ist sie aber keine Bibliothek (oder
+' fehlt ihr selbst eine), sagt die Meldung das statt "nicht gefunden".
+DECLARE FUNCTION f LIB "kaputt" () AS LONG
+TRY
+    PRINT f()
+CATCH e
+    PRINT INSTR(e, "laesst sich aber nicht laden") >= 0, INSTR(e, "nicht gefunden") < 0
+END TRY
+--- datei kaputt.dll
+keine Bibliothek
+--- datei libkaputt.so
+keine Bibliothek
+--- datei libkaputt.dylib
+keine Bibliothek
+--- erwartet
+TRUE TRUE
+
+=== gtk ueber mehrere namen, auch ohne bildschirm
+' gtk_get_major_version braucht keinen Bildschirm -- so laeuft der Fall auch
+' auf den Rechnern der CI, sofern dort GTK 3 liegt. Unter Windows nimmt er
+' das GTK von Inkscape ueber den vollen Pfad: dessen glib und gobject liegen
+' daneben und muessen ohne PATH gefunden werden.
+CONST GTK = "libgtk-3-0.dll|C:/Program Files/Inkscape/bin/libgtk-3-0.dll|libgtk-3.so.0|libgtk-3.0.dylib|/opt/homebrew/lib/libgtk-3.0.dylib"
+DECLARE FUNCTION gtk_get_major_version LIB GTK () AS ULONG
+DECLARE FUNCTION gtk_check_version LIB GTK (gross AS ULONG, klein AS ULONG, mikro AS ULONG) AS TEXT
+TRY
+    PRINT gtk_get_major_version()
+    PRINT "[" + gtk_check_version(3, 0, 0) + "]"
+CATCH e
+    IF INSTR(e, "nicht gefunden") >= 0 THEN
+        PRINT "UEBERSPRINGEN: kein GTK 3 auf diesem Rechner"
+    ELSE
+        PRINT e
+    END IF
+END TRY
+--- erwartet
+3
+[]
+
+=== das gtk-beispiel laeuft
+' examples/207_gtk.dh mit --probe: es traegt einen Namen ein, drueckt zweimal
+' "Gruessen" und dann "Beenden" -- alles ueber Signale und Rueckrufe.
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/207_gtk.dh"
+--- erwartet
+rueckgabe 0
+Hallo, Drache! (2. Gruss)
+Gruesse: 2
+
 === eine deklarierte funktion verdeckt den eingebauten befehl
 DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
 ' ABS der Laufzeit liefert fuer -5.5 eine Kommazahl; die aus der Bibliothek

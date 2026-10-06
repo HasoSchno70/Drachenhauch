@@ -292,6 +292,21 @@ auch für Dateiformate. Geprüft in `tests/pruef/ffi_struct.dhtest` (10) und
 mit Rust-Tests der Lage; Gegenproben ohne Ausrichtung bzw. ohne
 Laufzeit-Index lassen vier Fälle fallen.
 
+**Stand GTK (2026-10-06):** Ein Versuch mit GTK 3 (das von Inkscape unter
+Windows) trug auf Anhieb: Fenster, Box, Eingabefeld, Knöpfe, Signale über
+`g_signal_connect_data` und ein Zeitgeber (`g_timeout_add`), alles mit Stufe
+1 und 3. Drei Unbequemlichkeiten sind behoben: (1) **mehrere Namen in
+`LIB`**, durch `|` getrennt (`dateinamen` zerlegt; der erste, der sich laden
+lässt, gilt), (2) **`LIB name` mit einer CONST** (der Parser schreibt den
+Namen mit dem Vorsatz `LIB_CONST`, der Compiler setzt den Text aus
+`konst_werte` ein, `namensraum.rs` benennt die CONST mit um), (3) **unter
+Windows sucht ein voller Pfad die Abhängigkeiten der DLL in ihrem Ordner**
+(`LOAD_WITH_ALTERED_SEARCH_PATH`; der Pfad braucht dafür Rückstriche -- mit
+Schrägstrichen schlug es fehl). Dazu sagt die Meldung jetzt, wenn eine Datei
+da ist, sich aber nicht laden lässt, samt Grund des Systems. Beispiel
+`examples/207_gtk.dh` (mit `--probe` drückt es sich selbst). Offen bleibt
+die variable Argumentzahl (`g_object_set`).
+
 ## Die Fragen dazu (entschieden, siehe oben)
 
 1. **`DECLARE … LIB`** (empfohlen) oder Befehle wie ctypes?
