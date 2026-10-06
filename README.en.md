@@ -63,7 +63,7 @@ happen *next to* a game — tools, reports, small services:
 | **Network** | `HTTP_GET`/`POST` with headers and JSON, TLS, plus `SHA256$`, `HMAC_SHA256$` and `UUID4$` for authenticated services |
 | **Data** | SQLite, CSV per RFC 4180, ZIP, JSON, regex, `BUFFER` for binary files |
 | **Larger programs** | namespaces (`IMPORT "math.dh" AS math`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` with error codes, inheritance with `SUPER` and `ABSTRACT`, `ASSERT_EQ` |
-| **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks ([more, in German](docs/ffi.md)) |
+| **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks; even embed Python with numpy ([more, in German](docs/ffi.md)) |
 | **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
 
 None of it needs a window. A Drachenhauch program can be a console
@@ -76,7 +76,7 @@ Details in the [manual](docs/README.md); how it got there is in the
 
 **[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 52 MB, currently version 2026.23.
 
-You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 218 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
+You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 224 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
 ## Working from source
 
@@ -258,7 +258,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 
 ## Examples
 
-`examples/` contains 162 examples plus ten benchmarks, from "Hello World" to a complete mini game:
+`examples/` contains 214 examples plus ten benchmarks, from "Hello World" to a complete mini game:
 
 | File | Shows |
 |---|---|

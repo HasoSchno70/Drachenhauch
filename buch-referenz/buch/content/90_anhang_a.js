@@ -41,7 +41,9 @@ module.exports = (H) => {
   }
   const letters = Object.keys(groups).sort();
 
-  out.push(H.p("Insgesamt " + names.length + " Befehle."));
+  // Die Zahl als eigenes Stueck: im Satz stuende sie im Uebersetzungs-
+  // schluessel, und der veraltete mit jeder neuen Fassung.
+  out.push(H.pmix(["Insgesamt ", [String(names.length)], " Befehle."]));
 
   for (const L of letters) {
     out.push(H.h2("— " + L + " —"));

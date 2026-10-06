@@ -1,0 +1,178 @@
+' Python einbetten (examples/python/python.dh, docs/ffi.md Abschnitt "Python
+' einbetten"): die Bibliothek fragt das Python des Rechners nach seiner
+' DLL, traegt sie in DH_PYTHON_DLL ein (LIB "$DH_PYTHON_DLL" liest die
+' Variable beim ersten Aufruf) und startet es. Ohne Python ueberspringt
+' sich jeder Fall, der eins braucht -- ein Rechner muss keins haben.
+
+=== werte gehen hin und zurueck
+IMPORT "py.dh"
+pyOderUeberspringen()
+pythonAusfuehren("import statistics")
+PRINT pythonZahl("statistics.median([3, 1, 4, 1, 5])")
+PRINT pythonGanz("2 ** 40 + 1")
+pythonSetzeText("name", "Drache äöü €")
+PRINT pythonText$("name.upper() + '!'")
+pythonSetzeZahl("x", 2.5)
+pythonSetzeGanz("n", 7)
+PRINT pythonZahl("x * n")
+DIM b AS BUFFER : b = BUFFER_NEW(24)
+BUFFER_SET_F64(b, 0, 1.5)
+BUFFER_SET_F64(b, 8, 2.25)
+BUFFER_SET_F64(b, 16, -4.0)
+pythonSetzeBytes("roh", b)
+pythonAusfuehren("import struct")
+PRINT pythonZahl("sum(struct.unpack('<3d', roh))")
+DIM z AS BUFFER : z = pythonBytes("struct.pack('<2i', 10, -20)")
+PRINT BUFFER_LEN(z), BUFFER_GET_I32(z, 0), BUFFER_GET_I32(z, 4)
+PRINT BUFFER_LEN(pythonBytes("b''")), pythonText$("''") = ""
+' Anweisungen ueber mehrere Zeilen, eine Funktion, die spaeter gilt.
+pythonAusfuehren(!"def quadrat(a):\n    return a * a\n")
+PRINT pythonGanz("quadrat(12)")
+--- datei py.dh
+IMPORT "{sammlung}/../../examples/python/python.dh"
+' Uebersprungen wird NUR, wenn kein Python da ist -- startet eins nicht,
+' ist das ein Fehler, sonst verdeckte das Ueberspringen ihn.
+SUB pyOderUeberspringen()
+    TRY
+        pythonStarten()
+    CATCH e
+        IF INSTR(e, "keins gefunden") >= 0 OR INSTR(e, "ohne gemeinsame Bibliothek") >= 0 THEN
+            PRINT "UEBERSPRINGEN: " + e
+            END
+        END IF
+        THROW e
+    END TRY
+END SUB
+--- erwartet
+3.0
+1099511627777
+DRACHE ÄÖÜ €!
+17.5
+-0.25
+8 10 -20
+0 TRUE
+144
+
+=== ein fehler in python kommt als fehler an
+IMPORT "py.dh"
+pyOderUeberspringen()
+TRY
+    PRINT pythonZahl("1 / 0")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    pythonAusfuehren("das ist kein python")
+CATCH e
+    PRINT e
+END TRY
+' Bei mehreren Zeilen nennt die Meldung die Zeile.
+TRY
+    pythonAusfuehren(!"a = 1\nb = a / 0\n")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT pythonGanz("2 ** 70")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT pythonZahl("'kein Wert'")
+CATCH e
+    PRINT LEFT$(e, 18)
+END TRY
+' Danach geht es weiter wie vorher.
+PRINT pythonGanz("6 * 7")
+--- datei py.dh
+IMPORT "{sammlung}/../../examples/python/python.dh"
+' Uebersprungen wird NUR, wenn kein Python da ist -- startet eins nicht,
+' ist das ein Fehler, sonst verdeckte das Ueberspringen ihn.
+SUB pyOderUeberspringen()
+    TRY
+        pythonStarten()
+    CATCH e
+        IF INSTR(e, "keins gefunden") >= 0 OR INSTR(e, "ohne gemeinsame Bibliothek") >= 0 THEN
+            PRINT "UEBERSPRINGEN: " + e
+            END
+        END IF
+        THROW e
+    END TRY
+END SUB
+--- erwartet
+Python: ZeroDivisionError: division by zero
+Python: SyntaxError: invalid syntax
+Python: ZeroDivisionError: division by zero (Zeile 2)
+Python: OverflowError: die Zahl passt nicht in INTEGER (64 Bit)
+Python: ValueError
+42
+
+=== ein numpy-feld ist ein buffer
+IMPORT "py.dh"
+pyOderUeberspringen()
+TRY
+    pythonAusfuehren("import numpy as np")
+CATCH e
+    PRINT "UEBERSPRINGEN: kein numpy"
+    END
+END TRY
+DIM b AS BUFFER : b = BUFFER_NEW(32)
+DIM k AS INTEGER
+FOR k = 0 TO 3
+    BUFFER_SET_F64(b, k * 8, k * 1.5)
+NEXT
+pythonSetzeBytes("roh", b)
+DIM r AS BUFFER : r = pythonBytes("(np.frombuffer(roh, '<f8') ** 2).astype('<f8')")
+DIM zeile AS STRING : zeile = ""
+FOR k = 0 TO 3
+    zeile = zeile + STR$(BUFFER_GET_F64(r, k * 8)) + " "
+NEXT
+PRINT TRIM$(zeile)
+PRINT pythonZahl("np.frombuffer(roh, '<f8').mean()")
+--- datei py.dh
+IMPORT "{sammlung}/../../examples/python/python.dh"
+' Uebersprungen wird NUR, wenn kein Python da ist -- startet eins nicht,
+' ist das ein Fehler, sonst verdeckte das Ueberspringen ihn.
+SUB pyOderUeberspringen()
+    TRY
+        pythonStarten()
+    CATCH e
+        IF INSTR(e, "keins gefunden") >= 0 OR INSTR(e, "ohne gemeinsame Bibliothek") >= 0 THEN
+            PRINT "UEBERSPRINGEN: " + e
+            END
+        END IF
+        THROW e
+    END TRY
+END SUB
+--- erwartet
+0.0 2.25 9.0 20.25
+2.25
+
+=== ohne python sagt die bibliothek wo sie gesucht hat
+IMPORT "py.dh"
+PRINT pythonVorhanden()
+TRY
+    pythonStarten()
+CATCH e
+    PRINT e
+END TRY
+--- datei py.dh
+IMPORT "{sammlung}/../../examples/python/python.dh"
+' Uebersprungen wird NUR, wenn kein Python da ist -- startet eins nicht,
+' ist das ein Fehler, sonst verdeckte das Ueberspringen ihn.
+SUB pyOderUeberspringen()
+    TRY
+        pythonStarten()
+    CATCH e
+        IF INSTR(e, "keins gefunden") >= 0 OR INSTR(e, "ohne gemeinsame Bibliothek") >= 0 THEN
+            PRINT "UEBERSPRINGEN: " + e
+            END
+        END IF
+        THROW e
+    END TRY
+END SUB
+--- umgebung
+DH_PYTHON=gibt-es-nicht-python
+--- erwartet
+FALSE
+Python: keins gefunden (versucht: gibt-es-nicht-python) -- Python installieren oder den Pfad zum Programm in DH_PYTHON eintragen

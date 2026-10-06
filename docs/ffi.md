@@ -117,6 +117,14 @@ Ein Name mit Endung oder Pfad gilt wörtlich (`"libsqlite3.so.0"`,
 * **Statt des Textes eine CONST:** `CONST GTK = "libgtk-3-0.dll|libgtk-3.so.0"`
   und dann `LIB GTK` in jeder Zeile. Die CONST braucht einen festen Text;
   in einer Datei mit Namensraum gehört sie dieser Datei.
+* **Erst zur Laufzeit bekannt:** `LIB "$NAME"` nimmt den Inhalt der
+  Umgebungsvariablen `NAME`, gelesen beim **ersten Aufruf**. Ein Programm
+  sucht die Bibliothek also selbst und trägt sie vorher mit
+  `SETENV("NAME", pfad)` ein -- so findet `python.dh` die DLL des Pythons,
+  das auf dem Rechner liegt (siehe [Python einbetten](#python-einbetten)).
+  Der Inhalt darf mehrere Namen mit `|` tragen; `LIB "$NAME|ersatz"` nimmt
+  `ersatz`, wenn die Variable leer ist. Fehlt alles, nennt die Meldung die
+  Variable.
 * **Abhängigkeiten unter Windows:** Bei einem Pfad (`LIB "C:/Programme/X/x.dll"`)
   sucht Windows die Bibliotheken, die diese DLL selbst braucht, zuerst in
   ihrem Ordner -- der muss nicht im PATH stehen.
@@ -444,6 +452,61 @@ END IF
   [Variable Argumentzahl](#variable-argumentzahl):
   `g_object_set(knopf, "tooltip-text", "Sagt Hallo", NIL)`.
 
+## Python einbetten
+
+Python ist selbst eine C-Bibliothek (`python3XY.dll`, `libpython3.X.so`) --
+mit ihr laufen alle Pakete, die im Python des Rechners installiert sind:
+numpy, Pillow, PySide6 (Qt) und was sonst. Die Bibliothek
+`examples/python/python.dh` erledigt die Deklarationen; man kopiert sie
+neben das eigene Programm und importiert sie:
+
+```text
+IMPORT "python/python.dh"
+
+pythonStarten()
+pythonAusfuehren("import statistics")
+PRINT pythonZahl("statistics.median([3, 1, 4, 1, 5])")     ' 3.0
+
+pythonSetzeText("name", "Drache")
+PRINT pythonText$("name.upper() + '!'")                     ' DRACHE!
+```
+
+| Befehl | Was er tut |
+|---|---|
+| `pythonStarten([programm$])` | sucht ein Python (Argument, `DH_PYTHON`, `py -3`, `python3`, `python`) und startet es; ein zweiter Aufruf tut nichts |
+| `pythonVorhanden()` | TRUE, wenn sich eins starten lässt -- für Programme mit einem Weg ohne Python |
+| `pythonAusfuehren(code$)` | Anweisungen, auch mehrere Zeilen (`import`, `def`, `class`) |
+| `pythonZahl(a$)`, `pythonGanz(a$)`, `pythonText$(a$)` | einen Ausdruck auswerten -- als Kommazahl, INTEGER oder Text |
+| `pythonBytes(a$)` | `bytes(...)` als BUFFER -- ein numpy-Feld liefert seine Rohdaten |
+| `pythonSetzeZahl/Ganz/Text/Bytes(name$, wert)` | einen Wert unter einem Namen in Python ablegen |
+
+* **Welches Python:** das, das ein Aufruf auf der Kommandozeile liefern
+  würde, oder das in `DH_PYTHON` (der Pfad zum Programm, etwa
+  `.venv/Scripts/python.exe`). Es wird einmal nach seiner Bibliothek und
+  seinem Suchpfad gefragt; eingebettet bekommt es denselben Suchpfad, also
+  auch die Pakete eines venv und im Benutzerordner.
+* **Felder** gehen als Bytes: ein BUFFER aus Kommazahlen ist in Python
+  `numpy.frombuffer(roh, '<f8')`, und `pythonBytes("feld.astype('<f8')")`
+  bringt das Ergebnis zurück. Das Beispiel `208_python.dh` rechnet so das
+  Spektrum eines Signals -- mit numpy oder, ohne numpy, in reinem Python.
+* **Fehler in Python** kommen als Fehler in Drachenhauch an:
+  `Python: ZeroDivisionError: division by zero`, bei mehrzeiligem Code mit
+  der Zeile dahinter. `CATCH` fängt sie ab, danach geht es weiter.
+* **Qt** geht über PySide6 im eingebetteten Python: ein Fenster mit
+  `QApplication` öffnet sich aus dem Drachenhauch-Programm heraus. Solange
+  `app.exec()` läuft, steht das Drachenhauch-Programm.
+* **Grenzen:** Python läuft im selben Prozess -- stürzt eine Erweiterung ab,
+  ist das Programm weg. Was Python mit `print` ausgibt, steht nicht in der
+  Reihenfolge der `PRINT`-Zeilen; Ergebnisse besser holen. Ein exportiertes
+  Programm nimmt Python nicht mit, der Rechner braucht es.
+  `pythonStarten` setzt `PYTHONHOME` -- ein später gestartetes Python erbt
+  das.
+* Geprüft unter Windows mit Python 3.12 und 3.14 (numpy, PySide6). Unter
+  Linux und macOS lädt `dhrt` fremde Bibliotheken dafür global (sonst
+  fänden Pythons Erweiterungen dessen Funktionen nicht); dort braucht das
+  Python eine gemeinsame Bibliothek (`libpython3.X.so`, unter Linux etwa
+  aus dem Paket `libpython3-dev`).
+
 ## Variable Argumentzahl
 
 `...` am Ende der Parameter nimmt beliebig viele weitere Werte, wie bei
@@ -580,7 +643,9 @@ END TRY
 
 * Bitfelder in einem Struct; ein Struct als Wert in einem Rückruf oder
   hinter `...` (siehe [Structs als Wert](#structs-als-wert)).
-* C++-Namen, COM, `va_list`-Funktionen (`vprintf`).
+* C++-Namen, COM, `va_list`-Funktionen (`vprintf`). Eine C++-Bibliothek wie
+  Qt geht über einen Umweg mit C-Schnittstelle -- etwa
+  [Python einbetten](#python-einbetten) mit PySide6.
 * **Im Browser** gibt es keine fremden Bibliotheken; ein Aufruf ist dort ein
   Fehler mit diesem Satz.
 

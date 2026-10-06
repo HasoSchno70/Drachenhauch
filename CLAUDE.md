@@ -1442,6 +1442,23 @@ das Sprungbrett `sprungbrett` (`global_asm!`, setzt `al = 8`), Apple-ARM
 fuellt die acht X-Register mit Nullen (Rest auf den Stapel). Typ der
 weiteren Werte aus dem Wert. Unter Windows liegt `sprintf` in `msvcrt`, nicht
 in ucrtbase (`LIB "msvcrt|c"`). Faelle `variadisch:` in ffi.dhtest.
+**Python einbetten (2026-10-06):** `LIB "$NAME"` liest die Umgebungsvariable
+NAME beim ERSTEN Aufruf (`ffi::namen_einsetzen`, auch `$A|ersatz`; fehlt
+alles, nennt die Meldung die Variable; `dateinamen` laesst `$`-Teile fuer
+den Export weg). Unter Linux/macOS laedt `ffi::laden` jetzt RTLD_GLOBAL --
+Pythons Erweiterungen (numpy) brauchen die Zeichen von libpython, ohne
+dagegen gelinkt zu sein. Die Bibliothek `examples/python/python.dh` fragt
+ein Python (Argument, `DH_PYTHON`, `py -3`, `python3`, `python`) nach DLL,
+`base_prefix` und `sys.path`, setzt `DH_PYTHON_DLL` + `PYTHONHOME`, startet
+es und uebernimmt den Suchpfad; sie benutzt nur die stabile Schnittstelle
+(`Py_CompileString`/`PyEval_EvalCode` statt `PyRun_*`, das python3.dll nicht
+hat) und einen Hilfscode in Python, der nie wirft (Fehler nach `_dh_fehler`).
+**Falle fuer Bibliotheken:** kurze lokale Namen (`n`, `h`, `b`) verdecken
+Konstanten des importierenden Programms -- darum dort lange Namen. Beispiel
+`examples/208_python.dh` (Spektrum mit numpy oder reinem Python), Tests
+`tests/pruef/python_einbetten.dhtest` (uebersprungen nur ohne Python, nicht
+wenn es nicht startet) und zwei `$`-Faelle in ffi.dhtest; gegen einen Bau
+ohne `$NAME` fallen alle fuenf.
 **Structs als Wert (2026-10-06):** `BYVAL p AS Punkt` (ohne BYVAL bleibt es
 der Zeiger, wie bisher) und `DECLARE FUNCTION f(...) AS Punkt`. Der Parser
 schreibt `~name`, der Compiler `x` + `cstruct::wert_text` (Lage mit allen
