@@ -64,7 +64,7 @@ schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
 | **Daten** | SQLite, CSV nach RFC 4180, ZIP, JSON, Regex, `BUFFER` für Binärdateien |
 | **Größere Programme** | Namensräume (`IMPORT "mathe.dh" AS mathe`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` mit Fehler-Codes, Vererbung mit `SUPER` und `ABSTRACT`, Typtest zur Laufzeit (`x IS Hund`, `TYPEOF`), `ASSERT_EQ` |
 | **Objekte als Rückrufe** | `obj.methode` ist eine `FUNCREF`, die ihre Instanz mitträgt — `GUI_ON_CLICK(knopf, spieler.klick)`, `TIMER_EVERY(500, gegner.zucken)`, `SORT(zahlen, regel.cmp)` |
-| **Fremde Bibliotheken** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — Windows-API, C-Bibliothek, Gerätetreiber direkt aufrufen, mit Zeigern, Structs und Rückrufen ([mehr](docs/ffi.md)) |
+| **Fremde Bibliotheken** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — Windows-API, C-Bibliothek, Gerätetreiber direkt aufrufen, mit Zeigern, Structs und Rückrufen; sogar Python samt numpy einbetten ([mehr](docs/ffi.md)) |
 | **Nebenher** | HTTP, Datenbank, fremde Programme und **eigene Funktionen** im Hintergrund (`TASK_START`) — die Hauptschleife läuft weiter |
 
 Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine
@@ -77,7 +77,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 52 MB, aktuell Fassung 2026.22.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 223 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 224 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
@@ -257,7 +257,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 
 ## Beispiele
 
-`examples/` enthält 194 Beispiele plus zehn Benchmarks, von "Hallo Welt" bis zum kompletten Mini-Spiel:
+`examples/` enthält 214 Beispiele plus zehn Benchmarks, von "Hallo Welt" bis zum kompletten Mini-Spiel:
 
 | Datei | Zeigt |
 |---|---|

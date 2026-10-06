@@ -198,6 +198,10 @@ module.exports = (H) => [
   H.p("Mit DECLARE und Rückrufen lässt sich sogar GTK benutzen, die Bibliothek, mit der unter Linux die meisten Programme ihre Fenster zeichnen. Fenster, Knöpfe und Eingabefelder sind ZEIGER; ein Signal wie \"clicked\" verbindest du mit g_signal_connect_data und einer SUB deines Programms, und gtk_main dreht die Schleife von GTK, bis gtk_main_quit kommt. Das Beispiel 207_gtk.dh zeigt ein Fenster mit Eingabefeld, zwei Knöpfen und einer Beschriftung."),
   H.tip("g_signal_connect, wie es in jeder GTK-Anleitung steht, ist in C nur ein Makro. Gerufen wird g_signal_connect_data – und weil jedes Signal einen anderen Rückruf hat, bekommt jede Form eine eigene DECLARE-Zeile mit ALIAS auf dieselbe C-Funktion.", "Makros gibt es nicht"),
 
+  H.h2("Python einbetten"),
+  H.p("Auch Python ist eine C-Bibliothek. Die Datei python/python.dh aus den Beispielen holt das Python deines Rechners ins Programm – und mit ihm jedes Paket, das dort installiert ist, von numpy bis PySide6 für Qt. pythonStarten sucht es, pythonAusfuehren führt Anweisungen aus, pythonZahl, pythonText$ und pythonBytes holen Ergebnisse, die pythonSetze-Befehle legen Werte aus deinem Programm in Python ab. Ein Fehler in Python kommt als Fehler bei dir an und lässt sich mit CATCH abfangen."),
+  H.p("Wo die Bibliothek von Python liegt, steht erst fest, wenn das Programm läuft. Dafür nimmt LIB \"$NAME\" den Namen aus einer Umgebungsvariablen, gelesen beim ersten Aufruf: python.dh fragt das Python nach seiner DLL und trägt sie vorher mit SETENV ein. Das Beispiel 208_python.dh rechnet so das Spektrum eines Signals, das dein Programm erzeugt und danach zeichnet."),
+
   H.h2("Das Programm weitergeben"),
   H.p("dhrt --export nimmt jede Bibliothek mit, die neben dem Programm liegt, und legt sie neben die exportierte Exe – dort sucht die Laufzeit zuerst. Für eine Systembibliothek wie kernel32 oder die C-Bibliothek ist das nicht nötig; eine fremde, die nicht daneben liegt, nennt der Export als Hinweis, damit du sie selbst mitgibst."),
 

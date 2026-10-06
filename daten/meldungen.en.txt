@@ -1657,6 +1657,7 @@ SIZEOF: '{}' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER ..
 (moeglich: ein STRUCT ... LAYOUT C oder 	(possible: a STRUCT ... LAYOUT C or 
 LIB {}: erwartet eine CONST mit festem Text (CONST {} = "libname.so|name.dll") oder den Namen in Anfuehrungszeichen	LIB {}: expects a CONST with a fixed text (CONST {} = "libname.so|name.dll") or the name in quotes
 Bibliothek "{}" liegt als {} da, laesst sich aber nicht laden -- fehlt ihr selbst eine Bibliothek, oder passt sie nicht zu diesem System (64 Bit)? Das System sagt: {}	library "{}" is there as {} but cannot be loaded -- is a library it needs missing, or does it not fit this system (64 bit)? The system says: {}
+Bibliothek "{}": die Umgebungsvariable {} ist nicht gesetzt -- vor dem ersten Aufruf mit SETENV den Pfad der Bibliothek eintragen	library "{}": the environment variable {} is not set -- enter the path of the library with SETENV before the first call
 ... steht am Ende der Parameter -- danach kommt nichts mehr	... stands at the end of the parameters -- nothing comes after it
 Vor ... braucht es mindestens einen festen Parameter (in C wie printf(format, ...))	... needs at least one fixed parameter before it (in C like printf(format, ...))
 {}: erwartet mindestens {} Argument(e), erhalten {} (DECLARE in {})	{}: expects at least {} argument(s), got {} (DECLARE in {})

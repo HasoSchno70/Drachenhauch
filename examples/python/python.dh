@@ -1,0 +1,294 @@
+' python.dh -- das Python dieses Rechners in ein Drachenhauch-Programm holen.
+'
+'     IMPORT "python/python.dh"
+'     pythonStarten()
+'     pythonAusfuehren("import statistics")
+'     PRINT pythonZahl("statistics.median([3, 1, 4, 1, 5])")     ' 3.0
+'
+' Python ist eine C-Bibliothek wie jede andere (python3XY.dll,
+' libpython3.X.so); diese Datei ruft sie ueber DECLARE ... LIB auf. Damit
+' gehen alle Pakete, die in diesem Python installiert sind -- numpy, Pillow,
+' PySide6 (Qt), was auch immer.
+'
+' Gesucht wird das Python, das ein Programmaufruf liefern wuerde: zuerst das
+' Argument von pythonStarten, dann die Umgebungsvariable DH_PYTHON, dann
+' "py -3" (der Starter unter Windows), "python3" und "python". Es wird
+' einmal gefragt, wo seine Bibliothek liegt und welchen Suchpfad es hat;
+' eingebettet bekommt es denselben Suchpfad, also auch ein venv und die
+' Pakete im Benutzerordner.
+'
+' Werte gehen ueber vier Wege hin und zurueck: Zahl, Ganzzahl, Text und
+' Bytes (BUFFER -- ein numpy-Feld als Bytes ist ein Feld von Zahlen). Ein
+' Fehler in Python kommt als Fehler in Drachenhauch an ("Python: ..."),
+' den CATCH abfaengt.
+'
+' Grenzen: Python laeuft im selben Prozess -- stuerzt eine Erweiterung ab,
+' ist das Programm weg. Was Python mit print() ausgibt, steht nicht in der
+' Reihenfolge der PRINT-Zeilen; Ergebnisse besser holen als drucken. Ein
+' exportiertes Programm nimmt Python nicht mit, der Rechner braucht es.
+
+' Der Ort der Bibliothek steht erst zur Laufzeit fest: $DH_PYTHON_DLL liest
+' die Laufzeit beim ersten Aufruf, pythonStarten setzt die Variable vorher.
+CONST PY_DLL = "$DH_PYTHON_DLL"
+
+DECLARE SUB Py_InitializeEx LIB PY_DLL (signale AS LONG)
+DECLARE FUNCTION PyImport_AddModule LIB PY_DLL (name AS TEXT) AS ZEIGER
+DECLARE FUNCTION PyModule_GetDict LIB PY_DLL (modul AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION Py_CompileString LIB PY_DLL (code AS TEXT, datei AS TEXT, art AS LONG) AS ZEIGER
+DECLARE FUNCTION PyEval_EvalCode LIB PY_DLL (code AS ZEIGER, g AS ZEIGER, l AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION PyDict_SetItemString LIB PY_DLL (d AS ZEIGER, schluessel AS TEXT, wert AS ZEIGER) AS LONG
+DECLARE FUNCTION PyDict_GetItemString LIB PY_DLL (d AS ZEIGER, schluessel AS TEXT) AS ZEIGER
+DECLARE FUNCTION PyFloat_FromDouble LIB PY_DLL (wert AS FLOAT) AS ZEIGER
+DECLARE FUNCTION PyFloat_AsDouble LIB PY_DLL (obj AS ZEIGER) AS FLOAT
+DECLARE FUNCTION PyLong_FromLongLong LIB PY_DLL (wert AS INTEGER) AS ZEIGER
+DECLARE FUNCTION PyLong_AsLongLong LIB PY_DLL (obj AS ZEIGER) AS INTEGER
+DECLARE FUNCTION PyUnicode_FromString LIB PY_DLL (text AS TEXT) AS ZEIGER
+DECLARE FUNCTION PyBytes_FromStringAndSize LIB PY_DLL (daten AS ZEIGER, anzahl AS INTEGER) AS ZEIGER
+DECLARE FUNCTION PyBytes_AsString LIB PY_DLL (obj AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION PyBytes_Size LIB PY_DLL (obj AS ZEIGER) AS INTEGER
+DECLARE SUB Py_DecRef LIB PY_DLL (obj AS ZEIGER)
+
+' Py_file_input und Py_eval_input aus Pythons compile.h.
+CONST PY_ANWEISUNGEN = 257
+CONST PY_AUSDRUCK = 258
+
+DIM pyBereit AS BOOLEAN : pyBereit = FALSE
+DIM pyGlobale AS INTEGER : pyGlobale = 0      ' das dict von __main__
+DIM pyLauf AS INTEGER : pyLauf = 0            ' "_dh_lauf()", einmal uebersetzt
+DIM pyQuelle AS STRING : pyQuelle = ""        ' welches Python, fuer Meldungen
+
+' Fragt ein Python-Programm nach seiner Bibliothek, seinem Ordner und seinem
+' Suchpfad. Eine Zeile, nur einfache Anfuehrungszeichen -- so kommt sie
+' unveraendert durch jede Kommandozeile.
+FUNCTION pyFrage$() AS STRING
+    DIM frage AS STRING
+    frage = "import sys,os,sysconfig as c;v=lambda n:c.get_config_var(n) or '';"
+    frage = frage + "k=[os.path.join(sys.base_prefix,'python%d%d.dll'%sys.version_info[:2])] if os.name=='nt' else "
+    frage = frage + "[os.path.join(v('LIBDIR'),v('MULTIARCH'),v('INSTSONAME')),os.path.join(v('LIBDIR'),v('INSTSONAME')),"
+    frage = frage + "os.path.join(v('PYTHONFRAMEWORKPREFIX'),v('INSTSONAME')),os.path.join(v('LIBDIR'),v('LDLIBRARY'))];"
+    frage = frage + "print(next((p for p in k if os.path.isfile(p)),k[0]));print(sys.base_prefix);print(chr(10).join(sys.path))"
+    RETURN frage
+END FUNCTION
+
+' Die Antwort eines Python-Programms, leer, wenn es keins unter dem Namen gibt.
+FUNCTION pyFragen$(programm AS STRING, erstes AS STRING) AS STRING
+    DIM aus AS STRING : aus = ""
+    TRY
+        IF erstes = "" THEN
+            aus = SHELL_OUT$(programm, "-c", pyFrage$())
+        ELSE
+            aus = SHELL_OUT$(programm, erstes, "-c", pyFrage$())
+        END IF
+    CATCH fehler
+        aus = ""
+    END TRY
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+
+' Der Hilfscode in Python: fuehrt _dh_code aus und legt das Ergebnis in der
+' verlangten Art nach _dh_wert. Er laesst nie einen Fehler hinaus, sondern
+' schreibt ihn nach _dh_fehler -- so braucht diese Datei nur die Funktionen
+' der stabilen Python-Schnittstelle.
+FUNCTION pyHilfscode$() AS STRING
+    DIM hilfe AS STRING
+    hilfe = !"import sys as _dh_sys\n"
+    hilfe = hilfe + !"def _dh_lauf():\n"
+    hilfe = hilfe + !"    global _dh_wert, _dh_fehler\n"
+    hilfe = hilfe + !"    _dh_wert = None\n"
+    hilfe = hilfe + !"    _dh_fehler = b''\n"
+    hilfe = hilfe + !"    try:\n"
+    hilfe = hilfe + !"        if _dh_art == 'anweisung':\n"
+    hilfe = hilfe + !"            exec(_dh_code, globals())\n"
+    hilfe = hilfe + !"        else:\n"
+    hilfe = hilfe + !"            r = eval(_dh_code, globals())\n"
+    hilfe = hilfe + !"            if _dh_art == 'zahl':\n"
+    hilfe = hilfe + !"                _dh_wert = float(r)\n"
+    hilfe = hilfe + !"            elif _dh_art == 'ganz':\n"
+    hilfe = hilfe + !"                r = int(r)\n"
+    hilfe = hilfe + !"                if not -2**63 <= r < 2**63:\n"
+    hilfe = hilfe + !"                    raise OverflowError('die Zahl passt nicht in INTEGER (64 Bit)')\n"
+    hilfe = hilfe + !"                _dh_wert = r\n"
+    hilfe = hilfe + !"            elif _dh_art == 'text':\n"
+    hilfe = hilfe + !"                _dh_wert = str(r).encode('utf-8')\n"
+    hilfe = hilfe + !"            else:\n"
+    hilfe = hilfe + !"                _dh_wert = bytes(r)\n"
+    hilfe = hilfe + !"    except BaseException as e:\n"
+    hilfe = hilfe + !"        import traceback\n"
+    ' Die letzte Zeile ist "Typ: Meldung"; bei mehrzeiligem Code die Zeile dazu.
+    hilfe = hilfe + !"        m = traceback.format_exception_only(type(e), e)[-1].strip()\n"
+    hilfe = hilfe + !"        z = e.lineno if isinstance(e, SyntaxError) else None\n"
+    hilfe = hilfe + !"        t = e.__traceback__\n"
+    hilfe = hilfe + !"        while t is not None:\n"
+    hilfe = hilfe + !"            if t.tb_frame.f_code.co_filename == '<string>':\n"
+    hilfe = hilfe + !"                z = t.tb_lineno\n"
+    hilfe = hilfe + !"            t = t.tb_next\n"
+    hilfe = hilfe + !"        if z and chr(10) in _dh_code.strip():\n"
+    hilfe = hilfe + !"            m = m + ' (Zeile %d)' % z\n"
+    hilfe = hilfe + !"        _dh_fehler = m.encode('utf-8')\n"
+    hilfe = hilfe + !"    for s in (_dh_sys.stdout, _dh_sys.stderr):\n"
+    hilfe = hilfe + !"        try:\n"
+    hilfe = hilfe + !"            s.flush()\n"
+    hilfe = hilfe + !"        except Exception:\n"
+    hilfe = hilfe + !"            pass\n"
+    RETURN hilfe
+END FUNCTION
+
+' Einen Python-Wert unter einem Namen in __main__ ablegen (das dict nimmt
+' sich seinen eigenen Verweis, der von der Erzeugung wird abgegeben).
+SUB pySetzeRoh(name AS STRING, obj AS INTEGER)
+    IF obj = 0 THEN THROW "Python: der Wert fuer " + name + " liess sich nicht anlegen"
+    DIM erg AS INTEGER : erg = PyDict_SetItemString(pyGlobale, name, obj)
+    Py_DecRef(obj)
+    IF erg <> 0 THEN THROW "Python: " + name + " liess sich nicht setzen"
+END SUB
+
+' Ein bytes-Objekt als Text (UTF-8), ohne an einem Nullzeichen zu enden.
+FUNCTION pyBytesText$(obj AS INTEGER) AS STRING
+    IF obj = 0 THEN RETURN ""
+    DIM anzahl AS INTEGER : anzahl = PyBytes_Size(obj)
+    IF anzahl <= 0 THEN RETURN ""
+    RETURN BUFFER_TO_STRING$(BUFFER_AUS_ZEIGER(PyBytes_AsString(obj), anzahl))
+END FUNCTION
+
+' Python starten. Ohne Argument wird gesucht (siehe oben); mit Argument ist
+' es das Python-Programm, das gefragt wird (etwa "C:/Python312/python.exe"
+' oder ".venv/bin/python"). Ein zweiter Aufruf tut nichts.
+SUB pythonStarten(programm AS STRING = "")
+    IF pyBereit THEN RETURN
+    DIM antwort AS STRING : antwort = ""
+    DIM versucht AS STRING : versucht = ""
+    IF programm = "" THEN programm = GETENV$("DH_PYTHON")
+    IF programm <> "" THEN
+        antwort = pyFragen$(programm, "")
+        versucht = programm
+    ELSE
+        IF GETENV$("WINDIR") <> "" THEN
+            antwort = pyFragen$("py", "-3")
+            versucht = "py -3"
+        END IF
+        IF antwort = "" THEN
+            antwort = pyFragen$("python3", "")
+            versucht = versucht + ", python3"
+        END IF
+        IF antwort = "" THEN
+            antwort = pyFragen$("python", "")
+            versucht = versucht + ", python"
+        END IF
+    END IF
+    IF antwort = "" THEN
+        THROW "Python: keins gefunden (versucht: " + versucht + ") -- Python installieren oder den Pfad zum Programm in DH_PYTHON eintragen"
+    END IF
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(antwort, CHR$(10))
+    IF LEN(zeilen) < 2 THEN THROW "Python: unerwartete Antwort von " + versucht + ": " + antwort
+    DIM bib AS STRING : bib = TRIM$(zeilen[0])
+    IF NOT FILEEXISTS(bib) THEN
+        THROW "Python: die Bibliothek " + bib + " fehlt -- dieses Python ist ohne gemeinsame Bibliothek gebaut (unter Linux etwa das Paket libpython3-dev nachinstallieren)"
+    END IF
+    DIM pfad AS STRING : pfad = ""
+    DIM zeile AS INTEGER
+    FOR zeile = 2 TO LEN(zeilen) - 1
+        IF pfad <> "" THEN pfad = pfad + CHR$(10)
+        pfad = pfad + zeilen[zeile]
+    NEXT
+    SETENV("DH_PYTHON_DLL", bib)
+    SETENV("PYTHONHOME", TRIM$(zeilen[1]))
+    Py_InitializeEx(0)
+    pyGlobale = PyModule_GetDict(PyImport_AddModule("__main__"))
+    DIM code AS INTEGER : code = Py_CompileString(pyHilfscode$(), "<drachenhauch>", PY_ANWEISUNGEN)
+    IF code = 0 THEN THROW "Python: der Hilfscode laesst sich nicht uebersetzen"
+    DIM erg AS INTEGER : erg = PyEval_EvalCode(code, pyGlobale, pyGlobale)
+    Py_DecRef(code)
+    IF erg = 0 THEN THROW "Python: der Hilfscode laesst sich nicht ausfuehren"
+    Py_DecRef(erg)
+    pyLauf = Py_CompileString("_dh_lauf()", "<drachenhauch>", PY_AUSDRUCK)
+    pyQuelle = bib
+    pyBereit = TRUE
+    pythonSetzeText("_dh_pfad", pfad)
+    pythonAusfuehren("_dh_sys.path[:] = [p for p in _dh_pfad.split(chr(10))]")
+END SUB
+
+' TRUE, wenn sich ein Python starten laesst (oder schon laeuft) -- fuer
+' Programme, die ohne Python einen anderen Weg gehen.
+FUNCTION pythonVorhanden() AS BOOLEAN
+    TRY
+        pythonStarten()
+    CATCH fehler
+        RETURN FALSE
+    END TRY
+    RETURN TRUE
+END FUNCTION
+
+' Die Bibliothek des laufenden Pythons ("" vor dem Start).
+FUNCTION pythonBibliothek$() AS STRING
+    RETURN pyQuelle
+END FUNCTION
+
+' Code in der verlangten Art ausfuehren; ein Fehler in Python wird hier zum
+' Fehler in Drachenhauch.
+SUB pyAuftrag(art AS STRING, code AS STRING)
+    pythonStarten()
+    pySetzeRoh("_dh_art", PyUnicode_FromString(art))
+    pySetzeRoh("_dh_code", PyUnicode_FromString(code))
+    DIM erg AS INTEGER : erg = PyEval_EvalCode(pyLauf, pyGlobale, pyGlobale)
+    IF erg = 0 THEN THROW "Python: der Hilfscode ist gescheitert"
+    Py_DecRef(erg)
+    DIM f AS STRING : f = pyBytesText$(PyDict_GetItemString(pyGlobale, "_dh_fehler"))
+    IF f <> "" THEN THROW "Python: " + f
+END SUB
+
+' Anweisungen ausfuehren (auch mehrere Zeilen, import, def, class).
+SUB pythonAusfuehren(code AS STRING)
+    pyAuftrag("anweisung", code)
+END SUB
+
+' Einen Ausdruck auswerten -- als Kommazahl, Ganzzahl, Text oder Bytes.
+FUNCTION pythonZahl(ausdruck AS STRING) AS FLOAT
+    pyAuftrag("zahl", ausdruck)
+    RETURN PyFloat_AsDouble(PyDict_GetItemString(pyGlobale, "_dh_wert"))
+END FUNCTION
+
+FUNCTION pythonGanz(ausdruck AS STRING) AS INTEGER
+    pyAuftrag("ganz", ausdruck)
+    RETURN PyLong_AsLongLong(PyDict_GetItemString(pyGlobale, "_dh_wert"))
+END FUNCTION
+
+FUNCTION pythonText$(ausdruck AS STRING) AS STRING
+    pyAuftrag("text", ausdruck)
+    RETURN pyBytesText$(PyDict_GetItemString(pyGlobale, "_dh_wert"))
+END FUNCTION
+
+' bytes(ausdruck) als BUFFER -- auch fuer ein numpy-Feld (seine Rohdaten).
+FUNCTION pythonBytes(ausdruck AS STRING) AS BUFFER
+    pyAuftrag("bytes", ausdruck)
+    DIM obj AS INTEGER : obj = PyDict_GetItemString(pyGlobale, "_dh_wert")
+    DIM anzahl AS INTEGER : anzahl = PyBytes_Size(obj)
+    IF anzahl <= 0 THEN RETURN BUFFER_NEW(0)
+    RETURN BUFFER_AUS_ZEIGER(PyBytes_AsString(obj), anzahl)
+END FUNCTION
+
+' Einen Wert aus Drachenhauch unter einem Namen in Python ablegen.
+SUB pythonSetzeZahl(name AS STRING, wert AS FLOAT)
+    pythonStarten()
+    pySetzeRoh(name, PyFloat_FromDouble(wert))
+END SUB
+
+SUB pythonSetzeGanz(name AS STRING, anzahl AS INTEGER)
+    pythonStarten()
+    pySetzeRoh(name, PyLong_FromLongLong(anzahl))
+END SUB
+
+SUB pythonSetzeText(name AS STRING, text AS STRING)
+    pythonStarten()
+    pySetzeRoh(name, PyUnicode_FromString(text))
+END SUB
+
+' Die Bytes eines BUFFER als bytes-Objekt (kopiert) -- in Python etwa
+' numpy.frombuffer(name, dtype='<f8').
+SUB pythonSetzeBytes(name AS STRING, puffer AS BUFFER)
+    pythonStarten()
+    IF BUFFER_LEN(puffer) = 0 THEN
+        pySetzeRoh(name, PyBytes_FromStringAndSize(0, 0))
+    ELSE
+        pySetzeRoh(name, PyBytes_FromStringAndSize(BUFFER_ZEIGER(puffer), BUFFER_LEN(puffer)))
+    END IF
+END SUB
