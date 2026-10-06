@@ -161,7 +161,7 @@ pub fn dateinamen(name: &str, system: &str) -> Vec<String> {
     }
 }
 
-fn system() -> &'static str {
+pub fn system() -> &'static str {
     if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" }
 }
 
@@ -505,6 +505,85 @@ pub fn rufen(a: &[Value]) -> Result<Value, String> {
     }
 }
 
+/// Die Befehle fuer Zeiger einer Bibliothek (Stufe 2): `TEXT_AUS_ZEIGER$`,
+/// `BUFFER_AUS_ZEIGER`, `BUFFER_ZEIGER`. `None` = kein Befehl dieser Familie.
+/// Alle drei vertrauen dem Zeiger -- ein falscher beendet das Programm wie
+/// jeder Fehler in fremdem Code; geprueft wird, was sich pruefen laesst
+/// (Nullzeiger, Laenge, Obergrenze).
+pub fn zeiger_befehl(name: &str, a: &[Value]) -> Option<Result<Value, String>> {
+    let gross = match name {
+        "text_aus_zeiger$" => "TEXT_AUS_ZEIGER$",
+        "buffer_aus_zeiger" => "BUFFER_AUS_ZEIGER",
+        "buffer_zeiger" => "BUFFER_ZEIGER",
+        _ => return None,
+    };
+    #[cfg(not(feature = "ffi"))]
+    {
+        let _ = a;
+        return Some(Err(format!("{}: Zeiger gibt es nur mit fremden Bibliotheken -- dieser Bau ist ohne das Feature ffi gebaut", gross)));
+    }
+    #[cfg(feature = "ffi")]
+    Some(zeiger_rufen(gross, a))
+}
+
+#[cfg(feature = "ffi")]
+fn zeiger_rufen(gross: &str, a: &[Value]) -> Result<Value, String> {
+    let argzahl = |von: usize, bis: usize| -> Result<(), String> {
+        if a.len() < von || a.len() > bis {
+            let soll = if von == bis { von.to_string() } else { format!("{} bis {}", von, bis) };
+            return Err(format!("{}: erwartet {} Argument(e), erhalten {}", gross, soll, a.len()));
+        }
+        Ok(())
+    };
+    let zeiger = |v: &Value| -> Result<u64, String> {
+        match v {
+            Value::Int(i) => Ok(*i as u64),
+            Value::Nil => Ok(0),
+            _ => Err(format!("{}: erwartet einen Zeiger (INTEGER), erhalten {}", gross, v.type_name())),
+        }
+    };
+    match gross {
+        "TEXT_AUS_ZEIGER$" => {
+            argzahl(1, 2)?;
+            let p = zeiger(&a[0])?;
+            let breit = match a.get(1) {
+                None => false,
+                Some(Value::Bool(b)) => *b,
+                Some(Value::Int(i)) => *i != 0,
+                Some(v) => return Err(format!("{}: breit erwartet TRUE/FALSE, erhalten {}", gross, v.type_name())),
+            };
+            Ok(Value::str_rc(unsafe { text_aus(p, breit) }))
+        }
+        "BUFFER_AUS_ZEIGER" => {
+            argzahl(2, 2)?;
+            let p = zeiger(&a[0])?;
+            let n = match &a[1] {
+                Value::Int(i) => *i,
+                v => return Err(format!("{}: die Laenge erwartet INTEGER, erhalten {}", gross, v.type_name())),
+            };
+            if n < 0 { return Err(format!("{}: Laenge {} ist negativ", gross, n)); }
+            if n > 1 << 30 {
+                return Err(format!("{}: Laenge {} ueberschreitet die Obergrenze von {} Bytes", gross, n, 1i64 << 30));
+            }
+            if n == 0 { return Ok(crate::builtins::neuer_buffer(Vec::new())); }
+            if p == 0 { return Err(format!("{}: der Zeiger ist 0 (NULL) -- dort liegen keine {} Bytes", gross, n)); }
+            let bytes = unsafe { std::slice::from_raw_parts(p as *const u8, n as usize) }.to_vec();
+            Ok(crate::builtins::neuer_buffer(bytes))
+        }
+        _ => {
+            argzahl(1, 1)?;
+            match &a[0] {
+                // Ein leerer Puffer hat keine Bytes, auf die man zeigen koennte.
+                Value::Buffer(b) => {
+                    let b = b.borrow();
+                    Ok(Value::Int(if b.is_empty() { 0 } else { b.as_ptr() as usize as i64 }))
+                }
+                v => Err(format!("{}: erwartet einen BUFFER, erhalten {}", gross, v.type_name())),
+            }
+        }
+    }
+}
+
 #[cfg(feature = "ffi")]
 fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     let sig = &auf.sig;
@@ -707,6 +786,35 @@ mod tests {
             rufen_mit(&f, &[Value::Buffer(puf.clone()), Value::Int(4)]).unwrap();
             assert_eq!(*puf.borrow(), vec![1, 2, 3, 4]);
             assert!(fehler(rufen_mit(&f, &[Value::Buffer(puf), Value::Int(1 << 40)])).contains("Argument 2"));
+        }
+
+        #[test]
+        fn zeiger_lesen_und_puffer_zeigen() {
+            fn z(name: &str, a: &[Value]) -> Result<Value, String> { zeiger_befehl(name, a).expect("Befehl der Familie") }
+            assert!(zeiger_befehl("buffer_new", &[]).is_none());
+            // Ein Text der Rust-Seite als C-Zeiger, schmal und breit.
+            let schmal = std::ffi::CString::new("Grüße").unwrap();
+            let p = Value::Int(schmal.as_ptr() as i64);
+            assert!(matches!(z("text_aus_zeiger$", &[p.clone()]).unwrap(), Value::Str(s) if s.as_str() == "Grüße"));
+            let breit = breit_kodieren("Drache 🐉");
+            let pb = Value::Int(breit.as_ptr() as i64);
+            assert!(matches!(z("text_aus_zeiger$", &[pb, Value::Bool(true)]).unwrap(), Value::Str(s) if s.as_str() == "Drache 🐉"));
+            assert!(matches!(z("text_aus_zeiger$", &[Value::Int(0)]).unwrap(), Value::Str(s) if s.is_empty()));
+            // Bytes: genau die verlangte Zahl, samt der Null am Ende.
+            match z("buffer_aus_zeiger", &[p, Value::Int(8)]).unwrap() {
+                Value::Buffer(b) => assert_eq!(*b.borrow(), "Grüße\0".as_bytes()),
+                _ => panic!("BUFFER erwartet"),
+            }
+            assert!(fehler(z("buffer_aus_zeiger", &[Value::Int(0), Value::Int(1)])).contains("NULL"));
+            assert!(fehler(z("buffer_aus_zeiger", &[Value::Int(1), Value::Int(-1)])).contains("negativ"));
+            // BUFFER_ZEIGER zeigt auf die Bytes selbst: hin und zurueck.
+            let puf = Rc::new(RefCell::new(b"abc\0".to_vec()));
+            let adr = z("buffer_zeiger", &[Value::Buffer(puf.clone())]).unwrap();
+            assert!(matches!(&adr, Value::Int(i) if *i as usize == puf.borrow().as_ptr() as usize));
+            assert!(matches!(z("text_aus_zeiger$", &[adr]).unwrap(), Value::Str(s) if s.as_str() == "abc"));
+            let leer = Rc::new(RefCell::new(Vec::new()));
+            assert!(matches!(z("buffer_zeiger", &[Value::Buffer(leer)]).unwrap(), Value::Int(0)));
+            assert!(fehler(z("buffer_zeiger", &[Value::Int(3)])).contains("BUFFER"));
         }
     }
 }

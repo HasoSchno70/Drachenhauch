@@ -1915,7 +1915,8 @@ impl<'p> Vm<'p> {
             25 => self.try_video(name, a),
             26 => self.try_gui(name, a),
             27 => self.try_graphics(name, a),
-            28 => if name == "__ffi" { crate::ffi::rufen(a).map(Some) } else { Ok(None) },
+            28 => if name == "__ffi" { crate::ffi::rufen(a).map(Some) }
+                  else { crate::ffi::zeiger_befehl(name, a).transpose() },
             _ => match safe_call_builtin(name, a) {
                 Some(Ok(v)) => Ok(Some(v)),
                 Some(Err(e)) if e.starts_with("__UNKNOWN_BUILTIN__:") => Err(unknown_builtin_msg(name)),

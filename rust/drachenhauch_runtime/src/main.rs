@@ -2005,6 +2005,51 @@ fn gerufene_befehle(json: &serde_json::Value) -> std::collections::BTreeSet<Stri
     namen
 }
 
+/// Die Bibliotheken aller `DECLARE ... LIB`-Zeilen des uebersetzten
+/// Programms (samt IMPORTs): jede steht als Signatur (`ffi::signatur_text`)
+/// in den Konstanten. "c" und "m" sind immer die des Systems.
+fn ffi_bibliotheken(json: &serde_json::Value) -> std::collections::BTreeSet<String> {
+    let mut libs = std::collections::BTreeSet::new();
+    fn gehen(v: &serde_json::Value, libs: &mut std::collections::BTreeSet<String>) {
+        match v {
+            serde_json::Value::String(t) if t.contains(ffi::TRENNER) => {
+                if let Ok(sig) = ffi::signatur_lesen(t) {
+                    if !matches!(sig.lib.to_lowercase().as_str(), "c" | "m") { libs.insert(sig.lib); }
+                }
+            }
+            serde_json::Value::Array(a) => for x in a { gehen(x, libs); },
+            serde_json::Value::Object(o) => for x in o.values() { gehen(x, libs); },
+            _ => {}
+        }
+    }
+    gehen(json, &mut libs);
+    libs
+}
+
+/// Kopiert jede Bibliothek, die neben dem Programm liegt, an dieselbe
+/// Stelle neben der exportierten Exe. Je Bibliothek: `Some(datei)` =
+/// mitkopiert, `None` = liegt nicht daneben.
+fn bibliotheken_mitnehmen(json: &serde_json::Value, base: &std::path::Path, out: &std::path::Path)
+    -> Vec<(String, Result<Option<String>, String>)> {
+    let mut ergebnis = Vec::new();
+    for lib in ffi_bibliotheken(json) {
+        let datei = ffi::dateinamen(&lib, ffi::system()).into_iter()
+            .find(|n| std::path::Path::new(n).is_relative() && base.join(n).is_file());
+        let r = match datei {
+            None => Ok(None),
+            Some(n) => {
+                let ziel = out.join(&n);
+                ziel.parent().map(std::fs::create_dir_all).transpose()
+                    .and_then(|_| std::fs::copy(base.join(&n), &ziel))
+                    .map(|_| Some(n.replace('\\', "/")))
+                    .map_err(|e| e.to_string())
+            }
+        };
+        ergebnis.push((lib, r));
+    }
+    ergebnis
+}
+
 /// `dhrt --fehlende name ...`: jeder Name wird mit absichtlich unsinnigen
 /// Argumenten (40 x NIL) gerufen. Ein Befehl, den dieser Bau hat, scheitert
 /// an den Argumenten; einer, den er nicht hat, meldet das (`fehlt_im_bau`).
@@ -2209,6 +2254,16 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
     if assets.is_dir() {
         if let Err(e) = copy_dir_recursive(&assets, &out.join("assets")) {
             eprintln!("Warnung: assets/ nicht vollstaendig kopiert: {}", e);
+        }
+    }
+    // 4a) Fremde Bibliotheken (DECLARE ... LIB), die neben dem Programm
+    // liegen. Gefunden wird zur Laufzeit dort zuerst (neben der Exe); was
+    // nicht daneben liegt, muss das System des Zielrechners finden.
+    for (lib, kopiert) in bibliotheken_mitnehmen(&json, &base, &out) {
+        match kopiert {
+            Ok(Some(datei)) => println!("  Bibliothek \"{}\" mitkopiert: {}", lib, datei),
+            Ok(None) => println!("  Hinweis: Bibliothek \"{}\" liegt nicht neben dem Programm -- der Zielrechner muss sie haben (eine Systembibliothek wie kernel32 hat er)", lib),
+            Err(e) => eprintln!("Warnung: Bibliothek \"{}\" nicht kopiert: {}", lib, e),
         }
     }
     // 4b) Zusaetzlich alle im Quelltext referenzierten Dateien einsammeln --

@@ -2,7 +2,7 @@
 
 Stand 2026-10-05. Punkt „Kein Aufruf fremder DLLs/.so“ aus
 [entwurf-anwendungen-und-tempo.md](entwurf-anwendungen-und-tempo.md).
-**Stufe 1 ist gebaut (2026-10-05)** -- Handbuch [ffi.md](ffi.md). Die
+**Stufe 1 ist gebaut (2026-10-05), Stufe 2 am 2026-10-06** -- Handbuch [ffi.md](ffi.md). Die
 Syntax unten steht weiter in Textblöcken, weil es die Fassung des Entwurfs
 ist.
 
@@ -226,6 +226,25 @@ am Übergang selbst (Erweiterung der Rückgabe, SINGLE als FLOAT geladen)
 fallen unter x86-64 nicht, weil das Register die unteren Bits ohnehin
 richtig hält; die Prüfung sitzt darum an den Stellen davor und danach
 (`zahl_platz`, `platz_wert`) und in den Rust-Tests mit 8/16-Bit-Werten.
+
+**Stand Stufe 2 (2026-10-06):** `TEXT_AUS_ZEIGER$` und
+`BUFFER_AUS_ZEIGER` wie oben, dazu ein dritter Befehl, den der Bau gezeigt
+hat: `BUFFER_ZEIGER(puffer)`. Ohne ihn kann ein Struct kein Feld haben, das
+auf einen anderen Puffer zeigt -- und mit ihm liest `TEXT_AUS_ZEIGER$` auch
+ein Textfeld mitten in einem Struct (`uname`). Er gilt, solange der Puffer
+seine Groesse behaelt (`BUFFER_RESIZE` legt die Bytes neu an). Alle drei
+liegen in Befehlsfamilie 28 und duerfen in Maschinencode-Bereiche (sie rufen
+keinen fremden Code). Geprueft mit `GetCommandLineW/A`, `_strdup`/`_wcsdup`
++ `free`, `GlobalMemoryStatusEx` (Groessenfeld vorher setzen),
+`GetSystemTimeAsFileTime` -> `FileTimeToSystemTime` unter Windows und
+`strdup`/`wcsdup`, `gettimeofday` gegen `time`, `uname` auf Linux/macOS.
+**Export:** die Bibliotheken stehen als Signatur in den Konstanten des
+uebersetzten Programms -- nur gerufene, eine bloss deklarierte kommt nicht
+mit. Kopiert wird die Datei unter dem Namen des exportierenden Systems
+(`dateinamen`); "c"/"m" nie, alles andere, was nicht daneben liegt, nennt ein
+Hinweis. Unter Windows belegt mit einer umbenannten Kopie von
+`ucrtbase.dll`, die die exportierte Exe aus ihrem Ordner laedt, nachdem die
+Kopie neben der Quelle geloescht ist.
 
 ## Die Fragen dazu (entschieden, siehe oben)
 
