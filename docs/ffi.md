@@ -90,8 +90,9 @@ Drachenhauch-Typen sagen nicht, wie breit eine Zahl in C ist.
   Objektelement sein.
 * **Rückgabe:** jeder Typ außer `BUFFER`. `TEXT`/`WTEXT` werden aus dem
   Zeiger kopiert (ein Nullzeiger wird `""`); freigegeben wird nichts --
-  braucht die Bibliothek das, gibt man `ZEIGER` zurück und ruft ihre eigene
-  Freigabe.
+  braucht die Bibliothek das, gibt
+  man `ZEIGER` zurück, liest ihn mit `TEXT_AUS_ZEIGER$` und ruft danach ihre
+  eigene Freigabe (siehe [Zeiger](#zeiger)).
 
 ## Die Bibliothek finden
 
@@ -165,6 +166,86 @@ PRINT strtod("2.5 Meter", ende)     ' 2.5
 PRINT hypot(3.0, 4.0)               ' 5.0
 ```
 
+## Zeiger
+
+Manche Bibliotheken liefern keinen Wert, sondern einen **Zeiger** auf
+Speicher, der ihnen gehört: einen Text, den der Aufrufer danach freigeben
+soll, ein Feld von Bytes, ein Struct. Drei Befehle verbinden `ZEIGER` und
+`BUFFER`:
+
+| Befehl | was es tut |
+|---|---|
+| `TEXT_AUS_ZEIGER$(zeiger [, breit])` | kopiert den Text hinter einem Zeiger bis zum Nullzeichen (UTF-8; mit `breit` = TRUE `wchar_t`, also UTF-16 unter Windows); 0 ergibt `""` |
+| `BUFFER_AUS_ZEIGER(zeiger, laenge)` | kopiert `laenge` Bytes hinter einem Zeiger in einen neuen BUFFER; 0 Bytes ergeben einen leeren, ein Nullzeiger mit Länge ist ein Fehler |
+| `BUFFER_ZEIGER(puffer)` | die Adresse der Bytes eines BUFFER, für ein Struct-Feld, das auf einen anderen Puffer zeigt; ein leerer Puffer ergibt 0 |
+
+```basic
+DECLARE FUNCTION malloc LIB "c" (n AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION strcpy LIB "c" (ziel AS ZEIGER, quelle AS TEXT) AS ZEIGER
+DECLARE SUB free LIB "c" (z AS ZEIGER)
+
+DIM z AS INTEGER
+z = malloc(16)                             ' 16 Bytes, die der C-Bibliothek gehoeren
+strcpy(z, "Grüße")
+PRINT TEXT_AUS_ZEIGER$(z)                  ' Grüße
+PRINT BUFFER_LEN(BUFFER_AUS_ZEIGER(z, 8))  ' 8: sieben Bytes UTF-8 und die Null
+free(z)                                    ' der Speicher gehört der Bibliothek
+```
+
+* **Alle drei kopieren** -- ein Text oder BUFFER aus einem Zeiger hängt
+  danach nicht mehr am Speicher der Bibliothek, sie darf ihn freigeben.
+* **Sie vertrauen dem Zeiger.** Ein falscher oder schon freigegebener Zeiger
+  ist einer der Abstürze von oben; eine zu große Länge liest über das Ende
+  hinaus. Geprüft wird, was sich prüfen lässt: Nullzeiger, negative Länge,
+  höchstens 1 GiB.
+* **`BUFFER_ZEIGER` gilt, solange der Puffer seine Größe behält.**
+  `BUFFER_RESIZE` legt die Bytes woanders hin, der alte Zeiger zeigt dann ins
+  Leere. Die Bibliothek darf den Zeiger nur so lange halten, wie das Programm
+  den Puffer unverändert lässt.
+
+### Structs mit Zeigern
+
+Ein Feld vom Typ `char*` oder `void*` ist in einem Struct acht Bytes breit
+(auf 64-Bit-Systemen) und steht auf einer durch acht teilbaren Stelle. Mit
+`BUFFER_ZEIGER` und `BUFFER_SET_I64` setzt man es, mit `BUFFER_GET_I64` und
+`TEXT_AUS_ZEIGER$` liest man es:
+
+```basic
+' struct { const char* name; int32_t laenge; }   -- 16 Bytes mit Ausrichtung
+DIM name AS BUFFER
+name = BUFFER_CONCAT(BUFFER_FROM_STRING("Drache"), BUFFER_NEW(1))   ' mit der Null
+DIM s AS BUFFER
+s = BUFFER_NEW(16)
+BUFFER_SET_I64(s, 0, BUFFER_ZEIGER(name))
+BUFFER_SET_I32(s, 8, 6)
+PRINT TEXT_AUS_ZEIGER$(BUFFER_GET_I64(s, 0))   ' Drache
+```
+
+Manche Structs wollen vor dem Aufruf ihre eigene Größe im ersten Feld --
+unter Windows etwa `MEMORYSTATUSEX` (64) für `GlobalMemoryStatusEx`; ohne
+sie lehnt die Funktion ab. Auf Linux und macOS hat `struct utsname` (für
+`uname`) Felder fester Breite, 65 Bytes unter Linux und 256 unter macOS --
+die Lage eines Feldes hängt also am System.
+
+## Export
+
+`dhrt --export` nimmt jede Bibliothek mit, die **neben dem Programm** liegt,
+und legt sie neben die Exe -- dort sucht die Laufzeit zuerst. Ein Name mit
+Pfad (`"lib/messgeraet.dll"`) behält seinen Ordner. Gezählt werden nur
+Bibliotheken, deren Funktionen das Programm auch aufruft; die
+C-Bibliothek (`"c"`, `"m"`) nie. Was nicht daneben liegt, nennt der Export
+als Hinweis -- eine Systembibliothek wie `kernel32` hat jeder Zielrechner,
+eine fremde muss man selbst mitgeben:
+
+```text
+  Bibliothek "messgeraet" mitkopiert: messgeraet.dll
+  Hinweis: Bibliothek "kernel32" liegt nicht neben dem Programm -- der Zielrechner muss sie haben (eine Systembibliothek wie kernel32 hat er)
+```
+
+Mitgenommen wird die Datei **des Systems, auf dem exportiert wird**
+(`messgeraet.dll` unter Windows, `libmessgeraet.so` unter Linux) -- ein
+Export läuft ohnehin nur auf diesem System.
+
 ## Unsichere Bibliotheken
 
 Eine Bibliothek, die abstürzen könnte, ruft man in einem **Auftrag** auf
@@ -197,8 +278,6 @@ END TRY
 * **Structs als Wert**, nur über einen Zeiger (`BUFFER`); die Lage der
   Felder samt Ausrichtung rechnet man selbst.
 * **Variable Argumentzahl** (`printf`), C++-Namen, COM.
-* **Zeiger lesen**, die eine Bibliothek liefert (Text oder Bytes hinter
-  einem `ZEIGER`) -- als Nächstes geplant.
 * **Im Browser** gibt es keine fremden Bibliotheken; ein Aufruf ist dort ein
   Fehler mit diesem Satz.
 

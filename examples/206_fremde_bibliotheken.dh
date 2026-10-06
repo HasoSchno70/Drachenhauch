@@ -13,12 +13,16 @@ DECLARE FUNCTION strlen LIB "c" (s AS TEXT) AS ZEIGER
 DECLARE FUNCTION getenv LIB "c" (name AS TEXT) AS TEXT
 DECLARE FUNCTION strtod LIB "c" (s AS TEXT, BYREF ende AS ZEIGER) AS FLOAT
 DECLARE FUNCTION hypot LIB "m" (x AS FLOAT, y AS FLOAT) AS FLOAT
+DECLARE FUNCTION malloc LIB "c" (n AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION strcpy LIB "c" (ziel AS ZEIGER, quelle AS TEXT) AS ZEIGER
+DECLARE SUB free LIB "c" (z AS ZEIGER)
 
 ' --- die Windows-API
 DECLARE FUNCTION GetTickCount64 LIB "kernel32" () AS INTEGER
 DECLARE SUB GetSystemTime LIB "kernel32" (zeit AS BUFFER)
 DECLARE FUNCTION GetComputerNameW LIB "kernel32" (puffer AS BUFFER, BYREF laenge AS ULONG) AS BOOLEAN
 DECLARE FUNCTION Bytes LIB "kernel32" ALIAS "lstrlenA" (s AS TEXT) AS LONG
+DECLARE FUNCTION GetCommandLineW LIB "kernel32" () AS ZEIGER
 
 PRINT "== C-Bibliothek"
 PRINT "strlen(""Drachenhauch"") = "; strlen("Drachenhauch")
@@ -30,6 +34,15 @@ PRINT "strtod(""2.5 Meter"")    = "; strtod("2.5 Meter", ende)
 DIM pfad AS STRING
 pfad = getenv("PATH")
 PRINT "PATH hat "; LEN(pfad); " Zeichen"
+
+' Zeiger: Speicher, der der C-Bibliothek gehoert. TEXT_AUS_ZEIGER$ und
+' BUFFER_AUS_ZEIGER kopieren heraus -- danach darf free ihn freigeben.
+DIM z AS INTEGER
+z = malloc(32)
+strcpy(z, "aus dem C-Speicher")
+PRINT "TEXT_AUS_ZEIGER$       = "; TEXT_AUS_ZEIGER$(z)
+PRINT "erstes Byte            = "; BUFFER_GET(BUFFER_AUS_ZEIGER(z, 4), 0)
+free(z)
 
 PRINT
 PRINT "== Windows-API"
@@ -56,6 +69,8 @@ TRY
         PRINT "Rechnername: "; name
     END IF
     PRINT "lstrlenA(""Grüße"") = "; Bytes("Grüße")
+    ' Ein Zeiger auf UTF-16-Text, der Windows gehoert (nicht freigeben).
+    PRINT "Kommandozeile: "; TEXT_AUS_ZEIGER$(GetCommandLineW(), TRUE)
 CATCH e
     PRINT "(nicht unter Windows: "; e; ")"
 END TRY

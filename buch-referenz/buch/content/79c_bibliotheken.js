@@ -60,6 +60,42 @@ module.exports = (H) => [
   ]),
   H.p("Genauso kommen Texte zurück, die eine Funktion schreibt: GetComputerNameW füllt einen Puffer mit UTF-16-Zeichen und nennt die Länge über BYREF. Das ganze Programm steht in den Beispielen als 206_fremde_bibliotheken.dh."),
 
+  H.h2("Zeiger, die eine Bibliothek liefert"),
+  H.p("Manche Funktionen geben keinen Wert zurück, sondern einen Zeiger auf Speicher, der der Bibliothek gehört – einen Text, den du danach freigeben sollst, oder ein Stück Bytes. Den Zeiger nimmst du als ZEIGER entgegen; drei Befehle machen daraus etwas, mit dem Drachenhauch arbeiten kann:"),
+  H.table([
+    ["TEXT_AUS_ZEIGER$(zeiger [, breit])", "Text bis zum Nullzeichen, UTF-8 oder mit breit = TRUE als wchar_t"],
+    ["BUFFER_AUS_ZEIGER(zeiger, laenge)", "so viele Bytes in einen neuen BUFFER"],
+    ["BUFFER_ZEIGER(puffer)", "die Adresse der Bytes eines BUFFER, für ein Struct-Feld"],
+  ], { headers: ["Befehl", "liefert"], mono: [0] }),
+  H.code([
+    'DECLARE FUNCTION malloc LIB "c" (n AS ZEIGER) AS ZEIGER',
+    'DECLARE FUNCTION strcpy LIB "c" (ziel AS ZEIGER, quelle AS TEXT) AS ZEIGER',
+    'DECLARE SUB free LIB "c" (z AS ZEIGER)',
+    '',
+    'DIM z AS INTEGER',
+    'z = malloc(16)                   \' 16 Bytes, die der C-Bibliothek gehoeren',
+    'strcpy(z, "Grüße")',
+    'PRINT TEXT_AUS_ZEIGER$(z)',
+    'PRINT BUFFER_LEN(BUFFER_AUS_ZEIGER(z, 8))',
+    'free(z)',
+  ]),
+  H.code(["Grüße", "8"], { out: true }),
+  H.p("Alle drei kopieren: Was herauskommt, hängt nicht mehr am Speicher der Bibliothek, und free darf ihn danach freigeben. Die acht Bytes sind die sieben von „Grüße“ in UTF-8 und das Nullzeichen dahinter."),
+  H.warn("Die Befehle vertrauen dem Zeiger. Ein falscher oder schon freigegebener Zeiger beendet das Programm wie jeder Fehler in fremdem Code, eine zu große Länge liest über das Ende hinaus. Geprüft werden nur der Nullzeiger und die Länge.", "Vorsicht"),
+  H.p("BUFFER_ZEIGER braucht man, wenn ein Struct ein Feld hat, das auf einen anderen Puffer zeigt – ein char* ist auf einem 64-Bit-System acht Bytes breit:"),
+  H.code([
+    '\' struct { const char* name; int32_t laenge; } -- 16 Bytes',
+    'DIM name AS BUFFER',
+    'name = BUFFER_CONCAT(BUFFER_FROM_STRING("Drache"), BUFFER_NEW(1))',
+    'DIM s AS BUFFER',
+    's = BUFFER_NEW(16)',
+    'BUFFER_SET_I64(s, 0, BUFFER_ZEIGER(name))',
+    'BUFFER_SET_I32(s, 8, 6)',
+    'PRINT TEXT_AUS_ZEIGER$(BUFFER_GET_I64(s, 0))',
+  ]),
+  H.code(["Drache"], { out: true }),
+  H.tip("Der Zeiger aus BUFFER_ZEIGER gilt, solange der Puffer seine Größe behält. BUFFER_RESIZE legt die Bytes woanders hin – danach zeigt ein gemerkter Zeiger ins Leere.", "Nicht vergrößern"),
+
   H.h2("Wenn die Bibliothek fehlt"),
   H.p("Geladen wird erst beim ersten Aufruf. Ein Programm, das den Zweig nie nimmt, läuft auch ohne die Bibliothek – und fehlt sie oder die Funktion darin, ist das ein gewöhnlicher Laufzeitfehler, den CATCH abfängt:"),
   H.code([
@@ -72,7 +108,10 @@ module.exports = (H) => [
     'END TRY',
   ]),
 
+  H.h2("Das Programm weitergeben"),
+  H.p("dhrt --export nimmt jede Bibliothek mit, die neben dem Programm liegt, und legt sie neben die exportierte Exe – dort sucht die Laufzeit zuerst. Für eine Systembibliothek wie kernel32 oder die C-Bibliothek ist das nicht nötig; eine fremde, die nicht daneben liegt, nennt der Export als Hinweis, damit du sie selbst mitgibst."),
+
   H.h2("Unsichere Bibliotheken"),
   H.p("Einer Bibliothek, die abstürzen könnte, gibst du einen eigenen Prozess: Du rufst sie in einem Auftrag mit TASK_START auf (Kapitel „Programme, Aufträge & Umgebung“). Stürzt der Auftrag ab, bekommt dein Programm beim Abholen mit TASK_RESULT$ einen Fehler – „der Auftrag ist abgestuerzt“ – und läuft weiter."),
-  H.note("Noch nicht dabei sind Rückrufe (eine Bibliothek, die eine Funktion deines Programms aufruft), Structs als Wert, Funktionen mit variabler Argumentzahl wie printf und das Lesen von Speicher hinter einem ZEIGER. Im Browser gibt es keine fremden Bibliotheken."),
+  H.note("Noch nicht dabei sind Rückrufe (eine Bibliothek, die eine Funktion deines Programms aufruft), Structs als Wert und Funktionen mit variabler Argumentzahl wie printf. Im Browser gibt es keine fremden Bibliotheken."),
 ];

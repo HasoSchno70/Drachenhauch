@@ -1389,11 +1389,17 @@ Vervollstaendigung). **Gegenproben:** eine Verfaelschung der Rueckgabe-
 Erweiterung oder SINGLE-als-FLOAT IM Uebergang faellt unter x86-64 nicht
 (das Register haelt die unteren Bits richtig) -- geprueft wird an
 `zahl_platz`/`platz_wert` und in den Rust-Tests. Tests
-`tests/pruef/ffi.dhtest` (21; Windows kernel32/user32, sonst die C-Bibliothek
+`tests/pruef/ffi.dhtest` (32; Windows kernel32/user32, sonst die C-Bibliothek
 auf allen drei Systemen), Rust-Tests in ffi.rs und symbole.rs, Beispiel
 `examples/206_fremde_bibliotheken.dh`, Lehrbuch `79c_bibliotheken.js`.
-Offen: Stufe 2 (Zeiger lesen, Export der Bibliothek neben dem Programm),
-Stufe 3 (Rueckrufe).
+**Stufe 2 (2026-10-06):** `TEXT_AUS_ZEIGER$(z [, breit])`,
+`BUFFER_AUS_ZEIGER(z, n)` und `BUFFER_ZEIGER(b)` (`ffi::zeiger_befehl`,
+Familie 28 neben `__ffi`; kopieren, vertrauen dem Zeiger, ohne Feature ffi
+ein Fehler "ohne das Feature"). `BUFFER_ZEIGER` gilt nur, solange der Puffer
+seine Groesse behaelt. **Export** (`bibliotheken_mitnehmen` in main.rs): die
+Bibliotheken stehen als Signatur in den Konstanten des .dhc -- nur gerufene
+kommen mit, unter dem Dateinamen DIESES Systems; "c"/"m" nie, Fehlendes als
+Hinweis. Offen: Stufe 3 (Rueckrufe).
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 

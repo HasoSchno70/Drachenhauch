@@ -1593,5 +1593,13 @@ fremde Funktion: kaputte Signatur	foreign function: broken signature
 fremde Funktion: Signatur fehlt	foreign function: signature missing
 {}: fremde Bibliotheken (DECLARE ... LIB) gibt es im Browser nicht	{}: there are no foreign libraries (DECLARE ... LIB) in the browser
 {}: fremde Bibliotheken (DECLARE ... LIB) gehen in diesem Bau nicht -- er ist ohne das Feature ffi gebaut	{}: foreign libraries (DECLARE ... LIB) do not work in this build -- it was built without the ffi feature
+{}: Zeiger gibt es nur mit fremden Bibliotheken -- dieser Bau ist ohne das Feature ffi gebaut	{}: pointers only exist with foreign libraries -- this build was made without the ffi feature
+{}: erwartet einen Zeiger (INTEGER), erhalten {}	{}: expects a pointer (INTEGER), got {}
+{}: breit erwartet TRUE/FALSE, erhalten {}	{}: wide expects TRUE/FALSE, got {}
+{}: die Laenge erwartet INTEGER, erhalten {}	{}: the length expects INTEGER, got {}
+{}: Laenge {} ist negativ	{}: length {} is negative
+{}: Laenge {} ueberschreitet die Obergrenze von {} Bytes	{}: length {} exceeds the limit of {} bytes
+{}: der Zeiger ist 0 (NULL) -- dort liegen keine {} Bytes	{}: the pointer is 0 (NULL) -- there are no {} bytes there
+{}: erwartet einen BUFFER, erhalten {}	{}: expects a BUFFER, got {}
 TASK: der Auftrag ist abgestuerzt{} -- er hat keine Antwort mehr geschickt; das Hauptprogramm laeuft weiter	TASK: the task crashed{} -- it sent no answer any more; the main program keeps running
  (Rueckgabe {})	 (exit code {})

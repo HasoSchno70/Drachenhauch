@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2102,
+ "count": 2105,
  "builtins": [
   {
    "name": "ABS",
@@ -1146,6 +1146,18 @@
    "name": "BUFFER_NEW",
    "kind": "core",
    "signature": "BUFFER_NEW(groesse) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_AUS_ZEIGER",
+   "kind": "core",
+   "signature": "BUFFER_AUS_ZEIGER(zeiger, laenge) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_ZEIGER",
+   "kind": "core",
+   "signature": "BUFFER_ZEIGER(puffer) AS INTEGER",
    "module": "dhrt"
   },
   {
@@ -10465,6 +10477,12 @@
    "kind": "graphics",
    "signature": "TEXT_WIDTH(s: STRING)",
    "module": "core"
+  },
+  {
+   "name": "TEXT_AUS_ZEIGER$",
+   "kind": "core",
+   "signature": "TEXT_AUS_ZEIGER$(zeiger [, breit]) AS STRING",
+   "module": "dhrt"
   },
   {
    "name": "TILED_ADD_LAYER",

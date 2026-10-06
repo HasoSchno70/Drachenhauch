@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2055,
+ "count": 2058,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -179,6 +179,7 @@
   "BT_SCAN": "STRING (multi-line addr name rssi), 0..300s nach Geraeten in Reichweite suchen",
   "BT_SERVICES": "STRING (multi-line UUIDs) welche Dienste bietet das Geraet an?",
   "BT_WRITE": "Wert eines Merkmals schreiben",
+  "BUFFER_AUS_ZEIGER": "kopiert laenge Bytes hinter einem Zeiger in einen neuen BUFFER; 0 Bytes ergeben einen leeren, ein Nullzeiger mit Länge ist ein Fehler",
   "BUFFER_CONCAT": "neuer Puffer aus beiden",
   "BUFFER_DEFLATE": "Bytes mit Deflate packen (\"zlib\" Vorgabe, \"roh\")",
   "BUFFER_FILL": "alles mit einem Byte füllen",
@@ -208,6 +209,7 @@
   "BUFFER_SLICE": "Kopie der Bytes [von, bis)",
   "BUFFER_TO_HEX$": "Hex-Text (\"deadbeef\")",
   "BUFFER_TO_STRING$": "Bytes als UTF-8-Text",
+  "BUFFER_ZEIGER": "die Adresse der Bytes eines BUFFER, für ein Struct-Feld, das auf einen anderen Puffer zeigt; ein leerer Puffer ergibt 0",
   "CAMEL$": "Schreibweisen für Bezeichner: aus \"max hp\", \"MaxHp\", \"max_hp\" oder \"max-hp\" wird maxHp, max_hp, MaxHp. Wörter trennen Leerraum, _, -, ., der Wechsel von klein auf groß und das Ende einer Abkürzung (HTTPServer → http_server)",
   "CAMERA3D": "Kamera setzen: Standort, Blickziel, Öffnungswinkel in Grad (üblich 45). Oben ist +Y",
   "CAMERA3D_MOVE": "die Kamera vom Programm aus bewegen (in Einheiten, vor/rechts auf der Bodenebene) und drehen (Grad: gieren nach rechts, neigen nach oben, höchstens 89 Grad); zoom ändert den Abstand zum Ziel (positiv = weiter weg). Für eigene Tastenbelegung, Gamepad oder Kamerafahrten; gilt ab der Lage, die CAMERA3D zuletzt gesetzt hat — CAMERA3D also nicht in jedem Bild neu aufrufen",
@@ -1755,6 +1757,7 @@
   "TEMPFILE$": "freier Name im Temp-Verzeichnis, leer angelegt",
   "TEXT": "Text bei (x, y)",
   "TEXTROT": "Text zentriert auf (x, y), um das Zentrum gedreht (Grad, wie DRAWIMAGEROT) und skaliert — für Score-Popups, schräge Labels. Nutzt aktiven Font/Größe",
+  "TEXT_AUS_ZEIGER$": "kopiert den Text hinter einem Zeiger bis zum Nullzeichen (UTF-8; mit breit = TRUE wchar_t, also UTF-16 unter Windows); 0 ergibt \"\"",
   "TEXT_BOLD": "nur Fett bzw. Kursiv an- oder ausschalten, der Rest des Stils bleibt",
   "TEXT_GET_STYLE$": "der gesetzte Stil als Text, z. B. \"fett+kursiv\"",
   "TEXT_HEIGHT": "Zeilenhöhe der aktiven Schrift",
