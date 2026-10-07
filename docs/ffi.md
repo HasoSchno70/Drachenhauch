@@ -351,12 +351,26 @@ r = CreatePolygonRgn(dreieck, LEN(dreieck), 1)
 * **`ARRAY OF Punkt`** als Parameter oder Rückgabe einer FUNCTION meint
   dasselbe Feld; `DIM ps AS ARRAY OF Punkt` ohne Größe ist ein leeres, das
   eine Zuweisung bekommt.
-* **Eine Dimension.** Für mehrere rechnet man den Index selbst
-  (`g[zeile * breite + spalte].x`). `FOR EACH` geht nicht (es liefe über
-  die Bytes) -- mit Index geht es. Ein Element als Ganzes (`pts[2] = p`)
-  ist kein Wert; man liest und schreibt seine Felder. Ein Index direkt auf
-  dem Ergebnis eines Aufrufs (`reihe(5)[0].x`) ist eine Meldung -- erst
-  einer Variable zuweisen.
+* **Mehrere Dimensionen** wie in C: `DIM g[n, 4] AS Punkt` liegt
+  zeilenweise in einem Puffer (`g[i, j]` ist das Element `i * 4 + j`).
+  Die hinteren Größen müssen beim Übersetzen feststehen (eine Zahl oder
+  `CONST`), nur die erste darf erst zur Laufzeit kommen; jeder Index wird
+  gegen seine eigene Größe geprüft. `LEN(g)` zählt wie bei jedem Feld die
+  erste Dimension. Als Parameter `ARRAY OF Punkt` ist es ein flaches Feld
+  (`LEN` = alle Elemente) -- die Bibliothek bekommt dieselben Bytes.
+* **Ein Element als Ganzes ist eine Kopie:** `p = pts[2]` kopiert die
+  Bytes in einen eigenen Struct, `pts[2] = p` kopiert sie zurück; dasselbe
+  gilt für einen Struct im Struct (`linie.b = p`). An eine Bibliothek geht
+  ein Element dagegen als **Zeiger an seine Stelle** im Feld
+  (`GetCursorPos(pts[2])` schreibt ins Feld), ebenso `linie.b` und ein Feld
+  von Zahlen im Struct (`st.werte`).
+* **`FOR EACH p IN pts`** liefert je Runde eine Kopie des Elements -- auch
+  über ein Feld im Struct (`FOR EACH e IN linie.ecken`, `FOR EACH w IN
+  st.werte`). Ein Feld der Kopie zu schreiben (`p.x = 1`) ist darum eine
+  Meldung; ins Feld schreibt man mit Index. `FOR EACH` geht nur über eine
+  Dimension, wie bei jedem Feld.
+* Ein Index direkt auf dem Ergebnis eines Aufrufs (`reihe(5)[0].x`) ist
+  eine Meldung -- erst einer Variable zuweisen.
 
 **In einer Klasse** ist ein Struct ein gewöhnliches Feld; jedes Objekt
 bekommt bei `NEW` seinen eigenen Puffer:
@@ -813,8 +827,7 @@ END TRY
 
 * Ein Struct als Wert hinter `...` (siehe
   [Structs als Wert](#structs-als-wert)); Bitfelder mit `PACK` oder mit
-  0 Bits (siehe [Bitfelder](#bitfelder)); Felder von Structs mit mehr als
-  einer Dimension.
+  0 Bits (siehe [Bitfelder](#bitfelder)).
 * C++-Namen, COM. Eine C++-Bibliothek wie
   Qt geht über einen Umweg mit C-Schnittstelle -- etwa
   [Python einbetten](#python-einbetten) mit PySide6.

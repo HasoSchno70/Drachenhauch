@@ -1648,6 +1648,16 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
             },
             'p' => match v {
                 Value::Buffer(b) => unsafe { (*b.as_ptr()).as_mut_ptr() as u64 },
+                // (Puffer, Stelle): ein Element eines Feldes von Structs --
+                // der Compiler gibt so einen Zeiger an seine Stelle mit.
+                Value::Tuple(t) if t.len() == 2 && matches!((&t[0], &t[1]), (Value::Buffer(_), Value::Int(_))) => {
+                    let (Value::Buffer(b), Value::Int(off)) = (&t[0], &t[1]) else { unreachable!() };
+                    let len = b.borrow().len();
+                    if *off < 0 || *off as usize > len {
+                        return Err(fehler(format!("die Stelle {} liegt ausserhalb des Puffers (0..{})", off, len)));
+                    }
+                    unsafe { (*b.as_ptr()).as_mut_ptr().add(*off as usize) as u64 }
+                }
                 Value::Nil => 0,
                 _ => return Err(fehler(format!("erwartet einen BUFFER, erhalten {}", v.type_name()))),
             },

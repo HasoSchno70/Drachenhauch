@@ -647,6 +647,189 @@ PRINT k.p.y + k.ps[1].x, BUFFER_LEN(k.ps)
 --- erwartet
 15 16
 
+=== felder von structs mit mehreren dimensionen
+' Wie in C: zeilenweise in EINEM Puffer, die hinteren Groessen stehen beim
+' Uebersetzen fest, die erste darf erst zur Laufzeit kommen. Jeder Index
+' wird gegen seine eigene Groesse geprueft.
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+CONST SP = 3
+DIM n AS INTEGER
+n = 2
+DIM g[n, SP] AS Punkt
+DIM i AS INTEGER
+DIM j AS INTEGER
+FOR i = 0 TO n - 1
+    FOR j = 0 TO SP - 1
+        g[i, j].x = i * 10 + j
+    NEXT
+NEXT
+PRINT LEN(g), BUFFER_LEN(g), g[1, 2].x
+DIM flach AS ARRAY OF Punkt
+flach = g
+PRINT flach[4].x, LEN(flach)
+TRY
+    PRINT g[0, 3].x
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT g[2, 0].x
+CATCH e
+    PRINT e
+END TRY
+SUB setze(i AS INTEGER, j AS INTEGER)
+    g[i, j].y = 7
+END SUB
+setze(1, 1)
+PRINT g[1, 1].y, flach[4].y
+CLASS Brett
+    DIM feld[2, 2] AS Punkt
+END CLASS
+DIM b AS Brett
+b = NEW Brett()
+b.feld[1, 0].x = 4
+PRINT b.feld[1, 0].x, LEN(b.feld), BUFFER_LEN(b.feld)
+--- erwartet
+2 48 12
+11 6
+g[,].x: Index 3 liegt ausserhalb 0..2
+g[,].x: Index 2 liegt ausserhalb 0..1
+7 7
+4 2 32
+
+=== ein element als ganzes ist eine kopie
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+STRUCT Linie LAYOUT C
+    a AS Punkt
+    b AS Punkt
+END STRUCT
+DIM ps[3] AS Punkt
+ps[1].x = 5
+DIM p AS Punkt
+p = ps[1]
+p.y = 9
+PRINT p.x, p.y, ps[1].y
+ps[2] = p
+PRINT ps[2].x, ps[2].y
+ps[2] = ps[2]
+PRINT ps[2].x
+' Die Quelle ist derselbe Puffer: erst gelesen, dann geschrieben.
+ps[1] = ps
+PRINT ps[1].x
+DIM l AS Linie
+l.b = p
+l.a = l.b
+PRINT l.a.x, l.b.y, BUFFER_LEN(l.a)
+DIM kurz AS BUFFER
+kurz = BUFFER_NEW(4)
+TRY
+    ps[0] = kurz
+CATCH e
+    PRINT e
+END TRY
+TRY
+    ps[0] = 3
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+5 9 0
+5 9
+5
+0
+5 9 8
+ps[]: der Puffer ist 4 Bytes lang, der Struct braucht 8
+ps[]: erwartet einen Struct (einen BUFFER), erhalten INTEGER
+
+=== for each ueber ein feld von structs liefert kopien
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+STRUCT Reihe LAYOUT C
+    w[3] AS LONG
+    ecken[2] AS Punkt
+END STRUCT
+DIM ps[4] AS Punkt
+DIM i AS INTEGER
+FOR i = 0 TO 3
+    ps[i].y = i + 1
+NEXT
+DIM summe AS INTEGER
+FOR EACH q IN ps
+    summe = summe + q.y
+    IF q.y = 3 THEN BREAK
+NEXT
+PRINT summe
+SUB zeige(reihe AS ARRAY OF Punkt)
+    FOR EACH r IN reihe
+        IF r.y = 2 THEN CONTINUE
+        PRINT r.y;
+    NEXT
+    PRINT
+END SUB
+zeige(ps)
+DIM leer AS ARRAY OF Punkt
+zeige(leer)
+DIM st AS Reihe
+st.w[2] = 5
+st.ecken[1].x = 8
+FOR EACH v IN st.w
+    PRINT v;
+NEXT
+PRINT
+FOR EACH e IN st.ecken
+    PRINT e.x;
+NEXT
+PRINT
+--- erwartet
+6
+134
+
+005
+08
+
+=== ein element geht als zeiger an seine stelle
+' Eine Bibliothek, die in ein Element schreibt, schreibt ins Feld -- keine
+' Kopie. Ebenso ein Struct im Struct und ein Feld von Zahlen im Struct.
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+STRUCT Linie LAYOUT C
+    a AS Punkt
+    b AS Punkt
+    w[3] AS UBYTE
+END STRUCT
+DECLARE SUB memset LIB "c" (ziel AS Punkt, wert AS LONG, n AS ZEIGER)
+DECLARE SUB memsetb LIB "c" ALIAS "memset" (ziel AS BUFFER, wert AS LONG, n AS ZEIGER)
+DIM ps[4] AS Punkt
+DIM i AS INTEGER
+FOR i = 1 TO 2
+    memset(ps[i], i, 1)
+NEXT
+PRINT ps[0].x, ps[1].x, ps[2].x, ps[3].x
+memset(ps[3], 255, SIZEOF(Punkt))
+PRINT ps[3].x, ps[3].y, ps[2].y
+DIM g[2, 2] AS Punkt
+memset(g[1, 0], 1, 1)
+PRINT g[1, 0].x, g[0, 1].x
+DIM l AS Linie
+memset(l.b, 3, 1)
+memsetb(l.w, 9, 2)
+PRINT l.a.x, l.b.x, l.w[0], l.w[1], l.w[2]
+--- erwartet
+0 1 2 0
+-1 -1 0
+1 0
+0 3 9 9 0
+
 === was nicht geht, sagt der uebersetzer
 IMPORT "json"
 DIM p AS INTEGER
@@ -685,9 +868,15 @@ pruefe(kopf + "PRINT SIZEOF(Gibts)")
 pruefe(kopf + "PRINT OFFSETOF(Punkt, z)")
 pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "ps[1].x = 2")
 pruefe(kopf + "CLASS K" + nl + "  DIM p AS Punkt" + nl + "END CLASS")
-pruefe(kopf + "DIM g[2, 3] AS Punkt")
-pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "FOR EACH e IN ps" + nl + "NEXT")
-pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "ps[1] = p")
+pruefe(kopf + "DIM g[2, 3] AS Punkt" + nl + "g[1, 2] = p" + nl + "FOR EACH e IN g[1, 1].w" + nl + "NEXT")
+pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "FOR EACH e IN ps" + nl + "  p = e" + nl + "NEXT" + nl + "ps[1] = p")
+pruefe(kopf + "DIM n AS INTEGER" + nl + "DIM g[2, n] AS Punkt")
+pruefe(kopf + "DIM g[2, 3] AS Punkt" + nl + "PRINT g[1].x")
+pruefe(kopf + "DIM g[2, 3] AS Punkt" + nl + "PRINT g.x")
+pruefe(kopf + "DIM g[2, 3] AS Punkt" + nl + "FOR EACH e IN g" + nl + "NEXT")
+pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "FOR EACH e IN ps" + nl + "  e.x = 1" + nl + "NEXT")
+pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "DIM e AS INTEGER" + nl + "FOR EACH e IN ps" + nl + "NEXT")
+pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "FOR EACH i, e IN ps" + nl + "NEXT")
 pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "PRINT ps.x")
 pruefe(kopf + "DIM n AS INTEGER" + nl + "CLASS K" + nl + "  DIM e[n] AS Punkt" + nl + "END CLASS")
 pruefe(kopf + "FUNCTION reihe() AS ARRAY OF Punkt" + nl + "  DIM r[2] AS Punkt" + nl + "  RETURN r" + nl + "END FUNCTION" + nl + "PRINT reihe()[0].x")
@@ -715,9 +904,15 @@ SIZEOF: 'GIBTS' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER
 OFFSETOF: Punkt hat kein Feld 'z' (Felder: x, w)
 ok
 ok
-Ein Feld von Structs hat genau eine Groesse -- DIM g[10] AS Punkt (fuer mehrere Dimensionen den Index selbst rechnen)
-FOR EACH geht nicht ueber ein Feld von Structs -- mit Index: FOR i = 0 TO LEN(ps) - 1 : ... ps[i].feld
-ps[] ist ein Struct -- lies und schreib seine Felder (ps[].feld); seine Bytes liegen im Puffer ab OFFSETOF
+ok
+ok
+DIM g: die hinteren Groessen eines Feldes von Structs muessen beim Uebersetzen feststehen (eine Zahl oder CONST) -- wie in C darf nur die erste erst zur Laufzeit kommen
+g hat 2 Dimensionen -- mit allen Indizes: g[i, j]
+g ist ein Feld von Structs -- erst ein Index: g[0, 0].x
+FOR EACH geht nur ueber ein Feld mit einer Dimension -- g hat 2: FOR i = 0 TO LEN(g) - 1 : FOR j = ...
+e ist in FOR EACH eine Kopie des Elements -- e.x = ... ginge ins Leere; ins Feld schreiben mit Index (FOR i = 0 TO LEN(feld) - 1 : feld[i].x = ...)
+FOR EACH e: e ist schon als INTEGER angelegt -- fuer die Elemente von ps eine Variable vom Typ Punkt nehmen
+FOR EACH i, ... geht nicht ueber ps -- mit Index: FOR i = 0 TO LEN(ps) - 1
 ps ist ein Feld von Structs -- erst ein Index: ps[0].x
 Array-Feld 'e' braucht konstante INTEGER-Groesse
 reihe(...) liefert ein Feld von Structs -- erst einer Variable zuweisen: DIM r AS ARRAY OF Punkt : r = reihe(...) : r[0].feld

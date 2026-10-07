@@ -114,6 +114,7 @@ module.exports = (H) => [
     'PRINT f.ort.x, f.ecken[1].x, LEN(f.ecken)',
   ]),
   H.code(["3 7 3"], { out: true }),
+  H.p("Mehrere Dimensionen gehen wie in C: DIM g[n, 4] AS Punkt liegt zeilenweise in einem Puffer, die hinteren Größen stehen fest. Ein Element als Ganzes ist eine Kopie – p = pts[2] und pts[2] = p kopieren die Bytes, FOR EACH p IN pts liefert je Runde eine Kopie. An eine Bibliothek geht pts[2] dagegen als Zeiger auf seine Stelle im Feld, so dass sie hineinschreiben kann."),
 
   H.h2("Structs als Wert"),
   H.p("Ein Parameter AS Punkt ist in C ein Punkt* – die Funktion bekommt die Adresse deiner Bytes. Manche Funktionen wollen den Struct aber selbst, als Wert, oder geben einen zurück. Dafür steht BYVAL vor dem Parameter, und die Rückgabe heißt einfach wie der Struct. Die komplexen Zahlen der C-Bibliothek sind so ein Fall:"),
