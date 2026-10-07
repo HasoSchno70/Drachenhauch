@@ -2169,6 +2169,12 @@
    "module": "db"
   },
   {
+   "name": "DB_KIND$",
+   "kind": "core",
+   "signature": "DB_KIND$(c) AS STRING",
+   "module": "db"
+  },
+  {
    "name": "DB_LAST_ROWID",
    "kind": "core",
    "signature": "DB_LAST_ROWID(c)",
@@ -2183,7 +2189,13 @@
   {
    "name": "DB_OPEN",
    "kind": "core",
-   "signature": "DB_OPEN(path: STRING)",
+   "signature": "DB_OPEN(ziel: STRING)",
+   "module": "db"
+  },
+  {
+   "name": "DB_PING",
+   "kind": "core",
+   "signature": "DB_PING(c) AS BOOLEAN",
    "module": "db"
   },
   {
@@ -2219,7 +2231,7 @@
   {
    "name": "DB_QUERY_START",
    "kind": "core",
-   "signature": "DB_QUERY_START(datei, sql, ...) AS INTEGER",
+   "signature": "DB_QUERY_START(ziel, sql, ...) AS INTEGER",
    "module": "db"
   },
   {

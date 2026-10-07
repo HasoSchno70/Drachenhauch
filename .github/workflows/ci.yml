@@ -185,7 +185,23 @@ jobs:
       # gleicht am besten gegen `feats` in `rust/build_runtime.py` ab.
       - name: dhrt bauen (ohne Grafik)
         working-directory: rust/drachenhauch_runtime
-        run: cargo build --release --locked --features "db net http smtp pdf physik jit ffi"
+        run: cargo build --release --locked --features "db pg mysql net http smtp pdf physik jit ffi"
+
+      # PostgreSQL und MySQL fuer tests/pruef/db_server.dhtest: auf dem
+      # Linux-Laeufer liegen beide schon, nur nicht gestartet (MySQL mit dem
+      # Kennwort root fuer root). Die Sammlung findet sie ueber DH_TEST_PG /
+      # DH_TEST_MYSQL; ohne die Variablen ueberspringt sie sich (macOS,
+      # Windows).
+      - name: Datenbank-Server starten (nur Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo systemctl start postgresql.service
+          sudo -u postgres psql -q -c "CREATE ROLE dh LOGIN PASSWORD 'dhtest' CREATEDB"
+          sudo -u postgres createdb -O dh dhtest
+          sudo systemctl start mysql.service
+          mysql -uroot -proot -e "CREATE DATABASE dhtest CHARACTER SET utf8mb4; CREATE USER 'dh'@'%' IDENTIFIED BY 'dhtest'; GRANT ALL PRIVILEGES ON dhtest.* TO 'dh'@'%';"
+          echo "DH_TEST_PG=postgres://dh:dhtest@localhost:5432/dhtest" >> "$GITHUB_ENV"
+          echo "DH_TEST_MYSQL=mysql://dh:dhtest@localhost:3306/dhtest" >> "$GITHUB_ENV"
 
       # Wie im Windows-Job: die Sammlungen direkt, ohne pytest als Anker.
       # Ohne Grafik ueberspringen sich die Fenster-Faelle selbst.
@@ -232,7 +248,7 @@ jobs:
       # `rust/build_runtime.py` -- wer dort eines ergaenzt, ergaenzt es hier
       # mit, sonst kompiliert der neue Modul-Code auf Linux/macOS nie.
       - name: cargo check (+ db/net/http/smtp)
-        run: cargo check --locked --features "db net http smtp"
+        run: cargo check --locked --features "db pg mysql net http smtp"
 
       - name: cargo check (+ wifi)
         run: cargo check --locked --features "wifi"
@@ -251,4 +267,4 @@ jobs:
       # unbemerkt herum. Ohne Grafik-Feature, wie die Checks davor; die
       # Grafik-Tests laufen lokal mit CARGO_TARGET_DIR=C:/dht.
       - name: cargo test (ohne Grafik)
-        run: cargo test --locked --features "db net http smtp pdf physik jit ffi"
+        run: cargo test --locked --features "db pg mysql net http smtp pdf physik jit ffi"
