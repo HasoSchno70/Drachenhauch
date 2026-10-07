@@ -3947,7 +3947,23 @@ impl Compiler {
             let typ = if t == "*" {
                 "*".to_string()
             } else if let Some(rr) = t.strip_prefix('@') {
-                format!("r{}", rr)
+                // Ein Struct als Wert im Rueckruf steht als `{name}` darin; in
+                // die Signatur kommt seine Lage (`{lage}`).
+                let mut aus = String::from("r");
+                let mut rest = rr;
+                while let Some(k) = rest.find('{') {
+                    aus.push_str(&rest[..k]);
+                    let ende = rest[k..].find('}').map(|e| k + e).unwrap_or(rest.len());
+                    let sname = &rest[k + 1..ende];
+                    if !self.lagen.contains_key(sname) {
+                        self.err_line = zeile;
+                        return Err(crate::ffi::typ_hinweis(sname).replace("(moeglich: ", "(moeglich: ein STRUCT ... LAYOUT C oder "));
+                    }
+                    aus.push_str(&format!("{{{}}}", crate::cstruct::wert_text(sname, &self.lagen)));
+                    rest = &rest[(ende + 1).min(rest.len())..];
+                }
+                aus.push_str(rest);
+                aus
             } else if let Some(sname) = t.strip_prefix('#') {
                 // Ein STRUCT ... LAYOUT C geht als Zeiger auf seine Bytes.
                 if !self.lagen.contains_key(sname) {

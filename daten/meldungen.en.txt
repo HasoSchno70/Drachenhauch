@@ -1670,7 +1670,12 @@ erwartet einen Struct {} (einen BUFFER), erhalten {}	expected a struct {} (a BUF
 der Puffer ist {} Bytes lang, der Struct braucht {}	the buffer is {} bytes long, the struct needs {}
 ein Struct als Wert geht (noch) nicht in einer Funktion mit ... -- uebergib ihn dort als Zeiger (ohne BYVAL)	a struct by value does not work (yet) in a function with ... -- pass it as a pointer there (without BYVAL)
 der Struct {} (Argument {}) passt nicht mehr in die Register fuer Kommazahlen -- so viele Kommazahlen davor gehen hier (noch) nicht	the struct {} (argument {}) no longer fits into the floating-point registers -- that many floating-point arguments before it do not work here (yet)
-{} -- ein Struct geht in einem Rueckruf (noch) nicht: einen Zeiger darauf bekommt er als ZEIGER, BUFFER_AUS_ZEIGER liest ihn	{} -- a struct does not work in a callback (yet): it receives a pointer to it as ZEIGER, BUFFER_AUS_ZEIGER reads it
+Ein Struct im Rueckruf: mit BYVAL kommt er als Wert (BYVAL p AS {}) -- uebergibt die Bibliothek einen Zeiger darauf, heisst der Parameter ZEIGER, BUFFER_AUS_ZEIGER liest ihn	A struct in a callback: with BYVAL it arrives as a value (BYVAL p AS {}) -- if the library passes a pointer to it, the parameter is ZEIGER, BUFFER_AUS_ZEIGER reads it
+BYVAL steht im Rueckruf nur vor einem Struct -- Zahlen kommen ohnehin als Wert	In a callback BYVAL only goes before a struct -- numbers arrive as values anyway
+der Rueckruf {} soll einen Struct {} liefern: der Puffer ist {} Bytes lang, der Struct braucht {}	the callback {} should return a struct {}: the buffer is {} bytes long, the struct needs {}
+der Rueckruf {} soll einen Struct {} liefern (einen BUFFER), erhalten {}	the callback {} should return a struct {} (a BUFFER), got {}
+kaputte Signatur des Rueckrufs	broken signature of the callback
+Rueckruf {}: {}	callback {}: {}
 {}: Parameter-Typ {} nicht unterstuetzt (erlaubt: INTEGER, FLOAT, STRING, BOOLEAN, BUFFER, NIL)	{}: parameter type {} not supported (allowed: INTEGER, FLOAT, STRING, BOOLEAN, BUFFER, NIL)
 DB_GET_INT: Spalte {} ist die Dezimalzahl {}, nicht ganz	DB_GET_INT: column {} is the decimal {}, not a whole number
 DB_GET_FLOAT: Spalte {} ist {}, keine Zahl	DB_GET_FLOAT: column {} is {}, not a number

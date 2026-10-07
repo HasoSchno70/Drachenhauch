@@ -1665,7 +1665,9 @@ impl Parser {
 
     /// Ein Rueckruf als Typ eines Parameters: `FUNCTION(a AS typ, ...) AS typ`
     /// oder `SUB(...)` -- die Schreibweise von FreeBASIC. Ergebnis fuer den
-    /// Compiler: "@" + Rueckgabe-Zeichen + Parameter-Zeichen (`@lzz`).
+    /// Compiler: "@" + Rueckgabe-Zeichen + Parameter-Zeichen (`@lzz`); ein
+    /// Struct als Wert (`BYVAL p AS Punkt`, Rueckgabe `AS Punkt`) steht als
+    /// `{punkt}` darin, der Compiler setzt seine Lage ein.
     fn ffi_rueckruf(&mut self) -> R<String> {
         let ist_sub = self.check(Tt::Sub);
         self.pos += 1;                                  // FUNCTION | SUB
@@ -1677,12 +1679,29 @@ impl Parser {
                 if self.check(Tt::Byref) {
                     return self.err("BYREF gibt es in einem Rueckruf nicht -- was die Bibliothek als Zeiger uebergibt, kommt als ZEIGER an");
                 }
+                // BYVAL vor einem Struct: er kommt als Wert (`BYVAL p AS Punkt`).
+                let mut by_val = false;
+                if self.check(Tt::Ident) && sval(self.peek(0)) == "byval" && self.tt(1) == Tt::Ident {
+                    self.pos += 1;
+                    by_val = true;
+                }
                 // Der Name ist freiwillig: `a AS ZEIGER` oder nur `ZEIGER`.
                 if self.check(Tt::Ident) && self.tt(1) == Tt::As { self.pos += 2; }
                 if self.check(Tt::Ident) && crate::ffi::typ_zeichen(&sval(self.peek(0))).is_none()
                     && crate::ffi::typ_vorschlag(&sval(self.peek(0))).is_none() {
-                    let h = crate::ffi::typ_hinweis(&sval(self.peek(0)));
-                    return self.err(&format!("{} -- ein Struct geht in einem Rueckruf (noch) nicht: einen Zeiger darauf bekommt er als ZEIGER, BUFFER_AUS_ZEIGER liest ihn", h));
+                    // Ein STRUCT ... LAYOUT C -- ob es ihn gibt, weiss erst der Compiler.
+                    if !by_val {
+                        return self.err(&format!(
+                            "Ein Struct im Rueckruf: mit BYVAL kommt er als Wert (BYVAL p AS {}) -- uebergibt die Bibliothek einen Zeiger darauf, heisst der Parameter ZEIGER, BUFFER_AUS_ZEIGER liest ihn",
+                            sval(self.peek(0)).to_uppercase()));
+                    }
+                    zeichen.push_str(&format!("{{{}}}", sval(self.peek(0)).to_lowercase()));
+                    self.pos += 1;
+                    if !self.matches(Tt::Comma) { break; }
+                    continue;
+                }
+                if by_val {
+                    return self.err("BYVAL steht im Rueckruf nur vor einem Struct -- Zahlen kommen ohnehin als Wert");
                 }
                 let w = self.ffi_typwort()?;
                 if w == "buffer" {
@@ -1701,6 +1720,13 @@ impl Parser {
             'v'
         } else {
             self.expect(Tt::As, "Erwartet AS <Rueckgabetyp> nach FUNCTION(...) -- ohne Rueckgabe heisst es SUB(...)")?;
+            // Ein Struct als Wert zurueck.
+            if self.check(Tt::Ident) && crate::ffi::typ_zeichen(&sval(self.peek(0))).is_none()
+                && crate::ffi::typ_vorschlag(&sval(self.peek(0))).is_none() {
+                let w = format!("{{{}}}", sval(self.peek(0)).to_lowercase());
+                self.pos += 1;
+                return Ok(format!("@{}{}", w, zeichen));
+            }
             let w = self.ffi_typwort()?;
             if matches!(w.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer") {
                 self.pos -= 1;

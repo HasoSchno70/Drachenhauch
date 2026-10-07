@@ -1496,12 +1496,22 @@ X-Struct nicht ganz, fuellen Nullwerte die Register; Rueckgabe ueber X8 =
 `StructReturn`) -- in `Stelle`n (`Laden::Platz/Ueber/Kopie/Null/Versteckt`),
 aus denen `Bauer::holen_plan` den Uebergang baut. Kopien in `Vec<u64>` (8
 ausgerichtet, Laden ueber das Ende eines 12-Byte-Structs bleibt im
-Speicher). Nicht: in Rueckrufen, hinter `...`, HFA ohne freie V-Register
-(alles eine Meldung). Rust-Tests rufen `extern "C"`-Funktionen mit
+Speicher). Nicht: hinter `...`, HFA ohne freie V-Register (eine Meldung). Rust-Tests rufen `extern "C"`-Funktionen mit
 `#[repr(C)]`-Structs auf (Rust haelt die C-Konvention -- der Vergleich auf
 allen drei CI-Systemen), `plaene_je_konvention` prueft alle drei Plaene auf
 jedem System; Sammlung `tests/pruef/ffi_struct_wert.dhtest` (div/lldiv,
 csqrt/cabs(f), PtInRect, CoreGraphics).
+**Im Rueckruf (2026-10-07):** `FUNCTION(BYVAL p AS Punkt) AS Punkt`; Parser
+`{name}`, Signatur `{lage}` (`ffi::rueckruf_lesen` -> `RrTeil`). Der
+Einstieg `Bauer::rueckruf_plan` liest `ffi::plan` in GEGENrichtung: `Ueber`
+-> Bereich je Struct, im Platz ein Zeiger darauf; `Platz`/`Kopie` -> der
+ankommende Zeiger (Cranelift gibt bei `StructArgument` dem Gerufenen die
+Adresse). Rueckgabe in Teilen aus dem Rueckgabe-Bereich, ueber die
+versteckte Adresse Byte-genau kopiert (Cranelift gibt sie selbst zurueck).
+Ohne BYVAL im Rueckruf ist ein Struct eine Meldung (`ZEIGER` +
+BUFFER_AUS_ZEIGER). Rust-Test `structs_im_rueckruf` (Rust ruft den Einstieg
+als `extern "C" fn` mit `#[repr(C)]`-Structs), Windows-Faelle ueber
+`CallWindowProcW` in `ffi_struct_wert.dhtest`.
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 

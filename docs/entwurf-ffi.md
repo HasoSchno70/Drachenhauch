@@ -341,6 +341,24 @@ jeden Struct als Zeiger -- drei Rust-Tests und zwei Fälle fallen. Nicht:
 Struct als Wert in Rückrufen und hinter `...`, eine HFA ohne freie
 V-Register.
 
+**Stand Struct als Wert im Rückruf (2026-10-07):** `FUNCTION(BYVAL p AS
+Punkt) AS Punkt` im Rückruf. Der Parser schreibt `{name}`, der Compiler
+setzt die Lage ein (`r` + Rückgabe + Parameter, ein Struct als `{lage}`,
+`ffi::rueckruf_lesen`). Der Einstieg (`uebergang::Bauer::rueckruf_plan`)
+liest `ffi::plan` in Gegenrichtung: was in Registern ankommt (`Ueber`), legt
+er in einen Bereich je Struct und reicht `eingang` einen Zeiger darauf;
+kam der Struct als Zeiger (`Platz`, Windows und ARM über 16 Bytes) oder auf
+dem Stapel (`Kopie`, Cranelift gibt dem Gerufenen bei `StructArgument` die
+Adresse), steht dieser Zeiger im Platz. Die Rückgabe legt `eingang` in den
+Rückgabe-Bereich; in Teilen (`Teile`) geht sie in die Register, über die
+versteckte Adresse (`StructReturn`) wird sie Byte für Byte in Struct-Länge
+dorthin kopiert -- die Adresse selbst gibt Cranelift zurück. Geprüft wie
+bei den Aufrufen: Rust ruft den Einstieg wie eine C-Funktion mit
+`#[repr(C)]`-Structs (`structs_im_rueckruf`: 3, 8, 12, 16, 24 und 32 Bytes,
+volle Register davor), dazu unter Windows `CallWindowProcW` mit einem
+Struct im Register und einem als Zeiger. Gegenprobe: die Teile um vier
+Bytes verschoben abgelegt -- der Rust-Test und der Windows-Fall fallen.
+
 ## Die Fragen dazu (entschieden, siehe oben)
 
 1. **`DECLARE … LIB`** (empfohlen) oder Befehle wie ctypes?

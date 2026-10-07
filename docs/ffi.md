@@ -390,10 +390,11 @@ PRINT w.re, w.im, cabs(z)     ' 0.0  2.0  4.0
 * **Komplexe Zahlen** (`double complex`, `_Dcomplex`) behandelt C genau wie
   einen Struct aus zwei Kommazahlen -- `csqrt`, `cexp` und Co. aus der
   C-Bibliothek gehen damit wie oben.
-* Nicht (noch) als Wert: ein Struct in einem **Rückruf** (er kommt dort als
-  `ZEIGER` an) und in einer Funktion mit **`...`**; auf ARM ein Struct aus
-  Kommazahlen, für den hinter acht Kommazahl-Argumenten kein Register mehr
-  frei ist. Alle drei sind eine Meldung, kein stiller Fehler.
+* Im **Rückruf** geht ein Struct ebenso als Wert, siehe
+  [Structs als Wert im Rückruf](#structs-als-wert-im-rückruf).
+* Nicht (noch) als Wert: ein Struct in einer Funktion mit **`...`**; auf ARM
+  ein Struct aus Kommazahlen, für den hinter acht Kommazahl-Argumenten kein
+  Register mehr frei ist. Beide sind eine Meldung, kein stiller Fehler.
 
 ## GTK
 
@@ -569,7 +570,8 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   Zahltypen, `ZEIGER`, `BOOLEAN` und `TEXT`/`WTEXT` (kommt als STRING an);
   kein `BUFFER` (Speicher der Bibliothek ist ein `ZEIGER`) und kein `BYREF`.
   Zurück gibt ein Rückruf eine Zahl, einen `ZEIGER` oder `BOOLEAN`, oder als
-  `SUB(...)` nichts.
+  `SUB(...)` nichts. Ein Struct als Wert geht in beide Richtungen, siehe
+  unten.
 * **Übergeben wird eine Funktion**: ihr Name ohne Klammern, eine gebundene
   Methode (`zaehler.eins` -- das Objekt kommt mit) oder ein Lambda. `NIL`
   übergibt einen Nullzeiger. Passt die Zahl ihrer Parameter nicht, ist das
@@ -594,6 +596,43 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   entsteht, bekommt jedes Mal einen neuen (wenige Bytes, die bis zum Ende
   bleiben). Ein Fehler in einem Rückruf, den die Bibliothek außerhalb eines
   Aufrufs ruft, meldet sich beim nächsten Aufruf einer Bibliothek.
+
+### Structs als Wert im Rückruf
+
+Übergibt die Bibliothek einen Struct als Wert (C: `int f(Punkt p)`) oder
+erwartet sie einen zurück, steht er im Rückruf genauso wie in der
+`DECLARE`-Zeile -- mit `BYVAL` als Parameter, mit seinem Namen als
+Rückgabe:
+
+```basic
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DECLARE SUB zeichne LIB "grafik" (n AS LONG, _
+    ort AS FUNCTION(BYVAL p AS Punkt, i AS LONG) AS Punkt)
+
+FUNCTION verschiebe(p AS Punkt, i AS INTEGER) AS Punkt
+    DIM r AS Punkt
+    r.x = p.x + i * 10
+    r.y = p.y
+    RETURN r
+END FUNCTION
+
+zeichne(5, verschiebe)
+```
+
+* **Die Funktion bekommt eine Kopie** in einem BUFFER der Größe des Structs
+  -- was sie daran ändert, sieht die Bibliothek nicht.
+* **Zurück gibt sie einen Struct** (einen BUFFER, mindestens so lang wie
+  er); ein zu kurzer Puffer oder ein Wert anderer Art ist ein Fehler, der
+  wie jeder Fehler im Rückruf beim Aufruf der Bibliothek ankommt.
+* **Ohne `BYVAL` ist es ein Fehler:** übergibt die Bibliothek einen
+  *Zeiger* auf einen Struct (C: `Punkt*`), heißt der Parameter `ZEIGER`, und
+  `BUFFER_AUS_ZEIGER(z, SIZEOF(Punkt))` liest ihn.
+* Wie der Struct reist, entscheidet wieder das System -- dieselben Regeln
+  wie oben, nur in Gegenrichtung: was in Registern ankommt, setzt der
+  Einstieg wieder zusammen.
 
 ## Export
 
@@ -641,8 +680,8 @@ END TRY
 
 ## Was es (noch) nicht gibt
 
-* Bitfelder in einem Struct; ein Struct als Wert in einem Rückruf oder
-  hinter `...` (siehe [Structs als Wert](#structs-als-wert)).
+* Bitfelder in einem Struct; ein Struct als Wert hinter `...` (siehe
+  [Structs als Wert](#structs-als-wert)).
 * C++-Namen, COM, `va_list`-Funktionen (`vprintf`). Eine C++-Bibliothek wie
   Qt geht über einen Umweg mit C-Schnittstelle -- etwa
   [Python einbetten](#python-einbetten) mit PySide6.
