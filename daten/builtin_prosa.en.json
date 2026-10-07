@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2055,
+ "count": 2057,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -371,9 +371,11 @@
   "DB_GET_INT": "INTEGER — read a column of the current row as an integer",
   "DB_GET_STRING": "STRING — read a column of the current row as text (index from 0)",
   "DB_IS_NULL": "BOOLEAN — is this column NULL?",
+  "DB_KIND$": "STRING — which database: sqlite, postgres or mysql",
   "DB_LAST_ROWID": "INTEGER — ID of the most recently inserted row (SQLite rowid, MySQL AUTO_INCREMENT, PostgreSQL lastval())",
   "DB_NEXT": "BOOLEAN — advance by one row; FALSE when there are no more",
   "DB_OPEN": "DB_CONN — open a database: a file (created if it does not exist; \":memory:\" = volatile), postgres://... or mysql://...",
+  "DB_PING": "BOOLEAN — is the connection still up? (a file always is; a server answers within 5 s or not)",
   "DB_QUERY": "DB_RESULT — run a SELECT and return a cursor on the result",
   "DB_QUERY_CANCEL": "discard (unknown number = no effect)",
   "DB_QUERY_PENDING": "how many queries are still open",

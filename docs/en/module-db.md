@@ -1,6 +1,6 @@
 # Module `db`
 
-Databases: create, insert, query, transactions. Either an SQLite file (native in dhrt via the Rust crate `rusqlite`, with SQLite built in -- nothing extra to install) or a **PostgreSQL or MySQL server** -- with the same commands; `DB_OPEN` decides by the target (see [Server](#server-postgresql-und-mysql)).
+Databases: create, insert, query, transactions. Either an SQLite file (native in dhrt via the Rust crate `rusqlite`, with SQLite built in -- nothing extra to install) or a **PostgreSQL or MySQL server** -- with the same commands; `DB_OPEN` decides by the target (see [Server](#server-postgresql-and-mysql)).
 
 ```basic
 IMPORT "db"
