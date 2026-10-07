@@ -304,6 +304,35 @@ pub fn befehl(name: &str, a: &[Value]) -> Option<Result<Value, String>> {
                 v => Err(format!("{}: der Index muss INTEGER sein, erhalten {}", text(&a[2]), v.type_name())),
             }
         }
+        // __struct_feld_neu(n, wo$, groesse) -- ein Feld von n Structs.
+        "__struct_feld_neu" => match &a[0] {
+            Value::Int(n) if *n >= 0 && (*n as u128) * (zahl(&a[2]) as u128) <= 1 << 30 =>
+                Ok(crate::builtins::neuer_buffer(vec![0u8; (*n * zahl(&a[2])) as usize])),
+            Value::Int(n) if *n < 0 => Err(format!("DIM {}: die Groesse {} ist negativ", text(&a[1]), n)),
+            Value::Int(n) => Err(format!("DIM {}: {} Structs zu {} Bytes ueberschreiten die Obergrenze von {} Bytes",
+                                         text(&a[1]), n, zahl(&a[2]), 1i64 << 30)),
+            v => Err(format!("DIM {}: die Groesse muss INTEGER sein, erhalten {}", text(&a[1]), v.type_name())),
+        },
+        // __struct_index_puffer(i, puffer, groesse, wo$) -- ein Index in ein
+        // Feld von Structs; wie viele es sind, sagt der Puffer.
+        "__struct_index_puffer" => {
+            let wo = text(&a[3]);
+            let n = match &a[1] {
+                Value::Buffer(b) => b.borrow().len() as i64 / zahl(&a[2]).max(1),
+                v => return Some(buf(v, &wo).map(|_| Value::Nil)),
+            };
+            match &a[0] {
+                Value::Int(k) if *k >= 0 && *k < n => Ok(Value::Int(*k)),
+                Value::Int(k) if n == 0 => Err(format!("{}: Index {} -- das Feld ist leer", wo, k)),
+                Value::Int(k) => Err(format!("{}: Index {} liegt ausserhalb 0..{}", wo, k, n - 1)),
+                v => Err(format!("{}: der Index muss INTEGER sein, erhalten {}", wo, v.type_name())),
+            }
+        }
+        // __struct_anzahl(puffer, groesse) -- LEN eines Feldes von Structs.
+        "__struct_anzahl" => match &a[0] {
+            Value::Buffer(b) => Ok(Value::Int(b.borrow().len() as i64 / zahl(&a[1]).max(1))),
+            v => buf(v, "LEN").map(|_| Value::Nil),
+        },
         // __struct_get(puffer, wo$, offset, art$, zeichen)
         "__struct_get" => lesen(&a[0], &text(&a[1]), zahl(&a[2]), &text(&a[3]), zahl(&a[4]) as usize),
         // __struct_set(puffer, wo$, offset, art$, zeichen, wert)

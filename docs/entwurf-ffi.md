@@ -284,7 +284,7 @@ DECLARE-Zeile (`zahl_platz`/`platz_wert`), dazu die Länge des Puffers. Der
 Typname steht als angesagter Typ der Variable (`angesagter_typ`), die VM
 reicht ihn durch wie jeden unbekannten. `SIZEOF(typ)`/`OFFSETOF(struct,
 feld)` werden beim Übersetzen zu Zahlen. Ein DECLARE-Parameter `AS name`
-geht als BUFFER. **Nicht** (noch): Struct als Feld einer Klasse, `ARRAY OF`
+geht als BUFFER. **Nicht** (noch; seit 2026-10-07 doch, siehe unten): Struct als Feld einer Klasse, `ARRAY OF`
 Struct und `DIM x[n] AS` Struct (ein Feld von Structs ist ein Struct mit
 einem Feld davon), Bitfelder, Struct als Wert übergeben. Das Modul braucht
 das Feature `ffi` nicht -- es fasst nur den eigenen Puffer an und taugt so
@@ -441,3 +441,24 @@ der Signatur auf dem Stapel las die VM Muell als Zeiger und stuerzte ab.
 4. Reicht als Schutz der Hinweis plus `TASK_START` für unsichere
    Bibliotheken (empfohlen), oder soll es einen Schalter geben, der
    `DECLARE … LIB` ganz verbietet (etwa für Unterrichtsrechner)?
+
+**Stand Felder von Structs und Structs in Klassen (2026-10-07):**
+`DIM pts[n] AS Punkt` ist EIN Puffer mit `n * SIZEOF` Bytes, die Structs
+hintereinander wie in C -- als `Punkt*` geht er so an `CreatePolygonRgn`,
+und `qsort` sortiert an Ort und Stelle. Intern heisst der Typ `punkt[]`;
+`ARRAY OF Punkt` (Parameter, Rueckgabe, `DIM` ohne Groesse) wird dazu
+(`Compiler::typ_norm`) -- sonst lehnte die VM den Puffer als "kein ARRAY" ab.
+Die Groesse darf zur Laufzeit feststehen; der Index prueft gegen die Laenge
+des Puffers (`__struct_index_puffer`), `LEN` zaehlt die Structs
+(`__struct_anzahl`). In einer Klasse traegt das Feld `struct_bytes`
+(`FieldInfo`/`model::FieldDecl`, auch im .dhc), und `allocate_instance`
+legt je Objekt einen Puffer an; `obj.p.x`, `Self.p.x` und `p.x` in einer
+Methode gehen ueber `struct_objektfeld` (Klasse aus `typ_von`, Feldtyp aus
+`feld_typ`, geladen mit LOAD_MEMBER statt `expr`, sonst kaeme der Compiler
+wieder hierher). Ein ganzes Objektfeld (`k.p`) bleibt ein gewoehnlicher
+Wert. **Bewusst nicht:** mehrere Dimensionen, `FOR EACH`, ein Element als
+Ganzes als Wert, ein Index direkt auf einem Aufruf (dafuer muesste er fuer
+die Laenge zweimal laufen) -- je eine Meldung. Gegenproben: `struct_bytes`
+beim Laden einer .dhc uebergangen -> der .dhc-Fall faellt; die Pruefung des
+Index gegen den Puffer abgeschaltet -> der Index-Fall faellt; NEW ohne
+Puffer -> der Klassenfall faellt.

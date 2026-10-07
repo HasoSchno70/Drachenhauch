@@ -288,10 +288,9 @@ PRINT SIZEOF(Linie), OFFSETOF(Linie, name)   ' 48  20
 * **Ein Struct ist ein BUFFER, also eine Referenz:** `b = a` teilt die Bytes,
   eine Kopie macht `BUFFER_SLICE(a, 0, SIZEOF(Punkt))`. Umgekehrt lässt sich
   jeder Puffer durch eine Lage lesen (`DIM p AS Punkt : p = roh`).
-* Ein Struct lebt in einer Variable, einem Parameter oder einer Rückgabe;
-  als Feld einer Klasse, in `ARRAY OF` oder `DIM x[n]` geht er (noch) nicht
-  -- ein Feld von Structs ist ein Struct mit einem Feld davon
-  (`e[10] AS Punkt`). Struct-Namen gelten im ganzen Programm, auch aus
+* Ein Struct lebt in einer Variable, einem Parameter, einer Rückgabe oder
+  einem Feld einer Klasse; viele davon hintereinander sind ein Feld von
+  Structs (siehe unten). Struct-Namen gelten im ganzen Programm, auch aus
   einer Datei mit Namensraum.
 
 | Befehl | was es tut |
@@ -325,6 +324,67 @@ Auf Linux und macOS hat `struct utsname` (für `uname`) Felder fester Breite,
 65 Bytes unter Linux und 256 unter macOS -- die Lage hängt dort am System.
 Man gibt der Funktion den größeren Struct und liest danach durch die Lage
 des Systems (`tests/pruef/ffi_struct.dhtest` zeigt es).
+
+### Felder von Structs und Structs in Klassen
+
+`DIM pts[n] AS Punkt` legt `n` Structs **hintereinander in einem Puffer**
+an, genau wie ein C-Feld `Punkt pts[n]` -- so geht es als `Punkt*` an eine
+Bibliothek, die viele auf einmal will:
+
+```basic
+STRUCT POINT LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DECLARE FUNCTION CreatePolygonRgn LIB "gdi32" (pts AS POINT, n AS LONG, modus AS LONG) AS ZEIGER
+
+DIM dreieck[3] AS POINT
+dreieck[1].x = 100
+dreieck[2].y = 100
+DIM r AS INTEGER
+r = CreatePolygonRgn(dreieck, LEN(dreieck), 1)
+```
+
+* **`LEN(pts)`** zählt die Structs (`BUFFER_LEN` die Bytes); ein Index
+  außerhalb ist ein Fehler. Die Größe darf erst zur Laufzeit feststehen
+  (`DIM pts[n] AS Punkt`).
+* **`ARRAY OF Punkt`** als Parameter oder Rückgabe einer FUNCTION meint
+  dasselbe Feld; `DIM ps AS ARRAY OF Punkt` ohne Größe ist ein leeres, das
+  eine Zuweisung bekommt.
+* **Eine Dimension.** Für mehrere rechnet man den Index selbst
+  (`g[zeile * breite + spalte].x`). `FOR EACH` geht nicht (es liefe über
+  die Bytes) -- mit Index geht es. Ein Element als Ganzes (`pts[2] = p`)
+  ist kein Wert; man liest und schreibt seine Felder. Ein Index direkt auf
+  dem Ergebnis eines Aufrufs (`reihe(5)[0].x`) ist eine Meldung -- erst
+  einer Variable zuweisen.
+
+**In einer Klasse** ist ein Struct ein gewöhnliches Feld; jedes Objekt
+bekommt bei `NEW` seinen eigenen Puffer:
+
+```basic
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+CLASS Figur
+    DIM ort AS Punkt
+    DIM ecken[3] AS Punkt          ' ein Feld von Structs, feste Groesse
+    SUB setze(x AS INTEGER, y AS INTEGER)
+        Self.ort.x = x
+        ort.y = y                  ' in einer Methode auch ohne Self
+    END SUB
+END CLASS
+
+DIM f AS Figur
+f = NEW Figur()
+f.setze(3, 4)
+f.ecken[1].x = 7
+PRINT f.ort.x, f.ecken[1].x, LEN(f.ecken)     ' 3  7  3
+```
+
+* `f.ort` als Ganzes ist der Puffer -- er geht so an eine Bibliothek, und
+  eine Zuweisung teilt die Bytes wie bei jeder Struct-Variable.
+* Ein Feld von Structs in einer Klasse braucht eine feste Größe.
 
 ### Bitfelder
 
@@ -753,7 +813,8 @@ END TRY
 
 * Ein Struct als Wert hinter `...` (siehe
   [Structs als Wert](#structs-als-wert)); Bitfelder mit `PACK` oder mit
-  0 Bits (siehe [Bitfelder](#bitfelder)).
+  0 Bits (siehe [Bitfelder](#bitfelder)); Felder von Structs mit mehr als
+  einer Dimension.
 * C++-Namen, COM. Eine C++-Bibliothek wie
   Qt geht über einen Umweg mit C-Schnittstelle -- etwa
   [Python einbetten](#python-einbetten) mit PySide6.

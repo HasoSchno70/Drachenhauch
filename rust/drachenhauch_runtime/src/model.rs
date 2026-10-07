@@ -293,6 +293,8 @@ pub struct FieldDecl {
     pub name: String,
     pub type_name: String,
     pub array_dims: Vec<i64>,
+    /// Ein STRUCT ... LAYOUT C als Feld: so viele Bytes Puffer je Objekt.
+    pub struct_bytes: usize,
 }
 
 pub struct ClassInfo {
@@ -621,6 +623,7 @@ fn decode_class(j: &J) -> ClassInfo {
                             .and_then(|x| x.as_array())
                             .map(|a| a.iter().filter_map(|d| d.as_i64()).collect())
                             .unwrap_or_default(),
+                        struct_bytes: fo.get("struct_bytes").and_then(|x| x.as_u64()).unwrap_or(0) as usize,
                     }
                 })
                 .collect()
