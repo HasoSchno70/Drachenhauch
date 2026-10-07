@@ -776,6 +776,79 @@ DECLARE FUNCTION f LIB "c" (a AS LONG, ..., b AS LONG) AS LONG
 --- fehler
 ... steht am Ende der Parameter
 
+=== valist: vsprintf bekommt eine liste von werten
+' Funktionen mit va_list (vprintf, vsprintf, wvsprintfA) nehmen die Werte
+' als EINE Liste: ein Tupel, ein Feld, ein einzelner Wert oder NIL. Jedes
+' System baut den va_list anders (Windows und Apple-ARM ein Zeiger auf die
+' Werte, System V ein Struct mit gp/fp_offset); im Programm sieht man davon
+' nichts.
+DECLARE FUNCTION vsprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, werte AS VALIST) AS LONG
+DIM b AS BUFFER
+b = BUFFER_NEW(256)
+PRINT vsprintf(b, "%d|%s|%.2f|%lld|%x", (42, "Drache", 3.14159, 1234567890123, 255))
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+vsprintf(b, "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f", (1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5))
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+DIM zahlen AS ARRAY OF INTEGER
+zahlen = [3, 1, 4, 1, 5, 9, 2, 6]
+vsprintf(b, "%d-%d-%d-%d-%d-%d-%d-%d", zahlen)
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+vsprintf(b, "<%s>", "einer")
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+PRINT vsprintf(b, "keiner", NIL), TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+--- erwartet
+31
+42|Drache|3.14|1234567890123|ff
+1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5 9.5 10.5
+3-1-4-1-5-9-2-6
+<einer>
+6 keiner
+
+=== valist: wvsprintfa aus user32
+DECLARE FUNCTION wvsprintfA LIB "user32" (ziel AS BUFFER, format AS TEXT, werte AS VA_LIST) AS LONG
+DIM b AS BUFFER
+b = BUFFER_NEW(64)
+PRINT wvsprintfA(b, "%d-%s-%u", (-7, "x", 4000000000))
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))
+--- system windows
+--- erwartet
+15
+-7-x-4000000000
+
+=== valist: was beim laufen nicht passt
+DECLARE FUNCTION vsprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, werte AS VALIST) AS LONG
+DIM b AS BUFFER
+b = BUFFER_NEW(64)
+DIM m AS MAP OF INTEGER
+TRY
+    PRINT vsprintf(b, "%d %d", (1, m))
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT vsprintf(b, "%s", "a" + CHR$(0) + "b")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+vsprintf: Argument 3 (werte AS VALIST): Wert 2 der Liste: erwartet eine Zahl, einen Text, einen BUFFER oder NIL, erhalten MAP
+vsprintf: Argument 3 (werte AS VALIST): Wert 1 der Liste: ein Nullzeichen mitten im Text -- C saehe nur den Anfang
+
+=== valist: byref geht nicht
+DECLARE FUNCTION f LIB "c" (BYREF a AS VALIST) AS LONG
+--- fehler
+BYREF geht nicht bei VALIST
+
+=== valist: nicht als rueckgabe
+DECLARE FUNCTION f LIB "c" (a AS LONG) AS VALIST
+--- fehler
+VALIST geht nur als Parameter
+
+=== valist: nicht im rueckruf
+DECLARE SUB f LIB "c" (r AS SUB(a AS VALIST))
+--- fehler
+Ein Rueckruf bekommt (noch) keinen VALIST
+
 === eine deklarierte funktion verdeckt den eingebauten befehl
 DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
 ' ABS der Laufzeit liefert fuer -5.5 eine Kommazahl; die aus der Bibliothek

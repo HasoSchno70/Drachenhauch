@@ -382,6 +382,26 @@ Regelwerk), Breite 0 und unbenannte Felder. Geprueft an `BuildCommDCBA`
 a : 4`. Gegenprobe: Windows nach GCC-Regel -- der Windows-Fall faellt;
 ohne die Grenzpruefung von GCC -- der Rust-Test faellt.
 
+**Stand va_list (2026-10-07):** Typwort `VALIST` (`VA_LIST`, Zeichen `a`),
+das Argument ist ein Tupel, ein Feld, ein Wert oder NIL. Die Werte kommen
+wie hinter `...` in 8-Byte-Plaetze; davor setzt `ffi::valist_kopf` je
+System (`ValistForm`), was C als `va_list` erwartet: **Windows und
+Apple-ARM** sind `char*` -- der Zeiger auf die Plaetze genuegt; **System V
+x86-64** ist ein Feld aus einem `__va_list_tag` (`gp_offset`, `fp_offset`,
+`overflow_arg_area`, `reg_save_area`), als Parameter ein Zeiger darauf: mit
+`gp_offset` 48 und `fp_offset` 176 gelten alle Register als verbraucht, und
+`va_arg` liest alles aus dem Ueberlaufbereich, also den Plaetzen
+(nachgesehen in der WSL mit gcc gegen die glibc, bevor es gebaut wurde);
+**AAPCS64 ausser Apple** ist ein Struct mit 32 Bytes (`__stack`, `__gr_top`,
+`__vr_top`, `__gr_offs`, `__vr_offs`), der als Wert ueber 16 Bytes ohnehin
+als Zeiger auf eine Kopie reist -- mit beiden Offsets 0 liest `va_arg` ab
+`__stack`. Linux-ARM ist nach dem ABI gebaut, aber ungeprueft (die CI hat
+kein Linux-ARM). Ein Rust-Test ruft `vsprintf` der echten C-Bibliothek
+(in der CI auf allen drei Systemen), dazu `tests/pruef/ffi.dhtest` mit
+`vsprintf` und `wvsprintfA`. Gegenprobe: Kommazahlen als SINGLE abgelegt --
+Rust-Test und Fall fallen. Nicht: `VALIST` in einem Rueckruf (der Rueckruf
+muesste `va_arg` nachbauen), als Rueckgabe oder mit BYREF.
+
 ## Die Fragen dazu (entschieden, siehe oben)
 
 1. **`DECLARE … LIB`** (empfohlen) oder Befehle wie ctypes?

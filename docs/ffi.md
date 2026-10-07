@@ -71,6 +71,7 @@ Drachenhauch-Typen sagen nicht, wie breit eine Zahl in C ist.
 | `WTEXT` (auch `WSTR`) | `const wchar_t*` (Windows: UTF-16, sonst UTF-32) | STRING |
 | `BUFFER` | `void*` auf die Bytes des Puffers | BUFFER |
 | `FUNCTION(...) AS typ`, `SUB(...)` | Funktionszeiger (Rückruf) | FUNCREF |
+| `VALIST` (auch `VA_LIST`) | `va_list` (für `vprintf` und Co.) | ein Tupel, ein Feld, ein Wert oder NIL |
 
 * **Ein Wert, der nicht passt, ist ein Fehler**: `LONG` mit 2^40 bricht ab,
   statt still abgeschnitten zu werden; eine Kommazahl für `LONG` ebenso.
@@ -578,6 +579,35 @@ PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))      ' 3 Drachen, 4.5 Meter, feuerrot
   setzt ein kleines Sprungbrett das Register `al`, auf Apple-ARM liegen die
   weiteren Werte auf dem Stapel) -- das übernimmt dhrt.
 
+### va_list
+
+Zu vielen Funktionen mit `...` gibt es eine Schwester, die die Werte als
+**eine** Liste nimmt: `vprintf`, `vsprintf`, `vsnprintf`, unter Windows
+`wvsprintfA` -- und Bibliotheken, die eine Meldung so weiterreichen. Der
+Parameter heißt `VALIST`, das Argument ist ein Tupel der Werte:
+
+```basic
+DECLARE FUNCTION vsprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, werte AS VALIST) AS LONG
+
+DIM b AS BUFFER
+b = BUFFER_NEW(128)
+vsprintf(b, "%d Drachen, %.1f Meter, %s", (3, 4.5, "feuerrot"))
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))      ' 3 Drachen, 4.5 Meter, feuerrot
+```
+
+* **Die Liste** ist ein Tupel, ein Feld (`[1, 2, 3]`), ein einzelner Wert
+  (für genau einen) oder `NIL` (keiner). Jeder Wert wird wie hinter `...`
+  übergeben: ganze Zahlen mit 64 Bit, Kommazahlen als `double`, Text als
+  kopierter `const char*`, ein BUFFER als Zeiger auf seine Bytes.
+* **Ein `va_list` sieht auf jedem System anders aus** -- unter Windows und
+  auf Apple-ARM ein Zeiger auf die Werte, unter Linux und macOS auf Intel
+  ein Struct, der sagt, dass die Register schon verbraucht sind und alles
+  hinter ihm liegt, auf Linux-ARM ein ähnlicher. dhrt baut ihn für jeden
+  Aufruf neu; die Funktion darf ihn aufbrauchen.
+* `VALIST` gibt es nur als Parameter -- nicht als Rückgabe, nicht mit
+  `BYREF` und (noch) nicht in einem Rückruf (ein `va_list`, den eine
+  Bibliothek einem Rückruf gibt, kommt als `ZEIGER` an).
+
 ## Rückrufe
 
 Manche Bibliotheken rufen zurück: `qsort` fragt für jedes Paar, welches
@@ -724,7 +754,7 @@ END TRY
 * Ein Struct als Wert hinter `...` (siehe
   [Structs als Wert](#structs-als-wert)); Bitfelder mit `PACK` oder mit
   0 Bits (siehe [Bitfelder](#bitfelder)).
-* C++-Namen, COM, `va_list`-Funktionen (`vprintf`). Eine C++-Bibliothek wie
+* C++-Namen, COM. Eine C++-Bibliothek wie
   Qt geht über einen Umweg mit C-Schnittstelle -- etwa
   [Python einbetten](#python-einbetten) mit PySide6.
 * **Im Browser** gibt es keine fremden Bibliotheken; ein Aufruf ist dort ein

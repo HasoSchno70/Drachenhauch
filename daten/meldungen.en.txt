@@ -1604,6 +1604,11 @@ BYREF geht nicht bei einem Rueckruf -- die Bibliothek bekommt ohnehin einen Zeig
 Erwartet '(' -- ein Rueckruf nennt seine Parameter: FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG	Expected '(' -- a callback names its parameters: FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG
 BYREF gibt es in einem Rueckruf nicht -- was die Bibliothek als Zeiger uebergibt, kommt als ZEIGER an	There is no BYREF in a callback -- what the library passes as a pointer arrives as ZEIGER
 Ein Rueckruf bekommt keinen BUFFER -- Speicher der Bibliothek kommt als ZEIGER an, BUFFER_AUS_ZEIGER liest ihn	A callback does not get a BUFFER -- memory of the library arrives as ZEIGER, BUFFER_AUS_ZEIGER reads it
+Ein Rueckruf bekommt (noch) keinen VALIST -- eine Liste der Bibliothek kommt als ZEIGER an	A callback does not get a VALIST (yet) -- a list from the library arrives as ZEIGER
+BYREF geht nicht bei VALIST -- die Bibliothek bekommt ohnehin einen Zeiger auf die Werte	BYREF does not work for VALIST -- the library gets a pointer to the values anyway
+VALIST geht nur als Parameter -- eine Liste von Werten fuer vprintf und Co.	VALIST only works as a parameter -- a list of values for vprintf and the like
+Wert {} der Liste: ein Nullzeichen mitten im Text -- C saehe nur den Anfang	value {} of the list: a null character in the middle of the text -- C would only see the beginning
+Wert {} der Liste: erwartet eine Zahl, einen Text, einen BUFFER oder NIL, erhalten {}	value {} of the list: expects a number, a text, a BUFFER or NIL, got {}
 Erwartet ')' am Ende der Parameter des Rueckrufs	Expected ')' at the end of the callback's parameters
 Ein Rueckruf mit SUB gibt nichts zurueck -- mit Rueckgabe heisst es FUNCTION(...) AS typ	A callback with SUB returns nothing -- with a return value it is FUNCTION(...) AS type
 Erwartet AS <Rueckgabetyp> nach FUNCTION(...) -- ohne Rueckgabe heisst es SUB(...)	Expected AS <return type> after FUNCTION(...) -- without a return value it is SUB(...)

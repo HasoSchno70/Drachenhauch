@@ -93,6 +93,7 @@ module.exports = (H) => [
   H.bullet("SIZEOF und OFFSETOF sind feste Zahlen, schon beim Übersetzen gerechnet. Nach farbe bleiben drei Bytes frei, damit ende auf einer durch vier teilbaren Stelle liegt; vor gewicht vier, für die acht Bytes des FLOAT."),
   H.bullet("Ein Wert, der nicht ins Feld passt, ist ein Fehler – wie in der DECLARE-Zeile –, ebenso ein Index außerhalb und ein zu langer Text."),
   H.bullet("PACK 1 hinter LAYOUT C lässt die Lücken weg, für Dateiformate und die wenigen APIs, die gepackt sind."),
+  H.bullet("Bitfelder schreibst du wie in C mit der Breite hinter dem Typ: fBinary AS ULONG : 1. Wie sie im Speicher liegen, legt in C der Compiler fest – Drachenhauch rechnet unter Windows wie MSVC, unter Linux und macOS wie GCC und Clang, damit die Bits dort ankommen, wo die Bibliothek sie sucht."),
   H.bullet("Ein Struct ist ein BUFFER, also eine Referenz: b = a teilt die Bytes. Umgekehrt liest du jeden Puffer durch eine Lage, indem du ihn einer Struct-Variable zuweist."),
   H.p("Texte, die eine Funktion schreibt, kommen genauso zurück: GetComputerNameW füllt einen Puffer mit UTF-16-Zeichen und nennt die Länge über BYREF. Das ganze Programm steht in den Beispielen als 206_fremde_bibliotheken.dh."),
 
@@ -193,6 +194,7 @@ module.exports = (H) => [
   H.code(["-7 13 42", "42 13 -7"], { out: true }),
   H.p("qsort gibt deiner Funktion zwei Zeiger auf Elemente; BUFFER_AUS_ZEIGER liest die vier Bytes dahinter. Übergeben wird die Funktion mit ihrem Namen ohne Klammern – genauso gut eine gebundene Methode (zaehler.eins, das Objekt kommt mit) oder ein Lambda wie im zweiten Aufruf."),
   H.bullet("In den Klammern stehen die C-Typen, die der Rückruf bekommt, mit oder ohne Namen. Erlaubt sind Zahlen, ZEIGER, BOOLEAN und TEXT; zurück gibt er eine Zahl, einen ZEIGER oder BOOLEAN – oder als SUB(...) nichts."),
+  H.bullet("Auch ein Struct geht als Wert, hin wie zurück: BYVAL p AS Punkt in den Klammern, AS Punkt als Rückgabe. Deine Funktion bekommt eine Kopie als Struct und gibt einen zurück."),
   H.bullet("Passt die Zahl der Parameter deiner Funktion nicht, ist das ein Fehler, bevor die Bibliothek überhaupt gerufen wird."),
   H.bullet("Ein Fehler in deiner Funktion kommt beim Aufruf der Bibliothek an, sobald sie fertig ist – abfangbar mit CATCH. Bis dahin bekommt sie von jedem weiteren Rückruf eine 0."),
   H.bullet("Ein Rückruf bleibt gültig, bis das Programm endet; die Bibliothek darf ihn sich merken und später rufen."),
@@ -212,6 +214,16 @@ module.exports = (H) => [
   H.bullet("INTEGER und BOOLEAN gehen als ganze Zahl, FLOAT als double, ein Text als char*, ein BUFFER als Zeiger und NIL als Nullzeiger."),
   H.bullet("Unter Windows liegt die printf-Familie in msvcrt und nicht in der C-Bibliothek ucrtbase – daher die zwei Namen \"msvcrt|c\"."),
   H.bullet("Ob die Werte zum Format passen, prüft niemand: ein %s für eine Zahl ist einer der Abstürze vom Anfang des Kapitels."),
+  H.p("Zu vielen dieser Funktionen gibt es eine Schwester, die die Werte als eine einzige Liste nimmt – vsprintf, vprintf und Co., in C mit einem va_list. Der Parameter heißt hier VALIST, und die Werte übergibst du als Tupel:"),
+  H.code([
+    'DECLARE FUNCTION vsprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, werte AS VALIST) AS LONG',
+    '',
+    'DIM b AS BUFFER',
+    'b = BUFFER_NEW(128)',
+    'vsprintf(b, "%d Drachen, %.1f Meter, %s", (3, 4.5, "feuerrot"))',
+    'PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))',
+  ]),
+  H.code(["3 Drachen, 4.5 Meter, feuerrot"], { out: true }),
 
   H.h2("Eine ganze Oberfläche: GTK"),
   H.p("Mit DECLARE und Rückrufen lässt sich sogar GTK benutzen, die Bibliothek, mit der unter Linux die meisten Programme ihre Fenster zeichnen. Fenster, Knöpfe und Eingabefelder sind ZEIGER; ein Signal wie \"clicked\" verbindest du mit g_signal_connect_data und einer SUB deines Programms, und gtk_main dreht die Schleife von GTK, bis gtk_main_quit kommt. Das Beispiel 207_gtk.dh zeigt ein Fenster mit Eingabefeld, zwei Knöpfen und einer Beschriftung."),
@@ -226,5 +238,5 @@ module.exports = (H) => [
 
   H.h2("Unsichere Bibliotheken"),
   H.p("Einer Bibliothek, die abstürzen könnte, gibst du einen eigenen Prozess: Du rufst sie in einem Auftrag mit TASK_START auf (Kapitel „Programme, Aufträge & Umgebung“). Stürzt der Auftrag ab, bekommt dein Programm beim Abholen mit TASK_RESULT$ einen Fehler – „der Auftrag ist abgestuerzt“ – und läuft weiter."),
-  H.note("Noch nicht dabei sind Bitfelder, ein Struct als Wert in einem Rückruf und Funktionen mit va_list wie vprintf. Im Browser gibt es keine fremden Bibliotheken."),
+  H.note("Noch nicht dabei sind Bitfelder zusammen mit PACK, ein Struct als Wert hinter ... und ein va_list, den eine Bibliothek deinem Rückruf gibt. Im Browser gibt es keine fremden Bibliotheken."),
 ];

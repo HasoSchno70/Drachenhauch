@@ -58,6 +58,7 @@ pub const TYPWOERTER: &[(&str, char)] = &[
     ("single", 'f'), ("float", 'd'), ("boolean", 'o'),
     ("text", 't'), ("cstr", 't'), ("wtext", 'w'), ("wstr", 'w'),
     ("buffer", 'p'),
+    ("valist", 'a'), ("va_list", 'a'),
 ];
 
 /// Kurzzeichen eines Typworts (`None` = gibt es nicht).
@@ -73,6 +74,7 @@ pub fn typ_name(c: char) -> &'static str {
         'l' => "LONG", 'L' => "ULONG", 'q' => "INTEGER", 'z' => "ZEIGER",
         'f' => "SINGLE", 'd' => "FLOAT", 'o' => "BOOLEAN",
         't' => "TEXT", 'w' => "WTEXT", 'p' => "BUFFER",
+        'a' => "VALIST",
         'r' => "FUNCTION",
         'x' => "STRUCT",
         '*' => "...",
@@ -88,6 +90,7 @@ pub fn dh_typ(c: char) -> &'static str {
         't' | 'w' => "string",
         'p' | 'x' => "buffer",
         'r' => "funcref",
+        'a' => "tuple",
         _ => "integer",
     }
 }
@@ -113,7 +116,7 @@ pub fn typ_vorschlag(wort: &str) -> Option<&'static str> {
 /// Hinweis zu einem Wort, das kein Typwort einer `DECLARE`-Zeile ist.
 pub fn typ_hinweis(wort: &str) -> String {
     let vorschlag = typ_vorschlag(wort);
-    let liste = "BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER";
+    let liste = "BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST";
     match vorschlag {
         Some(v) => format!("'{}' ist kein Typ fuer fremde Bibliotheken -- hier heisst das {} (moeglich: {})", wort.to_uppercase(), v, liste),
         None => format!("'{}' ist kein Typ fuer fremde Bibliotheken (moeglich: {})", wort.to_uppercase(), liste),
@@ -1335,6 +1338,77 @@ fn zeiger_rufen(gross: &str, a: &[Value]) -> Result<Value, String> {
     }
 }
 
+/// Wie ein `va_list` auf diesem System aussieht.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValistForm {
+    /// Windows (x64, ARM64) und Apple-ARM: ein Zeiger auf die Werte, jeder
+    /// in einem 8-Byte-Platz.
+    Zeiger,
+    /// System V x86-64 (Linux, macOS Intel): ein Struct `{gp_offset,
+    /// fp_offset, overflow_arg_area, reg_save_area}`; mit gp_offset 48 und
+    /// fp_offset 176 gelten alle Register als verbraucht, und `va_arg` liest
+    /// alles aus dem Ueberlaufbereich -- den 8-Byte-Plaetzen.
+    SysV,
+    /// AAPCS64 ausser Apple (Linux ARM): ein Struct `{__stack, __gr_top,
+    /// __vr_top, __gr_offs, __vr_offs}`; mit beiden Offsets 0 liest
+    /// `va_arg` alles ab `__stack`. Er hat 32 Bytes und geht darum als
+    /// Zeiger auf eine Kopie -- genau das, was der ZEIGER-Platz traegt.
+    Aapcs,
+}
+
+pub fn valist_form() -> ValistForm {
+    if cfg!(windows) || cfg!(all(target_os = "macos", target_arch = "aarch64")) { ValistForm::Zeiger }
+    else if cfg!(target_arch = "aarch64") { ValistForm::Aapcs }
+    else { ValistForm::SysV }
+}
+
+/// Der Kopf eines `va_list` fuer diese Form, der auf die Plaetze zeigt (leer
+/// = der Zeiger auf die Plaetze IST der va_list). `ablage` ist der
+/// Speicher, den System V als `reg_save_area` sieht -- er wird nie gelesen,
+/// soll aber auf etwas zeigen.
+pub fn valist_kopf(form: ValistForm, plaetze: u64, ablage: u64) -> Vec<u64> {
+    match form {
+        ValistForm::Zeiger => Vec::new(),
+        ValistForm::SysV => vec![48 | (176u64 << 32), plaetze, ablage],
+        ValistForm::Aapcs => vec![plaetze, 0, 0, 0],
+    }
+}
+
+/// Die Werte eines VALIST-Arguments: ein Tupel, ein Feld, ein einzelner Wert
+/// oder NIL (keiner). Jeder kommt in einen 8-Byte-Platz, wie hinter `...`:
+/// eine Kommazahl als double, Text als Zeiger auf eine Kopie.
+#[cfg(feature = "ffi")]
+fn valist_plaetze(v: &Value, texte: &mut Vec<std::ffi::CString>) -> Result<Vec<u64>, String> {
+    let werte: Vec<Value> = match v {
+        Value::Tuple(t) => t.to_vec(),
+        Value::Array(a) => { let a = a.borrow(); (0..a.cells.len()).map(|i| a.cells.get(i)).collect() }
+        Value::Nil => Vec::new(),
+        v => vec![v.clone()],
+    };
+    let mut plaetze = Vec::with_capacity(werte.len().max(1));
+    for (k, w) in werte.iter().enumerate() {
+        plaetze.push(match w {
+            Value::Int(x) => *x as u64,
+            Value::Float(f) => f.to_bits(),
+            Value::Bool(b) => *b as u64,
+            Value::Nil => 0,
+            Value::Str(s) => {
+                let c = std::ffi::CString::new(s.as_bytes())
+                    .map_err(|_| format!("Wert {} der Liste: ein Nullzeichen mitten im Text -- C saehe nur den Anfang", k + 1))?;
+                let z = c.as_ptr() as u64;
+                texte.push(c);
+                z
+            }
+            Value::Buffer(b) => unsafe { (*b.as_ptr()).as_mut_ptr() as u64 },
+            _ => return Err(format!("Wert {} der Liste: erwartet eine Zahl, einen Text, einen BUFFER oder NIL, erhalten {}",
+                                    k + 1, w.type_name())),
+        });
+    }
+    // Ein Platz mehr, damit auch eine leere Liste auf Speicher zeigt.
+    plaetze.push(0);
+    Ok(plaetze)
+}
+
 /// Ob eine Kommazahl hinter `...` in einem Gleitkomma-Register reist. Unter
 /// Windows x64 liest die gerufene Funktion sie aus dem Speicher, in den sie
 /// die Ganzzahl-Register sichert, und auf Apple-ARM liegt alles hinter `...`
@@ -1419,6 +1493,7 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     let mut breite: Vec<Vec<WZeichen>> = Vec::new();
     let mut ref_plaetze = vec![0u64; n.max(1)];
     let mut kopien: Vec<Vec<u64>> = Vec::new();
+    let mut ablage = [0u64; 22];
     for (i, (p, v)) in sig.params[..fest].iter().zip(args).enumerate() {
         let typname = match &auf.structs[i] { Some(s) => s.name.to_uppercase(), None => typ_name(p.art).to_string() };
         let fehler = |e: String| format!("{}: Argument {} ({} AS {}): {}", sig.name, i + 1, p.name, typname, e);
@@ -1476,6 +1551,16 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
                 Value::Nil => 0,
                 _ => return Err(fehler(format!("erwartet einen BUFFER, erhalten {}", v.type_name()))),
             },
+            // Ein va_list: die Werte in 8-Byte-Plaetzen, davor je System
+            // der Kopf, der auf sie zeigt (`valist_kopf`).
+            'a' => {
+                let pl = valist_plaetze(v, &mut texte).map_err(fehler)?;
+                let kopf = valist_kopf(valist_form(), pl.as_ptr() as u64, ablage.as_mut_ptr() as u64);
+                let z = if kopf.is_empty() { pl.as_ptr() as u64 } else { kopf.as_ptr() as u64 };
+                kopien.push(pl);
+                if !kopf.is_empty() { kopien.push(kopf); }
+                z
+            }
             'r' => match v {
                 Value::FuncRef(_) | Value::BoundMethod(_) | Value::Closure(_) =>
                     rueckruf_einstieg(&p.rr, v).map_err(fehler)?,
@@ -1523,6 +1608,7 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     drop(texte);
     drop(breite);
     drop(kopien);
+    let _ = &ablage;
     if let Some(e) = rueckruf_fehler() { return Err(format!("{}: {}", sig.name, e)); }
     let rueck = rueck_platz[0];
     let ergebnis = match sig.rueck {
@@ -2091,6 +2177,46 @@ mod tests {
             let z = rr_einstieg(&format!("{}{}", b3, b3), e7 as usize);
             let f: extern "C" fn(B3) -> B3 = unsafe { std::mem::transmute(z) };
             assert_eq!(f(B3 { a: 1, b: 2, c: 3 }), B3 { a: 3, b: 1, c: 2 });
+        }
+
+        /// Ein VALIST ueber `vsprintf` der echten C-Bibliothek -- in der CI
+        /// unter Windows (char*), System V (Kopf mit gp/fp_offset) und
+        /// Apple-ARM (char*).
+        #[test]
+        fn valist_ueber_vsprintf() {
+            let sig = signatur_text("msvcrt|c", "vsprintf", "vsprintf", "l",
+                &[("p".into(), false, "ziel".into()), ("t".into(), false, "f".into()), ("a".into(), false, "w".into())]);
+            let puf = crate::builtins::neuer_buffer(vec![0u8; 256]);
+            let lies = |n: Value| -> String {
+                let Value::Int(n) = n else { panic!("Zahl erwartet") };
+                let Value::Buffer(b) = &puf else { panic!() };
+                String::from_utf8_lossy(&b.borrow()[..n as usize]).into_owned()
+            };
+            let werte = Value::Tuple(Rc::new(vec![Value::Int(3), Value::Float(4.5), Value::str_rc("feuerrot"),
+                                                  Value::Int(255), Value::Int(-1 << 40)]));
+            let r = rufen(&[Value::str_rc(sig.clone()), puf.clone(), Value::str_rc("%d Drachen, %.1f Meter, %s, %x, %lld"), werte]).unwrap();
+            assert_eq!(lies(r), "3 Drachen, 4.5 Meter, feuerrot, ff, -1099511627776");
+            // Mehr Kommazahlen als Register: alles kommt aus den Plaetzen.
+            let werte = Value::Tuple(Rc::new((1..=10).map(|i| Value::Float(i as f64 + 0.5)).collect()));
+            let r = rufen(&[Value::str_rc(sig.clone()), puf.clone(), Value::str_rc("%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f"), werte]).unwrap();
+            assert_eq!(lies(r), "1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5 9.5 10.5");
+            // Ein einzelner Wert und gar keiner.
+            let r = rufen(&[Value::str_rc(sig.clone()), puf.clone(), Value::str_rc("<%s>"), Value::str_rc("eins")]).unwrap();
+            assert_eq!(lies(r), "<eins>");
+            let r = rufen(&[Value::str_rc(sig.clone()), puf.clone(), Value::str_rc("nichts"), Value::Nil]).unwrap();
+            assert_eq!(lies(r), "nichts");
+            assert!(fehler(rufen(&[Value::str_rc(sig), puf.clone(), Value::str_rc("%s"),
+                                   Value::Tuple(Rc::new(vec![Value::Int(1), Value::Tuple(Rc::new(vec![]))]))])).contains("Wert 2"));
+        }
+
+        #[test]
+        fn valist_kopf_je_form() {
+            assert!(valist_kopf(ValistForm::Zeiger, 1000, 2000).is_empty());
+            assert_eq!(valist_kopf(ValistForm::SysV, 1000, 2000), vec![48 | (176 << 32), 1000, 2000]);
+            assert_eq!(valist_kopf(ValistForm::Aapcs, 1000, 2000), vec![1000, 0, 0, 0]);
+            let erwartet = if cfg!(windows) || cfg!(all(target_os = "macos", target_arch = "aarch64")) { ValistForm::Zeiger }
+                           else if cfg!(target_arch = "aarch64") { ValistForm::Aapcs } else { ValistForm::SysV };
+            assert_eq!(valist_form(), erwartet);
         }
 
         #[test]

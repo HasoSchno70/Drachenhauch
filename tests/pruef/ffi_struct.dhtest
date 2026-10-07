@@ -508,7 +508,7 @@ SIZEOF: 'GIBTS' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER
 OFFSETOF: Punkt hat kein Feld 'z' (Felder: x, w)
 Ein Feld von Punkt gibt es nicht -- ein STRUCT ... LAYOUT C mit einem Feld davon schon: STRUCT Liste LAYOUT C / e[10] AS Punkt / END STRUCT
 k.p: ein STRUCT ... LAYOUT C kann (noch) kein Feld einer Klasse sein -- er lebt in einer Variable oder einem Parameter (DIM p AS Punkt), oder das Feld ist ein BUFFER mit BUFFER_NEW(SIZEOF(Punkt))
-'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER)
+'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST)
 STRUCT A LAYOUT C enthaelt sich selbst (ueber a) -- ein Struct kann sich nicht einbetten, nur einen ZEIGER auf sich haben
 Erwartet 1, 2, 4, 8 oder 16 nach PACK
 Ein Text im Struct hat eine feste Laenge: TEXT * 32 (Zeichen) -- ein Zeiger auf Text ist ZEIGER

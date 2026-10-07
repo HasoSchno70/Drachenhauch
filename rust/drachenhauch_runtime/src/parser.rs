@@ -1624,6 +1624,10 @@ impl Parser {
                     } else {
                         self.ffi_typwort()?
                     };
+                    if by_ref && matches!(wort.as_str(), "valist" | "va_list") {
+                        self.pos -= 1;
+                        return self.err("BYREF geht nicht bei VALIST -- die Bibliothek bekommt ohnehin einen Zeiger auf die Werte");
+                    }
                     if by_ref && matches!(wort.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer") {
                         self.pos -= 1;
                         return self.err(&format!(
@@ -1656,6 +1660,10 @@ impl Parser {
             if wort == "buffer" {
                 self.pos -= 1;
                 return self.err("BUFFER geht nur als Parameter -- liefert die Bibliothek Speicher, ist die Rueckgabe ein ZEIGER");
+            }
+            if matches!(wort.as_str(), "valist" | "va_list") {
+                self.pos -= 1;
+                return self.err("VALIST geht nur als Parameter -- eine Liste von Werten fuer vprintf und Co.");
             }
             Some(wort)
         };
@@ -1708,6 +1716,10 @@ impl Parser {
                     self.pos -= 1;
                     return self.err("Ein Rueckruf bekommt keinen BUFFER -- Speicher der Bibliothek kommt als ZEIGER an, BUFFER_AUS_ZEIGER liest ihn");
                 }
+                if matches!(w.as_str(), "valist" | "va_list") {
+                    self.pos -= 1;
+                    return self.err("Ein Rueckruf bekommt (noch) keinen VALIST -- eine Liste der Bibliothek kommt als ZEIGER an");
+                }
                 zeichen.push(crate::ffi::typ_zeichen(&w).unwrap_or('q'));
                 if !self.matches(Tt::Comma) { break; }
             }
@@ -1728,7 +1740,7 @@ impl Parser {
                 return Ok(format!("@{}{}", w, zeichen));
             }
             let w = self.ffi_typwort()?;
-            if matches!(w.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer") {
+            if matches!(w.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer" | "valist" | "va_list") {
                 self.pos -= 1;
                 return self.err("Ein Rueckruf liefert eine Zahl, einen ZEIGER oder BOOLEAN -- keinen Text und keinen BUFFER (wem gehoerte der Speicher danach?)");
             }

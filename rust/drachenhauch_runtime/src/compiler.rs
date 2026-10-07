@@ -4061,6 +4061,8 @@ impl Compiler {
                 'f' | 'd' => matches!(t, Typ::Str | Typ::Bool),
                 'o' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl),
                 'p' | 'x' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
+                // Eine Liste darf alles sein: ein Tupel, ein Feld, ein Wert.
+                'a' => false,
                 'r' => matches!(t, Typ::Str | Typ::Int | Typ::Float | Typ::Zahl | Typ::Bool),
                 _ => matches!(t, Typ::Str | Typ::Bool | Typ::Float),
             };

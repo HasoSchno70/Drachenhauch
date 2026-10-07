@@ -1521,6 +1521,15 @@ fuer drei Ziele nachgesehen, `lagen_rechnen_mit` laesst die Rust-Tests beide
 auf jedem System rechnen. `Feld::bits/bit`, die Art fuer
 `__struct_get/_set` ist `l3@5`. Nicht: mit PACK, Breite 0. Tests
 `ffi_struct.dhtest` (DCB ueber `BuildCommDCBA`, Lage je System).
+**va_list (2026-10-07):** Typwort `VALIST`/`VA_LIST` (Zeichen `a`),
+Argument Tupel/Feld/Wert/NIL, Werte wie hinter `...` in 8-Byte-Plaetzen;
+`ffi::valist_kopf` je `ValistForm`: Windows + Apple-ARM `char*` (nur die
+Plaetze), System V Kopf `{gp_offset 48, fp_offset 176, overflow = Plaetze,
+reg_save}` (alle Register "verbraucht", vorher in der WSL mit gcc gegen
+glibc probiert), Linux-ARM `{__stack = Plaetze, 0, 0, 0}` (32 Bytes, reist
+als Zeiger -- ungeprueft). Nicht im Rueckruf/als Rueckgabe/BYREF. Tests:
+Rust `valist_ueber_vsprintf` (echte C-Bibliothek, alle CI-Systeme),
+`ffi.dhtest` (`vsprintf`, `wvsprintfA`).
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
