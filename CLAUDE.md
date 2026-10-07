@@ -1405,8 +1405,14 @@ neben Programm/Exe/System, `ffi::dateinamen`: "c"/"m" plattformneutral),
 je Signatur ein Cranelift-Uebergang `fn(ziel, args: *const u64, rueck: *mut
 u64)` (`uebergang::Bauer`, eigenes JITModule). Kleine Ganzzahlen tragen
 sext/uext in der Signatur; ein Wert, der nicht passt, ist ein Fehler
-(`zahl_platz`). Maschinencode-Bereiche nehmen `__ffi` nicht auf
-(`befehl_im_bereich`). Ein Absturz im Auftrag (TASK_START) meldet jetzt
+(`zahl_platz`). Maschinencode-Bereiche nehmen `__ffi` seit 2026-10-07 auf,
+**aber nur solange kein Rueckruf vergeben ist** (`ffi::rueckrufe_vergeben`
+beim Bauen, `ffi::ohne_drachenhauch_code` je Aufruf): eine Bibliothek darf
+einen gemerkten Rueckruf bei JEDEM Aufruf rufen, und der aendert womoeglich
+eine Globale, die der Bereich haelt (Gegenprobe: 120 statt 1020). Mit nur
+Zahlen geht der Aufruf getypt (`Art::S` = Zeiger auf die Signatur-Konstante,
+Helfer `ffi_zahlen` -> `ffi::zahlen_rufen`), nur in Bereichen, nicht in
+Funktionen. `ffi.dh` der Messbank 201 -> 54 ms. Ein Absturz im Auftrag (TASK_START) meldet jetzt
 "der Auftrag ist abgestuerzt (Rueckgabe N|Signal N)" statt "unverstaendliche
 Antwort". `symbole.rs` kennt die Zeile als Definition (Hover, Springen,
 Vervollstaendigung). **Gegenproben:** eine Verfaelschung der Rueckgabe-

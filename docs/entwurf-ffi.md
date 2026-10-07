@@ -402,6 +402,36 @@ kein Linux-ARM). Ein Rust-Test ruft `vsprintf` der echten C-Bibliothek
 Rust-Test und Fall fallen. Nicht: `VALIST` in einem Rueckruf (der Rueckruf
 muesste `va_arg` nachbauen), als Rueckgabe oder mit BYREF.
 
+**Stand Maschinencode (2026-10-07):** `__ffi` war in `befehl_im_bereich`
+pauschal gesperrt. Die Sperre ist noetig, sobald fremder Code
+Drachenhauch-Code rufen KANN -- und das kann nicht nur ein Aufruf mit
+Rueckruf-Parameter, sondern jeder, sobald das Programm einmal einen Rueckruf
+vergeben hat (die Bibliothek merkt ihn sich; GTK ruft ihn aus `gtk_main`).
+Darum gilt: `__ffi` im Bereich nur, solange **kein Rueckruf vergeben** ist
+(`ffi::rueckrufe_vergeben`, gefragt beim Bauen) und die Signatur **keinen
+Rueckruf nimmt** (`ffi::ohne_drachenhauch_code`, gefragt je Aufruf -- sonst
+steigt der Bereich vor dem Befehl aus). Belegt mit einem Fall, in dem
+`CallWindowProcW(proc AS ZEIGER, ...)` einen per `EncodePointer`
+gemerkten Rueckruf ruft, der eine Globale der Schleife aendert: ohne die
+Sperre rechnet der Maschinencode 120 statt 1020.
+Gemessen brachte das Erlauben allein nichts (abs je Million: 198 ms gegen
+196 ms in der VM): mit `__ffi` fiel der ganze Bereich in den Wertemodus, und
+der Aufrufweg selbst kostete ~200 ns. Zwei Schritte danach: (1) der
+Aufrufweg -- die Signatur wird an ihrem `Rc` erkannt statt je Aufruf
+gehasht (`aufruf_wert`, Zuletzt-Liste), Plaetze bis 16 Argumente auf dem
+Stapel, der Typname nur im Fehlerfall: VM 202 -> 116 ms; (2) **getypt**:
+eine Signatur nur aus Zahlen ist im Bereich `Art::S` (Zeiger auf die
+Konstante), der Aufruf geht ueber den Helfer `ffi_zahlen` ->
+`ffi::zahlen_rufen` (dieselben Pruefungen und derselbe Uebergang ueber
+`rufen_mit`); jeder Fehler kommt dort VOR dem eigentlichen Aufruf, also
+darf der Bereich davor aussteigen, und die VM ruft und meldet. Nicht in
+uebersetzten Funktionen (die VM rechnet dort bei einem Ausstieg die ganze
+Funktion nach -- ein Fremdaufruf hat Nebenwirkungen). Ergebnis 201 -> 54 ms
+mit Maschinencode (`tools/tempo/ffi.dh`, best of 5, gegen den Bau davor;
+die uebrigen Messungen unveraendert). Fund dabei: der Ausstieg mitten im
+Bereich schrieb nur Zahlen und Objekte in den Stapel der VM zurueck -- mit
+der Signatur auf dem Stapel las die VM Muell als Zeiger und stuerzte ab.
+
 ## Die Fragen dazu (entschieden, siehe oben)
 
 1. **`DECLARE … LIB`** (empfohlen) oder Befehle wie ctypes?

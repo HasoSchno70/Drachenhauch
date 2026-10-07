@@ -1,0 +1,12 @@
+' Tempo: eine Funktion der C-Bibliothek in einer Schleife (1 Mio. Aufrufe
+' von abs). Misst den Uebergang samt Schleife; mit Maschinencode laeuft die
+' Schleife im Bereich, solange das Programm keinen Rueckruf vergeben hat.
+DECLARE FUNCTION betrag LIB "c" ALIAS "abs" (x AS LONG) AS LONG
+DIM t0 AS FLOAT : t0 = TIMER()
+DIM s AS INTEGER : s = 0
+DIM i AS INTEGER
+FOR i = 1 TO 1000000
+    s = s + betrag(-i) + i MOD 7
+NEXT
+PRINT "ZEIT "; (TIMER() - t0) * 1000.0
+IF s <> 500000500000 + 2999998 THEN EXIT(1)

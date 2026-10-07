@@ -849,6 +849,318 @@ DECLARE SUB f LIB "c" (r AS SUB(a AS VALIST))
 --- fehler
 Ein Rueckruf bekommt (noch) keinen VALIST
 
+=== maschinencode: eine schleife ruft die c-bibliothek
+' Eine Funktion einer Bibliothek, die nur Zahlen nimmt und liefert, laeuft
+' im getypten Bereich (ffi_zahlen in jit.rs); dieselbe Ausgabe wie in der VM.
+DECLARE FUNCTION betrag LIB "c" ALIAS "abs" (x AS LONG) AS LONG
+DECLARE FUNCTION wurzel LIB "m" ALIAS "sqrt" (x AS FLOAT) AS FLOAT
+DECLARE FUNCTION grenze LIB "m" ALIAS "floorf" (x AS SINGLE) AS SINGLE
+DECLARE SUB saat LIB "c" ALIAS "srand" (s AS ULONG)
+DECLARE FUNCTION zufall LIB "c" ALIAS "rand" () AS LONG
+DIM s AS INTEGER
+DIM w AS FLOAT
+DIM g AS FLOAT
+DIM i AS INTEGER
+FOR i = 1 TO 1000
+    s = s + betrag(-i)
+    w = w + wurzel(i)
+    g = g + grenze(-0.5)
+NEXT
+PRINT s, INT(w), g
+saat(7)
+DIM r1 AS INTEGER
+r1 = zufall()
+DIM r AS INTEGER
+FOR i = 1 TO 100
+    saat(7)
+    r = zufall()
+NEXT
+PRINT r = r1
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+500500 21097 -1000.0
+TRUE
+
+=== maschinencode: eine schleife ruft die c-bibliothek (maschinencode)
+' Eine Funktion einer Bibliothek, die nur Zahlen nimmt und liefert, laeuft
+' im getypten Bereich (ffi_zahlen in jit.rs); dieselbe Ausgabe wie in der VM.
+DECLARE FUNCTION betrag LIB "c" ALIAS "abs" (x AS LONG) AS LONG
+DECLARE FUNCTION wurzel LIB "m" ALIAS "sqrt" (x AS FLOAT) AS FLOAT
+DECLARE FUNCTION grenze LIB "m" ALIAS "floorf" (x AS SINGLE) AS SINGLE
+DECLARE SUB saat LIB "c" ALIAS "srand" (s AS ULONG)
+DECLARE FUNCTION zufall LIB "c" ALIAS "rand" () AS LONG
+DIM s AS INTEGER
+DIM w AS FLOAT
+DIM g AS FLOAT
+DIM i AS INTEGER
+FOR i = 1 TO 1000
+    s = s + betrag(-i)
+    w = w + wurzel(i)
+    g = g + grenze(-0.5)
+NEXT
+PRINT s, INT(w), g
+saat(7)
+DIM r1 AS INTEGER
+r1 = zufall()
+DIM r AS INTEGER
+FOR i = 1 TO 100
+    saat(7)
+    r = zufall()
+NEXT
+PRINT r = r1
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+500500 21097 -1000.0
+TRUE
+--- stderr
+jit: 0 Funktionen, 2 Schleifen, 2 Schleifenlaeufe
+
+=== maschinencode: aussteigen vor und nach dem aufruf
+' Ein Wert, der nicht passt, laesst VOR dem Aufruf aussteigen, ein
+' Ueberlauf danach -- die Bibliothek wird dabei nicht doppelt gerufen
+' (rand zaehlt mit).
+DECLARE FUNCTION betrag LIB "c" ALIAS "abs" (x AS LONG) AS LONG
+DECLARE SUB saat LIB "c" ALIAS "srand" (s AS ULONG)
+DECLARE FUNCTION zufall LIB "c" ALIAS "rand" () AS LONG
+DIM s AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 5
+        s = s + betrag(i * 1000000000)
+    NEXT
+CATCH e
+    PRINT s; " | "; e; " | zeile "; ERROR_LINE()
+END TRY
+saat(1)
+s = 0
+TRY
+    FOR i = 1 TO 5
+        s = s + zufall() * 0 + i * 4611686018427387904
+    NEXT
+CATCH e
+    PRINT s; " | "; e; " | zeile "; ERROR_LINE()
+END TRY
+DIM naechste AS INTEGER
+naechste = zufall()
+saat(1)
+DIM k AS INTEGER
+FOR k = 1 TO 10
+    IF zufall() = naechste THEN
+        PRINT "rand vorher gerufen: "; k - 1
+        EXIT FOR
+    END IF
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+3000000000 | betrag: Argument 1 (x AS LONG): 3000000000 passt nicht in LONG (-2147483648 bis 2147483647) | zeile 11
+4611686018427387904 | Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) | zeile 20
+rand vorher gerufen: 2
+
+=== maschinencode: aussteigen vor und nach dem aufruf (maschinencode)
+' Ein Wert, der nicht passt, laesst VOR dem Aufruf aussteigen, ein
+' Ueberlauf danach -- die Bibliothek wird dabei nicht doppelt gerufen
+' (rand zaehlt mit).
+DECLARE FUNCTION betrag LIB "c" ALIAS "abs" (x AS LONG) AS LONG
+DECLARE SUB saat LIB "c" ALIAS "srand" (s AS ULONG)
+DECLARE FUNCTION zufall LIB "c" ALIAS "rand" () AS LONG
+DIM s AS INTEGER
+DIM i AS INTEGER
+TRY
+    FOR i = 1 TO 5
+        s = s + betrag(i * 1000000000)
+    NEXT
+CATCH e
+    PRINT s; " | "; e; " | zeile "; ERROR_LINE()
+END TRY
+saat(1)
+s = 0
+TRY
+    FOR i = 1 TO 5
+        s = s + zufall() * 0 + i * 4611686018427387904
+    NEXT
+CATCH e
+    PRINT s; " | "; e; " | zeile "; ERROR_LINE()
+END TRY
+DIM naechste AS INTEGER
+naechste = zufall()
+saat(1)
+DIM k AS INTEGER
+FOR k = 1 TO 10
+    IF zufall() = naechste THEN
+        PRINT "rand vorher gerufen: "; k - 1
+        EXIT FOR
+    END IF
+NEXT
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+3000000000 | betrag: Argument 1 (x AS LONG): 3000000000 passt nicht in LONG (-2147483648 bis 2147483647) | zeile 11
+4611686018427387904 | Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten) | zeile 20
+rand vorher gerufen: 2
+--- stderr
+jit: 2 mal mitten in einer Schleife ausgestiegen
+
+=== maschinencode: nach einem rueckruf ruft die vm
+' Hat das Programm einmal einen Rueckruf vergeben, koennte jede Funktion
+' der Bibliothek ihn rufen -- dann ruft die VM, der Bereich steigt davor aus.
+DECLARE FUNCTION betrag LIB "c" ALIAS "abs" (x AS LONG) AS LONG
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+FUNCTION vergleiche(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN SGN(BUFFER_GET_I32(BUFFER_AUS_ZEIGER(a, 4), 0) - BUFFER_GET_I32(BUFFER_AUS_ZEIGER(b, 4), 0))
+END FUNCTION
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    s = s + betrag(-i)
+NEXT
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_I32(b, 0, 5)
+BUFFER_SET_I32(b, 4, -5)
+qsort(b, 2, 4, vergleiche)
+PRINT s, BUFFER_GET_I32(b, 0)
+s = 0
+FOR i = 1 TO 100
+    s = s + betrag(-i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+5050 -5
+5050
+
+=== maschinencode: nach einem rueckruf ruft die vm (maschinencode)
+' Hat das Programm einmal einen Rueckruf vergeben, koennte jede Funktion
+' der Bibliothek ihn rufen -- dann ruft die VM, der Bereich steigt davor aus.
+DECLARE FUNCTION betrag LIB "c" ALIAS "abs" (x AS LONG) AS LONG
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+FUNCTION vergleiche(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN SGN(BUFFER_GET_I32(BUFFER_AUS_ZEIGER(a, 4), 0) - BUFFER_GET_I32(BUFFER_AUS_ZEIGER(b, 4), 0))
+END FUNCTION
+DIM s AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    s = s + betrag(-i)
+NEXT
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_I32(b, 0, 5)
+BUFFER_SET_I32(b, 4, -5)
+qsort(b, 2, 4, vergleiche)
+PRINT s, BUFFER_GET_I32(b, 0)
+s = 0
+FOR i = 1 TO 100
+    s = s + betrag(-i)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+5050 -5
+5050
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== maschinencode: text in der schleife
+' Text geht nicht getypt -- der Bereich laeuft im Wertemodus.
+DECLARE FUNCTION laenge LIB "c" ALIAS "strlen" (t AS TEXT) AS ZEIGER
+DIM s AS INTEGER
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 50
+    t = t + "x"
+    s = s + laenge(t)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1275
+
+=== maschinencode: text in der schleife (maschinencode)
+' Text geht nicht getypt -- der Bereich laeuft im Wertemodus.
+DECLARE FUNCTION laenge LIB "c" ALIAS "strlen" (t AS TEXT) AS ZEIGER
+DIM s AS INTEGER
+DIM i AS INTEGER
+DIM t AS STRING
+FOR i = 1 TO 50
+    t = t + "x"
+    s = s + laenge(t)
+NEXT
+PRINT s
+--- umgebung
+DHRT_JIT=immer
+DHRT_JIT_BILANZ=1
+--- erwartet
+1275
+--- stderr
+jit: 0 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== maschinencode: ein gemerkter rueckruf
+' Ein Rueckruf, den die Bibliothek sich gemerkt hat, kann bei JEDEM spaeteren
+' Aufruf kommen, auch ohne Rueckruf-Parameter (GTK: gtk_main). Hier: den
+' Einstieg als Zahl holen und ueber CallWindowProcW(proc AS ZEIGER) rufen.
+' Er aendert eine Globale, die die Schleife selbst fuehrt -- darum bleibt
+' eine Schleife mit __ffi in der VM, sobald ein Rueckruf vergeben ist.
+DECLARE FUNCTION merke LIB "kernel32" ALIAS "EncodePointer" (f AS FUNCTION(h AS ZEIGER, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION entpacke LIB "kernel32" ALIAS "DecodePointer" (p AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION rufe LIB "user32" ALIAS "CallWindowProcW" (proc AS ZEIGER, h AS ZEIGER, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS ZEIGER
+DIM zaehler AS INTEGER
+FUNCTION zaehle(h AS INTEGER, m AS INTEGER, w AS INTEGER, l AS INTEGER) AS INTEGER
+    zaehler = zaehler + 100
+    RETURN 1
+END FUNCTION
+DIM p AS INTEGER
+p = entpacke(merke(zaehle))
+DIM i AS INTEGER
+DIM r AS INTEGER
+FOR i = 1 TO 10
+    r = rufe(p, 0, 0, 0, 0)
+    zaehler = zaehler + 1 + r
+NEXT
+PRINT zaehler
+--- system windows
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+1020
+
+=== maschinencode: ein gemerkter rueckruf (maschinencode)
+' Ein Rueckruf, den die Bibliothek sich gemerkt hat, kann bei JEDEM spaeteren
+' Aufruf kommen, auch ohne Rueckruf-Parameter (GTK: gtk_main). Hier: den
+' Einstieg als Zahl holen und ueber CallWindowProcW(proc AS ZEIGER) rufen.
+' Er aendert eine Globale, die die Schleife selbst fuehrt -- darum bleibt
+' eine Schleife mit __ffi in der VM, sobald ein Rueckruf vergeben ist.
+DECLARE FUNCTION merke LIB "kernel32" ALIAS "EncodePointer" (f AS FUNCTION(h AS ZEIGER, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION entpacke LIB "kernel32" ALIAS "DecodePointer" (p AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION rufe LIB "user32" ALIAS "CallWindowProcW" (proc AS ZEIGER, h AS ZEIGER, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS ZEIGER
+DIM zaehler AS INTEGER
+FUNCTION zaehle(h AS INTEGER, m AS INTEGER, w AS INTEGER, l AS INTEGER) AS INTEGER
+    zaehler = zaehler + 100
+    RETURN 1
+END FUNCTION
+DIM p AS INTEGER
+p = entpacke(merke(zaehle))
+DIM i AS INTEGER
+DIM r AS INTEGER
+FOR i = 1 TO 10
+    r = rufe(p, 0, 0, 0, 0)
+    zaehler = zaehler + 1 + r
+NEXT
+PRINT zaehler
+--- system windows
+--- umgebung
+DHRT_JIT=immer
+--- erwartet
+1020
+
 === eine deklarierte funktion verdeckt den eingebauten befehl
 DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
 ' ABS der Laufzeit liefert fuer -5.5 eine Kommazahl; die aus der Bibliothek

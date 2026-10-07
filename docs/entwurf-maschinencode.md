@@ -1065,6 +1065,17 @@ den Platz). Gegenproben: Loeschen mit `swap_remove` (die Reihenfolge geht
 verloren) laesst zwei Faelle dort fallen, Ueberschreiben ans Ende schieben
 den neuen Fall und einen in `mengen.dhtest`.
 
+**Schritt 22 (2026-10-07): Funktionen fremder Bibliotheken.** `__ffi` war
+in `befehl_im_bereich` gesperrt, weil ein Rueckruf Drachenhauch-Code ruft,
+waehrend der Bereich Locals und Globale haelt. Jetzt erlaubt, solange das
+Programm keinen Rueckruf vergeben hat und die Signatur keinen nimmt
+(Begruendung und Gegenprobe: `entwurf-ffi.md`, Stand Maschinencode). Eine
+Signatur nur aus Zahlen wird im getypten Bereich zu `Art::S` (der Zeiger
+auf die Konstante; beim Aussteigen geht er als die Konstante selbst an die
+VM zurueck), der Aufruf zu `ffi_zahlen` mit den Werten in einem
+Stapelplatz. Allein erlaubt, aber im Wertemodus, brachte es nichts; getypt
+und mit schlankerem Aufrufweg: `ffi.dh` 201 -> 54 ms (VM 202 -> 116 ms).
+
 ## 5. Was bewusst nicht kommt
 
 - Kein eigener Registerzuteiler, keine eigenen Optimierungen jenseits dessen,

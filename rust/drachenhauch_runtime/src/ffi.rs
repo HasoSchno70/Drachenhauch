@@ -935,6 +935,10 @@ struct Zustand {
     /// zum Ende geladen -- ein Zeiger in sie hinein darf nie ins Leere zeigen.
     libs: HashMap<String, Rc<libloading::Library>>,
     aufrufe: HashMap<String, Rc<Aufruf>>,
+    /// Die zuletzt gerufenen Signaturen, erkannt am ZEIGER ihres Textes: die
+    /// Signatur ist eine Konstante des Programms, jeder Aufruf derselben
+    /// Stelle bringt denselben `Rc` -- das spart den Hash ueber den Text.
+    zuletzt: Vec<(Rc<String>, Rc<Aufruf>)>,
     /// Die Rueckrufe, die je einer Bibliothek gegeben wurden; die Nummer im
     /// Einstieg ist der Platz hier. Nie entfernt -- die Bibliothek darf den
     /// Einstieg behalten, und der Wert haelt die Funktion (samt Objekt) am
@@ -972,6 +976,78 @@ thread_local! {
 static HAUPTFADEN: std::sync::OnceLock<std::thread::ThreadId> = std::sync::OnceLock::new();
 #[cfg(feature = "ffi")]
 static FREMDER_FADEN: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Ob ein Aufruf `__ffi(signatur, ...)` sicher keinen Drachenhauch-Code
+/// ruft -- dann darf er in einem Bereich des Maschinencodes laufen, der
+/// Locals und Globale gerade selbst haelt. Dafuer darf die Signatur keinen
+/// Rueckruf nehmen, UND das Programm darf noch nie einen vergeben haben:
+/// eine Bibliothek kann einen frueher vergebenen bei jedem spaeteren Aufruf
+/// rufen (GTK merkt ihn sich bei `g_signal_connect`, `gtk_main` ruft ihn).
+/// Ohne das Feature ruft der Aufruf ohnehin nichts.
+pub fn ohne_drachenhauch_code(a: &[Value]) -> bool {
+    let Some(Value::Str(text)) = a.first() else { return false };
+    let params = text.rsplit(TRENNER).next().unwrap_or("");
+    if params.split(',').any(|p| p.starts_with('r')) { return false; }
+    #[cfg(feature = "ffi")]
+    { ZUSTAND.with(|z| z.borrow().rueckrufe.is_empty()) }
+    #[cfg(not(feature = "ffi"))]
+    true
+}
+
+/// Hat das Programm schon einen Rueckruf vergeben? Dann baut der
+/// Maschinencode keinen Bereich mehr um `__ffi` -- jeder Aufruf koennte ihn
+/// rufen, der Bereich muesste in jeder Runde vor ihm aussteigen.
+pub fn rueckrufe_vergeben() -> bool {
+    #[cfg(feature = "ffi")]
+    { ZUSTAND.with(|z| !z.borrow().rueckrufe.is_empty()) }
+    #[cfg(not(feature = "ffi"))]
+    false
+}
+
+/// Fuer den getypten Maschinencode: eine Signatur nur aus Zahlen (Parameter
+/// und Rueckgabe ganze Zahlen, ZEIGER, BOOLEAN, SINGLE, FLOAT oder keine
+/// Rueckgabe; kein BYREF, kein `...`). Dann reicht er die Werte als
+/// 8-Byte-Plaetze herein (`zahlen_rufen`) statt als Werte.
+pub fn zahlen_signatur(text: &str) -> Option<Signatur> {
+    let s = signatur_lesen(text).ok()?;
+    let zahl = |c: char| matches!(c, 'b' | 'B' | 's' | 'S' | 'l' | 'L' | 'q' | 'z' | 'o' | 'f' | 'd');
+    if !(zahl(s.rueck) || s.rueck == 'v') { return None; }
+    if s.params.iter().any(|p| p.byref || !zahl(p.art)) { return None; }
+    Some(s)
+}
+
+/// Ein Aufruf aus dem getypten Maschinencode: die Werte in Plaetzen (ganze
+/// Zahl, Bitmuster eines double, 0/1), das Ergebnis ebenso. `None` heisst:
+/// aussteigen, BEVOR etwas geschehen ist -- ein Rueckruf ist vergeben, die
+/// Bibliothek fehlt, ein Wert passt nicht --, die VM fuehrt den Befehl dann
+/// selbst aus und meldet es. Nach dem eigentlichen Aufruf kann ohne Rueckruf
+/// nichts mehr scheitern.
+pub fn zahlen_rufen(sig_wert: &Value, plaetze: &[u64]) -> Option<u64> {
+    #[cfg(not(feature = "ffi"))]
+    {
+        let _ = (sig_wert, plaetze);
+        None
+    }
+    #[cfg(feature = "ffi")]
+    {
+        let Value::Str(text) = sig_wert else { return None };
+        if !ZUSTAND.with(|z| z.borrow().rueckrufe.is_empty()) { return None; }
+        let auf = aufruf_wert(text).ok()?;
+        if plaetze.len() != auf.sig.params.len() { return None; }
+        let werte: Vec<Value> = auf.sig.params.iter().zip(plaetze).map(|(p, &x)| match p.art {
+            'f' | 'd' => Value::Float(f64::from_bits(x)),
+            'o' => Value::Bool(x != 0),
+            _ => Value::Int(x as i64),
+        }).collect();
+        match rufen_mit(&auf, &werte).ok()? {
+            Value::Int(i) => Some(i as u64),
+            Value::Float(f) => Some(f.to_bits()),
+            Value::Bool(b) => Some(b as u64),
+            Value::Nil => Some(0),
+            _ => None,
+        }
+    }
+}
 
 /// Die VM fuer die Rueckrufe merken (vor jedem `__ffi`).
 pub fn vm_setzen(vm: *mut crate::vm::Vm<'_>) {
@@ -1203,6 +1279,22 @@ fn aufruf(text: &str) -> Result<Rc<Aufruf>, String> {
     Ok(a)
 }
 
+/// `aufruf` mit der Zuletzt-Liste davor (bis 16 Stellen).
+#[cfg(feature = "ffi")]
+fn aufruf_wert(text: &Rc<String>) -> Result<Rc<Aufruf>, String> {
+    if let Some(a) = ZUSTAND.with(|z| z.borrow().zuletzt.iter()
+            .find(|(t, _)| Rc::ptr_eq(t, text)).map(|(_, a)| a.clone())) {
+        return Ok(a);
+    }
+    let a = aufruf(text)?;
+    ZUSTAND.with(|z| {
+        let mut z = z.borrow_mut();
+        if z.zuletzt.len() >= 16 { z.zuletzt.remove(0); }
+        z.zuletzt.push((text.clone(), a.clone()));
+    });
+    Ok(a)
+}
+
 /// Plan und Uebergang fuer eine Signatur, deren Ziel schon feststeht.
 #[cfg(feature = "ffi")]
 fn aufruf_bauen(sig: Signatur, ziel: *const u8) -> Result<Aufruf, String> {
@@ -1248,7 +1340,7 @@ pub fn rufen(a: &[Value]) -> Result<Value, String> {
     #[cfg(feature = "ffi")]
     {
         let Some(Value::Str(text)) = a.first() else { return Err("fremde Funktion: Signatur fehlt".into()); };
-        let auf = match aufruf(text) {
+        let auf = match aufruf_wert(text) {
             Ok(x) => x,
             Err(e) => {
                 let name = signatur_lesen(text).map(|s| s.name).unwrap_or_default();
@@ -1486,17 +1578,25 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
         return Err(format!("{}: erwartet {} Argument(e), erhalten {}", sig.name, fest, args.len()));
     }
     let n = args.len();
-    let mut plaetze = vec![0u64; n.max(1)];
+    // Die Plaetze liegen bis 16 Argumente auf dem Stapel -- ein Aufruf in
+    // einer heissen Schleife legt dann nichts an.
+    let (mut p_fest, mut r_fest) = ([0u64; 16], [0u64; 16]);
+    let (mut p_vec, mut r_vec) = (Vec::new(), Vec::new());
+    let plaetze: &mut [u64] = if n <= 16 { &mut p_fest[..] } else { p_vec = vec![0u64; n]; &mut p_vec[..] };
     // Was fuer die Dauer des Aufrufs leben muss: kopierte Texte und die
     // Plaetze der BYREF-Werte (feste Groesse, damit ihre Adressen halten).
     let mut texte: Vec<std::ffi::CString> = Vec::new();
     let mut breite: Vec<Vec<WZeichen>> = Vec::new();
-    let mut ref_plaetze = vec![0u64; n.max(1)];
+    let ref_plaetze: &mut [u64] = if n <= 16 { &mut r_fest[..] } else { r_vec = vec![0u64; n]; &mut r_vec[..] };
     let mut kopien: Vec<Vec<u64>> = Vec::new();
     let mut ablage = [0u64; 22];
     for (i, (p, v)) in sig.params[..fest].iter().zip(args).enumerate() {
-        let typname = match &auf.structs[i] { Some(s) => s.name.to_uppercase(), None => typ_name(p.art).to_string() };
-        let fehler = |e: String| format!("{}: Argument {} ({} AS {}): {}", sig.name, i + 1, p.name, typname, e);
+        // Der Typname erst im Fehlerfall -- sonst kostete jedes Argument
+        // jedes Aufrufs einen neuen Text.
+        let fehler = |e: String| {
+            let typname = match &auf.structs[i] { Some(s) => s.name.to_uppercase(), None => typ_name(p.art).to_string() };
+            format!("{}: Argument {} ({} AS {}): {}", sig.name, i + 1, p.name, typname, e)
+        };
         if let Some(s) = &auf.structs[i] {
             // Als Wert: die Funktion bekommt eine Kopie -- was sie daran
             // aendert, sieht das Programm nicht. In 8-Byte-Worten, damit jedes
@@ -1597,7 +1697,8 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     // Der Platz fuer die Rueckgabe: ein Wert, die Teile eines Structs aus
     // den Registern oder der ganze Struct, den die Funktion selbst schreibt.
     let worte = auf.rueck_struct.as_ref().map(|s| (s.groesse as usize).div_ceil(8)).unwrap_or(0).max(4);
-    let mut rueck_platz = vec![0u64; worte];
+    let (mut rp_fest, mut rp_vec) = ([0u64; 4], Vec::new());
+    let rueck_platz: &mut [u64] = if worte <= 4 { &mut rp_fest[..] } else { rp_vec = vec![0u64; worte]; &mut rp_vec[..] };
     if variadisch {
         let mut r = 0u64;
         variadisch_rufen(auf, fest, &plaetze[..n], &weitere, &mut r)?;

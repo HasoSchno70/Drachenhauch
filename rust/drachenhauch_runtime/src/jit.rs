@@ -54,7 +54,14 @@ use crate::vm::Slot;
 /// Eintritt vorfindet (nur in Bereichen, siehe `FeldInfo`); der Wert im
 /// Maschinencode ist bedeutungslos, die Daten beschreibt der Kontext.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-enum Art { I, F, B, N, Feld(u16), Obj(u16), W }
+enum Art { I, F, B, N, Feld(u16), Obj(u16), W, S(u16) }
+
+/// `S(k)`: die Signatur einer Funktion aus einer Bibliothek (`DECLARE ...
+/// LIB`, Konstante k), die nur Zahlen nimmt und liefert. Sie liegt nur auf
+/// dem Stapel, bis `CALL_BUILTIN "__ffi"` sie verbraucht; im Maschinencode
+/// ist sie der Zeiger auf die Konstante. So laeuft ein Aufruf einer
+/// Bibliothek im getypten Bereich (`ffi_zahlen`), statt den ganzen Bereich
+/// in den Wertemodus zu zwingen.
 
 /// `W` (M4 Schritt 5): ein beliebiger Wert -- Text, MAP, Feld, Objekt --, der
 /// in einem Werteplatz des Kontexts liegt (`Kontext::werte`: je Local ein
@@ -264,6 +271,30 @@ extern "C" fn mathe1(art: i64, x: f64) -> f64 {
 
 extern "C" fn mathe2(art: i64, x: f64, y: f64) -> f64 {
     if art == 0 { x.atan2(y) } else { x.hypot(y) }
+}
+
+/// Ist Konstante k die Signatur einer Bibliothek-Funktion nur mit Zahlen?
+/// Analyse und Codegen fragen dieselbe Stelle, sonst liefen sie auseinander.
+fn ffi_konstante(f: &Func, k: usize) -> Option<u16> {
+    let Value::Str(t) = f.constants.get(k)? else { return None };
+    if !t.contains(crate::ffi::TRENNER) || crate::ffi::rueckrufe_vergeben() { return None; }
+    crate::ffi::zahlen_signatur(t)?;
+    u16::try_from(k).ok()
+}
+
+/// Ein Aufruf einer Bibliothek aus dem getypten Bereich (`Art::S`): die
+/// Werte in `plaetze`, das Ergebnis nach `rueck`. 0 = gerufen, sonst
+/// aussteigen vor dem Befehl (die VM ruft und meldet).
+extern "C" fn ffi_zahlen(sig: i64, plaetze: *const u64, n: i64, rueck: *mut u64) -> i64 {
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let v = unsafe { &*(sig as *const Value) };
+        let pl = unsafe { std::slice::from_raw_parts(plaetze, n as usize) };
+        crate::ffi::zahlen_rufen(v, pl)
+    }));
+    match r {
+        Ok(Some(x)) => { unsafe { *rueck = x; } 0 }
+        _ => 1,
+    }
 }
 
 /// Welche eingebauten Befehle der getypte Maschinencode selbst rechnet, und
@@ -633,8 +664,11 @@ extern "C" fn w_wahr(k: *mut Kontext, i: u64) -> i64 { w_nehmen(k, i).truthy() a
 /// Vergleich (2), Coroutinen (4), TIMER_UPDATE und GUI_UPDATE (Rueckrufe),
 /// Auftraege (8, lesen die Globalen). Und nicht ASSERT (braucht die Zeile).
 fn befehl_im_bereich(f: u8, name: &str) -> bool {
-    f != 0 && !matches!(f, 2 | 4 | 8) && !name.starts_with("assert") && name != "__ffi"
+    f != 0 && !matches!(f, 2 | 4 | 8) && !name.starts_with("assert")
         && !matches!(name, "gui_update" | "timer_update")
+        // Eine Funktion einer Bibliothek koennte einen vergebenen Rueckruf
+        // rufen (siehe `ffi::ohne_drachenhauch_code`, das je Aufruf fragt).
+        && (name != "__ffi" || !crate::ffi::rueckrufe_vergeben())
 }
 
 /// Ein eingebauter Befehl aus der Familie der REINEN (`builtins::call_builtin`
@@ -654,6 +688,10 @@ fn w_builtin_roh(k: *mut Kontext, ins: u64, basis: u64, argc: u64) -> Option<Val
     // selbst aus und merkt sich dabei die Familie; beim naechsten Eintritt
     // laeuft er hier.
     if !befehl_im_bereich(ins.familie.get(), name) { w_fehler(k); return None; }
+    // Eine Funktion einer Bibliothek: nur, wenn sie sicher keinen
+    // Drachenhauch-Code ruft (kein Rueckruf in der Signatur, noch nie einer
+    // vergeben) -- sonst fuehrt die VM sie aus, wie jeden verbotenen Befehl.
+    if name == "__ffi" && !crate::ffi::ohne_drachenhauch_code(args) { w_fehler(k); return None; }
     if ins.familie.get() != crate::vm::BUILTIN_FAMILIEN {
         // Eine andere Familie: derselbe Weg wie CALL_BUILTIN in der VM. Ein
         // Fehler wird NICHT nachgerechnet -- der Befehl hat womoeglich schon
@@ -944,6 +982,7 @@ struct Hilfe {
     journal_schluss: FuncId,
     mathe1: FuncId,
     mathe2: FuncId,
+    ffi: FuncId,
     w: [FuncId; 21],
 }
 
@@ -1406,6 +1445,11 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 // Das Ende einer FUNCTION ohne RETURN: der Compiler legt einen
                 // Text vor HALT -- das ist ein Ausstieg, die VM liefert NIL.
                 let vor_halt = code.get(ip + 1).map_or(false, |n| n.op == op::HALT);
+                if let Some(k) = ffi_konstante(f, ins.arg.as_usize()).filter(|_| !modus_w && bereich.is_some()) {
+                    z.stapel.push(Art::S(k));
+                    melden(&mut vor, &mut offen, ip + 1, &z)?;
+                    continue;
+                }
                 match art_von_wert(c) {
                     Some(a) => z.stapel.push(a),
                     None if vor_halt => z.stapel.push(Art::N),
@@ -1522,6 +1566,27 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 schreibt_felder = true;
             }
             op::CALL_BUILTIN if match &ins.arg {
+                Arg::Call(n, c, _) => &**n == "__ffi" && *c >= 1 && z.stapel.len() >= *c as usize
+                    && matches!(z.stapel[z.stapel.len() - *c as usize], Art::S(_)),
+                _ => false,
+            } => {
+                // Eine Funktion einer Bibliothek mit Zahlen: getypt ueber
+                // `ffi_zahlen`. Eine Nebenwirkung wie eine Feldschreibung --
+                // der Bereich darf danach nicht aufgeben und von vorn rechnen.
+                let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
+                let teil = z.stapel.split_off(z.stapel.len() - argc);
+                let Art::S(k) = teil[0] else { unreachable!() };
+                let Some(Value::Str(t)) = f.constants.get(k as usize) else { return Err("Signatur fehlt".into()) };
+                let sig = crate::ffi::zahlen_signatur(t).ok_or("Signatur mit Nicht-Zahlen")?;
+                if sig.params.len() != argc - 1 { return Err(format!("{}: andere Zahl von Argumenten", sig.name)); }
+                for (p, a) in sig.params.iter().zip(&teil[1..]) {
+                    let ok = match p.art { 'f' | 'd' => zahl(*a), 'o' => *a == Art::B, _ => *a == Art::I };
+                    if !ok { return Err(format!("{}: Argument {:?} fuer {}", sig.name, a, crate::ffi::typ_name(p.art))); }
+                }
+                z.stapel.push(match sig.rueck { 'f' | 'd' => Art::F, 'o' => Art::B, 'v' => Art::N, _ => Art::I });
+                schreibt_felder = true;
+            }
+            op::CALL_BUILTIN if match &ins.arg {
                 Arg::Call(n, c, _) => z.stapel.len() >= *c as usize
                     && zahl_befehl(n, &z.stapel[z.stapel.len() - *c as usize..]).is_some(),
                 _ => false,
@@ -1634,6 +1699,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                     }
                 }
                 if a == Art::N { return Err("NIL gespeichert".into()); }
+                if matches!(a, Art::S(_)) { return Err("Signatur einer Bibliothek gespeichert".into()); }
                 if a == Art::W {
                     // In einen Platz mit Zahlentyp: dort als Zahl (geprueft);
                     // sonst bleibt es ein Wert.
@@ -1918,6 +1984,7 @@ struct Bauer<'a, 'b> {
     h_journal: cranelift_codegen::ir::FuncRef,
     h_mathe1: cranelift_codegen::ir::FuncRef,
     h_mathe2: cranelift_codegen::ir::FuncRef,
+    h_ffi: cranelift_codegen::ir::FuncRef,
     /// Wertemodus: die Helfer `w_*` und der erste Platz des Stapels unter den
     /// Werteplaetzen (= Zahl aller Locals samt `dyn_glob`).
     hw: Vec<cranelift_codegen::ir::FuncRef>,
@@ -1961,7 +2028,7 @@ impl<'a, 'b> Bauer<'a, 'b> {
                 if st.len() > MAX_STAPEL { self.zu_tief = true; }
                 let sp = self.b.ins().load(types::I64, MemFlagsData::trusted(), self.ctx, K_STAPEL);
                 for (d, (w, a)) in st.iter().enumerate().take(MAX_STAPEL) {
-                    if skalar(*a) || matches!(a, Art::Obj(_)) { self.b.ins().store(MemFlagsData::trusted(), *w, sp, (d * 8) as i32); }
+                    if skalar(*a) || matches!(a, Art::Obj(_) | Art::S(_)) { self.b.ins().store(MemFlagsData::trusted(), *w, sp, (d * 8) as i32); }
                 }
                 let nr = self.aussteige.len() as i64;
                 self.aussteige.push(Aussteig { stelle, lokal, stapel: st.iter().map(|(_, a)| *a).collect() });
@@ -2227,11 +2294,12 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         let h_journal = modul.declare_func_in_func(hilfe.journal_schluss, fb.func);
         let h_mathe1 = modul.declare_func_in_func(hilfe.mathe1, fb.func);
         let h_mathe2 = modul.declare_func_in_func(hilfe.mathe2, fb.func);
+        let h_ffi = modul.declare_func_in_func(hilfe.ffi, fb.func);
         let selbst = if an.selbst.is_some() { Some(fb.ins().load(types::I64, MemFlagsData::trusted(), ctxp, K_SELBST)) } else { None };
         let mut bau = Bauer { b: &mut fb, ctx: ctxp, fehler, vars: HashMap::new(), schatten, marken, holen,
                               befoerdert: HashMap::new(), felder: Vec::new(), mitten, punkt: None,
                               aussteige: Vec::new(), lok_zeiger, zu_tief: false, selbst,
-                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_gfeld, h_journal, h_mathe1, h_mathe2,
+                              h_lesen_i, h_lesen_f, h_setzen_i, h_setzen_f, h_element_i, h_element_f, h_gfeld, h_journal, h_mathe1, h_mathe2, h_ffi,
                               hw: Vec::new(), w_basis: an.typen.len() as i64 };
         if an.modus_w {
             for id in hilfe.w { let r = modul.declare_func_in_func(id, bau.b.func); bau.hw.push(r); }
@@ -2424,6 +2492,37 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                             bau.b.ins().brif(w, z_nein, &[], z_ja, &[]);
                         }
                         offen = false;
+                    }
+                    op::CALL_BUILTIN if match &ins.arg {
+                        Arg::Call(n, c, _) => &**n == "__ffi" && *c >= 1 && st.len() >= *c as usize
+                            && matches!(st[st.len() - *c as usize].1, Art::S(_)),
+                        _ => false,
+                    } => {
+                        let argc = match &ins.arg { Arg::Call(_, c, _) => *c as usize, _ => unreachable!() };
+                        let teil = st.split_off(st.len() - argc);
+                        let Art::S(k) = teil[0].1 else { unreachable!() };
+                        let Some(Value::Str(t)) = f.constants.get(k as usize) else { unreachable!() };
+                        let sig = crate::ffi::zahlen_signatur(t).unwrap();
+                        let n = argc - 1;
+                        // Die Werte in Plaetze, dahinter der Platz fuer das Ergebnis.
+                        let slot = bau.b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(cranelift_codegen::ir::StackSlotKind::ExplicitSlot, ((n + 1) * 8) as u32, 3));
+                        for (j, (p, (w, a))) in sig.params.iter().zip(&teil[1..]).enumerate() {
+                            let v = if matches!(p.art, 'f' | 'd') { bau.als_f(*w, *a) } else { *w };
+                            bau.b.ins().stack_store(types::I64, v, slot, (j * 8) as i32);
+                        }
+                        let pl = bau.b.ins().stack_addr(types::I64, slot, 0);
+                        let rp = bau.b.ins().stack_addr(types::I64, slot, (n * 8) as i32);
+                        let nc = bau.iconst(n as i64);
+                        let r = bau.b.ins().call(bau.h_ffi, &[teil[0].0, pl, nc, rp]);
+                        let status = bau.b.inst_results(r)[0];
+                        bau.aussteigen_wenn(status);
+                        let erg = match sig.rueck {
+                            'f' | 'd' => (bau.b.ins().stack_load(types::I64, types::F64, slot, (n * 8) as i32), Art::F),
+                            'v' => (bau.b.ins().iconst(types::I64, 0), Art::N),
+                            'o' => (bau.b.ins().stack_load(types::I64, types::I64, slot, (n * 8) as i32), Art::B),
+                            _ => (bau.b.ins().stack_load(types::I64, types::I64, slot, (n * 8) as i32), Art::I),
+                        };
+                        st.push(erg);
                     }
                     op::CALL_BUILTIN if match &ins.arg {
                         Arg::Call(n, c, _) => st.len() >= *c as usize && {
@@ -2650,6 +2749,11 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                                 bau.feld_setzen(obj, platz, a, w);
                             }
                         }
+                    }
+                    op::LOAD_CONST if !an.modus_w && bereich.is_some() && ffi_konstante(f, ins.arg.as_usize()).is_some() => {
+                        let k = ffi_konstante(f, ins.arg.as_usize()).unwrap();
+                        let z = bau.b.ins().iconst(types::I64, &f.constants[k as usize] as *const Value as i64);
+                        st.push((z, Art::S(k)));
                     }
                     op::LOAD_CONST => {
                         let w = match &f.constants[ins.arg.as_usize()] {
@@ -3183,6 +3287,7 @@ impl Jit {
         builder.symbol("dh_journal_schluss", journal_schluss as *const u8);
         builder.symbol("dh_mathe1", mathe1 as *const u8);
         builder.symbol("dh_mathe2", mathe2 as *const u8);
+        builder.symbol("dh_ffi_zahlen", ffi_zahlen as *const u8);
         let w_namen: [(&str, *const u8); 21] = [
             ("dh_w_konst", w_konst as *const u8), ("dh_w_kopie", w_kopie as *const u8),
             ("dh_w_frei", w_frei as *const u8), ("dh_w_ablegen_i", w_ablegen_i as *const u8),
@@ -3224,6 +3329,7 @@ impl Jit {
         let s_journal = sig_h(&[ptr], None);
         let s_mathe1 = sig_h(&[i, types::F64], Some(types::F64));
         let s_mathe2 = sig_h(&[i, types::F64, types::F64], Some(types::F64));
+        let s_ffi = sig_h(&[i, ptr, i, ptr], Some(i));
         let f64t = types::F64;
         let w_sigs: Vec<(&str, cranelift_codegen::ir::Signature)> = [
             ("dh_w_konst", vec![ptr, i, i], None),
@@ -3264,6 +3370,7 @@ impl Jit {
             journal_schluss: dekl("dh_journal_schluss", &s_journal)?,
             mathe1: dekl("dh_mathe1", &s_mathe1)?,
             mathe2: dekl("dh_mathe2", &s_mathe2)?,
+            ffi: dekl("dh_ffi_zahlen", &s_ffi)?,
             w: w_ids,
         };
         // Beruehrte Plaetze je Funktion samt allen, die sie ruft.
@@ -3531,6 +3638,8 @@ impl Jit {
             Art::B => Value::Bool(bits != 0),
             Art::Feld(nr) => werte[*nr as usize].clone(),
             Art::N => Value::Nil,
+            // Die Signatur-Konstante: der Zeiger zeigt auf sie selbst.
+            Art::S(_) => unsafe { (*(bits as *const Value)).clone() },
             // Ein Objekt, das die VM noch haelt (in einem Local, einem
             // globalen Platz oder einem Feld): noch ein Verweis darauf.
             Art::Obj(_) => unsafe {

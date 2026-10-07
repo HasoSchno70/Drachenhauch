@@ -760,9 +760,16 @@ END TRY
 * **Im Browser** gibt es keine fremden Bibliotheken; ein Aufruf ist dort ein
   Fehler mit diesem Satz.
 
-Der Maschinencode nimmt Aufrufe fremder Funktionen nicht in seine Schleifen
-auf, sie laufen in der VM -- eine Frage der Geschwindigkeit, nicht der
-Richtigkeit.
+**Im Maschinencode:** eine Schleife, die eine fremde Funktion ruft, wird
+übersetzt wie jede andere. Nimmt und liefert die Funktion nur Zahlen
+(ganze Zahlen, `ZEIGER`, `BOOLEAN`, `SINGLE`, `FLOAT`, ohne `BYREF`), läuft
+der Aufruf im schnellen, getypten Teil -- eine Million `abs`-Aufrufe in
+einer Schleife brauchen dann 54 statt 116 ms in der VM. **Sobald das
+Programm einen Rückruf vergeben hat, bleiben Schleifen mit Aufrufen einer
+Bibliothek in der VM**: eine Bibliothek darf sich einen Rückruf merken und
+ihn bei jedem späteren Aufruf rufen (GTK tut genau das), und der Rückruf
+darf Variablen ändern, die eine übersetzte Schleife gerade selbst hält.
+Am Ergebnis ändert das nichts, nur an der Geschwindigkeit.
 
 ## Unter der Haube
 
