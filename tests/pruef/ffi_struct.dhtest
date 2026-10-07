@@ -446,6 +446,207 @@ TRUE
 1 0 1 1 1
 7064 1 1
 
+=== felder von structs liegen hintereinander in einem puffer
+' DIM pts[n] AS Punkt ist EIN Puffer mit n Structs hintereinander, wie in C;
+' LEN zaehlt die Structs. ARRAY OF Punkt als Parameter und Rueckgabe meint
+' dasselbe, die Groesse darf erst zur Laufzeit feststehen.
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DIM pts[4] AS Punkt
+DIM i AS INTEGER
+FOR i = 0 TO LEN(pts) - 1
+    pts[i].x = i * 10
+    pts[i].y = -i
+NEXT
+PRINT LEN(pts), BUFFER_LEN(pts), TYPEOF(pts)
+PRINT pts[2].x, pts[3].y, BUFFER_GET_I32(pts, 16), BUFFER_GET_I32(pts, 28)
+TRY
+    PRINT pts[4].x
+CATCH e
+    PRINT e
+END TRY
+FUNCTION reihe(n AS INTEGER) AS ARRAY OF Punkt
+    DIM r[n] AS Punkt
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        r[k].x = k * k
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION summe(ps AS ARRAY OF Punkt) AS INTEGER
+    DIM s AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(ps) - 1
+        s = s + ps[k].x
+    NEXT
+    RETURN s
+END FUNCTION
+DIM q AS ARRAY OF Punkt
+PRINT LEN(q)
+q = reihe(5)
+PRINT LEN(q), summe(q), summe(pts)
+DIM leer AS ARRAY OF Punkt
+TRY
+    PRINT leer[0].x
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+4 32 BUFFER
+20 -3 20 -3
+pts[].x: Index 4 liegt ausserhalb 0..3
+0
+5 30 60
+leer[].x: Index 0 -- das Feld ist leer
+
+=== ein struct als feld einer klasse
+' Jedes Objekt bekommt bei NEW seinen eigenen Puffer -- fuer einen Struct
+' und fuer ein Feld davon; obj.p.x, Self.p.x und p.x in einer Methode
+' greifen an fester Stelle zu. Ein ganzes Feld ist der Puffer selbst (eine
+' Zuweisung teilt die Bytes, wie bei jeder Struct-Variable).
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+CLASS Figur
+    DIM name AS STRING
+    DIM ort AS Punkt
+    DIM ecken[3] AS Punkt
+    SUB setze(x AS INTEGER, y AS INTEGER)
+        Self.ort.x = x
+        ort.y = y
+        ecken[1].x = x + 1
+    END SUB
+    FUNCTION weite() AS INTEGER
+        RETURN Self.ecken[1].x + LEN(ecken)
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Figur
+    FUNCTION mitte() AS INTEGER
+        RETURN ort.x + 5
+    END FUNCTION
+END CLASS
+DIM f AS Figur
+f = NEW Figur()
+DIM g AS Figur
+g = NEW Figur()
+f.setze(3, 4)
+f.ort.x = f.ort.x + 100
+PRINT f.ort.x, f.ort.y, f.weite(), g.ort.x, TYPEOF(f.ort), BUFFER_LEN(f.ecken)
+DIM p AS Punkt
+p = f.ort
+p.y = 99
+PRINT f.ort.y
+DIM qu AS Quadrat
+qu = NEW Quadrat()
+qu.setze(1, 2)
+PRINT qu.mitte(), qu.ecken[1].x
+--- erwartet
+103 4 7 0 BUFFER 24
+99
+6 2
+
+=== ein feld von structs geht an eine bibliothek
+' Als Parameter AS Punkt bekommt die Bibliothek einen Zeiger auf das erste
+' Element (C: Punkt*), die uebrigen liegen dahinter -- qsort sortiert sie an
+' Ort und Stelle.
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DECLARE SUB qsort LIB "c" (feld AS Punkt, n AS ZEIGER, groesse AS ZEIGER, vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+FUNCTION nachY(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM p AS Punkt
+    p = BUFFER_AUS_ZEIGER(a, SIZEOF(Punkt))
+    DIM q AS Punkt
+    q = BUFFER_AUS_ZEIGER(b, SIZEOF(Punkt))
+    RETURN SGN(p.y - q.y)
+END FUNCTION
+DIM ps[5] AS Punkt
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    ps[i].x = i
+    ps[i].y = (i * 7) MOD 5
+NEXT
+qsort(ps, LEN(ps), SIZEOF(Punkt), nachY)
+DIM z AS STRING
+FOR i = 0 TO 4
+    z = z + STR$(ps[i].x) + ":" + STR$(ps[i].y) + " "
+NEXT
+PRINT TRIM$(z)
+--- erwartet
+0:0 3:1 1:2 4:3 2:4
+
+=== windows: ein polygon aus einem feld von structs
+STRUCT POINT LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DECLARE FUNCTION CreatePolygonRgn LIB "gdi32" (pts AS POINT, n AS LONG, modus AS LONG) AS ZEIGER
+DECLARE FUNCTION PtInRegion LIB "gdi32" (rgn AS ZEIGER, x AS LONG, y AS LONG) AS BOOLEAN
+DECLARE FUNCTION DeleteObject LIB "gdi32" (h AS ZEIGER) AS BOOLEAN
+DIM dreieck[3] AS POINT
+dreieck[1].x = 100
+dreieck[2].y = 100
+DIM r AS INTEGER
+r = CreatePolygonRgn(dreieck, LEN(dreieck), 1)
+PRINT PtInRegion(r, 10, 10), PtInRegion(r, 80, 80), PtInRegion(r, 10, 80)
+DeleteObject(r)
+--- system windows
+--- erwartet
+TRUE FALSE TRUE
+
+=== klassen mit structs ueber eine dhc-datei
+' Die Groesse des Puffers eines Struct-Feldes steht im .dhc (struct_bytes);
+' ein exportiertes Programm laeuft so.
+DIM d AS INTEGER
+d = PROCESS_START("dhrt", "--dumpbc", CWD$() + "/prog.dh")
+DIM aus AS STRING
+DIM leer AS INTEGER
+WHILE leer < 5
+    DIM t AS STRING
+    t = PROCESS_READ$(d)
+    IF t = "" THEN
+        IF NOT PROCESS_RUNNING(d) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        aus = aus + t
+    END IF
+WEND
+WRITEALL("prog.dhc", aus)
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", CWD$() + "/prog.dhc")
+aus = ""
+leer = 0
+WHILE leer < 5
+    t = PROCESS_READ$(p)
+    IF t = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        aus = aus + t
+    END IF
+WEND
+PRINT TRIM$(aus)
+--- datei prog.dh
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+CLASS K
+    DIM p AS Punkt
+    DIM ps[2] AS Punkt
+END CLASS
+DIM k AS K
+k = NEW K()
+k.p.y = 7
+k.ps[1].x = 8
+PRINT k.p.y + k.ps[1].x, BUFFER_LEN(k.ps)
+--- erwartet
+15 16
+
 === was nicht geht, sagt der uebersetzer
 IMPORT "json"
 DIM p AS INTEGER
@@ -482,8 +683,14 @@ pruefe(kopf + "PRINT p.w")
 pruefe(kopf + "PRINT p.x[1]")
 pruefe(kopf + "PRINT SIZEOF(Gibts)")
 pruefe(kopf + "PRINT OFFSETOF(Punkt, z)")
-pruefe(kopf + "DIM ps[3] AS Punkt")
+pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "ps[1].x = 2")
 pruefe(kopf + "CLASS K" + nl + "  DIM p AS Punkt" + nl + "END CLASS")
+pruefe(kopf + "DIM g[2, 3] AS Punkt")
+pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "FOR EACH e IN ps" + nl + "NEXT")
+pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "ps[1] = p")
+pruefe(kopf + "DIM ps[3] AS Punkt" + nl + "PRINT ps.x")
+pruefe(kopf + "DIM n AS INTEGER" + nl + "CLASS K" + nl + "  DIM e[n] AS Punkt" + nl + "END CLASS")
+pruefe(kopf + "FUNCTION reihe() AS ARRAY OF Punkt" + nl + "  DIM r[2] AS Punkt" + nl + "  RETURN r" + nl + "END FUNCTION" + nl + "PRINT reihe()[0].x")
 pruefe(kopf + "DECLARE SUB f LIB " + CHR$(34) + "c" + CHR$(34) + " (a AS Gibts)")
 pruefe("STRUCT A LAYOUT C" + nl + "  b AS A" + nl + "END STRUCT")
 pruefe("STRUCT A LAYOUT C PACK 3" + nl + "  b AS LONG" + nl + "END STRUCT")
@@ -506,8 +713,14 @@ p.w ist ein Feld von 2 Elementen -- mit Index: p.w[0]
 p.x ist kein Feld von Elementen -- ohne Index
 SIZEOF: 'GIBTS' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER ...)
 OFFSETOF: Punkt hat kein Feld 'z' (Felder: x, w)
-Ein Feld von Punkt gibt es nicht -- ein STRUCT ... LAYOUT C mit einem Feld davon schon: STRUCT Liste LAYOUT C / e[10] AS Punkt / END STRUCT
-k.p: ein STRUCT ... LAYOUT C kann (noch) kein Feld einer Klasse sein -- er lebt in einer Variable oder einem Parameter (DIM p AS Punkt), oder das Feld ist ein BUFFER mit BUFFER_NEW(SIZEOF(Punkt))
+ok
+ok
+Ein Feld von Structs hat genau eine Groesse -- DIM g[10] AS Punkt (fuer mehrere Dimensionen den Index selbst rechnen)
+FOR EACH geht nicht ueber ein Feld von Structs -- mit Index: FOR i = 0 TO LEN(ps) - 1 : ... ps[i].feld
+ps[] ist ein Struct -- lies und schreib seine Felder (ps[].feld); seine Bytes liegen im Puffer ab OFFSETOF
+ps ist ein Feld von Structs -- erst ein Index: ps[0].x
+Array-Feld 'e' braucht konstante INTEGER-Groesse
+reihe(...) liefert ein Feld von Structs -- erst einer Variable zuweisen: DIM r AS ARRAY OF Punkt : r = reihe(...) : r[0].feld
 'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST)
 STRUCT A LAYOUT C enthaelt sich selbst (ueber a) -- ein Struct kann sich nicht einbetten, nur einen ZEIGER auf sich haben
 Erwartet 1, 2, 4, 8 oder 16 nach PACK

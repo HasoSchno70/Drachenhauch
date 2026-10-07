@@ -1652,8 +1652,18 @@ Ein STRUCT ... LAYOUT C braucht mindestens ein Feld	A STRUCT ... LAYOUT C needs 
 BYREF braucht ein Struct nicht -- die Bibliothek bekommt ohnehin einen Zeiger auf seine Bytes	A struct does not need BYREF -- the library gets a pointer to its bytes anyway
 STRUCT {} ist zweimal deklariert -- eines von beiden umbenennen	STRUCT {} is declared twice -- rename one of them
 STRUCT ... LAYOUT C gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block	STRUCT ... LAYOUT C belongs at the top level of the program, not inside a subroutine or a block
-Ein Feld von {} gibt es nicht -- ein STRUCT ... LAYOUT C mit einem Feld davon schon: STRUCT Liste LAYOUT C / e[10] AS {} / END STRUCT	There is no array of {} -- but a STRUCT ... LAYOUT C with an array field of it: STRUCT Liste LAYOUT C / e[10] AS {} / END STRUCT
-{}.{}: ein STRUCT ... LAYOUT C kann (noch) kein Feld einer Klasse sein -- er lebt in einer Variable oder einem Parameter (DIM {} AS {}), oder das Feld ist ein BUFFER mit BUFFER_NEW(SIZEOF({}))	{}.{}: a STRUCT ... LAYOUT C cannot be a class field (yet) -- it lives in a variable or parameter (DIM {} AS {}), or the field is a BUFFER with BUFFER_NEW(SIZEOF({}))
+{}.{}: ein Feld von Structs hat genau eine Groesse -- DIM {}[10] AS {}	{}.{}: an array of structs has exactly one size -- DIM {}[10] AS {}
+Ein Feld von Structs hat genau eine Groesse -- DIM {}[10] AS {} (fuer mehrere Dimensionen den Index selbst rechnen)	An array of structs has exactly one size -- DIM {}[10] AS {} (for several dimensions compute the index yourself)
+{} ist ein Feld von Structs -- erst ein Index: {}[0].{}	{} is an array of structs -- first an index: {}[0].{}
+{} ist ein Feld von Structs -- mit Index: {}[0].feld	{} is an array of structs -- with an index: {}[0].feld
+FOR EACH geht nicht ueber ein Feld von Structs -- mit Index: FOR i = 0 TO LEN({}) - 1 : ... {}[i].feld	FOR EACH does not work over an array of structs -- with an index: FOR i = 0 TO LEN({}) - 1 : ... {}[i].feld
+{}(...) liefert {} -- erst einer Variable zuweisen: DIM r AS {} : r = {}(...) : r{}	{}(...) returns {} -- assign it to a variable first: DIM r AS {} : r = {}(...) : r{}
+ein Feld von Structs	an array of structs
+einen Struct	a struct
+DIM {}: die Groesse {} ist negativ	DIM {}: the size {} is negative
+DIM {}: {} Structs zu {} Bytes ueberschreiten die Obergrenze von {} Bytes	DIM {}: {} structs of {} bytes exceed the limit of {} bytes
+DIM {}: die Groesse muss INTEGER sein, erhalten {}	DIM {}: the size must be INTEGER, got {}
+{}: Index {} -- das Feld ist leer	{}: index {} -- the array is empty
 SIZEOF: erwartet einen Typ -- SIZEOF(SYSTEMTIME) fuer einen STRUCT ... LAYOUT C oder SIZEOF(LONG) fuer ein Typwort	SIZEOF: expects a type -- SIZEOF(SYSTEMTIME) for a STRUCT ... LAYOUT C or SIZEOF(LONG) for a type word
 SIZEOF: '{}' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER ...)	SIZEOF: '{}' is neither a STRUCT ... LAYOUT C nor a type word (LONG, ZEIGER ...)
 {}: erwartet einen Struct und ein Feld -- OFFSETOF(SYSTEMTIME, monat)	{}: expects a struct and a field -- OFFSETOF(SYSTEMTIME, monat)

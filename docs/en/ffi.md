@@ -288,11 +288,10 @@ PRINT SIZEOF(Linie), OFFSETOF(Linie, name)   ' 48  20
 * **A struct is a BUFFER, and therefore a reference:** `b = a` shares the bytes;
   `BUFFER_SLICE(a, 0, SIZEOF(Punkt))` makes a copy. Conversely, any
   buffer can be read through a layout (`DIM p AS Punkt : p = roh`).
-* A struct lives in a variable, a parameter or a return value;
-  as a field of a class, in `ARRAY OF` or in `DIM x[n]` it does not work (yet)
-  -- an array of structs is a struct with an array field of them
-  (`e[10] AS Punkt`). Struct names are valid in the whole program, also from
-  a file with a namespace.
+* A struct lives in a variable, a parameter, a return value or a field of
+  a class; many of them in a row are an array of structs (see below).
+  Struct names are valid in the whole program, also from a file with a
+  namespace.
 
 | Command | what it does |
 |---|---|
@@ -325,6 +324,67 @@ On Linux and macOS, `struct utsname` (for `uname`) has fields of fixed width,
 65 bytes on Linux and 256 on macOS -- the layout depends on the system there.
 You give the function the larger struct and afterwards read through the layout
 of the system (`tests/pruef/ffi_struct.dhtest` shows how).
+
+### Arrays of structs and structs in classes
+
+`DIM pts[n] AS Punkt` creates `n` structs **in a row in one buffer**, just
+like a C array `Punkt pts[n]` -- so it goes as a `Punkt*` to a library that
+wants many at once:
+
+```basic
+STRUCT POINT LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DECLARE FUNCTION CreatePolygonRgn LIB "gdi32" (pts AS POINT, n AS LONG, modus AS LONG) AS ZEIGER
+
+DIM dreieck[3] AS POINT
+dreieck[1].x = 100
+dreieck[2].y = 100
+DIM r AS INTEGER
+r = CreatePolygonRgn(dreieck, LEN(dreieck), 1)
+```
+
+* **`LEN(pts)`** counts the structs (`BUFFER_LEN` the bytes); an index out
+  of range is an error. The size may be known only at run time
+  (`DIM pts[n] AS Punkt`).
+* **`ARRAY OF Punkt`** as a parameter or return type of a FUNCTION means
+  the same array; `DIM ps AS ARRAY OF Punkt` without a size is an empty one
+  that receives an assignment.
+* **One dimension.** For several, compute the index yourself
+  (`g[zeile * breite + spalte].x`). `FOR EACH` does not work (it would run
+  over the bytes) -- with an index it does. An element as a whole
+  (`pts[2] = p`) is not a value; you read and write its fields. An index
+  directly on the result of a call (`reihe(5)[0].x`) is a message --
+  assign it to a variable first.
+
+**In a class** a struct is an ordinary field; every object gets its own
+buffer at `NEW`:
+
+```basic
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+CLASS Figur
+    DIM ort AS Punkt
+    DIM ecken[3] AS Punkt          ' an array of structs, fixed size
+    SUB setze(x AS INTEGER, y AS INTEGER)
+        Self.ort.x = x
+        ort.y = y                  ' in a method also without Self
+    END SUB
+END CLASS
+
+DIM f AS Figur
+f = NEW Figur()
+f.setze(3, 4)
+f.ecken[1].x = 7
+PRINT f.ort.x, f.ecken[1].x, LEN(f.ecken)     ' 3  7  3
+```
+
+* `f.ort` as a whole is the buffer -- it goes to a library that way, and an
+  assignment shares the bytes as with any struct variable.
+* An array of structs in a class needs a fixed size.
 
 ### Bit fields
 
@@ -752,7 +812,8 @@ END TRY
 
 * A struct by value behind `...` (see
   [Structs by value](#structs-by-value)); bit fields with `PACK` or with
-  0 bits (see [Bit fields](#bit-fields)).
+  0 bits (see [Bit fields](#bit-fields)); arrays of structs with more than
+  one dimension.
 * C++ names, COM. A C++ library such as
   Qt works via a detour with a C interface -- for example
   [Embedding Python](#embedding-python) with PySide6.

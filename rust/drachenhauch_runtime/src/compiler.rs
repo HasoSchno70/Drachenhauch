@@ -314,7 +314,10 @@ struct FnSig {
 }
 
 /// Ein Feld einer Klasse/Struct.
-struct FieldInfo { name: String, type_name: String, array_dims: Vec<i64> }
+struct FieldInfo { name: String, type_name: String, array_dims: Vec<i64>,
+                   /// Ein STRUCT ... LAYOUT C (oder ein Feld davon): so viele
+                   /// Bytes bekommt das Feld bei NEW als eigenen Puffer.
+                   struct_bytes: usize }
 
 /// Klassen-Metadaten (Compile-Zeit). `methods`/`properties` fuer Dispatch +
 /// Au_floesung; `compiled` haelt die fertigen Methoden-JSONs.
@@ -347,7 +350,17 @@ struct StructOrt {
     /// Bei einem Bitfeld: Breite und unterstes Bit in der Einheit.
     bits: u32,
     bit: u32,
+    /// Die Basis ist das Feld eines Objekts (`k.p`): geladen wird sie mit
+    /// LOAD_MEMBER, nicht ueber `expr` -- das fuehrte wieder hierher.
+    objekt: bool,
+    /// Der Ort ist genau dieses Objektfeld, ohne Feld oder Index dahinter --
+    /// dann ist er ein gewoehnlicher Wert (der Puffer selbst).
+    ganz: bool,
 }
+
+/// `anzahl` eines Feldes von Structs, dessen Laenge erst der Puffer sagt
+/// (`DIM pts[n] AS Punkt`, `ps AS ARRAY OF Punkt`).
+const STRUCT_DYN: u32 = u32::MAX;
 
 /// Eine Funktion aus einer fremden Bibliothek. Der Aufruf gibt `signatur`
 /// (ffi::signatur_text) dem internen Befehl `__ffi` als ersten Wert mit.
@@ -761,7 +774,7 @@ impl Compiler {
             self.global_types.get(&name.to_lowercase()).cloned()
         }?;
         // "" / "any" sind keine Aussage.
-        if t.is_empty() || t == "any" { None } else { Some(t) }
+        if t.is_empty() || t == "any" { None } else { Some(self.typ_norm(&t)) }
     }
 
     /// Typ eines Feldes entlang der Vererbung.
@@ -1129,7 +1142,10 @@ impl Compiler {
             }
             Node::MemberAssign { target, name, value } => {
                 let ziel = Node::MemberAccess { target: target.clone(), name: name.clone() };
-                if let Some(o) = self.struct_ort(&ziel) { return self.struct_schreiben(o?, value); }
+                if let Some(o) = self.struct_ort(&ziel) {
+                    let o = o?;
+                    if !o.ganz { return self.struct_schreiben(o, value); }
+                }
                 self.pruefe_feld_zuweisung(target, name, value);
                 self.expr(target)?;
                 self.expr(value)?;
@@ -1846,13 +1862,36 @@ impl Compiler {
         let eff = if array_dims.is_some() { format!("array:{}", type_name) }
                   else { type_name.to_string() };
         self.warn_dim_typ_wechsel(name, &eff);
-        // Ein Feld von Structs gibt es nicht: ihre Bytes muessten
-        // hintereinander liegen, ein ARRAY haelt einzelne Werte.
+        // Ein Feld von Structs: EIN Puffer, die Structs liegen darin
+        // hintereinander wie in C (`punkt[]`) -- so geht es als `Punkt*` an
+        // eine Bibliothek. Ohne Groesse (ARRAY OF Punkt) ein leerer Puffer.
         let elem = type_name.strip_prefix("array:").unwrap_or(if array_dims.is_some() { type_name } else { "" });
-        if let Some(l) = self.lagen.get(elem) {
-            return Err(format!(
-                "Ein Feld von {} gibt es nicht -- ein STRUCT ... LAYOUT C mit einem Feld davon schon: STRUCT Liste LAYOUT C / e[10] AS {} / END STRUCT",
-                l.name, l.name));
+        if let Some(groesse) = self.lagen.get(elem).map(|l| l.groesse) {
+            let typ = format!("{}[]", elem);
+            if let Some(dims) = array_dims {
+                if dims.len() != 1 {
+                    return Err(format!("Ein Feld von Structs hat genau eine Groesse -- DIM {}[10] AS {} (fuer mehrere Dimensionen den Index selbst rechnen)",
+                                       name, self.lagen[elem].name));
+                }
+            }
+            self.struct_variable(name, &typ)?;
+            match array_dims {
+                Some(dims) => {
+                    self.expr(&dims[0])?;
+                    let w = self.ctx.add_const(json!(name));
+                    self.ctx.emit(oc::LOAD_CONST, json!(w));
+                    let c = self.ctx.add_const(json!(groesse));
+                    self.ctx.emit(oc::LOAD_CONST, json!(c));
+                    self.ctx.emit(oc::CALL_BUILTIN, json!(["__struct_feld_neu", 3]));
+                }
+                None => {
+                    let c = self.ctx.add_const(json!(0));
+                    self.ctx.emit(oc::LOAD_CONST, json!(c));
+                    self.ctx.emit(oc::CALL_BUILTIN, json!(["__struct_neu", 1]));
+                }
+            }
+            self.store_var(name);
+            return Ok(());
         }
         // Sized-Array: `DIM x[10, 20] AS T` -- type_name = Element-Typ.
         if let Some(dims) = array_dims {
@@ -1909,18 +1948,7 @@ impl Compiler {
         }
         // STRUCT ... LAYOUT C: ein BUFFER in seiner Groesse, voller Nullen.
         if let Some(groesse) = self.lagen.get(type_name).map(|l| l.groesse) {
-            if self.ctx.is_main {
-                let name_idx = self.ctx.add_const(json!(name));
-                let type_idx = self.ctx.add_const(json!(type_name));
-                let default_idx = self.ctx.add_const(Value::Null);
-                if let Some(&slot) = self.global_slots.get(name) {
-                    self.ctx.emit(oc::DECLARE_GLOBAL_SLOT, json!([slot as i64, name_idx, type_idx, default_idx]));
-                } else {
-                    self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
-                }
-            } else {
-                self.ctx.declare_local(name, type_name);
-            }
+            self.struct_variable(name, type_name)?;
             let c = self.ctx.add_const(json!(groesse));
             self.ctx.emit(oc::LOAD_CONST, json!(c));
             self.ctx.emit(oc::CALL_BUILTIN, json!(["__struct_neu", 1]));
@@ -2707,7 +2735,10 @@ impl Compiler {
                 Ok(())
             }
             Node::MemberAccess { target, name } => {
-                if let Some(o) = self.struct_ort(e) { return self.struct_lesen(o?); }
+                if let Some(o) = self.struct_ort(e) {
+                    let o = o?;
+                    if !o.ganz { return self.struct_lesen(o); }
+                }
                 self.warn_unbekanntes_mitglied(target, name, false);
                 self.expr(target)?;
                 let idx = self.ctx.add_const(json!(name));
@@ -2897,6 +2928,18 @@ impl Compiler {
                 let c = self.ctx.add_const(json!(wert));
                 self.ctx.emit(oc::LOAD_CONST, json!(c));
                 return Ok(());
+            }
+            // LEN eines Feldes von Structs: die Zahl der Structs, nicht der Bytes.
+            if f == "len" && args.len() == 1 && !self.ctx.local_slots.contains_key("len") && !self.fn_sigs.contains_key("len") {
+                if let Some(Ok(o)) = self.struct_ort(&args[0]) {
+                    if o.anzahl == STRUCT_DYN && o.dyn_.is_empty() {
+                        self.struct_basis_laden(&o)?;
+                        let g = self.ctx.add_const(json!(o.groesse));
+                        self.ctx.emit(oc::LOAD_CONST, json!(g));
+                        self.ctx.emit(oc::CALL_BUILTIN, json!(["__struct_anzahl", 2]));
+                        return Ok(());
+                    }
+                }
             }
         }
         // Methoden-Aufruf obj.method(...) (auch Container-Methoden wie .length()).
@@ -3320,6 +3363,13 @@ impl Compiler {
     /// FOR EACH var IN iterable -- Desugar zu einem Index-Loop ueber
     /// __comp_iter(iterable) (TUPLE), wie compiler._stmt_ForEach.
     fn stmt_foreach(&mut self, var: &str, var2: Option<&str>, iterable: &Node, body: &[Node]) -> CR {
+        // Ein Feld von Structs ist EIN Puffer -- FOR EACH liefe ueber seine
+        // Bytes. Mit Index geht es.
+        if let Some(Ok(o)) = self.struct_ort(iterable) {
+            if o.anzahl == STRUCT_DYN && o.dyn_.is_empty() {
+                return Err(format!("FOR EACH geht nicht ueber ein Feld von Structs -- mit Index: FOR i = 0 TO LEN({}) - 1 : ... {}[i].feld", o.wo, o.wo));
+            }
+        }
         // Typ-Hinweise fuer den Editor (CODE_TYPES$): eine FOR-EACH-Variable
         // hat keinen geschriebenen Typ -- was sie haelt, sagt der Behaelter.
         if TYP_HINWEISE.with(|h| h.borrow().is_some()) {
@@ -3733,6 +3783,7 @@ impl Compiler {
         for (cname, ci) in classes {
             let fields: Vec<Value> = ci.fields.iter().map(|f| json!({
                 "name": f.name, "type_name": f.type_name, "array_dims": f.array_dims,
+                "struct_bytes": f.struct_bytes,
             })).collect();
             let mut props: Vec<String> = ci.property_set.iter().cloned().collect();
             props.sort();
@@ -3762,6 +3813,7 @@ impl Compiler {
         for (cname, ci) in classes {
             let fields = ci.fields.iter().map(|f| crate::model::FieldDecl {
                 name: f.name.clone(), type_name: f.type_name.clone(), array_dims: f.array_dims.clone(),
+                struct_bytes: f.struct_bytes,
             }).collect();
             let methods = ci.compiled.into_iter().map(|(n, m)| (n, m.zu_func())).collect();
             klassen.insert(cname, crate::model::ClassInfo {
@@ -3797,6 +3849,86 @@ impl Compiler {
         Ok(())
     }
 
+    /// Eine Variable fuer einen Struct oder ein Feld von Structs anlegen
+    /// (global mit Platz bzw. Name, sonst lokal); belegt wird sie danach.
+    fn struct_variable(&mut self, name: &str, typ: &str) -> CR {
+        if self.ctx.is_main {
+            let name_idx = self.ctx.add_const(json!(name));
+            let type_idx = self.ctx.add_const(json!(typ));
+            let default_idx = self.ctx.add_const(Value::Null);
+            if let Some(&slot) = self.global_slots.get(name) {
+                self.ctx.emit(oc::DECLARE_GLOBAL_SLOT, json!([slot as i64, name_idx, type_idx, default_idx]));
+            } else {
+                self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+            }
+        } else {
+            self.ctx.declare_local(name, typ);
+        }
+        Ok(())
+    }
+
+    /// `ARRAY OF Punkt` (Parser: `array:punkt`) heisst fuer einen STRUCT
+    /// ... LAYOUT C ein Feld von Structs, also EIN Puffer (`punkt[]`) --
+    /// kein ARRAY, sonst lehnte die VM den Puffer beim Uebergeben ab.
+    fn typ_norm(&self, t: &str) -> String {
+        match t.strip_prefix("array:") {
+            Some(x) if self.lagen.contains_key(x) => format!("{}[]", x),
+            _ => t.to_string(),
+        }
+    }
+
+    /// `k.p` -- ein STRUCT ... LAYOUT C als Feld eines Objekts. Gibt es
+    /// eins, ist es ein Ort wie eine Variable dieses Typs; geladen wird es mit
+    /// LOAD_MEMBER (`struct_basis_laden`).
+    fn struct_objektfeld(&self, n: &Node, target: &Node, name: &str) -> Option<Result<StructOrt, String>> {
+        let Typ::Klasse(k) = self.typ_von(target) else { return None };
+        let t = self.feld_typ(&k, name)?;
+        let (unter, anzahl) = match t.strip_suffix("[]") { Some(b) => (b.to_string(), STRUCT_DYN), None => (t.clone(), 0) };
+        let l = self.lagen.get(&unter)?;
+        Some(Ok(StructOrt { basis: n.clone(), wo: format!("{}.{}", Self::wo_text(target), name), fest: 0, dyn_: vec![],
+                            art: '#', unter, anzahl, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0,
+                            objekt: true, ganz: true }))
+    }
+
+    /// Feld oder Index direkt auf dem Ergebnis einer FUNCTION, die einen
+    /// Struct liefert (`reihe(5)[0].x`): fuer die Laenge muesste der Aufruf
+    /// zweimal laufen. Das sagt eine Meldung, statt dass zur Laufzeit ein
+    /// Puffer als Feld gelesen wird.
+    fn struct_aus_aufruf(&self, target: &Node) -> Option<Result<StructOrt, String>> {
+        let Node::Call { callee, .. } = target else { return None };
+        let Node::Identifier(f) = &**callee else { return None };
+        let rt = self.typ_norm(&self.fn_sigs.get(f.as_str())?.return_type);
+        let basis = rt.strip_suffix("[]").unwrap_or(&rt);
+        let l = self.lagen.get(basis)?;
+        Some(Err(format!("{}(...) liefert {} -- erst einer Variable zuweisen: DIM r AS {} : r = {}(...) : r{}",
+                         f, if rt.ends_with("[]") { "ein Feld von Structs" } else { "einen Struct" },
+                         if rt.ends_with("[]") { format!("ARRAY OF {}", l.name) } else { l.name.clone() },
+                         f, if rt.ends_with("[]") { "[0].feld" } else { ".feld" })))
+    }
+
+    /// Ein Ausdruck, wie er in einer Meldung steht (`k.p`, `Self.p`).
+    fn wo_text(n: &Node) -> String {
+        match n {
+            Node::Identifier(x) if x == "self" => "Self".into(),
+            Node::Identifier(x) => x.clone(),
+            Node::MemberAccess { target, name } => format!("{}.{}", Self::wo_text(target), name),
+            _ => "...".into(),
+        }
+    }
+
+    /// Den Puffer eines Orts auf den Stapel.
+    fn struct_basis_laden(&mut self, o: &StructOrt) -> CR {
+        match &o.basis {
+            Node::MemberAccess { target, name } if o.objekt => {
+                self.expr(target)?;
+                let idx = self.ctx.add_const(json!(name));
+                self.ctx.emit(oc::LOAD_MEMBER, json!(idx));
+                Ok(())
+            }
+            b => { let b = b.clone(); self.expr(&b) }
+        }
+    }
+
     /// `SIZEOF(typ)` und `OFFSETOF(struct, feld)`.
     fn groesse_oder_lage(&self, f: &str, args: &[Node]) -> Result<usize, String> {
         let gross = f.to_uppercase();
@@ -3829,12 +3961,22 @@ impl Compiler {
         match n {
             Node::Identifier(name) => {
                 let t = self.angesagter_typ(name)?;
-                let l = self.lagen.get(&t)?;
+                let (unter, anzahl) = match t.strip_suffix("[]") { Some(b) => (b.to_string(), STRUCT_DYN), None => (t.clone(), 0) };
+                let l = self.lagen.get(&unter)?;
                 Some(Ok(StructOrt { basis: n.clone(), wo: name.clone(), fest: 0, dyn_: vec![], art: '#',
-                                    unter: t.clone(), anzahl: 0, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0 }))
+                                    unter, anzahl, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0,
+                                    objekt: false, ganz: false }))
             }
             Node::MemberAccess { target, name } => {
-                let mut o = match self.struct_ort(target)? { Ok(o) => o, Err(e) => return Some(Err(e)) };
+                let mut o = match self.struct_ort(target) {
+                    Some(Ok(o)) => o,
+                    Some(Err(e)) => return Some(Err(e)),
+                    None => return self.struct_aus_aufruf(target).or_else(|| self.struct_objektfeld(n, target, name)),
+                };
+                o.ganz = false;
+                if o.anzahl == STRUCT_DYN {
+                    return Some(Err(format!("{} ist ein Feld von Structs -- erst ein Index: {}[0].{}", o.wo, o.wo, name)));
+                }
                 if o.anzahl > 0 {
                     return Some(Err(format!("{} ist ein Feld von {} Elementen -- erst ein Index: {}[0].{}", o.wo, o.anzahl, o.wo, name)));
                 }
@@ -3857,7 +3999,12 @@ impl Compiler {
                 Some(Ok(o))
             }
             Node::IndexAccess { target, indices } => {
-                let mut o = match self.struct_ort(target)? { Ok(o) => o, Err(e) => return Some(Err(e)) };
+                let mut o = match self.struct_ort(target) {
+                    Some(Ok(o)) => o,
+                    Some(Err(e)) => return Some(Err(e)),
+                    None => return self.struct_aus_aufruf(target),
+                };
+                o.ganz = false;
                 if o.anzahl == 0 {
                     return Some(Err(format!("{} ist kein Feld von Elementen -- ohne Index", o.wo)));
                 }
@@ -3879,6 +4026,20 @@ impl Compiler {
         self.ctx.emit(oc::LOAD_CONST, json!(c));
         for (ix, anzahl, faktor) in &o.dyn_ {
             self.expr(ix)?;
+            if *anzahl == STRUCT_DYN {
+                // Ein Feld von Structs: wie viele es sind, sagt der Puffer.
+                self.struct_basis_laden(o)?;
+                let g = self.ctx.add_const(json!(faktor));
+                self.ctx.emit(oc::LOAD_CONST, json!(g));
+                let w = self.ctx.add_const(json!(o.wo));
+                self.ctx.emit(oc::LOAD_CONST, json!(w));
+                self.ctx.emit(oc::CALL_BUILTIN, json!(["__struct_index_puffer", 4]));
+                let f = self.ctx.add_const(json!(faktor));
+                self.ctx.emit(oc::LOAD_CONST, json!(f));
+                self.ctx.emit(oc::MUL, Value::Null);
+                self.ctx.emit(oc::ADD, Value::Null);
+                continue;
+            }
             let a = self.ctx.add_const(json!(anzahl));
             self.ctx.emit(oc::LOAD_CONST, json!(a));
             let w = self.ctx.add_const(json!(o.wo));
@@ -3894,6 +4055,9 @@ impl Compiler {
 
     /// Ein ganzer Struct oder ein ganzes Feld von Elementen ist kein Wert.
     fn struct_einzelwert(o: &StructOrt) -> CR {
+        if o.anzahl == STRUCT_DYN {
+            return Err(format!("{} ist ein Feld von Structs -- mit Index: {}[0].feld", o.wo, o.wo));
+        }
         if o.anzahl > 0 {
             return Err(format!("{} ist ein Feld von {} Elementen -- mit Index: {}[0]", o.wo, o.anzahl, o.wo));
         }
@@ -3911,7 +4075,7 @@ impl Compiler {
 
     fn struct_lesen(&mut self, o: StructOrt) -> CR {
         Self::struct_einzelwert(&o)?;
-        self.expr(&o.basis.clone())?;
+        self.struct_basis_laden(&o)?;
         let w = self.ctx.add_const(json!(o.wo));
         self.ctx.emit(oc::LOAD_CONST, json!(w));
         self.struct_stelle(&o)?;
@@ -3925,7 +4089,7 @@ impl Compiler {
 
     fn struct_schreiben(&mut self, o: StructOrt, wert: &Node) -> CR {
         Self::struct_einzelwert(&o)?;
-        self.expr(&o.basis.clone())?;
+        self.struct_basis_laden(&o)?;
         let w = self.ctx.add_const(json!(o.wo));
         self.ctx.emit(oc::LOAD_CONST, json!(w));
         self.struct_stelle(&o)?;
@@ -4111,11 +4275,27 @@ impl Compiler {
         let mut field_infos = Vec::new();
         for f in fields {
             if let Node::Dim { name: fname, type_name, array_dims } = f {
+                // Ein STRUCT ... LAYOUT C als Feld: ein eigener Puffer je
+                // Objekt; mit Groesse ein Feld von Structs (`punkt[]`).
                 if let Some(l) = self.lagen.get(type_name) {
-                    self.err_line = zeile;
-                    return Err(format!(
-                        "{}.{}: ein STRUCT ... LAYOUT C kann (noch) kein Feld einer Klasse sein -- er lebt in einer Variable oder einem Parameter (DIM {} AS {}), oder das Feld ist ein BUFFER mit BUFFER_NEW(SIZEOF({}))",
-                        name, fname, fname, l.name, l.name));
+                    let mut n = 1usize;
+                    if let Some(des) = array_dims {
+                        if des.len() != 1 {
+                            self.err_line = zeile;
+                            return Err(format!("{}.{}: ein Feld von Structs hat genau eine Groesse -- DIM {}[10] AS {}", name, fname, fname, l.name));
+                        }
+                        n = match &des[0] {
+                            Node::NumberLit(NumV::Int(i)) if *i >= 1 => *i as usize,
+                            _ => {
+                                self.err_line = zeile;
+                                return Err(format!("Array-Feld '{}' braucht konstante INTEGER-Groesse", fname));
+                            }
+                        };
+                    }
+                    let t = if array_dims.is_some() { format!("{}[]", type_name) } else { type_name.clone() };
+                    field_infos.push(FieldInfo { name: fname.clone(), type_name: t, array_dims: vec![],
+                                                 struct_bytes: l.groesse * n });
+                    continue;
                 }
                 let dims: Vec<i64> = match array_dims {
                     None => vec![],
@@ -4132,7 +4312,7 @@ impl Compiler {
                     }
                 };
                 field_infos.push(FieldInfo { name: fname.clone(),
-                    type_name: type_name.clone(), array_dims: dims });
+                    type_name: type_name.clone(), array_dims: dims, struct_bytes: 0 });
             }
         }
         let mut method_sigs = HashMap::new();
@@ -4180,7 +4360,7 @@ impl Compiler {
             let mut ctx = Ctx::new();
             ctx.is_main = false;
             ctx.is_sub = is_sub;
-            ctx.return_type = if is_sub { String::new() } else { rt.to_string() };
+            ctx.return_type = if is_sub { String::new() } else { self.typ_norm(rt) };
             ctx.current_class = Some(cname.clone());
             if !is_sub && !self.classes[&cname].abstracts.contains(mname) {
                 let zeile = self.class_lines.get(&cname).copied().unwrap_or(0);
@@ -4190,7 +4370,7 @@ impl Compiler {
             for p in params {
                 let slot = ctx.local_types.len();
                 ctx.local_slots.insert(p.name.clone(), slot);
-                ctx.local_types.push(p.type_name.clone());
+                ctx.local_types.push(self.typ_norm(&p.type_name));
                 ctx.local_defaults.push(type_default(&p.type_name));
             }
             let saved = std::mem::replace(&mut self.ctx, ctx);
@@ -4212,7 +4392,7 @@ impl Compiler {
             r?;
             let sig = &self.classes[&cname].method_sigs[mname];
             let fnj = build_func(fn_ctx, mname, false, is_sub, sig.n_params, sig.n_required,
-                                 sig.is_variadic, sig.is_coroutine, &sig.return_type,
+                                 sig.is_variadic, sig.is_coroutine, &self.typ_norm(&sig.return_type),
                                  &sig.param_defaults, &sig.param_names, &sig.param_byref,
                                  &sig.param_default_is_expr);
             self.classes.get_mut(&cname).unwrap().compiled.push((mname.to_string(), fnj));
@@ -4273,7 +4453,7 @@ impl Compiler {
         let mut ctx = Ctx::new();
         ctx.is_main = false;
         ctx.is_sub = is_sub;
-        ctx.return_type = if is_sub { String::new() } else { rt.to_string() };
+        ctx.return_type = if is_sub { String::new() } else { self.typ_norm(rt) };
         if !is_sub {
             let zeile = self.fn_lines.get(name).copied().unwrap_or(0);
             // QBasic/VB-Gewohnheit: `f = x * 2` im Rumpf von FUNCTION f als
@@ -4295,7 +4475,7 @@ impl Compiler {
         for p in params {
             let slot = ctx.local_types.len();
             ctx.local_slots.insert(p.name.clone(), slot);
-            ctx.local_types.push(p.type_name.clone());
+            ctx.local_types.push(self.typ_norm(&p.type_name));
             ctx.local_defaults.push(type_default(&p.type_name));
         }
         let saved = std::mem::replace(&mut self.ctx, ctx);
@@ -4317,7 +4497,7 @@ impl Compiler {
         r?;
         let sig = &self.fn_sigs[name];
         let fnj = build_func(fn_ctx, name, false, is_sub, sig.n_params, sig.n_required,
-                             sig.is_variadic, sig.is_coroutine, &sig.return_type,
+                             sig.is_variadic, sig.is_coroutine, &self.typ_norm(&sig.return_type),
                              &sig.param_defaults, &sig.param_names, &sig.param_byref,
                              &sig.param_default_is_expr);
         self.compiled_fns.push((name.to_string(), fnj));
@@ -4386,7 +4566,7 @@ impl Compiler {
         for p in params {
             let slot = ctx.local_types.len();
             ctx.local_slots.insert(p.name.clone(), slot);
-            ctx.local_types.push(p.type_name.clone());
+            ctx.local_types.push(self.typ_norm(&p.type_name));
             ctx.local_defaults.push(type_default(&p.type_name));
             param_names.push(p.name.clone());
         }

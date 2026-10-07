@@ -1720,7 +1720,10 @@ impl<'p> Vm<'p> {
         }
         for ci in chain.iter().rev() {
             for fd in &ci.fields {
-                let value = if !fd.array_dims.is_empty() {
+                let value = if fd.struct_bytes > 0 {
+                    // Ein STRUCT ... LAYOUT C: je Objekt ein eigener Puffer.
+                    crate::builtins::neuer_buffer(vec![0u8; fd.struct_bytes])
+                } else if !fd.array_dims.is_empty() {
                     let et = fd.type_name.clone();
                     let arr = DhArray::new(et.clone(), fd.array_dims.clone(), || self.element_default(&et));
                     Value::Array(Rc::new(RefCell::new(arr)))
