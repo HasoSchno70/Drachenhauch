@@ -351,12 +351,26 @@ r = CreatePolygonRgn(dreieck, LEN(dreieck), 1)
 * **`ARRAY OF Punkt`** as a parameter or return type of a FUNCTION means
   the same array; `DIM ps AS ARRAY OF Punkt` without a size is an empty one
   that receives an assignment.
-* **One dimension.** For several, compute the index yourself
-  (`g[zeile * breite + spalte].x`). `FOR EACH` does not work (it would run
-  over the bytes) -- with an index it does. An element as a whole
-  (`pts[2] = p`) is not a value; you read and write its fields. An index
-  directly on the result of a call (`reihe(5)[0].x`) is a message --
-  assign it to a variable first.
+* **Several dimensions** as in C: `DIM g[n, 4] AS Punkt` lies row by row
+  in one buffer (`g[i, j]` is element `i * 4 + j`). The rear sizes must be
+  fixed at compile time (a number or `CONST`), only the first may come at
+  run time; every index is checked against its own size. `LEN(g)` counts
+  the first dimension, as for every array. As an `ARRAY OF Punkt`
+  parameter it is a flat array (`LEN` = all elements) -- the library gets
+  the same bytes.
+* **An element as a whole is a copy:** `p = pts[2]` copies the bytes into
+  a struct of its own, `pts[2] = p` copies them back; the same goes for a
+  struct inside a struct (`linie.b = p`). To a library, on the other hand,
+  an element goes as a **pointer to its place** in the array
+  (`GetCursorPos(pts[2])` writes into the array), and so do `linie.b` and
+  an array of numbers inside a struct (`st.werte`).
+* **`FOR EACH p IN pts`** yields a copy of the element in every round --
+  also over an array inside a struct (`FOR EACH e IN linie.ecken`,
+  `FOR EACH w IN st.werte`). Writing a field of the copy (`p.x = 1`) is
+  therefore a message; you write into the array with an index. `FOR EACH`
+  works over one dimension only, as for every array.
+* An index directly on the result of a call (`reihe(5)[0].x`) is a
+  message -- assign it to a variable first.
 
 **In a class** a struct is an ordinary field; every object gets its own
 buffer at `NEW`:
@@ -812,8 +826,7 @@ END TRY
 
 * A struct by value behind `...` (see
   [Structs by value](#structs-by-value)); bit fields with `PACK` or with
-  0 bits (see [Bit fields](#bit-fields)); arrays of structs with more than
-  one dimension.
+  0 bits (see [Bit fields](#bit-fields)).
 * C++ names, COM. A C++ library such as
   Qt works via a detour with a C interface -- for example
   [Embedding Python](#embedding-python) with PySide6.

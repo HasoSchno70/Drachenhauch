@@ -1458,9 +1458,14 @@ auch in `angesagter_typ`, Parametern und Rueckgaben, sonst lehnt die VM den
 Puffer ab), Index gegen die Pufferlaenge (`__struct_index_puffer`), `LEN` =
 Zahl der Structs; Klassenfeld = `FieldInfo::struct_bytes` -> eigener Puffer
 je Objekt in `allocate_instance`, Zugriff ueber `struct_objektfeld`
-(LOAD_MEMBER; ein ganzes Objektfeld ist ein gewoehnlicher Wert). Nicht:
-mehrere Dimensionen, FOR EACH, Element als Ganzes, Index auf einem Aufruf
-(je eine Meldung). Tests
+(LOAD_MEMBER; ein ganzes Objektfeld ist ein gewoehnlicher Wert). **Folgen
+(selber Tag):** mehrere Dimensionen wie in C (Typ `punkt[,4]` traegt die
+hinteren, festen Groessen, `struct_feldtyp`; je Dimension ein Eintrag in
+`dyn_`), ein Element als Ganzes ist eine KOPIE (Typzeichen `#`, Groesse in
+`zeichen`), an eine Bibliothek geht es aber als Zeiger an seine Stelle
+(Tupel (Puffer, Stelle), `struct_zeiger` -> `__ffi`), `FOR EACH` liefert
+Kopien und verbietet, ein Feld der Laufvariable zu schreiben
+(`foreach_kopien`). Nicht: Index direkt auf einem Aufruf (Meldung). Tests
 `tests/pruef/ffi_struct.dhtest`, Rust-Tests in cstruct.rs.
 **GTK (2026-10-06):** `LIB "a.dll|liba.so.0"` (mehrere Namen, `dateinamen`
 zerlegt an `|`), `LIB name` mit einer CONST (Vorsatz `ffi::LIB_CONST`,

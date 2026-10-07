@@ -351,6 +351,12 @@ fn bitfeld(art: &str) -> Option<(u32, u32)> {
 
 fn lesen(b: &Value, wo: &str, off: i64, art: &str, zeichen: usize) -> Result<Value, String> {
     let b = buf(b, wo)?.borrow();
+    // Ein ganzer Struct (Element eines Feldes, Struct im Struct): eine Kopie
+    // seiner Bytes -- ein Stueck eines Puffers kann kein eigener Puffer sein.
+    if art == "#" {
+        let o = bereich(b.len(), off, zeichen, wo)?;
+        return Ok(crate::builtins::neuer_buffer(b[o..o + zeichen].to_vec()));
+    }
     let c = art.chars().next().unwrap_or('q');
     let w = breite(c).unwrap_or(8);
     if let Some((bits, bit)) = bitfeld(art) {
@@ -389,6 +395,21 @@ fn lesen(b: &Value, wo: &str, off: i64, art: &str, zeichen: usize) -> Result<Val
 }
 
 fn schreiben(b: &Value, wo: &str, off: i64, art: &str, zeichen: usize, v: &Value) -> Result<(), String> {
+    if art == "#" {
+        // Erst die Quelle kopieren: `pts[1] = pts[1]` liest und schreibt
+        // denselben Puffer.
+        let quelle: Vec<u8> = match v {
+            Value::Buffer(q) => q.borrow().clone(),
+            _ => return Err(format!("{}: erwartet einen Struct (einen BUFFER), erhalten {}", wo, v.type_name())),
+        };
+        if quelle.len() < zeichen {
+            return Err(format!("{}: der Puffer ist {} Bytes lang, der Struct braucht {}", wo, quelle.len(), zeichen));
+        }
+        let mut b = buf(b, wo)?.borrow_mut();
+        let o = bereich(b.len(), off, zeichen, wo)?;
+        b[o..o + zeichen].copy_from_slice(&quelle[..zeichen]);
+        return Ok(());
+    }
     let mut b = buf(b, wo)?.borrow_mut();
     let c = art.chars().next().unwrap_or('q');
     let w = breite(c).unwrap_or(8);
@@ -598,6 +619,30 @@ mod tests {
         assert!(matches!(lies("L3@0"), Value::Int(5)));
         setze("q40@0", Value::Int(-2)).unwrap();
         assert!(matches!(lies("q40@0"), Value::Int(-2)));
+    }
+
+    #[test]
+    fn ganzer_struct_ist_eine_kopie() {
+        let r = |n: &str, a: &[Value]| befehl(n, a).unwrap();
+        let s = |t: &str| Value::str_rc(t);
+        let feld = crate::builtins::neuer_buffer((0u8..24).collect());
+        // Lesen kopiert die 8 Bytes ab Stelle 8 in einen eigenen Puffer.
+        let el = r("__struct_get", &[feld.clone(), s("ps[]"), Value::Int(8), s("#"), Value::Int(8)]).unwrap();
+        let Value::Buffer(e) = &el else { panic!() };
+        assert_eq!(*e.borrow(), (8u8..16).collect::<Vec<_>>());
+        e.borrow_mut()[0] = 99;
+        let Value::Buffer(f) = &feld else { panic!() };
+        assert_eq!(f.borrow()[8], 8);
+        // Schreiben kopiert zurueck -- auch aus demselben Puffer.
+        r("__struct_set", &[feld.clone(), s("ps[]"), Value::Int(16), s("#"), Value::Int(8), el.clone()]).unwrap();
+        assert_eq!(f.borrow()[16], 99);
+        r("__struct_set", &[feld.clone(), s("ps[]"), Value::Int(8), s("#"), Value::Int(8), feld.clone()]).unwrap();
+        assert_eq!(f.borrow()[8..16], (0u8..8).collect::<Vec<_>>()[..]);
+        // Zu kurz, kein Puffer, ausserhalb: Fehler.
+        let kurz = crate::builtins::neuer_buffer(vec![0; 4]);
+        assert!(r("__struct_set", &[feld.clone(), s("ps[]"), Value::Int(0), s("#"), Value::Int(8), kurz]).err().unwrap().contains("4 Bytes"));
+        assert!(r("__struct_set", &[feld.clone(), s("ps[]"), Value::Int(0), s("#"), Value::Int(8), Value::Int(3)]).err().unwrap().contains("BUFFER"));
+        assert!(r("__struct_get", &[feld.clone(), s("ps[]"), Value::Int(20), s("#"), Value::Int(8)]).is_err());
     }
 
     #[test]

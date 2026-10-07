@@ -462,3 +462,24 @@ die Laenge zweimal laufen) -- je eine Meldung. Gegenproben: `struct_bytes`
 beim Laden einer .dhc uebergangen -> der .dhc-Fall faellt; die Pruefung des
 Index gegen den Puffer abgeschaltet -> der Index-Fall faellt; NEW ohne
 Puffer -> der Klassenfall faellt.
+
+**Stand Folgen der Felder von Structs (2026-10-07):** (1) **Mehrere
+Dimensionen** wie in C: der Typ traegt die hinteren Groessen (`punkt[,4]`,
+`struct_feldtyp`), sie muessen beim Uebersetzen feststehen
+(`feste_groesse` ueber `falten`), die erste sagt der Puffer. Der Index wird
+in `struct_ort` zu je einem Eintrag in `dyn_` je Dimension (die erste mit
+der Zeilengroesse gegen den Puffer, die uebrigen gegen ihre feste Zahl) --
+`struct_stelle` brauchte dafuer nichts Neues. Globale tragen den Typ schon
+aus `merke_global_typ`, sonst kennte ein Zugriff aus einer SUB nur eine
+Dimension. (2) **Ein Element als Ganzes** (`p = pts[2]`, `pts[2] = p`,
+`linie.b = p`) ist eine KOPIE: Typzeichen `#` mit der Groesse in `zeichen`;
+`cstruct::schreiben` kopiert die Quelle vor dem Borgen (`pts[1] = pts[1]`
+borgte sonst denselben RefCell zweimal). (3) **An eine Bibliothek** geht
+ein Element dagegen als Zeiger an seine Stelle: der Compiler legt
+(Puffer, Stelle) als Tupel ab (`struct_zeiger`), `__ffi` macht bei `p`
+daraus den Zeiger -- sonst schriebe `GetCursorPos(pts[2])` in eine Kopie,
+ohne dass es jemand merkt. (4) **`FOR EACH`** (`foreach_struct`) liefert je
+Runde eine Kopie, die Laufvariable bekommt den Struct-Typ; ein Feld der
+Kopie zu schreiben ist eine Meldung (`foreach_kopien`), weil es ins Leere
+ginge. Geht auch ueber ein Feld im Struct (`st.werte`, `l.ecken`), nur
+ueber eine Dimension, ohne Paar-Form.

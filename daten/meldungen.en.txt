@@ -1652,11 +1652,16 @@ Ein STRUCT ... LAYOUT C braucht mindestens ein Feld	A STRUCT ... LAYOUT C needs 
 BYREF braucht ein Struct nicht -- die Bibliothek bekommt ohnehin einen Zeiger auf seine Bytes	A struct does not need BYREF -- the library gets a pointer to its bytes anyway
 STRUCT {} ist zweimal deklariert -- eines von beiden umbenennen	STRUCT {} is declared twice -- rename one of them
 STRUCT ... LAYOUT C gehoert auf die oberste Ebene des Programms, nicht in ein Unterprogramm oder einen Block	STRUCT ... LAYOUT C belongs at the top level of the program, not inside a subroutine or a block
-{}.{}: ein Feld von Structs hat genau eine Groesse -- DIM {}[10] AS {}	{}.{}: an array of structs has exactly one size -- DIM {}[10] AS {}
-Ein Feld von Structs hat genau eine Groesse -- DIM {}[10] AS {} (fuer mehrere Dimensionen den Index selbst rechnen)	An array of structs has exactly one size -- DIM {}[10] AS {} (for several dimensions compute the index yourself)
-{} ist ein Feld von Structs -- erst ein Index: {}[0].{}	{} is an array of structs -- first an index: {}[0].{}
-{} ist ein Feld von Structs -- mit Index: {}[0].feld	{} is an array of structs -- with an index: {}[0].feld
-FOR EACH geht nicht ueber ein Feld von Structs -- mit Index: FOR i = 0 TO LEN({}) - 1 : ... {}[i].feld	FOR EACH does not work over an array of structs -- with an index: FOR i = 0 TO LEN({}) - 1 : ... {}[i].feld
+DIM {}: die hinteren Groessen eines Feldes von Structs muessen beim Uebersetzen feststehen (eine Zahl oder CONST) -- wie in C darf nur die erste erst zur Laufzeit kommen	DIM {}: the rear sizes of an array of structs must be fixed at compile time (a number or CONST) -- as in C only the first may come at run time
+{} ist ein Feld von Structs mit einer Dimension -- ein Index: {}[i]	{} is an array of structs with one dimension -- one index: {}[i]
+{} hat {} Dimensionen -- mit allen Indizes: {}[{}]	{} has {} dimensions -- with all indices: {}[{}]
+{} ist ein Feld von Structs -- erst ein Index: {}{}.{}	{} is an array of structs -- first an index: {}{}.{}
+{} ist ein Feld von Structs -- mit Index: {}{}	{} is an array of structs -- with an index: {}{}
+FOR EACH {}, ... geht nicht ueber {} -- mit Index: FOR i = 0 TO LEN({}) - 1	FOR EACH {}, ... does not work over {} -- with an index: FOR i = 0 TO LEN({}) - 1
+FOR EACH geht nur ueber ein Feld mit einer Dimension -- {} hat {}: FOR i = 0 TO LEN({}) - 1 : FOR j = ...	FOR EACH works only over an array with one dimension -- {} has {}: FOR i = 0 TO LEN({}) - 1 : FOR j = ...
+FOR EACH {}: {} ist schon als {} angelegt -- fuer die Elemente von {} eine Variable vom Typ {} nehmen	FOR EACH {}: {} is already declared as {} -- for the elements of {} take a variable of type {}
+FOR EACH {}: {} ist schon ohne Typ angelegt -- fuer die Elemente von {} eine eigene Variable nehmen	FOR EACH {}: {} is already declared without a type -- for the elements of {} take a variable of its own
+{} ist in FOR EACH eine Kopie des Elements -- {} = ... ginge ins Leere; ins Feld schreiben mit Index (FOR i = 0 TO LEN(feld) - 1 : feld[i].x = ...)	{} is a copy of the element in FOR EACH -- {} = ... would go nowhere; write into the array with an index (FOR i = 0 TO LEN(feld) - 1 : feld[i].x = ...)
 {}(...) liefert {} -- erst einer Variable zuweisen: DIM r AS {} : r = {}(...) : r{}	{}(...) returns {} -- assign it to a variable first: DIM r AS {} : r = {}(...) : r{}
 ein Feld von Structs	an array of structs
 einen Struct	a struct
@@ -1675,7 +1680,9 @@ SIZEOF: '{}' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER ..
 {} ist kein Feld von Elementen -- ohne Index	{} is not an array -- without an index
 {}: ein Feld im Struct hat genau einen Index	{}: an array in a struct has exactly one index
 {} ist ein Feld von {} Elementen -- mit Index: {}[0]	{} is an array of {} elements -- with an index: {}[0]
-{} ist ein Struct -- lies und schreib seine Felder ({}.feld); seine Bytes liegen im Puffer ab OFFSETOF	{} is a struct -- read and write its fields ({}.field); its bytes lie in the buffer from OFFSETOF
+{}: erwartet einen Struct (einen BUFFER), erhalten {}	{}: expected a struct (a BUFFER), got {}
+{}: der Puffer ist {} Bytes lang, der Struct braucht {}	{}: the buffer is {} bytes long, the struct needs {}
+die Stelle {} liegt ausserhalb des Puffers (0..{})	the position {} lies outside the buffer (0..{})
 (moeglich: ein STRUCT ... LAYOUT C oder 	(possible: a STRUCT ... LAYOUT C or 
 LIB {}: erwartet eine CONST mit festem Text (CONST {} = "libname.so|name.dll") oder den Namen in Anfuehrungszeichen	LIB {}: expects a CONST with a fixed text (CONST {} = "libname.so|name.dll") or the name in quotes
 Bibliothek "{}" liegt als {} da, laesst sich aber nicht laden -- fehlt ihr selbst eine Bibliothek, oder passt sie nicht zu diesem System (64 Bit)? Das System sagt: {}	library "{}" is there as {} but cannot be loaded -- is a library it needs missing, or does it not fit this system (64 bit)? The system says: {}
