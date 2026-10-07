@@ -337,6 +337,147 @@ pub fn pfade(wurzel: &Path, ordner: &Path, nur: Option<&[String]>) -> Vec<Befund
     funde
 }
 
+// ============================================================ Uebersetzung (docs/en)
+
+/// Die Codebloecke einer Markdown-Datei in ihrer Reihenfolge, je mit der
+/// Zeile des oeffnenden Zauns. Code wird nicht uebersetzt (wie im Buch) --
+/// die englische Fassung traegt also dieselben Bloecke, und wer einen
+/// deutschen Block aendert, sieht hier, welche Uebersetzung nachzuziehen ist.
+/// Verglichen wird ohne Einrueckung und ohne Leerraum am Zeilenende: ein
+/// Block in einer Aufzaehlung darf in der Uebersetzung anders eingerueckt sein.
+fn codebloecke(text: &str) -> Vec<(usize, String)> {
+    let mut aus = Vec::new();
+    let mut offen: Option<(usize, String)> = None;
+    for (i, zeile) in text.lines().enumerate() {
+        let z = zeile.trim();
+        if let Some((start, mut inhalt)) = offen.take() {
+            if z.starts_with("```") { aus.push((start, inhalt)); }
+            else { inhalt.push_str(z); inhalt.push('\n'); offen = Some((start, inhalt)); }
+        } else if z.starts_with("```") {
+            offen = Some((i + 1, format!("{}\n", z)));
+        }
+    }
+    if let Some(o) = offen { aus.push(o); }
+    aus
+}
+
+/// Die Sprungmarken einer Markdown-Datei, wie GitHub sie bildet (und die IDE,
+/// `hbMarke$`): klein, Leerzeichen werden Striche, Buchstaben samt Umlauten,
+/// Ziffern, `-` und `_` bleiben, alles andere faellt weg. Doppelte bekommen
+/// `-1`, `-2`, ... angehaengt. Ueberschriften in Codebloecken zaehlen nicht.
+pub fn marken(text: &str) -> HashSet<String> {
+    let mut gesehen: std::collections::HashMap<String, usize> = Default::default();
+    let mut aus = HashSet::new();
+    let mut im_code = false;
+    for zeile in text.lines() {
+        let z = zeile.trim_start();
+        if z.starts_with("```") { im_code = !im_code; continue; }
+        if im_code || !z.starts_with('#') { continue; }
+        let titel = z.trim_start_matches('#');
+        if !titel.starts_with(' ') { continue; }
+        let mut m = String::new();
+        for c in titel.trim().to_lowercase().chars() {
+            if c == ' ' { m.push('-'); }
+            else if c == '-' || c == '_' || c.is_alphanumeric() { m.push(c); }
+        }
+        let n = gesehen.entry(m.clone()).or_insert(0);
+        aus.insert(if *n == 0 { m.clone() } else { format!("{}-{}", m, n) });
+        *n += 1;
+    }
+    aus
+}
+
+/// Verweise der `.md`-Dateien in `ordner` STRENG pruefen: der Pfad gilt
+/// relativ zum Ordner der Datei (so liest ihn GitHub und die IDE), und eine
+/// Sprungmarke muss es im Ziel geben. `pfade` prueft nur, ob es den
+/// Dateinamen irgendwo gibt -- fuer docs/en reicht das nicht, weil dort jeder
+/// Verweis auf eine deutsche Datei ein `../` braucht und jede Marke aus einer
+/// englischen Ueberschrift entsteht.
+pub fn verweise(wurzel: &Path, ordner: &Path) -> Vec<Befund> {
+    static LINK: OnceLock<Regex> = OnceLock::new();
+    let link = re(r"\]\(([^)\s]+)\)", &LINK);
+    let mut funde = Vec::new();
+    for datei in md_dateien(ordner, None) {
+        let wo = name_von(&datei, wurzel);
+        let text = lesen(&datei);
+        let eigene = marken(&text);
+        let mut im_code = false;
+        for (i, zeile) in text.lines().enumerate() {
+            if zeile.trim_start().starts_with("```") { im_code = !im_code; continue; }
+            if im_code { continue; }
+            for m in link.captures_iter(zeile) {
+                let r = &m[1];
+                if r.starts_with("http") || r.starts_with("mailto:") { continue; }
+                let (pfad, marke) = match r.split_once('#') { Some((p, m)) => (p, m), None => (r, "") };
+                let (ziel_marken, ziel) = if pfad.is_empty() {
+                    (Some(eigene.clone()), datei.clone())
+                } else {
+                    let ziel = datei.parent().unwrap_or(ordner).join(pfad);
+                    if !ziel.exists() {
+                        funde.push((wo.clone(), i + 1, format!("[...]({})", r),
+                            "Verweis zeigt ins Leere -- relativ zum Ordner der Datei gerechnet".into()));
+                        continue;
+                    }
+                    let mk = if pfad.ends_with(".md") { Some(marken(&lesen(&ziel))) } else { None };
+                    (mk, ziel)
+                };
+                if marke.is_empty() { continue; }
+                if let Some(mk) = ziel_marken {
+                    if !mk.contains(marke) {
+                        funde.push((wo.clone(), i + 1, format!("[...]({})", r),
+                            format!("Sprungmarke fehlt in {}", name_von(&ziel, wurzel))));
+                    }
+                }
+            }
+        }
+    }
+    funde
+}
+
+/// docs/en gegen docs: jede englische Datei hat ein deutsches Gegenstueck,
+/// traegt dieselben Codebloecke in derselben Reihenfolge, und ihre Verweise
+/// samt Sprungmarken loesen auf. Liefert (Zahl der englischen Dateien, Befunde).
+pub fn uebersetzung(wurzel: &Path) -> (usize, Vec<Befund>) {
+    let docs = wurzel.join("docs");
+    let en = docs.join("en");
+    let dateien = md_dateien(&en, None);
+    let mut funde = Vec::new();
+    for datei in &dateien {
+        let wo = name_von(datei, wurzel);
+        let name = datei.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let de = docs.join(&name);
+        if !de.exists() {
+            funde.push((wo, 1, name, "keine deutsche Fassung in docs/ -- die englische ist eine Uebersetzung, kein eigenes Dokument".into()));
+            continue;
+        }
+        let b_en = codebloecke(&lesen(datei));
+        let b_de = codebloecke(&lesen(&de));
+        let erste = |b: &str| -> String { b.lines().nth(1).unwrap_or("").chars().take(60).collect() };
+        for k in 0..b_en.len().max(b_de.len()) {
+            match (b_en.get(k), b_de.get(k)) {
+                (Some((z, a)), Some((zd, b))) if a != b => {
+                    funde.push((wo.clone(), *z, erste(a),
+                        format!("Codeblock {} weicht von docs/{}:{} ab -- Code wird nicht uebersetzt", k + 1, name, zd)));
+                    break;
+                }
+                (Some((z, a)), None) => {
+                    funde.push((wo.clone(), *z, erste(a), format!("Codeblock {} gibt es in docs/{} nicht", k + 1, name)));
+                    break;
+                }
+                (None, Some((zd, b))) => {
+                    funde.push((wo.clone(), 1, erste(b),
+                        format!("Codeblock {} aus docs/{}:{} fehlt in der Uebersetzung", k + 1, name, zd)));
+                    break;
+                }
+                _ => {}
+            }
+        }
+    }
+    funde.extend(verweise(wurzel, &en));
+    funde.sort();
+    (dateien.len(), funde)
+}
+
 // ============================================================ Aufruf
 
 fn ausgeben(funde: &[Befund]) {
@@ -371,6 +512,7 @@ dhrt pruef konstanten [ordner]  jede Tasten-Konstante steht in der Doku
 dhrt pruef pfade [ordner] [--nur datei ...]
                                 Pfade und Links zeigen auf Dateien, die es gibt
 dhrt pruef beispiele [repo]     Zahl der versionierten Beispiele
+dhrt pruef uebersetzung         docs/en gegen docs: Gegenstueck, gleiche Codebloecke, Verweise samt Marken
 dhrt pruef meldungen            den englischen Katalog gegen den Quelltext pruefen
 dhrt pruef meldungen --offen    Meldungen im Quelltext, die noch deutsch bleiben
   Rueckgabe 0 = sauber, 1 = Befund";
@@ -402,6 +544,11 @@ pub fn main(args: &[String]) -> ExitCode {
             let (ordner, nur) = ordner_und_nur(&wurzel, &rest);
             let f = pfade(&wurzel, &ordner, nur.as_deref());
             println!("Pfade und Links geprueft -- {} Befund(e)", f.len()); ausgeben(&f); code(&f)
+        }
+        Some("uebersetzung") => {
+            let (n, f) = uebersetzung(&wurzel);
+            println!("{} englische Dokumente geprueft -- {} Befund(e)", n, f.len());
+            ausgeben(&f); code(&f)
         }
         Some("beispiele") => {
             let repo = rest.first().map(PathBuf::from).unwrap_or(wurzel);
@@ -439,6 +586,19 @@ pub fn main(args: &[String]) -> ExitCode {
             funde.extend(namen(&wurzel, &wurzel, Some(&claude)));
             funde.extend(pfade(&wurzel, &wurzel, Some(&claude)));
             funde.extend(meldungen(&wurzel).1);
+            // Die englische Fassung mit denselben Regeln -- ohne die
+            // Tasten-Konstanten: die verlangen jede Konstante im Ordner, und
+            // was unuebersetzt ist, liegt nur in docs/.
+            let en = docs.join("en");
+            let mut n = n;
+            if en.is_dir() {
+                let (n_en, f_en) = bloecke(&en);
+                n += n_en;
+                funde.extend(f_en);
+                funde.extend(namen(&wurzel, &en, None));
+                funde.extend(pfade(&wurzel, &en, None));
+                funde.extend(uebersetzung(&wurzel).1);
+            }
             println!("{} Codebloecke geprueft; Doku-Aussagen geprueft -- {} Befund(e)", n, funde.len());
             ausgeben(&funde);
             println!("\n({} Namen und {} Pfade geduldet, siehe GEDULDET/GEDULDETE_PFADE in pruef.rs)",
@@ -710,6 +870,42 @@ mod tests {
         assert!(!stueck_belegt("Die Klasse kuendigt eine Methode an, ohne sie", k, &g));
         assert!(!stueck_belegt("Die Klasse kuendigt [[keine Methode]] an, ohne sie", k, &g));
         assert_eq!(format_stuecke("a {} b {:?} c {{x}} {name}"), vec!["a ", " b ", " c {x} ", ""]);
+    }
+
+    #[test]
+    fn marken_wie_github() {
+        let m = marken("# Sprite-Atlas + Batch-Draw\n## Server: PostgreSQL und MySQL\n```\n# kein Kopf\n```\n## `DB_OPEN`\n## Größe\n## Größe\n");
+        for k in ["sprite-atlas--batch-draw", "server-postgresql-und-mysql", "db_open", "größe", "größe-1"] {
+            assert!(m.contains(k), "{} fehlt in {:?}", k, m);
+        }
+        assert!(!m.contains("kein-kopf"));
+    }
+
+    #[test]
+    fn uebersetzung_folgt_der_deutschen() {
+        let dir = std::env::temp_dir().join(format!("dh_pruef_en_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("docs/en")).unwrap();
+        let de = "# Titel\n\nText.\n\n```basic\nPRINT 1 ' eins\n```\n\n## Zweiter Teil\n";
+        std::fs::write(dir.join("docs/a.md"), de).unwrap();
+        std::fs::write(dir.join("docs/b.md"), "# B\n").unwrap();
+        // gleich: Code unveraendert (anders eingerueckt), Verweis auf die
+        // deutsche Datei mit ../, Marke aus der englischen Ueberschrift
+        std::fs::write(dir.join("docs/en/a.md"),
+            "# Title\n\nText, see [b](../b.md#b) and [part](#second-part).\n\n  ```basic\n  PRINT 1 ' eins\n  ```\n\n## Second part\n").unwrap();
+        let (n, f) = uebersetzung(&dir);
+        assert_eq!((n, f.len()), (1, 0), "{:?}", f);
+        // Code uebersetzt, Marke deutsch, Verweis ohne ../, Datei ohne Gegenstueck
+        std::fs::write(dir.join("docs/en/a.md"),
+            "# Title\n\n[b](b.md) [x](#zweiter-teil)\n\n```basic\nPRINT 1 ' one\n```\n\n## Second part\n").unwrap();
+        std::fs::write(dir.join("docs/en/c.md"), "# C\n").unwrap();
+        let (_, f) = uebersetzung(&dir);
+        let msgs: Vec<&str> = f.iter().map(|b| b.3.as_str()).collect();
+        assert!(msgs.iter().any(|m| m.contains("Code wird nicht uebersetzt")), "{:?}", msgs);
+        assert!(msgs.iter().any(|m| m.contains("Sprungmarke fehlt")), "{:?}", msgs);
+        assert!(msgs.iter().any(|m| m.contains("ins Leere")), "{:?}", msgs);
+        assert!(msgs.iter().any(|m| m.contains("keine deutsche Fassung")), "{:?}", msgs);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
