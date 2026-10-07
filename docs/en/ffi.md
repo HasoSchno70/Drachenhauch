@@ -71,6 +71,7 @@ Drachenhauch types do not say how wide a number is in C.
 | `WTEXT` (also `WSTR`) | `const wchar_t*` (Windows: UTF-16, otherwise UTF-32) | STRING |
 | `BUFFER` | `void*` to the bytes of the buffer | BUFFER |
 | `FUNCTION(...) AS typ`, `SUB(...)` | function pointer (callback) | FUNCREF |
+| `VALIST` (also `VA_LIST`) | `va_list` (for `vprintf` and friends) | a tuple, an array, a value or NIL |
 
 * **A value that does not fit is an error**: `LONG` with 2^40 aborts
   instead of being silently truncated; so does a floating-point number for `LONG`.
@@ -325,6 +326,47 @@ On Linux and macOS, `struct utsname` (for `uname`) has fields of fixed width,
 You give the function the larger struct and afterwards read through the layout
 of the system (`tests/pruef/ffi_struct.dhtest` shows how).
 
+### Bit fields
+
+Some structs pack several small numbers into one word -- in C
+`DWORD fBinary : 1;`. In Drachenhauch the width in bits goes after the type
+(as in C) or, as in FreeBASIC, after the name:
+
+```basic
+STRUCT Status LAYOUT C
+    bereit AS ULONG : 1
+    modus AS ULONG : 2
+    stufe AS LONG : 5           ' signed: -16 to 15
+    fehler : 1 AS BOOLEAN       ' the FreeBASIC way of writing it
+    zaehler AS ULONG
+END STRUCT
+
+DIM s AS Status
+s.modus = 3
+s.stufe = -2
+PRINT s.modus, s.stufe, HEX$(BUFFER_GET_U32(s, 0))   ' 3  -2  F6
+```
+
+* **A bit field reads and writes only its own bits**; a value that does not
+  fit is an error (`s.modus = 4` -- "passt nicht in ein Bitfeld mit 2 Bits
+  (0 bis 3)", does not fit in a bit field with 2 bits). Signed types (`BYTE`,
+  `SHORT`, `LONG`, `INTEGER`) give back a negative number, unsigned ones
+  (`UBYTE` … `ULONG`) do not. `BOOLEAN` takes `TRUE`/`FALSE` (its unit is
+  4 bytes, like `int`; a C `bool` with one bit is `UBYTE : 1`).
+* **How bit fields are laid out is decided by the system's compiler, and
+  dhrt follows it:** on Windows (MSVC) consecutive bit fields share a unit
+  of their type only if the type has the same size and the bits still fit;
+  on Linux and macOS (GCC, Clang) a bit field goes to the next free bit
+  position as long as it does not cross a boundary of its type -- even right
+  after an ordinary field. The same declaration can therefore have
+  different sizes on different systems, just as in C (`char c; int a : 4;`
+  is 8 bytes on Windows, 4 elsewhere).
+* `OFFSETOF` of a bit field is an error (it has no position in bytes),
+  there are no arrays of bit fields, and bit fields do not work together
+  with `PACK` (yet) -- the compilers disagree there. A bit field with 0 bits
+  (C: `int : 0;`) does not exist; an unnamed padding field simply gets a
+  name.
+
 ### Structs with pointers
 
 A field of type `char*` or `void*` is a `ZEIGER`. It is set with
@@ -390,10 +432,11 @@ PRINT w.re, w.im, cabs(z)     ' 0.0  2.0  4.0
 * **Complex numbers** (`double complex`, `_Dcomplex`) are treated by C exactly like
   a struct of two floating-point numbers -- `csqrt`, `cexp` and friends from the
   C library work with them as shown above.
-* Not (yet) by value: a struct in a **callback** (it arrives there as a
-  `ZEIGER`) and in a function with **`...`**; on ARM, a struct of
-  floating-point numbers for which no register is left free after eight floating-point
-  arguments. All three produce a message, not a silent error.
+* In a **callback** a struct works by value as well, see
+  [Structs by value in a callback](#structs-by-value-in-a-callback).
+* Not (yet) by value: a struct in a function with **`...`**; on ARM, a
+  struct of floating-point numbers for which no register is left free after
+  eight floating-point arguments. Both produce a message, not a silent error.
 
 ## GTK
 
@@ -536,6 +579,35 @@ PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))      ' 3 Drachen, 4.5 Meter, feuerrot
   a small trampoline sets the register `al`, on Apple ARM the
   further values lie on the stack) -- dhrt takes care of that.
 
+### va_list
+
+Many functions with `...` have a sister that takes the values as **one**
+list: `vprintf`, `vsprintf`, `vsnprintf`, on Windows `wvsprintfA` -- and
+libraries that pass on a message that way. The parameter is called
+`VALIST`, the argument is a tuple of the values:
+
+```basic
+DECLARE FUNCTION vsprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, werte AS VALIST) AS LONG
+
+DIM b AS BUFFER
+b = BUFFER_NEW(128)
+vsprintf(b, "%d Drachen, %.1f Meter, %s", (3, 4.5, "feuerrot"))
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))      ' 3 Drachen, 4.5 Meter, feuerrot
+```
+
+* **The list** is a tuple, an array (`[1, 2, 3]`), a single value (for
+  exactly one) or `NIL` (none). Each value is passed as after `...`: whole
+  numbers with 64 bits, floating-point numbers as `double`, text as a
+  copied `const char*`, a BUFFER as a pointer to its bytes.
+* **A `va_list` looks different on every system** -- on Windows and on
+  Apple ARM a pointer to the values, on Linux and macOS on Intel a struct
+  saying that the registers are already used up and everything lies behind
+  it, on Linux ARM a similar one. dhrt builds it anew for every call; the
+  function may use it up.
+* `VALIST` only exists as a parameter -- not as a return type, not with
+  `BYREF` and not (yet) in a callback (a `va_list` that a library hands to
+  a callback arrives as a `ZEIGER`).
+
 ## Callbacks
 
 Some libraries call back: `qsort` asks for every pair which
@@ -569,7 +641,8 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   number types, `ZEIGER`, `BOOLEAN` and `TEXT`/`WTEXT` (arrives as a STRING);
   no `BUFFER` (the library's memory is a `ZEIGER`) and no `BYREF`.
   A callback returns a number, a `ZEIGER` or `BOOLEAN`, or, as
-  `SUB(...)`, nothing.
+  `SUB(...)`, nothing. A struct by value works in both directions, see
+  below.
 * **What you pass is a function**: its name without parentheses, a bound
   method (`zaehler.eins` -- the object comes along) or a lambda. `NIL`
   passes a null pointer. If the number of its parameters does not match, that is
@@ -594,6 +667,42 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   gets a new one every time (a few bytes that stay until the end).
   An error in a callback that the library calls outside a
   call reports itself at the next library call.
+
+### Structs by value in a callback
+
+If the library passes a struct by value (C: `int f(Punkt p)`) or expects
+one back, it is written in the callback just as in the `DECLARE` line --
+with `BYVAL` as a parameter, with its name as the return type:
+
+```basic
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DECLARE SUB zeichne LIB "grafik" (n AS LONG, _
+    ort AS FUNCTION(BYVAL p AS Punkt, i AS LONG) AS Punkt)
+
+FUNCTION verschiebe(p AS Punkt, i AS INTEGER) AS Punkt
+    DIM r AS Punkt
+    r.x = p.x + i * 10
+    r.y = p.y
+    RETURN r
+END FUNCTION
+
+zeichne(5, verschiebe)
+```
+
+* **The function gets a copy** in a BUFFER the size of the struct --
+  whatever it changes in it, the library does not see.
+* **It returns a struct** (a BUFFER at least as long as the struct); a
+  buffer that is too short or a value of another kind is an error that,
+  like any error in a callback, arrives at the library call.
+* **Without `BYVAL` it is an error:** if the library passes a *pointer* to
+  a struct (C: `Punkt*`), the parameter is `ZEIGER`, and
+  `BUFFER_AUS_ZEIGER(z, SIZEOF(Punkt))` reads it.
+* How the struct travels is again decided by the system -- the same rules
+  as above, only in the opposite direction: what arrives in registers, the
+  entry point puts back together.
 
 ## Export
 
@@ -641,17 +750,24 @@ END TRY
 
 ## What does not exist (yet)
 
-* Bit fields in a struct; a struct by value in a callback or
-  behind `...` (see [Structs by value](#structs-by-value)).
-* C++ names, COM, `va_list` functions (`vprintf`). A C++ library such as
+* A struct by value behind `...` (see
+  [Structs by value](#structs-by-value)); bit fields with `PACK` or with
+  0 bits (see [Bit fields](#bit-fields)).
+* C++ names, COM. A C++ library such as
   Qt works via a detour with a C interface -- for example
   [Embedding Python](#embedding-python) with PySide6.
 * **In the browser** there are no foreign libraries; a call there is an
   error saying exactly that.
 
-Machine code does not take calls of foreign functions into its loops;
-they run in the VM -- a question of speed, not of
-correctness.
+**In machine code:** a loop that calls a foreign function is compiled
+like any other. If the function takes and returns only numbers (whole
+numbers, `ZEIGER`, `BOOLEAN`, `SINGLE`, `FLOAT`, without `BYREF`), the call
+runs in the fast, typed part -- a million calls of `abs` in a loop then
+take 54 instead of 116 ms in the VM. **As soon as the program has handed out
+a callback, loops with library calls stay in the VM**: a library may keep a
+callback and call it at any later call (GTK does exactly that), and the
+callback may change variables that a compiled loop is holding itself. That
+changes nothing about the result, only about the speed.
 
 ## Under the hood
 
