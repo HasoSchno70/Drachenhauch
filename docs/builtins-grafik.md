@@ -11,7 +11,7 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 - [Zeichnen](#zeichnen)
 - [Bilder](#bilder)
 - [Asset-Preloader (`LOAD_ASSETS`)](#asset-preloader)
-- [Sprite-Atlas + Batch-Draw](#sprite-atlas--batch-draw)
+- [Sprite-Atlas + Batch-Draw](#sprite-atlas)
 - [Z-Layer-Rendering](#z-layer-rendering)
 - [Tilemap](#tilemap)
 - [Sound und Musik](#sound-und-musik)

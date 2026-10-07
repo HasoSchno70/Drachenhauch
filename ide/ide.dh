@@ -15012,6 +15012,18 @@ FUNCTION istWortzeichen(c AS STRING) AS BOOLEAN
     RETURN c = "_" OR c = "$" OR (c >= "a" AND c <= "z") OR (c >= "A" AND c <= "Z") OR (c >= "0" AND c <= "9")
 END FUNCTION
 
+' Wo ein Dokument liegt: mit englischer Oberflaeche die Uebersetzung in
+' docs/en, wenn es sie gibt, sonst das deutsche. Die Liste der Dokumente
+' bleibt die deutsche -- sie ist vollstaendig; die Entwuerfe und Notizen zur
+' Entwicklung gibt es nur auf Deutsch.
+FUNCTION docPfad$(name AS STRING) AS STRING
+    IF englisch THEN
+        DIM en AS STRING : en = PATHJOIN(docsOrdner, "en", name)
+        IF FILEEXISTS(en) THEN RETURN en
+    END IF
+    RETURN PATHJOIN(docsOrdner, name)
+END FUNCTION
+
 SUB handbuchDokumente()
     IF LEN(docNamen) > 0 THEN RETURN
     docNamen = DIRLIST(docsOrdner, "*.md")
@@ -15115,7 +15127,7 @@ SUB hbSucheAlle()
     DIM d AS STRING
     FOR EACH d IN docNamen
         IF voll THEN BREAK
-        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(docsOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(docPfad$(d))
         DIM kopf AS BOOLEAN : kopf = FALSE
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zeilen) - 1
@@ -15395,7 +15407,7 @@ SUB handbuchLaden(datei AS STRING, zeile AS INTEGER)
         IF docNamen[i] = datei THEN k = i
     NEXT
     IF k < 0 THEN GUI_SET_TEXT(lblStatus, tr$("Kein Handbuch gefunden in ") + docsOrdner) : RETURN
-    GUI_SET_TEXT(taHandbuch, dateiLesen(PATHJOIN(docsOrdner, datei)))
+    GUI_SET_TEXT(taHandbuch, dateiLesen(docPfad$(datei)))
     GUI_DROPDOWN_SET_SELECTED(ddDoku, k)
     docLetzteWahl = k
     GUI_SET_TEXT(lblHbStand, "")
@@ -15428,7 +15440,7 @@ SUB handbuch()
     DIM besteZahl AS INTEGER : besteZahl = 0
     DIM d AS STRING
     FOR EACH d IN docNamen
-        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(PATHJOIN(docsOrdner, d))
+        DIM zeilen AS ARRAY OF STRING : zeilen = zeilenLesen(docPfad$(d))
         DIM zahl AS INTEGER : zahl = 0
         DIM erste AS INTEGER : erste = 0
         DIM i AS INTEGER
@@ -15478,7 +15490,7 @@ SUB handbuchVerweis(ziel AS STRING)
         RETURN
     END IF
     DIM name AS STRING : name = BASENAME(z)
-    IF RIGHT$(LOWER$(name), 3) = ".md" AND FILEEXISTS(PATHJOIN(docsOrdner, name)) THEN
+    IF RIGHT$(LOWER$(name), 3) = ".md" AND FILEEXISTS(docPfad$(name)) THEN
         handbuchZeigen(name, 1)
         IF marke <> "" THEN hbZurMarke(marke)
         RETURN

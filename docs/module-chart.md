@@ -405,9 +405,6 @@ genauso wie bei `TEXT`.
   sitzt um den Eckenradius eingerückt; der schmale Rand bleibt in der
   Ausgangsfarbe.
 - **Kein Streudiagramm, keine zweite Y-Achse, keine logarithmische Skala.**
-- **Keine Maus-Interaktion** — kein Anklicken von Segmenten, keine
-  Werte-Sprechblasen. Wer das braucht, fragt die Mausposition selbst ab und
-  rechnet gegen die eigenen Daten.
 - **Beim Balken-Tacho** liegen die Farbzonen als schmaler Außenrand auf dem
   Ring, weil der Fortschrittsbogen denselben Platz füllt.
 

@@ -63,13 +63,13 @@ happen *next to* a game — tools, reports, small services:
 | **Network** | `HTTP_GET`/`POST` with headers and JSON, TLS, plus `SHA256$`, `HMAC_SHA256$` and `UUID4$` for authenticated services |
 | **Data** | SQLite, PostgreSQL and MySQL with the same commands, CSV per RFC 4180, ZIP, JSON, regex, `BUFFER` for binary files |
 | **Larger programs** | namespaces (`IMPORT "math.dh" AS math`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` with error codes, inheritance with `SUPER` and `ABSTRACT`, `ASSERT_EQ` |
-| **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks; even embed Python with numpy ([more, in German](docs/ffi.md)) |
+| **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks; even embed Python with numpy ([more, in German](docs/en/ffi.md)) |
 | **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
 
 None of it needs a window. A Drachenhauch program can be a console
 application, a cron job or a game — same language.
 
-Details in the [manual](docs/README.md); how it got there is in the
+Details in the [manual](docs/en/README.md); how it got there is in the
 [general-purpose roadmap](docs/allzweck-roadmap.md) (German).
 
 ## Download
@@ -112,122 +112,122 @@ One thing stays German on purpose: the run-time error messages quoted in Appendi
 
 ## Manual
 
-Full documentation lives in the [docs/](docs/README.md) folder (mostly German for now — contributions translating it are welcome):
+Full documentation lives in [docs/en/](docs/en/README.md) — the English translation of the German manual in [docs/](docs/README.md). Design notes, audits and release notes stay German only:
 
-- **[Language reference](docs/sprache.md)** — variables, types, `ENUM`, `SELECT CASE`, functions with defaults and named arguments, classes, try/catch, f-strings, coroutines (`YIELD` + `CORO_*`)
-- **[Standard built-ins](docs/builtins-core.md)** — math, strings, maps, file I/O, …
-- **[Graphics built-ins](docs/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
-- **[Performance](docs/PERFORMANCE.md)** — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
+- **[Language reference](docs/en/sprache.md)** — variables, types, `ENUM`, `SELECT CASE`, functions with defaults and named arguments, classes, try/catch, f-strings, coroutines (`YIELD` + `CORO_*`)
+- **[Standard built-ins](docs/en/builtins-core.md)** — math, strings, maps, file I/O, …
+- **[Graphics built-ins](docs/en/builtins-grafik.md)** — native runtime (dhrt/raylib), Z-layers, sprite atlas, asset preloader
+- **[Performance](docs/PERFORMANCE.md)** (German) — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
 - **Modules** — 48 of them, [table below](#modules)
-- **[IDE](docs/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
+- **[IDE](docs/en/ide.md)** — the development environment, written in Drachenhauch itself: tabs, project tree, completion, help on the word, snippets, multi-cursor, folding, split view, project-wide refactorings, **debugger** (incl. conditional breakpoints), **profiler**, git blame/diff, manual in a window, welcome page with an example gallery
 - **Tools** — all written in Drachenhauch, in the IDE under *Tools* or directly with `dhrt run examples/<file>`:
-  - **[Sprite editor](docs/sprite-editor.md)** (`189_sprite_editor.dh`) — pixel art with frames, layers, lasso/magic wand/move, GIF with a duration per frame, atlas export for `ATLAS_LOAD`, DH code, `.dhanim` template
-  - **[Particle editor](docs/particle-editor.md)** (`185_partikel_editor.dh`) — emitter sliders with a live preview, factory presets, your own settings as `.ini`, DH code
-  - **[SFX generator](docs/sfx-generator.md)** (`183_sfx_generator.dh`) — sfxr-style retro sound effects, WAV export, DH code with `AUDIO_SFX`
-  - **[Tracker](docs/tracker.md)** (`190_tracker.dh`) — multi-track music editor, [table below](#tracker)
-  - **[Score](docs/score-editor.md)** (`199_notenblatt.dh`) — real music-notation display, playback, hand-over to the tracker
-  - **[Tilemap/level editor](docs/tilemap-editor.md)** (`187_tilemap_editor.dh`) — layers, object layers, multiple tilesets, tile properties, Tiled JSON (`TILED_LOAD`), DH code renderer
-  - **[Form designer](docs/form-designer.md)** (`197_form_designer.dh`) — GUI forms in Xojo style, `.dhform` for `GUI_LOAD`, F5 launches, DH code
-  - **[Animation FSM editor](docs/anim-editor.md)** (`198_anim_fsm_editor.dh`) — states, transitions and conditions as a graph, `.dhanim` for `ANIM_FSM_LOAD` ([module `animfsm`](docs/module-animfsm.md)), preview with F5
-- **[Language server + VSCode extension](docs/lsp.md)** — Drachenhauch in any LSP editor: syntax highlighting, diagnostics, completion, hover, goto-definition, references, outline. The server is the runtime itself (`dhrt lsp`), no Python (`vscode-drachenhauch/`)
-- **[Web playground](docs/web-playground.md)** — `dhrt` as WebAssembly in the browser, [table below](#web-playground)
-- **[`cloud` module](docs/module-cloud.md)** — cloud save + leaderboard against the bundled, self-hostable reference server [`cloudserver/`](cloudserver/README.md) (a Drachenhauch program + SQLite, shared API-key secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core built-in) for idle-/incremental-game-style big-number formatting (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, falling back to scientific notation beyond that). Demo [examples/146_cloud_idle.dh](examples/146_cloud_idle.dh)
-- **[Connecting an ESP32 / ESP8266](esp32/README.md)** — a ready-made sketch skeleton (Wi-Fi, broker connection, reconnect, receiving) with four marked spots for your own code; **one file for both boards**, compiled for ESP32/ESP8266/ESP32-C3/ESP32-S3. Talks [`mqtt`](docs/module-mqtt.md) to its Drachenhauch counterpart [examples/159_esp32_bruecke.dh](examples/159_esp32_bruecke.dh) — which you can finish **without any board** using `mosquitto_pub`
+  - **[Sprite editor](docs/en/sprite-editor.md)** (`189_sprite_editor.dh`) — pixel art with frames, layers, lasso/magic wand/move, GIF with a duration per frame, atlas export for `ATLAS_LOAD`, DH code, `.dhanim` template
+  - **[Particle editor](docs/en/particle-editor.md)** (`185_partikel_editor.dh`) — emitter sliders with a live preview, factory presets, your own settings as `.ini`, DH code
+  - **[SFX generator](docs/en/sfx-generator.md)** (`183_sfx_generator.dh`) — sfxr-style retro sound effects, WAV export, DH code with `AUDIO_SFX`
+  - **[Tracker](docs/en/tracker.md)** (`190_tracker.dh`) — multi-track music editor, [table below](#tracker)
+  - **[Score](docs/en/score-editor.md)** (`199_notenblatt.dh`) — real music-notation display, playback, hand-over to the tracker
+  - **[Tilemap/level editor](docs/en/tilemap-editor.md)** (`187_tilemap_editor.dh`) — layers, object layers, multiple tilesets, tile properties, Tiled JSON (`TILED_LOAD`), DH code renderer
+  - **[Form designer](docs/en/form-designer.md)** (`197_form_designer.dh`) — GUI forms in Xojo style, `.dhform` for `GUI_LOAD`, F5 launches, DH code
+  - **[Animation FSM editor](docs/en/anim-editor.md)** (`198_anim_fsm_editor.dh`) — states, transitions and conditions as a graph, `.dhanim` for `ANIM_FSM_LOAD` ([module `animfsm`](docs/en/module-animfsm.md)), preview with F5
+- **[Language server + VSCode extension](docs/en/lsp.md)** — Drachenhauch in any LSP editor: syntax highlighting, diagnostics, completion, hover, goto-definition, references, outline. The server is the runtime itself (`dhrt lsp`), no Python (`vscode-drachenhauch/`)
+- **[Web playground](docs/en/web-playground.md)** — `dhrt` as WebAssembly in the browser, [table below](#web-playground)
+- **[`cloud` module](docs/en/module-cloud.md)** — cloud save + leaderboard against the bundled, self-hostable reference server [`cloudserver/`](cloudserver/README.md) (a Drachenhauch program + SQLite, shared API-key secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core built-in) for idle-/incremental-game-style big-number formatting (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, falling back to scientific notation beyond that). Demo [examples/146_cloud_idle.dh](examples/146_cloud_idle.dh)
+- **[Connecting an ESP32 / ESP8266](esp32/README.md)** — a ready-made sketch skeleton (Wi-Fi, broker connection, reconnect, receiving) with four marked spots for your own code; **one file for both boards**, compiled for ESP32/ESP8266/ESP32-C3/ESP32-S3. Talks [`mqtt`](docs/en/module-mqtt.md) to its Drachenhauch counterpart [examples/159_esp32_bruecke.dh](examples/159_esp32_bruecke.dh) — which you can finish **without any board** using `mosquitto_pub`
 
 ### Modules
 
 48 modules, available via `IMPORT "name"`. Each has its own page under
-[docs/](docs/README.md#module) (mostly German for now).
+[docs/en/](docs/en/README.md#modules).
 
 **Game building blocks**
 
 | Module | What for |
 |---|---|
-| [`sprite`](docs/module-sprite.md) | animated sheet sprites: position, velocity, named animations, collision |
-| [`animfsm`](docs/module-animfsm.md) | animation state machine, Unity-Mecanim style, loaded from `.dhanim` (editor `examples/198_anim_fsm_editor.dh`) |
-| [`camera`](docs/module-camera.md) | world translation, zoom and rotation for **every** drawing command; follow, screen↔world |
-| [`controller`](docs/module-controller.md) | character controller with coyote time, jump buffer and variable jump height |
-| [`scene`](docs/module-scene.md) | scene stack (`PUSH`/`POP`/`SWITCH`) with per-scene data |
-| [`save`](docs/module-save.md) | save slots backed by JSON, with a version field |
-| [`input`](docs/module-input.md) | named actions instead of key codes, edge detection, gamepad |
-| [`timer`](docs/module-timer.md) | scheduled actions (`TIMER_AFTER`/`EVERY`) + a `COOLDOWN` rate limiter |
-| [`video`](docs/module-video.md) | play videos (MP4/H.264), every frame an `IMAGE` |
-| [`tween`](docs/module-tween.md) | interpolate values smoothly, 13 easings |
-| [`curves`](docs/module-curves.md) | Bézier, Catmull-Rom, Hermite, smoothstep — pure functions |
-| [`astar`](docs/module-astar.md) | A* pathfinding on a tile grid |
-| [`ecs`](docs/module-ecs.md) | entity-component-system with bulk operations for hot loops |
+| [`sprite`](docs/en/module-sprite.md) | animated sheet sprites: position, velocity, named animations, collision |
+| [`animfsm`](docs/en/module-animfsm.md) | animation state machine, Unity-Mecanim style, loaded from `.dhanim` (editor `examples/198_anim_fsm_editor.dh`) |
+| [`camera`](docs/en/module-camera.md) | world translation, zoom and rotation for **every** drawing command; follow, screen↔world |
+| [`controller`](docs/en/module-controller.md) | character controller with coyote time, jump buffer and variable jump height |
+| [`scene`](docs/en/module-scene.md) | scene stack (`PUSH`/`POP`/`SWITCH`) with per-scene data |
+| [`save`](docs/en/module-save.md) | save slots backed by JSON, with a version field |
+| [`input`](docs/en/module-input.md) | named actions instead of key codes, edge detection, gamepad |
+| [`timer`](docs/en/module-timer.md) | scheduled actions (`TIMER_AFTER`/`EVERY`) + a `COOLDOWN` rate limiter |
+| [`video`](docs/en/module-video.md) | play videos (MP4/H.264), every frame an `IMAGE` |
+| [`tween`](docs/en/module-tween.md) | interpolate values smoothly, 13 easings |
+| [`curves`](docs/en/module-curves.md) | Bézier, Catmull-Rom, Hermite, smoothstep — pure functions |
+| [`astar`](docs/en/module-astar.md) | A* pathfinding on a tile grid |
+| [`ecs`](docs/en/module-ecs.md) | entity-component-system with bulk operations for hot loops |
 
 **Physics and maths**
 
 | Module | What for |
 |---|---|
-| [`physics`](docs/module-physics.md) | pure collision maths: box/circle/ray/segment/polygon, no state |
-| [`physics2d`](docs/module-physics2d.md) | **real** 2D rigid bodies (Rapier2D): gravity, stacking, throwing, rolling — [demo](examples/112_physics2d.dh) |
-| [`physics3d`](docs/module-physics3d.md) | the same in 3D (Rapier3D) — [demo](examples/107_physics3d.dh) |
-| [`vec2`](docs/module-vec2.md) | 2D vector with operator overloading, immutable |
-| [`m3d`](docs/module-m3d.md) | VEC3/VEC4/QUAT/MAT4, quaternions, matrices; GPU instancing via `MODEL_INSTANCED` |
+| [`physics`](docs/en/module-physics.md) | pure collision maths: box/circle/ray/segment/polygon, no state |
+| [`physics2d`](docs/en/module-physics2d.md) | **real** 2D rigid bodies (Rapier2D): gravity, stacking, throwing, rolling — [demo](examples/112_physics2d.dh) |
+| [`physics3d`](docs/en/module-physics3d.md) | the same in 3D (Rapier3D) — [demo](examples/107_physics3d.dh) |
+| [`vec2`](docs/en/module-vec2.md) | 2D vector with operator overloading, immutable |
+| [`m3d`](docs/en/module-m3d.md) | VEC3/VEC4/QUAT/MAT4, quaternions, matrices; GPU instancing via `MODEL_INSTANCED` |
 
 **Graphics and sound**
 
 | Module | What for |
 |---|---|
-| `g3d` | 3D: camera, models (OBJ/GLTF), skeletal animation, PBR, HDR IBL, shadows, normal maps, picking — see [graphics built-ins](docs/builtins-grafik.md) |
-| [`particles`](docs/module-particles.md) | particle emitters with gravity, colour gradient over lifetime, five render modes |
-| [`imgfx`](docs/module-imgfx.md) | scale, rotate, flip, tint images — including a crisp mode for pixel art |
-| [`g3d`](docs/module-g3d.md) | 3D: camera, primitives, models, skeletal animation, lights, shadows, PBR |
-| [`audio`](docs/module-audio.md) | on **Kira**: channels, buses, real-time effects (filter/reverb/delay/distortion/compressor/EQ), synthesis, sampler, `.mod`/`.xm` playback, seeking through music (`AUDIO_MUSIC_SEEK`), spatial audio, sample-accurate clock. [Modulators](docs/module-audio-modulatoren.md) keep running on the audio thread even when the frame rate drops |
+| `g3d` | 3D: camera, models (OBJ/GLTF), skeletal animation, PBR, HDR IBL, shadows, normal maps, picking — see [graphics built-ins](docs/en/builtins-grafik.md) |
+| [`particles`](docs/en/module-particles.md) | particle emitters with gravity, colour gradient over lifetime, five render modes |
+| [`imgfx`](docs/en/module-imgfx.md) | scale, rotate, flip, tint images — including a crisp mode for pixel art |
+| [`g3d`](docs/en/module-g3d.md) | 3D: camera, primitives, models, skeletal animation, lights, shadows, PBR |
+| [`audio`](docs/en/module-audio.md) | on **Kira**: channels, buses, real-time effects (filter/reverb/delay/distortion/compressor/EQ), synthesis, sampler, `.mod`/`.xm` playback, seeking through music (`AUDIO_MUSIC_SEEK`), spatial audio, sample-accurate clock. [Modulators](docs/en/module-audio-modulatoren.md) keep running on the audio thread even when the frame rate drops |
 
 **User interface**
 
 | Module | What for |
 |---|---|
-| [`gui`](docs/module-gui.md) | 22 retained-mode widget kinds — including a **professional table** (sort, filter, frozen and reorderable columns, edit cells in place). Glass themes, toggles, knobs, 9-slice skins. [All widgets](examples/156_gui_alle_widgets.dh) · [table](examples/157_gui_tabelle.dh) · [against SQLite](examples/158_gui_tabelle_sqlite.dh) |
-| [`ui`](docs/module-ui.md) | the same in immediate mode: nothing to set up, redrawn every frame |
-| [`chart`](docs/module-chart.md) | six chart kinds (pie, bar, line, gauge, bar gauge, LED chain), four themes, mouse interaction — [demo](examples/154_chart.dh) |
+| [`gui`](docs/en/module-gui.md) | 22 retained-mode widget kinds — including a **professional table** (sort, filter, frozen and reorderable columns, edit cells in place). Glass themes, toggles, knobs, 9-slice skins. [All widgets](examples/156_gui_alle_widgets.dh) · [table](examples/157_gui_tabelle.dh) · [against SQLite](examples/158_gui_tabelle_sqlite.dh) |
+| [`ui`](docs/en/module-ui.md) | the same in immediate mode: nothing to set up, redrawn every frame |
+| [`chart`](docs/en/module-chart.md) | six chart kinds (pie, bar, line, gauge, bar gauge, LED chain), four themes, mouse interaction — [demo](examples/154_chart.dh) |
 
 **Data**
 
 | Module | What for |
 |---|---|
-| [`json`](docs/module-json.md) | read/write JSON, path access (`"user.name"`, `"items.0"`) |
-| [`db`](docs/module-db.md) | SQLite, PostgreSQL and MySQL with `?` placeholders and transactions -- `DB_OPEN` picks by target |
-| [`regex`](docs/module-regex.md) | match, replace, split |
-| [`tiled`](docs/module-tiled.md) | load maps from the Tiled editor, including objects and properties |
-| [`tile_collide`](docs/module-tile-collide.md) | box against tilemap, axis by axis — classic platformer physics |
-| [`cloud`](docs/module-cloud.md) | cloud save and leaderboard against the bundled server [`cloudserver/`](cloudserver/README.md) |
-| [`ini`](docs/module-ini.md) | settings files a human can edit — read as a `MAP` |
-| [`xml`](docs/module-xml.md) | read XML from other systems, with path navigation |
-| [`geld`](docs/module-geld.md) | money as its own value: exact, not mixable with numbers, splits without losing cents |
-| [`zeit`](docs/module-zeit.md) | calculating with date and time: differences, weekdays, formatting |
+| [`json`](docs/en/module-json.md) | read/write JSON, path access (`"user.name"`, `"items.0"`) |
+| [`db`](docs/en/module-db.md) | SQLite, PostgreSQL and MySQL with `?` placeholders and transactions -- `DB_OPEN` picks by target |
+| [`regex`](docs/en/module-regex.md) | match, replace, split |
+| [`tiled`](docs/en/module-tiled.md) | load maps from the Tiled editor, including objects and properties |
+| [`tile_collide`](docs/en/module-tile-collide.md) | box against tilemap, axis by axis — classic platformer physics |
+| [`cloud`](docs/en/module-cloud.md) | cloud save and leaderboard against the bundled server [`cloudserver/`](cloudserver/README.md) |
+| [`ini`](docs/en/module-ini.md) | settings files a human can edit — read as a `MAP` |
+| [`xml`](docs/en/module-xml.md) | read XML from other systems, with path navigation |
+| [`geld`](docs/en/module-geld.md) | money as its own value: exact, not mixable with numbers, splits without losing cents |
+| [`zeit`](docs/en/module-zeit.md) | calculating with date and time: differences, weekdays, formatting |
 
 **Handing something over**
 
 | Module | What for |
 |---|---|
-| [`pdf`](docs/module-pdf.md) | print-ready pages: invoice, delivery note, report, label — set in millimetres, fonts embedded, Unicode |
-| [`xlsx`](docs/module-xlsx.md) | reports as an Excel workbook: several sheets, bold header row, number and date formats |
-| [`smtp`](docs/module-smtp.md) | send the report by e-mail: text and HTML, attachments, STARTTLS/TLS |
+| [`pdf`](docs/en/module-pdf.md) | print-ready pages: invoice, delivery note, report, label — set in millimetres, fonts embedded, Unicode |
+| [`xlsx`](docs/en/module-xlsx.md) | reports as an Excel workbook: several sheets, bold header row, number and date formats |
+| [`smtp`](docs/en/module-smtp.md) | send the report by e-mail: text and HTML, attachments, STARTTLS/TLS |
 
 **Network, hardware, making**
 
 | Module | What for |
 |---|---|
-| [`net`](docs/module-net.md) | TCP and UDP, non-blocking by default — won't freeze your game loop |
-| [`html`](docs/module-html.md) | HTTP GET/POST/download + HTML scraping |
-| [`httpd`](docs/module-httpd.md) | the other direction: a small web server driven by the main loop — a control panel on the home network |
-| [`mqtt`](docs/module-mqtt.md) | the IoT world's pub/sub protocol — the way to reach an ESP32 **over Wi-Fi** |
-| [`firmata`](docs/module-firmata.md) | drive Arduino/ESP32 pins directly, no sketch of your own needed |
-| [`serial`](docs/module-serial.md) | raw COM connection for your own protocols |
-| [`usb`](docs/module-usb.md) | USB HID: maker boards, programmers, custom controllers |
-| [`midi`](docs/module-midi.md) | read notes from a connected instrument and send some out |
-| [`bt`](docs/module-bt.md) | Bluetooth Low Energy: scan, connect, read/write characteristics |
-| [`wifi`](docs/module-wifi.md) | scan networks, connect, signal strength |
+| [`net`](docs/en/module-net.md) | TCP and UDP, non-blocking by default — won't freeze your game loop |
+| [`html`](docs/en/module-html.md) | HTTP GET/POST/download + HTML scraping |
+| [`httpd`](docs/en/module-httpd.md) | the other direction: a small web server driven by the main loop — a control panel on the home network |
+| [`mqtt`](docs/en/module-mqtt.md) | the IoT world's pub/sub protocol — the way to reach an ESP32 **over Wi-Fi** |
+| [`firmata`](docs/en/module-firmata.md) | drive Arduino/ESP32 pins directly, no sketch of your own needed |
+| [`serial`](docs/en/module-serial.md) | raw COM connection for your own protocols |
+| [`usb`](docs/en/module-usb.md) | USB HID: maker boards, programmers, custom controllers |
+| [`midi`](docs/en/module-midi.md) | read notes from a connected instrument and send some out |
+| [`bt`](docs/en/module-bt.md) | Bluetooth Low Energy: scan, connect, read/write characteristics |
+| [`wifi`](docs/en/module-wifi.md) | scan networks, connect, signal strength |
 
 A ready-made sketch skeleton for the board lives in **[esp32/](esp32/README.md)**.
 
 ### Tracker
 
-The multi-track music editor [`examples/190_tracker.dh`](docs/tracker.md) — a
+The multi-track music editor [`examples/190_tracker.dh`](docs/en/tracker.md) — a
 tracker in the tradition of ProTracker and FastTracker, written in Drachenhauch
 itself.
 
@@ -243,7 +243,7 @@ itself.
 
 `dhrt` runs as WebAssembly in the browser — not a cut-down version, the same
 runtime. Type source into the text area, hit run. Details in
-[docs/web-playground.md](docs/web-playground.md) (German).
+[docs/en/web-playground.md](docs/en/web-playground.md).
 
 | What runs in the browser | How |
 |---|---|
@@ -303,7 +303,7 @@ front-end, no Python anywhere in the execution path. What runs natively:
 | Sound | **Kira** on its own audio thread (replaced raylib audio on 2026-06-13): sounds, music, `.mod`/`.xm` through a pure-Rust player |
 | Interface | `gui` with 22 retained-mode widget kinds (themes, dragging, z-order, focus, FUNCREF callbacks) and `ui` in immediate mode |
 | Frame and loop | game loop (`DELTA`/`FPS`/`SETFPS`), GPU shaders and post-processing (`SHADER_LOAD`/`POSTFX`), TTF fonts ([demo](examples/87_ttf_fonts.dh)), gamepad |
-| Recording input | `AUTOMATION_RECORD`/`PLAY` for attract mode, replayable bug reports and automated playtests ([docs](docs/automation.md), [demo](examples/153_automation.dh)) |
+| Recording input | `AUTOMATION_RECORD`/`PLAY` for attract mode, replayable bug reports and automated playtests ([docs](docs/en/automation.md), [demo](examples/153_automation.dh)) |
 | Modules | **all of them** — including the formerly Python-only ones: `regex`, `tiled`, `tile_collide`, `controller`, extended `audio`; plus feature-gated `db` (rusqlite), `net`, `mqtt`, `html` (ureq) and the hardware side `serial`, `firmata`, `usb`, `wifi`, `bt` |
 | Shipping | `dhrt --export file.dh` (or Ctrl+F6 in the IDE) bundles bytecode + `assets/` into a standalone `.exe` |
 
@@ -313,7 +313,7 @@ them out again**, which is the most common reason a hardware example suddenly
 stops working. One showcase that exercises nearly all of it at once:
 [examples/97_pbr_reactor.dh](examples/97_pbr_reactor.dh) — an audio-reactive ring
 of chrome spheres with IBL, shadows, bloom and stereo techno. Plan and status in
-[docs/rust-runtime.md](docs/rust-runtime.md).
+[docs/rust-runtime.md](docs/en/rust-runtime.md).
 
 **Front-end port to Rust — complete.** The entire toolchain (lexer → parser → compiler → preprocessor) has been ported to Rust, each stage verified for output parity against the Python tree-walker. **`dhrt run file.dh` is a self-contained end-to-end run with no Python:** it preprocesses (`IMPORT` resolution for both source files and built-in modules), lexes, parses, compiles and executes — scalars/arithmetic/control flow, arrays/maps, functions, classes/OOP, `SELECT`/`FOR EACH`/tuples/`WITH`/`TRY`/slicing/comprehensions/coroutines. It changes into the file's directory so relative `IMPORT` and asset paths resolve correctly (`dhrt file.dh` without `run` works the same way; `.dhc` files still use the direct VM path). Debug entry points: `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Self-export without Python:** `dhrt --export file.dh` compiles the source itself and bundles it into a self-contained `.exe` (appends the bytecode to a copy of the runtime, copies `assets/`). Aliased module imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) work natively too. This also makes the **web playground pure Rust WASM**, compiling the source in the browser (no Pyodide): `rust/build_wasm.py file.dh` produces `web/dhrt.{js,wasm}` with the source embedded (the emscripten toolchain on Windows is wired up automatically). **Console and animated graphics both run in the browser** — the Drachenhauch render loop yields every frame via ASYNCIFY (`emscripten_sleep(0)` inside `flip()`), so `WHILE … FLIP() … WEND` doesn't freeze the tab; **shareable links** pack the source into the URL hash. Plan & stages in [docs/rust-frontend-port.md](docs/rust-frontend-port.md) (German).
 
@@ -325,7 +325,7 @@ Architecture details and extension notes in [CLAUDE.md](CLAUDE.md) (German).
 rust/drachenhauch_runtime/target/release/dhrt test tests/pruef
 ```
 
-Checks live in **test collections** (`tests/pruef/*.dhtest`, format in [docs/werkzeuge.md](docs/werkzeuge.md), German): per case a program and its expected output, plus image probes, WAV probes, attached files, and real keyboard and mouse recordings for the tools and the IDE. Every case runs as its own `dhrt` process; whatever needs a window or sound skips itself when there is none. On top of that come Rust `#[test]`s (`cargo test` in `rust/drachenhauch_runtime`).
+Checks live in **test collections** (`tests/pruef/*.dhtest`, format in [docs/en/werkzeuge.md](docs/en/werkzeuge.md)): per case a program and its expected output, plus image probes, WAV probes, attached files, and real keyboard and mouse recordings for the tools and the IDE. Every case runs as its own `dhrt` process; whatever needs a window or sound skips itself when there is none. On top of that come Rust `#[test]`s (`cargo test` in `rust/drachenhauch_runtime`).
 
 **CI** builds `dhrt` itself on every push and runs the collections on Windows (with graphics), Linux and macOS (without graphics); in addition, a `cargo check` on all three systems proves the Rust core compiles platform-independently. Until 2026-09-20 all of this ran through pytest — the Python tests were deleted along with the Python part, and whatever lasting thing they checked now lives in collections.
 

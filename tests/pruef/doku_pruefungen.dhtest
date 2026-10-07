@@ -473,3 +473,84 @@ PRINT "ohne parameternamen: "; TRIM$(ohne)
 {sammlung}/../..
 --- erwartet
 ohne parameternamen: GUI_RULE
+
+=== die englische fassung folgt der deutschen
+' docs/en ist eine Uebersetzung von docs: jede Datei hat ihr deutsches
+' Gegenstueck, dieselben Ueberschriften und Tabellenzeilen, denselben Code
+' (Kommentare duerfen uebersetzt sein), und die Verweise loesen samt
+' Sprungmarke auf. Wer ein deutsches Dokument aendert, sieht hier, welche
+' Uebersetzung nachzuziehen ist. Die Schranke: ohne sie waere ein leerer
+' Ordner gruen.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0))
+dlStarten(["pruef", "uebersetzung"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "rueckgabe "; dlCode
+DIM n AS INTEGER : n = VAL(dlAus)
+PRINT "dokumente "; (n > 70)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+dokumente TRUE
+
+=== jede englische doku ist vom englischen index erreichbar
+IMPORT "regex"
+DIM docs AS STRING : docs = ARG$(0) + "/docs/en"
+DIM index AS STRING : index = BUFFER_TO_STRING$(READALL_BYTES(docs + "/README.md"))
+DIM verlinkt AS MAP OF BOOLEAN
+DIM treffer AS ARRAY OF STRING : treffer = REGEX_FIND_ALL(index, "\(([A-Za-z0-9_.-]+\.md)\)")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(treffer) - 1
+    MAPPUT(verlinkt, treffer[i], TRUE)
+NEXT
+DIM alle AS ARRAY OF STRING : alle = DIRLIST(docs, "*.md")
+SORT(alle)
+DIM fehlen AS INTEGER : fehlen = 0
+FOR i = 0 TO LEN(alle) - 1
+    IF alle[i] = "README.md" THEN CONTINUE
+    IF NOT MAPHAS(verlinkt, alle[i]) THEN
+        PRINT "nicht im index: "; alle[i]
+        fehlen = fehlen + 1
+    END IF
+NEXT
+PRINT "dokumente "; (LEN(alle) > 70); ", fehlen "; fehlen
+--- argumente
+{sammlung}/../..
+--- erwartet
+dokumente TRUE, fehlen 0
+
+=== der hover spricht englisch, wenn die laufzeit es tut
+' Mit DHRT_LANG=en (so startet die IDE bei englischer Oberflaeche) nimmt der
+' Hover builtin_prosa.en.json -- aus docs/en und dem englischen Buch. Die
+' deutsche Handdoku kommt dann nicht; ohne die Variable bleibt alles, wie es
+' war. Dazu die Abdeckung: das englische Buch beschreibt fast jeden Befehl.
+IMPORT "json"
+DIM ed AS STRING : ed = ARG$(0) + "/daten"
+DIM hand AS JSON_HANDLE : hand = JSON_LOAD(ed + "/builtin_docs.json")
+DIM en AS JSON_HANDLE : en = JSON_LOAD(ed + "/builtin_prosa.en.json")
+DIM deutsch AS STRING : deutsch = JSON_GET_STRING(hand, "docs.abs.1")
+DIM englisch AS STRING : englisch = JSON_GET_STRING(en, "docs.ABS")
+SETENV("DHRT_LANG", "en")
+DIM h AS STRING : h = CODE_HOVER$("PRINT ABS(1)", 1, 8)
+PRINT "englisch "; (INSTR(h, englisch) >= 0); " deutsch "; (INSTR(h, deutsch) >= 0)
+SETENV("DHRT_LANG", "")
+h = CODE_HOVER$("PRINT ABS(1)", 1, 8)
+PRINT "ohne: englisch "; (INSTR(h, englisch) >= 0); " deutsch "; (INSTR(h, deutsch) >= 0)
+DIM idx AS JSON_HANDLE : idx = JSON_LOAD(ed + "/builtin_index.json")
+DIM gesamt AS INTEGER : gesamt = JSON_LEN(idx, "builtins")
+DIM mit AS INTEGER : mit = 0
+DIM i AS INTEGER
+FOR i = 0 TO gesamt - 1
+    DIM n AS STRING : n = JSON_GET_STRING(idx, "builtins." + STR$(i) + ".name")
+    IF JSON_HAS(en, "docs." + UPPER$(n)) OR JSON_HAS(en, "docs." + UPPER$(n) + "$") THEN mit = mit + 1
+NEXT
+PRINT "abdeckung ueber 45 % "; (mit * 100 > gesamt * 45)
+--- argumente
+{sammlung}/../..
+--- erwartet
+englisch TRUE deutsch FALSE
+ohne: englisch FALSE deutsch TRUE
+abdeckung ueber 45 % TRUE
