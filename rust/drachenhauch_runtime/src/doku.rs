@@ -187,7 +187,9 @@ fn ist_builtin(name: &str, namen: &HashSet<String>) -> bool {
         || namen.iter().any(|n| n.trim_end_matches('$') == name)
 }
 
-pub fn prosa_sammeln(wurzel: &Path) -> Result<BTreeMap<String, String>, String> {
+/// `en` = die englische Fassung: Tabellen aus docs/en und die Befehlstexte
+/// des englischen Buchs (fuer den Hover mit `DHRT_LANG=en`).
+pub fn prosa_sammeln(wurzel: &Path, en: bool) -> Result<BTreeMap<String, String>, String> {
     static TABELLE: OnceLock<Regex> = OnceLock::new();
     static TABELLE_2: OnceLock<Regex> = OnceLock::new();
     static LISTE: OnceLock<Regex> = OnceLock::new();
@@ -198,7 +200,8 @@ pub fn prosa_sammeln(wurzel: &Path) -> Result<BTreeMap<String, String>, String> 
     let kopf_name = re(r"`\s*([A-Z][A-Z0-9_]*\$?)[^`]*`", &KOPF_NAME);
     let namen = index_namen(wurzel)?;
     let mut raus: BTreeMap<String, String> = BTreeMap::new();
-    for datei in quellen(&wurzel.join("docs")) {
+    let docs = if en { wurzel.join("docs/en") } else { wurzel.join("docs") };
+    for datei in quellen(&docs) {
         for zeile in zeilen(&datei) {
             let mut m = tabelle.captures(&zeile).or_else(|| liste.captures(&zeile));
             if let Some(c) = &m {
@@ -218,7 +221,7 @@ pub fn prosa_sammeln(wurzel: &Path) -> Result<BTreeMap<String, String>, String> 
             }
         }
     }
-    for (name, text) in aus_dem_referenzbuch(wurzel, &namen) {
+    for (name, text) in aus_dem_referenzbuch(wurzel, &namen, en) {
         raus.entry(name).or_insert(text);
     }
     Ok(raus)
@@ -227,13 +230,16 @@ pub fn prosa_sammeln(wurzel: &Path) -> Result<BTreeMap<String, String>, String> 
 /// Kurzbeschreibungen aus dem Referenzbuch -- nur Eintraege, die GENAU EINEN
 /// Builtin nennen (Sammel-Eintraege beschreiben die Gruppe oder den falschen).
 /// Ohne Node bleibt es bei `docs/`.
-fn aus_dem_referenzbuch(wurzel: &Path, namen: &HashSet<String>) -> BTreeMap<String, String> {
+fn aus_dem_referenzbuch(wurzel: &Path, namen: &HashSet<String>, en: bool) -> BTreeMap<String, String> {
     static NAME: OnceLock<Regex> = OnceLock::new();
     let name_re = re(r"[A-Z][A-Z0-9_]*\$?", &NAME);
     let exporter = wurzel.join("tools/buch_cmd_export.js");
     let mut raus = BTreeMap::new();
     if !exporter.is_file() { return raus; }
-    let Ok(out) = std::process::Command::new("node").arg(&exporter).current_dir(wurzel).output() else { return raus };
+    let mut befehl = std::process::Command::new("node");
+    befehl.arg(&exporter).current_dir(wurzel);
+    if en { befehl.arg("--en"); }
+    let Ok(out) = befehl.output() else { return raus };
     let Ok(eintraege) = serde_json::from_slice::<Vec<(String, Value)>>(&out.stdout) else { return raus };
     for (name, text) in eintraege {
         let Some(text) = text.as_str() else { continue };
@@ -264,12 +270,18 @@ pub fn node_da() -> bool {
 
 fn prosa_main(pruefen: bool) -> ExitCode {
     let wurzel = match repo_wurzel() { Ok(w) => w, Err(e) => { eprintln!("{}", e); return ExitCode::from(2); } };
-    let daten = match prosa_sammeln(&wurzel) { Ok(d) => d, Err(e) => { eprintln!("{}", e); return ExitCode::from(2); } };
+    let daten = match prosa_sammeln(&wurzel, false) { Ok(d) => d, Err(e) => { eprintln!("{}", e); return ExitCode::from(2); } };
     let kopf = "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere \
                 Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer \
                 Beschreibung in das jeweilige docs/module-*.md.";
     let text = eins_eingerueckt(&json!({"_comment": kopf, "count": daten.len(), "docs": daten}));
     let ziel = wurzel.join("daten/builtin_prosa.json");
+    // Dieselbe Sammlung auf Englisch: docs/en und das englische Buch.
+    let daten_en = match prosa_sammeln(&wurzel, true) { Ok(d) => d, Err(e) => { eprintln!("{}", e); return ExitCode::from(2); } };
+    let kopf_en = "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand \
+                   aendern. Der Hover nimmt sie mit DHRT_LANG=en.";
+    let text_en = eins_eingerueckt(&json!({"_comment": kopf_en, "count": daten_en.len(), "docs": daten_en}));
+    let ziel_en = wurzel.join("daten/builtin_prosa.en.json");
     if pruefen && !node_da() {
         // Ohne Node fehlt eine der Quellen -- ein Vergleich meldete dann
         // Abweichungen, die nur an der Umgebung liegen.
@@ -277,6 +289,8 @@ fn prosa_main(pruefen: bool) -> ExitCode {
         return ExitCode::SUCCESS;
     }
     let code = abliefern(&ziel, &text, pruefen, &format!("{} Beschreibungen", daten.len()), "dhrt doku prosa");
+    let code_en = abliefern(&ziel_en, &text_en, pruefen, &format!("{} englische Beschreibungen", daten_en.len()), "dhrt doku prosa");
+    let code = if code_en != ExitCode::SUCCESS { code_en } else { code };
     if !pruefen && !node_da() { println!("  Hinweis: ohne Node -- die Eintraege aus buch-referenz fehlen."); }
     code
 }

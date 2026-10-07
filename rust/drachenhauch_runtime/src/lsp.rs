@@ -634,6 +634,22 @@ fn prosa() -> &'static HashMap<String, String> {
     })
 }
 
+/// Dieselben Kurzbeschreibungen auf Englisch (`builtin_prosa.en.json`, aus
+/// docs/en und dem englischen Buch) -- fuer den Hover mit `DHRT_LANG=en`.
+fn prosa_en() -> &'static HashMap<String, String> {
+    static M: std::sync::OnceLock<HashMap<String, String>> = std::sync::OnceLock::new();
+    M.get_or_init(|| {
+        let mut m = HashMap::new();
+        let raw = include_str!("../../../daten/builtin_prosa.en.json");
+        if let Ok(v) = serde_json::from_str::<Value>(raw) {
+            if let Some(o) = v.get("docs").and_then(|d| d.as_object()) {
+                for (k, e) in o { if let Some(t) = e.as_str() { m.insert(k.to_uppercase(), t.to_string()); } }
+            }
+        }
+        m
+    })
+}
+
 fn signatur(name: &str) -> Option<&'static str> {
     let klein = name.to_lowercase();
     crate::compiler::builtin_eintraege().iter()
@@ -646,6 +662,16 @@ fn signatur(name: &str) -> Option<&'static str> {
 /// aus `docs/` sind Tabellenzellen. `name` kommt ohne `$` an.
 pub fn builtin_doku(name: &str) -> Option<(String, String)> {
     let klein = name.to_lowercase();
+    // Auf Englisch: die englische Kurzbeschreibung, sonst nur die Signatur --
+    // die Handdoku und die deutsche Prosa sind deutsch.
+    if crate::meldung::englisch() {
+        let gross = name.to_uppercase();
+        let sig = signatur(name).map(str::to_string);
+        if let Some(t) = prosa_en().get(&gross).or_else(|| prosa_en().get(&format!("{}$", gross))) {
+            return Some((sig.unwrap_or(gross), t.clone()));
+        }
+        return sig.map(|s| (s, String::new()));
+    }
     if let Some(d) = handdoku().get(&klein).or_else(|| handdoku().get(&format!("{}$", klein))) {
         return Some(d.clone());
     }

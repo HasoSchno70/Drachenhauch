@@ -339,26 +339,80 @@ pub fn pfade(wurzel: &Path, ordner: &Path, nur: Option<&[String]>) -> Vec<Befund
 
 // ============================================================ Uebersetzung (docs/en)
 
-/// Die Codebloecke einer Markdown-Datei in ihrer Reihenfolge, je mit der
-/// Zeile des oeffnenden Zauns. Code wird nicht uebersetzt (wie im Buch) --
-/// die englische Fassung traegt also dieselben Bloecke, und wer einen
-/// deutschen Block aendert, sieht hier, welche Uebersetzung nachzuziehen ist.
-/// Verglichen wird ohne Einrueckung und ohne Leerraum am Zeilenende: ein
-/// Block in einer Aufzaehlung darf in der Uebersetzung anders eingerueckt sein.
-fn codebloecke(text: &str) -> Vec<(usize, String)> {
-    let mut aus = Vec::new();
-    let mut offen: Option<(usize, String)> = None;
-    for (i, zeile) in text.lines().enumerate() {
-        let z = zeile.trim();
-        if let Some((start, mut inhalt)) = offen.take() {
-            if z.starts_with("```") { aus.push((start, inhalt)); }
-            else { inhalt.push_str(z); inhalt.push('\n'); offen = Some((start, inhalt)); }
-        } else if z.starts_with("```") {
-            offen = Some((i + 1, format!("{}\n", z)));
+/// Eine Drachenhauch-Zeile ohne ihren Kommentar (`'` ausserhalb einer
+/// Zeichenkette, `REM` am Anfang). In `!"..."` beendet `\"` die Zeichenkette
+/// nicht.
+fn ohne_kommentar(zeile: &str) -> &str {
+    let t = zeile.trim_start();
+    if t.len() >= 3 && t[..3].eq_ignore_ascii_case("rem") && t[3..].chars().next().map_or(true, char::is_whitespace) {
+        return "";
+    }
+    let b = zeile.as_bytes();
+    let (mut im_text, mut escape) = (false, false);
+    for i in 0..b.len() {
+        match b[i] {
+            b'"' if !im_text => { im_text = true; escape = i > 0 && b[i - 1] == b'!'; }
+            b'"' if !(escape && i > 0 && b[i - 1] == b'\\') => { im_text = false; }
+            b'\'' if !im_text => return zeile[..i].trim_end(),
+            _ => {}
         }
     }
-    if let Some(o) = offen { aus.push(o); }
+    zeile
+}
+
+/// Die Codebloecke einer Markdown-Datei in ihrer Reihenfolge, je mit der
+/// Zeile des oeffnenden Zauns. Code wird nicht uebersetzt, Kommentare in
+/// Drachenhauch-Bloecken schon (wie im englischen Buch) -- verglichen wird
+/// darum der Code OHNE Kommentare; eine Kommentarzeile bleibt als leere
+/// Zeile stehen, die Uebersetzung muss also Zeile fuer Zeile folgen. Wer
+/// einen deutschen Block aendert, sieht hier, welche Uebersetzung
+/// nachzuziehen ist. Andere Bloecke (json, Shell, Text) muessen gleich
+/// bleiben. Ohne Einrueckung und Leerraum am Zeilenende: ein Block in einer
+/// Aufzaehlung darf in der Uebersetzung anders eingerueckt sein.
+fn codebloecke(text: &str) -> Vec<(usize, String)> {
+    let mut aus = Vec::new();
+    let mut offen: Option<(usize, String, bool)> = None;
+    for (i, zeile) in text.lines().enumerate() {
+        let z = zeile.trim();
+        if let Some((start, mut inhalt, dh)) = offen.take() {
+            if z.starts_with("```") { aus.push((start, inhalt)); }
+            else {
+                inhalt.push_str(if dh { ohne_kommentar(z).trim() } else { z });
+                inhalt.push('\n');
+                offen = Some((start, inhalt, dh));
+            }
+        } else if z.starts_with("```") {
+            let art = z.trim_start_matches('`').trim().to_lowercase();
+            let dh = matches!(art.as_str(), "basic" | "gb" | "dh" | "drachenhauch");
+            offen = Some((i + 1, format!("{}\n", z), dh));
+        }
+    }
+    if let Some((s, t, _)) = offen { aus.push((s, t)); }
     aus
+}
+
+/// Der Aufbau einer Markdown-Datei ausserhalb von Codebloecken: die Ebenen
+/// der Ueberschriften in ihrer Reihenfolge und die Zahl der Tabellenzeilen.
+/// Eine Uebersetzung hat denselben Aufbau -- fehlt ein Abschnitt oder eine
+/// Zeile, faellt es hier auf; und weil die Ueberschriften einander der Reihe
+/// nach entsprechen, laesst sich eine deutsche Sprungmarke in die englische
+/// umrechnen.
+fn aufbau(text: &str) -> (Vec<usize>, usize) {
+    let mut ebenen = Vec::new();
+    let mut tabelle = 0;
+    let mut im_code = false;
+    for zeile in text.lines() {
+        let z = zeile.trim_start();
+        if z.starts_with("```") { im_code = !im_code; continue; }
+        if im_code { continue; }
+        if z.starts_with('#') {
+            let n = z.chars().take_while(|c| *c == '#').count();
+            if z[n..].starts_with(' ') { ebenen.push(n); }
+        } else if z.starts_with('|') {
+            tabelle += 1;
+        }
+    }
+    (ebenen, tabelle)
 }
 
 /// Die Sprungmarken einer Markdown-Datei, wie GitHub sie bildet (und die IDE,
@@ -450,8 +504,19 @@ pub fn uebersetzung(wurzel: &Path) -> (usize, Vec<Befund>) {
             funde.push((wo, 1, name, "keine deutsche Fassung in docs/ -- die englische ist eine Uebersetzung, kein eigenes Dokument".into()));
             continue;
         }
-        let b_en = codebloecke(&lesen(datei));
-        let b_de = codebloecke(&lesen(&de));
+        let (t_en, t_de) = (lesen(datei), lesen(&de));
+        let ((e_en, tab_en), (e_de, tab_de)) = (aufbau(&t_en), aufbau(&t_de));
+        if e_en != e_de {
+            let k = e_en.iter().zip(e_de.iter()).take_while(|(a, b)| a == b).count();
+            funde.push((wo.clone(), 1, format!("{} gegen {} Ueberschriften", e_en.len(), e_de.len()),
+                format!("Ueberschriften weichen ab der {}. von docs/{} ab (Zahl oder Ebene)", k + 1, name)));
+        }
+        if tab_en != tab_de {
+            funde.push((wo.clone(), 1, format!("{} gegen {} Tabellenzeilen", tab_en, tab_de),
+                format!("Tabellen haben nicht so viele Zeilen wie in docs/{}", name)));
+        }
+        let b_en = codebloecke(&t_en);
+        let b_de = codebloecke(&t_de);
         let erste = |b: &str| -> String { b.lines().nth(1).unwrap_or("").chars().take(60).collect() };
         for k in 0..b_en.len().max(b_de.len()) {
             match (b_en.get(k), b_de.get(k)) {
@@ -583,6 +648,10 @@ pub fn main(args: &[String]) -> ExitCode {
             funde.extend(zaehlungen(&wurzel));
             funde.extend(konstanten(&docs));
             funde.extend(pfade(&wurzel, &docs, None));
+            // Verweise samt Sprungmarken auch im Deutschen streng -- eine
+            // umbenannte Ueberschrift liess eine Marke sonst still ins Leere
+            // zeigen (gefunden: `#sprite-atlas--batch-draw`).
+            funde.extend(verweise(&wurzel, &docs));
             funde.extend(namen(&wurzel, &wurzel, Some(&claude)));
             funde.extend(pfade(&wurzel, &wurzel, Some(&claude)));
             funde.extend(meldungen(&wurzel).1);
@@ -895,16 +964,28 @@ mod tests {
             "# Title\n\nText, see [b](../b.md#b) and [part](#second-part).\n\n  ```basic\n  PRINT 1 ' eins\n  ```\n\n## Second part\n").unwrap();
         let (n, f) = uebersetzung(&dir);
         assert_eq!((n, f.len()), (1, 0), "{:?}", f);
+        // ein uebersetzter Kommentar ist erlaubt, ein Text darin nicht
+        std::fs::write(dir.join("docs/en/a.md"),
+            "# Title\n\n```basic\nPRINT 1 ' one\n```\n\n## Second part\n").unwrap();
+        assert_eq!(uebersetzung(&dir).1.len(), 0);
+        assert_eq!(ohne_kommentar("PRINT \"it's\" ' sagt"), "PRINT \"it's\"");
+        assert_eq!(ohne_kommentar("x = !\"a\\\"'b\" ' k"), "x = !\"a\\\"'b\"");
+        assert_eq!(ohne_kommentar("REM alles weg"), "");
+        assert_eq!(ohne_kommentar("REMIS = 1"), "REMIS = 1");
         // Code uebersetzt, Marke deutsch, Verweis ohne ../, Datei ohne Gegenstueck
         std::fs::write(dir.join("docs/en/a.md"),
-            "# Title\n\n[b](b.md) [x](#zweiter-teil)\n\n```basic\nPRINT 1 ' one\n```\n\n## Second part\n").unwrap();
+            "# Title\n\n[b](b.md) [x](#zweiter-teil)\n\n```basic\nPRINT 2 ' eins\n```\n\n## Second part\n").unwrap();
         std::fs::write(dir.join("docs/en/c.md"), "# C\n").unwrap();
+        std::fs::write(dir.join("docs/d.md"), "# D\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n## Zwei\n").unwrap();
+        std::fs::write(dir.join("docs/en/d.md"), "# D\n\n| a | b |\n|---|---|\n\n### Two\n").unwrap();
         let (_, f) = uebersetzung(&dir);
         let msgs: Vec<&str> = f.iter().map(|b| b.3.as_str()).collect();
         assert!(msgs.iter().any(|m| m.contains("Code wird nicht uebersetzt")), "{:?}", msgs);
         assert!(msgs.iter().any(|m| m.contains("Sprungmarke fehlt")), "{:?}", msgs);
         assert!(msgs.iter().any(|m| m.contains("ins Leere")), "{:?}", msgs);
         assert!(msgs.iter().any(|m| m.contains("keine deutsche Fassung")), "{:?}", msgs);
+        assert!(msgs.iter().any(|m| m.contains("Ueberschriften weichen")), "{:?}", msgs);
+        assert!(msgs.iter().any(|m| m.contains("Tabellen haben")), "{:?}", msgs);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

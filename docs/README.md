@@ -2,7 +2,9 @@
 
 Vollständige Referenz für die Sprache Drachenhauch, alle eingebauten Befehle und alle Built-in-Module.
 
-Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`dhrt`** — die native Rust/raylib-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Python ist nur noch Editor-/Tooling-Schicht.
+Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`dhrt`** — die native Rust/raylib-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Die IDE und die Werkzeuge sind selbst Drachenhauch-Programme; Python gibt es nur noch in den zwei Bauskripten.
+
+**English:** [en/README.md](en/README.md) ist die Übersetzung dieses Handbuchs; die IDE zeigt sie bei englischer Oberfläche. Deutsch bleiben nur die Entwürfe, Audits und Release-Notizen. Code wird nicht übersetzt, Kommentare darin schon -- `dhrt pruef uebersetzung` prüft, dass jede englische Datei ihrer deutschen folgt (Überschriften, Tabellenzeilen, Code, Verweise). Wer hier ein Dokument ändert, zieht die Übersetzung mit.
 
 ## Inhalt
 

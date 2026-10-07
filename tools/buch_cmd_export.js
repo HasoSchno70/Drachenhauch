@@ -11,6 +11,13 @@ const fs = require("fs");
 const path = require("path");
 
 const CONTENT = path.join(__dirname, "..", "buch-referenz", "buch", "content");
+// --en: die Beschreibungen so, wie das englische Buch sie druckt -- ueber den
+// Katalog i18n/en.json (Schluessel = deutscher Text). Was dort fehlt, faellt
+// weg: ein deutscher Text im englischen Hover waere schlimmer als keiner.
+const EN = process.argv.includes("--en");
+const KATALOG = EN
+  ? JSON.parse(fs.readFileSync(path.join(__dirname, "..", "buch-referenz", "buch", "i18n", "en.json"), "utf8"))
+  : null;
 const nix = () => "";
 const treffer = [];
 const H = {
@@ -19,7 +26,12 @@ const H = {
   h1: nix, h2: nix, chapter: nix, part: nix, smallLabel: nix, sig: nix,
   PageBreak: null,
   cmd: (name, signatur, beschreibung) => {
-    treffer.push([String(name || ""), String(beschreibung || "")]);
+    let text = String(beschreibung || "");
+    if (KATALOG) {
+      if (!Object.prototype.hasOwnProperty.call(KATALOG, text)) return "";
+      text = String(KATALOG[text]);
+    }
+    treffer.push([String(name || ""), text]);
     return "";
   },
 };

@@ -1362,6 +1362,30 @@ Eine geoeffnete Paketdatei sagt das in der Statuszeile (`paketVon$`). Tests
 -- so blieb die erste Gegenprobe gruen), ein `-C`-Fall in `paket.dhtest`;
 sechs Verfaelschungen der IDE fallen je in ihrem Fall.
 
+## Handbuch auf Englisch: `docs/en` (2026-10-07)
+
+`docs/en/<datei>.md` ist die Uebersetzung von `docs/<datei>.md` (72 Dateien:
+Sprache, Befehle, alle Module, IDE, Werkzeuge, Editoren); deutsch bleiben nur
+`entwurf-*`, `release-*`, `allzweck-*`, Roadmaps, PERFORMANCE,
+`rust-frontend-port`, `umbenennung-drachenhauch` (verlinkt als `../x.md`).
+**Code wird nicht uebersetzt, Kommentare in Drachenhauch-Bloecken schon**
+(wie im Buch). `dhrt pruef uebersetzung` (`pruef.rs`, auch im vollen `dhrt
+pruef`) verlangt je Datei: deutsches Gegenstueck, dieselben Ueberschriften
+(Zahl und Ebene, der Reihe nach), gleich viele Tabellenzeilen, dieselben
+Codebloecke (Drachenhauch-Bloecke ohne Kommentare verglichen, andere
+byteweise) und Verweise relativ zum Ordner der Datei samt Sprungmarke nach
+GitHubs Regel (`marken`). Dieselbe strenge Verweispruefung laeuft seither
+auch ueber `docs/` (fand `#sprite-atlas--batch-draw`). **Wer ein deutsches
+Dokument aendert, zieht die Uebersetzung mit** -- die Pruefung sagt, welche.
+Die IDE liest mit englischer Oberflaeche `docs/en/<datei>`, sonst die
+deutsche (`docPfad$`). Der Hover nimmt mit `DHRT_LANG=en`
+`daten/builtin_prosa.en.json` (von `dhrt doku prosa` aus `docs/en` und den
+Befehlstexten des englischen Buchs, `buch_cmd_export.js --en`), sonst nur die
+Signatur -- nicht die deutsche Handdoku. Tests `doku_pruefungen.dhtest`
+(Uebersetzung, Index, englischer Hover), `werkzeug_ide_englisch.dhtest`
+(Handbuch aus docs/en mit Rueckfall), Rust-Tests `marken_wie_github`,
+`uebersetzung_folgt_der_deutschen`.
+
 ## Fremde Bibliotheken: `DECLARE … LIB` (2026-10-05, Stufe 1)
 
 `ffi.rs`, Entwurf `docs/entwurf-ffi.md`, Handbuch `docs/ffi.md`, Feature

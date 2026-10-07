@@ -169,15 +169,21 @@ Wer den Loop pausieren will (z.B. Pause-Menü), ruft `PARTICLE_UPDATE` einfach n
 
 `PARTICLE_DRAW` zeichnet via `CIRCLE` und respektiert daher die Camera (siehe [Camera-Modul](module-camera.md)). World-Koordinaten in `PARTICLE_SET_POS` reichen — Camera kümmert sich um die Screen-Konvertierung.
 
-## Performance (NumPy-vektorisiert)
+## Performance
 
-Position, Velocity, Lifetime, Age, Size und Color werden intern als NumPy-Arrays gehalten. `PARTICLE_UPDATE` ist komplett vektorisiert: Aging, Lifetime-Filter, Gravity-Integration und Position-Update sind je ein einziger Bulk-NumPy-Call. Bei 5000 Partikeln ist `PARTICLE_UPDATE` ca. **70× schneller** als die alte Python-Loop-Version (~0,01 ms statt ~0,55 ms).
+Die Partikel liegen in `dhrt` als Liste von Rust-Werten (Position,
+Geschwindigkeit, Lebensdauer, Alter, Größe, Farbe). `PARTICLE_UPDATE` geht in
+EINEM Builtin-Aufruf über alle: altern, Schwerkraft, Position, und wer seine
+Lebensdauer erreicht hat, fällt heraus -- kein Aufruf je Partikel aus dem
+Programm.
 
-`PARTICLE_EMIT` nutzt weiterhin Python-`random` (per-Partikel), damit die Resultate über `RANDOMIZE(seed)` deterministisch reproduzierbar bleiben — beim normalen Use-Case (5–50 emittierte Partikel pro Frame) ist das schnell genug, der Hot-Path ist `PARTICLE_UPDATE` der gleichzeitig mit allen aktiven Partikeln läuft.
+`PARTICLE_EMIT` zieht Geschwindigkeit, Lebensdauer und Größe aus demselben
+Zufallsgenerator wie `RND`, darum ist ein Lauf nach `RANDOMIZE(seed)`
+reproduzierbar.
 
-`PARTICLE_DRAW` berechnet beim Fade-Effekt die per-Partikel-Farben vorab in einer einzigen vektorisierten Operation und zeichnet dann pro Partikel einen Kreis (nativ in `dhrt`).
-
-Voraussetzung: `numpy` — steht in `requirements.txt`, ist im venv also schon da.
+`PARTICLE_DRAW` rechnet beim Ausblenden und beim Farbverlauf die Farbe je
+Partikel aus seinem Alter und zeichnet dann je Partikel einen Kreis bzw. die
+gewählte Form.
 
 ## Komplettes Beispiel
 
