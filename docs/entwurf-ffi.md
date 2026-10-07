@@ -483,3 +483,28 @@ Runde eine Kopie, die Laufvariable bekommt den Struct-Typ; ein Feld der
 Kopie zu schreiben ist eine Meldung (`foreach_kopien`), weil es ins Leere
 ginge. Geht auch ueber ein Feld im Struct (`st.werte`, `l.ecken`), nur
 ueber eine Dimension, ohne Paar-Form.
+
+**Stand Bitfelder mit PACK und ohne Namen (2026-10-07):** Gemessen statt
+erinnert -- `clang -Xclang -fdump-record-layouts-simple` fuer fuenf Ziele
+(x86_64-pc-windows-msvc, x86_64-linux-gnu, aarch64-linux-gnu,
+aarch64-/x86_64-apple-darwin) an 32 Structs, eine Auswahl von elf davon
+zusaetzlich mit dem echten gcc (WSL) und `cl.exe` (Build Tools); alle
+stimmen ueberein. Ergebnis: **drei** Regeln (`Bitregel::Msvc/Gcc/GccArm`).
+MSVC behaelt unter PACK seine Einheiten, ausgerichtet auf `min(Typ, n)`.
+GCC/Clang legen unter JEDEM PACK (auch `PACK 8`) Bit an Bit, ueber die
+Grenze des Typs hinweg -- ein Feld beruehrt dann bis zu neun Bytes, darum
+lesen/schreiben `__struct_get/_set` ueber `u128` so viele Bytes, wie
+`bit + bits` verlangt, und `wert_text` deckt jedes beruehrte Byte einmal ab.
+Ein Feld mit 0 Bits (nur ohne Namen, `AS LONG : 0`): MSVC beendet damit nur
+eine Einheit, die gerade offen ist, richtet auf `min(Typ, n)` aus und hebt
+die Ausrichtung des Structs; GCC/Clang richten auf den VOLLEN Typ aus (auch
+unter PACK), ohne den Struct auszurichten. Fuellbits ohne Namen (`AS LONG :
+3`) zaehlen bei MSVC wie benannte, bei GCC auf x86-64 und macOS nicht zur
+Ausrichtung des Structs. **Linux auf ARM64** (AAPCS64) unterscheidet sich
+von den anderen GCC-Zielen genau dort: Fuellbits und Felder mit 0 Bits
+zaehlen zur Ausrichtung, letztere mit dem vollen Typ auch unter PACK --
+gemessen nur ueber clang, einen Laeufer gibt es nicht. Die Rust-Tests
+rechnen alle 32 Structs unter allen drei Regeln gegen die Zahlen von clang;
+fuenf Verfaelschungen (PACK wie ohne, ARM ohne Ausrichtung, Fuellbits
+zaehlen bei GCC, MSVC-Nullfeld immer, Nullfeld nur auf PACK ausgerichtet)
+lassen je ihren Fall fallen.

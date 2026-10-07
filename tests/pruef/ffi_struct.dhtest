@@ -393,6 +393,128 @@ PRINT TRIM$(z)
 4 2 4
 0 F 0 0
 
+=== bitfelder mit pack, ohne namen und mit 0 bits: msvc
+' Dieselben Structs wie im naechsten Fall; die Zahlen sind die von cl.exe
+' und clang fuer x86_64-pc-windows-msvc. MSVC behaelt unter PACK seine
+' Einheiten (nur auf n Bytes ausgerichtet), ein Feld mit 0 Bits beendet die
+' Einheit und hebt die Ausrichtung, Fuellbits zaehlen wie benannte.
+STRUCT Dicht LAYOUT C PACK 1
+    a AS UBYTE : 3
+    b AS LONG : 30
+    c AS BYTE
+END STRUCT
+STRUCT Ende LAYOUT C
+    a AS BYTE : 3
+    AS LONG : 0
+    b AS UBYTE : 2
+END STRUCT
+STRUCT Fuell LAYOUT C
+    a AS BYTE
+    AS LONG : 4
+    b AS BYTE
+END STRUCT
+STRUCT Zwei LAYOUT C PACK 2
+    a AS BYTE : 7
+    b AS SHORT : 9
+    c AS LONG : 17
+END STRUCT
+SUB zeige(b AS BUFFER)
+    DIM z AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO BUFFER_LEN(b) - 1
+        z = z + HEX$(BUFFER_GET(b, i)) + " "
+    NEXT
+    PRINT TRIM$(z)
+END SUB
+DIM d AS Dicht
+d.a = 5
+d.b = -1
+d.c = 9
+PRINT SIZEOF(Dicht), d.a, d.b, d.c
+zeige(d)
+DIM e AS Ende
+e.a = 1
+e.b = 3
+PRINT SIZEOF(Ende), e.a, e.b
+zeige(e)
+PRINT SIZEOF(Fuell), OFFSETOF(Fuell, b)
+DIM w AS Zwei
+w.a = 1
+w.b = 1
+w.c = 1
+PRINT SIZEOF(Zwei), w.a + w.b + w.c
+zeige(w)
+--- system windows
+--- erwartet
+6 5 -1 9
+5 FF FF FF 3F 9
+8 1 3
+1 0 0 0 3 0 0 0
+12 8
+8 3
+1 0 1 0 1 0 0 0
+
+=== bitfelder mit pack, ohne namen und mit 0 bits: gcc und clang
+' GCC und Clang (Linux x86-64, macOS): unter PACK Bit an Bit, auch ueber die
+' Grenze des Typs (b liegt ab Bit 3 in fuenf Bytes); 0 Bits richten auf den
+' vollen Typ aus, ohne den Struct auszurichten; Fuellbits zaehlen fuer die
+' Ausrichtung nicht. Zahlen von gcc und clang (x86_64-linux-gnu).
+STRUCT Dicht LAYOUT C PACK 1
+    a AS UBYTE : 3
+    b AS LONG : 30
+    c AS BYTE
+END STRUCT
+STRUCT Ende LAYOUT C
+    a AS BYTE : 3
+    AS LONG : 0
+    b AS UBYTE : 2
+END STRUCT
+STRUCT Fuell LAYOUT C
+    a AS BYTE
+    AS LONG : 4
+    b AS BYTE
+END STRUCT
+STRUCT Zwei LAYOUT C PACK 2
+    a AS BYTE : 7
+    b AS SHORT : 9
+    c AS LONG : 17
+END STRUCT
+SUB zeige(b AS BUFFER)
+    DIM z AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO BUFFER_LEN(b) - 1
+        z = z + HEX$(BUFFER_GET(b, i)) + " "
+    NEXT
+    PRINT TRIM$(z)
+END SUB
+DIM d AS Dicht
+d.a = 5
+d.b = -1
+d.c = 9
+PRINT SIZEOF(Dicht), d.a, d.b, d.c
+zeige(d)
+DIM e AS Ende
+e.a = 1
+e.b = 3
+PRINT SIZEOF(Ende), e.a, e.b
+zeige(e)
+PRINT SIZEOF(Fuell), OFFSETOF(Fuell, b)
+DIM w AS Zwei
+w.a = 1
+w.b = 1
+w.c = 1
+PRINT SIZEOF(Zwei), w.a + w.b + w.c
+zeige(w)
+--- system posix
+--- erwartet
+6 5 -1 9
+FD FF FF FF 1 9
+5 1 3
+1 0 0 0 3
+3 2
+6 3
+81 0 1 0 0 0
+
 === bitfelder der windows-api: buildcommdcba fuellt ein dcb
 ' Das DCB einer seriellen Schnittstelle traegt 13 Bitfelder in einer
 ' DWORD-Einheit. BuildCommDCBA fuellt es aus einem Text, ohne dass es einen
@@ -893,7 +1015,10 @@ pruefe("STRUCT B LAYOUT C" + nl + "  a AS FLOAT : 3" + nl + "END STRUCT")
 pruefe("STRUCT B LAYOUT C" + nl + "  a AS BYTE : 9" + nl + "END STRUCT")
 pruefe("STRUCT B LAYOUT C" + nl + "  a AS LONG : 0" + nl + "END STRUCT")
 pruefe("STRUCT B LAYOUT C" + nl + "  a[2] AS LONG : 3" + nl + "END STRUCT")
-pruefe("STRUCT B LAYOUT C PACK 1" + nl + "  a AS LONG : 3" + nl + "END STRUCT")
+pruefe("STRUCT B LAYOUT C PACK 1" + nl + "  a AS LONG : 3" + nl + "  AS LONG : 0" + nl + "  AS SHORT : 2" + nl + "END STRUCT")
+pruefe("STRUCT B LAYOUT C" + nl + "  AS LONG" + nl + "END STRUCT")
+pruefe("STRUCT B LAYOUT C" + nl + "  AS FLOAT : 0" + nl + "END STRUCT")
+pruefe("STRUCT B LAYOUT C" + nl + "  a AS LONG : 65" + nl + "END STRUCT")
 pruefe("STRUCT B LAYOUT C" + nl + "  a : 3 AS TEXT * 4" + nl + "END STRUCT")
 --- erwartet
 ok
@@ -925,9 +1050,12 @@ ok
 OFFSETOF: B.a ist ein Bitfeld -- es hat keine Stelle in Bytes (in C ebenso)
 STRUCT B: das Bitfeld 'a' braucht eine ganze Zahl (BYTE, SHORT, LONG, INTEGER, auch ohne Vorzeichen, oder BOOLEAN), nicht FLOAT
 STRUCT B: das Bitfeld 'a' hat 9 Bits, BYTE hat nur 8
-Ein Bitfeld hat 1 bis 64 Bits -- etwa flags AS ULONG : 3 (ein Bitfeld mit 0 Bits gibt es hier nicht)
+Ein Bitfeld mit 0 Bits hat keinen Namen -- wie in C: AS LONG : 0 (es beendet die Einheit, Werte hat es keine)
 STRUCT B: 'a' ist ein Bitfeld -- ein Feld von Bitfeldern gibt es in C nicht
-STRUCT B: Bitfelder gehen (noch) nicht zusammen mit PACK -- dort legen die Compiler sie verschieden
+ok
+Ein Feld ohne Namen gibt es nur als Bitfeld -- AS LONG : 3 (Fuellbits) oder AS LONG : 0 (beendet die Einheit)
+STRUCT B: das Bitfeld ohne Namen braucht eine ganze Zahl (BYTE, SHORT, LONG, INTEGER, auch ohne Vorzeichen, oder BOOLEAN), nicht FLOAT
+Ein Bitfeld hat 0 bis 64 Bits -- etwa flags AS ULONG : 3 (0 Bits nur ohne Namen: AS ULONG : 0)
 Ein Bitfeld braucht eine ganze Zahl als Typ (LONG, ULONG, BYTE ...) -- etwa flags AS ULONG : 3
 
 === dhrt fmt schreibt die woerter des structs gross

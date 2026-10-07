@@ -435,11 +435,23 @@ PRINT s.modus, s.stufe, HEX$(BUFFER_GET_U32(s, 0))   ' 3  -2  F6
   Typs überschreitet -- auch direkt hinter ein gewöhnliches Feld. Dieselbe
   Deklaration kann darum auf den Systemen verschieden lang sein, genau wie
   in C (`char c; int a : 4;` ist unter Windows 8 Bytes, sonst 4).
+* **Ohne Namen** wie in C: `AS ULONG : 3` sind Füllbits (lesen und
+  schreiben kann man sie nicht), `AS ULONG : 0` beendet die laufende
+  Einheit -- das nächste Feld beginnt in einer neuen. Ein Bitfeld mit
+  0 Bits hat nie einen Namen.
+* **Mit `PACK`** gelten wieder die Regeln des Systems: MSVC behält seine
+  Einheiten und richtet sie auf höchstens n Bytes aus; GCC und Clang legen
+  Bitfelder dann Bit an Bit, auch über die Grenze ihres Typs hinweg
+  (`PACK 1` mit `a AS BYTE : 3` und `b AS LONG : 30` legt `b` ab Bit 3 in
+  fünf Bytes). Ein Feld mit 0 Bits richtet bei GCC und Clang auf den vollen
+  Typ aus, auch unter `PACK`; bei MSVC wirkt es nur direkt hinter einem
+  Bitfeld.
+* **Wer zur Ausrichtung des Structs zählt**, ist noch einmal verschieden:
+  Füllbits und Felder mit 0 Bits zählen unter Windows und unter Linux auf
+  ARM64 mit, unter Linux auf x86-64 und unter macOS nicht. Nachgemessen ist
+  das mit clang für alle fünf Ziele und mit dem echten gcc und `cl.exe`.
 * `OFFSETOF` eines Bitfelds ist ein Fehler (es hat keine Stelle in Bytes),
-  ein Feld von Bitfeldern gibt es nicht, und mit `PACK` gehen Bitfelder
-  (noch) nicht -- dort weichen die Compiler voneinander ab. Ein Bitfeld mit
-  0 Bits (C: `int : 0;`) gibt es nicht; ein unbenanntes Füllfeld bekommt
-  einfach einen Namen.
+  und ein Feld von Bitfeldern gibt es nicht.
 
 ### Structs mit Zeigern
 
@@ -826,8 +838,7 @@ END TRY
 ## Was es (noch) nicht gibt
 
 * Ein Struct als Wert hinter `...` (siehe
-  [Structs als Wert](#structs-als-wert)); Bitfelder mit `PACK` oder mit
-  0 Bits (siehe [Bitfelder](#bitfelder)).
+  [Structs als Wert](#structs-als-wert)).
 * C++-Namen, COM. Eine C++-Bibliothek wie
   Qt geht über einen Umweg mit C-Schnittstelle -- etwa
   [Python einbetten](#python-einbetten) mit PySide6.
