@@ -129,8 +129,9 @@ Working notes, not user documentation — they explain why something is the way 
 - **[Design: input methods (IME)](../entwurf-eingabemethoden.md)** (German) — measured: storage is Unicode, display is Latin-1 (the euro sign is a question mark); ways: character set, composition window, preedit, SDL; recommendation: first see, then type
 - **[Design: accessibility](../entwurf-barrierefreiheit.md)** (German) — the UIA tree of a dhrt window is empty, measured; AccessKit, speech output and craftsmanship as the ways; recommendation: craftsmanship right away, then AccessKit with Windows first
 - **[Design: printing](../entwurf-drucken.md)** (German) — no raylib for paper: building blocks checked, four ways; recommendation: draw the page ourselves (GDI/CUPS as targets of the pdf module), plus a command that opens a file
-- **[Release 2026.23](../release-2026.23.md)** (German) — what is new in this version
-- **[Release 2026.22](../release-2026.22.md)** (German) — the version before
+- **[Release 2026.24](../release-2026.24.md)** (German) — what is new in this version
+- **[Release 2026.23](../release-2026.23.md)** (German) — the version before
+- **[Release 2026.22](../release-2026.22.md)** (German) — and the one before that
 - **[Release 2026.21](../release-2026.21.md)** (German) — and the one before that
 - **[Release 2026.20](../release-2026.20.md)** (German) — and the one before that
 - **[Release 2026.19](../release-2026.19.md)** (German) — and the one before that

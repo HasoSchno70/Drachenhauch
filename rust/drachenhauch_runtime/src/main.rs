@@ -267,6 +267,8 @@ fn eingebaut() -> String {
         ("dialoge", cfg!(feature = "dialogs")),
         ("video", cfg!(feature = "video")),
         ("datenbank", cfg!(feature = "db")),
+        ("postgres", cfg!(feature = "pg")),
+        ("mysql", cfg!(feature = "mysql")),
         ("netz", cfg!(feature = "net")),
         ("http", cfg!(feature = "http")),
         ("mail", cfg!(feature = "smtp")),
