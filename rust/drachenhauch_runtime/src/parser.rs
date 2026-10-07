@@ -1984,10 +1984,15 @@ impl Parser {
             if self.at_end() { return self.err("END STRUCT erwartet, Programmende erreicht"); }
             if self.check(Tt::Newline) { self.pos += 1; continue; }
             self.matches(Tt::Dim);
-            let ftok = self.expect(Tt::Ident, "Erwartet ein Feld: name AS typ")?;
-            let fname = ftok.orig.as_deref().map(str::to_string).unwrap_or_else(|| sval(&ftok));
+            // Ohne Namen (`AS LONG : 3`, `AS LONG : 0`) wie in C: Fuellbits
+            // oder das Ende einer Einheit.
+            let ohne_namen = self.check(Tt::As);
+            let fname = if ohne_namen { String::new() } else {
+                let ftok = self.expect(Tt::Ident, "Erwartet ein Feld: name AS typ")?;
+                ftok.orig.as_deref().map(str::to_string).unwrap_or_else(|| sval(&ftok))
+            };
             let mut anzahl = 0u32;
-            if self.matches(Tt::Lbracket) {
+            if !ohne_namen && self.matches(Tt::Lbracket) {
                 let n = match &self.peek(0).val { Val::Int(n) if self.check(Tt::Number) => *n, _ => 0 };
                 if n < 1 { return self.err("Erwartet die Zahl der Elemente als feste Zahl ab 1, etwa werte[4] AS LONG"); }
                 self.pos += 1;
@@ -2015,16 +2020,22 @@ impl Parser {
                 self.pos -= 1;
                 return self.err("Ein BUFFER kann kein Feld sein -- ein Zeiger darauf ist ZEIGER (BUFFER_ZEIGER), ein Struct darin ist ein anderer STRUCT ... LAYOUT C");
             } else if crate::ffi::typ_zeichen(&w).is_some() {
-                if bits == 0 { bits = self.bitbreite()?; }
-                if bits > 0 { format!("{}:{}", w, bits) } else { w }
+                if bits.is_none() { bits = self.bitbreite()?; }
+                match bits { Some(b) => format!("{}:{}", w, b), None => w }
             } else if crate::ffi::typ_vorschlag(&w).is_some() {
                 self.pos -= 1;
                 return self.err(&crate::ffi::typ_hinweis(&w));
             } else {
                 format!("#{}", w)
             };
-            if bits > 0 && !typ.contains(':') {
+            if bits.is_some() && !typ.contains(':') {
                 return self.err("Ein Bitfeld braucht eine ganze Zahl als Typ (LONG, ULONG, BYTE ...) -- etwa flags AS ULONG : 3");
+            }
+            if ohne_namen && bits.is_none() {
+                return self.err("Ein Feld ohne Namen gibt es nur als Bitfeld -- AS LONG : 3 (Fuellbits) oder AS LONG : 0 (beendet die Einheit)");
+            }
+            if bits == Some(0) && !ohne_namen {
+                return self.err("Ein Bitfeld mit 0 Bits hat keinen Namen -- wie in C: AS LONG : 0 (es beendet die Einheit, Werte hat es keine)");
             }
             felder.push((fname, typ, anzahl));
             self.consume_terminator()?;
@@ -2037,17 +2048,17 @@ impl Parser {
     }
 
     /// `: n` hinter einem Feld eines STRUCT ... LAYOUT C: die Breite eines
-    /// Bitfelds (0 = keins). Ein Doppelpunkt ohne Zahl dahinter trennt
-    /// Anweisungen wie ueberall.
-    fn bitbreite(&mut self) -> R<u32> {
-        if !(self.check(Tt::Colon) && self.tt(1) == Tt::Number) { return Ok(0); }
+    /// Bitfelds (`None` = keins, `Some(0)` = eines mit 0 Bits). Ein
+    /// Doppelpunkt ohne Zahl dahinter trennt Anweisungen wie ueberall.
+    fn bitbreite(&mut self) -> R<Option<u32>> {
+        if !(self.check(Tt::Colon) && self.tt(1) == Tt::Number) { return Ok(None); }
         self.pos += 1;
-        let n = match &self.peek(0).val { Val::Int(n) => *n, _ => 0 };
-        if n < 1 || n > 64 {
-            return self.err("Ein Bitfeld hat 1 bis 64 Bits -- etwa flags AS ULONG : 3 (ein Bitfeld mit 0 Bits gibt es hier nicht)");
+        let n = match &self.peek(0).val { Val::Int(n) => *n, _ => -1 };
+        if !(0..=64).contains(&n) {
+            return self.err("Ein Bitfeld hat 0 bis 64 Bits -- etwa flags AS ULONG : 3 (0 Bits nur ohne Namen: AS ULONG : 0)");
         }
         self.pos += 1;
-        Ok(n as u32)
+        Ok(Some(n as u32))
     }
 
     fn new_expr(&mut self) -> R<Node> {

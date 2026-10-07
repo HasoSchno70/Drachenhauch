@@ -1538,8 +1538,16 @@ freie Bitstelle, keine Typgrenze ueberschreiten, auch hinter ein
 gewoehnliches Feld); beide mit `clang -Xclang -fdump-record-layouts-simple`
 fuer drei Ziele nachgesehen, `lagen_rechnen_mit` laesst die Rust-Tests beide
 auf jedem System rechnen. `Feld::bits/bit`, die Art fuer
-`__struct_get/_set` ist `l3@5`. Nicht: mit PACK, Breite 0. Tests
-`ffi_struct.dhtest` (DCB ueber `BuildCommDCBA`, Lage je System).
+`__struct_get/_set` ist `l3@5`. Tests
+`ffi_struct.dhtest` (DCB ueber `BuildCommDCBA`, Lage je System). **Mit PACK,
+ohne Namen und mit 0 Bits (selber Tag):** drei Regeln (`Msvc`, `Gcc`,
+`GccArm` = Linux ARM64, `bitregel()`), gemessen mit clang fuer fuenf Ziele
+und dem echten gcc/`cl.exe`. GCC unter PACK Bit an Bit ueber die Typgrenze
+(Lesen/Schreiben ueber `u128`, bis neun Bytes); `AS LONG : 0` beendet die
+Einheit (MSVC nur hinter einem Bitfeld), `AS LONG : 3` = Fuellbits ohne
+Namen (Feld mit leerem Namen, `Lage::feld` findet es nicht); wer zur
+Ausrichtung des Structs zaehlt, unterscheidet die drei Regeln. Rust-Test
+`pack_und_null_bits_nach_drei_regeln` (32 Structs aus clang).
 **va_list (2026-10-07):** Typwort `VALIST`/`VA_LIST` (Zeichen `a`),
 Argument Tupel/Feld/Wert/NIL, Werte wie hinter `...` in 8-Byte-Plaetzen;
 `ffi::valist_kopf` je `ValistForm`: Windows + Apple-ARM `char*` (nur die

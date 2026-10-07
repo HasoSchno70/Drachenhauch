@@ -435,11 +435,22 @@ PRINT s.modus, s.stufe, HEX$(BUFFER_GET_U32(s, 0))   ' 3  -2  F6
   after an ordinary field. The same declaration can therefore have
   different sizes on different systems, just as in C (`char c; int a : 4;`
   is 8 bytes on Windows, 4 elsewhere).
-* `OFFSETOF` of a bit field is an error (it has no position in bytes),
-  there are no arrays of bit fields, and bit fields do not work together
-  with `PACK` (yet) -- the compilers disagree there. A bit field with 0 bits
-  (C: `int : 0;`) does not exist; an unnamed padding field simply gets a
-  name.
+* **Without a name** as in C: `AS ULONG : 3` are padding bits (they cannot
+  be read or written), `AS ULONG : 0` ends the current unit -- the next
+  field starts in a new one. A bit field with 0 bits never has a name.
+* **With `PACK`** the system's rules apply again: MSVC keeps its units and
+  aligns them to at most n bytes; GCC and Clang then lay bit fields bit by
+  bit, even across the boundary of their type (`PACK 1` with
+  `a AS BYTE : 3` and `b AS LONG : 30` puts `b` from bit 3 into five
+  bytes). A field with 0 bits aligns to the full type with GCC and Clang,
+  even under `PACK`; with MSVC it only has an effect right after a bit
+  field.
+* **What counts towards the struct's alignment** differs once more:
+  padding bits and fields with 0 bits count on Windows and on Linux on
+  ARM64, not on Linux on x86-64 and not on macOS. This was measured with
+  clang for all five targets and with the real gcc and `cl.exe`.
+* `OFFSETOF` of a bit field is an error (it has no position in bytes), and
+  there are no arrays of bit fields.
 
 ### Structs with pointers
 
@@ -825,8 +836,7 @@ END TRY
 ## What does not exist (yet)
 
 * A struct by value behind `...` (see
-  [Structs by value](#structs-by-value)); bit fields with `PACK` or with
-  0 bits (see [Bit fields](#bit-fields)).
+  [Structs by value](#structs-by-value)).
 * C++ names, COM. A C++ library such as
   Qt works via a detour with a C interface -- for example
   [Embedding Python](#embedding-python) with PySide6.

@@ -94,6 +94,7 @@ module.exports = (H) => [
   H.bullet("Ein Wert, der nicht ins Feld passt, ist ein Fehler – wie in der DECLARE-Zeile –, ebenso ein Index außerhalb und ein zu langer Text."),
   H.bullet("PACK 1 hinter LAYOUT C lässt die Lücken weg, für Dateiformate und die wenigen APIs, die gepackt sind."),
   H.bullet("Bitfelder schreibst du wie in C mit der Breite hinter dem Typ: fBinary AS ULONG : 1. Wie sie im Speicher liegen, legt in C der Compiler fest – Drachenhauch rechnet unter Windows wie MSVC, unter Linux und macOS wie GCC und Clang, damit die Bits dort ankommen, wo die Bibliothek sie sucht."),
+  H.bullet("Wie in C gibt es Bitfelder ohne Namen: AS ULONG : 3 sind Füllbits, AS ULONG : 0 beendet die laufende Einheit. Auch zusammen mit PACK gelten die Regeln des Systems – unter Linux und macOS liegen die Bits dann lückenlos, auch über die Grenze ihres Typs hinweg."),
   H.bullet("Ein Struct ist ein BUFFER, also eine Referenz: b = a teilt die Bytes. Umgekehrt liest du jeden Puffer durch eine Lage, indem du ihn einer Struct-Variable zuweist."),
   H.p("Texte, die eine Funktion schreibt, kommen genauso zurück: GetComputerNameW füllt einen Puffer mit UTF-16-Zeichen und nennt die Länge über BYREF. Das ganze Programm steht in den Beispielen als 206_fremde_bibliotheken.dh."),
   H.p("Viele Structs auf einmal legst du mit DIM pts[n] AS Punkt an: Sie liegen hintereinander in einem Puffer wie ein Feld in C und gehen so an Funktionen, die eine ganze Reihe wollen. LEN zählt die Structs. Als Feld einer Klasse bekommt jedes Objekt seinen eigenen Struct:"),
@@ -257,5 +258,5 @@ module.exports = (H) => [
 
   H.h2("Unsichere Bibliotheken"),
   H.p("Einer Bibliothek, die abstürzen könnte, gibst du einen eigenen Prozess: Du rufst sie in einem Auftrag mit TASK_START auf (Kapitel „Programme, Aufträge & Umgebung“). Stürzt der Auftrag ab, bekommt dein Programm beim Abholen mit TASK_RESULT$ einen Fehler – „der Auftrag ist abgestuerzt“ – und läuft weiter."),
-  H.note("Noch nicht dabei sind Bitfelder zusammen mit PACK, ein Struct als Wert hinter ... und ein va_list, den eine Bibliothek deinem Rückruf gibt. Im Browser gibt es keine fremden Bibliotheken."),
+  H.note("Noch nicht dabei sind ein Struct als Wert hinter ... und ein va_list, den eine Bibliothek deinem Rückruf gibt. Im Browser gibt es keine fremden Bibliotheken."),
 ];
