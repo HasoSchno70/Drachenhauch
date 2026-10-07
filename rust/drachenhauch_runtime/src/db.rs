@@ -729,7 +729,14 @@ mod my {
         if url.to_ascii_lowercase().starts_with("mariadb://") { url = format!("mysql://{}", &url[10..]); }
         let opts = mysql::Opts::from_url(&url).map_err(|e| format!(
             "DB_OPEN: {} -- erwartet mysql://nutzer:kennwort@host:3306/datenbank", e))?;
+        // prefer_socket aus: sonst wechselt der Treiber bei einem Server auf
+        // demselben Rechner nach dem Verbinden auf dessen Unix-Socket -- und
+        // ueber die Socket gibt es kein TLS; `sslmode=require` verbaende dann
+        // stillschweigend unverschluesselt (gefunden in der CI unter Linux,
+        // unter Windows gibt es die Socket nicht). Verbunden wird an die
+        // Adresse, die im Ziel steht.
         let basis = || mysql::OptsBuilder::from_opts(opts.clone())
+            .prefer_socket(false)
             .tcp_connect_timeout(Some(std::time::Duration::from_secs(10)));
         let mit_tls = |pruefen: bool, b: mysql::OptsBuilder| {
             let ssl = if pruefen { mysql::SslOpts::default() } else {
