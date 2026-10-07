@@ -1512,6 +1512,15 @@ Ohne BYVAL im Rueckruf ist ein Struct eine Meldung (`ZEIGER` +
 BUFFER_AUS_ZEIGER). Rust-Test `structs_im_rueckruf` (Rust ruft den Einstieg
 als `extern "C" fn` mit `#[repr(C)]`-Structs), Windows-Faelle ueber
 `CallWindowProcW` in `ffi_struct_wert.dhtest`.
+**Bitfelder (2026-10-07):** `a AS LONG : 3` oder `a : 3 AS LONG`, Typ im
+Baum `long:3`. Lage nach `cstruct::Bitregel` -- MSVC unter Windows (neue
+Einheit bei anderer Typgroesse oder vollem Wort), GCC/Clang sonst (naechste
+freie Bitstelle, keine Typgrenze ueberschreiten, auch hinter ein
+gewoehnliches Feld); beide mit `clang -Xclang -fdump-record-layouts-simple`
+fuer drei Ziele nachgesehen, `lagen_rechnen_mit` laesst die Rust-Tests beide
+auf jedem System rechnen. `Feld::bits/bit`, die Art fuer
+`__struct_get/_set` ist `l3@5`. Nicht: mit PACK, Breite 0. Tests
+`ffi_struct.dhtest` (DCB ueber `BuildCommDCBA`, Lage je System).
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 

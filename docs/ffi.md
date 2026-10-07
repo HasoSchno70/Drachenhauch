@@ -325,6 +325,47 @@ Auf Linux und macOS hat `struct utsname` (für `uname`) Felder fester Breite,
 Man gibt der Funktion den größeren Struct und liest danach durch die Lage
 des Systems (`tests/pruef/ffi_struct.dhtest` zeigt es).
 
+### Bitfelder
+
+Manche Structs packen mehrere kleine Zahlen in ein Wort -- in C
+`DWORD fBinary : 1;`. In Drachenhauch steht die Breite in Bits hinter dem
+Typ (wie in C) oder, wie in FreeBASIC, hinter dem Namen:
+
+```basic
+STRUCT Status LAYOUT C
+    bereit AS ULONG : 1
+    modus AS ULONG : 2
+    stufe AS LONG : 5           ' mit Vorzeichen: -16 bis 15
+    fehler : 1 AS BOOLEAN       ' die Schreibweise von FreeBASIC
+    zaehler AS ULONG
+END STRUCT
+
+DIM s AS Status
+s.modus = 3
+s.stufe = -2
+PRINT s.modus, s.stufe, HEX$(BUFFER_GET_U32(s, 0))   ' 3  -2  F6
+```
+
+* **Ein Bitfeld liest und schreibt nur seine Bits**; was nicht hineinpasst,
+  ist ein Fehler (`s.modus = 4` -- „passt nicht in ein Bitfeld mit 2 Bits
+  (0 bis 3)“). Mit Vorzeichen (`BYTE`, `SHORT`, `LONG`, `INTEGER`) kommt eine
+  negative Zahl zurück, ohne (`UBYTE` … `ULONG`) nicht. `BOOLEAN` nimmt
+  `TRUE`/`FALSE` (seine Einheit sind 4 Bytes wie bei `int`; ein C-`bool`
+  mit einem Bit ist `UBYTE : 1`).
+* **Wie Bitfelder liegen, legt der Compiler des Systems fest, und dhrt hält
+  sich daran:** unter Windows (MSVC) teilen sich aufeinander folgende
+  Bitfelder eine Einheit ihres Typs nur, wenn der Typ gleich groß ist und
+  die Bits noch passen; unter Linux und macOS (GCC, Clang) kommt ein
+  Bitfeld an die nächste freie Bitstelle, solange es keine Grenze seines
+  Typs überschreitet -- auch direkt hinter ein gewöhnliches Feld. Dieselbe
+  Deklaration kann darum auf den Systemen verschieden lang sein, genau wie
+  in C (`char c; int a : 4;` ist unter Windows 8 Bytes, sonst 4).
+* `OFFSETOF` eines Bitfelds ist ein Fehler (es hat keine Stelle in Bytes),
+  ein Feld von Bitfeldern gibt es nicht, und mit `PACK` gehen Bitfelder
+  (noch) nicht -- dort weichen die Compiler voneinander ab. Ein Bitfeld mit
+  0 Bits (C: `int : 0;`) gibt es nicht; ein unbenanntes Füllfeld bekommt
+  einfach einen Namen.
+
 ### Structs mit Zeigern
 
 Ein Feld vom Typ `char*` oder `void*` ist ein `ZEIGER`. Gesetzt wird es mit
@@ -680,8 +721,9 @@ END TRY
 
 ## Was es (noch) nicht gibt
 
-* Bitfelder in einem Struct; ein Struct als Wert hinter `...` (siehe
-  [Structs als Wert](#structs-als-wert)).
+* Ein Struct als Wert hinter `...` (siehe
+  [Structs als Wert](#structs-als-wert)); Bitfelder mit `PACK` oder mit
+  0 Bits (siehe [Bitfelder](#bitfelder)).
 * C++-Namen, COM, `va_list`-Funktionen (`vprintf`). Eine C++-Bibliothek wie
   Qt geht über einen Umweg mit C-Schnittstelle -- etwa
   [Python einbetten](#python-einbetten) mit PySide6.

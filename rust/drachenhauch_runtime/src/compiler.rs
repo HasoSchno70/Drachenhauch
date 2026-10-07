@@ -344,6 +344,9 @@ struct StructOrt {
     anzahl: u32,
     zeichen: u32,
     groesse: usize,
+    /// Bei einem Bitfeld: Breite und unterstes Bit in der Einheit.
+    bits: u32,
+    bit: u32,
 }
 
 /// Eine Funktion aus einer fremden Bibliothek. Der Aufruf gibt `signatur`
@@ -3810,8 +3813,12 @@ impl Compiler {
             return Err(format!("{}: erwartet einen Struct und ein Feld -- OFFSETOF(SYSTEMTIME, monat)", gross));
         };
         let l = self.lagen.get(&t).ok_or_else(|| format!("{}: '{}' ist kein STRUCT ... LAYOUT C", gross, t.to_uppercase()))?;
-        l.feld(&feld).map(|x| x.offset)
-            .ok_or_else(|| format!("{}: {} hat kein Feld '{}' (Felder: {})", gross, l.name, feld, l.feldnamen()))
+        let x = l.feld(&feld)
+            .ok_or_else(|| format!("{}: {} hat kein Feld '{}' (Felder: {})", gross, l.name, feld, l.feldnamen()))?;
+        if x.bits > 0 {
+            return Err(format!("{}: {}.{} ist ein Bitfeld -- es hat keine Stelle in Bytes (in C ebenso)", gross, l.name, x.name));
+        }
+        Ok(x.offset)
     }
 
     /// Steht hier ein Feld eines `STRUCT ... LAYOUT C` (`st.monat`,
@@ -3824,7 +3831,7 @@ impl Compiler {
                 let t = self.angesagter_typ(name)?;
                 let l = self.lagen.get(&t)?;
                 Some(Ok(StructOrt { basis: n.clone(), wo: name.clone(), fest: 0, dyn_: vec![], art: '#',
-                                    unter: t.clone(), anzahl: 0, zeichen: 0, groesse: l.groesse }))
+                                    unter: t.clone(), anzahl: 0, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0 }))
             }
             Node::MemberAccess { target, name } => {
                 let mut o = match self.struct_ort(target)? { Ok(o) => o, Err(e) => return Some(Err(e)) };
@@ -3845,6 +3852,8 @@ impl Compiler {
                 o.anzahl = f.anzahl;
                 o.zeichen = f.zeichen;
                 o.groesse = f.groesse;
+                o.bits = f.bits;
+                o.bit = f.bit;
                 Some(Ok(o))
             }
             Node::IndexAccess { target, indices } => {
@@ -3894,13 +3903,19 @@ impl Compiler {
         Ok(())
     }
 
+    /// Das Typzeichen fuer `__struct_get/_set`; bei einem Bitfeld mit
+    /// `breite@bit` dahinter.
+    fn struct_art(o: &StructOrt) -> String {
+        if o.bits > 0 { format!("{}{}@{}", o.art, o.bits, o.bit) } else { o.art.to_string() }
+    }
+
     fn struct_lesen(&mut self, o: StructOrt) -> CR {
         Self::struct_einzelwert(&o)?;
         self.expr(&o.basis.clone())?;
         let w = self.ctx.add_const(json!(o.wo));
         self.ctx.emit(oc::LOAD_CONST, json!(w));
         self.struct_stelle(&o)?;
-        let a = self.ctx.add_const(json!(o.art.to_string()));
+        let a = self.ctx.add_const(json!(Self::struct_art(&o)));
         self.ctx.emit(oc::LOAD_CONST, json!(a));
         let z = self.ctx.add_const(json!(o.zeichen));
         self.ctx.emit(oc::LOAD_CONST, json!(z));
@@ -3914,7 +3929,7 @@ impl Compiler {
         let w = self.ctx.add_const(json!(o.wo));
         self.ctx.emit(oc::LOAD_CONST, json!(w));
         self.struct_stelle(&o)?;
-        let a = self.ctx.add_const(json!(o.art.to_string()));
+        let a = self.ctx.add_const(json!(Self::struct_art(&o)));
         self.ctx.emit(oc::LOAD_CONST, json!(a));
         let z = self.ctx.add_const(json!(o.zeichen));
         self.ctx.emit(oc::LOAD_CONST, json!(z));

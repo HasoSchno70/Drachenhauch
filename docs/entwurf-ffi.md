@@ -359,6 +359,29 @@ volle Register davor), dazu unter Windows `CallWindowProcW` mit einem
 Struct im Register und einem als Zeiger. Gegenprobe: die Teile um vier
 Bytes verschoben abgelegt -- der Rust-Test und der Windows-Fall fallen.
 
+**Stand Bitfelder (2026-10-07):** `a AS LONG : 3` (wie C) oder `a : 3 AS
+LONG` (wie FreeBASIC); der Parser haengt die Breite an den Typ (`long:3`),
+ein Doppelpunkt ohne Zahl dahinter trennt weiter Anweisungen. Die Lage
+rechnet `cstruct::lagen_rechnen` nach der Regel des Systems
+(`cstruct::Bitregel`): **MSVC** (Windows) teilt eine Einheit nur bei gleich
+grossem Typ und solange die Bits passen, sonst eine neue Einheit an der
+naechsten Ausrichtung ihres Typs; **GCC/Clang** (Linux, macOS, auch ARM)
+setzen an die naechste freie Bitstelle, solange keine Grenze des Typs
+ueberschritten wird -- auch in die Einheit eines gewoehnlichen Feldes davor.
+Beide Regeln standen nicht im Gedaechtnis, sondern wurden mit
+`clang --target=x86_64-pc-windows-msvc|x86_64-linux-gnu|aarch64-apple-darwin
+-Xclang -fdump-record-layouts-simple` an elf Deklarationen nachgesehen; die
+Rust-Tests rechnen beide auf jedem System. Ein Feld traegt `bits`/`bit`,
+`__struct_get/_set` bekommen `l3@5` als Art (Breite, unterstes Bit) und
+lesen/schreiben die Einheit mit Maske; ein Wert ausserhalb der Breite ist
+ein Fehler, mit Vorzeichen wird erweitert. Als Wert (`wert_text`) ist eine
+Einheit eine Ganzzahl, je Einheit einmal. **Bewusst nicht:** Bitfelder mit
+`PACK` (GCC packt dann bitweise ueber Grenzen, MSVC nicht -- ein drittes
+Regelwerk), Breite 0 und unbenannte Felder. Geprueft an `BuildCommDCBA`
+(das DCB traegt 13 Bitfelder), dazu je System die Lage von `char c; int
+a : 4`. Gegenprobe: Windows nach GCC-Regel -- der Windows-Fall faellt;
+ohne die Grenzpruefung von GCC -- der Rust-Test faellt.
+
 ## Die Fragen dazu (entschieden, siehe oben)
 
 1. **`DECLARE … LIB`** (empfohlen) oder Befehle wie ctypes?

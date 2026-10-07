@@ -1618,6 +1618,14 @@ der Rueckruf {} soll {} liefern: {}	the callback {} should return {}: {}
 Fehler im Rueckruf {}: {}	error in the callback {}: {}
 STRUCT {} LAYOUT C enthaelt sich selbst (ueber {}) -- ein Struct kann sich nicht einbetten, nur einen ZEIGER auf sich haben	STRUCT {} LAYOUT C contains itself (via {}) -- a struct cannot embed itself, only hold a ZEIGER to itself
 STRUCT {}: das Feld '{}' steht zweimal da	STRUCT {}: the field '{}' appears twice
+Ein Bitfeld hat 1 bis 64 Bits -- etwa flags AS ULONG : 3 (ein Bitfeld mit 0 Bits gibt es hier nicht)	A bit field has 1 to 64 bits -- for example flags AS ULONG : 3 (there is no bit field with 0 bits here)
+Ein Bitfeld braucht eine ganze Zahl als Typ (LONG, ULONG, BYTE ...) -- etwa flags AS ULONG : 3	A bit field needs a whole number as its type (LONG, ULONG, BYTE ...) -- for example flags AS ULONG : 3
+STRUCT {}: das Bitfeld '{}' braucht eine ganze Zahl (BYTE, SHORT, LONG, INTEGER, auch ohne Vorzeichen, oder BOOLEAN), nicht {}	STRUCT {}: the bit field '{}' needs a whole number (BYTE, SHORT, LONG, INTEGER, also unsigned, or BOOLEAN), not {}
+STRUCT {}: '{}' ist ein Bitfeld -- ein Feld von Bitfeldern gibt es in C nicht	STRUCT {}: '{}' is a bit field -- C has no arrays of bit fields
+STRUCT {}: Bitfelder gehen (noch) nicht zusammen mit PACK -- dort legen die Compiler sie verschieden	STRUCT {}: bit fields do not work together with PACK (yet) -- there the compilers lay them out differently
+STRUCT {}: das Bitfeld '{}' hat {} Bits, {} hat nur {}	STRUCT {}: the bit field '{}' has {} bits, {} has only {}
+{} passt nicht in ein Bitfeld mit {} Bits ({} bis {})	{} does not fit in a bit field with {} bits ({} to {})
+{}: {}.{} ist ein Bitfeld -- es hat keine Stelle in Bytes (in C ebenso)	{}: {}.{} is a bit field -- it has no position in bytes (same in C)
 STRUCT {}: '{}' ist weder ein Typwort noch ein STRUCT ... LAYOUT C	STRUCT {}: '{}' is neither a type word nor a STRUCT ... LAYOUT C
 STRUCT {}: {} geht in einem Struct nicht	STRUCT {}: {} does not work in a struct
 {}: der Struct ist NIL -- er bekommt seinen Speicher mit DIM	{}: the struct is NIL -- it gets its memory with DIM
