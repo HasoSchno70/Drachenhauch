@@ -61,7 +61,7 @@ schreibt man damit auch Anwendungen mit Fenstern, Formularen und Tabellen
 |---|---|
 | **Betriebssystem** | Dateien und Ordner, Umgebungsvariablen, `SHELL`, Exit-Codes, Argumente — ein `.dh`-Skript ist ein vollwertiges Kommandozeilen-Programm |
 | **Netz** | `HTTP_GET`/`POST` mit Kopfzeilen und JSON, TLS, dazu `SHA256$`, `HMAC_SHA256$` und `UUID4$` für angemeldete Dienste |
-| **Daten** | SQLite, CSV nach RFC 4180, ZIP, JSON, Regex, `BUFFER` für Binärdateien |
+| **Daten** | SQLite, PostgreSQL und MySQL mit denselben Befehlen, CSV nach RFC 4180, ZIP, JSON, Regex, `BUFFER` für Binärdateien |
 | **Größere Programme** | Namensräume (`IMPORT "mathe.dh" AS mathe`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` mit Fehler-Codes, Vererbung mit `SUPER` und `ABSTRACT`, Typtest zur Laufzeit (`x IS Hund`, `TYPEOF`), `ASSERT_EQ` |
 | **Objekte als Rückrufe** | `obj.methode` ist eine `FUNCREF`, die ihre Instanz mitträgt — `GUI_ON_CLICK(knopf, spieler.klick)`, `TIMER_EVERY(500, gegner.zucken)`, `SORT(zahlen, regel.cmp)` |
 | **Fremde Bibliotheken** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — Windows-API, C-Bibliothek, Gerätetreiber direkt aufrufen, mit Zeigern, Structs und Rückrufen; sogar Python samt numpy einbetten ([mehr](docs/ffi.md)) |
@@ -189,7 +189,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | Modul | Wofür |
 |---|---|
 | [`json`](docs/module-json.md) | JSON lesen/schreiben, Pfad-Zugriff (`"user.name"`, `"items.0"`) |
-| [`db`](docs/module-db.md) | SQLite mit `?`-Platzhaltern und Transaktionen |
+| [`db`](docs/module-db.md) | SQLite, PostgreSQL und MySQL mit `?`-Platzhaltern und Transaktionen -- `DB_OPEN` entscheidet am Ziel |
 | [`regex`](docs/module-regex.md) | Muster suchen, ersetzen, trennen |
 | [`tiled`](docs/module-tiled.md) | Karten aus dem Tiled-Editor laden, inklusive Objekte und Eigenschaften |
 | [`tile_collide`](docs/module-tile-collide.md) | Kasten-gegen-Kachelkarte, achsenweise — klassische Plattformer-Physik |

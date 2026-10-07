@@ -1,11 +1,11 @@
 module.exports = (H) => [
   H.chapter("Modul: db"),
-  H.p("Sobald ein Spiel mehr Daten verwalten muss als ein paar Variablen – eine Bestenliste, ein Inventar, Quest-Fortschritte über viele Sitzungen – lohnt sich eine echte Datenbank. Das db-Modul bindet SQLite ein: eine vollständige SQL-Datenbank, die ihre Daten in einer einzigen Datei hält (oder ganz im Arbeitsspeicher). Du brauchst keine Installation und keinen Server."),
+  H.p("Sobald ein Spiel mehr Daten verwalten muss als ein paar Variablen – eine Bestenliste, ein Inventar, Quest-Fortschritte über viele Sitzungen – lohnt sich eine echte Datenbank. Das db-Modul bindet SQLite ein: eine vollständige SQL-Datenbank, die ihre Daten in einer einzigen Datei hält (oder ganz im Arbeitsspeicher). Du brauchst keine Installation und keinen Server. Arbeiten später mehrere Rechner mit denselben Daten, sprechen dieselben Befehle mit einem PostgreSQL- oder MySQL-Server (Abschnitt „Ein Server statt einer Datei“)."),
   H.note("Dieses Kapitel setzt Grundkenntnisse in SQL voraus (CREATE TABLE, INSERT, SELECT, UPDATE, DELETE). Eine vollständige SQL-Einführung sprengt den Rahmen; die hier gezeigten Befehle reichen aber für die allermeisten Spiel-Anwendungen, und du kannst die SQL-Strings 1:1 übernehmen und anpassen."),
 
   H.h2("Verbinden und wieder schließen"),
   H.p('DB_OPEN öffnet (oder erstellt) eine Datenbank und liefert eine DB_CONN-Verbindung. Als Pfad nimmst du einen Dateinamen für eine dauerhafte Datenbank oder den besonderen Wert ":memory:" für eine flüchtige Datenbank, die nur im Arbeitsspeicher lebt und beim Programmende verschwindet (ideal zum Ausprobieren). Am Ende schließt DB_CLOSE die Verbindung.'),
-  H.cmd("DB_OPEN · DB_CLOSE", 'DB_OPEN(pfad$)   DB_CLOSE(conn)',
+  H.cmd("DB_OPEN · DB_CLOSE", 'DB_OPEN(ziel$)   DB_CLOSE(conn)',
     'Öffnet/erstellt die Datenbank, gibt eine DB_CONN zurück. ":memory:" = flüchtige In-Memory-DB. DB_CLOSE gibt die Verbindung am Programmende frei.',
     [
       'IMPORT "db"',
@@ -147,4 +147,39 @@ module.exports = (H) => [
     ]),
   H.note("Die Auftragsnummer auf -1 zu setzen, sobald das Ergebnis abgeholt ist, ist kein Schmuck: Ohne das würde die Schleife im nächsten Bild erneut abholen wollen – und die Nummer gibt es dann nicht mehr.",
     "Merke"),
+
+  H.h2("Ein Server statt einer Datei"),
+  H.p("Eine SQLite-Datei gehört einem Rechner. Sollen die Kasse vorn und die Buchhaltung hinten mit denselben Daten arbeiten, braucht es einen Datenbank-Server. Dafür ändert sich nur eine Zeile: DB_OPEN bekommt statt eines Dateinamens die Adresse des Servers – postgres://… für PostgreSQL, mysql://… für MySQL. Alle anderen Befehle dieses Kapitels bleiben, wie sie sind, auch die ?-Platzhalter."),
+  H.code([
+    'IMPORT "db"',
+    'DIM c AS DB_CONN',
+    'c = DB_OPEN("postgres://hans:geheim@server:5432/laden")',
+    '\' oder: c = DB_OPEN("mysql://hans:geheim@server:3306/laden")',
+    'DB_EXEC(c, "INSERT INTO kunde (name, ort) VALUES (?, ?)", "Meier", "Köln")',
+    'DIM r AS DB_RESULT',
+    'r = DB_QUERY(c, "SELECT name FROM kunde WHERE ort = ?", "Köln")',
+    'WHILE DB_NEXT(r)',
+    '    PRINT DB_GET_STRING(r, 0)',
+    'WEND',
+  ]),
+  H.bullet("Verschlüsselt wird, wenn der Server es kann. Mit ?sslmode=verify-full am Ende der Adresse prüft Drachenhauch zusätzlich das Zertifikat – für Server im Netz, deren Zertifikat von einer echten Stelle stammt."),
+  H.bullet("Genaue Dezimalzahlen (numeric, DECIMAL) kommen als Text an: DB_GET_STRING liefert 19.99 unverändert, DB_GET_FLOAT rechnet um. Für Geld ist das der richtige Weg."),
+  H.bullet("Was sich zwischen den Servern unterscheidet, schreibst du selbst unterschiedlich – etwa SERIAL gegen AUTO_INCREMENT beim Anlegen einer Tabelle. DB_KIND$ sagt, mit wem das Programm gerade spricht."),
+  H.cmd("DB_KIND$", 'DB_KIND$(conn)',
+    "Welche Datenbank hinter einer Verbindung steckt: \"sqlite\", \"postgres\" oder \"mysql\".",
+    [
+      'IMPORT "db"',
+      'DIM con AS DB_CONN',
+      'con = DB_OPEN(":memory:")',
+      'PRINT DB_KIND$(con)',
+    ], { out: ["sqlite"] }),
+  H.cmd("DB_PING", 'DB_PING(conn)',
+    "Steht die Verbindung noch? Eine Datei bricht nie weg, ein Server schon – DB_PING fragt nach und wartet höchstens fünf Sekunden auf die Antwort.",
+    [
+      'IMPORT "db"',
+      'DIM con AS DB_CONN',
+      'con = DB_OPEN(":memory:")',
+      'IF NOT DB_PING(con) THEN PRINT "Verbindung weg"',
+      'PRINT DB_PING(con)',
+    ], { out: ["TRUE"] }),
 ];

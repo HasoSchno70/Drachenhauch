@@ -61,7 +61,7 @@ happen *next to* a game — tools, reports, small services:
 |---|---|
 | **Operating system** | files and folders, environment variables, `SHELL`, exit codes, arguments — a `.dh` script is a fully-fledged command-line program |
 | **Network** | `HTTP_GET`/`POST` with headers and JSON, TLS, plus `SHA256$`, `HMAC_SHA256$` and `UUID4$` for authenticated services |
-| **Data** | SQLite, CSV per RFC 4180, ZIP, JSON, regex, `BUFFER` for binary files |
+| **Data** | SQLite, PostgreSQL and MySQL with the same commands, CSV per RFC 4180, ZIP, JSON, regex, `BUFFER` for binary files |
 | **Larger programs** | namespaces (`IMPORT "math.dh" AS math`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` with error codes, inheritance with `SUPER` and `ABSTRACT`, `ASSERT_EQ` |
 | **Foreign libraries** | `DECLARE FUNCTION MulDiv LIB "kernel32" (a AS LONG, b AS LONG, c AS LONG) AS LONG` — call the Windows API, the C library or device drivers directly, with pointers, structs and callbacks; even embed Python with numpy ([more, in German](docs/en/ffi.md)) |
 | **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
@@ -190,7 +190,7 @@ Full documentation lives in [docs/en/](docs/en/README.md) — the English transl
 | Module | What for |
 |---|---|
 | [`json`](docs/en/module-json.md) | read/write JSON, path access (`"user.name"`, `"items.0"`) |
-| [`db`](docs/en/module-db.md) | SQLite with `?` placeholders and transactions |
+| [`db`](docs/en/module-db.md) | SQLite, PostgreSQL and MySQL with `?` placeholders and transactions -- `DB_OPEN` picks by target |
 | [`regex`](docs/en/module-regex.md) | match, replace, split |
 | [`tiled`](docs/en/module-tiled.md) | load maps from the Tiled editor, including objects and properties |
 | [`tile_collide`](docs/en/module-tile-collide.md) | box against tilemap, axis by axis — classic platformer physics |

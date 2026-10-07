@@ -1,0 +1,529 @@
+' Das db-Modul gegen einen Server: PostgreSQL und MySQL ueber dieselben
+' DB_*-Befehle wie SQLite (docs/module-db.md, Abschnitt "Server"; db.rs).
+' Jeder Ablauf laeuft gegen beide Server mit DERSELBEN Erwartung -- das ist
+' die Zusage: dasselbe Programm, nur ein anderes Ziel in DB_OPEN.
+'
+' Die Server kommen aus der Umgebung (DH_TEST_PG, DH_TEST_MYSQL; die CI
+' startet beide auf dem Linux-Laeufer). Ohne sie ueberspringt sich der Fall.
+' Jede Tabelle bekommt einen eigenen Namen (_hilfen/dbserver.dh), weil die
+' Faelle gleichzeitig laufen.
+
+=== ohne server: falsche angaben werden gemeldet
+IMPORT "db"
+TRY
+    PRINT DB_OPEN("postgres://a:b@localhost:5432/x?sslmode=gibts")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT DB_OPEN("mysql://a:b@localhost:3306/x?sslmode=gibts")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT DB_OPEN("postgres://a:b@localhost:notaport/x")
+CATCH e
+    PRINT LEFT$(e, 8), INSTR(e, "postgres://nutzer") > 0
+END TRY
+' Eine Datei bleibt SQLite.
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+PRINT DB_KIND$(c), DB_PING(c)
+--- erwartet
+DB_OPEN: sslmode=gibts gibt es nicht (disable, prefer, require, verify-full)
+DB_OPEN: sslmode=gibts gibt es nicht (disable, prefer, require, verify-full)
+DB_OPEN: TRUE
+sqlite TRUE
+
+=== postgres: werte hin und zurueck
+IMPORT "db"
+IMPORT "hilfe.dh"
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("pg"))
+PRINT DB_PING(c)
+DIM t AS STRING : t = dbTabelle$(c)
+' Ein ? im Text ist kein Platzhalter; Umlaute, Anfuehrungszeichen, NULL.
+PRINT DB_EXEC(c, "INSERT INTO " + t + " (name, preis, menge, wert, aktiv, tag, zeit, daten) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", "Grüße 'x' ?", "19.99", 3, 2.5, TRUE, "2024-02-29", "2026-10-06 13:05:09", BUFFER_FROM_STRING("ab"))
+PRINT DB_LAST_ROWID(c)
+DB_EXEC(c, "INSERT INTO " + t + " (name, preis, menge, aktiv) VALUES (?, ?, ?, ?)", NIL, 7, NIL, FALSE)
+PRINT DB_LAST_ROWID(c)
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT id, name, preis, menge, wert, aktiv, tag, zeit, daten FROM " + t + " WHERE menge > ? OR menge IS NULL ORDER BY id", 1)
+DIM i AS INTEGER
+DIM kopf AS STRING
+FOR i = 0 TO DB_COL_COUNT(r) - 1
+    kopf = kopf + DB_COL_NAME(r, i) + " "
+NEXT
+PRINT TRIM$(kopf)
+WHILE DB_NEXT(r)
+    PRINT DB_GET_INT(r, 0), DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), DB_GET_FLOAT(r, 2), DB_IS_NULL(r, 3), DB_GET_FLOAT(r, 4), DB_GET_BOOL(r, 5), "[" + DB_GET_STRING(r, 6) + "]", "[" + DB_GET_STRING(r, 7) + "]", "[" + DB_GET_STRING(r, 8) + "]"
+WEND
+' Eine Dezimalzahl mit Nachkommastellen ist nicht ganz.
+r = DB_QUERY(c, "SELECT preis FROM " + t + " WHERE id = 1")
+DB_NEXT(r)
+TRY
+    PRINT DB_GET_INT(r, 0)
+CATCH e
+    PRINT e
+END TRY
+' Ein leeres Ergebnis kennt trotzdem seine Spalten.
+r = DB_QUERY(c, "SELECT name, menge FROM " + t + " WHERE id < 0")
+PRINT DB_COL_COUNT(r), DB_COL_NAME(r, 1), DB_NEXT(r)
+DB_EXEC(c, "DROP TABLE " + t)
+DB_CLOSE(c)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+TRUE
+1
+1
+2
+id name preis menge wert aktiv tag zeit daten
+1 Grüße 'x' ? 19.99 19.99 FALSE 2.5 TRUE [2024-02-29] [2026-10-06 13:05:09] [ab]
+2  7.00 7.0 TRUE 0.0 FALSE [] [] []
+DB_GET_INT: Spalte 0 ist die Dezimalzahl 19.99, nicht ganz
+2 menge FALSE
+
+=== postgres: transaktion: zuruecknehmen und festschreiben
+IMPORT "db"
+IMPORT "hilfe.dh"
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("pg"))
+DIM t AS STRING : t = dbTabelle$(c)
+DB_EXEC(c, "INSERT INTO " + t + " (name) VALUES (?)", "a")
+DB_BEGIN(c)
+PRINT DB_EXEC(c, "DELETE FROM " + t)
+DB_ROLLBACK(c)
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT COUNT(*) FROM " + t)
+DB_NEXT(r)
+PRINT DB_GET_INT(r, 0)
+DB_BEGIN(c)
+DB_EXEC(c, "INSERT INTO " + t + " (name) VALUES (?)", "b")
+DB_EXEC(c, "INSERT INTO " + t + " (name) VALUES (?)", "c")
+DB_COMMIT(c)
+' Eine zweite Verbindung sieht, was festgeschrieben ist.
+DIM d AS DB_CONN
+d = DB_OPEN(dbZiel$("pg"))
+r = DB_QUERY(d, "SELECT name FROM " + t + " ORDER BY name")
+DIM namen AS STRING
+WHILE DB_NEXT(r)
+    namen = namen + DB_GET_STRING(r, 0)
+WEND
+PRINT namen
+PRINT DB_EXEC(c, "UPDATE " + t + " SET menge = ? WHERE name <> ?", 5, "a")
+DB_EXEC(c, "DROP TABLE " + t)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+1
+1
+abc
+2
+
+=== postgres: fehler kommen als fehler an
+IMPORT "db"
+IMPORT "hilfe.dh"
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("pg"))
+DIM t AS STRING : t = dbTabelle$(c)
+' Der Server nennt den Fehler samt seiner Nummer.
+TRY
+    DB_EXEC(c, "SELECT * FROM gibts_nicht_" + t)
+CATCH e
+    PRINT LEFT$(e, 9), INSTR(e, "(PostgreSQL 42P01)") > 0
+END TRY
+' Zahl der Platzhalter und Werte passt nicht -- fuer beide gleich gesagt.
+TRY
+    DB_QUERY(c, "SELECT * FROM " + t + " WHERE id = ? AND name = ?", 1)
+CATCH e
+    PRINT e
+END TRY
+' Danach geht es weiter.
+PRINT DB_EXEC(c, "INSERT INTO " + t + " (name) VALUES (?)", "x"), DB_PING(c)
+DB_EXEC(c, "DROP TABLE " + t)
+DB_CLOSE(c)
+TRY
+    PRINT DB_PING(c)
+CATCH e
+    PRINT e
+END TRY
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+DB_EXEC:  TRUE
+DB_QUERY: die Abfrage hat 2 Platzhalter, uebergeben sind 1 Werte
+1 TRUE
+DB: ungueltiges/geschlossenes DB_CONN-Handle 0
+
+=== postgres: abfrage im hintergrund
+IMPORT "db"
+IMPORT "hilfe.dh"
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("pg"))
+DIM t AS STRING : t = dbTabelle$(c)
+DIM k AS INTEGER
+FOR k = 1 TO 5
+    DB_EXEC(c, "INSERT INTO " + t + " (name, menge) VALUES (?, ?)", "n" + STR$(k), k * k)
+NEXT
+' Der Auftrag oeffnet seine eigene Verbindung zum selben Ziel.
+DIM a AS INTEGER
+a = DB_QUERY_START(dbZiel$("pg"), "SELECT SUM(menge), COUNT(*) FROM " + t + " WHERE menge > ?", 3)
+WHILE NOT DB_QUERY_READY(a)
+    SLEEP(10)
+WEND
+DIM r AS DB_RESULT
+r = DB_QUERY_RESULT(a)
+DB_NEXT(r)
+PRINT DB_GET_INT(r, 0), DB_GET_INT(r, 1)
+a = DB_QUERY_START(dbZiel$("pg"), "SELECT * FROM gibts_nicht_" + t)
+WHILE NOT DB_QUERY_READY(a)
+    SLEEP(10)
+WEND
+TRY
+    r = DB_QUERY_RESULT(a)
+CATCH e
+    PRINT LEFT$(e, 15)
+END TRY
+DB_EXEC(c, "DROP TABLE " + t)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+54 4
+DB_QUERY_START:
+
+=== postgres: verschluesselt nach sslmode
+IMPORT "db"
+IMPORT "hilfe.dh"
+FUNCTION tls(ziel AS STRING) AS BOOLEAN
+    DIM c AS DB_CONN
+    c = DB_OPEN(ziel)
+    DIM r AS DB_RESULT
+    IF DB_KIND$(c) = "postgres" THEN
+        r = DB_QUERY(c, "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()")
+        DB_NEXT(r)
+        RETURN DB_GET_BOOL(r, 0)
+    END IF
+    r = DB_QUERY(c, "SHOW SESSION STATUS LIKE 'Ssl_cipher'")
+    DB_NEXT(r)
+    RETURN DB_GET_STRING(r, 1) <> ""
+END FUNCTION
+DIM z AS STRING : z = dbZiel$("pg")
+DIM v AS STRING
+IF INSTR(z, "?") >= 0 THEN v = "&" ELSE v = "?"
+' Die Vorgabe ist prefer: verschluesselt, wenn der Server es kann.
+PRINT tls(z), tls(z + v + "sslmode=require"), tls(z + v + "sslmode=disable")
+TRY
+    PRINT tls(z + v + "sslmode=gibts")
+CATCH e
+    PRINT e
+END TRY
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+TRUE TRUE FALSE
+DB_OPEN: sslmode=gibts gibt es nicht (disable, prefer, require, verify-full)
+
+=== postgres: ein formular speichert und laedt
+IMPORT "gui"
+IMPORT "db"
+IMPORT "hilfe.dh"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("pg"))
+DIM t AS STRING : t = dbTabelle$(c)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "")
+DIM menge AS GUI_WIDGET : menge = GUI_TEXTINPUT(w, 10, 50, 200, 28, "")
+GUI_TEXTINPUT_SET(menge, "zahlen", 1)
+GUI_BIND(name, "name") : GUI_BIND(menge, "menge")
+GUI_SET_TEXT(name, "Anna") : GUI_SET_TEXT(menge, "12")
+' -1 = neu: das INSERT liefert die vergebene Kennung (PostgreSQL ueber RETURNING).
+DIM id AS INTEGER : id = GUI_FORM_SAVE(w, c, t, -1)
+GUI_SET_TEXT(name, "Bert") : GUI_SET_TEXT(menge, "7")
+DIM id2 AS INTEGER : id2 = GUI_FORM_SAVE(w, c, t, -1)
+PRINT id, id2
+GUI_SET_TEXT(name, "Anja")
+PRINT GUI_FORM_SAVE(w, c, t, id)
+GUI_FORM_CLEAR(w)
+PRINT GUI_FORM_LOAD(w, c, t, id), GUI_TEXT(name), GUI_TEXT(menge)
+PRINT GUI_FORM_LOAD(w, c, t, 999)
+DB_EXEC(c, "DROP TABLE " + t)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+1 2
+1
+TRUE Anja 7
+FALSE
+
+=== mysql: werte hin und zurueck
+IMPORT "db"
+IMPORT "hilfe.dh"
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("mysql"))
+PRINT DB_PING(c)
+DIM t AS STRING : t = dbTabelle$(c)
+' Ein ? im Text ist kein Platzhalter; Umlaute, Anfuehrungszeichen, NULL.
+PRINT DB_EXEC(c, "INSERT INTO " + t + " (name, preis, menge, wert, aktiv, tag, zeit, daten) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", "Grüße 'x' ?", "19.99", 3, 2.5, TRUE, "2024-02-29", "2026-10-06 13:05:09", BUFFER_FROM_STRING("ab"))
+PRINT DB_LAST_ROWID(c)
+DB_EXEC(c, "INSERT INTO " + t + " (name, preis, menge, aktiv) VALUES (?, ?, ?, ?)", NIL, 7, NIL, FALSE)
+PRINT DB_LAST_ROWID(c)
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT id, name, preis, menge, wert, aktiv, tag, zeit, daten FROM " + t + " WHERE menge > ? OR menge IS NULL ORDER BY id", 1)
+DIM i AS INTEGER
+DIM kopf AS STRING
+FOR i = 0 TO DB_COL_COUNT(r) - 1
+    kopf = kopf + DB_COL_NAME(r, i) + " "
+NEXT
+PRINT TRIM$(kopf)
+WHILE DB_NEXT(r)
+    PRINT DB_GET_INT(r, 0), DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), DB_GET_FLOAT(r, 2), DB_IS_NULL(r, 3), DB_GET_FLOAT(r, 4), DB_GET_BOOL(r, 5), "[" + DB_GET_STRING(r, 6) + "]", "[" + DB_GET_STRING(r, 7) + "]", "[" + DB_GET_STRING(r, 8) + "]"
+WEND
+' Eine Dezimalzahl mit Nachkommastellen ist nicht ganz.
+r = DB_QUERY(c, "SELECT preis FROM " + t + " WHERE id = 1")
+DB_NEXT(r)
+TRY
+    PRINT DB_GET_INT(r, 0)
+CATCH e
+    PRINT e
+END TRY
+' Ein leeres Ergebnis kennt trotzdem seine Spalten.
+r = DB_QUERY(c, "SELECT name, menge FROM " + t + " WHERE id < 0")
+PRINT DB_COL_COUNT(r), DB_COL_NAME(r, 1), DB_NEXT(r)
+DB_EXEC(c, "DROP TABLE " + t)
+DB_CLOSE(c)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+TRUE
+1
+1
+2
+id name preis menge wert aktiv tag zeit daten
+1 Grüße 'x' ? 19.99 19.99 FALSE 2.5 TRUE [2024-02-29] [2026-10-06 13:05:09] [ab]
+2  7.00 7.0 TRUE 0.0 FALSE [] [] []
+DB_GET_INT: Spalte 0 ist die Dezimalzahl 19.99, nicht ganz
+2 menge FALSE
+
+=== mysql: transaktion: zuruecknehmen und festschreiben
+IMPORT "db"
+IMPORT "hilfe.dh"
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("mysql"))
+DIM t AS STRING : t = dbTabelle$(c)
+DB_EXEC(c, "INSERT INTO " + t + " (name) VALUES (?)", "a")
+DB_BEGIN(c)
+PRINT DB_EXEC(c, "DELETE FROM " + t)
+DB_ROLLBACK(c)
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT COUNT(*) FROM " + t)
+DB_NEXT(r)
+PRINT DB_GET_INT(r, 0)
+DB_BEGIN(c)
+DB_EXEC(c, "INSERT INTO " + t + " (name) VALUES (?)", "b")
+DB_EXEC(c, "INSERT INTO " + t + " (name) VALUES (?)", "c")
+DB_COMMIT(c)
+' Eine zweite Verbindung sieht, was festgeschrieben ist.
+DIM d AS DB_CONN
+d = DB_OPEN(dbZiel$("mysql"))
+r = DB_QUERY(d, "SELECT name FROM " + t + " ORDER BY name")
+DIM namen AS STRING
+WHILE DB_NEXT(r)
+    namen = namen + DB_GET_STRING(r, 0)
+WEND
+PRINT namen
+PRINT DB_EXEC(c, "UPDATE " + t + " SET menge = ? WHERE name <> ?", 5, "a")
+DB_EXEC(c, "DROP TABLE " + t)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+1
+1
+abc
+2
+
+=== mysql: fehler kommen als fehler an
+IMPORT "db"
+IMPORT "hilfe.dh"
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("mysql"))
+DIM t AS STRING : t = dbTabelle$(c)
+' Der Server nennt den Fehler samt seiner Nummer.
+TRY
+    DB_EXEC(c, "SELECT * FROM gibts_nicht_" + t)
+CATCH e
+    PRINT LEFT$(e, 9), INSTR(e, "(MySQL 1146)") > 0
+END TRY
+' Zahl der Platzhalter und Werte passt nicht -- fuer beide gleich gesagt.
+TRY
+    DB_QUERY(c, "SELECT * FROM " + t + " WHERE id = ? AND name = ?", 1)
+CATCH e
+    PRINT e
+END TRY
+' Danach geht es weiter.
+PRINT DB_EXEC(c, "INSERT INTO " + t + " (name) VALUES (?)", "x"), DB_PING(c)
+DB_EXEC(c, "DROP TABLE " + t)
+DB_CLOSE(c)
+TRY
+    PRINT DB_PING(c)
+CATCH e
+    PRINT e
+END TRY
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+DB_EXEC:  TRUE
+DB_QUERY: die Abfrage hat 2 Platzhalter, uebergeben sind 1 Werte
+1 TRUE
+DB: ungueltiges/geschlossenes DB_CONN-Handle 0
+
+=== mysql: abfrage im hintergrund
+IMPORT "db"
+IMPORT "hilfe.dh"
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("mysql"))
+DIM t AS STRING : t = dbTabelle$(c)
+DIM k AS INTEGER
+FOR k = 1 TO 5
+    DB_EXEC(c, "INSERT INTO " + t + " (name, menge) VALUES (?, ?)", "n" + STR$(k), k * k)
+NEXT
+' Der Auftrag oeffnet seine eigene Verbindung zum selben Ziel.
+DIM a AS INTEGER
+a = DB_QUERY_START(dbZiel$("mysql"), "SELECT SUM(menge), COUNT(*) FROM " + t + " WHERE menge > ?", 3)
+WHILE NOT DB_QUERY_READY(a)
+    SLEEP(10)
+WEND
+DIM r AS DB_RESULT
+r = DB_QUERY_RESULT(a)
+DB_NEXT(r)
+PRINT DB_GET_INT(r, 0), DB_GET_INT(r, 1)
+a = DB_QUERY_START(dbZiel$("mysql"), "SELECT * FROM gibts_nicht_" + t)
+WHILE NOT DB_QUERY_READY(a)
+    SLEEP(10)
+WEND
+TRY
+    r = DB_QUERY_RESULT(a)
+CATCH e
+    PRINT LEFT$(e, 15)
+END TRY
+DB_EXEC(c, "DROP TABLE " + t)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+54 4
+DB_QUERY_START:
+
+=== mysql: verschluesselt nach sslmode
+IMPORT "db"
+IMPORT "hilfe.dh"
+FUNCTION tls(ziel AS STRING) AS BOOLEAN
+    DIM c AS DB_CONN
+    c = DB_OPEN(ziel)
+    DIM r AS DB_RESULT
+    IF DB_KIND$(c) = "postgres" THEN
+        r = DB_QUERY(c, "SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()")
+        DB_NEXT(r)
+        RETURN DB_GET_BOOL(r, 0)
+    END IF
+    r = DB_QUERY(c, "SHOW SESSION STATUS LIKE 'Ssl_cipher'")
+    DB_NEXT(r)
+    RETURN DB_GET_STRING(r, 1) <> ""
+END FUNCTION
+DIM z AS STRING : z = dbZiel$("mysql")
+DIM v AS STRING
+IF INSTR(z, "?") >= 0 THEN v = "&" ELSE v = "?"
+' Die Vorgabe ist prefer: verschluesselt, wenn der Server es kann.
+PRINT tls(z), tls(z + v + "sslmode=require"), tls(z + v + "sslmode=disable")
+TRY
+    PRINT tls(z + v + "sslmode=gibts")
+CATCH e
+    PRINT e
+END TRY
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+TRUE TRUE FALSE
+DB_OPEN: sslmode=gibts gibt es nicht (disable, prefer, require, verify-full)
+
+=== mysql: ein formular speichert und laedt
+IMPORT "gui"
+IMPORT "db"
+IMPORT "hilfe.dh"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("mysql"))
+DIM t AS STRING : t = dbTabelle$(c)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "")
+DIM menge AS GUI_WIDGET : menge = GUI_TEXTINPUT(w, 10, 50, 200, 28, "")
+GUI_TEXTINPUT_SET(menge, "zahlen", 1)
+GUI_BIND(name, "name") : GUI_BIND(menge, "menge")
+GUI_SET_TEXT(name, "Anna") : GUI_SET_TEXT(menge, "12")
+' -1 = neu: das INSERT liefert die vergebene Kennung (PostgreSQL ueber RETURNING).
+DIM id AS INTEGER : id = GUI_FORM_SAVE(w, c, t, -1)
+GUI_SET_TEXT(name, "Bert") : GUI_SET_TEXT(menge, "7")
+DIM id2 AS INTEGER : id2 = GUI_FORM_SAVE(w, c, t, -1)
+PRINT id, id2
+GUI_SET_TEXT(name, "Anja")
+PRINT GUI_FORM_SAVE(w, c, t, id)
+GUI_FORM_CLEAR(w)
+PRINT GUI_FORM_LOAD(w, c, t, id), GUI_TEXT(name), GUI_TEXT(menge)
+PRINT GUI_FORM_LOAD(w, c, t, 999)
+DB_EXEC(c, "DROP TABLE " + t)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+1 2
+1
+TRUE Anja 7
+FALSE
+
+=== postgres: platzhalter mit dollar und lastval
+IMPORT "db"
+IMPORT "hilfe.dh"
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("pg"))
+' Ohne vergebene Kennung kennt die Verbindung kein lastval().
+TRY
+    PRINT DB_LAST_ROWID(c)
+CATCH e
+    PRINT INSTR(e, "RETURNING id") > 0
+END TRY
+DIM t AS STRING : t = dbTabelle$(c)
+' $1, $2 duerfen auch selbst stehen -- dann wird nichts uebersetzt, und ein
+' Wert darf zweimal gebraucht werden.
+DB_EXEC(c, "INSERT INTO " + t + " (name, menge) VALUES ($1, $2), ($1, $2 + 1)", "zwei", 4)
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT name, menge, '?' AS frage, $tag$ein ? hier$tag$ AS dollar FROM " + t + " WHERE menge > ? ORDER BY menge", 3)
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 0), DB_GET_INT(r, 1), DB_GET_STRING(r, 2), DB_GET_STRING(r, 3)
+WEND
+' Typen, die es nur hier gibt, kommen als Text.
+r = DB_QUERY(c, "SELECT '7c9e6679-7425-40de-944b-e07fc1f90ae7'::uuid, '{" + CHR$(34) + "a" + CHR$(34) + ": 1}'::jsonb, interval '1 day 02:00:00', 12.5::money")
+DB_NEXT(r)
+PRINT DB_GET_STRING(r, 0)
+PRINT DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), DB_GET_STRING(r, 3)
+' Was Drachenhauch nicht liest, sagt, wie es doch geht.
+TRY
+    r = DB_QUERY(c, "SELECT ARRAY[1, 2] AS feld")
+CATCH e
+    PRINT e
+END TRY
+r = DB_QUERY(c, "SELECT ARRAY[1, 2]::text AS feld")
+DB_NEXT(r)
+PRINT DB_GET_STRING(r, 0)
+DB_EXEC(c, "DROP TABLE " + t)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+--- erwartet
+TRUE
+zwei 4 ? ein ? hier
+zwei 5 ? ein ? hier
+7c9e6679-7425-40de-944b-e07fc1f90ae7
+{"a": 1} 1 day 02:00:00 12.50
+DB_QUERY: Spalte 0 (feld): den Typ _int4 liest Drachenhauch (noch) nicht -- in der Abfrage mit ::text umwandeln
+{1,2}

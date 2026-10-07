@@ -147,6 +147,14 @@ ureq = { version = "2", optional = true }
 # C-Toolchain mitbraeuchte -- dieselbe Wahl, die ureq schon getroffen hat.
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
 webpki-roots = { version = "0.26", optional = true }
+# db-Modul gegen einen Server (docs/entwurf-datenbanktreiber.md): PostgreSQL
+# und MySQL, beide reines Rust; TLS ueber dasselbe rustls+ring wie smtp/ureq
+# (fuer mysql ausdruecklich `rustls-tls-ring`, die Vorgabe zoege aws-lc-sys
+# und damit cmake nach).
+postgres = { version = "0.19", optional = true }
+tokio-postgres-rustls = { version = "0.13", optional = true }
+bytes = { version = "1", optional = true }
+mysql = { version = "28", default-features = false, features = ["minimal-rust", "rustls-tls-ring"], optional = true }
 # Hardware/IoT-Module (Phase 4):
 serialport = { version = "4", optional = true }   # serial
 hidapi = { version = "2", optional = true }        # usb (HID)
@@ -254,6 +262,9 @@ jit = ["dep:cranelift-codegen", "dep:cranelift-frontend", "dep:cranelift-jit", "
 # Uebergaenge baut Cranelift, darum haengt es an jit.
 ffi = ["jit", "dep:libloading"]
 db = ["dep:rusqlite"]
+# DB_OPEN("postgres://...") / DB_OPEN("mysql://...") -- dieselben DB_*-Befehle.
+pg = ["db", "dep:postgres", "dep:tokio-postgres-rustls", "dep:bytes", "dep:rustls", "dep:webpki-roots"]
+mysql = ["db", "dep:mysql"]
 # PDF-Modul (krilla, eingebettete DejaVu-Schriften, Textformung) -- gut 6 MB
 # der Laufzeit; ein Programm, das kein PDF schreibt, braucht es nicht
 # (schlanker Export, docs/entwurf-anwendungen-und-tempo.md).
