@@ -304,6 +304,148 @@ END FUNCTION
 --- erwartet
 7 8
 
+=== bitfelder lesen und schreiben
+' Die Lage haengt am System (MSVC unter Windows, GCC/Clang sonst); hier
+' nur, was ueberall gleich ist: drei Felder in einer ULONG-Einheit, ein
+' Vorzeichen, BOOLEAN, und dass jedes Feld nur seine Bits anfasst.
+STRUCT Flags LAYOUT C
+    a AS ULONG : 3
+    b AS LONG : 5
+    c AS ULONG : 24
+    d : 1 AS BOOLEAN
+    e AS ULONG
+END STRUCT
+DIM f AS Flags
+f.a = 5
+f.b = -7
+f.c = &HABCDEF
+PRINT f.a, f.b, f.c, f.d, f.e
+PRINT HEX$(BUFFER_GET_U32(f, 0))
+f.d = TRUE
+f.e = 42
+f.b = 15
+PRINT f.a, f.b, f.c, f.d, f.e, SIZEOF(Flags), OFFSETOF(Flags, e)
+f.b = -16
+PRINT f.b
+TRY
+    f.b = 16
+CATCH e
+    PRINT e
+END TRY
+TRY
+    f.a = -1
+CATCH e
+    PRINT e
+END TRY
+TRY
+    f.d = 1
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+5 -7 11259375 FALSE 0
+ABCDEFCD
+5 15 11259375 TRUE 42 12 8
+-16
+f.b: 16 passt nicht in ein Bitfeld mit 5 Bits (-16 bis 15)
+f.a: -1 passt nicht in ein Bitfeld mit 3 Bits (0 bis 7)
+f.d: erwartet einen Wahrheitswert (BOOLEAN), erhalten INTEGER
+
+=== bitfelder: die lage nach den regeln des systems
+' char c; int a:4; short s -- GCC und Clang setzen a in die int-Einheit
+' des char (Bit 8), MSVC beginnt eine neue (Stelle 4).
+STRUCT Bits LAYOUT C
+    c AS BYTE
+    a AS LONG : 4
+    s AS SHORT
+END STRUCT
+DIM b AS Bits
+b.a = -1
+PRINT SIZEOF(Bits), OFFSETOF(Bits, s), BUFFER_LEN(b)
+DIM z AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO BUFFER_LEN(b) - 1
+    z = z + HEX$(BUFFER_GET(b, i)) + " "
+NEXT
+PRINT TRIM$(z)
+--- system windows
+--- erwartet
+12 8 12
+0 0 0 0 F 0 0 0 0 0 0 0
+
+=== bitfelder: die lage nach den regeln von gcc und clang
+STRUCT Bits LAYOUT C
+    c AS BYTE
+    a AS LONG : 4
+    s AS SHORT
+END STRUCT
+DIM b AS Bits
+b.a = -1
+PRINT SIZEOF(Bits), OFFSETOF(Bits, s), BUFFER_LEN(b)
+DIM z AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO BUFFER_LEN(b) - 1
+    z = z + HEX$(BUFFER_GET(b, i)) + " "
+NEXT
+PRINT TRIM$(z)
+--- system posix
+--- erwartet
+4 2 4
+0 F 0 0
+
+=== bitfelder der windows-api: buildcommdcba fuellt ein dcb
+' Das DCB einer seriellen Schnittstelle traegt 13 Bitfelder in einer
+' DWORD-Einheit. BuildCommDCBA fuellt es aus einem Text, ohne dass es einen
+' Anschluss braucht.
+STRUCT DCB LAYOUT C
+    DCBlength AS ULONG
+    BaudRate AS ULONG
+    fBinary AS ULONG : 1
+    fParity AS ULONG : 1
+    fOutxCtsFlow AS ULONG : 1
+    fOutxDsrFlow AS ULONG : 1
+    fDtrControl AS ULONG : 2
+    fDsrSensitivity AS ULONG : 1
+    fTXContinueOnXoff AS ULONG : 1
+    fOutX AS ULONG : 1
+    fInX AS ULONG : 1
+    fErrorChar AS ULONG : 1
+    fNull AS ULONG : 1
+    fRtsControl AS ULONG : 2
+    fAbortOnError AS ULONG : 1
+    fDummy2 AS ULONG : 17
+    wReserved AS USHORT
+    XonLim AS USHORT
+    XoffLim AS USHORT
+    ByteSize AS UBYTE
+    Parity AS UBYTE
+    StopBits AS UBYTE
+    XonChar AS BYTE
+    XoffChar AS BYTE
+    ErrorChar AS BYTE
+    EofChar AS BYTE
+    EvtChar AS BYTE
+    wReserved1 AS USHORT
+END STRUCT
+DECLARE FUNCTION BuildCommDCBA LIB "kernel32" (def AS TEXT, dcb AS DCB) AS BOOLEAN
+PRINT SIZEOF(DCB), OFFSETOF(DCB, wReserved), OFFSETOF(DCB, ByteSize)
+DIM d AS DCB
+d.DCBlength = SIZEOF(DCB)
+PRINT BuildCommDCBA("baud=19200 parity=e data=7 stop=2 dtr=on rts=on octs=on idsr=on", d)
+PRINT d.BaudRate, d.ByteSize, d.Parity, d.StopBits
+PRINT d.fOutxCtsFlow, d.fOutxDsrFlow, d.fDtrControl, d.fDsrSensitivity, d.fRtsControl
+d.fDtrControl = 2
+d.fRtsControl = 3
+d.fAbortOnError = 1
+PRINT HEX$(BUFFER_GET_I32(d, 8) BAND &H7FFF), d.fOutxCtsFlow, d.fDsrSensitivity
+--- system windows
+--- erwartet
+28 12 18
+TRUE
+19200 7 2 2
+1 0 1 1 1
+7064 1 1
+
 === was nicht geht, sagt der uebersetzer
 IMPORT "json"
 DIM p AS INTEGER
@@ -347,6 +489,16 @@ pruefe("STRUCT A LAYOUT C" + nl + "  b AS A" + nl + "END STRUCT")
 pruefe("STRUCT A LAYOUT C PACK 3" + nl + "  b AS LONG" + nl + "END STRUCT")
 pruefe("STRUCT A LAYOUT C" + nl + "  b AS TEXT" + nl + "END STRUCT")
 pruefe("STRUCT A LAYOUT C" + nl + "  b AS LONG" + nl + "END STRUCT" + nl + "STRUCT A" + nl + "  DIM x AS INTEGER" + nl + "END STRUCT")
+DIM bits AS STRING
+bits = "STRUCT B LAYOUT C" + nl + "  a AS LONG : 3" + nl + "  x AS LONG : y AS LONG" + nl + "END STRUCT" + nl
+pruefe(bits + "DIM b AS B" + nl + "b.a = 3" + nl + "PRINT b.a + b.x + b.y")
+pruefe(bits + "PRINT OFFSETOF(B, a), OFFSETOF(B, y)")
+pruefe("STRUCT B LAYOUT C" + nl + "  a AS FLOAT : 3" + nl + "END STRUCT")
+pruefe("STRUCT B LAYOUT C" + nl + "  a AS BYTE : 9" + nl + "END STRUCT")
+pruefe("STRUCT B LAYOUT C" + nl + "  a AS LONG : 0" + nl + "END STRUCT")
+pruefe("STRUCT B LAYOUT C" + nl + "  a[2] AS LONG : 3" + nl + "END STRUCT")
+pruefe("STRUCT B LAYOUT C PACK 1" + nl + "  a AS LONG : 3" + nl + "END STRUCT")
+pruefe("STRUCT B LAYOUT C" + nl + "  a : 3 AS TEXT * 4" + nl + "END STRUCT")
 --- erwartet
 ok
 Punkt hat kein Feld 'z' (Felder: x, w)
@@ -356,11 +508,19 @@ SIZEOF: 'GIBTS' ist weder ein STRUCT ... LAYOUT C noch ein Typwort (LONG, ZEIGER
 OFFSETOF: Punkt hat kein Feld 'z' (Felder: x, w)
 Ein Feld von Punkt gibt es nicht -- ein STRUCT ... LAYOUT C mit einem Feld davon schon: STRUCT Liste LAYOUT C / e[10] AS Punkt / END STRUCT
 k.p: ein STRUCT ... LAYOUT C kann (noch) kein Feld einer Klasse sein -- er lebt in einer Variable oder einem Parameter (DIM p AS Punkt), oder das Feld ist ein BUFFER mit BUFFER_NEW(SIZEOF(Punkt))
-'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER)
+'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST)
 STRUCT A LAYOUT C enthaelt sich selbst (ueber a) -- ein Struct kann sich nicht einbetten, nur einen ZEIGER auf sich haben
 Erwartet 1, 2, 4, 8 oder 16 nach PACK
 Ein Text im Struct hat eine feste Laenge: TEXT * 32 (Zeichen) -- ein Zeiger auf Text ist ZEIGER
 STRUCT A ist zweimal deklariert -- eines von beiden umbenennen
+ok
+OFFSETOF: B.a ist ein Bitfeld -- es hat keine Stelle in Bytes (in C ebenso)
+STRUCT B: das Bitfeld 'a' braucht eine ganze Zahl (BYTE, SHORT, LONG, INTEGER, auch ohne Vorzeichen, oder BOOLEAN), nicht FLOAT
+STRUCT B: das Bitfeld 'a' hat 9 Bits, BYTE hat nur 8
+Ein Bitfeld hat 1 bis 64 Bits -- etwa flags AS ULONG : 3 (ein Bitfeld mit 0 Bits gibt es hier nicht)
+STRUCT B: 'a' ist ein Bitfeld -- ein Feld von Bitfeldern gibt es in C nicht
+STRUCT B: Bitfelder gehen (noch) nicht zusammen mit PACK -- dort legen die Compiler sie verschieden
+Ein Bitfeld braucht eine ganze Zahl als Typ (LONG, ULONG, BYTE ...) -- etwa flags AS ULONG : 3
 
 === dhrt fmt schreibt die woerter des structs gross
 DIM p AS INTEGER

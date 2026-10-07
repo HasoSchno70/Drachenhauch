@@ -71,6 +71,7 @@ Drachenhauch-Typen sagen nicht, wie breit eine Zahl in C ist.
 | `WTEXT` (auch `WSTR`) | `const wchar_t*` (Windows: UTF-16, sonst UTF-32) | STRING |
 | `BUFFER` | `void*` auf die Bytes des Puffers | BUFFER |
 | `FUNCTION(...) AS typ`, `SUB(...)` | Funktionszeiger (Rückruf) | FUNCREF |
+| `VALIST` (auch `VA_LIST`) | `va_list` (für `vprintf` und Co.) | ein Tupel, ein Feld, ein Wert oder NIL |
 
 * **Ein Wert, der nicht passt, ist ein Fehler**: `LONG` mit 2^40 bricht ab,
   statt still abgeschnitten zu werden; eine Kommazahl für `LONG` ebenso.
@@ -325,6 +326,47 @@ Auf Linux und macOS hat `struct utsname` (für `uname`) Felder fester Breite,
 Man gibt der Funktion den größeren Struct und liest danach durch die Lage
 des Systems (`tests/pruef/ffi_struct.dhtest` zeigt es).
 
+### Bitfelder
+
+Manche Structs packen mehrere kleine Zahlen in ein Wort -- in C
+`DWORD fBinary : 1;`. In Drachenhauch steht die Breite in Bits hinter dem
+Typ (wie in C) oder, wie in FreeBASIC, hinter dem Namen:
+
+```basic
+STRUCT Status LAYOUT C
+    bereit AS ULONG : 1
+    modus AS ULONG : 2
+    stufe AS LONG : 5           ' mit Vorzeichen: -16 bis 15
+    fehler : 1 AS BOOLEAN       ' die Schreibweise von FreeBASIC
+    zaehler AS ULONG
+END STRUCT
+
+DIM s AS Status
+s.modus = 3
+s.stufe = -2
+PRINT s.modus, s.stufe, HEX$(BUFFER_GET_U32(s, 0))   ' 3  -2  F6
+```
+
+* **Ein Bitfeld liest und schreibt nur seine Bits**; was nicht hineinpasst,
+  ist ein Fehler (`s.modus = 4` -- „passt nicht in ein Bitfeld mit 2 Bits
+  (0 bis 3)“). Mit Vorzeichen (`BYTE`, `SHORT`, `LONG`, `INTEGER`) kommt eine
+  negative Zahl zurück, ohne (`UBYTE` … `ULONG`) nicht. `BOOLEAN` nimmt
+  `TRUE`/`FALSE` (seine Einheit sind 4 Bytes wie bei `int`; ein C-`bool`
+  mit einem Bit ist `UBYTE : 1`).
+* **Wie Bitfelder liegen, legt der Compiler des Systems fest, und dhrt hält
+  sich daran:** unter Windows (MSVC) teilen sich aufeinander folgende
+  Bitfelder eine Einheit ihres Typs nur, wenn der Typ gleich groß ist und
+  die Bits noch passen; unter Linux und macOS (GCC, Clang) kommt ein
+  Bitfeld an die nächste freie Bitstelle, solange es keine Grenze seines
+  Typs überschreitet -- auch direkt hinter ein gewöhnliches Feld. Dieselbe
+  Deklaration kann darum auf den Systemen verschieden lang sein, genau wie
+  in C (`char c; int a : 4;` ist unter Windows 8 Bytes, sonst 4).
+* `OFFSETOF` eines Bitfelds ist ein Fehler (es hat keine Stelle in Bytes),
+  ein Feld von Bitfeldern gibt es nicht, und mit `PACK` gehen Bitfelder
+  (noch) nicht -- dort weichen die Compiler voneinander ab. Ein Bitfeld mit
+  0 Bits (C: `int : 0;`) gibt es nicht; ein unbenanntes Füllfeld bekommt
+  einfach einen Namen.
+
 ### Structs mit Zeigern
 
 Ein Feld vom Typ `char*` oder `void*` ist ein `ZEIGER`. Gesetzt wird es mit
@@ -390,10 +432,11 @@ PRINT w.re, w.im, cabs(z)     ' 0.0  2.0  4.0
 * **Komplexe Zahlen** (`double complex`, `_Dcomplex`) behandelt C genau wie
   einen Struct aus zwei Kommazahlen -- `csqrt`, `cexp` und Co. aus der
   C-Bibliothek gehen damit wie oben.
-* Nicht (noch) als Wert: ein Struct in einem **Rückruf** (er kommt dort als
-  `ZEIGER` an) und in einer Funktion mit **`...`**; auf ARM ein Struct aus
-  Kommazahlen, für den hinter acht Kommazahl-Argumenten kein Register mehr
-  frei ist. Alle drei sind eine Meldung, kein stiller Fehler.
+* Im **Rückruf** geht ein Struct ebenso als Wert, siehe
+  [Structs als Wert im Rückruf](#structs-als-wert-im-rückruf).
+* Nicht (noch) als Wert: ein Struct in einer Funktion mit **`...`**; auf ARM
+  ein Struct aus Kommazahlen, für den hinter acht Kommazahl-Argumenten kein
+  Register mehr frei ist. Beide sind eine Meldung, kein stiller Fehler.
 
 ## GTK
 
@@ -536,6 +579,35 @@ PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))      ' 3 Drachen, 4.5 Meter, feuerrot
   setzt ein kleines Sprungbrett das Register `al`, auf Apple-ARM liegen die
   weiteren Werte auf dem Stapel) -- das übernimmt dhrt.
 
+### va_list
+
+Zu vielen Funktionen mit `...` gibt es eine Schwester, die die Werte als
+**eine** Liste nimmt: `vprintf`, `vsprintf`, `vsnprintf`, unter Windows
+`wvsprintfA` -- und Bibliotheken, die eine Meldung so weiterreichen. Der
+Parameter heißt `VALIST`, das Argument ist ein Tupel der Werte:
+
+```basic
+DECLARE FUNCTION vsprintf LIB "msvcrt|c" (ziel AS BUFFER, format AS TEXT, werte AS VALIST) AS LONG
+
+DIM b AS BUFFER
+b = BUFFER_NEW(128)
+vsprintf(b, "%d Drachen, %.1f Meter, %s", (3, 4.5, "feuerrot"))
+PRINT TEXT_AUS_ZEIGER$(BUFFER_ZEIGER(b))      ' 3 Drachen, 4.5 Meter, feuerrot
+```
+
+* **Die Liste** ist ein Tupel, ein Feld (`[1, 2, 3]`), ein einzelner Wert
+  (für genau einen) oder `NIL` (keiner). Jeder Wert wird wie hinter `...`
+  übergeben: ganze Zahlen mit 64 Bit, Kommazahlen als `double`, Text als
+  kopierter `const char*`, ein BUFFER als Zeiger auf seine Bytes.
+* **Ein `va_list` sieht auf jedem System anders aus** -- unter Windows und
+  auf Apple-ARM ein Zeiger auf die Werte, unter Linux und macOS auf Intel
+  ein Struct, der sagt, dass die Register schon verbraucht sind und alles
+  hinter ihm liegt, auf Linux-ARM ein ähnlicher. dhrt baut ihn für jeden
+  Aufruf neu; die Funktion darf ihn aufbrauchen.
+* `VALIST` gibt es nur als Parameter -- nicht als Rückgabe, nicht mit
+  `BYREF` und (noch) nicht in einem Rückruf (ein `va_list`, den eine
+  Bibliothek einem Rückruf gibt, kommt als `ZEIGER` an).
+
 ## Rückrufe
 
 Manche Bibliotheken rufen zurück: `qsort` fragt für jedes Paar, welches
@@ -569,7 +641,8 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   Zahltypen, `ZEIGER`, `BOOLEAN` und `TEXT`/`WTEXT` (kommt als STRING an);
   kein `BUFFER` (Speicher der Bibliothek ist ein `ZEIGER`) und kein `BYREF`.
   Zurück gibt ein Rückruf eine Zahl, einen `ZEIGER` oder `BOOLEAN`, oder als
-  `SUB(...)` nichts.
+  `SUB(...)` nichts. Ein Struct als Wert geht in beide Richtungen, siehe
+  unten.
 * **Übergeben wird eine Funktion**: ihr Name ohne Klammern, eine gebundene
   Methode (`zaehler.eins` -- das Objekt kommt mit) oder ein Lambda. `NIL`
   übergibt einen Nullzeiger. Passt die Zahl ihrer Parameter nicht, ist das
@@ -594,6 +667,43 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   entsteht, bekommt jedes Mal einen neuen (wenige Bytes, die bis zum Ende
   bleiben). Ein Fehler in einem Rückruf, den die Bibliothek außerhalb eines
   Aufrufs ruft, meldet sich beim nächsten Aufruf einer Bibliothek.
+
+### Structs als Wert im Rückruf
+
+Übergibt die Bibliothek einen Struct als Wert (C: `int f(Punkt p)`) oder
+erwartet sie einen zurück, steht er im Rückruf genauso wie in der
+`DECLARE`-Zeile -- mit `BYVAL` als Parameter, mit seinem Namen als
+Rückgabe:
+
+```basic
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DECLARE SUB zeichne LIB "grafik" (n AS LONG, _
+    ort AS FUNCTION(BYVAL p AS Punkt, i AS LONG) AS Punkt)
+
+FUNCTION verschiebe(p AS Punkt, i AS INTEGER) AS Punkt
+    DIM r AS Punkt
+    r.x = p.x + i * 10
+    r.y = p.y
+    RETURN r
+END FUNCTION
+
+zeichne(5, verschiebe)
+```
+
+* **Die Funktion bekommt eine Kopie** in einem BUFFER der Größe des Structs
+  -- was sie daran ändert, sieht die Bibliothek nicht.
+* **Zurück gibt sie einen Struct** (einen BUFFER, mindestens so lang wie
+  er); ein zu kurzer Puffer oder ein Wert anderer Art ist ein Fehler, der
+  wie jeder Fehler im Rückruf beim Aufruf der Bibliothek ankommt.
+* **Ohne `BYVAL` ist es ein Fehler:** übergibt die Bibliothek einen
+  *Zeiger* auf einen Struct (C: `Punkt*`), heißt der Parameter `ZEIGER`, und
+  `BUFFER_AUS_ZEIGER(z, SIZEOF(Punkt))` liest ihn.
+* Wie der Struct reist, entscheidet wieder das System -- dieselben Regeln
+  wie oben, nur in Gegenrichtung: was in Registern ankommt, setzt der
+  Einstieg wieder zusammen.
 
 ## Export
 
@@ -641,17 +751,25 @@ END TRY
 
 ## Was es (noch) nicht gibt
 
-* Bitfelder in einem Struct; ein Struct als Wert in einem Rückruf oder
-  hinter `...` (siehe [Structs als Wert](#structs-als-wert)).
-* C++-Namen, COM, `va_list`-Funktionen (`vprintf`). Eine C++-Bibliothek wie
+* Ein Struct als Wert hinter `...` (siehe
+  [Structs als Wert](#structs-als-wert)); Bitfelder mit `PACK` oder mit
+  0 Bits (siehe [Bitfelder](#bitfelder)).
+* C++-Namen, COM. Eine C++-Bibliothek wie
   Qt geht über einen Umweg mit C-Schnittstelle -- etwa
   [Python einbetten](#python-einbetten) mit PySide6.
 * **Im Browser** gibt es keine fremden Bibliotheken; ein Aufruf ist dort ein
   Fehler mit diesem Satz.
 
-Der Maschinencode nimmt Aufrufe fremder Funktionen nicht in seine Schleifen
-auf, sie laufen in der VM -- eine Frage der Geschwindigkeit, nicht der
-Richtigkeit.
+**Im Maschinencode:** eine Schleife, die eine fremde Funktion ruft, wird
+übersetzt wie jede andere. Nimmt und liefert die Funktion nur Zahlen
+(ganze Zahlen, `ZEIGER`, `BOOLEAN`, `SINGLE`, `FLOAT`, ohne `BYREF`), läuft
+der Aufruf im schnellen, getypten Teil -- eine Million `abs`-Aufrufe in
+einer Schleife brauchen dann 54 statt 116 ms in der VM. **Sobald das
+Programm einen Rückruf vergeben hat, bleiben Schleifen mit Aufrufen einer
+Bibliothek in der VM**: eine Bibliothek darf sich einen Rückruf merken und
+ihn bei jedem späteren Aufruf rufen (GTK tut genau das), und der Rückruf
+darf Variablen ändern, die eine übersetzte Schleife gerade selbst hält.
+Am Ergebnis ändert das nichts, nur an der Geschwindigkeit.
 
 ## Unter der Haube
 

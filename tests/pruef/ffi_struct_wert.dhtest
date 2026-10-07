@@ -147,6 +147,77 @@ PRINT CGRectContainsPoint(u, p), CGRectContainsPoint(a, p)
 12.5
 TRUE FALSE
 
+=== windows: ein rueckruf bekommt und liefert einen struct als wert
+' CallWindowProcW ruft die Funktion mit (hwnd, msg, wParam, lParam). Unter
+' Windows x64 geht ein Struct mit 8 Bytes in einem Register -- an der Stelle
+' von hwnd; einer mit 16 Bytes geht als Zeiger auf seine Bytes. Zurueck kommt
+' ein Struct mit 8 Bytes in RAX, das ist das LRESULT. Wie die anderen Systeme
+' einen Struct im Rueckruf zusammensetzen, pruefen die Rust-Tests in ffi.rs
+' (structs_im_rueckruf).
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+STRUCT Gross LAYOUT C
+    a AS FLOAT
+    b AS INTEGER
+END STRUCT
+DECLARE FUNCTION CallWindowProcW LIB "user32" (proc AS FUNCTION(BYVAL p AS Punkt, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS Punkt, h AS ZEIGER, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS INTEGER
+DECLARE FUNCTION CallWindowProcG LIB "user32" ALIAS "CallWindowProcW" (proc AS FUNCTION(BYVAL g AS Gross, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS INTEGER, h AS ZEIGER, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS INTEGER
+FUNCTION tausch(p AS Punkt, m AS INTEGER, w AS INTEGER, l AS INTEGER) AS Punkt
+    PRINT "im rueckruf", p.x, p.y, m, w, l, TYPEOF(p), BUFFER_LEN(p)
+    DIM r AS Punkt
+    r.x = p.y * 10
+    r.y = p.x
+    p.x = 0
+    RETURN r
+END FUNCTION
+FUNCTION gross(g AS Gross, m AS INTEGER, w AS INTEGER, l AS INTEGER) AS INTEGER
+    RETURN INT(g.a * 100) + g.b + m + w + l
+END FUNCTION
+DIM e AS INTEGER
+e = CallWindowProcW(tausch, 7 + 3 * 4294967296, 5, 6, 8)
+PRINT e BAND &HFFFFFFFF, e SHR 32
+DIM g AS Gross
+g.a = 1.5
+g.b = 1000
+PRINT CallWindowProcG(gross, BUFFER_ZEIGER(g), 1, 2, 3)
+' Die Kopie gehoert dem Rueckruf: der Struct des Programms bleibt.
+PRINT g.a, g.b
+--- system windows
+--- erwartet
+im rueckruf 7 3 5 6 8 BUFFER 8
+30 7
+1156
+1.5 1000
+
+=== windows: ein rueckruf liefert den falschen struct
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DECLARE FUNCTION CallWindowProcW LIB "user32" (proc AS FUNCTION(BYVAL p AS Punkt, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS Punkt, h AS ZEIGER, m AS ULONG, w AS ZEIGER, l AS ZEIGER) AS INTEGER
+FUNCTION kurz(p AS Punkt, m AS INTEGER, w AS INTEGER, l AS INTEGER) AS BUFFER
+    RETURN BUFFER_NEW(4)
+END FUNCTION
+FUNCTION zahl(p AS Punkt, m AS INTEGER, w AS INTEGER, l AS INTEGER) AS INTEGER
+    RETURN 3
+END FUNCTION
+TRY
+    PRINT CallWindowProcW(kurz, 1, 2, 3, 4)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT CallWindowProcW(zahl, 1, 2, 3, 4)
+CATCH e
+    PRINT e
+END TRY
+--- system windows
+--- erwartet
+CallWindowProcW: der Rueckruf kurz soll einen Struct PUNKT liefern: der Puffer ist 4 Bytes lang, der Struct braucht 8
+CallWindowProcW: der Rueckruf zahl soll einen Struct PUNKT liefern (einen BUFFER), erhalten INTEGER
+
 === was beim laufen nicht passt
 STRUCT Komplex LAYOUT C
     re AS FLOAT
@@ -213,9 +284,17 @@ pruefe(kopf + "DECLARE FUNCTION f LIB " + q + "c" + q + " (BYVAL p AS Gibts) AS 
 pruefe(kopf + "DECLARE FUNCTION f LIB " + q + "c" + q + " (p AS LONG) AS Gibts")
 pruefe(kopf + "DECLARE SUB f LIB " + q + "c" + q + " (r AS FUNCTION(p AS Punkt) AS LONG)")
 pruefe(kopf + "DECLARE FUNCTION f LIB " + q + "c" + q + " (BYVAL p AS Punkt) AS LONG" + nl + "PRINT f(" + q + "x" + q + ")")
+pruefe(kopf + "DECLARE SUB f LIB " + q + "c" + q + " (r AS FUNCTION(BYVAL p AS Punkt, ZEIGER) AS Punkt)")
+pruefe(kopf + "DECLARE SUB f LIB " + q + "c" + q + " (r AS FUNCTION(BYVAL p AS Gibts) AS LONG)")
+pruefe(kopf + "DECLARE SUB f LIB " + q + "c" + q + " (r AS FUNCTION(p AS LONG) AS Gibts)")
+pruefe(kopf + "DECLARE SUB f LIB " + q + "c" + q + " (r AS SUB(BYVAL p AS LONG))")
 --- erwartet
 ok
-'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER)
-'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER)
-'PUNKT' ist kein Typ fuer fremde Bibliotheken (moeglich: BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER) -- ein Struct geht in einem Rueckruf (noch) nicht: einen Zeiger darauf bekommt er als ZEIGER, BUFFER_AUS_ZEIGER liest ihn
+'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST)
+'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST)
+Ein Struct im Rueckruf: mit BYVAL kommt er als Wert (BYVAL p AS PUNKT) -- uebergibt die Bibliothek einen Zeiger darauf, heisst der Parameter ZEIGER, BUFFER_AUS_ZEIGER liest ihn
 f: Argument 1 (p AS PUNKT) bekommt STRING -- beim Laufen bricht diese Zeile ab
+ok
+'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST)
+'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST)
+BYVAL steht im Rueckruf nur vor einem Struct -- Zahlen kommen ohnehin als Wert

@@ -1604,6 +1604,11 @@ BYREF geht nicht bei einem Rueckruf -- die Bibliothek bekommt ohnehin einen Zeig
 Erwartet '(' -- ein Rueckruf nennt seine Parameter: FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG	Expected '(' -- a callback names its parameters: FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG
 BYREF gibt es in einem Rueckruf nicht -- was die Bibliothek als Zeiger uebergibt, kommt als ZEIGER an	There is no BYREF in a callback -- what the library passes as a pointer arrives as ZEIGER
 Ein Rueckruf bekommt keinen BUFFER -- Speicher der Bibliothek kommt als ZEIGER an, BUFFER_AUS_ZEIGER liest ihn	A callback does not get a BUFFER -- memory of the library arrives as ZEIGER, BUFFER_AUS_ZEIGER reads it
+Ein Rueckruf bekommt (noch) keinen VALIST -- eine Liste der Bibliothek kommt als ZEIGER an	A callback does not get a VALIST (yet) -- a list from the library arrives as ZEIGER
+BYREF geht nicht bei VALIST -- die Bibliothek bekommt ohnehin einen Zeiger auf die Werte	BYREF does not work for VALIST -- the library gets a pointer to the values anyway
+VALIST geht nur als Parameter -- eine Liste von Werten fuer vprintf und Co.	VALIST only works as a parameter -- a list of values for vprintf and the like
+Wert {} der Liste: ein Nullzeichen mitten im Text -- C saehe nur den Anfang	value {} of the list: a null character in the middle of the text -- C would only see the beginning
+Wert {} der Liste: erwartet eine Zahl, einen Text, einen BUFFER oder NIL, erhalten {}	value {} of the list: expects a number, a text, a BUFFER or NIL, got {}
 Erwartet ')' am Ende der Parameter des Rueckrufs	Expected ')' at the end of the callback's parameters
 Ein Rueckruf mit SUB gibt nichts zurueck -- mit Rueckgabe heisst es FUNCTION(...) AS typ	A callback with SUB returns nothing -- with a return value it is FUNCTION(...) AS type
 Erwartet AS <Rueckgabetyp> nach FUNCTION(...) -- ohne Rueckgabe heisst es SUB(...)	Expected AS <return type> after FUNCTION(...) -- without a return value it is SUB(...)
@@ -1618,6 +1623,14 @@ der Rueckruf {} soll {} liefern: {}	the callback {} should return {}: {}
 Fehler im Rueckruf {}: {}	error in the callback {}: {}
 STRUCT {} LAYOUT C enthaelt sich selbst (ueber {}) -- ein Struct kann sich nicht einbetten, nur einen ZEIGER auf sich haben	STRUCT {} LAYOUT C contains itself (via {}) -- a struct cannot embed itself, only hold a ZEIGER to itself
 STRUCT {}: das Feld '{}' steht zweimal da	STRUCT {}: the field '{}' appears twice
+Ein Bitfeld hat 1 bis 64 Bits -- etwa flags AS ULONG : 3 (ein Bitfeld mit 0 Bits gibt es hier nicht)	A bit field has 1 to 64 bits -- for example flags AS ULONG : 3 (there is no bit field with 0 bits here)
+Ein Bitfeld braucht eine ganze Zahl als Typ (LONG, ULONG, BYTE ...) -- etwa flags AS ULONG : 3	A bit field needs a whole number as its type (LONG, ULONG, BYTE ...) -- for example flags AS ULONG : 3
+STRUCT {}: das Bitfeld '{}' braucht eine ganze Zahl (BYTE, SHORT, LONG, INTEGER, auch ohne Vorzeichen, oder BOOLEAN), nicht {}	STRUCT {}: the bit field '{}' needs a whole number (BYTE, SHORT, LONG, INTEGER, also unsigned, or BOOLEAN), not {}
+STRUCT {}: '{}' ist ein Bitfeld -- ein Feld von Bitfeldern gibt es in C nicht	STRUCT {}: '{}' is a bit field -- C has no arrays of bit fields
+STRUCT {}: Bitfelder gehen (noch) nicht zusammen mit PACK -- dort legen die Compiler sie verschieden	STRUCT {}: bit fields do not work together with PACK (yet) -- there the compilers lay them out differently
+STRUCT {}: das Bitfeld '{}' hat {} Bits, {} hat nur {}	STRUCT {}: the bit field '{}' has {} bits, {} has only {}
+{} passt nicht in ein Bitfeld mit {} Bits ({} bis {})	{} does not fit in a bit field with {} bits ({} to {})
+{}: {}.{} ist ein Bitfeld -- es hat keine Stelle in Bytes (in C ebenso)	{}: {}.{} is a bit field -- it has no position in bytes (same in C)
 STRUCT {}: '{}' ist weder ein Typwort noch ein STRUCT ... LAYOUT C	STRUCT {}: '{}' is neither a type word nor a STRUCT ... LAYOUT C
 STRUCT {}: {} geht in einem Struct nicht	STRUCT {}: {} does not work in a struct
 {}: der Struct ist NIL -- er bekommt seinen Speicher mit DIM	{}: the struct is NIL -- it gets its memory with DIM
@@ -1670,7 +1683,12 @@ erwartet einen Struct {} (einen BUFFER), erhalten {}	expected a struct {} (a BUF
 der Puffer ist {} Bytes lang, der Struct braucht {}	the buffer is {} bytes long, the struct needs {}
 ein Struct als Wert geht (noch) nicht in einer Funktion mit ... -- uebergib ihn dort als Zeiger (ohne BYVAL)	a struct by value does not work (yet) in a function with ... -- pass it as a pointer there (without BYVAL)
 der Struct {} (Argument {}) passt nicht mehr in die Register fuer Kommazahlen -- so viele Kommazahlen davor gehen hier (noch) nicht	the struct {} (argument {}) no longer fits into the floating-point registers -- that many floating-point arguments before it do not work here (yet)
-{} -- ein Struct geht in einem Rueckruf (noch) nicht: einen Zeiger darauf bekommt er als ZEIGER, BUFFER_AUS_ZEIGER liest ihn	{} -- a struct does not work in a callback (yet): it receives a pointer to it as ZEIGER, BUFFER_AUS_ZEIGER reads it
+Ein Struct im Rueckruf: mit BYVAL kommt er als Wert (BYVAL p AS {}) -- uebergibt die Bibliothek einen Zeiger darauf, heisst der Parameter ZEIGER, BUFFER_AUS_ZEIGER liest ihn	A struct in a callback: with BYVAL it arrives as a value (BYVAL p AS {}) -- if the library passes a pointer to it, the parameter is ZEIGER, BUFFER_AUS_ZEIGER reads it
+BYVAL steht im Rueckruf nur vor einem Struct -- Zahlen kommen ohnehin als Wert	In a callback BYVAL only goes before a struct -- numbers arrive as values anyway
+der Rueckruf {} soll einen Struct {} liefern: der Puffer ist {} Bytes lang, der Struct braucht {}	the callback {} should return a struct {}: the buffer is {} bytes long, the struct needs {}
+der Rueckruf {} soll einen Struct {} liefern (einen BUFFER), erhalten {}	the callback {} should return a struct {} (a BUFFER), got {}
+kaputte Signatur des Rueckrufs	broken signature of the callback
+Rueckruf {}: {}	callback {}: {}
 {}: Parameter-Typ {} nicht unterstuetzt (erlaubt: INTEGER, FLOAT, STRING, BOOLEAN, BUFFER, NIL)	{}: parameter type {} not supported (allowed: INTEGER, FLOAT, STRING, BOOLEAN, BUFFER, NIL)
 DB_GET_INT: Spalte {} ist die Dezimalzahl {}, nicht ganz	DB_GET_INT: column {} is the decimal {}, not a whole number
 DB_GET_FLOAT: Spalte {} ist {}, keine Zahl	DB_GET_FLOAT: column {} is {}, not a number

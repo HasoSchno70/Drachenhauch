@@ -341,6 +341,97 @@ jeden Struct als Zeiger -- drei Rust-Tests und zwei Fälle fallen. Nicht:
 Struct als Wert in Rückrufen und hinter `...`, eine HFA ohne freie
 V-Register.
 
+**Stand Struct als Wert im Rückruf (2026-10-07):** `FUNCTION(BYVAL p AS
+Punkt) AS Punkt` im Rückruf. Der Parser schreibt `{name}`, der Compiler
+setzt die Lage ein (`r` + Rückgabe + Parameter, ein Struct als `{lage}`,
+`ffi::rueckruf_lesen`). Der Einstieg (`uebergang::Bauer::rueckruf_plan`)
+liest `ffi::plan` in Gegenrichtung: was in Registern ankommt (`Ueber`), legt
+er in einen Bereich je Struct und reicht `eingang` einen Zeiger darauf;
+kam der Struct als Zeiger (`Platz`, Windows und ARM über 16 Bytes) oder auf
+dem Stapel (`Kopie`, Cranelift gibt dem Gerufenen bei `StructArgument` die
+Adresse), steht dieser Zeiger im Platz. Die Rückgabe legt `eingang` in den
+Rückgabe-Bereich; in Teilen (`Teile`) geht sie in die Register, über die
+versteckte Adresse (`StructReturn`) wird sie Byte für Byte in Struct-Länge
+dorthin kopiert -- die Adresse selbst gibt Cranelift zurück. Geprüft wie
+bei den Aufrufen: Rust ruft den Einstieg wie eine C-Funktion mit
+`#[repr(C)]`-Structs (`structs_im_rueckruf`: 3, 8, 12, 16, 24 und 32 Bytes,
+volle Register davor), dazu unter Windows `CallWindowProcW` mit einem
+Struct im Register und einem als Zeiger. Gegenprobe: die Teile um vier
+Bytes verschoben abgelegt -- der Rust-Test und der Windows-Fall fallen.
+
+**Stand Bitfelder (2026-10-07):** `a AS LONG : 3` (wie C) oder `a : 3 AS
+LONG` (wie FreeBASIC); der Parser haengt die Breite an den Typ (`long:3`),
+ein Doppelpunkt ohne Zahl dahinter trennt weiter Anweisungen. Die Lage
+rechnet `cstruct::lagen_rechnen` nach der Regel des Systems
+(`cstruct::Bitregel`): **MSVC** (Windows) teilt eine Einheit nur bei gleich
+grossem Typ und solange die Bits passen, sonst eine neue Einheit an der
+naechsten Ausrichtung ihres Typs; **GCC/Clang** (Linux, macOS, auch ARM)
+setzen an die naechste freie Bitstelle, solange keine Grenze des Typs
+ueberschritten wird -- auch in die Einheit eines gewoehnlichen Feldes davor.
+Beide Regeln standen nicht im Gedaechtnis, sondern wurden mit
+`clang --target=x86_64-pc-windows-msvc|x86_64-linux-gnu|aarch64-apple-darwin
+-Xclang -fdump-record-layouts-simple` an elf Deklarationen nachgesehen; die
+Rust-Tests rechnen beide auf jedem System. Ein Feld traegt `bits`/`bit`,
+`__struct_get/_set` bekommen `l3@5` als Art (Breite, unterstes Bit) und
+lesen/schreiben die Einheit mit Maske; ein Wert ausserhalb der Breite ist
+ein Fehler, mit Vorzeichen wird erweitert. Als Wert (`wert_text`) ist eine
+Einheit eine Ganzzahl, je Einheit einmal. **Bewusst nicht:** Bitfelder mit
+`PACK` (GCC packt dann bitweise ueber Grenzen, MSVC nicht -- ein drittes
+Regelwerk), Breite 0 und unbenannte Felder. Geprueft an `BuildCommDCBA`
+(das DCB traegt 13 Bitfelder), dazu je System die Lage von `char c; int
+a : 4`. Gegenprobe: Windows nach GCC-Regel -- der Windows-Fall faellt;
+ohne die Grenzpruefung von GCC -- der Rust-Test faellt.
+
+**Stand va_list (2026-10-07):** Typwort `VALIST` (`VA_LIST`, Zeichen `a`),
+das Argument ist ein Tupel, ein Feld, ein Wert oder NIL. Die Werte kommen
+wie hinter `...` in 8-Byte-Plaetze; davor setzt `ffi::valist_kopf` je
+System (`ValistForm`), was C als `va_list` erwartet: **Windows und
+Apple-ARM** sind `char*` -- der Zeiger auf die Plaetze genuegt; **System V
+x86-64** ist ein Feld aus einem `__va_list_tag` (`gp_offset`, `fp_offset`,
+`overflow_arg_area`, `reg_save_area`), als Parameter ein Zeiger darauf: mit
+`gp_offset` 48 und `fp_offset` 176 gelten alle Register als verbraucht, und
+`va_arg` liest alles aus dem Ueberlaufbereich, also den Plaetzen
+(nachgesehen in der WSL mit gcc gegen die glibc, bevor es gebaut wurde);
+**AAPCS64 ausser Apple** ist ein Struct mit 32 Bytes (`__stack`, `__gr_top`,
+`__vr_top`, `__gr_offs`, `__vr_offs`), der als Wert ueber 16 Bytes ohnehin
+als Zeiger auf eine Kopie reist -- mit beiden Offsets 0 liest `va_arg` ab
+`__stack`. Linux-ARM ist nach dem ABI gebaut, aber ungeprueft (die CI hat
+kein Linux-ARM). Ein Rust-Test ruft `vsprintf` der echten C-Bibliothek
+(in der CI auf allen drei Systemen), dazu `tests/pruef/ffi.dhtest` mit
+`vsprintf` und `wvsprintfA`. Gegenprobe: Kommazahlen als SINGLE abgelegt --
+Rust-Test und Fall fallen. Nicht: `VALIST` in einem Rueckruf (der Rueckruf
+muesste `va_arg` nachbauen), als Rueckgabe oder mit BYREF.
+
+**Stand Maschinencode (2026-10-07):** `__ffi` war in `befehl_im_bereich`
+pauschal gesperrt. Die Sperre ist noetig, sobald fremder Code
+Drachenhauch-Code rufen KANN -- und das kann nicht nur ein Aufruf mit
+Rueckruf-Parameter, sondern jeder, sobald das Programm einmal einen Rueckruf
+vergeben hat (die Bibliothek merkt ihn sich; GTK ruft ihn aus `gtk_main`).
+Darum gilt: `__ffi` im Bereich nur, solange **kein Rueckruf vergeben** ist
+(`ffi::rueckrufe_vergeben`, gefragt beim Bauen) und die Signatur **keinen
+Rueckruf nimmt** (`ffi::ohne_drachenhauch_code`, gefragt je Aufruf -- sonst
+steigt der Bereich vor dem Befehl aus). Belegt mit einem Fall, in dem
+`CallWindowProcW(proc AS ZEIGER, ...)` einen per `EncodePointer`
+gemerkten Rueckruf ruft, der eine Globale der Schleife aendert: ohne die
+Sperre rechnet der Maschinencode 120 statt 1020.
+Gemessen brachte das Erlauben allein nichts (abs je Million: 198 ms gegen
+196 ms in der VM): mit `__ffi` fiel der ganze Bereich in den Wertemodus, und
+der Aufrufweg selbst kostete ~200 ns. Zwei Schritte danach: (1) der
+Aufrufweg -- die Signatur wird an ihrem `Rc` erkannt statt je Aufruf
+gehasht (`aufruf_wert`, Zuletzt-Liste), Plaetze bis 16 Argumente auf dem
+Stapel, der Typname nur im Fehlerfall: VM 202 -> 116 ms; (2) **getypt**:
+eine Signatur nur aus Zahlen ist im Bereich `Art::S` (Zeiger auf die
+Konstante), der Aufruf geht ueber den Helfer `ffi_zahlen` ->
+`ffi::zahlen_rufen` (dieselben Pruefungen und derselbe Uebergang ueber
+`rufen_mit`); jeder Fehler kommt dort VOR dem eigentlichen Aufruf, also
+darf der Bereich davor aussteigen, und die VM ruft und meldet. Nicht in
+uebersetzten Funktionen (die VM rechnet dort bei einem Ausstieg die ganze
+Funktion nach -- ein Fremdaufruf hat Nebenwirkungen). Ergebnis 201 -> 54 ms
+mit Maschinencode (`tools/tempo/ffi.dh`, best of 5, gegen den Bau davor;
+die uebrigen Messungen unveraendert). Fund dabei: der Ausstieg mitten im
+Bereich schrieb nur Zahlen und Objekte in den Stapel der VM zurueck -- mit
+der Signatur auf dem Stapel las die VM Muell als Zeiger und stuerzte ab.
+
 ## Die Fragen dazu (entschieden, siehe oben)
 
 1. **`DECLARE … LIB`** (empfohlen) oder Befehle wie ctypes?

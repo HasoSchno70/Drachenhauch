@@ -1624,6 +1624,10 @@ impl Parser {
                     } else {
                         self.ffi_typwort()?
                     };
+                    if by_ref && matches!(wort.as_str(), "valist" | "va_list") {
+                        self.pos -= 1;
+                        return self.err("BYREF geht nicht bei VALIST -- die Bibliothek bekommt ohnehin einen Zeiger auf die Werte");
+                    }
                     if by_ref && matches!(wort.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer") {
                         self.pos -= 1;
                         return self.err(&format!(
@@ -1657,6 +1661,10 @@ impl Parser {
                 self.pos -= 1;
                 return self.err("BUFFER geht nur als Parameter -- liefert die Bibliothek Speicher, ist die Rueckgabe ein ZEIGER");
             }
+            if matches!(wort.as_str(), "valist" | "va_list") {
+                self.pos -= 1;
+                return self.err("VALIST geht nur als Parameter -- eine Liste von Werten fuer vprintf und Co.");
+            }
             Some(wort)
         };
         self.consume_terminator()?;
@@ -1665,7 +1673,9 @@ impl Parser {
 
     /// Ein Rueckruf als Typ eines Parameters: `FUNCTION(a AS typ, ...) AS typ`
     /// oder `SUB(...)` -- die Schreibweise von FreeBASIC. Ergebnis fuer den
-    /// Compiler: "@" + Rueckgabe-Zeichen + Parameter-Zeichen (`@lzz`).
+    /// Compiler: "@" + Rueckgabe-Zeichen + Parameter-Zeichen (`@lzz`); ein
+    /// Struct als Wert (`BYVAL p AS Punkt`, Rueckgabe `AS Punkt`) steht als
+    /// `{punkt}` darin, der Compiler setzt seine Lage ein.
     fn ffi_rueckruf(&mut self) -> R<String> {
         let ist_sub = self.check(Tt::Sub);
         self.pos += 1;                                  // FUNCTION | SUB
@@ -1677,17 +1687,38 @@ impl Parser {
                 if self.check(Tt::Byref) {
                     return self.err("BYREF gibt es in einem Rueckruf nicht -- was die Bibliothek als Zeiger uebergibt, kommt als ZEIGER an");
                 }
+                // BYVAL vor einem Struct: er kommt als Wert (`BYVAL p AS Punkt`).
+                let mut by_val = false;
+                if self.check(Tt::Ident) && sval(self.peek(0)) == "byval" && self.tt(1) == Tt::Ident {
+                    self.pos += 1;
+                    by_val = true;
+                }
                 // Der Name ist freiwillig: `a AS ZEIGER` oder nur `ZEIGER`.
                 if self.check(Tt::Ident) && self.tt(1) == Tt::As { self.pos += 2; }
                 if self.check(Tt::Ident) && crate::ffi::typ_zeichen(&sval(self.peek(0))).is_none()
                     && crate::ffi::typ_vorschlag(&sval(self.peek(0))).is_none() {
-                    let h = crate::ffi::typ_hinweis(&sval(self.peek(0)));
-                    return self.err(&format!("{} -- ein Struct geht in einem Rueckruf (noch) nicht: einen Zeiger darauf bekommt er als ZEIGER, BUFFER_AUS_ZEIGER liest ihn", h));
+                    // Ein STRUCT ... LAYOUT C -- ob es ihn gibt, weiss erst der Compiler.
+                    if !by_val {
+                        return self.err(&format!(
+                            "Ein Struct im Rueckruf: mit BYVAL kommt er als Wert (BYVAL p AS {}) -- uebergibt die Bibliothek einen Zeiger darauf, heisst der Parameter ZEIGER, BUFFER_AUS_ZEIGER liest ihn",
+                            sval(self.peek(0)).to_uppercase()));
+                    }
+                    zeichen.push_str(&format!("{{{}}}", sval(self.peek(0)).to_lowercase()));
+                    self.pos += 1;
+                    if !self.matches(Tt::Comma) { break; }
+                    continue;
+                }
+                if by_val {
+                    return self.err("BYVAL steht im Rueckruf nur vor einem Struct -- Zahlen kommen ohnehin als Wert");
                 }
                 let w = self.ffi_typwort()?;
                 if w == "buffer" {
                     self.pos -= 1;
                     return self.err("Ein Rueckruf bekommt keinen BUFFER -- Speicher der Bibliothek kommt als ZEIGER an, BUFFER_AUS_ZEIGER liest ihn");
+                }
+                if matches!(w.as_str(), "valist" | "va_list") {
+                    self.pos -= 1;
+                    return self.err("Ein Rueckruf bekommt (noch) keinen VALIST -- eine Liste der Bibliothek kommt als ZEIGER an");
                 }
                 zeichen.push(crate::ffi::typ_zeichen(&w).unwrap_or('q'));
                 if !self.matches(Tt::Comma) { break; }
@@ -1701,8 +1732,15 @@ impl Parser {
             'v'
         } else {
             self.expect(Tt::As, "Erwartet AS <Rueckgabetyp> nach FUNCTION(...) -- ohne Rueckgabe heisst es SUB(...)")?;
+            // Ein Struct als Wert zurueck.
+            if self.check(Tt::Ident) && crate::ffi::typ_zeichen(&sval(self.peek(0))).is_none()
+                && crate::ffi::typ_vorschlag(&sval(self.peek(0))).is_none() {
+                let w = format!("{{{}}}", sval(self.peek(0)).to_lowercase());
+                self.pos += 1;
+                return Ok(format!("@{}{}", w, zeichen));
+            }
             let w = self.ffi_typwort()?;
-            if matches!(w.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer") {
+            if matches!(w.as_str(), "text" | "cstr" | "wtext" | "wstr" | "buffer" | "valist" | "va_list") {
                 self.pos -= 1;
                 return self.err("Ein Rueckruf liefert eine Zahl, einen ZEIGER oder BOOLEAN -- keinen Text und keinen BUFFER (wem gehoerte der Speicher danach?)");
             }
@@ -1956,6 +1994,8 @@ impl Parser {
                 self.expect(Tt::Rbracket, "Erwartet ']'")?;
                 anzahl = n as u32;
             }
+            // Ein Bitfeld: `a AS LONG : 3` oder wie in FreeBASIC `a : 3 AS LONG`.
+            let mut bits = self.bitbreite()?;
             self.expect(Tt::As, "Erwartet AS nach dem Feldnamen")?;
             let w = sval(self.peek(0)).to_lowercase();
             if w.is_empty() {
@@ -1975,13 +2015,17 @@ impl Parser {
                 self.pos -= 1;
                 return self.err("Ein BUFFER kann kein Feld sein -- ein Zeiger darauf ist ZEIGER (BUFFER_ZEIGER), ein Struct darin ist ein anderer STRUCT ... LAYOUT C");
             } else if crate::ffi::typ_zeichen(&w).is_some() {
-                w
+                if bits == 0 { bits = self.bitbreite()?; }
+                if bits > 0 { format!("{}:{}", w, bits) } else { w }
             } else if crate::ffi::typ_vorschlag(&w).is_some() {
                 self.pos -= 1;
                 return self.err(&crate::ffi::typ_hinweis(&w));
             } else {
                 format!("#{}", w)
             };
+            if bits > 0 && !typ.contains(':') {
+                return self.err("Ein Bitfeld braucht eine ganze Zahl als Typ (LONG, ULONG, BYTE ...) -- etwa flags AS ULONG : 3");
+            }
             felder.push((fname, typ, anzahl));
             self.consume_terminator()?;
         }
@@ -1990,6 +2034,20 @@ impl Parser {
         self.consume_terminator()?;
         if felder.is_empty() { return self.err("Ein STRUCT ... LAYOUT C braucht mindestens ein Feld"); }
         Ok(Node::StructLayout { name, pack, felder })
+    }
+
+    /// `: n` hinter einem Feld eines STRUCT ... LAYOUT C: die Breite eines
+    /// Bitfelds (0 = keins). Ein Doppelpunkt ohne Zahl dahinter trennt
+    /// Anweisungen wie ueberall.
+    fn bitbreite(&mut self) -> R<u32> {
+        if !(self.check(Tt::Colon) && self.tt(1) == Tt::Number) { return Ok(0); }
+        self.pos += 1;
+        let n = match &self.peek(0).val { Val::Int(n) => *n, _ => 0 };
+        if n < 1 || n > 64 {
+            return self.err("Ein Bitfeld hat 1 bis 64 Bits -- etwa flags AS ULONG : 3 (ein Bitfeld mit 0 Bits gibt es hier nicht)");
+        }
+        self.pos += 1;
+        Ok(n as u32)
     }
 
     fn new_expr(&mut self) -> R<Node> {

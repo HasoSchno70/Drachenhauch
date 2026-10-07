@@ -58,6 +58,7 @@ pub const TYPWOERTER: &[(&str, char)] = &[
     ("single", 'f'), ("float", 'd'), ("boolean", 'o'),
     ("text", 't'), ("cstr", 't'), ("wtext", 'w'), ("wstr", 'w'),
     ("buffer", 'p'),
+    ("valist", 'a'), ("va_list", 'a'),
 ];
 
 /// Kurzzeichen eines Typworts (`None` = gibt es nicht).
@@ -73,6 +74,7 @@ pub fn typ_name(c: char) -> &'static str {
         'l' => "LONG", 'L' => "ULONG", 'q' => "INTEGER", 'z' => "ZEIGER",
         'f' => "SINGLE", 'd' => "FLOAT", 'o' => "BOOLEAN",
         't' => "TEXT", 'w' => "WTEXT", 'p' => "BUFFER",
+        'a' => "VALIST",
         'r' => "FUNCTION",
         'x' => "STRUCT",
         '*' => "...",
@@ -88,6 +90,7 @@ pub fn dh_typ(c: char) -> &'static str {
         't' | 'w' => "string",
         'p' | 'x' => "buffer",
         'r' => "funcref",
+        'a' => "tuple",
         _ => "integer",
     }
 }
@@ -113,7 +116,7 @@ pub fn typ_vorschlag(wort: &str) -> Option<&'static str> {
 /// Hinweis zu einem Wort, das kein Typwort einer `DECLARE`-Zeile ist.
 pub fn typ_hinweis(wort: &str) -> String {
     let vorschlag = typ_vorschlag(wort);
-    let liste = "BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER";
+    let liste = "BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST";
     match vorschlag {
         Some(v) => format!("'{}' ist kein Typ fuer fremde Bibliotheken -- hier heisst das {} (moeglich: {})", wort.to_uppercase(), v, liste),
         None => format!("'{}' ist kein Typ fuer fremde Bibliotheken (moeglich: {})", wort.to_uppercase(), liste),
@@ -168,13 +171,38 @@ pub fn signatur_lesen(s: &str) -> Result<Signatur, String> {
             let typ = it.next().unwrap_or("");
             let art = typ.chars().next().ok_or("fremde Funktion: kaputte Signatur")?;
             let rr = typ[art.len_utf8()..].to_string();
-            if art == 'r' && rr.is_empty() { return Err("fremde Funktion: kaputte Signatur".into()); }
+            if art == 'r' && rueckruf_lesen(&rr).is_none() { return Err("fremde Funktion: kaputte Signatur".into()); }
             if art == 'x' && struct_lesen(&rr).is_none() { return Err("fremde Funktion: kaputte Signatur".into()); }
             let name = it.next().unwrap_or("").to_string();
             params.push(Param { art, byref, name, rr });
         }
     }
     Ok(Signatur { lib: teile[0].into(), c_name: teile[1].into(), name: teile[2].into(), rueck, rueck_rr, params })
+}
+
+/// Ein Teil der Signatur eines Rueckrufs: ein Typzeichen oder ein Struct als
+/// Wert (in `Param::rr` als `{lage}` geschrieben).
+#[derive(Clone, Debug, PartialEq)]
+pub enum RrTeil { Zeichen(char), Struct(StructWert) }
+
+/// Rueckgabe und Parameter eines Rueckrufs aus `Param::rr`
+/// (`l{punkt;8;4;i4*2@0}z` = FUNCTION(BYVAL p AS Punkt, z AS ZEIGER) AS LONG).
+pub fn rueckruf_lesen(rr: &str) -> Option<(RrTeil, Vec<RrTeil>)> {
+    let mut teile = Vec::new();
+    let mut rest = rr;
+    while let Some(c) = rest.chars().next() {
+        if c == '{' {
+            let ende = rest.find('}')?;
+            teile.push(RrTeil::Struct(struct_lesen(&rest[1..ende])?));
+            rest = &rest[ende + 1..];
+        } else {
+            teile.push(RrTeil::Zeichen(c));
+            rest = &rest[c.len_utf8()..];
+        }
+    }
+    if teile.is_empty() { return None; }
+    let rueck = teile.remove(0);
+    Some((rueck, teile))
 }
 
 // ------------------------------------------------------------------ Structs als Wert
@@ -405,6 +433,14 @@ pub fn plan(k: Konvention, params: &[Form], rueck: Form) -> Result<(Vec<Stelle>,
         }
     }
     Ok((st, rf))
+}
+
+/// Ein Teil der Signatur eines Rueckrufs als Form fuer `plan`.
+pub fn rr_form(t: &RrTeil) -> Form<'_> {
+    match t {
+        RrTeil::Struct(s) => Form::Struct(s),
+        RrTeil::Zeichen(c) => Form::Skalar(art_von(*c, false)),
+    }
 }
 
 /// Die Dateinamen, unter denen eine Bibliothek gesucht wird -- in dieser
@@ -741,12 +777,32 @@ mod uebergang {
         /// `eingang(nummer, plaetze, rueck)` ruft. Jeder Rueckruf bekommt
         /// seinen eigenen (die Nummer steht als Konstante darin); er bleibt
         /// bis zum Ende des Programms -- die Bibliothek darf ihn behalten.
-        pub fn rueckruf(&mut self, params: &[Art], rueck: Art, nummer: u64, eingang: usize)
-            -> Result<*const u8, String> {
+        ///
+        /// Mit Structs als Wert gilt der Plan (`super::plan`) in Gegenrichtung:
+        /// was in Registern ankommt, setzt der Einstieg in einem Bereich je
+        /// Struct zusammen, im Platz des Parameters steht dann ein Zeiger auf
+        /// die Bytes (kam der Struct schon als Zeiger, steht dieser darin). Ein
+        /// Struct als Rueckgabe liegt nach `eingang` im Rueckgabe-Bereich und
+        /// geht in die Register oder an die versteckte Adresse.
+        /// `structs[i]` = Groesse, wenn Parameter i ein Struct ist;
+        /// `rueck_groesse` = Groesse eines Structs als Rueckgabe (sonst 0).
+        #[allow(clippy::too_many_arguments)]
+        pub fn rueckruf_plan(&mut self, stellen: &[Stelle], rueck: &Rueckform, structs: &[Option<u32>],
+                             rueck_groesse: u32, nummer: u64, eingang: usize) -> Result<*const u8, String> {
             let zt = self.modul.target_config().pointer_type();
             let mut sig = self.modul.make_signature();
-            for a in params { sig.params.push(abi(*a, zt)); }
-            if rueck != Art::Nichts { sig.returns.push(abi(rueck, zt)); }
+            for s in stellen {
+                sig.params.push(match s.laden {
+                    Laden::Kopie(_, n) => AbiParam::special(zt, ArgumentPurpose::StructArgument(n)),
+                    Laden::Versteckt => AbiParam::special(zt, ArgumentPurpose::StructReturn),
+                    _ => abi(s.art, zt),
+                });
+            }
+            match rueck {
+                Rueckform::Nichts => {}
+                Rueckform::Wert(a) => sig.returns.push(abi(*a, zt)),
+                Rueckform::Teile(t) => for (a, _) in t { sig.returns.push(AbiParam::new(typ(*a, zt))); },
+            }
             let mut ein_sig = self.modul.make_signature();
             for _ in 0..3 { ein_sig.params.push(AbiParam::new(zt)); }
             self.rueckrufe += 1;
@@ -762,32 +818,80 @@ mod uebergang {
                 fb.append_block_params_for_function_params(b);
                 fb.switch_to_block(b);
                 let p = fb.block_params(b).to_vec();
-                // Platz n = Rueckgabe, davor die Argumente.
-                let groesse = ((params.len() + 1) * 8) as u32;
-                let slot = fb.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, groesse, 3));
+                // Plaetze der Parameter, dahinter der Rueckgabe-Bereich, dahinter
+                // je Struct-Parameter ein Bereich fuer seine Bytes.
+                let rund8 = |n: u32| n.div_ceil(8) * 8;
+                let n = structs.len() as u32;
+                let rueck_ort = n * 8;
+                let rueck_laenge = rund8(rueck_groesse).max(8);
+                let mut bereich = vec![0u32; structs.len()];
+                let mut ende = rueck_ort + rueck_laenge;
+                for (i, g) in structs.iter().enumerate() {
+                    if let Some(g) = g { bereich[i] = ende; ende += rund8(*g).max(8); }
+                }
+                let slot = fb.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, ende.max(8), 3));
                 let null = fb.ins().iconst(types::I64, 0);
-                fb.ins().stack_store(zt, null, slot, (params.len() * 8) as i32);
-                for (i, a) in params.iter().enumerate() {
-                    // Ganzzahlen auf 64 Bit erweitert -- `platz_wert` liest
-                    // die unteren Bytes, die Erweiterung schadet nicht.
-                    let w = match a {
-                        Art::I8 | Art::I16 | Art::I32 => fb.ins().sextend(types::I64, p[i]),
-                        Art::U8 | Art::U16 | Art::U32 => fb.ins().uextend(types::I64, p[i]),
-                        _ => p[i],
-                    };
-                    fb.ins().stack_store(zt, w, slot, (i * 8) as i32);
+                for o in (0..rueck_laenge).step_by(8) { fb.ins().stack_store(zt, null, slot, (rueck_ort + o) as i32); }
+                for (i, g) in structs.iter().enumerate() {
+                    if g.is_some() {
+                        let a = fb.ins().stack_addr(zt, slot, bereich[i] as i32);
+                        fb.ins().stack_store(zt, a, slot, (i * 8) as i32);
+                    }
+                }
+                let mut sret = None;
+                for (j, s) in stellen.iter().enumerate() {
+                    let w = p[j];
+                    match s.laden {
+                        Laden::Platz(i) => {
+                            // Ganzzahlen auf 64 Bit erweitert -- `platz_wert` liest
+                            // die unteren Bytes, die Erweiterung schadet nicht.
+                            let w = match s.art {
+                                Art::I8 | Art::I16 | Art::I32 if structs[i].is_none() => fb.ins().sextend(types::I64, w),
+                                Art::U8 | Art::U16 | Art::U32 if structs[i].is_none() => fb.ins().uextend(types::I64, w),
+                                _ => w,
+                            };
+                            fb.ins().stack_store(zt, w, slot, (i * 8) as i32);
+                        }
+                        Laden::Ueber(i, o) => { fb.ins().stack_store(zt, w, slot, (bereich[i] + o) as i32); }
+                        Laden::Kopie(i, _) => { fb.ins().stack_store(zt, w, slot, (i * 8) as i32); }
+                        Laden::Null => {}
+                        Laden::Versteckt => sret = Some(w),
+                    }
                 }
                 let plaetze = fb.ins().stack_addr(zt, slot, 0);
-                let rueckplatz = fb.ins().stack_addr(zt, slot, (params.len() * 8) as i32);
+                let rueckplatz = fb.ins().stack_addr(zt, slot, rueck_ort as i32);
                 let nr = fb.ins().iconst(zt, nummer as i64);
                 let ziel = fb.ins().iconst(zt, eingang as i64);
                 let sref = fb.import_signature(ein_sig);
                 fb.ins().call_indirect(sref, ziel, &[nr, plaetze, rueckplatz]);
-                if rueck != Art::Nichts {
-                    let w = fb.ins().load(typ(rueck, zt), MemFlagsData::trusted(), rueckplatz, 0);
-                    fb.ins().return_(&[w]);
-                } else {
-                    fb.ins().return_(&[]);
+                match rueck {
+                    Rueckform::Nichts => {
+                        // Die versteckte Adresse: den Struct dorthin kopieren --
+                        // genau so viele Bytes, wie er lang ist. Sie selbst gibt
+                        // Cranelift zurueck (System V und Windows verlangen das).
+                        if let Some(z) = sret {
+                            let flags = MemFlagsData::new().with_notrap();
+                            let mut o = 0u32;
+                            for (breite, t) in [(8u32, types::I64), (4, types::I32), (2, types::I16), (1, types::I8)] {
+                                while rueck_groesse - o >= breite {
+                                    let w = fb.ins().load(t, flags, rueckplatz, o as i32);
+                                    fb.ins().store(flags, w, z, o as i32);
+                                    o += breite;
+                                }
+                            }
+                        }
+                        fb.ins().return_(&[]);
+                    }
+                    Rueckform::Wert(a) => {
+                        let w = fb.ins().load(typ(*a, zt), MemFlagsData::trusted(), rueckplatz, 0);
+                        fb.ins().return_(&[w]);
+                    }
+                    Rueckform::Teile(t) => {
+                        let ws: Vec<_> = t.iter()
+                            .map(|(a, o)| fb.ins().load(typ(*a, zt), MemFlagsData::trusted(), rueckplatz, *o as i32))
+                            .collect();
+                        fb.ins().return_(&ws);
+                    }
                 }
                 fb.seal_all_blocks();
                 fb.finalize(tc);
@@ -796,6 +900,16 @@ mod uebergang {
             self.modul.clear_context(&mut ctx);
             self.modul.finalize_definitions().map_err(|e| format!("Cranelift: {:?}", e))?;
             Ok(self.modul.get_finalized_function(id))
+        }
+
+        /// Der Einstieg fuer schlichte Werte, Platz fuer Platz (ohne Structs).
+        #[cfg(test)]
+        pub fn rueckruf(&mut self, params: &[Art], rueck: Art, nummer: u64, eingang: usize)
+            -> Result<*const u8, String> {
+            let stellen: Vec<Stelle> = params.iter().enumerate()
+                .map(|(i, a)| Stelle { art: *a, laden: Laden::Platz(i) }).collect();
+            let rf = if rueck == Art::Nichts { Rueckform::Nichts } else { Rueckform::Wert(rueck) };
+            self.rueckruf_plan(&stellen, &rf, &vec![None; params.len()], 0, nummer, eingang)
         }
     }
 }
@@ -821,6 +935,10 @@ struct Zustand {
     /// zum Ende geladen -- ein Zeiger in sie hinein darf nie ins Leere zeigen.
     libs: HashMap<String, Rc<libloading::Library>>,
     aufrufe: HashMap<String, Rc<Aufruf>>,
+    /// Die zuletzt gerufenen Signaturen, erkannt am ZEIGER ihres Textes: die
+    /// Signatur ist eine Konstante des Programms, jeder Aufruf derselben
+    /// Stelle bringt denselben `Rc` -- das spart den Hash ueber den Text.
+    zuletzt: Vec<(Rc<String>, Rc<Aufruf>)>,
     /// Die Rueckrufe, die je einer Bibliothek gegeben wurden; die Nummer im
     /// Einstieg ist der Platz hier. Nie entfernt -- die Bibliothek darf den
     /// Einstieg behalten, und der Wert haelt die Funktion (samt Objekt) am
@@ -832,6 +950,9 @@ struct Zustand {
 struct Rueckruf {
     /// Rueckgabe, dann die Parameter (wie `Param::rr`).
     sig: String,
+    /// Dieselbe Signatur zerlegt.
+    rueck: RrTeil,
+    params: Vec<RrTeil>,
     wert: Value,
     /// Der Name fuer Meldungen.
     name: String,
@@ -855,6 +976,78 @@ thread_local! {
 static HAUPTFADEN: std::sync::OnceLock<std::thread::ThreadId> = std::sync::OnceLock::new();
 #[cfg(feature = "ffi")]
 static FREMDER_FADEN: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// Ob ein Aufruf `__ffi(signatur, ...)` sicher keinen Drachenhauch-Code
+/// ruft -- dann darf er in einem Bereich des Maschinencodes laufen, der
+/// Locals und Globale gerade selbst haelt. Dafuer darf die Signatur keinen
+/// Rueckruf nehmen, UND das Programm darf noch nie einen vergeben haben:
+/// eine Bibliothek kann einen frueher vergebenen bei jedem spaeteren Aufruf
+/// rufen (GTK merkt ihn sich bei `g_signal_connect`, `gtk_main` ruft ihn).
+/// Ohne das Feature ruft der Aufruf ohnehin nichts.
+pub fn ohne_drachenhauch_code(a: &[Value]) -> bool {
+    let Some(Value::Str(text)) = a.first() else { return false };
+    let params = text.rsplit(TRENNER).next().unwrap_or("");
+    if params.split(',').any(|p| p.starts_with('r')) { return false; }
+    #[cfg(feature = "ffi")]
+    { ZUSTAND.with(|z| z.borrow().rueckrufe.is_empty()) }
+    #[cfg(not(feature = "ffi"))]
+    true
+}
+
+/// Hat das Programm schon einen Rueckruf vergeben? Dann baut der
+/// Maschinencode keinen Bereich mehr um `__ffi` -- jeder Aufruf koennte ihn
+/// rufen, der Bereich muesste in jeder Runde vor ihm aussteigen.
+pub fn rueckrufe_vergeben() -> bool {
+    #[cfg(feature = "ffi")]
+    { ZUSTAND.with(|z| !z.borrow().rueckrufe.is_empty()) }
+    #[cfg(not(feature = "ffi"))]
+    false
+}
+
+/// Fuer den getypten Maschinencode: eine Signatur nur aus Zahlen (Parameter
+/// und Rueckgabe ganze Zahlen, ZEIGER, BOOLEAN, SINGLE, FLOAT oder keine
+/// Rueckgabe; kein BYREF, kein `...`). Dann reicht er die Werte als
+/// 8-Byte-Plaetze herein (`zahlen_rufen`) statt als Werte.
+pub fn zahlen_signatur(text: &str) -> Option<Signatur> {
+    let s = signatur_lesen(text).ok()?;
+    let zahl = |c: char| matches!(c, 'b' | 'B' | 's' | 'S' | 'l' | 'L' | 'q' | 'z' | 'o' | 'f' | 'd');
+    if !(zahl(s.rueck) || s.rueck == 'v') { return None; }
+    if s.params.iter().any(|p| p.byref || !zahl(p.art)) { return None; }
+    Some(s)
+}
+
+/// Ein Aufruf aus dem getypten Maschinencode: die Werte in Plaetzen (ganze
+/// Zahl, Bitmuster eines double, 0/1), das Ergebnis ebenso. `None` heisst:
+/// aussteigen, BEVOR etwas geschehen ist -- ein Rueckruf ist vergeben, die
+/// Bibliothek fehlt, ein Wert passt nicht --, die VM fuehrt den Befehl dann
+/// selbst aus und meldet es. Nach dem eigentlichen Aufruf kann ohne Rueckruf
+/// nichts mehr scheitern.
+pub fn zahlen_rufen(sig_wert: &Value, plaetze: &[u64]) -> Option<u64> {
+    #[cfg(not(feature = "ffi"))]
+    {
+        let _ = (sig_wert, plaetze);
+        None
+    }
+    #[cfg(feature = "ffi")]
+    {
+        let Value::Str(text) = sig_wert else { return None };
+        if !ZUSTAND.with(|z| z.borrow().rueckrufe.is_empty()) { return None; }
+        let auf = aufruf_wert(text).ok()?;
+        if plaetze.len() != auf.sig.params.len() { return None; }
+        let werte: Vec<Value> = auf.sig.params.iter().zip(plaetze).map(|(p, &x)| match p.art {
+            'f' | 'd' => Value::Float(f64::from_bits(x)),
+            'o' => Value::Bool(x != 0),
+            _ => Value::Int(x as i64),
+        }).collect();
+        match rufen_mit(&auf, &werte).ok()? {
+            Value::Int(i) => Some(i as u64),
+            Value::Float(f) => Some(f.to_bits()),
+            Value::Bool(b) => Some(b as u64),
+            Value::Nil => Some(0),
+            _ => None,
+        }
+    }
+}
 
 /// Die VM fuer die Rueckrufe merken (vor jedem `__ffi`).
 pub fn vm_setzen(vm: *mut crate::vm::Vm<'_>) {
@@ -900,9 +1093,7 @@ fn rueckruf_einstieg(rr: &str, wert: &Value) -> Result<u64, String> {
             .find(|r| r.sig == rr && gleiche_funktion(&r.wert, wert)).map(|r| r.einstieg)) {
         return Ok(e as u64);
     }
-    let mut zeichen = rr.chars();
-    let rueck = zeichen.next().unwrap_or('v');
-    let params: Vec<char> = zeichen.collect();
+    let (rueck, params) = rueckruf_lesen(rr).ok_or("kaputte Signatur des Rueckrufs")?;
     // Passt die Zahl der Parameter? Vorher fragen -- im Rueckruf waere es ein
     // Fehler, den die Bibliothek erst nach der ganzen Arbeit zurueckgibt.
     let vm = VM.with(|v| v.get());
@@ -914,15 +1105,22 @@ fn rueckruf_einstieg(rr: &str, wert: &Value) -> Result<u64, String> {
             }
         }
     }
-    let arten: Vec<Art> = params.iter().map(|c| art_von(*c, false)).collect();
+    // Dieselbe Zerlegung wie beim Aufruf einer Bibliothek -- der Einstieg
+    // liest sie in Gegenrichtung.
+    let formen: Vec<Form> = params.iter().map(rr_form).collect();
+    let (stellen, rf) = plan(konvention(), &formen, rr_form(&rueck))
+        .map_err(|e| format!("Rueckruf {}: {}", funktionsname(wert), e))?;
+    let groessen: Vec<Option<u32>> = params.iter()
+        .map(|t| if let RrTeil::Struct(s) = t { Some(s.groesse) } else { None }).collect();
+    let rueck_groesse = if let RrTeil::Struct(s) = &rueck { s.groesse } else { 0 };
     let nummer = ZUSTAND.with(|z| z.borrow().rueckrufe.len()) as u64;
     let einstieg = ZUSTAND.with(|z| -> Result<_, String> {
         let mut z = z.borrow_mut();
         if z.bauer.is_none() { z.bauer = Some(uebergang::Bauer::neu()?); }
-        z.bauer.as_mut().unwrap().rueckruf(&arten, art_von(rueck, false), nummer, eingang as usize)
+        z.bauer.as_mut().unwrap().rueckruf_plan(&stellen, &rf, &groessen, rueck_groesse, nummer, eingang as usize)
     })? as usize;
     ZUSTAND.with(|z| z.borrow_mut().rueckrufe.push(Rc::new(Rueckruf {
-        sig: rr.to_string(), wert: wert.clone(), name: funktionsname(wert), einstieg })));
+        sig: rr.to_string(), rueck, params, wert: wert.clone(), name: funktionsname(wert), einstieg })));
     Ok(einstieg as u64)
 }
 
@@ -951,25 +1149,36 @@ unsafe fn eingang_innen(nummer: u64, plaetze: *const u64, rueck: *mut u64) {
     let setze = |m: String| RR_FEHLER.with(|f| *f.borrow_mut() = Some(m));
     let vm = VM.with(|v| v.get());
     if vm.is_null() { setze(format!("Rueckruf {}: keine laufende VM", rr.name)); return; }
-    let mut zeichen = rr.sig.chars();
-    let r = zeichen.next().unwrap_or('v');
-    let werte: Vec<Value> = zeichen.enumerate().map(|(i, c)| {
+    let werte: Vec<Value> = rr.params.iter().enumerate().map(|(i, t)| {
         let p = *plaetze.add(i);
-        match c {
-            't' => Value::str_rc(text_aus(p, false)),
-            'w' => Value::str_rc(text_aus(p, true)),
-            c => platz_wert(c, p),
+        match t {
+            // Im Platz steht ein Zeiger auf die Bytes: eine Kopie davon.
+            RrTeil::Struct(s) => crate::builtins::neuer_buffer(
+                std::slice::from_raw_parts(p as *const u8, s.groesse as usize).to_vec()),
+            RrTeil::Zeichen('t') => Value::str_rc(text_aus(p, false)),
+            RrTeil::Zeichen('w') => Value::str_rc(text_aus(p, true)),
+            RrTeil::Zeichen(c) => platz_wert(*c, p),
         }
     }).collect();
     match (*vm).wert_rufen(&rr.wert, werte, &rr.name) {
-        Ok(v) => {
-            if r != 'v' {
-                match zahl_platz(r, &v) {
-                    Ok(p) => *rueck = p,
-                    Err(e) => setze(format!("der Rueckruf {} soll {} liefern: {}", rr.name, typ_name(r), e)),
+        Ok(v) => match &rr.rueck {
+            RrTeil::Zeichen('v') => {}
+            RrTeil::Zeichen(r) => match zahl_platz(*r, &v) {
+                Ok(p) => *rueck = p,
+                Err(e) => setze(format!("der Rueckruf {} soll {} liefern: {}", rr.name, typ_name(*r), e)),
+            },
+            // Der Bereich fuer die Rueckgabe ist so gross wie der Struct
+            // (auf 8 Bytes aufgerundet); der Einstieg reicht ihn weiter.
+            RrTeil::Struct(s) => match &v {
+                Value::Buffer(b) if b.borrow().len() >= s.groesse as usize => {
+                    std::ptr::copy_nonoverlapping(b.borrow().as_ptr(), rueck as *mut u8, s.groesse as usize);
                 }
-            }
-        }
+                Value::Buffer(b) => setze(format!("der Rueckruf {} soll einen Struct {} liefern: der Puffer ist {} Bytes lang, der Struct braucht {}",
+                                                  rr.name, s.name.to_uppercase(), b.borrow().len(), s.groesse)),
+                _ => setze(format!("der Rueckruf {} soll einen Struct {} liefern (einen BUFFER), erhalten {}",
+                                   rr.name, s.name.to_uppercase(), v.type_name())),
+            },
+        },
         Err(e) => setze(format!("Fehler im Rueckruf {}: {}", rr.name, e)),
     }
 }
@@ -1070,6 +1279,22 @@ fn aufruf(text: &str) -> Result<Rc<Aufruf>, String> {
     Ok(a)
 }
 
+/// `aufruf` mit der Zuletzt-Liste davor (bis 16 Stellen).
+#[cfg(feature = "ffi")]
+fn aufruf_wert(text: &Rc<String>) -> Result<Rc<Aufruf>, String> {
+    if let Some(a) = ZUSTAND.with(|z| z.borrow().zuletzt.iter()
+            .find(|(t, _)| Rc::ptr_eq(t, text)).map(|(_, a)| a.clone())) {
+        return Ok(a);
+    }
+    let a = aufruf(text)?;
+    ZUSTAND.with(|z| {
+        let mut z = z.borrow_mut();
+        if z.zuletzt.len() >= 16 { z.zuletzt.remove(0); }
+        z.zuletzt.push((text.clone(), a.clone()));
+    });
+    Ok(a)
+}
+
 /// Plan und Uebergang fuer eine Signatur, deren Ziel schon feststeht.
 #[cfg(feature = "ffi")]
 fn aufruf_bauen(sig: Signatur, ziel: *const u8) -> Result<Aufruf, String> {
@@ -1115,7 +1340,7 @@ pub fn rufen(a: &[Value]) -> Result<Value, String> {
     #[cfg(feature = "ffi")]
     {
         let Some(Value::Str(text)) = a.first() else { return Err("fremde Funktion: Signatur fehlt".into()); };
-        let auf = match aufruf(text) {
+        let auf = match aufruf_wert(text) {
             Ok(x) => x,
             Err(e) => {
                 let name = signatur_lesen(text).map(|s| s.name).unwrap_or_default();
@@ -1205,6 +1430,77 @@ fn zeiger_rufen(gross: &str, a: &[Value]) -> Result<Value, String> {
     }
 }
 
+/// Wie ein `va_list` auf diesem System aussieht.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValistForm {
+    /// Windows (x64, ARM64) und Apple-ARM: ein Zeiger auf die Werte, jeder
+    /// in einem 8-Byte-Platz.
+    Zeiger,
+    /// System V x86-64 (Linux, macOS Intel): ein Struct `{gp_offset,
+    /// fp_offset, overflow_arg_area, reg_save_area}`; mit gp_offset 48 und
+    /// fp_offset 176 gelten alle Register als verbraucht, und `va_arg` liest
+    /// alles aus dem Ueberlaufbereich -- den 8-Byte-Plaetzen.
+    SysV,
+    /// AAPCS64 ausser Apple (Linux ARM): ein Struct `{__stack, __gr_top,
+    /// __vr_top, __gr_offs, __vr_offs}`; mit beiden Offsets 0 liest
+    /// `va_arg` alles ab `__stack`. Er hat 32 Bytes und geht darum als
+    /// Zeiger auf eine Kopie -- genau das, was der ZEIGER-Platz traegt.
+    Aapcs,
+}
+
+pub fn valist_form() -> ValistForm {
+    if cfg!(windows) || cfg!(all(target_os = "macos", target_arch = "aarch64")) { ValistForm::Zeiger }
+    else if cfg!(target_arch = "aarch64") { ValistForm::Aapcs }
+    else { ValistForm::SysV }
+}
+
+/// Der Kopf eines `va_list` fuer diese Form, der auf die Plaetze zeigt (leer
+/// = der Zeiger auf die Plaetze IST der va_list). `ablage` ist der
+/// Speicher, den System V als `reg_save_area` sieht -- er wird nie gelesen,
+/// soll aber auf etwas zeigen.
+pub fn valist_kopf(form: ValistForm, plaetze: u64, ablage: u64) -> Vec<u64> {
+    match form {
+        ValistForm::Zeiger => Vec::new(),
+        ValistForm::SysV => vec![48 | (176u64 << 32), plaetze, ablage],
+        ValistForm::Aapcs => vec![plaetze, 0, 0, 0],
+    }
+}
+
+/// Die Werte eines VALIST-Arguments: ein Tupel, ein Feld, ein einzelner Wert
+/// oder NIL (keiner). Jeder kommt in einen 8-Byte-Platz, wie hinter `...`:
+/// eine Kommazahl als double, Text als Zeiger auf eine Kopie.
+#[cfg(feature = "ffi")]
+fn valist_plaetze(v: &Value, texte: &mut Vec<std::ffi::CString>) -> Result<Vec<u64>, String> {
+    let werte: Vec<Value> = match v {
+        Value::Tuple(t) => t.to_vec(),
+        Value::Array(a) => { let a = a.borrow(); (0..a.cells.len()).map(|i| a.cells.get(i)).collect() }
+        Value::Nil => Vec::new(),
+        v => vec![v.clone()],
+    };
+    let mut plaetze = Vec::with_capacity(werte.len().max(1));
+    for (k, w) in werte.iter().enumerate() {
+        plaetze.push(match w {
+            Value::Int(x) => *x as u64,
+            Value::Float(f) => f.to_bits(),
+            Value::Bool(b) => *b as u64,
+            Value::Nil => 0,
+            Value::Str(s) => {
+                let c = std::ffi::CString::new(s.as_bytes())
+                    .map_err(|_| format!("Wert {} der Liste: ein Nullzeichen mitten im Text -- C saehe nur den Anfang", k + 1))?;
+                let z = c.as_ptr() as u64;
+                texte.push(c);
+                z
+            }
+            Value::Buffer(b) => unsafe { (*b.as_ptr()).as_mut_ptr() as u64 },
+            _ => return Err(format!("Wert {} der Liste: erwartet eine Zahl, einen Text, einen BUFFER oder NIL, erhalten {}",
+                                    k + 1, w.type_name())),
+        });
+    }
+    // Ein Platz mehr, damit auch eine leere Liste auf Speicher zeigt.
+    plaetze.push(0);
+    Ok(plaetze)
+}
+
 /// Ob eine Kommazahl hinter `...` in einem Gleitkomma-Register reist. Unter
 /// Windows x64 liest die gerufene Funktion sie aus dem Speicher, in den sie
 /// die Ganzzahl-Register sichert, und auf Apple-ARM liegt alles hinter `...`
@@ -1282,16 +1578,25 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
         return Err(format!("{}: erwartet {} Argument(e), erhalten {}", sig.name, fest, args.len()));
     }
     let n = args.len();
-    let mut plaetze = vec![0u64; n.max(1)];
+    // Die Plaetze liegen bis 16 Argumente auf dem Stapel -- ein Aufruf in
+    // einer heissen Schleife legt dann nichts an.
+    let (mut p_fest, mut r_fest) = ([0u64; 16], [0u64; 16]);
+    let (mut p_vec, mut r_vec) = (Vec::new(), Vec::new());
+    let plaetze: &mut [u64] = if n <= 16 { &mut p_fest[..] } else { p_vec = vec![0u64; n]; &mut p_vec[..] };
     // Was fuer die Dauer des Aufrufs leben muss: kopierte Texte und die
     // Plaetze der BYREF-Werte (feste Groesse, damit ihre Adressen halten).
     let mut texte: Vec<std::ffi::CString> = Vec::new();
     let mut breite: Vec<Vec<WZeichen>> = Vec::new();
-    let mut ref_plaetze = vec![0u64; n.max(1)];
+    let ref_plaetze: &mut [u64] = if n <= 16 { &mut r_fest[..] } else { r_vec = vec![0u64; n]; &mut r_vec[..] };
     let mut kopien: Vec<Vec<u64>> = Vec::new();
+    let mut ablage = [0u64; 22];
     for (i, (p, v)) in sig.params[..fest].iter().zip(args).enumerate() {
-        let typname = match &auf.structs[i] { Some(s) => s.name.to_uppercase(), None => typ_name(p.art).to_string() };
-        let fehler = |e: String| format!("{}: Argument {} ({} AS {}): {}", sig.name, i + 1, p.name, typname, e);
+        // Der Typname erst im Fehlerfall -- sonst kostete jedes Argument
+        // jedes Aufrufs einen neuen Text.
+        let fehler = |e: String| {
+            let typname = match &auf.structs[i] { Some(s) => s.name.to_uppercase(), None => typ_name(p.art).to_string() };
+            format!("{}: Argument {} ({} AS {}): {}", sig.name, i + 1, p.name, typname, e)
+        };
         if let Some(s) = &auf.structs[i] {
             // Als Wert: die Funktion bekommt eine Kopie -- was sie daran
             // aendert, sieht das Programm nicht. In 8-Byte-Worten, damit jedes
@@ -1346,6 +1651,16 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
                 Value::Nil => 0,
                 _ => return Err(fehler(format!("erwartet einen BUFFER, erhalten {}", v.type_name()))),
             },
+            // Ein va_list: die Werte in 8-Byte-Plaetzen, davor je System
+            // der Kopf, der auf sie zeigt (`valist_kopf`).
+            'a' => {
+                let pl = valist_plaetze(v, &mut texte).map_err(fehler)?;
+                let kopf = valist_kopf(valist_form(), pl.as_ptr() as u64, ablage.as_mut_ptr() as u64);
+                let z = if kopf.is_empty() { pl.as_ptr() as u64 } else { kopf.as_ptr() as u64 };
+                kopien.push(pl);
+                if !kopf.is_empty() { kopien.push(kopf); }
+                z
+            }
             'r' => match v {
                 Value::FuncRef(_) | Value::BoundMethod(_) | Value::Closure(_) =>
                     rueckruf_einstieg(&p.rr, v).map_err(fehler)?,
@@ -1382,7 +1697,8 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     // Der Platz fuer die Rueckgabe: ein Wert, die Teile eines Structs aus
     // den Registern oder der ganze Struct, den die Funktion selbst schreibt.
     let worte = auf.rueck_struct.as_ref().map(|s| (s.groesse as usize).div_ceil(8)).unwrap_or(0).max(4);
-    let mut rueck_platz = vec![0u64; worte];
+    let (mut rp_fest, mut rp_vec) = ([0u64; 4], Vec::new());
+    let rueck_platz: &mut [u64] = if worte <= 4 { &mut rp_fest[..] } else { rp_vec = vec![0u64; worte]; &mut rp_vec[..] };
     if variadisch {
         let mut r = 0u64;
         variadisch_rufen(auf, fest, &plaetze[..n], &weitere, &mut r)?;
@@ -1393,6 +1709,7 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     drop(texte);
     drop(breite);
     drop(kopien);
+    let _ = &ablage;
     if let Some(e) = rueckruf_fehler() { return Err(format!("{}: {}", sig.name, e)); }
     let rueck = rueck_platz[0];
     let ergebnis = match sig.rueck {
@@ -1848,6 +2165,172 @@ mod tests {
             args.push(Value::Int(4));
             let r = rufe(viele_komma as *const u8, "d", &ps, &args).unwrap();
             assert!(matches!(r, Value::Float(f) if f == 36.0 + 20.0 + 300.0 + 4000.0));
+        }
+
+        // ---------------------------------------------- Structs im Rueckruf
+        // Rust ruft den Einstieg wie eine C-Funktion; ein Test-Eingang liest
+        // die Plaetze (Zeiger auf die zusammengesetzten Bytes) und legt die
+        // Antwort ab -- so vergleicht die CI den Einstieg mit der Konvention
+        // jedes Systems, ohne VM.
+
+        fn rr_einstieg(rr: &str, eingang: usize) -> *const u8 {
+            let (rueck, params) = rueckruf_lesen(rr).unwrap();
+            let formen: Vec<Form> = params.iter().map(rr_form).collect();
+            let (stellen, rf) = plan(konvention(), &formen, rr_form(&rueck)).unwrap();
+            let groessen: Vec<Option<u32>> = params.iter()
+                .map(|t| if let RrTeil::Struct(s) = t { Some(s.groesse) } else { None }).collect();
+            let rg = if let RrTeil::Struct(s) = &rueck { s.groesse } else { 0 };
+            let mut bauer = uebergang::Bauer::neu().unwrap();
+            let z = bauer.rueckruf_plan(&stellen, &rf, &groessen, rg, 0, eingang).unwrap();
+            std::mem::forget(bauer);
+            z
+        }
+        unsafe fn lies<T: Copy>(plaetze: *const u64, i: usize) -> T {
+            std::ptr::read_unaligned(*plaetze.add(i) as *const T)
+        }
+        unsafe fn schreib<T>(rueck: *mut u64, x: T) { std::ptr::write_unaligned(rueck as *mut T, x) }
+
+        #[test]
+        fn structs_im_rueckruf() {
+            let p2f = "{p2f;8;4;f4*2@0}";
+            let mix = "{mix;16;8;f8*1@0;i8*1@8}";
+            let i3 = "{i3;24;8;i8*3@0}";
+            let b3 = "{b3;3;1;i1*3@0}";
+            let f3 = "{f3;12;4;f4*3@0}";
+            let d4 = "{d4;32;8;f8*4@0}";
+            let g8 = "{g8;8;4;i4*1@0;f4*1@4}";
+
+            extern "C" fn e1(_: u64, p: *const u64, r: *mut u64) {
+                unsafe {
+                    let a: P2f = lies(p, 0);
+                    let k = platz_wert('l', *p.add(1));
+                    let Value::Int(k) = k else { panic!() };
+                    schreib(r, P2f { x: a.y * k as f32, y: a.x });
+                }
+            }
+            let z = rr_einstieg(&format!("{}{}l", p2f, p2f), e1 as usize);
+            let f: extern "C" fn(P2f, i32) -> P2f = unsafe { std::mem::transmute(z) };
+            assert_eq!(f(P2f { x: 1.5, y: -2.0 }, 3), P2f { x: -6.0, y: 1.5 });
+
+            // 24 Bytes: unter System V auf dem Stapel, sonst als Zeiger, und
+            // zurueck ueber die versteckte Adresse.
+            extern "C" fn e2(_: u64, p: *const u64, r: *mut u64) {
+                unsafe {
+                    let m: Mix = lies(p, 0);
+                    let x: I3 = lies(p, 1);
+                    schreib(r, I3 { v: [x.v[2] + m.i, x.v[1] * 2, x.v[0] + m.d as i64] });
+                }
+            }
+            let z = rr_einstieg(&format!("{}{}{}", i3, mix, i3), e2 as usize);
+            let f: extern "C" fn(Mix, I3) -> I3 = unsafe { std::mem::transmute(z) };
+            assert_eq!(f(Mix { d: 7.0, i: 100 }, I3 { v: [1, 2, 3] }), I3 { v: [103, 4, 8] });
+
+            // Drei Bytes, eine HFA aus drei SINGLE und 32 Bytes gemischt mit
+            // einer Zahl; zurueck ein Struct aus LONG und SINGLE.
+            extern "C" fn e3(_: u64, p: *const u64, r: *mut u64) {
+                unsafe {
+                    let b: B3 = lies(p, 0);
+                    let k = *p.add(1) as i64;
+                    let f: F3 = lies(p, 2);
+                    let d: D4 = lies(p, 3);
+                    let s = b.a as i64 + b.b as i64 * 10 + b.c as i64 * 100 + k * 1000;
+                    schreib(r, Ganz8 { a: s as i32, f: f.v.iter().sum::<f32>() + d.v.iter().sum::<f64>() as f32 });
+                }
+            }
+            let z = rr_einstieg(&format!("{}{}q{}{}", g8, b3, f3, d4), e3 as usize);
+            let f: extern "C" fn(B3, i64, F3, D4) -> Ganz8 = unsafe { std::mem::transmute(z) };
+            assert_eq!(f(B3 { a: 1, b: 2, c: -3 }, 4, F3 { v: [0.5, 1.0, 1.5] }, D4 { v: [1.0, 2.0, 3.0, 4.0] }),
+                       Ganz8 { a: 1 + 20 - 300 + 4000, f: 13.0 });
+
+            // Volle Register davor: fuenf Ganzzahlen, ein Struct mit 16 Bytes
+            // (unter System V auf dem Stapel), danach noch eine Ganzzahl.
+            extern "C" fn e4(_: u64, p: *const u64, r: *mut u64) {
+                unsafe {
+                    let mut s = 0i64;
+                    for i in 0..5 { s += *p.add(i) as i64; }
+                    let z: Z2 = lies(p, 5);
+                    s += z.a * 100 + z.b * 1000 + *p.add(6) as i64 * 10000;
+                    *r = s as u64;
+                }
+            }
+            let z = rr_einstieg("qqqqqq{z2;16;8;i8*2@0}q", e4 as usize);
+            let f: extern "C" fn(i64, i64, i64, i64, i64, Z2, i64) -> i64 = unsafe { std::mem::transmute(z) };
+            assert_eq!(f(1, 2, 3, 4, 5, Z2 { a: 2, b: 3 }, 4), 15 + 200 + 3000 + 40000);
+
+            // Mix zurueck (in zwei Registern verschiedener Art), D4 zurueck
+            // (in vier V-Registern bzw. versteckt).
+            extern "C" fn e5(_: u64, p: *const u64, r: *mut u64) {
+                unsafe { let m: Mix = lies(p, 0); schreib(r, Mix { d: m.d * 2.0, i: m.i - 1 }); }
+            }
+            let z = rr_einstieg(&format!("{}{}", mix, mix), e5 as usize);
+            let f: extern "C" fn(Mix) -> Mix = unsafe { std::mem::transmute(z) };
+            assert_eq!(f(Mix { d: 1.25, i: 1 << 40 }), Mix { d: 2.5, i: (1 << 40) - 1 });
+            extern "C" fn e6(_: u64, p: *const u64, r: *mut u64) {
+                unsafe { let d: D4 = lies(p, 0); schreib(r, D4 { v: [d.v[3], d.v[2], d.v[1], d.v[0]] }); }
+            }
+            let z = rr_einstieg(&format!("{}{}", d4, d4), e6 as usize);
+            let f: extern "C" fn(D4) -> D4 = unsafe { std::mem::transmute(z) };
+            assert_eq!(f(D4 { v: [1.0, 2.0, 3.0, 4.0] }), D4 { v: [4.0, 3.0, 2.0, 1.0] });
+            // Drei Bytes zurueck: nicht mehr als drei werden geschrieben.
+            extern "C" fn e7(_: u64, p: *const u64, r: *mut u64) {
+                unsafe { let b: B3 = lies(p, 0); schreib(r, B3 { a: b.c, b: b.a, c: b.b }); }
+            }
+            let z = rr_einstieg(&format!("{}{}", b3, b3), e7 as usize);
+            let f: extern "C" fn(B3) -> B3 = unsafe { std::mem::transmute(z) };
+            assert_eq!(f(B3 { a: 1, b: 2, c: 3 }), B3 { a: 3, b: 1, c: 2 });
+        }
+
+        /// Ein VALIST ueber `vsprintf` der echten C-Bibliothek -- in der CI
+        /// unter Windows (char*), System V (Kopf mit gp/fp_offset) und
+        /// Apple-ARM (char*).
+        #[test]
+        fn valist_ueber_vsprintf() {
+            let sig = signatur_text("msvcrt|c", "vsprintf", "vsprintf", "l",
+                &[("p".into(), false, "ziel".into()), ("t".into(), false, "f".into()), ("a".into(), false, "w".into())]);
+            let puf = crate::builtins::neuer_buffer(vec![0u8; 256]);
+            let lies = |n: Value| -> String {
+                let Value::Int(n) = n else { panic!("Zahl erwartet") };
+                let Value::Buffer(b) = &puf else { panic!() };
+                String::from_utf8_lossy(&b.borrow()[..n as usize]).into_owned()
+            };
+            let werte = Value::Tuple(Rc::new(vec![Value::Int(3), Value::Float(4.5), Value::str_rc("feuerrot"),
+                                                  Value::Int(255), Value::Int(-1 << 40)]));
+            let r = rufen(&[Value::str_rc(sig.clone()), puf.clone(), Value::str_rc("%d Drachen, %.1f Meter, %s, %x, %lld"), werte]).unwrap();
+            assert_eq!(lies(r), "3 Drachen, 4.5 Meter, feuerrot, ff, -1099511627776");
+            // Mehr Kommazahlen als Register: alles kommt aus den Plaetzen.
+            let werte = Value::Tuple(Rc::new((1..=10).map(|i| Value::Float(i as f64 + 0.5)).collect()));
+            let r = rufen(&[Value::str_rc(sig.clone()), puf.clone(), Value::str_rc("%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f"), werte]).unwrap();
+            assert_eq!(lies(r), "1.5 2.5 3.5 4.5 5.5 6.5 7.5 8.5 9.5 10.5");
+            // Ein einzelner Wert und gar keiner.
+            let r = rufen(&[Value::str_rc(sig.clone()), puf.clone(), Value::str_rc("<%s>"), Value::str_rc("eins")]).unwrap();
+            assert_eq!(lies(r), "<eins>");
+            let r = rufen(&[Value::str_rc(sig.clone()), puf.clone(), Value::str_rc("nichts"), Value::Nil]).unwrap();
+            assert_eq!(lies(r), "nichts");
+            assert!(fehler(rufen(&[Value::str_rc(sig), puf.clone(), Value::str_rc("%s"),
+                                   Value::Tuple(Rc::new(vec![Value::Int(1), Value::Tuple(Rc::new(vec![]))]))])).contains("Wert 2"));
+        }
+
+        #[test]
+        fn valist_kopf_je_form() {
+            assert!(valist_kopf(ValistForm::Zeiger, 1000, 2000).is_empty());
+            assert_eq!(valist_kopf(ValistForm::SysV, 1000, 2000), vec![48 | (176 << 32), 1000, 2000]);
+            assert_eq!(valist_kopf(ValistForm::Aapcs, 1000, 2000), vec![1000, 0, 0, 0]);
+            let erwartet = if cfg!(windows) || cfg!(all(target_os = "macos", target_arch = "aarch64")) { ValistForm::Zeiger }
+                           else if cfg!(target_arch = "aarch64") { ValistForm::Aapcs } else { ValistForm::SysV };
+            assert_eq!(valist_form(), erwartet);
+        }
+
+        #[test]
+        fn rueckruf_signatur_lesen() {
+            let (r, p) = rueckruf_lesen("l{punkt;8;4;i4*2@0}z").unwrap();
+            assert_eq!(r, RrTeil::Zeichen('l'));
+            assert_eq!(p.len(), 2);
+            assert!(matches!(&p[0], RrTeil::Struct(s) if s.groesse == 8));
+            assert_eq!(p[1], RrTeil::Zeichen('z'));
+            assert!(matches!(rueckruf_lesen("{p;8;4;f4*2@0}").unwrap().0, RrTeil::Struct(_)));
+            assert!(rueckruf_lesen("l{kaputt}").is_none());
+            assert!(rueckruf_lesen("l{p;8;4;f4*2@0").is_none());
+            assert!(rueckruf_lesen("").is_none());
         }
 
         #[test]

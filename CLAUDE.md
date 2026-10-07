@@ -1405,8 +1405,14 @@ neben Programm/Exe/System, `ffi::dateinamen`: "c"/"m" plattformneutral),
 je Signatur ein Cranelift-Uebergang `fn(ziel, args: *const u64, rueck: *mut
 u64)` (`uebergang::Bauer`, eigenes JITModule). Kleine Ganzzahlen tragen
 sext/uext in der Signatur; ein Wert, der nicht passt, ist ein Fehler
-(`zahl_platz`). Maschinencode-Bereiche nehmen `__ffi` nicht auf
-(`befehl_im_bereich`). Ein Absturz im Auftrag (TASK_START) meldet jetzt
+(`zahl_platz`). Maschinencode-Bereiche nehmen `__ffi` seit 2026-10-07 auf,
+**aber nur solange kein Rueckruf vergeben ist** (`ffi::rueckrufe_vergeben`
+beim Bauen, `ffi::ohne_drachenhauch_code` je Aufruf): eine Bibliothek darf
+einen gemerkten Rueckruf bei JEDEM Aufruf rufen, und der aendert womoeglich
+eine Globale, die der Bereich haelt (Gegenprobe: 120 statt 1020). Mit nur
+Zahlen geht der Aufruf getypt (`Art::S` = Zeiger auf die Signatur-Konstante,
+Helfer `ffi_zahlen` -> `ffi::zahlen_rufen`), nur in Bereichen, nicht in
+Funktionen. `ffi.dh` der Messbank 201 -> 54 ms. Ein Absturz im Auftrag (TASK_START) meldet jetzt
 "der Auftrag ist abgestuerzt (Rueckgabe N|Signal N)" statt "unverstaendliche
 Antwort". `symbole.rs` kennt die Zeile als Definition (Hover, Springen,
 Vervollstaendigung). **Gegenproben:** eine Verfaelschung der Rueckgabe-
@@ -1496,12 +1502,40 @@ X-Struct nicht ganz, fuellen Nullwerte die Register; Rueckgabe ueber X8 =
 `StructReturn`) -- in `Stelle`n (`Laden::Platz/Ueber/Kopie/Null/Versteckt`),
 aus denen `Bauer::holen_plan` den Uebergang baut. Kopien in `Vec<u64>` (8
 ausgerichtet, Laden ueber das Ende eines 12-Byte-Structs bleibt im
-Speicher). Nicht: in Rueckrufen, hinter `...`, HFA ohne freie V-Register
-(alles eine Meldung). Rust-Tests rufen `extern "C"`-Funktionen mit
+Speicher). Nicht: hinter `...`, HFA ohne freie V-Register (eine Meldung). Rust-Tests rufen `extern "C"`-Funktionen mit
 `#[repr(C)]`-Structs auf (Rust haelt die C-Konvention -- der Vergleich auf
 allen drei CI-Systemen), `plaene_je_konvention` prueft alle drei Plaene auf
 jedem System; Sammlung `tests/pruef/ffi_struct_wert.dhtest` (div/lldiv,
 csqrt/cabs(f), PtInRect, CoreGraphics).
+**Im Rueckruf (2026-10-07):** `FUNCTION(BYVAL p AS Punkt) AS Punkt`; Parser
+`{name}`, Signatur `{lage}` (`ffi::rueckruf_lesen` -> `RrTeil`). Der
+Einstieg `Bauer::rueckruf_plan` liest `ffi::plan` in GEGENrichtung: `Ueber`
+-> Bereich je Struct, im Platz ein Zeiger darauf; `Platz`/`Kopie` -> der
+ankommende Zeiger (Cranelift gibt bei `StructArgument` dem Gerufenen die
+Adresse). Rueckgabe in Teilen aus dem Rueckgabe-Bereich, ueber die
+versteckte Adresse Byte-genau kopiert (Cranelift gibt sie selbst zurueck).
+Ohne BYVAL im Rueckruf ist ein Struct eine Meldung (`ZEIGER` +
+BUFFER_AUS_ZEIGER). Rust-Test `structs_im_rueckruf` (Rust ruft den Einstieg
+als `extern "C" fn` mit `#[repr(C)]`-Structs), Windows-Faelle ueber
+`CallWindowProcW` in `ffi_struct_wert.dhtest`.
+**Bitfelder (2026-10-07):** `a AS LONG : 3` oder `a : 3 AS LONG`, Typ im
+Baum `long:3`. Lage nach `cstruct::Bitregel` -- MSVC unter Windows (neue
+Einheit bei anderer Typgroesse oder vollem Wort), GCC/Clang sonst (naechste
+freie Bitstelle, keine Typgrenze ueberschreiten, auch hinter ein
+gewoehnliches Feld); beide mit `clang -Xclang -fdump-record-layouts-simple`
+fuer drei Ziele nachgesehen, `lagen_rechnen_mit` laesst die Rust-Tests beide
+auf jedem System rechnen. `Feld::bits/bit`, die Art fuer
+`__struct_get/_set` ist `l3@5`. Nicht: mit PACK, Breite 0. Tests
+`ffi_struct.dhtest` (DCB ueber `BuildCommDCBA`, Lage je System).
+**va_list (2026-10-07):** Typwort `VALIST`/`VA_LIST` (Zeichen `a`),
+Argument Tupel/Feld/Wert/NIL, Werte wie hinter `...` in 8-Byte-Plaetzen;
+`ffi::valist_kopf` je `ValistForm`: Windows + Apple-ARM `char*` (nur die
+Plaetze), System V Kopf `{gp_offset 48, fp_offset 176, overflow = Plaetze,
+reg_save}` (alle Register "verbraucht", vorher in der WSL mit gcc gegen
+glibc probiert), Linux-ARM `{__stack = Plaetze, 0, 0, 0}` (32 Bytes, reist
+als Zeiger -- ungeprueft). Nicht im Rueckruf/als Rueckgabe/BYREF. Tests:
+Rust `valist_ueber_vsprintf` (echte C-Bibliothek, alle CI-Systeme),
+`ffi.dhtest` (`vsprintf`, `wvsprintfA`).
 
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
