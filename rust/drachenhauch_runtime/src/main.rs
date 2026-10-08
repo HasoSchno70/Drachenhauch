@@ -265,6 +265,7 @@ fn eingebaut() -> String {
     for (name, da) in [
         ("grafik", cfg!(feature = "graphics")),
         ("dialoge", cfg!(feature = "dialogs")),
+        ("tray", cfg!(feature = "tray")),
         ("video", cfg!(feature = "video")),
         ("datenbank", cfg!(feature = "db")),
         ("postgres", cfg!(feature = "pg")),
