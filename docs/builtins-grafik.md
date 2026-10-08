@@ -82,6 +82,10 @@ System dazu beiträgt, unterscheidet sich:
 * `dhrt pruef tray` lässt das Symbol des Systems einmal echt durchlaufen —
   anlegen, zurücklesen, Klick und Menüwahl — und sagt, was dabei herauskam.
 
+Ein ganzes Werkzeug, das im Infobereich lebt, zeigt
+`examples/209_pausenwecker.dh`: Menü, Hinweis, der herunterzählt,
+Mitteilung, und das Kreuz versteckt das Fenster nur.
+
 ### Die Zwischenablage gehört jeweils einem Programm
 
 Unter Windows kann immer nur **ein** Prozess die Zwischenablage offen haben.

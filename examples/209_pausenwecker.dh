@@ -1,0 +1,132 @@
+' Pausenwecker -- ein kleines Werkzeug, das im Infobereich lebt
+' (Windows: Taskleiste, macOS: Menueleiste, Linux: Leiste des Desktops).
+'
+' Ein Regler stellt die Minuten bis zur naechsten Pause ein. Der Hinweis am
+' Symbol zaehlt herunter; ist die Zeit um, kommt eine Mitteilung des Systems
+' und die Uhr beginnt von vorn. Das Kreuz versteckt das Fenster nur -- ein
+' Klick auf das Symbol holt es zurueck, beendet wird ueber das Menue der
+' rechten Maustaste (macOS auch Ctrl+Klick).
+'
+' Neu hier: TRAY_SHOW, TRAY_MENU, TRAY_TOOLTIP, TRAY_CLICKED,
+' TRAY_MENU_CLICKED$, NOTIFY, NOTIFY_CLICKED, WINDOW_HIDE/WINDOW_SHOW,
+' WINDOW_CLOSE_REQUESTED und WINDOW_WAIT_EVENTS.
+IMPORT "gui"
+IMPORT "imgfx"
+
+SCREEN(360, 190, "Pausenwecker", 1)
+
+' --- Das Symbol: ein Zifferblatt, im Programm gezeichnet ------------------
+FUNCTION zifferblatt() AS INTEGER
+    DIM b AS INTEGER
+    b = IMAGE_NEW(32, 32)
+    IMAGE_FILL_ELLIPSE(b, 15.5, 15.5, 14.5, 14.5, RGB(250, 245, 230))
+    IMAGE_RING(b, 15.5, 15.5, 14.5, 2.5, RGB(200, 90, 40))
+    IMAGE_POLYLINE(b, [15.5, 15.5, 22.0], [7.0, 15.5, 19.0], 2.5, RGB(40, 40, 50))
+    IMAGE_FILL_ELLIPSE(b, 15.5, 15.5, 2.0, 2.0, RGB(200, 90, 40))
+    RETURN b
+END FUNCTION
+
+DIM symbol AS INTEGER
+symbol = zifferblatt()
+WINDOW_ICON(symbol)
+
+' --- Das Fenster ------------------------------------------------------------
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Pausenwecker", 0, 0, 360, 190)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM lblRest AS GUI_WIDGET
+lblRest = GUI_LABEL(win, "", 20, 18)
+DIM lblMin AS GUI_WIDGET
+lblMin = GUI_LABEL(win, "", 20, 64)
+DIM regler AS GUI_WIDGET
+regler = GUI_SLIDER(win, 20, 88, 320, 1.0, 60.0, 25.0)
+DIM knStart AS GUI_WIDGET
+knStart = GUI_BUTTON(win, "Neu starten", 20, 130, 150, 32)
+DIM knTray AS GUI_WIDGET
+knTray = GUI_BUTTON(win, "Ins Tray", 190, 130, 150, 32)
+
+' --- Das Symbol im Infobereich ----------------------------------------------
+TRAY_SHOW(symbol, "Pausenwecker")
+TRAY_MENU("Fenster zeigen|Pause jetzt|-|Beenden")
+
+DIM minuten AS INTEGER
+minuten = 25
+DIM ende AS INTEGER
+ende = MILLIS() + minuten * 60000
+DIM sichtbar AS BOOLEAN
+sichtbar = TRUE
+DIM letzteSekunde AS INTEGER
+letzteSekunde = -1
+DIM beenden AS BOOLEAN
+beenden = FALSE
+
+' FLIP wartet hoechstens eine Viertelsekunde auf Eingaben -- ein Werkzeug,
+' das meist versteckt im Hintergrund laeuft, braucht so kaum Rechenzeit.
+WINDOW_WAIT_EVENTS(0.25)
+
+SUB fensterZeigen(an AS BOOLEAN)
+    IF an THEN WINDOW_SHOW() ELSE WINDOW_HIDE()
+    sichtbar = an
+END SUB
+
+SUB pause()
+    NOTIFY("Pause!", "Zeit, kurz aufzustehen. Der Wecker beginnt von vorn.")
+    ende = MILLIS() + minuten * 60000
+END SUB
+
+FUNCTION zeit$(ms AS INTEGER) AS STRING
+    DIM s AS INTEGER
+    s = MAX(0, ms) \ 1000
+    RETURN STR$(s \ 60) + ":" + RIGHT$("0" + STR$(s MOD 60), 2)
+END FUNCTION
+
+WHILE NOT beenden
+    GUI_UPDATE()
+
+    ' Das Kreuz versteckt nur; das Bildlimit eines Testlaufs beendet.
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        fensterZeigen(FALSE)
+    ELSEIF QUITREQUESTED() THEN
+        BREAK
+    END IF
+
+    ' Der Regler stellt die Minuten ein; ein neuer Wert startet neu.
+    DIM neu AS INTEGER
+    neu = ROUND(GUI_VALUE(regler))
+    IF neu <> minuten THEN
+        minuten = neu
+        ende = MILLIS() + minuten * 60000
+    END IF
+    IF GUI_CLICKED(knStart) THEN ende = MILLIS() + minuten * 60000
+    IF GUI_CLICKED(knTray) THEN fensterZeigen(FALSE)
+
+    ' Klick aufs Symbol: Fenster zeigen bzw. verstecken.
+    IF TRAY_CLICKED() THEN fensterZeigen(NOT sichtbar)
+    IF NOTIFY_CLICKED() THEN fensterZeigen(TRUE)
+    SELECT CASE TRAY_MENU_CLICKED$()
+        CASE "Fenster zeigen"
+            fensterZeigen(TRUE)
+        CASE "Pause jetzt"
+            pause()
+        CASE "Beenden"
+            beenden = TRUE
+    END SELECT
+
+    IF MILLIS() >= ende THEN pause()
+
+    ' Hinweis und Anzeige nur, wenn sich die Sekunde geaendert hat.
+    DIM rest AS INTEGER
+    rest = ende - MILLIS()
+    IF rest \ 1000 <> letzteSekunde THEN
+        letzteSekunde = rest \ 1000
+        TRAY_TOOLTIP("Pause in " + zeit$(rest))
+        GUI_SET_TEXT(lblRest, "Nächste Pause in " + zeit$(rest))
+        GUI_SET_TEXT(lblMin, "Abstand: " + STR$(minuten) + " Minuten")
+    END IF
+
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+
+TRAY_HIDE()

@@ -161,6 +161,44 @@ TRAY_MENU: hoechstens 64 Eintraege, nicht 65
 TRAY_SHOW
 TRAY_SHOW: erwartet ([bild[, hinweis$]])
 
+=== das beispiel pausenwecker laesst sich ueber das symbol bedienen
+' examples/209_pausenwecker.dh, wie es ist -- nur mit dem Fenstertitel des
+' Senders und drei Ausgaben als Sonde. Klick aufs Symbol versteckt das
+' Fenster, ein zweiter holt es zurueck; "Pause jetzt" (Platz 1) schickt die
+' Mitteilung, "Beenden" (Platz 3) beendet das Programm von selbst.
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING
+z = READLINES(ARG$(0))
+DIM t AS STRING
+t = JOIN$(z, CHR$(10))
+FUNCTION ersetzt$(text AS STRING, alt AS STRING, neu AS STRING) AS STRING
+    IF INSTR(text, alt) < 0 THEN
+        PRINT "fehlt im Beispiel: "; alt
+        EXIT(1)
+    END IF
+    RETURN REPLACE$(text, alt, neu)
+END FUNCTION
+t = ersetzt$(t, "SCREEN(360, 190, " + CHR$(34) + "Pausenwecker" + CHR$(34) + ", 1)", "SCREEN(360, 190, ARG$(0), 1)")
+t = ersetzt$(t, "    sichtbar = an" + CHR$(10), "    sichtbar = an" + CHR$(10) + "    PRINT " + CHR$(34) + "fenster " + CHR$(34) + "; an" + CHR$(10))
+t = ersetzt$(t, "SUB pause()" + CHR$(10), "SUB pause()" + CHR$(10) + "    PRINT " + CHR$(34) + "pause" + CHR$(34) + CHR$(10))
+t = ersetzt$(t, CHR$(10) + "TRAY_HIDE()", CHR$(10) + "PRINT " + CHR$(34) + "ende " + CHR$(34) + "; TRAY_SHOWN()" + CHR$(10) + "TRAY_HIDE()")
+WRITEALL("kind.dh", t)
+PRINT sende$(skript$(), "kind.dh", "roh:32813:1:514;roh:32813:1:514;roh:273:28929:0;roh:273:28931:0", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- argumente
+{sammlung}/../../examples/209_pausenwecker.dh
+--- system windows
+--- erwartet
+gesendet
+fenster FALSE
+fenster TRUE
+pause
+ende TRUE
+
 === linux: das symbol meldet sich ueber d-bus an
 ' `dhrt pruef tray` startet einen eigenen dbus-daemon, meldet das Symbol bei
 ' einem Waechter an (wie ihn eine Leiste stellt) und laesst einen fremden

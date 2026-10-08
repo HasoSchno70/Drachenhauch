@@ -82,6 +82,10 @@ contributes differs:
 * `dhrt pruef tray` runs the system's icon once for real — create, read
   back, click and menu choice — and says what came out.
 
+A whole tool that lives in the notification area is
+`examples/209_pausenwecker.dh`: menu, a hint that counts down, a
+notification, and the close button only hides the window.
+
 ### The clipboard belongs to one program at a time
 
 Under Windows only **one** process can have the clipboard open at any time.
