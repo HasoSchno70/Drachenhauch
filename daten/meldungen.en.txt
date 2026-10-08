@@ -1122,7 +1122,12 @@ WINDOW_OPEN: kein freier Port auf 127.0.0.1: {}	WINDOW_OPEN: no free port on 127
 {}: Fenster {} gibt es nicht (mehr)	{}: window {} does not exist (any more)
 Windows hat das Symbol nicht angenommen	Windows did not accept the icon
 Windows hat die Mitteilung nicht angenommen	Windows did not accept the notification
-ein Tray-Symbol gibt es bisher nur unter Windows	a tray icon only exists on Windows so far
+ein Tray-Symbol gibt es in diesem Bau nicht (Feature tray)	this build has no tray icon (feature tray)
+keine D-Bus-Sitzung erreichbar ({}) -- ohne sie zeigt Linux kein Symbol in der Leiste	no D-Bus session reachable ({}) -- without one Linux shows no icon in the panel
+der Name auf dem D-Bus ist nicht zu bekommen ({})	the name on the D-Bus cannot be obtained ({})
+die Menueleiste hat kein Symbol angenommen	the menu bar did not accept an icon
+NSApplication fehlt	NSApplication is missing
+Mitteilungen gibt es im Browser nicht	there are no notifications in the browser
 osascript laesst sich nicht starten ({})	osascript cannot be started ({})
 notify-send laesst sich nicht starten ({}) -- unter Debian/Ubuntu im Paket libnotify-bin	notify-send cannot be started ({}) -- on Debian/Ubuntu it is in the package libnotify-bin
 SPEAK_RATE: faktor muss 0.5 .. 2.0 sein (ist {})	SPEAK_RATE: faktor must be 0.5 .. 2.0 (is {})

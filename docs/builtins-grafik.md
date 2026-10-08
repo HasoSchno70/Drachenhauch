@@ -40,11 +40,11 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `WINDOW_MINIMIZED()` / `WINDOW_MAXIMIZED()` / `WINDOW_HIDDEN()` → BOOLEAN | Zustand des Fensters abfragen |
 | `WINDOW_FOCUS()` | das eigene Fenster nach vorne holen |
 | `WINDOW_HIDE()` / `WINDOW_SHOW()` | das Fenster verschwinden lassen, auch aus der Taskleiste, und zurückholen — für Werkzeuge, die im Tray leben |
-| `TRAY_SHOW([bild[, hinweis$]])` | ein Symbol im Infobereich der Taskleiste zeigen (Windows); ohne Bild das aus `WINDOW_ICON`, sonst das Standardsymbol; der Hinweis erscheint beim Darüberfahren (Vorgabe: der Fenstertitel) |
+| `TRAY_SHOW([bild[, hinweis$]])` | ein Symbol im Infobereich zeigen — unter Windows in der Taskleiste, unter macOS in der Menüleiste, unter Linux in der Leiste des Desktops (über D-Bus); ohne Bild das aus `WINDOW_ICON`, sonst das Standardsymbol; der Hinweis erscheint beim Darüberfahren (Vorgabe: der Fenstertitel) |
 | `TRAY_HIDE()` / `TRAY_SHOWN()` → BOOLEAN | das Symbol entfernen; steht es gerade da? Beim Programmende verschwindet es von selbst |
 | `TRAY_TOOLTIP(hinweis$)` | den Hinweis ändern (etwa einen Fortschritt) |
-| `TRAY_MENU(eintraege$)` | das Menü der rechten Maustaste; die Einträge stehen durch senkrechte Striche getrennt in einem Text, ein einzelnes `-` ist ein Trenner, höchstens 64 Einträge |
-| `TRAY_CLICKED()` / `TRAY_DOUBLE_CLICKED()` → BOOLEAN | wurde das Symbol in diesem Bild angeklickt? Gilt genau ein Bild, wie `GUI_CLICKED` |
+| `TRAY_MENU(eintraege$)` | das Menü der rechten Maustaste (macOS auch Ctrl+Klick); die Einträge stehen durch senkrechte Striche getrennt in einem Text, ein einzelnes `-` ist ein Trenner, höchstens 64 Einträge |
+| `TRAY_CLICKED()` / `TRAY_DOUBLE_CLICKED()` → BOOLEAN | wurde das Symbol in diesem Bild angeklickt? Gilt genau ein Bild, wie `GUI_CLICKED`; einen Doppelklick meldet Linux nicht |
 | `TRAY_MENU_CLICKED$()` → STRING | der Text des Menüeintrags, der in diesem Bild gewählt wurde, sonst `""` |
 | `NOTIFY(titel$[, text$])` | eine Mitteilung des Systems — unter Windows am Tray-Symbol (ohne Symbol legt sie eins an), unter macOS über `osascript`, unter Linux über `notify-send` |
 | `NOTIFY_CLICKED()` → BOOLEAN | wurde die Mitteilung in diesem Bild angeklickt? (Windows) |
@@ -61,6 +61,26 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `GFX_PUSH()` | Zeichenzustand sichern: Kamera, Ebenen, Licht, Umgebung, Schatten, 3D-Kamera, Schrift, `POSTFX` |
 | `GFX_POP()` | ihn zurückholen — **ohne vorheriges `PUSH` ein Fehler** |
 | `GFX_DEPTH()` → INTEGER | wie tief ist der Stapel? |
+
+### Das Tray-Symbol unter macOS und Linux
+
+Die `TRAY_*`-Befehle verhalten sich auf allen drei Systemen gleich; was das
+System dazu beiträgt, unterscheidet sich:
+
+* **macOS:** das Symbol steht in der Menüleiste, auf 18 Punkte gebracht. Ein
+  Klick ist `TRAY_CLICKED`, zwei schnell hintereinander zusätzlich
+  `TRAY_DOUBLE_CLICKED`; die rechte Taste oder Ctrl+Klick öffnen das Menü.
+* **Linux:** das Symbol meldet sich über D-Bus bei der Leiste an (das
+  Verfahren *StatusNotifierItem* von KDE, samt Menü). KDE Plasma, Xfce,
+  LXQt und Cinnamon zeigen es; **GNOME nur mit der Erweiterung
+  „AppIndicator“**. Ohne Leiste bleibt das Symbol unsichtbar, `TRAY_SHOW` ist
+  aber kein Fehler — startet die Leiste später, meldet es sich von selbst
+  an. Ohne D-Bus-Sitzung (etwa über SSH) ist `TRAY_SHOW` ein Fehler.
+  Einen Doppelklick kennt das Verfahren nicht.
+* **Mitteilungen** (`NOTIFY`) gehen unter macOS über `osascript`, unter
+  Linux über `notify-send`; einen Klick darauf meldet dort keins von beiden.
+* `dhrt pruef tray` lässt das Symbol des Systems einmal echt durchlaufen —
+  anlegen, zurücklesen, Klick und Menüwahl — und sagt, was dabei herauskam.
 
 ### Die Zwischenablage gehört jeweils einem Programm
 

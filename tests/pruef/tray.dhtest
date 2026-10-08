@@ -160,3 +160,71 @@ DHRT_FRAMES=2
 TRAY_MENU: hoechstens 64 Eintraege, nicht 65
 TRAY_SHOW
 TRAY_SHOW: erwartet ([bild[, hinweis$]])
+
+=== linux: das symbol meldet sich ueber d-bus an
+' `dhrt pruef tray` startet einen eigenen dbus-daemon, meldet das Symbol bei
+' einem Waechter an (wie ihn eine Leiste stellt) und laesst einen fremden
+' Teilnehmer Titel, Hinweis, Bild und Menue lesen, Activate rufen und den
+' dritten Eintrag waehlen. Ohne dbus-daemon ueberspringt es sich.
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "pruef", "tray")
+DIM leer AS INTEGER
+WHILE leer < 5
+    DIM z AS STRING
+    z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        PRINT TRIM$(z)
+    END IF
+WEND
+DIM f AS STRING
+f = PROCESS_ERR$(p)
+IF f <> "" THEN PRINT "Fehler: "; TRIM$(f)
+PRINT "Rueckgabe "; PROCESS_CODE(p)
+--- system linux
+--- erwartet
+angemeldet: ja
+titel: Probe
+hinweis: Probe
+bild: 32x32, erster Punkt ARGB 255 10 20 30
+menue: Eins | - | Zwei
+klick: ja
+gewaehlt: Zwei
+hinweis danach: Neu
+nach dem Ausblenden: weg
+Rueckgabe 0
+
+=== macos: das symbol steht in der menueleiste
+' `dhrt pruef tray` legt ein echtes NSStatusItem an, liest Hinweis, Bild und
+' Menue zurueck und loest Klick (performClick:) und Menuewahl
+' (performActionForItemAtIndex:) aus.
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "pruef", "tray")
+DIM leer AS INTEGER
+WHILE leer < 5
+    DIM z AS STRING
+    z = PROCESS_READ$(p)
+    IF z = "" THEN
+        IF NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    ELSE
+        PRINT TRIM$(z)
+    END IF
+WEND
+DIM f AS STRING
+f = PROCESS_ERR$(p)
+IF f <> "" THEN PRINT "Fehler: "; TRIM$(f)
+PRINT "Rueckgabe "; PROCESS_CODE(p)
+--- system macos
+--- erwartet
+angemeldet: ja
+hinweis: Probe
+bild: 18x18
+menue: Eins | - | Zwei
+klick: ja
+gewaehlt: Zwei
+hinweis danach: Neu
+nach dem Ausblenden: weg
+Rueckgabe 0

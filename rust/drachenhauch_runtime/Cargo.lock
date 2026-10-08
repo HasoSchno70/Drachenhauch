@@ -1384,6 +1384,7 @@ dependencies = [
  "windows 0.62.2",
  "xmrs",
  "xmrsplayer",
+ "zbus 5.19.0",
  "zip",
 ]
 

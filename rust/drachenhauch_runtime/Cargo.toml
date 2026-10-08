@@ -228,6 +228,10 @@ accesskit_macos = { version = "0.27", optional = true }
 
 [target.'cfg(all(unix, not(target_os = "macos"), not(target_os = "emscripten")))'.dependencies]
 accesskit_unix = { version = "0.23", optional = true, features = ["async-io"] }
+# Tray-Symbol unter Linux (tray.rs): StatusNotifierItem und com.canonical.dbusmenu
+# ueber D-Bus. Dieselbe zbus-Fassung, die AccessKit ohnehin mitbringt; dazu nur
+# die blockierende Schnittstelle.
+zbus = { version = "5.19", optional = true, default-features = false, features = ["async-io", "blocking-api"] }
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
 wasm-bindgen = "=0.2.100"
@@ -244,11 +248,15 @@ raylib = { version = "6.0", optional = true, features = ["opengl_es_30"] }
 [features]
 default = []
 # Grafik (raylib: Fenster/GL/Input) + Audio (Kira: src/audio.rs) + native Dialoge.
-graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:symphonia", "dep:xmrs", "dep:xmrsplayer", "a11y"]
+graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:symphonia", "dep:xmrs", "dep:xmrsplayer", "a11y", "tray"]
 # Barrierefreiheit (a11y.rs) als eigenes Feature, damit sich der Adapter-Code
 # fuer macOS/Linux mit `cargo check --features a11y --target ...` pruefen
 # laesst, ohne raylib fuer das fremde Ziel zu bauen.
 a11y = ["dep:accesskit", "dep:accesskit_windows", "dep:accesskit_macos", "dep:accesskit_unix"]
+# Tray-Symbol unter macOS (NSStatusItem, nur die Objective-C-Laufzeit) und Linux
+# (zbus). Eigenes Feature wie a11y: so laeuft `dhrt pruef tray` auch in den
+# Bauten der CI ohne Grafik. Windows braucht dafuer nichts Zusaetzliches.
+tray = ["dep:zbus"]
 # Native OS-Dialoge (rfd) -- vom graphics-Feature GETRENNT, weil sie es im
 # Web-Build blockieren: rfd zieht js-sys/wasm-bindgen in einer Version nach,
 # die cpals WebAudio-Host nicht mehr uebersetzt. Auf dem Desktop immer mit

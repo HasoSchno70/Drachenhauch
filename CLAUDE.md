@@ -1558,6 +1558,26 @@ als Zeiger -- ungeprueft). Nicht im Rueckruf/als Rueckgabe/BYREF. Tests:
 Rust `valist_ueber_vsprintf` (echte C-Bibliothek, alle CI-Systeme),
 `ffi.dhtest` (`vsprintf`, `wvsprintfA`).
 
+## Tray-Symbol auf allen drei Systemen (2026-10-08)
+
+`tray.rs`, Feature `tray` (in `graphics` enthalten, eigenes Feature wie
+`a11y`, damit die CI es ohne raylib baut). Windows: `Shell_NotifyIconW` am
+raylib-Fenster (seit 2026-10-04). **macOS:** `NSStatusItem` nur ueber die
+Objective-C-Laufzeit (wie `finder.rs`), Zielklasse `DHTrayZiel` fuer Klick und
+Menue; Rechts/Ctrl+Klick zeigt das Menue (`popUpStatusItemMenu:`), Ereignisse
+kommen in GLFWs Ereignisschleife im Hauptfaden an. **Linux:**
+StatusNotifierItem + `com.canonical.dbusmenu` ueber zbus 5 (blockierend,
+dieselbe Fassung wie AccessKit), Anmeldung beim `StatusNotifierWatcher` und
+erneut, wenn er (neu) erscheint (`waechter`-Faden auf NameOwnerChanged);
+`TRAY_HIDE` gibt nur den Busnamen ab, die Verbindung bleibt. Ohne Leiste kein
+Fehler, ohne D-Bus-Sitzung schon. **`dhrt pruef tray`** laesst das Symbol des
+Systems echt durchlaufen (Linux gegen einen eigenen `dbus-daemon` mit einem
+Waechter und einem fremden Teilnehmer; macOS mit echten AppKit-Objekten,
+`performClick:`/`performActionForItemAtIndex:`), die Faelle in `tray.dhtest`
+rufen es je System; die CI baut dafuer `tray` mit. Gegengeprueft unter Linux
+mit GLibs `gdbus` als fremdem Leser (Eigenschaften, Layout `(u(ia{sv}av))`,
+Event). Lokal laeuft Linux in der WSL (`~/.cargo`, `CARGO_TARGET_DIR=$HOME/dht`).
+
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
 raylib liest Maus- und Tastentasten als ZUSTAND (Rueckruf schreibt
