@@ -227,11 +227,11 @@ schreiben will, trotzdem vermisst:
 | Lücke | Warum es zählt | Aufwand |
 |---|---|---|
 | ~~**Fehlermeldungen nur auf Deutsch**~~ | erledigt 2026-10-04/05 (drei Runden): `DHRT_LANG=en` übersetzt an der Ausgabe über `daten/meldungen.en.txt` -- Sprache, Laufzeit, Befehle und Module, gui, Grafik und Ton; deutsch bleiben die Kommandozeilen-Werkzeuge | — |
-| **Handbuch überwiegend Deutsch** | README und Buch gibt es englisch, `docs/` nicht | groß |
+| ~~**Handbuch überwiegend Deutsch**~~ | erledigt 2026-10-07: alle Dokumente auch in `docs/en/`, `dhrt pruef uebersetzung` hält beide gleich | — |
 | ~~**`DIM a AS INTEGER, b AS INTEGER`** geht nicht~~ | erledigt 2026-09-24: Gruppen mit je eigenem Typ und Startwert; `DIM a, i, z AS INTEGER` ging schon | — |
 | ~~**Anwendungsgröße 27,5 MB**~~ | erledigt 2026-10-04: `--export --schlank` nimmt die kleinste von drei Laufzeiten (Konsole 16 MB, Spiel 21 MB, voll 33 MB), die alle Befehle des Programms hat | — |
 | **Installer nicht signiert, macOS nicht beglaubigt** | SmartScreen/Gatekeeper warnen — für Anwendungen an Kunden ein Ausschlussgrund. Die Wege sind gebaut (`DH_SIGN_*`, `DH_MAC_SIGNATUR`), es fehlt das Zertifikat | Geld, kein Code |
-| ~~**Kein Tray-Symbol, keine System-Benachrichtigung**~~ | erledigt 2026-10-04: `TRAY_*`, `NOTIFY`, `WINDOW_HIDE`/`SHOW`; das Symbol bisher nur unter Windows, Mitteilungen auf allen drei Systemen | — |
+| ~~**Kein Tray-Symbol, keine System-Benachrichtigung**~~ | erledigt 2026-10-04: `TRAY_*`, `NOTIFY`, `WINDOW_HIDE`/`SHOW`; das Symbol seit 2026-10-08 auf allen drei Systemen (macOS Menüleiste, Linux StatusNotifierItem über D-Bus), Mitteilungen ebenso | — |
 | **Oberfläche ist selbst gezeichnet** | sieht auf jedem System gleich aus, aber nicht „nativ“; dafür gibt es Themen und Maßstab. Kein Handlungsbedarf, aber ehrlich sagen | — |
 | ~~**Kein Paketverzeichnis**~~ | erledigt 2026-10-04: `dhrt paket hole github:nutzer/repo@stand` (auch https, lokal), Pakete in `pakete/` des Projekts, `paket.lock.json` mit SHA-256 -- [pakete.md](pakete.md) | — |
 | ~~**Keine anonymen Funktionen**~~ | erledigt 2026-10-04: Lambdas `FUNCTION(x) x * 2` / `SUB() ...` mit kopierten Locals, dazu `ARRAY_MAP/FILTER/REDUCE/FIND` | — |

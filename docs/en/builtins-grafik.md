@@ -40,11 +40,11 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 | `WINDOW_MINIMIZED()` / `WINDOW_MAXIMIZED()` / `WINDOW_HIDDEN()` → BOOLEAN | query the window's state |
 | `WINDOW_FOCUS()` | bring your own window to the front |
 | `WINDOW_HIDE()` / `WINDOW_SHOW()` | make the window disappear, from the taskbar too, and bring it back — for tools that live in the tray |
-| `TRAY_SHOW([bild[, hinweis$]])` | show an icon in the notification area of the taskbar (Windows); without an image the one from `WINDOW_ICON`, otherwise the default icon; the hint appears on hover (default: the window title) |
+| `TRAY_SHOW([bild[, hinweis$]])` | show an icon in the notification area — on Windows in the taskbar, on macOS in the menu bar, on Linux in the desktop's panel (via D-Bus); without an image the one from `WINDOW_ICON`, otherwise the default icon; the hint appears on hover (default: the window title) |
 | `TRAY_HIDE()` / `TRAY_SHOWN()` → BOOLEAN | remove the icon; is it showing right now? It disappears by itself when the program ends |
 | `TRAY_TOOLTIP(hinweis$)` | change the hint (to show progress, say) |
-| `TRAY_MENU(eintraege$)` | the right-click menu; the entries stand in one text separated by vertical bars, a single `-` is a separator, at most 64 entries |
-| `TRAY_CLICKED()` / `TRAY_DOUBLE_CLICKED()` → BOOLEAN | was the icon clicked in this frame? Holds for exactly one frame, like `GUI_CLICKED` |
+| `TRAY_MENU(eintraege$)` | the right-click menu (on macOS also Ctrl+click); the entries stand in one text separated by vertical bars, a single `-` is a separator, at most 64 entries |
+| `TRAY_CLICKED()` / `TRAY_DOUBLE_CLICKED()` → BOOLEAN | was the icon clicked in this frame? Holds for exactly one frame, like `GUI_CLICKED`; Linux does not report a double click |
 | `TRAY_MENU_CLICKED$()` → STRING | the text of the menu entry chosen in this frame, otherwise `""` |
 | `NOTIFY(titel$[, text$])` | a system notification — under Windows at the tray icon (without an icon it creates one), under macOS via `osascript`, under Linux via `notify-send` |
 | `NOTIFY_CLICKED()` → BOOLEAN | was the notification clicked in this frame? (Windows) |
@@ -61,6 +61,30 @@ When the `camera` module is active and `CAMERA_SET` has been called, all drawing
 | `GFX_PUSH()` | save the drawing state: camera, layers, light, environment, shadows, 3D camera, font, `POSTFX` |
 | `GFX_POP()` | restore it — **an error without a preceding `PUSH`** |
 | `GFX_DEPTH()` → INTEGER | how deep is the stack? |
+
+### The tray icon on macOS and Linux
+
+The `TRAY_*` commands behave the same on all three systems; what the system
+contributes differs:
+
+* **macOS:** the icon sits in the menu bar, scaled to 18 points. A click is
+  `TRAY_CLICKED`, two in quick succession also `TRAY_DOUBLE_CLICKED`; the
+  right button or Ctrl+click opens the menu.
+* **Linux:** the icon registers with the panel over D-Bus (KDE's
+  *StatusNotifierItem* protocol, menu included). KDE Plasma, Xfce, LXQt and
+  Cinnamon show it; **GNOME only with the "AppIndicator"
+  extension**. Without a panel the icon stays invisible, but `TRAY_SHOW` is
+  not an error — if the panel starts later, the icon registers by itself.
+  Without a D-Bus session (over SSH, say) `TRAY_SHOW` is an error. The
+  protocol has no double click.
+* **Notifications** (`NOTIFY`) go through `osascript` on macOS and
+  `notify-send` on Linux; neither reports a click on them.
+* `dhrt pruef tray` runs the system's icon once for real — create, read
+  back, click and menu choice — and says what came out.
+
+A whole tool that lives in the notification area is
+`examples/209_pausenwecker.dh`: menu, a hint that counts down, a
+notification, and the close button only hides the window.
 
 ### The clipboard belongs to one program at a time
 

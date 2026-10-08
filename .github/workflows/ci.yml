@@ -183,9 +183,12 @@ jobs:
       # posix gab, weil der Windows-Job ueber `build_runtime.py` baut und das
       # Skript den ganzen Daten-Tier mitnimmt. Wer hier ein Feature ergaenzt,
       # gleicht am besten gegen `feats` in `rust/build_runtime.py` ab.
+      # `tray` ohne Grafik: `dhrt pruef tray` laesst das Symbol des Systems
+      # hier echt durchlaufen (Linux gegen einen eigenen dbus-daemon, macOS
+      # mit echten AppKit-Objekten) -- tests/pruef/tray.dhtest ruft es auf.
       - name: dhrt bauen (ohne Grafik)
         working-directory: rust/drachenhauch_runtime
-        run: cargo build --release --locked --features "db pg mysql net http smtp pdf physik jit ffi"
+        run: cargo build --release --locked --features "db pg mysql net http smtp pdf physik jit ffi tray"
 
       # PostgreSQL und MySQL fuer tests/pruef/db_server.dhtest: auf dem
       # Linux-Laeufer liegen beide schon, nur nicht gestartet (MySQL mit dem
@@ -260,6 +263,10 @@ jobs:
       # Entwicklungsmaschine gibt es macOS und Linux nicht.
       - name: cargo check (+ a11y, die AccessKit-Adapter dieses Systems)
         run: cargo check --locked --features "a11y"
+
+      # Das Tray-Symbol dieses Systems (tray.rs) -- wie a11y ohne raylib.
+      - name: cargo check (+ tray)
+        run: cargo check --locked --features "tray"
 
       # Die Rust-#[test]s liefen bis 2026-09-06 NIRGENDS: die CI prueft nur
       # (cargo check), und lokal scheiterte `cargo test` an raylibs

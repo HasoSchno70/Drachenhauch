@@ -127,7 +127,7 @@ mod systemzeiger;
 // Fenster unter `dhrt test` nehmen keine echte Tastatur/Maus an.
 #[cfg(feature = "graphics")]
 mod stillfenster;
-#[cfg(feature = "graphics")]
+#[cfg(any(feature = "graphics", feature = "tray"))]
 mod tray;
 // Klicks, die ganz zwischen zwei Bildern liegen (Zaehler + Regel, mit Tests).
 #[cfg(any(test, feature = "graphics"))]
@@ -458,6 +458,17 @@ fn main() -> ExitCode {
         // `dhrt doku prosa|grammatik|referenz` -- die Doku-Werkzeuge.
         if raw.len() >= 2 && raw[1] == "doku" {
             return doku::main(&raw[2..]);
+        }
+        // `dhrt pruef tray` -- das Tray-Symbol des Systems einmal echt
+        // durchlaufen lassen (braucht kein Repo, laeuft auch ohne Grafik).
+        if raw.len() >= 3 && raw[1] == "pruef" && raw[2] == "tray" {
+            #[cfg(any(feature = "graphics", feature = "tray"))]
+            return tray::selbsttest_main();
+            #[cfg(not(any(feature = "graphics", feature = "tray")))]
+            {
+                println!("UEBERSPRINGEN: dieser Bau hat kein Tray-Symbol (Feature tray)");
+                return ExitCode::SUCCESS;
+            }
         }
         // `dhrt pruef ...` -- die Doku-Pruefer.
         if raw.len() >= 2 && raw[1] == "pruef" {
