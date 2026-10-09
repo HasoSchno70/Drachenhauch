@@ -1488,6 +1488,7 @@ GUI_SET_COLOR: role muss bg/fg/border/accent/hover/pressed sein	GUI_SET_COLOR: r
 GUI_STYLE_SET: prop muss bg/fg/border/accent/hover/pressed/font/font_size sein	GUI_STYLE_SET: prop must be bg/fg/border/accent/hover/pressed/font/font_size
 GUI_APPLY_STYLE: unbekannter Style '{}'	GUI_APPLY_STYLE: unknown style '{}'
 GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_GET_*: invalid GUI_WINDOW handle
+GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_CONTENT_*: invalid GUI_WINDOW handle
 GUI_WINDOW_WIDGET_COUNT: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET_COUNT: invalid GUI_WINDOW handle
 GUI_WINDOW_WIDGET: ungueltiges GUI_WINDOW-Handle	GUI_WINDOW_WIDGET: invalid GUI_WINDOW handle
 GUI_SET_ALIGN: '{}' unbekannt -- links, mitte oder rechts	GUI_SET_ALIGN: '{}' unknown -- links, mitte or rechts

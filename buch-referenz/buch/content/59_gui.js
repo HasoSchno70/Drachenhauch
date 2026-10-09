@@ -846,6 +846,13 @@ module.exports = (H) => [
       'GUI_WINDOW_SET_BOUNDS(win, 100, 80, 320, 240)',
       'SAVE_SET_INT(slot, "win_x", GUI_WINDOW_GET_X(win))',
     ]),
+  H.cmd("GUI_WINDOW_CONTENT_W · GUI_WINDOW_CONTENT_H", 'GUI_WINDOW_CONTENT_W(win)   GUI_WINDOW_CONTENT_H(win)',
+    "Breite und Höhe des Inhaltsbereichs unter Titel-, Menü- und Reiterleiste. Dort zählen die Widget-Koordinaten -- so sitzt eine Statusleiste genau unten, ohne die Höhe der Menüleiste zu raten.",
+    [
+      'DIM h AS INTEGER',
+      'h = GUI_WINDOW_CONTENT_H(win)',
+      'sb = GUI_STATUSBAR(win, 0, h - 26, GUI_WINDOW_CONTENT_W(win), 26, "Bereit.")',
+    ]),
   H.cmd("GUI_WINDOW_MOVABLE · GUI_WINDOW_CLOSABLE · GUI_WINDOW_RESIZABLE", 'GUI_WINDOW_MOVABLE(win, an)   GUI_WINDOW_CLOSABLE(win, an)   GUI_WINDOW_RESIZABLE(win, an)',
     "Schalten Verschieben an der Titelleiste, den Schließen-Knopf und den Größengriff unten rechts ab oder an. Ein festgenageltes Fenster (movable = FALSE) eignet sich für eine Statusanzeige, die immer an derselben Stelle bleibt.",
     [

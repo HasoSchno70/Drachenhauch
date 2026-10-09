@@ -261,3 +261,55 @@ DHRT_FRAMES=1
 --- enthaelt
 keine Liste
 Eintrag 5 gibt es nicht
+
+=== der leer-hinweis bricht um, statt aus der liste zu laufen
+' Gefunden beim Dogfooding 2026-10-09: "Noch keine Notiz -- Strg+N legt eine
+' an." stand in einer Zeile und lief rechts aus einer 260 Punkte breiten
+' Liste. Gemessen im Bild: in der Hoehe der ZWEITEN Zeile steht Text.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 150, 200, [])
+GUI_LISTBOX_PLACEHOLDER(lb, "Noch keine Notiz -- Strg+N legt eine an.")
+DIM f AS INTEGER
+FOR f = 1 TO 3
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/bild.png
+--- nachher
+DIM b AS INTEGER
+b = LOADIMAGE("bild.png")
+' Grund der Liste unten links, wo kein Text steht
+DIM grund AS INTEGER
+grund = GETPIXEL(b, 40, 200)
+FUNCTION anders(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    DIM c AS INTEGER
+    c = GETPIXEL(b, x, y)
+    RETURN ABS((c SHR 16 BAND 255) - (grund SHR 16 BAND 255)) + ABS((c SHR 8 BAND 255) - (grund SHR 8 BAND 255)) + ABS((c BAND 255) - (grund BAND 255)) > 60
+END FUNCTION
+' Zeilen: die erste beginnt 10 Punkte unter der Oberkante (y 40)
+DIM zeile1 AS INTEGER
+DIM zeile2 AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 41 TO 54
+    FOR x = 32 TO 178
+        IF anders(x, y) THEN zeile1 += 1
+    NEXT
+NEXT
+FOR y = 60 TO 74
+    FOR x = 32 TO 178
+        IF anders(x, y) THEN zeile2 += 1
+    NEXT
+NEXT
+PRINT "erste zeile "; zeile1 > 20; " zweite zeile "; zeile2 > 20
+--- erwartet
+erste zeile TRUE zweite zeile TRUE

@@ -26,7 +26,7 @@ PDF_SAVE(p, "rechnung.pdf")
 | Funktion | Zweck |
 |---|---|
 | `PDF_NEW([größe$[, ausrichtung$]])` → PDF | `a3`…`a6`, `letter`, `legal`; `hoch`/`quer` |
-| `PDF_PAGE(p)` | neue Seite beginnen |
+| `PDF_PAGE(p)` | neue Seite beginnen -- die erste legt `PDF_NEW` schon an |
 | `PDF_PAGE_COUNT(p)` → INTEGER | wie viele bisher |
 | `PDF_PAGE_WIDTH(p)` / `PDF_PAGE_HEIGHT(p)` → FLOAT | Seitenmaß in mm |
 | `PDF_TITLE(p, titel$)` | Titel in den Dokument-Angaben |

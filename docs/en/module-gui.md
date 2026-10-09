@@ -234,7 +234,7 @@ IMPORT "gui"
 | `GUI_DRAW([obenauf])` | — | draw all windows (back→front); `obenauf`=FALSE leaves out the context menu and tooltip |
 | `GUI_DRAW_TOP()` | — | only what lies above all windows: open context menu and tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | draw ONE window again, above everything added since `GUI_DRAW` |
-| `GUI_CLICKED(widget)` | BOOLEAN | clicked in this frame? Applies to button, menu entry, **checkbox, toggle and radio** |
+| `GUI_CLICKED(widget)` | BOOLEAN | clicked in this frame? Applies to button, menu entry, **checkbox, toggle and radio** and to a click on a list entry -- also the one already selected |
 | `GUI_CHECKED(widget)` | BOOLEAN | checkbox state |
 | `GUI_VALUE(widget)` | FLOAT | slider value |
 | `GUI_TEXT(widget)` | STRING | text (label/button/TextInput) |
@@ -385,6 +385,7 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_APPLY_STYLE(widget, name$)` | — | apply a named style to a widget -- saves repeating it widget by widget |
 | `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | position and size of the widget in the window (counterpart to `GUI_SET_BOUNDS`) |
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | position and size of the window on the screen |
+| `GUI_WINDOW_CONTENT_W(win)` / `GUI_WINDOW_CONTENT_H(win)` | INTEGER | width and height of the content area below the title, menu and tab bar -- widget coordinates count from there; a status bar sits at the bottom without guessing the height of the menu bar |
 | `GUI_TABLE_SET(tbl, schluessel$, wert)` | — | set a table setting (`zebra`, `gitter`, `zeilenhoehe`, `filterzeile`, `feste_spalten`, ...) |
 | `GUI_TABLE_GET(tbl, schluessel$)` | FLOAT | read one of these settings back |
 | `GUI_TABLE_CLICKED_COL(tbl)` | INTEGER | which column was clicked? -- for cells of the kind `knopf` (button) |

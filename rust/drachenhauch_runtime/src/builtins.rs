@@ -2112,6 +2112,25 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 None => Ok(Value::Int(-1)),
             }
         }
+        "instrrev" => {
+            // Die LETZTE Fundstelle, 0-basiert in Zeichen wie INSTR; mit
+            // `start` die letzte, die dort oder davor beginnt (VB InStrRev,
+            // Pythons str.rfind). Gemeldet beim Dogfooding (2026-10-09):
+            // ohne den Befehl brauchte ein Umbruch an der letzten Wortgrenze
+            // eine eigene Schleife.
+            if a.len() < 2 || a.len() > 3 { return err(format!("INSTRREV: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            let hay = need_str(&a[0], "INSTRREV")?;
+            let needle = need_str(&a[1], "INSTRREV")?;
+            let bis = if a.len() == 3 {
+                let s = need_int(&a[2], "INSTRREV")?;
+                if s < 0 { return Ok(Value::Int(-1)); }
+                zeichen_stelle(hay, s as usize)
+            } else { hay.len() };
+            match hay.rmatch_indices(needle).find(|(o, _)| *o <= bis) {
+                Some((o, _)) => Ok(Value::Int(zeichen_zahl(&hay[..o]) as i64)),
+                None => Ok(Value::Int(-1)),
+            }
+        }
         "replace$" | "replace" => {
             arity!(3);
             let s = need_str(&a[0], "REPLACE$")?;

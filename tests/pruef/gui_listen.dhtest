@@ -462,3 +462,46 @@ FALSE
 TRUE
 TRUE TRUE 1
 
+=== ein klick auf einen eintrag meldet gui_clicked, auch auf den gewaehlten
+' Gefunden beim Dogfooding 2026-10-09: GUI_CLICKED war auf einer Liste STUMM
+' (immer FALSE, ohne Fehler) -- ein Notizzettel konnte die schon gewaehlte
+' Notiz nicht neu oeffnen, weil sich die Auswahl nicht aenderte. Zweimal
+' derselbe Eintrag: beide Klicks melden, on_click feuert zweimal.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche", "|"))
+DIM klicks AS INTEGER
+SUB zaehle()
+    klicks += 1
+END SUB
+GUI_ON_CLICK(lb, zaehle)
+DIM f AS INTEGER
+FOR f = 1 TO 16
+    GUI_UPDATE()
+    IF GUI_CLICKED(lb) THEN PRINT "klick "; GUI_LISTBOX_SELECTED(lb)
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "rueckrufe "; klicks
+--- datei ev.txt
+# Test-Aufnahme
+c 6
+e 3 7 61 64 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 5 0 0 0 0 // Event: test
+e 9 7 61 64 0 0 // Event: test
+e 10 6 0 0 0 0 // Event: test
+e 11 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=17
+--- erwartet
+klick 0
+klick 0
+rueckrufe 2
