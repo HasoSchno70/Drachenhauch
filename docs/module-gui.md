@@ -93,7 +93,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_ITEM_W(tb, eintrag)` | INTEGER | Breite eines Eintrags |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | wie viele Knöpfe gerade im »-Menü stehen (0 = alles passt) |
 | `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | Statusleiste; `text$` ist das erste Feld |
-| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | Feld anhängen: `breite` in Punkten, 0 = teilt sich den Rest; `links`/`mitte`/`rechts` |
+| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | Feld anhängen: `breite` in Punkten, 0 = teilt sich den Rest; `links`/`mitte`/`rechts`. Passt ein Text nicht, endet er mit `...` |
 | `GUI_STATUSBAR_SET(sb, feld, text$)` | — | Text eines Feldes (`GUI_SET_TEXT` meint Feld 0) |
 | `GUI_STATUSBAR_TEXT$(sb, feld)` | STRING | Text eines Feldes |
 | `GUI_STATUSBAR_TIP(sb, feld, tip$)` | — | Tooltip eines Feldes |
@@ -121,7 +121,7 @@ IMPORT "gui"
 | `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via `GUI_VALUE`) |
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | verschiebbare Trennlinie (`"v"`/`"h"`); Position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
-| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y) |
+| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y); der Platzhalter steht gedaempft da, bis getippt wird -- auch mit Fokus |
 | `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl) |
 | `GUI_ENTERED(tf)` | BOOLEAN | wurde in diesem Bild Enter im Textfeld gedrückt? |
 | `GUI_ON_ENTER(tf, handler)` | — | Rückruf dafür |

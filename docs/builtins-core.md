@@ -38,6 +38,11 @@ PRINT "x = ";           ' kein Newline
 PRINT x                 ' schließt an
 ```
 
+**Wann die Ausgabe erscheint:** im Terminal jede Zeile sofort. Geht die Ausgabe
+in eine Datei oder an ein anderes Programm, sammelt `PRINT` die Zeilen und gibt
+sie spätestens nach 50 ms hinaus -- vor `SLEEP`, `INPUT`, `EPRINT` und bei
+`FLIP` immer. Ein „Bitte warten …“ steht also da, bevor die Pause beginnt.
+
 ## Konvertierung
 
 | Funktion | Zweck |

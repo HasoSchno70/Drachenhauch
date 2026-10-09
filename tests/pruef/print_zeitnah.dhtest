@@ -1,0 +1,62 @@
+' PRINT geht zeitnah hinaus (2026-10-09, Dogfooding). Vorher sammelte dhrt
+' alle PRINT-Zeilen bis zum Programmende (oder bis INPUT/EPRINT) -- auch im
+' Terminal: "Bitte warten ..." vor einem SLEEP oder einer langen Rechnung
+' erschien erst danach. Jetzt: vor SLEEP immer, sonst nach einem Zeilenende,
+' wenn seit dem letzten Mal 50 ms vergangen sind (lange Schleifen bleiben
+' gebuendelt). Das Kind schreibt in eine Datei; DHRT_LIVE (das PROCESS_START
+' jedem Kind setzt) leert ein Skript vorher, sonst gaelte die alte Ausnahme.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== vor einer pause steht die ausgabe schon da (windows)
+WRITEALL("kind.dh", "PRINT " + CHR$(34) + "eins" + CHR$(34) + CHR$(10) + "SLEEP(1500)" + CHR$(10) + "PRINT " + CHR$(34) + "zwei" + CHR$(34) + CHR$(10))
+WRITEALL("lauf.cmd", "@echo off" + CHR$(13) + CHR$(10) + "set DHRT_LIVE=" + CHR$(13) + CHR$(10) + CHR$(34) + EXEPATH$() + CHR$(34) + " run kind.dh > aus.txt" + CHR$(13) + CHR$(10))
+DIM p AS INTEGER
+p = PROCESS_START("cmd", "/c", CWD$() + "\lauf.cmd")
+SLEEP(900)
+DIM mitten AS STRING
+IF FILEEXISTS("aus.txt") THEN mitten = REPLACE$(REPLACE$(READALL$(OPENFILE("aus.txt", "r")), CHR$(13), ""), CHR$(10), "/")
+PRINT "nach 0,9 s ["; mitten; "]"
+WHILE PROCESS_RUNNING(p)
+    SLEEP(50)
+WEND
+DIM ende AS STRING
+ende = REPLACE$(REPLACE$(READALL$(OPENFILE("aus.txt", "r")), CHR$(13), ""), CHR$(10), "/")
+PRINT "am ende ["; ende; "]"
+--- system windows
+--- erwartet
+nach 0,9 s [eins/]
+am ende [eins/zwei/]
+
+=== vor einer pause steht die ausgabe schon da (posix)
+WRITEALL("kind.dh", "PRINT " + CHR$(34) + "eins" + CHR$(34) + CHR$(10) + "SLEEP(1500)" + CHR$(10) + "PRINT " + CHR$(34) + "zwei" + CHR$(34) + CHR$(10))
+WRITEALL("lauf.sh", "unset DHRT_LIVE" + CHR$(10) + CHR$(34) + EXEPATH$() + CHR$(34) + " run kind.dh > aus.txt" + CHR$(10))
+DIM p AS INTEGER
+p = PROCESS_START("sh", "lauf.sh")
+SLEEP(900)
+DIM mitten AS STRING
+IF FILEEXISTS("aus.txt") THEN mitten = REPLACE$(REPLACE$(READALL$(OPENFILE("aus.txt", "r")), CHR$(13), ""), CHR$(10), "/")
+PRINT "nach 0,9 s ["; mitten; "]"
+WHILE PROCESS_RUNNING(p)
+    SLEEP(50)
+WEND
+DIM ende AS STRING
+ende = REPLACE$(REPLACE$(READALL$(OPENFILE("aus.txt", "r")), CHR$(13), ""), CHR$(10), "/")
+PRINT "am ende ["; ende; "]"
+--- system posix
+--- erwartet
+nach 0,9 s [eins/]
+am ende [eins/zwei/]
+
+=== viele zeilen bleiben vollstaendig und in der reihenfolge
+DIM i AS INTEGER
+FOR i = 1 TO 20000
+    PRINT i
+NEXT
+EPRINT("fertig")
+PRINT "ende"
+--- stderr
+fertig
+--- enthaelt
+19999
+20000
+ende

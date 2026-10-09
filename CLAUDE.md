@@ -1616,8 +1616,17 @@ dort markiert Ziehen. (5) **Der Leer-Hinweis** von Liste/Baum/Tabelle lief
 rechts hinaus -- jetzt umgebrochen (`Gui::leer_hinweis`, eine Routine fuer
 alle drei). Dazu Doku: `PDF_NEW` legt die erste Seite schon an (ein
 `PDF_PAGE` danach gab eine leere), und `LEFT$`/`MID$` im Handbuch nannten
-noch "Game"/"Basic". Offen als Frage an den Nutzer: der Platzhalter eines
-Textfelds verschwindet mit dem Fokus. Tests `gui_zug_nur_im_feld.dhtest`,
+noch "Game"/"Basic". **Nachgezogen (Wunsch des Nutzers):** der Platzhalter
+von Textfeld und Textbereich bleibt sichtbar, bis getippt wird -- auch mit
+Fokus (Textbereich: Platzhalter zeichnen und den Zweig mit der Schreibmarke
+trotzdem laufen lassen). **`PRINT` kommt zeitnah an:** im Terminal jede
+Zeile (`ausgabe_terminal`, IsTerminal), sonst nach einem Zeilenende, wenn
+50 ms seit dem letzten Mal vergangen sind (`Vm::out_zeit`), und immer vor
+SLEEP und (zeitlich) bei FLIP -- vorher sammelte dhrt alles bis zum
+Programmende, auch im Terminal. **`PDF_PAGE` auf der noch leeren ersten
+Seite** legt keine zweite an (`Dokument::seite_beginnen`). **Abgeschnittener
+Text in der Statusleiste** endet mit `...` (`text_kuerzen`; ohne Bildfall).
+Tests `gui_zug_nur_im_feld.dhtest`,
 `gui_inhaltsbereich.dhtest`, `beispiel_notizen.dhtest`, je ein Fall in
 `gui_listen`, `gui_liste_komfort`, `zeichenketten_stellen` (gegen 2026.25
 fallen alle 7 neuen Laufzeit-Faelle).

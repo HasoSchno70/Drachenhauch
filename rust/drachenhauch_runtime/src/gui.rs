@@ -10463,6 +10463,20 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
     }
 
+    /// Text auf `breite` Pixel kuerzen: passt er, unveraendert, sonst so viele
+    /// Zeichen, wie mit "..." dahinter passen.
+    fn text_kuerzen(&self, g: &Graphics, wdg: &Widget, text: &str, breite: i32) -> String {
+        if self.wtext_width(g, wdg, text) <= breite { return text.to_string(); }
+        let zeichen: Vec<char> = text.chars().collect();
+        let mut n = zeichen.len();
+        while n > 0 {
+            n -= 1;
+            let probe: String = zeichen[..n].iter().collect::<String>() + "...";
+            if self.wtext_width(g, wdg, &probe) <= breite { return probe; }
+        }
+        String::new()
+    }
+
     /// Text an Wortgrenzen auf `breite` Pixel umbrechen. Ein Wort, das allein
     /// nicht in eine Zeile passt, wird an der Zeichengrenze geteilt; `\n`
     /// bleibt ein Umbruch. Gemessen wird mit der Schrift des Widgets.
@@ -19088,7 +19102,10 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
         g.push_clip(ax + 2, ay + 1, (w - 4 - rechts).max(0), (h - 2).max(0));
         if anzeige.is_empty() {
-            if !wdg.placeholder.is_empty() && !focused {
+            // Der Platzhalter bleibt, bis getippt wird -- auch mit Fokus. Vorher
+            // verschwand er mit dem Fokus, und ein Feld, das beim Start den
+            // Fokus hat, zeigte ihn nie (Dogfooding 2026-10-09).
+            if !wdg.placeholder.is_empty() {
                 self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
             }
         } else {
@@ -19427,9 +19444,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         g.draw_image_rect_alpha(wdg.hg_bild, ax + (w - dw) / 2, ay + (h - dh) / 2, dw, dh, wdg.hg_deckkraft);
                     }
                 }
-                if wdg.text.is_empty() && !focused && !wdg.placeholder.is_empty() {
-                    self.wtext(g, wdg, ax + pad, ay + pad, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
-                } else {
+                // Der Platzhalter bleibt, bis getippt wird (wie im Textfeld);
+                // mit Fokus laeuft das Zeichnen danach weiter -- fuer die
+                // Schreibmarke und die Nummernspalte.
+                let platzhalter = wdg.text.is_empty() && wdg.vorschau.is_empty() && !wdg.placeholder.is_empty();
+                if platzhalter {
+                    let gut = self.ta_gutter(g, wdg, 1);
+                    self.wtext(g, wdg, ax + pad + gut, ay + pad, wdg.placeholder.clone(), self.leise(self.wcol(wdg, "bg", "win_bg")));
+                }
+                if !(platzhalter && !focused) {
                     let (chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
                     let starts = Self::line_starts(&chars);
                     let view_lines = ((h - 2 * pad) / lh).max(1);
@@ -20065,12 +20088,16 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         if ueber { g.box_fill(x0 + 1, ay + 1, x1 - 2, ay + h - 1, shade(bg, 14)); }
                         if n > 0 { g.line(x0, ay + self.sk(5), x0, ay + h - self.sk(5), self.th("win_border")); }
                         if f.text.is_empty() { continue; }
-                        let tw = self.wtext_width(g, wdg, &f.text);
                         let innen = (x1 - x0 - 2 * pad).max(0);
+                        // Passt der Text nicht, endet er mit "..." statt mitten
+                        // im Wort abgeschnitten (Dogfooding 2026-10-09: aus
+                        // "geaendert" wurde "geaender", ohne dass man es merkt).
+                        let text = self.text_kuerzen(g, wdg, &f.text, innen);
+                        let tw = self.wtext_width(g, wdg, &text);
                         let tx = match f.ausr { 1 => x0 + pad + ((innen - tw) / 2).max(0), 2 => x0 + pad + (innen - tw).max(0), _ => x0 + pad };
                         let fc = if ueber { acc } else if k == 0 { haupt } else { neben };
                         g.push_clip(x0 + pad / 2, ay, (x1 - x0 - pad).max(0), h);
-                        self.wtext(g, wdg, tx, ay + (h - sz).max(0) / 2, f.text.clone(), fc);
+                        self.wtext(g, wdg, tx, ay + (h - sz).max(0) / 2, text, fc);
                         g.pop_clip();
                     }
                 }

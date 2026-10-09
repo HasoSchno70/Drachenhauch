@@ -156,6 +156,15 @@ impl Dokument {
         self.seiten.push(Seite { breite_mm: self.breite_mm, hoehe_mm: self.hoehe_mm, ops: Vec::new() });
     }
 
+    /// PDF_PAGE: eine neue Seite -- ausser die erste ist noch leer. Sie legt
+    /// `PDF_NEW` schon an, und wer wie bei anderen Bibliotheken erst
+    /// PDF_PAGE ruft, bekam sonst eine leere erste Seite (Dogfooding
+    /// 2026-10-09).
+    pub fn seite_beginnen(&mut self) {
+        if self.seiten.len() == 1 && self.seiten[0].ops.is_empty() { return; }
+        self.neue_seite();
+    }
+
     fn hier(&mut self) -> &mut Seite {
         // `neu` legt immer eine Seite an, es gibt also nie keine.
         self.seiten.last_mut().unwrap()

@@ -328,3 +328,28 @@ p = PDF_NEW()
 PDF_FONT_LOAD(p, "gibtsnicht.ttf", "x")
 --- fehler
 PDF_FONT_LOAD: gibtsnicht.ttf:
+
+=== pdf_page auf der noch leeren ersten seite legt keine zweite an
+' PDF_NEW legt die erste Seite schon an; wer wie bei anderen Bibliotheken
+' erst PDF_PAGE ruft, bekam eine leere erste Seite (Dogfooding 2026-10-09).
+' Danach legt jedes PDF_PAGE eine Seite an -- auch eine leere.
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_PAGE(p)
+PRINT PDF_PAGE_COUNT(p)
+PDF_TEXT(p, 20, 20, "eins")
+PDF_PAGE(p)
+PRINT PDF_PAGE_COUNT(p)
+PDF_PAGE(p)
+PRINT PDF_PAGE_COUNT(p)
+DIM q AS PDF
+q = PDF_NEW()
+PDF_TEXT(q, 20, 20, "eins")
+PDF_PAGE(q)
+PRINT PDF_PAGE_COUNT(q)
+--- erwartet
+1
+2
+3
+2
