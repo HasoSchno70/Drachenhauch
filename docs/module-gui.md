@@ -234,7 +234,7 @@ IMPORT "gui"
 | `GUI_DRAW([obenauf])` | — | alle Fenster zeichnen (hinten→vorne); `obenauf`=FALSE lässt Kontextmenü und Tooltip weg |
 | `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Kontextmenü und Tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | EIN Fenster noch einmal zeichnen, über allem, was seit `GUI_DRAW` dazugekommen ist |
-| `GUI_CLICKED(widget)` | BOOLEAN | in diesem Frame angeklickt? Gilt für Button, Menü-Eintrag, **Checkbox, Toggle und Radio** |
+| `GUI_CLICKED(widget)` | BOOLEAN | in diesem Frame angeklickt? Gilt für Button, Menü-Eintrag, **Checkbox, Toggle und Radio** und für einen Klick auf einen Listeneintrag -- auch auf den schon gewählten |
 | `GUI_CHECKED(widget)` | BOOLEAN | Checkbox-Zustand |
 | `GUI_VALUE(widget)` | FLOAT | Slider-Wert |
 | `GUI_TEXT(widget)` | STRING | Text (Label/Button/TextInput) |
@@ -385,6 +385,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_APPLY_STYLE(widget, name$)` | — | einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen |
 | `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | Lage und Groesse des Widgets im Fenster (Gegenstueck zu `GUI_SET_BOUNDS`) |
 | `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | Lage und Groesse des Fensters auf dem Bildschirm |
+| `GUI_WINDOW_CONTENT_W(win)` / `GUI_WINDOW_CONTENT_H(win)` | INTEGER | Breite und Hoehe des Inhaltsbereichs unter Titel-, Menue- und Reiterleiste -- dort zaehlen die Widget-Koordinaten; so sitzt eine Statusleiste unten, ohne die Hoehe der Menueleiste zu raten |
 | `GUI_TABLE_SET(tbl, schluessel$, wert)` | — | Einstellung der Tabelle setzen (`zebra`, `gitter`, `zeilenhoehe`, `filterzeile`, `feste_spalten`, ...) |
 | `GUI_TABLE_GET(tbl, schluessel$)` | FLOAT | eine dieser Einstellungen zurueckreisen |
 | `GUI_TABLE_CLICKED_COL(tbl)` | INTEGER | welche Spalte wurde angeklickt? -- fuer Zellen der Art `knopf` |

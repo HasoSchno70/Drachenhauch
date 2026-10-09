@@ -1596,6 +1596,32 @@ baut `Node::Call` in die Kette). `+=`/`++` darauf ist eine Meldung
 `tests/pruef/index_auf_aufruf.dhtest` (11; gegen 2026.25 fallen 8, ohne den
 Zwischenspeicher die 4 Faelle, die die Aufrufe zaehlen).
 
+## Dogfooding: Notizzettel (2026-10-09)
+
+`examples/notizen/main.dh` (SQLite, Liste mit Suche, formatierter Text als
+Markdown, Menue mit Kuerzeln, PDF, Tray, Rueckfrage bei Ungesichertem),
+gefahren mit ECHTEN Fensternachrichten und im Bild angesehen. Fuenf Funde in
+der Laufzeit: (1) **`INSTRREV`** fehlte (letzte Fundstelle, ab 0, -1, mit
+`start` die letzte dort oder davor; `rmatch_indices`). (2) **Kein Weg zum
+Inhaltsbereich** -- ein Programm mit Menue musste die Hoehe der Leiste
+raten: `GUI_WINDOW_CONTENT_W/H` (`Gui::window_inhalt`, ueber `content_top`).
+(3) **`GUI_CLICKED` auf einer Liste war STUMM** (immer FALSE, wie frueher bei
+Kaestchen) -- ein Klick auf einen Eintrag meldet jetzt, auch auf den schon
+gewaehlten, und feuert `on_click`. (4) **Markieren beim Halten:** bekam ein
+Textbereich oder Textfeld den Fokus, waehrend die Maustaste noch unten war
+(Klick in die Liste -> Programm setzt den Fokus in den Text), hielt es das
+fuer seinen eigenen Zug und markierte bis zur Maus -- das erste Tippen haette
+die Notiz ersetzt. `Gui::zug_feld` = das Feld, in dem der Druck begann; nur
+dort markiert Ziehen. (5) **Der Leer-Hinweis** von Liste/Baum/Tabelle lief
+rechts hinaus -- jetzt umgebrochen (`Gui::leer_hinweis`, eine Routine fuer
+alle drei). Dazu Doku: `PDF_NEW` legt die erste Seite schon an (ein
+`PDF_PAGE` danach gab eine leere), und `LEFT$`/`MID$` im Handbuch nannten
+noch "Game"/"Basic". Offen als Frage an den Nutzer: der Platzhalter eines
+Textfelds verschwindet mit dem Fokus. Tests `gui_zug_nur_im_feld.dhtest`,
+`gui_inhaltsbereich.dhtest`, `beispiel_notizen.dhtest`, je ein Fall in
+`gui_listen`, `gui_liste_komfort`, `zeichenketten_stellen` (gegen 2026.25
+fallen alle 7 neuen Laufzeit-Faelle).
+
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
 raylib liest Maus- und Tastentasten als ZUSTAND (Rueckruf schreibt

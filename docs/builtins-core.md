@@ -291,6 +291,7 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 | `LEFT$(s, n)`, `RIGHT$(s, n)` | erste/letzte n Zeichen |
 | `MID$(s, start[, n])` | Teilstring ab Position start (0-basiert), n Zeichen oder bis Ende |
 | `INSTR(s, sub[, start])` → INTEGER | Position von sub in s, oder -1 |
+| `INSTRREV(s, sub[, start])` → INTEGER | letzte Position von sub in s (mit `start`: die letzte, die dort oder davor beginnt), oder -1 |
 | `REPLACE$(s, alt, neu)` | alle Vorkommen ersetzen |
 | `TRIM$(s)` | Whitespace vorne/hinten weg |
 | `SPLIT$(s, delim)` → ARRAY OF STRING | Zerlegen |
@@ -321,9 +322,10 @@ Erweiterungen *(nur native Runtime)*:
 
 ```basic
 PRINT UPPER$("hallo")           ' "HALLO"
-PRINT LEFT$("Drachenhauch", 4)     ' "Game"
-PRINT MID$("Drachenhauch", 4, 5)   ' "Basic"
+PRINT LEFT$("Drachenhauch", 4)     ' "Drac"
+PRINT MID$("Drachenhauch", 4, 5)   ' "henha" (ab 0 gezaehlt)
 PRINT INSTR("hello world", "world")   ' 6
+PRINT INSTRREV("a/b/c", "/")          ' 3
 PRINT REPLACE$("a-b-c", "-", "_")     ' "a_b_c"
 
 DIM teile AS ARRAY OF STRING

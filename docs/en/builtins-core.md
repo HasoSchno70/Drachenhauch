@@ -291,6 +291,7 @@ Functions with a `$` suffix also exist without it (`UPPER$` ≡ `UPPER`).
 | `LEFT$(s, n)`, `RIGHT$(s, n)` | first/last n characters |
 | `MID$(s, start[, n])` | substring from position start (0-based), n characters or to the end |
 | `INSTR(s, sub[, start])` → INTEGER | position of sub in s, or -1 |
+| `INSTRREV(s, sub[, start])` → INTEGER | last position of sub in s (with `start`: the last one beginning there or before), or -1 |
 | `REPLACE$(s, alt, neu)` | replace all occurrences |
 | `TRIM$(s)` | remove whitespace at the front/back |
 | `SPLIT$(s, delim)` → ARRAY OF STRING | split |
@@ -321,9 +322,10 @@ Extensions *(native runtime only)*:
 
 ```basic
 PRINT UPPER$("hallo")           ' "HALLO"
-PRINT LEFT$("Drachenhauch", 4)     ' "Game"
-PRINT MID$("Drachenhauch", 4, 5)   ' "Basic"
+PRINT LEFT$("Drachenhauch", 4)     ' "Drac"
+PRINT MID$("Drachenhauch", 4, 5)   ' "henha" (counted from 0)
 PRINT INSTR("hello world", "world")   ' 6
+PRINT INSTRREV("a/b/c", "/")          ' 3
 PRINT REPLACE$("a-b-c", "-", "_")     ' "a_b_c"
 
 DIM teile AS ARRAY OF STRING

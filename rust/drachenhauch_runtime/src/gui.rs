@@ -3254,6 +3254,13 @@ pub struct Gui {
     /// Bild einen Wunsch an Graphics, gesetzt wird beim FLIP.
     cursors: bool,
     was_mouse_down: bool,
+    /// Das Text-Widget, in dem der laufende Druck BEGANN. Nur dort markiert
+    /// Ziehen. Bekommt ein Feld den Fokus erst, waehrend die Taste schon
+    /// unten ist (Klick in eine Liste, das Programm setzt den Fokus in den
+    /// Text), hielt es das Halten fuer seinen eigenen Zug und markierte bis
+    /// zur Maus -- gefunden beim Dogfooding 2026-10-09: die ganze Notiz war
+    /// markiert, und das erste Tippen haette sie ersetzt.
+    zug_feld: Option<(usize, usize)>,
     frame_count: i64,
     theme: HashMap<String, i64>,
     metrics: HashMap<String, i32>,
@@ -3345,7 +3352,7 @@ impl Gui {
             open_menu: None, context_open: None, kontext_neu: None, sub_chain: Vec::new(), tasten_mod: (false, false),
             kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
-            was_mouse_down: false, frame_count: 0,
+            was_mouse_down: false, zug_feld: None, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
             styles: HashMap::new(),
             pending: Vec::new(),
@@ -10221,6 +10228,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             .ok_or("GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle")?;
         Ok((self.unsk(w.x), self.unsk(w.y), self.unsk(w.w), self.unsk(w.h)))
     }
+    /// Breite und Hoehe des INHALTSbereichs -- unter Titel-, Menue- und
+    /// Reiterleiste, dort, wo Widget-Koordinaten zaehlen. Ohne das musste ein
+    /// Programm mit Menue die Hoehe der Leiste raten, und die haengt an Thema
+    /// und Massstab (gefunden beim Dogfooding 2026-10-09: die Statusleiste
+    /// eines Notizzettels sass zu hoch).
+    pub fn window_inhalt(&self, h: i64) -> Result<(i32, i32), String> {
+        let wi = h as usize;
+        let w = self.windows.get(wi)
+            .ok_or("GUI_WINDOW_CONTENT_*: ungueltiges GUI_WINDOW-Handle")?;
+        Ok((self.unsk(w.w), self.unsk((w.h - self.content_top(wi)).max(0))))
+    }
     /// Loest JEDE Interaktions-Referenz auf Fenster `wi` (oder ein Widget
     /// darin), egal ob das Fenster gerade zerstoert, unsichtbar gemacht oder
     /// per Close-Button geschlossen wird.
@@ -10428,6 +10446,20 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         for (wi, i, h) in neu {
             let w = &mut self.windows[wi].widgets[i];
             w.h = h; w.bh = h;
+        }
+    }
+
+    /// Der Hinweis einer leeren Liste, eines Baums oder einer Tabelle:
+    /// umgebrochen auf die Breite, jede Zeile mittig. Vorher stand er in einer
+    /// Zeile und lief rechts aus dem Feld (gesehen beim Dogfooding 2026-10-09:
+    /// "Noch keine Notiz -- Strg" in einer 260 Punkte breiten Liste).
+    fn leer_hinweis(&self, g: &mut Graphics, wdg: &Widget, x: i32, y: i32, breite: i32, text: &str, farbe: i64) {
+        let rand = self.sk(6);
+        let innen = (breite - 2 * rand).max(1);
+        let zh = self.wsize(g, wdg) + self.sk(4);
+        for (k, z) in self.umbrechen(g, wdg, text, innen).into_iter().enumerate() {
+            let tw = self.wtext_width(g, wdg, &z);
+            self.wtext(g, wdg, x + ((breite - tw) / 2).max(rand), y + k as i32 * zh, z, farbe);
         }
     }
 
@@ -13034,6 +13066,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }   // !menue_hat_tasten
         self.dialog_auswerten();
         self.was_mouse_down = is_down;
+        if !is_down { self.zug_feld = None; }
         self.was_right_down = right_down;
         self.frame_count += 1;
     }
@@ -13388,6 +13421,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if !self.was_mouse_down {
                 let r = self.abs_rect(wi, &self.windows[wi].widgets[i]);
                 if Self::in_rect(mx, my, r) {
+                    self.zug_feld = Some((wi, i));
                     caret = idx; anchor = idx;
                     let jetzt = g.get_time();
                     let w = &mut self.windows[wi].widgets[i];
@@ -13402,8 +13436,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         w.wort_zug = true;
                     }
                 }
-            } else if !self.windows[wi].widgets[i].wort_zug {
-                caret = idx;   // Drag -> Selektion bis hierher
+            } else if !self.windows[wi].widgets[i].wort_zug && self.zug_feld == Some((wi, i)) {
+                caret = idx;   // Drag -> Selektion bis hierher (nur ein Zug, der hier begann)
             }
         }
 
@@ -14369,7 +14403,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             if !Self::in_rect(mx, my, (ax, ay, fw, fh)) || self.topmost_at(mx, my) != Some(wi) {
                 self.windows[wi].widgets[i].farbfeld_zug = true;
+            } else {
+                self.zug_feld = Some((wi, i));
             }
+        } else if g.mouse_button(0) && self.zug_feld != Some((wi, i)) {
+            // Die Taste war schon unten, als das Feld den Fokus bekam.
+            self.windows[wi].widgets[i].farbfeld_zug = true;
         }
         if g.mouse_button(0) && !self.windows[wi].widgets[i].farbfeld_zug {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
@@ -16430,6 +16469,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         geaendert = true;
                     }
                 } else {
+                    // Ein Klick auf einen Eintrag meldet GUI_CLICKED (und
+                    // on_click) ein Bild lang -- auch auf den schon gewaehlten.
+                    // Vorher war GUI_CLICKED auf einer Liste STUMM, immer FALSE
+                    // ohne Fehler (gefunden beim Dogfooding 2026-10-09: ein
+                    // Notizzettel konnte die gewaehlte Notiz nicht neu oeffnen,
+                    // die Auswahl aenderte sich ja nicht).
+                    w.clicked = true;
+                    if let Some(f) = w.on_click.clone() { self.pending.push(f); }
                     let multi = w.list.as_ref().map(|l| l.multi).unwrap_or(false);
                     if multi {
                         let l = w.list.as_mut().unwrap();
@@ -19837,8 +19884,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     // Leer ist eine Aussage: "keine Treffer" statt einer Flaeche,
                     // die aussieht, als sei die Liste kaputt.
                     if let Some(t) = l.map(|l| l.leer_text.clone()).filter(|t| !t.is_empty()) {
-                        let tw = self.wtext_width(g, wdg, &t);
-                        self.wtext(g, wdg, ax + ((w - tw) / 2).max(pad), ay + self.sk(10), t, muted);
+                        self.leer_hinweis(g, wdg, ax, ay + self.sk(10), w, &t, muted);
                     }
                 }
                 for (r, &k) in ansicht.iter().enumerate() {
@@ -20749,9 +20795,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         let wz = if bar.is_some() { w - self.sk(8) - 2 } else { w };
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
         if zeilen.is_empty() && !t.leer_text.is_empty() {
-            let tw = self.wtext_width(g, wdg, &t.leer_text);
             let muted = self.leise(self.wcol(wdg, "bg", "widget_bg"));
-            self.wtext(g, wdg, ax + ((w - tw) / 2).max(self.sk(6)), ay + self.sk(10), t.leer_text.clone(), muted);
+            self.leer_hinweis(g, wdg, ax, ay + self.sk(10), w, &t.leer_text, muted);
         }
         let rh = self.sk(TREE_ROW_H);
         let mut summe = 0.0f64;
@@ -21294,9 +21339,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         // Leer ist eine Aussage: "Keine Treffer" statt einer Flaeche, die
         // aussieht, als sei die Tabelle kaputt (wie bei der Liste).
         if t.view.is_empty() && !t.leer_text.is_empty() {
-            let tw = self.wtext_width(g, wdg, &t.leer_text);
             let muted = self.leise(bg);
-            self.wtext(g, wdg, body_x + ((body_w - tw) / 2).max(self.sk(6)), body_y + self.sk(10), t.leer_text.clone(), muted);
+            self.leer_hinweis(g, wdg, body_x, body_y + self.sk(10), body_w, &t.leer_text, muted);
         }
         g.pop_clip();
 

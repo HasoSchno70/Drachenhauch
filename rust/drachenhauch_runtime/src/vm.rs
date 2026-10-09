@@ -7778,6 +7778,8 @@ impl<'p> Vm<'p> {
             "gui_window_get_y" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_Y")?)?.1 as i64),
             "gui_window_get_w" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_W")?)?.2 as i64),
             "gui_window_get_h" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_H")?)?.3 as i64),
+            "gui_window_content_w" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_W")?)?.0 as i64),
+            "gui_window_content_h" => Value::Int(self.gui.window_inhalt(gi(a,0,"GUI_WINDOW_CONTENT_H")?)?.1 as i64),
             "gui_window_destroy" => { self.gui.window_destroy(gi(a,0,"GUI_WINDOW_DESTROY")?)?; Value::Nil }
             "gui_window_widget_count" => Value::Int(self.gui.window_widget_count(gi(a,0,"GUI_WINDOW_WIDGET_COUNT")?)?),
             "gui_window_widget" => Value::Int(self.gui.window_widget(gi(a,0,"GUI_WINDOW_WIDGET")?, gi(a,1,"GUI_WINDOW_WIDGET")?)?),

@@ -65,6 +65,8 @@ examples/tabelle_sqlite_arbeitskopie.db
 # Haushaltsbuch: die Buchungen legt das Programm beim ersten Start an --
 # Daten des Nutzers, kein Quelltext.
 examples/haushaltsbuch/*.db*
+examples/notizen/*.db*
+examples/notizen/*.pdf
 
 # Tippspiel-Buch: jeder Kapitelstand legt seine SQLite-Datei beim ersten Start
 # selbst an (tippspiel.db, kapNN.db, kapNN_sicherung.db, dazu -wal/-shm).

@@ -138,3 +138,29 @@ PRINT REGEX_FIND_POS(t, "[a-j]", 7); " "; REGEX_FIND_POS(t, "h.i", 0); " "; REGE
 12 de|füg|ghäij|j||
 abcdefü|häij|7 10 -1 11 12
 (7, 1) (8, 3) (-1, 0) (-1, 0)
+
+=== instrrev findet die letzte stelle
+' INSTRREV (2026-10-09, Dogfooding): wie INSTR, aber von hinten -- ab 0,
+' -1 = nicht gefunden; mit start die letzte Stelle, die dort oder davor
+' beginnt (VB InStrRev, Pythons rfind).
+PRINT INSTRREV("a/b/c", "/")
+PRINT INSTRREV("a/b/c", "/", 2)
+PRINT INSTRREV("a/b/c", "/", 1)
+PRINT INSTRREV("a/b/c", "/", 0)
+PRINT INSTRREV("abc", "x")
+PRINT INSTRREV("äöü/x/y", "/")
+PRINT INSTRREV("abc", "")
+PRINT INSTRREV("abab", "ab", 2)
+PRINT INSTRREV("abc", "a", -1)
+PRINT INSTRREV("abc", "c", 99)
+--- erwartet
+3
+1
+1
+-1
+-1
+5
+3
+2
+-1
+2
