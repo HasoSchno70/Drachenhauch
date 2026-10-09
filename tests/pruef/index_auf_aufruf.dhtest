@@ -1,0 +1,213 @@
+' Index, Feld und Zuweisung direkt auf dem Ergebnis eines Aufrufs
+' (2026-10-09): `reihe(5)[0].x`, `ort(7).y`, `f()[1].x = 3`, `held().hp = 5`.
+' Ein Feld, ein Struct und ein Objekt kommen als Verweis zurueck -- lesen
+' sieht das Original, schreiben aendert es. Der Aufruf laeuft dabei genau
+' einmal, auch wenn der Struct-Weg den Puffer zweimal braucht (Stelle und
+' Laenge); das zaehlt `n` in jedem Fall mit.
+
+=== feld von structs aus einer funktion mit index und feld
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DIM n AS INTEGER
+FUNCTION reihe(k AS INTEGER) AS ARRAY OF Punkt
+    n += 1
+    DIM r[k] AS Punkt
+    DIM i AS INTEGER
+    FOR i = 0 TO k - 1
+        r[i].x = i * 10
+        r[i].y = i * 10 + 1
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT reihe(5)[3].x; " "; n
+PRINT reihe(5)[4].y; " "; n
+PRINT LEN(reihe(4)); " "; n
+--- erwartet
+30 1
+41 2
+4 3
+
+=== ein struct aus einer funktion mit feld
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DIM n AS INTEGER
+FUNCTION ort(x AS INTEGER) AS Punkt
+    n += 1
+    DIM p AS Punkt
+    p.x = x
+    p.y = -x
+    RETURN p
+END FUNCTION
+PRINT ort(7).x; " "; ort(7).y; " "; n
+--- erwartet
+7 -7 2
+
+=== struct im struct und ein aufruf im index laufen je einmal
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+STRUCT Linie LAYOUT C
+    a AS Punkt
+    b AS Punkt
+    farben[3] AS UBYTE
+END STRUCT
+DIM n AS INTEGER
+FUNCTION linie() AS Linie
+    n += 1
+    DIM l AS Linie
+    l.b.y = 42
+    l.farben[2] = 9
+    RETURN l
+END FUNCTION
+FUNCTION welche() AS INTEGER
+    n += 100
+    RETURN 1
+END FUNCTION
+FUNCTION reihe() AS ARRAY OF Linie
+    n += 1
+    DIM r[3] AS Linie
+    r[1].a.x = 5
+    RETURN r
+END FUNCTION
+PRINT linie().b.y; " "; linie().farben[2]; " "; n
+PRINT reihe()[welche()].a.x; " "; n
+DIM p AS Punkt
+p = linie().b
+PRINT p.y; " "; n
+--- erwartet
+42 9 2
+5 103
+42 104
+
+=== ein element als ganzes und for each ueber ein ergebnis
+STRUCT Punkt LAYOUT C
+    x AS LONG
+    y AS LONG
+END STRUCT
+DIM n AS INTEGER
+FUNCTION reihe(k AS INTEGER) AS ARRAY OF Punkt
+    n += 1
+    DIM r[k] AS Punkt
+    DIM i AS INTEGER
+    FOR i = 0 TO k - 1
+        r[i].x = i * 10
+        r[i].y = i
+    NEXT
+    RETURN r
+END FUNCTION
+DIM k AS Punkt
+k = reihe(3)[2]
+PRINT k.x; " "; k.y; " "; n
+DIM s AS INTEGER
+FOR EACH q IN reihe(4)
+    s += q.x
+NEXT
+PRINT s; " "; n
+--- erwartet
+20 2 1
+60 2
+
+=== ein index ausserhalb nennt den aufruf
+STRUCT P LAYOUT C
+    x AS LONG
+END STRUCT
+FUNCTION f() AS ARRAY OF P
+    DIM p[2] AS P
+    RETURN p
+END FUNCTION
+PRINT f()[5].x
+--- fehler
+f(...)[].x: Index 5 liegt ausserhalb 0..1
+
+=== zuweisen in das ergebnis aendert das original
+STRUCT P LAYOUT C
+    x AS LONG
+END STRUCT
+DIM n AS INTEGER
+DIM gp[3] AS P
+FUNCTION f() AS ARRAY OF P
+    n += 1
+    RETURN gp
+END FUNCTION
+DIM g[3] AS INTEGER
+FUNCTION t() AS ARRAY OF INTEGER
+    n += 1
+    RETURN g
+END FUNCTION
+CLASS K
+    DIM hp AS INTEGER
+    FUNCTION selbst() AS K
+        RETURN Self
+    END FUNCTION
+END CLASS
+DIM ko AS K
+ko = NEW K()
+FUNCTION held() AS K
+    n += 1
+    RETURN ko
+END FUNCTION
+f()[1].x = 3
+t()[2] = 4
+held().hp = 5
+PRINT gp[1].x; " "; g[2]; " "; ko.hp; " "; n
+ko.selbst().hp = 6
+IF n > 0 THEN t()[0] = 8
+PRINT ko.hp; " "; g[0]; " "; n
+--- erwartet
+3 4 5 3
+6 8 4
+
+=== index auf einem befehl und einer funktion ohne structs
+FUNCTION reihe() AS ARRAY OF INTEGER
+    DIM a[3] AS INTEGER
+    a[2] = 7
+    RETURN a
+END FUNCTION
+PRINT reihe()[2]
+PRINT SPLIT$("a,b,c", ",")[1]
+PRINT LEN(reihe()[1:3]); " "; reihe()[1:3][1]
+--- erwartet
+7
+b
+2 7
+
+=== plus gleich auf einem ergebnis ist eine meldung
+FUNCTION t() AS ARRAY OF INTEGER
+    DIM a[2] AS INTEGER
+    RETURN a
+END FUNCTION
+t()[1] += 4
+--- fehler
+auf dem Ergebnis eines Aufrufs liefe den Aufruf zweimal
+
+=== plus plus auf einem ergebnis ist eine meldung
+CLASS K
+    DIM hp AS INTEGER
+END CLASS
+FUNCTION held() AS K
+    RETURN NEW K()
+END FUNCTION
+held().hp++
+--- fehler
+auf dem Ergebnis eines Aufrufs liefe den Aufruf zweimal
+
+=== ein aufruf allein links vom gleich bleibt ein fehler
+FUNCTION t(x AS INTEGER) AS INTEGER
+    RETURN x
+END FUNCTION
+t(1) = 4
+--- fehler
+'=' als Anweisung -- meintest du eine Zuweisung?
+
+=== ein aufruf als anweisung bleibt ein aufruf
+SUB sag(x AS INTEGER)
+    PRINT "sag "; x
+END SUB
+sag(3)
+--- erwartet
+sag 3

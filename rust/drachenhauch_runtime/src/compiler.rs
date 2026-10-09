@@ -359,6 +359,11 @@ struct StructOrt {
     /// Bei einem Feld von Structs mit mehreren Dimensionen die hinteren
     /// Groessen (`DIM g[n, 4] AS Punkt` -> [4]); die erste sagt der Puffer.
     innen: Vec<u32>,
+    /// Ist die Basis ein Aufruf (`reihe(5)[0].x`), der Platz, in dem sein
+    /// Ergebnis liegt, sobald es einmal geladen ist -- der Aufruf laeuft
+    /// genau einmal, auch wenn der Puffer zweimal gebraucht wird (Stelle
+    /// und Laenge).
+    merk: std::cell::Cell<Option<usize>>,
 }
 
 /// `anzahl` eines Feldes von Structs, dessen Laenge erst der Puffer sagt
@@ -4061,23 +4066,23 @@ impl Compiler {
         let l = self.lagen.get(&unter)?;
         Some(Ok(StructOrt { basis: n.clone(), wo: format!("{}.{}", Self::wo_text(target), name), fest: 0, dyn_: vec![],
                             art: '#', unter, anzahl, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0,
-                            objekt: true, ganz: true, innen: innen.unwrap_or_default() }))
+                            objekt: true, ganz: true, innen: innen.unwrap_or_default(), merk: Default::default() }))
     }
 
     /// Feld oder Index direkt auf dem Ergebnis einer FUNCTION, die einen
-    /// Struct liefert (`reihe(5)[0].x`): fuer die Laenge muesste der Aufruf
-    /// zweimal laufen. Das sagt eine Meldung, statt dass zur Laufzeit ein
-    /// Puffer als Feld gelesen wird.
+    /// Struct oder ein Feld von Structs liefert (`reihe(5)[0].x`,
+    /// `punkt().x`). Der Ort hat den Aufruf als Basis; `struct_basis_laden`
+    /// wertet ihn einmal aus und merkt sich das Ergebnis.
     fn struct_aus_aufruf(&self, target: &Node) -> Option<Result<StructOrt, String>> {
         let Node::Call { callee, .. } = target else { return None };
         let Node::Identifier(f) = &**callee else { return None };
         let rt = self.typ_norm(&self.fn_sigs.get(f.as_str())?.return_type);
-        let basis = rt.strip_suffix("[]").unwrap_or(&rt);
-        let l = self.lagen.get(basis)?;
-        Some(Err(format!("{}(...) liefert {} -- erst einer Variable zuweisen: DIM r AS {} : r = {}(...) : r{}",
-                         f, if rt.ends_with("[]") { "ein Feld von Structs" } else { "einen Struct" },
-                         if rt.ends_with("[]") { format!("ARRAY OF {}", l.name) } else { l.name.clone() },
-                         f, if rt.ends_with("[]") { "[0].feld" } else { ".feld" })))
+        let (unter, innen) = struct_feldtyp(&rt);
+        let anzahl = if innen.is_some() { STRUCT_DYN } else { 0 };
+        let l = self.lagen.get(&unter)?;
+        Some(Ok(StructOrt { basis: target.clone(), wo: format!("{}(...)", f), fest: 0, dyn_: vec![], art: '#',
+                            unter, anzahl, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0,
+                            objekt: false, ganz: false, innen: innen.unwrap_or_default(), merk: Default::default() }))
     }
 
     /// Ein Ausdruck, wie er in einer Meldung steht (`k.p`, `Self.p`).
@@ -4097,6 +4102,19 @@ impl Compiler {
                 self.expr(target)?;
                 let idx = self.ctx.add_const(json!(name));
                 self.ctx.emit(oc::LOAD_MEMBER, json!(idx));
+                Ok(())
+            }
+            Node::Call { .. } => {
+                if let Some(slot) = o.merk.get() {
+                    self.ctx.emit(oc::LOAD_LOCAL, json!(slot));
+                    return Ok(());
+                }
+                let slot = self.ctx.alloc_anon_slot("any");
+                let b = o.basis.clone();
+                self.expr(&b)?;
+                self.ctx.emit(oc::DUP, Value::Null);
+                self.ctx.emit(oc::STORE_LOCAL, json!(slot));
+                o.merk.set(Some(slot));
                 Ok(())
             }
             b => { let b = b.clone(); self.expr(&b) }
@@ -4140,13 +4158,13 @@ impl Compiler {
                 let l = self.lagen.get(&unter)?;
                 Some(Ok(StructOrt { basis: n.clone(), wo: name.clone(), fest: 0, dyn_: vec![], art: '#',
                                     unter, anzahl, zeichen: 0, groesse: l.groesse, bits: 0, bit: 0,
-                                    objekt: false, ganz: false, innen: innen.unwrap_or_default() }))
+                                    objekt: false, ganz: false, innen: innen.unwrap_or_default(), merk: Default::default() }))
             }
             Node::MemberAccess { target, name } => {
                 let mut o = match self.struct_ort(target) {
                     Some(Ok(o)) => o,
                     Some(Err(e)) => return Some(Err(e)),
-                    None => return self.struct_aus_aufruf(target).or_else(|| self.struct_objektfeld(n, target, name)),
+                    None => return self.struct_objektfeld(n, target, name),
                 };
                 o.ganz = false;
                 if o.anzahl == STRUCT_DYN {
@@ -4177,7 +4195,7 @@ impl Compiler {
                 let mut o = match self.struct_ort(target) {
                     Some(Ok(o)) => o,
                     Some(Err(e)) => return Some(Err(e)),
-                    None => return self.struct_aus_aufruf(target),
+                    None => return None,
                 };
                 o.ganz = false;
                 if o.anzahl == 0 {
@@ -4207,6 +4225,7 @@ impl Compiler {
                 o.anzahl = 0;
                 Some(Ok(o))
             }
+            Node::Call { .. } => self.struct_aus_aufruf(n),
             _ => None,
         }
     }

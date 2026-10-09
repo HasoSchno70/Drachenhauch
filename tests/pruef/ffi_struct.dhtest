@@ -1040,7 +1040,7 @@ FOR EACH e: e ist schon als INTEGER angelegt -- fuer die Elemente von ps eine Va
 FOR EACH i, ... geht nicht ueber ps -- mit Index: FOR i = 0 TO LEN(ps) - 1
 ps ist ein Feld von Structs -- erst ein Index: ps[0].x
 Array-Feld 'e' braucht konstante INTEGER-Groesse
-reihe(...) liefert ein Feld von Structs -- erst einer Variable zuweisen: DIM r AS ARRAY OF Punkt : r = reihe(...) : r[0].feld
+ok
 'GIBTS' ist kein Typ fuer fremde Bibliotheken (moeglich: ein STRUCT ... LAYOUT C oder BYTE, UBYTE, SHORT, USHORT, LONG, ULONG, INTEGER, ZEIGER, SINGLE, FLOAT, BOOLEAN, TEXT, WTEXT, BUFFER, VALIST)
 STRUCT A LAYOUT C enthaelt sich selbst (ueber a) -- ein Struct kann sich nicht einbetten, nur einen ZEIGER auf sich haben
 Erwartet 1, 2, 4, 8 oder 16 nach PACK

@@ -83,6 +83,7 @@ EXIT {} steht in keiner {}-Schleife	EXIT {} is not inside a {} loop
 SWAP a, b: erwartet ',' zwischen den beiden Variablen	SWAP a, b: expected ',' between the two variables
 IMPORT braucht Anfuehrungszeichen: IMPORT "{}" (eigene Datei mit Endung: IMPORT "{}.dh")	IMPORT needs quotes: IMPORT "{}" (your own file with its extension: IMPORT "{}.dh")
 '=' als Anweisung -- meintest du eine Zuweisung?	'=' as a statement -- did you mean an assignment?
++=, -=, ++ ... auf dem Ergebnis eines Aufrufs liefe den Aufruf zweimal -- erst einer Variable zuweisen und dort aendern: r = f(...) : r[0] += 1	+=, -=, ++ ... on the result of a call would run the call twice -- assign it to a variable first and change it there: r = f(...) : r[0] += 1
 Tupel-Destructuring erwartet mindestens 2 Ziele	Tuple destructuring needs at least 2 targets
 Erwartet '=' nach Tupel-Zielen	Expected '=' after the tuple targets
 Erwartet Variablenname als Tupel-Ziel	Expected a variable name as tuple target
@@ -1671,7 +1672,6 @@ FOR EACH geht nur ueber ein Feld mit einer Dimension -- {} hat {}: FOR i = 0 TO 
 FOR EACH {}: {} ist schon als {} angelegt -- fuer die Elemente von {} eine Variable vom Typ {} nehmen	FOR EACH {}: {} is already declared as {} -- for the elements of {} take a variable of type {}
 FOR EACH {}: {} ist schon ohne Typ angelegt -- fuer die Elemente von {} eine eigene Variable nehmen	FOR EACH {}: {} is already declared without a type -- for the elements of {} take a variable of its own
 {} ist in FOR EACH eine Kopie des Elements -- {} = ... ginge ins Leere; ins Feld schreiben mit Index (FOR i = 0 TO LEN(feld) - 1 : feld[i].x = ...)	{} is a copy of the element in FOR EACH -- {} = ... would go nowhere; write into the array with an index (FOR i = 0 TO LEN(feld) - 1 : feld[i].x = ...)
-{}(...) liefert {} -- erst einer Variable zuweisen: DIM r AS {} : r = {}(...) : r{}	{}(...) returns {} -- assign it to a variable first: DIM r AS {} : r = {}(...) : r{}
 ein Feld von Structs	an array of structs
 einen Struct	a struct
 DIM {}: die Groesse {} ist negativ	DIM {}: the size {} is negative
