@@ -369,8 +369,10 @@ r = CreatePolygonRgn(dreieck, LEN(dreieck), 1)
   st.werte`). Ein Feld der Kopie zu schreiben (`p.x = 1`) ist darum eine
   Meldung; ins Feld schreibt man mit Index. `FOR EACH` geht nur über eine
   Dimension, wie bei jedem Feld.
-* Ein Index direkt auf dem Ergebnis eines Aufrufs (`reihe(5)[0].x`) ist
-  eine Meldung -- erst einer Variable zuweisen.
+* **Direkt auf dem Ergebnis eines Aufrufs** geht beides: `reihe(5)[0].x`,
+  `ort(7).y`, `LEN(reihe(4))`, `FOR EACH p IN reihe(3)`. Der Aufruf läuft
+  dabei genau einmal. Ein Struct kommt wie ein Feld als Verweis zurück --
+  `f()[1].x = 3` schreibt in den Puffer, den `f` geliefert hat.
 
 **In einer Klasse** ist ein Struct ein gewöhnliches Feld; jedes Objekt
 bekommt bei `NEW` seinen eigenen Puffer:

@@ -1578,6 +1578,24 @@ rufen es je System; die CI baut dafuer `tray` mit. Gegengeprueft unter Linux
 mit GLibs `gdbus` als fremdem Leser (Eigenschaften, Layout `(u(ia{sv}av))`,
 Event). Lokal laeuft Linux in der WSL (`~/.cargo`, `CARGO_TARGET_DIR=$HOME/dht`).
 
+## Index und Feld auf dem Ergebnis eines Aufrufs (2026-10-09)
+
+`reihe(5)[0].x`, `ort(7).y`, `LEN(reihe(4))`, `FOR EACH p IN reihe(3)` --
+vorher fuer Structs eine Meldung ("erst einer Variable zuweisen"), weil der
+Struct-Weg den Puffer zweimal braucht (Stelle und Laenge). Jetzt kennt
+`struct_ort` einen `Node::Call` als Basis (`struct_aus_aufruf`), und
+`struct_basis_laden` wertet ihn EINMAL aus und merkt sich das Ergebnis in
+einem anonymen Platz (`StructOrt::merk`, Cell). Und **geschrieben** werden
+darf jetzt auch: Felder, Objekte UND Structs kommen als VERWEIS zurueck
+(gemessen), `f()[1].x = 3` / `t()[2] = 4` / `held().hp = 5` aendern also das
+Original. Der Parser nimmt dafuer Aufrufe in die linke Seite
+(`is_assignment_lookahead` springt ueber Klammern, verlangt dahinter aber
+noch `[` oder `.` -- `f(1) = 2` bleibt der alte Fehler; `assign_from_lvalue`
+baut `Node::Call` in die Kette). `+=`/`++` darauf ist eine Meldung
+(`ziel_ist_aufruf`): der Aufruf liefe zweimal. Tests
+`tests/pruef/index_auf_aufruf.dhtest` (11; gegen 2026.25 fallen 8, ohne den
+Zwischenspeicher die 4 Faelle, die die Aufrufe zaehlen).
+
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
 raylib liest Maus- und Tastentasten als ZUSTAND (Rueckruf schreibt

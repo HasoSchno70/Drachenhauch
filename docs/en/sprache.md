@@ -1036,6 +1036,12 @@ NEXT
 > `ARRAY_PUSH`/`SORT`/… and your own in-place routines rely on). If you need **a copy of your own**,
 > call `ARRAY_COPY(arr)`.
 >
+> The same holds for **return values**: an array, an object and a struct
+> come back as a reference. An index or field therefore works directly on
+> the result of a call (`teile(s)[2]`, `held().hp`), for reading and
+> writing -- `held().hp = 0` changes the object `held` returned. Only
+> `+=`, `-=`, `++` ... don't work there: the call would run twice.
+>
 > **Index access is strict, slicing clamps.** A direct index outside the
 > bounds throws a run-time error (`Index 5 ausserhalb [0..2]`). A **slice**,
 > on the other hand, is silently clamped to the valid bounds: `arr[0:99]` on a
