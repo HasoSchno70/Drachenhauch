@@ -1037,6 +1037,12 @@ NEXT
 > `ARRAY_PUSH`/`SORT`/… und eigene In-Place-Routinen). Wer eine **eigene Kopie**
 > braucht, ruft `ARRAY_COPY(arr)`.
 >
+> Dasselbe gilt für die **Rückgabe**: ein Feld, ein Objekt und ein Struct
+> kommen als Verweis zurück. Ein Index oder Feld geht darum direkt auf dem
+> Ergebnis eines Aufrufs (`teile(s)[2]`, `held().hp`), lesend wie
+> schreibend -- `held().hp = 0` ändert das Objekt, das `held` geliefert hat.
+> Nur `+=`, `-=`, `++` ... gehen dort nicht: der Aufruf liefe zweimal.
+>
 > **Index-Zugriff ist streng, Slicing klemmt.** Ein direkter Index außerhalb der
 > Grenzen wirft einen Laufzeitfehler (`Index 5 ausserhalb [0..2]`). Ein **Slice**
 > dagegen wird still auf die gültigen Grenzen geklemmt: `arr[0:99]` auf ein

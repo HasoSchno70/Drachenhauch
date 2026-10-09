@@ -369,8 +369,10 @@ r = CreatePolygonRgn(dreieck, LEN(dreieck), 1)
   `FOR EACH w IN st.werte`). Writing a field of the copy (`p.x = 1`) is
   therefore a message; you write into the array with an index. `FOR EACH`
   works over one dimension only, as for every array.
-* An index directly on the result of a call (`reihe(5)[0].x`) is a
-  message -- assign it to a variable first.
+* **Directly on the result of a call** both work: `reihe(5)[0].x`,
+  `ort(7).y`, `LEN(reihe(4))`, `FOR EACH p IN reihe(3)`. The call runs
+  exactly once. Like an array, a struct comes back as a reference --
+  `f()[1].x = 3` writes into the buffer `f` returned.
 
 **In a class** a struct is an ordinary field; every object gets its own
 buffer at `NEW`:
