@@ -500,7 +500,7 @@ of 16 would have silently shortened a confirmed sentence).
 | Function | Purpose |
 |---|---|
 | `LOADIMAGE(path$)` → IMAGE | load a file (PNG, JPG, BMP, …) |
-| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | pixel size |
+| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | pixel size; equivalently `IMAGE_WIDTH`/`IMAGE_HEIGHT` in the naming scheme of the other `IMAGE_*` commands |
 | `GETPIXEL(img, x, y)` → INTEGER | read the pixel colour (`&HRRGGBB`) at `(x, y)`; `-1` for an index outside. Counterpart to `PLOT` (write) — for per-pixel collision, masking, colour sampling |
 | `GETALPHA(img, x, y)` → INTEGER | opacity at `(x, y)`, `0..255`; `-1` for an index outside. Needed because `GETPIXEL` returns a **colour**, and there opacity 0 means *opaque* — a transparent pixel would come back as a black one |
 | `DRAWIMAGE(img, x, y)` | draw the image at (x, y) |

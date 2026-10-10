@@ -156,3 +156,29 @@ PRINT ABS(PHYS2D_BODY_Y(w, b) - y0) < 0.01
 --- erwartet
 TRUE
 
+
+=== schlafend angelegt haengt ein koerper bis er geweckt wird
+' PHYS2D_SLEEP (2026-10-10), wie PHYS3D_SLEEP.
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+DIM b AS INTEGER
+b = PHYS2D_ADD_BOX(w, 100.0, 50.0, 10.0, 10.0, TRUE, 0.0)
+PHYS2D_SLEEP(w, b)
+PRINT "schlaeft "; PHYS2D_SLEEPING(w, b)
+DIM i AS INTEGER
+FOR i = 1 TO 30 : PHYS2D_STEP(w, 1.0 / 60) : NEXT
+PRINT "haengt "; PHYS2D_BODY_Y(w, b)
+PHYS2D_APPLY_IMPULSE(w, b, 0.0, 1.0)
+PRINT "wach "; NOT PHYS2D_SLEEPING(w, b)
+FOR i = 1 TO 30 : PHYS2D_STEP(w, 1.0 / 60) : NEXT
+PRINT "faellt "; PHYS2D_BODY_Y(w, b) > 60.0
+PHYS2D_SLEEP(w, b)
+PHYS2D_SLEEP(w, b, FALSE)
+PRINT "wieder wach "; NOT PHYS2D_SLEEPING(w, b)
+--- erwartet
+schlaeft TRUE
+haengt 50.0
+wach TRUE
+faellt TRUE
+wieder wach TRUE

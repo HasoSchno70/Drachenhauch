@@ -137,6 +137,8 @@ Beleuchtung und Schatten wirken wie bei `MODEL`: ein Modell mit `MODEL_LIT`
 wirft unter `SHADOW_ENABLE` seinen Schatten und empfängt fremde (bis 2026.27
 warf es keinen -- gedrehte Physik-Körper standen schattenlos auf dem Boden).
 
+Den Umriss dazu zeichnet `MODEL_MATRIX_WIRES(handle, mat [, farbe])` mit derselben Matrix.
+
 Viele Instanzen = viele `MODEL_MATRIX`-Aufrufe (ein Draw pro Aufruf). Für sehr
 viele identische Meshes ist `MODEL_INSTANCED` die performante Variante (siehe
 unten).

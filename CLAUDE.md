@@ -1724,8 +1724,16 @@ RAY_HIT_* schon. Tests `g3d_licht.dhtest`, `g3d_strahlen.dhtest`,
 (`C:\Program Files\Drachenhauch-IDE\dhrt.exe`): `dhrt test` der alten Exe
 startet auch die Kinder mit ihr. **Falle:** vor einer Verfaelschung
 committen -- `git checkout datei` nahm die noch nicht committete Aenderung
-mit. Offen: `MODEL_WIRES` hat keine Matrix-Form (gedrehte Kloetze ohne
-Kanten), `IMAGEWIDTH`/`IMAGEHEIGHT` ohne Unterstrich neben `IMAGE_NEW`.
+mit. **Nachzug (3D-Reste):** `MODEL_MATRIX_WIRES(handle, mat [, farbe])`
+(Dreiecksgitter wie MODEL_WIRES, also mit Diagonalen) und
+`CUBE_MATRIX_WIRES(mat [, farbe])` (die 12 Kanten eines Einheitswuerfels --
+der Umriss gedrehter Kloetze; Entscheidung des Nutzers: beide). Beide werfen
+keinen Schatten. `PHYS3D_SLEEP/SLEEPING`, `PHYS2D_SLEEP/SLEEPING`
+(`(w, idx [, schlafen])`, FALSE weckt): ein frisch aufgebauter Stapel aus 1323
+Wuerfeln kostet schlafend 0,3 statt 20 ms je Schritt; ein Stoss weckt, ein
+schlafender Koerper IN DER LUFT bleibt haengen -- die Werkstatt legt darum nur
+aufliegende schlafen. `IMAGE_WIDTH`/`IMAGE_HEIGHT` als zweite Namen (Meldungen
+nennen jetzt diese). Tests in `m3d`, `physics3d`, `physics2d`, `image_io`.
 
 ## Zeichenketten anhaengen ist linear (2026-09-24)
 

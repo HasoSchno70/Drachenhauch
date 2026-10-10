@@ -62,6 +62,8 @@ the **body index** (INTEGER) for all subsequent calls.
 | `PHYS3D_SET_VEL(w, idx, vx, vy, vz)` | — | set the linear velocity |
 | `PHYS3D_APPLY_IMPULSE(w, idx, ix, iy, iz)` | — | give a one-off impulse (jump, shot, explosion) |
 | `PHYS3D_REMOVE(w, idx)` | — | remove a body from the world |
+| `PHYS3D_SLEEP(w, idx [, schlafen])` | — | put a body to sleep (without a third argument or TRUE) or wake it (FALSE). A sleeping body costs the solver nothing until a push, a set velocity or an awake body touches it. For freshly built stacks: 1323 boxes lying on each other cost 20 ms per step awake, 0.3 ms asleep. **Careful:** a sleeping body in mid-air stays there until something wakes it |
+| `PHYS3D_SLEEPING(w, idx)` | BOOLEAN | is the body asleep? (static and invalid ones: FALSE) |
 
 ## Rendering (quaternion → transform)
 

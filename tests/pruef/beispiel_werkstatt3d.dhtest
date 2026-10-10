@@ -76,6 +76,7 @@ datei 29
 ' ein Klotz frei in der Luft neben der Platte faellt, die Platte bleibt
 setzen(6, 3, 0, 1)
 einstuerzen()
+PRINT "aufliegend schlaeft "; PHYS3D_SLEEPING(welt, koerper[0]); " ueberhang wach "; NOT PHYS3D_SLEEPING(welt, koerper[klotzBei(6, 3, 0)])
 DIM prS AS INTEGER
 FOR prS = 1 TO 120
     PHYS3D_STEP(welt, 1.0 / 60)
@@ -89,6 +90,7 @@ EXIT(0)
 --- umgebung
 DHRT_FRAMES=5
 --- erwartet
+aufliegend schlaeft TRUE ueberhang wach TRUE
 gefallen TRUE
 platte steht TRUE
 
@@ -97,6 +99,15 @@ platte steht TRUE
 --- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
 --- umgebung
 DHRT_FRAMES=30
+--- erwartet
+--- bild
+groesse 1100 700
+
+=== der einsturz zeichnet mit kanten
+einstuerzen()
+--- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- umgebung
+DHRT_FRAMES=20
 --- erwartet
 --- bild
 groesse 1100 700

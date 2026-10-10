@@ -206,6 +206,9 @@ SUB einstuerzen()
     DIM i AS INTEGER
     FOR i = 0 TO anz - 1
         koerper[i] = PHYS3D_ADD_BOX(welt, kx[i], ky[i] + 0.5, kz[i], 0.5, 0.5, 0.5, 1, 0.1)
+        ' Was aufliegt, ruht ohnehin -- schlafend kostet es nichts, bis ein
+        ' Stoss es weckt. Ein Klotz in der Luft bleibt wach, sonst fiele er nie.
+        IF ky[i] = 0 OR klotzBei(kx[i], ky[i] - 1, kz[i]) >= 0 THEN PHYS3D_SLEEP(welt, koerper[i])
     NEXT
     einsturz = TRUE
 END SUB
@@ -314,6 +317,8 @@ WHILE NOT QUITREQUESTED()
         best = 1e9
         DIM one AS VEC3
         one = VEC3_NEW(1.0, 1.0, 1.0)
+        DIM kante AS MAT4
+        kante = MAT4_SCALE(1.005, 1.005, 1.005)
         FOR i = 0 TO anz - 1
             DIM b AS INTEGER
             b = koerper[i]
@@ -332,6 +337,7 @@ WHILE NOT QUITREQUESTED()
                 QUAT_NEW(PHYS3D_BODY_QX(welt, b), PHYS3D_BODY_QY(welt, b), _
                          PHYS3D_BODY_QZ(welt, b), PHYS3D_BODY_QW(welt, b)), one)
             MODEL_MATRIX(wuerfel, m, farben[kf[i]])
+            CUBE_MATRIX_WIRES(MAT4_MUL(m, kante), &H202830)
         NEXT
         IF getroffen >= 0 AND MOUSE_HIT(0) AND NOT imFenster THEN
             PHYS3D_APPLY_IMPULSE(welt, koerper[getroffen], dx * 6.0, 2.0, dz * 6.0)

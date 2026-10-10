@@ -9322,8 +9322,10 @@ impl<'p> Vm<'p> {
                 let tint = if a.len() >= 6 { Some(gi(a, 5, "DRAWIMAGEROT")?) } else { None };
                 g!().draw_image_rot(idx, x, y, ang, scale, tint)?; Value::Nil
             }
-            "imagewidth" => Value::Int(g!().image_width(gi(a,0,"IMAGEWIDTH")?)?),
-            "imageheight" => Value::Int(g!().image_height(gi(a,0,"IMAGEHEIGHT")?)?),
+            // IMAGE_WIDTH/IMAGE_HEIGHT: derselbe Befehl im Namensschema der
+            // uebrigen IMAGE_*-Befehle (IMAGE_NEW, IMAGE_SAVE ...).
+            "imagewidth" | "image_width" => Value::Int(g!().image_width(gi(a,0,"IMAGE_WIDTH")?)?),
+            "imageheight" | "image_height" => Value::Int(g!().image_height(gi(a,0,"IMAGE_HEIGHT")?)?),
             "flip" => {
                 g!().flip();
                 // Gesammelte PRINT-Zeilen eines Spiels gehen spaetestens nach
@@ -9797,6 +9799,26 @@ impl<'p> Vm<'p> {
                 };
                 let tint = if a.len() >= 3 { gi(a, 2, "MODEL_MATRIX")? } else { 0xFF_FFFF };
                 g!().draw_model_matrix(gi(a, 0, "MODEL_MATRIX")?, mat, tint)?;
+                Value::Nil
+            }
+            "cube_matrix_wires" => {
+                // CUBE_MATRIX_WIRES(mat [, farbe]) -- Kanten eines Einheitswuerfels.
+                let mat = match a.first() {
+                    Some(Value::Mat4(m)) => m.clone(),
+                    _ => return Err("CUBE_MATRIX_WIRES: Arg 1 muss MAT4 sein".into()),
+                };
+                let farbe = if a.len() >= 2 { gi(a, 1, "CUBE_MATRIX_WIRES")? } else { 0xFF_FFFF };
+                g!().draw_cube_matrix_wires(mat, farbe);
+                Value::Nil
+            }
+            "model_matrix_wires" => {
+                // MODEL_MATRIX_WIRES(handle, mat [, farbe]) -- Umriss zu MODEL_MATRIX.
+                let mat = match a.get(1) {
+                    Some(Value::Mat4(m)) => m.clone(),
+                    _ => return Err("MODEL_MATRIX_WIRES: Arg 2 muss MAT4 sein".into()),
+                };
+                let farbe = if a.len() >= 3 { gi(a, 2, "MODEL_MATRIX_WIRES")? } else { 0xFF_FFFF };
+                g!().draw_model_matrix_wires(gi(a, 0, "MODEL_MATRIX_WIRES")?, mat, farbe)?;
                 Value::Nil
             }
             "model_instanced" => {

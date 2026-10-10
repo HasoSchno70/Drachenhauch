@@ -251,3 +251,112 @@ MODEL_INSTANCED: tint-Array ist kuerzer als die Matrizen (2 < 3)
 DHRT_FRAMES=2
 --- bild
 0 0 = 0 0
+
+=== model_matrix_wires zeichnet das gitter mit der matrix
+' MODEL_WIRES kennt nur Lage und Groesse -- ein gedrehter Koerper hatte
+' keinen Umriss (gefunden in der 3D-Werkstatt, 2026-10-10). Links MODEL_WIRES,
+' rechts dieselbe Lage ueber MODEL_MATRIX_WIRES, unten um 45 Grad gedreht.
+IMPORT "g3d"
+IMPORT "m3d"
+SCREEN(320, 200, "draht", 1)
+DIM w AS INTEGER : w = MESH_CUBE(1.0, 1.0, 1.0)
+DIM m AS MAT4
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    CAMERA3D(0, 0, 6, 0, 0, 0, 40)
+    MODEL_WIRES(w, -1.2, 0, 0, 1.0, &HFFFFFF)
+    MODEL_MATRIX_WIRES(w, MAT4_TRANSLATE(1.2, 0, 0), &HFFFFFF)
+    m = MAT4_MUL(MAT4_TRANSLATE(0, -1.6, 0), QUAT_TO_MAT4(QUAT_FROM_AXIS_ANGLE(0, 0, 1, 45.0)))
+    MODEL_MATRIX_WIRES(w, m, &HFF0000)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/draht.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("draht.png")
+DIM weissL AS INTEGER
+DIM weissR AS INTEGER
+DIM rot AS INTEGER
+DIM obenY AS INTEGER : obenY = -1
+DIM obenMin AS INTEGER : obenMin = 999
+DIM obenMax AS INTEGER : obenMax = -1
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 199
+    FOR x = 0 TO 319
+        DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+        DIM r AS INTEGER : r = (c SHR 16) BAND 255
+        DIM g AS INTEGER : g = (c SHR 8) BAND 255
+        IF r > 150 AND g > 150 THEN
+            IF x < 160 THEN weissL = weissL + 1 ELSE weissR = weissR + 1
+        ELSEIF r > 150 AND g < 80 THEN
+            rot = rot + 1
+            IF obenY < 0 THEN obenY = y
+            IF y = obenY THEN
+                obenMin = MIN(obenMin, x) : obenMax = MAX(obenMax, x)
+            END IF
+        END IF
+    NEXT
+NEXT
+PRINT "rechts wie links "; weissR > 40 AND ABS(weissR - weissL) < weissL / 4
+PRINT "rot da "; rot > 40
+PRINT "spitze oben in der mitte "; obenMin > 140 AND obenMax < 180
+--- erwartet
+rechts wie links TRUE
+rot da TRUE
+spitze oben in der mitte TRUE
+
+=== cube_matrix_wires zeichnet die kanten mit der matrix
+' Die 12 Kanten eines Einheitswuerfels durch eine Matrix -- MODEL_MATRIX_WIRES
+' zeichnete jedes Dreieck, also mit Diagonalen (2026-10-10). Links CUBE_WIRES,
+' rechts dieselbe Lage ueber die Matrix, unten um 45 Grad gedreht.
+IMPORT "g3d"
+IMPORT "m3d"
+SCREEN(320, 200, "kanten", 1)
+DIM m AS MAT4
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    CAMERA3D(0, 0, 6, 0, 0, 0, 40)
+    CUBE_WIRES(-1.2, 0, 0, 1.0, 1.0, 1.0, &HFFFFFF)
+    CUBE_MATRIX_WIRES(MAT4_TRANSLATE(1.2, 0, 0), &HFFFFFF)
+    m = MAT4_MUL(MAT4_TRANSLATE(0, -1.6, 0), QUAT_TO_MAT4(QUAT_FROM_AXIS_ANGLE(0, 0, 1, 45.0)))
+    CUBE_MATRIX_WIRES(m, &HFF0000)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/kanten.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("kanten.png")
+DIM weissL AS INTEGER
+DIM weissR AS INTEGER
+DIM rot AS INTEGER
+DIM obenY AS INTEGER : obenY = -1
+DIM obenMin AS INTEGER : obenMin = 999
+DIM obenMax AS INTEGER : obenMax = -1
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 199
+    FOR x = 0 TO 319
+        DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+        DIM r AS INTEGER : r = (c SHR 16) BAND 255
+        DIM g AS INTEGER : g = (c SHR 8) BAND 255
+        IF r > 150 AND g > 150 THEN
+            IF x < 160 THEN weissL = weissL + 1 ELSE weissR = weissR + 1
+        ELSEIF r > 150 AND g < 80 THEN
+            rot = rot + 1
+            IF obenY < 0 THEN obenY = y
+            IF y = obenY THEN
+                obenMin = MIN(obenMin, x) : obenMax = MAX(obenMax, x)
+            END IF
+        END IF
+    NEXT
+NEXT
+PRINT "rechts wie links "; weissR > 40 AND ABS(weissR - weissL) < weissL / 4
+PRINT "rot da "; rot > 40
+PRINT "spitze oben in der mitte "; obenMin > 140 AND obenMax < 180
+--- erwartet
+rechts wie links TRUE
+rot da TRUE
+spitze oben in der mitte TRUE
