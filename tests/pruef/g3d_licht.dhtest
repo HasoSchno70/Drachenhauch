@@ -1,4 +1,4 @@
-' Schatten in 3D (SHADOW_ENABLE) -- wer wirft einen?
+' Licht in 3D: wer wirft einen Schatten, und wirkt die Deckkraft?
 '
 ' Bis 2026.27 zeichnete der Schatten-Durchgang nur MODEL/MODEL_EX in die
 ' Tiefenkarte. Was ueber MODEL_MATRIX kam -- also alles, was sich dreht:
@@ -8,6 +8,10 @@
 ' Die Proben vergleichen relativ (gleich wie / anders als), damit ein anderer
 ' Grafiktreiber mit anderen Grautoenen nicht stoert: von oben gesehen liegen
 ' die beiden Wuerfel spiegelgleich, ihre Schatten muessen es auch.
+'
+' Ebenso bis 2026.27: der Licht-Shader schrieb die Deckkraft fest auf 1.0 --
+' ein Modell mit MODEL_LIT blieb trotz RGBA(..., 100) deckend, ohne
+' MODEL_LIT war es durchsichtig. Gefunden am Vorschau-Klotz der Werkstatt.
 ' Format: docs/werkzeuge.md, dhrt test.
 
 === model_matrix wirft denselben schatten wie model
@@ -36,3 +40,29 @@ groesse 320 200
 113 72 <> 160 72
 207 72 = 113 72
 207 72 <> 160 72
+
+=== ein beleuchtetes modell nimmt die deckkraft der farbe
+' Hinten ein roter Klotz, davor links ein beleuchteter halbdurchsichtiger
+' blauer: wo der rote dahinter liegt (150), muss er anders aussehen als
+' daneben (120). Rechts derselbe ohne Licht als Vergleich (172 <> 190).
+IMPORT "g3d"
+SCREEN(320, 200, "alpha", 1)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.4)
+LIGHT_DIRECTIONAL(-0.3, -1.0, -0.4, &HFFFFFF)
+DIM w AS INTEGER : w = MESH_CUBE(1.0, 1.0, 1.0) : MODEL_LIT(w)
+DIM u AS INTEGER : u = MESH_CUBE(1.0, 1.0, 1.0)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    CAMERA3D(0, 0.5, 6, 0, 0.5, 0, 40)
+    MODEL(w, 0, 0.5, -2, 1.0, &HFF0000)
+    MODEL(w, -0.6, 0.5, 0, 1.0, RGBA(0, 0, 255, 100))
+    MODEL(u, 0.6, 0.5, 0, 1.0, RGBA(0, 0, 255, 100))
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 320 200
+150 100 <> 120 100
+172 100 <> 190 100

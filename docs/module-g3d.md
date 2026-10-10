@@ -102,7 +102,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `LIGHT_SET_COLOR(licht, farbe)` | — | Lichtfarbe ändern |
 | `LIGHT_SET_ENABLED(licht [, an])` | — | einzelnes Licht an- oder ausschalten |
 | `LIGHT_FOG(farbe, dichte)` | — | Nebel mit der Entfernung; lässt Weites verblassen |
-| `MODEL_LIT(modell)` | — | dieses Modell wird beleuchtet (sonst zeichnet es flach) |
+| `MODEL_LIT(modell)` | — | dieses Modell wird beleuchtet (sonst zeichnet es flach). Die Deckkraft der Farbe gilt auch beleuchtet: `MODEL(m, x, y, z, 1.0, RGBA(80, 160, 255, 100))` ist halbdurchsichtig -- durchsichtige Modelle zuletzt zeichnen, sonst verdecken sie, was danach kommt (bis 2026.27 blieb ein beleuchtetes Modell deckend) |
 | `MODEL_PBR(modell, metalness, roughness)` | — | Materialverhalten: `metalness` 0 = Kunststoff, 1 = Metall; `roughness` 0 = spiegelnd, 1 = matt |
 | `MODEL_EMISSIVE(modell, farbe, staerke)` | — | das Modell leuchtet selbst — auch durch den Nebel hindurch |
 
@@ -287,7 +287,8 @@ SHADOW_TARGET(0, 0, 0)
 ```
 
 Den Schatten wirft das **erste** gerichtete Licht; Modelle brauchen `MODEL_LIT`, um
-zu werfen und zu empfangen. Ein kleinerer `SHADOW_AREA`-Wert macht den Schatten
+zu werfen und zu empfangen -- gezeichnet mit `MODEL`, `MODEL_EX` oder
+`MODEL_MATRIX` (bis 2026.27 warf `MODEL_MATRIX` keinen). Ein kleinerer `SHADOW_AREA`-Wert macht den Schatten
 schärfer, deckt aber weniger ab — deshalb führt man ihn mit `SHADOW_TARGET` der
 Spielfigur nach. Demo: [93_shadows](../examples/93_shadows.dh).
 

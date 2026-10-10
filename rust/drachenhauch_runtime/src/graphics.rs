@@ -636,11 +636,15 @@ void main()
     vec3 color = ambientTerm + Lo;
     color = color/(color + vec3(1.0));        // Reinhard-Tonemapping
     color = pow(color, vec3(1.0/2.2));         // Gamma
-    finalColor = vec4(color, 1.0);
-    // Exponentieller Tiefen-Fog (fogDensity 0 => kein Effekt).
+    // Deckkraft aus der Farbe (RGBA) und der Textur -- bis 2026.27 stand hier
+    // 1.0, und ein beleuchtetes Modell blieb trotz RGBA(..., 100) deckend.
+    float alpha = colDiffuse.a*texture(texture0, fragTexCoord).a;
+    finalColor = vec4(color, alpha);
+    // Exponentieller Tiefen-Fog (fogDensity 0 => kein Effekt). Nur die Farbe:
+    // sonst wuerde ein Modell mit der Entfernung durchsichtig.
     float fd = length(viewPos - fragPosition)*fogDensity;
     float fog = clamp(1.0/exp(fd*fd), 0.0, 1.0);
-    finalColor = mix(fogColor, finalColor, fog);
+    finalColor.rgb = mix(fogColor.rgb, finalColor.rgb, fog);
     // Eigenleuchten (durchschlaegt den Fog -> Neon/Glow, mit Bloom-POSTFX).
     finalColor.rgb += emissive.rgb * emissive.a;
 }
@@ -699,7 +703,8 @@ uniform int lightCount;
 void main()
 {
     vec3 albedo = colDiffuse.rgb*texture(texture0, fragTexCoord).rgb*fragColor.rgb;
-    if (lightCount == 0) { finalColor = vec4(albedo, 1.0); return; }
+    float alpha = colDiffuse.a*texture(texture0, fragTexCoord).a*fragColor.a;
+    if (lightCount == 0) { finalColor = vec4(albedo, alpha); return; }
     vec3 N = normalize(fragNormal);
     vec3 V = normalize(viewPos - fragPosition);
     vec3 lit = ambient.rgb*albedo;
@@ -719,7 +724,7 @@ void main()
         float spec = pow(max(dot(N, H), 0.0), 32.0)*0.3;
         lit += (albedo*NdotL + vec3(spec))*lights[i].color.rgb*atten;
     }
-    finalColor = vec4(lit, 1.0);
+    finalColor = vec4(lit, alpha);
 }
 "#;
 
