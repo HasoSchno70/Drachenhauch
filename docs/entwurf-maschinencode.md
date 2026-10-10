@@ -1076,6 +1076,28 @@ VM zurueck), der Aufruf zu `ffi_zahlen` mit den Werten in einem
 Stapelplatz. Allein erlaubt, aber im Wertemodus, brachte es nichts; getypt
 und mit schlankerem Aufrufweg: `ffi.dh` 201 -> 54 ms (VM 202 -> 116 ms).
 
+**Schritt 23 (2026-10-10, Dogfooding mit einem Spiel): `^`, Zusammenfluss
+im Wertemodus, Werte an uebersetzte Funktionen.** Die Bilanz des Beispiels
+`examples/kometen` nannte drei Gruende, die in Spielen staendig vorkommen:
+(1) `^` gab es im Maschinencode gar nicht -- jede Schleife mit der
+ueblichen Abstandsrechnung `(dx) ^ 2 + (dy) ^ 2` blieb in der VM. Jetzt mit
+einer Kommazahl dabei `powf` (dieselbe Funktion wie `vm::pow`, also gleiche
+Ergebnisse), INTEGER ^ feste Ganzzahl 0..16 als Ganzzahl mit
+Ueberlaufpruefung (`fester_exponent`; ein Ueberlauf steigt aus, die VM
+meldet ihn); ein variabler INTEGER-Exponent bleibt beim Wertemodus, weil
+dort der Ergebnistyp am Wert haengt. 2 Mio. `(x) ^ 2` in einer Schleife:
+131 -> 19 ms, mit `(i MOD 100) ^ 2` 109 -> 3 ms. (2) `IF k.lebt AND x > 0`
+im Wertemodus: das kurzgeschlossene AND laesst auf dem einen Weg den Wert
+des Felds, auf dem anderen einen Wahrheitswert auf dem Stapel -- "zwei Wege
+treffen sich mit verschiedenen Arten". Jetzt erweitert `melden` die Stelle
+zum Wert und rechnet den Block neu, und `ablegen` legt auf dem Weg mit der
+Zahl sie vor dem Sprung in ihren Platz (`w_boxen`). (3) Ein Wert (Feld eines
+Objekts) als Argument einer UEBERSETZTEN Funktion lief nicht durch die
+getypte Pruefung ("Argument 1 an umlauf passt nicht") -- im Wertemodus geht
+so ein Aufruf jetzt ueber die VM (`w_funktion`), wie bei Funktionen ohne
+Maschinencode. Faelle in `jit.dhtest` ("potenz im maschinencode", "und und
+oder ueber objektfelder im wertemodus"), je mit und ohne.
+
 ## 5. Was bewusst nicht kommt
 
 - Kein eigener Registerzuteiler, keine eigenen Optimierungen jenseits dessen,
