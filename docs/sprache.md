@@ -130,9 +130,11 @@ bin = &B11010110          ' Binaer
 
 DIM f AS FLOAT
 f = 3.14
+f = 1.5e3                 ' Exponent: 1500.0 (auch 2.5E-3, 1e9)
 ```
 
 Hex und Binary sind nur INTEGER-Konstanten — keine Floats. Alle drei Schreibweisen ergeben denselben INTEGER-Wert.
+Eine Zahl mit Exponent (`1e9`, `2.5E-3`) ist immer eine Kommazahl, auch ohne Punkt -- wie bei `VAL("1e3")`.
 
 ## Datentypen
 
