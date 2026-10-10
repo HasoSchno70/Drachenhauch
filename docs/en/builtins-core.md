@@ -38,6 +38,12 @@ PRINT "x = ";           ' no newline
 PRINT x                 ' continues on the same line
 ```
 
+**When the output appears:** in a terminal, every line at once. When the
+output goes to a file or another program, `PRINT` collects the lines and
+writes them out after 50 ms at the latest -- and always before `SLEEP`,
+`INPUT`, `EPRINT` and at `FLIP`. A "please wait ..." is therefore there before
+the pause begins.
+
 ## Conversion
 
 | Function | Purpose |

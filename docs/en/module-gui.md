@@ -93,7 +93,7 @@ IMPORT "gui"
 | `GUI_TOOLBAR_ITEM_W(tb, eintrag)` | INTEGER | width of an entry |
 | `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | how many buttons are currently in the » menu (0 = everything fits) |
 | `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | status bar; `text$` is the first field |
-| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | append a field: `breite` (width) in points, 0 = shares the rest; `links`/`mitte`/`rechts` (left/centre/right) |
+| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | append a field: `breite` (width) in points, 0 = shares the rest; `links`/`mitte`/`rechts` (left/centre/right). A text that does not fit ends in `...` |
 | `GUI_STATUSBAR_SET(sb, feld, text$)` | — | text of a field (`GUI_SET_TEXT` means field 0) |
 | `GUI_STATUSBAR_TEXT$(sb, feld)` | STRING | text of a field |
 | `GUI_STATUSBAR_TIP(sb, feld, tip$)` | — | tooltip of a field |
@@ -121,7 +121,7 @@ IMPORT "gui"
 | `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | number field with +/- (click/mouse wheel/arrow keys; value via `GUI_VALUE`) |
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | movable divider (`"v"`/`"h"`); position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | container (decoration) |
-| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y) |
+| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y); the placeholder stays, dimmed, until something is typed -- also with focus |
 | `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal) |
 | `GUI_ENTERED(tf)` | BOOLEAN | was Enter pressed in the text input in this frame? |
 | `GUI_ON_ENTER(tf, handler)` | — | callback for it |

@@ -90,7 +90,8 @@ Aufrufer nicht sagen, ob es geklappt hat. Genau das ist der Kern von
 **Umsetzung:** zustandsfrei in `builtins.rs`
 (`ARGC`/`ARG$`/`GETENV$`/`SETENV`/`CWD$`/`CHDIR`), VM-behaftet in `vm.rs`
 `try_os` (`EXIT`/`EPRINT`/`SHELL`/`SHELL_OUT$`). Der gemeinsame Grund für
-`try_os`: **`PRINT` wird gepuffert** und erst am Programmende geschrieben — wer
+`try_os`: **`PRINT` wird gepuffert** (bis 2026-10-09 bis zum Programmende, seither
+im Terminal zeilenweise und sonst nach höchstens 50 ms) — wer
 daneben auf stderr schreibt oder ein Kindprogramm aufs selbe Terminal lässt,
 sähe die Ausgaben sonst in falscher Reihenfolge. Diese vier flushen den Puffer
 darum zuerst (geteilter Helfer `flush_out`, den sich `flush_and_prompt` für

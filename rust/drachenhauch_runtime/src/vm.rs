@@ -700,6 +700,15 @@ fn live_ausgabe() -> bool {
     *LIVE.get_or_init(|| std::env::var("DHRT_LIVE").map(|v| v == "1").unwrap_or(false))
 }
 
+/// stdout ist ein Terminal: dann geht jede PRINT-Zeile sofort hinaus
+/// (zeilenweise wie in C und Python). In eine Datei oder Leitung wird
+/// gebuendelt -- dort zaehlt der Durchsatz.
+fn ausgabe_terminal() -> bool {
+    use std::io::IsTerminal;
+    static T: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *T.get_or_init(|| std::io::stdout().is_terminal())
+}
+
 /// Ein JSON-Event als Zeile auf stdout schreiben + flushen.
 fn dbg_emit(ev: &serde_json::Value) {
     use std::io::Write;
@@ -788,6 +797,11 @@ pub struct Vm<'p> {
     global_slots: Vec<Option<Rc<RefCell<Slot>>>>,
     data_ptr: usize,
     out: String,
+    /// Wann `out` zuletzt hinausging. PRINT sammelt (schnell bei vielen
+    /// Zeilen), geht aber nach spaetestens 50 ms hinaus -- vorher erst am
+    /// Programmende, auch im Terminal: "Bitte warten ..." vor einer langen
+    /// Rechnung oder einem SLEEP erschien erst danach (Dogfooding 2026-10-09).
+    out_zeit: std::time::Instant,
     input_state: InputModule,
     ui_state: UiState,
     // Modul `scene`: globaler Stack (name, daten). Daten = key->typisierter Wert.
@@ -1047,6 +1061,7 @@ impl<'p> Vm<'p> {
             global_slots,
             data_ptr: 0,
             out: String::new(),
+            out_zeit: std::time::Instant::now(),
             input_state: InputModule::default(),
             ui_state: UiState::new(),
             scene_stack: Vec::new(),
@@ -1844,7 +1859,7 @@ impl<'p> Vm<'p> {
         // ueber PROCESS_START setzt DHRT_LIVE): an einer Leitung
         // waere stdout sonst blockgepuffert, und die Ausgabe kaeme
         // erst am Ende auf einmal.
-        if newline && live_ausgabe() { self.flush_out(); }
+        if newline && (live_ausgabe() || ausgabe_terminal() || self.out_zeit.elapsed() >= std::time::Duration::from_millis(50)) { self.flush_out(); }
     }
 
     /// Eine Funktion des Programms rufen, fuer den Maschinencode (M4 Schritt
@@ -5018,7 +5033,7 @@ impl<'p> Vm<'p> {
                 self.pdf_dok.push(Some(pdf::Dokument::neu(b, h)));
                 Value::Int((self.pdf_dok.len() - 1) as i64)
             }
-            "pdf_page" => { let i = bi_int(a, 0, "PDF_PAGE")?; self.pdf_d(i)?.neue_seite(); Value::Nil }
+            "pdf_page" => { let i = bi_int(a, 0, "PDF_PAGE")?; self.pdf_d(i)?.seite_beginnen(); Value::Nil }
             "pdf_page_count" => { let i = bi_int(a, 0, "PDF_PAGE_COUNT")?; Value::Int(self.pdf_d(i)?.seiten.len() as i64) }
             "pdf_page_width" => { let i = bi_int(a, 0, "PDF_PAGE_WIDTH")?; Value::Float(self.pdf_d(i)?.breite_mm) }
             "pdf_page_height" => { let i = bi_int(a, 0, "PDF_PAGE_HEIGHT")?; Value::Float(self.pdf_d(i)?.hoehe_mm) }
@@ -6200,6 +6215,8 @@ impl<'p> Vm<'p> {
         // Warteschleife auf 100% eines Kerns.
         if name == "sleep" {
             let ms = bi_int(a, 0, "SLEEP")?.max(0) as u64;
+            // Was vor der Pause ausgegeben wurde, steht waehrend der Pause da.
+            self.flush_out();
             std::thread::sleep(std::time::Duration::from_millis(ms));
             return Ok(Some(Value::Nil));
         }
@@ -6877,6 +6894,7 @@ impl<'p> Vm<'p> {
         let _ = h.write_all(self.out.as_bytes());
         let _ = h.flush();
         self.out.clear();
+        self.out_zeit = std::time::Instant::now();
     }
 
     /// Modul `timer` (timer.rs): AFTER/EVERY/CANCEL/UPDATE + COOLDOWN.
@@ -9294,6 +9312,9 @@ impl<'p> Vm<'p> {
             "imageheight" => Value::Int(g!().image_height(gi(a,0,"IMAGEHEIGHT")?)?),
             "flip" => {
                 g!().flip();
+                // Gesammelte PRINT-Zeilen eines Spiels gehen spaetestens nach
+                // 50 ms hinaus, nicht erst beim Beenden.
+                if !self.out.is_empty() && self.out_zeit.elapsed() >= std::time::Duration::from_millis(50) { self.flush_out(); }
                 // Musik-Stream nachfuettern (sonst stockt die Wiedergabe).
                 if let Some(au) = self.audio.as_mut() { au.update(); }
                 Value::Nil
