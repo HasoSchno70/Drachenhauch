@@ -129,19 +129,12 @@ pub fn datei_statt_handle(befehl: &str, text: &str) -> String {
 
 /// Ein TEXT, wo eine Zahl hingehoert: der Anhang, der sagt WARUM.
 ///
-/// Drei Faelle, alle gemessen an dem, was man aus anderen BASICs mitbringt:
-/// eine Taste als Buchstabe (`KEYHIT("a")` -- dort vergleicht man INKEY$),
+/// Zwei Faelle, beide gemessen an dem, was man aus anderen BASICs mitbringt:
 /// eine Farbe als Hex-Text (`RGB("FF0000")`) und ein Dateiname, wo ein
-/// geladenes Bild/ein geladener Klang hingehoert.
+/// geladenes Bild/ein geladener Klang hingehoert. (`KEYHIT("a")` war bis
+/// 2026.27 der dritte -- seither meint ein Buchstabe die beschriftete Taste.)
 pub fn text_statt_zahl(befehl: &str, text: &str) -> String {
     let b = befehl.to_lowercase();
-    if matches!(b.as_str(), "keyhit" | "keypressed" | "keyreleased" | "keyrepeat")
-        && text.chars().count() == 1 {
-        let c = text.chars().next().unwrap_or('a');
-        return format!(
-            " -- eine Taste ist eine ZAHL: {}(ASC(\"{}\")) oder die Konstante KEY_{}",
-            b.to_uppercase(), c, c.to_uppercase());
-    }
     if (b == "rgb" || b == "rgba")
         && text.trim_start_matches('#').chars().all(|c| c.is_ascii_hexdigit())
         && !text.is_empty() {
@@ -192,10 +185,6 @@ mod tests {
 
     #[test]
     fn text_wo_eine_zahl_hingehoert() {
-        assert!(text_statt_zahl("keyhit", "a").contains("ASC(\"a\")"));
-        assert!(text_statt_zahl("keyhit", "a").contains("KEY_A"));
-        // Mehr als ein Zeichen ist keine Taste -- dann kein Tasten-Satz.
-        assert!(text_statt_zahl("keyhit", "leertaste").is_empty());
         assert!(text_statt_zahl("rgb", "FF0000").contains("COLOR_FROM_HEX"));
         assert!(text_statt_zahl("rgb", "#f80").contains("&HF80"));
         assert!(text_statt_zahl("rgb", "rot").is_empty());

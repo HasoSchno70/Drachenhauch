@@ -103,7 +103,7 @@ and guide lines. Anyone who needs the same shape often uses a model (see below).
 | `LIGHT_SET_COLOR(licht, farbe)` | — | change the light colour |
 | `LIGHT_SET_ENABLED(licht [, an])` | — | switch a single light on or off |
 | `LIGHT_FOG(farbe, dichte)` | — | fog with distance; makes far things fade |
-| `MODEL_LIT(modell)` | — | this model is lit (otherwise it draws flat) |
+| `MODEL_LIT(modell)` | — | this model is lit (otherwise it draws flat). The opacity of the colour applies when lit too: `MODEL(m, x, y, z, 1.0, RGBA(80, 160, 255, 100))` is semi-transparent -- draw transparent models last, otherwise they hide what comes after (until 2026.27 a lit model stayed opaque) |
 | `MODEL_PBR(modell, metalness, roughness)` | — | material behaviour: `metalness` 0 = plastic, 1 = metal; `roughness` 0 = mirror-like, 1 = matte |
 | `MODEL_EMISSIVE(modell, farbe, staerke)` | — | the model glows by itself — even through the fog |
 
@@ -124,7 +124,9 @@ and guide lines. Anyone who needs the same shape often uses a model (see below).
 Two kinds: `PICK_*` takes **the mouse ray automatically** — that is the usual
 case. `RAY_HIT_*` gets the ray from you and suits shots, line of sight and
 anything that does not hang on the mouse. Both return the distance to the hit
-or `-1`.
+or `-1`, always in world units -- the direction of a `RAY_HIT_*` need not have
+length 1 (until 2026.27 box and model measured in multiples of the direction
+length). The hit point is the origin plus the unit direction times the distance.
 
 | Function | Returns | Meaning |
 |---|---|---|
@@ -288,7 +290,8 @@ SHADOW_TARGET(0, 0, 0)
 ```
 
 The **first** directional light casts the shadow; models need `MODEL_LIT` to
-cast and receive it. A smaller `SHADOW_AREA` value makes the shadow sharper
+cast and receive it -- drawn with `MODEL`, `MODEL_EX` or `MODEL_MATRIX` (until
+2026.27 `MODEL_MATRIX` cast none). A smaller `SHADOW_AREA` value makes the shadow sharper
 but covers less — which is why you make it follow the player character with
 `SHADOW_TARGET`. Demo: [93_shadows](../../examples/93_shadows.dh).
 

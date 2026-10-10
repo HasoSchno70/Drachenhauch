@@ -95,7 +95,7 @@ Drachenhauch understands these forms from other BASICs the way you know them:
 | `ARRAY_REMOVE` | `ARRAY_REMOVE_AT(a, i)` |
 | `MAKEDIR` | `MKDIR(pfad$)` — for every unknown command the message suggests the real name |
 | `MouseDown(1)` for left | `MOUSEBUTTON(0)` — 0 left, 1 right, 2 middle |
-| `KEYHIT("a")` | `KEYHIT(ASC("a"))` or `KEYHIT(KEY_A)` — a key is a number |
+| `KEYHIT("a")` | works: a letter as text means the key it is printed on; `KEYHIT(KEY_A)` means the position (for WASD) |
 | `RGB("FF0000")` | `COLOR_FROM_HEX("#FF0000")`, in source code `&HFF0000` |
 | `PLAYSOUND("sprung.wav")` | load it first: `s = LOADSOUND("sprung.wav")`, then `PLAYSOUND(s)` (likewise `DRAWIMAGE`, `SPRITE_NEW` with `LOADIMAGE`) |
 

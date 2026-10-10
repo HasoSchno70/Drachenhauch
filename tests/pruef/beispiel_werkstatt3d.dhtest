@@ -1,0 +1,102 @@
+' Das Beispiel examples/werkstatt3d/main.dh (2026-10-10, Dogfooding, 3D):
+' Kloetze setzen, wegnehmen, zuruecknehmen, sichern, laden, einstuerzen. Der
+' Einschub steht vor der Hauptschleife und ruft die Unterprogramme direkt --
+' die Zielsuche bekommt dabei einen eigenen Strahl statt der Maus.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== der strahl findet flaeche und boden
+' Startbau: 5x5 Grundplatte (y = 0), darauf blau (0,1,0) und (0,2,0), rot (1,1,0)
+zielSuchen(0, 10, 0, 0, -1, 0)
+PRINT "von oben "; zielX; ","; zielY; ","; zielZ; " "; zielOk
+zielSuchen(10, 1.5, 0, -2, 0, 0)
+PRINT "von rechts "; zielX; ","; zielY; ","; zielZ
+zielSuchen(0, 2.5, 10, 0, 0, -1)
+PRINT "von vorn "; zielX; ","; zielY; ","; zielZ
+zielSuchen(6, 10, 6, 0, -1, 0)
+PRINT "boden "; zielX; ","; zielY; ","; zielZ; " "; zielOk; " unter "; unterMaus
+zielSuchen(30, 10, 0, 0, -1, 0)
+PRINT "ausserhalb "; zielOk
+zielSuchen(0, 10, 0, 0, 1, 0)
+PRINT "himmel "; zielOk
+EXIT(0)
+--- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+von oben 0,3,0 TRUE
+von rechts 2,1,0
+von vorn 0,2,1
+boden 6,0,6 TRUE unter -1
+ausserhalb FALSE
+himmel FALSE
+
+=== setzen, wegnehmen und zuruecknehmen
+PRINT "start "; anz
+IF setzen(3, 0, 3, 2) THEN merken(1, 3, 0, 3, 2)
+PRINT "doppelt "; setzen(3, 0, 3, 5)
+DIM prI AS INTEGER
+prI = klotzBei(1, 1, 0)
+merken(2, kx[prI], ky[prI], kz[prI], kf[prI])
+entfernen(prI)
+PRINT "nach zwei schritten "; anz; " rot da "; klotzBei(1, 1, 0) >= 0
+rueckgaengig()
+PRINT "rot zurueck "; klotzBei(1, 1, 0) >= 0; " farbe "; kf[klotzBei(1, 1, 0)]
+rueckgaengig()
+PRINT "gelb weg "; klotzBei(3, 0, 3) < 0; " "; anz
+rueckgaengig()
+PRINT "leerer verlauf "; anz
+EXIT(0)
+--- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+start 28
+doppelt FALSE
+nach zwei schritten 28 rot da FALSE
+rot zurueck TRUE farbe 0
+gelb weg TRUE 28
+leerer verlauf 28
+
+=== sichern und laden
+setzen(-4, 0, 4, 5)
+sichern()
+anz = 0
+laden()
+PRINT "geladen "; anz; " lila da "; kf[klotzBei(-4, 0, 4)]
+PRINT "datei "; LEN(READLINES("bau.txt"))
+EXIT(0)
+--- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+geladen 29 lila da 5
+datei 29
+
+=== der einsturz laesst einen ueberhang fallen
+' ein Klotz frei in der Luft neben der Platte faellt, die Platte bleibt
+setzen(6, 3, 0, 1)
+einstuerzen()
+DIM prS AS INTEGER
+FOR prS = 1 TO 120
+    PHYS3D_STEP(welt, 1.0 / 60)
+NEXT
+DIM prK AS INTEGER
+prK = koerper[klotzBei(6, 3, 0)]
+PRINT "gefallen "; PHYS3D_BODY_Y(welt, prK) < 0.7
+PRINT "platte steht "; ABS(PHYS3D_BODY_Y(welt, koerper[0]) - 0.5) < 0.05
+EXIT(0)
+--- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+gefallen TRUE
+platte steht TRUE
+
+=== das ganze programm laeuft und zeichnet
+' leer: der Einschub ist ein Kommentar, das Programm laeuft wie gestartet
+--- programm ../../examples/werkstatt3d/main.dh nach ' --- Hauptschleife -------------------------------------------------------
+--- umgebung
+DHRT_FRAMES=30
+--- erwartet
+--- bild
+groesse 1100 700

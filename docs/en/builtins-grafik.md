@@ -837,6 +837,7 @@ sampler would stay black.
 | `KEYPRESSED(code)` → BOOLEAN | TRUE **as long as** the key with SDL code `code` is held — every frame again. For moving/steering. |
 | `KEYHIT(code)` → BOOLEAN | TRUE only in **the one frame** in which the key goes down. For shooting, jumping, toggling. |
 | | *Letters:* `KEY_A`…`KEY_Z` are the clear spelling. `ASC("s")` and `ASC("S")` both mean the same key — until 2026-08-31 the **upper-case** spelling silently hit nothing at all, which looked like a forgotten call. |
+| | *Position or label:* a key code means the **position** of the key on the US keyboard — `KEY_Z` is the key labelled Y on a German keyboard, the one labelled W on a French one. That is right for WASD. For shortcuts like Ctrl+Z write the **letter as text**: `KEYHIT("z")` means the key the Z is printed on (also for `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; letters, digits and the space). |
 | `KEYRELEASED(code)` → BOOLEAN | TRUE in the frame in which the key is released — for “charge up and fire on release”, say |
 | `KEYREPEAT(code)` → BOOLEAN | like `KEYHIT`, but while held it also fires with the system key repeat. For text cursors and quantity input. |
 | `MOUSEX()`, `MOUSEY()` → INTEGER | current mouse position (in logical pixels) |

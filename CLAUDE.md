@@ -1700,6 +1700,33 @@ mit einem JSON-Fehler ab; jetzt gilt ein Angebot nur fuer seinen Text
 Vordergrund-Frage schwankt ohne den Schalter, darum die Gegenprobe am Stil)
 und ein Fall in `werkzeug_ide_korrektur.dhtest`.
 
+## Dogfooding 3D: Bauklotz-Werkstatt (2026-10-10)
+
+`examples/werkstatt3d/main.dh` (Kloetze setzen per Strahl, Licht, Schatten,
+Vorschau-Klotz, Einsturz ueber physics3d, gui-Werkzeugfenster), mit echten
+Fensternachrichten bedient. Fuenf Funde: (1) **Zahlen mit Exponent**
+(`1e9`, `2.5E-3`) waren im Quelltext ein Parse-Fehler -- jetzt FLOAT
+(`lexer::scan_number`; ein Exponent jenseits von FLOAT ist ein Fehler, nicht
+inf). (2) **`KEYHIT("z")`**: ein Tastencode meint die LAGE nach der
+US-Tastatur (KEY_Z ist auf QWERTZ die Y-Taste), fuer Strg+Z falsch. Ein
+Buchstabe/eine Ziffer/das Leerzeichen als Text meint jetzt die beschriftete
+Taste (`Graphics::taste_fuer_zeichen` ueber `belegung`, dieselbe Quelle wie
+die gui-Kuerzel); vorher war Text dort ein Fehler mit Hinweis.
+`fenstersender.ps1` kennt `buchstabe:z` (Scancode aus MapVirtualKey).
+(3) **`MODEL_MATRIX` warf keinen Schatten** -- `render_shadow_map` kannte nur
+MODEL/MODEL_EX. (4) **Beleuchtete Modelle waren immer deckend**: beide
+Licht-Shader schrieben Alpha 1.0; jetzt `colDiffuse.a * tex.a`, der Nebel
+mischt nur die Farbe. (5) **`RAY_HIT_BOX`/`RAY_HIT_MODEL`** normalisierten die
+Richtung nicht (Laenge 2 = halbe Entfernung, Nullrichtung = inf), die anderen
+RAY_HIT_* schon. Tests `g3d_licht.dhtest`, `g3d_strahlen.dhtest`,
+`taste_nach_buchstabe.dhtest`, `beispiel_werkstatt3d.dhtest`, Faelle in
+`chex_literal`/`umstieg`. **Gegenprobe gegen die installierte Fassung**
+(`C:\Program Files\Drachenhauch-IDE\dhrt.exe`): `dhrt test` der alten Exe
+startet auch die Kinder mit ihr. **Falle:** vor einer Verfaelschung
+committen -- `git checkout datei` nahm die noch nicht committete Aenderung
+mit. Offen: `MODEL_WIRES` hat keine Matrix-Form (gedrehte Kloetze ohne
+Kanten), `IMAGEWIDTH`/`IMAGEHEIGHT` ohne Unterstrich neben `IMAGE_NEW`.
+
 ## Zeichenketten anhaengen ist linear (2026-09-24)
 
 `Value::Str` ist `Rc<String>` (vorher `Rc<str>`, jedes Anhaengen kopierte:

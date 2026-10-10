@@ -79,13 +79,24 @@ if ($Nachricht.StartsWith("roh:")) {
     # Weg fuellt raylibs Zeichenwarteschlange, eine Aufnahme tut es nicht),
     # "anf" = ein Anfuehrungszeichen (auf der Befehlszeile schwer zu
     # uebergeben), "rueck"/"links"/"rechts"/"auf"/"ab"/"enter"/"escape"/"f12" = die
-    # Taste gedrueckt und los ("esc" allein ist die Nachricht oben).
+    # Taste gedrueckt und los ("esc" allein ist die Nachricht oben),
+    # "buchstabe:z" = die Taste, auf der das Z steht.
     foreach ($teil in $Nachricht.Split("|")) {
         if ($teil.StartsWith("tippe:")) {
             foreach ($z in $teil.Substring(6).ToCharArray()) {
                 [FensterSender]::PostMessage($h, 0x102, [IntPtr][int]$z, [IntPtr]1) | Out-Null
                 Start-Sleep -Milliseconds 60
             }
+        } elseif ($teil.StartsWith("buchstabe:")) {
+            # Die Taste, auf der der Buchstabe STEHT -- so, wie ein echter Druck
+            # bei der Belegung dieses Rechners ankommt: virtueller Code = der
+            # Buchstabe, Scancode ueber MapVirtualKey (GLFW nimmt den Scancode).
+            Add-Type -Name M -Namespace W -MemberDefinition '[DllImport("user32.dll")] public static extern uint MapVirtualKey(uint c, uint t);' -ErrorAction SilentlyContinue
+            $vk = [int][char]$teil.Substring(10).ToUpper()
+            $l = 1 -bor (([int][W.M]::MapVirtualKey($vk, 0) -band 0xFF) -shl 16)
+            [FensterSender]::PostMessage($h, 0x100, [IntPtr]$vk, [IntPtr]$l) | Out-Null
+            Start-Sleep -Milliseconds 160
+            [FensterSender]::PostMessage($h, 0x101, [IntPtr]$vk, [IntPtr][int64]($l -bor 0xC0000000)) | Out-Null
         } elseif ($teil -eq "anf") {
             [FensterSender]::PostMessage($h, 0x102, [IntPtr]0x22, [IntPtr]1) | Out-Null
         } elseif (@("rueck", "links", "rechts", "auf", "ab", "enter", "escape", "f12") -contains $teil) {

@@ -636,11 +636,15 @@ void main()
     vec3 color = ambientTerm + Lo;
     color = color/(color + vec3(1.0));        // Reinhard-Tonemapping
     color = pow(color, vec3(1.0/2.2));         // Gamma
-    finalColor = vec4(color, 1.0);
-    // Exponentieller Tiefen-Fog (fogDensity 0 => kein Effekt).
+    // Deckkraft aus der Farbe (RGBA) und der Textur -- bis 2026.27 stand hier
+    // 1.0, und ein beleuchtetes Modell blieb trotz RGBA(..., 100) deckend.
+    float alpha = colDiffuse.a*texture(texture0, fragTexCoord).a;
+    finalColor = vec4(color, alpha);
+    // Exponentieller Tiefen-Fog (fogDensity 0 => kein Effekt). Nur die Farbe:
+    // sonst wuerde ein Modell mit der Entfernung durchsichtig.
     float fd = length(viewPos - fragPosition)*fogDensity;
     float fog = clamp(1.0/exp(fd*fd), 0.0, 1.0);
-    finalColor = mix(fogColor, finalColor, fog);
+    finalColor.rgb = mix(fogColor.rgb, finalColor.rgb, fog);
     // Eigenleuchten (durchschlaegt den Fog -> Neon/Glow, mit Bloom-POSTFX).
     finalColor.rgb += emissive.rgb * emissive.a;
 }
@@ -699,7 +703,8 @@ uniform int lightCount;
 void main()
 {
     vec3 albedo = colDiffuse.rgb*texture(texture0, fragTexCoord).rgb*fragColor.rgb;
-    if (lightCount == 0) { finalColor = vec4(albedo, 1.0); return; }
+    float alpha = colDiffuse.a*texture(texture0, fragTexCoord).a*fragColor.a;
+    if (lightCount == 0) { finalColor = vec4(albedo, alpha); return; }
     vec3 N = normalize(fragNormal);
     vec3 V = normalize(viewPos - fragPosition);
     vec3 lit = ambient.rgb*albedo;
@@ -719,7 +724,7 @@ void main()
         float spec = pow(max(dot(N, H), 0.0), 32.0)*0.3;
         lit += (albedo*NdotL + vec3(spec))*lights[i].color.rgb*atten;
     }
-    finalColor = vec4(lit, 1.0);
+    finalColor = vec4(lit, alpha);
 }
 "#;
 
@@ -2773,7 +2778,11 @@ impl Graphics {
     #[allow(clippy::too_many_arguments)]
     pub fn ray_hit_box(&self, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
                        cx: f32, cy: f32, cz: f32, sx: f32, sy: f32, sz: f32) -> f64 {
-        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        // Normalisiert wie bei Dreieck/Viereck/Kugel: sonst kam die Entfernung
+        // in Vielfachen der Richtungslaenge (bis 2026.27: Richtung 2 -> halbe
+        // Entfernung), und der naechste Treffer ueber verschiedene RAY_HIT_*
+        // liess sich nicht vergleichen.
+        let Some(ray) = Self::unit_ray(ox, oy, oz, dx, dy, dz) else { return -1.0; };
         let bb = BoundingBox::new(
             Vector3::new(cx - sx / 2.0, cy - sy / 2.0, cz - sz / 2.0),
             Vector3::new(cx + sx / 2.0, cy + sy / 2.0, cz + sz / 2.0));
@@ -2888,7 +2897,7 @@ impl Graphics {
     pub fn ray_hit_model(&self, idx: i64, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
                          px: f32, py: f32, pz: f32, scale: f32) -> f64 {
         if idx < 0 || idx as usize >= self.models.len() { return -1.0; }
-        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        let Some(ray) = Self::unit_ray(ox, oy, oz, dx, dy, dz) else { return -1.0; };
         // Gleiche Transform-Reihenfolge wie DrawModel: erst skalieren, dann verschieben.
         let transform = Matrix::scale(scale, scale, scale) * Matrix::translate(px, py, pz);
         let mut best = -1.0f64;
@@ -5348,6 +5357,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         match map_key(code) { Some(k) => self.t_neu(k), None => false }
     }
 
+    /// Die Taste, auf der ein Zeichen STEHT -- `KEYHIT("z")`. Ein Tastencode
+    /// meint die Lage (KEY_Z ist auf einer deutschen Tastatur die Taste mit
+    /// dem Y), ein Buchstabe als Text die Beschriftung, wie bei den
+    /// gui-Kuerzeln: Strg+Z soll dort sein, wo Z draufsteht.
+    pub fn taste_fuer_zeichen(&self, c: char) -> Option<i64> {
+        let c = c.to_ascii_lowercase();
+        if c.is_ascii_lowercase() { return Some(self.belegung[(c as u8 - b'a') as usize]); }
+        if c.is_ascii_digit() || c == ' ' { return Some(c as i64); }
+        None
+    }
+
     /// Die Belegung neu lesen: je Buchstabentaste (nach Lage) der Buchstabe,
     /// den sie schreibt. Waehrend eine Aufnahme laeuft, gilt die Lage -- eine
     /// Aufnahme speichert Tasten nach Lage, und die Pruefsammlungen spielen
@@ -6689,6 +6709,18 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                                 raylib::ffi::Vector3 { x: *x, y: *y, z: *z },
                                 raylib::ffi::Vector3 { x: *ax, y: *ay, z: *az }, *ang,
                                 raylib::ffi::Vector3 { x: *sc, y: *sc, z: *sc }, white);
+                        }
+                    }
+                    // MODEL_MATRIX wirft denselben Schatten wie MODEL -- bis
+                    // 2026.27 fehlte es hier, und alles, was sich dreht
+                    // (Physik, Bones), stand ohne Schatten auf dem Boden.
+                    Cmd3D::ModelMatrix(i, mat, _) => {
+                        if let Some(m) = self.models.get(*i) {
+                            raylib::ffi::rlPushMatrix();
+                            raylib::ffi::rlMultMatrixf(mat.as_ptr());
+                            raylib::ffi::DrawModel(*m.as_ref(),
+                                raylib::ffi::Vector3 { x: 0.0, y: 0.0, z: 0.0 }, 1.0, white);
+                            raylib::ffi::rlPopMatrix();
                         }
                     }
                     _ => {}

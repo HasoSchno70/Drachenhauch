@@ -1284,7 +1284,7 @@
   "MODEL_EMISSIVE": "das Modell leuchtet selbst — auch durch den Nebel hindurch",
   "MODEL_EX": "zeichnen und um eine Achse drehen",
   "MODEL_INSTANCED": "vollstaendig",
-  "MODEL_LIT": "dieses Modell wird beleuchtet (sonst zeichnet es flach)",
+  "MODEL_LIT": "dieses Modell wird beleuchtet (sonst zeichnet es flach). Die Deckkraft der Farbe gilt auch beleuchtet: MODEL(m, x, y, z, 1.0, RGBA(80, 160, 255, 100)) ist halbdurchsichtig -- durchsichtige Modelle zuletzt zeichnen, sonst verdecken sie, was danach kommt (bis 2026.27 blieb ein beleuchtetes Modell deckend)",
   "MODEL_LOAD_ANIMS": "INTEGER — Animationen aus einer Datei laden (GLTF/IQM)",
   "MODEL_MATRIX": "Zeichnet ein g3d-Modell (aus MESH_* oder LOADMODEL) mit der angegebenen Transformations-Matrix – so verbindest du m3d mit der 3D-Grafik.",
   "MODEL_PBR": "Materialverhalten: metalness 0 = Kunststoff, 1 = Metall; roughness 0 = spiegelnd, 1 = matt",
