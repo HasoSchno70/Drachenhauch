@@ -6702,6 +6702,18 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                                 raylib::ffi::Vector3 { x: *sc, y: *sc, z: *sc }, white);
                         }
                     }
+                    // MODEL_MATRIX wirft denselben Schatten wie MODEL -- bis
+                    // 2026.27 fehlte es hier, und alles, was sich dreht
+                    // (Physik, Bones), stand ohne Schatten auf dem Boden.
+                    Cmd3D::ModelMatrix(i, mat, _) => {
+                        if let Some(m) = self.models.get(*i) {
+                            raylib::ffi::rlPushMatrix();
+                            raylib::ffi::rlMultMatrixf(mat.as_ptr());
+                            raylib::ffi::DrawModel(*m.as_ref(),
+                                raylib::ffi::Vector3 { x: 0.0, y: 0.0, z: 0.0 }, 1.0, white);
+                            raylib::ffi::rlPopMatrix();
+                        }
+                    }
                     _ => {}
                 }
             }

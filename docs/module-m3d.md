@@ -133,6 +133,10 @@ arm = MAT4_MUL(body, MAT4_MUL(MAT4_TRANSLATE(1.2, 0.6, 0), MAT4_SCALE(1.2,0.3,0.
 MODEL_MATRIX(box, arm, &H50C0FF)
 ```
 
+Beleuchtung und Schatten wirken wie bei `MODEL`: ein Modell mit `MODEL_LIT`
+wirft unter `SHADOW_ENABLE` seinen Schatten und empfängt fremde (bis 2026.27
+warf es keinen -- gedrehte Physik-Körper standen schattenlos auf dem Boden).
+
 Viele Instanzen = viele `MODEL_MATRIX`-Aufrufe (ein Draw pro Aufruf). Für sehr
 viele identische Meshes ist `MODEL_INSTANCED` die performante Variante (siehe
 unten).
