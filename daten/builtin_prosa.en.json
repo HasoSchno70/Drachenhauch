@@ -1283,7 +1283,7 @@
   "MODEL_EMISSIVE": "the model glows by itself — even through the fog",
   "MODEL_EX": "draw and rotate around an axis",
   "MODEL_INSTANCED": "complete",
-  "MODEL_LIT": "this model is lit (otherwise it draws flat)",
+  "MODEL_LIT": "this model is lit (otherwise it draws flat). The opacity of the colour applies when lit too: MODEL(m, x, y, z, 1.0, RGBA(80, 160, 255, 100)) is semi-transparent -- draw transparent models last, otherwise they hide what comes after (until 2026.27 a lit model stayed opaque)",
   "MODEL_LOAD_ANIMS": "INTEGER — load animations from a file (GLTF/IQM)",
   "MODEL_MATRIX": "Draws a g3d model (from MESH_* or LOADMODEL) with the transformation matrix given — that is how you join m3d to the 3D graphics.",
   "MODEL_PBR": "material behaviour: metalness 0 = plastic, 1 = metal; roughness 0 = mirror-like, 1 = matte",

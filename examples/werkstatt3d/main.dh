@@ -1,0 +1,375 @@
+' Bauklotz-Werkstatt -- Kloetze im Raum setzen, ansehen, einstuerzen lassen
+'
+' Linksklick      setzt einen Klotz (auf den Boden oder an die Flaeche
+'                 unter der Maus)
+' Rechtsklick     nimmt den Klotz unter der Maus weg
+' Rechts ziehen   dreht die Kamera, Mausrad zoomt, Pos1 stellt zurueck
+' Mittelklick     uebernimmt die Farbe des Klotzes unter der Maus
+' Strg+Z          nimmt den letzten Schritt zurueck
+'
+' [Einsturz] uebergibt alle Kloetze an physics3d -- ein Klick stoesst dann
+' den Klotz unter der Maus an. [Aufbauen] stellt den Bau wieder her.
+
+IMPORT "g3d"
+IMPORT "m3d"
+IMPORT "physics3d"
+IMPORT "gui"
+
+CONST BREITE = 1100
+CONST HOEHE = 700
+CONST MAXK = 2000
+CONST FELD = 10            ' Boden reicht von -FELD bis +FELD
+CONST DATEI = "bau.txt"
+
+SCREEN(BREITE, HOEHE, "Bauklotz-Werkstatt", 1)
+SETFPS(60)
+
+' --- Licht und Schatten --------------------------------------------------
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.35)
+LIGHT_DIRECTIONAL(-0.5, -1.0, -0.35, &HFFF2E0)
+SHADOW_ENABLE(2048)
+SHADOW_AREA(26.0, 60.0)
+SHADOW_TARGET(0, 0, 0)
+
+DIM boden AS INTEGER
+boden = MESH_PLANE(FELD * 2 + 1, FELD * 2 + 1, 1, 1)
+MODEL_LIT(boden)
+DIM wuerfel AS INTEGER
+wuerfel = MESH_CUBE(1.0, 1.0, 1.0)
+MODEL_LIT(wuerfel)
+
+' --- Die Kloetze ---------------------------------------------------------
+DIM kx[MAXK] AS INTEGER
+DIM ky[MAXK] AS INTEGER
+DIM kz[MAXK] AS INTEGER
+DIM kf[MAXK] AS INTEGER
+DIM anz AS INTEGER
+
+DIM farben AS ARRAY OF INTEGER
+farben = [&HD04848, &HE09A30, &HE8D850, &H58B058, &H4888D8, &H9060C0, &HE8E8E8, &H505860]
+DIM farbe AS INTEGER
+farbe = 4
+
+' Verlauf: je Schritt Art (1 gesetzt, 2 entfernt) und der Klotz
+DIM vArt AS ARRAY OF INTEGER
+DIM vX AS ARRAY OF INTEGER
+DIM vY AS ARRAY OF INTEGER
+DIM vZ AS ARRAY OF INTEGER
+DIM vF AS ARRAY OF INTEGER
+vArt = [] : vX = [] : vY = [] : vZ = [] : vF = []
+
+FUNCTION klotzBei(x AS INTEGER, y AS INTEGER, z AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO anz - 1
+        IF kx[i] = x AND ky[i] = y AND kz[i] = z THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION setzen(x AS INTEGER, y AS INTEGER, z AS INTEGER, f AS INTEGER) AS BOOLEAN
+    IF anz >= MAXK THEN RETURN FALSE
+    IF ABS(x) > FELD OR ABS(z) > FELD OR y < 0 OR y > 30 THEN RETURN FALSE
+    IF klotzBei(x, y, z) >= 0 THEN RETURN FALSE
+    kx[anz] = x : ky[anz] = y : kz[anz] = z : kf[anz] = f
+    anz = anz + 1
+    RETURN TRUE
+END FUNCTION
+
+SUB entfernen(i AS INTEGER)
+    kx[i] = kx[anz - 1] : ky[i] = ky[anz - 1] : kz[i] = kz[anz - 1] : kf[i] = kf[anz - 1]
+    anz = anz - 1
+END SUB
+
+SUB merken(art AS INTEGER, x AS INTEGER, y AS INTEGER, z AS INTEGER, f AS INTEGER)
+    ARRAY_PUSH(vArt, art) : ARRAY_PUSH(vX, x) : ARRAY_PUSH(vY, y)
+    ARRAY_PUSH(vZ, z) : ARRAY_PUSH(vF, f)
+END SUB
+
+SUB rueckgaengig()
+    DIM n AS INTEGER
+    n = LEN(vArt)
+    IF n = 0 THEN RETURN
+    DIM art AS INTEGER
+    art = ARRAY_POP(vArt)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM z AS INTEGER
+    DIM f AS INTEGER
+    x = ARRAY_POP(vX) : y = ARRAY_POP(vY) : z = ARRAY_POP(vZ) : f = ARRAY_POP(vF)
+    IF art = 1 THEN
+        DIM i AS INTEGER
+        i = klotzBei(x, y, z)
+        IF i >= 0 THEN entfernen(i)
+    ELSE
+        setzen(x, y, z, f)
+    END IF
+END SUB
+
+SUB sichern()
+    DIM zeilen AS ARRAY OF STRING
+    zeilen = []
+    DIM i AS INTEGER
+    FOR i = 0 TO anz - 1
+        ARRAY_PUSH(zeilen, f"{kx[i]} {ky[i]} {kz[i]} {kf[i]}")
+    NEXT
+    WRITEALL(DATEI, JOIN$(zeilen, CHR$(10)))
+END SUB
+
+SUB laden()
+    IF NOT FILEEXISTS(DATEI) THEN RETURN
+    anz = 0
+    vArt = [] : vX = [] : vY = [] : vZ = [] : vF = []
+    DIM z AS STRING
+    FOR EACH z IN READLINES(DATEI)
+        DIM t AS ARRAY OF STRING
+        t = SPLIT$(TRIM$(z), " ")
+        IF LEN(t) = 4 THEN setzen(VAL(t[0]), VAL(t[1]), VAL(t[2]), VAL(t[3]))
+    NEXT
+END SUB
+
+' --- Kamera --------------------------------------------------------------
+DIM gieren AS FLOAT
+DIM neigen AS FLOAT
+DIM abstand AS FLOAT
+SUB kameraZurueck()
+    gieren = 35.0 : neigen = 35.0 : abstand = 22.0
+END SUB
+kameraZurueck()
+DIM camX AS FLOAT
+DIM camY AS FLOAT
+DIM camZ AS FLOAT
+
+' --- Was liegt unter dem Strahl? -----------------------------------------
+' Setzt unterMaus (der getroffene Klotz, -1 = keiner) und das Ziel fuer einen
+' neuen Klotz: an der Flaeche des getroffenen, sonst auf dem Boden.
+DIM zielX AS INTEGER
+DIM zielY AS INTEGER
+DIM zielZ AS INTEGER
+DIM zielOk AS BOOLEAN
+DIM unterMaus AS INTEGER
+
+SUB zielSuchen(ox AS FLOAT, oy AS FLOAT, oz AS FLOAT, dx AS FLOAT, dy AS FLOAT, dz AS FLOAT)
+    unterMaus = -1
+    DIM nah AS FLOAT
+    nah = 1e9
+    DIM i AS INTEGER
+    FOR i = 0 TO anz - 1
+        DIM t AS FLOAT
+        t = RAY_HIT_BOX(ox, oy, oz, dx, dy, dz, kx[i], ky[i] + 0.5, kz[i], 1.0, 1.0, 1.0)
+        IF t >= 0.0 AND t < nah THEN
+            nah = t
+            unterMaus = i
+        END IF
+    NEXT
+    zielOk = FALSE
+    IF unterMaus >= 0 THEN
+        ' Trefferpunkt -> die Flaeche, deren Achse am weitesten heraussteht.
+        ' Die Entfernung ist in Welt-Einheiten, die Richtung darum auf 1.
+        DIM l AS FLOAT
+        l = SQR(dx * dx + dy * dy + dz * dz)
+        DIM hx AS FLOAT
+        DIM hy AS FLOAT
+        DIM hz AS FLOAT
+        hx = ox + dx / l * nah - kx[unterMaus]
+        hy = oy + dy / l * nah - (ky[unterMaus] + 0.5)
+        hz = oz + dz / l * nah - kz[unterMaus]
+        zielX = kx[unterMaus] : zielY = ky[unterMaus] : zielZ = kz[unterMaus]
+        IF ABS(hx) >= ABS(hy) AND ABS(hx) >= ABS(hz) THEN
+            zielX = zielX + SGN(hx)
+        ELSEIF ABS(hy) >= ABS(hz) THEN
+            zielY = zielY + SGN(hy)
+        ELSE
+            zielZ = zielZ + SGN(hz)
+        END IF
+        zielOk = TRUE
+    ELSEIF dy < 0.0 THEN
+        ' der Boden: wo der Strahl y = 0 erreicht
+        DIM tb AS FLOAT
+        tb = -oy / dy
+        zielX = INT(FLOOR(ox + dx * tb + 0.5))
+        zielZ = INT(FLOOR(oz + dz * tb + 0.5))
+        zielY = 0
+        zielOk = TRUE
+    END IF
+    IF zielOk AND (zielY < 0 OR ABS(zielX) > FELD OR ABS(zielZ) > FELD) THEN zielOk = FALSE
+END SUB
+
+' --- Physik --------------------------------------------------------------
+DIM welt AS PHYS_WORLD
+DIM koerper[MAXK] AS INTEGER
+DIM einsturz AS BOOLEAN
+
+SUB einstuerzen()
+    welt = PHYS3D_NEW()
+    PHYS3D_ADD_BOX(welt, 0.0, -0.5, 0.0, FELD + 0.5, 0.5, FELD + 0.5, 0, 0.1)
+    DIM i AS INTEGER
+    FOR i = 0 TO anz - 1
+        koerper[i] = PHYS3D_ADD_BOX(welt, kx[i], ky[i] + 0.5, kz[i], 0.5, 0.5, 0.5, 1, 0.1)
+    NEXT
+    einsturz = TRUE
+END SUB
+
+' --- Werkzeugfenster -----------------------------------------------------
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Werkzeug", 12, 12, 216, 300)
+DIM knopfFarbe[8] AS GUI_WIDGET
+DIM i AS INTEGER
+FOR i = 0 TO 7
+    knopfFarbe[i] = GUI_BUTTON(win, "", 10 + (i MOD 4) * 44, 10 + (i \ 4) * 44, 38, 38)
+    GUI_SET_COLOR(knopfFarbe[i], "bg", farben[i])
+NEXT
+DIM lblZahl AS GUI_WIDGET
+lblZahl = GUI_LABEL(win, "", 10, 106)
+DIM btnEinsturz AS GUI_WIDGET
+btnEinsturz = GUI_BUTTON(win, "Einsturz", 10, 134, 192, 30)
+GUI_BUTTON_VARIANT(btnEinsturz, "gefahr")
+DIM btnLeeren AS GUI_WIDGET
+btnLeeren = GUI_BUTTON(win, "Leeren", 10, 172, 192, 30)
+DIM btnSichern AS GUI_WIDGET
+btnSichern = GUI_BUTTON(win, "Sichern", 10, 210, 93, 30)
+DIM btnLaden AS GUI_WIDGET
+btnLaden = GUI_BUTTON(win, "Laden", 109, 210, 93, 30)
+DIM lblStatus AS GUI_WIDGET
+lblStatus = GUI_LABEL(win, "", 10, 250)
+
+' Ein kleiner Startbau, damit es etwas zu sehen gibt
+DIM sx AS INTEGER
+DIM sz AS INTEGER
+FOR sx = -2 TO 2
+    FOR sz = -2 TO 2
+        setzen(sx, 0, sz, 7)
+    NEXT
+NEXT
+setzen(0, 1, 0, 4) : setzen(0, 2, 0, 4) : setzen(1, 1, 0, 0)
+
+' --- Hauptschleife -------------------------------------------------------
+DIM rechtsWeg AS FLOAT       ' wie weit die Maus mit gedrueckter rechter Taste lief
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    DIM imFenster AS BOOLEAN
+    imFenster = GUI_WINDOW_AT(MOUSEX(), MOUSEY()) >= 0
+
+    ' Knoepfe
+    FOR i = 0 TO 7
+        IF GUI_CLICKED(knopfFarbe[i]) THEN farbe = i
+    NEXT
+    IF GUI_CLICKED(btnEinsturz) THEN
+        IF einsturz THEN
+            einsturz = FALSE
+            GUI_SET_TEXT(btnEinsturz, "Einsturz")
+        ELSE
+            einstuerzen()
+            GUI_SET_TEXT(btnEinsturz, "Aufbauen")
+        END IF
+    END IF
+    IF GUI_CLICKED(btnLeeren) AND NOT einsturz THEN
+        anz = 0
+        vArt = [] : vX = [] : vY = [] : vZ = [] : vF = []
+    END IF
+    IF GUI_CLICKED(btnSichern) THEN
+        sichern()
+        GUI_SET_TEXT(lblStatus, f"gesichert: {anz}")
+    END IF
+    IF GUI_CLICKED(btnLaden) AND NOT einsturz THEN
+        laden()
+        GUI_SET_TEXT(lblStatus, f"geladen: {anz}")
+    END IF
+
+    ' Kamera
+    IF MOUSE_HIT(1) THEN rechtsWeg = 0.0
+    IF MOUSEBUTTON(1) AND NOT imFenster THEN
+        gieren = gieren - MOUSE_DELTA_X() * 0.4
+        neigen = CLAMP(neigen + MOUSE_DELTA_Y() * 0.3, 8.0, 85.0)
+        rechtsWeg = rechtsWeg + ABS(MOUSE_DELTA_X()) + ABS(MOUSE_DELTA_Y())
+    END IF
+    IF NOT imFenster THEN abstand = CLAMP(abstand - MOUSEWHEEL_Y() * 1.5, 6.0, 60.0)
+    IF KEYHIT(KEY_HOME) THEN kameraZurueck()
+    ' "z" als Text: die Taste, auf der das Z steht -- KEY_Z waere die LAGE
+    ' (auf einer deutschen Tastatur die Taste mit dem Y).
+    IF KEYPRESSED(KEY_LCTRL) AND KEYHIT("z") AND NOT einsturz THEN rueckgaengig()
+
+    camX = COS(RAD(neigen)) * SIN(RAD(gieren)) * abstand
+    camY = SIN(RAD(neigen)) * abstand
+    camZ = COS(RAD(neigen)) * COS(RAD(gieren)) * abstand
+
+    CLS(&H1A2030)
+    CAMERA3D(camX, camY, camZ, 0, 1.5, 0, 45)
+    MODEL(boden, 0, 0, 0, 1.0, &H586858)
+
+    ' Mausstrahl
+    DIM dx AS FLOAT
+    DIM dy AS FLOAT
+    DIM dz AS FLOAT
+    dx = SCREEN_TO_WORLD_DIR_X(MOUSEX(), MOUSEY())
+    dy = SCREEN_TO_WORLD_DIR_Y(MOUSEX(), MOUSEY())
+    dz = SCREEN_TO_WORLD_DIR_Z(MOUSEX(), MOUSEY())
+
+    IF einsturz THEN
+        PHYS3D_STEP(welt, MIN(DELTA(), 0.05))
+        DIM getroffen AS INTEGER
+        getroffen = -1
+        DIM best AS FLOAT
+        best = 1e9
+        DIM one AS VEC3
+        one = VEC3_NEW(1.0, 1.0, 1.0)
+        FOR i = 0 TO anz - 1
+            DIM b AS INTEGER
+            b = koerper[i]
+            DIM px AS FLOAT
+            DIM py AS FLOAT
+            DIM pz AS FLOAT
+            px = PHYS3D_BODY_X(welt, b) : py = PHYS3D_BODY_Y(welt, b) : pz = PHYS3D_BODY_Z(welt, b)
+            DIM d AS FLOAT
+            d = PICK_SPHERE(px, py, pz, 0.6)
+            IF d >= 0.0 AND d < best THEN
+                best = d
+                getroffen = i
+            END IF
+            DIM m AS MAT4
+            m = MAT4_TRS(VEC3_NEW(px, py, pz), _
+                QUAT_NEW(PHYS3D_BODY_QX(welt, b), PHYS3D_BODY_QY(welt, b), _
+                         PHYS3D_BODY_QZ(welt, b), PHYS3D_BODY_QW(welt, b)), one)
+            MODEL_MATRIX(wuerfel, m, farben[kf[i]])
+        NEXT
+        IF getroffen >= 0 AND MOUSE_HIT(0) AND NOT imFenster THEN
+            PHYS3D_APPLY_IMPULSE(welt, koerper[getroffen], dx * 6.0, 2.0, dz * 6.0)
+        END IF
+    ELSE
+        zielSuchen(camX, camY, camZ, dx, dy, dz)
+
+        IF NOT imFenster THEN
+            IF MOUSE_HIT(0) AND zielOk THEN
+                IF setzen(zielX, zielY, zielZ, farbe) THEN merken(1, zielX, zielY, zielZ, farbe)
+            END IF
+            IF MOUSE_RELEASED(1) AND rechtsWeg < 4.0 AND unterMaus >= 0 THEN
+                merken(2, kx[unterMaus], ky[unterMaus], kz[unterMaus], kf[unterMaus])
+                entfernen(unterMaus)
+                unterMaus = -1
+            END IF
+            IF MOUSE_HIT(2) AND unterMaus >= 0 THEN farbe = kf[unterMaus]
+        END IF
+
+        FOR i = 0 TO anz - 1
+            MODEL(wuerfel, kx[i], ky[i] + 0.5, kz[i], 1.0, farben[kf[i]])
+            CUBE_WIRES(kx[i], ky[i] + 0.5, kz[i], 1.005, 1.005, 1.005, &H202830)
+        NEXT
+        IF unterMaus >= 0 THEN
+            CUBE_WIRES(kx[unterMaus], ky[unterMaus] + 0.5, kz[unterMaus], 1.02, 1.02, 1.02, &HFFFFFF)
+        END IF
+        ' Vorschau: halbdurchsichtig und ZULETZT -- was danach kaeme, laege
+        ' sonst hinter ihr und waere verdeckt.
+        IF zielOk AND NOT imFenster THEN
+            MODEL(wuerfel, zielX, zielY + 0.5, zielZ, 1.0, (farben[farbe] BAND &HFFFFFF) BOR (110 SHL 24))
+            CUBE_WIRES(zielX, zielY + 0.5, zielZ, 1.01, 1.01, 1.01, farben[farbe])
+            TEXT(WORLD_TO_SCREEN_X(zielX, zielY + 1.3, zielZ) - 30, WORLD_TO_SCREEN_Y(zielX, zielY + 1.3, zielZ), _
+                 f"{zielX}, {zielY}, {zielZ}", &HE0E8F0)
+        END IF
+    END IF
+
+    GUI_SET_TEXT(lblZahl, f"{anz} Kloetze")
+    GUI_DRAW()
+    TEXT(240, HOEHE - 26, "Links setzt   Rechts nimmt weg   Rechts ziehen dreht   Rad zoomt   Strg+Z", &HB0C0D0)
+    FLIP()
+WEND

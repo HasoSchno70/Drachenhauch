@@ -68,6 +68,7 @@ examples/haushaltsbuch/*.db*
 examples/notizen/*.db*
 examples/notizen/*.pdf
 examples/kometen/bestenliste.json
+examples/werkstatt3d/bau.txt
 
 # Tippspiel-Buch: jeder Kapitelstand legt seine SQLite-Datei beim ersten Start
 # selbst an (tippspiel.db, kapNN.db, kapNN_sicherung.db, dazu -wal/-shm).
