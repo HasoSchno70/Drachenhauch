@@ -577,16 +577,20 @@ You write the function **without parentheses**: `TASK_START(BerechneKarte, 42)`.
 **A task runs as a separate process** — not as a thread. Three
 things follow from that which you need to know:
 
-**1. A task does not see your globals.** Not even a `CONST` at the top
-level. The main program does not run in the task process at all:
+**1. A task does not see your globals.** The main program does not run in
+the task process at all -- a variable it sets does not exist there:
 
 ```basic
-CONST FAKTOR AS INTEGER = 10
+DIM faktor AS INTEGER
+faktor = 10
 
 FUNCTION Nutzt() AS INTEGER
-    RETURN FAKTOR        ' error when started as a task
+    RETURN faktor        ' error when started as a task
 END FUNCTION
 ```
+
+A `CONST` with a fixed value (`CONST FAKTOR AS INTEGER = 10`) it does see,
+though: it is substituted already when compiling.
 
 Pass the function what it needs as parameters. The message explains this
 when it happens. The same limit applies to a module imported with `AS` —
@@ -596,7 +600,9 @@ on whatever happens to be at the top of the program.
 **2. Arguments and result are a number, text or BOOLEAN.** You may
 pass as many as you like — `TASK_START(Zeichne, 3, "rot", TRUE)` —, but an
 object or an array handle cannot cross a process boundary. Whoever needs more
-passes JSON through. A text with spaces stays **one** argument.
+passes JSON through. A text with spaces stays **one** argument, and a text
+may be any length -- the arguments go via standard input, not the command
+line (until 2026.27 Windows stopped at about 32,000 characters).
 The result always comes back as a STRING; for a number, therefore,
 `VAL(TASK_RESULT$(a))`.
 

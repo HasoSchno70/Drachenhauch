@@ -334,3 +334,46 @@ a = TASK_START(Summe, 1, feld, 3)
 --- fehler
 TASK_START: Argument 2 geht ueber eine Prozessgrenze und muss eine Zahl, ein Text oder BOOLEAN sein, nicht ARRAY. Fuer alles andere reich JSON durch.
 
+
+=== ein grosser text geht als argument durch
+' Bis 2026.27 gingen die Argumente ueber die Befehlszeile -- unter Windows ab
+' ~32 000 Zeichen "Der Dateiname oder die Erweiterung ist zu lang". Ein Feed
+' oder ein JSON-Dokument passte nicht (gefunden beim Feed-Leser). Jetzt ueber
+' die Standardeingabe, samt Umbruechen, Anfuehrungszeichen und Umlauten.
+FUNCTION Echo(s AS STRING) AS STRING
+    RETURN s
+END FUNCTION
+FUNCTION Laenge(s AS STRING, n AS INTEGER) AS STRING
+    RETURN STR$(LEN(s) + n)
+END FUNCTION
+DIM s AS STRING
+s = !"Zeile 1\nZeile \"2\" mit äöü und €\n" + "x" * 200000
+DIM a AS INTEGER
+a = TASK_START(Echo, s)
+DIM b AS INTEGER
+b = TASK_START(Laenge, "y" * 50000, 7)
+WHILE NOT TASK_READY(a) OR NOT TASK_READY(b)
+    SLEEP(5)
+WEND
+PRINT TASK_RESULT$(a) = s
+PRINT TASK_RESULT$(b)
+--- erwartet
+TRUE
+50007
+
+=== ein auftrag sieht konstanten mit festem wert
+' Seit dem Konstanten-Falten (2026-09-24) -- die Doku sagte bis 2026.27 noch
+' das Gegenteil.
+CONST FAKTOR AS INTEGER = 10
+CONST NAME AS STRING = "Drache"
+FUNCTION Nutzt(x AS INTEGER) AS STRING
+    RETURN STR$(x * FAKTOR) + " " + NAME
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Nutzt, 4)
+WHILE NOT TASK_READY(a)
+    SLEEP(5)
+WEND
+PRINT TASK_RESULT$(a)
+--- erwartet
+40 Drache

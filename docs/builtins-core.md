@@ -576,16 +576,21 @@ Die Funktion schreibst du **ohne Klammern** hin: `TASK_START(BerechneKarte, 42)`
 **Ein Auftrag läuft als eigener Prozess** — nicht als Thread. Daraus folgen
 drei Dinge, die man kennen muss:
 
-**1. Ein Auftrag sieht deine Globals nicht.** Auch keine `CONST` auf oberster
-Ebene. Das Hauptprogramm läuft im Auftragsprozess nämlich gar nicht:
+**1. Ein Auftrag sieht deine Globals nicht.** Das Hauptprogramm läuft im
+Auftragsprozess nämlich gar nicht -- eine Variable, die es setzt, gibt es dort
+nicht:
 
 ```basic
-CONST FAKTOR AS INTEGER = 10
+DIM faktor AS INTEGER
+faktor = 10
 
 FUNCTION Nutzt() AS INTEGER
-    RETURN FAKTOR        ' Fehler, wenn als Auftrag gestartet
+    RETURN faktor        ' Fehler, wenn als Auftrag gestartet
 END FUNCTION
 ```
+
+Eine `CONST` mit festem Wert (`CONST FAKTOR AS INTEGER = 10`) sieht er dagegen:
+sie wird schon beim Übersetzen eingesetzt.
 
 Gib der Funktion als Parameter mit, was sie braucht. Die Meldung erklärt das,
 wenn es passiert. Dieselbe Grenze gilt für ein mit `AS` importiertes Modul —
@@ -595,7 +600,10 @@ davon ab, was zufällig oben im Programm steht.
 **2. Argumente und Ergebnis sind Zahl, Text oder BOOLEAN.** Du darfst
 beliebig viele übergeben — `TASK_START(Zeichne, 3, "rot", TRUE)` —, aber ein
 Objekt oder ein Array-Handle geht nicht über eine Prozessgrenze. Wer mehr
-braucht, reicht JSON durch. Ein Text mit Leerzeichen bleibt **ein** Argument.
+braucht, reicht JSON durch. Ein Text mit Leerzeichen bleibt **ein** Argument,
+und ein Text darf beliebig lang sein -- die Argumente gehen über die
+Standardeingabe, nicht über die Befehlszeile (bis 2026.27 war unter Windows bei
+rund 32 000 Zeichen Schluss).
 Das Ergebnis kommt immer als STRING zurück; für eine Zahl also
 `VAL(TASK_RESULT$(a))`.
 

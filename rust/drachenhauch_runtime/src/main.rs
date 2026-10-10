@@ -533,6 +533,19 @@ fn main() -> ExitCode {
         // wie bei --check/profile/debug -- der Aufrufer ist eine Maschine.
         if raw.len() >= 4 && raw[1] == "call" {
             setze_programm_args(&raw);
+            // `--args-stdin`: die Argumente kommen als JSON-Feld ueber die
+            // Standardeingabe (so ruft TASK_START -- die Befehlszeile ist unter
+            // Windows auf ~32 000 Zeichen begrenzt).
+            if raw.len() == 5 && raw[4] == "--args-stdin" {
+                let mut text = String::new();
+                if let Err(e) = std::io::Read::read_to_string(&mut std::io::stdin(), &mut text) {
+                    return call_fehler(&format!("Argumente nicht lesbar: {}", e));
+                }
+                return match serde_json::from_str::<Vec<String>>(&text) {
+                    Ok(args) => call_main(&raw[2], &raw[3], args),
+                    Err(e) => call_fehler(&format!("Argumente sind kein JSON-Feld aus Texten: {}", e)),
+                };
+            }
             return call_main(&raw[2], &raw[3], raw[4..].to_vec());
         }
         // Stufe B (Phase 3): `dhrt profile datei.dh` -- instrumentierter Lauf,
