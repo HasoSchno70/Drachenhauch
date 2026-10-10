@@ -7281,6 +7281,7 @@ FOR i = 1 TO 1000
 NEXT
 PRINT s; " "; t
 --- umgebung
+DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 2.25 9.0 1.4142135623730951 50 3.0
@@ -7372,6 +7373,7 @@ FOR r = 1 TO 50
 NEXT
 PRINT n; " "; m; " "; ks[0].x; " "; ks[29].x; " "; namen
 --- umgebung
+DHRT_JIT=immer
 DHRT_JIT_BILANZ=1
 --- erwartet
 897 1011 82.5 96.0 k20,k22,k23,k25,k26,
