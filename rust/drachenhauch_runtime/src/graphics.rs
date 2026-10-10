@@ -188,6 +188,7 @@ enum Cmd {
 enum Cmd3D {
     Cube(f32, f32, f32, f32, f32, f32, Color),       // x,y,z, w,h,d
     CubeWires(f32, f32, f32, f32, f32, f32, Color),
+    CubeMatrixWires(Rc<[f32; 16]>, Color),
     Sphere(f32, f32, f32, f32, Color),               // cx,cy,cz, r
     SphereWires(f32, f32, f32, f32, Color),
     Cylinder(f32, f32, f32, f32, f32, f32, Color),   // x,y,z, r_top,r_bot, h
@@ -204,6 +205,7 @@ enum Cmd3D {
     // idx, mat, tint. Gerendert via rl-Matrix-Stack (rlMultMatrixf) -> kein
     // mutabler Model-Borrow noetig; DrawMesh honoriert rlGetMatrixTransform().
     ModelMatrix(usize, Rc<[f32; 16]>, Color),
+    ModelMatrixWires(usize, Rc<[f32; 16]>, Color),
     // Modul m3d: GPU-Instancing -- dasselbe Modell mit N Welt-Matrizen in EINEM
     // Draw-Call (raylib DrawMeshInstanced). idx, Matrizen (column-major), tint.
     ModelInstanced(usize, Rc<Vec<[f32; 16]>>, Color),
@@ -2633,6 +2635,19 @@ impl Graphics {
     pub fn draw_model_matrix(&mut self, idx: i64, mat: Rc<[f32; 16]>, col_: i64) -> Result<(), String> {
         let i = self.check_model(idx, "MODEL_MATRIX")?;
         self.emit3d(Cmd3D::ModelMatrix(i, mat, col(col_)));
+        Ok(())
+    }
+    /// MODEL_MATRIX_WIRES: das Drahtgitter zu MODEL_MATRIX -- MODEL_WIRES
+    /// kennt nur Lage und Groesse, ein gedrehter Koerper hatte keinen Umriss.
+    /// CUBE_MATRIX_WIRES: die 12 Kanten eines Einheitswuerfels (Mitte im
+    /// Ursprung, Kante 1) durch eine Welt-Matrix -- der Umriss eines gedrehten
+    /// Klotzes. MODEL_MATRIX_WIRES zeichnet jedes Dreieck, also mit Diagonalen.
+    pub fn draw_cube_matrix_wires(&mut self, mat: Rc<[f32; 16]>, col_: i64) {
+        self.emit3d(Cmd3D::CubeMatrixWires(mat, col(col_)));
+    }
+    pub fn draw_model_matrix_wires(&mut self, idx: i64, mat: Rc<[f32; 16]>, col_: i64) -> Result<(), String> {
+        let i = self.check_model(idx, "MODEL_MATRIX_WIRES")?;
+        self.emit3d(Cmd3D::ModelMatrixWires(i, mat, col(col_)));
         Ok(())
     }
     /// Laedt den Instancing-Shader (einmal). Das `instanceTransform`-Attribut wird
@@ -7399,6 +7414,14 @@ fn render_scene<D: RaylibDraw>(
                     match c {
                         Cmd3D::Cube(x, y, z, w, h, dd, col) =>
                             d3.draw_cube(Vector3::new(*x, *y, *z), *w, *h, *dd, *col),
+                        Cmd3D::CubeMatrixWires(mat, col) => {
+                            unsafe {
+                                raylib::ffi::rlPushMatrix();
+                                raylib::ffi::rlMultMatrixf(mat.as_ptr());
+                            }
+                            d3.draw_cube_wires(Vector3::new(0.0, 0.0, 0.0), 1.0, 1.0, 1.0, *col);
+                            unsafe { raylib::ffi::rlPopMatrix(); }
+                        }
                         Cmd3D::CubeWires(x, y, z, w, h, dd, col) =>
                             d3.draw_cube_wires(Vector3::new(*x, *y, *z), *w, *h, *dd, *col),
                         Cmd3D::Sphere(x, y, z, r, col) =>
@@ -7446,6 +7469,17 @@ fn render_scene<D: RaylibDraw>(
                                     raylib::ffi::rlMultMatrixf(mat.as_ptr());
                                 }
                                 d3.draw_model(m, Vector3::new(0.0, 0.0, 0.0), 1.0, *col);
+                                unsafe { raylib::ffi::rlPopMatrix(); }
+                            }
+                        }
+                        Cmd3D::ModelMatrixWires(i, mat, col) => {
+                            if let Some(m) = models.get(*i) {
+                                set_material(&mut light_shader, *i);
+                                unsafe {
+                                    raylib::ffi::rlPushMatrix();
+                                    raylib::ffi::rlMultMatrixf(mat.as_ptr());
+                                }
+                                d3.draw_model_wires(m, Vector3::new(0.0, 0.0, 0.0), 1.0, *col);
                                 unsafe { raylib::ffi::rlPopMatrix(); }
                             }
                         }

@@ -12,7 +12,7 @@ module.exports = (H) => [
       'held = LOADIMAGE("assets/hero.png")',
     ]),
   H.cmd("IMAGEWIDTH · IMAGEHEIGHT", 'IMAGEWIDTH(img)   IMAGEHEIGHT(img)',
-    "Liefern Breite und Höhe eines Bildes in Pixeln – nützlich, um es zu zentrieren oder ein Sheet in Frames aufzuteilen.",
+    "Liefern Breite und Höhe eines Bildes in Pixeln – nützlich, um es zu zentrieren oder ein Sheet in Frames aufzuteilen. IMAGE_WIDTH und IMAGE_HEIGHT sind dieselben Befehle im Namensschema der übrigen IMAGE_*-Befehle.",
     [
       'DIM held AS IMAGE',
       'held = LOADIMAGE("assets/hero.png")',

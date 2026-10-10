@@ -58,6 +58,8 @@ ang = PHYS2D_BODY_ANGLE(world, box)       ' radians -> rotate the sprite
 | `PHYS2D_SET_POS(w, idx, x, y)` | teleport the position |
 | `PHYS2D_SET_DYNAMIC(w, idx, dynamic)` | switch between static and dynamic — for structures that should first **stand** and then collapse (wall, logo, tower). Also wakes the body up; otherwise Rapier lets resting bodies sleep and a block that has just been made dynamic would hang motionless in the air |
 | `PHYS2D_IS_DYNAMIC(w, idx) AS BOOLEAN` | is the body dynamic? |
+| `PHYS2D_SLEEP(w, idx [, schlafen])` | put a body to sleep (without a third argument or TRUE) or wake it (FALSE) — like `PHYS3D_SLEEP`: a freshly built stack costs nothing until something pushes it. A sleeping body in mid-air stays there until something wakes it |
+| `PHYS2D_SLEEPING(w, idx) AS BOOLEAN` | is the body asleep? |
 | `PHYS2D_LOCK_ROTATION(w, idx, locked)` | lock the rotation — e.g. so that a character does not topple over |
 | `PHYS2D_REMOVE(w, idx)` | remove a body |
 | `PHYS2D_COUNT(w) AS INTEGER` | number of living bodies |

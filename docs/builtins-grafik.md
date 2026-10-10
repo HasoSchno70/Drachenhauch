@@ -501,7 +501,7 @@ wie getippt über die Tipp-Warteschlange, die 256 Zeichen je Bild fasst
 | Funktion | Zweck |
 |---|---|
 | `LOADIMAGE(path$)` → IMAGE | Datei laden (PNG, JPG, BMP, …) |
-| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | Pixelgröße |
+| `IMAGEWIDTH(img)`, `IMAGEHEIGHT(img)` → INTEGER | Pixelgröße; gleichwertig `IMAGE_WIDTH`/`IMAGE_HEIGHT` im Namensschema der übrigen `IMAGE_*`-Befehle |
 | `GETPIXEL(img, x, y)` → INTEGER | Pixelfarbe (`&HRRGGBB`) an `(x, y)` lesen; `-1` bei Index außerhalb. Gegenstück zu `PLOT` (schreiben) — für Kollision per Pixel, Maskierung, Farb-Sampling |
 | `GETALPHA(img, x, y)` → INTEGER | Deckkraft an `(x, y)`, `0..255`; `-1` bei Index außerhalb. Nötig, weil `GETPIXEL` eine **Farbe** liefert und dort Deckkraft 0 *deckend* bedeutet — ein durchsichtiger Punkt käme als schwarzer zurück |
 | `DRAWIMAGE(img, x, y)` | Bild bei (x, y) zeichnen |

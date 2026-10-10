@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2112,
+ "count": 2120,
  "builtins": [
   {
    "name": "ABS",
@@ -2016,6 +2016,12 @@
    "name": "CUBE_WIRES",
    "kind": "graphics",
    "signature": "CUBE_WIRES(x, y, z, breite, hoehe, tiefe, farbe)",
+   "module": "g3d"
+  },
+  {
+   "name": "CUBE_MATRIX_WIRES",
+   "kind": "graphics",
+   "signature": "CUBE_MATRIX_WIRES(mat [, farbe])",
    "module": "g3d"
   },
   {
@@ -6255,6 +6261,18 @@
    "module": "core"
   },
   {
+   "name": "IMAGE_HEIGHT",
+   "kind": "graphics",
+   "signature": "IMAGE_HEIGHT(img)",
+   "module": "core"
+  },
+  {
+   "name": "IMAGE_WIDTH",
+   "kind": "graphics",
+   "signature": "IMAGE_WIDTH(img)",
+   "module": "core"
+  },
+  {
    "name": "IMAGE_ALPHA_CROP",
    "kind": "graphics",
    "signature": "IMAGE_ALPHA_CROP(bild: IMAGE, schwelle: Zahl) -> IMAGE",
@@ -7671,6 +7689,12 @@
    "module": "m3d"
   },
   {
+   "name": "MODEL_MATRIX_WIRES",
+   "kind": "graphics",
+   "signature": "MODEL_MATRIX_WIRES(handle, mat [, farbe])",
+   "module": "m3d"
+  },
+  {
    "name": "MODEL_PBR",
    "kind": "graphics",
    "signature": "MODEL_PBR(modell, metalness, roughness)",
@@ -8397,6 +8421,18 @@
    "module": "physics2d"
   },
   {
+   "name": "PHYS2D_SLEEP",
+   "kind": "core",
+   "signature": "PHYS2D_SLEEP(w, idx [, schlafen])",
+   "module": "physics2d"
+  },
+  {
+   "name": "PHYS2D_SLEEPING",
+   "kind": "core",
+   "signature": "PHYS2D_SLEEPING(w, idx) AS BOOLEAN",
+   "module": "physics2d"
+  },
+  {
    "name": "PHYS2D_LOCK_ROTATION",
    "kind": "core",
    "signature": "PHYS2D_LOCK_ROTATION(w, idx, locked)",
@@ -8508,6 +8544,18 @@
    "name": "PHYS3D_COUNT",
    "kind": "core",
    "signature": "PHYS3D_COUNT(w) AS INTEGER",
+   "module": "physics3d"
+  },
+  {
+   "name": "PHYS3D_SLEEP",
+   "kind": "core",
+   "signature": "PHYS3D_SLEEP(w, idx [, schlafen])",
+   "module": "physics3d"
+  },
+  {
+   "name": "PHYS3D_SLEEPING",
+   "kind": "core",
+   "signature": "PHYS3D_SLEEPING(w, idx) AS BOOLEAN",
    "module": "physics3d"
   },
   {

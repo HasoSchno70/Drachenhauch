@@ -38,6 +38,7 @@ and guide lines. Anyone who needs the same shape often uses a model (see below).
 |---|---|
 | `CUBE(x, y, z, breite, hoehe, tiefe, farbe)` | filled box |
 | `CUBE_WIRES(x, y, z, breite, hoehe, tiefe, farbe)` | the same as a wireframe |
+| `CUBE_MATRIX_WIRES(mat [, farbe])` | the 12 edges of a cube (edge 1, centred on the origin) through a world matrix from `m3d` -- the outline of a rotated block, e.g. from `physics3d`; size via the scale of the matrix |
 | `SPHERE(x, y, z, radius, farbe)` | sphere around a centre point |
 | `SPHERE_WIRES(x, y, z, radius, farbe)` | sphere as a wireframe |
 | `CYLINDER(x, y, z, r_oben, r_unten, hoehe, farbe)` | cylinder — with `r_oben = 0` it becomes a cone |
@@ -75,6 +76,7 @@ and guide lines. Anyone who needs the same shape often uses a model (see below).
 | `MODEL(modell, x, y, z, skala, farbe)` | — | draw |
 | `MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad, skala, farbe)` | — | draw and rotate around an axis |
 | `MODEL_WIRES(modell, x, y, z, skala, farbe)` | — | draw as a wireframe |
+| `MODEL_MATRIX_WIRES(handle, mat [, farbe])` | — | wireframe with a world matrix from `m3d`, the counterpart of `MODEL_MATRIX` -- for rotated bodies (physics, bones); `MODEL_WIRES` only knows position and size. Every triangle is drawn, so a cube shows its diagonals -- for its 12 edges use `CUBE_MATRIX_WIRES`. If the wireframe lies exactly on the faces it looks dashed -- then scale the matrix half a percent larger |
 | `MODEL_BBOX(modell)` | TUPLE | bounding box `(min_x, min_y, min_z, max_x, max_y, max_z)` in the model's own coordinates (without the position and scale used when drawing) — for collisions and for standing a model on the ground |
 | `MODEL_SAVE(modell, pfad$)` | — | write all parts of the model as Wavefront OBJ (`.obj`) — keep editing a maze from `MESH_CUBICMAP` or a terrain in Blender, bring it back with `LOADMODEL`. Without material, texture and animation; the texture coordinates are written so that they are the right way round again after `LOADMODEL` |
 | `MODEL_TEXTURE(modell, bild)` | — | apply an image as the surface |

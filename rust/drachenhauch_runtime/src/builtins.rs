@@ -2704,6 +2704,21 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         #[cfg(feature = "physik")]
+        "phys3d_sleep" => {
+            if a.len() != 2 && a.len() != 3 {
+                return Err("PHYS3D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
+            }
+            let an = if a.len() == 3 { need_flag(&a[2], "PHYS3D_SLEEP")? } else { true };
+            phys3d_h(&a[0], "PHYS3D_SLEEP")?.borrow_mut().sleep(need_int(&a[1], "PHYS3D_SLEEP")?, an);
+            Ok(Value::Nil)
+        }
+        #[cfg(feature = "physik")]
+        "phys3d_sleeping" => {
+            arity!(2);
+            Ok(Value::Bool(phys3d_h(&a[0], "PHYS3D_SLEEPING")?.borrow()
+                .is_sleeping(need_int(&a[1], "PHYS3D_SLEEPING")?)))
+        }
+        #[cfg(feature = "physik")]
         "phys3d_count" => {
             arity!(1);
             Ok(Value::Int(phys3d_h(&a[0], "PHYS3D_COUNT")?.borrow().count()))
@@ -2796,6 +2811,21 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_int(&a[1], "PHYS2D_SET_DYNAMIC")?,
                 need_flag(&a[2], "PHYS2D_SET_DYNAMIC")?);
             Ok(Value::Nil)
+        }
+        #[cfg(feature = "physik")]
+        "phys2d_sleep" => {
+            if a.len() != 2 && a.len() != 3 {
+                return Err("PHYS2D_SLEEP: erwartet 2 oder 3 Argumente (welt, koerper [, schlafen])".into());
+            }
+            let an = if a.len() == 3 { need_flag(&a[2], "PHYS2D_SLEEP")? } else { true };
+            phys2d_h(&a[0], "PHYS2D_SLEEP")?.borrow_mut().sleep(need_int(&a[1], "PHYS2D_SLEEP")?, an);
+            Ok(Value::Nil)
+        }
+        #[cfg(feature = "physik")]
+        "phys2d_sleeping" => {
+            arity!(2);
+            Ok(Value::Bool(phys2d_h(&a[0], "PHYS2D_SLEEPING")?.borrow()
+                .is_sleeping(need_int(&a[1], "PHYS2D_SLEEPING")?)))
         }
         #[cfg(feature = "physik")]
         "phys2d_is_dynamic" => {
@@ -6493,7 +6523,8 @@ pub fn is_graphics_builtin(name: &str) -> bool {
         "screen" | "cls" | "flip" | "text" | "text_bold" | "text_size" | "circle"
         | "box" | "line" | "plot" | "rect" | "drawimage" | "loadimage" | "loadsound"
         | "playsound" | "keypressed" | "keydown" | "mousex" | "mousey" | "mousebutton"
-        | "quitrequested" | "sleep" | "imagewidth" | "imageheight" | "color" | "fill"
+        | "quitrequested" | "sleep" | "imagewidth" | "imageheight" | "image_width" | "image_height"
+        | "color" | "fill"
     )
 }
 

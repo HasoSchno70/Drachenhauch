@@ -34,6 +34,14 @@ module.exports = (H) => [
       'CUBE(0.0, 1.0, 0.0,  2.0, 2.0, 2.0,  RED)',
       'CUBE_WIRES(0.0, 1.0, 0.0,  2.0, 2.0, 2.0,  BLACK)',
     ]),
+  H.cmd("CUBE_MATRIX_WIRES", 'CUBE_MATRIX_WIRES(mat [, farbe])',
+    "Die zwölf Kanten eines Würfels mit Kante 1 und Mitte im Ursprung, gedreht, verschoben und skaliert durch eine Welt-Matrix aus m3d. CUBE_WIRES kann nicht drehen – das ist der Umriss für einen gekippten Klotz, etwa aus physics3d.",
+    [
+      'IMPORT "m3d"',
+      'DIM m AS MAT4',
+      'm = MAT4_MUL(MAT4_TRANSLATE(0, 1, 0), QUAT_TO_MAT4(QUAT_FROM_AXIS_ANGLE(0, 1, 0, 30.0)))',
+      'CUBE_MATRIX_WIRES(m, BLACK)',
+    ]),
   H.cmd("SPHERE · SPHERE_WIRES", 'SPHERE(x, y, z, radius, farbe)   SPHERE_WIRES(...)',
     "Zeichnet eine Kugel mit Mittelpunkt (x, y, z) und dem Radius.",
     [

@@ -37,6 +37,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 |---|---|
 | `CUBE(x, y, z, breite, hoehe, tiefe, farbe)` | gefüllter Quader |
 | `CUBE_WIRES(x, y, z, breite, hoehe, tiefe, farbe)` | derselbe als Drahtgitter |
+| `CUBE_MATRIX_WIRES(mat [, farbe])` | die 12 Kanten eines Würfels (Kante 1, Mitte im Ursprung) durch eine Welt-Matrix aus `m3d` -- der Umriss eines gedrehten Klotzes, etwa aus `physics3d`; Größe über die Skalierung der Matrix |
 | `SPHERE(x, y, z, radius, farbe)` | Kugel um einen Mittelpunkt |
 | `SPHERE_WIRES(x, y, z, radius, farbe)` | Kugel als Drahtgitter |
 | `CYLINDER(x, y, z, r_oben, r_unten, hoehe, farbe)` | Zylinder — mit `r_oben = 0` wird ein Kegel daraus |
@@ -74,6 +75,7 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 | `MODEL(modell, x, y, z, skala, farbe)` | — | zeichnen |
 | `MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad, skala, farbe)` | — | zeichnen und um eine Achse drehen |
 | `MODEL_WIRES(modell, x, y, z, skala, farbe)` | — | als Drahtgitter zeichnen |
+| `MODEL_MATRIX_WIRES(handle, mat [, farbe])` | — | Drahtgitter mit einer Welt-Matrix aus `m3d`, das Gegenstück zu `MODEL_MATRIX` -- für gedrehte Körper (Physik, Bones); `MODEL_WIRES` kennt nur Lage und Größe. Gezeichnet wird jedes Dreieck, ein Würfel also mit Diagonalen -- für seine 12 Kanten `CUBE_MATRIX_WIRES`. Liegt das Gitter genau auf den Flächen, wirkt es gestrichelt -- dann die Matrix um ein halbes Prozent größer skalieren |
 | `MODEL_BBOX(modell)` | TUPLE | Hüllquader `(min_x, min_y, min_z, max_x, max_y, max_z)` in den eigenen Koordinaten des Modells (ohne Lage und Skala beim Zeichnen) — für Kollisionen und um ein Modell auf den Boden zu stellen |
 | `MODEL_SAVE(modell, pfad$)` | — | alle Teile des Modells als Wavefront-OBJ schreiben (`.obj`) — ein Labyrinth aus `MESH_CUBICMAP` oder ein Gelände in Blender weiterbearbeiten, mit `LOADMODEL` zurückholen. Ohne Material, Textur und Animation; die Texturkoordinaten werden so geschrieben, dass sie nach `LOADMODEL` wieder richtig herum stehen |
 | `MODEL_TEXTURE(modell, bild)` | — | ein Bild als Oberfläche auflegen |
