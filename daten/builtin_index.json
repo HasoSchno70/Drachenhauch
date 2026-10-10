@@ -6911,25 +6911,25 @@
   {
    "name": "KEYHIT",
    "kind": "graphics",
-   "signature": "KEYHIT(code: Zahl) -> BOOLEAN",
+   "signature": "KEYHIT(taste: Code oder Buchstabe) -> BOOLEAN",
    "module": "core"
   },
   {
    "name": "KEYPRESSED",
    "kind": "graphics",
-   "signature": "KEYPRESSED(code: Zahl)",
+   "signature": "KEYPRESSED(taste: Code oder Buchstabe)",
    "module": "core"
   },
   {
    "name": "KEYRELEASED",
    "kind": "graphics",
-   "signature": "KEYRELEASED(code: Zahl) -> BOOLEAN",
+   "signature": "KEYRELEASED(taste: Code oder Buchstabe) -> BOOLEAN",
    "module": "core"
   },
   {
    "name": "KEYREPEAT",
    "kind": "graphics",
-   "signature": "KEYREPEAT(code: Zahl) -> BOOLEAN",
+   "signature": "KEYREPEAT(taste: Code oder Buchstabe) -> BOOLEAN",
    "module": "core"
   },
   {

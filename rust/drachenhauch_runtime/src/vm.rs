@@ -8695,6 +8695,20 @@ impl<'p> Vm<'p> {
                 None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
             }
         }
+        // Tastenargument von KEYHIT & Co.: eine Zahl ist die LAGE der Taste,
+        // ein einzelner Buchstabe (oder eine Ziffer) die Taste, auf der er steht.
+        fn taste(g: &crate::graphics::Graphics, a: &[Value], fn_: &str) -> R<i64> {
+            if let Some(Value::Str(s)) = a.first() {
+                let mut z = s.chars();
+                if let (Some(c), None) = (z.next(), z.next()) {
+                    if let Some(k) = g.taste_fuer_zeichen(c) { return Ok(k); }
+                }
+                return Err(format!(
+                    "{}: ein Text meint den Buchstaben oder die Ziffer auf der Taste -- \"{}\" ist keins (Sondertasten als Konstante: KEY_ENTER, KEY_LEFT, ...)",
+                    fn_, s));
+            }
+            gi(a, 0, fn_)
+        }
         fn gs<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
             match a.get(i) {
                 Some(Value::Str(s)) => Ok(s),
@@ -9319,7 +9333,7 @@ impl<'p> Vm<'p> {
                 if let Some(au) = self.audio.as_mut() { au.update(); }
                 Value::Nil
             }
-            "keypressed" => Value::Bool(g!().key_down(gi(a,0,"KEYPRESSED")?)),
+            "keypressed" => { let k = taste(g!(), a, "KEYPRESSED")?; Value::Bool(g!().key_down(k)) }
             "inkey$" | "inkey" => Value::Str(g!().inkey().into()),
             "waitkey" => Value::Int(g!().waitkey()),
             // SCROLL verschiebt persistente Framebuffer-Pixel -- die native
@@ -9348,9 +9362,9 @@ impl<'p> Vm<'p> {
             // sie umzudeuten wuerde bestehende Programme still kaputtmachen).
             "mouse_hit" => Value::Bool(g!().mouse_hit(gi(a,0,"MOUSE_HIT")?)),
             "mouse_released" => Value::Bool(g!().mouse_released(gi(a,0,"MOUSE_RELEASED")?)),
-            "keyhit" => Value::Bool(g!().key_hit(gi(a,0,"KEYHIT")?)),
-            "keyreleased" => Value::Bool(g!().key_released_edge(gi(a,0,"KEYRELEASED")?)),
-            "keyrepeat" => Value::Bool(g!().key_repeat(gi(a,0,"KEYREPEAT")?)),
+            "keyhit" => { let k = taste(g!(), a, "KEYHIT")?; Value::Bool(g!().key_hit(k)) }
+            "keyreleased" => { let k = taste(g!(), a, "KEYRELEASED")?; Value::Bool(g!().key_released_edge(k)) }
+            "keyrepeat" => { let k = taste(g!(), a, "KEYREPEAT")?; Value::Bool(g!().key_repeat(k)) }
             "mouse_delta_x" => Value::Float(g!().mouse_delta_x()),
             "mouse_delta_y" => Value::Float(g!().mouse_delta_y()),
             "mouse_set_pos" => { let (x, y) = (gi(a,0,"MOUSE_SET_POS")?, gi(a,1,"MOUSE_SET_POS")?);

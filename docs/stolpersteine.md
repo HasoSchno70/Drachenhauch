@@ -478,9 +478,10 @@ Reflexionen/Mirror-Effekte.
 >   (`PLAYSOUND("sprung.wav")`, `DRAWIMAGE("held.png", ...)`,
 >   `SPRITE_NEW("held.png", 16, 16)`) sagte nur "erwartet Zahl, erhalten
 >   STRING". Jetzt nennt die Meldung den Lader, ausgewaehlt an der ENDUNG
->   (`umstieg::text_statt_zahl`). Derselbe Weg deckt `KEYHIT("a")` (eine Taste
->   ist eine Zahl: `ASC("a")` oder `KEY_A`) und `RGB("FF0000")`
->   (`COLOR_FROM_HEX`) ab -- beides ging vorher stumm in eine Typmeldung.
+>   (`umstieg::text_statt_zahl`). Derselbe Weg deckt `RGB("FF0000")`
+>   (`COLOR_FROM_HEX`) ab -- das ging vorher stumm in eine Typmeldung.
+>   (`KEYHIT("a")` war hier bis 2026.27 ebenfalls ein Fehler mit Hinweis;
+>   seither meint ein Buchstabe als Text die Taste, auf der er steht.)
 > - **Die Lader melden ihre fehlende Datei jetzt gleich.** `LOADIMAGE` nannte
 >   Datei und Suchort, `LOADSOUND` gab `"...: os error 2"` heraus und
 >   `PLAYMUSIC` sogar `IoError(Os { code: 2, ... })` -- und zwar unter dem

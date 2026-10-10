@@ -839,6 +839,7 @@ Sampler bliebe schwarz.
 | `KEYPRESSED(code)` → BOOLEAN | TRUE **solange** die Taste mit SDL-Code `code` gehalten wird — jedes Frame erneut. Für Bewegen/Lenken. |
 | `KEYHIT(code)` → BOOLEAN | TRUE nur in **dem einen Frame**, in dem die Taste heruntergeht. Für Schießen, Springen, Umschalten. |
 | | *Buchstaben:* `KEY_A`…`KEY_Z` sind die klare Schreibweise. `ASC("s")` und `ASC("S")` meinen beide dieselbe Taste — bis 2026-08-31 traf die **große** Schreibweise still gar nichts, was wie ein vergessener Aufruf aussah. |
+| | *Lage oder Beschriftung:* ein Tastencode meint die **Lage** der Taste nach der US-Tastatur — `KEY_Z` ist auf einer deutschen Tastatur die Taste mit dem Y, auf einer französischen die mit dem W. Für WASD ist das richtig. Für Kürzel wie Strg+Z schreibt man den **Buchstaben als Text**: `KEYHIT("z")` meint die Taste, auf der das Z steht (auch für `KEYPRESSED`, `KEYRELEASED`, `KEYREPEAT`; Buchstaben, Ziffern und das Leerzeichen). |
 | `KEYRELEASED(code)` → BOOLEAN | TRUE in dem Frame, in dem die Taste losgelassen wird — etwa „aufladen und beim Loslassen feuern“ |
 | `KEYREPEAT(code)` → BOOLEAN | wie `KEYHIT`, feuert beim Halten aber zusätzlich mit der System-Tastenwiederholung. Für Textcursor und Mengen-Eingabe. |
 | `MOUSEX()`, `MOUSEY()` → INTEGER | aktuelle Mausposition (in logischen Pixeln) |

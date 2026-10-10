@@ -478,9 +478,10 @@ reflections/mirror effects become possible.
 >   (`PLAYSOUND("sprung.wav")`, `DRAWIMAGE("held.png", ...)`,
 >   `SPRITE_NEW("held.png", 16, 16)`) only said "erwartet Zahl, erhalten
 >   STRING" (expected a number, got STRING). Now the message names the loader, chosen by the EXTENSION
->   (`umstieg::text_statt_zahl`). The same path covers `KEYHIT("a")` (a key
->   is a number: `ASC("a")` or `KEY_A`) and `RGB("FF0000")`
->   (`COLOR_FROM_HEX`) -- both used to end silently in a type message.
+>   (`umstieg::text_statt_zahl`). The same path covers `RGB("FF0000")`
+>   (`COLOR_FROM_HEX`) -- it used to end silently in a type message.
+>   (`KEYHIT("a")` was an error with a hint here too until 2026.27; since
+>   then a letter as text means the key it is printed on.)
 > - **The loaders now report their missing file straight away.** `LOADIMAGE` named
 >   the file and the search location, `LOADSOUND` returned `"...: os error 2"` and
 >   `PLAYMUSIC` even `IoError(Os { code: 2, ... })` -- and that under the

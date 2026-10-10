@@ -41,6 +41,8 @@ Ungleich schreibt man in Drachenhauch <> -- IF a <> b THEN	Not-equal is written 
 Verglichen wird mit EINEM =: IF a = b THEN (== gibt es nicht)	Comparison uses ONE =: IF a = b THEN (there is no ==)
 Kommentare beginnen in Drachenhauch mit ' (Hochkomma) oder REM, nicht mit //	Comments in Drachenhauch start with ' (apostrophe) or REM, not with //
 Ganzzahl-Literal zu gross (INTEGER ist 64-bit)	Integer literal too large (INTEGER is 64-bit)
+Kommazahl-Literal zu gross (FLOAT reicht bis etwa 1.8e308)	Float literal too large (FLOAT goes up to about 1.8e308)
+{}: ein Text meint den Buchstaben oder die Ziffer auf der Taste -- "{}" ist keins (Sondertasten als Konstante: KEY_ENTER, KEY_LEFT, ...)	{}: a text means the letter or digit printed on the key -- "{}" is neither (special keys as a constant: KEY_ENTER, KEY_LEFT, ...)
 Hex-Literal &H ohne Ziffern	Hex literal &H without digits
 Binaer-Literal &B ohne Ziffern	Binary literal &B without digits
 Einzelnes '}' im f-String (verwende '}}}}')	Single '}' in an f-string (use '}}}}')
@@ -370,7 +372,6 @@ die eigene Instanz heisst in Drachenhauch Self (Self.x = 3)	the own instance is 
 ein Dateiname ist noch kein [[Bild]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not an image yet: first `x = {}("{}")`, then `{}(x, ...)`
 ein Dateiname ist noch kein [[Klang]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not a sound yet: first `x = {}("{}")`, then `{}(x, ...)`
 ein Dateiname ist noch kein [[Schrift]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not a font yet: first `x = {}("{}")`, then `{}(x, ...)`
-eine Taste ist eine ZAHL: {}(ASC("{}")) oder die Konstante KEY_{}	a key is a NUMBER: {}(ASC("{}")) or the constant KEY_{}
 eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX("{}"); im Quelltext geht auch &H{}	a color from hex text comes from COLOR_FROM_HEX("{}"); in the source &H{} works too
 
 # ---------------------------------------------------------------- Laufzeit: Typen und Werte

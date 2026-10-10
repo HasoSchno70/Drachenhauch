@@ -971,11 +971,13 @@ PRINT a[99]
 --- fehler
 Index 99 ausserhalb [0..2] in Dimension 0
 
-=== eine taste ist eine zahl
+=== eine taste als buchstabe
+' Bis 2026.27 ein Fehler mit dem Hinweis auf KEY_A -- seither meint ein
+' Buchstabe die Taste, auf der er steht (taste_nach_buchstabe.dhtest).
 SCREEN(40, 30, "Probe")
 PRINT KEYHIT("a")
---- fehler
-eine Taste ist eine ZAHL: KEYHIT(ASC("a")) oder die Konstante KEY_A
+--- erwartet
+FALSE
 
 === eine farbe aus hex-text
 PRINT RGB("FF0000")

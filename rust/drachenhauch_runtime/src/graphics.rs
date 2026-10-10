@@ -5348,6 +5348,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         match map_key(code) { Some(k) => self.t_neu(k), None => false }
     }
 
+    /// Die Taste, auf der ein Zeichen STEHT -- `KEYHIT("z")`. Ein Tastencode
+    /// meint die Lage (KEY_Z ist auf einer deutschen Tastatur die Taste mit
+    /// dem Y), ein Buchstabe als Text die Beschriftung, wie bei den
+    /// gui-Kuerzeln: Strg+Z soll dort sein, wo Z draufsteht.
+    pub fn taste_fuer_zeichen(&self, c: char) -> Option<i64> {
+        let c = c.to_ascii_lowercase();
+        if c.is_ascii_lowercase() { return Some(self.belegung[(c as u8 - b'a') as usize]); }
+        if c.is_ascii_digit() || c == ' ' { return Some(c as i64); }
+        None
+    }
+
     /// Die Belegung neu lesen: je Buchstabentaste (nach Lage) der Buchstabe,
     /// den sie schreibt. Waehrend eine Aufnahme laeuft, gilt die Lage -- eine
     /// Aufnahme speichert Tasten nach Lage, und die Pruefsammlungen spielen
