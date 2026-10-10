@@ -123,7 +123,10 @@ Hilfslinien. Wer dieselbe Form oft braucht, nimmt ein Modell (siehe unten).
 Zwei Sorten: `PICK_*` nimmt **automatisch den Mausstrahl** — das ist der übliche
 Fall. `RAY_HIT_*` bekommt den Strahl von dir und eignet sich für Schüsse, Sicht
 und alles, was nicht an der Maus hängt. Beide liefern die Entfernung bis zum
-Treffer oder `-1`.
+Treffer oder `-1`, immer in Welt-Einheiten -- die Richtung eines `RAY_HIT_*`
+muss nicht die Länge 1 haben (bis 2026.27 maßen Quader und Modell in
+Vielfachen der Richtungslänge). Der Treffpunkt ist der Ursprung plus die
+Einheitsrichtung mal Entfernung.
 
 | Funktion | Rückgabe | Bedeutung |
 |---|---|---|

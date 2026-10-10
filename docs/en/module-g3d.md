@@ -124,7 +124,9 @@ and guide lines. Anyone who needs the same shape often uses a model (see below).
 Two kinds: `PICK_*` takes **the mouse ray automatically** — that is the usual
 case. `RAY_HIT_*` gets the ray from you and suits shots, line of sight and
 anything that does not hang on the mouse. Both return the distance to the hit
-or `-1`.
+or `-1`, always in world units -- the direction of a `RAY_HIT_*` need not have
+length 1 (until 2026.27 box and model measured in multiples of the direction
+length). The hit point is the origin plus the unit direction times the distance.
 
 | Function | Returns | Meaning |
 |---|---|---|

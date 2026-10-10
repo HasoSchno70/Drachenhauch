@@ -2778,7 +2778,11 @@ impl Graphics {
     #[allow(clippy::too_many_arguments)]
     pub fn ray_hit_box(&self, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
                        cx: f32, cy: f32, cz: f32, sx: f32, sy: f32, sz: f32) -> f64 {
-        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        // Normalisiert wie bei Dreieck/Viereck/Kugel: sonst kam die Entfernung
+        // in Vielfachen der Richtungslaenge (bis 2026.27: Richtung 2 -> halbe
+        // Entfernung), und der naechste Treffer ueber verschiedene RAY_HIT_*
+        // liess sich nicht vergleichen.
+        let Some(ray) = Self::unit_ray(ox, oy, oz, dx, dy, dz) else { return -1.0; };
         let bb = BoundingBox::new(
             Vector3::new(cx - sx / 2.0, cy - sy / 2.0, cz - sz / 2.0),
             Vector3::new(cx + sx / 2.0, cy + sy / 2.0, cz + sz / 2.0));
@@ -2893,7 +2897,7 @@ impl Graphics {
     pub fn ray_hit_model(&self, idx: i64, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
                          px: f32, py: f32, pz: f32, scale: f32) -> f64 {
         if idx < 0 || idx as usize >= self.models.len() { return -1.0; }
-        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        let Some(ray) = Self::unit_ray(ox, oy, oz, dx, dy, dz) else { return -1.0; };
         // Gleiche Transform-Reihenfolge wie DrawModel: erst skalieren, dann verschieben.
         let transform = Matrix::scale(scale, scale, scale) * Matrix::translate(px, py, pz);
         let mut best = -1.0f64;

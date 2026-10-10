@@ -1,0 +1,39 @@
+' Strahltests in 3D (RAY_HIT_*): die Entfernung kommt in Welt-Einheiten.
+'
+' Bis 2026.27 normalisierten Dreieck, Viereck und Kugel die Richtung, Quader
+' und Modell nicht -- mit einer Richtung der Laenge 2 kam dort die halbe
+' Entfernung heraus, und wer den naechsten Treffer ueber Quader UND Flaechen
+' suchte, verglich zwei Masse. Gefunden beim Dogfooding der 3D-Werkstatt.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== alle strahltests messen in welt-einheiten
+IMPORT "g3d"
+SCREEN(100, 100, "r", 1)
+DIM m AS INTEGER : m = MESH_CUBE(1.0, 1.0, 1.0)
+' Ziel: eine Flaeche bei x = 4.5, Richtung (2, 0, 0)
+PRINT RAY_HIT_BOX(0, 0, 0, 2, 0, 0, 5, 0, 0, 1, 1, 1)
+PRINT RAY_HIT_SPHERE(0, 0, 0, 2, 0, 0, 5, 0, 0, 0.5)
+PRINT RAY_HIT_QUAD(0, 0, 0, 2, 0, 0, 4.5, -1, -1, 4.5, 1, -1, 4.5, 1, 1, 4.5, -1, 1)
+PRINT RAY_HIT_TRI(0, 0, 0, 2, 0, 0, 4.5, -1, -1, 4.5, 1, -1, 4.5, 0, 1)
+PRINT RAY_HIT_MODEL(m, 0, 0, 0, 2, 0, 0, 5, 0, 0)
+' schraeg, Laenge 3: Treffpunkt = Ursprung + Einheitsrichtung * Entfernung
+DIM t AS FLOAT
+t = RAY_HIT_BOX(0, 0, 0, 3, 0, 0.3, 5, 0, 0, 1, 1, 1)
+PRINT FORMAT$(t * 3 / SQR(9.09), "%.3f")
+--- erwartet
+4.5
+4.5
+4.5
+4.5
+4.5
+4.500
+
+=== eine richtung ohne laenge trifft nichts
+IMPORT "g3d"
+SCREEN(100, 100, "r", 1)
+DIM m AS INTEGER : m = MESH_CUBE(1.0, 1.0, 1.0)
+PRINT RAY_HIT_BOX(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1)
+PRINT RAY_HIT_MODEL(m, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+--- erwartet
+-1.0
+-1.0
