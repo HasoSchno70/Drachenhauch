@@ -262,6 +262,22 @@ fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
 /// verlangen zwingt den Aufrufer zu einem `INT(...)` um jeden Ausdruck --
 /// und wer es vergisst, bekommt einen Typfehler fuer etwas, das rechnerisch
 /// voellig in Ordnung ist.
+/// Die Bildzeit in Millisekunden fuer PARTICLE_/SPRITE_/ANIM_FSM_UPDATE.
+/// `DELTA()` liefert SEKUNDEN -- `PARTICLE_UPDATE(p, DELTA())` wurde zu 0 ms
+/// gerundet, und die Partikel alterten nie, ohne Meldung (Dogfooding
+/// 2026-10-10). Eine Kommazahl zwischen 0 und 1 ist darum ein Fehler mit dem
+/// richtigen Aufruf; sonst gerundet wie bisher, auch 16.7.
+fn dt_ms(v: &Value, fn_: &str) -> Result<i64, String> {
+    if let Value::Float(f) = v {
+        if *f > 0.0 && *f < 1.0 {
+            return Err(format!("{}: {} ms ist weniger als eine Millisekunde -- dt_ms zaehlt Millisekunden, DELTA() liefert Sekunden: INT(DELTA() * 1000)", fn_, f));
+        }
+    }
+    let dt = need_int_gerundet(v, fn_)?;
+    if dt < 0 { return Err(format!("{}: dt_ms muss >= 0 sein", fn_)); }
+    Ok(dt)
+}
+
 fn need_int_gerundet(v: &Value, fn_: &str) -> Result<i64, String> {
     match v {
         Value::Int(i) => Ok(*i),
@@ -2858,8 +2874,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "sprite_get_frame" => { arity!(1); Ok(Value::Int(spr(&a[0], "SPRITE_GET_FRAME")?.borrow().current_frame as i64)) }
         "sprite_update" => {
-            arity!(2); let dt = need_int(&a[1], "SPRITE_UPDATE")?;
-            if dt < 0 { return err("SPRITE_UPDATE: dt_ms muss >= 0 sein"); }
+            arity!(2); let dt = dt_ms(&a[1], "SPRITE_UPDATE")?;
             spr(&a[0], "SPRITE_UPDATE")?.borrow_mut().update(dt); Ok(Value::Nil)
         }
         "sprite_collides" | "sprite_collide" => {
@@ -2899,8 +2914,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "anim_fsm_update" => {
             arity!(3);
-            let dt = need_int(&a[2], "ANIM_FSM_UPDATE")?;
-            if dt < 0 { return err("ANIM_FSM_UPDATE: dt_ms muss >= 0 sein"); }
+            let dt = dt_ms(&a[2], "ANIM_FSM_UPDATE")?;
             let f = fsm_h(&a[0], "ANIM_FSM_UPDATE")?;
             let sp = spr(&a[1], "ANIM_FSM_UPDATE")?;
             let changed = f.borrow_mut().update(&mut sp.borrow_mut(), dt)?;
@@ -4561,7 +4575,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
             Ok(Value::Nil)
         }
-        "particle_update" => { arity!(2); let dt = need_int_gerundet(&a[1], "PARTICLE_UPDATE")?; if dt < 0 { return err("PARTICLE_UPDATE: dt_ms muss >= 0 sein"); } psys(&a[0], "PARTICLE_UPDATE")?.borrow_mut().update(dt as i32); Ok(Value::Nil) }
+        "particle_update" => { arity!(2); let dt = dt_ms(&a[1], "PARTICLE_UPDATE")?; psys(&a[0], "PARTICLE_UPDATE")?.borrow_mut().update(dt as i32); Ok(Value::Nil) }
 
         // ===== Modul: ecs =====
         "ecs_new_world" => { arity!(0); Ok(Value::Ecs(Rc::new(RefCell::new(crate::ecs::World::new())))) }

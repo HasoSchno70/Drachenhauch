@@ -1631,6 +1631,29 @@ Tests `gui_zug_nur_im_feld.dhtest`,
 `gui_listen`, `gui_liste_komfort`, `zeichenketten_stellen` (gegen 2026.25
 fallen alle 7 neuen Laufzeit-Faelle).
 
+## Dogfooding: Spiel "Kometen" (2026-10-10)
+
+`examples/kometen/main.dh` (Schiff, Kometen als Objekte in Listen mit
+`ARRAY_FILTER`-Lambdas, Partikel, `AUDIO_SFX`, `CAMERA_SHAKE`, Szenen,
+Bestenliste ueber `save`, Pause bei Fokusverlust), bedient mit echten
+Fensternachrichten (auch `WM_KILLFOCUS`), die Bilanz des Maschinencodes
+gelesen. Funde: (1) **`^` im Maschinencode** fehlte ganz -- jede Schleife
+mit `dx ^ 2 + dy ^ 2` blieb in der VM; jetzt `powf` wie `vm::pow`, INTEGER
+^ feste Ganzzahl 0..16 als Ganzzahl (`fester_exponent`). (2) **Kurz-
+geschlossenes AND/OR ueber ein Objektfeld** im Wertemodus: Wert und
+Wahrheitswert trafen sich an einer Stelle -- `melden` erweitert zum Wert,
+`ablegen` packt die Zahl vor dem Sprung ein. (3) **Wert an eine uebersetzte
+Funktion** geht im Wertemodus ueber die VM (`w_funktion`). (4)
+**`PARTICLE_UPDATE(p, DELTA())`** rundete 0,016 auf 0 ms, die Partikel
+alterten nie -- jetzt ist eine Kommazahl zwischen 0 und 1 ein Fehler mit dem
+richtigen Aufruf (`builtins::dt_ms`, auch SPRITE_/ANIM_FSM_UPDATE). Tempo
+war kein Problem (rund 0,4 ms je Bild bei 100 Kometen, fast alles Zeichnen).
+Bewusst so gelassen: Schleifen, die `getroffen` rufen, bleiben in der VM --
+die Funktion schreibt in die Liste, ueber die die Schleife laeuft. Tests
+`beispiel_kometen.dhtest`, zwei Faelle in `jit.dhtest` (je mit und ohne), ein
+Fall in `modules_particles.dhtest`; Doku `entwurf-maschinencode.md` Schritt
+23, `module-particles.md`.
+
 ## Klicks und Tasten zwischen zwei Bildern (2026-09-30)
 
 raylib liest Maus- und Tastentasten als ZUSTAND (Rueckruf schreibt

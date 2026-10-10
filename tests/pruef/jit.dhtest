@@ -7205,3 +7205,175 @@ ueber: VM: ruft druckt, das in der VM bleibt
 text: VM: Platz 0 hat den Typ 'string'
 global_: uebersetzt
 namenslaenge: VM: Konstante STRING ist keine Zahl
+
+=== potenz im maschinencode
+' `^` (2026-10-10, Dogfooding): mit einer Kommazahl dabei powf wie vm::pow,
+' INTEGER ^ feste Ganzzahl 0..16 als Ganzzahl mit Ueberlaufpruefung (der
+' Ueberlauf steigt aus, die VM meldet ihn). Vorher blieb jede Funktion und
+' Schleife mit `^` in der VM.
+FUNCTION quadrat(x AS FLOAT) AS FLOAT
+    RETURN x ^ 2
+END FUNCTION
+FUNCTION wurzel(x AS FLOAT) AS FLOAT
+    RETURN x ^ 0.5
+END FUNCTION
+FUNCTION ganz(r AS INTEGER) AS INTEGER
+    RETURN r ^ 2 + r ^ 0
+END FUNCTION
+FUNCTION gross(r AS INTEGER) AS INTEGER
+    RETURN r ^ 16
+END FUNCTION
+FUNCTION halb(r AS INTEGER) AS FLOAT
+    RETURN r ^ 0.5
+END FUNCTION
+PRINT quadrat(1.5); " "; quadrat(-3); " "; wurzel(2); " "; ganz(-7); " "; halb(9)
+PRINT gross(2); " "; gross(-3)
+TRY
+    PRINT gross(20)
+CATCH e
+    PRINT e; " zeile "; ERROR_LINE()
+END TRY
+DIM s AS FLOAT
+DIM t AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 1000
+    s = s + (i * 0.25 - 3) ^ 2
+    t = t + (i MOD 7) ^ 3
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+2.25 9.0 1.4142135623730951 50 3.0
+65536 43046721
+Ganzzahl-Ueberlauf bei '^' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 15
+20122843.75 63063
+
+=== potenz im maschinencode (maschinencode)
+FUNCTION quadrat(x AS FLOAT) AS FLOAT
+    RETURN x ^ 2
+END FUNCTION
+FUNCTION wurzel(x AS FLOAT) AS FLOAT
+    RETURN x ^ 0.5
+END FUNCTION
+FUNCTION ganz(r AS INTEGER) AS INTEGER
+    RETURN r ^ 2 + r ^ 0
+END FUNCTION
+FUNCTION gross(r AS INTEGER) AS INTEGER
+    RETURN r ^ 16
+END FUNCTION
+FUNCTION halb(r AS INTEGER) AS FLOAT
+    RETURN r ^ 0.5
+END FUNCTION
+PRINT quadrat(1.5); " "; quadrat(-3); " "; wurzel(2); " "; ganz(-7); " "; halb(9)
+PRINT gross(2); " "; gross(-3)
+TRY
+    PRINT gross(20)
+CATCH e
+    PRINT e; " zeile "; ERROR_LINE()
+END TRY
+DIM s AS FLOAT
+DIM t AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 1000
+    s = s + (i * 0.25 - 3) ^ 2
+    t = t + (i MOD 7) ^ 3
+NEXT
+PRINT s; " "; t
+--- umgebung
+DHRT_JIT_BILANZ=1
+--- erwartet
+2.25 9.0 1.4142135623730951 50 3.0
+65536 43046721
+Ganzzahl-Ueberlauf bei '^' (INTEGER ist 64-bit; Wertebereich ueberschritten) zeile 11
+20122843.75 63063
+--- stderr
+jit: 5 Funktionen, 1 Schleifen, 1 Schleifenlaeufe
+
+=== und und oder ueber objektfelder im wertemodus
+' Im Wertemodus treffen sich bei `IF e.lebt AND e.x > 20` ein Wert (das
+' Feld) und ein Wahrheitswert an derselben Stapelstelle -- vorher "zwei Wege
+' treffen sich mit verschiedenen Arten", die Schleife blieb in der VM. Dazu
+' ein Wert als Argument einer uebersetzten Funktion (umlauf(e.x, ...)).
+CLASS K
+    DIM lebt AS BOOLEAN
+    DIM x AS FLOAT
+    DIM r AS INTEGER
+    DIM name AS STRING
+END CLASS
+FUNCTION umlauf(v AS FLOAT, grenze AS FLOAT, rand AS FLOAT) AS FLOAT
+    IF v > grenze + rand THEN RETURN v - grenze - 2 * rand
+    RETURN v
+END FUNCTION
+DIM ks AS ARRAY OF K
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    DIM k AS K
+    k = NEW K()
+    k.lebt = i MOD 3 <> 0
+    k.x = i * 7.5
+    k.r = i MOD 4
+    k.name = "k" + STR$(i)
+    ARRAY_PUSH(ks, k)
+NEXT
+DIM n AS INTEGER
+DIM m AS INTEGER
+DIM namen AS STRING
+DIM r AS INTEGER
+FOR r = 1 TO 50
+    DIM e AS K
+    FOR EACH e IN ks
+        IF e.lebt AND e.x > 20 THEN n += 1
+        IF e.lebt OR e.x < 3 THEN m += 1
+        e.x = umlauf(e.x + 1.5, 200, e.r)
+        IF r = 1 AND e.x > 150 AND e.lebt THEN namen = namen + e.name + ","
+    NEXT
+NEXT
+PRINT n; " "; m; " "; ks[0].x; " "; ks[29].x; " "; namen
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+897 1011 82.5 96.0 k20,k22,k23,k25,k26,
+
+=== und und oder ueber objektfelder im wertemodus (maschinencode)
+CLASS K
+    DIM lebt AS BOOLEAN
+    DIM x AS FLOAT
+    DIM r AS INTEGER
+    DIM name AS STRING
+END CLASS
+FUNCTION umlauf(v AS FLOAT, grenze AS FLOAT, rand AS FLOAT) AS FLOAT
+    IF v > grenze + rand THEN RETURN v - grenze - 2 * rand
+    RETURN v
+END FUNCTION
+DIM ks AS ARRAY OF K
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    DIM k AS K
+    k = NEW K()
+    k.lebt = i MOD 3 <> 0
+    k.x = i * 7.5
+    k.r = i MOD 4
+    k.name = "k" + STR$(i)
+    ARRAY_PUSH(ks, k)
+NEXT
+DIM n AS INTEGER
+DIM m AS INTEGER
+DIM namen AS STRING
+DIM r AS INTEGER
+FOR r = 1 TO 50
+    DIM e AS K
+    FOR EACH e IN ks
+        IF e.lebt AND e.x > 20 THEN n += 1
+        IF e.lebt OR e.x < 3 THEN m += 1
+        e.x = umlauf(e.x + 1.5, 200, e.r)
+        IF r = 1 AND e.x > 150 AND e.lebt THEN namen = namen + e.name + ","
+    NEXT
+NEXT
+PRINT n; " "; m; " "; ks[0].x; " "; ks[29].x; " "; namen
+--- umgebung
+DHRT_JIT_BILANZ=1
+--- erwartet
+897 1011 82.5 96.0 k20,k22,k23,k25,k26,
+--- stderr
+jit: 1 Funktionen, 1 Schleifen, 50 Schleifenlaeufe

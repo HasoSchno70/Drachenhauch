@@ -736,6 +736,7 @@ Ungueltige Regex '{}': {}	Invalid regex '{}': {}
 {}: fps muss >= 0 sein	{}: fps must be >= 0
 {}: idx muss >= 0 sein	{}: idx must be >= 0
 {}: dt_ms muss >= 0 sein	{}: dt_ms must be >= 0
+{}: {} ms ist weniger als eine Millisekunde -- dt_ms zaehlt Millisekunden, DELTA() liefert Sekunden: INT(DELTA() * 1000)	{}: {} ms is less than a millisecond -- dt_ms counts milliseconds, DELTA() returns seconds: INT(DELTA() * 1000)
 {}: dauer_ms muss >= 0 sein	{}: dauer_ms must be >= 0
 {}: count muss >= 0 sein	{}: count must be >= 0
 {}: Radius muss >= 0 sein	{}: the radius must be >= 0

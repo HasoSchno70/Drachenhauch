@@ -1,0 +1,93 @@
+' Das Beispiel examples/kometen/main.dh (2026-10-10, Dogfooding, die
+' Spielseite): Schiff, Kometen, die zerbrechen, Funken, Bestenliste. Der
+' Einschub steht vor der Hauptschleife, ruft die Unterprogramme des Spiels mit
+' fester Bildzeit und liest danach Listen und Bestenliste.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== ein grosser komet zerbricht in zwei mittlere
+spielStarten()
+kometen = []
+schuesse = []
+DIM prK AS Komet
+prK = neuerKomet(100, 100, 40)
+ARRAY_PUSH(kometen, prK)
+getroffen(prK)
+PRINT "punkte "; punkte; " funken "; LEN(funken)
+kometen = ARRAY_FILTER(kometen, FUNCTION(k) k.lebt)
+PRINT "kometen "; LEN(kometen); " radius "; kometen[0].r; " "; kometen[1].r
+getroffen(kometen[0])
+getroffen(kometen[1])
+kometen = ARRAY_FILTER(kometen, FUNCTION(k) k.lebt)
+PRINT "danach "; LEN(kometen); " kleine, punkte "; punkte
+EXIT(0)
+--- programm ../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+punkte 20 funken 1
+kometen 2 radius 22 22
+danach 4 kleine, punkte 120
+
+=== ein schuss trifft und das schiff verliert ein leben
+spielStarten()
+kometen = []
+DIM prK AS Komet
+prK = neuerKomet(400, 100, 40)
+prK.vx = 0
+prK.vy = 0
+ARRAY_PUSH(kometen, prK)
+' das Schiff schaut nach oben (-90 Grad) auf den Kometen
+DIM prS AS Schuss
+prS = NEW Schuss()
+prS.x = 400
+prS.y = 120
+prS.vx = 0
+prS.vy = -500
+prS.rest = 1
+ARRAY_PUSH(schuesse, prS)
+spielBild(1.0 / 60)
+PRINT "getroffen "; LEN(kometen) = 2; " punkte "; punkte
+' ein Komet genau auf dem Schiff, ohne Schutzzeit
+schutz = 0
+kometen[0].x = sx
+kometen[0].y = sy
+kometen[0].vx = 0
+kometen[0].vy = 0
+spielBild(1.0 / 60)
+PRINT "leben "; leben; " schutz "; schutz > 1
+EXIT(0)
+--- programm ../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+getroffen TRUE punkte 20
+leben 2 schutz TRUE
+
+=== die bestenliste sortiert ein und bleibt in der datei
+PRINT eintragen(50); " "; eintragen(80); " "; eintragen(10); " "; eintragen(80)
+PRINT platz(1); " "; platz(2); " "; platz(3); " "; platz(4); " "; platz(5)
+PRINT eintragen(5); " "; eintragen(1)
+' eine Punktzahl unter allen Plaetzen kommt nicht hinein
+PRINT eintragen(0)
+DIM prB AS SAVE_HANDLE
+prB = SAVE_LOAD("bestenliste.json")
+PRINT "datei "; SAVE_GET_INT(prB, "platz1"); " "; SAVE_GET_INT(prB, "platz5")
+EXIT(0)
+--- programm ../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+1 1 3 2
+80 80 50 10 0
+5 0
+0
+datei 80 5
+
+=== was hinausfliegt, kommt gegenueber wieder herein
+PRINT umlauf(-50, 800, 16); " "; umlauf(830, 800, 16); " "; umlauf(400, 800, 16)
+EXIT(0)
+--- programm ../../examples/kometen/main.dh nach SCENE_SWITCH("menue")
+--- umgebung
+DHRT_FRAMES=60
+--- erwartet
+782.0 -2.0 400.0

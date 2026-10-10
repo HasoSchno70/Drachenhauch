@@ -270,7 +270,7 @@ extern "C" fn mathe1(art: i64, x: f64) -> f64 {
 }
 
 extern "C" fn mathe2(art: i64, x: f64, y: f64) -> f64 {
-    if art == 0 { x.atan2(y) } else { x.hypot(y) }
+    match art { 0 => x.atan2(y), 1 => x.hypot(y), _ => x.powf(y) }
 }
 
 /// Ist Konstante k die Signatur einer Bibliothek-Funktion nur mit Zahlen?
@@ -648,7 +648,7 @@ extern "C" fn w_op(k: *mut Kontext, o: u64, a_i: u64, b_i: u64, ziel: u64, lokal
     }
     let zeichen = match o {
         op::ADD => "+", op::SUB => "-", op::MUL => "*", op::DIV => "/",
-        op::INT_DIV => "\\", op::MOD => "mod", _ => { zurueck(k, a, b, abgegeben); return 0; }
+        op::INT_DIV => "\\", op::MOD => "mod", op::POW => "^", _ => { zurueck(k, a, b, abgegeben); return 0; }
     };
     match crate::vm::wert_rechnen(zeichen, &a, &b) {
         Some(v) => { *w_platz(k, ziel) = v; 0 }
@@ -1330,6 +1330,19 @@ fn for_teile(arg: &Arg) -> Option<[i64; 7]> {
 /// Local, Rueckgabe)? INTEGER <-> FLOAT geht (FLOAT -> INTEGER mit Pruefung
 /// zur Laufzeit), BOOLEAN nur nach BOOLEAN -- alles andere ist in der VM ein
 /// sicherer Fehler, und dann bleibt die Funktion dort.
+/// `x ^ n` mit einer festen Ganzzahl 0..16 als Exponent (die Konstante steht
+/// direkt vor POW): dann ist INTEGER ^ INTEGER wieder ein INTEGER, und der
+/// Maschinencode rechnet es wie `checked_pow` -- n-mal multiplizieren, ein
+/// Ueberlauf steigt aus.
+fn fester_exponent(f: &Func, ip: usize) -> Option<u32> {
+    let vor = f.code.get(ip.checked_sub(1)?)?;
+    if vor.op != op::LOAD_CONST { return None; }
+    match f.constants.get(vor.arg.as_usize())? {
+        Value::Int(n) if (0..=16).contains(n) => Some(*n as u32),
+        _ => None,
+    }
+}
+
 fn passt(von: Art, nach: Art) -> bool {
     von == nach || (zahl(von) && zahl(nach))
 }
@@ -1421,6 +1434,25 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 Ok(())
             }
             Some(alt) if alt == z => Ok(()),
+            // Im Wertemodus: kommt auf dem einen Weg ein Wert, auf dem anderen
+            // eine Zahl oder ein Wahrheitswert an derselben Stapelstelle an,
+            // ist die Stelle ein Wert -- der Weg mit der Zahl legt sie vor dem
+            // Sprung in ihren Platz (`ablegen`). So geht das kurzgeschlossene
+            // `IF obj.feld AND x > 0` (Dogfooding 2026-10-10: die Schleifen
+            // eines Spiels blieben daran in der VM).
+            Some(alt) if modus_w && alt.lokal == z.lokal && alt.stapel.len() == z.stapel.len()
+                && alt.stapel.iter().zip(&z.stapel).all(|(&a, &b)| a == b
+                    || (a == Art::W && w_oder_skalar(b)) || (b == Art::W && w_oder_skalar(a))) => {
+                let mut neu = alt.clone();
+                for (d, (&a, &b)) in alt.stapel.iter().zip(&z.stapel).enumerate() {
+                    if a != b { neu.stapel[d] = Art::W; }
+                }
+                if neu != *alt {
+                    vor[i] = Some(neu);
+                    if !draussen { offen.push(i); }
+                }
+                Ok(())
+            }
             Some(_) => Err(format!("zwei Wege treffen sich an Stelle {} mit verschiedenen Arten", i)),
         }
     };
@@ -1759,7 +1791,7 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
             }
             op::POP => { pop!(); }
             op::DUP => { let a = *z.stapel.last().ok_or("DUP auf leerem Stapel")?; z.stapel.push(a); }
-            op::ADD | op::SUB | op::MUL | op::MOD | op::DIV | op::INT_DIV
+            op::ADD | op::SUB | op::MUL | op::MOD | op::DIV | op::INT_DIV | op::POW
                 if modus_w && z.stapel.len() >= 2 && z.stapel[z.stapel.len() - 2..].iter().any(|&a| a == Art::W) => {
                 let b = pop!(); let a = pop!();
                 if !w_oder_skalar(a) || !w_oder_skalar(b) { return Err("Rechnen mit NIL".into()); }
@@ -1780,6 +1812,22 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 let b = pop!(); let a = pop!();
                 if !zahl(a) || !zahl(b) { return Err("/ mit einem Nicht-Zahl-Wert".into()); }
                 z.stapel.push(Art::F);
+            }
+            // `^`: mit einer Kommazahl dabei eine Kommazahl (powf wie vm::pow).
+            // Zwei INTEGER liefern je nach Exponent eine Ganz- oder eine
+            // Kommazahl -- das weiss man vorher nicht, dort rechnet der
+            // Wertemodus. Vorher blieb jede Schleife mit `^` in der VM, auch
+            // die uebliche Abstandsrechnung (dx ^ 2 + dy ^ 2): 65-mal langsamer
+            // (Dogfooding 2026-10-10).
+            op::POW => {
+                let b = pop!(); let a = pop!();
+                if !zahl(a) || !zahl(b) { return Err("^ mit einem Nicht-Zahl-Wert".into()); }
+                if a == Art::I && b == Art::I {
+                    if fester_exponent(f, ip).is_none() { return Err("^ mit zwei INTEGER (Typ haengt am Exponenten)".into()); }
+                    z.stapel.push(Art::I);
+                } else {
+                    z.stapel.push(Art::F);
+                }
             }
             op::INT_DIV => {
                 let b = pop!(); let a = pop!();
@@ -1811,8 +1859,13 @@ fn analysieren(prog: &Program, glob: &Globale, f: &Func, bereich: Option<&Bereic
                 if !skalar(a) && !(modus_w && a == Art::W) { return Err("Sprung auf NIL oder ein Feld".into()); }
                 melden(&mut vor, &mut offen, ziel(&ins.arg), &z)?;
             }
+            // Ueber die VM auch eine uebersetzte Funktion, wenn ein Argument ein
+            // Wert ist (das Feld eines Objekts im Wertemodus): der getypte
+            // Aufruf nimmt nur Zahlen, und vorher blieb die ganze Schleife in
+            // der VM ("Argument 1 an umlauf passt nicht", Dogfooding 2026-10-10).
             op::CALL_USER if modus_w && match &ins.arg {
-                Arg::Call(_, _, i) => *i >= 0 && bereich.map_or(false, |b| b.vm_fns.get(*i as usize).copied().unwrap_or(false)),
+                Arg::Call(_, c, i) => *i >= 0 && (bereich.map_or(false, |b| b.vm_fns.get(*i as usize).copied().unwrap_or(false))
+                    || z.stapel.len() >= *c as usize && z.stapel[z.stapel.len() - *c as usize..].iter().any(|&a| a == Art::W)),
                 _ => false,
             } => {
                 // Eine Funktion, die in der VM bleibt: die VM ruft sie
@@ -2360,9 +2413,20 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
         bau.b.ins().jump(b0, &[]);
 
         // Den Stapel am Blockende in die Variablen legen, am Blockanfang holen.
-        fn ablegen(bau: &mut Bauer, st: &[(CWert, Art)]) {
-            for (d, (w, a)) in st.iter().enumerate() { let v = bau.var(0, d, *a); bau.b.def_var(v, *w); }
+        // Erwartet ein Ziel an Stelle d einen Wert, wo hier eine Zahl liegt
+        // (Zusammenfluss im Wertemodus), kommt sie vorher in ihren Platz.
+        fn ablegen(bau: &mut Bauer, st: &[(CWert, Art)], ziele: &[Option<&Zustand>]) {
+            for (d, (w, a)) in st.iter().enumerate() {
+                let v = bau.var(0, d, *a); bau.b.def_var(v, *w);
+                let will_w = *a != Art::W && ziele.iter().any(|z| z.and_then(|z| z.stapel.get(d)).copied() == Some(Art::W));
+                if will_w {
+                    bau.w_boxen(&st[..=d], d);
+                    let n = bau.iconst(0);
+                    let v = bau.var(0, d, Art::W); bau.b.def_var(v, n);
+                }
+            }
         }
+        let ziel_z = |i: usize| an.vor.get(i).and_then(|z| z.as_ref());
 
         let mut ip = von;
         while ip <= bis && ip < code.len() {
@@ -2464,7 +2528,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         bau.fehler_pruefen();
                         bau.global_schreiben(g, w);
                     }
-                    op::ADD | op::SUB | op::MUL | op::DIV | op::MOD | op::INT_DIV
+                    op::ADD | op::SUB | op::MUL | op::DIV | op::MOD | op::INT_DIV | op::POW
                     | op::LT | op::GT | op::LEQ | op::GEQ | op::EQ | op::NEQ if an.modus_w && zwei_w => {
                         let d = st.len() - 2;
                         bau.w_boxen(&st, d);
@@ -2484,7 +2548,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         let z = bau.iconst(bau.w_slot(st.len() - 1));
                         let w = bau.w_ruf_w(W_WAHR, &[z]);
                         st.pop();
-                        ablegen(&mut bau, &st);
+                        ablegen(&mut bau, &st, &[ziel_z(ziel(&ins.arg)), ziel_z(ip + 1)]);
                         let (z_ja, z_nein) = (bloecke[&ziel(&ins.arg)], bloecke[&(ip + 1)]);
                         if o == op::JUMP_IF_TRUE {
                             bau.b.ins().brif(w, z_ja, &[], z_nein, &[]);
@@ -2823,7 +2887,19 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                     op::DECLARE_GLOBAL_SLOT => {}   // Platz gibt es schon (siehe Bereich)
                     op::POP => { st.pop(); }
                     op::DUP => { let t = *st.last().unwrap(); st.push(t); }
-                    op::ADD | op::SUB | op::MUL | op::DIV | op::MOD | op::INT_DIV => {
+                    op::POW if st.len() >= 2 && st[st.len() - 1].1 == Art::I && st[st.len() - 2].1 == Art::I => {
+                        st.pop();
+                        let (x, _) = st.pop().unwrap();
+                        let n = fester_exponent(f, ip).expect("die Analyse prueft den Exponenten");
+                        let mut w = bau.iconst(1);
+                        for _ in 0..n {
+                            let (r, u) = bau.b.ins().smul_overflow(w, x);
+                            bau.aussteigen_wenn(u);
+                            w = r;
+                        }
+                        st.push((w, Art::I));
+                    }
+                    op::ADD | op::SUB | op::MUL | op::DIV | op::MOD | op::INT_DIV | op::POW => {
                         let (y, ya) = st.pop().unwrap(); let (x, xa) = st.pop().unwrap();
                         st.push(rechnen(&mut bau, ins.op, x, xa, y, ya));
                     }
@@ -2858,14 +2934,14 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         st.push((bau.bool64(n), Art::B));
                     }
                     op::JUMP => {
-                        ablegen(&mut bau, &st);
+                        ablegen(&mut bau, &st, &[ziel_z(ziel(&ins.arg))]);
                         bau.b.ins().jump(bloecke[&ziel(&ins.arg)], &[]);
                         offen = false;
                     }
                     op::JUMP_IF_FALSE | op::JUMP_IF_TRUE => {
                         let (x, a) = st.pop().unwrap();
                         let w = bau.wahr(x, a);
-                        ablegen(&mut bau, &st);
+                        ablegen(&mut bau, &st, &[ziel_z(ziel(&ins.arg)), ziel_z(ip + 1)]);
                         let (z_ja, z_nein) = (bloecke[&ziel(&ins.arg)], bloecke[&(ip + 1)]);
                         if ins.op == op::JUMP_IF_TRUE {
                             bau.b.ins().brif(w, z_ja, &[], z_nein, &[]);
@@ -2944,7 +3020,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                         // Grenze), fuehrt die VM den Befehl von vorn aus.
                         let raus = vergleichen(&mut bau, if t[5] == 1 { op::LT } else { op::GT }, next, Art::I, en, ea);
                         if global { bau.global_schreiben(t[1] as usize, next); } else { bau.b.def_var(v, next); }
-                        ablegen(&mut bau, &st);
+                        ablegen(&mut bau, &st, &[ziel_z(ip + 1), ziel_z(t[6] as usize)]);
                         bau.b.ins().brif(raus, bloecke[&(ip + 1)], &[], bloecke[&(t[6] as usize)], &[]);
                         offen = false;
                     }
@@ -2954,7 +3030,7 @@ fn erzeugen(modul: &mut JITModule, prog: &Program, glob: &Globale, f: &Func, an:
                 if !offen { break; }
                 if ip >= code.len() || anfang[ip] {
                     // Weiter in den naechsten Block (oder ans Ende = NIL).
-                    ablegen(&mut bau, &st);
+                    ablegen(&mut bau, &st, &[ziel_z(ip)]);
                     match bloecke.get(&ip) {
                         Some(b) if ip < code.len() || bereich.is_some() => { bau.b.ins().jump(*b, &[]); }
                         _ => {
@@ -3152,7 +3228,7 @@ fn zahl_rechnen(bau: &mut Bauer, name: &str, args: &[(CWert, Art)]) -> (CWert, A
 }
 
 fn rechnen(bau: &mut Bauer, o: u16, x: CWert, xa: Art, y: CWert, ya: Art) -> (CWert, Art) {
-    if xa == Art::I && ya == Art::I && o != op::DIV {
+    if xa == Art::I && ya == Art::I && o != op::DIV && o != op::POW {
         let r = match o {
             op::ADD => { let (r, u) = bau.b.ins().sadd_overflow(x, y); bau.aussteigen_wenn(u); r }
             op::SUB => { let (r, u) = bau.b.ins().ssub_overflow(x, y); bau.aussteigen_wenn(u); r }
@@ -3188,6 +3264,11 @@ fn rechnen(bau: &mut Bauer, o: u16, x: CWert, xa: Art, y: CWert, ya: Art) -> (CW
         op::ADD => bau.b.ins().fadd(fx, fy),
         op::SUB => bau.b.ins().fsub(fx, fy),
         op::MUL => bau.b.ins().fmul(fx, fy),
+        op::POW => {
+            let c = bau.iconst(2);
+            let r = bau.b.ins().call(bau.h_mathe2, &[c, fx, fy]);
+            bau.b.inst_results(r)[0]
+        }
         op::DIV | op::MOD => {
             let z = bau.b.ins().f64const(0.0);
             let null = bau.b.ins().fcmp(FloatCC::Equal, fy, z);
