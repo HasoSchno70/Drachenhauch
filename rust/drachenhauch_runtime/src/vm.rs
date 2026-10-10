@@ -6152,8 +6152,9 @@ impl<'p> Vm<'p> {
                     // viel spaeter als unsinnige Rechnung auf.
                     None => return Err(format!(
                         "ZEIT_PARSE: '{}' ist kein Zeitpunkt -- erwartet \
-                         'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden \
-                         oder nur Datum)", text)),
+                         'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, \
+                         nur Datum oder mit Zeitzone) oder \
+                         'Sat, 28 Aug 2026 20:30:00 +0200'", text)),
                 }
             }
             // ZEIT_TEXT$ gibt Text, ZEIT_LESBAR fragt nach. Getrennte Namen,

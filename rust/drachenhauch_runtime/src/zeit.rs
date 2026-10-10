@@ -84,57 +84,143 @@ fn tage_im_monat(jahr: i64, monat: i64) -> i64 {
 
 /// Liest einen Zeitpunkt aus Text.
 ///
-/// Angenommen werden die Schreibweisen, die in Datenbanken und Schnittstellen
-/// tatsaechlich vorkommen:
+/// Angenommen werden die Schreibweisen, die in Datenbanken, Schnittstellen
+/// und Feeds tatsaechlich vorkommen:
 ///   `2026-08-28 20:30:00`, `2026-08-28T20:30:00` (ISO mit T),
-///   `2026-08-28 20:30` (ohne Sekunden), `2026-08-28` (nur Datum -> 00:00:00).
-/// Eine angehaengte Zeitzone (`Z`, `+02:00`) wird abgeschnitten, nicht
-/// verrechnet -- dieses Modul rechnet in Ortszeit.
+///   `2026-08-28 20:30` (ohne Sekunden), `2026-08-28` (nur Datum -> 00:00:00),
+///   `Sat, 28 Aug 2026 20:30:00 +0200` (RFC 822 -- RSS, HTTP-Kopf `Date`, E-Mail).
+///
+/// **Mit Zeitzone** (`Z`, `+02:00`, `-0500`, `GMT`, `CEST` ...) ist der Text ein
+/// fester Zeitpunkt: er wird auf UTC zurueckgerechnet und in Ortszeit an
+/// DIESEM Tag umgesetzt (`builtins::lokaler_versatz`). Bis 2026.27 wurde der
+/// Anhang abgeschnitten -- `14:30Z` galt als 14:30 Ortszeit, und Feeds aus
+/// verschiedenen Zonen sortierten um Stunden falsch. **Ohne Zeitzone** gilt
+/// der Text als Ortszeit, wie immer.
 ///
 /// `None` heisst: nicht lesbar. Der Aufrufer entscheidet, ob das ein Fehler
 /// ist; `ZEIT_PARSE` macht daraus eine Meldung, `ZEIT_LESBAR` ein FALSE.
 pub fn parse(text: &str) -> Option<i64> {
+    parse_mit(text, crate::builtins::lokaler_versatz)
+}
+
+/// `parse` mit einer eigenen Ortszeit: `lokal(utc)` = Versatz der Ortszeit in
+/// Sekunden fuer einen UTC-Zeitpunkt. Fuer die Tests, die sonst vom Rechner
+/// abhingen.
+pub fn parse_mit(text: &str, lokal: impl Fn(i64) -> i64) -> Option<i64> {
+    let (t, versatz) = parse_teile(text)?;
+    Some(match versatz {
+        None => t,
+        Some(v) => { let utc = t - v; utc + lokal(utc) }
+    })
+}
+
+/// Der Zeitpunkt, wie er dasteht, und der Versatz zu UTC in Sekunden, falls
+/// einer angegeben ist.
+pub fn parse_teile(text: &str) -> Option<(i64, Option<i64>)> {
     let roh = text.trim();
     if roh.is_empty() { return None; }
+    let b = roh.as_bytes();
+    if b.len() >= 5 && b[..4].iter().all(|c| c.is_ascii_digit()) && b[4] == b'-' {
+        iso_lesen(roh)
+    } else {
+        rfc822_lesen(roh)
+    }
+}
 
-    // Zeitzonen-Anhang abschneiden (nach der Uhrzeit, nicht im Datum!)
-    let ohne_zone = match roh.rfind(['+', 'Z', 'z']) {
-        Some(i) if i > 10 => &roh[..i],
-        _ => roh,
+fn iso_lesen(roh: &str) -> Option<(i64, Option<i64>)> {
+    let (datum_teil, rest) = match roh.find(['T', 't', ' ']) {
+        Some(i) => (&roh[..i], roh[i + 1..].trim()),
+        None => (roh, ""),
     };
-    let ohne_zone = ohne_zone.trim();
-
-    let (datum_teil, zeit_teil) = match ohne_zone.find(['T', 't', ' ']) {
-        Some(i) => (&ohne_zone[..i], ohne_zone[i + 1..].trim()),
-        None => (ohne_zone, ""),
-    };
-
     let d: Vec<&str> = datum_teil.split('-').collect();
     if d.len() != 3 { return None; }
     let jahr: i64 = d[0].parse().ok()?;
     let monat: i64 = d[1].parse().ok()?;
     let tag: i64 = d[2].parse().ok()?;
-
     if !(1..=12).contains(&monat) { return None; }
     if tag < 1 || tag > tage_im_monat(jahr, monat) { return None; }
+    if rest.is_empty() { return Some((aus_teilen(jahr, monat, tag, 0, 0, 0), None)); }
 
-    let (mut std, mut min, mut sek) = (0i64, 0i64, 0i64);
-    if !zeit_teil.is_empty() {
-        let z: Vec<&str> = zeit_teil.split(':').collect();
-        if z.len() < 2 || z.len() > 3 { return None; }
-        std = z[0].parse().ok()?;
-        min = z[1].parse().ok()?;
-        if z.len() == 3 {
-            // Bruchteile von Sekunden wegwerfen ("20:30:00.123")
-            let s = z[2].split('.').next().unwrap_or("");
-            sek = s.parse().ok()?;
-        }
+    // Uhrzeit und Zone: "20:30:00Z", "20:30:00+02:00", "20:30:00-0500",
+    // "20:30:00 UTC"
+    let (uhr, zone) = if let Some(i) = rest.find(char::is_whitespace) {
+        (&rest[..i], Some(rest[i..].trim()))
+    } else if rest.ends_with(['Z', 'z']) {
+        (&rest[..rest.len() - 1], Some("Z"))
+    } else if let Some(i) = rest.rfind(['+', '-']) {
+        (&rest[..i], Some(&rest[i..]))
+    } else {
+        (rest, None)
+    };
+    let (std, min, sek) = uhr_lesen(uhr)?;
+    let versatz = match zone { Some(z) => Some(zone_wert(z)?), None => None };
+    Some((aus_teilen(jahr, monat, tag, std, min, sek), versatz))
+}
+
+/// RFC 822/1123: `[Wochentag,] TT Mon JJJJ hh:mm[:ss] [Zone]`.
+fn rfc822_lesen(roh: &str) -> Option<(i64, Option<i64>)> {
+    let mut t: Vec<&str> = roh.split([' ', '\t', ',']).filter(|w| !w.is_empty()).collect();
+    if t.first().is_some_and(|w| w.chars().all(|c| c.is_ascii_alphabetic())) {
+        t.remove(0);    // Wochentag -- wird nicht nachgeprueft
+    }
+    if t.len() < 4 || t.len() > 5 { return None; }
+    let tag: i64 = t[0].parse().ok()?;
+    const MONATE: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun",
+                                "jul", "aug", "sep", "oct", "nov", "dec"];
+    let m = t[1].to_ascii_lowercase();
+    if m.len() < 3 { return None; }
+    let monat = MONATE.iter().position(|x| m.starts_with(x))? as i64 + 1;
+    let mut jahr: i64 = t[2].parse().ok()?;
+    if t[2].len() == 2 { jahr += if jahr < 50 { 2000 } else { 1900 }; }
+    if tag < 1 || tag > tage_im_monat(jahr, monat) { return None; }
+    let (std, min, sek) = uhr_lesen(t[3])?;
+    let versatz = match t.get(4) { Some(z) => Some(zone_wert(z)?), None => None };
+    Some((aus_teilen(jahr, monat, tag, std, min, sek), versatz))
+}
+
+fn uhr_lesen(uhr: &str) -> Option<(i64, i64, i64)> {
+    let z: Vec<&str> = uhr.split(':').collect();
+    if z.len() < 2 || z.len() > 3 { return None; }
+    let std: i64 = z[0].parse().ok()?;
+    let min: i64 = z[1].parse().ok()?;
+    let mut sek = 0;
+    if z.len() == 3 {
+        // Bruchteile von Sekunden wegwerfen ("20:30:00.123")
+        sek = z[2].split('.').next().unwrap_or("").parse().ok()?;
     }
     if !(0..=23).contains(&std) || !(0..=59).contains(&min) || !(0..=60).contains(&sek) {
         return None;
     }
+    Some((std, min, sek))
+}
 
-    Some(aus_teilen(jahr, monat, tag, std, min, sek))
+/// Versatz zu UTC in Sekunden. Ein unbekannter Name ist NICHT lesbar statt
+/// still UTC -- ein falscher Versatz fiele erst an einer falschen Sortierung auf.
+fn zone_wert(z: &str) -> Option<i64> {
+    let stunden = |h: i64| Some(h * 3600);
+    match z.to_ascii_uppercase().as_str() {
+        "Z" | "UT" | "UTC" | "GMT" => return Some(0),
+        "EST" => return stunden(-5), "EDT" => return stunden(-4),
+        "CST" => return stunden(-6), "CDT" => return stunden(-5),
+        "MST" => return stunden(-7), "MDT" => return stunden(-6),
+        "PST" => return stunden(-8), "PDT" => return stunden(-7),
+        "CET" | "MEZ" => return stunden(1), "CEST" | "MESZ" => return stunden(2),
+        _ => {}
+    }
+    let (vz, ziffern) = match z.as_bytes().first()? {
+        b'+' => (1, &z[1..]),
+        b'-' => (-1, &z[1..]),
+        _ => return None,
+    };
+    let ziffern: String = ziffern.chars().filter(|c| *c != ':').collect();
+    if !ziffern.chars().all(|c| c.is_ascii_digit()) { return None; }
+    let (h, m): (i64, i64) = match ziffern.len() {
+        2 => (ziffern.parse().ok()?, 0),
+        4 => (ziffern[..2].parse().ok()?, ziffern[2..].parse().ok()?),
+        _ => return None,
+    };
+    if h > 14 || m > 59 { return None; }
+    Some(vz * (h * 3600 + m * 60))
 }
 
 /// Formatiert einen Zeitpunkt.
@@ -236,9 +322,38 @@ mod tests {
         let soll = aus_teilen(2026, 8, 28, 20, 30, 0);
         for text in ["2026-08-28 20:30:00", "2026-08-28T20:30:00",
                      "2026-08-28 20:30", "2026-08-28T20:30:00.500",
-                     "2026-08-28T20:30:00Z", "2026-08-28T20:30:00+02:00",
                      "  2026-08-28 20:30:00  "] {
             assert_eq!(parse(text), Some(soll), "{}", text);
+        }
+    }
+
+    #[test]
+    fn zeitzonen_werden_in_ortszeit_umgerechnet() {
+        // Ortszeit fest auf UTC+2, damit der Test nicht am Rechner haengt
+        let mesz = |_| 7200;
+        let soll = aus_teilen(2026, 8, 28, 22, 30, 0);
+        for text in ["2026-08-28T20:30:00Z", "2026-08-28T22:30:00+02:00",
+                     "2026-08-28T15:30:00-05:00", "2026-08-28T16:30:00-0400",
+                     "2026-08-28 20:30:00 UTC", "2026-08-29T02:00:00+05:30",
+                     "Fri, 28 Aug 2026 20:30:00 GMT", "28 Aug 2026 22:30 +0200",
+                     "Fri, 28 Aug 2026 16:30:00 EDT", "Fri, 28 Aug 26 22:30:00 CEST"] {
+            assert_eq!(parse_mit(text, mesz), Some(soll), "{}", text);
+        }
+        // ohne Zone bleibt es, wie es dasteht
+        assert_eq!(parse_mit("2026-08-28T22:30:00", mesz), Some(soll));
+        assert_eq!(parse_mit("Fri, 28 Aug 2026 22:30", mesz), Some(soll));
+        // die Ortszeit wird fuer den UTC-Zeitpunkt gefragt, nicht fuer den Text
+        let gefragt = std::cell::Cell::new(0);
+        parse_mit("2026-01-15T12:00:00Z", |utc| { gefragt.set(utc); 3600 });
+        assert_eq!(gefragt.get(), aus_teilen(2026, 1, 15, 12, 0, 0));
+    }
+
+    #[test]
+    fn rfc822_lehnt_unsinn_ab() {
+        for text in ["Fri, 28 Aug 2026 20:30:00 XYZ", "31 Feb 2026 10:00",
+                     "28 Foo 2026 10:00", "28 Aug 2026", "Fri, 28 Aug 2026 25:00",
+                     "2026-08-28T20:30:00+99:00", "2026-08-28T20:30:00+2"] {
+            assert_eq!(parse_teile(text), None, "{}", text);
         }
     }
 

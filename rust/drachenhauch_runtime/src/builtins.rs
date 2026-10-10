@@ -147,6 +147,40 @@ pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     }
 }
 
+/// Versatz der Ortszeit zu UTC in Sekunden fuer einen UTC-Zeitpunkt (Sekunden
+/// seit 1970) -- samt der Sommerzeit an GENAU diesem Tag, damit ein Zeitstempel
+/// aus dem Winter auch im Sommer richtig umgerechnet wird. Fuer `ZEIT_PARSE`
+/// mit Zeitzone (zeit.rs). Windows rechnet ueber die Zonenregeln des Systems.
+#[cfg(windows)]
+pub(crate) fn lokaler_versatz(utc: i64) -> i64 {
+    #[repr(C)]
+    struct SystemTimeW {
+        w_year: u16, w_month: u16, w_day_of_week: u16, w_day: u16,
+        w_hour: u16, w_minute: u16, w_second: u16, w_milliseconds: u16,
+    }
+    extern "system" {
+        fn SystemTimeToTzSpecificLocalTime(tz: *const std::ffi::c_void,
+            u: *const SystemTimeW, l: *mut SystemTimeW) -> i32;
+    }
+    let (j, mo, d, h, mi, s) = crate::zeit::in_teile(utc);
+    if !(1601..=30827).contains(&j) { return 0; }
+    let u = SystemTimeW { w_year: j as u16, w_month: mo as u16, w_day_of_week: 0,
+        w_day: d as u16, w_hour: h as u16, w_minute: mi as u16, w_second: s as u16,
+        w_milliseconds: 0 };
+    unsafe {
+        let mut l: SystemTimeW = std::mem::zeroed();
+        if SystemTimeToTzSpecificLocalTime(std::ptr::null(), &u, &mut l) == 0 { return 0; }
+        crate::zeit::aus_teilen(l.w_year as i64, l.w_month as i64, l.w_day as i64,
+            l.w_hour as i64, l.w_minute as i64, l.w_second as i64) - utc
+    }
+}
+
+/// Ausserhalb von Windows ist die "Ortszeit" dieses Moduls UTC (siehe
+/// `local_datetime`) -- der Versatz ist darum 0, und ZEIT_JETZT und ZEIT_PARSE
+/// passen zusammen.
+#[cfg(not(windows))]
+pub(crate) fn lokaler_versatz(_utc: i64) -> i64 { 0 }
+
 #[cfg(not(windows))]
 pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     use std::time::{SystemTime, UNIX_EPOCH};
