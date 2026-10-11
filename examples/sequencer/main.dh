@@ -201,6 +201,10 @@ END FUNCTION
 SUB nachplanen()
     IF NOT spielt THEN RETURN
     DIM jetzt AS INTEGER : jetzt = AUDIO_CLOCK_TICKS(uhr) \ FEINE
+    ' Hing die Schleife (Fenster verschoben, Export), sind Schritte schon
+    ' vorbei -- ein Klang auf einem vergangenen Tick erklaenge SOFORT, alle
+    ' verpassten zusammen. Also ueberspringen.
+    IF geplant <= jetzt THEN geplant = jetzt + 1
     WHILE geplant < jetzt + VORAUS
         schrittPlanen(geplant)
         geplant = geplant + 1
