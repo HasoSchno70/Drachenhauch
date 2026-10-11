@@ -88,3 +88,80 @@ SLEEP(50)
 PRINT "kanaele "; AUDIO_BUSY_CHANNELS()
 --- erwartet
 kanaele 1
+
+=== ein wartender klang spielt noch nicht
+' Kira meldet einen Klang, der auf seinen Tick wartet, schon als spielend --
+' AUDIO_IS_PLAYING ist bis zum Tick FALSE, AUDIO_IS_WAITING TRUE.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 150, "sine", 0.5)
+DIM uhr AS AUDIO_CLOCK
+uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_PLAY_AT(ton, uhr, 30)
+PRINT "vorher "; AUDIO_IS_PLAYING(ton); " "; AUDIO_IS_WAITING(ton)
+AUDIO_CLOCK_START(uhr)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE AUDIO_CLOCK_TICKS(uhr) < 36 AND MILLIS() - t0 < 3000 : SLEEP(2) : WEND
+PRINT "klingt "; AUDIO_IS_PLAYING(ton); " "; AUDIO_IS_WAITING(ton)
+AUDIO_PLAY_AT(ton, uhr, 200)
+AUDIO_CLOCK_REMOVE(uhr)
+' eine entfernte Uhr startet nichts mehr: weder spielend noch wartend
+SLEEP(200)
+PRINT "uhr weg "; AUDIO_IS_PLAYING(ton); " "; AUDIO_IS_WAITING(ton)
+--- erwartet
+vorher FALSE TRUE
+klingt TRUE FALSE
+uhr weg FALSE FALSE
+
+=== der mitschnitt hoert den hall
+' AUDIO_SOUND_MIX baut trocken -- Bus-Effekte wirken nur live. Der
+' Mitschnitt am Master nimmt auf, was man hoert: der Ton dauert 120 ms, der
+' Hall klingt danach noch nach.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 120, "sine", 0.8)
+AUDIO_REVERB("sfx", 0.6, 0.9, 0.2)
+DIM uhr AS AUDIO_CLOCK
+uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_PLAY_AT(ton, uhr, 20)
+AUDIO_RECORD_START()
+PRINT "nimmt auf "; AUDIO_RECORDING()
+AUDIO_CLOCK_START(uhr)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE AUDIO_CLOCK_TICKS(uhr) < 120 AND MILLIS() - t0 < 4000 : SLEEP(2) : WEND
+DIM auf AS SOUND
+auf = AUDIO_RECORD_STOP()
+PRINT "nimmt auf "; AUDIO_RECORDING()
+AUDIO_SAVE_WAV(auf, "mit.wav")
+TRY
+    auf = AUDIO_RECORD_STOP()
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+nimmt auf TRUE
+nimmt auf FALSE
+AUDIO_RECORD_STOP: es laeuft kein Mitschnitt -- erst AUDIO_RECORD_START
+--- ton mit.wav
+pegel 600 900 > 0.02
+
+=== trocken gemischt klingt nichts nach
+' Die Gegenprobe zum Mitschnitt: derselbe Ton mit demselben Hall auf dem
+' Bus, aber per AUDIO_SOUND_MIX gebaut -- danach ist Stille.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 120, "sine", 0.8)
+AUDIO_REVERB("sfx", 0.6, 0.9, 0.2)
+DIM trocken AS SOUND
+trocken = AUDIO_SOUND_NEW(1200)
+AUDIO_SOUND_MIX(trocken, ton, 200)
+AUDIO_SAVE_WAV(trocken, "ohne.wav")
+--- ton ohne.wav
+pegel 200 300 > 0.5
+pegel 600 900 < 0.001
+
+=== mitschnitt mit falscher laenge
+IMPORT "audio"
+AUDIO_RECORD_START(0)
+--- fehler
+AUDIO_RECORD_START: max_sekunden muss

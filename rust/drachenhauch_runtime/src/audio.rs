@@ -479,6 +479,15 @@ const FFT_N: usize = 1024;    // FFT-Fenster
 struct Ring { buf: [f32; RING], pos: usize }
 static SAMPLES: Mutex<Ring> = Mutex::new(Ring { buf: [0.0; RING], pos: 0 });
 
+// --- Mitschnitt des Mixers (AUDIO_RECORD_*) -------------------------------
+// Derselbe Abgriff wie die FFT, hinter allen Bus- und Master-Effekten: was
+// aufgezeichnet wird, ist genau das, was man hoert (vor der Master-
+// Lautstaerke). Gebraucht vom Sequencer der Musik-Runde (2026-10-11): ein
+// AUDIO_SOUND_MIX-Export ist immer trocken, Hall/Echo/Filter wirken nur live.
+struct Aufnahme { frames: Vec<Frame>, max: usize }
+static AUFNAHME: Mutex<Option<Aufnahme>> = Mutex::new(None);
+static TAP_RATE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(44100);
+
 struct FftTapBuilder;
 struct FftTapEffect;
 impl EffectBuilder for FftTapBuilder {
@@ -486,7 +495,21 @@ impl EffectBuilder for FftTapBuilder {
     fn build(self) -> (Box<dyn Effect>, ()) { (Box::new(FftTapEffect), ()) }
 }
 impl Effect for FftTapEffect {
+    fn init(&mut self, sample_rate: u32, _internal_buffer_size: usize) {
+        TAP_RATE.store(sample_rate, Relaxed);
+    }
+    fn on_change_sample_rate(&mut self, sample_rate: u32) {
+        TAP_RATE.store(sample_rate, Relaxed);
+    }
     fn process(&mut self, input: &mut [Frame], _dt: f64, _info: &Info) {
+        // Kurz gesperrt: die Hauptseite haelt die Sperre nur zum Anlegen und
+        // Abholen -- ein verpasster Block waere ein Knacks in der Aufnahme.
+        if let Ok(mut a) = AUFNAHME.lock() {
+            if let Some(a) = a.as_mut() {
+                let rest = a.max.saturating_sub(a.frames.len());
+                a.frames.extend_from_slice(&input[..input.len().min(rest)]);
+            }
+        }
         if let Ok(mut ring) = SAMPLES.try_lock() {
             let mut p = ring.pos;
             for f in input.iter() {
@@ -632,7 +655,11 @@ struct SoundSlot {
     /// plant, loeschte damit die erste, bevor sie erklang (gemessen am
     /// Mischer: von zwei geplanten Einsaetzen kam einer an; Musik-Runde).
     /// STOP/PAUSE/RESUME/Lautstaerke/Tonhoehe/Pan wirken auf alle.
-    geplant: Vec<StaticSoundHandle>,
+    geplant: Vec<(StaticSoundHandle, Option<(i64, u64)>)>,
+    /// Uhr und Tick, auf die `handle` wartet (AUDIO_PLAY_AT), sonst None.
+    /// Kira meldet einen wartenden Klang schon als `Playing` -- AUDIO_IS_PLAYING
+    /// fragt darum selbst, ob die Uhr den Tick erreicht hat.
+    start: Option<(i64, u64)>,
     vol: f32,                 // getrackte Lautstaerke (linear 0..1)
     loops: i64,               // verbleibende endliche Wiederholungen (>0); -1 endlos via loop_region; 0 keine
     pan_anim: Option<Pendulum>, // AUTOPAN (per-Frame); SLIDE laeuft als Kira-Tween
@@ -641,14 +668,15 @@ struct SoundSlot {
 impl SoundSlot {
     /// Das Handle und alle geplanten Instanzen.
     fn alle(&mut self) -> impl Iterator<Item = &mut StaticSoundHandle> {
-        self.handle.iter_mut().chain(self.geplant.iter_mut())
+        self.handle.iter_mut().chain(self.geplant.iter_mut().map(|(h, _)| h))
     }
     fn weitere_stoppen(&mut self) {
-        for h in &mut self.geplant { h.stop(tween_now()); }
+        for (h, _) in &mut self.geplant { h.stop(tween_now()); }
         self.geplant.clear();
     }
-    fn spielt(&self) -> bool {
-        self.handle.iter().chain(self.geplant.iter()).any(|h| h.state() == PlaybackState::Playing)
+    /// Jede Instanz mit ihrem Start-Tick.
+    fn instanzen(&self) -> impl Iterator<Item = (&StaticSoundHandle, &Option<(i64, u64)>)> {
+        self.handle.iter().map(move |h| (h, &self.start)).chain(self.geplant.iter().map(|(h, st)| (h, st)))
     }
 }
 
@@ -906,7 +934,7 @@ impl Audio {
     }
 
     fn push_slot(&mut self, data: StaticSoundData, vol: f32) -> i64 {
-        self.sounds.push(SoundSlot { data: Some(data), handle: None, geplant: Vec::new(), vol, loops: 0, pan_anim: None });
+        self.sounds.push(SoundSlot { data: Some(data), handle: None, geplant: Vec::new(), start: None, vol, loops: 0, pan_anim: None });
         (self.sounds.len() - 1) as i64
     }
 
@@ -990,7 +1018,8 @@ impl Audio {
         // alte Instanz(en) stoppen -- AUDIO_PLAY spielt den Klang EINMAL
         { let s = self.slot_mut(idx, fn_)?;
           if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
-          s.weitere_stoppen(); }
+          s.weitere_stoppen();
+          s.start = None; }
         let mut settings = StaticSoundSettings::new();
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
@@ -1020,9 +1049,10 @@ impl Audio {
         // NICHT stoppen: die vorige Instanz wartet vielleicht noch auf ihren
         // Tick (Sequencer, Tracker) oder klingt aus -- sie wird eine weitere
         { let s = self.slot_mut(idx, "AUDIO_PLAY_AT")?;
-          s.geplant.retain(|h| h.state() != PlaybackState::Stopped);
+          s.geplant.retain(|(h, _)| h.state() != PlaybackState::Stopped);
+          let alt_start = s.start.take();
           if let Some(h) = s.handle.take() {
-              if h.state() != PlaybackState::Stopped { s.geplant.push(h); }
+              if h.state() != PlaybackState::Stopped { s.geplant.push((h, alt_start)); }
           } }
         let mut settings = StaticSoundSettings::new()
             .start_time(ClockTime { clock: clock_id, ticks: ticks as u64, fraction: 0.0 })
@@ -1035,6 +1065,7 @@ impl Audio {
             .map_err(|e| format!("AUDIO_PLAY_AT: {:?}", e))?;
         let s = self.slot_mut(idx, "AUDIO_PLAY_AT")?;
         s.handle = Some(handle);
+        s.start = Some((clock_idx, ticks as u64));
         s.vol = vol as f32;
         s.loops = if loops < 0 { -1 } else { loops };
         s.pan_anim = None;
@@ -1373,7 +1404,8 @@ resonance/reverb/distortion", other)),
         let vol = volume.clamp(0.0, 1.0);
         { let s = self.slot_mut(idx, "AUDIO_PLAY_ON")?;
           if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
-          s.weitere_stoppen(); }
+          s.weitere_stoppen();
+          s.start = None; }
         let mut settings = StaticSoundSettings::new();
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
@@ -1722,6 +1754,34 @@ resonance/reverb/distortion", other)),
                                     slide_halbtoene, sr);
         let data = self.make_data_mono(&buf, volume, sr);
         Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
+    }
+
+    /// AUDIO_RECORD_START([max_sekunden]) -- den fertigen Mix mitschneiden
+    /// (hoechstens `max_sekunden`, Vorgabe 600). Ein laufender Mitschnitt
+    /// beginnt von vorn.
+    pub fn record_start(&mut self, max_s: f64) -> Result<(), String> {
+        if !(max_s > 0.0 && max_s <= 3600.0) {
+            return Err("AUDIO_RECORD_START: max_sekunden muss 0 < x <= 3600 sein".into());
+        }
+        let max = (TAP_RATE.load(Relaxed) as f64 * max_s) as usize;
+        *AUFNAHME.lock().map_err(|_| "AUDIO_RECORD_START: Aufnahme gesperrt".to_string())? =
+            Some(Aufnahme { frames: Vec::with_capacity(max.min(48000 * 60)), max });
+        Ok(())
+    }
+    /// AUDIO_RECORD_STOP() -> SOUND -- den Mitschnitt beenden und als Klang
+    /// liefern (Stereo, Abtastrate des Geraets).
+    pub fn record_stop(&mut self) -> Result<i64, String> {
+        let a = AUFNAHME.lock().map_err(|_| "AUDIO_RECORD_STOP: Aufnahme gesperrt".to_string())?.take()
+            .ok_or_else(|| "AUDIO_RECORD_STOP: es laeuft kein Mitschnitt -- erst AUDIO_RECORD_START".to_string())?;
+        let frames: Arc<[Frame]> = if a.frames.is_empty() {
+            vec![Frame { left: 0.0, right: 0.0 }; 1].into()
+        } else { a.frames.into() };
+        let data = StaticSoundData { sample_rate: TAP_RATE.load(Relaxed), frames,
+                                     settings: StaticSoundSettings::new(), slice: None };
+        Ok(self.push_slot(data, 1.0))
+    }
+    pub fn recording(&self) -> bool {
+        AUFNAHME.lock().map(|a| a.is_some()).unwrap_or(false)
     }
 
     /// AUDIO_SOUND_NEW(dauer_ms) -- Stille, in die AUDIO_SOUND_MIX mischt.
@@ -2112,7 +2172,26 @@ resonance/reverb/distortion", other)),
         Ok(())
     }
     pub fn ch_is_playing(&self, idx: i64) -> Result<bool, String> {
-        Ok(self.slot(idx, "AUDIO_IS_PLAYING")?.spielt())
+        let s = self.slot(idx, "AUDIO_IS_PLAYING")?;
+        Ok(s.instanzen().any(|(h, st)| self.instanz_zustand(h, st) == 1))
+    }
+    /// AUDIO_IS_WAITING(sound) -- mit AUDIO_PLAY_AT geplant, aber die Uhr hat
+    /// den Tick noch nicht erreicht.
+    pub fn ch_is_waiting(&self, idx: i64) -> Result<bool, String> {
+        let s = self.slot(idx, "AUDIO_IS_WAITING")?;
+        Ok(s.instanzen().any(|(h, st)| self.instanz_zustand(h, st) == 2))
+    }
+    /// 0 = still, 1 = klingt, 2 = wartet auf seinen Tick. Eine Uhr, die es
+    /// nicht mehr gibt, startet den Klang nie -- er gilt dann als still.
+    fn instanz_zustand(&self, h: &StaticSoundHandle, start: &Option<(i64, u64)>) -> u8 {
+        if h.state() != PlaybackState::Playing { return 0; }
+        match start {
+            None => 1,
+            Some((c, t)) => match self.clocks.get(*c as usize).and_then(|x| x.as_ref()) {
+                None => 0,
+                Some(cs) => if cs.handle.time().ticks >= *t { 1 } else { 2 },
+            },
+        }
     }
     pub fn ch_set_volume(&mut self, idx: i64, v: f64) -> Result<(), String> {
         let vol = v.clamp(0.0, 1.0);
@@ -2189,7 +2268,7 @@ resonance/reverb/distortion", other)),
     pub fn set_num_channels(&mut self, n: i64) { self.num_channels = n.max(0); }
     pub fn get_num_channels(&self) -> i64 { self.num_channels }
     pub fn busy_channels(&self) -> i64 {
-        self.sounds.iter().filter(|s| s.spielt()).count() as i64
+        self.sounds.iter().filter(|s| s.instanzen().any(|(h, st)| self.instanz_zustand(h, st) == 1)).count() as i64
     }
 
     // ================= Musik =================
