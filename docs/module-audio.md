@@ -41,7 +41,8 @@ Spielt einen SOUND ab und liefert einen Channel-Handle zurueck. Mit dem kann man
 | `AUDIO_PAUSE(ch)` | Channel pausieren |
 | `AUDIO_RESUME(ch)` | wieder weiter |
 | `AUDIO_STOP(ch[, fade_out_ms])` | Channel stoppen, optional ausfaden |
-| `AUDIO_IS_PLAYING(ch)` → BOOLEAN | Spielt der Channel gerade? |
+| `AUDIO_IS_PLAYING(ch)` → BOOLEAN | Klingt der Sound gerade? Ein mit `AUDIO_PLAY_AT` geplanter erst ab seinem Tick |
+| `AUDIO_IS_WAITING(ch)` → BOOLEAN | mit `AUDIO_PLAY_AT` geplant, aber die Uhr hat den Tick noch nicht erreicht |
 | `AUDIO_VOLUME(ch, vol)` | Lautstaerke 0..1 setzen |
 | `AUDIO_GET_VOLUME(ch)` → FLOAT | aktuelle Lautstaerke |
 | `AUDIO_PAN(ch, left_vol, right_vol)` | Stereo-Pan (beide 0..1) |
@@ -482,6 +483,36 @@ PRINT AUDIO_BUS_GET_VOLUME("music")   ' 0.4
 
 Der `AUDIO_FFT`-Tap haengt am Master, erfasst also weiterhin den gesamten Mix.
 
+## Mitschnitt und Pegel
+
+`AUDIO_SOUND_MIX` baut einen Klang **trocken**: Hall, Echo, Filter und alles
+andere auf den Bussen wirkt nur live. Wer das, was aus dem Lautsprecher
+kommt, als Datei will, schneidet den Mixer mit:
+
+| Funktion | Wirkung |
+|---|---|
+| `AUDIO_RECORD_START([max_sekunden])` | den fertigen Mix mitschneiden, hinter allen Effekten und nach der Master-Lautstaerke; hoechstens `max_sekunden` (Vorgabe 600, hoechstens 3600). Ein laufender Mitschnitt beginnt von vorn |
+| `AUDIO_RECORD_STOP()` → SOUND | beenden und als Klang liefern (Stereo, Abtastrate des Geraets); ohne laufenden Mitschnitt ein Fehler |
+| `AUDIO_RECORDING()` → BOOLEAN | laeuft ein Mitschnitt? |
+| `AUDIO_PEAK()` → FLOAT | hoechster Ausschlag am Master seit dem letzten Aufruf, nach der Master-Lautstaerke; ueber 1.0 heisst Uebersteuern |
+
+```basic
+AUDIO_RECORD_START()
+' ... spielen lassen, bis das Stueck durch ist ...
+AUDIO_SAVE_WAV(AUDIO_RECORD_STOP(), "aufnahme.wav")
+```
+
+Der Mitschnitt dauert so lange wie die Musik; er laeuft auf dem
+Audio-Thread weiter, auch wenn das Programm zwischendurch zeichnet.
+
+`AUDIO_PEAK` einmal je Bild abgefragt ist eine Pegelanzeige. Mehrere Klaenge
+uebereinander addieren sich -- sechs Spuren mit je 0.8 gehen leicht ueber 1.0,
+und dann klippt der Mixer, im Lautsprecher und im Mitschnitt. Abhilfe ist
+ein leiserer Bus (`AUDIO_BUS_VOLUME("sfx", 0.4)`), nicht ein leiserer Master
+im Nachhinein. Eine Master-Lautstaerke per `AUDIO_MODULATE("master",
+"volume", ...)` kennen Mitschnitt und Pegel nicht -- sie rechnen mit dem
+Wert aus `AUDIO_BUS_VOLUME`.
+
 ## Echtzeit-Effekte (Filter / Reverb / Delay)
 
 Jeder Bus (`sfx`, `music`, `master`) hat eine **Echtzeit-Effektkette** auf dem
@@ -560,6 +591,31 @@ AUDIO_PLAY_AT(schlag, takt, 8)               ' klingt beim 8. Tick
 
 `AUDIO_PLAY_AT` plant den Start; ab da kümmert sich der Audio-Thread darum. Es
 gibt **kein** `UPDATE`, das man pro Bild rufen müsste.
+
+**Derselbe Klang darf mehrmals geplant sein.** Ein Sequencer plant die
+Hi-Hat zwei, drei Schritte voraus -- jedes `AUDIO_PLAY_AT` legt eine weitere
+Instanz an und lässt die wartenden stehen (bis 2026.28 stoppte es die vorige,
+und von zwei geplanten Einsätzen kam einer an). `AUDIO_STOP`, `AUDIO_PAUSE`,
+`AUDIO_RESUME`, `AUDIO_VOLUME`, `AUDIO_PITCH` und die Pan-Befehle wirken auf
+alle Instanzen; `AUDIO_PLAY` spielt den Klang wieder genau einmal.
+
+**Ein Tick, der schon vorbei ist, klingt sofort.** Hat das Programm eine
+Weile gehangen, holt eine Schleife, die stur jeden Schritt nachplant, alle
+verpassten auf einmal nach -- ein Knall aus übereinanderliegenden Noten. Der
+Sequencer im Beispiel überspringt sie:
+
+```basic
+DIM jetzt AS INTEGER : jetzt = AUDIO_CLOCK_TICKS(uhr) \ FEINE
+IF geplant <= jetzt THEN geplant = jetzt + 1     ' Verpasstes ueberspringen
+WHILE geplant < jetzt + VORAUS
+    AUDIO_PLAY_AT(hihat, uhr, geplant * FEINE)
+    geplant = geplant + 1
+WEND
+```
+
+`AUDIO_IS_PLAYING` ist für einen geplanten Klang erst ab seinem Tick wahr,
+vorher `AUDIO_IS_WAITING`. Entfernt man die Uhr, startet er nie -- dann ist
+beides FALSE.
 
 ## Räumliches Hören: Listener und Emitter
 
@@ -743,13 +799,15 @@ END IF
 
 [examples/190_tracker.dh](../examples/190_tracker.dh) — **der Tracker in Drachenhauch**: Noten aus `AUDIO_NOTE`, Wiedergabe über `AUDIO_CLOCK`/`AUDIO_PLAY_AT` (zwei Reihen voraus geplant, gestoppt wird durch Entfernen der Uhr), WAV-Export über `AUDIO_SOUND_NEW/MIX/NORMALIZE`.
 
+[examples/sequencer/main.dh](../examples/sequencer/main.dh) — **Step-Sequencer**: sechs Spuren, sechzehn Schritte, drei Schritte voraus auf einer Audio-Uhr geplant (Swing ueber feinere Ticks), Hall/Echo/Wah auf dem SFX-Bus, WAV trocken per `AUDIO_SOUND_MIX` oder mit Effekten per `AUDIO_RECORD_START`, Pegel aus `AUDIO_PEAK`.
+
 [examples/116_sampler.dh](../examples/116_sampler.dh) — **Amiga-Stil-Sampler**: ein einziges Zupf-Sample (`SAMPLE_LOAD`) wird per `SAMPLE_PLAY` ueber die ganze Klaviatur gespielt (Resampling = Tonhoehe wie Paula). Auto-Melodie + Bass aus demselben Sample, anklickbare Tasten, `L` schaltet den Paula-Lo-Fi-Modus zu.
 
 ## In der nativen Runtime (dhrt)
 
 Das `audio`-Modul laeuft nativ ueber **Kira** (cpal) — ein eigener Audio-Thread, vom Game-Loop entkoppelt (loeste 2026-06-13 raylib-Audio ab; mit dem `graphics`-Feature eingebunden, raylib bleibt fuer Fenster/Input). Audio-Ausgabe gehoert **nicht** zur deterministischen bit-identischen Garantie — wie `RND`/`tween`. Hinweise:
 
-- `SOUND` und `AUDIO_CHANNEL` sind ganzzahlige Handles; ein „Channel“ ist die zuletzt gestartete Instanz eines geladenen/gebauten Sounds.
+- `SOUND` und `AUDIO_CHANNEL` sind ganzzahlige Handles; ein „Channel“ ist die zuletzt gestartete Instanz eines geladenen/gebauten Sounds -- bei `AUDIO_PLAY_AT` zusammen mit allen noch geplanten.
 - Fade-in/out, `AUDIO_STOP` mit Fade und `AUDIO_PAN_SLIDE` sind **native Kira-Tweens** (laufen auf dem Audio-Thread); `loops` via `loop_region` (endlos) bzw. Restart-Zaehlung (endlich). `AUDIO_FFT` zapft den Mixer-Haupttrack ueber einen Effect an.
 - Volume wird intern in Dezibel gefuehrt (Kira), die Builtins nehmen weiterhin linear 0..1.
 - Ton-Generierung (`AUDIO_TONE`/`AUDIO_NOISE`/`AUDIO_SFX`) und der Sampler bauen die Wellenform als Float-Buffer direkt als Kira-`StaticSoundData`.
