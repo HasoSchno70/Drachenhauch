@@ -1,0 +1,144 @@
+' Die Zeitgrenze je Fall in `dhrt test` (2026-10-11).
+'
+' Bis dahin hielt ein haengender Fall den ganzen Lauf an, ohne jede Meldung --
+' in der Konsolen- und der Musik-Runde zweimal gesehen. Jetzt wird ein Fall,
+' der seine Zeit ueberschreitet, samt seinen Kindprozessen beendet und ist
+' FEHL mit Namen, Grund und den letzten Zeilen, die er ausgegeben hat.
+'
+' Wie in dhrt_test_format.dhtest schreibt jeder Fall seine innere Sammlung
+' SELBST: ihre `===`- und `---`-Zeilen hielte der aeussere Laeufer sonst fuer
+' seine eigenen. Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ein haengender fall wird abgebrochen und genannt
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "=== laeuft durch")
+ARRAY_PUSH(z, "PRINT 1")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "1")
+ARRAY_PUSH(z, "=== haengt")
+ARRAY_PUSH(z, !"PRINT \"angefangen\"")
+ARRAY_PUSH(z, "WHILE TRUE : SLEEP(50) : WEND")
+ARRAY_PUSH(z, "--- zeitgrenze 2")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "angefangen")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+DIM t0 AS INTEGER : t0 = MILLIS()
+dlStarten(["test", "s.dhtest"])
+PRINT "rueckgabe "; dlCode
+PRINT "genannt "; (INSTR(dlAus, "FEHL  Zeile 5: haengt: Zeitgrenze von 2 s ueberschritten (Hauptlauf) -- abgebrochen") >= 0)
+PRINT "letzte ausgabe "; (INSTR(dlAus, "zuletzt: angefangen") >= 0)
+PRINT "der andere lief "; (INSTR(dlAus, "1 von 2 Faellen") >= 0)
+PRINT "nicht gewartet "; (MILLIS() - t0 < 20000)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+genannt TRUE
+letzte ausgabe TRUE
+der andere lief TRUE
+nicht gewartet TRUE
+
+=== die grenze des falls schlaegt die der sammlung
+' Im Kopf eine Sekunde fuer alle; der erste Fall braucht 2,5 s und darf zehn.
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "--- zeitgrenze 1")
+ARRAY_PUSH(z, "=== darf laenger")
+ARRAY_PUSH(z, "SLEEP(2500) : PRINT 1")
+ARRAY_PUSH(z, "--- zeitgrenze 10")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "1")
+ARRAY_PUSH(z, "=== darf nicht")
+ARRAY_PUSH(z, "SLEEP(2500) : PRINT 1")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "1")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+dlStarten(["test", "s.dhtest"])
+PRINT "rueckgabe "; dlCode
+PRINT "eigene grenze reicht "; (INSTR(dlAus, "darf laenger") < 0)
+PRINT "kopf gilt "; (INSTR(dlAus, "darf nicht: Zeitgrenze von 1 s ueberschritten") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+eigene grenze reicht TRUE
+kopf gilt TRUE
+
+=== die kinder des falls werden mit beendet
+' Der haengende Fall startet ein zweites Programm, das alle 100 ms eine Datei
+' neu schreibt. Nach dem Abbruch darf sie sich nicht mehr aendern -- sonst
+' liefe das Kind weiter, und eine Leitung, die es geerbt hat, hielte den
+' Laeufer fest.
+IMPORT "helfer.dh"
+DIM ort AS STRING : ort = REPLACE$(CWD$(), CHR$(92), "/")
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "=== startet ein kind")
+ARRAY_PUSH(z, !"DIM p AS INTEGER : p = PROCESS_START(\"dhrt\", \"run\", \"" + ort + !"/kind.dh\", \"--\", \"" + ort + !"/puls.txt\")")
+ARRAY_PUSH(z, "WHILE TRUE : SLEEP(50) : WEND")
+ARRAY_PUSH(z, "--- zeitgrenze 3")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+dlStarten(["test", "s.dhtest"])
+PRINT "rueckgabe "; dlCode
+PRINT "kind lief "; FILEEXISTS("puls.txt")
+DIM a AS STRING, b AS STRING
+SLEEP(500)
+a = READALL$("puls.txt")
+SLEEP(1000)
+b = READALL$("puls.txt")
+PRINT "kind steht "; (a = b)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- datei kind.dh
+WHILE TRUE
+    WRITEALL(ARG$(0), STR$(MILLIS()))
+    SLEEP(100)
+WEND
+--- erwartet
+rueckgabe 1
+kind lief TRUE
+kind steht TRUE
+
+=== auch nachher und pruefprogramme haben die grenze
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "=== nachher haengt")
+ARRAY_PUSH(z, "PRINT 1")
+ARRAY_PUSH(z, "--- zeitgrenze 2")
+ARRAY_PUSH(z, "--- nachher")
+ARRAY_PUSH(z, "WHILE TRUE : SLEEP(50) : WEND")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+dlStarten(["test", "s.dhtest"])
+PRINT "nachher "; (INSTR(dlAus, "Zeitgrenze von 2 s ueberschritten (--- nachher)") >= 0)
+WRITEALL("haengt_pruefung.dh", "WHILE TRUE : SLEEP(50) : WEND" + CHR$(10))
+dlStarten(["test", "--zeitgrenze", "1", "haengt_pruefung.dh"])
+PRINT "pruefprogramm "; dlCode; " "; (INSTR(dlAus, "Zeitgrenze von 1 s ueberschritten (Pruefprogramm)") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+nachher TRUE
+pruefprogramm 1 TRUE
+
+=== zeitgrenze auf der kommandozeile
+' `--zeitgrenze N` setzt die Vorgabe fuer Faelle ohne eigene, 0 schaltet sie
+' ab; was keine ganze Zahl ist, ist ein Fehler des Aufrufs.
+IMPORT "helfer.dh"
+DIM z AS ARRAY OF STRING : z = []
+ARRAY_PUSH(z, "=== schlaeft")
+ARRAY_PUSH(z, "SLEEP(1500) : PRINT 1")
+ARRAY_PUSH(z, "--- erwartet")
+ARRAY_PUSH(z, "1")
+WRITEALL("s.dhtest", JOIN$(z, CHR$(10)) + CHR$(10))
+dlStarten(["test", "--zeitgrenze", "1", "s.dhtest"])
+PRINT "eine sekunde "; dlCode; " "; (INSTR(dlAus, "Zeitgrenze von 1 s") >= 0)
+dlStarten(["test", "--zeitgrenze", "0", "s.dhtest"])
+PRINT "ohne "; dlCode
+dlStarten(["test", "--zeitgrenze", "bald", "s.dhtest"])
+PRINT "falsch "; dlCode; " "; (INSTR(dlErr, "ganze Sekunden") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+eine sekunde 1 TRUE
+ohne 0
+falsch 2 TRUE

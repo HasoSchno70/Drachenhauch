@@ -275,7 +275,18 @@ Fälle laufen, deren Name den Text enthält, `--fall Name` genau den einen diese
 `--- langsam` vor dem ersten Fall lässt `dhrt test --schnell` aus (die
 Werkzeuge, die IDE und alles, was echte Fenster in Echtzeit bedient) — die
 Bilanz nennt jede ausgelassene Datei mit `langsam <name>`, damit niemand
-einen schnellen Lauf für einen vollen hält. Beide Schalter sind eigene Zeilen ohne `'` davor -- als Kommentar geschrieben (`' --- seriell`) gälten sie nicht, darum ist das ein Fehler. Die CI läuft immer alles. Ein Fall, der an einer Maschine
+einen schnellen Lauf für einen vollen hält. Beide Schalter sind eigene Zeilen ohne `'` davor -- als Kommentar geschrieben (`' --- seriell`) gälten sie nicht, darum ist das ein Fehler. Die CI läuft immer alles.
+
+**Zeitgrenze:** ein Fall darf höchstens 300 Sekunden brauchen, alle seine
+Läufe zusammen (`--- vorher`, Hauptlauf, `--- nochmal`, `--- zwischen`,
+`--- nachher`). Läuft er länger, beendet `dhrt test` ihn samt den Programmen,
+die er gestartet hat, und meldet ihn als FEHL mit
+„Zeitgrenze von N s ueberschritten (Hauptlauf)“ und den letzten Zeilen, die
+er ausgegeben hat — vorher hielt ein hängender Fall den ganzen Lauf an.
+`--- zeitgrenze N` vor dem ersten Fall setzt die Grenze für alle Fälle der
+Datei, innerhalb eines Falls nur für ihn (der Fall gewinnt);
+`dhrt test --zeitgrenze N` ändert die Vorgabe, `--zeitgrenze 0` schaltet
+sie ab. Prüfprogramme (`*_pruefung.dh`) haben dieselbe Vorgabe. Ein Fall, der an einer Maschine
 ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
 falsch (erkannt an der Meldung „Kein Fenster moeglich“, die `dhrt` dann
 statt eines Absturzes ausgibt; `DHRT_KEIN_FENSTER=1` täuscht genau diesen
