@@ -62,7 +62,7 @@ WHILE ai < ARGC()
 WEND
 
 IF mitFenster THEN
-    SCREEN(ARENA_B, ARENA_H, "Duell", 0)
+    SCREEN(ARENA_B, ARENA_H, "Duell")
     SETFPS(60)
 END IF
 
@@ -486,7 +486,7 @@ SUB schiffZeichnen(x AS FLOAT, y AS FLOAT, w AS FLOAT, farbe AS INTEGER, schild 
     LINEW(ax, ay, bx, by, 2, farbe)
     LINEW(bx, by, cx, cy, 2, farbe)
     LINEW(cx, cy, ax, ay, 2, farbe)
-    IF schild THEN CIRCLE(x, y, 19, RGB(90, 90, 140))
+    IF schild THEN CIRCLEOUTLINE(x, y, 19, RGB(110, 110, 170))
 END SUB
 
 FUNCTION winkelMischen(a AS FLOAT, b AS FLOAT, t AS FLOAT) AS FLOAT
