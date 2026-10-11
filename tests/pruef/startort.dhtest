@@ -1,0 +1,84 @@
+' STARTDIR$ und ARGPATH$ (2026-10-11, Konsolen-Runde): `dhrt run` und die
+' exportierte Exe wechseln in den Ordner des Programms -- ein relativer Pfad,
+' den der Nutzer aus SEINEM Ordner angibt, zeigte dann ins Leere. Auch
+' examples/172_filter.dh als Exe fand `daten/obst.txt` nicht, und die Exe
+' kannte den Aufrufort gar nicht (DHRT_START_DIR setzte nur `dhrt run`).
+'
+' Die Werkzeuge laufen als Kind; ihr Arbeitsordner ist der Fallordner, das
+' Programm selbst liegt in einem Unterordner.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== argpath unter dhrt run gilt vom aufrufort aus
+IMPORT "helfer.dh"
+dlStarten(["run", CWD$() + "/werkzeug/w.dh", "--", "daten/obst.txt", "-", "x"])
+PRINT "lauf "; dlCode
+DIM z AS STRING
+FOR EACH z IN SPLIT$(dlAus, CHR$(10))
+    IF z <> "" AND LEFT$(z, 6) <> "start=" THEN PRINT z
+NEXT
+PRINT "start ist der aufrufort "; INSTR(dlAus, "start=" + CWD$() + CHR$(10)) >= 0
+PRINT dlErr;
+--- datei werkzeug/w.dh
+PRINT "arg=" + ARG$(0)
+PRINT "da=" + STR$(FILEEXISTS(ARGPATH$(0))) + " neben dem programm=" + STR$(FILEEXISTS(ARG$(0)))
+PRINT "inhalt=" + READLINES(ARGPATH$(0))[0]
+PRINT "strich=" + ARGPATH$(1)
+PRINT "leer=[" + ARGPATH$(7) + "]"
+PRINT "start=" + STARTDIR$()
+--- datei daten/obst.txt
+apfel
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+lauf 0
+arg=daten/obst.txt
+da=TRUE neben dem programm=FALSE
+inhalt=apfel
+strich=-
+leer=[]
+start ist der aufrufort TRUE
+
+=== ein absoluter pfad bleibt
+IMPORT "helfer.dh"
+DIM abs AS STRING : abs = CWD$() + "/daten/obst.txt"
+dlStarten(["run", CWD$() + "/werkzeug/w.dh", "--", abs])
+PRINT "lauf "; dlCode
+PRINT "unveraendert "; INSTR(dlAus, "pfad=" + abs + CHR$(10)) >= 0
+--- datei werkzeug/w.dh
+PRINT "pfad=" + ARGPATH$(0)
+--- datei daten/obst.txt
+apfel
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+lauf 0
+unveraendert TRUE
+
+=== die exportierte exe kennt den aufrufort
+' Bis 2026.28 wechselte die Exe in ihren Ordner, ohne den Aufrufort zu
+' hinterlegen -- `werkzeug.exe daten/obst.txt` fand nichts.
+IMPORT "helfer.dh"
+dlStarten(["--export", CWD$() + "/werkzeug/w.dh", CWD$() + "/dist"])
+PRINT "export "; dlCode
+DIM exe AS STRING : exe = CWD$() + "/dist/" + exeName$("w")
+DIM aus AS STRING
+aus = REPLACE$(SHELL_OUT$(exe, "daten/obst.txt"), CHR$(13), "")
+DIM z AS STRING
+FOR EACH z IN SPLIT$(aus, CHR$(10))
+    IF z <> "" AND LEFT$(z, 6) <> "start=" THEN PRINT z
+NEXT
+PRINT "start ist der aufrufort "; INSTR(aus, "start=" + CWD$() + CHR$(10)) >= 0
+--- datei werkzeug/w.dh
+PRINT "da=" + STR$(FILEEXISTS(ARGPATH$(0)))
+PRINT "inhalt=" + READLINES(ARGPATH$(0))[0]
+PRINT "start=" + STARTDIR$()
+--- datei daten/obst.txt
+apfel
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+--- erwartet
+export 0
+da=TRUE
+inhalt=apfel
+start ist der aufrufort TRUE

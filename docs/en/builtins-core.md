@@ -1106,6 +1106,8 @@ worked.
 |---|---|
 | `ARGC()` → INTEGER | number of arguments for this program |
 | `ARG$(n)` → STRING | argument no. `n` (0-based); out of range → `""` |
+| `ARGPATH$(n)` → STRING | argument no. `n` as a **path from where the program was called** (see below) |
+| `STARTDIR$()` → STRING | the folder the program was called from |
 | `GETENV$(name$ [, vorgabe$])` → STRING | read an environment variable |
 | `SETENV(name$, wert$)` | set an environment variable (this program + its children) |
 | `CWD$()` → STRING | current working directory |
@@ -1124,7 +1126,7 @@ IF ARGC() < 1 THEN
     EPRINT("Verwendung: zaehle <datei>")
     EXIT(2)
 END IF
-pfad = ARG$(0)
+pfad = ARGPATH$(0)
 IF NOT FILEEXISTS(pfad) THEN
     EPRINT("Nicht gefunden: " + pfad)
     EXIT(1)
@@ -1146,6 +1148,23 @@ arguments. This is on purpose: otherwise `dhrt` could never add a switch of its 
 without breaking existing programs. The **exported `.exe`**
 is the program itself — there is nothing to separate there, all arguments
 belong to it, without `--`.
+
+**Paths in arguments: `ARGPATH$` instead of `ARG$`.** `dhrt run` and the
+exported `.exe` change into the program's folder at startup -- so that
+`LOADIMAGE("assets/held.png")` finds its image no matter where it was started
+from. A relative path the user gives from *their* folder then points nowhere:
+`werkzeug.exe daten/obst.txt` looks for `daten/obst.txt` next to the `.exe`.
+`ARGPATH$(n)` therefore puts the calling folder in front (`STARTDIR$()`); an
+absolute path, an empty argument and `-` (standard input) stay as they are. For
+options, patterns and numbers keep using `ARG$`.
+
+| Called from `C:\arbeit` | `ARG$(0)` | `ARGPATH$(0)` |
+|---|---|---|
+| `werkzeug.exe daten\obst.txt` | `daten\obst.txt` | `C:\arbeit\daten\obst.txt` |
+| `werkzeug.exe D:\x.txt` | `D:\x.txt` | `D:\x.txt` |
+
+Until 2026.28 the exported `.exe` did not know the calling folder at all; under
+`dhrt run` it was already in the environment variable `DHRT_START_DIR`.
 
 **`EXIT` is not an error.** It ends the program immediately and is **not** caught by
 `TRY`/`CATCH` — an `EXIT` in the middle of a `TRY` block really

@@ -113,6 +113,31 @@ Name: [Anna]
 rest: zeile1
 rest: zeile2
 
+=== input nach stdin liest aus demselben puffer
+' Die andere Richtung: erst STDIN(), dann INPUT. Bis 2026.28 blieb das
+' Programm hier haengen -- das STDIN()-Handle hielt die Sperre der
+' Standardeingabe, und INPUT wartete auf sie. Seit dem eigenen Puffer des
+' Handles (1 MiB, schneller an Pipes) liest INPUT aus diesem.
+DIM f AS FILE
+DIM name AS STRING
+DIM alter AS INTEGER
+f = STDIN()
+PRINT "erste: " + READLINE(f)
+INPUT "Name? ", name
+PRINT "zweite: " + READLINE(f)
+INPUT "Alter? ", alter
+PRINT name; " "; alter; " "; ENDOFFILE(f)
+--- eingabe
+zeile1
+Anna
+zeile2
+42
+
+--- erwartet
+erste: zeile1
+Name? zweite: zeile2
+Alter? Anna 42 TRUE
+
 === kodierung gilt auch hier
 DIM f AS FILE
 f = STDIN("cp1252")

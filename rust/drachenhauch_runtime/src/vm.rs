@@ -1316,6 +1316,23 @@ impl<'p> Vm<'p> {
         if self.stop.is_some() || self.dbg.is_some() {
             return String::new();
         }
+        // Gibt es das STDIN()-Handle schon, liest INPUT aus SEINEM Puffer --
+        // es liest voraus (1 MiB, siehe `stdin_handle`), und was dort liegt,
+        // saehe ein zweiter Leser nicht.
+        if let Some(Value::File(f)) = &self.stdin_datei {
+            use std::io::BufRead;
+            let mut f = f.borrow_mut();
+            let (kod, anfang, pfad) = (f.kod, f.am_anfang, f.path.clone());
+            f.am_anfang = false;
+            if let Some(r) = f.leser() {
+                let mut roh: Vec<u8> = Vec::new();
+                let _ = r.read_until(b'\n', &mut roh);
+                while roh.last() == Some(&b'\n') || roh.last() == Some(&b'\r') { roh.pop(); }
+                let z = crate::kodierung::dekodieren(&roh, kod, "INPUT", &pfad)
+                    .unwrap_or_else(|_| String::from_utf8_lossy(&roh).into_owned());
+                return if anfang { crate::kodierung::ohne_bom(z) } else { z };
+            }
+        }
         read_input_line()
     }
 
@@ -1386,10 +1403,16 @@ impl<'p> Vm<'p> {
         // Gehoert stdin jemand anderem (Stop-Kanal/Debugger), einen leeren
         // Strom geben: die uebliche Schleife laeuft dann null mal, statt dem
         // Protokoll eine Zeile wegzunehmen.
+        // Ein eigener Puffer von 1 MiB: Rusts Standardeingabe liest in 8-KB-
+        // Stuecken, und an einer Pipe kostet jeder Lesevorgang -- 400 000
+        // Zeilen aus `cat datei |` (Git-Bash) brauchten 2,8 s statt 0,1 s mit
+        // `< datei`, aus `type datei |` (cmd) 0,7 s (gemessen 2026-10-11,
+        // Konsolen-Runde). INPUT liest danach aus DIESEM Puffer
+        // (`read_input_line`), damit beide gemischt werden koennen.
         let strom: Box<dyn std::io::BufRead> = if self.stop.is_some() || self.dbg.is_some() {
             Box::new(std::io::empty())
         } else {
-            Box::new(std::io::stdin().lock())
+            Box::new(std::io::BufReader::with_capacity(1 << 20, std::io::stdin().lock()))
         };
         let h = Value::File(Rc::new(RefCell::new(crate::value::DhFile {
             path: "<Standardeingabe>".to_string(),

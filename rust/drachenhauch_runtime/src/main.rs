@@ -598,9 +598,10 @@ fn main() -> ExitCode {
             .map(|s| s.to_string_lossy().into_owned()).collect());
         // Ins Exe-Verzeichnis wechseln, damit relative Asset-Pfade
         // (LOADIMAGE("assets/...")) auch beim Doppelklick von ueberall stimmen.
-        if let Ok(exe) = std::env::current_exe() {
-            if let Some(dir) = exe.parent() { let _ = std::env::set_current_dir(dir); }
-        }
+        // Den Ort des Aufrufs vorher hinterlegen wie `dhrt run` -- sonst haette
+        // ein exportiertes Werkzeug keinen Weg, `meins.exe daten/x.csv` zu
+        // finden (STARTDIR$/ARGPATH$; bis 2026.28 fehlte das hier).
+        ins_quellverzeichnis_exe();
         let label = std::env::current_exe().ok()
             .and_then(|p| p.file_name().map(|s| s.to_string_lossy().into_owned()))
             .unwrap_or_else(|| "spiel".into());
@@ -1625,6 +1626,12 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
 /// hinterlegen: nach dem Wechsel kann kein Programm es mehr erfragen, und
 /// ein Werkzeug wie die IDE (`ide/ide.dh -- spiel.dh`) meint mit einem
 /// relativen Namen den Ort, an dem der Nutzer steht, nicht den der IDE.
+fn ins_quellverzeichnis_exe() {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() { ins_quellverzeichnis(dir); }
+    }
+}
+
 fn ins_quellverzeichnis(base: &std::path::Path) {
     if let Ok(hier) = std::env::current_dir() {
         std::env::set_var("DHRT_START_DIR", hier);

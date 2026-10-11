@@ -1109,6 +1109,8 @@ geklappt hat.
 |---|---|
 | `ARGC()` → INTEGER | Anzahl der Argumente für dieses Programm |
 | `ARG$(n)` → STRING | Argument Nr. `n` (0-basiert); außerhalb → `""` |
+| `ARGPATH$(n)` → STRING | Argument Nr. `n` als **Pfad vom Aufrufort aus** (siehe unten) |
+| `STARTDIR$()` → STRING | der Ordner, aus dem das Programm aufgerufen wurde |
 | `GETENV$(name$ [, vorgabe$])` → STRING | Umgebungsvariable lesen |
 | `SETENV(name$, wert$)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) |
 | `CWD$()` → STRING | aktuelles Arbeitsverzeichnis |
@@ -1127,7 +1129,7 @@ IF ARGC() < 1 THEN
     EPRINT("Verwendung: zaehle <datei>")
     EXIT(2)
 END IF
-pfad = ARG$(0)
+pfad = ARGPATH$(0)
 IF NOT FILEEXISTS(pfad) THEN
     EPRINT("Nicht gefunden: " + pfad)
     EXIT(1)
@@ -1149,6 +1151,23 @@ Argumente. Das ist Absicht: sonst könnte `dhrt` sich keinen eigenen Schalter
 mehr zulegen, ohne bestehende Programme zu brechen. Die **exportierte `.exe`**
 ist selbst das Programm — dort gibt es nichts zu trennen, alle Argumente
 gehören ihr, ohne `--`.
+
+**Pfade in Argumenten: `ARGPATH$` statt `ARG$`.** `dhrt run` und die
+exportierte `.exe` wechseln beim Start in den Ordner des Programms -- so findet
+`LOADIMAGE("assets/held.png")` sein Bild, egal von wo aus gestartet wurde. Ein
+relativer Pfad, den der Nutzer aus *seinem* Ordner angibt, zeigt dann aber
+ins Leere: `werkzeug.exe daten/obst.txt` sucht `daten/obst.txt` neben der
+`.exe`. `ARGPATH$(n)` setzt darum den Aufrufort davor (`STARTDIR$()`); ein
+absoluter Pfad, ein leeres Argument und `-` (Standardeingabe) bleiben, wie sie
+sind. Für Optionen, Muster und Zahlen bleibt es bei `ARG$`.
+
+| Aufruf aus `C:\arbeit` | `ARG$(0)` | `ARGPATH$(0)` |
+|---|---|---|
+| `werkzeug.exe daten\obst.txt` | `daten\obst.txt` | `C:\arbeit\daten\obst.txt` |
+| `werkzeug.exe D:\x.txt` | `D:\x.txt` | `D:\x.txt` |
+
+Bis 2026.28 kannte die exportierte `.exe` den Aufrufort gar nicht; unter
+`dhrt run` stand er schon in der Umgebungsvariablen `DHRT_START_DIR`.
 
 **`EXIT` ist kein Fehler.** Es beendet das Programm sofort und wird von
 `TRY`/`CATCH` **nicht** gefangen — ein `EXIT` mitten in einem `TRY`-Block läuft

@@ -97,6 +97,25 @@ static PROGRAMM_ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::ne
 /// so kann ein zweiter Einstiegspunkt sie gefahrlos ebenfalls setzen wollen.
 pub fn set_programm_args(args: Vec<String>) { let _ = PROGRAMM_ARGS.set(args); }
 
+/// Der Ort, von dem aus das Programm aufgerufen wurde: `DHRT_START_DIR`
+/// (setzen `dhrt run` und die exportierte Exe vor dem Ordnerwechsel), sonst
+/// das Arbeitsverzeichnis.
+pub fn startort() -> Result<String, String> {
+    if let Some(s) = std::env::var_os("DHRT_START_DIR") {
+        if !s.is_empty() { return Ok(s.to_string_lossy().into_owned()); }
+    }
+    std::env::current_dir().map(|p| p.to_string_lossy().into_owned()).map_err(|e| e.to_string())
+}
+
+/// Ein Argument als Pfad vom Aufrufort aus: absolut (auch mit Wurzel ohne
+/// Laufwerk) bleibt, leer und `-` (Standardeingabe) bleiben, sonst steht der
+/// Startort davor.
+pub fn arg_pfad(arg: &str, start: &str) -> String {
+    let p = std::path::Path::new(arg);
+    if arg.is_empty() || arg == "-" || p.is_absolute() || p.has_root() { return arg.to_string(); }
+    std::path::Path::new(start).join(p).to_string_lossy().into_owned()
+}
+
 /// Die .dh-Datei, die gerade laeuft.
 ///
 /// `TASK_START` startet einen Kindprozess `dhrt call <datei> <funktion>` --
@@ -3938,6 +3957,22 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if i < 0 || i as usize >= args.len() { return Ok(Value::str_rc("")); }
             Ok(Value::str_rc(&args[i as usize]))
         }
+        // STARTDIR$ / ARGPATH$ (2026-10-11, Konsolen-Runde): `dhrt run` und
+        // die exportierte Exe wechseln in den Ordner des Programms (damit
+        // Bilder und Klaenge gefunden werden) -- ein relativer Pfad, den der
+        // Nutzer aus SEINEM Ordner angibt, zeigte dann ins Leere. Auch
+        // examples/172_filter.dh als Exe fand `daten/obst.txt` nicht.
+        "startdir$" | "startdir" => {
+            arity!(0);
+            Ok(Value::str_rc(startort().map_err(|e| format!("STARTDIR$: {}", e))?))
+        }
+        "argpath$" | "argpath" => {
+            arity!(1);
+            let i = need_int(&a[0], "ARGPATH$")?;
+            let args = programm_args();
+            if i < 0 || i as usize >= args.len() { return Ok(Value::str_rc("")); }
+            Ok(Value::str_rc(arg_pfad(&args[i as usize], &startort().map_err(|e| format!("ARGPATH$: {}", e))?)))
+        }
         "getenv$" | "getenv" => {
             if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1..2 Argumente, erhalten {}", a.len())); }
             let name_ = need_str(&a[0], "GETENV$")?;
@@ -6560,6 +6595,22 @@ pub fn is_graphics_builtin(name: &str) -> bool {
         | "quitrequested" | "sleep" | "imagewidth" | "imageheight" | "image_width" | "image_height"
         | "color" | "fill"
     )
+}
+
+#[cfg(test)]
+mod arg_pfad_tests {
+    use super::arg_pfad;
+    #[test]
+    fn relativ_wird_vom_startort_aus_gelesen() {
+        let s = if cfg!(windows) { r"C:\a" } else { "/a" };
+        let erwartet = std::path::Path::new(s).join("b/c.txt").to_string_lossy().into_owned();
+        assert_eq!(arg_pfad("b/c.txt", s), erwartet);
+        assert_eq!(arg_pfad("", s), "");
+        assert_eq!(arg_pfad("-", s), "-");
+        let abs = if cfg!(windows) { r"D:\x.txt" } else { "/x.txt" };
+        assert_eq!(arg_pfad(abs, s), abs);
+        assert_eq!(arg_pfad("/wurzel", s), "/wurzel");
+    }
 }
 
 #[cfg(test)]
