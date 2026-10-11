@@ -1044,13 +1044,111 @@ fn bild_laden(_pfad: &std::path::Path) -> Result<pruefsammlung::Bild, BildFehler
 /// Eine Pruefsammlung laufen lassen: jeder Fall als eigener `dhrt run` in einem
 /// eigenen Verzeichnis, die Faelle parallel. Liefert (ok, fehl, uebersprungen,
 /// Meldungen der Fehlschlaege und Uebersprungenen).
-fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option<&str>, genau: bool)
+/// Vorgabe fuer `dhrt test`: so viele Sekunden darf ein Fall hoechstens
+/// brauchen (alle seine Laeufe zusammen). Gemessen braucht der laengste Fall
+/// des Repos unter Last rund eine Minute; die Vorgabe laesst Luft fuer
+/// langsamere Rechner und faengt trotzdem jeden Haenger.
+const TEST_ZEITGRENZE: u64 = 300;
+
+/// Ergebnis eines Laufs mit Zeitgrenze.
+struct TestLauf { code: i32, out: String, err: String, abgelaufen: bool }
+
+/// Einen Prozess laufen lassen, hoechstens bis `frist`. Laeuft er laenger,
+/// wird er samt seinen Kindprozessen beendet (`abgelaufen`), und was er bis
+/// dahin ausgegeben hat, kommt mit -- daran sieht man, wo er hing.
+fn test_lauf(mut cmd: std::process::Command, eingabe: Option<&[u8]>, frist: Option<std::time::Instant>)
+    -> Result<TestLauf, String>
+{
+    use std::io::{Read, Write};
+    use std::sync::mpsc;
+    cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+    if eingabe.is_some() { cmd.stdin(std::process::Stdio::piped()); }
+    let mut kind = cmd.spawn().map_err(|e| format!("Start fehlgeschlagen: {}", e))?;
+    let pid = kind.id();
+    // Beide Kanaele in eigenen Faeden leeren -- eine volle Leitung hielte
+    // das Kind sonst an, und es liefe in die Zeitgrenze, ohne zu haengen.
+    let leser = |quelle: Option<Box<dyn Read + Send>>| {
+        let (tx, rx) = mpsc::channel::<Vec<u8>>();
+        if let Some(mut q) = quelle {
+            std::thread::spawn(move || { let mut v = Vec::new(); let _ = q.read_to_end(&mut v); let _ = tx.send(v); });
+        } else { let _ = tx.send(Vec::new()); }
+        rx
+    };
+    let rx_out = leser(kind.stdout.take().map(|o| Box::new(o) as Box<dyn Read + Send>));
+    let rx_err = leser(kind.stderr.take().map(|e| Box::new(e) as Box<dyn Read + Send>));
+    if let (Some(bytes), Some(mut stdin)) = (eingabe, kind.stdin.take()) {
+        // Ganz hineinschreiben und schliessen -- ein Programm, das bis EOF
+        // liest, wartete sonst ewig. Ein Kind, das frueher aufhoert zu lesen,
+        // schliesst die Leitung (BrokenPipe); das ist kein Fehler des Falls.
+        let bytes = bytes.to_vec();
+        std::thread::spawn(move || { let _ = stdin.write_all(&bytes); });
+    }
+    let (tx_ende, rx_ende) = mpsc::channel();
+    std::thread::spawn(move || { let _ = tx_ende.send(kind.wait()); });
+    let status = match frist {
+        None => rx_ende.recv().ok(),
+        Some(f) => rx_ende.recv_timeout(f.saturating_duration_since(std::time::Instant::now())).ok(),
+    };
+    let abgelaufen = status.is_none();
+    let code = match status {
+        Some(Ok(s)) => s.code().unwrap_or(-1),
+        Some(Err(e)) => return Err(format!("Lauf fehlgeschlagen: {}", e)),
+        None => { prozessbaum_beenden(pid); let _ = rx_ende.recv_timeout(std::time::Duration::from_secs(10)); -1 }
+    };
+    // Haelt ein Enkel die Leitung noch offen, nicht ewig warten.
+    let warten = std::time::Duration::from_secs(if abgelaufen { 5 } else { 60 });
+    let out = String::from_utf8_lossy(&rx_out.recv_timeout(warten).unwrap_or_default()).into_owned();
+    let err = String::from_utf8_lossy(&rx_err.recv_timeout(warten).unwrap_or_default()).into_owned();
+    Ok(TestLauf { code, out, err, abgelaufen })
+}
+
+/// Ein Prozess und alle seine Nachkommen -- ein haengender Fall startet oft
+/// selbst Programme (die IDE ihr Programm, ein Werkzeug einen Server).
+fn prozessbaum_beenden(pid: u32) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let _ = std::process::Command::new("taskkill")
+            .args(["/T", "/F", "/PID", &pid.to_string()])
+            .stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+            .creation_flags(0x0800_0000)
+            .status();
+    }
+    #[cfg(not(windows))]
+    {
+        // Ohne eigene Prozessgruppe (Strg+C auf `dhrt test` soll die Faelle
+        // weiter treffen): erst die Kinder, dann der Prozess selbst.
+        let _ = std::process::Command::new("pkill").args(["-KILL", "-P", &pid.to_string()])
+            .stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+            .status();
+        let _ = std::process::Command::new("kill").args(["-KILL", &pid.to_string()])
+            .stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+            .status();
+    }
+}
+
+/// Die Meldung fuer einen Fall, der seine Zeitgrenze ueberschritten hat --
+/// mit den letzten Zeilen, die er ausgegeben hat.
+fn zeitgrenze_meldung(sek: u64, was: &str, lauf: &TestLauf) -> String {
+    let mut m = format!("Zeitgrenze von {} s ueberschritten ({}) -- abgebrochen", sek, was);
+    let zeilen: Vec<&str> = lauf.out.lines().chain(lauf.err.lines()).map(str::trim).filter(|z| !z.is_empty()).collect();
+    if !zeilen.is_empty() {
+        let ab = zeilen.len().saturating_sub(3);
+        m.push_str("; zuletzt: ");
+        m.push_str(&zeilen[ab..].join(" | "));
+    }
+    m
+}
+
+fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option<&str>, genau: bool,
+                   grenze_vorgabe: Option<u64>)
     -> Result<(usize, usize, usize, Vec<String>), String>
 {
     use std::sync::{Arc, Mutex};
     let text = std::fs::read_to_string(pfad).map_err(|e| format!("nicht lesbar: {}", e))?;
     let sammlung = pruefsammlung::sammlung_parsen(&text)?;
     let seriell = sammlung.seriell;
+    let grenze_sammlung = sammlung.zeitgrenze;
     let faelle: Vec<pruefsammlung::Fall> = sammlung.faelle
         .into_iter()
         .filter(|f| filter.map_or(true, |t| if genau { f.name == t } else { f.name.contains(t) }))
@@ -1085,6 +1183,10 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
             let i = { let mut n = naechster.lock().unwrap(); let i = *n; *n += 1; i };
             if i >= faelle.len() { break; }
             let f = &faelle[i];
+            // Die Zeitgrenze gilt dem ganzen Fall, ab jetzt: Fall > Sammlung >
+            // Vorgabe des Laeufers (`--zeitgrenze 0` schaltet sie ab).
+            let grenze = f.zeitgrenze.or(grenze_sammlung).or(grenze_vorgabe);
+            let frist = grenze.map(|s| std::time::Instant::now() + std::time::Duration::from_secs(s));
             let dir = wurzel.join(format!("fall_{}", i));
             let _ = std::fs::create_dir_all(&dir);
             let erg = (|| {
@@ -1183,17 +1285,20 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                 };
                 // Ein Hilfsprogramm in Drachenhauch (`--- vorher`, `--- zwischen`,
                 // `--- nachher`): im Fallordner, OHNE die Umgebung des Falls.
+                // Laeuft er in die Zeitgrenze, ist das Err mit der fertigen Meldung.
                 let hilfslauf = |name: &str, quelle: &str| -> Result<(i32, String, String), String> {
                     std::fs::write(dir.join(name), quelle).map_err(|e| e.to_string())?;
-                    let o = std::process::Command::new(&exe)
-                        .arg("run").arg(dir.join(name))
+                    let mut cmd = std::process::Command::new(&exe);
+                    cmd.arg("run").arg(dir.join(name))
                         .current_dir(&dir)
                         .stdin(std::process::Stdio::null())
                         .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
-                        .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
-                        .output().map_err(|e| format!("{}: Start fehlgeschlagen: {}", name, e))?;
-                    Ok((o.status.code().unwrap_or(-1),
-                        String::from_utf8_lossy(&o.stdout).into_owned(), String::from_utf8_lossy(&o.stderr).into_owned()))
+                        .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1");
+                    let l = test_lauf(cmd, None, frist).map_err(|e| format!("{}: {}", name, e))?;
+                    if l.abgelaufen {
+                        return Err(zeitgrenze_meldung(grenze.unwrap_or(0), &format!("--- {}", name.trim_end_matches(".dh")), &l));
+                    }
+                    Ok((l.code, l.out, l.err))
                 };
                 // Ein Zwischenlauf muss nur sauber enden; ein fehlendes Fenster
                 // heisst weiter "uebersprungen", nicht "falsch".
@@ -1207,21 +1312,12 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                     }
                 }
                 let mut cmd = befehl(&dir, &f.argumente);
-                cmd.stdin(if f.eingabe.is_some() { std::process::Stdio::piped() } else { std::process::Stdio::null() });
-                let mut kind = cmd.spawn().map_err(|e| format!("Start fehlgeschlagen: {}", e))?;
-                if let Some(bytes) = &f.eingabe {
-                    // Die Eingabe ganz hineinschreiben und das Ende schliessen --
-                    // ein Programm, das bis EOF liest, wartete sonst ewig. Ein
-                    // Kind, das frueher aufhoert zu lesen, schliesst die Leitung
-                    // (BrokenPipe); das ist kein Fehler des Falls.
-                    use std::io::Write;
-                    if let Some(mut stdin) = kind.stdin.take() {
-                        let _ = stdin.write_all(bytes);
-                    }
+                if f.eingabe.is_none() { cmd.stdin(std::process::Stdio::null()); }
+                let l = test_lauf(cmd, f.eingabe.as_deref(), frist)?;
+                if l.abgelaufen {
+                    return Ok(pruefsammlung::Ergebnis::Fehl(zeitgrenze_meldung(grenze.unwrap_or(0), "Hauptlauf", &l)));
                 }
-                let o = kind.wait_with_output().map_err(|e| format!("Lauf fehlgeschlagen: {}", e))?;
-                let (mut code, mut out, mut err) = (o.status.code().unwrap_or(-1),
-                    String::from_utf8_lossy(&o.stdout).into_owned(), String::from_utf8_lossy(&o.stderr).into_owned());
+                let (mut code, mut out, mut err) = (l.code, l.out, l.err);
                 // Mit Schritten oder `--- nachher` muss der Hauptlauf nur sauber
                 // enden (fehlendes Fenster = uebersprungen); die Erwartungen
                 // gelten dem letzten Lauf bzw. dem Leseprogramm.
@@ -1239,10 +1335,14 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                             pruefsammlung::Schritt::Nochmal { ordner, argumente } => {
                                 let cwd = match ordner { Some(o) => dir.join(o), None => dir.clone() };
                                 let _ = std::fs::create_dir_all(&cwd);
-                                let o = befehl(&cwd, argumente).stdin(std::process::Stdio::null()).output()
-                                    .map_err(|e| format!("--- nochmal: Start fehlgeschlagen: {}", e))?;
-                                (o.status.code().unwrap_or(-1), String::from_utf8_lossy(&o.stdout).into_owned(),
-                                 String::from_utf8_lossy(&o.stderr).into_owned(), "nochmal")
+                                let mut cmd = befehl(&cwd, argumente);
+                                cmd.stdin(std::process::Stdio::null());
+                                let l = test_lauf(cmd, None, frist).map_err(|e| format!("--- nochmal: {}", e))?;
+                                if l.abgelaufen {
+                                    return Ok(pruefsammlung::Ergebnis::Fehl(zeitgrenze_meldung(
+                                        grenze.unwrap_or(0), &format!("--- nochmal, {}. Schritt", k + 1), &l)));
+                                }
+                                (l.code, l.out, l.err, "nochmal")
                             }
                         };
                         match pruefsammlung::bewerten(&nur_lauf, c, &o, &e, ohne_grafik) {
@@ -1355,12 +1455,23 @@ fn test_main(args: &[String]) -> ExitCode {
     // Echtzeit, Durchlaeufe ueber das ganze Repo) -- fuer die Rueckmeldung
     // waehrend der Arbeit. Die volle Pruefung laeuft in der CI.
     let mut schnell = false;
+    // `--zeitgrenze N`: Sekunden je Fall, wo die Sammlung oder der Fall
+    // nichts sagt (Vorgabe TEST_ZEITGRENZE); 0 schaltet die Vorgabe ab.
+    let mut grenze: Option<u64> = Some(TEST_ZEITGRENZE);
     let mut pfade: Vec<String> = Vec::new();
     let mut i = 0;
     while i < args.len() {
         if args[i] == "--filter" && i + 1 < args.len() { filter = Some(args[i + 1].clone()); i += 2; continue; }
         if args[i] == "--fall" && i + 1 < args.len() { filter = Some(args[i + 1].clone()); genau = true; i += 2; continue; }
         if args[i] == "--schnell" { schnell = true; i += 1; continue; }
+        if args[i] == "--zeitgrenze" && i + 1 < args.len() {
+            match args[i + 1].parse::<u64>() {
+                Ok(0) => grenze = None,
+                Ok(n) => grenze = Some(n),
+                Err(_) => { eprintln!("dhrt test: --zeitgrenze braucht ganze Sekunden (0 = ohne), nicht '{}'", args[i + 1]); return ExitCode::from(2); }
+            }
+            i += 2; continue;
+        }
         pfade.push(args[i].clone());
         i += 1;
     }
@@ -1401,7 +1512,7 @@ fn test_main(args: &[String]) -> ExitCode {
                 ausgelassen.push(name);
                 continue;
             }
-            match sammlung_laufen(&exe, d, filter.as_deref(), genau) {
+            match sammlung_laufen(&exe, d, filter.as_deref(), genau, grenze) {
                 Ok((ok, fehl, ueber, meldungen)) => {
                     let dauer = t0.elapsed().as_secs_f64();
                     faelle_ok += ok; faelle_fehl += fehl; faelle_ueber += ueber;
@@ -1421,33 +1532,35 @@ fn test_main(args: &[String]) -> ExitCode {
             }
             continue;
         }
-        let r = std::process::Command::new(&exe)
-            .arg("run").arg(d)
+        let mut cmd = std::process::Command::new(&exe);
+        cmd.arg("run").arg(d)
             .stdin(std::process::Stdio::null())
-            .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1")
-            .output();
+            .env_remove("DHRT_LANG").env("DHRT_OHNE_EINGABE", "1");
+        let r = test_lauf(cmd, None, grenze.map(|s| t0 + std::time::Duration::from_secs(s)));
         let dauer = t0.elapsed().as_secs_f64();
         let name = d.display().to_string();
         match r {
-            Ok(o) if o.status.success() => {
+            Ok(l) if l.abgelaufen => {
+                fehler += 1;
+                println!("  FEHLER  {}  ({}, {:.2}s)", name, zeitgrenze_meldung(grenze.unwrap_or(0), "Pruefprogramm", &l), dauer);
+            }
+            Ok(l) if l.code == 0 => {
                 println!("  ok      {}  ({:.2}s)", name, dauer);
             }
-            Ok(o) => {
+            Ok(l) => {
                 fehler += 1;
-                let code = o.status.code().unwrap_or(-1);
-                println!("  FEHLER  {}  (Rueckgabewert {}, {:.2}s)", name, code, dauer);
+                println!("  FEHLER  {}  (Rueckgabewert {}, {:.2}s)", name, l.code, dauer);
                 // Beide Kanaele zeigen: die Bilanz einer Pruefung geht nach
                 // stdout, die einzelnen Fehlschlaege nach stderr (WP E).
-                for (kanal, roh) in [("", &o.stdout), ("", &o.stderr)] {
-                    let text = String::from_utf8_lossy(roh);
+                for text in [&l.out, &l.err] {
                     for zeile in text.lines() {
-                        println!("          {}{}", kanal, zeile);
+                        println!("          {}", zeile);
                     }
                 }
             }
             Err(e) => {
                 fehler += 1;
-                println!("  FEHLER  {}  (Start fehlgeschlagen: {})", name, e);
+                println!("  FEHLER  {}  ({})", name, e);
             }
         }
     }
