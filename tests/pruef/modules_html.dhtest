@@ -30,6 +30,18 @@ PRINT HTML_TEXT("<p>5 &lt; 10 &amp; ok</p>")
 --- erwartet
 5 < 10 & ok
 
+=== html text laesst eine spitze klammer ohne buchstaben stehen
+' Ein Tag beginnt nur mit Buchstabe, / + Buchstabe, ! oder ? -- bis 2026.27
+' wurde aus "a < b und c > d" das Wort "a d" (Feed-Leser).
+IMPORT "html"
+PRINT HTML_TEXT("a < b und c > d")
+PRINT HTML_TEXT("Preis <5 Euro, x</ y")
+PRINT HTML_TEXT("<b>fett</b> und <i>schraeg</i>")
+--- erwartet
+a < b und c > d
+Preis <5 Euro, x</ y
+fett und schraeg
+
 === html text comment with gt does not leak into text
 IMPORT "html"
 PRINT HTML_TEXT("<p>vorher</p><!-- if (x>1) then y --><p>nachher</p>")
