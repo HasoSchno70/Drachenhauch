@@ -69,6 +69,7 @@ SUB prErsteRunde()
 END SUB
 SUB prZweiteRunde()
     PRINT "nochmal abgerufen: "; prZahl("SELECT COUNT(*) FROM eintrag") = prZuerst; " gemeldet: "; prMeldungen
+    prFeeds()
     ' einen Feed waehlen, einen Eintrag lesen
     gewaehltFeed = prZahl("SELECT id FROM feed WHERE url LIKE '%/rss.xml'")
     eintraegeZeigen()
@@ -180,6 +181,11 @@ eintraege: 6 gemeldet: 6 ungelesen: 6
 tabelle alle: 6
 status: Bereit. / 6 ungelesen
 nochmal abgerufen: TRUE gemeldet: 6
+/rss.xml | mit Titel |  | 3
+/atom.xml | mit Titel |  | 2
+/rdf.xml | mit Titel |  | 1
+/kaputt.xml | ohne Titel | kein RSS- oder Atom-Feed (Wurzel <html>) | 0
+/fehlt.xml | ohne Titel | (404) | 0
 tabelle rss: 3
 gelesen: 1 1
 zweimal: 1

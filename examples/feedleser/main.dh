@@ -362,16 +362,23 @@ FUNCTION uebernehmen(i AS INTEGER, antwort AS STRING) AS INTEGER
     IF titel <> "" THEN DB_EXEC(ablage, "UPDATE feed SET titel = ?, abgerufen = ? WHERE id = ?", titel, ZEIT_TEXT$(ZEIT_JETZT()), fId[i])
     DIM neu AS INTEGER
     DIM k AS INTEGER
+    ' Alles in EINER Transaktion -- und bei einem Fehler zurueck, sonst bliebe
+    ' sie offen und das naechste DB_BEGIN scheiterte.
     DB_BEGIN(ablage)
-    FOR k = 0 TO JSON_LEN(j, "eintraege") - 1
-        DIM p AS STRING
-        p = "eintraege." + STR$(k) + "."
-        DIM wann AS STRING
-        wann = JSON_GET_STRING(j, p + "datum")
-        IF wann = "" THEN wann = ZEIT_TEXT$(ZEIT_JETZT())
-        neu = neu + DB_EXEC(ablage, "INSERT OR IGNORE INTO eintrag (feed, guid, titel, link, datum, text) VALUES (?, ?, ?, ?, ?, ?)", _
-            fId[i], JSON_GET_STRING(j, p + "guid"), JSON_GET_STRING(j, p + "titel"), JSON_GET_STRING(j, p + "link"), wann, JSON_GET_STRING(j, p + "text"))
-    NEXT
+    TRY
+        FOR k = 0 TO JSON_LEN(j, "eintraege") - 1
+            DIM p AS STRING
+            p = "eintraege." + STR$(k) + "."
+            DIM wann AS STRING
+            wann = JSON_GET_STRING(j, p + "datum")
+            IF wann = "" THEN wann = ZEIT_TEXT$(ZEIT_JETZT())
+            neu = neu + DB_EXEC(ablage, "INSERT OR IGNORE INTO eintrag (feed, guid, titel, link, datum, text) VALUES (?, ?, ?, ?, ?, ?)", _
+                fId[i], JSON_GET_STRING(j, p + "guid"), JSON_GET_STRING(j, p + "titel"), JSON_GET_STRING(j, p + "link"), wann, JSON_GET_STRING(j, p + "text"))
+        NEXT
+    CATCH e
+        DB_ROLLBACK(ablage)
+        THROW e
+    END TRY
     DB_COMMIT(ablage)
     RETURN neu
 END FUNCTION
