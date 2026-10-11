@@ -283,7 +283,17 @@ drives real windows in real time) — the summary names every file left out
 with `langsam <name>`, so that nobody mistakes a quick run for a full one.
 Both switches are lines of their own without `'` in front -- written as a
 comment (`' --- seriell`) they would not apply, which is why that is an
-error. The CI always runs everything. A case that fails on a machine without
+error. The CI always runs everything.
+
+**Time limit:** a case may take at most 300 seconds, all of its runs together
+(`--- vorher`, the main run, `--- nochmal`, `--- zwischen`, `--- nachher`). If
+it takes longer, `dhrt test` ends it together with the programs it started
+and reports it as FEHL with "Zeitgrenze von N s ueberschritten (Hauptlauf)"
+and the last lines it printed — before, a hanging case held up the whole
+run. `--- zeitgrenze N` before the first case sets the limit for every case
+of the file, inside a case only for that case (the case wins);
+`dhrt test --zeitgrenze N` changes the default, `--zeitgrenze 0` switches it
+off. Check programs (`*_pruefung.dh`) have the same default. A case that fails on a machine without
 a display or sound card counts as skipped, not as failed (recognized by the
 message "Kein Fenster moeglich" (no window possible), which `dhrt` prints
 instead of crashing; `DHRT_KEIN_FENSTER=1` fakes exactly this error, for
