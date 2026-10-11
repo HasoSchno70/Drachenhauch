@@ -1776,6 +1776,39 @@ die gewaehlte Tabellenzeile geht beim Neuaufbauen nicht verloren. Tests
 herausgenommen; drei Verfaelschungen des Beispiels fallen -- die zweite erst,
 nachdem die zweite Runde die Fehler der Feeds mit ausgab).
 
+## Dogfooding Konsole: textwerk (2026-10-11)
+
+`examples/textwerk/main.dh` (suche wie grep, csv mit Gruppen/Summen/Sortieren,
+zaehle wie wc), aus fremden Ordnern, ueber Pipes und als exportierte Exe
+benutzt. Funde: (1) **Relative Pfade aus der Kommandozeile zeigten ins
+Leere** -- `dhrt run` und die exportierte Exe wechseln in den Ordner des
+Programms; die Exe setzte nicht einmal `DHRT_START_DIR`, auch
+`examples/172_filter.dh` als Exe fand `daten/obst.txt` nicht. Neu
+**`STARTDIR$()`** und **`ARGPATH$(n)`** (Argument vom Aufrufort aus; absolut,
+leer und `-` bleiben; `builtins::startort`/`arg_pfad`), die Exe ruft
+`ins_quellverzeichnis_exe` (Entscheidung des Nutzers). (2) **`INPUT` nach
+`STDIN()` hing** -- das Handle hielt die Sperre der Standardeingabe; jetzt hat
+das Handle einen eigenen Puffer (1 MiB) und `INPUT` liest danach aus ihm
+(`read_input_line`). Pipe aus der Git-Bash: 400 000 Zeilen 2,8 -> 1,2 s (Python
+braucht dort 1,8 s; mit `<` 0,08 s -- die Langsamkeit ist die MSYS-Pipe).
+(3) **`FORMAT$` mit einer Maske ohne Platzhalter** (VB-Maske `"#,##0.00"`) gab
+die Maske zurueck und verlor den Wert still -- jetzt ein Fehler. (4) Neu
+**`ZAHL$(x [, stellen])`** (deutsch, Tausenderpunkte; `zahl_text`), denn
+`NUMFMT$` ist das Idle-Spiel-Format und `EURO$` nimmt nur ganze Cent.
+(5) Kodierung **`"auto"`** (nur lesen; UTF-8, sonst cp1252, Nullbyte =
+Binaerdatei mit eigener Meldung; zeilenweise je Zeile entschieden).
+(6) **`TERMINAL()`/`TERMINAL_WIDTH()`** (`IsTerminal`; Breite ueber
+`GetConsoleScreenBufferInfo` bzw. `ioctl(TIOCGWINSZ)`, sonst `COLUMNS`;
+`Win32_System_Console` im windows-Crate). (7) **`dhrt --export x.dh
+meins.exe`** legte einen ORDNER `meins.exe` an -- ein Ziel auf `.exe` ist jetzt
+der Dateiname. (8) Umstieg: `ISDIR`, `ISFILE`, `COMMAND$`, `CURDIR$`, `ISATTY`
+(auf `ISDIR` schlug die Meldung CHDIR/ISSTR/MKDIR vor). Tests `startort`,
+`konsole_werkzeug`, `beispiel_textwerk`, Faelle in `stdin`, `umstieg`,
+`dhrt_export`; alle neuen fallen mit 2026.25, `beispiel_textwerk` mit `ARG$`
+statt `ARGPATH$` (5 von 7). **Falle beim Testen:** Rueckstriche in einem
+`node -e '...'` aus der Git-Bash kommen nicht an -- Daten mit `\` per
+Write-Werkzeug schreiben.
+
 ## Zeichenketten anhaengen ist linear (2026-09-24)
 
 `Value::Str` ist `Rc<String>` (vorher `Rc<str>`, jedes Anhaengen kopierte:
