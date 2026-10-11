@@ -366,6 +366,34 @@ fn nimmt_text_w(w: &Widget) -> bool {
     w.kind.nimmt_text() || (w.kind == Kind::Dropdown && w.frei)
 }
 
+/// Braucht das Widget mit Fokus diese Taste (ohne Strg/Alt) selbst? Dann
+/// gehoert sie ihm und nicht einem Menue-Kuerzel. Bis 2026.28 galt das nur
+/// fuer Textfelder -- ein Kaestchen mit Fokus kippte bei der Leertaste UND
+/// das Kuerzel "Leertaste" feuerte (gefunden beim Sequencer, Musik-Runde).
+/// Leertaste und Enter loesen jedes bedienbare Widget aus, Pfeile und
+/// Pos1/Ende/Bild bewegen darin, und wo Tippen springt (Listen, Baeume,
+/// Tabellen, Klapplisten), gehoeren ihm auch Buchstaben und Ziffern.
+fn widget_nimmt_taste(w: &Widget, code: i64) -> bool {
+    if nimmt_text_w(w) { return true; }
+    const AUSLOESEN: [i64; 3] = [32, 13, 1073741912];          // Leertaste, Enter
+    const BEWEGEN: [i64; 8] = [1073741903, 1073741904, 1073741905, 1073741906,
+                               1073741898, 1073741901, 1073741899, 1073741902];
+    let k = w.kind;
+    if AUSLOESEN.contains(&code) {
+        return matches!(k, Kind::Button | Kind::Card | Kind::Checkbox | Kind::Radio | Kind::Toggle
+            | Kind::Dropdown | Kind::ListBox | Kind::Tree | Kind::Table | Kind::Accordion
+            | Kind::TabControl | Kind::DatePicker | Kind::ColorPicker | Kind::TimePicker);
+    }
+    if BEWEGEN.contains(&code) {
+        return matches!(k, Kind::Slider | Kind::Knob | Kind::Spinner | Kind::Radio | Kind::Dropdown
+            | Kind::ListBox | Kind::Tree | Kind::Table | Kind::Accordion | Kind::TabControl
+            | Kind::DatePicker | Kind::TimePicker | Kind::ColorPicker | Kind::RichText | Kind::Splitter);
+    }
+    // Wo Tippen springt, gehoeren auch Buchstaben und Ziffern dem Widget
+    matches!(k, Kind::ListBox | Kind::Tree | Kind::Table | Kind::Dropdown)
+        && ((97..=122).contains(&code) || (48..=57).contains(&code))
+}
+
 /// Bearbeitbare Klappliste: `sel` folgt dem Text -- der Eintrag, der genau so
 /// heisst (Gross/klein egal), sonst -1.
 fn dd_frei_abgleichen(w: &mut Widget) {
@@ -9779,9 +9807,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// (ein "Entf" darf dort loeschen, nicht den Menuepunkt ausloesen).
     fn kuerzel_pruefen(&mut self, g: &Graphics) {
         let mods = (g.key_ctrl() as u8) | ((g.key_shift() as u8) << 1) | ((g.key_alt() as u8) << 2);
-        let text_fokus = self.focus_widget
-            .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)))
-            .map(nimmt_text_w).unwrap_or(false);
+        let fokus_w = self.focus_widget
+            .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)));
         let kandidaten: Vec<usize> = self.focus_window.into_iter()
             .chain(self.z_order.iter().rev().copied())
             .filter(|&wi| wi < self.windows.len())
@@ -9797,10 +9824,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             for (mi, m) in win.menus.iter().enumerate() {
                 for (ii, it) in m.items.iter().enumerate() {
                     if it.k_code == 0 || !it.enabled || it.separator || it.k_mods != mods { continue; }
-                    // Ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus (Entf
-                    // loescht dort ein Zeichen) -- AUSSER F1..F12: die erzeugen nie
-                    // Text, und F5 in einer IDE muss aus dem Code-Feld heraus starten.
-                    if text_fokus && (mods & 5) == 0 && !ist_funktionstaste(it.k_code) { continue; }
+                    // Ohne Strg/Alt gehoert die Taste dem Widget mit Fokus, wenn es
+                    // sie braucht (Entf loescht im Textfeld ein Zeichen, die
+                    // Leertaste kippt ein Kaestchen) -- AUSSER F1..F12: die
+                    // erzeugen nie Text, und F5 in einer IDE muss aus dem
+                    // Code-Feld heraus starten.
+                    if (mods & 5) == 0 && !ist_funktionstaste(it.k_code)
+                        && fokus_w.is_some_and(|w| widget_nimmt_taste(w, it.k_code)) { continue; }
                     if kuerzel_taste(g, it.k_code) { treffer = Some((wi, mi, ii)); break 'suche; }
                 }
             }

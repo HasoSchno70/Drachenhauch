@@ -309,9 +309,6 @@ WHILE NOT beenden
     IF GUI_CLICKED(knSpielen) OR GUI_CLICKED(miSpielen) THEN
         IF spielt THEN stoppen() ELSE starten()
     END IF
-    IF GUI_FOCUSED() < 0 AND KEYHIT(KEY_SPACE) THEN
-        IF spielt THEN stoppen() ELSE starten()
-    END IF
     IF GUI_CLICKED(miSichern) THEN
         sichern("muster.json")
         GUI_STATUSBAR_SET(sb, 0, "Gesichert: muster.json")
