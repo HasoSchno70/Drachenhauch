@@ -1,0 +1,90 @@
+' AUDIO_PLAY_AT plant, ohne Vorhandenes zu loeschen (2026-10-11, Musik-Runde).
+'
+' Bis 2026.28 stoppte jedes AUDIO_PLAY_AT die vorige Instanz desselben
+' Klangs -- wie AUDIO_PLAY. Ein Sequencer, der dieselbe Hi-Hat zwei Schritte
+' voraus plant, loeschte damit die erste, bevor sie erklang; am Mischer kam
+' von zwei geplanten Einsaetzen einer an. Der Tracker-Pilot (190) puffert
+' seine Noten genauso. Die Faelle laufen auf einer echten Audio-Uhr (100
+' Ticks je Sekunde) und fragen AUDIO_IS_PLAYING zu festen Ticks.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== derselbe klang zweimal geplant klingt zweimal
+' Gezaehlt wird am Mischer (AUDIO_FFT): wie oft wird es laut? AUDIO_IS_PLAYING
+' taugt dafuer nicht -- ein Klang, der auf seinen Tick wartet, gilt schon als
+' spielend.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 120, "sine", 0.8)
+DIM uhr AS AUDIO_CLOCK
+uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_PLAY_AT(ton, uhr, 20)
+AUDIO_PLAY_AT(ton, uhr, 60)
+AUDIO_CLOCK_START(uhr)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM laut AS BOOLEAN, n AS INTEGER
+DIM f[32] AS FLOAT
+WHILE AUDIO_CLOCK_TICKS(uhr) < 100 AND MILLIS() - t0 < 3000
+    AUDIO_FFT(f)
+    DIM e AS FLOAT, i AS INTEGER
+    FOR i = 0 TO 31 : e = e + f[i] : NEXT
+    IF e > 0.5 AND NOT laut THEN
+        laut = TRUE : n = n + 1
+        PRINT "einsatz bei tick "; (AUDIO_CLOCK_TICKS(uhr) + 5) \ 10 * 10
+    ELSEIF e < 0.05 THEN
+        laut = FALSE
+    END IF
+    SLEEP(4)
+WEND
+PRINT n; " einsaetze"
+AUDIO_CLOCK_REMOVE(uhr)
+--- erwartet
+einsatz bei tick 20
+einsatz bei tick 60
+2 einsaetze
+
+=== audio stop beendet alle geplanten
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 120, "sine", 0.8)
+DIM uhr AS AUDIO_CLOCK
+uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_PLAY_AT(ton, uhr, 20)
+AUDIO_PLAY_AT(ton, uhr, 60)
+AUDIO_CLOCK_START(uhr)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE AUDIO_CLOCK_TICKS(uhr) < 5 AND MILLIS() - t0 < 3000
+    SLEEP(2)
+WEND
+AUDIO_STOP(ton)
+DIM n AS INTEGER, laut AS BOOLEAN
+DIM f[32] AS FLOAT
+WHILE AUDIO_CLOCK_TICKS(uhr) < 100 AND MILLIS() - t0 < 3000
+    AUDIO_FFT(f)
+    DIM e AS FLOAT, i AS INTEGER
+    FOR i = 0 TO 31 : e = e + f[i] : NEXT
+    IF e > 0.5 AND NOT laut THEN
+        laut = TRUE : n = n + 1
+    ELSEIF e < 0.05 THEN
+        laut = FALSE
+    END IF
+    SLEEP(4)
+WEND
+PRINT n; " einsaetze"
+AUDIO_CLOCK_REMOVE(uhr)
+--- erwartet
+0 einsaetze
+
+=== audio play bleibt bei einer instanz
+' AUDIO_PLAY spielt den Klang neu -- die laufende Instanz endet, sonst
+' stapelte ein Spiel bei jedem Schuss einen weiteren Laser.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 400, "sine", 0.5)
+AUDIO_PLAY(ton)
+SLEEP(50)
+AUDIO_PLAY(ton)
+SLEEP(50)
+PRINT "kanaele "; AUDIO_BUSY_CHANNELS()
+--- erwartet
+kanaele 1

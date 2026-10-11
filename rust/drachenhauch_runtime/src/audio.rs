@@ -626,9 +626,30 @@ fn tween_ms_eased(ms: i64, curve: FadeCurve) -> Tween {
 struct SoundSlot {
     data: Option<StaticSoundData>,
     handle: Option<StaticSoundHandle>,
+    /// Weitere Instanzen aus AUDIO_PLAY_AT, die noch warten oder klingen.
+    /// Bis 2026.28 stoppte jedes AUDIO_PLAY_AT die vorige Instanz desselben
+    /// Klangs -- ein Sequencer, der dieselbe Hi-Hat zwei Schritte voraus
+    /// plant, loeschte damit die erste, bevor sie erklang (gemessen am
+    /// Mischer: von zwei geplanten Einsaetzen kam einer an; Musik-Runde).
+    /// STOP/PAUSE/RESUME/Lautstaerke/Tonhoehe/Pan wirken auf alle.
+    geplant: Vec<StaticSoundHandle>,
     vol: f32,                 // getrackte Lautstaerke (linear 0..1)
     loops: i64,               // verbleibende endliche Wiederholungen (>0); -1 endlos via loop_region; 0 keine
     pan_anim: Option<Pendulum>, // AUTOPAN (per-Frame); SLIDE laeuft als Kira-Tween
+}
+
+impl SoundSlot {
+    /// Das Handle und alle geplanten Instanzen.
+    fn alle(&mut self) -> impl Iterator<Item = &mut StaticSoundHandle> {
+        self.handle.iter_mut().chain(self.geplant.iter_mut())
+    }
+    fn weitere_stoppen(&mut self) {
+        for h in &mut self.geplant { h.stop(tween_now()); }
+        self.geplant.clear();
+    }
+    fn spielt(&self) -> bool {
+        self.handle.iter().chain(self.geplant.iter()).any(|h| h.state() == PlaybackState::Playing)
+    }
 }
 
 /// Ein geladenes PCM-Sample fuer den Amiga-Stil-Sampler (SAMPLE_*).
@@ -885,7 +906,7 @@ impl Audio {
     }
 
     fn push_slot(&mut self, data: StaticSoundData, vol: f32) -> i64 {
-        self.sounds.push(SoundSlot { data: Some(data), handle: None, vol, loops: 0, pan_anim: None });
+        self.sounds.push(SoundSlot { data: Some(data), handle: None, geplant: Vec::new(), vol, loops: 0, pan_anim: None });
         (self.sounds.len() - 1) as i64
     }
 
@@ -938,6 +959,7 @@ impl Audio {
     pub fn unload_sound(&mut self, idx: i64) -> Result<(), String> {
         let s = self.slot_mut(idx, "UNLOADSOUND")?;
         if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
+        s.weitere_stoppen();
         s.handle = None;
         s.data = None;
         s.pan_anim = None;
@@ -965,8 +987,10 @@ impl Audio {
     fn start_slot(&mut self, idx: i64, fn_: &str, vol: f64, loops: i64, fade_in_ms: i64,
                   curve: FadeCurve) -> Result<(), String> {
         let vol = vol.clamp(0.0, 1.0);
-        // alte Instanz stoppen
-        if let Some(h) = self.slot_mut(idx, fn_)?.handle.as_mut() { h.stop(tween_now()); }
+        // alte Instanz(en) stoppen -- AUDIO_PLAY spielt den Klang EINMAL
+        { let s = self.slot_mut(idx, fn_)?;
+          if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
+          s.weitere_stoppen(); }
         let mut settings = StaticSoundSettings::new();
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
@@ -993,7 +1017,13 @@ impl Audio {
                        volume: f64, loops: i64) -> Result<i64, String> {
         let clock_id = self.clock_slot(clock_idx, "AUDIO_PLAY_AT")?.handle.id();
         let vol = volume.clamp(0.0, 1.0);
-        if let Some(h) = self.slot_mut(idx, "AUDIO_PLAY_AT")?.handle.as_mut() { h.stop(tween_now()); }
+        // NICHT stoppen: die vorige Instanz wartet vielleicht noch auf ihren
+        // Tick (Sequencer, Tracker) oder klingt aus -- sie wird eine weitere
+        { let s = self.slot_mut(idx, "AUDIO_PLAY_AT")?;
+          s.geplant.retain(|h| h.state() != PlaybackState::Stopped);
+          if let Some(h) = s.handle.take() {
+              if h.state() != PlaybackState::Stopped { s.geplant.push(h); }
+          } }
         let mut settings = StaticSoundSettings::new()
             .start_time(ClockTime { clock: clock_id, ticks: ticks as u64, fraction: 0.0 })
             .volume(db(vol));
@@ -1341,7 +1371,9 @@ resonance/reverb/distortion", other)),
                       fade_in_ms: i64, easing: &str) -> Result<i64, String> {
         let curve = FadeCurve::parse(easing, "AUDIO_PLAY_ON")?;
         let vol = volume.clamp(0.0, 1.0);
-        if let Some(h) = self.slot_mut(idx, "AUDIO_PLAY_ON")?.handle.as_mut() { h.stop(tween_now()); }
+        { let s = self.slot_mut(idx, "AUDIO_PLAY_ON")?;
+          if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
+          s.weitere_stoppen(); }
         let mut settings = StaticSoundSettings::new();
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
@@ -1606,7 +1638,8 @@ resonance/reverb/distortion", other)),
     }
 
     pub fn stop_sound(&mut self, idx: i64) -> Result<(), String> {
-        if let Some(h) = self.slot_mut(idx, "STOPSOUND")?.handle.as_mut() { h.stop(tween_now()); }
+        let s = self.slot_mut(idx, "STOPSOUND")?;
+        for h in s.alle() { h.stop(tween_now()); }
         Ok(())
     }
 
@@ -2062,31 +2095,30 @@ resonance/reverb/distortion", other)),
         Ok(idx)
     }
     pub fn ch_pause(&mut self, idx: i64) -> Result<(), String> {
-        if let Some(h) = self.slot_mut(idx, "AUDIO_PAUSE")?.handle.as_mut() { h.pause(tween_now()); }
+        for h in self.slot_mut(idx, "AUDIO_PAUSE")?.alle() { h.pause(tween_now()); }
         Ok(())
     }
     pub fn ch_resume(&mut self, idx: i64) -> Result<(), String> {
-        if let Some(h) = self.slot_mut(idx, "AUDIO_RESUME")?.handle.as_mut() { h.resume(tween_now()); }
+        for h in self.slot_mut(idx, "AUDIO_RESUME")?.alle() { h.resume(tween_now()); }
         Ok(())
     }
     pub fn ch_stop(&mut self, idx: i64, fade_out_ms: i64, easing: &str) -> Result<(), String> {
         let curve = FadeCurve::parse(easing, "AUDIO_STOP")?;
         let s = self.slot_mut(idx, "AUDIO_STOP")?;
         s.loops = 0;
-        if let Some(h) = s.handle.as_mut() {
+        for h in s.alle() {
             h.stop(if fade_out_ms > 0 { tween_ms_eased(fade_out_ms, curve) } else { tween_now() });
         }
         Ok(())
     }
     pub fn ch_is_playing(&self, idx: i64) -> Result<bool, String> {
-        Ok(matches!(self.slot(idx, "AUDIO_IS_PLAYING")?.handle.as_ref().map(|h| h.state()),
-                    Some(PlaybackState::Playing)))
+        Ok(self.slot(idx, "AUDIO_IS_PLAYING")?.spielt())
     }
     pub fn ch_set_volume(&mut self, idx: i64, v: f64) -> Result<(), String> {
         let vol = v.clamp(0.0, 1.0);
         let s = self.slot_mut(idx, "AUDIO_VOLUME")?;
         s.vol = vol as f32;
-        if let Some(h) = s.handle.as_mut() { h.set_volume(db(vol), tween_now()); }
+        for h in s.alle() { h.set_volume(db(vol), tween_now()); }
         Ok(())
     }
     pub fn ch_get_volume(&self, idx: i64) -> Result<f64, String> {
@@ -2096,7 +2128,7 @@ resonance/reverb/distortion", other)),
     /// 2.0 Oktave hoeher, 0.5 tiefer). Kira braucht &mut auf dem Handle; die VM
     /// ruft ueber audio_mut() (=&mut Audio), daher ist die Signatur &mut self.
     pub fn ch_pitch(&mut self, idx: i64, factor: f64) -> Result<(), String> {
-        if let Some(h) = self.slot_mut(idx, "AUDIO_PITCH")?.handle.as_mut() {
+        for h in self.slot_mut(idx, "AUDIO_PITCH")?.alle() {
             h.set_playback_rate(factor, tween_now());
         }
         Ok(())
@@ -2109,7 +2141,7 @@ resonance/reverb/distortion", other)),
         let s = self.slot_mut(idx, "AUDIO_PAN")?;
         s.vol = vol as f32;
         s.pan_anim = None;
-        if let Some(h) = s.handle.as_mut() {
+        for h in s.alle() {
             h.set_volume(db(vol), tween_now());
             h.set_panning(pan_of(pos), tween_now());
         }
@@ -2118,7 +2150,7 @@ resonance/reverb/distortion", other)),
     pub fn ch_pan_pos(&mut self, idx: i64, p: f64) -> Result<(), String> {
         let s = self.slot_mut(idx, "AUDIO_PAN_POS")?;
         s.pan_anim = None;
-        if let Some(h) = s.handle.as_mut() { h.set_panning(pan_of(p), tween_now()); }
+        for h in s.alle() { h.set_panning(pan_of(p), tween_now()); }
         Ok(())
     }
     pub fn ch_pan_slide(&mut self, idx: i64, from: f64, to: f64, dur_ms: i64,
@@ -2127,7 +2159,7 @@ resonance/reverb/distortion", other)),
         let (from, to) = (from.clamp(0.0, 1.0), to.clamp(0.0, 1.0));
         let s = self.slot_mut(idx, "AUDIO_PAN_SLIDE")?;
         s.pan_anim = None;
-        if let Some(h) = s.handle.as_mut() {
+        for h in s.alle() {
             h.set_panning(pan_of(from), tween_now());                    // Startpunkt
             h.set_panning(pan_of(to), tween_ms_eased(dur_ms, curve));    // Kira tweent nativ
         }
@@ -2142,21 +2174,22 @@ resonance/reverb/distortion", other)),
     }
 
     pub fn pause_all(&mut self) {
-        for s in &mut self.sounds { if let Some(h) = s.handle.as_mut() { h.pause(tween_now()); } }
+        for s in &mut self.sounds { for h in s.alle() { h.pause(tween_now()); } }
     }
     pub fn resume_all(&mut self) {
-        for s in &mut self.sounds { if let Some(h) = s.handle.as_mut() { h.resume(tween_now()); } }
+        for s in &mut self.sounds { for h in s.alle() { h.resume(tween_now()); } }
     }
     pub fn stop_all(&mut self) {
         for s in &mut self.sounds {
             s.loops = 0; s.pan_anim = None;
             if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
+            s.weitere_stoppen();
         }
     }
     pub fn set_num_channels(&mut self, n: i64) { self.num_channels = n.max(0); }
     pub fn get_num_channels(&self) -> i64 { self.num_channels }
     pub fn busy_channels(&self) -> i64 {
-        self.sounds.iter().filter(|s| matches!(s.handle.as_ref().map(|h| h.state()), Some(PlaybackState::Playing))).count() as i64
+        self.sounds.iter().filter(|s| s.spielt()).count() as i64
     }
 
     // ================= Musik =================
