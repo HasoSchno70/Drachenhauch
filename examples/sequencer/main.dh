@@ -130,6 +130,24 @@ DIM slEcho AS GUI_WIDGET : slEcho = GUI_SLIDER(win, 720, uy + 18, 110, 0, 100, 0
 DIM kaWah AS GUI_WIDGET : kaWah = GUI_CHECKBOX(win, "Wah", 850, uy + 14)
 DIM sb AS GUI_WIDGET
 sb = GUI_STATUSBAR(win, 0, GUI_WINDOW_CONTENT_H(win) - 26, BREITE, 26, "Bereit. Leertaste spielt.")
+DIM sbPegel AS INTEGER : sbPegel = GUI_STATUSBAR_ADD(sb, "Pegel 0 %", 190, "rechts")
+
+' --- Pegel -----------------------------------------------------------------
+' Sechs Spuren uebereinander gehen leicht ueber 1.0 -- dann klippt der
+' Mixer, im Lautsprecher und im Mitschnitt. Der SFX-Bus laeuft darum auf
+' 40 Prozent, und die Statusleiste zeigt die Spitze (AUDIO_PEAK
+' liefert den hoechsten Ausschlag seit dem letzten Aufruf).
+AUDIO_BUS_VOLUME("sfx", 0.4)
+DIM pegelHalt AS FLOAT
+DIM uebersteuertBis AS INTEGER
+SUB pegelZeigen()
+    DIM p AS FLOAT : p = AUDIO_PEAK()
+    IF p > pegelHalt THEN pegelHalt = p ELSE pegelHalt = pegelHalt * 0.96
+    IF p > 1.0 THEN uebersteuertBis = MILLIS() + 1500
+    DIM t AS STRING : t = "Pegel " + STR$(INT(pegelHalt * 100 + 0.5)) + " %"
+    IF MILLIS() < uebersteuertBis THEN t = "Übersteuert! " + t
+    GUI_STATUSBAR_SET(sb, sbPegel, t)
+END SUB
 
 ' --- Effekte ---------------------------------------------------------------
 DIM hallAlt AS INTEGER : hallAlt = -1
@@ -386,6 +404,7 @@ WHILE NOT beenden
         stumm[i] = GUI_CHECKED(stummKasten[i])
     NEXT
     effekteNachziehen()
+    pegelZeigen()
 
     ' Raster: Klick schaltet, Rad verstellt die Tonhoehe
     DIM sp AS INTEGER, s AS INTEGER
