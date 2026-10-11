@@ -229,9 +229,9 @@ SUB tw(args AS ARRAY OF STRING)
         END IF
         SLEEP(20)
     WEND
-    PRINT PROCESS_CODE(p); " "; LEFT$(TRIM$(REPLACE$(fehler, CHR$(13), "")), 40)
+    PRINT PROCESS_CODE(p); " "; RTRIM$(LEFT$(TRIM$(REPLACE$(fehler, CHR$(13), "")), 40))
 END SUB
 --- erwartet
 2 textwerk: unbekannter Schalter -x
 2 textwerk: Muster kaputt: Ungueltige Rege
-2 textwerk: unbekannter Befehl gibtsnicht (s
+2 textwerk: unbekannter Befehl gibtsnicht
