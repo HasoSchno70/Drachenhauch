@@ -200,6 +200,46 @@ DHRT_FRAMES=18
 --- erwartet
 loeschen 11
 
+=== die leertaste gehoert dem kaestchen mit fokus nicht dem kuerzel
+' Bis 2026.28 kippte das Kaestchen UND das Kuerzel "Leertaste" feuerte
+' (Sequencer, Musik-Runde). Ein Regler braucht die Leertaste nicht -- mit ihm
+' im Fokus loest das Kuerzel aus.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM m AS INTEGER : m = GUI_MENU(w, "Muster")
+DIM a AS INTEGER : a = GUI_MENU_ITEM(m, "Spielen", "Leertaste")
+DIM kb AS GUI_WIDGET : kb = GUI_CHECKBOX(w, "stumm", 10, 40)
+DIM sl AS GUI_WIDGET : sl = GUI_SLIDER(w, 10, 80, 200, 0, 10, 5)
+GUI_FOCUS(kb)
+DIM f AS INTEGER
+FOR f = 1 TO 16
+    GUI_UPDATE()
+    IF GUI_CLICKED(a) THEN PRINT "kuerzel " + STR$(f)
+    IF GUI_CLICKED(kb) THEN PRINT "kaestchen " + STR$(f) + " " + STR$(GUI_CHECKED(kb))
+    IF f = 8 THEN GUI_FOCUS(sl)
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "regler "; GUI_VALUE(sl)
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 32 0 0 0 // Event: test
+e 4 1 32 0 0 0 // Event: test
+e 12 2 32 0 0 0 // Event: test
+e 13 1 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=18
+--- erwartet
+kaestchen 2 TRUE
+kuerzel 11
+regler 5.0
+
 === kuerzel nachtraeglich und wieder weg
 IMPORT "gui"
 SCREEN(400, 300, "T", 1)
