@@ -43,10 +43,21 @@ IMPORT "zeit"
 
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30:00"))   ' normal form
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00"))   ' ISO with T
-PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00Z"))  ' with time-zone suffix
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30"))      ' without seconds
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28"))            ' date only = 00:00:00
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T18:30:00Z"))  ' with a time zone
+PRINT ZEIT_TEXT$(ZEIT_PARSE("Fri, 28 Aug 2026 20:30:00 +0200"))  ' RSS, HTTP, e-mail
 ```
+
+**With a time zone the text is a fixed point in time** and is converted into
+the local time of this machine -- on a machine in Central Europe the last two
+lines give `2026-08-28 20:30:00` in August. Understood are `Z`, `+02:00`,
+`+0200`, `-05:00`, `UTC`/`GMT`/`UT`, the US zones `EST`/`EDT`, `CST`/`CDT`,
+`MST`/`MDT`, `PST`/`PDT` and `CET`/`CEST`/`MEZ`/`MESZ`; an unknown zone name is
+unreadable rather than silently wrong. Daylight saving time applies for the
+day of the timestamp, not for today. **Without a time zone** the text counts as
+local time. Until 2026.27 a zone suffix was cut off -- `18:30Z` counted as
+18:30 local time --, and the RFC 822 date of RSS feeds was not readable at all.
 
 Anything unreadable aborts with a plain message instead of silently returning `-1` — otherwise a
 broken date only shows up much later as a nonsensical result. Where input
@@ -179,7 +190,8 @@ WEND
 - **Points in time are local time.** A point in time created on a machine in Berlin
   gives the same *number* on a machine in Tokyo only if both
   read the same text — and the same number shows a different time there.
-  If you compare across time zones, store the text, not the number.
+  If you compare across time zones, store the text with its time zone
+  (`2026-08-28T18:30:00Z`), not the number.
 - **`MILLIS()` is something else and cannot be converted.** It is the
   stopwatch for frame times and timers. If you compare `MILLIS() / 1000` with
   `ZEIT_JETZT()`, you are off by the time-zone offset —

@@ -1,0 +1,539 @@
+' feedleser -- Nachrichten aus RSS- und Atom-Feeds lesen.
+'
+' Links die Feeds (mit der Zahl ungelesener Eintraege), rechts die Eintraege,
+' darunter die Vorschau. Abgerufen wird im Hintergrund: HTTP_GET_START holt
+' den Feed, ein Auftrag (TASK_START) zerlegt das XML -- das Fenster bleibt
+' dabei bedienbar. Alle 15 Minuten von selbst, mit F5 sofort. Was neu ist,
+' meldet das Symbol im Infobereich.
+'
+' Strg+N  Feed hinzufuegen          F5      jetzt abrufen
+' Entf    Feed entfernen            Strg+R  alles als gelesen
+' Doppelklick auf einen Eintrag oeffnet ihn im Browser.
+IMPORT "gui"
+IMPORT "db"
+IMPORT "html"
+IMPORT "xml"
+IMPORT "json"
+IMPORT "zeit"
+IMPORT "timer"
+IMPORT "imgfx"
+
+CONST BREITE = 1000
+CONST HOEHE = 640
+CONST LINKS_B = 240
+CONST TAKT_MS = 900000          ' alle 15 Minuten
+CONST DATEI = "feeds.db"
+' Beim ersten Start stehen diese Feeds in der Liste (durch | getrennt)
+CONST STANDARD = "https://www.tagesschau.de/xml/rss2/|https://www.heise.de/rss/heise-atom.xml"
+
+' --- Ablage ----------------------------------------------------------------
+DIM ablage AS DB_CONN
+ablage = DB_OPEN(DATEI)
+DB_EXEC(ablage, "CREATE TABLE IF NOT EXISTS feed (id INTEGER PRIMARY KEY, url TEXT UNIQUE, titel TEXT, fehler TEXT, abgerufen TEXT)")
+DB_EXEC(ablage, "CREATE TABLE IF NOT EXISTS eintrag (id INTEGER PRIMARY KEY, feed INTEGER, guid TEXT, titel TEXT, link TEXT, datum TEXT, text TEXT, gelesen INTEGER DEFAULT 0, UNIQUE(feed, guid))")
+
+FUNCTION feedZahl() AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(ablage, "SELECT COUNT(*) FROM feed")
+    DB_NEXT(r)
+    RETURN DB_GET_INT(r, 0)
+END FUNCTION
+IF feedZahl() = 0 AND STANDARD <> "" THEN
+    DIM u AS STRING
+    FOR EACH u IN SPLIT$(STANDARD, "|")
+        DB_EXEC(ablage, "INSERT OR IGNORE INTO feed (url, titel, fehler) VALUES (?, ?, '')", u, u)
+    NEXT
+END IF
+
+' --- Feed zerlegen (laeuft als AUFTRAG in einem eigenen Prozess) ------------
+' Bekommt den Text des Feeds und gibt JSON zurueck:
+'   {"titel": ..., "eintraege": [{"guid","titel","link","datum","text"}], "fehler": ""}
+' Ein Auftrag sieht die Globals des Programms nicht -- alles, was er braucht,
+' kommt als Argument.
+FUNCTION kurz$(s AS STRING, n AS INTEGER) AS STRING
+    DIM t AS STRING
+    t = TRIM$(s)
+    IF LEN(t) <= n THEN RETURN t
+    RETURN LEFT$(t, n) + " ..."
+END FUNCTION
+
+FUNCTION datum$(roh AS STRING) AS STRING
+    IF ZEIT_LESBAR(TRIM$(roh)) THEN RETURN ZEIT_TEXT$(ZEIT_PARSE(TRIM$(roh)))
+    RETURN ""
+END FUNCTION
+
+FUNCTION eintragJson(guid AS STRING, titel AS STRING, link AS STRING, datum AS STRING, text AS STRING) AS JSON_HANDLE
+    DIM e AS JSON_HANDLE
+    e = JSON_NEW_OBJECT()
+    JSON_SET_STRING(e, "guid", guid)
+    JSON_SET_STRING(e, "titel", kurz$(HTML_TEXT(titel), 300))
+    JSON_SET_STRING(e, "link", TRIM$(link))
+    JSON_SET_STRING(e, "datum", datum$(datum))
+    JSON_SET_STRING(e, "text", kurz$(HTML_TEXT(text), 2000))
+    RETURN e
+END FUNCTION
+
+FUNCTION feedZerlegen(quelle AS STRING) AS STRING
+    DIM aus AS JSON_HANDLE
+    aus = JSON_NEW_OBJECT()
+    JSON_SET_STRING(aus, "titel", "")
+    JSON_SET_STRING(aus, "fehler", "")
+    JSON_SET_JSON(aus, "eintraege", JSON_NEW_ARRAY())
+    DIM d AS XML_HANDLE
+    TRY
+        d = XML_PARSE(quelle)
+    CATCH e
+        JSON_SET_STRING(aus, "fehler", "kein XML: " + e)
+        RETURN JSON_STRINGIFY(aus)
+    END TRY
+    DIM i AS INTEGER
+    DIM k AS XML_HANDLE
+    DIM art AS STRING
+    art = LOWER$(XML_NAME$(d))
+    IF art = "rss" OR art = "rdf:rdf" THEN
+        ' RSS 2.0 (Eintraege im channel) und RSS 1.0 (Eintraege neben dem channel)
+        DIM kanal AS XML_HANDLE
+        kanal = XML_FIND(d, "channel")
+        JSON_SET_STRING(aus, "titel", kurz$(XML_TEXT$(kanal, "title"), 200))
+        DIM wo AS XML_HANDLE
+        wo = IIF(art = "rss", kanal, d)
+        FOR i = 0 TO XML_COUNT(wo, "item") - 1
+            k = XML_AT(wo, "item", i)
+            DIM link AS STRING
+            link = IIF(XML_HAS(k, "link"), XML_TEXT$(k, "link"), "")
+            DIM guid AS STRING
+            guid = IIF(XML_HAS(k, "guid"), XML_TEXT$(k, "guid"), link)
+            DIM wann AS STRING
+            wann = IIF(XML_HAS(k, "pubDate"), XML_TEXT$(k, "pubDate"), IIF(XML_HAS(k, "dc:date"), XML_TEXT$(k, "dc:date"), ""))
+            DIM text AS STRING
+            text = IIF(XML_HAS(k, "description"), XML_TEXT$(k, "description"), "")
+            JSON_APPEND_JSON(aus, "eintraege", eintragJson(guid, XML_TEXT$(k, "title"), link, wann, text))
+        NEXT
+    ELSEIF art = "feed" THEN
+        ' Atom
+        JSON_SET_STRING(aus, "titel", kurz$(XML_TEXT$(d, "title"), 200))
+        FOR i = 0 TO XML_COUNT(d, "entry") - 1
+            k = XML_AT(d, "entry", i)
+            ' der Link zum Lesen: rel="alternate" oder ohne rel
+            DIM href AS STRING
+            DIM j AS INTEGER
+            FOR j = 0 TO XML_COUNT(k, "link") - 1
+                DIM l AS XML_HANDLE
+                l = XML_AT(k, "link", j)
+                DIM rel AS STRING
+                rel = XML_ATTR$(l, "rel", "alternate")
+                IF rel = "alternate" AND href = "" THEN href = XML_ATTR$(l, "href")
+            NEXT
+            DIM wannA AS STRING
+            wannA = IIF(XML_HAS(k, "updated"), XML_TEXT$(k, "updated"), IIF(XML_HAS(k, "published"), XML_TEXT$(k, "published"), ""))
+            DIM textA AS STRING
+            textA = IIF(XML_HAS(k, "summary"), XML_TEXT$(k, "summary"), IIF(XML_HAS(k, "content"), XML_TEXT$(k, "content"), ""))
+            DIM id AS STRING
+            id = IIF(XML_HAS(k, "id"), XML_TEXT$(k, "id"), href)
+            JSON_APPEND_JSON(aus, "eintraege", eintragJson(id, XML_TEXT$(k, "title"), href, wannA, textA))
+            href = ""
+        NEXT
+    ELSE
+        JSON_SET_STRING(aus, "fehler", "kein RSS- oder Atom-Feed (Wurzel <" + XML_NAME$(d) + ">)")
+    END IF
+    RETURN JSON_STRINGIFY(aus)
+END FUNCTION
+
+' --- Fenster ---------------------------------------------------------------
+SCREEN(BREITE, HOEHE, "Feed-Leser", 1)
+SETFPS(60)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(700, 420)
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Feed-Leser", 0, 0, BREITE, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM mFeeds AS INTEGER
+mFeeds = GUI_MENU(win, "Feeds")
+DIM miNeu AS INTEGER
+miNeu = GUI_MENU_ITEM(mFeeds, "Feed hinzufügen ...", "Strg+N")
+DIM miWeg AS INTEGER
+miWeg = GUI_MENU_ITEM(mFeeds, "Feed entfernen", "Entf")
+GUI_MENU_SEPARATOR(mFeeds)
+DIM miAbruf AS INTEGER
+miAbruf = GUI_MENU_ITEM(mFeeds, "Jetzt abrufen", "F5")
+DIM miGelesen AS INTEGER
+miGelesen = GUI_MENU_ITEM(mFeeds, "Alles als gelesen", "Strg+R")
+GUI_MENU_SEPARATOR(mFeeds)
+DIM miEnde AS INTEGER
+miEnde = GUI_MENU_ITEM(mFeeds, "Beenden", "Strg+Q")
+
+DIM innenH AS INTEGER
+innenH = GUI_WINDOW_CONTENT_H(win)
+DIM rechtsB AS INTEGER
+rechtsB = BREITE - LINKS_B - 36
+DIM lst AS GUI_WIDGET
+lst = GUI_LISTBOX(win, 12, 12, LINKS_B, innenH - 12 - 38, [])
+DIM tbl AS GUI_WIDGET
+tbl = GUI_TABLE(win, LINKS_B + 24, 12, rechtsB, 280, ["Titel", "Feed", "Datum"], [])
+GUI_TABLE_COL_WIDTHS(tbl, [rechtsB - 290, 150, 130])
+GUI_TABLE_PLACEHOLDER(tbl, "Noch keine Einträge -- F5 ruft die Feeds ab.")
+DIM vorschau AS GUI_WIDGET
+vorschau = GUI_RICHTEXT(win, LINKS_B + 24, 304, rechtsB, innenH - 304 - 38, "")
+DIM sb AS GUI_WIDGET
+sb = GUI_STATUSBAR(win, 0, innenH - 26, BREITE, 26, "Bereit.")
+GUI_STATUSBAR_ADD(sb, "", 170, "rechts")
+GUI_STATUSBAR_ADD(sb, "", 170, "rechts")
+GUI_SET_ANCHOR(lst, "ltb")
+GUI_SET_ANCHOR(tbl, "ltr")
+GUI_SET_ANCHOR(vorschau, "ltrb")
+GUI_SET_ANCHOR(sb, "lrb")
+
+' --- Symbol: ein Funksignal ------------------------------------------------
+FUNCTION funk() AS INTEGER
+    DIM b AS INTEGER
+    b = IMAGE_NEW(32, 32)
+    IMAGE_FILL_ROUNDRECT(b, 2, 2, 28, 28, 6, RGB(240, 140, 40))
+    IMAGE_FILL_ELLIPSE(b, 10, 22, 3, 3, RGB(255, 255, 255))
+    IMAGE_RING(b, 10, 22, 9, 11, RGB(255, 255, 255))
+    IMAGE_RING(b, 10, 22, 15, 17, RGB(255, 255, 255))
+    RETURN b
+END FUNCTION
+DIM symbol AS INTEGER
+symbol = funk()
+WINDOW_ICON(symbol)
+TRAY_SHOW(symbol, "Feed-Leser")
+TRAY_MENU("Fenster zeigen|Jetzt abrufen|-|Beenden")
+
+' --- Zustand ---------------------------------------------------------------
+' Die Feeds (Reihenfolge der Liste ab Eintrag 1; Eintrag 0 ist "Alle")
+DIM fId AS ARRAY OF INTEGER
+DIM fUrl AS ARRAY OF STRING
+DIM fTitel AS ARRAY OF STRING
+DIM fFehler AS ARRAY OF STRING
+DIM fAbruf AS ARRAY OF INTEGER      ' laufender HTTP-Abruf, -1 = keiner
+DIM fAuftrag AS ARRAY OF INTEGER    ' laufender Auftrag, -1 = keiner
+' Die Zeilen der Tabelle (Datenzeile -> id des Eintrags)
+DIM zId AS ARRAY OF INTEGER
+DIM zLink AS ARRAY OF STRING
+DIM gewaehltFeed AS INTEGER         ' 0 = alle, sonst feed.id
+DIM beenden AS BOOLEAN
+DIM letzterAbruf AS STRING
+DIM neuSeitStart AS INTEGER
+DIM dlgNeu AS GUI_WINDOW
+DIM dlgNeuOffen AS BOOLEAN
+
+FUNCTION ungelesen(feed AS INTEGER) AS INTEGER
+    DIM r AS DB_RESULT
+    IF feed = 0 THEN
+        r = DB_QUERY(ablage, "SELECT COUNT(*) FROM eintrag WHERE gelesen = 0")
+    ELSE
+        r = DB_QUERY(ablage, "SELECT COUNT(*) FROM eintrag WHERE gelesen = 0 AND feed = ?", feed)
+    END IF
+    DB_NEXT(r)
+    RETURN DB_GET_INT(r, 0)
+END FUNCTION
+
+SUB feedsLaden()
+    ' Laufende Abrufe ueber das Neuladen retten (nach URL)
+    DIM altUrl AS ARRAY OF STRING
+    DIM altAbruf AS ARRAY OF INTEGER
+    DIM altAuftrag AS ARRAY OF INTEGER
+    altUrl = fUrl : altAbruf = fAbruf : altAuftrag = fAuftrag
+    fId = [] : fUrl = [] : fTitel = [] : fFehler = [] : fAbruf = [] : fAuftrag = []
+    DIM r AS DB_RESULT
+    r = DB_QUERY(ablage, "SELECT id, url, titel, fehler FROM feed ORDER BY titel COLLATE NOCASE")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(fId, DB_GET_INT(r, 0))
+        ARRAY_PUSH(fUrl, DB_GET_STRING(r, 1))
+        ARRAY_PUSH(fTitel, DB_GET_STRING(r, 2))
+        ARRAY_PUSH(fFehler, DB_GET_STRING(r, 3))
+        DIM a AS INTEGER : a = -1
+        DIM t AS INTEGER : t = -1
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(altUrl) - 1
+            IF altUrl[i] = DB_GET_STRING(r, 1) THEN a = altAbruf[i] : t = altAuftrag[i]
+        NEXT
+        ARRAY_PUSH(fAbruf, a)
+        ARRAY_PUSH(fAuftrag, t)
+    WEND
+    listeZeigen()
+END SUB
+
+SUB listeZeigen()
+    DIM wahl AS INTEGER
+    wahl = GUI_LISTBOX_SELECTED(lst)
+    GUI_LISTBOX_CLEAR(lst)
+    GUI_LISTBOX_ADD(lst, "Alle Einträge")
+    GUI_LISTBOX_SET_DATA(lst, 0, "0")
+    DIM n AS INTEGER
+    n = ungelesen(0)
+    GUI_LISTBOX_DETAIL(lst, 0, IIF(n > 0, STR$(n), ""))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(fId) - 1
+        GUI_LISTBOX_ADD(lst, fTitel[i])
+        GUI_LISTBOX_SET_DATA(lst, i + 1, STR$(fId[i]))
+        n = ungelesen(fId[i])
+        IF fFehler[i] <> "" THEN
+            GUI_LISTBOX_DETAIL(lst, i + 1, "!")
+            GUI_LISTBOX_COLOR(lst, i + 1, RGB(230, 110, 100))
+            GUI_LISTBOX_TIP(lst, i + 1, fUrl[i] + CHR$(10) + fFehler[i])
+        ELSE
+            GUI_LISTBOX_DETAIL(lst, i + 1, IIF(n > 0, STR$(n), ""))
+            GUI_LISTBOX_TIP(lst, i + 1, fUrl[i])
+        END IF
+        IF abrufLaeuft(i) THEN GUI_LISTBOX_DETAIL(lst, i + 1, "...")
+    NEXT
+    IF wahl >= 0 AND wahl < GUI_LISTBOX_COUNT(lst) THEN GUI_LISTBOX_SELECT(lst, wahl, TRUE)
+    GUI_STATUSBAR_SET(sb, 1, STR$(ungelesen(0)) + " ungelesen")
+    TRAY_TOOLTIP("Feed-Leser -- " + STR$(ungelesen(0)) + " ungelesen")
+END SUB
+
+FUNCTION abrufLaeuft(i AS INTEGER) AS BOOLEAN
+    RETURN fAbruf[i] >= 0 OR fAuftrag[i] >= 0
+END FUNCTION
+
+SUB eintraegeZeigen()
+    ' Die gewaehlte Zeile ueber das Neuaufbauen retten (nach id) -- sonst
+    ' verschwaende sie bei jedem Abruf unter der Hand
+    DIM warId AS INTEGER : warId = -1
+    DIM sel AS INTEGER : sel = GUI_TABLE_SELECTED(tbl)
+    IF sel >= 0 AND sel < LEN(zId) THEN warId = zId[sel]
+    GUI_TABLE_CLEAR(tbl)
+    zId = [] : zLink = []
+    DIM r AS DB_RESULT
+    DIM sql AS STRING
+    sql = "SELECT e.id, e.titel, f.titel, e.datum, e.link, e.gelesen FROM eintrag e JOIN feed f ON f.id = e.feed"
+    IF gewaehltFeed = 0 THEN
+        r = DB_QUERY(ablage, sql + " ORDER BY e.datum DESC LIMIT 500")
+    ELSE
+        r = DB_QUERY(ablage, sql + " WHERE e.feed = ? ORDER BY e.datum DESC LIMIT 500", gewaehltFeed)
+    END IF
+    WHILE DB_NEXT(r)
+        DIM zeile AS INTEGER
+        zeile = GUI_TABLE_ADD_ROW(tbl, [DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), DB_GET_STRING(r, 3)])
+        ARRAY_PUSH(zId, DB_GET_INT(r, 0))
+        ARRAY_PUSH(zLink, DB_GET_STRING(r, 4))
+        IF DB_GET_INT(r, 5) = 1 THEN GUI_TABLE_ROW_COLOR(tbl, zeile, RGB(140, 150, 160), -1)
+        IF DB_GET_INT(r, 0) = warId THEN GUI_TABLE_SET_SELECTED(tbl, zeile)
+    WEND
+END SUB
+
+SUB vorschauZeigen(zeile AS INTEGER)
+    IF zeile < 0 OR zeile >= LEN(zId) THEN
+        GUI_RICHTEXT_SET_TEXT(vorschau, "")
+        RETURN
+    END IF
+    DIM r AS DB_RESULT
+    r = DB_QUERY(ablage, "SELECT e.titel, f.titel, e.datum, e.text, e.link, e.gelesen FROM eintrag e JOIN feed f ON f.id = e.feed WHERE e.id = ?", zId[zeile])
+    IF NOT DB_NEXT(r) THEN RETURN
+    DIM md AS STRING
+    md = "## " + DB_GET_STRING(r, 0) + CHR$(10) + CHR$(10)
+    md = md + "*" + DB_GET_STRING(r, 1) + "  ·  " + DB_GET_STRING(r, 2) + "*" + CHR$(10) + CHR$(10)
+    md = md + DB_GET_STRING(r, 3) + CHR$(10) + CHR$(10)
+    IF DB_GET_STRING(r, 4) <> "" THEN md = md + "[Im Browser öffnen](" + DB_GET_STRING(r, 4) + ")"
+    GUI_RICHTEXT_SET_TEXT(vorschau, md)
+    IF DB_GET_INT(r, 5) = 0 THEN
+        DB_EXEC(ablage, "UPDATE eintrag SET gelesen = 1 WHERE id = ?", zId[zeile])
+        GUI_TABLE_ROW_COLOR(tbl, zeile, RGB(140, 150, 160), -1)
+        listeZeigen()
+    END IF
+END SUB
+
+' --- Abrufen ---------------------------------------------------------------
+SUB abrufStarten()
+    DIM i AS INTEGER
+    DIM n AS INTEGER
+    FOR i = 0 TO LEN(fId) - 1
+        IF NOT abrufLaeuft(i) THEN
+            fAbruf[i] = HTTP_GET_START(fUrl[i])
+            n = n + 1
+        END IF
+    NEXT
+    IF n > 0 THEN GUI_STATUSBAR_SET(sb, 0, "Rufe " + STR$(n) + " Feed(s) ab ...")
+    listeZeigen()
+END SUB
+
+SUB feedFehler(i AS INTEGER, meldung AS STRING)
+    fFehler[i] = meldung
+    DB_EXEC(ablage, "UPDATE feed SET fehler = ? WHERE id = ?", meldung, fId[i])
+END SUB
+
+' Ergebnis eines Auftrags in die Ablage; liefert die Zahl neuer Eintraege
+FUNCTION uebernehmen(i AS INTEGER, antwort AS STRING) AS INTEGER
+    DIM j AS JSON_HANDLE
+    j = JSON_PARSE(antwort)
+    IF JSON_GET_STRING(j, "fehler") <> "" THEN
+        feedFehler(i, JSON_GET_STRING(j, "fehler"))
+        RETURN 0
+    END IF
+    feedFehler(i, "")
+    DIM titel AS STRING
+    titel = JSON_GET_STRING(j, "titel")
+    IF titel <> "" THEN DB_EXEC(ablage, "UPDATE feed SET titel = ?, abgerufen = ? WHERE id = ?", titel, ZEIT_TEXT$(ZEIT_JETZT()), fId[i])
+    DIM neu AS INTEGER
+    DIM k AS INTEGER
+    ' Alles in EINER Transaktion -- und bei einem Fehler zurueck, sonst bliebe
+    ' sie offen und das naechste DB_BEGIN scheiterte.
+    DB_BEGIN(ablage)
+    TRY
+        FOR k = 0 TO JSON_LEN(j, "eintraege") - 1
+            DIM p AS STRING
+            p = "eintraege." + STR$(k) + "."
+            DIM wann AS STRING
+            wann = JSON_GET_STRING(j, p + "datum")
+            IF wann = "" THEN wann = ZEIT_TEXT$(ZEIT_JETZT())
+            neu = neu + DB_EXEC(ablage, "INSERT OR IGNORE INTO eintrag (feed, guid, titel, link, datum, text) VALUES (?, ?, ?, ?, ?, ?)", _
+                fId[i], JSON_GET_STRING(j, p + "guid"), JSON_GET_STRING(j, p + "titel"), JSON_GET_STRING(j, p + "link"), wann, JSON_GET_STRING(j, p + "text"))
+        NEXT
+    CATCH e
+        DB_ROLLBACK(ablage)
+        THROW e
+    END TRY
+    DB_COMMIT(ablage)
+    RETURN neu
+END FUNCTION
+
+SUB abrufePruefen()
+    DIM i AS INTEGER
+    DIM fertig AS BOOLEAN
+    DIM neu AS INTEGER
+    FOR i = 0 TO LEN(fId) - 1
+        IF fAbruf[i] >= 0 THEN
+            IF HTTP_READY(fAbruf[i]) THEN
+                TRY
+                    DIM body AS STRING
+                    body = HTTP_RESULT(fAbruf[i])
+                    fAuftrag[i] = TASK_START(feedZerlegen, body)
+                CATCH e
+                    feedFehler(i, e)
+                    fertig = TRUE
+                END TRY
+                fAbruf[i] = -1
+            END IF
+        ELSEIF fAuftrag[i] >= 0 THEN
+            IF TASK_READY(fAuftrag[i]) THEN
+                TRY
+                    neu = neu + uebernehmen(i, TASK_RESULT$(fAuftrag[i]))
+                CATCH e
+                    feedFehler(i, e)
+                END TRY
+                fAuftrag[i] = -1
+                fertig = TRUE
+            END IF
+        END IF
+    NEXT
+    IF fertig THEN
+        DIM offen AS INTEGER
+        FOR i = 0 TO LEN(fId) - 1
+            IF abrufLaeuft(i) THEN offen = offen + 1
+        NEXT
+        feedsLaden()
+        eintraegeZeigen()
+        IF offen = 0 THEN
+            letzterAbruf = LEFT$(TIME$(), 5)
+            GUI_STATUSBAR_SET(sb, 0, "Bereit.")
+            GUI_STATUSBAR_SET(sb, 2, "abgerufen " + letzterAbruf)
+        END IF
+    END IF
+    IF neu > 0 THEN
+        neuSeitStart = neuSeitStart + neu
+        NOTIFY("Feed-Leser", STR$(neu) + IIF(neu = 1, " neuer Eintrag", " neue Eintraege"))
+    END IF
+END SUB
+
+' --- Feeds anlegen und entfernen ---------------------------------------------
+SUB feedFragen()
+    dlgNeu = GUI_PROMPT("Feed hinzufügen", "Adresse des Feeds (RSS oder Atom):", "https://", "Hinzufügen|Abbrechen")
+    dlgNeuOffen = TRUE
+END SUB
+
+SUB feedAnlegen(url AS STRING)
+    url = TRIM$(url)
+    IF NOT (LEFT$(url, 7) = "http://" OR LEFT$(url, 8) = "https://") OR LEN(url) < 12 THEN
+        GUI_STATUSBAR_SET(sb, 0, "Das ist keine Web-Adresse: " + url)
+        RETURN
+    END IF
+    DB_EXEC(ablage, "INSERT OR IGNORE INTO feed (url, titel, fehler) VALUES (?, ?, '')", url, url)
+    feedsLaden()
+    abrufStarten()
+END SUB
+
+SUB feedEntfernen()
+    IF gewaehltFeed = 0 THEN RETURN
+    DB_EXEC(ablage, "DELETE FROM eintrag WHERE feed = ?", gewaehltFeed)
+    DB_EXEC(ablage, "DELETE FROM feed WHERE id = ?", gewaehltFeed)
+    gewaehltFeed = 0
+    feedsLaden()
+    GUI_LISTBOX_SELECT(lst, 0, TRUE)
+    eintraegeZeigen()
+END SUB
+
+' --- Start -----------------------------------------------------------------
+feedsLaden()
+GUI_LISTBOX_SELECT(lst, 0, TRUE)
+eintraegeZeigen()
+TIMER_EVERY(TAKT_MS, abrufStarten)
+DIM bildNr AS INTEGER
+
+' --- Hauptschleife ---------------------------------------------------------
+WHILE NOT beenden
+    IF QUITREQUESTED() THEN BREAK
+    bildNr = bildNr + 1
+    IF bildNr = 2 THEN abrufStarten()
+    GUI_UPDATE()
+    TIMER_UPDATE()
+    abrufePruefen()
+
+    IF GUI_CLICKED(miNeu) THEN feedFragen()
+    IF GUI_CLICKED(miWeg) THEN feedEntfernen()
+    IF GUI_CLICKED(miAbruf) THEN abrufStarten()
+    IF GUI_CLICKED(miEnde) OR WINDOW_CLOSE_REQUESTED() THEN beenden = TRUE
+    IF GUI_CLICKED(miGelesen) THEN
+        DB_EXEC(ablage, "UPDATE eintrag SET gelesen = 1")
+        listeZeigen()
+        eintraegeZeigen()
+    END IF
+    IF dlgNeuOffen THEN
+        DIM antwort AS INTEGER
+        antwort = GUI_ANSWER(dlgNeu)
+        IF antwort > 0 THEN
+            dlgNeuOffen = FALSE
+            IF antwort = 1 THEN feedAnlegen(GUI_DIALOG_TEXT(dlgNeu))
+        END IF
+    END IF
+
+    IF GUI_CLICKED(lst) THEN
+        DIM w AS INTEGER
+        w = GUI_LISTBOX_SELECTED(lst)
+        IF w >= 0 THEN
+            gewaehltFeed = VAL(GUI_LISTBOX_DATA$(lst, w))
+            eintraegeZeigen()
+            vorschauZeigen(-1)
+        END IF
+    END IF
+    IF GUI_TABLE_CLICKED(tbl) >= 0 THEN vorschauZeigen(GUI_TABLE_SELECTED(tbl))
+    IF GUI_DOUBLE_CLICKED(tbl) THEN
+        DIM z AS INTEGER
+        z = GUI_TABLE_SELECTED(tbl)
+        IF z >= 0 AND z < LEN(zLink) THEN
+            IF zLink[z] <> "" THEN OPENURL(zLink[z])
+        END IF
+    END IF
+    DIM verweis AS STRING
+    verweis = GUI_RICHTEXT_LINK$(vorschau)
+    IF verweis <> "" THEN OPENURL(verweis)
+
+    SELECT CASE TRAY_MENU_CLICKED$()
+        CASE "Fenster zeigen"
+            WINDOW_RESTORE()
+            WINDOW_FOCUS()
+        CASE "Jetzt abrufen"
+            abrufStarten()
+        CASE "Beenden"
+            beenden = TRUE
+    END SELECT
+    IF TRAY_DOUBLE_CLICKED() OR NOTIFY_CLICKED() THEN
+        WINDOW_RESTORE()
+        WINDOW_FOCUS()
+    END IF
+
+    CLS(GUI_THEME_GET("win_bg"))
+    GUI_DRAW()
+    FLIP()
+WEND

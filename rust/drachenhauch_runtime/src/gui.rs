@@ -3044,6 +3044,14 @@ fn ist_funktionstaste(code: i64) -> bool {
 const K_PLUS: i64 = -43;
 const K_MINUS: i64 = -45;
 
+/// Unbekannter Schluessel bei Thema/Metrik: die gueltigen nennen, sortiert --
+/// wie bei den uebrigen *_SET (bis 2026.27 sagten diese vier nur "unbekannt").
+fn unbekannt<'a>(befehl: &str, key: &str, bekannt: impl Iterator<Item = &'a String>) -> String {
+    let mut namen: Vec<&str> = bekannt.map(|s| s.as_str()).collect();
+    namen.sort_unstable();
+    format!("{}: unbekannter Schluessel '{}' (bekannt: {})", befehl, key, namen.join(", "))
+}
+
 fn kuerzel_taste(g: &Graphics, code: i64) -> bool {
     match code {
         K_PLUS => [1073741911, 61, 93].iter().any(|&c| g.key_pressed(c)),
@@ -11735,19 +11743,19 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     // --- Theme / Metriken ---
     pub fn theme_accent(&mut self, c: i64) { self.theme.insert("accent".into(), c); }
     pub fn theme_set(&mut self, key: String, c: i64) -> Result<(), String> {
-        if !self.theme.contains_key(&key) { return Err(format!("GUI_THEME_SET: unbekannter Schluessel '{}'", key)); }
+        if !self.theme.contains_key(&key) { return Err(unbekannt("GUI_THEME_SET", &key, self.theme.keys())); }
         self.theme.insert(key, c); Ok(())
     }
     pub fn theme_get(&self, key: &str) -> Result<i64, String> {
-        self.theme.get(key).copied().ok_or_else(|| format!("GUI_THEME_GET: unbekannter Schluessel '{}'", key))
+        self.theme.get(key).copied().ok_or_else(|| unbekannt("GUI_THEME_GET", key, self.theme.keys()))
     }
     pub fn metric_set(&mut self, key: String, v: i32) -> Result<(), String> {
-        if !self.metrics.contains_key(&key) { return Err(format!("GUI_METRIC_SET: unbekannter Schluessel '{}'", key)); }
+        if !self.metrics.contains_key(&key) { return Err(unbekannt("GUI_METRIC_SET", &key, self.metrics.keys())); }
         if v < 0 { return Err("GUI_METRIC_SET: Wert muss >= 0 sein".into()); }
         self.metrics.insert(key, v); Ok(())
     }
     pub fn metric_get(&self, key: &str) -> Result<i32, String> {
-        self.metrics.get(key).copied().ok_or_else(|| format!("GUI_METRIC_GET: unbekannter Schluessel '{}'", key))
+        self.metrics.get(key).copied().ok_or_else(|| unbekannt("GUI_METRIC_GET", key, self.metrics.keys()))
     }
     pub fn theme_preset(&mut self, name: &str) -> Result<(), String> {
         let key = name.to_lowercase();

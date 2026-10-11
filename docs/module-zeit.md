@@ -43,10 +43,22 @@ IMPORT "zeit"
 
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30:00"))   ' Normalform
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00"))   ' ISO mit T
-PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00Z"))  ' mit Zeitzonen-Anhang
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30"))      ' ohne Sekunden
 PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28"))            ' nur Datum = 00:00:00
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T18:30:00Z"))  ' mit Zeitzone
+PRINT ZEIT_TEXT$(ZEIT_PARSE("Fri, 28 Aug 2026 20:30:00 +0200"))  ' RSS, HTTP, E-Mail
 ```
+
+**Mit Zeitzone ist der Text ein fester Zeitpunkt** und wird in die Ortszeit
+dieses Rechners umgerechnet -- an einem Rechner in Mitteleuropa ergeben die
+letzten beiden Zeilen im August `2026-08-28 20:30:00`. Verstanden werden `Z`,
+`+02:00`, `+0200`, `-05:00`, `UTC`/`GMT`/`UT`, die US-Zonen `EST`/`EDT`,
+`CST`/`CDT`, `MST`/`MDT`, `PST`/`PDT` und `CET`/`CEST`/`MEZ`/`MESZ`; ein
+unbekannter Zonenname ist nicht lesbar statt still falsch. Die Sommerzeit gilt
+für den Tag des Zeitstempels, nicht für heute. **Ohne Zeitzone** gilt der Text
+als Ortszeit. Bis 2026.27 wurde ein Zonen-Anhang abgeschnitten -- `18:30Z`
+galt als 18:30 Ortszeit --, und das RFC-822-Datum der RSS-Feeds war gar nicht
+lesbar.
 
 Unlesbares bricht mit Klartext ab statt still `-1` zu liefern — ein kaputtes
 Datum fällt sonst erst viel später als unsinniges Ergebnis auf. Wo Eingaben
@@ -179,7 +191,8 @@ WEND
 - **Zeitpunkte sind Ortszeit.** Ein Zeitpunkt, der auf einem Rechner in Berlin
   entsteht, ergibt auf einem Rechner in Tokio dieselbe *Zahl* nur, wenn beide
   denselben Text lesen — und dieselbe Zahl zeigt dort eine andere Uhrzeit.
-  Wer über Zeitzonen hinweg vergleicht, speichert den Text, nicht die Zahl.
+  Wer über Zeitzonen hinweg vergleicht, speichert den Text mit Zeitzone
+  (`2026-08-28T18:30:00Z`), nicht die Zahl.
 - **`MILLIS()` ist etwas anderes und lässt sich nicht umrechnen.** Es ist die
   Stoppuhr für Frame-Zeiten und Timer. Wer `MILLIS() / 1000` mit
   `ZEIT_JETZT()` vergleicht, liegt um den Zeitzonen-Versatz daneben —

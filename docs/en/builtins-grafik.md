@@ -432,14 +432,17 @@ things take care of this:
   languages of Central Europe), Greek, Cyrillic, general punctuation
   (`… – „ “`) and `€`. If the font file does not contain a character, raylib
   draws a `?` there; a pixel font for a retro game often has no umlauts.
-- **Without a font of your own, a fallback font steps in.** The built-in
-  raylib font knows ASCII and Latin-1 (characters 32 to 255, so `äöüÄÖÜß` as
-  well). If a character beyond that occurs (such as `€` or kanji), the
-  runtime draws this text with a system font (Windows: Segoe UI, macOS:
-  SF/Helvetica, Linux: DejaVu/Liberation). German text with umlauts stays in
-  the built-in font -- until 2026-10-01 every text with a character beyond
-  ASCII switched to the fallback, and in a user interface “Löschen” stood in
-  a different font from “Buchen” next to it.
+- **Without a font of your own, a fallback font steps in for missing
+  characters.** The built-in raylib font knows ASCII and Latin-1 (characters
+  32 to 255, so `äöüÄÖÜß` as well). It draws typographic punctuation as its
+  plain counterparts: `„“”` as `"`, `‚‘’` as `'`, `– —` as `-`, `…` as `...`
+  (display only -- the text stays as it is). Whatever is still missing (such
+  as `€` or kanji) comes **character by character** from a system font
+  (Windows: Segoe UI, macOS: SF/Helvetica, Linux: DejaVu/Liberation); the
+  rest of the line stays in the built-in font. Until 2026.27 such a character
+  switched the whole line to the other font, until 2026-10-01 even every
+  umlaut did. Rotated text (`TEXTROT`) still switches as a whole if a
+  character is missing after the replacement.
 - **Glyphs on demand.** If a character is in no loaded font (kanji, hangul,
   emoji, Arabic, Hebrew, Thai), the runtime notes it while drawing or
   measuring and bakes it at the next `FLIP` from the matching system font —

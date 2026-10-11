@@ -1976,24 +1976,24 @@ impl Graphics {
         Ok(g)
     }
 
-    /// Welcher Font zeichnet diesen Text? Normalerweise der aktive. Steht
-    /// keiner (eingebaute Bitmapschrift) und enthaelt der Text ein Zeichen,
-    /// das sie nicht hat (jenseits von Latin-1), springt der Ausweich-Font
-    /// ein -- als Handle
-    /// `FONT_AUSWEICH`, das nicht in `fonts` steht.
-    /// Braucht dieser Text in der eingebauten Schrift den Ausweich-Font? Nur,
-    /// wenn ein Zeichen darin fehlt: raylibs Bitmapschrift hat 32..255 samt
-    /// Umlauten und ss (rtext.c, LoadFontDefault). Bis 2026-10-01 ging jeder
-    /// Text mit einem Zeichen ueber ASCII GANZ an den Ausweich-Font -- in
-    /// einer Oberflaeche stand "Loeschen" dann in einer anderen Schrift als
-    /// "Buchen" daneben.
-    fn braucht_ausweich(&self, s: &str) -> bool {
-        !self.ausweich.is_empty() && s.chars().any(|c| !self.font_hat(-1, c as u32))
+    /// Welcher Font zeichnet diesen Text? Der aktive, sonst die eingebaute
+    /// Bitmapschrift (-1). Fehlt ihr ein Zeichen, zerlegen Zeichnen und Messen
+    /// den Text in Laeufe (`zeichne_text`, `std_breite`): nur das Zeichen kommt
+    /// aus der Ausweichschrift. Bis 2026-10-01 ging jeder Text mit einem Zeichen
+    /// ueber ASCII GANZ an die Ausweichschrift, bis 2026.27 noch jeder mit
+    /// einem Zeichen jenseits von Latin-1 (`„`, `–`, `€`).
+    fn font_fuer(&self, _s: &str) -> i64 {
+        if self.active_font >= 0 { self.active_font } else { -1 }
     }
 
-    fn font_fuer(&self, s: &str) -> i64 {
+    /// Fuer GEDREHTEN Text (TEXTROT): `DrawTextPro` dreht einen Text als
+    /// Ganzes, Laeufe aus zwei Schriften liessen sich nicht sauber
+    /// zusammensetzen -- hier wechselt darum weiter der ganze Text, aber erst,
+    /// wenn nach dem Ersetzen der Satzzeichen noch ein Zeichen fehlt.
+    fn font_fuer_gedreht(&self, s: &str) -> i64 {
         if self.active_font >= 0 { return self.active_font; }
-        if self.braucht_ausweich(&s) { return FONT_AUSWEICH; }
+        let s = pixel_ersatz(s);
+        if !self.ausweich.is_empty() && s.chars().any(|c| !std_hat(c as u32)) { return FONT_AUSWEICH; }
         -1
     }
 
@@ -2017,6 +2017,7 @@ impl Graphics {
     /// noch eine Ausweich-Schrift eine Glyphe hat -- FLIP laedt nach.
     fn glyphen_pruefen(&self, h: i64, s: &str) {
         if s.is_ascii() { return; }
+        let s = if h < 0 && h != FONT_AUSWEICH { pixel_ersatz(s) } else { std::borrow::Cow::Borrowed(s) };
         let mut fehlend = self.glyphen_fehlend.borrow_mut();
         for ch in s.chars() {
             let c = ch as u32;
@@ -2035,10 +2036,7 @@ impl Graphics {
         if s.is_ascii() || basis.is_none() {
             return match basis {
                 Some(f) => f.measure_text(s, size, self.text_spacing).x,
-                None => {
-                    let c = std::ffi::CString::new(s).unwrap_or_default();
-                    unsafe { raylib::ffi::MeasureText(c.as_ptr(), size as i32) as f32 }
-                }
+                None => std_breite(s, size, &self.ausweich),
             };
         }
         let mut breite = 0.0f32;
@@ -4010,7 +4008,6 @@ impl Graphics {
     /// Breite nicht.
     pub fn text_width_stil(&self, s: &str, size: i32, font: i64, stil: u8) -> i32 {
         let size = size.max(1);
-        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         let (h, emu) = self.schnitt_da(font, stil);
         let mut b = self.breite_mit(h, s, size as f32);
         if emu & crate::schnitt::FETT != 0 && !s.is_empty() { b += crate::schnitt::fett_versatz(size as f32); }
@@ -4023,7 +4020,7 @@ impl Graphics {
     /// durch die Camera (w2s) wie TEXT.
     pub fn text_rot(&mut self, x: i32, y: i32, s: String, angle_deg: f32, scale: f32, c: i64) {
         let (x, y) = self.w2s(x, y);
-        let font = self.font_fuer(&s);
+        let font = self.font_fuer_gedreht(&s);
         self.emit(Cmd::TextRot(x, y, s, self.text_size, col(c), font,
                                self.text_spacing, angle_deg, scale.max(0.0001)));
     }
@@ -4037,6 +4034,7 @@ impl Graphics {
     pub fn text_rot_styled(&mut self, x: i32, y: i32, s: String, angle_deg: f32,
                            c: i64, font: i64, size: i32) {
         let (x, y) = self.w2s(x, y);
+        let font = if font < 0 { self.font_fuer_gedreht(&s) } else { font };
         self.emit(Cmd::TextRot(x, y, s, size.max(1), col(c), font,
                                self.text_spacing, angle_deg, 1.0));
     }
@@ -4047,9 +4045,6 @@ impl Graphics {
         let (x, y) = self.w2s(x, y);
         // Auch hier ausweichen: ein Widget ohne eigene Schrift (font = -1)
         // zeigt sonst "K?ln" in der Tabelle.
-        let font = if font < 0 && self.braucht_ausweich(&s) {
-            FONT_AUSWEICH
-        } else { font };
         self.glyphen_pruefen(font, &s);
         self.emit(Cmd::Text(x, y, s, size.max(1), col(c), font, self.text_spacing));
     }
@@ -4059,7 +4054,6 @@ impl Graphics {
     pub fn text_styled_stil(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
         if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
         let (x, y) = self.w2s(x, y);
-        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         let sp = self.text_spacing;
         self.text_emit(x, y, s, size.max(1), c, font, sp, stil);
     }
@@ -4071,7 +4065,6 @@ impl Graphics {
     pub fn text_nachgebildet(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32, stil: u8) {
         if stil == 0 { return self.text_styled(x, y, s, c, font, size); }
         let (x, y) = self.w2s(x, y);
-        let font = if font < 0 && self.braucht_ausweich(&s) { FONT_AUSWEICH } else { font };
         self.glyphen_pruefen(font, &s);
         let sp = self.text_spacing;
         self.emit(Cmd::TextStil(x, y, s, size.max(1), col(c), font, sp, stil));
@@ -4235,10 +4228,6 @@ impl Graphics {
 
     pub fn text_width_in(&self, s: &str, size: i32, font: i64) -> i32 {
         let size = size.max(1);
-        // Gegenstueck zu text_styled, das bei Umlauten ebenfalls ausweicht.
-        let font = if font < 0 && self.braucht_ausweich(&s) {
-            FONT_AUSWEICH
-        } else { font };
         self.breite_mit(font, s, size as f32) as i32
     }
 
@@ -7070,6 +7059,67 @@ fn m3d_arr_to_ffi(a: &[f32; 16]) -> raylib::ffi::Matrix {
 /// Voraussetzung fuer Rueckkopplungs-/Nachzieheffekte).
 /// Font-Handle eines Zeichen-Befehls aufloesen. `None` = eingebaute Schrift.
 /// FONT_AUSWEICH steht fuer den Umlaut-Ausweichfont, der nicht in `fonts` liegt.
+/// Typografische Zeichen, die die eingebaute Pixelschrift nicht hat, als ihre
+/// einfachen Gegenstuecke -- NUR fuer die Anzeige, der Text bleibt, wie er ist.
+/// Bis 2026.27 setzte ein einziges `„` oder `–` die ganze Zeile in die
+/// Ausweichschrift (gefunden beim Feed-Leser: jede dritte Tabellenzeile sprang
+/// in eine andere Schrift). Entscheidung des Nutzers: ersetzen, und was dann
+/// noch fehlt, Zeichen fuer Zeichen aus der Ausweichschrift.
+fn ersatz_fuer(c: char) -> Option<&'static str> {
+    Some(match c {
+        '\u{201C}' | '\u{201D}' | '\u{201E}' | '\u{201F}' | '\u{2033}' => "\"",
+        '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}' | '\u{2032}' => "'",
+        '\u{2010}' | '\u{2011}' | '\u{2012}' | '\u{2013}' | '\u{2014}' | '\u{2015}' | '\u{2212}' => "-",
+        '\u{2026}' => "...",
+        '\u{2022}' => "\u{B7}",
+        '\u{2009}' | '\u{200A}' | '\u{202F}' => " ",
+        _ => return None,
+    })
+}
+
+fn pixel_ersatz(s: &str) -> std::borrow::Cow<'_, str> {
+    if s.is_ascii() || !s.chars().any(|c| ersatz_fuer(c).is_some()) {
+        return std::borrow::Cow::Borrowed(s);
+    }
+    let mut o = String::with_capacity(s.len());
+    for c in s.chars() {
+        match ersatz_fuer(c) { Some(e) => o.push_str(e), None => o.push(c) }
+    }
+    std::borrow::Cow::Owned(o)
+}
+
+/// Hat raylibs eingebaute Bitmapschrift das Zeichen? (32..126, 160..255)
+fn std_hat(c: u32) -> bool { c < 0x7F || (0xA0..=0xFF).contains(&c) }
+
+/// Die eingebaute Schrift als Font-Objekt, mit Groesse und Abstand wie raylibs
+/// `DrawText`/`MeasureText` (mindestens 10, Abstand Groesse/10 ganzzahlig) --
+/// so laesst sie sich in Laeufe zerlegen wie eine geladene Schrift.
+fn std_schrift(size: f32) -> (raylib::core::text::WeakFont, f32, f32) {
+    let s = (size as i32).max(10);
+    (unsafe { raylib::core::text::WeakFont::from_raw(raylib::ffi::GetFontDefault()) },
+     s as f32, (s / 10) as f32)
+}
+
+/// Breite eines Textes in der eingebauten Schrift samt Ausweich-Laeufen --
+/// EINE Rechnung fuer `breite_mit` und `miss_text`.
+fn std_breite(txt: &str, size: f32, ausweich: &[Ausweich]) -> f32 {
+    let txt = pixel_ersatz(txt);
+    if ausweich.is_empty() || txt.chars().all(|c| std_hat(c as u32)) {
+        let c = std::ffi::CString::new(txt.as_ref()).unwrap_or_default();
+        return unsafe { raylib::ffi::MeasureText(c.as_ptr(), size as i32) as f32 };
+    }
+    let (std, sz, sp) = std_schrift(size);
+    let mut b = 0.0f32;
+    let mut erster = true;
+    for (fi, lauf) in text_laeufe(-1, &txt, std_hat, ausweich) {
+        if !erster { b += sp; }
+        erster = false;
+        b += if fi == 0 { std.measure_text(&lauf, sz, sp).x }
+             else { ausweich[fi - 1].font.measure_text(&lauf, sz, sp).x };
+    }
+    b
+}
+
 fn font_zu_handle<'a>(h: i64, fonts: &'a [Font], ausweich: &'a [Ausweich]) -> Option<&'a Font> {
     if h == FONT_AUSWEICH { return ausweich.first().map(|a| &a.font); }
     if h < 0 { return None; }
@@ -7108,7 +7158,29 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
     let basis = font_zu_handle(h, fonts, ausweich);
     let basis = match basis {
         Some(f) => f,
-        None => { d.draw_text(txt, x as i32, y as i32, size as i32, col); return; }
+        None => {
+            let txt = pixel_ersatz(txt);
+            if ausweich.is_empty() || txt.chars().all(|c| std_hat(c as u32)) {
+                d.draw_text(&txt, x as i32, y as i32, size as i32, col);
+                return;
+            }
+            let (std, sz, sp) = std_schrift(size);
+            let mut cx = x;
+            let mut erster = true;
+            for (fi, lauf) in text_laeufe(-1, &txt, std_hat, ausweich) {
+                if !erster { cx += sp; }
+                erster = false;
+                if fi == 0 {
+                    d.draw_text_ex(&std, &lauf, Vector2::new(cx, y), sz, sp, col);
+                    cx += std.measure_text(&lauf, sz, sp).x;
+                } else {
+                    let f = &ausweich[fi - 1].font;
+                    sdf::mit(-1, || d.draw_text_ex(f, &lauf, Vector2::new(cx, y), sz, sp, col));
+                    cx += f.measure_text(&lauf, sz, sp).x;
+                }
+            }
+            return;
+        }
     };
     if txt.is_ascii() || ausweich.is_empty() {
         sdf::mit(h, || d.draw_text_ex(basis, txt, Vector2::new(x, y), size, spacing, col));
@@ -7244,10 +7316,7 @@ fn miss_text(h: i64, txt: &str, size: f32, spacing: f32, fonts: &[Font],
              font_glyphs: &[std::collections::HashSet<u32>], ausweich: &[Ausweich]) -> f32 {
     let basis = match font_zu_handle(h, fonts, ausweich) {
         Some(f) => f,
-        None => {
-            let c = std::ffi::CString::new(txt).unwrap_or_default();
-            return unsafe { raylib::ffi::MeasureText(c.as_ptr(), size as i32) as f32 };
-        }
+        None => return std_breite(txt, size, ausweich),
     };
     if txt.is_ascii() || ausweich.is_empty() { return basis.measure_text(txt, size, spacing).x; }
     let basis_hat = |c: u32| -> bool {
@@ -7709,7 +7778,7 @@ fn render_scene<D: RaylibDraw>(
                                 // DrawText). Via ffi, weil der generische Draw-Kontext kein
                                 // get_font_default hat.
                                 let fspacing = fsize / 10.0;
-                                let c_txt = std::ffi::CString::new(txt.as_str()).unwrap_or_default();
+                                let c_txt = std::ffi::CString::new(pixel_ersatz(txt).as_ref()).unwrap_or_default();
                                 unsafe {
                                     let df = raylib::ffi::GetFontDefault();
                                     let m = raylib::ffi::MeasureTextEx(df, c_txt.as_ptr(), fsize, fspacing);

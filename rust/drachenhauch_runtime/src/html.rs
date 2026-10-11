@@ -340,6 +340,18 @@ fn comment_end(chars: &[char], i: usize) -> Option<usize> {
     Some(chars.len()) // unabgeschlossener Kommentar -> Rest des Dokuments verschlucken
 }
 
+/// Beginnt bei `i` (dort steht `<`) ein Tag? Wie im HTML-Tokenizer nur, wenn
+/// ein Buchstabe, `/` + Buchstabe, `!` oder `?` folgt -- sonst ist `<` Text.
+/// Bis 2026.27 galt jedes `<` als Tag-Anfang: aus `a < b und c > d` wurde
+/// `a d` (gefunden beim Feed-Leser, Ueberschriften mit Vergleichen).
+fn tag_beginnt(chars: &[char], i: usize) -> bool {
+    match chars.get(i + 1) {
+        Some(c) if c.is_ascii_alphabetic() || *c == '!' || *c == '?' => true,
+        Some('/') => chars.get(i + 2).is_some_and(|c| c.is_ascii_alphabetic()),
+        _ => false,
+    }
+}
+
 /// HTML_TEXT: Tags raus, Entities dekodiert, script/style geskippt,
 /// Block-Tags -> Newline, Whitespace zusammengezogen.
 pub fn html_text(s: &str) -> String {
@@ -348,7 +360,7 @@ pub fn html_text(s: &str) -> String {
     let mut i = 0;
     let mut skip = 0i32;
     while i < chars.len() {
-        if chars[i] == '<' {
+        if chars[i] == '<' && tag_beginnt(&chars, i) {
             if let Some(end) = comment_end(&chars, i) {
                 i = end;
                 continue;
@@ -579,5 +591,18 @@ impl Abrufe {
             .and_then(|e| e.as_ref())
             .map(|e| e.url.clone())
             .unwrap_or_default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spitze_klammer_ohne_buchstaben_ist_text() {
+        assert_eq!(html_text("a < b und c > d"), "a < b und c > d");
+        assert_eq!(html_text("1 <2 und x</ y"), "1 <2 und x</ y");
+        assert_eq!(html_text("<p>x</p><!-- k -->y<br/>z"), "xy\nz");
+        assert_eq!(html_text("a<b>fett</b>"), "afett");
     }
 }

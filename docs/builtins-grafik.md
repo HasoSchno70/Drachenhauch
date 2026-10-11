@@ -433,14 +433,17 @@ Dinge:
   Interpunktion (`… – „ “`) und `€`. Enthält die Schriftdatei ein Zeichen
   nicht, zeichnet raylib dort ein `?`; eine Pixel-Schrift für ein Retro-Spiel
   hat oft keine Umlaute.
-- **Ohne eigene Schrift springt eine Ausweich-Schrift ein.** Die eingebaute
-  raylib-Schrift kennt ASCII und Latin-1 (Zeichen 32 bis 255, also auch
-  `äöüÄÖÜß`). Kommt ein Zeichen darüber hinaus vor (etwa `€` oder Kanji),
-  zeichnet die Runtime diesen Text mit einer Systemschrift (Windows: Segoe
-  UI, macOS: SF/Helvetica, Linux: DejaVu/Liberation). Deutscher Text mit
-  Umlauten bleibt in der eingebauten Schrift -- bis 2026-10-01 wich jeder
-  Text mit einem Zeichen über ASCII aus, und in einer Oberfläche stand
-  „Löschen“ in einer anderen Schrift als „Buchen“ daneben.
+- **Ohne eigene Schrift springt für fehlende Zeichen eine Ausweich-Schrift
+  ein.** Die eingebaute raylib-Schrift kennt ASCII und Latin-1 (Zeichen 32
+  bis 255, also auch `äöüÄÖÜß`). Typografische Satzzeichen zeichnet sie als
+  ihre einfachen Gegenstücke: `„“”` als `"`, `‚‘’` als `'`, `– —` als `-`,
+  `…` als `...` (nur die Anzeige -- der Text bleibt, wie er ist). Was dann
+  noch fehlt (etwa `€` oder Kanji), kommt **Zeichen für Zeichen** aus einer
+  Systemschrift (Windows: Segoe UI, macOS: SF/Helvetica, Linux:
+  DejaVu/Liberation); der Rest der Zeile bleibt in der eingebauten Schrift.
+  Bis 2026.27 wechselte bei einem solchen Zeichen die ganze Zeile die Schrift,
+  bis 2026-10-01 sogar bei jedem Umlaut. Gedrehter Text (`TEXTROT`) wechselt
+  weiterhin als Ganzes, wenn nach dem Ersetzen ein Zeichen fehlt.
 - **Glyphen auf Zuruf.** Steht ein Zeichen in keiner geladenen Schrift
   (Kanji, Hangul, Emoji, Arabisch, Hebräisch, Thai), merkt sich die Runtime
   es beim Zeichnen oder Messen und backt es beim nächsten `FLIP` aus der

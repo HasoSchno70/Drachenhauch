@@ -927,7 +927,7 @@ GUI_FORM_LOAD/SAVE: dieser Bau hat kein db-Modul	GUI_FORM_LOAD/SAVE: this build 
 {}: '{}' braucht von und bis	{}: '{}' needs from and to
 {}: '{}' ist kein Stil -- moeglich sind "ok" (Vorgabe) und "janein"	{}: '{}' is not a style -- possible are "ok" (default) and "janein"
 {}: '{}' ist kein Stil -- moeglich sind "ok" (Vorgabe), "janein" oder eigene Knoepfe mit | getrennt ("Speichern|Verwerfen|Abbrechen")	{}: '{}' is not a style -- possible are "ok" (default), "janein" or your own buttons separated by | ("Save|Discard|Cancel")
-{}: '{}' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)	{}: '{}' is not a point in time -- expected 'YYYY-MM-DD hh:mm:ss' (also with T, without seconds or just the date)
+{}: '{}' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, nur Datum oder mit Zeitzone) oder 'Sat, 28 Aug 2026 20:30:00 +0200'	{}: '{}' is not a point in time -- expected 'YYYY-MM-DD hh:mm:ss' (also with T, without seconds, just the date or with a time zone) or 'Sat, 28 Aug 2026 20:30:00 +0200'
 {}: '{}' kenne ich nicht -- "hoch" oder "quer"	{}: '{}' is unknown -- "hoch" (portrait) or "quer" (landscape)
 {}: 2. Argument ist "hoch" oder "quer"	{}: the 2nd argument is "hoch" (portrait) or "quer" (landscape)
 {}: Seitengroesse '{}' kenne ich nicht -- a3, a4, a5, a6, letter, legal	{}: unknown page size '{}' -- a3, a4, a5, a6, letter, legal
