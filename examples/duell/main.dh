@@ -22,6 +22,7 @@
 ' `--udp-port N` schickt die Pakete des Gastes ueber relay.dh (Verzoegerung,
 ' Schwankung und Verlust zum Ausprobieren auf einem Rechner).
 IMPORT "net"
+IMPORT "regex"
 IMPORT "spiel.dh"
 
 ' Text in einer Groesse -- TEXT selbst nimmt keine.
@@ -51,9 +52,8 @@ WHILE ai < ARGC()
         mitFenster = FALSE
     ELSEIF a = "wirt" OR a = "gast" THEN
         rolle = a
-    ELSEIF rolle = "gast" AND adresse = "127.0.0.1" AND VAL(a) = 0 THEN
-        adresse = a
-    ELSEIF VAL(a) > 0 THEN
+    ELSEIF REGEX_TEST(a, "^[0-9]+$") THEN
+        ' nur Ziffern: ein Port (VAL("192.168.1.20") waere 192.168)
         port = VAL(a)
     ELSEIF rolle = "gast" THEN
         adresse = a
