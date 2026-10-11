@@ -200,6 +200,12 @@ any more simply disappears. Windows does report it on the next read;
 is still there, with UDP, only shows in whether packets keep coming -- if you
 need to know, count the time since the last packet.
 
+**`NET_CLOSE` first reads what arrived unread**, and then ends its own
+direction cleanly. A socket that is closed with unread data otherwise drops
+the connection hard -- and the other side throws away what it was just sent
+(measured: a "BESETZT" refusal before closing did not arrive in 5 of 5
+attempts). The same holds at the end of the program.
+
 ## UTF-8 over TCP
 
 `NET_RECV` decodes the received byte stream as UTF-8. Since TCP is a pure
@@ -310,7 +316,9 @@ already in use" without `SO_REUSEADDR` (verified empirically).
 
 ## Example
 
-[examples/72_net_chat.dh](../../examples/72_net_chat.dh) shows a small chat (TCP server + client). UDP examples can be found in the tests (`tests/pruef/modules_net.dhtest`).
+[examples/72_net_chat.dh](../../examples/72_net_chat.dh) shows a small chat (TCP server + client).
+
+[examples/duell/main.dh](../../examples/duell/main.dh) is a real-time game for two: connecting and the end of a round over TCP, the game state 30 times a second as a binary packet over UDP, and the guest predicts its own ship and reconciles it with every state from the host. [examples/duell/relay.dh](../../examples/duell/relay.dh) imitates a bad network (delay, jitter, loss) -- so all of this can be tried on ONE computer: two windows, host and guest over `127.0.0.1`.
 
 ## In the native runtime (dhrt)
 

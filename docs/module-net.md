@@ -200,6 +200,12 @@ beim naechsten Lesen; `NET_UDP_RECV` liest dann weiter, statt abzubrechen.
 Ob der andere noch da ist, sagt bei UDP nur, ob noch Pakete kommen -- wer
 das wissen muss, zaehlt die Zeit seit dem letzten Paket.
 
+**`NET_CLOSE` liest erst, was noch ungelesen ankam**, und beendet dann die
+eigene Richtung sauber. Ein Socket, der mit ungelesenen Daten geschlossen
+wird, bricht sonst hart ab -- und die Gegenseite verwirft, was man ihr
+gerade noch geschickt hat (gemessen: eine Absage "BESETZT" vor dem Schliessen
+kam in 5 von 5 Versuchen nicht an). Dasselbe gilt am Programmende.
+
 ## UTF-8 ueber TCP
 
 `NET_RECV` dekodiert den empfangenen Byte-Strom als UTF-8. Da TCP ein reiner
@@ -312,7 +318,9 @@ kein TIME_WAIT-bedingtes "Address already in use" ohne `SO_REUSEADDR`
 
 ## Beispiel
 
-[examples/72_net_chat.dh](../examples/72_net_chat.dh) zeigt einen kleinen Chat (TCP-Server + Client). UDP-Beispiele sind in den Tests (`tests/pruef/modules_net.dhtest`) zu finden.
+[examples/72_net_chat.dh](../examples/72_net_chat.dh) zeigt einen kleinen Chat (TCP-Server + Client).
+
+[examples/duell/main.dh](../examples/duell/main.dh) ist ein Echtzeit-Spiel fuer zwei: Verbinden und Rundenende ueber TCP, der Spielstand 30-mal je Sekunde als Binaerpaket ueber UDP, der Gast rechnet sein eigenes Schiff voraus und gleicht es mit jedem Stand des Wirts ab. [examples/duell/relay.dh](../examples/duell/relay.dh) spielt ein schlechtes Netz nach (Verzoegerung, Schwankung, Verlust) -- so laesst sich das alles auf EINEM Rechner ausprobieren: zwei Fenster, Wirt und Gast ueber `127.0.0.1`.
 
 ## In der nativen Runtime (dhrt)
 
