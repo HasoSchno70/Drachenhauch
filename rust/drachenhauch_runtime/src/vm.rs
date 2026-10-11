@@ -10460,6 +10460,15 @@ impl<'p> Vm<'p> {
                 self.audio_mut()?.ch_stop(i, fade, &easing)?; Value::Nil
             }
             "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
+            "audio_is_waiting" => { let i = gi(a, 0, "AUDIO_IS_WAITING")?; Value::Bool(self.audio_mut()?.ch_is_waiting(i)?) }
+            "audio_record_start" => {
+                if a.len() > 1 { return Err(format!("AUDIO_RECORD_START: erwartet 0..1 Argumente, erhalten {}", a.len())); }
+                let m = if a.is_empty() { 600.0 } else { need_f(a, 0, "AUDIO_RECORD_START")? };
+                self.audio_mut()?.record_start(m)?; Value::Nil
+            }
+            "audio_record_stop" => { Value::Int(self.audio_mut()?.record_stop()?) }
+            "audio_recording" => { Value::Bool(self.audio_mut()?.recording()) }
+            "audio_peak" => { Value::Float(round_audio(self.audio_mut()?.peak())) }
             "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
             "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(round_audio(self.audio_mut()?.ch_get_volume(i)?)) }
             "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }

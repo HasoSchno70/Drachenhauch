@@ -1,0 +1,213 @@
+' AUDIO_PLAY_AT plant, ohne Vorhandenes zu loeschen (2026-10-11, Musik-Runde).
+'
+' Bis 2026.28 stoppte jedes AUDIO_PLAY_AT die vorige Instanz desselben
+' Klangs -- wie AUDIO_PLAY. Ein Sequencer, der dieselbe Hi-Hat zwei Schritte
+' voraus plant, loeschte damit die erste, bevor sie erklang; am Mischer kam
+' von zwei geplanten Einsaetzen einer an. Der Tracker-Pilot (190) puffert
+' seine Noten genauso. Die Faelle laufen auf einer echten Audio-Uhr (100
+' Ticks je Sekunde) und fragen AUDIO_IS_PLAYING zu festen Ticks.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== derselbe klang zweimal geplant klingt zweimal
+' Gezaehlt wird am Mischer (AUDIO_FFT): wie oft wird es laut? AUDIO_IS_PLAYING
+' taugt dafuer nicht -- ein Klang, der auf seinen Tick wartet, gilt schon als
+' spielend.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 120, "sine", 0.8)
+DIM uhr AS AUDIO_CLOCK
+uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_PLAY_AT(ton, uhr, 20)
+AUDIO_PLAY_AT(ton, uhr, 60)
+AUDIO_CLOCK_START(uhr)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM laut AS BOOLEAN, n AS INTEGER
+DIM f[32] AS FLOAT
+WHILE AUDIO_CLOCK_TICKS(uhr) < 100 AND MILLIS() - t0 < 3000
+    AUDIO_FFT(f)
+    DIM e AS FLOAT, i AS INTEGER
+    FOR i = 0 TO 31 : e = e + f[i] : NEXT
+    IF e > 0.5 AND NOT laut THEN
+        laut = TRUE : n = n + 1
+        PRINT "einsatz bei tick "; (AUDIO_CLOCK_TICKS(uhr) + 5) \ 10 * 10
+    ELSEIF e < 0.05 THEN
+        laut = FALSE
+    END IF
+    SLEEP(4)
+WEND
+PRINT n; " einsaetze"
+AUDIO_CLOCK_REMOVE(uhr)
+--- erwartet
+einsatz bei tick 20
+einsatz bei tick 60
+2 einsaetze
+
+=== audio stop beendet alle geplanten
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 120, "sine", 0.8)
+DIM uhr AS AUDIO_CLOCK
+uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_PLAY_AT(ton, uhr, 20)
+AUDIO_PLAY_AT(ton, uhr, 60)
+AUDIO_CLOCK_START(uhr)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE AUDIO_CLOCK_TICKS(uhr) < 5 AND MILLIS() - t0 < 3000
+    SLEEP(2)
+WEND
+AUDIO_STOP(ton)
+DIM n AS INTEGER, laut AS BOOLEAN
+DIM f[32] AS FLOAT
+WHILE AUDIO_CLOCK_TICKS(uhr) < 100 AND MILLIS() - t0 < 3000
+    AUDIO_FFT(f)
+    DIM e AS FLOAT, i AS INTEGER
+    FOR i = 0 TO 31 : e = e + f[i] : NEXT
+    IF e > 0.5 AND NOT laut THEN
+        laut = TRUE : n = n + 1
+    ELSEIF e < 0.05 THEN
+        laut = FALSE
+    END IF
+    SLEEP(4)
+WEND
+PRINT n; " einsaetze"
+AUDIO_CLOCK_REMOVE(uhr)
+--- erwartet
+0 einsaetze
+
+=== audio play bleibt bei einer instanz
+' AUDIO_PLAY spielt den Klang neu -- die laufende Instanz endet, sonst
+' stapelte ein Spiel bei jedem Schuss einen weiteren Laser.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 400, "sine", 0.5)
+AUDIO_PLAY(ton)
+SLEEP(50)
+AUDIO_PLAY(ton)
+SLEEP(50)
+PRINT "kanaele "; AUDIO_BUSY_CHANNELS()
+--- erwartet
+kanaele 1
+
+=== ein wartender klang spielt noch nicht
+' Kira meldet einen Klang, der auf seinen Tick wartet, schon als spielend --
+' AUDIO_IS_PLAYING ist bis zum Tick FALSE, AUDIO_IS_WAITING TRUE.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 150, "sine", 0.5)
+DIM uhr AS AUDIO_CLOCK
+uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_PLAY_AT(ton, uhr, 30)
+PRINT "vorher "; AUDIO_IS_PLAYING(ton); " "; AUDIO_IS_WAITING(ton)
+AUDIO_CLOCK_START(uhr)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE AUDIO_CLOCK_TICKS(uhr) < 36 AND MILLIS() - t0 < 3000 : SLEEP(2) : WEND
+PRINT "klingt "; AUDIO_IS_PLAYING(ton); " "; AUDIO_IS_WAITING(ton)
+AUDIO_PLAY_AT(ton, uhr, 200)
+AUDIO_CLOCK_REMOVE(uhr)
+' eine entfernte Uhr startet nichts mehr: weder spielend noch wartend
+SLEEP(200)
+PRINT "uhr weg "; AUDIO_IS_PLAYING(ton); " "; AUDIO_IS_WAITING(ton)
+--- erwartet
+vorher FALSE TRUE
+klingt TRUE FALSE
+uhr weg FALSE FALSE
+
+=== der mitschnitt hoert den hall
+' AUDIO_SOUND_MIX baut trocken -- Bus-Effekte wirken nur live. Der
+' Mitschnitt am Master nimmt auf, was man hoert: der Ton dauert 120 ms, der
+' Hall klingt danach noch nach.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 120, "sine", 0.8)
+AUDIO_REVERB("sfx", 0.6, 0.9, 0.2)
+DIM uhr AS AUDIO_CLOCK
+uhr = AUDIO_CLOCK_NEW(100)
+AUDIO_PLAY_AT(ton, uhr, 20)
+AUDIO_RECORD_START()
+PRINT "nimmt auf "; AUDIO_RECORDING()
+AUDIO_CLOCK_START(uhr)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE AUDIO_CLOCK_TICKS(uhr) < 120 AND MILLIS() - t0 < 4000 : SLEEP(2) : WEND
+DIM auf AS SOUND
+auf = AUDIO_RECORD_STOP()
+PRINT "nimmt auf "; AUDIO_RECORDING()
+AUDIO_SAVE_WAV(auf, "mit.wav")
+TRY
+    auf = AUDIO_RECORD_STOP()
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+nimmt auf TRUE
+nimmt auf FALSE
+AUDIO_RECORD_STOP: es laeuft kein Mitschnitt -- erst AUDIO_RECORD_START
+--- ton mit.wav
+pegel 600 900 > 0.02
+
+=== trocken gemischt klingt nichts nach
+' Die Gegenprobe zum Mitschnitt: derselbe Ton mit demselben Hall auf dem
+' Bus, aber per AUDIO_SOUND_MIX gebaut -- danach ist Stille.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 120, "sine", 0.8)
+AUDIO_REVERB("sfx", 0.6, 0.9, 0.2)
+DIM trocken AS SOUND
+trocken = AUDIO_SOUND_NEW(1200)
+AUDIO_SOUND_MIX(trocken, ton, 200)
+AUDIO_SAVE_WAV(trocken, "ohne.wav")
+--- ton ohne.wav
+pegel 200 300 > 0.5
+pegel 600 900 < 0.001
+
+=== mitschnitt mit falscher laenge
+IMPORT "audio"
+AUDIO_RECORD_START(0)
+--- fehler
+AUDIO_RECORD_START: max_sekunden muss
+
+=== audio peak meldet die spitze und das uebersteuern
+' AUDIO_PEAK liefert den hoechsten Ausschlag am Master seit dem letzten
+' Aufruf -- nach der Master-Lautstaerke. Zwei Toene mit 0.8 uebereinander
+' gehen ueber 1.0: das ist Uebersteuern, im Lautsprecher und im Mitschnitt.
+IMPORT "audio"
+DIM ton AS SOUND, t2 AS SOUND
+ton = AUDIO_TONE(440, 300, "sine", 0.8)
+t2 = AUDIO_TONE(440, 300, "sine", 0.8)
+PRINT "still "; AUDIO_PEAK()
+AUDIO_PLAY(ton)
+SLEEP(150)
+DIM p AS FLOAT : p = AUDIO_PEAK()
+PRINT "einer "; p > 0.75 AND p < 0.85
+PRINT "gelesen "; AUDIO_PEAK() < p
+SLEEP(400)
+AUDIO_PLAY(ton) : AUDIO_PLAY(t2)
+SLEEP(150)
+PRINT "zwei "; AUDIO_PEAK() > 1.0
+SLEEP(400)
+p = AUDIO_PEAK()
+AUDIO_BUS_VOLUME("master", 0.5)
+AUDIO_PLAY(ton)
+SLEEP(150)
+p = AUDIO_PEAK()
+PRINT "halb "; p > 0.35 AND p < 0.45
+--- erwartet
+still 0.0
+einer TRUE
+gelesen TRUE
+zwei TRUE
+halb TRUE
+
+=== der mitschnitt folgt der master lautstaerke
+' Kira dreht die Master-Lautstaerke NACH dem Abgriff -- ohne eigene Rechnung
+' kaeme die Aufnahme lauter heraus, als man sie hoert.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 200, "sine", 0.8)
+AUDIO_BUS_VOLUME("master", 0.5)
+AUDIO_RECORD_START()
+AUDIO_PLAY(ton)
+SLEEP(400)
+AUDIO_SAVE_WAV(AUDIO_RECORD_STOP(), "halb.wav")
+--- ton halb.wav
+spitze 0.4 +-0.03

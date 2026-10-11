@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2125,
+ "count": 2130,
  "builtins": [
   {
    "name": "ABS",
@@ -546,6 +546,36 @@
    "name": "AUDIO_IS_PLAYING",
    "kind": "core",
    "signature": "AUDIO_IS_PLAYING(ch)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_IS_WAITING",
+   "kind": "core",
+   "signature": "AUDIO_IS_WAITING(sound) AS BOOLEAN",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_RECORD_START",
+   "kind": "core",
+   "signature": "AUDIO_RECORD_START([max_sekunden])",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_RECORD_STOP",
+   "kind": "core",
+   "signature": "AUDIO_RECORD_STOP() AS SOUND",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_RECORDING",
+   "kind": "core",
+   "signature": "AUDIO_RECORDING() AS BOOLEAN",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_PEAK",
+   "kind": "core",
+   "signature": "AUDIO_PEAK() AS FLOAT",
    "module": "audio"
   },
   {
