@@ -165,3 +165,49 @@ IMPORT "audio"
 AUDIO_RECORD_START(0)
 --- fehler
 AUDIO_RECORD_START: max_sekunden muss
+
+=== audio peak meldet die spitze und das uebersteuern
+' AUDIO_PEAK liefert den hoechsten Ausschlag am Master seit dem letzten
+' Aufruf -- nach der Master-Lautstaerke. Zwei Toene mit 0.8 uebereinander
+' gehen ueber 1.0: das ist Uebersteuern, im Lautsprecher und im Mitschnitt.
+IMPORT "audio"
+DIM ton AS SOUND, t2 AS SOUND
+ton = AUDIO_TONE(440, 300, "sine", 0.8)
+t2 = AUDIO_TONE(440, 300, "sine", 0.8)
+PRINT "still "; AUDIO_PEAK()
+AUDIO_PLAY(ton)
+SLEEP(150)
+DIM p AS FLOAT : p = AUDIO_PEAK()
+PRINT "einer "; p > 0.75 AND p < 0.85
+PRINT "gelesen "; AUDIO_PEAK() < p
+SLEEP(400)
+AUDIO_PLAY(ton) : AUDIO_PLAY(t2)
+SLEEP(150)
+PRINT "zwei "; AUDIO_PEAK() > 1.0
+SLEEP(400)
+p = AUDIO_PEAK()
+AUDIO_BUS_VOLUME("master", 0.5)
+AUDIO_PLAY(ton)
+SLEEP(150)
+p = AUDIO_PEAK()
+PRINT "halb "; p > 0.35 AND p < 0.45
+--- erwartet
+still 0.0
+einer TRUE
+gelesen TRUE
+zwei TRUE
+halb TRUE
+
+=== der mitschnitt folgt der master lautstaerke
+' Kira dreht die Master-Lautstaerke NACH dem Abgriff -- ohne eigene Rechnung
+' kaeme die Aufnahme lauter heraus, als man sie hoert.
+IMPORT "audio"
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 200, "sine", 0.8)
+AUDIO_BUS_VOLUME("master", 0.5)
+AUDIO_RECORD_START()
+AUDIO_PLAY(ton)
+SLEEP(400)
+AUDIO_SAVE_WAV(AUDIO_RECORD_STOP(), "halb.wav")
+--- ton halb.wav
+spitze 0.4 +-0.03

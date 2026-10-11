@@ -487,6 +487,12 @@ static SAMPLES: Mutex<Ring> = Mutex::new(Ring { buf: [0.0; RING], pos: 0 });
 struct Aufnahme { frames: Vec<Frame>, max: usize }
 static AUFNAHME: Mutex<Option<Aufnahme>> = Mutex::new(None);
 static TAP_RATE: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(44100);
+/// Die Master-Lautstaerke (f32-Bits). Kira wendet sie NACH den Effekten an,
+/// also hinter diesem Abgriff -- Mitschnitt und Pegel rechnen sie selbst ein,
+/// sonst hoerten sie etwas anderes als der Lautsprecher.
+static MASTER_GAIN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0x3F80_0000);
+/// Hoechster Ausschlag seit dem letzten AUDIO_PEAK (f32-Bits).
+static PEAK: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 struct FftTapBuilder;
 struct FftTapEffect;
@@ -504,10 +510,16 @@ impl Effect for FftTapEffect {
     fn process(&mut self, input: &mut [Frame], _dt: f64, _info: &Info) {
         // Kurz gesperrt: die Hauptseite haelt die Sperre nur zum Anlegen und
         // Abholen -- ein verpasster Block waere ein Knacks in der Aufnahme.
+        let g = f32::from_bits(MASTER_GAIN.load(Relaxed));
+        let spitze = input.iter().fold(0.0f32, |m, f| m.max(f.left.abs()).max(f.right.abs())) * g;
+        let _ = PEAK.fetch_update(Relaxed, Relaxed, |alt| {
+            if spitze > f32::from_bits(alt) { Some(spitze.to_bits()) } else { None }
+        });
         if let Ok(mut a) = AUFNAHME.lock() {
             if let Some(a) = a.as_mut() {
                 let rest = a.max.saturating_sub(a.frames.len());
-                a.frames.extend_from_slice(&input[..input.len().min(rest)]);
+                a.frames.extend(input[..input.len().min(rest)].iter()
+                    .map(|f| Frame { left: f.left * g, right: f.right * g }));
             }
         }
         if let Ok(mut ring) = SAMPLES.try_lock() {
@@ -1487,7 +1499,11 @@ resonance/reverb/distortion", other)),
         match bus.to_lowercase().as_str() {
             "sfx" => { self.sfx_bus = vol as f32; self.sfx_track.set_volume(db(vol), tween_now()); }
             "music" => { self.music_bus = vol as f32; self.music_track.set_volume(db(vol), tween_now()); }
-            "master" => { self.master_bus = vol as f32; self.manager.main_track().set_volume(db(vol), tween_now()); }
+            "master" => {
+                self.master_bus = vol as f32;
+                MASTER_GAIN.store((vol as f32).to_bits(), Relaxed);
+                self.manager.main_track().set_volume(db(vol), tween_now());
+            }
             other => return Err(format!(
                 "AUDIO_BUS_VOLUME: unbekannter Bus '{}' (sfx, music, master, speech)", other)),
         }
@@ -1779,6 +1795,11 @@ resonance/reverb/distortion", other)),
         let data = StaticSoundData { sample_rate: TAP_RATE.load(Relaxed), frames,
                                      settings: StaticSoundSettings::new(), slice: None };
         Ok(self.push_slot(data, 1.0))
+    }
+    /// AUDIO_PEAK() -- hoechster Ausschlag am Master seit dem letzten Aufruf,
+    /// nach der Master-Lautstaerke; ueber 1.0 heisst Uebersteuern.
+    pub fn peak(&self) -> f64 {
+        f32::from_bits(PEAK.swap(0, Relaxed)) as f64
     }
     pub fn recording(&self) -> bool {
         AUFNAHME.lock().map(|a| a.is_some()).unwrap_or(false)

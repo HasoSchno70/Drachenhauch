@@ -8,8 +8,10 @@
 ' der naechsten Schritte werden vorausgeplant und kommen auf den Takt genau,
 ' auch wenn die Bildrate einbricht. Tempo und Swing wirken sofort.
 '
-' Strg+S sichert das Muster (muster.json), Strg+O laedt es, Strg+E schreibt
-' zwei Durchgaenge als WAV (muster.wav).
+' Strg+S sichert das Muster (muster.json), Strg+O laedt es. Strg+E schreibt
+' zwei Durchgaenge trocken als WAV (muster.wav, sofort, ohne Hall und Echo);
+' Strg+Umschalt+E spielt sie ab und schneidet den Mixer mit (muster_live.wav,
+' mit allen Effekten -- dauert so lange wie die Musik).
 IMPORT "gui"
 IMPORT "audio"
 IMPORT "json"
@@ -100,7 +102,8 @@ DIM menue AS INTEGER : menue = GUI_MENU(win, "Muster")
 DIM miSpielen AS INTEGER : miSpielen = GUI_MENU_ITEM(menue, "Spielen / Stopp", "Leertaste")
 DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(menue, "Sichern", "Strg+S")
 DIM miLaden AS INTEGER : miLaden = GUI_MENU_ITEM(menue, "Laden", "Strg+O")
-DIM miWav AS INTEGER : miWav = GUI_MENU_ITEM(menue, "Als WAV schreiben", "Strg+E")
+DIM miWav AS INTEGER : miWav = GUI_MENU_ITEM(menue, "Als WAV schreiben (trocken)", "Strg+E")
+DIM miLive AS INTEGER : miLive = GUI_MENU_ITEM(menue, "Mitschneiden (mit Effekten)", "Strg+Umschalt+E")
 DIM miLeeren AS INTEGER : miLeeren = GUI_MENU_ITEM(menue, "Leeren", "Strg+N")
 
 CONST RX = 176
@@ -161,6 +164,7 @@ END SUB
 DIM uhr AS AUDIO_CLOCK
 DIM spielt AS BOOLEAN
 DIM geplant AS INTEGER          ' der naechste Schritt, der noch nicht geplant ist
+DIM mitschnittBis AS INTEGER : mitschnittBis = -1   ' Uhr-Tick, an dem der Mitschnitt endet
 
 SUB schrittPlanen(n AS INTEGER)
     DIM s AS INTEGER : s = n MOD SCHRITTE
@@ -184,6 +188,11 @@ SUB starten()
 END SUB
 
 SUB stoppen()
+    IF mitschnittBis >= 0 THEN
+        mitschnittBis = -1
+        DIM weg AS SOUND : weg = AUDIO_RECORD_STOP()
+        GUI_STATUSBAR_SET(sb, 0, "Mitschnitt abgebrochen")
+    END IF
     ' ENTFERNEN statt anhalten: ein Klang, der auf eine Uhr wartet, die es
     ' nicht mehr gibt, startet nie (eine angehaltene Uhr spielte ihn beim
     ' naechsten Start an falscher Stelle)
@@ -209,6 +218,27 @@ SUB nachplanen()
         schrittPlanen(geplant)
         geplant = geplant + 1
     WEND
+END SUB
+
+' --- Mitschnitt -------------------------------------------------------------
+' Von vorn spielen und den Mixer aufnehmen, bis zwei Durchgaenge und ein
+' Nachhall vorbei sind -- so landen Hall, Echo und Wah in der Datei.
+SUB mitschnittStarten()
+    IF spielt THEN stoppen()
+    AUDIO_RECORD_START()
+    starten()
+    mitschnittBis = schrittTick(2 * SCHRITTE) + 2 * FEINE * 4
+    GUI_STATUSBAR_SET(sb, 0, "Schneide mit ...")
+END SUB
+
+SUB mitschnittPruefen()
+    IF mitschnittBis < 0 OR NOT spielt THEN RETURN
+    IF AUDIO_CLOCK_TICKS(uhr) < mitschnittBis THEN RETURN
+    mitschnittBis = -1
+    stoppen()
+    DIM auf AS SOUND : auf = AUDIO_RECORD_STOP()
+    AUDIO_SAVE_WAV(auf, "muster_live.wav")
+    GUI_STATUSBAR_SET(sb, 0, "Geschrieben: muster_live.wav (mit Effekten)")
 END SUB
 
 ' --- WAV -------------------------------------------------------------------
@@ -325,6 +355,7 @@ WHILE NOT beenden
             GUI_STATUSBAR_SET(sb, 0, "Noch kein muster.json -- erst sichern")
         END IF
     END IF
+    IF GUI_CLICKED(miLive) THEN mitschnittStarten()
     IF GUI_CLICKED(miWav) THEN
         wavSchreiben("muster.wav", 2)
         GUI_STATUSBAR_SET(sb, 0, "Geschrieben: muster.wav (zwei Durchgaenge)")
@@ -372,6 +403,7 @@ WHILE NOT beenden
     END IF
 
     nachplanen()
+    mitschnittPruefen()
 
     CLS(GUI_THEME_GET("win_bg"))
     GUI_DRAW()
