@@ -289,6 +289,11 @@ FUNCTION abrufLaeuft(i AS INTEGER) AS BOOLEAN
 END FUNCTION
 
 SUB eintraegeZeigen()
+    ' Die gewaehlte Zeile ueber das Neuaufbauen retten (nach id) -- sonst
+    ' verschwaende sie bei jedem Abruf unter der Hand
+    DIM warId AS INTEGER : warId = -1
+    DIM sel AS INTEGER : sel = GUI_TABLE_SELECTED(tbl)
+    IF sel >= 0 AND sel < LEN(zId) THEN warId = zId[sel]
     GUI_TABLE_CLEAR(tbl)
     zId = [] : zLink = []
     DIM r AS DB_RESULT
@@ -305,6 +310,7 @@ SUB eintraegeZeigen()
         ARRAY_PUSH(zId, DB_GET_INT(r, 0))
         ARRAY_PUSH(zLink, DB_GET_STRING(r, 4))
         IF DB_GET_INT(r, 5) = 1 THEN GUI_TABLE_ROW_COLOR(tbl, zeile, RGB(140, 150, 160), -1)
+        IF DB_GET_INT(r, 0) = warId THEN GUI_TABLE_SET_SELECTED(tbl, zeile)
     WEND
 END SUB
 

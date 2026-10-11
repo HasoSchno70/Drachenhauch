@@ -80,6 +80,11 @@ SUB prZweiteRunde()
     PRINT "gelesen: "; vor - ungelesen(0); " "; prZahl("SELECT gelesen FROM eintrag WHERE id = " + STR$(zId[0]))
     vorschauZeigen(0)
     PRINT "zweimal: "; vor - ungelesen(0)
+    ' die gewaehlte Zeile bleibt beim Neuaufbauen dieselbe
+    GUI_TABLE_SET_SELECTED(tbl, 1)
+    DIM war AS INTEGER : war = zId[1]
+    eintraegeZeigen()
+    PRINT "auswahl bleibt: "; GUI_TABLE_SELECTED(tbl) >= 0 AND zId[MAX(0, GUI_TABLE_SELECTED(tbl))] = war
     ' keine Web-Adresse
     feedAnlegen("ftp://example.org/feed")
     PRINT "ftp: "; GUI_STATUSBAR_TEXT$(sb, 0); " / "; feedZahl()
@@ -189,5 +194,6 @@ nochmal abgerufen: TRUE gemeldet: 6
 tabelle rss: 3
 gelesen: 1 1
 zweimal: 1
+auswahl bleibt: TRUE
 ftp: Das ist keine Web-Adresse: ftp://example.org/feed / 5
 entfernt: 4 0 0 TRUE
