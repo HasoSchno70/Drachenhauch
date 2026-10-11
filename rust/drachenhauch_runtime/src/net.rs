@@ -48,6 +48,17 @@ fn would_block(e: &std::io::Error) -> bool {
     matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut)
 }
 
+/// Die Gegenseite ist weg -- hart abgebrochen (RST), Programm beendet, Kabel
+/// gezogen. Das ist ein ZUSTAND, kein Fehler des Programms: NET_RECV liefert
+/// dann leer, NET_SEND 0, und NET_IS_CONNECTED wird FALSE (so stand es in der
+/// Doku). Bis 2026-10-11 brach das Programm hier mit einem Laufzeitfehler ab
+/// ("Eine vorhandene Verbindung wurde vom Remotehost geschlossen", 10054) --
+/// ein Spielwirt starb, sobald sein Gast das Fenster schloss.
+fn verbindung_weg(e: &std::io::Error) -> bool {
+    use std::io::ErrorKind::*;
+    matches!(e.kind(), ConnectionReset | ConnectionAborted | BrokenPipe | NotConnected | UnexpectedEof)
+}
+
 pub fn set_timeout_tcp(s: &TcpStream, ms: i64) {
     if ms == 0 {
         let _ = s.set_nonblocking(true);
@@ -122,6 +133,11 @@ pub fn accept(l: &TcpListener) -> Result<Option<NetSock>, String> {
 /// stdlib-DNS-Aufloesung), damit ein haengender/langsamer DNS-Server
 /// `NET_TCP_CONNECT` nicht den Game-Loop einfrieren lassen kann.
 fn resolve_with_timeout(fn_: &str, host: &str, port: i64, timeout: Duration) -> Result<std::net::SocketAddr, String> {
+    // Eine Adresse wie "127.0.0.1" oder "::1" braucht keinen Resolver -- und
+    // keinen Faden je Paket (NET_UDP_SEND loest bei JEDEM Datagramm auf).
+    if let Ok(ip) = host.trim_start_matches('[').trim_end_matches(']').parse::<std::net::IpAddr>() {
+        return Ok(std::net::SocketAddr::new(ip, port as u16));
+    }
     let host = host.to_string();
     let host_for_thread = host.clone();
     let (tx, rx) = mpsc::channel();
@@ -162,14 +178,7 @@ pub fn connect(host: &str, port: i64) -> Result<NetSock, String> {
 }
 
 pub fn send(s: &mut NetSock, text: &str) -> Result<i64, String> {
-    match s.stream.write(text.as_bytes()) {
-        Ok(n) => Ok(n as i64),
-        Err(ref e) if would_block(e) => Ok(0),
-        Err(e) => {
-            s.connected = false;
-            Err(format!("NET_SEND: {}", e))
-        }
-    }
+    send_bytes(s, text.as_bytes())
 }
 
 pub fn recv(s: &mut NetSock, n: i64) -> Result<String, String> {
@@ -188,6 +197,7 @@ pub fn recv(s: &mut NetSock, n: i64) -> Result<String, String> {
         }
         Ok(got) => Ok(s.decode_chunk(&buf[..got])),
         Err(ref e) if would_block(e) => Ok(String::new()),
+        Err(ref e) if verbindung_weg(e) => { s.connected = false; Ok(String::new()) }
         Err(e) => {
             s.connected = false;
             Err(format!("NET_RECV: {}", e))
@@ -198,9 +208,11 @@ pub fn recv(s: &mut NetSock, n: i64) -> Result<String, String> {
 /// Rohe Bytes senden -- fuer Binaerprotokolle und Daten, die kein UTF-8 sind
 /// (ein Bild, eine gepackte Datei, ein Geraet mit eigenem Format).
 pub fn send_bytes(s: &mut NetSock, bytes: &[u8]) -> Result<i64, String> {
+    if !s.connected { return Ok(0); }
     match s.stream.write(bytes) {
         Ok(n) => Ok(n as i64),
         Err(ref e) if would_block(e) => Ok(0),
+        Err(ref e) if verbindung_weg(e) => { s.connected = false; Ok(0) }
         Err(e) => {
             s.connected = false;
             Err(format!("NET_SEND: {}", e))
@@ -228,6 +240,7 @@ pub fn recv_bytes(s: &mut NetSock, n: i64) -> Result<Vec<u8>, String> {
         Ok(0) => { s.connected = false; Ok(raus) }
         Ok(got) => { raus.extend_from_slice(&buf[..got]); Ok(raus) }
         Err(ref e) if would_block(e) => Ok(raus),
+        Err(ref e) if verbindung_weg(e) => { s.connected = false; Ok(raus) }
         Err(e) => {
             s.connected = false;
             if raus.is_empty() { Err(format!("NET_RECV_BYTES: {}", e)) } else { Ok(raus) }
@@ -257,6 +270,12 @@ pub fn udp_open() -> Result<UdpSock, String> {
 }
 
 pub fn udp_send(s: &UdpSock, host: &str, port: i64, text: &str) -> Result<i64, String> {
+    udp_send_bytes(s, host, port, text.as_bytes())
+}
+
+/// Ein Datagramm aus rohen Bytes -- Spielstaende, Kommazahlen, alles, was
+/// kein UTF-8 ist. NET_UDP_SEND nimmt dafuer einen BUFFER.
+pub fn udp_send_bytes(s: &UdpSock, host: &str, port: i64, bytes: &[u8]) -> Result<i64, String> {
     // Review-Fund: `(host, port).to_socket_addrs()` (versteckt hinter dem
     // Tupel-ToSocketAddrs-Impl, den send_to hier nutzt) macht einen
     // SYNCHRONEN, nicht abbrechbaren OS-Resolver-Aufruf VOR jedem einzelnen
@@ -271,31 +290,49 @@ pub fn udp_send(s: &UdpSock, host: &str, port: i64, text: &str) -> Result<i64, S
         return Err(format!("NET_UDP_SEND: port out of range: {}", port));
     }
     let addr = resolve_with_timeout("NET_UDP_SEND", host, port, Duration::from_secs(2))?;
-    s.sock.send_to(text.as_bytes(), addr)
+    s.sock.send_to(bytes, addr)
         .map(|n| n as i64)
         .map_err(|e| format!("NET_UDP_SEND: {}", e))
 }
 
 pub fn udp_recv(s: &mut UdpSock, n: i64) -> Result<String, String> {
+    let bytes = udp_recv_bytes(s, n, "NET_UDP_RECV")?;
+    // Ein UDP-Datagramm kommt immer komplett-oder-gar-nicht an -- der
+    // einzige Fall fuer einen unvollstaendigen Zeichen-Rest ist ein zu
+    // kleiner `max_bytes`-Puffer, der das Datagramm abschneidet. Dieser
+    // Rest wird verworfen statt in ein naechstes (unabhaengiges!)
+    // Datagramm hineingemischt zu werden.
+    let (text, _leftover) = crate::text_stream::decode_utf8_streaming(bytes);
+    Ok(text)
+}
+
+/// Ein Datagramm als rohe Bytes (leer = keins da).
+///
+/// **Windows meldet beim Lesen, was beim Senden schiefging:** ging ein
+/// Datagramm an einen Port, an dem niemand lauscht, kommt die ICMP-Antwort
+/// als WSAECONNRESET (10054) beim NAECHSTEN recv_from an -- ein Spielwirt,
+/// dessen Gast gegangen ist, brach so mit einem Laufzeitfehler ab. Fuer UDP
+/// heisst das nur "ein frueheres Paket kam nicht an", und das sagt UDP
+/// ohnehin nicht zu: weiterlesen.
+pub fn udp_recv_bytes(s: &mut UdpSock, n: i64, fn_: &str) -> Result<Vec<u8>, String> {
     if n <= 0 {
-        return Err("NET_UDP_RECV: max_bytes muss > 0 sein".into());
+        return Err(format!("{}: max_bytes muss > 0 sein", fn_));
     }
     if n > MAX_READ_BYTES {
-        return Err(format!("NET_UDP_RECV: max_bytes {} ueberschreitet das Limit von {} Byte", n, MAX_READ_BYTES));
+        return Err(format!("{}: max_bytes {} ueberschreitet das Limit von {} Byte", fn_, n, MAX_READ_BYTES));
     }
     let mut buf = vec![0u8; n as usize];
-    match s.sock.recv_from(&mut buf) {
-        Ok((got, addr)) => {
-            s.last_from = (addr.ip().to_string(), addr.port() as i64);
-            // Ein UDP-Datagramm kommt immer komplett-oder-gar-nicht an -- der
-            // einzige Fall fuer einen unvollstaendigen Zeichen-Rest ist ein zu
-            // kleiner `max_bytes`-Puffer, der das Datagramm abschneidet. Dieser
-            // Rest wird verworfen statt in ein naechstes (unabhaengiges!)
-            // Datagramm hineingemischt zu werden.
-            let (text, _leftover) = crate::text_stream::decode_utf8_streaming(buf[..got].to_vec());
-            Ok(text)
+    for _ in 0..64 {
+        match s.sock.recv_from(&mut buf) {
+            Ok((got, addr)) => {
+                s.last_from = (addr.ip().to_string(), addr.port() as i64);
+                buf.truncate(got);
+                return Ok(buf);
+            }
+            Err(ref e) if would_block(e) => return Ok(Vec::new()),
+            Err(ref e) if verbindung_weg(e) => continue,
+            Err(e) => return Err(format!("{}: {}", fn_, e)),
         }
-        Err(ref e) if would_block(e) => Ok(String::new()),
-        Err(e) => Err(format!("NET_UDP_RECV: {}", e)),
     }
+    Ok(Vec::new())
 }

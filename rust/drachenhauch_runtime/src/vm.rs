@@ -4661,9 +4661,22 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "NET_UDP_SEND")?;
                 let h = bi_str(a, 1, "NET_UDP_SEND")?.to_string();
                 let p = bi_int(a, 2, "NET_UDP_SEND")?;
-                let t = bi_str(a, 3, "NET_UDP_SEND")?.to_string();
-                Value::Int(net::udp_send(self.net_udp(i)?, &h, p, &t)?)
+                // Text oder ein BUFFER -- ein Spielstand mit Kommazahlen ist kein UTF-8.
+                match a.get(3) {
+                    Some(Value::Buffer(b)) => { let bytes = b.borrow().clone(); Value::Int(net::udp_send_bytes(self.net_udp(i)?, &h, p, &bytes)?) }
+                    _ => { let t = bi_str(a, 3, "NET_UDP_SEND")?.to_string(); Value::Int(net::udp_send(self.net_udp(i)?, &h, p, &t)?) }
+                }
             }
+            "net_udp_recv_bytes" => {
+                let i = bi_int(a, 0, "NET_UDP_RECV_BYTES")?;
+                let n = bi_int(a, 1, "NET_UDP_RECV_BYTES")?;
+                let bytes = net::udp_recv_bytes(self.net_udp_mut(i)?, n, "NET_UDP_RECV_BYTES")?;
+                Value::Buffer(std::rc::Rc::new(std::cell::RefCell::new(bytes)))
+            }
+            // Absender getrennt: "::1:5000" laesst sich nur zerlegen, wenn man
+            // weiss, dass am LETZTEN Doppelpunkt geschnitten werden muss.
+            "net_udp_last_host$" | "net_udp_last_host" => Value::str_rc(&self.net_udp(bi_int(a, 0, "NET_UDP_LAST_HOST$")?)?.last_from.0),
+            "net_udp_last_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_LAST_PORT")?)?.last_from.1),
             "net_udp_recv" => { let i = bi_int(a, 0, "NET_UDP_RECV")?; let n = bi_int(a, 1, "NET_UDP_RECV")?; Value::str_rc(net::udp_recv(self.net_udp_mut(i)?, n)?) }
             "net_udp_last_from" => {
                 let s = self.net_udp(bi_int(a, 0, "NET_UDP_LAST_FROM")?)?;
