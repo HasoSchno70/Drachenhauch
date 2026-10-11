@@ -1735,6 +1735,47 @@ schlafender Koerper IN DER LUFT bleibt haengen -- die Werkstatt legt darum nur
 aufliegende schlafen. `IMAGE_WIDTH`/`IMAGE_HEIGHT` als zweite Namen (Meldungen
 nennen jetzt diese). Tests in `m3d`, `physics3d`, `physics2d`, `image_io`.
 
+## Dogfooding Netz: Feed-Leser (2026-10-10)
+
+`examples/feedleser/main.dh` (RSS 2.0, RSS 1.0/RDF und Atom; HTTP_GET_START
+holt, ein Auftrag (TASK_START) zerlegt mit dem xml-Modul, SQLite als Ablage,
+Vorschau als GUI_RICHTEXT, Symbol im Infobereich, Mitteilung bei Neuem,
+TIMER_EVERY alle 15 Minuten), mit echten Fensternachrichten bedient. Sechs
+Funde: (1) **`ZEIT_PARSE`** kannte keine Zeitzone und nicht das Datum aus RSS
+und E-Mail (`Sat, 10 Oct 2026 08:30:00 +0200`) -- `zeit::parse_mit` liest
+ISO mit `Z`/`+hh:mm` und RFC 822 samt Namen (GMT, UT, EST..PDT, CET/MEZ,
+CEST/MESZ) und rechnet in ORTSZEIT um (Entscheidung des Nutzers;
+`builtins::lokaler_versatz`, unter Windows `SystemTimeToTzSpecificLocalTime`,
+sonst 0). (2) **`TASK_START`** gab Argumente ueber die Kommandozeile weiter --
+ein Feed von 200 KB scheiterte; jetzt `dhrt call ... --args-stdin` mit JSON
+auf der Standardeingabe. (3) Ein **unbekannter Schluessel** bei
+`GUI_THEME_SET/GET`/`GUI_METRIC_SET/GET` nannte die gueltigen nicht
+(`gui::unbekannt`). (4) **`€` und andere Zeichen ausserhalb Latin-1 in der
+eingebauten Schrift** schalteten die GANZE Zeile auf die Ausweichschrift --
+jetzt wechseln nur die fehlenden Zeichen (`std_schrift`/`pixel_ersatz`, Laeufe
+wie bei geladenen Schriften; Entscheidung des Nutzers). (5) **Ein `DIM` in
+einer Schleife faengt jede Runde frisch an** (Entscheidung des Nutzers, wie
+FreeBASIC): bis 2026.27 behielt `DIM s AS STRING` im Rumpf den Wert der
+vorigen Runde, `DIM f[2]` im Hauptprogramm dagegen nicht. Die Anlage bleibt;
+dahinter setzt `Compiler::dim_frisch` den Startwert per gewoehnlicher
+Zuweisung (Zahlen/Texte/Wahrheitswerte als Konstante -- das kann auch der
+Maschinencode --, Felder/MAPs/Structs/Mathe-Typen ueber `__frisch` in
+`try_typtest`); nur, wenn `break_patches` nicht leer ist (= in einer
+Schleife). Ein lokales Feld mit Groesse wird bei erneutem DIM neu angelegt.
+Ein Fall in `name_collision.dhtest` sicherte das alte Verhalten und ist
+umgedreht. Gemessen: keine Tempo-Aenderung (bench mit und ohne
+Maschinencode), eine Schleife mit DIM bleibt Maschinencode.
+(6) **`HTML_TEXT`** hielt jedes `<` fuer einen Tag-Anfang (`a < b und c > d`
+-> `a d`); jetzt wie im HTML-Tokenizer nur vor Buchstabe, `/`+Buchstabe, `!`,
+`?` (`html::tag_beginnt`). Im Beispiel selbst: eine gescheiterte Einfuegung
+liess die Transaktion offen (das naechste `DB_BEGIN` scheiterte) -> ROLLBACK;
+die gewaehlte Tabellenzeile geht beim Neuaufbauen nicht verloren. Tests
+`modules_zeit`, `task`, `gui_thema_schluessel`, `schriften_vorrat`,
+`dim_in_schleife`, `modules_html`, `beispiel_feedleser.dhtest` (Gegenserver
+`dateien`, Standard-Feeds per `--- ersetzen`, Symbol und Mitteilung
+herausgenommen; drei Verfaelschungen des Beispiels fallen -- die zweite erst,
+nachdem die zweite Runde die Fehler der Feeds mit ausgab).
+
 ## Zeichenketten anhaengen ist linear (2026-09-24)
 
 `Value::Str` ist `Rc<String>` (vorher `Rc<str>`, jedes Anhaengen kopierte:

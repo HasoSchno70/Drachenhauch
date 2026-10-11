@@ -226,7 +226,7 @@ url = "https://api.example.com/search?q=" + q
 
 ## HTML parser
 
-`HTML_TEXT` strips all tags and decodes HTML entities (`&amp;` → `&`, `&lt;` → `<`, …). Block-level tags (`<p>`, `<div>`, `<li>`, …) produce a newline. `<script>` and `<style>` are skipped entirely.
+`HTML_TEXT` strips all tags and decodes HTML entities (`&amp;` → `&`, `&lt;` → `<`, …). Block-level tags (`<p>`, `<div>`, `<li>`, …) produce a newline. `<script>` and `<style>` are skipped entirely. As in a browser, a tag only starts when `<` is followed by a letter, `/` with a letter, `!` or `?` -- `a < b` stays text.
 
 ```basic
 DIM html AS STRING
