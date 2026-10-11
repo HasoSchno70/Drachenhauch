@@ -28,6 +28,27 @@ pub struct NetSock {
     pending: Vec<u8>,
 }
 
+/// Beim Schliessen erst lesen, was noch ungelesen ankam, dann die eigene
+/// Richtung sauber beenden (FIN). Schliesst man einen Socket mit
+/// ungelesenen Daten, bricht das Betriebssystem die Verbindung HART ab
+/// (RST) -- und die Gegenseite verwirft, was wir ihr gerade noch geschickt
+/// hatten. Gemessen: "BESETZT" senden und schliessen, ohne das "HALLO" des
+/// Gastes gelesen zu haben -- in 5 von 5 Versuchen kam beim Gast nichts an
+/// (Netz-Runde, 2026-10-11). Gilt fuer NET_CLOSE und das Programmende.
+impl Drop for NetSock {
+    fn drop(&mut self) {
+        let _ = self.stream.set_nonblocking(true);
+        let mut buf = [0u8; 4096];
+        for _ in 0..256 {
+            match self.stream.read(&mut buf) {
+                Ok(n) if n > 0 => continue,
+                _ => break,
+            }
+        }
+        let _ = self.stream.shutdown(std::net::Shutdown::Write);
+    }
+}
+
 impl NetSock {
     fn decode_chunk(&mut self, bytes: &[u8]) -> String {
         let mut data = std::mem::take(&mut self.pending);
