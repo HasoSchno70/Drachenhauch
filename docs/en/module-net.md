@@ -1,6 +1,6 @@
 # Module `net`
 
-TCP and UDP networking, native in `dhrt` via Rust's `std::net` (no additional crate). Cross-platform, **non-blocking** by default — fits game loops in which every frame has to return in <16 ms. The encoding is always UTF-8.
+TCP and UDP networking, native in `dhrt` via Rust's `std::net` (no additional crate). Cross-platform, **non-blocking** by default — fits game loops in which every frame has to return in <16 ms. Text goes out as UTF-8; raw bytes go as a `BUFFER` (TCP and UDP).
 
 ```basic
 IMPORT "net"
@@ -21,7 +21,7 @@ IMPORT "net"
 | `NET_RECV_BYTES(sock, max_bytes)` | BUFFER | raw bytes without UTF-8 decoding, empty if nothing is there -- for binary protocols |
 | `NET_PEER_ADDR(sock)` | STRING | remote IP |
 | `NET_PEER_PORT(sock)` | INTEGER | remote port |
-| `NET_IS_CONNECTED(sock)` | BOOLEAN | FALSE as soon as the other side has closed or a recv/send has failed |
+| `NET_IS_CONNECTED(sock)` | BOOLEAN | FALSE as soon as the other side has closed, dropped hard or a recv/send has failed |
 | `NET_SET_TIMEOUT(sock, ms)` | — | `0` = non-blocking (default), `> 0` = timeout in ms, `< 0` = fully blocking |
 | `NET_CLOSE(sock)` | — | close the socket |
 | `NET_CLOSE_LISTENER(lst)` | — | close the listener |
@@ -33,9 +33,12 @@ IMPORT "net"
 | `NET_UDP_BIND(port [, bind_addr$])` | NET_UDP | bind a UDP socket to a port. `bind_addr$` optional, default all IPv4 interfaces; `"::"` binds IPv6 instead |
 | `NET_UDP_OPEN()` | NET_UDP | UDP socket without bind (sending only) |
 | `NET_UDP_PORT(sock)` | INTEGER | bound port (0 if OPEN) |
-| `NET_UDP_SEND(sock, host, port, text)` | INTEGER | bytes sent |
+| `NET_UDP_SEND(sock, host, port, text)` | INTEGER | bytes sent; a `BUFFER` (raw bytes) works instead of text |
 | `NET_UDP_RECV(sock, max_bytes)` | STRING | empty if nothing is there |
+| `NET_UDP_RECV_BYTES(sock, max_bytes)` | BUFFER | one datagram as raw bytes, empty if nothing is there -- for game states and binary protocols |
 | `NET_UDP_LAST_FROM(sock)` | STRING `"host:port"` | sender of the last RECV (empty before the first RECV) |
+| `NET_UDP_LAST_HOST$(sock)` | STRING | only the sender's address (`"::1"` instead of `"::1:5000"`) |
+| `NET_UDP_LAST_PORT(sock)` | INTEGER | only its port |
 | `NET_UDP_SET_TIMEOUT(sock, ms)` | — | as above: `0` = non-blocking, `> 0` = timeout, `< 0` = fully blocking |
 | `NET_UDP_CLOSE(sock)` | — | close the socket |
 
@@ -184,6 +187,19 @@ PRINT "Verbindung getrennt"
 closed the connection cleanly (TCP FIN) or a `NET_RECV`/`NET_SEND` has failed
 with a real error (not just "nothing there right now").
 
+**If the other side drops hard** (program ends without reading, crash, cable
+pulled), that is not a runtime error: `NET_RECV` returns `""`,
+`NET_RECV_BYTES` an empty buffer, `NET_SEND` 0, and `NET_IS_CONNECTED`
+becomes `FALSE`. Until 2026-10-11 `NET_RECV` and `NET_SEND` threw "Eine
+vorhandene Verbindung wurde vom Remotehost geschlossen" here -- a game host
+died as soon as its guest closed the window.
+
+With **UDP** there is no connection: a datagram to a port where nobody listens
+any more simply disappears. Windows does report it on the next read;
+`NET_UDP_RECV` then keeps reading instead of aborting. Whether the other side
+is still there, with UDP, only shows in whether packets keep coming -- if you
+need to know, count the time since the last packet.
+
 ## UTF-8 over TCP
 
 `NET_RECV` decodes the received byte stream as UTF-8. Since TCP is a pure
@@ -209,6 +225,31 @@ NET_SEND(sock, b)
 DIM roh AS BUFFER : roh = NET_RECV_BYTES(sock, 4096)
 PRINT BUFFER_TO_HEX$(roh)
 ```
+
+The same with **UDP**: `NET_UDP_SEND` takes a `BUFFER`, and
+`NET_UDP_RECV_BYTES` returns one datagram as a `BUFFER`. A game state with
+floating-point numbers is not UTF-8 -- through `NET_UDP_RECV` bytes above 127
+would arrive as replacement characters.
+
+```basic
+IMPORT "net"
+DIM sock AS NET_UDP : sock = NET_UDP_BIND(0, "127.0.0.1")
+DIM paket AS BUFFER : paket = BUFFER_NEW(9)
+BUFFER_SET(paket, 0, 2)                  ' kind of packet
+BUFFER_SET_F32(paket, 1, 412.5)          ' x
+BUFFER_SET_F32(paket, 5, 288.0)          ' y
+NET_UDP_SEND(sock, "127.0.0.1", NET_UDP_PORT(sock), paket)
+SLEEP(20)
+DIM rein AS BUFFER : rein = NET_UDP_RECV_BYTES(sock, 512)
+IF BUFFER_LEN(rein) > 0 THEN
+    PRINT BUFFER_GET_F32(rein, 1); " von "; NET_UDP_LAST_HOST$(sock); ":"; NET_UDP_LAST_PORT(sock)
+END IF
+```
+
+An address like `127.0.0.1` or `::1` goes out without name resolution; only a
+name (`"spielserver.local"`) is resolved for every packet (at most 2 s). If you
+send to a name often, resolve it once -- for instance through the other
+side's first packet and `NET_UDP_LAST_HOST$`.
 
 ## IPv6
 
