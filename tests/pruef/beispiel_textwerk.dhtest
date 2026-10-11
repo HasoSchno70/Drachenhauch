@@ -1,0 +1,237 @@
+' Das Beispiel examples/textwerk (Konsolen-Runde, 2026-10-11): suche, csv,
+' zaehle. Das Werkzeug laeuft als Kind von `dhrt run` aus dem Fallordner --
+' die Dateien gibt der Fall RELATIV an, das Programm liegt woanders. Genau
+' das zeigte vorher ins Leere (dhrt wechselt in den Ordner des Programms);
+' jetzt loest ARGPATH$ es auf. Eingabe ueber eine echte Pipe
+' (PROCESS_WRITE + PROCESS_CLOSE_INPUT), Rueckgabewerte wie grep.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== suche ueber zwei dateien in zwei kodierungen
+IMPORT "tw.dh"
+tw(["suche", "-n", "-i", "müller", "daten/utf8.csv", "daten/excel.csv"], "")
+--- argumente
+{sammlung}/../../examples/textwerk/main.dh
+--- datei tw.dh
+DIM twAus AS STRING
+DIM twErr AS STRING
+DIM twCode AS INTEGER
+SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
+    IF eingabe <> "" THEN PROCESS_WRITE(p, eingabe)
+    PROCESS_CLOSE_INPUT(p)
+    twAus = "" : twErr = ""
+    DIM leer AS INTEGER
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        DIM e AS STRING : e = PROCESS_ERR$(p)
+        IF a <> "" OR e <> "" THEN
+            twAus = twAus + a : twErr = twErr + e : leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    twCode = PROCESS_CODE(p)
+    PRINT REPLACE$(twAus, CHR$(13), "");
+    IF twErr <> "" THEN PRINT "stderr: "; REPLACE$(REPLACE$(twErr, CHR$(13), ""), CWD$(), "FALL");
+    PRINT "rueckgabe "; twCode
+END SUB
+--- datei daten/utf8.csv
+Datum;Kunde;Betrag
+2026-10-01;Müller;1.234,50
+2026-10-02;Schäfer;99,90
+--- datei daten/excel.csv base64
+RGF0dW07S3VuZGU7QmV0cmFnDQoyMDI2LTEwLTAzO038bGxlcjstMTIsMDANCg==
+--- erwartet
+daten/utf8.csv:2:2026-10-01;Müller;1.234,50
+daten/excel.csv:2:2026-10-03;Müller;-12,00
+rueckgabe 0
+
+=== ohne treffer ist die rueckgabe eins
+IMPORT "tw.dh"
+tw(["suche", "nirgends", "daten/a.txt"], "")
+--- argumente
+{sammlung}/../../examples/textwerk/main.dh
+--- datei tw.dh
+DIM twCode AS INTEGER
+SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
+    PROCESS_CLOSE_INPUT(p)
+    WHILE PROCESS_RUNNING(p)
+        SLEEP(20)
+    WEND
+    DIM rest AS STRING : rest = PROCESS_READ$(p)
+    PRINT "rueckgabe "; PROCESS_CODE(p); " ausgabe ["; TRIM$(rest); "]"
+END SUB
+--- datei daten/a.txt
+apfel
+--- erwartet
+rueckgabe 1 ausgabe []
+
+=== ein ordner mit binaerdatei wird durchsucht
+' Die Binaerdatei ueberspringt "auto" mit eigener Meldung; im Ordner ist das
+' kein Fehler.
+IMPORT "tw.dh"
+tw(["suche", "-r", "-l", "--glob", "*", "apfel", "daten"], "")
+--- argumente
+{sammlung}/../../examples/textwerk/main.dh
+--- datei tw.dh
+DIM twAus AS STRING
+DIM twCode AS INTEGER
+SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
+    PROCESS_CLOSE_INPUT(p)
+    DIM leer AS INTEGER
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        IF a <> "" THEN
+            twAus = twAus + a : leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    DIM z AS STRING
+    DIM zeilen AS ARRAY OF STRING
+    FOR EACH z IN SPLIT$(REPLACE$(twAus, CHR$(13), ""), CHR$(10))
+        IF z <> "" THEN ARRAY_PUSH(zeilen, REPLACE$(z, CHR$(92), "/"))
+    NEXT
+    SORT(zeilen)
+    FOR EACH z IN zeilen
+        PRINT z
+    NEXT
+    PRINT "rueckgabe "; PROCESS_CODE(p)
+END SUB
+--- datei daten/a.txt
+apfel
+--- datei daten/unter/b.txt
+birne und apfel
+--- datei daten/bild.bin base64
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB
+--- erwartet
+daten/a.txt
+daten/unter/b.txt
+rueckgabe 0
+
+=== suche liest die standardeingabe
+IMPORT "tw.dh"
+tw(["suche", "-c", "apfel"], "apfel" + CHR$(10) + "birne" + CHR$(10) + "apfelmus" + CHR$(10))
+--- argumente
+{sammlung}/../../examples/textwerk/main.dh
+--- datei tw.dh
+SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
+    PROCESS_WRITE(p, eingabe)
+    PROCESS_CLOSE_INPUT(p)
+    DIM aus AS STRING
+    DIM leer AS INTEGER
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        IF a <> "" THEN
+            aus = aus + a : leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    PRINT TRIM$(aus); " / rueckgabe "; PROCESS_CODE(p)
+END SUB
+--- erwartet
+2 / rueckgabe 0
+
+=== csv aus excel nach kunden summiert
+IMPORT "tw.dh"
+tw(["csv", "daten/excel.csv", "--gruppe", "Kunde", "--summe", "Betrag"], "")
+--- argumente
+{sammlung}/../../examples/textwerk/main.dh
+--- datei tw.dh
+SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
+    PROCESS_CLOSE_INPUT(p)
+    DIM aus AS STRING
+    DIM leer AS INTEGER
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        IF a <> "" THEN
+            aus = aus + a : leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    PRINT REPLACE$(aus, CHR$(13), "");
+    PRINT "rueckgabe "; PROCESS_CODE(p)
+END SUB
+--- datei daten/excel.csv base64
+RGF0dW07S3VuZGU7QmV0cmFnDQoyMDI2LTEwLTAxO038bGxlcjsxLjIzNCw1MA0KMjAyNi0xMC0wMjtTY2jkZmVyOzk5LDkwDQoyMDI2LTEwLTAzO038bGxlcjstMTIsMDANCg==
+--- erwartet
+Kunde    Betrag
+-------  ------------
+Müller       1.222,50
+Schäfer         99,90
+-------  ------------
+Summe        1.322,40
+rueckgabe 0
+
+=== zaehle wie wc
+IMPORT "tw.dh"
+tw(["zaehle", "daten/a.txt", "daten/b.txt"], "")
+--- argumente
+{sammlung}/../../examples/textwerk/main.dh
+--- datei tw.dh
+SUB tw(args AS ARRAY OF STRING, eingabe AS STRING)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
+    PROCESS_CLOSE_INPUT(p)
+    DIM aus AS STRING
+    DIM leer AS INTEGER
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        IF a <> "" THEN
+            aus = aus + a : leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    PRINT REPLACE$(aus, CHR$(13), "");
+    PRINT "rueckgabe "; PROCESS_CODE(p)
+END SUB
+--- datei daten/a.txt
+eins zwei drei
+vier
+--- datei daten/b.txt
+fünf
+--- erwartet
+       2       4        20 daten/a.txt
+       1       1         5 daten/b.txt
+       3       5        25 zusammen
+rueckgabe 0
+
+=== falscher schalter und kaputtes muster
+IMPORT "tw.dh"
+tw(["suche", "-x", "apfel"])
+tw(["suche", "(offen"])
+tw(["gibtsnicht"])
+--- argumente
+{sammlung}/../../examples/textwerk/main.dh
+--- datei tw.dh
+SUB tw(args AS ARRAY OF STRING)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", args)
+    PROCESS_CLOSE_INPUT(p)
+    DIM fehler AS STRING
+    DIM leer AS INTEGER
+    WHILE leer < 5
+        DIM e AS STRING : e = PROCESS_ERR$(p)
+        IF e <> "" THEN
+            fehler = fehler + e : leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    PRINT PROCESS_CODE(p); " "; LEFT$(TRIM$(REPLACE$(fehler, CHR$(13), "")), 40)
+END SUB
+--- erwartet
+2 textwerk: unbekannter Schalter -x
+2 textwerk: Muster kaputt: Ungueltige Rege
+2 textwerk: unbekannter Befehl gibtsnicht (s
