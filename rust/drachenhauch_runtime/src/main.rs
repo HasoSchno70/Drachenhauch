@@ -598,9 +598,10 @@ fn main() -> ExitCode {
             .map(|s| s.to_string_lossy().into_owned()).collect());
         // Ins Exe-Verzeichnis wechseln, damit relative Asset-Pfade
         // (LOADIMAGE("assets/...")) auch beim Doppelklick von ueberall stimmen.
-        if let Ok(exe) = std::env::current_exe() {
-            if let Some(dir) = exe.parent() { let _ = std::env::set_current_dir(dir); }
-        }
+        // Den Ort des Aufrufs vorher hinterlegen wie `dhrt run` -- sonst haette
+        // ein exportiertes Werkzeug keinen Weg, `meins.exe daten/x.csv` zu
+        // finden (STARTDIR$/ARGPATH$; bis 2026.28 fehlte das hier).
+        ins_quellverzeichnis_exe();
         let label = std::env::current_exe().ok()
             .and_then(|p| p.file_name().map(|s| s.to_string_lossy().into_owned()))
             .unwrap_or_else(|| "spiel".into());
@@ -1625,6 +1626,12 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
 /// hinterlegen: nach dem Wechsel kann kein Programm es mehr erfragen, und
 /// ein Werkzeug wie die IDE (`ide/ide.dh -- spiel.dh`) meint mit einem
 /// relativen Namen den Ort, an dem der Nutzer steht, nicht den der IDE.
+fn ins_quellverzeichnis_exe() {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() { ins_quellverzeichnis(dir); }
+    }
+}
+
 fn ins_quellverzeichnis(base: &std::path::Path) {
     if let Ok(hier) = std::env::current_dir() {
         std::env::set_var("DHRT_START_DIR", hier);
@@ -2264,7 +2271,21 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
     bundle.extend_from_slice(&gbc_bytes);
     bundle.extend_from_slice(&(gbc_bytes.len() as u64).to_le_bytes());
     bundle.extend_from_slice(PAYLOAD_MAGIC);
-    // 3) Zielordner + Exe-Name.
+    // 3) Zielordner + Exe-Name. Endet das Ziel auf .exe (und ist kein
+    // vorhandener Ordner), ist es der DATEINAME -- bis 2026.28 entstand ein
+    // Ordner `meins.exe` mit `quelle.exe` darin (Konsolen-Runde).
+    let mut exe_name: Option<String> = None;
+    let ziel_ordner: Option<String>;
+    let out_dir: Option<&str> = match out_dir {
+        Some(d) if d.to_lowercase().ends_with(".exe") && !std::path::Path::new(d).is_dir() => {
+            let p = std::path::Path::new(d);
+            exe_name = p.file_name().map(|n| n.to_string_lossy().into_owned());
+            ziel_ordner = Some(p.parent().filter(|x| !x.as_os_str().is_empty())
+                .map(|x| x.to_string_lossy().into_owned()).unwrap_or_else(|| ".".into()));
+            ziel_ordner.as_deref()
+        }
+        andere => andere,
+    };
     let out = match out_dir {
         Some(d) => std::path::PathBuf::from(d),
         None => base.join(format!("{}_dist", stem)),
@@ -2301,7 +2322,7 @@ fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool, schlank: bool
         eprintln!("Kann Ausgabeverzeichnis '{}' nicht anlegen: {}", out.display(), e);
         return ExitCode::from(1);
     }
-    let out_exe = out.join(format!("{}{}", stem, exe_suffix));
+    let out_exe = out.join(exe_name.unwrap_or_else(|| format!("{}{}", stem, exe_suffix)));
     if let Err(e) = std::fs::write(&out_exe, &bundle) {
         eprintln!("Kann '{}' nicht schreiben: {}", out_exe.display(), e);
         return ExitCode::from(1);

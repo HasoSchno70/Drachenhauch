@@ -1029,7 +1029,12 @@ Bis 2026-09-21 gab es daneben die Python-Fassung `drachenhauch/export.py`
 ```
 dhrt --export examples/89_heightmap.dh [ausgabe-ordner]
 ```
-Default-Ausgabe: `<quelle>_dist/`. In der **IDE** (`dhrt run ide/ide.dh`):
+Default-Ausgabe: `<quelle>_dist/`. Endet das Ziel auf `.exe` (und ist kein
+vorhandener Ordner), ist es der **Dateiname** der Exe: `dhrt --export
+werkzeug.dh aus/meins.exe` schreibt `aus/meins.exe`, die Assets daneben (bis
+2026.28 entstand ein Ordner `meins.exe`). Die Exe hinterlegt beim Start den Ort
+des Aufrufs wie `dhrt run` -- ein Werkzeug liest relative Pfade aus seinen
+Argumenten mit `ARGPATH$` (siehe [builtins-core.md](builtins-core.md)). In der **IDE** (`dhrt run ide/ide.dh`):
 **Strg+F6** bündelt die aktive Datei nach `<name>_dist/` neben der Quelle, schlank
 (siehe unten); die Ausgabe des Exports läuft unten links mit (siehe [ide.md](ide.md)).
 

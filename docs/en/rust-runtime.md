@@ -1064,7 +1064,12 @@ has been removed.
 ```
 dhrt --export examples/89_heightmap.dh [ausgabe-ordner]
 ```
-Default output: `<quelle>_dist/`. In the **IDE** (`dhrt run ide/ide.dh`):
+Default output: `<quelle>_dist/`. If the target ends in `.exe` (and is not an
+existing folder), it is the exe's **file name**: `dhrt --export
+werkzeug.dh aus/meins.exe` writes `aus/meins.exe` with the assets next to it
+(until 2026.28 a folder `meins.exe` was created). At startup the exe records
+where it was called from, like `dhrt run` -- a tool reads relative paths from
+its arguments with `ARGPATH$` (see [builtins-core.md](builtins-core.md)). In the **IDE** (`dhrt run ide/ide.dh`):
 **Ctrl+F6** bundles the active file into `<name>_dist/` next to the source,
 lean (see below); the export's output scrolls along at the bottom left (see
 [ide.md](ide.md)).

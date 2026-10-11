@@ -57,6 +57,7 @@ the pause begins.
 | `RGB(r, g, b)` → INTEGER | 3 numbers (0..255) to a 24-bit colour. `RGB(255, 128, 0)` = `&HFF8000`. Decimal numbers are **rounded** (so `x * 255 / 640` works) -- there is no clamping, 255.6 is still too large. |
 | `HEX$(n)` → STRING | INT to upper-case hex (without prefix). `HEX$(255)` = `"FF"`. |
 | `NUMFMT$(zahl [, nachkommastellen])` → STRING | write large numbers briefly (`1.2K`, `3.4M`) — for scores and idle games |
+| `ZAHL$(zahl [, stellen])` → STRING | a number in German notation with dots between thousands and a decimal comma (`400.000`, `1.234.567,89`); with `stellen` rounded commercially |
 | `ENUM_NAME(enum, wert)` → STRING | return the name for an ENUM value — for display and debugging |
 
 ```basic
@@ -306,7 +307,7 @@ Functions with a `$` suffix also exist without it (`UPPER$` ≡ `UPPER`).
 | `REPEAT$(s, n)` | concatenate s n times |
 | `SPACE$(n)` | n spaces |
 | `HEX$(n)` | INT as a hex string |
-| `FORMAT$(value, mask)` | printf style. `FORMAT$(42, "%05d")` → `"00042"`. Six specifiers: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — plus `%%` for a literal percent sign. Width, zeros and precision as usual (`%05d`, `%-6d`, `%.2f`). Anything else reports "unknown specifier" |
+| `FORMAT$(value, mask)` | printf style. `FORMAT$(42, "%05d")` → `"00042"`. Six specifiers: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — plus `%%` for a literal percent sign. Width, zeros and precision as usual (`%05d`, `%-6d`, `%.2f`). Anything else reports "unknown specifier", and a mask without any placeholder (such as the VB mask `"#,##0.00"`) is an error too -- dots between thousands come from `ZAHL$` |
 
 Extensions *(native runtime only)*:
 
@@ -865,6 +866,7 @@ f = OPENFILE("gross.csv", "r", "cp1252")
 | Name | also written as |
 |---|---|
 | `utf8` (default) | `utf-8` |
+| `auto` (reading only) | -- |
 | `cp1252` | `windows-1252`, `ansi` |
 | `latin1` | `iso-8859-1` |
 
@@ -889,6 +891,24 @@ encoding has usually copied it from somewhere.
    (`cp1252` has the euro sign — that is exactly why both exist.)
 5. **A BOM at the start of the file is always dropped**, in every text reader. Otherwise
    the first column would forever be called `﻿Name`.
+
+**`auto` is for tools that read other people's files** and do not know in
+advance what they get: valid UTF-8 (with or without a BOM) is read as UTF-8,
+anything else as cp1252 -- ASCII is the same in both, so a line with umlauts
+decides unambiguously. A null byte means a binary file and is an error with
+its own message (*sieht nach einer Binärdatei aus*), so that a search tool can
+skip it. Line by line (`OPENFILE`, `STDIN`) the decision is made per line.
+When writing, `auto` is an error -- there you have to say what should come
+out.
+
+```basic
+DIM z AS ARRAY OF STRING
+TRY
+    z = READLINES(pfad, "auto")
+CATCH e
+    EPRINT("übersprungen: " + e)
+END TRY
+```
 
 **Not included: UTF-16.** Excel writes that for "Unicode Text (*.txt)". It
 needs BOM detection, two byte orders and surrogate pairs — a decision of its own,
@@ -1106,6 +1126,8 @@ worked.
 |---|---|
 | `ARGC()` → INTEGER | number of arguments for this program |
 | `ARG$(n)` → STRING | argument no. `n` (0-based); out of range → `""` |
+| `ARGPATH$(n)` → STRING | argument no. `n` as a **path from where the program was called** (see below) |
+| `STARTDIR$()` → STRING | the folder the program was called from |
 | `GETENV$(name$ [, vorgabe$])` → STRING | read an environment variable |
 | `SETENV(name$, wert$)` | set an environment variable (this program + its children) |
 | `CWD$()` → STRING | current working directory |
@@ -1116,6 +1138,8 @@ worked.
 | `SHELL(programm$, ...)` → INTEGER | start a program, wait, return value |
 | `SHELL_OUT$(programm$, ...)` → STRING | like `SHELL`, but collects the output |
 | `STDIN([kodierung$])` → FILE | standard input as a file handle |
+| `TERMINAL()` → BOOLEAN | does the output go to a terminal (not into a file, a pipe, the IDE)? |
+| `TERMINAL_WIDTH()` → INTEGER | columns of the terminal, 0 if the output does not go to one |
 
 ```basic
 ' A tool that expects a file
@@ -1124,7 +1148,7 @@ IF ARGC() < 1 THEN
     EPRINT("Verwendung: zaehle <datei>")
     EXIT(2)
 END IF
-pfad = ARG$(0)
+pfad = ARGPATH$(0)
 IF NOT FILEEXISTS(pfad) THEN
     EPRINT("Nicht gefunden: " + pfad)
     EXIT(1)
@@ -1146,6 +1170,23 @@ arguments. This is on purpose: otherwise `dhrt` could never add a switch of its 
 without breaking existing programs. The **exported `.exe`**
 is the program itself — there is nothing to separate there, all arguments
 belong to it, without `--`.
+
+**Paths in arguments: `ARGPATH$` instead of `ARG$`.** `dhrt run` and the
+exported `.exe` change into the program's folder at startup -- so that
+`LOADIMAGE("assets/held.png")` finds its image no matter where it was started
+from. A relative path the user gives from *their* folder then points nowhere:
+`werkzeug.exe daten/obst.txt` looks for `daten/obst.txt` next to the `.exe`.
+`ARGPATH$(n)` therefore puts the calling folder in front (`STARTDIR$()`); an
+absolute path, an empty argument and `-` (standard input) stay as they are. For
+options, patterns and numbers keep using `ARG$`.
+
+| Called from `C:\arbeit` | `ARG$(0)` | `ARGPATH$(0)` |
+|---|---|---|
+| `werkzeug.exe daten\obst.txt` | `daten\obst.txt` | `C:\arbeit\daten\obst.txt` |
+| `werkzeug.exe D:\x.txt` | `D:\x.txt` | `D:\x.txt` |
+
+Until 2026.28 the exported `.exe` did not know the calling folder at all; under
+`dhrt run` it was already in the environment variable `DHRT_START_DIR`.
 
 **`EXIT` is not an error.** It ends the program immediately and is **not** caught by
 `TRY`/`CATCH` — an `EXIT` in the middle of a `TRY` block really

@@ -124,6 +124,13 @@ module.exports = (H) => [
       "PRINT CENT(19.99)                 ' 1999",
       "PRINT EURO$(1999)",
     ]),
+  H.cmd("ZAHL$", 'ZAHL$(zahl[, stellen])',
+    "Schreibt eine Zahl so, wie man sie in Deutschland liest: mit Tausenderpunkten und Dezimalkomma. Ohne stellen bleibt eine Ganzzahl ganz und eine Kommazahl behält ihre Stellen; mit stellen wird kaufmännisch gerundet. Für Geld in ganzen Cent ist EURO$ da, für kurze Punktestände NUMFMT$.",
+    [
+      "PRINT ZAHL$(400000)",
+      "PRINT ZAHL$(1234567.891, 2)",
+      "PRINT ZAHL$(3.75)",
+    ], { out: ["400.000", "1.234.567,89", "3,75"] }),
   H.warn("In Kommazahlen zu rechnen ist bei Geld ein Fehler, den man erst beim Kassensturz sieht: INT(19.99 * 100) ergibt 1998, nicht 1999 – weil 19,99 in Fließkomma nicht genau darstellbar ist. Deshalb CENT, und deshalb wird darin ganzzahlig gerechnet.",
     "Der Cent, der verschwindet"),
   H.tip("Für mehr als das gibt es einen eigenen Typ", "CENT und EURO$ sind eine Rechenweise – man muss daran denken, dass die Zahl Cent bedeutet. Das Modul geld (Kapitel „Module: zeit & geld“) macht daraus einen Typ, der sich nicht mehr versehentlich mit einer gewöhnlichen Zahl mischen lässt."),

@@ -1,0 +1,95 @@
+' Was ein Werkzeug fuer die Kommandozeile braucht (2026-10-11,
+' Konsolen-Runde mit examples/textwerk): ZAHL$, die Kodierung "auto",
+' TERMINAL/TERMINAL_WIDTH und FORMAT$ ohne Platzhalter.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== zahl mit tausenderpunkten und dezimalkomma
+PRINT ZAHL$(400000)
+PRINT ZAHL$(1234567.891, 2)
+PRINT ZAHL$(3.75)
+PRINT ZAHL$(-1234, 2)
+PRINT ZAHL$(999.995, 2)
+PRINT ZAHL$(2.5, 0)
+PRINT ZAHL$(-0.001, 2)
+--- erwartet
+400.000
+1.234.567,89
+3,75
+-1.234,00
+1.000,00
+3
+0,00
+
+=== zahl braucht eine zahl
+PRINT ZAHL$("12")
+--- fehler
+ZAHL$: erwartet eine Zahl
+
+=== zahl mit zu vielen stellen
+PRINT ZAHL$(1.5, 16)
+--- fehler
+erlaubt sind 0 bis 15
+
+=== format ohne platzhalter ist ein fehler
+' Bis 2026.28 kam die Maske selbst zurueck, und der Wert verschwand still.
+PRINT FORMAT$(1234.5, "#,##0.00")
+--- fehler
+hat keinen Platzhalter
+
+=== format mit nur prozentzeichen ist auch ohne platzhalter
+PRINT FORMAT$(5, "100%%")
+--- fehler
+hat keinen Platzhalter
+
+=== auto liest utf8 und cp1252
+DIM z AS ARRAY OF STRING
+z = READLINES("utf8.txt", "auto")
+PRINT z[0]
+z = READLINES("ansi.txt", "auto")
+PRINT z[0]
+DIM f AS FILE
+f = OPENFILE("ansi.txt", "r", "auto")
+PRINT READLINE(f)
+CLOSEFILE(f)
+DIM t AS ARRAY OF STRING
+t = CSV_LOAD("ansi.txt", ";", "auto")
+PRINT t[0, 1]
+--- datei utf8.txt
+Müller;Köln
+--- datei ansi.txt base64
+TfxsbGVyO0v2bG4NCg==
+--- erwartet
+Müller;Köln
+Müller;Köln
+Müller;Köln
+Köln
+
+=== auto lehnt eine binaerdatei ab
+DIM z AS ARRAY OF STRING
+z = READLINES("bild.bin", "auto")
+--- datei bild.bin base64
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB
+--- fehler
+sieht nach einer Binaerdatei aus
+
+=== auto gilt nur beim lesen
+WRITEALL("aus.txt", "x", "auto")
+--- fehler
+gilt nur beim Lesen
+
+=== auto an der standardeingabe
+DIM f AS FILE
+f = STDIN("auto")
+PRINT READLINE(f)
+--- eingabe base64
+TfxsbGVyCg==
+--- erwartet
+Müller
+
+=== terminal und breite sind in einer pipe aus
+' Unter dhrt test geht die Ausgabe in eine Pipe, nicht in ein Terminal.
+PRINT TERMINAL()
+PRINT TERMINAL_WIDTH()
+--- erwartet
+FALSE
+0

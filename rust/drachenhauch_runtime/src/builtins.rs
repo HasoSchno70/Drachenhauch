@@ -97,6 +97,69 @@ static PROGRAMM_ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::ne
 /// so kann ein zweiter Einstiegspunkt sie gefahrlos ebenfalls setzen wollen.
 pub fn set_programm_args(args: Vec<String>) { let _ = PROGRAMM_ARGS.set(args); }
 
+/// Geht die Standardausgabe in ein Terminal (nicht in eine Datei, eine Pipe,
+/// die IDE)?
+pub fn ausgabe_ist_terminal() -> bool {
+    use std::io::IsTerminal;
+    std::io::stdout().is_terminal()
+}
+
+/// Spalten des Terminals der Standardausgabe; 0, wenn sie in keines geht oder
+/// die Breite sich nicht erfragen laesst.
+pub fn terminal_breite() -> i64 {
+    if !ausgabe_ist_terminal() { return 0; }
+    if let Some(b) = terminal_breite_system() { return b; }
+    std::env::var("COLUMNS").ok().and_then(|s| s.trim().parse::<i64>().ok()).filter(|&b| b > 0).unwrap_or(0)
+}
+
+#[cfg(windows)]
+fn terminal_breite_system() -> Option<i64> {
+    use windows::Win32::System::Console::{GetConsoleScreenBufferInfo, GetStdHandle, CONSOLE_SCREEN_BUFFER_INFO, STD_OUTPUT_HANDLE};
+    unsafe {
+        let h = GetStdHandle(STD_OUTPUT_HANDLE).ok()?;
+        let mut info = CONSOLE_SCREEN_BUFFER_INFO::default();
+        GetConsoleScreenBufferInfo(h, &mut info).ok()?;
+        let b = (info.srWindow.Right - info.srWindow.Left + 1) as i64;
+        if b > 0 { Some(b) } else { None }
+    }
+}
+
+#[cfg(all(unix, not(target_os = "emscripten")))]
+fn terminal_breite_system() -> Option<i64> {
+    #[repr(C)]
+    struct Winsize { zeilen: u16, spalten: u16, x: u16, y: u16 }
+    extern "C" { fn ioctl(fd: i32, anfrage: std::os::raw::c_ulong, ...) -> i32; }
+    #[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd"))]
+    const TIOCGWINSZ: std::os::raw::c_ulong = 0x4008_7468;
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "freebsd")))]
+    const TIOCGWINSZ: std::os::raw::c_ulong = 0x5413;
+    let mut w = Winsize { zeilen: 0, spalten: 0, x: 0, y: 0 };
+    let r = unsafe { ioctl(1, TIOCGWINSZ, &mut w as *mut Winsize) };
+    if r == 0 && w.spalten > 0 { Some(w.spalten as i64) } else { None }
+}
+
+#[cfg(not(any(windows, all(unix, not(target_os = "emscripten")))))]
+fn terminal_breite_system() -> Option<i64> { None }
+
+/// Der Ort, von dem aus das Programm aufgerufen wurde: `DHRT_START_DIR`
+/// (setzen `dhrt run` und die exportierte Exe vor dem Ordnerwechsel), sonst
+/// das Arbeitsverzeichnis.
+pub fn startort() -> Result<String, String> {
+    if let Some(s) = std::env::var_os("DHRT_START_DIR") {
+        if !s.is_empty() { return Ok(s.to_string_lossy().into_owned()); }
+    }
+    std::env::current_dir().map(|p| p.to_string_lossy().into_owned()).map_err(|e| e.to_string())
+}
+
+/// Ein Argument als Pfad vom Aufrufort aus: absolut (auch mit Wurzel ohne
+/// Laufwerk) bleibt, leer und `-` (Standardeingabe) bleiben, sonst steht der
+/// Startort davor.
+pub fn arg_pfad(arg: &str, start: &str) -> String {
+    let p = std::path::Path::new(arg);
+    if arg.is_empty() || arg == "-" || p.is_absolute() || p.has_root() { return arg.to_string(); }
+    std::path::Path::new(start).join(p).to_string_lossy().into_owned()
+}
+
 /// Die .dh-Datei, die gerade laeuft.
 ///
 /// `TASK_START` startet einen Kindprozess `dhrt call <datei> <funktion>` --
@@ -775,6 +838,39 @@ pub(crate) fn tausender_punkte(ganz: &str) -> String {
     out
 }
 
+/// Eine Zahl deutsch: Tausenderpunkte, Dezimalkomma. Ohne `stellen` bleibt
+/// eine Ganzzahl ganz und eine Kommazahl behaelt ihre Stellen; mit `stellen`
+/// wird am Dezimaltext gerundet (wie CENT, ab 5 auf).
+pub(crate) fn zahl_text(v: &Value, stellen: Option<usize>) -> Result<String, String> {
+    let (neg, ganz, bruch) = match v {
+        Value::Int(i) => {
+            let ganz = (*i as i128).abs().to_string();
+            match stellen {
+                None | Some(0) => (*i < 0, ganz, String::new()),
+                Some(n) => (*i < 0, ganz, "0".repeat(n)),
+            }
+        }
+        Value::Float(f) => match stellen {
+            Some(n) => dez_runden(*f, n)?,
+            None => {
+                if !f.is_finite() { return Err("kein endlicher Wert (NAN oder unendlich)".to_string()); }
+                let s = format!("{}", f.abs());
+                let (g, b) = s.split_once('.').map(|(g, b)| (g.to_string(), b.to_string()))
+                    .unwrap_or((s.clone(), String::new()));
+                (*f < 0.0, g, b)
+            }
+        },
+        v => return Err(format!("erwartet eine Zahl, erhalten {}", v.type_name())),
+    };
+    let ganz = { let t = ganz.trim_start_matches('0'); if t.is_empty() { "0".to_string() } else { t.to_string() } };
+    let null = ganz == "0" && bruch.bytes().all(|c| c == b'0');
+    let mut out = String::new();
+    if neg && !null { out.push('-'); }
+    out.push_str(&tausender_punkte(&ganz));
+    if !bruch.is_empty() { out.push(','); out.push_str(&bruch); }
+    Ok(out)
+}
+
 /// Cent in deutscher Schreibweise: 1234567 -> "1.234.567" + ",89".
 fn euro_text(cent: i64, symbol: &str) -> String {
     let neg = cent < 0;
@@ -808,6 +904,12 @@ fn round_half_even(x: f64) -> i64 {
 
 /// Minimaler printf fuer FORMAT$ / f-String-Specs: %[-][0][width][.prec](d|i|f|s|x|X).
 fn format_one(mask: &str, v: &Value) -> R {
+    // Eine Maske ohne Platzhalter gab bis 2026.28 sich selbst zurueck, und der
+    // Wert verschwand still -- etwa bei der VB-Maske "#,##0.00" (gefunden in
+    // der Konsolen-Runde). Die Doku versprach schon eine Meldung.
+    if !mask.replace("%%", "").contains('%') {
+        return err(format!("FORMAT$: die Maske {:?} hat keinen Platzhalter -- der Wert kaeme                             nicht vor. FORMAT$ arbeitet im printf-Stil (\"%.2f\", \"%05d\");                             Tausenderpunkte und Dezimalkomma schreibt ZAHL$(wert, stellen)", mask));
+    }
     let bytes: Vec<char> = mask.chars().collect();
     let mut out = String::new();
     let mut i = 0;
@@ -1456,6 +1558,25 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
             };
             Ok(Value::Int(cent_aus_teilen(neg, &ganz, &bruch, "CENT")?))
+        }
+        // ZAHL$ (2026-10-11, Konsolen-Runde): Tausenderpunkte und
+        // Dezimalkomma fuer jede Zahl, nicht nur fuer Geld -- vorher gab es das
+        // nur ueber EURO$ mit ganzen Cent, und NUMFMT$ schreibt "1.2K".
+        "zahl$" => {
+            if a.is_empty() || a.len() > 2 {
+                return err(format!("ZAHL$: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+            }
+            let stellen = match a.get(1) {
+                None => None,
+                Some(v) => {
+                    let n = need_int(v, "ZAHL$")?;
+                    if !(0..=15).contains(&n) {
+                        return err(format!("ZAHL$: Nachkommastellen {} -- erlaubt sind 0 bis 15", n));
+                    }
+                    Some(n as usize)
+                }
+            };
+            Ok(Value::str_rc(zahl_text(&a[0], stellen).map_err(|e| format!("ZAHL$: {}", e))?))
         }
         "euro$" => {
             if a.is_empty() || a.len() > 2 {
@@ -3938,6 +4059,28 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if i < 0 || i as usize >= args.len() { return Ok(Value::str_rc("")); }
             Ok(Value::str_rc(&args[i as usize]))
         }
+        // STARTDIR$ / ARGPATH$ (2026-10-11, Konsolen-Runde): `dhrt run` und
+        // die exportierte Exe wechseln in den Ordner des Programms (damit
+        // Bilder und Klaenge gefunden werden) -- ein relativer Pfad, den der
+        // Nutzer aus SEINEM Ordner angibt, zeigte dann ins Leere. Auch
+        // examples/172_filter.dh als Exe fand `daten/obst.txt` nicht.
+        "startdir$" | "startdir" => {
+            arity!(0);
+            Ok(Value::str_rc(startort().map_err(|e| format!("STARTDIR$: {}", e))?))
+        }
+        "argpath$" | "argpath" => {
+            arity!(1);
+            let i = need_int(&a[0], "ARGPATH$")?;
+            let args = programm_args();
+            if i < 0 || i as usize >= args.len() { return Ok(Value::str_rc("")); }
+            Ok(Value::str_rc(arg_pfad(&args[i as usize], &startort().map_err(|e| format!("ARGPATH$: {}", e))?)))
+        }
+        // TERMINAL / TERMINAL_WIDTH (2026-10-11, Konsolen-Runde): Farben und
+        // eine Fortschrittszeile gehoeren ins Terminal, nicht in eine Datei,
+        // in die jemand mit `> ergebnis.txt` umleitet -- vorher liess sich
+        // das nicht unterscheiden.
+        "terminal" => { arity!(0); Ok(Value::Bool(ausgabe_ist_terminal())) }
+        "terminal_width" => { arity!(0); Ok(Value::Int(terminal_breite())) }
         "getenv$" | "getenv" => {
             if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1..2 Argumente, erhalten {}", a.len())); }
             let name_ = need_str(&a[0], "GETENV$")?;
@@ -6560,6 +6703,40 @@ pub fn is_graphics_builtin(name: &str) -> bool {
         | "quitrequested" | "sleep" | "imagewidth" | "imageheight" | "image_width" | "image_height"
         | "color" | "fill"
     )
+}
+
+#[cfg(test)]
+mod zahl_text_tests {
+    use super::zahl_text;
+    use crate::value::Value;
+    #[test]
+    fn deutsch_mit_tausenderpunkten() {
+        assert_eq!(zahl_text(&Value::Int(400000), None).unwrap(), "400.000");
+        assert_eq!(zahl_text(&Value::Int(-1234), Some(2)).unwrap(), "-1.234,00");
+        assert_eq!(zahl_text(&Value::Float(1234567.891), Some(2)).unwrap(), "1.234.567,89");
+        assert_eq!(zahl_text(&Value::Float(3.75), None).unwrap(), "3,75");
+        assert_eq!(zahl_text(&Value::Float(2.5), Some(0)).unwrap(), "3");
+        assert_eq!(zahl_text(&Value::Float(-0.001), Some(2)).unwrap(), "0,00");
+        assert_eq!(zahl_text(&Value::Float(999.995), Some(2)).unwrap(), "1.000,00");
+        assert_eq!(zahl_text(&Value::Int(7), None).unwrap(), "7");
+        assert!(zahl_text(&Value::Float(f64::NAN), None).is_err());
+    }
+}
+
+#[cfg(test)]
+mod arg_pfad_tests {
+    use super::arg_pfad;
+    #[test]
+    fn relativ_wird_vom_startort_aus_gelesen() {
+        let s = if cfg!(windows) { r"C:\a" } else { "/a" };
+        let erwartet = std::path::Path::new(s).join("b/c.txt").to_string_lossy().into_owned();
+        assert_eq!(arg_pfad("b/c.txt", s), erwartet);
+        assert_eq!(arg_pfad("", s), "");
+        assert_eq!(arg_pfad("-", s), "-");
+        let abs = if cfg!(windows) { r"D:\x.txt" } else { "/x.txt" };
+        assert_eq!(arg_pfad(abs, s), abs);
+        assert_eq!(arg_pfad("/wurzel", s), "/wurzel");
+    }
 }
 
 #[cfg(test)]

@@ -56,6 +56,7 @@ sie spätestens nach 50 ms hinaus -- vor `SLEEP`, `INPUT`, `EPRINT` und bei
 | `RGB(r, g, b)` → INTEGER | 3 Zahlen (0..255) zu 24-Bit-Farbe. `RGB(255, 128, 0)` = `&HFF8000`. Kommazahlen werden **gerundet** (`x * 255 / 640` geht also) -- geklemmt wird nicht, 255.6 ist weiterhin zu gross. |
 | `HEX$(n)` → STRING | INT zu Hex-Großbuchstaben (ohne Präfix). `HEX$(255)` = `"FF"`. |
 | `NUMFMT$(zahl [, nachkommastellen])` → STRING | grosse Zahlen kurz schreiben (`1.2K`, `3.4M`) — für Punktestände und Idle-Spiele |
+| `ZAHL$(zahl [, stellen])` → STRING | Zahl deutsch mit Tausenderpunkten und Dezimalkomma (`400.000`, `1.234.567,89`); mit `stellen` kaufmännisch gerundet |
 | `ENUM_NAME(enum, wert)` → STRING | zu einem ENUM-Wert seinen Namen zurückgeben — für Anzeige und Fehlersuche |
 
 ```basic
@@ -305,7 +306,7 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 | `REPEAT$(s, n)` | s n-mal aneinanderhängen |
 | `SPACE$(n)` | n Leerzeichen |
 | `HEX$(n)` | INT als Hex-String |
-| `FORMAT$(value, mask)` | printf-Stil. `FORMAT$(42, "%05d")` → `"00042"`. Sechs Spezifizierer: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — dazu `%%` für ein wörtliches Prozentzeichen. Breite, Nullen und Genauigkeit wie gewohnt (`%05d`, `%-6d`, `%.2f`). Alles andere meldet „unbekannter Spezifizierer“ |
+| `FORMAT$(value, mask)` | printf-Stil. `FORMAT$(42, "%05d")` → `"00042"`. Sechs Spezifizierer: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — dazu `%%` für ein wörtliches Prozentzeichen. Breite, Nullen und Genauigkeit wie gewohnt (`%05d`, `%-6d`, `%.2f`). Alles andere meldet „unbekannter Spezifizierer“, eine Maske ganz ohne Platzhalter (etwa die VB-Maske `"#,##0.00"`) ebenfalls einen Fehler -- Tausenderpunkte schreibt `ZAHL$` |
 
 Erweiterungen *(nur native Runtime)*:
 
@@ -867,6 +868,7 @@ f = OPENFILE("gross.csv", "r", "cp1252")
 | Name | auch geschrieben als |
 |---|---|
 | `utf8` (Vorgabe) | `utf-8` |
+| `auto` (nur lesen) | -- |
 | `cp1252` | `windows-1252`, `ansi` |
 | `latin1` | `iso-8859-1` |
 
@@ -891,6 +893,24 @@ Kodierung angibt, hat sie meist irgendwo abgeschrieben.
    (`cp1252` hat das Euro-Zeichen — genau dafür gibt es beide.)
 5. **Ein BOM am Dateianfang fällt immer weg**, in jedem Textleser. Sonst hieße
    die erste Spalte für immer `﻿Name`.
+
+**`auto` ist für Werkzeuge, die fremde Dateien lesen** und vorher nicht wissen,
+was sie bekommen: gültiges UTF-8 (auch mit BOM) wird als UTF-8 gelesen, alles
+andere als cp1252 -- ASCII ist in beiden gleich, eine Zeile mit Umlauten
+entscheidet sich also eindeutig. Ein Nullbyte heißt Binärdatei und ist ein
+Fehler mit eigener Meldung (*sieht nach einer Binärdatei aus*), damit ein
+Such-Werkzeug sie überspringen kann. Zeilenweise (`OPENFILE`, `STDIN`) wird je
+Zeile entschieden. Beim Schreiben ist `auto` ein Fehler -- dort muss man
+sagen, was entstehen soll.
+
+```basic
+DIM z AS ARRAY OF STRING
+TRY
+    z = READLINES(pfad, "auto")
+CATCH e
+    EPRINT("übersprungen: " + e)
+END TRY
+```
 
 **Nicht dabei: UTF-16.** Das schreibt Excel bei „Unicode Text (*.txt)". Es
 braucht BOM-Erkennung, zwei Byte-Reihenfolgen und Ersatzpaare — eine eigene
@@ -1109,6 +1129,8 @@ geklappt hat.
 |---|---|
 | `ARGC()` → INTEGER | Anzahl der Argumente für dieses Programm |
 | `ARG$(n)` → STRING | Argument Nr. `n` (0-basiert); außerhalb → `""` |
+| `ARGPATH$(n)` → STRING | Argument Nr. `n` als **Pfad vom Aufrufort aus** (siehe unten) |
+| `STARTDIR$()` → STRING | der Ordner, aus dem das Programm aufgerufen wurde |
 | `GETENV$(name$ [, vorgabe$])` → STRING | Umgebungsvariable lesen |
 | `SETENV(name$, wert$)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) |
 | `CWD$()` → STRING | aktuelles Arbeitsverzeichnis |
@@ -1119,6 +1141,8 @@ geklappt hat.
 | `SHELL(programm$, ...)` → INTEGER | Programm starten, warten, Rückgabewert |
 | `SHELL_OUT$(programm$, ...)` → STRING | wie `SHELL`, sammelt aber die Ausgabe ein |
 | `STDIN([kodierung$])` → FILE | die Standardeingabe als Datei-Handle |
+| `TERMINAL()` → BOOLEAN | geht die Ausgabe in ein Terminal (nicht in eine Datei, eine Pipe, die IDE)? |
+| `TERMINAL_WIDTH()` → INTEGER | Spalten des Terminals, 0 wenn die Ausgabe in keines geht |
 
 ```basic
 ' Ein Werkzeug, das eine Datei erwartet
@@ -1127,7 +1151,7 @@ IF ARGC() < 1 THEN
     EPRINT("Verwendung: zaehle <datei>")
     EXIT(2)
 END IF
-pfad = ARG$(0)
+pfad = ARGPATH$(0)
 IF NOT FILEEXISTS(pfad) THEN
     EPRINT("Nicht gefunden: " + pfad)
     EXIT(1)
@@ -1149,6 +1173,23 @@ Argumente. Das ist Absicht: sonst könnte `dhrt` sich keinen eigenen Schalter
 mehr zulegen, ohne bestehende Programme zu brechen. Die **exportierte `.exe`**
 ist selbst das Programm — dort gibt es nichts zu trennen, alle Argumente
 gehören ihr, ohne `--`.
+
+**Pfade in Argumenten: `ARGPATH$` statt `ARG$`.** `dhrt run` und die
+exportierte `.exe` wechseln beim Start in den Ordner des Programms -- so findet
+`LOADIMAGE("assets/held.png")` sein Bild, egal von wo aus gestartet wurde. Ein
+relativer Pfad, den der Nutzer aus *seinem* Ordner angibt, zeigt dann aber
+ins Leere: `werkzeug.exe daten/obst.txt` sucht `daten/obst.txt` neben der
+`.exe`. `ARGPATH$(n)` setzt darum den Aufrufort davor (`STARTDIR$()`); ein
+absoluter Pfad, ein leeres Argument und `-` (Standardeingabe) bleiben, wie sie
+sind. Für Optionen, Muster und Zahlen bleibt es bei `ARG$`.
+
+| Aufruf aus `C:\arbeit` | `ARG$(0)` | `ARGPATH$(0)` |
+|---|---|---|
+| `werkzeug.exe daten\obst.txt` | `daten\obst.txt` | `C:\arbeit\daten\obst.txt` |
+| `werkzeug.exe D:\x.txt` | `D:\x.txt` | `D:\x.txt` |
+
+Bis 2026.28 kannte die exportierte `.exe` den Aufrufort gar nicht; unter
+`dhrt run` stand er schon in der Umgebungsvariablen `DHRT_START_DIR`.
 
 **`EXIT` ist kein Fehler.** Es beendet das Programm sofort und wird von
 `TRY`/`CATCH` **nicht** gefangen — ein `EXIT` mitten in einem `TRY`-Block läuft
