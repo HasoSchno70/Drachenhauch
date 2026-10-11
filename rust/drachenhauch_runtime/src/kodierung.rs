@@ -29,11 +29,17 @@ pub enum Kodierung {
     Cp1252,
     /// ISO-8859-1: jedes Byte ist sein eigener Codepunkt. Kann nie scheitern.
     Latin1,
+    /// Nur beim Lesen (2026-10-11, Konsolen-Runde): gueltiges UTF-8 bleibt
+    /// UTF-8, sonst Windows-1252; ein Nullbyte heisst Binaerdatei und ist ein
+    /// Fehler. Ein Werkzeug, das fremde Dateien durchsucht, weiss vorher
+    /// nicht, was es bekommt -- ASCII ist in beiden gleich, eine Zeile mit
+    /// Umlauten entscheidet sich also eindeutig.
+    Auto,
 }
 
 /// Alle Namen, die eine Kodierung annimmt -- fuer die Fehlermeldung an einer
 /// Stelle, statt in jedem Builtin neu aufgezaehlt.
-pub const NAMEN: &str = "utf8, cp1252 (= ansi, windows-1252), latin1 (= iso-8859-1)";
+pub const NAMEN: &str = "utf8, cp1252 (= ansi, windows-1252), latin1 (= iso-8859-1), auto (nur lesen)";
 
 /// Namen aus dem DH-Programm auf die Kodierung abbilden.
 ///
@@ -49,6 +55,7 @@ pub fn aus_name(name: &str, fn_: &str) -> Result<Kodierung, String> {
         "utf8" | "utf" => Ok(Kodierung::Utf8),
         "cp1252" | "windows1252" | "win1252" | "ansi" | "1252" => Ok(Kodierung::Cp1252),
         "latin1" | "iso88591" | "latin" | "88591" => Ok(Kodierung::Latin1),
+        "auto" => Ok(Kodierung::Auto),
         _ => Err(format!("{}: Kodierung '{}' kenne ich nicht -- moeglich sind: {}",
                          fn_, name, NAMEN)),
     }
@@ -80,11 +87,26 @@ pub fn dekodieren(bytes: &[u8], k: Kodierung, fn_: &str, pfad: &str)
             Err(e) => Err(utf8_meldung(fn_, pfad, bytes, e.valid_up_to())),
         },
         Kodierung::Latin1 => Ok(bytes.iter().map(|&b| b as char).collect()),
-        Kodierung::Cp1252 => Ok(bytes.iter().map(|&b| {
-            if (0x80..0xA0).contains(&b) { CP1252_HOCH[(b - 0x80) as usize] }
-            else { b as char }
-        }).collect()),
+        Kodierung::Cp1252 => Ok(cp1252_lesen(bytes)),
+        Kodierung::Auto => {
+            if let Some(stelle) = bytes.iter().position(|&b| b == 0) {
+                let wo = if pfad.is_empty() { String::new() } else { format!("{}: ", pfad) };
+                return Err(format!("{}: {}sieht nach einer Binaerdatei aus (Nullbyte an Stelle {}) \
+                                    -- \"auto\" liest nur Text", fn_, wo, stelle));
+            }
+            match std::str::from_utf8(bytes) {
+                Ok(s) => Ok(s.to_string()),
+                Err(_) => Ok(cp1252_lesen(bytes)),
+            }
+        }
     }
+}
+
+fn cp1252_lesen(bytes: &[u8]) -> String {
+    bytes.iter().map(|&b| {
+        if (0x80..0xA0).contains(&b) { CP1252_HOCH[(b - 0x80) as usize] }
+        else { b as char }
+    }).collect()
 }
 
 /// Die Meldung, um die es bei diesem ganzen Modul geht.
@@ -113,6 +135,8 @@ fn utf8_meldung(fn_: &str, pfad: &str, bytes: &[u8], bis: usize) -> String {
 /// nicht erst geschrieben wird.
 pub fn kodieren(text: &str, k: Kodierung, fn_: &str) -> Result<Vec<u8>, String> {
     match k {
+        Kodierung::Auto => Err(format!("{}: \"auto\" gilt nur beim Lesen -- zum Schreiben \
+                                        eine Kodierung angeben (utf8, cp1252, latin1)", fn_)),
         Kodierung::Utf8 => Ok(text.as_bytes().to_vec()),
         Kodierung::Latin1 => {
             let mut raus = Vec::with_capacity(text.len());
@@ -162,6 +186,20 @@ pub fn ohne_bom(s: String) -> String {
     match s.strip_prefix('\u{feff}') {
         Some(rest) => rest.to_string(),
         None => s,
+    }
+}
+
+#[cfg(test)]
+mod auto_tests {
+    use super::*;
+    #[test]
+    fn auto_nimmt_utf8_sonst_cp1252_und_lehnt_binaer_ab() {
+        assert_eq!(aus_name("AUTO", "T").unwrap(), Kodierung::Auto);
+        assert_eq!(dekodieren("Müller".as_bytes(), Kodierung::Auto, "T", "").unwrap(), "Müller");
+        assert_eq!(dekodieren(&[b'M', 0xFC, b'l', 0x80], Kodierung::Auto, "T", "").unwrap(), "Mül€");
+        let e = dekodieren(&[b'a', 0, b'b'], Kodierung::Auto, "READLINES", "x.bin").unwrap_err();
+        assert!(e.contains("Binaerdatei") && e.contains("x.bin") && e.contains("Stelle 1"), "{}", e);
+        assert!(kodieren("x", Kodierung::Auto, "WRITEALL").unwrap_err().contains("nur beim Lesen"));
     }
 }
 

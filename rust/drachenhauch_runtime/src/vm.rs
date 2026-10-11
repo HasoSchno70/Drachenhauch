@@ -1320,7 +1320,6 @@ impl<'p> Vm<'p> {
         // es liest voraus (1 MiB, siehe `stdin_handle`), und was dort liegt,
         // saehe ein zweiter Leser nicht.
         if let Some(Value::File(f)) = &self.stdin_datei {
-            use std::io::BufRead;
             let mut f = f.borrow_mut();
             let (kod, anfang, pfad) = (f.kod, f.am_anfang, f.path.clone());
             f.am_anfang = false;

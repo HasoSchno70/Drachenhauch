@@ -518,6 +518,18 @@ PRINT UCASE$("abc")
 --- fehler
 Unbekannter Befehl 'UCASE$' -- dhrt kennt ihn nicht (Tippfehler?) -- heisst in Drachenhauch UPPER$(text)
 
+=== namen fuer ordner und argumente aus anderen sprachen
+' Konsolen-Runde (2026-10-11): auf ISDIR schlug die Meldung CHDIR, ISSTR,
+' MKDIR vor -- DIREXISTS stand nicht darunter.
+PRINT ISDIR(".")
+--- fehler
+heisst in Drachenhauch DIREXISTS(pfad)
+
+=== command$ aus qbasic
+PRINT COMMAND$
+--- fehler
+ARGPATH$(n)
+
 === befehle anderer basics beim uebersetzen
 PRINT "vorher"
 PRINT UBOUND(3)
