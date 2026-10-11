@@ -1809,6 +1809,41 @@ statt `ARGPATH$` (5 von 7). **Falle beim Testen:** Rueckstriche in einem
 `node -e '...'` aus der Git-Bash kommen nicht an -- Daten mit `\` per
 Write-Werkzeug schreiben.
 
+## Dogfooding Musik: Sequencer (2026-10-11)
+
+`examples/sequencer/main.dh` (16 Schritte x 6 Spuren, Audio-Uhr mit 12 Ticks je
+Schritt fuer den Swing, drei Schritte voraus geplant, Hall/Echo/Wah auf dem
+SFX-Bus, Sichern/Laden als JSON, WAV trocken und als Mitschnitt). Funde:
+(1) **`AUDIO_PLAY_AT` stoppte die vorige Instanz desselben Klangs** -- eine
+voraus geplante Hi-Hat loeschte die wartende, am Mischer kam von zwei
+Einsaetzen einer an (gezaehlt ueber `AUDIO_FFT`). Jetzt `SoundSlot::geplant`
+(weitere Instanzen samt Start-Tick); STOP/PAUSE/RESUME/VOLUME/PITCH/Pan wirken
+ueber `alle()` auf alle, `AUDIO_PLAY`/`PLAY_ON`/`UNLOADSOUND` raeumen sie weg.
+(2) **Kira meldet einen wartenden Klang schon als `Playing`** --
+`instanz_zustand` vergleicht den Tick mit der Uhr: `AUDIO_IS_PLAYING` erst ab
+dem Tick, neu `AUDIO_IS_WAITING`, eine entfernte Uhr = beides FALSE
+(Entscheidung des Nutzers). Ein vergangener Tick klingt SOFORT -- der
+Sequencer ueberspringt verpasste Schritte. (3) **Eine WAV mit Bus-Effekten
+ging nicht** (`AUDIO_SOUND_MIX` ist trocken): neu `AUDIO_RECORD_START([max_s])`
+/`STOP` -> SOUND /`RECORDING` am FFT-Abgriff (`AUFNAHME`, `TAP_RATE` aus
+`init`/`on_change_sample_rate`; Mitschnitt des Mixers, Entscheidung des
+Nutzers). **Kira wendet die Track-Lautstaerke NACH den Effekten an**, also
+hinter dem Abgriff -- `MASTER_GAIN` (gesetzt in `AUDIO_BUS_VOLUME("master")`)
+rechnet sie fuer Mitschnitt und Pegel ein; eine Master-Lautstaerke ueber
+`AUDIO_MODULATE` kennen beide nicht (dokumentiert). (4) Neu **`AUDIO_PEAK()`**
+(hoechster Ausschlag seit dem letzten Aufruf, `PEAK` per `fetch_update`); der
+Sequencer klippte mit sechs Spuren bis 1,13 und laeuft jetzt mit SFX-Bus 0,4
+und Pegel in der Statusleiste. (5) **Ein Menuekuerzel auf der Leertaste nahm
+einem Kaestchen mit Fokus die Taste** (es kippte UND das Kuerzel feuerte):
+`gui::widget_nimmt_taste` -- Leertaste/Enter fuer Knoepfe, Kaestchen,
+Listen ..., Pfeile/Pos1/Ende/Bild fuer Regler, Listen, Baeume ..., Buchstaben
+fuer Liste/Baum/Tabelle/Klappliste; F1..F12 bleiben ausgenommen. Tests
+`audio_planen` (9), `beispiel_sequencer` (5), ein Fall in `gui_menu_ausbau`;
+die neuen fallen mit 2026.25, vier Verfaelschungen des Sequencers (Swing,
+stumm, Laden, Bus 1,0) je in ihrem Fall. **Falle:** eine Shift-Taste per
+PostMessage haelt nicht (GLFW fragt `GetKeyState`) -- Umschalt-Kuerzel im Test
+ueber das Menue.
+
 ## Zeichenketten anhaengen ist linear (2026-09-24)
 
 `Value::Str` ist `Rc<String>` (vorher `Rc<str>`, jedes Anhaengen kopierte:
