@@ -1,0 +1,380 @@
+' sequencer -- ein Step-Sequencer: Schlagzeug, Bass und eine Melodie.
+'
+' Sechzehn Schritte, sechs Spuren. Ein Klick in ein Feld schaltet die Note
+' an oder aus; auf den Spuren Bass und Lead verstellt das Mausrad ueber einem
+' Feld die Tonhoehe (Halbtoene). Die Leertaste startet und stoppt.
+'
+' Gespielt wird auf einer Audio-Uhr (AUDIO_CLOCK + AUDIO_PLAY_AT): die Noten
+' der naechsten Schritte werden vorausgeplant und kommen auf den Takt genau,
+' auch wenn die Bildrate einbricht. Tempo und Swing wirken sofort.
+'
+' Strg+S sichert das Muster (muster.json), Strg+O laedt es, Strg+E schreibt
+' zwei Durchgaenge als WAV (muster.wav).
+IMPORT "gui"
+IMPORT "audio"
+IMPORT "json"
+
+CONST BREITE = 960
+CONST HOEHE = 560
+CONST SCHRITTE = 16
+CONST SPUREN = 6
+CONST FEINE = 12                    ' Uhr-Ticks je Schritt (fuer den Swing)
+CONST VORAUS = 3                    ' so viele Schritte wird vorausgeplant
+DIM spurName AS ARRAY OF STRING
+spurName = ["Kick", "Snare", "Hi-Hat", "Clap", "Bass", "Lead"]
+DIM spurFarbe AS ARRAY OF INTEGER
+spurFarbe = [RGB(240, 90, 80), RGB(250, 170, 60), RGB(240, 220, 90), RGB(200, 120, 230), RGB(80, 170, 250), RGB(90, 220, 150)]
+DIM grundton AS ARRAY OF INTEGER    ' MIDI-Note bei Halbton 0
+grundton = [0, 0, 0, 0, 36, 60]
+
+' --- Muster ----------------------------------------------------------------
+DIM an[SPUREN, SCHRITTE] AS BOOLEAN
+DIM ton[SPUREN, SCHRITTE] AS INTEGER     ' Halbtoene ueber dem Grundton (Bass/Lead)
+DIM stumm[SPUREN] AS BOOLEAN
+DIM tempo AS INTEGER : tempo = 112
+DIM swing AS INTEGER : swing = 0         ' Prozent: so weit rutscht jeder zweite Schritt
+
+SUB grundmuster()
+    DIM s AS INTEGER
+    FOR s = 0 TO SCHRITTE - 1
+        an[0, s] = (s MOD 4 = 0)
+        an[1, s] = (s MOD 8 = 4)
+        an[2, s] = (s MOD 2 = 0)
+        an[3, s] = (s = 12)
+        an[4, s] = (s MOD 4 <> 3)
+        ton[4, s] = IIF(s < 8, 0, 5)
+        an[5, s] = (s MOD 3 = 0)
+        ton[5, s] = (s * 7) MOD 12
+    NEXT
+END SUB
+grundmuster()
+
+' --- Klaenge ---------------------------------------------------------------
+FUNCTION frequenz(midi AS INTEGER) AS FLOAT
+    RETURN 440.0 * 2.0 ^ ((midi - 69) / 12.0)
+END FUNCTION
+
+' Klaenge werden einmal gebaut und gemerkt: je Spur und Tonhoehe ein SOUND.
+DIM vorrat AS MAP OF INTEGER
+DIM klaenge AS ARRAY OF SOUND
+
+FUNCTION klang(spur AS INTEGER, halbton AS INTEGER) AS SOUND
+    DIM schl AS STRING
+    schl = STR$(spur) + ":" + STR$(halbton)
+    IF MAPHAS(vorrat, schl) THEN RETURN klaenge[MAPGET(vorrat, schl)]
+    DIM s AS SOUND
+    SELECT CASE spur
+        CASE 0 : s = AUDIO_SFX("sine", 150, -900, 0, 40, 220, 0, 0, 1.0)
+        CASE 1 : s = AUDIO_SFX("noise", 1800, 0, 0, 30, 160, 0, 0, 0.6)
+        CASE 2 : s = AUDIO_SFX("noise", 8000, 0, 0, 5, 45, 0, 0, 0.35)
+        CASE 3 : s = AUDIO_SFX("noise", 1200, 0, 0, 60, 180, 0, 0, 0.5)
+        CASE 4 : s = AUDIO_NOTE("saw", frequenz(grundton[4] + halbton), 180, 4, 80, 0.6, 60, 0.55)
+        CASE 5 : s = AUDIO_NOTE("square", frequenz(grundton[5] + halbton), 140, 2, 60, 0.4, 120, 0.35, 0.1, 5, 6)
+    END SELECT
+    ARRAY_PUSH(klaenge, s)
+    MAPPUT(vorrat, schl, LEN(klaenge) - 1)
+    RETURN s
+END FUNCTION
+
+' --- Zeit ------------------------------------------------------------------
+' Wo ein Schritt beginnt, in Uhr-Ticks ab dem Start -- EINE Rechnung fuer
+' Wiedergabe und WAV, sonst klaenge die Datei anders als das, was man hoert.
+FUNCTION schrittTick(n AS INTEGER) AS INTEGER
+    DIM t AS INTEGER
+    t = n * FEINE
+    IF n MOD 2 = 1 THEN t = t + INT(FEINE * swing / 100)
+    RETURN t
+END FUNCTION
+
+FUNCTION ticksJeSekunde() AS FLOAT
+    RETURN tempo / 60.0 * 4.0 * FEINE      ' vier Schritte je Schlag
+END FUNCTION
+
+' --- Fenster ---------------------------------------------------------------
+SCREEN(BREITE, HOEHE, "Sequencer", 1)
+SETFPS(60)
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Sequencer", 0, 0, BREITE, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM menue AS INTEGER : menue = GUI_MENU(win, "Muster")
+DIM miSpielen AS INTEGER : miSpielen = GUI_MENU_ITEM(menue, "Spielen / Stopp", "Leertaste")
+DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(menue, "Sichern", "Strg+S")
+DIM miLaden AS INTEGER : miLaden = GUI_MENU_ITEM(menue, "Laden", "Strg+O")
+DIM miWav AS INTEGER : miWav = GUI_MENU_ITEM(menue, "Als WAV schreiben", "Strg+E")
+DIM miLeeren AS INTEGER : miLeeren = GUI_MENU_ITEM(menue, "Leeren", "Strg+N")
+
+CONST RX = 176
+CONST RY = 20
+CONST FELD = 46
+DIM raster AS GUI_WIDGET
+raster = GUI_CANVAS(win, RX, RY, SCHRITTE * FELD, SPUREN * FELD)
+DIM stummKasten[SPUREN] AS GUI_WIDGET
+DIM i AS INTEGER
+FOR i = 0 TO SPUREN - 1
+    stummKasten[i] = GUI_CHECKBOX(win, "stumm", 92, RY + i * FELD + 12)
+NEXT
+DIM uy AS INTEGER : uy = RY + SPUREN * FELD + 24
+DIM knSpielen AS GUI_WIDGET : knSpielen = GUI_BUTTON(win, "Spielen", 20, uy, 110, 32)
+GUI_BUTTON_VARIANT(knSpielen, "primaer")
+DIM lbTempo AS GUI_WIDGET : lbTempo = GUI_LABEL(win, "Tempo 112 BPM", 150, uy - 2)
+DIM slTempo AS GUI_WIDGET : slTempo = GUI_SLIDER(win, 150, uy + 18, 220, 60, 200, tempo)
+DIM lbSwing AS GUI_WIDGET : lbSwing = GUI_LABEL(win, "Swing 0 %", 400, uy - 2)
+DIM slSwing AS GUI_WIDGET : slSwing = GUI_SLIDER(win, 400, uy + 18, 160, 0, 60, swing)
+DIM lbHall AS GUI_WIDGET : lbHall = GUI_LABEL(win, "Hall", 590, uy - 2)
+DIM slHall AS GUI_WIDGET : slHall = GUI_SLIDER(win, 590, uy + 18, 110, 0, 100, 20)
+DIM lbEcho AS GUI_WIDGET : lbEcho = GUI_LABEL(win, "Echo", 720, uy - 2)
+DIM slEcho AS GUI_WIDGET : slEcho = GUI_SLIDER(win, 720, uy + 18, 110, 0, 100, 0)
+DIM kaWah AS GUI_WIDGET : kaWah = GUI_CHECKBOX(win, "Wah", 850, uy + 14)
+DIM sb AS GUI_WIDGET
+sb = GUI_STATUSBAR(win, 0, GUI_WINDOW_CONTENT_H(win) - 26, BREITE, 26, "Bereit. Leertaste spielt.")
+
+' --- Effekte ---------------------------------------------------------------
+DIM hallAlt AS INTEGER : hallAlt = -1
+DIM echoAlt AS INTEGER : echoAlt = -1
+DIM wah AS AUDIO_MOD
+DIM wahAn AS BOOLEAN
+SUB effekteNachziehen()
+    DIM h AS INTEGER : h = INT(GUI_VALUE(slHall))
+    IF h <> hallAlt THEN
+        AUDIO_REVERB("sfx", h / 100.0 * 0.5, 0.85, 0.3)
+        hallAlt = h
+    END IF
+    DIM e AS INTEGER : e = INT(GUI_VALUE(slEcho))
+    IF e <> echoAlt THEN
+        ' Echo auf eine punktierte Achtel: drei Schritte
+        AUDIO_DELAY("sfx", e / 100.0 * 0.5, 0.45, INT(60000.0 / tempo * 0.75))
+        echoAlt = e
+    END IF
+    IF GUI_CHECKED(kaWah) <> wahAn THEN
+        wahAn = GUI_CHECKED(kaWah)
+        IF wahAn THEN
+            wah = AUDIO_LFO_NEW("sine", tempo / 60.0 / 2.0)
+            AUDIO_MODULATE("sfx", "filter", wah, 300.0, 6000.0)
+        ELSE
+            AUDIO_MOD_REMOVE(wah)
+            AUDIO_FILTER("sfx", 0)
+        END IF
+    END IF
+END SUB
+
+' --- Wiedergabe ------------------------------------------------------------
+DIM uhr AS AUDIO_CLOCK
+DIM spielt AS BOOLEAN
+DIM geplant AS INTEGER          ' der naechste Schritt, der noch nicht geplant ist
+
+SUB schrittPlanen(n AS INTEGER)
+    DIM s AS INTEGER : s = n MOD SCHRITTE
+    DIM sp AS INTEGER
+    FOR sp = 0 TO SPUREN - 1
+        IF an[sp, s] AND NOT stumm[sp] THEN AUDIO_PLAY_AT(klang(sp, ton[sp, s]), uhr, schrittTick(n))
+    NEXT
+END SUB
+
+SUB starten()
+    uhr = AUDIO_CLOCK_NEW(ticksJeSekunde())
+    geplant = 0
+    ' die ersten Schritte planen, bevor die Uhr laeuft
+    WHILE geplant < VORAUS
+        schrittPlanen(geplant)
+        geplant = geplant + 1
+    WEND
+    AUDIO_CLOCK_START(uhr)
+    spielt = TRUE
+    GUI_SET_TEXT(knSpielen, "Stopp")
+END SUB
+
+SUB stoppen()
+    ' ENTFERNEN statt anhalten: ein Klang, der auf eine Uhr wartet, die es
+    ' nicht mehr gibt, startet nie (eine angehaltene Uhr spielte ihn beim
+    ' naechsten Start an falscher Stelle)
+    AUDIO_CLOCK_REMOVE(uhr)
+    spielt = FALSE
+    GUI_SET_TEXT(knSpielen, "Spielen")
+END SUB
+
+FUNCTION aktuellerSchritt() AS INTEGER
+    IF NOT spielt THEN RETURN -1
+    DIM t AS INTEGER : t = AUDIO_CLOCK_TICKS(uhr)
+    RETURN (t \ FEINE) MOD SCHRITTE
+END FUNCTION
+
+SUB nachplanen()
+    IF NOT spielt THEN RETURN
+    DIM jetzt AS INTEGER : jetzt = AUDIO_CLOCK_TICKS(uhr) \ FEINE
+    WHILE geplant < jetzt + VORAUS
+        schrittPlanen(geplant)
+        geplant = geplant + 1
+    WEND
+END SUB
+
+' --- WAV -------------------------------------------------------------------
+SUB wavSchreiben(pfad AS STRING, durchgaenge AS INTEGER)
+    DIM msJeTick AS FLOAT : msJeTick = 1000.0 / ticksJeSekunde()
+    DIM gesamt AS INTEGER : gesamt = INT(schrittTick(durchgaenge * SCHRITTE) * msJeTick) + 600
+    DIM lied AS SOUND : lied = AUDIO_SOUND_NEW(gesamt)
+    DIM n AS INTEGER
+    FOR n = 0 TO durchgaenge * SCHRITTE - 1
+        DIM s AS INTEGER : s = n MOD SCHRITTE
+        DIM sp AS INTEGER
+        FOR sp = 0 TO SPUREN - 1
+            IF an[sp, s] AND NOT stumm[sp] THEN AUDIO_SOUND_MIX(lied, klang(sp, ton[sp, s]), INT(schrittTick(n) * msJeTick))
+        NEXT
+    NEXT
+    AUDIO_SOUND_NORMALIZE(lied, 0.9)
+    AUDIO_SAVE_WAV(lied, pfad)
+END SUB
+
+' --- Sichern / Laden -------------------------------------------------------
+SUB sichern(pfad AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_INT(j, "tempo", tempo)
+    JSON_SET_INT(j, "swing", swing)
+    JSON_SET_JSON(j, "spuren", JSON_NEW_ARRAY())
+    DIM sp AS INTEGER, s AS INTEGER
+    FOR sp = 0 TO SPUREN - 1
+        DIM o AS JSON_HANDLE : o = JSON_NEW_OBJECT()
+        JSON_SET_STRING(o, "name", spurName[sp])
+        JSON_SET_BOOL(o, "stumm", stumm[sp])
+        DIM zeile AS STRING
+        FOR s = 0 TO SCHRITTE - 1
+            zeile = zeile + IIF(an[sp, s], CHR$(ASC("a") + ton[sp, s]), ".")
+        NEXT
+        JSON_SET_STRING(o, "schritte", zeile)
+        JSON_APPEND_JSON(j, "spuren", o)
+    NEXT
+    WRITEALL(pfad, JSON_STRINGIFY(j))
+END SUB
+
+SUB laden(pfad AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_LOAD(pfad)
+    tempo = JSON_GET_INT(j, "tempo")
+    swing = JSON_GET_INT(j, "swing")
+    DIM sp AS INTEGER, s AS INTEGER
+    FOR sp = 0 TO SPUREN - 1
+        DIM zeile AS STRING : zeile = JSON_GET_STRING(j, "spuren." + STR$(sp) + ".schritte")
+        stumm[sp] = JSON_GET_BOOL(j, "spuren." + STR$(sp) + ".stumm")
+        FOR s = 0 TO SCHRITTE - 1
+            DIM z AS STRING : z = MID$(zeile, s, 1)
+            an[sp, s] = (z <> ".")
+            ton[sp, s] = IIF(z = ".", 0, ASC(z) - ASC("a"))
+        NEXT
+    NEXT
+    GUI_SET_VALUE(slTempo, tempo)
+    GUI_SET_VALUE(slSwing, swing)
+    FOR sp = 0 TO SPUREN - 1
+        GUI_SET_CHECKED(stummKasten[sp], stumm[sp])
+    NEXT
+END SUB
+
+' --- Raster ----------------------------------------------------------------
+SUB rasterZeichnen()
+    DIM ox AS INTEGER : ox = GUI_CANVAS_X(raster)
+    DIM oy AS INTEGER : oy = GUI_CANVAS_Y(raster)
+    DIM jetzt AS INTEGER : jetzt = aktuellerSchritt()
+    DIM sp AS INTEGER, s AS INTEGER
+    FOR sp = 0 TO SPUREN - 1
+        TEXT(ox - 166, oy + sp * FELD + 14, spurName[sp], spurFarbe[sp])
+        FOR s = 0 TO SCHRITTE - 1
+            DIM x AS INTEGER : x = ox + s * FELD
+            DIM y AS INTEGER : y = oy + sp * FELD
+            DIM grund AS INTEGER
+            grund = IIF(s MOD 4 = 0, RGB(52, 56, 66), RGB(40, 43, 51))
+            IF s = jetzt THEN grund = RGB(80, 86, 100)
+            BOXROUND(x + 3, y + 3, x + FELD - 3, y + FELD - 3, 6, grund)
+            IF an[sp, s] THEN
+                DIM f AS INTEGER : f = spurFarbe[sp]
+                IF stumm[sp] THEN f = RGB(110, 110, 110)
+                BOXROUND(x + 7, y + 7, x + FELD - 7, y + FELD - 7, 5, f)
+                IF sp >= 4 THEN TEXT(x + 14, y + 15, STR$(ton[sp, s]), RGB(20, 20, 20))
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION feldUnterMaus(BYREF sp AS INTEGER, BYREF s AS INTEGER) AS BOOLEAN
+    DIM mx AS INTEGER : mx = MOUSEX() - GUI_CANVAS_X(raster)
+    DIM my AS INTEGER : my = MOUSEY() - GUI_CANVAS_Y(raster)
+    IF mx < 0 OR my < 0 OR mx >= SCHRITTE * FELD OR my >= SPUREN * FELD THEN RETURN FALSE
+    s = mx \ FELD
+    sp = my \ FELD
+    RETURN TRUE
+END FUNCTION
+
+' --- Hauptschleife ---------------------------------------------------------
+DIM beenden AS BOOLEAN
+WHILE NOT beenden
+    IF QUITREQUESTED() THEN BREAK
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(knSpielen) OR GUI_CLICKED(miSpielen) THEN
+        IF spielt THEN stoppen() ELSE starten()
+    END IF
+    IF GUI_FOCUSED() < 0 AND KEYHIT(KEY_SPACE) THEN
+        IF spielt THEN stoppen() ELSE starten()
+    END IF
+    IF GUI_CLICKED(miSichern) THEN
+        sichern("muster.json")
+        GUI_STATUSBAR_SET(sb, 0, "Gesichert: muster.json")
+    END IF
+    IF GUI_CLICKED(miLaden) THEN
+        IF FILEEXISTS("muster.json") THEN
+            laden("muster.json")
+            GUI_STATUSBAR_SET(sb, 0, "Geladen: muster.json")
+        ELSE
+            GUI_STATUSBAR_SET(sb, 0, "Noch kein muster.json -- erst sichern")
+        END IF
+    END IF
+    IF GUI_CLICKED(miWav) THEN
+        wavSchreiben("muster.wav", 2)
+        GUI_STATUSBAR_SET(sb, 0, "Geschrieben: muster.wav (zwei Durchgaenge)")
+    END IF
+    IF GUI_CLICKED(miLeeren) THEN
+        DIM a AS INTEGER, b AS INTEGER
+        FOR a = 0 TO SPUREN - 1
+            FOR b = 0 TO SCHRITTE - 1
+                an[a, b] = FALSE
+            NEXT
+        NEXT
+    END IF
+    IF WINDOW_CLOSE_REQUESTED() THEN beenden = TRUE
+
+    ' Tempo und Swing: eine Aenderung wirkt sofort -- die Uhr laeuft
+    ' schneller, und alles, was schon geplant ist, liegt auf ihren Ticks
+    IF INT(GUI_VALUE(slTempo)) <> tempo THEN
+        tempo = INT(GUI_VALUE(slTempo))
+        GUI_SET_TEXT(lbTempo, "Tempo " + STR$(tempo) + " BPM")
+        IF spielt THEN AUDIO_CLOCK_SET_SPEED(uhr, ticksJeSekunde())
+        echoAlt = -1
+    END IF
+    IF INT(GUI_VALUE(slSwing)) <> swing THEN
+        swing = INT(GUI_VALUE(slSwing))
+        GUI_SET_TEXT(lbSwing, "Swing " + STR$(swing) + " %")
+    END IF
+    FOR i = 0 TO SPUREN - 1
+        stumm[i] = GUI_CHECKED(stummKasten[i])
+    NEXT
+    effekteNachziehen()
+
+    ' Raster: Klick schaltet, Rad verstellt die Tonhoehe
+    DIM sp AS INTEGER, s AS INTEGER
+    IF feldUnterMaus(sp, s) THEN
+        IF MOUSE_HIT(0) THEN
+            an[sp, s] = NOT an[sp, s]
+            IF an[sp, s] AND NOT spielt THEN PLAYSOUND(klang(sp, ton[sp, s]))
+        END IF
+        DIM rad AS INTEGER : rad = MOUSEWHEEL()
+        IF rad <> 0 AND sp >= 4 THEN
+            ton[sp, s] = CLAMP(ton[sp, s] + rad, 0, 24)
+            an[sp, s] = TRUE
+            IF NOT spielt THEN PLAYSOUND(klang(sp, ton[sp, s]))
+        END IF
+    END IF
+
+    nachplanen()
+
+    CLS(GUI_THEME_GET("win_bg"))
+    GUI_DRAW()
+    rasterZeichnen()
+    FLIP()
+WEND
+IF spielt THEN stoppen()
