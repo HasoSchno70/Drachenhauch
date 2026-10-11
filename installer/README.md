@@ -102,8 +102,9 @@ was fehlt) und oeffnet die IDE dort. Die Symbole liegen fertig in `installer/sym
 `dhrt run installer/symbole.dh`, wenn sich das Logo aendert. Gebaut und
 ausprobiert werden beide Pakete im Paket-Lauf der CI (`package.yml`, Job
 `paket-ohne-python`); Tests `tests/pruef/werkzeug_paket.dhtest`.
-**Auf einem echten Mac ist die IDE noch nicht gestartet worden** -- die
-macOS-Laeufer der CI haben kein OpenGL.
+Die macOS-Laeufer der CI haben kein OpenGL, ein Fenster geht dort nicht auf.
+**Auf einem echten Mac laeuft das Paket** (vom Nutzer am 2026-10-11 mit
+Fassung 2026.27 ausprobiert); beglaubigt ist es noch nicht (siehe unten).
 
 ### macOS: signieren und beglaubigen (Notarisierung)
 
