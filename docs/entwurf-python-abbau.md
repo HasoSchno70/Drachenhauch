@@ -544,7 +544,8 @@ OpenGL, dort ist alles bis zum Fenster geprüft. Eine `.dh` per Doppelklick
 im Finder kommt seit demselben Tag an (`finder.rs`, im Paket-Lauf belegt).
 Die Beglaubigung ist vorbereitet (dhrt als Hauptprogramm, Hardened Runtime,
 `notarytool` im Paket-Lauf aus GitHub-Secrets, Anleitung in
-`installer/README.md`); offen: das Apple-Konto dafür und ein echter Mac.
+`installer/README.md`); offen: das Apple-Konto dafür. Auf einem echten Mac
+läuft das Paket seit 2026-10-11 (vom Nutzer ausprobiert).
 
 **(c) entschieden am 18.09.2026: ja, mit einer Grenze.** `rust/build_runtime.py`
 und `rust/build_wasm.py` bleiben die bewusst letzten zwei Python-Dateien.

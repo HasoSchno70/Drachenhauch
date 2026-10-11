@@ -5198,8 +5198,9 @@ Paket-Lauf:** Linux (x86_64) 22 MB, install.sh in ein frisches HOME, die IDE
 startet unter xvfb und endet sauber, die Sammlung laeuft mit Grafik ganz;
 macOS (arm64) 22 MB, `codesign --verify` gueltig, die Laufzeit aus dem
 Bundle fuehrt Programme aus, der Starter legt die Beispiele an -- **ein
-Fenster geht auf den macOS-Laeufern nicht** (kein OpenGL), ob die IDE auf
-einem echten Mac aufgeht, ist ungeprueft. Bekannt offen: eine `.dh` per
+Fenster geht auf den macOS-Laeufern nicht** (kein OpenGL); **seit
+2026-10-11 auf einem echten Mac belegt** (der Nutzer: "es funktioniert",
+Fassung 2026.27). Bekannt offen: eine `.dh` per
 Doppelklick im Finder oeffnete die IDE nicht mit der Datei (seit demselben
 Tag behoben, siehe "Dateien vom Finder" unten), keine
 Beglaubigung (Notarisierung); ein gescheitertes Fenster endete in einem
