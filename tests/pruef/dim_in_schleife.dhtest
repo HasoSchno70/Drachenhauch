@@ -1,0 +1,155 @@
+' DIM in einer Schleife faengt jede Runde frisch an (2026-10-10).
+'
+' Bis 2026.27 legten die DECLARE-Befehle nur beim ersten Mal an: `DIM s AS
+' STRING` in einer Schleife behielt den Wert der vorigen Runde (wie VB.NET),
+' `DIM f[2]` im Hauptprogramm dagegen nicht -- und in einer SUB wieder doch.
+' Gefunden beim Feed-Leser, wo eine Zeichenkette von Bild zu Bild wuchs.
+' Entscheidung des Nutzers: jede Runde frisch, wie FreeBASIC und QBasic.
+' Wer einen Wert ueber Runden behalten will, schreibt das DIM vor die Schleife.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== zahl und text im hauptprogramm
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM s AS STRING
+    DIM n AS INTEGER
+    DIM f AS FLOAT
+    DIM b AS BOOLEAN
+    s = s + "x"
+    n = n + 1
+    f = f + 0.5
+    b = NOT b
+    PRINT s; " "; n; " "; f; " "; b
+NEXT
+--- erwartet
+x 1 0.5 TRUE
+x 1 0.5 TRUE
+x 1 0.5 TRUE
+
+=== in einer sub und in while
+SUB probe()
+    DIM k AS INTEGER
+    WHILE k < 3
+        k = k + 1
+        DIM t AS STRING
+        DIM a AS ARRAY OF INTEGER
+        DIM m AS MAP OF INTEGER
+        DIM f[2] AS INTEGER
+        t = t + "y"
+        ARRAY_PUSH(a, k)
+        m["k" + STR$(k)] = k
+        f[0] = f[0] + 1
+        PRINT t; " "; LEN(a); " "; LEN(m); " "; f[0]
+    WEND
+END SUB
+probe()
+--- erwartet
+y 1 1 1
+y 1 1 1
+y 1 1 1
+
+=== felder und maps im hauptprogramm, repeat und for each
+DIM i AS INTEGER
+REPEAT
+    i = i + 1
+    DIM a AS ARRAY OF STRING
+    DIM m AS MAP OF STRING
+    DIM g[3] AS INTEGER
+    ARRAY_PUSH(a, "x")
+    m["k" + STR$(i)] = "v"
+    g[1] = g[1] + 5
+    PRINT LEN(a); " "; LEN(m); " "; g[1]
+UNTIL i = 3
+DIM w AS STRING
+FOR EACH w IN ["a", "b"]
+    DIM zaehler AS INTEGER
+    zaehler = zaehler + 1
+    PRINT w; zaehler
+NEXT
+--- erwartet
+1 1 5
+1 1 5
+1 1 5
+a1
+b1
+
+=== struct, klasse und mathe-typ
+IMPORT "m3d"
+STRUCT Punkt
+    DIM x AS INTEGER
+END STRUCT
+CLASS Ding
+    DIM n AS INTEGER
+END CLASS
+SUB probe()
+    DIM i AS INTEGER
+    FOR i = 1 TO 2
+        DIM p AS Punkt
+        p.x = p.x + 1
+        DIM d AS Ding
+        PRINT p.x; " "; d IS NIL
+        d = NEW Ding()
+    NEXT
+END SUB
+probe()
+DIM i AS INTEGER
+FOR i = 1 TO 2
+    DIM q AS Punkt
+    q.x = q.x + 1
+    DIM v AS VEC3
+    PRINT q.x; " "; VEC3_X(v)
+    v = VEC3_NEW(5, 5, 5)
+NEXT
+--- erwartet
+1 TRUE
+1 TRUE
+1 0.0
+1 0.0
+
+=== mit startwert und vor der schleife behalten
+DIM gesamt AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM runde AS INTEGER = 10
+    runde = runde + i
+    gesamt = gesamt + runde
+    PRINT runde
+NEXT
+PRINT gesamt
+--- erwartet
+11
+12
+13
+36
+
+=== verschachtelt: aussen frisch je aeusserer runde
+DIM i AS INTEGER
+DIM j AS INTEGER
+FOR i = 1 TO 2
+    DIM zeile AS STRING
+    FOR j = 1 TO 3
+        DIM zelle AS STRING
+        zelle = zelle + "*"
+        zeile = zeile + zelle
+    NEXT
+    PRINT zeile
+NEXT
+--- erwartet
+***
+***
+
+=== auch ohne maschinencode
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM s AS STRING
+    DIM n AS INTEGER
+    s = s + "x"
+    n = n + i
+    PRINT s; n
+NEXT
+--- umgebung
+DHRT_JIT=aus
+--- erwartet
+x1
+x2
+x3

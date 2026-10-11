@@ -83,6 +83,24 @@ DIM spieler AS STRING = "Anna"
 This works for one variable per line; in a CLASS, `SUB Init()` sets the
 start values of the fields.
 
+**A `DIM` inside a loop starts fresh every round** -- with 0, `""`, `FALSE`,
+an empty array or an empty MAP, as in FreeBASIC and QBasic. If you want to
+keep a value across rounds, put the `DIM` before the loop:
+
+```basic
+DIM summe AS INTEGER          ' before the loop: keeps counting
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM zeile AS STRING       ' inside the loop: empty every round
+    zeile = zeile + "*"
+    summe = summe + i
+    PRINT zeile; " "; summe   ' * 1, * 3, * 6
+NEXT
+```
+
+Until 2026.27 a `DIM` inside a loop kept the value of the previous round (as
+in VB.NET) -- except for a sized array in the main program.
+
 > **No reserved words as variable names.** Some short names are
 > keywords and cannot serve as identifiers — besides the
 > obvious ones (`to`, `step`, `mod`, `end`, `next`, `new`, `class`, `in`)

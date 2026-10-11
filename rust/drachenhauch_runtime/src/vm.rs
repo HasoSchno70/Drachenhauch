@@ -1438,6 +1438,20 @@ impl<'p> Vm<'p> {
     }
 
     fn try_typtest(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        // `__frisch(typ$)`: ein NEUER Startwert fuer ein DIM in einem
+        // Schleifenrumpf (compiler.rs `dim_frisch`) -- leeres Feld, leere MAP,
+        // neue Struct-Instanz, neutrales Element, NIL fuer Klassen. Ein DIM in
+        // einer Schleife faengt seit 2026.28 jede Runde frisch an.
+        if name == "__frisch" {
+            let ty = match a.first() { Some(Value::Str(t)) => t.to_string(), _ => String::new() };
+            return Ok(Some(if let Some(vt) = ty.strip_prefix("map:") {
+                Value::Map(Rc::new(RefCell::new(DhMap::new(vt.to_string()))))
+            } else if ty.starts_with("array:") {
+                leeres_feld(&ty)
+            } else {
+                self.element_default(&ty)
+            }));
+        }
         if name != "__is_typ" { return Ok(None); }
         let gesucht = match a.get(1) {
             Some(Value::Str(s)) => s.to_string(),

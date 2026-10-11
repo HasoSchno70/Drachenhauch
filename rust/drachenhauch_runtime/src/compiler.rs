@@ -1882,6 +1882,32 @@ impl Compiler {
         }
     }
 
+    /// Ein DIM in einem Schleifenrumpf faengt jede Runde FRISCH an (seit
+    /// 2026.28, Entscheidung des Nutzers -- wie FreeBASIC/QBasic). Vorher
+    /// legten die DECLARE-Befehle nur beim ersten Mal an: `DIM s AS STRING`
+    /// behielt den Wert der vorigen Runde, `DIM f[2]` im Hauptprogramm nicht
+    /// -- gefunden beim Feed-Leser, eine Zeichenkette wuchs von Bild zu Bild.
+    /// Die Anlage bleibt, wie sie ist; dahinter steht eine gewoehnliche
+    /// Zuweisung des Startwerts (Zahlen, Texte und Wahrheitswerte als
+    /// Konstante, die kann auch der Maschinencode; alles andere ueber
+    /// `__frisch`).
+    fn dim_frisch(&mut self, name: &str, type_name: &str) -> CR {
+        if self.ctx.break_patches.is_empty() { return Ok(()); }
+        match type_default(type_name) {
+            CVal::Nil => {
+                let t = self.ctx.add_const(json!(type_name));
+                self.ctx.emit(oc::LOAD_CONST, json!(t));
+                self.ctx.emit(oc::CALL_BUILTIN, json!(["__frisch", 1]));
+            }
+            d => {
+                let c = self.ctx.add_const(enc(&d));
+                self.ctx.emit(oc::LOAD_CONST, json!(c));
+            }
+        }
+        self.store_var(name);
+        Ok(())
+    }
+
     fn stmt_dim(&mut self, name: &str, type_name: &str, array_dims: &Option<Vec<Node>>) -> CR {
         // Der Name ist ab hier bekannt -- EINMAL fuer alle DIM-Formen. Sie
         // laufen unten in fuenf verschiedene Zweige (Feld mit Groesse,
@@ -1948,9 +1974,11 @@ impl Compiler {
                 let name_idx = self.ctx.add_const(json!(name));
                 self.ctx.emit(oc::DECLARE_ARRAY_NAME, json!([name_idx, type_name, dims.len()]));
                 self.bind_global(name, name_idx);
-            } else if self.ctx.local_slots.contains_key(name) {
-                // Idempotent (Schleifenkoerper): Dim-Werte wieder vom Stack poppen.
-                for _ in 0..dims.len() { self.ctx.emit(oc::POP, Value::Null); }
+            } else if let Some(&slot) = self.ctx.local_slots.get(name) {
+                // Erneutes DIM (Schleifenrumpf): NEU anlegen wie im
+                // Hauptprogramm -- bis 2026.27 wurden die Groessen verworfen und
+                // das alte Feld behalten.
+                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, json!([slot, type_name, dims.len()]));
             } else {
                 // Funktions-lokales Array (eigener Slot statt globaler Name).
                 let slot = self.ctx.local_types.len();
@@ -1974,7 +2002,7 @@ impl Compiler {
                 // sizeless array: bleibt NIL bis zur Zuweisung.
                 self.ctx.declare_local(name, type_name);
             }
-            return Ok(());
+            return self.dim_frisch(name, type_name);
         }
         // STRUCT-Instanz -> Auto-Init.
         if self.struct_names.contains(type_name) {
@@ -1989,7 +2017,7 @@ impl Compiler {
                 self.ctx.local_defaults.push(CVal::Nil);
                 self.ctx.emit(oc::DECLARE_STRUCT_LOCAL, json!([slot, type_name]));
             }
-            return Ok(());
+            return self.dim_frisch(name, type_name);
         }
         // STRUCT ... LAYOUT C: ein BUFFER in seiner Groesse, voller Nullen.
         if let Some(groesse) = self.lagen.get(type_name).map(|l| l.groesse) {
@@ -2011,7 +2039,7 @@ impl Compiler {
         // aufrufende Schleife). Globaler Slot/Name nur im Hauptprogramm.
         if !self.ctx.is_main {
             self.ctx.declare_local(name, type_name);
-            return Ok(());
+            return self.dim_frisch(name, type_name);
         }
         let name_idx = self.ctx.add_const(json!(name));
         let type_idx = self.ctx.add_const(json!(type_name));
@@ -2022,7 +2050,7 @@ impl Compiler {
         } else {
             self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
         }
-        Ok(())
+        self.dim_frisch(name, type_name)
     }
 
     /// Welche angekuendigten Methoden sind bei `class_name` noch offen? (WP G)

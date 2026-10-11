@@ -83,6 +83,25 @@ DIM spieler AS STRING = "Anna"
 Das geht je Zeile für eine Variable; in einer CLASS setzt `SUB Init()` die
 Startwerte der Felder.
 
+**Ein `DIM` in einer Schleife fängt jede Runde frisch an** -- mit 0, `""`,
+`FALSE`, einem leeren Feld oder einer leeren MAP, wie in FreeBASIC und QBasic.
+Wer einen Wert über die Runden behalten will, schreibt das `DIM` vor die
+Schleife:
+
+```basic
+DIM summe AS INTEGER          ' vor der Schleife: zaehlt mit
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    DIM zeile AS STRING       ' in der Schleife: jede Runde leer
+    zeile = zeile + "*"
+    summe = summe + i
+    PRINT zeile; " "; summe   ' * 1, * 3, * 6
+NEXT
+```
+
+Bis 2026.27 behielt ein `DIM` in der Schleife den Wert der vorigen Runde (wie
+in VB.NET) -- außer bei einem Feld mit Größe im Hauptprogramm.
+
 > **Reservierte Wörter nicht als Variablennamen.** Manche kurze Namen sind
 > Schlüsselwörter und können nicht als Bezeichner dienen — neben den
 > offensichtlichen (`to`, `step`, `mod`, `end`, `next`, `new`, `class`, `in`)
