@@ -1,0 +1,187 @@
+' Das Beispiel examples/feedleser (Dogfooding-Runde 4, 2026-10-10): Feeds aus
+' RSS 2.0, RSS 1.0 (RDF) und Atom kommen von einem Gegenserver auf 127.0.0.1
+' (tests/pruef/_hilfen/gegenserver.dh, Modus dateien), dazu ein Dokument, das
+' kein Feed ist, und eine Adresse, die es nicht gibt. Abgerufen wird wie im
+' echten Lauf: HTTP_GET_START, dann ein Auftrag (TASK_START) zum Zerlegen, dann
+' die Ablage in SQLite. Geprueft wird an der Datenbank des Beispiels.
+'
+' `--- ersetzen` setzt die Standard-Feeds auf den Gegenserver und nimmt Symbol
+' im Infobereich und Mitteilung heraus -- eine echte Mitteilung bei jedem Lauf
+' der Pruefsammlung waere laestig. Gezaehlt wird stattdessen, was gemeldet
+' worden waere.
+--- seriell
+--- langsam
+
+=== abrufen zerlegen ablegen und nicht doppelt
+DIM prBild AS INTEGER
+DIM prPhase AS INTEGER
+DIM prMeldungen AS INTEGER
+DIM prZuerst AS INTEGER
+FUNCTION prLaeuft() AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(fId) - 1
+        IF abrufLaeuft(i) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION prZahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(ablage, sql)
+    DB_NEXT(r)
+    RETURN DB_GET_INT(r, 0)
+END FUNCTION
+FUNCTION prFeld$(sql AS STRING) AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(ablage, sql)
+    IF NOT DB_NEXT(r) THEN RETURN "(keiner)"
+    RETURN DB_GET_STRING(r, 0)
+END FUNCTION
+SUB prFeeds()
+    DIM r AS DB_RESULT
+    r = DB_QUERY(ablage, "SELECT replace(f.url, ?, ''), f.titel = f.url, f.fehler, (SELECT COUNT(*) FROM eintrag e WHERE e.feed = f.id) FROM feed f ORDER BY f.id", prBasis)
+    WHILE DB_NEXT(r)
+        DIM f AS STRING
+        f = DB_GET_STRING(r, 2)
+        IF INSTR(f, "404") >= 0 THEN f = "(404)"
+        PRINT DB_GET_STRING(r, 0); " | "; IIF(DB_GET_INT(r, 1) = 1, "ohne Titel", "mit Titel"); " | "; f; " | "; DB_GET_INT(r, 3)
+    WEND
+END SUB
+SUB prErsteRunde()
+    PRINT "feeds"
+    prFeeds()
+    PRINT "titel rss: "; prFeld$("SELECT titel FROM feed WHERE url LIKE '%/rss.xml'")
+    PRINT "titel atom: "; prFeld$("SELECT titel FROM feed WHERE url LIKE '%/atom.xml'")
+    PRINT "titel rdf: "; prFeld$("SELECT titel FROM feed WHERE url LIKE '%/rdf.xml'")
+    PRINT "eins: "; prFeld$("SELECT titel || ' / ' || text FROM eintrag WHERE guid = 'r1'")
+    PRINT "eins datum: "; prFeld$("SELECT datum FROM eintrag WHERE guid = 'r1'") = ZEIT_TEXT$(ZEIT_PARSE("Sat, 10 Oct 2026 08:30:00 +0200"))
+    PRINT "zwei guid ist link: "; prFeld$("SELECT guid FROM eintrag WHERE titel = 'Zweite'") = prFeld$("SELECT link FROM eintrag WHERE titel = 'Zweite'")
+    PRINT "zwei datum: "; prFeld$("SELECT datum FROM eintrag WHERE titel = 'Zweite'") = ZEIT_TEXT$(ZEIT_PARSE("Fri, 09 Oct 2026 18:00:00 GMT"))
+    PRINT "drei ohne datum hat eins: "; prFeld$("SELECT datum FROM eintrag WHERE titel = 'Dritte'") <> ""
+    PRINT "atom link: "; prFeld$("SELECT link FROM eintrag WHERE guid = 'urn:a1'")
+    PRINT "atom text: "; prFeld$("SELECT text FROM eintrag WHERE guid = 'urn:a1'")
+    PRINT "atom datum: "; prFeld$("SELECT datum FROM eintrag WHERE guid = 'urn:a1'") = ZEIT_TEXT$(ZEIT_PARSE("2026-10-09T12:00:00Z"))
+    PRINT "atom zwei ohne alternate: "; prFeld$("SELECT link FROM eintrag WHERE guid = 'urn:a2'")
+    PRINT "rdf datum: "; prFeld$("SELECT datum FROM eintrag WHERE titel = 'Aus RDF'") = ZEIT_TEXT$(ZEIT_PARSE("2026-10-08T07:00:00+02:00"))
+    prZuerst = prZahl("SELECT COUNT(*) FROM eintrag")
+    PRINT "eintraege: "; prZuerst; " gemeldet: "; prMeldungen; " ungelesen: "; ungelesen(0)
+    PRINT "tabelle alle: "; GUI_TABLE_ROW_COUNT(tbl)
+    PRINT "status: "; GUI_STATUSBAR_TEXT$(sb, 0); " / "; GUI_STATUSBAR_TEXT$(sb, 1)
+END SUB
+SUB prZweiteRunde()
+    PRINT "nochmal abgerufen: "; prZahl("SELECT COUNT(*) FROM eintrag") = prZuerst; " gemeldet: "; prMeldungen
+    ' einen Feed waehlen, einen Eintrag lesen
+    gewaehltFeed = prZahl("SELECT id FROM feed WHERE url LIKE '%/rss.xml'")
+    eintraegeZeigen()
+    PRINT "tabelle rss: "; GUI_TABLE_ROW_COUNT(tbl)
+    DIM vor AS INTEGER
+    vor = ungelesen(0)
+    vorschauZeigen(0)
+    PRINT "gelesen: "; vor - ungelesen(0); " "; prZahl("SELECT gelesen FROM eintrag WHERE id = " + STR$(zId[0]))
+    vorschauZeigen(0)
+    PRINT "zweimal: "; vor - ungelesen(0)
+    ' keine Web-Adresse
+    feedAnlegen("ftp://example.org/feed")
+    PRINT "ftp: "; GUI_STATUSBAR_TEXT$(sb, 0); " / "; feedZahl()
+    ' entfernen nimmt die Eintraege mit
+    feedEntfernen()
+    PRINT "entfernt: "; feedZahl(); " "; prZahl("SELECT COUNT(*) FROM eintrag WHERE feed NOT IN (SELECT id FROM feed)"); " "; gewaehltFeed; " "; GUI_TABLE_ROW_COUNT(tbl) = prZahl("SELECT COUNT(*) FROM eintrag")
+END SUB
+SUB prProbe()
+    IF prBild > 1500 THEN
+        PRINT "zu lange, phase "; prPhase
+        EXIT(1)
+    END IF
+    IF bildNr < 3 OR prLaeuft() THEN RETURN
+    IF prPhase = 0 THEN
+        prErsteRunde()
+        abrufStarten()
+        prPhase = 1
+    ELSE
+        prZweiteRunde()
+        EXIT(0)
+    END IF
+END SUB
+--- programm ../../examples/feedleser/main.dh nach SETFPS(60)
+--- ersetzen CONST STANDARD = "https://www.tagesschau.de/xml/rss2/|https://www.heise.de/rss/heise-atom.xml"
+DIM prSrv AS INTEGER : prSrv = PROCESS_START("dhrt", "run", "{sammlung}/_hilfen/gegenserver.dh", "--", "dateien", "0", "-", CWD$() + "/port.txt")
+DIM prT0 AS INTEGER : prT0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - prT0 < 15000
+    SLEEP(20)
+WEND
+SLEEP(50)
+DIM prBasis AS STRING : prBasis = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0])
+DIM STANDARD AS STRING
+STANDARD = prBasis + "/rss.xml|" + prBasis + "/atom.xml|" + prBasis + "/rdf.xml|" + prBasis + "/kaputt.xml|" + prBasis + "/fehlt.xml"
+
+--- ersetzen TRAY_SHOW(symbol, "Feed-Leser")
+' kein Symbol im Infobereich
+
+--- ersetzen NOTIFY("Feed-Leser", STR$(neu) + IIF(neu = 1, " neuer Eintrag", " neue Eintraege"))
+prMeldungen = prMeldungen + neu
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+prProbe()
+
+--- datei _programm/rss.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+<title>Testnachrichten</title>
+<link>http://example.org/</link>
+<item><title><![CDATA[Kurs < 5 Euro & mehr]]></title><link>http://example.org/1</link><guid>r1</guid>
+<pubDate>Sat, 10 Oct 2026 08:30:00 +0200</pubDate>
+<description>&lt;p&gt;Ein &lt;b&gt;fetter&lt;/b&gt; Text &amp;amp; mehr.&lt;/p&gt;</description></item>
+<item><title>Zweite</title><link>http://example.org/2</link><pubDate>Fri, 09 Oct 2026 18:00:00 GMT</pubDate></item>
+<item><title>Dritte</title><link>http://example.org/3</link><guid>r3</guid></item>
+</channel></rss>
+
+--- datei _programm/atom.xml
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+<title>Atom-Test</title>
+<entry><title type="html">Erster &amp;amp; bester</title><id>urn:a1</id>
+<link rel="self" href="http://example.org/self/1"/><link rel="alternate" href="http://example.org/a/1"/>
+<updated>2026-10-09T12:00:00Z</updated><summary>Kurz gefasst.</summary></entry>
+<entry><title>Zweiter</title><id>urn:a2</id><link href="http://example.org/a/2"/>
+<published>2026-10-07T09:00:00+02:00</published><content type="html">&lt;i&gt;Inhalt&lt;/i&gt;</content></entry>
+</feed>
+
+--- datei _programm/rdf.xml
+<?xml version="1.0"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel rdf:about="http://example.org/"><title>RDF-Test</title><link>http://example.org/</link></channel>
+<item rdf:about="http://example.org/r1"><title>Aus RDF</title><link>http://example.org/r1</link><dc:date>2026-10-08T07:00:00+02:00</dc:date><description>Alt aber gut.</description></item>
+</rdf:RDF>
+
+--- datei _programm/kaputt.xml
+<html><body>Hier gibt es keinen Feed.</body></html>
+
+--- erwartet
+feeds
+/rss.xml | mit Titel |  | 3
+/atom.xml | mit Titel |  | 2
+/rdf.xml | mit Titel |  | 1
+/kaputt.xml | ohne Titel | kein RSS- oder Atom-Feed (Wurzel <html>) | 0
+/fehlt.xml | ohne Titel | (404) | 0
+titel rss: Testnachrichten
+titel atom: Atom-Test
+titel rdf: RDF-Test
+eins: Kurs < 5 Euro & mehr / Ein fetter Text & mehr.
+eins datum: TRUE
+zwei guid ist link: TRUE
+zwei datum: TRUE
+drei ohne datum hat eins: TRUE
+atom link: http://example.org/a/1
+atom text: Kurz gefasst.
+atom datum: TRUE
+atom zwei ohne alternate: http://example.org/a/2
+rdf datum: TRUE
+eintraege: 6 gemeldet: 6 ungelesen: 6
+tabelle alle: 6
+status: Bereit. / 6 ungelesen
+nochmal abgerufen: TRUE gemeldet: 6
+tabelle rss: 3
+gelesen: 1 1
+zweimal: 1
+ftp: Das ist keine Web-Adresse: ftp://example.org/feed / 5
+entfernt: 4 0 0 TRUE
