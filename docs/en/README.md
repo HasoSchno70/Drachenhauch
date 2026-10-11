@@ -132,6 +132,7 @@ Working notes, not user documentation — they explain why something is the way 
 - **[Release 2026.28](../release-2026.28.md)** (German) — what is new in this version
 - **[Release 2026.27](../release-2026.27.md)** (German) — the version before
 - **[Release 2026.26](../release-2026.26.md)** (German) — and the one before that
+- **[Release 2026.25](../release-2026.25.md)** (German) — and the one before that
 - **[Release 2026.24](../release-2026.24.md)** (German) — and the one before that
 - **[Release 2026.23](../release-2026.23.md)** (German) — and the one before that
 - **[Release 2026.22](../release-2026.22.md)** (German) — and the one before that

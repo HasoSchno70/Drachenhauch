@@ -131,6 +131,7 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Release 2026.28](release-2026.28.md)** — was in dieser Fassung neu ist
 - **[Release 2026.27](release-2026.27.md)** — die Fassung davor
 - **[Release 2026.26](release-2026.26.md)** — und die davor
+- **[Release 2026.25](release-2026.25.md)** — und die davor
 - **[Release 2026.24](release-2026.24.md)** — und die davor
 - **[Release 2026.23](release-2026.23.md)** — und die davor
 - **[Release 2026.22](release-2026.22.md)** — und die davor
