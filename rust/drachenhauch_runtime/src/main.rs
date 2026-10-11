@@ -1045,9 +1045,10 @@ fn bild_laden(_pfad: &std::path::Path) -> Result<pruefsammlung::Bild, BildFehler
 /// eigenen Verzeichnis, die Faelle parallel. Liefert (ok, fehl, uebersprungen,
 /// Meldungen der Fehlschlaege und Uebersprungenen).
 /// Vorgabe fuer `dhrt test`: so viele Sekunden darf ein Fall hoechstens
-/// brauchen (alle seine Laeufe zusammen). Gemessen braucht der laengste Fall
-/// des Repos unter Last rund eine Minute; die Vorgabe laesst Luft fuer
-/// langsamere Rechner und faengt trotzdem jeden Haenger.
+/// brauchen (alle seine Laeufe zusammen). Gemessen (2026-10-11, voller Lauf
+/// mit `--zeitgrenze 60`, acht Faeden): kein Fall des Repos braucht ueber
+/// 60 s. Die Vorgabe laesst das Fuenffache fuer langsamere Rechner und faengt
+/// trotzdem jeden Haenger.
 const TEST_ZEITGRENZE: u64 = 300;
 
 /// Ergebnis eines Laufs mit Zeitgrenze.
