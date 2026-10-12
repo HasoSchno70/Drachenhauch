@@ -524,3 +524,40 @@ NEXT
 BESETZT FALSE
 BESETZT FALSE
 BESETZT FALSE
+
+=== die absage kommt auch an wenn das hallo erst nach dem schliessen ankommt
+' Kommt nach NET_CLOSE noch etwas an, bricht das Betriebssystem hart ab, und
+' die Gegenseite verwarf die Absage, die schon bei ihr lag (5 von 5; in der
+' CI unter Windows gesehen, weil der Wirt dort schneller annahm, als das
+' HALLO ankam). NET_CLOSE schliesst jetzt "nachlaufend": FIN senden, dann im
+' Hintergrund weiterlesen, bis die Gegenseite auch schliesst.
+IMPORT "net"
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(0, "127.0.0.1")
+DIM versuch AS INTEGER
+FOR versuch = 1 TO 3
+    DIM c AS NET_SOCKET : c = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(lst))
+    DIM s AS NET_SOCKET
+    DIM i AS INTEGER
+    FOR i = 1 TO 100
+        s = NET_TCP_ACCEPT(lst)
+        IF s <> NIL THEN EXIT FOR
+        SLEEP(5)
+    NEXT
+    NET_SEND(s, "BESETZT" + CHR$(10))
+    NET_CLOSE(s)
+    SLEEP(50)
+    NET_SEND(c, "HALLO Gast" + CHR$(10))
+    SLEEP(100)
+    DIM t AS STRING : t = ""
+    FOR i = 1 TO 30
+        t = t + NET_RECV(c, 100)
+        IF NOT NET_IS_CONNECTED(c) THEN EXIT FOR
+        SLEEP(10)
+    NEXT
+    PRINT TRIM$(t)
+    NET_CLOSE(c)
+NEXT
+--- erwartet
+BESETZT
+BESETZT
+BESETZT

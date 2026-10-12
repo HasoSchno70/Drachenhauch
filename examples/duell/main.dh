@@ -351,6 +351,8 @@ DIM korrekturen AS INTEGER
 DIM maxAbweichung AS FLOAT
 DIM ping AS INTEGER
 DIM standZuletzt AS INTEGER
+DIM letzterAck AS INTEGER           ' die letzte Eingabe, die der Wirt angewendet hat
+DIM nachgesendet AS INTEGER
 ' das fremde Schiff: zwei Staende zum Zeigen dazwischen
 DIM vorX AS FLOAT, vorY AS FLOAT, vorW AS FLOAT, vorZeit AS INTEGER
 DIM nachX AS FLOAT, nachY AS FLOAT, nachW AS FLOAT, nachZeit AS INTEGER
@@ -418,6 +420,7 @@ END SUB
 
 SUB standUebernehmen(b AS BUFFER)
     DIM ack AS INTEGER : ack = BUFFER_GET_U32(b, 5)
+    letzterAck = ack
     ' das fremde Schiff: neuen Stand hinten anhaengen
     DIM fremd AS Schiff : fremd = NEW Schiff()
     schiffLesen(b, 9, fremd)
@@ -459,12 +462,18 @@ SUB gastTick()
     gesendetUm[seqGast MOD EINGABEN_MAX] = MILLIS()
     ' vorausrechnen (die Kugel legt erst der Wirt an)
     DIM schuss AS BOOLEAN : schuss = s1.schritt(e)
+    eingabeSenden(seqGast)
+END SUB
+
+' Ein Eingabepaket: die Eingabe `seq` und die zwei davor -- geht eines
+' verloren, traegt das naechste sie mit.
+SUB eingabeSenden(seq AS INTEGER)
     DIM b AS BUFFER : b = BUFFER_NEW(8)
     BUFFER_SET(b, 0, P_EINGABE)
-    BUFFER_SET_U32(b, 1, seqGast)
-    BUFFER_SET(b, 5, e)
-    BUFFER_SET(b, 6, IIF(seqGast > 1, eigene[(seqGast - 1) MOD EINGABEN_MAX], 0))
-    BUFFER_SET(b, 7, IIF(seqGast > 2, eigene[(seqGast - 2) MOD EINGABEN_MAX], 0))
+    BUFFER_SET_U32(b, 1, seq)
+    BUFFER_SET(b, 5, eigene[seq MOD EINGABEN_MAX])
+    BUFFER_SET(b, 6, IIF(seq > 1, eigene[(seq - 1) MOD EINGABEN_MAX], 0))
+    BUFFER_SET(b, 7, IIF(seq > 2, eigene[(seq - 2) MOD EINGABEN_MAX], 0))
     NET_UDP_SEND(udp, adresse, IIF(udpPort > 0, udpPort, port), b)
     gesendet = gesendet + 1
 END SUB
@@ -559,16 +568,25 @@ WEND
 
 ' --- Ende -------------------------------------------------------------------------
 IF rolle = "gast" THEN
-    ' Nachlauf: die letzten Staende abwarten, damit alle Eingaben angewendet sind
+    ' Nachlauf: bis der Wirt die letzte Eingabe angewendet hat. Die letzten
+    ' Pakete haben kein naechstes, das sie mittraegt -- gehen sie verloren,
+    ' kaeme der Wirt nie bei ihnen an. Darum das letzte Paket nachsenden, bis
+    ' ein Stand mit genau dieser Eingabe zurueckkommt (hoechstens 4 s).
     IF botSchritte > 0 AND verbunden THEN
-        DIM bis AS INTEGER : bis = MILLIS() + 1500
-        WHILE MILLIS() < bis AND verbunden
+        DIM bis AS INTEGER : bis = MILLIS() + 4000
+        DIM nachsenden AS INTEGER : nachsenden = 0
+        WHILE MILLIS() < bis AND verbunden AND letzterAck < seqGast
             gastNetz()
+            IF MILLIS() >= nachsenden THEN
+                IF nachsenden > 0 THEN nachgesendet = nachgesendet + 1
+                eingabeSenden(seqGast)
+                nachsenden = MILLIS() + 60
+            END IF
             SLEEP(5)
         WEND
     END IF
     IF botSchritte > 0 THEN
-        PRINT "gast eingaben "; seqGast; " staende "; empfangen; " verloren "; verloren
+        PRINT "gast eingaben "; seqGast; " staende "; empfangen; " verloren "; verloren; " nachgesendet "; nachgesendet
         PRINT "gast korrekturen "; korrekturen; " max "; FORMAT$(maxAbweichung, "%.2f")
         PRINT "gast schiff "; FORMAT$(s1.x, "%.2f"); " "; FORMAT$(s1.y, "%.2f"); " leben "; s1.leben; " "; s0.leben
         PRINT "gast status "; status
@@ -577,17 +595,21 @@ IF rolle = "gast" THEN
 ELSE
     IF botSchritte > 0 THEN
         ' Nachlauf: noch eintreffende Eingaben anwenden und den Stand senden
+        DIM spielTicks AS INTEGER : spielTicks = tick
         ' bis der Gast sich abmeldet (er wartet selbst auf die letzten Staende)
         DIM bisW AS INTEGER : bisW = MILLIS() + 5000
         WHILE MILLIS() < bisW AND gastDa
             wirtNetz()
             IF gastDa THEN
                 gastSchritte()
+                ' ein neuer Stand braucht einen neuen Tick -- der Gast nimmt nur
+                ' neuere an, sonst kaeme die letzte Bestaetigung nie an
+                tick = tick + 1
                 IF gastHost <> "" THEN standSenden()
             END IF
             SLEEP(30)
         WEND
-        PRINT "wirt schritte "; tick; " eingaben "; empfangen; " verloren "; verloren
+        PRINT "wirt schritte "; spielTicks; " eingaben "; angewendet; " verloren "; verloren
         PRINT "wirt gast "; zuletztGesendet
         PRINT "wirt status "; status
     END IF

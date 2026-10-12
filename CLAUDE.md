@@ -1887,12 +1887,22 @@ ein UDP-Paket an einen geschlossenen Port beim NAECHSTEN recv_from als 10054,
 und TCP-RECV/SEND warfen bei RST -- `verbindung_weg` macht daraus einen
 Zustand (leer/0, `NET_IS_CONNECTED` FALSE), UDP liest weiter. (4) **Die
 letzte Nachricht vor NET_CLOSE ging verloren** (5 von 5), wenn noch
-Ungelesenes da war (RST verwirft den Sendepuffer der Gegenseite) -- `Drop for
-NetSock` liest erst ab und schickt FIN. (5) **Jedes UDP-Paket startete einen
+Ungelesenes da war oder danach noch etwas ankam (RST verwirft den
+Empfangspuffer der Gegenseite) -- `Drop for NetSock` schliesst nachlaufend:
+`shutdown(Write)` sofort, dann liest ein Faden ueber `try_clone` (haelt den
+Socket offen) bis EOF, hoechstens 2 s. Nur Ungelesenes abzulesen reichte
+nicht: in der CI von 2026.30 nahm der Wirt unter Windows schneller an, als
+das HALLO ankam, und der Fall "Absage" fiel. (5) **Jedes UDP-Paket startete einen
 Faden** fuer die Namensaufloesung, auch fuer `127.0.0.1` -- IP-Literale gehen
 jetzt direkt: 2000 Pakete 231 -> 17 ms. Tests `modules_net` (+5, alle fallen
 mit 2026.25), `beispiel_duell` (4, `--- langsam`: Schleife, Relay 80/30/10 %,
-hart beendeter Gast + naechster, Absage). Eigene Falle: `VAL("172.23.27.16")`
+hart beendeter Gast + naechster, Absage) -- dazu seit der CI von 2026.30 ein
+Fall mit 30 % Verlust und Saat 1: die LETZTEN Eingaben haben kein Paket nach
+sich, das sie mittraegt; ging das letzte verloren, stand der Gast am Ende
+einen Schritt weiter (unter macOS gesehen, unter Windows mit Saat 7 nie).
+Der Gast sendet es jetzt nach, bis ein Stand mit genau dieser Eingabe kommt,
+und der Wirt gibt Staenden im Nachlauf einen NEUEN Tick (der Gast nimmt nur
+neuere an -- die Bestaetigung kam sonst gar nicht an). Eigene Falle: `VAL("172.23.27.16")`
 ist 172.23 -- ein Port ist nur ein Argument aus Ziffern; mit `127.0.0.1` fiel
 es nicht auf, weil die Vorgabe dieselbe Adresse war. Nicht geprueft: zwei
 echte Rechner hinter Routern/Firewalls.

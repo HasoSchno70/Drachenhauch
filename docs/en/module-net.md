@@ -200,11 +200,15 @@ any more simply disappears. Windows does report it on the next read;
 is still there, with UDP, only shows in whether packets keep coming -- if you
 need to know, count the time since the last packet.
 
-**`NET_CLOSE` first reads what arrived unread**, and then ends its own
-direction cleanly. A socket that is closed with unread data otherwise drops
-the connection hard -- and the other side throws away what it was just sent
-(measured: a "BESETZT" refusal before closing did not arrive in 5 of 5
-attempts). The same holds at the end of the program.
+**`NET_CLOSE` closes lingering:** it ends its own direction at once (the
+other side then reads the end), but keeps reading in the background, for at
+most two seconds, whatever the other side still sends, until it closes too.
+If anything arrives at a socket that is fully closed, the operating system
+drops the connection hard -- and the other side throws away what it was just
+sent (measured: a "BESETZT" refusal before closing did not arrive in 5 of 5
+attempts when the other side's "HALLO" came in only afterwards). `NET_CLOSE`
+does not hold anything up meanwhile. The same holds at the end of the
+program.
 
 ## UTF-8 over TCP
 
