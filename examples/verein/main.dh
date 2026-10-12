@@ -1,0 +1,348 @@
+' verein -- Mitglieder, Beiträge und Zahlungen eines Vereins.
+'
+'     dhrt run main.dh                         (SQLite: verein.db daneben)
+'     dhrt run main.dh -- postgres://nutzer:kennwort@server/verein
+'     dhrt run main.dh -- mysql://nutzer:kennwort@server/verein
+'
+' Links die Mitglieder (Kopfklick sortiert, die Zeile darunter filtert),
+' rechts das gewählte Mitglied und seine Zahlungen. Mehrere Leute dürfen
+' gleichzeitig arbeiten: wer speichert, was ein anderer inzwischen geändert
+' hat, wird gefragt, statt dessen Änderung zu überschreiben.
+'
+' Strg+N neues Mitglied, Strg+S speichern, Strg+P Beitragsliste als PDF.
+IMPORT "gui"
+IMPORT "db"
+IMPORT "pdf"
+
+CONST BREITE = 1180
+CONST HOEHE = 720
+DIM ziel AS STRING : ziel = "verein.db"
+IF ARGC() > 0 THEN ziel = ARG$(0)
+
+SCREEN(BREITE, HOEHE, "Verein")
+WINDOW_RESIZABLE(TRUE)
+SETFPS(60)
+GUI_THEME_PRESET("glas_hell")
+
+' --- Datenbank ---------------------------------------------------------------
+DIM db AS DB_CONN
+TRY
+    db = DB_OPEN(ziel)
+CATCH fehler
+    PRINT "Keine Verbindung zu "; ziel; ": "; fehler
+    END
+END TRY
+DIM art AS STRING : art = DB_KIND$(db)
+
+SUB tabellenAnlegen()
+    DIM id AS STRING
+    IF art = "postgres" THEN id = "id SERIAL PRIMARY KEY"
+    IF art = "mysql" THEN id = "id INTEGER PRIMARY KEY AUTO_INCREMENT"
+    IF art = "sqlite" THEN id = "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS mitglied (" + id + ", name VARCHAR(80) NOT NULL, vorname VARCHAR(80), strasse VARCHAR(120), plz VARCHAR(10), ort VARCHAR(80), email VARCHAR(120), eintritt DATE, beitrag INTEGER NOT NULL DEFAULT 0, aktiv BOOLEAN NOT NULL DEFAULT TRUE, stand INTEGER NOT NULL DEFAULT 1)")
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS zahlung (" + id + ", mitglied INTEGER NOT NULL, datum DATE NOT NULL, betrag INTEGER NOT NULL, zweck VARCHAR(120))")
+END SUB
+tabellenAnlegen()
+
+' --- Fenster -----------------------------------------------------------------
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Verein", 0, 0, BREITE, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM menue AS INTEGER : menue = GUI_MENU(win, "Datei")
+DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(menue, "Neues Mitglied", "Strg+N")
+DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(menue, "Speichern", "Strg+S")
+DIM miListe AS INTEGER : miListe = GUI_MENU_ITEM(menue, "Beitragsliste als PDF", "Strg+P")
+DIM miEnde AS INTEGER : miEnde = GUI_MENU_ITEM(menue, "Beenden", "Strg+Q")
+
+DIM tab AS GUI_WIDGET : tab = GUI_TABLE(win, 12, 12, 560, 600)
+GUI_TABLE_HEADERS(tab, ["Name", "Vorname", "Ort", "Beitrag", "Aktiv"])
+GUI_TABLE_SET(tab, "filterzeile", 1)
+GUI_TABLE_COL_ALIGN(tab, 3, "rechts")
+GUI_TABLE_PLACEHOLDER(tab, "Noch keine Mitglieder -- Strg+N legt eines an.")
+GUI_SET_ANCHOR(tab, "ltb")
+
+' das Formular
+DIM fx AS INTEGER : fx = 600
+DIM lbKopf AS GUI_WIDGET : lbKopf = GUI_LABEL(win, "Neues Mitglied", fx, 12)
+FUNCTION feld(text AS STRING, y AS INTEGER, w AS INTEGER) AS GUI_WIDGET
+    DIM l AS GUI_WIDGET : l = GUI_LABEL(win, text, fx, y + 6)
+    RETURN GUI_TEXTINPUT(win, fx + 90, y, w, 28)
+END FUNCTION
+DIM tfName AS GUI_WIDGET : tfName = feld("Name", 44, 260)
+DIM tfVorname AS GUI_WIDGET : tfVorname = feld("Vorname", 78, 260)
+DIM tfStrasse AS GUI_WIDGET : tfStrasse = feld("Straße", 112, 260)
+DIM tfPlz AS GUI_WIDGET : tfPlz = feld("PLZ", 146, 70)
+DIM tfOrt AS GUI_WIDGET : tfOrt = GUI_TEXTINPUT(win, fx + 166, 146, 184, 28)
+DIM tfMail AS GUI_WIDGET : tfMail = feld("E-Mail", 180, 260)
+DIM lbEin AS GUI_WIDGET : lbEin = GUI_LABEL(win, "Eintritt", fx, 220)
+DIM dpEintritt AS GUI_WIDGET : dpEintritt = GUI_DATEPICKER(win, fx + 90, 214, 260, 240)
+DIM tfBeitrag AS GUI_WIDGET : tfBeitrag = feld("Beitrag", 470, 100)
+DIM lbEuro AS GUI_WIDGET : lbEuro = GUI_LABEL(win, "€ im Jahr", fx + 198, 476)
+GUI_TEXTINPUT_SET(tfBeitrag, "zahlen", 3)    ' Geldfeld: "48,00" im Feld, 4800 in der Datenbank
+GUI_SET_ALIGN(tfBeitrag, "rechts")
+DIM cbAktiv AS GUI_WIDGET : cbAktiv = GUI_CHECKBOX(win, "aktiv", fx + 300, 474)
+' Die Knoepfe messen sich selbst (Breite 0), die Zeile verteilt sie -- feste
+' Breiten schnitten "Speichern" in der Schrift des Themas ab.
+DIM knoepfe AS GUI_WIDGET : knoepfe = GUI_LAYOUT(win, "zeile", fx, 512, 350, 32)
+GUI_LAYOUT_SET(knoepfe, "abstand", 10)
+DIM btNeu AS GUI_WIDGET : btNeu = GUI_BUTTON(win, "Neu", 0, 0, 0, 30)
+DIM btSichern AS GUI_WIDGET : btSichern = GUI_BUTTON(win, "Speichern", 0, 0, 0, 30)
+GUI_BUTTON_VARIANT(btSichern, "primaer")
+DIM btLoeschen AS GUI_WIDGET : btLoeschen = GUI_BUTTON(win, "Löschen", 0, 0, 0, 30)
+GUI_BUTTON_VARIANT(btLoeschen, "gefahr")
+GUI_LAYOUT_ADD(knoepfe, btNeu) : GUI_LAYOUT_ADD(knoepfe, btSichern) : GUI_LAYOUT_ADD(knoepfe, btLoeschen)
+
+GUI_BIND(tfName, "name", "m") : GUI_BIND(tfVorname, "vorname", "m")
+GUI_BIND(tfStrasse, "strasse", "m") : GUI_BIND(tfPlz, "plz", "m")
+GUI_BIND(tfOrt, "ort", "m") : GUI_BIND(tfMail, "email", "m")
+GUI_BIND(dpEintritt, "eintritt", "m") : GUI_BIND(cbAktiv, "aktiv", "m")
+GUI_BIND(tfBeitrag, "beitrag", "m")
+' Jedes Speichern zaehlt `stand` hoch; GUI_FORM_SAVE speichert nur, wenn die
+' Zeile noch den Stand vom Laden traegt -- sonst hat ein anderer inzwischen
+' gespeichert, und wir fragen, statt seine Aenderung zu ueberschreiben.
+GUI_FORM_VERSION(win, "stand", "m")
+GUI_RULE(tfName, "pflicht", "Der Name fehlt.")
+GUI_RULE(tfPlz, "muster", "[0-9]{5}", "Eine Postleitzahl hat fünf Ziffern.")
+GUI_RULE(tfMail, "email")
+GUI_RULE(tfBeitrag, "zahl")
+
+' Zahlungen des Mitglieds
+DIM fx2 AS INTEGER : fx2 = fx + 380
+DIM lbZahl AS GUI_WIDGET : lbZahl = GUI_LABEL(win, "Zahlungen", fx2, 12)
+DIM tabZ AS GUI_WIDGET : tabZ = GUI_TABLE(win, fx2, 44, 180, 300)
+GUI_TABLE_HEADERS(tabZ, ["Datum", "Betrag"])
+GUI_TABLE_COL_WIDTHS(tabZ, [96, 82])
+GUI_TABLE_COL_ALIGN(tabZ, 1, "rechts")
+GUI_TABLE_PLACEHOLDER(tabZ, "keine")
+DIM zahlZeile AS GUI_WIDGET : zahlZeile = GUI_LAYOUT(win, "zeile", fx2, 356, 180, 28)
+GUI_LAYOUT_SET(zahlZeile, "abstand", 6)
+DIM tfZBetrag AS GUI_WIDGET : tfZBetrag = GUI_TEXTINPUT(win, 0, 0, 80, 28)
+GUI_TEXTINPUT_SET(tfZBetrag, "zahlen", 2)
+GUI_SET_ALIGN(tfZBetrag, "rechts")
+DIM btZahlung AS GUI_WIDGET : btZahlung = GUI_BUTTON(win, "buchen", 0, 0, 0, 28)
+GUI_LAYOUT_ADD(zahlZeile, tfZBetrag, 1) : GUI_LAYOUT_ADD(zahlZeile, btZahlung)
+DIM lbOffen AS GUI_WIDGET : lbOffen = GUI_LABEL(win, "", fx2, 396)
+
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(win, 0, GUI_WINDOW_CONTENT_H(win) - 26, BREITE, 26, "Verbunden: " + art)
+GUI_SET_ANCHOR(sb, "lrb")
+
+' --- Zustand -------------------------------------------------------------------
+DIM aktId AS INTEGER : aktId = -1        ' -1 = neues Mitglied
+DIM ids AS ARRAY OF INTEGER : ids = []   ' Datenzeile der Tabelle -> id
+DIM jahr AS INTEGER : jahr = VAL(LEFT$(DATE$(), 4))
+
+FUNCTION centText(c AS INTEGER) AS STRING
+    RETURN ZAHL$(c / 100.0, 2)
+END FUNCTION
+
+' "48,00" -> 4800 (das Feld nimmt Komma oder Punkt)
+FUNCTION textCent(t AS STRING) AS INTEGER
+    t = REPLACE$(TRIM$(t), ",", ".")
+    IF t = "" THEN RETURN 0
+    RETURN INT(VAL(t) * 100 + 0.5)
+END FUNCTION
+
+' "2026-10-12" -> "12.10.26"
+FUNCTION datumKurz(d AS STRING) AS STRING
+    IF LEN(d) < 10 THEN RETURN d
+    RETURN MID$(d, 8, 2) + "." + MID$(d, 5, 2) + "." + MID$(d, 2, 2)
+END FUNCTION
+
+SUB status(t AS STRING)
+    GUI_STATUSBAR_SET(sb, 0, t)
+END SUB
+
+SUB listeLaden()
+    GUI_TABLE_CLEAR(tab)
+    ids = []
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, name, vorname, ort, beitrag, aktiv FROM mitglied ORDER BY name, vorname")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(ids, DB_GET_INT(r, 0))
+        GUI_TABLE_ADD_ROW(tab, [DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), DB_GET_STRING(r, 3), centText(DB_GET_INT(r, 4)), IIF(DB_GET_BOOL(r, 5), "ja", "nein")])
+    WEND
+END SUB
+
+SUB zahlungenLaden()
+    GUI_TABLE_CLEAR(tabZ)
+    IF aktId < 0 THEN
+        GUI_SET_TEXT(lbOffen, "")
+        RETURN
+    END IF
+    DIM summe AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT datum, betrag FROM zahlung WHERE mitglied = ? ORDER BY datum DESC", aktId)
+    WHILE DB_NEXT(r)
+        GUI_TABLE_ADD_ROW(tabZ, [datumKurz(DB_GET_STRING(r, 0)), centText(DB_GET_INT(r, 1))])
+        IF LEFT$(DB_GET_STRING(r, 0), 4) = STR$(jahr) THEN summe = summe + DB_GET_INT(r, 1)
+    WEND
+    DIM offen AS INTEGER : offen = textCent(GUI_TEXT(tfBeitrag)) - summe
+    GUI_SET_TEXT(lbOffen, "offen " + STR$(jahr) + ": " + centText(MAX(offen, 0)) + " €")
+END SUB
+
+SUB neu()
+    aktId = -1
+    GUI_FORM_CLEAR(win, "m")
+    GUI_SET_TEXT(tfBeitrag, "48,00")
+    GUI_SET_CHECKED(cbAktiv, TRUE)
+    GUI_SET_DATE(dpEintritt, DATE$())
+    GUI_FORM_CLEAN(win, "m")
+    GUI_SET_TEXT(lbKopf, "Neues Mitglied")
+    GUI_CLEAR_ERRORS(win)
+    zahlungenLaden()
+    GUI_FOCUS(tfName)
+END SUB
+
+SUB laden(id AS INTEGER)
+    IF NOT GUI_FORM_LOAD(win, db, "mitglied", id, "m") THEN
+        status("Das Mitglied gibt es nicht mehr -- ein anderer hat es gelöscht.")
+        listeLaden()
+        neu()
+        RETURN
+    END IF
+    aktId = id
+    GUI_SET_TEXT(lbKopf, GUI_TEXT(tfVorname) + " " + GUI_TEXT(tfName))
+    status("Geladen: " + GUI_TEXT(tfVorname) + " " + GUI_TEXT(tfName))
+    GUI_CLEAR_ERRORS(win)
+    zahlungenLaden()
+END SUB
+
+' Speichern. Liefert GUI_FORM_SAVE 0, wurde nichts gespeichert:
+' GUI_FORM_CONFLICT$ sagt, ob ein anderer inzwischen gespeichert ("geaendert")
+' oder das Mitglied geloescht hat ("geloescht").
+FUNCTION speichern(ueberschreiben AS BOOLEAN = FALSE) AS BOOLEAN
+    IF GUI_VALIDATE(win) > 0 THEN
+        status("Bitte die markierten Felder prüfen.")
+        RETURN FALSE
+    END IF
+    DIM w AS MAP OF STRING : w = GUI_FORM_GET(win, "m")
+    DIM id AS INTEGER : id = GUI_FORM_SAVE(win, db, "mitglied", aktId, "m", ueberschreiben)
+    IF id = 0 THEN
+        IF GUI_FORM_CONFLICT$(win, "m") = "geaendert" THEN
+            konflikt()
+        ELSE
+            ' Die Eingaben bleiben stehen: als neues Mitglied speichern geht weiter.
+            aktId = -1
+            GUI_SET_TEXT(lbKopf, "Neues Mitglied")
+            listeLaden()
+            status("Ein anderer hat das Mitglied gelöscht -- Speichern legt es neu an.")
+        END IF
+        RETURN FALSE
+    END IF
+    status(IIF(aktId < 0, "Angelegt: ", "Gespeichert: ") + w["name"])
+    aktId = id
+    GUI_SET_TEXT(lbKopf, w["vorname"] + " " + w["name"])
+    listeLaden()
+    RETURN TRUE
+END FUNCTION
+
+DIM konfliktDlg AS GUI_WINDOW
+DIM konfliktOffen AS BOOLEAN
+SUB konflikt()
+    konfliktDlg = GUI_DIALOG("Inzwischen geändert", "Ein anderer hat dieses Mitglied gespeichert, während du es bearbeitet hast." + CHR$(10) + "Deine Änderungen verwerfen und neu laden, oder seine überschreiben?", "Neu laden|Überschreiben|Abbrechen")
+    konfliktOffen = TRUE
+END SUB
+
+SUB konfliktAuswerten()
+    IF NOT konfliktOffen THEN RETURN
+    DIM a AS INTEGER : a = GUI_ANSWER(konfliktDlg)
+    IF a = 0 THEN RETURN
+    konfliktOffen = FALSE
+    IF a = 1 THEN
+        laden(aktId)
+        status("Neu geladen -- deine Änderungen sind verworfen.")
+    ELSEIF a = 2 THEN
+        IF speichern(TRUE) THEN status("Überschrieben.")
+    END IF
+END SUB
+
+SUB loeschen()
+    IF aktId < 0 THEN RETURN
+    DB_BEGIN(db)
+    DB_EXEC(db, "DELETE FROM zahlung WHERE mitglied = ?", aktId)
+    DB_EXEC(db, "DELETE FROM mitglied WHERE id = ?", aktId)
+    DB_COMMIT(db)
+    status("Gelöscht.")
+    listeLaden()
+    neu()
+END SUB
+
+SUB zahlungBuchen()
+    IF aktId < 0 THEN
+        status("Erst das Mitglied speichern.")
+        RETURN
+    END IF
+    DIM c AS INTEGER : c = textCent(GUI_TEXT(tfZBetrag))
+    IF c <= 0 THEN
+        status("Betrag fehlt.")
+        RETURN
+    END IF
+    DB_EXEC(db, "INSERT INTO zahlung (mitglied, datum, betrag, zweck) VALUES (?, ?, ?, ?)", aktId, DATE$(), c, "Beitrag " + STR$(jahr))
+    GUI_SET_TEXT(tfZBetrag, "")
+    zahlungenLaden()
+    status("Gebucht: " + centText(c) + " €")
+END SUB
+
+' --- Beitragsliste als PDF -----------------------------------------------------
+SUB beitragsliste(pfad AS STRING)
+    DIM p AS PDF : p = PDF_NEW()
+    PDF_PAGE(p)
+    PDF_FONT(p, "sans-fett", 16)
+    PDF_TEXT(p, 20, 20, "Beitragsliste " + STR$(jahr))
+    PDF_FONT(p, "sans", 10)
+    DIM y AS FLOAT : y = 36
+    DIM summeSoll AS INTEGER, summeIst AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT m.name, m.vorname, m.beitrag, COALESCE(SUM(z.betrag), 0) FROM mitglied m LEFT JOIN zahlung z ON z.mitglied = m.id AND z.datum >= ? AND z.datum <= ? WHERE m.aktiv = ? GROUP BY m.id, m.name, m.vorname, m.beitrag ORDER BY m.name, m.vorname", STR$(jahr) + "-01-01", STR$(jahr) + "-12-31", TRUE)
+    WHILE DB_NEXT(r)
+        DIM soll AS INTEGER : soll = DB_GET_INT(r, 2)
+        DIM ist AS INTEGER : ist = DB_GET_INT(r, 3)
+        PDF_TEXT(p, 20, y, DB_GET_STRING(r, 0) + ", " + DB_GET_STRING(r, 1))
+        rechts(p, 130, y, centText(soll))
+        rechts(p, 160, y, centText(ist))
+        rechts(p, 190, y, centText(MAX(soll - ist, 0)))
+        summeSoll = summeSoll + soll : summeIst = summeIst + ist
+        y = y + 6
+        IF y > 270 THEN
+            PDF_PAGE(p)
+            y = 20
+        END IF
+    WEND
+    PDF_LINE(p, 20, y, 190, y)
+    PDF_FONT(p, "sans-fett", 10)
+    PDF_TEXT(p, 20, y + 2, "Summe")
+    rechts(p, 130, y + 2, centText(summeSoll))
+    rechts(p, 160, y + 2, centText(summeIst))
+    rechts(p, 190, y + 2, centText(MAX(summeSoll - summeIst, 0)))
+    PDF_SAVE(p, pfad)
+END SUB
+
+SUB rechts(p AS PDF, x AS FLOAT, y AS FLOAT, t AS STRING)
+    PDF_TEXT(p, x - PDF_TEXT_WIDTH(p, t), y, t)
+END SUB
+
+' --- Hauptschleife ---------------------------------------------------------------
+listeLaden()
+neu()
+DIM beenden AS BOOLEAN
+WHILE NOT beenden
+    IF QUITREQUESTED() THEN BREAK
+    GUI_UPDATE()
+    konfliktAuswerten()
+    IF GUI_CLICKED(btNeu) OR GUI_CLICKED(miNeu) THEN neu()
+    IF GUI_CLICKED(btSichern) OR GUI_CLICKED(miSichern) THEN
+        DIM ok AS BOOLEAN : ok = speichern()
+    END IF
+    IF GUI_CLICKED(btLoeschen) THEN loeschen()
+    IF GUI_CLICKED(btZahlung) THEN zahlungBuchen()
+    IF GUI_CLICKED(miListe) THEN
+        beitragsliste("beitragsliste.pdf")
+        status("Geschrieben: beitragsliste.pdf")
+        OPENDOC("beitragsliste.pdf")
+    END IF
+    IF GUI_CLICKED(miEnde) OR WINDOW_CLOSE_REQUESTED() THEN beenden = TRUE
+    DIM zeile AS INTEGER : zeile = GUI_TABLE_SELECTED(tab)
+    IF GUI_TABLE_CLICKED(tab) >= 0 AND zeile >= 0 AND zeile < LEN(ids) THEN
+        IF ids[zeile] <> aktId THEN laden(ids[zeile])
+    END IF
+    CLS(RGB(240, 242, 246))
+    GUI_DRAW()
+    FLIP()
+WEND
+DB_CLOSE(db)

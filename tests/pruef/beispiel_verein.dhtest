@@ -1,0 +1,164 @@
+' Die Vereinsverwaltung aus der Datenbank-Runde (examples/verein/main.dh,
+' 2026-10-12): Mitglieder, Beitraege und Zahlungen, mehrere Leute an einem
+' Server zugleich.
+'
+' Die Faelle rufen ihre Unterprogramme (Einschub hinter `DIM beenden AS
+' BOOLEAN`, also vor der Hauptschleife) -- derselbe Ablauf
+' (_hilfen/verein_ablauf.dh) gegen SQLite, PostgreSQL und MySQL mit DERSELBEN
+' Erwartung: das ist die Zusage des Beispiels, nur das Ziel wechselt. Ein
+' zweiter Zugang spielt den Kollegen, der gleichzeitig speichert oder
+' loescht. Die Server kommen wie in db_server.dhtest aus DH_TEST_PG und
+' DH_TEST_MYSQL; ohne sie ueberspringen sich die zwei Faelle. Die
+' Beitragsliste liest _hilfen/pdftext.dh.
+--- seriell
+
+=== sqlite: anlegen, gleichzeitig bearbeiten, zahlen, liste
+IMPORT "../ablauf.dh"
+vaAblauf()
+EXIT(0)
+--- programm ../../examples/verein/main.dh nach DIM beenden AS BOOLEAN
+--- datei ablauf.dh
+IMPORT "{sammlung}/_hilfen/verein_ablauf.dh"
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- erwartet
+ohne namen FALSE Der Name fehlt.
+plz kurz FALSE Eine Postleitzahl hat fünf Ziffern.
+angelegt TRUE
+ | Angelegt: Müller
+zeile Müller/Bonn/anna@example.org/6000/TRUE/1
+angelegt TRUE
+ | Angelegt: Öztürk
+zeile Öztürk///2450/FALSE/1 | tabelle 2 Müller 60,00
+geladen | Geladen: Anna Müller
+felder Müller|Bonn|2024-03-01|TRUE|60,00 geaendert FALSE
+speichern FALSE dialog TRUE
+zeile Müller/Bonn/neu@example.org/6000/TRUE/2
+ueberschreiben TRUE
+ | Gespeichert: Müller
+zeile Müller/Köln/anna@example.org/6000/TRUE/3
+speichern FALSE dialog TRUE
+neu geladen Aachen geaendert FALSE
+speichern geloeschtes FALSE neu TRUE
+ | Ein anderer hat das Mitglied gelöscht -- Speichern legt es neu an.
+tabelle 1
+nochmal TRUE tabelle 2
+ | Angelegt: Öztürk
+ | Gebucht: 25,50 €
+offen JJJJ: 34,50 € | zahlungen 1 25,50
+pdf TRUE
+seiten 1
+Müller, Anna
+60,00
+25,50
+34,50
+Summe
+60,00
+25,50
+34,50
+titel Beitragsliste
+
+=== postgres: anlegen, gleichzeitig bearbeiten, zahlen, liste
+' Ziel aus der Umgebung statt aus dem Argument, dann wie beim Start der App.
+DB_CLOSE(db)
+ziel = GETENV$("DH_TEST_PG")
+IF ziel = "" THEN
+    PRINT "UEBERSPRINGEN: kein Testserver (DH_TEST_PG)"
+    END
+END IF
+db = DB_OPEN(ziel) : art = DB_KIND$(db) : tabellenAnlegen()
+IMPORT "../ablauf.dh"
+vaAblauf()
+EXIT(0)
+--- programm ../../examples/verein/main.dh nach DIM beenden AS BOOLEAN
+--- datei ablauf.dh
+IMPORT "{sammlung}/_hilfen/verein_ablauf.dh"
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- erwartet
+ohne namen FALSE Der Name fehlt.
+plz kurz FALSE Eine Postleitzahl hat fünf Ziffern.
+angelegt TRUE
+ | Angelegt: Müller
+zeile Müller/Bonn/anna@example.org/6000/TRUE/1
+angelegt TRUE
+ | Angelegt: Öztürk
+zeile Öztürk///2450/FALSE/1 | tabelle 2 Müller 60,00
+geladen | Geladen: Anna Müller
+felder Müller|Bonn|2024-03-01|TRUE|60,00 geaendert FALSE
+speichern FALSE dialog TRUE
+zeile Müller/Bonn/neu@example.org/6000/TRUE/2
+ueberschreiben TRUE
+ | Gespeichert: Müller
+zeile Müller/Köln/anna@example.org/6000/TRUE/3
+speichern FALSE dialog TRUE
+neu geladen Aachen geaendert FALSE
+speichern geloeschtes FALSE neu TRUE
+ | Ein anderer hat das Mitglied gelöscht -- Speichern legt es neu an.
+tabelle 1
+nochmal TRUE tabelle 2
+ | Angelegt: Öztürk
+ | Gebucht: 25,50 €
+offen JJJJ: 34,50 € | zahlungen 1 25,50
+pdf TRUE
+seiten 1
+Müller, Anna
+60,00
+25,50
+34,50
+Summe
+60,00
+25,50
+34,50
+titel Beitragsliste
+
+=== mysql: anlegen, gleichzeitig bearbeiten, zahlen, liste
+' Ziel aus der Umgebung statt aus dem Argument, dann wie beim Start der App.
+DB_CLOSE(db)
+ziel = GETENV$("DH_TEST_MYSQL")
+IF ziel = "" THEN
+    PRINT "UEBERSPRINGEN: kein Testserver (DH_TEST_MYSQL)"
+    END
+END IF
+db = DB_OPEN(ziel) : art = DB_KIND$(db) : tabellenAnlegen()
+IMPORT "../ablauf.dh"
+vaAblauf()
+EXIT(0)
+--- programm ../../examples/verein/main.dh nach DIM beenden AS BOOLEAN
+--- datei ablauf.dh
+IMPORT "{sammlung}/_hilfen/verein_ablauf.dh"
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- erwartet
+ohne namen FALSE Der Name fehlt.
+plz kurz FALSE Eine Postleitzahl hat fünf Ziffern.
+angelegt TRUE
+ | Angelegt: Müller
+zeile Müller/Bonn/anna@example.org/6000/TRUE/1
+angelegt TRUE
+ | Angelegt: Öztürk
+zeile Öztürk///2450/FALSE/1 | tabelle 2 Müller 60,00
+geladen | Geladen: Anna Müller
+felder Müller|Bonn|2024-03-01|TRUE|60,00 geaendert FALSE
+speichern FALSE dialog TRUE
+zeile Müller/Bonn/neu@example.org/6000/TRUE/2
+ueberschreiben TRUE
+ | Gespeichert: Müller
+zeile Müller/Köln/anna@example.org/6000/TRUE/3
+speichern FALSE dialog TRUE
+neu geladen Aachen geaendert FALSE
+speichern geloeschtes FALSE neu TRUE
+ | Ein anderer hat das Mitglied gelöscht -- Speichern legt es neu an.
+tabelle 1
+nochmal TRUE tabelle 2
+ | Angelegt: Öztürk
+ | Gebucht: 25,50 €
+offen JJJJ: 34,50 € | zahlungen 1 25,50
+pdf TRUE
+seiten 1
+Müller, Anna
+60,00
+25,50
+34,50
+Summe
+60,00
+25,50
+34,50
+titel Beitragsliste
