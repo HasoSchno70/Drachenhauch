@@ -1677,6 +1677,44 @@ einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
 
+## Dogfooding 8: Vereinsverwaltung an drei Datenbanken (2026-10-12)
+
+`examples/verein/` (Mitglieder, Beitraege, Zahlungen, Beitragsliste als PDF;
+SQLite, PostgreSQL oder MySQL ueber dasselbe Programm). Die Datenschicht war
+dicht (Sonde: ids, getroffene Zeilen, Datum/BOOL/NULL, Rollback auf allen
+drei gleich) -- die Funde lagen an den Naehten:
+(1) **Die Datenbindung kannte kein gleichzeitiges Bearbeiten.** Neu
+`GUI_FORM_VERSION(win, spalte$[, formular$])`: LOAD merkt sich den Stand
+(`Window::form_db`, je Formular Spalte/Stand/Konflikt), SAVE schreibt
+`... spalte = spalte + 1 WHERE id = ? AND spalte = ?`, ein INSERT setzt 1.
+Trifft das UPDATE nichts, liefert SAVE **0** und `GUI_FORM_CONFLICT$` sagt
+`geaendert` (Zeile da) oder `geloescht`; sechstes Argument TRUE ueberschreibt
+und liest den Stand neu. Ohne LOAD (und ohne TRUE) ist SAVE mit Versionsspalte
+ein Fehler. (2) **SAVE auf eine geloeschte Zeile meldete Erfolg** (lieferte
+die id) -- jetzt auch ohne Versionsspalte 0/`geloescht`. Dafuer musste
+(3) **MySQL getroffene statt geaenderte Zeilen zaehlen**: `CLIENT_FOUND_ROWS`
+in db.rs -- vorher lieferte `DB_EXEC` fuer ein UPDATE ohne echte Aenderung 0
+(SQLite/PostgreSQL 1). (4) **Geld in Cent liess sich nicht binden** (die Doku
+sagte selbst "bindet es nicht und schreibt es selbst", Pilot 196 rechnet
+ebenso von Hand): `zahlen` 3 = Geldfeld, getippt/gezeigt wie `48,50`,
+gebunden als INTEGER 4850; eine Zahl aus FORM_SET/LOAD ist Cent, ein Text
+steht so da. (5) **"0,99" ging als TEXT in die Datenbank** -- die
+Postleitzahl-Regel griff bei jeder fuehrenden Null; jetzt nur vor einer Ziffer
+(`nummer_mit_null`). (6) **Die Filterzeile der Tabelle war in allen Themen
+schwarz** (im dunklen fiel es nicht auf): sie, die Haken- und Balkenzelle und
+der Zell-Editor fragten nach den Schluesseln `field_bg`/`field_border`, die es
+in keinem Thema gibt -- `th()` liefert dann 0; jetzt `win_bg`/`widget_border`
+wie das Textfeld, der Platzhalter ueber `leise`. (7) **Das Euro neben der
+Pixelschrift war halb so hoch**: die Ausweichschrift kam in derselben
+Punktgroesse; `an_pixelschrift` (graphics.rs) gleicht sie am "H" an die
+Grossbuchstabenhoehe der Pixelschrift (0,1..0,8 der Groesse) und deren
+Grundlinie an, Zeichnen und Messen gleich. Tests: `gui_bindung.dhtest`
+(+3), `db_server.dhtest` (+2; derselbe Ablauf `_hilfen/formversion.dh` gegen
+alle drei Datenbanken), `gui_tabelle_felder.dhtest` (3, Bild),
+`schriften_vorrat.dhtest` (+1), `beispiel_verein.dhtest` (3: der App-Ablauf
+gegen SQLite/PostgreSQL/MySQL mit DERSELBEN Erwartung, PDF ueber
+`pdftext.dh`), Rust-Tests `geldfeld_tests`.
+
 ## Tastennamen ohne Tottasten-Zustand (2026-10-12)
 
 `input_polish` "printable key uses the keyboard layout" fiel seit Fassungen
