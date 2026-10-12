@@ -1418,6 +1418,7 @@ GUI_BREADCRUMB_FIRST_VISIBLE: Widget ist keine Pfadleiste (GUI_BREADCRUMB)	GUI_B
 GUI_CANVAS_*: Widget ist kein canvas	GUI_CANVAS_*: widget is not a canvas
 {}: Widget ist kein dropdown/listbox	{}: widget is not a dropdown/listbox
 {}: das Widget ist keine Liste (GUI_LISTBOX)	{}: the widget is not a list (GUI_LISTBOX)
+{}: das Widget ist keine Liste und keine Klappliste	{}: the widget is neither a list nor a dropdown
 {}: Eintrag {} gibt es nicht (die Liste hat {})	{}: there is no entry {} (the list has {})
 GUI_DOUBLE_CLICKED: nur fuer Listen, Tabellen und Baeume (GUI_LISTBOX, GUI_TABLE, GUI_TREE)	GUI_DOUBLE_CLICKED: only for lists, tables and trees (GUI_LISTBOX, GUI_TABLE, GUI_TREE)
 {}: starts, laengen und farben muessen gleich lang sein ({}, {}, {})	{}: starts, lengths and colors must have the same length ({}, {}, {})

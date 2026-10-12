@@ -349,7 +349,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_ICON(lb, i, bild)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | Sinnbild und Textfarbe je Eintrag (-1 = keins / Thema) |
 | `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | Haken je Eintrag (mit `kaestchen`) |
 | `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | Mehrfachauswahl wie bei der Tabelle |
-| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | unsichtbarer Wert je Eintrag (eine ID, ein Pfad) |
+| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | unsichtbarer Wert je Eintrag (eine ID, ein Pfad, ein Steuersatz) -- auch für Klapplisten; eine gebundene Klappliste mit Werten bindet den Wert statt der Nummer |
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | den unsichtbaren Wert eines Eintrags lesen |
 | `GUI_LISTBOX_FIND_DATA(lb, wert$)` | INTEGER | erster Eintrag mit diesem Wert, -1 = keiner |
 | `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | Zusatztext rechts im Eintrag, gedämpft (Kürzel, Größe, Zeilennummer) |
@@ -2808,8 +2808,11 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   getippt und gezeigt wie eine Kommazahl mit zwei Stellen und gebunden als
   INTEGER in Cent — `48,50` im Feld ist `4850` in der Spalte, und beim Laden
   wird aus `4850` wieder `48,50`. Eine Zahl, die `GUI_FORM_SET` bekommt, sind
-  dort ebenfalls Cent; ein Text steht da, wie er kommt. Was das Programm
-  sonst umrechnet (eine Klappliste in einen Steuersatz), bindet es nicht und
+  dort ebenfalls Cent; ein Text steht da, wie er kommt. Eine **Klappliste mit
+  Werten** (`GUI_LISTBOX_SET_DATA` je Eintrag) bindet den Wert des gewählten
+  Eintrags statt seiner Nummer — gezeigt `19 %`, gespeichert `19` (als Zahl,
+  wenn er eine ist; ohne Auswahl NULL), beim Laden wird der Eintrag mit
+  diesem Wert gewählt. Was das Programm sonst umrechnet, bindet es nicht und
   schreibt es selbst.
 - **Nichts gespeichert:** `GUI_FORM_SAVE` liefert **0**, wenn das `UPDATE`
   keine Zeile getroffen hat, und `GUI_FORM_CONFLICT$` sagt `geloescht` (die

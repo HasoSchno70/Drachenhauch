@@ -5623,20 +5623,35 @@ impl Gui {
         if w.kind != Kind::ListBox { return Err(format!("{}: das Widget ist keine Liste (GUI_LISTBOX)", fn_)); }
         Ok(w)
     }
-    /// Unsichtbarer Wert je Eintrag -- die ID einer Datenbankzeile, ein Pfad.
-    /// Der TEXT ist fuer Menschen und aendert sich; der Wert bleibt.
+    /// Liste ODER Klappliste -- die Werte je Eintrag gelten fuer beide.
+    fn werte_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
+        let w = self.wdg(h, fn_)?;
+        if !matches!(w.kind, Kind::ListBox | Kind::Dropdown) {
+            return Err(format!("{}: das Widget ist keine Liste und keine Klappliste", fn_));
+        }
+        Ok(w)
+    }
+    /// Unsichtbarer Wert je Eintrag -- die ID einer Datenbankzeile, ein Pfad,
+    /// ein Steuersatz. Der TEXT ist fuer Menschen und aendert sich; der Wert
+    /// bleibt. Auch fuer Klapplisten: eine gebundene Klappliste mit Werten
+    /// bindet den WERT des gewaehlten Eintrags statt seiner Nummer.
     pub fn list_set_data(&mut self, h: i64, i: i64, wert: String) -> Result<(), String> {
-        let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_SET_DATA")?, i, "GUI_LISTBOX_SET_DATA")?;
-        self.list_mut(h, "GUI_LISTBOX_SET_DATA")?.daten[p] = wert; Ok(())
+        let p = Self::list_idx(self.werte_ref(h, "GUI_LISTBOX_SET_DATA")?, i, "GUI_LISTBOX_SET_DATA")?;
+        let w = self.wdg_mut(h, "GUI_LISTBOX_SET_DATA")?;
+        let n = w.items.len();
+        let l = w.list.get_or_insert_with(|| Box::new(ListState { anker: -1, ..Default::default() }));
+        l.sync(n);
+        l.daten[p] = wert;
+        Ok(())
     }
     pub fn list_data(&self, h: i64, i: i64) -> Result<String, String> {
-        let w = self.list_ref(h, "GUI_LISTBOX_DATA")?;
+        let w = self.werte_ref(h, "GUI_LISTBOX_DATA")?;
         let p = Self::list_idx(w, i, "GUI_LISTBOX_DATA")?;
         Ok(w.list.as_ref().and_then(|l| l.daten.get(p).cloned()).unwrap_or_default())
     }
     /// Der erste Eintrag mit diesem Wert, -1 = keiner.
     pub fn list_find_data(&self, h: i64, wert: &str) -> Result<i64, String> {
-        let w = self.list_ref(h, "GUI_LISTBOX_FIND_DATA")?;
+        let w = self.werte_ref(h, "GUI_LISTBOX_FIND_DATA")?;
         Ok(w.list.as_ref().and_then(|l| l.daten.iter().position(|d| d == wert)).map(|p| p as i64).unwrap_or(-1))
     }
     /// GUI_LISTBOX_SPANS: Abschnitte eines Eintrags einfaerben (Zeichen
@@ -16648,10 +16663,17 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             .map(|(i, w)| (w.bind.clone(), i)).collect()
     }
     /// Wert eines Widgets als Text -- die Form fuer Vergleich und MAP.
+    /// Die Werte einer Klappliste, wenn sie welche hat (GUI_LISTBOX_SET_DATA).
+    fn klapp_werte(w: &Widget) -> Option<&Vec<String>> {
+        w.list.as_ref().map(|l| &l.daten).filter(|d| d.iter().any(|x| !x.is_empty()))
+    }
     fn wert_text(&self, w: &Widget) -> String {
         match w.kind {
             Kind::Checkbox | Kind::Toggle => if w.checked { "1".into() } else { "0".into() },
-            Kind::Dropdown => w.sel.to_string(),
+            Kind::Dropdown => match Self::klapp_werte(w) {
+                Some(d) => if w.sel >= 0 { d.get(w.sel as usize).cloned().unwrap_or_default() } else { String::new() },
+                None => w.sel.to_string(),
+            },
             Kind::Slider | Kind::Spinner | Kind::Knob => Self::fmt_num(w.value),
             Kind::DatePicker => crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]),
             Kind::ColorPicker => format!("#{:06X}", crate::farbraum::hsv_zu_rgb(w.hsv[0], w.hsv[1], w.hsv[2])),
@@ -16664,7 +16686,18 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     fn wert_typisiert(&self, w: &Widget) -> Value {
         match w.kind {
             Kind::Checkbox | Kind::Toggle => Value::Bool(w.checked),
-            Kind::Dropdown => Value::Int(w.sel as i64),
+            // Mit Werten je Eintrag: der Wert (als Zahl, wenn er eine ist),
+            // ohne Auswahl NIL; sonst die Nummer des Eintrags.
+            Kind::Dropdown => match Self::klapp_werte(w) {
+                Some(d) => {
+                    let t = if w.sel >= 0 { d.get(w.sel as usize).cloned().unwrap_or_default() } else { String::new() };
+                    if w.sel < 0 { Value::Nil }
+                    else if let Ok(n) = t.trim().parse::<i64>() { Value::Int(n) }
+                    else if let Some(f) = zahl_lesen(&t).filter(|_| t.trim().contains('.')) { Value::Float(f) }
+                    else { Value::str_rc(&t) }
+                }
+                None => Value::Int(w.sel as i64),
+            },
             Kind::Slider | Kind::Knob => Value::Float(w.value),
             Kind::Spinner => if w.step.fract() == 0.0 && w.value.fract() == 0.0 { Value::Int(w.value as i64) } else { Value::Float(w.value) },
             // Ein Zahlenfeld liefert eine Zahl -- AUSSER es beginnt mit einer
@@ -16698,6 +16731,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     _ => zahl.map(|x| x != 0.0).unwrap_or_else(|| matches!(text.to_ascii_lowercase().as_str(), "true" | "ja" | "wahr" | "x")),
                 };
                 if w.kind == Kind::Toggle { w.value = if w.checked { 1.0 } else { 0.0 }; }
+            }
+            Kind::Dropdown if Self::klapp_werte(w).is_some() => {
+                // Gesucht wird der WERT: als Text, und bei Zahlen auch dem Betrag
+                // nach (aus der Datenbank kommt 19 oder 19.0 oder "19").
+                let d = Self::klapp_werte(w).cloned().unwrap_or_default();
+                w.sel = d.iter().position(|x| {
+                    *x == text || (zahl.is_some() && zahl_lesen(x) == zahl)
+                }).map(|p| p as i32).unwrap_or(-1);
             }
             Kind::Dropdown => {
                 let n = items.len() as i32;

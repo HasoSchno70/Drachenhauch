@@ -671,7 +671,7 @@
   "GUI_LISTBOX_SEL_ROW": "multi-selection as in the table",
   "GUI_LISTBOX_SET": "mehrfachauswahl (multi-select), kaestchen (checkboxes), bearbeitbar (editable: F2 renames)",
   "GUI_LISTBOX_SET_CHECKED": "BOOLEAN / — — check mark per entry (with kaestchen)",
-  "GUI_LISTBOX_SET_DATA": "invisible value per entry (an ID, a path)",
+  "GUI_LISTBOX_SET_DATA": "invisible value per entry (an ID, a path, a tax rate) -- also for dropdowns; a bound dropdown with values binds the value instead of the number",
   "GUI_LISTBOX_SET_ITEM": "count, read, relabel, move",
   "GUI_LISTBOX_SET_SELECTED": "set the selection from the program",
   "GUI_LISTBOX_SORT": "sort naturally (\"File 9\" before \"File 10\"), within the groups",
