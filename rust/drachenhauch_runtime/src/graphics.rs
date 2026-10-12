@@ -7147,6 +7147,32 @@ fn std_schrift(size: f32) -> (raylib::core::text::WeakFont, f32, f32) {
      s as f32, (s / 10) as f32)
 }
 
+/// Wo die Grossbuchstaben der eingebauten Pixelschrift stehen, als Anteil der
+/// Schriftgroesse: von 0,1 bis 0,8 (gemessen an "H" bei 30 Punkten: Zeilen
+/// 13 bis 33 ab y = 10).
+const STD_KAPPE_OBEN: f32 = 0.1;
+const STD_KAPPE_UNTEN: f32 = 0.8;
+
+/// Groesse und senkrechter Versatz fuer einen Lauf der Ausweich-Schrift NEBEN
+/// der eingebauten Pixelschrift. Dieselbe Punktgroesse sieht dort ganz anders
+/// aus: die Pixelschrift fuellt sieben Zehntel ihrer Groesse mit
+/// Grossbuchstaben, eine TrueType-Schrift gut die Haelfte -- ein "€" in einem
+/// Betrag kam nur halb so hoch wie die Ziffern daneben (Vereinsverwaltung,
+/// 2026-10-12). Darum wird die Ausweich-Schrift an ihrem "H" auf dieselbe
+/// Grossbuchstabenhoehe gebracht und auf dieselbe Grundlinie gesetzt.
+/// EINE Rechnung fuer Zeichnen und Messen.
+fn an_pixelschrift(f: &raylib::ffi::Font, size: f32) -> (f32, f32) {
+    if f.baseSize <= 0 || f.glyphs.is_null() || f.recs.is_null() { return (size, 0.0); }
+    let i = unsafe { raylib::ffi::GetGlyphIndex(*f, 'H' as i32) }.max(0) as usize;
+    let (g, rec) = unsafe { (*f.glyphs.add(i), *f.recs.add(i)) };
+    if g.value != 'H' as i32 || rec.height <= 0.0 { return (size, 0.0); }
+    let b = f.baseSize as f32;
+    let kappe = rec.height / b;
+    let unten = (g.offsetY as f32 + rec.height) / b;
+    let sz = size * (STD_KAPPE_UNTEN - STD_KAPPE_OBEN) / kappe;
+    (sz, size * STD_KAPPE_UNTEN - sz * unten)
+}
+
 /// Breite eines Textes in der eingebauten Schrift samt Ausweich-Laeufen --
 /// EINE Rechnung fuer `breite_mit` und `miss_text`.
 fn std_breite(txt: &str, size: f32, ausweich: &[Ausweich]) -> f32 {
@@ -7161,8 +7187,11 @@ fn std_breite(txt: &str, size: f32, ausweich: &[Ausweich]) -> f32 {
     for (fi, lauf) in text_laeufe(-1, &txt, std_hat, ausweich) {
         if !erster { b += sp; }
         erster = false;
-        b += if fi == 0 { std.measure_text(&lauf, sz, sp).x }
-             else { ausweich[fi - 1].font.measure_text(&lauf, sz, sp).x };
+        b += if fi == 0 { std.measure_text(&lauf, sz, sp).x } else {
+            let f = &ausweich[fi - 1].font;
+            let (fsz, _) = an_pixelschrift(f, sz);
+            f.measure_text(&lauf, fsz, sp).x
+        };
     }
     b
 }
@@ -7222,8 +7251,9 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
                     cx += std.measure_text(&lauf, sz, sp).x;
                 } else {
                     let f = &ausweich[fi - 1].font;
-                    sdf::mit(-1, || d.draw_text_ex(f, &lauf, Vector2::new(cx, y), sz, sp, col));
-                    cx += f.measure_text(&lauf, sz, sp).x;
+                    let (fsz, dy) = an_pixelschrift(f, sz);
+                    sdf::mit(-1, || d.draw_text_ex(f, &lauf, Vector2::new(cx, y + dy), fsz, sp, col));
+                    cx += f.measure_text(&lauf, fsz, sp).x;
                 }
             }
             return;
