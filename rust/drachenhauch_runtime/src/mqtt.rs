@@ -29,6 +29,11 @@ pub struct Client {
     connected: bool,
     keepalive: Duration,
     last_send: Instant,
+    /// Wann das PINGREQ hinausging, auf dessen Antwort wir noch warten. Kommt
+    /// nichts (Broker ohne Abmeldung weg: Strom, Netz -- dann gibt es auch
+    /// kein RST), gilt die Verbindung nach einer halben Keepalive-Zeit als
+    /// verloren. Ohne das merkte der Client es nie.
+    ping_offen: Option<Instant>,
     next_packet_id: u16,
     rx_pending: Vec<u8>,
     incoming: VecDeque<(String, String)>,
@@ -96,15 +101,34 @@ fn wrap_packet(type_and_flags: u8, body: &[u8]) -> Vec<u8> {
     packet
 }
 
-fn encode_connect(client_id: &str, keepalive_s: u16, username: Option<&str>, password: Option<&str>) -> Vec<u8> {
+/// Der "letzte Wille" eines Clients: der Broker veroeffentlicht ihn, sobald
+/// die Verbindung abreisst, ohne dass der Client sich abgemeldet hat (Strom
+/// weg, Absturz, Netz). Ohne ihn bleibt ein `online` mit retain stehen, und
+/// jeder, der spaeter dazukommt, haelt das tote Geraet fuer lebendig.
+#[derive(Clone)]
+pub struct Wille {
+    pub topic: String,
+    pub inhalt: Vec<u8>,
+    pub retain: bool,
+}
+
+fn encode_connect(client_id: &str, keepalive_s: u16, username: Option<&str>, password: Option<&str>,
+                  wille: Option<&Wille>) -> Vec<u8> {
     let mut body = encode_str("MQTT");
     body.push(0x04); // Protocol Level: MQTT 3.1.1
     let mut flags: u8 = 0x02; // Clean Session
     if username.is_some() { flags |= 0x80; }
     if password.is_some() { flags |= 0x40; }
+    // Will-Flag 0x04, Will-QoS 0 (Bits 3-4), Will-Retain 0x20
+    if let Some(w) = wille { flags |= 0x04; if w.retain { flags |= 0x20; } }
     body.push(flags);
     body.extend_from_slice(&keepalive_s.to_be_bytes());
     body.extend_from_slice(&encode_str(client_id));
+    if let Some(w) = wille {
+        body.extend_from_slice(&encode_str(&w.topic));
+        body.extend_from_slice(&(w.inhalt.len() as u16).to_be_bytes());
+        body.extend_from_slice(&w.inhalt);
+    }
     if let Some(u) = username { body.extend_from_slice(&encode_str(u)); }
     if let Some(p) = password { body.extend_from_slice(&encode_str(p)); }
     wrap_packet(PKT_CONNECT << 4, &body)
@@ -188,6 +212,7 @@ pub fn connect(
     keepalive_s: i64,
     username: Option<&str>,
     password: Option<&str>,
+    wille: Option<&Wille>,
 ) -> Result<Client, String> {
     if !(0..=65535).contains(&port) {
         return Err(format!("MQTT_CONNECT: Port {} ausserhalb 0..65535", port));
@@ -210,13 +235,14 @@ pub fn connect(
         connected: false,
         keepalive: Duration::from_secs(ka as u64),
         last_send: Instant::now(),
+        ping_offen: None,
         next_packet_id: 0,
         rx_pending: Vec::new(),
         incoming: VecDeque::new(),
         current: None,
     };
 
-    let pkt = encode_connect(client_id, ka, username, password);
+    let pkt = encode_connect(client_id, ka, username, password, wille);
     client.stream.write_all(&pkt).map_err(|e| format!("MQTT_CONNECT: Schreiben fehlgeschlagen: {}", e))?;
     client.last_send = Instant::now();
 
@@ -254,21 +280,34 @@ pub fn connect(
 
 pub fn is_connected(c: &Client) -> bool { c.connected }
 
-pub fn publish(c: &mut Client, topic: &str, payload: &str, retain: bool) -> Result<(), String> {
-    if !c.connected { return Err("MQTT_PUBLISH: nicht verbunden".into()); }
-    let pkt = encode_publish(topic, payload.as_bytes(), retain);
-    c.stream.write_all(&pkt).map_err(|e| format!("MQTT_PUBLISH: Schreiben fehlgeschlagen: {}", e))?;
-    c.last_send = Instant::now();
-    Ok(())
+/// Wie lange auf die Antwort zu einem PINGREQ gewartet wird: die halbe
+/// Keepalive-Zeit, mindestens 2 s (sonst gaelte bei Keepalive 1 schon eine
+/// kleine Verzoegerung als Ausfall).
+fn ping_frist(keepalive: Duration) -> Duration {
+    (keepalive / 2).max(Duration::from_secs(2))
 }
 
-pub fn subscribe(c: &mut Client, topic: &str) -> Result<(), String> {
-    if !c.connected { return Err("MQTT_SUBSCRIBE: nicht verbunden".into()); }
+/// Ein Paket hinausschicken. Scheitert das Schreiben, ist die Verbindung weg
+/// -- das ist ein ZUSTAND (MQTT_IS_CONNECTED wird FALSE), kein Laufzeitfehler:
+/// ein Broker, der neu startet, darf ein Dashboard nicht beenden.
+fn senden(c: &mut Client, pkt: &[u8]) -> bool {
+    if !c.connected { return false; }
+    match c.stream.write_all(pkt) {
+        Ok(()) => { c.last_send = Instant::now(); true }
+        Err(_) => { c.connected = false; false }
+    }
+}
+
+/// TRUE, wenn die Nachricht hinausging; FALSE, wenn die Verbindung weg ist.
+pub fn publish(c: &mut Client, topic: &str, payload: &str, retain: bool) -> bool {
+    let pkt = encode_publish(topic, payload.as_bytes(), retain);
+    senden(c, &pkt)
+}
+
+pub fn subscribe(c: &mut Client, topic: &str) -> bool {
     c.next_packet_id = if c.next_packet_id == u16::MAX { 1 } else { c.next_packet_id + 1 };
     let pkt = encode_subscribe(c.next_packet_id, topic);
-    c.stream.write_all(&pkt).map_err(|e| format!("MQTT_SUBSCRIBE: Schreiben fehlgeschlagen: {}", e))?;
-    c.last_send = Instant::now();
-    Ok(())
+    senden(c, &pkt)
 }
 
 pub fn disconnect(c: &mut Client) {
@@ -286,17 +325,25 @@ pub fn disconnect(c: &mut Client) {
 pub fn update(c: &mut Client) -> Result<(), String> {
     if !c.connected { return Ok(()); }
     if c.last_send.elapsed() > c.keepalive / 2 {
-        let _ = c.stream.write_all(&wrap_packet(PKT_PINGREQ << 4, &[]));
-        c.last_send = Instant::now();
+        if !senden(c, &wrap_packet(PKT_PINGREQ << 4, &[])) { return Ok(()); }
+        if c.ping_offen.is_none() { c.ping_offen = Some(Instant::now()); }
+    }
+    if let Some(t) = c.ping_offen {
+        if t.elapsed() > ping_frist(c.keepalive) { c.connected = false; return Ok(()); }
     }
     let mut chunk = [0u8; 4096];
     let n = match c.stream.read(&mut chunk) {
-        Ok(0) => { c.connected = false; return Ok(()); } // Broker hat sauber geschlossen
+        Ok(0) => { c.connected = false; return Ok(()); } // Broker hat geschlossen
         Ok(n) => n,
         Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut || e.kind() == std::io::ErrorKind::WouldBlock => 0,
-        Err(e) => { c.connected = false; return Err(format!("MQTT_UPDATE: {}", e)); }
+        // Jeder andere Lesefehler heisst: die Verbindung ist weg (unter
+        // Windows 10054, wenn der Broker abbricht). Bis 2026.30 war das ein
+        // Laufzeitfehler -- ein Dashboard ohne TRY endete, sobald der Broker
+        // neu startete.
+        Err(_) => { c.connected = false; return Ok(()); }
     };
     if n == 0 { return Ok(()); }
+    c.ping_offen = None; // der Broker lebt
     let mut pending = std::mem::take(&mut c.rx_pending);
     pending.extend_from_slice(&chunk[..n]);
     let (events, rest) = parse_packets(pending);
@@ -349,7 +396,7 @@ mod tests {
     fn encode_connect_matches_spec_byte_layout() {
         // Von Hand gegen die MQTT-3.1.1-Spec nachgerechnet: CONNECT("test", keepalive=60,
         // clean session, kein User/Passwort).
-        let pkt = encode_connect("test", 60, None, None);
+        let pkt = encode_connect("test", 60, None, None, None);
         let expected = vec![
             0x10, 0x10, // Fixed Header: Typ 1 (CONNECT), Remaining Length 16
             0x00, 0x04, b'M', b'Q', b'T', b'T', // Protokoll-Name "MQTT"
@@ -363,9 +410,29 @@ mod tests {
 
     #[test]
     fn encode_connect_sets_username_password_flags() {
-        let pkt = encode_connect("c", 10, Some("u"), Some("p"));
+        let pkt = encode_connect("c", 10, Some("u"), Some("p"), None);
         let flags_byte = pkt[9]; // Index: 0x10,len, "MQTT"(6), level(1) -> Flags bei Index 9
         assert_eq!(flags_byte, 0x02 | 0x80 | 0x40);
+    }
+
+    #[test]
+    fn ping_frist_halbe_keepalive_mindestens_zwei_sekunden() {
+        assert_eq!(ping_frist(Duration::from_secs(60)), Duration::from_secs(30));
+        assert_eq!(ping_frist(Duration::from_secs(1)), Duration::from_secs(2));
+    }
+
+    #[test]
+    fn encode_connect_mit_letztem_willen() {
+        // Von Hand nach MQTT 3.1.1, 3.1.2.5-3.1.2.7 und 3.1.3.2-3.1.3.3:
+        // Will-Flag 0x04, Will-Retain 0x20, Topic und Nachricht hinter der
+        // Client-Kennung, VOR Nutzername/Kennwort.
+        let w = Wille { topic: "a/s".into(), inhalt: b"off".to_vec(), retain: true };
+        let pkt = encode_connect("c", 10, Some("u"), None, Some(&w));
+        assert_eq!(pkt[9], 0x02 | 0x80 | 0x04 | 0x20);
+        let nach_id = 2 + 6 + 1 + 1 + 2 + 3; // Kopf, "MQTT", Level, Flags, Keepalive, "c"
+        assert_eq!(&pkt[nach_id..], &[0, 3, b'a', b'/', b's', 0, 3, b'o', b'f', b'f', 0, 1, b'u']);
+        let ohne_retain = Wille { retain: false, ..w };
+        assert_eq!(encode_connect("c", 10, None, None, Some(&ohne_retain))[9], 0x02 | 0x04);
     }
 
     #[test]

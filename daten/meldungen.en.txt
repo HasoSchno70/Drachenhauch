@@ -1070,8 +1070,6 @@ HTTPD_SEND: es liegt keine Anfrage an (erst HTTPD_ACCEPT)	HTTPD_SEND: there is n
 {}: Antwort ist kein gueltiges JSON: {}	{}: the response is not valid JSON: {}
 MQTT_CONNECT: Port {} ausserhalb 0..65535	MQTT_CONNECT: port {} outside 0..65535
 MQTT_CONNECT: Adresse {} nicht aufloesbar	MQTT_CONNECT: address {} cannot be resolved
-MQTT_PUBLISH: nicht verbunden	MQTT_PUBLISH: not connected
-MQTT_SUBSCRIBE: nicht verbunden	MQTT_SUBSCRIBE: not connected
 unbekannte Sicherheit {} -- erlaubt sind "starttls", "tls", "keine"	unknown security {} -- allowed are "starttls", "tls", "keine"
 {} enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{} contains a line break -- that would be an extra header line and is therefore not allowed
 {} {} sieht nicht wie eine Adresse aus (erwartet wird name@beispiel.de)	{} {} does not look like an address (expected is name@example.com)
@@ -1737,3 +1735,5 @@ die Abfrage hat {} Platzhalter, uebergeben sind {} Werte	the query has {} placeh
 den Typ {} liest Drachenhauch (noch) nicht -- in der Abfrage mit ::text umwandeln	Drachenhauch cannot read the type {} (yet) -- convert it with ::text in the query
 ein Nullzeichen im Text -- PostgreSQL nimmt es nicht	a null character in the text -- PostgreSQL does not accept it
 Spalte {} ({}): {}	column {} ({}): {}
+MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten	MQTT_WILL: the topic must not be empty or contain wildcards (# +)
+MQTT_WILL: retain ist TRUE oder FALSE	MQTT_WILL: retain is TRUE or FALSE

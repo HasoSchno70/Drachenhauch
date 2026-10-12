@@ -7973,19 +7973,25 @@
   {
    "name": "MQTT_PUBLISH",
    "kind": "core",
-   "signature": "MQTT_PUBLISH(h, topic$, payload$[, retain: BOOLEAN])",
+   "signature": "MQTT_PUBLISH(h, topic$, payload$[, retain: BOOLEAN]) AS BOOLEAN",
    "module": "mqtt"
   },
   {
    "name": "MQTT_SUBSCRIBE",
    "kind": "core",
-   "signature": "MQTT_SUBSCRIBE(h, topic$)",
+   "signature": "MQTT_SUBSCRIBE(h, topic$) AS BOOLEAN",
    "module": "mqtt"
   },
   {
    "name": "MQTT_UPDATE",
    "kind": "core",
    "signature": "MQTT_UPDATE(h)",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_WILL",
+   "kind": "core",
+   "signature": "MQTT_WILL(topic$, inhalt$[, retain])",
    "module": "mqtt"
   },
   {

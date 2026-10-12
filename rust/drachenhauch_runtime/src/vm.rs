@@ -939,6 +939,9 @@ pub struct Vm<'p> {
     // Modul mqtt: baut auf std::net auf wie net, eigener Handle-Typ.
     #[cfg(feature = "net")]
     mqtt_clients: Vec<Option<crate::mqtt::Client>>,
+    /// MQTT_WILL: der letzte Wille fuer das NAECHSTE MQTT_CONNECT.
+    #[cfg(feature = "net")]
+    mqtt_wille: Option<crate::mqtt::Wille>,
     /// Modul `httpd` -- laufende Webserver (Tombstone-Vec wie ueberall:
     /// eine vergebene Nummer bleibt gueltig, auch wenn ein frueherer
     /// Server schon gestoppt wurde).
@@ -1127,6 +1130,8 @@ impl<'p> Vm<'p> {
             udp_socks: Vec::new(),
             #[cfg(feature = "net")]
             mqtt_clients: Vec::new(),
+            #[cfg(feature = "net")]
+            mqtt_wille: None,
             httpd_server: Vec::new(),
             #[cfg(feature = "pdf")]
             pdf_dok: Vec::new(),
@@ -5378,9 +5383,24 @@ impl<'p> Vm<'p> {
                 let keepalive = if a.len() >= 4 { bi_int(a, 3, "MQTT_CONNECT")? } else { 60 };
                 let username = match a.get(4) { Some(Value::Str(s)) => Some(s.to_string()), _ => None };
                 let password = match a.get(5) { Some(Value::Str(s)) => Some(s.to_string()), _ => None };
-                let c = mqtt::connect(&host, port, &client_id, keepalive, username.as_deref(), password.as_deref())?;
+                // Der Wille gilt fuer genau diese Verbindung -- auch wenn sie
+                // scheitert, wer neu verbindet, setzt ihn neu.
+                let wille = self.mqtt_wille.take();
+                let c = mqtt::connect(&host, port, &client_id, keepalive, username.as_deref(), password.as_deref(), wille.as_ref())?;
                 self.mqtt_clients.push(Some(c));
                 Value::Int((self.mqtt_clients.len() - 1) as i64)
+            }
+            // MQTT_WILL(topic$, inhalt$[, retain]) -- vor MQTT_CONNECT
+            "mqtt_will" => {
+                let topic = bi_str(a, 0, "MQTT_WILL")?.to_string();
+                if topic.is_empty() || topic.contains('#') || topic.contains('+') {
+                    return Err("MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten".into());
+                }
+                let inhalt = bi_str(a, 1, "MQTT_WILL")?.as_bytes().to_vec();
+                let retain = match a.get(2) { Some(Value::Bool(b)) => *b, Some(Value::Int(n)) => *n != 0, None => false,
+                    _ => return Err("MQTT_WILL: retain ist TRUE oder FALSE".into()) };
+                self.mqtt_wille = Some(mqtt::Wille { topic, inhalt, retain });
+                Value::Nil
             }
             "mqtt_disconnect" => {
                 let i = bi_int(a, 0, "MQTT_DISCONNECT")? as usize;
@@ -5394,9 +5414,9 @@ impl<'p> Vm<'p> {
             "mqtt_publish" => {
                 let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string(); let payload = bi_str(a, 2, "MQTT_PUBLISH")?.to_string();
                 let retain = if a.len() >= 4 { bi_bool(a, 3, "MQTT_PUBLISH")? } else { false };
-                mqtt::publish(self.mqtt_client(i)?, &topic, &payload, retain)?; Value::Nil
+                Value::Bool(mqtt::publish(self.mqtt_client(i)?, &topic, &payload, retain))
             }
-            "mqtt_subscribe" => { let i = bi_int(a, 0, "MQTT_SUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_SUBSCRIBE")?.to_string(); mqtt::subscribe(self.mqtt_client(i)?, &topic)?; Value::Nil }
+            "mqtt_subscribe" => { let i = bi_int(a, 0, "MQTT_SUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_SUBSCRIBE")?.to_string(); Value::Bool(mqtt::subscribe(self.mqtt_client(i)?, &topic)) }
             "mqtt_update" => { let i = bi_int(a, 0, "MQTT_UPDATE")?; mqtt::update(self.mqtt_client(i)?)?; Value::Nil }
             "mqtt_next_message" => { let i = bi_int(a, 0, "MQTT_NEXT_MESSAGE")?; Value::Bool(mqtt::next_message(self.mqtt_client(i)?)) }
             "mqtt_message_topic" => { let i = bi_int(a, 0, "MQTT_MESSAGE_TOPIC")?; Value::str_rc(mqtt::message_topic(self.mqtt_client(i)?)) }

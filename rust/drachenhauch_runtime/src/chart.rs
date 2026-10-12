@@ -181,6 +181,9 @@ pub struct Style {
     pub f_schatten_daten: bool,
     /// Grosse Zahlen kurz schreiben (1.2M statt 1200000) -- wie NUMFMT$.
     pub f_kurz: bool,
+    /// Dezimalkomma statt Punkt ("25,7 °C") -- passend zu ZAHL$ und den
+    /// Feldern der gui; in der Pixelschrift ist der Punkt ein einzelnes Pixel.
+    pub f_komma: bool,
     /// Element unter der Maus hervorheben (aufhellen, herausruecken, wachsen).
     pub f_hover: bool,
     /// Sprechblase mit Name und Wert am Element unter der Maus.
@@ -277,6 +280,7 @@ impl Default for Style {
             f_verlauf_daten: false,
             f_schatten_daten: false,
             f_kurz: false,
+            f_komma: false,
             f_hover: true,
             f_tooltip: false,
             f_treppe: false,
@@ -737,6 +741,7 @@ impl ChartObj {
         } else {
             format!("{:.*}", n as usize, v)
         };
+        let s = if self.style.f_komma { s.replace('.', ",") } else { s };
         format!("{}{}", s, self.style.einheit)
     }
 }
@@ -1429,7 +1434,8 @@ impl ChartObj {
 
             if st.werte != "aus" {
                 let text = if st.f_prozent {
-                    format!("{:.*}%", st.nachkomma.clamp(0, 9) as usize, v / summe * 100.0)
+                    let p = format!("{:.*}%", st.nachkomma.clamp(0, 9) as usize, v / summe * 100.0);
+                    if st.f_komma { p.replace('.', ",") } else { p }
                 } else {
                     self.fmt_value(v)
                 };
@@ -2451,7 +2457,7 @@ pub const KEYS_COLOR: &[&str] = &[
 ];
 pub const KEYS_FLAG: &[&str] = &[
     "rahmen", "gitter_x", "gitter_y", "prozent", "flaeche", "punkte", "glatt", "null_linie",
-    "stapel", "verlauf", "verlauf_daten", "schatten_daten", "kurz",
+    "stapel", "verlauf", "verlauf_daten", "schatten_daten", "kurz", "komma",
     "hover", "tooltip", "treppe", "fadenkreuz",
 ];
 
@@ -2633,6 +2639,7 @@ impl ChartObj {
             "verlauf_daten" => s.f_verlauf_daten = v,
             "schatten_daten" => s.f_schatten_daten = v,
             "kurz" => s.f_kurz = v,
+            "komma" => s.f_komma = v,
             "hover" => s.f_hover = v,
             "tooltip" => s.f_tooltip = v,
             "treppe" => s.f_treppe = v,
@@ -2877,6 +2884,10 @@ mod tests {
         c.set_flag("kurz", true).unwrap();
         c.set_num("nachkomma", 2.0).unwrap();
         assert_eq!(c.fmt_value(1_500_000.0), "1.50M km/h");
+        c.set_flag("komma", true).unwrap();
+        assert_eq!(c.fmt_value(1_500_000.0), "1,50M km/h");
+        c.set_flag("kurz", false).unwrap();
+        assert_eq!(c.fmt_value(42.25), "42,25 km/h");
     }
 
     #[test]

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2081,
+ "count": 2082,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1340,9 +1340,10 @@
   "MQTT_MESSAGE_PAYLOAD": "STRING — content of the current message",
   "MQTT_MESSAGE_TOPIC": "STRING — topic of the current message",
   "MQTT_NEXT_MESSAGE": "BOOLEAN — advance by one message; FALSE when the queue is empty",
-  "MQTT_PUBLISH": "send a message to a topic; with retain the broker keeps it for later subscribers",
-  "MQTT_SUBSCRIBE": "subscribe to a topic -- incoming messages are then fetched by MQTT_UPDATE",
+  "MQTT_PUBLISH": "BOOLEAN — send a message to a topic; with retain the broker keeps it for later subscribers. FALSE if the connection is gone",
+  "MQTT_SUBSCRIBE": "BOOLEAN — subscribe to a topic -- incoming messages are then fetched by MQTT_UPDATE. FALSE if the connection is gone",
   "MQTT_UPDATE": "call once per frame: reads in received messages and keeps the connection alive with PINGREQ",
+  "MQTT_WILL": "the last will for the next MQTT_CONNECT: if the connection breaks without a disconnect, the broker publishes this message",
   "NET_CLOSE": "close the socket",
   "NET_CLOSE_LISTENER": "close the listener",
   "NET_IS_CONNECTED": "BOOLEAN — FALSE as soon as the other side has closed, dropped hard or a recv/send has failed",

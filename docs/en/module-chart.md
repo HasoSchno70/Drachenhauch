@@ -157,9 +157,11 @@ order from which series and segments without their own colour are served.
 `rahmen`, `gitter_x`, `gitter_y`, `prozent`, `flaeche`, `punkte`, `glatt`
 (curve instead of a polyline), `null_linie`, `stapel`, `verlauf`
 (background gradient), `verlauf_daten`, `schatten_daten`, `kurz`
-(1.2M instead of 1200000, like `NUMFMT$`). In order: frame, x grid, y grid,
-percent, area, points, smooth, zero line, stacked, gradient, gradient on the
-data, shadow on the data, short.
+(1.2M instead of 1200000, like `NUMFMT$`), `komma` (decimal comma: `25,7`
+instead of `25.7`, matching `ZAHL$` and the gui fields -- in the built-in
+pixel font the point is a single pixel and hard to see). In order: frame,
+x grid, y grid, percent, area, points, smooth, zero line, stacked, gradient,
+gradient on the data, shadow on the data, short, comma.
 
 ### Themes
 

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2086,
+ "count": 2087,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1341,9 +1341,10 @@
   "MQTT_MESSAGE_PAYLOAD": "STRING — Inhalt der aktuellen Nachricht",
   "MQTT_MESSAGE_TOPIC": "STRING — Topic der aktuellen Nachricht",
   "MQTT_NEXT_MESSAGE": "BOOLEAN — eine Nachricht weiterruecken; FALSE, wenn die Warteschlange leer ist",
-  "MQTT_PUBLISH": "Nachricht auf ein Topic senden; retain laesst der Broker sie fuer spaetere Abonnenten aufheben",
-  "MQTT_SUBSCRIBE": "Topic abonnieren -- eingehende Nachrichten holt danach MQTT_UPDATE ab",
+  "MQTT_PUBLISH": "BOOLEAN — Nachricht auf ein Topic senden; retain laesst der Broker sie fuer spaetere Abonnenten aufheben. FALSE, wenn die Verbindung weg ist",
+  "MQTT_SUBSCRIBE": "BOOLEAN — Topic abonnieren -- eingehende Nachrichten holt danach MQTT_UPDATE ab. FALSE, wenn die Verbindung weg ist",
   "MQTT_UPDATE": "pro Frame aufrufen: liest eingegangene Nachrichten ein und haelt die Verbindung mit PINGREQ am Leben",
+  "MQTT_WILL": "der letzte Wille fuer das naechste MQTT_CONNECT: reisst die Verbindung ohne Abmeldung ab, veroeffentlicht der Broker diese Nachricht",
   "NET_CLOSE": "Socket schliessen",
   "NET_CLOSE_LISTENER": "Listener schliessen",
   "NET_IS_CONNECTED": "BOOLEAN — FALSE sobald die Gegenseite geschlossen hat, hart abgebrochen ist oder ein Recv/Send fehlgeschlagen ist",
