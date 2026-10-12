@@ -83,7 +83,7 @@ Programme** (gleich zuerst).*
 
 **Zahlen.** **2133** Befehle in 48 Modulen (vorher 2130), 225 Beispiele auf
 der obersten Ebene von `examples/` (das neue liegt in einem eigenen
-Ordner). **5033 Fälle in 394 Prüfsammlungen** (vorher 5019 in 392) und
+Ordner). **5034 Fälle in 394 Prüfsammlungen** (vorher 5019 in 392) und
 **550 Rust-Testfunktionen**.
 
 * Das Duell prüft sich selbst: Wirt und Gast laufen als zwei Prozesse ohne

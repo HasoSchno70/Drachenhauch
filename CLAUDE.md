@@ -1892,7 +1892,13 @@ NetSock` liest erst ab und schickt FIN. (5) **Jedes UDP-Paket startete einen
 Faden** fuer die Namensaufloesung, auch fuer `127.0.0.1` -- IP-Literale gehen
 jetzt direkt: 2000 Pakete 231 -> 17 ms. Tests `modules_net` (+5, alle fallen
 mit 2026.25), `beispiel_duell` (4, `--- langsam`: Schleife, Relay 80/30/10 %,
-hart beendeter Gast + naechster, Absage). Eigene Falle: `VAL("172.23.27.16")`
+hart beendeter Gast + naechster, Absage) -- dazu seit der CI von 2026.30 ein
+Fall mit 30 % Verlust und Saat 1: die LETZTEN Eingaben haben kein Paket nach
+sich, das sie mittraegt; ging das letzte verloren, stand der Gast am Ende
+einen Schritt weiter (unter macOS gesehen, unter Windows mit Saat 7 nie).
+Der Gast sendet es jetzt nach, bis ein Stand mit genau dieser Eingabe kommt,
+und der Wirt gibt Staenden im Nachlauf einen NEUEN Tick (der Gast nimmt nur
+neuere an -- die Bestaetigung kam sonst gar nicht an). Eigene Falle: `VAL("172.23.27.16")`
 ist 172.23 -- ein Port ist nur ein Argument aus Ziffern; mit `127.0.0.1` fiel
 es nicht auf, weil die Vorgabe dieselbe Adresse war. Nicht geprueft: zwei
 echte Rechner hinter Routern/Firewalls.
