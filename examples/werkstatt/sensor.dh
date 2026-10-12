@@ -1,0 +1,83 @@
+' sensor -- spielt das ESP32-Board in der Werkstatt, damit das Dashboard
+' auch ohne Platine etwas zu zeigen hat.
+'
+'     dhrt run sensor.dh                      (Broker 127.0.0.1:1883, bis Strg+C)
+'     dhrt run sensor.dh -- 192.168.1.5       (Broker woanders, auch host:port)
+'     dhrt run sensor.dh -- 127.0.0.1 30      (nach 30 s still aufhoeren)
+'
+' Zweimal je Sekunde gehen Temperatur, Luftfeuchte, Licht und Strom hinaus,
+' die Tuer bei jeder Aenderung. Auf werkstatt/luefter/set hoert er: mit
+' laufendem Luefter faellt die Temperatur, ohne steigt sie langsam (die
+' Loetstation heizt). Ein echtes Board schickt dieselben Topics.
+IMPORT "mqtt"
+
+DIM broker AS STRING : broker = "127.0.0.1"
+DIM port AS INTEGER : port = 1883
+IF ARGC() > 0 THEN broker = ARG$(0)
+IF INSTR(broker, ":") >= 0 THEN
+    port = VAL(MID$(broker, INSTR(broker, ":") + 1))
+    broker = LEFT$(broker, INSTR(broker, ":"))
+END IF
+DIM dauer AS FLOAT : dauer = 0
+IF ARGC() > 1 THEN dauer = VAL(ARG$(1))
+
+DIM h AS MQTT_HANDLE
+' Der letzte Wille: reisst die Verbindung ab, ohne dass der Sensor sich
+' abmeldet (Strom weg, Absturz), veroeffentlicht der BROKER "offline" --
+' sonst bliebe das "online" von unten fuer immer stehen.
+MQTT_WILL("werkstatt/status", "offline", TRUE)
+TRY
+    h = MQTT_CONNECT(broker, port, "werkstatt-sensor")
+CATCH e
+    PRINT "Kein Broker auf "; broker; ": "; e
+    END
+END TRY
+MQTT_SUBSCRIBE(h, "werkstatt/luefter/set")
+' "online" bleibt beim Broker liegen (retain) -- wer spaeter dazukommt, sieht
+' es trotzdem.
+MQTT_PUBLISH(h, "werkstatt/status", "online", TRUE)
+PRINT "Sensor laeuft, Broker "; broker
+
+RANDOMIZE(7)
+DIM temp AS FLOAT : temp = 23.0
+DIM feuchte AS FLOAT : feuchte = 48.0
+DIM luefter AS BOOLEAN
+DIM tuer AS BOOLEAN
+' Den echten Zustand gleich melden: beim Broker liegt sonst womoeglich noch
+' das "an" vom letzten Lauf (retain), und das Dashboard glaubte es.
+MQTT_PUBLISH(h, "werkstatt/luefter", "aus", TRUE)
+MQTT_PUBLISH(h, "werkstatt/tuer", "zu", TRUE)
+DIM start AS INTEGER : start = MILLIS()
+DIM naechste AS INTEGER : naechste = start
+DIM schritt AS INTEGER
+
+WHILE dauer = 0 OR MILLIS() - start < dauer * 1000
+    MQTT_UPDATE(h)
+    WHILE MQTT_NEXT_MESSAGE(h)
+        IF MQTT_MESSAGE_TOPIC(h) = "werkstatt/luefter/set" THEN
+            luefter = (MQTT_MESSAGE_PAYLOAD(h) = "an")
+            MQTT_PUBLISH(h, "werkstatt/luefter", IIF(luefter, "an", "aus"), TRUE)
+        END IF
+    WEND
+    IF MILLIS() >= naechste THEN
+        naechste = naechste + 500
+        schritt = schritt + 1
+        temp = temp + IIF(luefter, -0.35, 0.12) + (RND() - 0.5) * 0.1
+        temp = CLAMP(temp, 15.0, 45.0)
+        feuchte = CLAMP(feuchte + (RND() - 0.5) * 0.8, 30.0, 75.0)
+        DIM licht AS INTEGER : licht = INT(600 + 300 * SIN(schritt / 20.0) + RND() * 40)
+        DIM strom AS FLOAT : strom = 1.2 + IIF(luefter, 0.4, 0.0) + RND() * 0.3
+        MQTT_PUBLISH(h, "werkstatt/temperatur", FORMAT$(temp, "%.1f"))
+        MQTT_PUBLISH(h, "werkstatt/feuchte", FORMAT$(feuchte, "%.1f"))
+        MQTT_PUBLISH(h, "werkstatt/licht", STR$(licht))
+        MQTT_PUBLISH(h, "werkstatt/strom", FORMAT$(strom, "%.2f"))
+        IF schritt MOD 17 = 0 THEN
+            tuer = NOT tuer
+            MQTT_PUBLISH(h, "werkstatt/tuer", IIF(tuer, "offen", "zu"), TRUE)
+        END IF
+    END IF
+    SLEEP(20)
+WEND
+' Absichtlich ohne "offline" und ohne MQTT_DISCONNECT: so sieht es aus, wenn
+' einem Board der Strom ausgeht.
+PRINT "Sensor still nach "; dauer; " s"
