@@ -200,11 +200,15 @@ beim naechsten Lesen; `NET_UDP_RECV` liest dann weiter, statt abzubrechen.
 Ob der andere noch da ist, sagt bei UDP nur, ob noch Pakete kommen -- wer
 das wissen muss, zaehlt die Zeit seit dem letzten Paket.
 
-**`NET_CLOSE` liest erst, was noch ungelesen ankam**, und beendet dann die
-eigene Richtung sauber. Ein Socket, der mit ungelesenen Daten geschlossen
-wird, bricht sonst hart ab -- und die Gegenseite verwirft, was man ihr
-gerade noch geschickt hat (gemessen: eine Absage "BESETZT" vor dem Schliessen
-kam in 5 von 5 Versuchen nicht an). Dasselbe gilt am Programmende.
+**`NET_CLOSE` schliesst nachlaufend:** es beendet sofort die eigene
+Richtung (die Gegenseite liest danach das Ende), liest aber im Hintergrund
+noch hoechstens zwei Sekunden lang, was die Gegenseite schickt, bis sie
+selbst schliesst. Kommt an einem ganz geschlossenen Socket noch etwas an,
+bricht das Betriebssystem hart ab -- und die Gegenseite verwirft, was man
+ihr gerade noch geschickt hat (gemessen: eine Absage "BESETZT" vor dem
+Schliessen kam in 5 von 5 Versuchen nicht an, wenn das "HALLO" des anderen
+erst danach eintraf). `NET_CLOSE` haelt dabei nichts an. Dasselbe gilt am
+Programmende.
 
 ## UTF-8 ueber TCP
 

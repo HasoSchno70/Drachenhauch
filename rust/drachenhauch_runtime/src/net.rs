@@ -28,24 +28,39 @@ pub struct NetSock {
     pending: Vec<u8>,
 }
 
-/// Beim Schliessen erst lesen, was noch ungelesen ankam, dann die eigene
-/// Richtung sauber beenden (FIN). Schliesst man einen Socket mit
-/// ungelesenen Daten, bricht das Betriebssystem die Verbindung HART ab
-/// (RST) -- und die Gegenseite verwirft, was wir ihr gerade noch geschickt
-/// hatten. Gemessen: "BESETZT" senden und schliessen, ohne das "HALLO" des
-/// Gastes gelesen zu haben -- in 5 von 5 Versuchen kam beim Gast nichts an
-/// (Netz-Runde, 2026-10-11). Gilt fuer NET_CLOSE und das Programmende.
+/// Sauber schliessen ("lingering close"): erst die eigene Richtung beenden
+/// (FIN), dann weiter lesen, was die Gegenseite noch schickt, bis sie selbst
+/// schliesst -- hoechstens 2 s, in einem eigenen Faden, damit NET_CLOSE das
+/// Spiel nicht anhaelt. Erst danach ist der Socket wirklich zu.
+///
+/// Der Grund: kommt an einem geschlossenen Socket noch etwas an (oder lag
+/// noch Ungelesenes darin), bricht das Betriebssystem HART ab (RST), und die
+/// Gegenseite verwirft, was wir ihr gerade noch geschickt hatten. Gemessen:
+/// "BESETZT" senden und schliessen -- kam das "HALLO" des Gastes erst danach
+/// an, fehlte beim Gast die Absage in 5 von 5 Versuchen (in der CI unter
+/// Windows gesehen; nur das Ungelesene abzulesen, half dagegen nicht).
+/// Gilt fuer NET_CLOSE und das Programmende.
 impl Drop for NetSock {
     fn drop(&mut self) {
-        let _ = self.stream.set_nonblocking(true);
-        let mut buf = [0u8; 4096];
-        for _ in 0..256 {
-            match self.stream.read(&mut buf) {
-                Ok(n) if n > 0 => continue,
-                _ => break,
-            }
-        }
         let _ = self.stream.shutdown(std::net::Shutdown::Write);
+        // Ein zweiter Griff auf DENSELBEN Socket haelt ihn offen, waehrend
+        // der erste hier freigegeben wird.
+        let Ok(rest) = self.stream.try_clone() else { return };
+        std::thread::spawn(move || {
+            let _ = rest.set_nonblocking(false);
+            let _ = rest.set_read_timeout(Some(Duration::from_millis(100)));
+            let ende = std::time::Instant::now() + Duration::from_secs(2);
+            let mut buf = [0u8; 4096];
+            let mut r = &rest;
+            while std::time::Instant::now() < ende {
+                match r.read(&mut buf) {
+                    Ok(0) => break,                         // Gegenseite hat auch geschlossen
+                    Ok(_) => continue,
+                    Err(ref e) if would_block(e) => continue,
+                    Err(_) => break,
+                }
+            }
+        });
     }
 }
 

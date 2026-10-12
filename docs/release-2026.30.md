@@ -46,7 +46,10 @@ Programme** (gleich zuerst).*
   noch etwas geschickt, das niemand gelesen hatte, brach das Schließen die
   Verbindung hart ab, und die Gegenseite verwarf, was ihr gerade noch
   geschickt worden war — eine Absage „BESETZT“ kam in 5 von 5 Versuchen
-  nicht an. `NET_CLOSE` und das Programmende lesen jetzt erst ab.
+  nicht an. `NET_CLOSE` und das Programmende schließen jetzt nachlaufend:
+  das eigene Ende geht sofort hinaus, gelesen wird im Hintergrund weiter,
+  bis die Gegenseite auch schließt (höchstens 2 s, ohne das Programm
+  anzuhalten).
 * **UDP an eine Adresse ist schneller:** bisher startete jedes Paket einen
   Faden für die Namensauflösung, auch an `127.0.0.1`. 2000 Pakete brauchen
   jetzt 17 statt 231 ms.
@@ -83,7 +86,7 @@ Programme** (gleich zuerst).*
 
 **Zahlen.** **2133** Befehle in 48 Modulen (vorher 2130), 225 Beispiele auf
 der obersten Ebene von `examples/` (das neue liegt in einem eigenen
-Ordner). **5034 Fälle in 394 Prüfsammlungen** (vorher 5019 in 392) und
+Ordner). **5035 Fälle in 394 Prüfsammlungen** (vorher 5019 in 392) und
 **550 Rust-Testfunktionen**.
 
 * Das Duell prüft sich selbst: Wirt und Gast laufen als zwei Prozesse ohne
