@@ -923,6 +923,10 @@ GUI_FORM_LOAD/SAVE: dieser Bau hat kein db-Modul	GUI_FORM_LOAD/SAVE: this build 
 404 -- nicht gefunden	404 -- not found
 {}: im Formular '{}' ist kein Widget gebunden (GUI_BIND)	{}: no widget is bound in the form '{}' (GUI_BIND)
 {}: '{}' ist kein Tabellenname (Buchstaben, Ziffern, _)	{}: '{}' is not a table name (letters, digits, _)
+GUI_FORM_VERSION: '{}' ist kein Spaltenname (Buchstaben, Ziffern, _)	GUI_FORM_VERSION: '{}' is not a column name (letters, digits, _)
+GUI_FORM_VERSION: '{}' ist an ein Widget gebunden -- die Versionsspalte fuehrt die Laufzeit selbst	GUI_FORM_VERSION: '{}' is bound to a widget -- the runtime keeps the version column itself
+{}: dieses Formular hat die Versionsspalte '{}', wurde aber nicht mit GUI_FORM_LOAD geladen -- es weiss nicht, welchen Stand es bearbeitet (oder ueberschreiben = TRUE)	{}: this form has the version column '{}' but was not loaded with GUI_FORM_LOAD -- it does not know which state it is editing (or ueberschreiben = TRUE)
+{}: die Versionsspalte '{}' ist leer oder keine ganze Zahl	{}: the version column '{}' is empty or not a whole number
 {}: '{}' ist kein Feld -- moeglich sind {}	{}: '{}' is not a field -- possible are {}
 {}: '{}' braucht von und bis	{}: '{}' needs from and to
 {}: '{}' ist kein Stil -- moeglich sind "ok" (Vorgabe) und "janein"	{}: '{}' is not a style -- possible are "ok" (default) and "janein"
@@ -1500,7 +1504,7 @@ GUI_SET_WRAP: breite muss >= 0 sein (0 = aus)	GUI_SET_WRAP: width must be >= 0 (
 GUI_SET_WRAP: nur eine Beschriftung (GUI_LABEL) kann umbrechen	GUI_SET_WRAP: only a label (GUI_LABEL) can wrap
 GUI_TEXTINPUT_SET: das Widget ist kein GUI_TEXTINPUT	GUI_TEXTINPUT_SET: the widget is not a GUI_TEXTINPUT
 GUI_TEXTINPUT_SET: maxlaenge muss >= 0 sein (0 = frei)	GUI_TEXTINPUT_SET: maxlaenge must be >= 0 (0 = unlimited)
-GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl) oder 2 (Kommazahl)	GUI_TEXTINPUT_SET: zahlen is 0 (any), 1 (whole number) or 2 (decimal number)
+GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl), 2 (Kommazahl) oder 3 (Geldbetrag in Cent)	GUI_TEXTINPUT_SET: zahlen is 0 (any), 1 (whole number), 2 (decimal number) or 3 (amount of money in cents)
 GUI_ON_ENTER: nur ein Textfeld (GUI_TEXTINPUT) meldet Enter	GUI_ON_ENTER: only a text field (GUI_TEXTINPUT) reports Enter
 {}: ungueltiges Fenster-Handle {}	{}: invalid window handle {}
 {}: ungueltiges Widget-Handle {}	{}: invalid widget handle {}

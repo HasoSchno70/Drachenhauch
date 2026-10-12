@@ -7460,10 +7460,28 @@ impl<'p> Vm<'p> {
                 let form = if a.len() > 1 { gs(a,1,"GUI_FORM_CHANGED")? } else { String::new() };
                 Value::Bool(self.gui.form_changed(gi(a,0,"GUI_FORM_CHANGED")?, &form)?)
             }
+            // GUI_FORM_VERSION(win, spalte$[, formular$]) -- Versionsspalte fuer
+            // GUI_FORM_LOAD/SAVE (optimistische Sperre), leer = aus.
+            "gui_form_version" => {
+                let form = if a.len() > 2 { gs(a,2,"GUI_FORM_VERSION")? } else { String::new() };
+                self.gui.form_version_setzen(gi(a,0,"GUI_FORM_VERSION")?, &form, &gs(a,1,"GUI_FORM_VERSION")?)?;
+                Value::Nil
+            }
+            "gui_form_conflict$" | "gui_form_conflict" => {
+                let form = if a.len() > 1 { gs(a,1,"GUI_FORM_CONFLICT$")? } else { String::new() };
+                Value::str_rc(self.gui.form_konflikt(gi(a,0,"GUI_FORM_CONFLICT$")?, &form)?)
+            }
             // GUI_FORM_LOAD(win, db, tabelle$, id[, formular$]) -> BOOLEAN
-            // GUI_FORM_SAVE(win, db, tabelle$, id[, formular$]) -> id
+            // GUI_FORM_SAVE(win, db, tabelle$, id[, formular$[, ueberschreiben]]) -> id
             // Die Spalte heisst `id` -- die Konvention von SQLite (rowid-Alias)
             // und von jedem ORM; wer anders heisst, schreibt sein SQL selbst.
+            //
+            // SAVE liefert 0, wenn nichts gespeichert wurde: die Zeile gibt es
+            // nicht mehr ("geloescht") oder -- mit GUI_FORM_VERSION -- ein
+            // anderer hat sie seit dem Laden gespeichert ("geaendert");
+            // GUI_FORM_CONFLICT$ sagt welches. Bis 2026.30 lieferte ein UPDATE
+            // auf eine geloeschte Zeile die Kennung zurueck, als waere alles
+            // gespeichert -- die Eingabe war still weg (Vereinsverwaltung).
             "gui_form_load" | "gui_form_save" => {
                 #[cfg(feature = "db")]
                 {
@@ -7480,12 +7498,28 @@ impl<'p> Vm<'p> {
                     if keys.is_empty() {
                         return Err(format!("{}: im Formular '{}' ist kein Widget gebunden (GUI_BIND)", fn_, form));
                     }
+                    let (vspalte, vstand) = self.gui.form_version(win, &form);
+                    let mit_version = !vspalte.is_empty();
                     if name == "gui_form_load" {
-                        let sql = format!("SELECT {} FROM {} WHERE id = ?", keys.join(", "), tabelle);
+                        let spalten = if mit_version { format!("{}, {}", keys.join(", "), vspalte) } else { keys.join(", ") };
+                        let sql = format!("SELECT {} FROM {} WHERE id = ?", spalten, tabelle);
                         let res = self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?;
                         match res.rows.first() {
                             None => Value::Bool(false),
                             Some(row) => {
+                                if mit_version {
+                                    let stand = match row.last() {
+                                        Some(crate::db::DbVal::Int(n)) => Some(*n),
+                                        Some(crate::db::DbVal::Real(f)) => Some(*f as i64),
+                                        Some(crate::db::DbVal::Text(t)) | Some(crate::db::DbVal::Zahl(t)) => t.trim().parse::<i64>().ok(),
+                                        _ => None,
+                                    };
+                                    if stand.is_none() {
+                                        return Err(format!("{}: die Versionsspalte '{}' ist leer oder keine ganze Zahl", fn_, vspalte));
+                                    }
+                                    self.gui.form_stand_setzen(win, &form, stand);
+                                }
+                                self.gui.form_konflikt_setzen(win, &form, "");
                                 let werte: Vec<(String, Value)> = keys.iter().cloned().zip(row.iter().map(|z| match z {
                                     crate::db::DbVal::Null => Value::str_rc(""),
                                     crate::db::DbVal::Int(n) => Value::Int(*n),
@@ -7498,20 +7532,61 @@ impl<'p> Vm<'p> {
                             }
                         }
                     } else {
+                        let ueberschreiben = a.len() > 5 && gbool(a,5,fn_)?;
+                        if a.len() > 6 { return Err(format!("{}: zu viele Argumente", fn_)); }
                         let werte = self.gui.form_get_typisiert(win, &form)?;
                         let mut params: Vec<crate::db::Param> = Vec::new();
                         for (_, wv) in &werte { params.push(crate::db::dh_to_sql(wv, fn_)?); }
                         let neue_id = if id < 0 {
-                            let sql = format!("INSERT INTO {} ({}) VALUES ({})", tabelle, keys.join(", "),
-                                              keys.iter().map(|_| "?").collect::<Vec<_>>().join(", "));
-                            self.db_conn(conn_idx)?.einfuegen(&sql, &params, fn_)?
+                            let (spalten, platz) = if mit_version {
+                                (format!("{}, {}", keys.join(", "), vspalte),
+                                 format!("{}, 1", keys.iter().map(|_| "?").collect::<Vec<_>>().join(", ")))
+                            } else {
+                                (keys.join(", "), keys.iter().map(|_| "?").collect::<Vec<_>>().join(", "))
+                            };
+                            let sql = format!("INSERT INTO {} ({}) VALUES ({})", tabelle, spalten, platz);
+                            let nid = self.db_conn(conn_idx)?.einfuegen(&sql, &params, fn_)?;
+                            if mit_version { self.gui.form_stand_setzen(win, &form, Some(1)); }
+                            nid
                         } else {
-                            let sql = format!("UPDATE {} SET {} WHERE id = ?", tabelle,
-                                              keys.iter().map(|k| format!("{} = ?", k)).collect::<Vec<_>>().join(", "));
+                            let mut setz = keys.iter().map(|k| format!("{} = ?", k)).collect::<Vec<_>>().join(", ");
+                            if mit_version { setz = format!("{}, {} = {} + 1", setz, vspalte, vspalte); }
                             params.push(crate::db::Param::Int(id));
-                            self.db_conn(conn_idx)?.exec(&sql, &params, fn_)?;
+                            let pruefen = mit_version && !ueberschreiben;
+                            let sql = if pruefen {
+                                let stand = vstand.ok_or_else(|| format!(
+                                    "{}: dieses Formular hat die Versionsspalte '{}', wurde aber nicht mit GUI_FORM_LOAD geladen -- \
+                                     es weiss nicht, welchen Stand es bearbeitet (oder ueberschreiben = TRUE)", fn_, vspalte))?;
+                                params.push(crate::db::Param::Int(stand));
+                                format!("UPDATE {} SET {} WHERE id = ? AND {} = ?", tabelle, setz, vspalte)
+                            } else {
+                                format!("UPDATE {} SET {} WHERE id = ?", tabelle, setz)
+                            };
+                            let n = self.db_conn(conn_idx)?.exec(&sql, &params, fn_)?;
+                            if n == 0 {
+                                // Getroffen hat es nichts: gibt es die Zeile noch?
+                                let sql = format!("SELECT {} FROM {} WHERE id = ?",
+                                                  if mit_version { vspalte.as_str() } else { "id" }, tabelle);
+                                let da = !self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?.rows.is_empty();
+                                self.gui.form_konflikt_setzen(win, &form, if da && pruefen { "geaendert" } else { "geloescht" });
+                                return Ok(Some(Value::Int(0)));
+                            }
+                            if mit_version {
+                                let neu = match vstand { Some(s) if !ueberschreiben => Some(s + 1), _ => {
+                                    let sql = format!("SELECT {} FROM {} WHERE id = ?", vspalte, tabelle);
+                                    let res = self.db_conn(conn_idx)?.query(&sql, &[crate::db::Param::Int(id)], fn_)?;
+                                    match res.rows.first().and_then(|z| z.first()) {
+                                        Some(crate::db::DbVal::Int(n)) => Some(*n),
+                                        Some(crate::db::DbVal::Real(f)) => Some(*f as i64),
+                                        Some(crate::db::DbVal::Text(t)) | Some(crate::db::DbVal::Zahl(t)) => t.trim().parse::<i64>().ok(),
+                                        _ => None,
+                                    }
+                                }};
+                                self.gui.form_stand_setzen(win, &form, neu);
+                            }
                             id
                         };
+                        self.gui.form_konflikt_setzen(win, &form, "");
                         self.gui.form_clean(win, &form)?;
                         Value::Int(neue_id)
                     }

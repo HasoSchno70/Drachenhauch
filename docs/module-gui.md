@@ -45,7 +45,10 @@ IMPORT "gui"
 | `GUI_BIND(wdg, schluessel$[, formular$])` | — | **Datenbindung**: das Widget trägt einen Schlüssel (Spaltennamen) — siehe [Datenbindung](#datenbindung) |
 | `GUI_FORM_GET(win[, formular$])` / `GUI_FORM_SET(win, map[, formular$])` | MAP OF STRING / — | alle gebundenen Werte lesen / aus einer MAP setzen |
 | `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, formular$])` | — / — / BOOL | leeren / als gespeichert markieren / seit dem letzten Setzen geändert? |
-| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` / `GUI_FORM_SAVE(…)` | BOOL / INTEGER | Zeile `WHERE id = ?` in die Widgets laden / INSERT (id < 0) oder UPDATE, liefert die id |
+| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` | BOOL | Zeile `WHERE id = ?` in die Widgets laden |
+| `GUI_FORM_SAVE(win, db, tabelle$, id[, formular$[, ueberschreiben]])` | INTEGER | INSERT (id < 0) oder UPDATE, liefert die id -- **0, wenn nichts gespeichert wurde** (Zeile gelöscht oder inzwischen geändert) |
+| `GUI_FORM_VERSION(win, spalte$[, formular$])` | — | Versionsspalte: SAVE speichert nur, wenn die Zeile noch den Stand vom Laden trägt (leer = aus) — siehe [Datenbindung](#datenbindung) |
+| `GUI_FORM_CONFLICT$(win[, formular$])` | STRING | warum das letzte SAVE nichts gespeichert hat: `geaendert`, `geloescht` oder leer |
 | `GUI_TEXTAREA_SET(ta, "umbruch", 1)` | — | Textbereich bricht an Wortgrenzen um (Notizen, Briefe) |
 | `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` | — | Mindestmaß: ein gewichtetes Kind im Behälter und ein verankertes Widget schrumpfen nicht darunter |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | was ein Behälter mindestens braucht — der Wert für `WINDOW_MIN_SIZE` |
@@ -122,7 +125,7 @@ IMPORT "gui"
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | verschiebbare Trennlinie (`"v"`/`"h"`); Position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y); der Platzhalter steht gedaempft da, bis getippt wird -- auch mit Fokus |
-| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl) |
+| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl, 3 Geldbetrag in Cent) |
 | `GUI_ENTERED(tf)` | BOOLEAN | wurde in diesem Bild Enter im Textfeld gedrückt? |
 | `GUI_ON_ENTER(tf, handler)` | — | Rückruf dafür |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als **Code-Feld** einfärbbar — siehe [Code-Feld](#das-textarea-als-code-feld) |
@@ -683,7 +686,8 @@ setzt, ist kein Schritt des Nutzers.
 GUI_TEXTINPUT_SET(tf, "passwort", 1)     ' Punkte statt Zeichen; GUI_TEXT liefert den echten Text
 GUI_TEXTINPUT_SET(tf, "nur_lesen", 1)    ' anzeigen, markieren, kopieren -- aber nicht ändern
 GUI_TEXTINPUT_SET(tf, "maxlaenge", 8)    ' schneidet ab, auch beim Einfügen (0 = frei)
-GUI_TEXTINPUT_SET(tf, "zahlen", 2)       ' 1 = ganze Zahl (mit Vorzeichen), 2 = Kommazahl (Punkt oder Komma)
+GUI_TEXTINPUT_SET(tf, "zahlen", 2)       ' 1 = ganze Zahl (mit Vorzeichen), 2 = Kommazahl (Punkt oder Komma),
+                                         ' 3 = Geldbetrag: "48,00" im Feld, 4800 (Cent) in der Bindung
 GUI_SET_ALIGN(tf, "rechts")              ' Zahlen stehen rechts -- solange der Text hineinpasst
 ```
 
@@ -2797,17 +2801,47 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   id = ?` und liefert FALSE, wenn es die Zeile nicht gibt; `GUI_FORM_SAVE`
   schreibt `INSERT` (bei `id < 0`, liefert die neue id) oder `UPDATE`. Die
   Spalte heißt `id` — die Konvention von SQLite. Gespeichert wird
-  **typisiert**: ein Zahlenfeld als Zahl (außer es beginnt mit einer Null wie
-  eine Postleitzahl — das bleibt Text), ein Kästchen als 0/1, eine Klappliste
-  als Index, ein Regler als Kommazahl, alles andere als Text. Was das
-  Programm umrechnet (Beträge in Cent, eine Klappliste in einen Steuersatz),
-  bindet es nicht und schreibt es selbst.
+  **typisiert**: ein Zahlenfeld als Zahl (außer es beginnt mit einer Null vor
+  einer Ziffer wie die Postleitzahl `01234` — das bleibt Text; `0,99` ist
+  eine Zahl), ein Kästchen als 0/1, eine Klappliste als Index, ein Regler als
+  Kommazahl, alles andere als Text. Ein **Geldfeld** (`zahlen` 3) wird
+  getippt und gezeigt wie eine Kommazahl mit zwei Stellen und gebunden als
+  INTEGER in Cent — `48,50` im Feld ist `4850` in der Spalte, und beim Laden
+  wird aus `4850` wieder `48,50`. Eine Zahl, die `GUI_FORM_SET` bekommt, sind
+  dort ebenfalls Cent; ein Text steht da, wie er kommt. Was das Programm
+  sonst umrechnet (eine Klappliste in einen Steuersatz), bindet es nicht und
+  schreibt es selbst.
+- **Nichts gespeichert:** `GUI_FORM_SAVE` liefert **0**, wenn das `UPDATE`
+  keine Zeile getroffen hat, und `GUI_FORM_CONFLICT$` sagt `geloescht` (die
+  Zeile gibt es nicht mehr) — bis 2026.30 lieferte es die id, als wäre
+  gespeichert worden, und die Eingabe war still weg.
+- **Gleichzeitig bearbeiten:** `GUI_FORM_VERSION(win, "stand", formular$)`
+  nennt eine ganzzahlige Spalte, die jedes Speichern hochzählt. `GUI_FORM_LOAD`
+  merkt sich ihren Stand, `GUI_FORM_SAVE` schreibt nur
+  `… WHERE id = ? AND stand = <beim Laden>` — hat ein anderer inzwischen
+  gespeichert, trifft es nichts, liefert 0 und `GUI_FORM_CONFLICT$` sagt
+  `geaendert`. Die Eingaben stehen dann noch im Formular; das Programm fragt
+  „neu laden oder überschreiben?“ und überschreibt bewusst mit dem sechsten
+  Argument `TRUE`. Ein neuer Datensatz bekommt `stand = 1`. Ohne vorheriges
+  `GUI_FORM_LOAD` weiß das Formular nicht, welchen Stand es bearbeitet — das
+  ist ein Fehler.
+
+```basic
+GUI_FORM_VERSION(win, "stand", "m")
+DIM id AS INTEGER : id = GUI_FORM_SAVE(win, db, "mitglied", aktId, "m")
+IF id = 0 THEN
+    IF GUI_FORM_CONFLICT$(win, "m") = "geaendert" THEN nachfragen() ELSE status("gelöscht")
+END IF
+```
 - **Geändert?** Beim Binden, nach `GUI_FORM_SET/LOAD/SAVE/CLEAR` und nach
   `GUI_FORM_CLEAN` gilt der Stand als sauber; `GUI_FORM_CHANGED` vergleicht
   dagegen. Damit ist die Rückfrage „Speichern | Verwerfen | Abbrechen" eine
   Zeile.
 - In der `.dhform`: `bind` und `form`; der Form-Designer hat dafür die Felder
   „Bindung" und „Formular".
+
+Die Vereinsverwaltung (`examples/verein/`) zeigt alles zusammen an einem
+Server, an dem mehrere Leute gleichzeitig arbeiten.
 
 Bewusst nicht: Tabellenzeilen an Listen binden, Fremdschlüssel auflösen,
 Verbunde. Das ist die Grenze zwischen Formular und ORM, und hinter ihr ist

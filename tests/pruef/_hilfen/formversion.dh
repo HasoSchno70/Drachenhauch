@@ -1,0 +1,71 @@
+' Helfer fuer gui_bindung.dhtest (SQLite) und db_server.dhtest (PostgreSQL,
+' MySQL): derselbe Ablauf mit Versionsspalte gegen jede Datenbank, damit die
+' Erwartung dreimal dieselbe ist. Die Tabelle braucht id, name, menge und
+' eine ganzzahlige Spalte `stand`. Ein zweiter Zugang (`fremd`) spielt den
+' Kollegen, der dieselbe Zeile gleichzeitig bearbeitet.
+IMPORT "gui"
+IMPORT "db"
+
+SUB versionAblauf(c AS DB_CONN, fremd AS DB_CONN, t AS STRING)
+    DIM w AS GUI_WINDOW : w = GUI_WINDOW("V", 0, 0, 400, 200)
+    DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "")
+    DIM menge AS GUI_WIDGET : menge = GUI_TEXTINPUT(w, 10, 50, 200, 28, "")
+    GUI_TEXTINPUT_SET(menge, "zahlen", 1)
+    GUI_BIND(name, "name", "m") : GUI_BIND(menge, "menge", "m")
+    GUI_FORM_VERSION(w, "stand", "m")
+
+    ' Anlegen setzt stand = 1 und merkt es sich.
+    GUI_SET_TEXT(name, "Anna") : GUI_SET_TEXT(menge, "3")
+    DIM id AS INTEGER : id = GUI_FORM_SAVE(w, c, t, -1, "m")
+    PRINT "angelegt "; id > 0; " stand "; standVon(c, t, id)
+    ' Gleich weiter speichern geht -- der Stand ist bekannt.
+    GUI_SET_TEXT(menge, "4")
+    PRINT "gespeichert "; GUI_FORM_SAVE(w, c, t, id, "m") = id; " stand "; standVon(c, t, id)
+    ' Unveraendert noch einmal: auch das trifft die Zeile (unter MySQL zaehlte
+    ' ein UPDATE ohne echte Aenderung frueher 0).
+    PRINT "unveraendert "; GUI_FORM_SAVE(w, c, t, id, "m") = id; " stand "; standVon(c, t, id)
+
+    ' Ein anderer speichert dazwischen.
+    PRINT "fremd "; DB_EXEC(fremd, "UPDATE " + t + " SET name = ?, stand = stand + 1 WHERE id = ?", "Anja", id)
+    GUI_SET_TEXT(menge, "9")
+    PRINT "konflikt "; GUI_FORM_SAVE(w, c, t, id, "m"); " "; GUI_FORM_CONFLICT$(w, "m"); " noch geaendert "; GUI_FORM_CHANGED(w, "m")
+    PRINT "in der datenbank "; zeile$(c, t, id)
+
+    ' Bewusst ueberschreiben, danach geht es normal weiter.
+    PRINT "ueberschrieben "; GUI_FORM_SAVE(w, c, t, id, "m", TRUE) = id; " '"; GUI_FORM_CONFLICT$(w, "m"); "' "; zeile$(c, t, id)
+    GUI_SET_TEXT(menge, "10")
+    PRINT "danach "; GUI_FORM_SAVE(w, c, t, id, "m") = id; " "; zeile$(c, t, id)
+
+    ' Neu laden holt den fremden Stand samt Version.
+    DB_EXEC(fremd, "UPDATE " + t + " SET name = ?, stand = stand + 1 WHERE id = ?", "Berta", id)
+    PRINT "geladen "; GUI_FORM_LOAD(w, c, t, id, "m"); " "; GUI_TEXT(name); " '"; GUI_FORM_CONFLICT$(w, "m"); "'"
+    GUI_SET_TEXT(menge, "11")
+    PRINT "nach laden "; GUI_FORM_SAVE(w, c, t, id, "m") = id; " "; zeile$(c, t, id)
+
+    ' Geloescht -- mit und ohne Versionsspalte.
+    DB_EXEC(fremd, "DELETE FROM " + t + " WHERE id = ?", id)
+    PRINT "geloescht "; GUI_FORM_SAVE(w, c, t, id, "m"); " "; GUI_FORM_CONFLICT$(w, "m")
+    PRINT "ueberschreiben hilft nicht "; GUI_FORM_SAVE(w, c, t, id, "m", TRUE); " "; GUI_FORM_CONFLICT$(w, "m")
+    GUI_FORM_VERSION(w, "", "m")
+    PRINT "ohne version "; GUI_FORM_SAVE(w, c, t, id, "m"); " "; GUI_FORM_CONFLICT$(w, "m")
+    GUI_WINDOW_DESTROY(w)
+END SUB
+
+FUNCTION standVon(c AS DB_CONN, t AS STRING, id AS INTEGER) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT stand FROM " + t + " WHERE id = ?", id)
+    IF DB_NEXT(r) THEN RETURN DB_GET_INT(r, 0)
+    RETURN -1
+END FUNCTION
+
+FUNCTION zeile$(c AS DB_CONN, t AS STRING, id AS INTEGER) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT name, menge, stand FROM " + t + " WHERE id = ?", id)
+    IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0) + "/" + STR$(DB_GET_INT(r, 1)) + "/" + STR$(DB_GET_INT(r, 2))
+    RETURN "(keine)"
+END FUNCTION
+
+' Ein UPDATE, das nichts aendert, trifft die Zeile trotzdem -- unter MySQL
+' zaehlte es bis 2026.30 nur geaenderte Zeilen und lieferte 0.
+SUB gleichAblauf(c AS DB_CONN, t AS STRING)
+    DB_EXEC(c, "INSERT INTO " + t + " (name, menge, stand) VALUES (?, ?, ?)", "Gleich", 5, 1)
+    PRINT "ohne aenderung "; DB_EXEC(c, "UPDATE " + t + " SET menge = ? WHERE name = ?", 5, "Gleich")
+END SUB

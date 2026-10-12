@@ -258,6 +258,39 @@ IMPORT "{sammlung}/_hilfen/dbserver.dh"
 TRUE Anja 7
 FALSE
 
+=== postgres: ein formular mit versionsspalte erkennt fremdes speichern
+' Derselbe Ablauf wie in gui_bindung.dhtest gegen SQLite, mit derselben
+' Erwartung (_hilfen/formversion.dh).
+IMPORT "hilfe.dh"
+SCREEN(400, 200, "V", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("pg"))
+DIM fremd AS DB_CONN : fremd = DB_OPEN(dbZiel$("pg"))
+DIM t AS STRING : t = dbTabelle$(c)
+DB_EXEC(c, "ALTER TABLE " + t + " ADD COLUMN stand INTEGER NOT NULL DEFAULT 1")
+versionAblauf(c, fremd, t)
+gleichAblauf(c, t)
+DB_EXEC(c, "DROP TABLE " + t)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/_hilfen/formversion.dh"
+--- erwartet
+angelegt TRUE stand 1
+gespeichert TRUE stand 2
+unveraendert TRUE stand 3
+fremd 1
+konflikt 0 geaendert noch geaendert TRUE
+in der datenbank Anja/4/4
+ueberschrieben TRUE '' Anna/9/5
+danach TRUE Anna/10/6
+geladen TRUE Berta ''
+nach laden TRUE Berta/11/8
+geloescht 0 geloescht
+ueberschreiben hilft nicht 0 geloescht
+ohne version 0 geloescht
+ohne aenderung 1
+
 === mysql: werte hin und zurueck
 IMPORT "db"
 IMPORT "hilfe.dh"
@@ -481,6 +514,39 @@ IMPORT "{sammlung}/_hilfen/dbserver.dh"
 1
 TRUE Anja 7
 FALSE
+
+=== mysql: ein formular mit versionsspalte erkennt fremdes speichern
+' Derselbe Ablauf wie in gui_bindung.dhtest gegen SQLite, mit derselben
+' Erwartung (_hilfen/formversion.dh).
+IMPORT "hilfe.dh"
+SCREEN(400, 200, "V", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM c AS DB_CONN
+c = DB_OPEN(dbZiel$("mysql"))
+DIM fremd AS DB_CONN : fremd = DB_OPEN(dbZiel$("mysql"))
+DIM t AS STRING : t = dbTabelle$(c)
+DB_EXEC(c, "ALTER TABLE " + t + " ADD COLUMN stand INTEGER NOT NULL DEFAULT 1")
+versionAblauf(c, fremd, t)
+gleichAblauf(c, t)
+DB_EXEC(c, "DROP TABLE " + t)
+--- datei hilfe.dh
+IMPORT "{sammlung}/_hilfen/dbserver.dh"
+IMPORT "{sammlung}/_hilfen/formversion.dh"
+--- erwartet
+angelegt TRUE stand 1
+gespeichert TRUE stand 2
+unveraendert TRUE stand 3
+fremd 1
+konflikt 0 geaendert noch geaendert TRUE
+in der datenbank Anja/4/4
+ueberschrieben TRUE '' Anna/9/5
+danach TRUE Anna/10/6
+geladen TRUE Berta ''
+nach laden TRUE Berta/11/8
+geloescht 0 geloescht
+ueberschreiben hilft nicht 0 geloescht
+ohne version 0 geloescht
+ohne aenderung 1
 
 === postgres: platzhalter mit dollar und lastval
 IMPORT "db"

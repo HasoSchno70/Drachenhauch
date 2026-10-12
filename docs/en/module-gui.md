@@ -45,7 +45,10 @@ IMPORT "gui"
 | `GUI_BIND(wdg, schluessel$[, formular$])` | — | **data binding**: the widget carries a key (column name) — see [Data binding](#data-binding) |
 | `GUI_FORM_GET(win[, formular$])` / `GUI_FORM_SET(win, map[, formular$])` | MAP OF STRING / — | read all bound values / set them from a MAP |
 | `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, formular$])` | — / — / BOOL | clear / mark as saved / changed since the last set? |
-| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` / `GUI_FORM_SAVE(…)` | BOOL / INTEGER | load the row `WHERE id = ?` into the widgets / INSERT (id < 0) or UPDATE, returns the id |
+| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` | BOOL | load the row `WHERE id = ?` into the widgets |
+| `GUI_FORM_SAVE(win, db, tabelle$, id[, formular$[, ueberschreiben]])` | INTEGER | INSERT (id < 0) or UPDATE, returns the id -- **0 if nothing was saved** (row deleted or changed in the meantime) |
+| `GUI_FORM_VERSION(win, spalte$[, formular$])` | — | version column: SAVE only saves while the row still carries the state it was loaded with (empty = off) — see [Data binding](#data-binding) |
+| `GUI_FORM_CONFLICT$(win[, formular$])` | STRING | why the last SAVE saved nothing: `geaendert` (changed), `geloescht` (deleted) or empty |
 | `GUI_TEXTAREA_SET(ta, "umbruch", 1)` | — | text area wraps at word boundaries (notes, letters) |
 | `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` | — | minimum size: a weighted child in a container and an anchored widget do not shrink below it |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | what a container needs at least — the value for `WINDOW_MIN_SIZE` |
@@ -122,7 +125,7 @@ IMPORT "gui"
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | movable divider (`"v"`/`"h"`); position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | container (decoration) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | single-line input field (cursor + selection, Ctrl+Z/Y); the placeholder stays, dimmed, until something is typed -- also with focus |
-| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal) |
+| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort` (password), `nur_lesen` (read-only), `maxlaenge` (max length), `zahlen` (numbers: 0 free, 1 integer, 2 decimal, 3 amount of money in cents) |
 | `GUI_ENTERED(tf)` | BOOLEAN | was Enter pressed in the text input in this frame? |
 | `GUI_ON_ENTER(tf, handler)` | — | callback for it |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **multi-line** text field (ENTER = new line, scrolls vertically and horizontally, arrows, selection via mouse drag/Shift+arrow, Ctrl+A/C/X/V). Can be coloured as a **code field** — see [Code field](#the-textarea-as-a-code-field) |
@@ -682,7 +685,8 @@ user.
 GUI_TEXTINPUT_SET(tf, "passwort", 1)     ' dots instead of characters; GUI_TEXT returns the real text
 GUI_TEXTINPUT_SET(tf, "nur_lesen", 1)    ' display, select, copy -- but not change
 GUI_TEXTINPUT_SET(tf, "maxlaenge", 8)    ' cuts off, also when pasting (0 = unlimited)
-GUI_TEXTINPUT_SET(tf, "zahlen", 2)       ' 1 = integer (with sign), 2 = decimal (point or comma)
+GUI_TEXTINPUT_SET(tf, "zahlen", 2)       ' 1 = integer (with sign), 2 = decimal (point or comma),
+                                         ' 3 = money: "48,00" in the field, 4800 (cents) in the binding
 GUI_SET_ALIGN(tf, "rechts")              ' numbers sit on the right -- as long as the text fits
 ```
 
@@ -2784,17 +2788,45 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   id = ?` and returns FALSE if the row does not exist; `GUI_FORM_SAVE`
   writes `INSERT` (for `id < 0`, returns the new id) or `UPDATE`. The
   column is called `id` — SQLite's convention. Values are stored **typed**:
-  a numeric field as a number (unless it starts with a zero like a postcode
-  — that stays text), a checkbox as 0/1, a dropdown as its index, a slider
-  as a floating-point number, everything else as text. Whatever the program
-  converts (amounts in cents, a dropdown into a tax rate) it does not bind
-  and writes itself.
+  a numeric field as a number (unless it starts with a zero before a digit
+  like the postcode `01234` — that stays text; `0,99` is a number), a
+  checkbox as 0/1, a dropdown as its index, a slider as a floating-point
+  number, everything else as text. A **money field** (`zahlen` 3) is typed
+  and shown like a decimal with two places and bound as an INTEGER in
+  cents — `48,50` in the field is `4850` in the column, and loading turns
+  `4850` back into `48,50`. A number that `GUI_FORM_SET` receives is cents
+  there too; a text stands as it comes. Whatever else the program converts
+  (a dropdown into a tax rate) it does not bind and writes itself.
+- **Nothing saved:** `GUI_FORM_SAVE` returns **0** when the `UPDATE` hit no
+  row, and `GUI_FORM_CONFLICT$` says `geloescht` (the row no longer exists)
+  — up to 2026.30 it returned the id as if it had saved, and the input was
+  silently gone.
+- **Editing at the same time:** `GUI_FORM_VERSION(win, "stand", formular$)`
+  names an integer column that every save counts up. `GUI_FORM_LOAD`
+  remembers its state, `GUI_FORM_SAVE` only writes
+  `… WHERE id = ? AND stand = <when loaded>` — if someone else has saved in
+  the meantime, it hits nothing, returns 0 and `GUI_FORM_CONFLICT$` says
+  `geaendert`. The input is still in the form then; the program asks
+  "reload or overwrite?" and overwrites deliberately with the sixth argument
+  `TRUE`. A new record gets `stand = 1`. Without a preceding `GUI_FORM_LOAD`
+  the form does not know which state it is editing — that is an error.
+
+```basic
+GUI_FORM_VERSION(win, "stand", "m")
+DIM id AS INTEGER : id = GUI_FORM_SAVE(win, db, "mitglied", aktId, "m")
+IF id = 0 THEN
+    IF GUI_FORM_CONFLICT$(win, "m") = "geaendert" THEN nachfragen() ELSE status("gelöscht")
+END IF
+```
 - **Changed?** On binding, after `GUI_FORM_SET/LOAD/SAVE/CLEAR` and after
   `GUI_FORM_CLEAN` the state counts as clean; `GUI_FORM_CHANGED` compares
   against it. That makes the prompt "Save | Discard | Cancel" a single
   line.
 - In the `.dhform`: `bind` and `form`; the form designer has the fields
   "Binding" and "Form" for them.
+
+The club manager (`examples/verein/`) shows all of it together against a
+server that several people use at the same time.
 
 Deliberately not included: binding table rows to lists, resolving foreign
 keys, joins. That is the border between a form and an ORM, and beyond it a
