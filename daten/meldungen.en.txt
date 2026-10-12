@@ -373,6 +373,7 @@ ein Dateiname ist noch kein [[Bild]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a f
 ein Dateiname ist noch kein [[Klang]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not a sound yet: first `x = {}("{}")`, then `{}(x, ...)`
 ein Dateiname ist noch kein [[Schrift]]: erst `x = {}("{}")`, dann `{}(x, ...)`	a file name is not a font yet: first `x = {}("{}")`, then `{}(x, ...)`
 eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX("{}"); im Quelltext geht auch &H{}	a color from hex text comes from COLOR_FROM_HEX("{}"); in the source &H{} works too
+ein ganzes Thema setzt GUI_THEME_PRESET("{}"); GUI_THEME nimmt nur die Akzentfarbe	a whole theme is set by GUI_THEME_PRESET("{}"); GUI_THEME only takes the accent colour
 
 # ---------------------------------------------------------------- Laufzeit: Typen und Werte
 {}: Erwartet {}, erhalten {}	{}: expected {}, got {}

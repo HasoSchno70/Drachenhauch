@@ -7059,6 +7059,8 @@ impl<'p> Vm<'p> {
         if !name.starts_with("gui_") { return Ok(None); }
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
             match a.get(i) { Some(Value::Int(n)) => Ok(*n),
+                Some(Value::Str(t)) => Err(format!("{}: erwartet INTEGER (Arg {}){}", f, i + 1,
+                    crate::umstieg::text_statt_zahl(f, t))),
                 _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
         }
         fn gs(a: &[Value], i: usize, f: &str) -> R<String> {

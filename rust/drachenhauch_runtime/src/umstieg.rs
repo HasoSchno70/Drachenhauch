@@ -152,6 +152,11 @@ pub fn text_statt_zahl(befehl: &str, text: &str) -> String {
         return format!(
             " -- eine Farbe aus Hex-Text kommt aus COLOR_FROM_HEX(\"{}\"); im Quelltext geht auch &H{}", text, text.trim_start_matches('#').to_uppercase());
     }
+    // GUI_THEME nimmt nur die Akzentfarbe; ein Themenname gehoert zu
+    // GUI_THEME_PRESET (gefunden bei der Vereinsverwaltung, 2026-10-12).
+    if b == "gui_theme" {
+        return format!(" -- ein ganzes Thema setzt GUI_THEME_PRESET(\"{}\"); GUI_THEME nimmt nur die Akzentfarbe", text);
+    }
     datei_statt_handle(befehl, text)
 }
 
@@ -201,6 +206,7 @@ mod tests {
         assert!(text_statt_zahl("rgb", "rot").is_empty());
         // Der Datei-Fall laeuft weiter durch.
         assert!(text_statt_zahl("playsound", "a.wav").contains("LOADSOUND"));
+        assert!(text_statt_zahl("GUI_THEME", "glas_hell").contains("GUI_THEME_PRESET(\"glas_hell\")"));
     }
 
     #[test]

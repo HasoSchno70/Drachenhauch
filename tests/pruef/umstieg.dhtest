@@ -1016,3 +1016,12 @@ c[0] = 7
 PRINT a[0]; " "; b[0]; " "; c[0]
 --- erwartet
 9 9 7
+
+=== ein themenname an gui_theme nennt gui_theme_preset
+' GUI_THEME nimmt nur die Akzentfarbe -- wer "glas_hell" schreibt, meint
+' GUI_THEME_PRESET (Vereinsverwaltung, 2026-10-12). Vorher nur "erwartet
+' INTEGER (Arg 1)".
+IMPORT "gui"
+GUI_THEME("glas_hell")
+--- fehler
+GUI_THEME: erwartet INTEGER (Arg 1) -- ein ganzes Thema setzt GUI_THEME_PRESET("glas_hell"); GUI_THEME nimmt nur die Akzentfarbe
