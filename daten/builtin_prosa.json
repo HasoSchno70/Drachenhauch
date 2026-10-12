@@ -677,7 +677,7 @@
   "GUI_LISTBOX_SORT": "natürlich sortieren („Datei 9“ vor „Datei 10“), innerhalb der Gruppen",
   "GUI_LISTBOX_SPANS": "Abschnitte eines Eintrags einfärben (Zeichen ab 0, drei gleich lange ARRAY OF INTEGER; leer nimmt sie weg) -- etwa das Schlüsselwort in einer, den Namen in einer anderen Farbe. Auf der Auswahl und gesperrt gilt eine Farbe. Die Zeilenhöhe einer Liste folgt ihrer Schrift (GUI_SET_FONT_SIZE)",
   "GUI_LISTBOX_TEXT": "STRING — Text der Auswahl",
-  "GUI_LISTBOX_TIP": "Tooltip je Eintrag",
+  "GUI_LISTBOX_TIP": "Tooltip je Eintrag. Ohne ihn zeigt ein Eintrag, der nicht in die Zeile passt (er endet mit „...“), beim Überfahren seinen ganzen Text",
   "GUI_LISTBOX_VIEW_COUNT": "INTEGER — Zahl der sichtbaren Zeilen",
   "GUI_LISTBOX_VIEW_ROW": "INTEGER — die k-te sichtbare Zeile als Eintragsnummer, -1 = keine",
   "GUI_LOAD": "JSON-Datei laden, neues Fenster, Handle zurück",

@@ -2603,6 +2603,10 @@ pub struct Widget {
     /// Zeile unter der Maus fuer die Blende, je Bild neu (eine schlichte
     /// Liste hat keinen ListState, der sie tragen koennte).
     zeile_jetzt: i32,
+    /// Der GANZE Text der Listenzeile unter der Maus, wenn er in der Zeile
+    /// gekuerzt dasteht ("..."); sonst leer. Gesetzt in GUI_UPDATE, gezeigt
+    /// als Tooltip, wenn der Eintrag keinen eigenen hat.
+    ganzer_text: String,
     /// Weiches Rollen mit dem Rad: das Ziel, und der Stand, den das Rollen
     /// zuletzt selbst geschrieben hat -- steht dort etwas anderes, hat jemand
     /// anderes gerollt (Pfeiltaste, SCROLL_TO), und das Rad gibt nach.
@@ -4428,7 +4432,7 @@ impl Gui {
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
-            ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0, zeile_b: Blende::default(), zeile_jetzt: -1, rad_ziel: None, rad_letzt: 0.0,
+            ueber_t: 0.0, druck_t: 0.0, fokus_t: 0.0, zeile_b: Blende::default(), zeile_jetzt: -1, ganzer_text: String::new(), rad_ziel: None, rad_letzt: 0.0,
             alive: true, visible: true, rund: false, variante: 0,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0, stil: 0,
@@ -12699,6 +12703,13 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         let k = if self.list_bar_at(top, i, mx, my) { -1 } else { self.liste_zeile(top, i, my) };
                         if let Some(l) = self.windows[top].widgets[i].list.as_mut() { l.hover = k; }
                         self.windows[top].widgets[i].zeile_jetzt = k;
+                        let ganz = if k >= 0 {
+                            let platz = self.liste_textplatz(g, top, i, k as usize);
+                            let wdg = &self.windows[top].widgets[i];
+                            let it = wdg.items.get(k as usize).cloned().unwrap_or_default();
+                            if self.mit_auslassung(g, wdg, &it, platz).is_some() { it } else { String::new() }
+                        } else { String::new() };
+                        self.windows[top].widgets[i].ganzer_text = ganz;
                         if right_just { self.liste_rechtsklick(top, i, k); }
                     }
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
@@ -12839,7 +12850,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                     .and_then(|s| s.felder.get(s.hover.max(0) as usize).filter(|_| s.hover >= 0))
                     .map(|f| !f.tip.is_empty()).unwrap_or(false);
                 let pfad_tip = w.pfad.as_ref().map(|p| p.hover == -2).unwrap_or(false);
-                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty() || leisten_tip || listen_tip || status_tip || pfad_tip) { found = Some((top, i)); }
+                let ganz_tip = w.hovered && !w.ganzer_text.is_empty();
+                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty() || leisten_tip || listen_tip || status_tip || pfad_tip || ganz_tip) { found = Some((top, i)); }
             }
             found
         });
@@ -12850,6 +12862,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             let w = &self.windows[wi].widgets[i];
             w.leiste.as_ref().map(|l| l.hover).or_else(|| w.list.as_ref().map(|l| l.hover))
                 .or_else(|| w.status.as_ref().map(|s| s.hover)).or_else(|| w.pfad.as_ref().map(|p| p.hover))
+                // Eine schlichte Liste hat keinen ListState -- ihre Zeile
+                // unter der Maus zaehlt trotzdem als eigener Teil.
+                .or_else(|| (w.kind == Kind::ListBox).then_some(w.zeile_jetzt))
         }).unwrap_or(-1);
         if teil != self.hover_teil {
             self.hover_teil = teil;
@@ -17560,6 +17575,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 }
             }
         }
+        // Ein gekuerzter Eintrag ("...") zeigt seinen ganzen Text.
+        if w.kind == Kind::ListBox && !w.ganzer_text.is_empty() { return Some(w.ganzer_text.clone()); }
         if let Some(l) = w.leiste.as_ref() {
             if l.hover >= 0 {
                 if let Some(e) = l.eintraege.get(l.hover as usize).filter(|e| !e.tip.is_empty()) {
@@ -20161,7 +20178,11 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                                 self.wtext(g, wdg, x, ty, teil, c);
                             }
                         }
-                        _ => self.wtext(g, wdg, tx, ty, Self::sichtbar_vorn(it, rechts - tx), farbe),
+                        _ => {
+                            let t = self.mit_auslassung(g, wdg, it, rechts - tx)
+                                .unwrap_or_else(|| Self::sichtbar_vorn(it, rechts - tx));
+                            self.wtext(g, wdg, tx, ty, t, farbe)
+                        }
                     }
                     g.pop_clip();
                 }
@@ -20530,6 +20551,41 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// schmaler als ein Punkt. Eine Liste zeichnete einen Eintrag sonst ganz
     /// und liess ihn nur vom Clip beschneiden -- eine Ausgabezeile mit 300000
     /// Zeichen kostete so jedes Bild bis zu 72 ms (Stresstest 2026-10-02).
+    /// Wie viel Breite der TEXT eines Listeneintrags hat -- dieselbe Rechnung
+    /// wie beim Zeichnen (Kaestchen, Sinnbild, Zusatztext rechts, Rollbalken).
+    /// Gebraucht fuer den Tooltip mit dem ganzen Text.
+    fn liste_textplatz(&self, g: &Graphics, wi: usize, idx: usize, k: usize) -> i32 {
+        let wdg = &self.windows[wi].widgets[idx];
+        let pad = self.m("pad");
+        let ih = self.list_zeile_h(wdg);
+        let box_w = self.list_box_w(wdg);
+        let l = wdg.list.as_deref();
+        let hat_icon = l.map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
+        let icon_w = if hat_icon { ih } else { 0 };
+        let (_, _, w, _) = self.abs_rect(wi, wdg);
+        let wz = if self.list_bar_geom(wi, idx).is_some() { w - self.sk(8) - 2 } else { w };
+        let tx = if box_w > 0 { box_w } else { pad } + icon_w + if icon_w > 0 { 2 } else { 0 };
+        let rechts = match l.and_then(|l| l.details.get(k)).filter(|d| !d.is_empty()) {
+            Some(d) => wz - pad - self.wtext_width(g, wdg, d) - self.sk(10),
+            None => wz - 2,
+        };
+        rechts - tx
+    }
+
+    /// Text auf eine Breite kuerzen: passt er nicht, endet er mit "..." --
+    /// statt mitten im Buchstaben abgeschnitten zu werden.
+    fn mit_auslassung(&self, g: &Graphics, wdg: &Widget, text: &str, breite: i32) -> Option<String> {
+        if self.wtext_width(g, wdg, text) <= breite { return None; }
+        let z: Vec<char> = text.chars().collect();
+        let (mut lo, mut hi) = (0usize, z.len());
+        while lo < hi {
+            let m = (lo + hi + 1) / 2;
+            let t: String = z[..m].iter().collect::<String>().trim_end().to_string() + "...";
+            if self.wtext_width(g, wdg, &t) <= breite { lo = m; } else { hi = m - 1; }
+        }
+        Some(z[..lo].iter().collect::<String>().trim_end().to_string() + "...")
+    }
+
     fn sichtbar_vorn(s: &str, px: i32) -> String {
         let cap = px.max(0) as usize + 8;
         if s.len() <= cap { return s.to_string(); }

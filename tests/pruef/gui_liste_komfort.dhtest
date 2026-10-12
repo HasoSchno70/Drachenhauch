@@ -313,3 +313,53 @@ NEXT
 PRINT "erste zeile "; zeile1 > 20; " zweite zeile "; zeile2 > 20
 --- erwartet
 erste zeile TRUE zweite zeile TRUE
+
+=== ein gekuerzter eintrag zeigt seinen ganzen text als tooltip
+' Seit 2026-10-12 (Werkstatt-Dashboard): ein Eintrag, der nicht in die
+' Zeile passt, endet mit "..." statt mitten im Buchstaben, und beim
+' Verweilen zeigt der Tooltip den ganzen Text -- vorher war der Rest nicht zu
+' sehen. Der Tooltip liegt unter der Zeile auf dem Widget-Grund (#26323F);
+' ohne ihn steht dort der Fenstergrund (#18222E).
+IMPORT "gui"
+SCREEN(360, 200, "K", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("K", 0, 0, 360, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 10, 160, 120, ["kurz", "ein sehr langer Eintrag, der nicht passt", "noch einer"])
+' Maus auf die zweite Zeile, dann verweilen
+WRITEALL("ev.txt", "# Test" + CHR$(10) + "c 1" + CHR$(10) + "e 2 7 60 46 0 0" + CHR$(10))
+AUTOMATION_PLAY("ev.txt")
+DIM i AS INTEGER
+FOR i = 1 TO 90
+    GUI_UPDATE()
+    CLS(RGB(20, 20, 20))
+    GUI_DRAW()
+    FLIP()
+NEXT
+SAVESCREENSHOT("k.png")
+--- bild k.png
+250 80 #26323F +-8
+
+=== ein passender eintrag bekommt keinen tooltip
+' Die Gegenprobe zum Fall davor: derselbe Aufbau, der Eintrag passt.
+IMPORT "gui"
+SCREEN(360, 200, "K", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("K", 0, 0, 360, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 10, 160, 120, ["kurz", "mittel", "noch einer"])
+' Maus auf die zweite Zeile, dann verweilen
+WRITEALL("ev.txt", "# Test" + CHR$(10) + "c 1" + CHR$(10) + "e 2 7 60 46 0 0" + CHR$(10))
+AUTOMATION_PLAY("ev.txt")
+DIM i AS INTEGER
+FOR i = 1 TO 90
+    GUI_UPDATE()
+    CLS(RGB(20, 20, 20))
+    GUI_DRAW()
+    FLIP()
+NEXT
+SAVESCREENSHOT("k.png")
+--- bild k.png
+250 80 #18222E +-8

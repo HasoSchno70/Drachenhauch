@@ -677,7 +677,7 @@
   "GUI_LISTBOX_SORT": "sort naturally (\"File 9\" before \"File 10\"), within the groups",
   "GUI_LISTBOX_SPANS": "colour sections of an entry (characters from 0, three equally long ARRAY OF INTEGER; empty removes them) -- say, the keyword in one colour, the name in another. On the selection and when disabled one colour applies. The row height of a list box follows its font (GUI_SET_FONT_SIZE)",
   "GUI_LISTBOX_TEXT": "STRING — text of the selection",
-  "GUI_LISTBOX_TIP": "tooltip per entry",
+  "GUI_LISTBOX_TIP": "tooltip per entry. Without one, an entry that does not fit the row (it ends with \"...\") shows its whole text when hovered",
   "GUI_LISTBOX_VIEW_COUNT": "INTEGER — number of visible rows",
   "GUI_LISTBOX_VIEW_ROW": "INTEGER — the k-th visible row as an entry number, -1 = none",
   "GUI_LOAD": "load a JSON file, new window, returns the handle",
