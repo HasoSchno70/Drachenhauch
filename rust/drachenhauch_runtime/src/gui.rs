@@ -762,7 +762,7 @@ fn zahl_erlaubt(text: &str, zahlen: u8) -> bool {
     for (i, ch) in text.chars().enumerate() {
         if ch.is_ascii_digit() { continue; }
         if ch == '-' && i == 0 { continue; }
-        if zahlen == 2 && (ch == '.' || ch == ',') { trenner += 1; if trenner > 1 { return false; } continue; }
+        if zahlen >= 2 && (ch == '.' || ch == ',') { trenner += 1; if trenner > 1 { return false; } continue; }
         return false;
     }
     true
@@ -1631,6 +1631,24 @@ fn zahl_lesen(text: &str) -> Option<f64> {
     let t = text.trim().replace(',', ".");
     if t.is_empty() { return None; }
     t.parse::<f64>().ok().filter(|x| x.is_finite())
+}
+
+/// Ein Betrag in Cent, wie ein Geldfeld ihn zeigt: 4800 -> "48,00",
+/// -5 -> "-0,05".
+fn cent_text(c: i64) -> String {
+    let v = if c < 0 { "-" } else { "" };
+    format!("{}{},{:02}", v, c.unsigned_abs() / 100, c.unsigned_abs() % 100)
+}
+
+/// Die Regel fuer Zahlenfelder mit fuehrender Null: "080331" ist eine
+/// Postleitzahl oder Nummer und bleibt Text (als INTEGER verloere sie die
+/// Null) -- "0,99" und "0" sind dagegen Zahlen. Bis 2026.30 galt die Regel
+/// fuer alles, was mit 0 anfing und laenger war: ein Preis "0,99" ging als
+/// Text in die Datenbank.
+fn nummer_mit_null(text: &str) -> bool {
+    let t = text.trim();
+    let mut z = t.chars();
+    z.next() == Some('0') && z.next().map_or(false, |c| c.is_ascii_digit())
 }
 
 fn zahl_kurz(x: f64) -> String {
@@ -2901,6 +2919,15 @@ pub struct Widget {
     undo_zeit: f64,
 }
 
+/// Datenbank-Buchfuehrung eines Formulars (siehe `Window::form_db`).
+#[derive(Default, Clone)]
+struct FormDb {
+    form: String,
+    spalte: String,
+    stand: Option<i64>,
+    konflikt: String,
+}
+
 pub struct Window {
     title: String,
     x: i32, y: i32, w: i32, h: i32,
@@ -2916,6 +2943,10 @@ pub struct Window {
     /// Stand der gebundenen Werte beim letzten Setzen/Leeren/Bereinigen:
     /// (Formular, Schluessel, Text). Daraus antwortet GUI_FORM_CHANGED.
     form_stand: Vec<(String, String, String)>,
+    /// Je Formular, das mit der Datenbank spricht: Versionsspalte
+    /// (GUI_FORM_VERSION), der beim Laden gelesene Stand und was das letzte
+    /// GUI_FORM_SAVE verhindert hat (GUI_FORM_CONFLICT$).
+    form_db: Vec<FormDb>,
     /// Entwurfsmodus (GUI_WINDOW_DESIGN): das Fenster wird gezeichnet, aber
     /// seine Widgets bekommen KEINE Eingabe -- kein Hover, kein Klick, kein
     /// Fokus, keine Rueckrufe. Ein Form-Designer legt so echte Widgets auf
@@ -3493,7 +3524,7 @@ impl Gui {
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
             movable: true, closable: false, visible: true, entwurf: false, zoom: 1.0,
-            resizable: false, pruefung_live: false, form_stand: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
+            resizable: false, pruefung_live: false, form_stand: Vec::new(), form_db: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
             menus: Vec::new(),
@@ -10399,8 +10430,8 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 w.maxlaenge = wert as i32;
             }
             "zahlen" | "numeric" => {
-                if !(0.0..=2.0).contains(&wert) {
-                    return Err("GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl) oder 2 (Kommazahl)".into());
+                if !(0.0..=3.0).contains(&wert) || wert.fract() != 0.0 {
+                    return Err("GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl), 2 (Kommazahl) oder 3 (Geldbetrag in Cent)".into());
                 }
                 w.zahlen = wert as u8;
             }
@@ -11313,7 +11344,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         w.nur_lesen = wj["nur_lesen"].as_bool().unwrap_or(false);
         w.frei = w.kind == Kind::Dropdown && wj["bearbeitbar"].as_bool().unwrap_or(false);
         w.maxlaenge = wj["maxlaenge"].as_i64().unwrap_or(0).max(0) as i32;
-        w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 2) as u8;
+        w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 3) as u8;
         w.tooltip = wj["tooltip"].as_str().unwrap_or("").to_string();
         w.tab_index = wj["tab_index"].as_i64().unwrap_or(0).max(0) as i32;
         w.on_enter = wj["on_enter"].as_str().map(Rueckruf::benannt);
@@ -16639,7 +16670,9 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             // Ein Zahlenfeld liefert eine Zahl -- AUSSER es beginnt mit einer
             // Null und hat mehr als eine Stelle: das ist eine Postleitzahl
             // oder eine Nummer, und die verloere als INTEGER ihre Null.
-            Kind::TextInput if w.zahlen > 0 && !(w.text.trim().len() > 1 && w.text.trim().starts_with('0')) => match zahl_lesen(&w.text) {
+            // Ein Geldfeld (zahlen 3) liefert ganze Cent.
+            Kind::TextInput if w.zahlen > 0 && !nummer_mit_null(&w.text) => match zahl_lesen(&w.text) {
+                Some(x) if w.zahlen == 3 => Value::Int((x * 100.0).round() as i64),
                 Some(x) if w.zahlen == 1 && x.fract() == 0.0 => Value::Int(x as i64),
                 Some(x) => Value::Float(x),
                 None => Value::str_rc(&w.text),
@@ -16694,8 +16727,12 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             _ => {
                 // Textfelder: eine Zahl aus der Datenbank kommt als Text an,
                 // ein Zahlenfeld mit Komma-Stellen zeigt sie deutsch.
+                // Ein Geldfeld bekommt eine ZAHL als Cent; ein Text steht so
+                // da, wie er kommt (er ist schon die Anzeige).
                 let t = match v {
                     Value::Float(f) if w.zahlen == 2 => format!("{:.2}", f).replace('.', ","),
+                    Value::Int(n) if w.zahlen == 3 => cent_text(*n),
+                    Value::Float(f) if w.zahlen == 3 => cent_text(f.round() as i64),
                     _ => text,
                 };
                 w.text = t;
@@ -16774,6 +16811,48 @@ zellmodus, zeilen_anhaengen, spalten", key)),
             if jetzt != alt { return Ok(true); }
         }
         Ok(false)
+    }
+    fn form_db_mut(&mut self, wi: usize, form: &str) -> &mut FormDb {
+        let v = &mut self.windows[wi].form_db;
+        let pos = match v.iter().position(|f| f.form == form) {
+            Some(p) => p,
+            None => { v.push(FormDb { form: form.to_string(), ..Default::default() }); v.len() - 1 }
+        };
+        &mut v[pos]
+    }
+    /// GUI_FORM_VERSION(win, spalte$[, formular$]): diese Spalte zaehlt jedes
+    /// Speichern hoch, und GUI_FORM_SAVE speichert nur, wenn sie noch den
+    /// Stand vom Laden traegt. Leer schaltet ab.
+    pub fn form_version_setzen(&mut self, win: i64, form: &str, spalte: &str) -> Result<(), String> {
+        let wi = win as usize;
+        self.windows.get(wi).ok_or("GUI_FORM_VERSION: erwartet GUI_WINDOW")?;
+        if !spalte.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(format!("GUI_FORM_VERSION: '{}' ist kein Spaltenname (Buchstaben, Ziffern, _)", spalte));
+        }
+        if !spalte.is_empty() && self.form_widgets(wi, form).iter().any(|(k, _)| k.eq_ignore_ascii_case(spalte)) {
+            return Err(format!("GUI_FORM_VERSION: '{}' ist an ein Widget gebunden -- die Versionsspalte fuehrt die Laufzeit selbst", spalte));
+        }
+        let f = self.form_db_mut(wi, form);
+        f.spalte = spalte.to_string();
+        f.stand = None;
+        Ok(())
+    }
+    /// (Versionsspalte, beim Laden gelesener Stand) -- Spalte leer = keine.
+    pub fn form_version(&self, win: i64, form: &str) -> (String, Option<i64>) {
+        self.windows.get(win as usize)
+            .and_then(|w| w.form_db.iter().find(|f| f.form == form))
+            .map(|f| (f.spalte.clone(), f.stand)).unwrap_or_default()
+    }
+    pub fn form_stand_setzen(&mut self, win: i64, form: &str, stand: Option<i64>) {
+        if (win as usize) < self.windows.len() { self.form_db_mut(win as usize, form).stand = stand; }
+    }
+    pub fn form_konflikt_setzen(&mut self, win: i64, form: &str, k: &str) {
+        if (win as usize) < self.windows.len() { self.form_db_mut(win as usize, form).konflikt = k.to_string(); }
+    }
+    /// GUI_FORM_CONFLICT$: "" (gespeichert), "geaendert" oder "geloescht".
+    pub fn form_konflikt(&self, win: i64, form: &str) -> Result<String, String> {
+        let w = self.windows.get(win as usize).ok_or("GUI_FORM_CONFLICT$: erwartet GUI_WINDOW")?;
+        Ok(w.form_db.iter().find(|f| f.form == form).map(|f| f.konflikt.clone()).unwrap_or_default())
     }
     /// Die Schluessel eines Formulars (fuer SELECT/INSERT/UPDATE in der VM).
     pub fn form_keys(&self, win: i64, form: &str) -> Result<Vec<String>, String> {
@@ -21261,12 +21340,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         g.push_clip(kx, fy, kw, self.sk(TBL_FILTER_H));
                         let fokus = t.filter_focus == c as i32;
                         self.fbox_tief(g, cx + 2, fy + 2, cx + cw - 3, fy + self.sk(TBL_FILTER_H) - 3,
-                                       self.th("field_bg"),
-                                       if fokus { accent } else { self.th("field_border") });
+                                       self.th("win_bg"),
+                                       if fokus { accent } else { self.th("widget_border") });
                         let leer = t.filters.get(c).map(|s| s.is_empty()).unwrap_or(true);
                         let s = if leer { "Filter ...".to_string() }
                                 else { t.filters[c].clone() };
-                        let farbe = if leer { shade(title_fg, -60) } else { fg };
+                        // Gedaempft wie der Platzhalter eines Textfelds, gegen DESSEN Grund
+                        // gemessen (vorher aus der Kopfschrift abgeleitet: auf hellen
+                        // Themen fast schwarz, auf dem schwarzen Feld unsichtbar).
+                        let farbe = if leer { self.leise(self.th("win_bg")) } else { fg };
                         g.push_clip(cx + 4, fy + 2, (cw - 8).max(1), self.sk(TBL_FILTER_H) - 4);
                         self.wtext(g, wdg, cx + 6, fy + (self.sk(TBL_FILTER_H) - schrift).max(0) / 2,
                                    s, farbe);
@@ -21449,7 +21531,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if t.edit_row == r as i32 && t.edit_col == c as i32 && t.col_typ_of(c) == 3 {
             // Auswahlspalte: der gewaehlte Eintrag und ein Pfeil -- die Liste
             // selbst liegt in der oberen Schicht (draw_wahl_popup).
-            self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3, self.th("field_bg"), accent);
+            self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3, self.th("win_bg"), accent);
             self.wtext(g, wdg, cx + 5, cy + (ch - schrift).max(0) / 2, t.edit_text.clone(), fg_thema);
             let (px, py) = (cx + cw - 12, cy + ch / 2);
             g.line(px - 4, py - 2, px, py + 2, accent);
@@ -21458,7 +21540,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         if t.edit_row == r as i32 && t.edit_col == c as i32 {
             self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3,
-                           self.th("field_bg"), accent);
+                           self.th("win_bg"), accent);
             let alle: Vec<char> = t.edit_text.chars().collect();
             let tx = cx + 5 - t.edit_scroll;
             let ty = cy + (ch - schrift).max(0) / 2;
@@ -21513,7 +21595,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let b = (ch - 8).clamp(10, 18);
                 let bx = match al { 1 => cx + (cw - b) / 2, 2 => cx + cw - b - self.sk(TBL_PADDING), _ => cx + self.sk(TBL_PADDING) };
                 let by = cy + (ch - b) / 2;
-                g.box_fill(bx, by, bx + b - 1, by + b - 1, self.th("field_bg"));
+                g.box_fill(bx, by, bx + b - 1, by + b - 1, self.th("win_bg"));
                 g.rect(bx, by, bx + b - 1, by + b - 1, border);
                 if cell.value >= 0.5 {
                     // Haken als zwei Striche -- ein gefuelltes Kaestchen
@@ -21530,7 +21612,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let bx = cx + rand;
                 let by = cy + (ch - bh) / 2;
                 let v = cell.value.clamp(0.0, 1.0);
-                g.box_fill(bx, by, bx + bw - 1, by + bh - 1, self.th("field_bg"));
+                g.box_fill(bx, by, bx + bw - 1, by + bh - 1, self.th("win_bg"));
                 if v > 0.0 {
                     let fw = ((bw - 2) as f64 * v) as i32;
                     if fw > 0 {
@@ -21558,6 +21640,36 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                            cell.text.clone(), fgc);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod geldfeld_tests {
+    use super::{cent_text, nummer_mit_null, zahl_erlaubt};
+
+    #[test]
+    fn cent_als_anzeige() {
+        assert_eq!(cent_text(4800), "48,00");
+        assert_eq!(cent_text(5), "0,05");
+        assert_eq!(cent_text(-1999), "-19,99");
+        assert_eq!(cent_text(0), "0,00");
+    }
+
+    #[test]
+    fn fuehrende_null_nur_vor_ziffern() {
+        assert!(nummer_mit_null("080331"));
+        assert!(nummer_mit_null(" 01 "));
+        assert!(!nummer_mit_null("0,99"));
+        assert!(!nummer_mit_null("0.5"));
+        assert!(!nummer_mit_null("0"));
+        assert!(!nummer_mit_null("80331"));
+    }
+
+    #[test]
+    fn geldfeld_nimmt_komma_wie_kommazahl() {
+        assert!(zahl_erlaubt("12,50", 3));
+        assert!(!zahl_erlaubt("12,5,0", 3));
+        assert!(!zahl_erlaubt("12,50", 1));
     }
 }
 

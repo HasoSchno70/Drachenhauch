@@ -5379,7 +5379,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     fn belegung_auffrischen(&mut self) {
         if self.auto_playing { self.belegung = std::array::from_fn(|i| 97 + i as i64); return; }
         let namen: [Option<String>; 26] = std::array::from_fn(|i| {
-            map_key(97 + i as i64).and_then(|k| self.rl.get_key_name(k))
+            map_key(97 + i as i64).and_then(|k| self.tastenname_roh(k))
         });
         self.belegung = belegung_aus(&namen);
     }
@@ -5688,10 +5688,57 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Namen pro Bild ab, und die Antwort aendert sich nicht. Auf Plattformen
     /// ohne `GetKeyName` (Web) warnt raylib bei JEDEM Aufruf -- ungemerkt
     /// flutete das die Ausgabe und verdeckte alles andere.
+    /// Was eine Taste nach der Belegung schreibt (klein), oder None.
+    ///
+    /// **Unter Windows nicht ueber GLFW:** `glfwGetKeyName` liest die Namen
+    /// mit `ToUnicode`, und das veraendert den Tottasten-Zustand -- und der
+    /// gilt nicht je Prozess. Starteten mehrere Programme zugleich, kam der
+    /// Akzent der deutschen ´-Taste (in GLFWs Reihenfolge vor A) bei einem
+    /// ANDEREN an: aus A wurde "Á", aus Q "^" (gemessen: 8 Fenster zugleich,
+    /// 6 von 48 falsch; nacheinander 24 von 24 richtig). Das traf KEY_NAME$
+    /// und die Belegung fuer KEYHIT("z") und die Menue-Kuerzel.
+    /// `MapVirtualKeyW` liest die Belegung ohne Zustand; eine Tottaste
+    /// erkennt es am hoechsten Bit und liefert ihr eigenes Zeichen.
+    #[cfg(windows)]
+    fn tastenname_roh(&self, k: raylib::consts::KeyboardKey) -> Option<String> {
+        // ueber das windows-Crate, nicht #[link(name = "user32")]: das stellte
+        // user32.lib vor raylib, und dessen CloseWindow/ShowCursor heissen
+        // wie user32-Exporte (LNK2005, siehe a11y)
+        use windows::Win32::UI::Input::KeyboardAndMouse::{MapVirtualKeyW, MAPVK_VK_TO_CHAR, MAPVK_VSC_TO_VK_EX};
+        unsafe extern "C" {
+            fn glfwGetKeyScancode(taste: i32) -> i32;
+        }
+        // Ziffernblock wie GLFW: feste Tasten statt des Scancodes -- der
+        // meint ohne NumLock Pos1/Bild/Entf, und KEY_KP5 hiesse dann nichts.
+        const ZIFFERNBLOCK: [u32; 15] = [0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69,
+                                         0x6E, 0x6F, 0x6A, 0x6D, 0x6B]; // 0..9 . / * - +
+        let kc = k as i32;
+        let vk = if (320..=334).contains(&kc) {
+            ZIFFERNBLOCK[(kc - 320) as usize]
+        } else {
+            let scan = unsafe { glfwGetKeyScancode(kc) };
+            if scan <= 0 { return None; }
+            // GLFW zaehlt erweiterte Tasten als 0x100 + Scancode, Windows als 0xE0xx
+            let scan = if scan & 0x100 != 0 { 0xE000 | (scan as u32 & 0xFF) } else { scan as u32 };
+            unsafe { MapVirtualKeyW(scan, MAPVK_VSC_TO_VK_EX) }
+        };
+        if vk == 0 { return None; }
+        let z = unsafe { MapVirtualKeyW(vk, MAPVK_VK_TO_CHAR) } & 0xFFFF;
+        let c = char::from_u32(z)?;
+        if c == '\0' || c.is_control() { return None; }
+        Some(c.to_lowercase().collect())
+    }
+    #[cfg(not(windows))]
+    fn tastenname_roh(&self, k: raylib::consts::KeyboardKey) -> Option<String> {
+        // X11 (XkbKeycodeToKeysym) und macOS (UCKeyTranslate mit eigenem
+        // Tottasten-Zustand) lesen ohne geteilten Zustand.
+        self.rl.get_key_name(k)
+    }
+
     pub fn key_name(&mut self, code: i64) -> String {
         if let Some(n) = self.key_names.get(&code) { return n.clone(); }
         let Some(k) = map_key(code) else { return String::new(); };
-        let name = match self.rl.get_key_name(k) {
+        let name = match self.tastenname_roh(k) {
             Some(n) if !n.trim().is_empty() => n.to_uppercase(),
             _ => key_label(k).to_string(),
         };
@@ -7100,6 +7147,32 @@ fn std_schrift(size: f32) -> (raylib::core::text::WeakFont, f32, f32) {
      s as f32, (s / 10) as f32)
 }
 
+/// Wo die Grossbuchstaben der eingebauten Pixelschrift stehen, als Anteil der
+/// Schriftgroesse: von 0,1 bis 0,8 (gemessen an "H" bei 30 Punkten: Zeilen
+/// 13 bis 33 ab y = 10).
+const STD_KAPPE_OBEN: f32 = 0.1;
+const STD_KAPPE_UNTEN: f32 = 0.8;
+
+/// Groesse und senkrechter Versatz fuer einen Lauf der Ausweich-Schrift NEBEN
+/// der eingebauten Pixelschrift. Dieselbe Punktgroesse sieht dort ganz anders
+/// aus: die Pixelschrift fuellt sieben Zehntel ihrer Groesse mit
+/// Grossbuchstaben, eine TrueType-Schrift gut die Haelfte -- ein "€" in einem
+/// Betrag kam nur halb so hoch wie die Ziffern daneben (Vereinsverwaltung,
+/// 2026-10-12). Darum wird die Ausweich-Schrift an ihrem "H" auf dieselbe
+/// Grossbuchstabenhoehe gebracht und auf dieselbe Grundlinie gesetzt.
+/// EINE Rechnung fuer Zeichnen und Messen.
+fn an_pixelschrift(f: &raylib::ffi::Font, size: f32) -> (f32, f32) {
+    if f.baseSize <= 0 || f.glyphs.is_null() || f.recs.is_null() { return (size, 0.0); }
+    let i = unsafe { raylib::ffi::GetGlyphIndex(*f, 'H' as i32) }.max(0) as usize;
+    let (g, rec) = unsafe { (*f.glyphs.add(i), *f.recs.add(i)) };
+    if g.value != 'H' as i32 || rec.height <= 0.0 { return (size, 0.0); }
+    let b = f.baseSize as f32;
+    let kappe = rec.height / b;
+    let unten = (g.offsetY as f32 + rec.height) / b;
+    let sz = size * (STD_KAPPE_UNTEN - STD_KAPPE_OBEN) / kappe;
+    (sz, size * STD_KAPPE_UNTEN - sz * unten)
+}
+
 /// Breite eines Textes in der eingebauten Schrift samt Ausweich-Laeufen --
 /// EINE Rechnung fuer `breite_mit` und `miss_text`.
 fn std_breite(txt: &str, size: f32, ausweich: &[Ausweich]) -> f32 {
@@ -7114,8 +7187,11 @@ fn std_breite(txt: &str, size: f32, ausweich: &[Ausweich]) -> f32 {
     for (fi, lauf) in text_laeufe(-1, &txt, std_hat, ausweich) {
         if !erster { b += sp; }
         erster = false;
-        b += if fi == 0 { std.measure_text(&lauf, sz, sp).x }
-             else { ausweich[fi - 1].font.measure_text(&lauf, sz, sp).x };
+        b += if fi == 0 { std.measure_text(&lauf, sz, sp).x } else {
+            let f = &ausweich[fi - 1].font;
+            let (fsz, _) = an_pixelschrift(f, sz);
+            f.measure_text(&lauf, fsz, sp).x
+        };
     }
     b
 }
@@ -7175,8 +7251,9 @@ fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, siz
                     cx += std.measure_text(&lauf, sz, sp).x;
                 } else {
                     let f = &ausweich[fi - 1].font;
-                    sdf::mit(-1, || d.draw_text_ex(f, &lauf, Vector2::new(cx, y), sz, sp, col));
-                    cx += f.measure_text(&lauf, sz, sp).x;
+                    let (fsz, dy) = an_pixelschrift(f, sz);
+                    sdf::mit(-1, || d.draw_text_ex(f, &lauf, Vector2::new(cx, y + dy), fsz, sp, col));
+                    cx += f.measure_text(&lauf, fsz, sp).x;
                 }
             }
             return;

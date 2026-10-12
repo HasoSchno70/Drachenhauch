@@ -3675,6 +3675,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_FORM_CONFLICT$",
+   "kind": "core",
+   "signature": "GUI_FORM_CONFLICT$(win[, formular$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FORM_VERSION",
+   "kind": "core",
+   "signature": "GUI_FORM_VERSION(win, spalte$[, formular$])",
+   "module": "gui"
+  },
+  {
    "name": "GUI_FORM_LOAD",
    "kind": "core",
    "signature": "GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])",
@@ -3683,7 +3695,7 @@
   {
    "name": "GUI_FORM_SAVE",
    "kind": "core",
-   "signature": "GUI_FORM_SAVE(win, db, tabelle$, id[, formular$])",
+   "signature": "GUI_FORM_SAVE(win, db, tabelle$, id[, formular$[, ueberschreiben]])",
    "module": "gui"
   },
   {

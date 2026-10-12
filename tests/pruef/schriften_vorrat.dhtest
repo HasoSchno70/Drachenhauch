@@ -384,3 +384,38 @@ END FUNCTION
 --- system windows
 --- erwartet
 etwas anders TRUE, aber nur am zeichen TRUE
+
+=== das euro in der pixelschrift ist so hoch wie ein grossbuchstabe
+' Fehlt ein Zeichen in der eingebauten Pixelschrift, kommt es aus der
+' Ausweichschrift. Bis 2026.30 in DERSELBEN Punktgroesse -- aber eine
+' TrueType-Schrift fuellt ihre Groesse ganz anders: das "€" eines Betrags
+' kam nur gut halb so hoch wie die Ziffern daneben (gesehen an der
+' Vereinsverwaltung). Jetzt steht es von Ober- bis Unterkante wie ein "H".
+SCREEN(200, 60, "Euro", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    CLS(RGB(255, 255, 255))
+    TEXT_SIZE(30)
+    TEXT(10, 10, "H", RGB(0, 0, 0))
+    TEXT(80, 10, "€", RGB(0, 0, 0))
+    FLIP()
+NEXT
+SAVESCREENSHOT("euro.png")
+DIM b AS IMAGE : b = LOADIMAGE("euro.png")
+FUNCTION kante(x0 AS INTEGER, x1 AS INTEGER, oben AS BOOLEAN) AS INTEGER
+    DIM y AS INTEGER, x AS INTEGER
+    FOR y = 0 TO 59
+        DIM zeile AS INTEGER : zeile = IIF(oben, y, 59 - y)
+        FOR x = x0 TO x1
+            IF (GETPIXEL(b, x, zeile) BAND &HFF) < 128 THEN RETURN zeile
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+PRINT "oben gleich "; ABS(kante(5, 60, TRUE) - kante(70, 150, TRUE)) <= 1
+PRINT "unten gleich "; ABS(kante(5, 60, FALSE) - kante(70, 150, FALSE)) <= 1
+--- system windows
+--- erwartet
+oben gleich TRUE
+unten gleich TRUE

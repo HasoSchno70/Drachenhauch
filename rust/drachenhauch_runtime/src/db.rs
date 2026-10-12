@@ -735,7 +735,12 @@ mod my {
         // stillschweigend unverschluesselt (gefunden in der CI unter Linux,
         // unter Windows gibt es die Socket nicht). Verbunden wird an die
         // Adresse, die im Ziel steht.
+        // CLIENT_FOUND_ROWS: ein UPDATE zaehlt die GETROFFENEN Zeilen, nicht nur
+        // die geaenderten -- wie SQLite und PostgreSQL. Sonst lieferte
+        // DB_EXEC bei einem UPDATE ohne echte Aenderung 0, und ein Programm,
+        // das fragt "gibt es die Zeile noch?", hielte sie fuer geloescht.
         let basis = || mysql::OptsBuilder::from_opts(opts.clone())
+            .additional_capabilities(mysql::consts::CapabilityFlags::CLIENT_FOUND_ROWS)
             .prefer_socket(false)
             .tcp_connect_timeout(Some(std::time::Duration::from_secs(10)));
         let mit_tls = |pruefen: bool, b: mysql::OptsBuilder| {
