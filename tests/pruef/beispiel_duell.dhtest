@@ -173,6 +173,87 @@ eingaben kamen fast alle an TRUE
 kaum korrekturen TRUE
 rueckgabe 0 0
 
+=== die letzte eingabe kommt auch an wenn ihr paket verloren geht
+' Die letzten Eingaben haben kein naechstes Paket, das sie mittraegt -- geht
+' das letzte verloren, kommt der Wirt nie bei ihnen an, und der Gast stand am
+' Ende einen Schritt weiter (in der CI unter macOS gesehen). Er schickt das
+' letzte Paket jetzt nach, bis ein Stand mit genau dieser Eingabe
+' zurueckkommt. 30 % Verlust mit Saat 1: dort geht das letzte Paket verloren
+' (ohne das Nachsenden in 3 von 3 Laeufen ein Schritt Unterschied).
+IMPORT "hilfe.dh"
+DIM w AS INTEGER : w = starten("main.dh", ["wirt", "47341", "--bot", "150", "--ohne-fenster"])
+DIM r AS INTEGER : r = starten("relay.dh", ["47342", "127.0.0.1", "47341", "60", "20", "30", "1", "30"])
+warteMs(500)
+DIM g AS INTEGER : g = starten("main.dh", ["gast", "127.0.0.1", "47341", "--udp-port", "47342", "--bot", "150", "--ohne-fenster"])
+warten([w, g])
+PROCESS_KILL(prozesse[r])
+PRINT "gleich "; gleich(w, g)
+PRINT "rueckgabe "; code(w); " "; code(g)
+IF fehler <> "" THEN PRINT "stderr "; fehler
+--- datei hilfe.dh
+' Startet main.dh/relay.dh als eigene Prozesse und sammelt ihre Ausgaben.
+DIM prozesse AS ARRAY OF INTEGER : prozesse = []
+DIM ausgaben AS ARRAY OF STRING : ausgaben = []
+DIM fehler AS STRING
+FUNCTION starten(prog AS STRING, args AS ARRAY OF STRING) AS INTEGER
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", ["run", "{sammlung}/../../examples/duell/" + prog, "--"] + args)
+    ARRAY_PUSH(prozesse, p) : ARRAY_PUSH(ausgaben, "")
+    RETURN LEN(prozesse) - 1
+END FUNCTION
+SUB sammeln()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(prozesse) - 1
+        ausgaben[i] = ausgaben[i] + PROCESS_READ$(prozesse[i])
+        fehler = fehler + PROCESS_ERR$(prozesse[i])
+    NEXT
+END SUB
+SUB warteMs(ms AS INTEGER)
+    DIM bis AS INTEGER : bis = MILLIS() + ms
+    WHILE MILLIS() < bis : sammeln() : SLEEP(30) : WEND
+END SUB
+' bis die genannten Prozesse beendet sind (hoechstens 60 s)
+SUB warten(welche AS ARRAY OF INTEGER)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    DIM leer AS INTEGER
+    WHILE leer < 5 AND MILLIS() - t0 < 60000
+        sammeln()
+        DIM noch AS BOOLEAN : noch = FALSE
+        DIM k AS INTEGER
+        FOR EACH k IN welche
+            IF PROCESS_RUNNING(prozesse[k]) THEN noch = TRUE
+        NEXT
+        IF noch THEN leer = 0 ELSE leer = leer + 1
+        SLEEP(30)
+    WEND
+END SUB
+FUNCTION code(i AS INTEGER) AS INTEGER
+    RETURN PROCESS_CODE(prozesse[i])
+END FUNCTION
+FUNCTION zeileMit$(i AS INTEGER, anfang AS STRING) AS STRING
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(REPLACE$(ausgaben[i], CHR$(13), ""), CHR$(10))
+        IF LEFT$(z, LEN(anfang)) = anfang THEN RETURN z
+    NEXT
+    RETURN "(keine Zeile '" + anfang + "')"
+END FUNCTION
+' die Zahl hinter einem Wort in der Zeile, die so anfaengt
+FUNCTION zahlNach(i AS INTEGER, anfang AS STRING, wort AS STRING) AS INTEGER
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(zeileMit$(i, anfang), " ")
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(teile) - 2
+        IF teile[j] = wort THEN RETURN VAL(teile[j + 1])
+    NEXT
+    RETURN -1
+END FUNCTION
+' Steht das Gastschiff bei beiden an derselben Stelle? (Zeile "wirt gast X Y
+' leben ..." gegen "gast schiff X Y leben ...")
+FUNCTION gleich(wirt AS INTEGER, gast AS INTEGER) AS BOOLEAN
+    RETURN MID$(zeileMit$(wirt, "wirt gast"), 10) = MID$(zeileMit$(gast, "gast schiff"), 12)
+END FUNCTION
+--- erwartet
+gleich TRUE
+rueckgabe 0 0
+
 === der wirt ueberlebt einen hart beendeten gast und nimmt den naechsten
 ' Der erste Gast wird mitten im Spiel beendet (kein TSCHUESS). Bis
 ' 2026-10-11 brach der Wirt dabei ab: sein naechstes NET_UDP_RECV meldete
