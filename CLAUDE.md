@@ -1856,7 +1856,7 @@ hinter dem Abgriff -- `MASTER_GAIN` (gesetzt in `AUDIO_BUS_VOLUME("master")`)
 rechnet sie fuer Mitschnitt und Pegel ein; eine Master-Lautstaerke ueber
 `AUDIO_MODULATE` kennen beide nicht (dokumentiert). (4) Neu **`AUDIO_PEAK()`**
 (hoechster Ausschlag seit dem letzten Aufruf, `PEAK` per `fetch_update`); der
-Sequencer klippte mit sechs Spuren bis 1,13 und laeuft jetzt mit SFX-Bus 0,4
+Sequencer klippte mit sechs Spuren bis 1,13 und laeuft jetzt mit SFX-Bus 0,32 (bei 0,4 schwankte die Spitze 0,88..1,01 -- Echo in ms gegen Noten auf Ticks)
 und Pegel in der Statusleiste. (5) **Ein Menuekuerzel auf der Leertaste nahm
 einem Kaestchen mit Fokus die Taste** (es kippte UND das Kuerzel feuerte):
 `gui::widget_nimmt_taste` -- Leertaste/Enter fuer Knoepfe, Kaestchen,
@@ -1867,6 +1867,35 @@ die neuen fallen mit 2026.25, vier Verfaelschungen des Sequencers (Swing,
 stumm, Laden, Bus 1,0) je in ihrem Fall. **Falle:** eine Shift-Taste per
 PostMessage haelt nicht (GLFW fragt `GetKeyState`) -- Umschalt-Kuerzel im Test
 ueber das Menue.
+
+## Dogfooding Netz: Duell (2026-10-11)
+
+`examples/duell/` (`main.dh` Wirt/Gast, `spiel.dh` die gemeinsame Simulation
+im festen Takt, `relay.dh` ein schlechtes Netz mit Verzoegerung, Schwankung,
+Verlust): TCP fuer Hallo/Willkommen/Rundenende, UDP fuer Eingaben (je Paket
+die zwei vorigen mit) und den Stand als Binaerpaket; der Gast rechnet sein
+Schiff voraus und gleicht mit jedem Stand ab, der Wirt rechnet das Gastschiff
+im Takt der GAST-Eingaben (nicht seiner eigenen Schritte). `--bot N
+--ohne-fenster` fuer Pruefungen. Der Nutzer hat keinen zweiten Rechner --
+geprueft ueber zwei Prozesse auf 127.0.0.1, das Relay und die WSL (Wirt als
+Linux-dhrt, Gast unter Windows ueber 172.x). Funde in `net.rs`: (1) **UDP nur
+Text** -- `NET_UDP_SEND` nimmt jetzt einen BUFFER, neu `NET_UDP_RECV_BYTES`.
+(2) **Absender bei IPv6** nur als `"::1:5000"` -- neu `NET_UDP_LAST_HOST$`/
+`NET_UDP_LAST_PORT` (das Referenzbuch empfahl `SPLIT(adr, ":")[0]`, bei IPv6
+leer). (3) **Ein hart beendeter Gast liess den Wirt abbrechen**: Windows meldet
+ein UDP-Paket an einen geschlossenen Port beim NAECHSTEN recv_from als 10054,
+und TCP-RECV/SEND warfen bei RST -- `verbindung_weg` macht daraus einen
+Zustand (leer/0, `NET_IS_CONNECTED` FALSE), UDP liest weiter. (4) **Die
+letzte Nachricht vor NET_CLOSE ging verloren** (5 von 5), wenn noch
+Ungelesenes da war (RST verwirft den Sendepuffer der Gegenseite) -- `Drop for
+NetSock` liest erst ab und schickt FIN. (5) **Jedes UDP-Paket startete einen
+Faden** fuer die Namensaufloesung, auch fuer `127.0.0.1` -- IP-Literale gehen
+jetzt direkt: 2000 Pakete 231 -> 17 ms. Tests `modules_net` (+5, alle fallen
+mit 2026.25), `beispiel_duell` (4, `--- langsam`: Schleife, Relay 80/30/10 %,
+hart beendeter Gast + naechster, Absage). Eigene Falle: `VAL("172.23.27.16")`
+ist 172.23 -- ein Port ist nur ein Argument aus Ziffern; mit `127.0.0.1` fiel
+es nicht auf, weil die Vorgabe dieselbe Adresse war. Nicht geprueft: zwei
+echte Rechner hinter Routern/Firewalls.
 
 ## Zeichenketten anhaengen ist linear (2026-09-24)
 

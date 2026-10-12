@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 2130,
+ "count": 2133,
  "builtins": [
   {
    "name": "ABS",
@@ -8073,6 +8073,18 @@
    "module": "net"
   },
   {
+   "name": "NET_UDP_LAST_HOST$",
+   "kind": "core",
+   "signature": "NET_UDP_LAST_HOST$(sock) AS STRING",
+   "module": "net"
+  },
+  {
+   "name": "NET_UDP_LAST_PORT",
+   "kind": "core",
+   "signature": "NET_UDP_LAST_PORT(sock) AS INTEGER",
+   "module": "net"
+  },
+  {
    "name": "NET_UDP_OPEN",
    "kind": "core",
    "signature": "NET_UDP_OPEN()",
@@ -8091,9 +8103,15 @@
    "module": "net"
   },
   {
+   "name": "NET_UDP_RECV_BYTES",
+   "kind": "core",
+   "signature": "NET_UDP_RECV_BYTES(sock, max_bytes) AS BUFFER",
+   "module": "net"
+  },
+  {
    "name": "NET_UDP_SEND",
    "kind": "core",
-   "signature": "NET_UDP_SEND(sock, host, port, text)",
+   "signature": "NET_UDP_SEND(sock, host, port, text_oder_puffer)",
    "module": "net"
   },
   {

@@ -100,8 +100,10 @@ TRUE 3 TRUE 12 TRUE 24 FALSE
 === der mitschnitt klingt mit hall und uebersteuert nicht
 ' Strg+Umschalt+E im Programm: zwei Durchgaenge live mit allen Effekten.
 ' Sechs Spuren uebereinander gingen auf vollem SFX-Bus bis 1,13 -- der
-' Mixer klippte; auf 40 Prozent bleibt die Spitze darunter, und die
-' Statusleiste meldet kein Uebersteuern.
+' Mixer klippte. Die Spitze schwankt von Lauf zu Lauf (das Echo laeuft in
+' Millisekunden, die Noten auf Uhr-Ticks): auf 40 Prozent 0,88 bis 1,01 in
+' acht Laeufen -- der Fall fiel ab und zu mit "uebersteuert TRUE". Auf 32
+' Prozent 0,72 bis 0,85; geprueft wird "laut genug und nicht ueber 1,0".
 DIM prBild AS INTEGER
 DIM prUeber AS BOOLEAN
 --- programm ../../examples/sequencer/main.dh nach DIM beenden AS BOOLEAN
@@ -118,5 +120,5 @@ END IF
 uebersteuert FALSE
 Geschrieben: muster_live.wav (mit Effekten)
 --- ton _programm/muster_live.wav
-spitze 0.85 +-0.12
+spitze 0.75 +-0.25
 dauer 5.36 +-0.15

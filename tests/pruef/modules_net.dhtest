@@ -383,3 +383,144 @@ DIM cli AS NET_SOCKET : cli = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(lst
 PRINT NET_RECV_BYTES(cli, 0)
 --- fehler
 NET_RECV_BYTES: max_bytes muss > 0 sein
+
+=== udp schickt und empfaengt rohe bytes
+' Ein Spielstand ist kein UTF-8: eine Kommazahl und ein 0xFF muessen
+' unveraendert ankommen (Netz-Runde, 2026-10-11 -- vorher nahm NET_UDP_SEND
+' nur Text, und NET_UDP_RECV las jedes Datagramm als UTF-8).
+IMPORT "net"
+DIM a AS NET_UDP : a = NET_UDP_BIND(0, "127.0.0.1")
+DIM b AS NET_UDP : b = NET_UDP_BIND(0, "127.0.0.1")
+DIM p AS BUFFER : p = BUFFER_FROM_HEX("02FF00")
+BUFFER_RESIZE(p, 7)
+BUFFER_SET_F32(p, 3, 3.25)
+PRINT NET_UDP_SEND(a, "127.0.0.1", NET_UDP_PORT(b), p)
+DIM r AS BUFFER
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    r = NET_UDP_RECV_BYTES(b, 64)
+    IF BUFFER_LEN(r) > 0 THEN EXIT FOR
+    SLEEP(5)
+NEXT
+PRINT BUFFER_TO_HEX$(r); " "; BUFFER_GET_F32(r, 3)
+PRINT NET_UDP_LAST_HOST$(b); " "; (NET_UDP_LAST_PORT(b) = NET_UDP_PORT(a))
+PRINT BUFFER_LEN(NET_UDP_RECV_BYTES(b, 64))
+--- erwartet
+7
+02ff0000005040 3.25
+127.0.0.1 TRUE
+0
+
+=== udp absender getrennt auch bei ipv6
+' NET_UDP_LAST_FROM schreibt "::1:5000" -- getrennt muss man nicht wissen,
+' dass am letzten Doppelpunkt geschnitten wird.
+IMPORT "net"
+DIM a AS NET_UDP, b AS NET_UDP
+TRY
+    a = NET_UDP_BIND(0, "::1")
+    b = NET_UDP_BIND(0, "::1")
+CATCH e
+    PRINT "UEBERSPRINGEN: kein IPv6 auf dieser Maschine"
+    END
+END TRY
+NET_UDP_SEND(a, "::1", NET_UDP_PORT(b), "v6")
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    t = NET_UDP_RECV(b, 64)
+    IF t <> "" THEN EXIT FOR
+    SLEEP(5)
+NEXT
+PRINT t; " "; NET_UDP_LAST_HOST$(b); " "; (NET_UDP_LAST_PORT(b) = NET_UDP_PORT(a))
+--- erwartet
+v6 ::1 TRUE
+
+=== udp liest weiter wenn die gegenseite weg ist
+' Windows meldet ein Datagramm an einen geschlossenen Port beim NAECHSTEN
+' Lesen als 10054 -- ein Wirt, dessen Gast gegangen war, brach damit ab.
+IMPORT "net"
+DIM a AS NET_UDP : a = NET_UDP_BIND(0, "127.0.0.1")
+DIM b AS NET_UDP : b = NET_UDP_BIND(0, "127.0.0.1")
+DIM weg AS NET_UDP : weg = NET_UDP_BIND(0, "127.0.0.1")
+DIM pw AS INTEGER : pw = NET_UDP_PORT(weg)
+NET_UDP_CLOSE(weg)
+NET_UDP_SEND(a, "127.0.0.1", pw, "hallo?")
+SLEEP(100)
+PRINT "'"; NET_UDP_RECV(a, 100); "'"
+NET_UDP_SEND(b, "127.0.0.1", NET_UDP_PORT(a), "noch da")
+DIM t AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    t = NET_UDP_RECV(a, 100)
+    IF t <> "" THEN EXIT FOR
+    SLEEP(5)
+NEXT
+PRINT t
+--- erwartet
+''
+noch da
+
+=== tcp nach hartem abbruch ist ein zustand und kein fehler
+' Liest die Gegenseite nicht und schliesst, kommt ein RST. Bis 2026-10-11
+' warfen NET_RECV und NET_SEND dann einen Laufzeitfehler (10054); die Doku
+' versprach NET_IS_CONNECTED = FALSE.
+IMPORT "net"
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(0, "127.0.0.1")
+DIM gast AS NET_SOCKET : gast = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(lst))
+DIM wirt AS NET_SOCKET
+DIM i AS INTEGER
+FOR i = 1 TO 100
+    wirt = NET_TCP_ACCEPT(lst)
+    IF wirt <> NIL THEN EXIT FOR
+    SLEEP(10)
+NEXT
+NET_SEND(wirt, "ungelesen")
+SLEEP(100)
+NET_CLOSE(gast)
+SLEEP(200)
+DIM t AS STRING
+FOR i = 1 TO 20
+    t = NET_RECV(wirt, 100)
+    IF NOT NET_IS_CONNECTED(wirt) THEN EXIT FOR
+    SLEEP(20)
+NEXT
+PRINT "'"; t; "' "; NET_IS_CONNECTED(wirt)
+PRINT NET_SEND(wirt, "noch da?"); " "; NET_IS_CONNECTED(wirt)
+--- erwartet
+'' FALSE
+0 FALSE
+
+=== die letzte nachricht vor net close kommt an
+' Schliesst man einen Socket, dessen Gegenseite noch ungelesene Daten
+' geschickt hat, bricht das Betriebssystem hart ab (RST) -- und die
+' Gegenseite verwarf, was ihr gerade noch geschickt worden war. Gemessen:
+' 5 von 5 Absagen kamen nicht an. NET_CLOSE liest jetzt erst das Ungelesene.
+IMPORT "net"
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(0, "127.0.0.1")
+DIM versuch AS INTEGER
+FOR versuch = 1 TO 3
+    DIM c AS NET_SOCKET : c = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(lst))
+    NET_SEND(c, "HALLO Gast" + CHR$(10))
+    DIM s AS NET_SOCKET
+    DIM i AS INTEGER
+    FOR i = 1 TO 100
+        s = NET_TCP_ACCEPT(lst)
+        IF s <> NIL THEN EXIT FOR
+        SLEEP(5)
+    NEXT
+    SLEEP(50)
+    NET_SEND(s, "BESETZT" + CHR$(10))
+    NET_CLOSE(s)
+    DIM t AS STRING : t = ""
+    FOR i = 1 TO 30
+        t = t + NET_RECV(c, 100)
+        IF NOT NET_IS_CONNECTED(c) THEN EXIT FOR
+        SLEEP(10)
+    NEXT
+    PRINT TRIM$(t); " "; NET_IS_CONNECTED(c)
+    NET_CLOSE(c)
+NEXT
+--- erwartet
+BESETZT FALSE
+BESETZT FALSE
+BESETZT FALSE

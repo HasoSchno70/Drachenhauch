@@ -1,0 +1,134 @@
+' spiel.dh -- die Simulation des Duells, ohne Netz und ohne Bild.
+'
+' Wirt und Gast rechnen mit DENSELBEN Unterprogrammen: der Wirt fuer die
+' Wahrheit, der Gast fuer die Vorhersage seines eigenen Schiffs. Liefen
+' beide auseinander, sprange das Schiff des Gastes bei jeder Korrektur.
+' Darum ist alles hier ein fester Schritt (TAKT je Sekunde), ohne MILLIS().
+
+CONST ARENA_B = 800
+CONST ARENA_H = 600
+CONST TAKT = 30                 ' Simulationsschritte je Sekunde
+CONST DT = 1.0 / 30.0
+CONST DREH = 4.2                ' Bogenmass je Sekunde
+CONST SCHUB = 260.0             ' Pixel je Sekunde^2
+CONST REIBUNG = 0.985           ' je Schritt
+CONST MAX_TEMPO = 320.0
+CONST KUGEL_TEMPO = 520.0
+CONST KUGEL_LEBEN = 1.1         ' Sekunden
+CONST NACHLADEN = 0.28          ' Sekunden zwischen zwei Schuessen
+CONST TREFFER_ABSTAND = 15.0
+CONST MAX_KUGELN = 32
+CONST LEBEN_START = 5
+
+' Eingabe-Bits: eine Eingabe ist ein Byte
+CONST E_LINKS = 1
+CONST E_RECHTS = 2
+CONST E_SCHUB = 4
+CONST E_SCHUSS = 8
+
+CLASS Schiff
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+    DIM winkel AS FLOAT
+    DIM leben AS INTEGER
+    DIM nachladen AS FLOAT
+    DIM schild AS FLOAT         ' Sekunden unverwundbar nach einem Treffer
+
+    SUB setzen(px AS FLOAT, py AS FLOAT, w AS FLOAT)
+        Self.x = px : Self.y = py : Self.vx = 0 : Self.vy = 0
+        Self.winkel = w : Self.nachladen = 0 : Self.schild = 1.5
+    END SUB
+
+    ' Ein Schritt mit einer Eingabe. Liefert TRUE, wenn das Schiff schiesst --
+    ' die Kugel legt der Aufrufer an (nur der Wirt hat die Kugeln).
+    FUNCTION schritt(e AS INTEGER) AS BOOLEAN
+        IF (e BAND E_LINKS) <> 0 THEN Self.winkel = Self.winkel - DREH * DT
+        IF (e BAND E_RECHTS) <> 0 THEN Self.winkel = Self.winkel + DREH * DT
+        IF (e BAND E_SCHUB) <> 0 THEN
+            Self.vx = Self.vx + COS(Self.winkel) * SCHUB * DT
+            Self.vy = Self.vy + SIN(Self.winkel) * SCHUB * DT
+        END IF
+        Self.vx = Self.vx * REIBUNG
+        Self.vy = Self.vy * REIBUNG
+        DIM t AS FLOAT : t = SQR(Self.vx * Self.vx + Self.vy * Self.vy)
+        IF t > MAX_TEMPO THEN
+            Self.vx = Self.vx / t * MAX_TEMPO
+            Self.vy = Self.vy / t * MAX_TEMPO
+        END IF
+        Self.x = umlauf(Self.x + Self.vx * DT, ARENA_B)
+        Self.y = umlauf(Self.y + Self.vy * DT, ARENA_H)
+        IF Self.nachladen > 0 THEN Self.nachladen = Self.nachladen - DT
+        IF Self.schild > 0 THEN Self.schild = Self.schild - DT
+        IF (e BAND E_SCHUSS) <> 0 AND Self.nachladen <= 0 AND Self.leben > 0 THEN
+            Self.nachladen = NACHLADEN
+            RETURN TRUE
+        END IF
+        RETURN FALSE
+    END FUNCTION
+END CLASS
+
+FUNCTION umlauf(v AS FLOAT, grenze AS INTEGER) AS FLOAT
+    IF v < 0 THEN RETURN v + grenze
+    IF v >= grenze THEN RETURN v - grenze
+    RETURN v
+END FUNCTION
+
+' --- Kugeln (nur beim Wirt simuliert, beim Gast aus dem Stand gezeichnet) --
+DIM kx[MAX_KUGELN] AS FLOAT
+DIM ky[MAX_KUGELN] AS FLOAT
+DIM kvx[MAX_KUGELN] AS FLOAT
+DIM kvy[MAX_KUGELN] AS FLOAT
+DIM kzeit[MAX_KUGELN] AS FLOAT      ' Restleben; <= 0 = frei
+DIM kvon[MAX_KUGELN] AS INTEGER     ' 0 = Wirt, 1 = Gast
+
+SUB kugelnLeeren()
+    DIM i AS INTEGER
+    FOR i = 0 TO MAX_KUGELN - 1 : kzeit[i] = 0 : NEXT
+END SUB
+
+SUB kugelAbschiessen(s AS Schiff, von AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO MAX_KUGELN - 1
+        IF kzeit[i] <= 0 THEN
+            kx[i] = s.x + COS(s.winkel) * 14
+            ky[i] = s.y + SIN(s.winkel) * 14
+            kvx[i] = s.vx + COS(s.winkel) * KUGEL_TEMPO
+            kvy[i] = s.vy + SIN(s.winkel) * KUGEL_TEMPO
+            kzeit[i] = KUGEL_LEBEN
+            kvon[i] = von
+            RETURN
+        END IF
+    NEXT
+END SUB
+
+' Ein Schritt der Kugeln. Ein Treffer kostet ein Leben, setzt das Schiff an
+' einen festen Platz zurueck und gibt ihm kurz einen Schild. Liefert, wer
+' getroffen wurde (-1 = niemand, sonst 0/1; bei zwei Treffern im selben
+' Schritt der zweite).
+FUNCTION kugelnSchritt(s0 AS Schiff, s1 AS Schiff) AS INTEGER
+    DIM wer AS INTEGER : wer = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO MAX_KUGELN - 1
+        IF kzeit[i] > 0 THEN
+            kx[i] = umlauf(kx[i] + kvx[i] * DT, ARENA_B)
+            ky[i] = umlauf(ky[i] + kvy[i] * DT, ARENA_H)
+            kzeit[i] = kzeit[i] - DT
+            DIM ziel AS Schiff
+            IF kvon[i] = 0 THEN ziel = s1 ELSE ziel = s0
+            IF ziel.leben > 0 AND ziel.schild <= 0 THEN
+                IF HYPOT(kx[i] - ziel.x, ky[i] - ziel.y) < TREFFER_ABSTAND THEN
+                    kzeit[i] = 0
+                    ziel.leben = ziel.leben - 1
+                    IF kvon[i] = 0 THEN
+                        wer = 1 : ziel.setzen(ARENA_B * 0.75, ARENA_H * 0.5, PI)
+                    ELSE
+                        wer = 0 : ziel.setzen(ARENA_B * 0.25, ARENA_H * 0.5, 0)
+                    END IF
+                END IF
+            END IF
+        END IF
+    NEXT
+    RETURN wer
+END FUNCTION

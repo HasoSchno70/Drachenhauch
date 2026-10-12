@@ -1,0 +1,594 @@
+' duell -- ein Weltraum-Duell fuer zwei ueber das Netz.
+'
+' Einer ist Wirt, der andere verbindet sich als Gast:
+'
+'     dhrt run main.dh -- wirt [port]
+'     dhrt run main.dh -- gast 192.168.1.20 [port]
+'
+' Ohne Argumente fragt ein kleines Menue. Steuerung: Pfeile links/rechts
+' drehen, Pfeil hoch gibt Schub, Leertaste schiesst. Fuenf Leben; wer zuerst
+' keins mehr hat, verliert, und nach drei Sekunden beginnt eine neue Runde.
+'
+' Wie es laeuft: der Gast verbindet sich ueber TCP (Hallo, Willkommen,
+' Rundenende -- alles, was ankommen MUSS). Das Spiel selbst geht ueber UDP:
+' der Gast schickt 30-mal je Sekunde seine Eingabe (mit den zwei vorigen,
+' falls ein Paket verloren geht), der Wirt rechnet die Welt und schickt den
+' Stand zurueck. Damit sich das eigene Schiff trotz Verzoegerung sofort
+' bewegt, rechnet der Gast es selbst voraus und gleicht es mit jedem Stand
+' des Wirts ab; das fremde Schiff zeigt er zwischen den letzten zwei Staenden.
+'
+' Fuer Pruefungen: `--bot N` spielt N Schritte mit festen Eingaben und gibt
+' danach eine Bilanz aus, `--ohne-fenster` laeuft ganz ohne Bild, und
+' `--udp-port N` schickt die Pakete des Gastes ueber relay.dh (Verzoegerung,
+' Schwankung und Verlust zum Ausprobieren auf einem Rechner).
+IMPORT "net"
+IMPORT "regex"
+IMPORT "spiel.dh"
+
+' Text in einer Groesse -- TEXT selbst nimmt keine.
+SUB txt(x AS FLOAT, y AS FLOAT, t AS STRING, farbe AS INTEGER, groesse AS INTEGER)
+    TEXT_SIZE(groesse)
+    TEXT(x, y, t, farbe)
+END SUB
+
+CONST PORT_VORGABE = 47110
+CONST EINGABEN_MAX = 256        ' Ring der eigenen Eingaben (Gast)
+
+' --- Argumente --------------------------------------------------------------
+DIM rolle AS STRING              ' "wirt" oder "gast"
+DIM adresse AS STRING : adresse = "127.0.0.1"
+DIM port AS INTEGER : port = PORT_VORGABE
+DIM botSchritte AS INTEGER : botSchritte = 0
+DIM mitFenster AS BOOLEAN : mitFenster = TRUE
+DIM udpPort AS INTEGER : udpPort = 0     ' Gast: UDP an einen anderen Port (relay.dh)
+DIM ai AS INTEGER : ai = 0
+WHILE ai < ARGC()
+    DIM a AS STRING : a = ARG$(ai)
+    IF a = "--bot" THEN
+        botSchritte = VAL(ARG$(ai + 1)) : ai = ai + 1
+    ELSEIF a = "--udp-port" THEN
+        udpPort = VAL(ARG$(ai + 1)) : ai = ai + 1
+    ELSEIF a = "--ohne-fenster" THEN
+        mitFenster = FALSE
+    ELSEIF a = "wirt" OR a = "gast" THEN
+        rolle = a
+    ELSEIF REGEX_TEST(a, "^[0-9]+$") THEN
+        ' nur Ziffern: ein Port (VAL("192.168.1.20") waere 192.168)
+        port = VAL(a)
+    ELSEIF rolle = "gast" THEN
+        adresse = a
+    END IF
+    ai = ai + 1
+WEND
+
+IF mitFenster THEN
+    SCREEN(ARENA_B, ARENA_H, "Duell")
+    SETFPS(60)
+END IF
+
+' --- Menue (nur ohne Argumente) ------------------------------------------------
+IF rolle = "" THEN
+    IF NOT mitFenster THEN
+        EPRINT("duell: ohne Fenster bitte 'wirt' oder 'gast ADRESSE' angeben")
+        EXIT(2)
+    END IF
+    DIM getippt AS STRING : getippt = "127.0.0.1"
+    WHILE rolle = "" AND NOT QUITREQUESTED()
+        DIM z AS STRING : z = INKEY$()
+        IF z = "w" OR z = "W" THEN rolle = "wirt"
+        IF z = CHR$(8) AND LEN(getippt) > 0 THEN getippt = LEFT$(getippt, LEN(getippt) - 1)
+        IF LEN(z) = 1 AND INSTR("0123456789.:abcdefABCDEF", z) >= 0 THEN getippt = getippt + z
+        IF z = CHR$(13) THEN rolle = "gast" : adresse = getippt
+        CLS(RGB(8, 10, 24))
+        txt(260, 200, "DUELL", RGB(120, 220, 255), 48)
+        txt(200, 290, "W  -- Wirt sein (andere verbinden sich hierher)", WHITE, 18)
+        txt(200, 330, "Adresse eintippen und Enter -- als Gast verbinden:", WHITE, 18)
+        txt(200, 360, getippt + "_", RGB(255, 200, 80), 22)
+        txt(200, 420, "Port " + STR$(port), RGB(140, 140, 160), 16)
+        FLIP()
+    WEND
+    IF rolle = "" THEN END
+END IF
+
+' --- Welt ---------------------------------------------------------------------
+DIM s0 AS Schiff : s0 = NEW Schiff()       ' der Wirt
+DIM s1 AS Schiff : s1 = NEW Schiff()       ' der Gast
+DIM tick AS INTEGER                        ' Schritte des Wirts
+DIM sieger AS INTEGER : sieger = -1
+DIM pauseBis AS INTEGER : pauseBis = 0     ' MILLIS bis zur neuen Runde
+
+SUB rundeAnfangen()
+    s0.leben = LEBEN_START : s1.leben = LEBEN_START
+    s0.setzen(ARENA_B * 0.25, ARENA_H * 0.5, 0)
+    s1.setzen(ARENA_B * 0.75, ARENA_H * 0.5, PI)
+    kugelnLeeren()
+    sieger = -1
+END SUB
+rundeAnfangen()
+
+' --- Eingabe (Tastatur oder Bot) -----------------------------------------------
+FUNCTION eingabeLesen(nr AS INTEGER) AS INTEGER
+    DIM e AS INTEGER
+    IF botSchritte > 0 THEN
+        ' feste, aber nicht triviale Folge: drehen, Schub, ab und zu schiessen
+        DIM t AS INTEGER : t = nr + IIF(rolle = "wirt", 0, 17)
+        IF (t \ 20) MOD 3 = 0 THEN e = e BOR E_LINKS
+        IF (t \ 20) MOD 3 = 1 THEN e = e BOR E_RECHTS
+        IF (t \ 7) MOD 2 = 0 THEN e = e BOR E_SCHUB
+        IF t MOD 11 = 0 THEN e = e BOR E_SCHUSS
+        RETURN e
+    END IF
+    IF NOT mitFenster THEN RETURN 0
+    IF NOT WINDOW_FOCUSED() THEN RETURN 0
+    IF KEYPRESSED(KEY_LEFT) THEN e = e BOR E_LINKS
+    IF KEYPRESSED(KEY_RIGHT) THEN e = e BOR E_RECHTS
+    IF KEYPRESSED(KEY_UP) THEN e = e BOR E_SCHUB
+    IF KEYPRESSED(KEY_SPACE) THEN e = e BOR E_SCHUSS
+    RETURN e
+END FUNCTION
+
+' --- TCP: Zeilen --------------------------------------------------------------
+' TCP ist ein Strom ohne Nachrichtengrenzen -- eine Zeile kann in zwei
+' Stuecken ankommen, zwei Zeilen in einem. Darum sammeln und an \n trennen.
+DIM tcpRest AS STRING
+FUNCTION zeileLesen(s AS NET_SOCKET) AS STRING
+    tcpRest = tcpRest + NET_RECV(s, 4096)
+    DIM p AS INTEGER : p = INSTR(tcpRest, CHR$(10))
+    IF p < 0 THEN RETURN ""
+    DIM zeile AS STRING : zeile = LEFT$(tcpRest, p)
+    tcpRest = MID$(tcpRest, p + 1)
+    RETURN TRIM$(zeile)
+END FUNCTION
+
+SUB zeileSenden(s AS NET_SOCKET, t AS STRING)
+    NET_SEND(s, t + CHR$(10))
+END SUB
+
+' --- Pakete -----------------------------------------------------------------------
+CONST P_EINGABE = 1
+CONST P_STAND = 2
+CONST SCHIFF_BYTES = 22
+
+SUB schiffSchreiben(b AS BUFFER, ab AS INTEGER, s AS Schiff)
+    BUFFER_SET_F32(b, ab, s.x)
+    BUFFER_SET_F32(b, ab + 4, s.y)
+    BUFFER_SET_F32(b, ab + 8, s.vx)
+    BUFFER_SET_F32(b, ab + 12, s.vy)
+    BUFFER_SET_F32(b, ab + 16, s.winkel)
+    BUFFER_SET(b, ab + 20, s.leben)
+    BUFFER_SET(b, ab + 21, IIF(s.schild > 0, 1, 0))
+END SUB
+
+SUB schiffLesen(b AS BUFFER, ab AS INTEGER, s AS Schiff)
+    s.x = BUFFER_GET_F32(b, ab)
+    s.y = BUFFER_GET_F32(b, ab + 4)
+    s.vx = BUFFER_GET_F32(b, ab + 8)
+    s.vy = BUFFER_GET_F32(b, ab + 12)
+    s.winkel = BUFFER_GET_F32(b, ab + 16)
+    s.leben = BUFFER_GET(b, ab + 20)
+    s.schild = IIF(BUFFER_GET(b, ab + 21) = 1, 0.5, 0)
+END SUB
+
+' Wie viele Pakete gingen hinaus/kamen an -- fuer die Anzeige und den Bot.
+DIM gesendet AS INTEGER, empfangen AS INTEGER, verloren AS INTEGER
+
+' ============================================================================
+' WIRT
+' ============================================================================
+DIM lst AS NET_LISTENER
+DIM udp AS NET_UDP
+DIM gastTcp AS NET_SOCKET
+DIM gastDa AS BOOLEAN
+DIM gastHost AS STRING
+DIM gastPort AS INTEGER
+DIM gastZuletzt AS INTEGER          ' MILLIS des letzten UDP-Pakets vom Gast
+DIM eingRing[EINGABEN_MAX] AS INTEGER
+DIM eingDa[EINGABEN_MAX] AS INTEGER ' welche Folgenummer liegt dort (-1 = keine)
+DIM naechsteSeq AS INTEGER          ' die naechste Eingabe des Gastes, die dran ist
+DIM letzteEingabe AS INTEGER        ' fuer verlorene Eingaben: die vorige wiederholen
+DIM angewendet AS INTEGER           ' Folgenummer der zuletzt angewendeten (= Ack)
+DIM status AS STRING
+DIM zuletztGesendet AS STRING       ' das Gastschiff im letzten Stand (fuer die Bilanz)
+
+SUB wirtStarten()
+    lst = NET_TCP_LISTEN(port)
+    udp = NET_UDP_BIND(port)
+    status = "Warte auf einen Gast auf Port " + STR$(port) + " ..."
+END SUB
+
+SUB gastVergessen(warum AS STRING)
+    IF gastDa THEN NET_CLOSE(gastTcp)
+    gastDa = FALSE
+    gastHost = ""
+    status = warum + " -- warte auf einen Gast auf Port " + STR$(port) + " ..."
+    rundeAnfangen()
+END SUB
+
+SUB wirtNetz()
+    ' neuer Gast? (nur einer: ein zweiter bekommt eine Absage)
+    DIM neu AS NET_SOCKET : neu = NET_TCP_ACCEPT(lst)
+    IF neu <> NIL THEN
+        IF gastDa THEN
+            zeileSenden(neu, "BESETZT")
+            NET_CLOSE(neu)
+        ELSE
+            gastTcp = neu : gastDa = TRUE : tcpRest = ""
+            gastZuletzt = MILLIS()
+            DIM i AS INTEGER
+            FOR i = 0 TO EINGABEN_MAX - 1 : eingDa[i] = -1 : NEXT
+            naechsteSeq = 1 : angewendet = 0 : letzteEingabe = 0
+            status = "Gast verbindet sich von " + NET_PEER_ADDR(neu) + " ..."
+        END IF
+    END IF
+    IF NOT gastDa THEN RETURN
+    DIM zeile AS STRING : zeile = zeileLesen(gastTcp)
+    WHILE zeile <> ""
+        IF LEFT$(zeile, 6) = "HALLO " THEN
+            zeileSenden(gastTcp, "WILLKOMMEN " + STR$(TAKT))
+            rundeAnfangen()
+            status = "Gast: " + MID$(zeile, 6)
+        ELSEIF zeile = "TSCHUESS" THEN
+            gastVergessen("Gast hat das Spiel verlassen")
+            RETURN
+        END IF
+        zeile = zeileLesen(gastTcp)
+    WEND
+    IF NOT NET_IS_CONNECTED(gastTcp) THEN
+        gastVergessen("Verbindung zum Gast getrennt")
+        RETURN
+    END IF
+    ' Eingaben ueber UDP -- alle, die da sind
+    DIM b AS BUFFER : b = NET_UDP_RECV_BYTES(udp, 64)
+    WHILE BUFFER_LEN(b) > 0
+        IF BUFFER_LEN(b) = 8 AND BUFFER_GET(b, 0) = P_EINGABE THEN
+            empfangen = empfangen + 1
+            gastHost = NET_UDP_LAST_HOST$(udp)
+            gastPort = NET_UDP_LAST_PORT(udp)
+            gastZuletzt = MILLIS()
+            DIM seq AS INTEGER : seq = BUFFER_GET_U32(b, 1)
+            DIM k AS INTEGER
+            FOR k = 0 TO 2
+                DIM sq AS INTEGER : sq = seq - k
+                IF sq >= naechsteSeq THEN
+                    eingRing[sq MOD EINGABEN_MAX] = BUFFER_GET(b, 5 + k)
+                    eingDa[sq MOD EINGABEN_MAX] = sq
+                END IF
+            NEXT
+        END IF
+        b = NET_UDP_RECV_BYTES(udp, 64)
+    WEND
+    IF MILLIS() - gastZuletzt > 3000 THEN gastVergessen("Vom Gast kommt nichts mehr")
+END SUB
+
+' Die Eingabe des Gastes fuer diesen Schritt. Ohne neue Eingabe steht sein
+' Schiff still -- es laeuft im Takt SEINER Eingaben, nicht unserer Schritte;
+' sonst liefe die Vorhersage des Gastes davon. Liegen schon mehrere bereit
+' (ein Schub nach einer Stockung), werden zwei auf einmal genommen.
+SUB gastSchritte()
+    DIM n AS INTEGER : n = 0
+    DIM bereit AS INTEGER : bereit = 0
+    DIM sq AS INTEGER
+    FOR sq = naechsteSeq TO naechsteSeq + 8
+        IF eingDa[sq MOD EINGABEN_MAX] = sq THEN bereit = bereit + 1
+    NEXT
+    DIM wieviel AS INTEGER : wieviel = IIF(bereit > 3, 2, 1)
+    WHILE n < wieviel
+        DIM platz AS INTEGER : platz = naechsteSeq MOD EINGABEN_MAX
+        DIM e AS INTEGER
+        IF eingDa[platz] = naechsteSeq THEN
+            e = eingRing[platz]
+        ELSE
+            ' fehlt sie, kommen aber schon spaetere? dann ist sie verloren
+            DIM spaeter AS BOOLEAN : spaeter = FALSE
+            FOR sq = naechsteSeq + 1 TO naechsteSeq + 8
+                IF eingDa[sq MOD EINGABEN_MAX] = sq THEN spaeter = TRUE
+            NEXT
+            IF NOT spaeter THEN RETURN
+            e = letzteEingabe
+            verloren = verloren + 1
+        END IF
+        IF s1.schritt(e) THEN kugelAbschiessen(s1, 1)
+        letzteEingabe = e
+        angewendet = naechsteSeq
+        naechsteSeq = naechsteSeq + 1
+        n = n + 1
+    WEND
+END SUB
+
+SUB wirtTick()
+    tick = tick + 1
+    IF sieger >= 0 THEN
+        IF MILLIS() >= pauseBis THEN rundeAnfangen()
+    ELSE
+        IF s0.schritt(eingabeLesen(tick)) THEN kugelAbschiessen(s0, 0)
+        IF gastDa THEN gastSchritte()
+        DIM wer AS INTEGER : wer = kugelnSchritt(s0, s1)
+        IF s0.leben <= 0 OR s1.leben <= 0 THEN
+            sieger = IIF(s0.leben > 0, 0, 1)
+            pauseBis = MILLIS() + 3000
+            IF gastDa THEN zeileSenden(gastTcp, "ENDE " + STR$(sieger))
+        END IF
+    END IF
+    IF gastHost <> "" THEN standSenden()
+END SUB
+
+SUB standSenden()
+    DIM n AS INTEGER, i AS INTEGER
+    FOR i = 0 TO MAX_KUGELN - 1
+        IF kzeit[i] > 0 THEN n = n + 1
+    NEXT
+    DIM b AS BUFFER : b = BUFFER_NEW(54 + n * 9)
+    BUFFER_SET(b, 0, P_STAND)
+    BUFFER_SET_U32(b, 1, tick)
+    BUFFER_SET_U32(b, 5, angewendet)
+    schiffSchreiben(b, 9, s0)
+    schiffSchreiben(b, 9 + SCHIFF_BYTES, s1)
+    BUFFER_SET(b, 53, n)
+    DIM j AS INTEGER : j = 54
+    FOR i = 0 TO MAX_KUGELN - 1
+        IF kzeit[i] > 0 THEN
+            BUFFER_SET_F32(b, j, kx[i])
+            BUFFER_SET_F32(b, j + 4, ky[i])
+            BUFFER_SET(b, j + 8, kvon[i])
+            j = j + 9
+        END IF
+    NEXT
+    NET_UDP_SEND(udp, gastHost, gastPort, b)
+    gesendet = gesendet + 1
+    zuletztGesendet = FORMAT$(BUFFER_GET_F32(b, 9 + SCHIFF_BYTES), "%.2f") + " " + FORMAT$(BUFFER_GET_F32(b, 13 + SCHIFF_BYTES), "%.2f") + " leben " + STR$(s1.leben) + " " + STR$(s0.leben)
+END SUB
+
+' ============================================================================
+' GAST
+' ============================================================================
+DIM tcp AS NET_SOCKET
+DIM verbunden AS BOOLEAN
+DIM seqGast AS INTEGER              ' Folgenummer der eigenen Eingaben
+DIM eigene[EINGABEN_MAX] AS INTEGER ' die eigenen Eingaben, nach Folgenummer
+DIM gesendetUm[EINGABEN_MAX] AS INTEGER
+DIM letzterStand AS INTEGER : letzterStand = -1   ' Tick des neuesten Stands
+DIM korrekturen AS INTEGER
+DIM maxAbweichung AS FLOAT
+DIM ping AS INTEGER
+DIM standZuletzt AS INTEGER
+' das fremde Schiff: zwei Staende zum Zeigen dazwischen
+DIM vorX AS FLOAT, vorY AS FLOAT, vorW AS FLOAT, vorZeit AS INTEGER
+DIM nachX AS FLOAT, nachY AS FLOAT, nachW AS FLOAT, nachZeit AS INTEGER
+DIM gkx[MAX_KUGELN] AS FLOAT, gky[MAX_KUGELN] AS FLOAT, gkvon[MAX_KUGELN] AS INTEGER
+DIM gkAnzahl AS INTEGER
+DIM wahr AS Schiff : wahr = NEW Schiff()   ' der eigene Stand laut Wirt
+
+SUB gastStarten()
+    status = "Verbinde mit " + adresse + ":" + STR$(port) + " ..."
+    TRY
+        tcp = NET_TCP_CONNECT(adresse, port)
+    CATCH fehler
+        status = "Keine Verbindung: " + fehler
+        RETURN
+    END TRY
+    udp = NET_UDP_BIND(0)
+    zeileSenden(tcp, "HALLO " + IIF(botSchritte > 0, "Bot", "Gast"))
+    verbunden = TRUE
+    standZuletzt = MILLIS()
+END SUB
+
+SUB gastNetz()
+    IF NOT verbunden THEN RETURN
+    DIM zeile AS STRING : zeile = zeileLesen(tcp)
+    WHILE zeile <> ""
+        IF LEFT$(zeile, 10) = "WILLKOMMEN" THEN
+            status = "Verbunden mit " + adresse
+            rundeAnfangen()
+        ELSEIF zeile = "BESETZT" THEN
+            status = "Der Wirt hat schon einen Gast"
+            verbunden = FALSE
+            RETURN
+        ELSEIF LEFT$(zeile, 5) = "ENDE " THEN
+            sieger = VAL(MID$(zeile, 5))
+            pauseBis = MILLIS() + 3000
+        END IF
+        zeile = zeileLesen(tcp)
+    WEND
+    IF NOT NET_IS_CONNECTED(tcp) THEN
+        status = "Der Wirt hat die Verbindung getrennt"
+        verbunden = FALSE
+        RETURN
+    END IF
+    ' Staende: nur der neueste zaehlt -- ein spaet angekommener aelterer
+    ' wuerde die Welt zurueckspulen.
+    DIM b AS BUFFER : b = NET_UDP_RECV_BYTES(udp, 2048)
+    WHILE BUFFER_LEN(b) > 0
+        IF BUFFER_LEN(b) >= 54 AND BUFFER_GET(b, 0) = P_STAND THEN
+            DIM t AS INTEGER : t = BUFFER_GET_U32(b, 1)
+            IF t > letzterStand THEN
+                IF letzterStand >= 0 AND t > letzterStand + 1 THEN verloren = verloren + (t - letzterStand - 1)
+                letzterStand = t
+                empfangen = empfangen + 1
+                standZuletzt = MILLIS()
+                standUebernehmen(b)
+            END IF
+        END IF
+        b = NET_UDP_RECV_BYTES(udp, 2048)
+    WEND
+    IF MILLIS() - standZuletzt > 3000 THEN
+        status = "Vom Wirt kommt nichts mehr"
+        verbunden = FALSE
+    END IF
+END SUB
+
+SUB standUebernehmen(b AS BUFFER)
+    DIM ack AS INTEGER : ack = BUFFER_GET_U32(b, 5)
+    ' das fremde Schiff: neuen Stand hinten anhaengen
+    DIM fremd AS Schiff : fremd = NEW Schiff()
+    schiffLesen(b, 9, fremd)
+    vorX = nachX : vorY = nachY : vorW = nachW : vorZeit = nachZeit
+    nachX = fremd.x : nachY = fremd.y : nachW = fremd.winkel : nachZeit = MILLIS()
+    s0.leben = fremd.leben : s0.schild = fremd.schild
+    ' das eigene: Stand des Wirts uebernehmen und alle Eingaben danach erneut
+    ' anwenden -- dann steht es da, wo es nach unseren Tasten sein wird
+    schiffLesen(b, 9 + SCHIFF_BYTES, wahr)
+    IF ack > 0 THEN ping = MILLIS() - gesendetUm[ack MOD EINGABEN_MAX]
+    DIM vorherX AS FLOAT : vorherX = s1.x
+    DIM vorherY AS FLOAT : vorherY = s1.y
+    s1.x = wahr.x : s1.y = wahr.y : s1.vx = wahr.vx : s1.vy = wahr.vy
+    s1.winkel = wahr.winkel : s1.leben = wahr.leben : s1.schild = wahr.schild
+    DIM sq AS INTEGER
+    FOR sq = ack + 1 TO seqGast
+        DIM schuss AS BOOLEAN : schuss = s1.schritt(eigene[sq MOD EINGABEN_MAX])
+    NEXT
+    DIM d AS FLOAT : d = HYPOT(s1.x - vorherX, s1.y - vorherY)
+    IF d > 40 THEN d = 0                ' Umlauf am Rand oder Neustart: keine Abweichung
+    IF d > 0.5 THEN korrekturen = korrekturen + 1
+    IF d > maxAbweichung THEN maxAbweichung = d
+    ' Kugeln: so, wie der Wirt sie sieht
+    gkAnzahl = BUFFER_GET(b, 53)
+    DIM i AS INTEGER
+    FOR i = 0 TO gkAnzahl - 1
+        gkx[i] = BUFFER_GET_F32(b, 54 + i * 9)
+        gky[i] = BUFFER_GET_F32(b, 58 + i * 9)
+        gkvon[i] = BUFFER_GET(b, 62 + i * 9)
+    NEXT
+END SUB
+
+SUB gastTick()
+    tick = tick + 1
+    IF NOT verbunden THEN RETURN
+    seqGast = seqGast + 1
+    DIM e AS INTEGER : e = eingabeLesen(seqGast)
+    eigene[seqGast MOD EINGABEN_MAX] = e
+    gesendetUm[seqGast MOD EINGABEN_MAX] = MILLIS()
+    ' vorausrechnen (die Kugel legt erst der Wirt an)
+    DIM schuss AS BOOLEAN : schuss = s1.schritt(e)
+    DIM b AS BUFFER : b = BUFFER_NEW(8)
+    BUFFER_SET(b, 0, P_EINGABE)
+    BUFFER_SET_U32(b, 1, seqGast)
+    BUFFER_SET(b, 5, e)
+    BUFFER_SET(b, 6, IIF(seqGast > 1, eigene[(seqGast - 1) MOD EINGABEN_MAX], 0))
+    BUFFER_SET(b, 7, IIF(seqGast > 2, eigene[(seqGast - 2) MOD EINGABEN_MAX], 0))
+    NET_UDP_SEND(udp, adresse, IIF(udpPort > 0, udpPort, port), b)
+    gesendet = gesendet + 1
+END SUB
+
+SUB gastAbmelden()
+    IF verbunden THEN zeileSenden(tcp, "TSCHUESS")
+END SUB
+
+' ============================================================================
+' Bild
+' ============================================================================
+SUB schiffZeichnen(x AS FLOAT, y AS FLOAT, w AS FLOAT, farbe AS INTEGER, schild AS BOOLEAN)
+    DIM ax AS FLOAT : ax = x + COS(w) * 14
+    DIM ay AS FLOAT : ay = y + SIN(w) * 14
+    DIM bx AS FLOAT : bx = x + COS(w + 2.5) * 10
+    DIM by AS FLOAT : by = y + SIN(w + 2.5) * 10
+    DIM cx AS FLOAT : cx = x + COS(w - 2.5) * 10
+    DIM cy AS FLOAT : cy = y + SIN(w - 2.5) * 10
+    LINEW(ax, ay, bx, by, 2, farbe)
+    LINEW(bx, by, cx, cy, 2, farbe)
+    LINEW(cx, cy, ax, ay, 2, farbe)
+    IF schild THEN CIRCLEOUTLINE(x, y, 19, RGB(110, 110, 170))
+END SUB
+
+FUNCTION winkelMischen(a AS FLOAT, b AS FLOAT, t AS FLOAT) AS FLOAT
+    DIM d AS FLOAT : d = b - a
+    WHILE d > PI : d = d - TAU : WEND
+    WHILE d < -PI : d = d + TAU : WEND
+    RETURN a + d * t
+END FUNCTION
+
+SUB zeichnen()
+    CLS(RGB(8, 10, 24))
+    DIM ich AS Schiff, du AS Schiff
+    DIM i AS INTEGER
+    IF rolle = "wirt" THEN
+        schiffZeichnen(s0.x, s0.y, s0.winkel, RGB(110, 220, 255), s0.schild > 0)
+        IF gastDa THEN schiffZeichnen(s1.x, s1.y, s1.winkel, RGB(255, 170, 70), s1.schild > 0)
+        FOR i = 0 TO MAX_KUGELN - 1
+            IF kzeit[i] > 0 THEN CIRCLE(kx[i], ky[i], 2, IIF(kvon[i] = 0, RGB(160, 240, 255), RGB(255, 210, 120)))
+        NEXT
+        ich = s0 : du = s1
+    ELSE
+        ' das fremde Schiff zwischen den letzten zwei Staenden zeigen, einen
+        ' Takt hinter dem neuesten -- sonst ruckelt es mit jedem Paket
+        DIM t AS FLOAT : t = 1.0
+        IF nachZeit > vorZeit THEN t = CLAMP((MILLIS() - nachZeit) / (1000.0 / TAKT), 0, 1)
+        DIM fx AS FLOAT : fx = vorX + (nachX - vorX) * t
+        DIM fy AS FLOAT : fy = vorY + (nachY - vorY) * t
+        IF ABS(nachX - vorX) > 200 OR ABS(nachY - vorY) > 200 THEN fx = nachX : fy = nachY
+        IF verbunden THEN schiffZeichnen(fx, fy, winkelMischen(vorW, nachW, t), RGB(110, 220, 255), s0.schild > 0)
+        schiffZeichnen(s1.x, s1.y, s1.winkel, RGB(255, 170, 70), s1.schild > 0)
+        FOR i = 0 TO gkAnzahl - 1
+            CIRCLE(gkx[i], gky[i], 2, IIF(gkvon[i] = 0, RGB(160, 240, 255), RGB(255, 210, 120)))
+        NEXT
+        ich = s1 : du = s0
+    END IF
+    txt(10, 8, "Leben " + STR$(ich.leben) + "   Gegner " + STR$(du.leben), WHITE, 18)
+    IF rolle = "gast" AND verbunden THEN txt(ARENA_B - 230, 8, "Ping " + STR$(ping) + " ms  verloren " + STR$(verloren), RGB(140, 140, 160), 16)
+    txt(10, ARENA_H - 24, status, RGB(160, 160, 190), 16)
+    IF sieger >= 0 THEN
+        DIM gewonnen AS BOOLEAN : gewonnen = (sieger = 0) = (rolle = "wirt")
+        txt(ARENA_B / 2 - 120, ARENA_H / 2 - 20, IIF(gewonnen, "GEWONNEN", "VERLOREN"), IIF(gewonnen, RGB(120, 255, 160), RGB(255, 110, 110)), 40)
+    END IF
+    FLIP()
+END SUB
+
+' ============================================================================
+' Hauptschleife: fester Takt, unabhaengig von der Bildrate
+' ============================================================================
+IF rolle = "wirt" THEN wirtStarten() ELSE gastStarten()
+DIM naechsterTick AS FLOAT : naechsterTick = MILLIS()
+DIM laeuft AS BOOLEAN : laeuft = TRUE
+WHILE laeuft
+    IF mitFenster THEN
+        IF WINDOW_CLOSE_REQUESTED() OR QUITREQUESTED() THEN laeuft = FALSE
+    END IF
+    IF rolle = "wirt" THEN wirtNetz() ELSE gastNetz()
+    DIM schritte AS INTEGER : schritte = 0
+    WHILE MILLIS() >= naechsterTick AND schritte < 5
+        IF rolle = "wirt" THEN wirtTick() ELSE gastTick()
+        naechsterTick = naechsterTick + 1000.0 / TAKT
+        schritte = schritte + 1
+    WEND
+    ' hing das Programm (Fenster gezogen), nicht alles auf einmal nachholen
+    IF MILLIS() - naechsterTick > 500 THEN naechsterTick = MILLIS()
+    IF botSchritte > 0 THEN
+        IF (rolle = "wirt" AND tick >= botSchritte) OR (rolle = "gast" AND (seqGast >= botSchritte OR NOT verbunden)) THEN laeuft = FALSE
+    END IF
+    IF mitFenster THEN zeichnen() ELSE SLEEP(1)
+WEND
+
+' --- Ende -------------------------------------------------------------------------
+IF rolle = "gast" THEN
+    ' Nachlauf: die letzten Staende abwarten, damit alle Eingaben angewendet sind
+    IF botSchritte > 0 AND verbunden THEN
+        DIM bis AS INTEGER : bis = MILLIS() + 1500
+        WHILE MILLIS() < bis AND verbunden
+            gastNetz()
+            SLEEP(5)
+        WEND
+    END IF
+    IF botSchritte > 0 THEN
+        PRINT "gast eingaben "; seqGast; " staende "; empfangen; " verloren "; verloren
+        PRINT "gast korrekturen "; korrekturen; " max "; FORMAT$(maxAbweichung, "%.2f")
+        PRINT "gast schiff "; FORMAT$(s1.x, "%.2f"); " "; FORMAT$(s1.y, "%.2f"); " leben "; s1.leben; " "; s0.leben
+        PRINT "gast status "; status
+    END IF
+    gastAbmelden()
+ELSE
+    IF botSchritte > 0 THEN
+        ' Nachlauf: noch eintreffende Eingaben anwenden und den Stand senden
+        ' bis der Gast sich abmeldet (er wartet selbst auf die letzten Staende)
+        DIM bisW AS INTEGER : bisW = MILLIS() + 5000
+        WHILE MILLIS() < bisW AND gastDa
+            wirtNetz()
+            IF gastDa THEN
+                gastSchritte()
+                IF gastHost <> "" THEN standSenden()
+            END IF
+            SLEEP(30)
+        WEND
+        PRINT "wirt schritte "; tick; " eingaben "; empfangen; " verloren "; verloren
+        PRINT "wirt gast "; zuletztGesendet
+        PRINT "wirt status "; status
+    END IF
+END IF
