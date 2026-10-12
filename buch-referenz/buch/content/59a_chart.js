@@ -142,10 +142,11 @@ module.exports = (H) => [
       'CHART_SET_COLOR(c, "titel", RGB(255, 220, 120))',
     ]),
   H.cmd("CHART_SET_FLAG", 'CHART_SET_FLAG(diagramm, eigenschaft$, an)',
-    "Alles, was ein Schalter ist: rahmen, gitter_x, gitter_y, prozent, flaeche, punkte, glatt, null_linie, stapel, verlauf, treppe, fadenkreuz, hover, tooltip.",
+    "Alles, was ein Schalter ist: rahmen, gitter_x, gitter_y, prozent, flaeche, punkte, glatt, null_linie, stapel, verlauf, treppe, fadenkreuz, hover, tooltip, kurz und komma (Dezimalkomma: 25,7 statt 25.7 – passend zu ZAHL$ und den Feldern der gui).",
     [
       'CHART_SET_FLAG(c, "glatt", TRUE)      \' weiche Kurve statt Kanten',
       'CHART_SET_FLAG(c, "flaeche", TRUE)    \' Fläche unter der Linie füllen',
+      'CHART_SET_FLAG(c, "komma", TRUE)      \' 25,7 °C statt 25.7 °C',
     ]),
   H.tip("Zwei Kurvenformen schließen sich aus", "„glatt“ und „treppe“ vertragen sich nicht – setzt du beides, gewinnt die Treppe."),
 
