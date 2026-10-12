@@ -134,10 +134,13 @@ DIM sbPegel AS INTEGER : sbPegel = GUI_STATUSBAR_ADD(sb, "Pegel 0 %", 190, "rech
 
 ' --- Pegel -----------------------------------------------------------------
 ' Sechs Spuren uebereinander gehen leicht ueber 1.0 -- dann klippt der
-' Mixer, im Lautsprecher und im Mitschnitt. Der SFX-Bus laeuft darum auf
-' 40 Prozent, und die Statusleiste zeigt die Spitze (AUDIO_PEAK
-' liefert den hoechsten Ausschlag seit dem letzten Aufruf).
-AUDIO_BUS_VOLUME("sfx", 0.4)
+' Mixer, im Lautsprecher und im Mitschnitt. Wie hoch, schwankt: das Echo
+' laeuft in Millisekunden, die Noten auf Uhr-Ticks, und je nachdem, wie sie
+' aufeinandertreffen, lag die Spitze bei 40 Prozent zwischen 0,88 und 1,01
+' (acht Laeufe). Der SFX-Bus laeuft darum auf 32 Prozent (0,72 bis 0,85),
+' und die Statusleiste zeigt die Spitze (AUDIO_PEAK liefert den hoechsten
+' Ausschlag seit dem letzten Aufruf).
+AUDIO_BUS_VOLUME("sfx", 0.32)
 DIM pegelHalt AS FLOAT
 DIM uebersteuertBis AS INTEGER
 SUB pegelZeigen()

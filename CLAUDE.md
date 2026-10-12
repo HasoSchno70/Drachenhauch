@@ -1856,7 +1856,7 @@ hinter dem Abgriff -- `MASTER_GAIN` (gesetzt in `AUDIO_BUS_VOLUME("master")`)
 rechnet sie fuer Mitschnitt und Pegel ein; eine Master-Lautstaerke ueber
 `AUDIO_MODULATE` kennen beide nicht (dokumentiert). (4) Neu **`AUDIO_PEAK()`**
 (hoechster Ausschlag seit dem letzten Aufruf, `PEAK` per `fetch_update`); der
-Sequencer klippte mit sechs Spuren bis 1,13 und laeuft jetzt mit SFX-Bus 0,4
+Sequencer klippte mit sechs Spuren bis 1,13 und laeuft jetzt mit SFX-Bus 0,32 (bei 0,4 schwankte die Spitze 0,88..1,01 -- Echo in ms gegen Noten auf Ticks)
 und Pegel in der Statusleiste. (5) **Ein Menuekuerzel auf der Leertaste nahm
 einem Kaestchen mit Fokus die Taste** (es kippte UND das Kuerzel feuerte):
 `gui::widget_nimmt_taste` -- Leertaste/Enter fuer Knoepfe, Kaestchen,
