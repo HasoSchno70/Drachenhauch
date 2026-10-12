@@ -128,6 +128,11 @@ pub struct Fall {
     /// eines Eingabefeldes -- ersetzt wird genau dieser Aufruf, alles dahinter
     /// bleibt der echte Code.
     pub ersetzungen: Vec<(String, String)>,
+    /// `--- zeitgrenze N`: hoechstens N Sekunden fuer den ganzen Fall (alle
+    /// Laeufe zusammen). Ohne Angabe gilt die der Sammlung bzw. die Vorgabe
+    /// des Laeufers; ein Fall darueber wird samt Kindprozessen beendet und
+    /// ist FEHL -- vorher hielt ein haengender Fall den ganzen Lauf an.
+    pub zeitgrenze: Option<u64>,
 }
 
 /// Ein Schritt zwischen Hauptlauf und `--- nachher`.
@@ -575,7 +580,17 @@ pub struct Sammlung {
     /// `--- langsam` im Kopf: die Sammlung braucht lange (Fenster in Echtzeit,
     /// Durchlaeufe ueber das ganze Repo). `dhrt test --schnell` laesst sie aus.
     pub langsam: bool,
+    /// `--- zeitgrenze N` im Kopf: gilt fuer jeden Fall ohne eigene.
+    pub zeitgrenze: Option<u64>,
     pub faelle: Vec<Fall>,
+}
+
+/// Die Sekunden hinter `--- zeitgrenze`: eine ganze Zahl ab 1.
+fn sekunden_lesen(arg: &str, nr: usize) -> Result<u64, String> {
+    match arg.trim().parse::<u64>() {
+        Ok(n) if n > 0 => Ok(n),
+        _ => Err(format!("Zeile {}: '--- zeitgrenze' braucht eine ganze Zahl Sekunden ab 1, nicht '{}'", nr + 1, arg.trim())),
+    }
 }
 
 /// Die Faelle einer Sammlung lesen (ohne den Kopf; siehe `sammlung_parsen`).
@@ -588,6 +603,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
     let mut faelle: Vec<Fall> = Vec::new();
     let mut seriell = false;
     let mut langsam = false;
+    let mut zeitgrenze: Option<u64> = None;
     let mut abschnitt = Abschnitt::Quelle;
     let mut puffer: Vec<String> = Vec::new();
     let mut datei_name = String::new();
@@ -690,11 +706,14 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
         if faelle.is_empty() {                       // Kopfkommentar vor dem ersten Fall
             if zeile.trim() == "--- seriell" { seriell = true; }
             else if zeile.trim() == "--- langsam" { langsam = true; }
-            else if zeile.starts_with("--- ") { return Err(format!("Zeile {}: vor dem ersten Fall ist nur '--- seriell' oder '--- langsam' erlaubt", nr + 1)); }
+            else if let Some(arg) = zeile.trim().strip_prefix("--- zeitgrenze") {
+                zeitgrenze = Some(sekunden_lesen(arg, nr)?);
+            }
+            else if zeile.starts_with("--- ") { return Err(format!("Zeile {}: vor dem ersten Fall ist nur '--- seriell', '--- langsam' oder '--- zeitgrenze N' erlaubt", nr + 1)); }
             // Als Kommentar geschrieben gilt der Schalter nicht -- zwei
             // Sammlungen liefen so stillschweigend parallel.
             else if let Some(w) = zeile.trim().strip_prefix('\'').map(str::trim) {
-                if w == "--- seriell" || w == "--- langsam" {
+                if w == "--- seriell" || w == "--- langsam" || w.starts_with("--- zeitgrenze") {
                     return Err(format!("Zeile {}: '{}' steht als Kommentar da und gilt so nicht -- ohne das ' davor schreiben", nr + 1, w));
                 }
             }
@@ -761,6 +780,11 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     if marke.as_deref() == Some("") { return Err(format!("Zeile {}: hinter 'nach' fehlt die Marke", nr + 1)); }
                     f.programm = Some(pfad.to_string());
                     f.nach = marke;
+                    Abschnitt::Verzeichnis        // kein Inhalt
+                }
+                "zeitgrenze" => {
+                    if f.zeitgrenze.is_some() { return Err(format!("Zeile {}: '--- zeitgrenze' gibt es in diesem Fall schon", nr + 1)); }
+                    f.zeitgrenze = Some(sekunden_lesen(arg, nr)?);
                     Abschnitt::Verzeichnis        // kein Inhalt
                 }
                 "streichen" => {
@@ -836,7 +860,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
             return Err(format!("Zeile {}: der Fall '{}' hat keinen Quelltext", f.zeile, f.name));
         }
     }
-    Ok(Sammlung { seriell, langsam, faelle })
+    Ok(Sammlung { seriell, langsam, zeitgrenze, faelle })
 }
 
 /// Leerzeilen am Ende zaehlen nicht, Windows-Umbrueche auch nicht -- in einer
@@ -1214,6 +1238,21 @@ PRINT 1
         let s = sammlung_parsen("' Kopf\n--- langsam\n--- seriell\n=== a\nPRINT 1\n").unwrap();
         assert!(s.langsam && s.seriell);
         assert!(!sammlung_parsen("=== a\nPRINT 1\n").unwrap().langsam);
+    }
+
+    #[test]
+    fn zeitgrenze_im_kopf_und_je_fall() {
+        let s = sammlung_parsen("--- zeitgrenze 120\n=== a\nPRINT 1\n=== b\nPRINT 2\n--- zeitgrenze 5\n").unwrap();
+        assert_eq!(s.zeitgrenze, Some(120));
+        assert_eq!(s.faelle[0].zeitgrenze, None);
+        assert_eq!(s.faelle[1].zeitgrenze, Some(5));
+        // der Block hat keinen Inhalt: die Quelle bleibt, wie sie war
+        assert_eq!(s.faelle[1].quelle, "PRINT 2");
+        assert!(sammlung_parsen("=== a\nPRINT 1\n--- zeitgrenze 0\n").unwrap_err().contains("ab 1"));
+        assert!(sammlung_parsen("=== a\nPRINT 1\n--- zeitgrenze zwei\n").unwrap_err().contains("ganze Zahl"));
+        assert!(sammlung_parsen("--- zeitgrenze\n=== a\nPRINT 1\n").is_err());
+        assert!(sammlung_parsen("' --- zeitgrenze 9\n=== a\nPRINT 1\n").unwrap_err().contains("Kommentar"));
+        assert!(sammlung_parsen("=== a\nPRINT 1\n--- zeitgrenze 3\n--- zeitgrenze 4\n").unwrap_err().contains("schon"));
     }
 
     #[test]

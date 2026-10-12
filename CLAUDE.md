@@ -1700,6 +1700,30 @@ mit einem JSON-Fehler ab; jetzt gilt ein Angebot nur fuer seinen Text
 Vordergrund-Frage schwankt ohne den Schalter, darum die Gegenprobe am Stil)
 und ein Fall in `werkzeug_ide_korrektur.dhtest`.
 
+## Zeitgrenze je Fall in `dhrt test` (2026-10-11)
+
+Ein haengender Fall hielt den ganzen Lauf an, ohne Meldung (zweimal gesehen,
+in der Konsolen- und der Musik-Runde). Jetzt laeuft jeder Lauf eines Falls
+ueber `main.rs::test_lauf` (Leser-Faeden fuer beide Kanaele, Warte-Faden +
+`recv_timeout` gegen eine Frist): die Frist gilt dem GANZEN Fall (`--- vorher`,
+Hauptlauf, `--- nochmal`, `--- zwischen`, `--- nachher`), Vorrang
+`--- zeitgrenze N` im Fall > im Kopf der Sammlung > `dhrt test --zeitgrenze N`
+(0 = aus) > `TEST_ZEITGRENZE` = 300 s; Pruefprogramme (`*_pruefung.dh`) haben
+dieselbe Vorgabe. Bei Ablauf beendet `prozessbaum_beenden` den Fall samt
+Nachkommen (Windows `taskkill /T /F`, sonst `pkill -KILL -P` + `kill -KILL`
+-- bewusst OHNE eigene Prozessgruppe, damit Strg+C auf `dhrt test` die Faelle
+weiter trifft), und der Fall ist FEHL mit "Zeitgrenze von N s ueberschritten
+(Hauptlauf|--- nachher|...) -- abgebrochen; zuletzt: ..." (die letzten drei
+Ausgabezeilen). **Die Nachkommen sind der Punkt:** in der Gegenprobe ohne `/T`
+lebte das Kind des Falls weiter und hielt die geerbte Ausgabeleitung des
+Laeufers offen -- die Pipeline hing, bis es von Hand beendet war. Gemessen:
+ein voller Lauf mit `--zeitgrenze 60` hat keinen Fall darueber, die Vorgabe
+laesst das Fuenffache. Tests `tests/pruef/dhrt_test_zeitgrenze.dhtest` (5,
+seriell; die Kinder-Probe ueber eine Pulsdatei), Rust-Test
+`zeitgrenze_im_kopf_und_je_fall`. Nebenbefund: `input_polish` "printable key
+uses the keyboard layout" faellt auch EINZELN sporadisch ('Á' statt 'A', etwa
+einer von drei Laeufen) -- nicht von der Zeitgrenze, noch offen.
+
 ## Dogfooding 3D: Bauklotz-Werkstatt (2026-10-10)
 
 `examples/werkstatt3d/main.dh` (Kloetze setzen per Strahl, Licht, Schatten,
