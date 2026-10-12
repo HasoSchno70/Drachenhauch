@@ -38,6 +38,9 @@ gleitet; rechts oben stehen Ping und verlorene Pakete.
   (ein Byte) und hängt die zwei vorigen an, falls ein Paket verloren geht. Der
   Wirt rechnet die Welt und schickt den Stand als Binärpaket zurück
   (`BUFFER_SET_F32`, `NET_UDP_SEND` mit einem `BUFFER`, `NET_UDP_RECV_BYTES`).
+  Jeder Stand nennt die letzte Eingabe, die der Wirt angewendet hat. Die
+  letzten Eingaben haben kein Paket nach sich, das sie mitträgt — der Gast
+  schickt sein letztes darum nach, bis es bestätigt ist.
 - **Vorhersage:** der Gast rechnet sein eigenes Schiff mit denselben
   Unterprogrammen wie der Wirt (`spiel.dh`) voraus. Kommt ein Stand, übernimmt
   er die Wahrheit des Wirts und wendet alle Eingaben danach noch einmal an.
