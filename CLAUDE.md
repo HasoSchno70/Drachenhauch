@@ -1677,6 +1677,26 @@ einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
 
+## Tastennamen ohne Tottasten-Zustand (2026-10-12)
+
+`input_polish` "printable key uses the keyboard layout" fiel seit Fassungen
+sporadisch ("Á" statt "A"), auch einzeln. Ursache: GLFW liest die Namen unter
+Windows mit `ToUnicode`, und das veraendert den Tottasten-Zustand -- der gilt
+NICHT je Prozess. Starten mehrere Programme zugleich, landet der Akzent der
+deutschen ´-Taste (in GLFWs Reihenfolge vor A) bei einem anderen: gemessen
+8 Fenster zugleich 6 von 48 falsch (`Á`, `Û`, `Ú`, Q als `^`), nacheinander
+24 von 24 richtig. Betroffen waren `KEY_NAME$` UND die Belegung fuer
+`KEYHIT("z")` und die Menue-Kuerzel (`belegung_auffrischen`). Jetzt
+`Graphics::tastenname_roh`: unter Windows `MapVirtualKeyW` (VSC_TO_VK_EX, dann
+VK_TO_CHAR; ohne Zustand, eine Tottaste liefert ihr eigenes Zeichen), der
+Ziffernblock wie GLFW ueber feste VK_NUMPAD*, erweiterte Scancodes 0x100+x ->
+0xE0xx; sonst weiter GLFW (X11 und macOS lesen ohne geteilten Zustand).
+**Falle:** `#[link(name = "user32")]` fuer MapVirtualKeyW stellte user32.lib
+vor raylib -- LNK2005 CloseWindow/ShowCursor; darum ueber das windows-Crate
+(Feature `Win32_UI_Input_KeyboardAndMouse`). Danach 80 von 80 richtig. Test
+"key names stay right when several programs start at once" in
+`input_polish.dhtest` (faellt mit 2026.25 in 3 von 3 Laeufen).
+
 ## Testfenster ohne echte Eingabe (2026-10-06)
 
 Die "wackelnden" IDE-Faelle waren nicht Last (fuenf Runden unter 16

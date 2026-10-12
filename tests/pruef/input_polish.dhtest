@@ -175,3 +175,35 @@ DHRT_FRAMES=1
 TRUE
 TRUE
 
+
+=== key names stay right when several programs start at once
+' Unter Windows las GLFW die Tastennamen mit ToUnicode, und das veraendert
+' den Tottasten-Zustand -- der gilt nicht je Prozess. Starteten mehrere
+' Programme zugleich, landete der Akzent der deutschen Taste vor A bei einem
+' anderen: aus A wurde "Á", aus Q "^" (gemessen 6 von 48 falsch). Jetzt
+' liest MapVirtualKeyW die Belegung ohne Zustand. 8 Fenster zugleich, drei
+' Runden; auf anderen Belegungen und Systemen gilt dasselbe: jeder liefert
+' denselben Namen wie ein Programm allein.
+DIM p[8] AS INTEGER
+DIM i AS INTEGER, r AS INTEGER
+DIM allein AS STRING, abweichend AS INTEGER
+p[0] = PROCESS_START("dhrt", "run", "name.dh")
+WHILE PROCESS_RUNNING(p[0]) : SLEEP(10) : WEND
+FOR i = 1 TO 5 : allein = allein + PROCESS_READ$(p[0]) : SLEEP(5) : NEXT
+allein = TRIM$(allein)
+FOR r = 1 TO 3
+    FOR i = 0 TO 7 : p[i] = PROCESS_START("dhrt", "run", "name.dh") : NEXT
+    FOR i = 0 TO 7
+        WHILE PROCESS_RUNNING(p[i]) : SLEEP(10) : WEND
+        DIM t AS STRING : t = ""
+        DIM k AS INTEGER
+        FOR k = 1 TO 5 : t = t + PROCESS_READ$(p[i]) : SLEEP(5) : NEXT
+        IF TRIM$(t) <> allein THEN abweichend = abweichend + 1 : PRINT "abweichend: "; TRIM$(t)
+    NEXT
+NEXT
+PRINT "laenge "; LEN(allein); " abweichend "; abweichend
+--- datei name.dh
+SCREEN(160, 120, "In", 1)
+PRINT KEY_NAME$(KEY_A); KEY_NAME$(KEY_Q); KEY_NAME$(KEY_E); KEY_NAME$(KEY_O); KEY_NAME$(KEY_U)
+--- erwartet
+laenge 5 abweichend 0
