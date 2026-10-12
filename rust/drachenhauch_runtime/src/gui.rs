@@ -21261,12 +21261,15 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                         g.push_clip(kx, fy, kw, self.sk(TBL_FILTER_H));
                         let fokus = t.filter_focus == c as i32;
                         self.fbox_tief(g, cx + 2, fy + 2, cx + cw - 3, fy + self.sk(TBL_FILTER_H) - 3,
-                                       self.th("field_bg"),
-                                       if fokus { accent } else { self.th("field_border") });
+                                       self.th("win_bg"),
+                                       if fokus { accent } else { self.th("widget_border") });
                         let leer = t.filters.get(c).map(|s| s.is_empty()).unwrap_or(true);
                         let s = if leer { "Filter ...".to_string() }
                                 else { t.filters[c].clone() };
-                        let farbe = if leer { shade(title_fg, -60) } else { fg };
+                        // Gedaempft wie der Platzhalter eines Textfelds, gegen DESSEN Grund
+                        // gemessen (vorher aus der Kopfschrift abgeleitet: auf hellen
+                        // Themen fast schwarz, auf dem schwarzen Feld unsichtbar).
+                        let farbe = if leer { self.leise(self.th("win_bg")) } else { fg };
                         g.push_clip(cx + 4, fy + 2, (cw - 8).max(1), self.sk(TBL_FILTER_H) - 4);
                         self.wtext(g, wdg, cx + 6, fy + (self.sk(TBL_FILTER_H) - schrift).max(0) / 2,
                                    s, farbe);
@@ -21449,7 +21452,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         if t.edit_row == r as i32 && t.edit_col == c as i32 && t.col_typ_of(c) == 3 {
             // Auswahlspalte: der gewaehlte Eintrag und ein Pfeil -- die Liste
             // selbst liegt in der oberen Schicht (draw_wahl_popup).
-            self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3, self.th("field_bg"), accent);
+            self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3, self.th("win_bg"), accent);
             self.wtext(g, wdg, cx + 5, cy + (ch - schrift).max(0) / 2, t.edit_text.clone(), fg_thema);
             let (px, py) = (cx + cw - 12, cy + ch / 2);
             g.line(px - 4, py - 2, px, py + 2, accent);
@@ -21458,7 +21461,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
         }
         if t.edit_row == r as i32 && t.edit_col == c as i32 {
             self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3,
-                           self.th("field_bg"), accent);
+                           self.th("win_bg"), accent);
             let alle: Vec<char> = t.edit_text.chars().collect();
             let tx = cx + 5 - t.edit_scroll;
             let ty = cy + (ch - schrift).max(0) / 2;
@@ -21513,7 +21516,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let b = (ch - 8).clamp(10, 18);
                 let bx = match al { 1 => cx + (cw - b) / 2, 2 => cx + cw - b - self.sk(TBL_PADDING), _ => cx + self.sk(TBL_PADDING) };
                 let by = cy + (ch - b) / 2;
-                g.box_fill(bx, by, bx + b - 1, by + b - 1, self.th("field_bg"));
+                g.box_fill(bx, by, bx + b - 1, by + b - 1, self.th("win_bg"));
                 g.rect(bx, by, bx + b - 1, by + b - 1, border);
                 if cell.value >= 0.5 {
                     // Haken als zwei Striche -- ein gefuelltes Kaestchen
@@ -21530,7 +21533,7 @@ zellmodus, zeilen_anhaengen, spalten", key)),
                 let bx = cx + rand;
                 let by = cy + (ch - bh) / 2;
                 let v = cell.value.clamp(0.0, 1.0);
-                g.box_fill(bx, by, bx + bw - 1, by + bh - 1, self.th("field_bg"));
+                g.box_fill(bx, by, bx + bw - 1, by + bh - 1, self.th("win_bg"));
                 if v > 0.0 {
                     let fw = ((bw - 2) as f64 * v) as i32;
                     if fw > 0 {

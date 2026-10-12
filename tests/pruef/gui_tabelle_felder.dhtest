@@ -1,0 +1,73 @@
+' Eingabefelder in der Tabelle (Filterzeile, Haken-Zelle, Zell-Editor) tragen
+' die Farben des Themas.
+'
+' Bis 2026-10-12 fragte die Tabelle nach den Farbschluesseln "field_bg" und
+' "field_border" -- die es in keinem Thema gibt. `th` liefert dann 0, also
+' SCHWARZ: im hellen Thema stand die Filterzeile als schwarzer Balken da, der
+' Platzhalter "Filter ..." (aus der Kopfschrift abgeleitet, also fast schwarz)
+' war darauf unsichtbar, und das Kaestchen einer Haken-Zelle war ein schwarzes
+' Loch. Im dunklen Thema fiel es nicht auf. Gefunden beim Dogfooding der
+' Vereinsverwaltung (examples/verein). Jetzt nehmen die Felder dieselben
+' Schluessel wie ein Textfeld (win_bg, widget_border).
+
+=== die filterzeile ist im hellen thema hell
+IMPORT "gui"
+SCREEN(320, 160, "F", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("light")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("F", 0, 0, 320, 160)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 10, 10, 300, 140)
+GUI_TABLE_HEADERS(t, ["Name", "Ort"])
+GUI_TABLE_SET(t, "filterzeile", 1)
+GUI_TABLE_ADD_ROW(t, ["Müller", "Bonn"])
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(RGB(200, 200, 200))
+    GUI_DRAW()
+    FLIP()
+WEND
+--- bild
+280 42 #F4F6F9 +-8
+130 42 #F4F6F9 +-8
+
+=== die filterzeile im dunklen thema hat den grund eines textfelds
+IMPORT "gui"
+SCREEN(320, 160, "F", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("F", 0, 0, 320, 160)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 10, 10, 300, 140)
+GUI_TABLE_HEADERS(t, ["Name", "Ort"])
+GUI_TABLE_SET(t, "filterzeile", 1)
+GUI_TABLE_ADD_ROW(t, ["Müller", "Bonn"])
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(RGB(200, 200, 200))
+    GUI_DRAW()
+    FLIP()
+WEND
+--- bild
+280 42 #18222E +-8
+
+=== das kaestchen einer haken-zelle ist im hellen thema hell
+IMPORT "gui"
+SCREEN(320, 160, "H", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("light")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("H", 0, 0, 320, 160)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 10, 10, 300, 140)
+GUI_TABLE_HEADERS(t, ["Name", "Aktiv"])
+GUI_TABLE_COL_ALIGN(t, 1, "mitte")
+GUI_TABLE_ADD_ROW(t, ["Müller", ""])
+GUI_TABLE_CELL_KIND(t, 0, 1, "haken")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(RGB(200, 200, 200))
+    GUI_DRAW()
+    FLIP()
+WEND
+--- bild
+225 42 #F4F6F9 +-8
