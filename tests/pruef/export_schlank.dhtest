@@ -64,7 +64,9 @@ pruefen()
 DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "spiel.dh", "ziel", "--schlank"])
 PRINT INSTR(zeile$(aus, "Schlank:"), "dhrt-spiel") >= 0
 DIM exe AS STRING : exe = PATHJOIN(CWD$(), "ziel/spiel" + endung)
-PRINT "kleiner "; FILESIZE(exe) < FILESIZE(EXEPATH$()) * 7 \ 10
+' Seit 2026.31 bringt die Spiel-Laufzeit die eingebauten Schriften mit
+' (+5 MB) -- sie liegt bei knapp drei Vierteln der vollen.
+PRINT "kleiner "; FILESIZE(exe) < FILESIZE(EXEPATH$()) * 8 \ 10
 PRINT TRIM$(lauf$(exe, [""]))
 --- datei spiel.dh
 IMPORT "physics2d"
@@ -84,6 +86,29 @@ IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
 TRUE
 kleiner TRUE
 bilder 3
+
+=== ein spiel mit eingebauter schrift laeuft schlank
+' LOADFONT("sans") gibt es in jeder Laufzeit mit Grafik -- die Wahl fragt
+' nach Befehlen, nicht nach Schriften. Bis 2026.31 nahm sie darum die
+' Spiel-Laufzeit, und das exportierte Spiel brach ab: "dieser Bau hat keine".
+IMPORT "lauf.dh"
+pruefen()
+DIM aus AS STRING : aus = lauf$(EXEPATH$(), ["--export", "schrift.dh", "ziel", "--schlank"])
+PRINT INSTR(zeile$(aus, "Schlank:"), "dhrt-spiel") >= 0
+DIM exe AS STRING : exe = PATHJOIN(CWD$(), "ziel/schrift" + endung)
+PRINT TRIM$(lauf$(exe, [""]))
+--- datei schrift.dh
+SCREEN(100, 60, "t")
+SET_WINDOW_POS(-3000, -3000)
+DIM f AS INTEGER : f = LOADFONT("sans-fett", 24)
+SETFONT(f)
+CLS(BLUE) : TEXT(4, 4, "Größe", WHITE) : FLIP()
+PRINT "schrift "; f >= 0; " "; TEXT_WIDTH("Größe") > 0
+--- datei lauf.dh
+IMPORT "{sammlung}/_hilfen/schlanklauf.dh"
+--- erwartet
+TRUE
+schrift TRUE TRUE
 
 === ein befehl in einer nie gerufenen sub zaehlt
 ' Das Hauptprogramm braucht nur die Konsole; die SUB oeffnet ein Fenster.

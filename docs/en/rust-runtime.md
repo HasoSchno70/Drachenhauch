@@ -1076,9 +1076,10 @@ lean (see below); the export's output scrolls along at the bottom left (see
 
 **Lean export** (`--schlank`): the full runtime carries everything (graphics,
 sound, PDF with embedded fonts, database, network, video, hardware) and is
-about 33 MB in size. Next to it, two smaller ones live in `laufzeiten/`:
-`dhrt-konsole` (data, network, mail, machine code; 16 MB) and `dhrt-spiel`
-(graphics, sound, dialogs, physics, machine code; 21 MB). With `--schlank` the
+about 37 MB in size. Next to it, two smaller ones live in `laufzeiten/`:
+`dhrt-konsole` (data, network, mail, machine code; 19 MB) and `dhrt-spiel`
+(graphics, sound, dialogs, physics, the built-in fonts for
+`LOADFONT("sans")`, machine code; 27 MB). With `--schlank` the
 export takes the smallest one that lacks none of the commands the program
 calls -- even in a subroutine that never runs. **The runtimes themselves are
 asked** (`dhrt-konsole --fehlende name …`: every name is called with

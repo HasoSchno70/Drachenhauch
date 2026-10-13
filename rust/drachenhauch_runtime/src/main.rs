@@ -281,6 +281,7 @@ fn eingebaut() -> String {
         ("maschinencode", cfg!(feature = "jit")),
         ("ffi", cfg!(feature = "ffi")),
         ("pdf", cfg!(feature = "pdf")),
+        ("schriften", cfg!(feature = "schriften")),
         ("physik", cfg!(feature = "physik")),
         ("seriell", cfg!(feature = "serial")),
         ("usb", cfg!(feature = "usb")),

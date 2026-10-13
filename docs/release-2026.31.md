@@ -126,6 +126,10 @@ Ordnern). **5079 Fälle in 400 Prüfsammlungen** (vorher 5035 in 394) und
 * Die eingebauten Schriften sind ein eigenes Feature `schriften`, das das
   pdf-Modul mitbringt; der Web-Bau schaltet es eigens ein (`dhrt.wasm`
   18,8 MB statt 13,7).
+* **Die Spiel-Laufzeit für den schlanken Export bringt die Schriften mit**
+  (27 statt 22 MB). Gefunden beim Bau dieser Fassung: ein Spiel mit
+  `LOADFONT("sans")` bekam die Spiel-Laufzeit — den Befehl hat sie ja —
+  und brach dann beim Start ab.
 * Die Vereinsverwaltung läuft im Test gegen alle drei Datenbanken mit
   derselben erwarteten Ausgabe.
 

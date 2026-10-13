@@ -172,7 +172,9 @@ def main() -> int:
 # rechneten Programme bis zu hundertmal langsamer.
 LAUFZEITEN = [
     ("konsole", ["db", "pg", "mysql", "net", "http", "smtp", "jit", "ffi"]),
-    ("spiel", ["graphics", "dialogs", "physik", "jit", "ffi"]),
+    # "schriften": LOADFONT("sans") -- ohne sie brach ein schlank exportiertes
+    # Spiel damit ab, obwohl der Befehl da war (Fassung 2026.31).
+    ("spiel", ["graphics", "dialogs", "physik", "schriften", "jit", "ffi"]),
 ]
 
 
