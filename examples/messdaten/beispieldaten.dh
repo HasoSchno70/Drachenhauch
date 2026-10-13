@@ -1,0 +1,40 @@
+' beispieldaten -- schreibt eine Woche Werkstatt-Messungen als CSV, im Format
+' der Aufzeichnung von examples/werkstatt (zeit;temperatur;feuchte;licht;strom).
+'
+'     dhrt run beispieldaten.dh                  (messdaten.csv, alle 10 s)
+'     dhrt run beispieldaten.dh -- datei.csv 60  (anderer Name, alle 60 s)
+'
+' Tagesgang, Wochenende ohne Loetstation, ein paar Ausreisser (ein
+' Wackelkontakt) und eine Luecke, in der das Board aus war -- damit die
+' Auswertung etwas zu tun hat.
+IMPORT "zeit"
+DIM datei AS STRING : datei = "messdaten.csv"
+IF ARGC() > 0 THEN datei = ARG$(0)
+DIM takt AS INTEGER : takt = 10
+IF ARGC() > 1 THEN takt = VAL(ARG$(1))
+
+RANDOMIZE(42)
+DIM f AS FILE : f = OPENFILE(datei, "w")
+WRITELINE(f, "zeit;temperatur;feuchte;licht;strom")
+DIM start AS INTEGER : start = ZEIT_PARSE("2026-10-05 00:00:00")
+DIM t AS INTEGER, n AS INTEGER
+DIM temp AS FLOAT : temp = 19.0
+FOR t = 0 TO 7 * 24 * 3600 - 1 STEP takt
+    DIM tag AS INTEGER : tag = t \ 86400
+    DIM stunde AS FLOAT : stunde = (t MOD 86400) / 3600.0
+    ' Mittwoch 14:00 bis 16:30 war das Board aus
+    IF tag = 2 AND stunde >= 14.0 AND stunde < 16.5 THEN CONTINUE
+    DIM arbeit AS BOOLEAN : arbeit = tag < 5 AND stunde >= 8.0 AND stunde < 18.0
+    DIM ziel AS FLOAT : ziel = 18.0 + 3.0 * SIN((stunde - 9.0) / 24.0 * TAU) + IIF(arbeit, 6.0, 0.0)
+    temp = temp + (ziel - temp) * 0.002 * takt + (RND() - 0.5) * 0.05
+    DIM feuchte AS FLOAT : feuchte = 55.0 - (temp - 18.0) * 1.5 + (RND() - 0.5) * 2.0
+    DIM licht AS INTEGER : licht = INT(MAX(0.0, 900.0 * SIN((stunde - 6.0) / 14.0 * PI)) + IIF(arbeit, 300, 0) + RND() * 20)
+    DIM strom AS FLOAT : strom = 0.15 + IIF(arbeit, 1.1 + RND() * 0.6, 0.0) + RND() * 0.05
+    DIM tw AS FLOAT : tw = temp
+    ' Wackelkontakt: ab und zu ein Wert, der nicht stimmen kann
+    IF RND() < 0.0005 THEN tw = -40.0
+    WRITELINE(f, ZEIT_FORMAT$(start + t, "JJJJ-MM-TT hh:mm:ss") + ";" + FORMAT$(tw, "%.1f") + ";" + FORMAT$(feuchte, "%.1f") + ";" + STR$(licht) + ";" + FORMAT$(strom, "%.2f"))
+    n = n + 1
+NEXT
+CLOSEFILE(f)
+PRINT n; " Zeilen -> "; datei
