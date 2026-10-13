@@ -4585,6 +4585,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             c.borrow_mut().set_data(s as usize, &werte)?;
             Ok(Value::Nil)
         }
+        "chart_x" => {
+            arity!(2);
+            let xs = num_array(&a[1], "CHART_X")?;
+            let c = chart_h(&a[0], "CHART_X")?;
+            c.borrow_mut().set_x(&xs)?;
+            Ok(Value::Nil)
+        }
         "chart_set_point" => {
             arity!(4);
             let c = chart_h(&a[0], "CHART_SET_POINT")?;

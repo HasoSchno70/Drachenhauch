@@ -5161,6 +5161,29 @@ impl<'p> Vm<'p> {
                 self.pdf_d(i)?.rechteck(x, y, b, h, name == "pdf_rect_fill");
                 Value::Nil
             }
+            // PDF_IMAGE(pdf, bild, x, y, b [, h]) -- ein IMAGE (LOADIMAGE,
+            // RENDERTARGET_IMAGE, IMAGE_NEW ...) in die Seite setzen. Bis 2026.30
+            // kannte das pdf-Modul nur Text, Linien und Rechtecke; ein Bericht
+            // musste seine Diagramme Strich fuer Strich nachmalen
+            // (Messdaten-Runde, 2026-10-13).
+            "pdf_image" => {
+                if a.len() != 5 && a.len() != 6 {
+                    return Err(format!("PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}", a.len()));
+                }
+                let i = bi_int(a, 0, "PDF_IMAGE")?;
+                let bild = bi_int(a, 1, "PDF_IMAGE")?;
+                let (x, y, b) = (bi_num(a, 2, "PDF_IMAGE")?, bi_num(a, 3, "PDF_IMAGE")?, bi_num(a, 4, "PDF_IMAGE")?);
+                let h = if a.len() > 5 { bi_num(a, 5, "PDF_IMAGE")? } else { 0.0 };
+                #[cfg(feature = "graphics")]
+                {
+                    let g = self.gfx.as_ref().ok_or("PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE")?;
+                    let (px, pw, ph) = g.image_rgba(bild, "PDF_IMAGE")?;
+                    self.pdf_d(i)?.bild(x, y, b, h, px, pw, ph).map_err(|e| format!("PDF_IMAGE: {}", e))?;
+                    Value::Nil
+                }
+                #[cfg(not(feature = "graphics"))]
+                { let _ = (i, bild, x, y, b, h); return Err("PDF_IMAGE: dieser Bau hat keine Grafik".into()); }
+            }
             "pdf_save" => {
                 let i = bi_int(a, 0, "PDF_SAVE")?;
                 let pfad = bi_str(a, 1, "PDF_SAVE")?.to_string();
@@ -6235,7 +6258,7 @@ impl<'p> Vm<'p> {
             "zeit_format$" | "zeit_format" => {
                 let t = z_int(a, 0, "ZEIT_FORMAT$")?;
                 let muster = if a.len() > 1 { z_str(a, 1, "ZEIT_FORMAT$")? } else { "" };
-                Value::str_rc(zeit::format(t, muster))
+                Value::str_rc(zeit::format_pruefen(t, muster)?)
             }
             "zeit_teil" => {
                 let t = z_int(a, 0, "ZEIT_TEIL")?;
@@ -7484,6 +7507,7 @@ impl<'p> Vm<'p> {
             }
             // GUI_FORM_VERSION(win, spalte$[, formular$]) -- Versionsspalte fuer
             // GUI_FORM_LOAD/SAVE (optimistische Sperre), leer = aus.
+            "gui_changed" => Value::Bool(self.gui.changed(gi(a,0,"GUI_CHANGED")?)?),
             "gui_form_version" => {
                 let form = if a.len() > 2 { gs(a,2,"GUI_FORM_VERSION")? } else { String::new() };
                 self.gui.form_version_setzen(gi(a,0,"GUI_FORM_VERSION")?, &form, &gs(a,1,"GUI_FORM_VERSION")?)?;
@@ -9244,6 +9268,7 @@ impl<'p> Vm<'p> {
             }
             "rendertarget_begin" => { g!().rendertarget_begin(gi(a,0,"RENDERTARGET_BEGIN")?)?; Value::Nil }
             "rendertarget_end" => { g!().rendertarget_end(); Value::Nil }
+            "rendertarget_image" => Value::Int(g!().rendertarget_image(gi(a,0,"RENDERTARGET_IMAGE")?)?),
             "rendertarget_draw" => {
                 let scale = if a.len() >= 4 { need_f(a,3,"RENDERTARGET_DRAW")? } else { 1.0 };
                 let tint = if a.len() >= 5 { Some(gi(a,4,"RENDERTARGET_DRAW")?) } else { None };

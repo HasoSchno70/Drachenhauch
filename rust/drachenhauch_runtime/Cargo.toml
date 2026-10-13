@@ -45,7 +45,7 @@ miniz_oxide = "0.8"
 # vorher standen hier 440 Zeilen Handarbeit, die nur die vierzehn
 # Standardschriften und cp1252 konnten. Pure-Rust. `simple-text` bringt die
 # Textformung (rustybuzz); Bilder brauchen wir (noch) nicht.
-krilla = { version = "0.8.2", default-features = false, features = ["simple-text"], optional = true }
+krilla = { version = "0.8.2", default-features = false, features = ["simple-text", "raster-images"], optional = true }
 # Die eingebauten Schriften des PDF-Moduls: DejaVu Sans/Serif/Sans Mono in je
 # vier Schnitten (freie Lizenz, deckt Latein, Griechisch, Kyrillisch und viele
 # Zeichen wie Pfeile und Haken ab). Der Linker nimmt nur die zwoelf benutzten.

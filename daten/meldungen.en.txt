@@ -1737,3 +1737,4 @@ ein Nullzeichen im Text -- PostgreSQL nimmt es nicht	a null character in the tex
 Spalte {} ({}): {}	column {} ({}): {}
 MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten	MQTT_WILL: the topic must not be empty or contain wildcards (# +)
 MQTT_WILL: retain ist TRUE oder FALSE	MQTT_WILL: retain is TRUE or FALSE
+ZEIT_FORMAT$: '%{}' kennt das Muster nicht -- %Y %y %m %d %H %M %S %a %A %% oder JJJJ MM TT hh mm ss WT WTAG	ZEIT_FORMAT$: the pattern does not know '%{}' -- %Y %y %m %d %H %M %S %a %A %% or JJJJ MM TT hh mm ss WT WTAG

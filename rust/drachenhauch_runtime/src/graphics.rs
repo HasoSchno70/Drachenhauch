@@ -1600,6 +1600,10 @@ fn schrift_laden(rl: &mut RaylibHandle, thread: &RaylibThread, pfad: &str, groes
 /// Die Bytes einer Schriftdatei, Sammlungen (.ttc) auf ihre erste Schrift
 /// verkleinert, dazu die Endung, unter der raylib sie lesen soll.
 fn schrift_daten(pfad: &str) -> Result<(Vec<u8>, &'static str), String> {
+    if let Some(name) = pfad.strip_prefix(EINGEBAUT_VORSATZ) {
+        return eingebaute_schrift(name).map(|d| (d.to_vec(), ".ttf"))
+            .ok_or_else(|| format!("'{}' ist keine eingebaute Schrift", name));
+    }
     let daten = std::fs::read(pfad).map_err(|e| format!("'{}': {}", pfad, e))?;
     Ok(match ttc_erste_schrift(&daten) {
         Some(erste) => (erste, ".ttf"),
@@ -1608,6 +1612,25 @@ fn schrift_daten(pfad: &str) -> Result<(Vec<u8>, &'static str), String> {
             (daten, art)
         }
     })
+}
+
+/// Eine eingebaute Schrift steht in `font_herkunft` als "eingebaut:sans" --
+/// so laufen sie und eine Datei durch dieselben Wege (Laden, Schnitte).
+const EINGEBAUT_VORSATZ: &str = "eingebaut:";
+
+#[cfg(feature = "pdf")]
+fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> { crate::pdf::eingebaute_schrift(name) }
+#[cfg(not(feature = "pdf"))]
+fn eingebaute_schrift(_name: &str) -> Option<&'static [u8]> { None }
+
+/// LOADFONT("sans", 32): ein Name der eingebauten DejaVu-Schriften (sans,
+/// serif, mono, je mit -fett/-kursiv/-fett-kursiv). Eine Datei gleichen
+/// Namens gewinnt. Bis 2026.30 bekam ein Programm eine normale Schrift nur
+/// ueber einen festen Pfad wie C:/Windows/Fonts/segoeui.ttf -- unter macOS
+/// und Linux gab es den nicht.
+fn eingebauter_pfad(pfad: &str) -> Option<String> {
+    if std::path::Path::new(pfad).exists() { return None; }
+    eingebaute_schrift(pfad).map(|_| format!("{}{}", EINGEBAUT_VORSATZ, pfad.trim().to_lowercase()))
 }
 
 /// Fuehrt `f` aus, waehrend raylib nur Fehler meldet.
@@ -2190,6 +2213,44 @@ impl Graphics {
         Ok(())
     }
     pub fn rendertarget_end(&mut self) { self.active_rt = None; }
+
+    /// RENDERTARGET_IMAGE(rt): der Inhalt eines Render-Targets als IMAGE --
+    /// was seit RENDERTARGET_BEGIN aufgezeichnet ist, wird dafuer SOFORT
+    /// abgespielt, nicht erst beim FLIP.
+    ///
+    /// Bis 2026.30 gab es keinen Weg von Gezeichnetem zu einem Bild: ein
+    /// Diagramm liess sich zeigen, aber nicht in einen PDF-Bericht oder eine
+    /// PNG-Datei bringen, ohne den Bildschirm abzufotografieren
+    /// (Messdaten-Runde, 2026-10-13).
+    pub fn rendertarget_image(&mut self, idx: i64) -> Result<i64, String> {
+        let i = self.check_rt(idx, "RENDERTARGET_IMAGE")?;
+        if self.active_rt == Some(i) {
+            return Err("RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END".into());
+        }
+        if !self.render_targets[i].cmds.is_empty() {
+            self.ausweich_nachladen();
+            let Graphics { rl, thread, textures, fonts, ausweich, font_glyphs, render_targets, cam3d, .. } = self;
+            let cmds = std::mem::take(&mut render_targets[i].cmds);
+            let synth = [Layer { z: 0, cmds }];
+            let clear = if render_targets[i].behalten { None } else { Some(Color::new(0, 0, 0, 0)) };
+            let empty_set = std::collections::HashSet::new();
+            let empty_map = std::collections::HashMap::new();
+            let empty_emis = std::collections::HashMap::new();
+            let ausweich: &[Ausweich] = ausweich.as_slice();
+            let font_glyphs: &[std::collections::HashSet<u32>] = font_glyphs.as_slice();
+            let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
+            // Dieselben Argumente wie beim FLIP: Massstab 1, keine 3D-Szene.
+            render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich, font_glyphs,
+                &[], *cam3d, &[], None,
+                (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
+                (false, 0, 0, 0), &[], None, None, None, None);
+        }
+        let mut img = self.render_targets[i].rt.texture().load_image()
+            .map_err(|e| format!("RENDERTARGET_IMAGE: {}", e))?;
+        // Eine RenderTexture steht in OpenGL auf dem Kopf.
+        img.flip_vertical();
+        self.push_tex_from_image(img)
+    }
 
     /// GUI_WINDOW_ZOOM: ab jetzt in die Zoom-Flaeche zeichnen. FALSE, wenn
     /// es keine gibt (dann zeichnet der Aufrufer unvergroessert).
@@ -3958,8 +4019,17 @@ impl Graphics {
             if !pfad.is_empty() {
                 let versuche: Vec<u8> = if s == FETT | KURSIV { vec![FETT | KURSIV, FETT, KURSIV] } else { vec![s] };
                 'suche: for v in versuche {
-                    for kand in crate::schnitt::schnitt_kandidaten(&pfad, v) {
-                        if !std::path::Path::new(&kand).exists() { continue; }
+                    let kandidaten = match pfad.strip_prefix(EINGEBAUT_VORSATZ) {
+                        // Eingebaut: die Familie hat alle vier Schnitte
+                        Some(name) => {
+                            let familie = name.split('-').next().unwrap_or(name);
+                            let endung = match v { FETT => "-fett", KURSIV => "-kursiv", _ => "-fett-kursiv" };
+                            vec![format!("{}{}{}", EINGEBAUT_VORSATZ, familie, endung)]
+                        }
+                        None => crate::schnitt::schnitt_kandidaten(&pfad, v),
+                    };
+                    for kand in kandidaten {
+                        if !kand.starts_with(EINGEBAUT_VORSATZ) && !std::path::Path::new(&kand).exists() { continue; }
                         let rl = &mut self.rl;
                         let thread = &self.thread;
                         if let Ok(f) = schrift_laden(rl, thread, &kand, groesse, &zeichen) {
@@ -4075,12 +4145,13 @@ impl Graphics {
     /// Mit erweitertem Zeichensatz: raylib backt sonst nur die 95 ASCII-
     /// Glyphen, und jedes deutsche Wort mit Umlaut kaeme als "K?ln" heraus.
     pub fn load_font(&mut self, path: &str, size: i32) -> Result<i64, String> {
-        let resolved = crate::builtins::resolve_asset_path(path);
+        let eingebaut = eingebauter_pfad(path);
+        let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
         let chars = zeichensatz();
         let rl = &mut self.rl;
         let thread = &self.thread;
-        crate::builtins::datei_da(path, "LOADFONT")?;
+        if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT")?; }
         let f = schrift_laden(rl, thread, path, size, &chars)
             .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
         Self::keine_ersatzschrift(&f, path)?;
@@ -4100,11 +4171,12 @@ impl Graphics {
     /// es braucht; ein Programm fuer Japan die Kana und alle Kanji.
     pub fn load_font_mit(&mut self, path: &str, size: i32, zeichen: &str) -> Result<i64, String> {
         let chars = zeichen_aus_namen(zeichen)?;
-        let resolved = crate::builtins::resolve_asset_path(path);
+        let eingebaut = eingebauter_pfad(path);
+        let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
         let rl = &mut self.rl;
         let thread = &self.thread;
-        crate::builtins::datei_da(path, "LOADFONT")?;
+        if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT")?; }
         let f = schrift_laden(rl, thread, path, size, &chars)
             .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
         Self::keine_ersatzschrift(&f, path)?;
@@ -4297,9 +4369,10 @@ impl Graphics {
             None => (32u32..127).chain(0xA0..=0xFF).filter_map(char::from_u32)
                 .chain("€–—„“”‘’…•".chars()).collect(),
         };
-        let resolved = crate::builtins::resolve_asset_path(path);
+        let eingebaut = eingebauter_pfad(path);
+        let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
-        crate::builtins::datei_da(path, "LOADFONT_SDF")?;
+        if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT_SDF")?; }
         let (daten, _) = schrift_daten(path).map_err(|e| format!("LOADFONT_SDF: Font nicht ladbar: {}", e))?;
         let size = size.clamp(8, 256);
         let cps: Vec<i32> = chars.chars().map(|c| c as i32).collect();
@@ -4513,6 +4586,16 @@ impl Graphics {
         self.textures[i] = Tex { tex, img: leer };
         self.tex_frei[i] = true;
         Ok(())
+    }
+
+    /// Die Punkte eines Bildes als RGBA (Zeile fuer Zeile) -- fuer PDF_IMAGE.
+    pub fn image_rgba(&self, idx: i64, fn_: &str) -> Result<(Vec<u8>, u32, u32), String> {
+        let mut img = self.src_image(idx, fn_)?;
+        img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        let (w, h) = (img.width.max(0) as usize, img.height.max(0) as usize);
+        if w == 0 || h == 0 { return Err(format!("{}: das Bild ist leer", fn_)); }
+        let px = unsafe { std::slice::from_raw_parts(img.data as *const u8, w * h * 4) }.to_vec();
+        Ok((px, w as u32, h as u32))
     }
 
     fn src_image(&self, idx: i64, fn_: &str) -> Result<Image, String> {
@@ -4946,6 +5029,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                     } else {
                         img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c));
                     }
+                }
+                Op::Bild { x, y, b, h, rgba, pw, ph } => {
+                    let mut quelle = Image::gen_image_color(*pw as i32, *ph as i32, Color::BLANK);
+                    quelle.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+                    let n = rgba.len();
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(quelle.data as *mut u8, n) };
+                    ziel.copy_from_slice(rgba);
+                    img.draw(&quelle,
+                        Rectangle::new(0.0, 0.0, *pw as f32, *ph as f32),
+                        Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32),
+                        Color::WHITE);
                 }
             }
         }

@@ -2580,6 +2580,13 @@ pub struct Widget {
     hovered: bool,
     on_click: Option<Rueckruf>,
     on_change: Option<Rueckruf>,
+    /// GUI_CHANGED: einmal gefragt, wird das Widget beobachtet -- GUI_UPDATE
+    /// merkt sich zu Beginn seinen Wert und vergleicht am Ende. So zaehlt nur,
+    /// was die BEDIENUNG geaendert hat; ein Wert, den das Programm zwischen
+    /// zwei Bildern setzt, ist keine Aenderung.
+    beobachtet: bool,
+    stand_vorher: String,
+    geaendert: bool,
     /// Maus betritt / verlaesst das Widget, Fokus kommt / geht.
     on_hover: Option<Rueckruf>,
     on_leave: Option<Rueckruf>,
@@ -4422,7 +4429,7 @@ impl Gui {
             kind, x, y, w, h, text: String::new(), color: -1,   // -1 = dem Thema folgen
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
-            on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
+            on_click: None, on_change: None, beobachtet: false, stand_vorher: String::new(), geaendert: false, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
             panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1, akk: None, wz: None,
             leiste: None, status: None, pfad: None, sinnbild: String::new(),
@@ -12524,7 +12531,46 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     }
 
     // --- Update (ein Frame) ---
+    /// Was GUI_CHANGED vergleicht: der Wert wie fuer die Bindung, dazu
+    /// Auswahl, Zahl und Haken (eine Liste, eine Tabelle haben keinen Text).
+    fn abdruck(&self, w: &Widget) -> String {
+        let tab = w.tbl.as_ref().map(|t| t.selected).unwrap_or(-1);
+        format!("{}|{}|{}|{}|{}", self.wert_text(w), w.sel, w.value, w.checked, tab)
+    }
+
+    /// GUI_CHANGED(wdg): hat die Bedienung das Widget im letzten GUI_UPDATE
+    /// geaendert? Der erste Aufruf meldet FALSE und beginnt zu beobachten.
+    pub fn changed(&mut self, h: i64) -> Result<bool, String> {
+        let w = self.wdg_mut(h, "GUI_CHANGED")?;
+        if !w.beobachtet { w.beobachtet = true; return Ok(false); }
+        Ok(w.geaendert)
+    }
+
     pub fn update(&mut self, g: &mut Graphics) {
+        // GUI_CHANGED: den Stand vor der Bedienung merken
+        for wi in 0..self.windows.len() {
+            for i in 0..self.windows[wi].widgets.len() {
+                if self.windows[wi].widgets[i].beobachtet {
+                    let a = self.abdruck(&self.windows[wi].widgets[i]);
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.stand_vorher = a;
+                    w.geaendert = false;
+                }
+            }
+        }
+        self.update_innen(g);
+        for wi in 0..self.windows.len() {
+            for i in 0..self.windows[wi].widgets.len() {
+                if self.windows[wi].widgets[i].beobachtet {
+                    let a = self.abdruck(&self.windows[wi].widgets[i]);
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.geaendert = a != w.stand_vorher;
+                }
+            }
+        }
+    }
+
+    fn update_innen(&mut self, g: &mut Graphics) {
         let mx = g.mouse_x() as i32;
         let my = g.mouse_y() as i32;
         let is_down = g.mouse_button(0);

@@ -1515,6 +1515,12 @@
    "module": "chart"
   },
   {
+   "name": "CHART_X",
+   "kind": "core",
+   "signature": "CHART_X(diagramm, xwerte)",
+   "module": "chart"
+  },
+  {
    "name": "CHART_NEW",
    "kind": "core",
    "signature": "CHART_NEW(art: STRING, x: INTEGER, y: INTEGER, breite: INTEGER, hoehe: INTEGER) AS CHART",
@@ -3270,6 +3276,12 @@
    "name": "GUI_CHECKBOX",
    "kind": "core",
    "signature": "GUI_CHECKBOX(win, label$, x, y[, default])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CHANGED",
+   "kind": "core",
+   "signature": "GUI_CHANGED(wdg) AS BOOLEAN",
    "module": "gui"
   },
   {
@@ -8349,6 +8361,12 @@
    "module": "pdf"
   },
   {
+   "name": "PDF_IMAGE",
+   "kind": "core",
+   "signature": "PDF_IMAGE(pdf, bild, x, y, breite [, hoehe])",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_LINE",
    "kind": "core",
    "signature": "PDF_LINE(p: PDF, x1, y1, x2, y2)",
@@ -9366,6 +9384,12 @@
    "name": "RENDERTARGET_END",
    "kind": "graphics",
    "signature": "RENDERTARGET_END()",
+   "module": "core"
+  },
+  {
+   "name": "RENDERTARGET_IMAGE",
+   "kind": "graphics",
+   "signature": "RENDERTARGET_IMAGE(rt) AS IMAGE",
    "module": "core"
   },
   {
