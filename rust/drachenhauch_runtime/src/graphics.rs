@@ -1614,13 +1614,22 @@ fn schrift_daten(pfad: &str) -> Result<(Vec<u8>, &'static str), String> {
     })
 }
 
+/// Das Fenster-Handle des Systems -- im Browser gibt es keins (raylib warnt
+/// dort bei jedem Aufruf; FLIP fragte es in jedem Bild).
+fn fenster_handle(rl: &mut RaylibHandle) -> *mut std::ffi::c_void {
+    #[cfg(target_os = "emscripten")]
+    { let _ = rl; std::ptr::null_mut() }
+    #[cfg(not(target_os = "emscripten"))]
+    unsafe { rl.get_window_handle() }
+}
+
 /// Eine eingebaute Schrift steht in `font_herkunft` als "eingebaut:sans" --
 /// so laufen sie und eine Datei durch dieselben Wege (Laden, Schnitte).
 const EINGEBAUT_VORSATZ: &str = "eingebaut:";
 
-#[cfg(feature = "pdf")]
-fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> { crate::pdf::eingebaute_schrift(name) }
-#[cfg(not(feature = "pdf"))]
+#[cfg(feature = "schriften")]
+fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> { crate::schriften::eingebaute_schrift(name) }
+#[cfg(not(feature = "schriften"))]
 fn eingebaute_schrift(_name: &str) -> Option<&'static [u8]> { None }
 
 /// LOADFONT("sans", 32): ein Name der eingebauten DejaVu-Schriften (sans,
@@ -1628,9 +1637,20 @@ fn eingebaute_schrift(_name: &str) -> Option<&'static [u8]> { None }
 /// Namens gewinnt. Bis 2026.30 bekam ein Programm eine normale Schrift nur
 /// ueber einen festen Pfad wie C:/Windows/Fonts/segoeui.ttf -- unter macOS
 /// und Linux gab es den nicht.
-fn eingebauter_pfad(pfad: &str) -> Option<String> {
-    if std::path::Path::new(pfad).exists() { return None; }
-    eingebaute_schrift(pfad).map(|_| format!("{}{}", EINGEBAUT_VORSATZ, pfad.trim().to_lowercase()))
+fn eingebauter_pfad(pfad: &str, befehl: &str) -> Result<Option<String>, String> {
+    if std::path::Path::new(pfad).exists() { return Ok(None); }
+    if eingebaute_schrift(pfad).is_some() {
+        return Ok(Some(format!("{}{}", EINGEBAUT_VORSATZ, pfad.trim().to_lowercase())));
+    }
+    // Ein Name, der eine eingebaute Schrift meint, in einem Bau ohne sie: das
+    // sagen, statt "Datei 'sans' nicht gefunden" zu melden.
+    let k = pfad.trim().to_lowercase();
+    let familie = k.split('-').next().unwrap_or("");
+    if !k.contains('.') && !k.contains('/') && !k.contains('\\')
+        && ["sans", "serif", "mono", "helvetica", "times", "courier"].contains(&familie) {
+        return Err(format!("{}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature \"schriften\") -- eine .ttf-Datei angeben", befehl, pfad));
+    }
+    Ok(None)
 }
 
 /// Fuehrt `f` aus, waehrend raylib nur Fehler meldet.
@@ -1786,21 +1806,27 @@ impl Graphics {
         // IMMER versteckt anlegen: der Barrierefreiheits-Adapter (a11y.rs)
         // verlangt ein Fenster, das noch nie sichtbar war. Gezeigt wird es
         // gleich darunter -- ausser der Aufrufer wollte es ohnehin versteckt.
+        // Im Browser gibt es kein verstecktes Fenster (raylib warnt nur).
+        #[cfg(not(target_os = "emscripten"))]
         builder.hidden();
         let (mut rl, thread) = Graphics::fenster_bauen(builder)?;
         // Klicks zwischen zwei Bildern mitzaehlen (flanken.rs).
         crate::flanken::einhaengen();
         let _ = crate::flanken::abholen();
         let _ = crate::flanken::tasten_abholen();
-        let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
+        let hwnd = fenster_handle(&mut rl);
+        let a11y = crate::a11y::A11y::neu(hwnd);
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
-        crate::ime::einhaengen(unsafe { rl.get_window_handle() });
-        crate::systemzeiger::einhaengen(unsafe { rl.get_window_handle() });
-        crate::stillfenster::einrichten(unsafe { rl.get_window_handle() });
-        crate::tray::einhaengen(unsafe { rl.get_window_handle() });
+        crate::ime::einhaengen(hwnd);
+        crate::systemzeiger::einhaengen(hwnd);
+        crate::stillfenster::einrichten(hwnd);
+        crate::tray::einhaengen(hwnd);
+        #[cfg(not(target_os = "emscripten"))]
         if !hidden {
             rl.clear_window_state(WindowState::default().set_window_hidden(true));
         }
+        #[cfg(target_os = "emscripten")]
+        let _ = hidden;
         // `dhrt bild` setzt DHRT_ABSEITS: das Fenster wird aus dem Blick
         // geschoben, statt fuer eine Sekunde aufzublitzen. Das BILD stimmt
         // trotzdem -- gesichert wird der Zeichenpuffer, nicht der Bildschirm
@@ -4145,7 +4171,7 @@ impl Graphics {
     /// Mit erweitertem Zeichensatz: raylib backt sonst nur die 95 ASCII-
     /// Glyphen, und jedes deutsche Wort mit Umlaut kaeme als "K?ln" heraus.
     pub fn load_font(&mut self, path: &str, size: i32) -> Result<i64, String> {
-        let eingebaut = eingebauter_pfad(path);
+        let eingebaut = eingebauter_pfad(path, "LOADFONT")?;
         let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
         let chars = zeichensatz();
@@ -4171,7 +4197,7 @@ impl Graphics {
     /// es braucht; ein Programm fuer Japan die Kana und alle Kanji.
     pub fn load_font_mit(&mut self, path: &str, size: i32, zeichen: &str) -> Result<i64, String> {
         let chars = zeichen_aus_namen(zeichen)?;
-        let eingebaut = eingebauter_pfad(path);
+        let eingebaut = eingebauter_pfad(path, "LOADFONT")?;
         let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
         let rl = &mut self.rl;
@@ -4369,7 +4395,7 @@ impl Graphics {
             None => (32u32..127).chain(0xA0..=0xFF).filter_map(char::from_u32)
                 .chain("€–—„“”‘’…•".chars()).collect(),
         };
-        let eingebaut = eingebauter_pfad(path);
+        let eingebaut = eingebauter_pfad(path, "LOADFONT_SDF")?;
         let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
         if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT_SDF")?; }
@@ -5472,6 +5498,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Strg+Z als die Taste an der US-Lage des Z ein.
     fn belegung_auffrischen(&mut self) {
         if self.auto_playing { self.belegung = std::array::from_fn(|i| 97 + i as i64); return; }
+        // Im Browser kennt raylib GetKeyName nicht und warnt bei JEDEM Aufruf
+        // -- 26 Zeilen je Bild in der Ausgabe, die den Playground ausbremsten
+        // (Web-Runde 2026-10-13). Dort gilt die Lage.
+        #[cfg(target_os = "emscripten")]
+        { self.belegung = std::array::from_fn(|i| 97 + i as i64); return; }
         let namen: [Option<String>; 26] = std::array::from_fn(|i| {
             map_key(97 + i as i64).and_then(|k| self.tastenname_roh(k))
         });
@@ -6969,7 +7000,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
 
     pub fn flip(&mut self) {
         self.zeiger_anwenden();
-        crate::stillfenster::zurueckgeben(unsafe { self.rl.get_window_handle() });
+        crate::stillfenster::zurueckgeben(fenster_handle(&mut self.rl));
         self.flips += 1;
         // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
         // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.
@@ -7082,7 +7113,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // DH-Render-Loop den Main-Thread und der Tab haengt. ASYNCIFY wickelt den
         // Stack ab; beim naechsten Frame geht es hier weiter.
         #[cfg(target_os = "emscripten")]
-        unsafe { emscripten_sleep(0); }
+        {
+            unsafe { emscripten_sleep(0); }
+            crate::web_speicher::takt();
+        }
 
         // Aufgezeichnete Eingabe einspeisen. Muss HIER stehen: das Draw-Handle
         // ist gerade gedroppt worden (= EndDrawing), raylib hat die echte

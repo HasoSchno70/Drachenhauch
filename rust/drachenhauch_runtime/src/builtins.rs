@@ -344,6 +344,7 @@ fn zeichen_stelle_genau(s: &str, n: usize) -> Option<usize> {
 fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
     match v {
         Value::Int(i) => Ok(*i),
+        Value::Float(f) => glatt_int(*f).ok_or_else(|| format!("{} erwartet INTEGER, erhalten FLOAT {}{}", fn_, crate::value::fmt_float(*f), KEIN_GANZ_HINWEIS)),
         // Ein Text, wo eine Zahl steht, ist fast immer einer von drei Faellen
         // (Dateiname, Taste, Hex-Farbe) -- der Satz dazu steht in umstieg.rs.
         Value::Str(s) => Err(format!("{} erwartet INTEGER, erhalten STRING{}",
@@ -351,6 +352,15 @@ fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
         _ => Err(format!("{} erwartet INTEGER, erhalten {}", fn_, v.type_name())),
     }
 }
+
+/// Eine Kommazahl ohne Nachkommastellen als INTEGER -- dieselbe Regel wie
+/// eine Zuweisung an eine INTEGER-Variable. `/` liefert immer FLOAT (seit
+/// 2026-09-24); `GUI_WINDOW("...", BREITE / 2 - 170, ...)` brach deshalb mit
+/// "erwartet INTEGER" ab, obwohl `x = BREITE / 2` ging (Web-Runde 2026-10-13).
+pub(crate) fn glatt_int(f: f64) -> Option<i64> {
+    if f.is_finite() && f.fract() == 0.0 && f.abs() < 9.0e15 { Some(f as i64) } else { None }
+}
+pub(crate) const KEIN_GANZ_HINWEIS: &str = " -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \\ teilt ganzzahlig";
 
 /// Wie `need_int`, nimmt aber auch eine Kommazahl und rundet sie.
 ///

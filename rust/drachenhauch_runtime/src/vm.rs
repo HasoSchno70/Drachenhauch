@@ -7102,6 +7102,8 @@ impl<'p> Vm<'p> {
         if !name.starts_with("gui_") { return Ok(None); }
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
             match a.get(i) { Some(Value::Int(n)) => Ok(*n),
+                Some(Value::Float(x)) => crate::builtins::glatt_int(*x).ok_or_else(|| format!("{}: erwartet INTEGER (Arg {}), erhalten {}{}",
+                    f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
                 Some(Value::Str(t)) => Err(format!("{}: erwartet INTEGER (Arg {}){}", f, i + 1,
                     crate::umstieg::text_statt_zahl(f, t))),
                 _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
@@ -8590,7 +8592,10 @@ impl<'p> Vm<'p> {
         const HDR: i32 = 22; const ROW: i32 = 20; const SCR: i32 = 12; const PAD: i32 = 6;
         // --- Arg-Extraktion (lokal) ---
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
-            match a.get(i) { Some(Value::Int(n)) => Ok(*n), _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
+            match a.get(i) { Some(Value::Int(n)) => Ok(*n),
+                Some(Value::Float(x)) => crate::builtins::glatt_int(*x).ok_or_else(|| format!("{}: erwartet INTEGER (Arg {}), erhalten {}{}",
+                    f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
+                _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
         }
         fn gid(a: &[Value], f: &str) -> R<String> {
             match a.first() { Some(Value::Str(s)) => Ok(s.to_string()), _ => Err(format!("{}: id muss STRING sein", f)) }
@@ -9200,10 +9205,18 @@ impl<'p> Vm<'p> {
                 gi(a,4,"GENTEX_CHECKED")?, gi(a,5,"GENTEX_CHECKED")?)?),
             "gentex_color" => Value::Int(g!().gen_tex_color(
                 gi(a,0,"GENTEX_COLOR")? as i32, gi(a,1,"GENTEX_COLOR")? as i32, gi(a,2,"GENTEX_COLOR")?)?),
-            "gentex_radial" => Value::Int(g!().gen_tex_radial(
-                gi(a,0,"GENTEX_RADIAL")? as i32, gi(a,1,"GENTEX_RADIAL")? as i32,
-                gi(a,2,"GENTEX_RADIAL")?, gi(a,3,"GENTEX_RADIAL")?,
-                if a.len() >= 5 { need_f(a,4,"GENTEX_RADIAL")? } else { 0.0 })?),
+            "gentex_radial" => {
+                // dichte = Anteil des Radius in voller Innenfarbe. Ueber 1 gab
+                // raylib still eine harte Scheibe statt eines Lichts
+                // (Web-Runde 2026-10-13: 1.6 sah nach "dichter" aus).
+                let dichte = if a.len() >= 5 { need_f(a,4,"GENTEX_RADIAL")? } else { 0.0 };
+                if !(0.0..=1.0).contains(&dichte) {
+                    return Err(format!("GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in voller Innenfarbe (0 = weicher Verlauf ab der Mitte, 1 = Scheibe)", dichte));
+                }
+                Value::Int(g!().gen_tex_radial(
+                    gi(a,0,"GENTEX_RADIAL")? as i32, gi(a,1,"GENTEX_RADIAL")? as i32,
+                    gi(a,2,"GENTEX_RADIAL")?, gi(a,3,"GENTEX_RADIAL")?, dichte)?)
+            }
             "gentex_cellular" => Value::Int(g!().gen_tex_cellular(
                 gi(a,0,"GENTEX_CELLULAR")? as i32, gi(a,1,"GENTEX_CELLULAR")? as i32,
                 gi(a,2,"GENTEX_CELLULAR")?)?),
