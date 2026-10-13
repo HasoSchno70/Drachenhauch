@@ -165,6 +165,18 @@ module.exports = (H) => [
       "RENDERTARGET_DRAW(rt, 0, 0)",
     ]),
   H.note("Das Abdunkeln ist der Trick: Ohne es würde die Spur nie verblassen und die Fläche liefe nach ein paar Sekunden voll. Ein Vollbild-Rechteck im Multiplikations-Modus zieht jedes Bild ein paar Prozent Helligkeit ab – der Schweif wird nach hinten von selbst dunkler."),
+  H.cmd("RENDERTARGET_IMAGE", "RENDERTARGET_IMAGE(rt)",
+    "Liefert den Inhalt eines Render-Targets als IMAGE. Was seit RENDERTARGET_BEGIN hineingezeichnet wurde, wird dafür sofort abgespielt – ein FLIP ist nicht nötig. So wird aus einem Diagramm oder einer Szene ein Bild für IMAGE_SAVE oder einen PDF-Bericht (PDF_IMAGE).",
+    [
+      "DIM rt AS INTEGER",
+      "rt = RENDERTARGET_NEW(800, 400)",
+      "RENDERTARGET_BEGIN(rt)",
+      "CHART_DRAW(c)",
+      "RENDERTARGET_END()",
+      "DIM bild AS IMAGE",
+      "bild = RENDERTARGET_IMAGE(rt)",
+      'IMAGE_SAVE(bild, "diagramm.png")',
+    ]),
   H.warn("RENDERTARGET_DRAW innerhalb eines anderen Render-Targets tut nichts. Wer Rückkopplung will, nimmt behalten = TRUE – das ist genau dafür da.", "Ein Ziel kann sich nicht selbst zeichnen"),
 
   H.h2("Zustand sichern: GFX_PUSH und GFX_POP"),

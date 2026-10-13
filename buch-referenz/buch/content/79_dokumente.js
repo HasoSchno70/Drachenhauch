@@ -77,6 +77,13 @@ module.exports = (H) => [
       "PDF_COLOR(p, RGB(235, 235, 235))",
       "PDF_RECT_FILL(p, 20, 100, 170, 8)     ' Zeilenhinterlegung",
     ]),
+  H.cmd("PDF_IMAGE", "PDF_IMAGE(p, bild, x, y, b [, h])",
+    "Setzt ein Bild (IMAGE) in die Seite, Lage und Größe in Millimetern; ohne h nach dem Seitenverhältnis des Bildes. Das Bild kommt aus LOADIMAGE, IMAGE_NEW – oder aus RENDERTARGET_IMAGE: so landet ein Diagramm im Bericht. Mit 10 Bildpunkten je Millimeter wird es gedruckt scharf.",
+    [
+      'DIM logo AS IMAGE',
+      'logo = LOADIMAGE("logo.png")',
+      "PDF_IMAGE(p, logo, 150, 15, 40)     ' 40 mm breit, oben rechts",
+    ]),
   H.cmd("PDF_TEXT_WIDTH", "PDF_TEXT_WIDTH(p, text$)",
     "Die Breite eines Textes in Millimetern, in der aktuellen Schrift und Größe – die Voraussetzung dafür, etwas rechtsbündig zu setzen. Gemessen wird mit derselben Textformung, mit der auch gezeichnet wird, Unterschneidung eingeschlossen; das Maß stimmt also in jeder Schrift.",
     [

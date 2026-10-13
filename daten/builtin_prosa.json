@@ -266,7 +266,7 @@
   "CHART_SET": "Alles, was ein Text ist: titel, einheit, achse_x, achse_y, legende (aus/oben/unten/links/rechts), ausrichtung (senkrecht/waagerecht), werte (aus/innen/aussen), wertanzeige (aus/innen/pille/blase/am_zeiger), zifferblatt (ring/segmente/striche/baender), punktform (kreis/quadrat/raute/dreieck).",
   "CHART_SET_COLOR": "Alles, was eine Farbe ist: hintergrund, rahmen, gitter, text, titel, achse, zeiger, flaeche, verlauf, schatten – und der gerichtete Skalen-Verlauf skala_von / skala_mitte / skala_bis.",
   "CHART_SET_FLAG": "Alles, was ein Schalter ist: rahmen, gitter_x, gitter_y, prozent, flaeche, punkte, glatt, null_linie, stapel, verlauf, treppe, fadenkreuz, hover, tooltip, kurz und komma (Dezimalkomma: 25,7 statt 25.7 – passend zu ZAHL$ und den Feldern der gui).",
-  "CHART_SET_NUM": "Alles, was eine Zahl ist: min, max, innenradius, ecken, polster, gitter (ABSTAND der Gitterlinien, nicht ihre Anzahl), nachkomma, striche, unterstriche, linien_dicke, animation, fenster, schatten, deckkraft …",
+  "CHART_SET_NUM": "Alles, was eine Zahl ist: min, max, innenradius, ecken, polster, gitter (ABSTAND der Gitterlinien, nicht ihre Anzahl), nachkomma, striche, unterstriche, linien_dicke, animation, fenster, schatten, deckkraft, luecke_ab …",
   "CHART_SET_POINT": "Einzelnen Wert ändern",
   "CHART_STAT": "anzahl/summe/mittel/min/max",
   "CHART_THEME": "Setzt Hintergrund-, Text-, Gitter- und Datenfarben in einem Zug: „dunkel“, „hell“, „neon“ oder „pastell“.",
