@@ -1040,9 +1040,10 @@ Argumenten mit `ARGPATH$` (siehe [builtins-core.md](builtins-core.md)). In der *
 
 **Schlanker Export** (`--schlank`): Die volle Laufzeit trägt alles mit (Grafik,
 Ton, PDF mit eingebetteten Schriften, Datenbank, Netz, Video, Hardware) und ist
-rund 33 MB groß. Neben ihr liegen zwei kleinere in `laufzeiten/`:
-`dhrt-konsole` (Daten, Netz, Mail, Maschinencode; 16 MB) und `dhrt-spiel`
-(Grafik, Ton, Dialoge, Physik, Maschinencode; 21 MB). Mit `--schlank` nimmt der
+rund 37 MB groß. Neben ihr liegen zwei kleinere in `laufzeiten/`:
+`dhrt-konsole` (Daten, Netz, Mail, Maschinencode; 19 MB) und `dhrt-spiel`
+(Grafik, Ton, Dialoge, Physik, die eingebauten Schriften für
+`LOADFONT("sans")`, Maschinencode; 27 MB). Mit `--schlank` nimmt der
 Export die kleinste, der keiner der Befehle fehlt, die das Programm aufruft --
 auch in einem Unterprogramm, das nie läuft. **Gefragt werden die Laufzeiten
 selbst** (`dhrt-konsole --fehlende name …`: jeder Name wird mit absichtlich
