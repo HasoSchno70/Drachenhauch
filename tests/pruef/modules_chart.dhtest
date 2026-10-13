@@ -287,7 +287,7 @@ CATCH e
     PRINT e
 END TRY
 --- erwartet
-CHART_SET_NUM: unbekannte Eigenschaft 'gibtsnicht' (gueltig: min, max, innenradius, abstand, ecken, rahmen_dicke, polster, gitter, nachkomma, titel_groesse, text_groesse, schrift, start_winkel, end_winkel, striche, unterstriche, linien_dicke, punkt_radius, animation, fenster, schatten, schatten_weich, deckkraft, flaeche_deckkraft, hover_tempo, hover_weite, hover_glanz, glanz, blatt_teile, blatt_luecke, blatt_dicke, fassung, strich)
+CHART_SET_NUM: unbekannte Eigenschaft 'gibtsnicht' (gueltig: min, max, innenradius, abstand, ecken, rahmen_dicke, polster, gitter, nachkomma, titel_groesse, text_groesse, schrift, start_winkel, end_winkel, striche, unterstriche, linien_dicke, punkt_radius, animation, fenster, schatten, schatten_weich, deckkraft, flaeche_deckkraft, hover_tempo, hover_weite, hover_glanz, glanz, blatt_teile, blatt_luecke, blatt_dicke, fassung, strich, luecke_ab)
 
 === unbekannter schluessel nennt die gueltigen[CHART SET COLOR-255]
 ' Der Preis der String-Schluessel: der Tippfehler faellt erst zur
