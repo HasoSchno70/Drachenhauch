@@ -157,6 +157,13 @@ PRINT ZEIT_WOCHENTAG(a)                         ' 5
 
 Ohne Muster (`""`) kommt die Normalform heraus, genau wie bei `ZEIT_TEXT$`.
 
+**Die Schreibweise von C, Python und PHP geht auch:** `%Y` `%m` `%d` `%H` `%M`
+`%S`, dazu `%y` (Jahr zweistellig), `%a`/`%A` (Wochentag kurz/lang) und `%%`.
+`ZEIT_FORMAT$(a, "%Y-%m-%d %H:%M:%S")` ist dasselbe wie die Normalform. Ein
+`%`-Platzhalter, den es nicht gibt (`%j`), ist ein **Fehler** -- bis 2026.30
+kam er wörtlich wieder heraus, und eine CSV-Datei bekam in jeder Zeile den
+Text `%Y-%m-%d` statt eines Datums.
+
 `ZEIT_WOCHENTAG` zählt ab Montag, weil ein Spieltag am Wochenende sonst über
 zwei Zahlen läuft: Montag 1 … Sonntag 7.
 

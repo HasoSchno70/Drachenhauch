@@ -65,11 +65,12 @@ CHART_LABEL(c, 0, "Mo")                ' label a category
 |---|---|
 | `CHART_SERIES(c, name$ [, farbe])` | create a series → index |
 | `CHART_ADD(c, name$, wert [, farbe])` | category + value in series 0 → index |
-| `CHART_DATA(c, reihe, werte)` | replace all values of a series (`ARRAY OF FLOAT`) |
+| `CHART_DATA(c, reihe, werte)` | replace all values of a series (`ARRAY OF FLOAT`); the number of points follows the list, downwards too |
 | `CHART_SET_POINT(c, reihe, punkt, wert)` | change a single value |
 | `CHART_PUSH(c, reihe, wert)` | append a value at the end (live curves, see `fenster`) |
 | `CHART_VALUE(c, wert)` | short form for series 0, point 0 — the gauge way |
 | `CHART_LABEL(c, punkt, text$)` | label a category |
+| `CHART_X(c, xwerte)` | line chart: real x values per point (e.g. timestamps), ascending; `[]` = equal spacing again |
 | `CHART_GET(c, reihe, punkt)` | read a value |
 | `CHART_COUNT(c)` / `CHART_SERIES_COUNT(c)` | number of points / series |
 | `CHART_CLEAR(c)` | discard the data |
@@ -373,12 +374,36 @@ so a program can reliably read its own data back.
 | `glatt` | curve instead of a polyline (Catmull-Rom) |
 | `treppe` | step line — for switching states, tariff levels, stock levels |
 | `strich` | dash length in pixels; 0 = solid |
+| `luecke_ab` | with `CHART_X`: break the line where two neighbours are further apart; 0 = never |
 | `flaeche` + `flaeche_deckkraft` | area under the curve |
 | `fadenkreuz` | crosshair lines through the point under the mouse |
 | `linien_dicke` | line width |
 
 `glatt` (smooth) and `treppe` (steps) exclude each other — the step line wins, because it makes the
 more precise statement.
+
+### Measurement series: x values, gaps, labels
+
+By default the points are equally spaced — point number i. For a measurement
+series that is wrong: if two and a half hours are missing, 13:00 would stand
+right next to 16:00. `CHART_X` gives every point its x value, and `luecke_ab`
+breaks the line where two neighbours are further apart:
+
+```basic
+CHART_DATA(c, reihe, werte)          ' first the values ...
+CHART_X(c, zeiten)                   ' ... then as many x values
+CHART_SET_NUM(c, "luecke_ab", 60)    ' more than 60 s without a reading: line off
+```
+
+`CHART_X` applies to the number of points it was set for: a `CHART_DATA` or
+`CHART_PUSH` with a different number cancels it (otherwise the x values would
+point at other points). Falling values and a wrong count are errors.
+
+**If you label only single points** — the start of each day under 60000
+readings —, every label that does not run into the previous one is drawn. If
+all points are labelled, every k-th one is used as before, as many as fit side
+by side. Up to 2026.30 the first case also used only every k-th position, and
+the day starts fell exactly into the gaps between them.
 
 With dashed lines the dash phase continues over the **whole** path,
 not anew at every support point. Otherwise the pattern would visibly get denser

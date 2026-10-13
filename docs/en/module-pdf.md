@@ -39,6 +39,7 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | width in mm, in the current font and size |
 | `PDF_LINE(p, x1, y1, x2, y2)` | draw a line |
 | `PDF_RECT(p, x, y, b, h)` / `PDF_RECT_FILL(…)` | outline / fill |
+| `PDF_IMAGE(p, bild, x, y, b[, h])` | place an image (`IMAGE`) in the rectangle, sizes in mm; without `h` by the aspect ratio |
 | `PDF_SAVE(p, pfad$)` | write |
 | `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` | **print** — Windows via GDI, macOS/Linux via CUPS; see [Printing](#printing-and-preview) |
 | `PDF_PREVIEW(p, seite[, breite_px])` → IMAGE | the page as an image, for a preview in a window |
@@ -77,6 +78,29 @@ PDF_FONT_LOAD(p, "fonts/NotoSansJP-Regular.ttf", "japanisch")
 PDF_FONT(p, "japanisch", 12)
 PDF_TEXT(p, 20, 40, "請求書")
 ```
+
+## Images and charts
+
+`PDF_IMAGE` places an `IMAGE` — from `LOADIMAGE`, `IMAGE_NEW` or a render
+target. This is how a chart gets into a report: draw it into a render target,
+fetch it as an image with `RENDERTARGET_IMAGE`, place it. At 10 pixels per
+millimetre it prints sharp:
+
+```basic
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(1700, 850)
+RENDERTARGET_BEGIN(rt)
+CHART_BOUNDS(c, 0, 0, 1700, 850)   ' briefly at (0, 0) ...
+CHART_DRAW(c)
+RENDERTARGET_END()
+CHART_BOUNDS(c, x, y, b, h)        ' ... and back to its place
+DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+PDF_IMAGE(p, bild, 20, 90, 170)    ' 170 mm wide
+```
+
+A transparent pixel stays transparent in the PDF; when printing through GDI it
+is blended onto white paper. Up to 2026.30 the module knew no images — a
+report had to redraw its curves stroke by stroke with `PDF_LINE`, without axes
+or labels.
 
 ## Text and width
 

@@ -38,6 +38,7 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | Breite in mm, in der aktuellen Schrift und Größe |
 | `PDF_LINE(p, x1, y1, x2, y2)` | Linie zeichnen |
 | `PDF_RECT(p, x, y, b, h)` / `PDF_RECT_FILL(…)` | Umriss / Fläche |
+| `PDF_IMAGE(p, bild, x, y, b[, h])` | ein Bild (`IMAGE`) in das Rechteck setzen, Maße in mm; ohne `h` nach dem Seitenverhältnis |
 | `PDF_SAVE(p, pfad$)` | schreiben |
 | `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` | **drucken** — Windows über GDI, macOS/Linux über CUPS; siehe [Drucken](#drucken-und-vorschau) |
 | `PDF_PREVIEW(p, seite[, breite_px])` → IMAGE | die Seite als Bild, für eine Vorschau im Fenster |
@@ -76,6 +77,29 @@ PDF_FONT_LOAD(p, "fonts/NotoSansJP-Regular.ttf", "japanisch")
 PDF_FONT(p, "japanisch", 12)
 PDF_TEXT(p, 20, 40, "請求書")
 ```
+
+## Bilder und Diagramme
+
+`PDF_IMAGE` setzt ein `IMAGE` — aus `LOADIMAGE`, `IMAGE_NEW` oder einem
+Render-Ziel. Ein Diagramm kommt so in den Bericht: in ein Render-Ziel zeichnen,
+mit `RENDERTARGET_IMAGE` als Bild holen, einsetzen. Mit 10 Punkten je
+Millimeter wird es gedruckt scharf:
+
+```basic
+DIM rt AS INTEGER : rt = RENDERTARGET_NEW(1700, 850)
+RENDERTARGET_BEGIN(rt)
+CHART_BOUNDS(c, 0, 0, 1700, 850)   ' kurz an die Stelle (0, 0) ...
+CHART_DRAW(c)
+RENDERTARGET_END()
+CHART_BOUNDS(c, x, y, b, h)        ' ... und zurueck an seinen Platz
+DIM bild AS IMAGE : bild = RENDERTARGET_IMAGE(rt)
+PDF_IMAGE(p, bild, 20, 90, 170)    ' 170 mm breit
+```
+
+Ein durchsichtiger Punkt bleibt im PDF durchsichtig; beim Drucken über GDI
+wird er auf weißes Papier gerechnet. Bis 2026.30 kannte das Modul keine
+Bilder — ein Bericht musste seine Kurven Strich für Strich mit `PDF_LINE`
+nachzeichnen, ohne Achsen und Beschriftung.
 
 ## Text und Breite
 
