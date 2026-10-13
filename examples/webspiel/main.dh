@@ -1,0 +1,328 @@
+' Glühwürmchen -- ein kleines Spiel für den Browser (und den Desktop).
+'
+'     dhrt run main.dh                                (auf dem Desktop)
+'     py rust/build_wasm.py examples/webspiel/main.dh  (für den Web-Playground)
+'
+' Leuchtende Punkte tauchen auf und verlöschen wieder: anklicken oder antippen,
+' solange sie leuchten. Wer mehrere hintereinander trifft, sammelt eine Kombo.
+' Goldene bringen Zeit, rote kosten Punkte. Die Bestenliste steht in
+' bestenliste.json -- im Browser überlebt sie das Neuladen der Seite.
+IMPORT "gui"
+IMPORT "json"
+IMPORT "particles"
+IMPORT "audio"
+
+CONST BREITE = 800
+CONST HOEHE = 600
+CONST SPIELZEIT = 45.0
+CONST LISTENDATEI = "bestenliste.json"
+CONST PLAETZE = 5
+
+SCREEN(BREITE, HOEHE, "Glühwürmchen")
+SETFPS(60)
+' Eine richtige Schrift -- eingebaut, auch im Browser
+DIM schrift AS INTEGER : schrift = LOADFONT("sans", 48)
+DIM schriftFett AS INTEGER : schriftFett = LOADFONT("sans-fett", 64)
+SETFONT(schrift)
+
+' Ein weicher Lichtfleck, additiv gezeichnet: das Leuchten
+DIM licht AS IMAGE : licht = GENTEX_RADIAL(128, 128, RGB(255, 255, 255), RGB(0, 0, 0))
+
+' --- Klänge ------------------------------------------------------------------------
+DIM tonFang AS SOUND, tonGold AS SOUND, tonRot AS SOUND, tonDaneben AS SOUND
+tonGold = AUDIO_SFX("triangle", 660.0, 900.0, 2, 120, 260, 0.0, 0.0, 0.5)
+tonRot = AUDIO_SFX("square", 180.0, -260.0, 2, 80, 160, 0.0, 0.0, 0.35)
+tonDaneben = AUDIO_SFX("noise", 300.0, 0.0, 1, 20, 40, 0.0, 0.0, 0.15)
+
+' Je Kombostufe ein Ton der Tonleiter -- eine Kette klingt wie eine Melodie
+DIM leiter AS ARRAY OF FLOAT : leiter = [523.25, 587.33, 659.25, 698.46, 783.99, 880.0, 987.77, 1046.5]
+DIM toene[8] AS SOUND
+DIM i AS INTEGER
+FOR i = 0 TO 7
+    toene[i] = AUDIO_SFX("sine", leiter[i], 40.0, 2, 60, 220, 3.0, 6.0, 0.45)
+NEXT
+
+' --- Funken beim Fangen ----------------------------------------------------------
+DIM funken AS PARTICLE_SYSTEM : funken = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_VELOCITY(funken, -220, 220, -220, 220)
+PARTICLE_SET_LIFETIME(funken, 300, 700)
+PARTICLE_SET_SIZE(funken, 2, 5)
+PARTICLE_SET_GRAVITY(funken, 0, 260)
+PARTICLE_SET_FADE(funken, TRUE)
+PARTICLE_SET_MODE(funken, "glow")
+
+' --- Die Glühwürmchen --------------------------------------------------------------
+CONST MAXW = 24
+DIM wx[MAXW] AS FLOAT, wy[MAXW] AS FLOAT, wvx[MAXW] AS FLOAT, wvy[MAXW] AS FLOAT
+DIM wr[MAXW] AS FLOAT, walter[MAXW] AS FLOAT, wleben[MAXW] AS FLOAT
+DIM wart[MAXW] AS INTEGER       ' 0 = keins, 1 = gelb, 2 = gold, 3 = rot
+DIM farbe AS ARRAY OF INTEGER : farbe = [0, RGB(255, 230, 120), RGB(255, 190, 40), RGB(255, 70, 70)]
+
+DIM punkte AS INTEGER, kombo AS INTEGER, besteKombo AS INTEGER
+DIM rest AS FLOAT, bisNeu AS FLOAT
+DIM zustand AS STRING : zustand = "titel"   ' titel | spiel | ende
+DIM meldung AS STRING, meldungZeit AS FLOAT
+
+SUB neuesWuermchen()
+    DIM k AS INTEGER
+    FOR k = 0 TO MAXW - 1
+        IF wart[k] = 0 THEN
+            wx[k] = 60 + RND() * (BREITE - 120)
+            wy[k] = 110 + RND() * (HOEHE - 170)
+            wvx[k] = (RND() - 0.5) * 60 : wvy[k] = (RND() - 0.5) * 60
+            wr[k] = 16 + RND() * 14
+            walter[k] = 0
+            ' je weiter das Spiel, desto kuerzer leuchten sie
+            wleben[k] = MAX(0.9, 2.6 - (SPIELZEIT - rest) * 0.03) + RND() * 0.8
+            DIM w AS FLOAT : w = RND()
+            wart[k] = IIF(w < 0.07, 2, IIF(w < 0.17, 3, 1))
+            RETURN
+        END IF
+    NEXT
+END SUB
+
+SUB spielStarten()
+    FOR i = 0 TO MAXW - 1 : wart[i] = 0 : NEXT
+    punkte = 0 : kombo = 0 : besteKombo = 0
+    rest = SPIELZEIT : bisNeu = 0
+    PARTICLE_CLEAR(funken)
+    zustand = "spiel"
+END SUB
+
+SUB melden(text AS STRING)
+    meldung = text : meldungZeit = 1.2
+END SUB
+
+' --- Bestenliste (JSON-Feld aus {name, punkte}) ----------------------------------
+DIM liste AS JSON_HANDLE
+SUB listeLaden()
+    liste = JSON_NEW_ARRAY()
+    IF FILEEXISTS(LISTENDATEI) THEN
+        TRY
+            DIM gelesen AS JSON_HANDLE : gelesen = JSON_LOAD(LISTENDATEI)
+            IF JSON_TYPE(gelesen, "") = "array" THEN liste = gelesen
+        CATCH e
+            ' kaputte Datei: neu anfangen
+        END TRY
+    END IF
+END SUB
+
+FUNCTION listenPlatz(p AS INTEGER) AS INTEGER
+    ' an welche Stelle p gehoert (PLAETZE = kommt nicht hinein)
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(liste, "") - 1
+        IF p > JSON_GET_INT(liste, STR$(k) + ".punkte") THEN RETURN k
+    NEXT
+    RETURN MIN(JSON_LEN(liste, ""), PLAETZE)
+END FUNCTION
+
+SUB eintragen(name AS STRING, p AS INTEGER)
+    DIM neu AS JSON_HANDLE : neu = JSON_NEW_ARRAY()
+    DIM platz AS INTEGER : platz = listenPlatz(p)
+    DIM k AS INTEGER, n AS INTEGER
+    FOR k = 0 TO JSON_LEN(liste, "") - 1
+        IF k = platz THEN
+            JSON_APPEND_JSON(neu, "", eintrag(name, p)) : n = n + 1
+        END IF
+        IF n < PLAETZE THEN JSON_APPEND_JSON(neu, "", JSON_GET_JSON(liste, STR$(k))) : n = n + 1
+    NEXT
+    IF platz >= JSON_LEN(liste, "") AND n < PLAETZE THEN JSON_APPEND_JSON(neu, "", eintrag(name, p))
+    liste = neu
+    WRITEALL(LISTENDATEI, JSON_PRETTY(liste))
+END SUB
+
+FUNCTION eintrag(name AS STRING, p AS INTEGER) AS JSON_HANDLE
+    DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+    JSON_SET_STRING(e, "name", name)
+    JSON_SET_INT(e, "punkte", p)
+    RETURN e
+END FUNCTION
+
+' --- Namenseingabe am Ende ---------------------------------------------------------
+GUI_THEME_PRESET("modern_dark")
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Neuer Eintrag", BREITE / 2 - 170, 330, 340, 120)
+DIM tfName AS GUI_WIDGET : tfName = GUI_TEXTINPUT(win, 16, 16, 200, 34, "Dein Name")
+GUI_TEXTINPUT_SET(tfName, "maxlaenge", 14)
+DIM btEintragen AS GUI_WIDGET : btEintragen = GUI_BUTTON(win, "Eintragen", 226, 16, 98, 34)
+GUI_BUTTON_VARIANT(btEintragen, "primaer")
+GUI_WINDOW_DEFAULT(win, btEintragen)
+GUI_WINDOW_VISIBLE(win, FALSE)
+DIM eintragOffen AS BOOLEAN
+
+' --- Eingabe: Maus oder Finger ----------------------------------------------------
+DIM tippX AS FLOAT, tippY AS FLOAT
+FUNCTION getippt() AS BOOLEAN
+    ' Ein Finger zaehlt wie ein Klick (MOUSE_HIT meldet einen Tipp auch)
+    IF MOUSE_HIT(0) THEN
+        tippX = MOUSEX() : tippY = MOUSEY()
+        RETURN TRUE
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+' --- Zeichnen -----------------------------------------------------------------------
+SUB textMitte(y AS INTEGER, t AS STRING, groesse AS INTEGER, f AS INTEGER)
+    TEXT_SIZE(groesse)
+    TEXT((BREITE - TEXT_WIDTH(t)) / 2, y, t, f)
+END SUB
+
+SUB himmel()
+    GRADIENTV(0, 0, BREITE, HOEHE, RGB(10, 14, 34), RGB(28, 22, 50))
+END SUB
+
+SUB wuermchenZeichnen()
+    BLEND_MODE("add")
+    DIM k AS INTEGER
+    FOR k = 0 TO MAXW - 1
+        IF wart[k] > 0 THEN
+            ' auf- und abschwellen, am Ende verloeschen
+            DIM t AS FLOAT : t = walter[k] / wleben[k]
+            DIM hell AS FLOAT : hell = MIN(1.0, walter[k] * 4) * (1.0 - t * t) * (0.8 + 0.2 * SIN(walter[k] * 9))
+            DIM c AS INTEGER : c = farbe[wart[k]]
+            DIM rr AS INTEGER : rr = INT(((c SHR 16) BAND 255) * hell)
+            DIM gg AS INTEGER : gg = INT(((c SHR 8) BAND 255) * hell)
+            DIM bb AS INTEGER : bb = INT((c BAND 255) * hell)
+            DRAWIMAGEROT(licht, wx[k], wy[k], 0, wr[k] / 22.0, RGB(rr, gg, bb))
+            CIRCLE(wx[k], wy[k], wr[k] * 0.25, RGB(rr, gg, bb))
+        END IF
+    NEXT
+    PARTICLE_DRAW(funken)
+    BLEND_MODE("alpha")
+END SUB
+
+SUB kopfzeile()
+    SETFONT(schrift)
+    TEXT_SIZE(24)
+    TEXT(20, 16, "Punkte  " + ZAHL$(punkte, 0), WHITE)
+    DIM z AS STRING : z = ZAHL$(MAX(rest, 0), 1) + " s"
+    TEXT(BREITE - 20 - TEXT_WIDTH(z), 16, z, IIF(rest < 10, RGB(255, 120, 120), WHITE))
+    IF kombo > 1 THEN textMitte(16, "Kombo ×" + STR$(kombo), 24, RGB(255, 220, 120))
+    IF meldungZeit > 0 THEN textMitte(60, meldung, 22, RGB(200, 220, 255))
+END SUB
+
+SUB liste_zeichnen(y AS INTEGER)
+    SETFONT(schrift)
+    textMitte(y, "Bestenliste", 26, RGB(255, 220, 120))
+    DIM k AS INTEGER
+    IF JSON_LEN(liste, "") = 0 THEN textMitte(y + 40, "noch leer", 20, RGB(150, 150, 180))
+    FOR k = 0 TO JSON_LEN(liste, "") - 1
+        TEXT_SIZE(20)
+        TEXT(BREITE / 2 - 150, y + 40 + k * 30, STR$(k + 1) + ".  " + JSON_GET_STRING(liste, STR$(k) + ".name"), WHITE)
+        DIM s AS STRING : s = ZAHL$(JSON_GET_INT(liste, STR$(k) + ".punkte"), 0)
+        TEXT(BREITE / 2 + 150 - TEXT_WIDTH(s), y + 40 + k * 30, s, WHITE)
+    NEXT
+END SUB
+
+' --- Spielschritt -----------------------------------------------------------------------
+SUB spielSchritt(dt AS FLOAT)
+    rest = rest - dt
+    meldungZeit = meldungZeit - dt
+    bisNeu = bisNeu - dt
+    IF bisNeu <= 0 THEN
+        neuesWuermchen()
+        bisNeu = MAX(0.25, 0.75 - (SPIELZEIT - rest) * 0.01)
+    END IF
+    DIM k AS INTEGER
+    FOR k = 0 TO MAXW - 1
+        IF wart[k] > 0 THEN
+            walter[k] = walter[k] + dt
+            wx[k] = wx[k] + wvx[k] * dt : wy[k] = wy[k] + wvy[k] * dt
+            IF walter[k] >= wleben[k] THEN
+                ' verpasst: ein gelbes kostet die Kombo, ein rotes nicht
+                IF wart[k] = 1 THEN kombo = 0
+                wart[k] = 0
+            END IF
+        END IF
+    NEXT
+    IF getippt() THEN
+        DIM getroffen AS INTEGER : getroffen = -1
+        FOR k = 0 TO MAXW - 1
+            IF wart[k] > 0 THEN
+                IF (tippX - wx[k]) ^ 2 + (tippY - wy[k]) ^ 2 <= (wr[k] + 10) ^ 2 THEN getroffen = k
+            END IF
+        NEXT
+        IF getroffen < 0 THEN
+            kombo = 0
+            PLAYSOUND(tonDaneben)
+        ELSE
+            k = getroffen
+            PARTICLE_SET_POS(funken, wx[k], wy[k])
+            PARTICLE_SET_COLOR(funken, farbe[wart[k]])
+            PARTICLE_SET_COLOR_END(funken, RGB(255, 80, 20))
+            PARTICLE_EMIT(funken, IIF(wart[k] = 3, 12, 24))
+            IF wart[k] = 3 THEN
+                punkte = MAX(0, punkte - 50) : kombo = 0
+                PLAYSOUND(tonRot) : melden("Autsch! -50")
+            ELSE
+                kombo = kombo + 1 : besteKombo = MAX(besteKombo, kombo)
+                punkte = punkte + 10 * kombo
+                PLAYSOUND(toene[MIN(kombo, 8) - 1])
+                IF wart[k] = 2 THEN
+                    rest = rest + 5 : PLAYSOUND(tonGold) : melden("+5 Sekunden")
+                END IF
+            END IF
+            wart[k] = 0
+        END IF
+    END IF
+    IF rest <= 0 THEN
+        zustand = "ende"
+        eintragOffen = listenPlatz(punkte) < PLAETZE AND punkte > 0
+        IF eintragOffen THEN
+            GUI_WINDOW_VISIBLE(win, TRUE)
+            GUI_SET_TEXT(tfName, "")
+            GUI_FOCUS(tfName)
+        END IF
+    END IF
+END SUB
+
+' --- Hauptschleife -------------------------------------------------------------------
+listeLaden()
+WHILE NOT QUITREQUESTED()
+    DIM dt AS FLOAT : dt = MIN(DELTA(), 0.05)
+    GUI_UPDATE()
+    PARTICLE_UPDATE(funken, INT(dt * 1000))
+    IF zustand = "titel" THEN
+        IF getippt() OR KEYHIT(KEY_SPACE) THEN spielStarten()
+    ELSEIF zustand = "spiel" THEN
+        spielSchritt(dt)
+    ELSE
+        IF eintragOffen THEN
+            IF GUI_CLICKED(btEintragen) OR GUI_ENTERED(tfName) THEN
+                DIM name AS STRING : name = TRIM$(GUI_TEXT(tfName))
+                IF name = "" THEN name = "Namenlos"
+                eintragen(name, punkte)
+                eintragOffen = FALSE
+                GUI_WINDOW_VISIBLE(win, FALSE)
+            END IF
+        ELSEIF getippt() OR KEYHIT(KEY_SPACE) THEN
+            zustand = "titel"
+        END IF
+    END IF
+
+    himmel()
+    wuermchenZeichnen()
+    IF zustand = "titel" THEN
+        SETFONT(schriftFett)
+        textMitte(90, "Glühwürmchen", 64, RGB(255, 230, 140))
+        SETFONT(schrift)
+        textMitte(180, "Klicke oder tippe die Lichter an, solange sie leuchten.", 20, RGB(210, 210, 240))
+        textMitte(210, "Gold bringt Zeit, Rot kostet Punkte.", 20, RGB(210, 210, 240))
+        liste_zeichnen(270)
+        textMitte(HOEHE - 60, "Klicken oder Leertaste: los geht's", 22, WHITE)
+    ELSEIF zustand = "spiel" THEN
+        kopfzeile()
+    ELSE
+        SETFONT(schriftFett)
+        textMitte(110, "Zeit um!", 56, RGB(255, 230, 140))
+        SETFONT(schrift)
+        textMitte(190, ZAHL$(punkte, 0) + " Punkte · beste Kombo ×" + STR$(besteKombo), 26, WHITE)
+        IF eintragOffen THEN
+            textMitte(280, "Das reicht für die Bestenliste!", 22, RGB(255, 220, 120))
+        ELSE
+            liste_zeichnen(250)
+            textMitte(HOEHE - 60, "Klicken oder Leertaste: zum Titel", 22, WHITE)
+        END IF
+    END IF
+    GUI_DRAW()
+    FLIP()
+WEND

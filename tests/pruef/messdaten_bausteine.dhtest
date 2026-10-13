@@ -320,3 +320,44 @@ DHRT_FRAMES=8
 6 FALSE FALSE FALSE
 7 FALSE FALSE FALSE
 8 FALSE FALSE FALSE
+
+=== glatte kommazahl gilt als integer
+' Aus der Web-Runde: "/" liefert immer FLOAT, und GUI_WINDOW("...", BREITE / 2
+' - 170, ...) brach mit "erwartet INTEGER" ab -- obwohl x = BREITE / 2 in eine
+' INTEGER-Variable geht. Jetzt dieselbe Regel: glatt geht, sonst ein Fehler
+' mit dem Weg dorthin.
+IMPORT "gui"
+CONST BREITE = 800
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("x", BREITE / 2 - 170, 330 / 1, 340, 120)
+PRINT GUI_WINDOW_GET_X(w); " "; GUI_WINDOW_GET_Y(w)
+PRINT CHR$(130 / 2); LEFT$("abcd", 6 / 3)
+TRY
+    PRINT LEFT$("abcd", 5 / 2)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    DIM v AS GUI_WINDOW : v = GUI_WINDOW("y", 2.5, 0, 10, 10)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+230 330
+Aab
+LEFT$ erwartet INTEGER, erhalten FLOAT 2.5 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
+GUI_WINDOW: erwartet INTEGER (Arg 2), erhalten 2.5 -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig
+
+=== gentex radial prueft die dichte
+' 1.6 sah nach "dichter" aus und gab still eine harte Scheibe.
+SCREEN(100, 100, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM b AS IMAGE : b = GENTEX_RADIAL(64, 64, WHITE, BLACK, 0.5)
+PRINT IMAGEWIDTH(b)
+TRY
+    b = GENTEX_RADIAL(64, 64, WHITE, BLACK, 1.6)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+64
+GENTEX_RADIAL: dichte 1.6 liegt nicht in 0..1 -- sie ist der Anteil des Radius in voller Innenfarbe (0 = weicher Verlauf ab der Mitte, 1 = Scheibe)
