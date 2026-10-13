@@ -20575,8 +20575,14 @@ zellmodus, zeilen_anhaengen, spalten", key)),
     /// Text auf eine Breite kuerzen: passt er nicht, endet er mit "..." --
     /// statt mitten im Buchstaben abgeschnitten zu werden.
     fn mit_auslassung(&self, g: &Graphics, wdg: &Widget, text: &str, breite: i32) -> Option<String> {
-        if self.wtext_width(g, wdg, text) <= breite { return None; }
-        let z: Vec<char> = text.chars().collect();
+        // Nie mehr Zeichen messen, als in die Zeile passen KOENNEN (keins ist
+        // schmaler als ein Punkt) -- ein Eintrag mit einer Million Zeichen
+        // kostete sonst je Bild zwanzig Messungen ueber den ganzen Text.
+        let cap = breite.max(0) as usize + 8;
+        let kopf: String = text.chars().take(cap + 1).collect();
+        let zu_lang = kopf.chars().count() > cap;
+        if !zu_lang && self.wtext_width(g, wdg, &kopf) <= breite { return None; }
+        let z: Vec<char> = kopf.chars().take(cap).collect();
         let (mut lo, mut hi) = (0usize, z.len());
         while lo < hi {
             let m = (lo + hi + 1) / 2;

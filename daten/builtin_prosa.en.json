@@ -266,7 +266,7 @@
   "CHART_SERIES_COUNT": "number of points / series",
   "CHART_SET": "Everything that is text: titel, einheit, achse_x, achse_y, legende (aus/oben/unten/links/rechts), ausrichtung (senkrecht/waagerecht), werte (aus/innen/aussen), wertanzeige (aus/innen/pille/blase/am_zeiger), zifferblatt (ring/segmente/striche/baender), punktform (kreis/quadrat/raute/dreieck).",
   "CHART_SET_COLOR": "Everything that is a colour: hintergrund, rahmen, gitter, text, titel, achse, zeiger, flaeche, verlauf, schatten — and the directed scale gradient skala_von / skala_mitte / skala_bis.",
-  "CHART_SET_FLAG": "Everything that is a switch: rahmen, gitter_x, gitter_y, prozent, flaeche, punkte, glatt, null_linie, stapel, verlauf, treppe, fadenkreuz, hover, tooltip.",
+  "CHART_SET_FLAG": "Everything that is a switch: rahmen, gitter_x, gitter_y, prozent, flaeche, punkte, glatt, null_linie, stapel, verlauf, treppe, fadenkreuz, hover, tooltip, kurz and komma (decimal comma: 25,7 instead of 25.7 – matching ZAHL$ and the gui fields).",
   "CHART_SET_NUM": "Everything that is a number: min, max, innenradius, ecken, polster, gitter (the SPACING of the grid lines, not how many), nachkomma, striche, unterstriche, linien_dicke, animation, fenster, schatten, deckkraft …",
   "CHART_SET_POINT": "change a single value",
   "CHART_STAT": "anzahl/summe/mittel/min/max (count/sum/mean/min/max)",
