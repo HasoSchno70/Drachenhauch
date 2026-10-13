@@ -369,7 +369,7 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | nur Fett bzw. Kursiv an- oder ausschalten, der Rest des Stils bleibt |
 | `FONT_STYLE(font, stil$)` → FONT | der echte fette/kursive Schnitt einer geladenen Schrift (sucht die Datei daneben, z. B. `segoeuib.ttf` zu `segoeui.ttf`); gibt es keinen, kommt `font` selbst zurück |
 | `FONT_HAS_STYLE(font, stil$)` | TRUE, wenn es diesen Schnitt als Datei gibt -- sonst bildet die Laufzeit ihn nach |
-| `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `zeichen$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen |
+| `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `zeichen$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen. Statt eines Pfads geht auch eine **eingebaute Schrift**: `"sans"`, `"serif"`, `"mono"` (DejaVu, je mit `-fett`, `-kursiv`, `-fett-kursiv`) |
 | `LOADFONT_SDF(pfad$, groesse[, zeichen$])` → FONT | eine Schrift, die bei **jeder** Größe scharf bleibt: gebacken als Abstandsfeld, gezeichnet mit einem Shader, der die Kante einen Punkt weich hält. Eine gewöhnliche Schrift verschwimmt, sobald sie größer gezeichnet wird, als sie gebacken wurde (Titel, Kamera-Zoom). Ohne `zeichen$` ASCII und Latin-1 samt €; das Backen kostet je Zeichen mehr als bei `LOADFONT` (rund 130 ms für diese Auswahl) |
 | `FONT_HAS_GLYPH(font, zeichen$)` → BOOLEAN | hat die Schrift selbst ein Zeichen dafür? Wenn nicht, zeichnet `TEXT` es mit der Ausweich-Schrift; `-1` = eingebaute Schrift |
 | `FONT_GLYPH_WIDTH(font, zeichen$, groesse)` → FLOAT | wie weit `TEXT` nach diesem Zeichen weiterrückt, bei `groesse` Punkten — gemessen wie `TEXT_WIDTH`, ohne die aktive Schrift umzustellen |
@@ -379,7 +379,11 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `TEXT_LINE_SPACING(px)` | Zeilenabstand für mehrzeiligen Text |
 
 `LOADFONT` lädt eine eigene TrueType-/OpenType-Schrift; `TEXT_SIZE` skaliert sie
-anschließend frei. `TEXT_WIDTH` misst in der **aktiven** Schrift — damit lässt
+anschließend frei. **Eine normale Schrift ohne Pfad:** `LOADFONT("sans", 32)`
+nimmt DejaVu Sans aus der Laufzeit — dieselbe wie im PDF, auf jedem System,
+mit allen vier Schnitten für `TEXT_STYLE`/`FONT_STYLE`. Vorher brauchte das
+einen Pfad wie `C:/Windows/Fonts/segoeui.ttf`, den es unter macOS und Linux
+nicht gibt. Eine Datei, die genauso heißt, gewinnt. `TEXT_WIDTH` misst in der **aktiven** Schrift — damit lässt
 sich zentrieren/rechtsbündig setzen. Echte Glyphen rendert die native Runtime
 (raylib `LoadFontEx`/`DrawTextEx`).
 
@@ -790,7 +794,7 @@ lässt.
 | `GENTEX_COLOR(breite, hoehe, farbe)` | einfarbige Fläche |
 | `GENTEX_GRADIENT(breite, hoehe, farbe1, farbe2 [, vertikal])` | linearer Verlauf |
 | `GENTEX_GRADIENT_BOX(breite, hoehe, dichte, farbe1, farbe2)` | rechteckiger Verlauf von innen nach außen — Vignetten |
-| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet |
+| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet. `dichte` (0..1, Vorgabe 0) ist der Anteil des Radius in voller Innenfarbe: 0 = weich ab der Mitte, 1 = Scheibe; mehr ist ein Fehler |
 | `GENTEX_CHECKED(breite, hoehe, feld_x, feld_y, farbe1, farbe2)` | Schachbrett |
 | `GENTEX_PERLIN(breite, hoehe, skala)` | Perlin-Rauschen — Wolken, Gelände, Marmor |
 | `GENTEX_CELLULAR(breite, hoehe, kachel)` | Zellrauschen (Voronoi) — Steinboden, Risse, Schuppen |
@@ -808,6 +812,7 @@ wie auf das Fenster — für Spiegel, Minikarten, Bild-im-Bild oder Nachzieheffe
 | `RENDERTARGET_END()` | zurück auf das Fenster |
 | `RENDERTARGET_DRAW(ziel, x, y [, skala [, tint [, gespiegelt]]])` | das Ziel wie ein Bild aufs Fenster stempeln |
 | `RENDERTARGET_CLEAR(ziel [, farbe])` | von Hand leeren — nötig, wenn `behalten` an ist |
+| `RENDERTARGET_IMAGE(ziel)` → IMAGE | der Inhalt als Bild — was seit `RENDERTARGET_BEGIN` gezeichnet wurde, wird dafür **sofort** abgespielt, nicht erst beim `FLIP`. So kommt ein Diagramm in ein PDF (`PDF_IMAGE`) oder eine Datei (`IMAGE_SAVE`) |
 
 Ohne `behalten` wird das Ziel zu Beginn jedes Bildes durchsichtig geleert. Ein
 Schweif entsteht dagegen so: `behalten = TRUE`, und pro Bild ein

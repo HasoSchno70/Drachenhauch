@@ -41,6 +41,9 @@ pub enum Op {
     Text { x: f64, y: f64, text: String, schrift: usize, groesse_pt: f64, farbe: (f64, f64, f64) },
     Linie { x1: f64, y1: f64, x2: f64, y2: f64, breite_mm: f64, farbe: (f64, f64, f64) },
     Rechteck { x: f64, y: f64, b: f64, h: f64, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64) },
+    /// PDF_IMAGE: ein Bild, RGBA Zeile fuer Zeile, `pw` x `ph` Punkte, in das
+    /// Rechteck x/y/b/h (mm) gestreckt.
+    Bild { x: f64, y: f64, b: f64, h: f64, rgba: Arc<Vec<u8>>, pw: u32, ph: u32 },
 }
 
 pub struct Seite {
@@ -64,35 +67,9 @@ pub struct Dokument {
     geladen: Vec<(String, Arc<Vec<u8>>)>,
 }
 
-/// Die eingebauten Schriften: Name im Programm und Dateiinhalt.
-const EINGEBAUT: [(&str, fn() -> &'static [u8]); 12] = [
-    ("sans", dejavu::sans::regular),
-    ("sans-fett", dejavu::sans::bold),
-    ("sans-kursiv", dejavu::sans::oblique),
-    ("sans-fett-kursiv", dejavu::sans::bold_oblique),
-    ("serif", dejavu::serif::regular),
-    ("serif-fett", dejavu::serif::bold),
-    ("serif-kursiv", dejavu::serif::italic),
-    ("serif-fett-kursiv", dejavu::serif::bold_italic),
-    ("mono", dejavu::sans_mono::regular),
-    ("mono-fett", dejavu::sans_mono::bold),
-    ("mono-kursiv", dejavu::sans_mono::oblique),
-    ("mono-fett-kursiv", dejavu::sans_mono::bold_oblique),
-];
-
-/// Die Namen von vorher meinen die passende DejaVu-Familie.
-const ALTE_NAMEN: [(&str, &str); 3] = [("helvetica", "sans"), ("times", "serif"), ("courier", "mono")];
-
-fn normalisieren(name: &str) -> String {
-    let k = name.trim().to_lowercase();
-    for (alt, neu) in ALTE_NAMEN {
-        if k == alt { return neu.to_string(); }
-        if let Some(rest) = k.strip_prefix(alt).and_then(|r| r.strip_prefix('-')) {
-            return format!("{}-{}", neu, rest);
-        }
-    }
-    k
-}
+// Die eingebauten Schriften (DejaVu) stehen in schriften.rs -- LOADFONT
+// benutzt sie auch ohne das pdf-Modul (Web-Bau).
+use crate::schriften::{normalisieren, EINGEBAUT};
 
 /// Seitengroesse aus einem Namen -- in Millimetern.
 pub fn seitenmass(name: &str, quer: bool) -> Option<(f64, f64)> {
@@ -265,6 +242,18 @@ impl Dokument {
         self.hier().ops.push(Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe });
     }
 
+    /// Ein Bild (RGBA) in das Rechteck x/y/b/h setzen; `h` <= 0 = nach dem
+    /// Seitenverhaeltnis des Bildes.
+    pub fn bild(&mut self, x: f64, y: f64, b: f64, h: f64, rgba: Vec<u8>, pw: u32, ph: u32) -> Result<(), String> {
+        if pw == 0 || ph == 0 || rgba.len() != pw as usize * ph as usize * 4 {
+            return Err("das Bild ist leer".into());
+        }
+        if !(b > 0.0) { return Err(format!("die Breite muss groesser als 0 sein, nicht {}", b)); }
+        let h = if h > 0.0 { h } else { b * ph as f64 / pw as f64 };
+        self.hier().ops.push(Op::Bild { x, y, b, h, rgba: Arc::new(rgba), pw, ph });
+        Ok(())
+    }
+
     /// Das fertige PDF als Bytes.
     ///
     /// KEIN Erstellungsdatum: dasselbe Programm soll zweimal dieselbe Datei
@@ -339,6 +328,14 @@ impl Dokument {
                                 flaeche.set_stroke(Some(strich(*f, *breite_mm)));
                             }
                             flaeche.draw_path(&pfad);
+                        }
+                    }
+                    Op::Bild { x, y, b, h, rgba, pw, ph } => {
+                        let bild = krilla::image::Image::from_rgba8(rgba.as_ref().clone(), *pw, *ph);
+                        if let Some(groesse) = krilla::geom::Size::from_wh(p(*b), p(*h)) {
+                            flaeche.push_transform(&krilla::geom::Transform::from_translate(p(*x), p(*y)));
+                            flaeche.draw_image(bild, groesse);
+                            flaeche.pop();
                         }
                     }
                 }

@@ -65,11 +65,12 @@ CHART_LABEL(c, 0, "Mo")                ' Kategorie beschriften
 |---|---|
 | `CHART_SERIES(c, name$ [, farbe])` | Reihe anlegen → Index |
 | `CHART_ADD(c, name$, wert [, farbe])` | Kategorie + Wert in Reihe 0 → Index |
-| `CHART_DATA(c, reihe, werte)` | Werte einer Reihe komplett ersetzen (`ARRAY OF FLOAT`) |
+| `CHART_DATA(c, reihe, werte)` | Werte einer Reihe komplett ersetzen (`ARRAY OF FLOAT`); die Punktzahl folgt der Liste, auch nach unten |
 | `CHART_SET_POINT(c, reihe, punkt, wert)` | Einzelnen Wert ändern |
 | `CHART_PUSH(c, reihe, wert)` | Wert hinten anhängen (Live-Kurven, siehe `fenster`) |
 | `CHART_VALUE(c, wert)` | Kurzform für Reihe 0, Punkt 0 — der Tacho-Weg |
 | `CHART_LABEL(c, punkt, text$)` | Kategorie beschriften |
+| `CHART_X(c, xwerte)` | Liniendiagramm: echte x-Werte je Punkt (z. B. Zeitstempel), aufsteigend; `[]` = wieder gleiche Abstände |
 | `CHART_GET(c, reihe, punkt)` | Wert auslesen |
 | `CHART_COUNT(c)` / `CHART_SERIES_COUNT(c)` | Anzahl Punkte / Reihen |
 | `CHART_CLEAR(c)` | Daten verwerfen |
@@ -369,12 +370,37 @@ ein Programm kann seine eigenen Daten also zuverlässig zurücklesen.
 | `glatt` | Kurve statt Streckenzug (Catmull-Rom) |
 | `treppe` | Treppenverlauf — für Schaltzustände, Tarifstufen, Bestände |
 | `strich` | Strichlänge in Pixeln; 0 = durchgezogen |
+| `luecke_ab` | mit `CHART_X`: Linie unterbrechen, wo zwei Nachbarn weiter auseinander liegen; 0 = nie |
 | `flaeche` + `flaeche_deckkraft` | Fläche unter der Kurve |
 | `fadenkreuz` | Hilfslinien durch den Punkt unter der Maus |
 | `linien_dicke` | Strichstärke |
 
 `glatt` und `treppe` schließen sich aus — die Treppe gewinnt, weil sie die
 genauere Aussage macht.
+
+### Messreihen: x-Werte, Lücken, Beschriftung
+
+Ohne weiteres stehen die Punkte in gleichen Abständen — Punkt Nummer i. Bei
+einer Messreihe stimmt das nicht: fehlen zweieinhalb Stunden, stünde 13:00
+direkt neben 16:00. `CHART_X` gibt jedem Punkt seinen x-Wert, und
+`luecke_ab` unterbricht die Linie, wo zwei Nachbarn weiter auseinander liegen:
+
+```basic
+CHART_DATA(c, reihe, werte)          ' erst die Werte ...
+CHART_X(c, zeiten)                   ' ... dann gleich viele x-Werte
+CHART_SET_NUM(c, "luecke_ab", 60)    ' mehr als 60 s ohne Messung: Linie aus
+```
+
+`CHART_X` gilt für die Punktzahl, für die es gesetzt wurde: ein `CHART_DATA`
+oder `CHART_PUSH` mit einer anderen Zahl hebt es auf (sonst zeigten die
+x-Werte auf andere Punkte). Fallende Werte und eine falsche Anzahl sind ein
+Fehler.
+
+**Beschriftet man nur einzelne Punkte** — die Tagesanfänge unter 60000
+Messwerten —, steht jede Beschriftung, die nicht in die vorige ragt. Sind
+alle Punkte beschriftet, gilt wie bisher jede k-te, so viele wie
+nebeneinander passen. Bis 2026.30 galt auch im ersten Fall nur jede k-te
+Stelle, und die Tagesanfänge fielen genau in die Lücken dazwischen.
 
 Bei gestrichelten Linien läuft die Strichphase über den **ganzen** Zug weiter,
 nicht an jedem Stützpunkt neu. Sonst verdichtete sich das Muster sichtbar

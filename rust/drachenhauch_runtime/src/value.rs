@@ -957,7 +957,7 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
 ///
 /// Rusts `{}` liefert die kuerzesten Ziffern (immer Fixpunkt), `{:e}` die
 /// kuerzeste Mantisse + Exponent -- daraus rekonstruieren wir Pythons Regel.
-fn fmt_float(f: f64) -> String {
+pub(crate) fn fmt_float(f: f64) -> String {
     if f.is_nan() {
         return "nan".to_string();
     }

@@ -45,7 +45,7 @@ miniz_oxide = "0.8"
 # vorher standen hier 440 Zeilen Handarbeit, die nur die vierzehn
 # Standardschriften und cp1252 konnten. Pure-Rust. `simple-text` bringt die
 # Textformung (rustybuzz); Bilder brauchen wir (noch) nicht.
-krilla = { version = "0.8.2", default-features = false, features = ["simple-text"], optional = true }
+krilla = { version = "0.8.2", default-features = false, features = ["simple-text", "raster-images"], optional = true }
 # Die eingebauten Schriften des PDF-Moduls: DejaVu Sans/Serif/Sans Mono in je
 # vier Schnitten (freie Lizenz, deckt Latein, Griechisch, Kyrillisch und viele
 # Zeichen wie Pfeile und Haken ab). Der Linker nimmt nur die zwoelf benutzten.
@@ -276,7 +276,10 @@ mysql = ["db", "dep:mysql"]
 # PDF-Modul (krilla, eingebettete DejaVu-Schriften, Textformung) -- gut 6 MB
 # der Laufzeit; ein Programm, das kein PDF schreibt, braucht es nicht
 # (schlanker Export, docs/entwurf-anwendungen-und-tempo.md).
-pdf = ["dep:krilla", "dep:dejavu", "dep:rustybuzz"]
+pdf = ["dep:krilla", "schriften", "dep:rustybuzz"]
+# Die eingebauten Schriften (DejaVu, ~5,3 MB) fuer LOADFONT("sans") -- das
+# pdf-Modul bringt sie mit, der Web-Bau schaltet sie eigens ein.
+schriften = ["dep:dejavu"]
 # 2D/3D-Starrkoerper-Physik (rapier) -- rund 1 MB.
 physik = ["dep:rapier2d", "dep:rapier3d"]
 net = []                       # nur std::net -- Gate dient dem Opt-out

@@ -1,0 +1,59 @@
+' Das Beispiel examples/messdaten (Messdaten-Runde, 2026-10-13): CSV lesen,
+' Ausreisser und Luecken, Tagesauswahl, CSV und PDF-Bericht mit Diagrammen.
+' Die Daten schreibt der Fall selbst (zwei Tage, jede Minute, eine Luecke von
+' drei Stunden, ein Ausreisser) -- beispieldaten.dh hat einen eigenen Fall.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== beispieldaten schreibt eine woche
+--- programm ../../examples/messdaten/beispieldaten.dh
+--- argumente
+daten.csv
+600
+--- erwartet
+993 Zeilen -> daten.csv
+--- inhalt _programm/daten.csv
+zeit;temperatur;feuchte;licht;strom
+2026-10-05 00:00:00;
+
+=== auswertung bericht und export
+DIM prF AS FILE : prF = OPENFILE("m.csv", "w")
+WRITELINE(prF, "zeit;temperatur;feuchte;licht;strom")
+DIM prT0 AS INTEGER : prT0 = ZEIT_PARSE("2026-10-05 00:00:00")
+DIM prI AS INTEGER
+FOR prI = 0 TO 2 * 1440 - 1
+    IF prI >= 600 AND prI < 780 THEN CONTINUE
+    DIM prW AS FLOAT : prW = 20.0 + 5.0 * SIN(prI / 100.0)
+    IF prI = 1000 THEN prW = -40.0
+    WRITELINE(prF, ZEIT_FORMAT$(prT0 + prI * 60, "%Y-%m-%d %H:%M:%S") + ";" + FORMAT$(prW, "%.1f") + ";50;300;0.5")
+NEXT
+CLOSEFILE(prF)
+datei = "m.csv"
+--- programm ../../examples/messdaten/main.dh nach DIM datei AS STRING : datei = "messdaten.csv"
+--- einschub nach DIM beenden AS BOOLEAN
+PRINT LEFT$(GUI_TEXT(lbDatei), 14)
+PRINT GUI_TEXT(lbStatistik)
+PRINT "Punkte im Verlauf: "; CHART_COUNT(cVerlauf)
+PRINT "Tage: "; CHART_COUNT(cTage)
+csvSchreiben("aus.csv")
+berichtSchreiben("bericht.pdf")
+PRINT "PDF mit Bild: "; BUFFER_INDEXOF(READALL_BYTES("bericht.pdf"), BUFFER_FROM_STRING("/Image")) >= 0
+GUI_DROPDOWN_SET_SELECTED(ddTag, 2)
+auswerten()
+PRINT "zweiter Tag: "; CHART_COUNT(cVerlauf)
+EXIT(0)
+--- erwartet
+2700 Messungen
+Werte: 2699
+Minimum: 15,0 °C
+Maximum: 25,0 °C
+Mittel: 20,18 °C
+Std.-Abw.: 3,53 °C
+Ausreißer entfernt: 1
+Lücken über 1 min: 1
+Punkte im Verlauf: 2699
+Tage: 2
+PDF mit Bild: TRUE
+zweiter Tag: 1440
+--- inhalt _programm/aus.csv
+zeit;temperatur
+2026-10-05 00:00:00;20.00

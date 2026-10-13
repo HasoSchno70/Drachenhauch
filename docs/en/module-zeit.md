@@ -156,6 +156,13 @@ PRINT ZEIT_WOCHENTAG(a)                         ' 5
 
 Without a pattern (`""`) you get the normal form, exactly as with `ZEIT_TEXT$`.
 
+**The notation of C, Python and PHP works too:** `%Y` `%m` `%d` `%H` `%M`
+`%S`, plus `%y` (two-digit year), `%a`/`%A` (weekday short/long) and `%%`.
+`ZEIT_FORMAT$(a, "%Y-%m-%d %H:%M:%S")` is the same as the normal form. A
+`%` placeholder that does not exist (`%j`) is an **error** -- up to 2026.30
+it came back literally, and a CSV file got the text `%Y-%m-%d` instead of a
+date in every line.
+
 `ZEIT_WOCHENTAG` counts from Monday, because otherwise a match day at the weekend
 would run across two numbers: Monday 1 … Sunday 7.
 

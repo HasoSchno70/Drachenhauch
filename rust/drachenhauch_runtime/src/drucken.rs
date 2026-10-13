@@ -228,6 +228,27 @@ mod plattform {
                                 let _ = DeleteObject(stift.into());
                             }
                         }
+                        Op::Bild { x, y, b, h, rgba, pw, ph } => {
+                            // Durchsichtiges auf weisses Papier rechnen -- GDI
+                            // druckt 32 Bit ohne Alpha.
+                            let mut bgr = Vec::with_capacity(rgba.len());
+                            for p in rgba.chunks_exact(4) {
+                                let a = p[3] as u32;
+                                let misch = |c: u8| ((c as u32 * a + 255 * (255 - a)) / 255) as u8;
+                                bgr.extend_from_slice(&[misch(p[2]), misch(p[1]), misch(p[0]), 0]);
+                            }
+                            let mut info = BITMAPINFO::default();
+                            info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+                            info.bmiHeader.biWidth = *pw as i32;
+                            info.bmiHeader.biHeight = -(*ph as i32); // von oben nach unten
+                            info.bmiHeader.biPlanes = 1;
+                            info.bmiHeader.biBitCount = 32;
+                            info.bmiHeader.biCompression = BI_RGB.0;
+                            let _ = SetStretchBltMode(hdc, HALFTONE);
+                            let _ = StretchDIBits(hdc, px(*x), py(*y), px(*x + *b) - px(*x), py(*y + *h) - py(*y),
+                                                  0, 0, *pw as i32, *ph as i32, Some(bgr.as_ptr() as *const _),
+                                                  &info, DIB_RGB_COLORS, SRCCOPY);
+                        }
                     }
                 }
                 if EndPage(hdc) <= 0 { let _ = EndDoc(hdc); return Err("PDF_PRINT: EndPage schlug fehl".into()); }

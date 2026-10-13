@@ -66,6 +66,14 @@ module.exports = (H) => [
       'DIM lautstaerke AS FLOAT',
       'lautstaerke = GUI_VALUE(vol)',
     ]),
+  H.cmd("GUI_CHANGED", 'GUI_CHANGED(widget)',
+    "TRUE in dem Bild, in dem die Bedienung das Widget geändert hat – eine andere Auswahl in der Klappliste, ein gezogener Regler, ein getippter Text, ein Haken. Was das Programm selbst setzt, zählt nicht; so kann eine Auswertung ihre Klapplisten füllen, ohne sich selbst auszulösen. Der erste Aufruf beginnt zu beobachten und liefert FALSE.",
+    [
+      'GUI_UPDATE()',
+      'IF GUI_CHANGED(auswahl) OR GUI_CHANGED(regler) THEN',
+      '    auswerten()',
+      'END IF',
+    ]),
 
   H.h2("Baumansicht (Tree)"),
   H.p("Eine Baumansicht zeigt hierarchische Daten mit aufklappbaren Knoten – ideal für einen Level-Browser, eine Datei-/Ordnerstruktur oder einen Szenegraph-Inspektor."),

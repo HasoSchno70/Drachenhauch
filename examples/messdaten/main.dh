@@ -1,0 +1,348 @@
+' messdaten -- Auswertung einer Messreihe: einlesen, filtern, glaetten,
+' Statistik, Diagramme, Bericht als PDF.
+'
+'     dhrt run beispieldaten.dh          (einmal: eine Woche Beispieldaten)
+'     dhrt run main.dh                   (liest messdaten.csv)
+'     dhrt run main.dh -- datei.csv      (eine Aufzeichnung von examples/werkstatt)
+'
+' Erwartet wird eine CSV mit Semikolon: zeit;temperatur;feuchte;licht;strom
+' (so schreibt sie das Werkstatt-Dashboard). Zahlen mit Punkt oder Komma.
+IMPORT "gui"
+IMPORT "zeit"
+IMPORT "chart"
+IMPORT "pdf"
+IMPORT "imgfx"
+
+CONST BREITE = 1280
+CONST HOEHE = 780
+CONST PANEL = 300
+DIM datei AS STRING : datei = "messdaten.csv"
+IF ARGC() > 0 THEN datei = ARG$(0)
+' Beim ersten Start gibt es noch keine Messdaten: beispieldaten.dh schreibt eine Woche
+IF ARGC() = 0 AND NOT FILEEXISTS(datei) AND FILEEXISTS("beispieldaten.dh") THEN
+    DIM erzeuger AS INTEGER : erzeuger = PROCESS_START("dhrt", "run", "beispieldaten.dh", "--", datei)
+    WHILE PROCESS_RUNNING(erzeuger) : SLEEP(50) : WEND
+END IF
+
+SCREEN(BREITE, HOEHE, "Messdaten")
+SETFPS(60)
+' Eine richtige Schrift statt der Pixelschrift -- eingebaut, auf jedem System
+DIM schrift AS INTEGER : schrift = LOADFONT("sans", 32)
+SETFONT(schrift)
+TEXT_SIZE(16)                  ' geladen in 32 fuer scharfe Kanten, gezeigt in 16
+GUI_THEME_PRESET("modern_light")
+
+' --- Daten ------------------------------------------------------------------------
+CONST SPALTEN = 4
+DIM namen AS ARRAY OF STRING : namen = ["Temperatur", "Luftfeuchte", "Licht", "Strom"]
+DIM einheiten AS ARRAY OF STRING : einheiten = [" °C", " %", " lx", " A"]
+DIM zeit AS ARRAY OF INTEGER : zeit = []
+DIM werte AS ARRAY OF FLOAT : werte = []    ' Spalte s, Zeile i: werte[i * SPALTEN + s]
+DIM anzahl AS INTEGER
+
+FUNCTION zahl(t AS STRING) AS FLOAT
+    RETURN VAL(REPLACE$(TRIM$(t), ",", "."))
+END FUNCTION
+
+FUNCTION laden(pfad AS STRING) AS STRING
+    IF NOT FILEEXISTS(pfad) THEN RETURN "Datei fehlt: " + pfad
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    DIM tab AS ARRAY OF STRING : tab = CSV_LOAD(pfad, ";")
+    DIM n AS INTEGER : n = DIMSIZE(tab, 0) - 1
+    zeit = [] : werte = []
+    DIM i AS INTEGER, s AS INTEGER
+    FOR i = 1 TO n
+        ARRAY_PUSH(zeit, ZEIT_PARSE(tab[i, 0]))
+        FOR s = 0 TO SPALTEN - 1
+            ARRAY_PUSH(werte, zahl(tab[i, s + 1]))
+        NEXT
+    NEXT
+    anzahl = n
+    RETURN STR$(n) + " Messungen in " + STR$(MILLIS() - t0) + " ms gelesen"
+END FUNCTION
+
+' --- Bedienfeld --------------------------------------------------------------------
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Messdaten", 0, 0, BREITE, HOEHE)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM lbDatei AS GUI_WIDGET : lbDatei = GUI_LABEL(win, "", 16, 14)
+GUI_SET_WRAP(lbDatei, PANEL - 32)
+DIM btOeffnen AS GUI_WIDGET : btOeffnen = GUI_BUTTON(win, "Datei öffnen ...", 16, 60, PANEL - 32, 32)
+DIM lbGroesse AS GUI_WIDGET : lbGroesse = GUI_LABEL(win, "Messgröße", 16, 108)
+DIM ddGroesse AS GUI_WIDGET : ddGroesse = GUI_DROPDOWN(win, 16, 132, PANEL - 32, 30, namen)
+DIM lbTag AS GUI_WIDGET : lbTag = GUI_LABEL(win, "Zeitraum", 16, 176)
+DIM ddTag AS GUI_WIDGET : ddTag = GUI_DROPDOWN(win, 16, 200, PANEL - 32, 30, ["ganze Aufzeichnung"])
+DIM lbGlatt AS GUI_WIDGET : lbGlatt = GUI_LABEL(win, "Glättung", 16, 244)
+DIM slGlatt AS GUI_WIDGET : slGlatt = GUI_SLIDER(win, 16, 270, PANEL - 32, 1, 360, 30)
+DIM cbAusreisser AS GUI_WIDGET : cbAusreisser = GUI_CHECKBOX(win, "Ausreißer entfernen", 16, 304)
+GUI_SET_CHECKED(cbAusreisser, TRUE)
+DIM lbStatistik AS GUI_WIDGET : lbStatistik = GUI_LABEL(win, "", 16, 346)
+GUI_SET_WRAP(lbStatistik, PANEL - 32)
+DIM btCsv AS GUI_WIDGET : btCsv = GUI_BUTTON(win, "Auswahl als CSV ...", 16, HOEHE - 92, PANEL - 32, 32)
+DIM btPdf AS GUI_WIDGET : btPdf = GUI_BUTTON(win, "Bericht als PDF ...", 16, HOEHE - 52, PANEL - 32, 32)
+GUI_BUTTON_VARIANT(btPdf, "primaer")
+
+DIM tab AS GUI_WIDGET : tab = GUI_TABLE(win, 800, 440, BREITE - 816, HOEHE - 456)
+GUI_TABLE_HEADERS(tab, ["Zeit", "Wert"])
+GUI_TABLE_COL_WIDTHS(tab, [230, 220])
+GUI_TABLE_COL_ALIGN(tab, 1, "rechts")
+
+' --- Diagramme -----------------------------------------------------------------------
+DIM cVerlauf AS CHART : cVerlauf = CHART_NEW("linie", PANEL + 10, 10, BREITE - PANEL - 26, 420)
+CHART_THEME(cVerlauf, "hell")
+CHART_SET_NUM(cVerlauf, "schrift", schrift)
+CHART_SET_FLAG(cVerlauf, "komma", TRUE)
+CHART_SET_NUM(cVerlauf, "nachkomma", 1)
+CHART_SET(cVerlauf, "legende", "oben")
+DIM rRoh AS INTEGER : rRoh = CHART_SERIES(cVerlauf, "Messwerte", RGBA(120, 150, 200, 110))
+DIM rGlatt AS INTEGER : rGlatt = CHART_SERIES(cVerlauf, "geglättet", RGB(220, 90, 40))
+
+CHART_SET_NUM(cVerlauf, "luecke_ab", 60)   ' mehr als eine Minute ohne Messung: Linie unterbrechen
+DIM cTage AS CHART : cTage = CHART_NEW("balken", PANEL + 10, 440, 480, HOEHE - 456)
+CHART_THEME(cTage, "hell")
+CHART_SET_NUM(cTage, "schrift", schrift)
+CHART_SET_FLAG(cTage, "komma", TRUE)
+CHART_SET_NUM(cTage, "nachkomma", 1)
+CHART_SET(cTage, "titel", "Tagesmittel")
+CHART_SET_NUM(cTage, "abstand", 14)
+
+' --- Auswertung ----------------------------------------------------------------------
+DIM sel AS ARRAY OF FLOAT : sel = []      ' die Werte der Auswahl
+DIM selZeit AS ARRAY OF INTEGER : selZeit = []
+DIM tage AS ARRAY OF INTEGER : tage = []  ' Mitternacht jedes Tages
+
+SUB tageFinden()
+    tage = []
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl - 1
+        DIM t AS INTEGER : t = zeit[i] - zeit[i] MOD 86400
+        IF LEN(tage) = 0 THEN
+            ARRAY_PUSH(tage, t)
+        ELSEIF tage[LEN(tage) - 1] <> t THEN
+            ARRAY_PUSH(tage, t)
+        END IF
+    NEXT
+    DIM eintraege AS ARRAY OF STRING : eintraege = ["ganze Aufzeichnung"]
+    FOR i = 0 TO LEN(tage) - 1
+        ARRAY_PUSH(eintraege, ZEIT_FORMAT$(tage[i], "WT TT.MM."))
+    NEXT
+    GUI_SET_DROPDOWN(ddTag, eintraege)
+    GUI_DROPDOWN_SET_SELECTED(ddTag, 0)
+END SUB
+
+FUNCTION median(a AS ARRAY OF FLOAT) AS FLOAT
+    IF LEN(a) = 0 THEN RETURN 0
+    DIM k AS ARRAY OF FLOAT : k = ARRAY_COPY(a)
+    SORT(k)
+    RETURN k[LEN(k) \ 2]
+END FUNCTION
+
+DIM ausreisser AS INTEGER
+DIM luecken AS INTEGER
+
+SUB auswerten()
+    DIM s AS INTEGER : s = GUI_DROPDOWN_SELECTED(ddGroesse)
+    DIM tag AS INTEGER : tag = GUI_DROPDOWN_SELECTED(ddTag) - 1
+    sel = [] : selZeit = []
+    IF anzahl = 0 THEN
+        CHART_DATA(cVerlauf, rRoh, []) : CHART_DATA(cVerlauf, rGlatt, []) : CHART_CLEAR(cTage)
+        GUI_TABLE_CLEAR(tab)
+        GUI_SET_TEXT(lbStatistik, "Keine Messwerte.")
+        RETURN
+    END IF
+    ' Ausreisser: weiter als 8 mittlere Abweichungen vom Median der GANZEN
+    ' Aufzeichnung -- so gilt fuer einen Tag dieselbe Grenze wie fuer die Woche
+    DIM unten AS FLOAT : unten = -1E300
+    DIM oben AS FLOAT : oben = 1E300
+    DIM i AS INTEGER
+    IF GUI_CHECKED(cbAusreisser) AND anzahl > 10 THEN
+        DIM spalte AS ARRAY OF FLOAT : spalte = []
+        FOR i = 0 TO anzahl - 1 : ARRAY_PUSH(spalte, werte[i * SPALTEN + s]) : NEXT
+        DIM m AS FLOAT : m = median(spalte)
+        DIM abw AS ARRAY OF FLOAT : abw = []
+        FOR i = 0 TO anzahl - 1 : ARRAY_PUSH(abw, ABS(spalte[i] - m)) : NEXT
+        DIM mad AS FLOAT : mad = MAX(median(abw), 0.01)
+        unten = m - 8 * mad : oben = m + 8 * mad
+    END IF
+    ausreisser = 0 : luecken = 0
+    DIM vorher AS INTEGER : vorher = -1
+    FOR i = 0 TO anzahl - 1
+        IF tag < 0 OR (zeit[i] - zeit[i] MOD 86400) = tage[MAX(tag, 0)] THEN
+            ' Luecken: mehr als eine Minute ohne Messung -- vor dem Aussortieren
+            ' gezaehlt, ein entfernter Ausreisser ist keine Luecke
+            IF vorher >= 0 AND zeit[i] - vorher > 60 THEN luecken = luecken + 1
+            vorher = zeit[i]
+            DIM w AS FLOAT : w = werte[i * SPALTEN + s]
+            IF w < unten OR w > oben THEN
+                ausreisser = ausreisser + 1
+            ELSE
+                ARRAY_PUSH(sel, w)
+                ARRAY_PUSH(selZeit, zeit[i])
+            END IF
+        END IF
+    NEXT
+    ' Gleitender Mittelwert ueber eine laufende Summe
+    DIM fenster AS INTEGER : fenster = INT(GUI_VALUE(slGlatt))
+    DIM glatt AS ARRAY OF FLOAT : glatt = []
+    DIM summe AS FLOAT
+    FOR i = 0 TO LEN(sel) - 1
+        summe = summe + sel[i]
+        IF i >= fenster THEN summe = summe - sel[i - fenster]
+        ARRAY_PUSH(glatt, summe / MIN(i + 1, fenster))
+    NEXT
+    CHART_DATA(cVerlauf, rRoh, sel)
+    CHART_DATA(cVerlauf, rGlatt, glatt)
+    ' Die Zeit als x-Achse: eine Luecke in der Aufzeichnung bleibt eine Luecke
+    CHART_X(cVerlauf, selZeit)
+    ' Beschriftet wird nur, wo etwas anfaengt: bei der Woche jeder Tag, bei
+    ' einem Tag jede volle Stunde -- das Diagramm laesst weg, was nicht passt.
+    DIM vorige AS INTEGER : vorige = -1
+    FOR i = 0 TO LEN(selZeit) - 1
+        DIM einheit AS INTEGER : einheit = IIF(tag < 0, 86400, 3600)
+        DIM block AS INTEGER : block = selZeit[i] \ einheit
+        IF block <> vorige THEN
+            CHART_LABEL(cVerlauf, i, ZEIT_FORMAT$(selZeit[i], IIF(tag < 0, "WT TT.MM.", "hh:00")))
+            vorige = block
+        END IF
+    NEXT
+    CHART_SET(cVerlauf, "titel", namen[s] + IIF(tag < 0, "", " am " + ZEIT_FORMAT$(tage[MAX(tag, 0)], "TT.MM.JJJJ")))
+    CHART_SET(cVerlauf, "einheit", einheiten[s])
+    ' Tagesmittel ueber die ganze Aufzeichnung
+    CHART_CLEAR(cTage)
+    DIM d AS INTEGER
+    FOR d = 0 TO LEN(tage) - 1
+        DIM su AS FLOAT, nn AS INTEGER
+        su = 0 : nn = 0
+        FOR i = 0 TO anzahl - 1
+            IF zeit[i] - zeit[i] MOD 86400 = tage[d] THEN
+                DIM wt AS FLOAT : wt = werte[i * SPALTEN + s]
+                IF wt >= unten AND wt <= oben THEN su = su + wt : nn = nn + 1
+            END IF
+        NEXT
+        CHART_ADD(cTage, ZEIT_FORMAT$(tage[d], "WT"), IIF(nn > 0, su / MAX(nn, 1), 0))
+    NEXT
+    CHART_SET(cTage, "einheit", einheiten[s])
+    ' Statistik
+    IF LEN(sel) = 0 THEN
+        GUI_SET_TEXT(lbStatistik, "Keine Messwerte im Zeitraum.")
+        GUI_TABLE_CLEAR(tab)
+        RETURN
+    END IF
+    DIM mittel AS FLOAT : mittel = ARRAY_AVG(sel)
+    DIM qs AS FLOAT
+    FOR i = 0 TO LEN(sel) - 1 : qs = qs + (sel[i] - mittel) ^ 2 : NEXT
+    DIM std AS FLOAT : std = SQR(qs / MAX(LEN(sel) - 1, 1))
+    GUI_SET_TEXT(lbStatistik, "Werte: " + STR$(LEN(sel)) + CHR$(10) + _
+        "Minimum: " + ZAHL$(ARRAY_MIN(sel), 1) + einheiten[s] + CHR$(10) + _
+        "Maximum: " + ZAHL$(ARRAY_MAX(sel), 1) + einheiten[s] + CHR$(10) + _
+        "Mittel: " + ZAHL$(mittel, 2) + einheiten[s] + CHR$(10) + _
+        "Std.-Abw.: " + ZAHL$(std, 2) + einheiten[s] + CHR$(10) + _
+        "Ausreißer entfernt: " + STR$(ausreisser) + CHR$(10) + _
+        "Lücken über 1 min: " + STR$(luecken))
+    ' Tabelle: die Werte der Auswahl
+    GUI_TABLE_CLEAR(tab)
+    FOR i = 0 TO LEN(sel) - 1
+        GUI_TABLE_ADD_ROW(tab, [ZEIT_FORMAT$(selZeit[i], "TT.MM. hh:mm:ss"), ZAHL$(sel[i], 1)])
+    NEXT
+END SUB
+
+' --- Export ---------------------------------------------------------------------------
+SUB csvSchreiben(pfad AS STRING)
+    IF LEN(sel) = 0 THEN RETURN
+    DIM f AS FILE : f = OPENFILE(pfad, "w")
+    WRITELINE(f, "zeit;" + LOWER$(namen[GUI_DROPDOWN_SELECTED(ddGroesse)]))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(sel) - 1
+        WRITELINE(f, ZEIT_FORMAT$(selZeit[i], "JJJJ-MM-TT hh:mm:ss") + ";" + FORMAT$(sel[i], "%.2f"))
+    NEXT
+    CLOSEFILE(f)
+END SUB
+
+' Ein Diagramm als Bild fuer den Bericht: kurz an die Stelle (0, 0) eines
+' Render-Ziels gezeichnet, 10 Punkte je Millimeter (gedruckt scharf), mit
+' Schrift und Linien in Druckgroesse -- danach wieder an seinen Platz.
+DIM rtBericht AS INTEGER : rtBericht = -1
+FUNCTION diagrammBild(c AS CHART, mmB AS INTEGER, mmH AS INTEGER) AS IMAGE
+    IF rtBericht < 0 THEN rtBericht = RENDERTARGET_NEW(1800, 1000)
+    DIM b AS INTEGER : b = mmB * 10
+    DIM h AS INTEGER : h = mmH * 10
+    RENDERTARGET_BEGIN(rtBericht)
+    BOX(0, 0, b, h, WHITE)
+    CHART_BOUNDS(c, 0, 0, b, h)
+    CHART_SET_NUM(c, "text_groesse", 34) : CHART_SET_NUM(c, "titel_groesse", 46)
+    CHART_SET_NUM(c, "linien_dicke", 4)
+    CHART_DRAW(c)
+    RENDERTARGET_END()
+    DIM ganz AS IMAGE : ganz = RENDERTARGET_IMAGE(rtBericht)
+    DIM bild AS IMAGE : bild = IMAGE_CROP(ganz, 0, 0, b, h)
+    IMAGE_FREE(ganz)
+    CHART_SET_NUM(c, "text_groesse", 14) : CHART_SET_NUM(c, "titel_groesse", 20)
+    CHART_SET_NUM(c, "linien_dicke", 2)
+    RETURN bild
+END FUNCTION
+
+SUB berichtSchreiben(pfad AS STRING)
+    IF LEN(sel) = 0 THEN RETURN
+    DIM s AS INTEGER : s = GUI_DROPDOWN_SELECTED(ddGroesse)
+    DIM p AS PDF : p = PDF_NEW("a4")
+    PDF_PAGE(p)
+    PDF_FONT(p, "sans-fett", 18)
+    PDF_TEXT(p, 20, 20, "Messbericht: " + namen[s])
+    PDF_FONT(p, "sans", 10)
+    PDF_TEXT(p, 20, 30, "Datei " + datei + ", " + ZEIT_FORMAT$(selZeit[0], "TT.MM.JJJJ hh:mm") + " bis " + ZEIT_FORMAT$(selZeit[LEN(selZeit) - 1], "TT.MM.JJJJ hh:mm"))
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(lbStatistik), CHR$(10))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        PDF_TEXT(p, 20, 42 + i * 6, zeilen[i])
+    NEXT
+    ' Beide Diagramme so, wie sie im Fenster stehen: in ein Render-Ziel
+    ' gezeichnet, als Bild geholt und ins PDF gesetzt
+    DIM bild AS IMAGE
+    bild = diagrammBild(cVerlauf, 170, 85)
+    PDF_IMAGE(p, bild, 20, 92, 170) : IMAGE_FREE(bild)
+    bild = diagrammBild(cTage, 110, 70)
+    PDF_IMAGE(p, bild, 20, 185, 110) : IMAGE_FREE(bild)
+    ' Danach wieder an ihren Platz im Fenster
+    CHART_BOUNDS(cVerlauf, PANEL + 10, 10, BREITE - PANEL - 26, 420)
+    CHART_BOUNDS(cTage, PANEL + 10, 440, 480, HOEHE - 456)
+    PDF_SAVE(p, pfad)
+END SUB
+
+' --- Start ----------------------------------------------------------------------------
+GUI_SET_TEXT(lbDatei, laden(datei))
+tageFinden()
+auswerten()
+
+DIM beenden AS BOOLEAN
+DIM wartet AS BOOLEAN       ' Regler bewegt: erst rechnen, wenn er stillsteht
+DIM ruhe AS INTEGER
+WHILE NOT beenden
+    IF QUITREQUESTED() OR WINDOW_CLOSE_REQUESTED() THEN beenden = TRUE
+    GUI_UPDATE()
+    IF GUI_CLICKED(btOeffnen) THEN
+        DIM neu AS STRING : neu = FILE_OPEN_DIALOG("Messdaten öffnen", "csv")
+        IF neu <> "" THEN
+            datei = neu
+            GUI_SET_TEXT(lbDatei, laden(datei))
+            tageFinden() : auswerten()
+        END IF
+    END IF
+    IF GUI_CHANGED(ddGroesse) OR GUI_CHANGED(ddTag) OR GUI_CLICKED(cbAusreisser) THEN auswerten()
+    IF GUI_CHANGED(slGlatt) THEN wartet = TRUE : ruhe = 0
+    IF wartet THEN
+        ruhe = ruhe + 1
+        IF ruhe > 10 AND NOT MOUSEBUTTON(0) THEN wartet = FALSE : auswerten()
+    END IF
+    IF GUI_CLICKED(btCsv) THEN
+        DIM ziel AS STRING : ziel = FILE_SAVE_DIALOG("Auswahl speichern", "auswahl.csv", "csv")
+        IF ziel <> "" THEN csvSchreiben(ziel)
+    END IF
+    IF GUI_CLICKED(btPdf) THEN
+        DIM bericht AS STRING : bericht = FILE_SAVE_DIALOG("Bericht speichern", "bericht.pdf", "pdf")
+        IF bericht <> "" THEN berichtSchreiben(bericht) : OPENDOC(bericht)
+    END IF
+    CLS(RGB(245, 247, 250))
+    GUI_DRAW()
+    CHART_DRAW(cVerlauf)
+    CHART_DRAW(cTage)
+    FLIP()
+WEND

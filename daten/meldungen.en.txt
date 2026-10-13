@@ -1737,3 +1737,18 @@ ein Nullzeichen im Text -- PostgreSQL nimmt es nicht	a null character in the tex
 Spalte {} ({}): {}	column {} ({}): {}
 MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten	MQTT_WILL: the topic must not be empty or contain wildcards (# +)
 MQTT_WILL: retain ist TRUE oder FALSE	MQTT_WILL: retain is TRUE or FALSE
+ZEIT_FORMAT$: '%{}' kennt das Muster nicht -- %Y %y %m %d %H %M %S %a %A %% oder JJJJ MM TT hh mm ss WT WTAG	ZEIT_FORMAT$: '%{}' is not a known pattern -- %Y %y %m %d %H %M %S %a %A %% or JJJJ MM TT hh mm ss WT WTAG
+CHART_X: {} x-Werte fuer {} Punkte -- erst CHART_DATA, dann CHART_X mit gleich vielen	CHART_X: {} x values for {} points -- first CHART_DATA, then CHART_X with as many
+CHART_X: der x-Wert von Punkt {} ist kleiner als der davor -- die Werte muessen aufsteigen	CHART_X: the x value of point {} is smaller than the one before -- the values must ascend
+RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END	RENDERTARGET_IMAGE: the target is still open -- RENDERTARGET_END first
+PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}	PDF_IMAGE: expects 5 or 6 arguments (pdf, image, x, y, w [, h]), not {}
+PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE	PDF_IMAGE: no image loaded -- an image comes from LOADIMAGE, IMAGE_NEW or RENDERTARGET_IMAGE
+PDF_IMAGE: dieser Bau hat keine Grafik	PDF_IMAGE: this build has no graphics
+die Breite muss groesser als 0 sein, nicht {}	the width must be greater than 0, not {}
+das Bild ist leer	the image is empty
+{}: das Bild ist leer	{}: the image is empty
+'{}' ist keine eingebaute Schrift	'{}' is not a built-in font
+GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in voller Innenfarbe (0 = weicher Verlauf ab der Mitte, 1 = Scheibe)	GENTEX_RADIAL: dichte {} is not in 0..1 -- it is the share of the radius in full inner colour (0 = soft gradient from the centre, 1 = disc)
+{} erwartet INTEGER, erhalten FLOAT {} -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig	{} expects INTEGER, got FLOAT {} -- not a whole number; INT(x) cuts off, ROUND(x) rounds, \ divides as integers
+{}: erwartet INTEGER (Arg {}), erhalten {} -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig	{}: expects INTEGER (arg {}), got {} -- not a whole number; INT(x) cuts off, ROUND(x) rounds, \ divides as integers
+{}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature "schriften") -- eine .ttf-Datei angeben	{}: '{}' is a built-in font, but this build has none (feature "schriften") -- give a .ttf file

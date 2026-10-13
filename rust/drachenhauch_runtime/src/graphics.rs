@@ -1600,6 +1600,10 @@ fn schrift_laden(rl: &mut RaylibHandle, thread: &RaylibThread, pfad: &str, groes
 /// Die Bytes einer Schriftdatei, Sammlungen (.ttc) auf ihre erste Schrift
 /// verkleinert, dazu die Endung, unter der raylib sie lesen soll.
 fn schrift_daten(pfad: &str) -> Result<(Vec<u8>, &'static str), String> {
+    if let Some(name) = pfad.strip_prefix(EINGEBAUT_VORSATZ) {
+        return eingebaute_schrift(name).map(|d| (d.to_vec(), ".ttf"))
+            .ok_or_else(|| format!("'{}' ist keine eingebaute Schrift", name));
+    }
     let daten = std::fs::read(pfad).map_err(|e| format!("'{}': {}", pfad, e))?;
     Ok(match ttc_erste_schrift(&daten) {
         Some(erste) => (erste, ".ttf"),
@@ -1608,6 +1612,45 @@ fn schrift_daten(pfad: &str) -> Result<(Vec<u8>, &'static str), String> {
             (daten, art)
         }
     })
+}
+
+/// Das Fenster-Handle des Systems -- im Browser gibt es keins (raylib warnt
+/// dort bei jedem Aufruf; FLIP fragte es in jedem Bild).
+fn fenster_handle(rl: &mut RaylibHandle) -> *mut std::ffi::c_void {
+    #[cfg(target_os = "emscripten")]
+    { let _ = rl; std::ptr::null_mut() }
+    #[cfg(not(target_os = "emscripten"))]
+    unsafe { rl.get_window_handle() }
+}
+
+/// Eine eingebaute Schrift steht in `font_herkunft` als "eingebaut:sans" --
+/// so laufen sie und eine Datei durch dieselben Wege (Laden, Schnitte).
+const EINGEBAUT_VORSATZ: &str = "eingebaut:";
+
+#[cfg(feature = "schriften")]
+fn eingebaute_schrift(name: &str) -> Option<&'static [u8]> { crate::schriften::eingebaute_schrift(name) }
+#[cfg(not(feature = "schriften"))]
+fn eingebaute_schrift(_name: &str) -> Option<&'static [u8]> { None }
+
+/// LOADFONT("sans", 32): ein Name der eingebauten DejaVu-Schriften (sans,
+/// serif, mono, je mit -fett/-kursiv/-fett-kursiv). Eine Datei gleichen
+/// Namens gewinnt. Bis 2026.30 bekam ein Programm eine normale Schrift nur
+/// ueber einen festen Pfad wie C:/Windows/Fonts/segoeui.ttf -- unter macOS
+/// und Linux gab es den nicht.
+fn eingebauter_pfad(pfad: &str, befehl: &str) -> Result<Option<String>, String> {
+    if std::path::Path::new(pfad).exists() { return Ok(None); }
+    if eingebaute_schrift(pfad).is_some() {
+        return Ok(Some(format!("{}{}", EINGEBAUT_VORSATZ, pfad.trim().to_lowercase())));
+    }
+    // Ein Name, der eine eingebaute Schrift meint, in einem Bau ohne sie: das
+    // sagen, statt "Datei 'sans' nicht gefunden" zu melden.
+    let k = pfad.trim().to_lowercase();
+    let familie = k.split('-').next().unwrap_or("");
+    if !k.contains('.') && !k.contains('/') && !k.contains('\\')
+        && ["sans", "serif", "mono", "helvetica", "times", "courier"].contains(&familie) {
+        return Err(format!("{}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature \"schriften\") -- eine .ttf-Datei angeben", befehl, pfad));
+    }
+    Ok(None)
 }
 
 /// Fuehrt `f` aus, waehrend raylib nur Fehler meldet.
@@ -1763,21 +1806,27 @@ impl Graphics {
         // IMMER versteckt anlegen: der Barrierefreiheits-Adapter (a11y.rs)
         // verlangt ein Fenster, das noch nie sichtbar war. Gezeigt wird es
         // gleich darunter -- ausser der Aufrufer wollte es ohnehin versteckt.
+        // Im Browser gibt es kein verstecktes Fenster (raylib warnt nur).
+        #[cfg(not(target_os = "emscripten"))]
         builder.hidden();
         let (mut rl, thread) = Graphics::fenster_bauen(builder)?;
         // Klicks zwischen zwei Bildern mitzaehlen (flanken.rs).
         crate::flanken::einhaengen();
         let _ = crate::flanken::abholen();
         let _ = crate::flanken::tasten_abholen();
-        let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
+        let hwnd = fenster_handle(&mut rl);
+        let a11y = crate::a11y::A11y::neu(hwnd);
         // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
-        crate::ime::einhaengen(unsafe { rl.get_window_handle() });
-        crate::systemzeiger::einhaengen(unsafe { rl.get_window_handle() });
-        crate::stillfenster::einrichten(unsafe { rl.get_window_handle() });
-        crate::tray::einhaengen(unsafe { rl.get_window_handle() });
+        crate::ime::einhaengen(hwnd);
+        crate::systemzeiger::einhaengen(hwnd);
+        crate::stillfenster::einrichten(hwnd);
+        crate::tray::einhaengen(hwnd);
+        #[cfg(not(target_os = "emscripten"))]
         if !hidden {
             rl.clear_window_state(WindowState::default().set_window_hidden(true));
         }
+        #[cfg(target_os = "emscripten")]
+        let _ = hidden;
         // `dhrt bild` setzt DHRT_ABSEITS: das Fenster wird aus dem Blick
         // geschoben, statt fuer eine Sekunde aufzublitzen. Das BILD stimmt
         // trotzdem -- gesichert wird der Zeichenpuffer, nicht der Bildschirm
@@ -2190,6 +2239,44 @@ impl Graphics {
         Ok(())
     }
     pub fn rendertarget_end(&mut self) { self.active_rt = None; }
+
+    /// RENDERTARGET_IMAGE(rt): der Inhalt eines Render-Targets als IMAGE --
+    /// was seit RENDERTARGET_BEGIN aufgezeichnet ist, wird dafuer SOFORT
+    /// abgespielt, nicht erst beim FLIP.
+    ///
+    /// Bis 2026.30 gab es keinen Weg von Gezeichnetem zu einem Bild: ein
+    /// Diagramm liess sich zeigen, aber nicht in einen PDF-Bericht oder eine
+    /// PNG-Datei bringen, ohne den Bildschirm abzufotografieren
+    /// (Messdaten-Runde, 2026-10-13).
+    pub fn rendertarget_image(&mut self, idx: i64) -> Result<i64, String> {
+        let i = self.check_rt(idx, "RENDERTARGET_IMAGE")?;
+        if self.active_rt == Some(i) {
+            return Err("RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END".into());
+        }
+        if !self.render_targets[i].cmds.is_empty() {
+            self.ausweich_nachladen();
+            let Graphics { rl, thread, textures, fonts, ausweich, font_glyphs, render_targets, cam3d, .. } = self;
+            let cmds = std::mem::take(&mut render_targets[i].cmds);
+            let synth = [Layer { z: 0, cmds }];
+            let clear = if render_targets[i].behalten { None } else { Some(Color::new(0, 0, 0, 0)) };
+            let empty_set = std::collections::HashSet::new();
+            let empty_map = std::collections::HashMap::new();
+            let empty_emis = std::collections::HashMap::new();
+            let ausweich: &[Ausweich] = ausweich.as_slice();
+            let font_glyphs: &[std::collections::HashSet<u32>] = font_glyphs.as_slice();
+            let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
+            // Dieselben Argumente wie beim FLIP: Massstab 1, keine 3D-Szene.
+            render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich, font_glyphs,
+                &[], *cam3d, &[], None,
+                (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
+                (false, 0, 0, 0), &[], None, None, None, None);
+        }
+        let mut img = self.render_targets[i].rt.texture().load_image()
+            .map_err(|e| format!("RENDERTARGET_IMAGE: {}", e))?;
+        // Eine RenderTexture steht in OpenGL auf dem Kopf.
+        img.flip_vertical();
+        self.push_tex_from_image(img)
+    }
 
     /// GUI_WINDOW_ZOOM: ab jetzt in die Zoom-Flaeche zeichnen. FALSE, wenn
     /// es keine gibt (dann zeichnet der Aufrufer unvergroessert).
@@ -3958,8 +4045,17 @@ impl Graphics {
             if !pfad.is_empty() {
                 let versuche: Vec<u8> = if s == FETT | KURSIV { vec![FETT | KURSIV, FETT, KURSIV] } else { vec![s] };
                 'suche: for v in versuche {
-                    for kand in crate::schnitt::schnitt_kandidaten(&pfad, v) {
-                        if !std::path::Path::new(&kand).exists() { continue; }
+                    let kandidaten = match pfad.strip_prefix(EINGEBAUT_VORSATZ) {
+                        // Eingebaut: die Familie hat alle vier Schnitte
+                        Some(name) => {
+                            let familie = name.split('-').next().unwrap_or(name);
+                            let endung = match v { FETT => "-fett", KURSIV => "-kursiv", _ => "-fett-kursiv" };
+                            vec![format!("{}{}{}", EINGEBAUT_VORSATZ, familie, endung)]
+                        }
+                        None => crate::schnitt::schnitt_kandidaten(&pfad, v),
+                    };
+                    for kand in kandidaten {
+                        if !kand.starts_with(EINGEBAUT_VORSATZ) && !std::path::Path::new(&kand).exists() { continue; }
                         let rl = &mut self.rl;
                         let thread = &self.thread;
                         if let Ok(f) = schrift_laden(rl, thread, &kand, groesse, &zeichen) {
@@ -4075,12 +4171,13 @@ impl Graphics {
     /// Mit erweitertem Zeichensatz: raylib backt sonst nur die 95 ASCII-
     /// Glyphen, und jedes deutsche Wort mit Umlaut kaeme als "K?ln" heraus.
     pub fn load_font(&mut self, path: &str, size: i32) -> Result<i64, String> {
-        let resolved = crate::builtins::resolve_asset_path(path);
+        let eingebaut = eingebauter_pfad(path, "LOADFONT")?;
+        let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
         let chars = zeichensatz();
         let rl = &mut self.rl;
         let thread = &self.thread;
-        crate::builtins::datei_da(path, "LOADFONT")?;
+        if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT")?; }
         let f = schrift_laden(rl, thread, path, size, &chars)
             .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
         Self::keine_ersatzschrift(&f, path)?;
@@ -4100,11 +4197,12 @@ impl Graphics {
     /// es braucht; ein Programm fuer Japan die Kana und alle Kanji.
     pub fn load_font_mit(&mut self, path: &str, size: i32, zeichen: &str) -> Result<i64, String> {
         let chars = zeichen_aus_namen(zeichen)?;
-        let resolved = crate::builtins::resolve_asset_path(path);
+        let eingebaut = eingebauter_pfad(path, "LOADFONT")?;
+        let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
         let rl = &mut self.rl;
         let thread = &self.thread;
-        crate::builtins::datei_da(path, "LOADFONT")?;
+        if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT")?; }
         let f = schrift_laden(rl, thread, path, size, &chars)
             .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
         Self::keine_ersatzschrift(&f, path)?;
@@ -4297,9 +4395,10 @@ impl Graphics {
             None => (32u32..127).chain(0xA0..=0xFF).filter_map(char::from_u32)
                 .chain("€–—„“”‘’…•".chars()).collect(),
         };
-        let resolved = crate::builtins::resolve_asset_path(path);
+        let eingebaut = eingebauter_pfad(path, "LOADFONT_SDF")?;
+        let resolved = match &eingebaut { Some(e) => e.clone(), None => crate::builtins::resolve_asset_path(path) };
         let path = resolved.as_str();
-        crate::builtins::datei_da(path, "LOADFONT_SDF")?;
+        if eingebaut.is_none() { crate::builtins::datei_da(path, "LOADFONT_SDF")?; }
         let (daten, _) = schrift_daten(path).map_err(|e| format!("LOADFONT_SDF: Font nicht ladbar: {}", e))?;
         let size = size.clamp(8, 256);
         let cps: Vec<i32> = chars.chars().map(|c| c as i32).collect();
@@ -4513,6 +4612,16 @@ impl Graphics {
         self.textures[i] = Tex { tex, img: leer };
         self.tex_frei[i] = true;
         Ok(())
+    }
+
+    /// Die Punkte eines Bildes als RGBA (Zeile fuer Zeile) -- fuer PDF_IMAGE.
+    pub fn image_rgba(&self, idx: i64, fn_: &str) -> Result<(Vec<u8>, u32, u32), String> {
+        let mut img = self.src_image(idx, fn_)?;
+        img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        let (w, h) = (img.width.max(0) as usize, img.height.max(0) as usize);
+        if w == 0 || h == 0 { return Err(format!("{}: das Bild ist leer", fn_)); }
+        let px = unsafe { std::slice::from_raw_parts(img.data as *const u8, w * h * 4) }.to_vec();
+        Ok((px, w as u32, h as u32))
     }
 
     fn src_image(&self, idx: i64, fn_: &str) -> Result<Image, String> {
@@ -4947,6 +5056,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                         img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c));
                     }
                 }
+                Op::Bild { x, y, b, h, rgba, pw, ph } => {
+                    let mut quelle = Image::gen_image_color(*pw as i32, *ph as i32, Color::BLANK);
+                    quelle.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+                    let n = rgba.len();
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(quelle.data as *mut u8, n) };
+                    ziel.copy_from_slice(rgba);
+                    img.draw(&quelle,
+                        Rectangle::new(0.0, 0.0, *pw as f32, *ph as f32),
+                        Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32),
+                        Color::WHITE);
+                }
             }
         }
         self.push_tex_from_image(img)
@@ -5378,6 +5498,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Strg+Z als die Taste an der US-Lage des Z ein.
     fn belegung_auffrischen(&mut self) {
         if self.auto_playing { self.belegung = std::array::from_fn(|i| 97 + i as i64); return; }
+        // Im Browser kennt raylib GetKeyName nicht und warnt bei JEDEM Aufruf
+        // -- 26 Zeilen je Bild in der Ausgabe, die den Playground ausbremsten
+        // (Web-Runde 2026-10-13). Dort gilt die Lage.
+        #[cfg(target_os = "emscripten")]
+        { self.belegung = std::array::from_fn(|i| 97 + i as i64); return; }
         let namen: [Option<String>; 26] = std::array::from_fn(|i| {
             map_key(97 + i as i64).and_then(|k| self.tastenname_roh(k))
         });
@@ -6875,7 +7000,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
 
     pub fn flip(&mut self) {
         self.zeiger_anwenden();
-        crate::stillfenster::zurueckgeben(unsafe { self.rl.get_window_handle() });
+        crate::stillfenster::zurueckgeben(fenster_handle(&mut self.rl));
         self.flips += 1;
         // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
         // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.
@@ -6988,7 +7113,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // DH-Render-Loop den Main-Thread und der Tab haengt. ASYNCIFY wickelt den
         // Stack ab; beim naechsten Frame geht es hier weiter.
         #[cfg(target_os = "emscripten")]
-        unsafe { emscripten_sleep(0); }
+        {
+            unsafe { emscripten_sleep(0); }
+            crate::web_speicher::takt();
+        }
 
         // Aufgezeichnete Eingabe einspeisen. Muss HIER stehen: das Draw-Handle
         // ist gerade gedroppt worden (= EndDrawing), raylib hat die echte

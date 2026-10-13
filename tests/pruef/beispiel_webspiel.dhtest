@@ -1,0 +1,72 @@
+' Das Beispiel examples/webspiel (Glühwürmchen, Web-Runde 2026-10-13): Treffer,
+' Kombo, Gold, Rot, daneben -- mit echten Klicks aus einer Aufnahme auf
+' Lichter an festen Stellen -- und die Bestenliste in bestenliste.json.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== klicks treffen kombo gold rot daneben
+spielStarten()
+bisNeu = 1000
+wart[0] = 1 : wx[0] = 400 : wy[0] = 300
+wart[1] = 2 : wx[1] = 600 : wy[1] = 400
+wart[2] = 3 : wx[2] = 200 : wy[2] = 200
+DIM prK AS INTEGER
+FOR prK = 0 TO 2
+    wr[prK] = 20 : wleben[prK] = 60 : walter[prK] = 0 : wvx[prK] = 0 : wvy[prK] = 0
+NEXT
+AUTOMATION_PLAY("../ev.txt")
+DIM prBild AS INTEGER
+--- programm ../../examples/webspiel/main.dh nach listeLaden()
+--- einschub nach     FLIP()
+    prBild = prBild + 1
+    IF prBild = 8 OR prBild = 14 OR prBild = 20 OR prBild = 26 THEN
+        PRINT prBild; ": punkte "; punkte; " kombo "; kombo; " zeit ueber 45 "; rest > 45
+    END IF
+    IF prBild = 26 THEN EXIT(0)
+--- datei ev.txt
+# Test-Aufnahme
+c 12
+e 1 7 400 300 0 0 // Event: test
+e 3 6 0 0 0 0 // Event: test
+e 4 5 0 0 0 0 // Event: test
+e 7 7 600 400 0 0 // Event: test
+e 9 6 0 0 0 0 // Event: test
+e 10 5 0 0 0 0 // Event: test
+e 13 7 200 200 0 0 // Event: test
+e 15 6 0 0 0 0 // Event: test
+e 16 5 0 0 0 0 // Event: test
+e 19 7 50 560 0 0 // Event: test
+e 21 6 0 0 0 0 // Event: test
+e 22 5 0 0 0 0 // Event: test
+
+--- erwartet
+8: punkte 10 kombo 1 zeit ueber 45 FALSE
+14: punkte 30 kombo 2 zeit ueber 45 TRUE
+20: punkte 0 kombo 0 zeit ueber 45 TRUE
+26: punkte 0 kombo 0 zeit ueber 45 TRUE
+
+=== bestenliste haelt die besten fuenf in der datei
+' Sechs Ergebnisse, die besten fuenf bleiben -- absteigend, in
+' bestenliste.json; ein siebtes mit zu wenig Punkten kaeme nicht hinein.
+eintragen("Anna", 100)
+eintragen("Ben", 300)
+eintragen("Cem", 200)
+eintragen("Dora", 50)
+eintragen("Emil", 400)
+eintragen("Fritz", 10)
+PRINT "Platz fuer 20: "; listenPlatz(20); " Platz fuer 250: "; listenPlatz(250)
+listeLaden()
+DIM prK AS INTEGER
+FOR prK = 0 TO JSON_LEN(liste, "") - 1
+    PRINT JSON_GET_STRING(liste, STR$(prK) + ".name"); " "; JSON_GET_INT(liste, STR$(prK) + ".punkte")
+NEXT
+EXIT(0)
+--- programm ../../examples/webspiel/main.dh nach listeLaden()
+--- erwartet
+Platz fuer 20: 5 Platz fuer 250: 2
+Emil 400
+Ben 300
+Cem 200
+Anna 100
+Dora 50
+--- inhalt _programm/bestenliste.json
+"name": "Emil"

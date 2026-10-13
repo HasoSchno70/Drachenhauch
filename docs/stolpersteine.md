@@ -93,6 +93,11 @@ verlangen. Aktuell konsistent, also kein Muss.
 > Eine Zuweisung an eine INTEGER-Variable geht weiter, solange das Ergebnis glatt ist
 > (`i = 8 / 2` ist 4); ein Feld-Index aus `/` bricht ab, und `dhrt --check` warnt
 > davor. Im Bestand fand der volle Testlauf keine einzige Stelle, die daran hing.
+> **Seit 2026-10-13 gilt dieselbe Regel für die Befehle:** wo ein Befehl eine
+> ganze Zahl will, geht eine glatte Kommazahl durch --
+> `GUI_WINDOW("…", BREITE / 2 - 170, …)` brach vorher mit „erwartet INTEGER“ ab,
+> obwohl `x = BREITE / 2` ging. `2.5` bleibt ein Fehler, mit dem Weg dorthin
+> (`INT`, `ROUND`, `\`).
 > Der Rest dieses Abschnitts beschreibt den Stand davor.
 > Autor-Entscheidung (2026-06-14): **`/` bleibt wie es ist** (glatt → INTEGER, sonst FLOAT;
 > kein `4.0`-Bruch, Buch unverändert). Stattdessen weist die Fehlermeldung beim Zuweisen

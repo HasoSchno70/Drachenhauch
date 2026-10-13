@@ -238,6 +238,7 @@ IMPORT "gui"
 | `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Kontextmenü und Tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | EIN Fenster noch einmal zeichnen, über allem, was seit `GUI_DRAW` dazugekommen ist |
 | `GUI_CLICKED(widget)` | BOOLEAN | in diesem Frame angeklickt? Gilt für Button, Menü-Eintrag, **Checkbox, Toggle und Radio** und für einen Klick auf einen Listeneintrag -- auch auf den schon gewählten |
+| `GUI_CHANGED(widget)` | BOOLEAN | hat die **Bedienung** das Widget im letzten `GUI_UPDATE` geändert (Auswahl, Wert, Text, Haken)? Was das Programm selbst setzt, zählt nicht. Der erste Aufruf beginnt zu beobachten und liefert FALSE |
 | `GUI_CHECKED(widget)` | BOOLEAN | Checkbox-Zustand |
 | `GUI_VALUE(widget)` | FLOAT | Slider-Wert |
 | `GUI_TEXT(widget)` | STRING | Text (Label/Button/TextInput) |

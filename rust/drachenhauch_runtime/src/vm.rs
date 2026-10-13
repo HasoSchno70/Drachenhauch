@@ -5161,6 +5161,29 @@ impl<'p> Vm<'p> {
                 self.pdf_d(i)?.rechteck(x, y, b, h, name == "pdf_rect_fill");
                 Value::Nil
             }
+            // PDF_IMAGE(pdf, bild, x, y, b [, h]) -- ein IMAGE (LOADIMAGE,
+            // RENDERTARGET_IMAGE, IMAGE_NEW ...) in die Seite setzen. Bis 2026.30
+            // kannte das pdf-Modul nur Text, Linien und Rechtecke; ein Bericht
+            // musste seine Diagramme Strich fuer Strich nachmalen
+            // (Messdaten-Runde, 2026-10-13).
+            "pdf_image" => {
+                if a.len() != 5 && a.len() != 6 {
+                    return Err(format!("PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}", a.len()));
+                }
+                let i = bi_int(a, 0, "PDF_IMAGE")?;
+                let bild = bi_int(a, 1, "PDF_IMAGE")?;
+                let (x, y, b) = (bi_num(a, 2, "PDF_IMAGE")?, bi_num(a, 3, "PDF_IMAGE")?, bi_num(a, 4, "PDF_IMAGE")?);
+                let h = if a.len() > 5 { bi_num(a, 5, "PDF_IMAGE")? } else { 0.0 };
+                #[cfg(feature = "graphics")]
+                {
+                    let g = self.gfx.as_ref().ok_or("PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE")?;
+                    let (px, pw, ph) = g.image_rgba(bild, "PDF_IMAGE")?;
+                    self.pdf_d(i)?.bild(x, y, b, h, px, pw, ph).map_err(|e| format!("PDF_IMAGE: {}", e))?;
+                    Value::Nil
+                }
+                #[cfg(not(feature = "graphics"))]
+                { let _ = (i, bild, x, y, b, h); return Err("PDF_IMAGE: dieser Bau hat keine Grafik".into()); }
+            }
             "pdf_save" => {
                 let i = bi_int(a, 0, "PDF_SAVE")?;
                 let pfad = bi_str(a, 1, "PDF_SAVE")?.to_string();
@@ -6235,7 +6258,7 @@ impl<'p> Vm<'p> {
             "zeit_format$" | "zeit_format" => {
                 let t = z_int(a, 0, "ZEIT_FORMAT$")?;
                 let muster = if a.len() > 1 { z_str(a, 1, "ZEIT_FORMAT$")? } else { "" };
-                Value::str_rc(zeit::format(t, muster))
+                Value::str_rc(zeit::format_pruefen(t, muster)?)
             }
             "zeit_teil" => {
                 let t = z_int(a, 0, "ZEIT_TEIL")?;
@@ -7079,6 +7102,8 @@ impl<'p> Vm<'p> {
         if !name.starts_with("gui_") { return Ok(None); }
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
             match a.get(i) { Some(Value::Int(n)) => Ok(*n),
+                Some(Value::Float(x)) => crate::builtins::glatt_int(*x).ok_or_else(|| format!("{}: erwartet INTEGER (Arg {}), erhalten {}{}",
+                    f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
                 Some(Value::Str(t)) => Err(format!("{}: erwartet INTEGER (Arg {}){}", f, i + 1,
                     crate::umstieg::text_statt_zahl(f, t))),
                 _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
@@ -7484,6 +7509,7 @@ impl<'p> Vm<'p> {
             }
             // GUI_FORM_VERSION(win, spalte$[, formular$]) -- Versionsspalte fuer
             // GUI_FORM_LOAD/SAVE (optimistische Sperre), leer = aus.
+            "gui_changed" => Value::Bool(self.gui.changed(gi(a,0,"GUI_CHANGED")?)?),
             "gui_form_version" => {
                 let form = if a.len() > 2 { gs(a,2,"GUI_FORM_VERSION")? } else { String::new() };
                 self.gui.form_version_setzen(gi(a,0,"GUI_FORM_VERSION")?, &form, &gs(a,1,"GUI_FORM_VERSION")?)?;
@@ -8566,7 +8592,10 @@ impl<'p> Vm<'p> {
         const HDR: i32 = 22; const ROW: i32 = 20; const SCR: i32 = 12; const PAD: i32 = 6;
         // --- Arg-Extraktion (lokal) ---
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
-            match a.get(i) { Some(Value::Int(n)) => Ok(*n), _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
+            match a.get(i) { Some(Value::Int(n)) => Ok(*n),
+                Some(Value::Float(x)) => crate::builtins::glatt_int(*x).ok_or_else(|| format!("{}: erwartet INTEGER (Arg {}), erhalten {}{}",
+                    f, i + 1, crate::value::fmt_float(*x), crate::builtins::KEIN_GANZ_HINWEIS)),
+                _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
         }
         fn gid(a: &[Value], f: &str) -> R<String> {
             match a.first() { Some(Value::Str(s)) => Ok(s.to_string()), _ => Err(format!("{}: id muss STRING sein", f)) }
@@ -9176,10 +9205,18 @@ impl<'p> Vm<'p> {
                 gi(a,4,"GENTEX_CHECKED")?, gi(a,5,"GENTEX_CHECKED")?)?),
             "gentex_color" => Value::Int(g!().gen_tex_color(
                 gi(a,0,"GENTEX_COLOR")? as i32, gi(a,1,"GENTEX_COLOR")? as i32, gi(a,2,"GENTEX_COLOR")?)?),
-            "gentex_radial" => Value::Int(g!().gen_tex_radial(
-                gi(a,0,"GENTEX_RADIAL")? as i32, gi(a,1,"GENTEX_RADIAL")? as i32,
-                gi(a,2,"GENTEX_RADIAL")?, gi(a,3,"GENTEX_RADIAL")?,
-                if a.len() >= 5 { need_f(a,4,"GENTEX_RADIAL")? } else { 0.0 })?),
+            "gentex_radial" => {
+                // dichte = Anteil des Radius in voller Innenfarbe. Ueber 1 gab
+                // raylib still eine harte Scheibe statt eines Lichts
+                // (Web-Runde 2026-10-13: 1.6 sah nach "dichter" aus).
+                let dichte = if a.len() >= 5 { need_f(a,4,"GENTEX_RADIAL")? } else { 0.0 };
+                if !(0.0..=1.0).contains(&dichte) {
+                    return Err(format!("GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in voller Innenfarbe (0 = weicher Verlauf ab der Mitte, 1 = Scheibe)", dichte));
+                }
+                Value::Int(g!().gen_tex_radial(
+                    gi(a,0,"GENTEX_RADIAL")? as i32, gi(a,1,"GENTEX_RADIAL")? as i32,
+                    gi(a,2,"GENTEX_RADIAL")?, gi(a,3,"GENTEX_RADIAL")?, dichte)?)
+            }
             "gentex_cellular" => Value::Int(g!().gen_tex_cellular(
                 gi(a,0,"GENTEX_CELLULAR")? as i32, gi(a,1,"GENTEX_CELLULAR")? as i32,
                 gi(a,2,"GENTEX_CELLULAR")?)?),
@@ -9244,6 +9281,7 @@ impl<'p> Vm<'p> {
             }
             "rendertarget_begin" => { g!().rendertarget_begin(gi(a,0,"RENDERTARGET_BEGIN")?)?; Value::Nil }
             "rendertarget_end" => { g!().rendertarget_end(); Value::Nil }
+            "rendertarget_image" => Value::Int(g!().rendertarget_image(gi(a,0,"RENDERTARGET_IMAGE")?)?),
             "rendertarget_draw" => {
                 let scale = if a.len() >= 4 { need_f(a,3,"RENDERTARGET_DRAW")? } else { 1.0 };
                 let tint = if a.len() >= 5 { Some(gi(a,4,"RENDERTARGET_DRAW")?) } else { None };

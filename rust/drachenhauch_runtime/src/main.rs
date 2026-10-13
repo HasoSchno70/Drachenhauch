@@ -33,6 +33,9 @@ mod sprache;
 // ueber emscriptens OpenAL (das intern WebAudio bedient).
 #[cfg(all(feature = "graphics", target_os = "emscripten"))]
 mod web_audio;
+// Im Browser: das Arbeitsverzeichnis ist ein IndexedDB-Ordner (web_speicher.rs).
+#[cfg(target_os = "emscripten")]
+mod web_speicher;
 mod chart;
 mod csv;
 mod kodierung;
@@ -40,6 +43,8 @@ mod ini;
 mod xml;
 #[cfg(feature = "pdf")]
 mod pdf;
+#[cfg(feature = "schriften")]
+mod schriften;
 mod xlsx;
 mod gifschreiber;
 #[allow(dead_code)]
@@ -619,11 +624,17 @@ fn main() -> ExitCode {
     // also gar nicht geben. Siehe web/ + docs/web-playground.md.
     #[cfg(target_os = "emscripten")]
     {
+        // Was das Programm schreibt, ueberlebt das Neuladen (web_speicher.rs).
+        web_speicher::einrichten();
         if let Ok(src) = std::fs::read_to_string("/program.dh") {
-            return compile_and_run_source(&src, std::path::Path::new("/"), "playground");
+            let code = compile_and_run_source(&src, std::path::Path::new("/"), "playground");
+            web_speicher::sichern();
+            return code;
         }
         if let Ok(text) = std::fs::read_to_string("/program.dhc") {
-            return run_dhc_text(&text, "playground");
+            let code = run_dhc_text(&text, "playground");
+            web_speicher::sichern();
+            return code;
         }
     }
 

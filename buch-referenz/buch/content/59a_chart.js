@@ -77,7 +77,7 @@ module.exports = (H) => [
       'DIM aus AS INTEGER : aus = CHART_SERIES(c, "Ausgaben")',
     ]),
   H.cmd("CHART_DATA", 'CHART_DATA(diagramm, reihe, werte)',
-    "Setzt alle Werte einer Reihe auf einmal (ARRAY OF FLOAT oder TUPLE) – der schnellste Weg, wenn die Zahlen schon vorliegen.",
+    "Setzt alle Werte einer Reihe auf einmal (ARRAY OF FLOAT oder TUPLE) – der schnellste Weg, wenn die Zahlen schon vorliegen. Die Zahl der Punkte folgt der Liste, auch nach unten.",
     [
       'DIM woche AS ARRAY OF FLOAT',
       'woche = [42.0, 51.0, 38.0, 60.0, 47.0]',
@@ -97,10 +97,17 @@ module.exports = (H) => [
       'PRINT CHART_GET(c, ein, 2)',
     ], { out: ["55.0"] }),
   H.cmd("CHART_LABEL", 'CHART_LABEL(diagramm, punkt, text$)',
-    "Beschriftet einen Punkt (die x-Achse bei Linien/Balken, das Kuchenstück bei Kuchen).",
+    "Beschriftet einen Punkt (die x-Achse bei Linien/Balken, das Kuchenstück bei Kuchen). Beschriftet man bei einer langen Linie nur einzelne Punkte – etwa jeden Tagesanfang –, steht jede, die nicht in die vorige ragt.",
     [
       'CHART_LABEL(c, 0, "Mo")',
       'CHART_LABEL(c, 1, "Di")',
+    ]),
+  H.cmd("CHART_X", 'CHART_X(diagramm, xwerte)',
+    "Gibt den Punkten eines Liniendiagramms echte x-Werte, etwa Zeitstempel – aufsteigend und so viele wie Punkte. Sonst stehen die Punkte in gleichen Abständen, und eine Lücke in einer Messreihe wäre nicht zu sehen. Mit der Eigenschaft luecke_ab bricht die Linie ab, wo zwei Nachbarn weiter auseinander liegen. Ein leeres Feld schaltet zurück; CHART_DATA mit einer anderen Punktzahl hebt es auf.",
+    [
+      'CHART_DATA(c, ein, temperaturen)',
+      'CHART_X(c, zeitstempel)',
+      'CHART_SET_NUM(c, "luecke_ab", 60)    \' ueber 60 s ohne Messung: Luecke',
     ]),
   H.cmd("CHART_COUNT · CHART_SERIES_COUNT", 'CHART_COUNT(diagramm)   CHART_SERIES_COUNT(diagramm)',
     "Anzahl der Punkte je Reihe bzw. Anzahl der Reihen.",
@@ -129,7 +136,7 @@ module.exports = (H) => [
       'CHART_SET(c, "legende", "unten")',
     ]),
   H.cmd("CHART_SET_NUM", 'CHART_SET_NUM(diagramm, eigenschaft$, wert)',
-    "Alles, was eine Zahl ist: min, max, innenradius, ecken, polster, gitter (ABSTAND der Gitterlinien, nicht ihre Anzahl), nachkomma, striche, unterstriche, linien_dicke, animation, fenster, schatten, deckkraft …",
+    "Alles, was eine Zahl ist: min, max, innenradius, ecken, polster, gitter (ABSTAND der Gitterlinien, nicht ihre Anzahl), nachkomma, striche, unterstriche, linien_dicke, animation, fenster, schatten, deckkraft, luecke_ab …",
     [
       'CHART_SET_NUM(c, "min", 0.0)',
       'CHART_SET_NUM(c, "max", 100.0)',

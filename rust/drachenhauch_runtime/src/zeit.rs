@@ -229,6 +229,16 @@ fn zone_wert(z: &str) -> Option<i64> {
 /// `ss` Sekunde, `WT` Wochentag kurz (Mo..So), `WTAG` ausgeschrieben.
 /// Leeres Muster = `JJJJ-MM-TT hh:mm:ss`.
 pub fn format(t: i64, muster: &str) -> String {
+    format_pruefen(t, muster).unwrap_or_else(|e| e)
+}
+
+/// Wie `format`, aber ein unbekannter `%`-Platzhalter ist ein Fehler.
+///
+/// Neben den deutschen Platzhaltern versteht es die Schreibweise von C,
+/// Python und PHP (`%Y-%m-%d %H:%M:%S`). Bis 2026.30 ging sie STILL
+/// woertlich durch -- 59580 Zeitstempel "%Y-%m-%d %H:%M:%S" in einer Datei,
+/// ohne ein Wort (Messdaten-Runde, 2026-10-13).
+pub fn format_pruefen(t: i64, muster: &str) -> Result<String, String> {
     let m = if muster.trim().is_empty() { "JJJJ-MM-TT hh:mm:ss" } else { muster };
     let (j, mo, d, h, mi, s) = in_teile(t);
     let wt = wochentag(t);
@@ -243,6 +253,25 @@ pub fn format(t: i64, muster: &str) -> String {
     let zeichen: Vec<char> = m.chars().collect();
     let mut i = 0;
     while i < zeichen.len() {
+        if zeichen[i] == '%' && i + 1 < zeichen.len() {
+            let c = zeichen[i + 1];
+            match c {
+                'Y' => aus.push_str(&format!("{:04}", j)),
+                'y' => aus.push_str(&format!("{:02}", j.rem_euclid(100))),
+                'm' => aus.push_str(&format!("{:02}", mo)),
+                'd' => aus.push_str(&format!("{:02}", d)),
+                'H' => aus.push_str(&format!("{:02}", h)),
+                'M' => aus.push_str(&format!("{:02}", mi)),
+                'S' => aus.push_str(&format!("{:02}", s)),
+                'a' => aus.push_str(KURZ[(wt - 1) as usize]),
+                'A' => aus.push_str(LANG[(wt - 1) as usize]),
+                '%' => aus.push('%'),
+                _ => return Err(format!(
+                    "ZEIT_FORMAT$: '%{}' kennt das Muster nicht -- %Y %y %m %d %H %M %S %a %A %% oder JJJJ MM TT hh mm ss WT WTAG", c)),
+            }
+            i += 2;
+            continue;
+        }
         let rest: String = zeichen[i..].iter().collect();
         if rest.starts_with("JJJJ") { aus.push_str(&format!("{:04}", j)); i += 4; }
         else if rest.starts_with("WTAG") { aus.push_str(LANG[(wt - 1) as usize]); i += 4; }
@@ -254,7 +283,7 @@ pub fn format(t: i64, muster: &str) -> String {
         else if rest.starts_with("ss") { aus.push_str(&format!("{:02}", s)); i += 2; }
         else { aus.push(zeichen[i]); i += 1; }
     }
-    aus
+    Ok(aus)
 }
 
 /// Eine Dauer in Sekunden als lesbarer Text: "45 s", "12 min", "2:15 h",
@@ -303,6 +332,18 @@ pub const TEILE: &str = "jahr, monat, tag, stunde, minute, sekunde, wochentag";
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn format_versteht_auch_prozent_muster() {
+        let t = parse("2026-08-28 20:30:05").unwrap();
+        assert_eq!(format(t, "%Y-%m-%d %H:%M:%S"), "2026-08-28 20:30:05");
+        assert_eq!(format(t, "%a %d.%m.%y"), "Fr 28.08.26");
+        assert_eq!(format(t, "%A, 100%%"), "Freitag, 100%");
+        assert_eq!(format(t, "TT.MM.JJJJ"), "28.08.2026");
+        // ein Prozentzeichen ohne Buchstaben dahinter bleibt stehen
+        assert_eq!(format(t, "MM %"), "08 %");
+        assert!(format_pruefen(t, "%Q").unwrap_err().contains("'%Q'"));
+    }
 
     #[test]
     fn datum_hin_und_zurueck() {
