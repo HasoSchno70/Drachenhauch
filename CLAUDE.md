@@ -1677,6 +1677,62 @@ einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
 
+## Dogfooding 10: Messdaten-Auswertung und ein Spiel im Browser (2026-10-13)
+
+Wunsch des Nutzers: beide Ideen, "und bitte mit normalem Zeichensatz".
+**(a) `examples/messdaten/`** -- CSV einlesen (60000 Zeilen in 0,2 s),
+Ausreisser nach Median/MAD der GANZEN Aufzeichnung, Luecken (vor dem
+Aussortieren gezaehlt), gleitender Mittelwert, Tagesauswahl, Tabelle, CSV
+und PDF-Bericht mit beiden Diagrammen als Bild; `beispieldaten.dh` schreibt
+beim ersten Start eine Woche (`.gitignore`). Funde: (1) **Eine normale Schrift
+gab es nur ueber einen festen Windows-Pfad** -- `LOADFONT("sans"|"serif"|
+"mono"[-fett|-kursiv|-fett-kursiv])` nimmt die eingebauten DejaVu-Schriften
+(`schriften.rs`, Feature `schriften`, das `pdf` mitbringt; in `font_herkunft`
+als `eingebaut:sans`, Schnitte ueber dieselbe Familie; eine Datei gleichen
+Namens gewinnt). (2) **`ZEIT_FORMAT$("%Y-%m-%d")` kam still woertlich
+zurueck** (59580 solche Zeitstempel in einer CSV) -- %Y %y %m %d %H %M %S %a
+%A %% gehen, ein unbekannter %-Platzhalter ist ein Fehler
+(`zeit::format_pruefen`). (3) **`GUI_CHANGED(wdg)`** -- hat die BEDIENUNG
+das Widget im letzten GUI_UPDATE geaendert? `abdruck` vorher/nachher nur fuer
+beobachtete Widgets (erster Aufruf beginnt zu beobachten, liefert FALSE);
+Programm-Setzungen zaehlen nicht. (4) **Das Liniendiagramm kannte nur "Punkt
+Nummer i"**: eine Luecke von 2,5 h war unsichtbar -- `CHART_X(c, xwerte)`
+(aufsteigend, gleich viele; CHART_DATA/PUSH mit anderer Zahl hebt es auf) und
+`luecke_ab` (Linie unterbrechen); EINE Lagequelle `linien_xs` fuer Zeichnen,
+Treffertest, Fadenkreuz, Beschriftung. (5) **Einzeln beschriftete Punkte
+(Tagesanfaenge) fielen in die Luecken zwischen den k-ten** --
+`linien_beschriftung`: sind nicht alle beschriftet, steht jede, die nicht
+ueberlappt. (6) **`CHART_DATA` mit weniger Punkten liess Nullen stehen**
+(Woche -> Tag), jetzt kuerzt es. (7) **Kein Weg von Gezeichnetem zu einem
+Bild, und das PDF kannte keine Bilder** -- `RENDERTARGET_IMAGE(rt)` spielt die
+Befehle des Ziels SOFORT ab (ohne FLIP, `render_scene` wie beim FLIP, Bild
+gespiegelt, weil RenderTextures auf dem Kopf stehen), `PDF_IMAGE(p, bild, x,
+y, b[, h])` (`pdf::Op::Bild`, krilla `raster-images`, Vorschau ueber
+`Image::draw`, GDI-Druck ueber StretchDIBits auf weiss gerechnet).
+**(b) `examples/webspiel/`** (Gluehwuermchen: Lichter antippen, Kombo als
+Tonleiter, Gold = Zeit, Rot = Abzug, Bestenliste mit Namen) im Web-Playground:
+(8) **`LOADFONT("sans")` ging im Web-Bau nicht** (nur Feature graphics) --
+`build_wasm.py` schaltet `schriften` ein (18,8 MB statt 13,7), ohne Feature
+sagt die Meldung das. (9) **Dateien waren nach dem Neuladen weg** (MEMFS) --
+`web_speicher.rs`: `/spiel` als IDBFS-Arbeitsordner, `syncfs` beim Start,
+hoechstens je Sekunde aus FLIP und am Ende; `/spiel/assets` ist ein Verweis
+(IDBFS sammelt mit `lstat`, nachgesehen in `libidbfs.js`); `-lidbfs.js`.
+Belegt mit einem Zaehler, der nach "Ausfuehren" (= Neuladen) auf 2 stand.
+(10) **Ein schneller Klick/Antippen kam im Browser nie an** -- `flanken.rs`
+war dort seit #308 ausgenommen; emscriptens GLFW kennt die Rueckrufe.
+(11) **26 Warnzeilen `GetKeyName` je Bild** -- `belegung_auffrischen` lief
+in jedem FLIP; im Browser gilt die Lage, `fenster_handle` liefert dort null,
+kein verstecktes Fenster. (12) **`GUI_WINDOW("...", BREITE / 2 - 170, ...)`
+brach ab** (`/` liefert FLOAT): Befehle nehmen jetzt eine GLATTE Kommazahl als
+INTEGER wie eine Zuweisung (`builtins::glatt_int` in `need_int` und den
+strengen `gi`), 2.5 bleibt ein Fehler mit Hinweis. (13) `GENTEX_RADIAL`
+mit dichte > 1 gab still eine Scheibe -- jetzt ein Fehler, Doku nennt 0..1.
+Grenze: auf dem Handy oeffnet die Leinwand keine Bildschirmtastatur. Tests
+`messdaten_bausteine.dhtest` (15), `beispiel_messdaten.dhtest` (2),
+`beispiel_webspiel.dhtest` (2, echte Klicks aus einer Aufnahme); alle neuen
+Faelle fallen mit 2026.30. Falle beim Testschreiben: der Quelltext eines
+Falls steht VOR `--- programm`, sonst wird er nicht eingeschoben.
+
 ## Dogfooding 9: Werkstatt-Dashboard ueber MQTT (2026-10-12)
 
 `examples/werkstatt/` (main.dh: Tachos, Leisten, Verlauf, Luefter mit
