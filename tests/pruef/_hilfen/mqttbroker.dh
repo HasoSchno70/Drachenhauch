@@ -2,7 +2,10 @@
 ' Code mit dem Rust-Client zu teilen -- gerade gross genug fuer einen Rundweg:
 ' CONNECT -> CONNACK, PINGREQ -> PINGRESP, SUBSCRIBE -> SUBACK, jedes PUBLISH
 ' geht an denselben Client zurueck, DISCONNECT beendet. Eine Verbindung.
-' Aufruf: dhrt run mqttbroker.dh -- PORTDATEI
+' Aufruf: dhrt run mqttbroker.dh -- PORTDATEI [stumm]
+' Das CONNECT-Paket landet als Hex in PORTDATEI.connect (fuer den letzten
+' Willen). Mit `stumm` beantwortet er keine PINGREQ -- so sieht ein Broker
+' aus, der ohne Abmeldung verschwunden ist (Strom weg, kein RST).
 ' Nach 30 s ohne Verbindung beendet er sich selbst.
 IMPORT "net"
 
@@ -85,6 +88,9 @@ END FUNCTION
 
 DIM p AS BUFFER : p = paket()
 IF BUFFER_LEN(p) = 0 THEN EXIT(0)
+WRITEALL(ARG$(0) + ".connect", BUFFER_TO_HEX$(p))
+DIM stumm AS BOOLEAN : stumm = ARGC() > 1
+IF stumm THEN stumm = ARG$(1) = "stumm"
 ' CONNECT: der Inhalt ist hier gleich -- angenommen.
 NET_SEND(c, bytes(&H20, 2, 0, 0, 4))
 WHILE TRUE
@@ -93,7 +99,7 @@ WHILE TRUE
     DIM art AS INTEGER : art = BUFFER_GET(p, 0) SHR 4
     DIM kl AS INTEGER : kl = kopflaenge(p)
     IF art = 12 THEN
-        NET_SEND(c, bytes(&HD0, 0, 0, 0, 2))
+        IF NOT stumm THEN NET_SEND(c, bytes(&HD0, 0, 0, 0, 2))
     ELSEIF art = 8 THEN
         ' SUBACK mit der Paketnummer aus dem SUBSCRIBE und QoS 0 -- das
         ' fuenfte Byte (Rueckgabecode 0) steht schon im neuen Puffer; ein

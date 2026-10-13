@@ -313,7 +313,7 @@ CATCH e
     PRINT e
 END TRY
 --- erwartet
-CHART_SET_FLAG: unbekannte Eigenschaft 'gibtsnicht' (gueltig: rahmen, gitter_x, gitter_y, prozent, flaeche, punkte, glatt, null_linie, stapel, verlauf, verlauf_daten, schatten_daten, kurz, hover, tooltip, treppe, fadenkreuz)
+CHART_SET_FLAG: unbekannte Eigenschaft 'gibtsnicht' (gueltig: rahmen, gitter_x, gitter_y, prozent, flaeche, punkte, glatt, null_linie, stapel, verlauf, verlauf_daten, schatten_daten, kurz, komma, hover, tooltip, treppe, fadenkreuz)
 
 === ungueltiger stil wert wird abgelehnt
 IMPORT "chart"

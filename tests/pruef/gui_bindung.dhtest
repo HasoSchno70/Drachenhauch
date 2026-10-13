@@ -350,3 +350,59 @@ TRUE -19,99 | 0,99 | 01234 | geaendert FALSE
 0,05
 12,30
 GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl), 2 (Kommazahl) oder 3 (Geldbetrag in Cent)
+
+=== eine klappliste mit werten bindet den wert statt der nummer
+' GUI_LISTBOX_SET_DATA gilt seit 2026-10-12 auch fuer Klapplisten: gezeigt
+' wird "19 %", gebunden 19. Ohne Werte bleibt es bei der Nummer des Eintrags.
+' Gefunden am Rechnungen-Piloten, der den Steuersatz von Hand umrechnete.
+IMPORT "gui"
+IMPORT "db"
+SCREEN(400, 200, "K", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("K", 0, 0, 400, 200)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 10, 120, 28, ["19 %", "7 %", "0 %"])
+GUI_LISTBOX_SET_DATA(dd, 0, "19") : GUI_LISTBOX_SET_DATA(dd, 1, "7") : GUI_LISTBOX_SET_DATA(dd, 2, "0")
+DIM art AS GUI_WIDGET : art = GUI_DROPDOWN(w, 10, 50, 120, 28, ["privat", "firma"])
+DIM land AS GUI_WIDGET : land = GUI_DROPDOWN(w, 10, 90, 120, 28, ["Deutschland", "Österreich"])
+GUI_LISTBOX_SET_DATA(land, 0, "DE") : GUI_LISTBOX_SET_DATA(land, 1, "AT")
+GUI_BIND(dd, "mwst") : GUI_BIND(art, "art") : GUI_BIND(land, "land")
+PRINT GUI_LISTBOX_DATA$(dd, 1); " "; GUI_LISTBOX_FIND_DATA(land, "AT")
+DIM c AS DB_CONN : c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, mwst INTEGER, art INTEGER, land TEXT)")
+GUI_DROPDOWN_SET_SELECTED(dd, 1) : GUI_DROPDOWN_SET_SELECTED(art, 1)
+' ohne Auswahl: NULL
+GUI_DROPDOWN_SET_SELECTED(land, -1)
+DIM id AS INTEGER : id = GUI_FORM_SAVE(w, c, "t", -1)
+DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT mwst, typeof(mwst), art, land IS NULL FROM t")
+IF DB_NEXT(r) THEN PRINT DB_GET_INT(r, 0); " "; DB_GET_STRING(r, 1); " "; DB_GET_INT(r, 2); " "; DB_GET_INT(r, 3)
+DB_EXEC(c, "UPDATE t SET mwst = 0, land = 'AT' WHERE id = ?", id)
+PRINT GUI_FORM_LOAD(w, c, "t", id); " "; GUI_DROPDOWN_TEXT(dd); " "; GUI_DROPDOWN_TEXT(land)
+DIM m AS MAP OF STRING : m = GUI_FORM_GET(w)
+PRINT MAPGET(m, "mwst"); " "; MAPGET(m, "art"); " "; MAPGET(m, "land")
+' aus einer MAP: Text oder Zahl, verglichen mit dem Wert
+GUI_FORM_SET(w, {"mwst": 7, "land": "DE"})
+PRINT GUI_DROPDOWN_TEXT(dd); " "; GUI_DROPDOWN_TEXT(land)
+GUI_FORM_SET(w, {"mwst": "19.0"})
+PRINT GUI_DROPDOWN_TEXT(dd)
+' unbekannter Wert: keine Auswahl
+GUI_FORM_SET(w, {"mwst": 16})
+PRINT GUI_DROPDOWN_SELECTED(dd)
+' die Werte ueberleben die .dhform
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(GUI_TO_JSON(w))
+PRINT GUI_LISTBOX_DATA$(GUI_WINDOW_WIDGET(w2, 0), 2)
+TRY
+    DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 150, 60, 28)
+    GUI_LISTBOX_SET_DATA(b, 0, "1")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+7 1
+7 integer 1 1
+TRUE 0 % Österreich
+0 1 AT
+7 % Deutschland
+19 %
+-1
+0
+GUI_LISTBOX_SET_DATA: das Widget ist keine Liste und keine Klappliste

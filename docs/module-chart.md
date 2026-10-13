@@ -155,7 +155,9 @@ Reihenfolge, aus der Reihen und Segmente ohne eigene Farbe bedient werden.
 `rahmen`, `gitter_x`, `gitter_y`, `prozent`, `flaeche`, `punkte`, `glatt`
 (Kurve statt Streckenzug), `null_linie`, `stapel`, `verlauf`
 (Hintergrundverlauf), `verlauf_daten`, `schatten_daten`, `kurz`
-(1.2M statt 1200000, wie `NUMFMT$`).
+(1.2M statt 1200000, wie `NUMFMT$`), `komma` (Dezimalkomma: `25,7` statt
+`25.7`, passend zu `ZAHL$` und den Feldern der gui -- in der eingebauten
+Pixelschrift ist der Punkt ein einzelnes Pixel und kaum zu sehen).
 
 ### Themen
 

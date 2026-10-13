@@ -224,6 +224,55 @@ DHRT_FRAMES=4
 --- inhalt _programm/probe.txt
 |G 19,99 EUR/1999/123456/1250/-1/1.234.567,89 EUR/-0,05 EUR|
 
+=== artikel binden preis in cent und mwst als satz
+' Seit 2026-10-12 laeuft der Artikel ueber die Datenbindung: der Preis ist
+' ein Geldfeld (zahlen 3, Cent in preis_cent), die MwSt-Klappliste traegt
+' je Eintrag den Satz als Wert (GUI_LISTBOX_SET_DATA) -- vorher rechnete der
+' Pilot beides an der Bindung vorbei um.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prFlag AS STRING : prFlag = ""
+SUB prMerke(z AS STRING)
+    prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+FUNCTION prZeile$(id AS INTEGER) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT bezeichnung, preis_cent, mwst, typeof(preis_cent), typeof(mwst) FROM artikel WHERE id = ?", id)
+    IF DB_NEXT(r) THEN RETURN DB_GET_STRING(r, 0) + "/" + STR$(DB_GET_INT(r, 1)) + "/" + STR$(DB_GET_INT(r, 2)) + "/" + DB_GET_STRING(r, 3) + "/" + DB_GET_STRING(r, 4)
+    RETURN "(keine)"
+END FUNCTION
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 2 THEN
+    ' Der Artikel-Reiter muss vorn sein: GUI_VALIDATE prueft die sichtbaren Felder.
+    GUI_SET_ACTIVE_TAB(win, 1) : GUI_UPDATE()
+    artikelZeigen(-1)
+    prMerke("neu " + GUI_TEXT(tfAPreis) + " " + GUI_DROPDOWN_TEXT(ddAMwst))
+    GUI_SET_TEXT(tfABez, "Kabel") : GUI_SET_TEXT(tfAPreis, "12,5")
+    GUI_DROPDOWN_SET_SELECTED(ddAMwst, 1)
+    prMerke("gespeichert " + STR$(artikelSpeichern()) + " " + prZeile$(artikelIdAkt))
+    DIM prId AS INTEGER : prId = artikelIdAkt
+    artikelZeigen(-1)
+    artikelZeigen(prId)
+    prMerke("geladen " + GUI_TEXT(tfABez) + " " + GUI_TEXT(tfAPreis) + " " + GUI_DROPDOWN_TEXT(ddAMwst) + " geaendert " + STR$(GUI_FORM_CHANGED(win, "artikel")))
+    GUI_DROPDOWN_SET_SELECTED(ddAMwst, 2)
+    PRINT artikelSpeichern()
+    prMerke("null prozent " + prZeile$(prId))
+    DB_EXEC(db, "DELETE FROM artikel WHERE id = ?", prId)
+    GUI_SET_TEXT(tfAPreis, "1,00")
+    prMerke("geloescht " + STR$(artikelSpeichern()) + " neu " + STR$(artikelIdAkt < 0))
+    WRITEALL("probe.txt", prFlag)
+END IF
+
+--- umgebung
+DHRT_FRAMES=4
+--- inhalt _programm/probe.txt
+|neu  19 %|
+|gespeichert TRUE Kabel/1250/7/integer/integer|
+|geladen Kabel 12,50 7 % geaendert FALSE|
+|null prozent Kabel/1250/0/integer/integer|
+|geloescht FALSE neu TRUE|
+
 === kunde anlegen landet in der datenbank
 ' Name ueber die Zwischenablage getippt (Strg+V), dann [Speichern].
 SET_WINDOW_POS(-3000, -3000)

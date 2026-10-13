@@ -1070,8 +1070,6 @@ HTTPD_SEND: es liegt keine Anfrage an (erst HTTPD_ACCEPT)	HTTPD_SEND: there is n
 {}: Antwort ist kein gueltiges JSON: {}	{}: the response is not valid JSON: {}
 MQTT_CONNECT: Port {} ausserhalb 0..65535	MQTT_CONNECT: port {} outside 0..65535
 MQTT_CONNECT: Adresse {} nicht aufloesbar	MQTT_CONNECT: address {} cannot be resolved
-MQTT_PUBLISH: nicht verbunden	MQTT_PUBLISH: not connected
-MQTT_SUBSCRIBE: nicht verbunden	MQTT_SUBSCRIBE: not connected
 unbekannte Sicherheit {} -- erlaubt sind "starttls", "tls", "keine"	unknown security {} -- allowed are "starttls", "tls", "keine"
 {} enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt	{} contains a line break -- that would be an extra header line and is therefore not allowed
 {} {} sieht nicht wie eine Adresse aus (erwartet wird name@beispiel.de)	{} {} does not look like an address (expected is name@example.com)
@@ -1418,6 +1416,7 @@ GUI_BREADCRUMB_FIRST_VISIBLE: Widget ist keine Pfadleiste (GUI_BREADCRUMB)	GUI_B
 GUI_CANVAS_*: Widget ist kein canvas	GUI_CANVAS_*: widget is not a canvas
 {}: Widget ist kein dropdown/listbox	{}: widget is not a dropdown/listbox
 {}: das Widget ist keine Liste (GUI_LISTBOX)	{}: the widget is not a list (GUI_LISTBOX)
+{}: das Widget ist keine Liste und keine Klappliste	{}: the widget is neither a list nor a dropdown
 {}: Eintrag {} gibt es nicht (die Liste hat {})	{}: there is no entry {} (the list has {})
 GUI_DOUBLE_CLICKED: nur fuer Listen, Tabellen und Baeume (GUI_LISTBOX, GUI_TABLE, GUI_TREE)	GUI_DOUBLE_CLICKED: only for lists, tables and trees (GUI_LISTBOX, GUI_TABLE, GUI_TREE)
 {}: starts, laengen und farben muessen gleich lang sein ({}, {}, {})	{}: starts, lengths and colors must have the same length ({}, {}, {})
@@ -1736,3 +1735,5 @@ die Abfrage hat {} Platzhalter, uebergeben sind {} Werte	the query has {} placeh
 den Typ {} liest Drachenhauch (noch) nicht -- in der Abfrage mit ::text umwandeln	Drachenhauch cannot read the type {} (yet) -- convert it with ::text in the query
 ein Nullzeichen im Text -- PostgreSQL nimmt es nicht	a null character in the text -- PostgreSQL does not accept it
 Spalte {} ({}): {}	column {} ({}): {}
+MQTT_WILL: das Topic darf nicht leer sein und keine Platzhalter (# +) enthalten	MQTT_WILL: the topic must not be empty or contain wildcards (# +)
+MQTT_WILL: retain ist TRUE oder FALSE	MQTT_WILL: retain is TRUE or FALSE

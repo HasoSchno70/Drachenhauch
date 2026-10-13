@@ -1,0 +1,142 @@
+' Das Werkstatt-Dashboard aus der Bastler-Runde (examples/werkstatt/main.dh,
+' 2026-10-12): Sensoren ueber MQTT, Instrumente, Luefter, Alarm, CSV.
+'
+' Die Faelle laufen ohne echten Broker: ohne jeden, mit dem Test-Broker
+' _hilfen/mqttbroker.dh (schickt jedes PUBLISH an den Absender zurueck) und
+' mit Nachrichten, die der Fall selbst einspeist. NOTIFY wird ersetzt -- im
+' Testlauf soll keine Meldung auf dem Bildschirm des Pruefenden landen.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ohne broker laeuft das dashboard weiter und sagt es
+DIM prBild AS INTEGER
+--- programm ../../examples/werkstatt/main.dh nach DIM beenden AS BOOLEAN
+--- argumente
+127.0.0.1:1
+--- einschub nach FLIP()
+    prBild = prBild + 1
+    IF prBild = 10 THEN
+        PRINT GUI_TEXT(lbSensor)
+        PRINT "verbunden "; verbunden
+        EXIT(0)
+    END IF
+--- erwartet
+Kein Broker auf 127.0.0.1 -- neuer Versuch in 3 s
+verbunden FALSE
+
+=== alarm, entwarnung und aufzeichnung
+' Messwerte speist der Fall selbst ein (nachricht), wie sie vom Broker kaemen.
+DIM prBild AS INTEGER
+DIM prMeldung AS STRING
+GUI_SET_VALUE(slGrenze, 24)
+aufnahme(TRUE)
+--- programm ../../examples/werkstatt/main.dh nach DIM beenden AS BOOLEAN
+--- argumente
+127.0.0.1:1
+--- ersetzen NOTIFY("Werkstatt", "Temperatur " + ZAHL$(temp, 1) + " °C über " + ZAHL$(grenze, 1) + " °C")
+prMeldung = "Temperatur " + ZAHL$(temp, 1) + " °C über " + ZAHL$(grenze, 1) + " °C"
+--- einschub nach FLIP()
+    prBild = prBild + 1
+    IF prBild = 2 THEN nachricht("werkstatt/status", "online") : nachricht("werkstatt/temperatur", "23.0")
+    IF prBild = 4 THEN nachricht("werkstatt/temperatur", "25.5")
+    IF prBild = 6 THEN nachricht("werkstatt/temperatur", "24.2")
+    IF prBild = 8 THEN nachricht("werkstatt/temperatur", "23.4")
+    IF prBild = 10 THEN
+        aufnahme(FALSE)
+        DIM prI AS INTEGER
+        FOR prI = GUI_LISTBOX_COUNT(lsEreignisse) - 1 TO 0 STEP -1
+            DIM prT AS STRING : prT = MID$(GUI_LISTBOX_ITEM(lsEreignisse, prI), 10)
+            ' "Sensor sendet/schweigt" haengt an Sekunden, nicht an Bildern
+            IF INSTR(prT, "Aufzeichnung") < 0 AND LEFT$(prT, 8) <> "Sensor s" THEN PRINT prT
+        NEXT
+        PRINT "meldung: "; prMeldung
+        PRINT "alarm '"; GUI_TEXT(lbAlarm); "' | "; GUI_TEXT(lbAufnahme)
+        DIM prZ AS ARRAY OF STRING : prZ = READLINES(DIRLIST(".", "werkstatt_*.csv")[0])
+        PRINT prZ[0] : PRINT LEN(prZ); " zeilen, zweite: "; MID$(prZ[2], 20)
+        EXIT(0)
+    END IF
+--- erwartet
+Sensor online
+Alarm: 25,5 °C
+wieder unter 24,0 °C
+meldung: Temperatur 25,5 °C über 24,0 °C
+alarm '' | 4 Zeilen geschrieben
+zeit;temperatur;feuchte;licht;strom
+5 zeilen, zweite: 25.5;0.0;0;0.00
+
+=== der luefter schaltet selbst, und ein wegbrechender broker beendet nichts
+' Der Test-Broker schickt jedes PUBLISH an den Absender zurueck -- so sieht
+' der Fall, was das Dashboard gesendet hat. Danach stirbt der Broker: bis
+' 2026.30 warf MQTT_UPDATE dann (10054), und das Dashboard endete.
+DIM prBild AS INTEGER
+--- programm ../../examples/werkstatt/main.dh nach DIM beenden AS BOOLEAN
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- einschub nach SETFPS(60)
+' Den Test-Broker starten und das Dashboard auf ihn zeigen lassen.
+DIM prGesendet AS STRING
+DIM prBroker AS INTEGER : prBroker = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt")
+DIM prT0 AS INTEGER : prT0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - prT0 < 15000 : SLEEP(10) : WEND
+SLEEP(50)
+broker = "127.0.0.1" : port = VAL(READLINES("port.txt")[0])
+--- ersetzen NOTIFY("Werkstatt", "Temperatur " + ZAHL$(temp, 1) + " °C über " + ZAHL$(grenze, 1) + " °C")
+' (im Test keine Meldung des Systems)
+--- einschub nach SUB nachricht(thema AS STRING, inhalt AS STRING)
+    IF thema = "werkstatt/luefter/set" THEN prGesendet = prGesendet + inhalt + ";"
+--- einschub nach FLIP()
+    prBild = prBild + 1
+    IF prBild = 3 THEN
+        GUI_SET_VALUE(slGrenze, 24) : GUI_SET_CHECKED(cbAuto, TRUE)
+        nachricht("werkstatt/temperatur", "25.0")
+    END IF
+    IF prBild = 40 THEN
+        ' Der Sensor bestaetigt (hier: der Fall), dann wird es kuehl genug
+        nachricht("werkstatt/luefter", "an")
+        nachricht("werkstatt/temperatur", "21.5")
+    END IF
+    IF prBild = 80 THEN PROCESS_KILL(prBroker)
+    IF prBild = 140 THEN
+        DIM prI AS INTEGER
+        FOR prI = GUI_LISTBOX_COUNT(lsEreignisse) - 1 TO 0 STEP -1
+            DIM prT AS STRING : prT = MID$(GUI_LISTBOX_ITEM(lsEreignisse, prI), 10)
+            IF LEFT$(prT, 8) <> "Sensor s" THEN PRINT prT
+        NEXT
+        PRINT "gesendet "; prGesendet
+        ' Neu verbunden wird erst nach 3 s -- hier zaehlt: es laeuft weiter.
+        PRINT "verbunden "; verbunden
+        EXIT(0)
+    END IF
+--- erwartet
+verbunden mit 127.0.0.1
+Alarm: 25,0 °C
+Lüfter an
+wieder unter 24,0 °C
+Verbindung zum Broker verloren
+gesendet an;aus;
+verbunden FALSE
+
+=== der sensor hinterlegt seinen letzten willen
+' sensor.dh meldet "online" mit retain -- ohne letzten Willen bliebe das nach
+' einem Stromausfall fuer immer stehen. Der Test-Broker schreibt das CONNECT
+' als Hex: Flag-Byte 0x26 (Will, Will-Retain, Clean Session), dahinter
+' "werkstatt/status" und "offline".
+IMPORT "mqtt"
+DIM b AS INTEGER : b = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - t0 < 15000 : SLEEP(10) : WEND
+SLEEP(50)
+DIM s AS INTEGER : s = PROCESS_START("dhrt", "run", "sensor.dh", "--", "127.0.0.1:" + READLINES("port.txt")[0], "1")
+WHILE PROCESS_RUNNING(s) AND MILLIS() - t0 < 20000 : SLEEP(20) : WEND
+DIM hex AS STRING : hex = UPPER$(READLINES("port.txt.connect")[0])
+PRINT "flags "; MID$(hex, 18, 2)
+' 0010 "werkstatt/status" 0007 "offline"
+PRINT "wille "; INSTR(hex, "0010776572" + "6B73746174742F737461747573" + "00076F66666C696E65") > 0
+IF PROCESS_RUNNING(b) THEN PROCESS_KILL(b)
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- datei sensor.dh
+IMPORT "{sammlung}/../../examples/werkstatt/sensor.dh"
+--- erwartet
+flags 26
+wille TRUE

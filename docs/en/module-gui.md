@@ -349,11 +349,11 @@ Native, blocking standard dialogs (no IMPORT needed — like the file dialogs):
 | `GUI_LISTBOX_ICON(lb, i, bild)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | icon and text colour per entry (-1 = none / theme) |
 | `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | check mark per entry (with `kaestchen`) |
 | `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | multi-selection as in the table |
-| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | invisible value per entry (an ID, a path) |
+| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | invisible value per entry (an ID, a path, a tax rate) -- also for dropdowns; a bound dropdown with values binds the value instead of the number |
 | `GUI_LISTBOX_DATA$(lb, i)` | STRING | read the invisible value of an entry |
 | `GUI_LISTBOX_FIND_DATA(lb, wert$)` | INTEGER | first entry with this value, -1 = none |
 | `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | extra text on the right of the entry, dimmed (shortcut, size, line number) |
-| `GUI_LISTBOX_TIP(lb, i, text$)` | — | tooltip per entry |
+| `GUI_LISTBOX_TIP(lb, i, text$)` | — | tooltip per entry. Without one, an entry that does not fit the row (it ends with "...") shows its whole text when hovered |
 | `GUI_LISTBOX_ENABLE(lb, i, an)` | — | disable an entry: visible, but neither clickable nor reachable with the arrow keys |
 | `GUI_LISTBOX_ENABLED(lb, i)` | BOOLEAN | whether an entry is selectable |
 | `GUI_LISTBOX_HEADER(lb, i, an)` | — | make an entry a group header: structures the list, is not selectable |
@@ -2795,8 +2795,12 @@ IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
   and shown like a decimal with two places and bound as an INTEGER in
   cents — `48,50` in the field is `4850` in the column, and loading turns
   `4850` back into `48,50`. A number that `GUI_FORM_SET` receives is cents
-  there too; a text stands as it comes. Whatever else the program converts
-  (a dropdown into a tax rate) it does not bind and writes itself.
+  there too; a text stands as it comes. A **dropdown with values**
+  (`GUI_LISTBOX_SET_DATA` per entry) binds the value of the selected entry
+  instead of its number — shown `19 %`, stored `19` (as a number if it is
+  one; without a selection NULL), and loading selects the entry with that
+  value. Whatever else the program converts it does not bind and writes
+  itself.
 - **Nothing saved:** `GUI_FORM_SAVE` returns **0** when the `UPDATE` hit no
   row, and `GUI_FORM_CONFLICT$` says `geloescht` (the row no longer exists)
   — up to 2026.30 it returned the id as if it had saved, and the input was

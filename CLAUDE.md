@@ -1677,6 +1677,48 @@ einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
 
+## Dogfooding 9: Werkstatt-Dashboard ueber MQTT (2026-10-12)
+
+`examples/werkstatt/` (main.dh: Tachos, Leisten, Verlauf, Luefter mit
+Bestaetigung, Hitzealarm mit NOTIFY und Automatik, CSV, Wiederverbinden;
+sensor.dh spielt das ESP32-Board). Dazu der Rechnungen-Pilot 196 auf die
+Datenbindung fuer Geld und Steuersatz. Funde:
+(1) **Kein letzter Wille**: das Board meldet `online` mit retain, und nach
+einem Stromausfall hielt jedes spaeter gestartete Dashboard es fuer lebendig
+(gemessen). Neu `MQTT_WILL(topic$, inhalt$[, retain])` fuer das NAECHSTE
+`MQTT_CONNECT` (`Vm::mqtt_wille`, beim Verbinden verbraucht; im CONNECT
+Will-Flag 0x04/Retain 0x20, Topic und Nachricht hinter der Kennung, Rust-Test
+von Hand nach 3.1.1). (2) **`MQTT_UPDATE` warf, wenn der Broker abbrach**
+(Windows 10054) -- ein Dashboard ohne TRY endete beim Neustart des Pi. Wie
+beim net-Modul in Runde 7 ist das jetzt ein ZUSTAND: `MQTT_IS_CONNECTED`
+FALSE, `MQTT_PUBLISH`/`MQTT_SUBSCRIBE` liefern BOOLEAN (`senden` in mqtt.rs).
+(3) **Ein stumm verschwundener Broker** (kein RST) wurde nie bemerkt: jetzt
+`Client::ping_offen`, nach der halben Keepalive-Zeit (min. 2 s) ohne Antwort
+gilt die Verbindung als verloren. (4) **Diagramme kannten kein Dezimalkomma**
+-- in der Pixelschrift ist der Punkt ein Pixel ("1.25 A" las sich wie
+"125 A"), neben "30,0" aus ZAHL$ uneinheitlich: `CHART_SET_FLAG "komma"`
+(eine Stelle, `fmt_value`, dazu die Prozentangabe). (5) **Listen schnitten
+zu lange Eintraege mitten im Buchstaben ab**, der Rest war nirgends zu
+lesen: jetzt "..." (`mit_auslassung`) und beim Verweilen der ganze Text als
+Tooltip, wenn der Eintrag keinen eigenen hat (`Widget::ganzer_text`, in
+GUI_UPDATE ueber `liste_textplatz`, dieselbe Platzrechnung wie das
+Zeichnen; die Zeile einer schlichten Liste zaehlt jetzt als eigener
+Tooltip-Teil). (6) **Klapplisten konnten keinen Wert binden** -- 196 rechnete
+den Steuersatz von Hand (Index -> 19/7/0): `GUI_LISTBOX_SET_DATA/DATA$/
+FIND_DATA` gelten auch fuer Klapplisten (`werte_ref`), eine gebundene
+Klappliste mit Werten bindet den WERT (Zahl wenn moeglich, ohne Auswahl
+NULL) und waehlt beim Laden den Eintrag mit diesem Wert (`klapp_werte`).
+Zwei App-Lehren im LIESMICH: das Board muss beim Start seinen echten Zustand
+melden (sonst glaubt das Dashboard ein liegengebliebenes "Luefter an"), und
+Wunsch (`/set`) und Bestaetigung sind getrennte Topics. Tests:
+`modules_mqtt.dhtest` +3 (der Test-Broker `_hilfen/mqttbroker.dh` schreibt das
+CONNECT als Hex nach `PORTDATEI.connect`, Modus `stumm` beantwortet keine
+Pings), `beispiel_werkstatt.dhtest` (4; NOTIFY per `--- ersetzen`, damit kein
+Test eine Meldung auf den Bildschirm wirft), `gui_liste_komfort.dhtest` +2
+(Bild, Paar), `gui_bindung.dhtest` +1, `werkzeug_rechnungen.dhtest` +1,
+`modules_chart.dhtest` und Rust-Tests in mqtt.rs/chart.rs. Gegenproben gegen
+die installierte 2026.30 (`C:\Program Files\Drachenhauch-IDE\dhrt.exe`).
+
 ## Dogfooding 8: Vereinsverwaltung an drei Datenbanken (2026-10-12)
 
 `examples/verein/` (Mitglieder, Beitraege, Zahlungen, Beitragsliste als PDF;
