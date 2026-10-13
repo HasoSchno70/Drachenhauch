@@ -485,7 +485,7 @@
   "GENTEX_GRADIENT_BOX": "rectangular gradient from the inside out — vignettes",
   "GENTEX_NOISE": "white noise — star fields, film grain",
   "GENTEX_PERLIN": "Perlin noise — clouds, terrain, marble",
-  "GENTEX_RADIAL": "round gradient from the centre outwards — soft lights and glows, drawn additively",
+  "GENTEX_RADIAL": "round gradient from the centre outwards — soft lights and glows, drawn additively. dichte (0..1, default 0) is the share of the radius in full inner colour: 0 = soft from the centre, 1 = a disc; more is an error",
   "GESTURE$": "recognized gesture: tap, doubletap, hold, drag, swipe_left, swipe_right, swipe_up, swipe_down, pinch_in, pinch_out — \"\" if none",
   "GESTURE_DRAG_ANGLE": "its angle",
   "GESTURE_DRAG_X": "direction of a drag",

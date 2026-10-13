@@ -792,7 +792,7 @@ loaded one.
 | `GENTEX_COLOR(breite, hoehe, farbe)` | single-coloured area |
 | `GENTEX_GRADIENT(breite, hoehe, farbe1, farbe2 [, vertikal])` | linear gradient |
 | `GENTEX_GRADIENT_BOX(breite, hoehe, dichte, farbe1, farbe2)` | rectangular gradient from the inside out — vignettes |
-| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | round gradient from the centre outwards — soft lights and glows, drawn additively |
+| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | round gradient from the centre outwards — soft lights and glows, drawn additively. `dichte` (0..1, default 0) is the share of the radius in full inner colour: 0 = soft from the centre, 1 = a disc; more is an error |
 | `GENTEX_CHECKED(breite, hoehe, feld_x, feld_y, farbe1, farbe2)` | checkerboard |
 | `GENTEX_PERLIN(breite, hoehe, skala)` | Perlin noise — clouds, terrain, marble |
 | `GENTEX_CELLULAR(breite, hoehe, kachel)` | cellular noise (Voronoi) — stone floors, cracks, scales |

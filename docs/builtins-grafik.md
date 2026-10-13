@@ -794,7 +794,7 @@ lässt.
 | `GENTEX_COLOR(breite, hoehe, farbe)` | einfarbige Fläche |
 | `GENTEX_GRADIENT(breite, hoehe, farbe1, farbe2 [, vertikal])` | linearer Verlauf |
 | `GENTEX_GRADIENT_BOX(breite, hoehe, dichte, farbe1, farbe2)` | rechteckiger Verlauf von innen nach außen — Vignetten |
-| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet |
+| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet. `dichte` (0..1, Vorgabe 0) ist der Anteil des Radius in voller Innenfarbe: 0 = weich ab der Mitte, 1 = Scheibe; mehr ist ein Fehler |
 | `GENTEX_CHECKED(breite, hoehe, feld_x, feld_y, farbe1, farbe2)` | Schachbrett |
 | `GENTEX_PERLIN(breite, hoehe, skala)` | Perlin-Rauschen — Wolken, Gelände, Marmor |
 | `GENTEX_CELLULAR(breite, hoehe, kachel)` | Zellrauschen (Voronoi) — Steinboden, Risse, Schuppen |

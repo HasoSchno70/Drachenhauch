@@ -75,7 +75,7 @@ module.exports = (H) => [
       'CLS() : DRAWIMAGE(himmel, 0, 0) : FLIP()',
     ]),
   H.cmd("GENTEX_CHECKED · GENTEX_COLOR · GENTEX_RADIAL", "GENTEX_CHECKED(b, h, fx, fy, f1, f2)   GENTEX_COLOR(b, h, f)   GENTEX_RADIAL(b, h, innen, außen[, dichte])",
-    "GENTEX_CHECKED erzeugt ein Schachbrettmuster (fx × fy Felder), GENTEX_COLOR eine einfarbige Fläche, GENTEX_RADIAL einen runden Verlauf von der Mitte nach außen – perfekt für weiche Lichter und Glows.",
+    "GENTEX_CHECKED erzeugt ein Schachbrettmuster (fx × fy Felder), GENTEX_COLOR eine einfarbige Fläche, GENTEX_RADIAL einen runden Verlauf von der Mitte nach außen – perfekt für weiche Lichter und Glows; dichte (0 bis 1) ist der Anteil des Radius in voller Innenfarbe – 0 gibt den weichsten Schein.",
     [
       'DIM brett AS IMAGE',
       'brett = GENTEX_CHECKED(160, 120, 8, 6, RGB(48, 56, 56), RGB(208, 216, 208))',

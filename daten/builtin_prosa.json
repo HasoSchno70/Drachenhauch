@@ -485,7 +485,7 @@
   "GENTEX_GRADIENT_BOX": "rechteckiger Verlauf von innen nach außen — Vignetten",
   "GENTEX_NOISE": "Weißrauschen — Sternenfelder, Filmkorn",
   "GENTEX_PERLIN": "Perlin-Rauschen — Wolken, Gelände, Marmor",
-  "GENTEX_RADIAL": "runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet",
+  "GENTEX_RADIAL": "runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet. dichte (0..1, Vorgabe 0) ist der Anteil des Radius in voller Innenfarbe: 0 = weich ab der Mitte, 1 = Scheibe; mehr ist ein Fehler",
   "GESTURE$": "erkannte Geste: tap, doubletap, hold, drag, swipe_left, swipe_right, swipe_up, swipe_down, pinch_in, pinch_out — \"\" wenn keine",
   "GESTURE_DRAG_ANGLE": "sein Winkel",
   "GESTURE_DRAG_X": "Richtung eines Zugs",

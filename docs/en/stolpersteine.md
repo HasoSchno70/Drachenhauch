@@ -93,6 +93,11 @@ and the documentation. Consistent right now, so not a must.
 > Assigning to an INTEGER variable still works as long as the result is whole
 > (`i = 8 / 2` is 4); an array index from `/` aborts, and `dhrt --check` warns
 > about it. In the existing code, the full test run did not find a single place that depended on it.
+> **Since 2026-10-13 the same rule holds for commands:** where a command wants a
+> whole number, a whole floating-point number passes --
+> `GUI_WINDOW("…", BREITE / 2 - 170, …)` used to abort with "expects INTEGER",
+> although `x = BREITE / 2` worked. `2.5` stays an error, with the way out
+> (`INT`, `ROUND`, `\`).
 > The rest of this section describes the state before.
 > Author decision (2026-06-14): **`/` stays as it is** (whole → INTEGER, otherwise FLOAT;
 > no `4.0` break, book unchanged). Instead, the error message when assigning
