@@ -4452,6 +4452,22 @@ impl<'p> Vm<'p> {
         self.cur_line
     }
 
+    /// FFI-Rueckrufe (2026-10-14): ein Fehler im Rueckruf wird nie per CATCH
+    /// "verbraucht", `err_line_set` bliebe also stehen, und jeder spaetere
+    /// Fehler trug die Zeile des ersten. Jeder Rueckruf beginnt darum frisch.
+    #[cfg(feature = "ffi")]
+    pub(crate) fn fehlerzeile_vergessen(&mut self) { self.err_line_set = false; }
+
+    /// Die Zeile des ersten Rueckruf-Fehlers wieder einsetzen, wenn der Aufruf
+    /// der Bibliothek ihn meldet -- sonst stuende dort die des letzten.
+    #[cfg(feature = "ffi")]
+    pub(crate) fn fehlerzeile_setzen(&mut self, zeile: u32) {
+        if zeile == 0 { return; }
+        self.cur_line = zeile;
+        self.error_line = zeile;
+        self.err_line_set = true;
+    }
+
     /// Zugriff auf den frame_count (fuer main.rs-Schleifenlogik), 0 ohne Grafik.
     #[allow(dead_code)]
     pub fn frame_count(&self) -> u64 {

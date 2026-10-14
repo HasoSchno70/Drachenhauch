@@ -128,7 +128,16 @@ Ein Name mit Endung oder Pfad gilt wörtlich (`"libsqlite3.so.0"`,
   Variable.
 * **Abhängigkeiten unter Windows:** Bei einem Pfad (`LIB "C:/Programme/X/x.dll"`)
   sucht Windows die Bibliotheken, die diese DLL selbst braucht, zuerst in
-  ihrem Ordner -- der muss nicht im PATH stehen.
+  ihrem Ordner -- der muss nicht im PATH stehen. Außerdem hängt Drachenhauch
+  den Ordner hinten an den PATH dieses Programms: Lädt die Bibliothek
+  später selbst Module nach (GdkPixbuf seine Bildlader, GStreamer und Qt
+  ihre Plugins), finden auch die ihre Abhängigkeiten. Ohne das brach GTK aus
+  Inkscape beim ersten Symbol ab, weil das SVG-Modul librsvg nicht fand.
+* **Gleiche Funktion, anderer Name je System:** Manche Bibliotheken
+  exportieren unter Windows nur eine Fassung mit Anhang (`gdk_pixbuf_save`
+  heißt dort `gdk_pixbuf_save_utf8` -- in C ist das ein Makro). Meist gibt es
+  eine Schwester, die überall gleich heißt (`gdk_pixbuf_savev`); sonst zwei
+  `DECLARE`-Zeilen mit `ALIAS`.
 * Liegt eine Datei unter dem Namen da, lässt sich aber nicht laden, sagt
   die Meldung das samt dem Grund des Systems: meist fehlt ihr selbst eine
   Bibliothek, oder sie ist für 32 Bit gebaut.
@@ -736,11 +745,20 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   übergibt einen Nullzeiger. Passt die Zahl ihrer Parameter nicht, ist das
   ein Fehler, bevor die Bibliothek überhaupt gerufen wird.
 * **Ein Fehler im Rückruf** kommt beim Aufruf der Bibliothek an, sobald sie
-  zurückkehrt -- als gewöhnlicher Laufzeitfehler, abfangbar mit `CATCH`.
-  Durch die Bibliothek hindurch abbrechen kann er nicht; ab dem Fehler
-  liefert jeder weitere Rückruf dieses Aufrufs 0, und die Bibliothek
-  arbeitet mit diesen Antworten zu Ende. Dasselbe gilt für einen Wert vom
-  falschen Typ (eine BOOLEAN-Funktion, wo `LONG` verlangt ist).
+  zurückkehrt -- als gewöhnlicher Laufzeitfehler, abfangbar mit `CATCH`,
+  mit der Zeile im Rückruf, an der es scheiterte (`ERROR_LINE()`). Durch die
+  Bibliothek hindurch abbrechen kann er nicht: der gescheiterte Rückruf
+  liefert 0, und die Bibliothek arbeitet weiter. Weitere Rückrufe laufen
+  wie gewohnt (bis 2026.31 lieferten sie stumm 0 -- in einer GTK-Oberfläche
+  reagierte danach kein Knopf mehr, nicht einmal der zum Schließen).
+  Gemeldet wird der erste Fehler. Dasselbe gilt für einen Wert vom falschen
+  Typ (eine BOOLEAN-Funktion, wo `LONG` verlangt ist).
+* **Kehrt die Bibliothek nicht zurück** -- `gtk_main`, `g_main_loop_run`,
+  eine Nachrichtenschleife --, steht der Fehler nach einer Sekunde in der
+  Fehlerausgabe, mit Zeile und dem Namen der Funktion, die noch läuft; jeder
+  weitere sofort. Vorher sah man nichts, und das Programm wirkte, als hinge
+  es. Wer einen Fehler in einem Rückruf selbst behandeln will, umgibt dessen
+  Inhalt mit `TRY ... CATCH`.
 * **Ein Rückruf darf selbst Bibliotheken rufen**, auch dieselbe.
 * **Nur auf dem Faden des Programms.** Ruft eine Bibliothek aus einem eigenen
   Faden zurück (`CreateThread`, `pthread_create`, manche Treiber), wird der
