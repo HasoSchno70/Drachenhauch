@@ -925,7 +925,7 @@ fn gerufenes_harmlos<'a>(prog: &'a Program, f: &'a Func, b: &Bereich, start: Vec
                     offen.extend(methoden(&format!("__get_{}", n)));
                     offen.extend(methoden(&format!("__set_{}", n)));
                 },
-                op::CALL_VALUE | op::CALL_SUPER =>
+                op::CALL_VALUE | op::CALL_SUPER | op::CALL_METHOD_BYREF =>
                     return Err(format!("{}: {} ruft {}", name, g.name, befehl_name(ins.op))),
                 op::CALL_BUILTIN => if let Arg::Call(n, _, _) = &ins.arg {
                     let n: &str = n;
@@ -1943,7 +1943,7 @@ fn befehl_name(o: u16) -> String {
         op::LOAD_GLOBAL_SLOT | op::STORE_GLOBAL_SLOT | op::ADD_STORE_GLOBAL_SLOT
         | op::LOAD_NAME | op::STORE_NAME => "globale Variable".into(),
         op::CALL_BUILTIN => "eingebauter Befehl".into(),
-        op::CALL_METHOD | op::LOAD_MEMBER | op::STORE_MEMBER | op::LOAD_FIELD
+        op::CALL_METHOD | op::CALL_METHOD_BYREF | op::LOAD_MEMBER | op::STORE_MEMBER | op::LOAD_FIELD
         | op::STORE_FIELD | op::NEW_INSTANCE | op::LOAD_SELF => "Objekt".into(),
         op::LOAD_INDEX | op::STORE_INDEX | op::DECLARE_ARRAY_LOCAL => "Feld".into(),
         op::CALL_VALUE | op::LOAD_FUNCREF => "FUNCREF".into(),
