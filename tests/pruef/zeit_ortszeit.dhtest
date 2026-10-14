@@ -1,0 +1,56 @@
+' Ortszeit unter macOS und Linux (2026-10-14). Bis 2026.31 war die "Ortszeit"
+' ausserhalb von Windows schlicht UTC: DATE$/TIME$/ZEIT_JETZT gingen in Berlin
+' im Sommer zwei Stunden nach, und ZEIT_PARSE("...Z") rechnete nicht um. Jetzt
+' kommt sie aus localtime_r samt Zonenregeln (TZ). Unter Windows gilt die
+' Zone des Systems, TZ wirkt dort nicht -- darum nur POSIX.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== zeit parse rechnet in die zone um samt sommerzeit
+IMPORT "zeit"
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-07-01T12:00:00Z"), "hh:mm")
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-01-15T12:00:00Z"), "hh:mm")
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("Wed, 01 Jul 2026 12:00:00 GMT"), "hh:mm")
+--- umgebung
+TZ=Europe/Berlin
+--- system posix
+--- erwartet
+14:00
+13:00
+14:00
+
+=== andere zone andere stunde
+IMPORT "zeit"
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-07-01T12:00:00Z"), "hh:mm")
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-01-15T12:00:00Z"), "hh:mm")
+--- umgebung
+TZ=America/New_York
+--- system posix
+--- erwartet
+08:00
+07:00
+
+=== die uhr geht in der zone
+' Zwei Kinder zur selben Zeit: eines in UTC, eines in Indien (+5:30, ohne
+' Sommerzeit). ZEIT_JETZT unterscheidet sich um 19800 Sekunden; vorher 0.
+' DATE$/TIME$ und ZEIT_JETZT passen in jeder Zone zusammen, und eine frische
+' Datei ist 0 Sekunden alt (FILETIME rechnet mit demselben Versatz um).
+IMPORT "lauf.dh"
+WRITEALL("uhr.dh", "IMPORT " + CHR$(34) + "zeit" + CHR$(34) + CHR$(10) + _
+    "WRITEALL(" + CHR$(34) + "f.txt" + CHR$(34) + ", " + CHR$(34) + "x" + CHR$(34) + ")" + CHR$(10) + _
+    "PRINT ZEIT_JETZT(); " + CHR$(34) + " " + CHR$(34) + "; LEFT$(DATE$() + " + CHR$(34) + " " + CHR$(34) + " + TIME$(), 16) = LEFT$(ZEIT_TEXT$(ZEIT_JETZT()), 16); " + CHR$(34) + " " + CHR$(34) + "; ABS(ZEIT_DIFF(FILETIME(" + CHR$(34) + "f.txt" + CHR$(34) + "), ZEIT_JETZT())) <= 2" + CHR$(10))
+SETENV("TZ", "UTC")
+dlStarten(["run", "uhr.dh"])
+DIM a AS ARRAY OF STRING : a = SPLIT$(TRIM$(dlAus), " ")
+SETENV("TZ", "Asia/Kolkata")
+dlStarten(["run", "uhr.dh"])
+DIM b AS ARRAY OF STRING : b = SPLIT$(TRIM$(dlAus), " ")
+PRINT "versatz "; ABS(VAL(b[0]) - VAL(a[0]) - 19800) <= 2
+PRINT "utc "; a[1]; " "; a[2]
+PRINT "indien "; b[1]; " "; b[2]
+--- datei lauf.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- system posix
+--- erwartet
+versatz TRUE
+utc TRUE TRUE
+indien TRUE TRUE
