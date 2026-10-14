@@ -223,8 +223,9 @@ Der Ausdruck endet mitten drin -- geht er in der naechsten Zeile weiter, die Zei
 IMPORT: Datei nicht gefunden: {} (gesucht: {})	IMPORT: file not found: {} (searched: {})
 IMPORT: Lesefehler bei {}: {}	IMPORT: error reading {}: {}
 Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: python rust\build_runtime.py --hardware	Hardware module '{}' is not included in this dhrt build -- calls will fail at run time. Rebuild with: python rust\build_runtime.py --hardware
-{} kennt keine Klasse {}.	{} has no class {}.
-{} kennt keinen Namen {}.	{} has no name {}.
+{} kennt keine Klasse {}.{}	{} has no class {}.{}
+{} kennt keinen Namen {}.{}	{} has no name {}.{}
+{} steht in {}, und diese Datei gehoert nicht zum Namensraum {} -- was eine Datei des Namensraums ohne AS einbindet, bleibt draussen. Dort IMPORT "{}" AS {} schreiben.	{} is in {}, and that file does not belong to the namespace {} -- what a file of the namespace imports without AS stays outside. Write IMPORT "{}" AS {} there.
 {} kommt aus dem Hauptprogramm. Eine mit AS importierte Datei [[]]sieht dessen Globals nicht -- reiche den Wert als Parameter [[]]herein oder deklariere ihn in der Datei selbst.	{} comes from the main program. A file imported with AS does not see its globals -- pass the value in as a parameter or declare it in the file itself.
 {}.{} ist eine Klasse. Zum Erzeugen `NEW {}.{}(...)`, als Typ `DIM x AS {}.{}`.	{}.{} is a class. To create one `NEW {}.{}(...)`, as a type `DIM x AS {}.{}`.
 {}.{} ist PRIVATE und nur innerhalb der eigenen Datei verwendbar.	{}.{} is PRIVATE and can only be used inside its own file.
@@ -1758,3 +1759,6 @@ GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in
 {}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature "schriften") -- eine .ttf-Datei angeben	{}: '{}' is a built-in font, but this build has none (feature "schriften") -- give a .ttf file
 {} -- {} ist eine Sekunde spaeter noch nicht zurueckgekehrt, darum steht der Fehler schon jetzt hier; Rueckrufe, die scheitern duerfen, mit TRY ... CATCH umgeben	{} -- {} has not returned one second later, so the error is shown here already; wrap callbacks that may fail in TRY ... CATCH
 {} (Zeile {})	{} (line {})
+{}.{} hat BYREF-Parameter, aber beim Uebersetzen war die Klasse des Objekts nicht bekannt -- die Werte kaemen nicht zurueck. Das Objekt in einer Variablen mit Typ halten (DIM x AS {}) und darueber aufrufen.	{}.{} has BYREF parameters, but the class of the object was not known at compile time -- the values would not come back. Hold the object in a typed variable (DIM x AS {}) and call through it.
+{}.{}: die Methode der Klasse {} hat ihre BYREF-Parameter an anderen Stellen als die, nach der der Aufruf uebersetzt ist -- eine Ueberschreibung muss dieselben Parameter BYREF nehmen	{}.{}: the method of class {} has its BYREF parameters in other places than the one the call was compiled for -- an override must take the same parameters BYREF
+{}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben	{}: a coroutine cannot write back BYREF parameters
