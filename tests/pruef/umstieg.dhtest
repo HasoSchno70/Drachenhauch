@@ -1025,3 +1025,16 @@ IMPORT "gui"
 GUI_THEME("glas_hell")
 --- fehler
 GUI_THEME: erwartet INTEGER (Arg 1) -- ein ganzes Thema setzt GUI_THEME_PRESET("glas_hell"); GUI_THEME nimmt nur die Akzentfarbe
+
+=== dim hinter then sagt wie es geht
+' Texteditor-Runde, 2026-10-14: vorher nur "Unerwartetes Token DIM".
+DIM a AS INTEGER
+IF a = 0 THEN DIM b AS INTEGER : b = 1
+--- fehler
+DIM geht nicht hinter THEN/ELSE -- die Variable vor dem IF anlegen
+
+=== for im einzeiligen if sagt wie es geht
+DIM i AS INTEGER
+IF TRUE THEN FOR i = 1 TO 3 : PRINT i : NEXT
+--- fehler
+FOR geht nicht im einzeiligen IF -- IF ... THEN, dann FOR auf eigener Zeile, am Ende END IF

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2091,
+ "count": 2092,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -446,6 +446,7 @@
   "FILES_DROPPED": "wie viele Dateien wurden in diesem Bild ins Fenster gezogen oder (macOS) vom Finder übergeben? Gilt genau ein Bild, beliebig oft abfragbar",
   "FILETIME": "zuletzt geändert, Sekunden wie im Modul zeit",
   "FILE_DROPPED": "Pfad der i-ten davon",
+  "FILE_ENCODING$": "was \"auto\" wählen würde: utf8, utf8bom, cp1252 oder binaer (siehe Kodierungen)",
   "FILE_OPEN_DIALOG": "Datei zum Öffnen wählen",
   "FILE_SAVE_DIALOG": "Datei zum Speichern wählen (default$ = vorgeschlagener Dateiname)",
   "FIRMATA_ANALOG_READ": "INTEGER (0..16383) Analogwert lesen -- Achtung, hier zaehlt der Kanal (A0 = 0), nicht die Pin-Nummer",
@@ -1670,7 +1671,7 @@
   "SERIAL_TIMEOUT": "— (Read-Timeout setzen, Default 1.0 s) wie lange ein Lesen hoechstens wartet",
   "SERIAL_WRITE": "INTEGER (geschriebene Bytes) Text senden",
   "SETENV": "Umgebungsvariable setzen (dieses Programm + seine Kinder)",
-  "SETFONT": "aktive Schrift setzen; SETFONT(-1) = Default-Font",
+  "SETFONT": "aktive Schrift setzen; SETFONT(-1) = Default-Font. Ohne groesse gilt danach die Größe, mit der die Schrift geladen wurde; mit groesse wird ab jetzt so groß gezeichnet (wie SETFONT + TEXT_SIZE) -- scharf laden, klein zeichnen: SETFONT(LOADFONT(\"sans\", 32), 16)",
   "SETFPS": "Ziel-Bildrate; 0 = so schnell wie möglich",
   "SETWINDOWTITLE": "Fenstertitel im Lauf ändern — etwa für den Dateinamen oder den Punktestand",
   "SET_ADD": "aufnehmen; schon drin = kein Effekt",

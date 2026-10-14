@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2086,
+ "count": 2087,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -446,6 +446,7 @@
   "FILES_DROPPED": "how many files were dragged into the window in this frame or (macOS) handed over by the Finder? Holds for exactly one frame, can be queried any number of times",
   "FILETIME": "last modified, seconds as in the module zeit",
   "FILE_DROPPED": "path of the i-th of them",
+  "FILE_ENCODING$": "what \"auto\" would choose: utf8, utf8bom, cp1252 or binaer (see encodings)",
   "FILE_OPEN_DIALOG": "choose a file to open",
   "FILE_SAVE_DIALOG": "choose a file to save (default$ = suggested file name)",
   "FIRMATA_ANALOG_READ": "INTEGER (0..16383) read an analogue value -- careful, what counts here is the channel (A0 = 0), not the pin number",
@@ -1668,7 +1669,7 @@
   "SERIAL_TIMEOUT": "— (set the read timeout, default 1.0 s) how long a read waits at most",
   "SERIAL_WRITE": "INTEGER (bytes written) send text",
   "SETENV": "set an environment variable (this program + its children)",
-  "SETFONT": "set the active font; SETFONT(-1) = default font",
+  "SETFONT": "set the active font; SETFONT(-1) = default font. Without groesse the size the font was loaded at applies afterwards; with groesse everything is drawn at that size from now on (like SETFONT + TEXT_SIZE) -- load sharp, draw small: SETFONT(LOADFONT(\"sans\", 32), 16)",
   "SETFPS": "target frame rate; 0 = as fast as possible",
   "SETWINDOWTITLE": "change the window title while running — for the file name or the score, say",
   "SET_ADD": "add; already in it = no effect",

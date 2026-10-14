@@ -2691,6 +2691,12 @@
    "module": "core"
   },
   {
+   "name": "FILE_ENCODING$",
+   "kind": "core",
+   "signature": "FILE_ENCODING$(pfad) AS STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "FILESIZE",
    "kind": "core",
    "signature": "FILESIZE(pfad) AS INTEGER",
@@ -9947,7 +9953,7 @@
   {
    "name": "SETFONT",
    "kind": "graphics",
-   "signature": "SETFONT(handle: INTEGER)",
+   "signature": "SETFONT(handle: INTEGER [, groesse: INTEGER])",
    "module": "core"
   },
   {

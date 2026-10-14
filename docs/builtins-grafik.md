@@ -374,7 +374,7 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `FONT_HAS_GLYPH(font, zeichen$)` → BOOLEAN | hat die Schrift selbst ein Zeichen dafür? Wenn nicht, zeichnet `TEXT` es mit der Ausweich-Schrift; `-1` = eingebaute Schrift |
 | `FONT_GLYPH_WIDTH(font, zeichen$, groesse)` → FLOAT | wie weit `TEXT` nach diesem Zeichen weiterrückt, bei `groesse` Punkten — gemessen wie `TEXT_WIDTH`, ohne die aktive Schrift umzustellen |
 | `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | die Zeichen `erstes`..`letztes` (Vorgabe 32..126, höchstens 256) als Bild im Format von `LOADFONT_IMAGE`: jedes Zeichen weiß in einem durchsichtigen Feld, Magenta (`&HFF00FF`) außen und dazwischen. So wird aus einer Vektorschrift eine Pixelschrift, die man nachbearbeiten und mit `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` wieder laden kann |
-| `SETFONT(font)` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font |
+| `SETFONT(font[, groesse])` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font. Ohne `groesse` gilt danach die Größe, mit der die Schrift geladen wurde; mit `groesse` wird ab jetzt so groß gezeichnet (wie `SETFONT` + `TEXT_SIZE`) -- scharf laden, klein zeichnen: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
 | `TEXT_LINE_SPACING(px)` | Zeilenabstand für mehrzeiligen Text |
 

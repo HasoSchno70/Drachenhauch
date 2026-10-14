@@ -866,6 +866,7 @@ f = OPENFILE("gross.csv", "r", "cp1252")
 | Name | also written as |
 |---|---|
 | `utf8` (default) | `utf-8` |
+| `utf8bom` | `utf-8-bom`, `utf-8-sig` |
 | `auto` (reading only) | -- |
 | `cp1252` | `windows-1252`, `ansi` |
 | `latin1` | `iso-8859-1` |
@@ -910,6 +911,27 @@ CATCH e
 END TRY
 ```
 
+**Whoever reads a file AND writes it back** (an editor, a tool that changes
+one line) has to know what `auto` chose -- otherwise a cp1252 file silently
+becomes UTF-8 on saving. `FILE_ENCODING$(pfad$)` tells you: `"utf8"`,
+`"utf8bom"` (valid UTF-8 with a BOM in front), `"cp1252"` or `"binaer"` (a
+null byte, so UTF-16 as well). Every name except `"binaer"` is accepted again
+when writing:
+
+```basic
+DIM kod AS STRING : kod = FILE_ENCODING$(pfad)
+DIM text AS STRING
+DIM f AS FILE : f = OPENFILE(pfad, "r", kod)
+text = READALL$(f) : CLOSEFILE(f)
+' ... edit ...
+WRITEALL(pfad, text, kod)          ' same encoding, same BOM
+```
+
+`utf8bom` reads like `utf8` (the BOM is dropped as always) and puts
+`EF BB BF` in front of the file when writing -- only in front of an **empty**
+one: `WRITE`/`WRITELINE` and `APPENDFILE` to a non-empty file do not write a
+second one.
+
 **Not included: UTF-16.** Excel writes that for "Unicode Text (*.txt)". It
 needs BOM detection, two byte orders and surrogate pairs — a decision of its own,
 not an addendum to this one.
@@ -935,6 +957,7 @@ Path-based, without a FILE handle *(native runtime only)*:
 | `WRITEALL(pfad$, text$[, kodierung$])` | write text completely (overwrites/creates) |
 | `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | read a file as an array of lines |
 | `FILESIZE(pfad$)` → INTEGER | size in bytes |
+| `FILE_ENCODING$(pfad$)` → STRING | what `"auto"` would choose: `utf8`, `utf8bom`, `cp1252` or `binaer` (see encodings) |
 | `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | delete / rename·move |
 | `DIREXISTS(pfad$)` → BOOLEAN | directory present? |
 | `DIRLIST(pfad$[, muster$])` → ARRAY OF STRING | entry names (sorted), optionally filtered |

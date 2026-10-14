@@ -1199,6 +1199,22 @@ impl Parser {
         if self.ist_exit() { return self.exit_kern(); }
         if self.ist_swap() { return self.swap_kern(); }
         if self.ist_let() || self.ist_call() { self.pos += 1; return self.inline_statement_kern(); }
+        // Anweisungen, die es im Einzeiler nicht gibt (2026-10-14,
+        // Texteditor-Runde): vorher hiess es nur "Unerwartetes Token DIM".
+        match self.tt(0) {
+            Tt::Dim | Tt::Const => {
+                let w = if self.tt(0) == Tt::Dim { "DIM" } else { "CONST" };
+                return self.err(&format!("{} geht nicht hinter THEN/ELSE -- die Variable vor dem IF \
+                                          anlegen und im IF nur zuweisen (oder das IF mehrzeilig \
+                                          schreiben, mit END IF)", w));
+            }
+            Tt::For | Tt::While | Tt::Repeat | Tt::Select | Tt::Try | Tt::With => {
+                let w = self.tt(0).name();
+                return self.err(&format!("{} geht nicht im einzeiligen IF -- IF ... THEN, dann {} auf \
+                                          eigener Zeile, am Ende END IF", w, w));
+            }
+            _ => {}
+        }
         match self.tt(0) {
             Tt::Print => {
                 self.pos += 1;

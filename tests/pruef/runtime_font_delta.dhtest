@@ -76,3 +76,28 @@ PRINT "OK"
 --- erwartet
 OK
 
+
+=== setfont mit groesse zeichnet kleiner als geladen
+' Texteditor-Runde, 2026-10-14: scharf laden, klein zeichnen -- vorher
+' SETFONT + TEXT_SIZE, und das zweite vergass man.
+SCREEN(320, 120, "t")
+DIM f AS INTEGER : f = LOADFONT("sans", 32)
+SETFONT(f)
+PRINT TEXT_HEIGHT()
+DIM w32 AS INTEGER : w32 = TEXT_WIDTH("Drachenhauch")
+SETFONT(f, 16)
+PRINT TEXT_HEIGHT()
+PRINT ABS(TEXT_WIDTH("Drachenhauch") * 2 - w32) <= 2
+SETFONT(f)
+PRINT TEXT_HEIGHT()
+--- erwartet
+32
+16
+TRUE
+32
+
+=== setfont groesse null ist ein fehler
+SCREEN(160, 100, "t")
+SETFONT(LOADFONT("sans", 20), 0)
+--- fehler
+SETFONT: groesse muss mindestens 1 sein, erhalten 0
