@@ -1677,6 +1677,45 @@ einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
 
+## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
+
+Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
+Oberflaeche, mit Styling. `examples/fotos/` -- GTK 3 ueber `DECLARE ... LIB`
+(unter Windows das GTK von Inkscape), dunkles Stylesheet ueber
+`GtkCssProvider`; HeaderBar, GtkStack (Uebersicht als FlowBox mit Karten,
+Einzelansicht als Overlay mit runden Pfeilen und Infoleiste), Vorschaubilder
+per `g_idle_add`, GdkPixbuf `at_scale` (nie groesser als das Original --
+at_scale zieht kleine Bilder sonst HOCH), EXIF-Drehung
+(`gdk_pixbuf_apply_embedded_orientation`), Drehen, Originalgroesse, Diaschau
+(`g_timeout_add`), Vollbild, Tasten (`key-press-event` +
+`gdk_event_get_keyval` mit BYREF). Je Signalform eine eigene
+`g_signal_connect_data`-Zeile mit ALIAS. Funde in `ffi.rs`: (1) **Nachgeladene
+Module fanden ihre Abhaengigkeiten nicht** -- `LOAD_WITH_ALTERED_SEARCH_PATH`
+gilt nur fuer das eine Laden; das SVG-Lademodul von GdkPixbuf fand librsvg
+nicht, GTK brach beim ersten Symbol ab. Jetzt haengt `ordner_in_suchpfad` den
+Ordner einer ueber den vollen Pfad geladenen Bibliothek hinten an den PATH
+des Prozesses, einmal. (2) **Ein Fehler im Rueckruf liess das Programm ohne
+Meldung haengen** -- gemerkt und erst gemeldet, wenn die Bibliothek
+zurueckkehrt, und `gtk_main` tut das nie. Jetzt `rueckruf_gescheitert`: der
+erste Fehler bleibt gemerkt (mit Zeile), ein Waechter-Faden schreibt ihn nach
+einer Sekunde in die Fehlerausgabe, wenn ihn niemand abgeholt hat
+(`WACHE_NR` zaehlt die abgeholten, `WACHE_GEMELDET` -> jeder weitere sofort);
+`LAUFEND` haelt die laufenden Bibliotheksfunktionen fuer den Namen.
+(3) **Weitere Rueckrufe laufen nach einem Fehler weiter** (wie ctypes) --
+vorher lieferten sie stumm 0, in GTK reagierte kein Knopf mehr, auch nicht der
+zum Schliessen. VERHALTENSAENDERUNG fuer die Fassungsnotizen. (4) **Jeder
+spaetere Fehler trug die Zeile des ersten**: `err_line_set` blieb stehen, weil
+ein Rueckruf-Fehler nie per CATCH verbraucht wird -- `Vm::fehlerzeile_vergessen`
+vor jedem Rueckruf, `fehlerzeile_setzen` beim Melden (`ERROR_LINE()` stimmt).
+Nebenbei: `gdk_pixbuf_save` heisst unter Windows `gdk_pixbuf_save_utf8` (in C
+ein Makro), `gdk_pixbuf_savev` ueberall gleich; `gdk_pixbuf_get_from_window`
+liefert unter Windows nur Weiss -- die Vorfuehrung (`--probe --foto ziel`)
+zeichnet das Fenster mit `gtk_widget_draw` in eine Cairo-Flaeche. Tests
+`ffi.dhtest` (qsort-Fall geaendert, Waechter mit langsamem qsort samt
+`--- stderr` und Zeilen, Suchpfad nur Windows), `beispiel_fotos.dhtest` (Bilder
+schreibt der Fall selbst, das JPEG mit von Hand eingesetztem EXIF-APP1);
+gegen 2026.31 fallen alle neuen bzw. geaenderten Faelle.
+
 ## Dogfooding 11: Texteditor (2026-10-14)
 
 Wunsch des Nutzers: ein Texteditor "mit richtiger Schrift". `examples/texteditor/`
