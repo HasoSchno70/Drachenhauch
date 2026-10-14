@@ -868,6 +868,7 @@ f = OPENFILE("gross.csv", "r", "cp1252")
 | Name | auch geschrieben als |
 |---|---|
 | `utf8` (Vorgabe) | `utf-8` |
+| `utf8bom` | `utf-8-bom`, `utf-8-sig` |
 | `auto` (nur lesen) | -- |
 | `cp1252` | `windows-1252`, `ansi` |
 | `latin1` | `iso-8859-1` |
@@ -912,6 +913,26 @@ CATCH e
 END TRY
 ```
 
+**Wer eine Datei liest UND wieder schreibt** (ein Editor, ein Werkzeug, das
+eine Zeile ändert), muss wissen, was `auto` gewählt hat -- sonst wird aus einer
+cp1252-Datei beim Sichern stillschweigend UTF-8. Das sagt
+`FILE_ENCODING$(pfad$)`: `"utf8"`, `"utf8bom"` (gültiges UTF-8 mit BOM vorn),
+`"cp1252"` oder `"binaer"` (Nullbyte, also auch UTF-16). Jeder Name außer
+`"binaer"` geht beim Schreiben wieder hinein:
+
+```basic
+DIM kod AS STRING : kod = FILE_ENCODING$(pfad)
+DIM text AS STRING
+DIM f AS FILE : f = OPENFILE(pfad, "r", kod)
+text = READALL$(f) : CLOSEFILE(f)
+' ... bearbeiten ...
+WRITEALL(pfad, text, kod)          ' gleiche Kodierung, gleiches BOM
+```
+
+`utf8bom` liest wie `utf8` (das BOM fällt wie immer weg) und setzt beim
+Schreiben `EF BB BF` vor die Datei -- nur vor eine **leere**: `WRITE`/
+`WRITELINE` und `APPENDFILE` an eine volle Datei schreiben kein zweites.
+
 **Nicht dabei: UTF-16.** Das schreibt Excel bei „Unicode Text (*.txt)". Es
 braucht BOM-Erkennung, zwei Byte-Reihenfolgen und Ersatzpaare — eine eigene
 Entscheidung, kein Nachtrag zu dieser.
@@ -937,6 +958,7 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 | `WRITEALL(pfad$, text$[, kodierung$])` | Text komplett schreiben (überschreibt/erzeugt) |
 | `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | Datei als Zeilen-Array lesen |
 | `FILESIZE(pfad$)` → INTEGER | Größe in Bytes |
+| `FILE_ENCODING$(pfad$)` → STRING | was `"auto"` wählen würde: `utf8`, `utf8bom`, `cp1252` oder `binaer` (siehe Kodierungen) |
 | `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
 | `DIREXISTS(pfad$)` → BOOLEAN | Verzeichnis vorhanden? |
 | `DIRLIST(pfad$[, muster$])` → ARRAY OF STRING | Eintragsnamen (sortiert), optional gefiltert |

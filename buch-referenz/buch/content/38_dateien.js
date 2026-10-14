@@ -84,6 +84,16 @@ module.exports = (H) => [
       'WRITEALL("daten.txt", "12345")',
       'PRINT FILESIZE("daten.txt")',
     ], { out: ["5"] }),
+  H.cmd("FILE_ENCODING$", 'FILE_ENCODING$(pfad$)',
+    "Sagt, welche Kodierung \"auto\" für diese Datei wählen würde: \"utf8\", \"utf8bom\" (UTF-8 mit BOM vorn), \"cp1252\" oder \"binaer\" (Nullbytes, auch UTF-16). Wer eine Datei liest und wieder schreibt, gibt den Namen beim Schreiben mit – sonst wird aus einer cp1252-Datei beim Sichern stillschweigend UTF-8, und ein BOM geht verloren.",
+    [
+      'WRITEALL("alt.txt", "Müller", "cp1252")',
+      'WRITEALL("neu.txt", "Müller")',
+      'PRINT FILE_ENCODING$("alt.txt"); " "; FILE_ENCODING$("neu.txt")',
+      'DIM kod AS STRING : kod = FILE_ENCODING$("alt.txt")',
+      'WRITEALL("alt.txt", READLINES("alt.txt", kod)[0] + "!", kod)',
+      'PRINT FILESIZE("alt.txt")',
+    ], { out: ["cp1252 utf8", "7"] }),
 
   H.h2("Vorhandensein & Verwaltung"),
   H.cmd("FILEEXISTS", 'FILEEXISTS(pfad$)',

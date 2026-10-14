@@ -9468,7 +9468,22 @@ impl<'p> Vm<'p> {
                     Value::Int(g!().load_font(gs(a,0,"LOADFONT")?, gi(a,1,"LOADFONT")? as i32)?)
                 }
             }
-            "setfont" => { g!().set_font(gi(a,0,"SETFONT")?)?; Value::Nil }
+            "setfont" => {
+                // Zweites Argument (2026-10-14, Texteditor-Runde): die Groesse,
+                // in der ab jetzt gezeichnet wird. Ohne sie gilt weiter die
+                // Lade-Groesse -- wer scharf bei 32 laedt und bei 16 zeichnen
+                // will, schrieb vorher SETFONT + TEXT_SIZE und vergass das zweite.
+                if a.is_empty() || a.len() > 2 {
+                    return Err(format!("SETFONT: erwartet (handle[, groesse]), erhalten {} Argument(e)", a.len()));
+                }
+                g!().set_font(gi(a,0,"SETFONT")?)?;
+                if a.len() == 2 {
+                    let gr = gi(a,1,"SETFONT")?;
+                    if gr < 1 { return Err(format!("SETFONT: groesse muss mindestens 1 sein, erhalten {}", gr)); }
+                    g!().set_text_size(gr as i32);
+                }
+                Value::Nil
+            }
             "loadfont_sdf" => {
                 if a.len() < 2 || a.len() > 3 { return Err("LOADFONT_SDF: erwartet (pfad$, groesse[, zeichen$])".into()); }
                 let z = if a.len() == 3 { Some(gs(a,2,"LOADFONT_SDF")?) } else { None };

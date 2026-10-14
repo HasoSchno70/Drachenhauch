@@ -187,11 +187,9 @@ fn next_rand() -> u64 {
     })
 }
 
-/// Lokale Datum/Uhrzeit als (Jahr, Monat, Tag, Stunde, Minute, Sekunde).
-/// Pendant zu Pythons `time.strftime` (LOKALzeit) fuer TIME$/DATE$. Auf Windows
-/// liefert `GetLocalTime` die Felder direkt (inkl. Zeitzone); sonst Fallback auf
-/// UTC, berechnet aus dem Unix-Timestamp (civil-from-days). Clock-basiert,
-/// also naturgemaess nicht deterministisch testbar.
+/// Lokale Datum/Uhrzeit als (Jahr, Monat, Tag, Stunde, Minute, Sekunde) fuer
+/// TIME$/DATE$/ZEIT_JETZT. Auf Windows liefert `GetLocalTime` die Felder direkt
+/// (inkl. Zeitzone), sonst `localtime_r` (unten).
 #[cfg(windows)]
 pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     #[repr(C)]
@@ -238,31 +236,57 @@ pub(crate) fn lokaler_versatz(utc: i64) -> i64 {
     }
 }
 
-/// Ausserhalb von Windows ist die "Ortszeit" dieses Moduls UTC (siehe
-/// `local_datetime`) -- der Versatz ist darum 0, und ZEIT_JETZT und ZEIT_PARSE
-/// passen zusammen.
+/// Ausserhalb von Windows: die Ortszeit aus der C-Bibliothek (`localtime_r`),
+/// unter Linux und macOS samt Zonenregeln aus `TZ` bzw. `/etc/localtime`, im
+/// Browser (emscripten) aus JavaScripts `Date`. Bis 2026.31 war die "Ortszeit"
+/// dort schlicht UTC: `DATE$`/`TIME$`/`ZEIT_JETZT` gingen in Berlin im Sommer
+/// zwei Stunden nach, und `ZEIT_PARSE("...Z")` rechnete nicht um.
+///
+/// `struct tm` ist unter glibc, macOS und musl gleich aufgebaut: neun `int`,
+/// dann `tm_gmtoff` (Sekunden oestlich von UTC, samt Sommerzeit) und
+/// `tm_zone`. Der Versatz kommt aus `tm_gmtoff` -- dieselbe Quelle wie die
+/// Felder, also passen Uhr und Umrechnung zusammen.
 #[cfg(not(windows))]
-pub(crate) fn lokaler_versatz(_utc: i64) -> i64 { 0 }
+mod ortszeit_c {
+    use std::os::raw::{c_char, c_int, c_long};
+    #[repr(C)]
+    struct Tm {
+        sec: c_int, min: c_int, hour: c_int, mday: c_int, mon: c_int, year: c_int,
+        wday: c_int, yday: c_int, isdst: c_int, gmtoff: c_long, zone: *const c_char,
+    }
+    extern "C" {
+        fn localtime_r(t: *const i64, ergebnis: *mut Tm) -> *mut Tm;
+        fn tzset();
+    }
+    static TZ: std::sync::Once = std::sync::Once::new();
+
+    /// (Jahr, Monat, Tag, Stunde, Minute, Sekunde, Versatz) fuer einen
+    /// UTC-Zeitpunkt; `None`, wenn die C-Bibliothek ihn nicht darstellen kann.
+    pub(crate) fn lokal(utc: i64) -> Option<(i64, i64, i64, i64, i64, i64, i64)> {
+        // POSIX verlangt von localtime_r nicht, TZ zu lesen -- tzset tut es.
+        TZ.call_once(|| unsafe { tzset() });
+        unsafe {
+            let mut tm: Tm = std::mem::zeroed();
+            if localtime_r(&utc, &mut tm).is_null() { return None; }
+            Some((tm.year as i64 + 1900, tm.mon as i64 + 1, tm.mday as i64,
+                  tm.hour as i64, tm.min as i64, tm.sec as i64, tm.gmtoff as i64))
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub(crate) fn lokaler_versatz(utc: i64) -> i64 {
+    ortszeit_c::lokal(utc).map(|t| t.6).unwrap_or(0)
+}
 
 #[cfg(not(windows))]
 pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     use std::time::{SystemTime, UNIX_EPOCH};
     let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
-    let days = secs.div_euclid(86_400);
-    let rem = secs.rem_euclid(86_400);
-    let (h, mi, s) = (rem / 3600, (rem % 3600) / 60, rem % 60);
-    // Howard Hinnant's civil_from_days (UTC).
-    let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let mo = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if mo <= 2 { y + 1 } else { y };
-    (y, mo, d, h, mi, s)
+    if let Some((j, mo, d, h, mi, s, _)) = ortszeit_c::lokal(secs) {
+        return (j, mo, d, h, mi, s);
+    }
+    crate::zeit::in_teile(secs)
 }
 
 fn need_str<'a>(v: &'a Value, fn_: &str) -> Result<&'a str, String> {
@@ -3334,6 +3358,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 FileH::Write(w) => {
                     let payload = if name == "writeline" { format!("{}\n", text) } else { text };
                     let bytes = crate::kodierung::kodieren(&payload, kod, "WRITE")?;
+                    // utf8bom: das BOM gehoert vor die leere Datei, nicht vor jede Zeile.
+                    let bom = crate::kodierung::bom_vorn(kod);
+                    if !bom.is_empty() && w.metadata().map(|m| m.len() == 0).unwrap_or(false) {
+                        w.write_all(bom).map_err(|e| format!("WRITE: {}", e))?;
+                    }
                     w.write_all(&bytes).map_err(|e| format!("WRITE: {}", e))?;
                     Ok(Value::Nil)
                 }
@@ -3454,6 +3483,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let kod = if a.len() > 1 { Some(need_str(&a[1], "READLINES")?) } else { None };
             let text = text_lesen(pfad, kod, "READLINES")?;
             Ok(new_str_array(text.lines().map(|l| l.to_string()).collect()))
+        }
+        // FILE_ENCODING$(pfad$) -- welche Kodierung "auto" fuer diese Datei
+        // waehlt (2026-10-14, Texteditor-Runde). Ohne die Antwort liest ein
+        // Editor eine cp1252-Datei richtig und schreibt sie als UTF-8 zurueck:
+        // "auto" gilt nur beim Lesen, und wer sichert, muss den Namen kennen.
+        "file_encoding$" => {
+            arity!(1);
+            let pfad = need_str(&a[0], "FILE_ENCODING$")?;
+            let bytes = std::fs::read(resolve_asset_path(pfad))
+                .map_err(|e| format!("FILE_ENCODING$: {}: {}", pfad, e))?;
+            Ok(Value::str_rc(crate::kodierung::erkennen(&bytes)))
         }
         "filesize" => {
             arity!(1);
@@ -5883,7 +5923,14 @@ fn text_schreiben(pfad: &str, text: &str, kodierung: Option<&str>, fn_: &str,
         Some(n) => crate::kodierung::aus_name(n, fn_)?,
         None => crate::kodierung::Kodierung::Utf8,
     };
-    let bytes = crate::kodierung::kodieren(text, k, fn_)?;
+    let mut bytes = crate::kodierung::kodieren(text, k, fn_)?;
+    // utf8bom: nur vor eine leere Datei -- beim Anhaengen an eine volle
+    // stuende es sonst mitten im Text.
+    let bom = crate::kodierung::bom_vorn(k);
+    let leer = !anhaengen || std::fs::metadata(pfad).map(|m| m.len() == 0).unwrap_or(true);
+    if !bom.is_empty() && leer {
+        bytes.splice(0..0, bom.iter().copied());
+    }
     if anhaengen {
         use std::io::Write;
         let mut f = std::fs::OpenOptions::new().append(true).create(true).open(pfad)

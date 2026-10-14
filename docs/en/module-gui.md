@@ -3542,7 +3542,10 @@ font stays pixelated — unlike `LOADFONT` (TTF), which smooths.
 > `LOADFONT(pfad, 18)` builds the character set *for 18 px*; `SETFONT`
 > thereby sets not only the typeface but also the active text size to 18.
 > So don't be surprised if after `SETFONT` everything is larger or smaller
-> than before. The same font sharp in two sizes? Load it twice — otherwise a
+> than before. Should the interface be smaller than the load size, say so
+> right away: `SETFONT(font, 16)` loads nothing anew, it just draws at 16
+> from now on — a font loaded at 32 stays sharp that way.
+> The same font sharp in two sizes? Load it twice — otherwise a
 > TTF becomes soft when scaled up a lot. `GUI_SET_FONT_SIZE` only changes how
 > large it is drawn, not what the character set was built for.
 

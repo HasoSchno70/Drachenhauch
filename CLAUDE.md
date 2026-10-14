@@ -1677,6 +1677,34 @@ einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
 
+## Dogfooding 11: Texteditor (2026-10-14)
+
+Wunsch des Nutzers: ein Texteditor "mit richtiger Schrift". `examples/texteditor/`
+(Reiter, Suchen/Weitersuchen/Ersetzen, Gehe zu Zeile, Zeilennummern,
+Umbruch, Zoom, Dateien per Argument oder Ablegen, Rueckfragen nicht
+blockierend ueber GUI_DIALOG/GUI_PROMPT, Statusleiste mit Zeile/Spalte,
+Kodierung und Zeilenende -- die letzten beiden per Klick umstellbar).
+Funde: (1) **Kein Weg zu erfahren, was `"auto"` gewaehlt hat** -- ein Editor
+las cp1252 richtig und schrieb es beim Sichern still als UTF-8 zurueck. Neu
+`FILE_ENCODING$(pfad$)` -> `utf8`/`utf8bom`/`cp1252`/`binaer`
+(`kodierung::erkennen`), und jeder Name ausser `binaer` geht beim Schreiben
+wieder hinein. Dafuer die Kodierung **`utf8bom`** (`utf-8-bom`/`utf-8-sig`):
+liest wie utf8, schreibt `EF BB BF` -- nur vor eine LEERE Datei
+(`kodierung::bom_vorn`; `kodieren` selbst setzt es nie, sonst stuende es vor
+jeder WRITELINE-Zeile; WRITE am Handle und APPENDFILE fragen die
+Dateilaenge). (2) **`SETFONT` uebernimmt die Lade-Groesse** -- wer bei 32
+scharf laedt, bekam Menue, Reiter und Statusleiste in 32 (zweite Runde mit
+demselben Stolperstein). Neu `SETFONT(font, groesse)` = SETFONT + TEXT_SIZE in
+einem; ohne zweites Argument wie bisher. (3) **`IF x THEN DIM y ...` meldete
+nur "Unerwartetes Token DIM"** -- jetzt sagt die Meldung, wie es geht (DIM/
+CONST vor dem IF; FOR/WHILE/REPEAT/SELECT/TRY/WITH nur im mehrzeiligen IF,
+`inline_statement_kern`). Alle waren vorher schon Fehler. Tests
+`kodierung.dhtest` (+4, zwei Erwartungen mit der laengeren Namensliste),
+`runtime_font_delta.dhtest` (+2), `umstieg.dhtest` (+2),
+`beispiel_texteditor.dhtest` (4: cp1252+CRLF bleiben samt Zeichen, das cp1252
+nicht kennt; BOM bleibt, Binaeres wird abgelehnt; Suchen mit Umlauf; echte
+Klicks auf die Statusleiste). Gegen 2026.31 fallen alle neuen Faelle.
+
 ## Dogfooding 10: Messdaten-Auswertung und ein Spiel im Browser (2026-10-13)
 
 Wunsch des Nutzers: beide Ideen, "und bitte mit normalem Zeichensatz".
