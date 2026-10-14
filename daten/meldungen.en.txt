@@ -1756,3 +1756,5 @@ GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in
 {} erwartet INTEGER, erhalten FLOAT {} -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig	{} expects INTEGER, got FLOAT {} -- not a whole number; INT(x) cuts off, ROUND(x) rounds, \ divides as integers
 {}: erwartet INTEGER (Arg {}), erhalten {} -- keine ganze Zahl; INT(x) schneidet ab, ROUND(x) rundet, \ teilt ganzzahlig	{}: expects INTEGER (arg {}), got {} -- not a whole number; INT(x) cuts off, ROUND(x) rounds, \ divides as integers
 {}: '{}' ist eine eingebaute Schrift, aber dieser Bau hat keine (Feature "schriften") -- eine .ttf-Datei angeben	{}: '{}' is a built-in font, but this build has none (feature "schriften") -- give a .ttf file
+{} -- {} ist eine Sekunde spaeter noch nicht zurueckgekehrt, darum steht der Fehler schon jetzt hier; Rueckrufe, die scheitern duerfen, mit TRY ... CATCH umgeben	{} -- {} has not returned one second later, so the error is shown here already; wrap callbacks that may fail in TRY ... CATCH
+{} (Zeile {})	{} (line {})

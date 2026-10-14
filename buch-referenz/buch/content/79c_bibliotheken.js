@@ -216,7 +216,8 @@ module.exports = (H) => [
   H.bullet("In den Klammern stehen die C-Typen, die der Rückruf bekommt, mit oder ohne Namen. Erlaubt sind Zahlen, ZEIGER, BOOLEAN und TEXT; zurück gibt er eine Zahl, einen ZEIGER oder BOOLEAN – oder als SUB(...) nichts."),
   H.bullet("Auch ein Struct geht als Wert, hin wie zurück: BYVAL p AS Punkt in den Klammern, AS Punkt als Rückgabe. Deine Funktion bekommt eine Kopie als Struct und gibt einen zurück."),
   H.bullet("Passt die Zahl der Parameter deiner Funktion nicht, ist das ein Fehler, bevor die Bibliothek überhaupt gerufen wird."),
-  H.bullet("Ein Fehler in deiner Funktion kommt beim Aufruf der Bibliothek an, sobald sie fertig ist – abfangbar mit CATCH. Bis dahin bekommt sie von jedem weiteren Rückruf eine 0."),
+  H.bullet("Ein Fehler in deiner Funktion kommt beim Aufruf der Bibliothek an, sobald sie fertig ist – abfangbar mit CATCH, ERROR_LINE() nennt die Zeile im Rückruf. Der gescheiterte Rückruf liefert der Bibliothek eine 0; weitere Rückrufe laufen wie gewohnt."),
+  H.bullet("Kehrt die Bibliothek nicht zurück – gtk_main dreht seine Schleife, bis das Fenster zugeht –, steht der Fehler nach einer Sekunde in der Fehlerausgabe, samt Zeile. Wer ihn selbst behandeln will, legt TRY ... CATCH in den Rückruf."),
   H.bullet("Ein Rückruf bleibt gültig, bis das Programm endet; die Bibliothek darf ihn sich merken und später rufen."),
   H.tip("Ruft eine Bibliothek aus einem eigenen Faden zurück (CreateThread, pthread_create, manche Treiber), läuft deine Funktion nicht: Drachenhauch-Code läuft nur auf dem Faden des Programms. Der Rückruf liefert dann 0, und der nächste Aufruf einer Bibliothek meldet es.", "Nur ein Faden"),
 
@@ -246,7 +247,7 @@ module.exports = (H) => [
   H.code(["3 Drachen, 4.5 Meter, feuerrot"], { out: true }),
 
   H.h2("Eine ganze Oberfläche: GTK"),
-  H.p("Mit DECLARE und Rückrufen lässt sich sogar GTK benutzen, die Bibliothek, mit der unter Linux die meisten Programme ihre Fenster zeichnen. Fenster, Knöpfe und Eingabefelder sind ZEIGER; ein Signal wie \"clicked\" verbindest du mit g_signal_connect_data und einer SUB deines Programms, und gtk_main dreht die Schleife von GTK, bis gtk_main_quit kommt. Das Beispiel 207_gtk.dh zeigt ein Fenster mit Eingabefeld, zwei Knöpfen und einer Beschriftung."),
+  H.p("Mit DECLARE und Rückrufen lässt sich sogar GTK benutzen, die Bibliothek, mit der unter Linux die meisten Programme ihre Fenster zeichnen. Fenster, Knöpfe und Eingabefelder sind ZEIGER; ein Signal wie \"clicked\" verbindest du mit g_signal_connect_data und einer SUB deines Programms, und gtk_main dreht die Schleife von GTK, bis gtk_main_quit kommt. Das Beispiel 207_gtk.dh zeigt ein Fenster mit Eingabefeld, zwei Knöpfen und einer Beschriftung; examples/fotos ist ein ganzer Fotobetrachter mit Kopfleiste, Vorschaubildern, Diaschau und einem eigenen Stylesheet (GtkCssProvider)."),
   H.tip("g_signal_connect, wie es in jeder GTK-Anleitung steht, ist in C nur ein Makro. Gerufen wird g_signal_connect_data – und weil jedes Signal einen anderen Rückruf hat, bekommt jede Form eine eigene DECLARE-Zeile mit ALIAS auf dieselbe C-Funktion.", "Makros gibt es nicht"),
 
   H.h2("Python einbetten"),

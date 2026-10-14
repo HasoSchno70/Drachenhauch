@@ -1,0 +1,50 @@
+' Das Beispiel examples/fotos (Fotobetrachter mit GTK 3, 2026-10-14): Ordner
+' lesen, Vorschaubilder, Einzelansicht mit Blaettern, Drehen, Originalgroesse,
+' Diaschau und Esc -- ueber --probe, das sich selbst vorfuehrt. Ohne GTK mit
+' Bildschirm ueberspringt sich der Fall. Die Bilder schreibt der Fall selbst:
+' klein, damit nichts eingepasst wird und die Masse nicht vom Fenster abhaengen.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== der fotobetrachter fuehrt sich vor
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe", "bilder"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/fotos/main.dh"
+--- vorher
+' Drei Bilder, eine kaputte Datei und eine, die kein Bild ist. b.jpg ist
+' 400 x 100 gespeichert und traegt in den Kameradaten "um 90 Grad drehen"
+' (EXIF Orientation 6) -- angezeigt wird es 100 x 400.
+MKDIR("bilder")
+DIM b AS IMAGE
+b = IMAGE_NEW(300, 200, RGB(200, 40, 40)) : IMAGE_SAVE(b, "bilder/a.png")
+b = IMAGE_NEW(200, 200, RGB(40, 200, 40)) : IMAGE_SAVE(b, "bilder/c.png")
+b = IMAGE_NEW(400, 100, RGB(40, 40, 200)) : IMAGE_SAVE(b, "_roh.jpg")
+DIM roh AS BUFFER : roh = READALL_BYTES("_roh.jpg")
+' APP1 "Exif": TIFF-Kopf (Motorola), ein Eintrag 0x0112 SHORT = 6
+DIM exif AS BUFFER : exif = BUFFER_FROM_HEX("FFD8FFE100224578696600004D4D002A00000008000101120003000000010006000000000000")
+WRITEALL_BYTES("bilder/b.jpg", BUFFER_CONCAT(exif, BUFFER_SLICE(roh, 2, BUFFER_LEN(roh))))
+DELETEFILE("_roh.jpg")
+WRITEALL("bilder/kaputt.jpg", "kein Bild")
+WRITEALL("bilder/notiz.txt", "auch kein Bild")
+--- erwartet
+rueckgabe 0
+bilder 4, vorschaubilder 4
+geoeffnet: ansicht 2 / 4 b.jpg 100x400
+knopf weiter: ansicht 3 / 4 c.png 200x200
+zweimal pfeil links: ansicht 1 / 4 a.png 300x200
+noch einmal: von vorn nach hinten: ansicht 4 / 4 kaputt.jpg nicht lesbar
+pfeil rechts: von hinten nach vorn: ansicht 1 / 4 a.png 300x200
+r gedreht: ansicht 1 / 4 a.png 200x300
+l zurueck: ansicht 1 / 4 a.png 300x200
+1 originalgroesse: ansicht 1 / 4 a.png 300x200
+diaschau an: TRUE
+diaschau schaltet weiter: TRUE
+esc: raster, diaschau an: FALSE
