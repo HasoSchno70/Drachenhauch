@@ -1694,7 +1694,7 @@ Farbfeldern und Ebenen), `daten/` (19 Paletten, Symbole, Demo-Muster,
 `gdk_pixbuf_get_from_window` ist unter Windows weiss). **Gegengeprueft mit dem
 fremden Leser:** PyStickys `load_pattern` liest eine hier geschriebene Datei
 (200 x 200, 40 544 Stiche) ohne abweichende Zelle; die Paletten- und
-Stichtabellen sind mit `core/stitch.py` verglichen.
+Stichtabellen sind mit core/stitch.py von PySticky verglichen.
 
 **Funde in der Laufzeit** (alle mit Faellen, alle fallen gegen 2026.31):
 (1) **BYREF bei Methoden lief still als BYVAL** -- `ebenen.zusammensetzen(farbe,

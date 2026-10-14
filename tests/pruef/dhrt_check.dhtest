@@ -199,13 +199,32 @@ IMPORT "json"
 DIM ordner AS STRING : ordner = ARG$(0)
 DIM roh AS ARRAY OF STRING : roh = DIRLIST_REC(ordner, "*.dh")
 DIM dateien AS ARRAY OF STRING : dateien = []
+' Ein Programm aus Unterordnern (examples/sticky: kern/, gtk/, ansicht/)
+' prueft man ueber seine main.dh -- die Teile eines Namensraums sprechen
+' einander ohne Praefix an und uebersetzen allein nicht.
+DIM programme AS MAP OF BOOLEAN
 DIM i AS INTEGER
+FOR i = 0 TO LEN(roh) - 1
+    IF BASENAME(roh[i]) = "main.dh" THEN MAPPUT(programme, DIRNAME(roh[i]), TRUE)
+NEXT
+DIM teile AS INTEGER
 FOR i = 0 TO LEN(roh) - 1
     IF INSTR(roh[i], "_smoketest") >= 0 THEN CONTINUE
     IF LEFT$(BASENAME(roh[i]), 7) = "_dhtmp_" THEN CONTINUE
+    DIM d AS STRING : d = DIRNAME(DIRNAME(roh[i]))
+    DIM teil AS BOOLEAN : teil = FALSE
+    WHILE d <> "" AND d <> "."
+        IF MAPHAS(programme, d) THEN teil = TRUE
+        d = DIRNAME(d)
+    WEND
+    IF teil THEN
+        teile = teile + 1
+        CONTINUE
+    END IF
     ARRAY_PUSH(dateien, ordner + "/" + roh[i])
 NEXT
 PRINT "genug dateien "; (LEN(dateien) > 150)
+PRINT "teile von programmen uebergangen "; (teile > 0)
 DIM zeilen AS ARRAY OF STRING : zeilen = dlCheckViele(dateien)
 PRINT "je datei eine zeile "; (LEN(zeilen) = LEN(dateien))
 DIM fehler AS INTEGER : fehler = 0
@@ -242,6 +261,7 @@ PRINT "doppelte dims "; doppelt
 IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
 --- erwartet
 genug dateien TRUE
+teile von programmen uebergangen TRUE
 je datei eine zeile TRUE
 fehler 0
 unbekannte builtins 0
