@@ -327,6 +327,30 @@ pub fn stelle(tabelle: &[Herkunft], zeile: u32, haupt: &str) -> String {
     }
 }
 
+thread_local! {
+    /// Herkunft der Zeilen des LAUFENDEN Programms samt Name der Hauptdatei.
+    /// Gesetzt beim Uebersetzen; gelesen von allem, was waehrend des Laufs eine
+    /// Zeile nennt (Laufzeitfehler, Fehler im Rueckruf einer Bibliothek) --
+    /// sonst kaeme die Zeile der zusammengefuegten Quelle heraus ("Zeile 1804"
+    /// statt "main.dh:220"; Sticky, 2026-10-14).
+    static LAUF: std::cell::RefCell<(Vec<Herkunft>, String)> =
+        const { std::cell::RefCell::new((Vec::new(), String::new())) };
+}
+
+/// Merkt die Herkunft der Zeilen fuer den folgenden Lauf.
+pub fn lauf_merken(tabelle: &[Herkunft], haupt: &str) {
+    LAUF.with(|l| *l.borrow_mut() = (tabelle.to_vec(), haupt.to_string()));
+}
+
+/// `datei:zeile` fuer eine Zeile der zusammengefuegten Quelle des laufenden
+/// Programms; `None`, wenn keine Herkunft gemerkt ist (ein .dhc).
+pub fn lauf_stelle(zeile: u32) -> Option<String> {
+    LAUF.with(|l| {
+        let l = l.borrow();
+        if l.0.is_empty() { None } else { Some(stelle(&l.0, zeile, &l.1)) }
+    })
+}
+
 /// Ein fuehrendes BOM abschneiden.
 ///
 /// Windows-Editoren schreiben UTF-8 gern mit Byte-Reihenfolge-Markierung --
