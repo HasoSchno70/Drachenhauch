@@ -1,0 +1,164 @@
+' Der Kern des Sticky-Ports (examples/sticky/kern): Paletten, Muster, Ebenen
+' und das .pxs-Format von PySticky. Die Zahlen sind am Original abgelesen
+' (PySticky, file_io.py) -- das Demo-Muster hat drei Ebenen und sechs Farben.
+' Der Kern wird ueber eine Beilage eingebunden, weil Platzhalter nur dort gelten.
+
+=== paletten werden gelesen wie im original
+IMPORT "k.dh"
+DIM ordner AS STRING : ordner = PATHJOIN(ARG$(0), "daten/paletten")
+DIM ps AS ARRAY OF kern.Palette : ps = kern.palettenLaden(ordner)
+PRINT "paletten "; LEN(ps)
+DIM p AS kern.Palette
+FOR EACH p IN ps
+    IF p.hersteller = "DMC" OR p.hersteller = "Mill Hill Beads" OR p.hersteller = "DMC Diamond Painting" THEN
+        PRINT p.hersteller; " "; LEN(p.garne); " perlen "; p.istPerlen; " diamant "; p.istDiamant
+        DIM g AS kern.Garn : g = p.garne[0]
+        PRINT "  "; g.nummer; " "; g.name; " "; kern.farbeAlsHex$(g.farbe)
+    END IF
+NEXT
+DIM d AS kern.Palette : d = kern.paletteLaden(PATHJOIN(ordner, "DMC_Farben.json"))
+PRINT "310: "; d.nachNummer("310").name
+PRINT "gibt es nicht: "; d.nachNummer("xyz") IS NIL
+--- argumente
+{sammlung}/../../examples/sticky
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+
+--- erwartet
+paletten 19
+DMC Diamond Painting 450 perlen FALSE diamant TRUE
+  150 dusty rose #AB0249
+DMC 492 perlen FALSE diamant FALSE
+  01 White Tin #C5C5C5
+Mill Hill Beads 105 perlen TRUE diamant FALSE
+  00020 Crystal #F0F0F0
+310: Black
+gibt es nicht: TRUE
+
+=== das demo muster
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = kern.pxsLaden(PATHJOIN(ARG$(0), "daten/muster/demo_kreuzstich.pxs"))
+PRINT m.name; " "; m.breite; "x"; m.hoehe; " stoff "; m.stoff
+PRINT "farben "; m.farbanzahl(); " stiche "; m.sticheGesamt()
+DIM i AS INTEGER
+FOR i = 0 TO m.farbanzahl() - 1
+    PRINT "  "; m.farben[i].garn.hersteller; " "; m.farben[i].garn.nummer; " "; m.farben[i].symbol; " "; m.farben[i].stichzahl
+NEXT
+FOR i = 0 TO m.ebenen.anzahl() - 1
+    PRINT "  ebene "; m.ebenen.ebenen[i].name; " "; m.ebenen.ebenen[i].stichzahl(); " sichtbar "; m.ebenen.ebenen[i].sichtbar
+NEXT
+PRINT "zelle 5,5: "; m.stich(5, 5); "  zelle 17,12: "; m.stich(17, 12); "  zelle 0,0: "; m.stich(0, 0)
+' Die Ebene "Herz" ausblenden: der oberste sichtbare Stich verschwindet
+m.ebenen.ebenen[1].sichtbar = FALSE
+PRINT "ohne herz 17,12: "; m.stich(17, 12)
+DIM f AS ARRAY OF INTEGER
+DIM t AS ARRAY OF INTEGER
+DIM e AS ARRAY OF INTEGER
+m.ebenen.zusammensetzen(f, t, e)
+PRINT "zusammengesetzt "; LEN(f); " "; f[5 * m.breite + 5]; " "; f[12 * m.breite + 17]
+--- argumente
+{sammlung}/../../examples/sticky
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+
+--- erwartet
+Demo Kreuzstich 40x40 stoff 14.0
+farben 6 stiche 185
+  Anchor 403 ● 0
+  Anchor 47 ○ 52
+  Anchor 309 ■ 17
+  Anchor 228 □ 0
+  Anchor 134 ▲ 116
+  Anchor 1 △ 0
+  ebene Rahmen 128 sichtbar TRUE
+  ebene Herz 52 sichtbar TRUE
+  ebene Details 5 sichtbar TRUE
+zelle 5,5: 4  zelle 17,12: 1  zelle 0,0: -1
+ohne herz 17,12: -1
+zusammengesetzt 1600 4 -1
+
+=== sichern und wieder laden ergibt dasselbe muster
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = kern.pxsLaden(PATHJOIN(ARG$(0), "daten/muster/demo_kreuzstich.pxs"))
+m.ebenen.ebenen[0].setzeStich(1, 2, 3, kern.HALB_OL_UR)
+m.ebenen.ebenen[0].setzeErledigt(5, 5, TRUE)
+kern.pxsSpeichern(m, "kopie.pxs")
+DIM n AS kern.Muster : n = kern.pxsLaden("kopie.pxs")
+DIM gleich AS BOOLEAN : gleich = n.breite = m.breite AND n.hoehe = m.hoehe AND n.farbanzahl() = m.farbanzahl()
+DIM k AS INTEGER, x AS INTEGER, y AS INTEGER
+FOR k = 0 TO m.ebenen.anzahl() - 1
+    DIM a AS kern.Ebene : a = m.ebenen.ebenen[k]
+    DIM b AS kern.Ebene : b = n.ebenen.ebenen[k]
+    IF a.name <> b.name OR a.sichtbar <> b.sichtbar THEN gleich = FALSE
+    FOR y = 0 TO m.hoehe - 1
+        FOR x = 0 TO m.breite - 1
+            IF a.stich(x, y) <> b.stich(x, y) OR a.stichArt(x, y) <> b.stichArt(x, y) OR a.istErledigt(x, y) <> b.istErledigt(x, y) THEN gleich = FALSE
+        NEXT
+    NEXT
+NEXT
+FOR k = 0 TO m.farbanzahl() - 1
+    IF m.farben[k].symbol <> n.farben[k].symbol OR m.farben[k].garn.farbe <> n.farben[k].garn.farbe THEN gleich = FALSE
+NEXT
+PRINT "gleich: "; gleich
+PRINT "halbstich: "; n.ebenen.ebenen[0].stichArt(1, 2); " erledigt: "; n.ebenen.ebenen[0].istErledigt(5, 5)
+PRINT "keine nebendatei: "; NOT FILEEXISTS("kopie.pxs.tmp")
+--- argumente
+{sammlung}/../../examples/sticky
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+
+--- erwartet
+gleich: TRUE
+halbstich: 1 erledigt: TRUE
+keine nebendatei: TRUE
+
+=== kaputte dateien werden mit der meldung des originals abgelehnt
+IMPORT "k.dh"
+SUB versuch(pfad AS STRING)
+    TRY
+        DIM m AS kern.Muster : m = kern.pxsLaden(pfad)
+        PRINT "geladen?"
+    CATCH e
+        ' Die Meldung des JSON-Lesers haengt am System -- nur der eigene Teil
+        IF INSTR(e, "JSON_LOAD") >= 0 THEN PRINT LEFT$(e, INSTR(e, "JSON_LOAD") + 9) ELSE PRINT e
+    END TRY
+END SUB
+versuch("gibtsnicht.pxs")
+versuch("kein_json.pxs")
+versuch("fremd.pxs")
+versuch("ohne_muster.pxs")
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+
+--- datei kein_json.pxs
+das ist kein json
+--- datei fremd.pxs
+{"format": "anderes", "pattern": {}}
+--- datei ohne_muster.pxs
+{"format": "pysticky", "version": "1.0"}
+--- erwartet
+Datei nicht gefunden: gibtsnicht.pxs
+Fehlerhafte Datei-Syntax: JSON_LOAD
+Ungültiges Dateiformat: erwartet 'pysticky', gefunden 'anderes'
+Datei enthält keine Muster-Daten
+
+=== stichtypen drehen und spiegeln
+' Die Tabellen von PySticky (core/stitch.py ROTATE_CW_MAP, FLIP_H_MAP, FLIP_V_MAP)
+IMPORT "k.dh"
+DIM d AS STRING, h AS STRING, v AS STRING
+DIM t AS INTEGER
+FOR t = 0 TO kern.STICHTYP_MAX
+    d = d + STR$(kern.stichGedreht(t)) + " "
+    h = h + STR$(kern.stichGespiegeltH(t)) + " "
+    v = v + STR$(kern.stichGespiegeltV(t)) + " "
+NEXT
+PRINT TRIM$(d) : PRINT TRIM$(h) : PRINT TRIM$(v)
+PRINT kern.istTeilstich(kern.VOLL); " "; kern.istTeilstich(kern.VIERTEL_OL); " "; LEN(kern.teilstichPunkte(kern.VIERTEL_OL))
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+
+--- erwartet
+0 2 1 4 6 3 5 7 8 9 10 11
+0 2 1 4 3 6 5 7 8 9 10 11
+0 2 1 5 6 3 4 7 8 9 10 11
+FALSE TRUE 6

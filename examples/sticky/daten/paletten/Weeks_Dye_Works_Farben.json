@@ -1,0 +1,956 @@
+[
+ {
+  "WeeksDyeWorksNumber": "1091",
+  "Color": {
+   "R": 190,
+   "G": 160,
+   "B": 145
+  },
+  "Name": "Adobe"
+ },
+ {
+  "WeeksDyeWorksNumber": "1092",
+  "Color": {
+   "R": 165,
+   "G": 120,
+   "B": 100
+  },
+  "Name": "Almond"
+ },
+ {
+  "WeeksDyeWorksNumber": "1093",
+  "Color": {
+   "R": 200,
+   "G": 180,
+   "B": 160
+  },
+  "Name": "Angel Hair"
+ },
+ {
+  "WeeksDyeWorksNumber": "1094",
+  "Color": {
+   "R": 100,
+   "G": 80,
+   "B": 70
+  },
+  "Name": "Bark"
+ },
+ {
+  "WeeksDyeWorksNumber": "1095",
+  "Color": {
+   "R": 180,
+   "G": 155,
+   "B": 120
+  },
+  "Name": "Beige"
+ },
+ {
+  "WeeksDyeWorksNumber": "1096",
+  "Color": {
+   "R": 140,
+   "G": 100,
+   "B": 60
+  },
+  "Name": "Cappuccino"
+ },
+ {
+  "WeeksDyeWorksNumber": "1097",
+  "Color": {
+   "R": 160,
+   "G": 110,
+   "B": 70
+  },
+  "Name": "Caramel"
+ },
+ {
+  "WeeksDyeWorksNumber": "1098",
+  "Color": {
+   "R": 130,
+   "G": 90,
+   "B": 70
+  },
+  "Name": "Chestnut"
+ },
+ {
+  "WeeksDyeWorksNumber": "1099",
+  "Color": {
+   "R": 85,
+   "G": 55,
+   "B": 40
+  },
+  "Name": "Cocoa"
+ },
+ {
+  "WeeksDyeWorksNumber": "1100",
+  "Color": {
+   "R": 75,
+   "G": 50,
+   "B": 35
+  },
+  "Name": "Coffee"
+ },
+ {
+  "WeeksDyeWorksNumber": "1101",
+  "Color": {
+   "R": 170,
+   "G": 135,
+   "B": 110
+  },
+  "Name": "Conch"
+ },
+ {
+  "WeeksDyeWorksNumber": "1102",
+  "Color": {
+   "R": 90,
+   "G": 65,
+   "B": 50
+  },
+  "Name": "Dark Chocolate"
+ },
+ {
+  "WeeksDyeWorksNumber": "1103",
+  "Color": {
+   "R": 60,
+   "G": 40,
+   "B": 30
+  },
+  "Name": "Espresso"
+ },
+ {
+  "WeeksDyeWorksNumber": "1104",
+  "Color": {
+   "R": 200,
+   "G": 175,
+   "B": 150
+  },
+  "Name": "Fawn"
+ },
+ {
+  "WeeksDyeWorksNumber": "1105",
+  "Color": {
+   "R": 190,
+   "G": 160,
+   "B": 130
+  },
+  "Name": "Flax"
+ },
+ {
+  "WeeksDyeWorksNumber": "1201",
+  "Color": {
+   "R": 180,
+   "G": 50,
+   "B": 50
+  },
+  "Name": "Brick"
+ },
+ {
+  "WeeksDyeWorksNumber": "1202",
+  "Color": {
+   "R": 140,
+   "G": 30,
+   "B": 30
+  },
+  "Name": "Cayenne"
+ },
+ {
+  "WeeksDyeWorksNumber": "1203",
+  "Color": {
+   "R": 200,
+   "G": 70,
+   "B": 70
+  },
+  "Name": "Cherry"
+ },
+ {
+  "WeeksDyeWorksNumber": "1204",
+  "Color": {
+   "R": 160,
+   "G": 40,
+   "B": 50
+  },
+  "Name": "Claret"
+ },
+ {
+  "WeeksDyeWorksNumber": "1205",
+  "Color": {
+   "R": 180,
+   "G": 60,
+   "B": 80
+  },
+  "Name": "Cranberry"
+ },
+ {
+  "WeeksDyeWorksNumber": "1206",
+  "Color": {
+   "R": 100,
+   "G": 20,
+   "B": 30
+  },
+  "Name": "Garnet"
+ },
+ {
+  "WeeksDyeWorksNumber": "1207",
+  "Color": {
+   "R": 150,
+   "G": 35,
+   "B": 45
+  },
+  "Name": "Merlot"
+ },
+ {
+  "WeeksDyeWorksNumber": "1208",
+  "Color": {
+   "R": 170,
+   "G": 40,
+   "B": 55
+  },
+  "Name": "Pomegranate"
+ },
+ {
+  "WeeksDyeWorksNumber": "1209",
+  "Color": {
+   "R": 190,
+   "G": 80,
+   "B": 90
+  },
+  "Name": "Raspberry"
+ },
+ {
+  "WeeksDyeWorksNumber": "1210",
+  "Color": {
+   "R": 220,
+   "G": 100,
+   "B": 110
+  },
+  "Name": "Strawberry Fields"
+ },
+ {
+  "WeeksDyeWorksNumber": "1211",
+  "Color": {
+   "R": 120,
+   "G": 25,
+   "B": 35
+  },
+  "Name": "Wine"
+ },
+ {
+  "WeeksDyeWorksNumber": "1301",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 200
+  },
+  "Name": "Baby Pink"
+ },
+ {
+  "WeeksDyeWorksNumber": "1302",
+  "Color": {
+   "R": 220,
+   "G": 140,
+   "B": 160
+  },
+  "Name": "Blush"
+ },
+ {
+  "WeeksDyeWorksNumber": "1303",
+  "Color": {
+   "R": 180,
+   "G": 100,
+   "B": 120
+  },
+  "Name": "Cameo Rose"
+ },
+ {
+  "WeeksDyeWorksNumber": "1304",
+  "Color": {
+   "R": 200,
+   "G": 120,
+   "B": 140
+  },
+  "Name": "Charlotte"
+ },
+ {
+  "WeeksDyeWorksNumber": "1305",
+  "Color": {
+   "R": 160,
+   "G": 80,
+   "B": 100
+  },
+  "Name": "Dusty Rose"
+ },
+ {
+  "WeeksDyeWorksNumber": "1306",
+  "Color": {
+   "R": 240,
+   "G": 180,
+   "B": 180
+  },
+  "Name": "Hibiscus"
+ },
+ {
+  "WeeksDyeWorksNumber": "1307",
+  "Color": {
+   "R": 230,
+   "G": 160,
+   "B": 170
+  },
+  "Name": "Peony"
+ },
+ {
+  "WeeksDyeWorksNumber": "1308",
+  "Color": {
+   "R": 255,
+   "G": 220,
+   "B": 220
+  },
+  "Name": "Pink Sand"
+ },
+ {
+  "WeeksDyeWorksNumber": "1309",
+  "Color": {
+   "R": 210,
+   "G": 130,
+   "B": 150
+  },
+  "Name": "Romance"
+ },
+ {
+  "WeeksDyeWorksNumber": "1310",
+  "Color": {
+   "R": 250,
+   "G": 190,
+   "B": 195
+  },
+  "Name": "Tea Rose"
+ },
+ {
+  "WeeksDyeWorksNumber": "1401",
+  "Color": {
+   "R": 255,
+   "G": 180,
+   "B": 100
+  },
+  "Name": "Apricot"
+ },
+ {
+  "WeeksDyeWorksNumber": "1402",
+  "Color": {
+   "R": 220,
+   "G": 120,
+   "B": 50
+  },
+  "Name": "Carrot"
+ },
+ {
+  "WeeksDyeWorksNumber": "1403",
+  "Color": {
+   "R": 200,
+   "G": 100,
+   "B": 30
+  },
+  "Name": "Cinnamon"
+ },
+ {
+  "WeeksDyeWorksNumber": "1404",
+  "Color": {
+   "R": 180,
+   "G": 90,
+   "B": 20
+  },
+  "Name": "Ginger"
+ },
+ {
+  "WeeksDyeWorksNumber": "1405",
+  "Color": {
+   "R": 240,
+   "G": 160,
+   "B": 80
+  },
+  "Name": "Marigold"
+ },
+ {
+  "WeeksDyeWorksNumber": "1406",
+  "Color": {
+   "R": 255,
+   "G": 140,
+   "B": 50
+  },
+  "Name": "Orange Marmalade"
+ },
+ {
+  "WeeksDyeWorksNumber": "1407",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 140
+  },
+  "Name": "Peach"
+ },
+ {
+  "WeeksDyeWorksNumber": "1408",
+  "Color": {
+   "R": 230,
+   "G": 140,
+   "B": 70
+  },
+  "Name": "Persimmon"
+ },
+ {
+  "WeeksDyeWorksNumber": "1409",
+  "Color": {
+   "R": 210,
+   "G": 110,
+   "B": 40
+  },
+  "Name": "Pumpkin"
+ },
+ {
+  "WeeksDyeWorksNumber": "1410",
+  "Color": {
+   "R": 190,
+   "G": 85,
+   "B": 25
+  },
+  "Name": "Rust"
+ },
+ {
+  "WeeksDyeWorksNumber": "1501",
+  "Color": {
+   "R": 255,
+   "G": 230,
+   "B": 100
+  },
+  "Name": "Buttercup"
+ },
+ {
+  "WeeksDyeWorksNumber": "1502",
+  "Color": {
+   "R": 255,
+   "G": 240,
+   "B": 140
+  },
+  "Name": "Cornsilk"
+ },
+ {
+  "WeeksDyeWorksNumber": "1503",
+  "Color": {
+   "R": 200,
+   "G": 170,
+   "B": 50
+  },
+  "Name": "Curry"
+ },
+ {
+  "WeeksDyeWorksNumber": "1504",
+  "Color": {
+   "R": 220,
+   "G": 180,
+   "B": 30
+  },
+  "Name": "Goldenrod"
+ },
+ {
+  "WeeksDyeWorksNumber": "1505",
+  "Color": {
+   "R": 180,
+   "G": 150,
+   "B": 30
+  },
+  "Name": "Harvest Gold"
+ },
+ {
+  "WeeksDyeWorksNumber": "1506",
+  "Color": {
+   "R": 255,
+   "G": 245,
+   "B": 180
+  },
+  "Name": "Lemon Drops"
+ },
+ {
+  "WeeksDyeWorksNumber": "1507",
+  "Color": {
+   "R": 200,
+   "G": 160,
+   "B": 40
+  },
+  "Name": "Mustard"
+ },
+ {
+  "WeeksDyeWorksNumber": "1508",
+  "Color": {
+   "R": 170,
+   "G": 140,
+   "B": 20
+  },
+  "Name": "Old Gold"
+ },
+ {
+  "WeeksDyeWorksNumber": "1509",
+  "Color": {
+   "R": 240,
+   "G": 210,
+   "B": 80
+  },
+  "Name": "Sunflower"
+ },
+ {
+  "WeeksDyeWorksNumber": "1510",
+  "Color": {
+   "R": 255,
+   "G": 250,
+   "B": 200
+  },
+  "Name": "Sunshine"
+ },
+ {
+  "WeeksDyeWorksNumber": "1601",
+  "Color": {
+   "R": 50,
+   "G": 100,
+   "B": 50
+  },
+  "Name": "Brethren Blue"
+ },
+ {
+  "WeeksDyeWorksNumber": "1602",
+  "Color": {
+   "R": 80,
+   "G": 120,
+   "B": 60
+  },
+  "Name": "Clover"
+ },
+ {
+  "WeeksDyeWorksNumber": "1603",
+  "Color": {
+   "R": 30,
+   "G": 80,
+   "B": 50
+  },
+  "Name": "Evergreen"
+ },
+ {
+  "WeeksDyeWorksNumber": "1604",
+  "Color": {
+   "R": 100,
+   "G": 140,
+   "B": 80
+  },
+  "Name": "Fern"
+ },
+ {
+  "WeeksDyeWorksNumber": "1605",
+  "Color": {
+   "R": 60,
+   "G": 100,
+   "B": 60
+  },
+  "Name": "Forest Glade"
+ },
+ {
+  "WeeksDyeWorksNumber": "1606",
+  "Color": {
+   "R": 120,
+   "G": 160,
+   "B": 100
+  },
+  "Name": "Grass"
+ },
+ {
+  "WeeksDyeWorksNumber": "1607",
+  "Color": {
+   "R": 80,
+   "G": 110,
+   "B": 60
+  },
+  "Name": "Hunter"
+ },
+ {
+  "WeeksDyeWorksNumber": "1608",
+  "Color": {
+   "R": 180,
+   "G": 200,
+   "B": 140
+  },
+  "Name": "Meadow"
+ },
+ {
+  "WeeksDyeWorksNumber": "1609",
+  "Color": {
+   "R": 150,
+   "G": 180,
+   "B": 120
+  },
+  "Name": "Moss"
+ },
+ {
+  "WeeksDyeWorksNumber": "1610",
+  "Color": {
+   "R": 90,
+   "G": 100,
+   "B": 50
+  },
+  "Name": "Olive"
+ },
+ {
+  "WeeksDyeWorksNumber": "1611",
+  "Color": {
+   "R": 40,
+   "G": 80,
+   "B": 40
+  },
+  "Name": "Pine"
+ },
+ {
+  "WeeksDyeWorksNumber": "1612",
+  "Color": {
+   "R": 160,
+   "G": 190,
+   "B": 140
+  },
+  "Name": "Sage"
+ },
+ {
+  "WeeksDyeWorksNumber": "1701",
+  "Color": {
+   "R": 80,
+   "G": 140,
+   "B": 140
+  },
+  "Name": "Caribbean"
+ },
+ {
+  "WeeksDyeWorksNumber": "1702",
+  "Color": {
+   "R": 100,
+   "G": 160,
+   "B": 160
+  },
+  "Name": "Lagoon"
+ },
+ {
+  "WeeksDyeWorksNumber": "1703",
+  "Color": {
+   "R": 50,
+   "G": 100,
+   "B": 100
+  },
+  "Name": "Peacock"
+ },
+ {
+  "WeeksDyeWorksNumber": "1704",
+  "Color": {
+   "R": 120,
+   "G": 180,
+   "B": 180
+  },
+  "Name": "Robin's Egg"
+ },
+ {
+  "WeeksDyeWorksNumber": "1705",
+  "Color": {
+   "R": 70,
+   "G": 120,
+   "B": 120
+  },
+  "Name": "Sea Foam"
+ },
+ {
+  "WeeksDyeWorksNumber": "1706",
+  "Color": {
+   "R": 60,
+   "G": 100,
+   "B": 110
+  },
+  "Name": "Teal"
+ },
+ {
+  "WeeksDyeWorksNumber": "1707",
+  "Color": {
+   "R": 90,
+   "G": 150,
+   "B": 150
+  },
+  "Name": "Turquoise"
+ },
+ {
+  "WeeksDyeWorksNumber": "1801",
+  "Color": {
+   "R": 30,
+   "G": 50,
+   "B": 90
+  },
+  "Name": "Americana"
+ },
+ {
+  "WeeksDyeWorksNumber": "1802",
+  "Color": {
+   "R": 100,
+   "G": 140,
+   "B": 180
+  },
+  "Name": "Blue Bonnet"
+ },
+ {
+  "WeeksDyeWorksNumber": "1803",
+  "Color": {
+   "R": 80,
+   "G": 120,
+   "B": 160
+  },
+  "Name": "Blue Jeans"
+ },
+ {
+  "WeeksDyeWorksNumber": "1804",
+  "Color": {
+   "R": 70,
+   "G": 100,
+   "B": 150
+  },
+  "Name": "Confederate"
+ },
+ {
+  "WeeksDyeWorksNumber": "1805",
+  "Color": {
+   "R": 50,
+   "G": 80,
+   "B": 130
+  },
+  "Name": "Deep Sea"
+ },
+ {
+  "WeeksDyeWorksNumber": "1806",
+  "Color": {
+   "R": 60,
+   "G": 90,
+   "B": 140
+  },
+  "Name": "Indigo"
+ },
+ {
+  "WeeksDyeWorksNumber": "1807",
+  "Color": {
+   "R": 20,
+   "G": 40,
+   "B": 80
+  },
+  "Name": "Midnight"
+ },
+ {
+  "WeeksDyeWorksNumber": "1808",
+  "Color": {
+   "R": 30,
+   "G": 50,
+   "B": 100
+  },
+  "Name": "Navy"
+ },
+ {
+  "WeeksDyeWorksNumber": "1809",
+  "Color": {
+   "R": 120,
+   "G": 160,
+   "B": 200
+  },
+  "Name": "Periwinkle"
+ },
+ {
+  "WeeksDyeWorksNumber": "1810",
+  "Color": {
+   "R": 160,
+   "G": 190,
+   "B": 220
+  },
+  "Name": "Sky"
+ },
+ {
+  "WeeksDyeWorksNumber": "1901",
+  "Color": {
+   "R": 80,
+   "G": 50,
+   "B": 100
+  },
+  "Name": "Eggplant"
+ },
+ {
+  "WeeksDyeWorksNumber": "1902",
+  "Color": {
+   "R": 150,
+   "G": 120,
+   "B": 160
+  },
+  "Name": "Heather"
+ },
+ {
+  "WeeksDyeWorksNumber": "1903",
+  "Color": {
+   "R": 100,
+   "G": 70,
+   "B": 120
+  },
+  "Name": "Iris"
+ },
+ {
+  "WeeksDyeWorksNumber": "1904",
+  "Color": {
+   "R": 200,
+   "G": 180,
+   "B": 210
+  },
+  "Name": "Lavender"
+ },
+ {
+  "WeeksDyeWorksNumber": "1905",
+  "Color": {
+   "R": 170,
+   "G": 140,
+   "B": 180
+  },
+  "Name": "Lilac"
+ },
+ {
+  "WeeksDyeWorksNumber": "1906",
+  "Color": {
+   "R": 130,
+   "G": 100,
+   "B": 140
+  },
+  "Name": "Orchid"
+ },
+ {
+  "WeeksDyeWorksNumber": "1907",
+  "Color": {
+   "R": 70,
+   "G": 40,
+   "B": 80
+  },
+  "Name": "Plum"
+ },
+ {
+  "WeeksDyeWorksNumber": "1908",
+  "Color": {
+   "R": 60,
+   "G": 30,
+   "B": 70
+  },
+  "Name": "Purple"
+ },
+ {
+  "WeeksDyeWorksNumber": "1909",
+  "Color": {
+   "R": 180,
+   "G": 150,
+   "B": 190
+  },
+  "Name": "Thistle"
+ },
+ {
+  "WeeksDyeWorksNumber": "1910",
+  "Color": {
+   "R": 110,
+   "G": 80,
+   "B": 130
+  },
+  "Name": "Violet"
+ },
+ {
+  "WeeksDyeWorksNumber": "1911",
+  "Color": {
+   "R": 220,
+   "G": 200,
+   "B": 230
+  },
+  "Name": "Wisteria"
+ },
+ {
+  "WeeksDyeWorksNumber": "2001",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Blackboard"
+ },
+ {
+  "WeeksDyeWorksNumber": "2002",
+  "Color": {
+   "R": 60,
+   "G": 60,
+   "B": 60
+  },
+  "Name": "Charcoal"
+ },
+ {
+  "WeeksDyeWorksNumber": "2003",
+  "Color": {
+   "R": 100,
+   "G": 100,
+   "B": 100
+  },
+  "Name": "Dolphin"
+ },
+ {
+  "WeeksDyeWorksNumber": "2004",
+  "Color": {
+   "R": 140,
+   "G": 140,
+   "B": 140
+  },
+  "Name": "Graphite"
+ },
+ {
+  "WeeksDyeWorksNumber": "2005",
+  "Color": {
+   "R": 180,
+   "G": 180,
+   "B": 180
+  },
+  "Name": "Pelican"
+ },
+ {
+  "WeeksDyeWorksNumber": "2006",
+  "Color": {
+   "R": 100,
+   "G": 110,
+   "B": 120
+  },
+  "Name": "Pewter"
+ },
+ {
+  "WeeksDyeWorksNumber": "2007",
+  "Color": {
+   "R": 200,
+   "G": 200,
+   "B": 200
+  },
+  "Name": "Silver"
+ },
+ {
+  "WeeksDyeWorksNumber": "2008",
+  "Color": {
+   "R": 80,
+   "G": 90,
+   "B": 100
+  },
+  "Name": "Slate"
+ },
+ {
+  "WeeksDyeWorksNumber": "2009",
+  "Color": {
+   "R": 220,
+   "G": 220,
+   "B": 220
+  },
+  "Name": "Snow"
+ },
+ {
+  "WeeksDyeWorksNumber": "2010",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "White Lightning"
+ }
+]

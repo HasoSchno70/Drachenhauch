@@ -1,0 +1,11 @@
+' Der Kern von Sticky -- ohne Oberflaeche. Eingebunden als
+'     IMPORT "kern/kern.dh" AS kern
+' Die Teile tragen denselben Namensraum "kern" (mehrere Dateien mit einem
+' Alias bilden EINEN Raum) und sehen einander dadurch ohne Vorsatz.
+IMPORT "json"
+IMPORT "zeit"
+IMPORT "stich.dh" AS kern
+IMPORT "garn.dh" AS kern
+IMPORT "ebene.dh" AS kern
+IMPORT "muster.dh" AS kern
+IMPORT "pxs.dh" AS kern

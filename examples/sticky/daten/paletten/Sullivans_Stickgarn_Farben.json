@@ -1,0 +1,875 @@
+[
+ {
+  "SullivansNumber": "45001",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "White"
+ },
+ {
+  "SullivansNumber": "45002",
+  "Color": {
+   "R": 252,
+   "G": 250,
+   "B": 245
+  },
+  "Name": "Antique White"
+ },
+ {
+  "SullivansNumber": "45003",
+  "Color": {
+   "R": 255,
+   "G": 253,
+   "B": 230
+  },
+  "Name": "Cream"
+ },
+ {
+  "SullivansNumber": "45004",
+  "Color": {
+   "R": 245,
+   "G": 235,
+   "B": 215
+  },
+  "Name": "Ecru"
+ },
+ {
+  "SullivansNumber": "45005",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Black"
+ },
+ {
+  "SullivansNumber": "45010",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Maroon"
+ },
+ {
+  "SullivansNumber": "45011",
+  "Color": {
+   "R": 139,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Dark Red"
+ },
+ {
+  "SullivansNumber": "45012",
+  "Color": {
+   "R": 178,
+   "G": 34,
+   "B": 34
+  },
+  "Name": "Firebrick"
+ },
+ {
+  "SullivansNumber": "45013",
+  "Color": {
+   "R": 205,
+   "G": 92,
+   "B": 92
+  },
+  "Name": "Indian Red"
+ },
+ {
+  "SullivansNumber": "45014",
+  "Color": {
+   "R": 220,
+   "G": 20,
+   "B": 60
+  },
+  "Name": "Crimson"
+ },
+ {
+  "SullivansNumber": "45015",
+  "Color": {
+   "R": 255,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Red"
+ },
+ {
+  "SullivansNumber": "45016",
+  "Color": {
+   "R": 255,
+   "G": 99,
+   "B": 71
+  },
+  "Name": "Tomato"
+ },
+ {
+  "SullivansNumber": "45017",
+  "Color": {
+   "R": 255,
+   "G": 127,
+   "B": 80
+  },
+  "Name": "Coral"
+ },
+ {
+  "SullivansNumber": "45018",
+  "Color": {
+   "R": 250,
+   "G": 128,
+   "B": 114
+  },
+  "Name": "Salmon"
+ },
+ {
+  "SullivansNumber": "45019",
+  "Color": {
+   "R": 255,
+   "G": 160,
+   "B": 122
+  },
+  "Name": "Light Salmon"
+ },
+ {
+  "SullivansNumber": "45020",
+  "Color": {
+   "R": 255,
+   "G": 182,
+   "B": 193
+  },
+  "Name": "Light Pink"
+ },
+ {
+  "SullivansNumber": "45021",
+  "Color": {
+   "R": 255,
+   "G": 192,
+   "B": 203
+  },
+  "Name": "Pink"
+ },
+ {
+  "SullivansNumber": "45022",
+  "Color": {
+   "R": 255,
+   "G": 105,
+   "B": 180
+  },
+  "Name": "Hot Pink"
+ },
+ {
+  "SullivansNumber": "45023",
+  "Color": {
+   "R": 255,
+   "G": 20,
+   "B": 147
+  },
+  "Name": "Deep Pink"
+ },
+ {
+  "SullivansNumber": "45024",
+  "Color": {
+   "R": 219,
+   "G": 112,
+   "B": 147
+  },
+  "Name": "Pale Violet Red"
+ },
+ {
+  "SullivansNumber": "45030",
+  "Color": {
+   "R": 255,
+   "G": 165,
+   "B": 0
+  },
+  "Name": "Orange"
+ },
+ {
+  "SullivansNumber": "45031",
+  "Color": {
+   "R": 255,
+   "G": 140,
+   "B": 0
+  },
+  "Name": "Dark Orange"
+ },
+ {
+  "SullivansNumber": "45032",
+  "Color": {
+   "R": 255,
+   "G": 69,
+   "B": 0
+  },
+  "Name": "Orange Red"
+ },
+ {
+  "SullivansNumber": "45033",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 100
+  },
+  "Name": "Light Orange"
+ },
+ {
+  "SullivansNumber": "45034",
+  "Color": {
+   "R": 255,
+   "G": 218,
+   "B": 185
+  },
+  "Name": "Peach Puff"
+ },
+ {
+  "SullivansNumber": "45035",
+  "Color": {
+   "R": 255,
+   "G": 228,
+   "B": 196
+  },
+  "Name": "Bisque"
+ },
+ {
+  "SullivansNumber": "45040",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 0
+  },
+  "Name": "Yellow"
+ },
+ {
+  "SullivansNumber": "45041",
+  "Color": {
+   "R": 255,
+   "G": 215,
+   "B": 0
+  },
+  "Name": "Gold"
+ },
+ {
+  "SullivansNumber": "45042",
+  "Color": {
+   "R": 255,
+   "G": 223,
+   "B": 0
+  },
+  "Name": "Golden Yellow"
+ },
+ {
+  "SullivansNumber": "45043",
+  "Color": {
+   "R": 238,
+   "G": 232,
+   "B": 170
+  },
+  "Name": "Pale Goldenrod"
+ },
+ {
+  "SullivansNumber": "45044",
+  "Color": {
+   "R": 240,
+   "G": 230,
+   "B": 140
+  },
+  "Name": "Khaki"
+ },
+ {
+  "SullivansNumber": "45045",
+  "Color": {
+   "R": 255,
+   "G": 250,
+   "B": 205
+  },
+  "Name": "Lemon Chiffon"
+ },
+ {
+  "SullivansNumber": "45046",
+  "Color": {
+   "R": 250,
+   "G": 250,
+   "B": 210
+  },
+  "Name": "Light Goldenrod"
+ },
+ {
+  "SullivansNumber": "45047",
+  "Color": {
+   "R": 218,
+   "G": 165,
+   "B": 32
+  },
+  "Name": "Goldenrod"
+ },
+ {
+  "SullivansNumber": "45048",
+  "Color": {
+   "R": 184,
+   "G": 134,
+   "B": 11
+  },
+  "Name": "Dark Goldenrod"
+ },
+ {
+  "SullivansNumber": "45050",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 0
+  },
+  "Name": "Green"
+ },
+ {
+  "SullivansNumber": "45051",
+  "Color": {
+   "R": 0,
+   "G": 100,
+   "B": 0
+  },
+  "Name": "Dark Green"
+ },
+ {
+  "SullivansNumber": "45052",
+  "Color": {
+   "R": 34,
+   "G": 139,
+   "B": 34
+  },
+  "Name": "Forest Green"
+ },
+ {
+  "SullivansNumber": "45053",
+  "Color": {
+   "R": 0,
+   "G": 255,
+   "B": 0
+  },
+  "Name": "Lime"
+ },
+ {
+  "SullivansNumber": "45054",
+  "Color": {
+   "R": 50,
+   "G": 205,
+   "B": 50
+  },
+  "Name": "Lime Green"
+ },
+ {
+  "SullivansNumber": "45055",
+  "Color": {
+   "R": 144,
+   "G": 238,
+   "B": 144
+  },
+  "Name": "Light Green"
+ },
+ {
+  "SullivansNumber": "45056",
+  "Color": {
+   "R": 152,
+   "G": 251,
+   "B": 152
+  },
+  "Name": "Pale Green"
+ },
+ {
+  "SullivansNumber": "45057",
+  "Color": {
+   "R": 0,
+   "G": 255,
+   "B": 127
+  },
+  "Name": "Spring Green"
+ },
+ {
+  "SullivansNumber": "45058",
+  "Color": {
+   "R": 46,
+   "G": 139,
+   "B": 87
+  },
+  "Name": "Sea Green"
+ },
+ {
+  "SullivansNumber": "45059",
+  "Color": {
+   "R": 143,
+   "G": 188,
+   "B": 143
+  },
+  "Name": "Dark Sea Green"
+ },
+ {
+  "SullivansNumber": "45060",
+  "Color": {
+   "R": 85,
+   "G": 107,
+   "B": 47
+  },
+  "Name": "Dark Olive Green"
+ },
+ {
+  "SullivansNumber": "45061",
+  "Color": {
+   "R": 107,
+   "G": 142,
+   "B": 35
+  },
+  "Name": "Olive Drab"
+ },
+ {
+  "SullivansNumber": "45062",
+  "Color": {
+   "R": 128,
+   "G": 128,
+   "B": 0
+  },
+  "Name": "Olive"
+ },
+ {
+  "SullivansNumber": "45070",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 128
+  },
+  "Name": "Teal"
+ },
+ {
+  "SullivansNumber": "45071",
+  "Color": {
+   "R": 0,
+   "G": 139,
+   "B": 139
+  },
+  "Name": "Dark Cyan"
+ },
+ {
+  "SullivansNumber": "45072",
+  "Color": {
+   "R": 0,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "Cyan"
+ },
+ {
+  "SullivansNumber": "45073",
+  "Color": {
+   "R": 0,
+   "G": 206,
+   "B": 209
+  },
+  "Name": "Dark Turquoise"
+ },
+ {
+  "SullivansNumber": "45074",
+  "Color": {
+   "R": 64,
+   "G": 224,
+   "B": 208
+  },
+  "Name": "Turquoise"
+ },
+ {
+  "SullivansNumber": "45075",
+  "Color": {
+   "R": 72,
+   "G": 209,
+   "B": 204
+  },
+  "Name": "Medium Turquoise"
+ },
+ {
+  "SullivansNumber": "45076",
+  "Color": {
+   "R": 175,
+   "G": 238,
+   "B": 238
+  },
+  "Name": "Pale Turquoise"
+ },
+ {
+  "SullivansNumber": "45077",
+  "Color": {
+   "R": 127,
+   "G": 255,
+   "B": 212
+  },
+  "Name": "Aquamarine"
+ },
+ {
+  "SullivansNumber": "45080",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Navy"
+ },
+ {
+  "SullivansNumber": "45081",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 139
+  },
+  "Name": "Dark Blue"
+ },
+ {
+  "SullivansNumber": "45082",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 205
+  },
+  "Name": "Medium Blue"
+ },
+ {
+  "SullivansNumber": "45083",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 255
+  },
+  "Name": "Blue"
+ },
+ {
+  "SullivansNumber": "45084",
+  "Color": {
+   "R": 65,
+   "G": 105,
+   "B": 225
+  },
+  "Name": "Royal Blue"
+ },
+ {
+  "SullivansNumber": "45085",
+  "Color": {
+   "R": 100,
+   "G": 149,
+   "B": 237
+  },
+  "Name": "Cornflower Blue"
+ },
+ {
+  "SullivansNumber": "45086",
+  "Color": {
+   "R": 70,
+   "G": 130,
+   "B": 180
+  },
+  "Name": "Steel Blue"
+ },
+ {
+  "SullivansNumber": "45087",
+  "Color": {
+   "R": 30,
+   "G": 144,
+   "B": 255
+  },
+  "Name": "Dodger Blue"
+ },
+ {
+  "SullivansNumber": "45088",
+  "Color": {
+   "R": 0,
+   "G": 191,
+   "B": 255
+  },
+  "Name": "Deep Sky Blue"
+ },
+ {
+  "SullivansNumber": "45089",
+  "Color": {
+   "R": 135,
+   "G": 206,
+   "B": 235
+  },
+  "Name": "Sky Blue"
+ },
+ {
+  "SullivansNumber": "45090",
+  "Color": {
+   "R": 173,
+   "G": 216,
+   "B": 230
+  },
+  "Name": "Light Blue"
+ },
+ {
+  "SullivansNumber": "45091",
+  "Color": {
+   "R": 176,
+   "G": 224,
+   "B": 230
+  },
+  "Name": "Powder Blue"
+ },
+ {
+  "SullivansNumber": "45100",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Purple"
+ },
+ {
+  "SullivansNumber": "45101",
+  "Color": {
+   "R": 75,
+   "G": 0,
+   "B": 130
+  },
+  "Name": "Indigo"
+ },
+ {
+  "SullivansNumber": "45102",
+  "Color": {
+   "R": 138,
+   "G": 43,
+   "B": 226
+  },
+  "Name": "Blue Violet"
+ },
+ {
+  "SullivansNumber": "45103",
+  "Color": {
+   "R": 148,
+   "G": 0,
+   "B": 211
+  },
+  "Name": "Dark Violet"
+ },
+ {
+  "SullivansNumber": "45104",
+  "Color": {
+   "R": 153,
+   "G": 50,
+   "B": 204
+  },
+  "Name": "Dark Orchid"
+ },
+ {
+  "SullivansNumber": "45105",
+  "Color": {
+   "R": 186,
+   "G": 85,
+   "B": 211
+  },
+  "Name": "Medium Orchid"
+ },
+ {
+  "SullivansNumber": "45106",
+  "Color": {
+   "R": 218,
+   "G": 112,
+   "B": 214
+  },
+  "Name": "Orchid"
+ },
+ {
+  "SullivansNumber": "45107",
+  "Color": {
+   "R": 238,
+   "G": 130,
+   "B": 238
+  },
+  "Name": "Violet"
+ },
+ {
+  "SullivansNumber": "45108",
+  "Color": {
+   "R": 221,
+   "G": 160,
+   "B": 221
+  },
+  "Name": "Plum"
+ },
+ {
+  "SullivansNumber": "45109",
+  "Color": {
+   "R": 216,
+   "G": 191,
+   "B": 216
+  },
+  "Name": "Thistle"
+ },
+ {
+  "SullivansNumber": "45110",
+  "Color": {
+   "R": 230,
+   "G": 230,
+   "B": 250
+  },
+  "Name": "Lavender"
+ },
+ {
+  "SullivansNumber": "45111",
+  "Color": {
+   "R": 147,
+   "G": 112,
+   "B": 219
+  },
+  "Name": "Medium Purple"
+ },
+ {
+  "SullivansNumber": "45120",
+  "Color": {
+   "R": 139,
+   "G": 69,
+   "B": 19
+  },
+  "Name": "Saddle Brown"
+ },
+ {
+  "SullivansNumber": "45121",
+  "Color": {
+   "R": 101,
+   "G": 67,
+   "B": 33
+  },
+  "Name": "Dark Brown"
+ },
+ {
+  "SullivansNumber": "45122",
+  "Color": {
+   "R": 150,
+   "G": 105,
+   "B": 60
+  },
+  "Name": "Medium Brown"
+ },
+ {
+  "SullivansNumber": "45123",
+  "Color": {
+   "R": 193,
+   "G": 154,
+   "B": 107
+  },
+  "Name": "Light Brown"
+ },
+ {
+  "SullivansNumber": "45124",
+  "Color": {
+   "R": 210,
+   "G": 180,
+   "B": 140
+  },
+  "Name": "Tan"
+ },
+ {
+  "SullivansNumber": "45125",
+  "Color": {
+   "R": 245,
+   "G": 222,
+   "B": 179
+  },
+  "Name": "Wheat"
+ },
+ {
+  "SullivansNumber": "45126",
+  "Color": {
+   "R": 222,
+   "G": 184,
+   "B": 135
+  },
+  "Name": "Burlywood"
+ },
+ {
+  "SullivansNumber": "45127",
+  "Color": {
+   "R": 210,
+   "G": 105,
+   "B": 30
+  },
+  "Name": "Chocolate"
+ },
+ {
+  "SullivansNumber": "45128",
+  "Color": {
+   "R": 205,
+   "G": 133,
+   "B": 63
+  },
+  "Name": "Peru"
+ },
+ {
+  "SullivansNumber": "45129",
+  "Color": {
+   "R": 160,
+   "G": 82,
+   "B": 45
+  },
+  "Name": "Sienna"
+ },
+ {
+  "SullivansNumber": "45130",
+  "Color": {
+   "R": 45,
+   "G": 45,
+   "B": 45
+  },
+  "Name": "Charcoal"
+ },
+ {
+  "SullivansNumber": "45131",
+  "Color": {
+   "R": 85,
+   "G": 85,
+   "B": 85
+  },
+  "Name": "Dark Gray"
+ },
+ {
+  "SullivansNumber": "45132",
+  "Color": {
+   "R": 128,
+   "G": 128,
+   "B": 128
+  },
+  "Name": "Gray"
+ },
+ {
+  "SullivansNumber": "45133",
+  "Color": {
+   "R": 169,
+   "G": 169,
+   "B": 169
+  },
+  "Name": "Dark Silver"
+ },
+ {
+  "SullivansNumber": "45134",
+  "Color": {
+   "R": 192,
+   "G": 192,
+   "B": 192
+  },
+  "Name": "Silver"
+ },
+ {
+  "SullivansNumber": "45135",
+  "Color": {
+   "R": 211,
+   "G": 211,
+   "B": 211
+  },
+  "Name": "Light Gray"
+ },
+ {
+  "SullivansNumber": "45136",
+  "Color": {
+   "R": 112,
+   "G": 128,
+   "B": 144
+  },
+  "Name": "Slate Gray"
+ }
+]

@@ -1,0 +1,290 @@
+[
+    {
+        "LightEffectsNumber": "E155",
+        "Color": {
+            "R": 152,
+            "G": 145,
+            "B": 182
+        },
+        "Name": "Amethyst"
+    },
+    {
+        "LightEffectsNumber": "E316",
+        "Color": {
+            "R": 183,
+            "G": 115,
+            "B": 127
+        },
+        "Name": "Antique Mauve Med"
+    },
+    {
+        "LightEffectsNumber": "E321",
+        "Color": {
+            "R": 199,
+            "G": 43,
+            "B": 59
+        },
+        "Name": "Red Ruby"
+    },
+    {
+        "LightEffectsNumber": "E334",
+        "Color": {
+            "R": 115,
+            "G": 159,
+            "B": 193
+        },
+        "Name": "Baby Blue medium"
+    },
+    {
+        "LightEffectsNumber": "E699",
+        "Color": {
+            "R": 5,
+            "G": 101,
+            "B": 23
+        },
+        "Name": "Green"
+    },
+    {
+        "LightEffectsNumber": "E3837",
+        "Color": {
+            "R": 108,
+            "G": 58,
+            "B": 110
+        },
+        "Name": "Lavender Ultra Dark"
+    },
+    {
+        "LightEffectsNumber": "E3843",
+        "Color": {
+            "R": 20,
+            "G": 170,
+            "B": 208
+        },
+        "Name": "Electric Blue"
+    },
+    {
+        "LightEffectsNumber": "E3849",
+        "Color": {
+            "R": 82,
+            "G": 179,
+            "B": 164
+        },
+        "Name": "Aquamarine Blue"
+    },
+    {
+        "LightEffectsNumber": "E703",
+        "Color": {
+            "R": 123,
+            "G": 181,
+            "B": 71
+        },
+        "Name": "Charteuse"
+    },
+    {
+        "LightEffectsNumber": "E718",
+        "Color": {
+            "R": 156,
+            "G": 36,
+            "B": 98
+        },
+        "Name": "Plum"
+    },
+    {
+        "LightEffectsNumber": "E815",
+        "Color": {
+            "R": 135,
+            "G": 7,
+            "B": 31
+        },
+        "Name": "Garnet Medium"
+    },
+    {
+        "LightEffectsNumber": "E825",
+        "Color": {
+            "R": 71,
+            "G": 129,
+            "B": 165
+        },
+        "Name": "Blue Sapphire"
+    },
+    {
+        "LightEffectsNumber": "E168",
+        "Color": {
+            "R": 209,
+            "G": 209,
+            "B": 209
+        },
+        "Name": "Silver"
+    },
+    {
+        "LightEffectsNumber": "E301",
+        "Color": {
+            "R": 179,
+            "G": 95,
+            "B": 43
+        },
+        "Name": "Copper"
+    },
+    {
+        "LightEffectsNumber": "E317",
+        "Color": {
+            "R": 108,
+            "G": 108,
+            "B": 108
+        },
+        "Name": "Pewder gray"
+    },
+    {
+        "LightEffectsNumber": "E677",
+        "Color": {
+            "R": 245,
+            "G": 236,
+            "B": 203
+        },
+        "Name": "White Gold"
+    },
+    {
+        "LightEffectsNumber": "E3821",
+        "Color": {
+            "R": 243,
+            "G": 206,
+            "B": 117
+        },
+        "Name": "Straw"
+    },
+    {
+        "LightEffectsNumber": "E3852",
+        "Color": {
+            "R": 205,
+            "G": 157,
+            "B": 55
+        },
+        "Name": "Straw very Dark"
+    },
+    {
+        "LightEffectsNumber": "E898",
+        "Color": {
+            "R": 73,
+            "G": 42,
+            "B": 19
+        },
+        "Name": "Coffee Brown Very Dark"
+    },
+    {
+        "LightEffectsNumber": "E436",
+        "Color": {
+            "R": 203,
+            "G": 144,
+            "B": 81
+        },
+        "Name": "Tan"
+    },
+    {
+        "LightEffectsNumber": "E3865",
+        "Color": {
+            "R": 249,
+            "G": 247,
+            "B": 241
+        },
+        "Name": "Winter white"
+    },
+    {
+        "LightEffectsNumber": "E310",
+        "Color": {
+            "R": 0,
+            "G": 0,
+            "B": 0
+        },
+        "Name": "Ebony"
+    },
+    {
+        "LightEffectsNumber": "E415",
+        "Color": {
+            "R": 211,
+            "G": 211,
+            "B": 214
+        },
+        "Name": "Pearl Gray"
+    },
+    {
+        "LightEffectsNumber": "E746",
+        "Color": {
+            "R": 252,
+            "G": 252,
+            "B": 238
+        },
+        "Name": "Off white"
+    },
+    {
+        "LightEffectsNumber": "E966",
+        "Color": {
+            "R": 185,
+            "G": 215,
+            "B": 192
+        },
+        "Name": "Jade Ultra Very Light"
+    },
+    {
+        "LightEffectsNumber": "E818",
+        "Color": {
+            "R": 255,
+            "G": 223,
+            "B": 217
+        },
+        "Name": "Baby Pink"
+    },
+    {
+        "LightEffectsNumber": "E747",
+        "Color": {
+            "R": 229,
+            "G": 252,
+            "B": 253
+        },
+        "Name": "Peacock Blue Very Light"
+    },
+    {
+        "LightEffectsNumber": "E967",
+        "Color": {
+            "R": 255,
+            "G": 222,
+            "B": 213
+        },
+        "Name": "Apricot Very Light"
+    },
+    {
+        "LightEffectsNumber": "E3747",
+        "Color": {
+            "R": 211,
+            "G": 215,
+            "B": 237
+        },
+        "Name": "Blue Violet Very Light"
+    },
+    {
+        "LightEffectsNumber": "E5200",
+        "Color": {
+            "R": 255,
+            "G": 255,
+            "B": 255
+        },
+        "Name": "Snow White"
+    },
+    {
+        "LightEffectsNumber": "E980",
+        "Color": {
+            "R": 240,
+            "G": 255,
+            "B": 0
+        },
+        "Name": "Neon Yellow"
+    },
+    {
+        "LightEffectsNumber": "E990",
+        "Color": {
+            "R": 6,
+            "G": 236,
+            "B": 33
+        },
+        "Name": "Neon Green"
+    }
+]

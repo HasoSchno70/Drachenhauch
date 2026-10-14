@@ -1,0 +1,947 @@
+[
+ {
+  "ValdaniNumber": "1",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "White"
+ },
+ {
+  "ValdaniNumber": "2",
+  "Color": {
+   "R": 252,
+   "G": 250,
+   "B": 245
+  },
+  "Name": "Ivory"
+ },
+ {
+  "ValdaniNumber": "3",
+  "Color": {
+   "R": 255,
+   "G": 253,
+   "B": 230
+  },
+  "Name": "Cream"
+ },
+ {
+  "ValdaniNumber": "4",
+  "Color": {
+   "R": 245,
+   "G": 235,
+   "B": 215
+  },
+  "Name": "Ecru"
+ },
+ {
+  "ValdaniNumber": "5",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Black"
+ },
+ {
+  "ValdaniNumber": "6",
+  "Color": {
+   "R": 50,
+   "G": 50,
+   "B": 50
+  },
+  "Name": "Charcoal"
+ },
+ {
+  "ValdaniNumber": "7",
+  "Color": {
+   "R": 100,
+   "G": 100,
+   "B": 100
+  },
+  "Name": "Medium Gray"
+ },
+ {
+  "ValdaniNumber": "8",
+  "Color": {
+   "R": 150,
+   "G": 150,
+   "B": 150
+  },
+  "Name": "Light Gray"
+ },
+ {
+  "ValdaniNumber": "9",
+  "Color": {
+   "R": 200,
+   "G": 200,
+   "B": 200
+  },
+  "Name": "Pearl Gray"
+ },
+ {
+  "ValdaniNumber": "H6",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Rich Wine"
+ },
+ {
+  "ValdaniNumber": "H201",
+  "Color": {
+   "R": 200,
+   "G": 50,
+   "B": 50
+  },
+  "Name": "Brick Red"
+ },
+ {
+  "ValdaniNumber": "H202",
+  "Color": {
+   "R": 180,
+   "G": 35,
+   "B": 35
+  },
+  "Name": "Turkey Red"
+ },
+ {
+  "ValdaniNumber": "H203",
+  "Color": {
+   "R": 160,
+   "G": 45,
+   "B": 55
+  },
+  "Name": "Crimson Glory"
+ },
+ {
+  "ValdaniNumber": "H204",
+  "Color": {
+   "R": 220,
+   "G": 80,
+   "B": 80
+  },
+  "Name": "Strawberry Fields"
+ },
+ {
+  "ValdaniNumber": "H205",
+  "Color": {
+   "R": 255,
+   "G": 120,
+   "B": 120
+  },
+  "Name": "Cherry Blossom"
+ },
+ {
+  "ValdaniNumber": "H206",
+  "Color": {
+   "R": 255,
+   "G": 182,
+   "B": 193
+  },
+  "Name": "Baby Pink"
+ },
+ {
+  "ValdaniNumber": "H207",
+  "Color": {
+   "R": 230,
+   "G": 150,
+   "B": 170
+  },
+  "Name": "Dusty Rose"
+ },
+ {
+  "ValdaniNumber": "H208",
+  "Color": {
+   "R": 200,
+   "G": 100,
+   "B": 130
+  },
+  "Name": "Wild Rose"
+ },
+ {
+  "ValdaniNumber": "H209",
+  "Color": {
+   "R": 170,
+   "G": 50,
+   "B": 90
+  },
+  "Name": "Mulberry"
+ },
+ {
+  "ValdaniNumber": "H210",
+  "Color": {
+   "R": 140,
+   "G": 30,
+   "B": 70
+  },
+  "Name": "Burgundy Wine"
+ },
+ {
+  "ValdaniNumber": "M1",
+  "Color": {
+   "R": 178,
+   "G": 34,
+   "B": 34
+  },
+  "Name": "Firebrick"
+ },
+ {
+  "ValdaniNumber": "M2",
+  "Color": {
+   "R": 139,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Dark Maroon"
+ },
+ {
+  "ValdaniNumber": "M3",
+  "Color": {
+   "R": 205,
+   "G": 92,
+   "B": 92
+  },
+  "Name": "Indian Red"
+ },
+ {
+  "ValdaniNumber": "M4",
+  "Color": {
+   "R": 188,
+   "G": 143,
+   "B": 143
+  },
+  "Name": "Rosy Brown"
+ },
+ {
+  "ValdaniNumber": "M10",
+  "Color": {
+   "R": 204,
+   "G": 153,
+   "B": 153
+  },
+  "Name": "Misty Rose"
+ },
+ {
+  "ValdaniNumber": "O1",
+  "Color": {
+   "R": 255,
+   "G": 165,
+   "B": 0
+  },
+  "Name": "Orange"
+ },
+ {
+  "ValdaniNumber": "O5",
+  "Color": {
+   "R": 255,
+   "G": 140,
+   "B": 0
+  },
+  "Name": "Dark Orange"
+ },
+ {
+  "ValdaniNumber": "O7",
+  "Color": {
+   "R": 230,
+   "G": 110,
+   "B": 30
+  },
+  "Name": "Autumn Harvest"
+ },
+ {
+  "ValdaniNumber": "O8",
+  "Color": {
+   "R": 200,
+   "G": 90,
+   "B": 20
+  },
+  "Name": "Pumpkin"
+ },
+ {
+  "ValdaniNumber": "O10",
+  "Color": {
+   "R": 210,
+   "G": 105,
+   "B": 30
+  },
+  "Name": "Cinnamon"
+ },
+ {
+  "ValdaniNumber": "O12",
+  "Color": {
+   "R": 255,
+   "G": 180,
+   "B": 100
+  },
+  "Name": "Peach"
+ },
+ {
+  "ValdaniNumber": "O14",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 150
+  },
+  "Name": "Apricot"
+ },
+ {
+  "ValdaniNumber": "O15",
+  "Color": {
+   "R": 180,
+   "G": 80,
+   "B": 30
+  },
+  "Name": "Rust"
+ },
+ {
+  "ValdaniNumber": "O201",
+  "Color": {
+   "R": 255,
+   "G": 127,
+   "B": 80
+  },
+  "Name": "Coral"
+ },
+ {
+  "ValdaniNumber": "O202",
+  "Color": {
+   "R": 250,
+   "G": 128,
+   "B": 114
+  },
+  "Name": "Salmon"
+ },
+ {
+  "ValdaniNumber": "O203",
+  "Color": {
+   "R": 233,
+   "G": 150,
+   "B": 122
+  },
+  "Name": "Dark Salmon"
+ },
+ {
+  "ValdaniNumber": "P1",
+  "Color": {
+   "R": 255,
+   "G": 192,
+   "B": 203
+  },
+  "Name": "Pink"
+ },
+ {
+  "ValdaniNumber": "P2",
+  "Color": {
+   "R": 255,
+   "G": 182,
+   "B": 193
+  },
+  "Name": "Light Pink"
+ },
+ {
+  "ValdaniNumber": "P3",
+  "Color": {
+   "R": 255,
+   "G": 105,
+   "B": 180
+  },
+  "Name": "Hot Pink"
+ },
+ {
+  "ValdaniNumber": "P4",
+  "Color": {
+   "R": 255,
+   "G": 20,
+   "B": 147
+  },
+  "Name": "Deep Pink"
+ },
+ {
+  "ValdaniNumber": "P5",
+  "Color": {
+   "R": 219,
+   "G": 112,
+   "B": 147
+  },
+  "Name": "Pale Violet Red"
+ },
+ {
+  "ValdaniNumber": "P6",
+  "Color": {
+   "R": 199,
+   "G": 21,
+   "B": 133
+  },
+  "Name": "Medium Violet Red"
+ },
+ {
+  "ValdaniNumber": "P7",
+  "Color": {
+   "R": 200,
+   "G": 80,
+   "B": 120
+  },
+  "Name": "Berry"
+ },
+ {
+  "ValdaniNumber": "Y1",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 0
+  },
+  "Name": "Yellow"
+ },
+ {
+  "ValdaniNumber": "Y5",
+  "Color": {
+   "R": 255,
+   "G": 240,
+   "B": 100
+  },
+  "Name": "Lemon"
+ },
+ {
+  "ValdaniNumber": "Y7",
+  "Color": {
+   "R": 255,
+   "G": 230,
+   "B": 80
+  },
+  "Name": "Buttercup"
+ },
+ {
+  "ValdaniNumber": "Y10",
+  "Color": {
+   "R": 255,
+   "G": 215,
+   "B": 0
+  },
+  "Name": "Gold"
+ },
+ {
+  "ValdaniNumber": "Y12",
+  "Color": {
+   "R": 218,
+   "G": 165,
+   "B": 32
+  },
+  "Name": "Goldenrod"
+ },
+ {
+  "ValdaniNumber": "Y14",
+  "Color": {
+   "R": 200,
+   "G": 150,
+   "B": 30
+  },
+  "Name": "Old Gold"
+ },
+ {
+  "ValdaniNumber": "Y201",
+  "Color": {
+   "R": 240,
+   "G": 200,
+   "B": 50
+  },
+  "Name": "Mustard"
+ },
+ {
+  "ValdaniNumber": "Y202",
+  "Color": {
+   "R": 184,
+   "G": 134,
+   "B": 11
+  },
+  "Name": "Dark Goldenrod"
+ },
+ {
+  "ValdaniNumber": "Y203",
+  "Color": {
+   "R": 255,
+   "G": 250,
+   "B": 200
+  },
+  "Name": "Corn Silk"
+ },
+ {
+  "ValdaniNumber": "G1",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 0
+  },
+  "Name": "Green"
+ },
+ {
+  "ValdaniNumber": "G5",
+  "Color": {
+   "R": 0,
+   "G": 100,
+   "B": 0
+  },
+  "Name": "Dark Green"
+ },
+ {
+  "ValdaniNumber": "G7",
+  "Color": {
+   "R": 34,
+   "G": 139,
+   "B": 34
+  },
+  "Name": "Forest Green"
+ },
+ {
+  "ValdaniNumber": "G10",
+  "Color": {
+   "R": 50,
+   "G": 205,
+   "B": 50
+  },
+  "Name": "Lime Green"
+ },
+ {
+  "ValdaniNumber": "G12",
+  "Color": {
+   "R": 144,
+   "G": 238,
+   "B": 144
+  },
+  "Name": "Light Green"
+ },
+ {
+  "ValdaniNumber": "G14",
+  "Color": {
+   "R": 152,
+   "G": 251,
+   "B": 152
+  },
+  "Name": "Pale Green"
+ },
+ {
+  "ValdaniNumber": "G201",
+  "Color": {
+   "R": 85,
+   "G": 160,
+   "B": 85
+  },
+  "Name": "Clover"
+ },
+ {
+  "ValdaniNumber": "G202",
+  "Color": {
+   "R": 107,
+   "G": 142,
+   "B": 35
+  },
+  "Name": "Olive"
+ },
+ {
+  "ValdaniNumber": "G203",
+  "Color": {
+   "R": 85,
+   "G": 107,
+   "B": 47
+  },
+  "Name": "Dark Olive"
+ },
+ {
+  "ValdaniNumber": "G204",
+  "Color": {
+   "R": 46,
+   "G": 139,
+   "B": 87
+  },
+  "Name": "Sea Green"
+ },
+ {
+  "ValdaniNumber": "G205",
+  "Color": {
+   "R": 60,
+   "G": 179,
+   "B": 113
+  },
+  "Name": "Medium Sea Green"
+ },
+ {
+  "ValdaniNumber": "G206",
+  "Color": {
+   "R": 143,
+   "G": 188,
+   "B": 143
+  },
+  "Name": "Dark Sea Green"
+ },
+ {
+  "ValdaniNumber": "G207",
+  "Color": {
+   "R": 180,
+   "G": 200,
+   "B": 140
+  },
+  "Name": "Sage"
+ },
+ {
+  "ValdaniNumber": "T1",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 128
+  },
+  "Name": "Teal"
+ },
+ {
+  "ValdaniNumber": "T5",
+  "Color": {
+   "R": 0,
+   "G": 139,
+   "B": 139
+  },
+  "Name": "Dark Cyan"
+ },
+ {
+  "ValdaniNumber": "T7",
+  "Color": {
+   "R": 64,
+   "G": 224,
+   "B": 208
+  },
+  "Name": "Turquoise"
+ },
+ {
+  "ValdaniNumber": "T10",
+  "Color": {
+   "R": 72,
+   "G": 209,
+   "B": 204
+  },
+  "Name": "Medium Turquoise"
+ },
+ {
+  "ValdaniNumber": "T12",
+  "Color": {
+   "R": 127,
+   "G": 255,
+   "B": 212
+  },
+  "Name": "Aquamarine"
+ },
+ {
+  "ValdaniNumber": "T201",
+  "Color": {
+   "R": 175,
+   "G": 238,
+   "B": 238
+  },
+  "Name": "Pale Turquoise"
+ },
+ {
+  "ValdaniNumber": "T202",
+  "Color": {
+   "R": 95,
+   "G": 158,
+   "B": 160
+  },
+  "Name": "Cadet Blue"
+ },
+ {
+  "ValdaniNumber": "B1",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Navy"
+ },
+ {
+  "ValdaniNumber": "B5",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 180
+  },
+  "Name": "Blue"
+ },
+ {
+  "ValdaniNumber": "B7",
+  "Color": {
+   "R": 65,
+   "G": 105,
+   "B": 225
+  },
+  "Name": "Royal Blue"
+ },
+ {
+  "ValdaniNumber": "B10",
+  "Color": {
+   "R": 100,
+   "G": 149,
+   "B": 237
+  },
+  "Name": "Cornflower Blue"
+ },
+ {
+  "ValdaniNumber": "B12",
+  "Color": {
+   "R": 70,
+   "G": 130,
+   "B": 180
+  },
+  "Name": "Steel Blue"
+ },
+ {
+  "ValdaniNumber": "B14",
+  "Color": {
+   "R": 135,
+   "G": 206,
+   "B": 235
+  },
+  "Name": "Sky Blue"
+ },
+ {
+  "ValdaniNumber": "B201",
+  "Color": {
+   "R": 173,
+   "G": 216,
+   "B": 230
+  },
+  "Name": "Light Blue"
+ },
+ {
+  "ValdaniNumber": "B202",
+  "Color": {
+   "R": 176,
+   "G": 224,
+   "B": 230
+  },
+  "Name": "Powder Blue"
+ },
+ {
+  "ValdaniNumber": "B203",
+  "Color": {
+   "R": 30,
+   "G": 60,
+   "B": 100
+  },
+  "Name": "Midnight Blue"
+ },
+ {
+  "ValdaniNumber": "V1",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Purple"
+ },
+ {
+  "ValdaniNumber": "V5",
+  "Color": {
+   "R": 75,
+   "G": 0,
+   "B": 130
+  },
+  "Name": "Indigo"
+ },
+ {
+  "ValdaniNumber": "V7",
+  "Color": {
+   "R": 148,
+   "G": 0,
+   "B": 211
+  },
+  "Name": "Dark Violet"
+ },
+ {
+  "ValdaniNumber": "V10",
+  "Color": {
+   "R": 186,
+   "G": 85,
+   "B": 211
+  },
+  "Name": "Medium Orchid"
+ },
+ {
+  "ValdaniNumber": "V12",
+  "Color": {
+   "R": 218,
+   "G": 112,
+   "B": 214
+  },
+  "Name": "Orchid"
+ },
+ {
+  "ValdaniNumber": "V14",
+  "Color": {
+   "R": 238,
+   "G": 130,
+   "B": 238
+  },
+  "Name": "Violet"
+ },
+ {
+  "ValdaniNumber": "V201",
+  "Color": {
+   "R": 147,
+   "G": 112,
+   "B": 219
+  },
+  "Name": "Medium Purple"
+ },
+ {
+  "ValdaniNumber": "V202",
+  "Color": {
+   "R": 216,
+   "G": 191,
+   "B": 216
+  },
+  "Name": "Thistle"
+ },
+ {
+  "ValdaniNumber": "V203",
+  "Color": {
+   "R": 230,
+   "G": 230,
+   "B": 250
+  },
+  "Name": "Lavender"
+ },
+ {
+  "ValdaniNumber": "JP1",
+  "Color": {
+   "R": 100,
+   "G": 50,
+   "B": 90
+  },
+  "Name": "Deep Plum"
+ },
+ {
+  "ValdaniNumber": "JP3",
+  "Color": {
+   "R": 120,
+   "G": 70,
+   "B": 110
+  },
+  "Name": "Plum"
+ },
+ {
+  "ValdaniNumber": "JP5",
+  "Color": {
+   "R": 140,
+   "G": 90,
+   "B": 130
+  },
+  "Name": "Mauve"
+ },
+ {
+  "ValdaniNumber": "BR1",
+  "Color": {
+   "R": 139,
+   "G": 69,
+   "B": 19
+  },
+  "Name": "Saddle Brown"
+ },
+ {
+  "ValdaniNumber": "BR5",
+  "Color": {
+   "R": 101,
+   "G": 67,
+   "B": 33
+  },
+  "Name": "Dark Brown"
+ },
+ {
+  "ValdaniNumber": "BR7",
+  "Color": {
+   "R": 150,
+   "G": 105,
+   "B": 60
+  },
+  "Name": "Medium Brown"
+ },
+ {
+  "ValdaniNumber": "BR10",
+  "Color": {
+   "R": 193,
+   "G": 154,
+   "B": 107
+  },
+  "Name": "Light Brown"
+ },
+ {
+  "ValdaniNumber": "BR12",
+  "Color": {
+   "R": 210,
+   "G": 180,
+   "B": 140
+  },
+  "Name": "Tan"
+ },
+ {
+  "ValdaniNumber": "BR14",
+  "Color": {
+   "R": 245,
+   "G": 222,
+   "B": 179
+  },
+  "Name": "Wheat"
+ },
+ {
+  "ValdaniNumber": "BR201",
+  "Color": {
+   "R": 205,
+   "G": 133,
+   "B": 63
+  },
+  "Name": "Peru"
+ },
+ {
+  "ValdaniNumber": "BR202",
+  "Color": {
+   "R": 160,
+   "G": 82,
+   "B": 45
+  },
+  "Name": "Sienna"
+ },
+ {
+  "ValdaniNumber": "BR203",
+  "Color": {
+   "R": 80,
+   "G": 50,
+   "B": 30
+  },
+  "Name": "Coffee Bean"
+ },
+ {
+  "ValdaniNumber": "BR204",
+  "Color": {
+   "R": 90,
+   "G": 60,
+   "B": 40
+  },
+  "Name": "Espresso"
+ },
+ {
+  "ValdaniNumber": "BR205",
+  "Color": {
+   "R": 180,
+   "G": 140,
+   "B": 100
+  },
+  "Name": "Caramel"
+ },
+ {
+  "ValdaniNumber": "BR206",
+  "Color": {
+   "R": 222,
+   "G": 184,
+   "B": 135
+  },
+  "Name": "Burlywood"
+ }
+]

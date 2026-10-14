@@ -1,0 +1,830 @@
+[
+ {
+  "RiolisNumber": "001",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "Белый (White)"
+ },
+ {
+  "RiolisNumber": "002",
+  "Color": {
+   "R": 252,
+   "G": 250,
+   "B": 245
+  },
+  "Name": "Молочный (Milk White)"
+ },
+ {
+  "RiolisNumber": "003",
+  "Color": {
+   "R": 255,
+   "G": 253,
+   "B": 230
+  },
+  "Name": "Кремовый (Cream)"
+ },
+ {
+  "RiolisNumber": "004",
+  "Color": {
+   "R": 245,
+   "G": 235,
+   "B": 215
+  },
+  "Name": "Экрю (Ecru)"
+ },
+ {
+  "RiolisNumber": "005",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Черный (Black)"
+ },
+ {
+  "RiolisNumber": "006",
+  "Color": {
+   "R": 50,
+   "G": 50,
+   "B": 50
+  },
+  "Name": "Темно-серый (Dark Gray)"
+ },
+ {
+  "RiolisNumber": "007",
+  "Color": {
+   "R": 100,
+   "G": 100,
+   "B": 100
+  },
+  "Name": "Серый (Gray)"
+ },
+ {
+  "RiolisNumber": "008",
+  "Color": {
+   "R": 150,
+   "G": 150,
+   "B": 150
+  },
+  "Name": "Светло-серый (Light Gray)"
+ },
+ {
+  "RiolisNumber": "009",
+  "Color": {
+   "R": 200,
+   "G": 200,
+   "B": 200
+  },
+  "Name": "Жемчужный (Pearl)"
+ },
+ {
+  "RiolisNumber": "100",
+  "Color": {
+   "R": 178,
+   "G": 34,
+   "B": 34
+  },
+  "Name": "Красный темный (Dark Red)"
+ },
+ {
+  "RiolisNumber": "101",
+  "Color": {
+   "R": 200,
+   "G": 50,
+   "B": 50
+  },
+  "Name": "Кирпичный (Brick)"
+ },
+ {
+  "RiolisNumber": "102",
+  "Color": {
+   "R": 220,
+   "G": 20,
+   "B": 60
+  },
+  "Name": "Малиновый (Crimson)"
+ },
+ {
+  "RiolisNumber": "103",
+  "Color": {
+   "R": 255,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Красный (Red)"
+ },
+ {
+  "RiolisNumber": "104",
+  "Color": {
+   "R": 255,
+   "G": 99,
+   "B": 71
+  },
+  "Name": "Томатный (Tomato)"
+ },
+ {
+  "RiolisNumber": "105",
+  "Color": {
+   "R": 255,
+   "G": 127,
+   "B": 80
+  },
+  "Name": "Коралловый (Coral)"
+ },
+ {
+  "RiolisNumber": "106",
+  "Color": {
+   "R": 250,
+   "G": 128,
+   "B": 114
+  },
+  "Name": "Лососевый (Salmon)"
+ },
+ {
+  "RiolisNumber": "107",
+  "Color": {
+   "R": 255,
+   "G": 182,
+   "B": 193
+  },
+  "Name": "Светло-розовый (Light Pink)"
+ },
+ {
+  "RiolisNumber": "108",
+  "Color": {
+   "R": 255,
+   "G": 192,
+   "B": 203
+  },
+  "Name": "Розовый (Pink)"
+ },
+ {
+  "RiolisNumber": "109",
+  "Color": {
+   "R": 255,
+   "G": 105,
+   "B": 180
+  },
+  "Name": "Ярко-розовый (Hot Pink)"
+ },
+ {
+  "RiolisNumber": "110",
+  "Color": {
+   "R": 255,
+   "G": 20,
+   "B": 147
+  },
+  "Name": "Глубокий розовый (Deep Pink)"
+ },
+ {
+  "RiolisNumber": "111",
+  "Color": {
+   "R": 219,
+   "G": 112,
+   "B": 147
+  },
+  "Name": "Бледно-фиолетовый (Pale Violet)"
+ },
+ {
+  "RiolisNumber": "112",
+  "Color": {
+   "R": 199,
+   "G": 21,
+   "B": 133
+  },
+  "Name": "Фуксия (Fuchsia)"
+ },
+ {
+  "RiolisNumber": "113",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Бордовый (Burgundy)"
+ },
+ {
+  "RiolisNumber": "114",
+  "Color": {
+   "R": 139,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Темно-бордовый (Dark Burgundy)"
+ },
+ {
+  "RiolisNumber": "200",
+  "Color": {
+   "R": 255,
+   "G": 165,
+   "B": 0
+  },
+  "Name": "Оранжевый (Orange)"
+ },
+ {
+  "RiolisNumber": "201",
+  "Color": {
+   "R": 255,
+   "G": 140,
+   "B": 0
+  },
+  "Name": "Темно-оранжевый (Dark Orange)"
+ },
+ {
+  "RiolisNumber": "202",
+  "Color": {
+   "R": 255,
+   "G": 69,
+   "B": 0
+  },
+  "Name": "Красно-оранжевый (Red Orange)"
+ },
+ {
+  "RiolisNumber": "203",
+  "Color": {
+   "R": 230,
+   "G": 110,
+   "B": 30
+  },
+  "Name": "Тыквенный (Pumpkin)"
+ },
+ {
+  "RiolisNumber": "204",
+  "Color": {
+   "R": 210,
+   "G": 105,
+   "B": 30
+  },
+  "Name": "Шоколадный (Chocolate)"
+ },
+ {
+  "RiolisNumber": "205",
+  "Color": {
+   "R": 255,
+   "G": 218,
+   "B": 185
+  },
+  "Name": "Персиковый (Peach)"
+ },
+ {
+  "RiolisNumber": "206",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 130
+  },
+  "Name": "Абрикосовый (Apricot)"
+ },
+ {
+  "RiolisNumber": "207",
+  "Color": {
+   "R": 180,
+   "G": 80,
+   "B": 30
+  },
+  "Name": "Ржавый (Rust)"
+ },
+ {
+  "RiolisNumber": "300",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 0
+  },
+  "Name": "Желтый (Yellow)"
+ },
+ {
+  "RiolisNumber": "301",
+  "Color": {
+   "R": 255,
+   "G": 215,
+   "B": 0
+  },
+  "Name": "Золотой (Gold)"
+ },
+ {
+  "RiolisNumber": "302",
+  "Color": {
+   "R": 255,
+   "G": 230,
+   "B": 80
+  },
+  "Name": "Лимонный (Lemon)"
+ },
+ {
+  "RiolisNumber": "303",
+  "Color": {
+   "R": 240,
+   "G": 200,
+   "B": 50
+  },
+  "Name": "Горчичный (Mustard)"
+ },
+ {
+  "RiolisNumber": "304",
+  "Color": {
+   "R": 218,
+   "G": 165,
+   "B": 32
+  },
+  "Name": "Золотистый (Goldenrod)"
+ },
+ {
+  "RiolisNumber": "305",
+  "Color": {
+   "R": 200,
+   "G": 150,
+   "B": 30
+  },
+  "Name": "Старое золото (Old Gold)"
+ },
+ {
+  "RiolisNumber": "306",
+  "Color": {
+   "R": 255,
+   "G": 250,
+   "B": 200
+  },
+  "Name": "Бледно-желтый (Pale Yellow)"
+ },
+ {
+  "RiolisNumber": "307",
+  "Color": {
+   "R": 184,
+   "G": 134,
+   "B": 11
+  },
+  "Name": "Темно-золотистый (Dark Gold)"
+ },
+ {
+  "RiolisNumber": "400",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 0
+  },
+  "Name": "Зеленый (Green)"
+ },
+ {
+  "RiolisNumber": "401",
+  "Color": {
+   "R": 0,
+   "G": 100,
+   "B": 0
+  },
+  "Name": "Темно-зеленый (Dark Green)"
+ },
+ {
+  "RiolisNumber": "402",
+  "Color": {
+   "R": 34,
+   "G": 139,
+   "B": 34
+  },
+  "Name": "Лесной (Forest)"
+ },
+ {
+  "RiolisNumber": "403",
+  "Color": {
+   "R": 50,
+   "G": 205,
+   "B": 50
+  },
+  "Name": "Лаймовый (Lime)"
+ },
+ {
+  "RiolisNumber": "404",
+  "Color": {
+   "R": 144,
+   "G": 238,
+   "B": 144
+  },
+  "Name": "Светло-зеленый (Light Green)"
+ },
+ {
+  "RiolisNumber": "405",
+  "Color": {
+   "R": 152,
+   "G": 251,
+   "B": 152
+  },
+  "Name": "Бледно-зеленый (Pale Green)"
+ },
+ {
+  "RiolisNumber": "406",
+  "Color": {
+   "R": 46,
+   "G": 139,
+   "B": 87
+  },
+  "Name": "Морской зеленый (Sea Green)"
+ },
+ {
+  "RiolisNumber": "407",
+  "Color": {
+   "R": 107,
+   "G": 142,
+   "B": 35
+  },
+  "Name": "Оливковый (Olive)"
+ },
+ {
+  "RiolisNumber": "408",
+  "Color": {
+   "R": 85,
+   "G": 107,
+   "B": 47
+  },
+  "Name": "Темно-оливковый (Dark Olive)"
+ },
+ {
+  "RiolisNumber": "409",
+  "Color": {
+   "R": 143,
+   "G": 188,
+   "B": 143
+  },
+  "Name": "Хаки (Khaki)"
+ },
+ {
+  "RiolisNumber": "410",
+  "Color": {
+   "R": 180,
+   "G": 200,
+   "B": 140
+  },
+  "Name": "Шалфей (Sage)"
+ },
+ {
+  "RiolisNumber": "500",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 128
+  },
+  "Name": "Бирюзовый (Teal)"
+ },
+ {
+  "RiolisNumber": "501",
+  "Color": {
+   "R": 0,
+   "G": 139,
+   "B": 139
+  },
+  "Name": "Темная бирюза (Dark Teal)"
+ },
+ {
+  "RiolisNumber": "502",
+  "Color": {
+   "R": 64,
+   "G": 224,
+   "B": 208
+  },
+  "Name": "Морская волна (Turquoise)"
+ },
+ {
+  "RiolisNumber": "503",
+  "Color": {
+   "R": 72,
+   "G": 209,
+   "B": 204
+  },
+  "Name": "Средняя бирюза (Medium Turquoise)"
+ },
+ {
+  "RiolisNumber": "504",
+  "Color": {
+   "R": 127,
+   "G": 255,
+   "B": 212
+  },
+  "Name": "Аквамарин (Aquamarine)"
+ },
+ {
+  "RiolisNumber": "505",
+  "Color": {
+   "R": 175,
+   "G": 238,
+   "B": 238
+  },
+  "Name": "Бледная бирюза (Pale Turquoise)"
+ },
+ {
+  "RiolisNumber": "506",
+  "Color": {
+   "R": 95,
+   "G": 158,
+   "B": 160
+  },
+  "Name": "Сине-серый (Cadet Blue)"
+ },
+ {
+  "RiolisNumber": "600",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Темно-синий (Navy)"
+ },
+ {
+  "RiolisNumber": "601",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 180
+  },
+  "Name": "Синий (Blue)"
+ },
+ {
+  "RiolisNumber": "602",
+  "Color": {
+   "R": 65,
+   "G": 105,
+   "B": 225
+  },
+  "Name": "Королевский синий (Royal Blue)"
+ },
+ {
+  "RiolisNumber": "603",
+  "Color": {
+   "R": 100,
+   "G": 149,
+   "B": 237
+  },
+  "Name": "Васильковый (Cornflower)"
+ },
+ {
+  "RiolisNumber": "604",
+  "Color": {
+   "R": 70,
+   "G": 130,
+   "B": 180
+  },
+  "Name": "Стальной синий (Steel Blue)"
+ },
+ {
+  "RiolisNumber": "605",
+  "Color": {
+   "R": 135,
+   "G": 206,
+   "B": 235
+  },
+  "Name": "Небесный (Sky Blue)"
+ },
+ {
+  "RiolisNumber": "606",
+  "Color": {
+   "R": 173,
+   "G": 216,
+   "B": 230
+  },
+  "Name": "Светло-синий (Light Blue)"
+ },
+ {
+  "RiolisNumber": "607",
+  "Color": {
+   "R": 176,
+   "G": 224,
+   "B": 230
+  },
+  "Name": "Пудровый синий (Powder Blue)"
+ },
+ {
+  "RiolisNumber": "608",
+  "Color": {
+   "R": 30,
+   "G": 60,
+   "B": 100
+  },
+  "Name": "Полночный синий (Midnight Blue)"
+ },
+ {
+  "RiolisNumber": "700",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Пурпурный (Purple)"
+ },
+ {
+  "RiolisNumber": "701",
+  "Color": {
+   "R": 75,
+   "G": 0,
+   "B": 130
+  },
+  "Name": "Индиго (Indigo)"
+ },
+ {
+  "RiolisNumber": "702",
+  "Color": {
+   "R": 148,
+   "G": 0,
+   "B": 211
+  },
+  "Name": "Темно-фиолетовый (Dark Violet)"
+ },
+ {
+  "RiolisNumber": "703",
+  "Color": {
+   "R": 186,
+   "G": 85,
+   "B": 211
+  },
+  "Name": "Орхидея (Orchid)"
+ },
+ {
+  "RiolisNumber": "704",
+  "Color": {
+   "R": 218,
+   "G": 112,
+   "B": 214
+  },
+  "Name": "Светлая орхидея (Light Orchid)"
+ },
+ {
+  "RiolisNumber": "705",
+  "Color": {
+   "R": 238,
+   "G": 130,
+   "B": 238
+  },
+  "Name": "Фиолетовый (Violet)"
+ },
+ {
+  "RiolisNumber": "706",
+  "Color": {
+   "R": 147,
+   "G": 112,
+   "B": 219
+  },
+  "Name": "Средний пурпурный (Medium Purple)"
+ },
+ {
+  "RiolisNumber": "707",
+  "Color": {
+   "R": 216,
+   "G": 191,
+   "B": 216
+  },
+  "Name": "Чертополох (Thistle)"
+ },
+ {
+  "RiolisNumber": "708",
+  "Color": {
+   "R": 230,
+   "G": 230,
+   "B": 250
+  },
+  "Name": "Лавандовый (Lavender)"
+ },
+ {
+  "RiolisNumber": "709",
+  "Color": {
+   "R": 100,
+   "G": 50,
+   "B": 90
+  },
+  "Name": "Слива (Plum)"
+ },
+ {
+  "RiolisNumber": "800",
+  "Color": {
+   "R": 139,
+   "G": 69,
+   "B": 19
+  },
+  "Name": "Коричневый (Brown)"
+ },
+ {
+  "RiolisNumber": "801",
+  "Color": {
+   "R": 101,
+   "G": 67,
+   "B": 33
+  },
+  "Name": "Темно-коричневый (Dark Brown)"
+ },
+ {
+  "RiolisNumber": "802",
+  "Color": {
+   "R": 150,
+   "G": 105,
+   "B": 60
+  },
+  "Name": "Средне-коричневый (Medium Brown)"
+ },
+ {
+  "RiolisNumber": "803",
+  "Color": {
+   "R": 193,
+   "G": 154,
+   "B": 107
+  },
+  "Name": "Светло-коричневый (Light Brown)"
+ },
+ {
+  "RiolisNumber": "804",
+  "Color": {
+   "R": 210,
+   "G": 180,
+   "B": 140
+  },
+  "Name": "Песочный (Tan)"
+ },
+ {
+  "RiolisNumber": "805",
+  "Color": {
+   "R": 245,
+   "G": 222,
+   "B": 179
+  },
+  "Name": "Пшеничный (Wheat)"
+ },
+ {
+  "RiolisNumber": "806",
+  "Color": {
+   "R": 222,
+   "G": 184,
+   "B": 135
+  },
+  "Name": "Мешковина (Burlap)"
+ },
+ {
+  "RiolisNumber": "807",
+  "Color": {
+   "R": 205,
+   "G": 133,
+   "B": 63
+  },
+  "Name": "Перу (Peru)"
+ },
+ {
+  "RiolisNumber": "808",
+  "Color": {
+   "R": 160,
+   "G": 82,
+   "B": 45
+  },
+  "Name": "Сиена (Sienna)"
+ },
+ {
+  "RiolisNumber": "809",
+  "Color": {
+   "R": 80,
+   "G": 50,
+   "B": 30
+  },
+  "Name": "Кофейный (Coffee)"
+ },
+ {
+  "RiolisNumber": "810",
+  "Color": {
+   "R": 180,
+   "G": 140,
+   "B": 100
+  },
+  "Name": "Карамель (Caramel)"
+ },
+ {
+  "RiolisNumber": "900",
+  "Color": {
+   "R": 255,
+   "G": 215,
+   "B": 180
+  },
+  "Name": "Телесный (Flesh)"
+ },
+ {
+  "RiolisNumber": "901",
+  "Color": {
+   "R": 255,
+   "G": 228,
+   "B": 196
+  },
+  "Name": "Светлый телесный (Light Flesh)"
+ },
+ {
+  "RiolisNumber": "902",
+  "Color": {
+   "R": 210,
+   "G": 170,
+   "B": 140
+  },
+  "Name": "Загар (Suntan)"
+ },
+ {
+  "RiolisNumber": "903",
+  "Color": {
+   "R": 180,
+   "G": 130,
+   "B": 100
+  },
+  "Name": "Бежевый (Beige)"
+ }
+]

@@ -1,0 +1,368 @@
+' Die Zeichenflaeche: ein Muster ansehen -- Zoom um den Mauszeiger, Verschieben
+' mit gedrueckter Maustaste, Raster, Symbole, Teilstiche, Rueckstiche.
+'
+' Das Muster liegt einmal als Bild mit EINEM Pixel je Kaestchen vor
+' (lwPuffer, ARGB); Cairo vergroessert es ohne Glaettung. So kostet auch ein
+' 2000 x 2000-Muster einen Zeichenaufruf, egal wie weit herausgezoomt ist.
+' Was es feiner braucht (Teilstiche, Symbole, Raster), kommt nur fuer den
+' sichtbaren Ausschnitt obendrauf.
+
+CONST LW_HINTERGRUND = &H2D2D2D
+CONST LW_STOFF = &HFAFAF5             ' Aida-Stoff, cremeweiss
+CONST LW_ZELLE_STANDARD = 20.0        ' 100 %
+CONST LW_ZELLE_MIN = 1.0
+CONST LW_ZELLE_MAX = 60.0
+CONST LW_RASTER_GROSS = 10            ' jede zehnte Linie kraeftiger
+
+DIM lwFlaeche AS INTEGER              ' GtkDrawingArea
+DIM lwMuster AS kern.Muster
+DIM lwHat AS BOOLEAN
+DIM lwFarbe AS ARRAY OF INTEGER       ' zusammengesetzt: Farbindex je Zelle
+DIM lwTyp AS ARRAY OF INTEGER
+DIM lwFertig AS ARRAY OF INTEGER
+DIM lwRgb AS ARRAY OF INTEGER         ' je Farbindex
+DIM lwPuffer AS BUFFER
+DIM lwBild AS INTEGER                 ' cairo_surface_t, 0 = keins
+DIM lwZelle AS FLOAT
+DIM lwX AS FLOAT
+DIM lwY AS FLOAT
+DIM lwZiehen AS BOOLEAN
+DIM lwZiehX AS FLOAT
+DIM lwZiehY AS FLOAT
+DIM lwMausX AS INTEGER
+DIM lwMausY AS INTEGER
+DIM lwSchrift AS INTEGER              ' PangoFontDescription
+DIM lwEingepasst AS BOOLEAN           ' beim ersten Zeichnen einpassen
+
+FUNCTION leinwandNeu() AS INTEGER
+    lwFlaeche = gtk_drawing_area_new()
+    gtk_widget_set_hexpand(lwFlaeche, TRUE)
+    gtk_widget_set_vexpand(lwFlaeche, TRUE)
+    gtk_widget_add_events(lwFlaeche, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_RAD BOR GDK_MASKE_RAD_FEIN)
+    signalZeichnen(lwFlaeche, "draw", lwZeichnen, 0, 0, 0)
+    signalEreignis(lwFlaeche, "scroll-event", lwRad, 0, 0, 0)
+    signalEreignis(lwFlaeche, "button-press-event", lwDruck, 0, 0, 0)
+    signalEreignis(lwFlaeche, "button-release-event", lwLoslassen, 0, 0, 0)
+    signalEreignis(lwFlaeche, "motion-notify-event", lwBewegung, 0, 0, 0)
+    lwSchrift = pango_font_description_from_string("DejaVu Sans Bold 10")
+    lwZelle = LW_ZELLE_STANDARD
+    lwMausX = -1
+    RETURN lwFlaeche
+END FUNCTION
+
+SUB leinwandMuster(m AS kern.Muster)
+    lwMuster = m
+    lwHat = TRUE
+    leinwandAufbauen()
+    lwEingepasst = FALSE
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+' Zusammensetzen und das Pixelbild neu schreiben -- nach dem Laden und wenn
+' eine Ebene ein- oder ausgeblendet wird.
+SUB leinwandAufbauen()
+    IF NOT lwHat THEN RETURN
+    lwMuster.ebenen.zusammensetzen(lwFarbe, lwTyp, lwFertig)
+    DIM n AS INTEGER : n = lwMuster.farbanzahl()
+    DIM rgb[n + 1] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        rgb[i] = lwMuster.farben[i].garn.farbe
+    NEXT
+    lwRgb = rgb
+    DIM b AS INTEGER : b = lwMuster.breite
+    DIM h AS INTEGER : h = lwMuster.hoehe
+    IF lwBild <> 0 THEN cairo_surface_destroy(lwBild) : lwBild = 0
+    DIM zeile AS INTEGER : zeile = cairo_format_stride_for_width(CAIRO_ARGB32, b)
+    lwPuffer = BUFFER_NEW(zeile * h)
+    DIM x AS INTEGER, y AS INTEGER, c AS INTEGER
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            c = lwFarbe[y * b + x]
+            IF c >= 0 AND c < n THEN BUFFER_SET_U32(lwPuffer, y * zeile + x * 4, &HFF000000 BOR lwRgb[c])
+        NEXT
+    NEXT
+    lwBild = cairo_image_surface_create_for_data(BUFFER_ZEIGER(lwPuffer), CAIRO_ARGB32, b, h, zeile)
+END SUB
+
+' --- Zoom und Lage ---------------------------------------------------------------
+FUNCTION leinwandZoomProzent() AS INTEGER
+    RETURN ROUND(lwZelle / LW_ZELLE_STANDARD * 100)
+END FUNCTION
+
+' Neue Zellgroesse, der Punkt (px, py) bleibt unter dem Zeiger stehen.
+SUB leinwandZoom(neu AS FLOAT, px AS FLOAT, py AS FLOAT)
+    neu = CLAMP(neu, LW_ZELLE_MIN, LW_ZELLE_MAX)
+    DIM wx AS FLOAT : wx = (px - lwX) / lwZelle
+    DIM wy AS FLOAT : wy = (py - lwY) / lwZelle
+    lwZelle = neu
+    lwX = px - wx * neu
+    lwY = py - wy * neu
+    gtk_widget_queue_draw(lwFlaeche)
+    statusNachziehen()
+END SUB
+
+SUB leinwandZoomMitte(faktor AS FLOAT)
+    leinwandZoom(lwZelle * faktor, gtk_widget_get_allocated_width(lwFlaeche) / 2.0, gtk_widget_get_allocated_height(lwFlaeche) / 2.0)
+END SUB
+
+SUB leinwandEinpassen()
+    IF NOT lwHat THEN RETURN
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(lwFlaeche)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(lwFlaeche)
+    IF bw < 10 OR bh < 10 THEN RETURN
+    lwZelle = CLAMP(MIN((bw - 40) / lwMuster.breite, (bh - 40) / lwMuster.hoehe), LW_ZELLE_MIN, LW_ZELLE_MAX)
+    lwX = (bw - lwMuster.breite * lwZelle) / 2
+    lwY = (bh - lwMuster.hoehe * lwZelle) / 2
+    lwEingepasst = TRUE
+    gtk_widget_queue_draw(lwFlaeche)
+    statusNachziehen()
+END SUB
+
+' Bildschirmpunkt -> Zelle (-1, wenn ausserhalb des Musters)
+FUNCTION leinwandZelleX(px AS FLOAT) AS INTEGER
+    IF NOT lwHat THEN RETURN -1
+    DIM x AS INTEGER : x = FLOOR((px - lwX) / lwZelle)
+    IF x < 0 OR x >= lwMuster.breite THEN RETURN -1
+    RETURN x
+END FUNCTION
+FUNCTION leinwandZelleY(py AS FLOAT) AS INTEGER
+    IF NOT lwHat THEN RETURN -1
+    DIM y AS INTEGER : y = FLOOR((py - lwY) / lwZelle)
+    IF y < 0 OR y >= lwMuster.hoehe THEN RETURN -1
+    RETURN y
+END FUNCTION
+
+' --- Zeichnen -----------------------------------------------------------------------
+FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, LW_HINTERGRUND)
+    cairo_paint(cr)
+    IF NOT lwHat THEN RETURN TRUE
+    IF NOT lwEingepasst THEN leinwandEinpassen()
+    DIM b AS INTEGER : b = lwMuster.breite
+    DIM h AS INTEGER : h = lwMuster.hoehe
+    DIM z AS FLOAT : z = lwZelle
+
+    ' Stoff und das Pixelbild
+    cairoFarbe(cr, LW_STOFF)
+    cairo_rectangle(cr, lwX, lwY, b * z, h * z)
+    cairo_fill(cr)
+    cairo_save(cr)
+    cairo_translate(cr, lwX, lwY)
+    cairo_scale(cr, z, z)
+    cairo_set_source_surface(cr, lwBild, 0, 0)
+    cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_NAECHST)
+    cairo_rectangle(cr, 0, 0, b, h)
+    cairo_fill(cr)
+    cairo_restore(cr)
+
+    ' Der sichtbare Ausschnitt
+    DIM x0 AS INTEGER : x0 = MAX(0, FLOOR(-lwX / z))
+    DIM y0 AS INTEGER : y0 = MAX(0, FLOOR(-lwY / z))
+    DIM x1 AS INTEGER : x1 = MIN(b - 1, FLOOR((bw - lwX) / z))
+    DIM y1 AS INTEGER : y1 = MIN(h - 1, FLOOR((bh - lwY) / z))
+    DIM x AS INTEGER, y AS INTEGER, c AS INTEGER, t AS INTEGER, i AS INTEGER
+
+    ' Besondere Stichtypen: die Zelle zuerst wieder Stoff, dann die Form
+    IF z >= 6 THEN
+        FOR y = y0 TO y1
+            FOR x = x0 TO x1
+                i = y * b + x
+                t = lwTyp[i]
+                IF t = 0 OR lwFarbe[i] < 0 THEN CONTINUE
+                lwSonderstich(cr, lwX + x * z, lwY + y * z, z, t, lwRgb[lwFarbe[i]])
+            NEXT
+        NEXT
+    END IF
+
+    ' Symbole
+    IF z >= 12 THEN lwSymbole(cr, x0, y0, x1, y1)
+
+    ' Raster
+    IF z >= 4 THEN
+        cairo_set_line_width(cr, 1.0)
+        cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.14)
+        FOR x = x0 TO x1 + 1
+            IF x MOD LW_RASTER_GROSS = 0 THEN CONTINUE
+            cairo_move_to(cr, ROUND(lwX + x * z) + 0.5, MAX(lwY, 0))
+            cairo_line_to(cr, ROUND(lwX + x * z) + 0.5, MIN(lwY + h * z, bh))
+        NEXT
+        FOR y = y0 TO y1 + 1
+            IF y MOD LW_RASTER_GROSS = 0 THEN CONTINUE
+            cairo_move_to(cr, MAX(lwX, 0), ROUND(lwY + y * z) + 0.5)
+            cairo_line_to(cr, MIN(lwX + b * z, bw), ROUND(lwY + y * z) + 0.5)
+        NEXT
+        cairo_stroke(cr)
+    END IF
+    IF z >= 2 THEN
+        cairo_set_line_width(cr, IIF(z >= 8, 2.0, 1.0))
+        cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.5)
+        FOR x = 0 TO b STEP LW_RASTER_GROSS
+            cairo_move_to(cr, ROUND(lwX + x * z), lwY)
+            cairo_line_to(cr, ROUND(lwX + x * z), lwY + h * z)
+        NEXT
+        FOR y = 0 TO h STEP LW_RASTER_GROSS
+            cairo_move_to(cr, lwX, ROUND(lwY + y * z))
+            cairo_line_to(cr, lwX + b * z, ROUND(lwY + y * z))
+        NEXT
+        cairo_stroke(cr)
+    END IF
+
+    ' Rueckstiche (Halbstich-Einheiten)
+    DIM r AS kern.Rueckstich
+    cairo_set_line_width(cr, MAX(1.5, z / 6))
+    FOR EACH r IN lwMuster.rueckstiche
+        IF r.farbe < 0 OR r.farbe >= LEN(lwRgb) - 1 THEN CONTINUE
+        cairoFarbe(cr, lwRgb[r.farbe])
+        cairo_move_to(cr, lwX + r.x1 * z / 2, lwY + r.y1 * z / 2)
+        cairo_line_to(cr, lwX + r.x2 * z / 2, lwY + r.y2 * z / 2)
+        cairo_stroke(cr)
+    NEXT
+
+    ' Rahmen und die Zelle unter dem Zeiger
+    cairo_set_line_width(cr, 1.0)
+    cairo_set_source_rgb(cr, 0.55, 0.57, 0.62)
+    cairo_rectangle(cr, lwX - 0.5, lwY - 0.5, b * z + 1, h * z + 1)
+    cairo_stroke(cr)
+    IF lwMausX >= 0 AND z >= 4 THEN
+        cairo_set_line_width(cr, 2.0)
+        cairo_set_source_rgb(cr, 0.0, 0.47, 0.83)
+        cairo_rectangle(cr, lwX + lwMausX * z, lwY + lwMausY * z, z, z)
+        cairo_stroke(cr)
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+' Ein Kaestchen mit besonderem Stichtyp an (px, py), Groesse z.
+SUB lwSonderstich(cr AS INTEGER, px AS FLOAT, py AS FLOAT, z AS FLOAT, t AS INTEGER, farbe AS INTEGER)
+    cairoFarbe(cr, LW_STOFF)
+    cairo_rectangle(cr, px, py, z, z)
+    cairo_fill(cr)
+    cairoFarbe(cr, farbe)
+    IF kern.istTeilstich(t) THEN
+        DIM p AS ARRAY OF FLOAT : p = kern.teilstichPunkte(t)
+        DIM k AS INTEGER
+        cairo_move_to(cr, px + p[0] * z, py + p[1] * z)
+        FOR k = 2 TO LEN(p) - 1 STEP 2
+            cairo_line_to(cr, px + p[k] * z, py + p[k + 1] * z)
+        NEXT
+        cairo_close_path(cr)
+        cairo_fill(cr)
+    ELSEIF t = kern.KNOTEN THEN
+        cairo_arc(cr, px + z / 2, py + z / 2, z * kern.KNOTEN_RADIUS, 0, TAU)
+        cairo_fill(cr)
+    ELSEIF t = kern.PERLE THEN
+        cairo_arc(cr, px + z / 2, py + z / 2, z * kern.PERLE_RADIUS, 0, TAU)
+        cairo_fill(cr)
+        cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.55)
+        cairo_arc(cr, px + z * 0.40, py + z * 0.38, z * 0.10, 0, TAU)
+        cairo_fill(cr)
+    ELSEIF t = kern.DIAMANT THEN
+        DIM rand AS FLOAT : rand = kern.diamantRand(z)
+        cairo_rectangle(cr, px + rand, py + rand, z - 2 * rand, z - 2 * rand)
+        cairo_fill(cr)
+        cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.28)
+        cairo_move_to(cr, px + rand, py + rand)
+        cairo_line_to(cr, px + z - rand, py + rand)
+        cairo_line_to(cr, px + z / 2, py + z / 2)
+        cairo_close_path(cr)
+        cairo_fill(cr)
+    ELSE
+        cairo_rectangle(cr, px, py, z, z)
+        cairo_fill(cr)
+    END IF
+END SUB
+
+' Die Symbole im sichtbaren Ausschnitt -- je Farbe einmal gemessen.
+SUB lwSymbole(cr AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
+    DIM z AS FLOAT : z = lwZelle
+    DIM b AS INTEGER : b = lwMuster.breite
+    DIM n AS INTEGER : n = lwMuster.farbanzahl()
+    pango_font_description_set_absolute_size(lwSchrift, z * 0.62 * PANGO_SCALE)
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, lwSchrift)
+    DIM sb[n + 1] AS INTEGER
+    DIM sh[n + 1] AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1 : sb[k] = -1 : NEXT
+    DIM x AS INTEGER, y AS INTEGER, c AS INTEGER, t AS INTEGER, letzte AS INTEGER
+    letzte = -2
+    FOR y = y0 TO y1
+        FOR x = x0 TO x1
+            c = lwFarbe[y * b + x]
+            IF c < 0 OR c >= n THEN CONTINUE
+            t = lwTyp[y * b + x]
+            IF t = kern.KNOTEN OR t = kern.PERLE THEN CONTINUE
+            pango_layout_set_text(layout, lwMuster.farben[c].symbol, -1)
+            IF sb[c] < 0 THEN
+                DIM wb AS INTEGER, wh AS INTEGER
+                pango_layout_get_pixel_size(layout, wb, wh)
+                sb[c] = wb : sh[c] = wh
+            END IF
+            ' Schwarz auf hellen, weiss auf dunklen Farben
+            DIM schwarz AS INTEGER : schwarz = IIF(kern.helligkeit(lwRgb[c]) > 0.55, 1, 0)
+            IF schwarz <> letzte THEN
+                IF schwarz = 1 THEN cairo_set_source_rgb(cr, 0.0, 0.0, 0.0) ELSE cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
+                letzte = schwarz
+            END IF
+            cairo_move_to(cr, lwX + x * z + (z - sb[c]) / 2, lwY + y * z + (z - sh[c]) / 2)
+            pango_cairo_show_layout(cr, layout)
+        NEXT
+    NEXT
+    g_object_unref(layout)
+END SUB
+
+' --- Maus ---------------------------------------------------------------------------
+FUNCTION lwRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    DIM richtung AS INTEGER
+    ok = gdk_event_get_scroll_direction(ereignis, richtung)
+    DIM schritt AS FLOAT
+    IF richtung = GDK_RAD_HOCH THEN
+        schritt = -1
+    ELSEIF richtung = GDK_RAD_RUNTER THEN
+        schritt = 1
+    ELSE
+        DIM dx AS FLOAT, dy AS FLOAT
+        ok = gdk_event_get_scroll_deltas(ereignis, dx, dy)
+        schritt = dy
+    END IF
+    IF schritt = 0 THEN RETURN TRUE
+    leinwandZoom(lwZelle * 1.15 ^ (-schritt), px, py)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION lwDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, lwZiehX, lwZiehY)
+    lwZiehen = TRUE
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION lwLoslassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    lwZiehen = FALSE
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION lwBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    IF lwZiehen THEN
+        lwX = lwX + (px - lwZiehX)
+        lwY = lwY + (py - lwZiehY)
+        lwZiehX = px
+        lwZiehY = py
+    END IF
+    DIM mx AS INTEGER : mx = leinwandZelleX(px)
+    DIM my AS INTEGER : my = leinwandZelleY(py)
+    IF mx < 0 OR my < 0 THEN mx = -1 : my = -1
+    IF lwZiehen OR mx <> lwMausX OR my <> lwMausY THEN
+        lwMausX = mx
+        lwMausY = my
+        gtk_widget_queue_draw(lwFlaeche)
+        statusNachziehen()
+    END IF
+    RETURN TRUE
+END FUNCTION

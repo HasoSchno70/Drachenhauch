@@ -1,0 +1,119 @@
+[
+    {
+        "DiamantNumber": "D168",
+        "Color": {
+            "R": 209,
+            "G": 209,
+            "B": 209
+        },
+        "Name": "Light Silver"
+    },
+    {
+        "DiamantNumber": "D225",
+        "Color": {
+            "R": 255,
+            "G": 223,
+            "B": 213
+        },
+        "Name": "Antique Pink"
+    },
+    {
+        "DiamantNumber": "D301",
+        "Color": {
+            "R": 179,
+            "G": 95,
+            "B": 43
+        },
+        "Name": "Copper"
+    },
+    {
+        "DiamantNumber": "D310",
+        "Color": {
+            "R": 0,
+            "G": 0,
+            "B": 0
+        },
+        "Name": "Black"
+    },
+    {
+        "DiamantNumber": "D316",
+        "Color": {
+            "R": 183,
+            "G": 115,
+            "B": 127
+        },
+        "Name": "Pink Amethyst"
+    },
+    {
+        "DiamantNumber": "D317",
+        "Color": {
+            "R": 108,
+            "G": 108,
+            "B": 108
+        },
+        "Name": "Anthracite Grey"
+    },
+    {
+        "DiamantNumber": "D321",
+        "Color": {
+            "R": 199,
+            "G": 43,
+            "B": 59
+        },
+        "Name": "Red"
+    },
+    {
+        "DiamantNumber": "D415",
+        "Color": {
+            "R": 211,
+            "G": 211,
+            "B": 214
+        },
+        "Name": "Metallic Pewter"
+    },
+    {
+        "DiamantNumber": "D699",
+        "Color": {
+            "R": 5,
+            "G": 101,
+            "B": 23
+        },
+        "Name": "Green"
+    },
+    {
+        "DiamantNumber": "D898",
+        "Color": {
+            "R": 73,
+            "G": 42,
+            "B": 19
+        },
+        "Name": "Bronze"
+    },
+    {
+        "DiamantNumber": "D3821",
+        "Color": {
+            "R": 243,
+            "G": 206,
+            "B": 117
+        },
+        "Name": "Light Gold"
+    },
+    {
+        "DiamantNumber": "D3852",
+        "Color": {
+            "R": 205,
+            "G": 157,
+            "B": 55
+        },
+        "Name": "Dark Gold"
+    },
+    {
+        "DiamantNumber": "D5200",
+        "Color": {
+            "R": 255,
+            "G": 255,
+            "B": 255
+        },
+        "Name": "Snow White"
+    }
+]

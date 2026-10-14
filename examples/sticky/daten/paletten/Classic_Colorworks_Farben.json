@@ -1,0 +1,803 @@
+[
+ {
+  "ClassicColorworksNumber": "CCW-001",
+  "Color": {
+   "R": 178,
+   "G": 34,
+   "B": 34
+  },
+  "Name": "Barn Door Red"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-002",
+  "Color": {
+   "R": 139,
+   "G": 35,
+   "B": 35
+  },
+  "Name": "Bandana"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-003",
+  "Color": {
+   "R": 205,
+   "G": 92,
+   "B": 92
+  },
+  "Name": "Copper Kettle"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-004",
+  "Color": {
+   "R": 220,
+   "G": 60,
+   "B": 60
+  },
+  "Name": "Caliente"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-005",
+  "Color": {
+   "R": 160,
+   "G": 50,
+   "B": 50
+  },
+  "Name": "Williamsburg Red"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-006",
+  "Color": {
+   "R": 180,
+   "G": 70,
+   "B": 70
+  },
+  "Name": "Cherry Cobbler"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-007",
+  "Color": {
+   "R": 150,
+   "G": 30,
+   "B": 30
+  },
+  "Name": "Buckeye Scarlet"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-008",
+  "Color": {
+   "R": 200,
+   "G": 80,
+   "B": 80
+  },
+  "Name": "Tulip"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-010",
+  "Color": {
+   "R": 255,
+   "G": 182,
+   "B": 193
+  },
+  "Name": "Baby Pink"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-011",
+  "Color": {
+   "R": 255,
+   "G": 192,
+   "B": 203
+  },
+  "Name": "Sweetheart"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-012",
+  "Color": {
+   "R": 255,
+   "G": 150,
+   "B": 170
+  },
+  "Name": "Cherry Blossom"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-013",
+  "Color": {
+   "R": 230,
+   "G": 130,
+   "B": 150
+  },
+  "Name": "Romance"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-014",
+  "Color": {
+   "R": 200,
+   "G": 100,
+   "B": 130
+  },
+  "Name": "Berry Cobbler"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-015",
+  "Color": {
+   "R": 180,
+   "G": 80,
+   "B": 110
+  },
+  "Name": "Wild Berry"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-016",
+  "Color": {
+   "R": 210,
+   "G": 120,
+   "B": 140
+  },
+  "Name": "Cameo Rose"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-017",
+  "Color": {
+   "R": 240,
+   "G": 160,
+   "B": 180
+  },
+  "Name": "Tea Rose"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-020",
+  "Color": {
+   "R": 255,
+   "G": 140,
+   "B": 0
+  },
+  "Name": "Orange Marmalade"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-021",
+  "Color": {
+   "R": 255,
+   "G": 165,
+   "B": 50
+  },
+  "Name": "Pumpkin Harvest"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-022",
+  "Color": {
+   "R": 230,
+   "G": 120,
+   "B": 30
+  },
+  "Name": "Autumn Leaves"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-023",
+  "Color": {
+   "R": 210,
+   "G": 105,
+   "B": 30
+  },
+  "Name": "Gingersnap"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-024",
+  "Color": {
+   "R": 200,
+   "G": 90,
+   "B": 20
+  },
+  "Name": "Maple Syrup"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-025",
+  "Color": {
+   "R": 180,
+   "G": 80,
+   "B": 10
+  },
+  "Name": "Rust"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-026",
+  "Color": {
+   "R": 255,
+   "G": 180,
+   "B": 100
+  },
+  "Name": "Apricot"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-027",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 130
+  },
+  "Name": "Melon"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-030",
+  "Color": {
+   "R": 255,
+   "G": 215,
+   "B": 0
+  },
+  "Name": "Fool's Gold"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-031",
+  "Color": {
+   "R": 255,
+   "G": 230,
+   "B": 100
+  },
+  "Name": "Butter Cream"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-032",
+  "Color": {
+   "R": 255,
+   "G": 240,
+   "B": 150
+  },
+  "Name": "Lemon Drops"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-033",
+  "Color": {
+   "R": 240,
+   "G": 200,
+   "B": 50
+  },
+  "Name": "Mustard Seed"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-034",
+  "Color": {
+   "R": 218,
+   "G": 165,
+   "B": 32
+  },
+  "Name": "Goldenrod"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-035",
+  "Color": {
+   "R": 200,
+   "G": 150,
+   "B": 20
+  },
+  "Name": "Old Gold"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-036",
+  "Color": {
+   "R": 255,
+   "G": 250,
+   "B": 200
+  },
+  "Name": "Cornsilk"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-037",
+  "Color": {
+   "R": 240,
+   "G": 220,
+   "B": 130
+  },
+  "Name": "Sunflower"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-040",
+  "Color": {
+   "R": 85,
+   "G": 170,
+   "B": 85
+  },
+  "Name": "Clover"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-041",
+  "Color": {
+   "R": 60,
+   "G": 140,
+   "B": 60
+  },
+  "Name": "Evergreen"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-042",
+  "Color": {
+   "R": 100,
+   "G": 180,
+   "B": 100
+  },
+  "Name": "Meadow"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-043",
+  "Color": {
+   "R": 34,
+   "G": 139,
+   "B": 34
+  },
+  "Name": "Forest Glade"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-044",
+  "Color": {
+   "R": 144,
+   "G": 238,
+   "B": 144
+  },
+  "Name": "Mint Julep"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-045",
+  "Color": {
+   "R": 50,
+   "G": 100,
+   "B": 50
+  },
+  "Name": "Pine"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-046",
+  "Color": {
+   "R": 107,
+   "G": 142,
+   "B": 35
+  },
+  "Name": "Olive Branch"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-047",
+  "Color": {
+   "R": 130,
+   "G": 160,
+   "B": 80
+  },
+  "Name": "Spring Grass"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-048",
+  "Color": {
+   "R": 180,
+   "G": 200,
+   "B": 140
+  },
+  "Name": "Celery"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-049",
+  "Color": {
+   "R": 85,
+   "G": 107,
+   "B": 47
+  },
+  "Name": "Turtle"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-050",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 128
+  },
+  "Name": "Deep Sea"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-051",
+  "Color": {
+   "R": 95,
+   "G": 158,
+   "B": 160
+  },
+  "Name": "Verdigris"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-052",
+  "Color": {
+   "R": 0,
+   "G": 139,
+   "B": 139
+  },
+  "Name": "Peacock"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-053",
+  "Color": {
+   "R": 64,
+   "G": 224,
+   "B": 208
+  },
+  "Name": "Caribbean"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-054",
+  "Color": {
+   "R": 127,
+   "G": 255,
+   "B": 212
+  },
+  "Name": "Island Blue"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-055",
+  "Color": {
+   "R": 100,
+   "G": 180,
+   "B": 180
+  },
+  "Name": "Sea Spray"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-060",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 139
+  },
+  "Name": "Midnight"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-061",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 180
+  },
+  "Name": "Blue Suede"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-062",
+  "Color": {
+   "R": 65,
+   "G": 105,
+   "B": 225
+  },
+  "Name": "Liberty"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-063",
+  "Color": {
+   "R": 100,
+   "G": 149,
+   "B": 237
+  },
+  "Name": "Blue Jeans"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-064",
+  "Color": {
+   "R": 135,
+   "G": 206,
+   "B": 235
+  },
+  "Name": "Summer Sky"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-065",
+  "Color": {
+   "R": 176,
+   "G": 224,
+   "B": 230
+  },
+  "Name": "Bluebonnet"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-066",
+  "Color": {
+   "R": 70,
+   "G": 130,
+   "B": 180
+  },
+  "Name": "Denim"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-067",
+  "Color": {
+   "R": 30,
+   "G": 60,
+   "B": 100
+  },
+  "Name": "Navy Pier"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-068",
+  "Color": {
+   "R": 100,
+   "G": 130,
+   "B": 170
+  },
+  "Name": "Twilight"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-070",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Wild Grapes"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-071",
+  "Color": {
+   "R": 148,
+   "G": 0,
+   "B": 211
+  },
+  "Name": "Grape Hyacinth"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-072",
+  "Color": {
+   "R": 186,
+   "G": 85,
+   "B": 211
+  },
+  "Name": "Lavender Mist"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-073",
+  "Color": {
+   "R": 218,
+   "G": 112,
+   "B": 214
+  },
+  "Name": "Wisteria"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-074",
+  "Color": {
+   "R": 230,
+   "G": 190,
+   "B": 230
+  },
+  "Name": "Sweet Pea"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-075",
+  "Color": {
+   "R": 147,
+   "G": 112,
+   "B": 219
+  },
+  "Name": "Hyacinth"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-076",
+  "Color": {
+   "R": 75,
+   "G": 0,
+   "B": 130
+  },
+  "Name": "Purple Iris"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-077",
+  "Color": {
+   "R": 100,
+   "G": 50,
+   "B": 100
+  },
+  "Name": "Plum Street"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-080",
+  "Color": {
+   "R": 139,
+   "G": 69,
+   "B": 19
+  },
+  "Name": "Sable"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-081",
+  "Color": {
+   "R": 101,
+   "G": 67,
+   "B": 33
+  },
+  "Name": "Bark"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-082",
+  "Color": {
+   "R": 150,
+   "G": 105,
+   "B": 60
+  },
+  "Name": "Trail Dust"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-083",
+  "Color": {
+   "R": 210,
+   "G": 180,
+   "B": 140
+  },
+  "Name": "Parchment"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-084",
+  "Color": {
+   "R": 205,
+   "G": 133,
+   "B": 63
+  },
+  "Name": "Caramel Corn"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-085",
+  "Color": {
+   "R": 160,
+   "G": 82,
+   "B": 45
+  },
+  "Name": "Roasted Chestnut"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-086",
+  "Color": {
+   "R": 120,
+   "G": 80,
+   "B": 50
+  },
+  "Name": "Hazelnut"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-087",
+  "Color": {
+   "R": 180,
+   "G": 140,
+   "B": 100
+  },
+  "Name": "Cappuccino"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-088",
+  "Color": {
+   "R": 90,
+   "G": 60,
+   "B": 40
+  },
+  "Name": "Espresso"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-089",
+  "Color": {
+   "R": 245,
+   "G": 222,
+   "B": 179
+  },
+  "Name": "Harvest Basket"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-090",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 0
+  },
+  "Name": "Blackbird"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-091",
+  "Color": {
+   "R": 50,
+   "G": 50,
+   "B": 50
+  },
+  "Name": "Graphite"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-092",
+  "Color": {
+   "R": 105,
+   "G": 105,
+   "B": 105
+  },
+  "Name": "Confederate Gray"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-093",
+  "Color": {
+   "R": 169,
+   "G": 169,
+   "B": 169
+  },
+  "Name": "Silver"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-094",
+  "Color": {
+   "R": 220,
+   "G": 220,
+   "B": 220
+  },
+  "Name": "Morning Fog"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-095",
+  "Color": {
+   "R": 112,
+   "G": 128,
+   "B": 144
+  },
+  "Name": "Stone"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-096",
+  "Color": {
+   "R": 70,
+   "G": 80,
+   "B": 90
+  },
+  "Name": "Charcoal"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-097",
+  "Color": {
+   "R": 200,
+   "G": 200,
+   "B": 210
+  },
+  "Name": "Thistle"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-100",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "Snow"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-101",
+  "Color": {
+   "R": 252,
+   "G": 250,
+   "B": 240
+  },
+  "Name": "Antique Lace"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-102",
+  "Color": {
+   "R": 255,
+   "G": 250,
+   "B": 230
+  },
+  "Name": "Cream"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-103",
+  "Color": {
+   "R": 255,
+   "G": 245,
+   "B": 220
+  },
+  "Name": "Toasted Barley"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-104",
+  "Color": {
+   "R": 245,
+   "G": 235,
+   "B": 210
+  },
+  "Name": "Heirloom"
+ },
+ {
+  "ClassicColorworksNumber": "CCW-105",
+  "Color": {
+   "R": 230,
+   "G": 220,
+   "B": 200
+  },
+  "Name": "Oatmeal"
+ }
+]
