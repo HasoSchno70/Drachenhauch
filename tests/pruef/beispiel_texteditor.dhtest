@@ -1,0 +1,113 @@
+' Das Beispiel examples/texteditor (Texteditor-Runde, 2026-10-14): Reiter,
+' Suchen/Ersetzen, Kodierung und Zeilenenden bleiben beim Speichern, wie sie
+' waren. Die Unterprogramme werden direkt gerufen; Beilagen liegen eine Ebene
+' ueber der Programmkopie. Format: docs/werkzeuge.md, dhrt test.
+
+=== cp1252 und crlf bleiben beim speichern
+--- programm ../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
+--- einschub nach DIM ok AS BOOLEAN
+DIM prI AS INTEGER : prI = oeffnen("../w.txt")
+PRINT dokKod[prI]; " "; dokCrlf[prI]; " "; GUI_STATUSBAR_TEXT$(status, 0)
+PRINT REPLACE$(GUI_TEXT(dokTa[prI]), CHR$(10), "|")
+PRINT ersetzenAlle(prI, "10", "12")
+PRINT speichern(prI, FALSE)
+PRINT BUFFER_TO_HEX$(READALL_BYTES("../w.txt"))
+' Ein Zeichen, das es in cp1252 nicht gibt: nicht gespeichert, die Datei bleibt
+GUI_SET_TEXT(dokTa[prI], "Pfeil →")
+PRINT speichern(prI, FALSE)
+PRINT LEFT$(GUI_STATUSBAR_TEXT$(status, 0), 18)
+PRINT BUFFER_TO_HEX$(READALL_BYTES("../w.txt"))
+EXIT(0)
+--- datei w.txt base64
+WmVpbGUgZWlucw0KTfxsbGVyIDEwIIANCg==
+--- erwartet
+cp1252 TRUE Geöffnet: w.txt
+Zeile eins|Müller 10 €|
+1
+TRUE
+5a65696c652065696e730d0a4dfc6c6c657220313220800d0a
+FALSE
+Nicht gespeichert:
+5a65696c652065696e730d0a4dfc6c6c657220313220800d0a
+
+=== bom bleibt und binaeres wird nicht geoeffnet
+--- programm ../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
+--- einschub nach DIM ok AS BOOLEAN
+DIM prI AS INTEGER : prI = oeffnen("../b.txt")
+PRINT dokKod[prI]; " "; kodName$(dokKod[prI]); " "; dokCrlf[prI]
+PRINT oeffnen("../b.txt") = prI
+PRINT speichern(prI, FALSE)
+PRINT BUFFER_TO_HEX$(READALL_BYTES("../b.txt"))
+PRINT oeffnen("../bin.dat")
+PRINT GUI_STATUSBAR_TEXT$(status, 0)
+PRINT anzahl
+EXIT(0)
+--- datei b.txt base64
+77u/R3LDvMOfZQo=
+--- datei bin.dat base64
+//5HAHIA
+--- erwartet
+utf8bom UTF-8 mit BOM FALSE
+TRUE
+TRUE
+efbbbf4772c3bcc39f650a
+-1
+Nicht geöffnet: keine Textdatei (Nullbytes)
+2
+
+=== suchen springt weiter und faengt oben wieder an
+--- programm ../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
+--- einschub nach DIM ok AS BOOLEAN
+DIM prI AS INTEGER : prI = oeffnen("../t.txt")
+DIM prA AS INTEGER, prB AS INTEGER, prC AS INTEGER, prD AS INTEGER
+PRINT suchen(prI, "rot", 1, 1)
+(prA, prB, prC, prD) = GUI_TEXTAREA_SELECTION_RANGE(dokTa[prI])
+PRINT prA; " "; prB; " "; prD
+PRINT suchen(prI, "rot", prC, prD)
+(prA, prB, prC, prD) = GUI_TEXTAREA_SELECTION_RANGE(dokTa[prI])
+PRINT prA; " "; prB
+PRINT suchen(prI, "rot", prC, prD)
+(prA, prB, prC, prD) = GUI_TEXTAREA_SELECTION_RANGE(dokTa[prI])
+PRINT prA; " "; prB
+PRINT suchen(prI, "blau", 1, 1); " "; GUI_STATUSBAR_TEXT$(status, 0)
+EXIT(0)
+--- datei t.txt
+eins rot
+zwei
+drei rot
+--- erwartet
+TRUE
+1 6 9
+TRUE
+3 6
+TRUE
+1 6
+FALSE Nicht gefunden: blau
+
+=== klick auf die statusleiste wechselt kodierung und zeilenende
+' Echte Klicks: die Lage der Felder kommt aus der Statusleiste selbst.
+DIM prX AS INTEGER : prX = GUI_STATUSBAR_FIELD_X(status, sfKod) + GUI_STATUSBAR_FIELD_W(status, sfKod) \ 2
+DIM prX2 AS INTEGER : prX2 = GUI_STATUSBAR_FIELD_X(status, sfEnde) + GUI_STATUSBAR_FIELD_W(status, sfEnde) \ 2
+DIM prY AS INTEGER : prY = GUI_GET_Y(status) + KOPF + STATUS_H \ 2
+DIM prE AS ARRAY OF STRING : prE = ["c 10"]
+ARRAY_PUSH(prE, "e 0 7 " + STR$(prX) + " " + STR$(prY) + " 0 0")
+ARRAY_PUSH(prE, "e 2 6 0 0 0 0") : ARRAY_PUSH(prE, "e 3 5 0 0 0 0")
+ARRAY_PUSH(prE, "e 6 6 0 0 0 0") : ARRAY_PUSH(prE, "e 7 5 0 0 0 0")
+ARRAY_PUSH(prE, "e 10 6 0 0 0 0") : ARRAY_PUSH(prE, "e 11 5 0 0 0 0")
+ARRAY_PUSH(prE, "e 14 7 " + STR$(prX2) + " " + STR$(prY) + " 0 0")
+ARRAY_PUSH(prE, "e 16 6 0 0 0 0") : ARRAY_PUSH(prE, "e 17 5 0 0 0 0")
+WRITEALL("../ev.txt", JOIN$(prE, CHR$(10)) + CHR$(10))
+AUTOMATION_PLAY("../ev.txt")
+DIM prBild AS INTEGER
+--- programm ../../examples/texteditor/main.dh nach DIM ok AS BOOLEAN
+--- einschub nach     FLIP()
+    prBild = prBild + 1
+    IF prBild = 5 OR prBild = 9 OR prBild = 13 OR prBild = 20 THEN
+        PRINT dokKod[0]; " "; dokCrlf[0]; " "; dokGeaendert[0]; " "; GUI_STATUSBAR_TEXT$(status, sfKod)
+    END IF
+    IF prBild = 20 THEN EXIT(0)
+--- erwartet
+utf8bom FALSE TRUE UTF-8 mit BOM
+cp1252 FALSE TRUE Windows-1252
+utf8 FALSE TRUE UTF-8
+utf8 TRUE TRUE UTF-8

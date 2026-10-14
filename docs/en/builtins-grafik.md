@@ -375,7 +375,7 @@ a second canvas with its own memory, where a rectangle is enough.
 | `FONT_HAS_GLYPH(font, zeichen$)` → BOOLEAN | does the font itself have a glyph for it? If not, `TEXT` draws it with the fallback font; `-1` = built-in font |
 | `FONT_GLYPH_WIDTH(font, zeichen$, groesse)` → FLOAT | how far `TEXT` advances after this character at `groesse` points — measured like `TEXT_WIDTH`, without switching the active font |
 | `FONT_TO_IMAGE(font[, erstes[, letztes]])` → IMAGE | the characters `erstes`..`letztes` (default 32..126, at most 256) as an image in the format of `LOADFONT_IMAGE`: each character white in a transparent field, magenta (`&HFF00FF`) outside and in between. That turns a vector font into a pixel font that you can touch up and load again with `LOADFONT_IMAGE(bild, &HFF00FF, erstes)` |
-| `SETFONT(font)` | set the active font; `SETFONT(-1)` = default font |
+| `SETFONT(font[, groesse])` | set the active font; `SETFONT(-1)` = default font. Without `groesse` the size the font was loaded at applies afterwards; with `groesse` everything is drawn at that size from now on (like `SETFONT` + `TEXT_SIZE`) -- load sharp, draw small: `SETFONT(LOADFONT("sans", 32), 16)` |
 | `TEXT_SPACING(px)` | letter spacing for TTF (native) |
 | `TEXT_LINE_SPACING(px)` | line spacing for multi-line text |
 

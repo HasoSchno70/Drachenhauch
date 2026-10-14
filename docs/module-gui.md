@@ -3552,6 +3552,9 @@ pixelig bleibt — anders als `LOADFONT` (TTF), das glättet.
 > 18)` baut den Zeichensatz *für 18 px*; `SETFONT` setzt damit nicht nur die
 > Schriftart, sondern auch die aktive Textgröße auf 18. Wundere dich also
 > nicht, wenn nach `SETFONT` alles größer oder kleiner ist als vorher.
+> Soll die Oberfläche kleiner sein als die Lade-Größe, sag es gleich mit:
+> `SETFONT(schrift, 16)` lädt nichts neu, es zeichnet nur ab jetzt in 16 —
+> eine bei 32 geladene Schrift bleibt dabei scharf.
 > Dieselbe Schrift in zwei Größen scharf? Zweimal laden — stark hochskaliert
 > wird eine TTF sonst weich. `GUI_SET_FONT_SIZE` ändert nur, wie groß
 > gezeichnet wird, nicht, wofür der Zeichensatz gebaut wurde.

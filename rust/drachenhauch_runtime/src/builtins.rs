@@ -3358,6 +3358,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 FileH::Write(w) => {
                     let payload = if name == "writeline" { format!("{}\n", text) } else { text };
                     let bytes = crate::kodierung::kodieren(&payload, kod, "WRITE")?;
+                    // utf8bom: das BOM gehoert vor die leere Datei, nicht vor jede Zeile.
+                    let bom = crate::kodierung::bom_vorn(kod);
+                    if !bom.is_empty() && w.metadata().map(|m| m.len() == 0).unwrap_or(false) {
+                        w.write_all(bom).map_err(|e| format!("WRITE: {}", e))?;
+                    }
                     w.write_all(&bytes).map_err(|e| format!("WRITE: {}", e))?;
                     Ok(Value::Nil)
                 }
@@ -3478,6 +3483,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let kod = if a.len() > 1 { Some(need_str(&a[1], "READLINES")?) } else { None };
             let text = text_lesen(pfad, kod, "READLINES")?;
             Ok(new_str_array(text.lines().map(|l| l.to_string()).collect()))
+        }
+        // FILE_ENCODING$(pfad$) -- welche Kodierung "auto" fuer diese Datei
+        // waehlt (2026-10-14, Texteditor-Runde). Ohne die Antwort liest ein
+        // Editor eine cp1252-Datei richtig und schreibt sie als UTF-8 zurueck:
+        // "auto" gilt nur beim Lesen, und wer sichert, muss den Namen kennen.
+        "file_encoding$" => {
+            arity!(1);
+            let pfad = need_str(&a[0], "FILE_ENCODING$")?;
+            let bytes = std::fs::read(resolve_asset_path(pfad))
+                .map_err(|e| format!("FILE_ENCODING$: {}: {}", pfad, e))?;
+            Ok(Value::str_rc(crate::kodierung::erkennen(&bytes)))
         }
         "filesize" => {
             arity!(1);
@@ -5907,7 +5923,14 @@ fn text_schreiben(pfad: &str, text: &str, kodierung: Option<&str>, fn_: &str,
         Some(n) => crate::kodierung::aus_name(n, fn_)?,
         None => crate::kodierung::Kodierung::Utf8,
     };
-    let bytes = crate::kodierung::kodieren(text, k, fn_)?;
+    let mut bytes = crate::kodierung::kodieren(text, k, fn_)?;
+    // utf8bom: nur vor eine leere Datei -- beim Anhaengen an eine volle
+    // stuende es sonst mitten im Text.
+    let bom = crate::kodierung::bom_vorn(k);
+    let leer = !anhaengen || std::fs::metadata(pfad).map(|m| m.len() == 0).unwrap_or(true);
+    if !bom.is_empty() && leer {
+        bytes.splice(0..0, bom.iter().copied());
+    }
     if anhaengen {
         use std::io::Write;
         let mut f = std::fs::OpenOptions::new().append(true).create(true).open(pfad)

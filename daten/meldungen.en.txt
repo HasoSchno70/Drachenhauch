@@ -129,6 +129,8 @@ Nach Prompt-String erwartet ',' (oder ';') und Variable	After the prompt string 
 Erwartet Variable nach INPUT	Expected a variable after INPUT
 Erwartet THEN nach Bedingung	Expected THEN after the condition
 ELSEIF geht nur im mehrzeiligen IF -- IF ... THEN, dann jeder Zweig auf eigenen Zeilen, am Ende END IF	ELSEIF only works in a multi-line IF -- IF ... THEN, then each branch on its own lines, END IF at the end
+{} geht nicht hinter THEN/ELSE -- die Variable vor dem IF anlegen und im IF nur zuweisen (oder das IF mehrzeilig schreiben, mit END IF)	{} does not work after THEN/ELSE -- declare the variable before the IF and only assign it inside (or write the IF over several lines, with END IF)
+{} geht nicht im einzeiligen IF -- IF ... THEN, dann {} auf eigener Zeile, am Ende END IF	{} does not work in a single-line IF -- IF ... THEN, then {} on its own line, END IF at the end
 END IF erwartet, Programmende erreicht	Expected END IF, reached the end of the program
 ELSE IF: in Drachenhauch in EINEM Wort -- ELSEIF bedingung THEN	ELSE IF: in Drachenhauch it is ONE word -- ELSEIF condition THEN
 Erwartet END IF	Expected END IF
@@ -1289,6 +1291,8 @@ LOADFONT: Font nicht ladbar: {}	LOADFONT: font cannot be loaded: {}
 LOADFONT: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
 DHRT_FONT nicht ladbar: {}	DHRT_FONT cannot be loaded: {}
 SETFONT: ungueltiges FONT-Handle {}	SETFONT: invalid FONT handle {}
+SETFONT: erwartet (handle[, groesse]), erhalten {} Argument(e)	SETFONT: expects (handle[, groesse]), got {} argument(s)
+SETFONT: groesse muss mindestens 1 sein, erhalten {}	SETFONT: groesse must be at least 1, got {}
 LOADFONT_SDF: Font nicht ladbar: {}	LOADFONT_SDF: font cannot be loaded: {}
 LOADFONT_SDF: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)	LOADFONT_SDF: font '{}' cannot be loaded (not a TrueType/OpenType font raylib can read)
 LOADFONT_SDF: der Schrift-Shader liess sich nicht uebersetzen	LOADFONT_SDF: the font shader could not be compiled
