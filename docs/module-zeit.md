@@ -25,6 +25,12 @@ Armbanduhr, und `DATE$() + " " + TIME$()` liefert denselben Text. Beim Rechnen
 über eine Zeitumstellung hinweg zählt das Modul echte Sekunden, nicht
 Zifferblatt-Stunden.
 
+Die Ortszeit kommt unter Windows aus der Systemeinstellung, unter macOS und
+Linux aus der C-Bibliothek (Umgebungsvariable `TZ`, sonst `/etc/localtime`),
+im Browser aus der Zeitzone des Browsers. Bis 2026.31 galt außerhalb von
+Windows schlicht UTC: `TIME$()` ging in Berlin im Sommer zwei Stunden nach,
+und `ZEIT_PARSE("…Z")` rechnete nicht um.
+
 ## Text und Zeitpunkt
 
 | Funktion | Wirkung |

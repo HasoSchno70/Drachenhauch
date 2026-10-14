@@ -25,6 +25,12 @@ wristwatch, and `DATE$() + " " + TIME$()` returns the same text. When calculatin
 across a daylight-saving change, the module counts real seconds, not
 clock-face hours.
 
+On Windows the local time comes from the system setting, on macOS and Linux
+from the C library (environment variable `TZ`, otherwise `/etc/localtime`),
+in the browser from the browser's time zone. Up to 2026.31 it was simply UTC
+outside Windows: `TIME$()` ran two hours behind in Berlin in summer, and
+`ZEIT_PARSE("…Z")` did not convert.
+
 ## Text and point in time
 
 | Function | Effect |
