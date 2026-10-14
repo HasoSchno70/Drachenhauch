@@ -505,3 +505,63 @@ Namensraum-Fehler: e kennt keine Klasse gibtsnicht.
 PRIVATE PRINT 1
 --- fehler
 PRIVATE steht vor
+
+=== case mit konstanten im namensraum
+' Die CASE-Zweige liefen am Umbenennen vorbei -- ROT war im Namensraum
+' unbekannt (Sticky, 2026-10-14).
+IMPORT "farbe.dh" AS farbe
+PRINT farbe.name$(1); " "; farbe.name$(7); " "; farbe.name$(9)
+--- datei farbe.dh
+CONST ROT = 1
+CONST BLAU = 2
+FUNCTION name$(f AS INTEGER) AS STRING
+    SELECT CASE f
+        CASE ROT : RETURN "rot"
+        CASE BLAU, 7 : RETURN "blau"
+        CASE IS > BLAU : RETURN "mehr"
+    END SELECT
+    RETURN "?"
+END FUNCTION
+
+--- erwartet
+rot blau mehr
+
+=== flach eingebundenes bleibt draussen und die meldung sagt es
+' Eine Sammeldatei, die ihre Teile ohne AS einbindet, macht sie NICHT zum
+' Teil des Namensraums. Die Meldung nennt die Datei und den Weg hinaus.
+IMPORT "sammel.dh" AS kern
+PRINT kern.Doppelt(4)
+--- datei sammel.dh
+IMPORT "teil.dh"
+
+--- datei teil.dh
+FUNCTION Doppelt(x AS INTEGER) AS INTEGER
+    RETURN 2 * x
+END FUNCTION
+
+--- fehler
+doppelt steht in teil.dh, und diese Datei gehoert nicht zum Namensraum kern
+
+=== mehrere dateien mit demselben namensraum
+IMPORT "sammel.dh" AS kern
+DIM k AS kern.Knoten : k = kern.knotenNeu()
+PRINT k.wert; " "; TYPEOF(k)
+--- datei sammel.dh
+IMPORT "knoten.dh" AS kern
+IMPORT "bau.dh" AS kern
+
+--- datei knoten.dh
+CLASS Knoten
+    DIM wert AS INTEGER
+END CLASS
+CONST START = 3
+
+--- datei bau.dh
+FUNCTION knotenNeu() AS Knoten
+    DIM k AS Knoten : k = NEW Knoten()
+    k.wert = START
+    RETURN k
+END FUNCTION
+
+--- erwartet
+3 KERN.KNOTEN
