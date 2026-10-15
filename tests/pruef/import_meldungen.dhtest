@@ -172,3 +172,37 @@ PRINT TRIM$(lesen$(PROCESS_START("dhrt", "run", "main.dh")))
 
 --- erwartet
 42
+
+=== ein laufzeitfehler in einer importierten datei nennt sie
+' Bis 2026-10-14 stand hier die Zeile der zusammengefuegten Quelle mit dem
+' Namen der Hauptdatei ("fall.dh:7" fuer Zeile 3 von hilfe.dh).
+IMPORT "hilfe.dh"
+PRINT "a"
+kaputt()
+--- datei hilfe.dh
+SUB kaputt()
+    DIM x AS INTEGER
+    x = 1 \ 0
+END SUB
+
+--- erwartet
+a
+--- fehler
+Laufzeitfehler in hilfe.dh:3: Integer-Division durch 0
+
+=== ein laufzeitfehler hinter dem import nennt die zeile der hauptdatei
+IMPORT "hilfe.dh"
+PRINT hilfe()
+DIM n AS INTEGER
+PRINT 1 \ n
+--- datei hilfe.dh
+FUNCTION hilfe() AS INTEGER
+    DIM a AS INTEGER
+    a = 2
+    RETURN a
+END FUNCTION
+
+--- erwartet
+2
+--- fehler
+Laufzeitfehler in fall.dh:4: Integer-Division durch 0

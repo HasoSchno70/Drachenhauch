@@ -992,7 +992,12 @@ static WACHE_GEMELDET: std::sync::atomic::AtomicBool = std::sync::atomic::Atomic
 fn rueckruf_gescheitert(meldung: String, zeile: u32) {
     use std::sync::atomic::Ordering;
     let laufend = LAUFEND.with(|l| l.borrow().last().cloned()).unwrap_or_default();
-    let text = if zeile > 0 { format!("{} (Zeile {})", meldung, zeile) } else { meldung.clone() };
+    let text = if zeile > 0 {
+        match crate::preprocess::lauf_stelle(zeile) {
+            Some(wo) => format!("{} ({})", meldung, wo),
+            None => format!("{} (Zeile {})", meldung, zeile),
+        }
+    } else { meldung.clone() };
     let neu = RR_FEHLER.with(|f| {
         let mut f = f.borrow_mut();
         if f.is_none() { *f = Some((meldung, zeile)); true } else { false }

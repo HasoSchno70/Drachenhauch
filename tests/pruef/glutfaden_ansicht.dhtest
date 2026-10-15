@@ -1,0 +1,47 @@
+' Die Ansicht des Glutfaden-Ports (examples/glutfaden, GTK 3): ein .pxs oeffnen,
+' einpassen, zoomen, eine Ebene aus- und wieder einblenden -- ueber --probe,
+' das sich selbst vorfuehrt, mit Bildschirmfotos (--foto). Ohne GTK mit
+' Bildschirm ueberspringt sich der Fall. Format: docs/werkzeuge.md, dhrt test.
+
+=== glutfaden zeigt das demo muster
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe", "--foto", "s"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    ' Das Herz ist Anchor 47 (#A9152C): auf dem nahen Bild viele solche
+    ' Punkte, nach dem Ausblenden der Ebene keiner mehr.
+    PRINT "herz nah: "; rotePunkte("s_nah.png") > 500
+    PRINT "herz ausgeblendet: "; rotePunkte("s_ohne_herz.png")
+    PRINT "eingepasst: "; rotePunkte("s_eingepasst.png") > 200
+END IF
+
+FUNCTION rotePunkte(pfad AS STRING) AS INTEGER
+    IF NOT FILEEXISTS(pfad) THEN RETURN -1
+    DIM b AS IMAGE : b = LOADIMAGE(pfad)
+    DIM n AS INTEGER, x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO IMAGE_HEIGHT(b) - 1 STEP 3
+        FOR x = 0 TO IMAGE_WIDTH(b) - 320 STEP 3   ' ohne die Seitenleiste (Farbfelder)
+            DIM f AS INTEGER : f = GETPIXEL(b, x, y)
+            ' BAND bindet schwaecher als das Minus -- darum die Klammern
+            IF ABS(((f SHR 16) BAND 255) - &HA9) < 12 AND ABS(((f SHR 8) BAND 255) - &H15) < 12 AND ABS((f BAND 255) - &H2C) < 12 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+geladen: TRUE, eingepasst: TRUE
+40 × 40 Stiche   ·   7,3 × 7,3 cm auf 14er Stoff
+zoom: 150 %
+zelle 17,12: 1 -> -1
+wieder da: 1
+herz nah: TRUE
+herz ausgeblendet: 0
+eingepasst: TRUE

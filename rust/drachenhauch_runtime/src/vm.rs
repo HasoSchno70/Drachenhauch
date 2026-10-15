@@ -3670,6 +3670,7 @@ impl<'p> Vm<'p> {
                                 let cn = rc.borrow().class_name.clone();
                                 let m = self.resolve_method(&cn, method)
                                     .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                                byref_ohne_typ(m, method, &cn, argc)?;
                                 instr.merk.set((Rc::as_ptr(&rc.borrow().layout), m as *const Func as usize));
                                 m
                             };
@@ -3701,6 +3702,7 @@ impl<'p> Vm<'p> {
                             let cn = rc.borrow().class_name.clone();
                             let m = self.resolve_method(&cn, method)
                                 .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                            byref_ohne_typ(m, method, &cn, argc)?;
                             if m.is_coroutine {
                                 stack.push(make_coro(m, margs, Some(obj.clone())));
                             } else {
@@ -4179,6 +4181,53 @@ impl<'p> Vm<'p> {
                 // (der Elternklasse der Aufrufstelle) statt bei der Klasse
                 // des Objekts. Sonst fande sie die ueberschreibende Methode
                 // wieder und riefe sich selbst, bis der Stapel voll ist.
+                op::CALL_METHOD_BYREF => {
+                    let l = arg.list();
+                    let method = l[0].str();
+                    let argc = l[1].as_usize();
+                    let stellen: Vec<usize> = match &l[2] {
+                        Arg::List(s) => s.iter().map(|a| a.as_usize()).collect(),
+                        Arg::Ints(s) => s.iter().map(|&a| a as usize).collect(),
+                        _ => Vec::new(),
+                    };
+                    let split = stack.len() - argc;
+                    let margs = stack.split_off(split);
+                    let obj = vm_pop(stack)?;
+                    let rc = match &obj {
+                        Value::Instance(rc) => rc.clone(),
+                        Value::Nil => return Err(format!(
+                            "Methodenaufruf '.{}' bei NIL-Referenz{}", method, NIL_NEW)),
+                        _ => return Err(format!("Methodenaufruf '.{}' bei nicht-Objekt ({})", method, obj.type_name())),
+                    };
+                    let cn = rc.borrow().class_name.clone();
+                    let m = self.resolve_method(&cn, method)
+                        .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
+                    // Eine Unterklasse, die die Methode mit anderen BYREF-Stellen
+                    // ueberschreibt, passt nicht zu dem, was der Compiler erfasst hat.
+                    let hier: Vec<usize> = (0..argc).filter(|&i| m.param_byref.get(i).copied().unwrap_or(false)).collect();
+                    if hier != stellen {
+                        return Err(format!(
+                            "{}.{}: die Methode der Klasse {} hat ihre BYREF-Parameter an anderen Stellen \
+                             als die, nach der der Aufruf uebersetzt ist -- eine Ueberschreibung muss \
+                             dieselben Parameter BYREF nehmen", crate::namensraum::lesbar_text(&cn).to_uppercase(), method,
+                            crate::namensraum::lesbar_text(&cn).to_uppercase()));
+                    }
+                    if m.is_coroutine {
+                        return Err(format!("{}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben", method));
+                    }
+                    let (ret, werte) = self.exec_byref(m, margs, Some(obj))?;
+                    // exec_byref liefert ALLE BYREF-Parameter; zurueck geht nur,
+                    // was der Aufruf uebergeben hat.
+                    let mut k = 0;
+                    for (i, &br) in m.param_byref.iter().enumerate() {
+                        if br {
+                            if i < argc { stack.push(werte[k].clone()); }
+                            k += 1;
+                        }
+                    }
+                    if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                }
+
                 op::CALL_SUPER => {
                     let l = arg.list();
                     let start_class = l[0].str();
@@ -12919,4 +12968,19 @@ fn feld_platz(instr: &crate::model::Instr, obj: &Instance, name: &str) -> Option
 
 thread_local! {
     static LEERE_LAGE: Rc<crate::value::Layout> = Rc::new(crate::value::Layout::default());
+}
+
+/// CALL_METHOD auf eine Methode mit BYREF-Parametern: der Compiler kannte die
+/// Klasse nicht (`DIM x` ohne Typ, Feldelement ohne Typ), konnte die Argumente
+/// also nicht erfassen. Still als BYVAL zu laufen hiesse, die Aenderungen zu
+/// verlieren -- darum ein Fehler mit dem Weg hinaus.
+fn byref_ohne_typ(m: &Func, method: &str, cn: &str, argc: usize) -> Result<(), String> {
+    if m.param_byref.iter().take(argc).any(|&b| b) {
+        let k = crate::namensraum::lesbar_text(cn).to_uppercase();
+        return Err(format!(
+            "{}.{} hat BYREF-Parameter, aber beim Uebersetzen war die Klasse des Objekts \
+             nicht bekannt -- die Werte kaemen nicht zurueck. Das Objekt in einer \
+             Variablen mit Typ halten (DIM x AS {}) und darueber aufrufen.", k, method, k));
+    }
+    Ok(())
 }

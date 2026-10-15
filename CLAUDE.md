@@ -1677,6 +1677,52 @@ einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
 
+## Glutfaden: PySticky in Drachenhauch + GTK 3 (Stufe 1, 2026-10-14)
+
+Wunsch des Nutzers: PySticky (Kreuzstich-Editor in Python + PySide6, eigenes
+Repo `C:/Programmieren/Python/PySticky`, ~62 000 Zeilen, MIT) nach
+Drachenhauch mit GTK portieren -- als Programm aus vielen Dateien.
+Name **Glutfaden** (Wunsch des Nutzers 2026-10-15; bis dahin "Sticky"), das
+Dateiformat bleibt `.pxs` mit der Kennung `pysticky`, damit PySticky die Dateien
+weiter liest.
+`examples/glutfaden/`: `kern/` (Muster, Ebenenstapel, Garne, Paletten,
+Stichtypen, `.pxs` lesen und schreiben; fuenf Dateien, ueber die Sammeldatei
+`kern/kern.dh` alle mit `AS kern` -- EIN Namensraum), `gtk/gtk.dh`
+(Deklarationen GTK/GDK/Cairo/Pango/GLib), `ansicht/` (Zeichenflaeche: ein
+Punkt je Zelle in einem ARGB-BUFFER, skaliert mit Filter "nearest", darueber
+Symbole mit Pango, Teilstiche, Zehnerlinien, Rueckstiche; Seitenleiste mit
+Farbfeldern und Ebenen), `daten/` (19 Paletten, Symbole, Demo-Muster,
+`LIZENZ-PySticky.txt`). Stufe 1 = oeffnen und ansehen; `--probe` fuehrt vor,
+`--foto ziel` sichert Bilder (`gtk_widget_draw` in eine Cairo-Flaeche --
+`gdk_pixbuf_get_from_window` ist unter Windows weiss). **Gegengeprueft mit dem
+fremden Leser:** PyStickys `load_pattern` liest eine hier geschriebene Datei
+(200 x 200, 40 544 Stiche) ohne abweichende Zelle; die Paletten- und
+Stichtabellen sind mit core/stitch.py von PySticky verglichen.
+
+**Funde in der Laufzeit** (alle mit Faellen, alle fallen gegen 2026.31):
+(1) **BYREF bei Methoden lief still als BYVAL** -- `ebenen.zusammensetzen(farbe,
+typ, fertig)` liess die Felder leer. Neu `CALL_METHOD_BYREF` (124): kennt der
+Compiler die Klasse (`statischer_typ` + `find_method_sig`, auch der Aufruf auf
+Self), erfasst er die Argumente wie bei CALL_USER (`methode_rufen`); die VM
+prueft, dass die aufgeloeste Methode dieselben BYREF-Stellen hat (eine
+Ueberschreibung mit anderen ist ein Fehler). Ohne bekannte Klasse meldet
+CALL_METHOD einen Fehler (`byref_ohne_typ`) statt still zu verlieren. Bereiche
+mit dem Befehl bleiben in der VM. (2) **CASE-Konstanten im Namensraum** liefen
+am Umbenennen vorbei. (3) **Ein Namensraum ohne eigene Namen** (Sammeldatei)
+galt nicht als Namensraum -- `kern.X` hiess "Variable 'kern' nicht
+deklariert". (4) Was eine Datei des Namensraums OHNE `AS` einbindet, bleibt
+draussen (Absicht) -- die Meldung sagt jetzt, in welcher Datei der Name steht
+und dass dort `IMPORT ... AS kern` fehlt (`sammeln` liefert `draussen`).
+(5) **TYPEOF** zeigte den internen Namen `KERN@KNOTEN`. (6) **Laufzeitfehler
+nannten die Zeile der zusammengefuegten Quelle** mit dem Namen der Hauptdatei,
+ein Fehler im Rueckruf "(Zeile 1804)" -- jetzt `datei:zeile` ueber
+`preprocess::lauf_merken`/`lauf_stelle` (Thread-Speicher, beim Uebersetzen
+gesetzt). Tests `byref.dhtest` (+4), `namensraeume.dhtest` (+3),
+`import_meldungen.dhtest` (+2), `glutfaden_kern.dhtest` (5), `glutfaden_ansicht.dhtest`
+(Bildproben: Herz-Rot im nahen Bild, keins nach dem Ausblenden der Ebene).
+**Stolpersteine beim Schreiben:** `BAND` bindet schwaecher als `-`
+(`(f SHR 16) BAND 255 - &HA9` rechnet `BAND 86`), und `UBOUND` gibt es nicht.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

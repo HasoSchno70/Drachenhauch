@@ -1,0 +1,336 @@
+' .pxs lesen und schreiben (PySticky core/file_io.py).
+'
+' JSON: {"format": "pysticky", "version": "1.5", "saved_at": ..., "pattern": {...}}.
+' Die Stiche einer Ebene stehen duenn als [[x, y, farbe], ...], erledigte als
+' [[x, y], ...], Stichtypen ausser VOLL als [[x, y, typ], ...].
+CONST PXS_FORMAT = "pysticky"
+CONST PXS_VERSION = "1.5"
+
+PRIVATE FUNCTION ganzOder(j AS JSON_HANDLE, pfad AS STRING, vorgabe AS INTEGER) AS INTEGER
+    IF NOT JSON_HAS(j, pfad) THEN RETURN vorgabe
+    IF JSON_TYPE(j, pfad) <> "number" THEN RETURN vorgabe
+    RETURN INT(JSON_GET_FLOAT(j, pfad))
+END FUNCTION
+
+PRIVATE FUNCTION textOder$(j AS JSON_HANDLE, pfad AS STRING, vorgabe AS STRING) AS STRING
+    IF NOT JSON_HAS(j, pfad) THEN RETURN vorgabe
+    IF JSON_TYPE(j, pfad) <> "string" THEN RETURN vorgabe
+    RETURN JSON_GET_STRING(j, pfad)
+END FUNCTION
+
+PRIVATE FUNCTION wahrOder(j AS JSON_HANDLE, pfad AS STRING, vorgabe AS BOOLEAN) AS BOOLEAN
+    IF NOT JSON_HAS(j, pfad) THEN RETURN vorgabe
+    IF JSON_TYPE(j, pfad) <> "bool" THEN RETURN vorgabe
+    RETURN JSON_GET_BOOL(j, pfad)
+END FUNCTION
+
+' Eine Zahl, auch als Kommazahl gespeichert (Python schreibt ints, aber eine
+' von Hand bearbeitete Datei vielleicht nicht).
+PRIVATE FUNCTION istGanzeZahl(j AS JSON_HANDLE, pfad AS STRING) AS BOOLEAN
+    IF JSON_TYPE(j, pfad) <> "number" THEN RETURN FALSE
+    DIM f AS FLOAT : f = JSON_GET_FLOAT(j, pfad)
+    RETURN f = INT(f)
+END FUNCTION
+
+FUNCTION pxsLaden(pfad AS STRING) AS Muster
+    IF NOT FILEEXISTS(pfad) THEN THROW "Datei nicht gefunden: " + pfad
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(pfad)
+    CATCH e
+        THROW "Fehlerhafte Datei-Syntax: " + e
+    END TRY
+    IF JSON_TYPE(j, "") <> "object" THEN THROW "Ungültiges Dateiformat: JSON-Objekt erwartet, gefunden " + JSON_TYPE(j, "")
+    IF textOder$(j, "format", "unbekannt") <> PXS_FORMAT THEN
+        THROW "Ungültiges Dateiformat: erwartet 'pysticky', gefunden '" + textOder$(j, "format", "unbekannt") + "'"
+    END IF
+    IF NOT JSON_HAS(j, "pattern") THEN THROW "Datei enthält keine Muster-Daten"
+    IF JSON_TYPE(j, "pattern") <> "object" THEN THROW "Ungültige Musterdaten: Objekt erwartet, gefunden " + JSON_TYPE(j, "pattern")
+    RETURN musterAusJson(JSON_GET_JSON(j, "pattern"))
+END FUNCTION
+
+FUNCTION musterAusJson(p AS JSON_HANDLE) AS Muster
+    DIM feld AS STRING
+    FOR EACH feld IN ["name", "width", "height", "colors", "layers"]
+        IF NOT JSON_HAS(p, feld) THEN THROW "Pflichtfeld '" + feld + "' fehlt in der Datei"
+    NEXT
+    IF NOT istGanzeZahl(p, "width") OR NOT istGanzeZahl(p, "height") THEN
+        THROW "Ungültige Mustergröße (ganze Zahlen erwartet)"
+    END IF
+    DIM b AS INTEGER : b = INT(JSON_GET_FLOAT(p, "width"))
+    DIM h AS INTEGER : h = INT(JSON_GET_FLOAT(p, "height"))
+    IF b < 1 OR h < 1 THEN THROW "Ungültige Mustergröße: " + STR$(b) + "x" + STR$(h) + " (min. 1x1)"
+    IF b > GROESSTES_MUSTER OR h > GROESSTES_MUSTER THEN
+        THROW "Mustergröße zu groß: " + STR$(b) + "x" + STR$(h) + " (max. 2000x2000)"
+    END IF
+    IF JSON_TYPE(p, "colors") <> "array" THEN THROW "Ungültiges Farbformat: Liste erwartet"
+    IF JSON_TYPE(p, "layers") <> "array" THEN THROW "Mindestens ein Layer erforderlich"
+    IF JSON_LEN(p, "layers") = 0 THEN THROW "Mindestens ein Layer erforderlich"
+
+    DIM m AS Muster : m = neuesMuster(textOder$(p, "name", ""), b, h)
+    ' Stoff: eine kaputte Angabe (<= 0) faellt auf die Vorgabe zurueck
+    IF JSON_HAS(p, "fabric_count") AND JSON_TYPE(p, "fabric_count") = "number" THEN
+        DIM s AS FLOAT : s = JSON_GET_FLOAT(p, "fabric_count")
+        IF s > 0 THEN m.stoff = s
+    END IF
+    IF JSON_HAS(p, "metadata") AND JSON_TYPE(p, "metadata") = "object" THEN m.metadaten = JSON_GET_JSON(p, "metadata")
+    m.quellBild = textOder$(p, "source_image_path", "")
+    m.quellPalette = textOder$(p, "source_palette_name", "")
+    IF JSON_TYPE(p, "source_image_crop") = "array" AND JSON_LEN(p, "source_image_crop") = 4 THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO 3
+            m.quellAusschnitt[k] = JSON_GET_FLOAT(p, "source_image_crop." + STR$(k))
+        NEXT
+    END IF
+    DIM md AS STRING : md = textOder$(p, "mode", "stitch")
+    m.modus = IIF(md = "diamond", "diamond", "stitch")
+
+    ' Farben
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(p, "colors") - 1
+        DIM w AS STRING : w = "colors." + STR$(i)
+        IF JSON_TYPE(p, w) <> "object" THEN THROW "Ungültiger Farbeintrag bei Index " + STR$(i) + ": Objekt erwartet, gefunden " + JSON_TYPE(p, w)
+        ARRAY_PUSH(m.farben, farbeintragAusJson(p, w))
+    NEXT
+
+    ' Ebenen
+    DIM neu AS ARRAY OF Ebene : neu = []
+    FOR i = 0 TO JSON_LEN(p, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_TYPE(p, l) <> "object" THEN THROW "Ungültiger Layer bei Index " + STR$(i) + ": Objekt erwartet, gefunden " + JSON_TYPE(p, l)
+        ARRAY_PUSH(neu, ebeneAusJson(p, l, b, h))
+    NEXT
+    m.ebenen.ersetzen(neu, ganzOder(p, "active_layer", 0))
+
+    ' Rueckstiche (seit 1.1)
+    IF JSON_HAS(p, "backstitches") THEN
+        IF JSON_TYPE(p, "backstitches") <> "array" THEN THROW "Ungültiges Rückstich-Format: Liste erwartet"
+        FOR i = 0 TO JSON_LEN(p, "backstitches") - 1
+            DIM r AS STRING : r = "backstitches." + STR$(i)
+            IF JSON_TYPE(p, r) <> "object" THEN THROW "Ungültiger Rückstich bei Index " + STR$(i) + ": Objekt erwartet, gefunden " + JSON_TYPE(p, r)
+            FOR EACH feld IN ["x1", "y1", "x2", "y2", "color_index"]
+                IF NOT JSON_HAS(p, r + "." + feld) THEN THROW "Rückstich: Pflichtfeld '" + feld + "' fehlt"
+            NEXT
+            ARRAY_PUSH(m.rueckstiche, neuerRueckstich(JSON_GET_INT(p, r + ".x1"), JSON_GET_INT(p, r + ".y1"), _
+                JSON_GET_INT(p, r + ".x2"), JSON_GET_INT(p, r + ".y2"), JSON_GET_INT(p, r + ".color_index")))
+        NEXT
+    END IF
+
+    m.stichzahlenNeu()
+    RETURN m
+END FUNCTION
+
+PRIVATE FUNCTION garnAusJson(p AS JSON_HANDLE, w AS STRING) AS Garn
+    DIM hex AS STRING : hex = textOder$(p, w + ".color", "")
+    DIM f AS INTEGER : f = farbeAusHex(hex)
+    IF f < 0 THEN THROW "Ungültige Hex-Farbe: '" + hex + "'"
+    RETURN neuesGarn(JSON_GET_STRING(p, w + ".name"), f, textOder$(p, w + ".manufacturer", ""), textOder$(p, w + ".catalog_number", ""))
+END FUNCTION
+
+FUNCTION farbeintragAusJson(p AS JSON_HANDLE, w AS STRING) AS Farbeintrag
+    DIM feld AS STRING
+    FOR EACH feld IN ["name", "color", "symbol"]
+        IF NOT JSON_HAS(p, w + "." + feld) THEN THROW "Farbeintrag: Pflichtfeld '" + feld + "' fehlt"
+    NEXT
+    DIM g AS Garn : g = garnAusJson(p, w)
+    IF JSON_HAS(p, w + ".blend_components") AND JSON_TYPE(p, w + ".blend_components") = "array" THEN
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(p, w + ".blend_components") - 1
+            DIM t AS STRING : t = w + ".blend_components." + STR$(k)
+            IF JSON_TYPE(p, t) <> "object" THEN THROW "Ungültige Blend-Komponente bei Index " + STR$(k) + ": Objekt erwartet"
+            FOR EACH feld IN ["name", "color"]
+                IF NOT JSON_HAS(p, t + "." + feld) THEN THROW "Blend-Komponente bei Index " + STR$(k) + ": Pflichtfeld '" + feld + "' fehlt"
+            NEXT
+            ARRAY_PUSH(g.teile, garnAusJson(p, t))
+            ARRAY_PUSH(g.anteile, 1)
+        NEXT
+        IF JSON_TYPE(p, w + ".strand_ratios") = "array" AND JSON_LEN(p, w + ".strand_ratios") = LEN(g.teile) THEN
+            FOR k = 0 TO LEN(g.teile) - 1
+                g.anteile[k] = JSON_GET_INT(p, w + ".strand_ratios." + STR$(k))
+            NEXT
+        END IF
+    END IF
+    DIM f AS Farbeintrag : f = neuerFarbeintrag(g, JSON_GET_STRING(p, w + ".symbol"))
+    f.stichzahl = ganzOder(p, w + ".stitch_count", 0)
+    f.auslassen = wahrOder(p, w + ".skip_stitching", FALSE)
+    f.straenge = ganzOder(p, w + ".strands", 2)
+    f.istPerle = wahrOder(p, w + ".is_bead", FALSE)
+    f.istDiamant = wahrOder(p, w + ".is_diamond", FALSE)
+    DIM id AS STRING : id = textOder$(p, w + ".color_id", "")
+    IF id <> "" THEN f.farbId = id
+    RETURN f
+END FUNCTION
+
+' Eine Liste von Zahlen-Tripeln/-Paaren -- krumme Eintraege werden uebergangen.
+FUNCTION ebeneAusJson(p AS JSON_HANDLE, l AS STRING, b AS INTEGER, h AS INTEGER) AS Ebene
+    DIM e AS Ebene : e = neueEbene(textOder$(p, l + ".name", ""), b, h)
+    e.sichtbar = wahrOder(p, l + ".visible", TRUE)
+    IF JSON_HAS(p, l + ".opacity") AND JSON_TYPE(p, l + ".opacity") = "number" THEN e.deckkraft = JSON_GET_FLOAT(p, l + ".opacity")
+    e.notiz = textOder$(p, l + ".note", "")
+    DIM i AS INTEGER, s AS STRING
+    IF JSON_TYPE(p, l + ".stitches") = "array" THEN
+        FOR i = 0 TO JSON_LEN(p, l + ".stitches") - 1
+            s = l + ".stitches." + STR$(i)
+            IF JSON_TYPE(p, s) <> "array" THEN CONTINUE
+            IF JSON_LEN(p, s) < 3 THEN CONTINUE
+            IF JSON_TYPE(p, s + ".0") <> "number" OR JSON_TYPE(p, s + ".1") <> "number" OR JSON_TYPE(p, s + ".2") <> "number" THEN CONTINUE
+            DIM ok AS BOOLEAN : ok = e.setzeStich(INT(JSON_GET_FLOAT(p, s + ".0")), INT(JSON_GET_FLOAT(p, s + ".1")), INT(JSON_GET_FLOAT(p, s + ".2")))
+        NEXT
+    END IF
+    IF JSON_TYPE(p, l + ".completed_stitches") = "array" THEN
+        FOR i = 0 TO JSON_LEN(p, l + ".completed_stitches") - 1
+            s = l + ".completed_stitches." + STR$(i)
+            IF JSON_TYPE(p, s) <> "array" THEN CONTINUE
+            IF JSON_LEN(p, s) < 2 THEN CONTINUE
+            DIM ok2 AS BOOLEAN : ok2 = e.setzeErledigt(JSON_GET_INT(p, s + ".0"), JSON_GET_INT(p, s + ".1"), TRUE)
+        NEXT
+    END IF
+    IF JSON_TYPE(p, l + ".stitch_types") = "array" THEN
+        FOR i = 0 TO JSON_LEN(p, l + ".stitch_types") - 1
+            s = l + ".stitch_types." + STR$(i)
+            IF JSON_TYPE(p, s) <> "array" THEN CONTINUE
+            IF JSON_LEN(p, s) < 3 THEN CONTINUE
+            DIM x AS INTEGER : x = JSON_GET_INT(p, s + ".0")
+            DIM y AS INTEGER : y = JSON_GET_INT(p, s + ".1")
+            DIM t AS INTEGER : t = JSON_GET_INT(p, s + ".2")
+            IF e.drin(x, y) AND t >= 0 AND t <= STICHTYP_MAX THEN e.art[y * b + x] = t
+        NEXT
+    END IF
+    ' Gesperrt erst NACH dem Laden -- sonst nimmt setzeStich nichts an
+    e.gesperrt = wahrOder(p, l + ".locked", FALSE)
+    RETURN e
+END FUNCTION
+
+' --- Schreiben ---------------------------------------------------------------------
+
+PRIVATE SUB garnNachJson(o AS JSON_HANDLE, pfad AS STRING, g AS Garn)
+    JSON_SET_STRING(o, pfad + "name", g.name)
+    JSON_SET_STRING(o, pfad + "color", farbeAlsHex$(g.farbe))
+    JSON_SET_STRING(o, pfad + "manufacturer", g.hersteller)
+    JSON_SET_STRING(o, pfad + "catalog_number", g.nummer)
+END SUB
+
+FUNCTION farbeintragNachJson(f AS Farbeintrag) AS JSON_HANDLE
+    DIM o AS JSON_HANDLE : o = JSON_NEW_OBJECT()
+    garnNachJson(o, "", f.garn)
+    JSON_SET_STRING(o, "symbol", f.symbol)
+    JSON_SET_INT(o, "stitch_count", f.stichzahl)
+    JSON_SET_BOOL(o, "skip_stitching", f.auslassen)
+    JSON_SET_INT(o, "strands", f.straenge)
+    JSON_SET_BOOL(o, "is_bead", f.istPerle)
+    JSON_SET_BOOL(o, "is_diamond", f.istDiamant)
+    JSON_SET_STRING(o, "color_id", f.farbId)
+    IF f.garn.istBlend() THEN
+        DIM teile AS JSON_HANDLE : teile = JSON_NEW_ARRAY()
+        DIM g AS Garn
+        FOR EACH g IN f.garn.teile
+            DIM t AS JSON_HANDLE : t = JSON_NEW_OBJECT()
+            garnNachJson(t, "", g)
+            JSON_APPEND_JSON(teile, "", t)
+        NEXT
+        JSON_SET_JSON(o, "blend_components", teile)
+        DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+        DIM n AS INTEGER
+        FOR EACH n IN f.garn.anteile
+            JSON_APPEND_INT(a, "", n)
+        NEXT
+        JSON_SET_JSON(o, "strand_ratios", a)
+    END IF
+    RETURN o
+END FUNCTION
+
+' Duenne Listen als Text bauen und einmal parsen -- schneller als je Eintrag
+' ein JSON-Aufruf.
+FUNCTION ebeneNachJson(e AS Ebene) AS JSON_HANDLE
+    DIM o AS JSON_HANDLE : o = JSON_NEW_OBJECT()
+    JSON_SET_STRING(o, "name", e.name)
+    JSON_SET_BOOL(o, "visible", e.sichtbar)
+    JSON_SET_BOOL(o, "locked", e.gesperrt)
+    JSON_SET_FLOAT(o, "opacity", e.deckkraft)
+    DIM stiche AS STRING : stiche = "["
+    DIM fertig AS STRING : fertig = "["
+    DIM arten AS STRING : arten = "["
+    DIM x AS INTEGER, y AS INTEGER, i AS INTEGER
+    FOR y = 0 TO e.hoehe - 1
+        FOR x = 0 TO e.breite - 1
+            i = y * e.breite + x
+            IF e.raster[i] = KEIN_STICH THEN CONTINUE
+            IF stiche <> "[" THEN stiche += ","
+            stiche += "[" + STR$(x) + "," + STR$(y) + "," + STR$(e.raster[i]) + "]"
+            IF e.erledigt[i] <> 0 THEN
+                IF fertig <> "[" THEN fertig += ","
+                fertig += "[" + STR$(x) + "," + STR$(y) + "]"
+            END IF
+        NEXT
+    NEXT
+    ' Stichtypen: alle Zellen mit Typ <> 0, wie das Original (auch ohne Stich)
+    FOR y = 0 TO e.hoehe - 1
+        FOR x = 0 TO e.breite - 1
+            i = y * e.breite + x
+            IF e.art[i] = 0 THEN CONTINUE
+            IF arten <> "[" THEN arten += ","
+            arten += "[" + STR$(x) + "," + STR$(y) + "," + STR$(e.art[i]) + "]"
+        NEXT
+    NEXT
+    JSON_SET_JSON(o, "stitches", JSON_PARSE(stiche + "]"))
+    JSON_SET_JSON(o, "completed_stitches", JSON_PARSE(fertig + "]"))
+    IF arten <> "[" THEN JSON_SET_JSON(o, "stitch_types", JSON_PARSE(arten + "]"))
+    IF e.notiz <> "" THEN JSON_SET_STRING(o, "note", e.notiz)
+    RETURN o
+END FUNCTION
+
+FUNCTION musterNachJson(m AS Muster) AS JSON_HANDLE
+    DIM p AS JSON_HANDLE : p = JSON_NEW_OBJECT()
+    JSON_SET_STRING(p, "name", m.name)
+    JSON_SET_INT(p, "width", m.breite)
+    JSON_SET_INT(p, "height", m.hoehe)
+    IF m.stoff = INT(m.stoff) THEN JSON_SET_INT(p, "fabric_count", INT(m.stoff)) ELSE JSON_SET_FLOAT(p, "fabric_count", m.stoff)
+    JSON_SET_JSON(p, "metadata", m.metadaten)
+    DIM farben AS JSON_HANDLE : farben = JSON_NEW_ARRAY()
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        JSON_APPEND_JSON(farben, "", farbeintragNachJson(f))
+    NEXT
+    JSON_SET_JSON(p, "colors", farben)
+    DIM ebenen AS JSON_HANDLE : ebenen = JSON_NEW_ARRAY()
+    DIM e AS Ebene
+    FOR EACH e IN m.ebenen.ebenen
+        JSON_APPEND_JSON(ebenen, "", ebeneNachJson(e))
+    NEXT
+    JSON_SET_JSON(p, "layers", ebenen)
+    JSON_SET_INT(p, "active_layer", m.ebenen.aktiv)
+    DIM rs AS JSON_HANDLE : rs = JSON_NEW_ARRAY()
+    DIM r AS Rueckstich
+    FOR EACH r IN m.rueckstiche
+        DIM o AS JSON_HANDLE : o = JSON_NEW_OBJECT()
+        JSON_SET_INT(o, "x1", r.x1) : JSON_SET_INT(o, "y1", r.y1)
+        JSON_SET_INT(o, "x2", r.x2) : JSON_SET_INT(o, "y2", r.y2)
+        JSON_SET_INT(o, "color_index", r.farbe)
+        JSON_APPEND_JSON(rs, "", o)
+    NEXT
+    JSON_SET_JSON(p, "backstitches", rs)
+    IF m.quellBild = "" THEN JSON_SET_NULL(p, "source_image_path") ELSE JSON_SET_STRING(p, "source_image_path", m.quellBild)
+    DIM aus AS JSON_HANDLE : aus = JSON_NEW_ARRAY()
+    DIM z AS FLOAT
+    FOR EACH z IN m.quellAusschnitt
+        IF z = INT(z) THEN JSON_APPEND_INT(aus, "", INT(z)) ELSE JSON_APPEND_FLOAT(aus, "", z)
+    NEXT
+    JSON_SET_JSON(p, "source_image_crop", aus)
+    IF m.quellPalette = "" THEN JSON_SET_NULL(p, "source_palette_name") ELSE JSON_SET_STRING(p, "source_palette_name", m.quellPalette)
+    JSON_SET_STRING(p, "mode", m.modus)
+    RETURN p
+END FUNCTION
+
+' Speichern: erst in eine Nebendatei, dann umbenennen -- ein Abbruch mitten
+' im Schreiben laesst die alte Datei stehen.
+SUB pxsSpeichern(m AS Muster, pfad AS STRING)
+    DIM d AS JSON_HANDLE : d = JSON_NEW_OBJECT()
+    JSON_SET_STRING(d, "format", PXS_FORMAT)
+    JSON_SET_STRING(d, "version", PXS_VERSION)
+    JSON_SET_STRING(d, "saved_at", ZEIT_FORMAT$(ZEIT_JETZT(), "%Y-%m-%dT%H:%M:%S"))
+    JSON_SET_JSON(d, "pattern", musterNachJson(m))
+    DIM tmp AS STRING : tmp = pfad + ".tmp"
+    WRITEALL(tmp, JSON_PRETTY(d))
+    IF FILEEXISTS(pfad) THEN DELETEFILE(pfad)
+    RENAME(tmp, pfad)
+END SUB

@@ -1691,6 +1691,7 @@ fn compile_source_mit<T>(raw_source: &str, base: &std::path::Path, label: &str,
     // Zeile, die der Nutzer VOR SICH HAT -- nicht auf die gemergte Quelle.
     // Ohne IMPORT ist beides dasselbe, mit IMPORT war es bisher irrefuehrend.
     let wo = |zeile: u32| preprocess::stelle(&herkunft, zeile, label);
+    preprocess::lauf_merken(&herkunft, label);
     let (ext_types, aliases, module) = preprocess::compile_env(&imports);
     // E1: Hardware-Module (serial/usb/bt/wifi) sind zwar importierbar, fehlen aber
     // im Default-Build. Frueh (beim IMPORT) warnen statt erst beim ersten Aufruf --
@@ -2666,7 +2667,9 @@ fn run_program(prog: model::Program, source_label: &str) -> ExitCode {
             let e = meldung::t(&crate::vm::mit_signatur(&e));
             let art = meldung::wort("Laufzeitfehler in", "Runtime error in");
             if line != 0 {
-                eprintln!("{} {}:{}: {}", art, source_label, line, e);
+                let wo = preprocess::lauf_stelle(line)
+                    .unwrap_or_else(|| format!("{}:{}", source_label, line));
+                eprintln!("{} {}: {}", art, wo, e);
             } else {
                 eprintln!("{} {}: {}", art, source_label, e);
             }

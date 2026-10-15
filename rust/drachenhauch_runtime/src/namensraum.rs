@@ -101,15 +101,18 @@ fn sammeln(
     herkunft: &[Herkunft],
     datei_alias: &HashMap<String, String>,
     privat: &[(u32, String)],
-) -> (HashMap<String, Modul>, HashSet<String>) {
+) -> (HashMap<String, Modul>, HashSet<String>, HashMap<String, String>) {
     let mut module: HashMap<String, Modul> = HashMap::new();
+    // Was in eingebundenen Dateien OHNE Namensraum steht (Name -> Datei) --
+    // nur fuer die Meldung, wenn jemand es ueber einen Alias anspricht.
+    let mut draussen: HashMap<String, String> = HashMap::new();
     // Top-Level-Namen der HAUPTDATEI (datei == ""). Ein Namensraum darf sie
     // nicht sehen -- das ist der eigentliche Gewinn von `AS` und die einzige
     // Stelle, an der sich durch das Anfuegen von `AS` Verhalten aendert.
     let mut haupt: HashSet<String> = HashSet::new();
     let stmts = match prog {
         Node::Program { statements } => statements,
-        _ => return (module, haupt),
+        _ => return (module, haupt, draussen),
     };
     for s in stmts {
         let (zeile, body) = match s {
@@ -120,6 +123,16 @@ fn sammeln(
         let alias = match datei_alias.get(datei) {
             Some(a) => a.clone(),
             None => {
+                if !datei.is_empty() {
+                    let name = match body {
+                        Node::FunctionDecl { name, .. } | Node::SubDecl { name, .. }
+                        | Node::DeclareLib { name, .. } | Node::Dim { name, .. }
+                        | Node::Const { name, .. } | Node::ClassDecl { name, .. }
+                        | Node::EnumDecl { name, .. } => Some(name.to_lowercase()),
+                        _ => None,
+                    };
+                    if let Some(n) = name { draussen.entry(n).or_insert_with(|| datei.to_string()); }
+                }
                 if datei.is_empty() {
                     match body {
                         Node::FunctionDecl { name, .. } | Node::SubDecl { name, .. }
@@ -170,7 +183,7 @@ fn sammeln(
             }
         }
     }
-    (module, haupt)
+    (module, haupt, draussen)
 }
 
 /// Lokale Namen einer Funktion: Parameter und alles, was ihr Rumpf deklariert.
@@ -227,6 +240,8 @@ struct Lauf<'a> {
     datei_alias: &'a HashMap<String, String>,
     module: &'a HashMap<String, Modul>,
     haupt: &'a HashSet<String>,
+    /// Name (klein) -> Datei, fuer Dateien, die ohne `AS` eingebunden sind.
+    draussen: &'a HashMap<String, String>,
     /// Namensraum der gerade bearbeiteten Zeile (None = Hauptprogramm oder
     /// eine importierte Datei ohne `AS`).
     hier: Option<String>,
@@ -238,6 +253,18 @@ struct Lauf<'a> {
 }
 
 impl<'a> Lauf<'a> {
+    /// Steht der Name in einer Datei, die ohne `AS` eingebunden ist? Dann ist
+    /// der haeufigste Grund eine Sammeldatei, die ihre Teile flach einbindet --
+    /// die bleiben draussen (Glutfaden, 2026-10-14). Leer, wenn nicht.
+    fn hinweis_draussen(&self, alias: &str, name: &str) -> String {
+        match self.draussen.get(&name.to_lowercase()) {
+            Some(datei) => format!(" {} steht in {}, und diese Datei gehoert nicht zum Namensraum {} -- \
+                was eine Datei des Namensraums ohne AS einbindet, bleibt draussen. Dort \
+                IMPORT \"{}\" AS {} schreiben.", name, datei, alias, datei, alias),
+            None => String::new(),
+        }
+    }
+
     /// Soll dieser Name im aktuellen Modul umbenannt werden?
     fn eigen(&self, name: &str) -> Option<String> {
         let alias = self.hier.as_ref()?;
@@ -285,8 +312,9 @@ impl<'a> Lauf<'a> {
                 // ENUM, das der Parser schon beim Lesen zu "integer" macht.
                 Some(m) if m.enums.contains(&low) => *name = "integer".to_string(),
                 _ => {
+                    let hinweis = self.hinweis_draussen(alias_teil, typ_teil);
                     self.fehler.get_or_insert((self.zeile, format!(
-                        "{} kennt keine Klasse {}.", alias_teil, typ_teil)));
+                        "{} kennt keine Klasse {}.{}", alias_teil, typ_teil, hinweis)));
                 }
             }
             return;
@@ -329,7 +357,11 @@ impl<'a> Lauf<'a> {
             return None;
         }
         let low = name.to_lowercase();
-        let m = self.module.get(&alias)?;
+        // Ein Namensraum ohne eigene Namen (eine Sammeldatei, die ihre Teile
+        // flach einbindet) ist trotzdem einer -- sonst hiess `kern.Name` still
+        // "Variable 'kern' nicht deklariert" statt zu sagen, wo der Name steht.
+        let leer = Modul::default();
+        let m: &Modul = self.module.get(&alias).unwrap_or(&leer);
         if m.klassen.contains(&low) {
             // In AUSDRUCKS-Position ist ein blosser Klassenname trotzdem nichts
             // Sinnvolles -- gemeint ist fast immer `NEW alias.Klasse()`.
@@ -345,8 +377,9 @@ impl<'a> Lauf<'a> {
             return Some(intern(&alias, &low));
         }
         if !m.namen.contains(&low) {
+            let hinweis = self.hinweis_draussen(&alias, name);
             self.fehler.get_or_insert((self.zeile, format!(
-                "{} kennt keinen Namen {}.", alias, name)));
+                "{} kennt keinen Namen {}.{}", alias, name, hinweis)));
             return None;
         }
         if m.privat.contains(&low) {
@@ -535,7 +568,15 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
         }
         Select { subject, cases, else_block } => {
             knoten(l, subject);
-            for (_, guard, blk) in cases.iter_mut() {
+            // Die Werte der CASE-Zeilen (auch `IS > x` und `a TO b`) -- ohne
+            // das blieb eine CONST der Datei dort unbenannt, und `CASE ROT`
+            // brach mit "Variable nicht deklariert" ab (Glutfaden, 2026-10-14).
+            for (treffer, guard, blk) in cases.iter_mut() {
+                for t in treffer.iter_mut() {
+                    for v in t.values.iter_mut() {
+                        if let crate::ast::CaseVal::Expr(e) = v { knoten(l, e); }
+                    }
+                }
                 if let Some(g) = guard { knoten(l, g); }
                 for x in blk.iter_mut() { knoten(l, x); }
             }
@@ -621,12 +662,13 @@ pub fn anwenden(
         return Ok(());
     }
     let datei_alias: HashMap<String, String> = namensraeume.iter().cloned().collect();
-    let (module, haupt) = sammeln(prog, herkunft, &datei_alias, privat);
+    let (module, haupt, draussen) = sammeln(prog, herkunft, &datei_alias, privat);
     let mut l = Lauf {
         herkunft,
         datei_alias: &datei_alias,
         module: &module,
         haupt: &haupt,
+        draussen: &draussen,
         hier: None,
         lokal: HashSet::new(),
         fehler: None,

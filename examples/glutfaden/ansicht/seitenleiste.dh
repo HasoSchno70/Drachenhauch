@@ -1,0 +1,103 @@
+' Die Seitenleiste: Farben des Musters (Farbfeld, Symbol, Garn, Stiche) und
+' die Ebenen mit einem Kaestchen fuer die Sichtbarkeit.
+
+DIM slBox AS INTEGER                  ' aeussere Box, bleibt
+DIM slInhalt AS INTEGER               ' wird beim Laden neu gebaut
+DIM slEbenenKnoepfe AS ARRAY OF INTEGER
+DIM slSchrift AS INTEGER              ' feste Groesse, anders als die der Zeichenflaeche
+
+FUNCTION seitenleisteNeu() AS INTEGER
+    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    gtk_widget_set_size_request(rolle, 280, -1)
+    gtkKlasse(rolle, "seitenleiste")
+    slBox = gtk_box_new(GTK_SENKRECHT, 0)
+    gtk_container_add(rolle, slBox)
+    slEbenenKnoepfe = []
+    slSchrift = pango_font_description_from_string("DejaVu Sans Bold 11")
+    RETURN rolle
+END FUNCTION
+
+FUNCTION slUeberschrift(text AS STRING) AS INTEGER
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtk_label_set_xalign(l, 0.0)
+    gtkKlasse(l, "ueberschrift")
+    RETURN l
+END FUNCTION
+
+SUB seitenleisteMuster(m AS kern.Muster)
+    IF slInhalt <> 0 THEN gtk_widget_destroy(slInhalt)
+    slInhalt = gtk_box_new(GTK_SENKRECHT, 2)
+    gtk_box_pack_start(slBox, slInhalt, FALSE, FALSE, 0)
+    slEbenenKnoepfe = []
+
+    gtk_box_pack_start(slInhalt, slUeberschrift("Farben"), FALSE, FALSE, 0)
+    DIM i AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        DIM f AS kern.Farbeintrag : f = m.farben[i]
+        DIM zeile AS INTEGER : zeile = gtk_box_new(GTK_WAAGERECHT, 8)
+        gtkKlasse(zeile, "farbzeile")
+        DIM feld AS INTEGER : feld = gtk_drawing_area_new()
+        gtk_widget_set_size_request(feld, 26, 26)
+        gtk_widget_set_valign(feld, GTK_AUSRICHTEN_MITTE)
+        signalZeichnen(feld, "draw", slFarbfeld, i, 0, 0)
+        DIM name AS STRING : name = f.garn.hersteller + " " + f.garn.nummer
+        IF TRIM$(name) = "" THEN name = f.garn.name
+        DIM text AS INTEGER : text = gtk_label_new(TRIM$(name))
+        gtk_label_set_xalign(text, 0.0)
+        gtk_label_set_ellipsize(text, GTK_ELLIPSE_ENDE)
+        gtk_widget_set_hexpand(text, TRUE)
+        gtk_widget_set_tooltip_text(zeile, f.garn.name + IIF(f.garn.istBlend(), " (Blend)", ""))
+        DIM zahl AS INTEGER : zahl = gtk_label_new(ZAHL$(f.stichzahl, 0))
+        gtkKlasse(zahl, "nebensache")
+        gtk_box_pack_start(zeile, feld, FALSE, FALSE, 0)
+        gtk_box_pack_start(zeile, text, TRUE, TRUE, 0)
+        gtk_box_pack_end(zeile, zahl, FALSE, FALSE, 0)
+        gtk_box_pack_start(slInhalt, zeile, FALSE, FALSE, 0)
+    NEXT
+
+    gtk_box_pack_start(slInhalt, slUeberschrift("Ebenen"), FALSE, FALSE, 0)
+    ' Oben im Stapel = oben in der Liste
+    FOR i = m.ebenen.anzahl() - 1 TO 0 STEP -1
+        DIM e AS kern.Ebene : e = m.ebenen.ebenen[i]
+        DIM k AS INTEGER : k = gtk_check_button_new_with_label(e.name + "  (" + ZAHL$(e.stichzahl(), 0) + ")")
+        gtk_toggle_button_set_active(k, e.sichtbar)
+        IF e.notiz <> "" THEN gtk_widget_set_tooltip_text(k, e.notiz)
+        gtkKlasse(k, "ebene")
+        signal(k, "toggled", slEbeneUmgeschaltet, i, 0, 0)
+        gtk_box_pack_start(slInhalt, k, FALSE, FALSE, 0)
+        ARRAY_PUSH(slEbenenKnoepfe, k)
+    NEXT
+    gtk_widget_show_all(slInhalt)
+END SUB
+
+' Das Farbfeld einer Zeile: Farbe und Symbol darin.
+FUNCTION slFarbfeld(w AS INTEGER, cr AS INTEGER, i AS INTEGER) AS BOOLEAN
+    IF NOT lwHat OR i >= lwMuster.farbanzahl() THEN RETURN TRUE
+    DIM f AS INTEGER : f = lwMuster.farben[i].garn.farbe
+    DIM g AS FLOAT : g = gtk_widget_get_allocated_width(w)
+    cairoFarbe(cr, f)
+    cairo_rectangle(cr, 0, 0, g, g)
+    cairo_fill(cr)
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.35)
+    cairo_set_line_width(cr, 1.0)
+    cairo_rectangle(cr, 0.5, 0.5, g - 1, g - 1)
+    cairo_stroke(cr)
+    IF kern.helligkeit(f) > 0.55 THEN cairo_set_source_rgb(cr, 0.0, 0.0, 0.0) ELSE cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
+    DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
+    pango_layout_set_font_description(layout, slSchrift)
+    pango_layout_set_text(layout, lwMuster.farben[i].symbol, -1)
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(layout, tb, th)
+    cairo_move_to(cr, (g - tb) / 2, (g - th) / 2)
+    pango_cairo_show_layout(cr, layout)
+    g_object_unref(layout)
+    RETURN TRUE
+END FUNCTION
+
+SUB slEbeneUmgeschaltet(knopf AS INTEGER, i AS INTEGER)
+    IF NOT lwHat THEN RETURN
+    lwMuster.ebenen.ebenen[i].sichtbar = gtk_toggle_button_get_active(knopf)
+    leinwandAufbauen()
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB

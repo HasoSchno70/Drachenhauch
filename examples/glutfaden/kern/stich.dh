@@ -1,0 +1,66 @@
+' Stichtypen -- dieselben Nummern wie in PySticky (core/stitch.py), weil sie
+' so in der .pxs stehen.
+CONST VOLL = 0                ' kompletter Kreuzstich (X)
+CONST HALB_OL_UR = 1          ' halber Stich oben-links nach unten-rechts
+CONST HALB_OR_UL = 2          ' halber Stich oben-rechts nach unten-links
+CONST VIERTEL_OL = 3
+CONST VIERTEL_OR = 4
+CONST VIERTEL_UL = 5
+CONST VIERTEL_UR = 6
+CONST DREIVIERTEL = 7
+CONST RUECKSTICH = 8
+CONST KNOTEN = 9              ' franzoesischer Knoten
+CONST PERLE = 10
+CONST DIAMANT = 11            ' Diamond-Painting-Drill
+CONST STICHTYP_MAX = 11
+
+' Spiegeln und Drehen: was aus einem Stichtyp wird (PySticky FLIP_H_MAP usw.).
+' Index = alter Typ, Wert = neuer Typ.
+FUNCTION stichGespiegeltH(t AS INTEGER) AS INTEGER
+    DIM tab AS ARRAY OF INTEGER : tab = [0, 2, 1, 4, 3, 6, 5, 7, 8, 9, 10, 11]
+    IF t < 0 OR t > STICHTYP_MAX THEN RETURN t
+    RETURN tab[t]
+END FUNCTION
+
+FUNCTION stichGespiegeltV(t AS INTEGER) AS INTEGER
+    DIM tab AS ARRAY OF INTEGER : tab = [0, 2, 1, 5, 6, 3, 4, 7, 8, 9, 10, 11]
+    IF t < 0 OR t > STICHTYP_MAX THEN RETURN t
+    RETURN tab[t]
+END FUNCTION
+
+FUNCTION stichGedreht(t AS INTEGER) AS INTEGER
+    DIM tab AS ARRAY OF INTEGER : tab = [0, 2, 1, 4, 6, 3, 5, 7, 8, 9, 10, 11]
+    IF t < 0 OR t > STICHTYP_MAX THEN RETURN t
+    RETURN tab[t]
+END FUNCTION
+
+' --- Formen (PySticky core/stitch_shapes.py) ------------------------------------
+' Die Eckpunkte eines Teilstichs, normalisiert auf die Zelle (0..1, y nach
+' unten), flach als [x0, y0, x1, y1, ...]; leer fuer alles, was kein Vieleck
+' ist (voll, Rueckstich, Knoten, Perle, Diamant).
+FUNCTION teilstichPunkte(t AS INTEGER) AS ARRAY OF FLOAT
+    SELECT CASE t
+        CASE HALB_OL_UR : RETURN [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
+        CASE HALB_OR_UL : RETURN [0.0, 0.0, 1.0, 0.0, 1.0, 1.0]
+        CASE VIERTEL_OL : RETURN [0.0, 0.0, 0.5, 0.0, 0.0, 0.5]
+        CASE VIERTEL_OR : RETURN [0.5, 0.0, 1.0, 0.0, 1.0, 0.5]
+        CASE VIERTEL_UL : RETURN [0.0, 0.5, 0.0, 1.0, 0.5, 1.0]
+        CASE VIERTEL_UR : RETURN [1.0, 0.5, 0.5, 1.0, 1.0, 1.0]
+        CASE DREIVIERTEL : RETURN [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.5, 1.0, 0.0, 0.5]
+    END SELECT
+    DIM leer AS ARRAY OF FLOAT : leer = []
+    RETURN leer
+END FUNCTION
+
+FUNCTION istTeilstich(t AS INTEGER) AS BOOLEAN
+    RETURN t >= HALB_OL_UR AND t <= DREIVIERTEL
+END FUNCTION
+
+CONST KNOTEN_RADIUS = 0.18        ' Anteil an der Zellgroesse
+CONST PERLE_RADIUS = 0.38
+
+' Innenabstand eines Drills in Pixeln: bei kleinen Zellen keiner, sonst 8 %.
+FUNCTION diamantRand(zelle AS FLOAT) AS FLOAT
+    IF zelle < 12 THEN RETURN 0.0
+    RETURN zelle * 0.08
+END FUNCTION

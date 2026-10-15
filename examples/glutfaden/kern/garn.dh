@@ -1,0 +1,170 @@
+' Garne, Farben und Paletten (PySticky core/thread.py + core/palette.py).
+'
+' Eine Farbe ist eine Zahl &HRRGGBB. Ein Garn hat Namen, Farbe, Hersteller und
+' Katalognummer; ein Tweed-Blend besteht aus zwei oder mehr Garnen.
+IMPORT "json"
+
+' "#RRGGBB" (auch "#RGB") -> Farbe; -1 bei krummem Text.
+FUNCTION farbeAusHex(text AS STRING) AS INTEGER
+    DIM t AS STRING : t = TRIM$(text)
+    IF LEFT$(t, 1) <> "#" OR (LEN(t) <> 4 AND LEN(t) <> 7) THEN RETURN -1
+    TRY
+        RETURN COLOR_FROM_HEX(t)
+    CATCH e
+        RETURN -1
+    END TRY
+END FUNCTION
+
+' Farbe -> "#RRGGBB" in Grossbuchstaben, wie PySticky schreibt.
+FUNCTION farbeAlsHex$(f AS INTEGER) AS STRING
+    RETURN "#" + RIGHT$("000000" + UPPER$(HEX$(f BAND &HFFFFFF)), 6)
+END FUNCTION
+
+FUNCTION rotAnteil(f AS INTEGER) AS INTEGER
+    RETURN (f SHR 16) BAND 255
+END FUNCTION
+FUNCTION gruenAnteil(f AS INTEGER) AS INTEGER
+    RETURN (f SHR 8) BAND 255
+END FUNCTION
+FUNCTION blauAnteil(f AS INTEGER) AS INTEGER
+    RETURN f BAND 255
+END FUNCTION
+
+' Helligkeit 0..1 nach ITU-R BT.601 (wie ThreadColor.luminance).
+FUNCTION helligkeit(f AS INTEGER) AS FLOAT
+    RETURN (0.299 * rotAnteil(f) + 0.587 * gruenAnteil(f) + 0.114 * blauAnteil(f)) / 255.0
+END FUNCTION
+
+CLASS Garn
+    DIM name AS STRING
+    DIM farbe AS INTEGER
+    DIM hersteller AS STRING
+    DIM nummer AS STRING
+    DIM staerke AS INTEGER
+    ' Tweed-Blend: die echten Garne und ihre Strang-Anteile
+    DIM teile AS ARRAY OF Garn
+    DIM anteile AS ARRAY OF INTEGER
+
+    SUB Init()
+        staerke = 40
+        teile = []
+        anteile = []
+    END SUB
+
+    FUNCTION istBlend() AS BOOLEAN
+        RETURN LEN(teile) >= 2
+    END FUNCTION
+END CLASS
+
+FUNCTION neuesGarn(name AS STRING, farbe AS INTEGER, hersteller AS STRING, nummer AS STRING) AS Garn
+    DIM g AS Garn : g = NEW Garn()
+    g.name = name
+    g.farbe = farbe
+    g.hersteller = hersteller
+    g.nummer = nummer
+    RETURN g
+END FUNCTION
+
+CLASS Palette
+    DIM name AS STRING
+    DIM hersteller AS STRING
+    DIM garne AS ARRAY OF Garn
+    DIM istPerlen AS BOOLEAN
+    DIM istDiamant AS BOOLEAN
+
+    SUB Init()
+        garne = []
+    END SUB
+
+    FUNCTION nachNummer(nummer AS STRING) AS Garn
+        DIM g AS Garn
+        FOR EACH g IN garne
+            IF g.nummer = nummer THEN RETURN g
+        NEXT
+        RETURN NIL
+    END FUNCTION
+END CLASS
+
+' Herstellername aus dem Dateinamen: "Mill_Hill_Beads_Farben" -> "Mill Hill Beads".
+FUNCTION herstellerAusDatei$(pfad AS STRING) AS STRING
+    DIM n AS STRING : n = BASENAME(pfad)
+    DIM p AS INTEGER : p = INSTRREV(n, ".")
+    IF p >= 0 THEN n = LEFT$(n, p)
+    n = REPLACE$(n, "_Farben", "")
+    n = REPLACE$(n, "_Stickgarn", "")
+    n = REPLACE$(n, "_Stick", "")
+    RETURN TRIM$(REPLACE$(n, "_", " "))
+END FUNCTION
+
+' Eine Paletten-Datei: Liste von {"<X>Number": "...", "Color": {R,G,B}, "Name": "..."}.
+' Ein krummer Eintrag wird uebergangen, wie im Original.
+FUNCTION paletteLaden(pfad AS STRING) AS Palette
+    DIM pal AS Palette : pal = NEW Palette()
+    pal.hersteller = herstellerAusDatei$(pfad)
+    pal.name = pal.hersteller
+    pal.istPerlen = INSTR(LOWER$(pal.hersteller), "bead") >= 0
+    pal.istDiamant = NOT pal.istPerlen AND INSTR(LOWER$(pal.hersteller), "diamond") >= 0
+    DIM j AS JSON_HANDLE : j = JSON_LOAD(pfad)
+    IF JSON_TYPE(j, "") <> "array" THEN THROW "Palette " + BASENAME(pfad) + ": Liste von Farb-Objekten erwartet"
+    DIM n AS INTEGER : n = JSON_LEN(j, "")
+    IF n = 0 THEN RETURN pal
+    ' Das Nummernfeld heisst je Hersteller anders (DmcNumber, BeadNumber, Code ...)
+    DIM nummernFeld AS STRING
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(j, "0")
+        IF RIGHT$(LOWER$(k), 6) = "number" OR k = "Code" THEN
+            nummernFeld = k
+            BREAK
+        END IF
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM w AS STRING : w = STR$(i)
+        IF JSON_TYPE(j, w) <> "object" THEN CONTINUE
+        IF JSON_TYPE(j, w + ".Color") <> "object" THEN CONTINUE
+        DIM r AS INTEGER : r = 128
+        DIM gr AS INTEGER : gr = 128
+        DIM b AS INTEGER : b = 128
+        TRY
+            IF JSON_HAS(j, w + ".Color.R") THEN r = JSON_GET_INT(j, w + ".Color.R")
+            IF JSON_HAS(j, w + ".Color.G") THEN gr = JSON_GET_INT(j, w + ".Color.G")
+            IF JSON_HAS(j, w + ".Color.B") THEN b = JSON_GET_INT(j, w + ".Color.B")
+        CATCH e
+            CONTINUE
+        END TRY
+        DIM name AS STRING : name = "Unknown"
+        IF JSON_HAS(j, w + ".Name") THEN name = JSON_GET_STRING(j, w + ".Name")
+        DIM nummer AS STRING
+        IF nummernFeld <> "" AND JSON_HAS(j, w + "." + nummernFeld) THEN
+            IF JSON_TYPE(j, w + "." + nummernFeld) = "string" THEN
+                nummer = JSON_GET_STRING(j, w + "." + nummernFeld)
+            ELSE
+                nummer = STR$(JSON_GET_INT(j, w + "." + nummernFeld))
+            END IF
+        END IF
+        ARRAY_PUSH(pal.garne, neuesGarn(name, RGB(CLAMP(r, 0, 255), CLAMP(gr, 0, 255), CLAMP(b, 0, 255)), pal.hersteller, nummer))
+    NEXT
+    RETURN pal
+END FUNCTION
+
+' Alle Paletten eines Ordners, nach Namen sortiert.
+FUNCTION palettenLaden(ordner AS STRING) AS ARRAY OF Palette
+    DIM ergebnis AS ARRAY OF Palette : ergebnis = []
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(ordner, "*.json")
+    SORT(dateien)
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        ARRAY_PUSH(ergebnis, paletteLaden(PATHJOIN(ordner, d)))
+    NEXT
+    RETURN ergebnis
+END FUNCTION
+
+' Die Symbole fuer neue Farben (eins je Zeile).
+FUNCTION symboleLaden(pfad AS STRING) AS ARRAY OF STRING
+    DIM z AS ARRAY OF STRING : z = []
+    DIM zeile AS STRING
+    FOR EACH zeile IN READLINES(pfad)
+        IF TRIM$(zeile) <> "" THEN ARRAY_PUSH(z, TRIM$(zeile))
+    NEXT
+    RETURN z
+END FUNCTION

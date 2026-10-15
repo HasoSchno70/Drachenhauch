@@ -1826,7 +1826,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "typeof" => {
             arity!(1);
             Ok(match &a[0] {
-                Value::Instance(rc) => Value::str_rc(&rc.borrow().class_name.to_uppercase()),
+                // Eine Klasse aus einem Namensraum heisst intern `alias@klasse`;
+                // nach aussen `ALIAS.KLASSE`, wie man sie schreibt.
+                Value::Instance(rc) => Value::str_rc(crate::namensraum::lesbar_text(&rc.borrow().class_name).to_uppercase()),
                 v => Value::str_rc(v.type_name()),
             })
         }

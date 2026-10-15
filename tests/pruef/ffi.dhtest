@@ -520,8 +520,8 @@ qsort: Fehler im Rueckruf langsam: Integer-Division durch 0
 zeile 6
 spaeter als eine sekunde: TRUE
 --- stderr
-qsort: Fehler im Rueckruf langsam: Integer-Division durch 0 (Zeile 6) -- qsort ist eine Sekunde spaeter noch nicht zurueckgekehrt
-qsort: Fehler im Rueckruf langsam: zweiter fehler (Zeile 13)
+qsort: Fehler im Rueckruf langsam: Integer-Division durch 0 (fall.dh:6) -- qsort ist eine Sekunde spaeter noch nicht zurueckgekehrt
+qsort: Fehler im Rueckruf langsam: zweiter fehler (fall.dh:13)
 
 === ein rueckruf aus einem anderen faden wird nicht ausgefuehrt
 ' CreateThread ruft die Funktion auf einem neuen Faden -- die VM laeuft nur

@@ -39,6 +39,20 @@ module.exports = (H) => [
     { out: ["36", "1.618"] }),
   H.warn("Hier der feine, aber wichtige Unterschied: Ein eingebautes Modul schreibst du OHNE Endung (IMPORT \"vec2\"), eine eigene Datei MIT (IMPORT \"mathe.dh\"). Die Endung .dh sagt Drachenhauch: „Das ist eine Datei von mir, kein eingebautes Modul.“"),
 
+  H.h2("Eigene Dateien mit eigenem Namensraum"),
+  H.p("Ohne Zusatz landen alle Namen einer importierten Datei im selben Raum wie dein eigener Code. Bei zwei Dateien, die beide eine Funktion init haben, geht das nicht mehr gut. Schreibst du AS und einen Namen dahinter, bekommt die Datei einen eigenen Namensraum: Ihre Funktionen, Konstanten und Klassen erreichst du dann über diesen Namen und einen Punkt."),
+  H.cmd("IMPORT ... AS (eigene Datei)", 'IMPORT "datei.dh" AS name',
+    "Fügt die Datei ein, legt ihre Namen aber in einen eigenen Namensraum. Von außen heißt quadrat dann mathe.quadrat, innerhalb der Datei weiter schlicht quadrat.",
+    [
+      'IMPORT "mathe.dh" AS mathe',
+      '',
+      'PRINT mathe.quadrat(6)',
+      'PRINT mathe.GOLDENER_SCHNITT',
+    ],
+    { out: ["36", "1.618"] }),
+  H.note("Ein Namensraum sieht die Variablen deines Hauptprogramms nicht – die Datei hängt also nicht davon ab, was du zufällig oben deklariert hast. Klassen gehen ebenfalls über den Namen: DIM p AS mathe.Punkt und p = NEW mathe.Punkt()."),
+  H.tip("Eine Bibliothek aus mehreren Dateien", "Dateien, die du mit demselben Namen einbindest, bilden einen gemeinsamen Namensraum und sehen einander. So zerlegst du eine große Bibliothek in Teile und bindest sie über eine Sammeldatei ein, die selbst nur IMPORT-Zeilen enthält – jede mit demselben AS. Was eine Datei des Namensraums ohne AS einbindet, gehört nicht dazu; die Fehlermeldung sagt dir dann, in welcher Datei der Name steht."),
+
   H.h2("Module unter anderem Namen: AS"),
   H.p("Manche Module haben lange Funktionsnamen. Mit dem Zusatz AS gibst du einem Modul beim Import ein kürzeres Namenspräfix. Aus den JSON-Funktionen, die normalerweise mit JSON_ beginnen, werden dann etwa J_-Funktionen – das spart Tipparbeit, wenn du das Modul oft benutzt."),
   H.cmd("IMPORT ... AS", 'IMPORT "modul" AS kürzel',

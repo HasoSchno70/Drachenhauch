@@ -1,0 +1,235 @@
+' Glutfaden -- Kreuzstich-Muster ansehen. Eine Portierung von PySticky (Python +
+' Qt) nach Drachenhauch, mit GTK 3 als Oberflaeche.
+'
+'     dhrt run main.dh                       (Beispielmuster)
+'     dhrt run main.dh -- muster.pxs         (diese Datei)
+'
+' Stufe 1: Muster (.pxs) oeffnen und ansehen -- Zoom um den Mauszeiger (Rad,
+' + / - / 0), Verschieben mit gedrueckter Maustaste, Ebenen ein- und
+' ausblenden, Farbliste mit Symbol und Stichzahl.
+'
+' Aufbau:
+'     kern/      Muster, Ebenen, Garne, Paletten, .pxs -- ohne Oberflaeche,
+'                als Namensraum "kern" eingebunden
+'     gtk/       die Deklarationen fuer GTK, Cairo, Pango, GLib
+'     ansicht/   Zeichenflaeche und Seitenleiste
+'     daten/     Paletten, Symbole, Beispielmuster (aus PySticky, MIT-Lizenz,
+'                siehe daten/LIZENZ-PySticky.txt)
+'
+' GTK muss da sein: unter Linux fast immer (libgtk-3-0), unter macOS ueber
+' Homebrew (brew install gtk+3), unter Windows aus MSYS2 im PATH -- oder aus
+' Inkscape. Mit --probe fuehrt sich das Programm selbst vor und endet; --foto
+' ziel sichert dabei Bilder des Fensters (fuer Pruefungen).
+IMPORT "kern/kern.dh" AS kern
+IMPORT "gtk/gtk.dh"
+IMPORT "ansicht/leinwand.dh"
+IMPORT "ansicht/seitenleiste.dh"
+
+CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
+    " headerbar { background-image: linear-gradient(to bottom, #2c2e35, #22242a); border-bottom: 1px solid #0c0d10; color: #e4e5ea; box-shadow: none; }" + _
+    " headerbar .title { font-weight: 700; color: #f2f3f7; } headerbar .subtitle { color: #9aa0ad; opacity: 1; }" + _
+    " headerbar button { background-image: none; background-color: transparent; border: none; border-radius: 8px; color: #d6d9e1; box-shadow: none; text-shadow: none; -gtk-icon-shadow: none; }" + _
+    " headerbar button:hover { background-color: rgba(255,255,255,0.08); }" + _
+    " .zoom { color: #c9ccd4; min-width: 52px; }" + _
+    " .seitenleiste { background-color: #202228; border-left: 1px solid #0c0d10; }" + _
+    " .ueberschrift { color: #8d93a1; font-weight: 700; font-size: 9pt; margin: 14px 14px 4px 14px; }" + _
+    " .farbzeile { padding: 4px 14px; } .farbzeile:hover { background-color: rgba(255,255,255,0.04); }" + _
+    " .farbzeile label { color: #d6d9e1; } .nebensache { color: #8d93a1; }" + _
+    " .ebene { margin: 2px 14px; color: #d6d9e1; }" + _
+    " .status { background-color: #16171b; color: #9aa0ad; padding: 4px 12px; border-top: 1px solid #0c0d10; font-size: 9pt; }"
+
+DIM fenster AS INTEGER
+DIM kopf AS INTEGER
+DIM zoomText AS INTEGER
+DIM status AS INTEGER
+DIM musterPfad AS STRING
+
+' Die Statuszeile und den Zoom nachfuehren -- die Zeichenflaeche ruft das.
+SUB statusNachziehen()
+    IF zoomText = 0 THEN RETURN
+    gtk_label_set_text(zoomText, STR$(leinwandZoomProzent()) + " %")
+    IF NOT lwHat THEN RETURN
+    DIM t AS STRING
+    t = STR$(lwMuster.breite) + " × " + STR$(lwMuster.hoehe) + " Stiche   ·   " + _
+        ZAHL$(lwMuster.breiteCm(), 1) + " × " + ZAHL$(lwMuster.hoeheCm(), 1) + " cm auf " + ZAHL$(lwMuster.stoff, 0) + "er Stoff"
+    IF lwMausX >= 0 THEN
+        t = t + "   ·   Stich " + STR$(lwMausX + 1) + ", " + STR$(lwMausY + 1)
+        DIM c AS INTEGER : c = lwFarbe[lwMausY * lwMuster.breite + lwMausX]
+        IF c >= 0 AND c < lwMuster.farbanzahl() THEN
+            DIM g AS kern.Garn : g = lwMuster.farben[c].garn
+            t = t + ": " + TRIM$(g.hersteller + " " + g.nummer) + " " + g.name
+        END IF
+    END IF
+    gtk_label_set_text(status, t)
+END SUB
+
+FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
+    DIM m AS kern.Muster
+    TRY
+        m = kern.pxsLaden(pfad)
+    CATCH e
+        gtk_label_set_text(status, "Nicht geöffnet: " + e)
+        RETURN FALSE
+    END TRY
+    musterPfad = pfad
+    leinwandMuster(m)
+    seitenleisteMuster(m)
+    gtk_header_bar_set_title(kopf, IIF(m.name <> "", m.name, BASENAME(pfad)))
+    gtk_header_bar_set_subtitle(kopf, BASENAME(pfad) + "  ·  " + STR$(m.farbanzahl()) + " Farben  ·  " + ZAHL$(m.sticheGesamt(), 0) + " Stiche")
+    statusNachziehen()
+    RETURN TRUE
+END FUNCTION
+
+SUB oeffnenGeklickt(knopf AS INTEGER, daten AS INTEGER)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Muster öffnen", fenster, GTK_DATEI_OEFFNEN, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Öffnen", GTK_ANTWORT_ANNEHMEN, NIL)
+    DIM filter AS INTEGER : filter = gtk_file_filter_new()
+    gtk_file_filter_set_name(filter, "Kreuzstich-Muster (*.pxs)")
+    gtk_file_filter_add_pattern(filter, "*.pxs")
+    gtk_file_chooser_add_filter(d, filter)
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        DIM pfad AS STRING : pfad = TEXT_AUS_ZEIGER$(z)
+        g_free(z)
+        gtk_widget_destroy(d)
+        DIM ok AS BOOLEAN : ok = musterOeffnen(pfad)
+    ELSE
+        gtk_widget_destroy(d)
+    END IF
+END SUB
+
+SUB kleinerGeklickt(knopf AS INTEGER, daten AS INTEGER) : leinwandZoomMitte(1 / 1.25) : END SUB
+SUB groesserGeklickt(knopf AS INTEGER, daten AS INTEGER) : leinwandZoomMitte(1.25) : END SUB
+SUB einpassenGeklickt(knopf AS INTEGER, daten AS INTEGER) : leinwandEinpassen() : END SUB
+SUB fensterZu(objekt AS INTEGER, daten AS INTEGER) : gtk_main_quit() : END SUB
+
+FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM t AS INTEGER
+    IF NOT gdk_event_get_keyval(ereignis, t) THEN RETURN FALSE
+    SELECT CASE t
+        CASE &H2B, &H3D, &HFFAB : leinwandZoomMitte(1.25)          ' + = (Ziffernblock +)
+        CASE &H2D, &HFFAD : leinwandZoomMitte(1 / 1.25)            ' - (Ziffernblock -)
+        CASE &H30, &HFFB0 : leinwandEinpassen()                     ' 0
+        CASE &H31 : leinwandZoomMitte(LW_ZELLE_STANDARD / lwZelle)  ' 1 = 100 %
+        CASE ELSE : RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION knopf(symbol AS STRING, tipp AS STRING) AS INTEGER
+    DIM k AS INTEGER : k = gtk_button_new_from_icon_name(symbol, GTK_ICON_KNOPF)
+    gtk_widget_set_tooltip_text(k, tipp)
+    gtk_widget_set_can_focus(k, FALSE)
+    RETURN k
+END FUNCTION
+
+' --- Aufbau -------------------------------------------------------------------------
+DIM bereit AS BOOLEAN
+TRY
+    bereit = gtk_init_check(0, 0)
+CATCH e
+    PRINT "GTK nicht gefunden -- unter Linux das Paket libgtk-3-0, unter macOS brew install gtk+3, unter Windows GTK aus MSYS2 in den PATH oder Inkscape installieren."
+    END
+END TRY
+IF NOT bereit THEN
+    PRINT "GTK ist da, findet aber keinen Bildschirm."
+    END
+END IF
+DIM stilFehler AS STRING : stilFehler = gtkStil$(STIL)
+IF stilFehler <> "" THEN PRINT "Stylesheet: "; stilFehler
+
+fenster = gtk_window_new(0)
+gtk_window_set_default_size(fenster, 1200, 800)
+gtkKlasse(fenster, "flaeche")
+kopf = gtk_header_bar_new()
+gtk_header_bar_set_title(kopf, "Glutfaden")
+gtk_header_bar_set_show_close_button(kopf, TRUE)
+gtk_window_set_titlebar(fenster, kopf)
+DIM kOeffnen AS INTEGER : kOeffnen = knopf("document-open-symbolic", "Muster öffnen")
+gtk_header_bar_pack_start(kopf, kOeffnen)
+DIM kEinpassen AS INTEGER : kEinpassen = knopf("zoom-fit-best-symbolic", "Einpassen (0)")
+DIM kGroesser AS INTEGER : kGroesser = knopf("zoom-in-symbolic", "Größer (+)")
+DIM kKleiner AS INTEGER : kKleiner = knopf("zoom-out-symbolic", "Kleiner (-)")
+zoomText = gtk_label_new("100 %")
+gtkKlasse(zoomText, "zoom")
+gtk_header_bar_pack_end(kopf, kEinpassen)
+gtk_header_bar_pack_end(kopf, kGroesser)
+gtk_header_bar_pack_end(kopf, zoomText)
+gtk_header_bar_pack_end(kopf, kKleiner)
+
+DIM spalte AS INTEGER : spalte = gtk_box_new(GTK_SENKRECHT, 0)
+DIM teilung AS INTEGER : teilung = gtk_paned_new(GTK_WAAGERECHT)
+gtk_paned_pack1(teilung, leinwandNeu(), TRUE, FALSE)
+gtk_paned_pack2(teilung, seitenleisteNeu(), FALSE, FALSE)
+gtk_paned_set_position(teilung, 900)
+status = gtk_label_new("")
+gtk_label_set_xalign(status, 0.0)
+gtkKlasse(status, "status")
+gtk_box_pack_start(spalte, teilung, TRUE, TRUE, 0)
+gtk_box_pack_start(spalte, status, FALSE, FALSE, 0)
+gtk_container_add(fenster, spalte)
+
+signal(kOeffnen, "clicked", oeffnenGeklickt, 0, 0, 0)
+signal(kKleiner, "clicked", kleinerGeklickt, 0, 0, 0)
+signal(kGroesser, "clicked", groesserGeklickt, 0, 0, 0)
+signal(kEinpassen, "clicked", einpassenGeklickt, 0, 0, 0)
+signalEreignis(fenster, "key-press-event", taste, 0, 0, 0)
+signal(fenster, "destroy", fensterZu, 0, 0, 0)
+gtk_widget_show_all(fenster)
+
+' Welche Datei? Das Argument, sonst das Beispielmuster.
+DIM probe AS BOOLEAN
+DIM fotoZiel AS STRING
+DIM start AS STRING
+DIM a AS INTEGER
+FOR a = 0 TO ARGC() - 1
+    IF ARG$(a) = "--probe" THEN
+        probe = TRUE
+    ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
+        fotoZiel = ARGPATH$(a + 1)
+        a = a + 1
+    ELSE
+        start = ARGPATH$(a)
+    END IF
+NEXT
+IF start = "" THEN start = PATHJOIN(CWD$(), "daten/muster/demo_kreuzstich.pxs")
+DIM geladen AS BOOLEAN : geladen = musterOeffnen(start)
+
+' --- Vorfuehrung fuer Pruefungen -----------------------------------------------------
+DIM schritt AS INTEGER
+SUB foto(name AS STRING)
+    IF fotoZiel = "" THEN RETURN
+    IF NOT gtkFoto(fenster, fotoZiel + "_" + name + ".png") THEN PRINT "Foto nicht gesichert: "; name
+END SUB
+FUNCTION vorfuehren(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    SELECT CASE schritt
+        CASE 1
+            ' Das erste Zeichnen hat eingepasst
+            PRINT "geladen: "; geladen; ", eingepasst: "; lwEingepasst
+            PRINT gtk_label_get_text(status)
+        CASE 2
+            foto("eingepasst")
+            leinwandZoom(30.0, lwX + 5.5 * lwZelle, lwY + 5.5 * lwZelle)
+            PRINT "zoom: "; leinwandZoomProzent(); " %"
+        CASE 3
+            foto("nah")
+            ' Die Ebene "Herz" ausblenden -- die Stiche verschwinden aus dem Bild
+            IF LEN(slEbenenKnoepfe) < 2 THEN RETURN TRUE
+            DIM vorher AS INTEGER : vorher = lwFarbe[12 * lwMuster.breite + 17]
+            gtk_toggle_button_set_active(slEbenenKnoepfe[1], FALSE)
+            PRINT "zelle 17,12: "; vorher; " -> "; lwFarbe[12 * lwMuster.breite + 17]
+        CASE 4
+            IF LEN(slEbenenKnoepfe) < 2 THEN RETURN TRUE
+            foto("ohne_herz")
+            gtk_toggle_button_set_active(slEbenenKnoepfe[1], TRUE)
+            PRINT "wieder da: "; lwFarbe[12 * lwMuster.breite + 17]
+        CASE ELSE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+IF probe THEN g_timeout_add(300, vorfuehren, 0)
+
+gtk_main()

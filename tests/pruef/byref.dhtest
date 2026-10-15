@@ -156,3 +156,98 @@ PRINT mult(10, 5, 4)
 150
 200
 
+
+=== byref bei einer methode schreibt zurueck
+' Bis 2026-10-14 nahm eine Methode BYREF still als BYVAL -- der Aufrufer
+' sah nach dem Aufruf die alten Werte (Glutfaden: ebenen.zusammensetzen).
+CLASS Stapel
+    DIM n AS INTEGER
+    SUB fuellen(BYREF a AS ARRAY OF INTEGER, BYREF anzahl AS INTEGER, faktor AS INTEGER)
+        DIM b[3] AS INTEGER
+        b[0] = 7 * faktor
+        a = b
+        anzahl = 5
+    END SUB
+    FUNCTION tauschen(BYREF x AS INTEGER, BYREF y AS INTEGER) AS STRING
+        DIM t AS INTEGER : t = x : x = y : y = t
+        RETURN "getauscht"
+    END FUNCTION
+    SUB selbst(BYREF z AS INTEGER)
+        mehr(z)
+        Self.mehr(z)
+    END SUB
+    SUB mehr(BYREF z AS INTEGER)
+        z = z + 10
+    END SUB
+END CLASS
+DIM s AS Stapel : s = NEW Stapel()
+DIM a AS ARRAY OF INTEGER
+DIM k AS INTEGER
+s.fuellen(a, k, 2)
+PRINT LEN(a); " "; a[0]; " "; k
+DIM p AS INTEGER : p = 1
+DIM q AS INTEGER : q = 2
+PRINT s.tauschen(p, q); " "; p; " "; q
+s.selbst(p)
+PRINT p
+' Feld eines Objekts und Feldelement als Ziel
+DIM f[2] AS INTEGER
+s.mehr(f[1])
+s.mehr(s.n)
+PRINT f[1]; " "; s.n
+--- erwartet
+3 14 5
+getauscht 2 1
+22
+10 10
+
+=== byref bei einer methode im maschinencode
+CLASS Zaehler
+    SUB plus(BYREF z AS INTEGER, um AS INTEGER)
+        z = z + um
+    END SUB
+END CLASS
+DIM c AS Zaehler : c = NEW Zaehler()
+DIM summe AS INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 1000
+    c.plus(summe, i)
+NEXT
+PRINT summe
+--- erwartet
+500500
+
+=== byref bei einer methode ohne bekannte klasse ist ein fehler
+' Ohne Typ kann der Compiler die Argumente nicht erfassen -- still als BYVAL
+' zu laufen hiesse, die Aenderung zu verlieren.
+CLASS K
+    SUB setzen(BYREF z AS INTEGER)
+        z = 5
+    END SUB
+END CLASS
+DIM liste AS TUPLE
+liste = (NEW K(), NEW K())
+DIM w AS INTEGER
+FOR EACH o IN liste
+    o.setzen(w)
+NEXT
+--- fehler
+K.setzen hat BYREF-Parameter, aber beim Uebersetzen war die Klasse des Objekts nicht bekannt
+
+=== eine ueberschreibung mit anderen byref-stellen ist ein fehler
+CLASS Tier
+    SUB laut(BYREF n AS INTEGER, m AS INTEGER)
+        n = 1
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    SUB laut(n AS INTEGER, BYREF m AS INTEGER)
+        m = 2
+    END SUB
+END CLASS
+DIM t AS Tier : t = NEW Hund()
+DIM a AS INTEGER
+DIM b AS INTEGER
+t.laut(a, b)
+--- fehler
+HUND.laut: die Methode der Klasse

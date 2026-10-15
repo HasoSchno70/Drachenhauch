@@ -1,0 +1,848 @@
+[
+ {
+  "GentleArtNumber": "0010",
+  "Color": {
+   "R": 255,
+   "G": 255,
+   "B": 255
+  },
+  "Name": "Snow White"
+ },
+ {
+  "GentleArtNumber": "0110",
+  "Color": {
+   "R": 252,
+   "G": 250,
+   "B": 240
+  },
+  "Name": "Ivory"
+ },
+ {
+  "GentleArtNumber": "0120",
+  "Color": {
+   "R": 255,
+   "G": 253,
+   "B": 230
+  },
+  "Name": "Buttermilk"
+ },
+ {
+  "GentleArtNumber": "0130",
+  "Color": {
+   "R": 245,
+   "G": 235,
+   "B": 210
+  },
+  "Name": "Oatmeal"
+ },
+ {
+  "GentleArtNumber": "0140",
+  "Color": {
+   "R": 250,
+   "G": 240,
+   "B": 220
+  },
+  "Name": "Shaker White"
+ },
+ {
+  "GentleArtNumber": "0150",
+  "Color": {
+   "R": 235,
+   "G": 220,
+   "B": 195
+  },
+  "Name": "Tea Dyed"
+ },
+ {
+  "GentleArtNumber": "0170",
+  "Color": {
+   "R": 255,
+   "G": 245,
+   "B": 200
+  },
+  "Name": "Chamomile"
+ },
+ {
+  "GentleArtNumber": "0210",
+  "Color": {
+   "R": 45,
+   "G": 45,
+   "B": 45
+  },
+  "Name": "Black Crow"
+ },
+ {
+  "GentleArtNumber": "0220",
+  "Color": {
+   "R": 85,
+   "G": 85,
+   "B": 85
+  },
+  "Name": "Pigeon"
+ },
+ {
+  "GentleArtNumber": "0230",
+  "Color": {
+   "R": 128,
+   "G": 128,
+   "B": 128
+  },
+  "Name": "Banker's Gray"
+ },
+ {
+  "GentleArtNumber": "0240",
+  "Color": {
+   "R": 175,
+   "G": 175,
+   "B": 175
+  },
+  "Name": "Confederate Gray"
+ },
+ {
+  "GentleArtNumber": "0250",
+  "Color": {
+   "R": 200,
+   "G": 200,
+   "B": 200
+  },
+  "Name": "Silver"
+ },
+ {
+  "GentleArtNumber": "0260",
+  "Color": {
+   "R": 112,
+   "G": 128,
+   "B": 144
+  },
+  "Name": "Slate"
+ },
+ {
+  "GentleArtNumber": "0270",
+  "Color": {
+   "R": 70,
+   "G": 80,
+   "B": 90
+  },
+  "Name": "Stormy"
+ },
+ {
+  "GentleArtNumber": "0310",
+  "Color": {
+   "R": 50,
+   "G": 35,
+   "B": 25
+  },
+  "Name": "Dark Chocolate"
+ },
+ {
+  "GentleArtNumber": "0320",
+  "Color": {
+   "R": 80,
+   "G": 50,
+   "B": 30
+  },
+  "Name": "Walnut"
+ },
+ {
+  "GentleArtNumber": "0330",
+  "Color": {
+   "R": 101,
+   "G": 67,
+   "B": 33
+  },
+  "Name": "Woodrose"
+ },
+ {
+  "GentleArtNumber": "0340",
+  "Color": {
+   "R": 139,
+   "G": 90,
+   "B": 50
+  },
+  "Name": "Heirloom Gold"
+ },
+ {
+  "GentleArtNumber": "0350",
+  "Color": {
+   "R": 160,
+   "G": 105,
+   "B": 60
+  },
+  "Name": "Brandy"
+ },
+ {
+  "GentleArtNumber": "0360",
+  "Color": {
+   "R": 180,
+   "G": 130,
+   "B": 90
+  },
+  "Name": "Harvest Moon"
+ },
+ {
+  "GentleArtNumber": "0370",
+  "Color": {
+   "R": 210,
+   "G": 160,
+   "B": 110
+  },
+  "Name": "Grecian Gold"
+ },
+ {
+  "GentleArtNumber": "0380",
+  "Color": {
+   "R": 230,
+   "G": 190,
+   "B": 140
+  },
+  "Name": "Amber"
+ },
+ {
+  "GentleArtNumber": "0390",
+  "Color": {
+   "R": 245,
+   "G": 220,
+   "B": 180
+  },
+  "Name": "Straw Bonnet"
+ },
+ {
+  "GentleArtNumber": "0410",
+  "Color": {
+   "R": 200,
+   "G": 50,
+   "B": 50
+  },
+  "Name": "Cherry Wine"
+ },
+ {
+  "GentleArtNumber": "0420",
+  "Color": {
+   "R": 180,
+   "G": 35,
+   "B": 35
+  },
+  "Name": "Pomegranate"
+ },
+ {
+  "GentleArtNumber": "0430",
+  "Color": {
+   "R": 160,
+   "G": 50,
+   "B": 60
+  },
+  "Name": "Claret"
+ },
+ {
+  "GentleArtNumber": "0440",
+  "Color": {
+   "R": 140,
+   "G": 30,
+   "B": 40
+  },
+  "Name": "Cranberry"
+ },
+ {
+  "GentleArtNumber": "0450",
+  "Color": {
+   "R": 220,
+   "G": 80,
+   "B": 80
+  },
+  "Name": "Red Apple"
+ },
+ {
+  "GentleArtNumber": "0460",
+  "Color": {
+   "R": 255,
+   "G": 100,
+   "B": 100
+  },
+  "Name": "Strawberry Fields"
+ },
+ {
+  "GentleArtNumber": "0470",
+  "Color": {
+   "R": 210,
+   "G": 120,
+   "B": 120
+  },
+  "Name": "Victorian Rose"
+ },
+ {
+  "GentleArtNumber": "0480",
+  "Color": {
+   "R": 255,
+   "G": 160,
+   "B": 160
+  },
+  "Name": "Baby's Breath"
+ },
+ {
+  "GentleArtNumber": "0490",
+  "Color": {
+   "R": 230,
+   "G": 180,
+   "B": 180
+  },
+  "Name": "Cherry Blossom"
+ },
+ {
+  "GentleArtNumber": "0510",
+  "Color": {
+   "R": 200,
+   "G": 80,
+   "B": 120
+  },
+  "Name": "Mulberry"
+ },
+ {
+  "GentleArtNumber": "0520",
+  "Color": {
+   "R": 170,
+   "G": 50,
+   "B": 100
+  },
+  "Name": "Raspberry Parfait"
+ },
+ {
+  "GentleArtNumber": "0530",
+  "Color": {
+   "R": 220,
+   "G": 140,
+   "B": 170
+  },
+  "Name": "Peony"
+ },
+ {
+  "GentleArtNumber": "0540",
+  "Color": {
+   "R": 255,
+   "G": 182,
+   "B": 193
+  },
+  "Name": "Pink Petunia"
+ },
+ {
+  "GentleArtNumber": "0550",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 210
+  },
+  "Name": "Pink Powder"
+ },
+ {
+  "GentleArtNumber": "0560",
+  "Color": {
+   "R": 140,
+   "G": 30,
+   "B": 80
+  },
+  "Name": "Berry Cobbler"
+ },
+ {
+  "GentleArtNumber": "0610",
+  "Color": {
+   "R": 255,
+   "G": 140,
+   "B": 50
+  },
+  "Name": "Orange Peel"
+ },
+ {
+  "GentleArtNumber": "0620",
+  "Color": {
+   "R": 230,
+   "G": 110,
+   "B": 30
+  },
+  "Name": "Burnt Orange"
+ },
+ {
+  "GentleArtNumber": "0630",
+  "Color": {
+   "R": 200,
+   "G": 90,
+   "B": 20
+  },
+  "Name": "Pumpkin Pie"
+ },
+ {
+  "GentleArtNumber": "0640",
+  "Color": {
+   "R": 180,
+   "G": 80,
+   "B": 30
+  },
+  "Name": "Cinnamon"
+ },
+ {
+  "GentleArtNumber": "0650",
+  "Color": {
+   "R": 210,
+   "G": 130,
+   "B": 60
+  },
+  "Name": "Carrot"
+ },
+ {
+  "GentleArtNumber": "0660",
+  "Color": {
+   "R": 255,
+   "G": 180,
+   "B": 100
+  },
+  "Name": "Apricot"
+ },
+ {
+  "GentleArtNumber": "0670",
+  "Color": {
+   "R": 255,
+   "G": 200,
+   "B": 150
+  },
+  "Name": "Peach"
+ },
+ {
+  "GentleArtNumber": "0680",
+  "Color": {
+   "R": 210,
+   "G": 105,
+   "B": 30
+  },
+  "Name": "Saffron"
+ },
+ {
+  "GentleArtNumber": "0710",
+  "Color": {
+   "R": 255,
+   "G": 215,
+   "B": 0
+  },
+  "Name": "Sunflower"
+ },
+ {
+  "GentleArtNumber": "0720",
+  "Color": {
+   "R": 255,
+   "G": 230,
+   "B": 80
+  },
+  "Name": "Buttercup"
+ },
+ {
+  "GentleArtNumber": "0730",
+  "Color": {
+   "R": 240,
+   "G": 200,
+   "B": 50
+  },
+  "Name": "Mustard"
+ },
+ {
+  "GentleArtNumber": "0740",
+  "Color": {
+   "R": 218,
+   "G": 165,
+   "B": 32
+  },
+  "Name": "Goldenrod"
+ },
+ {
+  "GentleArtNumber": "0750",
+  "Color": {
+   "R": 200,
+   "G": 150,
+   "B": 30
+  },
+  "Name": "Old Gold"
+ },
+ {
+  "GentleArtNumber": "0760",
+  "Color": {
+   "R": 180,
+   "G": 130,
+   "B": 20
+  },
+  "Name": "Honeycomb"
+ },
+ {
+  "GentleArtNumber": "0770",
+  "Color": {
+   "R": 255,
+   "G": 250,
+   "B": 200
+  },
+  "Name": "Lemon Grass"
+ },
+ {
+  "GentleArtNumber": "0780",
+  "Color": {
+   "R": 255,
+   "G": 240,
+   "B": 150
+  },
+  "Name": "Daffodil"
+ },
+ {
+  "GentleArtNumber": "0810",
+  "Color": {
+   "R": 60,
+   "G": 140,
+   "B": 60
+  },
+  "Name": "Evergreen"
+ },
+ {
+  "GentleArtNumber": "0820",
+  "Color": {
+   "R": 34,
+   "G": 120,
+   "B": 34
+  },
+  "Name": "Forest Glade"
+ },
+ {
+  "GentleArtNumber": "0830",
+  "Color": {
+   "R": 50,
+   "G": 100,
+   "B": 50
+  },
+  "Name": "Pine"
+ },
+ {
+  "GentleArtNumber": "0840",
+  "Color": {
+   "R": 85,
+   "G": 160,
+   "B": 85
+  },
+  "Name": "Clover"
+ },
+ {
+  "GentleArtNumber": "0850",
+  "Color": {
+   "R": 100,
+   "G": 180,
+   "B": 100
+  },
+  "Name": "Spring Grass"
+ },
+ {
+  "GentleArtNumber": "0860",
+  "Color": {
+   "R": 144,
+   "G": 200,
+   "B": 144
+  },
+  "Name": "Mint Julep"
+ },
+ {
+  "GentleArtNumber": "0870",
+  "Color": {
+   "R": 180,
+   "G": 220,
+   "B": 150
+  },
+  "Name": "Celery"
+ },
+ {
+  "GentleArtNumber": "0880",
+  "Color": {
+   "R": 107,
+   "G": 142,
+   "B": 35
+  },
+  "Name": "Olive"
+ },
+ {
+  "GentleArtNumber": "0890",
+  "Color": {
+   "R": 85,
+   "G": 107,
+   "B": 47
+  },
+  "Name": "Turtle"
+ },
+ {
+  "GentleArtNumber": "0910",
+  "Color": {
+   "R": 0,
+   "G": 128,
+   "B": 128
+  },
+  "Name": "Peacock"
+ },
+ {
+  "GentleArtNumber": "0920",
+  "Color": {
+   "R": 64,
+   "G": 170,
+   "B": 170
+  },
+  "Name": "Tropical Ocean"
+ },
+ {
+  "GentleArtNumber": "0930",
+  "Color": {
+   "R": 100,
+   "G": 200,
+   "B": 200
+  },
+  "Name": "Robin's Egg"
+ },
+ {
+  "GentleArtNumber": "0940",
+  "Color": {
+   "R": 127,
+   "G": 255,
+   "B": 212
+  },
+  "Name": "Aquamarine"
+ },
+ {
+  "GentleArtNumber": "0950",
+  "Color": {
+   "R": 95,
+   "G": 158,
+   "B": 160
+  },
+  "Name": "Verdigris"
+ },
+ {
+  "GentleArtNumber": "0960",
+  "Color": {
+   "R": 46,
+   "G": 139,
+   "B": 87
+  },
+  "Name": "Sea Foam"
+ },
+ {
+  "GentleArtNumber": "1010",
+  "Color": {
+   "R": 30,
+   "G": 60,
+   "B": 100
+  },
+  "Name": "Midnight"
+ },
+ {
+  "GentleArtNumber": "1020",
+  "Color": {
+   "R": 0,
+   "G": 0,
+   "B": 139
+  },
+  "Name": "Patriot Blue"
+ },
+ {
+  "GentleArtNumber": "1030",
+  "Color": {
+   "R": 65,
+   "G": 105,
+   "B": 180
+  },
+  "Name": "Liberty"
+ },
+ {
+  "GentleArtNumber": "1040",
+  "Color": {
+   "R": 100,
+   "G": 149,
+   "B": 237
+  },
+  "Name": "Cornflower"
+ },
+ {
+  "GentleArtNumber": "1050",
+  "Color": {
+   "R": 135,
+   "G": 180,
+   "B": 220
+  },
+  "Name": "Summer Sky"
+ },
+ {
+  "GentleArtNumber": "1060",
+  "Color": {
+   "R": 176,
+   "G": 200,
+   "B": 230
+  },
+  "Name": "Blue Jay"
+ },
+ {
+  "GentleArtNumber": "1070",
+  "Color": {
+   "R": 200,
+   "G": 220,
+   "B": 240
+  },
+  "Name": "Blue Bonnet"
+ },
+ {
+  "GentleArtNumber": "1080",
+  "Color": {
+   "R": 70,
+   "G": 130,
+   "B": 180
+  },
+  "Name": "Williamsburg Blue"
+ },
+ {
+  "GentleArtNumber": "1090",
+  "Color": {
+   "R": 30,
+   "G": 80,
+   "B": 150
+  },
+  "Name": "Midnight Blue"
+ },
+ {
+  "GentleArtNumber": "1110",
+  "Color": {
+   "R": 75,
+   "G": 0,
+   "B": 130
+  },
+  "Name": "Grape"
+ },
+ {
+  "GentleArtNumber": "1120",
+  "Color": {
+   "R": 128,
+   "G": 0,
+   "B": 128
+  },
+  "Name": "Wild Grapes"
+ },
+ {
+  "GentleArtNumber": "1130",
+  "Color": {
+   "R": 148,
+   "G": 60,
+   "B": 180
+  },
+  "Name": "Hyacinth"
+ },
+ {
+  "GentleArtNumber": "1140",
+  "Color": {
+   "R": 186,
+   "G": 100,
+   "B": 200
+  },
+  "Name": "Orchid"
+ },
+ {
+  "GentleArtNumber": "1150",
+  "Color": {
+   "R": 218,
+   "G": 140,
+   "B": 214
+  },
+  "Name": "Wisteria"
+ },
+ {
+  "GentleArtNumber": "1160",
+  "Color": {
+   "R": 230,
+   "G": 180,
+   "B": 230
+  },
+  "Name": "Lavender"
+ },
+ {
+  "GentleArtNumber": "1170",
+  "Color": {
+   "R": 147,
+   "G": 112,
+   "B": 219
+  },
+  "Name": "Purple Iris"
+ },
+ {
+  "GentleArtNumber": "1180",
+  "Color": {
+   "R": 100,
+   "G": 50,
+   "B": 100
+  },
+  "Name": "Plum Street"
+ },
+ {
+  "GentleArtNumber": "1210",
+  "Color": {
+   "R": 180,
+   "G": 140,
+   "B": 100
+  },
+  "Name": "Caramel Corn"
+ },
+ {
+  "GentleArtNumber": "1220",
+  "Color": {
+   "R": 160,
+   "G": 82,
+   "B": 45
+  },
+  "Name": "Cinnamon Stick"
+ },
+ {
+  "GentleArtNumber": "1230",
+  "Color": {
+   "R": 139,
+   "G": 69,
+   "B": 19
+  },
+  "Name": "Saddle"
+ },
+ {
+  "GentleArtNumber": "1240",
+  "Color": {
+   "R": 210,
+   "G": 180,
+   "B": 140
+  },
+  "Name": "Parchment"
+ },
+ {
+  "GentleArtNumber": "1250",
+  "Color": {
+   "R": 245,
+   "G": 222,
+   "B": 179
+  },
+  "Name": "Wheat"
+ },
+ {
+  "GentleArtNumber": "1260",
+  "Color": {
+   "R": 222,
+   "G": 184,
+   "B": 135
+  },
+  "Name": "Burlap"
+ },
+ {
+  "GentleArtNumber": "1270",
+  "Color": {
+   "R": 205,
+   "G": 133,
+   "B": 63
+  },
+  "Name": "Baked Clay"
+ },
+ {
+  "GentleArtNumber": "1280",
+  "Color": {
+   "R": 178,
+   "G": 102,
+   "B": 51
+  },
+  "Name": "Terra Cotta"
+ }
+]

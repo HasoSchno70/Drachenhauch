@@ -117,6 +117,7 @@ mod oc {
     /// den Typ hat, den `typ_von` ihm zuschreibt (Arg = Konstante mit der
     /// Angabe). Der Wert bleibt liegen.
     pub const TYP_PRUEFEN: i64 = 123;
+    pub const CALL_METHOD_BYREF: i64 = 124;
     pub const HALT: i64 = 99;
 }
 
@@ -3046,16 +3047,16 @@ impl Compiler {
                 return Ok(());
             }
             self.warn_unbekanntes_mitglied(target, name, true);
+            let mut byref: Vec<bool> = Vec::new();
             if let Some(klasse) = self.statischer_typ(target) {
                 if let Some(sig) = self.find_method_sig(&klasse, name) {
+                    byref = sig.param_byref.clone();
                     let ws = self.arg_warnungen(&format!("{}.{}", Self::typ_klartext(&klasse), name), sig, args);
                     self.warnings.extend(ws);
                 }
             }
             self.expr(target)?;
-            for a in args { self.expr(a)?; }
-            self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
-            return Ok(());
+            return self.methode_rufen(name, args, &byref);
         }
         let name = match callee {
             Node::Identifier(n) => n.clone(),
@@ -3097,14 +3098,14 @@ impl Compiler {
                 if has_named {
                     return Err(format!("{}: Named-Args bei Methoden-Call nicht unterstuetzt", name));
                 }
+                let mut byref: Vec<bool> = Vec::new();
                 if let Some(sig) = self.find_method_sig(&cn, &name) {
+                    byref = sig.param_byref.clone();
                     let ws = self.arg_warnungen(&format!("{}.{}", Self::typ_klartext(&cn), name), sig, args);
                     self.warnings.extend(ws);
                 }
                 self.ctx.emit(oc::LOAD_SELF, Value::Null);
-                for a in args { self.expr(a)?; }
-                self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
-                return Ok(());
+                return self.methode_rufen(&name, args, &byref);
             }
         }
         if let Some(d) = self.ffi_decls.get(&name.to_lowercase()).cloned() {
@@ -3267,6 +3268,32 @@ impl Compiler {
     }
 
     // ---------------------------------------------------- BYREF (Copy-In/Copy-Out)
+    /// Argumente und Aufruf einer Methode; das Objekt liegt schon auf dem
+    /// Stapel. Hat die (statisch bekannte) Methode BYREF-Parameter, werden die
+    /// Argumente dort wie bei CALL_USER erfasst und nach dem Aufruf
+    /// zurueckgeschrieben -- bis 2026-10-14 nahm eine Methode BYREF still als
+    /// BYVAL (Glutfaden: `ebenen.zusammensetzen(farbe, typ, fertig)` blieb leer).
+    fn methode_rufen(&mut self, name: &str, args: &[Node], byref: &[bool]) -> CR {
+        let stellen: Vec<usize> = (0..args.len())
+            .filter(|&i| byref.get(i).copied().unwrap_or(false)).collect();
+        if stellen.is_empty() {
+            for a in args { self.expr(a)?; }
+            self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
+            return Ok(());
+        }
+        let mut caps: Vec<ByrefCap> = Vec::new();
+        for (i, a) in args.iter().enumerate() {
+            if stellen.contains(&i) {
+                caps.push(self.emit_byref_capture_and_load(a).map_err(|e| format!("{}: {}", name, e))?);
+            } else {
+                self.expr(a)?;
+            }
+        }
+        self.ctx.emit(oc::CALL_METHOD_BYREF, json!([name, args.len(), stellen]));
+        self.emit_byref_writeback(&caps);
+        Ok(())
+    }
+
     /// Frischer anonymer Local-Slot (kein DECLARE_LOCAL noetig -- vorab aus
     /// local_defaults alloziert). Name garantiert eindeutig via Slot-Index.
     fn fresh_byref_temp(&mut self) -> usize {
