@@ -1677,12 +1677,15 @@ einen (MOUSE_HIT zaehlt beide). Tests `tests/pruef/klick_im_selben_bild.dhtest`
 Nachrichten ueber `fenstersender.ps1` `klicks:N:MS`/`tasten:N:MS`),
 Rust-Tests in flanken.rs.
 
-## Sticky: PySticky in Drachenhauch + GTK 3 (Stufe 1, 2026-10-14)
+## Glutfaden: PySticky in Drachenhauch + GTK 3 (Stufe 1, 2026-10-14)
 
 Wunsch des Nutzers: PySticky (Kreuzstich-Editor in Python + PySide6, eigenes
 Repo `C:/Programmieren/Python/PySticky`, ~62 000 Zeilen, MIT) nach
 Drachenhauch mit GTK portieren -- als Programm aus vielen Dateien.
-`examples/sticky/`: `kern/` (Muster, Ebenenstapel, Garne, Paletten,
+Name **Glutfaden** (Wunsch des Nutzers 2026-10-15; bis dahin "Sticky"), das
+Dateiformat bleibt `.pxs` mit der Kennung `pysticky`, damit PySticky die Dateien
+weiter liest.
+`examples/glutfaden/`: `kern/` (Muster, Ebenenstapel, Garne, Paletten,
 Stichtypen, `.pxs` lesen und schreiben; fuenf Dateien, ueber die Sammeldatei
 `kern/kern.dh` alle mit `AS kern` -- EIN Namensraum), `gtk/gtk.dh`
 (Deklarationen GTK/GDK/Cairo/Pango/GLib), `ansicht/` (Zeichenflaeche: ein
@@ -1715,7 +1718,7 @@ nannten die Zeile der zusammengefuegten Quelle** mit dem Namen der Hauptdatei,
 ein Fehler im Rueckruf "(Zeile 1804)" -- jetzt `datei:zeile` ueber
 `preprocess::lauf_merken`/`lauf_stelle` (Thread-Speicher, beim Uebersetzen
 gesetzt). Tests `byref.dhtest` (+4), `namensraeume.dhtest` (+3),
-`import_meldungen.dhtest` (+2), `sticky_kern.dhtest` (5), `sticky_ansicht.dhtest`
+`import_meldungen.dhtest` (+2), `glutfaden_kern.dhtest` (5), `glutfaden_ansicht.dhtest`
 (Bildproben: Herz-Rot im nahen Bild, keins nach dem Ausblenden der Ebene).
 **Stolpersteine beim Schreiben:** `BAND` bindet schwaecher als `-`
 (`(f SHR 16) BAND 255 - &HA9` rechnet `BAND 86`), und `UBOUND` gibt es nicht.

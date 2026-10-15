@@ -159,7 +159,7 @@ PRINT mult(10, 5, 4)
 
 === byref bei einer methode schreibt zurueck
 ' Bis 2026-10-14 nahm eine Methode BYREF still als BYVAL -- der Aufrufer
-' sah nach dem Aufruf die alten Werte (Sticky: ebenen.zusammensetzen).
+' sah nach dem Aufruf die alten Werte (Glutfaden: ebenen.zusammensetzen).
 CLASS Stapel
     DIM n AS INTEGER
     SUB fuellen(BYREF a AS ARRAY OF INTEGER, BYREF anzahl AS INTEGER, faktor AS INTEGER)

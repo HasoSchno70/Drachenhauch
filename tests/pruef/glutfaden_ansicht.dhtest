@@ -1,9 +1,9 @@
-' Die Ansicht des Sticky-Ports (examples/sticky, GTK 3): ein .pxs oeffnen,
+' Die Ansicht des Glutfaden-Ports (examples/glutfaden, GTK 3): ein .pxs oeffnen,
 ' einpassen, zoomen, eine Ebene aus- und wieder einblenden -- ueber --probe,
 ' das sich selbst vorfuehrt, mit Bildschirmfotos (--foto). Ohne GTK mit
 ' Bildschirm ueberspringt sich der Fall. Format: docs/werkzeuge.md, dhrt test.
 
-=== sticky zeigt das demo muster
+=== glutfaden zeigt das demo muster
 IMPORT "helfer.dh"
 dlStarten(["run", BEISPIEL, "--", "--probe", "--foto", "s"])
 IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
@@ -34,7 +34,7 @@ FUNCTION rotePunkte(pfad AS STRING) AS INTEGER
 END FUNCTION
 --- datei helfer.dh
 IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
-CONST BEISPIEL = "{sammlung}/../../examples/sticky/main.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
 geladen: TRUE, eingepasst: TRUE

@@ -3272,7 +3272,7 @@ impl Compiler {
     /// Stapel. Hat die (statisch bekannte) Methode BYREF-Parameter, werden die
     /// Argumente dort wie bei CALL_USER erfasst und nach dem Aufruf
     /// zurueckgeschrieben -- bis 2026-10-14 nahm eine Methode BYREF still als
-    /// BYVAL (Sticky: `ebenen.zusammensetzen(farbe, typ, fertig)` blieb leer).
+    /// BYVAL (Glutfaden: `ebenen.zusammensetzen(farbe, typ, fertig)` blieb leer).
     fn methode_rufen(&mut self, name: &str, args: &[Node], byref: &[bool]) -> CR {
         let stellen: Vec<usize> = (0..args.len())
             .filter(|&i| byref.get(i).copied().unwrap_or(false)).collect();

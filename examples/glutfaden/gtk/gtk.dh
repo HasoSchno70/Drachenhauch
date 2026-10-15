@@ -1,4 +1,4 @@
-' GTK 3, GDK, Cairo, Pango und GLib fuer Sticky -- nur die Teile, die das
+' GTK 3, GDK, Cairo, Pango und GLib fuer Glutfaden -- nur die Teile, die das
 ' Programm braucht. Je System ein Bibliotheksname, durch | getrennt; der erste,
 ' der laedt, gilt (unter Windows das GTK von Inkscape, wenn keins im PATH ist).
 CONST GTK = "libgtk-3-0.dll|C:/Program Files/Inkscape/bin/libgtk-3-0.dll|libgtk-3.so.0|libgtk-3.0.dylib|/opt/homebrew/lib/libgtk-3.0.dylib"

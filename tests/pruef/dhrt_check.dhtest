@@ -199,7 +199,7 @@ IMPORT "json"
 DIM ordner AS STRING : ordner = ARG$(0)
 DIM roh AS ARRAY OF STRING : roh = DIRLIST_REC(ordner, "*.dh")
 DIM dateien AS ARRAY OF STRING : dateien = []
-' Ein Programm aus Unterordnern (examples/sticky: kern/, gtk/, ansicht/)
+' Ein Programm aus Unterordnern (examples/glutfaden: kern/, gtk/, ansicht/)
 ' prueft man ueber seine main.dh -- die Teile eines Namensraums sprechen
 ' einander ohne Praefix an und uebersetzen allein nicht.
 DIM programme AS MAP OF BOOLEAN

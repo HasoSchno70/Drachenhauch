@@ -508,7 +508,7 @@ PRIVATE steht vor
 
 === case mit konstanten im namensraum
 ' Die CASE-Zweige liefen am Umbenennen vorbei -- ROT war im Namensraum
-' unbekannt (Sticky, 2026-10-14).
+' unbekannt (Glutfaden, 2026-10-14).
 IMPORT "farbe.dh" AS farbe
 PRINT farbe.name$(1); " "; farbe.name$(7); " "; farbe.name$(9)
 --- datei farbe.dh

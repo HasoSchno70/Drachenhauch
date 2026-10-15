@@ -1,4 +1,4 @@
-' Der Kern von Sticky -- ohne Oberflaeche. Eingebunden als
+' Der Kern von Glutfaden -- ohne Oberflaeche. Eingebunden als
 '     IMPORT "kern/kern.dh" AS kern
 ' Die Teile tragen denselben Namensraum "kern" (mehrere Dateien mit einem
 ' Alias bilden EINEN Raum) und sehen einander dadurch ohne Vorsatz.

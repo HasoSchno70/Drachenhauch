@@ -255,7 +255,7 @@ struct Lauf<'a> {
 impl<'a> Lauf<'a> {
     /// Steht der Name in einer Datei, die ohne `AS` eingebunden ist? Dann ist
     /// der haeufigste Grund eine Sammeldatei, die ihre Teile flach einbindet --
-    /// die bleiben draussen (Sticky, 2026-10-14). Leer, wenn nicht.
+    /// die bleiben draussen (Glutfaden, 2026-10-14). Leer, wenn nicht.
     fn hinweis_draussen(&self, alias: &str, name: &str) -> String {
         match self.draussen.get(&name.to_lowercase()) {
             Some(datei) => format!(" {} steht in {}, und diese Datei gehoert nicht zum Namensraum {} -- \
@@ -570,7 +570,7 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
             knoten(l, subject);
             // Die Werte der CASE-Zeilen (auch `IS > x` und `a TO b`) -- ohne
             // das blieb eine CONST der Datei dort unbenannt, und `CASE ROT`
-            // brach mit "Variable nicht deklariert" ab (Sticky, 2026-10-14).
+            // brach mit "Variable nicht deklariert" ab (Glutfaden, 2026-10-14).
             for (treffer, guard, blk) in cases.iter_mut() {
                 for t in treffer.iter_mut() {
                     for v in t.values.iter_mut() {

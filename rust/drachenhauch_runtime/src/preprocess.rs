@@ -332,7 +332,7 @@ thread_local! {
     /// Gesetzt beim Uebersetzen; gelesen von allem, was waehrend des Laufs eine
     /// Zeile nennt (Laufzeitfehler, Fehler im Rueckruf einer Bibliothek) --
     /// sonst kaeme die Zeile der zusammengefuegten Quelle heraus ("Zeile 1804"
-    /// statt "main.dh:220"; Sticky, 2026-10-14).
+    /// statt "main.dh:220"; Glutfaden, 2026-10-14).
     static LAUF: std::cell::RefCell<(Vec<Herkunft>, String)> =
         const { std::cell::RefCell::new((Vec::new(), String::new())) };
 }

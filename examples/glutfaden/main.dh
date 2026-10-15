@@ -1,4 +1,4 @@
-' Sticky -- Kreuzstich-Muster ansehen. Eine Portierung von PySticky (Python +
+' Glutfaden -- Kreuzstich-Muster ansehen. Eine Portierung von PySticky (Python +
 ' Qt) nach Drachenhauch, mit GTK 3 als Oberflaeche.
 '
 '     dhrt run main.dh                       (Beispielmuster)
@@ -142,7 +142,7 @@ fenster = gtk_window_new(0)
 gtk_window_set_default_size(fenster, 1200, 800)
 gtkKlasse(fenster, "flaeche")
 kopf = gtk_header_bar_new()
-gtk_header_bar_set_title(kopf, "Sticky")
+gtk_header_bar_set_title(kopf, "Glutfaden")
 gtk_header_bar_set_show_close_button(kopf, TRUE)
 gtk_window_set_titlebar(fenster, kopf)
 DIM kOeffnen AS INTEGER : kOeffnen = knopf("document-open-symbolic", "Muster öffnen")

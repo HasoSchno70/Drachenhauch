@@ -1,4 +1,4 @@
-' Der Kern des Sticky-Ports (examples/sticky/kern): Paletten, Muster, Ebenen
+' Der Kern des Glutfaden-Ports (examples/glutfaden/kern): Paletten, Muster, Ebenen
 ' und das .pxs-Format von PySticky. Die Zahlen sind am Original abgelesen
 ' (PySticky, file_io.py) -- das Demo-Muster hat drei Ebenen und sechs Farben.
 ' Der Kern wird ueber eine Beilage eingebunden, weil Platzhalter nur dort gelten.
@@ -20,9 +20,9 @@ DIM d AS kern.Palette : d = kern.paletteLaden(PATHJOIN(ordner, "DMC_Farben.json"
 PRINT "310: "; d.nachNummer("310").name
 PRINT "gibt es nicht: "; d.nachNummer("xyz") IS NIL
 --- argumente
-{sammlung}/../../examples/sticky
+{sammlung}/../../examples/glutfaden
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 
 --- erwartet
 paletten 19
@@ -57,9 +57,9 @@ DIM e AS ARRAY OF INTEGER
 m.ebenen.zusammensetzen(f, t, e)
 PRINT "zusammengesetzt "; LEN(f); " "; f[5 * m.breite + 5]; " "; f[12 * m.breite + 17]
 --- argumente
-{sammlung}/../../examples/sticky
+{sammlung}/../../examples/glutfaden
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 
 --- erwartet
 Demo Kreuzstich 40x40 stoff 14.0
@@ -103,9 +103,9 @@ PRINT "gleich: "; gleich
 PRINT "halbstich: "; n.ebenen.ebenen[0].stichArt(1, 2); " erledigt: "; n.ebenen.ebenen[0].istErledigt(5, 5)
 PRINT "keine nebendatei: "; NOT FILEEXISTS("kopie.pxs.tmp")
 --- argumente
-{sammlung}/../../examples/sticky
+{sammlung}/../../examples/glutfaden
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 
 --- erwartet
 gleich: TRUE
@@ -128,7 +128,7 @@ versuch("kein_json.pxs")
 versuch("fremd.pxs")
 versuch("ohne_muster.pxs")
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 
 --- datei kein_json.pxs
 das ist kein json
@@ -155,7 +155,7 @@ NEXT
 PRINT TRIM$(d) : PRINT TRIM$(h) : PRINT TRIM$(v)
 PRINT kern.istTeilstich(kern.VOLL); " "; kern.istTeilstich(kern.VIERTEL_OL); " "; LEN(kern.teilstichPunkte(kern.VIERTEL_OL))
 --- datei k.dh
-IMPORT "{sammlung}/../../examples/sticky/kern/kern.dh" AS kern
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 
 --- erwartet
 0 2 1 4 6 3 5 7 8 9 10 11
