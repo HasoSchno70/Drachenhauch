@@ -211,22 +211,7 @@ END FUNCTION
 SUB teilAnwenden(m AS Muster, t AS Aenderung, hin AS BOOLEAN)
     SELECT CASE t.art
         CASE TEIL_STICHE
-            DIM e AS Ebene : e = t.ebene
-            DIM n AS INTEGER : n = LEN(t.zellen)
-            DIM k AS INTEGER, z AS INTEGER
-            IF hin THEN
-                FOR k = 0 TO n - 1
-                    z = t.zellen[k]
-                    m.zaehlen(e.raster[z], t.neuFarbe[k])
-                    e.raster[z] = t.neuFarbe[k] : e.art[z] = t.neuArt[k] : e.erledigt[z] = t.neuFertig[k]
-                NEXT
-            ELSE
-                FOR k = n - 1 TO 0 STEP -1
-                    z = t.zellen[k]
-                    m.zaehlen(e.raster[z], t.altFarbe[k])
-                    e.raster[z] = t.altFarbe[k] : e.art[z] = t.altArt[k] : e.erledigt[z] = t.altFertig[k]
-                NEXT
-            END IF
+            stichTeilAnwenden(m, t, hin)
         CASE TEIL_EBENEN
             IF hin THEN
                 m.ebenen.ebenen = ARRAY_COPY(t.ebenenNachher)
@@ -254,6 +239,45 @@ SUB teilAnwenden(m AS Muster, t AS Aenderung, hin AS BOOLEAN)
             ' Umbenannt wird die Ebene selbst (die Liste haelt Objekte)
             t.ebene.name = IIF(hin, t.textNachher, t.textVorher)
     END SELECT
+END SUB
+
+' Die Zellen eines Stiche-Teils setzen. Rueckwaerts in umgekehrter
+' Reihenfolge -- kam eine Zelle zweimal vor, landet sie so beim ersten Stand.
+' Auf lokalen Zahlenfeldern, damit die Schleife Maschinencode wird (eine
+' Million Zellen: 665 ms ueber die Felder des Objekts, so wenige ms).
+SUB stichTeilAnwenden(m AS Muster, t AS Aenderung, hin AS BOOLEAN)
+    DIM e AS Ebene : e = t.ebene
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    DIM a AS ARRAY OF INTEGER : a = e.art
+    DIM d AS ARRAY OF INTEGER : d = e.erledigt
+    DIM z AS ARRAY OF INTEGER : z = t.zellen
+    DIM f AS ARRAY OF INTEGER
+    DIM s AS ARRAY OF INTEGER
+    DIM g AS ARRAY OF INTEGER
+    IF hin THEN
+        f = t.neuFarbe : s = t.neuArt : g = t.neuFertig
+    ELSE
+        f = t.altFarbe : s = t.altArt : g = t.altFertig
+    END IF
+    DIM nfarben AS INTEGER : nfarben = m.farbanzahl()
+    DIM zaehl[nfarben + 1] AS INTEGER
+    DIM n AS INTEGER : n = LEN(z)
+    DIM k AS INTEGER, j AS INTEGER, i AS INTEGER, alt AS INTEGER, neu AS INTEGER
+    FOR j = 0 TO n - 1
+        k = j
+        IF NOT hin THEN k = n - 1 - j
+        i = z[k]
+        alt = r[i]
+        neu = f[k]
+        IF alt >= 0 AND alt < nfarben THEN zaehl[alt] = zaehl[alt] - 1
+        IF neu >= 0 AND neu < nfarben THEN zaehl[neu] = zaehl[neu] + 1
+        r[i] = neu
+        a[i] = s[k]
+        d[i] = g[k]
+    NEXT
+    FOR k = 0 TO nfarben - 1
+        IF zaehl[k] <> 0 THEN m.farben[k].stichzahl = m.farben[k].stichzahl + zaehl[k]
+    NEXT
 END SUB
 
 ' Jeden Farbindex einer Ebene ueber eine Abbildung fuehren (-1 bleibt -1).

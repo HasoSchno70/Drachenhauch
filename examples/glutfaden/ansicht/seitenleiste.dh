@@ -1,20 +1,47 @@
-' Die Seitenleiste: Farben des Musters (Farbfeld, Symbol, Garn, Stiche) und
-' die Ebenen mit einem Kaestchen fuer die Sichtbarkeit.
+' Die Seitenleiste: die Farben des Musters (anklicken = aktuelle Farbe), der
+' Katalog der Hersteller (Doppelklick nimmt ein Garn ins Muster) und die Ebenen
+' (Auge, Schloss, Name; anklicken = aktive Ebene, Doppelklick = umbenennen).
+'
+' Die Listen werden neu gebaut, wenn sich ihr Bestand aendert (Laden,
+' Rueckgaengig, neue Farbe, Ebenen-Umbau); nach einem Strich werden nur die
+' Zahlen nachgezogen.
 
 DIM slBox AS INTEGER                  ' aeussere Box, bleibt
-DIM slInhalt AS INTEGER               ' wird beim Laden neu gebaut
-DIM slEbenenKnoepfe AS ARRAY OF INTEGER
+DIM slInhalt AS INTEGER               ' wird neu gebaut
 DIM slSchrift AS INTEGER              ' feste Groesse, anders als die der Zeichenflaeche
+DIM slSperre AS BOOLEAN               ' eigene Auswahl loest nichts aus
+' Farben
+DIM slFarbListe AS INTEGER
+DIM slFarbZahlen AS ARRAY OF INTEGER
+' Katalog
+DIM slPaletten AS ARRAY OF kern.Palette
+DIM slSymbole AS ARRAY OF STRING
+DIM slPalWahl AS INTEGER
+DIM slSuche AS INTEGER
+DIM slKatListe AS INTEGER
+DIM slKatZeilen AS ARRAY OF INTEGER   ' die Zeilen-Widgets (zum Entfernen)
+DIM slKatGarne AS ARRAY OF INTEGER    ' je Zeile die Nummer in der Palette
+DIM slPalette AS INTEGER              ' gewaehlte Palette
+' Ebenen
+DIM slEbenenListe AS INTEGER
+DIM slEbenenKnoepfe AS ARRAY OF INTEGER   ' Augen-Kaestchen, oben im Stapel zuerst
+DIM slEbenenTexte AS ARRAY OF INTEGER
+DIM slDeckkraft AS INTEGER
+DIM slKnoepfe AS ARRAY OF INTEGER         ' neu, loeschen, duplizieren, hoch, runter, zusammen
 
 FUNCTION seitenleisteNeu() AS INTEGER
     DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
     gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
-    gtk_widget_set_size_request(rolle, 280, -1)
+    gtk_widget_set_size_request(rolle, 300, -1)
     gtkKlasse(rolle, "seitenleiste")
     slBox = gtk_box_new(GTK_SENKRECHT, 0)
     gtk_container_add(rolle, slBox)
     slEbenenKnoepfe = []
     slSchrift = pango_font_description_from_string("DejaVu Sans Bold 11")
+    slPaletten = kern.palettenLaden(PATHJOIN(CWD$(), "daten/paletten"))
+    slSymbole = kern.symboleLaden(PATHJOIN(CWD$(), "daten/symbole.txt"))
+    slKatZeilen = []
+    slKatGarne = []
     RETURN rolle
 END FUNCTION
 
@@ -25,13 +52,27 @@ FUNCTION slUeberschrift(text AS STRING) AS INTEGER
     RETURN l
 END FUNCTION
 
+FUNCTION slKnopf(text AS STRING, tipp AS STRING) AS INTEGER
+    DIM k AS INTEGER : k = gtk_button_new_with_label(text)
+    gtk_widget_set_tooltip_text(k, tipp)
+    gtk_widget_set_can_focus(k, FALSE)
+    gtkKlasse(k, "klein")
+    RETURN k
+END FUNCTION
+
+' Alles neu -- nach dem Laden und nach Umbauten.
 SUB seitenleisteMuster(m AS kern.Muster)
     IF slInhalt <> 0 THEN gtk_widget_destroy(slInhalt)
     slInhalt = gtk_box_new(GTK_SENKRECHT, 2)
     gtk_box_pack_start(slBox, slInhalt, FALSE, FALSE, 0)
-    slEbenenKnoepfe = []
+    slSperre = TRUE
 
-    gtk_box_pack_start(slInhalt, slUeberschrift("Farben"), FALSE, FALSE, 0)
+    ' --- Farben
+    gtk_box_pack_start(slInhalt, slUeberschrift("Farben im Muster"), FALSE, FALSE, 0)
+    slFarbListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(slFarbListe, GTK_AUSWAHL_EINE)
+    gtkKlasse(slFarbListe, "liste")
+    slFarbZahlen = []
     DIM i AS INTEGER
     FOR i = 0 TO m.farbanzahl() - 1
         DIM f AS kern.Farbeintrag : f = m.farben[i]
@@ -47,28 +88,199 @@ SUB seitenleisteMuster(m AS kern.Muster)
         gtk_label_set_xalign(text, 0.0)
         gtk_label_set_ellipsize(text, GTK_ELLIPSE_ENDE)
         gtk_widget_set_hexpand(text, TRUE)
-        gtk_widget_set_tooltip_text(zeile, f.garn.name + IIF(f.garn.istBlend(), " (Blend)", ""))
+        gtk_widget_set_tooltip_text(zeile, f.garn.name + IIF(f.garn.istBlend(), " (Blend)", "") + IIF(f.istPerle, " -- Perle", "") + IIF(f.istDiamant, " -- Diamant", ""))
         DIM zahl AS INTEGER : zahl = gtk_label_new(ZAHL$(f.stichzahl, 0))
         gtkKlasse(zahl, "nebensache")
         gtk_box_pack_start(zeile, feld, FALSE, FALSE, 0)
         gtk_box_pack_start(zeile, text, TRUE, TRUE, 0)
         gtk_box_pack_end(zeile, zahl, FALSE, FALSE, 0)
-        gtk_box_pack_start(slInhalt, zeile, FALSE, FALSE, 0)
+        gtk_list_box_insert(slFarbListe, zeile, -1)
+        ARRAY_PUSH(slFarbZahlen, zahl)
     NEXT
+    signalZeile(slFarbListe, "row-selected", slFarbeGewaehlt, 0, 0, 0)
+    gtk_box_pack_start(slInhalt, slFarbListe, FALSE, FALSE, 0)
+    DIM weg AS INTEGER : weg = slKnopf("Unbenutzte entfernen", "Farben ohne Stich und ohne Rückstich aus dem Muster nehmen")
+    gtk_widget_set_halign(weg, GTK_AUSRICHTEN_ENDE)
+    signal(weg, "clicked", slUnbenutzteEntfernen, 0, 0, 0)
+    gtk_box_pack_start(slInhalt, weg, FALSE, FALSE, 4)
 
+    ' --- Katalog
+    gtk_box_pack_start(slInhalt, slUeberschrift("Garn hinzufügen"), FALSE, FALSE, 0)
+    slPalWahl = gtk_combo_box_text_new()
+    gtkKlasse(slPalWahl, "innen")
+    DIM p AS kern.Palette
+    FOR EACH p IN slPaletten
+        gtk_combo_box_text_append_text(slPalWahl, p.name + "  (" + STR$(LEN(p.garne)) + ")")
+    NEXT
+    gtk_box_pack_start(slInhalt, slPalWahl, FALSE, FALSE, 0)
+    slSuche = gtk_search_entry_new()
+    gtk_entry_set_placeholder_text(slSuche, "Nummer oder Name")
+    gtkKlasse(slSuche, "innen")
+    gtk_box_pack_start(slInhalt, slSuche, FALSE, FALSE, 0)
+    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    gtk_widget_set_size_request(rolle, -1, 210)
+    gtkKlasse(rolle, "innen")
+    slKatListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(slKatListe, GTK_AUSWAHL_EINE)
+    gtkKlasse(slKatListe, "liste")
+    gtk_container_add(rolle, slKatListe)
+    gtk_box_pack_start(slInhalt, rolle, FALSE, FALSE, 0)
+    slKatZeilen = []
+    slKatGarne = []
+    ' Die Palette des ersten Garns im Muster, sonst DMC
+    slPalette = slPaletteFuer(m)
+    gtk_combo_box_set_active(slPalWahl, slPalette)
+    signal(slPalWahl, "changed", slPaletteGeaendert, 0, 0, 0)
+    signal(slSuche, "search-changed", slSucheGeaendert, 0, 0, 0)
+    signalZeile(slKatListe, "row-activated", slGarnGewaehlt, 0, 0, 0)
+    slKatalogFuellen()
+
+    ' --- Ebenen
     gtk_box_pack_start(slInhalt, slUeberschrift("Ebenen"), FALSE, FALSE, 0)
+    slEbenenListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(slEbenenListe, GTK_AUSWAHL_EINE)
+    gtkKlasse(slEbenenListe, "liste")
+    slEbenenKnoepfe = []
+    slEbenenTexte = []
     ' Oben im Stapel = oben in der Liste
     FOR i = m.ebenen.anzahl() - 1 TO 0 STEP -1
         DIM e AS kern.Ebene : e = m.ebenen.ebenen[i]
-        DIM k AS INTEGER : k = gtk_check_button_new_with_label(e.name + "  (" + ZAHL$(e.stichzahl(), 0) + ")")
-        gtk_toggle_button_set_active(k, e.sichtbar)
-        IF e.notiz <> "" THEN gtk_widget_set_tooltip_text(k, e.notiz)
-        gtkKlasse(k, "ebene")
-        signal(k, "toggled", slEbeneUmgeschaltet, i, 0, 0)
-        gtk_box_pack_start(slInhalt, k, FALSE, FALSE, 0)
-        ARRAY_PUSH(slEbenenKnoepfe, k)
+        DIM ez AS INTEGER : ez = gtk_box_new(GTK_WAAGERECHT, 6)
+        gtkKlasse(ez, "ebene")
+        DIM auge AS INTEGER : auge = gtk_check_button_new_with_label("")
+        gtk_toggle_button_set_active(auge, e.sichtbar)
+        gtk_widget_set_tooltip_text(auge, "Sichtbar")
+        signal(auge, "toggled", slEbeneUmgeschaltet, i, 0, 0)
+        DIM schloss AS INTEGER : schloss = gtk_toggle_button_new()
+        gtk_widget_set_can_focus(schloss, FALSE)
+        gtkKlasse(schloss, "schloss")
+        gtk_widget_set_tooltip_text(schloss, "Gesperrt -- nimmt keine Stiche an")
+        DIM sb AS INTEGER : sb = gtk_drawing_area_new()
+        gtk_widget_set_size_request(sb, 14, 14)
+        signalZeichnen(sb, "draw", slSchlossZeichnen, i, 0, 0)
+        gtk_container_add(schloss, sb)
+        gtk_toggle_button_set_active(schloss, e.gesperrt)
+        signal(schloss, "toggled", slSchlossUmgeschaltet, i, 0, 0)
+        DIM et AS INTEGER : et = gtk_label_new(e.name + "  (" + ZAHL$(e.stichzahl(), 0) + ")")
+        gtk_label_set_xalign(et, 0.0)
+        gtk_label_set_ellipsize(et, GTK_ELLIPSE_ENDE)
+        gtk_widget_set_hexpand(et, TRUE)
+        IF e.notiz <> "" THEN gtk_widget_set_tooltip_text(et, e.notiz)
+        gtk_box_pack_start(ez, auge, FALSE, FALSE, 0)
+        gtk_box_pack_start(ez, schloss, FALSE, FALSE, 0)
+        gtk_box_pack_start(ez, et, TRUE, TRUE, 0)
+        gtk_list_box_insert(slEbenenListe, ez, -1)
+        ARRAY_PUSH(slEbenenKnoepfe, auge)
+        ARRAY_PUSH(slEbenenTexte, et)
     NEXT
+    signalZeile(slEbenenListe, "row-selected", slEbeneGewaehlt, 0, 0, 0)
+    signalZeile(slEbenenListe, "row-activated", slEbeneDoppelklick, 0, 0, 0)
+    gtk_box_pack_start(slInhalt, slEbenenListe, FALSE, FALSE, 0)
+
+    DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 2)
+    gtkKlasse(leiste, "innen")
+    slKnoepfe = []
+    ARRAY_PUSH(slKnoepfe, slKnopf("+", "Neue Ebene über der aktiven (Strg+Umschalt+N)"))
+    ARRAY_PUSH(slKnoepfe, slKnopf("−", "Ebene löschen -- die letzte bleibt"))
+    ARRAY_PUSH(slKnoepfe, slKnopf("⧉", "Ebene duplizieren"))
+    ARRAY_PUSH(slKnoepfe, slKnopf("↑", "Nach vorne (weiter oben im Stapel)"))
+    ARRAY_PUSH(slKnoepfe, slKnopf("↓", "Nach hinten"))
+    ARRAY_PUSH(slKnoepfe, slKnopf("⤓", "Mit der Ebene darunter zusammenführen"))
+    FOR i = 0 TO LEN(slKnoepfe) - 1
+        signal(slKnoepfe[i], "clicked", slEbenenKnopf, i, 0, 0)
+        gtk_box_pack_start(leiste, slKnoepfe[i], TRUE, TRUE, 0)
+    NEXT
+    gtk_box_pack_start(slInhalt, leiste, FALSE, FALSE, 4)
+    DIM dz AS INTEGER : dz = gtk_box_new(GTK_WAAGERECHT, 6)
+    gtkKlasse(dz, "innen")
+    DIM dl AS INTEGER : dl = gtk_label_new("Deckkraft")
+    gtkKlasse(dl, "nebensache")
+    slDeckkraft = gtk_scale_new_with_range(GTK_WAAGERECHT, 0.0, 100.0, 5.0)
+    gtk_scale_set_digits(slDeckkraft, 0)
+    gtk_scale_set_value_pos(slDeckkraft, GTK_LAGE_RECHTS)
+    gtk_widget_set_hexpand(slDeckkraft, TRUE)
+    gtk_widget_set_can_focus(slDeckkraft, FALSE)
+    signal(slDeckkraft, "value-changed", slDeckkraftGeaendert, 0, 0, 0)
+    gtk_box_pack_start(dz, dl, FALSE, FALSE, 0)
+    gtk_box_pack_start(dz, slDeckkraft, TRUE, TRUE, 0)
+    gtk_box_pack_start(slInhalt, dz, FALSE, FALSE, 0)
+
     gtk_widget_show_all(slInhalt)
+    slSperre = FALSE
+    seitenleisteFarbeMarkieren()
+    slEbeneMarkieren()
+END SUB
+
+FUNCTION slPaletteFuer(m AS kern.Muster) AS INTEGER
+    DIM h AS STRING : h = "DMC"
+    IF m.farbanzahl() > 0 THEN h = m.farben[0].garn.hersteller
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(slPaletten) - 1
+        IF slPaletten[i].hersteller = h THEN RETURN i
+    NEXT
+    FOR i = 0 TO LEN(slPaletten) - 1
+        IF slPaletten[i].hersteller = "DMC" THEN RETURN i
+    NEXT
+    RETURN 0
+END FUNCTION
+
+' Nach einem Strich: nur die Zahlen.
+SUB seitenleisteZahlen()
+    IF NOT lwHat THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO MIN(LEN(slFarbZahlen), lwMuster.farbanzahl()) - 1
+        gtk_label_set_text(slFarbZahlen[i], ZAHL$(lwMuster.farben[i].stichzahl, 0))
+    NEXT
+    ' die aktive Ebene (die anderen haben sich nicht geaendert)
+    DIM a AS INTEGER : a = lwMuster.ebenen.aktiv
+    DIM zeile AS INTEGER : zeile = lwMuster.ebenen.anzahl() - 1 - a
+    IF zeile >= 0 AND zeile < LEN(slEbenenTexte) THEN
+        DIM e AS kern.Ebene : e = lwMuster.ebenen.ebenen[a]
+        gtk_label_set_text(slEbenenTexte[zeile], e.name + "  (" + ZAHL$(e.stichzahl(), 0) + ")")
+    END IF
+END SUB
+
+' --- Farben -------------------------------------------------------------------------------
+
+SUB seitenleisteFarbeMarkieren()
+    IF slFarbListe = 0 THEN RETURN
+    slSperre = TRUE
+    IF wzFarbe >= 0 THEN
+        DIM z AS INTEGER : z = gtk_list_box_get_row_at_index(slFarbListe, wzFarbe)
+        IF z <> 0 THEN gtk_list_box_select_row(slFarbListe, z)
+    ELSE
+        gtk_list_box_unselect_all(slFarbListe)
+    END IF
+    slSperre = FALSE
+END SUB
+
+SUB slFarbeGewaehlt(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF slSperre OR zeile = 0 THEN RETURN
+    farbeWaehlen(gtk_list_box_row_get_index(zeile))
+END SUB
+
+SUB slUnbenutzteEntfernen(knopf AS INTEGER, daten AS INTEGER)
+    unbenutzteFarbenEntfernen()
+END SUB
+
+SUB unbenutzteFarbenEntfernen()
+    IF NOT lwHat THEN RETURN
+    DIM vorher AS kern.Farbeintrag
+    IF wzFarbe >= 0 THEN vorher = lwMuster.farben[wzFarbe]
+    DIM n AS INTEGER : n = kern.unbenutzteEntfernen(lwMuster, wzVerlauf)
+    IF n = 0 THEN
+        statusMeldung("Alle Farben werden benutzt.")
+        RETURN
+    END IF
+    ' die aktuelle Farbe wandert mit, oder sie ist weg
+    wzFarbe = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO lwMuster.farbanzahl() - 1
+        IF lwMuster.farben[i] = vorher THEN wzFarbe = i
+    NEXT
+    allesNeu()
+    statusMeldung(STR$(n) + IIF(n = 1, " Farbe", " Farben") + " entfernt.")
 END SUB
 
 ' Das Farbfeld einer Zeile: Farbe und Symbol darin.
@@ -95,9 +307,184 @@ FUNCTION slFarbfeld(w AS INTEGER, cr AS INTEGER, i AS INTEGER) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
-SUB slEbeneUmgeschaltet(knopf AS INTEGER, i AS INTEGER)
+' --- Katalog ------------------------------------------------------------------------------
+
+CONST SL_KATALOG_MAX = 400            ' mehr Zeilen braucht niemand zum Suchen
+
+SUB slKatalogFuellen()
+    DIM z AS INTEGER
+    FOR EACH z IN slKatZeilen
+        gtk_widget_destroy(z)
+    NEXT
+    slKatZeilen = []
+    slKatGarne = []
+    IF slPalette < 0 OR slPalette >= LEN(slPaletten) THEN RETURN
+    DIM pal AS kern.Palette : pal = slPaletten[slPalette]
+    DIM suche AS STRING : suche = LOWER$(TRIM$(gtk_entry_get_text(slSuche)))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(pal.garne) - 1
+        DIM g AS kern.Garn : g = pal.garne[i]
+        IF suche <> "" AND INSTR(LOWER$(g.nummer + " " + g.name), suche) < 0 THEN CONTINUE
+        DIM zeile AS INTEGER : zeile = gtk_box_new(GTK_WAAGERECHT, 8)
+        gtkKlasse(zeile, "farbzeile")
+        DIM feld AS INTEGER : feld = gtk_drawing_area_new()
+        gtk_widget_set_size_request(feld, 18, 18)
+        gtk_widget_set_valign(feld, GTK_AUSRICHTEN_MITTE)
+        signalZeichnen(feld, "draw", slGarnfeld, g.farbe, 0, 0)
+        DIM benutzt AS BOOLEAN : benutzt = slGarnImMuster(g)
+        DIM t AS INTEGER : t = gtk_label_new(IIF(benutzt, "✓ ", "") + g.nummer + "  " + g.name)
+        gtk_label_set_xalign(t, 0.0)
+        gtk_label_set_ellipsize(t, GTK_ELLIPSE_ENDE)
+        IF benutzt THEN gtkKlasse(t, "benutzt")
+        gtk_box_pack_start(zeile, feld, FALSE, FALSE, 0)
+        gtk_box_pack_start(zeile, t, TRUE, TRUE, 0)
+        gtk_list_box_insert(slKatListe, zeile, -1)
+        gtk_widget_show_all(zeile)
+        ARRAY_PUSH(slKatZeilen, gtk_list_box_get_row_at_index(slKatListe, LEN(slKatZeilen)))
+        ARRAY_PUSH(slKatGarne, i)
+        IF LEN(slKatZeilen) >= SL_KATALOG_MAX THEN EXIT FOR
+    NEXT
+END SUB
+
+FUNCTION slGarnImMuster(g AS kern.Garn) AS BOOLEAN
+    IF NOT lwHat THEN RETURN FALSE
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN lwMuster.farben
+        IF f.garn.nummer = g.nummer AND f.garn.hersteller = g.hersteller THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION slGarnfeld(w AS INTEGER, cr AS INTEGER, farbe AS INTEGER) AS BOOLEAN
+    DIM g AS FLOAT : g = gtk_widget_get_allocated_width(w)
+    cairoFarbe(cr, farbe)
+    cairo_rectangle(cr, 0, 0, g, g)
+    cairo_fill(cr)
+    RETURN TRUE
+END FUNCTION
+
+SUB slPaletteGeaendert(wahl AS INTEGER, daten AS INTEGER)
+    slPalette = gtk_combo_box_get_active(wahl)
+    slKatalogFuellen()
+END SUB
+
+SUB slSucheGeaendert(feld AS INTEGER, daten AS INTEGER)
+    slKatalogFuellen()
+END SUB
+
+SUB slGarnGewaehlt(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF zeile = 0 THEN RETURN
+    DIM k AS INTEGER : k = gtk_list_box_row_get_index(zeile)
+    IF k < 0 OR k >= LEN(slKatGarne) THEN RETURN
+    garnHinzufuegen(slPalette, slKatGarne[k])
+END SUB
+
+' Ein Garn aus einer Palette ins Muster und als aktuelle Farbe.
+SUB garnHinzufuegen(palNr AS INTEGER, garnNr AS INTEGER)
     IF NOT lwHat THEN RETURN
+    DIM pal AS kern.Palette : pal = slPaletten[palNr]
+    DIM g AS kern.Garn : g = pal.garne[garnNr]
+    DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
+    DIM nr AS INTEGER : nr = kern.farbeHinzufuegen(lwMuster, wzVerlauf, g, slSymbole, pal.istPerlen, pal.istDiamant)
+    wzFarbe = nr
+    IF lwMuster.farbanzahl() > vorher THEN
+        allesNeu()
+        statusMeldung(TRIM$(g.hersteller + " " + g.nummer) + " " + g.name + " ist jetzt im Muster (Symbol " + lwMuster.farben[nr].symbol + ").")
+    ELSE
+        farbeWaehlen(nr)
+    END IF
+END SUB
+
+' --- Ebenen -------------------------------------------------------------------------------
+
+SUB slEbeneMarkieren()
+    IF slEbenenListe = 0 OR NOT lwHat THEN RETURN
+    slSperre = TRUE
+    DIM z AS INTEGER : z = gtk_list_box_get_row_at_index(slEbenenListe, lwMuster.ebenen.anzahl() - 1 - lwMuster.ebenen.aktiv)
+    IF z <> 0 THEN gtk_list_box_select_row(slEbenenListe, z)
+    gtk_range_set_value(slDeckkraft, lwMuster.ebenen.aktiveEbene().deckkraft * 100)
+    slSperre = FALSE
+END SUB
+
+SUB slEbeneGewaehlt(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF slSperre OR zeile = 0 OR NOT lwHat THEN RETURN
+    lwMuster.ebenen.aktiv = lwMuster.ebenen.anzahl() - 1 - gtk_list_box_row_get_index(zeile)
+    slEbeneMarkieren()
+    statusNachziehen()
+END SUB
+
+SUB slEbeneDoppelklick(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF zeile = 0 OR NOT lwHat THEN RETURN
+    ebeneUmbenennenFragen(lwMuster.ebenen.anzahl() - 1 - gtk_list_box_row_get_index(zeile))
+END SUB
+
+SUB ebeneUmbenennenFragen(nr AS INTEGER)
+    DIM name AS STRING : name = textFragen("Ebene umbenennen", "Name der Ebene", lwMuster.ebenen.ebenen[nr].name)
+    IF name = "" THEN RETURN
+    IF kern.ebeneUmbenennen(lwMuster, wzVerlauf, nr, name) THEN allesNeu()
+END SUB
+
+' Sichtbarkeit und Sperre sind Ansichtssache und kein Schritt im Verlauf --
+' wie im Original.
+SUB slEbeneUmgeschaltet(knopf AS INTEGER, i AS INTEGER)
+    IF slSperre OR NOT lwHat THEN RETURN
     lwMuster.ebenen.ebenen[i].sichtbar = gtk_toggle_button_get_active(knopf)
     leinwandAufbauen()
     gtk_widget_queue_draw(lwFlaeche)
+    extraAenderung()
+END SUB
+
+SUB slSchlossUmgeschaltet(knopf AS INTEGER, i AS INTEGER)
+    IF slSperre OR NOT lwHat THEN RETURN
+    lwMuster.ebenen.ebenen[i].gesperrt = gtk_toggle_button_get_active(knopf)
+    gtk_widget_queue_draw(knopf)
+    extraAenderung()
+END SUB
+
+FUNCTION slSchlossZeichnen(w AS INTEGER, cr AS INTEGER, i AS INTEGER) AS BOOLEAN
+    IF NOT lwHat OR i >= lwMuster.ebenen.anzahl() THEN RETURN TRUE
+    DIM zu AS BOOLEAN : zu = lwMuster.ebenen.ebenen[i].gesperrt
+    IF zu THEN cairo_set_source_rgb(cr, 1.0, 0.60, 0.25) ELSE cairo_set_source_rgba(cr, 0.84, 0.85, 0.88, 0.45)
+    cairo_set_line_width(cr, 1.5)
+    ' Buegel (offen: zur Seite gerueckt), Koerper
+    IF zu THEN
+        cairo_arc(cr, 7, 6, 3.2, PI, TAU)
+    ELSE
+        cairo_arc(cr, 10, 5, 3.2, PI, TAU)
+    END IF
+    cairo_stroke(cr)
+    cairo_rectangle(cr, 2.5, 6.5, 9, 6.5)
+    IF zu THEN cairo_fill(cr) ELSE cairo_stroke(cr)
+    RETURN TRUE
+END FUNCTION
+
+SUB slDeckkraftGeaendert(regler AS INTEGER, daten AS INTEGER)
+    IF slSperre OR NOT lwHat THEN RETURN
+    lwMuster.ebenen.aktiveEbene().deckkraft = gtk_range_get_value(regler) / 100.0
+    leinwandAufbauen()
+    gtk_widget_queue_draw(lwFlaeche)
+    extraAenderung()
+END SUB
+
+SUB slEbenenKnopf(knopf AS INTEGER, nr AS INTEGER)
+    ebenenBefehl(nr)
+END SUB
+
+' Die Ebenen-Befehle -- auch fuer die Tastatur und die Vorfuehrung.
+' 0 neu, 1 loeschen, 2 duplizieren, 3 nach vorne, 4 nach hinten, 5 zusammenfuehren
+SUB ebenenBefehl(nr AS INTEGER)
+    IF NOT lwHat OR wzZug <> ZUG_KEINER THEN RETURN
+    DIM a AS INTEGER : a = lwMuster.ebenen.aktiv
+    DIM ok AS BOOLEAN
+    SELECT CASE nr
+        CASE 0 : ok = kern.ebeneNeu(lwMuster, wzVerlauf, "") >= 0
+        CASE 1 : ok = kern.ebeneLoeschen(lwMuster, wzVerlauf, a)
+        CASE 2 : ok = kern.ebeneDuplizieren(lwMuster, wzVerlauf, a) >= 0
+        CASE 3 : ok = kern.ebeneVerschieben(lwMuster, wzVerlauf, a, a + 1)
+        CASE 4 : ok = kern.ebeneVerschieben(lwMuster, wzVerlauf, a, a - 1)
+        CASE 5
+            ok = kern.ebeneNachUnten(lwMuster, wzVerlauf, a)
+            IF NOT ok AND a > 0 THEN statusMeldung("Die Ebene darunter ist gesperrt.")
+    END SELECT
+    IF ok THEN allesNeu()
 END SUB

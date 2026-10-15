@@ -33,17 +33,81 @@ FUNCTION stichSetzen(m AS Muster, v AS Verlauf, x AS INTEGER, y AS INTEGER, farb
     RETURN TRUE
 END FUNCTION
 
-' Viele Zellen auf einmal, [x0, y0, x1, y1, ...]. Liefert, wie viele sich
-' geaendert haben.
+' Viele Zellen auf einmal, [x0, y0, x1, y1, ...], in EINEM Schritt (Formen,
+' Fuellen). Dieselben Regeln wie stichSetzen, aber ohne Aufruf je Zelle: die
+' Schleife arbeitet auf festen Zahlenfeldern und laeuft als Maschinencode --
+' eine gefuellte Flaeche von einer Million Zellen kostete Zelle fuer Zelle
+' ueber stichSetzen dreieinhalb Sekunden. Liefert, wie viele sich geaendert
+' haben.
 FUNCTION zellenSetzen(m AS Muster, v AS Verlauf, punkte AS ARRAY OF INTEGER, farbe AS INTEGER, typ AS INTEGER, text AS STRING) AS INTEGER
-    DIM n AS INTEGER
-    v.beginnen(text)
-    DIM k AS INTEGER
-    FOR k = 0 TO LEN(punkte) - 2 STEP 2
-        IF stichSetzen(m, v, punkte[k], punkte[k + 1], farbe, typ) THEN n = n + 1
+    DIM e AS Ebene : e = m.ebenen.aktiveEbene()
+    IF e IS NIL THEN RETURN 0
+    IF e.gesperrt THEN RETURN 0
+    DIM nfarben AS INTEGER : nfarben = m.farbanzahl()
+    IF farbe >= nfarben THEN RETURN 0
+    DIM nf AS INTEGER : nf = KEIN_STICH
+    DIM na AS INTEGER
+    IF farbe >= 0 THEN
+        nf = farbe
+        na = m.typFuer(farbe, typ)
+    END IF
+    DIM b AS INTEGER : b = e.breite
+    DIM h AS INTEGER : h = e.hoehe
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    DIM a AS ARRAY OF INTEGER : a = e.art
+    DIM d AS ARRAY OF INTEGER : d = e.erledigt
+    DIM n AS INTEGER : n = LEN(punkte) \ 2
+    DIM zi[n] AS INTEGER
+    DIM af[n] AS INTEGER
+    DIM aa[n] AS INTEGER
+    DIM ae[n] AS INTEGER
+    DIM ne[n] AS INTEGER
+    DIM zaehl[nfarben + 1] AS INTEGER
+    DIM k AS INTEGER, x AS INTEGER, y AS INTEGER, i AS INTEGER, c AS INTEGER, alt AS INTEGER, fe AS INTEGER
+    FOR k = 0 TO n - 1
+        x = punkte[2 * k]
+        y = punkte[2 * k + 1]
+        IF x < 0 OR y < 0 OR x >= b OR y >= h THEN CONTINUE
+        i = y * b + x
+        alt = r[i]
+        fe = 0
+        IF nf >= 0 THEN fe = d[i]            ' setzen laesst "erledigt" stehen
+        IF alt = nf AND a[i] = na AND d[i] = fe THEN CONTINUE
+        zi[c] = i
+        af[c] = alt
+        aa[c] = a[i]
+        ae[c] = d[i]
+        ne[c] = fe
+        IF alt >= 0 AND alt < nfarben THEN zaehl[alt] = zaehl[alt] - 1
+        IF nf >= 0 THEN zaehl[nf] = zaehl[nf] + 1
+        r[i] = nf
+        a[i] = na
+        d[i] = fe
+        c = c + 1
     NEXT
+    IF c = 0 THEN RETURN 0
+    FOR k = 0 TO nfarben - 1
+        IF zaehl[k] <> 0 THEN m.farben[k].stichzahl = m.farben[k].stichzahl + zaehl[k]
+    NEXT
+    v.beginnen(text)
+    DIM t AS Aenderung : t = v.teil(TEIL_STICHE)
+    t.ebene = e
+    t.zellen = zi[0:c]
+    t.altFarbe = af[0:c]
+    t.altArt = aa[0:c]
+    t.altFertig = ae[0:c]
+    t.neuFertig = ne[0:c]
+    ' Farbe und Art sind fuer alle Zellen gleich
+    DIM gleichF[c] AS INTEGER
+    DIM gleichA[c] AS INTEGER
+    FOR k = 0 TO c - 1
+        gleichF[k] = nf
+        gleichA[k] = na
+    NEXT
+    t.neuFarbe = gleichF
+    t.neuArt = gleichA
     v.beenden()
-    RETURN n
+    RETURN c
 END FUNCTION
 
 ' --- Ebenen ---------------------------------------------------------------------
@@ -149,15 +213,9 @@ FUNCTION ebeneNachUnten(m AS Muster, v AS Verlauf, nr AS INTEGER) AS BOOLEAN
     DIM unten AS Ebene : unten = m.ebenen.ebenen[nr - 1]
     IF unten.gesperrt THEN RETURN FALSE
     v.beginnen("Ebenen zusammenführen")
-    DIM i AS INTEGER
-    FOR i = 0 TO LEN(oben.raster) - 1
-        IF oben.raster[i] = KEIN_STICH THEN CONTINUE
-        IF unten.raster[i] = oben.raster[i] AND unten.art[i] = oben.art[i] AND unten.erledigt[i] = oben.erledigt[i] THEN CONTINUE
-        v.zelle(unten, i, unten.raster[i], unten.art[i], unten.erledigt[i], oben.raster[i], oben.art[i], oben.erledigt[i])
-        unten.raster[i] = oben.raster[i]
-        unten.art[i] = oben.art[i]
-        unten.erledigt[i] = oben.erledigt[i]
-    NEXT
+    ' Die Stiche der oberen als Zellen auf die untere -- ueber zellenUebernehmen,
+    ' damit es ein Stiche-Teil wird, den Rueckgaengig zuruecknimmt
+    zellenUebernehmen(v, oben, unten)
     DIM t AS Aenderung : t = v.teil(TEIL_EBENEN)
     t.ebenenVorher = ARRAY_COPY(m.ebenen.ebenen)
     t.aktivVorher = m.ebenen.aktiv
@@ -169,6 +227,48 @@ FUNCTION ebeneNachUnten(m AS Muster, v AS Verlauf, nr AS INTEGER) AS BOOLEAN
     v.beenden()
     RETURN TRUE
 END FUNCTION
+
+' Alle Stiche von quelle auf ziel schreiben (Farbe, Typ, erledigt), als ein
+' Stiche-Teil im offenen Schritt. Stichzahlen aendern sich nicht (dieselben
+' Farben, nur auf einer anderen Ebene) -- der Umbau zaehlt danach neu.
+SUB zellenUebernehmen(v AS Verlauf, quelle AS Ebene, ziel AS Ebene)
+    DIM qr AS ARRAY OF INTEGER : qr = quelle.raster
+    DIM qa AS ARRAY OF INTEGER : qa = quelle.art
+    DIM qd AS ARRAY OF INTEGER : qd = quelle.erledigt
+    DIM r AS ARRAY OF INTEGER : r = ziel.raster
+    DIM a AS ARRAY OF INTEGER : a = ziel.art
+    DIM d AS ARRAY OF INTEGER : d = ziel.erledigt
+    DIM n AS INTEGER : n = LEN(qr)
+    DIM c AS INTEGER, i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF qr[i] <> KEIN_STICH THEN
+            IF r[i] <> qr[i] OR a[i] <> qa[i] OR d[i] <> qd[i] THEN c = c + 1
+        END IF
+    NEXT
+    IF c = 0 THEN RETURN
+    DIM zi[c] AS INTEGER
+    DIM af[c] AS INTEGER
+    DIM aa[c] AS INTEGER
+    DIM ae[c] AS INTEGER
+    DIM nf[c] AS INTEGER
+    DIM na[c] AS INTEGER
+    DIM ne[c] AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO n - 1
+        IF qr[i] = KEIN_STICH THEN CONTINUE
+        IF r[i] = qr[i] AND a[i] = qa[i] AND d[i] = qd[i] THEN CONTINUE
+        zi[k] = i
+        af[k] = r[i] : aa[k] = a[i] : ae[k] = d[i]
+        nf[k] = qr[i] : na[k] = qa[i] : ne[k] = qd[i]
+        r[i] = qr[i] : a[i] = qa[i] : d[i] = qd[i]
+        k = k + 1
+    NEXT
+    DIM t AS Aenderung : t = v.teil(TEIL_STICHE)
+    t.ebene = ziel
+    t.zellen = zi
+    t.altFarbe = af : t.altArt = aa : t.altFertig = ae
+    t.neuFarbe = nf : t.neuArt = na : t.neuFertig = ne
+END SUB
 
 FUNCTION ebeneUmbenennen(m AS Muster, v AS Verlauf, nr AS INTEGER, name AS STRING) AS BOOLEAN
     IF nr < 0 OR nr >= m.ebenen.anzahl() THEN RETURN FALSE

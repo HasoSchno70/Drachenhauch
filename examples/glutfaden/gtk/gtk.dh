@@ -7,6 +7,7 @@ CONST GOBJECT = "libgobject-2.0-0.dll|C:/Program Files/Inkscape/bin/libgobject-2
 CONST GLIB = "libglib-2.0-0.dll|C:/Program Files/Inkscape/bin/libglib-2.0-0.dll|libglib-2.0.so.0|libglib-2.0.0.dylib|/opt/homebrew/lib/libglib-2.0.0.dylib"
 CONST CAIRO = "libcairo-2.dll|C:/Program Files/Inkscape/bin/libcairo-2.dll|libcairo.so.2|libcairo.2.dylib|/opt/homebrew/lib/libcairo.2.dylib"
 CONST PANGO = "libpango-1.0-0.dll|C:/Program Files/Inkscape/bin/libpango-1.0-0.dll|libpango-1.0.so.0|libpango-1.0.0.dylib|/opt/homebrew/lib/libpango-1.0.0.dylib"
+CONST PIXBUF = "libgdk_pixbuf-2.0-0.dll|C:/Program Files/Inkscape/bin/libgdk_pixbuf-2.0-0.dll|libgdk_pixbuf-2.0.so.0|libgdk_pixbuf-2.0.0.dylib|/opt/homebrew/lib/libgdk_pixbuf-2.0.0.dylib"
 CONST PANGOCAIRO = "libpangocairo-1.0-0.dll|C:/Program Files/Inkscape/bin/libpangocairo-1.0-0.dll|libpangocairo-1.0.so.0|libpangocairo-1.0.0.dylib|/opt/homebrew/lib/libpangocairo-1.0.0.dylib"
 
 ' --- Fenster und Behaelter
@@ -16,6 +17,8 @@ DECLARE SUB gtk_main_quit LIB GTK ()
 DECLARE FUNCTION gtk_window_new LIB GTK (art AS LONG) AS ZEIGER
 DECLARE SUB gtk_window_set_titlebar LIB GTK (fenster AS ZEIGER, leiste AS ZEIGER)
 DECLARE SUB gtk_window_set_default_size LIB GTK (fenster AS ZEIGER, b AS LONG, h AS LONG)
+DECLARE FUNCTION gtk_window_set_icon_from_file LIB GTK (fenster AS ZEIGER, pfad AS TEXT, BYREF fehler AS ZEIGER) AS BOOLEAN
+DECLARE SUB gtk_window_set_title LIB GTK (fenster AS ZEIGER, titel AS TEXT)
 DECLARE FUNCTION gtk_header_bar_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_header_bar_set_title LIB GTK (leiste AS ZEIGER, titel AS TEXT)
 DECLARE SUB gtk_header_bar_set_subtitle LIB GTK (leiste AS ZEIGER, titel AS TEXT)
@@ -36,6 +39,7 @@ DECLARE SUB gtk_container_set_border_width LIB GTK (behaelter AS ZEIGER, rand AS
 ' --- Bedienelemente
 DECLARE FUNCTION gtk_button_new_from_icon_name LIB GTK (name AS TEXT, groesse AS LONG) AS ZEIGER
 DECLARE FUNCTION gtk_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
+DECLARE FUNCTION gtk_button_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_button_clicked LIB GTK (knopf AS ZEIGER)
 DECLARE FUNCTION gtk_check_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
 DECLARE FUNCTION gtk_toggle_button_get_active LIB GTK (knopf AS ZEIGER) AS BOOLEAN
@@ -45,8 +49,32 @@ DECLARE SUB gtk_label_set_text LIB GTK (label AS ZEIGER, text AS TEXT)
 DECLARE FUNCTION gtk_label_get_text LIB GTK (label AS ZEIGER) AS TEXT
 DECLARE SUB gtk_label_set_xalign LIB GTK (label AS ZEIGER, x AS SINGLE)
 DECLARE SUB gtk_label_set_ellipsize LIB GTK (label AS ZEIGER, art AS LONG)
+DECLARE FUNCTION gtk_toggle_button_new LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_list_box_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_list_box_set_selection_mode LIB GTK (box AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_list_box_set_activate_on_single_click LIB GTK (box AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_list_box_insert LIB GTK (box AS ZEIGER, kind AS ZEIGER, stelle AS LONG)
+DECLARE FUNCTION gtk_list_box_get_row_at_index LIB GTK (box AS ZEIGER, nr AS LONG) AS ZEIGER
+DECLARE SUB gtk_list_box_select_row LIB GTK (box AS ZEIGER, zeile AS ZEIGER)
+DECLARE SUB gtk_list_box_unselect_all LIB GTK (box AS ZEIGER)
+DECLARE FUNCTION gtk_list_box_row_get_index LIB GTK (zeile AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_combo_box_text_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_combo_box_text_append_text LIB GTK (wahl AS ZEIGER, text AS TEXT)
+DECLARE SUB gtk_combo_box_set_active LIB GTK (wahl AS ZEIGER, nr AS LONG)
+DECLARE FUNCTION gtk_combo_box_get_active LIB GTK (wahl AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_entry_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_search_entry_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_entry_get_text LIB GTK (feld AS ZEIGER) AS TEXT
+DECLARE SUB gtk_entry_set_text LIB GTK (feld AS ZEIGER, text AS TEXT)
+DECLARE SUB gtk_entry_set_activates_default LIB GTK (feld AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_entry_set_placeholder_text LIB GTK (feld AS ZEIGER, text AS TEXT)
+DECLARE FUNCTION gtk_scale_new_with_range LIB GTK (richtung AS LONG, von AS FLOAT, bis AS FLOAT, schritt AS FLOAT) AS ZEIGER
+DECLARE SUB gtk_scale_set_digits LIB GTK (regler AS ZEIGER, stellen AS LONG)
+DECLARE SUB gtk_scale_set_value_pos LIB GTK (regler AS ZEIGER, lage AS LONG)
+DECLARE FUNCTION gtk_range_get_value LIB GTK (regler AS ZEIGER) AS FLOAT
+DECLARE SUB gtk_range_set_value LIB GTK (regler AS ZEIGER, wert AS FLOAT)
+DECLARE FUNCTION gtk_image_new_from_file LIB GTK (pfad AS TEXT) AS ZEIGER
+DECLARE FUNCTION gtk_separator_new LIB GTK (richtung AS LONG) AS ZEIGER
 DECLARE FUNCTION gtk_drawing_area_new LIB GTK () AS ZEIGER
 ' --- Widgets allgemein
 DECLARE SUB gtk_widget_set_size_request LIB GTK (w AS ZEIGER, b AS LONG, h AS LONG)
@@ -57,6 +85,10 @@ DECLARE SUB gtk_widget_set_halign LIB GTK (w AS ZEIGER, art AS LONG)
 DECLARE SUB gtk_widget_set_valign LIB GTK (w AS ZEIGER, art AS LONG)
 DECLARE SUB gtk_widget_set_can_focus LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_widget_grab_focus LIB GTK (w AS ZEIGER)
+DECLARE FUNCTION gtk_widget_has_focus LIB GTK (w AS ZEIGER) AS BOOLEAN
+DECLARE SUB gtk_widget_set_sensitive LIB GTK (w AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_widget_set_visible LIB GTK (w AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_widget_show LIB GTK (w AS ZEIGER)
 DECLARE SUB gtk_widget_add_events LIB GTK (w AS ZEIGER, maske AS LONG)
 DECLARE SUB gtk_widget_queue_draw LIB GTK (w AS ZEIGER)
 DECLARE FUNCTION gtk_widget_get_allocated_width LIB GTK (w AS ZEIGER) AS LONG
@@ -78,12 +110,29 @@ DECLARE FUNCTION gtk_file_filter_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_file_filter_set_name LIB GTK (filter AS ZEIGER, name AS TEXT)
 DECLARE SUB gtk_file_filter_add_pattern LIB GTK (filter AS ZEIGER, muster AS TEXT)
 DECLARE SUB gtk_file_chooser_add_filter LIB GTK (wahl AS ZEIGER, filter AS ZEIGER)
+DECLARE SUB gtk_file_chooser_set_do_overwrite_confirmation LIB GTK (wahl AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_file_chooser_set_current_name LIB GTK (wahl AS ZEIGER, name AS TEXT)
+DECLARE FUNCTION gtk_file_chooser_set_current_folder LIB GTK (wahl AS ZEIGER, ordner AS TEXT) AS BOOLEAN
+' --- Rueckfragen
+DECLARE FUNCTION gtk_dialog_new_with_buttons LIB GTK (titel AS TEXT, eltern AS ZEIGER, flags AS LONG, knopf AS TEXT, ...) AS ZEIGER
+DECLARE FUNCTION gtk_dialog_get_content_area LIB GTK (dialog AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_dialog_set_default_response LIB GTK (dialog AS ZEIGER, antwort AS LONG)
+DECLARE FUNCTION gtk_dialog_add_button LIB GTK (dialog AS ZEIGER, text AS TEXT, antwort AS LONG) AS ZEIGER
+DECLARE FUNCTION gtk_message_dialog_new LIB GTK (eltern AS ZEIGER, flags AS LONG, art AS LONG, knoepfe AS LONG, format AS TEXT, ...) AS ZEIGER
+DECLARE SUB gtk_message_dialog_format_secondary_text LIB GTK (dialog AS ZEIGER, format AS TEXT, ...)
+DECLARE SUB gtk_show_about_dialog LIB GTK (eltern AS ZEIGER, name AS TEXT, ...)
+DECLARE FUNCTION gdk_pixbuf_new_from_file_at_size LIB PIXBUF (pfad AS TEXT, b AS LONG, h AS LONG, BYREF fehler AS ZEIGER) AS ZEIGER
 ' --- Ereignisse (GDK)
 DECLARE FUNCTION gdk_event_get_keyval LIB GDK (ereignis AS ZEIGER, BYREF taste AS ULONG) AS BOOLEAN
 DECLARE FUNCTION gdk_event_get_coords LIB GDK (ereignis AS ZEIGER, BYREF x AS FLOAT, BYREF y AS FLOAT) AS BOOLEAN
 DECLARE FUNCTION gdk_event_get_button LIB GDK (ereignis AS ZEIGER, BYREF knopf AS ULONG) AS BOOLEAN
 DECLARE FUNCTION gdk_event_get_scroll_direction LIB GDK (ereignis AS ZEIGER, BYREF richtung AS LONG) AS BOOLEAN
 DECLARE FUNCTION gdk_event_get_scroll_deltas LIB GDK (ereignis AS ZEIGER, BYREF dx AS FLOAT, BYREF dy AS FLOAT) AS BOOLEAN
+DECLARE FUNCTION gtk_widget_get_window LIB GTK (w AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_display_get_default LIB GDK () AS ZEIGER
+DECLARE FUNCTION gdk_cursor_new_from_name LIB GDK (anzeige AS ZEIGER, name AS TEXT) AS ZEIGER
+DECLARE SUB gdk_window_set_cursor LIB GDK (fenster AS ZEIGER, zeiger AS ZEIGER)
+DECLARE FUNCTION gdk_event_get_state LIB GDK (ereignis AS ZEIGER, BYREF zustand AS ULONG) AS BOOLEAN
 ' --- Cairo
 DECLARE SUB cairo_set_source_rgb LIB CAIRO (cr AS ZEIGER, r AS FLOAT, g AS FLOAT, b AS FLOAT)
 DECLARE SUB cairo_set_source_rgba LIB CAIRO (cr AS ZEIGER, r AS FLOAT, g AS FLOAT, b AS FLOAT, a AS FLOAT)
@@ -133,6 +182,10 @@ DECLARE FUNCTION signalZeichnen LIB GOBJECT ALIAS "g_signal_connect_data" _
 DECLARE FUNCTION signalEreignis LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS FUNCTION(objekt AS ZEIGER, ereignis AS ZEIGER, daten AS ZEIGER) AS BOOLEAN, _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+' Signale mit einem Wert zwischen Objekt und Daten (row-selected, row-activated)
+DECLARE FUNCTION signalZeile LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, zeile AS ZEIGER, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 DECLARE SUB g_object_unref LIB GOBJECT (objekt AS ZEIGER)
 DECLARE FUNCTION g_timeout_add LIB GLIB (ms AS ULONG, rueckruf AS FUNCTION(daten AS ZEIGER) AS BOOLEAN, daten AS ZEIGER) AS ULONG
 DECLARE SUB g_free LIB GLIB (z AS ZEIGER)
@@ -155,6 +208,18 @@ CONST GTK_AUSRICHTEN_ENDE = 2
 CONST GTK_AUSRICHTEN_MITTE = 3
 CONST GTK_ELLIPSE_ENDE = 3
 CONST GTK_AUSWAHL_KEINE = 0
+CONST GTK_AUSWAHL_EINE = 1
+CONST GTK_LAGE_RECHTS = 1                 ' GTK_POS_RIGHT
+CONST GTK_DIALOG_MODAL = 1
+CONST GTK_DIALOG_EIGENE_LEISTE = 4        ' GTK_DIALOG_USE_HEADER_BAR
+CONST GTK_NACHRICHT_FRAGE = 2             ' GTK_MESSAGE_QUESTION
+CONST GTK_KNOEPFE_KEINE = 0
+CONST GTK_DATEI_SICHERN = 1
+CONST GTK_ANTWORT_OK = -5
+CONST GTK_ANTWORT_ZU = -4                 ' GTK_RESPONSE_DELETE_EVENT
+CONST GDK_UMSCHALT = 1
+CONST GDK_STRG = 4
+CONST GDK_ALT = 8
 CONST GTK_DATEI_OEFFNEN = 0
 CONST GTK_ANTWORT_ANNEHMEN = -3
 CONST GTK_ANTWORT_ABBRECHEN = -6
@@ -162,6 +227,7 @@ CONST GTK_VORRANG_ANWENDUNG = 600
 CONST GDK_MASKE_BEWEGUNG = 4              ' GDK_POINTER_MOTION_MASK
 CONST GDK_MASKE_DRUCK = 256               ' GDK_BUTTON_PRESS_MASK
 CONST GDK_MASKE_LOSLASSEN = 512           ' GDK_BUTTON_RELEASE_MASK
+CONST GDK_MASKE_VERLASSEN = 8192          ' GDK_LEAVE_NOTIFY_MASK
 CONST GDK_MASKE_RAD = 2097152             ' GDK_SCROLL_MASK
 CONST GDK_MASKE_RAD_FEIN = 8388608        ' GDK_SMOOTH_SCROLL_MASK
 CONST GDK_RAD_HOCH = 0

@@ -1,0 +1,169 @@
+' Die Selbstvorfuehrung fuer Pruefungen (--probe, --probe-bearbeiten): ein
+' Zeitgeber geht Schritt fuer Schritt durch, schreibt, was er sieht, und sichert
+' mit --foto Bilder des Fensters. Die Werkzeuge bekommen dieselben Zellen und
+' Knoepfe gemeldet wie von der Maus (wzDruck/wzZiehen/wzLos).
+
+DIM schritt AS INTEGER
+SUB foto(name AS STRING)
+    IF fotoZiel = "" THEN RETURN
+    IF NOT gtkFoto(fenster, fotoZiel + "_" + name + ".png") THEN PRINT "Foto nicht gesichert: "; name
+END SUB
+
+' Stufe 1: ansehen, zoomen, eine Ebene aus- und einblenden
+FUNCTION vorfuehren(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    SELECT CASE schritt
+        CASE 1
+            ' Das erste Zeichnen hat eingepasst
+            PRINT "geladen: "; geladen; ", eingepasst: "; lwEingepasst
+            PRINT lwMuster.breite; " x "; lwMuster.hoehe; ", "; ZAHL$(lwMuster.breiteCm(), 1); " cm"
+        CASE 2
+            foto("eingepasst")
+            leinwandZoom(30.0, lwX + 5.5 * lwZelle, lwY + 5.5 * lwZelle)
+            PRINT "zoom: "; leinwandZoomProzent(); " %"
+        CASE 3
+            foto("nah")
+            ' Die Ebene "Herz" ausblenden -- die Stiche verschwinden aus dem Bild
+            IF LEN(slEbenenKnoepfe) < 2 THEN RETURN TRUE
+            DIM vorher AS INTEGER : vorher = lwFarbe[12 * lwMuster.breite + 17]
+            gtk_toggle_button_set_active(slEbenenKnoepfe[1], FALSE)
+            PRINT "zelle 17,12: "; vorher; " -> "; lwFarbe[12 * lwMuster.breite + 17]
+        CASE 4
+            IF LEN(slEbenenKnoepfe) < 2 THEN RETURN TRUE
+            foto("ohne_herz")
+            gtk_toggle_button_set_active(slEbenenKnoepfe[1], TRUE)
+            PRINT "wieder da: "; lwFarbe[12 * lwMuster.breite + 17]
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Ein Zug mit der Maus: druecken, ueber die Zellen ziehen, loslassen.
+SUB zug(taste AS INTEGER, punkte AS ARRAY OF INTEGER, umschalt AS BOOLEAN)
+    DIM n AS INTEGER : n = LEN(punkte)
+    DIM z AS INTEGER : z = wzDruck(punkte[0], punkte[1], taste, umschalt)
+    DIM k AS INTEGER
+    FOR k = 2 TO n - 2 STEP 2
+        wzZiehen(punkte[k], punkte[k + 1], umschalt)
+    NEXT
+    wzLos(punkte[n - 2], punkte[n - 1], umschalt)
+END SUB
+
+' Stufe 2: bearbeiten
+DIM vfBlau AS INTEGER
+DIM vfDatei AS STRING
+FUNCTION vorfuehrenBearbeiten(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM i AS INTEGER, p AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            PRINT "geladen: "; geladen; " farben "; lwMuster.farbanzahl(); " geaendert "; istGeaendert()
+            ' DMC 996 (Electric Blue) aus dem Katalog ins Muster
+            FOR p = 0 TO LEN(slPaletten) - 1
+                IF slPaletten[p].hersteller = "DMC" THEN
+                    FOR i = 0 TO LEN(slPaletten[p].garne) - 1
+                        IF slPaletten[p].garne[i].nummer = "996" THEN garnHinzufuegen(p, i)
+                    NEXT
+                END IF
+            NEXT
+            vfBlau = wzFarbe
+            PRINT "farbe "; vfBlau; " "; lwMuster.farben[vfBlau].garn.name; " symbol "; lwMuster.farben[vfBlau].symbol; " farben "; lwMuster.farbanzahl()
+            ' dasselbe Garn noch einmal: keine neue Farbe
+            FOR p = 0 TO LEN(slPaletten) - 1
+                IF slPaletten[p].hersteller = "DMC" THEN
+                    FOR i = 0 TO LEN(slPaletten[p].garne) - 1
+                        IF slPaletten[p].garne[i].nummer = "996" THEN garnHinzufuegen(p, i)
+                    NEXT
+                END IF
+            NEXT
+            PRINT "noch einmal: farben "; lwMuster.farbanzahl(); " katalogzeilen "; LEN(slKatZeilen) > 100
+        CASE 2
+            ' neue Ebene, gefuelltes Rechteck in Blau
+            ebenenBefehl(0)
+            werkzeugWaehlen(WZ_RECHTECK, TRUE)
+            zug(1, [2, 2, 6, 5, 9, 7], FALSE)
+            PRINT "ebenen "; lwMuster.ebenen.anzahl(); " aktiv "; lwMuster.ebenen.aktiveEbene().name; " blau "; lwMuster.farben[vfBlau].stichzahl
+            PRINT "schritte "; LEN(wzVerlauf.rueck); " oben "; wzVerlauf.textZurueck$(); " geaendert "; istGeaendert()
+            PRINT "titel "; gtk_label_get_text_titel()
+            leinwandEinpassen()
+        CASE 3
+            foto("rechteck")
+            werkzeugZurueck()
+            PRINT "zurueck: blau "; lwMuster.farben[vfBlau].stichzahl; " ebenen "; lwMuster.ebenen.anzahl()
+        CASE 4
+            foto("zurueck")
+            werkzeugVor()
+            ' Stift mit Umschalt-Linie und Ellipse: Umschalt haelt die Linie gerade
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            zug(1, [0, 10, 15, 12], TRUE)
+            PRINT "linie gerade: "; lwMuster.stich(15, 10) = vfBlau; " "; lwMuster.stich(15, 12)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            stichartWaehlen(kern.HALB_OL_UR)
+            zug(1, [20, 20, 24, 24], FALSE)
+            PRINT "stift: "; lwMuster.stich(22, 22) = vfBlau; " art "; lwMuster.ebenen.aktiveEbene().stichArt(22, 22)
+            stichartWaehlen(kern.VOLL)
+            ' rechte Maustaste radiert -- auch mit dem Stift
+            zug(3, [22, 22], FALSE)
+            PRINT "radiert: "; lwMuster.stich(22, 22) = vfBlau
+            ' Pipette nimmt die Farbe darunter
+            werkzeugWaehlen(WZ_PIPETTE, FALSE)
+            zug(1, [17, 12], FALSE)
+            PRINT "pipette: "; wzFarbe; " "; lwMuster.stich(17, 12)
+            ' Fuellen auf der leeren Ebene in einem Schritt
+            farbeWaehlen(vfBlau)
+            werkzeugWaehlen(WZ_FUELLEN, FALSE)
+            DIM vorher AS INTEGER : vorher = LEN(wzVerlauf.rueck)
+            zug(1, [30, 30], FALSE)
+            PRINT "gefuellt: "; lwMuster.ebenen.aktiveEbene().stichzahl(); " schritte +"; LEN(wzVerlauf.rueck) - vorher
+            werkzeugZurueck()
+            PRINT "fuellen zurueck: "; lwMuster.ebenen.aktiveEbene().stichzahl()
+        CASE 5
+            foto("wieder")
+            ' Ebene sperren: Stift setzt nichts
+            lwMuster.ebenen.aktiveEbene().gesperrt = TRUE
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            DIM n AS INTEGER : n = lwMuster.ebenen.aktiveEbene().stichzahl()
+            zug(1, [35, 35, 38, 38], FALSE)
+            PRINT "gesperrt: "; lwMuster.ebenen.aktiveEbene().stichzahl() = n
+            lwMuster.ebenen.aktiveEbene().gesperrt = FALSE
+            ' Ebene loeschen und zurueckholen
+            ebenenBefehl(1)
+            PRINT "geloescht: ebenen "; lwMuster.ebenen.anzahl(); " blau "; lwMuster.farben[vfBlau].stichzahl
+            werkzeugZurueck()
+            PRINT "zurueckgeholt: ebenen "; lwMuster.ebenen.anzahl(); " blau "; lwMuster.farben[vfBlau].stichzahl
+            ' Deckkraft halb: das Blau mischt sich mit dem Stoff
+            gtk_range_set_value(slDeckkraft, 50.0)
+            PRINT "deckkraft "; lwMuster.ebenen.aktiveEbene().deckkraft; " geaendert "; istGeaendert()
+        CASE 6
+            foto("halb")
+            gtk_range_set_value(slDeckkraft, 100.0)
+            ' sichern und wieder laden
+            vfDatei = fotoZiel + "_gesichert.pxs"
+            IF fotoZiel = "" THEN vfDatei = PATHJOIN(TEMPDIR$(), "glutfaden_probe.pxs")
+            PRINT "gesichert: "; musterSichern(vfDatei); " geaendert "; istGeaendert(); " titel "; gtk_label_get_text_titel()
+            DIM m AS kern.Muster : m = kern.pxsLaden(vfDatei)
+            PRINT "geladen: ebenen "; m.ebenen.anzahl(); " farben "; m.farbanzahl(); " stiche "; m.sticheGesamt(); " = "; lwMuster.sticheGesamt()
+            PRINT "zelle 5,4: "; m.stich(5, 4) = vfBlau; " "; m.farben[vfBlau].garn.hersteller; " "; m.farben[vfBlau].garn.nummer
+            ' zurueck nach dem Sichern: wieder ungesichert, und vor: wieder gesichert
+            werkzeugZurueck()
+            PRINT "nach zurueck "; istGeaendert()
+            werkzeugVor()
+            PRINT "nach vor "; istGeaendert()
+            ' unbenutzte Farben entfernen (die Demo hat keine), umbenennen
+            PRINT "ebene umbenannt: "; kern.ebeneUmbenennen(lwMuster, wzVerlauf, lwMuster.ebenen.aktiv, "Blau")
+            allesNeu()
+            PRINT "oben "; wzVerlauf.textZurueck$(); " liste "; gtk_label_get_text(slEbenenTexte[lwMuster.ebenen.anzahl() - 1 - lwMuster.ebenen.aktiv])
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION gtk_label_get_text_titel() AS STRING
+    RETURN musterTitel + IIF(istGeaendert(), " •", "")
+END FUNCTION

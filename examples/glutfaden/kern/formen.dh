@@ -160,7 +160,7 @@ FUNCTION ellipse(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, gef
 END FUNCTION
 
 SUB ellipsePunkt(cx AS INTEGER, cy AS INTEGER, x AS INTEGER, y AS INTEGER, gefuellt AS BOOLEAN, _
-                 BYREF breiteJe AS ARRAY OF INTEGER, BYREF rand AS MAP OF BOOLEAN, BYREF p AS ARRAY OF INTEGER)
+                 breiteJe AS ARRAY OF INTEGER, rand AS MAP OF BOOLEAN, p AS ARRAY OF INTEGER)
     IF gefuellt THEN
         IF x > breiteJe[y] THEN breiteJe[y] = x
         RETURN
@@ -171,7 +171,7 @@ SUB ellipsePunkt(cx AS INTEGER, cy AS INTEGER, x AS INTEGER, y AS INTEGER, gefue
     randPunkt(cx - x, cy - y, rand, p)
 END SUB
 
-SUB randPunkt(x AS INTEGER, y AS INTEGER, BYREF rand AS MAP OF BOOLEAN, BYREF p AS ARRAY OF INTEGER)
+SUB randPunkt(x AS INTEGER, y AS INTEGER, rand AS MAP OF BOOLEAN, p AS ARRAY OF INTEGER)
     DIM k AS STRING : k = STR$(x) + "," + STR$(y)
     IF MAPHAS(rand, k) THEN RETURN
     MAPPUT(rand, k, TRUE)
@@ -181,35 +181,52 @@ END SUB
 ' Fuellen auf einer Ebene: alle Zellen, die mit (x, y) dieselbe Farbe teilen
 ' und ueber Nachbarn links/rechts/oben/unten zusammenhaengen (kein Stich
 ' zaehlt als Farbe -1). Hat die Startzelle schon die neue Farbe, leer.
+'
+' Die Warteschlange ist ein Feld fester Groesse und die Nachbarn stehen in
+' der Schleife selbst: so bleibt sie bei festen Zahlentypen und laeuft als
+' Maschinencode (eine Million Zellen in einigen Millisekunden statt Sekunden).
 FUNCTION fuellung(e AS Ebene, x AS INTEGER, y AS INTEGER, neu AS INTEGER) AS ARRAY OF INTEGER
-    DIM p AS ARRAY OF INTEGER : p = []
-    IF NOT e.drin(x, y) THEN RETURN p
+    DIM leer AS ARRAY OF INTEGER : leer = []
+    IF NOT e.drin(x, y) THEN RETURN leer
     DIM b AS INTEGER : b = e.breite
     DIM h AS INTEGER : h = e.hoehe
     DIM r AS ARRAY OF INTEGER : r = e.raster
     DIM ziel AS INTEGER : ziel = r[y * b + x]
-    IF ziel = neu THEN RETURN p
-    DIM gesehen[b * h] AS INTEGER
-    DIM warte AS ARRAY OF INTEGER : warte = [y * b + x]
+    IF ziel = neu THEN RETURN leer
+    DIM n AS INTEGER : n = b * h
+    DIM gesehen[n] AS INTEGER
+    DIM warte[n] AS INTEGER
+    DIM ende AS INTEGER : ende = 1
+    warte[0] = y * b + x
     gesehen[y * b + x] = 1
     DIM kopf AS INTEGER
-    WHILE kopf < LEN(warte)
-        DIM i AS INTEGER : i = warte[kopf]
+    DIM i AS INTEGER, cx AS INTEGER, j AS INTEGER
+    WHILE kopf < ende
+        i = warte[kopf]
         kopf = kopf + 1
-        DIM cx AS INTEGER : cx = i MOD b
-        DIM cy AS INTEGER : cy = i \ b
-        ARRAY_PUSH(p, cx) : ARRAY_PUSH(p, cy)
-        IF cx > 0 THEN fuellNachbar(i - 1, ziel, r, gesehen, warte)
-        IF cx < b - 1 THEN fuellNachbar(i + 1, ziel, r, gesehen, warte)
-        IF cy > 0 THEN fuellNachbar(i - b, ziel, r, gesehen, warte)
-        IF cy < h - 1 THEN fuellNachbar(i + b, ziel, r, gesehen, warte)
+        cx = i MOD b
+        IF cx > 0 THEN
+            j = i - 1
+            IF gesehen[j] = 0 AND r[j] = ziel THEN gesehen[j] = 1 : warte[ende] = j : ende = ende + 1
+        END IF
+        IF cx < b - 1 THEN
+            j = i + 1
+            IF gesehen[j] = 0 AND r[j] = ziel THEN gesehen[j] = 1 : warte[ende] = j : ende = ende + 1
+        END IF
+        IF i >= b THEN
+            j = i - b
+            IF gesehen[j] = 0 AND r[j] = ziel THEN gesehen[j] = 1 : warte[ende] = j : ende = ende + 1
+        END IF
+        IF i < n - b THEN
+            j = i + b
+            IF gesehen[j] = 0 AND r[j] = ziel THEN gesehen[j] = 1 : warte[ende] = j : ende = ende + 1
+        END IF
     WEND
+    ' Die Warteschlange enthaelt jede gefundene Zelle genau einmal
+    DIM p[2 * ende] AS INTEGER
+    FOR i = 0 TO ende - 1
+        p[2 * i] = warte[i] MOD b
+        p[2 * i + 1] = warte[i] \ b
+    NEXT
     RETURN p
 END FUNCTION
-
-SUB fuellNachbar(i AS INTEGER, ziel AS INTEGER, r AS ARRAY OF INTEGER, BYREF gesehen AS ARRAY OF INTEGER, BYREF warte AS ARRAY OF INTEGER)
-    IF gesehen[i] <> 0 THEN RETURN
-    IF r[i] <> ziel THEN RETURN
-    gesehen[i] = 1
-    ARRAY_PUSH(warte, i)
-END SUB
