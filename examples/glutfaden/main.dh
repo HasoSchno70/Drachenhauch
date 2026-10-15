@@ -12,6 +12,10 @@
 ' duplizieren, verschieben, zusammenfuehren, umbenennen, sperren, Deckkraft,
 ' Garne aus 19 Herstellerkatalogen, Sichern (Strg+S) mit Rueckfrage beim
 ' Schliessen.
+' Stufe 3: Auswahl und Lasso (S, Umschalt+S; Strg+C/X/V/A, Entf, F, R drehen,
+' H/V spiegeln), Vieleck (G), Text (T), Rueckstich (B), Fortschritt (K; Pfeile
+' und Enter), Symmetrie, Farbe ersetzen (Strg+R) mit Toleranz, seltene Farben
+' zusammenlegen, Symbol aendern, ganze Farbe als erledigt.
 '
 ' Aufbau:
 '     kern/      Muster, Ebenen, Garne, Paletten, .pxs, Formen, Verlauf,
@@ -457,6 +461,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "ansehen"
     ELSEIF ARG$(a) = "--probe-bearbeiten" THEN
         probe = "bearbeiten"
+    ELSEIF ARG$(a) = "--probe-stufe3" THEN
+        probe = "stufe3"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -470,5 +476,6 @@ DIM geladen AS BOOLEAN : geladen = musterOeffnen(start)
 IMPORT "ansicht/vorfuehrung.dh"
 IF probe = "ansehen" THEN g_timeout_add(300, vorfuehren, 0)
 IF probe = "bearbeiten" THEN g_timeout_add(300, vorfuehrenBearbeiten, 0)
+IF probe = "stufe3" THEN g_timeout_add(300, vorfuehrenStufe3, 0)
 
 gtk_main()

@@ -167,3 +167,135 @@ END FUNCTION
 FUNCTION gtk_label_get_text_titel() AS STRING
     RETURN musterTitel + IIF(istGeaendert(), " •", "")
 END FUNCTION
+
+' Stufe 3: Auswahl, Vieleck, Symmetrie, Rueckstich, Fortschritt, Text
+FUNCTION blauHolen() AS INTEGER
+    DIM p AS INTEGER, i AS INTEGER
+    FOR p = 0 TO LEN(slPaletten) - 1
+        IF slPaletten[p].hersteller = "DMC" THEN
+            FOR i = 0 TO LEN(slPaletten[p].garne) - 1
+                IF slPaletten[p].garne[i].nummer = "996" THEN garnHinzufuegen(p, i)
+            NEXT
+        END IF
+    NEXT
+    RETURN wzFarbe
+END FUNCTION
+
+FUNCTION vorfuehrenStufe3(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM n AS INTEGER, vorher AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            vfBlau = blauHolen()
+            PRINT "geladen: "; geladen; " blau "; vfBlau; " stiche "; lwMuster.sticheGesamt()
+            ' Auswahl ueber das Herz (Zeilen 12..20) auf der Ebene "Herz" -- die
+            ' Auswahl nimmt wie im Original nur die AKTIVE Ebene --, kopieren,
+            ' links oben einfuegen
+            lwMuster.ebenen.aktiv = 1
+            slEbeneMarkieren()
+            PRINT "aktive ebene "; lwMuster.ebenen.aktiveEbene().name
+            werkzeugWaehlen(WZ_AUSWAHL, FALSE)
+            zug(1, [14, 12, 20, 16, 25, 20], FALSE)
+            PRINT "auswahl "; mrAuswahl.anzahl; " "; mrAuswahl.x0; ","; mrAuswahl.y0; "-"; mrAuswahl.x1; ","; mrAuswahl.y1
+            auswahlKopieren()
+            vorher = lwMuster.sticheGesamt()
+            einfuegenBeginnen()
+            DIM z AS INTEGER : z = wzDruck(3, 3, 1, FALSE)
+            PRINT "eingefuegt: +"; lwMuster.sticheGesamt() - vorher; " oben "; wzVerlauf.textZurueck$(); " auswahl jetzt "; mrAuswahl.x0; ","; mrAuswahl.y0
+        CASE 2
+            foto("eingefuegt")
+            ' die eingefuegte Auswahl um 5 nach rechts ziehen: ein Schritt
+            DIM s0 AS INTEGER : s0 = LEN(wzVerlauf.rueck)
+            zug(1, [5, 5, 8, 5, 10, 5], FALSE)
+            PRINT "verschoben: auswahl "; mrAuswahl.x0; ","; mrAuswahl.y0; " schritte +"; LEN(wzVerlauf.rueck) - s0; " zelle 4,5 "; lwMuster.stich(4, 5)
+            ' drehen (r) und zurueck
+            vorher = lwMuster.sticheGesamt()
+            DIM ok AS BOOLEAN : ok = werkzeugTaste(&H72, FALSE, FALSE)
+            PRINT "gedreht: "; wzVerlauf.textZurueck$(); " breite "; mrAuswahl.x1 - mrAuswahl.x0 + 1; " hoehe "; mrAuswahl.y1 - mrAuswahl.y0 + 1; " stiche gleich "; lwMuster.sticheGesamt() = vorher
+            werkzeugZurueck()
+            ' Entf und ESC
+            ok = werkzeugTaste(&HFFFF, FALSE, FALSE)
+            PRINT "geloescht: "; wzVerlauf.textZurueck$(); " stiche "; lwMuster.sticheGesamt() - vorher
+            werkzeugZurueck()
+            ok = werkzeugTaste(&HFF1B, FALSE, FALSE)
+            PRINT "esc: auswahl weg "; NOT mehrHatAuswahl()
+        CASE 3
+            ' gefuelltes Vieleck in Blau: drei Ecken, rechte Taste schliesst
+            farbeWaehlen(vfBlau)
+            werkzeugWaehlen(WZ_VIELECK, TRUE)
+            n = wzDruck(28, 26, 1, FALSE)
+            n = wzDruck(36, 28, 1, FALSE)
+            n = wzDruck(30, 35, 1, FALSE)
+            n = wzDruck(30, 35, 3, FALSE)
+            PRINT "vieleck: blau "; lwMuster.farben[vfBlau].stichzahl; " oben "; wzVerlauf.textZurueck$(); " ecken "; LEN(mrEcken)
+            ' Symmetrie vierfach: ein Punkt mit dem Stift ergibt vier
+            spiegelWaehlen(kern.SPIEGEL_VIERFACH)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            vorher = lwMuster.farben[vfBlau].stichzahl
+            zug(1, [2, 37], FALSE)
+            PRINT "vierfach: +"; lwMuster.farben[vfBlau].stichzahl - vorher; " "; lwMuster.stich(37, 37) = vfBlau; " "; lwMuster.stich(2, 2) = vfBlau; " "; lwMuster.stich(37, 2) = vfBlau
+            spiegelWaehlen(kern.SPIEGEL_AUS)
+        CASE 4
+            foto("vieleck")
+            ' Rueckstich: zwei Klicks auf Rasterpunkte (Halbstich-Einheiten)
+            werkzeugWaehlen(WZ_RUECKSTICH, FALSE)
+            lwHalbX = 4 : lwHalbY = 60
+            n = wzDruck(2, 30, 1, FALSE)
+            lwHalbX = 30 : lwHalbY = 60
+            n = wzDruck(15, 30, 1, FALSE)
+            lwHalbX = 30 : lwHalbY = 70
+            n = wzDruck(15, 35, 1, FALSE)
+            n = wzDruck(15, 35, 3, FALSE)
+            PRINT "rueckstiche "; LEN(lwMuster.rueckstiche); " oben "; wzVerlauf.textZurueck$()
+            ' rechts auf eine Linie: entfernt
+            lwHalbGenauX = 17.2 : lwHalbGenauY = 60.4
+            n = wzDruck(8, 30, 3, FALSE)
+            PRINT "entfernt: "; LEN(lwMuster.rueckstiche); " oben "; wzVerlauf.textZurueck$()
+            werkzeugZurueck()
+            PRINT "zurueck: "; LEN(lwMuster.rueckstiche)
+        CASE 5
+            foto("rueckstich")
+            ' Fortschritt: die Zeile des Rahmens ziehen, dann Pfeile und Enter
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            zug(1, [5, 5, 30, 5], FALSE)
+            PRINT "erledigt "; lwFertig[5 * lwMuster.breite + 10]; " "; lwFertig[5 * lwMuster.breite + 30]; " oben "; wzVerlauf.textZurueck$()
+            farbeWaehlen(lwMuster.stich(10, 5))
+            DIM ok2 AS BOOLEAN : ok2 = werkzeugTaste(&HFF53, FALSE, FALSE)
+            PRINT "naechster offen "; mrCursor MOD lwMuster.breite; ","; mrCursor \ lwMuster.breite
+            ok2 = werkzeugTaste(&HFF0D, FALSE, FALSE)
+            DIM c AS INTEGER : c = kern.naechsterOffen(lwMuster, wzFarbe, -1, TRUE)
+            PRINT "nach enter "; mrCursor MOD lwMuster.breite; ","; mrCursor \ lwMuster.breite; " erster offen "; c MOD lwMuster.breite; ","; c \ lwMuster.breite
+            ' rechts nimmt zurueck
+            zug(3, [10, 5], FALSE)
+            PRINT "zurueckgenommen 10,5: "; lwFertig[5 * lwMuster.breite + 10]
+        CASE 6
+            foto("fortschritt")
+            ' Text, ohne Dialog: groesse 12 -> etwa 16 hoch
+            farbeWaehlen(vfBlau)
+            werkzeugWaehlen(WZ_TEXT, FALSE)
+            txText = "Hi" : txSchrift = "Sans" : txGroesse = 12 : txFett = TRUE : txKursiv = FALSE
+            textAnhaengen()
+            PRINT "text: an der maus "; mrEinfuegen; " groesse "; mrEinfuegenAus.breite; "x"; mrEinfuegenAus.hoehe; " stiche > 20 "; mrEinfuegenAus.stiche() > 20
+            vorher = lwMuster.farben[vfBlau].stichzahl
+            n = wzDruck(6, 18, 1, FALSE)
+            PRINT "text gesetzt: +"; lwMuster.farben[vfBlau].stichzahl - vorher = mrEinfuegenAus.stiche(); " oben "; wzVerlauf.textZurueck$(); " haengt "; mrEinfuegen
+            ' seltene Farben zusammenlegen (die Demo hat Anchor 309 mit 17)
+            n = seltenZusammenlegen(20)
+            allesNeu()
+            PRINT "selten: "; n; " oben "; wzVerlauf.textZurueck$()
+        CASE 7
+            foto("text")
+            ' sichern und laden: Rueckstiche und erledigt kommen mit
+            vfDatei = fotoZiel + "_stufe3.pxs"
+            IF fotoZiel = "" THEN vfDatei = PATHJOIN(TEMPDIR$(), "glutfaden_stufe3.pxs")
+            DIM ok3 AS BOOLEAN : ok3 = musterSichern(vfDatei)
+            DIM m AS kern.Muster : m = kern.pxsLaden(vfDatei)
+            DIM e AS kern.Ebene : e = kern.ebeneMitStich(m, 30, 5)
+            PRINT "geladen: rueckstiche "; LEN(m.rueckstiche); " erledigt 30,5 "; e.istErledigt(30, 5); " stiche "; m.sticheGesamt() = lwMuster.sticheGesamt()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

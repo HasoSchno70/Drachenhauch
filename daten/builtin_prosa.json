@@ -1127,7 +1127,7 @@
   "ISNUMERIC": "als Zahl parsebar?",
   "ISSTR": "Typ-Prädikate (Bool ist KEINE Zahl)",
   "IS_NIL": "Liefert TRUE, wenn der Wert NIL ist (also „noch nichts“), sonst FALSE.",
-  "JOIN$": "Vereinen (Array OF STRING)",
+  "JOIN$": "Vereinen; Zahlen und Wahrheitswerte im Feld werden wie mit STR$ geschrieben",
   "JOYSTICK_ANY_BUTTON": "zuletzt gedrückter Knopf, -1 = keiner — für Belegungsdialoge",
   "JOYSTICK_AXIS": "Stellung einer Analogachse, -1.0 bis +1.0",
   "JOYSTICK_AXIS_COUNT": "wie viele Achsen hat das Gerät?",
