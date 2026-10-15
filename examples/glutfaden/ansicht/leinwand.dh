@@ -1,11 +1,16 @@
-' Die Zeichenflaeche: ein Muster ansehen -- Zoom um den Mauszeiger, Verschieben
-' mit gedrueckter Maustaste, Raster, Symbole, Teilstiche, Rueckstiche.
+' Die Zeichenflaeche: Zoom um den Mauszeiger, Verschieben (Hand oder mittlere
+' Maustaste), Raster, Symbole, Teilstiche, Rueckstiche -- und die Werkzeuge
+' (ansicht/werkzeuge.dh), denen sie die Zellen unter der Maus meldet.
 '
 ' Das Muster liegt einmal als Bild mit EINEM Pixel je Kaestchen vor
 ' (lwPuffer, ARGB); Cairo vergroessert es ohne Glaettung. So kostet auch ein
 ' 2000 x 2000-Muster einen Zeichenaufruf, egal wie weit herausgezoomt ist.
 ' Was es feiner braucht (Teilstiche, Symbole, Raster), kommt nur fuer den
 ' sichtbaren Ausschnitt obendrauf.
+'
+' Ein Werkzeug aendert wenige Zellen: dafuer schreibt leinwandZellen() nur
+' deren Bildpunkte neu. Hat eine sichtbare Ebene weniger als volle Deckkraft,
+' wird sie wie im Original ueber das Darunterliegende gemischt.
 
 CONST LW_HINTERGRUND = &H2D2D2D
 CONST LW_STOFF = &HFAFAF5             ' Aida-Stoff, cremeweiss
@@ -33,17 +38,20 @@ DIM lwMausX AS INTEGER
 DIM lwMausY AS INTEGER
 DIM lwSchrift AS INTEGER              ' PangoFontDescription
 DIM lwEingepasst AS BOOLEAN           ' beim ersten Zeichnen einpassen
+DIM lwZeile AS INTEGER                ' Bytes je Bildzeile in lwPuffer
 
 FUNCTION leinwandNeu() AS INTEGER
     lwFlaeche = gtk_drawing_area_new()
     gtk_widget_set_hexpand(lwFlaeche, TRUE)
     gtk_widget_set_vexpand(lwFlaeche, TRUE)
-    gtk_widget_add_events(lwFlaeche, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_RAD BOR GDK_MASKE_RAD_FEIN)
+    gtk_widget_add_events(lwFlaeche, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_RAD BOR GDK_MASKE_RAD_FEIN BOR GDK_MASKE_VERLASSEN)
     signalZeichnen(lwFlaeche, "draw", lwZeichnen, 0, 0, 0)
     signalEreignis(lwFlaeche, "scroll-event", lwRad, 0, 0, 0)
     signalEreignis(lwFlaeche, "button-press-event", lwDruck, 0, 0, 0)
     signalEreignis(lwFlaeche, "button-release-event", lwLoslassen, 0, 0, 0)
     signalEreignis(lwFlaeche, "motion-notify-event", lwBewegung, 0, 0, 0)
+    signalEreignis(lwFlaeche, "leave-notify-event", lwVerlassen, 0, 0, 0)
+    gtk_widget_set_can_focus(lwFlaeche, TRUE)
     lwSchrift = pango_font_description_from_string("DejaVu Sans Bold 10")
     lwZelle = LW_ZELLE_STANDARD
     lwMausX = -1
@@ -58,8 +66,8 @@ SUB leinwandMuster(m AS kern.Muster)
     gtk_widget_queue_draw(lwFlaeche)
 END SUB
 
-' Zusammensetzen und das Pixelbild neu schreiben -- nach dem Laden und wenn
-' eine Ebene ein- oder ausgeblendet wird.
+' Zusammensetzen und das Pixelbild neu schreiben -- nach dem Laden, nach
+' Rueckgaengig und wenn sich an Ebenen oder Farben etwas aendert.
 SUB leinwandAufbauen()
     IF NOT lwHat THEN RETURN
     lwMuster.ebenen.zusammensetzen(lwFarbe, lwTyp, lwFertig)
@@ -73,16 +81,96 @@ SUB leinwandAufbauen()
     DIM b AS INTEGER : b = lwMuster.breite
     DIM h AS INTEGER : h = lwMuster.hoehe
     IF lwBild <> 0 THEN cairo_surface_destroy(lwBild) : lwBild = 0
-    DIM zeile AS INTEGER : zeile = cairo_format_stride_for_width(CAIRO_ARGB32, b)
-    lwPuffer = BUFFER_NEW(zeile * h)
+    lwZeile = cairo_format_stride_for_width(CAIRO_ARGB32, b)
+    lwPuffer = BUFFER_NEW(lwZeile * h)
+    DIM gemischt AS BOOLEAN : gemischt = lwMischen()
     DIM x AS INTEGER, y AS INTEGER, c AS INTEGER
     FOR y = 0 TO h - 1
         FOR x = 0 TO b - 1
-            c = lwFarbe[y * b + x]
-            IF c >= 0 AND c < n THEN BUFFER_SET_U32(lwPuffer, y * zeile + x * 4, &HFF000000 BOR lwRgb[c])
+            IF gemischt THEN
+                BUFFER_SET_U32(lwPuffer, y * lwZeile + x * 4, lwMischfarbe(x, y))
+            ELSE
+                c = lwFarbe[y * b + x]
+                IF c >= 0 AND c < n THEN BUFFER_SET_U32(lwPuffer, y * lwZeile + x * 4, &HFF000000 BOR lwRgb[c])
+            END IF
         NEXT
     NEXT
-    lwBild = cairo_image_surface_create_for_data(BUFFER_ZEIGER(lwPuffer), CAIRO_ARGB32, b, h, zeile)
+    lwBild = cairo_image_surface_create_for_data(BUFFER_ZEIGER(lwPuffer), CAIRO_ARGB32, b, h, lwZeile)
+END SUB
+
+' Hat eine sichtbare Ebene weniger als volle Deckkraft?
+FUNCTION lwMischen() AS BOOLEAN
+    DIM e AS kern.Ebene
+    FOR EACH e IN lwMuster.ebenen.ebenen
+        IF e.sichtbar AND e.deckkraft < 0.999 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Die Farbe einer Zelle, Ebene fuer Ebene von unten ueber den Stoff gemischt
+' (wie das Original jede Ebene mit ihrer Deckkraft darueber malt). Ohne Stich
+' durchsichtig -- dort zeigt sich der Stoff von selbst.
+FUNCTION lwMischfarbe(x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM r AS FLOAT, g AS FLOAT, bl AS FLOAT
+    DIM da AS BOOLEAN
+    DIM n AS INTEGER : n = lwMuster.farbanzahl()
+    DIM e AS kern.Ebene
+    FOR EACH e IN lwMuster.ebenen.ebenen
+        IF NOT e.sichtbar THEN CONTINUE
+        DIM c AS INTEGER : c = e.raster[y * e.breite + x]
+        IF c < 0 OR c >= n THEN CONTINUE
+        IF NOT da THEN
+            r = (LW_STOFF SHR 16) BAND 255 : g = (LW_STOFF SHR 8) BAND 255 : bl = LW_STOFF BAND 255
+            da = TRUE
+        END IF
+        DIM f AS INTEGER : f = lwRgb[c]
+        DIM a AS FLOAT : a = CLAMP(e.deckkraft, 0.0, 1.0)
+        r = r + (((f SHR 16) BAND 255) - r) * a
+        g = g + (((f SHR 8) BAND 255) - g) * a
+        bl = bl + ((f BAND 255) - bl) * a
+    NEXT
+    IF NOT da THEN RETURN 0
+    RETURN &HFF000000 BOR (ROUND(r) SHL 16) BOR (ROUND(g) SHL 8) BOR ROUND(bl)
+END FUNCTION
+
+' Nur diese Zellen neu ([x0, y0, ...]) -- nach einem Strich. Ausserhalb wird
+' uebergangen.
+SUB leinwandZellen(p AS ARRAY OF INTEGER)
+    IF NOT lwHat OR lwBild = 0 THEN RETURN
+    DIM b AS INTEGER : b = lwMuster.breite
+    DIM h AS INTEGER : h = lwMuster.hoehe
+    DIM n AS INTEGER : n = lwMuster.farbanzahl()
+    IF LEN(lwRgb) < n + 1 THEN
+        ' eine neue Farbe ist dazugekommen
+        leinwandAufbauen()
+        gtk_widget_queue_draw(lwFlaeche)
+        RETURN
+    END IF
+    DIM gemischt AS BOOLEAN : gemischt = lwMischen()
+    DIM k AS INTEGER, x AS INTEGER, y AS INTEGER, i AS INTEGER
+    FOR k = 0 TO LEN(p) - 2 STEP 2
+        x = p[k] : y = p[k + 1]
+        IF x < 0 OR y < 0 OR x >= b OR y >= h THEN CONTINUE
+        i = y * b + x
+        ' der oberste sichtbare Stich fuer Symbol und Form
+        lwFarbe[i] = kern.KEIN_STICH : lwTyp[i] = 0 : lwFertig[i] = 0
+        DIM e AS kern.Ebene
+        FOR EACH e IN lwMuster.ebenen.ebenen
+            IF e.sichtbar AND e.raster[i] <> kern.KEIN_STICH THEN
+                lwFarbe[i] = e.raster[i] : lwTyp[i] = e.art[i] : lwFertig[i] = e.erledigt[i]
+            END IF
+        NEXT
+        DIM c AS INTEGER : c = lwFarbe[i]
+        IF gemischt THEN
+            BUFFER_SET_U32(lwPuffer, y * lwZeile + x * 4, lwMischfarbe(x, y))
+        ELSEIF c >= 0 AND c < n THEN
+            BUFFER_SET_U32(lwPuffer, y * lwZeile + x * 4, &HFF000000 BOR lwRgb[c])
+        ELSE
+            BUFFER_SET_U32(lwPuffer, y * lwZeile + x * 4, 0)
+        END IF
+    NEXT
+    cairo_surface_mark_dirty(lwBild)
+    gtk_widget_queue_draw(lwFlaeche)
 END SUB
 
 ' --- Zoom und Lage ---------------------------------------------------------------
@@ -118,6 +206,14 @@ SUB leinwandEinpassen()
     gtk_widget_queue_draw(lwFlaeche)
     statusNachziehen()
 END SUB
+
+' Bildschirmpunkt -> Zelle, auch ausserhalb (fuer Formen, die ueber den Rand gehen)
+FUNCTION lwRohX(px AS FLOAT) AS INTEGER
+    RETURN FLOOR((px - lwX) / lwZelle)
+END FUNCTION
+FUNCTION lwRohY(py AS FLOAT) AS INTEGER
+    RETURN FLOOR((py - lwY) / lwZelle)
+END FUNCTION
 
 ' Bildschirmpunkt -> Zelle (-1, wenn ausserhalb des Musters)
 FUNCTION leinwandZelleX(px AS FLOAT) AS INTEGER
@@ -166,13 +262,19 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM x AS INTEGER, y AS INTEGER, c AS INTEGER, t AS INTEGER, i AS INTEGER
 
     ' Besondere Stichtypen: die Zelle zuerst wieder Stoff, dann die Form
+    DIM gemischt AS BOOLEAN : gemischt = lwMischen()
     IF z >= 6 THEN
         FOR y = y0 TO y1
             FOR x = x0 TO x1
                 i = y * b + x
                 t = lwTyp[i]
                 IF t = 0 OR lwFarbe[i] < 0 THEN CONTINUE
-                lwSonderstich(cr, lwX + x * z, lwY + y * z, z, t, lwRgb[lwFarbe[i]])
+                ' gemischt: die Farbe aus dem Bild, damit auch Teilstiche durchscheinen
+                IF gemischt THEN
+                    lwSonderstich(cr, lwX + x * z, lwY + y * z, z, t, BUFFER_GET_U32(lwPuffer, y * lwZeile + x * 4) BAND &HFFFFFF)
+                ELSE
+                    lwSonderstich(cr, lwX + x * z, lwY + y * z, z, t, lwRgb[lwFarbe[i]])
+                END IF
             NEXT
         NEXT
     END IF
@@ -220,6 +322,19 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         cairo_line_to(cr, lwX + r.x2 * z / 2, lwY + r.y2 * z / 2)
         cairo_stroke(cr)
     NEXT
+
+    ' Die Form, die gerade gezogen wird, halb durchsichtig in der Farbe
+    IF LEN(wzVorschau) > 0 AND wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl() THEN
+        DIM vf AS INTEGER : vf = lwRgb[wzFarbe]
+        cairo_set_source_rgba(cr, ((vf SHR 16) BAND 255) / 255.0, ((vf SHR 8) BAND 255) / 255.0, (vf BAND 255) / 255.0, 0.6)
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(wzVorschau) - 2 STEP 2
+            x = wzVorschau[k] : y = wzVorschau[k + 1]
+            IF x < x0 OR x > x1 OR y < y0 OR y > y1 THEN CONTINUE
+            cairo_rectangle(cr, lwX + x * z, lwY + y * z, z, z)
+        NEXT
+        cairo_fill(cr)
+    END IF
 
     ' Rahmen und die Zelle unter dem Zeiger
     cairo_set_line_width(cr, 1.0)
@@ -335,14 +450,35 @@ FUNCTION lwRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
+' Knopf und Umschalt aus einem Ereignis
+FUNCTION lwTaste(ereignis AS INTEGER) AS INTEGER
+    DIM k AS INTEGER
+    IF NOT gdk_event_get_button(ereignis, k) THEN RETURN 0
+    RETURN k
+END FUNCTION
+FUNCTION lwUmschalt(ereignis AS INTEGER) AS BOOLEAN
+    DIM z AS INTEGER
+    IF NOT gdk_event_get_state(ereignis, z) THEN RETURN FALSE
+    RETURN (z BAND GDK_UMSCHALT) <> 0
+END FUNCTION
+
 FUNCTION lwDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
-    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, lwZiehX, lwZiehY)
-    lwZiehen = TRUE
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    gtk_widget_grab_focus(lwFlaeche)
+    IF wzDruck(lwRohX(px), lwRohY(py), lwTaste(ereignis), lwUmschalt(ereignis)) = ZUG_HAND THEN
+        lwZiehX = px
+        lwZiehY = py
+        lwZiehen = TRUE
+    END IF
     RETURN TRUE
 END FUNCTION
 
 FUNCTION lwLoslassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM px AS FLOAT, py AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
     lwZiehen = FALSE
+    wzLos(lwRohX(px), lwRohY(py), lwUmschalt(ereignis))
     RETURN TRUE
 END FUNCTION
 
@@ -354,6 +490,10 @@ FUNCTION lwBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOL
         lwY = lwY + (py - lwZiehY)
         lwZiehX = px
         lwZiehY = py
+    ELSEIF wzZug <> ZUG_KEINER THEN
+        DIM rx AS INTEGER : rx = lwRohX(px)
+        DIM ry AS INTEGER : ry = lwRohY(py)
+        IF rx <> wzLetzteX OR ry <> wzLetzteY THEN wzZiehen(rx, ry, lwUmschalt(ereignis))
     END IF
     DIM mx AS INTEGER : mx = leinwandZelleX(px)
     DIM my AS INTEGER : my = leinwandZelleY(py)
@@ -366,3 +506,30 @@ FUNCTION lwBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOL
     END IF
     RETURN TRUE
 END FUNCTION
+
+FUNCTION lwVerlassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF lwMausX >= 0 THEN
+        lwMausX = -1
+        lwMausY = -1
+        gtk_widget_queue_draw(lwFlaeche)
+        statusNachziehen()
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+' Der Mauszeiger passend zum Werkzeug.
+SUB leinwandZeiger()
+    IF lwFlaeche = 0 THEN RETURN
+    DIM fenster AS INTEGER : fenster = gtk_widget_get_window(lwFlaeche)
+    IF fenster = 0 THEN RETURN
+    DIM name AS STRING
+    SELECT CASE wzAktiv
+        CASE WZ_HAND : name = "grab"
+        CASE WZ_PIPETTE : name = "copy"
+        CASE WZ_FUELLEN : name = "cell"
+        CASE ELSE : name = "crosshair"
+    END SELECT
+    DIM z AS INTEGER : z = gdk_cursor_new_from_name(gdk_display_get_default(), name)
+    IF z = 0 THEN z = gdk_cursor_new_from_name(gdk_display_get_default(), "default")
+    gdk_window_set_cursor(fenster, z)
+END SUB

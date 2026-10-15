@@ -319,6 +319,7 @@ Default-Parameter muessen Literale sein (VM-Pfad)	Default parameters must be lit
 DATA: '-' nur auf Zahlen	DATA: '-' only on numbers
 DATA: ungueltiges Literal	DATA: invalid literal
 IS: unbekannter Typ '{}' (keine Klasse, kein Werttyp)	IS: unknown type '{}' (not a class, not a value type)
+IS: '{}' ist eine Variable, kein Typ -- IS prueft den Typ (x IS Klasse); ob zwei Variablen dasselbe Objekt meinen, sagt =	IS: '{}' is a variable, not a type -- IS checks the type (x IS Class); whether two variables refer to the same object is answered by =
 IS: unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})	IS: unknown type '{}' -- is an IMPORT missing? (e.g. {})
 Unbekannter Typ '{}' (keine Klasse, kein Werttyp, kein importiertes Modul)	Unknown type '{}' (not a class, not a value type, not an imported module)
 Unbekannter Typ '{}' -- fehlt IMPORT "{}"?	Unknown type '{}' -- is IMPORT "{}" missing?

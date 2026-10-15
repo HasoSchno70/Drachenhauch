@@ -2858,6 +2858,12 @@ impl Compiler {
             Node::IsTyp { wert, typ } => {
                 let t = typ.to_lowercase();
                 if !self.is_typname_bekannt(&t) {
+                    // Eine Variable rechts: gemeint ist meist "dasselbe Objekt",
+                    // und das fragt `=` (Glutfaden, 2026-10-15 -- vorher hiess es
+                    // nur "unbekannter Typ 'e'").
+                    if self.ctx.local_slots.contains_key(t.as_str()) || self.global_slots.contains_key(t.as_str()) || self.is_field(&t) {
+                        return Err(format!("IS: '{}' ist eine Variable, kein Typ -- IS prueft den Typ (x IS Klasse); ob zwei Variablen dasselbe Objekt meinen, sagt =", typ));
+                    }
                     return Err(unbekannter_is_typ_msg(typ));
                 }
                 self.expr(wert)?;

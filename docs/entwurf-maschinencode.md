@@ -1098,6 +1098,19 @@ so ein Aufruf jetzt ueber die VM (`w_funktion`), wie bei Funktionen ohne
 Maschinencode. Faelle in `jit.dhtest` ("potenz im maschinencode", "und und
 oder ueber objektfelder im wertemodus"), je mit und ohne.
 
+**Schritt 24 (2026-10-15, Glutfaden): Bit-Operatoren.** `BAND`, `BOR`,
+`BXOR`, `SHL`, `SHR` und `BNOT` gab es im Maschinencode gar nicht -- jede
+Schleife damit blieb in der VM, also fast jeder Code, der Farben in Bytes
+zerlegt oder zusammensetzt (`(f SHR 16) BAND 255`). Jetzt getypt fuer zwei
+INTEGER (`band`/`bor`/`bxor`, `ishl`/`sshr` wie Rusts `<<`/`>>`, `bnot`)
+und im Wertemodus ueber `w_op`; eine Schiebeweite ausserhalb 0..63 steigt
+aus und die VM meldet sie in ihrer Zeile, ein Nicht-INTEGER ebenso. Ein
+Bildpuffer mit einer Million Punkten (`BUFFER_SET_U32` mit `BOR` in der
+Schleife): 217 -> 151 ms, der Rest ist der Befehlsaufruf je Punkt. Faelle
+in `jit.dhtest` ("bit-operatoren in funktion und schleife"), je mit und ohne;
+gegen den Bau davor faellt der Maschinencode-Fall an der Bilanz (0 statt 3
+Funktionen, 0 statt 2 Schleifen).
+
 ## 5. Was bewusst nicht kommt
 
 - Kein eigener Registerzuteiler, keine eigenen Optimierungen jenseits dessen,

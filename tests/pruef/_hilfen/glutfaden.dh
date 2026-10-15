@@ -1,0 +1,42 @@
+' Helfer fuer die Glutfaden-Sammlungen (glutfaden_bearbeiten, glutfaden_ansicht).
+' Eingebunden NACH dem Kern (IMPORT ... AS kern).
+' Ein 6x5-Muster mit drei Farben: Garn, Perle, Diamant.
+FUNCTION neuesTestmuster() AS kern.Muster
+    DIM m AS kern.Muster : m = kern.neuesMuster("t", 6, 5)
+    DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+    DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+    DIM i AS INTEGER
+    i = kern.farbeHinzufuegen(m, v, kern.neuesGarn("Rot", &HFF0000, "DMC", "321"), sym, FALSE, FALSE)
+    i = kern.farbeHinzufuegen(m, v, kern.neuesGarn("Gold", &HFFD700, "Mill Hill", "00557"), sym, TRUE, FALSE)
+    i = kern.farbeHinzufuegen(m, v, kern.neuesGarn("Blau", &H0000FF, "DMC Diamond", "820"), sym, FALSE, TRUE)
+    RETURN m
+END FUNCTION
+
+' Ebenen mit Name und Stichzahl, die aktive mit *, Stiche je Farbe und eine
+' Pruefsumme ueber alle Zellen (Farbe, Typ, erledigt, Stelle).
+FUNCTION zustand$(m AS kern.Muster) AS STRING
+    DIM t AS STRING : t = "["
+    DIM i AS INTEGER
+    FOR i = 0 TO m.ebenen.anzahl() - 1
+        DIM e AS kern.Ebene : e = m.ebenen.ebenen[i]
+        IF i > 0 THEN t = t + " "
+        IF i = m.ebenen.aktiv THEN t = t + "*"
+        t = t + e.name + ":" + STR$(e.stichzahl())
+    NEXT
+    t = t + "] farben"
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN m.farben
+        t = t + " " + f.symbol + "=" + STR$(f.stichzahl)
+    NEXT
+    DIM s AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO m.ebenen.anzahl() - 1
+        DIM r AS kern.Ebene : r = m.ebenen.ebenen[i]
+        FOR k = 0 TO LEN(r.raster) - 1
+            IF r.raster[k] <> kern.KEIN_STICH THEN
+                s = (s * 31 + (i + 1) * 1000003 + k * 101 + r.raster[k] * 7 + r.art[k] * 3 + r.erledigt[k]) MOD 1000000007
+            END IF
+        NEXT
+    NEXT
+    RETURN t + " summe " + STR$(s)
+END FUNCTION

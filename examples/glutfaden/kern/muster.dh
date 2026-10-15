@@ -100,6 +100,24 @@ CLASS Muster
         NEXT
     END SUB
 
+    ' Eine Zelle wechselt von Farbe alt zu Farbe neu (je -1 = kein Stich).
+    SUB zaehlen(alt AS INTEGER, neu AS INTEGER)
+        IF alt = neu THEN RETURN
+        DIM n AS INTEGER : n = LEN(farben)
+        IF alt >= 0 AND alt < n THEN farben[alt].stichzahl = farben[alt].stichzahl - 1
+        IF neu >= 0 AND neu < n THEN farben[neu].stichzahl = farben[neu].stichzahl + 1
+    END SUB
+
+    ' Der Stichtyp, den eine Farbe erzwingt: ein voller Stich in einer Perlen-
+    ' oder Diamantfarbe wird Perle bzw. Drill (wie PlaceStitchCommand im
+    ' Original); ein ausdruecklich gewaehlter Teilstich bleibt.
+    FUNCTION typFuer(farbe AS INTEGER, gewaehlt AS INTEGER) AS INTEGER
+        IF gewaehlt <> VOLL OR farbe < 0 OR farbe >= LEN(farben) THEN RETURN gewaehlt
+        IF farben[farbe].istPerle THEN RETURN PERLE
+        IF farben[farbe].istDiamant THEN RETURN DIAMANT
+        RETURN gewaehlt
+    END FUNCTION
+
     FUNCTION sticheGesamt() AS INTEGER
         DIM s AS INTEGER
         DIM f AS Farbeintrag

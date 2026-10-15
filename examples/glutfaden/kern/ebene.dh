@@ -95,6 +95,18 @@ CLASS Ebene
     FUNCTION istLeer() AS BOOLEAN
         RETURN stichzahl() = 0
     END FUNCTION
+
+    ' Eine eigene Kopie samt Rastern, nie gesperrt (wie layer.copy im Original).
+    FUNCTION kopie(neuerName AS STRING) AS Ebene
+        DIM k AS Ebene : k = NEW Ebene(neuerName, breite, hoehe)
+        k.sichtbar = sichtbar
+        k.deckkraft = deckkraft
+        k.notiz = notiz
+        k.raster = ARRAY_COPY(raster)
+        k.erledigt = ARRAY_COPY(erledigt)
+        k.art = ARRAY_COPY(art)
+        RETURN k
+    END FUNCTION
 END CLASS
 
 FUNCTION neueEbene(name AS STRING, b AS INTEGER, h AS INTEGER) AS Ebene

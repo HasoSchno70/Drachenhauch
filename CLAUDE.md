@@ -1723,6 +1723,48 @@ gesetzt). Tests `byref.dhtest` (+4), `namensraeume.dhtest` (+3),
 **Stolpersteine beim Schreiben:** `BAND` bindet schwaecher als `-`
 (`(f SHR 16) BAND 255 - &HA9` rechnet `BAND 86`), und `UBOUND` gibt es nicht.
 
+**Stufe 2: bearbeiten** (2026-10-15). `kern/formen.dh` (Linie, Rechteck,
+Ellipse, Fuellen, Umschalt-Beschraenkungen -- Punkt fuer Punkt gegen die
+Ausgabe der PySticky-Algorithmen, `glutfaden_formen.dhtest`; die Ellipse
+merkt sich gefuellt je Zeilenabstand die halbe Breite statt einer Menge),
+`kern/verlauf.dh` (Rueckgaengig mit Aenderungen statt Kopien, ein Zug = ein
+Schritt ueber `beginnen`/`beenden`, Grenze 100, `geaendert()` ueber die
+Nummer des obersten Schritts; ein Stiche-Teil haelt seine Ebene als OBJEKT,
+nicht als Nummer -- sonst traefe ein Rueckgaengig nach dem Verschieben die
+falsche), `kern/bearbeiten.dh` (alles, was das Muster aendert). **Anders als
+PySticky** sind Ebenen-Umbauten und "unbenutzte Farben entfernen" Schritte
+(dort leeren sie den Verlauf); Sichtbarkeit, Sperre und Deckkraft sind wie
+dort keine, zaehlen aber als ungesichert (`extraGeaendert`). Ein voller
+Stich in einer Perlen-/Diamantfarbe wird Perle bzw. Drill, ein gewaehlter
+Teilstich bleibt (wie `PlaceStitchCommand`). Oberflaeche: `ansicht/
+werkzeuge.dh` (Leiste mit selbst gezeichneten Symbolen, Kuerzel P E F I L R
+O M, Alt+1..0 Stichart, rechte Taste radiert in jedem Werkzeug, mittlere
+verschiebt), Zeichenflaeche schreibt nach einem Strich nur die geaenderten
+Punkte (`leinwandZellen`) und mischt Ebenen mit Deckkraft ueber den Stoff
+wie das Original, Seitenleiste mit Farbliste, Katalog der 19 Hersteller
+(Suche, hoechstens 400 Zeilen, Haken an benutzten), Ebenenliste mit Auge,
+Schloss, Doppelklick = umbenennen, Knoepfen und Deckkraft-Regler;
+Sichern/Sichern unter, Punkt im Titel, Rueckfrage bei Kreuz und Oeffnen.
+**Logo** vom Nutzer (ein JPEG mit gemaltem Schachbrett): ausgeschnitten,
+Ecken zeilenweise aus dem Bild gemessen (Squircle, kein Kreisbogen),
+Randpunkt mit Teil-Deckkraft in der Farbe von innen, `daten/bilder/
+glutfaden_16..256.png`; Fenstersymbol und Ueber-Fenster. `--probe-bearbeiten`
+(`ansicht/vorfuehrung.dh`) spielt alles durch; `glutfaden_ansicht.dhtest`
+prueft Ausgabe und Bild (Blau da, nach Zurueck weg, bei halber Deckkraft
+gemischt), `glutfaden_bearbeiten.dhtest` (5) den Kern. Die gesicherte Datei
+liest PyStickys `load_pattern` richtig (Ebenen, DMC 996 mit Symbol,
+Halbstiche, radierte Zelle). **Tempo an 1000 x 1000:** Fuellen 2892 -> 14 ms,
+Setzen 3455 -> 23 ms, Zurueck 665 -> 8 ms, Zusammenfuehren 400 -> 9 ms --
+feste Zahlenfelder in der Schleife statt Aufrufen je Zelle; eine Hilfs-SUB
+mit BYREF-Feldern hielt das Fuellen in der VM (ein Feld wird ohnehin als
+Verweis uebergeben, BYREF braucht es nur zum Neu-Zuweisen). **Funde in der
+Laufzeit:** (1) der Maschinencode kannte die **Bit-Operatoren** nicht (siehe
+docs/entwurf-maschinencode.md, Schritt 24); (2) `a IS b` mit einer Variablen
+rechts meldete "unbekannter Typ 'b'" -- jetzt der Hinweis, dass dasselbe
+Objekt mit `=` verglichen wird (`typtest.dhtest`). Nicht getestet: die
+modalen Dialoge (Umbenennen, Rueckfrage, Dateiwahl) -- `gtk_dialog_run`
+blockiert die Vorfuehrung.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
