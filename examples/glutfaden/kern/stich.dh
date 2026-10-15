@@ -34,6 +34,14 @@ FUNCTION stichGedreht(t AS INTEGER) AS INTEGER
     RETURN tab[t]
 END FUNCTION
 
+' Gegen den Uhrzeigersinn (PySticky ROTATE_CCW_MAP): stichGedreht ist der
+' Uhrzeigersinn.
+FUNCTION stichGedrehtLinks(t AS INTEGER) AS INTEGER
+    DIM tab AS ARRAY OF INTEGER : tab = [0, 2, 1, 5, 3, 6, 4, 7, 8, 9, 10, 11]
+    IF t < 0 OR t > STICHTYP_MAX THEN RETURN t
+    RETURN tab[t]
+END FUNCTION
+
 ' --- Formen (PySticky core/stitch_shapes.py) ------------------------------------
 ' Die Eckpunkte eines Teilstichs, normalisiert auf die Zelle (0..1, y nach
 ' unten), flach als [x0, y0, x1, y1, ...]; leer fuer alles, was kein Vieleck

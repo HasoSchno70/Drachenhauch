@@ -1,0 +1,424 @@
+' Glutfaden Stufe 3, Formen und Auswahl Punkt fuer Punkt gegen PySticky: die
+' Erwartung ist die Ausgabe der Original-Algorithmen (PolygonTool.
+' _get_polygon_points, LassoSelectTool._fill_lasso_polygon, MirrorMixin.
+' get_mirrored_positions), einmal mit PySticky aufgezeichnet. Je Zeile: Zahl
+' der Zellen, dann jede als (x+1000)*10000 + (y+1000), sortiert.
+
+=== vieleck lasso und spiegel wie in pysticky
+IMPORT "k.dh"
+DIM i AS INTEGER, x AS INTEGER, y AS INTEGER
+zeile("vieleck 0 2,2 12,4 6,11", kern.vieleck([2, 2, 12, 4, 6, 11], FALSE, 16, 14))
+zeile("vieleck 0 0,0 9,0 9,6 5,3 0,6", kern.vieleck([0, 0, 9, 0, 9, 6, 5, 3, 0, 6], FALSE, 16, 14))
+zeile("vieleck 0 3,1 14,9 1,12 10,2", kern.vieleck([3, 1, 14, 9, 1, 12, 10, 2], FALSE, 16, 14))
+zeile("vieleck 0 1,1 6,1 6,6 1,6", kern.vieleck([1, 1, 6, 1, 6, 6, 1, 6], FALSE, 16, 14))
+zeile("vieleck 0 -3,2 8,-2 5,9", kern.vieleck([-3, 2, 8, -2, 5, 9], FALSE, 16, 14))
+zeile("vieleck 1 2,2 12,4 6,11", kern.vieleck([2, 2, 12, 4, 6, 11], TRUE, 16, 14))
+zeile("vieleck 1 0,0 9,0 9,6 5,3 0,6", kern.vieleck([0, 0, 9, 0, 9, 6, 5, 3, 0, 6], TRUE, 16, 14))
+zeile("vieleck 1 3,1 14,9 1,12 10,2", kern.vieleck([3, 1, 14, 9, 1, 12, 10, 2], TRUE, 16, 14))
+zeile("vieleck 1 1,1 6,1 6,6 1,6", kern.vieleck([1, 1, 6, 1, 6, 6, 1, 6], TRUE, 16, 14))
+zeile("vieleck 1 -3,2 8,-2 5,9", kern.vieleck([-3, 2, 8, -2, 5, 9], TRUE, 16, 14))
+zeile("lasso 2,2 12,4 6,11", kern.auswahlLasso(16, 14, [2, 2, 12, 4, 6, 11]).zellen())
+zeile("lasso 1,1 8,1 8,2 2,2 2,8 1,8", kern.auswahlLasso(16, 14, [1, 1, 8, 1, 8, 2, 2, 2, 2, 8, 1, 8]).zellen())
+zeile("lasso 3,1 14,9 1,12 10,2", kern.auswahlLasso(16, 14, [3, 1, 14, 9, 1, 12, 10, 2]).zellen())
+zeile("lasso 5,5 6,5", kern.auswahlLasso(16, 14, [5, 5, 6, 5]).zellen())
+zeile("lasso 0,0 20,3 4,18", kern.auswahlLasso(16, 14, [0, 0, 20, 3, 4, 18]).zellen())
+zeile("spiegel 10 10 1 0 0", kern.spiegelZellen(0, 0, 10, 10, 1))
+zeile("spiegel 10 10 1 2 5", kern.spiegelZellen(2, 5, 10, 10, 1))
+zeile("spiegel 10 10 1 4 4", kern.spiegelZellen(4, 4, 10, 10, 1))
+zeile("spiegel 10 10 1 9 1", kern.spiegelZellen(9, 1, 10, 10, 1))
+zeile("spiegel 10 10 2 0 0", kern.spiegelZellen(0, 0, 10, 10, 2))
+zeile("spiegel 10 10 2 2 5", kern.spiegelZellen(2, 5, 10, 10, 2))
+zeile("spiegel 10 10 2 4 4", kern.spiegelZellen(4, 4, 10, 10, 2))
+zeile("spiegel 10 10 2 9 1", kern.spiegelZellen(9, 1, 10, 10, 2))
+zeile("spiegel 10 10 3 0 0", kern.spiegelZellen(0, 0, 10, 10, 3))
+zeile("spiegel 10 10 3 2 5", kern.spiegelZellen(2, 5, 10, 10, 3))
+zeile("spiegel 10 10 3 4 4", kern.spiegelZellen(4, 4, 10, 10, 3))
+zeile("spiegel 10 10 3 9 1", kern.spiegelZellen(9, 1, 10, 10, 3))
+zeile("spiegel 10 10 4 0 0", kern.spiegelZellen(0, 0, 10, 10, 4))
+zeile("spiegel 10 10 4 2 5", kern.spiegelZellen(2, 5, 10, 10, 4))
+zeile("spiegel 10 10 4 4 4", kern.spiegelZellen(4, 4, 10, 10, 4))
+zeile("spiegel 10 10 4 9 1", kern.spiegelZellen(9, 1, 10, 10, 4))
+zeile("spiegel 11 7 1 0 0", kern.spiegelZellen(0, 0, 11, 7, 1))
+zeile("spiegel 11 7 1 2 5", kern.spiegelZellen(2, 5, 11, 7, 1))
+zeile("spiegel 11 7 1 4 4", kern.spiegelZellen(4, 4, 11, 7, 1))
+zeile("spiegel 11 7 1 10 1", kern.spiegelZellen(10, 1, 11, 7, 1))
+zeile("spiegel 11 7 2 0 0", kern.spiegelZellen(0, 0, 11, 7, 2))
+zeile("spiegel 11 7 2 2 5", kern.spiegelZellen(2, 5, 11, 7, 2))
+zeile("spiegel 11 7 2 4 4", kern.spiegelZellen(4, 4, 11, 7, 2))
+zeile("spiegel 11 7 2 10 1", kern.spiegelZellen(10, 1, 11, 7, 2))
+zeile("spiegel 11 7 3 0 0", kern.spiegelZellen(0, 0, 11, 7, 3))
+zeile("spiegel 11 7 3 2 5", kern.spiegelZellen(2, 5, 11, 7, 3))
+zeile("spiegel 11 7 3 4 4", kern.spiegelZellen(4, 4, 11, 7, 3))
+zeile("spiegel 11 7 3 10 1", kern.spiegelZellen(10, 1, 11, 7, 3))
+zeile("spiegel 11 7 4 0 0", kern.spiegelZellen(0, 0, 11, 7, 4))
+zeile("spiegel 11 7 4 2 5", kern.spiegelZellen(2, 5, 11, 7, 4))
+zeile("spiegel 11 7 4 4 4", kern.spiegelZellen(4, 4, 11, 7, 4))
+zeile("spiegel 11 7 4 10 1", kern.spiegelZellen(10, 1, 11, 7, 4))
+zeile("spiegel 9 9 1 0 0", kern.spiegelZellen(0, 0, 9, 9, 1))
+zeile("spiegel 9 9 1 2 5", kern.spiegelZellen(2, 5, 9, 9, 1))
+zeile("spiegel 9 9 1 4 4", kern.spiegelZellen(4, 4, 9, 9, 1))
+zeile("spiegel 9 9 1 8 1", kern.spiegelZellen(8, 1, 9, 9, 1))
+zeile("spiegel 9 9 2 0 0", kern.spiegelZellen(0, 0, 9, 9, 2))
+zeile("spiegel 9 9 2 2 5", kern.spiegelZellen(2, 5, 9, 9, 2))
+zeile("spiegel 9 9 2 4 4", kern.spiegelZellen(4, 4, 9, 9, 2))
+zeile("spiegel 9 9 2 8 1", kern.spiegelZellen(8, 1, 9, 9, 2))
+zeile("spiegel 9 9 3 0 0", kern.spiegelZellen(0, 0, 9, 9, 3))
+zeile("spiegel 9 9 3 2 5", kern.spiegelZellen(2, 5, 9, 9, 3))
+zeile("spiegel 9 9 3 4 4", kern.spiegelZellen(4, 4, 9, 9, 3))
+zeile("spiegel 9 9 3 8 1", kern.spiegelZellen(8, 1, 9, 9, 3))
+zeile("spiegel 9 9 4 0 0", kern.spiegelZellen(0, 0, 9, 9, 4))
+zeile("spiegel 9 9 4 2 5", kern.spiegelZellen(2, 5, 9, 9, 4))
+zeile("spiegel 9 9 4 4 4", kern.spiegelZellen(4, 4, 9, 9, 4))
+zeile("spiegel 9 9 4 8 1", kern.spiegelZellen(8, 1, 9, 9, 4))
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+vieleck 0 2,2 12,4 6,11 26 10021002 10021003 10031002 10031004 10031005 10041002 10041006 10041007 10051003 10051008 10051009 10061003 10061010 10061011 10071003 10071010 10081003 10081009 10091003 10091007 10091008 10101004 10101006 10111004 10111005 10121004
+vieleck 0 0,0 9,0 9,6 5,3 0,6 30 10001000 10001001 10001002 10001003 10001004 10001005 10001006 10011000 10011005 10021000 10021005 10031000 10031004 10041000 10041004 10051000 10051003 10061000 10061004 10071000 10071004 10081000 10081005 10091000 10091001 10091002 10091003 10091004 10091005 10091006
+vieleck 0 3,1 14,9 1,12 10,2 41 10011012 10021011 10021012 10031001 10031010 10031012 10041001 10041002 10041009 10041011 10051001 10051002 10051007 10051008 10051011 10061001 10061003 10061006 10061011 10071002 10071004 10071005 10071011 10081002 10081004 10081005 10081010 10091002 10091003 10091005 10091010 10101002 10101006 10101010 10111007 10111010 10121008 10121009 10131008 10131009 10141009
+vieleck 0 1,1 6,1 6,6 1,6 20 10011001 10011002 10011003 10011004 10011005 10011006 10021001 10021006 10031001 10031006 10041001 10041006 10051001 10051006 10061001 10061002 10061003 10061004 10061005 10061006
+vieleck 0 -3,2 8,-2 5,9 30 9971002 9981002 9981003 9991001 9991004 10001001 10001005 10011001 10011005 10021000 10021006 10031000 10031007 10040999 10041008 10050999 10051008 10051009 10060999 10061004 10061005 10061006 10061007 10070998 10071000 10071001 10071002 10071003 10080998 10080999
+vieleck 1 2,2 12,4 6,11 59 10021002 10021003 10021004 10031002 10031003 10031004 10031005 10031006 10041002 10041003 10041004 10041005 10041006 10041007 10041008 10051003 10051004 10051005 10051006 10051007 10051008 10051009 10051010 10061003 10061004 10061005 10061006 10061007 10061008 10061009 10061010 10061011 10071003 10071004 10071005 10071006 10071007 10071008 10071009 10071010 10081003 10081004 10081005 10081006 10081007 10081008 10081009 10091003 10091004 10091005 10091006 10091007 10091008 10101004 10101005 10101006 10111004 10111005 10121004
+vieleck 1 0,0 9,0 9,6 5,3 0,6 57 10001000 10001001 10001002 10001003 10001004 10001005 10001006 10011000 10011001 10011002 10011003 10011004 10011005 10021000 10021001 10021002 10021003 10021004 10021005 10031000 10031001 10031002 10031003 10031004 10041000 10041001 10041002 10041003 10041004 10051000 10051001 10051002 10051003 10061000 10061001 10061002 10061003 10061004 10071000 10071001 10071002 10071003 10071004 10071005 10081000 10081001 10081002 10081003 10081004 10081005 10091000 10091001 10091002 10091003 10091004 10091005 10091006
+vieleck 1 3,1 14,9 1,12 10,2 75 10011011 10011012 10021010 10021011 10021012 10031001 10031009 10031010 10031011 10031012 10041001 10041002 10041008 10041009 10041010 10041011 10051001 10051002 10051003 10051007 10051008 10051009 10051010 10051011 10061001 10061002 10061003 10061006 10061007 10061008 10061009 10061010 10061011 10071002 10071003 10071004 10071005 10071006 10071007 10071008 10071009 10071010 10071011 10081002 10081003 10081004 10081005 10081006 10081007 10081008 10081009 10081010 10091002 10091003 10091005 10091006 10091007 10091008 10091009 10091010 10101002 10101006 10101007 10101008 10101009 10101010 10111007 10111008 10111009 10111010 10121008 10121009 10131008 10131009 10141009
+vieleck 1 1,1 6,1 6,6 1,6 36 10011001 10011002 10011003 10011004 10011005 10011006 10021001 10021002 10021003 10021004 10021005 10021006 10031001 10031002 10031003 10031004 10031005 10031006 10041001 10041002 10041003 10041004 10041005 10041006 10051001 10051002 10051003 10051004 10051005 10051006 10061001 10061002 10061003 10061004 10061005 10061006
+vieleck 1 -3,2 8,-2 5,9 70 9971002 9981002 9981003 9991001 9991004 10001001 10001002 10001003 10001004 10001005 10011001 10011002 10011003 10011004 10011005 10011006 10021000 10021001 10021002 10021003 10021004 10021005 10021006 10021007 10031000 10031001 10031002 10031003 10031004 10031005 10031006 10031007 10031008 10040999 10041000 10041001 10041002 10041003 10041004 10041005 10041006 10041007 10041008 10050999 10051000 10051001 10051002 10051003 10051004 10051005 10051006 10051007 10051008 10051009 10060999 10061000 10061001 10061002 10061003 10061004 10061005 10061006 10061007 10070998 10071000 10071001 10071002 10071003 10080998 10080999
+lasso 2,2 12,4 6,11 53 10021002 10021003 10031002 10031003 10031004 10031005 10041002 10041003 10041004 10041005 10041006 10041007 10051003 10051004 10051005 10051006 10051007 10051008 10051009 10061003 10061004 10061005 10061006 10061007 10061008 10061009 10061010 10061011 10071003 10071004 10071005 10071006 10071007 10071008 10071010 10081003 10081004 10081005 10081006 10081007 10081009 10091003 10091004 10091005 10091006 10091007 10091008 10101004 10101005 10101006 10111004 10111005 10121004
+lasso 1,1 8,1 8,2 2,2 2,8 1,8 28 10011001 10011002 10011003 10011004 10011005 10011006 10011007 10011008 10021001 10021002 10021003 10021004 10021005 10021006 10021007 10021008 10031001 10031002 10041001 10041002 10051001 10051002 10061001 10061002 10071001 10071002 10081001 10081002
+lasso 3,1 14,9 1,12 10,2 72 10011011 10011012 10021010 10021011 10021012 10031001 10031009 10031010 10031012 10041001 10041002 10041008 10041009 10041010 10041011 10051001 10051002 10051007 10051008 10051009 10051010 10051011 10061001 10061002 10061003 10061006 10061007 10061008 10061009 10061010 10061011 10071002 10071003 10071004 10071005 10071006 10071007 10071008 10071009 10071011 10081002 10081003 10081004 10081005 10081006 10081007 10081008 10081009 10081010 10091002 10091003 10091005 10091006 10091007 10091008 10091009 10091010 10101002 10101006 10101007 10101008 10101009 10101010 10111007 10111008 10111009 10111010 10121008 10121009 10131008 10131009 10141009
+lasso 5,5 6,5 0
+lasso 0,0 20,3 4,18 166 10001000 10001001 10001002 10011000 10011001 10011002 10011003 10011004 10011005 10011006 10021000 10021001 10021002 10021003 10021004 10021005 10021006 10021007 10021008 10021009 10021010 10021011 10031000 10031001 10031002 10031003 10031004 10031005 10031006 10031007 10031008 10031009 10031010 10031011 10031012 10031013 10041001 10041002 10041003 10041004 10041005 10041006 10041007 10041008 10041009 10041010 10041011 10041012 10041013 10051001 10051002 10051003 10051004 10051005 10051006 10051007 10051008 10051009 10051010 10051011 10051012 10051013 10061001 10061002 10061003 10061004 10061005 10061006 10061007 10061008 10061009 10061010 10061011 10061012 10061013 10071001 10071002 10071003 10071004 10071005 10071006 10071007 10071008 10071009 10071010 10071011 10071012 10071013 10081001 10081002 10081003 10081004 10081005 10081006 10081007 10081008 10081009 10081010 10081011 10081012 10081013 10091001 10091002 10091003 10091004 10091005 10091006 10091007 10091008 10091009 10091010 10091011 10091012 10091013 10101001 10101002 10101003 10101004 10101005 10101006 10101007 10101008 10101009 10101010 10101011 10101012 10111002 10111003 10111004 10111005 10111006 10111007 10111008 10111009 10111010 10111011 10121002 10121003 10121004 10121005 10121006 10121007 10121008 10121009 10121010 10131002 10131003 10131004 10131005 10131006 10131007 10131008 10131010 10141002 10141003 10141004 10141005 10141006 10141007 10141009 10151002 10151003 10151004 10151005 10151006 10151008
+spiegel 10 10 1 0 0 2 10001000 10091000
+spiegel 10 10 1 2 5 2 10021005 10071005
+spiegel 10 10 1 4 4 2 10041004 10051004
+spiegel 10 10 1 9 1 2 10001001 10091001
+spiegel 10 10 2 0 0 2 10001000 10001009
+spiegel 10 10 2 2 5 2 10021004 10021005
+spiegel 10 10 2 4 4 2 10041004 10041005
+spiegel 10 10 2 9 1 2 10091001 10091008
+spiegel 10 10 3 0 0 4 10001000 10001009 10091000 10091009
+spiegel 10 10 3 2 5 4 10021004 10021005 10071004 10071005
+spiegel 10 10 3 4 4 4 10041004 10041005 10051004 10051005
+spiegel 10 10 3 9 1 4 10001001 10001008 10091001 10091008
+spiegel 10 10 4 0 0 4 10001000 10001009 10091000 10091009
+spiegel 10 10 4 2 5 8 10021004 10021005 10041002 10041007 10051002 10051007 10071004 10071005
+spiegel 10 10 4 4 4 4 10041004 10041005 10051004 10051005
+spiegel 10 10 4 9 1 8 10001001 10001008 10011000 10011009 10081000 10081009 10091001 10091008
+spiegel 11 7 1 0 0 2 10001000 10101000
+spiegel 11 7 1 2 5 2 10021005 10081005
+spiegel 11 7 1 4 4 2 10041004 10061004
+spiegel 11 7 1 10 1 2 10001001 10101001
+spiegel 11 7 2 0 0 2 10001000 10001006
+spiegel 11 7 2 2 5 2 10021001 10021005
+spiegel 11 7 2 4 4 2 10041002 10041004
+spiegel 11 7 2 10 1 2 10101001 10101005
+spiegel 11 7 3 0 0 4 10001000 10001006 10101000 10101006
+spiegel 11 7 3 2 5 4 10021001 10021005 10081001 10081005
+spiegel 11 7 3 4 4 4 10041002 10041004 10061002 10061004
+spiegel 11 7 3 10 1 4 10001001 10001005 10101001 10101005
+spiegel 11 7 4 0 0 4 10001000 10001006 10101000 10101006
+spiegel 11 7 4 2 5 4 10021001 10021005 10081001 10081005
+spiegel 11 7 4 4 4 4 10041002 10041004 10061002 10061004
+spiegel 11 7 4 10 1 4 10001001 10001005 10101001 10101005
+spiegel 9 9 1 0 0 2 10001000 10081000
+spiegel 9 9 1 2 5 2 10021005 10061005
+spiegel 9 9 1 4 4 1 10041004
+spiegel 9 9 1 8 1 2 10001001 10081001
+spiegel 9 9 2 0 0 2 10001000 10001008
+spiegel 9 9 2 2 5 2 10021003 10021005
+spiegel 9 9 2 4 4 1 10041004
+spiegel 9 9 2 8 1 2 10081001 10081007
+spiegel 9 9 3 0 0 4 10001000 10001008 10081000 10081008
+spiegel 9 9 3 2 5 4 10021003 10021005 10061003 10061005
+spiegel 9 9 3 4 4 1 10041004
+spiegel 9 9 3 8 1 4 10001001 10001007 10081001 10081007
+spiegel 9 9 4 0 0 4 10001000 10001008 10081000 10081008
+spiegel 9 9 4 2 5 8 10021003 10021005 10031002 10031006 10051002 10051006 10061003 10061005
+spiegel 9 9 4 4 4 1 10041004
+spiegel 9 9 4 8 1 8 10001001 10001007 10011000 10011008 10071000 10071008 10081001 10081007
+
+=== farbabstand wie in pysticky
+' CIEDE2000 -- die Werte hat PySticky (core/color_math.delta_e) geliefert.
+IMPORT "k.dh"
+DIM paare AS ARRAY OF INTEGER : paare = [&HFF0000, &HFE0000, &H0097E1, &H7DC8EB, &H000000, &HFFFFFF, &H808080, &H818181, &H123456, &H654321, &HA9152C, &HAB0249, &H00FF00, &H0000FF, &HFFFF00, &HFFC800]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(paare) - 2 STEP 2
+    PRINT HEX$(paare[i]); " "; HEX$(paare[i + 1]); " "; FORMAT$(kern.farbAbstand(paare[i], paare[i + 1]), "%.6f")
+NEXT
+' Rangfolge und seltene Farben am Demo-Muster (rank_similar_colors,
+' compute_rare_color_replacements)
+DIM m AS kern.Muster : m = kern.pxsLaden(PATHJOIN(ARG$(0), "daten/muster/demo_kreuzstich.pxs"))
+FOR i = 0 TO m.farbanzahl() - 1
+    PRINT "aehnlich "; i; " "; JOIN$(kern.aehnlicheFarben(m, i), ",")
+NEXT
+DIM n AS INTEGER
+FOR EACH n IN [5, 20, 60]
+    PRINT "selten "; n; " ["; JOIN$(kern.selteneErsetzungen(m, n), ","); "]"
+NEXT
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+FF0000 FE0000 0.207852
+97E1 7DC8EB 16.167522
+0 FFFFFF 100.000004
+808080 818181 0.377849
+123456 654321 33.599934
+A9152C AB0249 9.816841
+FF00 FF 83.185878
+FFFF00 FFC800 16.604549
+aehnlich 0 1,3,4,2,5
+aehnlich 1 0,4,3,5,2
+aehnlich 2 5,3,4,1,0
+aehnlich 3 4,0,5,2,1
+aehnlich 4 3,5,0,1,2
+aehnlich 5 2,4,3,1,0
+selten 5 []
+selten 20 [2,4]
+selten 60 [1,4,2,4]
+
+=== auswahl kopieren einfuegen verschieben drehen spiegeln
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = neuesTestmuster()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM n AS INTEGER
+' ein L aus drei Zellen mit Teilstichen: (1,1) Viertel oben links, (1,2) und (2,2) voll
+DIM ok AS BOOLEAN
+ok = kern.stichSetzen(m, v, 1, 1, 0, kern.VIERTEL_OL)
+ok = kern.stichSetzen(m, v, 1, 2, 0, kern.VOLL)
+ok = kern.stichSetzen(m, v, 2, 2, 0, kern.HALB_OL_UR)
+PRINT bild$(m)
+DIM a AS kern.Auswahl : a = kern.auswahlRechteck(6, 5, 1, 1, 2, 2)
+PRINT "auswahl "; a.anzahl; " "; a.x0; ","; a.y0; "-"; a.x1; ","; a.y1
+DIM s AS kern.Ausschnitt : s = kern.ausschnittVon(m.ebenen.aktiveEbene(), a)
+PRINT "ausschnitt "; s.breite; "x"; s.hoehe; " stiche "; s.stiche()
+' einfuegen an (3, 2): nur Zellen mit Stich, die leere laesst stehen
+ok = kern.stichSetzen(m, v, 4, 2, 1, kern.VOLL)
+n = kern.ausschnittSetzen(m, v, NIL, s, 3, 2, "Einfügen")
+PRINT "eingefuegt "; n; " schritte "; LEN(v.rueck)
+PRINT bild$(m)
+ok = v.zurueckNehmen(m)
+' verschieben um (2, 1): alte Zellen weg, neue da, ein Schritt
+n = kern.ausschnittSetzen(m, v, a, s, 3, 2, "Verschieben")
+PRINT "verschoben "; n; " oben "; v.textZurueck$()
+PRINT bild$(m)
+ok = v.zurueckNehmen(m)
+PRINT "zurueck"
+PRINT bild$(m)
+' im Uhrzeigersinn drehen: (x, y) -> (h-1-y, x), Viertel oben links -> oben rechts
+DIM d AS kern.Ausschnitt : d = kern.ausschnittGedreht(s, TRUE)
+n = kern.ausschnittSetzen(m, v, a, d, 1, 1, "Drehen")
+PRINT "gedreht"
+PRINT bild$(m)
+ok = v.zurueckNehmen(m)
+d = kern.ausschnittGedreht(kern.ausschnittGedreht(kern.ausschnittGedreht(kern.ausschnittGedreht(s, TRUE), TRUE), TRUE), TRUE)
+PRINT "viermal gedreht gleich: "; ausschnittGleich(d, s)
+PRINT "rechts und links gleich: "; ausschnittGleich(kern.ausschnittGedreht(kern.ausschnittGedreht(s, TRUE), FALSE), s)
+' waagerecht spiegeln: Halbstich kippt
+d = kern.ausschnittGespiegelt(s, TRUE)
+n = kern.ausschnittSetzen(m, v, a, d, 1, 1, "Spiegeln")
+PRINT "gespiegelt"
+PRINT bild$(m)
+ok = v.zurueckNehmen(m)
+' loeschen und fuellen
+n = kern.zellenSetzen(m, v, a.zellen(), -1, kern.VOLL, "Löschen")
+PRINT "geloescht "; n
+n = kern.zellenSetzen(m, v, a.zellen(), 1, kern.VOLL, "Füllen")
+PRINT "gefuellt "; n; " (Perlenfarbe)"
+PRINT bild$(m)
+' gesperrte Ebene: nichts
+WHILE v.zurueckNehmen(m) : WEND
+m.ebenen.aktiveEbene().gesperrt = TRUE
+PRINT "gesperrt "; kern.ausschnittSetzen(m, v, a, s, 3, 2, "Verschieben")
+' Lasso und verschobene Auswahl
+DIM l AS kern.Auswahl : l = kern.auswahlLasso(6, 5, [0, 0, 5, 0, 0, 4])
+PRINT "lasso "; l.anzahl; " rechteck "; l.istRechteck
+DIM w AS kern.Auswahl : w = kern.auswahlVerschoben(l, 3, 0)
+PRINT "verschoben "; w.anzahl; " "; w.x0; "-"; w.x1
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+.. .. .. .. .. ..
+.. 03 .. .. .. ..
+.. 00 01 .. .. ..
+.. .. .. .. .. ..
+.. .. .. .. .. ..
+auswahl 4 1,1-2,2
+ausschnitt 2x2 stiche 3
+eingefuegt 3 schritte 5
+.. .. .. .. .. ..
+.. 03 .. .. .. ..
+.. 00 01 03 1A ..
+.. .. .. 00 01 ..
+.. .. .. .. .. ..
+verschoben 6 oben Verschieben
+.. .. .. .. .. ..
+.. .. .. .. .. ..
+.. .. .. 03 1A ..
+.. .. .. 00 01 ..
+.. .. .. .. .. ..
+zurueck
+.. .. .. .. .. ..
+.. 03 .. .. .. ..
+.. 00 01 .. 1A ..
+.. .. .. .. .. ..
+.. .. .. .. .. ..
+gedreht
+.. .. .. .. .. ..
+.. 00 04 .. .. ..
+.. 02 .. .. 1A ..
+.. .. .. .. .. ..
+.. .. .. .. .. ..
+viermal gedreht gleich: TRUE
+rechts und links gleich: TRUE
+gespiegelt
+.. .. .. .. .. ..
+.. .. 04 .. .. ..
+.. 02 00 .. 1A ..
+.. .. .. .. .. ..
+.. .. .. .. .. ..
+geloescht 3
+gefuellt 4 (Perlenfarbe)
+.. .. .. .. .. ..
+.. 1A 1A .. .. ..
+.. 1A 1A .. 1A ..
+.. .. .. .. .. ..
+.. .. .. .. .. ..
+gesperrt 0
+lasso 17 rechteck FALSE
+verschoben 12 3-5
+
+=== rueckstiche setzen finden entfernen
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = neuesTestmuster()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+' Halbstich-Einheiten, gespiegelt vierfach: eine Linie wird vier
+DIM l AS ARRAY OF INTEGER : l = kern.spiegelRueckstich(1, 1, 4, 3, 6, 5, kern.SPIEGEL_VIERFACH)
+PRINT "linien "; JOIN$(l, ",")
+PRINT "gesetzt "; kern.ruecksticheSetzen(m, v, l, 0); " schritte "; LEN(v.rueck)
+PRINT "laenge null "; kern.ruecksticheSetzen(m, v, [2, 2, 2, 2], 0); " schritte "; LEN(v.rueck)
+PRINT "bei 2,2 "; kern.rueckstichBei(m, 2.5, 2.0, 2.0); "  bei 11,1 "; kern.rueckstichBei(m, 10.5, 1.5, 2.0); "  weit weg "; kern.rueckstichBei(m, 6.0, 9.0, 1.0)
+PRINT "entfernt "; kern.rueckstichEntfernen(m, v, 1); " uebrig "; LEN(m.rueckstiche)
+DIM ok AS BOOLEAN : ok = v.zurueckNehmen(m)
+PRINT "zurueck "; LEN(m.rueckstiche); " zweiter "; m.rueckstiche[1].x1; ","; m.rueckstiche[1].y1
+ok = v.zurueckNehmen(m)
+PRINT "ganz zurueck "; LEN(m.rueckstiche)
+ok = v.wiederholen(m)
+' sichern und laden: die Rueckstiche kommen mit
+DIM pfad AS STRING : pfad = PATHJOIN(CWD$(), "r.pxs")
+kern.pxsSpeichern(m, pfad)
+DIM g AS kern.Muster : g = kern.pxsLaden(pfad)
+PRINT "geladen "; LEN(g.rueckstiche); " "; g.rueckstiche[3].x1; ","; g.rueckstiche[3].y1; " "; g.rueckstiche[3].x2; ","; g.rueckstiche[3].y2; " farbe "; g.rueckstiche[3].farbe
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+linien 1,1,4,3,11,1,8,3,1,9,4,7,11,9,8,7
+gesetzt 4 schritte 1
+laenge null 0 schritte 1
+bei 2,2 0  bei 11,1 1  weit weg -1
+entfernt TRUE uebrig 3
+zurueck 4 zweiter 11,1
+ganz zurueck 0
+geladen 4 11,9 8,7 farbe 0
+
+=== fortschritt markieren und naechster offener stich
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = neuesTestmuster()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM ok AS BOOLEAN
+DIM n AS INTEGER
+' unten Farbe 0 in Zeile 0, oben (neue Ebene) Farbe 0 bei (2,0) und (4,1)
+n = kern.zellenSetzen(m, v, [0, 0, 1, 0, 2, 0, 3, 0], 0, kern.VOLL, "unten")
+n = kern.ebeneNeu(m, v, "Oben")
+n = kern.zellenSetzen(m, v, [2, 0, 4, 1], 0, kern.VOLL, "oben")
+' (2,0) markieren trifft die OBERE Ebene, (5,4) ist leer
+PRINT "markiert "; kern.erledigtSetzen(m, v, [2, 0, 5, 4, 0, 0], TRUE)
+PRINT "oben "; m.ebenen.ebenen[1].istErledigt(2, 0); " unten "; m.ebenen.ebenen[0].istErledigt(2, 0); " (0,0) "; m.ebenen.ebenen[0].istErledigt(0, 0)
+PRINT "naechster ab vorn "; kern.naechsterOffen(m, 0, -1, TRUE); " ab 1 "; kern.naechsterOffen(m, 0, 1, TRUE); " ab 3 "; kern.naechsterOffen(m, 0, 3, TRUE)
+PRINT "rueckwaerts ab 1 "; kern.naechsterOffen(m, 0, 1, FALSE); " ab vorn "; kern.naechsterOffen(m, 0, -1, FALSE)
+ok = v.zurueckNehmen(m)
+PRINT "zurueck "; m.ebenen.ebenen[1].istErledigt(2, 0); " "; m.ebenen.ebenen[0].istErledigt(0, 0)
+' eine ganze Farbe -- auch auf unsichtbaren Ebenen
+m.ebenen.ebenen[1].sichtbar = FALSE
+PRINT "farbe erledigt "; kern.farbeErledigt(m, v, 0); " oben "; m.ebenen.ebenen[1].istErledigt(4, 1)
+PRINT "keiner offen "; kern.naechsterOffen(m, 0, -1, TRUE)
+ok = v.zurueckNehmen(m)
+PRINT "wieder offen "; kern.naechsterOffen(m, 0, -1, TRUE)
+' markieren laesst die Stiche und Stichzahlen stehen
+PRINT "stiche "; m.farben[0].stichzahl
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+markiert 2
+oben TRUE unten FALSE (0,0) TRUE
+naechster ab vorn 1 ab 1 3 ab 3 10
+rueckwaerts ab 1 10 ab vorn 10
+zurueck FALSE FALSE
+farbe erledigt 6 oben TRUE
+keiner offen -1
+wieder offen 0
+stiche 6
+
+=== farbe ersetzen und symbol aendern
+IMPORT "k.dh"
+DIM m AS kern.Muster : m = neuesTestmuster()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D", "E"]
+DIM rot2 AS INTEGER : rot2 = kern.farbeHinzufuegen(m, v, kern.neuesGarn("Rot dunkler", &HF00000, "DMC", "666"), sym, FALSE, FALSE)
+DIM ok AS BOOLEAN
+DIM n AS INTEGER
+' unten Rot (0) in einer Zeile, Perle (1) bei (0,1); oben Rot (0) ueber (0,0)
+n = kern.zellenSetzen(m, v, [0, 0, 1, 0, 2, 0], 0, kern.HALB_OL_UR, "unten")
+ok = kern.stichSetzen(m, v, 0, 1, 1, kern.VOLL)
+ok = kern.stichSetzen(m, v, 3, 0, rot2, kern.VOLL)
+n = kern.ebeneNeu(m, v, "Oben")
+ok = kern.stichSetzen(m, v, 0, 0, 0, kern.VOLL)
+m.ebenen.ebenen[1].sichtbar = FALSE
+' Rot -> Diamant: nur sichtbare oberste Zellen; (0,0) unten zaehlt, weil oben unsichtbar
+PRINT "quellen ohne toleranz "; JOIN$(kern.ersetzenQuellen(m, 0, 2, 0.0), ","); " mit 5 "; JOIN$(kern.ersetzenQuellen(m, 0, 2, 5.0), ",")
+n = kern.farbeErsetzen(m, v, kern.ersetzenQuellen(m, 0, 2, 5.0), 2)
+PRINT "ersetzt "; n; " "; zustand$(m)
+DIM u AS kern.Ebene : u = m.ebenen.ebenen[0]
+PRINT "unten "; u.stich(0, 0); "/"; u.stichArt(0, 0); " "; u.stich(3, 0); "/"; u.stichArt(3, 0); "  oben "; m.ebenen.ebenen[1].stich(0, 0)
+ok = v.zurueckNehmen(m)
+PRINT "zurueck "; zustand$(m)
+' sichtbar oben: dann bleibt die verdeckte untere Zelle
+m.ebenen.ebenen[1].sichtbar = TRUE
+n = kern.farbeErsetzen(m, v, [0], 2)
+PRINT "mit oben "; n; " unten 0,0 "; u.stich(0, 0); " oben "; m.ebenen.ebenen[1].stich(0, 0)
+ok = v.zurueckNehmen(m)
+' Perle -> gewoehnliche Farbe: wird voller Stich
+n = kern.farbeErsetzen(m, v, [1], 0)
+PRINT "perle zu rot "; u.stich(0, 1); "/"; u.stichArt(0, 1)
+' Symbol: doppelt abgelehnt, sonst ein Schritt
+PRINT "doppelt: "; kern.symbolSetzen(m, v, 0, "B")
+PRINT "leer: "; kern.symbolSetzen(m, v, 0, " ")
+PRINT "neu: '"; kern.symbolSetzen(m, v, 0, "★"); "' "; m.farben[0].symbol; " oben "; v.textZurueck$()
+ok = v.zurueckNehmen(m)
+PRINT "zurueck "; m.farben[0].symbol
+--- datei k.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden.dh"
+
+--- erwartet
+quellen ohne toleranz 0 mit 5 0,3
+ersetzt 4 [Hintergrund:5 *Oben:1] farben A=1 B=1 C=4 D=0 summe 35568723
+unten 2/11 2/11  oben 0
+zurueck [Hintergrund:5 *Oben:1] farben A=4 B=1 C=0 D=1 summe 733915379
+mit oben 3 unten 0,0 0 oben 2
+perle zu rot 0/0
+doppelt: B hat schon Mill Hill 00557.
+leer: Ein Symbol braucht ein Zeichen.
+neu: '' ★ oben Symbol ändern
+zurueck A

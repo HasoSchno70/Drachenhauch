@@ -18,6 +18,7 @@ CONST TEIL_STICHE = 1
 CONST TEIL_EBENEN = 2
 CONST TEIL_FARBEN = 3
 CONST TEIL_NAME = 4
+CONST TEIL_LISTEN = 5             ' Farbliste und Rueckstiche, ohne Umnummerieren
 
 CLASS Aenderung
     DIM art AS INTEGER
@@ -227,6 +228,15 @@ SUB teilAnwenden(m AS Muster, t AS Aenderung, hin AS BOOLEAN)
             FOR EACH eb IN m.ebenen.ebenen
                 umnummerieren(eb, abb)
             NEXT
+            IF hin THEN
+                m.farben = ARRAY_COPY(t.farbenNachher)
+                m.rueckstiche = ARRAY_COPY(t.rueckNachher)
+            ELSE
+                m.farben = ARRAY_COPY(t.farbenVorher)
+                m.rueckstiche = ARRAY_COPY(t.rueckVorher)
+            END IF
+            m.stichzahlenNeu()
+        CASE TEIL_LISTEN
             IF hin THEN
                 m.farben = ARRAY_COPY(t.farbenNachher)
                 m.rueckstiche = ARRAY_COPY(t.rueckNachher)

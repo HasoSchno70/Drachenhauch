@@ -40,3 +40,47 @@ FUNCTION zustand$(m AS kern.Muster) AS STRING
     NEXT
     RETURN t + " summe " + STR$(s)
 END FUNCTION
+
+' Zellen als Vergleichszeile: Zahl, dann (x+1000)*10000 + (y+1000) sortiert.
+SUB zeile(name AS STRING, p AS ARRAY OF INTEGER)
+    DIM ks AS ARRAY OF INTEGER : ks = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(p) - 2 STEP 2
+        ARRAY_PUSH(ks, (p[k] + 1000) * 10000 + (p[k + 1] + 1000))
+    NEXT
+    SORT(ks)
+    DIM t AS STRING : t = name + " " + STR$(LEN(ks))
+    DIM v AS INTEGER
+    FOR EACH v IN ks
+        t = t + " " + STR$(v)
+    NEXT
+    PRINT t
+END SUB
+
+' Das sichtbare Muster als Text: je Zelle Farbe und Stichtyp (hex), ".." leer.
+FUNCTION bild$(m AS kern.Muster) AS STRING
+    DIM t AS STRING
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO m.hoehe - 1
+        IF y > 0 THEN t = t + CHR$(10)
+        FOR x = 0 TO m.breite - 1
+            IF x > 0 THEN t = t + " "
+            DIM e AS kern.Ebene : e = kern.ebeneMitStich(m, x, y)
+            IF e IS NIL THEN
+                t = t + ".."
+            ELSE
+                t = t + STR$(e.stich(x, y)) + HEX$(e.stichArt(x, y))
+            END IF
+        NEXT
+    NEXT
+    RETURN t
+END FUNCTION
+
+FUNCTION ausschnittGleich(a AS kern.Ausschnitt, b AS kern.Ausschnitt) AS BOOLEAN
+    IF a.breite <> b.breite OR a.hoehe <> b.hoehe THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(a.farbe) - 1
+        IF a.dabei[i] <> b.dabei[i] OR a.farbe[i] <> b.farbe[i] OR a.art[i] <> b.art[i] THEN RETURN FALSE
+    NEXT
+    RETURN TRUE
+END FUNCTION

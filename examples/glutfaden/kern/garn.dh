@@ -168,3 +168,96 @@ FUNCTION symboleLaden(pfad AS STRING) AS ARRAY OF STRING
     NEXT
     RETURN z
 END FUNCTION
+
+' --- Farbabstand (PySticky core/color_math.py) -----------------------------------
+' CIEDE2000 nach Sharma, Wu und Dalal (2005), sRGB -> Lab mit Weisspunkt D65 --
+' dieselben Konstanten wie das Original, damit "Farbe ersetzen" mit Toleranz
+' dieselben Farben trifft.
+FUNCTION srgbLinear(c AS INTEGER) AS FLOAT
+    DIM v AS FLOAT : v = c / 255.0
+    IF v > 0.04045 THEN RETURN ((v + 0.055) / 1.055) ^ 2.4
+    RETURN v / 12.92
+END FUNCTION
+
+FUNCTION labF(t AS FLOAT) AS FLOAT
+    IF t > 0.008856 THEN RETURN t ^ (1.0 / 3.0)
+    RETURN (903.3 * t + 16) / 116
+END FUNCTION
+
+' &HRRGGBB -> (L, a, b)
+FUNCTION farbeLab(f AS INTEGER) AS TUPLE
+    DIM rl AS FLOAT : rl = srgbLinear(rotAnteil(f))
+    DIM gl AS FLOAT : gl = srgbLinear(gruenAnteil(f))
+    DIM bl AS FLOAT : bl = srgbLinear(blauAnteil(f))
+    DIM x AS FLOAT : x = 0.4124564 * rl + 0.3575761 * gl + 0.1804375 * bl
+    DIM y AS FLOAT : y = 0.2126729 * rl + 0.7151522 * gl + 0.0721750 * bl
+    DIM z AS FLOAT : z = 0.0193339 * rl + 0.1191920 * gl + 0.9503041 * bl
+    DIM fx AS FLOAT : fx = labF(x / 0.95047)
+    DIM fy AS FLOAT : fy = labF(y / 1.0)
+    DIM fz AS FLOAT : fz = labF(z / 1.08883)
+    RETURN (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+END FUNCTION
+
+FUNCTION labWinkel(ap AS FLOAT, b AS FLOAT) AS FLOAT
+    IF ap = 0 AND b = 0 THEN RETURN 0.0
+    DIM h AS FLOAT : h = DEG(ATAN2(b, ap))
+    IF h < 0 THEN h = h + 360.0
+    RETURN h
+END FUNCTION
+
+FUNCTION deltaE2000(l1 AS FLOAT, a1 AS FLOAT, b1 AS FLOAT, l2 AS FLOAT, a2 AS FLOAT, b2 AS FLOAT) AS FLOAT
+    DIM c1 AS FLOAT : c1 = HYPOT(a1, b1)
+    DIM c2 AS FLOAT : c2 = HYPOT(a2, b2)
+    DIM cq AS FLOAT : cq = (c1 + c2) / 2.0
+    DIM cq7 AS FLOAT : cq7 = cq ^ 7
+    DIM g AS FLOAT : g = 0.5 * (1 - SQR(cq7 / (cq7 + 25.0 ^ 7)))
+    DIM a1p AS FLOAT : a1p = (1 + g) * a1
+    DIM a2p AS FLOAT : a2p = (1 + g) * a2
+    DIM c1p AS FLOAT : c1p = HYPOT(a1p, b1)
+    DIM c2p AS FLOAT : c2p = HYPOT(a2p, b2)
+    DIM h1p AS FLOAT : h1p = labWinkel(a1p, b1)
+    DIM h2p AS FLOAT : h2p = labWinkel(a2p, b2)
+    DIM dlp AS FLOAT : dlp = l2 - l1
+    DIM dcp AS FLOAT : dcp = c2p - c1p
+    DIM prod AS FLOAT : prod = c1p * c2p
+    DIM dhg AS FLOAT
+    IF prod <> 0 THEN
+        dhg = h2p - h1p
+        IF dhg > 180 THEN
+            dhg = dhg - 360
+        ELSEIF dhg < -180 THEN
+            dhg = dhg + 360
+        END IF
+    END IF
+    DIM dhp AS FLOAT : dhp = 2 * SQR(prod) * SIN(RAD(dhg) / 2)
+    DIM lqp AS FLOAT : lqp = (l1 + l2) / 2.0
+    DIM cqp AS FLOAT : cqp = (c1p + c2p) / 2.0
+    DIM hqp AS FLOAT
+    IF prod = 0 THEN
+        hqp = h1p + h2p
+    ELSEIF ABS(h1p - h2p) > 180 THEN
+        IF h1p + h2p < 360 THEN hqp = (h1p + h2p + 360) / 2 ELSE hqp = (h1p + h2p - 360) / 2
+    ELSE
+        hqp = (h1p + h2p) / 2
+    END IF
+    DIM t AS FLOAT : t = 1 - 0.17 * COS(RAD(hqp - 30)) + 0.24 * COS(RAD(2 * hqp)) + 0.32 * COS(RAD(3 * hqp + 6)) - 0.20 * COS(RAD(4 * hqp - 63))
+    DIM dth AS FLOAT : dth = 30 * EXP(-(((hqp - 275) / 25) ^ 2))
+    DIM cqp7 AS FLOAT : cqp7 = cqp ^ 7
+    DIM rc AS FLOAT : rc = 2 * SQR(cqp7 / (cqp7 + 25.0 ^ 7))
+    DIM sl AS FLOAT : sl = 1 + (0.015 * (lqp - 50) ^ 2) / SQR(20 + (lqp - 50) ^ 2)
+    DIM sc AS FLOAT : sc = 1 + 0.045 * cqp
+    DIM sh AS FLOAT : sh = 1 + 0.015 * cqp * t
+    DIM rt AS FLOAT : rt = -SIN(RAD(2 * dth)) * rc
+    DIM dl AS FLOAT : dl = dlp / sl
+    DIM dc AS FLOAT : dc = dcp / sc
+    DIM dh AS FLOAT : dh = dhp / sh
+    RETURN SQR(dl * dl + dc * dc + dh * dh + rt * dc * dh)
+END FUNCTION
+
+' Abstand zweier Farben &HRRGGBB.
+FUNCTION farbAbstand(f1 AS INTEGER, f2 AS INTEGER) AS FLOAT
+    DIM l1 AS FLOAT, a1 AS FLOAT, b1 AS FLOAT, l2 AS FLOAT, a2 AS FLOAT, b2 AS FLOAT
+    (l1, a1, b1) = farbeLab(f1)
+    (l2, a2, b2) = farbeLab(f2)
+    RETURN deltaE2000(l1, a1, b1, l2, a2, b2)
+END FUNCTION

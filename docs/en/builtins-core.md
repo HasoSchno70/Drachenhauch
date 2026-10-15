@@ -302,7 +302,7 @@ Functions with a `$` suffix also exist without it (`UPPER$` ≡ `UPPER`).
 | `REPLACE$(s, alt, neu)` | replace all occurrences |
 | `TRIM$(s)` | remove whitespace at the front/back |
 | `SPLIT$(s, delim)` → ARRAY OF STRING | split |
-| `JOIN$(arr, delim)` → STRING | join (array OF STRING) |
+| `JOIN$(arr, delim)` → STRING | join; numbers and booleans in the array are written as with `STR$` |
 | `PADL$(s, breite[, fill])`, `PADR$(...)` | pad on the left/right |
 | `REPEAT$(s, n)` | concatenate s n times |
 | `SPACE$(n)` | n spaces |
@@ -1649,7 +1649,7 @@ For more complex sprite collision see the [sprite module](module-sprite.md) with
 | `AUDIO_SET_VOLUME(ch, v)` | `AUDIO_VOLUME(ch, v)` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | `AUDIO_MUSIC_VOLUME(v)` |
 
-Container method `arr.join(trenner)` ≡ `JOIN$(arr, trenner)` (array OF STRING).
+Container method `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 
 **Conventions / stumbling blocks** (deliberately NOT renamed — for clarification only):
 
