@@ -279,7 +279,8 @@ Meldung ohne Zeilenangabe.
 **Compile-Fehler** (vor der Ausführung) tragen ebenfalls die Zeile, in der sie
 entstehen — Parser-Fehler wie Übersetzungsfehler (z. B. eine doppelt
 deklarierte SUB). `dhrt --check datei.dh` meldet sie als JSON, ohne das
-Programm zu starten.
+Programm zu starten. Die Zeile ist die in ihrer eigenen Datei; liegt der
+Befund in einer per IMPORT eingebundenen, nennt `file` deren Pfad.
 
 ### Meldungen auf Englisch (`DHRT_LANG=en`)
 

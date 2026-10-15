@@ -28,6 +28,9 @@
 IMPORT "kern/kern.dh" AS kern
 IMPORT "gtk/gtk.dh"
 IMPORT "ansicht/werkzeuge.dh"
+IMPORT "ansicht/mehr.dh"
+IMPORT "ansicht/text.dh"
+IMPORT "ansicht/dialoge.dh"
 IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/seitenleiste.dh"
 
@@ -87,6 +90,8 @@ SUB statusNachziehen()
     DIM t AS STRING
     IF meldung <> "" AND MILLIS() - meldungZeit < 5000 THEN t = meldung + "   ·   "
     t = t + wzKurzname$(wzAktiv) + ", " + wzStichartName$(wzStichart)
+    IF wzSpiegel > 0 THEN t = t + ", " + spiegelName$(wzSpiegel)
+    IF NOT (mrAuswahl IS NIL) THEN t = t + ", Auswahl " + STR$(mrAuswahl.anzahl)
     IF wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl() THEN
         DIM gf AS kern.Garn : gf = lwMuster.farben[wzFarbe].garn
         t = t + ", " + TRIM$(gf.hersteller + " " + gf.nummer)
@@ -109,7 +114,7 @@ FUNCTION wzKurzname$(nr AS INTEGER) AS STRING
     DIM n AS STRING : n = wzName$(nr)
     DIM p AS INTEGER : p = INSTR(n, " (")
     IF p >= 0 THEN n = LEFT$(n, p)
-    IF (nr = WZ_RECHTECK OR nr = WZ_ELLIPSE) AND wzGefuellt THEN n = n + " gefüllt"
+    IF wzKannGefuellt(nr) AND wzGefuellt THEN n = n + " gefüllt"
     RETURN n
 END FUNCTION
 
@@ -313,6 +318,10 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM strg AS BOOLEAN : strg = (z BAND GDK_STRG) <> 0
     DIM umschalt AS BOOLEAN : umschalt = (z BAND GDK_UMSCHALT) <> 0
     DIM alt AS BOOLEAN : alt = (z BAND GDK_ALT) <> 0
+    ' Im Suchfeld gehoeren Kopieren/Einfuegen/Alles dem Feld
+    IF strg AND gtk_widget_has_focus(slSuche) THEN
+        IF t = &H63 OR t = &H43 OR t = &H78 OR t = &H58 OR t = &H76 OR t = &H56 OR t = &H61 OR t = &H41 THEN RETURN FALSE
+    END IF
     IF strg THEN
         SELECT CASE t
             CASE &H7A, &H5A                                      ' Strg+Z, Strg+Umschalt+Z
@@ -325,6 +334,11 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
                     ok = musterSichern(musterPfad)
                 END IF
             CASE &H6F, &H4F : oeffnenGeklickt(0, 0)              ' Strg+O
+            CASE &H63, &H43 : auswahlKopieren()                  ' Strg+C
+            CASE &H78, &H58 : auswahlAusschneiden()              ' Strg+X
+            CASE &H76, &H56 : einfuegenBeginnen()                ' Strg+V
+            CASE &H61, &H41 : auswahlAlles()                     ' Strg+A
+            CASE &H72, &H52 : farbeErsetzenDialog()              ' Strg+R
             CASE &H6E, &H4E                                      ' Strg+Umschalt+N
                 IF NOT umschalt THEN RETURN FALSE
                 ebenenBefehl(0)

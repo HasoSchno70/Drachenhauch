@@ -1,5 +1,11 @@
 ' Die Werkzeuge (PySticky ui/tools/): Stift, Radierer, Fuellen, Pipette,
-' Linie, Rechteck, Ellipse, Hand -- und die Leiste, die sie waehlt.
+' Linie, Rechteck, Ellipse, Vieleck, Hand -- und die Leiste, die sie waehlt.
+' Auswahl, Lasso, Text, Rueckstich und Fortschritt (Stufe 3) stehen in
+' ansicht/mehr.dh; hier wird nur dorthin verteilt.
+'
+' Symmetrie (PySticky MirrorMode): Striche, Formen, Fuellen und Rueckstiche
+' werden gespiegelt (waagerecht, senkrecht, vierfach, achtfach nur bei
+' quadratischen Mustern); Auswahl, Einfuegen und Text nicht -- wie dort.
 '
 ' Die Zeichenflaeche meldet Zellen (wzDruck/wzZiehen/wzLos), die Werkzeuge
 ' entscheiden, was daraus wird. Alles, was das Muster aendert, geht ueber
@@ -18,12 +24,19 @@ CONST WZ_LINIE = 4
 CONST WZ_RECHTECK = 5
 CONST WZ_ELLIPSE = 6
 CONST WZ_HAND = 7
-CONST WZ_ANZAHL = 8
+CONST WZ_AUSWAHL = 8
+CONST WZ_LASSO = 9
+CONST WZ_VIELECK = 10
+CONST WZ_TEXT = 11
+CONST WZ_RUECKSTICH = 12
+CONST WZ_FORTSCHRITT = 13
+CONST WZ_ANZAHL = 14
 
 CONST ZUG_KEINER = 0
 CONST ZUG_WERKZEUG = 1
 CONST ZUG_RADIEREN = 2
 CONST ZUG_HAND = 3
+CONST ZUG_MEHR = 4                    ' ein Zug eines Werkzeugs aus mehr.dh
 
 DIM wzAktiv AS INTEGER                ' WZ_*
 DIM wzGefuellt AS BOOLEAN             ' Rechteck und Ellipse gefuellt
@@ -40,6 +53,8 @@ DIM wzKnoepfe AS ARRAY OF INTEGER     ' Werkzeugknoepfe der Leiste
 DIM wzKnopfSperre AS BOOLEAN          ' beim Umschalten nicht noch einmal ausloesen
 DIM wzStichWahl AS INTEGER            ' GtkComboBoxText
 DIM wzFarbeLeiste AS INTEGER          ' Farbfeld der aktuellen Farbe
+DIM wzSpiegel AS INTEGER              ' kern.SPIEGEL_*
+DIM wzSpiegelWahl AS INTEGER
 
 ' Die Sticharten der Auswahl, in der Reihenfolge der Kuerzel Alt+1 .. Alt+0
 FUNCTION wzSticharten() AS ARRAY OF INTEGER
@@ -73,6 +88,12 @@ FUNCTION wzName$(nr AS INTEGER) AS STRING
         CASE WZ_RECHTECK : RETURN "Rechteck (R, gefüllt Umschalt+R) -- Umschalt beim Ziehen: Quadrat"
         CASE WZ_ELLIPSE : RETURN "Ellipse (O, gefüllt Umschalt+O) -- Umschalt beim Ziehen: Kreis"
         CASE WZ_HAND : RETURN "Hand (M) -- Ansicht verschieben, auch mit der mittleren Maustaste"
+        CASE WZ_AUSWAHL : RETURN "Auswahl (S) -- ziehen wählt, in die Auswahl ziehen verschiebt; Strg+C/X/V, Entf, F füllen, R drehen, H/V spiegeln"
+        CASE WZ_LASSO : RETURN "Lasso (Umschalt+S) -- freie Auswahl"
+        CASE WZ_VIELECK : RETURN "Vieleck (G, gefüllt Umschalt+G) -- Klick = Ecke, rechte Taste schließt, Rücktaste nimmt die letzte"
+        CASE WZ_TEXT : RETURN "Text (T)"
+        CASE WZ_RUECKSTICH : RETURN "Rückstich (B) -- Klick für Klick eine Linie, rechte Taste entfernt"
+        CASE WZ_FORTSCHRITT : RETURN "Fortschritt (K) -- ziehen markiert erledigt, rechts zurück; Pfeile springen, Enter markiert"
     END SELECT
     RETURN ""
 END FUNCTION
@@ -82,17 +103,22 @@ SUB werkzeugeStart()
     wzVorschau = []
     wzFarbe = -1
     wzKnoepfe = []
+    mrEcken = []
+    mrLasso = []
+    mrCursor = -1
 END SUB
 
 ' --- Waehlen ------------------------------------------------------------------------
 
 SUB werkzeugWaehlen(nr AS INTEGER, gefuellt AS BOOLEAN)
     IF wzZug <> ZUG_KEINER THEN RETURN
+    IF nr <> wzAktiv THEN mehrWechsel(nr)
     wzAktiv = nr
-    wzGefuellt = gefuellt AND (nr = WZ_RECHTECK OR nr = WZ_ELLIPSE)
+    wzGefuellt = gefuellt AND wzKannGefuellt(nr)
     wzKnopfSperre = TRUE
     DIM i AS INTEGER
     FOR i = 0 TO LEN(wzKnoepfe) - 1
+        IF wzKnoepfe[i] = 0 THEN CONTINUE
         gtk_toggle_button_set_active(wzKnoepfe[i], i = nr)
         gtk_widget_queue_draw(wzKnoepfe[i])
     NEXT
@@ -103,12 +129,39 @@ END SUB
 
 SUB wzKnopfGeklickt(knopf AS INTEGER, nr AS INTEGER)
     IF wzKnopfSperre THEN RETURN
-    ' Ein zweiter Klick auf Rechteck oder Ellipse schaltet gefuellt um, wie im Original
-    IF nr = wzAktiv AND (nr = WZ_RECHTECK OR nr = WZ_ELLIPSE) THEN
+    ' Ein zweiter Klick auf Rechteck, Ellipse oder Vieleck schaltet gefuellt um, wie im Original
+    IF nr = wzAktiv AND wzKannGefuellt(nr) THEN
         werkzeugWaehlen(nr, NOT wzGefuellt)
     ELSE
         werkzeugWaehlen(nr, FALSE)
     END IF
+END SUB
+
+FUNCTION wzKannGefuellt(nr AS INTEGER) AS BOOLEAN
+    RETURN nr = WZ_RECHTECK OR nr = WZ_ELLIPSE OR nr = WZ_VIELECK
+END FUNCTION
+
+SUB spiegelWaehlen(modus AS INTEGER)
+    wzSpiegel = CLAMP(modus, 0, 4)
+    IF wzSpiegelWahl <> 0 THEN
+        IF gtk_combo_box_get_active(wzSpiegelWahl) <> wzSpiegel THEN gtk_combo_box_set_active(wzSpiegelWahl, wzSpiegel)
+    END IF
+    gtk_widget_queue_draw(lwFlaeche)
+    statusNachziehen()
+END SUB
+
+FUNCTION spiegelName$(modus AS INTEGER) AS STRING
+    SELECT CASE modus
+        CASE 1 : RETURN "Spiegel ↔"
+        CASE 2 : RETURN "Spiegel ↕"
+        CASE 3 : RETURN "vierfach gespiegelt"
+        CASE 4 : RETURN "achtfach gespiegelt"
+    END SELECT
+    RETURN "ohne Spiegel"
+END FUNCTION
+
+SUB wzSpiegelGeaendert(wahl AS INTEGER, daten AS INTEGER)
+    spiegelWaehlen(gtk_combo_box_get_active(wahl))
 END SUB
 
 SUB stichartWaehlen(t AS INTEGER)
@@ -150,6 +203,17 @@ FUNCTION wzDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLE
         wzZug = ZUG_HAND
         RETURN ZUG_HAND
     END IF
+    IF mehrIstWerkzeug(wzAktiv) THEN
+        ' rechts radiert auch hier, ausser dort, wo die rechte Taste etwas tut
+        IF taste = 3 AND (wzAktiv = WZ_AUSWAHL OR wzAktiv = WZ_LASSO OR wzAktiv = WZ_TEXT) AND NOT mrEinfuegen THEN
+            wzZug = ZUG_RADIEREN
+            wzVerlauf.beginnen("Radieren")
+            wzStrich(x, y, x, y, -1)
+            RETURN wzZug
+        END IF
+        wzZug = mehrDruck(x, y, taste, umschalt)
+        RETURN wzZug
+    END IF
     IF taste = 3 THEN
         wzZug = ZUG_RADIEREN
         wzVerlauf.beginnen("Radieren")
@@ -186,6 +250,8 @@ END FUNCTION
 
 SUB wzZiehen(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
     SELECT CASE wzZug
+        CASE ZUG_MEHR
+            mehrZiehen(x, y, umschalt)
         CASE ZUG_RADIEREN
             wzStrich(wzLetzteX, wzLetzteY, x, y, -1)
         CASE ZUG_WERKZEUG
@@ -202,6 +268,8 @@ SUB wzLos(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
     DIM zug AS INTEGER : zug = wzZug
     wzZug = ZUG_KEINER
     SELECT CASE zug
+        CASE ZUG_MEHR
+            mehrLos(x, y, umschalt)
         CASE ZUG_RADIEREN
             wzVerlauf.beenden()
             nachAenderung()
@@ -228,7 +296,7 @@ END SUB
 ' Ein Strich von (x1, y1) nach (x2, y2) im offenen Zug -- jeder Punkt der
 ' Linie, damit ein schneller Zug keine Luecken laesst.
 SUB wzStrich(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, farbe AS INTEGER)
-    DIM p AS ARRAY OF INTEGER : p = kern.linie(x1, y1, x2, y2)
+    DIM p AS ARRAY OF INTEGER : p = kern.gespiegelt(kern.linie(x1, y1, x2, y2), lwMuster.breite, lwMuster.hoehe, wzSpiegel)
     DIM geaendert AS ARRAY OF INTEGER : geaendert = []
     DIM k AS INTEGER
     FOR k = 0 TO LEN(p) - 2 STEP 2
@@ -246,8 +314,12 @@ SUB wzStrich(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, farbe A
     END IF
 END SUB
 
-' Eine fertige Form in einem Schritt setzen.
+' Eine fertige Form in einem Schritt setzen -- mit Symmetrie.
 SUB wzAnwenden(p AS ARRAY OF INTEGER, farbe AS INTEGER, text AS STRING)
+    wzAnwendenOhneSpiegel(kern.gespiegelt(p, lwMuster.breite, lwMuster.hoehe, wzSpiegel), farbe, text)
+END SUB
+
+SUB wzAnwendenOhneSpiegel(p AS ARRAY OF INTEGER, farbe AS INTEGER, text AS STRING)
     IF LEN(p) = 0 THEN RETURN
     IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
         statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
@@ -308,8 +380,17 @@ END SUB
 FUNCTION werkzeugleisteNeu() AS INTEGER
     DIM box AS INTEGER : box = gtk_box_new(GTK_WAAGERECHT, 2)
     gtkKlasse(box, "werkzeuge")
+    DIM folge AS ARRAY OF INTEGER : folge = [WZ_STIFT, WZ_RADIERER, WZ_FUELLEN, WZ_PIPETTE, -1, _
+        WZ_LINIE, WZ_RECHTECK, WZ_ELLIPSE, WZ_VIELECK, -1, WZ_AUSWAHL, WZ_LASSO, WZ_TEXT, -1, _
+        WZ_RUECKSTICH, WZ_FORTSCHRITT, -1, WZ_HAND]
+    DIM kn[WZ_ANZAHL] AS INTEGER
+    wzKnoepfe = kn
     DIM i AS INTEGER
-    FOR i = 0 TO WZ_ANZAHL - 1
+    FOR EACH i IN folge
+        IF i < 0 THEN
+            gtk_box_pack_start(box, gtk_separator_new(GTK_SENKRECHT), FALSE, FALSE, 4)
+            CONTINUE
+        END IF
         DIM k AS INTEGER : k = gtk_toggle_button_new()
         gtk_widget_set_can_focus(k, FALSE)
         gtk_widget_set_tooltip_text(k, wzName$(i))
@@ -319,8 +400,7 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
         gtk_container_add(k, bild)
         signal(k, "toggled", wzKnopfGeklickt, i, 0, 0)
         gtk_box_pack_start(box, k, FALSE, FALSE, 0)
-        ARRAY_PUSH(wzKnoepfe, k)
-        IF i = WZ_PIPETTE OR i = WZ_ELLIPSE THEN gtk_box_pack_start(box, gtk_separator_new(GTK_SENKRECHT), FALSE, FALSE, 4)
+        wzKnoepfe[i] = k
     NEXT
     gtk_box_pack_start(box, gtk_separator_new(GTK_SENKRECHT), FALSE, FALSE, 4)
     wzFarbeLeiste = gtk_drawing_area_new()
@@ -339,6 +419,16 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
     gtk_combo_box_set_active(wzStichWahl, 0)
     signal(wzStichWahl, "changed", wzStichGeaendert, 0, 0, 0)
     gtk_box_pack_start(box, wzStichWahl, FALSE, FALSE, 0)
+    wzSpiegelWahl = gtk_combo_box_text_new()
+    gtk_widget_set_can_focus(wzSpiegelWahl, FALSE)
+    gtk_widget_set_tooltip_text(wzSpiegelWahl, "Symmetrie: Striche, Formen und Rückstiche gespiegelt (Achtfach nur bei quadratischen Mustern)")
+    DIM sn AS STRING
+    FOR EACH sn IN ["Ohne Spiegel", "Spiegel ↔", "Spiegel ↕", "Vierfach", "Achtfach"]
+        gtk_combo_box_text_append_text(wzSpiegelWahl, sn)
+    NEXT
+    gtk_combo_box_set_active(wzSpiegelWahl, 0)
+    signal(wzSpiegelWahl, "changed", wzSpiegelGeaendert, 0, 0, 0)
+    gtk_box_pack_start(box, wzSpiegelWahl, FALSE, FALSE, 4)
     werkzeugWaehlen(WZ_STIFT, FALSE)
     RETURN box
 END FUNCTION
@@ -408,6 +498,38 @@ FUNCTION wzSymbolZeichnen(w AS INTEGER, cr AS INTEGER, nr AS INTEGER) AS BOOLEAN
             cairo_arc(cr, 0, 0, 7, 0, TAU)
             cairo_restore(cr)
             IF wzGefuellt AND nr = wzAktiv THEN cairo_fill(cr) ELSE cairo_stroke(cr)
+        CASE WZ_VIELECK
+            cairo_move_to(cr, 3, 15) : cairo_line_to(cr, 6, 4) : cairo_line_to(cr, 17, 7)
+            cairo_line_to(cr, 13, 17) : cairo_close_path(cr)
+            IF wzGefuellt AND nr = wzAktiv THEN cairo_fill(cr) ELSE cairo_stroke(cr)
+        CASE WZ_AUSWAHL
+            wzGestrichelt(cr, 3.5, 4.5, 16.5, 4.5)
+            wzGestrichelt(cr, 16.5, 4.5, 16.5, 15.5)
+            wzGestrichelt(cr, 16.5, 15.5, 3.5, 15.5)
+            wzGestrichelt(cr, 3.5, 15.5, 3.5, 4.5)
+        CASE WZ_LASSO
+            cairo_save(cr)
+            cairo_translate(cr, 10, 8)
+            cairo_scale(cr, 1.0, 0.6)
+            cairo_arc(cr, 0, 0, 7, 0, TAU)
+            cairo_restore(cr)
+            cairo_stroke(cr)
+            cairo_move_to(cr, 6, 12) : cairo_line_to(cr, 5, 17) : cairo_line_to(cr, 8, 15)
+            cairo_stroke(cr)
+        CASE WZ_TEXT
+            cairo_move_to(cr, 4, 4) : cairo_line_to(cr, 16, 4) : cairo_stroke(cr)
+            cairo_move_to(cr, 10, 4) : cairo_line_to(cr, 10, 17) : cairo_stroke(cr)
+            cairo_move_to(cr, 7, 17) : cairo_line_to(cr, 13, 17) : cairo_stroke(cr)
+        CASE WZ_RUECKSTICH
+            cairo_move_to(cr, 3, 15) : cairo_line_to(cr, 8, 10) : cairo_stroke(cr)
+            cairo_move_to(cr, 10, 8) : cairo_line_to(cr, 15, 3) : cairo_stroke(cr)
+            cairo_arc(cr, 3, 15, 1.6, 0, TAU) : cairo_fill(cr)
+            cairo_arc(cr, 9, 9, 1.6, 0, TAU) : cairo_fill(cr)
+            cairo_arc(cr, 16, 3, 1.6, 0, TAU) : cairo_fill(cr)
+        CASE WZ_FORTSCHRITT
+            cairo_set_line_width(cr, 2.2)
+            cairo_move_to(cr, 3, 10) : cairo_line_to(cr, 8, 15) : cairo_line_to(cr, 17, 4)
+            cairo_stroke(cr)
         CASE WZ_HAND
             ' vier Pfeile
             cairo_move_to(cr, 10, 2) : cairo_line_to(cr, 10, 18) : cairo_stroke(cr)
@@ -420,11 +542,26 @@ FUNCTION wzSymbolZeichnen(w AS INTEGER, cr AS INTEGER, nr AS INTEGER) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
+' Eine gestrichelte Linie (fuer das Auswahl-Symbol).
+SUB wzGestrichelt(cr AS INTEGER, x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT)
+    DIM l AS FLOAT : l = HYPOT(x2 - x1, y2 - y1)
+    DIM n AS INTEGER : n = MAX(1, ROUND(l / 3))
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1 STEP 2
+        cairo_move_to(cr, x1 + (x2 - x1) * k / n, y1 + (y2 - y1) * k / n)
+        cairo_line_to(cr, x1 + (x2 - x1) * (k + 1) / n, y1 + (y2 - y1) * (k + 1) / n)
+    NEXT
+    cairo_stroke(cr)
+END SUB
+
 ' --- Tasten ------------------------------------------------------------------------------
 
 ' Kuerzel der Werkzeuge; TRUE, wenn die Taste genommen wurde.
 FUNCTION werkzeugTaste(t AS INTEGER, strg AS BOOLEAN, alt AS BOOLEAN) AS BOOLEAN
     IF strg THEN RETURN FALSE
+    IF NOT alt THEN
+        IF mehrTaste(t) THEN RETURN TRUE
+    END IF
     IF alt THEN
         ' Alt+1 .. Alt+9, Alt+0 = die zehnte
         DIM arten AS ARRAY OF INTEGER : arten = wzSticharten()
@@ -449,6 +586,13 @@ FUNCTION werkzeugTaste(t AS INTEGER, strg AS BOOLEAN, alt AS BOOLEAN) AS BOOLEAN
         CASE &H6F : werkzeugWaehlen(WZ_ELLIPSE, FALSE)                ' o
         CASE &H4F : werkzeugWaehlen(WZ_ELLIPSE, TRUE)                 ' O
         CASE &H6D, &H4D : werkzeugWaehlen(WZ_HAND, FALSE)             ' m
+        CASE &H73 : werkzeugWaehlen(WZ_AUSWAHL, FALSE)                ' s
+        CASE &H53 : werkzeugWaehlen(WZ_LASSO, FALSE)                  ' S
+        CASE &H67 : werkzeugWaehlen(WZ_VIELECK, FALSE)                ' g
+        CASE &H47 : werkzeugWaehlen(WZ_VIELECK, TRUE)                 ' G
+        CASE &H74, &H54 : werkzeugWaehlen(WZ_TEXT, FALSE)             ' t
+        CASE &H62, &H42 : werkzeugWaehlen(WZ_RUECKSTICH, FALSE)       ' b
+        CASE &H6B, &H4B : werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)      ' k
         CASE &HFF1B                                                    ' ESC: Form abbrechen
             IF wzZug = ZUG_WERKZEUG AND LEN(wzVorschau) > 0 THEN
                 wzZug = ZUG_KEINER

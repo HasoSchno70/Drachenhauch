@@ -286,6 +286,8 @@ Laufzeitfehler in spiel.dh:42: Index 10 ausserhalb [0..2] in Dimension 0
 **Compile errors** (before execution) carry the line where they arise as
 well — parser errors as much as compiler errors (e.g. a SUB declared twice).
 `dhrt --check datei.dh` reports them as JSON without starting the program.
+The line is the one in its own file; if the finding is in a file pulled in
+with IMPORT, `file` gives its path.
 
 ### Messages in English (`DHRT_LANG=en`)
 

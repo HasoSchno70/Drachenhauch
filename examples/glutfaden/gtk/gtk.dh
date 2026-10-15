@@ -68,6 +68,9 @@ DECLARE FUNCTION gtk_entry_get_text LIB GTK (feld AS ZEIGER) AS TEXT
 DECLARE SUB gtk_entry_set_text LIB GTK (feld AS ZEIGER, text AS TEXT)
 DECLARE SUB gtk_entry_set_activates_default LIB GTK (feld AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_entry_set_placeholder_text LIB GTK (feld AS ZEIGER, text AS TEXT)
+DECLARE FUNCTION gtk_spin_button_new_with_range LIB GTK (von AS FLOAT, bis AS FLOAT, schritt AS FLOAT) AS ZEIGER
+DECLARE SUB gtk_spin_button_set_value LIB GTK (feld AS ZEIGER, wert AS FLOAT)
+DECLARE FUNCTION gtk_spin_button_get_value_as_int LIB GTK (feld AS ZEIGER) AS LONG
 DECLARE FUNCTION gtk_scale_new_with_range LIB GTK (richtung AS LONG, von AS FLOAT, bis AS FLOAT, schritt AS FLOAT) AS ZEIGER
 DECLARE SUB gtk_scale_set_digits LIB GTK (regler AS ZEIGER, stellen AS LONG)
 DECLARE SUB gtk_scale_set_value_pos LIB GTK (regler AS ZEIGER, lage AS LONG)
@@ -158,10 +161,20 @@ DECLARE FUNCTION cairo_image_surface_create LIB CAIRO (format AS LONG, b AS LONG
 DECLARE FUNCTION cairo_image_surface_create_for_data LIB CAIRO (daten AS ZEIGER, format AS LONG, b AS LONG, h AS LONG, zeile AS LONG) AS ZEIGER
 DECLARE FUNCTION cairo_format_stride_for_width LIB CAIRO (format AS LONG, b AS LONG) AS LONG
 DECLARE SUB cairo_surface_mark_dirty LIB CAIRO (flaeche AS ZEIGER)
+DECLARE SUB cairo_surface_flush LIB CAIRO (flaeche AS ZEIGER)
+DECLARE FUNCTION cairo_image_surface_get_data LIB CAIRO (flaeche AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION cairo_image_surface_get_stride LIB CAIRO (flaeche AS ZEIGER) AS LONG
 DECLARE FUNCTION cairo_create LIB CAIRO (flaeche AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION cairo_surface_write_to_png LIB CAIRO (flaeche AS ZEIGER, pfad AS TEXT) AS LONG
 DECLARE SUB cairo_destroy LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_surface_destroy LIB CAIRO (flaeche AS ZEIGER)
+STRUCT PangoRechteck LAYOUT C
+    x AS LONG
+    y AS LONG
+    breite AS LONG
+    hoehe AS LONG
+END STRUCT
+
 ' --- Pango (Text mit Schriftersatz -- die Symbole stammen aus vielen Bloecken)
 DECLARE FUNCTION pango_cairo_create_layout LIB PANGOCAIRO (cr AS ZEIGER) AS ZEIGER
 DECLARE SUB pango_cairo_show_layout LIB PANGOCAIRO (cr AS ZEIGER, layout AS ZEIGER)
@@ -169,6 +182,8 @@ DECLARE SUB pango_cairo_update_layout LIB PANGOCAIRO (cr AS ZEIGER, layout AS ZE
 DECLARE SUB pango_layout_set_text LIB PANGO (layout AS ZEIGER, text AS TEXT, laenge AS LONG)
 DECLARE SUB pango_layout_set_font_description LIB PANGO (layout AS ZEIGER, schrift AS ZEIGER)
 DECLARE SUB pango_layout_get_pixel_size LIB PANGO (layout AS ZEIGER, BYREF b AS LONG, BYREF h AS LONG)
+DECLARE SUB pango_layout_get_pixel_extents LIB PANGO (layout AS ZEIGER, tinte AS PangoRechteck, logisch AS PangoRechteck)
+DECLARE SUB pango_font_description_free LIB PANGO (schrift AS ZEIGER)
 DECLARE FUNCTION pango_font_description_from_string LIB PANGO (text AS TEXT) AS ZEIGER
 DECLARE SUB pango_font_description_set_absolute_size LIB PANGO (schrift AS ZEIGER, groesse AS FLOAT)
 ' --- GObject und GLib
@@ -234,6 +249,7 @@ CONST GDK_RAD_HOCH = 0
 CONST GDK_RAD_RUNTER = 1
 CONST GDK_RAD_FEIN = 4
 CONST CAIRO_ARGB32 = 0
+CONST CAIRO_A8 = 2
 CONST CAIRO_FILTER_NAECHST = 3            ' CAIRO_FILTER_NEAREST
 CONST PANGO_SCALE = 1024
 
