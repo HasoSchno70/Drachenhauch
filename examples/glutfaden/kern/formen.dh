@@ -1,0 +1,215 @@
+' Formen fuer die Werkzeuge (PySticky ui/tools/*_tool.py): welche Zellen eine
+' Linie, ein Rechteck, eine Ellipse oder eine Fuellung trifft. Ohne
+' Oberflaeche und ohne Muster-Zustand -- nur Rechnen.
+'
+' Ergebnis ist immer ein flaches Feld [x0, y0, x1, y1, ...]. Die Zellen
+' koennen ausserhalb des Musters liegen (eine Form, die ueber den Rand
+' gezogen wird); wegschneiden ist Sache dessen, der sie setzt.
+
+' Abrunden wie Pythons // (zur kleineren Zahl, auch bei negativen Werten).
+FUNCTION halbAb(a AS INTEGER) AS INTEGER
+    IF a >= 0 THEN RETURN a \ 2
+    RETURN -((-a + 1) \ 2)
+END FUNCTION
+
+' Bresenham, immer vom kleineren Punkt aus gerechnet: sonst saehe dieselbe
+' Linie je nach Zugrichtung anders aus (bei 2:1 entscheidet der Fehlerterm
+' in beiden Richtungen verschieden).
+FUNCTION linie(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS ARRAY OF INTEGER
+    IF x1 > x2 OR (x1 = x2 AND y1 > y2) THEN
+        SWAP x1, x2
+        SWAP y1, y2
+    END IF
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM dx AS INTEGER : dx = ABS(x2 - x1)
+    DIM dy AS INTEGER : dy = ABS(y2 - y1)
+    DIM sx AS INTEGER : sx = IIF(x1 < x2, 1, -1)
+    DIM sy AS INTEGER : sy = IIF(y1 < y2, 1, -1)
+    DIM fehler AS INTEGER : fehler = dx - dy
+    DIM x AS INTEGER : x = x1
+    DIM y AS INTEGER : y = y1
+    DO
+        ARRAY_PUSH(p, x)
+        ARRAY_PUSH(p, y)
+        IF x = x2 AND y = y2 THEN EXIT DO
+        DIM e2 AS INTEGER : e2 = 2 * fehler
+        IF e2 > -dy THEN
+            fehler = fehler - dy
+            x = x + sx
+        END IF
+        IF e2 < dx THEN
+            fehler = fehler + dx
+            y = y + sy
+        END IF
+    LOOP
+    RETURN p
+END FUNCTION
+
+' Mit Umschalt: nur waagerecht, senkrecht oder 45 Grad. Liefert den
+' Endpunkt als (x, y).
+FUNCTION winkelGerade(sx AS INTEGER, sy AS INTEGER, x AS INTEGER, y AS INTEGER) AS TUPLE
+    DIM dx AS INTEGER : dx = x - sx
+    DIM dy AS INTEGER : dy = y - sy
+    DIM adx AS INTEGER : adx = ABS(dx)
+    DIM ady AS INTEGER : ady = ABS(dy)
+    IF adx > 2 * ady THEN RETURN (x, sy)
+    IF ady > 2 * adx THEN RETURN (sx, y)
+    DIM l AS INTEGER : l = MAX(adx, ady)
+    RETURN (sx + l * IIF(dx >= 0, 1, -1), sy + l * IIF(dy >= 0, 1, -1))
+END FUNCTION
+
+' Mit Umschalt: Quadrat bzw. Kreis -- die laengere Seite gilt fuer beide.
+FUNCTION quadratEcke(sx AS INTEGER, sy AS INTEGER, x AS INTEGER, y AS INTEGER) AS TUPLE
+    DIM dx AS INTEGER : dx = x - sx
+    DIM dy AS INTEGER : dy = y - sy
+    DIM l AS INTEGER : l = MAX(ABS(dx), ABS(dy))
+    RETURN (sx + l * IIF(dx >= 0, 1, -1), sy + l * IIF(dy >= 0, 1, -1))
+END FUNCTION
+
+FUNCTION rechteck(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, gefuellt AS BOOLEAN) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM ax AS INTEGER : ax = MIN(x1, x2)
+    DIM bx AS INTEGER : bx = MAX(x1, x2)
+    DIM ay AS INTEGER : ay = MIN(y1, y2)
+    DIM by AS INTEGER : by = MAX(y1, y2)
+    DIM x AS INTEGER, y AS INTEGER
+    IF gefuellt THEN
+        FOR y = ay TO by
+            FOR x = ax TO bx
+                ARRAY_PUSH(p, x) : ARRAY_PUSH(p, y)
+            NEXT
+        NEXT
+        RETURN p
+    END IF
+    ' Rand ohne doppelte Ecken (eine Zeile oder Spalte ist ihr eigener Rand)
+    FOR x = ax TO bx
+        ARRAY_PUSH(p, x) : ARRAY_PUSH(p, ay)
+        IF by <> ay THEN
+            ARRAY_PUSH(p, x) : ARRAY_PUSH(p, by)
+        END IF
+    NEXT
+    FOR y = ay + 1 TO by - 1
+        ARRAY_PUSH(p, ax) : ARRAY_PUSH(p, y)
+        IF bx <> ax THEN
+            ARRAY_PUSH(p, bx) : ARRAY_PUSH(p, y)
+        END IF
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Mittelpunkt-Ellipse im Rechteck der beiden Punkte. Gefuellt merkt sich je
+' Zeilenabstand vom Mittelpunkt die groesste halbe Breite: das ist genau die
+' Vereinigung der Spannen, die das Original Zeile fuer Zeile in eine Menge
+' legt -- ohne vier Millionen Eintraege bei einer grossen Ellipse.
+FUNCTION ellipse(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, gefuellt AS BOOLEAN) AS ARRAY OF INTEGER
+    DIM cx AS INTEGER : cx = halbAb(x1 + x2)
+    DIM cy AS INTEGER : cy = halbAb(y1 + y2)
+    DIM rx AS INTEGER : rx = ABS(x2 - x1) \ 2
+    DIM ry AS INTEGER : ry = ABS(y2 - y1) \ 2
+    IF rx = 0 AND ry = 0 THEN
+        IF x1 = x2 AND y1 = y2 THEN RETURN [cx, cy]
+        RETURN rechteck(x1, y1, x2, y2, TRUE)
+    END IF
+    IF rx = 0 THEN RETURN rechteck(cx, MIN(y1, y2), cx, MAX(y1, y2), TRUE)
+    IF ry = 0 THEN RETURN rechteck(MIN(x1, x2), cy, MAX(x1, x2), cy, TRUE)
+
+    DIM breiteJe[ry + 1] AS INTEGER          ' gefuellt: halbe Breite je Abstand
+    DIM i AS INTEGER
+    FOR i = 0 TO ry : breiteJe[i] = -1 : NEXT
+    DIM rand AS MAP OF BOOLEAN : rand = {}
+    DIM p AS ARRAY OF INTEGER : p = []
+
+    DIM x AS INTEGER : x = 0
+    DIM y AS INTEGER : y = ry
+    DIM rx2 AS INTEGER : rx2 = rx * rx
+    DIM ry2 AS INTEGER : ry2 = ry * ry
+    DIM p1 AS FLOAT : p1 = ry2 - rx2 * ry + 0.25 * rx2
+    WHILE ry2 * x < rx2 * y
+        ellipsePunkt(cx, cy, x, y, gefuellt, breiteJe, rand, p)
+        x = x + 1
+        IF p1 < 0 THEN
+            p1 = p1 + 2 * ry2 * x + ry2
+        ELSE
+            y = y - 1
+            p1 = p1 + 2 * ry2 * x - 2 * rx2 * y + ry2
+        END IF
+    WEND
+    DIM p2 AS FLOAT : p2 = ry2 * (x + 0.5) ^ 2 + rx2 * (y - 1) ^ 2 - rx2 * ry2
+    WHILE y >= 0
+        ellipsePunkt(cx, cy, x, y, gefuellt, breiteJe, rand, p)
+        y = y - 1
+        IF p2 > 0 THEN
+            p2 = p2 + rx2 - 2 * rx2 * y
+        ELSE
+            x = x + 1
+            p2 = p2 + 2 * ry2 * x - 2 * rx2 * y + rx2
+        END IF
+    WEND
+    IF NOT gefuellt THEN RETURN p
+    DIM d AS INTEGER, xi AS INTEGER
+    FOR d = 0 TO ry
+        IF breiteJe[d] < 0 THEN CONTINUE
+        FOR xi = cx - breiteJe[d] TO cx + breiteJe[d]
+            ARRAY_PUSH(p, xi) : ARRAY_PUSH(p, cy + d)
+            IF d > 0 THEN
+                ARRAY_PUSH(p, xi) : ARRAY_PUSH(p, cy - d)
+            END IF
+        NEXT
+    NEXT
+    RETURN p
+END FUNCTION
+
+SUB ellipsePunkt(cx AS INTEGER, cy AS INTEGER, x AS INTEGER, y AS INTEGER, gefuellt AS BOOLEAN, _
+                 BYREF breiteJe AS ARRAY OF INTEGER, BYREF rand AS MAP OF BOOLEAN, BYREF p AS ARRAY OF INTEGER)
+    IF gefuellt THEN
+        IF x > breiteJe[y] THEN breiteJe[y] = x
+        RETURN
+    END IF
+    randPunkt(cx + x, cy + y, rand, p)
+    randPunkt(cx - x, cy + y, rand, p)
+    randPunkt(cx + x, cy - y, rand, p)
+    randPunkt(cx - x, cy - y, rand, p)
+END SUB
+
+SUB randPunkt(x AS INTEGER, y AS INTEGER, BYREF rand AS MAP OF BOOLEAN, BYREF p AS ARRAY OF INTEGER)
+    DIM k AS STRING : k = STR$(x) + "," + STR$(y)
+    IF MAPHAS(rand, k) THEN RETURN
+    MAPPUT(rand, k, TRUE)
+    ARRAY_PUSH(p, x) : ARRAY_PUSH(p, y)
+END SUB
+
+' Fuellen auf einer Ebene: alle Zellen, die mit (x, y) dieselbe Farbe teilen
+' und ueber Nachbarn links/rechts/oben/unten zusammenhaengen (kein Stich
+' zaehlt als Farbe -1). Hat die Startzelle schon die neue Farbe, leer.
+FUNCTION fuellung(e AS Ebene, x AS INTEGER, y AS INTEGER, neu AS INTEGER) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = []
+    IF NOT e.drin(x, y) THEN RETURN p
+    DIM b AS INTEGER : b = e.breite
+    DIM h AS INTEGER : h = e.hoehe
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    DIM ziel AS INTEGER : ziel = r[y * b + x]
+    IF ziel = neu THEN RETURN p
+    DIM gesehen[b * h] AS INTEGER
+    DIM warte AS ARRAY OF INTEGER : warte = [y * b + x]
+    gesehen[y * b + x] = 1
+    DIM kopf AS INTEGER
+    WHILE kopf < LEN(warte)
+        DIM i AS INTEGER : i = warte[kopf]
+        kopf = kopf + 1
+        DIM cx AS INTEGER : cx = i MOD b
+        DIM cy AS INTEGER : cy = i \ b
+        ARRAY_PUSH(p, cx) : ARRAY_PUSH(p, cy)
+        IF cx > 0 THEN fuellNachbar(i - 1, ziel, r, gesehen, warte)
+        IF cx < b - 1 THEN fuellNachbar(i + 1, ziel, r, gesehen, warte)
+        IF cy > 0 THEN fuellNachbar(i - b, ziel, r, gesehen, warte)
+        IF cy < h - 1 THEN fuellNachbar(i + b, ziel, r, gesehen, warte)
+    WEND
+    RETURN p
+END FUNCTION
+
+SUB fuellNachbar(i AS INTEGER, ziel AS INTEGER, r AS ARRAY OF INTEGER, BYREF gesehen AS ARRAY OF INTEGER, BYREF warte AS ARRAY OF INTEGER)
+    IF gesehen[i] <> 0 THEN RETURN
+    IF r[i] <> ziel THEN RETURN
+    gesehen[i] = 1
+    ARRAY_PUSH(warte, i)
+END SUB

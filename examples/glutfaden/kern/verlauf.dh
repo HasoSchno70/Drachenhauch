@@ -1,0 +1,268 @@
+' Rueckgaengig und Wiederholen (PySticky core/undo.py).
+'
+' Wie im Original mit Aenderungen statt ganzer Kopien des Musters: ein
+' Schritt merkt sich je Zelle den Stand vorher und nachher. Ein Zug mit der
+' Maus (Druecken bis Loslassen) ist EIN Schritt -- beginnen()/beenden().
+'
+' Anders als im Original sind auch Ebenen-Umbauten Schritte (anlegen,
+' loeschen, duplizieren, verschieben, zusammenfuehren, umbenennen) und das
+' Entfernen unbenutzter Farben -- PySticky leert dabei den ganzen Verlauf,
+' und eine versehentlich geloeschte Ebene ist dort weg.
+'
+' Ein Stiche-Teil haelt seine Ebene als OBJEKT, nicht als Nummer: nach einem
+' Verschieben zeigt eine Nummer auf eine andere Ebene, ein Rueckgaengig
+' schriebe dann in die falsche.
+CONST VERLAUF_GRENZE = 100
+
+CONST TEIL_STICHE = 1
+CONST TEIL_EBENEN = 2
+CONST TEIL_FARBEN = 3
+CONST TEIL_NAME = 4
+
+CLASS Aenderung
+    DIM art AS INTEGER
+    ' TEIL_STICHE: je Zelle Index und Stand vorher/nachher
+    DIM ebene AS Ebene
+    DIM zellen AS ARRAY OF INTEGER
+    DIM altFarbe AS ARRAY OF INTEGER
+    DIM altArt AS ARRAY OF INTEGER
+    DIM altFertig AS ARRAY OF INTEGER
+    DIM neuFarbe AS ARRAY OF INTEGER
+    DIM neuArt AS ARRAY OF INTEGER
+    DIM neuFertig AS ARRAY OF INTEGER
+    ' TEIL_EBENEN: die Liste der Ebenen und die aktive vorher/nachher
+    DIM ebenenVorher AS ARRAY OF Ebene
+    DIM ebenenNachher AS ARRAY OF Ebene
+    DIM aktivVorher AS INTEGER
+    DIM aktivNachher AS INTEGER
+    ' TEIL_FARBEN: Farbliste, Umnummerierung alt -> neu und zurueck, Rueckstiche
+    DIM farbenVorher AS ARRAY OF Farbeintrag
+    DIM farbenNachher AS ARRAY OF Farbeintrag
+    DIM hin AS ARRAY OF INTEGER
+    DIM zurueck AS ARRAY OF INTEGER
+    DIM rueckVorher AS ARRAY OF Rueckstich
+    DIM rueckNachher AS ARRAY OF Rueckstich
+    ' TEIL_NAME
+    DIM textVorher AS STRING
+    DIM textNachher AS STRING
+
+    SUB Init(a AS INTEGER)
+        art = a
+        zellen = [] : altFarbe = [] : altArt = [] : altFertig = []
+        neuFarbe = [] : neuArt = [] : neuFertig = []
+    END SUB
+END CLASS
+
+CLASS Schritt
+    DIM text AS STRING
+    DIM nummer AS INTEGER
+    DIM teile AS ARRAY OF Aenderung
+
+    SUB Init(t AS STRING, n AS INTEGER)
+        text = t
+        nummer = n
+        teile = []
+    END SUB
+END CLASS
+
+CLASS Verlauf
+    DIM rueck AS ARRAY OF Schritt       ' oben = zuletzt getan
+    DIM vor AS ARRAY OF Schritt         ' oben = zuletzt zurueckgenommen
+    DIM offen AS Schritt                ' NIL = kein Zug offen
+    DIM tiefe AS INTEGER                ' beginnen() darf verschachtelt kommen
+    DIM grenze AS INTEGER
+    DIM zaehler AS INTEGER              ' vergibt Schrittnummern
+    DIM gesichert AS INTEGER            ' Nummer des Schritts beim Sichern
+
+    SUB Init()
+        rueck = []
+        vor = []
+        grenze = VERLAUF_GRENZE
+    END SUB
+
+    ' Einen Schritt oeffnen. Verschachtelt zaehlt nur der aeusserste.
+    SUB beginnen(text AS STRING)
+        tiefe = tiefe + 1
+        IF tiefe > 1 THEN RETURN
+        zaehler = zaehler + 1
+        offen = NEW Schritt(text, zaehler)
+    END SUB
+
+    ' Den Schritt schliessen. Ein leerer Schritt verschwindet.
+    SUB beenden()
+        IF tiefe = 0 THEN RETURN
+        tiefe = tiefe - 1
+        IF tiefe > 0 THEN RETURN
+        DIM s AS Schritt : s = offen
+        offen = NIL
+        IF LEN(s.teile) = 0 THEN RETURN
+        ARRAY_PUSH(rueck, s)
+        vor = []
+        WHILE LEN(rueck) > grenze
+            ARRAY_REMOVE_AT(rueck, 0)
+        WEND
+    END SUB
+
+    FUNCTION istOffen() AS BOOLEAN
+        RETURN tiefe > 0
+    END FUNCTION
+
+    FUNCTION kannZurueck() AS BOOLEAN
+        RETURN LEN(rueck) > 0 AND tiefe = 0
+    END FUNCTION
+
+    FUNCTION kannVor() AS BOOLEAN
+        RETURN LEN(vor) > 0 AND tiefe = 0
+    END FUNCTION
+
+    FUNCTION textZurueck$() AS STRING
+        IF LEN(rueck) = 0 THEN RETURN ""
+        RETURN rueck[LEN(rueck) - 1].text
+    END FUNCTION
+
+    FUNCTION textVor$() AS STRING
+        IF LEN(vor) = 0 THEN RETURN ""
+        RETURN vor[LEN(vor) - 1].text
+    END FUNCTION
+
+    ' Nummer des obersten Schritts: steht sie beim Sichern fest, sagt sie
+    ' danach, ob der Stand ein anderer ist -- auch nach Zurueck und Vor.
+    FUNCTION stand() AS INTEGER
+        IF LEN(rueck) = 0 THEN RETURN 0
+        RETURN rueck[LEN(rueck) - 1].nummer
+    END FUNCTION
+
+    SUB alsGesichert()
+        gesichert = stand()
+    END SUB
+
+    FUNCTION geaendert() AS BOOLEAN
+        RETURN stand() <> gesichert
+    END FUNCTION
+
+    SUB leeren()
+        rueck = []
+        vor = []
+        offen = NIL
+        tiefe = 0
+        gesichert = 0
+    END SUB
+
+    ' Den offenen Schritt holen; ohne offenen Zug wird jeder Aufruf sein
+    ' eigener Schritt (der Aufrufer schliesst ihn mit beenden()).
+    FUNCTION teil(art AS INTEGER) AS Aenderung
+        DIM a AS Aenderung : a = NEW Aenderung(art)
+        ARRAY_PUSH(offen.teile, a)
+        RETURN a
+    END FUNCTION
+
+    ' Eine Zelle hat sich geaendert: an den letzten Stiche-Teil derselben
+    ' Ebene anhaengen. Doppelte Zellen bleiben -- zurueck laeuft rueckwaerts
+    ' und landet so beim allerersten Stand.
+    SUB zelle(e AS Ebene, i AS INTEGER, af AS INTEGER, aa AS INTEGER, ae AS INTEGER, nf AS INTEGER, na AS INTEGER, ne AS INTEGER)
+        DIM a AS Aenderung
+        DIM n AS INTEGER : n = LEN(offen.teile)
+        IF n > 0 THEN
+            IF offen.teile[n - 1].art = TEIL_STICHE THEN
+                IF offen.teile[n - 1].ebene = e THEN a = offen.teile[n - 1]
+            END IF
+        END IF
+        IF a IS NIL THEN
+            a = teil(TEIL_STICHE)
+            a.ebene = e
+        END IF
+        ARRAY_PUSH(a.zellen, i)
+        ARRAY_PUSH(a.altFarbe, af) : ARRAY_PUSH(a.altArt, aa) : ARRAY_PUSH(a.altFertig, ae)
+        ARRAY_PUSH(a.neuFarbe, nf) : ARRAY_PUSH(a.neuArt, na) : ARRAY_PUSH(a.neuFertig, ne)
+    END SUB
+
+    FUNCTION zurueckNehmen(m AS Muster) AS BOOLEAN
+        IF NOT kannZurueck() THEN RETURN FALSE
+        DIM s AS Schritt : s = rueck[LEN(rueck) - 1]
+        ARRAY_REMOVE_AT(rueck, LEN(rueck) - 1)
+        DIM i AS INTEGER
+        FOR i = LEN(s.teile) - 1 TO 0 STEP -1
+            teilAnwenden(m, s.teile[i], FALSE)
+        NEXT
+        ARRAY_PUSH(vor, s)
+        RETURN TRUE
+    END FUNCTION
+
+    FUNCTION wiederholen(m AS Muster) AS BOOLEAN
+        IF NOT kannVor() THEN RETURN FALSE
+        DIM s AS Schritt : s = vor[LEN(vor) - 1]
+        ARRAY_REMOVE_AT(vor, LEN(vor) - 1)
+        DIM t AS Aenderung
+        FOR EACH t IN s.teile
+            teilAnwenden(m, t, TRUE)
+        NEXT
+        ARRAY_PUSH(rueck, s)
+        RETURN TRUE
+    END FUNCTION
+END CLASS
+
+FUNCTION neuerVerlauf() AS Verlauf
+    DIM v AS Verlauf : v = NEW Verlauf()
+    RETURN v
+END FUNCTION
+
+' Einen Teil vorwaerts (hin = TRUE) oder rueckwaerts anwenden. Die Stichzahlen
+' gehen mit: bei Stichen Zelle fuer Zelle, nach einem Umbau neu gezaehlt.
+SUB teilAnwenden(m AS Muster, t AS Aenderung, hin AS BOOLEAN)
+    SELECT CASE t.art
+        CASE TEIL_STICHE
+            DIM e AS Ebene : e = t.ebene
+            DIM n AS INTEGER : n = LEN(t.zellen)
+            DIM k AS INTEGER, z AS INTEGER
+            IF hin THEN
+                FOR k = 0 TO n - 1
+                    z = t.zellen[k]
+                    m.zaehlen(e.raster[z], t.neuFarbe[k])
+                    e.raster[z] = t.neuFarbe[k] : e.art[z] = t.neuArt[k] : e.erledigt[z] = t.neuFertig[k]
+                NEXT
+            ELSE
+                FOR k = n - 1 TO 0 STEP -1
+                    z = t.zellen[k]
+                    m.zaehlen(e.raster[z], t.altFarbe[k])
+                    e.raster[z] = t.altFarbe[k] : e.art[z] = t.altArt[k] : e.erledigt[z] = t.altFertig[k]
+                NEXT
+            END IF
+        CASE TEIL_EBENEN
+            IF hin THEN
+                m.ebenen.ebenen = ARRAY_COPY(t.ebenenNachher)
+                m.ebenen.aktiv = t.aktivNachher
+            ELSE
+                m.ebenen.ebenen = ARRAY_COPY(t.ebenenVorher)
+                m.ebenen.aktiv = t.aktivVorher
+            END IF
+            m.stichzahlenNeu()
+        CASE TEIL_FARBEN
+            DIM abb AS ARRAY OF INTEGER : abb = IIF(hin, t.hin, t.zurueck)
+            DIM eb AS Ebene
+            FOR EACH eb IN m.ebenen.ebenen
+                umnummerieren(eb, abb)
+            NEXT
+            IF hin THEN
+                m.farben = ARRAY_COPY(t.farbenNachher)
+                m.rueckstiche = ARRAY_COPY(t.rueckNachher)
+            ELSE
+                m.farben = ARRAY_COPY(t.farbenVorher)
+                m.rueckstiche = ARRAY_COPY(t.rueckVorher)
+            END IF
+            m.stichzahlenNeu()
+        CASE TEIL_NAME
+            ' Umbenannt wird die Ebene selbst (die Liste haelt Objekte)
+            t.ebene.name = IIF(hin, t.textNachher, t.textVorher)
+    END SELECT
+END SUB
+
+' Jeden Farbindex einer Ebene ueber eine Abbildung fuehren (-1 bleibt -1).
+SUB umnummerieren(e AS Ebene, abb AS ARRAY OF INTEGER)
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    DIM n AS INTEGER : n = LEN(abb)
+    DIM i AS INTEGER, v AS INTEGER
+    FOR i = 0 TO LEN(r) - 1
+        v = r[i]
+        IF v >= 0 AND v < n THEN r[i] = abb[v]
+    NEXT
+END SUB
