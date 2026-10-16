@@ -235,18 +235,18 @@ END FUNCTION
 
 ' Ein Absatz in einem Stil von PDFExporter._setup_styles; `text` mit
 ' Auszeichnung, so wie PySticky ihn an Paragraph uebergibt.
-SUB pdfAbsatz(s AS PdfSatz, stil AS STRING, text AS STRING)
+SUB pdfAbsatz(s AS PdfSatz, absatzStil AS STRING, text AS STRING)
     ' Leerraum faellt in einem Absatz zu einem Leerzeichen zusammen, wie bei
     ' reportlab (auch ein Tabulator im Copyright)
     text = TRIM$(REGEX_REPLACE(text, "\s+", " "))
-    ARRAY_PUSH(s.ablauf, "P " + stil + " | " + text)
+    ARRAY_PUSH(s.ablauf, "P " + absatzStil + " | " + text)
     DIM groesse AS FLOAT : groesse = 10
     DIM zeile AS FLOAT : zeile = 12
     DIM vor AS FLOAT, nach AS FLOAT
     DIM fett AS BOOLEAN
     DIM mitte AS BOOLEAN
     DIM farbe AS INTEGER : farbe = &H000000
-    SELECT CASE stil
+    SELECT CASE absatzStil
         CASE "Title1" : groesse = 24 : zeile = 22 : nach = 12 : fett = TRUE : mitte = TRUE : farbe = &H333333
         CASE "Title2" : groesse = 16 : zeile = 18 : vor = 12 : nach = 8 : fett = TRUE : mitte = TRUE : farbe = &H555555
         CASE "CenterText" : mitte = TRUE

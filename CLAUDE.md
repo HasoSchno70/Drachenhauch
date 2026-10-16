@@ -1841,6 +1841,33 @@ Gross/klein -- ein Feld `voll` oder eine lokale `perle` verdeckt `VOLL`/
 Funktion etwas Neues zuweist, braucht BYREF; die helle Schrift fuer
 Klapplisten im Stylesheet galt auch in hellen Dialogen.
 
+**Stufe 5: Export** (2026-10-16). Kern `kern/export.dh` (Bedarf, Seitenplan
+A4..A0/Letter, Diamond 1:1 in Punkten wie reportlab, Entsprechungen ueber
+CIEDE2000), `kern/oxs.dh` (Schreiber byte-gleich mit PySticky bis auf LF,
+Leser samt dessen Warnungen; Stiche einer Perlen-/Drillfarbe werden PERLE/
+DIAMANT), `kern/bildexport.dh` (PNG/JPG/BMP; die Leinwand zaehlt Koordinaten
+an Punktmitten wie PIL, Qt an Kanten -- alles ausser Rechtecken um -0,5),
+`kern/pdfexport.dh` (reportlabs Fluss nachgebaut: Absaetze mit Umbruch und
+Auszeichnung, Tabellen mit wiederholtem Kopf, Zeichnungen; Tabellen-Leading
+bleibt 12 pt, Abstand davor minus Abstand nach dem vorigen Absatz),
+`kern/htmlexport.dh` (Kopf mit CSS aus dem Python-Quelltext umgesetzt),
+`kern/paket.dh` (ZIP mit pxs/html/png/pdf/garnliste.csv/original/LIESMICH).
+**Geprueft gegen PySticky:** HTML Zeile fuer Zeile gleich (auch 2,5 MB),
+Garnliste byte-gleich, PDF ueber ein Ablaufprotokoll in PyStickys
+Schreibweise gegen Aufzeichnungen aus dessen Story (`ref_pdf.py` faengt
+`SimpleDocTemplate.build` ab) samt Seitenzahl; Absichten: kein "None", ◆
+statt 💎 (DejaVu hat kein Emoji), Diamond-Groesse = Drills mal Kante, Fuss
+"Erstellt mit Glutfaden". Oberflaeche `ansicht/exportdialog.dh` (Strg+E,
+ein Dialog fuer alle Formate, nicht Geltendes ausgegraut), `.oxs` oeffnet
+im Oeffnen-Dialog, `--probe-stufe5`. **Funde in der Laufzeit:** PDF_CIRCLE/
+_FILL, PDF_POLYGON/_FILL, Winkel bei PDF_TEXT, PDF_OPACITY (krilla
+ExtGState; GDI und PDF_PREVIEW mischen gegen Weiss), PDF_NEW mit A2/A1/A0,
+**ZIP_WRITE wandelte Puffer still in "<BUFFER n Bytes>"**, Namensraum:
+Methoden mit dem Namen einer Modulfunktion, `--check` warnt bei einem Text,
+den JSON_TYPE nie liefert ("bool" statt "boolean" -- daran luden
+Wahrheitswerte einer .pxs nie). Ohne Passwortschutz (krilla verschluesselt
+nicht); die Stickpfad-Vorschau (PyStickys Optimierer) fehlt noch.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

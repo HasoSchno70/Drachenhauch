@@ -500,11 +500,11 @@ FUNCTION htmlLegende$(r AS HtmlLauf) AS STRING
         DIM pz AS STRING : pz = "-"
         DIM sz AS STRING : sz = "-"
         DIM anhang AS STRING : anhang = " [⊘]"
-        DIM stil AS STRING : stil = " style='opacity:0.55;'"
+        DIM zeilenStil AS STRING : zeilenStil = " style='opacity:0.55;'"
         IF NOT fb.auslassen THEN
             pz = FORMAT$(IIF(r.b.zuSticken > 0, fb.zahl * 100.0 / r.b.zuSticken, 0.0), "%.1f") + "%"
             sz = STR$(fb.straenge)
-            anhang = "" : stil = ""
+            anhang = "" : zeilenStil = ""
         END IF
         DIM kz AS STRING
         FOR i = 0 TO LEN(kpal) - 1
@@ -528,7 +528,7 @@ FUNCTION htmlLegende$(r AS HtmlLauf) AS STRING
         ELSE
             lab = TRIM$(g.hersteller + " " + g.nummer)
         END IF
-        DIM t AS ARRAY OF STRING : t = ["<tr" + stil + ">"]
+        DIM t AS ARRAY OF STRING : t = ["<tr" + zeilenStil + ">"]
         ARRAY_PUSH(t, "<td>" + STR$(nr) + "</td>")
         ARRAY_PUSH(t, "<td style='text-align:center;font-size:14px;'><b>" + htmlKodiere$(e.symbol) + "</b></td>")
         ARRAY_PUSH(t, "<td><div class='color-box' style='background:" + cssRgb$(g.farbe) + "'></div></td>")
@@ -686,8 +686,8 @@ FUNCTION htmlNavigator$(r AS HtmlLauf, cx AS INTEGER, cy AS INTEGER) AS STRING
         DIM zellen AS STRING
         zellen = ""
         FOR px = 0 TO r.seitenX - 1
-            DIM stil AS STRING : stil = IIF(px = cx AND py = cy, "background:#3498db;color:white;font-weight:bold;", "background:#fff;color:#666;")
-            zellen = zellen + "<td style='" + stil + "border:1px solid #ccc;width:18px;height:14px;font-size:9px;text-align:center;'>" + STR$(py * r.seitenX + px + 1) + "</td>"
+            DIM zellStil AS STRING : zellStil = IIF(px = cx AND py = cy, "background:#3498db;color:white;font-weight:bold;", "background:#fff;color:#666;")
+            zellen = zellen + "<td style='" + zellStil + "border:1px solid #ccc;width:18px;height:14px;font-size:9px;text-align:center;'>" + STR$(py * r.seitenX + px + 1) + "</td>"
         NEXT
         zeilen = zeilen + "<tr>" + zellen + "</tr>"
     NEXT

@@ -367,3 +367,73 @@ FUNCTION vorfuehrenStufe4(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' Stufe 5: Export -- der Dialog mit allen Zeilen, dann PDF, HTML, Bild, OXS
+' (und wieder eingelesen) und das Paket, je in eine Datei neben die Fotos.
+FUNCTION vfZiel$(name AS STRING) AS STRING
+    IF fotoZiel <> "" THEN RETURN fotoZiel + "_" + name
+    RETURN PATHJOIN(TEMPDIR$(), "glutfaden_stufe5_" + name)
+END FUNCTION
+
+FUNCTION vorfuehrenStufe5(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM d AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            d = exDialogBauen()
+            DIM f AS INTEGER, zeilen AS STRING
+            FOR f = EX_PDF TO EX_PAKET
+                gtk_combo_box_set_active(exFormat, f)
+                zeilen = zeilen + " " + STR$(exZeilenAktiv())
+            NEXT
+            PRINT "dialog: zeilen je format"; zeilen; " papiere "; LEN(kern.papierNamen()); " entsprechungen "; LEN(exKreuz)
+            gtk_combo_box_set_active(exFormat, EX_PDF)
+            gtk_spin_button_set_value(exUeb, 2)
+            gtk_entry_set_text(exWasser, "ENTWURF")
+            gtk_toggle_button_set_active(exKreuz[0], TRUE)
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(exNotizen), "Mit dem Rand beginnen." + CHR$(10) + "Rot zuletzt.", -1)
+            IF fotoZiel <> "" THEN ok = gtkFoto(d, fotoZiel + "_exportdialog.png")
+            exWahlMerken()
+            DIM nz AS STRING : nz = exNotizenText$()
+            gtk_widget_destroy(d)
+            exExportieren(EX_PDF, vfZiel$("muster.pdf"), nz)
+            PRINT "pdf: "; meldung; " | "; exWahlKreuz[0]; " ueb "; exWahlUeb
+        CASE 2
+            exExportieren(EX_HTML, vfZiel$("muster.html"), "")
+            PRINT "html: "; meldung; " | beginnt "; LEFT$(READALL$(vfZiel$("muster.html")), 15)
+        CASE 3
+            exWahlZelle = 8 : exWahlSymbole = TRUE
+            exExportieren(EX_BILD, vfZiel$("muster.png"), "")
+            DIM b AS IMAGE : b = LOADIMAGE(vfZiel$("muster.png"))
+            PRINT "bild: "; meldung; " | "; IMAGE_WIDTH(b); "x"; IMAGE_HEIGHT(b)
+        CASE 4
+            DIM vorher AS INTEGER : vorher = lwMuster.sticheGesamt()
+            DIM alt AS STRING : alt = musterPfad
+            exExportieren(EX_OXS, vfZiel$("muster.oxs"), "")
+            PRINT "oxs: "; meldung
+            ok = musterOeffnen(vfZiel$("muster.oxs"))
+            PRINT "wieder eingelesen: "; ok; " stiche gleich "; lwMuster.sticheGesamt() = vorher; " datei leer "; musterPfad = ""; " | "; LEFT$(meldung, 29)
+            foto("aus_oxs")
+            ok = musterOeffnen(alt)
+        CASE 5
+            exWahlPapier = 0
+            exExportieren(EX_PAKET, vfZiel$("muster.zip"), "")
+            PRINT "paket: "; meldung
+            PRINT "  "; JOIN$(ZIP_LIST(vfZiel$("muster.zip")), ", ")
+        CASE 6
+            ' Diamond: der Papierwaehler empfiehlt das Format fuer 1:1
+            lwMuster.modus = "diamond" : lwMuster.stoff = 10
+            exWahlPapier = -1
+            d = exDialogBauen()
+            DIM wahl AS INTEGER : wahl = gtk_combo_box_get_active(exPapier)
+            PRINT "diamond: vorgewaehlt "; kern.papierNamen()[wahl]; " = empfehlung "; kern.papierEmpfehlung$(lwMuster, 1)
+            gtk_widget_destroy(d)
+            lwMuster.modus = "stitch" : lwMuster.stoff = 14
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

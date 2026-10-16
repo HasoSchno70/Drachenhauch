@@ -21,6 +21,10 @@
 ' Kontrast/Saettigung, Konturen als Rueckstiche, Voreinstellungen, Ausschnitt
 ' aufziehen, Vorschau; erneut aus dem Quellbild (auch mit anderer Palette):
 ' Strg+Umschalt+I.
+' Stufe 5: Exportieren (Strg+E) -- PDF-Anleitung (A4 bis A0, Letter; Diamond
+' 1:1, Mystery, Wasserzeichen, Notizen, Entsprechungen anderer Hersteller),
+' HTML-Anleitung, Bild, Open Cross Stitch (.oxs, auch zum Oeffnen) und ein
+' Paket als ZIP. Ohne Passwortschutz.
 '
 ' Aufbau:
 '     kern/      Muster, Ebenen, Garne, Paletten, .pxs, Formen, Verlauf,
@@ -32,7 +36,8 @@
 '
 ' GTK muss da sein: unter Linux fast immer (libgtk-3-0), unter macOS ueber
 ' Homebrew (brew install gtk+3), unter Windows aus MSYS2 im PATH -- oder aus
-' Inkscape. Mit --probe fuehrt sich das Programm selbst vor und endet; --foto
+' Inkscape. Mit --probe (bzw. --probe-bearbeiten, --probe-stufe3 .. 5) fuehrt
+' sich das Programm selbst vor und endet; --foto
 ' ziel sichert dabei Bilder des Fensters (fuer Pruefungen).
 IMPORT "kern/kern.dh" AS kern
 IMPORT "gtk/gtk.dh"
@@ -41,6 +46,7 @@ IMPORT "ansicht/mehr.dh"
 IMPORT "ansicht/text.dh"
 IMPORT "ansicht/dialoge.dh"
 IMPORT "ansicht/importdialog.dh"
+IMPORT "ansicht/exportdialog.dh"
 IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/seitenleiste.dh"
 
@@ -199,13 +205,23 @@ END FUNCTION
 
 FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     DIM m AS kern.Muster
+    DIM oxsHinweis AS STRING
+    DIM ausOxs AS BOOLEAN : ausOxs = LOWER$(RIGHT$(pfad, 4)) = ".oxs"
     TRY
-        m = kern.pxsLaden(pfad)
+        IF ausOxs THEN
+            ' ein fremdes Format: eingelesen, gesichert wird als .pxs
+            DIM imp AS kern.OxsImport : imp = kern.oxsLaden(pfad, slPaletten, slSymbole)
+            m = imp.muster
+            oxsHinweis = "Aus OXS eingelesen -- Sichern legt eine .pxs an."
+            IF LEN(imp.warnungen) > 0 THEN oxsHinweis = oxsHinweis + " " + JOIN$(imp.warnungen, " ")
+        ELSE
+            m = kern.pxsLaden(pfad)
+        END IF
     CATCH e
         statusMeldung("Nicht geöffnet: " + e)
         RETURN FALSE
     END TRY
-    musterPfad = pfad
+    musterPfad = IIF(ausOxs, "", pfad)
     musterTitel = IIF(m.name <> "", m.name, BASENAME(pfad))
     wzVerlauf.leeren()
     extraGeaendert = FALSE
@@ -214,6 +230,7 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     seitenleisteMuster(m)
     zustandNachziehen()
     statusNachziehen()
+    IF oxsHinweis <> "" THEN statusMeldung(oxsHinweis)
     RETURN TRUE
 END FUNCTION
 
@@ -257,8 +274,9 @@ FUNCTION dateiWaehlen(sichern AS BOOLEAN) AS STRING
             "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Öffnen", GTK_ANTWORT_ANNEHMEN, 0)
     END IF
     DIM filter AS INTEGER : filter = gtk_file_filter_new()
-    gtk_file_filter_set_name(filter, "Kreuzstich-Muster (*.pxs)")
+    gtk_file_filter_set_name(filter, IIF(sichern, "Kreuzstich-Muster (*.pxs)", "Kreuzstich-Muster (*.pxs, *.oxs)"))
     gtk_file_filter_add_pattern(filter, "*.pxs")
+    IF NOT sichern THEN gtk_file_filter_add_pattern(filter, "*.oxs")
     gtk_file_chooser_add_filter(d, filter)
     DIM pfad AS STRING
     IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
@@ -302,6 +320,8 @@ SUB sichernGeklickt(knopf AS INTEGER, daten AS INTEGER)
     END IF
 END SUB
 
+SUB exportGeklickt(knopf AS INTEGER, daten AS INTEGER) : exportDialog() : END SUB
+
 SUB sichernUnter()
     IF NOT lwHat THEN RETURN
     DIM pfad AS STRING : pfad = dateiWaehlen(TRUE)
@@ -327,7 +347,7 @@ SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 4", _
+    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 5", _
         "comments", "Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.", _
         "website", "https://github.com/HasoSchno70/Pysticky", "website-label", "PySticky (das Original)", 0)
 END SUB
@@ -361,6 +381,7 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
             CASE &H76, &H56 : einfuegenBeginnen()                ' Strg+V
             CASE &H61, &H41 : auswahlAlles()                     ' Strg+A
             CASE &H72, &H52 : farbeErsetzenDialog()              ' Strg+R
+            CASE &H65, &H45 : exportDialog()                     ' Strg+E
             CASE &H69, &H49                                      ' Strg+I, Strg+Umschalt+I
                 IF umschalt THEN bildNeuImportieren() ELSE bildImportieren()
             CASE &H6E, &H4E                                      ' Strg+Umschalt+N
@@ -425,11 +446,13 @@ gtk_header_bar_pack_start(kopf, kUeber)
 DIM kOeffnen AS INTEGER : kOeffnen = knopf("document-open-symbolic", "Muster öffnen (Strg+O)")
 DIM kImport AS INTEGER : kImport = knopf("insert-image-symbolic", "Bild importieren (Strg+I) -- erneut aus dem Quellbild: Strg+Umschalt+I")
 kSichern = knopf("document-save-symbolic", "Sichern (Strg+S) -- Sichern unter: Strg+Umschalt+S")
+DIM kExport AS INTEGER : kExport = knopf("document-send-symbolic", "Exportieren (Strg+E) -- PDF, HTML, Bild, OXS oder Paket")
 kZurueck = knopf("edit-undo-symbolic", "Rückgängig (Strg+Z)")
 kVor = knopf("edit-redo-symbolic", "Wiederholen (Strg+Y)")
 gtk_header_bar_pack_start(kopf, kOeffnen)
 gtk_header_bar_pack_start(kopf, kImport)
 gtk_header_bar_pack_start(kopf, kSichern)
+gtk_header_bar_pack_start(kopf, kExport)
 gtk_header_bar_pack_start(kopf, kZurueck)
 gtk_header_bar_pack_start(kopf, kVor)
 DIM kEinpassen AS INTEGER : kEinpassen = knopf("zoom-fit-best-symbolic", "Einpassen (0)")
@@ -463,6 +486,7 @@ signal(kUeber, "clicked", ueberGeklickt, 0, 0, 0)
 signal(kOeffnen, "clicked", oeffnenGeklickt, 0, 0, 0)
 signal(kImport, "clicked", bildImportierenGeklickt, 0, 0, 0)
 signal(kSichern, "clicked", sichernGeklickt, 0, 0, 0)
+signal(kExport, "clicked", exportGeklickt, 0, 0, 0)
 signal(kZurueck, "clicked", zurueckGeklickt, 0, 0, 0)
 signal(kVor, "clicked", vorGeklickt, 0, 0, 0)
 signal(kKleiner, "clicked", kleinerGeklickt, 0, 0, 0)
@@ -488,6 +512,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe3"
     ELSEIF ARG$(a) = "--probe-stufe4" THEN
         probe = "stufe4"
+    ELSEIF ARG$(a) = "--probe-stufe5" THEN
+        probe = "stufe5"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -503,5 +529,6 @@ IF probe = "ansehen" THEN g_timeout_add(300, vorfuehren, 0)
 IF probe = "bearbeiten" THEN g_timeout_add(300, vorfuehrenBearbeiten, 0)
 IF probe = "stufe3" THEN g_timeout_add(300, vorfuehrenStufe3, 0)
 IF probe = "stufe4" THEN g_timeout_add(300, vorfuehrenStufe4, 0)
+IF probe = "stufe5" THEN g_timeout_add(300, vorfuehrenStufe5, 0)
 
 gtk_main()

@@ -68,6 +68,15 @@ DECLARE FUNCTION gtk_entry_get_text LIB GTK (feld AS ZEIGER) AS TEXT
 DECLARE SUB gtk_entry_set_text LIB GTK (feld AS ZEIGER, text AS TEXT)
 DECLARE SUB gtk_entry_set_activates_default LIB GTK (feld AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_entry_set_placeholder_text LIB GTK (feld AS ZEIGER, text AS TEXT)
+' Mehrzeiliger Text (die Notizen im Export). GtkTextIter ist ein Struct, das
+' GTK fuellt -- uebergeben wird ein Puffer (BUFFER_ZEIGER), gross genug fuer
+' jede Plattform (80 Bytes unter 64 Bit).
+DECLARE FUNCTION gtk_text_view_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_text_view_get_buffer LIB GTK (sicht AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_text_view_set_wrap_mode LIB GTK (sicht AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_text_buffer_set_text LIB GTK (puffer AS ZEIGER, text AS TEXT, laenge AS LONG)
+DECLARE SUB gtk_text_buffer_get_bounds LIB GTK (puffer AS ZEIGER, anfang AS ZEIGER, ende AS ZEIGER)
+DECLARE FUNCTION gtk_text_buffer_get_text LIB GTK (puffer AS ZEIGER, anfang AS ZEIGER, ende AS ZEIGER, verborgen AS BOOLEAN) AS ZEIGER
 DECLARE FUNCTION gtk_spin_button_new_with_range LIB GTK (von AS FLOAT, bis AS FLOAT, schritt AS FLOAT) AS ZEIGER
 DECLARE SUB gtk_spin_button_set_value LIB GTK (feld AS ZEIGER, wert AS FLOAT)
 DECLARE FUNCTION gtk_spin_button_get_value_as_int LIB GTK (feld AS ZEIGER) AS LONG
@@ -242,6 +251,7 @@ CONST GTK_NACHRICHT_FRAGE = 2             ' GTK_MESSAGE_QUESTION
 CONST GTK_KNOEPFE_KEINE = 0
 CONST GTK_DATEI_SICHERN = 1
 CONST GTK_ANTWORT_OK = -5
+CONST GTK_UMBRUCH_WORT = 2               ' GTK_WRAP_WORD
 CONST GTK_ANTWORT_ZU = -4                 ' GTK_RESPONSE_DELETE_EVENT
 CONST GDK_UMSCHALT = 1
 CONST GDK_STRG = 4
@@ -303,6 +313,11 @@ END SUB
 
 ' Ein Widget in eine PNG zeichnen (unabhaengig davon, ob es zu sehen ist).
 FUNCTION gtkFoto(w AS INTEGER, pfad AS STRING) AS BOOLEAN
+    ' erst verteilen lassen, was noch ansteht -- ein eben gebautes Fenster hat
+    ' sonst noch keine Groessen (Gtk-CRITICAL "alloc_needed")
+    WHILE gtk_events_pending()
+        DIM weiter AS BOOLEAN : weiter = gtk_main_iteration_do(FALSE)
+    WEND
     DIM flaeche AS INTEGER : flaeche = cairo_image_surface_create(CAIRO_ARGB32, gtk_widget_get_allocated_width(w), gtk_widget_get_allocated_height(w))
     DIM cr AS INTEGER : cr = cairo_create(flaeche)
     gtk_widget_draw(w, cr)
