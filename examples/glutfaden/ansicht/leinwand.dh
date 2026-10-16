@@ -39,6 +39,10 @@ DIM lwMausY AS INTEGER
 DIM lwSchrift AS INTEGER              ' PangoFontDescription
 DIM lwEingepasst AS BOOLEAN           ' beim ersten Zeichnen einpassen
 DIM lwZeile AS INTEGER                ' Bytes je Bildzeile in lwPuffer
+DIM lwHalbX AS INTEGER                ' Rueckstich: Rasterpunkt unter der Maus (Halbstich-Einheiten)
+DIM lwHalbY AS INTEGER
+DIM lwHalbGenauX AS FLOAT             ' ... und ungerastert (zum Treffen eines Rueckstichs)
+DIM lwHalbGenauY AS FLOAT
 
 FUNCTION leinwandNeu() AS INTEGER
     lwFlaeche = gtk_drawing_area_new()
@@ -323,6 +327,38 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         cairo_stroke(cr)
     NEXT
 
+    ' Erledigte Stiche: Stoff halb darueber und ein Haken -- so sieht man, was
+    ' noch zu sticken ist (PySticky blendet sie ebenso ab)
+    IF z >= 4 THEN
+        cairo_set_source_rgba(cr, 0.98, 0.98, 0.96, 0.62)
+        DIM erl AS BOOLEAN
+        FOR y = y0 TO y1
+            FOR x = x0 TO x1
+                i = y * b + x
+                IF lwFertig[i] <> 0 AND lwFarbe[i] >= 0 THEN
+                    cairo_rectangle(cr, lwX + x * z, lwY + y * z, z, z)
+                    erl = TRUE
+                END IF
+            NEXT
+        NEXT
+        cairo_fill(cr)
+        IF erl AND z >= 10 THEN
+            cairo_set_source_rgba(cr, 0.15, 0.55, 0.25, 0.9)
+            cairo_set_line_width(cr, MAX(1.5, z / 10))
+            FOR y = y0 TO y1
+                FOR x = x0 TO x1
+                    i = y * b + x
+                    IF lwFertig[i] <> 0 AND lwFarbe[i] >= 0 THEN
+                        cairo_move_to(cr, lwX + (x + 0.25) * z, lwY + (y + 0.55) * z)
+                        cairo_line_to(cr, lwX + (x + 0.42) * z, lwY + (y + 0.72) * z)
+                        cairo_line_to(cr, lwX + (x + 0.78) * z, lwY + (y + 0.3) * z)
+                    END IF
+                NEXT
+            NEXT
+            cairo_stroke(cr)
+        END IF
+    END IF
+
     ' Die Form, die gerade gezogen wird, halb durchsichtig in der Farbe
     IF LEN(wzVorschau) > 0 AND wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl() THEN
         DIM vf AS INTEGER : vf = lwRgb[wzFarbe]
@@ -335,6 +371,9 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         NEXT
         cairo_fill(cr)
     END IF
+
+    ' Auswahl, Lasso, Vieleck, Rueckstich, Fortschritt (ansicht/mehr.dh)
+    mehrZeichnen(cr)
 
     ' Rahmen und die Zelle unter dem Zeiger
     cairo_set_line_width(cr, 1.0)
@@ -462,10 +501,35 @@ FUNCTION lwUmschalt(ereignis AS INTEGER) AS BOOLEAN
     RETURN (z BAND GDK_UMSCHALT) <> 0
 END FUNCTION
 
+' Der Rasterpunkt eines Rueckstichs (PySticky backstitch_tool._to_half_stitch):
+' Zelle * 2 plus 0/1/2 je Drittel der Zelle -- Ecken, Kantenmitten und die
+' Mitte; aufs Muster geklemmt.
+SUB lwHalbRechnen(px AS FLOAT, py AS FLOAT)
+    DIM rx AS FLOAT : rx = (px - lwX) / lwZelle
+    DIM ry AS FLOAT : ry = (py - lwY) / lwZelle
+    lwHalbGenauX = rx * 2
+    lwHalbGenauY = ry * 2
+    lwHalbX = CLAMP(lwHalbAchse(rx), 0, 2 * lwMuster.breite)
+    lwHalbY = CLAMP(lwHalbAchse(ry), 0, 2 * lwMuster.hoehe)
+END SUB
+
+FUNCTION lwHalbAchse(r AS FLOAT) AS INTEGER
+    DIM zelle AS INTEGER : zelle = FLOOR(r)
+    DIM innen AS FLOAT : innen = r - zelle
+    DIM s AS INTEGER : s = 2
+    IF innen < 1.0 / 3 THEN
+        s = 0
+    ELSEIF innen < 2.0 / 3 THEN
+        s = 1
+    END IF
+    RETURN zelle * 2 + s
+END FUNCTION
+
 FUNCTION lwDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
     gtk_widget_grab_focus(lwFlaeche)
+    IF lwHat THEN lwHalbRechnen(px, py)
     IF wzDruck(lwRohX(px), lwRohY(py), lwTaste(ereignis), lwUmschalt(ereignis)) = ZUG_HAND THEN
         lwZiehX = px
         lwZiehY = py
@@ -485,6 +549,7 @@ END FUNCTION
 FUNCTION lwBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
+    IF lwHat THEN lwHalbRechnen(px, py)
     IF lwZiehen THEN
         lwX = lwX + (px - lwZiehX)
         lwY = lwY + (py - lwZiehY)
@@ -494,6 +559,8 @@ FUNCTION lwBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOL
         DIM rx AS INTEGER : rx = lwRohX(px)
         DIM ry AS INTEGER : ry = lwRohY(py)
         IF rx <> wzLetzteX OR ry <> wzLetzteY THEN wzZiehen(rx, ry, lwUmschalt(ereignis))
+    ELSEIF lwHat THEN
+        mehrBewegung(lwRohX(px), lwRohY(py))
     END IF
     DIM mx AS INTEGER : mx = leinwandZelleX(px)
     DIM my AS INTEGER : my = leinwandZelleY(py)
@@ -527,9 +594,26 @@ SUB leinwandZeiger()
         CASE WZ_HAND : name = "grab"
         CASE WZ_PIPETTE : name = "copy"
         CASE WZ_FUELLEN : name = "cell"
+        CASE WZ_TEXT : name = "text"
+        CASE WZ_AUSWAHL, WZ_LASSO : name = "crosshair"
+        CASE WZ_FORTSCHRITT : name = "pointer"
         CASE ELSE : name = "crosshair"
     END SELECT
     DIM z AS INTEGER : z = gdk_cursor_new_from_name(gdk_display_get_default(), name)
     IF z = 0 THEN z = gdk_cursor_new_from_name(gdk_display_get_default(), "default")
     gdk_window_set_cursor(fenster, z)
+END SUB
+
+' Die Zelle (x, y) ins Bild holen, wenn sie draussen liegt (Fortschritt).
+SUB leinwandZeigen(x AS INTEGER, y AS INTEGER)
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(lwFlaeche)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(lwFlaeche)
+    DIM px AS FLOAT : px = lwX + (x + 0.5) * lwZelle
+    DIM py AS FLOAT : py = lwY + (y + 0.5) * lwZelle
+    IF px < lwZelle OR px > bw - lwZelle OR py < lwZelle OR py > bh - lwZelle THEN
+        lwX = bw / 2 - (x + 0.5) * lwZelle
+        lwY = bh / 2 - (y + 0.5) * lwZelle
+    END IF
+    gtk_widget_queue_draw(lwFlaeche)
+    statusNachziehen()
 END SUB

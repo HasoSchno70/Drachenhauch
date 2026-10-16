@@ -2361,14 +2361,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2);
             if let Value::Array(arr) = &a[0] {
                 let arr = arr.borrow();
-                // Ein LEERES Array kann keinen falschen Wert enthalten.
-                if arr.element_type != "string" && arr.cells.len() > 0 {
-                    return err("JOIN$: ARRAY OF STRING noetig".to_string());
+                // Texte, Zahlen und Wahrheitswerte -- je wie STR$ geschrieben.
+                // Vorher nur ARRAY OF STRING: wer Zahlen verbinden wollte,
+                // musste sie erst einzeln umwandeln (Glutfaden, 2026-10-15).
+                if arr.cells.iter().any(|v| !matches!(v, Value::Str(_) | Value::Int(_) | Value::Float(_) | Value::Bool(_))) {
+                    return err("JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig".to_string());
                 }
                 let delim = need_str(&a[1], "JOIN$")?;
                 let parts: Vec<String> = arr.cells.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect();
                 Ok(Value::str_rc(&parts.join(delim)))
-            } else { err("JOIN$ erwartet ARRAY OF STRING".to_string()) }
+            } else { err("JOIN$ erwartet ein Feld".to_string()) }
         }
         // --- String-Erweiterungen (WP3) ---
         "ltrim$" | "ltrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "LTRIM$")?.trim_start())) }

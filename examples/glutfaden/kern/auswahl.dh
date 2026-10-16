@@ -1,0 +1,321 @@
+' Auswahl, Lasso und Zwischenablage (PySticky ui/tools/select_tool.py,
+' lasso_select_tool.py).
+'
+' Eine Auswahl ist eine Maske ueber dem ganzen Muster (1 = gewaehlt) samt
+' ihrem umschliessenden Rechteck. Rechteck und Lasso schreiben in dieselbe
+' Form, alles Weitere fragt nur die Maske.
+'
+' Ein Ausschnitt ist der Inhalt einer Auswahl auf der aktiven Ebene, relativ
+' zur linken oberen Ecke: je Zelle, ob sie dazugehoert, Farbe (-1 = leer) und
+' Stichtyp. Er ist die Zwischenablage und das, was beim Verschieben, Drehen
+' und Spiegeln wandert.
+'
+' Verschieben, Drehen, Spiegeln, Einfuegen sind EINE Operation: die alten
+' Zellen leeren, die neuen schreiben -- ein Schritt im Verlauf.
+
+CLASS Auswahl
+    DIM breite AS INTEGER            ' des Musters
+    DIM hoehe AS INTEGER
+    DIM maske AS ARRAY OF INTEGER
+    DIM x0 AS INTEGER                ' umschliessendes Rechteck (einschliesslich)
+    DIM y0 AS INTEGER
+    DIM x1 AS INTEGER
+    DIM y1 AS INTEGER
+    DIM anzahl AS INTEGER
+    DIM istRechteck AS BOOLEAN
+
+    SUB Init(b AS INTEGER, h AS INTEGER)
+        breite = b
+        hoehe = h
+        DIM mk[b * h] AS INTEGER
+        maske = mk
+        x0 = b : y0 = h : x1 = -1 : y1 = -1
+    END SUB
+
+    FUNCTION leer() AS BOOLEAN
+        RETURN anzahl = 0
+    END FUNCTION
+
+    FUNCTION drin(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+        IF x < 0 OR y < 0 OR x >= breite OR y >= hoehe THEN RETURN FALSE
+        RETURN maske[y * breite + x] <> 0
+    END FUNCTION
+
+    SUB setzen(x AS INTEGER, y AS INTEGER)
+        IF x < 0 OR y < 0 OR x >= breite OR y >= hoehe THEN RETURN
+        DIM i AS INTEGER : i = y * breite + x
+        IF maske[i] <> 0 THEN RETURN
+        maske[i] = 1
+        anzahl = anzahl + 1
+        IF x < x0 THEN x0 = x
+        IF y < y0 THEN y0 = y
+        IF x > x1 THEN x1 = x
+        IF y > y1 THEN y1 = y
+    END SUB
+
+    ' Alle gewaehlten Zellen als [x0, y0, ...] in Lesereihenfolge.
+    FUNCTION zellen() AS ARRAY OF INTEGER
+        DIM p[2 * anzahl] AS INTEGER
+        IF anzahl = 0 THEN RETURN p
+        DIM k AS INTEGER, x AS INTEGER, y AS INTEGER
+        DIM mk AS ARRAY OF INTEGER : mk = maske
+        FOR y = y0 TO y1
+            FOR x = x0 TO x1
+                IF mk[y * breite + x] <> 0 THEN
+                    p[k] = x : p[k + 1] = y : k = k + 2
+                END IF
+            NEXT
+        NEXT
+        RETURN p
+    END FUNCTION
+END CLASS
+
+FUNCTION neueAuswahl(b AS INTEGER, h AS INTEGER) AS Auswahl
+    DIM a AS Auswahl : a = NEW Auswahl(b, h)
+    RETURN a
+END FUNCTION
+
+' Rechteck zwischen zwei Zellen, aufs Muster beschnitten. Ganz draussen: leer.
+FUNCTION auswahlRechteck(b AS INTEGER, h AS INTEGER, xa AS INTEGER, ya AS INTEGER, xb AS INTEGER, yb AS INTEGER) AS Auswahl
+    DIM a AS Auswahl : a = neueAuswahl(b, h)
+    a.istRechteck = TRUE
+    DIM l AS INTEGER : l = MAX(0, MIN(xa, xb))
+    DIM r AS INTEGER : r = MIN(b - 1, MAX(xa, xb))
+    DIM o AS INTEGER : o = MAX(0, MIN(ya, yb))
+    DIM u AS INTEGER : u = MIN(h - 1, MAX(ya, yb))
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = o TO u
+        FOR x = l TO r
+            a.setzen(x, y)
+        NEXT
+    NEXT
+    RETURN a
+END FUNCTION
+
+' Lasso: das Vieleck durch die Zellen, die die Maus beruehrt hat. Gewaehlt ist
+' jede Zelle, deren MITTE innen liegt (gerade/ungerade, wie QPainterPath), und
+' jede Zelle auf einer Kante -- sonst fiele ein schmaler Zug ganz heraus.
+' Unter drei Punkten: leer.
+FUNCTION auswahlLasso(b AS INTEGER, h AS INTEGER, punkte AS ARRAY OF INTEGER) AS Auswahl
+    DIM a AS Auswahl : a = neueAuswahl(b, h)
+    DIM n AS INTEGER : n = LEN(punkte) \ 2
+    IF n < 3 THEN RETURN a
+    DIM lx AS INTEGER : lx = punkte[0]
+    DIM rx AS INTEGER : rx = punkte[0]
+    DIM oy AS INTEGER : oy = punkte[1]
+    DIM uy AS INTEGER : uy = punkte[1]
+    DIM k AS INTEGER
+    FOR k = 1 TO n - 1
+        lx = MIN(lx, punkte[2 * k]) : rx = MAX(rx, punkte[2 * k])
+        oy = MIN(oy, punkte[2 * k + 1]) : uy = MAX(uy, punkte[2 * k + 1])
+    NEXT
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = MAX(0, oy) TO MIN(h - 1, uy)
+        FOR x = MAX(0, lx) TO MIN(b - 1, rx)
+            IF innen(x + 0.5, y + 0.5, punkte) THEN a.setzen(x, y)
+        NEXT
+    NEXT
+    ' die Kanten selbst, auch die schliessende
+    FOR k = 0 TO n - 1
+        DIM j AS INTEGER : j = (k + 1) MOD n
+        DIM p AS ARRAY OF INTEGER : p = linieRoh(punkte[2 * k], punkte[2 * k + 1], punkte[2 * j], punkte[2 * j + 1])
+        DIM q AS INTEGER
+        FOR q = 0 TO LEN(p) - 2 STEP 2
+            a.setzen(p[q], p[q + 1])
+        NEXT
+    NEXT
+    RETURN a
+END FUNCTION
+
+' Liegt (px, py) im Vieleck? Strahl nach rechts, gerade/ungerade.
+FUNCTION innen(px AS FLOAT, py AS FLOAT, punkte AS ARRAY OF INTEGER) AS BOOLEAN
+    DIM n AS INTEGER : n = LEN(punkte) \ 2
+    DIM drin AS BOOLEAN
+    DIM k AS INTEGER, j AS INTEGER
+    j = n - 1
+    FOR k = 0 TO n - 1
+        DIM xk AS FLOAT : xk = punkte[2 * k]
+        DIM yk AS FLOAT : yk = punkte[2 * k + 1]
+        DIM xj AS FLOAT : xj = punkte[2 * j]
+        DIM yj AS FLOAT : yj = punkte[2 * j + 1]
+        IF (yk > py) <> (yj > py) THEN
+            IF px < (xj - xk) * (py - yk) / (yj - yk) + xk THEN drin = NOT drin
+        END IF
+        j = k
+    NEXT
+    RETURN drin
+END FUNCTION
+
+' Bresenham ohne feste Richtung -- so zieht das Original die Lasso-Kanten.
+FUNCTION linieRoh(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM dx AS INTEGER : dx = ABS(x2 - x1)
+    DIM dy AS INTEGER : dy = ABS(y2 - y1)
+    DIM sx AS INTEGER : sx = IIF(x1 < x2, 1, -1)
+    DIM sy AS INTEGER : sy = IIF(y1 < y2, 1, -1)
+    DIM fehler AS INTEGER : fehler = dx - dy
+    DIM x AS INTEGER : x = x1
+    DIM y AS INTEGER : y = y1
+    DO
+        ARRAY_PUSH(p, x) : ARRAY_PUSH(p, y)
+        IF x = x2 AND y = y2 THEN EXIT DO
+        DIM e2 AS INTEGER : e2 = 2 * fehler
+        IF e2 > -dy THEN
+            fehler = fehler - dy
+            x = x + sx
+        END IF
+        IF e2 < dx THEN
+            fehler = fehler + dx
+            y = y + sy
+        END IF
+    LOOP
+    RETURN p
+END FUNCTION
+
+' Eine Auswahl um (dx, dy) verschoben; was hinausfaellt, faellt weg.
+FUNCTION auswahlVerschoben(a AS Auswahl, dx AS INTEGER, dy AS INTEGER) AS Auswahl
+    DIM n AS Auswahl : n = neueAuswahl(a.breite, a.hoehe)
+    n.istRechteck = a.istRechteck
+    DIM p AS ARRAY OF INTEGER : p = a.zellen()
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(p) - 2 STEP 2
+        n.setzen(p[k] + dx, p[k + 1] + dy)
+    NEXT
+    RETURN n
+END FUNCTION
+
+' --- Ausschnitt (Zwischenablage) ------------------------------------------------
+
+CLASS Ausschnitt
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM dabei AS ARRAY OF INTEGER    ' 1 = gehoert zur Auswahl
+    DIM farbe AS ARRAY OF INTEGER    ' -1 = leer
+    DIM art AS ARRAY OF INTEGER
+
+    SUB Init(b AS INTEGER, h AS INTEGER)
+        breite = b
+        hoehe = h
+        DIM d[b * h] AS INTEGER
+        DIM f[b * h] AS INTEGER
+        DIM t[b * h] AS INTEGER
+        DIM i AS INTEGER
+        FOR i = 0 TO b * h - 1 : f[i] = KEIN_STICH : NEXT
+        dabei = d : farbe = f : art = t
+    END SUB
+
+    FUNCTION stiche() AS INTEGER
+        DIM n AS INTEGER, v AS INTEGER
+        FOR EACH v IN farbe
+            IF v <> KEIN_STICH THEN n = n + 1
+        NEXT
+        RETURN n
+    END FUNCTION
+END CLASS
+
+FUNCTION neuerAusschnitt(b AS INTEGER, h AS INTEGER) AS Ausschnitt
+    DIM a AS Ausschnitt : a = NEW Ausschnitt(b, h)
+    RETURN a
+END FUNCTION
+
+' Den Inhalt der Auswahl auf einer Ebene kopieren.
+FUNCTION ausschnittVon(e AS Ebene, a AS Auswahl) AS Ausschnitt
+    IF a.leer() THEN RETURN neuerAusschnitt(0, 0)
+    DIM b AS INTEGER : b = a.x1 - a.x0 + 1
+    DIM h AS INTEGER : h = a.y1 - a.y0 + 1
+    DIM s AS Ausschnitt : s = neuerAusschnitt(b, h)
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            IF a.drin(a.x0 + x, a.y0 + y) THEN
+                DIM i AS INTEGER : i = y * b + x
+                s.dabei[i] = 1
+                s.farbe[i] = e.stich(a.x0 + x, a.y0 + y)
+                s.art[i] = e.stichArt(a.x0 + x, a.y0 + y)
+            END IF
+        NEXT
+    NEXT
+    RETURN s
+END FUNCTION
+
+' Drehen: im Uhrzeigersinn (x, y) -> (h-1-y, x), dagegen (y, b-1-x); Breite und
+' Hoehe tauschen. Teilstiche drehen mit (PySticky ROTATE_CW_MAP/CCW_MAP).
+FUNCTION ausschnittGedreht(s AS Ausschnitt, rechts AS BOOLEAN) AS Ausschnitt
+    DIM n AS Ausschnitt : n = neuerAusschnitt(s.hoehe, s.breite)
+    DIM x AS INTEGER, y AS INTEGER, nx AS INTEGER, ny AS INTEGER
+    FOR y = 0 TO s.hoehe - 1
+        FOR x = 0 TO s.breite - 1
+            DIM i AS INTEGER : i = y * s.breite + x
+            IF rechts THEN
+                nx = s.hoehe - 1 - y : ny = x
+            ELSE
+                nx = y : ny = s.breite - 1 - x
+            END IF
+            DIM j AS INTEGER : j = ny * n.breite + nx
+            n.dabei[j] = s.dabei[i]
+            n.farbe[j] = s.farbe[i]
+            n.art[j] = IIF(rechts, stichGedreht(s.art[i]), stichGedrehtLinks(s.art[i]))
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Spiegeln: waagerecht (links/rechts) oder senkrecht (oben/unten).
+FUNCTION ausschnittGespiegelt(s AS Ausschnitt, waagerecht AS BOOLEAN) AS Ausschnitt
+    DIM n AS Ausschnitt : n = neuerAusschnitt(s.breite, s.hoehe)
+    DIM x AS INTEGER, y AS INTEGER, nx AS INTEGER, ny AS INTEGER
+    FOR y = 0 TO s.hoehe - 1
+        FOR x = 0 TO s.breite - 1
+            DIM i AS INTEGER : i = y * s.breite + x
+            nx = x : ny = y
+            IF waagerecht THEN nx = s.breite - 1 - x ELSE ny = s.hoehe - 1 - y
+            DIM j AS INTEGER : j = ny * n.breite + nx
+            n.dabei[j] = s.dabei[i]
+            n.farbe[j] = s.farbe[i]
+            n.art[j] = IIF(waagerecht, stichGespiegeltH(s.art[i]), stichGespiegeltV(s.art[i]))
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+
+' Die Auswahl, die ein Ausschnitt an (x, y) belegt.
+FUNCTION auswahlVonAusschnitt(b AS INTEGER, h AS INTEGER, s AS Ausschnitt, x AS INTEGER, y AS INTEGER, rechteck AS BOOLEAN) AS Auswahl
+    DIM a AS Auswahl : a = neueAuswahl(b, h)
+    a.istRechteck = rechteck
+    DIM rx AS INTEGER, ry AS INTEGER
+    FOR ry = 0 TO s.hoehe - 1
+        FOR rx = 0 TO s.breite - 1
+            IF s.dabei[ry * s.breite + rx] <> 0 THEN a.setzen(x + rx, y + ry)
+        NEXT
+    NEXT
+    RETURN a
+END FUNCTION
+
+' --- Operationen auf dem Muster (je ein Schritt) -----------------------------------
+
+' Die alten Zellen leeren (leeren = Auswahl oder NIL) und den Ausschnitt an
+' (x, y) schreiben -- nur Zellen mit Stich, ein leerer Platz im Ausschnitt laesst
+' stehen, was dort ist (wie Einfuegen im Original). Liefert die geaenderten.
+FUNCTION ausschnittSetzen(m AS Muster, v AS Verlauf, leeren AS Auswahl, s AS Ausschnitt, x AS INTEGER, y AS INTEGER, text AS STRING) AS INTEGER
+    DIM e AS Ebene : e = m.ebenen.aktiveEbene()
+    IF e IS NIL THEN RETURN 0
+    IF e.gesperrt THEN RETURN 0
+    DIM n AS INTEGER
+    v.beginnen(text)
+    IF NOT (leeren IS NIL) THEN n = zellenSetzen(m, v, leeren.zellen(), -1, VOLL, text)
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM f AS ARRAY OF INTEGER : f = []
+    DIM a AS ARRAY OF INTEGER : a = []
+    DIM rx AS INTEGER, ry AS INTEGER
+    FOR ry = 0 TO s.hoehe - 1
+        FOR rx = 0 TO s.breite - 1
+            DIM i AS INTEGER : i = ry * s.breite + rx
+            IF s.dabei[i] = 0 OR s.farbe[i] = KEIN_STICH THEN CONTINUE
+            ARRAY_PUSH(p, x + rx) : ARRAY_PUSH(p, y + ry)
+            ARRAY_PUSH(f, s.farbe[i]) : ARRAY_PUSH(a, s.art[i])
+        NEXT
+    NEXT
+    n = n + zellenSetzenJe(m, v, p, f, a, text)
+    v.beenden()
+    RETURN n
+END FUNCTION

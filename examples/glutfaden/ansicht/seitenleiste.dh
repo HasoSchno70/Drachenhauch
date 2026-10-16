@@ -99,10 +99,28 @@ SUB seitenleisteMuster(m AS kern.Muster)
     NEXT
     signalZeile(slFarbListe, "row-selected", slFarbeGewaehlt, 0, 0, 0)
     gtk_box_pack_start(slInhalt, slFarbListe, FALSE, FALSE, 0)
+    DIM fk AS INTEGER : fk = gtk_box_new(GTK_WAAGERECHT, 2)
+    gtkKlasse(fk, "innen")
+    DIM kn AS INTEGER
+    kn = slKnopf("Ersetzen…", "Die aktuelle Farbe durch eine andere ersetzen (Strg+R)")
+    signal(kn, "clicked", slFarbKnopf, 0, 0, 0)
+    gtk_box_pack_start(fk, kn, TRUE, TRUE, 0)
+    kn = slKnopf("Symbol…", "Das Symbol der aktuellen Farbe ändern")
+    signal(kn, "clicked", slFarbKnopf, 1, 0, 0)
+    gtk_box_pack_start(fk, kn, TRUE, TRUE, 0)
+    kn = slKnopf("✓ Erledigt", "Alle Stiche der aktuellen Farbe als erledigt markieren")
+    signal(kn, "clicked", slFarbKnopf, 2, 0, 0)
+    gtk_box_pack_start(fk, kn, TRUE, TRUE, 0)
+    gtk_box_pack_start(slInhalt, fk, FALSE, FALSE, 2)
+    DIM fk2 AS INTEGER : fk2 = gtk_box_new(GTK_WAAGERECHT, 2)
+    gtkKlasse(fk2, "innen")
+    kn = slKnopf("Seltene zusammenlegen…", "Farben mit wenigen Stichen in die ähnlichste häufige übernehmen")
+    signal(kn, "clicked", slFarbKnopf, 3, 0, 0)
+    gtk_box_pack_start(fk2, kn, TRUE, TRUE, 0)
     DIM weg AS INTEGER : weg = slKnopf("Unbenutzte entfernen", "Farben ohne Stich und ohne Rückstich aus dem Muster nehmen")
-    gtk_widget_set_halign(weg, GTK_AUSRICHTEN_ENDE)
     signal(weg, "clicked", slUnbenutzteEntfernen, 0, 0, 0)
-    gtk_box_pack_start(slInhalt, weg, FALSE, FALSE, 4)
+    gtk_box_pack_start(fk2, weg, TRUE, TRUE, 0)
+    gtk_box_pack_start(slInhalt, fk2, FALSE, FALSE, 2)
 
     ' --- Katalog
     gtk_box_pack_start(slInhalt, slUeberschrift("Garn hinzufügen"), FALSE, FALSE, 0)
@@ -258,6 +276,24 @@ END SUB
 SUB slFarbeGewaehlt(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
     IF slSperre OR zeile = 0 THEN RETURN
     farbeWaehlen(gtk_list_box_row_get_index(zeile))
+END SUB
+
+SUB slFarbKnopf(knopf AS INTEGER, nr AS INTEGER)
+    SELECT CASE nr
+        CASE 0 : farbeErsetzenDialog()
+        CASE 1 : symbolDialog()
+        CASE 2 : farbeAlsErledigt()
+        CASE 3 : selteneDialog()
+    END SELECT
+END SUB
+
+SUB farbeAlsErledigt()
+    IF NOT lwHat OR NOT wzFarbeDa() THEN RETURN
+    DIM n AS INTEGER : n = kern.farbeErledigt(lwMuster, wzVerlauf, wzFarbe)
+    leinwandAufbauen()
+    gtk_widget_queue_draw(lwFlaeche)
+    nachAenderung()
+    statusMeldung(STR$(n) + " Stiche als erledigt markiert.")
 END SUB
 
 SUB slUnbenutzteEntfernen(knopf AS INTEGER, daten AS INTEGER)

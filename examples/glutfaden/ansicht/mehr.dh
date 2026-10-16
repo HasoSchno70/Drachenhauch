@@ -1,0 +1,554 @@
+' Die Werkzeuge der Stufe 3 (PySticky ui/tools/select_tool.py,
+' lasso_select_tool.py, polygon_tool.py, backstitch_tool.py,
+' progress_tool.py, text_tool.py): Auswahl, Lasso, Vieleck, Rueckstich,
+' Fortschritt, Text.
+'
+' Auswahl und Lasso:
+'   ziehen = waehlen, in die Auswahl klicken und ziehen = Inhalt verschieben
+'   (ein Schritt), Strg+C/X/V, Entf, F fuellen, R/Umschalt+R drehen,
+'   H/V spiegeln, ESC hebt auf. Einfuegen haengt den Inhalt an die Maus, ein
+'   Klick setzt ihn ab (ESC bricht ab).
+' Vieleck: Klick = Ecke, rechte Taste schliesst (ab drei Ecken), Ruecktaste
+'   nimmt die letzte, ESC bricht ab.
+' Rueckstich: Klick = Anfang, jeder weitere Klick eine Linie (verkettet),
+'   rechte Taste bricht ab oder entfernt den Rueckstich unter der Maus.
+'   Gerastert auf Ecken, Kantenmitten und Mitten der Zellen (Drittel).
+' Fortschritt: ziehen markiert erledigt, rechte Taste nimmt zurueck; Pfeile
+'   springen zum naechsten offenen Stich der aktuellen Farbe, Enter oder
+'   Leertaste markieren ihn.
+' Text: Klick fragt nach Text und Schrift, dann haengt er an der Maus, ein
+'   Klick setzt ihn (ESC bricht ab).
+
+DIM mrAuswahl AS kern.Auswahl         ' NIL = keine
+DIM mrAblage AS kern.Ausschnitt       ' die Zwischenablage, NIL = leer
+DIM mrAblageRechteck AS BOOLEAN
+DIM mrModus AS INTEGER                ' MR_*: was der laufende Zug tut
+DIM mrStartX AS INTEGER
+DIM mrStartY AS INTEGER
+DIM mrInhalt AS kern.Ausschnitt       ' beim Verschieben: was wandert
+DIM mrDx AS INTEGER
+DIM mrDy AS INTEGER
+DIM mrLasso AS ARRAY OF INTEGER
+DIM mrEcken AS ARRAY OF INTEGER       ' Vieleck
+DIM mrRueckAktiv AS BOOLEAN           ' Rueckstich: Anfang gesetzt
+DIM mrRueckX AS INTEGER
+DIM mrRueckY AS INTEGER
+DIM mrEinfuegen AS BOOLEAN            ' Ablage (oder Text) haengt an der Maus
+DIM mrEinfuegenText AS STRING         ' "Einfügen" oder "Text"
+DIM mrEinfuegenAus AS kern.Ausschnitt
+DIM mrMausX AS INTEGER                ' letzte Zelle unter der Maus (auch draussen)
+DIM mrMausY AS INTEGER
+DIM mrCursor AS INTEGER               ' Fortschritt: Stelle y*b+x, -1 = keine
+
+CONST MR_NICHTS = 0
+CONST MR_WAEHLEN = 1
+CONST MR_VERSCHIEBEN = 2
+CONST MR_LASSO = 3
+CONST MR_FORTSCHRITT = 4
+CONST MR_ZURUECK = 5                  ' Fortschritt zuruecknehmen
+
+FUNCTION mehrIstWerkzeug(nr AS INTEGER) AS BOOLEAN
+    RETURN nr = WZ_AUSWAHL OR nr = WZ_LASSO OR nr = WZ_VIELECK OR nr = WZ_TEXT OR nr = WZ_RUECKSTICH OR nr = WZ_FORTSCHRITT
+END FUNCTION
+
+' Beim Werkzeugwechsel: Halbfertiges weg; die Auswahl bleibt nur zwischen
+' Auswahl und Lasso.
+SUB mehrWechsel(nr AS INTEGER)
+    mrEcken = []
+    mrRueckAktiv = FALSE
+    mrEinfuegen = FALSE
+    mrCursor = -1
+    IF nr <> WZ_AUSWAHL AND nr <> WZ_LASSO THEN mrAuswahl = NIL
+END SUB
+
+SUB mehrAbbrechen()
+    mrModus = MR_NICHTS
+    mrEcken = []
+    mrRueckAktiv = FALSE
+    mrEinfuegen = FALSE
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+' --- Maus ------------------------------------------------------------------------------
+
+FUNCTION mehrDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLEAN) AS INTEGER
+    mrMausX = x : mrMausY = y
+    ' Einfuegen (auch Text) wartet auf den Klick, der absetzt
+    IF mrEinfuegen THEN
+        IF taste = 1 THEN mehrAbsetzen(x, y)
+        IF taste = 3 THEN mehrAbbrechen()
+        RETURN ZUG_KEINER
+    END IF
+    SELECT CASE wzAktiv
+        CASE WZ_AUSWAHL, WZ_LASSO
+            IF taste = 3 THEN
+                ' wie in jedem Werkzeug: rechts radiert
+                RETURN ZUG_KEINER
+            END IF
+            IF taste <> 1 THEN RETURN ZUG_KEINER
+            mrStartX = x : mrStartY = y
+            IF NOT (mrAuswahl IS NIL) THEN
+                IF mrAuswahl.drin(x, y) THEN
+                    ' in die Auswahl: verschieben
+                    mrModus = MR_VERSCHIEBEN
+                    mrInhalt = kern.ausschnittVon(lwMuster.ebenen.aktiveEbene(), mrAuswahl)
+                    mrDx = 0 : mrDy = 0
+                    RETURN ZUG_MEHR
+                END IF
+            END IF
+            IF wzAktiv = WZ_LASSO THEN
+                mrModus = MR_LASSO
+                mrLasso = [x, y]
+            ELSE
+                mrModus = MR_WAEHLEN
+                mrAuswahl = kern.auswahlRechteck(lwMuster.breite, lwMuster.hoehe, x, y, x, y)
+            END IF
+            gtk_widget_queue_draw(lwFlaeche)
+            RETURN ZUG_MEHR
+        CASE WZ_VIELECK
+            IF taste = 1 THEN
+                IF NOT wzFarbeDa() THEN RETURN ZUG_KEINER
+                DIM n AS INTEGER : n = LEN(mrEcken)
+                IF n >= 2 THEN
+                    IF mrEcken[n - 2] = x AND mrEcken[n - 1] = y THEN RETURN ZUG_KEINER
+                END IF
+                ARRAY_PUSH(mrEcken, x) : ARRAY_PUSH(mrEcken, y)
+                gtk_widget_queue_draw(lwFlaeche)
+            ELSEIF taste = 3 THEN
+                vieleckSchliessen()
+            END IF
+            RETURN ZUG_KEINER
+        CASE WZ_RUECKSTICH
+            IF taste = 1 THEN
+                IF NOT wzFarbeDa() THEN RETURN ZUG_KEINER
+                IF mrRueckAktiv THEN
+                    IF lwHalbX <> mrRueckX OR lwHalbY <> mrRueckY THEN
+                        DIM l AS ARRAY OF INTEGER : l = kern.spiegelRueckstich(mrRueckX, mrRueckY, lwHalbX, lwHalbY, lwMuster.breite, lwMuster.hoehe, wzSpiegel)
+                        IF kern.ruecksticheSetzen(lwMuster, wzVerlauf, mehrRueckImMuster(l), wzFarbe) > 0 THEN nachAenderung()
+                    END IF
+                END IF
+                mrRueckAktiv = TRUE
+                mrRueckX = lwHalbX : mrRueckY = lwHalbY
+            ELSEIF taste = 3 THEN
+                IF mrRueckAktiv THEN
+                    mrRueckAktiv = FALSE
+                ELSE
+                    DIM nr AS INTEGER : nr = kern.rueckstichBei(lwMuster, lwHalbGenauX, lwHalbGenauY, 2.0)
+                    IF nr >= 0 THEN
+                        IF kern.rueckstichEntfernen(lwMuster, wzVerlauf, nr) THEN nachAenderung()
+                    END IF
+                END IF
+            END IF
+            gtk_widget_queue_draw(lwFlaeche)
+            RETURN ZUG_KEINER
+        CASE WZ_FORTSCHRITT
+            IF taste <> 1 AND taste <> 3 THEN RETURN ZUG_KEINER
+            mrModus = IIF(taste = 1, MR_FORTSCHRITT, MR_ZURUECK)
+            wzVerlauf.beginnen(IIF(taste = 1, "Fortschritt markieren", "Fortschritt zurücknehmen"))
+            mehrFortschritt(x, y, x, y)
+            mrStartX = x : mrStartY = y
+            RETURN ZUG_MEHR
+        CASE WZ_TEXT
+            IF taste = 1 THEN textBeginnen(x, y)
+            RETURN ZUG_KEINER
+    END SELECT
+    RETURN ZUG_KEINER
+END FUNCTION
+
+SUB mehrZiehen(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
+    mrMausX = x : mrMausY = y
+    SELECT CASE mrModus
+        CASE MR_WAEHLEN
+            DIM ex AS INTEGER : ex = x
+            DIM ey AS INTEGER : ey = y
+            IF umschalt THEN (ex, ey) = kern.quadratEcke(mrStartX, mrStartY, x, y)
+            mrAuswahl = kern.auswahlRechteck(lwMuster.breite, lwMuster.hoehe, mrStartX, mrStartY, ex, ey)
+        CASE MR_LASSO
+            DIM n AS INTEGER : n = LEN(mrLasso)
+            IF mrLasso[n - 2] <> x OR mrLasso[n - 1] <> y THEN
+                ARRAY_PUSH(mrLasso, x) : ARRAY_PUSH(mrLasso, y)
+            END IF
+        CASE MR_VERSCHIEBEN
+            mrDx = x - mrStartX
+            mrDy = y - mrStartY
+        CASE MR_FORTSCHRITT, MR_ZURUECK
+            mehrFortschritt(mrStartX, mrStartY, x, y)
+            mrStartX = x : mrStartY = y
+    END SELECT
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+SUB mehrLos(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
+    DIM modus AS INTEGER : modus = mrModus
+    mrModus = MR_NICHTS
+    SELECT CASE modus
+        CASE MR_LASSO
+            mrAuswahl = kern.auswahlLasso(lwMuster.breite, lwMuster.hoehe, mrLasso)
+            mrLasso = []
+            IF mrAuswahl.leer() THEN mrAuswahl = NIL
+        CASE MR_WAEHLEN
+            IF mrAuswahl.leer() THEN mrAuswahl = NIL
+        CASE MR_VERSCHIEBEN
+            IF mrDx <> 0 OR mrDy <> 0 THEN
+                IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
+                    statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+                ELSE
+                    DIM n AS INTEGER : n = kern.ausschnittSetzen(lwMuster, wzVerlauf, mrAuswahl, mrInhalt, mrAuswahl.x0 + mrDx, mrAuswahl.y0 + mrDy, "Verschieben")
+                    mrAuswahl = kern.auswahlVerschoben(mrAuswahl, mrDx, mrDy)
+                    IF mrAuswahl.leer() THEN mrAuswahl = NIL
+                    allesNeu()
+                END IF
+            END IF
+            mrDx = 0 : mrDy = 0
+        CASE MR_FORTSCHRITT, MR_ZURUECK
+            wzVerlauf.beenden()
+            nachAenderung()
+    END SELECT
+    gtk_widget_queue_draw(lwFlaeche)
+    statusNachziehen()
+END SUB
+
+SUB mehrBewegung(x AS INTEGER, y AS INTEGER)
+    IF x = mrMausX AND y = mrMausY THEN
+        IF wzAktiv <> WZ_RUECKSTICH THEN RETURN
+    END IF
+    mrMausX = x : mrMausY = y
+    IF mrEinfuegen OR LEN(mrEcken) > 0 OR mrRueckAktiv THEN gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+' Rueckstiche, deren Enden im Muster liegen (Spiegelbilder koennen hinaus).
+FUNCTION mehrRueckImMuster(l AS ARRAY OF INTEGER) AS ARRAY OF INTEGER
+    DIM o AS ARRAY OF INTEGER : o = []
+    DIM mx AS INTEGER : mx = 2 * lwMuster.breite
+    DIM my AS INTEGER : my = 2 * lwMuster.hoehe
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(l) - 4 STEP 4
+        IF l[k] < 0 OR l[k] > mx OR l[k + 2] < 0 OR l[k + 2] > mx THEN CONTINUE
+        IF l[k + 1] < 0 OR l[k + 1] > my OR l[k + 3] < 0 OR l[k + 3] > my THEN CONTINUE
+        ARRAY_PUSH(o, l[k]) : ARRAY_PUSH(o, l[k + 1]) : ARRAY_PUSH(o, l[k + 2]) : ARRAY_PUSH(o, l[k + 3])
+    NEXT
+    RETURN o
+END FUNCTION
+
+' Fortschritt entlang einer Linie im offenen Schritt.
+SUB mehrFortschritt(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    DIM p AS ARRAY OF INTEGER : p = kern.linie(x1, y1, x2, y2)
+    IF kern.erledigtSetzen(lwMuster, wzVerlauf, p, mrModus = MR_FORTSCHRITT) > 0 THEN leinwandZellen(p)
+END SUB
+
+SUB vieleckSchliessen()
+    IF LEN(mrEcken) < 6 THEN
+        statusMeldung("Ein Vieleck braucht mindestens drei Ecken.")
+        RETURN
+    END IF
+    DIM p AS ARRAY OF INTEGER : p = kern.vieleck(mrEcken, wzGefuellt, lwMuster.breite, lwMuster.hoehe)
+    mrEcken = []
+    wzAnwenden(p, wzFarbe, "Vieleck")
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+' --- Auswahl-Befehle --------------------------------------------------------------
+
+FUNCTION mehrHatAuswahl() AS BOOLEAN
+    RETURN NOT (mrAuswahl IS NIL)
+END FUNCTION
+
+SUB auswahlAlles()
+    IF NOT lwHat THEN RETURN
+    IF wzAktiv <> WZ_AUSWAHL AND wzAktiv <> WZ_LASSO THEN werkzeugWaehlen(WZ_AUSWAHL, FALSE)
+    mrAuswahl = kern.auswahlRechteck(lwMuster.breite, lwMuster.hoehe, 0, 0, lwMuster.breite - 1, lwMuster.hoehe - 1)
+    gtk_widget_queue_draw(lwFlaeche)
+    statusNachziehen()
+END SUB
+
+SUB auswahlKopieren()
+    IF mrAuswahl IS NIL THEN RETURN
+    mrAblage = kern.ausschnittVon(lwMuster.ebenen.aktiveEbene(), mrAuswahl)
+    mrAblageRechteck = mrAuswahl.istRechteck
+    statusMeldung("Kopiert: " + STR$(mrAblage.stiche()) + " Stiche.")
+END SUB
+
+SUB auswahlAusschneiden()
+    IF mrAuswahl IS NIL THEN RETURN
+    auswahlKopieren()
+    auswahlLoeschen()
+END SUB
+
+SUB auswahlLoeschen()
+    IF mrAuswahl IS NIL THEN RETURN
+    wzAnwendenOhneSpiegel(mrAuswahl.zellen(), -1, "Löschen")
+END SUB
+
+SUB auswahlFuellen()
+    IF mrAuswahl IS NIL OR NOT wzFarbeDa() THEN RETURN
+    DIM n AS INTEGER : n = kern.zellenSetzen(lwMuster, wzVerlauf, mrAuswahl.zellen(), wzFarbe, kern.VOLL, "Auswahl füllen")
+    IF n > 0 THEN leinwandZellen(mrAuswahl.zellen())
+    nachAenderung()
+END SUB
+
+' Drehen (rechts = im Uhrzeigersinn) oder spiegeln; die Auswahl folgt.
+SUB auswahlWandeln(art AS STRING)
+    IF mrAuswahl IS NIL THEN RETURN
+    IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
+        statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+        RETURN
+    END IF
+    DIM s AS kern.Ausschnitt : s = kern.ausschnittVon(lwMuster.ebenen.aktiveEbene(), mrAuswahl)
+    DIM text AS STRING
+    SELECT CASE art
+        CASE "rechts" : s = kern.ausschnittGedreht(s, TRUE) : text = "Drehen"
+        CASE "links" : s = kern.ausschnittGedreht(s, FALSE) : text = "Drehen"
+        CASE "waagerecht" : s = kern.ausschnittGespiegelt(s, TRUE) : text = "Spiegeln"
+        CASE ELSE : s = kern.ausschnittGespiegelt(s, FALSE) : text = "Spiegeln"
+    END SELECT
+    DIM x AS INTEGER : x = mrAuswahl.x0
+    DIM y AS INTEGER : y = mrAuswahl.y0
+    DIM n AS INTEGER : n = kern.ausschnittSetzen(lwMuster, wzVerlauf, mrAuswahl, s, x, y, text)
+    mrAuswahl = kern.auswahlVonAusschnitt(lwMuster.breite, lwMuster.hoehe, s, x, y, mrAuswahl.istRechteck)
+    IF mrAuswahl.leer() THEN mrAuswahl = NIL
+    allesNeu()
+END SUB
+
+' Einfuegen: die Ablage haengt an der Maus, der naechste Klick setzt sie.
+SUB einfuegenBeginnen()
+    IF mrAblage IS NIL THEN
+        statusMeldung("Die Zwischenablage ist leer.")
+        RETURN
+    END IF
+    IF wzAktiv <> WZ_AUSWAHL AND wzAktiv <> WZ_LASSO THEN werkzeugWaehlen(IIF(mrAblageRechteck, WZ_AUSWAHL, WZ_LASSO), FALSE)
+    mrEinfuegen = TRUE
+    mrEinfuegenText = "Einfügen"
+    mrEinfuegenAus = mrAblage
+    statusMeldung("Klicken setzt ein, ESC bricht ab.")
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+SUB mehrAbsetzen(x AS INTEGER, y AS INTEGER)
+    mrEinfuegen = FALSE
+    IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
+        statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+        RETURN
+    END IF
+    DIM s AS kern.Ausschnitt : s = mrEinfuegenAus
+    DIM n AS INTEGER : n = kern.ausschnittSetzen(lwMuster, wzVerlauf, NIL, s, x, y, mrEinfuegenText)
+    IF mrEinfuegenText = "Einfügen" THEN
+        mrAuswahl = kern.auswahlVonAusschnitt(lwMuster.breite, lwMuster.hoehe, s, x, y, mrAblageRechteck)
+        IF mrAuswahl.leer() THEN mrAuswahl = NIL
+    END IF
+    allesNeu()
+END SUB
+
+' --- Tasten -----------------------------------------------------------------------
+
+' Tasten, die nur in diesen Werkzeugen etwas bedeuten; TRUE = genommen.
+FUNCTION mehrTaste(t AS INTEGER) AS BOOLEAN
+    IF t = &HFF1B THEN                                        ' ESC
+        IF mrEinfuegen OR LEN(mrEcken) > 0 OR mrRueckAktiv THEN
+            mehrAbbrechen()
+            RETURN TRUE
+        END IF
+        IF NOT (mrAuswahl IS NIL) THEN
+            mrAuswahl = NIL
+            gtk_widget_queue_draw(lwFlaeche)
+            RETURN TRUE
+        END IF
+        RETURN FALSE
+    END IF
+    IF wzAktiv = WZ_VIELECK AND t = &HFF08 THEN               ' Ruecktaste: letzte Ecke weg
+        IF LEN(mrEcken) >= 2 THEN
+            ARRAY_REMOVE_AT(mrEcken, LEN(mrEcken) - 1)
+            ARRAY_REMOVE_AT(mrEcken, LEN(mrEcken) - 1)
+            gtk_widget_queue_draw(lwFlaeche)
+        END IF
+        RETURN TRUE
+    END IF
+    IF (wzAktiv = WZ_AUSWAHL OR wzAktiv = WZ_LASSO) AND NOT (mrAuswahl IS NIL) THEN
+        SELECT CASE t
+            CASE &HFFFF : auswahlLoeschen()                     ' Entf
+            CASE &H66, &H46 : auswahlFuellen()                  ' F
+            CASE &H72 : auswahlWandeln("rechts")                ' r
+            CASE &H52 : auswahlWandeln("links")                 ' R
+            CASE &H68, &H48 : auswahlWandeln("waagerecht")      ' H
+            CASE &H76, &H56 : auswahlWandeln("senkrecht")       ' V
+            CASE ELSE : RETURN FALSE
+        END SELECT
+        RETURN TRUE
+    END IF
+    IF wzAktiv = WZ_FORTSCHRITT THEN
+        SELECT CASE t
+            CASE &HFF53, &HFF54 : fortschrittSpringen(TRUE)      ' rechts, runter
+            CASE &HFF51, &HFF52 : fortschrittSpringen(FALSE)     ' links, hoch
+            CASE &HFF0D, &H20                                    ' Enter, Leertaste
+                IF mrCursor >= 0 THEN
+                    DIM b AS INTEGER : b = lwMuster.breite
+                    DIM p AS ARRAY OF INTEGER : p = [mrCursor MOD b, mrCursor \ b]
+                    IF kern.erledigtSetzen(lwMuster, wzVerlauf, p, TRUE) > 0 THEN
+                        leinwandZellen(p)
+                        nachAenderung()
+                    END IF
+                    fortschrittSpringen(TRUE)
+                END IF
+            CASE ELSE : RETURN FALSE
+        END SELECT
+        RETURN TRUE
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+SUB fortschrittSpringen(vor AS BOOLEAN)
+    IF NOT wzFarbeDa() THEN RETURN
+    DIM i AS INTEGER : i = kern.naechsterOffen(lwMuster, wzFarbe, mrCursor, vor)
+    IF i < 0 THEN
+        statusMeldung("Alle Stiche dieser Farbe sind erledigt.")
+        mrCursor = -1
+    ELSE
+        mrCursor = i
+        leinwandZeigen(i MOD lwMuster.breite, i \ lwMuster.breite)
+    END IF
+    gtk_widget_queue_draw(lwFlaeche)
+END SUB
+
+' --- Zeichnen (die Zeichenflaeche ruft das im sichtbaren Ausschnitt) ------------------
+
+SUB mehrZeichnen(cr AS INTEGER)
+    DIM z AS FLOAT : z = lwZelle
+    DIM b AS INTEGER : b = lwMuster.breite
+    ' Auswahl: Kanten der Maske, gestrichelt in Glut; beim Verschieben versetzt
+    IF NOT (mrAuswahl IS NIL) THEN
+        DIM dx AS INTEGER : dx = mrDx
+        DIM dy AS INTEGER : dy = mrDy
+        IF mrModus <> MR_VERSCHIEBEN THEN
+            dx = 0
+            dy = 0
+        END IF
+        IF mrModus = MR_VERSCHIEBEN THEN mehrAusschnittZeichnen(cr, mrInhalt, mrAuswahl.x0 + dx, mrAuswahl.y0 + dy)
+        mehrMaskeZeichnen(cr, mrAuswahl, dx, dy)
+    END IF
+    ' Lasso: der Weg
+    IF mrModus = MR_LASSO AND LEN(mrLasso) >= 4 THEN
+        cairo_set_source_rgba(cr, 1.0, 0.54, 0.24, 0.9)
+        cairo_set_line_width(cr, 1.5)
+        cairo_move_to(cr, lwX + (mrLasso[0] + 0.5) * z, lwY + (mrLasso[1] + 0.5) * z)
+        DIM k AS INTEGER
+        FOR k = 2 TO LEN(mrLasso) - 2 STEP 2
+            cairo_line_to(cr, lwX + (mrLasso[k] + 0.5) * z, lwY + (mrLasso[k + 1] + 0.5) * z)
+        NEXT
+        cairo_stroke(cr)
+    END IF
+    ' Einfuegen/Text: der Inhalt an der Maus
+    IF mrEinfuegen AND NOT (mrEinfuegenAus IS NIL) THEN mehrAusschnittZeichnen(cr, mrEinfuegenAus, mrMausX, mrMausY)
+    ' Vieleck: die Ecken, die Kanten und die Linie zur Maus
+    IF LEN(mrEcken) >= 2 AND wzFarbe >= 0 THEN
+        DIM v AS ARRAY OF INTEGER : v = ARRAY_COPY(mrEcken)
+        ARRAY_PUSH(v, mrMausX) : ARRAY_PUSH(v, mrMausY)
+        DIM p AS ARRAY OF INTEGER : p = []
+        DIM q AS INTEGER
+        FOR q = 0 TO LEN(v) - 4 STEP 2
+            DIM l AS ARRAY OF INTEGER : l = kern.linie(v[q], v[q + 1], v[q + 2], v[q + 3])
+            DIM r AS INTEGER
+            FOR r = 0 TO LEN(l) - 1
+                ARRAY_PUSH(p, l[r])
+            NEXT
+        NEXT
+        mehrZellenZeichnen(cr, p, lwRgb[wzFarbe], 0.55)
+    END IF
+    ' Rueckstich in Arbeit
+    IF mrRueckAktiv AND wzFarbe >= 0 THEN
+        DIM f AS INTEGER : f = lwRgb[wzFarbe]
+        cairo_set_source_rgba(cr, kern.rotAnteil(f) / 255.0, kern.gruenAnteil(f) / 255.0, kern.blauAnteil(f) / 255.0, 0.7)
+        cairo_set_line_width(cr, MAX(1.5, z / 6))
+        cairo_move_to(cr, lwX + mrRueckX * z / 2, lwY + mrRueckY * z / 2)
+        cairo_line_to(cr, lwX + lwHalbX * z / 2, lwY + lwHalbY * z / 2)
+        cairo_stroke(cr)
+    END IF
+    ' Rasterpunkt des Rueckstichs unter der Maus
+    IF wzAktiv = WZ_RUECKSTICH AND lwMausX >= 0 THEN
+        cairo_set_source_rgba(cr, 1.0, 0.54, 0.24, 0.95)
+        cairo_arc(cr, lwX + lwHalbX * z / 2, lwY + lwHalbY * z / 2, MAX(2.5, z / 8), 0, TAU)
+        cairo_fill(cr)
+    END IF
+    ' Fortschritt: der Stich, zu dem gesprungen wurde
+    IF wzAktiv = WZ_FORTSCHRITT AND mrCursor >= 0 THEN
+        cairo_set_source_rgb(cr, 1.0, 0.54, 0.24)
+        cairo_set_line_width(cr, 3.0)
+        cairo_rectangle(cr, lwX + (mrCursor MOD b) * z - 1, lwY + (mrCursor \ b) * z - 1, z + 2, z + 2)
+        cairo_stroke(cr)
+    END IF
+END SUB
+
+SUB mehrZellenZeichnen(cr AS INTEGER, p AS ARRAY OF INTEGER, farbe AS INTEGER, deck AS FLOAT)
+    DIM z AS FLOAT : z = lwZelle
+    cairo_set_source_rgba(cr, kern.rotAnteil(farbe) / 255.0, kern.gruenAnteil(farbe) / 255.0, kern.blauAnteil(farbe) / 255.0, deck)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(p) - 2 STEP 2
+        cairo_rectangle(cr, lwX + p[k] * z, lwY + p[k + 1] * z, z, z)
+    NEXT
+    cairo_fill(cr)
+END SUB
+
+' Ein Ausschnitt halb durchsichtig an (x, y) -- Zellen mit Stich in ihrer Farbe.
+SUB mehrAusschnittZeichnen(cr AS INTEGER, s AS kern.Ausschnitt, x AS INTEGER, y AS INTEGER)
+    DIM z AS FLOAT : z = lwZelle
+    DIM rx AS INTEGER, ry AS INTEGER
+    FOR ry = 0 TO s.hoehe - 1
+        FOR rx = 0 TO s.breite - 1
+            DIM i AS INTEGER : i = ry * s.breite + rx
+            DIM c AS INTEGER : c = s.farbe[i]
+            IF s.dabei[i] = 0 OR c < 0 OR c >= LEN(lwRgb) - 1 THEN CONTINUE
+            DIM f AS INTEGER : f = lwRgb[c]
+            cairo_set_source_rgba(cr, kern.rotAnteil(f) / 255.0, kern.gruenAnteil(f) / 255.0, kern.blauAnteil(f) / 255.0, 0.7)
+            cairo_rectangle(cr, lwX + (x + rx) * z, lwY + (y + ry) * z, z, z)
+            cairo_fill(cr)
+        NEXT
+    NEXT
+    ' Umriss des Rechtecks
+    cairo_set_source_rgba(cr, 1.0, 0.54, 0.24, 0.9)
+    cairo_set_line_width(cr, 1.5)
+    cairo_rectangle(cr, lwX + x * z, lwY + y * z, s.breite * z, s.hoehe * z)
+    cairo_stroke(cr)
+END SUB
+
+' Die Grenze einer Maske: je Zelle die Seiten, an denen keine gewaehlte liegt.
+' Ein Rechteck als ein Rahmen; sonst nur im sichtbaren Ausschnitt (alles
+' waehlen auf 2000 x 2000 waeren sonst vier Millionen Zellen je Bild).
+SUB mehrMaskeZeichnen(cr AS INTEGER, a AS kern.Auswahl, dx AS INTEGER, dy AS INTEGER)
+    DIM z AS FLOAT : z = lwZelle
+    cairo_set_line_width(cr, 2.0)
+    cairo_set_source_rgba(cr, 1.0, 0.54, 0.24, 0.95)
+    IF a.istRechteck THEN
+        cairo_rectangle(cr, lwX + (a.x0 + dx) * z, lwY + (a.y0 + dy) * z, (a.x1 - a.x0 + 1) * z, (a.y1 - a.y0 + 1) * z)
+        cairo_stroke(cr)
+        RETURN
+    END IF
+    DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(lwFlaeche)
+    DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(lwFlaeche)
+    DIM vx0 AS INTEGER : vx0 = MAX(a.x0, FLOOR(-lwX / z) - dx)
+    DIM vy0 AS INTEGER : vy0 = MAX(a.y0, FLOOR(-lwY / z) - dy)
+    DIM vx1 AS INTEGER : vx1 = MIN(a.x1, FLOOR((bw - lwX) / z) - dx)
+    DIM vy1 AS INTEGER : vy1 = MIN(a.y1, FLOOR((bh - lwY) / z) - dy)
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = vy0 TO vy1
+        FOR x = vx0 TO vx1
+            IF NOT a.drin(x, y) THEN CONTINUE
+            DIM px AS FLOAT : px = lwX + (x + dx) * z
+            DIM py AS FLOAT : py = lwY + (y + dy) * z
+            IF NOT a.drin(x, y - 1) THEN
+                cairo_move_to(cr, px, py)
+                cairo_line_to(cr, px + z, py)
+            END IF
+            IF NOT a.drin(x, y + 1) THEN
+                cairo_move_to(cr, px, py + z)
+                cairo_line_to(cr, px + z, py + z)
+            END IF
+            IF NOT a.drin(x - 1, y) THEN
+                cairo_move_to(cr, px, py)
+                cairo_line_to(cr, px, py + z)
+            END IF
+            IF NOT a.drin(x + 1, y) THEN
+                cairo_move_to(cr, px + z, py)
+                cairo_line_to(cr, px + z, py + z)
+            END IF
+        NEXT
+    NEXT
+    cairo_stroke(cr)
+END SUB

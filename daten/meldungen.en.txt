@@ -1763,3 +1763,5 @@ GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in
 {}.{} hat BYREF-Parameter, aber beim Uebersetzen war die Klasse des Objekts nicht bekannt -- die Werte kaemen nicht zurueck. Das Objekt in einer Variablen mit Typ halten (DIM x AS {}) und darueber aufrufen.	{}.{} has BYREF parameters, but the class of the object was not known at compile time -- the values would not come back. Hold the object in a typed variable (DIM x AS {}) and call through it.
 {}.{}: die Methode der Klasse {} hat ihre BYREF-Parameter an anderen Stellen als die, nach der der Aufruf uebersetzt ist -- eine Ueberschreibung muss dieselben Parameter BYREF nehmen	{}.{}: the method of class {} has its BYREF parameters in other places than the one the call was compiled for -- an override must take the same parameters BYREF
 {}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben	{}: a coroutine cannot write back BYREF parameters
+JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig	JOIN$: needs an array of strings, numbers or booleans
+JOIN$ erwartet ein Feld	JOIN$ expects an array

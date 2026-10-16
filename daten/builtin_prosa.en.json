@@ -1127,7 +1127,7 @@
   "ISNUMERIC": "parseable as a number?",
   "ISSTR": "type predicates (a bool is NOT a number)",
   "IS_NIL": "Gives TRUE when the value is NIL (“nothing yet”), otherwise FALSE.",
-  "JOIN$": "join (array OF STRING)",
+  "JOIN$": "join; numbers and booleans in the array are written as with STR$",
   "JOYSTICK_ANY_BUTTON": "last button pressed, -1 = none — for key-binding dialogs",
   "JOYSTICK_AXIS": "position of an analogue axis, -1.0 to +1.0",
   "JOYSTICK_AXIS_COUNT": "how many axes does the device have?",

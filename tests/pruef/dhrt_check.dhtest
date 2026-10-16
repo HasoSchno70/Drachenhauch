@@ -25,6 +25,31 @@ sauber 0
 rueckgabe 0
 parse 1 parse Zeile 2
 
+=== befunde in importierten dateien nennen datei und zeile
+' Vorher die Zeile des zusammengefuegten Quelltexts und keine Datei -- der
+' Fehler in teil.dh Zeile 2 hiess "Zeile 4" einer Hauptdatei mit drei Zeilen
+' (Glutfaden, 2026-10-15).
+IMPORT "helfer.dh"
+IMPORT "json"
+WRITEALL("teil.dh", !"' Kopf\n' noch eine\nSUB f()\n    PRINT GIBTSNICHT_X(1)\nEND SUB\n")
+DIM d AS JSON_HANDLE : d = dlCheck(!"IMPORT \"teil.dh\"\nPRINT UNBEKANNT_Y(2)\n")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(d, "d") - 1
+    DIM w AS STRING : w = "d." + STR$(i)
+    DIM datei AS STRING : datei = "haupt"
+    IF JSON_HAS(d, w + ".file") THEN datei = BASENAME(JSON_GET_STRING(d, w + ".file"))
+    PRINT datei; " Zeile "; JSON_GET_INT(d, w + ".line"); " "; LEFT$(JSON_GET_STRING(d, w + ".message"), 32)
+NEXT
+WRITEALL("teil.dh", !"SUB g()\n    PRINT 1 +\nEND SUB\n")
+d = dlCheck(!"' eins\n' zwei\nIMPORT \"teil.dh\"\n")
+PRINT BASENAME(JSON_GET_STRING(d, "d.0.file")); " Zeile "; JSON_GET_INT(d, "d.0.line"); " "; JSON_GET_STRING(d, "d.0.phase")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+teil.dh Zeile 4 Unbekanntes Builtin 'GIBTSNICHT_
+haupt Zeile 2 Unbekanntes Builtin 'UNBEKANNT_Y
+teil.dh Zeile 2 parse
+
 === break und return am falschen ort nennen die zeile
 IMPORT "helfer.dh"
 IMPORT "json"

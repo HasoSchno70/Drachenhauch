@@ -1,0 +1,147 @@
+' Dialoge der Stufe 3: Farbe ersetzen (PySticky ui/dialogs/
+' replace_color_dialog.py), seltene Farben zusammenlegen (die "Auto-
+' Reduzierung" darin) und das Symbol einer Farbe (symbol_editor_dialog.py).
+' Die Arbeit tut der Kern (kern/bearbeiten.dh); hier wird nur gefragt.
+
+DIM dlQuelle AS INTEGER
+DIM dlZiele AS ARRAY OF INTEGER       ' Farbnummern in der Reihenfolge der Klappliste
+DIM dlZielWahl AS INTEGER
+DIM dlToleranz AS INTEGER
+DIM dlHinweis AS INTEGER
+DIM dlSelten AS INTEGER
+
+FUNCTION dlGarnName$(nr AS INTEGER) AS STRING
+    DIM g AS kern.Garn : g = lwMuster.farben[nr].garn
+    DIM n AS STRING : n = TRIM$(g.hersteller + " " + g.nummer)
+    IF n = "" THEN RETURN g.name
+    RETURN n + " " + g.name
+END FUNCTION
+
+FUNCTION dlZeile(text AS STRING, w AS INTEGER) AS INTEGER
+    DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 8)
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtk_label_set_xalign(l, 0.0)
+    gtk_widget_set_size_request(l, 90, -1)
+    gtk_box_pack_start(z, l, FALSE, FALSE, 0)
+    gtk_box_pack_start(z, w, TRUE, TRUE, 0)
+    RETURN z
+END FUNCTION
+
+' --- Farbe ersetzen ---------------------------------------------------------------
+
+SUB farbeErsetzenDialog()
+    IF NOT lwHat OR NOT wzFarbeDa() THEN RETURN
+    IF lwMuster.farbanzahl() < 2 THEN
+        statusMeldung("Zum Ersetzen braucht es eine zweite Farbe.")
+        RETURN
+    END IF
+    dlQuelle = wzFarbe
+    dlZiele = kern.aehnlicheFarben(lwMuster, dlQuelle)
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Farbe ersetzen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Ersetzen", GTK_ANTWORT_OK, 0)
+    gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
+    gtk_container_set_border_width(innen, 12)
+    dlZielWahl = gtk_combo_box_text_new()
+    DIM qf AS INTEGER : qf = lwMuster.farben[dlQuelle].garn.farbe
+    DIM z AS INTEGER
+    FOR EACH z IN dlZiele
+        gtk_combo_box_text_append_text(dlZielWahl, dlGarnName$(z) + "   (ΔE " + ZAHL$(kern.farbAbstand(qf, lwMuster.farben[z].garn.farbe), 1) + ")")
+    NEXT
+    gtk_combo_box_set_active(dlZielWahl, 0)
+    dlToleranz = gtk_scale_new_with_range(GTK_WAAGERECHT, 0.0, 50.0, 1.0)
+    gtk_scale_set_digits(dlToleranz, 0)
+    gtk_widget_set_tooltip_text(dlToleranz, "0 = nur diese Farbe; sonst auch alle, die so ähnlich sind (CIEDE2000)")
+    dlHinweis = gtk_label_new("")
+    gtk_label_set_xalign(dlHinweis, 0.0)
+    gtk_box_pack_start(innen, dlZeile("Ersetzen", gtk_label_new(dlGarnName$(dlQuelle))), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile("durch", dlZielWahl), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlZeile("Toleranz", dlToleranz), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlHinweis, FALSE, FALSE, 8)
+    signal(dlZielWahl, "changed", dlErsetzenGeaendert, 0, 0, 0)
+    signal(dlToleranz, "value-changed", dlErsetzenGeaendert, 0, 0, 0)
+    dlErsetzenGeaendert(0, 0)
+    gtk_widget_show_all(d)
+    IF gtk_dialog_run(d) = GTK_ANTWORT_OK THEN
+        DIM ziel AS INTEGER : ziel = dlZiele[MAX(0, gtk_combo_box_get_active(dlZielWahl))]
+        DIM q AS ARRAY OF INTEGER : q = kern.ersetzenQuellen(lwMuster, dlQuelle, ziel, gtk_range_get_value(dlToleranz))
+        DIM n AS INTEGER : n = kern.farbeErsetzen(lwMuster, wzVerlauf, q, ziel)
+        wzFarbe = ziel
+        allesNeu()
+        statusMeldung(STR$(n) + " Stiche ersetzt. Die alte Farbe bleibt in der Liste -- „Unbenutzte entfernen“ räumt sie weg.")
+    END IF
+    gtk_widget_destroy(d)
+END SUB
+
+' Was der Ersatz trifft: welche Farben und wie viele sichtbare Stiche.
+SUB dlErsetzenGeaendert(w AS INTEGER, daten AS INTEGER)
+    DIM ziel AS INTEGER : ziel = dlZiele[MAX(0, gtk_combo_box_get_active(dlZielWahl))]
+    DIM q AS ARRAY OF INTEGER : q = kern.ersetzenQuellen(lwMuster, dlQuelle, ziel, gtk_range_get_value(dlToleranz))
+    DIM s AS INTEGER, c AS INTEGER
+    FOR EACH c IN q
+        s = s + lwMuster.farben[c].stichzahl
+    NEXT
+    gtk_label_set_text(dlHinweis, STR$(LEN(q)) + IIF(LEN(q) = 1, " Farbe", " Farben") + " mit zusammen " + ZAHL$(s, 0) + " Stichen (verdeckte und ausgeblendete bleiben).")
+END SUB
+
+' --- Seltene Farben ----------------------------------------------------------------
+
+SUB selteneDialog()
+    IF NOT lwHat THEN RETURN
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Seltene Farben zusammenlegen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Zusammenlegen", GTK_ANTWORT_OK, 0)
+    gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
+    gtk_container_set_border_width(innen, 12)
+    dlSelten = gtk_spin_button_new_with_range(1, 999, 1)
+    gtk_spin_button_set_value(dlSelten, 10)
+    dlHinweis = gtk_label_new("")
+    gtk_label_set_xalign(dlHinweis, 0.0)
+    gtk_box_pack_start(innen, dlZeile("Höchstens", dlSelten), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, dlHinweis, FALSE, FALSE, 8)
+    signal(dlSelten, "value-changed", dlSeltenGeaendert, 0, 0, 0)
+    dlSeltenGeaendert(0, 0)
+    gtk_widget_show_all(d)
+    IF gtk_dialog_run(d) = GTK_ANTWORT_OK THEN
+        DIM n AS INTEGER : n = seltenZusammenlegen(gtk_spin_button_get_value_as_int(dlSelten))
+        allesNeu()
+        statusMeldung(STR$(n) + " Stiche umgefärbt.")
+    END IF
+    gtk_widget_destroy(d)
+END SUB
+
+SUB dlSeltenGeaendert(w AS INTEGER, daten AS INTEGER)
+    DIM p AS ARRAY OF INTEGER : p = kern.selteneErsetzungen(lwMuster, gtk_spin_button_get_value_as_int(dlSelten))
+    gtk_label_set_text(dlHinweis, STR$(LEN(p) \ 2) + " Farben mit so wenigen Stichen gehen in die ähnlichste häufige über.")
+END SUB
+
+' Alle Paare in EINEM Schritt (auch fuer die Vorfuehrung).
+FUNCTION seltenZusammenlegen(hoechstens AS INTEGER) AS INTEGER
+    DIM p AS ARRAY OF INTEGER : p = kern.selteneErsetzungen(lwMuster, hoechstens)
+    IF LEN(p) = 0 THEN RETURN 0
+    DIM n AS INTEGER, k AS INTEGER
+    wzVerlauf.beginnen("Seltene Farben zusammenlegen")
+    FOR k = 0 TO LEN(p) - 2 STEP 2
+        n = n + kern.farbeErsetzen(lwMuster, wzVerlauf, [p[k]], p[k + 1])
+    NEXT
+    wzVerlauf.beenden()
+    RETURN n
+END FUNCTION
+
+' --- Symbol --------------------------------------------------------------------------
+
+SUB symbolDialog()
+    IF NOT lwHat OR NOT wzFarbeDa() THEN RETURN
+    DIM vorgabe AS STRING : vorgabe = lwMuster.farben[wzFarbe].symbol
+    DO
+        DIM s AS STRING : s = textFragen("Symbol", "Symbol für " + dlGarnName$(wzFarbe) + " (ein Zeichen)", vorgabe)
+        IF s = "" THEN RETURN
+        DIM fehler AS STRING : fehler = kern.symbolSetzen(lwMuster, wzVerlauf, wzFarbe, s)
+        IF fehler = "" THEN
+            allesNeu()
+            RETURN
+        END IF
+        statusMeldung(fehler)
+        vorgabe = s
+    LOOP
+END SUB

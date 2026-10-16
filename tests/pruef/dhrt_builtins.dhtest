@@ -429,3 +429,32 @@ TRUE
 2 b.txt data.txt
 FALSE TRUE
 FALSE
+
+=== join verbindet texte zahlen und wahrheitswerte
+' Zahlen und Wahrheitswerte wie STR$ (vorher: "ARRAY OF STRING noetig").
+DIM t AS ARRAY OF STRING : t = ["a", "b", "c"]
+PRINT JOIN$(t, "-")
+DIM z AS ARRAY OF INTEGER : z = [3, -1, 20]
+PRINT JOIN$(z, ",")
+DIM f AS ARRAY OF FLOAT : f = [1.5, 2.0]
+PRINT JOIN$(f, " ")
+PRINT JOIN$([TRUE, FALSE], "/")
+DIM leer AS ARRAY OF INTEGER : leer = []
+PRINT "["; JOIN$(leer, ","); "]"
+PRINT t.join("+")
+--- erwartet
+a-b-c
+3,-1,20
+1.5 2.0
+TRUE/FALSE
+[]
+a+b+c
+
+=== join lehnt objekte im feld ab
+CLASS K
+END CLASS
+DIM b AS ARRAY OF K : b = [NEW K(), NEW K()]
+PRINT JOIN$(b, ",")
+--- fehler
+JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig
+

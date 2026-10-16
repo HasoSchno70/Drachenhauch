@@ -230,3 +230,143 @@ FUNCTION fuellung(e AS Ebene, x AS INTEGER, y AS INTEGER, neu AS INTEGER) AS ARR
     NEXT
     RETURN p
 END FUNCTION
+
+' --- Vieleck (PySticky ui/tools/polygon_tool.py) ------------------------------------
+' Umriss: eine Linie je Kante, auch die schliessende. Gefuellt: der Umriss und
+' je Zeile die Spannen zwischen den Kantenschnitten (gerade/ungerade, Kante
+' halboffen min <= y < max, waagerechte Kanten zaehlen nicht), abgeschnitten
+' auf das Vieleck UND das Muster -- wie das Original. Die Eckpunkte sind Zellen;
+' der Umriss bleibt unbeschnitten (wegschneiden ist Sache dessen, der setzt).
+FUNCTION vieleck(punkte AS ARRAY OF INTEGER, gefuellt AS BOOLEAN, b AS INTEGER, h AS INTEGER) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM n AS INTEGER : n = LEN(punkte) \ 2
+    IF n = 0 THEN RETURN p
+    DIM lx AS INTEGER : lx = punkte[0]
+    DIM rx AS INTEGER : rx = punkte[0]
+    DIM oy AS INTEGER : oy = punkte[1]
+    DIM uy AS INTEGER : uy = punkte[1]
+    DIM k AS INTEGER
+    FOR k = 1 TO n - 1
+        lx = MIN(lx, punkte[2 * k]) : rx = MAX(rx, punkte[2 * k])
+        oy = MIN(oy, punkte[2 * k + 1]) : uy = MAX(uy, punkte[2 * k + 1])
+    NEXT
+    ' Doppelte ueber eine Maske des umschliessenden Rechtecks
+    DIM mb AS INTEGER : mb = rx - lx + 1
+    DIM gesehen[mb * (uy - oy + 1)] AS INTEGER
+    DIM q AS INTEGER
+    FOR k = 0 TO n - 1
+        DIM j AS INTEGER : j = (k + 1) MOD n
+        DIM l AS ARRAY OF INTEGER : l = linie(punkte[2 * k], punkte[2 * k + 1], punkte[2 * j], punkte[2 * j + 1])
+        FOR q = 0 TO LEN(l) - 2 STEP 2
+            DIM gi AS INTEGER : gi = (l[q + 1] - oy) * mb + l[q] - lx
+            IF gesehen[gi] = 0 THEN
+                gesehen[gi] = 1
+                ARRAY_PUSH(p, l[q]) : ARRAY_PUSH(p, l[q + 1])
+            END IF
+        NEXT
+    NEXT
+    IF NOT gefuellt OR n < 3 THEN RETURN p
+    DIM y AS INTEGER, x AS INTEGER
+    FOR y = MAX(0, oy) TO MIN(h - 1, uy)
+        DIM xs AS ARRAY OF FLOAT : xs = []
+        FOR k = 0 TO n - 1
+            j = (k + 1) MOD n
+            DIM y1 AS INTEGER : y1 = punkte[2 * k + 1]
+            DIM y2 AS INTEGER : y2 = punkte[2 * j + 1]
+            IF y1 = y2 THEN CONTINUE
+            IF y >= MIN(y1, y2) AND y < MAX(y1, y2) THEN
+                DIM x1 AS INTEGER : x1 = punkte[2 * k]
+                DIM x2 AS INTEGER : x2 = punkte[2 * j]
+                ARRAY_PUSH(xs, x1 + (y - y1) * (x2 - x1) / (y2 - y1))
+            END IF
+        NEXT
+        SORT(xs)
+        FOR k = 0 TO LEN(xs) - 2 STEP 2
+            DIM xa AS INTEGER : xa = MAX(MAX(0, lx), abschneiden(xs[k]))
+            DIM xb AS INTEGER : xb = MIN(MIN(b - 1, rx), abschneiden(xs[k + 1]))
+            FOR x = xa TO xb
+                gi = (y - oy) * mb + x - lx
+                IF gesehen[gi] = 0 THEN
+                    gesehen[gi] = 1
+                    ARRAY_PUSH(p, x) : ARRAY_PUSH(p, y)
+                END IF
+            NEXT
+        NEXT
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Richtung null abschneiden, wie Pythons int().
+FUNCTION abschneiden(v AS FLOAT) AS INTEGER
+    IF v >= 0 THEN RETURN FLOOR(v)
+    RETURN -FLOOR(-v)
+END FUNCTION
+
+' --- Symmetrie (PySticky ui/canvas/mixins/mirror_mixin.py) --------------------------
+CONST SPIEGEL_AUS = 0
+CONST SPIEGEL_WAAGERECHT = 1      ' links/rechts gespiegelt
+CONST SPIEGEL_SENKRECHT = 2       ' oben/unten
+CONST SPIEGEL_VIERFACH = 3
+CONST SPIEGEL_ACHTFACH = 4        ' nur bei quadratischen Mustern, sonst vierfach
+
+' Die Zelle und ihre Spiegelbilder, ohne Doppelte, nur innerhalb des Musters.
+' Die Formeln des Originals (mit Mitte b/2 und halben Zellen) ergeben genau
+' b-1-x und h-1-y, beim Achtfachen zusaetzlich die vertauschten Achsen.
+FUNCTION spiegelZellen(x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER, modus AS INTEGER) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = [x, y]
+    IF modus = SPIEGEL_AUS THEN RETURN p
+    DIM sx AS INTEGER : sx = b - 1 - x
+    DIM sy AS INTEGER : sy = h - 1 - y
+    IF modus = SPIEGEL_WAAGERECHT OR modus >= SPIEGEL_VIERFACH THEN spiegelDazu(p, sx, y, b, h)
+    IF modus = SPIEGEL_SENKRECHT OR modus >= SPIEGEL_VIERFACH THEN spiegelDazu(p, x, sy, b, h)
+    IF modus >= SPIEGEL_VIERFACH THEN spiegelDazu(p, sx, sy, b, h)
+    IF modus = SPIEGEL_ACHTFACH AND b = h THEN
+        spiegelDazu(p, y, x, b, h)
+        spiegelDazu(p, b - 1 - y, h - 1 - x, b, h)
+        spiegelDazu(p, b - 1 - y, x, b, h)
+        spiegelDazu(p, y, h - 1 - x, b, h)
+    END IF
+    RETURN p
+END FUNCTION
+
+SUB spiegelDazu(p AS ARRAY OF INTEGER, x AS INTEGER, y AS INTEGER, b AS INTEGER, h AS INTEGER)
+    IF x < 0 OR y < 0 OR x >= b OR y >= h THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(p) - 2 STEP 2
+        IF p[k] = x AND p[k + 1] = y THEN RETURN
+    NEXT
+    ARRAY_PUSH(p, x) : ARRAY_PUSH(p, y)
+END SUB
+
+' Viele Zellen samt Spiegelbildern (Formen, Striche).
+FUNCTION gespiegelt(punkte AS ARRAY OF INTEGER, b AS INTEGER, h AS INTEGER, modus AS INTEGER) AS ARRAY OF INTEGER
+    IF modus = SPIEGEL_AUS THEN RETURN punkte
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM k AS INTEGER, q AS INTEGER
+    FOR k = 0 TO LEN(punkte) - 2 STEP 2
+        DIM s AS ARRAY OF INTEGER : s = spiegelZellen(punkte[k], punkte[k + 1], b, h, modus)
+        FOR q = 0 TO LEN(s) - 1
+            ARRAY_PUSH(p, s[q])
+        NEXT
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Rueckstiche in Halbstich-Einheiten (0..2b, 0..2h): waagerecht, senkrecht,
+' beides; achtfach zaehlt hier als vierfach (wie im Original). Nur Linien,
+' deren Enden im Muster liegen. Liefert [x1, y1, x2, y2, ...] samt der eigenen.
+FUNCTION spiegelRueckstich(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, b AS INTEGER, h AS INTEGER, modus AS INTEGER) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = [x1, y1, x2, y2]
+    DIM mx AS INTEGER : mx = 2 * b
+    DIM my AS INTEGER : my = 2 * h
+    IF modus = SPIEGEL_WAAGERECHT OR modus >= SPIEGEL_VIERFACH THEN
+        ARRAY_PUSH(p, mx - x1) : ARRAY_PUSH(p, y1) : ARRAY_PUSH(p, mx - x2) : ARRAY_PUSH(p, y2)
+    END IF
+    IF modus = SPIEGEL_SENKRECHT OR modus >= SPIEGEL_VIERFACH THEN
+        ARRAY_PUSH(p, x1) : ARRAY_PUSH(p, my - y1) : ARRAY_PUSH(p, x2) : ARRAY_PUSH(p, my - y2)
+    END IF
+    IF modus >= SPIEGEL_VIERFACH THEN
+        ARRAY_PUSH(p, mx - x1) : ARRAY_PUSH(p, my - y1) : ARRAY_PUSH(p, mx - x2) : ARRAY_PUSH(p, my - y2)
+    END IF
+    RETURN p
+END FUNCTION

@@ -88,3 +88,51 @@ blau im rechteck: TRUE
 blau nach zurueck: 0
 blau wieder: TRUE
 halb: rein TRUE gemischt TRUE
+
+=== glutfaden stufe 3 auswahl vieleck rueckstich fortschritt text
+' Auswahl (nur die aktive Ebene) kopieren, einfuegen, verschieben (ein
+' Schritt), drehen, loeschen; gefuelltes Vieleck; vierfache Symmetrie;
+' Rueckstiche setzen, rechts entfernen, zurueck; Fortschritt ziehen, Pfeil und
+' Enter; Text ohne Dialog; seltene Farben; sichern und laden (Rueckstiche und
+' erledigt kommen mit). Bilder: das Blau des Texts, die gruenen Haken.
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe3", "--foto", "d"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "text blau: "; punkte("d_text.png", &H0097E1) > 1500
+    ' gruen gibt es vorher schon an den Kanten der blauen Rueckstiche ueber Gelb
+    PRINT "haken: "; gruenePunkte("d_fortschritt.png") - gruenePunkte("d_rueckstich.png") > 400
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+geladen: TRUE blau 6 stiche 185
+aktive ebene Herz
+auswahl 108 14,12-25,20
+eingefuegt: +52 oben Einfügen auswahl jetzt 3,3
+verschoben: auswahl 8,3 schritte +1 zelle 4,5 -1
+gedreht: Drehen breite 9 hoehe 12 stiche gleich TRUE
+geloescht: Löschen stiche -49
+esc: auswahl weg TRUE
+vieleck: blau 52 oben Vieleck ecken 0
+vierfach: +4 TRUE TRUE TRUE
+rueckstiche 2 oben Rückstich
+entfernt: 1 oben Rückstich entfernen
+zurueck: 2
+erledigt 1 1 oben Fortschritt markieren
+naechster offen 11,3
+nach enter 12,3 erster offen 12,3
+zurueckgenommen 10,5: 0
+text: an der maus TRUE groesse 15x12 stiche > 20 TRUE
+text gesetzt: +TRUE oben Text haengt FALSE
+selten: 15 oben Seltene Farben zusammenlegen
+geladen: rueckstiche 2 erledigt 30,5 TRUE stiche TRUE
+text blau: TRUE
+haken: TRUE

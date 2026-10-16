@@ -301,7 +301,7 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 | `REPLACE$(s, alt, neu)` | alle Vorkommen ersetzen |
 | `TRIM$(s)` | Whitespace vorne/hinten weg |
 | `SPLIT$(s, delim)` → ARRAY OF STRING | Zerlegen |
-| `JOIN$(arr, delim)` → STRING | Vereinen (Array OF STRING) |
+| `JOIN$(arr, delim)` → STRING | Vereinen; Zahlen und Wahrheitswerte im Feld werden wie mit `STR$` geschrieben |
 | `PADL$(s, breite[, fill])`, `PADR$(...)` | Auffüllen links/rechts |
 | `REPEAT$(s, n)` | s n-mal aneinanderhängen |
 | `SPACE$(n)` | n Leerzeichen |
@@ -1651,7 +1651,7 @@ Für komplexere Sprite-Kollision siehe [Sprite-Modul](module-sprite.md) mit `SPR
 | `AUDIO_SET_VOLUME(ch, v)` | `AUDIO_VOLUME(ch, v)` |
 | `AUDIO_MUSIC_SET_VOLUME(v)` | `AUDIO_MUSIC_VOLUME(v)` |
 
-Container-Methode `arr.join(trenner)` ≡ `JOIN$(arr, trenner)` (Array OF STRING).
+Container-Methode `arr.join(trenner)` ≡ `JOIN$(arr, trenner)`.
 
 **Konventionen / Stolpersteine** (bewusst NICHT umbenannt — nur zur Klarstellung):
 

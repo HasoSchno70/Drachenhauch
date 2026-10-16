@@ -1765,6 +1765,49 @@ Objekt mit `=` verglichen wird (`typtest.dhtest`). Nicht getestet: die
 modalen Dialoge (Umbenennen, Rueckfrage, Dateiwahl) -- `gtk_dialog_run`
 blockiert die Vorfuehrung.
 
+**Stufe 3: Auswahl, Vieleck, Symmetrie, Rueckstich, Fortschritt, Text,
+Farben** (2026-10-15). Kern: `kern/auswahl.dh` -- eine Auswahl ist eine
+Maske ueber dem Muster (Rechteck; Lasso = Zellmitten gerade/ungerade plus
+die Kanten als Bresenham OHNE feste Richtung, wie das Original), ein
+`Ausschnitt` (dabei/Farbe/Art je Zelle) ist Zwischenablage und Wanderinhalt;
+Einfuegen, Verschieben, Drehen, Spiegeln sind EINE Operation
+(`ausschnittSetzen`: alte Zellen leeren, Zellen mit Stich schreiben -- ein
+leerer Platz im Ausschnitt laesst stehen, was dort ist). Auswahl und
+Kopieren nehmen wie im Original nur die AKTIVE Ebene. `kern/formen.dh`:
+Vieleck (Fuellspannen auf Vieleck UND Muster geschnitten -- das stand nicht
+im Erkundungsbericht, der Abgleich fand es), `spiegelZellen` (die Formeln
+des Originals sind genau `b-1-x`/`h-1-y`, achtfach nur bei b = h),
+`spiegelRueckstich`. `kern/garn.dh`: CIEDE2000 wie core/color_math (auf
+sechs Stellen gleich). `kern/bearbeiten.dh`: `zellenSetzenJe` (Farbe und Typ
+je Zelle, Perle/Drill einmal je Farbe statt je Zelle), Rueckstiche als
+TEIL_LISTEN-Schritte, Fortschritt auf der obersten sichtbaren Ebene,
+`farbeErledigt` ueber alle Ebenen, `naechsterOffen` (Lesereihenfolge,
+Umlauf), `farbeErsetzen` (nur Sichtbares, verdeckt bleibt; Perle/Drill
+angepasst; Toleranz ueber `ersetzenQuellen`), `aehnlicheFarben` und
+`selteneErsetzungen` (stabil wie Pythons sort), `symbolSetzen` (ersetzt den
+Eintrag statt ihn zu aendern, sonst naehme der Vorher-Stand das neue Symbol
+mit; doppelt = Fehlertext). Anders als PySticky ist das Symbol rueckgaengig
+zu machen. Oberflaeche: `ansicht/mehr.dh` (die sechs Werkzeuge, Vorschau,
+Auswahl-Umriss nur im sichtbaren Ausschnitt -- Rechteck als ein Rahmen),
+`ansicht/text.dh` (Pango in ein A8-Bild, ein Punkt je Kaestchen, ab halber
+Deckung ein Stich), `ansicht/dialoge.dh` (Farbe ersetzen mit Rangfolge,
+Toleranz und Vorschau der Wirkung; seltene Farben; Symbol), Symmetrie-
+Auswahl in der Leiste, erledigte Stiche abgeblendet mit Haken, Knoepfe
+unter der Farbliste. Pruefungen: `glutfaden_stufe3.dhtest` (Vieleck, Lasso,
+Spiegeln Punkt fuer Punkt gegen PySticky, Farbabstand, Rangfolge, seltene
+Farben, Auswahl-Operationen, Rueckstiche mit Rundweg, Fortschritt, Farbe
+ersetzen, Symbol) und ein dritter Fall in `glutfaden_ansicht.dhtest`
+(`--probe-stufe3`, Bildproben: Text-Blau, Zuwachs gruener Haken -- Gruen
+gibt es vorher schon an den Kanten blauer Rueckstiche ueber Gelb).
+**Funde in der Laufzeit:** (1) `dhrt --check` meldete Befunde in
+importierten Dateien mit der Zeile des ZUSAMMENGEFUEGTEN Quelltexts und
+ohne Datei -- jetzt die eigene Zeile und `file` (`auf_dateien_umrechnen` in
+main.rs; Sprachserver und CODE_CHECK$ rechneten schon selbst zurueck);
+(2) `JOIN$` nahm nur ARRAY OF STRING -- jetzt auch Zahlen und
+Wahrheitswerte (wie STR$). **Stolpersteine:** `IS` vergleicht Typen, fuer
+"dasselbe Objekt" `=` (Stufe 2 hat die Meldung verbessert); die Shell frisst
+in Heredocs Rueckstriche (Patches als Dateien).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

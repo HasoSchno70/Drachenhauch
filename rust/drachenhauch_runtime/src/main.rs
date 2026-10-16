@@ -1953,6 +1953,7 @@ fn check_main(pfade: &[String]) -> ExitCode {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| pfad.to_string());
         let mut diags = check_source(&raw_source, &base, &label);
+        auf_dateien_umrechnen(&mut diags, &raw_source, &base);
         // Erst hier uebersetzen: check_source liefert auch dem Sprachserver
         // zu, und dessen Schnellkorrekturen lesen den deutschen Satz.
         if meldung::englisch() {
@@ -1969,6 +1970,29 @@ fn check_main(pfade: &[String]) -> ExitCode {
         }
     }
     ExitCode::SUCCESS
+}
+
+/// `--check` meldete Zeilen des ZUSAMMENGEFUEGTEN Quelltexts (IMPORTs
+/// eingesetzt) -- bei einem Programm aus mehreren Dateien also eine Zeile, die
+/// es in keiner Datei gibt, und keine Datei (Glutfaden, 2026-10-15). Jetzt die
+/// Zeile in ihrer eigenen Datei, bei einer importierten dazu `file`. Der
+/// Sprachserver und CODE_CHECK$ rechnen selbst zurueck und bekommen
+/// check_source unveraendert. Die Hardware-Warnungen der Vorverarbeitung
+/// zaehlen schon nach der Hauptdatei.
+fn auf_dateien_umrechnen(diags: &mut [serde_json::Value], raw_source: &str, base: &std::path::Path) {
+    let herkunft = match preprocess::process(raw_source, base) { Ok(r) => r.2, Err(_) => return };
+    for d in diags.iter_mut() {
+        if d.get("phase").and_then(|p| p.as_str()) == Some("preprocess") { continue; }
+        let z = d.get("line").and_then(|l| l.as_u64()).unwrap_or(0) as usize;
+        if z == 0 { continue; }
+        if let Some(h) = herkunft.get(z - 1) {
+            d["line"] = serde_json::json!(h.zeile);
+            if !h.datei.is_empty() {
+                let datei = if h.pfad.is_empty() { h.datei.clone() } else { h.pfad.clone() };
+                d["file"] = serde_json::json!(datei);
+            }
+        }
+    }
 }
 
 /// Front-End-Kette (preprocess -> lex -> parse -> compile) als Diagnostik.
