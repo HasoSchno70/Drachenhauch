@@ -1868,6 +1868,33 @@ den JSON_TYPE nie liefert ("bool" statt "boolean" -- daran luden
 Wahrheitswerte einer .pxs nie). Ohne Passwortschutz (krilla verschluesselt
 nicht); die Stickpfad-Vorschau (PyStickys Optimierer) fehlt noch.
 
+**Stufe 6: fremde Formate, Diamond, Blends** (2026-10-16). **PyStickys
+Leser fuer .pat und .xsd lesen keine echte Datei** (sie erwarten Kennungen
+"PAT" bzw. "PM", die es nicht gibt). `kern/pat.dh` ist an einer echten
+PCStitch-8-Datei ("Cement Mixer" von CyberStitchers, nur zum Testen
+geladen, nicht im Repo) entschluesselt und gegen das PDF geprueft, das
+PCStitch selbst davon druckt (Textlagen und Linien ueber `pdftext.dh`):
+alle 1073 Stiche samt Viertel-/Dreiviertelstichen mit Symbol, alle 210
+Rueckstiche. Gitter spaltenweise in Laeufen, "Lage" = Ziffernblock-Raster
+(1 2 3 / 4 5 6 / 7 8 9), Art 1 ganz, 31..34 Viertel bzw. Dreiviertel (Lage
+5); zwei Teilstiche je Zelle -> zweite Ebene. `kern/xsd.dh` folgt der
+Formatbeschreibung von Embroiderly (GPL, eigener Code; Herstellertafel
+`kern/xsdhersteller.dh`), geprueft an dessen Beispieldatei (250 x 331, acht
+Blends): Stichblock XOR-verschluesselt mit wanderndem Schluessel, Texte
+UTF-8 oder cp1251, Petite -> Viertel, Spannstich -> Rueckstich, Knoten/
+Perlen auf die naechste freie Ebene. **Teilstiche und Rueckstiche in XSD
+sind nur an selbst gebauten Dateien geprueft** (das Beispiel hat keine).
+Tests bauen beide Formate mit `_hilfen/glutfaden_pat.dh`/`_xsd.dh`.
+`kern/diamant.dh` = PySticky `convert_to_mode` (mode_backups je farbId,
+Stoff 14 -> 10 -> 14, Umstempeln auch der Teilstiche wie dort), gegen
+PyStickys Ausgabe fuer zwei Muster hin/zurueck/hin geprueft; Strg+D,
+Knopf in der Kopfleiste, die Leinwand zeichnet ganze Stiche als Drills.
+`garnBlend` = Thread.blend (Lab-Mittel, Name "DMC 310 / DMC 321 (1+2)"),
+Dialog Strg+B bzw. [Blend...] neben der Garnsuche. **Fund:**
+`farbeHinzufuegen` legte einen Blend mit anderem Strangverhaeltnis still auf
+den vorhandenen zusammen. `--probe-stufe6`, Sammlung
+`tests/pruef/glutfaden_stufe6.dhtest`.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
