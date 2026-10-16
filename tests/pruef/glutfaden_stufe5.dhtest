@@ -3379,3 +3379,1664 @@ symbol: TRUE ohne: 0
 bmp: 96 jpg: 72
 Bild-Export: unbekannte Endung -- .png, .jpg oder .bmp
 drill oben heller: TRUE rand stoff: FAFAF5
+
+=== pdf: ablauf wie pysticky beim probemuster
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+' Die Beilage hat ref_pdf.py aus PyStickys Story aufgezeichnet: Absaetze,
+' Tabellenzeilen, Zeichnungen (Formen je Art, Texte als Menge), Umbrueche.
+' Einzige Abweichung mit Absicht: ein Garn ohne Hersteller heisst nicht "None".
+DIM m AS kern.Muster : m = kern.pxsLaden("probe.pxs")
+DIM o AS kern.PdfOptionen : o = gePdfOptionen(pal, "A4", 0, 0, "", "", FALSE, "")
+o.titel = "probe"
+DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
+PRINT geAbweichungen$(geLies$("probe.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
+PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- datei probe.txt
+S 30.0
+P Title1 | ✂ KREUZSTICH-MUSTER
+P Title2 | probe
+P CenterText | von Hans &amp; Co
+P SmallCenter | Erstellt am 16.10.2026
+P SmallCenter | (c) 2026 Tab
+S 15.0
+D 353.2x264.9 | Circle:3 Line:3 Polygon:7 Rect:27 | 
+S 15.0
+T Mustergröße | 12 × 9 Stiche
+T Stoffempfehlung | Aida 16
+T Fertige Größe | 1.9 × 1.4 cm
+T Anzahl Farben | 5 verschiedene
+T Gesamt-Stiche | 32 Stiche
+T Rückstiche | 3 Linien
+T Garnbedarf | ca. 4 Stränge
+T Musterseiten | 1 Seiten
+PB
+P Title1 | Vorschau des fertigen Musters
+P CenterText | Fertige Größe auf Aida 16: 1.9 × 1.4 cm
+S 10.0
+D 496.1x372.0 | Circle:3 Line:3 Polygon:7 Rect:27 | 
+S 5.0
+P SmallCenter | Rückstiche: 3 Linien werden über dem Muster gezeigt.
+PB
+P Title1 | Legende und Materialbedarf
+P CenterText | 4 Farben · 32 Stiche · ca. 4 Stränge benötigt
+S 8.0
+T Nr. | Sym. | Farbe | Garnnummer | Farbname | Stiche | % | Stränge
+T 1 | ● |  | DMC 310 | Black | 11 | 34.4% | 1
+T 2 | ○ |  | DMC 321 | Christmas Red | 8 | 25.0% | 1
+T 3 | ■ |  | None  | Eigene Farbe | 1 | 3.1% | 1
+T 4 | □ |  | DMC 310 + DMC B5200 | Tweed | 12 | 37.5% | 1
+T  |  |  |  | Gesamt: | 32 | 100% | 4
+S 10.0
+P Title2 | Rückstiche
+T Farbe | Symbol | Garnnummer | Farbname | Anzahl
+T  | ● | DMC 310 | Black | 1
+T  | ○ | DMC 321 | Christmas Red | 1
+T  | ■ | None  | Eigene Farbe | 1
+T  |  |  | Gesamt: | 3
+S 10.0
+P Title2 | Perlen (Beads)
+T Farbe | Symbol | Perlen-Nr. | Farbname | Anzahl
+T  | ▲ | Mill Hill Beads 00557 | Gold | 1
+T  |  |  | Gesamt: | 1
+PB
+P Title1 | Seitenübersicht
+P CenterText | 1 Musterseiten · 1 Spalten × 1 Zeilen · je 40×40 Stiche · A4
+S 10.0
+D 306.1x229.6 | Circle:3 Line:3 Polygon:7 Rect:27 | 
+S 10.0
+T Seite 1 / X: 1-12 / Y: 1-9
+PB
+P CenterText | <b>Seite 1 von 1</b> | Spalten 1-12 · Zeilen 1-9
+S 3.0
+D 158.7x124.7 | Line:26 Rect:1 String:38 | 1x2 10x1 5x2 ■x1 □x12 ▲x1 ○x8 ●x11
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ●=310 (11) | ○=321 (8) | ■=Eigene F (1) | □=TW1 (12) | ▲=00557 (1)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>probe · Seite 1/1 · 16.10.2026</font>
+seiten 5
+
+--- erwartet
+32: [T 3 | ■ |  | None  | Eigene Farbe | 1 | 3.1% | 1] gegen [T 3 | ■ |  |  | Eigene Farbe | 1 | 3.1% | 1]
+40: [T  | ■ | None  | Eigene Farbe | 1] gegen [T  | ■ |  | Eigene Farbe | 1]
+datei TRUE seiten seiten 5
+
+=== pdf: a3 mit notizen, entsprechungen, ueberlappung und wasserzeichen
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+DIM m AS kern.Muster : m = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
+DIM o AS kern.PdfOptionen : o = gePdfOptionen(pal, "A3", 0, 2, "Anchor,Madeira", "Erste Zeile" + CHR$(10) + CHR$(10) + "Zweite <Zeile>", FALSE, "ENTWURF")
+o.titel = "demo_a3"
+DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
+PRINT geAbweichungen$(geLies$("demo_a3.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
+PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei demo_a3.txt
+S 30.0
+P Title1 | ✂ KREUZSTICH-MUSTER
+P Title2 | demo_a3
+P SmallCenter | Erstellt am 16.10.2026
+S 15.0
+D 386.9x386.9 | Rect:186 | 
+S 15.0
+T Mustergröße | 40 × 40 Stiche
+T Stoffempfehlung | Aida 14
+T Fertige Größe | 7.3 × 7.3 cm
+T Anzahl Farben | 6 verschiedene
+T Gesamt-Stiche | 185 Stiche
+T Garnbedarf | ca. 3 Stränge
+T Musterseiten | 1 Seiten
+PB
+P Title2 | Notizen
+S 6.0
+P Normal | Erste Zeile
+P Normal | &nbsp;
+P Normal | Zweite &lt;Zeile&gt;
+PB
+P Title1 | Vorschau des fertigen Musters
+P CenterText | Fertige Größe auf Aida 14: 7.3 × 7.3 cm
+S 10.0
+D 742.7x742.7 | Rect:186 | 
+PB
+P Title1 | Legende und Materialbedarf
+P CenterText | 6 Farben · 185 Stiche · ca. 3 Stränge benötigt
+S 8.0
+T Nr. | Sym. | Farbe | Garnnummer | Farbname | Anchor | Madeira | Stiche | % | Stränge
+T 1 | ● |  | Anchor 403 | Black | 403 | 2400 | 0 | 0.0% | 0
+T 2 | ○ |  | Anchor 47 | Red-DK | 47 | 0210 | 52 | 28.1% | 1
+T 3 | ■ |  | Anchor 309 | Lemon-DK | 309 | 0104 | 17 | 9.2% | 1
+T 4 | □ |  | Anchor 228 | Celadon Green-DK | 228 | 1202 | 0 | 0.0% | 0
+T 5 | ▲ |  | Anchor 134 | Blue-DK | 134 | 0910 | 116 | 62.7% | 1
+T 6 | △ |  | Anchor 1 | Snow White | 1 | 9998 | 0 | 0.0% | 0
+T  |  |  |  | Gesamt: |  |  | 185 | 100% | 3
+PB
+P Title1 | Seitenübersicht
+P CenterText | 1 Musterseiten · 1 Spalten × 1 Zeilen · je 60×60 Stiche · A3
+S 10.0
+D 386.9x386.9 | Rect:186 | 
+S 10.0
+T Seite 1 / X: 1-40 / Y: 1-40
+PB
+P CenterText | <b>Seite 1 von 1</b> | Spalten 1-40 · Zeilen 1-40
+S 3.0
+D 476.2x476.2 | Line:82 Rect:1 String:203 | 1x2 10x2 15x2 20x2 25x2 30x2 35x2 40x2 5x2 ■x17 ▲x116 ○x52
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ○=47 (52) | ■=309 (17) | ▲=134 (116)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_a3 · Seite 1/1 · 16.10.2026</font>
+seiten 6
+
+--- erwartet
+gleich (53 Zeilen)
+datei TRUE seiten seiten 6
+
+=== pdf: diamond 2,8 mm
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+' Mit Absicht anders: ◆ statt 💎 (die eingebaute Schrift hat kein Emoji) und
+' die fertige Groesse als Drills mal Kante -- 40 x 2,8 mm sind 11,2 cm,
+' PySticky rechnet wie beim Stoff (40 / (9 / 2,54) = 11,3).
+DIM m AS kern.Muster : m = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
+DIM o AS kern.PdfOptionen : o = gePdfOptionen(pal, "A4", 0, 0, "", "", FALSE, "")
+m.modus = "diamond" : m.stoff = 9
+o.titel = "demo_dp"
+DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
+PRINT geAbweichungen$(geLies$("demo_dp.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
+PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei demo_dp.txt
+S 30.0
+P Title1 | 💎 DIAMOND-PAINTING-VORLAGE
+P Title2 | demo_dp
+P SmallCenter | Erstellt am 16.10.2026
+S 15.0
+D 264.9x264.9 | Polygon:740 Rect:186 | 
+S 15.0
+T Mustergröße | 40 × 40 Drills
+T Drill-Raster | 2.8 mm Round
+T Fertige Größe | 11.3 × 11.3 cm
+T Anzahl Farben | 6 verschiedene
+T Gesamt-Drills | 185 Drills
+T Drill-Bedarf | ca. 202 Drills
+T Musterseiten | 1 Seiten
+PB
+P Title1 | Vorschau der fertigen Vorlage
+P CenterText | Fertige Größe auf 2.8 mm Round: 11.3 × 11.3 cm
+S 10.0
+D 496.1x496.1 | Polygon:740 Rect:186 | 
+PB
+P Title1 | Drill-Legende und Material
+P CenterText | 6 Farben · 185 Drills · ca. 202 Drills benötigt
+S 8.0
+T Nr. | Sym. | Farbe | Drill-Code | Farbname | Drills | % | Drills
+T 1 | ● |  | 403 | Black | 0 | 0.0% | 0
+T 2 | ○ |  | 47 | Red-DK | 52 | 28.1% | 57
+T 3 | ■ |  | 309 | Lemon-DK | 17 | 9.2% | 18
+T 4 | □ |  | 228 | Celadon Green-DK | 0 | 0.0% | 0
+T 5 | ▲ |  | 134 | Blue-DK | 116 | 62.7% | 127
+T 6 | △ |  | 1 | Snow White | 0 | 0.0% | 0
+T  |  |  |  | Gesamt: | 185 | 100% | 202
+PB
+P Title1 | Seitenübersicht
+P CenterText | 1 Musterseiten · 1 Spalten × 1 Zeilen · je 60×77 Drills · A4
+S 10.0
+D 264.9x264.9 | Polygon:740 Rect:186 | 
+S 10.0
+T Seite 1 / X: 1-40 / Y: 1-40
+PB
+P CenterText | <b>Seite 1 von 1</b> | Spalten 1-40 · Zeilen 1-40
+S 3.0
+D 340.2x340.2 | Line:82 Polygon:740 Rect:186 String:203 | 1x2 10x2 15x2 20x2 25x2 30x2 35x2 40x2 5x2 ■x17 ▲x116 ○x52
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> <font color="#A9152C">■</font> <b>47</b> (52) | <font color="#FFD802">■</font> <b>309</b> (17) | <font color="#4983A7">■</font> <b>134</b> (116)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_dp · Seite 1/1 · 16.10.2026</font>
+seiten 5
+
+--- erwartet
+2: [P Title1 | 💎 DIAMOND-PAINTING-VORLAGE] gegen [P Title1 | ◆ DIAMOND-PAINTING-VORLAGE]
+10: [T Fertige Größe | 11.3 × 11.3 cm] gegen [T Fertige Größe | 11.2 × 11.2 cm]
+17: [P CenterText | Fertige Größe auf 2.8 mm Round: 11.3 × 11.3 cm] gegen [P CenterText | Fertige Größe auf 2.8 mm Round: 11.2 × 11.2 cm]
+datei TRUE seiten seiten 5
+
+=== pdf: mystery auf vier seiten
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+DIM m AS kern.Muster : m = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
+DIM o AS kern.PdfOptionen : o = gePdfOptionen(pal, "A4", 25, 0, "", "", TRUE, "")
+o.titel = "demo_mys"
+DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
+PRINT geAbweichungen$(geLies$("demo_mys.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
+PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei demo_mys.txt
+S 30.0
+P Title1 | ✂ KREUZSTICH-MUSTER
+P Title2 | demo_mys
+P SmallCenter | Erstellt am 16.10.2026
+S 15.0
+D 264.9x264.9 | Rect:1 String:1 | ?x1
+S 15.0
+T Mustergröße | 40 × 40 Stiche
+T Stoffempfehlung | Aida 14
+T Fertige Größe | 7.3 × 7.3 cm
+T Anzahl Farben | 6 verschiedene
+T Gesamt-Stiche | 185 Stiche
+T Garnbedarf | ca. 3 Stränge
+T Musterseiten | 4 Seiten
+PB
+P Title1 | Vorschau des fertigen Musters
+P CenterText | Fertige Größe auf Aida 14: 7.3 × 7.3 cm
+S 10.0
+D 496.1x496.1 | Rect:1 String:1 | ?x1
+PB
+P Title1 | Legende und Materialbedarf
+P CenterText | 6 Farben · 185 Stiche · ca. 3 Stränge benötigt
+S 8.0
+T Nr. | Sym. | Farbe | Garnnummer | Farbname | Stiche | % | Stränge
+T 1 | ● |  | Anchor 403 | Black | 0 | 0.0% | 0
+T 2 | ○ |  | Anchor 47 | Red-DK | 52 | 28.1% | 1
+T 3 | ■ |  | Anchor 309 | Lemon-DK | 17 | 9.2% | 1
+T 4 | □ |  | Anchor 228 | Celadon Green-DK | 0 | 0.0% | 0
+T 5 | ▲ |  | Anchor 134 | Blue-DK | 116 | 62.7% | 1
+T 6 | △ |  | Anchor 1 | Snow White | 0 | 0.0% | 0
+T  |  |  |  | Gesamt: | 185 | 100% | 3
+PB
+P Title1 | Seitenübersicht
+P CenterText | 4 Musterseiten · 2 Spalten × 2 Zeilen · je 25×25 Stiche · A4
+S 10.0
+D 264.9x264.9 | Line:2 Rect:1 String:1 | ?x1
+S 10.0
+T Seite 1 / X: 1-25 / Y: 1-25 | Seite 2 / X: 26-40 / Y: 1-25
+T Seite 3 / X: 1-25 / Y: 26-40 | Seite 4 / X: 26-40 / Y: 26-40
+PB
+P CenterText | <b>Seite 1 von 4</b> | Spalten 1-25 · Zeilen 1-25 | <font size='8' color='#888'>S. 2 &rarr; &darr; S. 3</font>
+S 3.0
+D 306.1x306.1 | Line:52 Rect:1 String:107 | 1x2 10x2 15x2 20x2 25x2 5x2 ■x4 ▲x39 ○x52
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ○=47 (52) | ■=309 (4) | ▲=134 (39)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_mys · Seite 1/4 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 2 von 4</b> | Spalten 26-40 · Zeilen 1-25 | <font size='8' color='#888'>&larr; S. 1 &darr; S. 4</font>
+S 3.0
+D 192.8x306.1 | Line:42 Rect:1 String:43 | 1x1 10x1 15x1 20x1 25x1 26x1 30x1 35x1 40x1 5x1 ■x4 ▲x29
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ■=309 (4) | ▲=134 (29)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_mys · Seite 2/4 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 3 von 4</b> | Spalten 1-25 · Zeilen 26-40 | <font size='8' color='#888'>S. 4 &rarr; &uarr; S. 1</font>
+S 3.0
+D 306.1x192.8 | Line:42 Rect:1 String:44 | 1x1 10x1 15x1 20x1 25x1 26x1 30x1 35x1 40x1 5x1 ■x5 ▲x29
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ■=309 (5) | ▲=134 (29)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_mys · Seite 3/4 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 4 von 4</b> | Spalten 26-40 · Zeilen 26-40 | <font size='8' color='#888'>&larr; S. 3 &uarr; S. 2</font>
+S 3.0
+D 192.8x192.8 | Line:32 Rect:1 String:31 | 26x2 30x2 35x2 40x2 ■x4 ▲x19
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ■=309 (4) | ▲=134 (19)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_mys · Seite 4/4 · 16.10.2026</font>
+seiten 8
+
+--- erwartet
+gleich (72 Zeilen)
+datei TRUE seiten seiten 8
+
+=== pdf: letter, neun seiten mit ueberlappung, entsprechung dmc
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+DIM m AS kern.Muster : m = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
+DIM o AS kern.PdfOptionen : o = gePdfOptionen(pal, "Letter", 15, 2, "DMC", "", FALSE, "")
+o.titel = "demo_ueb"
+DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "aus.pdf", o)
+PRINT geAbweichungen$(geLies$("demo_ueb.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
+PRINT "datei "; FILEEXISTS("aus.pdf"); " seiten "; ab[LEN(ab) - 1]
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei demo_ueb.txt
+S 30.0
+P Title1 | ✂ KREUZSTICH-MUSTER
+P Title2 | demo_ueb
+P SmallCenter | Erstellt am 16.10.2026
+S 15.0
+D 247.4x247.4 | Rect:186 | 
+S 15.0
+T Mustergröße | 40 × 40 Stiche
+T Stoffempfehlung | Aida 14
+T Fertige Größe | 7.3 × 7.3 cm
+T Anzahl Farben | 6 verschiedene
+T Gesamt-Stiche | 185 Stiche
+T Garnbedarf | ca. 3 Stränge
+T Musterseiten | 9 Seiten
+PB
+P Title1 | Vorschau des fertigen Musters
+P CenterText | Fertige Größe auf Aida 14: 7.3 × 7.3 cm
+S 10.0
+D 512.8x512.8 | Rect:186 | 
+PB
+P Title1 | Legende und Materialbedarf
+P CenterText | 6 Farben · 185 Stiche · ca. 3 Stränge benötigt
+S 8.0
+T Nr. | Sym. | Farbe | Garnnummer | Farbname | DMC | Stiche | % | Stränge
+T 1 | ● |  | Anchor 403 | Black | 310 | 0 | 0.0% | 0
+T 2 | ○ |  | Anchor 47 | Red-DK | 347 | 52 | 28.1% | 1
+T 3 | ■ |  | Anchor 309 | Lemon-DK | 307 | 17 | 9.2% | 1
+T 4 | □ |  | Anchor 228 | Celadon Green-DK | 562 | 0 | 0.0% | 0
+T 5 | ▲ |  | Anchor 134 | Blue-DK | 518 | 116 | 62.7% | 1
+T 6 | △ |  | Anchor 1 | Snow White | 8000 | 0 | 0.0% | 0
+T  |  |  |  | Gesamt: |  | 185 | 100% | 3
+PB
+P Title1 | Seitenübersicht
+P CenterText | 9 Musterseiten · 3 Spalten × 3 Zeilen · je 15×15 Stiche · Letter
+S 10.0
+D 247.4x247.4 | Line:4 Rect:186 | 
+S 10.0
+T Seite 1 / X: 1-15 / Y: 1-15 | Seite 2 / X: 16-30 / Y: 1-15 | Seite 3 / X: 31-40 / Y: 1-15
+T Seite 4 / X: 1-15 / Y: 16-30 | Seite 5 / X: 16-30 / Y: 16-30 | Seite 6 / X: 31-40 / Y: 16-30
+T Seite 7 / X: 1-15 / Y: 31-40 | Seite 8 / X: 16-30 / Y: 31-40 | Seite 9 / X: 31-40 / Y: 31-40
+PB
+P CenterText | <b>Seite 1 von 9</b> | Spalten 1-17 · Zeilen 1-17 | <font size='8' color='#888'>S. 2 &rarr; &darr; S. 4</font>
+S 3.0
+D 215.4x215.4 | Line:36 Rect:1 String:41 | 1x2 10x2 15x2 5x2 ■x4 ▲x23 ○x6
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ○=47 (6) | ■=309 (4) | ▲=134 (23)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_ueb · Seite 1/9 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 2 von 9</b> | Spalten 16-32 · Zeilen 1-17 | <font size='8' color='#888'>&larr; S. 1 S. 3 &rarr; &darr; S. 5</font>
+S 3.0
+D 215.4x215.4 | Line:36 Rect:1 String:67 | 1x1 10x1 15x1 16x1 20x1 25x1 30x1 5x1 ■x2 ▲x17 ○x40
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ○=47 (40) | ■=309 (2) | ▲=134 (17)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_ueb · Seite 2/9 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 3 von 9</b> | Spalten 31-40 · Zeilen 1-17 | <font size='8' color='#888'>&larr; S. 2 &darr; S. 6</font>
+S 3.0
+D 136.1x215.4 | Line:29 Rect:1 String:27 | 1x1 10x1 15x1 31x1 35x1 40x1 5x1 ■x4 ▲x16
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ■=309 (4) | ▲=134 (16)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_ueb · Seite 3/9 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 4 von 9</b> | Spalten 1-17 · Zeilen 16-32 | <font size='8' color='#888'>S. 5 &rarr; &uarr; S. 1 &darr; S. 7</font>
+S 3.0
+D 215.4x215.4 | Line:36 Rect:1 String:30 | 1x1 10x1 15x1 16x1 20x1 25x1 30x1 5x1 ■x2 ▲x17 ○x3
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ○=47 (3) | ■=309 (2) | ▲=134 (17)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_ueb · Seite 4/9 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 5 von 9</b> | Spalten 16-32 · Zeilen 16-32 | <font size='8' color='#888'>&larr; S. 4 S. 6 &rarr; &uarr; S. 2 &darr; S. 8</font>
+S 3.0
+D 215.4x215.4 | Line:36 Rect:1 String:41 | 16x2 20x2 25x2 30x2 ■x3 ○x30
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ○=47 (30) | ■=309 (3)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_ueb · Seite 5/9 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 6 von 9</b> | Spalten 31-40 · Zeilen 16-32 | <font size='8' color='#888'>&larr; S. 5 &uarr; S. 3 &darr; S. 9</font>
+S 3.0
+D 136.1x215.4 | Line:29 Rect:1 String:26 | 16x1 20x1 25x1 30x1 31x1 35x1 40x1 ■x2 ▲x17
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ■=309 (2) | ▲=134 (17)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_ueb · Seite 6/9 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 7 von 9</b> | Spalten 1-17 · Zeilen 31-40 | <font size='8' color='#888'>S. 8 &rarr; &uarr; S. 4</font>
+S 3.0
+D 215.4x136.1 | Line:29 Rect:1 String:27 | 1x1 10x1 15x1 31x1 35x1 40x1 5x1 ■x4 ▲x16
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ■=309 (4) | ▲=134 (16)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_ueb · Seite 7/9 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 8 von 9</b> | Spalten 16-32 · Zeilen 31-40 | <font size='8' color='#888'>&larr; S. 7 S. 9 &rarr; &uarr; S. 5</font>
+S 3.0
+D 215.4x136.1 | Line:29 Rect:1 String:26 | 16x1 20x1 25x1 30x1 31x1 35x1 40x1 ■x2 ▲x17
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ■=309 (2) | ▲=134 (17)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_ueb · Seite 8/9 · 16.10.2026</font>
+PB
+P CenterText | <b>Seite 9 von 9</b> | Spalten 31-40 · Zeilen 31-40 | <font size='8' color='#888'>&larr; S. 8 &uarr; S. 6</font>
+S 3.0
+D 136.1x136.1 | Line:22 Rect:1 String:19 | 31x2 35x2 40x2 ■x4 ▲x9
+S 3.0
+P Normal | <font size='7'><b>Farben:</b> ■=309 (4) | ▲=134 (9)</font>
+S 2.0
+P CenterText | <font size='7' color='#999999'>demo_ueb · Seite 9/9 · 16.10.2026</font>
+seiten 13
+
+--- erwartet
+gleich (113 Zeilen)
+datei TRUE seiten seiten 13
+
+=== pdf: was in der datei steht
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+' Gelesen mit dem PDF-Leser der Pruefungen: Seiten, Texte, Symbole je Seite,
+' Seitengroesse, Durchsicht des Wasserzeichens. Ein Absatz steht Wort fuer
+' Wort im PDF (er bricht um) -- fuer Fliesstext werden die Zeilen einer Seite
+' darum wieder aneinandergehaengt.
+IMPORT "pdftext.dh"
+DIM m AS kern.Muster : m = kern.pxsLaden("probe.pxs")
+DIM o AS kern.PdfOptionen : o = gePdfOptionen(pal, "A4", 0, 0, "", "", FALSE, "")
+DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "ohne", o)
+PRINT "endung "; FILEEXISTS("ohne.pdf")
+DIM s AS ARRAY OF STRING : s = pdfSeiten("ohne.pdf")
+PRINT "seiten "; LEN(s)
+PRINT "deckblatt "; INSTR(s[0], "KREUZSTICH-MUSTER") >= 0; " "; INSTR(s[0], "ohne") >= 0; " "; INSTR(s[0], "12 × 9 Stiche") >= 0; " "; INSTR(s[0], "(c) 2026 Tab") >= 0
+PRINT "legende "; INSTR(s[2], "Christmas Red") >= 0; " "; INSTR(REPLACE$(s[2], CHR$(10), ""), "Perlen (Beads)") >= 0; " "; INSTR(s[2], "Mill Hill Beads 00557") >= 0
+FUNCTION zeilen(t AS STRING, z AS STRING) AS INTEGER
+    DIM n AS INTEGER, x AS STRING
+    FOR EACH x IN SPLIT$(t, CHR$(10))
+        IF x = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "musterseite "; INSTR(REPLACE$(s[4], CHR$(10), ""), "Seite 1 von 1 | Spalten 1-12 · Zeilen 1-9") >= 0; " ● "; zeilen(s[4], "●"); " □ "; zeilen(s[4], "□"); " ○ "; zeilen(s[4], "○")
+PRINT "fusszeile "; INSTR(REPLACE$(s[4], CHR$(10), ""), "ohne · Seite 1/1 · 16.10.2026") >= 0
+DIM w AS ARRAY OF STRING : w = pdfWoerter()
+PRINT "ohne wasserzeichen: ca "; pdfWortZahl(w, "/ca")
+PRINT "a4 "; INSTR(JOIN$(w, " "), "/MediaBox [0 0 595.2756 841.8898 ]") >= 0
+o = gePdfOptionen(pal, "A3", 0, 0, "", "", FALSE, "ENTWURF")
+ab = kern.pdfExportieren(m, "mit.pdf", o)
+s = pdfSeiten("mit.pdf")
+w = pdfWoerter()
+PRINT "mit wasserzeichen: ca "; pdfWortZahl(w, "/ca"); " formulare je seite "; pdfWortZahl(w, "Do") = LEN(s)
+PRINT "a3 "; INSTR(JOIN$(w, " "), "/MediaBox [0 0 841.8898 1190.5511 ]") >= 0
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- datei pdftext.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+
+--- erwartet
+endung TRUE
+seiten 5
+deckblatt TRUE TRUE TRUE TRUE
+legende TRUE TRUE TRUE
+musterseite TRUE ● 11 □ 12 ○ 8
+fusszeile TRUE
+ohne wasserzeichen: ca 0
+a4 TRUE
+mit wasserzeichen: ca 1 formulare je seite TRUE
+a3 TRUE
+
+=== pdf: eine unbekannte palette ist ein fehler
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+DIM m AS kern.Muster : m = kern.pxsLaden("probe.pxs")
+DIM o AS kern.PdfOptionen : o = gePdfOptionen(pal, "A4", 0, 0, "Gibtsnicht", "", FALSE, "")
+TRY
+    DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, "x.pdf", o)
+CATCH e
+    PRINT e
+END TRY
+PRINT "datei "; FILEEXISTS("x.pdf")
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- erwartet
+PDF-Export: Palette 'Gibtsnicht' gibt es nicht
+datei FALSE

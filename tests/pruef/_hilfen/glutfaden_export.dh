@@ -146,3 +146,37 @@ FUNCTION geMuster$(m AS kern.Muster) AS STRING
     NEXT
     RETURN JOIN$(z, CHR$(10)) + CHR$(10)
 END FUNCTION
+
+' Alle abweichenden Zeilen, je eine Zeile "n: [a] gegen [b]" -- fuer
+' Vergleiche, in denen bekannte Abweichungen stehen: die Erwartung nennt dann
+' jede einzeln, und eine neue faellt auf.
+FUNCTION geAbweichungen$(a AS STRING, b AS STRING) AS STRING
+    a = REPLACE$(a, CHR$(13), "") : b = REPLACE$(b, CHR$(13), "")
+    IF RIGHT$(a, 1) = CHR$(10) THEN a = LEFT$(a, LEN(a) - 1)
+    IF RIGHT$(b, 1) = CHR$(10) THEN b = LEFT$(b, LEN(b) - 1)
+    DIM za AS ARRAY OF STRING : za = SPLIT$(a, CHR$(10))
+    DIM zb AS ARRAY OF STRING : zb = SPLIT$(b, CHR$(10))
+    DIM r AS ARRAY OF STRING : r = []
+    IF LEN(za) <> LEN(zb) THEN ARRAY_PUSH(r, "Zeilenzahl " + STR$(LEN(za)) + " gegen " + STR$(LEN(zb)))
+    DIM i AS INTEGER
+    FOR i = 0 TO MIN(LEN(za), LEN(zb)) - 1
+        IF za[i] <> zb[i] THEN ARRAY_PUSH(r, STR$(i + 1) + ": [" + za[i] + "] gegen [" + zb[i] + "]")
+    NEXT
+    IF LEN(r) = 0 THEN RETURN "gleich (" + STR$(LEN(za)) + " Zeilen)"
+    RETURN JOIN$(r, CHR$(10))
+END FUNCTION
+
+' PDF-Optionen wie die Aufzeichnungen von ref_pdf.py (Datum fest).
+FUNCTION gePdfOptionen(pal AS ARRAY OF kern.Palette, papier AS STRING, zellen AS INTEGER, ueb AS INTEGER, kreuz AS STRING, notizen AS STRING, mystery AS BOOLEAN, wasser AS STRING) AS kern.PdfOptionen
+    DIM o AS kern.PdfOptionen : o = NEW kern.PdfOptionen()
+    o.datum = "16.10.2026"
+    o.paletten = pal
+    o.papier = papier
+    o.zellen = zellen
+    o.ueberlappung = ueb
+    IF kreuz <> "" THEN o.kreuz = SPLIT$(kreuz, ",")
+    o.notizen = notizen
+    o.mystery = mystery
+    o.wasserzeichen = wasser
+    RETURN o
+END FUNCTION
