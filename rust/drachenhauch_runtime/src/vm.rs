@@ -5199,11 +5199,48 @@ impl<'p> Vm<'p> {
                 self.pdf_d(i)?.setze_strich(mm.max(0.0));
                 Value::Nil
             }
+            // PDF_TEXT(p, x, y, text$ [, winkel]) -- der Winkel in Grad gegen
+            // den Uhrzeigersinn, gedreht um (x, y). Fuer Wasserzeichen und
+            // senkrechte Achsenbeschriftungen (Glutfaden, 2026-10-16).
             "pdf_text" => {
+                if a.len() != 4 && a.len() != 5 {
+                    return Err(format!("PDF_TEXT: erwartet 4 oder 5 Argumente (pdf, x, y, text$ [, winkel]), nicht {}", a.len()));
+                }
                 let i = bi_int(a, 0, "PDF_TEXT")?;
                 let (x, y) = (bi_num(a, 1, "PDF_TEXT")?, bi_num(a, 2, "PDF_TEXT")?);
                 let t = bi_str(a, 3, "PDF_TEXT")?.to_string();
-                self.pdf_d(i)?.text(x, y, &t).map_err(|e| format!("PDF_TEXT: {}", e))?;
+                let w = if a.len() > 4 { bi_num(a, 4, "PDF_TEXT")? } else { 0.0 };
+                self.pdf_d(i)?.text(x, y, &t, w).map_err(|e| format!("PDF_TEXT: {}", e))?;
+                Value::Nil
+            }
+            // PDF_OPACITY(p, deckkraft) -- 0..1 fuer alles, was danach kommt;
+            // PDF_GET_OPACITY liest sie zurueck.
+            "pdf_opacity" => {
+                let i = bi_int(a, 0, "PDF_OPACITY")?;
+                let d = bi_num(a, 1, "PDF_OPACITY")?;
+                self.pdf_d(i)?.setze_deckkraft(d).map_err(|e| format!("PDF_OPACITY: {}", e))?;
+                Value::Nil
+            }
+            "pdf_get_opacity" => { let i = bi_int(a, 0, "PDF_GET_OPACITY")?; Value::Float(self.pdf_d(i)?.deckkraft()) }
+            "pdf_circle" | "pdf_circle_fill" => {
+                let fn_ = if name == "pdf_circle" { "PDF_CIRCLE" } else { "PDF_CIRCLE_FILL" };
+                let i = bi_int(a, 0, fn_)?;
+                let (x, y, r) = (bi_num(a, 1, fn_)?, bi_num(a, 2, fn_)?, bi_num(a, 3, fn_)?);
+                self.pdf_d(i)?.kreis(x, y, r, name == "pdf_circle_fill").map_err(|e| format!("{}: {}", fn_, e))?;
+                Value::Nil
+            }
+            // PDF_POLYGON(p, xs, ys) -- ein geschlossener Zug; die Felder
+            // muessen gleich lang sein.
+            "pdf_polygon" | "pdf_polygon_fill" => {
+                let fn_ = if name == "pdf_polygon" { "PDF_POLYGON" } else { "PDF_POLYGON_FILL" };
+                let i = bi_int(a, 0, fn_)?;
+                let xs = gfloats(a, 1, fn_)?;
+                let ys = gfloats(a, 2, fn_)?;
+                if xs.len() != ys.len() {
+                    return Err(format!("{}: xs und ys muessen gleich lang sein ({} gegen {})", fn_, xs.len(), ys.len()));
+                }
+                let pkt: Vec<(f64, f64)> = xs.into_iter().zip(ys).collect();
+                self.pdf_d(i)?.vieleck(pkt, name == "pdf_polygon_fill").map_err(|e| format!("{}: {}", fn_, e))?;
                 Value::Nil
             }
             "pdf_text_width" => {

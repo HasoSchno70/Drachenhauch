@@ -35,18 +35,25 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_FONT_LOAD(p, pfad$, name$)` | load your own TrueType/OpenType font, afterwards available to `PDF_FONT` as `name$` |
 | `PDF_COLOR(p, farbe)` | `RGB(…)` — applies to text, strokes and fills |
 | `PDF_LINE_WIDTH(p, mm)` | stroke width |
-| `PDF_TEXT(p, x, y, text$)` | set text |
+| `PDF_TEXT(p, x, y, text$[, winkel])` | set text; `winkel` (angle) in degrees counter-clockwise, rotated about (x, y) |
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | width in mm, in the current font and size |
 | `PDF_LINE(p, x1, y1, x2, y2)` | draw a line |
 | `PDF_RECT(p, x, y, b, h)` / `PDF_RECT_FILL(…)` | outline / fill |
+| `PDF_CIRCLE(p, x, y, r)` / `PDF_CIRCLE_FILL(…)` | circle around (x, y), outline / fill |
+| `PDF_POLYGON(p, xs, ys)` / `PDF_POLYGON_FILL(…)` | closed polygon from two arrays of equal length, at least three points |
+| `PDF_OPACITY(p, deckkraft)` / `PDF_GET_OPACITY(p)` → FLOAT | opacity 0..1 for everything that follows (watermarks) |
 | `PDF_IMAGE(p, bild, x, y, b[, h])` | place an image (`IMAGE`) in the rectangle, sizes in mm; without `h` by the aspect ratio |
 | `PDF_SAVE(p, pfad$)` | write |
 | `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` | **print** — Windows via GDI, macOS/Linux via CUPS; see [Printing](#printing-and-preview) |
 | `PDF_PREVIEW(p, seite[, breite_px])` → IMAGE | the page as an image, for a preview in a window |
 | `PDF_CLOSE(p)` | free the memory |
 
-Font, size, colour and stroke width are settings of the **document**,
-not of the page — they stay in effect after `PDF_PAGE`.
+Font, size, colour, stroke width and opacity are settings of the
+**document**, not of the page — they stay in effect after `PDF_PAGE`. The
+opacity is written into the PDF as real transparency; when printing on
+Windows (GDI) and in `PDF_PREVIEW` the colour is mixed against the white
+paper instead — the same picture, as long as nothing lies underneath. There is
+no password protection: krilla does not encrypt.
 
 ## Fonts
 

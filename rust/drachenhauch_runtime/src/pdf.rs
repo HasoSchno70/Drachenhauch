@@ -37,13 +37,31 @@ const MM: f64 = 72.0 / 25.4;
 /// oben, Farbe als Anteile 0..1. `y` bei Text meint die OBERKANTE der Zeile,
 /// wie im Programm angegeben.
 #[derive(Clone, Debug)]
+/// Jeder Befehl traegt seine Deckkraft (`deck`, 0..1, PDF_OPACITY) selbst --
+/// ein Zustand im Strom muesste beim Seitenwechsel neu gesetzt werden, und
+/// die Vorschau und der Drucker muessten ihn mitfuehren.
 pub enum Op {
-    Text { x: f64, y: f64, text: String, schrift: usize, groesse_pt: f64, farbe: (f64, f64, f64) },
-    Linie { x1: f64, y1: f64, x2: f64, y2: f64, breite_mm: f64, farbe: (f64, f64, f64) },
-    Rechteck { x: f64, y: f64, b: f64, h: f64, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64) },
+    /// `winkel` in Grad gegen den Uhrzeigersinn, gedreht um (x, y) -- die
+    /// linke obere Ecke des Textes, wie ohne Winkel.
+    Text { x: f64, y: f64, text: String, schrift: usize, groesse_pt: f64, farbe: (f64, f64, f64), winkel: f64, deck: f64 },
+    Linie { x1: f64, y1: f64, x2: f64, y2: f64, breite_mm: f64, farbe: (f64, f64, f64), deck: f64 },
+    Rechteck { x: f64, y: f64, b: f64, h: f64, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64 },
+    /// PDF_CIRCLE / PDF_CIRCLE_FILL: Mittelpunkt und Radius in mm.
+    Kreis { x: f64, y: f64, r: f64, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64 },
+    /// PDF_POLYGON / PDF_POLYGON_FILL: geschlossener Zug, mindestens drei
+    /// Punkte; gefuellt nach der Nicht-Null-Regel (wie PostScript `fill`).
+    Vieleck { punkte: Vec<(f64, f64)>, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64 },
     /// PDF_IMAGE: ein Bild, RGBA Zeile fuer Zeile, `pw` x `ph` Punkte, in das
     /// Rechteck x/y/b/h (mm) gestreckt.
-    Bild { x: f64, y: f64, b: f64, h: f64, rgba: Arc<Vec<u8>>, pw: u32, ph: u32 },
+    Bild { x: f64, y: f64, b: f64, h: f64, rgba: Arc<Vec<u8>>, pw: u32, ph: u32, deck: f64 },
+}
+
+/// Eine Farbe so weit gegen Weiss gemischt, wie die Deckkraft sagt -- fuer
+/// Ziele, die keine Durchsicht kennen (GDI, die Vorschau). Auf weissem Papier
+/// ist das dasselbe Bild, ueber anderem Inhalt eine Naeherung.
+pub fn gegen_weiss(f: (f64, f64, f64), deck: f64) -> (f64, f64, f64) {
+    let d = deck.clamp(0.0, 1.0);
+    (f.0 * d + (1.0 - d), f.1 * d + (1.0 - d), f.2 * d + (1.0 - d))
 }
 
 pub struct Seite {
@@ -61,6 +79,8 @@ pub struct Dokument {
     pub groesse_pt: f64,
     farbe: (f64, f64, f64),
     strich_mm: f64,
+    /// PDF_OPACITY: gilt fuer alles, was danach gezeichnet wird.
+    deck: f64,
     pub titel: String,
     /// Mit PDF_FONT_LOAD geladene Schriften: (Name, Dateiinhalt). Ihre
     /// Nummern beginnen hinter den eingebauten.
@@ -119,7 +139,7 @@ impl Dokument {
     pub fn neu(breite_mm: f64, hoehe_mm: f64) -> Dokument {
         let mut d = Dokument {
             seiten: Vec::new(), breite_mm, hoehe_mm,
-            schrift: 0, groesse_pt: 11.0, farbe: (0.0, 0.0, 0.0), strich_mm: 0.2,
+            schrift: 0, groesse_pt: 11.0, farbe: (0.0, 0.0, 0.0), strich_mm: 0.2, deck: 1.0,
             titel: String::new(), geladen: Vec::new(),
         };
         d.neue_seite();
@@ -216,10 +236,22 @@ impl Dokument {
 
     pub fn setze_strich(&mut self, mm: f64) { self.strich_mm = mm; }
 
-    pub fn text(&mut self, x: f64, y: f64, text: &str) -> Result<(), String> {
-        let (schrift, groesse_pt, farbe) = (self.schrift, self.groesse_pt, self.farbe);
+    /// Deckkraft 0..1 fuer alles Folgende; ausserhalb ist ein Fehler, weil
+    /// ein 35 statt 0.35 sonst still deckend waere.
+    pub fn setze_deckkraft(&mut self, d: f64) -> Result<(), String> {
+        if !(0.0..=1.0).contains(&d) {
+            return Err(format!("die Deckkraft geht von 0 bis 1, nicht {}", d));
+        }
+        self.deck = d;
+        Ok(())
+    }
+
+    pub fn deckkraft(&self) -> f64 { self.deck }
+
+    pub fn text(&mut self, x: f64, y: f64, text: &str, winkel: f64) -> Result<(), String> {
+        let (schrift, groesse_pt, farbe, deck) = (self.schrift, self.groesse_pt, self.farbe, self.deck);
         zeichen_pruefen(self.schrift_daten(schrift), &self.schrift_name(schrift), text)?;
-        self.hier().ops.push(Op::Text { x, y, text: text.to_string(), schrift, groesse_pt, farbe });
+        self.hier().ops.push(Op::Text { x, y, text: text.to_string(), schrift, groesse_pt, farbe, winkel, deck });
         Ok(())
     }
 
@@ -231,15 +263,33 @@ impl Dokument {
     }
 
     pub fn linie(&mut self, x1: f64, y1: f64, x2: f64, y2: f64) {
-        let (farbe, breite_mm) = (self.farbe, self.strich_mm);
-        self.hier().ops.push(Op::Linie { x1, y1, x2, y2, breite_mm, farbe });
+        let (farbe, breite_mm, deck) = (self.farbe, self.strich_mm, self.deck);
+        self.hier().ops.push(Op::Linie { x1, y1, x2, y2, breite_mm, farbe, deck });
     }
 
     /// Rechteck von (x,y) mit Breite/Hoehe -- `fuellen` entscheidet zwischen
     /// Flaeche und Umriss.
     pub fn rechteck(&mut self, x: f64, y: f64, b: f64, h: f64, fuellen: bool) {
-        let (farbe, breite_mm) = (self.farbe, self.strich_mm);
-        self.hier().ops.push(Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe });
+        let (farbe, breite_mm, deck) = (self.farbe, self.strich_mm, self.deck);
+        self.hier().ops.push(Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe, deck });
+    }
+
+    /// Kreis um (x, y) mit Radius r (mm); ein Radius <= 0 ist ein Fehler.
+    pub fn kreis(&mut self, x: f64, y: f64, r: f64, fuellen: bool) -> Result<(), String> {
+        if !(r > 0.0) { return Err(format!("der Radius muss groesser als 0 sein, nicht {}", r)); }
+        let (farbe, breite_mm, deck) = (self.farbe, self.strich_mm, self.deck);
+        self.hier().ops.push(Op::Kreis { x, y, r, fuellen, breite_mm, farbe, deck });
+        Ok(())
+    }
+
+    /// Geschlossenes Vieleck aus den Punkten (mm).
+    pub fn vieleck(&mut self, punkte: Vec<(f64, f64)>, fuellen: bool) -> Result<(), String> {
+        if punkte.len() < 3 {
+            return Err(format!("ein Vieleck braucht mindestens drei Punkte, nicht {}", punkte.len()));
+        }
+        let (farbe, breite_mm, deck) = (self.farbe, self.strich_mm, self.deck);
+        self.hier().ops.push(Op::Vieleck { punkte, fuellen, breite_mm, farbe, deck });
+        Ok(())
     }
 
     /// Ein Bild (RGBA) in das Rechteck x/y/b/h setzen; `h` <= 0 = nach dem
@@ -250,7 +300,8 @@ impl Dokument {
         }
         if !(b > 0.0) { return Err(format!("die Breite muss groesser als 0 sein, nicht {}", b)); }
         let h = if h > 0.0 { h } else { b * ph as f64 / pw as f64 };
-        self.hier().ops.push(Op::Bild { x, y, b, h, rgba: Arc::new(rgba), pw, ph });
+        let deck = self.deck;
+        self.hier().ops.push(Op::Bild { x, y, b, h, rgba: Arc::new(rgba), pw, ph, deck });
         Ok(())
     }
 
@@ -274,6 +325,18 @@ impl Dokument {
         let fuellung = |f| Fill { paint: farbe(f).into(), ..Default::default() };
         let strich = |f, mm: f64| Stroke { paint: farbe(f).into(), width: (mm * MM) as f32, ..Default::default() };
         let p = |v: f64| (v * MM) as f32;
+        // Flaeche oder Umriss -- dieselbe Entscheidung fuer Rechteck, Kreis und
+        // Vieleck.
+        let malen = |fl: &mut krilla::surface::Surface<'_>, pfad: &krilla::geom::Path, fuellen: bool, f: (f64, f64, f64), mm: f64| {
+            if fuellen {
+                fl.set_stroke(None);
+                fl.set_fill(Some(fuellung(f)));
+            } else {
+                fl.set_fill(None);
+                fl.set_stroke(Some(strich(f, mm)));
+            }
+            fl.draw_path(pfad);
+        };
 
         let mut doc = krilla::Document::new();
         let mut angaben = Metadata::new().producer("Drachenhauch".to_string());
@@ -287,8 +350,20 @@ impl Dokument {
             let mut seite = doc.start_page_with(einstellung);
             let mut flaeche = seite.surface();
             for op in &s.ops {
+                let deck = match op {
+                    Op::Text { deck, .. } | Op::Linie { deck, .. } | Op::Rechteck { deck, .. }
+                    | Op::Kreis { deck, .. } | Op::Vieleck { deck, .. } | Op::Bild { deck, .. } => *deck,
+                };
+                // Jeder Befehl mit eigener Deckkraft ist eine eigene Gruppe:
+                // was er ueberdeckt, scheint durch, sich selbst ueberdeckt er
+                // nicht doppelt.
+                let durchsicht = deck < 1.0;
+                if durchsicht {
+                    flaeche.push_opacity(krilla::num::NormalizedF32::new(deck.clamp(0.0, 1.0) as f32)
+                        .unwrap_or(krilla::num::NormalizedF32::ONE));
+                }
                 match op {
-                    Op::Text { x, y, text, schrift, groesse_pt, farbe: f } => {
+                    Op::Text { x, y, text, schrift, groesse_pt, farbe: f, winkel, .. } => {
                         if schriften[*schrift].is_none() {
                             schriften[*schrift] = Some(Font::new(self.schrift_data(*schrift), 0)
                                 .ok_or_else(|| format!("die Schrift '{}' laesst sich nicht einbetten", self.schrift_name(*schrift)))?);
@@ -296,13 +371,20 @@ impl Dokument {
                         let font = schriften[*schrift].clone().unwrap();
                         flaeche.set_stroke(None);
                         flaeche.set_fill(Some(fuellung(*f)));
+                        // krilla zaehlt y nach unten: gegen den Uhrzeigersinn
+                        // ist dort ein negativer Winkel.
+                        let gedreht = *winkel != 0.0;
+                        if gedreht {
+                            flaeche.push_transform(&krilla::geom::Transform::from_rotate_at(-*winkel as f32, p(*x), p(*y)));
+                        }
                         // Die Y-Angabe des Programms meint die OBERKANTE der
                         // Zeile, krilla setzt auf die Grundlinie -- also um die
                         // Schriftgroesse nach unten ruecken.
                         flaeche.draw_text(Point::from_xy(p(*x), p(*y) + *groesse_pt as f32),
                                           font, *groesse_pt as f32, text, false, TextDirection::Auto);
+                        if gedreht { flaeche.pop(); }
                     }
-                    Op::Linie { x1, y1, x2, y2, breite_mm, farbe: f } => {
+                    Op::Linie { x1, y1, x2, y2, breite_mm, farbe: f, .. } => {
                         let mut pb = PathBuilder::new();
                         pb.move_to(p(*x1), p(*y1));
                         pb.line_to(p(*x2), p(*y2));
@@ -312,7 +394,7 @@ impl Dokument {
                             flaeche.draw_path(&pfad);
                         }
                     }
-                    Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe: f } => {
+                    Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe: f, .. } => {
                         let mut pb = PathBuilder::new();
                         pb.move_to(p(*x), p(*y));
                         pb.line_to(p(*x + *b), p(*y));
@@ -320,17 +402,35 @@ impl Dokument {
                         pb.line_to(p(*x), p(*y + *h));
                         pb.close();
                         if let Some(pfad) = pb.finish() {
-                            if *fuellen {
-                                flaeche.set_stroke(None);
-                                flaeche.set_fill(Some(fuellung(*f)));
-                            } else {
-                                flaeche.set_fill(None);
-                                flaeche.set_stroke(Some(strich(*f, *breite_mm)));
-                            }
-                            flaeche.draw_path(&pfad);
+                            malen(&mut flaeche, &pfad, *fuellen, *f, *breite_mm);
                         }
                     }
-                    Op::Bild { x, y, b, h, rgba, pw, ph } => {
+                    Op::Kreis { x, y, r, fuellen, breite_mm, farbe: f, .. } => {
+                        // vier Bezier-Viertel; k = 4/3 * (sqrt(2) - 1) haelt den
+                        // Radius in der Mitte jedes Viertels auf 0,03 % genau
+                        let (cx, cy, rr) = (p(*x), p(*y), p(*r));
+                        let k = 0.552_284_8_f32 * rr;
+                        let mut pb = PathBuilder::new();
+                        pb.move_to(cx + rr, cy);
+                        pb.cubic_to(cx + rr, cy + k, cx + k, cy + rr, cx, cy + rr);
+                        pb.cubic_to(cx - k, cy + rr, cx - rr, cy + k, cx - rr, cy);
+                        pb.cubic_to(cx - rr, cy - k, cx - k, cy - rr, cx, cy - rr);
+                        pb.cubic_to(cx + k, cy - rr, cx + rr, cy - k, cx + rr, cy);
+                        pb.close();
+                        if let Some(pfad) = pb.finish() {
+                            malen(&mut flaeche, &pfad, *fuellen, *f, *breite_mm);
+                        }
+                    }
+                    Op::Vieleck { punkte, fuellen, breite_mm, farbe: f, .. } => {
+                        let mut pb = PathBuilder::new();
+                        pb.move_to(p(punkte[0].0), p(punkte[0].1));
+                        for q in &punkte[1..] { pb.line_to(p(q.0), p(q.1)); }
+                        pb.close();
+                        if let Some(pfad) = pb.finish() {
+                            malen(&mut flaeche, &pfad, *fuellen, *f, *breite_mm);
+                        }
+                    }
+                    Op::Bild { x, y, b, h, rgba, pw, ph, .. } => {
                         let bild = krilla::image::Image::from_rgba8(rgba.as_ref().clone(), *pw, *ph);
                         if let Some(groesse) = krilla::geom::Size::from_wh(p(*b), p(*h)) {
                             flaeche.push_transform(&krilla::geom::Transform::from_translate(p(*x), p(*y)));
@@ -339,6 +439,7 @@ impl Dokument {
                         }
                     }
                 }
+                if durchsicht { flaeche.pop(); }
             }
             flaeche.finish();
             seite.finish();
@@ -390,8 +491,8 @@ mod tests {
     #[test]
     fn fehlendes_zeichen_ist_ein_fehler() {
         let mut d = Dokument::neu(210.0, 297.0);
-        assert!(d.text(20.0, 25.0, "Grüße, Ωμέγα, Привет, 1 € \u{2713}").is_ok());
-        let e = d.text(20.0, 25.0, "中").unwrap_err();
+        assert!(d.text(20.0, 25.0, "Grüße, Ωμέγα, Привет, 1 € \u{2713}", 0.0).is_ok());
+        let e = d.text(20.0, 25.0, "中", 0.0).unwrap_err();
         assert!(e.contains("kein Zeichen") && e.contains("U+4E2D"), "{}", e);
         assert!(d.textbreite("中").is_err());
     }
@@ -420,7 +521,7 @@ mod tests {
     fn seiten_zaehlen_und_titel_steht_drin() {
         let mut d = Dokument::neu(210.0, 297.0);
         d.titel = "Rechnung 4711".into();
-        d.text(20.0, 25.0, "eins").unwrap();
+        d.text(20.0, 25.0, "eins", 0.0).unwrap();
         d.neue_seite();
         d.neue_seite();
         d.linie(20.0, 45.0, 190.0, 45.0);
@@ -433,7 +534,7 @@ mod tests {
     #[test]
     fn zweimal_bauen_gibt_dieselben_bytes() {
         let mut d = Dokument::neu(210.0, 297.0);
-        d.text(20.0, 25.0, "gleich").unwrap();
+        d.text(20.0, 25.0, "gleich", 0.0).unwrap();
         assert_eq!(d.bauen().unwrap(), d.bauen().unwrap());
     }
 }

@@ -353,3 +353,165 @@ PRINT PDF_PAGE_COUNT(q)
 2
 3
 2
+
+=== kreis und vieleck stehen als pfade im pdf
+' Ein Kreis sind vier Bezier-Viertel (c), ein Vieleck Linien (l); gefuellt mit
+' f, als Umriss mit S. Gelesen ueber die Woerter des Inhaltsstroms.
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_CIRCLE_FILL(p, 50, 50, 10)
+PDF_CIRCLE(p, 100, 50, 10)
+PDF_POLYGON_FILL(p, [20.0, 40, 30], [100.0, 100, 120])
+PDF_POLYGON(p, [60, 80, 80, 60], [100, 100, 120, 120])
+PDF_SAVE(p, "a.pdf")
+--- datei pdftext.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+
+--- nachher
+IMPORT "pdftext.dh"
+DIM s AS ARRAY OF STRING : s = pdfSeiten("a.pdf")
+DIM w AS ARRAY OF STRING : w = pdfWoerter()
+PRINT "kurven "; pdfWortZahl(w, "c"); " linien "; pdfWortZahl(w, "l")
+PRINT "gefuellt "; pdfWortZahl(w, "f"); " umriss "; pdfWortZahl(w, "S")
+' der Mittelpunkt des ersten Kreises: 50 mm -> 141.73228 pt, rechts davon
+' beginnt der Pfad (Mitte + Radius = 60 mm -> 170.07874 pt)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(w) - 1
+    IF w[i] = "m" THEN
+        PRINT "erster pfad ab "; w[i - 2]; " "; w[i - 1]
+        EXIT FOR
+    END IF
+NEXT
+--- erwartet
+kurven 8 linien 5
+gefuellt 2 umriss 2
+erster pfad ab 170.07874 141.73228
+
+=== deckkraft steht als durchsicht im pdf
+' PDF_OPACITY gilt fuer alles Folgende, auch ueber den Seitenwechsel; im PDF
+' ein ExtGState mit /ca (Flaeche) und /CA (Strich).
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PRINT "vorgabe "; PDF_GET_OPACITY(p)
+PDF_RECT_FILL(p, 20, 20, 10, 10)
+PDF_OPACITY(p, 0.35)
+PDF_TEXT(p, 20, 50, "ENTWURF")
+PDF_PAGE(p)
+PRINT "nach pdf_page "; PDF_GET_OPACITY(p)
+PDF_OPACITY(p, 1)
+PDF_RECT_FILL(p, 20, 20, 10, 10)
+PDF_SAVE(p, "a.pdf")
+--- datei pdftext.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+
+--- nachher
+IMPORT "pdftext.dh"
+DIM s AS ARRAY OF STRING : s = pdfSeiten("a.pdf")
+DIM w AS ARRAY OF STRING : w = pdfWoerter()
+DIM i AS INTEGER, ca AS STRING, gross AS STRING
+FOR i = 0 TO LEN(w) - 2
+    IF w[i] = "/ca" THEN ca = ca + w[i + 1] + " "
+    IF w[i] = "/CA" THEN gross = gross + w[i + 1] + " "
+NEXT
+PRINT "ca "; ca; "/ CA "; TRIM$(gross)
+PRINT "gruppen "; pdfWortZahl(w, "gs"); " formulare "; pdfWortZahl(w, "Do")
+--- erwartet
+ca 0.35 / CA 0.35
+gruppen 1 formulare 1
+
+=== deckkraft gilt ueber den seitenwechsel und nur von 0 bis 1
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PRINT "vorgabe "; PDF_GET_OPACITY(p)
+PDF_OPACITY(p, 0.35)
+PDF_PAGE(p)
+PRINT "nach pdf_page "; PDF_GET_OPACITY(p)
+TRY
+    PDF_OPACITY(p, 35)
+CATCH e
+    PRINT e
+END TRY
+PRINT "bleibt "; PDF_GET_OPACITY(p)
+--- erwartet
+vorgabe 1.0
+nach pdf_page 0.35
+PDF_OPACITY: die Deckkraft geht von 0 bis 1, nicht 35
+bleibt 0.35
+
+=== gedrehter text dreht um seine linke obere ecke
+' krilla rechnet die Drehung mit dem Kippen der Seite (y nach unten -> nach
+' oben) in EINE Matrix: gegen den Uhrzeigersinn steht dort cos sin sin -cos.
+' Sie bildet den Ankerpunkt (x, y) auf seinen Ort im PDF ab, (x, H - y).
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_TEXT(p, 50, 100, "Achse", 90)
+PDF_TEXT(p, 50, 100, "Schraeg", 30)
+PDF_TEXT(p, 50, 100, "Gerade")
+PDF_SAVE(p, "a.pdf")
+--- datei pdftext.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+
+--- nachher
+IMPORT "pdftext.dh"
+DIM s AS ARRAY OF STRING : s = pdfSeiten("a.pdf")
+DIM w AS ARRAY OF STRING : w = pdfWoerter()
+DIM i AS INTEGER
+FUNCTION r$(t AS STRING) AS STRING
+    RETURN FORMAT$(VAL(t), "%.3f")
+END FUNCTION
+FOR i = 6 TO LEN(w) - 1
+    IF w[i] = "cm" AND w[i - 6] <> "1" THEN
+        DIM a AS FLOAT : a = VAL(w[i - 6])
+        DIM b AS FLOAT : b = VAL(w[i - 5])
+        DIM x AS FLOAT : x = 50 * 72 / 25.4
+        DIM y AS FLOAT : y = 100 * 72 / 25.4
+        DIM nx AS FLOAT : nx = a * x + VAL(w[i - 4]) * y + VAL(w[i - 2])
+        DIM ny AS FLOAT : ny = b * x + VAL(w[i - 3]) * y + VAL(w[i - 1])
+        PRINT r$(w[i - 6]); " "; r$(w[i - 5]); " "; r$(w[i - 4]); " "; r$(w[i - 3]); " fest "; ABS(nx - x) < 0.01 AND ABS(ny - (841.8898 - y)) < 0.01
+    END IF
+NEXT
+PRINT "texte "; LEN(SPLIT$(s[0], CHR$(10)))
+--- erwartet
+-0.000 1.000 1.000 0.000 fest TRUE
+0.866 0.500 0.500 -0.866 fest TRUE
+texte 4
+
+=== kreis und vieleck melden falsche angaben
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+TRY
+    PDF_CIRCLE(p, 10, 10, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PDF_POLYGON_FILL(p, [1.0, 2], [1.0, 2])
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PDF_POLYGON(p, [1.0, 2, 3], [1.0, 2])
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PDF_POLYGON(p, "x", [1.0])
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PDF_TEXT(p, 0, 0, "x", 1, 2)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+PDF_CIRCLE: der Radius muss groesser als 0 sein, nicht 0
+PDF_POLYGON_FILL: ein Vieleck braucht mindestens drei Punkte, nicht 2
+PDF_POLYGON: xs und ys muessen gleich lang sein (3 gegen 2)
+PDF_POLYGON: erwartet 1D ARRAY OF FLOAT
+PDF_TEXT: erwartet 4 oder 5 Argumente (pdf, x, y, text$ [, winkel]), nicht 6

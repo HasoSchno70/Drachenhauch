@@ -5063,34 +5063,94 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         let f = breite_px as f64 / breite_mm.max(1.0);
         let hoehe_px = ((hoehe_mm * f).round() as i32).max(1);
         let mut img = Image::gen_image_color(breite_px, hoehe_px, Color::WHITE);
-        let farbe = |c: (f64, f64, f64)| Color::new((c.0 * 255.0) as u8, (c.1 * 255.0) as u8, (c.2 * 255.0) as u8, 255);
+        // Durchsicht kennt die Vorschau nicht -- die Farbe wird gegen das
+        // weisse Papier gemischt (dasselbe Bild, solange darunter nichts liegt).
+        let farbe = |c: (f64, f64, f64), d: f64| {
+            let c = crate::pdf::gegen_weiss(c, d);
+            Color::new((c.0 * 255.0).round() as u8, (c.1 * 255.0).round() as u8, (c.2 * 255.0).round() as u8, 255)
+        };
         let px = |mm: f64| (mm * f).round() as i32;
+        let (bw, bh) = (img.width, img.height);
         for op in ops {
             match op {
-                Op::Text { x, y, text, groesse_pt, farbe: c, .. } => {
-                    let groesse = ((groesse_pt * 25.4 / 72.0) * f).round() as i32;
-                    img.draw_text(text, px(*x), px(*y), groesse.max(4), farbe(*c));
-                }
-                Op::Linie { x1, y1, x2, y2, farbe: c, .. } => {
-                    img.draw_line(px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c));
-                }
-                Op::Rechteck { x, y, b, h, fuellen, farbe: c, .. } => {
-                    if *fuellen {
-                        img.draw_rectangle(px(*x), px(*y), px(*b).max(1), px(*h).max(1), farbe(*c));
-                    } else {
-                        img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c));
+                Op::Text { x, y, text, groesse_pt, farbe: c, winkel, deck, .. } => {
+                    let groesse = (((groesse_pt * 25.4 / 72.0) * f).round() as i32).max(4);
+                    if *winkel == 0.0 {
+                        img.draw_text(text, px(*x), px(*y), groesse, farbe(*c, *deck));
+                        continue;
+                    }
+                    // gedreht: den Text als Bild setzen und Punkt fuer Punkt
+                    // um (x, y) gedreht hineinmischen (gegen den Uhrzeigersinn;
+                    // y zeigt nach unten)
+                    let mut t = Image::image_text(text, groesse, farbe(*c, *deck));
+                    t.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+                    let (tw, th) = (t.width, t.height);
+                    let quelle = unsafe { std::slice::from_raw_parts(t.data as *const u8, (tw * th * 4).max(0) as usize) };
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, (bw * bh * 4).max(0) as usize) };
+                    let (sn, cs) = (winkel.to_radians().sin(), winkel.to_radians().cos());
+                    let (ax, ay) = (*x * f, *y * f);
+                    let ecken = [(0.0, 0.0), (tw as f64, 0.0), (0.0, th as f64), (tw as f64, th as f64)];
+                    let lage: Vec<(f64, f64)> = ecken.iter().map(|(u, v)| (ax + u * cs + v * sn, ay - u * sn + v * cs)).collect();
+                    let x0 = lage.iter().map(|q| q.0).fold(f64::INFINITY, f64::min).floor().max(0.0) as i32;
+                    let x1 = lage.iter().map(|q| q.0).fold(f64::NEG_INFINITY, f64::max).ceil().min(bw as f64 - 1.0) as i32;
+                    let y0 = lage.iter().map(|q| q.1).fold(f64::INFINITY, f64::min).floor().max(0.0) as i32;
+                    let y1 = lage.iter().map(|q| q.1).fold(f64::NEG_INFINITY, f64::max).ceil().min(bh as f64 - 1.0) as i32;
+                    for yy in y0..=y1 {
+                        for xx in x0..=x1 {
+                            let (dx, dy) = (xx as f64 + 0.5 - ax, yy as f64 + 0.5 - ay);
+                            let u = (dx * cs - dy * sn).floor() as i32;
+                            let v = (dx * sn + dy * cs).floor() as i32;
+                            if u < 0 || v < 0 || u >= tw || v >= th { continue; }
+                            let q = ((v * tw + u) * 4) as usize;
+                            let al = quelle[q + 3] as u32;
+                            if al == 0 { continue; }
+                            let z = ((yy * bw + xx) * 4) as usize;
+                            for k in 0..3 {
+                                ziel[z + k] = ((quelle[q + k] as u32 * al + ziel[z + k] as u32 * (255 - al)) / 255) as u8;
+                            }
+                        }
                     }
                 }
-                Op::Bild { x, y, b, h, rgba, pw, ph } => {
+                Op::Linie { x1, y1, x2, y2, farbe: c, deck, .. } => {
+                    img.draw_line(px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c, *deck));
+                }
+                Op::Rechteck { x, y, b, h, fuellen, farbe: c, deck, .. } => {
+                    if *fuellen {
+                        img.draw_rectangle(px(*x), px(*y), px(*b).max(1), px(*h).max(1), farbe(*c, *deck));
+                    } else {
+                        img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c, *deck));
+                    }
+                }
+                Op::Kreis { x, y, r, fuellen, farbe: c, deck, .. } => {
+                    let k = farbe(*c, *deck);
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, (bw * bh * 4).max(0) as usize) };
+                    if let Some(mut l) = crate::leinwand::Leinwand::neu(ziel, bw, bh) {
+                        // die Leinwand zaehlt an Punktmitten, das Blatt an Kanten
+                        let (cx, cy, rr) = ((*x * f - 0.5) as f32, (*y * f - 0.5) as f32, (*r * f) as f32);
+                        if *fuellen { l.ellipse(cx, cy, rr, rr, [k.r, k.g, k.b, 255]); }
+                        else { l.ring(cx, cy, rr, 1.0, [k.r, k.g, k.b, 255]); }
+                    }
+                }
+                Op::Vieleck { punkte, fuellen, farbe: c, deck, .. } => {
+                    let k = farbe(*c, *deck);
+                    let ziel = unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, (bw * bh * 4).max(0) as usize) };
+                    if let Some(mut l) = crate::leinwand::Leinwand::neu(ziel, bw, bh) {
+                        let mut pkt: Vec<(f32, f32)> = punkte.iter().map(|q| ((q.0 * f - 0.5) as f32, (q.1 * f - 0.5) as f32)).collect();
+                        if *fuellen { l.vieleck(&pkt, [k.r, k.g, k.b, 255]); }
+                        else { pkt.push(pkt[0]); l.linie(&pkt, 1.0, [k.r, k.g, k.b, 255]); }
+                    }
+                }
+                Op::Bild { x, y, b, h, rgba, pw, ph, deck } => {
                     let mut quelle = Image::gen_image_color(*pw as i32, *ph as i32, Color::BLANK);
                     quelle.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
                     let n = rgba.len();
                     let ziel = unsafe { std::slice::from_raw_parts_mut(quelle.data as *mut u8, n) };
                     ziel.copy_from_slice(rgba);
+                    let a = (deck.clamp(0.0, 1.0) * 255.0).round() as u8;
                     img.draw(&quelle,
                         Rectangle::new(0.0, 0.0, *pw as f32, *ph as f32),
                         Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32),
-                        Color::WHITE);
+                        Color::new(255, 255, 255, a));
                 }
             }
         }
