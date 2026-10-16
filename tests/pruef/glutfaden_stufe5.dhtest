@@ -1955,3 +1955,1427 @@ entsprechung DMC: 310 347 307 562 518 8000
 
 --- erwartet
 gleich (41 Zeilen)
+
+=== bild: zellmitten wie pysticky
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+' Die Beilagen hat PyStickys ImageExporter geschrieben (Zelle 20, ohne Raster
+' und Symbole). Verglichen wird die Mitte jeder Zelle. Beim Probemuster liegen
+' zwei Mitten auf einer Kante (Diagonale eines Halbstichs, Ende eines
+' Rueckstichs mit Schatten), die Qt glaettet -- sonst ist alles gleich.
+FUNCTION mitten(m AS kern.Muster, unser AS STRING, ihr AS STRING) AS STRING
+    DIM a AS IMAGE : a = LOADIMAGE(unser)
+    DIM b AS IMAGE : b = LOADIMAGE(ihr)
+    DIM x AS INTEGER, y AS INTEGER, n AS INTEGER
+    FOR y = 0 TO m.hoehe - 1
+        FOR x = 0 TO m.breite - 1
+            IF GETPIXEL(a, x * 20 + 10, y * 20 + 10) <> GETPIXEL(b, x * 20 + 10, y * 20 + 10) THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN STR$(IMAGE_WIDTH(a)) + "x" + STR$(IMAGE_HEIGHT(a)) + " gegen " + STR$(IMAGE_WIDTH(b)) + "x" + STR$(IMAGE_HEIGHT(b)) + ", abweichend " + STR$(n) + " von " + STR$(m.breite * m.hoehe)
+END FUNCTION
+DIM d AS kern.Muster : d = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
+kern.bildExportieren(d, "demo.png", 20, FALSE, FALSE)
+PRINT "demo: "; mitten(d, "demo.png", "demo_py_nackt.png")
+DIM p AS kern.Muster : p = kern.pxsLaden("probe.pxs")
+kern.bildExportieren(p, "probe.png", 20, FALSE, FALSE)
+PRINT "probe: "; mitten(p, "probe.png", "probe_py_nackt.png")
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- datei demo_py_nackt.png base64
+iVBORw0KGgoAAAANSUhEUgAAAyAAAAMgCAYAAADbcAZoAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAS
+KklEQVR4nO3ZvY2bVxBAUcn4GLICZmyCPSiwwcCRC3ENLmQjBYQ3cA9sghkrIJQsAym1AUOWgbf3
+8eecAgbDXQKPF/Px7e3L1w8AAACBn2YvAAAAPA8BAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQI
+AACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkB
+AgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBG
+gAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQ
+ESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAA
+ZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAA
+ABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAA
+AEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQI
+AACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkB
+AgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQWWYvwD/98sfr7BUAAB7Kn7//PHsF/sYFBAAA
+yAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEA
+ADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAIDMMnsB3tdfv/42dN51exk6DwC4
+f6vTeui8T59fhs7jtriAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaA
+AAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJBZ
+Zi/A+7puL0PnrU7rofNG7wcA/Lfbf89fB8/jlriAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQEC
+AABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaA
+AAAAGQECAABkBAgAAJBZZi/AfbluL0PnrU7rofNG7wcAt8B7ySNxAQEAADICBAAAyAgQAAAgI0AA
+AICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQ
+AAAgI0AAAICMAAEAADICBAAAyAgQAAAgs8xegOd23V5mrwAAN897ySNxAQEAADICBAAAyAgQAAAg
+I0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAA
+yAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgs8xegOe2Oq2HzrtuL0PnAcAt8F7ySFxAAACAjAAB
+AAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNA
+AACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgssxfguV23l9krAMDN817ySFxAAACA
+jAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAA
+ICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgssxcAeBSHzW72Ct+1Px9nr/Bd
+/n4Az8EFBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAg
+I0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAIDMMnsBgFkOm93s
+FVLP9nlHG/3325+PQ+cB3AsXEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQA
+AMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAAB
+AAAyy+wFAH7UYbObvQIMM/r7vD8fh84DeC8uIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAA
+GQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAA
+QEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgA
+AJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQEC
+AABkltkLAPyo/fk4dN5hsxs6D/6P0d9ngHvhAgIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAA
+kBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIA
+AGQECAAAkBEgAABAZpm9AMAs+/Nx6LzDZjd0Hrdl9PcF4Fm5gAAAABkBAgAAZAQIAACQESAAAEBG
+gAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQESAAAEBGgAAAABkBAgAAZAQIAACQ
+ESAAAEBGgAAAABkBAgAAZAQIAACQWWYvAPAo9ufj0HmHzW7ovGcz+v8BwBguIAAAQEaAAAAAGQEC
+AABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaA
+AAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkltkLAPDv9ufj0HmHzW7ovNFGf14AbpMLCAAA
+kBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIA
+AGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAACZZfYCADT25+PsFQDABQQAAOgI
+EAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAy
+AgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACA
+jAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAA
+ICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQA
+AMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAAB
+AAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNA
+AACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgI
+EAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAy
+AgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACA
+zDJ7AQDu0+q0Hjrvur0MnQfAbXIBAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAj
+QAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADI
+CBAAACCzzF4AgPt03V5mrwDAHXIBAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAj
+QAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADI
+CBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAA
+MgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAA
+gIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAA
+ACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIE
+AADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwA
+AQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACCzzF6A57Y6rYfOu24vQ+cBwC3wXvJI
+XEAAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAA
+yAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEA
+ADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyAgQAAAgI0AA
+AICMAAEAADICBAAAyAgQAAAgI0AAAICMAAEAADICBAAAyCyzF+C+rE7rofOu28vQeQDwiEa/l95z
+ZnIBAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAA
+ACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACCzzF6A97U6rYfOu24v
+Q+cBAL3R7/no3xsfPrwMnsctcQEBAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNA
+AACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgIEAAAICNAAACAjAABAAAyAgQAAMgI
+EAAAILPMXoD39enzy+CJr4PnAQD3b/TvDR6ZCwgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAA
+QEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgA
+AJARIAAAQEaAAAAAmY9vb1++zl4CAAB4Di4gAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZ
+AQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABA
+RoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAA
+kBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIA
+AGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAA
+AAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEg
+AABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQE
+CAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZ
+AQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGQECAAAkBEgAABA
+RoAAAAAZAQIAAGQECAAAkBEgAABARoAAAAAZAQIAAGS+AfnLd/9q/eqLAAAAAElFTkSuQmCC
+
+--- datei probe_py_nackt.png base64
+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
+CMCJHaP3AAAAAElFTkSuQmCC
+
+--- erwartet
+demo: 800x800 gegen 800x800, abweichend 0 von 1600
+probe: 240x180 gegen 240x180, abweichend 2 von 108
+
+=== bild: teilstiche, knoten und perle wie pysticky
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+' Je Kaestchen die Punkte, die nicht Stoff sind -- gegen PyStickys Bild. Ohne
+' Kantenglaettung weichen sie etwas ab; verlangt ist hoechstens ein Fuenftel
+' (der Knoten ist der knappste: 44 gegen 52).
+FUNCTION punkte(b AS IMAGE, cx AS INTEGER, cy AS INTEGER) AS INTEGER
+    DIM n AS INTEGER, x AS INTEGER, y AS INTEGER
+    FOR y = cy * 20 TO cy * 20 + 19
+        FOR x = cx * 20 TO cx * 20 + 19
+            IF GETPIXEL(b, x, y) <> &HFAFAF5 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+DIM p AS kern.Muster : p = kern.pxsLaden("probe.pxs")
+kern.bildExportieren(p, "probe.png", 20, FALSE, FALSE)
+DIM a AS IMAGE : a = LOADIMAGE("probe.png")
+DIM b AS IMAGE : b = LOADIMAGE("probe_py_nackt.png")
+DIM zellen AS ARRAY OF INTEGER : zellen = [1, 2, 2, 2, 3, 2, 4, 2, 5, 2, 6, 2, 7, 2, 1, 4, 3, 4]
+DIM namen AS ARRAY OF STRING : namen = ["halb 1", "halb 2", "viertel ol", "viertel or", "viertel ul", "viertel ur", "dreiviertel", "knoten", "perle"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    DIM u AS INTEGER : u = punkte(a, zellen[i * 2], zellen[i * 2 + 1])
+    DIM s AS INTEGER : s = punkte(b, zellen[i * 2], zellen[i * 2 + 1])
+    PRINT namen[i]; ": "; ABS(u - s) * 5 <= s
+NEXT
+' die Perle hat ihren Glanzpunkt: oben links heller als die Mitte
+PRINT "glanz: "; GETPIXEL(a, 3 * 20 + 7, 4 * 20 + 7) <> GETPIXEL(a, 3 * 20 + 10, 4 * 20 + 12)
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- datei probe_py_nackt.png base64
+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
+CMCJHaP3AAAAAElFTkSuQmCC
+
+--- erwartet
+halb 1: TRUE
+halb 2: TRUE
+viertel ol: TRUE
+viertel or: TRUE
+viertel ul: TRUE
+viertel ur: TRUE
+dreiviertel: TRUE
+knoten: TRUE
+perle: TRUE
+glanz: TRUE
+
+=== bild: raster, symbole, formate und drills
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+DIM p AS kern.Muster : p = kern.pxsLaden("probe.pxs")
+kern.bildExportieren(p, "mit.png", 20, TRUE, TRUE)
+kern.bildExportieren(p, "ohne.png", 20, FALSE, FALSE)
+DIM a AS IMAGE : a = LOADIMAGE("mit.png")
+DIM o AS IMAGE : o = LOADIMAGE("ohne.png")
+' Raster: jede Linie hellgrau, jede zehnte dunkler (auch die erste)
+PRINT "raster: "; HEX$(GETPIXEL(a, 20, 175)); " "; HEX$(GETPIXEL(a, 200, 175)); " "; HEX$(GETPIXEL(a, 0, 175)); " ohne: "; HEX$(GETPIXEL(o, 20, 175))
+' Symbole: in einem schwarzen Kaestchen weisse Punkte (helles Garn -> schwarz)
+FUNCTION weisse(b AS IMAGE, cx AS INTEGER, cy AS INTEGER) AS INTEGER
+    DIM n AS INTEGER, x AS INTEGER, y AS INTEGER
+    FOR y = cy * 20 + 2 TO cy * 20 + 18
+        FOR x = cx * 20 + 2 TO cx * 20 + 18
+            IF GETPIXEL(b, x, y) = &HFFFFFF THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "symbol: "; weisse(a, 4, 0) > 10; " ohne: "; weisse(o, 4, 0)
+' andere Formate
+kern.bildExportieren(p, "bild.bmp", 8, TRUE, FALSE)
+kern.bildExportieren(p, "bild.jpg", 8, TRUE, FALSE)
+PRINT "bmp: "; IMAGE_WIDTH(LOADIMAGE("bild.bmp")); " jpg: "; IMAGE_HEIGHT(LOADIMAGE("bild.jpg"))
+TRY
+    kern.bildExportieren(p, "bild.gif", 8, TRUE, FALSE)
+CATCH e
+    PRINT e
+END TRY
+' Diamond: jeder Stich ein Drill mit hellerer oberer Facette, kein Rueckstich
+DIM d AS kern.Muster : d = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
+d.modus = "diamond"
+kern.bildExportieren(d, "drill.png", 20, FALSE, FALSE)
+DIM r AS IMAGE : r = LOADIMAGE("drill.png")
+DIM ob AS INTEGER : ob = GETPIXEL(r, 5 * 20 + 10, 5 * 20 + 4)
+DIM un AS INTEGER : un = GETPIXEL(r, 5 * 20 + 10, 5 * 20 + 16)
+PRINT "drill oben heller: "; kern.rotAnteil(ob) + kern.gruenAnteil(ob) + kern.blauAnteil(ob) > kern.rotAnteil(un) + kern.gruenAnteil(un) + kern.blauAnteil(un); " rand stoff: "; HEX$(GETPIXEL(r, 5 * 20, 5 * 20))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- erwartet
+raster: C8C8C8 8C8C8C 8C8C8C ohne: FAFAF5
+symbol: TRUE ohne: 0
+bmp: 96 jpg: 72
+Bild-Export: unbekannte Endung -- .png, .jpg oder .bmp
+drill oben heller: TRUE rand stoff: FAFAF5

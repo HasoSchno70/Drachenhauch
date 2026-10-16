@@ -17,4 +17,5 @@ IMPORT "auswahl.dh" AS kern
 IMPORT "bildimport.dh" AS kern
 IMPORT "export.dh" AS kern
 IMPORT "oxs.dh" AS kern
+IMPORT "bildexport.dh" AS kern
 IMPORT "pxs.dh" AS kern
