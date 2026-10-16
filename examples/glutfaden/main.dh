@@ -427,6 +427,7 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
             CASE &H72, &H52 : farbeErsetzenDialog()              ' Strg+R
             CASE &H65, &H45 : exportDialog()                     ' Strg+E
             CASE &H64, &H44 : modusUmschalten()                  ' Strg+D
+            CASE &H62, &H42 : blendDialog()                      ' Strg+B
             CASE &H69, &H49                                      ' Strg+I, Strg+Umschalt+I
                 IF umschalt THEN bildNeuImportieren() ELSE bildImportieren()
             CASE &H6E, &H4E                                      ' Strg+Umschalt+N

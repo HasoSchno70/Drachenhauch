@@ -117,6 +117,9 @@ SUB seitenleisteMuster(m AS kern.Muster)
     kn = slKnopf("Seltene zusammenlegen…", "Farben mit wenigen Stichen in die ähnlichste häufige übernehmen")
     signal(kn, "clicked", slFarbKnopf, 3, 0, 0)
     gtk_box_pack_start(fk2, kn, TRUE, TRUE, 0)
+    kn = slKnopf("Blend…", "Zwei Garne zu einem Tweed-Blend mischen (Strg+B)")
+    signal(kn, "clicked", slFarbKnopf, 4, 0, 0)
+    gtk_box_pack_start(fk2, kn, TRUE, TRUE, 0)
     DIM weg AS INTEGER : weg = slKnopf("Unbenutzte entfernen", "Farben ohne Stich und ohne Rückstich aus dem Muster nehmen")
     signal(weg, "clicked", slUnbenutzteEntfernen, 0, 0, 0)
     gtk_box_pack_start(fk2, weg, TRUE, TRUE, 0)
@@ -284,6 +287,7 @@ SUB slFarbKnopf(knopf AS INTEGER, nr AS INTEGER)
         CASE 1 : symbolDialog()
         CASE 2 : farbeAlsErledigt()
         CASE 3 : selteneDialog()
+        CASE 4 : blendDialog()
     END SELECT
 END SUB
 

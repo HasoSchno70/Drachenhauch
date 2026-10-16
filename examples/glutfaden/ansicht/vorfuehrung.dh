@@ -372,6 +372,16 @@ END FUNCTION
 ' (und wieder eingelesen) und das Paket, je in eine Datei neben die Fotos.
 DIM vfVorher AS STRING
 
+' Der Platz eines Garns in der Garnliste einer Palette des Blend-Dialogs.
+FUNCTION vfGarnNr(palWahl AS INTEGER, nummer AS STRING) AS INTEGER
+    DIM g AS ARRAY OF kern.Garn : g = slPaletten[blPal[gtk_combo_box_get_active(palWahl)]].garne
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(g) - 1
+        IF g[i].nummer = nummer THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
 FUNCTION vfZiel$(name AS STRING) AS STRING
     IF fotoZiel <> "" THEN RETURN fotoZiel + "_" + name
     RETURN PATHJOIN(TEMPDIR$(), "glutfaden_stufe5_" + name)
@@ -454,12 +464,31 @@ FUNCTION vorfuehrenStufe6(daten AS INTEGER) AS BOOLEAN
             PRINT "xsd: "; ok; " "; LEFT$(meldung, 36); " | farben "; lwMuster.farbanzahl(); " blend "; lwMuster.farben[2].garn.istBlend()
             foto("aus_xsd")
         CASE 3
+            ' Tweed-Blend: DMC 310 + DMC 321 (1:2), zweimal derselbe, dann 1:1
+            DIM bd AS INTEGER : bd = blDialogBauen()
+            gtk_combo_box_set_active(blGarnA, vfGarnNr(blPalA, "310"))
+            gtk_combo_box_set_active(blGarnB, vfGarnNr(blPalB, "321"))
+            gtk_spin_button_set_value(blStrB, 2)
+            PRINT "blend: "; REPLACE$(gtk_label_get_text(blText), CHR$(10), " | ")
+            IF fotoZiel <> "" THEN ok = gtkFoto(bd, fotoZiel + "_blend.png")
+            DIM n0 AS INTEGER : n0 = lwMuster.farbanzahl()
+            blUebernehmen()
+            DIM n1 AS INTEGER : n1 = lwMuster.farbanzahl()
+            blUebernehmen()
+            DIM n2 AS INTEGER : n2 = lwMuster.farbanzahl()
+            gtk_spin_button_set_value(blStrB, 1)
+            blUebernehmen()
+            PRINT "farben "; n0; " -> "; n1; " -> "; n2; " -> "; lwMuster.farbanzahl(); " | aktuell "; lwMuster.farben[wzFarbe].garn.name; " | rueckgaengig: "; wzVerlauf.textZurueck$()
+            gtk_widget_destroy(bd)
+        CASE 4
             DIM vorher AS STRING : vorher = lwMuster.farben[0].garn.hersteller + " " + lwMuster.farben[0].garn.nummer
             modusUmschalten()
             PRINT "diamond: "; lwMuster.modus; " stoff "; lwMuster.stoff; " | "; TEXT_AUS_ZEIGER$(gtk_button_get_label(kModus)); " | "; lwMuster.farben[0].garn.hersteller; " | verlauf leer "; NOT wzVerlauf.kannZurueck(); " ungesichert "; istGeaendert()
             foto("diamond")
             vfVorher = vorher
-        CASE 4
+            blendDialog()
+            PRINT "blend im diamond-modus: "; meldung
+        CASE 5
             modusUmschalten()
             PRINT "zurueck: "; lwMuster.modus; " stoff "; lwMuster.stoff; " | "; TEXT_AUS_ZEIGER$(gtk_button_get_label(kModus)); " | dasselbe garn "; lwMuster.farben[0].garn.hersteller + " " + lwMuster.farben[0].garn.nummer = vfVorher
         CASE ELSE

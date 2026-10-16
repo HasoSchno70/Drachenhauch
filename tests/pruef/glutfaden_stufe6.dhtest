@@ -371,7 +371,10 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 rueckgabe 0
 pat: Aus PCStitch eingelesen -- Siche | ebenen 2 stiche 7 rueckstiche 3 datei leer TRUE
 xsd: TRUE Aus Pattern Maker eingelesen -- Sich | farben 3 blend TRUE
+blend: DMC 310 / DMC 321 (1+2) | Mischfarbe #74161D
+farben 3 -> 3 -> 3 -> 4 | aktuell DMC 310 / DMC 321 (1+1) | rueckgaengig: Farbe hinzufügen
 diamond: diamond stoff 10.0 | ◆ Diamond | DMC Diamond Painting | verlauf leer TRUE ungesichert TRUE
+blend im diamond-modus: Im Diamond-Modus gibt es keine Blends -- ein Drill ist eine Farbe.
 zurueck: stitch stoff 18.0 | ✕ Kreuzstich | dasselbe garn TRUE
 fotos: TRUE TRUE TRUE
 
@@ -872,3 +875,38 @@ farbe 5 Winter white | DMC Diamond Painting | 3865 | #F9F7F1 | True False
 ebene 0 2:11=12 4:11=116
 ebene 1 1:11=52
 ebene 2 2:11=5
+
+=== blend: hinzufuegen erkennt denselben, nicht das andere verhaeltnis
+IMPORT "helfer.dh"
+' Wie PySticky add_color_to_pattern: dieselbe Nummer reicht bei Blends nicht,
+' das Strangverhaeltnis muss auch gleich sein; ohne Nummer zaehlt die Farbe.
+DIM m AS kern.Muster : m = NEW kern.Muster("t", 2, 2)
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM sy AS ARRAY OF STRING : sy = ["A", "B", "C", "D", "E"]
+DIM a AS kern.Garn : a = kern.neuesGarn("Black", &H0C0C0C, "DMC", "310")
+DIM b AS kern.Garn : b = kern.neuesGarn("Red", &HC72B3B, "DMC", "321")
+PRINT kern.farbeHinzufuegen(m, v, kern.garnBlend([a, b], [1, 2]), sy, FALSE, FALSE)
+PRINT kern.farbeHinzufuegen(m, v, kern.garnBlend([a, b], [1, 2]), sy, FALSE, FALSE)
+PRINT kern.farbeHinzufuegen(m, v, kern.garnBlend([a, b], [1, 1]), sy, FALSE, FALSE)
+PRINT kern.farbeHinzufuegen(m, v, a, sy, FALSE, FALSE)
+PRINT kern.farbeHinzufuegen(m, v, kern.neuesGarn("eigen", &H123456, "", ""), sy, FALSE, FALSE)
+PRINT kern.farbeHinzufuegen(m, v, kern.neuesGarn("auch eigen", &H123456, "", ""), sy, FALSE, FALSE)
+PRINT kern.farbeHinzufuegen(m, v, kern.neuesGarn("anders", &H654321, "", ""), sy, FALSE, FALSE)
+PRINT "farben "; m.farbanzahl(); " | "; m.farben[0].garn.name; " | "; m.farben[1].garn.name
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+0
+0
+1
+2
+3
+3
+4
+farben 5 | DMC 310 / DMC 321 (1+2) | DMC 310 / DMC 321 (1+1)
