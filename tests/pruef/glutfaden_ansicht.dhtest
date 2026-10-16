@@ -136,3 +136,39 @@ selten: 15 oben Seltene Farben zusammenlegen
 geladen: rueckstiche 2 erledigt 30,5 TRUE stiche TRUE
 text blau: TRUE
 haken: TRUE
+
+=== glutfaden stufe 4 bild importieren
+' --probe-stufe4: den Import-Dialog fuer das Logo bauen und einstellen (60x60,
+' 12 Farben, Floyd-Steinberg, Confetti 2, Ausschnitt 10..90 %), Vorschau,
+' uebernehmen, erneut aus dem Quellbild mit den Einstellungen von damals
+' (muss dasselbe Muster geben), Voreinstellung "DP A4", sichern und laden.
+' Bildproben: der orange Ausschnittrahmen im Dialog, das dunkle Navy des
+' Logos auf der Zeichenflaeche (das Demo-Muster hat davon fast nichts).
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe4", "--foto", "d"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "rahmen: "; punkteGanz("d_importdialog.png", &HFF9E40) > 800
+    PRINT "navy: "; punkte("d_importiert.png", &H1B1B2C) > 8000
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+dialog: TRUE bild 256x256
+info: 60 × 60 Stiche  ·  ≈ 10,9 × 10,9 cm bei 14ct Aida  ·  Ausschnitt 205 × 205 px
+vorschau: 60x60 farben 12 stiche 3600
+importiert: 60x60 farben 12 titel glutfaden_256 ungesichert TRUE datei leer TRUE
+quelle: glutfaden_256.png palette DMC dithering floyd_steinberg
+wieder: 60x60 farben 12 dither 1 confetti 2 ausschnitt 0.1 palette DMC
+dasselbe muster: TRUE
+vorlage: 60x60 farben 30 dither 1 median TRUE palette DMC Diamond Painting
+geladen: quelle glutfaden_256.png palette DMC max 12 ausschnitt 0.9 stiche TRUE gesichert TRUE
+rahmen: TRUE
+navy: TRUE
