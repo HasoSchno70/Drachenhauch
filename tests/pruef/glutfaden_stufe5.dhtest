@@ -8451,8 +8451,15 @@ IMPORT "helfer.dh"
 DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
 DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
 ' Die Garnliste vergleicht mit der von PyStickys export_bundle (BOM, CRLF,
-' Semikolon); die Anleitung im Paket ist dieselbe wie htmlText$.
+' Semikolon); die Anleitung im Paket ist dieselbe wie htmlText$. Ohne Grafik
+' entsteht kein Bild (es stuende in e.fehlt) -- dann ueberspringt sich der Fall.
 DIM m AS kern.Muster : m = kern.pxsLaden("probe.pxs")
+TRY
+    DIM probeBild AS IMAGE : probeBild = IMAGE_NEW(1, 1)
+CATCH keineGrafik
+    PRINT "UEBERSPRINGEN: ohne Grafik entsteht kein Bild im Paket"
+    END
+END TRY
 WRITEALL("alt.zip", "kaputt")
 DIM e AS kern.PaketErgebnis : e = kern.paketExportieren(m, "alt.zip", "A4", FALSE, pal)
 PRINT JOIN$(ZIP_LIST("alt.zip"), ", ")
