@@ -54,6 +54,7 @@ CLASS PdfSatz
     DIM ah AS FLOAT
     DIM y AS FLOAT                   ' Fluss: Oberkante des Naechsten, Punkte von oben
     DIM leer AS BOOLEAN              ' auf der Seite steht noch nichts
+    DIM nachLetzt AS FLOAT           ' spaceAfter des vorigen Absatzes (reportlab: _prevASpace)
     DIM seiten AS INTEGER
     DIM wasser AS STRING
     DIM copyright AS STRING
@@ -110,6 +111,7 @@ SUB pdfSeitenschmuck(s AS PdfSatz)
     END IF
     s.y = pdfOben(s)
     s.leer = TRUE
+    s.nachLetzt = 0
 END SUB
 
 SUB pdfNeueSeite(s AS PdfSatz)
@@ -132,6 +134,7 @@ END SUB
 SUB pdfAbstand(s AS PdfSatz, mm AS FLOAT)
     ARRAY_PUSH(s.ablauf, "S " + pdfZahl1$(mm))
     s.y = s.y + mm * PDF_PT
+    s.nachLetzt = 0
     IF s.y > pdfUnten(s) THEN pdfNeueSeite(s)
 END SUB
 
@@ -278,7 +281,8 @@ SUB pdfAbsatz(s AS PdfSatz, stil AS STRING, text AS STRING)
     NEXT
     ARRAY_PUSH(bz, akt)
     DIM hoehe AS FLOAT : hoehe = LEN(zeilen) * zeile
-    IF NOT s.leer THEN s.y = s.y + vor
+    ' reportlab zieht den Abstand nach dem vorigen Absatz vom Abstand davor ab
+    IF NOT s.leer THEN s.y = s.y + MAX(0, vor - s.nachLetzt)
     pdfPlatz(s, hoehe)
     DIM z AS INTEGER
     FOR z = 0 TO LEN(zeilen) - 1
@@ -298,6 +302,7 @@ SUB pdfAbsatz(s AS PdfSatz, stil AS STRING, text AS STRING)
     NEXT
     s.y = s.y + hoehe + nach
     s.leer = FALSE
+    s.nachLetzt = nach
 END SUB
 
 ' --- Tabellen ------------------------------------------------------------------------
@@ -447,6 +452,7 @@ SUB pdfTabelleSetzen(s AS PdfSatz, t AS PdfTabelle)
         s.y = s.y + h
         s.leer = FALSE
     NEXT
+    s.nachLetzt = 0
 END SUB
 
 ' --- Zeichnungen: Formen in einem Rahmen der Groesse w x h (Punkte), Ursprung
@@ -480,6 +486,7 @@ SUB pdfZeichnungEnde(s AS PdfSatz, w AS FLOAT, h AS FLOAT)
     ARRAY_PUSH(s.ablauf, "D " + pdfZahl1$(w) + "x" + pdfZahl1$(h) + " | " + t + " | " + tt)
     s.y = s.y + h
     s.leer = FALSE
+    s.nachLetzt = 0
 END SUB
 
 ' Rechteck: Flaeche `fuellung` (-1 = keine), Rand `rand` (-1 = keiner).

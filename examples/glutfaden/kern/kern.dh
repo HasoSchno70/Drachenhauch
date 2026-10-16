@@ -20,4 +20,6 @@ IMPORT "export.dh" AS kern
 IMPORT "oxs.dh" AS kern
 IMPORT "bildexport.dh" AS kern
 IMPORT "pdfexport.dh" AS kern
+IMPORT "htmlexport.dh" AS kern
+IMPORT "paket.dh" AS kern
 IMPORT "pxs.dh" AS kern
