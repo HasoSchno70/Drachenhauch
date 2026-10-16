@@ -611,3 +611,32 @@ END FUNCTION
 
 --- erwartet
 5 10 0
+
+=== eine methode heisst wie eine funktion des moduls
+' Vorher wurde die METHODE mit umbenannt: obj.breite() fand sie nicht mehr,
+' und ein nackter Aufruf in einer anderen Methode landete bei der Funktion
+' des Moduls (Glutfaden, 2026-10-16: Muster.breiteCm neben breiteCm).
+IMPORT "lib.dh" AS n
+DIM k AS n.K : k = NEW n.K()
+PRINT k.breite(); " "; k.doppelt(); " "; n.flaeche(k); " "; n.modulBreite()
+--- datei lib.dh
+FUNCTION flaeche(k AS K) AS INTEGER
+    RETURN k.breite() * 2
+END FUNCTION
+CLASS K
+    FUNCTION breite() AS INTEGER
+        RETURN 7
+    END FUNCTION
+    FUNCTION doppelt() AS INTEGER
+        RETURN breite() + breite()
+    END FUNCTION
+END CLASS
+FUNCTION breite(x AS INTEGER) AS INTEGER
+    RETURN x + 100
+END FUNCTION
+FUNCTION modulBreite() AS INTEGER
+    RETURN breite(1)
+END FUNCTION
+
+--- erwartet
+7 14 14 101
