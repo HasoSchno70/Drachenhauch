@@ -94,6 +94,9 @@ use crate::schriften::{normalisieren, EINGEBAUT};
 /// Seitengroesse aus einem Namen -- in Millimetern.
 pub fn seitenmass(name: &str, quer: bool) -> Option<(f64, f64)> {
     let (b, h) = match name.to_lowercase().as_str() {
+        "a0" => (841.0, 1189.0),
+        "a1" => (594.0, 841.0),
+        "a2" => (420.0, 594.0),
         "a3" => (297.0, 420.0),
         "a4" | "" => (210.0, 297.0),
         "a5" => (148.0, 210.0),
@@ -461,6 +464,8 @@ mod tests {
         assert_eq!(seitenmass("a4", false), Some((210.0, 297.0)));
         assert_eq!(seitenmass("A4", true), Some((297.0, 210.0)));
         assert_eq!(seitenmass("gibtsnicht", false), None);
+        assert_eq!(seitenmass("A0", false), Some((841.0, 1189.0)));
+        assert_eq!(seitenmass("a2", true), Some((594.0, 420.0)));
     }
 
     #[test]

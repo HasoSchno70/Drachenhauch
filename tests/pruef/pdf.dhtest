@@ -208,7 +208,7 @@ IMPORT "pdf"
 DIM p AS PDF
 p = PDF_NEW("din a4")
 --- fehler
-PDF_NEW: Seitengroesse 'din a4' kenne ich nicht -- a3, a4, a5, a6, letter, legal
+PDF_NEW: Seitengroesse 'din a4' kenne ich nicht -- a0 bis a6, letter, legal
 
 === ein zeichen das die schrift nicht hat
 ' Kein stilles leeres Kaestchen: auf einer Rechnung ist ein verschwundenes
@@ -515,3 +515,19 @@ PDF_POLYGON_FILL: ein Vieleck braucht mindestens drei Punkte, nicht 2
 PDF_POLYGON: xs und ys muessen gleich lang sein (3 gegen 2)
 PDF_POLYGON: erwartet 1D ARRAY OF FLOAT
 PDF_TEXT: erwartet 4 oder 5 Argumente (pdf, x, y, text$ [, winkel]), nicht 6
+
+=== die grossen formate a2 a1 a0
+IMPORT "pdf"
+DIM n AS STRING
+FOR EACH n IN ["a2", "a1", "a0"]
+    DIM p AS PDF : p = PDF_NEW(n)
+    PRINT n; " "; PDF_PAGE_WIDTH(p); " x "; PDF_PAGE_HEIGHT(p)
+    PDF_CLOSE(p)
+NEXT
+DIM q AS PDF : q = PDF_NEW("a1", "quer")
+PRINT "a1 quer "; PDF_PAGE_WIDTH(q); " x "; PDF_PAGE_HEIGHT(q)
+--- erwartet
+a2 420.0 x 594.0
+a1 594.0 x 841.0
+a0 841.0 x 1189.0
+a1 quer 841.0 x 594.0

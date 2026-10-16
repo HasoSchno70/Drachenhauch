@@ -1419,7 +1419,7 @@
   "PDF_IMAGE": "ein Bild (IMAGE) in das Rechteck setzen, Maße in mm; ohne h nach dem Seitenverhältnis",
   "PDF_LINE": "Linie zeichnen",
   "PDF_LINE_WIDTH": "Strichstärke",
-  "PDF_NEW": "a3…a6, letter, legal; hoch/quer",
+  "PDF_NEW": "a0…a6, letter, legal; hoch/quer",
   "PDF_OPACITY": "Deckkraft 0..1 für alles Folgende (Wasserzeichen)",
   "PDF_PAGE": "neue Seite beginnen -- die erste legt PDF_NEW schon an; solange sie leer ist, legt PDF_PAGE keine zweite an",
   "PDF_PAGE_COUNT": "wie viele bisher",

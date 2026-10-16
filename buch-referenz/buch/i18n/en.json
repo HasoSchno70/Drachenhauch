@@ -2853,7 +2853,7 @@
  "A4 hoch": "A4 portrait",
  "20 mm links, 25 mm oben": "20 mm from the left, 25 mm from the top",
  "Dokument und Seiten": "Document and pages",
- "Legt ein neues Dokument an und liefert ein PDF-Handle. Ohne Angabe A4 hoch; sonst a3 bis a6, letter oder legal, dazu hoch oder quer.": "Creates a new document and returns a PDF handle. Without arguments A4 portrait; otherwise a3 to a6, letter or legal, plus hoch or quer.",
+ "Legt ein neues Dokument an und liefert ein PDF-Handle. Ohne Angabe A4 hoch; sonst a0 bis a6, letter oder legal, dazu hoch oder quer.": "Creates a new document and returns a PDF handle. Without arguments A4 portrait; otherwise a0 to a6, letter or legal, plus hoch or quer.",
  "PDF_PAGE beginnt eine neue Seite, PDF_PAGE_COUNT sagt, wie viele es bisher sind. Ein frisches Dokument hat bereits eine Seite – der erste PDF_PAGE-Aufruf erzeugt also die zweite.": "PDF_PAGE begins a new page, PDF_PAGE_COUNT says how many there are so far. A fresh document already has one page – so the first PDF_PAGE call creates the second.",
  "Das Seitenmaß in Millimetern. Damit setzt du etwas an den rechten Rand, ohne die Zahlen der einzelnen Papierformate im Kopf zu haben.": "The page size in millimetres. Use it to place something at the right margin without carrying the numbers of every paper format in your head.",
  "Setzt den Titel in den Dokument-Angaben – das ist der Text, den ein PDF-Leser in seiner Fensterleiste zeigt.": "Sets the title in the document information – that is the text a PDF reader shows in its title bar.",
@@ -3423,6 +3423,7 @@
   "Mit DECLARE und Rückrufen lässt sich sogar GTK benutzen, die Bibliothek, mit der unter Linux die meisten Programme ihre Fenster zeichnen. Fenster, Knöpfe und Eingabefelder sind ZEIGER; ein Signal wie \"clicked\" verbindest du mit g_signal_connect_data und einer SUB deines Programms, und gtk_main dreht die Schleife von GTK, bis gtk_main_quit kommt. Das Beispiel 207_gtk.dh zeigt ein Fenster mit Eingabefeld, zwei Knöpfen und einer Beschriftung.": "With DECLARE and callbacks you can even use GTK, the library most programs on Linux draw their windows with. Windows, buttons and entry fields are ZEIGER; you connect a signal such as \"clicked\" with g_signal_connect_data and a SUB of your program, and gtk_main runs GTK's loop until gtk_main_quit comes. The example 207_gtk.dh shows a window with an entry field, two buttons and a label.",
   "Liefert eine in der angegebenen Größe skalierte Kopie des Bildes.": "Gives a copy of the image scaled to the size given.",
   "Setzt Text an eine Stelle, gemessen in Millimetern von links und von oben.": "Places text at a position, measured in millimetres from the left and from the top.",
-  "Eine Linie, ein Rechteck als Umriss, ein Rechteck als Fläche – mehr Geometrie gibt es nicht, und für ein Formular braucht es auch nicht mehr.": "A line, a rectangle as an outline, a rectangle as a filled area – there is no more geometry than that, and a form needs no more."
+  "Eine Linie, ein Rechteck als Umriss, ein Rechteck als Fläche – mehr Geometrie gibt es nicht, und für ein Formular braucht es auch nicht mehr.": "A line, a rectangle as an outline, a rectangle as a filled area – there is no more geometry than that, and a form needs no more.",
+  "Legt ein neues Dokument an und liefert ein PDF-Handle. Ohne Angabe A4 hoch; sonst a3 bis a6, letter oder legal, dazu hoch oder quer.": "Creates a new document and returns a PDF handle. Without arguments A4 portrait; otherwise a3 to a6, letter or legal, plus hoch or quer."
  }
 }

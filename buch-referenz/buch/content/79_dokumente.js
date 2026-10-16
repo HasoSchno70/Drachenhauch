@@ -17,7 +17,7 @@ module.exports = (H) => [
 
   H.h2("Dokument und Seiten"),
   H.cmd("PDF_NEW", "PDF_NEW([größe$[, ausrichtung$]])",
-    "Legt ein neues Dokument an und liefert ein PDF-Handle. Ohne Angabe A4 hoch; sonst a3 bis a6, letter oder legal, dazu hoch oder quer.",
+    "Legt ein neues Dokument an und liefert ein PDF-Handle. Ohne Angabe A4 hoch; sonst a0 bis a6, letter oder legal, dazu hoch oder quer.",
     [
       'IMPORT "pdf"',
       "DIM p AS PDF",

@@ -5148,7 +5148,7 @@ impl<'p> Vm<'p> {
                     Some(_) => return Err("PDF_NEW: 2. Argument ist \"hoch\" oder \"quer\"".to_string()),
                 };
                 let (b, h) = pdf::seitenmass(&art, quer).ok_or_else(|| format!(
-                    "PDF_NEW: Seitengroesse '{}' kenne ich nicht -- a3, a4, a5, a6, letter, legal", art))?;
+                    "PDF_NEW: Seitengroesse '{}' kenne ich nicht -- a0 bis a6, letter, legal", art))?;
                 self.pdf_dok.push(Some(pdf::Dokument::neu(b, h)));
                 Value::Int((self.pdf_dok.len() - 1) as i64)
             }

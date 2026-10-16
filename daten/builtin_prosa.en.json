@@ -1418,7 +1418,7 @@
   "PDF_IMAGE": "place an image (IMAGE) in the rectangle, sizes in mm; without h by the aspect ratio",
   "PDF_LINE": "draw a line",
   "PDF_LINE_WIDTH": "stroke width",
-  "PDF_NEW": "a3…a6, letter, legal; hoch/quer (portrait/landscape)",
+  "PDF_NEW": "a0…a6, letter, legal; hoch/quer (portrait/landscape)",
   "PDF_OPACITY": "opacity 0..1 for everything that follows (watermarks)",
   "PDF_PAGE": "start a new page -- PDF_NEW already creates the first one; while it is empty, PDF_PAGE does not add a second",
   "PDF_PAGE_COUNT": "how many so far",
