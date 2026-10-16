@@ -1490,6 +1490,9 @@ END FUNCTION
 ```
 
 Pass the value in as a parameter or declare it in the file itself.
+The fields of a class are not affected: in a method a bare `e` means the
+field (an inherited one too), even if the main program or the file itself
+also has an `e`.
 Without `AS`, the old flat access remains allowed — existing programs
 do not change.
 
