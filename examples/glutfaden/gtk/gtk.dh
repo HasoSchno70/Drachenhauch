@@ -39,6 +39,8 @@ DECLARE SUB gtk_container_set_border_width LIB GTK (behaelter AS ZEIGER, rand AS
 ' --- Bedienelemente
 DECLARE FUNCTION gtk_button_new_from_icon_name LIB GTK (name AS TEXT, groesse AS LONG) AS ZEIGER
 DECLARE FUNCTION gtk_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
+DECLARE SUB gtk_button_set_label LIB GTK (knopf AS ZEIGER, text AS TEXT)
+DECLARE FUNCTION gtk_button_get_label LIB GTK (knopf AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_button_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_button_clicked LIB GTK (knopf AS ZEIGER)
 DECLARE FUNCTION gtk_check_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER

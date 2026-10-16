@@ -90,6 +90,7 @@ DIM status AS INTEGER
 DIM kZurueck AS INTEGER
 DIM kVor AS INTEGER
 DIM kSichern AS INTEGER
+DIM kModus AS INTEGER
 DIM musterPfad AS STRING
 DIM musterTitel AS STRING
 DIM extraGeaendert AS BOOLEAN         ' Sichtbarkeit, Sperre, Deckkraft (kein Schritt)
@@ -241,6 +242,7 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     wzFarbe = IIF(m.farbanzahl() > 0, 0, -1)
     leinwandMuster(m)
     seitenleisteMuster(m)
+    modusKnopfNachziehen()
     zustandNachziehen()
     statusNachziehen()
     IF fremdHinweis <> "" THEN statusMeldung(fremdHinweis)
@@ -339,6 +341,31 @@ END SUB
 
 SUB exportGeklickt(knopf AS INTEGER, daten AS INTEGER) : exportDialog() : END SUB
 
+' Kreuzstich <-> Diamond Painting (Strg+D, PySticky "Diamond-Painting-Ansicht").
+' Wie dort ist der Wechsel kein Schritt im Verlauf -- der Verlauf wird geleert,
+' weil er die alten Stichtypen haelt; Strg+D noch einmal holt die Garne genau
+' zurueck (der gemerkte Stand in mode_backups).
+SUB modusUmschalten()
+    IF NOT lwHat THEN RETURN
+    DIM ziel AS STRING : ziel = IIF(lwMuster.modus = "diamond", "stitch", "diamond")
+    DIM ok AS BOOLEAN : ok = kern.modusWechseln(lwMuster, ziel, slPaletten)
+    wzVerlauf.leeren()
+    mrAblage = NIL
+    extraGeaendert = TRUE
+    allesNeu()
+    modusKnopfNachziehen()
+    statusMeldung(IIF(ziel = "diamond", "Diamond Painting -- die Farben sind jetzt Drills der Palette DMC Diamond Painting (Strg+D zurück).", "Kreuzstich -- die Garne von vorher sind zurück (Strg+D: wieder Diamond Painting)."))
+END SUB
+
+SUB modusGeklickt(knopf AS INTEGER, daten AS INTEGER) : modusUmschalten() : END SUB
+
+SUB modusKnopfNachziehen()
+    IF kModus = 0 THEN RETURN
+    DIM dp AS BOOLEAN : dp = lwHat
+    IF dp THEN dp = lwMuster.modus = "diamond"
+    gtk_button_set_label(kModus, IIF(dp, "◆ Diamond", "✕ Kreuzstich"))
+END SUB
+
 SUB sichernUnter()
     IF NOT lwHat THEN RETURN
     DIM pfad AS STRING : pfad = dateiWaehlen(TRUE)
@@ -399,6 +426,7 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
             CASE &H61, &H41 : auswahlAlles()                     ' Strg+A
             CASE &H72, &H52 : farbeErsetzenDialog()              ' Strg+R
             CASE &H65, &H45 : exportDialog()                     ' Strg+E
+            CASE &H64, &H44 : modusUmschalten()                  ' Strg+D
             CASE &H69, &H49                                      ' Strg+I, Strg+Umschalt+I
                 IF umschalt THEN bildNeuImportieren() ELSE bildImportieren()
             CASE &H6E, &H4E                                      ' Strg+Umschalt+N
@@ -472,6 +500,10 @@ gtk_header_bar_pack_start(kopf, kSichern)
 gtk_header_bar_pack_start(kopf, kExport)
 gtk_header_bar_pack_start(kopf, kZurueck)
 gtk_header_bar_pack_start(kopf, kVor)
+kModus = gtk_button_new_with_label("✕ Kreuzstich")
+gtk_widget_set_tooltip_text(kModus, "Kreuzstich oder Diamond Painting (Strg+D) -- die Farben wechseln in die passende Palette, zurück kommen dieselben Garne")
+gtk_widget_set_can_focus(kModus, FALSE)
+gtk_header_bar_pack_start(kopf, kModus)
 DIM kEinpassen AS INTEGER : kEinpassen = knopf("zoom-fit-best-symbolic", "Einpassen (0)")
 DIM kGroesser AS INTEGER : kGroesser = knopf("zoom-in-symbolic", "Größer (+)")
 DIM kKleiner AS INTEGER : kKleiner = knopf("zoom-out-symbolic", "Kleiner (-)")
@@ -506,6 +538,7 @@ signal(kSichern, "clicked", sichernGeklickt, 0, 0, 0)
 signal(kExport, "clicked", exportGeklickt, 0, 0, 0)
 signal(kZurueck, "clicked", zurueckGeklickt, 0, 0, 0)
 signal(kVor, "clicked", vorGeklickt, 0, 0, 0)
+signal(kModus, "clicked", modusGeklickt, 0, 0, 0)
 signal(kKleiner, "clicked", kleinerGeklickt, 0, 0, 0)
 signal(kGroesser, "clicked", groesserGeklickt, 0, 0, 0)
 signal(kEinpassen, "clicked", einpassenGeklickt, 0, 0, 0)
@@ -531,6 +564,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe4"
     ELSEIF ARG$(a) = "--probe-stufe5" THEN
         probe = "stufe5"
+    ELSEIF ARG$(a) = "--probe-stufe6" THEN
+        probe = "stufe6"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -547,5 +582,6 @@ IF probe = "bearbeiten" THEN g_timeout_add(300, vorfuehrenBearbeiten, 0)
 IF probe = "stufe3" THEN g_timeout_add(300, vorfuehrenStufe3, 0)
 IF probe = "stufe4" THEN g_timeout_add(300, vorfuehrenStufe4, 0)
 IF probe = "stufe5" THEN g_timeout_add(300, vorfuehrenStufe5, 0)
+IF probe = "stufe6" THEN g_timeout_add(300, vorfuehrenStufe6, 0)
 
 gtk_main()

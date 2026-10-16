@@ -370,6 +370,8 @@ END FUNCTION
 
 ' Stufe 5: Export -- der Dialog mit allen Zeilen, dann PDF, HTML, Bild, OXS
 ' (und wieder eingelesen) und das Paket, je in eine Datei neben die Fotos.
+DIM vfVorher AS STRING
+
 FUNCTION vfZiel$(name AS STRING) AS STRING
     IF fotoZiel <> "" THEN RETURN fotoZiel + "_" + name
     RETURN PATHJOIN(TEMPDIR$(), "glutfaden_stufe5_" + name)
@@ -437,3 +439,34 @@ FUNCTION vorfuehrenStufe5(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' Stufe 6: eine PCStitch-Datei ist geoeffnet (das Startargument), daneben
+' liegt dieselbe als .xsd; dann Diamond Painting hin und zurueck (Strg+D).
+FUNCTION vorfuehrenStufe6(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "pat: "; LEFT$(meldung, 32); " | ebenen "; lwMuster.ebenen.anzahl(); " stiche "; lwMuster.sticheGesamt(); " rueckstiche "; LEN(lwMuster.rueckstiche); " datei leer "; musterPfad = ""
+            foto("aus_pat")
+        CASE 2
+            ok = musterOeffnen(LEFT$(start, LEN(start) - 4) + ".xsd")
+            PRINT "xsd: "; ok; " "; LEFT$(meldung, 36); " | farben "; lwMuster.farbanzahl(); " blend "; lwMuster.farben[2].garn.istBlend()
+            foto("aus_xsd")
+        CASE 3
+            DIM vorher AS STRING : vorher = lwMuster.farben[0].garn.hersteller + " " + lwMuster.farben[0].garn.nummer
+            modusUmschalten()
+            PRINT "diamond: "; lwMuster.modus; " stoff "; lwMuster.stoff; " | "; TEXT_AUS_ZEIGER$(gtk_button_get_label(kModus)); " | "; lwMuster.farben[0].garn.hersteller; " | verlauf leer "; NOT wzVerlauf.kannZurueck(); " ungesichert "; istGeaendert()
+            foto("diamond")
+            vfVorher = vorher
+        CASE 4
+            modusUmschalten()
+            PRINT "zurueck: "; lwMuster.modus; " stoff "; lwMuster.stoff; " | "; TEXT_AUS_ZEIGER$(gtk_button_get_label(kModus)); " | dasselbe garn "; lwMuster.farben[0].garn.hersteller + " " + lwMuster.farben[0].garn.nummer = vfVorher
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+

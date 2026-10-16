@@ -32,6 +32,8 @@ phZeigen(kern.patLaden("probe.pat", pal, sym))
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
 IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 fassung 8
 Probe 4x3 stoff 16.0 ebenen 2
@@ -68,6 +70,8 @@ PRINT "[" + kern.patRtfText$("ohne rtf") + "]"
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
 IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 [Hallo	Welt
 
@@ -93,6 +97,8 @@ phZeigen(kern.patLaden("mein stueck.pat", pal, sym))
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
 IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 fassung 8
 mein stueck 1x2 stoff 14.0 ebenen 1
@@ -140,6 +146,8 @@ versuch("fehlt", BUFFER_FROM_STRING(""))
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
 IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 gut: gelesen
 kennung: PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)
@@ -182,6 +190,8 @@ xhZeigen(kern.xsdLaden("probe.xsd", pal, sym))
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
 IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 fassung 4.8.4.0
 Probe XSD 4x3 stoff 18.0 ebenen 2
@@ -259,6 +269,8 @@ versuch("zu gross", xhDatei(2001, 1, 18, "T", "", "", 3, fa, sy, st, kl, 7, jo))
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
 IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 gut: gelesen, 2 rueckstiche
 kennung: XSD: keine Pattern-Maker-Datei (die Kennung 0x0510 fehlt)
@@ -290,8 +302,573 @@ END TRY
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
 IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 DMC 310 / DMC 321 (1+1) | DMC | 310+321 | #652224 | TRUE
 DMC 310 / DMC 321 / Anchor 306 (1+2+1) | Blend | 310+321+306 | #A4542D
 #7F6DAA 2 4 0
 Blend braucht mindestens 2 Garne
+
+=== oberflaeche: pat und xsd oeffnen, diamond hin und zurueck
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+DIM fa AS STRING : fa = phFarbe$("DMC", "310", "black", &H000000, ASC("X"))
+fa = fa + phFarbe$("Foo", "9999", "Testgarn", &H0C2238, &H8A)
+fa = fa + phFarbe$("DMC", "5200", "snow white", &HE6E6E6, ASC("X"))
+' spaltenweise, 4 x 3: (0,0) voll Farbe 0 | 3 leer ueber die Spaltengrenze |
+' (1,1) Viertel oben rechts + Dreiviertel unten links | (1,2) Viertel unten
+' rechts | (2,0..2) voll Farbe 2 | (3,0) unbekannte Art | (3,1) Farbe 7 | (3,2) leer
+DIM gi AS STRING : gi = phLauf$(1, 1, phStich$(0, 0, 5, 0, 1)) + phLeer$(3)
+gi = gi + phLauf$(1, 2, phStich$(1, 1, 3, 1, 32) + phStich$(1, 1, 5, 2, 33))
+gi = gi + phLauf$(1, 1, phStich$(1, 2, 9, 0, 34))
+gi = gi + phLauf$(3, 1, phStich$(2, 0, 5, 2, 1))
+gi = gi + phLauf$(1, 1, phStich$(3, 0, 5, 0, 7))
+gi = gi + phLauf$(1, 1, phStich$(3, 1, 5, 7, 1)) + phLeer$(1)
+DIM ru AS STRING : ru = phRueck$(0, 0, 1, 4, 3, 1, 0) + phRueck$(1, 1, 5, 2, 1, 6, 1) + phRueck$(2, 0, 3, 1, 2, 7, 2) + phRueck$(0, 0, 0, 1, 1, 1, 0)
+DIM xf AS STRING : xf = xhFarbe$(0, "310", "Black", &H101010, FALSE, "")
+xf = xf + xhFarbe$(1, "9403", "Schwarz " + CHR$(&HD7) + CHR$(&HE5), &H202020, TRUE, "")
+xf = xf + xhFarbe$(252, "11", "", &H884444, FALSE, "0:310:1;0:321:2")
+DIM sy AS ARRAY OF INTEGER : sy = [ASC("S"), &HFFFF, ASC("S")]
+' zeilenweise, 4 x 3: voll Farbe 0 | Lauf 2 x Blend | leer | Teilstich-Satz 0 |
+' Satz 1 | Lauf 4 leer | Perle (Farbe 1) | Farbe 9
+DIM wo AS ARRAY OF INTEGER : wo = [&H00000000, &H40020000, &H00020000, &H0F000000, &H80000000, &H80010000, &H40040000, &H0F000000, &H00010000, &H00090000]
+DIM st AS STRING : st = xhStiche$(wo, [&H12345678, &H0BADCAFE, &H31415926, &H27182818])
+' Satz 0: halber Stich oben (Farbe 0) + Viertel oben rechts (Farbe 2); Satz 1: Petite unten rechts (Farbe 0)
+DIM kl AS STRING : kl = "11000000000002000000" + "00080000000000000000"
+' Knoten, Rueckstich, Spannstich, Kurve, Sonderstich, Perle, Rueckstich mit Farbe 9
+DIM jo AS STRING : jo = ph16$(1) + "0000" + ph16$(3) + ph16$(1) + "00000000" + "00" + "00"
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(8) + ph16$(6) + "02" + "00"
+jo = jo + ph16$(5) + "0000" + ph16$(2) + ph16$(2) + ph16$(4) + ph16$(2) + "00" + "00"
+jo = jo + ph16$(3) + "000000" + ph16$(2) + "0100020003000400"
+jo = jo + ph16$(4) + phNull$(23)
+jo = jo + ph16$(6) + "0000" + ph16$(7) + ph16$(5) + "01" + "00" + ph16$(90)
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(2) + ph16$(0) + "09" + "00"
+
+' --probe-stufe6: Glutfaden oeffnet die .pat (Startargument) und die .xsd
+' daneben, dann Strg+D zweimal. Dazu die Fotos.
+WRITEALL_BYTES("probe.pat", phDatei("8", 4, 3, 16, "", "Probe", "Hans", 3, fa, gi, 3, ru, phNull$(14)))
+WRITEALL_BYTES("probe.xsd", xhDatei(4, 3, 18, "Probe XSD", "Hans", "", 3, xf, sy, st, kl, 7, jo))
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe6", "--foto", "d", "probe.pat"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "fotos: "; FILEEXISTS("d_aus_pat.png"); " "; FILEEXISTS("d_aus_xsd.png"); " "; FILEEXISTS("d_diamond.png")
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+pat: Aus PCStitch eingelesen -- Siche | ebenen 2 stiche 7 rueckstiche 3 datei leer TRUE
+xsd: TRUE Aus Pattern Maker eingelesen -- Sich | farben 3 blend TRUE
+diamond: diamond stoff 10.0 | ◆ Diamond | DMC Diamond Painting | verlauf leer TRUE ungesichert TRUE
+zurueck: stitch stoff 18.0 | ✕ Kreuzstich | dasselbe garn TRUE
+fotos: TRUE TRUE TRUE
+
+=== diamond: hin und zurueck wie pysticky
+IMPORT "helfer.dh"
+' Die Erwartung ist PyStickys Ausgabe (Pattern.convert_to_mode: hin, zurueck,
+' wieder hin) fuer probe.pxs und demo_kreuzstich.pxs -- Garne, Drill-Flags,
+' Stichtypen je Ebene, Stoff und der gemerkte Aida-Stoff.
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+FUNCTION pb$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "True", "False")
+END FUNCTION
+SUB zeigen(m AS kern.Muster, titel AS STRING)
+    DIM sfc AS STRING : sfc = "None"
+    IF JSON_TYPE(m.metadaten, "stitch_fabric_count") = "number" THEN sfc = STR$(JSON_GET_INT(m.metadaten, "stitch_fabric_count"))
+    PRINT "== "; titel; " "; m.modus; " "; INT(m.stoff); " "; sfc
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(m.farben) - 1
+        DIM f AS kern.Farbeintrag : f = m.farben[i]
+        PRINT "farbe "; i; " "; f.garn.name; " | "; f.garn.hersteller; " | "; f.garn.nummer; " | "; kern.farbeAlsHex$(f.garn.farbe); " | "; pb$(f.istDiamant); " "; pb$(f.istPerle)
+    NEXT
+    FOR i = 0 TO m.ebenen.anzahl() - 1
+        DIM eb AS kern.Ebene : eb = m.ebenen.ebenen[i]
+        DIM z AS MAP OF INTEGER : z = {}
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(eb.raster) - 1
+            IF eb.raster[k] < 0 THEN CONTINUE
+            DIM s AS STRING : s = RIGHT$("000" + STR$(eb.raster[k]), 3) + ":" + RIGHT$("000" + STR$(eb.art[k]), 3)
+            MAPPUT(z, s, IIF(MAPHAS(z, s), MAPGET(z, s), 0) + 1)
+        NEXT
+        DIM schl AS ARRAY OF STRING : schl = MAPKEYS(z)
+        SORT(schl)
+        DIM t AS STRING : t = "ebene " + STR$(i)
+        DIM q AS STRING
+        FOR EACH q IN schl
+            t = t + " " + STR$(VAL(LEFT$(q, 3))) + ":" + STR$(VAL(RIGHT$(q, 3))) + "=" + STR$(MAPGET(z, q))
+        NEXT
+        PRINT t
+    NEXT
+END SUB
+DIM datei AS STRING
+FOR EACH datei IN ["probe.pxs", ARG$(0) + "/daten/muster/demo_kreuzstich.pxs"]
+    DIM m AS kern.Muster : m = kern.pxsLaden(datei)
+    zeigen(m, "start")
+    kern.modusWechseln(m, "diamond", pal) : zeigen(m, "diamond")
+    kern.modusWechseln(m, "stitch", pal) : zeigen(m, "stitch")
+    kern.modusWechseln(m, "diamond", pal) : zeigen(m, "diamond2")
+NEXT
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+--- erwartet
+== start stitch 16 None
+farbe 0 Black | DMC | 310 | #000000 | False False
+farbe 1 Christmas Red | DMC | 321 | #C72B3B | False False
+farbe 2 Eigene Farbe |  |  | #123456 | False False
+farbe 3 Tweed | DMC | TW1 | #804020 | False False
+farbe 4 Gold | Mill Hill Beads | 00557 | #D4AF37 | False True
+ebene 0 0:0=12 1:1=1 1:2=1 1:3=1 1:4=1 1:5=1 1:6=1 1:7=1 2:9=1 3:0=12 4:10=1
+ebene 1 1:0=1
+== diamond diamond 10 16
+farbe 0 Black | DMC Diamond Painting | 310 | #000000 | True False
+farbe 1 Red | DMC Diamond Painting | 321 | #CA2939 | True False
+farbe 2 Royal Blue Very Dark | DMC Diamond Painting | 820 | #0D345F | True False
+farbe 3 Brown med | DMC Diamond Painting | 433 | #7A451F | True False
+farbe 4 Gold | Mill Hill Beads | 00557 | #D4AF37 | False True
+ebene 0 0:11=12 1:11=7 2:11=1 3:11=12 4:10=1
+ebene 1 1:11=1
+== stitch stitch 16 16
+farbe 0 Black | DMC | 310 | #000000 | False False
+farbe 1 Christmas Red | DMC | 321 | #C72B3B | False False
+farbe 2 Eigene Farbe |  |  | #123456 | False False
+farbe 3 Tweed | DMC | TW1 | #804020 | False False
+farbe 4 Gold | Mill Hill Beads | 00557 | #D4AF37 | False True
+ebene 0 0:0=12 1:0=7 2:0=1 3:0=12 4:10=1
+ebene 1 1:0=1
+== diamond2 diamond 10 16
+farbe 0 Black | DMC Diamond Painting | 310 | #000000 | True False
+farbe 1 Red | DMC Diamond Painting | 321 | #CA2939 | True False
+farbe 2 Royal Blue Very Dark | DMC Diamond Painting | 820 | #0D345F | True False
+farbe 3 Brown med | DMC Diamond Painting | 433 | #7A451F | True False
+farbe 4 Gold | Mill Hill Beads | 00557 | #D4AF37 | False True
+ebene 0 0:11=12 1:11=7 2:11=1 3:11=12 4:10=1
+ebene 1 1:11=1
+== start stitch 14 None
+farbe 0 Black | Anchor | 403 | #000000 | False False
+farbe 1 Red-DK | Anchor | 47 | #A9152C | False False
+farbe 2 Lemon-DK | Anchor | 309 | #FFD802 | False False
+farbe 3 Celadon Green-DK | Anchor | 228 | #49795A | False False
+farbe 4 Blue-DK | Anchor | 134 | #4983A7 | False False
+farbe 5 Snow White | Anchor | 1 | #FDFCF9 | False False
+ebene 0 2:0=12 4:0=116
+ebene 1 1:0=52
+ebene 2 2:0=5
+== diamond diamond 10 14
+farbe 0 Black | DMC Diamond Painting | 310 | #000000 | True False
+farbe 1 Red Dark | DMC Diamond Painting | 498 | #AA1129 | True False
+farbe 2 Lemon dark | DMC Diamond Painting | 444 | #FFD800 | True False
+farbe 3 Caladon green Dark | DMC Diamond Painting | 3815 | #477758 | True False
+farbe 4 Blue Dark | DMC Diamond Painting | 825 | #4781A5 | True False
+farbe 5 Winter white | DMC Diamond Painting | 3865 | #F9F7F1 | True False
+ebene 0 2:11=12 4:11=116
+ebene 1 1:11=52
+ebene 2 2:11=5
+== stitch stitch 14 14
+farbe 0 Black | Anchor | 403 | #000000 | False False
+farbe 1 Red-DK | Anchor | 47 | #A9152C | False False
+farbe 2 Lemon-DK | Anchor | 309 | #FFD802 | False False
+farbe 3 Celadon Green-DK | Anchor | 228 | #49795A | False False
+farbe 4 Blue-DK | Anchor | 134 | #4983A7 | False False
+farbe 5 Snow White | Anchor | 1 | #FDFCF9 | False False
+ebene 0 2:0=12 4:0=116
+ebene 1 1:0=52
+ebene 2 2:0=5
+== diamond2 diamond 10 14
+farbe 0 Black | DMC Diamond Painting | 310 | #000000 | True False
+farbe 1 Red Dark | DMC Diamond Painting | 498 | #AA1129 | True False
+farbe 2 Lemon dark | DMC Diamond Painting | 444 | #FFD800 | True False
+farbe 3 Caladon green Dark | DMC Diamond Painting | 3815 | #477758 | True False
+farbe 4 Blue Dark | DMC Diamond Painting | 825 | #4781A5 | True False
+farbe 5 Winter white | DMC Diamond Painting | 3865 | #F9F7F1 | True False
+ebene 0 2:11=12 4:11=116
+ebene 1 1:11=52
+ebene 2 2:11=5
