@@ -6575,7 +6575,13 @@
   {
    "name": "IMAGE_SCALE",
    "kind": "core",
-   "signature": "IMAGE_SCALE(img, w, h)",
+   "signature": "IMAGE_SCALE(img, w, h [, filter$])",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_ENHANCE",
+   "kind": "core",
+   "signature": "IMAGE_ENHANCE(img, art$, faktor)",
    "module": "imgfx"
   },
   {

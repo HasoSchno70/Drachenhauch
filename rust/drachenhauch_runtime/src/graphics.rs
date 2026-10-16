@@ -4636,6 +4636,31 @@ impl Graphics {
         img.resize(w, h);
         self.push_tex_from_image(img)
     }
+    /// IMAGE_SCALE mit Filter (`lanczos`, `bikubisch`, `box`, `hamming`,
+    /// `linear`): gerechnet wie Pillows `Image.resize` (resample.rs), nicht
+    /// mit raylibs stb_image_resize -- ein Muster aus einem Foto haengt an
+    /// diesen Zahlen. Ohne Filter bleibt es bei raylibs Glaetten.
+    pub fn image_scale_filter(&mut self, idx: i64, w: i32, h: i32, filter: crate::resample::Filter) -> Result<i64, String> {
+        if w <= 0 || h <= 0 { return Err("IMAGE_SCALE: w und h muessen > 0 sein".into()); }
+        let (px, b, hh) = self.image_rgba(idx, "IMAGE_SCALE")?;
+        let neu = crate::resample::skalieren(&px, b as usize, hh as usize, w as usize, h as usize, filter);
+        self.bild_aus_rgba(&neu, w, h, "IMAGE_SCALE")
+    }
+    /// IMAGE_ENHANCE: Helligkeit, Kontrast, Saettigung wie Pillows
+    /// `ImageEnhance` (1.0 = unveraendert, 0.0 = schwarz / grau / Graustufen).
+    pub fn image_enhance(&mut self, idx: i64, art: crate::resample::Anpassung, faktor: f64) -> Result<i64, String> {
+        let (px, b, hh) = self.image_rgba(idx, "IMAGE_ENHANCE")?;
+        let neu = crate::resample::anpassen(&px, art, faktor);
+        self.bild_aus_rgba(&neu, b as i32, hh as i32, "IMAGE_ENHANCE")
+    }
+    /// Ein neues IMAGE aus RGBA-Bytes (Zeile fuer Zeile).
+    fn bild_aus_rgba(&mut self, px: &[u8], w: i32, h: i32, fn_: &str) -> Result<i64, String> {
+        let img = Image::gen_image_color(w, h, Color::new(0, 0, 0, 0));
+        let n = (w.max(0) as usize) * (h.max(0) as usize) * 4;
+        if px.len() != n { return Err(format!("{}: {} Bytes statt {}", fn_, px.len(), n)); }
+        unsafe { std::slice::from_raw_parts_mut(img.data as *mut u8, n) }.copy_from_slice(px);
+        self.push_tex_from_image(img)
+    }
     /// IMAGE_SCALE_NN: Skalieren OHNE Interpolation (Nearest-Neighbour).
     /// `IMAGE_SCALE` glaettet bilinear -- fuer Pixelgrafik ist das falsch: aus
     /// harten Kanten werden Farbverlaeufe, ein 8x8-Sprite auf 32x32 ist danach
