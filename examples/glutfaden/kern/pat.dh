@@ -1,0 +1,401 @@
+' PCStitch-Muster (.pat) lesen.
+'
+' PyStickys PAT-Leser (io/formats/pat_import.py) beschreibt ein Format, das es
+' so nicht gibt -- er erwartet die Kennung "PAT" und kann keine echte Datei
+' lesen. Dieser Leser ist am echten Beispiel entschluesselt (PCStitch 8,
+' "Cement Mixer" von CyberStitchers) und gegen das PDF geprueft, das PCStitch
+' selbst dazu gedruckt hat: jeder Stich samt Viertel- und Dreiviertelstichen
+' an seiner Stelle mit seinem Symbol, alle 210 Rueckstiche.
+'
+' Aufbau (alle Zahlen little-endian; "Text" = u32 Laenge + Bytes in cp1252):
+'
+'   0     "PCStitch 8 Pattern File" (ohne Laenge)
+'   0x2D  u32 Kennzahl, u32 2, u32 Hoehe, u32 Breite, u32 Stoff x, u32 Stoff y,
+'         u32 0, Text Notizen (RTF)
+'         Text ?, Text Webseite, Text Copyright, Text Autor, Text Titel,
+'         Text ?, Text Schrift, ... ein PNG ...
+'   "PCStitch 8a Floss Palette": 13 x u32, u32 Zahl der Farben, je Farbe:
+'         u32 0, Text Nummer, Text Name, 6 Bytes, Text Hersteller,
+'         Text Nummer, Text (Hersteller, aufgefuellt), Text, Text Name,
+'         u16 R, u16 G, u16 B, 4 + 32 Bytes, Text Symbolschrift,
+'         u32 Zeichen des Symbols, 446 Bytes, 36 Bytes Abschluss
+'   Gitter: u32 Breite, u32 Hoehe, u32 Stoff x, u32 Stoff y, u32 0, dann
+'         SPALTENweise in Laeufen: u32 Laenge, i32 n (-1 = leer), n Stiche zu
+'         u16 Spalte, u16 Zeile, u16 Lage, u32 Farbe, u32 Art
+'   Rueckstiche: u32 Zahl, je u16 x1, y1, Lage1, x2, y2, Lage2, u32 Farbe,
+'         u32, u32
+'
+' Eine "Lage" ist die Stelle in der Zelle wie auf einem Telefon-Ziffernblock:
+' 1 2 3 oben, 4 5 6 Mitte, 7 8 9 unten. Ein Stich der Art 1 ist ein ganzer;
+' Art 31..34 meint das Viertel oben links, oben rechts, unten links, unten
+' rechts -- mit der Lage der passenden Ecke ein Viertelstich, mit Lage 5 ein
+' Dreiviertelstich (dessen Ausrichtung Glutfaden nicht kennt, wie PySticky).
+' Zwei Stiche in einer Zelle landen auf zwei Ebenen.
+
+CLASS PatImport
+    DIM muster AS Muster
+    DIM warnungen AS ARRAY OF STRING
+    DIM fassung AS STRING
+END CLASS
+
+' Die Leseposition in der Datei; jeder Zugriff prueft das Ende.
+CLASS PatLeser
+    DIM daten AS BUFFER
+    DIM p AS INTEGER
+
+    SUB Init(b AS BUFFER)
+        daten = b
+    END SUB
+
+    SUB brauche(n AS INTEGER)
+        IF n < 0 OR p + n > BUFFER_LEN(daten) THEN THROW "PAT: Datei endet vorzeitig (bei Byte " + STR$(p) + ")"
+    END SUB
+
+    FUNCTION u16() AS INTEGER
+        brauche(2)
+        DIM w AS INTEGER : w = BUFFER_GET_U16(daten, p)
+        p = p + 2
+        RETURN w
+    END FUNCTION
+
+    FUNCTION u32() AS INTEGER
+        brauche(4)
+        DIM w AS INTEGER : w = BUFFER_GET_U32(daten, p)
+        p = p + 4
+        RETURN w
+    END FUNCTION
+
+    FUNCTION i32() AS INTEGER
+        brauche(4)
+        DIM w AS INTEGER : w = BUFFER_GET_I32(daten, p)
+        p = p + 4
+        RETURN w
+    END FUNCTION
+
+    SUB ueber(n AS INTEGER)
+        brauche(n)
+        p = p + n
+    END SUB
+
+    FUNCTION text$() AS STRING
+        DIM n AS INTEGER : n = u32()
+        IF n > 1000000 THEN THROW "PAT: unglaubwürdige Textlänge " + STR$(n) + " bei Byte " + STR$(p - 4)
+        brauche(n)
+        DIM t AS STRING : t = patCp1252$(daten, p, n)
+        p = p + n
+        RETURN t
+    END FUNCTION
+END CLASS
+
+' Bytes in cp1252 lesen (so schreibt PCStitch unter Windows).
+FUNCTION patCp1252$(b AS BUFFER, ab AS INTEGER, n AS INTEGER) AS STRING
+    DIM zusatz AS ARRAY OF INTEGER
+    zusatz = [&H20AC, &H81, &H201A, &H192, &H201E, &H2026, &H2020, &H2021, &H2C6, &H2030, &H160, &H2039, &H152, &H8D, &H17D, &H8F, _
+              &H90, &H2018, &H2019, &H201C, &H201D, &H2022, &H2013, &H2014, &H2DC, &H2122, &H161, &H203A, &H153, &H9D, &H17E, &H178]
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM c AS INTEGER : c = BUFFER_GET(b, ab + i)
+        IF c >= &H80 AND c <= &H9F THEN c = zusatz[c - &H80]
+        t = t + CHR$(c)
+    NEXT
+    RETURN t
+END FUNCTION
+
+' Die Notizen als Text: RTF ohne Steuerwoerter, Absaetze als Zeilen.
+FUNCTION patRtfText$(rtf AS STRING) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM n AS INTEGER : n = LEN(rtf)
+    DIM i AS INTEGER : i = 0
+    DIM tiefe AS INTEGER : tiefe = 0
+    DIM verborgen AS INTEGER : verborgen = -1        ' Tiefe der Gruppe ohne Text
+    DIM rueck AS STRING : rueck = CHR$(92)
+    IF LEFT$(rtf, 5) <> "{" + rueck + "rtf" THEN RETURN TRIM$(rtf)
+    WHILE i < n
+        DIM c AS STRING : c = MID$(rtf, i, 1)
+        IF c = "{" THEN
+            tiefe = tiefe + 1
+            IF verborgen < 0 THEN
+                DIM vor AS STRING : vor = MID$(rtf, i + 1, 12)
+                IF LEFT$(vor, 8) = rueck + "fonttbl" OR LEFT$(vor, 9) = rueck + "colortbl" OR LEFT$(vor, 11) = rueck + "stylesheet" OR LEFT$(vor, 5) = rueck + "info" OR LEFT$(vor, 2) = rueck + "*" THEN verborgen = tiefe
+            END IF
+            i = i + 1
+        ELSEIF c = "}" THEN
+            IF verborgen = tiefe THEN verborgen = -1
+            tiefe = tiefe - 1
+            i = i + 1
+        ELSEIF c = rueck THEN
+            DIM d AS STRING : d = MID$(rtf, i + 1, 1)
+            IF d = rueck OR d = "{" OR d = "}" THEN
+                IF verborgen < 0 THEN aus = aus + d
+                i = i + 2
+            ELSEIF d = "'" THEN
+                DIM h AS STRING : h = MID$(rtf, i + 2, 2)
+                IF verborgen < 0 AND REGEX_TEST(h, "^[0-9A-Fa-f]{2}$") THEN
+                    DIM eins AS BUFFER : eins = BUFFER_FROM_HEX(h)
+                    aus = aus + patCp1252$(eins, 0, 1)
+                END IF
+                i = i + 4
+            ELSEIF REGEX_TEST(d, "^[A-Za-z]$") THEN
+                DIM j AS INTEGER : j = i + 1
+                WHILE j < n AND REGEX_TEST(MID$(rtf, j, 1), "^[A-Za-z]$")
+                    j = j + 1
+                WEND
+                DIM wort AS STRING : wort = MID$(rtf, i + 1, j - i - 1)
+                DIM k AS INTEGER : k = j
+                IF k < n AND MID$(rtf, k, 1) = "-" THEN k = k + 1
+                WHILE k < n AND REGEX_TEST(MID$(rtf, k, 1), "^[0-9]$")
+                    k = k + 1
+                WEND
+                DIM zahl AS STRING : zahl = MID$(rtf, j, k - j)
+                IF k < n AND MID$(rtf, k, 1) = " " THEN k = k + 1
+                IF verborgen < 0 THEN
+                    IF wort = "par" OR wort = "line" THEN
+                        aus = aus + CHR$(10)
+                    ELSEIF wort = "tab" THEN
+                        aus = aus + CHR$(9)
+                    ELSEIF wort = "u" AND zahl <> "" THEN
+                        DIM cp AS INTEGER : cp = VAL(zahl)
+                        IF cp < 0 THEN cp = cp + 65536
+                        aus = aus + CHR$(cp)
+                        ' das Ersatzzeichen dahinter (\uc1) faellt weg
+                        IF k < n AND MID$(rtf, k, 1) <> rueck AND MID$(rtf, k, 1) <> "{" AND MID$(rtf, k, 1) <> "}" THEN k = k + 1
+                    END IF
+                END IF
+                i = k
+            ELSE
+                IF d = "~" AND verborgen < 0 THEN aus = aus + " "
+                i = i + 2
+            END IF
+        ELSEIF c = CHR$(13) OR c = CHR$(10) THEN
+            i = i + 1                                  ' Umbrueche im Quelltext zaehlen nicht
+        ELSE
+            IF verborgen < 0 AND tiefe >= 1 THEN aus = aus + c
+            i = i + 1
+        END IF
+    WEND
+    RETURN TRIM$(aus)
+END FUNCTION
+
+' Ein Symbol aus dem Zeichen der Symbolschrift: druckbar wie in PCStitchs
+' eigenem PDF (Latin-1), sonst "".
+FUNCTION patSymbol$(code AS INTEGER) AS STRING
+    IF (code >= &H21 AND code <= &H7E) OR (code >= &HA1 AND code <= &HFF AND code <> &HAD) THEN RETURN CHR$(code)
+    RETURN ""
+END FUNCTION
+
+' Art und Lage eines Stichs -> Stichtyp, -1 = unbekannt.
+FUNCTION patStichtyp(art AS INTEGER, lage AS INTEGER) AS INTEGER
+    IF art = 1 THEN RETURN VOLL
+    IF art < 31 OR art > 34 THEN RETURN -1
+    DIM ecke AS ARRAY OF INTEGER : ecke = [1, 3, 7, 9]
+    DIM viertel AS ARRAY OF INTEGER : viertel = [VIERTEL_OL, VIERTEL_OR, VIERTEL_UL, VIERTEL_UR]
+    IF lage = 5 THEN RETURN DREIVIERTEL
+    IF lage = ecke[art - 31] THEN RETURN viertel[art - 31]
+    RETURN -1
+END FUNCTION
+
+FUNCTION patLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS PatImport
+    DIM erg AS PatImport : erg = NEW PatImport()
+    erg.warnungen = []
+    DIM roh AS BUFFER
+    TRY
+        roh = READALL_BYTES(pfad)
+    CATCH e
+        THROW "PAT: Datei nicht lesbar – " + e
+    END TRY
+    DIM r AS PatLeser : r = NEW PatLeser(roh)
+    ' Kennung
+    DIM kopf AS STRING : kopf = patCp1252$(roh, 0, MIN(BUFFER_LEN(roh), 40))
+    IF LEFT$(kopf, 9) <> "PCStitch " THEN THROW "PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)"
+    DIM ende AS INTEGER : ende = INSTR(kopf, " Pattern File")
+    IF ende < 0 THEN THROW "PAT: keine PCStitch-Musterdatei"
+    erg.fassung = MID$(kopf, 9, ende - 9)
+    IF erg.fassung <> "8" THEN THROW "PAT: PCStitch " + erg.fassung + " wird noch nicht gelesen (bekannt ist PCStitch 8)"
+    r.p = &H2D
+    r.ueber(8)                                      ' Kennzahl, 2
+    DIM h AS INTEGER : h = r.u32()
+    DIM b AS INTEGER : b = r.u32()
+    DIM stoffX AS INTEGER : stoffX = r.u32()
+    DIM stoffY AS INTEGER : stoffY = r.u32()
+    r.ueber(4)
+    IF b < 1 OR h < 1 THEN THROW "PAT: ungültige Größe " + STR$(b) + "x" + STR$(h)
+    IF b > GROESSTES_MUSTER OR h > GROESSTES_MUSTER THEN THROW "PAT: Muster zu groß: " + STR$(b) + "x" + STR$(h) + " (höchstens " + STR$(GROESSTES_MUSTER) + ")"
+    DIM notizen AS STRING : notizen = patRtfText$(r.text$())
+    r.text$()
+    DIM webseite AS STRING : webseite = TRIM$(r.text$())
+    DIM recht AS STRING : recht = TRIM$(r.text$())
+    DIM autor AS STRING : autor = TRIM$(r.text$())
+    DIM titel AS STRING : titel = TRIM$(r.text$())
+    IF titel = "" THEN
+        titel = BASENAME(pfad)
+        IF INSTRREV(titel, ".") > 0 THEN titel = LEFT$(titel, INSTRREV(titel, "."))
+    END IF
+    DIM m AS Muster : m = NEW Muster(titel, b, h)
+    m.stoff = stoffX
+    IF stoffY <> stoffX THEN ARRAY_PUSH(erg.warnungen, "Der Stoff zählt waagerecht " + STR$(stoffX) + " und senkrecht " + STR$(stoffY) + " Stiche je Zoll – übernommen ist " + STR$(stoffX))
+    IF autor <> "" THEN JSON_SET_STRING(m.metadaten, "author", autor)
+    IF recht <> "" THEN JSON_SET_STRING(m.metadaten, "copyright", recht)
+    IF notizen <> "" THEN JSON_SET_STRING(m.metadaten, "notes", notizen)
+    IF webseite <> "" THEN JSON_SET_STRING(m.metadaten, "website", webseite)
+    JSON_SET_STRING(m.metadaten, "imported_from", "pat")
+    JSON_SET_STRING(m.metadaten, "pat_version", erg.fassung)
+    erg.muster = m
+
+    ' Die Palette
+    DIM pal AS INTEGER : pal = BUFFER_INDEXOF(roh, BUFFER_FROM_STRING(" Floss Palette"), r.p)
+    IF pal < 0 THEN THROW "PAT: keine Garnpalette gefunden"
+    r.p = pal + 14
+    DIM i AS INTEGER
+    FOR i = 1 TO 13 : r.u32() : NEXT
+    DIM nf AS INTEGER : nf = r.u32()
+    IF nf < 0 OR nf > 1000 THEN THROW "PAT: unglaubwürdige Farbzahl " + STR$(nf)
+    DIM bekannt AS MAP OF INTEGER : bekannt = garnVerzeichnis(paletten)
+    DIM ohneSymbol AS ARRAY OF STRING : ohneSymbol = []
+    DIM doppelt AS ARRAY OF STRING : doppelt = []
+    FOR i = 0 TO nf - 1
+        r.ueber(4)
+        DIM nummer AS STRING : nummer = TRIM$(r.text$())
+        DIM name AS STRING : name = TRIM$(r.text$())
+        r.ueber(6)
+        DIM hst AS STRING : hst = TRIM$(r.text$())
+        r.text$() : r.text$() : r.text$()
+        DIM name2 AS STRING : name2 = TRIM$(r.text$())
+        IF name = "" THEN name = name2
+        DIM rot AS INTEGER : rot = r.u16()
+        DIM gruen AS INTEGER : gruen = r.u16()
+        DIM blau AS INTEGER : blau = r.u16()
+        r.ueber(36)
+        r.text$()                                       ' Symbolschrift
+        DIM code AS INTEGER : code = r.u32()
+        r.ueber(446)
+        IF r.u32() <> &HFFFFFFFF THEN THROW "PAT: unbekannter Aufbau der Farbe " + STR$(i + 1) + " (" + hst + " " + nummer + ")"
+        r.ueber(32)
+        DIM garn AS Garn
+        DIM istP AS BOOLEAN, istD AS BOOLEAN
+        IF hst <> "" AND nummer <> "" THEN
+            DIM schl AS STRING : schl = LOWER$(hst) + "|" + LOWER$(nummer)
+            IF MAPHAS(bekannt, schl) THEN
+                DIM wo AS INTEGER : wo = MAPGET(bekannt, schl)
+                garn = paletten[wo \ 100000].garne[wo MOD 100000]
+                istP = paletten[wo \ 100000].istPerlen
+                istD = paletten[wo \ 100000].istDiamant
+            END IF
+        END IF
+        IF IS_NIL(garn) THEN garn = neuesGarn(IIF(name <> "", name, "Farbe " + STR$(i + 1)), RGB(rot BAND 255, gruen BAND 255, blau BAND 255), hst, nummer)
+        DIM sym AS STRING : sym = patSymbol$(code)
+        IF sym = "" THEN
+            ARRAY_PUSH(ohneSymbol, hst + " " + nummer)
+        ELSE
+            DIM f AS Farbeintrag
+            FOR EACH f IN m.farben
+                IF f.symbol = sym THEN sym = ""
+            NEXT
+            IF sym = "" THEN ARRAY_PUSH(doppelt, hst + " " + nummer)
+        END IF
+        IF sym = "" THEN sym = oxsSymbol$(m, symbole)
+        DIM fe AS Farbeintrag : fe = neuerFarbeintrag(garn, sym)
+        fe.istPerle = istP
+        fe.istDiamant = istD
+        ARRAY_PUSH(m.farben, fe)
+    NEXT
+    IF LEN(ohneSymbol) > 0 THEN ARRAY_PUSH(erg.warnungen, "Neues Symbol für " + JOIN$(ohneSymbol, ", ") + " (das Zeichen aus PCStitchs Symbolschrift ist nicht darstellbar)")
+    IF LEN(doppelt) > 0 THEN ARRAY_PUSH(erg.warnungen, "Neues Symbol für " + JOIN$(doppelt, ", ") + " (das Zeichen ist schon vergeben)")
+
+    ' Das Gitter: sein Kopf steht kurz hinter der Palette
+    DIM suche AS BUFFER : suche = BUFFER_NEW(8)
+    BUFFER_SET_U32(suche, 0, b)
+    BUFFER_SET_U32(suche, 4, h)
+    DIM g AS INTEGER : g = BUFFER_INDEXOF(roh, suche, r.p)
+    IF g < 0 OR g - r.p > 64 THEN THROW "PAT: Gitter nicht gefunden"
+    r.p = g + 20
+    DIM ebenen AS ARRAY OF Ebene : ebenen = [m.ebenen.aktiveEbene()]
+    DIM unbekannt AS MAP OF INTEGER : unbekannt = {}
+    DIM falscheFarbe AS INTEGER
+    DIM verschoben AS BOOLEAN
+    DIM zellen AS INTEGER : zellen = b * h
+    DIM pos AS INTEGER : pos = 0
+    WHILE pos < zellen
+        DIM lauf AS INTEGER : lauf = r.u32()
+        DIM zahl AS INTEGER : zahl = r.i32()
+        IF lauf < 1 OR pos + lauf > zellen THEN THROW "PAT: kaputter Lauf im Gitter bei Byte " + STR$(r.p - 8)
+        IF zahl < -1 OR zahl > 16 THEN THROW "PAT: unglaubwürdige Stichzahl " + STR$(zahl) + " bei Byte " + STR$(r.p - 4)
+        DIM k AS INTEGER
+        FOR k = 0 TO zahl - 1
+            DIM sx AS INTEGER : sx = r.u16()
+            DIM sy AS INTEGER : sy = r.u16()
+            DIM lage AS INTEGER : lage = r.u16()
+            DIM farbe AS INTEGER : farbe = r.u32()
+            DIM art AS INTEGER : art = r.u32()
+            IF sx <> pos \ h OR sy <> pos MOD h THEN verschoben = TRUE
+            DIM typ AS INTEGER : typ = patStichtyp(art, lage)
+            IF typ < 0 THEN
+                DIM uk AS STRING : uk = STR$(art) + "/" + STR$(lage)
+                MAPPUT(unbekannt, uk, IIF(MAPHAS(unbekannt, uk), MAPGET(unbekannt, uk), 0) + lauf)
+                CONTINUE
+            END IF
+            IF farbe >= nf THEN
+                falscheFarbe = falscheFarbe + lauf
+                CONTINUE
+            END IF
+            WHILE LEN(ebenen) <= k
+                DIM neu AS Ebene : neu = neueEbene("Teilstiche " + STR$(LEN(ebenen) + 1), b, h)
+                ARRAY_PUSH(m.ebenen.ebenen, neu)
+                ARRAY_PUSH(ebenen, neu)
+            WEND
+            DIM z AS INTEGER
+            FOR z = pos TO pos + lauf - 1
+                oxsSetzen(m, ebenen[k], z \ h, z MOD h, farbe, typ)
+            NEXT
+        NEXT
+        pos = pos + lauf
+    WEND
+    IF verschoben THEN ARRAY_PUSH(erg.warnungen, "Stiche nennen eine andere Zelle als ihr Platz im Gitter – es zählt der Platz")
+    IF falscheFarbe > 0 THEN ARRAY_PUSH(erg.warnungen, STR$(falscheFarbe) + " Stich(e) mit unbekannter Farbe übersprungen")
+    DIM uks AS STRING
+    FOR EACH uks IN MAPKEYS(unbekannt)
+        ARRAY_PUSH(erg.warnungen, STR$(MAPGET(unbekannt, uks)) + " Stich(e) unbekannter Art " + uks + " übersprungen")
+    NEXT
+    IF LEN(ebenen) > 1 THEN ARRAY_PUSH(erg.warnungen, "Zellen mit zwei Teilstichen: der zweite liegt auf der Ebene '" + ebenen[1].name + "'")
+
+    ' Rueckstiche
+    DIM nr AS INTEGER : nr = r.u32()
+    IF nr < 0 OR nr > 1000000 THEN THROW "PAT: unglaubwürdige Zahl der Rückstiche " + STR$(nr)
+    DIM gewarnt AS BOOLEAN
+    FOR i = 1 TO nr
+        DIM x1 AS INTEGER : x1 = r.u16()
+        DIM y1 AS INTEGER : y1 = r.u16()
+        DIM l1 AS INTEGER : l1 = r.u16()
+        DIM x2 AS INTEGER : x2 = r.u16()
+        DIM y2 AS INTEGER : y2 = r.u16()
+        DIM l2 AS INTEGER : l2 = r.u16()
+        DIM rf AS INTEGER : rf = r.u32()
+        r.ueber(8)
+        IF l1 < 1 OR l1 > 9 OR l2 < 1 OR l2 > 9 OR rf >= nf THEN
+            IF NOT gewarnt THEN ARRAY_PUSH(erg.warnungen, "Rückstiche mit unbekannter Farbe oder Lage verworfen")
+            gewarnt = TRUE
+            CONTINUE
+        END IF
+        DIM hx1 AS INTEGER : hx1 = 2 * x1 + (l1 - 1) MOD 3
+        DIM hy1 AS INTEGER : hy1 = 2 * y1 + (l1 - 1) \ 3
+        DIM hx2 AS INTEGER : hx2 = 2 * x2 + (l2 - 1) MOD 3
+        DIM hy2 AS INTEGER : hy2 = 2 * y2 + (l2 - 1) \ 3
+        IF hx1 > 2 * b OR hx2 > 2 * b OR hy1 > 2 * h OR hy2 > 2 * h THEN
+            IF NOT gewarnt THEN ARRAY_PUSH(erg.warnungen, "Rückstich-Koordinaten außerhalb der Mustergrenzen — betroffene Rückstiche werden verworfen")
+            gewarnt = TRUE
+            CONTINUE
+        END IF
+        ARRAY_PUSH(m.rueckstiche, neuerRueckstich(hx1, hy1, hx2, hy2, rf))
+    NEXT
+    ' Was danach noch steht, kennt dieser Leser nicht (Knoten, Perlen?)
+    DIM rest AS BOOLEAN
+    FOR i = r.p TO BUFFER_LEN(roh) - 1
+        IF BUFFER_GET(roh, i) <> 0 THEN
+            rest = TRUE
+            BREAK
+        END IF
+    NEXT
+    IF rest THEN ARRAY_PUSH(erg.warnungen, "Hinter den Rückstichen stehen noch Daten (Knoten oder Perlen?) – nicht gelesen")
+    m.stichzahlenNeu()
+    RETURN erg
+END FUNCTION

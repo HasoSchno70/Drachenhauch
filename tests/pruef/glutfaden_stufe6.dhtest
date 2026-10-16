@@ -1,0 +1,145 @@
+' Glutfaden Stufe 6: PCStitch (.pat), XSD, Diamond-Modus, Blends.
+'
+' PCStitch: der Leser ist an einer echten Datei samt dem PDF entschluesselt,
+' das PCStitch selbst davon gedruckt hat (siehe kern/pat.dh). Die Datei liegt
+' nicht im Repo (Rechte des Urhebers); geprueft wird hier an Dateien, die
+' _hilfen/glutfaden_pat.dh im selben Aufbau baut.
+
+=== pat: ein ganzes muster
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+DIM fa AS STRING : fa = phFarbe$("DMC", "310", "black", &H000000, ASC("X"))
+fa = fa + phFarbe$("Foo", "9999", "Testgarn", &H0C2238, &H8A)
+fa = fa + phFarbe$("DMC", "5200", "snow white", &HE6E6E6, ASC("X"))
+' spaltenweise, 4 x 3: (0,0) voll Farbe 0 | 3 leer ueber die Spaltengrenze |
+' (1,1) Viertel oben rechts + Dreiviertel unten links | (1,2) Viertel unten
+' rechts | (2,0..2) voll Farbe 2 | (3,0) unbekannte Art | (3,1) Farbe 7 | (3,2) leer
+DIM gi AS STRING : gi = phLauf$(1, 1, phStich$(0, 0, 5, 0, 1)) + phLeer$(3)
+gi = gi + phLauf$(1, 2, phStich$(1, 1, 3, 1, 32) + phStich$(1, 1, 5, 2, 33))
+gi = gi + phLauf$(1, 1, phStich$(1, 2, 9, 0, 34))
+gi = gi + phLauf$(3, 1, phStich$(2, 0, 5, 2, 1))
+gi = gi + phLauf$(1, 1, phStich$(3, 0, 5, 0, 7))
+gi = gi + phLauf$(1, 1, phStich$(3, 1, 5, 7, 1)) + phLeer$(1)
+DIM ru AS STRING : ru = phRueck$(0, 0, 1, 4, 3, 1, 0) + phRueck$(1, 1, 5, 2, 1, 6, 1) + phRueck$(2, 0, 3, 1, 2, 7, 2) + phRueck$(0, 0, 0, 1, 1, 1, 0)
+
+DIM b AS BUFFER : b = phDatei("8", 4, 3, 16, "{\rtf1\ansi{\fonttbl{\f0\fnil Arial;}}\viewkind4\pard\f0\fs20 Erste Zeile\par Zweite \'e4 \{x\}\par}", "Probe", "Hans", 3, fa, gi, 4, ru, phNull$(14))
+WRITEALL_BYTES("probe.pat", b)
+phZeigen(kern.patLaden("probe.pat", pal, sym))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+--- erwartet
+fassung 8 | Probe 4x3 stoff 16.0 ebenen 2
+farbe X DMC 310 Black #0C0C0C stiche 2
+farbe A Foo 9999 Testgarn #0C2238 stiche 1
+farbe B DMC 5200 Snow white Original #FFFFFF stiche 4
+ebene Hintergrund
+  0:0 . 2:0 .
+  . 1:4 2:0 .
+  . 0:6 2:0 .
+ebene Teilstiche 2
+  . . . .
+  . 2:7 . .
+  . . . .
+rueckstich 0,0 - 8,6 farbe 0
+rueckstich 3,3 - 6,3 farbe 1
+rueckstich 6,0 - 2,6 farbe 2
+{"author":"Hans","copyright":"2026","notes":"Erste Zeile\nZweite ä {x}","website":"www.example.org","imported_from":"pat","pat_version":"8"}
+warnung: Neues Symbol für Foo 9999 (das Zeichen aus PCStitchs Symbolschrift ist nicht darstellbar)
+warnung: Neues Symbol für DMC 5200 (das Zeichen ist schon vergeben)
+warnung: 1 Stich(e) mit unbekannter Farbe übersprungen
+warnung: 1 Stich(e) unbekannter Art 7/5 übersprungen
+warnung: Zellen mit zwei Teilstichen: der zweite liegt auf der Ebene 'Teilstiche 2'
+warnung: Rückstiche mit unbekannter Farbe oder Lage verworfen
+
+=== pat: notizen aus rtf
+IMPORT "helfer.dh"
+PRINT "[" + kern.patRtfText$("{\rtf1\ansi{\fonttbl{\f0\fnil Arial;}}{\colortbl;\red0\green0\blue0;}\pard\f0 Hallo\tab Welt\par\par {\*\generator x}Ende \u8364? \'80}") + "]"
+PRINT "[" + kern.patRtfText$("") + "]"
+PRINT "[" + kern.patRtfText$("ohne rtf") + "]"
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+--- erwartet
+[Hallo	Welt
+
+Ende € €]
+[]
+[ohne rtf]
+
+=== pat: ohne titel heisst es wie die datei, daten am ende werden gemeldet
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+DIM fa AS STRING : fa = phFarbe$("DMC", "310", "black", &H000000, ASC("X"))
+fa = fa + phFarbe$("Foo", "9999", "Testgarn", &H0C2238, &H8A)
+fa = fa + phFarbe$("DMC", "5200", "snow white", &HE6E6E6, ASC("X"))
+
+DIM gi AS STRING : gi = phLeer$(2)
+DIM b AS BUFFER : b = phDatei("8", 1, 2, 14, "", "", "", 3, fa, gi, 0, "", "0000000001000000")
+WRITEALL_BYTES("mein stueck.pat", b)
+phZeigen(kern.patLaden("mein stueck.pat", pal, sym))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+--- erwartet
+fassung 8 | mein stueck 1x2 stoff 14.0 ebenen 1
+farbe X DMC 310 Black #0C0C0C stiche 0
+farbe A Foo 9999 Testgarn #0C2238 stiche 0
+farbe B DMC 5200 Snow white Original #FFFFFF stiche 0
+ebene Hintergrund
+  .
+  .
+{"copyright":"2026","website":"www.example.org","imported_from":"pat","pat_version":"8"}
+warnung: Neues Symbol für Foo 9999 (das Zeichen aus PCStitchs Symbolschrift ist nicht darstellbar)
+warnung: Neues Symbol für DMC 5200 (das Zeichen ist schon vergeben)
+warnung: Hinter den Rückstichen stehen noch Daten (Knoten oder Perlen?) – nicht gelesen
+
+=== pat: fremde und kaputte dateien
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+DIM fa AS STRING : fa = phFarbe$("DMC", "310", "black", &H000000, ASC("X"))
+fa = fa + phFarbe$("Foo", "9999", "Testgarn", &H0C2238, &H8A)
+fa = fa + phFarbe$("DMC", "5200", "snow white", &HE6E6E6, ASC("X"))
+
+SUB versuch(name AS STRING, b AS BUFFER)
+    WRITEALL_BYTES("x.pat", b)
+    TRY
+        DIM imp AS kern.PatImport : imp = kern.patLaden("x.pat", pal, sym)
+        PRINT name; ": gelesen"
+    CATCH e
+        PRINT name; ": "; e
+    END TRY
+END SUB
+DIM gi AS STRING : gi = phLauf$(1, 1, phStich$(0, 0, 5, 0, 1))
+DIM gut AS BUFFER : gut = phDatei("8", 1, 1, 14, "", "T", "", 3, fa, gi, 0, "", "")
+versuch("gut", gut)
+versuch("kennung", BUFFER_FROM_STRING("PAT" + " " * 100))
+versuch("fassung 9", phDatei("9", 1, 1, 14, "", "T", "", 3, fa, gi, 0, "", ""))
+versuch("abgeschnitten", BUFFER_SLICE(gut, 0, BUFFER_LEN(gut) - 10))
+versuch("zu lauf", phDatei("8", 1, 1, 14, "", "T", "", 3, fa, phLauf$(2, 1, phStich$(0, 0, 5, 0, 1)), 0, "", ""))
+versuch("zu gross", phDatei("8", 2001, 1, 14, "", "T", "", 3, fa, gi, 0, "", ""))
+versuch("farbe kaputt", BUFFER_FROM_HEX(REPLACE$(UPPER$(BUFFER_TO_HEX$(gut)), "FFFFFFFF020000000200000002000000020000000200000002000000FFFFFFFF02000000", "EEFFFFFF020000000200000002000000020000000200000002000000FFFFFFFF02000000")))
+versuch("fehlt", BUFFER_FROM_STRING(""))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+--- erwartet
+gut: gelesen
+kennung: PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)
+fassung 9: PAT: PCStitch 9 wird noch nicht gelesen (bekannt ist PCStitch 8)
+abgeschnitten: PAT: Datei endet vorzeitig (bei Byte 2218)
+zu lauf: PAT: kaputter Lauf im Gitter bei Byte 2204
+zu gross: PAT: Muster zu groß: 2001x1 (höchstens 2000)
+farbe kaputt: PAT: unbekannter Aufbau der Farbe 1 (DMC 310)
+fehlt: PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)

@@ -272,16 +272,8 @@ FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY
     erg.muster = m
 
     ' Garne aller Paletten nach (hersteller, nummer), klein
-    DIM bekannt AS MAP OF INTEGER : bekannt = {}     ' Schluessel -> p * 100000 + i
-    DIM p AS INTEGER, i AS INTEGER
-    FOR p = 0 TO LEN(paletten) - 1
-        FOR i = 0 TO LEN(paletten[p].garne) - 1
-            DIM gg AS Garn : gg = paletten[p].garne[i]
-            IF gg.hersteller = "" OR gg.nummer = "" THEN CONTINUE
-            DIM sk AS STRING : sk = LOWER$(gg.hersteller) + "|" + LOWER$(gg.nummer)
-            IF NOT MAPHAS(bekannt, sk) THEN MAPPUT(bekannt, sk, p * 100000 + i)
-        NEXT
-    NEXT
+    DIM bekannt AS MAP OF INTEGER : bekannt = garnVerzeichnis(paletten)
+    DIM i AS INTEGER
     IF NOT XML_HAS(x, "palette") THEN THROW "OXS: keine <palette>"
     DIM pal AS XML_HANDLE : pal = XML_FIND(x, "palette")
     DIM zuordnung AS MAP OF INTEGER : zuordnung = {}   ' palindex -> Farbnummer

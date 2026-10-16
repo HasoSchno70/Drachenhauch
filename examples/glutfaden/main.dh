@@ -205,23 +205,31 @@ END FUNCTION
 
 FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     DIM m AS kern.Muster
-    DIM oxsHinweis AS STRING
-    DIM ausOxs AS BOOLEAN : ausOxs = LOWER$(RIGHT$(pfad, 4)) = ".oxs"
+    DIM fremdHinweis AS STRING
+    DIM endung AS STRING : endung = LOWER$(RIGHT$(pfad, 4))
+    DIM fremd AS BOOLEAN : fremd = endung = ".oxs" OR endung = ".pat"
     TRY
-        IF ausOxs THEN
-            ' ein fremdes Format: eingelesen, gesichert wird als .pxs
+        ' ein fremdes Format: eingelesen, gesichert wird als .pxs
+        DIM warnungen AS ARRAY OF STRING : warnungen = []
+        IF endung = ".oxs" THEN
             DIM imp AS kern.OxsImport : imp = kern.oxsLaden(pfad, slPaletten, slSymbole)
             m = imp.muster
-            oxsHinweis = "Aus OXS eingelesen -- Sichern legt eine .pxs an."
-            IF LEN(imp.warnungen) > 0 THEN oxsHinweis = oxsHinweis + " " + JOIN$(imp.warnungen, " ")
+            warnungen = imp.warnungen
+            fremdHinweis = "Aus OXS eingelesen -- Sichern legt eine .pxs an."
+        ELSEIF endung = ".pat" THEN
+            DIM pimp AS kern.PatImport : pimp = kern.patLaden(pfad, slPaletten, slSymbole)
+            m = pimp.muster
+            warnungen = pimp.warnungen
+            fremdHinweis = "Aus PCStitch eingelesen -- Sichern legt eine .pxs an."
         ELSE
             m = kern.pxsLaden(pfad)
         END IF
+        IF LEN(warnungen) > 0 THEN fremdHinweis = fremdHinweis + " " + JOIN$(warnungen, " ")
     CATCH e
         statusMeldung("Nicht geöffnet: " + e)
         RETURN FALSE
     END TRY
-    musterPfad = IIF(ausOxs, "", pfad)
+    musterPfad = IIF(fremd, "", pfad)
     musterTitel = IIF(m.name <> "", m.name, BASENAME(pfad))
     wzVerlauf.leeren()
     extraGeaendert = FALSE
@@ -230,7 +238,7 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     seitenleisteMuster(m)
     zustandNachziehen()
     statusNachziehen()
-    IF oxsHinweis <> "" THEN statusMeldung(oxsHinweis)
+    IF fremdHinweis <> "" THEN statusMeldung(fremdHinweis)
     RETURN TRUE
 END FUNCTION
 
@@ -274,9 +282,12 @@ FUNCTION dateiWaehlen(sichern AS BOOLEAN) AS STRING
             "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Öffnen", GTK_ANTWORT_ANNEHMEN, 0)
     END IF
     DIM filter AS INTEGER : filter = gtk_file_filter_new()
-    gtk_file_filter_set_name(filter, IIF(sichern, "Kreuzstich-Muster (*.pxs)", "Kreuzstich-Muster (*.pxs, *.oxs)"))
+    gtk_file_filter_set_name(filter, IIF(sichern, "Kreuzstich-Muster (*.pxs)", "Kreuzstich-Muster (*.pxs, *.oxs, *.pat)"))
     gtk_file_filter_add_pattern(filter, "*.pxs")
-    IF NOT sichern THEN gtk_file_filter_add_pattern(filter, "*.oxs")
+    IF NOT sichern THEN
+        gtk_file_filter_add_pattern(filter, "*.oxs")
+        gtk_file_filter_add_pattern(filter, "*.pat")
+    END IF
     gtk_file_chooser_add_filter(d, filter)
     DIM pfad AS STRING
     IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN

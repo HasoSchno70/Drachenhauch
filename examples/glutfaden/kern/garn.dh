@@ -85,6 +85,23 @@ CLASS Palette
     END FUNCTION
 END CLASS
 
+' Die Garne aller Paletten nach "hersteller|nummer" (klein): der Wert ist
+' p * 100000 + i (Palette p, Garn i). Bei gleichem Schluessel gewinnt das
+' erste -- so ordnen OXS und PAT ein Garn aus der Datei einer Palette zu.
+FUNCTION garnVerzeichnis(paletten AS ARRAY OF Palette) AS MAP OF INTEGER
+    DIM bekannt AS MAP OF INTEGER : bekannt = {}
+    DIM p AS INTEGER, i AS INTEGER
+    FOR p = 0 TO LEN(paletten) - 1
+        FOR i = 0 TO LEN(paletten[p].garne) - 1
+            DIM gg AS Garn : gg = paletten[p].garne[i]
+            IF gg.hersteller = "" OR gg.nummer = "" THEN CONTINUE
+            DIM sk AS STRING : sk = LOWER$(gg.hersteller) + "|" + LOWER$(gg.nummer)
+            IF NOT MAPHAS(bekannt, sk) THEN MAPPUT(bekannt, sk, p * 100000 + i)
+        NEXT
+    NEXT
+    RETURN bekannt
+END FUNCTION
+
 ' Herstellername aus dem Dateinamen: "Mill_Hill_Beads_Farben" -> "Mill Hill Beads".
 FUNCTION herstellerAusDatei$(pfad AS STRING) AS STRING
     DIM n AS STRING : n = BASENAME(pfad)
