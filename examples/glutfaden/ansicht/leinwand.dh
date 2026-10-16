@@ -267,11 +267,14 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
 
     ' Besondere Stichtypen: die Zelle zuerst wieder Stoff, dann die Form
     DIM gemischt AS BOOLEAN : gemischt = lwMischen()
+    ' Diamond Painting: auch ein ganzer Stich ist ein Drill (PySticky diamond_view)
+    DIM drills AS BOOLEAN : drills = lwMuster.modus = "diamond"
     IF z >= 6 THEN
         FOR y = y0 TO y1
             FOR x = x0 TO x1
                 i = y * b + x
                 t = lwTyp[i]
+                IF t = 0 AND drills THEN t = kern.DIAMANT
                 IF t = 0 OR lwFarbe[i] < 0 THEN CONTINUE
                 ' gemischt: die Farbe aus dem Bild, damit auch Teilstiche durchscheinen
                 IF gemischt THEN

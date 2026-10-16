@@ -25,6 +25,9 @@
 ' 1:1, Mystery, Wasserzeichen, Notizen, Entsprechungen anderer Hersteller),
 ' HTML-Anleitung, Bild, Open Cross Stitch (.oxs, auch zum Oeffnen) und ein
 ' Paket als ZIP. Ohne Passwortschutz.
+' Stufe 6: echte PCStitch- (.pat) und Pattern-Maker-Muster (.xsd) oeffnen,
+' Diamond Painting (Strg+D: die Farben wechseln in die Drill-Palette, zurueck
+' kommen dieselben Garne), Tweed-Blends aus zwei Garnen (Strg+B).
 '
 ' Aufbau:
 '     kern/      Muster, Ebenen, Garne, Paletten, .pxs, Formen, Verlauf,
@@ -90,6 +93,7 @@ DIM status AS INTEGER
 DIM kZurueck AS INTEGER
 DIM kVor AS INTEGER
 DIM kSichern AS INTEGER
+DIM kModus AS INTEGER
 DIM musterPfad AS STRING
 DIM musterTitel AS STRING
 DIM extraGeaendert AS BOOLEAN         ' Sichtbarkeit, Sperre, Deckkraft (kein Schritt)
@@ -205,32 +209,46 @@ END FUNCTION
 
 FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     DIM m AS kern.Muster
-    DIM oxsHinweis AS STRING
-    DIM ausOxs AS BOOLEAN : ausOxs = LOWER$(RIGHT$(pfad, 4)) = ".oxs"
+    DIM fremdHinweis AS STRING
+    DIM endung AS STRING : endung = LOWER$(RIGHT$(pfad, 4))
+    DIM fremd AS BOOLEAN : fremd = endung = ".oxs" OR endung = ".pat" OR endung = ".xsd"
     TRY
-        IF ausOxs THEN
-            ' ein fremdes Format: eingelesen, gesichert wird als .pxs
+        ' ein fremdes Format: eingelesen, gesichert wird als .pxs
+        DIM warnungen AS ARRAY OF STRING : warnungen = []
+        IF endung = ".oxs" THEN
             DIM imp AS kern.OxsImport : imp = kern.oxsLaden(pfad, slPaletten, slSymbole)
             m = imp.muster
-            oxsHinweis = "Aus OXS eingelesen -- Sichern legt eine .pxs an."
-            IF LEN(imp.warnungen) > 0 THEN oxsHinweis = oxsHinweis + " " + JOIN$(imp.warnungen, " ")
+            warnungen = imp.warnungen
+            fremdHinweis = "Aus OXS eingelesen -- Sichern legt eine .pxs an."
+        ELSEIF endung = ".pat" THEN
+            DIM pimp AS kern.PatImport : pimp = kern.patLaden(pfad, slPaletten, slSymbole)
+            m = pimp.muster
+            warnungen = pimp.warnungen
+            fremdHinweis = "Aus PCStitch eingelesen -- Sichern legt eine .pxs an."
+        ELSEIF endung = ".xsd" THEN
+            DIM ximp AS kern.XsdImport : ximp = kern.xsdLaden(pfad, slPaletten, slSymbole)
+            m = ximp.muster
+            warnungen = ximp.warnungen
+            fremdHinweis = "Aus Pattern Maker eingelesen -- Sichern legt eine .pxs an."
         ELSE
             m = kern.pxsLaden(pfad)
         END IF
+        IF LEN(warnungen) > 0 THEN fremdHinweis = fremdHinweis + " " + JOIN$(warnungen, " ")
     CATCH e
         statusMeldung("Nicht geöffnet: " + e)
         RETURN FALSE
     END TRY
-    musterPfad = IIF(ausOxs, "", pfad)
+    musterPfad = IIF(fremd, "", pfad)
     musterTitel = IIF(m.name <> "", m.name, BASENAME(pfad))
     wzVerlauf.leeren()
     extraGeaendert = FALSE
     wzFarbe = IIF(m.farbanzahl() > 0, 0, -1)
     leinwandMuster(m)
     seitenleisteMuster(m)
+    modusKnopfNachziehen()
     zustandNachziehen()
     statusNachziehen()
-    IF oxsHinweis <> "" THEN statusMeldung(oxsHinweis)
+    IF fremdHinweis <> "" THEN statusMeldung(fremdHinweis)
     RETURN TRUE
 END FUNCTION
 
@@ -274,9 +292,13 @@ FUNCTION dateiWaehlen(sichern AS BOOLEAN) AS STRING
             "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Öffnen", GTK_ANTWORT_ANNEHMEN, 0)
     END IF
     DIM filter AS INTEGER : filter = gtk_file_filter_new()
-    gtk_file_filter_set_name(filter, IIF(sichern, "Kreuzstich-Muster (*.pxs)", "Kreuzstich-Muster (*.pxs, *.oxs)"))
+    gtk_file_filter_set_name(filter, IIF(sichern, "Kreuzstich-Muster (*.pxs)", "Kreuzstich-Muster (*.pxs, *.oxs, *.pat, *.xsd)"))
     gtk_file_filter_add_pattern(filter, "*.pxs")
-    IF NOT sichern THEN gtk_file_filter_add_pattern(filter, "*.oxs")
+    IF NOT sichern THEN
+        gtk_file_filter_add_pattern(filter, "*.oxs")
+        gtk_file_filter_add_pattern(filter, "*.pat")
+        gtk_file_filter_add_pattern(filter, "*.xsd")
+    END IF
     gtk_file_chooser_add_filter(d, filter)
     DIM pfad AS STRING
     IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
@@ -322,6 +344,31 @@ END SUB
 
 SUB exportGeklickt(knopf AS INTEGER, daten AS INTEGER) : exportDialog() : END SUB
 
+' Kreuzstich <-> Diamond Painting (Strg+D, PySticky "Diamond-Painting-Ansicht").
+' Wie dort ist der Wechsel kein Schritt im Verlauf -- der Verlauf wird geleert,
+' weil er die alten Stichtypen haelt; Strg+D noch einmal holt die Garne genau
+' zurueck (der gemerkte Stand in mode_backups).
+SUB modusUmschalten()
+    IF NOT lwHat THEN RETURN
+    DIM ziel AS STRING : ziel = IIF(lwMuster.modus = "diamond", "stitch", "diamond")
+    DIM ok AS BOOLEAN : ok = kern.modusWechseln(lwMuster, ziel, slPaletten)
+    wzVerlauf.leeren()
+    mrAblage = NIL
+    extraGeaendert = TRUE
+    allesNeu()
+    modusKnopfNachziehen()
+    statusMeldung(IIF(ziel = "diamond", "Diamond Painting -- die Farben sind jetzt Drills der Palette DMC Diamond Painting (Strg+D zurück).", "Kreuzstich -- die Garne von vorher sind zurück (Strg+D: wieder Diamond Painting)."))
+END SUB
+
+SUB modusGeklickt(knopf AS INTEGER, daten AS INTEGER) : modusUmschalten() : END SUB
+
+SUB modusKnopfNachziehen()
+    IF kModus = 0 THEN RETURN
+    DIM dp AS BOOLEAN : dp = lwHat
+    IF dp THEN dp = lwMuster.modus = "diamond"
+    gtk_button_set_label(kModus, IIF(dp, "◆ Diamond", "✕ Kreuzstich"))
+END SUB
+
 SUB sichernUnter()
     IF NOT lwHat THEN RETURN
     DIM pfad AS STRING : pfad = dateiWaehlen(TRUE)
@@ -347,7 +394,7 @@ SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 5", _
+    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 6", _
         "comments", "Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.", _
         "website", "https://github.com/HasoSchno70/Pysticky", "website-label", "PySticky (das Original)", 0)
 END SUB
@@ -382,6 +429,8 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
             CASE &H61, &H41 : auswahlAlles()                     ' Strg+A
             CASE &H72, &H52 : farbeErsetzenDialog()              ' Strg+R
             CASE &H65, &H45 : exportDialog()                     ' Strg+E
+            CASE &H64, &H44 : modusUmschalten()                  ' Strg+D
+            CASE &H62, &H42 : blendDialog()                      ' Strg+B
             CASE &H69, &H49                                      ' Strg+I, Strg+Umschalt+I
                 IF umschalt THEN bildNeuImportieren() ELSE bildImportieren()
             CASE &H6E, &H4E                                      ' Strg+Umschalt+N
@@ -455,6 +504,10 @@ gtk_header_bar_pack_start(kopf, kSichern)
 gtk_header_bar_pack_start(kopf, kExport)
 gtk_header_bar_pack_start(kopf, kZurueck)
 gtk_header_bar_pack_start(kopf, kVor)
+kModus = gtk_button_new_with_label("✕ Kreuzstich")
+gtk_widget_set_tooltip_text(kModus, "Kreuzstich oder Diamond Painting (Strg+D) -- die Farben wechseln in die passende Palette, zurück kommen dieselben Garne")
+gtk_widget_set_can_focus(kModus, FALSE)
+gtk_header_bar_pack_start(kopf, kModus)
 DIM kEinpassen AS INTEGER : kEinpassen = knopf("zoom-fit-best-symbolic", "Einpassen (0)")
 DIM kGroesser AS INTEGER : kGroesser = knopf("zoom-in-symbolic", "Größer (+)")
 DIM kKleiner AS INTEGER : kKleiner = knopf("zoom-out-symbolic", "Kleiner (-)")
@@ -489,6 +542,7 @@ signal(kSichern, "clicked", sichernGeklickt, 0, 0, 0)
 signal(kExport, "clicked", exportGeklickt, 0, 0, 0)
 signal(kZurueck, "clicked", zurueckGeklickt, 0, 0, 0)
 signal(kVor, "clicked", vorGeklickt, 0, 0, 0)
+signal(kModus, "clicked", modusGeklickt, 0, 0, 0)
 signal(kKleiner, "clicked", kleinerGeklickt, 0, 0, 0)
 signal(kGroesser, "clicked", groesserGeklickt, 0, 0, 0)
 signal(kEinpassen, "clicked", einpassenGeklickt, 0, 0, 0)
@@ -514,6 +568,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe4"
     ELSEIF ARG$(a) = "--probe-stufe5" THEN
         probe = "stufe5"
+    ELSEIF ARG$(a) = "--probe-stufe6" THEN
+        probe = "stufe6"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -530,5 +586,6 @@ IF probe = "bearbeiten" THEN g_timeout_add(300, vorfuehrenBearbeiten, 0)
 IF probe = "stufe3" THEN g_timeout_add(300, vorfuehrenStufe3, 0)
 IF probe = "stufe4" THEN g_timeout_add(300, vorfuehrenStufe4, 0)
 IF probe = "stufe5" THEN g_timeout_add(300, vorfuehrenStufe5, 0)
+IF probe = "stufe6" THEN g_timeout_add(300, vorfuehrenStufe6, 0)
 
 gtk_main()

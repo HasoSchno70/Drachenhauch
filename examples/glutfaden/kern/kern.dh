@@ -18,6 +18,10 @@ IMPORT "auswahl.dh" AS kern
 IMPORT "bildimport.dh" AS kern
 IMPORT "export.dh" AS kern
 IMPORT "oxs.dh" AS kern
+IMPORT "pat.dh" AS kern
+IMPORT "xsdhersteller.dh" AS kern
+IMPORT "xsd.dh" AS kern
+IMPORT "diamant.dh" AS kern
 IMPORT "bildexport.dh" AS kern
 IMPORT "pdfexport.dh" AS kern
 IMPORT "htmlexport.dh" AS kern

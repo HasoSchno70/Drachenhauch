@@ -317,11 +317,29 @@ END FUNCTION
 ' Ein Garn ins Muster nehmen. Gibt es dasselbe (Hersteller und Nummer) schon,
 ' liefert es dessen Nummer und aendert nichts. Neue Farben bekommen das erste
 ' freie Symbol, danach "#1", "#2" ... (nie "?" -- das hiesse "nicht vergeben").
+' Die Strang-Anteile eines Blends als Text ("1+2"), leer ohne.
+FUNCTION anteileText$(g AS Garn) AS STRING
+    DIM t AS STRING : t = ""
+    DIM a AS INTEGER
+    FOR EACH a IN g.anteile
+        t = t + IIF(t = "", "", "+") + STR$(a)
+    NEXT
+    RETURN t
+END FUNCTION
+
 FUNCTION farbeHinzufuegen(m AS Muster, v AS Verlauf, g AS Garn, symbole AS ARRAY OF STRING, perle AS BOOLEAN, diamant AS BOOLEAN) AS INTEGER
     DIM i AS INTEGER
+    ' schon im Muster? (PySticky add_color_to_pattern): gleicher Hersteller und
+    ' gleiche Nummer -- bei Blends auch dasselbe Strangverhaeltnis, denn die
+    ' Nummer "310+745" nennt nur die Garne --, ohne Nummer gleiche Farbe
     FOR i = 0 TO m.farbanzahl() - 1
         DIM h AS Garn : h = m.farben[i].garn
-        IF g.nummer <> "" AND h.nummer = g.nummer AND h.hersteller = g.hersteller THEN RETURN i
+        IF h.hersteller <> g.hersteller THEN CONTINUE
+        IF g.nummer = "" AND h.nummer = "" THEN
+            IF h.farbe = g.farbe THEN RETURN i
+        ELSEIF h.nummer = g.nummer AND anteileText$(h) = anteileText$(g) THEN
+            RETURN i
+        END IF
     NEXT
     DIM benutzt AS MAP OF BOOLEAN : benutzt = {}
     DIM f AS Farbeintrag

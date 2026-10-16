@@ -1,0 +1,109 @@
+' Zwischen Kreuzstich und Diamond Painting wechseln (PySticky
+' Pattern.convert_to_mode).
+'
+' Jede Farbe bekommt das naechste Garn bzw. den naechsten Drill der
+' Vorgabe-Palette des Ziels ("DMC Diamond Painting" bzw. "DMC", CIEDE2000).
+' Vorher wird der Stand jeder Farbe unter metadaten.mode_backups.<modus>
+' gemerkt -- nach ihrer farbId, nicht nach ihrem Platz --, und ein Rueckweg
+' nimmt diesen Stand statt eines zweiten Naechsten (der leicht abdriftete).
+' Perlen bleiben, wie sie sind. Aus einem typischen Aida-Stoff wird 10 (ein
+' 2,5-mm-Drill), zurueck der gemerkte Stoff.
+'
+' Wie PySticky stempelt der Wechsel alle Zellen einer gewechselten Farbe auf
+' ganz bzw. Drill um -- auch Teilstiche; der gemerkte Stand haelt nur die
+' Garne, nicht die Stichtypen.
+
+FUNCTION paletteNamens(paletten AS ARRAY OF Palette, name AS STRING) AS Palette
+    DIM p AS Palette
+    FOR EACH p IN paletten
+        IF LOWER$(p.name) = LOWER$(name) THEN RETURN p
+    NEXT
+    RETURN NIL
+END FUNCTION
+
+FUNCTION modusWechseln(m AS Muster, ziel AS STRING, paletten AS ARRAY OF Palette) AS BOOLEAN
+    IF ziel <> "stitch" AND ziel <> "diamond" THEN RETURN FALSE
+    IF ziel = m.modus THEN RETURN FALSE
+    DIM stoff AS INTEGER : stoff = INT(m.stoff)
+    DIM ganz AS BOOLEAN : ganz = m.stoff = stoff
+    IF ziel = "diamond" AND ganz AND (stoff = 11 OR stoff = 14 OR stoff = 16 OR stoff = 18 OR stoff = 20 OR stoff = 22 OR stoff = 25) THEN
+        JSON_SET_INT(m.metadaten, "stitch_fabric_count", stoff)
+        m.stoff = 10
+    ELSEIF ziel = "stitch" AND ganz AND stoff >= 8 AND stoff <= 10 THEN
+        m.stoff = 14
+        IF JSON_TYPE(m.metadaten, "stitch_fabric_count") = "number" THEN m.stoff = JSON_GET_INT(m.metadaten, "stitch_fabric_count")
+    END IF
+
+    IF LEN(m.farben) > 0 THEN
+        IF JSON_TYPE(m.metadaten, "mode_backups") <> "object" THEN JSON_SET_JSON(m.metadaten, "mode_backups", JSON_NEW_OBJECT())
+        ' den jetzigen Stand merken
+        DIM stand AS JSON_HANDLE : stand = JSON_NEW_OBJECT()
+        DIM f AS Farbeintrag
+        FOR EACH f IN m.farben
+            IF f.istPerle THEN CONTINUE
+            DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+            JSON_SET_STRING(e, "name", f.garn.name)
+            JSON_SET_STRING(e, "color", farbeAlsHex$(f.garn.farbe))
+            JSON_SET_STRING(e, "manufacturer", f.garn.hersteller)
+            JSON_SET_STRING(e, "catalog_number", f.garn.nummer)
+            JSON_SET_BOOL(e, "is_diamond", f.istDiamant)
+            JSON_SET_JSON(stand, f.farbId, e)
+        NEXT
+        JSON_SET_JSON(m.metadaten, "mode_backups." + m.modus, stand)
+        DIM gemerkt AS BOOLEAN : gemerkt = JSON_TYPE(m.metadaten, "mode_backups." + ziel) = "object"
+        DIM pal AS Palette : pal = paletteNamens(paletten, IIF(ziel = "diamond", "DMC Diamond Painting", "DMC"))
+        DIM gf AS Garnfarben
+        IF NOT IS_NIL(pal) AND LEN(pal.garne) > 0 THEN gf = garnfarbenVon(pal.garne)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(m.farben) - 1
+            DIM fe AS Farbeintrag : fe = m.farben[i]
+            IF fe.istPerle THEN CONTINUE
+            DIM w AS STRING : w = "mode_backups." + ziel + "." + fe.farbId
+            IF gemerkt AND JSON_TYPE(m.metadaten, w) = "object" THEN
+                DIM fw AS INTEGER : fw = farbeAusHex(modusText$(m.metadaten, w + ".color"))
+                IF fw >= 0 THEN
+                    fe.garn = neuesGarn(modusText$(m.metadaten, w + ".name"), fw, modusText$(m.metadaten, w + ".manufacturer"), modusText$(m.metadaten, w + ".catalog_number"))
+                    DIM wieder AS BOOLEAN : wieder = JSON_TYPE(m.metadaten, w + ".is_diamond") = "boolean"
+                    IF wieder THEN wieder = JSON_GET_BOOL(m.metadaten, w + ".is_diamond")
+                    IF wieder <> fe.istDiamant THEN
+                        fe.istDiamant = wieder
+                        modusUmstempeln(m, i, wieder)
+                    END IF
+                    CONTINUE
+                END IF
+            END IF
+            ' kein gemerkter Stand: das Naechste der Vorgabe-Palette
+            IF IS_NIL(gf) THEN CONTINUE
+            DIM schon AS BOOLEAN : schon = (ziel = "diamond") = fe.istDiamant
+            ' (entsprechung gibt das Garn selbst zurueck, wenn es schon aus der Palette stammt)
+            DIM selbst AS BOOLEAN : selbst = fe.garn.hersteller <> "" AND LOWER$(fe.garn.hersteller) = LOWER$(pal.name)
+            IF schon AND selbst THEN CONTINUE
+            DIM treffer AS Garn : treffer = entsprechung(fe.garn, pal, gf)
+            IF IS_NIL(treffer) THEN CONTINUE
+            fe.garn = treffer
+            IF (ziel = "diamond") <> fe.istDiamant THEN
+                fe.istDiamant = ziel = "diamond"
+                modusUmstempeln(m, i, fe.istDiamant)
+            END IF
+        NEXT
+    END IF
+    m.modus = ziel
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION modusText$(j AS JSON_HANDLE, pfad AS STRING) AS STRING
+    IF JSON_TYPE(j, pfad) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(j, pfad)
+END FUNCTION
+
+' Alle Zellen der Farbe `farbe` auf allen Ebenen: Drill bzw. ganzer Stich.
+SUB modusUmstempeln(m AS Muster, farbe AS INTEGER, zuDrill AS BOOLEAN)
+    DIM art AS INTEGER : art = IIF(zuDrill, DIAMANT, VOLL)
+    DIM eb AS Ebene
+    FOR EACH eb IN m.ebenen.ebenen
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(eb.raster) - 1
+            IF eb.raster[i] = farbe THEN eb.art[i] = art
+        NEXT
+    NEXT
+END SUB

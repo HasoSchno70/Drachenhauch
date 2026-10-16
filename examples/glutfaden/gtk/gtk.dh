@@ -39,6 +39,8 @@ DECLARE SUB gtk_container_set_border_width LIB GTK (behaelter AS ZEIGER, rand AS
 ' --- Bedienelemente
 DECLARE FUNCTION gtk_button_new_from_icon_name LIB GTK (name AS TEXT, groesse AS LONG) AS ZEIGER
 DECLARE FUNCTION gtk_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
+DECLARE SUB gtk_button_set_label LIB GTK (knopf AS ZEIGER, text AS TEXT)
+DECLARE FUNCTION gtk_button_get_label LIB GTK (knopf AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_button_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_button_clicked LIB GTK (knopf AS ZEIGER)
 DECLARE FUNCTION gtk_check_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
@@ -46,6 +48,9 @@ DECLARE FUNCTION gtk_toggle_button_get_active LIB GTK (knopf AS ZEIGER) AS BOOLE
 DECLARE SUB gtk_toggle_button_set_active LIB GTK (knopf AS ZEIGER, an AS BOOLEAN)
 DECLARE FUNCTION gtk_label_new LIB GTK (text AS TEXT) AS ZEIGER
 DECLARE SUB gtk_label_set_text LIB GTK (label AS ZEIGER, text AS TEXT)
+DECLARE SUB gtk_label_set_markup LIB GTK (label AS ZEIGER, text AS TEXT)
+DECLARE SUB gtk_label_set_line_wrap LIB GTK (label AS ZEIGER, an AS BOOLEAN)
+DECLARE SUB gtk_label_set_max_width_chars LIB GTK (label AS ZEIGER, n AS LONG)
 DECLARE FUNCTION gtk_label_get_text LIB GTK (label AS ZEIGER) AS TEXT
 DECLARE SUB gtk_label_set_xalign LIB GTK (label AS ZEIGER, x AS SINGLE)
 DECLARE SUB gtk_label_set_ellipsize LIB GTK (label AS ZEIGER, art AS LONG)
@@ -60,6 +65,7 @@ DECLARE SUB gtk_list_box_unselect_all LIB GTK (box AS ZEIGER)
 DECLARE FUNCTION gtk_list_box_row_get_index LIB GTK (zeile AS ZEIGER) AS LONG
 DECLARE FUNCTION gtk_combo_box_text_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_combo_box_text_append_text LIB GTK (wahl AS ZEIGER, text AS TEXT)
+DECLARE SUB gtk_combo_box_text_remove_all LIB GTK (wahl AS ZEIGER)
 DECLARE SUB gtk_combo_box_set_active LIB GTK (wahl AS ZEIGER, nr AS LONG)
 DECLARE FUNCTION gtk_combo_box_get_active LIB GTK (wahl AS ZEIGER) AS LONG
 DECLARE FUNCTION gtk_entry_new LIB GTK () AS ZEIGER
