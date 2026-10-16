@@ -124,3 +124,30 @@ inhalte = SPLIT$("nur eins", "|")
 ZIP_WRITE("f.zip", namen, inhalte)
 --- fehler
 gleich lang
+
+=== puffer kommen byte fuer byte ins archiv
+' Bis 2026-10-16 wurde jede Zelle zu Text: ein BUFFER landete als
+' "<BUFFER 4 Bytes>" im Archiv, ohne Meldung.
+DIM namen AS ARRAY OF STRING
+namen = SPLIT$("bild.bin|unter/text.txt", "|")
+DIM b AS BUFFER : b = BUFFER_NEW(4)
+BUFFER_SET(b, 0, 0) : BUFFER_SET(b, 1, 255) : BUFFER_SET(b, 2, 137) : BUFFER_SET(b, 3, 80)
+DIM inhalte AS ARRAY OF BUFFER
+inhalte = [b, BUFFER_FROM_STRING("Grüße")]
+PRINT ZIP_WRITE("f.zip", namen, inhalte)
+DIM r AS BUFFER : r = ZIP_READ("f.zip", "bild.bin")
+PRINT BUFFER_LEN(r); " "; BUFFER_GET(r, 0); " "; BUFFER_GET(r, 1); " "; BUFFER_GET(r, 2); " "; BUFFER_GET(r, 3)
+PRINT ZIP_READ$("f.zip", "unter/text.txt")
+--- erwartet
+2
+4 0 255 137 80
+Grüße
+
+=== ein inhalt, der weder text noch puffer ist, meldet sich
+DIM namen AS ARRAY OF STRING
+namen = SPLIT$("a", "|")
+DIM inhalte AS ARRAY OF INTEGER
+inhalte = [5]
+ZIP_WRITE("f.zip", namen, inhalte)
+--- fehler
+ZIP_WRITE: Inhalt 0 ist INTEGER -- erwartet wird ein Text oder ein BUFFER

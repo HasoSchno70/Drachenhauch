@@ -2095,6 +2095,6 @@
   "ZIP_LIST": "names of all entries",
   "ZIP_READ": "one entry as bytes",
   "ZIP_READ$": "one entry as text",
-  "ZIP_WRITE": "archive from names and texts, without a detour through files"
+  "ZIP_WRITE": "archive from names and contents (texts or buffers), without a detour through files"
  }
 }

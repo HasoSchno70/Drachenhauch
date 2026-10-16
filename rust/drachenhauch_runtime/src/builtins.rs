@@ -3623,14 +3623,33 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(3);
             let pfad = need_str(&a[0], "ZIP_WRITE")?;
             let namen = str_array(&a[1], "ZIP_WRITE")?;
-            let inhalte = str_array(&a[2], "ZIP_WRITE")?;
+            // Texte ODER Puffer: bis 2026-10-16 ging jede Zelle durch
+            // `str_of`, und ein BUFFER (ein PNG, ein PDF) landete still als
+            // Text "<BUFFER 123 Bytes>" im Archiv.
+            let inhalte: Vec<Vec<u8>> = match &a[2] {
+                Value::Array(arr) => {
+                    let arr = arr.borrow();
+                    let mut v = Vec::with_capacity(arr.cells.len());
+                    for i in 0..arr.cells.len() {
+                        match arr.cells.get(i) {
+                            Value::Str(t) => v.push(t.as_bytes().to_vec()),
+                            Value::Buffer(b) => v.push(b.borrow().clone()),
+                            andere => return err(format!(
+                                "ZIP_WRITE: Inhalt {} ist {} -- erwartet wird ein Text oder ein BUFFER",
+                                i, andere.type_name())),
+                        }
+                    }
+                    v
+                }
+                _ => return err("ZIP_WRITE: erwartet ein ARRAY OF STRING oder ARRAY OF BUFFER".to_string()),
+            };
             if namen.len() != inhalte.len() {
                 return err(format!(
                     "ZIP_WRITE: {} Namen, aber {} Inhalte -- die Arrays muessen \
                      gleich lang sein", namen.len(), inhalte.len()));
             }
             let paare: Vec<(String, Vec<u8>)> = namen.into_iter()
-                .zip(inhalte.into_iter().map(|s| s.into_bytes()))
+                .zip(inhalte)
                 .collect();
             Ok(Value::Int(crate::zipdatei::packe_daten(
                 std::path::Path::new(pfad), &paare)?))

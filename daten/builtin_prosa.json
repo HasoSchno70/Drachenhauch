@@ -2100,6 +2100,6 @@
   "ZIP_LIST": "Namen aller Einträge",
   "ZIP_READ": "einen Eintrag als Bytes",
   "ZIP_READ$": "einen Eintrag als Text",
-  "ZIP_WRITE": "Archiv aus Namen und Texten, ohne Umweg über Dateien"
+  "ZIP_WRITE": "Archiv aus Namen und Inhalten (Texte oder Puffer), ohne Umweg über Dateien"
  }
 }
