@@ -299,3 +299,71 @@ FUNCTION vorfuehrenStufe3(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' Stufe 4: Bildimport -- Dialog bauen und einstellen, Vorschau, uebernehmen,
+' erneut aus dem Quellbild (mit den Einstellungen von damals), eine
+' Voreinstellung, sichern und laden.
+DIM vfMuster AS kern.Muster
+FUNCTION vorfuehrenStufe4(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM logoBild AS STRING : logoBild = PATHJOIN(CWD$(), "daten/bilder/glutfaden_256.png")
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "dialog: "; imDialogBauen(logoBild, NIL); " bild "; imBildB; "x"; imBildH
+            gtk_spin_button_set_value(imBreite, 60)
+            gtk_spin_button_set_value(imHoehe, 60)
+            gtk_spin_button_set_value(imFarben, 12)
+            gtk_combo_box_set_active(imDither, 1)
+            gtk_spin_button_set_value(imConfetti, 2)
+            imAusschnitt = [0.1, 0.1, 0.9, 0.9]
+            imAusschnittGeaendert()
+            PRINT "info: "; gtk_label_get_text(imInfo)
+        CASE 2
+            imVorschauGeklickt(0, 0)
+            PRINT "vorschau: "; imErgebnis.breite; "x"; imErgebnis.hoehe; " farben "; imErgebnis.farbanzahl(); " stiche "; imErgebnis.sticheGesamt()
+        CASE 3
+            IF fotoZiel <> "" THEN ok = gtkFoto(imDialog, fotoZiel + "_importdialog.png")
+            DIM m AS kern.Muster : m = imRechnen()
+            musterUebernehmen(m)
+            imDialogWeg()
+            PRINT "importiert: "; lwMuster.breite; "x"; lwMuster.hoehe; " farben "; lwMuster.farbanzahl(); " titel "; musterTitel; " ungesichert "; istGeaendert(); " datei leer "; musterPfad = ""
+            PRINT "quelle: "; BASENAME(lwMuster.quellBild); " palette "; lwMuster.quellPalette; " dithering "; JSON_GET_STRING(lwMuster.metadaten, "dithering_mode")
+        CASE 4
+            foto("importiert")
+            ' erneut aus dem Quellbild: dieselben Einstellungen, dasselbe Muster
+            DIM e AS kern.Importeinstellung : e = imEinstellungAusMuster(lwMuster)
+            PRINT "wieder: "; e.breite; "x"; e.hoehe; " farben "; e.maxFarben; " dither "; e.dithering; " confetti "; e.confetti; " ausschnitt "; e.ausschnitt[0]; " palette "; e.palette.name
+            ok = imDialogBauen(lwMuster.quellBild, e)
+            DIM m2 AS kern.Muster : m2 = imRechnen()
+            imDialogWeg()
+            DIM gleich AS BOOLEAN : gleich = m2.breite = lwMuster.breite AND m2.hoehe = lwMuster.hoehe
+            DIM i AS INTEGER
+            IF gleich THEN
+                FOR i = 0 TO m2.breite * m2.hoehe - 1
+                    DIM a1 AS INTEGER : a1 = m2.ebenen.aktiveEbene().raster[i]
+                    DIM a2 AS INTEGER : a2 = lwMuster.ebenen.aktiveEbene().raster[i]
+                    IF m2.farben[a1].garn.nummer <> lwMuster.farben[a2].garn.nummer THEN gleich = FALSE
+                NEXT
+            END IF
+            PRINT "dasselbe muster: "; gleich
+        CASE 5
+            ' Voreinstellung "DP A4" setzt Groesse, Farben und die Diamant-Palette
+            ok = imDialogBauen(logoBild, NIL)
+            gtk_combo_box_set_active(imVorein, 5)
+            DIM ein AS kern.Importeinstellung : ein = imEinstellung()
+            PRINT "vorlage: "; ein.breite; "x"; ein.hoehe; " farben "; ein.maxFarben; " dither "; ein.dithering; " median "; ein.farbwahl = kern.WAHL_MEDIAN; " palette "; ein.palette.name
+            imDialogWeg()
+        CASE 6
+            vfDatei = fotoZiel + "_stufe4.pxs"
+            IF fotoZiel = "" THEN vfDatei = PATHJOIN(TEMPDIR$(), "glutfaden_stufe4.pxs")
+            ok = musterSichern(vfDatei)
+            DIM g AS kern.Muster : g = kern.pxsLaden(vfDatei)
+            PRINT "geladen: quelle "; BASENAME(g.quellBild); " palette "; g.quellPalette; " max "; JSON_GET_INT(g.metadaten, "max_colors"); " ausschnitt "; g.quellAusschnitt[2]; " stiche "; g.sticheGesamt() = lwMuster.sticheGesamt(); " gesichert "; NOT istGeaendert()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

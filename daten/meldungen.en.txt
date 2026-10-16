@@ -1765,3 +1765,8 @@ GENTEX_RADIAL: dichte {} liegt nicht in 0..1 -- sie ist der Anteil des Radius in
 {}: eine Coroutine kann keine BYREF-Parameter zurueckschreiben	{}: a coroutine cannot write back BYREF parameters
 JOIN$: Feld aus Texten, Zahlen oder Wahrheitswerten noetig	JOIN$: needs an array of strings, numbers or booleans
 JOIN$ erwartet ein Feld	JOIN$ expects an array
+IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])	IMAGE_SCALE: expects (image, width, height [, filter$])
+IMAGE_SCALE: unbekannter Filter '{}' -- moeglich sind lanczos, bikubisch, box, hamming, linear	IMAGE_SCALE: unknown filter '{}' -- possible are lanczos, bicubic, box, hamming, linear
+IMAGE_ENHANCE: erwartet (bild, art$, faktor)	IMAGE_ENHANCE: expects (image, kind$, factor)
+IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung	IMAGE_ENHANCE: unknown kind '{}' -- possible are brightness, contrast, saturation
+IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein	IMAGE_ENHANCE: the factor must be a number from 0 up

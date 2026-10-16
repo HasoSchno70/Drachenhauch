@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2087,
+ "count": 2088,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1071,6 +1071,7 @@
   "IMAGE_DRAW_LINE": "line into the image",
   "IMAGE_DRAW_RECT": "filled rectangle into the image",
   "IMAGE_DRAW_TEXT": "text into the image; without font the built-in font as before, with font one loaded via LOADFONT or LOADFONT_IMAGE (blended correctly over a semi-transparent background like IMAGE_DRAW_IMAGE; an SDF font does not work)",
+  "IMAGE_ENHANCE": "IMAGE (new): brightness, contrast or saturation like Pillow's ImageEnhance — 1.0 leaves the image, 0.0 gives black, grey (the mean) or greyscale, above 1.0 amplifies; opacity is kept",
   "IMAGE_FILL_ELLIPSE": "filled ellipse around cx, cy; with rx = ry a circle",
   "IMAGE_FILL_POLY": "filled polygon from two arrays with the corner points, concave too",
   "IMAGE_FILL_RECT": "rectangle from corner to corner, both bounds included",
@@ -1096,7 +1097,7 @@
   "IMAGE_ROTATE_CW": "IMAGE (new, rotated 90° clockwise) — exact, w × h → h × w",
   "IMAGE_SAVE": "write the image to a file (.png, .bmp, .jpg, .tga); with FALSE without an opacity channel (RGB) — print services reject a PNG with an alpha channel, even if every point is opaque. The opacity is simply left out, not blended in: anyone who wants a background lays the image onto an opaque one first",
   "IMAGE_SAVE_GIF": "write several images as an animated GIF",
-  "IMAGE_SCALE": "IMAGE (new, in w × h) — bilinearly smoothed",
+  "IMAGE_SCALE": "IMAGE (new, in w × h) — bilinearly smoothed; with filter$ (lanczos, bicubic, box, hamming, linear) computed like Pillow's Image.resize, number for number",
   "IMAGE_SCALE_NN": "IMAGE (new, in w × h) — without interpolation (nearest neighbour), for pixel art",
   "IMAGE_TEXT": "IMAGE — a new image exactly as large as the text (as wide as TEXT_WIDTH measures it), on a transparent background — for signs, labels on textures, billboards with text",
   "IMAGE_TINT": "IMAGE (new, RGB-multiplied)",

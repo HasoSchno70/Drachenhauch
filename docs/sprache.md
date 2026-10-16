@@ -1492,6 +1492,9 @@ END FUNCTION
 ```
 
 Reiche den Wert als Parameter herein oder deklariere ihn in der Datei selbst.
+Die Felder einer Klasse sind davon nicht betroffen: in einer Methode meint ein
+nacktes `e` das Feld (auch ein geerbtes), selbst wenn das Hauptprogramm oder
+die Datei ebenfalls ein `e` hat.
 Ohne `AS` bleibt der alte, flache Zugriff erlaubt — bestehende Programme
 ändern sich nicht.
 

@@ -1,0 +1,140 @@
+' Helfer fuer glutfaden_stufe4.dhtest: Aufzeichnungen von PySticky lesen und
+' den Bildimport des Kerns damit vergleichen. Eingebunden NACH dem Kern
+' (IMPORT ... AS kern). `daten` ist examples/glutfaden/daten.
+IMPORT "json"
+
+' Die Einstellungen der Aufzeichnung, mit der Palette aus `daten`.
+FUNCTION giEinstellung(daten AS STRING, refPfad AS STRING) AS kern.Importeinstellung
+    DIM ref AS JSON_HANDLE : ref = JSON_LOAD(refPfad)
+    DIM ein AS kern.Importeinstellung : ein = NEW kern.Importeinstellung()
+    ein.breite = JSON_GET_INT(ref, "einst.width")
+    ein.hoehe = JSON_GET_INT(ref, "einst.height")
+    ein.maxFarben = JSON_GET_INT(ref, "einst.max_colors")
+    ein.seitenverhaeltnis = JSON_GET_BOOL(ref, "einst.keep_aspect_ratio")
+    ein.konturen = JSON_GET_BOOL(ref, "einst.auto_backstitches")
+    ein.helligkeit = JSON_GET_FLOAT(ref, "einst.brightness")
+    ein.kontrast = JSON_GET_FLOAT(ref, "einst.contrast")
+    ein.saettigung = JSON_GET_FLOAT(ref, "einst.saturation")
+    ein.confetti = JSON_GET_INT(ref, "einst.confetti_min_run_size")
+    DIM dm AS STRING : dm = JSON_GET_STRING(ref, "einst.dithering_mode")
+    IF dm = "floyd_steinberg" THEN ein.dithering = kern.DITHER_FLOYD
+    IF dm = "ordered" THEN ein.dithering = kern.DITHER_GEORDNET
+    IF JSON_GET_STRING(ref, "einst.quantization_method") = "median_cut" THEN ein.farbwahl = kern.WAHL_MEDIAN
+    DIM k AS INTEGER
+    FOR k = 0 TO 3
+        ein.ausschnitt[k] = JSON_GET_FLOAT(ref, "crop." + STR$(k))
+    NEXT
+    DIM pal AS kern.Palette
+    FOR EACH pal IN kern.palettenLaden(daten + "/paletten")
+        IF pal.name = JSON_GET_STRING(ref, "einst.palette_name") THEN ein.palette = pal
+    NEXT
+    RETURN ein
+END FUNCTION
+
+FUNCTION giHex(h AS STRING, i AS INTEGER, n AS INTEGER) AS INTEGER
+    RETURN kern.farbeAusHex("#" + MID$(h, i * n, n))
+END FUNCTION
+
+' Die aufgezeichneten Pixel ("pixel", sechs Stellen je Punkt) oder das
+' Graubild ("grau", zwei Stellen) als Pixelbild.
+FUNCTION giPixel(refPfad AS STRING, feld AS STRING) AS kern.Pixelbild
+    DIM ref AS JSON_HANDLE : ref = JSON_LOAD(refPfad)
+    DIM b AS INTEGER : b = JSON_GET_INT(ref, "breite")
+    DIM h AS INTEGER : h = JSON_GET_INT(ref, "hoehe")
+    DIM p AS kern.Pixelbild : p = kern.neuesPixelbild(b, h)
+    DIM hx AS STRING : hx = JSON_GET_STRING(ref, feld)
+    DIM i AS INTEGER
+    FOR i = 0 TO b * h - 1
+        IF feld = "grau" THEN
+            DIM v AS INTEGER : v = kern.farbeAusHex("#" + MID$(hx, i * 2, 2) + MID$(hx, i * 2, 2) + MID$(hx, i * 2, 2))
+            p.r[i] = v BAND 255 : p.g[i] = v BAND 255 : p.b[i] = v BAND 255
+        ELSE
+            DIM c AS INTEGER : c = giHex(hx, i, 6)
+            p.r[i] = c SHR 16 : p.g[i] = (c SHR 8) BAND 255 : p.b[i] = c BAND 255
+        END IF
+    NEXT
+    RETURN p
+END FUNCTION
+
+' Den Kern mit PyStickys Pixeln fuettern und vergleichen: gewaehlte Garne als
+' Menge, jedes Rasterfeld ueber die Garnnummer, jeder Rueckstich samt Farbe.
+FUNCTION giAbgleich(daten AS STRING, refPfad AS STRING) AS kern.Muster
+    DIM ref AS JSON_HANDLE : ref = JSON_LOAD(refPfad)
+    DIM ein AS kern.Importeinstellung : ein = giEinstellung(daten, refPfad)
+    DIM p AS kern.Pixelbild : p = giPixel(refPfad, "pixel")
+    DIM g AS kern.Pixelbild
+    IF ein.konturen THEN g = giPixel(refPfad, "grau")
+    DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(daten + "/symbole.txt")
+    DIM m AS kern.Muster : m = kern.musterAusPixeln(p, g, ein, "t", sym)
+    DIM ihre AS MAP OF BOOLEAN : ihre = {}
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(ref, "garne") - 1
+        MAPPUT(ihre, JSON_GET_STRING(ref, "garne." + STR$(i)), TRUE)
+    NEXT
+    DIM gleich AS BOOLEAN : gleich = LEN(m.farben) = JSON_LEN(ref, "garne")
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN m.farben
+        IF NOT MAPHAS(ihre, f.garn.nummer) THEN gleich = FALSE
+    NEXT
+    PRINT "garne "; LEN(m.farben); " gleich "; gleich
+    DIM eb AS kern.Ebene : eb = m.ebenen.aktiveEbene()
+    DIM ra AS INTEGER
+    FOR i = 0 TO p.breite * p.hoehe - 1
+        DIM sie AS INTEGER : sie = JSON_GET_INT(ref, "raster." + STR$(i))
+        DIM sn AS STRING : sn = ""
+        IF sie >= 0 THEN sn = JSON_GET_STRING(ref, "garne." + STR$(sie))
+        DIM wn AS STRING : wn = ""
+        IF eb.raster[i] >= 0 THEN wn = m.farben[eb.raster[i]].garn.nummer
+        IF sn <> wn THEN ra = ra + 1
+    NEXT
+    PRINT "raster abweichend "; ra
+    DIM nr AS INTEGER : nr = JSON_LEN(ref, "rueckstiche")
+    DIM rs AS INTEGER : rs = ABS(nr - LEN(m.rueckstiche))
+    FOR i = 0 TO MIN(nr, LEN(m.rueckstiche)) - 1
+        DIM w AS STRING : w = "rueckstiche." + STR$(i) + "."
+        DIM r AS kern.Rueckstich : r = m.rueckstiche[i]
+        IF r.x1 <> JSON_GET_INT(ref, w + "0") OR r.y1 <> JSON_GET_INT(ref, w + "1") OR r.x2 <> JSON_GET_INT(ref, w + "2") OR r.y2 <> JSON_GET_INT(ref, w + "3") THEN rs = rs + 1
+        IF m.farben[r.farbe].garn.nummer <> JSON_GET_STRING(ref, "garne." + STR$(JSON_GET_INT(ref, w + "4"))) THEN rs = rs + 1
+    NEXT
+    PRINT "rueckstiche "; LEN(m.rueckstiche); " abweichend "; rs
+    RETURN m
+END FUNCTION
+
+' Confetti allein: PyStickys Raster vor der Reduktion mit seinen Nummern.
+FUNCTION giConfettiAllein(refPfad AS STRING) AS INTEGER
+    DIM ref AS JSON_HANDLE : ref = JSON_LOAD(refPfad)
+    DIM n AS INTEGER : n = JSON_GET_INT(ref, "breite") * JSON_GET_INT(ref, "hoehe")
+    DIM vr[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        vr[i] = JSON_GET_INT(ref, "vor_confetti." + STR$(i))
+    NEXT
+    kern.confettiEntfernen(vr, JSON_GET_INT(ref, "breite"), JSON_GET_INT(ref, "hoehe"), JSON_GET_INT(ref, "einst.confetti_min_run_size"), JSON_LEN(ref, "garne"))
+    DIM a AS INTEGER
+    FOR i = 0 TO n - 1
+        IF vr[i] <> JSON_GET_INT(ref, "nach_confetti." + STR$(i)) THEN a = a + 1
+    NEXT
+    RETURN a
+END FUNCTION
+
+' Ein Bild vorbereiten und mit den aufgezeichneten Pixeln (und, mit Konturen,
+' dem Graubild) vergleichen.
+FUNCTION giVorbereitenAbw(daten AS STRING, refPfad AS STRING, bildPfad AS STRING) AS STRING
+    DIM ein AS kern.Importeinstellung : ein = giEinstellung(daten, refPfad)
+    DIM g AS kern.Pixelbild
+    DIM p AS kern.Pixelbild : p = kern.bildVorbereiten(LOADIMAGE(bildPfad), ein, g)
+    DIM q AS kern.Pixelbild : q = giPixel(refPfad, "pixel")
+    DIM t AS STRING : t = STR$(p.breite) + "x" + STR$(p.hoehe)
+    IF p.breite <> q.breite OR p.hoehe <> q.hoehe THEN RETURN t + " statt " + STR$(q.breite) + "x" + STR$(q.hoehe)
+    t = t + " abw " + STR$(giAbweichend(p, q)) + " grau "
+    IF IS_NIL(g) THEN RETURN t + "-"
+    RETURN t + STR$(giAbweichend(g, giPixel(refPfad, "grau")))
+END FUNCTION
+
+FUNCTION giAbweichend(p AS kern.Pixelbild, q AS kern.Pixelbild) AS INTEGER
+    DIM a AS INTEGER, i AS INTEGER
+    FOR i = 0 TO p.breite * p.hoehe - 1
+        IF p.r[i] <> q.r[i] OR p.g[i] <> q.g[i] OR p.b[i] <> q.b[i] THEN a = a + 1
+    NEXT
+    RETURN a
+END FUNCTION

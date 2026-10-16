@@ -11304,7 +11304,27 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             // --- Modul: imgfx (immutable, liefern neues IMAGE-Handle) ---
-            "image_scale" => Value::Int(g!().image_scale(gi(a,0,"IMAGE_SCALE")?, gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32)?),
+            "image_scale" => {
+                let (b, h) = (gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32);
+                if a.len() > 4 { return Err("IMAGE_SCALE: erwartet (bild, breite, hoehe [, filter$])".into()); }
+                if a.len() == 4 {
+                    let name = gs(a, 3, "IMAGE_SCALE")?;
+                    let f = crate::resample::Filter::aus_namen(&name).ok_or_else(|| format!(
+                        "IMAGE_SCALE: unbekannter Filter '{}' -- moeglich sind lanczos, bikubisch, box, hamming, linear", name))?;
+                    Value::Int(g!().image_scale_filter(gi(a,0,"IMAGE_SCALE")?, b, h, f)?)
+                } else {
+                    Value::Int(g!().image_scale(gi(a,0,"IMAGE_SCALE")?, b, h)?)
+                }
+            }
+            "image_enhance" => {
+                if a.len() != 3 { return Err("IMAGE_ENHANCE: erwartet (bild, art$, faktor)".into()); }
+                let name = gs(a, 1, "IMAGE_ENHANCE")?;
+                let art = crate::resample::Anpassung::aus_namen(&name).ok_or_else(|| format!(
+                    "IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung", name))?;
+                let f = need_f(a, 2, "IMAGE_ENHANCE")?;
+                if !f.is_finite() || f < 0.0 { return Err("IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein".into()); }
+                Value::Int(g!().image_enhance(gi(a,0,"IMAGE_ENHANCE")?, art, f)?)
+            }
             "image_scale_nn" => Value::Int(g!().image_scale_nn(gi(a,0,"IMAGE_SCALE_NN")?, gi(a,1,"IMAGE_SCALE_NN")? as i32, gi(a,2,"IMAGE_SCALE_NN")? as i32)?),
             "image_rotate" => Value::Int(g!().image_rotate(gi(a,0,"IMAGE_ROTATE")?, need_f(a,1,"IMAGE_ROTATE")? as f32)?),
             "image_rotate_cw" => Value::Int(g!().image_rotate_cw(gi(a,0,"IMAGE_ROTATE_CW")?)?),

@@ -1808,6 +1808,39 @@ Wahrheitswerte (wie STR$). **Stolpersteine:** `IS` vergleicht Typen, fuer
 "dasselbe Objekt" `=` (Stufe 2 hat die Meldung verbessert); die Shell frisst
 in Heredocs Rueckstriche (Patches als Dateien).
 
+**Stufe 4: Bildimport** (2026-10-16). Kern `kern/bildimport.dh`: Bild
+vorbereiten (weiss unterlegen ueber `IMAGE_DRAW_IMAGE`, Ausschnitt wie das
+Original geklemmt, `IMAGE_ENHANCE` fuer Helligkeit/Kontrast/Saettigung,
+`IMAGE_SCALE(..., "lanczos")`), dann nur noch Zahlenfelder (`Pixelbild`):
+die haeufigsten N Garne (stabil nach Haeufigkeit) oder Median-Cut, naechstes
+Garn nach CIEDE2000 mit einer MAP je Farbe, Floyd-Steinberg (Gewichte in
+derselben Reihenfolge wie numpy: `fehler * 7 / 16`, dann geklemmt), Bayer
+4x4 (Versatz `2M - 16`, ganzzahlig), Confetti (Gebiete per Stapel, Runden
+lesen das schon geaenderte Raster), Konturen per Sobel (Rand wie `np.pad`
+edge, neun Summanden in der Reihenfolge des Originals). `Bildimport.schritt`
+rechnet zeilenweise, die Oberflaeche pumpt dazwischen GTK (`gtkAbarbeiten`).
+**Gegen PySticky Punkt fuer Punkt gleich** -- Pixel nach der Vorbereitung,
+Garne, jedes Rasterfeld, jeder Rueckstich (`glutfaden_stufe4.dhtest`, die
+Aufzeichnungen schrieb ein Skript in PyStickys venv) -- und etwa zehnmal
+schneller (200x130, 30 Farben: 215/443/260 ms gegen 2,5/4,9/0,55 s). Bewusst
+anders: Farben nach Haeufigkeit (PySticky: Reihenfolge einer Python-Menge),
+darum bricht das Confetti einen Gleichstand anders (mit PyStickys Nummern
+gefuettert: gleich); Konturen folgen dem Ausschnitt. Oberflaeche
+`ansicht/importdialog.dh` (Strg+I, Strg+Umschalt+I = erneut aus dem
+Quellbild ueber die Metadaten). **Funde in der Laufzeit:** (1) PILs
+Skalierung und `ImageEnhance` gab es nicht -- `resample.rs`, `IMAGE_SCALE`
+mit Filter und `IMAGE_ENHANCE`, gegen Pillow-Bilder ohne einen abweichenden
+Punkt (`bild_wie_pillow.dhtest`); (2) **ein Feld in einer Methode einer mit
+AS importierten Klasse** galt der Namensraum-Pruefung als Name von aussen:
+hiess eine Globale des Hauptprogramms genauso, Abbruch; hiess ein Name des
+Moduls genauso (hier das Feld `helligkeit` neben der Funktion `helligkeit`),
+wurde das Feld STILL umbenannt und schrieb in die Modul-Globale
+(`klassen_felder` in namensraum.rs). **Stolpersteine:** Namen ohne
+Gross/klein -- ein Feld `voll` oder eine lokale `perle` verdeckt `VOLL`/
+`PERLE` (`--check` sagt es als Typwarnung); ein Objekt-Parameter, dem die
+Funktion etwas Neues zuweist, braucht BYREF; die helle Schrift fuer
+Klapplisten im Stylesheet galt auch in hellen Dialogen.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

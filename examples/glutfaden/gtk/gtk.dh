@@ -125,6 +125,17 @@ DECLARE FUNCTION gtk_message_dialog_new LIB GTK (eltern AS ZEIGER, flags AS LONG
 DECLARE SUB gtk_message_dialog_format_secondary_text LIB GTK (dialog AS ZEIGER, format AS TEXT, ...)
 DECLARE SUB gtk_show_about_dialog LIB GTK (eltern AS ZEIGER, name AS TEXT, ...)
 DECLARE FUNCTION gdk_pixbuf_new_from_file_at_size LIB PIXBUF (pfad AS TEXT, b AS LONG, h AS LONG, BYREF fehler AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_pixbuf_get_width LIB PIXBUF (bild AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_get_height LIB PIXBUF (bild AS ZEIGER) AS LONG
+DECLARE SUB gdk_cairo_set_source_pixbuf LIB GDK (cr AS ZEIGER, bild AS ZEIGER, x AS FLOAT, y AS FLOAT)
+' --- Fortschritt und Ereignisse abarbeiten (fuer lange Rechnungen ohne zweiten Faden)
+DECLARE FUNCTION gtk_progress_bar_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_progress_bar_set_fraction LIB GTK (balken AS ZEIGER, anteil AS FLOAT)
+DECLARE SUB gtk_progress_bar_set_text LIB GTK (balken AS ZEIGER, text AS TEXT)
+DECLARE SUB gtk_progress_bar_set_show_text LIB GTK (balken AS ZEIGER, an AS BOOLEAN)
+DECLARE FUNCTION gtk_events_pending LIB GTK () AS BOOLEAN
+DECLARE FUNCTION gtk_main_iteration_do LIB GTK (warten AS BOOLEAN) AS BOOLEAN
+DECLARE FUNCTION gdk_event_get_event_type LIB GDK (ereignis AS ZEIGER) AS LONG
 ' --- Ereignisse (GDK)
 DECLARE FUNCTION gdk_event_get_keyval LIB GDK (ereignis AS ZEIGER, BYREF taste AS ULONG) AS BOOLEAN
 DECLARE FUNCTION gdk_event_get_coords LIB GDK (ereignis AS ZEIGER, BYREF x AS FLOAT, BYREF y AS FLOAT) AS BOOLEAN
@@ -251,6 +262,7 @@ CONST GDK_RAD_FEIN = 4
 CONST CAIRO_ARGB32 = 0
 CONST CAIRO_A8 = 2
 CONST CAIRO_FILTER_NAECHST = 3            ' CAIRO_FILTER_NEAREST
+CONST GDK_DOPPELKLICK = 5                 ' GDK_2BUTTON_PRESS
 CONST PANGO_SCALE = 1024
 
 ' --- Kleine Helfer
@@ -279,6 +291,15 @@ FUNCTION gtkStil$(css AS STRING) AS STRING
     gtk_style_context_add_provider_for_screen(gdk_screen_get_default(), p, GTK_VORRANG_ANWENDUNG)
     RETURN ""
 END FUNCTION
+
+' Anstehende Ereignisse abarbeiten -- damit ein Balken waehrend einer langen
+' Rechnung weiterzeichnet.
+SUB gtkAbarbeiten()
+    DIM weiter AS BOOLEAN
+    WHILE gtk_events_pending()
+        weiter = gtk_main_iteration_do(FALSE)
+    WEND
+END SUB
 
 ' Ein Widget in eine PNG zeichnen (unabhaengig davon, ob es zu sehen ist).
 FUNCTION gtkFoto(w AS INTEGER, pfad AS STRING) AS BOOLEAN

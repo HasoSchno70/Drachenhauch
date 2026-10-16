@@ -247,6 +247,9 @@ struct Lauf<'a> {
     hier: Option<String>,
     /// Lokale Namen, die in diesem Rumpf NICHT umbenannt werden duerfen.
     lokal: HashSet<String>,
+    /// Je Klasse (Name klein, wie geschrieben): Elternklasse und Feldnamen --
+    /// in einer Methode ist ein nacktes Feld so lokal wie ein Parameter.
+    klassen: &'a HashMap<String, (Option<String>, Vec<String>)>,
     fehler: Option<(u32, String)>,
     /// Zeile fuer die naechste Fehlermeldung.
     zeile: u32,
@@ -622,6 +625,13 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
                     *name = intern(&alias, &low);
                 }
             }
+            // Die Feldnamen der Klasse und ihrer Vorfahren sind in den
+            // Methoden lokal: ein nacktes `e` meint das Feld, nicht eine
+            // Globale `e` des Hauptprogramms (das hielt die Pruefung fuer
+            // einen verbotenen Zugriff) und nicht einen gleichnamigen Namen des
+            // Moduls (dann waere das Feld still umbenannt worden) -- Glutfaden,
+            // 2026-10-16.
+            let felder = klassen_felder(l.klassen, name, parent.as_deref());
             if let Some(pa) = parent { l.typ(pa); }
             // Felder: nur die Typen, nicht die Feldnamen -- die gehoeren der
             // Klasse und haben mit dem Modul-Namensraum nichts zu tun.
@@ -631,8 +641,11 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
                     if let Dim { type_name, .. } = body.as_mut() { l.typ(type_name); }
                 }
             }
+            let vorher = l.lokal.clone();
+            l.lokal.extend(felder);
             for m in methods.iter_mut() { knoten(l, m); }
             for pr in properties.iter_mut() { knoten(l, pr); }
+            l.lokal = vorher;
         }
         EnumDecl { name, .. } => {
             if let Some(alias) = l.hier.clone() {
@@ -644,6 +657,51 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
         }
         _ => {}
     }
+}
+
+/// Alle Klassen des Programms: Name (klein) -> (Elternklasse, Feldnamen).
+fn klassen_sammeln(n: &Node, aus: &mut HashMap<String, (Option<String>, Vec<String>)>) {
+    match n {
+        Node::Program { statements } => for s in statements { klassen_sammeln(s, aus); },
+        Node::Stmt { body, .. } => klassen_sammeln(body, aus),
+        Node::ClassDecl { name, parent, fields, statics, .. } => {
+            let mut namen = Vec::new();
+            for f in fields.iter().chain(statics.iter()) { feldnamen(f, &mut namen); }
+            aus.insert(name.to_lowercase(), (parent.clone(), namen));
+        }
+        _ => {}
+    }
+}
+
+fn feldnamen(n: &Node, aus: &mut Vec<String>) {
+    match n {
+        Node::Stmt { body, .. } => feldnamen(body, aus),
+        Node::Dim { name, .. } | Node::Const { name, .. } => aus.push(name.to_lowercase()),
+        Node::MultiDim { dims } => for d in dims { feldnamen(d, aus); },
+        _ => {}
+    }
+}
+
+/// Feldnamen einer Klasse samt Vorfahren. Eine Elternklasse darf als
+/// `alias.Klasse` geschrieben sein; gesucht wird der Name hinter dem Punkt.
+fn klassen_felder(klassen: &HashMap<String, (Option<String>, Vec<String>)>, name: &str,
+                  parent: Option<&str>) -> Vec<String> {
+    let mut aus = Vec::new();
+    let mut gesehen = HashSet::new();
+    let mut akt = Some(name.to_lowercase());
+    let mut erste_eltern = parent.map(|p| p.to_string());
+    while let Some(k) = akt.take() {
+        let k = k.rsplit(|c| c == '.' || c == '@').next().unwrap_or(&k).to_lowercase();
+        if !gesehen.insert(k.clone()) { break; }
+        match klassen.get(&k) {
+            Some((pa, felder)) => {
+                aus.extend(felder.iter().cloned());
+                akt = erste_eltern.take().or_else(|| pa.clone());
+            }
+            None => { akt = erste_eltern.take(); }
+        }
+    }
+    aus
 }
 
 /// Namensraeume auf das geparste Programm anwenden.
@@ -663,6 +721,8 @@ pub fn anwenden(
     }
     let datei_alias: HashMap<String, String> = namensraeume.iter().cloned().collect();
     let (module, haupt, draussen) = sammeln(prog, herkunft, &datei_alias, privat);
+    let mut klassen = HashMap::new();
+    klassen_sammeln(prog, &mut klassen);
     let mut l = Lauf {
         herkunft,
         datei_alias: &datei_alias,
@@ -671,6 +731,7 @@ pub fn anwenden(
         draussen: &draussen,
         hier: None,
         lokal: HashSet::new(),
+        klassen: &klassen,
         fehler: None,
         zeile: 0,
     };

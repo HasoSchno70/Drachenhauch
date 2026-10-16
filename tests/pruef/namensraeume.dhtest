@@ -565,3 +565,49 @@ END FUNCTION
 
 --- erwartet
 3 KERN.KNOTEN
+
+=== ein feld in einer methode heisst wie eine globale des hauptprogramms
+' Vorher hielt die Pruefung das nackte Feld `e` in der Methode fuer einen
+' Zugriff auf die Globale `e` des Hauptprogramms und brach ab ("kommt aus dem
+' Hauptprogramm") -- auch fuer geerbte Felder (Glutfaden, 2026-10-16).
+IMPORT "lib.dh" AS n
+DIM e AS INTEGER : e = 100
+DIM z AS INTEGER : z = 7
+DIM k AS n.K : k = NEW n.K()
+PRINT k.f(); " "; e; " "; z
+--- datei lib.dh
+CLASS Basis
+    DIM z AS INTEGER
+END CLASS
+CLASS K EXTENDS Basis
+    DIM e AS INTEGER
+    FUNCTION f() AS INTEGER
+        e = e + 5
+        z = z + 1
+        RETURN e * 10 + z
+    END FUNCTION
+END CLASS
+
+--- erwartet
+51 100 7
+
+=== ein feld heisst wie ein name des moduls
+' Sonst wuerde das Feld still auf die Modul-Globale umbenannt.
+IMPORT "lib.dh" AS n
+DIM k AS n.K : k = NEW n.K()
+PRINT k.f(); " "; k.f(); " "; n.modulE()
+--- datei lib.dh
+DIM e AS INTEGER
+CLASS K
+    DIM e AS INTEGER
+    FUNCTION f() AS INTEGER
+        e = e + 5
+        RETURN e
+    END FUNCTION
+END CLASS
+FUNCTION modulE() AS INTEGER
+    RETURN e
+END FUNCTION
+
+--- erwartet
+5 10 0

@@ -4,6 +4,7 @@
 ' Alias bilden EINEN Raum) und sehen einander dadurch ohne Vorsatz.
 IMPORT "json"
 IMPORT "zeit"
+IMPORT "imgfx"
 IMPORT "stich.dh" AS kern
 IMPORT "garn.dh" AS kern
 IMPORT "ebene.dh" AS kern
@@ -12,4 +13,5 @@ IMPORT "formen.dh" AS kern
 IMPORT "verlauf.dh" AS kern
 IMPORT "bearbeiten.dh" AS kern
 IMPORT "auswahl.dh" AS kern
+IMPORT "bildimport.dh" AS kern
 IMPORT "pxs.dh" AS kern
