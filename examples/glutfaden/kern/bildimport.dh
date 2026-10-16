@@ -201,7 +201,7 @@ CLASS Garnfarben
     DIM rgb AS ARRAY OF INTEGER
 END CLASS
 
-FUNCTION garnfarben(liste AS ARRAY OF Garn) AS Garnfarben
+FUNCTION garnfarbenVon(liste AS ARRAY OF Garn) AS Garnfarben
     DIM gf AS Garnfarben : gf = NEW Garnfarben()
     gf.garne = liste
     DIM n AS INTEGER : n = LEN(liste)
@@ -806,7 +806,7 @@ CLASS Bildimport
 
     ' Nach der Wahl: Lab der gewaehlten Garne, Arbeitsfelder fuer die Zuordnung.
     SUB gewaehltSetzen()
-        gewaehlt = garnfarben(teilGarne(alle, nummern))
+        gewaehlt = garnfarbenVon(teilGarne(alle, nummern))
         merk = {}
         DIM n AS INTEGER : n = bild.breite * bild.hoehe
         DIM r[n] AS INTEGER
@@ -911,7 +911,7 @@ FUNCTION importBeginnen(bild AS Pixelbild, grau AS Pixelbild, e AS Importeinstel
     im.grau = grau
     im.name = name
     im.symbole = symbole
-    im.alle = garnfarben(e.palette.garne)
+    im.alle = garnfarbenVon(e.palette.garne)
     DIM n AS INTEGER : n = bild.breite * bild.hoehe
     DIM v[n] AS INTEGER
     im.jeAlle = v

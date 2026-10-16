@@ -1,0 +1,1957 @@
+' Glutfaden Stufe 5: Export. Die Beilagen hat PySticky geschrieben bzw.
+' aufgezeichnet -- probe.pxs (alle Stichtypen, ein Blend, eine Perlenfarbe,
+' Rueckstiche, zwei Ebenen, Sonderzeichen im Titel), PyStickys OXS davon und
+' von demo_kreuzstich.pxs, die Zusammenfassung dessen, was PyStickys OXS-Leser
+' daraus macht, und die Zahlen der Export-Rechnung (Seiten je Format, Farben
+' und Rueckstiche je Seite, Garnbedarf, Papierempfehlung, Entsprechungen bei
+' anderen Herstellern; io/pdf_export.py, io/export_common.py,
+' core/thread_cross_ref.py). Erwartet ist ueberall: gleich.
+' PySticky schreibt OXS im Textmodus (unter Windows CRLF); verglichen wird
+' ohne CR, Glutfaden schreibt LF.
+
+=== oxs schreiben byte fuer byte wie pysticky
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+DIM m AS kern.Muster : m = kern.pxsLaden("probe.pxs")
+PRINT "probe: "; geVergleich$(kern.oxsText$(m), geLies$("probe_pysticky.oxs"))
+DIM d AS kern.Muster : d = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
+PRINT "demo: "; geVergleich$(kern.oxsText$(d), geLies$("demo.oxs"))
+kern.oxsSpeichern(m, "aus.oxs")
+PRINT "datei ohne cr: "; INSTR(geLies$("aus.oxs"), CHR$(13)) < 0; " endet mit chart: "; RIGHT$(geLies$("aus.oxs"), 8) = "</chart>"
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- datei probe_pysticky.oxs
+<?xml version='1.0' encoding='utf-8'?>
+<chart>
+  <format comments_about_this_chart_format="OXS — Open Cross Stitch XML">
+    <FormatVersion value="1.0" />
+  </format>
+  <chart_info>
+    <title value="Probe &lt;&amp;&gt; &quot;OXS&quot;" />
+    <author value="Hans &amp; Co" />
+    <copyright value="(c) 2026&#09;Tab" />
+    <chartwidth value="12" />
+    <chartheight value="9" />
+    <stitchesperinch value="16" />
+    <stitchesperinch_y value="16" />
+  </chart_info>
+  <palette>
+    <palette_item index="0" number="cloth" name="cloth" symbol="" color="FFFFFF" />
+    <palette_item index="1" number="310" name="DMC 310 - Black" symbol="●" color="000000" />
+    <palette_item index="2" number="321" name="DMC 321 - Christmas Red" symbol="○" color="C72B3B" />
+    <palette_item index="3" number="Eigene Farbe" name="Eigene Farbe" symbol="■" color="123456" />
+    <palette_item index="4" number="TW1" name="DMC TW1 - Tweed" symbol="□" color="804020" blend_components="DMC|310|000000|Black;DMC|B5200|FFFFFF|White" blend_ratios="2,1" />
+    <palette_item index="5" number="00557" name="Mill Hill Beads 00557 - Gold" symbol="▲" color="D4AF37" />
+  </palette>
+  <fullstitches>
+    <stitch x="1" y="1" palindex="2" />
+    <stitch x="2" y="1" palindex="1" />
+    <stitch x="3" y="1" palindex="1" />
+    <stitch x="4" y="1" palindex="1" />
+    <stitch x="5" y="1" palindex="1" />
+    <stitch x="6" y="1" palindex="1" />
+    <stitch x="7" y="1" palindex="1" />
+    <stitch x="8" y="1" palindex="1" />
+    <stitch x="9" y="1" palindex="1" />
+    <stitch x="10" y="1" palindex="1" />
+    <stitch x="11" y="1" palindex="1" />
+    <stitch x="12" y="1" palindex="1" />
+    <stitch x="6" y="6" palindex="4" />
+    <stitch x="7" y="6" palindex="4" />
+    <stitch x="8" y="6" palindex="4" />
+    <stitch x="9" y="6" palindex="4" />
+    <stitch x="6" y="7" palindex="4" />
+    <stitch x="7" y="7" palindex="4" />
+    <stitch x="8" y="7" palindex="4" />
+    <stitch x="9" y="7" palindex="4" />
+    <stitch x="6" y="8" palindex="4" />
+    <stitch x="7" y="8" palindex="4" />
+    <stitch x="8" y="8" palindex="4" />
+    <stitch x="9" y="8" palindex="4" />
+  </fullstitches>
+  <halfstitches>
+    <halfstitch x="2" y="3" palindex="2" direction="1" />
+    <halfstitch x="3" y="3" palindex="2" direction="2" />
+  </halfstitches>
+  <quarterstitches>
+    <quarterstitch x="4" y="3" palindex="2" position="TL" />
+    <quarterstitch x="5" y="3" palindex="2" position="TR" />
+    <quarterstitch x="6" y="3" palindex="2" position="BL" />
+    <quarterstitch x="7" y="3" palindex="2" position="BR" />
+  </quarterstitches>
+  <threequarterstitches>
+    <threequarterstitch x="8" y="3" palindex="2" />
+  </threequarterstitches>
+  <backstitches>
+    <backstitch x1="1" y1="1" x2="3" y2="1" palindex="1" />
+    <backstitch x1="2" y1="2.5" x2="3.5" y2="5.5" palindex="2" />
+    <backstitch x1="13" y1="10" x2="12.5" y2="9.5" palindex="3" />
+  </backstitches>
+  <ornaments_inc_knots_and_beads>
+    <object x1="2.5" y1="5.5" palindex="3" objecttype="knot" />
+    <object x1="4.5" y1="5.5" palindex="5" objecttype="bead" />
+  </ornaments_inc_knots_and_beads>
+</chart>
+
+--- datei demo.oxs
+<?xml version='1.0' encoding='utf-8'?>
+<chart>
+  <format comments_about_this_chart_format="OXS — Open Cross Stitch XML">
+    <FormatVersion value="1.0" />
+  </format>
+  <chart_info>
+    <title value="Demo Kreuzstich" />
+    <author value="" />
+    <copyright value="" />
+    <chartwidth value="40" />
+    <chartheight value="40" />
+    <stitchesperinch value="14" />
+    <stitchesperinch_y value="14" />
+  </chart_info>
+  <palette>
+    <palette_item index="0" number="cloth" name="cloth" symbol="" color="FFFFFF" />
+    <palette_item index="1" number="403" name="Anchor 403 - Black" symbol="●" color="000000" />
+    <palette_item index="2" number="47" name="Anchor 47 - Red-DK" symbol="○" color="A9152C" />
+    <palette_item index="3" number="309" name="Anchor 309 - Lemon-DK" symbol="■" color="FFD802" />
+    <palette_item index="4" number="228" name="Anchor 228 - Celadon Green-DK" symbol="□" color="49795A" />
+    <palette_item index="5" number="134" name="Anchor 134 - Blue-DK" symbol="▲" color="4983A7" />
+    <palette_item index="6" number="1" name="Anchor 1 - Snow White" symbol="△" color="FDFCF9" />
+  </palette>
+  <fullstitches>
+    <stitch x="6" y="6" palindex="5" />
+    <stitch x="7" y="6" palindex="5" />
+    <stitch x="8" y="6" palindex="5" />
+    <stitch x="9" y="6" palindex="5" />
+    <stitch x="10" y="6" palindex="5" />
+    <stitch x="11" y="6" palindex="5" />
+    <stitch x="12" y="6" palindex="5" />
+    <stitch x="13" y="6" palindex="5" />
+    <stitch x="14" y="6" palindex="5" />
+    <stitch x="15" y="6" palindex="5" />
+    <stitch x="16" y="6" palindex="5" />
+    <stitch x="17" y="6" palindex="5" />
+    <stitch x="18" y="6" palindex="5" />
+    <stitch x="19" y="6" palindex="5" />
+    <stitch x="20" y="6" palindex="5" />
+    <stitch x="21" y="6" palindex="5" />
+    <stitch x="22" y="6" palindex="5" />
+    <stitch x="23" y="6" palindex="5" />
+    <stitch x="24" y="6" palindex="5" />
+    <stitch x="25" y="6" palindex="5" />
+    <stitch x="26" y="6" palindex="5" />
+    <stitch x="27" y="6" palindex="5" />
+    <stitch x="28" y="6" palindex="5" />
+    <stitch x="29" y="6" palindex="5" />
+    <stitch x="30" y="6" palindex="5" />
+    <stitch x="31" y="6" palindex="5" />
+    <stitch x="32" y="6" palindex="5" />
+    <stitch x="33" y="6" palindex="5" />
+    <stitch x="34" y="6" palindex="5" />
+    <stitch x="35" y="6" palindex="5" />
+    <stitch x="6" y="7" palindex="5" />
+    <stitch x="7" y="7" palindex="3" />
+    <stitch x="34" y="7" palindex="3" />
+    <stitch x="35" y="7" palindex="5" />
+    <stitch x="6" y="8" palindex="5" />
+    <stitch x="8" y="8" palindex="3" />
+    <stitch x="33" y="8" palindex="3" />
+    <stitch x="35" y="8" palindex="5" />
+    <stitch x="6" y="9" palindex="5" />
+    <stitch x="9" y="9" palindex="3" />
+    <stitch x="32" y="9" palindex="3" />
+    <stitch x="35" y="9" palindex="5" />
+    <stitch x="6" y="10" palindex="5" />
+    <stitch x="35" y="10" palindex="5" />
+    <stitch x="6" y="11" palindex="5" />
+    <stitch x="9" y="11" palindex="3" />
+    <stitch x="32" y="11" palindex="3" />
+    <stitch x="35" y="11" palindex="5" />
+    <stitch x="6" y="12" palindex="5" />
+    <stitch x="35" y="12" palindex="5" />
+    <stitch x="6" y="13" palindex="5" />
+    <stitch x="18" y="13" palindex="2" />
+    <stitch x="19" y="13" palindex="2" />
+    <stitch x="22" y="13" palindex="2" />
+    <stitch x="23" y="13" palindex="2" />
+    <stitch x="35" y="13" palindex="5" />
+    <stitch x="6" y="14" palindex="5" />
+    <stitch x="17" y="14" palindex="2" />
+    <stitch x="18" y="14" palindex="2" />
+    <stitch x="19" y="14" palindex="2" />
+    <stitch x="20" y="14" palindex="2" />
+    <stitch x="21" y="14" palindex="2" />
+    <stitch x="22" y="14" palindex="2" />
+    <stitch x="23" y="14" palindex="2" />
+    <stitch x="24" y="14" palindex="2" />
+    <stitch x="35" y="14" palindex="5" />
+    <stitch x="6" y="15" palindex="5" />
+    <stitch x="16" y="15" palindex="2" />
+    <stitch x="17" y="15" palindex="2" />
+    <stitch x="18" y="15" palindex="2" />
+    <stitch x="19" y="15" palindex="2" />
+    <stitch x="20" y="15" palindex="2" />
+    <stitch x="21" y="15" palindex="2" />
+    <stitch x="22" y="15" palindex="2" />
+    <stitch x="23" y="15" palindex="2" />
+    <stitch x="24" y="15" palindex="2" />
+    <stitch x="25" y="15" palindex="2" />
+    <stitch x="35" y="15" palindex="5" />
+    <stitch x="6" y="16" palindex="5" />
+    <stitch x="16" y="16" palindex="2" />
+    <stitch x="17" y="16" palindex="2" />
+    <stitch x="18" y="16" palindex="2" />
+    <stitch x="19" y="16" palindex="2" />
+    <stitch x="20" y="16" palindex="2" />
+    <stitch x="21" y="16" palindex="2" />
+    <stitch x="22" y="16" palindex="2" />
+    <stitch x="23" y="16" palindex="2" />
+    <stitch x="24" y="16" palindex="2" />
+    <stitch x="25" y="16" palindex="2" />
+    <stitch x="35" y="16" palindex="5" />
+    <stitch x="6" y="17" palindex="5" />
+    <stitch x="17" y="17" palindex="2" />
+    <stitch x="18" y="17" palindex="2" />
+    <stitch x="19" y="17" palindex="2" />
+    <stitch x="20" y="17" palindex="2" />
+    <stitch x="21" y="17" palindex="2" />
+    <stitch x="22" y="17" palindex="2" />
+    <stitch x="23" y="17" palindex="2" />
+    <stitch x="24" y="17" palindex="2" />
+    <stitch x="35" y="17" palindex="5" />
+    <stitch x="6" y="18" palindex="5" />
+    <stitch x="18" y="18" palindex="2" />
+    <stitch x="19" y="18" palindex="2" />
+    <stitch x="20" y="18" palindex="2" />
+    <stitch x="21" y="18" palindex="2" />
+    <stitch x="22" y="18" palindex="2" />
+    <stitch x="23" y="18" palindex="2" />
+    <stitch x="35" y="18" palindex="5" />
+    <stitch x="6" y="19" palindex="5" />
+    <stitch x="19" y="19" palindex="2" />
+    <stitch x="20" y="19" palindex="2" />
+    <stitch x="21" y="19" palindex="2" />
+    <stitch x="22" y="19" palindex="2" />
+    <stitch x="35" y="19" palindex="5" />
+    <stitch x="6" y="20" palindex="5" />
+    <stitch x="20" y="20" palindex="2" />
+    <stitch x="21" y="20" palindex="2" />
+    <stitch x="35" y="20" palindex="5" />
+    <stitch x="6" y="21" palindex="5" />
+    <stitch x="35" y="21" palindex="5" />
+    <stitch x="6" y="22" palindex="5" />
+    <stitch x="35" y="22" palindex="5" />
+    <stitch x="6" y="23" palindex="5" />
+    <stitch x="35" y="23" palindex="5" />
+    <stitch x="6" y="24" palindex="5" />
+    <stitch x="35" y="24" palindex="5" />
+    <stitch x="6" y="25" palindex="5" />
+    <stitch x="35" y="25" palindex="5" />
+    <stitch x="6" y="26" palindex="5" />
+    <stitch x="21" y="26" palindex="3" />
+    <stitch x="35" y="26" palindex="5" />
+    <stitch x="6" y="27" palindex="5" />
+    <stitch x="35" y="27" palindex="5" />
+    <stitch x="6" y="28" palindex="5" />
+    <stitch x="35" y="28" palindex="5" />
+    <stitch x="6" y="29" palindex="5" />
+    <stitch x="35" y="29" palindex="5" />
+    <stitch x="6" y="30" palindex="5" />
+    <stitch x="35" y="30" palindex="5" />
+    <stitch x="6" y="31" palindex="5" />
+    <stitch x="9" y="31" palindex="3" />
+    <stitch x="32" y="31" palindex="3" />
+    <stitch x="35" y="31" palindex="5" />
+    <stitch x="6" y="32" palindex="5" />
+    <stitch x="9" y="32" palindex="3" />
+    <stitch x="32" y="32" palindex="3" />
+    <stitch x="35" y="32" palindex="5" />
+    <stitch x="6" y="33" palindex="5" />
+    <stitch x="8" y="33" palindex="3" />
+    <stitch x="33" y="33" palindex="3" />
+    <stitch x="35" y="33" palindex="5" />
+    <stitch x="6" y="34" palindex="5" />
+    <stitch x="7" y="34" palindex="3" />
+    <stitch x="34" y="34" palindex="3" />
+    <stitch x="35" y="34" palindex="5" />
+    <stitch x="6" y="35" palindex="5" />
+    <stitch x="7" y="35" palindex="5" />
+    <stitch x="8" y="35" palindex="5" />
+    <stitch x="9" y="35" palindex="5" />
+    <stitch x="10" y="35" palindex="5" />
+    <stitch x="11" y="35" palindex="5" />
+    <stitch x="12" y="35" palindex="5" />
+    <stitch x="13" y="35" palindex="5" />
+    <stitch x="14" y="35" palindex="5" />
+    <stitch x="15" y="35" palindex="5" />
+    <stitch x="16" y="35" palindex="5" />
+    <stitch x="17" y="35" palindex="5" />
+    <stitch x="18" y="35" palindex="5" />
+    <stitch x="19" y="35" palindex="5" />
+    <stitch x="20" y="35" palindex="5" />
+    <stitch x="21" y="35" palindex="5" />
+    <stitch x="22" y="35" palindex="5" />
+    <stitch x="23" y="35" palindex="5" />
+    <stitch x="24" y="35" palindex="5" />
+    <stitch x="25" y="35" palindex="5" />
+    <stitch x="26" y="35" palindex="5" />
+    <stitch x="27" y="35" palindex="5" />
+    <stitch x="28" y="35" palindex="5" />
+    <stitch x="29" y="35" palindex="5" />
+    <stitch x="30" y="35" palindex="5" />
+    <stitch x="31" y="35" palindex="5" />
+    <stitch x="32" y="35" palindex="5" />
+    <stitch x="33" y="35" palindex="5" />
+    <stitch x="34" y="35" palindex="5" />
+    <stitch x="35" y="35" palindex="5" />
+  </fullstitches>
+  <halfstitches />
+  <quarterstitches />
+  <threequarterstitches />
+  <backstitches />
+  <ornaments_inc_knots_and_beads />
+</chart>
+
+--- erwartet
+probe: gleich (71 Zeilen)
+demo: gleich (216 Zeilen)
+datei ohne cr: TRUE endet mit chart: TRUE
+
+=== oxs lesen wie pysticky
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+' Die eine bewusste Abweichung: ein Garn ohne Palette behaelt seinen Namen ohne
+' "DMC TW1 - " davor (PySticky laesst ihn bei jedem Rundweg wachsen).
+DIM g AS kern.OxsImport : g = kern.oxsLaden("probe_pysticky.oxs", pal, sym)
+PRINT "probe: "; geVergleich$(geMuster$(g.muster), geLies$("gelesen.txt")); " warnungen "; LEN(g.warnungen)
+' bekannte Garne kommen aus der Palette (DMC 310 hat dort eine andere Farbe)
+PRINT "aus der palette: "; kern.farbeAlsHex$(g.muster.farben[0].garn.farbe); " blend "; g.muster.farben[3].garn.istBlend()
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe_pysticky.oxs
+<?xml version='1.0' encoding='utf-8'?>
+<chart>
+  <format comments_about_this_chart_format="OXS — Open Cross Stitch XML">
+    <FormatVersion value="1.0" />
+  </format>
+  <chart_info>
+    <title value="Probe &lt;&amp;&gt; &quot;OXS&quot;" />
+    <author value="Hans &amp; Co" />
+    <copyright value="(c) 2026&#09;Tab" />
+    <chartwidth value="12" />
+    <chartheight value="9" />
+    <stitchesperinch value="16" />
+    <stitchesperinch_y value="16" />
+  </chart_info>
+  <palette>
+    <palette_item index="0" number="cloth" name="cloth" symbol="" color="FFFFFF" />
+    <palette_item index="1" number="310" name="DMC 310 - Black" symbol="●" color="000000" />
+    <palette_item index="2" number="321" name="DMC 321 - Christmas Red" symbol="○" color="C72B3B" />
+    <palette_item index="3" number="Eigene Farbe" name="Eigene Farbe" symbol="■" color="123456" />
+    <palette_item index="4" number="TW1" name="DMC TW1 - Tweed" symbol="□" color="804020" blend_components="DMC|310|000000|Black;DMC|B5200|FFFFFF|White" blend_ratios="2,1" />
+    <palette_item index="5" number="00557" name="Mill Hill Beads 00557 - Gold" symbol="▲" color="D4AF37" />
+  </palette>
+  <fullstitches>
+    <stitch x="1" y="1" palindex="2" />
+    <stitch x="2" y="1" palindex="1" />
+    <stitch x="3" y="1" palindex="1" />
+    <stitch x="4" y="1" palindex="1" />
+    <stitch x="5" y="1" palindex="1" />
+    <stitch x="6" y="1" palindex="1" />
+    <stitch x="7" y="1" palindex="1" />
+    <stitch x="8" y="1" palindex="1" />
+    <stitch x="9" y="1" palindex="1" />
+    <stitch x="10" y="1" palindex="1" />
+    <stitch x="11" y="1" palindex="1" />
+    <stitch x="12" y="1" palindex="1" />
+    <stitch x="6" y="6" palindex="4" />
+    <stitch x="7" y="6" palindex="4" />
+    <stitch x="8" y="6" palindex="4" />
+    <stitch x="9" y="6" palindex="4" />
+    <stitch x="6" y="7" palindex="4" />
+    <stitch x="7" y="7" palindex="4" />
+    <stitch x="8" y="7" palindex="4" />
+    <stitch x="9" y="7" palindex="4" />
+    <stitch x="6" y="8" palindex="4" />
+    <stitch x="7" y="8" palindex="4" />
+    <stitch x="8" y="8" palindex="4" />
+    <stitch x="9" y="8" palindex="4" />
+  </fullstitches>
+  <halfstitches>
+    <halfstitch x="2" y="3" palindex="2" direction="1" />
+    <halfstitch x="3" y="3" palindex="2" direction="2" />
+  </halfstitches>
+  <quarterstitches>
+    <quarterstitch x="4" y="3" palindex="2" position="TL" />
+    <quarterstitch x="5" y="3" palindex="2" position="TR" />
+    <quarterstitch x="6" y="3" palindex="2" position="BL" />
+    <quarterstitch x="7" y="3" palindex="2" position="BR" />
+  </quarterstitches>
+  <threequarterstitches>
+    <threequarterstitch x="8" y="3" palindex="2" />
+  </threequarterstitches>
+  <backstitches>
+    <backstitch x1="1" y1="1" x2="3" y2="1" palindex="1" />
+    <backstitch x1="2" y1="2.5" x2="3.5" y2="5.5" palindex="2" />
+    <backstitch x1="13" y1="10" x2="12.5" y2="9.5" palindex="3" />
+  </backstitches>
+  <ornaments_inc_knots_and_beads>
+    <object x1="2.5" y1="5.5" palindex="3" objecttype="knot" />
+    <object x1="4.5" y1="5.5" palindex="5" objecttype="bead" />
+  </ornaments_inc_knots_and_beads>
+</chart>
+
+--- datei gelesen.txt
+name Probe <&> "OXS"
+groesse 12x9 stoff 16
+meta Hans & Co|(c) 2026	Tab|oxs
+farbe 0 DMC|310|Black|#0C0C0C|●|perle False|drill False
+farbe 1 DMC|321|Christmas Red|#AC0025|○|perle False|drill False
+farbe 2 None|Eigene Farbe|Eigene Farbe|#123456|■|perle False|drill False
+farbe 3 DMC|TW1|DMC TW1 - Tweed|#804020|□|perle False|drill False blend DMC|310|#000000|Black;DMC|B5200|#FFFFFF|White 2,1
+farbe 4 Mill Hill Beads|00557|Gold|#D7AF41|▲|perle True|drill False
+stich 0,0 1 0
+stich 1,0 0 0
+stich 2,0 0 0
+stich 3,0 0 0
+stich 4,0 0 0
+stich 5,0 0 0
+stich 6,0 0 0
+stich 7,0 0 0
+stich 8,0 0 0
+stich 9,0 0 0
+stich 10,0 0 0
+stich 11,0 0 0
+stich 1,2 1 1
+stich 2,2 1 2
+stich 3,2 1 3
+stich 4,2 1 4
+stich 5,2 1 5
+stich 6,2 1 6
+stich 7,2 1 7
+stich 1,4 2 9
+stich 3,4 4 10
+stich 5,5 3 0
+stich 6,5 3 0
+stich 7,5 3 0
+stich 8,5 3 0
+stich 5,6 3 0
+stich 6,6 3 0
+stich 7,6 3 0
+stich 8,6 3 0
+stich 5,7 3 0
+stich 6,7 3 0
+stich 7,7 3 0
+stich 8,7 3 0
+rueck 0,0,4,0 0
+rueck 2,3,5,9 1
+rueck 24,18,23,17 2
+
+--- erwartet
+probe: 1 abweichend, Zeile 7: [farbe 3 DMC|TW1|Tweed|#804020|□|perle False|drill False blend DMC|310|#000000|Black;DMC|B5200|#FFFFFF|White 2,1] gegen [farbe 3 DMC|TW1|DMC TW1 - Tweed|#804020|□|perle False|drill False blend DMC|310|#000000|Black;DMC|B5200|#FFFFFF|White 2,1] warnungen 0
+aus der palette: #0C0C0C blend TRUE
+
+=== eine krumme oxs wie pysticky, warnungen eingeschlossen
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+' Kommazahl-Koordinaten, unbekannter und doppelter palindex, kaputte Farbe und
+' Index, Ornamente unter dem kurzen Namen, Rueckstich ausserhalb, fehlender Titel
+DIM g AS kern.OxsImport : g = kern.oxsLaden("krumm.oxs", pal, sym)
+DIM t AS STRING : t = geMuster$(g.muster)
+DIM w AS STRING
+FOR EACH w IN g.warnungen
+    t = t + "warnung " + w + CHR$(10)
+NEXT
+PRINT geVergleich$(t, geLies$("krumm_py.txt"))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei krumm.oxs
+<?xml version="1.0" encoding="UTF-8"?>
+<chart>
+  <chart_info>
+    <title value="" />
+    <chartwidth value="6" />
+    <chartheight value="4" />
+  </chart_info>
+  <palette>
+    <palette_item index="0" number="cloth" name="cloth" color="FFFFFF" />
+    <palette_item index="1" number="310" name="DMC 310" symbol="X" color="000000" />
+    <palette_item index="2" number="" name="Anchor 403 Schwarz" symbol="" color="#123" />
+    <palette_item index="3" number="77" name="Fremdfirma 77" symbol="Y" color="zzzzzz" />
+    <palette_item index="3" number="78" name="Fremdfirma 78" symbol="Z" color="00FF00" />
+    <palette_item index="x" number="1" name="kaputt" color="FF0000" />
+    <palette_item index="4" number="00557" name="Mill Hill Beads 00557" symbol="" color="D4AF37" />
+  </palette>
+  <fullstitches>
+    <stitch x="1.0" y="1" palindex="1" />
+    <stitch x="2" y="1" palindex="2" />
+    <stitch x="3" y="1" palindex="9" />
+    <stitch x="4" y="1" palindex="9" />
+    <stitch x="5" y="1" palindex="0" />
+    <stitch x="99" y="1" palindex="1" />
+    <stitch x="a" y="1" palindex="1" />
+    <stitch x="6" y="1" palindex="4" />
+  </fullstitches>
+  <halfstitches>
+    <halfstitch x="1" y="2" palindex="3" direction="2" />
+  </halfstitches>
+  <quarterstitches>
+    <quarterstitch x="2" y="2" palindex="1" position="br" />
+  </quarterstitches>
+  <backstitches>
+    <backstitch x1="1" y1="1" x2="2.5" y2="3" palindex="2" />
+    <backstitch x1="1" y1="1" x2="40" y2="3" palindex="2" />
+    <backstitch x1="1" y1="1" x2="40" y2="3" palindex="1" />
+  </backstitches>
+  <ornaments>
+    <object x1="3.5" y1="3.5" palindex="1" objecttype="Knot" />
+    <object x1="4.5" y1="3.5" palindex="1" objecttype="stern" />
+  </ornaments>
+</chart>
+
+--- datei krumm_py.txt
+name krumm
+groesse 6x4 stoff 14
+meta ||oxs
+farbe 0 DMC|310|Black|#0C0C0C|X|perle False|drill False
+farbe 1 Anchor|403|Black|#000000|●|perle False|drill False
+farbe 2 None|77|Fremdfirma 77|#000000|Y|perle False|drill False
+farbe 3 None|78|Fremdfirma 78|#00FF00|Z|perle False|drill False
+farbe 4 Mill Hill Beads|00557|Gold|#D7AF41|○|perle True|drill False
+stich 0,0 0 0
+stich 1,0 1 0
+stich 5,0 4 10
+stich 0,1 3 2
+stich 1,1 0 6
+stich 2,2 0 9
+rueck 0,0,3,4 1
+warnung Ungueltige Farbe 'zzzzzz' für Palette-Item 3
+warnung Doppelter Palette-Index 3 in <palette> — letzter Eintrag gewinnt
+warnung Palette-Item ohne gueltigen Index: x
+warnung Stich(e) mit unbekanntem palindex=9 (kein passendes palette_item gefunden) übersprungen
+warnung Rückstich-Koordinaten außerhalb der Mustergrenzen — betroffene Rückstiche werden verworfen
+warnung Unbekannter Ornament-Typ: stern
+
+--- erwartet
+gleich (21 Zeilen)
+
+=== oxs rundweg ueber glutfaden
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+' Ein Rundweg ist keine Identitaet: beim Lesen kommen bekannte Garne aus der
+' Palette (bei PySticky genauso). Ab dem ersten Lesen bleibt alles stehen.
+DIM m AS kern.Muster : m = kern.pxsLaden("probe.pxs")
+kern.oxsSpeichern(m, "eins.oxs")
+DIM g1 AS kern.OxsImport : g1 = kern.oxsLaden("eins.oxs", pal, sym)
+kern.oxsSpeichern(g1.muster, "zwei.oxs")
+DIM g2 AS kern.OxsImport : g2 = kern.oxsLaden("zwei.oxs", pal, sym)
+PRINT "muster: "; geVergleich$(geMuster$(g1.muster), geMuster$(g2.muster))
+kern.oxsSpeichern(g2.muster, "drei.oxs")
+PRINT "datei: "; geVergleich$(geLies$("zwei.oxs"), geLies$("drei.oxs"))
+' der Name eines Garns ohne Palette waechst nicht (bei PySticky schon)
+PRINT "name: "; g2.muster.farben[3].garn.name
+DIM g AS kern.OxsImport
+TRY
+    g = kern.oxsLaden("probe.pxs", pal, sym)
+CATCH e
+    PRINT "kein xml: "; LEFT$(e, 24)
+END TRY
+WRITEALL("falsch.oxs", "<muster><a/></muster>")
+TRY
+    g = kern.oxsLaden("falsch.oxs", pal, sym)
+CATCH e
+    PRINT e
+END TRY
+WRITEALL("riesig.oxs", "<chart><chart_info><chartwidth value='3000'/><chartheight value='5'/></chart_info><palette/></chart>")
+TRY
+    g = kern.oxsLaden("riesig.oxs", pal, sym)
+CATCH e
+    PRINT e
+END TRY
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- erwartet
+muster: gleich (44 Zeilen)
+datei: gleich (71 Zeilen)
+name: Tweed
+kein xml: OXS: kein lesbares XML -
+OXS: Wurzel ist 'muster', erwartet 'chart'
+OXS: Muster zu gross: 3000x5 (hoechstens 2000)
+
+=== export-rechnung wie pysticky: probe
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+DIM m AS kern.Muster : m = kern.pxsLaden("probe.pxs")
+PRINT geVergleich$(geExport$(m, pal), geLies$("ref.txt"))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei probe.pxs
+{
+  "format": "pysticky",
+  "version": "1.5",
+  "saved_at": "2026-10-16T16:51:23.335371",
+  "pattern": {
+    "name": "Probe <&> \"OXS\"",
+    "width": 12,
+    "height": 9,
+    "fabric_count": 16,
+    "metadata": {
+      "author": "Hans & Co",
+      "copyright": "(c) 2026\tTab"
+    },
+    "colors": [
+      {
+        "name": "Black",
+        "color": "#000000",
+        "manufacturer": "DMC",
+        "catalog_number": "310",
+        "symbol": "●",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "2f09588d"
+      },
+      {
+        "name": "Christmas Red",
+        "color": "#C72B3B",
+        "manufacturer": "DMC",
+        "catalog_number": "321",
+        "symbol": "○",
+        "stitch_count": 7,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "19e0c3a5"
+      },
+      {
+        "name": "Eigene Farbe",
+        "color": "#123456",
+        "manufacturer": null,
+        "catalog_number": null,
+        "symbol": "■",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "735d4695"
+      },
+      {
+        "name": "Tweed",
+        "color": "#804020",
+        "manufacturer": "DMC",
+        "catalog_number": "TW1",
+        "symbol": "□",
+        "stitch_count": 12,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": false,
+        "is_diamond": false,
+        "color_id": "f2110c3e",
+        "blend_components": [
+          {
+            "name": "Black",
+            "color": "#000000",
+            "manufacturer": "DMC",
+            "catalog_number": "310"
+          },
+          {
+            "name": "White",
+            "color": "#FFFFFF",
+            "manufacturer": "DMC",
+            "catalog_number": "B5200"
+          }
+        ],
+        "strand_ratios": [
+          2,
+          1
+        ]
+      },
+      {
+        "name": "Gold",
+        "color": "#D4AF37",
+        "manufacturer": "Mill Hill Beads",
+        "catalog_number": "00557",
+        "symbol": "▲",
+        "stitch_count": 1,
+        "skip_stitching": false,
+        "strands": 2,
+        "is_bead": true,
+        "is_diamond": false,
+        "color_id": "4c50854b"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Hintergrund",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            3,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            5,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            0
+          ],
+          [
+            7,
+            0,
+            0
+          ],
+          [
+            8,
+            0,
+            0
+          ],
+          [
+            9,
+            0,
+            0
+          ],
+          [
+            10,
+            0,
+            0
+          ],
+          [
+            11,
+            0,
+            0
+          ],
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            1
+          ],
+          [
+            3,
+            2,
+            1
+          ],
+          [
+            4,
+            2,
+            1
+          ],
+          [
+            5,
+            2,
+            1
+          ],
+          [
+            6,
+            2,
+            1
+          ],
+          [
+            7,
+            2,
+            1
+          ],
+          [
+            1,
+            4,
+            2
+          ],
+          [
+            3,
+            4,
+            4
+          ],
+          [
+            5,
+            5,
+            3
+          ],
+          [
+            6,
+            5,
+            3
+          ],
+          [
+            7,
+            5,
+            3
+          ],
+          [
+            8,
+            5,
+            3
+          ],
+          [
+            5,
+            6,
+            3
+          ],
+          [
+            6,
+            6,
+            3
+          ],
+          [
+            7,
+            6,
+            3
+          ],
+          [
+            8,
+            6,
+            3
+          ],
+          [
+            5,
+            7,
+            3
+          ],
+          [
+            6,
+            7,
+            3
+          ],
+          [
+            7,
+            7,
+            3
+          ],
+          [
+            8,
+            7,
+            3
+          ]
+        ],
+        "completed_stitches": [],
+        "stitch_types": [
+          [
+            1,
+            2,
+            1
+          ],
+          [
+            2,
+            2,
+            2
+          ],
+          [
+            3,
+            2,
+            3
+          ],
+          [
+            4,
+            2,
+            4
+          ],
+          [
+            5,
+            2,
+            5
+          ],
+          [
+            6,
+            2,
+            6
+          ],
+          [
+            7,
+            2,
+            7
+          ],
+          [
+            1,
+            4,
+            9
+          ],
+          [
+            3,
+            4,
+            10
+          ]
+        ]
+      },
+      {
+        "name": "Oben",
+        "visible": true,
+        "locked": false,
+        "opacity": 1.0,
+        "stitches": [
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "completed_stitches": []
+      }
+    ],
+    "active_layer": 1,
+    "backstitches": [
+      {
+        "x1": 0,
+        "y1": 0,
+        "x2": 4,
+        "y2": 0,
+        "color_index": 0
+      },
+      {
+        "x1": 2,
+        "y1": 3,
+        "x2": 5,
+        "y2": 9,
+        "color_index": 1
+      },
+      {
+        "x1": 24,
+        "y1": 18,
+        "x2": 23,
+        "y2": 17,
+        "color_index": 2
+      }
+    ],
+    "source_image_path": null,
+    "source_image_crop": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "source_palette_name": null,
+    "mode": "stitch"
+  }
+}
+
+--- datei ref.txt
+stoff Aida 16
+A4 ueb 0 zellen 0: je 40x40 seiten 1x1
+  seite 1: 0,0-11,8 farben 0:11 1:8 2:1 3:12 4:1 rueck 3
+A4 ueb 3 zellen 0: je 40x40 seiten 1x1
+  seite 1: 0,0-11,8 farben 0:11 1:8 2:1 3:12 4:1 rueck 3
+A4 ueb 0 zellen 25: je 25x25 seiten 1x1
+A4 ueb 1 zellen 5: je 5x5 seiten 3x2
+  seite 1: 0,0-5,5 farben 0:5 1:6 2:1 3:1 4:1 rueck 2
+  seite 2: 5,0-10,5 farben 0:6 1:3 3:4 rueck 0
+  seite 3: 10,0-11,5 farben 0:2 rueck 0
+  seite 4: 0,5-5,8 farben 3:3 rueck 0
+  seite 5: 5,5-10,8 farben 3:12 rueck 0
+  seite 6: 10,5-11,8 farben  rueck 1
+A3 ueb 0 zellen 0: je 60x60 seiten 1x1
+A3 ueb 3 zellen 0: je 60x60 seiten 1x1
+A3 ueb 0 zellen 25: je 25x25 seiten 1x1
+A3 ueb 1 zellen 5: je 5x5 seiten 3x2
+A2 ueb 0 zellen 0: je 90x90 seiten 1x1
+A2 ueb 3 zellen 0: je 90x90 seiten 1x1
+A2 ueb 0 zellen 25: je 25x25 seiten 1x1
+A2 ueb 1 zellen 5: je 5x5 seiten 3x2
+A1 ueb 0 zellen 0: je 130x130 seiten 1x1
+A1 ueb 3 zellen 0: je 130x130 seiten 1x1
+A1 ueb 0 zellen 25: je 25x25 seiten 1x1
+A1 ueb 1 zellen 5: je 5x5 seiten 3x2
+A0 ueb 0 zellen 0: je 190x190 seiten 1x1
+A0 ueb 3 zellen 0: je 190x190 seiten 1x1
+A0 ueb 0 zellen 25: je 25x25 seiten 1x1
+A0 ueb 1 zellen 5: je 5x5 seiten 3x2
+Letter ueb 0 zellen 0: je 40x40 seiten 1x1
+Letter ueb 3 zellen 0: je 40x40 seiten 1x1
+Letter ueb 0 zellen 25: je 25x25 seiten 1x1
+Letter ueb 1 zellen 5: je 5x5 seiten 3x2
+bedarf stiche 32 straenge 4 zusticken 32 ausgelassen 0
+  farbe 0 zahl 11 straenge 1 perle False aus False
+  farbe 1 zahl 8 straenge 1 perle False aus False
+  farbe 2 zahl 1 straenge 1 perle False aus False
+  farbe 3 zahl 12 straenge 1 perle False aus False
+  farbe 4 zahl 1 straenge 0 perle True aus False
+empfehlung 1: A4
+empfehlung 2: A4
+empfehlung 4: A4
+entsprechung Anchor: 403 12 143 1004 958
+entsprechung Madeira: 2400 0209 0905 2303 2411
+entsprechung DMC: 310 321 803 TW1 3821
+
+--- erwartet
+gleich (45 Zeilen)
+
+=== export-rechnung wie pysticky: demo
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+DIM m AS kern.Muster : m = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
+PRINT geVergleich$(geExport$(m, pal), geLies$("ref.txt"))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei ref.txt
+stoff Aida 14
+A4 ueb 0 zellen 0: je 40x40 seiten 1x1
+  seite 1: 0,0-39,39 farben 1:52 2:17 4:116 rueck 0
+A4 ueb 3 zellen 0: je 40x40 seiten 1x1
+  seite 1: 0,0-39,39 farben 1:52 2:17 4:116 rueck 0
+A4 ueb 0 zellen 25: je 25x25 seiten 2x2
+A4 ueb 1 zellen 5: je 5x5 seiten 8x8
+  seite 1: 0,0-5,5 farben 4:1 rueck 0
+  seite 2: 5,0-10,5 farben 4:6 rueck 0
+  seite 3: 10,0-15,5 farben 4:6 rueck 0
+  seite 4: 15,0-20,5 farben 4:6 rueck 0
+  seite 5: 20,0-25,5 farben 4:6 rueck 0
+  seite 6: 25,0-30,5 farben 4:6 rueck 0
+  seite 7: 30,0-35,5 farben 4:5 rueck 0
+  seite 8: 35,0-39,5 farben  rueck 0
+  seite 9: 0,5-5,10 farben 4:6 rueck 0
+  seite 10: 5,5-10,10 farben 2:4 4:11 rueck 0
+  seite 11: 10,5-15,10 farben 4:6 rueck 0
+  seite 12: 15,5-20,10 farben 4:6 rueck 0
+  seite 13: 20,5-25,10 farben 4:6 rueck 0
+  seite 14: 25,5-30,10 farben 4:6 rueck 0
+  seite 15: 30,5-35,10 farben 2:4 4:10 rueck 0
+  seite 16: 35,5-39,10 farben  rueck 0
+  seite 17: 0,10-5,15 farben 4:6 rueck 0
+  seite 18: 5,10-10,15 farben 2:1 4:6 rueck 0
+  seite 19: 10,10-15,15 farben 1:2 rueck 0
+  seite 20: 15,10-20,15 farben 1:19 rueck 0
+  seite 21: 20,10-25,15 farben 1:16 rueck 0
+  seite 22: 25,10-30,15 farben  rueck 0
+  seite 23: 30,10-35,15 farben 2:1 4:6 rueck 0
+  seite 24: 35,10-39,15 farben  rueck 0
+  seite 25: 0,15-5,20 farben 4:6 rueck 0
+  seite 26: 5,15-10,20 farben 4:6 rueck 0
+  seite 27: 10,15-15,20 farben 1:1 rueck 0
+  seite 28: 15,15-20,20 farben 1:20 rueck 0
+  seite 29: 20,15-25,20 farben 1:15 rueck 0
+  seite 30: 25,15-30,20 farben  rueck 0
+  seite 31: 30,15-35,20 farben 4:6 rueck 0
+  seite 32: 35,15-39,20 farben  rueck 0
+  seite 33: 0,20-5,25 farben 4:6 rueck 0
+  seite 34: 5,20-10,25 farben 4:6 rueck 0
+  seite 35: 10,20-15,25 farben  rueck 0
+  seite 36: 15,20-20,25 farben 2:1 rueck 0
+  seite 37: 20,20-25,25 farben 2:1 rueck 0
+  seite 38: 25,20-30,25 farben  rueck 0
+  seite 39: 30,20-35,25 farben 4:6 rueck 0
+  seite 40: 35,20-39,25 farben  rueck 0
+  seite 41: 0,25-5,30 farben 4:6 rueck 0
+  seite 42: 5,25-10,30 farben 2:1 4:6 rueck 0
+  seite 43: 10,25-15,30 farben  rueck 0
+  seite 44: 15,25-20,30 farben 2:1 rueck 0
+  seite 45: 20,25-25,30 farben 2:1 rueck 0
+  seite 46: 25,25-30,30 farben  rueck 0
+  seite 47: 30,25-35,30 farben 2:1 4:6 rueck 0
+  seite 48: 35,25-39,30 farben  rueck 0
+  seite 49: 0,30-5,35 farben 4:5 rueck 0
+  seite 50: 5,30-10,35 farben 2:4 4:10 rueck 0
+  seite 51: 10,30-15,35 farben 4:6 rueck 0
+  seite 52: 15,30-20,35 farben 4:6 rueck 0
+  seite 53: 20,30-25,35 farben 4:6 rueck 0
+  seite 54: 25,30-30,35 farben 4:6 rueck 0
+  seite 55: 30,30-35,35 farben 2:4 4:9 rueck 0
+  seite 56: 35,30-39,35 farben  rueck 0
+  seite 57: 0,35-5,39 farben  rueck 0
+  seite 58: 5,35-10,39 farben  rueck 0
+  seite 59: 10,35-15,39 farben  rueck 0
+  seite 60: 15,35-20,39 farben  rueck 0
+  seite 61: 20,35-25,39 farben  rueck 0
+  seite 62: 25,35-30,39 farben  rueck 0
+  seite 63: 30,35-35,39 farben  rueck 0
+  seite 64: 35,35-39,39 farben  rueck 0
+A3 ueb 0 zellen 0: je 60x60 seiten 1x1
+A3 ueb 3 zellen 0: je 60x60 seiten 1x1
+A3 ueb 0 zellen 25: je 25x25 seiten 2x2
+A3 ueb 1 zellen 5: je 5x5 seiten 8x8
+A2 ueb 0 zellen 0: je 90x90 seiten 1x1
+A2 ueb 3 zellen 0: je 90x90 seiten 1x1
+A2 ueb 0 zellen 25: je 25x25 seiten 2x2
+A2 ueb 1 zellen 5: je 5x5 seiten 8x8
+A1 ueb 0 zellen 0: je 130x130 seiten 1x1
+A1 ueb 3 zellen 0: je 130x130 seiten 1x1
+A1 ueb 0 zellen 25: je 25x25 seiten 2x2
+A1 ueb 1 zellen 5: je 5x5 seiten 8x8
+A0 ueb 0 zellen 0: je 190x190 seiten 1x1
+A0 ueb 3 zellen 0: je 190x190 seiten 1x1
+A0 ueb 0 zellen 25: je 25x25 seiten 2x2
+A0 ueb 1 zellen 5: je 5x5 seiten 8x8
+Letter ueb 0 zellen 0: je 40x40 seiten 1x1
+Letter ueb 3 zellen 0: je 40x40 seiten 1x1
+Letter ueb 0 zellen 25: je 25x25 seiten 2x2
+Letter ueb 1 zellen 5: je 5x5 seiten 8x8
+bedarf stiche 185 straenge 3 zusticken 185 ausgelassen 0
+  farbe 0 zahl 0 straenge 0 perle False aus False
+  farbe 1 zahl 52 straenge 1 perle False aus False
+  farbe 2 zahl 17 straenge 1 perle False aus False
+  farbe 3 zahl 0 straenge 0 perle False aus False
+  farbe 4 zahl 116 straenge 1 perle False aus False
+  farbe 5 zahl 0 straenge 0 perle False aus False
+empfehlung 1: A4
+empfehlung 2: A4
+empfehlung 4: A4
+entsprechung Anchor: 403 47 309 228 134 1
+entsprechung Madeira: 2400 0210 0104 1202 0910 9998
+entsprechung DMC: 310 347 307 562 518 8000
+
+--- erwartet
+gleich (104 Zeilen)
+
+=== export-rechnung wie pysticky: demo als diamond 2,8 mm
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = kern.symboleLaden(ARG$(0) + "/daten/symbole.txt")
+DIM m AS kern.Muster : m = kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs")
+m.modus = "diamond"
+m.stoff = 9
+PRINT geVergleich$(geExport$(m, pal), geLies$("ref.txt"))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+
+--- datei ref.txt
+stoff 2.8 mm Round
+A4 ueb 0 zellen 0: je 60x77 seiten 1x1
+  seite 1: 0,0-39,39 farben 1:52 2:17 4:116 rueck 0
+A4 ueb 3 zellen 0: je 60x77 seiten 1x1
+  seite 1: 0,0-39,39 farben 1:52 2:17 4:116 rueck 0
+A4 ueb 0 zellen 25: je 60x77 seiten 1x1
+A4 ueb 1 zellen 5: je 60x77 seiten 1x1
+  seite 1: 0,0-39,39 farben 1:52 2:17 4:116 rueck 0
+A3 ueb 0 zellen 0: je 91x121 seiten 1x1
+A3 ueb 3 zellen 0: je 91x121 seiten 1x1
+A3 ueb 0 zellen 25: je 91x121 seiten 1x1
+A3 ueb 1 zellen 5: je 91x121 seiten 1x1
+A2 ueb 0 zellen 0: je 131x180 seiten 1x1
+A2 ueb 3 zellen 0: je 131x180 seiten 1x1
+A2 ueb 0 zellen 25: je 131x180 seiten 1x1
+A2 ueb 1 zellen 5: je 131x180 seiten 1x1
+A1 ueb 0 zellen 0: je 193x268 seiten 1x1
+A1 ueb 3 zellen 0: je 193x268 seiten 1x1
+A1 ueb 0 zellen 25: je 193x268 seiten 1x1
+A1 ueb 1 zellen 5: je 193x268 seiten 1x1
+A0 ueb 0 zellen 0: je 278x388 seiten 1x1
+A0 ueb 3 zellen 0: je 278x388 seiten 1x1
+A0 ueb 0 zellen 25: je 278x388 seiten 1x1
+A0 ueb 1 zellen 5: je 278x388 seiten 1x1
+Letter ueb 0 zellen 0: je 62x71 seiten 1x1
+Letter ueb 3 zellen 0: je 62x71 seiten 1x1
+Letter ueb 0 zellen 25: je 62x71 seiten 1x1
+Letter ueb 1 zellen 5: je 62x71 seiten 1x1
+bedarf stiche 185 straenge 202 zusticken 185 ausgelassen 0
+  farbe 0 zahl 0 straenge 0 perle False aus False
+  farbe 1 zahl 52 straenge 57 perle False aus False
+  farbe 2 zahl 17 straenge 18 perle False aus False
+  farbe 3 zahl 0 straenge 0 perle False aus False
+  farbe 4 zahl 116 straenge 127 perle False aus False
+  farbe 5 zahl 0 straenge 0 perle False aus False
+empfehlung 1: A4
+empfehlung 2: A4
+empfehlung 4: A4
+entsprechung Anchor: 403 47 309 228 134 1
+entsprechung Madeira: 2400 0210 0104 1202 0910 9998
+entsprechung DMC: 310 347 307 562 518 8000
+
+--- erwartet
+gleich (41 Zeilen)

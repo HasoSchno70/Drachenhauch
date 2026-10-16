@@ -1,0 +1,499 @@
+' OXS (Open Cross Stitch) lesen und schreiben -- PySticky io/formats/oxs_io.py.
+' Das XML-Austauschformat von Pattern Maker, MacStitch/WinStitch, Stitch
+' Fiddle und anderen.
+'
+' Koordinaten: Stiche 1-basiert (Zelle x -> x + 1); Rueckstiche in Stichen ab
+' 1.0, also Halbstich h -> h / 2 + 1; Knoten und Perlen in der Zellmitte
+' (x + 1.5). Index 0 der Palette ist per Konvention der Stoff.
+'
+' Geschrieben wird so, wie ElementTree es mit ET.indent(space="  ") und
+' xml_declaration tut -- Attribut fuer Attribut in derselben Reihenfolge und
+' mit derselben Maskierung, damit die Datei Byte fuer Byte der von PySticky
+' gleicht (ausser den Zeilenenden: PySticky schreibt sie im Textmodus, unter
+' Windows also CRLF; hier immer LF).
+
+IMPORT "xml"
+
+CONST OXS_HERSTELLER = "Mill Hill Beads|Mill Hill|Weeks Dye Works|Classic Colorworks|Gentle Art Sampler Threads|Riolis Gamma|DMC Diamond Painting|DMC|Anchor|Madeira|Cosmo|Olympus|Weeks|Valdani|Venus|Finca|Sullivans|Riolis|Gamma|Classic|Gentle|Toho|Miyuki"
+
+' Wie ElementTrees _escape_attrib.
+FUNCTION oxsMaske$(t AS STRING) AS STRING
+    t = REPLACE$(t, "&", "&amp;")
+    t = REPLACE$(t, "<", "&lt;")
+    t = REPLACE$(t, ">", "&gt;")
+    t = REPLACE$(t, CHR$(34), "&quot;")
+    t = REPLACE$(t, CHR$(13), "&#13;")
+    t = REPLACE$(t, CHR$(10), "&#10;")
+    t = REPLACE$(t, CHR$(9), "&#09;")
+    RETURN t
+END FUNCTION
+
+' Ein leeres Element mit Attributen: namen und werte paarweise.
+FUNCTION oxsElement$(einzug AS STRING, tag AS STRING, namen AS ARRAY OF STRING, werte AS ARRAY OF STRING) AS STRING
+    DIM t AS STRING : t = einzug + "<" + tag
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        t = t + " " + namen[i] + "=" + CHR$(34) + oxsMaske$(werte[i]) + CHR$(34)
+    NEXT
+    RETURN t + " />"
+END FUNCTION
+
+FUNCTION oxsHex$(f AS INTEGER) AS STRING
+    RETURN RIGHT$("000000" + HEX$(f BAND &HFFFFFF), 6)
+END FUNCTION
+
+' Koordinate wie _fmt_coord: ganz ohne Komma, sonst eine Stelle.
+FUNCTION oxsKoord$(v AS FLOAT) AS STRING
+    IF ABS(v - ROUND(v)) < 0.000001 THEN RETURN STR$(INT(ROUND(v)))
+    RETURN FORMAT$(v, "%.1f")
+END FUNCTION
+
+' --- Schreiben ---------------------------------------------------------------------
+
+FUNCTION oxsText$(m AS Muster) AS STRING
+    DIM z AS ARRAY OF STRING : z = ["<?xml version='1.0' encoding='utf-8'?>", "<chart>"]
+    ARRAY_PUSH(z, "  <format comments_about_this_chart_format=" + CHR$(34) + "OXS — Open Cross Stitch XML" + CHR$(34) + ">")
+    ARRAY_PUSH(z, oxsElement$("    ", "FormatVersion", ["value"], ["1.0"]))
+    ARRAY_PUSH(z, "  </format>")
+    ARRAY_PUSH(z, "  <chart_info>")
+    DIM autor AS STRING, recht AS STRING
+    IF JSON_HAS(m.metadaten, "author") THEN autor = JSON_GET_STRING(m.metadaten, "author")
+    IF JSON_HAS(m.metadaten, "copyright") THEN recht = JSON_GET_STRING(m.metadaten, "copyright")
+    ARRAY_PUSH(z, oxsElement$("    ", "title", ["value"], [m.name]))
+    ARRAY_PUSH(z, oxsElement$("    ", "author", ["value"], [autor]))
+    ARRAY_PUSH(z, oxsElement$("    ", "copyright", ["value"], [recht]))
+    ARRAY_PUSH(z, oxsElement$("    ", "chartwidth", ["value"], [STR$(m.breite)]))
+    ARRAY_PUSH(z, oxsElement$("    ", "chartheight", ["value"], [STR$(m.hoehe)]))
+    ARRAY_PUSH(z, oxsElement$("    ", "stitchesperinch", ["value"], [STR$(INT(m.stoff))]))
+    ARRAY_PUSH(z, oxsElement$("    ", "stitchesperinch_y", ["value"], [STR$(INT(m.stoff))]))
+    ARRAY_PUSH(z, "  </chart_info>")
+    ARRAY_PUSH(z, "  <palette>")
+    ARRAY_PUSH(z, oxsElement$("    ", "palette_item", ["index", "number", "name", "symbol", "color"], ["0", "cloth", "cloth", "", "FFFFFF"]))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(m.farben) - 1
+        DIM g AS Garn : g = m.farben[i].garn
+        DIM nummer AS STRING : nummer = TRIM$(g.nummer)
+        DIM hst AS STRING : hst = TRIM$(g.hersteller)
+        DIM anzeige AS STRING : anzeige = g.name
+        IF anzeige = "" THEN anzeige = "Color " + STR$(i + 1)
+        IF hst <> "" AND nummer <> "" THEN anzeige = hst + " " + nummer + " - " + g.name
+        DIM nn AS ARRAY OF STRING : nn = ["index", "number", "name", "symbol", "color"]
+        DIM ww AS ARRAY OF STRING : ww = [STR$(i + 1), IIF(nummer <> "", nummer, anzeige), anzeige, m.farben[i].symbol, oxsHex$(g.farbe)]
+        IF g.istBlend() THEN
+            DIM teile AS STRING, anteile AS STRING
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(g.teile) - 1
+                DIM c AS Garn : c = g.teile[k]
+                IF k > 0 THEN teile = teile + ";"
+                teile = teile + TRIM$(c.hersteller) + "|" + TRIM$(c.nummer) + "|" + oxsHex$(c.farbe) + "|" + c.name
+            NEXT
+            FOR k = 0 TO LEN(g.anteile) - 1
+                IF k > 0 THEN anteile = anteile + ","
+                anteile = anteile + STR$(g.anteile[k])
+            NEXT
+            ARRAY_PUSH(nn, "blend_components") : ARRAY_PUSH(ww, teile)
+            ARRAY_PUSH(nn, "blend_ratios") : ARRAY_PUSH(ww, anteile)
+        END IF
+        ARRAY_PUSH(z, oxsElement$("    ", "palette_item", nn, ww))
+    NEXT
+    ARRAY_PUSH(z, "  </palette>")
+    ' Stiche: was zu sehen ist (oberste sichtbare Ebene), je Art ein Abschnitt
+    DIM k2 AS Komposit : k2 = kompositVon(m)
+    DIM voll AS ARRAY OF STRING : voll = []
+    DIM halb AS ARRAY OF STRING : halb = []
+    DIM viertel AS ARRAY OF STRING : viertel = []
+    DIM dreiv AS ARRAY OF STRING : dreiv = []
+    DIM orn AS ARRAY OF STRING : orn = []
+    DIM pos AS ARRAY OF STRING : pos = ["", "", "", "TL", "TR", "BL", "BR"]
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO m.hoehe - 1
+        FOR x = 0 TO m.breite - 1
+            DIM f AS INTEGER : f = k2.farbe[y * m.breite + x]
+            IF f < 0 THEN CONTINUE
+            DIM a AS INTEGER : a = k2.art[y * m.breite + x]
+            DIM sx AS STRING : sx = STR$(x + 1)
+            DIM sy AS STRING : sy = STR$(y + 1)
+            DIM pn AS STRING : pn = STR$(f + 1)
+            SELECT CASE a
+                CASE HALB_OL_UR, HALB_OR_UL
+                    ARRAY_PUSH(halb, oxsElement$("    ", "halfstitch", ["x", "y", "palindex", "direction"], [sx, sy, pn, IIF(a = HALB_OL_UR, "1", "2")]))
+                CASE VIERTEL_OL, VIERTEL_OR, VIERTEL_UL, VIERTEL_UR
+                    ARRAY_PUSH(viertel, oxsElement$("    ", "quarterstitch", ["x", "y", "palindex", "position"], [sx, sy, pn, pos[a]]))
+                CASE DREIVIERTEL
+                    ARRAY_PUSH(dreiv, oxsElement$("    ", "threequarterstitch", ["x", "y", "palindex"], [sx, sy, pn]))
+                CASE KNOTEN, PERLE
+                    ARRAY_PUSH(orn, oxsElement$("    ", "object", ["x1", "y1", "palindex", "objecttype"], [STR$(x + 1) + ".5", STR$(y + 1) + ".5", pn, IIF(a = KNOTEN, "knot", "bead")]))
+                CASE ELSE
+                    ' Vollstich -- und alles Unbekannte (Diamant) als Vollstich, wie das Original
+                    ARRAY_PUSH(voll, oxsElement$("    ", "stitch", ["x", "y", "palindex"], [sx, sy, pn]))
+            END SELECT
+        NEXT
+    NEXT
+    DIM rueck AS ARRAY OF STRING : rueck = []
+    DIM r AS Rueckstich
+    FOR EACH r IN m.rueckstiche
+        ARRAY_PUSH(rueck, oxsElement$("    ", "backstitch", ["x1", "y1", "x2", "y2", "palindex"], _
+            [oxsKoord$(r.x1 / 2 + 1), oxsKoord$(r.y1 / 2 + 1), oxsKoord$(r.x2 / 2 + 1), oxsKoord$(r.y2 / 2 + 1), STR$(r.farbe + 1)]))
+    NEXT
+    oxsAbschnitt(z, "fullstitches", voll)
+    oxsAbschnitt(z, "halfstitches", halb)
+    oxsAbschnitt(z, "quarterstitches", viertel)
+    oxsAbschnitt(z, "threequarterstitches", dreiv)
+    oxsAbschnitt(z, "backstitches", rueck)
+    oxsAbschnitt(z, "ornaments_inc_knots_and_beads", orn)
+    ARRAY_PUSH(z, "</chart>")
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+SUB oxsAbschnitt(z AS ARRAY OF STRING, tag AS STRING, zeilen AS ARRAY OF STRING)
+    IF LEN(zeilen) = 0 THEN
+        ARRAY_PUSH(z, "  <" + tag + " />")
+        RETURN
+    END IF
+    ARRAY_PUSH(z, "  <" + tag + ">")
+    DIM s AS STRING
+    FOR EACH s IN zeilen
+        ARRAY_PUSH(z, s)
+    NEXT
+    ARRAY_PUSH(z, "  </" + tag + ">")
+END SUB
+
+SUB oxsSpeichern(m AS Muster, pfad AS STRING)
+    WRITEALL(pfad, oxsText$(m))
+END SUB
+
+' --- Lesen ---------------------------------------------------------------------------
+
+' Das Ergebnis eines Imports: das Muster und die Warnungen (krumme Eintraege
+' werden uebergangen, nicht gemeldet als Fehler -- wie im Original).
+CLASS OxsImport
+    DIM muster AS Muster
+    DIM warnungen AS ARRAY OF STRING
+END CLASS
+
+FUNCTION oxsWert$(k AS XML_HANDLE, tag AS STRING) AS STRING
+    IF NOT XML_HAS(k, tag) THEN RETURN ""
+    RETURN XML_ATTR$(XML_FIND(k, tag), "value", "")
+END FUNCTION
+
+FUNCTION oxsGanz(t AS STRING, vorgabe AS INTEGER) AS INTEGER
+    t = TRIM$(t)
+    IF t = "" THEN RETURN vorgabe
+    IF NOT REGEX_TEST(t, "^[+-]?[0-9]+$") THEN RETURN vorgabe
+    RETURN VAL(t)
+END FUNCTION
+
+' int() in Python: Richtung null
+FUNCTION oxsGegenNull(v AS FLOAT) AS INTEGER
+    IF v < 0 THEN RETURN -INT(-v)
+    RETURN INT(v)
+END FUNCTION
+
+' Eine Hexfarbe mit oder ohne # (auch die Kurzform).
+FUNCTION oxsFarbwert(t AS STRING) AS INTEGER
+    t = TRIM$(t)
+    IF LEFT$(t, 1) <> "#" THEN t = "#" + t
+    RETURN farbeAusHex(t)
+END FUNCTION
+
+FUNCTION oxsZahlOk(t AS STRING) AS BOOLEAN
+    RETURN REGEX_TEST(TRIM$(t), "^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?$")
+END FUNCTION
+
+' Hersteller und Nummer aus name/number ("DMC 310 - Black", "310").
+FUNCTION oxsHerstellerNummer(name AS STRING, nummer AS STRING) AS TUPLE
+    IF nummer <> "" AND (LOWER$(nummer) = "cloth" OR LOWER$(nummer) = "fabric") THEN RETURN ("", "")
+    DIM bekannt AS ARRAY OF STRING : bekannt = SPLIT$(OXS_HERSTELLER, "|")
+    DIM h AS STRING
+    IF name <> "" AND nummer <> "" THEN
+        FOR EACH h IN bekannt
+            IF LEFT$(LOWER$(name), LEN(h)) = LOWER$(h) THEN RETURN (h, nummer)
+        NEXT
+    END IF
+    ' "Hersteller NUMMER ..." (nur ein Wort als Hersteller, wie split(None, 2))
+    DIM teile AS ARRAY OF STRING : teile = REGEX_SPLIT(TRIM$(name), "\s+")
+    IF LEN(teile) >= 2 AND TRIM$(name) <> "" THEN
+        FOR EACH h IN bekannt
+            IF teile[0] = h THEN RETURN (h, teile[1])
+        NEXT
+    END IF
+    IF nummer <> "" THEN RETURN ("", nummer)
+    RETURN ("", "")
+END FUNCTION
+
+' Das naechste freie Symbol wie Pattern.add_color (sonst #1, #2 ...).
+FUNCTION oxsSymbol$(m AS Muster, symbole AS ARRAY OF STRING) AS STRING
+    DIM benutzt AS MAP OF BOOLEAN : benutzt = {}
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        MAPPUT(benutzt, f.symbol, TRUE)
+    NEXT
+    DIM s AS STRING
+    FOR EACH s IN symbole
+        IF NOT MAPHAS(benutzt, s) THEN RETURN s
+    NEXT
+    DIM n AS INTEGER : n = 1
+    WHILE MAPHAS(benutzt, "#" + STR$(n)) : n = n + 1 : WEND
+    RETURN "#" + STR$(n)
+END FUNCTION
+
+FUNCTION oxsLaden(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS OxsImport
+    DIM erg AS OxsImport : erg = NEW OxsImport()
+    erg.warnungen = []
+    DIM x AS XML_HANDLE
+    TRY
+        x = XML_LOAD(pfad)
+    CATCH e
+        THROW "OXS: kein lesbares XML -- " + e
+    END TRY
+    IF LOWER$(XML_NAME$(x)) <> "chart" THEN THROW "OXS: Wurzel ist '" + XML_NAME$(x) + "', erwartet 'chart'"
+    DIM titel AS STRING, autor AS STRING, recht AS STRING
+    DIM b AS INTEGER, h AS INTEGER, spi AS INTEGER : spi = 14
+    IF XML_HAS(x, "chart_info") THEN
+        DIM info AS XML_HANDLE : info = XML_FIND(x, "chart_info")
+        titel = oxsWert$(info, "title")
+        autor = oxsWert$(info, "author")
+        recht = oxsWert$(info, "copyright")
+        b = oxsGanz(oxsWert$(info, "chartwidth"), 0)
+        h = oxsGanz(oxsWert$(info, "chartheight"), 0)
+        spi = oxsGanz(oxsWert$(info, "stitchesperinch"), 14)
+    END IF
+    IF titel = "" THEN
+        titel = BASENAME(pfad)
+        IF INSTRREV(titel, ".") > 0 THEN titel = LEFT$(titel, INSTRREV(titel, "."))
+    END IF
+    IF b < 1 OR h < 1 THEN THROW "OXS: ungueltige Groesse " + STR$(b) + "x" + STR$(h)
+    IF b > GROESSTES_MUSTER OR h > GROESSTES_MUSTER THEN THROW "OXS: Muster zu gross: " + STR$(b) + "x" + STR$(h) + " (hoechstens " + STR$(GROESSTES_MUSTER) + ")"
+    DIM m AS Muster : m = NEW Muster(titel, b, h)
+    m.stoff = spi
+    IF autor <> "" THEN JSON_SET_STRING(m.metadaten, "author", autor)
+    IF recht <> "" THEN JSON_SET_STRING(m.metadaten, "copyright", recht)
+    JSON_SET_STRING(m.metadaten, "imported_from", "oxs")
+    erg.muster = m
+
+    ' Garne aller Paletten nach (hersteller, nummer), klein
+    DIM bekannt AS MAP OF INTEGER : bekannt = {}     ' Schluessel -> p * 100000 + i
+    DIM p AS INTEGER, i AS INTEGER
+    FOR p = 0 TO LEN(paletten) - 1
+        FOR i = 0 TO LEN(paletten[p].garne) - 1
+            DIM gg AS Garn : gg = paletten[p].garne[i]
+            IF gg.hersteller = "" OR gg.nummer = "" THEN CONTINUE
+            DIM sk AS STRING : sk = LOWER$(gg.hersteller) + "|" + LOWER$(gg.nummer)
+            IF NOT MAPHAS(bekannt, sk) THEN MAPPUT(bekannt, sk, p * 100000 + i)
+        NEXT
+    NEXT
+    IF NOT XML_HAS(x, "palette") THEN THROW "OXS: keine <palette>"
+    DIM pal AS XML_HANDLE : pal = XML_FIND(x, "palette")
+    DIM zuordnung AS MAP OF INTEGER : zuordnung = {}   ' palindex -> Farbnummer
+    DIM gesehen AS MAP OF BOOLEAN : gesehen = {}
+    FOR i = 0 TO XML_COUNT(pal, "palette_item") - 1
+        DIM it AS XML_HANDLE : it = XML_AT(pal, "palette_item", i)
+        DIM ix AS STRING : ix = XML_ATTR$(it, "index", "")
+        IF NOT REGEX_TEST(TRIM$(ix), "^[+-]?[0-9]+$") THEN
+            ARRAY_PUSH(erg.warnungen, "Palette-Item ohne gueltigen Index: " + ix)
+            CONTINUE
+        END IF
+        DIM pidx AS INTEGER : pidx = VAL(TRIM$(ix))
+        IF MAPHAS(gesehen, STR$(pidx)) THEN ARRAY_PUSH(erg.warnungen, "Doppelter Palette-Index " + STR$(pidx) + " in <palette> — letzter Eintrag gewinnt")
+        MAPPUT(gesehen, STR$(pidx), TRUE)
+        DIM nummer AS STRING : nummer = TRIM$(XML_ATTR$(it, "number", ""))
+        DIM name AS STRING : name = TRIM$(XML_ATTR$(it, "name", ""))
+        DIM symbol AS STRING : symbol = TRIM$(XML_ATTR$(it, "symbol", ""))
+        DIM farbe AS STRING : farbe = TRIM$(XML_ATTR$(it, "color", ""))
+        IF pidx = 0 AND (LOWER$(name) = "cloth" OR LOWER$(name) = "fabric" OR name = "" OR nummer = "") THEN CONTINUE
+        DIM hst AS STRING, kat AS STRING
+        (hst, kat) = oxsHerstellerNummer(name, nummer)
+        DIM garn AS Garn
+        DIM istP AS BOOLEAN, istD AS BOOLEAN
+        IF hst <> "" AND kat <> "" THEN
+            DIM schl AS STRING : schl = LOWER$(hst) + "|" + LOWER$(kat)
+            IF MAPHAS(bekannt, schl) THEN
+                DIM wo AS INTEGER : wo = MAPGET(bekannt, schl)
+                garn = paletten[wo \ 100000].garne[wo MOD 100000]
+                istP = paletten[wo \ 100000].istPerlen
+                istD = paletten[wo \ 100000].istDiamant
+            END IF
+        END IF
+        IF IS_NIL(garn) THEN
+            DIM fw AS INTEGER : fw = 0
+            IF REGEX_TEST(farbe, "^#?[0-9A-Fa-f]{6}$") OR REGEX_TEST(farbe, "^#?[0-9A-Fa-f]{3}$") THEN
+                fw = oxsFarbwert(farbe)
+            ELSEIF farbe <> "" THEN
+                ARRAY_PUSH(erg.warnungen, "Ungueltige Farbe '" + farbe + "' für Palette-Item " + STR$(pidx))
+            END IF
+            ' Der Schreiber nennt ein Garn "Hersteller Nummer - Name". Ohne
+            ' Palette dazu macht PySticky den ganzen Text zum Namen -- und bei
+            ' jedem Rundweg kaeme "DMC TW1 - " noch einmal davor. Bewusst
+            ' anders: der Vorsatz faellt weg.
+            DIM gname AS STRING : gname = IIF(name <> "", name, "Color " + STR$(pidx))
+            DIM vorsatz AS STRING : vorsatz = hst + " " + kat + " - "
+            IF hst <> "" AND kat <> "" AND LEN(gname) > LEN(vorsatz) AND LEFT$(gname, LEN(vorsatz)) = vorsatz THEN gname = RIGHT$(gname, LEN(gname) - LEN(vorsatz))
+            garn = neuesGarn(gname, fw, hst, kat)
+            IF INSTR(LOWER$(hst), "bead") >= 0 THEN
+                istP = TRUE
+            ELSEIF INSTR(LOWER$(hst), "diamond") >= 0 THEN
+                istD = TRUE
+            END IF
+        END IF
+        ' Blend aus den eigenen Attributen
+        DIM bl AS STRING : bl = XML_ATTR$(it, "blend_components", "")
+        IF bl <> "" THEN
+            DIM teile AS ARRAY OF Garn : teile = []
+            DIM stueck AS STRING
+            FOR EACH stueck IN SPLIT$(bl, ";")
+                DIM fe AS ARRAY OF STRING : fe = SPLIT$(stueck, "|")
+                IF LEN(fe) < 4 THEN CONTINUE
+                IF NOT REGEX_TEST(fe[2], "^#?([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$") THEN CONTINUE
+                ARRAY_PUSH(teile, neuesGarn(fe[3], oxsFarbwert(fe[2]), fe[0], fe[1]))
+            NEXT
+            IF LEN(teile) >= 2 THEN
+                DIM neu AS Garn : neu = neuesGarn(garn.name, garn.farbe, garn.hersteller, garn.nummer)
+                neu.teile = teile
+                DIM ant AS ARRAY OF INTEGER : ant = []
+                DIM ra AS STRING : ra = XML_ATTR$(it, "blend_ratios", "")
+                DIM gut AS BOOLEAN : gut = ra <> ""
+                DIM q AS STRING
+                IF gut THEN
+                    FOR EACH q IN SPLIT$(ra, ",")
+                        IF TRIM$(q) = "" THEN CONTINUE
+                        IF NOT REGEX_TEST(TRIM$(q), "^[+-]?[0-9]+$") THEN gut = FALSE : BREAK
+                        ARRAY_PUSH(ant, VAL(TRIM$(q)))
+                    NEXT
+                END IF
+                IF NOT gut THEN
+                    ant = []
+                    FOR q = 0 TO LEN(teile) - 1
+                        ARRAY_PUSH(ant, 1)
+                    NEXT
+                END IF
+                neu.anteile = ant
+                garn = neu
+            END IF
+        END IF
+        DIM fe2 AS Farbeintrag : fe2 = neuerFarbeintrag(garn, oxsSymbol$(m, symbole))
+        fe2.istPerle = istP
+        fe2.istDiamant = istD
+        IF symbol <> "" THEN fe2.symbol = symbol
+        ARRAY_PUSH(m.farben, fe2)
+        MAPPUT(zuordnung, STR$(pidx), LEN(m.farben) - 1)
+    NEXT
+
+    DIM eb AS Ebene : eb = m.ebenen.aktiveEbene()
+    DIM unbekanntGemeldet AS MAP OF BOOLEAN : unbekanntGemeldet = {}
+    oxsStiche(x, "fullstitches", "stitch", erg, eb, zuordnung, gesehen, unbekanntGemeldet, 0)
+    oxsStiche(x, "halfstitches", "halfstitch", erg, eb, zuordnung, gesehen, unbekanntGemeldet, 1)
+    oxsStiche(x, "quarterstitches", "quarterstitch", erg, eb, zuordnung, gesehen, unbekanntGemeldet, 2)
+    oxsStiche(x, "threequarterstitches", "threequarterstitch", erg, eb, zuordnung, gesehen, unbekanntGemeldet, 3)
+    ' Rueckstiche
+    IF XML_HAS(x, "backstitches") THEN
+        DIM rs AS XML_HANDLE : rs = XML_FIND(x, "backstitches")
+        DIM gewarnt AS BOOLEAN
+        FOR i = 0 TO XML_COUNT(rs, "backstitch") - 1
+            DIM el AS XML_HANDLE : el = XML_AT(rs, "backstitch", i)
+            DIM w1 AS STRING : w1 = XML_ATTR$(el, "x1", "")
+            DIM w2 AS STRING : w2 = XML_ATTR$(el, "y1", "")
+            DIM w3 AS STRING : w3 = XML_ATTR$(el, "x2", "")
+            DIM w4 AS STRING : w4 = XML_ATTR$(el, "y2", "")
+            DIM w5 AS STRING : w5 = XML_ATTR$(el, "palindex", "")
+            IF NOT (oxsZahlOk(w1) AND oxsZahlOk(w2) AND oxsZahlOk(w3) AND oxsZahlOk(w4) AND REGEX_TEST(TRIM$(w5), "^[+-]?[0-9]+$")) THEN CONTINUE
+            DIM fi AS INTEGER : fi = oxsFarbe(VAL(TRIM$(w5)), erg, zuordnung, gesehen, unbekanntGemeldet)
+            IF fi < 0 THEN CONTINUE
+            DIM hx1 AS INTEGER : hx1 = ROUND((VAL(w1) - 1) * 2)
+            DIM hy1 AS INTEGER : hy1 = ROUND((VAL(w2) - 1) * 2)
+            DIM hx2 AS INTEGER : hx2 = ROUND((VAL(w3) - 1) * 2)
+            DIM hy2 AS INTEGER : hy2 = ROUND((VAL(w4) - 1) * 2)
+            IF hx1 < 0 OR hy1 < 0 OR hx2 < 0 OR hy2 < 0 OR hx1 > 2 * b OR hx2 > 2 * b OR hy1 > 2 * h OR hy2 > 2 * h THEN
+                IF NOT gewarnt THEN ARRAY_PUSH(erg.warnungen, "Rückstich-Koordinaten außerhalb der Mustergrenzen — betroffene Rückstiche werden verworfen")
+                gewarnt = TRUE
+                CONTINUE
+            END IF
+            ARRAY_PUSH(m.rueckstiche, neuerRueckstich(hx1, hy1, hx2, hy2, fi))
+        NEXT
+    END IF
+    ' Knoten und Perlen
+    DIM orn AS STRING : orn = ""
+    IF XML_HAS(x, "ornaments_inc_knots_and_beads") THEN
+        orn = "ornaments_inc_knots_and_beads"
+    ELSEIF XML_HAS(x, "ornaments") THEN
+        orn = "ornaments"
+    END IF
+    IF orn <> "" THEN
+        DIM os AS XML_HANDLE : os = XML_FIND(x, orn)
+        FOR i = 0 TO XML_COUNT(os, "object") - 1
+            DIM ob AS XML_HANDLE : ob = XML_AT(os, "object", i)
+            DIM ox AS STRING : ox = XML_ATTR$(ob, "x1", "")
+            DIM oy AS STRING : oy = XML_ATTR$(ob, "y1", "")
+            DIM op AS STRING : op = XML_ATTR$(ob, "palindex", "")
+            IF NOT (oxsZahlOk(ox) AND oxsZahlOk(oy) AND REGEX_TEST(TRIM$(op), "^[+-]?[0-9]+$")) THEN CONTINUE
+            DIM ofa AS INTEGER : ofa = oxsFarbe(VAL(TRIM$(op)), erg, zuordnung, gesehen, unbekanntGemeldet)
+            IF ofa < 0 THEN CONTINUE
+            DIM ot AS STRING : ot = LOWER$(XML_ATTR$(ob, "objecttype", "knot"))
+            DIM art AS INTEGER
+            IF ot = "knot" THEN
+                art = KNOTEN
+            ELSEIF ot = "bead" THEN
+                art = PERLE
+            ELSE
+                ARRAY_PUSH(erg.warnungen, "Unbekannter Ornament-Typ: " + ot)
+                CONTINUE
+            END IF
+            ' int(x1 - 1): Richtung null, wie Python
+            oxsSetzen(m, eb, oxsGegenNull(VAL(ox) - 1), oxsGegenNull(VAL(oy) - 1), ofa, art)
+        NEXT
+    END IF
+    m.stichzahlenNeu()
+    RETURN erg
+END FUNCTION
+
+' palindex -> Farbnummer; -1 = ueberspringen (Stoff still, Unbekanntes mit Warnung).
+FUNCTION oxsFarbe(pidx AS INTEGER, erg AS OxsImport, zuordnung AS MAP OF INTEGER, gesehen AS MAP OF BOOLEAN, gemeldet AS MAP OF BOOLEAN) AS INTEGER
+    IF MAPHAS(zuordnung, STR$(pidx)) THEN RETURN MAPGET(zuordnung, STR$(pidx))
+    IF NOT MAPHAS(gesehen, STR$(pidx)) AND NOT MAPHAS(gemeldet, STR$(pidx)) THEN
+        MAPPUT(gemeldet, STR$(pidx), TRUE)
+        ARRAY_PUSH(erg.warnungen, "Stich(e) mit unbekanntem palindex=" + STR$(pidx) + " (kein passendes palette_item gefunden) übersprungen")
+    END IF
+    RETURN -1
+END FUNCTION
+
+' Wie Pattern.set_stitch: ein Vollstich einer Perlen- oder Diamant-Farbe wird
+' Perle bzw. Drill.
+SUB oxsSetzen(m AS Muster, eb AS Ebene, x AS INTEGER, y AS INTEGER, farbe AS INTEGER, art AS INTEGER)
+    IF x < 0 OR y < 0 OR x >= m.breite OR y >= m.hoehe THEN RETURN
+    IF art = VOLL THEN
+        IF m.farben[farbe].istPerle THEN
+            art = PERLE
+        ELSEIF m.farben[farbe].istDiamant THEN
+            art = DIAMANT
+        END IF
+    END IF
+    eb.raster[y * m.breite + x] = farbe
+    eb.art[y * m.breite + x] = art
+END SUB
+
+' Ein Abschnitt mit Zellstichen: welche = 0 voll, 1 halb, 2 viertel, 3 dreiviertel.
+SUB oxsStiche(x AS XML_HANDLE, abschnitt AS STRING, tag AS STRING, erg AS OxsImport, eb AS Ebene, zuordnung AS MAP OF INTEGER, gesehen AS MAP OF BOOLEAN, gemeldet AS MAP OF BOOLEAN, welche AS INTEGER)
+    IF NOT XML_HAS(x, abschnitt) THEN RETURN
+    DIM s AS XML_HANDLE : s = XML_FIND(x, abschnitt)
+    DIM i AS INTEGER
+    FOR i = 0 TO XML_COUNT(s, tag) - 1
+        DIM el AS XML_HANDLE : el = XML_AT(s, tag, i)
+        DIM wx AS STRING : wx = XML_ATTR$(el, "x", "")
+        DIM wy AS STRING : wy = XML_ATTR$(el, "y", "")
+        DIM wp AS STRING : wp = XML_ATTR$(el, "palindex", "")
+        IF NOT (oxsZahlOk(wx) AND oxsZahlOk(wy) AND REGEX_TEST(TRIM$(wp), "^[+-]?[0-9]+$")) THEN CONTINUE
+        DIM f AS INTEGER : f = oxsFarbe(VAL(TRIM$(wp)), erg, zuordnung, gesehen, gemeldet)
+        IF f < 0 THEN CONTINUE
+        DIM art AS INTEGER : art = VOLL
+        IF welche = 1 THEN art = IIF(XML_ATTR$(el, "direction", "1") = "1", HALB_OL_UR, HALB_OR_UL)
+        IF welche = 2 THEN
+            SELECT CASE UPPER$(XML_ATTR$(el, "position", "TL"))
+                CASE "TR" : art = VIERTEL_OR
+                CASE "BL" : art = VIERTEL_UL
+                CASE "BR" : art = VIERTEL_UR
+                CASE ELSE : art = VIERTEL_OL
+            END SELECT
+        END IF
+        IF welche = 3 THEN art = DREIVIERTEL
+        oxsSetzen(erg.muster, eb, ROUND(VAL(wx)) - 1, ROUND(VAL(wy)) - 1, f, art)
+    NEXT
+END SUB
