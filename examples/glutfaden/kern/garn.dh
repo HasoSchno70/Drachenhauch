@@ -215,6 +215,81 @@ FUNCTION farbeLab(f AS INTEGER) AS TUPLE
     RETURN (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
 END FUNCTION
 
+' Pythons round(): bei genau .5 zur geraden Zahl.
+FUNCTION pyRunden(v AS FLOAT) AS INTEGER
+    DIM n AS INTEGER : n = FLOOR(v)
+    DIM d AS FLOAT : d = v - n
+    IF d > 0.5 THEN RETURN n + 1
+    IF d < 0.5 THEN RETURN n
+    IF n MOD 2 = 0 THEN RETURN n
+    RETURN n + 1
+END FUNCTION
+
+FUNCTION srgbAusLinear(c AS FLOAT) AS INTEGER
+    DIM v AS FLOAT : v = CLAMP(c, 0.0, 1.0)
+    IF v > 0.0031308 THEN
+        v = 1.055 * v ^ (1.0 / 2.4) - 0.055
+    ELSE
+        v = 12.92 * v
+    END IF
+    RETURN CLAMP(pyRunden(v * 255), 0, 255)
+END FUNCTION
+
+FUNCTION labFUmkehr(t AS FLOAT) AS FLOAT
+    IF t ^ 3 > 0.008856 THEN RETURN t ^ 3
+    RETURN (116 * t - 16) / 903.3
+END FUNCTION
+
+' (L, a, b) -> &HRRGGBB, die Umkehrung von farbeLab (PySticky lab_to_rgb).
+FUNCTION labFarbe(l AS FLOAT, a AS FLOAT, b AS FLOAT) AS INTEGER
+    DIM fy AS FLOAT : fy = (l + 16) / 116
+    DIM fx AS FLOAT : fx = a / 500 + fy
+    DIM fz AS FLOAT : fz = fy - b / 200
+    DIM x AS FLOAT : x = labFUmkehr(fx) * 0.95047
+    DIM y AS FLOAT : y = labFUmkehr(fy)
+    DIM z AS FLOAT : z = labFUmkehr(fz) * 1.08883
+    DIM r AS INTEGER : r = srgbAusLinear(3.2404542 * x - 1.5371385 * y - 0.4985314 * z)
+    DIM g AS INTEGER : g = srgbAusLinear(-0.9692660 * x + 1.8760108 * y + 0.0415560 * z)
+    DIM bb AS INTEGER : bb = srgbAusLinear(0.0556434 * x - 0.2040259 * y + 1.0572252 * z)
+    RETURN RGB(r, g, bb)
+END FUNCTION
+
+' Ein Tweed-Blend aus zwei oder mehr Garnen (PySticky Thread.blend): die Farbe
+' ist das nach Straengen gewichtete Mittel in Lab, der Name "DMC 310 / DMC
+' 3799 (1+1)", der Hersteller der gemeinsame oder "Blend", die Nummer die
+' Nummern mit "+".
+FUNCTION garnBlend(teile AS ARRAY OF Garn, anteile AS ARRAY OF INTEGER) AS Garn
+    IF LEN(teile) < 2 THEN THROW "Blend braucht mindestens 2 Garne"
+    IF LEN(anteile) <> LEN(teile) THEN THROW "Blend: Zahl der Anteile passt nicht zu den Garnen"
+    DIM summe AS INTEGER : summe = 0
+    DIM sl AS FLOAT, sa AS FLOAT, sb AS FLOAT
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM nummern AS ARRAY OF STRING : nummern = []
+    DIM anteilText AS ARRAY OF STRING : anteilText = []
+    DIM hst AS MAP OF BOOLEAN : hst = {}
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        IF anteile[i] < 1 THEN THROW "Blend: Anteile müssen mindestens 1 sein"
+        DIM l AS FLOAT, a AS FLOAT, b AS FLOAT
+        (l, a, b) = farbeLab(teile[i].farbe)
+        sl = sl + l * anteile[i]
+        sa = sa + a * anteile[i]
+        sb = sb + b * anteile[i]
+        summe = summe + anteile[i]
+        DIM g AS Garn : g = teile[i]
+        ARRAY_PUSH(namen, TRIM$(g.hersteller + " " + IIF(g.nummer <> "", g.nummer, g.name)))
+        ARRAY_PUSH(nummern, g.nummer)
+        ARRAY_PUSH(anteilText, STR$(anteile[i]))
+        IF g.hersteller <> "" THEN MAPPUT(hst, g.hersteller, TRUE)
+    NEXT
+    DIM hersteller AS STRING : hersteller = "Blend"
+    IF LEN(MAPKEYS(hst)) = 1 THEN hersteller = MAPKEYS(hst)[0]
+    DIM erg AS Garn : erg = neuesGarn(JOIN$(namen, " / ") + " (" + JOIN$(anteilText, "+") + ")", labFarbe(sl / summe, sa / summe, sb / summe), hersteller, JOIN$(nummern, "+"))
+    erg.teile = teile
+    erg.anteile = anteile
+    RETURN erg
+END FUNCTION
+
 FUNCTION labWinkel(ap AS FLOAT, b AS FLOAT) AS FLOAT
     IF ap = 0 AND b = 0 THEN RETURN 0.0
     DIM h AS FLOAT : h = DEG(ATAN2(b, ap))

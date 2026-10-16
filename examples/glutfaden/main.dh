@@ -207,7 +207,7 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
     DIM m AS kern.Muster
     DIM fremdHinweis AS STRING
     DIM endung AS STRING : endung = LOWER$(RIGHT$(pfad, 4))
-    DIM fremd AS BOOLEAN : fremd = endung = ".oxs" OR endung = ".pat"
+    DIM fremd AS BOOLEAN : fremd = endung = ".oxs" OR endung = ".pat" OR endung = ".xsd"
     TRY
         ' ein fremdes Format: eingelesen, gesichert wird als .pxs
         DIM warnungen AS ARRAY OF STRING : warnungen = []
@@ -221,6 +221,11 @@ FUNCTION musterOeffnen(pfad AS STRING) AS BOOLEAN
             m = pimp.muster
             warnungen = pimp.warnungen
             fremdHinweis = "Aus PCStitch eingelesen -- Sichern legt eine .pxs an."
+        ELSEIF endung = ".xsd" THEN
+            DIM ximp AS kern.XsdImport : ximp = kern.xsdLaden(pfad, slPaletten, slSymbole)
+            m = ximp.muster
+            warnungen = ximp.warnungen
+            fremdHinweis = "Aus Pattern Maker eingelesen -- Sichern legt eine .pxs an."
         ELSE
             m = kern.pxsLaden(pfad)
         END IF
@@ -282,11 +287,12 @@ FUNCTION dateiWaehlen(sichern AS BOOLEAN) AS STRING
             "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Öffnen", GTK_ANTWORT_ANNEHMEN, 0)
     END IF
     DIM filter AS INTEGER : filter = gtk_file_filter_new()
-    gtk_file_filter_set_name(filter, IIF(sichern, "Kreuzstich-Muster (*.pxs)", "Kreuzstich-Muster (*.pxs, *.oxs, *.pat)"))
+    gtk_file_filter_set_name(filter, IIF(sichern, "Kreuzstich-Muster (*.pxs)", "Kreuzstich-Muster (*.pxs, *.oxs, *.pat, *.xsd)"))
     gtk_file_filter_add_pattern(filter, "*.pxs")
     IF NOT sichern THEN
         gtk_file_filter_add_pattern(filter, "*.oxs")
         gtk_file_filter_add_pattern(filter, "*.pat")
+        gtk_file_filter_add_pattern(filter, "*.xsd")
     END IF
     gtk_file_chooser_add_filter(d, filter)
     DIM pfad AS STRING

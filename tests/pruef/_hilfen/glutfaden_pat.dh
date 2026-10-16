@@ -77,11 +77,20 @@ END FUNCTION
 
 ' Alles, was der Leser aus einer Datei macht, als Text.
 SUB phZeigen(imp AS kern.PatImport)
-    DIM m AS kern.Muster : m = imp.muster
-    PRINT "fassung "; imp.fassung; " | "; m.name; " "; m.breite; "x"; m.hoehe; " stoff "; m.stoff; " ebenen "; m.ebenen.anzahl()
+    PRINT "fassung "; imp.fassung
+    phMuster(imp.muster, imp.warnungen)
+END SUB
+
+SUB phMuster(m AS kern.Muster, warnungen AS ARRAY OF STRING)
+    PRINT m.name; " "; m.breite; "x"; m.hoehe; " stoff "; m.stoff; " ebenen "; m.ebenen.anzahl()
     DIM f AS kern.Farbeintrag
     FOR EACH f IN m.farben
-        PRINT "farbe "; f.symbol; " "; f.garn.hersteller; " "; f.garn.nummer; " "; f.garn.name; " #"; RIGHT$("00000" + HEX$(f.garn.farbe), 6); " stiche "; f.stichzahl
+        PRINT "farbe "; f.symbol; " "; f.garn.hersteller; " "; f.garn.nummer; " "; f.garn.name; " #"; RIGHT$("00000" + HEX$(f.garn.farbe), 6); " stiche "; f.stichzahl; IIF(f.istPerle, " perle", "")
+        DIM tg AS kern.Garn
+        FOR EACH tg IN f.garn.teile
+            PRINT "  teil "; tg.hersteller; " "; tg.nummer; " #"; RIGHT$("00000" + HEX$(tg.farbe), 6)
+        NEXT
+        IF LEN(f.garn.anteile) > 0 THEN PRINT "  anteile "; JOIN$(f.garn.anteile, "+")
     NEXT
     DIM e AS INTEGER, y AS INTEGER, x AS INTEGER
     FOR e = 0 TO m.ebenen.anzahl() - 1
@@ -105,7 +114,7 @@ SUB phZeigen(imp AS kern.PatImport)
     NEXT
     PRINT JSON_STRINGIFY(m.metadaten)
     DIM w AS STRING
-    FOR EACH w IN imp.warnungen
+    FOR EACH w IN warnungen
         PRINT "warnung: "; w
     NEXT
 END SUB

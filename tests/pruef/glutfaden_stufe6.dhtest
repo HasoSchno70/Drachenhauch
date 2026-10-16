@@ -31,8 +31,10 @@ phZeigen(kern.patLaden("probe.pat", pal, sym))
 --- datei helfer.dh
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
 --- erwartet
-fassung 8 | Probe 4x3 stoff 16.0 ebenen 2
+fassung 8
+Probe 4x3 stoff 16.0 ebenen 2
 farbe X DMC 310 Black #0C0C0C stiche 2
 farbe A Foo 9999 Testgarn #0C2238 stiche 1
 farbe B DMC 5200 Snow white Original #FFFFFF stiche 4
@@ -65,6 +67,7 @@ PRINT "[" + kern.patRtfText$("ohne rtf") + "]"
 --- datei helfer.dh
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
 --- erwartet
 [Hallo	Welt
 
@@ -89,8 +92,10 @@ phZeigen(kern.patLaden("mein stueck.pat", pal, sym))
 --- datei helfer.dh
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
 --- erwartet
-fassung 8 | mein stueck 1x2 stoff 14.0 ebenen 1
+fassung 8
+mein stueck 1x2 stoff 14.0 ebenen 1
 farbe X DMC 310 Black #0C0C0C stiche 0
 farbe A Foo 9999 Testgarn #0C2238 stiche 0
 farbe B DMC 5200 Snow white Original #FFFFFF stiche 0
@@ -134,6 +139,7 @@ versuch("fehlt", BUFFER_FROM_STRING(""))
 --- datei helfer.dh
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
 --- erwartet
 gut: gelesen
 kennung: PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)
@@ -143,3 +149,149 @@ zu lauf: PAT: kaputter Lauf im Gitter bei Byte 2204
 zu gross: PAT: Muster zu groß: 2001x1 (höchstens 2000)
 farbe kaputt: PAT: unbekannter Aufbau der Farbe 1 (DMC 310)
 fehlt: PAT: keine PCStitch-Datei (die Kennung 'PCStitch' fehlt)
+
+=== xsd: ein ganzes muster
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+DIM fa AS STRING : fa = xhFarbe$(0, "310", "Black", &H101010, FALSE, "")
+fa = fa + xhFarbe$(1, "9403", "Schwarz " + CHR$(&HD7) + CHR$(&HE5), &H202020, TRUE, "")
+fa = fa + xhFarbe$(252, "11", "", &H884444, FALSE, "0:310:1;0:321:2")
+DIM sy AS ARRAY OF INTEGER : sy = [ASC("S"), &HFFFF, ASC("S")]
+' zeilenweise, 4 x 3: voll Farbe 0 | Lauf 2 x Blend | leer | Teilstich-Satz 0 |
+' Satz 1 | Lauf 4 leer | Perle (Farbe 1) | Farbe 9
+DIM wo AS ARRAY OF INTEGER : wo = [&H00000000, &H40020000, &H00020000, &H0F000000, &H80000000, &H80010000, &H40040000, &H0F000000, &H00010000, &H00090000]
+DIM st AS STRING : st = xhStiche$(wo, [&H12345678, &H0BADCAFE, &H31415926, &H27182818])
+' Satz 0: halber Stich oben (Farbe 0) + Viertel oben rechts (Farbe 2); Satz 1: Petite unten rechts (Farbe 0)
+DIM kl AS STRING : kl = "11000000000002000000" + "00080000000000000000"
+' Knoten, Rueckstich, Spannstich, Kurve, Sonderstich, Perle, Rueckstich mit Farbe 9
+DIM jo AS STRING : jo = ph16$(1) + "0000" + ph16$(3) + ph16$(1) + "00000000" + "00" + "00"
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(8) + ph16$(6) + "02" + "00"
+jo = jo + ph16$(5) + "0000" + ph16$(2) + ph16$(2) + ph16$(4) + ph16$(2) + "00" + "00"
+jo = jo + ph16$(3) + "000000" + ph16$(2) + "0100020003000400"
+jo = jo + ph16$(4) + phNull$(23)
+jo = jo + ph16$(6) + "0000" + ph16$(7) + ph16$(5) + "01" + "00" + ph16$(90)
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(2) + ph16$(0) + "09" + "00"
+
+DIM b AS BUFFER : b = xhDatei(4, 3, 18, "Probe XSD", "Hans", "Notiz", 3, fa, sy, st, kl, 7, jo)
+WRITEALL_BYTES("probe.xsd", b)
+xhZeigen(kern.xsdLaden("probe.xsd", pal, sym))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+--- erwartet
+fassung 4.8.4.0
+Probe XSD 4x3 stoff 18.0 ebenen 2
+farbe S DMC 310 Black #0C0C0C stiche 4
+farbe A Anchor 9403 Schwarz Че #202020 stiche 2 perle
+farbe B DMC 310+321 DMC 310 / DMC 321 (1+2) #884444 stiche 3
+  teil DMC 310 #0C0C0C
+  teil DMC 321 #AC0025
+  anteile 1+2
+ebene Hintergrund
+  0:0 2:0 2:0 .
+  0:1 0:6 . .
+  . . 1:10 1:10
+ebene Teilstiche 2
+  . 0:9 . .
+  2:4 . . .
+  . . . .
+rueckstich 0,0 - 8,6 farbe 2
+rueckstich 2,2 - 4,2 farbe 0
+{"author":"Hans","copyright":"(c) 2026","notes":"Notiz","imported_from":"xsd","xsd_version":"4.8.4.0"}
+warnung: Neues Symbol für Anchor 9403 (das Zeichen aus Pattern Makers Symbolschrift ist nicht darstellbar)
+warnung: Neues Symbol für DMC 310+321 (das Zeichen ist schon vergeben)
+warnung: 1 Stich(e) mit unbekannter Farbe übersprungen
+warnung: 1 Petite-Stich(e) als Viertelstiche übernommen
+warnung: Zellen mit mehreren Teilstichen: die weiteren liegen auf eigenen Ebenen
+warnung: 1 Spannstich(e) als Rückstiche übernommen
+warnung: 1 Sonderstich(e) nicht übernommen (kennt Glutfaden nicht)
+warnung: 1 gebogene(r) Stich(e) nicht übernommen (kennt Glutfaden nicht)
+warnung: 1 Rückstich(e), Knoten oder Perle(n) mit unbekannter Farbe übersprungen
+
+=== xsd: fremde und kaputte dateien
+IMPORT "helfer.dh"
+DIM pal AS ARRAY OF kern.Palette : pal = kern.palettenLaden(ARG$(0) + "/daten/paletten")
+DIM sym AS ARRAY OF STRING : sym = ["A", "B", "C", "D"]
+DIM fa AS STRING : fa = xhFarbe$(0, "310", "Black", &H101010, FALSE, "")
+fa = fa + xhFarbe$(1, "9403", "Schwarz " + CHR$(&HD7) + CHR$(&HE5), &H202020, TRUE, "")
+fa = fa + xhFarbe$(252, "11", "", &H884444, FALSE, "0:310:1;0:321:2")
+DIM sy AS ARRAY OF INTEGER : sy = [ASC("S"), &HFFFF, ASC("S")]
+' zeilenweise, 4 x 3: voll Farbe 0 | Lauf 2 x Blend | leer | Teilstich-Satz 0 |
+' Satz 1 | Lauf 4 leer | Perle (Farbe 1) | Farbe 9
+DIM wo AS ARRAY OF INTEGER : wo = [&H00000000, &H40020000, &H00020000, &H0F000000, &H80000000, &H80010000, &H40040000, &H0F000000, &H00010000, &H00090000]
+DIM st AS STRING : st = xhStiche$(wo, [&H12345678, &H0BADCAFE, &H31415926, &H27182818])
+' Satz 0: halber Stich oben (Farbe 0) + Viertel oben rechts (Farbe 2); Satz 1: Petite unten rechts (Farbe 0)
+DIM kl AS STRING : kl = "11000000000002000000" + "00080000000000000000"
+' Knoten, Rueckstich, Spannstich, Kurve, Sonderstich, Perle, Rueckstich mit Farbe 9
+DIM jo AS STRING : jo = ph16$(1) + "0000" + ph16$(3) + ph16$(1) + "00000000" + "00" + "00"
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(8) + ph16$(6) + "02" + "00"
+jo = jo + ph16$(5) + "0000" + ph16$(2) + ph16$(2) + ph16$(4) + ph16$(2) + "00" + "00"
+jo = jo + ph16$(3) + "000000" + ph16$(2) + "0100020003000400"
+jo = jo + ph16$(4) + phNull$(23)
+jo = jo + ph16$(6) + "0000" + ph16$(7) + ph16$(5) + "01" + "00" + ph16$(90)
+jo = jo + ph16$(2) + "0000" + ph16$(0) + ph16$(0) + ph16$(2) + ph16$(0) + "09" + "00"
+
+SUB versuch(name AS STRING, b AS BUFFER)
+    WRITEALL_BYTES("x.xsd", b)
+    TRY
+        DIM imp AS kern.XsdImport : imp = kern.xsdLaden("x.xsd", pal, sym)
+        PRINT name; ": gelesen, "; LEN(imp.muster.rueckstiche); " rueckstiche"
+    CATCH e
+        PRINT name; ": "; e
+    END TRY
+END SUB
+DIM gut AS BUFFER : gut = xhDatei(4, 3, 18, "T", "", "", 3, fa, sy, st, kl, 7, jo)
+versuch("gut", gut)
+versuch("kennung", BUFFER_FROM_HEX("0000" + phNull$(100)))
+versuch("leer", BUFFER_FROM_STRING(""))
+versuch("abgeschnitten", BUFFER_SLICE(gut, 0, BUFFER_LEN(gut) - 30))
+versuch("falscher schluessel", xhDatei(4, 3, 18, "T", "", "", 3, fa, sy, REPLACE$(st, "78563412", "79563412"), kl, 7, jo))
+versuch("satz fehlt", xhDatei(4, 3, 18, "T", "", "", 3, fa, sy, st, LEFT$(kl, 20), 7, LEFT$(jo, 0)))
+versuch("joint unbekannt", xhDatei(4, 3, 18, "T", "", "", 3, fa, sy, st, kl, 1, ph16$(9) + phNull$(20)))
+versuch("zu gross", xhDatei(2001, 1, 18, "T", "", "", 3, fa, sy, st, kl, 7, jo))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+--- erwartet
+gut: gelesen, 2 rueckstiche
+kennung: XSD: keine Pattern-Maker-Datei (die Kennung 0x0510 fehlt)
+leer: XSD: keine Pattern-Maker-Datei
+abgeschnitten: XSD: Datei endet vorzeitig (bei Byte 49678)
+falscher schluessel: XSD: zu viele Stiche (mehr als 12 Zellen)
+satz fehlt: XSD: Teilstich-Satz 1 fehlt (es gibt 1)
+joint unbekannt: XSD: unbekannte Joint-Art 9 bei Byte 49619
+zu gross: XSD: Muster zu groß: 2001x1 (höchstens 2000)
+
+=== blend: farbe und name wie pysticky
+IMPORT "helfer.dh"
+DIM a AS kern.Garn : a = kern.neuesGarn("Black", &H0C0C0C, "DMC", "310")
+DIM b AS kern.Garn : b = kern.neuesGarn("Red", &HC72B3B, "DMC", "321")
+DIM c AS kern.Garn : c = kern.neuesGarn("Gold", &HFFD700, "Anchor", "306")
+DIM g AS kern.Garn : g = kern.garnBlend([a, b], [1, 1])
+PRINT g.name; " | "; g.hersteller; " | "; g.nummer; " | "; kern.farbeAlsHex$(g.farbe); " | "; g.istBlend()
+g = kern.garnBlend([a, b, c], [1, 2, 1])
+PRINT g.name; " | "; g.hersteller; " | "; g.nummer; " | "; kern.farbeAlsHex$(g.farbe)
+PRINT kern.farbeAlsHex$(kern.labFarbe(50.0, 20.0, -30.0)); " "; kern.pyRunden(2.5); " "; kern.pyRunden(3.5); " "; kern.pyRunden(-0.5)
+TRY
+    g = kern.garnBlend([a], [1])
+CATCH e
+    PRINT e
+END TRY
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_pat.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_xsd.dh"
+--- erwartet
+DMC 310 / DMC 321 (1+1) | DMC | 310+321 | #652224 | TRUE
+DMC 310 / DMC 321 / Anchor 306 (1+2+1) | Blend | 310+321+306 | #A4542D
+#7F6DAA 2 4 0
+Blend braucht mindestens 2 Garne
