@@ -1,0 +1,1111 @@
+' Muster als PDF -- PySticky io/pdf_export.py samt Sektionen und Zeichnungen.
+'
+' Deckblatt (Vorschau, Kenndaten), Notizen, Vorschau, Legende mit Bedarf und
+' Entsprechungen anderer Hersteller, Rueckstich- und Perlen-Legende,
+' Seitenuebersicht, dann je Seite das Raster mit Symbolen, Zehnerlinien,
+' Nummern und einer kleinen Legende. Diamond-Modus 1:1 (die Zelle ist die
+' Drill-Kante), Mystery-Modus (Vorschau ohne Bild, Musterseiten nur Symbole),
+' Wasserzeichen. Ein Passwortschutz fehlt: krilla verschluesselt nicht.
+'
+' PySticky setzt mit reportlab (Absaetze, Tabellen, Zeichnungen fliessen von
+' oben nach unten und brechen um); hier ist das nachgebaut, in Punkten wie
+' reportlab, und erst beim Zeichnen in Millimeter umgerechnet. Wer will,
+' bekommt dazu ein Protokoll in PyStickys Schreibweise (`pdfAblauf`): je
+' Absatz "P Stil | Text", je Tabellenzeile "T a | b", je Zeichnung "D BxH |
+' Arten | Texte", je Umbruch "PB" -- dasselbe, was ein Aufzeichner aus
+' PyStickys Story liest. So laesst sich vergleichen, was auf den Seiten steht.
+'
+' Bewusst anders: im Diamond-Modus steht ◆ statt 💎 im Titel (die eingebaute
+' Schrift hat kein Emoji), die fertige Groesse ist dort Drills mal Kante
+' (PySticky rechnet sie wie Stoff), und ein Garn ohne Hersteller heisst nicht
+' "None".
+
+CONST PDF_PT = 2.834645669        ' Punkte je mm
+CONST PDF_GRUND = &HEBE8DC        ' Klebegrund unter einem Drill
+CONST PDF_STOFF = &HFAFAFA
+
+CLASS PdfOptionen
+    DIM papier AS STRING
+    DIM zellen AS INTEGER            ' Stiche je Seite (0 = Vorgabe des Formats)
+    DIM ueberlappung AS INTEGER
+    DIM notizen AS STRING
+    DIM kreuz AS ARRAY OF STRING     ' Namen der Paletten fuer Entsprechungen
+    DIM paletten AS ARRAY OF Palette
+    DIM wasserzeichen AS STRING
+    DIM mystery AS BOOLEAN
+    DIM titel AS STRING              ' leer = Dateiname ohne Endung
+    DIM datum AS STRING              ' TT.MM.JJJJ, leer = heute
+
+    SUB Init()
+        papier = "A4"
+        kreuz = []
+        paletten = []
+    END SUB
+END CLASS
+
+' --- Satz: Seiten, Fluss und Zeichnungen -------------------------------------------------
+
+CLASS PdfSatz
+    DIM pdf AS PDF
+    DIM bw AS FLOAT                  ' Seite in Punkten
+    DIM bh AS FLOAT
+    DIM rand AS FLOAT
+    DIM aw AS FLOAT                  ' nutzbar (Seite minus Rand)
+    DIM ah AS FLOAT
+    DIM y AS FLOAT                   ' Fluss: Oberkante des Naechsten, Punkte von oben
+    DIM leer AS BOOLEAN              ' auf der Seite steht noch nichts
+    DIM nachLetzt AS FLOAT           ' spaceAfter des vorigen Absatzes (reportlab: _prevASpace)
+    DIM seiten AS INTEGER
+    DIM wasser AS STRING
+    DIM copyright AS STRING
+    DIM ablauf AS ARRAY OF STRING
+    ' die laufende Zeichnung
+    DIM zx AS FLOAT
+    DIM zy AS FLOAT
+    DIM zArten AS MAP OF INTEGER
+    DIM zTexte AS MAP OF INTEGER
+END CLASS
+
+FUNCTION pdfMm(pt AS FLOAT) AS FLOAT
+    RETURN pt / PDF_PT
+END FUNCTION
+
+FUNCTION pdfZahl1$(v AS FLOAT) AS STRING
+    RETURN FORMAT$(v, "%.1f")
+END FUNCTION
+
+FUNCTION pdfOben(s AS PdfSatz) AS FLOAT
+    RETURN s.rand + 6
+END FUNCTION
+
+FUNCTION pdfUnten(s AS PdfSatz) AS FLOAT
+    RETURN s.bh - s.rand - 6
+END FUNCTION
+
+' Fusszeile und Wasserzeichen jeder Seite -- wie onPage bei reportlab vor dem
+' Inhalt (das Wasserzeichen liegt also darunter).
+SUB pdfSeitenschmuck(s AS PdfSatz)
+    s.seiten = s.seiten + 1
+    IF s.copyright <> "" THEN
+        PDF_FONT(s.pdf, "sans", 8)
+        PDF_COLOR(s.pdf, &H888888)
+        DIM b AS FLOAT : b = PDF_TEXT_WIDTH(s.pdf, s.copyright)
+        PDF_TEXT(s.pdf, pdfMm(s.bw) / 2 - b / 2, pdfMm(s.bh) - 8 - pdfMm(8), s.copyright)
+    END IF
+    IF s.wasser <> "" THEN
+        PDF_FONT(s.pdf, "sans-fett", 60)
+        PDF_COLOR(s.pdf, &HCCCCCC)
+        PDF_OPACITY(s.pdf, 0.35)
+        ' drawCentredString(0, 0) nach translate(Mitte) + rotate(45): die
+        ' Grundlinie mittig durch die Seitenmitte, 45 Grad steigend. PDF_TEXT
+        ' dreht um die linke obere Ecke -- die liegt eine Schrifthoehe ueber der
+        ' Grundlinie und eine halbe Breite links der Mitte.
+        DIM w AS FLOAT : w = PDF_TEXT_WIDTH(s.pdf, s.wasser)
+        DIM hs AS FLOAT : hs = pdfMm(60)
+        DIM c AS FLOAT : c = COS(RAD(45.0))
+        DIM sn AS FLOAT : sn = SIN(RAD(45.0))
+        DIM u AS FLOAT : u = -w / 2
+        DIM v AS FLOAT : v = -hs
+        PDF_TEXT(s.pdf, pdfMm(s.bw) / 2 + u * c + v * sn, pdfMm(s.bh) / 2 - u * sn + v * c, s.wasser, 45)
+        PDF_OPACITY(s.pdf, 1)
+    END IF
+    s.y = pdfOben(s)
+    s.leer = TRUE
+    s.nachLetzt = 0
+END SUB
+
+SUB pdfNeueSeite(s AS PdfSatz)
+    IF s.seiten > 0 THEN PDF_PAGE(s.pdf)
+    pdfSeitenschmuck(s)
+END SUB
+
+' PageBreak: eine neue Seite, ausser die laufende ist noch leer (reportlab
+' setzt keinen Umbruch auf eine leere Seite).
+SUB pdfUmbruch(s AS PdfSatz)
+    ARRAY_PUSH(s.ablauf, "PB")
+    IF NOT s.leer THEN pdfNeueSeite(s)
+END SUB
+
+' Platz fuer etwas der Hoehe h -- sonst auf die naechste Seite.
+SUB pdfPlatz(s AS PdfSatz, h AS FLOAT)
+    IF s.y + h > pdfUnten(s) AND NOT s.leer THEN pdfNeueSeite(s)
+END SUB
+
+SUB pdfAbstand(s AS PdfSatz, mm AS FLOAT)
+    ARRAY_PUSH(s.ablauf, "S " + pdfZahl1$(mm))
+    s.y = s.y + mm * PDF_PT
+    s.nachLetzt = 0
+    IF s.y > pdfUnten(s) THEN pdfNeueSeite(s)
+END SUB
+
+' --- Absaetze: der kleine Teil von reportlabs Auszeichnung, den PySticky
+' benutzt (<b>, <font size color>, &larr; ...)
+
+CLASS PdfLauf
+    DIM text AS STRING
+    DIM groesse AS FLOAT
+    DIM fett AS BOOLEAN
+    DIM farbe AS INTEGER
+END CLASS
+
+FUNCTION pdfEntitaeten$(t AS STRING) AS STRING
+    t = REPLACE$(t, "&larr;", "←")
+    t = REPLACE$(t, "&rarr;", "→")
+    t = REPLACE$(t, "&uarr;", "↑")
+    t = REPLACE$(t, "&darr;", "↓")
+    t = REPLACE$(t, "&nbsp;", " ")
+    t = REPLACE$(t, "&lt;", "<")
+    t = REPLACE$(t, "&gt;", ">")
+    t = REPLACE$(t, "&amp;", "&")
+    RETURN t
+END FUNCTION
+
+' Freitext fuer einen Absatz (pdf_text_escape).
+FUNCTION pdfMaske$(t AS STRING) AS STRING
+    t = REPLACE$(t, "&", "&amp;")
+    t = REPLACE$(t, "<", "&lt;")
+    t = REPLACE$(t, ">", "&gt;")
+    RETURN t
+END FUNCTION
+
+FUNCTION pdfAttribut$(tag AS STRING, name AS STRING) AS STRING
+    DIM p AS INTEGER : p = INSTR(tag, name + "=")
+    IF p < 0 THEN RETURN ""
+    DIM r AS STRING : r = MID$(tag, p + LEN(name) + 1, 200)
+    DIM q AS STRING : q = LEFT$(r, 1)
+    r = MID$(r, 1, 200)
+    RETURN LEFT$(r, INSTR(r, q))
+END FUNCTION
+
+FUNCTION pdfLaeufe(text AS STRING, groesse AS FLOAT, fett AS BOOLEAN, farbe AS INTEGER) AS ARRAY OF PdfLauf
+    DIM r AS ARRAY OF PdfLauf : r = []
+    DIM sg AS ARRAY OF FLOAT : sg = [groesse]
+    DIM sf AS ARRAY OF BOOLEAN : sf = [fett]
+    DIM sc AS ARRAY OF INTEGER : sc = [farbe]
+    DIM i AS INTEGER, stueck AS STRING
+    WHILE i < LEN(text)
+        DIM c AS STRING : c = MID$(text, i, 1)
+        IF c = "<" THEN
+            DIM e AS INTEGER : e = INSTR(text, ">", i)
+            DIM tag AS STRING : tag = MID$(text, i + 1, e - i - 1)
+            IF stueck <> "" THEN
+                DIM l AS PdfLauf : l = NEW PdfLauf()
+                l.text = pdfEntitaeten$(stueck) : l.groesse = sg[LEN(sg) - 1] : l.fett = sf[LEN(sf) - 1] : l.farbe = sc[LEN(sc) - 1]
+                ARRAY_PUSH(r, l)
+                stueck = ""
+            END IF
+            IF tag = "b" THEN
+                ARRAY_PUSH(sg, sg[LEN(sg) - 1]) : ARRAY_PUSH(sf, TRUE) : ARRAY_PUSH(sc, sc[LEN(sc) - 1])
+            ELSEIF LEFT$(tag, 4) = "font" THEN
+                DIM g AS FLOAT : g = sg[LEN(sg) - 1]
+                DIM gs AS STRING : gs = pdfAttribut$(tag, "size")
+                IF gs <> "" THEN g = VAL(gs)
+                DIM fc AS INTEGER : fc = sc[LEN(sc) - 1]
+                DIM fs AS STRING : fs = pdfAttribut$(tag, "color")
+                IF LEFT$(fs, 1) = "#" THEN
+                    IF LEN(fs) = 4 THEN fs = "#" + MID$(fs, 1, 1) + MID$(fs, 1, 1) + MID$(fs, 2, 1) + MID$(fs, 2, 1) + MID$(fs, 3, 1) + MID$(fs, 3, 1)
+                    fc = farbeAusHex(fs)
+                END IF
+                ARRAY_PUSH(sg, g) : ARRAY_PUSH(sf, sf[LEN(sf) - 1]) : ARRAY_PUSH(sc, fc)
+            ELSEIF LEFT$(tag, 1) = "/" AND LEN(sg) > 1 THEN
+                ARRAY_POP(sg) : ARRAY_POP(sf) : ARRAY_POP(sc)
+            END IF
+            i = e + 1
+        ELSE
+            stueck = stueck + c
+            i = i + 1
+        END IF
+    WEND
+    IF stueck <> "" THEN
+        DIM l2 AS PdfLauf : l2 = NEW PdfLauf()
+        l2.text = pdfEntitaeten$(stueck) : l2.groesse = sg[LEN(sg) - 1] : l2.fett = sf[LEN(sf) - 1] : l2.farbe = sc[LEN(sc) - 1]
+        ARRAY_PUSH(r, l2)
+    END IF
+    RETURN r
+END FUNCTION
+
+SUB pdfSchrift(s AS PdfSatz, fett AS BOOLEAN, groesse AS FLOAT)
+    PDF_FONT(s.pdf, IIF(fett, "sans-fett", "sans"), groesse)
+END SUB
+
+FUNCTION pdfBreitePt(s AS PdfSatz, l AS PdfLauf) AS FLOAT
+    pdfSchrift(s, l.fett, l.groesse)
+    RETURN PDF_TEXT_WIDTH(s.pdf, l.text) * PDF_PT
+END FUNCTION
+
+' Ein Absatz in einem Stil von PDFExporter._setup_styles; `text` mit
+' Auszeichnung, so wie PySticky ihn an Paragraph uebergibt.
+SUB pdfAbsatz(s AS PdfSatz, absatzStil AS STRING, text AS STRING)
+    ' Leerraum faellt in einem Absatz zu einem Leerzeichen zusammen, wie bei
+    ' reportlab (auch ein Tabulator im Copyright)
+    text = TRIM$(REGEX_REPLACE(text, "\s+", " "))
+    ARRAY_PUSH(s.ablauf, "P " + absatzStil + " | " + text)
+    DIM groesse AS FLOAT : groesse = 10
+    DIM zeile AS FLOAT : zeile = 12
+    DIM vor AS FLOAT, nach AS FLOAT
+    DIM fett AS BOOLEAN
+    DIM mitte AS BOOLEAN
+    DIM farbe AS INTEGER : farbe = &H000000
+    SELECT CASE absatzStil
+        CASE "Title1" : groesse = 24 : zeile = 22 : nach = 12 : fett = TRUE : mitte = TRUE : farbe = &H333333
+        CASE "Title2" : groesse = 16 : zeile = 18 : vor = 12 : nach = 8 : fett = TRUE : mitte = TRUE : farbe = &H555555
+        CASE "CenterText" : mitte = TRUE
+        CASE "SmallCenter" : groesse = 8 : mitte = TRUE : farbe = &H666666
+    END SELECT
+    DIM laeufe AS ARRAY OF PdfLauf : laeufe = pdfLaeufe(text, groesse, fett, farbe)
+    ' in Woerter zerlegen, damit ein langer Absatz umbricht
+    DIM woerter AS ARRAY OF PdfLauf : woerter = []
+    DIM l AS PdfLauf
+    FOR EACH l IN laeufe
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(l.text, " ")
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(teile) - 1
+            DIM w AS PdfLauf : w = NEW PdfLauf()
+            w.text = teile[k] + IIF(k < LEN(teile) - 1, " ", "")
+            w.groesse = l.groesse : w.fett = l.fett : w.farbe = l.farbe
+            IF w.text <> "" THEN ARRAY_PUSH(woerter, w)
+        NEXT
+    NEXT
+    DIM breite AS FLOAT : breite = s.aw - 12
+    DIM zeilen AS ARRAY OF INTEGER : zeilen = [0]     ' Anfang jeder Zeile in `woerter`
+    DIM bz AS ARRAY OF FLOAT : bz = []
+    DIM akt AS FLOAT, i AS INTEGER
+    FOR i = 0 TO LEN(woerter) - 1
+        DIM wb AS FLOAT : wb = pdfBreitePt(s, woerter[i])
+        IF akt + wb > breite AND i > zeilen[LEN(zeilen) - 1] THEN
+            ARRAY_PUSH(bz, akt)
+            ARRAY_PUSH(zeilen, i)
+            akt = 0
+        END IF
+        akt = akt + wb
+    NEXT
+    ARRAY_PUSH(bz, akt)
+    DIM hoehe AS FLOAT : hoehe = LEN(zeilen) * zeile
+    ' reportlab zieht den Abstand nach dem vorigen Absatz vom Abstand davor ab
+    IF NOT s.leer THEN s.y = s.y + MAX(0, vor - s.nachLetzt)
+    pdfPlatz(s, hoehe)
+    DIM z AS INTEGER
+    FOR z = 0 TO LEN(zeilen) - 1
+        DIM bis AS INTEGER : bis = IIF(z < LEN(zeilen) - 1, zeilen[MIN(z + 1, LEN(zeilen) - 1)], LEN(woerter))
+        DIM x AS FLOAT : x = s.rand + 6
+        IF mitte THEN x = s.bw / 2 - bz[z] / 2
+        ' Grundlinie: Zeilenhoehe minus ein Fuenftel der Schrift (reportlab:
+        ' leading - fontSize * 0.2 ueber der Unterkante der Zeile)
+        DIM grund AS FLOAT : grund = s.y + z * zeile + zeile - groesse * 0.2
+        FOR i = zeilen[z] TO bis - 1
+            DIM wl AS PdfLauf : wl = woerter[i]
+            pdfSchrift(s, wl.fett, wl.groesse)
+            PDF_COLOR(s.pdf, wl.farbe)
+            PDF_TEXT(s.pdf, pdfMm(x), pdfMm(grund - wl.groesse), wl.text)
+            x = x + PDF_TEXT_WIDTH(s.pdf, wl.text) * PDF_PT
+        NEXT
+    NEXT
+    s.y = s.y + hoehe + nach
+    s.leer = FALSE
+    s.nachLetzt = nach
+END SUB
+
+' --- Tabellen ------------------------------------------------------------------------
+
+CLASS PdfTabelle
+    DIM zeilen AS ARRAY OF STRING        ' Zellen mit TAB getrennt, Umbruch in einer Zelle mit CHR$(10)
+    DIM breiten AS ARRAY OF FLOAT        ' mm
+    DIM groesse AS FLOAT
+    DIM oben AS FLOAT                    ' Innenabstand (pt)
+    DIM unten AS FLOAT
+    DIM links AS FLOAT
+    DIM gitter AS INTEGER
+    DIM gitterBreite AS FLOAT
+    DIM kopfGrund AS INTEGER             ' -1 = keine Kopfzeile
+    DIM kopfText AS INTEGER
+    DIM summe AS BOOLEAN                 ' letzte Zeile hervorgehoben
+    DIM zebra AS BOOLEAN
+    DIM ausrichtung AS ARRAY OF STRING   ' je Spalte "l", "m", "r"
+    ' je Zelle (Zeile * Spalten + Spalte): Grundfarbe, Textfarbe, fett (-1 = Vorgabe)
+    DIM grund AS ARRAY OF INTEGER
+    DIM textfarbe AS ARRAY OF INTEGER
+    DIM fett AS ARRAY OF INTEGER
+    DIM wiederholen AS BOOLEAN           ' Kopf auf jeder Seite
+
+    SUB Init()
+        zeilen = [] : breiten = [] : ausrichtung = []
+        grund = [] : textfarbe = [] : fett = []
+        groesse = 10 : oben = 3 : unten = 3 : links = 6
+        gitter = &HDDDDDD : gitterBreite = 0.5
+        kopfGrund = -1 : kopfText = &HFFFFFF
+    END SUB
+
+    FUNCTION spalten() AS INTEGER
+        RETURN LEN(breiten)
+    END FUNCTION
+
+    SUB zelleSetzen(z AS INTEGER, sp AS INTEGER, g AS INTEGER, t AS INTEGER, f AS INTEGER)
+        DIM n AS INTEGER : n = LEN(zeilen) * LEN(breiten)
+        WHILE LEN(grund) < n
+            ARRAY_PUSH(grund, -1) : ARRAY_PUSH(textfarbe, -1) : ARRAY_PUSH(fett, -1)
+        WEND
+        DIM i AS INTEGER : i = z * LEN(breiten) + sp
+        IF g <> -2 THEN grund[i] = g
+        IF t <> -2 THEN textfarbe[i] = t
+        IF f <> -2 THEN fett[i] = f
+    END SUB
+END CLASS
+
+FUNCTION pdfTabelleNeu(breiten AS ARRAY OF FLOAT) AS PdfTabelle
+    DIM t AS PdfTabelle : t = NEW PdfTabelle()
+    t.breiten = breiten
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(breiten) - 1
+        ARRAY_PUSH(t.ausrichtung, "l")
+    NEXT
+    RETURN t
+END FUNCTION
+
+FUNCTION pdfZellen(t AS PdfTabelle, z AS INTEGER) AS ARRAY OF STRING
+    DIM c AS ARRAY OF STRING : c = SPLIT$(t.zeilen[z], CHR$(9))
+    WHILE LEN(c) < t.spalten()
+        ARRAY_PUSH(c, "")
+    WEND
+    RETURN c
+END FUNCTION
+
+FUNCTION pdfZeilenhoehe(t AS PdfTabelle, z AS INTEGER) AS FLOAT
+    DIM n AS INTEGER : n = 1
+    DIM c AS STRING
+    FOR EACH c IN pdfZellen(t, z)
+        n = MAX(n, LEN(SPLIT$(c, CHR$(10))))
+    NEXT
+    ' reportlab: FONTSIZE aendert den Zeilenabstand nicht, er bleibt 12 pt
+    RETURN n * 12 + t.oben + t.unten
+END FUNCTION
+
+FUNCTION pdfZelleWert(t AS PdfTabelle, liste AS ARRAY OF INTEGER, z AS INTEGER, sp AS INTEGER) AS INTEGER
+    DIM i AS INTEGER : i = z * t.spalten() + sp
+    IF i < LEN(liste) THEN RETURN liste[i]
+    RETURN -1
+END FUNCTION
+
+SUB pdfTabZeile(s AS PdfSatz, t AS PdfTabelle, z AS INTEGER, x0 AS FLOAT, h AS FLOAT)
+    DIM zellen AS ARRAY OF STRING : zellen = pdfZellen(t, z)
+    DIM kopf AS BOOLEAN : kopf = z = 0 AND t.kopfGrund >= 0
+    DIM letzte AS BOOLEAN : letzte = z = LEN(t.zeilen) - 1 AND t.summe
+    DIM x AS FLOAT : x = x0
+    DIM sp AS INTEGER
+    FOR sp = 0 TO t.spalten() - 1
+        DIM b AS FLOAT : b = t.breiten[sp] * PDF_PT
+        DIM g AS INTEGER : g = -1
+        IF kopf THEN g = t.kopfGrund
+        IF letzte THEN g = &HE8F4FC
+        IF t.zebra AND NOT kopf AND NOT letzte AND z MOD 2 = 0 THEN g = &HF9F9F9
+        IF pdfZelleWert(t, t.grund, z, sp) >= 0 THEN g = pdfZelleWert(t, t.grund, z, sp)
+        IF g >= 0 THEN
+            PDF_COLOR(s.pdf, g)
+            PDF_RECT_FILL(s.pdf, pdfMm(x), pdfMm(s.y), pdfMm(b), pdfMm(h))
+        END IF
+        PDF_COLOR(s.pdf, t.gitter)
+        PDF_LINE_WIDTH(s.pdf, pdfMm(t.gitterBreite))
+        PDF_RECT(s.pdf, pdfMm(x), pdfMm(s.y), pdfMm(b), pdfMm(h))
+        DIM fett AS BOOLEAN : fett = kopf OR letzte
+        IF pdfZelleWert(t, t.fett, z, sp) >= 0 THEN fett = pdfZelleWert(t, t.fett, z, sp) = 1
+        DIM tf AS INTEGER : tf = IIF(kopf, t.kopfText, &H000000)
+        IF pdfZelleWert(t, t.textfarbe, z, sp) >= 0 THEN tf = pdfZelleWert(t, t.textfarbe, z, sp)
+        pdfSchrift(s, fett, t.groesse)
+        PDF_COLOR(s.pdf, tf)
+        DIM zz AS ARRAY OF STRING : zz = SPLIT$(zellen[sp], CHR$(10))
+        DIM gesamt AS FLOAT : gesamt = LEN(zz) * 12
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(zz) - 1
+            DIM tb AS FLOAT : tb = PDF_TEXT_WIDTH(s.pdf, zz[k]) * PDF_PT
+            DIM tx AS FLOAT : tx = x + t.links
+            IF t.ausrichtung[sp] = "m" THEN tx = x + b / 2 - tb / 2
+            IF t.ausrichtung[sp] = "r" THEN tx = x + b - t.links - tb
+            ' senkrecht mittig
+            DIM ty AS FLOAT : ty = s.y + (h - gesamt) / 2 + k * 12 + (12 - t.groesse) * 0.6
+            IF zz[k] <> "" THEN PDF_TEXT(s.pdf, pdfMm(tx), pdfMm(ty), zz[k])
+        NEXT
+        x = x + b
+    NEXT
+END SUB
+
+SUB pdfTabelleSetzen(s AS PdfSatz, t AS PdfTabelle)
+    DIM z AS INTEGER
+    FOR z = 0 TO LEN(t.zeilen) - 1
+        ARRAY_PUSH(s.ablauf, "T " + REPLACE$(REPLACE$(t.zeilen[z], CHR$(9), " | "), CHR$(10), " / "))
+    NEXT
+    DIM gesamtB AS FLOAT
+    DIM b AS FLOAT
+    FOR EACH b IN t.breiten
+        gesamtB = gesamtB + b * PDF_PT
+    NEXT
+    DIM x0 AS FLOAT : x0 = s.bw / 2 - gesamtB / 2
+    FOR z = 0 TO LEN(t.zeilen) - 1
+        DIM h AS FLOAT : h = pdfZeilenhoehe(t, z)
+        IF s.y + h > pdfUnten(s) AND NOT s.leer THEN
+            pdfNeueSeite(s)
+            IF t.wiederholen AND z > 0 THEN
+                DIM hk AS FLOAT : hk = pdfZeilenhoehe(t, 0)
+                pdfTabZeile(s, t, 0, x0, hk)
+                s.y = s.y + hk
+            END IF
+        END IF
+        pdfTabZeile(s, t, z, x0, h)
+        s.y = s.y + h
+        s.leer = FALSE
+    NEXT
+    s.nachLetzt = 0
+END SUB
+
+' --- Zeichnungen: Formen in einem Rahmen der Groesse w x h (Punkte), Ursprung
+' oben links, gezaehlt nach reportlabs Formenarten ------------------------------------
+
+SUB pdfZeichnungBeginnen(s AS PdfSatz, w AS FLOAT, h AS FLOAT)
+    pdfPlatz(s, h)
+    s.zx = s.bw / 2 - w / 2
+    s.zy = s.y
+    s.zArten = {}
+    s.zTexte = {}
+END SUB
+
+SUB pdfZaehlen(s AS PdfSatz, art AS STRING)
+    IF MAPHAS(s.zArten, art) THEN MAPPUT(s.zArten, art, MAPGET(s.zArten, art) + 1) ELSE MAPPUT(s.zArten, art, 1)
+END SUB
+
+SUB pdfZeichnungEnde(s AS PdfSatz, w AS FLOAT, h AS FLOAT)
+    DIM arten AS ARRAY OF STRING : arten = MAPKEYS(s.zArten)
+    SORT(arten)
+    DIM a AS STRING, t AS STRING
+    FOR EACH a IN arten
+        t = t + IIF(t = "", "", " ") + a + ":" + STR$(MAPGET(s.zArten, a))
+    NEXT
+    DIM texte AS ARRAY OF STRING : texte = MAPKEYS(s.zTexte)
+    SORT(texte)
+    DIM tt AS STRING
+    FOR EACH a IN texte
+        tt = tt + IIF(tt = "", "", " ") + a + "x" + STR$(MAPGET(s.zTexte, a))
+    NEXT
+    ARRAY_PUSH(s.ablauf, "D " + pdfZahl1$(w) + "x" + pdfZahl1$(h) + " | " + t + " | " + tt)
+    s.y = s.y + h
+    s.leer = FALSE
+    s.nachLetzt = 0
+END SUB
+
+' Rechteck: Flaeche `fuellung` (-1 = keine), Rand `rand` (-1 = keiner).
+SUB zRect(s AS PdfSatz, x AS FLOAT, y AS FLOAT, w AS FLOAT, h AS FLOAT, fuellung AS INTEGER, rand AS INTEGER, breite AS FLOAT)
+    pdfZaehlen(s, "Rect")
+    IF fuellung >= 0 THEN
+        PDF_COLOR(s.pdf, fuellung)
+        PDF_RECT_FILL(s.pdf, pdfMm(s.zx + x), pdfMm(s.zy + y), pdfMm(w), pdfMm(h))
+    END IF
+    IF rand >= 0 THEN
+        PDF_COLOR(s.pdf, rand)
+        PDF_LINE_WIDTH(s.pdf, pdfMm(breite))
+        PDF_RECT(s.pdf, pdfMm(s.zx + x), pdfMm(s.zy + y), pdfMm(w), pdfMm(h))
+    END IF
+END SUB
+
+SUB zLine(s AS PdfSatz, x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT, farbe AS INTEGER, breite AS FLOAT)
+    pdfZaehlen(s, "Line")
+    PDF_COLOR(s.pdf, farbe)
+    PDF_LINE_WIDTH(s.pdf, pdfMm(breite))
+    PDF_LINE(s.pdf, pdfMm(s.zx + x1), pdfMm(s.zy + y1), pdfMm(s.zx + x2), pdfMm(s.zy + y2))
+END SUB
+
+SUB zCircle(s AS PdfSatz, x AS FLOAT, y AS FLOAT, r AS FLOAT, farbe AS INTEGER)
+    pdfZaehlen(s, "Circle")
+    PDF_COLOR(s.pdf, farbe)
+    PDF_CIRCLE_FILL(s.pdf, pdfMm(s.zx + x), pdfMm(s.zy + y), pdfMm(r))
+END SUB
+
+SUB zPolygon(s AS PdfSatz, xs AS ARRAY OF FLOAT, ys AS ARRAY OF FLOAT, farbe AS INTEGER)
+    pdfZaehlen(s, "Polygon")
+    DIM mx AS ARRAY OF FLOAT : mx = []
+    DIM my AS ARRAY OF FLOAT : my = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(xs) - 1
+        ARRAY_PUSH(mx, pdfMm(s.zx + xs[i]))
+        ARRAY_PUSH(my, pdfMm(s.zy + ys[i]))
+    NEXT
+    PDF_COLOR(s.pdf, farbe)
+    PDF_POLYGON_FILL(s.pdf, mx, my)
+END SUB
+
+' Text mit der Grundlinie bei y; `anker` "start", "middle" oder "end".
+SUB zString(s AS PdfSatz, x AS FLOAT, y AS FLOAT, text AS STRING, groesse AS FLOAT, farbe AS INTEGER, anker AS STRING)
+    pdfZaehlen(s, "String")
+    IF MAPHAS(s.zTexte, text) THEN MAPPUT(s.zTexte, text, MAPGET(s.zTexte, text) + 1) ELSE MAPPUT(s.zTexte, text, 1)
+    PDF_FONT(s.pdf, "sans", groesse)
+    PDF_COLOR(s.pdf, farbe)
+    DIM b AS FLOAT : b = PDF_TEXT_WIDTH(s.pdf, text) * PDF_PT
+    DIM tx AS FLOAT : tx = x
+    IF anker = "middle" THEN tx = x - b / 2
+    IF anker = "end" THEN tx = x - b
+    PDF_TEXT(s.pdf, pdfMm(s.zx + tx), pdfMm(s.zy + y - groesse), text)
+END SUB
+
+' Ein Drill: vier Facetten, oben hell, unten dunkel (_add_drill_shape).
+SUB zDrill(s AS PdfSatz, rx AS FLOAT, ry AS FLOAT, z AS FLOAT, farbe AS INTEGER)
+    DIM ein AS FLOAT : ein = diamantRand(z)
+    DIM x0 AS FLOAT : x0 = rx + ein
+    DIM y0 AS FLOAT : y0 = ry + ein
+    DIM x1 AS FLOAT : x1 = rx + z - ein
+    DIM y1 AS FLOAT : y1 = ry + z - ein
+    DIM cx AS FLOAT : cx = (x0 + x1) / 2
+    DIM cy AS FLOAT : cy = (y0 + y1) / 2
+    zPolygon(s, [x0, x1, cx], [y0, y0, cy], schattiert(farbe, 145))
+    zPolygon(s, [x1, x1, cx], [y0, y1, cy], schattiert(farbe, 110))
+    zPolygon(s, [x1, x0, cx], [y1, y1, cy], schattiert(farbe, 70))
+    zPolygon(s, [x0, x0, cx], [y1, y0, cy], schattiert(farbe, 95))
+    IF z >= 14 THEN
+        pdfZaehlen(s, "Rect")
+        PDF_COLOR(s.pdf, &H000000)
+        PDF_OPACITY(s.pdf, 0.4)
+        PDF_LINE_WIDTH(s.pdf, pdfMm(0.3))
+        PDF_RECT(s.pdf, pdfMm(s.zx + x0), pdfMm(s.zy + y0), pdfMm(x1 - x0), pdfMm(y1 - y0))
+        PDF_OPACITY(s.pdf, 1)
+    END IF
+END SUB
+
+' Ein Kaestchen der Vorschau (_add_stitch_shape).
+SUB zStich(s AS PdfSatz, rx AS FLOAT, ry AS FLOAT, z AS FLOAT, t AS INTEGER, farbe AS INTEGER, dp AS BOOLEAN)
+    IF t = DIAMANT OR (dp AND t = VOLL) THEN
+        zRect(s, rx, ry, z + 0.3, z + 0.3, PDF_GRUND, -1, 0)
+        zDrill(s, rx, ry, z, farbe)
+    ELSEIF t = KNOTEN THEN
+        zRect(s, rx, ry, z + 0.3, z + 0.3, PDF_STOFF, -1, 0)
+        zCircle(s, rx + z / 2, ry + z / 2, MAX(0.5, z * KNOTEN_RADIUS), farbe)
+    ELSEIF t = PERLE THEN
+        zRect(s, rx, ry, z + 0.3, z + 0.3, PDF_STOFF, -1, 0)
+        DIM r AS FLOAT : r = MAX(1.0, z * PERLE_RADIUS)
+        zCircle(s, rx + z / 2, ry + z / 2, r, farbe)
+        ' Glanzpunkt: halb Weiss
+        DIM gl AS INTEGER : gl = RGB((rotAnteil(farbe) + 255) \ 2, (gruenAnteil(farbe) + 255) \ 2, (blauAnteil(farbe) + 255) \ 2)
+        zCircle(s, rx + z / 2 - r / 2.5, ry + z / 2 - r / 2.5, r / 3.0, gl)
+    ELSEIF istTeilstich(t) THEN
+        DIM p AS ARRAY OF FLOAT : p = teilstichPunkte(t)
+        DIM xs AS ARRAY OF FLOAT : xs = []
+        DIM ys AS ARRAY OF FLOAT : ys = []
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(p) - 1 STEP 2
+            ARRAY_PUSH(xs, rx + p[k] * z)
+            ARRAY_PUSH(ys, ry + p[k + 1] * z)
+        NEXT
+        zPolygon(s, xs, ys, farbe)
+    ELSE
+        zRect(s, rx, ry, z + 0.3, z + 0.3, farbe, -1, 0)
+    END IF
+END SUB
+
+' --- die Seiten ----------------------------------------------------------------------
+
+CLASS PdfLauf2
+    DIM m AS Muster
+    DIM k AS Komposit
+    DIM b AS Bedarf
+    DIM plan AS Seitenplan
+    DIM o AS PdfOptionen
+    DIM dp AS BOOLEAN
+    DIM titel AS STRING
+    DIM datum AS STRING
+END CLASS
+
+FUNCTION pdfEinheit$(r AS PdfLauf2) AS STRING
+    RETURN begriff$(r.m, "einheit")
+END FUNCTION
+
+' _create_preview_drawing: die ganze Flaeche, auf hoechstens maxW x maxH
+' eingepasst. `seiten` zeichnet die Seitengrenzen der Uebersicht dazu.
+SUB pdfVorschau(s AS PdfSatz, r AS PdfLauf2, maxW AS FLOAT, maxH AS FLOAT, seiten AS BOOLEAN)
+    DIM m AS Muster : m = r.m
+    DIM w AS FLOAT, h AS FLOAT
+    IF m.breite / m.hoehe > maxW / maxH THEN
+        w = maxW : h = maxW / (m.breite / m.hoehe)
+    ELSE
+        h = maxH : w = maxH * (m.breite / m.hoehe)
+    END IF
+    pdfZeichnungBeginnen(s, w, h)
+    DIM zw AS FLOAT : zw = w / m.breite
+    DIM zh AS FLOAT : zh = h / m.hoehe
+    zRect(s, 0, 0, w, h, PDF_STOFF, &H333333, 1)
+    IF r.o.mystery THEN
+        DIM fg AS FLOAT : fg = MIN(w, h) * 0.4
+        zString(s, w / 2, h / 2 + MIN(w, h) * 0.12, "?", fg, &HCCCCCC, "middle")
+    ELSE
+        DIM x AS INTEGER, y AS INTEGER
+        FOR y = 0 TO m.hoehe - 1
+            FOR x = 0 TO m.breite - 1
+                DIM f AS INTEGER : f = r.k.farbe[y * m.breite + x]
+                IF f < 0 OR f >= LEN(m.farben) THEN CONTINUE
+                zStich(s, x * zw, y * zh, zw, r.k.art[y * m.breite + x], m.farben[f].garn.farbe, r.dp)
+            NEXT
+        NEXT
+        IF NOT r.dp THEN
+            DIM rs AS Rueckstich
+            FOR EACH rs IN m.rueckstiche
+                DIM rf AS INTEGER : rf = &H000000
+                IF rs.farbe >= 0 AND rs.farbe < LEN(m.farben) THEN rf = m.farben[rs.farbe].garn.farbe
+                zLine(s, rs.x1 * zw / 2, rs.y1 * zh / 2, rs.x2 * zw / 2, rs.y2 * zh / 2, rf, MAX(0.5, zw / 10))
+            NEXT
+        END IF
+    END IF
+    IF seiten THEN
+        DIM sx AS INTEGER
+        FOR sx = 1 TO r.plan.seitenX - 1
+            zLine(s, sx * r.plan.jeX * zw, 0, sx * r.plan.jeX * zw, h, &HFFFFFF, 1.5)
+        NEXT
+        FOR sx = 1 TO r.plan.seitenY - 1
+            zLine(s, 0, sx * r.plan.jeY * zh, w, sx * r.plan.jeY * zh, &HFFFFFF, 1.5)
+        NEXT
+    END IF
+    pdfZeichnungEnde(s, w, h)
+END SUB
+
+FUNCTION pdfGroesse$(r AS PdfLauf2) AS STRING
+    RETURN pdfZahl1$(breiteCm(r.m)) + " × " + pdfZahl1$(hoeheCm(r.m))
+END FUNCTION
+
+FUNCTION pdfMeta$(m AS Muster, schluessel AS STRING) AS STRING
+    IF NOT JSON_HAS(m.metadaten, schluessel) THEN RETURN ""
+    IF JSON_TYPE(m.metadaten, schluessel) <> "string" THEN RETURN ""
+    RETURN TRIM$(JSON_GET_STRING(m.metadaten, schluessel))
+END FUNCTION
+
+FUNCTION pdfStoffLabel$(r AS PdfLauf2) AS STRING
+    RETURN stoffName$(r.m)
+END FUNCTION
+
+SUB pdfDeckblatt(s AS PdfSatz, r AS PdfLauf2)
+    DIM m AS Muster : m = r.m
+    pdfAbstand(s, 30)
+    pdfAbsatz(s, "Title1", IIF(r.dp, "◆ DIAMOND-PAINTING-VORLAGE", "✂ KREUZSTICH-MUSTER"))
+    pdfAbsatz(s, "Title2", pdfMaske$(r.titel))
+    DIM autor AS STRING : autor = pdfMeta$(m, "author")
+    IF autor <> "" THEN pdfAbsatz(s, "CenterText", "von " + pdfMaske$(autor))
+    pdfAbsatz(s, "SmallCenter", "Erstellt am " + r.datum)
+    IF s.copyright <> "" THEN pdfAbsatz(s, "SmallCenter", pdfMaske$(s.copyright))
+    pdfAbstand(s, 15)
+    DIM pw AS FLOAT : pw = s.aw * 0.8
+    pdfVorschau(s, r, pw, MIN(pw * 0.66, s.ah * 0.35), FALSE)
+    pdfAbstand(s, 15)
+    DIM einheit AS STRING : einheit = pdfEinheit$(r)
+    DIM farbenText AS STRING : farbenText = STR$(LEN(m.farben)) + " verschiedene"
+    IF r.b.ausgelassen > 0 THEN farbenText = farbenText + " (" + STR$(r.b.ausgelassen) + " " + IIF(r.dp, "nicht kleben", "nicht sticken") + ")"
+    DIM sticheText AS STRING : sticheText = STR$(r.b.stiche) + " " + einheit
+    IF r.b.ausgelassen > 0 THEN sticheText = STR$(r.b.zuSticken) + " " + einheit + " (+ " + STR$(r.b.stiche - r.b.zuSticken) + " Stofffarbe)"
+    DIM t AS PdfTabelle : t = pdfTabelleNeu([60.0, 80.0])
+    ARRAY_PUSH(t.zeilen, "Mustergröße" + CHR$(9) + STR$(m.breite) + " × " + STR$(m.hoehe) + " " + einheit)
+    ARRAY_PUSH(t.zeilen, begriff$(m, "stoff") + CHR$(9) + pdfStoffLabel$(r))
+    ARRAY_PUSH(t.zeilen, "Fertige Größe" + CHR$(9) + pdfGroesse$(r) + " cm")
+    ARRAY_PUSH(t.zeilen, "Anzahl Farben" + CHR$(9) + farbenText)
+    ARRAY_PUSH(t.zeilen, "Gesamt-" + einheit + CHR$(9) + sticheText)
+    IF NOT r.dp AND NOT r.o.mystery AND LEN(m.rueckstiche) > 0 THEN ARRAY_PUSH(t.zeilen, "Rückstiche" + CHR$(9) + STR$(LEN(m.rueckstiche)) + " Linien")
+    ARRAY_PUSH(t.zeilen, begriff$(m, "bedarf") + CHR$(9) + "ca. " + STR$(r.b.straenge) + " " + begriff$(m, "bedarfseinheit"))
+    ARRAY_PUSH(t.zeilen, "Musterseiten" + CHR$(9) + STR$(r.plan.anzahl()) + " Seiten")
+    DIM begonnen AS STRING : begonnen = pdfMeta$(m, "started_date")
+    IF begonnen <> "" THEN
+        IF LEN(begonnen) = 10 AND MID$(begonnen, 4, 1) = "-" AND MID$(begonnen, 7, 1) = "-" THEN begonnen = RIGHT$(begonnen, 2) + "." + MID$(begonnen, 5, 2) + "." + LEFT$(begonnen, 4)
+        ARRAY_PUSH(t.zeilen, "Begonnen am" + CHR$(9) + begonnen)
+    END IF
+    t.oben = 6 : t.unten = 6 : t.links = 10 : t.gitter = &HE0E0E0
+    DIM z AS INTEGER
+    FOR z = 0 TO LEN(t.zeilen) - 1
+        t.zelleSetzen(z, 0, &HF0F4FF, &H667EEA, 1)
+    NEXT
+    pdfTabelleSetzen(s, t)
+END SUB
+
+SUB pdfNotizen(s AS PdfSatz, r AS PdfLauf2)
+    pdfAbsatz(s, "Title2", "Notizen")
+    pdfAbstand(s, 6)
+    DIM zl AS STRING
+    FOR EACH zl IN SPLIT$(TRIM$(REPLACE$(r.o.notizen, CHR$(13), "")), CHR$(10))
+        pdfAbsatz(s, "Normal", IIF(zl = "", "&nbsp;", pdfMaske$(zl)))
+    NEXT
+END SUB
+
+SUB pdfVorschauSeite(s AS PdfSatz, r AS PdfLauf2)
+    pdfAbsatz(s, "Title1", begriff$(r.m, "vorschau"))
+    pdfAbsatz(s, "CenterText", "Fertige Größe auf " + pdfStoffLabel$(r) + ": " + pdfGroesse$(r) + " cm")
+    pdfAbstand(s, 10)
+    pdfVorschau(s, r, s.aw - 5 * PDF_PT, s.ah - 40 * PDF_PT, FALSE)
+    IF NOT r.dp AND NOT r.o.mystery AND LEN(r.m.rueckstiche) > 0 THEN
+        pdfAbstand(s, 5)
+        pdfAbsatz(s, "SmallCenter", "Rückstiche: " + STR$(LEN(r.m.rueckstiche)) + " Linien werden über dem Muster gezeigt.")
+    END IF
+END SUB
+
+' "DMC 310", bei Blends "DMC 310 + DMC B5200", im Diamond-Modus nur die Nummer.
+' "DMC 310" wie f"{manufacturer} {catalog_number or ''}" -- ohne Hersteller
+' nur die Nummer (PySticky schreibt dort "None ").
+FUNCTION pdfHerstellerNummer$(g AS Garn) AS STRING
+    IF g.hersteller = "" THEN RETURN g.nummer
+    RETURN g.hersteller + " " + g.nummer
+END FUNCTION
+
+FUNCTION pdfGarnLabel$(g AS Garn, dp AS BOOLEAN) AS STRING
+    IF g.istBlend() THEN
+        DIM t AS STRING, i AS INTEGER
+        FOR i = 0 TO LEN(g.teile) - 1
+            t = t + IIF(i > 0, " + ", "") + TRIM$(g.teile[i].hersteller + " " + g.teile[i].nummer)
+        NEXT
+        RETURN t
+    END IF
+    IF dp THEN RETURN IIF(g.nummer <> "", g.nummer, LEFT$(g.name, 8))
+    RETURN pdfHerstellerNummer$(g)
+END FUNCTION
+
+SUB pdfLegende(s AS PdfSatz, r AS PdfLauf2)
+    DIM m AS Muster : m = r.m
+    pdfAbsatz(s, "Title1", IIF(r.dp, "Drill-Legende und Material", "Legende und Materialbedarf"))
+    DIM einheit AS STRING : einheit = pdfEinheit$(r)
+    DIM vorrat AS STRING : vorrat = begriff$(m, "bedarfseinheit")
+    DIM faeden AS INTEGER, perlen AS INTEGER
+    DIM fb AS Farbbedarf
+    FOR EACH fb IN r.b.farben
+        IF fb.perle THEN perlen = perlen + 1 ELSE faeden = faeden + 1
+    NEXT
+    DIM zus AS STRING : zus = STR$(faeden) + " Farben"
+    IF r.b.ausgelassen > 0 THEN
+        zus = zus + " · " + STR$(r.b.zuSticken) + " " + IIF(r.dp, "zu klebende", "zu stickende") + " " + einheit
+        zus = zus + " · " + STR$(r.b.ausgelassen) + " Farbe(n) = Stofffarbe"
+    ELSE
+        zus = zus + " · " + STR$(r.b.stiche) + " " + einheit
+    END IF
+    zus = zus + " · ca. " + STR$(r.b.straenge) + " " + vorrat + " benötigt"
+    pdfAbsatz(s, "CenterText", zus)
+    pdfAbstand(s, 8)
+    ' Paletten der Entsprechungen
+    DIM kpal AS ARRAY OF Palette : kpal = []
+    DIM kgf AS ARRAY OF Garnfarben : kgf = []
+    DIM kn AS STRING
+    FOR EACH kn IN r.o.kreuz
+        DIM p AS Palette
+        DIM gefunden AS Palette
+        FOR EACH p IN r.o.paletten
+            IF LOWER$(p.name) = LOWER$(kn) THEN gefunden = p
+        NEXT
+        IF IS_NIL(gefunden) THEN THROW "PDF-Export: Palette '" + kn + "' gibt es nicht"
+        ARRAY_PUSH(kpal, gefunden)
+        ARRAY_PUSH(kgf, garnfarbenVon(gefunden.garne))
+    NEXT
+    DIM nk AS INTEGER : nk = LEN(kpal)
+    DIM br AS ARRAY OF FLOAT : br = IIF(r.dp, [10.0, 10, 10, 18, 51], [10.0, 10, 8, 30, 45])
+    DIM i AS INTEGER
+    FOR i = 1 TO nk
+        ARRAY_PUSH(br, 14.0)
+    NEXT
+    ARRAY_PUSH(br, 18.0) : ARRAY_PUSH(br, 15.0) : ARRAY_PUSH(br, 15.0)
+    DIM t AS PdfTabelle : t = pdfTabelleNeu(br)
+    t.groesse = 8 : t.oben = 4 : t.unten = 4 : t.kopfGrund = &H3498DB : t.summe = TRUE : t.zebra = TRUE : t.wiederholen = TRUE
+    t.ausrichtung[0] = "m" : t.ausrichtung[1] = "m"
+    DIM ss AS INTEGER : ss = 5 + nk
+    FOR i = ss TO ss + 2
+        t.ausrichtung[i] = "r"
+    NEXT
+    DIM kopf AS STRING : kopf = "Nr." + CHR$(9) + "Sym." + CHR$(9) + "Farbe" + CHR$(9) + begriff$(m, "nummer") + CHR$(9) + "Farbname"
+    FOR EACH kn IN r.o.kreuz
+        kopf = kopf + CHR$(9) + kn
+    NEXT
+    ARRAY_PUSH(t.zeilen, kopf + CHR$(9) + einheit + CHR$(9) + "%" + CHR$(9) + vorrat)
+    DIM nr AS INTEGER
+    FOR EACH fb IN r.b.farben
+        IF fb.perle THEN CONTINUE
+        nr = nr + 1
+        DIM e AS Farbeintrag : e = m.farben[fb.nr]
+        DIM g AS Garn : g = e.garn
+        DIM pz AS STRING : pz = "-"
+        DIM sz AS STRING : sz = "-"
+        DIM anhang AS STRING : anhang = " [⊘]"
+        IF NOT fb.auslassen THEN
+            pz = FORMAT$(IIF(r.b.zuSticken > 0, fb.zahl * 100.0 / r.b.zuSticken, 0.0), "%.1f") + "%"
+            sz = STR$(fb.straenge)
+            anhang = ""
+        END IF
+        DIM zeile AS STRING : zeile = STR$(nr) + CHR$(9) + e.symbol + CHR$(9) + "" + CHR$(9) + pdfGarnLabel$(g, r.dp) + CHR$(9) + LEFT$(g.name, 18) + anhang
+        FOR i = 0 TO nk - 1
+            DIM eq AS Garn : eq = entsprechung(g, kpal[i], kgf[i])
+            zeile = zeile + CHR$(9) + IIF(IS_NIL(eq), "—", IIF(eq.nummer <> "", eq.nummer, eq.name))
+        NEXT
+        ARRAY_PUSH(t.zeilen, zeile + CHR$(9) + STR$(fb.zahl) + CHR$(9) + pz + CHR$(9) + sz)
+        t.zelleSetzen(nr, 2, g.farbe, -2, -2)
+        IF fb.auslassen THEN
+            t.zelleSetzen(nr, 4, -2, &HFF9800, -2)
+            FOR i = ss + 1 TO ss + 2
+                t.zelleSetzen(nr, i, -2, &H999999, -2)
+            NEXT
+        END IF
+    NEXT
+    DIM summe AS STRING : summe = "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + IIF(r.b.ausgelassen > 0, IIF(r.dp, "Zu kleben:", "Zu sticken:"), "Gesamt:")
+    FOR i = 1 TO nk
+        summe = summe + CHR$(9) + ""
+    NEXT
+    ARRAY_PUSH(t.zeilen, summe + CHR$(9) + STR$(IIF(r.b.ausgelassen > 0, r.b.zuSticken, r.b.stiche)) + CHR$(9) + "100%" + CHR$(9) + STR$(r.b.straenge))
+    ' die Farbspalte bleibt in der Zebra-Zeile die Garnfarbe
+    pdfTabelleSetzen(s, t)
+    IF r.b.ausgelassen > 0 THEN
+        pdfAbstand(s, 3)
+        pdfAbsatz(s, "Normal", "<font size='8' color='#ff9800'>⊘ = Stofffarbe, wird nicht gestickt</font>")
+    END IF
+    ' Rueckstiche je Farbe
+    IF NOT r.dp AND LEN(m.rueckstiche) > 0 THEN
+        pdfAbstand(s, 10)
+        pdfAbsatz(s, "Title2", "Rückstiche")
+        DIM je[MAX(1, LEN(m.farben))] AS INTEGER
+        DIM rs AS Rueckstich
+        FOR EACH rs IN m.rueckstiche
+            IF rs.farbe >= 0 AND rs.farbe < LEN(m.farben) THEN je[rs.farbe] = je[rs.farbe] + 1
+        NEXT
+        DIM tb AS PdfTabelle : tb = pdfLegendeKlein(&H667EEA, "Garnnummer")
+        DIM zz AS INTEGER
+        FOR i = 0 TO LEN(m.farben) - 1
+            IF je[i] = 0 THEN CONTINUE
+            zz = zz + 1
+            ARRAY_PUSH(tb.zeilen, "" + CHR$(9) + m.farben[i].symbol + CHR$(9) + pdfHerstellerNummer$(m.farben[i].garn) + CHR$(9) + LEFT$(m.farben[i].garn.name, 25) + CHR$(9) + STR$(je[i]))
+            tb.zelleSetzen(zz, 0, m.farben[i].garn.farbe, -2, -2)
+        NEXT
+        ARRAY_PUSH(tb.zeilen, "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + "Gesamt:" + CHR$(9) + STR$(LEN(m.rueckstiche)))
+        pdfTabelleSetzen(s, tb)
+    END IF
+    ' Perlen
+    IF perlen > 0 THEN
+        pdfAbstand(s, 10)
+        pdfAbsatz(s, "Title2", "Perlen (Beads)")
+        DIM tp AS PdfTabelle : tp = pdfLegendeKlein(&H8B5CF6, "Perlen-Nr.")
+        DIM pz2 AS INTEGER, gesamtP AS INTEGER
+        FOR EACH fb IN r.b.farben
+            IF NOT fb.perle THEN CONTINUE
+            pz2 = pz2 + 1
+            gesamtP = gesamtP + fb.zahl
+            DIM ep AS Farbeintrag : ep = m.farben[fb.nr]
+            ARRAY_PUSH(tp.zeilen, "" + CHR$(9) + ep.symbol + CHR$(9) + pdfHerstellerNummer$(ep.garn) + CHR$(9) + LEFT$(ep.garn.name, 25) + CHR$(9) + STR$(fb.zahl))
+            tp.zelleSetzen(pz2, 0, ep.garn.farbe, -2, -2)
+        NEXT
+        ARRAY_PUSH(tp.zeilen, "" + CHR$(9) + "" + CHR$(9) + "" + CHR$(9) + "Gesamt:" + CHR$(9) + STR$(gesamtP))
+        pdfTabelleSetzen(s, tp)
+    END IF
+END SUB
+
+FUNCTION pdfLegendeKlein(kopfFarbe AS INTEGER, nummer AS STRING) AS PdfTabelle
+    DIM t AS PdfTabelle : t = pdfTabelleNeu([10.0, 15, 40, 55, 20])
+    t.groesse = 9 : t.oben = 4 : t.unten = 4 : t.kopfGrund = kopfFarbe : t.summe = TRUE
+    t.ausrichtung[0] = "m" : t.ausrichtung[1] = "m" : t.ausrichtung[4] = "r"
+    ARRAY_PUSH(t.zeilen, "Farbe" + CHR$(9) + "Symbol" + CHR$(9) + nummer + CHR$(9) + "Farbname" + CHR$(9) + "Anzahl")
+    RETURN t
+END FUNCTION
+
+SUB pdfUebersicht(s AS PdfSatz, r AS PdfLauf2)
+    DIM pl AS Seitenplan : pl = r.plan
+    pdfAbsatz(s, "Title1", "Seitenübersicht")
+    pdfAbsatz(s, "CenterText", STR$(pl.anzahl()) + " Musterseiten · " + STR$(pl.seitenX) + " Spalten × " + STR$(pl.seitenY) + " Zeilen · je " + STR$(pl.jeX) + "×" + STR$(pl.jeY) + " " + pdfEinheit$(r) + " · " + pl.papier.name)
+    pdfAbstand(s, 10)
+    DIM mw AS FLOAT : mw = s.aw * 0.6
+    DIM mh AS FLOAT : mh = s.ah * 0.35
+    DIM pw AS FLOAT : pw = mw
+    DIM ph AS FLOAT : ph = pw * r.m.hoehe / r.m.breite
+    IF ph > mh THEN
+        ph = mh : pw = ph * r.m.breite / r.m.hoehe
+    END IF
+    pdfVorschau(s, r, pw, ph, TRUE)
+    pdfAbstand(s, 10)
+    DIM zb AS FLOAT : zb = MIN(35.0, pdfMm(s.aw) * 0.9 / pl.seitenX)
+    DIM br AS ARRAY OF FLOAT : br = []
+    DIM i AS INTEGER
+    FOR i = 1 TO pl.seitenX
+        ARRAY_PUSH(br, zb)
+    NEXT
+    DIM t AS PdfTabelle : t = pdfTabelleNeu(br)
+    t.groesse = 8 : t.oben = 6 : t.unten = 6 : t.gitter = &H667EEA : t.gitterBreite = 1
+    FOR i = 0 TO pl.seitenX - 1
+        t.ausrichtung[i] = "m"
+    NEXT
+    DIM sy AS INTEGER, sx AS INTEGER, n AS INTEGER : n = 1
+    FOR sy = 0 TO pl.seitenY - 1
+        DIM zeile AS STRING : zeile = ""
+        FOR sx = 0 TO pl.seitenX - 1
+            DIM zelle AS STRING : zelle = "Seite " + STR$(n) + CHR$(10) + "X: " + STR$(sx * pl.jeX + 1) + "-" + STR$(MIN((sx + 1) * pl.jeX, r.m.breite)) + CHR$(10) + "Y: " + STR$(sy * pl.jeY + 1) + "-" + STR$(MIN((sy + 1) * pl.jeY, r.m.hoehe))
+            zeile = zeile + IIF(sx > 0, CHR$(9), "") + zelle
+            n = n + 1
+        NEXT
+        ARRAY_PUSH(t.zeilen, zeile)
+    NEXT
+    FOR i = 0 TO LEN(t.zeilen) * pl.seitenX - 1
+        t.zelleSetzen(i \ pl.seitenX, i MOD pl.seitenX, &HF0F4FF, &H333333, -2)
+    NEXT
+    pdfTabelleSetzen(s, t)
+END SUB
+
+' Das Raster einer Seite (_create_pattern_drawing_with_paths, ohne Stickpfad).
+SUB pdfRaster(s AS PdfSatz, r AS PdfLauf2, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
+    DIM m AS Muster : m = r.m
+    DIM bw AS INTEGER : bw = x1 - x0 + 1
+    DIM bh AS INTEGER : bh = y1 - y0 + 1
+    DIM kopf AS FLOAT : kopf = 8 * PDF_PT
+    DIM z AS FLOAT
+    IF r.dp THEN
+        z = r.plan.zelleMm * PDF_PT
+    ELSE
+        z = MIN(4 * PDF_PT, (s.aw - kopf) / bw)
+    END IF
+    DIM w AS FLOAT : w = kopf + bw * z
+    DIM h AS FLOAT : h = kopf + bh * z
+    pdfZeichnungBeginnen(s, w, h)
+    ' reportlab zaehlt y nach oben, das Raster liegt unten; die Nummernleiste
+    ' (kopf) steht darueber
+    DIM gy AS FLOAT : gy = kopf
+    zRect(s, kopf, gy, bw * z, bh * z, &HFFFFFF, &H333333, 1)
+    DIM i AS INTEGER
+    FOR i = 0 TO bw
+        DIM zehn AS BOOLEAN : zehn = (x0 + i) MOD 10 = 0
+        zLine(s, kopf + i * z, gy, kopf + i * z, gy + bh * z, IIF(zehn, &H333333, &HCCCCCC), IIF(zehn, 1.0, 0.25))
+    NEXT
+    FOR i = 0 TO bh
+        ' wie PySticky: die Zeile wird von unten gezaehlt (my = y0 + bh - i)
+        DIM zehn2 AS BOOLEAN : zehn2 = (y0 + i) MOD 10 = 0
+        zLine(s, kopf, gy + i * z, kopf + bw * z, gy + i * z, IIF(zehn2, &H333333, &HCCCCCC), IIF(zehn2, 1.0, 0.25))
+    NEXT
+    DIM fs AS FLOAT : fs = MAX(5, MIN(z * 0.7, 9))
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO bh - 1
+        FOR x = 0 TO bw - 1
+            DIM f AS INTEGER : f = r.k.farbe[(y0 + y) * m.breite + x0 + x]
+            IF f < 0 OR f >= LEN(m.farben) THEN CONTINUE
+            DIM sym AS STRING : sym = m.farben[f].symbol
+            DIM rx AS FLOAT : rx = kopf + x * z
+            DIM ry AS FLOAT : ry = gy + y * z
+            DIM tf AS INTEGER : tf = &H000000
+            IF r.dp AND NOT r.o.mystery THEN
+                DIM c AS INTEGER : c = m.farben[f].garn.farbe
+                zRect(s, rx, ry, z + 0.3, z + 0.3, PDF_GRUND, -1, 0)
+                zDrill(s, rx, ry, z, c)
+                IF NOT istHell(c) THEN tf = &HFFFFFF
+            END IF
+            IF sym <> "" THEN zString(s, rx + z / 2, ry + z / 2 + fs / 3, sym, fs, tf, "middle")
+        NEXT
+    NEXT
+    IF NOT r.dp THEN
+        DIM rs AS Rueckstich
+        FOR EACH rs IN seitenRueckstiche(m, x0, y0, x1, y1)
+            DIM rf AS INTEGER : rf = &H000000
+            IF rs.farbe >= 0 AND rs.farbe < LEN(m.farben) THEN rf = m.farben[rs.farbe].garn.farbe
+            zLine(s, kopf + (rs.x1 - x0 * 2) * z / 2, gy + (rs.y1 - y0 * 2) * z / 2, kopf + (rs.x2 - x0 * 2) * z / 2, gy + (rs.y2 - y0 * 2) * z / 2, rf, MAX(0.5, z / 10))
+        NEXT
+    END IF
+    DIM nf AS FLOAT : nf = MAX(5, MIN(6, z * 0.6))
+    FOR x = 0 TO bw - 1
+        DIM mx AS INTEGER : mx = x0 + x
+        IF mx = x0 OR (x + 1) MOD 5 = 0 OR (mx + 1) MOD 10 = 0 THEN zString(s, kopf + x * z + z / 2, gy - 2 * PDF_PT, STR$(mx + 1), nf, &H666666, "middle")
+    NEXT
+    FOR y = 0 TO bh - 1
+        DIM my AS INTEGER : my = y0 + y
+        IF my = y0 OR (y + 1) MOD 5 = 0 OR (my + 1) MOD 10 = 0 THEN zString(s, kopf - 2 * PDF_PT, gy + y * z + z / 2 + nf / 3, STR$(my + 1), nf, &H666666, "end")
+    NEXT
+    pdfZeichnungEnde(s, w, h)
+END SUB
+
+SUB pdfMusterseite(s AS PdfSatz, r AS PdfLauf2, n AS INTEGER)
+    DIM m AS Muster : m = r.m
+    DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
+    (x0, y0, x1, y1) = seitenBereich(m, r.plan, n)
+    DIM nb AS ARRAY OF INTEGER : nb = nachbarn(r.plan, n)
+    DIM teile AS ARRAY OF STRING : teile = []
+    IF nb[0] > 0 THEN ARRAY_PUSH(teile, "&larr; S. " + STR$(nb[0]))
+    IF nb[1] > 0 THEN ARRAY_PUSH(teile, "S. " + STR$(nb[1]) + " &rarr;")
+    IF nb[2] > 0 THEN ARRAY_PUSH(teile, "&uarr; S. " + STR$(nb[2]))
+    IF nb[3] > 0 THEN ARRAY_PUSH(teile, "&darr; S. " + STR$(nb[3]))
+    DIM kopf AS STRING : kopf = "<b>Seite " + STR$(n + 1) + " von " + STR$(r.plan.anzahl()) + "</b>  |  Spalten " + STR$(x0 + 1) + "-" + STR$(x1 + 1) + "  ·  Zeilen " + STR$(y0 + 1) + "-" + STR$(y1 + 1)
+    IF LEN(teile) > 0 THEN kopf = kopf + "  |  <font size='8' color='#888'>" + JOIN$(teile, "  ") + "</font>"
+    pdfAbsatz(s, "CenterText", kopf)
+    pdfAbstand(s, 3)
+    pdfRaster(s, r, x0, y0, x1, y1)
+    pdfAbstand(s, 3)
+    DIM zf AS ARRAY OF INTEGER : zf = seitenFarben(r.k, LEN(m.farben), x0, y0, x1, y1)
+    DIM da AS INTEGER, i AS INTEGER
+    DIM leg AS ARRAY OF STRING : leg = []
+    FOR i = 0 TO LEN(m.farben) - 1
+        IF zf[i] = 0 THEN CONTINUE
+        da = da + 1
+        DIM g AS Garn : g = m.farben[i].garn
+        DIM code AS STRING : code = pdfMaske$(IIF(g.nummer <> "", g.nummer, LEFT$(g.name, 8)))
+        IF r.dp THEN
+            ARRAY_PUSH(leg, "<font color=" + CHR$(34) + farbeAlsHex$(g.farbe) + CHR$(34) + ">■</font> <b>" + code + "</b> (" + STR$(zf[i]) + ")")
+        ELSE
+            ARRAY_PUSH(leg, pdfMaske$(m.farben[i].symbol) + "=" + code + " (" + STR$(zf[i]) + ")")
+        END IF
+    NEXT
+    IF da > 0 THEN
+        DIM sichtbar AS ARRAY OF STRING : sichtbar = []
+        FOR i = 0 TO MIN(12, LEN(leg)) - 1
+            ARRAY_PUSH(sichtbar, leg[i])
+        NEXT
+        DIM lt AS STRING : lt = JOIN$(sichtbar, "  |  ")
+        IF da > 12 THEN lt = lt + "  |  ... (+" + STR$(da - 12) + " weitere)"
+        pdfAbsatz(s, "Normal", "<font size='7'><b>Farben:</b> " + lt + "</font>")
+    END IF
+    pdfAbstand(s, 2)
+    pdfAbsatz(s, "CenterText", "<font size='7' color='#999999'>" + pdfMaske$(r.titel) + " · Seite " + STR$(n + 1) + "/" + STR$(r.plan.anzahl()) + " · " + r.datum + "</font>")
+END SUB
+
+' --- Einstieg ------------------------------------------------------------------------
+
+' Das Dokument bauen, ohne es zu schreiben -- `titel` steht auf dem
+' Deckblatt und in jeder Fusszeile. Das PDF im Ergebnis gehoert dem
+' Aufrufer (PDF_SAVE, PDF_PREVIEW, PDF_CLOSE).
+FUNCTION pdfBauen(m AS Muster, o AS PdfOptionen, titel AS STRING) AS PdfSatz
+    DIM r AS PdfLauf2 : r = NEW PdfLauf2()
+    r.m = m : r.o = o
+    r.dp = m.modus = "diamond"
+    r.k = kompositVon(m)
+    r.b = bedarfVon(m, r.k)
+    r.plan = seitenplanFuer(m, o.papier, o.zellen, o.ueberlappung)
+    r.titel = IIF(o.titel <> "", o.titel, titel)
+    r.datum = o.datum
+    IF r.datum = "" THEN r.datum = RIGHT$(DATE$(), 2) + "." + MID$(DATE$(), 5, 2) + "." + LEFT$(DATE$(), 4)
+    DIM s AS PdfSatz : s = NEW PdfSatz()
+    s.ablauf = []
+    s.pdf = PDF_NEW(LOWER$(r.plan.papier.name))
+    PDF_TITLE(s.pdf, r.titel)
+    s.bw = r.plan.papier.breite * PDF_PT
+    s.bh = r.plan.papier.hoehe * PDF_PT
+    s.rand = r.plan.papier.rand * PDF_PT
+    s.aw = s.bw - 2 * s.rand
+    s.ah = s.bh - 2 * s.rand
+    s.wasser = TRIM$(o.wasserzeichen)
+    s.copyright = TRIM$(REGEX_REPLACE(pdfMeta$(m, "copyright"), "\s+", " "))
+    pdfNeueSeite(s)
+    pdfDeckblatt(s, r)
+    pdfUmbruch(s)
+    IF TRIM$(o.notizen) <> "" THEN
+        pdfNotizen(s, r)
+        pdfUmbruch(s)
+    END IF
+    pdfVorschauSeite(s, r)
+    pdfUmbruch(s)
+    pdfLegende(s, r)
+    pdfUmbruch(s)
+    pdfUebersicht(s, r)
+    pdfUmbruch(s)
+    DIM n AS INTEGER
+    FOR n = 0 TO r.plan.anzahl() - 1
+        pdfMusterseite(s, r, n)
+        IF n < r.plan.anzahl() - 1 THEN pdfUmbruch(s)
+    NEXT
+    ARRAY_PUSH(s.ablauf, "seiten " + STR$(s.seiten))
+    RETURN s
+END FUNCTION
+
+' Das PDF schreiben (die Endung .pdf kommt dazu, wenn sie fehlt); liefert das
+' Protokoll in PyStickys Schreibweise (siehe oben), am Ende "seiten N". Ohne
+' Titel in den Optionen steht der Dateiname auf dem Deckblatt.
+FUNCTION pdfExportieren(m AS Muster, pfad AS STRING, o AS PdfOptionen) AS ARRAY OF STRING
+    IF RIGHT$(LOWER$(pfad), 4) <> ".pdf" THEN pfad = pfad + ".pdf"
+    DIM titel AS STRING : titel = BASENAME(pfad)
+    titel = LEFT$(titel, LEN(titel) - 4)
+    DIM s AS PdfSatz : s = pdfBauen(m, o, titel)
+    TRY
+        PDF_SAVE(s.pdf, pfad)
+    CATCH f
+        PDF_CLOSE(s.pdf)
+        THROW "PDF nicht gesichert: " + f
+    END TRY
+    PDF_CLOSE(s.pdf)
+    RETURN s.ablauf
+END FUNCTION

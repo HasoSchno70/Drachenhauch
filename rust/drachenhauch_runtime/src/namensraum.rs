@@ -625,12 +625,14 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
                     *name = intern(&alias, &low);
                 }
             }
-            // Die Feldnamen der Klasse und ihrer Vorfahren sind in den
-            // Methoden lokal: ein nacktes `e` meint das Feld, nicht eine
+            // Die Feld- und Methodennamen der Klasse und ihrer Vorfahren sind
+            // in den Methoden lokal: ein nacktes `e` meint das Feld, nicht eine
             // Globale `e` des Hauptprogramms (das hielt die Pruefung fuer
             // einen verbotenen Zugriff) und nicht einen gleichnamigen Namen des
-            // Moduls (dann waere das Feld still umbenannt worden) -- Glutfaden,
-            // 2026-10-16.
+            // Moduls (dann waere das Feld still umbenannt worden). Ebenso eine
+            // Methode: hiess eine Funktion des Moduls genauso, wurde die
+            // Methode selbst umbenannt und `obj.methode()` fand sie nicht mehr
+            // -- Glutfaden, 2026-10-16.
             let felder = klassen_felder(l.klassen, name, parent.as_deref());
             if let Some(pa) = parent { l.typ(pa); }
             // Felder: nur die Typen, nicht die Feldnamen -- die gehoeren der
@@ -659,16 +661,26 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
     }
 }
 
-/// Alle Klassen des Programms: Name (klein) -> (Elternklasse, Feldnamen).
+/// Alle Klassen des Programms: Name (klein) -> (Elternklasse, Feld- und
+/// Methodennamen).
 fn klassen_sammeln(n: &Node, aus: &mut HashMap<String, (Option<String>, Vec<String>)>) {
     match n {
         Node::Program { statements } => for s in statements { klassen_sammeln(s, aus); },
         Node::Stmt { body, .. } => klassen_sammeln(body, aus),
-        Node::ClassDecl { name, parent, fields, statics, .. } => {
+        Node::ClassDecl { name, parent, fields, statics, methods, .. } => {
             let mut namen = Vec::new();
             for f in fields.iter().chain(statics.iter()) { feldnamen(f, &mut namen); }
+            for m in methods { methodenname(m, &mut namen); }
             aus.insert(name.to_lowercase(), (parent.clone(), namen));
         }
+        _ => {}
+    }
+}
+
+fn methodenname(n: &Node, aus: &mut Vec<String>) {
+    match n {
+        Node::Stmt { body, .. } => methodenname(body, aus),
+        Node::FunctionDecl { name, .. } | Node::SubDecl { name, .. } => aus.push(name.to_lowercase()),
         _ => {}
     }
 }

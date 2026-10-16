@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2088,
+ "count": 2094,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1408,23 +1408,29 @@
   "PARTICLE_UPDATE": "advance the physics",
   "PASCAL$": "identifier notations: \"max hp\", \"MaxHp\", \"max_hp\" or \"max-hp\" become maxHp, max_hp, MaxHp. Words are separated by whitespace, _, -, ., the change from lower to upper case and the end of an abbreviation (HTTPServer → http_server)",
   "PATHJOIN": "join path parts with /",
+  "PDF_CIRCLE": "circle around (x, y), outline / fill",
+  "PDF_CIRCLE_FILL": "circle around (x, y), outline / fill",
   "PDF_CLOSE": "free the memory",
   "PDF_COLOR": "RGB(…) — applies to text, strokes and fills",
   "PDF_FONT": "font and size",
   "PDF_FONT_LOAD": "load your own TrueType/OpenType font, afterwards available to PDF_FONT as name$",
+  "PDF_GET_OPACITY": "opacity 0..1 for everything that follows (watermarks)",
   "PDF_IMAGE": "place an image (IMAGE) in the rectangle, sizes in mm; without h by the aspect ratio",
   "PDF_LINE": "draw a line",
   "PDF_LINE_WIDTH": "stroke width",
-  "PDF_NEW": "a3…a6, letter, legal; hoch/quer (portrait/landscape)",
+  "PDF_NEW": "a0…a6, letter, legal; hoch/quer (portrait/landscape)",
+  "PDF_OPACITY": "opacity 0..1 for everything that follows (watermarks)",
   "PDF_PAGE": "start a new page -- PDF_NEW already creates the first one; while it is empty, PDF_PAGE does not add a second",
   "PDF_PAGE_COUNT": "how many so far",
   "PDF_PAGE_HEIGHT": "page size in mm",
   "PDF_PAGE_WIDTH": "page size in mm",
+  "PDF_POLYGON": "closed polygon from two arrays of equal length, at least three points",
+  "PDF_POLYGON_FILL": "closed polygon from two arrays of equal length, at least three points",
   "PDF_PREVIEW": "the page as an image, for a preview in a window",
   "PDF_PRINT": "print — Windows via GDI, macOS/Linux via CUPS; see Printing",
   "PDF_RECT": "outline / fill",
   "PDF_RECT_FILL": "outline / fill",
-  "PDF_TEXT": "set text",
+  "PDF_TEXT": "set text; winkel (angle) in degrees counter-clockwise, rotated about (x, y)",
   "PDF_TEXT_WIDTH": "width in mm, in the current font and size",
   "PDF_TITLE": "title in the document information",
   "PHYS2D_ADD_BOX": "rectangle (half extents), restitution bounce 0..1",
@@ -2089,6 +2095,6 @@
   "ZIP_LIST": "names of all entries",
   "ZIP_READ": "one entry as bytes",
   "ZIP_READ$": "one entry as text",
-  "ZIP_WRITE": "archive from names and texts, without a detour through files"
+  "ZIP_WRITE": "archive from names and contents (texts or buffers), without a detour through files"
  }
 }

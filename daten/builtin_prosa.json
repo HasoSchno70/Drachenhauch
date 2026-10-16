@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2093,
+ "count": 2099,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1409,24 +1409,30 @@
   "PARTICLE_UPDATE": "Physik fortschreiben",
   "PASCAL$": "Schreibweisen für Bezeichner: aus \"max hp\", \"MaxHp\", \"max_hp\" oder \"max-hp\" wird maxHp, max_hp, MaxHp. Wörter trennen Leerraum, _, -, ., der Wechsel von klein auf groß und das Ende einer Abkürzung (HTTPServer → http_server)",
   "PATHJOIN": "Pfadteile mit / verbinden",
+  "PDF_CIRCLE": "Kreis um (x, y), Umriss / Fläche",
+  "PDF_CIRCLE_FILL": "Kreis um (x, y), Umriss / Fläche",
   "PDF_CLOSE": "Speicher freigeben",
   "PDF_COLOR": "RGB(…) — gilt für Text, Striche und Flächen",
   "PDF_FONT": "Schrift und Größe",
   "PDF_FONT_LOAD": "eine eigene TrueType-/OpenType-Schrift laden, danach unter name$ für PDF_FONT da",
+  "PDF_GET_OPACITY": "Deckkraft 0..1 für alles Folgende (Wasserzeichen)",
   "PDF_IMAGE": "ein Bild (IMAGE) in das Rechteck setzen, Maße in mm; ohne h nach dem Seitenverhältnis",
   "PDF_LINE": "Linie zeichnen",
   "PDF_LINE_WIDTH": "Strichstärke",
-  "PDF_NEW": "a3…a6, letter, legal; hoch/quer",
+  "PDF_NEW": "a0…a6, letter, legal; hoch/quer",
+  "PDF_OPACITY": "Deckkraft 0..1 für alles Folgende (Wasserzeichen)",
   "PDF_PAGE": "neue Seite beginnen -- die erste legt PDF_NEW schon an; solange sie leer ist, legt PDF_PAGE keine zweite an",
   "PDF_PAGE_COUNT": "wie viele bisher",
   "PDF_PAGE_HEIGHT": "Seitenmaß in mm",
   "PDF_PAGE_WIDTH": "Seitenmaß in mm",
+  "PDF_POLYGON": "geschlossenes Vieleck aus zwei gleich langen Feldern, mindestens drei Punkte",
+  "PDF_POLYGON_FILL": "geschlossenes Vieleck aus zwei gleich langen Feldern, mindestens drei Punkte",
   "PDF_PREVIEW": "die Seite als Bild, für eine Vorschau im Fenster",
   "PDF_PRINT": "drucken — Windows über GDI, macOS/Linux über CUPS; siehe Drucken",
   "PDF_RECT": "Umriss / Fläche",
   "PDF_RECT_FILL": "Umriss / Fläche",
   "PDF_SAVE": "schreiben",
-  "PDF_TEXT": "Text setzen",
+  "PDF_TEXT": "Text setzen; winkel in Grad gegen den Uhrzeigersinn, gedreht um (x, y)",
   "PDF_TEXT_WIDTH": "Breite in mm, in der aktuellen Schrift und Größe",
   "PDF_TITLE": "Titel in den Dokument-Angaben",
   "PHYS2D_ADD_BOX": "Rechteck (Halb-Extents), Restitution bounce 0..1",
@@ -2094,6 +2100,6 @@
   "ZIP_LIST": "Namen aller Einträge",
   "ZIP_READ": "einen Eintrag als Bytes",
   "ZIP_READ$": "einen Eintrag als Text",
-  "ZIP_WRITE": "Archiv aus Namen und Texten, ohne Umweg über Dateien"
+  "ZIP_WRITE": "Archiv aus Namen und Inhalten (Texte oder Puffer), ohne Umweg über Dateien"
  }
 }

@@ -8349,6 +8349,18 @@
    "module": "dhrt"
   },
   {
+   "name": "PDF_CIRCLE",
+   "kind": "core",
+   "signature": "PDF_CIRCLE(p: PDF, x, y, r)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_CIRCLE_FILL",
+   "kind": "core",
+   "signature": "PDF_CIRCLE_FILL(p: PDF, x, y, r)",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_CLOSE",
    "kind": "core",
    "signature": "PDF_CLOSE(p: PDF)",
@@ -8370,6 +8382,12 @@
    "name": "PDF_FONT_LOAD",
    "kind": "core",
    "signature": "PDF_FONT_LOAD(p: PDF, pfad$, name$)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_GET_OPACITY",
+   "kind": "core",
+   "signature": "PDF_GET_OPACITY(p: PDF) AS FLOAT",
    "module": "pdf"
   },
   {
@@ -8397,6 +8415,12 @@
    "module": "pdf"
   },
   {
+   "name": "PDF_OPACITY",
+   "kind": "core",
+   "signature": "PDF_OPACITY(p: PDF, deckkraft)",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_PAGE",
    "kind": "core",
    "signature": "PDF_PAGE(p: PDF)",
@@ -8418,6 +8442,18 @@
    "name": "PDF_PAGE_WIDTH",
    "kind": "core",
    "signature": "PDF_PAGE_WIDTH(p: PDF) AS FLOAT",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_POLYGON",
+   "kind": "core",
+   "signature": "PDF_POLYGON(p: PDF, xs, ys)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_POLYGON_FILL",
+   "kind": "core",
+   "signature": "PDF_POLYGON_FILL(p: PDF, xs, ys)",
    "module": "pdf"
   },
   {
@@ -8453,7 +8489,7 @@
   {
    "name": "PDF_TEXT",
    "kind": "core",
-   "signature": "PDF_TEXT(p: PDF, x_mm, y_mm, text$)",
+   "signature": "PDF_TEXT(p: PDF, x_mm, y_mm, text$ [, winkel])",
    "module": "pdf"
   },
   {

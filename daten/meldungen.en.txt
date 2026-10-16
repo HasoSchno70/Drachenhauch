@@ -939,7 +939,7 @@ GUI_FORM_VERSION: '{}' ist an ein Widget gebunden -- die Versionsspalte fuehrt d
 {}: '{}' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden, nur Datum oder mit Zeitzone) oder 'Sat, 28 Aug 2026 20:30:00 +0200'	{}: '{}' is not a point in time -- expected 'YYYY-MM-DD hh:mm:ss' (also with T, without seconds, just the date or with a time zone) or 'Sat, 28 Aug 2026 20:30:00 +0200'
 {}: '{}' kenne ich nicht -- "hoch" oder "quer"	{}: '{}' is unknown -- "hoch" (portrait) or "quer" (landscape)
 {}: 2. Argument ist "hoch" oder "quer"	{}: the 2nd argument is "hoch" (portrait) or "quer" (landscape)
-{}: Seitengroesse '{}' kenne ich nicht -- a3, a4, a5, a6, letter, legal	{}: unknown page size '{}' -- a3, a4, a5, a6, letter, legal
+{}: Seitengroesse '{}' kenne ich nicht -- a0 bis a6, letter, legal	{}: unknown page size '{}' -- a0 to a6, letter, legal
 {}: Seite {} gibt es nicht (1..{})	{}: page {} does not exist (1..{})
 {}: 0 bis 4 Nachkommastellen (mehr haelt ein Betrag nicht)	{}: 0 to 4 decimal places (an amount holds no more)
 {}: Betrag zu gross	{}: amount too large
@@ -1770,3 +1770,4 @@ IMAGE_SCALE: unbekannter Filter '{}' -- moeglich sind lanczos, bikubisch, box, h
 IMAGE_ENHANCE: erwartet (bild, art$, faktor)	IMAGE_ENHANCE: expects (image, kind$, factor)
 IMAGE_ENHANCE: unbekannte Art '{}' -- moeglich sind helligkeit, kontrast, saettigung	IMAGE_ENHANCE: unknown kind '{}' -- possible are brightness, contrast, saturation
 IMAGE_ENHANCE: der Faktor muss eine Zahl ab 0 sein	IMAGE_ENHANCE: the factor must be a number from 0 up
+{} liefert nie "{}" -- der Vergleich trifft nie. Moeglich sind: {}.	{} never returns "{}" -- the comparison never matches. Possible are: {}.

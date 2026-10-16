@@ -506,7 +506,7 @@ as one.
 | `ZIP_READ(archiv$, name$)` → BUFFER | one entry as bytes |
 | `ZIP_EXTRACT(archiv$, ordner$)` → INTEGER | extract everything, returns the number of files |
 | `ZIP_CREATE(archiv$, dateien)` → INTEGER | archive from a list of file paths |
-| `ZIP_WRITE(archiv$, namen, inhalte)` → INTEGER | archive from names and texts, without a detour through files |
+| `ZIP_WRITE(archiv$, namen, inhalte)` → INTEGER | archive from names and contents (texts or buffers), without a detour through files |
 
 ```basic
 DIM namen AS ARRAY OF STRING

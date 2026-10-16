@@ -93,7 +93,7 @@ pub fn gdi_schrift(programmname: &str) -> (&'static str, bool, bool) {
 mod plattform {
     use super::*;
     use windows::core::PCWSTR;
-    use windows::Win32::Foundation::{COLORREF, RECT};
+    use windows::Win32::Foundation::{COLORREF, POINT, RECT};
     use windows::Win32::Graphics::Gdi::*;
     use windows::Win32::Graphics::Printing::*;
     use windows::Win32::Storage::Xps::{EndDoc, EndPage, StartDocW, StartPage, DOCINFOW};
@@ -142,6 +142,29 @@ mod plattform {
     }
 
     #[cfg(feature = "pdf")]
+    /// Eine Form als Flaeche (Pinsel, kein Stift) oder als Umriss (Stift,
+    /// leerer Pinsel) -- Kreis und Vieleck teilen sich das.
+    unsafe fn form_zeichnen(hdc: HDC, fuellen: bool, dick: i32, c: COLORREF, leer: HGDIOBJ, f: impl FnOnce(HDC)) {
+        if fuellen {
+            let pinsel = CreateSolidBrush(c);
+            let stift = GetStockObject(NULL_PEN);
+            let alt_b = SelectObject(hdc, pinsel.into());
+            let alt_s = SelectObject(hdc, stift);
+            f(hdc);
+            SelectObject(hdc, alt_s);
+            SelectObject(hdc, alt_b);
+            let _ = DeleteObject(pinsel.into());
+        } else {
+            let stift = CreatePen(PS_SOLID, dick, c);
+            let alt_s = SelectObject(hdc, stift.into());
+            let alt_b = SelectObject(hdc, leer);
+            f(hdc);
+            SelectObject(hdc, alt_b);
+            SelectObject(hdc, alt_s);
+            let _ = DeleteObject(stift.into());
+        }
+    }
+
     fn farbe(f: (f64, f64, f64)) -> COLORREF {
         let k = |x: f64| (x.clamp(0.0, 1.0) * 255.0).round() as u32;
         COLORREF(k(f.0) | (k(f.1) << 8) | (k(f.2) << 16))
@@ -187,11 +210,17 @@ mod plattform {
                 if StartPage(hdc) <= 0 { let _ = EndDoc(hdc); return Err("PDF_PRINT: StartPage schlug fehl".into()); }
                 for op in &seite.ops {
                     match op {
-                        Op::Text { x, y, text, schrift, groesse_pt, farbe: f } => {
+                        Op::Text { x, y, text, schrift, groesse_pt, farbe: f, winkel, deck } => {
+                            // GDI kennt keine Durchsicht: auf weissem Papier
+                            // gemischt ist es dasselbe Bild
+                            let f = &crate::pdf::gegen_weiss(*f, *deck);
+                            // lfEscapement in Zehntelgrad gegen den Uhrzeigersinn,
+                            // gedreht um den Bezugspunkt (TA_TOP | TA_LEFT)
+                            let esc = (winkel * 10.0).round() as i32;
                             let (face, fett, kursiv) = gdi_schrift(&doc.schrift_name(*schrift));
                             let hoehe = -((groesse_pt / 72.0 * dpi_y).round() as i32);
                             let facew = wide(face);
-                            let font = CreateFontW(hoehe, 0, 0, 0, if fett { FW_BOLD.0 as i32 } else { FW_NORMAL.0 as i32 },
+                            let font = CreateFontW(hoehe, 0, esc, esc, if fett { FW_BOLD.0 as i32 } else { FW_NORMAL.0 as i32 },
                                                    kursiv as u32, 0, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
                                                    CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH.0 as u32,
                                                    PCWSTR(facew.as_ptr()));
@@ -202,7 +231,8 @@ mod plattform {
                             SelectObject(hdc, alt);
                             let _ = DeleteObject(font.into());
                         }
-                        Op::Linie { x1, y1, x2, y2, breite_mm, farbe: f } => {
+                        Op::Linie { x1, y1, x2, y2, breite_mm, farbe: f, deck } => {
+                            let f = &crate::pdf::gegen_weiss(*f, *deck);
                             let dick = ((breite_mm / 25.4 * dpi_x).round() as i32).max(1);
                             let stift = CreatePen(PS_SOLID, dick, farbe(*f));
                             let alt = SelectObject(hdc, stift.into());
@@ -211,7 +241,8 @@ mod plattform {
                             SelectObject(hdc, alt);
                             let _ = DeleteObject(stift.into());
                         }
-                        Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe: f } => {
+                        Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe: f, deck } => {
+                            let f = &crate::pdf::gegen_weiss(*f, *deck);
                             let r = RECT { left: px(*x), top: py(*y), right: px(*x + *b), bottom: py(*y + *h) };
                             if *fuellen {
                                 let pinsel = CreateSolidBrush(farbe(*f));
@@ -228,12 +259,24 @@ mod plattform {
                                 let _ = DeleteObject(stift.into());
                             }
                         }
-                        Op::Bild { x, y, b, h, rgba, pw, ph } => {
+                        Op::Kreis { x, y, r, fuellen, breite_mm, farbe: f, deck } => {
+                            let f = crate::pdf::gegen_weiss(*f, *deck);
+                            let (l, t, rr, bb) = (px(*x - *r), py(*y - *r), px(*x + *r), py(*y + *r));
+                            form_zeichnen(hdc, *fuellen, ((breite_mm / 25.4 * dpi_x).round() as i32).max(1), farbe(f), leer,
+                                          |hdc| { let _ = Ellipse(hdc, l, t, rr, bb); });
+                        }
+                        Op::Vieleck { punkte, fuellen, breite_mm, farbe: f, deck } => {
+                            let f = crate::pdf::gegen_weiss(*f, *deck);
+                            let pkt: Vec<POINT> = punkte.iter().map(|q| POINT { x: px(q.0), y: py(q.1) }).collect();
+                            form_zeichnen(hdc, *fuellen, ((breite_mm / 25.4 * dpi_x).round() as i32).max(1), farbe(f), leer,
+                                          |hdc| { let _ = Polygon(hdc, &pkt); });
+                        }
+                        Op::Bild { x, y, b, h, rgba, pw, ph, deck } => {
                             // Durchsichtiges auf weisses Papier rechnen -- GDI
                             // druckt 32 Bit ohne Alpha.
                             let mut bgr = Vec::with_capacity(rgba.len());
                             for p in rgba.chunks_exact(4) {
-                                let a = p[3] as u32;
+                                let a = (p[3] as f64 * deck.clamp(0.0, 1.0)).round() as u32;
                                 let misch = |c: u8| ((c as u32 * a + 255 * (255 - a)) / 255) as u8;
                                 bgr.extend_from_slice(&[misch(p[2]), misch(p[1]), misch(p[0]), 0]);
                             }

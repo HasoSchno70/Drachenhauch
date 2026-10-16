@@ -20,7 +20,7 @@ END FUNCTION
 
 PRIVATE FUNCTION wahrOder(j AS JSON_HANDLE, pfad AS STRING, vorgabe AS BOOLEAN) AS BOOLEAN
     IF NOT JSON_HAS(j, pfad) THEN RETURN vorgabe
-    IF JSON_TYPE(j, pfad) <> "bool" THEN RETURN vorgabe
+    IF JSON_TYPE(j, pfad) <> "boolean" THEN RETURN vorgabe
     RETURN JSON_GET_BOOL(j, pfad)
 END FUNCTION
 

@@ -172,3 +172,41 @@ vorlage: 60x60 farben 30 dither 1 median TRUE palette DMC Diamond Painting
 geladen: quelle glutfaden_256.png palette DMC max 12 ausschnitt 0.9 stiche TRUE gesichert TRUE
 rahmen: TRUE
 navy: TRUE
+
+=== glutfaden stufe 5 exportieren
+' --probe-stufe5: der Export-Dialog (wie viele Zeilen je Format gelten), dann
+' PDF mit Ueberlappung, Wasserzeichen, Anchor und Notizen, HTML, Bild mit
+' Symbolen, OXS -- und dasselbe OXS wieder geoeffnet (gleiche Stichzahl, als
+' neue Datei) --, das Paket, und im Diamond-Modus das empfohlene Papier
+' vorgewaehlt. Dazu die Dateien selbst.
+IMPORT "helfer.dh"
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe5", "--foto", "d"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    DIM pdf AS BUFFER : pdf = READALL_BYTES("d_muster.pdf")
+    PRINT "pdf: "; CHR$(BUFFER_GET(pdf, 0)) + CHR$(BUFFER_GET(pdf, 1)) + CHR$(BUFFER_GET(pdf, 2)) + CHR$(BUFFER_GET(pdf, 3)); " wasserzeichen "; INSTR(LOWER$(BUFFER_TO_HEX$(pdf)), "2f636120302e3335") >= 0
+    PRINT "oxs: "; LEFT$(READALL$("d_muster.oxs"), 38)
+    PRINT "fotos: "; FILEEXISTS("d_exportdialog.png"); " "; FILEEXISTS("d_aus_oxs.png")
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+dialog: zeilen je format 8 3 2 0 2 papiere 6 entsprechungen 15
+pdf: PDF exportiert (6 Seiten, A4): d_muster.pdf | Anchor ueb 2
+html: HTML exportiert: d_muster.html | beginnt <!DOCTYPE html>
+bild: Bild exportiert (320 × 320): d_muster.png | 320x320
+oxs: OXS exportiert: d_muster.oxs
+wieder eingelesen: TRUE stiche gleich TRUE datei leer TRUE | Aus OXS eingelesen -- Sichern
+paket: Paket exportiert (6 Dateien): d_muster.zip
+  Demo_Kreuzstich.pxs, Demo_Kreuzstich.html, Demo_Kreuzstich.png, Demo_Kreuzstich.pdf, garnliste.csv, LIESMICH.txt
+diamond: vorgewaehlt A4 = empfehlung A4
+pdf: %PDF wasserzeichen TRUE
+oxs: <?xml version='1.0' encoding='utf-8'?>
+fotos: TRUE TRUE

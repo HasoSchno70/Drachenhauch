@@ -5,6 +5,8 @@
 IMPORT "json"
 IMPORT "zeit"
 IMPORT "imgfx"
+IMPORT "regex"
+IMPORT "pdf"
 IMPORT "stich.dh" AS kern
 IMPORT "garn.dh" AS kern
 IMPORT "ebene.dh" AS kern
@@ -14,4 +16,10 @@ IMPORT "verlauf.dh" AS kern
 IMPORT "bearbeiten.dh" AS kern
 IMPORT "auswahl.dh" AS kern
 IMPORT "bildimport.dh" AS kern
+IMPORT "export.dh" AS kern
+IMPORT "oxs.dh" AS kern
+IMPORT "bildexport.dh" AS kern
+IMPORT "pdfexport.dh" AS kern
+IMPORT "htmlexport.dh" AS kern
+IMPORT "paket.dh" AS kern
 IMPORT "pxs.dh" AS kern

@@ -2916,8 +2916,32 @@ impl Compiler {
         Ok(())
     }
 
+    /// Befehle mit festem Wertevorrat: ein Vergleich mit einem Text ausserhalb
+    /// davon ist immer FALSE (bzw. `<>` immer TRUE) -- fast immer ein
+    /// Tippfehler, und er faellt nicht auf, weil das Programm einfach den
+    /// anderen Zweig nimmt. Glutfaden (2026-10-16) las so jeden
+    /// Wahrheitswert einer Datei als Vorgabe: `JSON_TYPE(..) <> "bool"`.
+    fn feste_werte(n: &Node) -> Option<(&'static str, &'static [&'static str])> {
+        let Node::Call { callee, .. } = n else { return None };
+        let Node::Identifier(name) = &**callee else { return None };
+        match name.as_str() {
+            "json_type" => Some(("JSON_TYPE", &["object", "array", "string", "number", "boolean", "null", "missing"])),
+            _ => None,
+        }
+    }
+
+    fn feste_werte_pruefen(&mut self, befehl: &Node, wert: &Node) {
+        let (Some((name, werte)), Node::StringLit(s)) = (Self::feste_werte(befehl), wert) else { return };
+        if werte.contains(&s.as_str()) { return; }
+        self.warnings.push((self.ctx.cur_line, format!(
+            "{} liefert nie \"{}\" -- der Vergleich trifft nie. Moeglich sind: {}.",
+            name, s, werte.join(", "))));
+    }
+
     fn expr_binary(&mut self, op: &str, left: &Node, right: &Node) -> CR {
         if op == "=" || op == "<>" {
+            self.feste_werte_pruefen(left, right);
+            self.feste_werte_pruefen(right, left);
             // `"5" = 5` und `TRUE = 1` sind in Drachenhauch immer FALSE (bzw.
             // `<>` immer TRUE): verschiedene Arten sind nie gleich, und
             // umgewandelt wird nicht. Das ist fast nie gemeint.
@@ -3392,6 +3416,13 @@ impl Compiler {
                    cases: &[(Vec<CaseMatch>, Option<Node>, Vec<Node>)],
                    else_block: &[Node]) -> CR {
         self.expr(subject)?;                  // Stack: [subj]
+        for (matches, _, _) in cases {
+            for m in matches {
+                if m.kind == "value" {
+                    if let Some(CaseVal::Expr(w)) = m.values.first() { self.feste_werte_pruefen(subject, w); }
+                }
+            }
+        }
         let mut end_jumps: Vec<usize> = vec![];
         for (matches, guard, block) in cases {
             let mut block_jumps: Vec<usize> = vec![];

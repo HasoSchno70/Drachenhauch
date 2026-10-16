@@ -458,3 +458,77 @@ FUNCTION pdfStelleXmm(suche AS STRING) AS FLOAT
     IF s = "" THEN RETURN -1.0
     RETURN VAL(SPLIT$(s, "|")[0]) * 25.4 / 72.0
 END FUNCTION
+
+' Die Nummern der Inhaltsstroeme: was eine Seite unter /Contents nennt (ein
+' Verweis oder ein Feld davon) und jedes Formular (/Subtype/Form) -- ohne
+' Schriftdateien, die als Bytes zufaellig wie Befehle aussehen.
+FUNCTION pdfInhaltsNummern() AS ARRAY OF INTEGER
+    DIM r AS ARRAY OF INTEGER : r = []
+    DIM k AS STRING
+    FOR EACH k IN MAPKEYS(pdfObjAb)
+        DIM kopf AS STRING : kopf = pdfKopf$(VAL(k))
+        IF INSTR(REPLACE$(kopf, " ", ""), "/Subtype/Form") >= 0 THEN ARRAY_PUSH(r, VAL(k))
+        DIM p AS INTEGER : p = INSTR(kopf, "/Contents")
+        IF p >= 0 THEN
+            DIM rest AS STRING : rest = TRIM$(MID$(kopf, p + 9, 200))
+            ' ein Feld bis "]", sonst nur der eine Verweis "N 0 R" -- dahinter
+            ' koennen weitere Eintraege mit Verweisen stehen
+            IF LEFT$(rest, 1) = "[" THEN
+                rest = MID$(rest, 1, INSTR(rest, "]") - 1)
+            ELSE
+                rest = LEFT$(rest, INSTR(rest, "R") + 1)
+            END IF
+            ' "12 0 R 13 0 R" -- jede dritte Zahl vor einem R ist eine Nummer
+            DIM t AS ARRAY OF STRING : t = SPLIT$(TRIM$(REPLACE$(rest, "R", " R ")), " ")
+            DIM ws AS ARRAY OF STRING : ws = []
+            DIM x AS STRING
+            FOR EACH x IN t
+                IF x <> "" THEN ARRAY_PUSH(ws, x)
+            NEXT
+            DIM i AS INTEGER
+            FOR i = 2 TO LEN(ws) - 1
+                IF ws[i] = "R" THEN ARRAY_PUSH(r, VAL(ws[i - 2]))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+
+' Nach pdfSeiten: Objektkoepfe aller Objekte und die (entpackten)
+' Inhaltsstroeme als Woerter -- fuer Faelle, die nach Befehlen fragen (`cm`,
+' `c`, `f`, `/ca`). Nicht lesbare Bytes werden Leerzeichen, `/`, `[`, `]`,
+' `<`, `>` trennen.
+FUNCTION pdfWoerter() AS ARRAY OF STRING
+    DIM w AS ARRAY OF STRING : w = []
+    DIM inhalt AS ARRAY OF INTEGER : inhalt = pdfInhaltsNummern()
+    DIM k AS STRING
+    FOR EACH k IN MAPKEYS(pdfObjAb)
+        DIM nr AS INTEGER : nr = VAL(k)
+        DIM t AS STRING : t = pdfKopf$(nr) + " "
+        DIM b AS BUFFER : b = BUFFER_NEW(0)
+        IF ARRAY_INDEXOF(inhalt, nr) >= 0 THEN b = pdfStrom(nr)
+        DIM i AS INTEGER
+        FOR i = 0 TO BUFFER_LEN(b) - 1
+            DIM c AS INTEGER : c = BUFFER_GET(b, i)
+            IF c > 32 AND c < 127 THEN t = t + CHR$(c) ELSE t = t + " "
+        NEXT
+        DIM z AS STRING
+        FOR EACH z IN ["/", "[", "]", "<", ">"]
+            t = REPLACE$(t, z, " " + z)
+        NEXT
+        DIM s AS STRING
+        FOR EACH s IN SPLIT$(REPLACE$(t, CHR$(10), " "), " ")
+            IF s <> "" THEN ARRAY_PUSH(w, s)
+        NEXT
+    NEXT
+    RETURN w
+END FUNCTION
+
+' Wie oft ein Wort vorkommt
+FUNCTION pdfWortZahl(w AS ARRAY OF STRING, wort AS STRING) AS INTEGER
+    DIM n AS INTEGER, s AS STRING
+    FOR EACH s IN w
+        IF s = wort THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION

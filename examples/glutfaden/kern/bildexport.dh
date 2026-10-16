@@ -1,0 +1,181 @@
+' Muster als Bild (PNG, JPG, BMP) -- PySticky io/image_export.py.
+'
+' Je Stich ein Kaestchen der Groesse `zelle` (4..100), was zu sehen ist
+' (oberste sichtbare Ebene): Vollstiche als Flaeche, Teilstiche als Dreieck
+' bzw. Fuenfeck, Knoten und Perlen als Kreis (Perle mit Glanzpunkt), Drills
+' als vier Facetten, Rueckstiche mit Schatten (nicht im Diamond-Modus),
+' wahlweise Symbole und das Raster (jede Linie hellgrau, jede zehnte dunkler).
+'
+' Die Leinwand-Befehle ueberschreiben Punkte samt Deckkraft statt zu mischen --
+' halbdurchsichtige Schatten und Kanten entstehen darum auf einem eigenen,
+' durchsichtigen Bild, das IMAGE_DRAW_IMAGE dann daraufmischt.
+' Qt zaehlt Koordinaten an den Punktkanten, die Leinwand an den Punktmitten
+' (wie PIL) -- alles ausser Rechtecken ist darum um einen halben Punkt
+' verschoben. Nicht pixelgenau wie Qt: keine Kantenglaettung.
+
+CONST BILD_STOFF = &HFAFAF5
+
+' Heller oder dunkler wie _shade_rgb (export_common): > 100 heller, < 100 dunkler.
+FUNCTION schattiert(f AS INTEGER, faktor AS INTEGER) AS INTEGER
+    DIM r AS INTEGER : r = rotAnteil(f)
+    DIM g AS INTEGER : g = gruenAnteil(f)
+    DIM b AS INTEGER : b = blauAnteil(f)
+    IF faktor >= 100 THEN
+        DIM a AS FLOAT : a = (faktor - 100) / 100.0
+        RETURN RGB(INT(r + (255 - r) * a), INT(g + (255 - g) * a), INT(b + (255 - b) * a))
+    END IF
+    DIM d AS FLOAT : d = faktor / 100.0
+    RETURN RGB(INT(r * d), INT(g * d), INT(b * d))
+END FUNCTION
+
+FUNCTION istHell(f AS INTEGER) AS BOOLEAN
+    RETURN (0.299 * rotAnteil(f) + 0.587 * gruenAnteil(f) + 0.114 * blauAnteil(f)) / 255.0 > 0.5
+END FUNCTION
+
+' Ein Dreieck (drei Punkte) fuellen.
+SUB bxDreieck(bild AS IMAGE, ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT, cx AS FLOAT, cy AS FLOAT, farbe AS INTEGER)
+    IMAGE_FILL_POLY(bild, [ax - 0.5, bx - 0.5, cx - 0.5], [ay - 0.5, by - 0.5, cy - 0.5], farbe)
+END SUB
+
+' Ein Kaestchen mit besonderem Stichtyp (Hintergrund ist schon Stoff).
+SUB bxSonderstich(bild AS IMAGE, ueber AS IMAGE, px AS FLOAT, py AS FLOAT, z AS FLOAT, t AS INTEGER, farbe AS INTEGER, alsDrill AS BOOLEAN)
+    IF t = DIAMANT OR (alsDrill AND t = VOLL) THEN
+        DIM rand AS FLOAT : rand = 0
+        IF z >= 12 THEN rand = z * 0.08
+        DIM x0 AS FLOAT : x0 = px + rand
+        DIM y0 AS FLOAT : y0 = py + rand
+        DIM x1 AS FLOAT : x1 = px + z - rand
+        DIM y1 AS FLOAT : y1 = py + z - rand
+        DIM mx AS FLOAT : mx = (x0 + x1) / 2
+        DIM my AS FLOAT : my = (y0 + y1) / 2
+        bxDreieck(bild, x0, y0, x1, y0, mx, my, schattiert(farbe, 145))
+        bxDreieck(bild, x1, y0, x1, y1, mx, my, schattiert(farbe, 110))
+        bxDreieck(bild, x1, y1, x0, y1, mx, my, schattiert(farbe, 70))
+        bxDreieck(bild, x0, y1, x0, y0, mx, my, schattiert(farbe, 95))
+        IF z >= 14 THEN IMAGE_FRAME(ueber, x0, y0, x1 - 1, y1 - 1, 1, &H000000, 120)
+    ELSEIF t = KNOTEN THEN
+        DIM r AS FLOAT : r = MAX(1.0, z * 0.18)
+        IMAGE_FILL_ELLIPSE(bild, px + z / 2 - 0.5, py + z / 2 - 0.5, r, r, farbe)
+    ELSEIF t = PERLE THEN
+        DIM rp AS FLOAT : rp = MAX(1.5, z * 0.38)
+        IMAGE_FILL_ELLIPSE(bild, px + z / 2 - 0.5, py + z / 2 - 0.5, rp, rp, farbe)
+        DIM hr AS FLOAT : hr = MAX(1.0, rp / 3.0)
+        IMAGE_FILL_ELLIPSE(ueber, px + z / 2 - rp / 2.5 - 0.5, py + z / 2 - rp / 2.5 - 0.5, hr, hr, schattiert(farbe, 150), 217)
+    ELSEIF istTeilstich(t) THEN
+        DIM p AS ARRAY OF FLOAT : p = teilstichPunkte(t)
+        DIM xs AS ARRAY OF FLOAT : xs = []
+        DIM ys AS ARRAY OF FLOAT : ys = []
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(p) - 1 STEP 2
+            ARRAY_PUSH(xs, px + p[k] * z - 0.5)
+            ARRAY_PUSH(ys, py + p[k + 1] * z - 0.5)
+        NEXT
+        IMAGE_FILL_POLY(bild, xs, ys, farbe)
+    END IF
+END SUB
+
+' Das Muster als Bild. Das IMAGE gehoert dem Aufrufer (IMAGE_FREE).
+FUNCTION musterBild(m AS Muster, zelle AS INTEGER, raster AS BOOLEAN, symbole AS BOOLEAN) AS IMAGE
+    DIM z AS INTEGER : z = CLAMP(zelle, 4, 100)
+    DIM bb AS INTEGER : bb = m.breite * z
+    DIM bh AS INTEGER : bh = m.hoehe * z
+    DIM bild AS IMAGE : bild = IMAGE_NEW(bb, bh, BILD_STOFF)
+    DIM ueber AS IMAGE : ueber = IMAGE_NEW(bb, bh)
+    DIM k AS Komposit : k = kompositVon(m)
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO m.hoehe - 1
+        FOR x = 0 TO m.breite - 1
+            DIM f AS INTEGER : f = k.farbe[y * m.breite + x]
+            IF f < 0 OR f >= LEN(m.farben) THEN CONTINUE
+            DIM t AS INTEGER : t = k.art[y * m.breite + x]
+            DIM c AS INTEGER : c = m.farben[f].garn.farbe
+            IF t = VOLL AND NOT dp THEN
+                IMAGE_FILL_RECT(bild, x * z, y * z, x * z + z - 1, y * z + z - 1, c)
+            ELSE
+                bxSonderstich(bild, ueber, x * z, y * z, z, t, c, dp)
+            END IF
+        NEXT
+    NEXT
+    ' Rueckstiche: Schatten (schwarz, Deckkraft 80) und darueber die Linie
+    IF NOT dp AND LEN(m.rueckstiche) > 0 THEN
+        DIM halb AS FLOAT : halb = z / 2.0
+        DIM sb AS FLOAT : sb = MAX(1.5, z / 8.0)
+        DIM r AS Rueckstich
+        FOR EACH r IN m.rueckstiche
+            IMAGE_POLYLINE(ueber, [r.x1 * halb - 0.5, r.x2 * halb - 0.5], [r.y1 * halb - 0.5, r.y2 * halb - 0.5], sb + 1, &H000000, 80)
+        NEXT
+        FOR EACH r IN m.rueckstiche
+            DIM rf AS INTEGER : rf = &H000000
+            IF r.farbe >= 0 AND r.farbe < LEN(m.farben) THEN rf = m.farben[r.farbe].garn.farbe
+            IMAGE_POLYLINE(ueber, [r.x1 * halb - 0.5, r.x2 * halb - 0.5], [r.y1 * halb - 0.5, r.y2 * halb - 0.5], sb, rf)
+        NEXT
+    END IF
+    IMAGE_DRAW_IMAGE(bild, ueber, 0, 0)
+    IMAGE_FREE(ueber)
+    ' Symbole: je Farbe ein vorgefertigtes Textbild, mittig ins Kaestchen
+    IF symbole AND z >= 8 THEN
+        ' der Grundvorrat einer Schrift kennt die Symbole (Geometrische Formen,
+        ' Pfeile ...) nicht -- die Zeichen des Musters ausdruecklich backen
+        DIM zeichen AS STRING
+        DIM fz AS Farbeintrag
+        FOR EACH fz IN m.farben
+            zeichen = zeichen + fz.symbol
+        NEXT
+        DIM schrift AS INTEGER : schrift = LOADFONT("sans", MAX(4, INT(z * 0.6)), zeichen)
+        DIM texte AS ARRAY OF IMAGE : texte = []
+        DIM tb AS ARRAY OF INTEGER : tb = []
+        DIM th AS ARRAY OF INTEGER : th = []
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(m.farben) - 1
+            DIM s AS STRING : s = m.farben[i].symbol
+            DIM tf AS INTEGER : tf = IIF(istHell(m.farben[i].garn.farbe), &H000000, &HFFFFFF)
+            DIM ti AS IMAGE : ti = IMAGE_TEXT(IIF(s = "", " ", s), MAX(4, INT(z * 0.6)), tf, schrift)
+            ARRAY_PUSH(texte, ti)
+            ARRAY_PUSH(tb, IMAGE_WIDTH(ti))
+            ARRAY_PUSH(th, IMAGE_HEIGHT(ti))
+        NEXT
+        FOR y = 0 TO m.hoehe - 1
+            FOR x = 0 TO m.breite - 1
+                DIM fs AS INTEGER : fs = k.farbe[y * m.breite + x]
+                IF fs < 0 OR fs >= LEN(m.farben) THEN CONTINUE
+                IF m.farben[fs].symbol = "" THEN CONTINUE
+                IMAGE_DRAW_IMAGE(bild, texte[fs], x * z + (z - tb[fs]) \ 2, y * z + (z - th[fs]) \ 2)
+            NEXT
+        NEXT
+        DIM tx AS IMAGE
+        FOR EACH tx IN texte
+            IMAGE_FREE(tx)
+        NEXT
+    END IF
+    ' Raster: jede Linie hellgrau, dann jede zehnte dunkler darueber
+    IF raster THEN
+        FOR x = 0 TO m.breite
+            IF x * z < bb THEN IMAGE_FILL_RECT(bild, x * z, 0, x * z, bh - 1, &HC8C8C8)
+        NEXT
+        FOR y = 0 TO m.hoehe
+            IF y * z < bh THEN IMAGE_FILL_RECT(bild, 0, y * z, bb - 1, y * z, &HC8C8C8)
+        NEXT
+        FOR x = 0 TO m.breite STEP 10
+            IF x * z < bb THEN IMAGE_FILL_RECT(bild, x * z, 0, x * z, bh - 1, &H8C8C8C)
+        NEXT
+        FOR y = 0 TO m.hoehe STEP 10
+            IF y * z < bh THEN IMAGE_FILL_RECT(bild, 0, y * z, bb - 1, y * z, &H8C8C8C)
+        NEXT
+    END IF
+    RETURN bild
+END FUNCTION
+
+' Als Datei; das Format folgt der Endung (.png, .jpg, .bmp).
+SUB bildExportieren(m AS Muster, pfad AS STRING, zelle AS INTEGER, raster AS BOOLEAN, symbole AS BOOLEAN)
+    DIM e AS STRING : e = LOWER$(pfad)
+    IF NOT (RIGHT$(e, 4) = ".png" OR RIGHT$(e, 4) = ".jpg" OR RIGHT$(e, 5) = ".jpeg" OR RIGHT$(e, 4) = ".bmp") THEN THROW "Bild-Export: unbekannte Endung -- .png, .jpg oder .bmp"
+    DIM b AS IMAGE : b = musterBild(m, zelle, raster, symbole)
+    TRY
+        IMAGE_SAVE(b, pfad, FALSE)
+    CATCH f
+        IMAGE_FREE(b)
+        THROW "Bild nicht gesichert: " + f
+    END TRY
+    IMAGE_FREE(b)
+END SUB
