@@ -1,0 +1,124 @@
+' Farbverwaltung als Text -- dieselben Zeilen, die ref_farbverwaltung.py aus
+' PyStickys ColorManagementDialog aufzeichnet: je Ablauf von Bedienschritten
+' der Stand des Musters, dazu die Reihenfolge je Sortierung.
+'
+' Ein Ablauf, der Farben VERSCHIEBT, vergleicht nur Farben und Rueckstiche:
+' PyStickys _swap_colors nummeriert ueber set_stitch ohne Stichtyp (jeder
+' Halb-/Viertelstich, Knoten und jede Perle wird ein voller Stich) und
+' uebergeht gesperrte Ebenen (die zeigen danach andere Farben). Dass
+' Glutfaden dabei das Bild behaelt, prueft die Sammlung eigens.
+FUNCTION fvVerschiebt(ablauf AS STRING) AS BOOLEAN
+    RETURN REGEX_TEST(ablauf, "(^|; )(hoch|runter|anfang|ende) ")
+END FUNCTION
+
+' Die Zeilen einer Aufzeichnung ohne die Ebenen der Ablaeufe mit Verschieben
+FUNCTION fvRefOhneVerschoben$(ref AS STRING) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM weg AS BOOLEAN
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(ref, CHR$(10))
+        IF LEFT$(z, 7) = "ablauf " THEN weg = fvVerschiebt(MID$(z, 7))
+        IF LEFT$(z, 9) = "sortiert " THEN weg = FALSE
+        IF weg AND LEFT$(z, 6) = "ebene " THEN CONTINUE
+        ARRAY_PUSH(aus, z)
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION
+IMPORT "../../../examples/glutfaden/kern/kern.dh" AS kern
+
+FUNCTION fvStand$(m AS kern.Muster) AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    DIM t AS ARRAY OF STRING : t = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN m.farben
+        ARRAY_PUSH(t, f.garn.name + "/" + f.symbol + "/" + STR$(f.straenge) + "/" + IIF(f.istPerle, "1", "0") + IIF(f.istDiamant, "1", "0"))
+    NEXT
+    ARRAY_PUSH(z, "farben: " + JOIN$(t, " | "))
+    DIM k AS INTEGER
+    FOR k = 0 TO m.ebenen.anzahl() - 1
+        DIM e AS kern.Ebene : e = m.ebenen.ebenen[k]
+        DIM zellen AS ARRAY OF STRING : zellen = []
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(e.raster) - 1
+            IF e.raster[i] < 0 THEN CONTINUE
+            ARRAY_PUSH(zellen, STR$(i MOD e.breite) + "," + STR$(i \ e.breite) + "=" + STR$(e.raster[i]) + ":" + STR$(e.art[i]) + ":" + STR$(e.erledigt[i]))
+        NEXT
+        ARRAY_PUSH(z, "ebene " + STR$(k) + ": " + JOIN$(zellen, " "))
+    NEXT
+    DIM r AS ARRAY OF STRING : r = []
+    DIM rs AS kern.Rueckstich
+    FOR EACH rs IN m.rueckstiche
+        ARRAY_PUSH(r, STR$(rs.x1) + "," + STR$(rs.y1) + "," + STR$(rs.x2) + "," + STR$(rs.y2) + ":" + STR$(rs.farbe))
+    NEXT
+    ARRAY_PUSH(z, "rueck: " + JOIN$(r, " "))
+    RETURN JOIN$(z, CHR$(10))
+END FUNCTION
+
+FUNCTION fvZahlen(w AS ARRAY OF STRING) AS ARRAY OF INTEGER
+    DIM z AS ARRAY OF INTEGER : z = []
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(w) - 1
+        ARRAY_PUSH(z, VAL(w[i]))
+    NEXT
+    RETURN z
+END FUNCTION
+
+' Einen Ablauf ("hoch 3 ; zusammen 0 6 4 ; ...") auf einem frisch geladenen
+' Muster: Plan bauen, anwenden, Stand
+FUNCTION fvAblauf$(pfad AS STRING, ablauf AS STRING) AS STRING
+    DIM m AS kern.Muster : m = kern.pxsLaden(pfad)
+    m.stichzahlenNeu()
+    DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+    DIM p AS kern.Farbplan : p = kern.neuerFarbplan(m)
+    DIM s AS STRING
+    FOR EACH s IN SPLIT$(ablauf, " ; ")
+        DIM w AS ARRAY OF STRING : w = SPLIT$(TRIM$(s), " ")
+        DIM z AS ARRAY OF INTEGER : z = fvZahlen(w)
+        DIM i AS INTEGER
+        SELECT CASE w[0]
+            CASE "loeschen" : kern.planLoeschen(p, z)
+            CASE "zusammen" : kern.planZusammen(p, z[0], z[1:LEN(z)])
+            CASE "hoch" : kern.planVerschieben(p, z[0], z[0] - 1)
+            CASE "runter" : kern.planVerschieben(p, z[0], z[0] + 1)
+            CASE "anfang" : kern.planVerschieben(p, z[0], 0)
+            CASE "ende" : kern.planVerschieben(p, z[0], LEN(p.folge) - 1)
+            CASE "faeden"
+                FOR i = 0 TO LEN(z) - 2
+                    p.straenge[p.folge[z[i]]] = z[LEN(z) - 1]
+                NEXT
+            CASE "alle"
+                FOR i = 0 TO LEN(p.folge) - 1
+                    p.straenge[p.folge[i]] = z[0]
+                NEXT
+            CASE "ungenutzte"
+                DIM n AS INTEGER : n = kern.planUngenutzte(m, p)
+        END SELECT
+    NEXT
+    DIM ok AS BOOLEAN : ok = kern.planAnwenden(m, v, p)
+    RETURN fvStand$(m)
+END FUNCTION
+
+FUNCTION farbverwaltungText$(ref AS STRING, pfad AS STRING) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(ref, CHR$(10))
+        IF LEFT$(z, 7) = "ablauf " THEN
+            ARRAY_PUSH(aus, z)
+            ARRAY_PUSH(aus, fvAblauf$(pfad, MID$(z, 7)))
+            IF fvVerschiebt(MID$(z, 7)) THEN aus = SPLIT$(fvRefOhneVerschoben$(JOIN$(aus, CHR$(10))), CHR$(10))
+        ELSEIF LEFT$(z, 9) = "sortiert " THEN
+            DIM art AS INTEGER : art = VAL(MID$(z, 9, 1))
+            DIM m AS kern.Muster : m = kern.pxsLaden(pfad)
+            m.stichzahlenNeu()
+            DIM p AS kern.Farbplan : p = kern.neuerFarbplan(m)
+            kern.planSortieren(m, p, art)
+            DIM t AS ARRAY OF STRING : t = []
+            DIM k AS INTEGER
+            FOR EACH k IN p.folge
+                ARRAY_PUSH(t, m.farben[k].garn.name)
+            NEXT
+            ARRAY_PUSH(aus, "sortiert " + STR$(art) + ": " + JOIN$(t, " | "))
+        END IF
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION

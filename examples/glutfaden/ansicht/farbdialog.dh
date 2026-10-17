@@ -1,0 +1,366 @@
+' Farben verwalten (PySticky ui/dialogs/color_management_dialog.py) --
+' Seitenleiste "Verwalten…" oder Strg+Umschalt+F.
+'
+' Der Dialog bearbeitet einen Plan (kern/farbverwaltung.dh); erst
+' "Übernehmen" aendert das Muster, als EIN Schritt, den Rueckgaengig ganz
+' zuruecknimmt. Links die Farben (mehrere waehlbar, Suche, Sortierung),
+' rechts die gewaehlte Farbe mit ihren Faeden und die Aktionen. Beim
+' Zusammenfuehren bleibt die OBERSTE gewaehlte Farbe -- im Original "die
+' zuerst gewaehlte", was sich in einer Liste nicht sehen laesst.
+
+DIM fvDialog AS INTEGER
+DIM fvPlan AS kern.Farbplan
+DIM fvListe AS INTEGER
+DIM fvZeilen AS ARRAY OF INTEGER       ' GtkListBoxRow je Stelle im Plan
+DIM fvKopf AS INTEGER
+DIM fvSortierung AS INTEGER
+DIM fvSuche AS INTEGER
+DIM fvVorschau AS INTEGER
+DIM fvVorschauFarbe AS INTEGER
+DIM fvInfo AS INTEGER
+DIM fvFaeden AS INTEGER
+DIM fvAlleFaeden AS INTEGER
+DIM fvKnoepfe AS ARRAY OF INTEGER      ' hoch, runter, Anfang, Ende, Loeschen, Zusammenfuehren
+DIM fvSperre AS BOOLEAN
+
+FUNCTION fvAntwortUebernehmen() AS INTEGER
+    RETURN GTK_ANTWORT_OK
+END FUNCTION
+
+' Die gewaehlten Stellen, von oben nach unten
+FUNCTION fvGewaehlt() AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(fvZeilen) - 1
+        IF gtk_list_box_row_is_selected(fvZeilen[i]) THEN ARRAY_PUSH(aus, i)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION fvFarbfeld(w AS INTEGER, cr AS INTEGER, farbe AS INTEGER) AS BOOLEAN
+    DIM b AS FLOAT : b = gtk_widget_get_allocated_width(w)
+    DIM h AS FLOAT : h = gtk_widget_get_allocated_height(w)
+    cairoFarbe(cr, farbe)
+    cairo_rectangle(cr, 1, 1, b - 2, h - 2)
+    cairo_fill_preserve(cr)
+    cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.35)
+    cairo_set_line_width(cr, 1.0)
+    cairo_stroke(cr)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION fvVorschauZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    RETURN fvFarbfeld(w, cr, fvVorschauFarbe)
+END FUNCTION
+
+FUNCTION fvSpalte(text AS STRING, breite AS INTEGER, rechts AS BOOLEAN) AS INTEGER
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtk_widget_set_size_request(l, breite, -1)
+    gtk_label_set_xalign(l, IIF(rechts, 1.0, 0.0))
+    gtk_label_set_ellipsize(l, GTK_ELLIPSE_ENDE)
+    RETURN l
+END FUNCTION
+
+' Die Liste aus dem Plan; gewaehlt bleibt, was die alten Nummern in waehle hat
+SUB fvListeBauen(waehle AS ARRAY OF INTEGER)
+    fvSperre = TRUE
+    DIM z AS INTEGER
+    FOR EACH z IN fvZeilen
+        gtk_widget_destroy(z)
+    NEXT
+    fvZeilen = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(fvPlan.folge) - 1
+        DIM f AS kern.Farbeintrag : f = lwMuster.farben[fvPlan.folge[k]]
+        DIM zeile AS INTEGER : zeile = gtk_box_new(GTK_WAAGERECHT, 8)
+        gtk_container_set_border_width(zeile, 3)
+        DIM feld AS INTEGER : feld = gtk_drawing_area_new()
+        gtk_widget_set_size_request(feld, 22, 22)
+        signalZeichnen(feld, "draw", fvFarbfeld, f.garn.farbe, 0, 0)
+        gtk_box_pack_start(zeile, feld, FALSE, FALSE, 0)
+        gtk_box_pack_start(zeile, fvSpalte(f.symbol, 26, FALSE), FALSE, FALSE, 0)
+        gtk_box_pack_start(zeile, fvSpalte(f.garn.name, 190, FALSE), FALSE, FALSE, 0)
+        gtk_box_pack_start(zeile, fvSpalte(TRIM$(f.garn.hersteller + " " + f.garn.nummer), 130, FALSE), FALSE, FALSE, 0)
+        gtk_box_pack_start(zeile, fvSpalte(STR$(fvPlan.straenge[fvPlan.folge[k]]) + " F.", 40, TRUE), FALSE, FALSE, 0)
+        gtk_box_pack_start(zeile, fvSpalte(ZAHL$(kern.planStiche(lwMuster, fvPlan, k), 0) + " Stiche", 100, TRUE), FALSE, FALSE, 0)
+        gtk_widget_set_tooltip_text(zeile, f.garn.name + CHR$(10) + "Hersteller: " + IIF(f.garn.hersteller = "", "-", f.garn.hersteller) + CHR$(10) + "Nr: " + IIF(f.garn.nummer = "", "-", f.garn.nummer) + CHR$(10) + "Fäden: " + STR$(fvPlan.straenge[fvPlan.folge[k]]))
+        gtk_list_box_insert(fvListe, zeile, -1)
+        DIM row AS INTEGER : row = gtk_list_box_get_row_at_index(fvListe, k)
+        ARRAY_PUSH(fvZeilen, row)
+        gtk_widget_show_all(row)
+        IF ARRAY_INDEXOF(waehle, fvPlan.folge[k]) >= 0 THEN gtk_list_box_select_row(fvListe, row)
+    NEXT
+    fvSperre = FALSE
+    fvFiltern(0, 0)
+    fvKopfNachziehen()
+    fvAuswahlGeaendert(0, 0)
+END SUB
+
+SUB fvKopfNachziehen()
+    DIM benutzt AS INTEGER, k AS INTEGER
+    FOR k = 0 TO LEN(fvPlan.folge) - 1
+        IF kern.planStiche(lwMuster, fvPlan, k) > 0 THEN benutzt = benutzt + 1
+    NEXT
+    gtk_label_set_text(fvKopf, STR$(LEN(fvPlan.folge)) + " Farben (" + STR$(benutzt) + " verwendet)" + IIF(LEN(fvPlan.folge) <> lwMuster.farbanzahl(), " -- vorher " + STR$(lwMuster.farbanzahl()), ""))
+END SUB
+
+' Suche in Name, Hersteller, Nummer und Symbol
+SUB fvFiltern(w AS INTEGER, daten AS INTEGER)
+    IF fvSuche = 0 THEN RETURN
+    DIM s AS STRING : s = LOWER$(TRIM$(gtk_entry_get_text(fvSuche)))
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(fvZeilen) - 1
+        DIM f AS kern.Farbeintrag : f = lwMuster.farben[fvPlan.folge[k]]
+        DIM such AS STRING : such = LOWER$(f.garn.name + " " + f.garn.hersteller + " " + f.garn.nummer + " " + f.symbol)
+        gtk_widget_set_visible(fvZeilen[k], s = "" OR INSTR(such, s) >= 0)
+    NEXT
+END SUB
+
+SUB fvAuswahlGeaendert(w AS INTEGER, daten AS INTEGER)
+    IF fvSperre OR fvDialog = 0 THEN RETURN
+    DIM g AS ARRAY OF INTEGER : g = fvGewaehlt()
+    DIM i AS INTEGER
+    FOR i = 0 TO 3
+        gtk_widget_set_sensitive(fvKnoepfe[i], LEN(g) = 1)
+    NEXT
+    gtk_widget_set_sensitive(fvKnoepfe[4], LEN(g) >= 1)
+    gtk_widget_set_sensitive(fvKnoepfe[5], LEN(g) >= 2)
+    gtk_widget_set_sensitive(fvFaeden, LEN(g) >= 1)
+    fvSperre = TRUE
+    IF LEN(g) = 0 THEN
+        fvVorschauFarbe = &H808080
+        gtk_label_set_text(fvInfo, "Keine Farbe gewählt")
+    ELSE
+        DIM alt AS INTEGER : alt = fvPlan.folge[g[0]]
+        DIM f AS kern.Farbeintrag : f = lwMuster.farben[alt]
+        fvVorschauFarbe = IIF(LEN(g) = 1, f.garn.farbe, &H808080)
+        IF LEN(g) = 1 THEN
+            gtk_label_set_markup(fvInfo, "<b>" + sdMaske$(f.symbol) + " " + sdMaske$(f.garn.name) + "</b>" + CHR$(10) + sdMaske$(IIF(f.garn.hersteller = "", "-", TRIM$(f.garn.hersteller + " " + f.garn.nummer))) + CHR$(10) + ZAHL$(kern.planStiche(lwMuster, fvPlan, g[0]), 0) + " Stiche")
+        ELSE
+            gtk_label_set_text(fvInfo, STR$(LEN(g)) + " Farben gewählt" + CHR$(10) + "Zusammenführen: „" + f.garn.name + "“ bleibt")
+        END IF
+        gtk_spin_button_set_value(fvFaeden, fvPlan.straenge[alt])
+    END IF
+    fvSperre = FALSE
+    gtk_widget_queue_draw(fvVorschau)
+END SUB
+
+' Faeden fuer alle gewaehlten
+SUB fvFaedenGeaendert(w AS INTEGER, daten AS INTEGER)
+    IF fvSperre THEN RETURN
+    DIM g AS ARRAY OF INTEGER : g = fvGewaehlt()
+    IF LEN(g) = 0 THEN RETURN
+    DIM v AS INTEGER : v = gtk_spin_button_get_value_as_int(fvFaeden)
+    DIM s AS INTEGER, alte AS ARRAY OF INTEGER : alte = []
+    FOR EACH s IN g
+        fvPlan.straenge[fvPlan.folge[s]] = v
+        ARRAY_PUSH(alte, fvPlan.folge[s])
+    NEXT
+    fvListeBauen(alte)
+END SUB
+
+SUB fvAlleFaedenGeklickt(w AS INTEGER, daten AS INTEGER)
+    DIM v AS INTEGER : v = gtk_spin_button_get_value_as_int(fvAlleFaeden)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(fvPlan.folge) - 1
+        fvPlan.straenge[fvPlan.folge[k]] = v
+    NEXT
+    fvListeBauen(fvAlteGewaehlt())
+END SUB
+
+FUNCTION fvAlteGewaehlt() AS ARRAY OF INTEGER
+    DIM aus AS ARRAY OF INTEGER : aus = []
+    DIM s AS INTEGER
+    FOR EACH s IN fvGewaehlt()
+        ARRAY_PUSH(aus, fvPlan.folge[s])
+    NEXT
+    RETURN aus
+END FUNCTION
+
+SUB fvSortierungGeaendert(w AS INTEGER, daten AS INTEGER)
+    IF fvSperre THEN RETURN
+    kern.planSortieren(lwMuster, fvPlan, MAX(0, gtk_combo_box_get_active(fvSortierung)))
+    fvListeBauen(fvAlteGewaehlt())
+END SUB
+
+' 0 hoch, 1 runter, 2 Anfang, 3 Ende, 4 Loeschen, 5 Zusammenfuehren,
+' 6 Ungenutzte, 7 Zuruecksetzen
+SUB fvAktion(w AS INTEGER, was AS INTEGER)
+    DIM g AS ARRAY OF INTEGER : g = fvGewaehlt()
+    DIM alte AS ARRAY OF INTEGER : alte = fvAlteGewaehlt()
+    SELECT CASE was
+        CASE 0, 1, 2, 3
+            IF LEN(g) <> 1 THEN RETURN
+            DIM nach AS INTEGER
+            SELECT CASE was
+                CASE 0 : nach = g[0] - 1
+                CASE 1 : nach = g[0] + 1
+                CASE 2 : nach = 0
+                CASE 3 : nach = LEN(fvPlan.folge) - 1
+            END SELECT
+            kern.planVerschieben(fvPlan, g[0], nach)
+        CASE 4
+            IF LEN(g) = 0 THEN RETURN
+            ' Benutzte: nachfragen, die Stiche gehen mit
+            DIM namen AS ARRAY OF STRING : namen = []
+            DIM s AS INTEGER
+            FOR EACH s IN g
+                IF kern.planStiche(lwMuster, fvPlan, s) > 0 THEN ARRAY_PUSH(namen, lwMuster.farben[fvPlan.folge[s]].garn.name)
+            NEXT
+            IF LEN(namen) > 0 AND NOT fvFragenAus THEN
+                DIM t AS STRING : t = JOIN$(namen[0:MIN(3, LEN(namen))], ", ")
+                IF LEN(namen) > 3 THEN t = t + " (+" + STR$(LEN(namen) - 3) + " weitere)"
+                IF NOT pdFrage(fvDialog, "Farben in Verwendung", "Noch verwendet: " + t + CHR$(10) + "Beim Löschen werden alle Stiche und Rückstiche dieser Farben entfernt. Fortfahren?") THEN RETURN
+            END IF
+            kern.planLoeschen(fvPlan, g)
+            alte = []
+        CASE 5
+            IF LEN(g) < 2 THEN RETURN
+            kern.planZusammen(fvPlan, g[0], g[1:LEN(g)])
+            alte = [alte[0]]
+        CASE 6
+            DIM n AS INTEGER : n = kern.planUngenutzte(lwMuster, fvPlan)
+            IF n = 0 AND NOT fvFragenAus THEN pdWarnung(fvDialog, "Keine ungenutzten Farben", "Alle Farben haben Stiche oder Rückstiche.")
+        CASE 7
+            fvPlan = kern.neuerFarbplan(lwMuster)
+            fvSperre = TRUE
+            gtk_combo_box_set_active(fvSortierung, 0)
+            fvSperre = FALSE
+    END SELECT
+    fvListeBauen(alte)
+END SUB
+
+' Fuer die Probe: keine Rueckfragen
+DIM fvFragenAus AS BOOLEAN
+
+FUNCTION fvKnopf(box AS INTEGER, text AS STRING, was AS INTEGER) AS INTEGER
+    DIM k AS INTEGER : k = gtk_button_new_with_label(text)
+    signal(k, "clicked", fvAktion, was, 0, 0)
+    gtk_box_pack_start(box, k, FALSE, FALSE, 0)
+    RETURN k
+END FUNCTION
+
+FUNCTION fvBauen() AS INTEGER
+    lwMuster.stichzahlenNeu()
+    fvPlan = kern.neuerFarbplan(lwMuster)
+    fvDialog = gtk_dialog_new_with_buttons("Farben verwalten — " + musterTitel, fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Übernehmen", GTK_ANTWORT_OK, "Abbrechen", GTK_ANTWORT_ABBRECHEN, 0)
+    gtk_dialog_set_default_response(fvDialog, GTK_ANTWORT_OK)
+    gtk_window_set_default_size(fvDialog, 1000, 640)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(fvDialog)
+    gtk_container_set_border_width(innen, 12)
+    gtk_box_set_spacing(innen, 8)
+    fvKopf = gtk_label_new("")
+    gtk_label_set_xalign(fvKopf, 0.0)
+    gtkKlasse(fvKopf, "dim-label")
+    gtk_box_pack_start(innen, fvKopf, FALSE, FALSE, 0)
+    DIM haupt AS INTEGER : haupt = gtk_box_new(GTK_WAAGERECHT, 14)
+    gtk_box_pack_start(innen, haupt, TRUE, TRUE, 0)
+    ' links: Leiste und Liste
+    DIM links AS INTEGER : links = gtk_box_new(GTK_SENKRECHT, 6)
+    gtk_box_pack_start(haupt, links, TRUE, TRUE, 0)
+    DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 6)
+    gtk_box_pack_start(leiste, gtk_label_new("Sortieren:"), FALSE, FALSE, 0)
+    fvSortierung = imKlappliste(kern.farbSortierungen(), 0)
+    gtk_widget_set_tooltip_text(fvSortierung, "Stellt die Reihenfolge der Farben um -- die Stiche behalten ihre Farbe")
+    signal(fvSortierung, "changed", fvSortierungGeaendert, 0, 0, 0)
+    gtk_box_pack_start(leiste, fvSortierung, FALSE, FALSE, 0)
+    fvSuche = gtk_search_entry_new()
+    gtk_entry_set_placeholder_text(fvSuche, "Name, Hersteller, Nummer …")
+    signal(fvSuche, "search-changed", fvFiltern, 0, 0, 0)
+    gtk_box_pack_start(leiste, fvSuche, TRUE, TRUE, 0)
+    DIM ug AS INTEGER : ug = gtk_button_new_with_label("Ungenutzte entfernen")
+    gtk_widget_set_tooltip_text(ug, "Farben ohne Stich und ohne Rückstich")
+    signal(ug, "clicked", fvAktion, 6, 0, 0)
+    gtk_box_pack_start(leiste, ug, FALSE, FALSE, 0)
+    gtk_box_pack_start(links, leiste, FALSE, FALSE, 0)
+    fvListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(fvListe, 3)                ' GTK_SELECTION_MULTIPLE
+    signal(fvListe, "selected-rows-changed", fvAuswahlGeaendert, 0, 0, 0)
+    DIM roll AS INTEGER : roll = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(roll, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    gtk_container_add(roll, fvListe)
+    gtk_box_pack_start(links, roll, TRUE, TRUE, 0)
+    DIM tipp1 AS INTEGER : tipp1 = gtk_label_new("Strg- und Umschalt-Klick wählen mehrere. Erst „Übernehmen“ ändert das Muster -- als ein Schritt, den Rückgängig zurücknimmt.")
+    gtk_label_set_xalign(tipp1, 0.0)
+    gtk_label_set_line_wrap(tipp1, TRUE)
+    gtkKlasse(tipp1, "dim-label")
+    gtk_box_pack_start(links, tipp1, FALSE, FALSE, 0)
+    ' rechts: gewaehlte Farbe, Faeden, Aktionen
+    DIM rechts AS INTEGER : rechts = gtk_box_new(GTK_SENKRECHT, 6)
+    gtk_widget_set_size_request(rechts, 250, -1)
+    gtk_box_pack_start(haupt, rechts, FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, adUeberschrift("Gewählte Farbe"), FALSE, FALSE, 0)
+    fvVorschau = gtk_drawing_area_new()
+    gtk_widget_set_size_request(fvVorschau, 60, 60)
+    gtk_widget_set_halign(fvVorschau, GTK_AUSRICHTEN_MITTE)
+    signalZeichnen(fvVorschau, "draw", fvVorschauZeichnen, 0, 0, 0)
+    gtk_box_pack_start(rechts, fvVorschau, FALSE, FALSE, 4)
+    fvInfo = gtk_label_new("")
+    gtk_label_set_justify(fvInfo, 2)                           ' GTK_JUSTIFY_CENTER
+    gtk_label_set_line_wrap(fvInfo, TRUE)
+    gtk_box_pack_start(rechts, fvInfo, FALSE, FALSE, 0)
+    fvFaeden = adSpin(1, 6, 1, 2, 0)
+    signal(fvFaeden, "value-changed", fvFaedenGeaendert, 0, 0, 0)
+    gtk_box_pack_start(rechts, dlZeile("Fäden:", fvFaeden), FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, adUeberschrift("Fäden für alle Farben"), FALSE, FALSE, 0)
+    DIM az AS INTEGER : az = gtk_box_new(GTK_WAAGERECHT, 6)
+    fvAlleFaeden = adSpin(1, 6, 1, 2, 0)
+    gtk_box_pack_start(az, fvAlleFaeden, FALSE, FALSE, 0)
+    DIM ak AS INTEGER : ak = gtk_button_new_with_label("Auf alle anwenden")
+    signal(ak, "clicked", fvAlleFaedenGeklickt, 0, 0, 0)
+    gtk_box_pack_start(az, ak, TRUE, TRUE, 0)
+    gtk_box_pack_start(rechts, az, FALSE, FALSE, 0)
+    gtk_box_pack_start(rechts, adUeberschrift("Aktionen"), FALSE, FALSE, 0)
+    fvKnoepfe = []
+    ARRAY_PUSH(fvKnoepfe, fvKnopf(rechts, "Nach oben", 0))
+    ARRAY_PUSH(fvKnoepfe, fvKnopf(rechts, "Nach unten", 1))
+    ARRAY_PUSH(fvKnoepfe, fvKnopf(rechts, "An den Anfang", 2))
+    ARRAY_PUSH(fvKnoepfe, fvKnopf(rechts, "An das Ende", 3))
+    DIM lk AS INTEGER : lk = fvKnopf(rechts, "Farbe löschen", 4)
+    gtkKlasse(lk, "destructive-action")
+    ARRAY_PUSH(fvKnoepfe, lk)
+    gtk_box_pack_start(rechts, adUeberschrift("Zusammenführen"), FALSE, FALSE, 0)
+    DIM zt AS INTEGER : zt = gtk_label_new("Mehrere wählen: alle Stiche gehen auf die oberste.")
+    gtk_label_set_line_wrap(zt, TRUE)
+    gtk_label_set_xalign(zt, 0.0)
+    gtkKlasse(zt, "dim-label")
+    gtk_box_pack_start(rechts, zt, FALSE, FALSE, 0)
+    ARRAY_PUSH(fvKnoepfe, fvKnopf(rechts, "Gewählte zusammenführen", 5))
+    DIM zr AS INTEGER : zr = gtk_button_new_with_label("Zurücksetzen")
+    gtk_widget_set_tooltip_text(zr, "Alle Änderungen in diesem Dialog verwerfen")
+    signal(zr, "clicked", fvAktion, 7, 0, 0)
+    gtk_box_pack_end(rechts, zr, FALSE, FALSE, 0)
+    fvZeilen = []
+    gtk_widget_show_all(fvDialog)
+    fvListeBauen([])
+    RETURN fvDialog
+END FUNCTION
+
+' Den Plan ins Muster: ein Schritt; die aktuelle Farbe wandert mit, die
+' Zwischenablage gilt nicht mehr (ihre Nummern sind andere)
+FUNCTION fvUebernehmen() AS BOOLEAN
+    DIM alteFarbe AS INTEGER : alteFarbe = wzFarbe
+    IF NOT kern.planAnwenden(lwMuster, wzVerlauf, fvPlan) THEN RETURN FALSE
+    wzFarbe = -1
+    IF alteFarbe >= 0 AND alteFarbe < LEN(fvPlan.ziel) THEN
+        DIM z AS INTEGER : z = IIF(fvPlan.ziel[alteFarbe] >= 0, fvPlan.ziel[alteFarbe], alteFarbe)
+        IF fvPlan.ziel[alteFarbe] <> kern.FP_WEG THEN wzFarbe = ARRAY_INDEXOF(fvPlan.folge, z)
+    END IF
+    IF wzFarbe < 0 AND lwMuster.farbanzahl() > 0 THEN wzFarbe = 0
+    mrAblage = NIL
+    allesNeu()
+    statusMeldung("Farben verwaltet: " + STR$(lwMuster.farbanzahl()) + " Farben (" + kern.kuerzelVon$(einst, "zurueck") + " nimmt es zurück).")
+    RETURN TRUE
+END FUNCTION
+
+SUB farbverwaltungDialog()
+    IF NOT lwHat THEN RETURN
+    DIM d AS INTEGER : d = fvBauen()
+    IF gtk_dialog_run(fvDialog) = GTK_ANTWORT_OK THEN
+        DIM ok AS BOOLEAN : ok = fvUebernehmen()
+    END IF
+    gtk_widget_destroy(fvDialog)
+    fvDialog = 0
+    fvZeilen = []
+END SUB

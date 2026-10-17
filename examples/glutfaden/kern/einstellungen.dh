@@ -505,6 +505,7 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("palette", "Palette umwandeln", "Strg+Umschalt+K"), _
         ka("bibliothek", "Bibliothek", "Strg+L"), _
         ka("harmonie", "Farb-Harmonien", "Strg+Umschalt+H"), _
+        ka("farben", "Farben verwalten", "Strg+Umschalt+F"), _
         ka("stickpfad", "Stickpfad", "Strg+Umschalt+O"), _
         ka("eigenschaften", "Eigenschaften", "Strg+Alt+P"), _
         ka("versionen", "Versionen", "Strg+Alt+V"), _

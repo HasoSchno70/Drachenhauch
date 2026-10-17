@@ -126,6 +126,9 @@ SUB seitenleisteMuster(m AS kern.Muster)
     kn = slKnopf("Harmonien…", "Garne, die nach Farbtheorie zur aktuellen Farbe passen ({harmonie})")
     signal(kn, "clicked", slFarbKnopf, 5, 0, 0)
     gtk_box_pack_start(fk3, kn, TRUE, TRUE, 0)
+    kn = slKnopf("Verwalten…", "Farben sortieren, umordnen, löschen, zusammenführen, Fäden ({farben})")
+    signal(kn, "clicked", slFarbKnopf, 6, 0, 0)
+    gtk_box_pack_start(fk3, kn, TRUE, TRUE, 0)
     gtk_box_pack_start(slInhalt, fk3, FALSE, FALSE, 2)
 
     ' --- Katalog
@@ -303,6 +306,7 @@ SUB slFarbKnopf(knopf AS INTEGER, nr AS INTEGER)
         CASE 3 : selteneDialog()
         CASE 4 : blendDialog()
         CASE 5 : harmonieDialog()
+        CASE 6 : farbverwaltungDialog()
     END SELECT
 END SUB
 

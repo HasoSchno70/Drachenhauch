@@ -378,10 +378,33 @@ END FUNCTION
 
 ' --- Rueckgaengig ---------------------------------------------------------------------
 
+' Die aktuelle Farbe folgt beim Zuruecknehmen und Wiederholen ihrem Eintrag:
+' ein Schritt, der die Liste umstellt (Farben verwalten, Loeschen), nimmt nur
+' die Liste zurueck -- die Nummer zeigte danach auf eine andere Farbe.
+FUNCTION wzFarbKennung$(nr AS INTEGER) AS STRING
+    IF nr < 0 OR nr >= lwMuster.farbanzahl() THEN RETURN ""
+    DIM f AS kern.Farbeintrag : f = lwMuster.farben[nr]
+    RETURN f.symbol + CHR$(1) + f.garn.name + CHR$(1) + HEX$(f.garn.farbe)
+END FUNCTION
+
+SUB wzFarbeWiederfinden(kennung AS STRING)
+    IF kennung = "" OR wzFarbKennung$(wzFarbe) = kennung THEN RETURN
+    DIM i AS INTEGER
+    FOR i = 0 TO lwMuster.farbanzahl() - 1
+        IF wzFarbKennung$(i) = kennung THEN
+            wzFarbe = i
+            RETURN
+        END IF
+    NEXT
+    IF wzFarbe >= lwMuster.farbanzahl() THEN wzFarbe = -1
+END SUB
+
 SUB werkzeugZurueck()
     IF wzZug <> ZUG_KEINER THEN RETURN
     DIM text AS STRING : text = wzVerlauf.textZurueck$()
+    DIM kennung AS STRING : kennung = wzFarbKennung$(wzFarbe)
     IF wzVerlauf.zurueckNehmen(lwMuster) THEN
+        wzFarbeWiederfinden(kennung)
         allesNeu()
         statusMeldung("Zurückgenommen: " + text)
     END IF
@@ -390,7 +413,9 @@ END SUB
 SUB werkzeugVor()
     IF wzZug <> ZUG_KEINER THEN RETURN
     DIM text AS STRING : text = wzVerlauf.textVor$()
+    DIM kennung AS STRING : kennung = wzFarbKennung$(wzFarbe)
     IF wzVerlauf.wiederholen(lwMuster) THEN
+        wzFarbeWiederfinden(kennung)
         allesNeu()
         statusMeldung("Wiederholt: " + text)
     END IF
