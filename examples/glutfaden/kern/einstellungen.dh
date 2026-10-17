@@ -60,6 +60,8 @@ CLASS Einstellungen
     ' Farben
     DIM palette AS STRING                ' default_palette
     DIM katalog AS BOOLEAN               ' show_catalog
+    DIM farbleiste AS BOOLEAN            ' show_color_bar (eigener Schluessel, PySticky: Dock)
+    DIM farbleisteGroesse AS INTEGER     ' color_bar_size 20..60
     DIM symbolSchrift AS STRING          ' symbol_font
     DIM symbolGroesse AS INTEGER         ' symbol_size 6..20 (10 = wie vorgesehen)
     DIM symboleAuto AS BOOLEAN           ' auto_symbols
@@ -125,6 +127,8 @@ SUB einstellungenVorgabe(e AS Einstellungen)
     e.rueckEinrasten = TRUE
     e.palette = "DMC"                    ' PySticky: Anchor; Glutfaden nahm schon immer DMC
     e.katalog = TRUE
+    e.farbleiste = TRUE
+    e.farbleisteGroesse = 48
     e.symbolSchrift = "Segoe UI Symbol"
     e.symbolGroesse = 10
     e.symboleAuto = TRUE
@@ -139,7 +143,7 @@ SUB einstellungenVorgabe(e AS Einstellungen)
 END SUB
 
 FUNCTION startAktionen() AS ARRAY OF STRING
-    RETURN ["Beispielmuster öffnen", "Leeres Muster", "Neues Muster (Dialog)", "Letzte Datei öffnen"]
+    RETURN ["Beispielmuster öffnen", "Leeres Muster", "Neues Muster (Dialog)", "Letzte Datei öffnen", "Willkommensseite"]
 END FUNCTION
 
 FUNCTION pipettenArten() AS ARRAY OF STRING
@@ -177,6 +181,7 @@ SUB einstellungenOrdnen(e AS Einstellungen)
     e.fuellToleranz = CLAMP(e.fuellToleranz, 0, 100)
     e.rueckBreite = CLAMP(e.rueckBreite, 1, 5)
     e.symbolGroesse = CLAMP(e.symbolGroesse, 6, 20)
+    e.farbleisteGroesse = CLAMP(e.farbleisteGroesse, 20, 60)
     e.farbAnzeige = CLAMP(e.farbAnzeige, 0, 2)
     IF e.pdfZellen <> 0 THEN e.pdfZellen = CLAMP(e.pdfZellen, 20, 60)
     e.ueberlappung = CLAMP(e.ueberlappung, 0, 20)
@@ -291,6 +296,8 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
         IF TRIM$(t) <> "" THEN e.palette = TRIM$(t)
     END IF
     IF esBool(j, "show_catalog", b) THEN e.katalog = b
+    IF esBool(j, "show_color_bar", b) THEN e.farbleiste = b
+    IF jsonGanz(j, "color_bar_size", z) THEN e.farbleisteGroesse = z
     IF esText(j, "symbol_font", t) THEN
         IF TRIM$(t) <> "" THEN e.symbolSchrift = TRIM$(t)
     END IF
@@ -366,6 +373,8 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
     JSON_SET_BOOL(j, "backstitch_snap", e.rueckEinrasten)
     JSON_SET_STRING(j, "default_palette", e.palette)
     JSON_SET_BOOL(j, "show_catalog", e.katalog)
+    JSON_SET_BOOL(j, "show_color_bar", e.farbleiste)
+    JSON_SET_INT(j, "color_bar_size", e.farbleisteGroesse)
     JSON_SET_STRING(j, "symbol_font", e.symbolSchrift)
     JSON_SET_INT(j, "symbol_size", e.symbolGroesse)
     JSON_SET_BOOL(j, "auto_symbols", e.symboleAuto)
@@ -523,6 +532,8 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("kacheln", "Kachel-Vorschau", "Strg+Umschalt+P"), _
         ka("lineale", "Lineale ein/aus", "Strg+Umschalt+L"), _
         ka("uebersicht", "Übersicht ein/aus", "Strg+Umschalt+U"), _
+        ka("farbleiste", "Farbleiste ein/aus", "Strg+Umschalt+B"), _
+        ka("hervorheben", "Farbe hervorheben", "Strg+H"), _
         ka("zoom_rein", "Vergrößern", "Plus, ="), _
         ka("zoom_raus", "Verkleinern", "Minus"), _
         ka("einpassen", "Einpassen", "0"), _

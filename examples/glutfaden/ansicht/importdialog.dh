@@ -542,9 +542,11 @@ SUB musterUebernehmen(m AS kern.Muster)
     wzVerlauf.leeren()
     extraGeaendert = TRUE
     wzFarbe = IIF(m.farbanzahl() > 0, 0, -1)
+    lwHervor = -1
     leinwandMuster(m)
     seitenleisteMuster(m)
     modusKnopfNachziehen()
+    willkommenVerbergen()
     leinwandEinpassen()
     zustandNachziehen()
     statusNachziehen()

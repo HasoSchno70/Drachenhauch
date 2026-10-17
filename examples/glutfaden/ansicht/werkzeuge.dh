@@ -211,6 +211,7 @@ SUB farbeWaehlen(nr AS INTEGER)
     IF nr >= lwMuster.farbanzahl() THEN nr = -1
     wzFarbe = nr
     seitenleisteFarbeMarkieren()
+    farbleisteMarkieren()
     IF wzFarbeLeiste <> 0 THEN gtk_widget_queue_draw(wzFarbeLeiste)
     statusNachziehen()
 END SUB

@@ -50,6 +50,8 @@ DIM edEinrasten AS INTEGER
 DIM edPalette AS INTEGER
 DIM edPalNamen AS ARRAY OF STRING
 DIM edKatalog AS INTEGER
+DIM edFarbleiste AS INTEGER
+DIM edFarbleisteGroesse AS INTEGER
 DIM edSymSchrift AS INTEGER
 DIM edSymGroesse AS INTEGER
 DIM edSymAuto AS INTEGER
@@ -272,6 +274,10 @@ FUNCTION edBauen() AS INTEGER
     edRein(s, edZeile("Für Muster ohne Farben:", edPalette, "Welche Palette die Seitenleiste zeigt, solange das Muster noch keine Farbe hat"))
     edKatalog = edKaestchen("Katalognummern zeigen", "In der Farbliste und im Katalog")
     edRein(s, edKatalog)
+    edFarbleiste = edKaestchen("Farbleiste unter der Zeichenfläche", "Alle Farben des Musters als Felder: klicken wählt, ziehen tauscht")
+    edRein(s, edFarbleiste)
+    edFarbleisteGroesse = adSpin(20, 60, 1, 48, 0)
+    edRein(s, edZeile("Farbleisten-Größe (px):", edFarbleisteGroesse, "Größe der Farbfelder in der Farbleiste"))
     edAbschnitt(s, "Symbole")
     edSymSchrift = gtk_entry_new()
     edRein(s, edZeile("Schrift:", edSymSchrift, "Name einer installierten Schrift, z. B. Segoe UI Symbol oder DejaVu Sans"))
@@ -406,6 +412,8 @@ SUB edFuellen(e AS kern.Einstellungen)
     gtk_toggle_button_set_active(edEinrasten, e.rueckEinrasten)
     gtk_combo_box_set_active(edPalette, MAX(0, ARRAY_INDEXOF(edPalNamen, e.palette)))
     gtk_toggle_button_set_active(edKatalog, e.katalog)
+    gtk_toggle_button_set_active(edFarbleiste, e.farbleiste)
+    gtk_spin_button_set_value(edFarbleisteGroesse, e.farbleisteGroesse)
     gtk_entry_set_text(edSymSchrift, e.symbolSchrift)
     gtk_spin_button_set_value(edSymGroesse, e.symbolGroesse)
     gtk_toggle_button_set_active(edSymAuto, e.symboleAuto)
@@ -465,6 +473,8 @@ SUB edUebernehmen()
     DIM pn AS INTEGER : pn = gtk_combo_box_get_active(edPalette)
     IF pn >= 0 AND pn < LEN(edPalNamen) THEN einst.palette = edPalNamen[pn]
     einst.katalog = gtk_toggle_button_get_active(edKatalog)
+    einst.farbleiste = gtk_toggle_button_get_active(edFarbleiste)
+    einst.farbleisteGroesse = gtk_spin_button_get_value_as_int(edFarbleisteGroesse)
     IF TRIM$(gtk_entry_get_text(edSymSchrift)) <> "" THEN einst.symbolSchrift = TRIM$(gtk_entry_get_text(edSymSchrift))
     einst.symbolGroesse = gtk_spin_button_get_value_as_int(edSymGroesse)
     einst.symboleAuto = gtk_toggle_button_get_active(edSymAuto)
@@ -621,6 +631,8 @@ SUB einstellungenAnwenden()
     zuletztNachziehen()
     flLinealeZeigen(einst.lineale)
     minikarteZeigen(einst.uebersicht)
+    farbleisteZeigen(einst.farbleiste)
+    farbleisteNachziehen()
     IF lwHat THEN
         lwZelle = CLAMP(lwZelle, einst.zelleMin, einst.zelleMax)
         seitenleisteMuster(lwMuster)

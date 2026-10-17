@@ -2228,6 +2228,47 @@ fallen je in ihrem Fall (Runden statt Abschneiden faellt nur an einer
 eigens gebauten Palette -- in den Referenzdaten aendert es nie die naechste
 Farbe).
 
+**Stufe 16: Farbleiste und Willkommensseite** (2026-10-17). **Farbleiste**
+`ansicht/farbleiste.dh` (PyStickys ColorBar) unter der Zeichenflaeche: je
+Farbe ein Feld (Verlauf lighter(115)/darker(110) ueber `kern.farbeHeller/
+-Dunkler`, Glanz, Symbol, Leuchten und Haken an der gewaehlten); EIN
+Zeichenfeld statt eines Widgets je Farbe, Lage aus `fbFeldX`, die Zeichnen,
+Treffer und Tooltip teilen. Klick waehlt, Doppelklick aendert das Symbol,
+rechte Taste = Menue (Symbol, Harmonien, hervorheben, nicht sticken,
+ersetzen, tauschen), ein Feld auf ein anderes gezogen (ab 25 Punkten
+Manhattan) tauscht die Farben ueber `tauschenAusfuehren`; am Rand rollt
+sie von selbst, das Rad seitwaerts. Groesse `color_bar_size` 20..60,
+ein/aus `show_color_bar` (Strg+Umschalt+B). Nicht: Garn aus dem Katalog
+hineinziehen (DnD zwischen Widgets). **Hervorheben** (Strg+H, PySticky
+"Nur diese Farbe hervorheben"): die anderen Farben gedimmt ueber dem Stoff
+(`kern.gedimmt`, Deckkraft max(20, a \ 5)) und ohne Symbol; Uebersicht und
+Kacheln zeigen die echten Farben (`lwRgbEcht`). **Nicht sticken**
+(`kern.farbeAuslassen`, skip_stitching) ist ein Rueckgaengig-Schritt --
+PySticky setzt das Feld nur. **Willkommensseite** `ansicht/willkommen.dh`
+(WelcomeWidget) in einem GtkStack an der Stelle der Zeichenflaeche: vier
+Kacheln (Neu, Oeffnen, Aus Bild, Demo -- das Demo wie `_on_open_demo` als
+neues Muster ohne Datei) und die zuletzt geoeffneten Dateien, die es noch
+gibt. Sie kommt bei der neuen Startaktion "Willkommensseite", wenn die
+letzte Datei fehlt (wie PySticky; vorher kam das Beispielmuster) oder eine
+Datei im Aufruf nicht aufgeht, und ueber den Muster-Knopf (dann mit
+"Zurueck zum Muster"). Ohne Muster sind Werkzeuge, Sichern, Export,
+Ansicht gesperrt, und `befehlAusfuehren` meldet sich statt abzubrechen
+(`ohneMusterErlaubt`). **Drei Fallen:** (1) die Seite liegt in einer
+Rolle -- ein GtkStack nimmt die Mindestgroesse aller Kinder, vier Kacheln
+nebeneinander hoben sonst eine gemerkte Fenstergroesse auf; (2)
+`statusNachziehen` laeuft schon beim Aufbau der Werkzeugleiste, bevor es
+die Statuszeile gibt (Gtk-CRITICAL); (3) wieder "alloc_needed": die
+Farbleiste setzt ihre Groesse nur bei Aenderung. Die Fotoproben vor Stufe
+16 verbergen die Farbleiste (`fbProbeAus`) -- sie zaehlen Farben im
+Bereich der Zeichenflaeche, und die Leiste zeigt dieselben. Kuerzel-Tafel
+56 Befehle. Sammlung `tests/pruef/glutfaden_stufe16.dhtest` (3: Kern, Probe
+samt Rot im Foto, zwei Startlaeufe ohne Muster); 14 Verfaelschungen
+fallen je in ihrem Fall. **Dazu:** `gtkFoto` ruft vor dem Zeichnen
+`gtk_container_check_resize` auf das Fenster -- GTK vermisst im Takt der
+Bildwiederholung, nicht beim Abholen der Ereignisse; ohne das fielen die
+Proben von Stufe 10 und 13 unter voller Last in 1 von 3 bis 1 von 5
+Laeufen mit Gtk-CRITICAL "alloc_needed", danach 0 von 8.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

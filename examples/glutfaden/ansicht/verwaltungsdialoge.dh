@@ -1004,6 +1004,7 @@ SUB musterGeklickt(w AS INTEGER, was AS INTEGER)
         CASE 7 : einstellungenDialog()
         CASE 8 : rasterDialog()
         CASE 9 : kachelDialog()
+        CASE 10 : willkommenZeigen()
     END SELECT
 END SUB
 
@@ -1084,7 +1085,7 @@ FUNCTION musterKnopf() AS INTEGER
     musterPopover = gtk_popover_new(mb)
     DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 2)
     gtk_container_set_border_width(box, 8)
-    DIM texte AS ARRAY OF STRING : texte = ["Neues Muster …", "Eigenschaften …", "Größe ändern …", "Versionen …", "Als Vorlage speichern …", "Vorlagen verwalten …", "Bibliothek …", "Einstellungen …", "Raster-Optionen …", "Kachel-Vorschau …"]
+    DIM texte AS ARRAY OF STRING : texte = ["Neues Muster …", "Eigenschaften …", "Größe ändern …", "Versionen …", "Als Vorlage speichern …", "Vorlagen verwalten …", "Bibliothek …", "Einstellungen …", "Raster-Optionen …", "Kachel-Vorschau …", "Startseite …"]
     DIM i AS INTEGER
     FOR i = 0 TO LEN(texte) - 1
         IF i = 4 OR i = 6 OR i = 7 THEN gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)

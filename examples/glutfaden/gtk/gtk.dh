@@ -55,6 +55,16 @@ DECLARE SUB gtk_paned_pack1 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOL
 DECLARE SUB gtk_paned_pack2 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, schrumpfen AS BOOLEAN)
 DECLARE SUB gtk_paned_set_position LIB GTK (p AS ZEIGER, pos AS LONG)
 DECLARE FUNCTION gtk_scrolled_window_new LIB GTK (h AS ZEIGER, v AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_scrolled_window_get_hadjustment LIB GTK (sw AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_adjustment_get_value LIB GTK (a AS ZEIGER) AS FLOAT
+DECLARE SUB gtk_adjustment_set_value LIB GTK (a AS ZEIGER, wert AS FLOAT)
+DECLARE FUNCTION gtk_adjustment_get_upper LIB GTK (a AS ZEIGER) AS FLOAT
+DECLARE FUNCTION gtk_adjustment_get_page_size LIB GTK (a AS ZEIGER) AS FLOAT
+DECLARE FUNCTION gtk_stack_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_stack_add_named LIB GTK (stapel AS ZEIGER, kind AS ZEIGER, name AS TEXT)
+DECLARE SUB gtk_stack_set_visible_child_name LIB GTK (stapel AS ZEIGER, name AS TEXT)
+DECLARE FUNCTION gtk_stack_get_visible_child_name LIB GTK (stapel AS ZEIGER) AS TEXT
+DECLARE SUB gtk_image_set_pixel_size LIB GTK (bild AS ZEIGER, groesse AS LONG)
 DECLARE SUB gtk_scrolled_window_set_policy LIB GTK (sw AS ZEIGER, h AS LONG, v AS LONG)
 DECLARE SUB gtk_container_add LIB GTK (behaelter AS ZEIGER, kind AS ZEIGER)
 DECLARE SUB gtk_container_set_border_width LIB GTK (behaelter AS ZEIGER, rand AS ULONG)
@@ -231,6 +241,8 @@ DECLARE FUNCTION gtk_window_get_title LIB GTK (fenster AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_combo_box_get_model LIB GTK (wahl AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_tree_model_iter_n_children LIB GTK (modell AS ZEIGER, eintrag AS ZEIGER) AS LONG
 DECLARE SUB gtk_widget_set_no_show_all LIB GTK (w AS ZEIGER, nicht AS BOOLEAN)
+DECLARE FUNCTION gtk_widget_get_toplevel LIB GTK (w AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_container_check_resize LIB GTK (behaelter AS ZEIGER)
 DECLARE SUB cairo_fill_preserve LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_set_line_cap LIB CAIRO (cr AS ZEIGER, art AS LONG)
 DECLARE SUB cairo_set_line_join LIB CAIRO (cr AS ZEIGER, art AS LONG)
@@ -247,6 +259,10 @@ DECLARE SUB cairo_clip LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_set_source_surface LIB CAIRO (cr AS ZEIGER, flaeche AS ZEIGER, x AS FLOAT, y AS FLOAT)
 DECLARE FUNCTION cairo_get_source LIB CAIRO (cr AS ZEIGER) AS ZEIGER
 DECLARE SUB cairo_pattern_set_filter LIB CAIRO (muster AS ZEIGER, filter AS LONG)
+DECLARE FUNCTION cairo_pattern_create_linear LIB CAIRO (x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT) AS ZEIGER
+DECLARE SUB cairo_pattern_add_color_stop_rgba LIB CAIRO (muster AS ZEIGER, stelle AS FLOAT, r AS FLOAT, g AS FLOAT, b AS FLOAT, a AS FLOAT)
+DECLARE SUB cairo_pattern_destroy LIB CAIRO (muster AS ZEIGER)
+DECLARE SUB cairo_set_source LIB CAIRO (cr AS ZEIGER, muster AS ZEIGER)
 DECLARE FUNCTION cairo_image_surface_create LIB CAIRO (format AS LONG, b AS LONG, h AS LONG) AS ZEIGER
 DECLARE FUNCTION cairo_image_surface_create_for_data LIB CAIRO (daten AS ZEIGER, format AS LONG, b AS LONG, h AS LONG, zeile AS LONG) AS ZEIGER
 DECLARE FUNCTION cairo_format_stride_for_width LIB CAIRO (format AS LONG, b AS LONG) AS LONG
@@ -291,6 +307,7 @@ DECLARE SUB pango_layout_get_pixel_extents LIB PANGO (layout AS ZEIGER, tinte AS
 DECLARE SUB pango_font_description_free LIB PANGO (schrift AS ZEIGER)
 DECLARE FUNCTION pango_font_description_from_string LIB PANGO (text AS TEXT) AS ZEIGER
 DECLARE SUB pango_font_description_set_absolute_size LIB PANGO (schrift AS ZEIGER, groesse AS FLOAT)
+DECLARE SUB pango_font_description_set_weight LIB PANGO (schrift AS ZEIGER, gewicht AS LONG)
 ' --- GObject und GLib
 ' g_signal_connect ist in C ein Makro; je Form des Rueckrufs ein Name.
 DECLARE FUNCTION signal LIB GOBJECT ALIAS "g_signal_connect_data" _
@@ -326,6 +343,7 @@ CONST GTK_POLITIK_NIE = 2
 CONST GTK_AUSRICHTEN_START = 1
 CONST GTK_AUSRICHTEN_ENDE = 2
 CONST GTK_AUSRICHTEN_MITTE = 3
+CONST GTK_ELLIPSE_MITTE = 2
 CONST GTK_ELLIPSE_ENDE = 3
 CONST GTK_AUSWAHL_KEINE = 0
 CONST GTK_AUSWAHL_EINE = 1
@@ -405,6 +423,10 @@ FUNCTION gtkFoto(w AS INTEGER, pfad AS STRING) AS BOOLEAN
     WHILE gtk_events_pending()
         DIM weiter AS BOOLEAN : weiter = gtk_main_iteration_do(FALSE)
     WEND
+    ' ... und das Vermessen: das macht GTK im Takt der Bildwiederholung, nicht
+    ' beim Abholen der Ereignisse. Hat im selben Takt etwas eine neue Groesse
+    ' verlangt, verteilt erst das hier sie (sonst wieder "alloc_needed")
+    gtk_container_check_resize(gtk_widget_get_toplevel(w))
     DIM flaeche AS INTEGER : flaeche = cairo_image_surface_create(CAIRO_ARGB32, gtk_widget_get_allocated_width(w), gtk_widget_get_allocated_height(w))
     DIM cr AS INTEGER : cr = cairo_create(flaeche)
     gtk_widget_draw(w, cr)

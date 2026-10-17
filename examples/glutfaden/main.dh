@@ -86,6 +86,8 @@ IMPORT "ansicht/einstellungsdialog.dh"
 IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/seitenleiste.dh"
 IMPORT "ansicht/flaechenteile.dh"
+IMPORT "ansicht/farbleiste.dh"
+IMPORT "ansicht/willkommen.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
@@ -116,7 +118,20 @@ CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" +
     " button.klein:hover { background-color: #33363e; }" + _
     " button.schloss { background-image: none; background-color: transparent; border: none; box-shadow: none; padding: 2px; min-height: 0; min-width: 0; }" + _
     " scale trough { background-color: #33363e; } scale highlight { background-color: #ff8a3d; } scale value { color: #8d93a1; }" + _
-    " .status { background-color: #16171b; color: #9aa0ad; padding: 4px 12px; border-top: 1px solid #0c0d10; font-size: 9pt; }"
+    " .status { background-color: #16171b; color: #9aa0ad; padding: 4px 12px; border-top: 1px solid #0c0d10; font-size: 9pt; }" + _
+    " .farbleiste { background-color: #202228; border-top: 1px solid #0c0d10; padding: 4px 8px 2px 8px; }" + _
+    " .fb-titel { font-size: 8pt; font-weight: 700; color: #8d93a1; letter-spacing: 1px; } .fb-zahl { font-size: 8pt; color: #5c606b; } .fb-aktuell { font-size: 8pt; color: #ff8a3d; font-weight: 700; padding-left: 10px; }" + _
+    " .willkommen { background-image: linear-gradient(to bottom, #16171b, #22242a); }" + _
+    " .wk-titel { font-size: 36px; font-weight: 700; color: #ff8a3d; letter-spacing: 2px; } .wk-unter { font-size: 13px; color: #8d93a1; letter-spacing: 3px; }" + _
+    " button.wk-kachel { background-image: linear-gradient(to bottom right, #2a2c33, #2a2c33); border: 1px solid #3a3c44; border-left: 5px solid #ff8a3d; border-radius: 12px; padding: 12px 14px 10px 16px; color: #e4e5ea; box-shadow: none; text-shadow: none; }" + _
+    " button.wk-kachel:hover { border-color: #ff8a3d; background-image: linear-gradient(to bottom right, #2a2c33, #4a3527); }" + _
+    " button.wk-oeffnen { border-left-color: #4a90d9; } button.wk-oeffnen:hover { border-color: #4a90d9; background-image: linear-gradient(to bottom right, #2a2c33, #263547); }" + _
+    " button.wk-bild { border-left-color: #2fb5a6; } button.wk-bild:hover { border-color: #2fb5a6; background-image: linear-gradient(to bottom right, #2a2c33, #234240); }" + _
+    " button.wk-demo { border-left-color: #a77bd8; } button.wk-demo:hover { border-color: #a77bd8; background-image: linear-gradient(to bottom right, #2a2c33, #3a2f4a); }" + _
+    " .wk-ktitel { font-size: 13pt; font-weight: 700; } .wk-ktext { font-size: 9pt; color: #8d93a1; }" + _
+    " .wk-zuletzt { font-size: 10px; font-weight: 600; color: #8d93a1; letter-spacing: 2px; }" + _
+    " .wk-liste { background-color: #22242a; border: 1px solid #3a3c44; border-radius: 8px; padding: 4px; } .wk-liste row { padding: 6px 10px; border-radius: 4px; } .wk-liste row:hover { background-color: #2a2c33; } .wk-liste row:selected { background-color: rgba(255,138,61,0.30); }" + _
+    " .wk-name { font-size: 10pt; font-weight: 600; color: #e4e5ea; } .wk-ort { font-size: 8pt; color: #8d93a1; } .wk-leer { color: #5c606b; font-style: italic; }"
 
 CONST LOGO = "daten/bilder/glutfaden_256.png"
 CONST LOGO_KLEIN = "daten/bilder/glutfaden_32.png"
@@ -142,7 +157,12 @@ DIM schliessenErlaubt AS BOOLEAN
 SUB statusNachziehen()
     IF zoomText = 0 THEN RETURN
     gtk_label_set_text(zoomText, STR$(leinwandZoomProzent()) + " %")
-    IF NOT lwHat THEN RETURN
+    IF status = 0 THEN RETURN          ' die Werkzeugleiste ruft schon beim Aufbau
+    IF NOT lwHat THEN
+        ' ohne Muster: nur eine Meldung, solange sie gilt
+        IF meldung <> "" AND MILLIS() - meldungZeit < einst.meldungSekunden * 1000 THEN gtk_label_set_text(status, meldung) ELSE gtk_label_set_text(status, "Kein Muster geladen")
+        RETURN
+    END IF
     DIM t AS STRING
     IF meldung <> "" AND MILLIS() - meldungZeit < einst.meldungSekunden * 1000 THEN t = meldung + "   ·   "
     t = t + wzKurzname$(wzAktiv) + ", " + wzStichartName$(wzStichart)
@@ -251,10 +271,12 @@ SUB musterZeigen(m AS kern.Muster, pfad AS STRING, titel AS STRING)
     wzVerlauf.leeren()
     extraGeaendert = FALSE
     wzFarbe = IIF(m.farbanzahl() > 0, 0, -1)
+    lwHervor = -1                        ' Hervorheben gilt je Muster
     leinwandMuster(m)
     seitenleisteMuster(m)
     modusKnopfNachziehen()
     vwNeuesMuster()
+    willkommenVerbergen()
     zustandNachziehen()
     statusNachziehen()
 END SUB
@@ -479,6 +501,11 @@ END SUB
 ' die Tasten selbst stehen in den Einstellungen und lassen sich umlegen.
 SUB befehlAusfuehren(kennung AS STRING)
     DIM ok AS BOOLEAN
+    ' Ohne Muster (Willkommensseite) nur, was keins braucht
+    IF NOT lwHat AND NOT ohneMusterErlaubt(kennung) THEN
+        statusMeldung("Erst ein Muster öffnen oder anlegen.")
+        RETURN
+    END IF
     SELECT CASE kennung
         CASE "neu" : neuDialog()
         CASE "oeffnen" : oeffnenGeklickt(0, 0)
@@ -532,6 +559,12 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "wz_rueckstich" : werkzeugWaehlen(WZ_RUECKSTICH, FALSE)
         CASE "wz_fortschritt" : werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
         CASE "wz_farbverlauf" : werkzeugWaehlen(WZ_FARBVERLAUF, FALSE)
+        CASE "hervorheben" : hervorhebenUmschalten()
+        CASE "willkommen" : willkommenZeigen()
+        CASE "farbleiste"
+            einst.farbleiste = NOT einst.farbleiste
+            farbleisteZeigen(einst.farbleiste)
+            einstellungenMerken()
         CASE "kacheln" : kachelDialog()
         CASE "lineale"
             einst.lineale = NOT einst.lineale
@@ -672,7 +705,8 @@ gtk_header_bar_pack_start(kopf, kExport)
 gtk_header_bar_pack_start(kopf, kPfad)
 gtk_header_bar_pack_start(kopf, kVorschau)
 gtk_header_bar_pack_start(kopf, musterKnopf())
-gtk_header_bar_pack_start(kopf, auswertenKnopf())
+DIM kAuswerten AS INTEGER : kAuswerten = auswertenKnopf()
+gtk_header_bar_pack_start(kopf, kAuswerten)
 gtk_header_bar_pack_start(kopf, kZurueck)
 gtk_header_bar_pack_start(kopf, kVor)
 kModus = gtk_button_new_with_label("✕ Kreuzstich")
@@ -694,7 +728,11 @@ DIM werkzeugzeile AS INTEGER : werkzeugzeile = gtk_box_new(GTK_WAAGERECHT, 0)
 gtkKlasse(werkzeugzeile, "werkzeugzeile")
 gtk_box_pack_start(werkzeugzeile, werkzeugleisteNeu(), FALSE, FALSE, 0)
 DIM teilung AS INTEGER : teilung = gtk_paned_new(GTK_WAAGERECHT)
-gtk_paned_pack1(teilung, leinwandNeu(), TRUE, FALSE)
+' Links: Zeichenflaeche mit Farbleiste darunter -- oder die Willkommensseite
+DIM linksBox AS INTEGER : linksBox = gtk_box_new(GTK_SENKRECHT, 0)
+gtk_box_pack_start(linksBox, leinwandNeu(), TRUE, TRUE, 0)
+gtk_box_pack_start(linksBox, farbleisteNeu(), FALSE, FALSE, 0)
+gtk_paned_pack1(teilung, willkommenStapel(linksBox), TRUE, FALSE)
 gtk_paned_pack2(teilung, seitenleisteNeu(), FALSE, FALSE)
 ' Die Seitenleiste behaelt ihre Breite, der Rest gehoert der Zeichenflaeche
 gtk_paned_set_position(teilung, MAX(600, fensterBreite - 400))
@@ -726,6 +764,7 @@ signal(fenster, "destroy", fensterZu, 0, 0, 0)
 gtk_widget_show_all(fenster)
 flLinealeZeigen(einst.lineale)
 minikarteZeigen(einst.uebersicht)
+farbleisteZeigen(einst.farbleiste)
 leinwandZeiger()
 
 ' Welche Datei? Das Argument, sonst das Beispielmuster.
@@ -766,6 +805,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe14"
     ELSEIF ARG$(a) = "--probe-stufe15" THEN
         probe = "stufe15"
+    ELSEIF ARG$(a) = "--probe-stufe16" THEN
+        probe = "stufe16"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -777,6 +818,7 @@ autosichernStart()
 DIM geladen AS BOOLEAN
 IF start <> "" THEN
     geladen = musterOeffnen(start)
+    IF NOT lwHat THEN willkommenZeigen()
 ELSE
     ' Ohne Datei: erst liegen gebliebene automatische Sicherungen, dann die
     ' Startaktion aus den Einstellungen (wie PySticky _perform_start_action)
@@ -793,12 +835,21 @@ ELSE
                 IF LEN(liste) > 0 THEN geladen = musterOeffnen(liste[0])
         END SELECT
     END IF
-    IF NOT lwHat THEN geladen = musterOeffnen(PATHJOIN(CWD$(), "daten/muster/demo_kreuzstich.pxs"))
+    ' Das Beispielmuster nur als Startaktion; fehlt die letzte Datei oder
+    ' steht die Startaktion auf der Willkommensseite, kommt diese (PySticky)
+    IF NOT lwHat AND einst.startAktion = 0 THEN geladen = musterOeffnen(PATHJOIN(CWD$(), "daten/muster/demo_kreuzstich.pxs"))
+    IF NOT lwHat THEN willkommenZeigen()
 END IF
 ' Werkzeug beim Start (Einstellungen -> Werkzeuge)
 werkzeugWaehlen(IIF(einst.werkzeugMerken, einst.letztesWerkzeug, einst.startWerkzeug), FALSE)
 
 IMPORT "ansicht/vorfuehrung.dh"
+' Die Fotoproben vor Stufe 16 zaehlen Farben im Bereich der Zeichenflaeche --
+' die Farbleiste darunter zeigt dieselben Farben und zaehlte mit
+IF probe <> "" AND probe <> "stufe16" AND probe <> "start" THEN
+    fbProbeAus = TRUE
+    farbleisteZeigen(FALSE)
+END IF
 IF probe = "ansehen" THEN g_timeout_add(300, vorfuehren, 0)
 IF probe = "bearbeiten" THEN g_timeout_add(300, vorfuehrenBearbeiten, 0)
 IF probe = "stufe3" THEN g_timeout_add(300, vorfuehrenStufe3, 0)
@@ -815,6 +866,7 @@ IF probe = "stufe13" THEN g_timeout_add(300, vorfuehrenStufe13, 0)
 IF probe = "start" THEN g_timeout_add(300, vorfuehrenStart, 0)
 IF probe = "stufe14" THEN g_timeout_add(300, vorfuehrenStufe14, 0)
 IF probe = "stufe15" THEN g_timeout_add(300, vorfuehrenStufe15, 0)
+IF probe = "stufe16" THEN g_timeout_add(300, vorfuehrenStufe16, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 
