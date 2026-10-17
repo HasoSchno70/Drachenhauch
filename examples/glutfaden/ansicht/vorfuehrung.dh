@@ -1008,3 +1008,117 @@ FUNCTION vorfuehrenStufe10(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' --- Stufe 11: Farb-Harmonien und Bibliothek -------------------------------------------
+' Die Bibliothek nimmt die Muster im Ordner "sammlung" neben dem Arbeitsordner auf.
+DIM vfHinzu AS INTEGER
+DIM vfGewaehlt AS INTEGER
+
+FUNCTION vfHarmonien$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hdVorschlaege) - 1
+        DIM v AS kern.Harmonievorschlag : v = hdVorschlaege[i]
+        DIM p AS STRING, b AS STRING, st AS INTEGER
+        (p, b, st) = kern.harmonieBewertung(v.abstand)
+        DIM g AS kern.Garn : g = hdGarn(i)
+        ARRAY_PUSH(t, v.name + " " + IIF(g IS NIL, "-", g.hersteller + " " + g.nummer) + " " + b)
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vfBibliothek$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM p AS INTEGER
+    FOR EACH p IN bbPlaetze
+        ARRAY_PUSH(t, bbBib.eintraege[p].name)
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vfKategorien$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bbBib.kategorien) - 1
+        DIM n AS INTEGER : n = kern.kategorieZahl(bbBib, bbBib.kategorien[i])
+        IF n > 0 OR i < 2 THEN ARRAY_PUSH(t, bbBib.kategorien[i] + " " + STR$(n))
+    NEXT
+    RETURN JOIN$(t, ", ")
+END FUNCTION
+
+FUNCTION vorfuehrenStufe11(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            wzFarbe = 2
+            DIM d AS INTEGER : d = hdBauen()
+            DIM q AS kern.Garn : q = lwMuster.farben[hdQuelle].garn
+            PRINT "harmonie: quelle "; q.hersteller; " "; q.nummer; " | palette "; slPaletten[gtk_combo_box_get_active(hdPalWahl)].name; " | "; gtk_label_get_text(hdInfo)
+            PRINT "  "; gtk_label_get_text(hdBeschreibung); " | "; vfHarmonien$()
+            gtk_combo_box_set_active(hdArt, 4)
+            PRINT "tetrade: "; vfHarmonien$()
+            hdKarteKippen(0)
+            hdKarteKippen(2)
+            PRINT "zwei gewaehlt: "; TEXT_AUS_ZEIGER$(gtk_button_get_label(hdHinzu)); " "; gtk_widget_get_sensitive(hdHinzu)
+        CASE 2
+            ok = vfFoto(hdDialog, "harmonie")
+            hdAlle(0, 0)
+            PRINT "keine: "; TEXT_AUS_ZEIGER$(gtk_button_get_label(hdHinzu)); " "; gtk_widget_get_sensitive(hdHinzu)
+            hdAlle(0, 1)
+            PRINT "alle: "; TEXT_AUS_ZEIGER$(gtk_button_get_label(hdHinzu))
+            DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
+            vfHinzu = hdHinzufuegen()
+            PRINT "hinzugefuegt: "; vfHinzu; " | farben "; vorher; " -> "; lwMuster.farbanzahl(); " | "; meldung
+            PRINT "  nochmal: "; hdHinzufuegen(); " | "; meldung
+            gtk_widget_destroy(hdDialog)
+            hdDialog = 0
+            FOR i = 1 TO vfHinzu
+                werkzeugZurueck()
+            NEXT
+            PRINT "rueckgaengig: farben "; lwMuster.farbanzahl(); " | ungesichert "; istGeaendert()
+            ' Bibliothek
+            d = bbBauen()
+            PRINT "bibliothek leer: "; gtk_label_get_text(bbInfo); " | "; vfKategorien$()
+            PRINT "aufgenommen: "; bbAufnehmenAlle(kern.musterDateien(PATHJOIN(STARTDIR$(), "sammlung"))); " | nochmal: "; bbAufnehmenAlle(kern.musterDateien(PATHJOIN(STARTDIR$(), "sammlung")))
+            PRINT "  "; vfBibliothek$(); " | "; gtk_label_get_text(bbInfo)
+            PRINT "  "; vfKategorien$()
+            bbVorschauAlle()
+            PRINT "vorschaubilder: "; LEN(DIRLIST(bbThumbOrdner$(), "*.png"))
+        CASE 3
+            ok = vfFoto(bbDialog, "bibliothek")
+            gtk_combo_box_set_active(bbSort, 2)
+            PRINT "nach groesse: "; vfBibliothek$()
+            bbWaehlen(bbPlaetze[0])
+            PRINT "gewaehlt: "; gtk_label_get_text(bbDetail); " | oeffnen "; gtk_widget_get_sensitive(bbOeffnen)
+            gtk_entry_set_text(bbTags, " rot, gross ,, ")
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(bbNotizen), "Für den Flur  ", -1)
+            vfGewaehlt = bbGewaehlt
+            bbWaehlen(bbPlaetze[1])
+            PRINT "uebernommen: "; JOIN$(bbBib.eintraege[vfGewaehlt].tags, "|"); " | '"; bbBib.eintraege[vfGewaehlt].notizen; "'"
+            gtk_entry_set_text(bbSuche, "ROT")
+            bbFuellen()
+            PRINT "suche rot: "; vfBibliothek$(); " | "; gtk_label_get_text(bbInfo)
+            gtk_entry_set_text(bbSuche, "")
+            bbFavorit(vfGewaehlt)
+            bbKategorieKippen(vfGewaehlt, "Tiere")
+            PRINT "favorit und tiere: "; vfKategorien$()
+            gtk_list_box_select_row(bbKatListe, gtk_list_box_get_row_at_index(bbKatListe, 1))
+            PRINT "favoriten: "; vfBibliothek$()
+            PRINT "alle loeschen: "; bbKategorieLoeschen(0, FALSE); " | tiere loeschen: "; bbKategorieLoeschen(ARRAY_INDEXOF(bbBib.kategorien, "Tiere"), FALSE); " | "; vfKategorien$()
+            gtk_list_box_select_row(bbKatListe, gtk_list_box_get_row_at_index(bbKatListe, 0))
+            bbWaehlen(vfGewaehlt)
+        CASE 4
+            ok = vfFoto(bbDialog, "bibliothek_auswahl")
+            PRINT "vor dem oeffnen: "; musterTitel
+            bbOeffnenGeklickt(0, 0)
+            PRINT "geoeffnet: "; musterTitel; " | "; meldung; " | zuletzt "; bbBib.eintraege[vfGewaehlt].geoeffnet <> ""
+            bbSchliessen()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
