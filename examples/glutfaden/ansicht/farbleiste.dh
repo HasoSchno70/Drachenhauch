@@ -32,6 +32,8 @@ DIM fbRollt AS BOOLEAN
 DIM fbMenueFarbe AS INTEGER
 DIM fbSchrift AS INTEGER
 DIM fbTipp AS STRING
+DIM fbMass AS STRING                  ' zuletzt gesetzte Groesse (nur bei Aenderung neu)
+DIM fbProbeAus AS BOOLEAN             ' Fotoproben vor Stufe 16: immer verborgen
 
 FUNCTION fbBreite() AS INTEGER
     RETURN CLAMP(einst.farbleisteGroesse, 20, 60)
@@ -90,6 +92,7 @@ FUNCTION farbleisteNeu() AS INTEGER
 END FUNCTION
 
 SUB farbleisteZeigen(an AS BOOLEAN)
+    IF fbProbeAus THEN an = FALSE
     IF fbBox <> 0 THEN gtk_widget_set_visible(fbBox, an)
 END SUB
 
@@ -98,8 +101,14 @@ SUB farbleisteNachziehen()
     IF fbFeld = 0 THEN RETURN
     DIM n AS INTEGER : n = IIF(lwHat, lwMuster.farbanzahl(), 0)
     DIM b AS INTEGER : b = MAX(1, n * (fbBreite() + FB_ABSTAND) - FB_ABSTAND)
-    gtk_widget_set_size_request(fbFeld, b, fbHoehe())
-    gtk_widget_set_size_request(fbRolle, -1, fbHoehe() + 8)
+    ' Groesse nur, wenn sie sich aendert -- jedes Setzen laesst GTK neu
+    ' vermessen, und das Auffrischen kommt oft (siehe verlaufLeisteNachziehen)
+    DIM mass AS STRING : mass = STR$(b) + "x" + STR$(fbHoehe())
+    IF mass <> fbMass THEN
+        fbMass = mass
+        gtk_widget_set_size_request(fbFeld, b, fbHoehe())
+        gtk_widget_set_size_request(fbRolle, -1, fbHoehe() + 8)
+    END IF
     DIM z AS STRING : z = STR$(n)
     IF z <> gtk_label_get_text(fbZahl) THEN gtk_label_set_text(fbZahl, z)
     IF fbUeber >= n THEN fbUeber = -1

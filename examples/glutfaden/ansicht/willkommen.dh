@@ -16,7 +16,12 @@ DIM wkKacheln AS ARRAY OF INTEGER     ' fuer die Probe
 FUNCTION willkommenStapel(flaeche AS INTEGER) AS INTEGER
     wkStapel = gtk_stack_new()
     gtk_stack_add_named(wkStapel, flaeche, "flaeche")
-    gtk_stack_add_named(wkStapel, wkBauen(), "willkommen")
+    ' in einer Rolle: sonst zwaenge die Seite (vier Kacheln nebeneinander)
+    ' dem Fenster ihre Mindestgroesse auf, auch wenn sie nicht zu sehen ist
+    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_AUTO, GTK_POLITIK_AUTO)
+    gtk_container_add(rolle, wkBauen())
+    gtk_stack_add_named(wkStapel, rolle, "willkommen")
     wkPfade = []
     RETURN wkStapel
 END FUNCTION

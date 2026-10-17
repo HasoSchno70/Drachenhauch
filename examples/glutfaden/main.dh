@@ -844,6 +844,12 @@ END IF
 werkzeugWaehlen(IIF(einst.werkzeugMerken, einst.letztesWerkzeug, einst.startWerkzeug), FALSE)
 
 IMPORT "ansicht/vorfuehrung.dh"
+' Die Fotoproben vor Stufe 16 zaehlen Farben im Bereich der Zeichenflaeche --
+' die Farbleiste darunter zeigt dieselben Farben und zaehlte mit
+IF probe <> "" AND probe <> "stufe16" AND probe <> "start" THEN
+    fbProbeAus = TRUE
+    farbleisteZeigen(FALSE)
+END IF
 IF probe = "ansehen" THEN g_timeout_add(300, vorfuehren, 0)
 IF probe = "bearbeiten" THEN g_timeout_add(300, vorfuehrenBearbeiten, 0)
 IF probe = "stufe3" THEN g_timeout_add(300, vorfuehrenStufe3, 0)
