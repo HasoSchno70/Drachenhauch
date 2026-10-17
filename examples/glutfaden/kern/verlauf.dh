@@ -19,6 +19,7 @@ CONST TEIL_EBENEN = 2
 CONST TEIL_FARBEN = 3
 CONST TEIL_NAME = 4
 CONST TEIL_LISTEN = 5             ' Farbliste und Rueckstiche, ohne Umnummerieren
+CONST TEIL_GROESSE = 6            ' Mustergroesse samt Ebenen und Rueckstichen
 
 CLASS Aenderung
     DIM art AS INTEGER
@@ -46,6 +47,11 @@ CLASS Aenderung
     ' TEIL_NAME
     DIM textVorher AS STRING
     DIM textNachher AS STRING
+    ' TEIL_GROESSE (dazu ebenenVorher/Nachher, aktiv*, rueckVorher/Nachher)
+    DIM breiteVorher AS INTEGER
+    DIM hoeheVorher AS INTEGER
+    DIM breiteNachher AS INTEGER
+    DIM hoeheNachher AS INTEGER
 
     SUB Init(a AS INTEGER)
         art = a
@@ -244,6 +250,15 @@ SUB teilAnwenden(m AS Muster, t AS Aenderung, hin AS BOOLEAN)
                 m.farben = ARRAY_COPY(t.farbenVorher)
                 m.rueckstiche = ARRAY_COPY(t.rueckVorher)
             END IF
+            m.stichzahlenNeu()
+        CASE TEIL_GROESSE
+            m.breite = IIF(hin, t.breiteNachher, t.breiteVorher)
+            m.hoehe = IIF(hin, t.hoeheNachher, t.hoeheVorher)
+            m.ebenen.breite = m.breite
+            m.ebenen.hoehe = m.hoehe
+            m.ebenen.ebenen = ARRAY_COPY(IIF(hin, t.ebenenNachher, t.ebenenVorher))
+            m.ebenen.aktiv = IIF(hin, t.aktivNachher, t.aktivVorher)
+            m.rueckstiche = ARRAY_COPY(IIF(hin, t.rueckNachher, t.rueckVorher))
             m.stichzahlenNeu()
         CASE TEIL_NAME
             ' Umbenannt wird die Ebene selbst (die Liste haelt Objekte)

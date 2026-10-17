@@ -25,6 +25,7 @@ IMPORT "diamant.dh" AS kern
 IMPORT "stickpfad.dh" AS kern
 IMPORT "analyse.dh" AS kern
 IMPORT "planung.dh" AS kern
+IMPORT "verwalten.dh" AS kern
 IMPORT "bildexport.dh" AS kern
 IMPORT "pdfexport.dh" AS kern
 IMPORT "htmlexport.dh" AS kern
