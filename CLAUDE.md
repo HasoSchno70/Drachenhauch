@@ -975,7 +975,7 @@ Endung schreiben: `IMPORT "json.dh"`.
 
 | Modul | Funktionen (Auswahl) | Externer Typ |
 |---|---|---|
-| `json` | `JSON_PARSE/LOAD/STRINGIFY`, `JSON_GET_STRING/INT/FLOAT/BOOL`, `JSON_GET_JSON` (Teilbaum als Kopie), Pfad-Notation `"user.name"` / `"items.0"` | `JSON_HANDLE` |
+| `json` | `JSON_PARSE/LOAD/STRINGIFY`, `JSON_GET_STRING/INT/FLOAT/BOOL`, `JSON_GET_JSON` (Teilbaum als Kopie), Pfad-Notation `"user.name"` / `"items.0"`; ein Punkt im Schluessel als `\.`, `JSON_KEY$(name)` maskiert einen Namen aus `JSON_KEYS` | `JSON_HANDLE` |
 | `db` | SQLite, **PostgreSQL und MySQL** (Features `pg`/`mysql`, seit 2026-10-06): `DB_OPEN` entscheidet am Ziel (`postgres://`, `mysql://`, sonst Datei), alles andere gleich. `DB_OPEN/CLOSE`, `DB_EXEC/QUERY` mit `?`-Binding (fuer PostgreSQL zu `$n` uebersetzt, `db::platzhalter_pg`, ausser in Texten/Bezeichnern/Kommentaren und wenn das SQL selbst `$1` schreibt), `DB_NEXT`, `DB_GET_*`, `DB_BEGIN/COMMIT/ROLLBACK`, `DB_KIND$`, `DB_PING`. `db::Verbindung` (Enum) traegt alle drei; PostgreSQL bindet im TEXTformat (Server wandelt) und liest binaer (`pg::dekodieren`, `numeric`/`DECIMAL` genau als `DbVal::Zahl`), TLS rustls+ring (`sslmode` prefer/require/disable/verify-full; ohne verify wird jedem Zertifikat geglaubt wie bei psql), MySQL ueber `rustls-tls-ring` (kein aws-lc). Der MySQL-Treiber versucht nur die ERSTE Adresse eines Namens -- `localhost` = `::1` -- darum probiert `my::oeffnen` die weiteren selbst. Tests `tests/pruef/db_server.dhtest` (jeder Ablauf gegen beide Server mit derselben Erwartung; Server aus `DH_TEST_PG`/`DH_TEST_MYSQL`, die CI startet beide auf dem Linux-Laeufer, sonst uebersprungen) | `DB_CONN`, `DB_RESULT` |
 | `tween` | **Kein `TWEEN_UPDATE`** (Absicht, keine Luecke): ein Tween rechnet seinen Wert bei jedem Abruf aus `MILLIS()` aus, laeuft also in ECHTER Zeit weiter statt bildgetrieben wie `timer`/`input`/`gui`. Folgen: bei einbrechender Bildrate SPRINGT er statt langsamer zu werden, und unter `AUTOMATION_PLAY` ist er nicht reproduzierbar (`timer` ist es). Werteinterpolation. 13 Easings (`linear`, `out_bounce`, `out_elastic`, …), Pause/Resume/Reverse | `TWEEN` |
 | `timer` | Geplante Aktionen ohne MILLIS-Buchführung: `TIMER_AFTER/EVERY(ms, fnref)` → ID (FUNCREF-Callbacks, parameterlos), `TIMER_UPDATE()` pro Frame feuert die fälligen (Muster wie INPUT_UPDATE/GUI_UPDATE; EVERY max. 1×/Update, kein Aufhol-Burst), `TIMER_CANCEL/ACTIVE/COUNT/CLEAR` (Tombstone-stabile IDs). Plus `COOLDOWN(id$, ms)` — String-ID-Ratenbegrenzer (TRUE wenn frei, startet dann die Sperre; braucht kein UPDATE). Konsolen-tauglich (kein Grafik-Bezug; `rust/drachenhauch_runtime/src/timer.rs` + `try_timer` in vm.rs). Doku `docs/module-timer.md`, Demo `examples/113_timer.dh`, Tests `tests/pruef/modules_timer.dhtest`. | — |
@@ -1959,9 +1959,53 @@ verdeckte Stiche). Oberflaeche `ansicht/analysedialoge.dh`: Knopf
 "Auswerten" in der Kopfleiste mit Aufklapper (Statistik mit fuenf Reitern
 und CSV, auch Strg+Umschalt+G; Heatmap; Aehnliche Farben; Farbenblindheit
 als Auswahl -- nur `lwRgb` der Zeichenflaeche, die Seitenleiste bleibt wie
-in PySticky). Ohne den Reiter Einkaufsliste (braucht den Garn-Vorrat).
+in PySticky). Der Reiter Einkaufsliste kam mit Stufe 9.
 `--probe-stufe8`, Sammlung `tests/pruef/glutfaden_stufe8.dhtest` (8; 13
 Verfaelschungen des Kerns und 8 der Oberflaeche fallen je in ihrem Fall).
+
+**Stufe 9: planen und Vorrat** (2026-10-17). `kern/planung.dh` nach
+PyStickys core/inventory.py, project_list.py, hoop_planner.py und den
+Rechnungen der Dialoge fuer Palette und Tauschen. **Garn-Vorrat** als JSON
+im Einstellungsordner (`einstellungsDatei$`: APPDATA bzw. ~/.config,
+Unterordner Glutfaden) im selben Aufbau wie PyStickys inventory.json
+(`{"version":1,"stock":{sortiert}}`, Einzug 2) -- Schluessel
+`Hersteller::Nummer`, ohne beides `unknown::unknown::Name`; gelesen wie
+Pythons `int()` (Kommazahl Richtung null, Text mit Ziffern und `_`,
+TRUE = 1, alles andere uebergangen, auch eine flache Datei ohne `stock`),
+0 oder weniger beim Setzen nimmt heraus. **Der Fund dabei steckt in der
+Laufzeit:** ein Schluessel wie `unknown::unknown::Farbe 1.5` war im
+json-Modul nicht zu erreichen, der Punkt teilt den Pfad -- neu `\.` und
+`\\` im Pfad (`json_segmente` in builtins.rs) und **`JSON_KEY$(name)`**,
+das einen Namen aus `JSON_KEYS` wieder adressierbar macht. **Einkaufsliste**
+(`einkaufslisteMehrere`): je echtes Garn, CEIL je Farbeintrag, ueber
+Schluessel summiert und sortiert, der Vorrat EINMAL abgezogen; DP-Muster
+mit Drills statt Straengen. **Palette konvertieren**: naechstes Garn nach
+CIEDE2000, bei Gleichstand das erste (die Paletten haben echte
+Gleichstaende -- die Gegenprobe mit `<=` faellt), gut/akzeptabel/schlecht
+bis 10/25, Mehrfachzuordnung gewarnt; ein Schritt im Verlauf (PySticky
+leert ihn). **Farben tauschen**: `farbeErsetzen` geht jetzt ueber
+`farbenUmsetzen` (Abbildung Farbe -> Ziel, nur Sichtbares auf der
+Ursprungsebene, Perle/Drill angepasst), das Tauschen ist dieselbe
+Abbildung in beide Richtungen. **Rahmenaufteilung** (`rahmenRaster`/
+`rahmenPlanen`, der letzte Sektor rueckt an den Rand, gezaehlt ueber
+Zeilensummen statt je Zelle). **Gegen PySticky gleich** (ref_planung.py,
+570 Zeilen) an einem von PySticky gebauten Probemuster, einem DP-Muster und
+einem grossen fuer die Strangrechnung; Vorrat und Projektliste byte-gleich
+bis auf CR LF, das Python unter Windows im Textmodus schreibt. Oberflaeche
+`ansicht/planungsdialoge.dh`: Garn-Vorrat mit drei Reitern (Im Muster je
+ECHTES Garn statt je Farbeintrag -- PySticky legte den Bestand eines Blends
+unter einen Schluessel, den die Einkaufsliste nie fragt; Alle Eintraege mit
+Suche und Eintrag von Hand; Mehrere Projekte, die gemeinsame Liste folgt
+dem Bestand sofort), Einkaufsliste als sechster Reiter der Statistik (folgt
+dem Zuschlag des Garn-Reiters, PySticky liest ihn einmal), Palette
+(Strg+Umschalt+K, Ziel von Hand mit Suche), Tauschen (Strg+Umschalt+T),
+Rahmen mit Vorschau. Strg+Umschalt+I bleibt "Bild neu importieren", der
+Vorrat hat kein Kuerzel. **Stolperstein im Layout:** zwei dehnbare Spalten
+in einer Zeile teilen den Platz nach ihrer Textlaenge, die Spalten danach
+stehen in jeder Zeile woanders -- `pdReihe` setzt `max_width_chars` 1.
+`--probe-stufe9` (Einstellungsordner ueber APPDATA/HOME umgesetzt), Sammlung
+`tests/pruef/glutfaden_stufe9.dhtest` (7; elf Verfaelschungen von Kern und
+Oberflaeche fallen je in ihrem Fall).
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
