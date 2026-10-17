@@ -2269,6 +2269,45 @@ Bildwiederholung, nicht beim Abholen der Ereignisse; ohne das fielen die
 Proben von Stufe 10 und 13 unter voller Last in 1 von 3 bis 1 von 5
 Laeufen mit Gtk-CRITICAL "alloc_needed", danach 0 von 8.
 
+**Stufe 17: Info- und Fortschritts-Leiste, Symbol-Editor** (2026-10-17).
+Die Seitenleiste hat unter der Uebersicht drei Reiter (GtkStackSwitcher,
+`slStapel`, nicht gleich hoch): "Muster" (der bisherige Inhalt), "Info"
+und "Fortschritt" (`ansicht/infoleiste.dh`, PyStickys InfoPanel und
+ProgressPanel). Nachgezogen wird nur der sichtbare Reiter (`ilNachziehen`
+aus `seitenleisteZahlen`/`-Muster` und beim Umschalten); Widgets entstehen
+nur bei geaendertem Bestand, sonst werden Texte gesetzt (die Lehre aus
+"alloc_needed"). **Info:** Stoffzaehlung als Klappliste (eine Zaehlung
+ausserhalb 11..32, etwa 10 im Diamond-Modus, wird einsortiert -- PySticky
+zeigte dann 11), neun Karten, Quellbild mit Tooltip, Farbliste mit Garn je
+Farbe (anklicken waehlt). Die Texte rechnet der Kern (`kern.infoKarten`,
+`stickzeitText$`, `garnbedarfText$`, `garnJeFarbeText$`,
+`farbeInfoText$`) und sind **gegen PySticky aufgezeichnet**: drei Muster
+je wie geladen, Diamond, sechs Stoffe, eine Farbe ausgelassen, eine
+erledigt -- 90 Zeilen gleich. Falle dabei: PySticky rundet die Prozente je
+Farbe erst auf eine Stelle und formatiert dann ohne Stelle (`round(p, 1)`
+-> `:.0f`) -- `farbeProzentText$` nimmt darum das gerundete `farbeProzent`,
+nicht die Zahlen. **Stoff aendern ist ein Rueckgaengig-Schritt**
+(`kern.stoffSetzen`, neuer Verlaufsteil `TEIL_STOFF`); PySticky setzt das
+Feld nur. **Fortschritt:** Sticken-Modus = das Fortschritts-Werkzeug
+(Strg+M, Knopf; beenden kehrt zum Werkzeug davor zurueck), Gesamtbalken,
+je Farbe mit Stichen Prozent, Balken und "Alle erledigt", und "Fortschritt
+zuruecksetzen" (`kern.fortschrittZuruecksetzen`, alle Ebenen auch
+unsichtbare und ausgelassene Farben) -- **ein Schritt**, PySticky leert
+dafuer den Verlauf. **Symbol-Editor** (`symbolEditor` in
+`ansicht/dialoge.dh` statt der Textfrage): Vorschau 90x90, eigenes Zeichen
+(Leerraum zaehlt nicht), Auswahl aus `daten/symbole.txt` in einer FlowBox
+mit zwoelf Spalten (ausgeblendete Kinder statt Filter-Rueckruf), Suche
+nach Zeichen, Unicode-Name oder Codepunkt (`kern.symbolPasst`; die Namen
+liegen in `daten/symbolnamen.txt`, einmal aus Pythons `unicodedata`
+erzeugt -- die Laufzeit hat keine Unicode-Namen), gegen PySticky
+aufgezeichnet (32 Anfragen gleich); ein Symbol einer anderen Farbe wird
+abgewiesen und der Dialog bleibt offen. Kuerzel-Tafel 57 Befehle (Stufe 13
+neu erzeugt). Sammlung `tests/pruef/glutfaden_stufe17.dhtest` (4: Info und
+Suche gegen PySticky, Grenzen der Texte samt Schritten, Probe); 17
+Verfaelschungen fallen je in ihrem Fall -- "fremde Zaehlung hinten
+angehaengt" blieb im ersten Anlauf gruen, weil die Probe nur 25 ct
+(einsortiert) pruefte; jetzt auch 40.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
