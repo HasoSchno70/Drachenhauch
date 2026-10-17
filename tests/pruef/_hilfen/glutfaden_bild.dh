@@ -1,6 +1,7 @@
 ' Bildproben fuer glutfaden_ansicht: Punkte einer Farbe (+-12 je Kanal) im
 ' Bereich der Zeichenflaeche -- ohne Kopfleiste, Werkzeugzeile, Seitenleiste
-' und Statuszeile, dort stehen Farbfelder derselben Farben.
+' und Statuszeile, dort stehen Farbfelder derselben Farben. Die Seitenleiste
+' ist 400 Punkte breit, dazu der Schatten des Fensters.
 FUNCTION punkte(pfad AS STRING, farbe AS INTEGER) AS INTEGER
     IF NOT FILEEXISTS(pfad) THEN RETURN -1
     DIM b AS IMAGE : b = LOADIMAGE(pfad)
@@ -9,7 +10,7 @@ FUNCTION punkte(pfad AS STRING, farbe AS INTEGER) AS INTEGER
     DIM bl AS INTEGER : bl = farbe BAND 255
     DIM n AS INTEGER, x AS INTEGER, y AS INTEGER
     FOR y = 120 TO IMAGE_HEIGHT(b) - 40 STEP 3
-        FOR x = 0 TO IMAGE_WIDTH(b) - 340 STEP 3
+        FOR x = 0 TO IMAGE_WIDTH(b) - 460 STEP 3
             DIM f AS INTEGER : f = GETPIXEL(b, x, y)
             ' BAND bindet schwaecher als das Minus -- darum die Klammern
             IF ABS(((f SHR 16) BAND 255) - r) < 12 AND ABS(((f SHR 8) BAND 255) - g) < 12 AND ABS((f BAND 255) - bl) < 12 THEN n = n + 1
@@ -25,7 +26,7 @@ FUNCTION gruenePunkte(pfad AS STRING) AS INTEGER
     DIM b AS IMAGE : b = LOADIMAGE(pfad)
     DIM n AS INTEGER, x AS INTEGER, y AS INTEGER
     FOR y = 120 TO IMAGE_HEIGHT(b) - 40
-        FOR x = 0 TO IMAGE_WIDTH(b) - 340
+        FOR x = 0 TO IMAGE_WIDTH(b) - 460
             DIM f AS INTEGER : f = GETPIXEL(b, x, y)
             DIM r AS INTEGER : r = (f SHR 16) BAND 255
             DIM g AS INTEGER : g = (f SHR 8) BAND 255

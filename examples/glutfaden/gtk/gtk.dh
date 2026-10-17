@@ -252,6 +252,11 @@ STRUCT PangoRechteck LAYOUT C
     breite AS LONG
     hoehe AS LONG
 END STRUCT
+' GdkRectangle hat dieselbe Lage
+DECLARE FUNCTION gdk_display_get_primary_monitor LIB GDK (anzeige AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gdk_display_get_monitor LIB GDK (anzeige AS ZEIGER, n AS LONG) AS ZEIGER
+DECLARE SUB gdk_monitor_get_workarea LIB GDK (monitor AS ZEIGER, flaeche AS PangoRechteck)
+DECLARE SUB gtk_window_set_position LIB GTK (w AS ZEIGER, lage AS LONG)
 
 ' --- Pango (Text mit Schriftersatz -- die Symbole stammen aus vielen Bloecken)
 DECLARE FUNCTION pango_cairo_create_layout LIB PANGOCAIRO (cr AS ZEIGER) AS ZEIGER

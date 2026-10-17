@@ -534,8 +534,35 @@ DIM stilFehler AS STRING : stilFehler = gtkStil$(STIL)
 IF stilFehler <> "" THEN PRINT "Stylesheet: "; stilFehler
 werkzeugeStart()
 
+' 92 % der Arbeitsflaeche des Bildschirms, mittig (vorher fest 1280 x 840 --
+' auf einem grossen Schirm ein kleines Fenster). PySticky deckelt bei
+' 1920 x 1080; hier nicht, ein grosser Schirm soll genutzt werden.
+DIM fensterBreite AS INTEGER
+
+SUB fensterGroesseSetzen()
+    DIM b AS INTEGER : b = 1280
+    DIM h AS INTEGER : h = 840
+    DIM anzeige AS INTEGER : anzeige = gdk_display_get_default()
+    DIM mon AS INTEGER
+    IF anzeige <> 0 THEN
+        mon = gdk_display_get_primary_monitor(anzeige)
+        IF mon = 0 THEN mon = gdk_display_get_monitor(anzeige, 0)
+    END IF
+    IF mon <> 0 THEN
+        DIM flaeche AS PangoRechteck
+        gdk_monitor_get_workarea(mon, flaeche)
+        IF flaeche.breite > 0 AND flaeche.hoehe > 0 THEN
+            b = INT(flaeche.breite * 0.92)
+            h = INT(flaeche.hoehe * 0.92)
+        END IF
+    END IF
+    fensterBreite = b
+    gtk_window_set_default_size(fenster, b, h)
+    gtk_window_set_position(fenster, 1)                  ' GTK_WIN_POS_CENTER
+END SUB
+
 fenster = gtk_window_new(0)
-gtk_window_set_default_size(fenster, 1280, 840)
+fensterGroesseSetzen()
 gtk_window_set_title(fenster, "Glutfaden")
 gtkKlasse(fenster, "flaeche")
 DIM symFehler AS INTEGER
@@ -586,7 +613,8 @@ gtk_box_pack_start(werkzeugzeile, werkzeugleisteNeu(), FALSE, FALSE, 0)
 DIM teilung AS INTEGER : teilung = gtk_paned_new(GTK_WAAGERECHT)
 gtk_paned_pack1(teilung, leinwandNeu(), TRUE, FALSE)
 gtk_paned_pack2(teilung, seitenleisteNeu(), FALSE, FALSE)
-gtk_paned_set_position(teilung, 960)
+' Die Seitenleiste behaelt ihre Breite, der Rest gehoert der Zeichenflaeche
+gtk_paned_set_position(teilung, MAX(600, fensterBreite - 400))
 status = gtk_label_new("")
 gtk_label_set_xalign(status, 0.0)
 gtk_label_set_ellipsize(status, GTK_ELLIPSE_ENDE)
