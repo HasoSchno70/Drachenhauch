@@ -145,6 +145,7 @@ SUB werkzeugWaehlen(nr AS INTEGER, gefuellt AS BOOLEAN)
     NEXT
     wzKnopfSperre = FALSE
     verlaufLeisteZeigen(nr = WZ_FARBVERLAUF)
+    fortschrittModusNachziehen()
     leinwandZeiger()
     statusNachziehen()
 END SUB
