@@ -1164,6 +1164,11 @@ FUNCTION vorfuehrenStufe12(daten AS INTEGER) AS BOOLEAN
             PRINT vdlZoom; " | raus: ";
             vdlRadZoom(FALSE, FALSE, 100, 100)
             PRINT vdlZoom
+            ' gezoomt wird um den Punkt unter der Maus
+            DIM gx AS FLOAT : gx = (100 - vdlPanX) / vdlZelle()
+            DIM gy AS FLOAT : gy = (60 - vdlPanY) / vdlZelle()
+            vdlRadZoom(TRUE, FALSE, 100, 60)
+            PRINT "punkt unter der maus bleibt: "; ABS((100 - vdlPanX) / vdlZelle() - gx) < 0.001 AND ABS((60 - vdlPanY) / vdlZelle() - gy) < 0.001; " | zelle "; vdlZelle()
             FOR i = 1 TO 40
                 vdlRadZoom(TRUE, FALSE, 0, 0)
             NEXT
