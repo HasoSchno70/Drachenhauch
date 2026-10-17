@@ -845,3 +845,164 @@ FUNCTION vorfuehrenStufe9(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' --- Stufe 10: Muster anlegen und verwalten -----------------------------------------
+DIM vfVgl AS INTEGER
+
+FUNCTION vfListeZahl(liste AS INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    WHILE gtk_list_box_get_row_at_index(liste, n) <> 0
+        n = n + 1
+    WEND
+    RETURN n
+END FUNCTION
+
+FUNCTION vorfuehrenStufe10(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM f AS STRING
+    DIM i AS INTEGER
+    DIM d AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            d = ehBauen()
+            PRINT "eigenschaften: stoff "; kern.stoffBezeichnung$(lwMuster); " | autor '"; gtk_entry_get_text(ehAutor); "' | begonnen "; gtk_toggle_button_get_active(ehBegonnen)
+            gtk_entry_set_text(ehAutor, "Anna Schmidt")
+            gtk_entry_set_text(ehCopyright, "© 2026 Anna Schmidt")
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(ehNotizen), "Zeile eins" + CHR$(10) + "Zeile zwei", -1)
+            gtk_toggle_button_set_active(ehBegonnen, TRUE)
+            gtk_entry_set_text(ehDatum, "31.02.2026")
+            DIM geaendert AS BOOLEAN
+            PRINT "31.02.: "; ehUebernehmen$(geaendert); " | autor im muster '"; kern.eigenschaft$(lwMuster, "author"); "'"
+            gtk_entry_set_text(ehDatum, "3.2.2026")
+            PRINT "3.2.: '"; ehUebernehmen$(geaendert); "' geaendert "; geaendert
+            PRINT "  im muster: "; kern.eigenschaft$(lwMuster, "author"); " | "; kern.eigenschaft$(lwMuster, "copyright"); " | "; kern.eigenschaft$(lwMuster, "started_date"); " | notizen "; LEN(SPLIT$(kern.notizen$(lwMuster), CHR$(10))); " zeilen"
+            PRINT "  nochmal: '"; ehUebernehmen$(geaendert); "' geaendert "; geaendert
+        CASE 2
+            ok = vfFoto(ehDialog, "eigenschaften")
+            gtk_widget_destroy(ehDialog)
+            ehDialog = 0
+            d = ehBauen()
+            PRINT "wieder geoeffnet: "; gtk_entry_get_text(ehDatum); " "; gtk_toggle_button_get_active(ehBegonnen)
+            gtk_widget_destroy(ehDialog)
+            ehDialog = 0
+            DIM b0 AS INTEGER : b0 = lwMuster.breite
+            DIM h0 AS INTEGER : h0 = lwMuster.hoehe
+            d = grBauen()
+            PRINT "groesse: "; gtk_spin_button_get_value_as_int(grBreite); " x "; gtk_spin_button_get_value_as_int(grHoehe)
+            gtk_widget_destroy(grDialog)
+            grDialog = 0
+            PRINT "gleich: "; grAusfuehren(b0, h0, FALSE)
+            ok = grAusfuehren(b0 + 10, h0 + 6, FALSE)
+            PRINT "groesser: "; lwMuster.breite; " x "; lwMuster.hoehe; " | "; meldung
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.breite; " x "; lwMuster.hoehe
+            werkzeugVor()
+            PRINT "wiederholt: "; lwMuster.breite; " x "; lwMuster.hoehe
+            werkzeugZurueck()
+            d = grBauen()
+            gtk_spin_button_set_value(grBreite, 20)
+            gtk_toggle_button_set_active(grSmart, TRUE)
+        CASE 3
+            ok = vfFoto(grDialog, "groesse")
+            PRINT "dialog: "; gtk_spin_button_get_value_as_int(grBreite); " x "; gtk_spin_button_get_value_as_int(grHoehe); " smart "; gtk_toggle_button_get_active(grSmart)
+            gtk_widget_destroy(grDialog)
+            grDialog = 0
+            DIM st0 AS INTEGER : st0 = lwMuster.sticheGesamt()
+            ok = grAusfuehren(20, 15, TRUE)
+            PRINT "smart: "; lwMuster.breite; " x "; lwMuster.hoehe; " stiche "; st0; " -> "; lwMuster.sticheGesamt(); " | "; meldung
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.breite; " x "; lwMuster.hoehe; " stiche "; lwMuster.sticheGesamt()
+            ' Schnappschuesse
+            PRINT "schluessel: "; vwSchluessel$(); " | ordner "; BASENAME(DIRNAME(kern.schnappschussOrdner$(vwSchluessel$())))
+            PRINT "vorher: "; LEN(kern.schnappschuesse(vwSchluessel$()))
+            vwSchnappschussWennFaellig()
+            vwSchnappschussWennFaellig()
+            PRINT "zweimal faellig: "; LEN(kern.schnappschuesse(vwSchluessel$()))
+            f = kern.schnappschussAnlegen(lwMuster, vwSchluessel$(), ZEIT_JETZT() - 3600, kern.SCHNAPPSCHUESSE_HOECHSTENS)
+            PRINT "aelter angelegt: "; LEN(kern.schnappschuesse(vwSchluessel$())); " | neuester zuerst "; kern.schnappschussZeit(kern.schnappschuesse(vwSchluessel$())[0]) > kern.schnappschussZeit(f)
+            d = vsBauen()
+            PRINT "versionen: "; vfListeZahl(vsListe); " eintraege | knoepfe "; gtk_widget_get_sensitive(vsKnoepfe[0])
+            gtk_list_box_select_row(vsListe, gtk_list_box_get_row_at_index(vsListe, 0))
+            PRINT "gewaehlt: "; gtk_widget_get_sensitive(vsKnoepfe[0]); " | "; REPLACE$(gtk_label_get_text(vsDetail), CHR$(10), " / ")
+        CASE 4
+            ok = vfFoto(vsDialog, "versionen")
+            ' eine Zelle aendern, eine wegnehmen, dann vergleichen
+            DIM e0 AS kern.Ebene : e0 = lwMuster.ebenen.ebenen[0]
+            DIM k AS INTEGER
+            DIM erst AS INTEGER : erst = -1
+            FOR k = 0 TO LEN(e0.raster) - 1
+                IF e0.raster[k] >= 0 AND erst < 0 THEN erst = k
+            NEXT
+            e0.raster[erst] = -1
+            e0.raster[LEN(e0.raster) - 1] = 1
+            lwMuster.stichzahlenNeu()
+            PRINT "vergleich offen: "; vsAntwort(VS_VERGLEICH, FALSE)
+            vfVgl = vgFenster
+            PRINT "vergleich: neu "; vgErgebnis.neu; " weg "; vgErgebnis.weg; " anders "; vgErgebnis.anders; " | "; vgErgebnis.breite; " x "; vgErgebnis.hoehe
+        CASE 5
+            ok = vfFoto(vfVgl, "vergleich")
+            gtk_widget_destroy(vfVgl)
+            vgFenster = 0
+            DIM vorher AS INTEGER : vorher = LEN(vsDateien)
+            gtk_list_box_select_row(vsListe, gtk_list_box_get_row_at_index(vsListe, vorher - 1))
+            PRINT "loeschen bleibt offen: "; vsAntwort(VS_LOESCHEN, FALSE); " | "; vorher; " -> "; LEN(vsDateien); " | eintraege "; vfListeZahl(vsListe)
+            gtk_list_box_select_row(vsListe, gtk_list_box_get_row_at_index(vsListe, 0))
+            DIM pfadVorher AS STRING : pfadVorher = musterPfad
+            PRINT "wiederherstellen schliesst: "; NOT vsAntwort(VS_WIEDER, FALSE)
+            PRINT "  pfad leer "; musterPfad = ""; " | ungesichert "; istGeaendert(); " | kennung bleibt "; vwSchluessel$() <> ""; " | "; LEFT$(meldung, 15)
+            gtk_widget_destroy(vsDialog)
+            vsDialog = 0
+            ' Stickzeit
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            PRINT "stickzeit laeuft: "; kern.stickzeitLaeuft(lwMuster)
+            kern.stickzeitStart(lwMuster, ZEIT_UNIX() - 125)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            PRINT "stickzeit: "; meldung; " | laeuft "; kern.stickzeitLaeuft(lwMuster)
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            PRINT "sofort wieder weg: "; meldung
+            ' eigene Vorlagen
+            PRINT "vorlage leer: "; vlSichern$("  ", "Eigene", "")
+            PRINT "vorlage: '"; vlSichern$("Probe", "", "Ein Test"); "' | doppelt: "; vlSichern$("Probe", "Eigene", "")
+            PRINT "vorlage 2: '"; vlSichern$("Zweite", "Kissen", ""); "' | datei "; BASENAME(vwVorlagenDatei$())
+            vlDaten = kern.eigeneVorlagen(vwVorlagenDatei$())
+            PRINT "umbenennen auf vergeben: "; vlAendern$(0, "Zweite", FALSE)
+            PRINT "umbenennen: '"; vlAendern$(0, "Erste", FALSE); "'"
+            PRINT "loeschen: '"; vlAendern$(1, "", TRUE); "'"
+            DIM vv AS kern.Vorlage
+            FOR EACH vv IN kern.eigeneVorlagen(vwVorlagenDatei$())
+                PRINT "  "; vv.name; " "; vv.breite; "x"; vv.hoehe; " "; vv.stoff; " "; vv.kategorie; " '"; vv.beschreibung; "'"
+            NEXT
+            ' Neues Muster
+            d = nmBauen()
+            PRINT "neu: karten "; LEN(nmListe); " | breite "; gtk_spin_button_get_value_as_int(nmBreite); " | "; REPLACE$(gtk_label_get_text(nmInfo), CHR$(10), " / ")
+            gtk_toggle_button_set_active(nmKategorien[1], TRUE)
+            PRINT "eigene: "; LEN(nmListe); " | gewaehlt "; nmName$(); " "; gtk_spin_button_get_value_as_int(nmBreite); "x"; gtk_spin_button_get_value_as_int(nmHoehe); " | felder frei "; gtk_widget_get_sensitive(nmBreite)
+            gtk_toggle_button_set_active(nmKategorien[2], TRUE)
+        CASE 6
+            ok = vfFoto(nmDialog, "neu")
+            PRINT "kategorie "; kern.vorlagenKategorien()[0]; ": "; LEN(nmListe); " karten | "; nmName$(); " "; gtk_spin_button_get_value_as_int(nmBreite); "x"; gtk_spin_button_get_value_as_int(nmHoehe)
+            gtk_toggle_button_set_active(nmKarten[1], TRUE)
+            PRINT "zweite karte: "; nmName$(); " "; gtk_spin_button_get_value_as_int(nmBreite); "x"; gtk_spin_button_get_value_as_int(nmHoehe)
+            gtk_toggle_button_set_active(nmKategorien[0], TRUE)
+            gtk_combo_box_set_active(nmDpWahl, 2)
+            PRINT "dp: "; kern.dpVorlagenNamen()[2]; " "; gtk_spin_button_get_value_as_int(nmBreite); "x"; gtk_spin_button_get_value_as_int(nmHoehe); " dp "; nmDp
+            nmAnlegen()
+            PRINT "angelegt: "; lwMuster.breite; "x"; lwMuster.hoehe; " "; lwMuster.modus; " stoff "; INT(lwMuster.stoff); " farben "; lwMuster.farbanzahl(); " | "; meldung; " | pfad leer "; musterPfad = ""; " | geaendert "; istGeaendert()
+            gtk_combo_box_set_active(nmDpWahl, 0)
+            gtk_spin_button_set_value(nmBreite, 40)
+            gtk_spin_button_set_value(nmHoehe, 30)
+            gtk_combo_box_set_active(nmStoff, 0)
+            PRINT "eigene werte: "; REPLACE$(gtk_label_get_text(nmInfo), CHR$(10), " / ")
+            nmAnlegen()
+            PRINT "angelegt: "; lwMuster.breite; "x"; lwMuster.hoehe; " "; lwMuster.modus; " stoff "; INT(lwMuster.stoff); " | "; meldung
+            gtk_widget_destroy(nmDialog)
+            nmDialog = 0
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
