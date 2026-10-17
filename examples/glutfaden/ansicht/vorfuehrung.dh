@@ -924,7 +924,9 @@ FUNCTION vorfuehrenStufe10(daten AS INTEGER) AS BOOLEAN
             d = vsBauen()
             PRINT "versionen: "; vfListeZahl(vsListe); " eintraege | knoepfe "; gtk_widget_get_sensitive(vsKnoepfe[0])
             gtk_list_box_select_row(vsListe, gtk_list_box_get_row_at_index(vsListe, 0))
-            PRINT "gewaehlt: "; gtk_widget_get_sensitive(vsKnoepfe[0]); " | "; REPLACE$(gtk_label_get_text(vsDetail), CHR$(10), " / ")
+            ' das Datum ist das von heute -- die Uhrzeit wechselt, darum nur der Tag
+            DIM detail AS ARRAY OF STRING : detail = SPLIT$(gtk_label_get_text(vsDetail), CHR$(10))
+            PRINT "gewaehlt: "; gtk_widget_get_sensitive(vsKnoepfe[0]); " | heute "; LEFT$(detail[0], 17) = "Datum: " + ZEIT_FORMAT$(ZEIT_JETZT(), "TT.MM.JJJJ"); " | "; detail[1]
         CASE 4
             ok = vfFoto(vsDialog, "versionen")
             ' eine Zelle aendern, eine wegnehmen, dann vergleichen
