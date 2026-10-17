@@ -601,3 +601,98 @@ FUNCTION vorfuehrenStufe7(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' Stufe 8: auswerten -- Statistik (alle Reiter, CSV), Heatmap, aehnliche
+' Farben zusammenfuehren und zuruecknehmen, Farbenblindheit der Ansicht.
+FUNCTION vfFoto(w AS INTEGER, name AS STRING) AS BOOLEAN
+    IF fotoZiel = "" THEN RETURN TRUE
+    DIM ok AS BOOLEAN : ok = gtkFoto(w, fotoZiel + "_" + name + ".png")
+    IF NOT ok THEN PRINT "Foto nicht gesichert: "; name
+    RETURN ok
+END FUNCTION
+
+FUNCTION vfKarten$(namen AS ARRAY OF STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM n AS STRING
+    FOR EACH n IN namen
+        ARRAY_PUSH(t, n + "=" + adWort$(n))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vorfuehrenStufe8(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM ziel AS STRING : ziel = IIF(fotoZiel <> "", fotoZiel, PATHJOIN(TEMPDIR$(), "glutfaden_stufe8"))
+    SELECT CASE schritt
+        CASE 1
+            DIM d AS INTEGER : d = adStatistikBauen()
+            PRINT "statistik: "; vfKarten$(["groesse", "stiche", "farben", "rueckstiche", "abdeckung", "ebenen", "schwierigkeit"])
+            PRINT "  tipp: "; REPLACE$(TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(MAPGET(adKarten, "schwierigkeit"))), CHR$(10), " / ")
+            DIM i AS INTEGER
+            FOR i = 0 TO 4
+                PRINT "  top: "; gtk_label_get_text(adTop[3 * i + 1]); " "; TEXT_AUS_ZEIGER$(gtk_progress_bar_get_text(adTop[3 * i + 2]))
+            NEXT
+        CASE 2
+            ok = vfFoto(adDialog, "statistik")
+            gtk_combo_box_set_active(adStoff, 3)
+            gtk_spin_button_set_value(adZuschlag, 0)
+            gtk_spin_button_set_value(adPreis, 0.95)
+            PRINT "garn 18/0/0.95: "; gtk_label_get_text(adGarnSumme); " | "; gtk_label_get_text(adGarnKosten); " | "; adGarnLetzte.zeilen[1].garn.name; " "; FORMAT$(adGarnLetzte.zeilen[1].genau, "%.2f"); " Stränge"
+            gtk_notebook_set_current_page(adReiter, 2)
+        CASE 3
+            ok = vfFoto(adDialog, "statistik_garn")
+            gtk_combo_box_set_active(adErfahrung, 3)
+            gtk_spin_button_set_value(adStunden, 12)
+            PRINT "zeit Profi 12 h: "; vfKarten$(["gesamtzeit", "tage", "jestunde", "jefarbe"])
+            PRINT "fortschritt: "; TEXT_AUS_ZEIGER$(gtk_progress_bar_get_text(adBalken)); " | "; gtk_label_get_text(adBalkenText); " | "; vfKarten$(["erledigt", "verbleibend", "farbenfertig"])
+            PRINT "csv: ["; adCsvSichern$(ziel + "_statistik.csv"); "] wie kern bei 18/0/0.95: "; BUFFER_TO_STRING$(READALL_BYTES(ziel + "_statistik.csv")) = kern.statistikCsv$(lwMuster, 18, 0, 0.95)
+            gtk_notebook_set_current_page(adReiter, 4)
+        CASE 4
+            ok = vfFoto(adDialog, "statistik_fortschritt")
+            gtk_widget_destroy(adDialog)
+            adDialog = 0
+            DIM hd AS INTEGER : hd = hmBauen()
+            PRINT "heatmap: "; gtk_label_get_text(hmText)
+            gtk_combo_box_set_active(hmAchse, 1)
+            gtk_range_set_value(hmBloecke, 3)
+            PRINT "heatmap: "; gtk_label_get_text(hmText); " | "; gtk_label_get_text(hmBlockText)
+        CASE 5
+            ok = vfFoto(hmDialog, "heatmap")
+            gtk_widget_destroy(hmDialog)
+            hmDialog = 0
+            DIM ad AS INTEGER : ad = aeBauen()
+            PRINT "aehnlich 10: "; gtk_label_get_text(aeZahl); " | knopf "; gtk_widget_get_sensitive(aeKnopf)
+            gtk_range_set_value(aeSchwelle, 3)
+            PRINT "aehnlich 3: "; gtk_label_get_text(aeZahl)
+            gtk_range_set_value(aeSchwelle, 25)
+            PRINT "aehnlich 25: "; gtk_label_get_text(aeZahl)
+            aeAlle(0, 1)
+            PRINT "alle gewaehlt, widerspruch: "; LEFT$(aeZusammenfuehren$(), 40)
+            aeAlle(0, 0)
+            PRINT "keins gewaehlt: "; aeZusammenfuehren$()
+            gtk_range_set_value(aeSchwelle, 10)
+            aeAlle(0, 1)
+        CASE 6
+            ok = vfFoto(aeDialog, "aehnlich")
+            DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
+            PRINT "zusammenfuehren: ["; aeZusammenfuehren$(); "] "; vorher; " -> "; lwMuster.farbanzahl(); " | "; meldung
+            gtk_widget_destroy(aeDialog)
+            aeDialog = 0
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.farbanzahl(); " farben, "; LEN(lwMuster.rueckstiche); " rueckstiche"
+        CASE 7
+            gtk_toggle_button_set_active(fbKnoepfe[2], TRUE)
+            PRINT "farbenblind: "; fbArt; " | "; LEFT$(meldung, 40); " | anzeige wie kern "; lwRgb[2] = kern.farbenblind(lwMuster.farben[2].garn.farbe, kern.FARBENBLIND_DEUTERANOPIE); " | muster unveraendert "; NOT istGeaendert()
+        CASE 8
+            foto("farbenblind")
+            gtk_toggle_button_set_active(fbKnoepfe[0], TRUE)
+            PRINT "zurueck: "; fbArt; " | anzeige "; lwRgb[2] = lwMuster.farben[2].garn.farbe
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+

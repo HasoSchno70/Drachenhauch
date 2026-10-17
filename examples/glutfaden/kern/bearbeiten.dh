@@ -396,11 +396,25 @@ FUNCTION unbenutzteEntfernen(m AS Muster, v AS Verlauf) AS INTEGER
     FOR EACH r IN m.rueckstiche
         IF r.farbe >= 0 AND r.farbe < n THEN genutzt[r.farbe] = 1
     NEXT
+    DIM umleiten[n] AS INTEGER
+    FOR i = 0 TO n - 1
+        umleiten[i] = -1
+    NEXT
+    RETURN farbenBehalten(m, v, genutzt, umleiten, "Unbenutzte Farben entfernen")
+END FUNCTION
+
+' Nur die Farben mit behalten[i] = 1 bleiben, die Nummern ruecken auf. Ein
+' Rueckstich einer weggenommenen Farbe geht an umleiten[i] (-1 = kein Ziel,
+' nur fuer Farben ohne Rueckstich gedacht). Liefert die Zahl der entfernten.
+FUNCTION farbenBehalten(m AS Muster, v AS Verlauf, behalten AS ARRAY OF INTEGER, umleiten AS ARRAY OF INTEGER, titel AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM i AS INTEGER
+    DIM r AS Rueckstich
     DIM hin[n] AS INTEGER
     DIM zurueck AS ARRAY OF INTEGER : zurueck = []
     DIM neueFarben AS ARRAY OF Farbeintrag : neueFarben = []
     FOR i = 0 TO n - 1
-        IF genutzt[i] = 1 THEN
+        IF behalten[i] = 1 THEN
             hin[i] = LEN(neueFarben)
             ARRAY_PUSH(zurueck, i)
             ARRAY_PUSH(neueFarben, m.farben[i])
@@ -410,7 +424,13 @@ FUNCTION unbenutzteEntfernen(m AS Muster, v AS Verlauf) AS INTEGER
     NEXT
     DIM weg AS INTEGER : weg = n - LEN(neueFarben)
     IF weg = 0 THEN RETURN 0
-    v.beginnen("Unbenutzte Farben entfernen")
+    ' Rueckstiche: weggenommene Farbe -> ihr Ziel
+    DIM rueckZiel[n] AS INTEGER
+    FOR i = 0 TO n - 1
+        rueckZiel[i] = hin[i]
+        IF behalten[i] <> 1 AND umleiten[i] >= 0 AND umleiten[i] < n THEN rueckZiel[i] = hin[umleiten[i]]
+    NEXT
+    v.beginnen(titel)
     DIM t AS Aenderung : t = v.teil(TEIL_FARBEN)
     t.farbenVorher = ARRAY_COPY(m.farben)
     t.rueckVorher = ARRAY_COPY(m.rueckstiche)
@@ -419,7 +439,7 @@ FUNCTION unbenutzteEntfernen(m AS Muster, v AS Verlauf) AS INTEGER
     ' sonst stuende nach einem Rueckgaengig die neue Nummer im alten Stich.
     DIM rn AS ARRAY OF Rueckstich : rn = []
     FOR EACH r IN m.rueckstiche
-        ARRAY_PUSH(rn, neuerRueckstich(r.x1, r.y1, r.x2, r.y2, IIF(r.farbe >= 0 AND r.farbe < n, hin[r.farbe], r.farbe)))
+        ARRAY_PUSH(rn, neuerRueckstich(r.x1, r.y1, r.x2, r.y2, IIF(r.farbe >= 0 AND r.farbe < n, rueckZiel[r.farbe], r.farbe)))
     NEXT
     t.rueckNachher = rn
     t.hin = hin

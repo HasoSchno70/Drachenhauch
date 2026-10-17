@@ -1930,6 +1930,39 @@ Fall). **Stolperstein:** ein eben sichtbar gemachtes Widget hat im selben
 Schritt noch keine Groesse -- `gtkFoto` gleich danach meldet
 `alloc_needed`; das Foto gehoert in den naechsten Schritt.
 
+**Stufe 8: auswerten** (2026-10-17). `kern/analyse.dh` rechnet, was
+PyStickys Statistik-Dialog, Heatmap, Farbenblindheits-Ansicht und
+"Aehnliche Farben" rechnen: `statistikVon` (get_statistics: Stiche je Ebene
+auch unsichtbar, bedeckt ueber das Komposit, Perlen nur sichtbar),
+`fortschrittVon` (ohne ausgelassene Farben, je Farbe mit; round(x, 1) als
+`VAL(FORMAT$(x, "%.1f"))`), `schwierigkeitVon` (vier Faktoren je 0..3,
+Sonderstiche ueber ALLE Ebenen, im Diamond-Modus ist der Drill die
+Grundform), `garnRechnen` (je echtem Garn -- ein Blend mit jedem seiner
+Garne und der vollen Stichzahl -- CEIL mit Zuschlag), `zeitRechnen`,
+`statistikCsv$` (BOM, CR LF, Komma wie Pythons csv-Modul), `heatmapRechnen`
+(Werte als single ueber BUFFER_SET/GET_F32 wie numpy float32, Randbloecke
+nach ihrer echten Flaeche), `heatmapFarben` (die Farbe je Tausendstel nimmt
+der erste Wert darin -- PyStickys Zwischenspeicher, am echten QImage
+nachgesehen), `farbenblind` (Vienot mit Pythons round), `aehnlichePaare`
+(CIEDE2000, stabil sortiert) und `farbenZusammenfuehren$` (Ketten werden
+aufgeloest, eine Farbe in zwei Paaren ist ein Fehler). **Gegen PySticky
+gleich** (ref_analyse.py) an einem von PySticky gebauten Probemuster (drei
+Ebenen, ausgelassene Farbe, Blend, Perlen, Teilstiche, Erledigtes), im
+Diamond-Modus, am Beispielmuster und am Leuchtturm; die CSV byte-gleich.
+**Bewusst anders beim Zusammenfuehren:** PySticky loescht mit der Farbe
+ihre Rueckstiche (im Probemuster alle zwoelf) und es ist nicht
+rueckgaengig zu machen -- hier gehen sie an die bleibende Farbe, und es ist
+ein Schritt im Verlauf (`farbenBehalten` mit Umleitung, aus
+`unbenutzteEntfernen` herausgeloest; `alleUmfaerben` ueber alle Ebenen --
+`farbeErsetzen` nimmt nur Sichtbares, der erste Versuch verlor so 30
+verdeckte Stiche). Oberflaeche `ansicht/analysedialoge.dh`: Knopf
+"Auswerten" in der Kopfleiste mit Aufklapper (Statistik mit fuenf Reitern
+und CSV, auch Strg+Umschalt+G; Heatmap; Aehnliche Farben; Farbenblindheit
+als Auswahl -- nur `lwRgb` der Zeichenflaeche, die Seitenleiste bleibt wie
+in PySticky). Ohne den Reiter Einkaufsliste (braucht den Garn-Vorrat).
+`--probe-stufe8`, Sammlung `tests/pruef/glutfaden_stufe8.dhtest` (8; 13
+Verfaelschungen des Kerns und 8 der Oberflaeche fallen je in ihrem Fall).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

@@ -79,7 +79,7 @@ SUB leinwandAufbauen()
     DIM rgb[n + 1] AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
-        rgb[i] = lwMuster.farben[i].garn.farbe
+        rgb[i] = kern.farbenblind(lwMuster.farben[i].garn.farbe, fbArt)   ' nur die Anzeige
     NEXT
     lwRgb = rgb
     DIM b AS INTEGER : b = lwMuster.breite

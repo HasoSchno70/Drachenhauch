@@ -29,6 +29,22 @@ DECLARE FUNCTION gtk_box_new LIB GTK (richtung AS LONG, abstand AS LONG) AS ZEIG
 DECLARE SUB gtk_box_pack_start LIB GTK (box AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, fuellen AS BOOLEAN, rand AS ULONG)
 DECLARE SUB gtk_box_pack_end LIB GTK (box AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, fuellen AS BOOLEAN, rand AS ULONG)
 DECLARE FUNCTION gtk_paned_new LIB GTK (richtung AS LONG) AS ZEIGER
+DECLARE FUNCTION gtk_notebook_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_notebook_append_page LIB GTK (nb AS ZEIGER, kind AS ZEIGER, reiter AS ZEIGER) AS LONG
+DECLARE SUB gtk_notebook_set_current_page LIB GTK (nb AS ZEIGER, seite AS LONG)
+DECLARE FUNCTION gtk_grid_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_grid_attach LIB GTK (g AS ZEIGER, kind AS ZEIGER, x AS LONG, y AS LONG, b AS LONG, h AS LONG)
+DECLARE SUB gtk_grid_set_row_spacing LIB GTK (g AS ZEIGER, abstand AS ULONG)
+DECLARE SUB gtk_grid_set_column_spacing LIB GTK (g AS ZEIGER, abstand AS ULONG)
+DECLARE SUB gtk_grid_set_column_homogeneous LIB GTK (g AS ZEIGER, gleich AS BOOLEAN)
+DECLARE FUNCTION gtk_menu_button_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_menu_button_set_popover LIB GTK (mb AS ZEIGER, popover AS ZEIGER)
+DECLARE FUNCTION gtk_popover_new LIB GTK (bezug AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_popover_popdown LIB GTK (p AS ZEIGER)
+DECLARE FUNCTION gtk_radio_button_new_with_label_from_widget LIB GTK (gruppe AS ZEIGER, text AS TEXT) AS ZEIGER
+DECLARE FUNCTION gtk_image_new_from_icon_name LIB GTK (name AS TEXT, groesse AS LONG) AS ZEIGER
+DECLARE SUB gtk_spin_button_set_digits LIB GTK (s AS ZEIGER, stellen AS ULONG)
+DECLARE FUNCTION gtk_spin_button_get_value LIB GTK (s AS ZEIGER) AS FLOAT
 DECLARE SUB gtk_paned_pack1 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, schrumpfen AS BOOLEAN)
 DECLARE SUB gtk_paned_pack2 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, schrumpfen AS BOOLEAN)
 DECLARE SUB gtk_paned_set_position LIB GTK (p AS ZEIGER, pos AS LONG)
@@ -97,6 +113,9 @@ DECLARE FUNCTION gtk_drawing_area_new LIB GTK () AS ZEIGER
 ' --- Widgets allgemein
 DECLARE SUB gtk_widget_set_size_request LIB GTK (w AS ZEIGER, b AS LONG, h AS LONG)
 DECLARE SUB gtk_widget_set_tooltip_text LIB GTK (w AS ZEIGER, text AS TEXT)
+DECLARE FUNCTION gtk_widget_get_tooltip_text LIB GTK (w AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_widget_get_sensitive LIB GTK (w AS ZEIGER) AS BOOLEAN
+DECLARE FUNCTION gtk_progress_bar_get_text LIB GTK (b AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_widget_set_has_tooltip LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_widget_set_hexpand LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_widget_set_vexpand LIB GTK (w AS ZEIGER, an AS BOOLEAN)

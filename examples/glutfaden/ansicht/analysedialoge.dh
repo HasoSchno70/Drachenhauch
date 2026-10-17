@@ -1,0 +1,779 @@
+' Das Muster auswerten -- die Dialoge zu kern/analyse.dh: Statistik
+' (PySticky statistics_dialog.py mit den Reitern aus statistics_tabs),
+' Heatmap (heatmap_dialog.py), aehnliche Farben (similar_colors_dialog.py)
+' und die Farbenblindheits-Ansicht der Zeichenflaeche (color_blindness.py).
+' Erreichbar ueber den Knopf "Auswerten" in der Kopfleiste, die Statistik
+' auch mit Strg+Umschalt+G.
+'
+' Anders als PySticky: ohne den Reiter "Einkaufsliste" (der braucht den
+' Garn-Vorrat, den Glutfaden noch nicht hat); Tabellen nicht sortierbar;
+' Zusammenfuehren fragt nicht nach, weil Rueckgaengig es zuruecknimmt;
+' Meldungen stehen in einer Zeile unten statt in Kaesten.
+
+DIM fbArt AS INTEGER                 ' Farbenblindheit der Zeichenflaeche (kern.FARBENBLIND_*)
+
+' --- Bausteine -------------------------------------------------------------------------
+
+' Ein Farbfeld als Text (Pango): ein paar Leerzeichen auf der Farbe
+FUNCTION adFeld$(f AS INTEGER) AS STRING
+    RETURN "<span background='" + kern.farbeAlsHex$(f) + "'>      </span>"
+END FUNCTION
+
+FUNCTION adKarte(titel AS STRING, BYREF wert AS INTEGER) AS INTEGER
+    DIM k AS INTEGER : k = gtk_box_new(GTK_SENKRECHT, 2)
+    gtkKlasse(k, "karte")
+    DIM t AS INTEGER : t = gtk_label_new(titel)
+    gtk_label_set_xalign(t, 0.0)
+    gtkKlasse(t, "nebensache")
+    wert = gtk_label_new("-")
+    gtk_label_set_xalign(wert, 0.0)
+    gtkKlasse(wert, "kartenwert")
+    gtk_box_pack_start(k, t, FALSE, FALSE, 0)
+    gtk_box_pack_start(k, wert, FALSE, FALSE, 0)
+    RETURN k
+END FUNCTION
+
+' Eine Tabellenzeile: Breite 0 = dehnt sich; Ausrichtung je Spalte "l"/"r"
+FUNCTION adReihe(texte AS ARRAY OF STRING, breiten AS ARRAY OF INTEGER, ausr AS STRING) AS INTEGER
+    DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 12)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(texte) - 1
+        DIM l AS INTEGER : l = sdZelle(texte[i], breiten[i], MID$(ausr, i, 1) = "r")
+        gtk_box_pack_start(z, l, breiten[i] = 0, TRUE, 0)
+    NEXT
+    RETURN z
+END FUNCTION
+
+FUNCTION adUeberschrift(text AS STRING) AS INTEGER
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtk_label_set_xalign(l, 0.0)
+    gtkKlasse(l, "abschnitt")
+    RETURN l
+END FUNCTION
+
+' Eine Liste mit Kopf in einem rollenden Bereich; liefert die Liste
+FUNCTION adTabelle(kasten AS INTEGER, kopf AS ARRAY OF STRING, breiten AS ARRAY OF INTEGER, ausr AS STRING) AS INTEGER
+    DIM k AS ARRAY OF STRING : k = []
+    DIM t AS STRING
+    FOR EACH t IN kopf
+        ARRAY_PUSH(k, "<b>" + t + "</b>")
+    NEXT
+    gtk_box_pack_start(kasten, adReihe(k, breiten, ausr), FALSE, FALSE, 0)
+    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    DIM l AS INTEGER : l = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(l, GTK_AUSWAHL_KEINE)
+    gtkKlasse(l, "liste")
+    gtk_container_add(rolle, l)
+    gtk_box_pack_start(kasten, rolle, TRUE, TRUE, 0)
+    RETURN l
+END FUNCTION
+
+' Alle Zeilen einer Liste weg
+SUB adLeeren(liste AS INTEGER)
+    WHILE TRUE
+        DIM z AS INTEGER : z = gtk_list_box_get_row_at_index(liste, 0)
+        IF z = 0 THEN EXIT WHILE
+        gtk_widget_destroy(z)
+    WEND
+END SUB
+
+FUNCTION adZeile(liste AS INTEGER, texte AS ARRAY OF STRING, breiten AS ARRAY OF INTEGER, ausr AS STRING) AS INTEGER
+    DIM z AS INTEGER : z = adReihe(texte, breiten, ausr)
+    gtk_list_box_insert(liste, z, -1)
+    RETURN z
+END FUNCTION
+
+FUNCTION adSeite() AS INTEGER
+    DIM s AS INTEGER : s = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(s, 12)
+    RETURN s
+END FUNCTION
+
+FUNCTION adSpin(von AS FLOAT, bis AS FLOAT, schritt AS FLOAT, wert AS FLOAT, stellen AS INTEGER) AS INTEGER
+    DIM s AS INTEGER : s = gtk_spin_button_new_with_range(von, bis, schritt)
+    gtk_spin_button_set_digits(s, stellen)
+    gtk_spin_button_set_value(s, wert)
+    RETURN s
+END FUNCTION
+
+' --- Statistik ---------------------------------------------------------------------------
+
+DIM adDialog AS INTEGER
+DIM adReiter AS INTEGER
+DIM adKarten AS MAP OF INTEGER       ' Name -> Wert-Beschriftung
+DIM adTop AS ARRAY OF INTEGER        ' je Zeile: Feld, Name, Balken
+DIM adFarbListe AS INTEGER
+DIM adStoff AS INTEGER
+DIM adZuschlag AS INTEGER
+DIM adPreis AS INTEGER
+DIM adGarnListe AS INTEGER
+DIM adGarnSumme AS INTEGER
+DIM adGarnKosten AS INTEGER
+DIM adGarnLetzte AS kern.Garnrechnung  ' was der Garn-Reiter zeigt
+DIM adErfahrung AS INTEGER
+DIM adStunden AS INTEGER
+DIM adZeitListe AS INTEGER
+DIM adBalken AS INTEGER
+DIM adBalkenText AS INTEGER
+DIM adFortListe AS INTEGER
+DIM adMeldung AS INTEGER
+DIM adSperre AS BOOLEAN
+
+FUNCTION adStoffe() AS ARRAY OF INTEGER
+    RETURN [11, 14, 16, 18, 28, 32]
+END FUNCTION
+
+FUNCTION adStoffNamen() AS ARRAY OF STRING
+    RETURN ["Aida 11 (4,3 St/cm)", "Aida 14 (5,5 St/cm)", "Aida 16 (6,3 St/cm)", "Aida 18 (7,1 St/cm)", "Evenweave 28 (11 St/cm)", "Leinen 32 (12,6 St/cm)"]
+END FUNCTION
+
+FUNCTION adKarteIn(g AS INTEGER, name AS STRING, titel AS STRING, x AS INTEGER, y AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM w AS INTEGER
+    gtk_grid_attach(g, adKarte(titel, w), x, y, b, 1)
+    MAPPUT(adKarten, name, w)
+    RETURN w
+END FUNCTION
+
+SUB adSetzen(name AS STRING, text AS STRING)
+    gtk_label_set_text(MAPGET(adKarten, name), text)
+END SUB
+
+FUNCTION adWort$(name AS STRING) AS STRING
+    RETURN gtk_label_get_text(MAPGET(adKarten, name))
+END FUNCTION
+
+' Uebersicht und Farben (stehen fest), dann die Rechner
+SUB adFuellen()
+    DIM m AS kern.Muster : m = lwMuster
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    DIM s AS kern.Statistik : s = kern.statistikVon(m)
+    adSetzen("groesse", STR$(s.breite) + " × " + STR$(s.hoehe))
+    adSetzen("stiche", ZAHL$(IIF(s.ausgelassen > 0, s.zuSticken, s.sticheGesamt)))
+    adSetzen("farben", STR$(s.benutzt - s.ausgelasseneFarben) + IIF(s.ausgelasseneFarben > 0, " (+" + STR$(s.ausgelasseneFarben) + " übersp.)", ""))
+    adSetzen("rueckstiche", STR$(LEN(m.rueckstiche)))
+    adSetzen("abdeckung", IIF(s.breite * s.hoehe > 0, FORMAT$(s.bedeckt / (s.breite * s.hoehe) * 100, "%.1f") + "%", "0%"))
+    adSetzen("ebenen", STR$(s.ebenen))
+    DIM d AS kern.Schwierigkeit : d = kern.schwierigkeitVon(m)
+    adSetzen("schwierigkeit", d.stufe)
+    gtk_widget_set_tooltip_text(MAPGET(adKarten, "schwierigkeit"), "Score: " + STR$(d.punkte) + " / 12" + CHR$(10) + _
+        "  Farben: " + STR$(d.pFarben) + "/3 (" + STR$(d.benutzt) + " verwendet)" + CHR$(10) + _
+        "  Stiche: " + STR$(d.pGroesse) + "/3 (" + ZAHL$(d.zuSticken) + " zu sticken)" + CHR$(10) + _
+        "  Sonderstiche: " + STR$(d.pSonder) + "/3 (" + FORMAT$(d.sonderAnteil * 100, "%.1f") + "% Anteil)" + CHR$(10) + _
+        "  Backstitches: " + STR$(d.pRueck) + "/3 (" + STR$(d.rueckstiche) + " Linien)")
+    ' die fuenf haeufigsten (ohne ausgelassene), stabil wie Pythons sorted
+    DIM nr AS ARRAY OF INTEGER : nr = []
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        IF m.farben[i].auslassen THEN CONTINUE
+        j = LEN(nr)
+        WHILE j > 0
+            IF m.farben[nr[j - 1]].stichzahl >= m.farben[i].stichzahl THEN EXIT WHILE
+            j = j - 1
+        WEND
+        ARRAY_INSERT(nr, j, i)
+    NEXT
+    DIM summe AS INTEGER : summe = IIF(s.zuSticken > 0, s.zuSticken, 1)
+    FOR i = 0 TO 4
+        DIM feld AS INTEGER : feld = adTop[3 * i]
+        DIM name AS INTEGER : name = adTop[3 * i + 1]
+        DIM balken AS INTEGER : balken = adTop[3 * i + 2]
+        IF i < LEN(nr) THEN
+            DIM f AS kern.Farbeintrag : f = m.farben[nr[i]]
+            gtk_label_set_markup(feld, adFeld$(f.garn.farbe))
+            gtk_label_set_text(name, f.symbol + " " + f.garn.name)
+            DIM pz AS INTEGER : pz = INT(f.stichzahl / summe * 100)
+            gtk_progress_bar_set_fraction(balken, pz / 100)
+            gtk_progress_bar_set_text(balken, ZAHL$(f.stichzahl) + " (" + STR$(pz) + "%)")
+        ELSE
+            gtk_label_set_text(feld, "")
+            gtk_label_set_text(name, "-")
+            gtk_progress_bar_set_fraction(balken, 0)
+            gtk_progress_bar_set_text(balken, "")
+        END IF
+    NEXT
+    ' Farben
+    adLeeren(adFarbListe)
+    FOR i = 0 TO m.farbanzahl() - 1
+        f = m.farben[i]
+        DIM symbol AS STRING : symbol = sdMaske$(f.symbol)
+        DIM nm AS STRING : nm = sdMaske$(f.garn.name)
+        DIM pr AS STRING
+        IF f.auslassen THEN
+            symbol = "<span foreground='#ff9800'>⊘ " + symbol + "</span>"
+            nm = "<span foreground='#ff9800'>" + nm + " (" + IIF(dp, "nicht kleben", "nicht sticken") + ")</span>"
+            pr = "-"
+        ELSE
+            pr = FORMAT$(f.stichzahl / summe * 100, "%.1f") + "%"
+        END IF
+        DIM z AS INTEGER : z = adZeile(adFarbListe, [adFeld$(f.garn.farbe), symbol, nm, sdMaske$(kern.oderStrich$(f.garn.hersteller)), sdMaske$(kern.oderStrich$(f.garn.nummer)), STR$(f.stichzahl), pr], [44, 50, 0, 110, 70, 70, 60], "lllllrr")
+    NEXT
+    gtk_widget_show_all(adFarbListe)
+    adFortschritt()
+    adGarn(0, 0)
+    adZeit(0, 0)
+END SUB
+
+SUB adGarn(w AS INTEGER, daten AS INTEGER)
+    IF adSperre THEN RETURN
+    DIM m AS kern.Muster : m = lwMuster
+    DIM stoff AS INTEGER : stoff = adStoffe()[MAX(0, gtk_combo_box_get_active(adStoff))]
+    DIM g AS kern.Garnrechnung : g = kern.garnRechnen(m, stoff, gtk_spin_button_get_value_as_int(adZuschlag), gtk_spin_button_get_value(adPreis))
+    adGarnLetzte = g
+    adLeeren(adGarnListe)
+    DIM z AS kern.Garnzeile
+    FOR EACH z IN g.zeilen
+        DIM r AS INTEGER : r = adZeile(adGarnListe, [adFeld$(z.garn.farbe), sdMaske$(z.garn.name), STR$(z.stiche), FORMAT$(z.genau, "%.2f"), STR$(z.mitZuschlag), FORMAT$(z.kosten, "%.2f") + " €"], [44, 0, 70, 80, 130, 90], "llrrrr")
+    NEXT
+    gtk_widget_show_all(adGarnListe)
+    gtk_label_set_markup(adGarnSumme, "<b>Gesamt: " + STR$(g.straenge) + " Stränge" + IIF(g.ausgelasseneFarben > 0, " (" + STR$(g.ausgelasseneFarben) + " Farbe(n) übersprungen)", "") + "</b>")
+    gtk_label_set_markup(adGarnKosten, "<b>Geschätzte Kosten: " + FORMAT$(g.kosten, "%.2f") + " €</b>")
+END SUB
+
+SUB adZeit(w AS INTEGER, daten AS INTEGER)
+    IF adSperre THEN RETURN
+    DIM m AS kern.Muster : m = lwMuster
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    DIM t AS kern.Zeitrechnung : t = kern.zeitRechnen(m, kern.erfahrungsstufen()[MAX(0, gtk_combo_box_get_active(adErfahrung))], gtk_spin_button_get_value(adStunden))
+    adSetzen("gesamtzeit", t.gesamt)
+    adSetzen("tage", t.tage)
+    adSetzen("jestunde", STR$(t.jeStunde))
+    adSetzen("jefarbe", t.jeFarbe)
+    adLeeren(adZeitListe)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(t.farben) - 1
+        DIM f AS kern.Farbeintrag : f = m.farben[t.farben[k]]
+        DIM z AS INTEGER : z = adZeile(adZeitListe, [adFeld$(f.garn.farbe), sdMaske$(f.garn.name), STR$(f.stichzahl), t.farbZeit[k]], [44, 0, 80, 120], "llrr")
+    NEXT
+    gtk_widget_show_all(adZeitListe)
+END SUB
+
+SUB adFortschritt()
+    DIM m AS kern.Muster : m = lwMuster
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    DIM p AS kern.Fortschritt : p = kern.fortschrittVon(m)
+    gtk_progress_bar_set_fraction(adBalken, p.prozent / 100)
+    gtk_progress_bar_set_text(adBalken, FORMAT$(p.prozent, "%.1f") + "%")
+    gtk_label_set_text(adBalkenText, ZAHL$(p.erledigt) + " / " + ZAHL$(p.gesamt) + IIF(dp, " Diamanten gesetzt", " Stiche gestickt"))
+    adSetzen("erledigt", ZAHL$(p.erledigt))
+    adSetzen("verbleibend", ZAHL$(p.gesamt - p.erledigt))
+    DIM fertig AS INTEGER, alle AS INTEGER
+    DIM i AS INTEGER
+    adLeeren(adFortListe)
+    FOR i = 0 TO m.farbanzahl() - 1
+        IF p.farbeGesamt[i] = 0 OR m.farben[i].auslassen THEN CONTINUE
+        alle = alle + 1
+        DIM status AS STRING
+        IF p.farbeErledigt[i] = p.farbeGesamt[i] THEN
+            fertig = fertig + 1
+            status = "<span foreground='#2ecc71'>✓ Fertig</span>"
+        ELSEIF p.farbeErledigt[i] > 0 THEN
+            status = "<span foreground='#f39c12'>In Arbeit</span>"
+        ELSE
+            status = "<span foreground='#8d93a1'>Offen</span>"
+        END IF
+        DIM z AS INTEGER : z = adZeile(adFortListe, [adFeld$(m.farben[i].garn.farbe), sdMaske$(m.farben[i].garn.name), STR$(p.farbeErledigt[i]), STR$(p.farbeGesamt[i]), FORMAT$(p.farbeProzent[i], "%.1f") + "%", status], [44, 0, 80, 80, 70, 100], "llrrrl")
+    NEXT
+    gtk_widget_show_all(adFortListe)
+    adSetzen("farbenfertig", STR$(fertig) + " / " + STR$(alle))
+END SUB
+
+FUNCTION adCsvZiel$() AS STRING
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Statistiken exportieren", adDialog, GTK_DATEI_SICHERN, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Sichern", GTK_ANTWORT_ANNEHMEN, 0)
+    gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
+    gtk_file_chooser_set_current_name(d, lwMuster.name + "_statistik.csv")
+    IF musterPfad <> "" THEN
+        DIM ok AS BOOLEAN : ok = gtk_file_chooser_set_current_folder(d, DIRNAME(musterPfad))
+    END IF
+    DIM pfad AS STRING
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        pfad = TEXT_AUS_ZEIGER$(z)
+        g_free(z)
+    END IF
+    gtk_widget_destroy(d)
+    RETURN pfad
+END FUNCTION
+
+' Die CSV mit den Einstellungen des Garn-Reiters; "" = gesichert, sonst der Fehler
+FUNCTION adCsvSichern$(pfad AS STRING) AS STRING
+    DIM stoff AS INTEGER : stoff = adStoffe()[MAX(0, gtk_combo_box_get_active(adStoff))]
+    TRY
+        WRITEALL(pfad, kern.statistikCsv$(lwMuster, stoff, gtk_spin_button_get_value_as_int(adZuschlag), gtk_spin_button_get_value(adPreis)))
+    CATCH f
+        RETURN f
+    END TRY
+    RETURN ""
+END FUNCTION
+
+SUB adCsvGeklickt(w AS INTEGER, daten AS INTEGER)
+    DIM pfad AS STRING : pfad = adCsvZiel$()
+    IF pfad = "" THEN RETURN
+    DIM f AS STRING : f = adCsvSichern$(pfad)
+    gtk_label_set_text(adMeldung, IIF(f = "", "Statistiken exportiert nach " + pfad, "Export fehlgeschlagen: " + f))
+END SUB
+
+FUNCTION adStatistikBauen() AS INTEGER
+    IF NOT lwHat THEN RETURN 0
+    DIM m AS kern.Muster : m = lwMuster
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    adKarten = {}
+    adTop = []
+    adDialog = gtk_dialog_new_with_buttons("Muster-Statistiken & Garnverbrauch", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Schließen", GTK_ANTWORT_OK, 0)
+    gtk_window_set_default_size(adDialog, 900, 640)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(adDialog)
+    gtk_container_set_border_width(innen, 10)
+    adReiter = gtk_notebook_new()
+    gtk_box_pack_start(innen, adReiter, TRUE, TRUE, 0)
+
+    ' Uebersicht
+    DIM s1 AS INTEGER : s1 = adSeite()
+    DIM g AS INTEGER : g = gtk_grid_new()
+    gtk_grid_set_row_spacing(g, 10)
+    gtk_grid_set_column_spacing(g, 10)
+    gtk_grid_set_column_homogeneous(g, TRUE)
+    DIM w AS INTEGER
+    w = adKarteIn(g, "groesse", "Größe", 0, 0, 1)
+    w = adKarteIn(g, "stiche", IIF(dp, "Gesamt-Drills", "Gesamtstiche"), 1, 0, 1)
+    w = adKarteIn(g, "farben", "Farben", 2, 0, 1)
+    w = adKarteIn(g, "rueckstiche", "Rückstiche", 0, 1, 1)
+    w = adKarteIn(g, "abdeckung", "Abdeckung", 1, 1, 1)
+    w = adKarteIn(g, "ebenen", "Ebenen", 2, 1, 1)
+    w = adKarteIn(g, "schwierigkeit", "Schwierigkeit", 0, 2, 3)
+    gtk_box_pack_start(s1, g, FALSE, FALSE, 0)
+    gtk_box_pack_start(s1, adUeberschrift("Top 5 Farben"), FALSE, FALSE, 6)
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        DIM reihe AS INTEGER : reihe = gtk_box_new(GTK_WAAGERECHT, 8)
+        DIM feld AS INTEGER : feld = gtk_label_new("")
+        DIM name AS INTEGER : name = gtk_label_new("-")
+        gtk_label_set_xalign(name, 0.0)
+        gtk_widget_set_size_request(name, 220, -1)
+        DIM balken AS INTEGER : balken = gtk_progress_bar_new()
+        gtk_progress_bar_set_show_text(balken, TRUE)
+        gtk_widget_set_hexpand(balken, TRUE)
+        gtk_box_pack_start(reihe, feld, FALSE, FALSE, 0)
+        gtk_box_pack_start(reihe, name, FALSE, FALSE, 0)
+        gtk_box_pack_start(reihe, balken, TRUE, TRUE, 0)
+        gtk_box_pack_start(s1, reihe, FALSE, FALSE, 2)
+        ARRAY_PUSH(adTop, feld) : ARRAY_PUSH(adTop, name) : ARRAY_PUSH(adTop, balken)
+    NEXT
+    DIM n AS INTEGER : n = gtk_notebook_append_page(adReiter, s1, gtk_label_new("Übersicht"))
+
+    ' Farben
+    DIM s2 AS INTEGER : s2 = adSeite()
+    adFarbListe = adTabelle(s2, ["Farbe", "Symbol", "Name", "Hersteller", "Nr.", IIF(dp, "Drills", "Stiche"), "%"], [44, 50, 0, 110, 70, 70, 60], "lllllrr")
+    n = gtk_notebook_append_page(adReiter, s2, gtk_label_new("Farben"))
+
+    ' Garnverbrauch (im Diamond-Modus nicht -- Drills gibt es nicht in Straengen)
+    DIM s3 AS INTEGER : s3 = adSeite()
+    DIM ein AS INTEGER : ein = gtk_box_new(GTK_WAAGERECHT, 8)
+    gtk_box_pack_start(ein, gtk_label_new("Stoffart:"), FALSE, FALSE, 0)
+    adStoff = gtk_combo_box_text_new()
+    DIM t AS STRING
+    FOR EACH t IN adStoffNamen()
+        gtk_combo_box_text_append_text(adStoff, t)
+    NEXT
+    DIM wahl AS INTEGER : wahl = 1
+    FOR i = 0 TO LEN(adStoffe()) - 1
+        IF adStoffe()[i] = INT(m.stoff) THEN wahl = i
+    NEXT
+    gtk_combo_box_set_active(adStoff, wahl)
+    gtk_box_pack_start(ein, adStoff, FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new("   Sicherheitszuschlag:"), FALSE, FALSE, 0)
+    adZuschlag = adSpin(0, 50, 1, 20, 0)
+    gtk_box_pack_start(ein, adZuschlag, FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new("%   Preis pro Strang:"), FALSE, FALSE, 0)
+    adPreis = adSpin(0, 50, 0.05, 1.5, 2)
+    gtk_box_pack_start(ein, adPreis, FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new("€"), FALSE, FALSE, 0)
+    gtk_box_pack_start(s3, ein, FALSE, FALSE, 0)
+    adGarnListe = adTabelle(s3, ["Farbe", "Name", "Stiche", "Stränge", "Stränge (+Zuschlag)", "Kosten"], [44, 0, 70, 80, 130, 90], "llrrrr")
+    DIM fuss AS INTEGER : fuss = gtk_box_new(GTK_WAAGERECHT, 8)
+    adGarnSumme = gtk_label_new("")
+    adGarnKosten = gtk_label_new("")
+    gtkKlasse(adGarnKosten, "wert")
+    gtk_box_pack_start(fuss, adGarnSumme, FALSE, FALSE, 0)
+    gtk_box_pack_end(fuss, adGarnKosten, FALSE, FALSE, 0)
+    gtk_box_pack_start(s3, fuss, FALSE, FALSE, 4)
+    IF NOT dp THEN n = gtk_notebook_append_page(adReiter, s3, gtk_label_new("Garnverbrauch"))
+
+    ' Zeitschaetzung
+    DIM s4 AS INTEGER : s4 = adSeite()
+    DIM ze AS INTEGER : ze = gtk_box_new(GTK_WAAGERECHT, 8)
+    gtk_box_pack_start(ze, gtk_label_new("Stickerfahrung:"), FALSE, FALSE, 0)
+    adErfahrung = gtk_combo_box_text_new()
+    FOR EACH t IN kern.erfahrungsstufen()
+        gtk_combo_box_text_append_text(adErfahrung, t)
+    NEXT
+    gtk_combo_box_set_active(adErfahrung, 1)
+    gtk_widget_set_sensitive(adErfahrung, NOT dp)
+    gtk_box_pack_start(ze, adErfahrung, FALSE, FALSE, 0)
+    gtk_box_pack_start(ze, gtk_label_new("   Stunden pro Tag:"), FALSE, FALSE, 0)
+    adStunden = adSpin(0.5, 12, 0.5, 2, 1)
+    gtk_box_pack_start(ze, adStunden, FALSE, FALSE, 0)
+    gtk_box_pack_start(s4, ze, FALSE, FALSE, 0)
+    DIM g4 AS INTEGER : g4 = gtk_grid_new()
+    gtk_grid_set_row_spacing(g4, 10)
+    gtk_grid_set_column_spacing(g4, 10)
+    gtk_grid_set_column_homogeneous(g4, TRUE)
+    w = adKarteIn(g4, "gesamtzeit", "Geschätzte Gesamtzeit", 0, 0, 1)
+    w = adKarteIn(g4, "tage", IIF(dp, "Bei täglichem Kleben", "Bei täglichem Sticken"), 1, 0, 1)
+    w = adKarteIn(g4, "jestunde", IIF(dp, "Drills pro Stunde", "Stiche pro Stunde"), 0, 1, 1)
+    w = adKarteIn(g4, "jefarbe", "Durchschn. pro Farbe", 1, 1, 1)
+    gtk_box_pack_start(s4, g4, FALSE, FALSE, 6)
+    gtk_box_pack_start(s4, adUeberschrift("Zeitaufwand pro Farbe (geschätzt)"), FALSE, FALSE, 0)
+    adZeitListe = adTabelle(s4, ["Farbe", "Name", IIF(dp, "Drills", "Stiche"), "Geschätzte Zeit"], [44, 0, 80, 120], "llrr")
+    n = gtk_notebook_append_page(adReiter, s4, gtk_label_new("Zeitschätzung"))
+
+    ' Fortschritt
+    DIM s5 AS INTEGER : s5 = adSeite()
+    gtk_box_pack_start(s5, adUeberschrift("Gesamtfortschritt"), FALSE, FALSE, 0)
+    adBalken = gtk_progress_bar_new()
+    gtk_progress_bar_set_show_text(adBalken, TRUE)
+    gtk_box_pack_start(s5, adBalken, FALSE, FALSE, 0)
+    adBalkenText = gtk_label_new("")
+    gtkKlasse(adBalkenText, "nebensache")
+    gtk_box_pack_start(s5, adBalkenText, FALSE, FALSE, 0)
+    DIM g5 AS INTEGER : g5 = gtk_grid_new()
+    gtk_grid_set_column_spacing(g5, 10)
+    gtk_grid_set_column_homogeneous(g5, TRUE)
+    w = adKarteIn(g5, "erledigt", "Erledigt", 0, 0, 1)
+    w = adKarteIn(g5, "verbleibend", "Verbleibend", 1, 0, 1)
+    w = adKarteIn(g5, "farbenfertig", "Farben fertig", 2, 0, 1)
+    gtk_box_pack_start(s5, g5, FALSE, FALSE, 6)
+    gtk_box_pack_start(s5, adUeberschrift("Fortschritt pro Farbe"), FALSE, FALSE, 0)
+    adFortListe = adTabelle(s5, ["Farbe", "Name", "Erledigt", "Gesamt", "%", "Status"], [44, 0, 80, 80, 70, 100], "llrrrl")
+    n = gtk_notebook_append_page(adReiter, s5, gtk_label_new("Fortschritt"))
+
+    ' unten: CSV und Meldung
+    DIM unten AS INTEGER : unten = gtk_box_new(GTK_WAAGERECHT, 8)
+    DIM kCsv AS INTEGER : kCsv = gtk_button_new_with_label("Als CSV exportieren …")
+    gtk_widget_set_tooltip_text(kCsv, "Je Garn Symbol, Name, Hersteller, Nummer, Stiche, Anteil" + IIF(dp, "", ", Stränge und Kosten (Einstellungen des Garn-Reiters)"))
+    gtk_box_pack_start(unten, kCsv, FALSE, FALSE, 0)
+    adMeldung = gtk_label_new("")
+    gtk_label_set_xalign(adMeldung, 0.0)
+    gtk_label_set_ellipsize(adMeldung, GTK_ELLIPSE_ENDE)
+    gtkKlasse(adMeldung, "nebensache")
+    gtk_box_pack_start(unten, adMeldung, TRUE, TRUE, 0)
+    gtk_box_pack_start(innen, unten, FALSE, FALSE, 6)
+
+    signal(kCsv, "clicked", adCsvGeklickt, 0, 0, 0)
+    signal(adStoff, "changed", adGarn, 0, 0, 0)
+    signal(adZuschlag, "value-changed", adGarn, 0, 0, 0)
+    signal(adPreis, "value-changed", adGarn, 0, 0, 0)
+    signal(adErfahrung, "changed", adZeit, 0, 0, 0)
+    signal(adStunden, "value-changed", adZeit, 0, 0, 0)
+    adFuellen()
+    gtk_widget_show_all(adDialog)
+    RETURN adDialog
+END FUNCTION
+
+SUB statistikDialog()
+    IF adStatistikBauen() = 0 THEN RETURN
+    DIM a AS INTEGER : a = gtk_dialog_run(adDialog)
+    gtk_widget_destroy(adDialog)
+    adDialog = 0
+END SUB
+
+' --- Heatmap ---------------------------------------------------------------------------
+
+DIM hmDialog AS INTEGER
+DIM hmAchse AS INTEGER
+DIM hmBloecke AS INTEGER
+DIM hmBlockText AS INTEGER
+DIM hmText AS INTEGER
+DIM hmFlaeche AS INTEGER
+DIM hmKarte AS kern.Heatmap
+DIM hmFarben AS ARRAY OF INTEGER
+
+FUNCTION hmAchseNr() AS INTEGER
+    ' Farbenvielfalt steht zuerst (wie PySticky -- Stichdichte ist bei voll
+    ' gestickten Mustern meist durchgehend rot)
+    RETURN IIF(gtk_combo_box_get_active(hmAchse) = 1, kern.HEATMAP_DICHTE, kern.HEATMAP_VIELFALT)
+END FUNCTION
+
+SUB hmRechnen(w AS INTEGER, daten AS INTEGER)
+    DIM bs AS INTEGER : bs = MAX(1, INT(gtk_range_get_value(hmBloecke) + 0.5))
+    gtk_label_set_text(hmBlockText, STR$(bs) + " Stich" + IIF(bs = 1, "", "e"))
+    hmKarte = kern.heatmapRechnen(lwMuster, hmAchseNr(), bs)
+    hmFarben = kern.heatmapFarben(hmKarte)
+    gtk_label_set_text(hmText, kern.heatmapText$(hmKarte, hmAchseNr()))
+    gtk_widget_queue_draw(hmFlaeche)
+END SUB
+
+' Bloecke ganzzahlig gross, mindestens 2 Punkte, mittig (wie PySticky)
+FUNCTION hmZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(w)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(w)
+    sdFarbe(cr, &H0A0A18, 1)
+    cairo_paint(cr)
+    IF IS_NIL(hmKarte) THEN RETURN FALSE
+    DIM z AS INTEGER : z = MAX(2, MIN(MAX(100, b - 20) \ MAX(1, hmKarte.bb), MAX(100, h - 20) \ MAX(1, hmKarte.bh)))
+    DIM ox AS FLOAT : ox = INT((b - z * hmKarte.bb) / 2)
+    DIM oy AS FLOAT : oy = INT((h - z * hmKarte.bh) / 2)
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO hmKarte.bh - 1
+        FOR x = 0 TO hmKarte.bb - 1
+            sdFarbe(cr, hmFarben[y * hmKarte.bb + x], 1)
+            cairo_rectangle(cr, ox + x * z, oy + y * z, z, z)
+            cairo_fill(cr)
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION hmLegende(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(w)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(w)
+    DIM x AS INTEGER
+    FOR x = 0 TO b - 1
+        sdFarbe(cr, kern.heatmapFarbe(x / MAX(1, b - 1)), 1)
+        cairo_rectangle(cr, x, 0, 1, h)
+        cairo_fill(cr)
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION hmBauen() AS INTEGER
+    IF NOT lwHat THEN RETURN 0
+    hmKarte = NIL
+    hmDialog = gtk_dialog_new_with_buttons("Pattern-Heatmap", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Schließen", GTK_ANTWORT_OK, 0)
+    gtk_window_set_default_size(hmDialog, 720, 640)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(hmDialog)
+    gtk_container_set_border_width(innen, 12)
+    hmAchse = gtk_combo_box_text_new()
+    gtk_combo_box_text_append_text(hmAchse, "Farbenvielfalt (verschiedene Farben pro Block)")
+    gtk_combo_box_text_append_text(hmAchse, "Stichdichte (Anzahl Stiche pro Block)")
+    gtk_combo_box_set_active(hmAchse, 0)
+    gtk_box_pack_start(innen, dlZeile("Achse", hmAchse), FALSE, FALSE, 4)
+    DIM reihe AS INTEGER : reihe = gtk_box_new(GTK_WAAGERECHT, 8)
+    hmBloecke = gtk_scale_new_with_range(GTK_WAAGERECHT, 1, 32, 1)
+    gtk_scale_set_digits(hmBloecke, 0)
+    gtk_range_set_value(hmBloecke, 8)
+    gtk_widget_set_hexpand(hmBloecke, TRUE)
+    hmBlockText = gtk_label_new("")
+    gtk_widget_set_size_request(hmBlockText, 80, -1)
+    gtk_box_pack_start(reihe, hmBloecke, TRUE, TRUE, 0)
+    gtk_box_pack_start(reihe, hmBlockText, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, dlZeile("Block-Größe", reihe), FALSE, FALSE, 4)
+    hmText = gtk_label_new("")
+    gtk_label_set_xalign(hmText, 0.0)
+    gtkKlasse(hmText, "nebensache")
+    gtk_box_pack_start(innen, hmText, FALSE, FALSE, 4)
+    hmFlaeche = gtk_drawing_area_new()
+    gtk_widget_set_size_request(hmFlaeche, -1, 400)
+    gtk_box_pack_start(innen, hmFlaeche, TRUE, TRUE, 0)
+    DIM leg AS INTEGER : leg = gtk_drawing_area_new()
+    gtk_widget_set_size_request(leg, -1, 18)
+    gtk_widget_set_tooltip_text(leg, "Links: niedrig — Rechts: hoch (höchster Wert im Muster)")
+    gtk_box_pack_start(innen, leg, FALSE, FALSE, 6)
+    signalZeichnen(hmFlaeche, "draw", hmZeichnen, 0, 0, 0)
+    signalZeichnen(leg, "draw", hmLegende, 0, 0, 0)
+    signal(hmAchse, "changed", hmRechnen, 0, 0, 0)
+    signal(hmBloecke, "value-changed", hmRechnen, 0, 0, 0)
+    hmRechnen(0, 0)
+    gtk_widget_show_all(hmDialog)
+    RETURN hmDialog
+END FUNCTION
+
+SUB heatmapDialog()
+    IF hmBauen() = 0 THEN RETURN
+    DIM a AS INTEGER : a = gtk_dialog_run(hmDialog)
+    gtk_widget_destroy(hmDialog)
+    hmDialog = 0
+END SUB
+
+' --- Aehnliche Farben -----------------------------------------------------------------
+
+DIM aeDialog AS INTEGER
+DIM aeSchwelle AS INTEGER
+DIM aeSchwelleText AS INTEGER
+DIM aeListe AS INTEGER
+DIM aeZahl AS INTEGER
+DIM aeMeldung AS INTEGER
+DIM aeKnopf AS INTEGER
+DIM aePaare AS ARRAY OF INTEGER
+DIM aeKaestchen AS ARRAY OF INTEGER
+
+SUB aePaareZeigen(w AS INTEGER, daten AS INTEGER)
+    DIM s AS INTEGER : s = INT(gtk_range_get_value(aeSchwelle) + 0.5)
+    gtk_label_set_text(aeSchwelleText, STR$(s))
+    DIM ab AS ARRAY OF FLOAT
+    aePaare = kern.aehnlichePaare(lwMuster, s, ab)
+    aeKaestchen = []
+    adLeeren(aeListe)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ab) - 1
+        DIM a AS kern.Farbeintrag : a = lwMuster.farben[aePaare[2 * i]]
+        DIM b AS kern.Farbeintrag : b = lwMuster.farben[aePaare[2 * i + 1]]
+        DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 8)
+        DIM k AS INTEGER : k = gtk_check_button_new_with_label("")
+        ARRAY_PUSH(aeKaestchen, k)
+        gtk_box_pack_start(z, k, FALSE, FALSE, 0)
+        DIM t AS INTEGER : t = gtk_label_new("")
+        gtk_label_set_markup(t, adFeld$(a.garn.farbe) + "  " + sdMaske$(a.garn.name) + "   →   " + adFeld$(b.garn.farbe) + "  " + sdMaske$(b.garn.name))
+        gtk_label_set_xalign(t, 0.0)
+        gtk_box_pack_start(z, t, TRUE, TRUE, 0)
+        gtk_box_pack_end(z, gtk_label_new("ΔE: " + FORMAT$(ab[i], "%.1f")), FALSE, FALSE, 0)
+        gtk_list_box_insert(aeListe, z, -1)
+    NEXT
+    gtk_widget_show_all(aeListe)
+    gtk_label_set_text(aeZahl, STR$(LEN(ab)) + " Paar(e) gefunden")
+    gtk_widget_set_sensitive(aeKnopf, LEN(ab) > 0)
+END SUB
+
+SUB aeAlle(w AS INTEGER, an AS INTEGER)
+    DIM k AS INTEGER
+    FOR EACH k IN aeKaestchen
+        gtk_toggle_button_set_active(k, an = 1)
+    NEXT
+END SUB
+
+' Die angehakten Paare zusammenfuehren; "" = erledigt (der Dialog geht zu)
+FUNCTION aeZusammenfuehren$() AS STRING
+    DIM gewaehlt AS ARRAY OF INTEGER : gewaehlt = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(aeKaestchen) - 1
+        IF gtk_toggle_button_get_active(aeKaestchen[i]) THEN
+            ARRAY_PUSH(gewaehlt, aePaare[2 * i]) : ARRAY_PUSH(gewaehlt, aePaare[2 * i + 1])
+        END IF
+    NEXT
+    DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
+    DIM n AS INTEGER
+    DIM f AS STRING : f = kern.farbenZusammenfuehren$(lwMuster, wzVerlauf, gewaehlt, n)
+    IF f <> "" THEN RETURN f
+    IF wzFarbe >= lwMuster.farbanzahl() THEN wzFarbe = lwMuster.farbanzahl() - 1
+    allesNeu()
+    statusMeldung(STR$(vorher - lwMuster.farbanzahl()) + " Farbe(n) zusammengeführt, " + STR$(n) + " Stiche umgefärbt (Strg+Z nimmt es zurück).")
+    RETURN ""
+END FUNCTION
+
+FUNCTION aeBauen() AS INTEGER
+    IF NOT lwHat THEN RETURN 0
+    aeDialog = gtk_dialog_new_with_buttons("Ähnliche Farben zusammenführen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, 0)
+    aeKnopf = gtk_dialog_add_button(aeDialog, "Zusammenführen", GTK_ANTWORT_OK)
+    gtk_window_set_default_size(aeDialog, 640, 480)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(aeDialog)
+    gtk_container_set_border_width(innen, 12)
+    DIM reihe AS INTEGER : reihe = gtk_box_new(GTK_WAAGERECHT, 8)
+    aeSchwelle = gtk_scale_new_with_range(GTK_WAAGERECHT, 1, 50, 1)
+    gtk_scale_set_digits(aeSchwelle, 0)
+    gtk_range_set_value(aeSchwelle, 10)
+    gtk_widget_set_hexpand(aeSchwelle, TRUE)
+    aeSchwelleText = gtk_label_new("10")
+    gtk_widget_set_size_request(aeSchwelleText, 30, -1)
+    gtk_box_pack_start(reihe, aeSchwelle, TRUE, TRUE, 0)
+    gtk_box_pack_start(reihe, aeSchwelleText, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, dlZeile("Schwellwert", reihe), FALSE, FALSE, 4)
+    DIM info AS INTEGER : info = gtk_label_new("Niedrigerer Wert = nur sehr ähnliche Farben (CIEDE2000). Höherer Wert = mehr Paare. Die zweite Farbe jedes Paars geht in die erste über.")
+    gtk_label_set_xalign(info, 0.0)
+    gtk_label_set_line_wrap(info, TRUE)
+    gtkKlasse(info, "nebensache")
+    gtk_box_pack_start(innen, info, FALSE, FALSE, 4)
+    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    aeListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(aeListe, GTK_AUSWAHL_KEINE)
+    gtkKlasse(aeListe, "liste")
+    gtk_container_add(rolle, aeListe)
+    gtk_box_pack_start(innen, rolle, TRUE, TRUE, 4)
+    DIM unten AS INTEGER : unten = gtk_box_new(GTK_WAAGERECHT, 8)
+    aeZahl = gtk_label_new("")
+    gtkKlasse(aeZahl, "nebensache")
+    DIM kAlle AS INTEGER : kAlle = gtk_button_new_with_label("Alle auswählen")
+    DIM kKeine AS INTEGER : kKeine = gtk_button_new_with_label("Keine auswählen")
+    gtk_box_pack_start(unten, aeZahl, FALSE, FALSE, 0)
+    gtk_box_pack_end(unten, kKeine, FALSE, FALSE, 0)
+    gtk_box_pack_end(unten, kAlle, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, unten, FALSE, FALSE, 0)
+    aeMeldung = gtk_label_new("")
+    gtk_label_set_xalign(aeMeldung, 0.0)
+    gtk_label_set_line_wrap(aeMeldung, TRUE)
+    gtk_box_pack_start(innen, aeMeldung, FALSE, FALSE, 4)
+    signal(aeSchwelle, "value-changed", aePaareZeigen, 0, 0, 0)
+    signal(kAlle, "clicked", aeAlle, 1, 0, 0)
+    signal(kKeine, "clicked", aeAlle, 0, 0, 0)
+    aePaareZeigen(0, 0)
+    gtk_widget_show_all(aeDialog)
+    RETURN aeDialog
+END FUNCTION
+
+SUB aehnlicheDialog()
+    IF aeBauen() = 0 THEN RETURN
+    WHILE gtk_dialog_run(aeDialog) = GTK_ANTWORT_OK
+        DIM f AS STRING : f = aeZusammenfuehren$()
+        IF f = "" THEN EXIT WHILE
+        gtk_label_set_text(aeMeldung, f)
+    WEND
+    gtk_widget_destroy(aeDialog)
+    aeDialog = 0
+END SUB
+
+' --- Farbenblindheit und der Knopf "Auswerten" -------------------------------------------
+
+SUB farbenblindSetzen(art AS INTEGER)
+    IF art = fbArt THEN RETURN
+    fbArt = art
+    leinwandAufbauen()
+    gtk_widget_queue_draw(lwFlaeche)
+    statusMeldung(IIF(art = kern.FARBENBLIND_KEINE, "Farben wieder wie gestickt.", "Ansicht: " + kern.farbenblindNamen()[art] + " -- nur die Anzeige, die Farben bleiben."))
+END SUB
+
+DIM fbKnoepfe AS ARRAY OF INTEGER
+DIM auswertenPopover AS INTEGER
+
+SUB fbGewaehlt(w AS INTEGER, art AS INTEGER)
+    IF NOT gtk_toggle_button_get_active(w) THEN RETURN
+    farbenblindSetzen(art)
+END SUB
+
+SUB auswertenGeklickt(w AS INTEGER, was AS INTEGER)
+    gtk_popover_popdown(auswertenPopover)
+    SELECT CASE was
+        CASE 0 : statistikDialog()
+        CASE 1 : heatmapDialog()
+        CASE 2 : aehnlicheDialog()
+    END SELECT
+END SUB
+
+' Der Knopf in der Kopfleiste mit seinem Aufklapper
+FUNCTION auswertenKnopf() AS INTEGER
+    DIM mb AS INTEGER : mb = gtk_menu_button_new()
+    gtk_container_add(mb, gtk_image_new_from_icon_name("x-office-spreadsheet-symbolic", GTK_ICON_KNOPF))
+    gtk_widget_set_tooltip_text(mb, "Auswerten -- Statistik (Strg+Umschalt+G), Heatmap, ähnliche Farben, Farbenblindheit")
+    gtk_widget_set_can_focus(mb, FALSE)
+    auswertenPopover = gtk_popover_new(mb)
+    DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 2)
+    gtk_container_set_border_width(box, 8)
+    DIM texte AS ARRAY OF STRING : texte = ["Statistik & Garnverbrauch …", "Heatmap …", "Ähnliche Farben zusammenführen …"]
+    DIM i AS INTEGER
+    FOR i = 0 TO 2
+        DIM k AS INTEGER : k = gtk_button_new_with_label(texte[i])
+        gtkKlasse(k, "flat")
+        gtk_box_pack_start(box, k, FALSE, FALSE, 0)
+        signal(k, "clicked", auswertenGeklickt, i, 0, 0)
+    NEXT
+    gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)
+    gtk_box_pack_start(box, adUeberschrift("Farbenblindheit simulieren"), FALSE, FALSE, 0)
+    fbKnoepfe = []
+    DIM gruppe AS INTEGER : gruppe = 0
+    DIM n AS STRING
+    i = 0
+    FOR EACH n IN kern.farbenblindNamen()
+        DIM r AS INTEGER : r = gtk_radio_button_new_with_label_from_widget(gruppe, n)
+        IF gruppe = 0 THEN gruppe = r
+        gtk_box_pack_start(box, r, FALSE, FALSE, 0)
+        ARRAY_PUSH(fbKnoepfe, r)
+        signal(r, "toggled", fbGewaehlt, i, 0, 0)
+        i = i + 1
+    NEXT
+    gtk_widget_show_all(box)
+    gtk_container_add(auswertenPopover, box)
+    gtk_menu_button_set_popover(mb, auswertenPopover)
+    RETURN mb
+END FUNCTION
