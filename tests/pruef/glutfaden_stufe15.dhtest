@@ -177,6 +177,14 @@ PRINT "farbe 9 gibt es nicht: "; LEN(p); " "; LEN(f)
 ' gleiche Start- und Endfarbe: ueberall dieselbe
 (p, f) = kern.farbverlauf(m, 0, 2, 7, 2, 3, 3)
 PRINT "gleich: "; JOIN$(f, ",")
+' Abgeschnitten wie Pythons int(), nicht gerundet: in der Mitte zwischen
+' #000000 und #030303 liegt 1,5 je Kanal -- #010101, nicht #020202
+m.farben[0].garn.farbe = &H000000
+m.farben[1].garn.farbe = &H030303
+m.farben[2].garn.farbe = &H010101
+m.farben[3].garn.farbe = &H020202
+(p, f) = kern.farbverlauf(m, 0, 0, 2, 0, 0, 1)
+PRINT "mitte abgeschnitten: "; JOIN$(f, ",")
 ' Masse fuer ein flaches Muster und ein Feld unter dem Mindestmass
 DIM iw AS INTEGER, ih AS INTEGER, bx AS INTEGER, by AS INTEGER
 (iw, ih, bx, by) = kern.minikarteMass(500, 20, 50, 50)
@@ -200,6 +208,7 @@ linie: 0,0,1,0,2,1,3,1,4,1,5,1,6,2,7,2,8,2,9,2,10,3,11,3
 ein punkt: 4,4 | 2
 farbe 9 gibt es nicht: 0 0
 gleich: 3,3,3,3,3,3,3,3
+mitte abgeschnitten: 0,2,1
 flaches muster: 104x10 bei 8,45
 kachel bei 0 x 0: 4 | riesig: 1
 
