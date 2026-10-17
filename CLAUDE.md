@@ -2160,6 +2160,40 @@ stumm ist, beim Oeffnen ein Stand neuer als die Datei. Sammlung
 JSON, Kuerzel, Export, Probe samt Rasterfarben im Bild, drei Startlaeufe);
 21 Verfaelschungen fallen je in ihrem Fall.
 
+**Stufe 14: Farben verwalten** (2026-10-17, PyStickys
+`color_management_dialog.py`). Kern `kern/farbverwaltung.dh`: ein
+`Farbplan` (die bleibenden alten Nummern in der neuen Reihenfolge, je alter
+Farbe Ziel = bleibt/weg/geht auf in, Faeden), den der Dialog bearbeitet;
+`farbplanAnwenden` macht daraus EINEN Schritt -- erst die Stiche
+weggenommener Farben auf allen Ebenen, auch gesperrten (kurz entsperrt,
+sonst blieben dort Nummern stehen, die es nicht mehr gibt), dann Liste,
+Faeden (Kopie des Eintrags, sonst aenderte der Verlauf den Vorher-Stand mit),
+Rueckstiche und das Umnummerieren ueber einen `TEIL_FARBEN`-Teil. Beim
+Zusammenfuehren wird der Typ nur umgestempelt, wenn Quelle oder Ziel Perle
+oder Drill ist (wie `merge_colors_stitches`), "erledigt" bleibt; eine Kette
+(A in B, dann B in C) landet ganz in C. Acht Sortierungen, stabil auch
+absteigend wie Pythons `reverse=True`. **Mit Absicht anders als PySticky,
+alles dort Fehler:** Umordnen und Sortieren nummerieren die Stiche mit
+(PySticky stellt nur die Liste um und faerbt das Muster damit um; sein
+`_swap_colors` setzt jeden Stich als vollen Stich und uebergeht gesperrte
+Ebenen); Abbrechen laesst das Muster unberuehrt und der Verlauf bleibt (PySticky
+behaelt Teile und leert den Verlauf); "Ungenutzte entfernen" laesst Farben
+mit Rueckstichen stehen. Dialog `ansicht/farbdialog.dh` (Strg+Umschalt+F,
+Knopf "Verwalten..." in der Seitenleiste; die Kuerzel-Tafel hat damit 50
+Befehle): Liste mit Mehrfachauswahl, Sortierung, Suche, Faeden je Auswahl
+und fuer alle, Verschieben (nur bei einer Auswahl), Loeschen, Zusammenfuehren
+(die oberste gewaehlte bleibt), Ungenutzte, Zuruecksetzen; erst Uebernehmen
+aendert das Muster, die aktuelle Farbe wandert mit. **Nebenfund:**
+Zuruecknehmen und Wiederholen stellten die Farbliste um, nicht aber die
+Nummer der aktuellen Farbe -- nach Sortieren und Strg+Z war aus Gelb Blau
+geworden; `werkzeugZurueck`/`Vor` suchen sie jetzt ueber Symbol, Garnname
+und Farbe wieder (`wzFarbeWiederfinden`). Sammlung
+`tests/pruef/glutfaden_stufe14.dhtest` (4: PySticky-Referenz 64 Zeilen,
+wobei Ablaeufe mit Verschieben nur Farben und Rueckstiche vergleichen; das
+Bild bleibt bei neun Umordnungen samt gesperrter Ebene und Strg+Z/Strg+Y;
+Loeschen/Zusammenfuehren als ein Schritt; die Probe); elf Verfaelschungen
+fallen je in ihrem Fall.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
