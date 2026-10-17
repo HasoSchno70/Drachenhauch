@@ -36,6 +36,9 @@ outside Windows: `TIME$()` ran two hours behind in Berlin in summer, and
 | Function | Effect |
 |---|---|
 | `ZEIT_JETZT()` → INTEGER | now, as a point in time |
+| `ZEIT_UNIX()` → FLOAT | now as **Unix time**: seconds since 1970 in UTC, with fraction (like Python's `time.time()`) |
+| `ZEIT_AUS_UNIX(sekunden)` → INTEGER | Unix seconds to a point in local time (with that day's daylight saving time) |
+| `ZEIT_NACH_UNIX(zeit)` → INTEGER | point in local time to Unix seconds |
 | `ZEIT_PARSE(text$)` → INTEGER | text to point in time; aborts on anything unreadable |
 | `ZEIT_LESBAR(text$)` → BOOLEAN | could the text be read? (asks, does not abort) |
 | `ZEIT_TEXT$(zeit)` → STRING | point in time as `JJJJ-MM-TT hh:mm:ss` (YYYY-MM-DD hh:mm:ss) |
@@ -211,6 +214,13 @@ WEND
   measured on 16.08.2026 in Central Europe: `MILLIS()/1000 = 1786883970`,
   `ZEIT_JETZT() = 1786891170`, i.e. **two hours of difference**. For date
   and time always use `ZEIT_JETZT()`.
+- **Unix time is UTC, a point in time is local time.** Other programs, web APIs
+  and many file formats write Unix seconds. Read them with `ZEIT_AUS_UNIX`
+  and write them with `ZEIT_NACH_UNIX` (or `ZEIT_UNIX()` for "now") --
+  writing the number from `ZEIT_JETZT()` there would be off by the time-zone
+  offset. In the hour that does not exist when daylight saving time starts,
+  or the doubled one in autumn, `ZEIT_NACH_UNIX` returns one of the two
+  possible answers.
 - **A day is not always 86400 seconds.** On the changeover days it is
   23 or 25 hours. `ZEIT_PLUS(t, 86400)` adds exactly 86400 seconds — on those
   two days of the year that is not the same time on the following day. If the

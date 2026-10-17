@@ -6351,6 +6351,26 @@ impl<'p> Vm<'p> {
                 let (j, mo, d, h, mi, s) = crate::builtins::local_datetime();
                 Value::Int(zeit::aus_teilen(j, mo, d, h, mi, s))
             }
+            // Unix-Zeit (UTC, mit Bruchteil) -- die Zahl, die andere Programme,
+            // Web-APIs und Dateiformate meinen (Pythons time.time())
+            "zeit_unix" => {
+                if !a.is_empty() { return Err("ZEIT_UNIX: erwartet keine Argumente".into()); }
+                let d = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+                Value::Float(d.as_secs_f64())
+            }
+            "zeit_aus_unix" => {
+                let u = match a.first() {
+                    Some(Value::Int(n)) if a.len() == 1 => *n,
+                    Some(Value::Float(f)) if a.len() == 1 && f.is_finite() => f.floor() as i64,
+                    _ => return Err("ZEIT_AUS_UNIX: erwartet Unix-Sekunden (eine Zahl)".into()),
+                };
+                Value::Int(zeit::aus_unix_mit(u, crate::builtins::lokaler_versatz))
+            }
+            "zeit_nach_unix" => {
+                if a.len() != 1 { return Err("ZEIT_NACH_UNIX: erwartet einen Zeitpunkt".into()); }
+                let t = z_int(a, 0, "ZEIT_NACH_UNIX")?;
+                Value::Int(zeit::nach_unix_mit(t, crate::builtins::lokaler_versatz))
+            }
             "zeit_parse" => {
                 let text = z_str(a, 0, "ZEIT_PARSE")?;
                 match zeit::parse(text) {

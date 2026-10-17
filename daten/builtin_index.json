@@ -12375,6 +12375,24 @@
    "module": "zeit"
   },
   {
+   "name": "ZEIT_UNIX",
+   "kind": "core",
+   "signature": "ZEIT_UNIX() AS FLOAT",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_AUS_UNIX",
+   "kind": "core",
+   "signature": "ZEIT_AUS_UNIX(unix_sekunden) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_NACH_UNIX",
+   "kind": "core",
+   "signature": "ZEIT_NACH_UNIX(zeit) AS INTEGER",
+   "module": "zeit"
+  },
+  {
    "name": "ZEIT_LESBAR",
    "kind": "core",
    "signature": "ZEIT_LESBAR(text: STRING) AS BOOLEAN",
