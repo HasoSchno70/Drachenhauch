@@ -142,6 +142,9 @@ DECLARE SUB gtk_widget_destroy LIB GTK (w AS ZEIGER)
 DECLARE SUB gtk_widget_draw LIB GTK (w AS ZEIGER, cr AS ZEIGER)
 DECLARE FUNCTION gtk_widget_get_style_context LIB GTK (w AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_style_context_add_class LIB GTK (kontext AS ZEIGER, klasse AS TEXT)
+DECLARE SUB gtk_style_context_remove_class LIB GTK (kontext AS ZEIGER, klasse AS TEXT)
+DECLARE SUB gtk_box_set_spacing LIB GTK (box AS ZEIGER, abstand AS LONG)
+DECLARE SUB gtk_label_set_justify LIB GTK (label AS ZEIGER, art AS LONG)
 DECLARE FUNCTION gtk_css_provider_new LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_css_provider_load_from_data LIB GTK (p AS ZEIGER, css AS TEXT, laenge AS INTEGER, BYREF fehler AS ZEIGER) AS BOOLEAN
 DECLARE SUB gtk_style_context_add_provider_for_screen LIB GTK (schirm AS ZEIGER, p AS ZEIGER, vorrang AS ULONG)
@@ -154,6 +157,21 @@ DECLARE FUNCTION gtk_file_filter_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_file_filter_set_name LIB GTK (filter AS ZEIGER, name AS TEXT)
 DECLARE SUB gtk_file_filter_add_pattern LIB GTK (filter AS ZEIGER, muster AS TEXT)
 DECLARE SUB gtk_file_chooser_add_filter LIB GTK (wahl AS ZEIGER, filter AS ZEIGER)
+DECLARE SUB gtk_file_chooser_set_select_multiple LIB GTK (wahl AS ZEIGER, mehrere AS BOOLEAN)
+DECLARE FUNCTION gtk_file_chooser_get_filenames LIB GTK (wahl AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION g_slist_length LIB GLIB (liste AS ZEIGER) AS ULONG
+DECLARE FUNCTION g_slist_nth_data LIB GLIB (liste AS ZEIGER, n AS ULONG) AS ZEIGER
+DECLARE SUB g_slist_free LIB GLIB (liste AS ZEIGER)
+DECLARE FUNCTION gtk_event_box_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_menu_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_menu_item_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
+DECLARE FUNCTION gtk_check_menu_item_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
+DECLARE SUB gtk_check_menu_item_set_active LIB GTK (eintrag AS ZEIGER, an AS BOOLEAN)
+DECLARE FUNCTION gtk_separator_menu_item_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_menu_item_set_submenu LIB GTK (eintrag AS ZEIGER, menue AS ZEIGER)
+DECLARE SUB gtk_menu_shell_append LIB GTK (menue AS ZEIGER, eintrag AS ZEIGER)
+DECLARE SUB gtk_menu_popup_at_pointer LIB GTK (menue AS ZEIGER, ereignis AS ZEIGER)
+DECLARE FUNCTION gtk_image_new_from_pixbuf LIB GTK (bild AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_file_chooser_set_do_overwrite_confirmation LIB GTK (wahl AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_file_chooser_set_current_name LIB GTK (wahl AS ZEIGER, name AS TEXT)
 DECLARE FUNCTION gtk_file_chooser_set_current_folder LIB GTK (wahl AS ZEIGER, ordner AS TEXT) AS BOOLEAN
@@ -169,6 +187,7 @@ DECLARE SUB gtk_show_about_dialog LIB GTK (eltern AS ZEIGER, name AS TEXT, ...)
 DECLARE FUNCTION gdk_pixbuf_new_from_file_at_size LIB PIXBUF (pfad AS TEXT, b AS LONG, h AS LONG, BYREF fehler AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gdk_pixbuf_get_width LIB PIXBUF (bild AS ZEIGER) AS LONG
 DECLARE FUNCTION gdk_pixbuf_get_height LIB PIXBUF (bild AS ZEIGER) AS LONG
+DECLARE FUNCTION gdk_pixbuf_new_from_file_at_scale LIB PIXBUF (pfad AS TEXT, b AS LONG, h AS LONG, seitenverhaeltnis AS BOOLEAN, BYREF fehler AS ZEIGER) AS ZEIGER
 DECLARE SUB gdk_cairo_set_source_pixbuf LIB GDK (cr AS ZEIGER, bild AS ZEIGER, x AS FLOAT, y AS FLOAT)
 ' --- Fortschritt und Ereignisse abarbeiten (fuer lange Rechnungen ohne zweiten Faden)
 DECLARE FUNCTION gtk_progress_bar_new LIB GTK () AS ZEIGER
@@ -199,6 +218,10 @@ DECLARE SUB cairo_paint LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_move_to LIB CAIRO (cr AS ZEIGER, x AS FLOAT, y AS FLOAT)
 DECLARE SUB cairo_line_to LIB CAIRO (cr AS ZEIGER, x AS FLOAT, y AS FLOAT)
 DECLARE SUB cairo_close_path LIB CAIRO (cr AS ZEIGER)
+DECLARE SUB cairo_new_sub_path LIB CAIRO (cr AS ZEIGER)
+DECLARE SUB cairo_fill_preserve LIB CAIRO (cr AS ZEIGER)
+DECLARE SUB cairo_set_line_cap LIB CAIRO (cr AS ZEIGER, art AS LONG)
+DECLARE SUB cairo_set_line_join LIB CAIRO (cr AS ZEIGER, art AS LONG)
 DECLARE SUB cairo_arc LIB CAIRO (cr AS ZEIGER, x AS FLOAT, y AS FLOAT, r AS FLOAT, a1 AS FLOAT, a2 AS FLOAT)
 DECLARE SUB cairo_new_path LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_set_line_width LIB CAIRO (cr AS ZEIGER, b AS FLOAT)

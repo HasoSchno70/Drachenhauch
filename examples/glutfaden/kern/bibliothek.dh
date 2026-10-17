@@ -235,6 +235,16 @@ FUNCTION eintragAusMuster(pfad AS STRING, m AS Muster) AS Bibliothekseintrag
     RETURN e
 END FUNCTION
 
+' Ein Muster in einem der vier Formate lesen (wirft bei Fehlern)
+FUNCTION musterLesen(pfad AS STRING, paletten AS ARRAY OF Palette, symbole AS ARRAY OF STRING) AS Muster
+    SELECT CASE LOWER$(RIGHT$(pfad, 4))
+        CASE ".oxs" : RETURN oxsLaden(pfad, paletten, symbole).muster
+        CASE ".pat" : RETURN patLaden(pfad, paletten, symbole).muster
+        CASE ".xsd" : RETURN xsdLaden(pfad, paletten, symbole).muster
+    END SELECT
+    RETURN pxsLaden(pfad)
+END FUNCTION
+
 FUNCTION eintragIndex(b AS Bibliothek, pfad AS STRING) AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO LEN(b.eintraege) - 1
