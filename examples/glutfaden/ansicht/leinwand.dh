@@ -12,12 +12,8 @@
 ' deren Bildpunkte neu. Hat eine sichtbare Ebene weniger als volle Deckkraft,
 ' wird sie wie im Original ueber das Darunterliegende gemischt.
 
-CONST LW_HINTERGRUND = &H2D2D2D
-CONST LW_STOFF = &HFAFAF5             ' Aida-Stoff, cremeweiss
-CONST LW_ZELLE_STANDARD = 20.0        ' 100 %
-CONST LW_ZELLE_MIN = 1.0
-CONST LW_ZELLE_MAX = 60.0
-CONST LW_RASTER_GROSS = 10            ' jede zehnte Linie kraeftiger
+' Farben, Zellgroessen, Raster, Symbole und Rueckstich-Breite kommen aus den
+' Einstellungen (einst, ansicht/einstellungsstand.dh).
 
 DIM lwFlaeche AS INTEGER              ' GtkDrawingArea
 DIM lwMuster AS kern.Muster
@@ -56,8 +52,8 @@ FUNCTION leinwandNeu() AS INTEGER
     signalEreignis(lwFlaeche, "motion-notify-event", lwBewegung, 0, 0, 0)
     signalEreignis(lwFlaeche, "leave-notify-event", lwVerlassen, 0, 0, 0)
     gtk_widget_set_can_focus(lwFlaeche, TRUE)
-    lwSchrift = pango_font_description_from_string("DejaVu Sans Bold 10")
-    lwZelle = LW_ZELLE_STANDARD
+    lwSchrift = pango_font_description_from_string(einst.symbolSchrift + " Bold 10")
+    lwZelle = einst.zelleStandard
     lwMausX = -1
     RETURN lwFlaeche
 END FUNCTION
@@ -124,7 +120,7 @@ FUNCTION lwMischfarbe(x AS INTEGER, y AS INTEGER) AS INTEGER
         DIM c AS INTEGER : c = e.raster[y * e.breite + x]
         IF c < 0 OR c >= n THEN CONTINUE
         IF NOT da THEN
-            r = (LW_STOFF SHR 16) BAND 255 : g = (LW_STOFF SHR 8) BAND 255 : bl = LW_STOFF BAND 255
+            r = (einst.stoff SHR 16) BAND 255 : g = (einst.stoff SHR 8) BAND 255 : bl = einst.stoff BAND 255
             da = TRUE
         END IF
         DIM f AS INTEGER : f = lwRgb[c]
@@ -179,12 +175,12 @@ END SUB
 
 ' --- Zoom und Lage ---------------------------------------------------------------
 FUNCTION leinwandZoomProzent() AS INTEGER
-    RETURN ROUND(lwZelle / LW_ZELLE_STANDARD * 100)
+    RETURN ROUND(lwZelle / einst.zelleStandard * 100)
 END FUNCTION
 
 ' Neue Zellgroesse, der Punkt (px, py) bleibt unter dem Zeiger stehen.
 SUB leinwandZoom(neu AS FLOAT, px AS FLOAT, py AS FLOAT)
-    neu = CLAMP(neu, LW_ZELLE_MIN, LW_ZELLE_MAX)
+    neu = CLAMP(neu, einst.zelleMin, einst.zelleMax)
     DIM wx AS FLOAT : wx = (px - lwX) / lwZelle
     DIM wy AS FLOAT : wy = (py - lwY) / lwZelle
     lwZelle = neu
@@ -203,7 +199,7 @@ SUB leinwandEinpassen()
     DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(lwFlaeche)
     DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(lwFlaeche)
     IF bw < 10 OR bh < 10 THEN RETURN
-    lwZelle = CLAMP(MIN((bw - 40) / lwMuster.breite, (bh - 40) / lwMuster.hoehe), LW_ZELLE_MIN, LW_ZELLE_MAX)
+    lwZelle = CLAMP(MIN((bw - 40) / lwMuster.breite, (bh - 40) / lwMuster.hoehe), einst.zelleMin, einst.zelleMax)
     lwX = (bw - lwMuster.breite * lwZelle) / 2
     lwY = (bh - lwMuster.hoehe * lwZelle) / 2
     lwEingepasst = TRUE
@@ -237,7 +233,7 @@ END FUNCTION
 FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM bw AS FLOAT : bw = gtk_widget_get_allocated_width(w)
     DIM bh AS FLOAT : bh = gtk_widget_get_allocated_height(w)
-    cairoFarbe(cr, LW_HINTERGRUND)
+    cairoFarbe(cr, einst.hintergrund)
     cairo_paint(cr)
     IF NOT lwHat THEN RETURN TRUE
     IF NOT lwEingepasst THEN leinwandEinpassen()
@@ -245,10 +241,12 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM h AS INTEGER : h = lwMuster.hoehe
     DIM z AS FLOAT : z = lwZelle
 
-    ' Stoff und das Pixelbild
-    cairoFarbe(cr, LW_STOFF)
+    ' Stoff und das Pixelbild (bei "Nur Symbol" bleibt es beim Stoff)
+    cairoFarbe(cr, einst.stoff)
     cairo_rectangle(cr, lwX, lwY, b * z, h * z)
     cairo_fill(cr)
+    DIM farbig AS BOOLEAN : farbig = einst.farbAnzeige <> 2
+    IF farbig THEN
     cairo_save(cr)
     cairo_translate(cr, lwX, lwY)
     cairo_scale(cr, z, z)
@@ -257,6 +255,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     cairo_rectangle(cr, 0, 0, b, h)
     cairo_fill(cr)
     cairo_restore(cr)
+    END IF
 
     ' Der sichtbare Ausschnitt
     DIM x0 AS INTEGER : x0 = MAX(0, FLOOR(-lwX / z))
@@ -269,7 +268,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     DIM gemischt AS BOOLEAN : gemischt = lwMischen()
     ' Diamond Painting: auch ein ganzer Stich ist ein Drill (PySticky diamond_view)
     DIM drills AS BOOLEAN : drills = lwMuster.modus = "diamond"
-    IF z >= 6 THEN
+    IF z >= 6 AND farbig THEN
         FOR y = y0 TO y1
             FOR x = x0 TO x1
                 i = y * b + x
@@ -286,42 +285,55 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         NEXT
     END IF
 
-    ' Symbole
-    IF z >= 12 THEN lwSymbole(cr, x0, y0, x1, y1)
+    ' Symbole (Einstellungen -> Farben -> Anzeige)
+    IF z >= 12 AND einst.farbAnzeige >= 1 THEN lwSymbole(cr, x0, y0, x1, y1)
 
-    ' Raster
-    IF z >= 4 THEN
-        cairo_set_line_width(cr, 1.0)
-        cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.14)
-        FOR x = x0 TO x1 + 1
-            IF x MOD LW_RASTER_GROSS = 0 THEN CONTINUE
-            cairo_move_to(cr, ROUND(lwX + x * z) + 0.5, MAX(lwY, 0))
-            cairo_line_to(cr, ROUND(lwX + x * z) + 0.5, MIN(lwY + h * z, bh))
+    ' Raster in drei Stufen wie PySticky: jede rasterHaupt-te Linie kraeftig,
+    ' jede rasterNeben-te (wenn an) in der Neben-Farbe, der Rest normal. Jede
+    ' Farbe wird gegen den Stoff geprueft -- frei waehlbar koennten sie sich
+    ' sonst gegenseitig unsichtbar machen (color_utils.ensure_contrast).
+    IF einst.raster THEN
+        DIM gross AS INTEGER : gross = einst.rasterHaupt
+        DIM klein AS INTEGER : klein = IIF(einst.nebenraster, einst.rasterNeben, 0)
+        DIM stufe AS INTEGER
+        FOR stufe = 0 TO 1
+            IF z < 4 THEN EXIT FOR
+            IF stufe = 1 AND klein = 0 THEN EXIT FOR
+            cairo_set_line_width(cr, 1.0)
+            cairoFarbe(cr, kern.kontrastFarbe(IIF(stufe = 0, einst.rasterFarbe, einst.nebenFarbe), einst.stoff))
+            FOR x = x0 TO x1 + 1
+                IF x MOD gross = 0 THEN CONTINUE
+                IF klein > 0 AND (x MOD klein = 0) <> (stufe = 1) THEN CONTINUE
+                cairo_move_to(cr, ROUND(lwX + x * z) + 0.5, MAX(lwY, 0))
+                cairo_line_to(cr, ROUND(lwX + x * z) + 0.5, MIN(lwY + h * z, bh))
+            NEXT
+            FOR y = y0 TO y1 + 1
+                IF y MOD gross = 0 THEN CONTINUE
+                IF klein > 0 AND (y MOD klein = 0) <> (stufe = 1) THEN CONTINUE
+                cairo_move_to(cr, MAX(lwX, 0), ROUND(lwY + y * z) + 0.5)
+                cairo_line_to(cr, MIN(lwX + b * z, bw), ROUND(lwY + y * z) + 0.5)
+            NEXT
+            cairo_stroke(cr)
         NEXT
-        FOR y = y0 TO y1 + 1
-            IF y MOD LW_RASTER_GROSS = 0 THEN CONTINUE
-            cairo_move_to(cr, MAX(lwX, 0), ROUND(lwY + y * z) + 0.5)
-            cairo_line_to(cr, MIN(lwX + b * z, bw), ROUND(lwY + y * z) + 0.5)
-        NEXT
-        cairo_stroke(cr)
-    END IF
-    IF z >= 2 THEN
-        cairo_set_line_width(cr, IIF(z >= 8, 2.0, 1.0))
-        cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.5)
-        FOR x = 0 TO b STEP LW_RASTER_GROSS
-            cairo_move_to(cr, ROUND(lwX + x * z), lwY)
-            cairo_line_to(cr, ROUND(lwX + x * z), lwY + h * z)
-        NEXT
-        FOR y = 0 TO h STEP LW_RASTER_GROSS
-            cairo_move_to(cr, lwX, ROUND(lwY + y * z))
-            cairo_line_to(cr, lwX + b * z, ROUND(lwY + y * z))
-        NEXT
-        cairo_stroke(cr)
+        IF z >= 2 THEN
+            cairo_set_line_width(cr, IIF(z >= 8, 2.0, 1.0))
+            cairoFarbe(cr, kern.kontrastFarbe(einst.hauptFarbe, einst.stoff))
+            FOR x = 0 TO b STEP gross
+                cairo_move_to(cr, ROUND(lwX + x * z), lwY)
+                cairo_line_to(cr, ROUND(lwX + x * z), lwY + h * z)
+            NEXT
+            FOR y = 0 TO h STEP gross
+                cairo_move_to(cr, lwX, ROUND(lwY + y * z))
+                cairo_line_to(cr, lwX + b * z, ROUND(lwY + y * z))
+            NEXT
+            cairo_stroke(cr)
+        END IF
     END IF
 
     ' Rueckstiche (Halbstich-Einheiten)
     DIM r AS kern.Rueckstich
-    cairo_set_line_width(cr, MAX(1.5, z / 6))
+    ' Einstellungen -> Werkzeuge -> Rueckstich: Breite 2 = wie vorgesehen
+    cairo_set_line_width(cr, MAX(1.0, MAX(1.5, z / 6) + einst.rueckBreite - 2))
     FOR EACH r IN lwMuster.rueckstiche
         IF r.farbe < 0 OR r.farbe >= LEN(lwRgb) - 1 THEN CONTINUE
         cairoFarbe(cr, lwRgb[r.farbe])
@@ -394,7 +406,7 @@ END FUNCTION
 
 ' Ein Kaestchen mit besonderem Stichtyp an (px, py), Groesse z.
 SUB lwSonderstich(cr AS INTEGER, px AS FLOAT, py AS FLOAT, z AS FLOAT, t AS INTEGER, farbe AS INTEGER)
-    cairoFarbe(cr, LW_STOFF)
+    cairoFarbe(cr, einst.stoff)
     cairo_rectangle(cr, px, py, z, z)
     cairo_fill(cr)
     cairoFarbe(cr, farbe)
@@ -437,7 +449,7 @@ SUB lwSymbole(cr AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS 
     DIM z AS FLOAT : z = lwZelle
     DIM b AS INTEGER : b = lwMuster.breite
     DIM n AS INTEGER : n = lwMuster.farbanzahl()
-    pango_font_description_set_absolute_size(lwSchrift, z * 0.62 * PANGO_SCALE)
+    pango_font_description_set_absolute_size(lwSchrift, z * 0.62 * einst.symbolGroesse / 10 * PANGO_SCALE)
     DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
     pango_layout_set_font_description(layout, lwSchrift)
     DIM sb[n + 1] AS INTEGER
@@ -458,8 +470,8 @@ SUB lwSymbole(cr AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS 
                 pango_layout_get_pixel_size(layout, wb, wh)
                 sb[c] = wb : sh[c] = wh
             END IF
-            ' Schwarz auf hellen, weiss auf dunklen Farben
-            DIM schwarz AS INTEGER : schwarz = IIF(kern.helligkeit(lwRgb[c]) > 0.55, 1, 0)
+            ' Schwarz auf hellen, weiss auf dunklen Farben (bei "Nur Symbol" auf dem Stoff)
+            DIM schwarz AS INTEGER : schwarz = IIF(kern.helligkeit(IIF(einst.farbAnzeige = 2, einst.stoff, lwRgb[c])) > 0.55, 1, 0)
             IF schwarz <> letzte THEN
                 IF schwarz = 1 THEN cairo_set_source_rgb(cr, 0.0, 0.0, 0.0) ELSE cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
                 letzte = schwarz
@@ -488,7 +500,7 @@ FUNCTION lwRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
         schritt = dy
     END IF
     IF schritt = 0 THEN RETURN TRUE
-    leinwandZoom(lwZelle * 1.15 ^ (-schritt), px, py)
+    leinwandZoom(lwZelle * kern.zoomFaktor(einst) ^ (-schritt), px, py)
     RETURN TRUE
 END FUNCTION
 
@@ -519,6 +531,8 @@ END SUB
 FUNCTION lwHalbAchse(r AS FLOAT) AS INTEGER
     DIM zelle AS INTEGER : zelle = FLOOR(r)
     DIM innen AS FLOAT : innen = r - zelle
+    ' Einrasten aus (Einstellungen -> Werkzeuge): nur die naechste Ecke
+    IF NOT einst.rueckEinrasten THEN RETURN zelle * 2 + IIF(innen < 0.5, 0, 2)
     DIM s AS INTEGER : s = 2
     IF innen < 1.0 / 3 THEN
         s = 0

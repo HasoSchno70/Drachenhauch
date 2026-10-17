@@ -1201,3 +1201,139 @@ FUNCTION vorfuehrenStufe12(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' --- Stufe 13: Einstellungen -----------------------------------------------------------
+' Der Einstellungsordner kommt aus APPDATA/HOME (die Pruefung setzt ihn um);
+' sie liest danach die einstellungen.json.
+FUNCTION vfKu(kennung AS STRING) AS INTEGER
+    DIM a AS ARRAY OF kern.Kuerzelaktion : a = kern.kuerzelAktionen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(a) - 1
+        IF a[i].kennung = kennung THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION vfHex$(f AS INTEGER) AS STRING
+    RETURN RIGHT$("000000" + HEX$(f), 6)
+END FUNCTION
+
+FUNCTION vorfuehrenStufe13(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM d AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            d = edBauen()
+            PRINT "vorgaben: raster "; gtk_spin_button_get_value_as_int(edHaupt); "/"; gtk_spin_button_get_value_as_int(edNeben); " zelle "; gtk_spin_button_get_value_as_int(edZelle); " zoom "; gtk_spin_button_get_value(edZoom); " pipette "; gtk_combo_box_get_active(edPipette); " anzeige "; gtk_combo_box_get_active(edAnzeige); " palette "; edPalNamen[gtk_combo_box_get_active(edPalette)]
+            PRINT "farben: "; vfHex$(edFarbe(edFarbeNormal)); " "; vfHex$(edFarbe(edFarbeNeben)); " "; vfHex$(edFarbe(edFarbeHaupt)); " | stoff "; vfHex$(edFarbe(edStoff))
+            PRINT "kuerzel: sichern "; gtk_label_get_text(edKuText[vfKu("sichern")]); " | vor "; gtk_label_get_text(edKuText[vfKu("vor")]); " | zoom_rein "; gtk_label_get_text(edKuText[vfKu("zoom_rein")]); " | "; LEN(edKuText); " Befehle"
+            ok = vfFoto(edDialog, "einstellungen")
+        CASE 2, 3, 4, 5, 6
+            ' jeder Reiter einmal im Bild (gezeichnet wird erst im naechsten Takt)
+            IF schritt > 2 THEN ok = vfFoto(edDialog, "einstellungen_" + STR$(schritt - 2))
+            gtk_notebook_set_current_page(edReiter, schritt - 1)
+        CASE 7
+            ok = vfFoto(edDialog, "einstellungen_kuerzel")
+            gtk_spin_button_set_value(edNeben, 9)
+            gtk_spin_button_set_value(edHaupt, 8)
+            PRINT "neben nach haupt 8: "; gtk_spin_button_get_value_as_int(edNeben)
+            gtk_spin_button_set_value(edNeben, 4)
+            edFarbeSetzen(edFarbeHaupt, &HC00000)
+            gtk_spin_button_set_value(edZelle, 30)
+            gtk_spin_button_set_value(edZoom, 1.5)
+            gtk_combo_box_set_active(edPipette, 1)
+            gtk_spin_button_set_value(edToleranz, 100)
+            gtk_toggle_button_set_active(edDiagonal, TRUE)
+            gtk_toggle_button_set_active(edKatalog, FALSE)
+            gtk_spin_button_set_value(edSymGroesse, 14)
+            gtk_combo_box_set_active(edAnzeige, 2)
+            gtk_spin_button_set_value(edMeldung, 7)
+            gtk_entry_set_text(edAutor, " Anna Müller ")
+            PRINT "kuerzel setzen: '"; edKuSetzen$(vfKu("sichern"), "f2"); "' | '"; edKuSetzen$(vfKu("export"), "F2"); "' | '"; edKuSetzen$(vfKu("export"), "Hyper+X"); "' | '"; edKuSetzen$(vfKu("vorschau"), "Strg+S"); "'"
+            PRINT "angezeigt: "; gtk_label_get_text(edKuText[vfKu("sichern")]); " | "; gtk_label_get_text(edKuText[vfKu("vorschau")])
+            edUebernehmen()
+            PRINT "uebernommen: raster "; einst.rasterHaupt; "/"; einst.rasterNeben; " haupt "; vfHex$(einst.hauptFarbe); " zelle "; einst.zelleStandard; " zoom "; einst.zoomTempo; " pipette "; einst.pipetteDanach; " toleranz "; einst.fuellToleranz; " diagonal "; einst.fuellenDiagonal; " katalog "; einst.katalog; " symbol "; einst.symbolGroesse; " anzeige "; einst.farbAnzeige; " meldung "; einst.meldungSekunden; " autor '"; einst.autor; "'"
+            PRINT "tafel: F2 "; MAPGETOR(einstTafel, "F2", "-"); " | Strg+S "; MAPGETOR(einstTafel, "Strg+S", "-"); " | sichern "; kern.kuerzelVon$(einst, "sichern")
+            PRINT "tooltip: "; TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(kSichern))
+            PRINT "datei: "; FILEEXISTS(einst.pfad)
+            gtk_widget_destroy(edDialog)
+            edDialog = 0
+        CASE 8
+            ok = vfFoto(fenster, "nur_symbol")
+            befehlAusfuehren("zoom_100")
+            PRINT "100 %: zelle "; lwZelle; " | "; leinwandZoomProzent(); " %"
+            befehlAusfuehren("zoom_rein")
+            PRINT "zoom rein: "; leinwandZoomProzent(); " %"
+            ' Fuellen auf der untersten Ebene: gleiche Farben liegen dort auf
+            ' Schraegen -- diagonal haengen sie zusammen, gerade nicht
+            lwMuster.ebenen.aktiv = 0
+            DIM e AS kern.Ebene : e = lwMuster.ebenen.aktiveEbene()
+            DIM fx AS INTEGER : fx = 4
+            DIM fy AS INTEGER : fy = 1
+            wzFarbe = lwMuster.farbanzahl() - 1
+            IF e.raster[fy * e.breite + fx] = wzFarbe THEN wzFarbe = 0
+            PRINT "fuellen: gerade "; LEN(kern.fuellung(e, fx, fy, wzFarbe)) \ 2; " | diagonal mit toleranz "; LEN(wzFuellung(e, fx, fy)) \ 2; " | ziel "; e.raster[fy * e.breite + fx]
+            werkzeugWaehlen(WZ_PIPETTE, FALSE)
+            DIM zug AS INTEGER : zug = wzDruck(fx, fy, 1, FALSE)
+            wzLos(fx, fy, FALSE)
+            PRINT "pipette: werkzeug "; wzAktiv; " | farbe "; wzFarbe; " = "; lwMuster.stich(fx, fy); " | "; meldung
+        CASE 9
+            d = roBauen()
+            roVoreinstellung(0, 2)
+            PRINT "raster-optionen blau: "; gtk_spin_button_get_value_as_int(roHaupt); "/"; gtk_spin_button_get_value_as_int(roNeben); " "; vfHex$(edFarbe(roNormal)); " "; vfHex$(edFarbe(roNebenFarbe)); " "; vfHex$(edFarbe(roHauptFarbe))
+            ok = vfFoto(roDialog, "raster_optionen")
+            roUebernehmen()
+            PRINT "uebernommen: "; einst.rasterHaupt; "/"; einst.rasterNeben; " "; vfHex$(einst.rasterFarbe); " "; vfHex$(einst.nebenFarbe); " "; vfHex$(einst.hauptFarbe)
+            gtk_widget_destroy(roDialog)
+            roDialog = 0
+            ok = vfFoto(fenster, "raster_blau")
+        CASE 10
+            d = edBauen()
+            DIM v AS kern.Einstellungen : v = NEW kern.Einstellungen()
+            edFuellen(v)
+            edUebernehmen()
+            PRINT "zurueckgesetzt: raster "; einst.rasterHaupt; "/"; einst.rasterNeben; " zoom "; einst.zoomTempo; " anzeige "; einst.farbAnzeige; " sichern "; kern.kuerzelVon$(einst, "sichern"); " | eigene kuerzel "; LEN(MAPKEYS(einst.kuerzel)); " | autor '"; einst.autor; "'"
+            gtk_widget_destroy(edDialog)
+            edDialog = 0
+        CASE 11
+            PRINT "zuletzt: "; LEN(zlPfade); " "; BASENAME(zlPfade[0])
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            wzFarbe = 0
+            DIM zug2 AS INTEGER : zug2 = wzDruck(0, 0, 1, FALSE)
+            wzLos(0, 0, FALSE)
+            PRINT "automatisch: "; autosichernJetzt(); " | "; RIGHT$(asZiel$(), 16); " da "; FILEEXISTS(asZiel$())
+            DIM ord AS STRING : ord = asOrdner$()
+            COPYFILE(musterPfad, PATHJOIN(ord, "tot.pxs"))
+            COPYFILE(musterPfad, PATHJOIN(ord, "lebend.pxs"))
+            WRITEALL(PATHJOIN(ord, "lebend.lebt"), "x")
+            DIM v2 AS STRING
+            DIM liste AS ARRAY OF STRING : liste = []
+            FOR EACH v2 IN asVerwaist()
+                ARRAY_PUSH(liste, BASENAME(v2))
+            NEXT
+            PRINT "verwaist: "; JOIN$(liste, " ")
+            DIM gesichert AS BOOLEAN : gesichert = musterSichern(musterPfad)
+            PRINT "gesichert: "; gesichert; " | autosave weg "; NOT FILEEXISTS(musterPfad + ".autosave"); " | bak "; FILEEXISTS(musterPfad + ".bak")
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' --probe-start: was der Start aus den Einstellungen gemacht hat (ohne Datei
+' im Aufruf -- dann gilt die Startaktion), danach zu.
+FUNCTION vorfuehrenStart(daten AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER, h AS INTEGER
+    gtk_window_get_size(fenster, b, h)
+    PRINT "start: "; musterTitel; " | "; lwMuster.breite; "x"; lwMuster.hoehe; " | datei "; BASENAME(musterPfad); " | werkzeug "; wzAktiv; " | fenster "; b; "x"; h; " | zuletzt "; LEN(zlPfade)
+    PRINT "kuerzel: "; TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(kSichern)); " | export "; kern.kuerzelVon$(einst, "export"); " | F2 "; MAPGETOR(einstTafel, "F2", "-")
+    ' wie das Kreuz: Fenster messen, dann zu (gemerkt wird beim Ende)
+    werkzeugWaehlen(WZ_LINIE, FALSE)
+    fensterMessen()
+    schliessenErlaubt = TRUE
+    gtk_widget_destroy(fenster)
+    RETURN FALSE
+END FUNCTION

@@ -1,0 +1,749 @@
+' Der Einstellungs-Dialog (PySticky ui/dialogs/settings_dialog.py mit den
+' Reitern aus settings_tabs/) und die Raster-Optionen (grid_options_dialog.py).
+'
+' Sechs Reiter: Allgemein, Zeichenfläche, Werkzeuge, Farben, Dateien,
+' Tastenkürzel. Der Dialog arbeitet auf seinen Feldern; erst "Übernehmen" oder
+' "OK" schreibt sie in die Einstellungen, sichert und wendet sie an -- wie
+' im Original verwirft "Abbrechen" alles, auch geaenderte Tastenkuerzel.
+
+DIM edDialog AS INTEGER
+DIM edReiter AS INTEGER
+' Allgemein
+DIM edAutosichern AS INTEGER
+DIM edAutoMin AS INTEGER
+DIM edBak AS INTEGER
+DIM edSchnapp AS INTEGER
+DIM edStart AS INTEGER
+DIM edZuletzt AS INTEGER
+DIM edFenster AS INTEGER
+DIM edBeenden AS INTEGER
+DIM edUeberschreiben AS INTEGER
+DIM edMeldung AS INTEGER
+DIM edAutor AS INTEGER
+DIM edCopyright AS INTEGER
+' Zeichenflaeche
+DIM edRaster AS INTEGER
+DIM edHaupt AS INTEGER
+DIM edNebenAn AS INTEGER
+DIM edNeben AS INTEGER
+DIM edFarbeNormal AS INTEGER
+DIM edFarbeNeben AS INTEGER
+DIM edFarbeHaupt AS INTEGER
+DIM edZelle AS INTEGER
+DIM edZelleMin AS INTEGER
+DIM edZelleMax AS INTEGER
+DIM edZoom AS INTEGER
+DIM edHintergrund AS INTEGER
+DIM edStoff AS INTEGER
+' Werkzeuge
+DIM edStartWz AS INTEGER
+DIM edWzMerken AS INTEGER
+DIM edPipette AS INTEGER
+DIM edPipInfo AS INTEGER
+DIM edDiagonal AS INTEGER
+DIM edToleranz AS INTEGER
+DIM edRueckBreite AS INTEGER
+DIM edEinrasten AS INTEGER
+' Farben
+DIM edPalette AS INTEGER
+DIM edPalNamen AS ARRAY OF STRING
+DIM edKatalog AS INTEGER
+DIM edSymSchrift AS INTEGER
+DIM edSymGroesse AS INTEGER
+DIM edSymAuto AS INTEGER
+DIM edAnzeige AS INTEGER
+' Dateien
+DIM edOrdner AS INTEGER
+DIM edPdfZellen AS INTEGER
+DIM edUeber AS INTEGER
+DIM edMystery AS INTEGER
+DIM edImpFarben AS INTEGER
+DIM edDither AS INTEGER
+' Tastenkuerzel: eigene Kuerzel, wie sie im Dialog stehen (erst OK gilt)
+DIM edKuerzel AS MAP OF STRING
+DIM edKuListe AS INTEGER
+DIM edKuText AS ARRAY OF INTEGER
+
+CONST ED_UEBERNEHMEN = 3
+
+' --- Bausteine --------------------------------------------------------------------------
+
+FUNCTION edZeile(text AS STRING, w AS INTEGER, tippText AS STRING) AS INTEGER
+    DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 10)
+    DIM l AS INTEGER : l = gtk_label_new(text)
+    gtk_label_set_xalign(l, 0.0)
+    gtk_widget_set_size_request(l, 210, -1)
+    gtk_box_pack_start(z, l, FALSE, FALSE, 0)
+    gtk_box_pack_start(z, w, FALSE, FALSE, 0)
+    IF tippText <> "" THEN
+        gtk_widget_set_tooltip_text(l, tippText)
+        gtk_widget_set_tooltip_text(w, tippText)
+    END IF
+    RETURN z
+END FUNCTION
+
+FUNCTION edKaestchen(text AS STRING, tippText AS STRING) AS INTEGER
+    DIM k AS INTEGER : k = gtk_check_button_new_with_label(text)
+    IF tippText <> "" THEN gtk_widget_set_tooltip_text(k, tippText)
+    RETURN k
+END FUNCTION
+
+FUNCTION edFarbknopf() AS INTEGER
+    DIM f AS GdkRGBA
+    f.deckkraft = 1.0
+    RETURN gtk_color_button_new_with_rgba(f)
+END FUNCTION
+
+SUB edFarbeSetzen(k AS INTEGER, farbe AS INTEGER)
+    DIM f AS GdkRGBA
+    f.rot = ((farbe SHR 16) BAND 255) / 255.0
+    f.gruen = ((farbe SHR 8) BAND 255) / 255.0
+    f.blau = (farbe BAND 255) / 255.0
+    f.deckkraft = 1.0
+    gtk_color_chooser_set_rgba(k, f)
+END SUB
+
+FUNCTION edFarbe(k AS INTEGER) AS INTEGER
+    DIM f AS GdkRGBA
+    gtk_color_chooser_get_rgba(k, f)
+    RETURN (CLAMP(ROUND(f.rot * 255), 0, 255) SHL 16) BOR (CLAMP(ROUND(f.gruen * 255), 0, 255) SHL 8) BOR CLAMP(ROUND(f.blau * 255), 0, 255)
+END FUNCTION
+
+' Eine Seite des Reiterwerks: rollend, Abschnitte untereinander
+FUNCTION edSeite(titel AS STRING) AS INTEGER
+    DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 6)
+    gtk_container_set_border_width(box, 14)
+    DIM roll AS INTEGER : roll = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(roll, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    gtk_container_add(roll, box)
+    DIM n AS INTEGER : n = gtk_notebook_append_page(edReiter, roll, gtk_label_new(titel))
+    RETURN box
+END FUNCTION
+
+SUB edAbschnitt(box AS INTEGER, titel AS STRING)
+    DIM u AS INTEGER : u = adUeberschrift(titel)
+    gtk_widget_set_margin_top(u, 8)
+    gtk_box_pack_start(box, u, FALSE, FALSE, 0)
+END SUB
+
+SUB edRein(box AS INTEGER, w AS INTEGER)
+    gtk_box_pack_start(box, w, FALSE, FALSE, 0)
+END SUB
+
+' Deutsche Namen der Werkzeuge (wzName$ ohne den Teil in Klammern)
+FUNCTION edWerkzeugName$(nr AS INTEGER) AS STRING
+    DIM n AS STRING : n = wzName$(nr)
+    DIM p AS INTEGER : p = INSTR(n, " (")
+    IF p >= 0 THEN n = LEFT$(n, p)
+    RETURN n
+END FUNCTION
+
+' --- Aufbau -----------------------------------------------------------------------------
+
+FUNCTION edBauen() AS INTEGER
+    ' In der Kopfleiste steht, was zuletzt kommt, am weitesten links -- OK
+    ' zuerst, damit es ganz rechts steht
+    edDialog = gtk_dialog_new_with_buttons("Einstellungen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "OK", GTK_ANTWORT_OK, "Übernehmen", ED_UEBERNEHMEN, "Abbrechen", GTK_ANTWORT_ABBRECHEN, 0)
+    gtk_dialog_set_default_response(edDialog, GTK_ANTWORT_OK)
+    gtk_window_set_default_size(edDialog, 720, 620)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(edDialog)
+    gtk_container_set_border_width(innen, 8)
+    edReiter = gtk_notebook_new()
+    gtk_box_pack_start(innen, edReiter, TRUE, TRUE, 0)
+    ' Zuruecksetzen unten links, nicht in der Kopfleiste (dort waere es ein
+    ' Knopf neben OK)
+    DIM unten AS INTEGER : unten = gtk_box_new(GTK_WAAGERECHT, 8)
+    DIM zk AS INTEGER : zk = gtk_button_new_with_label("Alles zurücksetzen")
+    gtk_widget_set_tooltip_text(zk, "Alle Einstellungen auf die Vorgaben -- gesichert wird erst mit Übernehmen oder OK")
+    signal(zk, "clicked", edZuruecksetzenGeklickt, 0, 0, 0)
+    gtk_box_pack_start(unten, zk, FALSE, FALSE, 0)
+    gtk_widget_set_margin_top(unten, 8)
+    gtk_box_pack_end(innen, unten, FALSE, FALSE, 0)
+    DIM s AS INTEGER, i AS INTEGER
+
+    ' Allgemein
+    s = edSeite("Allgemein")
+    edAbschnitt(s, "Automatisch sichern")
+    edAutosichern = edKaestchen("Automatisch sichern", "Sichert ungesicherte Änderungen regelmäßig neben die Datei (<name>.pxs.autosave) bzw. in den Einstellungsordner. Nach einem Absturz bietet Glutfaden den Stand an.")
+    edRein(s, edAutosichern)
+    edAutoMin = adSpin(1, 60, 1, 5, 0)
+    edRein(s, edZeile("Alle (Minuten):", edAutoMin, "Abstand zwischen zwei automatischen Sicherungen"))
+    edBak = edKaestchen("Vor dem Überschreiben eine .bak anlegen", "Beim Sichern wandert die vorige Fassung nach <name>.pxs.bak")
+    edRein(s, edBak)
+    edSchnapp = adSpin(5, 240, 5, 30, 0)
+    edRein(s, edZeile("Versionen höchstens alle (Minuten):", edSchnapp, "Wie oft beim Arbeiten eine Version (Muster -> Versionen) angelegt wird"))
+    edAbschnitt(s, "Programmstart")
+    edStart = imKlappliste(kern.startAktionen(), 0)
+    edRein(s, edZeile("Ohne Datei beim Start:", edStart, "Was Glutfaden zeigt, wenn es ohne Datei gestartet wird"))
+    edZuletzt = adSpin(0, 20, 1, 10, 0)
+    edRein(s, edZeile("Zuletzt geöffnet (Anzahl):", edZuletzt, "So viele Dateien stehen unter Muster -> Zuletzt geöffnet; 0 = keine Liste"))
+    edFenster = edKaestchen("Fenstergröße wiederherstellen", "Startet in der Größe, in der Glutfaden zuletzt geschlossen wurde")
+    edRein(s, edFenster)
+    edAbschnitt(s, "Nachfragen und Meldungen")
+    edBeenden = edKaestchen("Vor dem Beenden fragen", "Fragt auch dann, wenn nichts ungesichert ist")
+    edRein(s, edBeenden)
+    edUeberschreiben = edKaestchen("Vor dem Überschreiben warnen", "Fragt im Sichern-Dialog, bevor eine vorhandene Datei ersetzt wird")
+    edRein(s, edUeberschreiben)
+    edMeldung = adSpin(1, 30, 1, 3, 0)
+    edRein(s, edZeile("Meldungen stehen (Sekunden):", edMeldung, "Wie lange eine Meldung vorn in der Statuszeile steht"))
+    edAbschnitt(s, "Wasserzeichen im Export")
+    edAutor = gtk_entry_new()
+    gtk_entry_set_placeholder_text(edAutor, "z. B. Anna Müller")
+    edRein(s, edZeile("Autor:", edAutor, "Steht in PDF und HTML, wenn das Muster selbst keinen Autor hat"))
+    edCopyright = gtk_entry_new()
+    gtk_entry_set_placeholder_text(edCopyright, "z. B. © 2026 Anna Müller")
+    edRein(s, edZeile("Copyright:", edCopyright, "Fußzeile in PDF und HTML, wenn das Muster selbst keins hat"))
+
+    ' Zeichenflaeche
+    s = edSeite("Zeichenfläche")
+    edAbschnitt(s, "Raster")
+    edRaster = edKaestchen("Raster zeigen", "")
+    edRein(s, edRaster)
+    edHaupt = adSpin(5, 50, 1, 10, 0)
+    edRein(s, edZeile("Kräftige Linie alle (Stiche):", edHaupt, ""))
+    edNebenAn = edKaestchen("Neben-Raster zeigen", "Eine zweite, eigene Linie zwischen den kräftigen")
+    edRein(s, edNebenAn)
+    edNeben = adSpin(1, 20, 1, 5, 0)
+    edRein(s, edZeile("Neben-Linie alle (Stiche):", edNeben, "Muss kleiner sein als der Abstand der kräftigen Linien -- sonst fiele jede Neben-Linie auf eine kräftige"))
+    edFarbeNormal = edFarbknopf()
+    edRein(s, edZeile("Farbe der Linien:", edFarbeNormal, ""))
+    edFarbeNeben = edFarbknopf()
+    edRein(s, edZeile("Farbe der Neben-Linien:", edFarbeNeben, ""))
+    edFarbeHaupt = edFarbknopf()
+    edRein(s, edZeile("Farbe der kräftigen Linien:", edFarbeHaupt, "Eine Farbe, die auf dem Stoff kaum zu sehen wäre, wird beim Zeichnen durch Grau ersetzt"))
+    edAbschnitt(s, "Zoom")
+    edZelle = adSpin(1, 100, 1, 20, 0)
+    edRein(s, edZeile("Kästchen bei 100 % (Pixel):", edZelle, ""))
+    edZelleMin = adSpin(1, 20, 1, 1, 0)
+    edRein(s, edZeile("Kleinstes Kästchen (Pixel):", edZelleMin, ""))
+    edZelleMax = adSpin(30, 100, 1, 60, 0)
+    edRein(s, edZeile("Größtes Kästchen (Pixel):", edZelleMax, ""))
+    edZoom = adSpin(1.0, 5.0, 0.1, 1.2, 1)
+    edRein(s, edZeile("Faktor je Zoomschritt:", edZoom, "Mausrad, + und - und die Knöpfe"))
+    edAbschnitt(s, "Hintergrund")
+    edHintergrund = edFarbknopf()
+    edRein(s, edZeile("Um das Muster:", edHintergrund, ""))
+    edStoff = edFarbknopf()
+    edRein(s, edZeile("Leere Kästchen (Stoff):", edStoff, ""))
+
+    ' Werkzeuge
+    s = edSeite("Werkzeuge")
+    edAbschnitt(s, "Beim Start")
+    edStartWz = gtk_combo_box_text_new()
+    FOR i = 0 TO WZ_ANZAHL - 1
+        gtk_combo_box_text_append_text(edStartWz, edWerkzeugName$(i))
+    NEXT
+    edRein(s, edZeile("Werkzeug:", edStartWz, ""))
+    edWzMerken = edKaestchen("Stattdessen das zuletzt benutzte", "")
+    edRein(s, edWzMerken)
+    edAbschnitt(s, "Pipette")
+    edPipette = imKlappliste(kern.pipettenArten(), 0)
+    edRein(s, edZeile("Nach dem Aufnehmen:", edPipette, ""))
+    edPipInfo = edKaestchen("Farbe in der Statuszeile nennen", "Beim Aufnehmen und für das Kästchen unter der Maus")
+    edRein(s, edPipInfo)
+    edAbschnitt(s, "Füllen")
+    edDiagonal = edKaestchen("Auch über Ecken füllen (diagonal)", "")
+    edRein(s, edDiagonal)
+    edToleranz = adSpin(0, 100, 5, 0, 0)
+    edRein(s, edZeile("Toleranz (%):", edToleranz, "Füllt auch ähnliche Farben mit -- 100 % sind ein Farbabstand (CIEDE2000) von 50"))
+    edAbschnitt(s, "Rückstich")
+    edRueckBreite = adSpin(1, 5, 1, 2, 0)
+    edRein(s, edZeile("Linienstärke (2 = normal):", edRueckBreite, ""))
+    edEinrasten = edKaestchen("Auch an Kantenmitten und in der Mitte ansetzen", "Aus: nur an den Ecken der Kästchen")
+    edRein(s, edEinrasten)
+
+    ' Farben
+    s = edSeite("Farben")
+    edAbschnitt(s, "Palette")
+    edPalette = gtk_combo_box_text_new()
+    edPalNamen = []
+    DIM p AS kern.Palette
+    FOR EACH p IN slPaletten
+        ARRAY_PUSH(edPalNamen, p.name)
+        gtk_combo_box_text_append_text(edPalette, p.name)
+    NEXT
+    edRein(s, edZeile("Für Muster ohne Farben:", edPalette, "Welche Palette die Seitenleiste zeigt, solange das Muster noch keine Farbe hat"))
+    edKatalog = edKaestchen("Katalognummern zeigen", "In der Farbliste und im Katalog")
+    edRein(s, edKatalog)
+    edAbschnitt(s, "Symbole")
+    edSymSchrift = gtk_entry_new()
+    edRein(s, edZeile("Schrift:", edSymSchrift, "Name einer installierten Schrift, z. B. Segoe UI Symbol oder DejaVu Sans"))
+    edSymGroesse = adSpin(6, 20, 1, 10, 0)
+    edRein(s, edZeile("Größe (10 = normal):", edSymGroesse, ""))
+    edSymAuto = edKaestchen("Neuen Farben automatisch ein Symbol geben", "Aus: neue Farben bekommen „?“ und das Symbol wird von Hand vergeben")
+    edRein(s, edSymAuto)
+    edAbschnitt(s, "Anzeige")
+    edAnzeige = imKlappliste(kern.farbAnzeigen(), 1)
+    edRein(s, edZeile("Auf der Zeichenfläche:", edAnzeige, "Symbole erscheinen ab 12 Pixel je Kästchen"))
+
+    ' Dateien
+    s = edSeite("Dateien")
+    edAbschnitt(s, "Ordner")
+    edOrdner = gtk_entry_new()
+    gtk_entry_set_placeholder_text(edOrdner, "leer = was das System vorschlägt")
+    DIM oz AS INTEGER : oz = edZeile("Öffnen und Sichern in:", edOrdner, "Wo die Datei-Dialoge anfangen, solange das Muster noch keine Datei hat")
+    gtk_widget_set_size_request(edOrdner, 360, -1)
+    DIM wahl AS INTEGER : wahl = gtk_button_new_with_label("…")
+    signal(wahl, "clicked", edOrdnerWaehlen, 0, 0, 0)
+    gtk_box_pack_start(oz, wahl, FALSE, FALSE, 0)
+    edRein(s, oz)
+    edAbschnitt(s, "Export (Vorgaben)")
+    edPdfZellen = adSpin(0, 60, 1, 0, 0)
+    edRein(s, edZeile("PDF: Stiche je Seite:", edPdfZellen, "0 = die Vorgabe des Formats, sonst 20 bis 60"))
+    edUeber = adSpin(0, 20, 1, 0, 0)
+    edRein(s, edZeile("Überlappung (Stiche):", edUeber, ""))
+    edMystery = edKaestchen("Mystery: Vorschau ohne Bild", "")
+    edRein(s, edMystery)
+    edAbschnitt(s, "Bildimport (Vorgaben)")
+    edImpFarben = adSpin(1, 100, 1, 20, 0)
+    edRein(s, edZeile("Höchstens Farben:", edImpFarben, ""))
+    edDither = imKlappliste(["Kein Dithering", "Floyd-Steinberg", "Geordnet (Bayer)"], 0)
+    edRein(s, edZeile("Dithering:", edDither, ""))
+
+    ' Tastenkuerzel
+    s = edSeite("Tastenkürzel")
+    DIM hinweis AS INTEGER : hinweis = gtk_label_new("Doppelklick auf eine Zeile (oder „Ändern …“) und dann die neue Taste drücken. Eine Taste, die schon ein anderer Befehl hat, wird abgelehnt.")
+    gtk_label_set_line_wrap(hinweis, TRUE)
+    gtk_label_set_xalign(hinweis, 0.0)
+    edRein(s, hinweis)
+    edKuListe = gtk_list_box_new()
+    edKuText = []
+    DIM a AS kern.Kuerzelaktion
+    FOR EACH a IN kern.kuerzelAktionen()
+        DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 10)
+        gtk_container_set_border_width(z, 4)
+        DIM n AS INTEGER : n = gtk_label_new(a.name)
+        gtk_label_set_xalign(n, 0.0)
+        gtk_widget_set_hexpand(n, TRUE)
+        DIM t AS INTEGER : t = gtk_label_new("")
+        gtkKlasse(t, "monospace")
+        gtk_box_pack_start(z, n, TRUE, TRUE, 0)
+        gtk_box_pack_end(z, t, FALSE, FALSE, 0)
+        gtk_list_box_insert(edKuListe, z, -1)
+        ARRAY_PUSH(edKuText, t)
+    NEXT
+    DIM sk AS INTEGER : sk = signalZeile(edKuListe, "row-activated", edKuAktiviert, 0, 0, 0)
+    gtk_box_pack_start(s, edKuListe, TRUE, TRUE, 0)
+    DIM knoepfe AS INTEGER : knoepfe = gtk_box_new(GTK_WAAGERECHT, 8)
+    DIM b1 AS INTEGER : b1 = gtk_button_new_with_label("Ändern …")
+    signal(b1, "clicked", edKuKnopf, 0, 0, 0)
+    DIM b2 AS INTEGER : b2 = gtk_button_new_with_label("Vorgabe")
+    signal(b2, "clicked", edKuKnopf, 1, 0, 0)
+    DIM b3 AS INTEGER : b3 = gtk_button_new_with_label("Alle zurücksetzen")
+    signal(b3, "clicked", edKuKnopf, 2, 0, 0)
+    gtk_box_pack_start(knoepfe, b1, FALSE, FALSE, 0)
+    gtk_box_pack_start(knoepfe, b2, FALSE, FALSE, 0)
+    gtk_box_pack_start(knoepfe, b3, FALSE, FALSE, 0)
+    edRein(s, knoepfe)
+
+    signal(edNebenAn, "toggled", edAbhaengig, 0, 0, 0)
+    signal(edRaster, "toggled", edAbhaengig, 0, 0, 0)
+    signal(edHaupt, "value-changed", edAbhaengig, 0, 0, 0)
+    signal(edAutosichern, "toggled", edAbhaengig, 0, 0, 0)
+    signal(edWzMerken, "toggled", edAbhaengig, 0, 0, 0)
+    edFuellen(einst)
+    gtk_widget_show_all(edDialog)
+    RETURN edDialog
+END FUNCTION
+
+' Was nur gilt, wenn ein anderes Feld an ist, wird grau -- und das
+' Neben-Raster bleibt kleiner als das Haupt-Raster (_sync_minor_max).
+SUB edAbhaengig(w AS INTEGER, daten AS INTEGER)
+    DIM raster AS BOOLEAN : raster = gtk_toggle_button_get_active(edRaster)
+    gtk_widget_set_sensitive(edHaupt, raster)
+    gtk_widget_set_sensitive(edNebenAn, raster)
+    gtk_widget_set_sensitive(edNeben, raster AND gtk_toggle_button_get_active(edNebenAn))
+    DIM h AS INTEGER : h = gtk_spin_button_get_value_as_int(edHaupt)
+    gtk_spin_button_set_range(edNeben, 1, MIN(20, MAX(1, h - 1)))
+    gtk_widget_set_sensitive(edAutoMin, gtk_toggle_button_get_active(edAutosichern))
+    gtk_widget_set_sensitive(edStartWz, NOT gtk_toggle_button_get_active(edWzMerken))
+END SUB
+
+' Die Felder aus einem Stand fuellen (beim Oeffnen und "Zurücksetzen")
+SUB edFuellen(e AS kern.Einstellungen)
+    gtk_toggle_button_set_active(edAutosichern, e.autosichern)
+    gtk_spin_button_set_value(edAutoMin, e.autosichernMinuten)
+    gtk_toggle_button_set_active(edBak, e.sicherungskopie)
+    gtk_spin_button_set_value(edSchnapp, e.schnappschussMinuten)
+    gtk_combo_box_set_active(edStart, e.startAktion)
+    gtk_spin_button_set_value(edZuletzt, e.zuletztAnzahl)
+    gtk_toggle_button_set_active(edFenster, e.fensterMerken)
+    gtk_toggle_button_set_active(edBeenden, e.beendenFragen)
+    gtk_toggle_button_set_active(edUeberschreiben, e.ueberschreibenFragen)
+    gtk_spin_button_set_value(edMeldung, e.meldungSekunden)
+    gtk_entry_set_text(edAutor, e.autor)
+    gtk_entry_set_text(edCopyright, e.copyright)
+    gtk_toggle_button_set_active(edRaster, e.raster)
+    gtk_spin_button_set_value(edHaupt, e.rasterHaupt)
+    gtk_toggle_button_set_active(edNebenAn, e.nebenraster)
+    gtk_spin_button_set_range(edNeben, 1, MIN(20, MAX(1, e.rasterHaupt - 1)))
+    gtk_spin_button_set_value(edNeben, e.rasterNeben)
+    edFarbeSetzen(edFarbeNormal, e.rasterFarbe)
+    edFarbeSetzen(edFarbeNeben, e.nebenFarbe)
+    edFarbeSetzen(edFarbeHaupt, e.hauptFarbe)
+    gtk_spin_button_set_value(edZelle, e.zelleStandard)
+    gtk_spin_button_set_value(edZelleMin, e.zelleMin)
+    gtk_spin_button_set_value(edZelleMax, e.zelleMax)
+    gtk_spin_button_set_value(edZoom, e.zoomTempo / 10.0)
+    edFarbeSetzen(edHintergrund, e.hintergrund)
+    edFarbeSetzen(edStoff, e.stoff)
+    gtk_combo_box_set_active(edStartWz, e.startWerkzeug)
+    gtk_toggle_button_set_active(edWzMerken, e.werkzeugMerken)
+    gtk_combo_box_set_active(edPipette, e.pipetteDanach)
+    gtk_toggle_button_set_active(edPipInfo, e.pipetteInfo)
+    gtk_toggle_button_set_active(edDiagonal, e.fuellenDiagonal)
+    gtk_spin_button_set_value(edToleranz, e.fuellToleranz)
+    gtk_spin_button_set_value(edRueckBreite, e.rueckBreite)
+    gtk_toggle_button_set_active(edEinrasten, e.rueckEinrasten)
+    gtk_combo_box_set_active(edPalette, MAX(0, ARRAY_INDEXOF(edPalNamen, e.palette)))
+    gtk_toggle_button_set_active(edKatalog, e.katalog)
+    gtk_entry_set_text(edSymSchrift, e.symbolSchrift)
+    gtk_spin_button_set_value(edSymGroesse, e.symbolGroesse)
+    gtk_toggle_button_set_active(edSymAuto, e.symboleAuto)
+    gtk_combo_box_set_active(edAnzeige, e.farbAnzeige)
+    gtk_entry_set_text(edOrdner, e.ordner)
+    gtk_spin_button_set_value(edPdfZellen, e.pdfZellen)
+    gtk_spin_button_set_value(edUeber, e.ueberlappung)
+    gtk_toggle_button_set_active(edMystery, e.mystery)
+    gtk_spin_button_set_value(edImpFarben, e.importFarben)
+    gtk_combo_box_set_active(edDither, e.dithering)
+    edKuerzel = {}
+    DIM k AS STRING
+    FOR EACH k IN MAPKEYS(e.kuerzel)
+        MAPPUT(edKuerzel, k, e.kuerzel[k])
+    NEXT
+    edKuAnzeigen()
+    edAbhaengig(0, 0)
+END SUB
+
+' Die Felder in die Einstellungen, ordnen, sichern, anwenden
+SUB edUebernehmen()
+    einst.autosichern = gtk_toggle_button_get_active(edAutosichern)
+    einst.autosichernMinuten = gtk_spin_button_get_value_as_int(edAutoMin)
+    einst.sicherungskopie = gtk_toggle_button_get_active(edBak)
+    einst.schnappschussMinuten = gtk_spin_button_get_value_as_int(edSchnapp)
+    einst.startAktion = MAX(0, gtk_combo_box_get_active(edStart))
+    einst.zuletztAnzahl = gtk_spin_button_get_value_as_int(edZuletzt)
+    einst.fensterMerken = gtk_toggle_button_get_active(edFenster)
+    einst.beendenFragen = gtk_toggle_button_get_active(edBeenden)
+    einst.ueberschreibenFragen = gtk_toggle_button_get_active(edUeberschreiben)
+    einst.meldungSekunden = gtk_spin_button_get_value_as_int(edMeldung)
+    einst.autor = TRIM$(gtk_entry_get_text(edAutor))
+    einst.copyright = TRIM$(gtk_entry_get_text(edCopyright))
+    einst.raster = gtk_toggle_button_get_active(edRaster)
+    einst.rasterHaupt = gtk_spin_button_get_value_as_int(edHaupt)
+    einst.nebenraster = gtk_toggle_button_get_active(edNebenAn)
+    einst.rasterNeben = gtk_spin_button_get_value_as_int(edNeben)
+    einst.rasterFarbe = edFarbe(edFarbeNormal)
+    einst.nebenFarbe = edFarbe(edFarbeNeben)
+    einst.hauptFarbe = edFarbe(edFarbeHaupt)
+    einst.zelleStandard = gtk_spin_button_get_value_as_int(edZelle)
+    einst.zelleMin = gtk_spin_button_get_value_as_int(edZelleMin)
+    einst.zelleMax = gtk_spin_button_get_value_as_int(edZelleMax)
+    einst.zoomTempo = ROUND(gtk_spin_button_get_value(edZoom) * 10)
+    einst.hintergrund = edFarbe(edHintergrund)
+    einst.stoff = edFarbe(edStoff)
+    einst.startWerkzeug = MAX(0, gtk_combo_box_get_active(edStartWz))
+    einst.werkzeugMerken = gtk_toggle_button_get_active(edWzMerken)
+    einst.pipetteDanach = MAX(0, gtk_combo_box_get_active(edPipette))
+    einst.pipetteInfo = gtk_toggle_button_get_active(edPipInfo)
+    einst.fuellenDiagonal = gtk_toggle_button_get_active(edDiagonal)
+    einst.fuellToleranz = gtk_spin_button_get_value_as_int(edToleranz)
+    einst.rueckBreite = gtk_spin_button_get_value_as_int(edRueckBreite)
+    einst.rueckEinrasten = gtk_toggle_button_get_active(edEinrasten)
+    DIM pn AS INTEGER : pn = gtk_combo_box_get_active(edPalette)
+    IF pn >= 0 AND pn < LEN(edPalNamen) THEN einst.palette = edPalNamen[pn]
+    einst.katalog = gtk_toggle_button_get_active(edKatalog)
+    IF TRIM$(gtk_entry_get_text(edSymSchrift)) <> "" THEN einst.symbolSchrift = TRIM$(gtk_entry_get_text(edSymSchrift))
+    einst.symbolGroesse = gtk_spin_button_get_value_as_int(edSymGroesse)
+    einst.symboleAuto = gtk_toggle_button_get_active(edSymAuto)
+    einst.farbAnzeige = MAX(0, gtk_combo_box_get_active(edAnzeige))
+    einst.ordner = TRIM$(gtk_entry_get_text(edOrdner))
+    einst.pdfZellen = gtk_spin_button_get_value_as_int(edPdfZellen)
+    IF einst.pdfZellen > 0 AND einst.pdfZellen < 20 THEN einst.pdfZellen = 20
+    einst.ueberlappung = gtk_spin_button_get_value_as_int(edUeber)
+    einst.mystery = gtk_toggle_button_get_active(edMystery)
+    einst.importFarben = gtk_spin_button_get_value_as_int(edImpFarben)
+    einst.dithering = MAX(0, gtk_combo_box_get_active(edDither))
+    einst.kuerzel = {}
+    DIM k AS STRING
+    FOR EACH k IN MAPKEYS(edKuerzel)
+        MAPPUT(einst.kuerzel, k, edKuerzel[k])
+    NEXT
+    kern.einstellungenOrdnen(einst)
+    einstellungenMerken()
+    einstellungenAnwenden()
+    edFuellen(einst)                ' was geordnet wurde, steht jetzt auch im Dialog
+END SUB
+
+SUB edOrdnerWaehlen(w AS INTEGER, daten AS INTEGER)
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new("Ordner wählen", edDialog, GTK_DATEI_ORDNER, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Wählen", GTK_ANTWORT_ANNEHMEN, 0)
+    DIM ok AS BOOLEAN
+    IF TRIM$(gtk_entry_get_text(edOrdner)) <> "" AND DIREXISTS(TRIM$(gtk_entry_get_text(edOrdner))) THEN ok = gtk_file_chooser_set_current_folder(d, TRIM$(gtk_entry_get_text(edOrdner)))
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM z AS INTEGER : z = gtk_file_chooser_get_filename(d)
+        gtk_entry_set_text(edOrdner, TEXT_AUS_ZEIGER$(z))
+        g_free(z)
+    END IF
+    gtk_widget_destroy(d)
+END SUB
+
+' --- Tastenkuerzel ----------------------------------------------------------------------
+
+' Was im Dialog gerade gilt: die Einstellungen mit den Kuerzeln des Dialogs
+FUNCTION edKuStand() AS kern.Einstellungen
+    DIM e AS kern.Einstellungen : e = NEW kern.Einstellungen()
+    e.kuerzel = edKuerzel
+    RETURN e
+END FUNCTION
+
+SUB edKuAnzeigen()
+    DIM w AS ARRAY OF STRING : w = kern.kuerzelWirksam(edKuStand())
+    DIM aktionen AS ARRAY OF kern.Kuerzelaktion : aktionen = kern.kuerzelAktionen()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(edKuText) - 1
+        DIM t AS STRING : t = w[i]
+        IF t <> kern.kuerzelNormal$(aktionen[i].vorgabe) THEN t = t + "  (eigen)"
+        gtk_label_set_text(edKuText[i], t)
+    NEXT
+END SUB
+
+' Ein Kuerzel fuer Aktion i setzen ("" = zurueck auf die Vorgabe). Liefert ""
+' oder warum nicht (schon vergeben, krumm).
+FUNCTION edKuSetzen$(i AS INTEGER, text AS STRING) AS STRING
+    DIM aktionen AS ARRAY OF kern.Kuerzelaktion : aktionen = kern.kuerzelAktionen()
+    IF i < 0 OR i >= LEN(aktionen) THEN RETURN "Keine Zeile gewählt."
+    DIM kennung AS STRING : kennung = aktionen[i].kennung
+    IF text = "" THEN
+        IF MAPHAS(edKuerzel, kennung) THEN MAPREMOVE(edKuerzel, kennung)
+        edKuAnzeigen()
+        RETURN ""
+    END IF
+    DIM n AS STRING : n = kern.kuerzelNormal$(text)
+    IF n = "" THEN RETURN "„" + text + "“ ist kein Tastenkürzel."
+    DIM j AS INTEGER : j = kern.kuerzelKonflikt(kern.kuerzelWirksam(edKuStand()), n, i)
+    IF j >= 0 THEN RETURN "„" + n + "“ hat schon „" + aktionen[j].name + "“."
+    IF n = kern.kuerzelNormal$(aktionen[i].vorgabe) THEN
+        IF MAPHAS(edKuerzel, kennung) THEN MAPREMOVE(edKuerzel, kennung)
+    ELSE
+        MAPPUT(edKuerzel, kennung, n)
+    END IF
+    edKuAnzeigen()
+    RETURN ""
+END FUNCTION
+
+FUNCTION edKuGewaehlt() AS INTEGER
+    DIM z AS INTEGER : z = gtk_list_box_get_selected_row(edKuListe)
+    IF z = 0 THEN RETURN -1
+    RETURN gtk_list_box_row_get_index(z)
+END FUNCTION
+
+SUB edKuAktiviert(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    edKuAendern(gtk_list_box_row_get_index(zeile))
+END SUB
+
+SUB edKuKnopf(w AS INTEGER, was AS INTEGER)
+    DIM i AS INTEGER
+    SELECT CASE was
+        CASE 0 : edKuAendern(edKuGewaehlt())
+        CASE 1
+            DIM f AS STRING : f = edKuSetzen$(edKuGewaehlt(), "")
+        CASE 2
+            IF pdFrage(edDialog, "Tastenkürzel zurücksetzen", "Alle Tastenkürzel auf die Vorgaben zurücksetzen?") THEN
+                edKuerzel = {}
+                edKuAnzeigen()
+            END IF
+    END SELECT
+END SUB
+
+' Die neue Taste abfragen: ein kleiner Dialog, der den naechsten Tastendruck
+' mit Strg/Alt/Umschalt aufnimmt (GTK kennt kein QKeySequenceEdit).
+DIM ekText AS STRING
+DIM ekAnzeige AS INTEGER
+
+FUNCTION ekTaste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM t AS INTEGER
+    IF NOT gdk_event_get_keyval(ereignis, t) THEN RETURN FALSE
+    DIM z AS INTEGER
+    DIM ok AS BOOLEAN : ok = gdk_event_get_state(ereignis, z)
+    DIM k AS STRING : k = kern.kuerzelAusTaste$(t, (z BAND GDK_STRG) <> 0, (z BAND GDK_ALT) <> 0, (z BAND GDK_UMSCHALT) <> 0)
+    IF k = "" THEN RETURN TRUE                 ' Strg, Umschalt & Co. allein
+    IF k = "Esc" THEN RETURN FALSE             ' bricht ab
+    IF k = "Enter" AND ekText <> "" THEN RETURN FALSE
+    ekText = k
+    gtk_label_set_text(ekAnzeige, k)
+    RETURN TRUE
+END FUNCTION
+
+SUB edKuAendern(i AS INTEGER)
+    DIM aktionen AS ARRAY OF kern.Kuerzelaktion : aktionen = kern.kuerzelAktionen()
+    IF i < 0 OR i >= LEN(aktionen) THEN RETURN
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons("Tastenkürzel: " + aktionen[i].name, edDialog, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "OK", GTK_ANTWORT_OK, 0)
+    gtk_dialog_set_default_response(d, GTK_ANTWORT_OK)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(d)
+    gtk_container_set_border_width(innen, 14)
+    gtk_box_pack_start(innen, gtk_label_new("Neue Taste für „" + aktionen[i].name + "“ drücken:"), FALSE, FALSE, 4)
+    ekText = ""
+    ekAnzeige = gtk_label_new(kern.kuerzelWirksam(edKuStand())[i])
+    gtkKlasse(ekAnzeige, "kartenwert")
+    gtk_box_pack_start(innen, ekAnzeige, FALSE, FALSE, 8)
+    signalEreignis(d, "key-press-event", ekTaste, 0, 0, 0)
+    gtk_widget_show_all(d)
+    DIM a AS INTEGER : a = gtk_dialog_run(d)
+    gtk_widget_destroy(d)
+    IF a <> GTK_ANTWORT_OK OR ekText = "" THEN RETURN
+    DIM f AS STRING : f = edKuSetzen$(i, ekText)
+    IF f <> "" THEN pdWarnung(edDialog, "Tastenkürzel bereits vergeben", f)
+END SUB
+
+' --- Anwenden ---------------------------------------------------------------------------
+
+' Nach dem Laden oder Uebernehmen: alles, was Einstellungen liest, nachziehen.
+SUB einstellungenAnwenden()
+    einstTafel = kern.kuerzelTafel(einst)
+    tippsAuffrischen()
+    IF lwSchrift <> 0 THEN pango_font_description_free(lwSchrift)
+    lwSchrift = pango_font_description_from_string(einst.symbolSchrift + " Bold 10")
+    exVorbelegt = FALSE
+    zuletztNachziehen()
+    IF lwHat THEN
+        lwZelle = CLAMP(lwZelle, einst.zelleMin, einst.zelleMax)
+        seitenleisteMuster(lwMuster)
+        gtk_widget_queue_draw(lwFlaeche)
+    END IF
+    statusNachziehen()
+END SUB
+
+' Beim Ende: was sich gemerkt wird
+SUB einstellungenBeimEnde()
+    einst.letztesWerkzeug = wzAktiv
+    einstellungenMerken()
+END SUB
+
+SUB edZuruecksetzenGeklickt(w AS INTEGER, daten AS INTEGER)
+    IF NOT pdFrage(edDialog, "Einstellungen zurücksetzen", "Alle Einstellungen auf die Vorgaben zurücksetzen?" + CHR$(10) + "Gesichert wird erst mit Übernehmen oder OK.") THEN RETURN
+    DIM v AS kern.Einstellungen : v = NEW kern.Einstellungen()
+    edFuellen(v)
+END SUB
+
+SUB einstellungenDialog()
+    DIM d AS INTEGER : d = edBauen()
+    DIM weiter AS BOOLEAN : weiter = TRUE
+    WHILE weiter
+        DIM a AS INTEGER : a = gtk_dialog_run(edDialog)
+        SELECT CASE a
+            CASE ED_UEBERNEHMEN
+                edUebernehmen()
+                statusMeldung("Einstellungen übernommen.")
+            CASE GTK_ANTWORT_OK
+                edUebernehmen()
+                statusMeldung("Einstellungen gesichert.")
+                weiter = FALSE
+            CASE ELSE
+                weiter = FALSE
+        END SELECT
+    WEND
+    gtk_widget_destroy(edDialog)
+    edDialog = 0
+END SUB
+
+' --- Raster-Optionen --------------------------------------------------------------------
+
+DIM roDialog AS INTEGER
+DIM roHaupt AS INTEGER
+DIM roNebenAn AS INTEGER
+DIM roNeben AS INTEGER
+DIM roNormal AS INTEGER
+DIM roNebenFarbe AS INTEGER
+DIM roHauptFarbe AS INTEGER
+
+SUB roAbhaengig(w AS INTEGER, daten AS INTEGER)
+    gtk_widget_set_sensitive(roNeben, gtk_toggle_button_get_active(roNebenAn))
+    gtk_spin_button_set_range(roNeben, 1, MIN(20, MAX(1, gtk_spin_button_get_value_as_int(roHaupt) - 1)))
+END SUB
+
+SUB roFuellen(e AS kern.Einstellungen)
+    gtk_spin_button_set_value(roHaupt, e.rasterHaupt)
+    gtk_toggle_button_set_active(roNebenAn, e.nebenraster)
+    gtk_spin_button_set_range(roNeben, 1, MIN(20, MAX(1, e.rasterHaupt - 1)))
+    gtk_spin_button_set_value(roNeben, e.rasterNeben)
+    edFarbeSetzen(roNormal, e.rasterFarbe)
+    edFarbeSetzen(roNebenFarbe, e.nebenFarbe)
+    edFarbeSetzen(roHauptFarbe, e.hauptFarbe)
+    roAbhaengig(0, 0)
+END SUB
+
+SUB roVoreinstellung(w AS INTEGER, nr AS INTEGER)
+    DIM e AS kern.Einstellungen : e = NEW kern.Einstellungen()
+    kern.rasterVoreinstellung(e, nr)
+    roFuellen(e)
+END SUB
+
+FUNCTION roBauen() AS INTEGER
+    roDialog = gtk_dialog_new_with_buttons("Raster-Optionen", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, "Übernehmen", ED_UEBERNEHMEN, "OK", GTK_ANTWORT_OK, 0)
+    gtk_dialog_set_default_response(roDialog, GTK_ANTWORT_OK)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(roDialog)
+    gtk_container_set_border_width(innen, 14)
+    gtk_box_set_spacing(innen, 6)
+    gtk_box_pack_start(innen, adUeberschrift("Linien"), FALSE, FALSE, 0)
+    roHaupt = adSpin(5, 50, 1, 10, 0)
+    gtk_box_pack_start(innen, edZeile("Kräftig alle (Stiche):", roHaupt, ""), FALSE, FALSE, 0)
+    roNebenAn = edKaestchen("Neben-Raster zeigen", "")
+    gtk_box_pack_start(innen, roNebenAn, FALSE, FALSE, 0)
+    roNeben = adSpin(1, 20, 1, 5, 0)
+    gtk_box_pack_start(innen, edZeile("Neben-Linie alle (Stiche):", roNeben, "Kleiner als der Abstand der kräftigen Linien"), FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, adUeberschrift("Farben"), FALSE, FALSE, 0)
+    roNormal = edFarbknopf()
+    gtk_box_pack_start(innen, edZeile("Normal:", roNormal, ""), FALSE, FALSE, 0)
+    roNebenFarbe = edFarbknopf()
+    gtk_box_pack_start(innen, edZeile("Neben-Linien:", roNebenFarbe, ""), FALSE, FALSE, 0)
+    roHauptFarbe = edFarbknopf()
+    gtk_box_pack_start(innen, edZeile("Kräftige Linien:", roHauptFarbe, ""), FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, adUeberschrift("Voreinstellungen"), FALSE, FALSE, 0)
+    DIM vz AS INTEGER : vz = gtk_box_new(GTK_WAAGERECHT, 6)
+    DIM i AS INTEGER
+    DIM namen AS ARRAY OF STRING : namen = kern.rasterVoreinstellungen()
+    FOR i = 0 TO LEN(namen) - 1
+        DIM k AS INTEGER : k = gtk_button_new_with_label(namen[i])
+        signal(k, "clicked", roVoreinstellung, i, 0, 0)
+        gtk_box_pack_start(vz, k, TRUE, TRUE, 0)
+    NEXT
+    gtk_box_pack_start(innen, vz, FALSE, FALSE, 0)
+    signal(roNebenAn, "toggled", roAbhaengig, 0, 0, 0)
+    signal(roHaupt, "value-changed", roAbhaengig, 0, 0, 0)
+    roFuellen(einst)
+    gtk_widget_show_all(roDialog)
+    RETURN roDialog
+END FUNCTION
+
+' Die Raster-Optionen schreiben in dieselben Einstellungen wie der grosse
+' Dialog -- im Original vergass der kleine sie beim naechsten Oeffnen des
+' grossen (grid_options_dialog.py _apply).
+SUB roUebernehmen()
+    einst.rasterHaupt = gtk_spin_button_get_value_as_int(roHaupt)
+    einst.nebenraster = gtk_toggle_button_get_active(roNebenAn)
+    einst.rasterNeben = gtk_spin_button_get_value_as_int(roNeben)
+    einst.rasterFarbe = edFarbe(roNormal)
+    einst.nebenFarbe = edFarbe(roNebenFarbe)
+    einst.hauptFarbe = edFarbe(roHauptFarbe)
+    einst.raster = TRUE
+    kern.einstellungenOrdnen(einst)
+    einstellungenMerken()
+    einstellungenAnwenden()
+END SUB
+
+SUB rasterDialog()
+    DIM d AS INTEGER : d = roBauen()
+    DIM weiter AS BOOLEAN : weiter = TRUE
+    WHILE weiter
+        DIM a AS INTEGER : a = gtk_dialog_run(roDialog)
+        IF a = ED_UEBERNEHMEN OR a = GTK_ANTWORT_OK THEN roUebernehmen()
+        weiter = a = ED_UEBERNEHMEN
+    WEND
+    gtk_widget_destroy(roDialog)
+    roDialog = 0
+END SUB

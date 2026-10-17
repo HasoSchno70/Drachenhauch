@@ -706,7 +706,7 @@ FUNCTION aeZusammenfuehren$() AS STRING
     IF f <> "" THEN RETURN f
     IF wzFarbe >= lwMuster.farbanzahl() THEN wzFarbe = lwMuster.farbanzahl() - 1
     allesNeu()
-    statusMeldung(STR$(vorher - lwMuster.farbanzahl()) + " Farbe(n) zusammengeführt, " + STR$(n) + " Stiche umgefärbt (Strg+Z nimmt es zurück).")
+    statusMeldung(STR$(vorher - lwMuster.farbanzahl()) + " Farbe(n) zusammengeführt, " + STR$(n) + " Stiche umgefärbt (" + kern.kuerzelVon$(einst, "zurueck") + " nimmt es zurück).")
     RETURN ""
 END FUNCTION
 
@@ -807,7 +807,7 @@ END SUB
 FUNCTION auswertenKnopf() AS INTEGER
     DIM mb AS INTEGER : mb = gtk_menu_button_new()
     gtk_container_add(mb, gtk_image_new_from_icon_name("x-office-spreadsheet-symbolic", GTK_ICON_KNOPF))
-    gtk_widget_set_tooltip_text(mb, "Auswerten und planen -- Statistik (Strg+Umschalt+G), Heatmap, ähnliche Farben, Garn-Vorrat, Palette (Strg+Umschalt+K), Farben tauschen (Strg+Umschalt+T), Rahmen, Farbenblindheit")
+    tipp(mb, "Auswerten und planen -- Statistik ({statistik}), Heatmap, ähnliche Farben, Garn-Vorrat, Palette ({palette}), Farben tauschen ({tauschen}), Rahmen, Farbenblindheit")
     gtk_widget_set_can_focus(mb, FALSE)
     auswertenPopover = gtk_popover_new(mb)
     DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 2)

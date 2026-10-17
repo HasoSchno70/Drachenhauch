@@ -36,6 +36,8 @@ CLASS PdfOptionen
     DIM titel AS STRING              ' leer = Dateiname ohne Endung
     DIM datum AS STRING              ' TT.MM.JJJJ, leer = heute
     DIM stickpfad AS BOOLEAN         ' Pfadlinien auf den Musterseiten (wie PySticky: an)
+    DIM autor AS STRING              ' Vorgaben, wenn das Muster keine hat
+    DIM copyright AS STRING          ' (Einstellungen, export_common.get_watermark)
 
     SUB Init()
         papier = "A4"
@@ -684,6 +686,7 @@ SUB pdfDeckblatt(s AS PdfSatz, r AS PdfLauf2)
     pdfAbsatz(s, "Title1", IIF(r.dp, "◆ DIAMOND-PAINTING-VORLAGE", "✂ KREUZSTICH-MUSTER"))
     pdfAbsatz(s, "Title2", pdfMaske$(r.titel))
     DIM autor AS STRING : autor = pdfMeta$(m, "author")
+    IF autor = "" THEN autor = TRIM$(r.o.autor)
     IF autor <> "" THEN pdfAbsatz(s, "CenterText", "von " + pdfMaske$(autor))
     pdfAbsatz(s, "SmallCenter", "Erstellt am " + r.datum)
     IF s.copyright <> "" THEN pdfAbsatz(s, "SmallCenter", pdfMaske$(s.copyright))
@@ -1114,6 +1117,7 @@ FUNCTION pdfBauen(m AS Muster, o AS PdfOptionen, titel AS STRING) AS PdfSatz
     s.ah = s.bh - 2 * s.rand
     s.wasser = TRIM$(o.wasserzeichen)
     s.copyright = TRIM$(REGEX_REPLACE(pdfMeta$(m, "copyright"), "\s+", " "))
+    IF s.copyright = "" THEN s.copyright = TRIM$(REGEX_REPLACE(o.copyright, "\s+", " "))
     pdfNeueSeite(s)
     pdfDeckblatt(s, r)
     pdfUmbruch(s)

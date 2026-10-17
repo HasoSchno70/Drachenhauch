@@ -18,6 +18,8 @@ CLASS HtmlOptionen
     DIM mystery AS BOOLEAN
     DIM titel AS STRING              ' leer = Dateiname ohne Endung
     DIM datum AS STRING              ' TT.MM.JJJJ, leer = heute
+    DIM autor AS STRING              ' Vorgaben, wenn das Muster keine hat
+    DIM copyright AS STRING
 
     SUB Init()
         kreuz = []
@@ -882,7 +884,9 @@ FUNCTION htmlText$(m AS Muster, o AS HtmlOptionen, titel AS STRING) AS STRING
     r.datum = o.datum
     IF r.datum = "" THEN r.datum = RIGHT$(DATE$(), 2) + "." + MID$(DATE$(), 5, 2) + "." + LEFT$(DATE$(), 4)
     r.autor = htmlMeta$(m, "author")
+    IF r.autor = "" THEN r.autor = TRIM$(o.autor)
     r.copyright = htmlMeta$(m, "copyright")
+    IF r.copyright = "" THEN r.copyright = TRIM$(o.copyright)
     DIM kopf AS ARRAY OF STRING : kopf = htmlKopf(r.titel, htmlDpCss$(r))
     DIM teile AS ARRAY OF STRING : teile = []
     ARRAY_PUSH(teile, JOIN$(kopf, CHR$(10)))

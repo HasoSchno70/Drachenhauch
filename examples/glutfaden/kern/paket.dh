@@ -92,7 +92,7 @@ FUNCTION leseMich$(m AS Muster, inhalt AS ARRAY OF STRING) AS STRING
 END FUNCTION
 
 ' Das Paket schreiben. `papier` ist das Format des PDFs ("" = ohne PDF).
-FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, mystery AS BOOLEAN, paletten AS ARRAY OF Palette) AS PaketErgebnis
+FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, mystery AS BOOLEAN, paletten AS ARRAY OF Palette, autor AS STRING = "", copyright AS STRING = "") AS PaketErgebnis
     DIM erg AS PaketErgebnis : erg = NEW PaketErgebnis()
     erg.pfad = zipPfad
     DIM basis AS STRING : basis = paketName$(m)
@@ -110,6 +110,8 @@ FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, myst
             DIM ho AS HtmlOptionen : ho = NEW HtmlOptionen()
             ho.mystery = mystery
             ho.paletten = paletten
+            ho.autor = autor
+            ho.copyright = copyright
             ARRAY_PUSH(inhalte, BUFFER_FROM_STRING(htmlText$(m, ho, basis)))
             ARRAY_PUSH(namen, basis + ".html")
         CATCH f1
@@ -131,6 +133,8 @@ FUNCTION paketExportieren(m AS Muster, zipPfad AS STRING, papier AS STRING, myst
                 po.papier = papier
                 po.mystery = mystery
                 po.paletten = paletten
+                po.autor = autor
+                po.copyright = copyright
                 DIM pd AS STRING : pd = PATHJOIN(arbeit, basis + ".pdf")
                 DIM ab AS ARRAY OF STRING : ab = pdfExportieren(m, pd, po)
                 ARRAY_PUSH(inhalte, READALL_BYTES(pd))

@@ -2114,6 +2114,52 @@ zehn Bilder gegen PySticky mit Grenze je Bild, die Probe samt "Export =
 vbPng" und "der Punkt unter der Maus bleibt"); acht Verfaelschungen fallen
 je in ihrem Fall.
 
+**Stufe 13: Einstellungen** (2026-10-17). `kern/einstellungen.dh` haelt
+`einstellungen.json` im Einstellungsordner mit PyStickys QSettings-Namen
+(`major_grid_interval`, `fill_tolerance`, `shortcuts` ...); gelesen wird
+nachsichtig (Text "true", Zahl als Text, Kurz-Hex; Krummes bleibt bei der
+Vorgabe, Zahlen werden geklemmt wie ein Drehfeld; Neben-Raster echt kleiner
+als Haupt-Raster). **Uebernommen ist nur, was in Glutfaden wirkt** --
+PySticky hatte lange Reiter, die nur schrieben; weggelassen: Sprache,
+Datei-Protokoll, Stoff-Textur, magnetisches Raster, laufende Ameisen,
+Tablet/Touch, Farbleiste, Querverweis-Paletten, Bibliotheks-/Vorlagenpfad.
+Mit Absicht anders: Standard-Palette DMC (PySticky Anchor), "Farbe +
+Symbol" als Vorgabe (PySticky "Nur Farbe" -- Glutfaden zeigte Symbole
+schon immer), kleinste Zelle 1 (grosse Muster passen sonst nicht ins
+Fenster), Startaktion 0 = Beispielmuster. Wirkt auf: Zeichenflaeche (Raster
+in drei Stufen mit eigenen Farben, gegen den Stoff geprueft wie
+`ensure_contrast` -- BT.601, nicht WCAG; Hintergrund, Stoff, Zellgroessen,
+Zoomfaktor, Symbolschrift/-groesse, Anzeige Farbe/Symbol), Werkzeuge
+(Startwerkzeug oder das zuletzt benutzte, Pipette danach Stift/bleiben/
+Auswahl, Fuellen mit Toleranz und diagonal -- `fuellungWie` mit einer
+Tafel passender Farben, gegen PyStickys FillTool gleich; Rueckstich-Breite
+und Einrasten), Farben (Katalognummern, Standard-Palette, "?" ohne
+automatisches Symbol), Export-/Import-Vorgaben, Autor/Copyright als
+Rueckfall in PDF/HTML/Paket (das Muster geht vor). **Tastenkuerzel** aus
+EINER Tafel (`kuerzelAktionen`, 49 Befehle; `befehlAusfuehren` in main.dh
+statt der festen SELECT-Liste), Text wie "Strg+Umschalt+S", mehrere durch
+Komma; ein eigenes Kuerzel, das zusammenstoesst, gilt nicht
+(apply_saved_overrides). Umschalt zaehlt bei Zeichen nicht ("=" statt
+"Umschalt+="), der Buchstabe kommt aus dem Keyval in Grossschreibung --
+Feststelltaste aendert nichts. Tooltips nennen das Kuerzel ueber
+Platzhalter (`{sichern}`), `tipp()` merkt sie und frischt nach jeder
+Aenderung auf (zerstoerte Widgets fallen per "destroy" heraus). Dialog
+`ansicht/einstellungsdialog.dh` (Muster -> Einstellungen, Strg+Komma):
+sechs Reiter, erst Uebernehmen/OK schreibt, Kuerzel per Tastendruck mit
+Zusammenstoss-Meldung; Raster-Optionen (Strg+Umschalt+R) mit den vier
+Voreinstellungen schreiben in dieselben Einstellungen. Dazu Zuletzt
+geoeffnet im Muster-Knopf (Vergleich ueber `SAMEFILE` -- ein 8.3-Kurzname
+und der lange Name waren sonst zwei Eintraege), Startaktion, gemerkte
+Fenstergroesse, `.bak` vor dem Ueberschreiben, Startordner der
+Datei-Dialoge. **Automatisch sichern** (`ansicht/autosichern.dh`):
+`<datei>.pxs.autosave` bzw. `autosicherung/<sitzung>.pxs`, ueber Nebendatei
++ RENAME; ohne Prozessnummer eine zufaellige Sitzung mit Lebenszeichen
+(`.lebt`, alle 30 s) -- angeboten wird beim Start nur, was seit drei Takten
+stumm ist, beim Oeffnen ein Stand neuer als die Datei. Sammlung
+`tests/pruef/glutfaden_stufe13.dhtest` (6: PySticky-Referenz 712 Zeilen,
+JSON, Kuerzel, Export, Probe samt Rasterfarben im Bild, drei Startlaeufe);
+21 Verfaelschungen fallen je in ihrem Fall.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

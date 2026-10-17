@@ -444,9 +444,9 @@ FUNCTION imDialogBauen(pfad AS STRING, vorher AS kern.Importeinstellung) AS BOOL
     NEXT
     imPalette = imKlappliste(pn, dmc)
     signal(imPalette, "changed", imInfoNachziehen, 0, 0, 0)
-    imFarben = imSpin(1, kern.MEISTE_FARBEN, 20)
+    imFarben = imSpin(1, kern.MEISTE_FARBEN, MIN(einst.importFarben, kern.MEISTE_FARBEN))
     imWahl = imKlappliste(["Die häufigsten", "Median-Cut (bessere Verteilung)"], 0)
-    imDither = imKlappliste(["Kein Dithering", "Floyd-Steinberg", "Geordnet (Bayer)"], 0)
+    imDither = imKlappliste(["Kein Dithering", "Floyd-Steinberg", "Geordnet (Bayer)"], einst.dithering)
     imConfetti = imSpin(1, 10, 1)
     gtk_widget_set_tooltip_text(imConfetti, "Inseln kleiner als das bekommen die Farbe ihrer Nachbarn (1 = aus; 2 dezent, 3 kräftig)")
     gtk_box_pack_start(links, dlZeile("Palette", imPalette), FALSE, FALSE, 2)

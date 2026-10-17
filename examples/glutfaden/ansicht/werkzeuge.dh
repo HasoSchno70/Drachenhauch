@@ -80,20 +80,20 @@ END FUNCTION
 
 FUNCTION wzName$(nr AS INTEGER) AS STRING
     SELECT CASE nr
-        CASE WZ_STIFT : RETURN "Stift (P)"
-        CASE WZ_RADIERER : RETURN "Radierer (E)"
-        CASE WZ_FUELLEN : RETURN "Füllen (F)"
-        CASE WZ_PIPETTE : RETURN "Pipette (I)"
-        CASE WZ_LINIE : RETURN "Linie (L) -- Umschalt: 0/45/90 Grad"
-        CASE WZ_RECHTECK : RETURN "Rechteck (R, gefüllt Umschalt+R) -- Umschalt beim Ziehen: Quadrat"
-        CASE WZ_ELLIPSE : RETURN "Ellipse (O, gefüllt Umschalt+O) -- Umschalt beim Ziehen: Kreis"
-        CASE WZ_HAND : RETURN "Hand (M) -- Ansicht verschieben, auch mit der mittleren Maustaste"
-        CASE WZ_AUSWAHL : RETURN "Auswahl (S) -- ziehen wählt, in die Auswahl ziehen verschiebt; Strg+C/X/V, Entf, F füllen, R drehen, H/V spiegeln"
-        CASE WZ_LASSO : RETURN "Lasso (Umschalt+S) -- freie Auswahl"
-        CASE WZ_VIELECK : RETURN "Vieleck (G, gefüllt Umschalt+G) -- Klick = Ecke, rechte Taste schließt, Rücktaste nimmt die letzte"
-        CASE WZ_TEXT : RETURN "Text (T)"
-        CASE WZ_RUECKSTICH : RETURN "Rückstich (B) -- Klick für Klick eine Linie, rechte Taste entfernt"
-        CASE WZ_FORTSCHRITT : RETURN "Fortschritt (K) -- ziehen markiert erledigt, rechts zurück; Pfeile springen, Enter markiert"
+        CASE WZ_STIFT : RETURN "Stift ({wz_stift})"
+        CASE WZ_RADIERER : RETURN "Radierer ({wz_radierer})"
+        CASE WZ_FUELLEN : RETURN "Füllen ({wz_fuellen})"
+        CASE WZ_PIPETTE : RETURN "Pipette ({wz_pipette})"
+        CASE WZ_LINIE : RETURN "Linie ({wz_linie}) -- Umschalt: 0/45/90 Grad"
+        CASE WZ_RECHTECK : RETURN "Rechteck ({wz_rechteck}, gefüllt {wz_rechteck_voll}) -- Umschalt beim Ziehen: Quadrat"
+        CASE WZ_ELLIPSE : RETURN "Ellipse ({wz_ellipse}, gefüllt {wz_ellipse_voll}) -- Umschalt beim Ziehen: Kreis"
+        CASE WZ_HAND : RETURN "Hand ({wz_hand}) -- Ansicht verschieben, auch mit der mittleren Maustaste"
+        CASE WZ_AUSWAHL : RETURN "Auswahl ({wz_auswahl}) -- ziehen wählt, in die Auswahl ziehen verschiebt; {kopieren}/{ausschneiden}/{einfuegen}, Entf, F füllen, R drehen, H/V spiegeln"
+        CASE WZ_LASSO : RETURN "Lasso ({wz_lasso}) -- freie Auswahl"
+        CASE WZ_VIELECK : RETURN "Vieleck ({wz_vieleck}, gefüllt {wz_vieleck_voll}) -- Klick = Ecke, rechte Taste schließt, Rücktaste nimmt die letzte"
+        CASE WZ_TEXT : RETURN "Text ({wz_text})"
+        CASE WZ_RUECKSTICH : RETURN "Rückstich ({wz_rueckstich}) -- Klick für Klick eine Linie, rechte Taste entfernt"
+        CASE WZ_FORTSCHRITT : RETURN "Fortschritt ({wz_fortschritt}) -- ziehen markiert erledigt, rechts zurück; Pfeile springen, Enter markiert"
     END SELECT
     RETURN ""
 END FUNCTION
@@ -107,6 +107,21 @@ SUB werkzeugeStart()
     mrLasso = []
     mrCursor = -1
 END SUB
+
+' Fuellen nach den Einstellungen (Werkzeuge -> Fuellen): ohne Toleranz und
+' nicht diagonal der schnelle Weg von Anfang an.
+FUNCTION wzFuellung(e AS kern.Ebene, x AS INTEGER, y AS INTEGER) AS ARRAY OF INTEGER
+    IF einst.fuellToleranz = 0 AND NOT einst.fuellenDiagonal THEN RETURN kern.fuellung(e, x, y, wzFarbe)
+    DIM n AS INTEGER : n = lwMuster.farbanzahl()
+    DIM farben[n] AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        farben[k] = lwMuster.farben[k].garn.farbe
+    NEXT
+    DIM ziel AS INTEGER : ziel = -1
+    IF e.drin(x, y) THEN ziel = e.raster[y * e.breite + x]
+    RETURN kern.fuellungWie(e, x, y, wzFarbe, kern.fuellPassend(farben, ziel, einst.fuellToleranz), einst.fuellenDiagonal)
+END FUNCTION
 
 ' --- Waehlen ------------------------------------------------------------------------
 
@@ -238,10 +253,16 @@ FUNCTION wzDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLE
                 statusMeldung("Die Ebene „" + e.name + "“ ist gesperrt.")
                 RETURN ZUG_KEINER
             END IF
-            wzAnwenden(kern.fuellung(e, x, y, wzFarbe), wzFarbe, "Füllen")
+            wzAnwenden(wzFuellung(e, x, y), wzFarbe, "Füllen")
         CASE WZ_PIPETTE
             DIM c AS INTEGER : c = lwMuster.stich(x, y)
-            IF c >= 0 THEN farbeWaehlen(c)
+            IF c >= 0 THEN
+                farbeWaehlen(c)
+                ' Einstellungen -> Werkzeuge -> Pipette
+                IF einst.pipetteInfo THEN statusMeldung("Farbe aufgenommen: " + lwMuster.farben[c].garn.name + " (" + lwMuster.farben[c].symbol + ")")
+                IF einst.pipetteDanach = 0 THEN werkzeugWaehlen(WZ_STIFT, FALSE)
+                IF einst.pipetteDanach = 2 THEN werkzeugWaehlen(WZ_AUSWAHL, FALSE)
+            END IF
         CASE WZ_LINIE, WZ_RECHTECK, WZ_ELLIPSE
             IF NOT wzFarbeDa() THEN RETURN ZUG_KEINER
             wzZug = ZUG_WERKZEUG
@@ -395,7 +416,7 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
         END IF
         DIM k AS INTEGER : k = gtk_toggle_button_new()
         gtk_widget_set_can_focus(k, FALSE)
-        gtk_widget_set_tooltip_text(k, wzName$(i))
+        tipp(k, wzName$(i))
         DIM bild AS INTEGER : bild = gtk_drawing_area_new()
         gtk_widget_set_size_request(bild, 20, 20)
         signalZeichnen(bild, "draw", wzSymbolZeichnen, i, 0, 0)
@@ -443,7 +464,7 @@ FUNCTION wzFarbeZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLE
         cairo_fill(cr)
     ELSE
         ' keine Farbe: Stoff mit rotem Schraegstrich
-        cairoFarbe(cr, LW_STOFF)
+        cairoFarbe(cr, einst.stoff)
         cairo_rectangle(cr, 0, 0, g, g)
         cairo_fill(cr)
         cairo_set_source_rgb(cr, 0.85, 0.2, 0.2)
@@ -577,24 +598,8 @@ FUNCTION werkzeugTaste(t AS INTEGER, strg AS BOOLEAN, alt AS BOOLEAN) AS BOOLEAN
         END IF
         RETURN FALSE
     END IF
+    ' Die Buchstaben der Werkzeuge stehen in der Kuerzel-Tafel (befehlAusfuehren)
     SELECT CASE t
-        CASE &H70, &H50 : werkzeugWaehlen(WZ_STIFT, FALSE)            ' p
-        CASE &H65, &H45 : werkzeugWaehlen(WZ_RADIERER, FALSE)         ' e
-        CASE &H66, &H46 : werkzeugWaehlen(WZ_FUELLEN, FALSE)          ' f
-        CASE &H69, &H49 : werkzeugWaehlen(WZ_PIPETTE, FALSE)          ' i
-        CASE &H6C, &H4C : werkzeugWaehlen(WZ_LINIE, FALSE)            ' l
-        CASE &H72 : werkzeugWaehlen(WZ_RECHTECK, FALSE)               ' r
-        CASE &H52 : werkzeugWaehlen(WZ_RECHTECK, TRUE)                ' R
-        CASE &H6F : werkzeugWaehlen(WZ_ELLIPSE, FALSE)                ' o
-        CASE &H4F : werkzeugWaehlen(WZ_ELLIPSE, TRUE)                 ' O
-        CASE &H6D, &H4D : werkzeugWaehlen(WZ_HAND, FALSE)             ' m
-        CASE &H73 : werkzeugWaehlen(WZ_AUSWAHL, FALSE)                ' s
-        CASE &H53 : werkzeugWaehlen(WZ_LASSO, FALSE)                  ' S
-        CASE &H67 : werkzeugWaehlen(WZ_VIELECK, FALSE)                ' g
-        CASE &H47 : werkzeugWaehlen(WZ_VIELECK, TRUE)                 ' G
-        CASE &H74, &H54 : werkzeugWaehlen(WZ_TEXT, FALSE)             ' t
-        CASE &H62, &H42 : werkzeugWaehlen(WZ_RUECKSTICH, FALSE)       ' b
-        CASE &H6B, &H4B : werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)      ' k
         CASE &HFF1B                                                    ' ESC: Form abbrechen
             IF wzZug = ZUG_WERKZEUG AND LEN(wzVorschau) > 0 THEN
                 wzZug = ZUG_KEINER

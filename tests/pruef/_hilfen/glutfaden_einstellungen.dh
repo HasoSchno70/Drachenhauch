@@ -1,0 +1,52 @@
+' Einstellungen als Text -- dieselben Zeilen, die ref_einstellungen.py aus
+' PySticky aufzeichnet: ensure_contrast fuer Rasterfarben und das Fuellen mit
+' Toleranz und diagonal (FillTool._scanline_fill/_diagonal_fill).
+IMPORT "../../../examples/glutfaden/kern/kern.dh" AS kern
+
+FUNCTION geHex6$(f AS INTEGER) AS STRING
+    RETURN RIGHT$("000000" + HEX$(f BAND &HFFFFFF), 6)
+END FUNCTION
+
+FUNCTION einstellungenText$(ref AS STRING, m AS kern.Muster) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM e AS kern.Ebene : e = m.ebenen.ebenen[0]
+    DIM farben AS ARRAY OF INTEGER : farben = []
+    DIM fe AS kern.Farbeintrag
+    FOR EACH fe IN m.farben
+        ARRAY_PUSH(farben, fe.garn.farbe)
+    NEXT
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(ref, CHR$(10))
+        DIM t AS ARRAY OF STRING : t = SPLIT$(z, " ")
+        IF LEN(t) < 2 THEN CONTINUE
+        IF t[0] = "kontrast" THEN
+            DIM f AS INTEGER : f = kern.farbeAusHex("#" + t[1])
+            DIM g AS INTEGER : g = kern.farbeAusHex("#" + t[2])
+            ARRAY_PUSH(aus, "kontrast " + t[1] + " " + t[2] + " " + geHex6$(kern.kontrastFarbe(f, g)))
+        ELSEIF t[0] = "fuellen" THEN
+            ' fuellen x,y tol T diag D neu N: ...
+            DIM sx AS INTEGER : sx = VAL(LEFT$(t[1], INSTR(t[1], ",")))
+            DIM sy AS INTEGER : sy = VAL(MID$(t[1], INSTR(t[1], ",") + 1))
+            DIM tol AS INTEGER : tol = VAL(t[3])
+            DIM diag AS BOOLEAN : diag = t[5] = "1"
+            DIM neu AS INTEGER : neu = VAL(t[7])
+            DIM ziel AS INTEGER : ziel = e.raster[sy * e.breite + sx]
+            DIM p AS ARRAY OF INTEGER : p = kern.fuellungWie(e, sx, sy, neu, kern.fuellPassend(farben, ziel, tol), diag)
+            DIM schl AS ARRAY OF INTEGER : schl = []
+            DIM i AS INTEGER
+            FOR i = 0 TO LEN(p) - 2 STEP 2
+                ARRAY_PUSH(schl, p[i] * 1000 + p[i + 1])
+            NEXT
+            SORT(schl)
+            DIM teile AS ARRAY OF STRING : teile = []
+            DIM k AS INTEGER
+            FOR EACH k IN schl
+                ARRAY_PUSH(teile, STR$(k \ 1000) + "," + STR$(k MOD 1000))
+            NEXT
+            DIM zeile AS STRING : zeile = t[0] + " " + t[1] + " tol " + t[3] + " diag " + t[5] + " neu " + t[7] + " " + STR$(LEN(schl))
+            IF LEN(teile) > 0 THEN zeile = zeile + " " + JOIN$(teile, " ")
+            ARRAY_PUSH(aus, zeile)
+        END IF
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION

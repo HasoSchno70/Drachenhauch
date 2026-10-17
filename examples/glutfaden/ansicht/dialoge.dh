@@ -282,7 +282,7 @@ SUB blUebernehmen()
     DIM g AS kern.Garn : g = blBlend()
     IF IS_NIL(g) THEN RETURN
     DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
-    DIM nr AS INTEGER : nr = kern.farbeHinzufuegen(lwMuster, wzVerlauf, g, slSymbole, FALSE, FALSE)
+    DIM nr AS INTEGER : nr = kern.farbeHinzufuegen(lwMuster, wzVerlauf, g, slSymbole, FALSE, FALSE, NOT einst.symboleAuto)
     wzFarbe = nr
     allesNeu()
     IF lwMuster.farbanzahl() > vorher THEN

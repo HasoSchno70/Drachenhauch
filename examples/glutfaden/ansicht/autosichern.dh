@@ -1,0 +1,179 @@
+' Automatisch sichern und wiederherstellen (PySticky ui/handlers/
+' autosave_handlers.py) -- Einstellungen -> Allgemein.
+'
+' Hat das Muster eine Datei, geht der Stand nach "<datei>.autosave" daneben;
+' sonst in den Einstellungsordner (autosicherung/<sitzung>.pxs). Geschrieben
+' wird erst in eine Nebendatei und dann umbenannt -- ein Absturz mitten im
+' Schreiben laesst den letzten ganzen Stand liegen. Sichern raeumt auf.
+'
+' Eine Sitzung hat keine Prozessnummer wie bei PySticky, sondern eine
+' zufaellige Kennung und daneben ein Lebenszeichen (<sitzung>.lebt, alle 30 s
+' neu). Beim Start werden nur Staende angeboten, deren Lebenszeichen fehlt
+' oder seit drei Takten steht: eine zweite, laufende Glutfaden-Sitzung
+' bekaeme ihre Sicherung sonst von der ersten weggenommen.
+
+CONST AS_TAKT_MS = 30000
+DIM asSitzung AS STRING
+DIM asLetzte AS FLOAT                ' ZEIT_UNIX der letzten automatischen Sicherung
+DIM asTaktNr AS INTEGER
+
+FUNCTION asOrdner$() AS STRING
+    RETURN kern.einstellungsDatei$("autosicherung")
+END FUNCTION
+
+' Wohin die automatische Sicherung des aktuellen Musters geht
+FUNCTION asZiel$() AS STRING
+    IF musterPfad <> "" THEN RETURN musterPfad + ".autosave"
+    RETURN PATHJOIN(asOrdner$(), asSitzung + ".pxs")
+END FUNCTION
+
+SUB asLebenszeichen()
+    TRY
+        IF NOT DIREXISTS(asOrdner$()) THEN MKDIR(asOrdner$())
+        WRITEALL(PATHJOIN(asOrdner$(), asSitzung + ".lebt"), STR$(INT(ZEIT_UNIX())))
+    CATCH fehler
+    END TRY
+END SUB
+
+SUB autosichernStart()
+    asSitzung = LEFT$(REPLACE$(UUID4$(), "-", ""), 12)
+    asLetzte = ZEIT_UNIX()
+    asLebenszeichen()
+    asTaktNr = g_timeout_add(AS_TAKT_MS, asTakt, 0)
+END SUB
+
+FUNCTION asTakt(daten AS INTEGER) AS BOOLEAN
+    asLebenszeichen()
+    IF einst.autosichern AND ZEIT_UNIX() - asLetzte >= einst.autosichernMinuten * 60 THEN autosichernJetzt()
+    RETURN TRUE
+END FUNCTION
+
+' Den Stand jetzt sichern, wenn etwas ungesichert ist; TRUE = geschrieben
+FUNCTION autosichernJetzt() AS BOOLEAN
+    asLetzte = ZEIT_UNIX()
+    IF NOT lwHat OR NOT istGeaendert() THEN RETURN FALSE
+    DIM ziel AS STRING : ziel = asZiel$()
+    DIM neben AS STRING : neben = ziel + ".tmp"
+    TRY
+        IF NOT DIREXISTS(DIRNAME(ziel)) THEN MKDIR(DIRNAME(ziel))
+        kern.pxsSpeichern(lwMuster, neben)
+        IF FILEEXISTS(ziel) THEN DELETEFILE(ziel)
+        RENAME(neben, ziel)
+    CATCH fehler
+        statusMeldung("Automatisch sichern ging nicht: " + fehler)
+        IF FILEEXISTS(neben) THEN DELETEFILE(neben)
+        RETURN FALSE
+    END TRY
+    statusMeldung("Automatisch gesichert: " + BASENAME(ziel))
+    RETURN TRUE
+END FUNCTION
+
+' Nach dem Sichern in eine Datei: die automatischen Staende sind ueberholt
+SUB autosicherungWeg(pfad AS STRING)
+    DIM p AS STRING
+    FOR EACH p IN [pfad + ".autosave", PATHJOIN(asOrdner$(), asSitzung + ".pxs")]
+        IF FILEEXISTS(p) THEN
+            TRY
+                DELETEFILE(p)
+            CATCH fehler
+            END TRY
+        END IF
+    NEXT
+END SUB
+
+' Beim regulaeren Ende: eigenes Lebenszeichen und den eigenen Stand weg --
+' wer bewusst ohne Sichern schliesst, will nicht beim naechsten Start gefragt
+' werden.
+SUB autosichernEnde()
+    DIM p AS STRING
+    FOR EACH p IN [PATHJOIN(asOrdner$(), asSitzung + ".lebt"), PATHJOIN(asOrdner$(), asSitzung + ".pxs")]
+        IF FILEEXISTS(p) THEN
+            TRY
+                DELETEFILE(p)
+            CATCH fehler
+            END TRY
+        END IF
+    NEXT
+END SUB
+
+' Ein gefundener Stand: fragen, laden oder nicht, danach wegraeumen.
+' pfad = die Datei, zu der er gehoert ("" = nie gesichert).
+FUNCTION asAnbieten(stand AS STRING, pfad AS STRING) AS BOOLEAN
+    DIM ok AS BOOLEAN
+    DIM text AS STRING : text = "Es gibt einen automatisch gesicherten Stand"
+    IF pfad <> "" THEN text = text + " von „" + BASENAME(pfad) + "“, neuer als die Datei" ELSE text = text + " eines nie gesicherten Musters"
+    text = text + " (" + ZEIT_FORMAT$(ZEIT_AUS_UNIX(FILETIME(stand)), "%d.%m.%Y %H:%M") + ")." + CHR$(10) + "Wiederherstellen?"
+    DIM geladen AS BOOLEAN
+    IF pdFrage(fenster, "Automatisch gesicherter Stand", text) THEN
+        TRY
+            DIM m AS kern.Muster : m = kern.pxsLaden(stand)
+            musterZeigen(m, pfad, IIF(m.name <> "", m.name, IIF(pfad <> "", BASENAME(pfad), "Wiederhergestellt")))
+            extraGeaendert = TRUE
+            zustandNachziehen()
+            statusMeldung("Wiederhergestellt -- noch nicht gesichert.")
+            geladen = TRUE
+        CATCH fehler
+            pdWarnung(fenster, "Nicht wiederhergestellt", "Der Stand ließ sich nicht laden: " + fehler)
+        END TRY
+    END IF
+    TRY
+        DELETEFILE(stand)
+    CATCH fehler
+    END TRY
+    RETURN geladen
+END FUNCTION
+
+' Beim Oeffnen einer Datei: liegt ein neuerer automatischer Stand daneben?
+SUB asNebenDatei(pfad AS STRING)
+    DIM stand AS STRING : stand = pfad + ".autosave"
+    IF NOT FILEEXISTS(stand) THEN RETURN
+    IF FILETIME(stand) < FILETIME(pfad) THEN
+        TRY
+            DELETEFILE(stand)
+        CATCH fehler
+        END TRY
+        RETURN
+    END IF
+    DIM ok AS BOOLEAN : ok = asAnbieten(stand, pfad)
+END SUB
+
+' Beim Start: Staende nie gesicherter Muster aus Sitzungen, die nicht mehr
+' leben -- der aelteste zuerst, damit bei mehreren der neueste bleibt.
+FUNCTION asVerwaist() AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    IF NOT DIREXISTS(asOrdner$()) THEN RETURN aus
+    DIM zeiten AS ARRAY OF INTEGER : zeiten = []
+    DIM d AS STRING
+    FOR EACH d IN DIRLIST(asOrdner$(), "*.pxs")
+        DIM name AS STRING : name = LEFT$(BASENAME(d), LEN(BASENAME(d)) - 4)
+        IF name = asSitzung THEN CONTINUE
+        DIM lebt AS STRING : lebt = PATHJOIN(asOrdner$(), name + ".lebt")
+        IF FILEEXISTS(lebt) THEN
+            IF ZEIT_UNIX() - FILETIME(lebt) < 3 * AS_TAKT_MS / 1000 THEN CONTINUE
+        END IF
+        DIM voll AS STRING : voll = PATHJOIN(asOrdner$(), BASENAME(d))
+        DIM t AS INTEGER : t = FILETIME(voll)
+        DIM i AS INTEGER : i = 0
+        WHILE i < LEN(zeiten)
+            IF zeiten[i] > t THEN EXIT WHILE
+            i = i + 1
+        WEND
+        DIM n AS INTEGER : n = ARRAY_INSERT(aus, i, voll)
+        n = ARRAY_INSERT(zeiten, i, t)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+SUB asStartPruefen()
+    DIM s AS STRING
+    FOR EACH s IN asVerwaist()
+        DIM ok AS BOOLEAN : ok = asAnbieten(s, "")
+        DIM lebt AS STRING : lebt = LEFT$(s, LEN(s) - 4) + ".lebt"
+        IF FILEEXISTS(lebt) THEN
+            TRY
+                DELETEFILE(lebt)
+            CATCH fehler
+            END TRY
+        END IF
+    NEXT
+END SUB
