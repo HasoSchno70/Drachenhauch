@@ -17,6 +17,7 @@ DIM exZellen AS INTEGER
 DIM exUeb AS INTEGER
 DIM exWasser AS INTEGER
 DIM exMystery AS INTEGER
+DIM exStickpfad AS INTEGER
 DIM exNotizen AS INTEGER
 DIM exKreuz AS ARRAY OF INTEGER        ' Kaestchen je Palette in exKreuzNamen
 DIM exKreuzNamen AS ARRAY OF STRING
@@ -33,6 +34,7 @@ DIM exWahlZellen AS INTEGER
 DIM exWahlUeb AS INTEGER
 DIM exWahlWasser AS STRING
 DIM exWahlMystery AS BOOLEAN
+DIM exWahlStickpfad AS BOOLEAN : exWahlStickpfad = TRUE
 DIM exWahlKreuz AS ARRAY OF STRING : exWahlKreuz = []
 DIM exWahlZelle AS INTEGER : exWahlZelle = 10
 DIM exWahlRaster AS BOOLEAN : exWahlRaster = TRUE
@@ -150,6 +152,7 @@ FUNCTION exAusfuehren(format AS INTEGER, pfad AS STRING) AS STRING
             o.ueberlappung = exWahlUeb
             o.wasserzeichen = exWahlWasser
             o.mystery = exWahlMystery
+            o.stickpfad = exWahlStickpfad
             o.kreuz = exWahlKreuz
             o.paletten = slPaletten
             o.notizen = exLetzteNotizen
@@ -186,6 +189,7 @@ SUB exWahlMerken()
     exWahlUeb = gtk_spin_button_get_value_as_int(exUeb)
     exWahlWasser = TRIM$(gtk_entry_get_text(exWasser))
     exWahlMystery = gtk_toggle_button_get_active(exMystery)
+    exWahlStickpfad = gtk_toggle_button_get_active(exStickpfad)
     exWahlKreuz = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(exKreuz) - 1
@@ -231,6 +235,8 @@ FUNCTION exDialogBauen() AS INTEGER
     gtk_entry_set_placeholder_text(exWasser, "z. B. ENTWURF -- leer = keins")
     exMystery = gtk_check_button_new_with_label("Mystery: Vorschau ohne Bild, Musterseiten nur mit Symbolen")
     gtk_toggle_button_set_active(exMystery, exWahlMystery)
+    exStickpfad = gtk_check_button_new_with_label("Stickpfad auf den Musterseiten (nächster Nachbar, Sprünge rot gestrichelt)")
+    gtk_toggle_button_set_active(exStickpfad, exWahlStickpfad)
     exNotizen = gtk_text_view_new()
     gtk_text_view_set_wrap_mode(exNotizen, GTK_UMBRUCH_WORT)
     DIM nz AS STRING : nz = exMeta$(m, "notes")
@@ -276,6 +282,7 @@ FUNCTION exDialogBauen() AS INTEGER
     gtk_box_pack_start(innen, exZeile("Zellen/Seite", exZellen, "0"), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, exZeile("Überlappung", exUeb, "01"), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, exZeile("", exMystery, "014"), FALSE, FALSE, 4)
+    gtk_box_pack_start(innen, exZeile("", exStickpfad, "0"), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, exZeile("Wasserzeichen", exWasser, "0"), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, exZeile("Notizen", nr, "0"), FALSE, FALSE, 4)
     gtk_box_pack_start(innen, exZeile("Entsprechungen", kr, "01"), FALSE, FALSE, 4)

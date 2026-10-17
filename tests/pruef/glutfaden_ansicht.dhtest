@@ -198,7 +198,7 @@ IMPORT "{sammlung}/_hilfen/glutfaden_bild.dh"
 CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 rueckgabe 0
-dialog: zeilen je format 8 3 2 0 2 papiere 6 entsprechungen 15
+dialog: zeilen je format 9 3 2 0 2 papiere 6 entsprechungen 15
 pdf: PDF exportiert (6 Seiten, A4): d_muster.pdf | Anchor ueb 2
 html: HTML exportiert: d_muster.html | beginnt <!DOCTYPE html>
 bild: Bild exportiert (320 × 320): d_muster.png | 320x320

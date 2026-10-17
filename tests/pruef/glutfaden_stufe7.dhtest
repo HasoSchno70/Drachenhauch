@@ -23,6 +23,8 @@ NEXT
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
 IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- datei plan_row_by_row.txt
 ============================================================
 STICKPLAN - Optimierte Stichreihenfolge
@@ -1157,6 +1159,8 @@ vergleichZeigen(m, 18, "vergleich_18.txt")
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
 IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- datei vergleich_14.txt
 nearest | 274.8 | 4 | 600 | ★★★ Beste
 column | 1142.6 | 36 | 1034 | —
@@ -1186,6 +1190,8 @@ PRINT "beste 0: "; kern.spBewertung$(0.0, 0.0)
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
 IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 100.0 ★★★ Beste
 104.9 ★★★ Beste
@@ -1265,6 +1271,8 @@ NEXT
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
 IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 farbe 4 stiche 116: gueltig
 farbe 2 stiche 17: gueltig
@@ -1314,6 +1322,8 @@ zeigen(kern.spAusschnitt(sp, 0, 0, 1, 9))
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
 IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 links oben 0..4 x 0..4:
   farbe 2: (0,0) (1,0) (2,0) distanz 2.000 spruenge 0
@@ -1349,6 +1359,8 @@ PRINT geAbweichungen$(geLies$("pdf_pfad.txt"), JOIN$(ab, CHR$(10)) + CHR$(10))
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
 IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- datei pdf_pfad.txt
 S 30.0
 P Title1 | ✂ KREUZSTICH-MUSTER
@@ -1494,6 +1506,8 @@ PRINT "diamond: "; zaehlen$(kern.pdfExportieren(m, "c.pdf", o))
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
 IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 vorgabe an: TRUE
 mit: Line:264 absatz 1
@@ -1538,7 +1552,61 @@ PRINT "ohne: "; strom$("b.pdf")
 IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
 IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
 IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 --- erwartet
 spruenge 4 linien 182
 mit: [1.5 1.5 ]0 x4 | gs 182
 ohne: | gs 0
+
+=== probe: der dialog, strategie, tooltip, zoom, vergleich und exporte
+IMPORT "helfer.dh"
+' --probe-stufe7: Glutfaden oeffnet das Beispielmuster und den Stickpfad-
+' Dialog, waehlt den naechsten Nachbarn, fragt den Tooltip ueber Stich 3 der
+' zweiten Farbe ab, zoomt mit Nummern, vergleicht bei 18 ct und exportiert
+' Text, ein Bild und alle Bilder; dann der Schalter im Export-Dialog.
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe7", "--foto", "d"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT dlAus;
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    PRINT "fotos: "; FILEEXISTS("d_stickpfad.png"); " "; FILEEXISTS("d_stickpfad_nummern.png"); " "; FILEEXISTS("d_stickpfad_vergleich.png")
+    PRINT "plan wie kern: "; geLies$("d_plan.txt") = kern.stickplanText$(kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs"), kern.stickpfadBerechnen(kern.pxsLaden(ARG$(0) + "/daten/muster/demo_kreuzstich.pxs"), kern.SP_NACHBAR, 18))
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- erwartet
+rueckgabe 0
+dialog: Zeilenweise (Schlangenlinie) stoff 14 | 185 | 3 | 1190.4 | 38 | 1058 cm (10.6 m)
+farben 3 gewaehlt 0 Blue-DK | vergleich sichtbar FALSE
+naechster nachbar: 185 | 3 | 274.8 | 4 | 600 cm (6.0 m)
+farbe 2 Lemon-DK | maus auf stich 3: Schritt 3  |  Position (8, 8)  |  Distanz: 1.4 | daneben -1
+sprung: Schritt 5  |  Position (20, 25)  |  Distanz: 19.2  |  ⚠ Sprung!
+zoom x1.25^3: TRUE | TRUE
+eingepasst: TRUE
+vor dem vergleich: Diagonal | 185 | 3 | 2596.9 | 116 | 1370 cm (13.7 m)
+verglichen: Nächster Nachbar | 185 | 3 | 274.8 | 4 | 467 cm (4.7 m) | vergleich sichtbar TRUE
+  Nächster Nachbar 274.8 4 467 ★★★ Beste
+  Spaltenweise 1142.6 36 804 —
+  Zeilenweise 1190.4 38 823 —
+  Dänische Methode 2175.0 79 1206 —
+  Diagonal 2596.9 116 1370 —
+text: [] Strategie: nearest
+bild: TRUE
+  660 x 720 = 660 x 720
+alle: 3 fehler 0
+  01_Blue-DK.png, 02_Lemon-DK.png, 03_Red-DK.png
+  01_Blue-DK.png: grund #AAAAB4 stich 3 #4983A7 garn #4983A7
+  02_Lemon-DK.png: grund #32323A stich 3 #FFD802 garn #FFD802
+export: stickpfad vorgewaehlt TRUE
+abgewaehlt gemerkt: TRUE
+fotos: TRUE TRUE TRUE
+plan wie kern: TRUE
