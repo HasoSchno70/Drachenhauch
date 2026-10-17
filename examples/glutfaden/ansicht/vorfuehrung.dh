@@ -775,16 +775,21 @@ FUNCTION vorfuehrenStufe9(daten AS INTEGER) AS BOOLEAN
             DIM gelesen AS kern.Vorrat : gelesen = kern.vorratLaden(pdVorratDatei$())
             PRINT "gelesen: "; JOIN$(gelesen.schluessel(), " | ")
             PRINT "projekte gelesen: "; LEN(kern.projektlisteLaden(pdProjekteDatei$()).pfade)
+            ' bei 32 ct liegt Rot zwischen 0 und 50 % Zuschlag ueber einer Stranggrenze
+            lwMuster.stoff = 32
             d = adStatistikBauen()
             gtk_notebook_set_current_page(adReiter, 5)
-            PRINT "einkauf 20 %: "; gtk_label_get_text(adEinkaufSumme)
-            PRINT "  wie kern: "; vfZeilen$(adEinkaufLetzte) = vfZeilen$(kern.einkaufsliste(lwMuster, gelesen, 20))
+            PRINT "einkauf 32 ct 20 %: "; gtk_label_get_text(adEinkaufSumme); " | wie kern "; vfZeilen$(adEinkaufLetzte) = vfZeilen$(kern.einkaufsliste(lwMuster, gelesen, 20))
+            gtk_spin_button_set_value(adZuschlag, 0)
+            PRINT "einkauf 0 %: "; gtk_label_get_text(adEinkaufSumme); " | "; vfZeilen$(adEinkaufLetzte)
             gtk_spin_button_set_value(adZuschlag, 50)
-            PRINT "einkauf 50 %: "; gtk_label_get_text(adEinkaufSumme); " | wie kern "; vfZeilen$(adEinkaufLetzte) = vfZeilen$(kern.einkaufsliste(lwMuster, gelesen, 50))
+            PRINT "einkauf 50 %: "; gtk_label_get_text(adEinkaufSumme); " | "; vfZeilen$(adEinkaufLetzte)
+            PRINT "  wie kern: "; vfZeilen$(adEinkaufLetzte) = vfZeilen$(kern.einkaufsliste(lwMuster, gelesen, 50))
         CASE 5
             ok = vfFoto(adDialog, "statistik_einkauf")
             gtk_widget_destroy(adDialog)
             adDialog = 0
+            lwMuster.stoff = 16
             DIM pd AS INTEGER : pd = pkBauen()
             PRINT "palette: "; pkNamen[gtk_combo_box_get_active(pkWahl)]; " "; gtk_label_get_text(pkInfo)
             FOR i = 0 TO LEN(pkNamen) - 1
