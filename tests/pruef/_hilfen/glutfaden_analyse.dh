@@ -1,0 +1,103 @@
+' Die Analyse eines Musters als Text -- dieselben Zeilen, die ref_analyse.py
+' aus PySticky aufzeichnet (Statistik, Fortschritt, Schwierigkeit,
+' Garnverbrauch, Zeit, Heatmap, Farbenblindheit, aehnliche Farben).
+FUNCTION gaWahr$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "True", "False")
+END FUNCTION
+
+FUNCTION gaHex6$(f AS INTEGER) AS STRING
+    RETURN MID$(kern.farbeAlsHex$(f), 1, 6)
+END FUNCTION
+
+' Pythons repr einer Kommazahl
+FUNCTION gaRepr$(x AS FLOAT) AS STRING
+    DIM t AS STRING : t = STR$(x)
+    IF INSTR(t, ".") < 0 AND INSTR(t, "e") < 0 THEN t = t + ".0"
+    RETURN t
+END FUNCTION
+
+FUNCTION analyseText$(m AS kern.Muster) AS STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM s AS kern.Statistik : s = kern.statistikVon(m)
+    ARRAY_PUSH(aus, "statistik: " + STR$(s.breite) + " " + STR$(s.hoehe) + " " + FORMAT$(s.breiteCm, "%.1f") + " " + FORMAT$(s.hoeheCm, "%.1f") + " " + STR$(INT(s.stoff)) + " " + STR$(s.sticheGesamt) + " " + STR$(s.zuSticken) + " " + STR$(s.ausgelassen) + " " + STR$(s.farbanzahl) + " " + STR$(s.benutzt) + " " + STR$(s.ausgelasseneFarben) + " " + STR$(s.ebenen) + " " + STR$(s.perlen) + " " + STR$(s.bedeckt))
+    DIM f AS kern.Fortschritt : f = kern.fortschrittVon(m)
+    ARRAY_PUSH(aus, "fortschritt: " + STR$(f.gesamt) + " " + STR$(f.erledigt) + " " + FORMAT$(f.prozent, "%.1f"))
+    DIM i AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        ARRAY_PUSH(aus, "  farbe " + STR$(i) + " " + STR$(f.farbeGesamt[i]) + " " + STR$(f.farbeErledigt[i]) + " " + FORMAT$(f.farbeProzent[i], "%.1f") + " " + gaWahr$(m.farben[i].auslassen))
+    NEXT
+    DIM d AS kern.Schwierigkeit : d = kern.schwierigkeitVon(m)
+    ARRAY_PUSH(aus, "schwierigkeit: " + d.stufe + " " + STR$(d.punkte) + " " + STR$(d.pFarben) + " " + STR$(d.pGroesse) + " " + STR$(d.pSonder) + " " + STR$(d.pRueck) + " | " + STR$(d.benutzt) + " " + STR$(d.zuSticken) + " " + FORMAT$(d.sonderAnteil, "%.6f") + " " + STR$(d.rueckstiche))
+    DIM stoffe AS ARRAY OF INTEGER : stoffe = [14, 18, 11]
+    DIM zuschl AS ARRAY OF INTEGER : zuschl = [20, 0, 35]
+    DIM preise AS ARRAY OF FLOAT : preise = [1.5, 0.95, 2.0]
+    DIM preisText AS ARRAY OF STRING : preisText = ["1.5", "0.95", "2.0"]
+    FOR i = 0 TO 2
+        DIM g AS kern.Garnrechnung : g = kern.garnRechnen(m, stoffe[i], zuschl[i], preise[i])
+        ARRAY_PUSH(aus, "garn " + STR$(stoffe[i]) + " " + STR$(zuschl[i]) + " " + preisText[i] + ": " + STR$(g.straenge) + " " + FORMAT$(g.kosten, "%.2f") + " " + STR$(g.ausgelasseneFarben))
+        DIM z AS kern.Garnzeile
+        FOR EACH z IN g.zeilen
+            ARRAY_PUSH(aus, "  " + z.garn.name + " " + STR$(z.stiche) + " " + FORMAT$(z.genau, "%.2f") + " " + STR$(z.mitZuschlag) + " " + FORMAT$(z.kosten, "%.2f"))
+        NEXT
+    NEXT
+    DIM stufen AS ARRAY OF STRING : stufen = ["Anfänger", "Fortgeschritten", "Erfahren", "Profi"]
+    DIM stunden AS ARRAY OF FLOAT : stunden = [2.0, 0.5, 2.0, 12.0]
+    DIM stundenText AS ARRAY OF STRING : stundenText = ["2", "0.5", "2", "12"]
+    FOR i = 0 TO 3
+        DIM t AS kern.Zeitrechnung : t = kern.zeitRechnen(m, stufen[i], stunden[i])
+        ARRAY_PUSH(aus, "zeit " + stufen[i] + " " + stundenText[i] + ": " + t.gesamt + " | " + t.tage + " | " + STR$(t.jeStunde) + " | " + t.jeFarbe)
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(t.farben) - 1
+            ARRAY_PUSH(aus, "  " + m.farben[t.farben[k]].garn.name + " " + STR$(m.farben[t.farben[k]].stichzahl) + " " + t.farbZeit[k])
+        NEXT
+    NEXT
+    DIM achsen AS ARRAY OF INTEGER : achsen = [kern.HEATMAP_VIELFALT, kern.HEATMAP_DICHTE]
+    DIM achsName AS ARRAY OF STRING : achsName = ["colors", "density"]
+    DIM a AS INTEGER, bs AS INTEGER
+    FOR a = 0 TO 1
+        FOR EACH bs IN [1, 3, 8, 32]
+            DIM h AS kern.Heatmap : h = kern.heatmapRechnen(m, achsen[a], bs)
+            ARRAY_PUSH(aus, "heatmap " + achsName[a] + " " + STR$(bs) + ": " + kern.heatmapText$(h, achsen[a]))
+            DIM w AS ARRAY OF STRING : w = []
+            DIM v AS FLOAT
+            FOR EACH v IN h.werte
+                ARRAY_PUSH(w, gaRepr$(v))
+            NEXT
+            ARRAY_PUSH(aus, "  " + JOIN$(w, " "))
+            DIM fs AS ARRAY OF STRING : fs = []
+            DIM c AS INTEGER
+            FOR EACH c IN kern.heatmapFarben(h)
+                ARRAY_PUSH(fs, gaHex6$(c))
+            NEXT
+            ARRAY_PUSH(aus, "  " + JOIN$(fs, " "))
+        NEXT
+    NEXT
+    DIM typName AS ARRAY OF STRING : typName = ["", "protanopia", "deuteranopia", "tritanopia"]
+    DIM ty AS INTEGER
+    FOR ty = 1 TO 3
+        DIM z2 AS ARRAY OF STRING : z2 = []
+        FOR i = 0 TO m.farbanzahl() - 1
+            ARRAY_PUSH(z2, gaHex6$(kern.farbenblind(m.farben[i].garn.farbe, ty)))
+        NEXT
+        DIM r AS INTEGER, gg AS INTEGER, b AS INTEGER
+        FOR r = 0 TO 255 STEP 51
+            FOR gg = 0 TO 255 STEP 51
+                FOR b = 0 TO 255 STEP 51
+                    ARRAY_PUSH(z2, gaHex6$(kern.farbenblind(RGB(r, gg, b), ty)))
+                NEXT
+            NEXT
+        NEXT
+        ARRAY_PUSH(aus, "farbenblind " + typName[ty] + ": " + JOIN$(z2, " "))
+    NEXT
+    DIM schw AS INTEGER
+    FOR EACH schw IN [3, 10, 25, 50]
+        DIM ab AS ARRAY OF FLOAT
+        DIM pa AS ARRAY OF INTEGER : pa = kern.aehnlichePaare(m, schw, ab)
+        DIM pz AS ARRAY OF STRING : pz = []
+        FOR i = 0 TO LEN(ab) - 1
+            ARRAY_PUSH(pz, STR$(pa[2 * i]) + "-" + STR$(pa[2 * i + 1]) + ":" + FORMAT$(ab[i], "%.1f"))
+        NEXT
+        ARRAY_PUSH(aus, "aehnlich " + STR$(schw) + ": " + JOIN$(pz, " "))
+    NEXT
+    RETURN JOIN$(aus, CHR$(10))
+END FUNCTION

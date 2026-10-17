@@ -1,0 +1,646 @@
+' Ein Muster auswerten -- was PyStickys Statistik-Dialog, Heatmap, Ansicht
+' "Farbenblindheit" und "Aehnliche Farben" rechnen:
+'
+'   Pattern.get_statistics / get_progress_statistics   statistikVon, fortschrittVon
+'   core/difficulty.py                                  schwierigkeitVon
+'   statistics_tabs/thread_tab.py (Garnverbrauch)       garnRechnen
+'   statistics_tabs/time_tab.py (Zeitschaetzung)        zeitRechnen
+'   statistics_dialog.py _on_export_csv                 statistikCsv$
+'   heatmap_dialog.py                                   heatmapRechnen, heatmapFarbe
+'   core/color_blindness.py                             farbenblind
+'   similar_colors_dialog.py                            aehnlichePaare, farbenZusammenfuehren
+'
+' Ausgelassene Farben ("nicht sticken", z. B. die Stofffarbe) zaehlen fuer
+' Stiche, Garn, Zeit, Fortschritt und Heatmap nicht.
+'
+' Anders als PySticky: beim Zusammenfuehren aehnlicher Farben gehen die
+' Rueckstiche der ersetzten Farbe an die bleibende (PySticky loescht sie mit
+' der Farbe), und es ist ein Schritt im Verlauf (PySticky: nicht
+' rueckgaengig zu machen).
+
+CONST FARBENBLIND_KEINE = 0
+CONST FARBENBLIND_PROTANOPIE = 1
+CONST FARBENBLIND_DEUTERANOPIE = 2
+CONST FARBENBLIND_TRITANOPIE = 3
+
+CONST HEATMAP_VIELFALT = 0
+CONST HEATMAP_DICHTE = 1
+
+' --- Statistik ---------------------------------------------------------------------
+
+CLASS Statistik
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM breiteCm AS FLOAT
+    DIM hoeheCm AS FLOAT
+    DIM stoff AS FLOAT
+    DIM sticheGesamt AS INTEGER       ' je Ebene gezaehlt, auch unsichtbare
+    DIM zuSticken AS INTEGER          ' ohne ausgelassene Farben
+    DIM ausgelassen AS INTEGER        ' Stiche ausgelassener Farben
+    DIM farbanzahl AS INTEGER         ' Eintraege in der Farbliste
+    DIM benutzt AS INTEGER            ' Farben mit Stichen
+    DIM ausgelasseneFarben AS INTEGER ' ausgelassene Farben mit Stichen
+    DIM ebenen AS INTEGER
+    DIM perlen AS INTEGER             ' sichtbare Perlen
+    DIM bedeckt AS INTEGER            ' Zellen mit einem sichtbaren Stich
+END CLASS
+
+FUNCTION statistikVon(m AS Muster) AS Statistik
+    DIM s AS Statistik : s = NEW Statistik()
+    m.stichzahlenNeu()
+    s.breite = m.breite : s.hoehe = m.hoehe
+    s.stoff = m.stoff
+    s.breiteCm = m.breite / m.stoff * 2.54
+    s.hoeheCm = m.hoehe / m.stoff * 2.54
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        IF f.auslassen THEN
+            s.ausgelassen = s.ausgelassen + f.stichzahl
+            IF f.stichzahl > 0 THEN s.ausgelasseneFarben = s.ausgelasseneFarben + 1
+        ELSE
+            s.zuSticken = s.zuSticken + f.stichzahl
+        END IF
+        IF f.stichzahl > 0 THEN s.benutzt = s.benutzt + 1
+    NEXT
+    s.farbanzahl = LEN(m.farben)
+    s.ebenen = m.ebenen.anzahl()
+    DIM eb AS Ebene
+    DIM i AS INTEGER
+    FOR EACH eb IN m.ebenen.ebenen
+        FOR i = 0 TO LEN(eb.raster) - 1
+            IF eb.raster[i] = KEIN_STICH THEN CONTINUE
+            s.sticheGesamt = s.sticheGesamt + 1
+            IF eb.sichtbar AND eb.art[i] = PERLE THEN s.perlen = s.perlen + 1
+        NEXT
+    NEXT
+    DIM k AS Komposit : k = kompositVon(m)
+    FOR i = 0 TO LEN(k.farbe) - 1
+        IF k.farbe[i] <> KEIN_STICH THEN s.bedeckt = s.bedeckt + 1
+    NEXT
+    RETURN s
+END FUNCTION
+
+' --- Fortschritt -------------------------------------------------------------------
+
+CLASS Fortschritt
+    DIM gesamt AS INTEGER             ' ohne ausgelassene Farben
+    DIM erledigt AS INTEGER
+    DIM prozent AS FLOAT              ' auf eine Stelle gerundet
+    DIM farbeGesamt AS ARRAY OF INTEGER    ' je Farbe (auch ausgelassene)
+    DIM farbeErledigt AS ARRAY OF INTEGER
+    DIM farbeProzent AS ARRAY OF FLOAT
+END CLASS
+
+' Pythons round(x, 1) -- die Zahl, deren Text "%.1f" ist
+FUNCTION runden1(x AS FLOAT) AS FLOAT
+    RETURN VAL(FORMAT$(x, "%.1f"))
+END FUNCTION
+
+FUNCTION fortschrittVon(m AS Muster) AS Fortschritt
+    DIM p AS Fortschritt : p = NEW Fortschritt()
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM ges[n] AS INTEGER
+    DIM erl[n] AS INTEGER
+    DIM eb AS Ebene
+    DIM i AS INTEGER
+    FOR EACH eb IN m.ebenen.ebenen
+        FOR i = 0 TO LEN(eb.raster) - 1
+            DIM c AS INTEGER : c = eb.raster[i]
+            IF c < 0 OR c >= n THEN CONTINUE
+            ges[c] = ges[c] + 1
+            IF eb.erledigt[i] <> 0 THEN erl[c] = erl[c] + 1
+        NEXT
+    NEXT
+    p.farbeGesamt = [] : p.farbeErledigt = [] : p.farbeProzent = []
+    FOR i = 0 TO n - 1
+        IF NOT m.farben[i].auslassen THEN
+            p.gesamt = p.gesamt + ges[i]
+            p.erledigt = p.erledigt + erl[i]
+        END IF
+        ARRAY_PUSH(p.farbeGesamt, ges[i])
+        ARRAY_PUSH(p.farbeErledigt, erl[i])
+        ARRAY_PUSH(p.farbeProzent, IIF(ges[i] > 0, runden1(erl[i] / ges[i] * 100.0), 0.0))
+    NEXT
+    p.prozent = IIF(p.gesamt > 0, runden1(p.erledigt / p.gesamt * 100.0), 0.0)
+    RETURN p
+END FUNCTION
+
+' --- Schwierigkeit -----------------------------------------------------------------
+
+CLASS Schwierigkeit
+    DIM stufe AS STRING               ' Anfänger / Mittel / Fortgeschritten / Profi
+    DIM punkte AS INTEGER             ' 0..12
+    DIM pFarben AS INTEGER            ' je 0..3
+    DIM pGroesse AS INTEGER
+    DIM pSonder AS INTEGER
+    DIM pRueck AS INTEGER
+    DIM benutzt AS INTEGER
+    DIM zuSticken AS INTEGER
+    DIM sonderAnteil AS FLOAT
+    DIM rueckstiche AS INTEGER
+END CLASS
+
+FUNCTION schwierigkeitVon(m AS Muster) AS Schwierigkeit
+    DIM d AS Schwierigkeit : d = NEW Schwierigkeit()
+    m.stichzahlenNeu()
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        IF f.auslassen THEN CONTINUE
+        IF f.stichzahl > 0 THEN d.benutzt = d.benutzt + 1
+        d.zuSticken = d.zuSticken + f.stichzahl
+    NEXT
+    ' Sonderstiche ueber alle Ebenen: alles ausser dem gewoehnlichen Stich
+    ' (im Diamond-Modus ist das der Drill -- jeder gesetzte Drill traegt ihn)
+    DIM grund AS INTEGER : grund = IIF(m.modus = "diamond", DIAMANT, VOLL)
+    DIM alle AS INTEGER, sonder AS INTEGER
+    DIM eb AS Ebene
+    DIM i AS INTEGER
+    FOR EACH eb IN m.ebenen.ebenen
+        FOR i = 0 TO LEN(eb.raster) - 1
+            IF eb.raster[i] < 0 THEN CONTINUE
+            alle = alle + 1
+            IF eb.art[i] <> grund THEN sonder = sonder + 1
+        NEXT
+    NEXT
+    d.sonderAnteil = IIF(alle > 0, sonder / alle, 0.0)
+    d.rueckstiche = LEN(m.rueckstiche)
+    d.pFarben = punkteFarben(d.benutzt)
+    d.pGroesse = punkteGroesse(d.zuSticken)
+    d.pSonder = punkteSonder(d.sonderAnteil)
+    d.pRueck = punkteRueck(d.rueckstiche)
+    d.punkte = d.pFarben + d.pGroesse + d.pSonder + d.pRueck
+    d.stufe = stufeFuer$(d.punkte)
+    RETURN d
+END FUNCTION
+
+' Je 0..3 Punkte: Farben, zu stickende Stiche, Anteil Sonderstiche, Rueckstiche
+FUNCTION punkteFarben(n AS INTEGER) AS INTEGER
+    RETURN IIF(n <= 5, 0, IIF(n <= 15, 1, IIF(n <= 30, 2, 3)))
+END FUNCTION
+
+FUNCTION punkteGroesse(n AS INTEGER) AS INTEGER
+    RETURN IIF(n <= 1000, 0, IIF(n <= 5000, 1, IIF(n <= 20000, 2, 3)))
+END FUNCTION
+
+FUNCTION punkteSonder(anteil AS FLOAT) AS INTEGER
+    RETURN IIF(anteil < 0.02, 0, IIF(anteil < 0.10, 1, IIF(anteil < 0.25, 2, 3)))
+END FUNCTION
+
+FUNCTION punkteRueck(n AS INTEGER) AS INTEGER
+    RETURN IIF(n = 0, 0, IIF(n <= 30, 1, IIF(n <= 150, 2, 3)))
+END FUNCTION
+
+FUNCTION stufeFuer$(punkte AS INTEGER) AS STRING
+    RETURN IIF(punkte <= 2, "Anfänger", IIF(punkte <= 5, "Mittel", IIF(punkte <= 8, "Fortgeschritten", "Profi")))
+END FUNCTION
+
+' --- Garnverbrauch -----------------------------------------------------------------
+
+' Eine Zeile des Rechners: ein echtes Garn (ein Blend steht mit jedem seiner
+' Garne da, jedes mit der vollen Stichzahl -- beide Faeden laufen durch
+' dieselbe Nadel).
+CLASS Garnzeile
+    DIM farbe AS INTEGER              ' Nummer in der Farbliste
+    DIM garn AS Garn
+    DIM stiche AS INTEGER
+    DIM genau AS FLOAT                ' Straenge ohne Zuschlag
+    DIM mitZuschlag AS INTEGER
+    DIM kosten AS FLOAT
+END CLASS
+
+CLASS Garnrechnung
+    DIM zeilen AS ARRAY OF Garnzeile
+    DIM straenge AS INTEGER
+    DIM kosten AS FLOAT
+    DIM ausgelasseneFarben AS INTEGER
+
+    SUB Init()
+        zeilen = []
+    END SUB
+END CLASS
+
+' Die echten Garne eines Eintrags (Thread.real_components)
+FUNCTION echteGarne(g AS Garn) AS ARRAY OF Garn
+    IF g.istBlend() THEN RETURN g.teile
+    RETURN [g]
+END FUNCTION
+
+FUNCTION strangZuschlag(stiche AS INTEGER, stoff AS INTEGER, zuschlag AS FLOAT) AS INTEGER
+    IF stiche <= 0 THEN RETURN 0
+    RETURN CEIL(stiche / stichJeStrang(stoff) * (1 + (zuschlag / 100)))
+END FUNCTION
+
+FUNCTION garnRechnen(m AS Muster, stoff AS INTEGER, zuschlag AS FLOAT, preis AS FLOAT) AS Garnrechnung
+    DIM r AS Garnrechnung : r = NEW Garnrechnung()
+    m.stichzahlenNeu()
+    DIM i AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        DIM f AS Farbeintrag : f = m.farben[i]
+        IF f.auslassen THEN
+            IF f.stichzahl > 0 THEN r.ausgelasseneFarben = r.ausgelasseneFarben + 1
+            CONTINUE
+        END IF
+        DIM g AS Garn
+        FOR EACH g IN echteGarne(f.garn)
+            DIM z AS Garnzeile : z = NEW Garnzeile()
+            z.farbe = i
+            z.garn = g
+            z.stiche = f.stichzahl
+            IF f.stichzahl > 0 THEN
+                z.genau = f.stichzahl / stichJeStrang(stoff)
+                z.mitZuschlag = strangZuschlag(f.stichzahl, stoff, zuschlag)
+                z.kosten = z.mitZuschlag * preis
+                r.straenge = r.straenge + z.mitZuschlag
+                r.kosten = r.kosten + z.kosten
+            END IF
+            ARRAY_PUSH(r.zeilen, z)
+        NEXT
+    NEXT
+    RETURN r
+END FUNCTION
+
+' --- Zeitschaetzung ----------------------------------------------------------------
+
+FUNCTION erfahrungsstufen() AS ARRAY OF STRING
+    RETURN ["Anfänger", "Fortgeschritten", "Erfahren", "Profi"]
+END FUNCTION
+
+' Sekunden je Stich (Diamond: je Drill, unabhaengig von der Erfahrung)
+FUNCTION sekundenJeStich(m AS Muster, stufe AS STRING) AS FLOAT
+    IF m.modus = "diamond" THEN RETURN 3.0
+    SELECT CASE stufe
+        CASE "Anfänger" : RETURN 8
+        CASE "Fortgeschritten" : RETURN 5
+        CASE "Erfahren" : RETURN 3
+        CASE "Profi" : RETURN 2
+    END SELECT
+    RETURN 5
+END FUNCTION
+
+CLASS Zeitrechnung
+    DIM gesamt AS STRING              ' "12 Minuten", "3.5 Stunden", "40 Stunden"
+    DIM tage AS STRING                ' "< 1 Tag", "2.5 Tage", "1.5 Wochen", "2.0 Monate"
+    DIM jeStunde AS INTEGER
+    DIM jeFarbe AS STRING             ' "12 min" oder "-"
+    DIM farben AS ARRAY OF INTEGER    ' die zu stickenden Farben
+    DIM farbZeit AS ARRAY OF STRING   ' "40 s", "12 min", "1.5 h"
+END CLASS
+
+FUNCTION zeitRechnen(m AS Muster, stufe AS STRING, stundenJeTag AS FLOAT) AS Zeitrechnung
+    DIM z AS Zeitrechnung : z = NEW Zeitrechnung()
+    m.stichzahlenNeu()
+    DIM sps AS FLOAT : sps = sekundenJeStich(m, stufe)
+    z.farben = [] : z.farbZeit = []
+    DIM summe AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        IF m.farben[i].auslassen THEN CONTINUE
+        ARRAY_PUSH(z.farben, i)
+        summe = summe + m.farben[i].stichzahl
+        DIM s AS FLOAT : s = m.farben[i].stichzahl * sps
+        IF s < 60 THEN
+            ARRAY_PUSH(z.farbZeit, FORMAT$(s, "%.0f") + " s")
+        ELSEIF s < 3600 THEN
+            ARRAY_PUSH(z.farbZeit, FORMAT$(s / 60, "%.0f") + " min")
+        ELSE
+            ARRAY_PUSH(z.farbZeit, FORMAT$(s / 3600, "%.1f") + " h")
+        END IF
+    NEXT
+    DIM sek AS FLOAT : sek = summe * sps
+    DIM std AS FLOAT : std = sek / 3600
+    IF std < 1 THEN
+        z.gesamt = STR$(INT(sek / 60)) + " Minuten"
+    ELSEIF std < 24 THEN
+        z.gesamt = FORMAT$(std, "%.1f") + " Stunden"
+    ELSE
+        z.gesamt = FORMAT$(std, "%.0f") + " Stunden"
+    END IF
+    DIM tage AS FLOAT : tage = std / stundenJeTag
+    IF tage < 1 THEN
+        z.tage = "< 1 Tag"
+    ELSEIF tage < 7 THEN
+        z.tage = FORMAT$(tage, "%.1f") + " Tage"
+    ELSEIF tage < 30 THEN
+        z.tage = FORMAT$(tage / 7, "%.1f") + " Wochen"
+    ELSE
+        z.tage = FORMAT$(tage / 30, "%.1f") + " Monate"
+    END IF
+    z.jeStunde = INT(3600 / sps)
+    IF LEN(z.farben) > 0 THEN
+        z.jeFarbe = FORMAT$(summe / LEN(z.farben) * sps / 60, "%.0f") + " min"
+    ELSE
+        z.jeFarbe = "-"
+    END IF
+    RETURN z
+END FUNCTION
+
+' --- CSV ---------------------------------------------------------------------------
+
+' Ein Feld wie Pythons csv-Modul mit Komma als Trenner
+FUNCTION csvKomma$(t AS STRING) AS STRING
+    IF INSTR(t, ",") >= 0 OR INSTR(t, CHR$(34)) >= 0 OR INSTR(t, CHR$(10)) >= 0 OR INSTR(t, CHR$(13)) >= 0 THEN
+        RETURN CHR$(34) + REPLACE$(t, CHR$(34), CHR$(34) + CHR$(34)) + CHR$(34)
+    END IF
+    RETURN t
+END FUNCTION
+
+FUNCTION csvZeile$(felder AS ARRAY OF STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM f AS STRING
+    FOR EACH f IN felder
+        ARRAY_PUSH(t, csvKomma$(f))
+    NEXT
+    RETURN JOIN$(t, ",") + CHR$(13) + CHR$(10)
+END FUNCTION
+
+FUNCTION oderStrich$(t AS STRING) AS STRING
+    RETURN IIF(t = "", "-", t)
+END FUNCTION
+
+' Die Statistik als CSV (mit BOM fuer Excel, Zeilenende CR LF); je echtem
+' Garn eine Zeile, im Diamond-Modus ohne Straenge und Kosten.
+FUNCTION statistikCsv$(m AS Muster, stoff AS INTEGER, zuschlag AS FLOAT, preis AS FLOAT) AS STRING
+    m.stichzahlenNeu()
+    DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+    DIM kopf AS ARRAY OF STRING : kopf = ["Symbol", "Name", "Hersteller", "Katalognummer", "Stiche", "Prozent"]
+    IF NOT dp THEN
+        ARRAY_PUSH(kopf, "Stränge")
+        ARRAY_PUSH(kopf, "Kosten")
+    END IF
+    ARRAY_PUSH(kopf, "Nicht sticken")
+    DIM t AS STRING : t = CHR$(&HFEFF) + csvZeile$(kopf)
+    DIM summe AS INTEGER
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        IF NOT f.auslassen THEN summe = summe + f.stichzahl
+    NEXT
+    IF summe = 0 THEN summe = 1
+    FOR EACH f IN m.farben
+        DIM prozent AS STRING : prozent = "-"
+        DIM stueck AS INTEGER : stueck = 0
+        DIM kosten AS FLOAT : kosten = 0.0
+        IF NOT f.auslassen THEN
+            prozent = FORMAT$(f.stichzahl / summe * 100, "%.1f") + "%"
+            IF NOT dp THEN
+                stueck = strangZuschlag(f.stichzahl, stoff, zuschlag)
+                kosten = stueck * preis
+            END IF
+        END IF
+        DIM g AS Garn
+        FOR EACH g IN echteGarne(f.garn)
+            DIM z AS ARRAY OF STRING : z = [f.symbol, g.name, oderStrich$(g.hersteller), oderStrich$(g.nummer), STR$(f.stichzahl), prozent]
+            IF NOT dp THEN
+                ARRAY_PUSH(z, STR$(stueck))
+                ARRAY_PUSH(z, FORMAT$(kosten, "%.2f"))
+            END IF
+            ARRAY_PUSH(z, IIF(f.auslassen, "Ja", "Nein"))
+            t = t + csvZeile$(z)
+        NEXT
+    NEXT
+    RETURN t
+END FUNCTION
+
+' --- Heatmap -----------------------------------------------------------------------
+
+CLASS Heatmap
+    DIM bloecke AS INTEGER            ' Stiche je Blockkante
+    DIM bb AS INTEGER                 ' Bloecke waagerecht
+    DIM bh AS INTEGER                 ' Bloecke senkrecht
+    DIM werte AS ARRAY OF FLOAT       ' je Block 0..1 (single, wie numpy float32)
+    DIM aktiv AS INTEGER              ' Bloecke mit Wert > 0
+END CLASS
+
+' Auf single runden (numpy float32)
+FUNCTION einfach(x AS FLOAT) AS FLOAT
+    DIM b AS BUFFER : b = BUFFER_NEW(4)
+    BUFFER_SET_F32(b, 0, x)
+    RETURN BUFFER_GET_F32(b, 0)
+END FUNCTION
+
+' Je Block die Stichdichte (Fuellrate, relativ zum dichtesten Block) oder
+' die Zahl verschiedener Farben (relativ zum buntesten). Grundlage: je Zelle
+' der oberste sichtbare Stich, ausgelassene Farben zaehlen als leer.
+FUNCTION heatmapRechnen(m AS Muster, achse AS INTEGER, bloecke AS INTEGER) AS Heatmap
+    DIM h AS Heatmap : h = NEW Heatmap()
+    DIM bs AS INTEGER : bs = MAX(1, bloecke)
+    h.bloecke = bs
+    h.bb = (m.breite + bs - 1) \ bs
+    h.bh = (m.hoehe + bs - 1) \ bs
+    DIM k AS Komposit : k = kompositVon(m)
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(k.farbe) - 1
+        DIM c AS INTEGER : c = k.farbe[i]
+        IF c >= 0 AND c < n THEN
+            IF m.farben[c].auslassen THEN k.farbe[i] = KEIN_STICH
+        END IF
+    NEXT
+    DIM gesehen[n + 1] AS INTEGER
+    DIM marke AS INTEGER
+    DIM roh AS ARRAY OF FLOAT : roh = []
+    DIM hoechst AS FLOAT : hoechst = 0
+    DIM bx AS INTEGER, by AS INTEGER, x AS INTEGER, y AS INTEGER
+    FOR by = 0 TO h.bh - 1
+        DIM y0 AS INTEGER : y0 = by * bs
+        DIM y1 AS INTEGER : y1 = MIN(y0 + bs, m.hoehe)
+        FOR bx = 0 TO h.bb - 1
+            DIM x0 AS INTEGER : x0 = bx * bs
+            DIM x1 AS INTEGER : x1 = MIN(x0 + bs, m.breite)
+            DIM wert AS FLOAT : wert = 0
+            IF achse = HEATMAP_DICHTE THEN
+                DIM belegt AS INTEGER : belegt = 0
+                FOR y = y0 TO y1 - 1
+                    FOR x = x0 TO x1 - 1
+                        IF k.farbe[y * m.breite + x] <> KEIN_STICH THEN belegt = belegt + 1
+                    NEXT
+                NEXT
+                wert = belegt / ((y1 - y0) * (x1 - x0))
+            ELSE
+                ' verschiedene Farben: je Block eine neue Marke statt eines Leerens
+                marke = marke + 1
+                DIM verschieden AS INTEGER : verschieden = 0
+                FOR y = y0 TO y1 - 1
+                    FOR x = x0 TO x1 - 1
+                        DIM fc AS INTEGER : fc = k.farbe[y * m.breite + x]
+                        IF fc < 0 OR fc >= n THEN CONTINUE
+                        IF gesehen[fc] <> marke THEN
+                            gesehen[fc] = marke
+                            verschieden = verschieden + 1
+                        END IF
+                    NEXT
+                NEXT
+                wert = verschieden
+            END IF
+            ARRAY_PUSH(roh, wert)
+            hoechst = MAX(hoechst, wert)
+        NEXT
+    NEXT
+    h.werte = []
+    FOR i = 0 TO LEN(roh) - 1
+        DIM v AS FLOAT : v = IIF(hoechst = 0, roh[i], roh[i] / hoechst)
+        v = einfach(v)
+        ARRAY_PUSH(h.werte, v)
+        IF v > 0 THEN h.aktiv = h.aktiv + 1
+    NEXT
+    RETURN h
+END FUNCTION
+
+' blau -> cyan -> gruen -> gelb -> rot; leer fast schwarz (_intensity_to_rgb)
+FUNCTION heatmapFarbe(w AS FLOAT) AS INTEGER
+    IF w <= 0.0 THEN RETURN RGB(20, 20, 60)
+    w = CLAMP(w, 0.0, 1.0)
+    DIM u AS FLOAT
+    IF w < 0.25 THEN
+        u = w / 0.25
+        RETURN RGB(0, INT(255 * u), 255)
+    ELSEIF w < 0.5 THEN
+        u = (w - 0.25) / 0.25
+        RETURN RGB(0, 255, INT(255 * (1 - u)))
+    ELSEIF w < 0.75 THEN
+        u = (w - 0.5) / 0.25
+        RETURN RGB(INT(255 * u), 255, 0)
+    END IF
+    u = (w - 0.75) / 0.25
+    RETURN RGB(255, INT(255 * (1 - u)), 0)
+END FUNCTION
+
+' Die Farbe je Block wie PyStickys Bild: Werte im selben Tausendstel teilen
+' sich die Farbe des ersten (dort ein Zwischenspeicher je Tausendstel).
+FUNCTION heatmapFarben(h AS Heatmap) AS ARRAY OF INTEGER
+    DIM erg AS ARRAY OF INTEGER : erg = []
+    DIM merk AS MAP OF INTEGER : merk = {}
+    DIM w AS FLOAT
+    FOR EACH w IN h.werte
+        DIM k AS STRING : k = STR$(INT(w * 1000))
+        IF NOT MAPHAS(merk, k) THEN MAPPUT(merk, k, heatmapFarbe(w))
+        ARRAY_PUSH(erg, MAPGET(merk, k))
+    NEXT
+    RETURN erg
+END FUNCTION
+
+FUNCTION heatmapText$(h AS Heatmap, achse AS INTEGER) AS STRING
+    RETURN IIF(achse = HEATMAP_VIELFALT, "Farbenvielfalt", "Stichdichte") + ": " + STR$(h.bb) + "×" + STR$(h.bh) + " Blöcke à " + STR$(h.bloecke) + " Stich(e), " + STR$(h.aktiv) + " aktive Blöcke"
+END FUNCTION
+
+' --- Farbenblindheit ---------------------------------------------------------------
+
+FUNCTION farbenblindNamen() AS ARRAY OF STRING
+    RETURN ["Keine Simulation", "Protanopie (Rot-Blindheit)", "Deuteranopie (Grün-Blindheit)", "Tritanopie (Blau-Blindheit)"]
+END FUNCTION
+
+' Wie die Farbe bei der Farbenblindheit `art` aussieht (Vienot 1999)
+FUNCTION farbenblind(f AS INTEGER, art AS INTEGER) AS INTEGER
+    IF art = FARBENBLIND_KEINE THEN RETURN f
+    DIM m AS ARRAY OF FLOAT
+    SELECT CASE art
+        CASE FARBENBLIND_PROTANOPIE : m = [0.56667, 0.43333, 0.0, 0.55833, 0.44167, 0.0, 0.0, 0.24167, 0.75833]
+        CASE FARBENBLIND_DEUTERANOPIE : m = [0.625, 0.375, 0.0, 0.7, 0.3, 0.0, 0.0, 0.3, 0.7]
+        CASE ELSE : m = [0.95, 0.05, 0.0, 0.0, 0.43333, 0.56667, 0.0, 0.475, 0.525]
+    END SELECT
+    DIM r AS INTEGER : r = (f SHR 16) BAND 255
+    DIM g AS INTEGER : g = (f SHR 8) BAND 255
+    DIM b AS INTEGER : b = f BAND 255
+    DIM nr AS INTEGER : nr = CLAMP(pyRunden(m[0] * r + m[1] * g + m[2] * b), 0, 255)
+    DIM ng AS INTEGER : ng = CLAMP(pyRunden(m[3] * r + m[4] * g + m[5] * b), 0, 255)
+    DIM nb AS INTEGER : nb = CLAMP(pyRunden(m[6] * r + m[7] * g + m[8] * b), 0, 255)
+    RETURN RGB(nr, ng, nb)
+END FUNCTION
+
+' --- Aehnliche Farben --------------------------------------------------------------
+
+' Alle Paare mit CIEDE2000 hoechstens `schwelle`, nach Abstand (bei gleichem
+' Abstand in der Reihenfolge der Farbliste): [a, b, ...] und die Abstaende.
+FUNCTION aehnlichePaare(m AS Muster, schwelle AS FLOAT, BYREF abstaende AS ARRAY OF FLOAT) AS ARRAY OF INTEGER
+    DIM paare AS ARRAY OF INTEGER : paare = []
+    abstaende = []
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        FOR j = i + 1 TO m.farbanzahl() - 1
+            DIM d AS FLOAT : d = farbAbstand(m.farben[i].garn.farbe, m.farben[j].garn.farbe)
+            IF d > schwelle THEN CONTINUE
+            ' stabil einsortieren
+            DIM k AS INTEGER : k = LEN(abstaende)
+            ARRAY_PUSH(abstaende, d)
+            ARRAY_PUSH(paare, i) : ARRAY_PUSH(paare, j)
+            WHILE k > 0
+                IF abstaende[k - 1] <= d THEN EXIT WHILE
+                abstaende[k] = abstaende[k - 1]
+                paare[2 * k] = paare[2 * k - 2] : paare[2 * k + 1] = paare[2 * k - 1]
+                k = k - 1
+            WEND
+            abstaende[k] = d
+            paare[2 * k] = i : paare[2 * k + 1] = j
+        NEXT
+    NEXT
+    RETURN paare
+END FUNCTION
+
+' Jeder Stich einer Farbe i mit ziel[i] >= 0 bekommt ziel[i] -- auf ALLEN
+' Ebenen, auch verdeckten, unsichtbaren und gesperrten (Pattern.
+' merge_colors_stitches; "Farbe ersetzen" nimmt dagegen nur Sichtbares).
+' Ist Quelle oder Ziel Perle oder Drill, bekommt der Stich die Form des
+' Ziels, sonst bleibt sie. "Erledigt" bleibt.
+FUNCTION alleUmfaerben(m AS Muster, v AS Verlauf, ziel AS ARRAY OF INTEGER) AS INTEGER
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM zaehl AS INTEGER
+    DIM eb AS Ebene
+    DIM i AS INTEGER
+    FOR EACH eb IN m.ebenen.ebenen
+        DIM r AS ARRAY OF INTEGER : r = eb.raster
+        DIM a AS ARRAY OF INTEGER : a = eb.art
+        DIM d AS ARRAY OF INTEGER : d = eb.erledigt
+        FOR i = 0 TO LEN(r) - 1
+            DIM c AS INTEGER : c = r[i]
+            IF c < 0 OR c >= n THEN CONTINUE
+            DIM z AS INTEGER : z = ziel[c]
+            IF z < 0 THEN CONTINUE
+            DIM typ AS INTEGER : typ = a[i]
+            DIM qf AS Farbeintrag : qf = m.farben[c]
+            DIM zf AS Farbeintrag : zf = m.farben[z]
+            IF qf.istPerle OR qf.istDiamant OR zf.istPerle OR zf.istDiamant THEN typ = IIF(zf.istPerle, PERLE, IIF(zf.istDiamant, DIAMANT, VOLL))
+            v.zelle(eb, i, c, a[i], d[i], z, typ, d[i])
+            r[i] = z
+            a[i] = typ
+            zaehl = zaehl + 1
+        NEXT
+    NEXT
+    m.stichzahlenNeu()
+    RETURN zaehl
+END FUNCTION
+
+' Ausgewaehlte Paare [bleibt, geht, ...] zusammenfuehren: die zweite Farbe
+' jedes Paars geht in die erste ueber und verschwindet. "" = erledigt, sonst
+' warum nicht (eine Farbe soll in zwei Paaren gehen).
+FUNCTION farbenZusammenfuehren$(m AS Muster, v AS Verlauf, paare AS ARRAY OF INTEGER, BYREF umgefaerbt AS INTEGER) AS STRING
+    umgefaerbt = 0
+    IF LEN(paare) = 0 THEN RETURN "Keine Paare zum Zusammenführen ausgewählt."
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM ziel[n] AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        ziel[k] = -1
+    NEXT
+    FOR k = 0 TO LEN(paare) - 2 STEP 2
+        IF ziel[paare[k + 1]] >= 0 THEN RETURN "Mindestens eine Farbe ist in mehreren ausgewählten Paaren als zu ersetzende Farbe markiert. Bitte pro Farbe nur ein Paar auswählen."
+        ziel[paare[k + 1]] = paare[k]
+    NEXT
+    ' Ketten aufloesen: geht a in b und b in c, landet a in c
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM schritte AS INTEGER : schritte = 0
+        WHILE ziel[i] >= 0 AND ziel[ziel[i]] >= 0 AND schritte < n
+            ziel[i] = ziel[ziel[i]]
+            schritte = schritte + 1
+        WEND
+    NEXT
+    v.beginnen("Ähnliche Farben zusammenführen")
+    umgefaerbt = alleUmfaerben(m, v, ziel)
+    DIM behalten[n] AS INTEGER
+    FOR i = 0 TO n - 1
+        IF ziel[i] < 0 THEN behalten[i] = 1
+    NEXT
+    DIM weg AS INTEGER : weg = farbenBehalten(m, v, behalten, ziel, "Ähnliche Farben zusammenführen")
+    v.beenden()
+    m.stichzahlenNeu()
+    RETURN ""
+END FUNCTION
