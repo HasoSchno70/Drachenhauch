@@ -592,6 +592,44 @@ FUNCTION farbeErledigt(m AS Muster, v AS Verlauf, farbe AS INTEGER) AS INTEGER
     RETURN n
 END FUNCTION
 
+' Den ganzen Fortschritt zuruecksetzen -- auf ALLEN Ebenen, auch unsichtbaren
+' (wie Pattern.reset_progress). PySticky leert dabei den Verlauf, weil es
+' sich nicht zuruecknehmen laesst; hier ist es ein Schritt wie jeder andere.
+' Liefert die zurueckgesetzten Zellen.
+FUNCTION fortschrittZuruecksetzen(m AS Muster, v AS Verlauf) AS INTEGER
+    DIM n AS INTEGER
+    v.beginnen("Fortschritt zurücksetzen")
+    DIM e AS Ebene
+    FOR EACH e IN m.ebenen.ebenen
+        DIM r AS ARRAY OF INTEGER : r = e.raster
+        DIM d AS ARRAY OF INTEGER : d = e.erledigt
+        DIM a AS ARRAY OF INTEGER : a = e.art
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(d) - 1
+            IF d[i] <> 0 THEN
+                v.zelle(e, i, r[i], a[i], d[i], r[i], a[i], 0)
+                d[i] = 0
+                n = n + 1
+            END IF
+        NEXT
+    NEXT
+    v.beenden()
+    RETURN n
+END FUNCTION
+
+' Die Stoffzaehlung (Kaestchen je Zoll; PySticky: die Klappliste der
+' Info-Leiste setzt fabric_count). Ein Schritt; FALSE ohne Aenderung.
+FUNCTION stoffSetzen(m AS Muster, v AS Verlauf, stoff AS FLOAT) AS BOOLEAN
+    IF stoff <= 0 OR stoff = m.stoff THEN RETURN FALSE
+    v.beginnen("Stoff ändern")
+    DIM t AS Aenderung : t = v.teil(TEIL_STOFF)
+    t.stoffVorher = m.stoff
+    t.stoffNachher = stoff
+    m.stoff = stoff
+    v.beenden()
+    RETURN TRUE
+END FUNCTION
+
 ' Der naechste noch offene Stich einer Farbe in Lesereihenfolge (y * b + x),
 ' sichtbar betrachtet; vorwaerts oder rueckwaerts, mit Umlauf. von = -1:
 ' von vorn (bzw. von hinten). Liefert die Stelle oder -1.

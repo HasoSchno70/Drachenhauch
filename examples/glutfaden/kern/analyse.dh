@@ -125,6 +125,106 @@ FUNCTION fortschrittVon(m AS Muster) AS Fortschritt
     RETURN p
 END FUNCTION
 
+' --- Info-Leiste (PySticky ui/panels/info_panel.py) ------------------------------
+
+' Die Stoffzaehlungen der Klappliste (COMMON_FABRIC_COUNTS)
+FUNCTION stoffzaehlungen() AS ARRAY OF INTEGER
+    RETURN [11, 14, 16, 18, 22, 28, 32]
+END FUNCTION
+
+' Die Arbeitszeit wie _calculate_stitch_time: 20 s je Kreuzstich (mit
+' Fadenwechsel), 3 s je Drill im Diamond-Modus.
+FUNCTION stickzeitText$(stiche AS INTEGER, modus AS STRING) AS STRING
+    IF stiche = 0 THEN RETURN "0 Min"
+    DIM minuten AS FLOAT : minuten = stiche * IIF(modus = "diamond", 3.0, 20.0) / 60
+    DIM h AS INTEGER : h = INT(minuten / 60)
+    DIM mi AS INTEGER : mi = INT(minuten - h * 60.0)
+    IF h >= 100 THEN RETURN "~" + STR$(h) + " Std"
+    IF h > 0 THEN RETURN "~" + STR$(h) + "h " + STR$(mi) + "m"
+    IF mi > 0 THEN RETURN "~" + STR$(mi) + " Min"
+    RETURN "< 1 Min"
+END FUNCTION
+
+' Garn je Stich in cm: 5 cm bei 14 ct, auf feinerem Stoff entsprechend weniger
+FUNCTION garnJeStichCm(stoff AS FLOAT) AS FLOAT
+    RETURN 5.0 * (14 / stoff)
+END FUNCTION
+
+' Der Garnbedarf aller zu stickenden Farben wie _calculate_thread_usage: in
+' Metern mit 15 % Zuschlag, im Diamond-Modus die Drills mit 10 % Reserve.
+FUNCTION garnbedarfText$(m AS Muster, modus AS STRING) AS STRING
+    DIM n AS INTEGER
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        IF NOT f.auslassen THEN n = n + f.stichzahl
+    NEXT
+    IF n = 0 THEN RETURN "0"
+    IF modus = "diamond" THEN RETURN "~" + ZAHL$(INT(n * 1.10), 0) + " Drills"
+    DIM meter AS FLOAT : meter = n * garnJeStichCm(m.stoff) / 100 * 1.15
+    IF meter >= 100 THEN RETURN "~" + FORMAT$(meter, "%.0f") + " m"
+    IF meter >= 10 THEN RETURN "~" + FORMAT$(meter, "%.1f") + " m"
+    RETURN "~" + FORMAT$(meter, "%.2f") + " m"
+END FUNCTION
+
+' Je Farbe (_calculate_thread_per_color): ab einem Meter "1.7m", sonst "86cm";
+' im Diamond-Modus die Drills.
+FUNCTION garnJeFarbeText$(stiche AS INTEGER, stoff AS FLOAT, modus AS STRING) AS STRING
+    IF stiche = 0 THEN RETURN ""
+    IF modus = "diamond" THEN RETURN "~" + ZAHL$(INT(stiche * 1.10), 0)
+    DIM cm AS FLOAT : cm = stiche * garnJeStichCm(stoff) * 1.15
+    IF cm / 100 >= 1 THEN RETURN FORMAT$(cm / 100, "%.1f") + "m"
+    RETURN FORMAT$(cm, "%.0f") + "cm"
+END FUNCTION
+
+' Der Text rechts in der Farbliste der Info-Leiste (_ColorListItem)
+FUNCTION farbeInfoText$(m AS Muster, nr AS INTEGER, modus AS STRING) AS STRING
+    DIM f AS Farbeintrag : f = m.farben[nr]
+    IF f.auslassen THEN RETURN "übersp."
+    IF f.stichzahl = 0 THEN RETURN "0"
+    RETURN STR$(f.stichzahl) + "  ·  " + garnJeFarbeText$(f.stichzahl, m.stoff, modus)
+END FUNCTION
+
+' Die neun Karten der Info-Leiste in ihrer Reihenfolge: Stiche, Farben,
+' Groesse, Masse, Ebenen, Stickzeit, Garnbedarf, Fortschritt, Schwierigkeit.
+FUNCTION infoKarten(m AS Muster, modus AS STRING) AS ARRAY OF STRING
+    DIM s AS Statistik : s = statistikVon(m)
+    DIM p AS Fortschritt : p = fortschrittVon(m)
+    DIM d AS Schwierigkeit : d = schwierigkeitVon(m)
+    DIM k AS ARRAY OF STRING : k = []
+    IF s.ausgelassen > 0 THEN
+        ARRAY_PUSH(k, ZAHL$(s.zuSticken, 0) + " (+" + STR$(s.ausgelassen) + " überspr.)")
+    ELSE
+        ARRAY_PUSH(k, ZAHL$(s.sticheGesamt, 0))
+    END IF
+    DIM fa AS STRING : fa = STR$(s.benutzt) + " / " + STR$(s.farbanzahl)
+    IF s.ausgelasseneFarben > 0 THEN fa = fa + " (" + STR$(s.ausgelasseneFarben) + " überspr.)"
+    ARRAY_PUSH(k, fa)
+    ARRAY_PUSH(k, STR$(s.breite) + " × " + STR$(s.hoehe))
+    ARRAY_PUSH(k, FORMAT$(s.breiteCm, "%.1f") + " × " + FORMAT$(s.hoeheCm, "%.1f") + " cm")
+    ARRAY_PUSH(k, STR$(s.ebenen))
+    ARRAY_PUSH(k, stickzeitText$(s.zuSticken, modus))
+    ARRAY_PUSH(k, garnbedarfText$(m, modus))
+    IF p.gesamt > 0 THEN
+        ARRAY_PUSH(k, FORMAT$(p.erledigt / p.gesamt * 100.0, "%.1f") + "% (" + STR$(p.erledigt) + "/" + STR$(p.gesamt) + ")")
+    ELSE
+        ARRAY_PUSH(k, "0%")
+    END IF
+    ARRAY_PUSH(k, d.stufe)
+    RETURN k
+END FUNCTION
+
+' Der Tooltip der Schwierigkeits-Karte
+FUNCTION schwierigkeitTipp$(d AS Schwierigkeit) AS STRING
+    RETURN "Score " + STR$(d.punkte) + "/12  —  Farben " + STR$(d.pFarben) + "/3, Größe " + STR$(d.pGroesse) + "/3, Sonderstiche " + STR$(d.pSonder) + "/3, Backstitches " + STR$(d.pRueck) + "/3" + CHR$(10) + _
+        "(" + STR$(d.benutzt) + " Farben, " + ZAHL$(d.zuSticken, 0) + " Stiche, " + FORMAT$(d.sonderAnteil * 100, "%.1f") + "% Sonder, " + STR$(d.rueckstiche) + " Linien)"
+END FUNCTION
+
+' Prozent einer Farbe in der Fortschritts-Leiste ("{percent:.0f}%") -- aus dem
+' schon auf eine Stelle gerundeten Wert, wie PySticky (per_color "percent")
+FUNCTION farbeProzentText$(p AS Fortschritt, nr AS INTEGER) AS STRING
+    RETURN FORMAT$(p.farbeProzent[nr], "%.0f") + "%"
+END FUNCTION
+
 ' --- Schwierigkeit -----------------------------------------------------------------
 
 CLASS Schwierigkeit
