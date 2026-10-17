@@ -3778,6 +3778,7 @@ impl Compiler {
     /// anderer.
     fn stmt_try(&mut self, body: &[Node], catch_var: &str, catch_block: &[Node],
                 has_catch: bool, finally_block: &[Node]) -> CR {
+        let try_zeile = self.ctx.cur_line;
         let hat_finally = !finally_block.is_empty();
         let fin_jmp = if hat_finally { Some(self.ctx.emit(oc::TRY_BEGIN, Value::Null)) } else { None };
         // Ohne CATCH gibt es keinen zweiten Handler. Ausnahme: das alte
@@ -3801,12 +3802,38 @@ impl Compiler {
             let ct = self.ctx.here();
             self.ctx.patch(cj, ct);
             if !catch_var.is_empty() {
+                // Die CATCH-Variable ist ein Text. Ein DIM desselben Namens
+                // weiter unten meint dieselbe Variable -- mit anderem Typ ist
+                // das dieselbe Warnung wie bei zwei DIM (2026-10-17, Glutfaden
+                // Stufe 11: `DIM e AS Eintrag` nach `CATCH e` meldete nur
+                // "'e' ist als STRING angesagt", ohne zu sagen, wo).
+                let klein = catch_var.to_lowercase();
+                if !self.ctx.dim_types.contains_key(&klein) {
+                    // Die Zeile des CATCH steht nicht im Baum: die Zeile ueber
+                    // der ersten Anweisung des Zweigs, sonst die des TRY.
+                    let zeile = match catch_block.first() {
+                        Some(Node::Stmt { line, .. }) if *line > 1 => *line - 1,
+                        _ => try_zeile,
+                    };
+                    self.ctx.dim_types.insert(klein, ("string".to_string(), zeile));
+                }
                 if self.ctx.is_main {
                     if !self.ctx.local_slots.contains_key(catch_var) {
                         let name_idx = self.ctx.add_const(json!(catch_var));
                         let type_idx = self.ctx.add_const(json!("string"));
                         let default_idx = self.ctx.add_const(json!(""));
-                        self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                        // Hat der Name einen globalen Platz (ein DIM desselben
+                        // Namens irgendwo im Hauptprogramm), muss der Platz
+                        // HIER angelegt werden wie bei FOR -- sonst schrieb der
+                        // CATCH in einen Platz, den erst das spaetere DIM
+                        // einhaengt, und brach mit "globale Variable noch nicht
+                        // gesetzt" ab (in der Zeile des Fehlers, nicht des CATCH).
+                        if let Some(&slot) = self.global_slots.get(catch_var) {
+                            self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
+                                          json!([slot as i64, name_idx, type_idx, default_idx]));
+                        } else {
+                            self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                        }
                     }
                     self.merke_deklariert(catch_var);
                 } else if !self.ctx.local_slots.contains_key(catch_var) {

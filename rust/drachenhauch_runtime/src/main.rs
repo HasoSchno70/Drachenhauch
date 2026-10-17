@@ -2002,6 +2002,20 @@ fn auf_dateien_umrechnen(diags: &mut [serde_json::Value], raw_source: &str, base
 /// (wie error_check.py einen ParseProblem liefert). Leeres Array = fehlerfrei.
 /// Compiler-Fehler tragen heute keine Zeile -> `line: 0` (spaetere Verfeinerung).
 fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<serde_json::Value> {
+    // Interne Namen (`kern@eintrag`) lesbar machen wie beim Lauf auf stderr
+    // (2026-10-17: --check, der Sprachserver und CODE_CHECK$ zeigten
+    // "KERN@BIBLIOTHEKSEINTRAG" in einer Typ-Warnung).
+    let mut diags = check_source_roh(raw_source, base, label);
+    for d in diags.iter_mut() {
+        if let Some(m) = d.get("message").and_then(|m| m.as_str()) {
+            let lesbar = namensraum::lesbar_text(m);
+            d["message"] = serde_json::Value::String(lesbar);
+        }
+    }
+    diags
+}
+
+fn check_source_roh(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<serde_json::Value> {
     let (source, imports, herkunft, namensraeume) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
         Err(e) => return vec![serde_json::json!({
