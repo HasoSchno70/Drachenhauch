@@ -5,8 +5,11 @@
 ' Erreichbar ueber den Knopf "Auswerten" in der Kopfleiste, die Statistik
 ' auch mit Strg+Umschalt+G.
 '
-' Anders als PySticky: ohne den Reiter "Einkaufsliste" (der braucht den
-' Garn-Vorrat, den Glutfaden noch nicht hat); Tabellen nicht sortierbar;
+' Der Reiter "Einkaufsliste" rechnet mit dem Garn-Vorrat (planungsdialoge.dh)
+' und folgt dem Zuschlag des Garn-Reiters, auch wenn er sich aendert
+' (PySticky liest ihn einmal beim Oeffnen).
+'
+' Anders als PySticky: Tabellen nicht sortierbar;
 ' Zusammenfuehren fragt nicht nach, weil Rueckgaengig es zuruecknimmt;
 ' Meldungen stehen in einer Zeile unten statt in Kaesten.
 
@@ -119,6 +122,10 @@ DIM adBalkenText AS INTEGER
 DIM adFortListe AS INTEGER
 DIM adMeldung AS INTEGER
 DIM adSperre AS BOOLEAN
+DIM adEinkaufListe AS INTEGER
+DIM adEinkaufSumme AS INTEGER
+DIM adVorrat AS kern.Vorrat
+DIM adEinkaufLetzte AS ARRAY OF kern.Einkaufszeile  ' was die Einkaufsliste zeigt
 
 FUNCTION adStoffe() AS ARRAY OF INTEGER
     RETURN [11, 14, 16, 18, 28, 32]
@@ -228,6 +235,36 @@ SUB adGarn(w AS INTEGER, daten AS INTEGER)
     gtk_widget_show_all(adGarnListe)
     gtk_label_set_markup(adGarnSumme, "<b>Gesamt: " + STR$(g.straenge) + " Stränge" + IIF(g.ausgelasseneFarben > 0, " (" + STR$(g.ausgelasseneFarben) + " Farbe(n) übersprungen)", "") + "</b>")
     gtk_label_set_markup(adGarnKosten, "<b>Geschätzte Kosten: " + FORMAT$(g.kosten, "%.2f") + " €</b>")
+    adEinkauf()
+END SUB
+
+' Die Einkaufsliste: der Bedarf mit dem Zuschlag des Garn-Reiters (Stoff des
+' Musters, wie PySticky), gegen den Vorrat gerechnet
+SUB adEinkauf()
+    IF adEinkaufListe = 0 OR lwMuster.modus = "diamond" THEN RETURN
+    DIM liste AS ARRAY OF kern.Einkaufszeile : liste = kern.einkaufsliste(lwMuster, adVorrat, gtk_spin_button_get_value_as_int(adZuschlag))
+    adEinkaufLetzte = liste
+    adLeeren(adEinkaufListe)
+    DIM z AS kern.Einkaufszeile
+    FOR EACH z IN liste
+        DIM r AS INTEGER : r = adZeile(adEinkaufListe, [adFeld$(z.garn.farbe), sdMaske$(z.garn.name), sdMaske$(z.garn.nummer), STR$(z.benoetigt), STR$(z.vorhanden), pdKaufen$(z.benoetigt, z.vorhanden)], [44, 0, 80, 80, 80, 80], "lllrrr")
+    NEXT
+    gtk_widget_show_all(adEinkaufListe)
+    DIM summe AS INTEGER : summe = kern.einkaufSumme(liste)
+    IF LEN(liste) = 0 THEN
+        gtk_label_set_markup(adEinkaufSumme, "<i>Das Muster enthält keine gestickte Farbe — keine Einkaufsliste.</i>")
+    ELSEIF summe > 0 THEN
+        gtk_label_set_markup(adEinkaufSumme, "<span foreground='#e74c3c'><b>" + STR$(summe) + "</b> Stränge insgesamt zu kaufen</span>")
+    ELSE
+        gtk_label_set_markup(adEinkaufSumme, "<span foreground='#2ecc71'>✓ Du hast alles im Vorrat!</span>")
+    END IF
+END SUB
+
+SUB adVorratGeklickt(w AS INTEGER, daten AS INTEGER)
+    IF vorratDialog() THEN
+        adVorrat = kern.vorratLaden(pdVorratDatei$())
+        adEinkauf()
+    END IF
 END SUB
 
 SUB adZeit(w AS INTEGER, daten AS INTEGER)
@@ -447,6 +484,27 @@ FUNCTION adStatistikBauen() AS INTEGER
     gtk_box_pack_start(s5, adUeberschrift("Fortschritt pro Farbe"), FALSE, FALSE, 0)
     adFortListe = adTabelle(s5, ["Farbe", "Name", "Erledigt", "Gesamt", "%", "Status"], [44, 0, 80, 80, 70, 100], "llrrrl")
     n = gtk_notebook_append_page(adReiter, s5, gtk_label_new("Fortschritt"))
+
+    ' Einkaufsliste (nur Kreuzstich, wie der Garn-Reiter)
+    adVorrat = kern.vorratLaden(pdVorratDatei$())
+    adEinkaufListe = 0
+    IF NOT dp THEN
+        DIM s6 AS INTEGER : s6 = adSeite()
+        DIM ei AS INTEGER : ei = gtk_label_new("Vergleich des Garnbedarfs für dieses Muster mit deinem hinterlegten Vorrat (Zuschlag wie im Reiter „Garnverbrauch“).")
+        gtk_label_set_line_wrap(ei, TRUE)
+        gtk_label_set_xalign(ei, 0.0)
+        gtkKlasse(ei, "nebensache")
+        gtk_box_pack_start(s6, ei, FALSE, FALSE, 0)
+        adEinkaufListe = adTabelle(s6, ["Farbe", "Name", "Nr.", "Benötigt", "Vorrat", "Zu kaufen"], [44, 0, 80, 80, 80, 80], "lllrrr")
+        DIM ef AS INTEGER : ef = gtk_box_new(GTK_WAAGERECHT, 8)
+        adEinkaufSumme = gtk_label_new("")
+        gtk_box_pack_start(ef, adEinkaufSumme, TRUE, TRUE, 0)
+        DIM kVorrat AS INTEGER : kVorrat = gtk_button_new_with_label("Garn-Vorrat bearbeiten …")
+        gtk_box_pack_end(ef, kVorrat, FALSE, FALSE, 0)
+        signal(kVorrat, "clicked", adVorratGeklickt, 0, 0, 0)
+        gtk_box_pack_start(s6, ef, FALSE, FALSE, 4)
+        n = gtk_notebook_append_page(adReiter, s6, gtk_label_new("🛒 Einkaufsliste"))
+    END IF
 
     ' unten: CSV und Meldung
     DIM unten AS INTEGER : unten = gtk_box_new(GTK_WAAGERECHT, 8)
@@ -738,6 +796,10 @@ SUB auswertenGeklickt(w AS INTEGER, was AS INTEGER)
         CASE 0 : statistikDialog()
         CASE 1 : heatmapDialog()
         CASE 2 : aehnlicheDialog()
+        CASE 3 : IF vorratDialog() THEN statusNachziehen()
+        CASE 4 : paletteDialog()
+        CASE 5 : tauschenDialog()
+        CASE 6 : rahmenDialog()
     END SELECT
 END SUB
 
@@ -745,14 +807,18 @@ END SUB
 FUNCTION auswertenKnopf() AS INTEGER
     DIM mb AS INTEGER : mb = gtk_menu_button_new()
     gtk_container_add(mb, gtk_image_new_from_icon_name("x-office-spreadsheet-symbolic", GTK_ICON_KNOPF))
-    gtk_widget_set_tooltip_text(mb, "Auswerten -- Statistik (Strg+Umschalt+G), Heatmap, ähnliche Farben, Farbenblindheit")
+    gtk_widget_set_tooltip_text(mb, "Auswerten und planen -- Statistik (Strg+Umschalt+G), Heatmap, ähnliche Farben, Garn-Vorrat, Palette (Strg+Umschalt+K), Farben tauschen (Strg+Umschalt+T), Rahmen, Farbenblindheit")
     gtk_widget_set_can_focus(mb, FALSE)
     auswertenPopover = gtk_popover_new(mb)
     DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 2)
     gtk_container_set_border_width(box, 8)
-    DIM texte AS ARRAY OF STRING : texte = ["Statistik & Garnverbrauch …", "Heatmap …", "Ähnliche Farben zusammenführen …"]
+    DIM texte AS ARRAY OF STRING : texte = ["Statistik & Garnverbrauch …", "Heatmap …", "Ähnliche Farben zusammenführen …", "Garn-Vorrat …", "Palette konvertieren …", "Farben tauschen …", "Rahmenaufteilung …"]
     DIM i AS INTEGER
-    FOR i = 0 TO 2
+    FOR i = 0 TO LEN(texte) - 1
+        IF i = 3 THEN
+            gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)
+            gtk_box_pack_start(box, adUeberschrift("Planen & Vorrat"), FALSE, FALSE, 0)
+        END IF
         DIM k AS INTEGER : k = gtk_button_new_with_label(texte[i])
         gtkKlasse(k, "flat")
         gtk_box_pack_start(box, k, FALSE, FALSE, 0)

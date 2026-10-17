@@ -79,9 +79,12 @@ DECLARE FUNCTION gtk_list_box_get_row_at_index LIB GTK (box AS ZEIGER, nr AS LON
 DECLARE SUB gtk_list_box_select_row LIB GTK (box AS ZEIGER, zeile AS ZEIGER)
 DECLARE SUB gtk_list_box_unselect_all LIB GTK (box AS ZEIGER)
 DECLARE FUNCTION gtk_list_box_row_get_index LIB GTK (zeile AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_list_box_get_selected_row LIB GTK (box AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_combo_box_text_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_combo_box_text_append_text LIB GTK (wahl AS ZEIGER, text AS TEXT)
 DECLARE SUB gtk_combo_box_text_remove_all LIB GTK (wahl AS ZEIGER)
+DECLARE FUNCTION gtk_combo_box_text_new_with_entry LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_bin_get_child LIB GTK (behaelter AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_combo_box_set_active LIB GTK (wahl AS ZEIGER, nr AS LONG)
 DECLARE FUNCTION gtk_combo_box_get_active LIB GTK (wahl AS ZEIGER) AS LONG
 DECLARE FUNCTION gtk_entry_new LIB GTK () AS ZEIGER
@@ -127,6 +130,7 @@ DECLARE FUNCTION gtk_widget_has_focus LIB GTK (w AS ZEIGER) AS BOOLEAN
 DECLARE SUB gtk_widget_set_sensitive LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_widget_set_visible LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE FUNCTION gtk_widget_get_visible LIB GTK (w AS ZEIGER) AS BOOLEAN
+DECLARE FUNCTION gtk_widget_get_parent LIB GTK (w AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_widget_show LIB GTK (w AS ZEIGER)
 DECLARE SUB gtk_widget_add_events LIB GTK (w AS ZEIGER, maske AS LONG)
 DECLARE SUB gtk_widget_queue_draw LIB GTK (w AS ZEIGER)
@@ -156,6 +160,7 @@ DECLARE FUNCTION gtk_file_chooser_set_current_folder LIB GTK (wahl AS ZEIGER, or
 DECLARE FUNCTION gtk_dialog_new_with_buttons LIB GTK (titel AS TEXT, eltern AS ZEIGER, flags AS LONG, knopf AS TEXT, ...) AS ZEIGER
 DECLARE FUNCTION gtk_dialog_get_content_area LIB GTK (dialog AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_dialog_set_default_response LIB GTK (dialog AS ZEIGER, antwort AS LONG)
+DECLARE SUB gtk_dialog_response LIB GTK (dialog AS ZEIGER, antwort AS LONG)
 DECLARE FUNCTION gtk_dialog_add_button LIB GTK (dialog AS ZEIGER, text AS TEXT, antwort AS LONG) AS ZEIGER
 DECLARE FUNCTION gtk_message_dialog_new LIB GTK (eltern AS ZEIGER, flags AS LONG, art AS LONG, knoepfe AS LONG, format AS TEXT, ...) AS ZEIGER
 DECLARE SUB gtk_message_dialog_format_secondary_text LIB GTK (dialog AS ZEIGER, format AS TEXT, ...)
@@ -278,6 +283,7 @@ CONST GTK_LAGE_RECHTS = 1                 ' GTK_POS_RIGHT
 CONST GTK_DIALOG_MODAL = 1
 CONST GTK_DIALOG_EIGENE_LEISTE = 4        ' GTK_DIALOG_USE_HEADER_BAR
 CONST GTK_NACHRICHT_FRAGE = 2             ' GTK_MESSAGE_QUESTION
+CONST GTK_NACHRICHT_WARNUNG = 1           ' GTK_MESSAGE_WARNING
 CONST GTK_KNOEPFE_KEINE = 0
 CONST GTK_DATEI_SICHERN = 1
 CONST GTK_ANTWORT_OK = -5
