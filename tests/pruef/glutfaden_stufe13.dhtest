@@ -1017,7 +1017,10 @@ ELSE
     NEXT
     ' Die Rasterfarben im Bild: kraeftige Linien erst rot (Dialog), dann blau
     ' (Raster-Optionen) -- und jeweils nicht die andere Farbe
-    PRINT "raster im bild: rot "; punkte("d_nur_symbol.png", &HC00000) > 100; " blau "; punkte("d_nur_symbol.png", &H2864B4) = 0; " | danach blau "; punkte("d_raster_blau.png", &H2864B4) > 100; " rot "; punkte("d_raster_blau.png", &HC00000) = 0
+    ' -- kaum, nicht gar keine: die geglaetteten Raender des blauen Rueckstichs
+    ' treffen die Toleranz je nach Zoom (1920x1080: 23 Punkte; eine Rasterfarbe
+    ' liefert weit ueber 100)
+    PRINT "raster im bild: rot "; punkte("d_nur_symbol.png", &HC00000) > 100; " blau "; punkte("d_nur_symbol.png", &H2864B4) < 40; " | danach blau "; punkte("d_raster_blau.png", &H2864B4) > 100; " rot "; punkte("d_raster_blau.png", &HC00000) < 40
     ' "Nur Symbol": keine Farbflaechen -- Garn-Gelb kommt nur in Kaestchen vor
     PRINT "nur symbol: gelb "; punkte("d_nur_symbol.png", &HFAC81E)
     DIM e AS kern.Einstellungen : e = kern.einstellungenLaden("app/Glutfaden/einstellungen.json")
