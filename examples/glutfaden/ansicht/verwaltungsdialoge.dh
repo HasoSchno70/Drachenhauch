@@ -55,7 +55,7 @@ END SUB
 SUB vwSchnappschussWennFaellig()
     IF NOT lwHat THEN RETURN
     TRY
-        IF kern.schnappschussFaellig(vwSchluessel$(), ZEIT_JETZT(), kern.SCHNAPPSCHUSS_ABSTAND) THEN
+        IF kern.schnappschussFaellig(vwSchluessel$(), ZEIT_JETZT(), einst.schnappschussMinuten * 60) THEN
             DIM z AS STRING : z = kern.schnappschussAnlegen(lwMuster, vwSchluessel$(), ZEIT_JETZT(), kern.SCHNAPPSCHUESSE_HOECHSTENS)
         END IF
     CATCH e
@@ -1001,26 +1001,100 @@ SUB musterGeklickt(w AS INTEGER, was AS INTEGER)
         CASE 4 : vorlageSichernDialog()
         CASE 5 : vorlagenDialog()
         CASE 6 : bibliothekDialog()
+        CASE 7 : einstellungenDialog()
+        CASE 8 : rasterDialog()
     END SELECT
+END SUB
+
+' Zuletzt geoeffnet (PySticky "Kürzlich geöffnet"): die Liste unter den
+' Eintraegen des Knopfs, neu gebaut, wann immer sie sich aendert.
+DIM zlHalter AS INTEGER
+DIM zlBox AS INTEGER
+DIM zlPfade AS ARRAY OF STRING
+
+SUB zuletztGeklickt(w AS INTEGER, i AS INTEGER)
+    gtk_popover_popdown(musterPopover)
+    IF i < 0 THEN
+        einst.zuletzt = []
+        einstellungenMerken()
+        zuletztNachziehen()
+        RETURN
+    END IF
+    IF i >= LEN(zlPfade) THEN RETURN
+    DIM p AS STRING : p = zlPfade[i]
+    IF NOT ungesichertFragen("Öffnen") THEN RETURN
+    IF NOT FILEEXISTS(p) THEN
+        pdWarnung(fenster, "Datei nicht gefunden", "Die Datei gibt es nicht mehr:" + CHR$(10) + p)
+        zuletztNachziehen()
+        RETURN
+    END IF
+    DIM ok AS BOOLEAN : ok = musterOeffnen(p)
+END SUB
+
+SUB zuletztNachziehen()
+    IF zlHalter = 0 THEN RETURN
+    IF zlBox <> 0 THEN gtk_widget_destroy(zlBox)
+    zlBox = gtk_box_new(GTK_SENKRECHT, 0)
+    zlPfade = kern.zuletztVorhanden(einst)
+    IF einst.zuletztAnzahl > 0 THEN
+        gtk_box_pack_start(zlBox, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)
+        DIM ue AS INTEGER : ue = gtk_label_new("Zuletzt geöffnet")
+        gtk_label_set_xalign(ue, 0.0)
+        gtkKlasse(ue, "dim-label")
+        gtk_box_pack_start(zlBox, ue, FALSE, FALSE, 2)
+        IF LEN(zlPfade) = 0 THEN
+            DIM leer AS INTEGER : leer = gtk_label_new("(keine)")
+            gtk_label_set_xalign(leer, 0.0)
+            gtk_widget_set_sensitive(leer, FALSE)
+            gtk_box_pack_start(zlBox, leer, FALSE, FALSE, 2)
+        END IF
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zlPfade) - 1
+            DIM k AS INTEGER : k = gtk_button_new_with_label(STR$(i + 1) + ". " + BASENAME(zlPfade[i]))
+            gtk_widget_set_tooltip_text(k, zlPfade[i])
+            gtkKlasse(k, "flat")
+            gtk_box_pack_start(zlBox, k, FALSE, FALSE, 0)
+            signal(k, "clicked", zuletztGeklickt, i, 0, 0)
+        NEXT
+        IF LEN(zlPfade) > 0 THEN
+            DIM weg AS INTEGER : weg = gtk_button_new_with_label("Liste leeren")
+            gtkKlasse(weg, "flat")
+            gtk_box_pack_start(zlBox, weg, FALSE, FALSE, 0)
+            signal(weg, "clicked", zuletztGeklickt, -1, 0, 0)
+        END IF
+    END IF
+    gtk_widget_show_all(zlBox)
+    gtk_container_add(zlHalter, zlBox)
+END SUB
+
+' Eine geoeffnete oder gesicherte Datei vorn in die Liste
+SUB zuletztMerken(pfad AS STRING)
+    IF pfad = "" OR einst.zuletztAnzahl = 0 THEN RETURN
+    kern.zuletztHinzufuegen(einst, pfad)
+    einstellungenMerken()
+    zuletztNachziehen()
 END SUB
 
 FUNCTION musterKnopf() AS INTEGER
     DIM mb AS INTEGER : mb = gtk_menu_button_new()
     gtk_container_add(mb, gtk_image_new_from_icon_name("document-new-symbolic", GTK_ICON_KNOPF))
-    gtk_widget_set_tooltip_text(mb, "Muster -- neu (Strg+N), Eigenschaften (Strg+Alt+P), Größe, Versionen (Strg+Alt+V), Vorlagen, Bibliothek (Strg+L)")
+    tipp(mb, "Muster -- neu ({neu}), Eigenschaften ({eigenschaften}), Größe, Versionen ({versionen}), Vorlagen, Bibliothek ({bibliothek}), Einstellungen ({einstellungen})")
     gtk_widget_set_can_focus(mb, FALSE)
     musterPopover = gtk_popover_new(mb)
     DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 2)
     gtk_container_set_border_width(box, 8)
-    DIM texte AS ARRAY OF STRING : texte = ["Neues Muster …", "Eigenschaften …", "Größe ändern …", "Versionen …", "Als Vorlage speichern …", "Vorlagen verwalten …", "Bibliothek …"]
+    DIM texte AS ARRAY OF STRING : texte = ["Neues Muster …", "Eigenschaften …", "Größe ändern …", "Versionen …", "Als Vorlage speichern …", "Vorlagen verwalten …", "Bibliothek …", "Einstellungen …", "Raster-Optionen …"]
     DIM i AS INTEGER
     FOR i = 0 TO LEN(texte) - 1
-        IF i = 4 OR i = 6 THEN gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)
+        IF i = 4 OR i = 6 OR i = 7 THEN gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)
         DIM k AS INTEGER : k = gtk_button_new_with_label(texte[i])
         gtkKlasse(k, "flat")
         gtk_box_pack_start(box, k, FALSE, FALSE, 0)
         signal(k, "clicked", musterGeklickt, i, 0, 0)
     NEXT
+    zlHalter = gtk_event_box_new()
+    gtk_box_pack_start(box, zlHalter, FALSE, FALSE, 0)
+    zuletztNachziehen()
     gtk_widget_show_all(box)
     gtk_container_add(musterPopover, box)
     gtk_menu_button_set_popover(mb, musterPopover)

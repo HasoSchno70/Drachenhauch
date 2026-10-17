@@ -31,6 +31,7 @@ DIM exGilt AS ARRAY OF STRING          ' je Zeile: fuer welche Formate (Ziffern)
 DIM exWahlFormat AS INTEGER
 DIM exWahlPapier AS INTEGER : exWahlPapier = -1
 DIM exWahlZellen AS INTEGER
+DIM exVorbelegt AS BOOLEAN           ' die Wahl aus den Einstellungen schon uebernommen?
 DIM exWahlUeb AS INTEGER
 DIM exWahlWasser AS STRING
 DIM exWahlMystery AS BOOLEAN
@@ -156,6 +157,8 @@ FUNCTION exAusfuehren(format AS INTEGER, pfad AS STRING) AS STRING
             o.kreuz = exWahlKreuz
             o.paletten = slPaletten
             o.notizen = exLetzteNotizen
+            o.autor = einst.autor
+            o.copyright = einst.copyright
             DIM ab AS ARRAY OF STRING : ab = kern.pdfExportieren(m, pfad, o)
             RETURN "PDF exportiert (" + MID$(ab[LEN(ab) - 1], 7, 9) + " Seiten, " + papier + "): " + BASENAME(pfad)
         CASE EX_HTML
@@ -164,6 +167,8 @@ FUNCTION exAusfuehren(format AS INTEGER, pfad AS STRING) AS STRING
             h.mystery = exWahlMystery
             h.kreuz = exWahlKreuz
             h.paletten = slPaletten
+            h.autor = einst.autor
+            h.copyright = einst.copyright
             kern.htmlExportieren(m, pfad, h)
             RETURN "HTML exportiert: " + BASENAME(pfad)
         CASE EX_BILD
@@ -173,7 +178,7 @@ FUNCTION exAusfuehren(format AS INTEGER, pfad AS STRING) AS STRING
             kern.oxsSpeichern(m, pfad)
             RETURN "OXS exportiert: " + BASENAME(pfad)
         CASE EX_PAKET
-            DIM e AS kern.PaketErgebnis : e = kern.paketExportieren(m, pfad, papier, exWahlMystery, slPaletten)
+            DIM e AS kern.PaketErgebnis : e = kern.paketExportieren(m, pfad, papier, exWahlMystery, slPaletten, einst.autor, einst.copyright)
             DIM t AS STRING : t = "Paket exportiert (" + STR$(LEN(e.dateien)) + " Dateien): " + BASENAME(pfad)
             IF LEN(e.fehlt) > 0 THEN t = t + " -- fehlt: " + JOIN$(e.fehlt, ", ")
             RETURN t
@@ -224,6 +229,13 @@ FUNCTION exDialogBauen() AS INTEGER
         IF m.modus = "diamond" AND namen[i] = empf THEN vorgabe = i
     NEXT
     gtk_combo_box_set_active(exPapier, IIF(exWahlPapier >= 0, exWahlPapier, vorgabe))
+    ' Beim ersten Mal (und nach den Einstellungen) die Vorgaben von dort
+    IF NOT exVorbelegt THEN
+        exWahlZellen = einst.pdfZellen
+        exWahlUeb = einst.ueberlappung
+        exWahlMystery = einst.mystery
+        exVorbelegt = TRUE
+    END IF
     exZellen = gtk_spin_button_new_with_range(0, 300, 5)
     gtk_spin_button_set_value(exZellen, exWahlZellen)
     gtk_widget_set_tooltip_text(exZellen, "Stiche je Seite und Richtung -- 0 nimmt die Vorgabe des Formats. Im Diamond-Modus bestimmt die Drill-Kante (1:1) die Seite.")

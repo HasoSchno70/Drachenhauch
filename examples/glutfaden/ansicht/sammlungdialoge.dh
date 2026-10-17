@@ -356,7 +356,7 @@ FUNCTION hdHinzufuegen() AS INTEGER
     DIM i AS INTEGER
     FOR EACH i IN hdAuswahl()
         DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
-        DIM nr AS INTEGER : nr = kern.farbeHinzufuegen(lwMuster, wzVerlauf, hdPal.garne[i], slSymbole, hdPal.istPerlen, hdPal.istDiamant)
+        DIM nr AS INTEGER : nr = kern.farbeHinzufuegen(lwMuster, wzVerlauf, hdPal.garne[i], slSymbole, hdPal.istPerlen, hdPal.istDiamant, NOT einst.symboleAuto)
         IF lwMuster.farbanzahl() > vorher THEN neu = neu + 1
     NEXT
     IF neu > 0 THEN allesNeu()

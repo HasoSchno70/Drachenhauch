@@ -17,6 +17,9 @@ DECLARE SUB gtk_main_quit LIB GTK ()
 DECLARE FUNCTION gtk_window_new LIB GTK (art AS LONG) AS ZEIGER
 DECLARE SUB gtk_window_set_titlebar LIB GTK (fenster AS ZEIGER, leiste AS ZEIGER)
 DECLARE SUB gtk_window_set_default_size LIB GTK (fenster AS ZEIGER, b AS LONG, h AS LONG)
+DECLARE SUB gtk_window_get_size LIB GTK (fenster AS ZEIGER, BYREF b AS LONG, BYREF h AS LONG)
+DECLARE FUNCTION gtk_window_is_maximized LIB GTK (fenster AS ZEIGER) AS BOOLEAN
+DECLARE SUB gtk_window_maximize LIB GTK (fenster AS ZEIGER)
 DECLARE FUNCTION gtk_window_set_icon_from_file LIB GTK (fenster AS ZEIGER, pfad AS TEXT, BYREF fehler AS ZEIGER) AS BOOLEAN
 DECLARE SUB gtk_window_set_title LIB GTK (fenster AS ZEIGER, titel AS TEXT)
 DECLARE FUNCTION gtk_header_bar_new LIB GTK () AS ZEIGER
@@ -46,6 +49,8 @@ DECLARE FUNCTION gtk_radio_button_new_with_label_from_widget LIB GTK (gruppe AS 
 DECLARE FUNCTION gtk_image_new_from_icon_name LIB GTK (name AS TEXT, groesse AS LONG) AS ZEIGER
 DECLARE SUB gtk_spin_button_set_digits LIB GTK (s AS ZEIGER, stellen AS ULONG)
 DECLARE FUNCTION gtk_spin_button_get_value LIB GTK (s AS ZEIGER) AS FLOAT
+DECLARE SUB gtk_spin_button_set_range LIB GTK (s AS ZEIGER, von AS FLOAT, bis AS FLOAT)
+DECLARE SUB gtk_widget_set_margin_top LIB GTK (w AS ZEIGER, rand AS LONG)
 DECLARE SUB gtk_paned_pack1 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, schrumpfen AS BOOLEAN)
 DECLARE SUB gtk_paned_pack2 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, schrumpfen AS BOOLEAN)
 DECLARE SUB gtk_paned_set_position LIB GTK (p AS ZEIGER, pos AS LONG)
@@ -259,6 +264,15 @@ STRUCT PangoRechteck LAYOUT C
     hoehe AS LONG
 END STRUCT
 ' GdkRectangle hat dieselbe Lage
+STRUCT GdkRGBA LAYOUT C
+    rot AS FLOAT
+    gruen AS FLOAT
+    blau AS FLOAT
+    deckkraft AS FLOAT
+END STRUCT
+DECLARE FUNCTION gtk_color_button_new_with_rgba LIB GTK (farbe AS GdkRGBA) AS ZEIGER
+DECLARE SUB gtk_color_chooser_get_rgba LIB GTK (wahl AS ZEIGER, farbe AS GdkRGBA)
+DECLARE SUB gtk_color_chooser_set_rgba LIB GTK (wahl AS ZEIGER, farbe AS GdkRGBA)
 DECLARE FUNCTION gdk_display_get_primary_monitor LIB GDK (anzeige AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gdk_display_get_monitor LIB GDK (anzeige AS ZEIGER, n AS LONG) AS ZEIGER
 DECLARE SUB gdk_monitor_get_workarea LIB GDK (monitor AS ZEIGER, flaeche AS PangoRechteck)

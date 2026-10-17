@@ -52,9 +52,9 @@ FUNCTION slUeberschrift(text AS STRING) AS INTEGER
     RETURN l
 END FUNCTION
 
-FUNCTION slKnopf(text AS STRING, tipp AS STRING) AS INTEGER
+FUNCTION slKnopf(text AS STRING, tippText AS STRING) AS INTEGER
     DIM k AS INTEGER : k = gtk_button_new_with_label(text)
-    gtk_widget_set_tooltip_text(k, tipp)
+    tipp(k, tippText)
     gtk_widget_set_can_focus(k, FALSE)
     gtkKlasse(k, "klein")
     RETURN k
@@ -83,7 +83,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
         gtk_widget_set_valign(feld, GTK_AUSRICHTEN_MITTE)
         signalZeichnen(feld, "draw", slFarbfeld, i, 0, 0)
         DIM name AS STRING : name = f.garn.hersteller + " " + f.garn.nummer
-        IF TRIM$(name) = "" THEN name = f.garn.name
+        IF TRIM$(name) = "" OR NOT einst.katalog THEN name = f.garn.name
         DIM text AS INTEGER : text = gtk_label_new(TRIM$(name))
         gtk_label_set_xalign(text, 0.0)
         gtk_label_set_ellipsize(text, GTK_ELLIPSE_ENDE)
@@ -102,7 +102,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
     DIM fk AS INTEGER : fk = gtk_box_new(GTK_WAAGERECHT, 2)
     gtkKlasse(fk, "innen")
     DIM kn AS INTEGER
-    kn = slKnopf("Ersetzen…", "Die aktuelle Farbe durch eine andere ersetzen (Strg+R)")
+    kn = slKnopf("Ersetzen…", "Die aktuelle Farbe durch eine andere ersetzen ({ersetzen})")
     signal(kn, "clicked", slFarbKnopf, 0, 0, 0)
     gtk_box_pack_start(fk, kn, TRUE, TRUE, 0)
     kn = slKnopf("Symbol…", "Das Symbol der aktuellen Farbe ändern")
@@ -123,7 +123,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
     gtk_box_pack_start(slInhalt, fk2, FALSE, FALSE, 2)
     DIM fk3 AS INTEGER : fk3 = gtk_box_new(GTK_WAAGERECHT, 2)
     gtkKlasse(fk3, "innen")
-    kn = slKnopf("Harmonien…", "Garne, die nach Farbtheorie zur aktuellen Farbe passen (Strg+Umschalt+H)")
+    kn = slKnopf("Harmonien…", "Garne, die nach Farbtheorie zur aktuellen Farbe passen ({harmonie})")
     signal(kn, "clicked", slFarbKnopf, 5, 0, 0)
     gtk_box_pack_start(fk3, kn, TRUE, TRUE, 0)
     gtk_box_pack_start(slInhalt, fk3, FALSE, FALSE, 2)
@@ -143,7 +143,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
     DIM sz AS INTEGER : sz = gtk_box_new(GTK_WAAGERECHT, 4)
     gtkKlasse(sz, "innen")
     gtk_box_pack_start(sz, slSuche, TRUE, TRUE, 0)
-    kn = slKnopf("Blend…", "Zwei Garne zu einem Tweed-Blend mischen (Strg+B)")
+    kn = slKnopf("Blend…", "Zwei Garne zu einem Tweed-Blend mischen ({blend})")
     signal(kn, "clicked", slFarbKnopf, 4, 0, 0)
     gtk_box_pack_start(sz, kn, FALSE, FALSE, 0)
     gtk_box_pack_start(slInhalt, sz, FALSE, FALSE, 0)
@@ -211,7 +211,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
     DIM leiste AS INTEGER : leiste = gtk_box_new(GTK_WAAGERECHT, 2)
     gtkKlasse(leiste, "innen")
     slKnoepfe = []
-    ARRAY_PUSH(slKnoepfe, slKnopf("+", "Neue Ebene über der aktiven (Strg+Umschalt+N)"))
+    ARRAY_PUSH(slKnoepfe, slKnopf("+", "Neue Ebene über der aktiven ({ebene})"))
     ARRAY_PUSH(slKnoepfe, slKnopf("−", "Ebene löschen -- die letzte bleibt"))
     ARRAY_PUSH(slKnoepfe, slKnopf("⧉", "Ebene duplizieren"))
     ARRAY_PUSH(slKnoepfe, slKnopf("↑", "Nach vorne (weiter oben im Stapel)"))
@@ -242,15 +242,20 @@ SUB seitenleisteMuster(m AS kern.Muster)
     slEbeneMarkieren()
 END SUB
 
+' Die Palette zum Muster: der Hersteller der ersten Farbe, sonst die aus den
+' Einstellungen (Farben -> Standard-Palette), sonst DMC.
 FUNCTION slPaletteFuer(m AS kern.Muster) AS INTEGER
-    DIM h AS STRING : h = "DMC"
-    IF m.farbanzahl() > 0 THEN h = m.farben[0].garn.hersteller
     DIM i AS INTEGER
-    FOR i = 0 TO LEN(slPaletten) - 1
-        IF slPaletten[i].hersteller = h THEN RETURN i
-    NEXT
-    FOR i = 0 TO LEN(slPaletten) - 1
-        IF slPaletten[i].hersteller = "DMC" THEN RETURN i
+    IF m.farbanzahl() > 0 THEN
+        FOR i = 0 TO LEN(slPaletten) - 1
+            IF slPaletten[i].hersteller = m.farben[0].garn.hersteller THEN RETURN i
+        NEXT
+    END IF
+    DIM w AS STRING
+    FOR EACH w IN [einst.palette, "DMC"]
+        FOR i = 0 TO LEN(slPaletten) - 1
+            IF slPaletten[i].name = w OR slPaletten[i].hersteller = w THEN RETURN i
+        NEXT
     NEXT
     RETURN 0
 END FUNCTION
@@ -382,7 +387,7 @@ SUB slKatalogFuellen()
         gtk_widget_set_valign(feld, GTK_AUSRICHTEN_MITTE)
         signalZeichnen(feld, "draw", slGarnfeld, g.farbe, 0, 0)
         DIM benutzt AS BOOLEAN : benutzt = slGarnImMuster(g)
-        DIM t AS INTEGER : t = gtk_label_new(IIF(benutzt, "✓ ", "") + g.nummer + "  " + g.name)
+        DIM t AS INTEGER : t = gtk_label_new(IIF(benutzt, "✓ ", "") + IIF(einst.katalog, g.nummer + "  •  ", "") + g.name)
         gtk_label_set_xalign(t, 0.0)
         gtk_label_set_ellipsize(t, GTK_ELLIPSE_ENDE)
         IF benutzt THEN gtkKlasse(t, "benutzt")
@@ -435,7 +440,7 @@ SUB garnHinzufuegen(palNr AS INTEGER, garnNr AS INTEGER)
     DIM pal AS kern.Palette : pal = slPaletten[palNr]
     DIM g AS kern.Garn : g = pal.garne[garnNr]
     DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
-    DIM nr AS INTEGER : nr = kern.farbeHinzufuegen(lwMuster, wzVerlauf, g, slSymbole, pal.istPerlen, pal.istDiamant)
+    DIM nr AS INTEGER : nr = kern.farbeHinzufuegen(lwMuster, wzVerlauf, g, slSymbole, pal.istPerlen, pal.istDiamant, NOT einst.symboleAuto)
     wzFarbe = nr
     IF lwMuster.farbanzahl() > vorher THEN
         allesNeu()
