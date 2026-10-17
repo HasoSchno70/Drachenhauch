@@ -7025,7 +7025,7 @@ mod json_segment_tests {
     fn punkt_im_schluessel_und_rueckweg() {
         assert_eq!(json_segmente("a.b"), vec!["a", "b"]);
         assert_eq!(json_segmente(r"a\.b.c"), vec!["a.b", "c"]);
-        assert_eq!(json_segmente(r"a\.b"), vec![r"a\", "b"]);
+        assert_eq!(json_segmente(r"a\\.b"), vec![r"a\", "b"]);
         assert_eq!(json_segmente(r"a\xb"), vec![r"a\xb"]);
         assert_eq!(json_segmente(""), vec![""]);
         for name in ["Farbe 1.5", r"C:\pfad\x.y", "ohne", "..", r"\"] {
