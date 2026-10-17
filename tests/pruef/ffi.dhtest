@@ -523,6 +523,44 @@ spaeter als eine sekunde: TRUE
 qsort: Fehler im Rueckruf langsam: Integer-Division durch 0 (fall.dh:6) -- qsort ist eine Sekunde spaeter noch nicht zurueckgekehrt
 qsort: Fehler im Rueckruf langsam: zweiter fehler (fall.dh:13)
 
+=== der fehler eines rueckrufs gehoert dem aufruf, der ihn ausgeloest hat
+' Der erste Vergleich scheitert, jeder weitere ruft selbst die C-Bibliothek
+' (abs). Bis 2026-10-17 holte der naechste Aufruf, der zurueckkehrte, den
+' Fehler ab -- das abs IM naechsten Vergleich. Der warf ihn dort, der
+' Vergleich scheiterte damit selbst, und so jeder weitere: die Meldung trug
+' eine Schale "abs: Fehler im Rueckruf ..." je Vergleich, und keiner rechnete
+' mehr. In einer GTK-Hauptschleife war nach einem Fehler jedes Zeichnen kaputt.
+DECLARE SUB qsort LIB "c" (feld AS BUFFER, n AS ZEIGER, groesse AS ZEIGER, _
+                           vergleich AS FUNCTION(a AS ZEIGER, b AS ZEIGER) AS LONG)
+DECLARE FUNCTION abs LIB "c" (x AS LONG) AS LONG
+DIM runden AS INTEGER
+DIM spaeter AS INTEGER
+FUNCTION erstKaputt(a AS INTEGER, b AS INTEGER) AS INTEGER
+    runden = runden + 1
+    IF runden = 1 THEN RETURN 1 \ 0
+    DIM x AS INTEGER : x = abs(BUFFER_GET_I32(BUFFER_AUS_ZEIGER(a, 4), 0))
+    DIM y AS INTEGER : y = abs(BUFFER_GET_I32(BUFFER_AUS_ZEIGER(b, 4), 0))
+    spaeter = spaeter + 1
+    RETURN SGN(x - y)
+END FUNCTION
+DIM b AS BUFFER
+b = BUFFER_NEW(40)
+DIM i AS INTEGER
+FOR i = 0 TO 9
+    BUFFER_SET_I32(b, 4 * i, 9 - i)
+NEXT
+TRY
+    qsort(b, 10, 4, erstKaputt)
+CATCH e
+    PRINT e
+END TRY
+PRINT "spaetere vergleiche liefen: "; spaeter = runden - 1; " "; spaeter > 3
+PRINT "abs danach: "; abs(-4)
+--- erwartet
+qsort: Fehler im Rueckruf erstkaputt: Integer-Division durch 0
+spaetere vergleiche liefen: TRUE TRUE
+abs danach: 4
+
 === ein rueckruf aus einem anderen faden wird nicht ausgefuehrt
 ' CreateThread ruft die Funktion auf einem neuen Faden -- die VM laeuft nur
 ' auf dem des Programms. Der Rueckruf liefert 0, und der naechste Aufruf
