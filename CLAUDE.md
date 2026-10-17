@@ -2044,6 +2044,44 @@ der Zustand stimmt. `--probe-stufe10`, Sammlung
 `tests/pruef/glutfaden_stufe10.dhtest` (6; zwoelf Verfaelschungen von Kern
 und Oberflaeche fallen je in ihrem Fall).
 
+**Stufe 11: Farb-Harmonien und Muster-Bibliothek** (2026-10-17).
+`kern/harmonie.dh` nach color_harmony_dialog.py: der Farbton dreht im
+HSL-Raum (Pythons colorsys samt `% 1.0` und `int()` beim Zurueckrechnen),
+Saettigung und Helligkeit bleiben, je Versatz EIN Vorschlag mit dem
+naechsten Garn der Palette (CIEDE2000, Gleichstand = das erste); gegen
+PySticky gleich (640 Zeilen, 40 Farben, drei Paletten). `kern/bibliothek.dh`
+nach pattern_library_data.py/-dialog.py/thumbnail_widget.py: library.json
+im selben Aufbau (byte-gleich geschrieben; ein Eintrag mit unbekanntem
+Schluessel faellt weg wie bei `LibraryEntry(**e)`), Einsortieren nach
+Teilwoertern aus Datei- und Ordnername (wie im Original findet "ei" auch
+"Meise"), Stiche ueber ALLE Ebenen, Vorschaubild Punkt fuer Punkt wie Qt
+(hoechstens 100 Punkte und doppelt, `INT(massstab)` je Stich -- bei 1,67
+bleiben Luecken, unter 1 ueberschreibt), Cache-Name `MD5$(pfad)` 16
+Zeichen. Mit Absicht anders: Bibliothek im Einstellungsordner, Vorgabe
+"Bordüren" (PySticky "Bordueren" -- so einsortierte Muster standen unter
+keiner Kategorie), Sortieren nur in der Anzeige, Vorschaubilder auch fuer
+.oxs/.pat/.xsd. Oberflaeche `ansicht/sammlungdialoge.dh`: Harmonien
+(Strg+Umschalt+H, [Harmonien…] unter der Farbliste; Karten mit Cairo
+gezeichnet, Hinzufuegen als Verlaufsschritte, die Meldung zaehlt nur
+Neues), Bibliothek (Strg+L, "Muster" -> Bibliothek; Kategorien, Suche,
+Sortierung, Karten im Raster zu fuenf, fehlende Vorschaubilder je Takt,
+Kontextmenue per GtkMenu, Schlagwoerter/Notizen beim Kartenwechsel und
+Schliessen gesichert). **Zwei Funde in der Laufzeit:** (1) `CATCH e` und
+spaeter `DIM e` -- im Hauptprogramm brach der CATCH mit "globale Variable
+noch nicht gesetzt" ab (das DIM gibt dem Namen einen Platz, der CATCH
+schrieb hinein, bevor er eingehaengt war; jetzt `DECLARE_GLOBAL_SLOT` wie
+FOR), und ein DIM mit anderem Typ warnte nur "ist als STRING angesagt" --
+jetzt dieselbe Warnung wie bei zwei DIM, mit der Zeile des CATCH. (2)
+`--check`, der Sprachserver und CODE_CHECK$ zeigten interne Namen
+(`KERN@BIBLIOTHEKSEINTRAG`) -- jetzt `lesbar_text` in `check_source`.
+**Stolpersteine:** `IMAGE_FILL_RECT` nimmt zwei Ecken (beide eingeschlossen),
+keine Breite; `adLeeren` ist nur fuer Listen (an einer GtkBox lauter
+Gtk-CRITICAL, und nichts wird entfernt); die Dialoge sind hell, gezeichnete
+Karten brauchen helle Farben. `--probe-stufe11` (Ordner "sammlung" neben dem
+Arbeitsordner ueber STARTDIR$), Sammlung `tests/pruef/glutfaden_stufe11.dhtest`
+(5; vierzehn Verfaelschungen fallen je in ihrem Fall -- der Gleichstand erst
+mit einer eigenen Palette aus zwei gleichen Farben).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
