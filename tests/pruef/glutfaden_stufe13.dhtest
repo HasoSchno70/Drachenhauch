@@ -821,6 +821,8 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
   "default_author": "",
   "default_copyright": "",
   "show_grid": true,
+  "show_rulers": true,
+  "show_minimap": true,
   "major_grid_interval": 10,
   "minor_grid_interval": 5,
   "show_minor_grid": true,
@@ -939,8 +941,8 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 'Del' -> 'Entf' TRUE
 Strg+S | Strg+Umschalt+S | R | = | Plus | 1
 |F5 | Umschalt+Entf | Ä | Strg+Komma | Alt+Enter
-aktionen 50 | krumme vorgaben 0 | zusammenstoesse 0
-tafel 52 | Strg+S sichern | = zoom_rein | Plus zoom_rein | Strg+Umschalt+Z vor | Umschalt+R wz_rechteck_voll | R wz_rechteck
+aktionen 54 | krumme vorgaben 0 | zusammenstoesse 0
+tafel 56 | Strg+S sichern | = zoom_rein | Plus zoom_rein | Strg+Umschalt+Z vor | Umschalt+R wz_rechteck_voll | R wz_rechteck
 sichern F2 | export Strg+E | bibliothek Strg+L | vorschau Strg+S | F9 FALSE
 
 === export: autor und copyright aus den einstellungen, das muster geht vor
@@ -1038,7 +1040,7 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 rueckgabe 0
 vorgaben: raster 10/5 zelle 20 zoom 1.2 pipette 0 anzeige 1 palette DMC
 farben: 2D2D2D 303050 404060 | stoff FAFAF5
-kuerzel: sichern Strg+S | vor Strg+Y, Strg+Umschalt+Z | zoom_rein Plus, = | 50 Befehle
+kuerzel: sichern Strg+S | vor Strg+Y, Strg+Umschalt+Z | zoom_rein Plus, = | 54 Befehle
 neben nach haupt 8: 7
 kuerzel setzen: '' | '„F2“ hat schon „Sichern“.' | '„Hyper+X“ ist kein Tastenkürzel.' | ''
 angezeigt: F2  (eigen) | Strg+S  (eigen)
