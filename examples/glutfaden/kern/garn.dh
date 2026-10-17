@@ -186,6 +186,43 @@ FUNCTION symboleLaden(pfad AS STRING) AS ARRAY OF STRING
     RETURN z
 END FUNCTION
 
+' Die Unicode-Namen der Symbole (daten/symbolnamen.txt, Zeichen TAB Name) --
+' PySticky fragt dafuer unicodedata.name, das gibt es hier nicht.
+FUNCTION symbolnamenLaden(pfad AS STRING) AS MAP OF STRING
+    DIM m AS MAP OF STRING : m = {}
+    IF NOT FILEEXISTS(pfad) THEN RETURN m
+    DIM zeile AS STRING
+    FOR EACH zeile IN READLINES(pfad)
+        IF LEFT$(zeile, 1) = "#" THEN CONTINUE
+        DIM t AS INTEGER : t = INSTR(zeile, CHR$(9))
+        IF t < 1 THEN CONTINUE
+        MAPPUT(m, LEFT$(zeile, t), TRIM$(MID$(zeile, t + 1)))
+    NEXT
+    RETURN m
+END FUNCTION
+
+' Passt ein Symbol zur Suche (PySticky _symbol_matches_query)? Teiltext des
+' Zeichens oder seines Unicode-Namens, sonst der Codepunkt als "U+25CF",
+' "25CF" oder dezimal "9679" -- Gross/klein egal, Leerraum aussen auch.
+FUNCTION symbolPasst(symbol AS STRING, name AS STRING, suche AS STRING) AS BOOLEAN
+    DIM q AS STRING : q = LOWER$(TRIM$(suche))
+    IF q = "" THEN RETURN TRUE
+    IF INSTR(LOWER$(symbol), q) >= 0 THEN RETURN TRUE
+    IF name <> "" AND INSTR(LOWER$(name), q) >= 0 THEN RETURN TRUE
+    IF symbol = "" THEN RETURN FALSE
+    DIM cp AS INTEGER : cp = ASC(symbol)
+    DIM h AS STRING : h = LOWER$(HEX$(cp))
+    IF LEN(h) < 4 THEN h = "0" * (4 - LEN(h)) + h
+    IF LEFT$(q, 2) = "u+" AND MID$(q, 2) = h THEN RETURN TRUE
+    IF q = h THEN RETURN TRUE
+    IF REGEX_TEST(q, "^[0-9]+$") THEN
+        IF LEN(q) < 10 THEN
+            IF VAL(q) = cp THEN RETURN TRUE
+        END IF
+    END IF
+    RETURN FALSE
+END FUNCTION
+
 ' --- Farbabstand (PySticky core/color_math.py) -----------------------------------
 ' CIEDE2000 nach Sharma, Wu und Dalal (2005), sRGB -> Lab mit Weisspunkt D65 --
 ' dieselben Konstanten wie das Original, damit "Farbe ersetzen" mit Toleranz
