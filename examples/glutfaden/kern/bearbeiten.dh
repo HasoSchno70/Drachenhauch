@@ -633,20 +633,29 @@ END FUNCTION
 
 ' Jede SICHTBARE Zelle mit einer der Quellfarben bekommt das Ziel, auf der
 ' obersten sichtbaren Ebene mit Stich (verdeckte und unsichtbare bleiben, wie
-' im Original). Perle/Drill im Ziel erzwingen ihre Form, eine Perle oder ein
-' Drill in eine gewoehnliche Farbe wird ein voller Stich, sonst bleibt der
-' Typ. Die alte Farbe bleibt in der Liste. Ein Schritt.
+' im Original). Die alte Farbe bleibt in der Liste. Ein Schritt.
 FUNCTION farbeErsetzen(m AS Muster, v AS Verlauf, quellen AS ARRAY OF INTEGER, ziel AS INTEGER) AS INTEGER
     IF ziel < 0 OR ziel >= m.farbanzahl() THEN RETURN 0
     DIM nfarben AS INTEGER : nfarben = m.farbanzahl()
-    DIM trifft[nfarben + 1] AS INTEGER
+    DIM abb[nfarben] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO nfarben - 1 : abb[i] = -1 : NEXT
     DIM q AS INTEGER
     FOR EACH q IN quellen
-        IF q >= 0 AND q < nfarben AND q <> ziel THEN trifft[q] = 1
+        IF q >= 0 AND q < nfarben AND q <> ziel THEN abb[q] = ziel
     NEXT
-    DIM zf AS Farbeintrag : zf = m.farben[ziel]
+    RETURN farbenUmsetzen(m, v, abb, "Farbe ersetzen")
+END FUNCTION
+
+' Jede SICHTBARE Zelle einer Farbe c mit abb[c] >= 0 bekommt abb[c] -- auf
+' ihrer Ursprungs-Ebene (der obersten sichtbaren mit Stich). Perle/Drill im
+' Ziel erzwingen ihre Form, eine Perle oder ein Drill in eine gewoehnliche
+' Farbe wird ein voller Stich, sonst bleibt der Typ (PySticky
+' _apply_color_changes_per_origin_layer). Ein Schritt; liefert die Zellen.
+FUNCTION farbenUmsetzen(m AS Muster, v AS Verlauf, abb AS ARRAY OF INTEGER, text AS STRING) AS INTEGER
+    DIM nfarben AS INTEGER : nfarben = m.farbanzahl()
     DIM n AS INTEGER
-    v.beginnen("Farbe ersetzen")
+    v.beginnen(text)
     DIM ne AS INTEGER : ne = m.ebenen.anzahl()
     DIM b AS INTEGER : b = m.breite
     ' wo eine sichtbare Ebene darueber schon einen Stich hat, gilt die untere nicht
@@ -665,8 +674,10 @@ FUNCTION farbeErsetzen(m AS Muster, v AS Verlauf, quellen AS ARRAY OF INTEGER, z
             DIM c AS INTEGER : c = r[i]
             IF c < 0 OR verdeckt[i] <> 0 THEN CONTINUE
             verdeckt[i] = 1
-            IF c >= nfarben THEN CONTINUE
-            IF trifft[c] = 0 THEN CONTINUE
+            IF c >= nfarben OR c >= LEN(abb) THEN CONTINUE
+            DIM ziel AS INTEGER : ziel = abb[c]
+            IF ziel < 0 OR ziel >= nfarben OR ziel = c THEN CONTINUE
+            DIM zf AS Farbeintrag : zf = m.farben[ziel]
             DIM typ AS INTEGER : typ = a[i]
             IF zf.istPerle THEN
                 typ = PERLE
@@ -678,7 +689,7 @@ FUNCTION farbeErsetzen(m AS Muster, v AS Verlauf, quellen AS ARRAY OF INTEGER, z
             ARRAY_PUSH(p, i MOD b) : ARRAY_PUSH(p, i \ b)
             ARRAY_PUSH(fa, ziel) : ARRAY_PUSH(ta, typ)
         NEXT
-        IF LEN(p) > 0 THEN n = n + zellenAufEbene(m, v, e, p, fa, ta, "Farbe ersetzen")
+        IF LEN(p) > 0 THEN n = n + zellenAufEbene(m, v, e, p, fa, ta, text)
     NEXT
     v.beenden()
     RETURN n
