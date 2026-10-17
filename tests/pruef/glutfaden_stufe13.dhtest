@@ -943,8 +943,8 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 'Del' -> 'Entf' TRUE
 Strg+S | Strg+Umschalt+S | R | = | Plus | 1
 |F5 | Umschalt+Entf | Ä | Strg+Komma | Alt+Enter
-aktionen 56 | krumme vorgaben 0 | zusammenstoesse 0
-tafel 58 | Strg+S sichern | = zoom_rein | Plus zoom_rein | Strg+Umschalt+Z vor | Umschalt+R wz_rechteck_voll | R wz_rechteck
+aktionen 57 | krumme vorgaben 0 | zusammenstoesse 0
+tafel 59 | Strg+S sichern | = zoom_rein | Plus zoom_rein | Strg+Umschalt+Z vor | Umschalt+R wz_rechteck_voll | R wz_rechteck
 sichern F2 | export Strg+E | bibliothek Strg+L | vorschau Strg+S | F9 FALSE
 
 === export: autor und copyright aus den einstellungen, das muster geht vor
@@ -1017,7 +1017,10 @@ ELSE
     NEXT
     ' Die Rasterfarben im Bild: kraeftige Linien erst rot (Dialog), dann blau
     ' (Raster-Optionen) -- und jeweils nicht die andere Farbe
-    PRINT "raster im bild: rot "; punkte("d_nur_symbol.png", &HC00000) > 100; " blau "; punkte("d_nur_symbol.png", &H2864B4) = 0; " | danach blau "; punkte("d_raster_blau.png", &H2864B4) > 100; " rot "; punkte("d_raster_blau.png", &HC00000) = 0
+    ' -- kaum, nicht gar keine: die geglaetteten Raender des blauen Rueckstichs
+    ' treffen die Toleranz je nach Zoom (1920x1080: 23 Punkte; eine Rasterfarbe
+    ' liefert weit ueber 100)
+    PRINT "raster im bild: rot "; punkte("d_nur_symbol.png", &HC00000) > 100; " blau "; punkte("d_nur_symbol.png", &H2864B4) < 40; " | danach blau "; punkte("d_raster_blau.png", &H2864B4) > 100; " rot "; punkte("d_raster_blau.png", &HC00000) < 40
     ' "Nur Symbol": keine Farbflaechen -- Garn-Gelb kommt nur in Kaestchen vor
     PRINT "nur symbol: gelb "; punkte("d_nur_symbol.png", &HFAC81E)
     DIM e AS kern.Einstellungen : e = kern.einstellungenLaden("app/Glutfaden/einstellungen.json")
@@ -1042,7 +1045,7 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
 rueckgabe 0
 vorgaben: raster 10/5 zelle 20 zoom 1.2 pipette 0 anzeige 1 palette DMC
 farben: 2D2D2D 303050 404060 | stoff FAFAF5
-kuerzel: sichern Strg+S | vor Strg+Y, Strg+Umschalt+Z | zoom_rein Plus, = | 56 Befehle
+kuerzel: sichern Strg+S | vor Strg+Y, Strg+Umschalt+Z | zoom_rein Plus, = | 57 Befehle
 neben nach haupt 8: 7
 kuerzel setzen: '' | '„F2“ hat schon „Sichern“.' | '„Hyper+X“ ist kein Tastenkürzel.' | ''
 angezeigt: F2  (eigen) | Strg+S  (eigen)

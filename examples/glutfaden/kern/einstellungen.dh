@@ -534,6 +534,7 @@ FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
         ka("uebersicht", "Übersicht ein/aus", "Strg+Umschalt+U"), _
         ka("farbleiste", "Farbleiste ein/aus", "Strg+Umschalt+B"), _
         ka("hervorheben", "Farbe hervorheben", "Strg+H"), _
+        ka("stickmodus", "Sticken-Modus", "Strg+M"), _
         ka("zoom_rein", "Vergrößern", "Plus, ="), _
         ka("zoom_raus", "Verkleinern", "Minus"), _
         ka("einpassen", "Einpassen", "0"), _

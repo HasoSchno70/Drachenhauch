@@ -1,12 +1,16 @@
-' Die Seitenleiste: die Farben des Musters (anklicken = aktuelle Farbe), der
-' Katalog der Hersteller (Doppelklick nimmt ein Garn ins Muster) und die Ebenen
-' (Auge, Schloss, Name; anklicken = aktive Ebene, Doppelklick = umbenennen).
+' Die Seitenleiste: oben die Uebersicht, darunter drei Reiter. "Muster": die
+' Farben des Musters (anklicken = aktuelle Farbe), der Katalog der Hersteller
+' (Doppelklick nimmt ein Garn ins Muster) und die Ebenen (Auge, Schloss, Name;
+' anklicken = aktive Ebene, Doppelklick = umbenennen). "Info" und
+' "Fortschritt" stehen in ansicht/infoleiste.dh.
 '
 ' Die Listen werden neu gebaut, wenn sich ihr Bestand aendert (Laden,
 ' Rueckgaengig, neue Farbe, Ebenen-Umbau); nach einem Strich werden nur die
 ' Zahlen nachgezogen.
 
 DIM slBox AS INTEGER                  ' aeussere Box, bleibt
+DIM slStapel AS INTEGER               ' die drei Reiter
+DIM slMusterSeite AS INTEGER          ' Reiter "Muster", haelt slInhalt
 DIM slInhalt AS INTEGER               ' wird neu gebaut
 DIM slSchrift AS INTEGER              ' feste Groesse, anders als die der Zeichenflaeche
 DIM slSperre AS BOOLEAN               ' eigene Auswahl loest nichts aus
@@ -37,6 +41,20 @@ FUNCTION seitenleisteNeu() AS INTEGER
     slBox = gtk_box_new(GTK_SENKRECHT, 0)
     gtk_container_add(rolle, slBox)
     gtk_box_pack_start(slBox, minikarteNeu(), FALSE, FALSE, 0)
+    ' Drei Reiter; jeder so hoch wie er selbst (nicht wie der hoechste)
+    slStapel = gtk_stack_new()
+    gtk_stack_set_vhomogeneous(slStapel, FALSE)
+    slMusterSeite = gtk_box_new(GTK_SENKRECHT, 0)
+    gtk_stack_add_titled(slStapel, slMusterSeite, "muster", "Muster")
+    gtk_stack_add_titled(slStapel, infoleisteNeu(), "info", "Info")
+    gtk_stack_add_titled(slStapel, fortschrittleisteNeu(), "fortschritt", "Fortschritt")
+    DIM umschalter AS INTEGER : umschalter = gtk_stack_switcher_new()
+    gtk_stack_switcher_set_stack(umschalter, slStapel)
+    gtk_widget_set_halign(umschalter, GTK_AUSRICHTEN_MITTE)
+    gtkKlasse(umschalter, "reiter")
+    gtk_box_pack_start(slBox, umschalter, FALSE, FALSE, 6)
+    gtk_box_pack_start(slBox, slStapel, FALSE, FALSE, 0)
+    signalZeile(slStapel, "notify::visible-child-name", slReiterGewechselt, 0, 0, 0)
     slEbenenKnoepfe = []
     slSchrift = pango_font_description_from_string("DejaVu Sans Bold 11")
     slPaletten = kern.palettenLaden(PATHJOIN(CWD$(), "daten/paletten"))
@@ -65,7 +83,7 @@ END FUNCTION
 SUB seitenleisteMuster(m AS kern.Muster)
     IF slInhalt <> 0 THEN gtk_widget_destroy(slInhalt)
     slInhalt = gtk_box_new(GTK_SENKRECHT, 2)
-    gtk_box_pack_start(slBox, slInhalt, FALSE, FALSE, 0)
+    gtk_box_pack_start(slMusterSeite, slInhalt, FALSE, FALSE, 0)
     slSperre = TRUE
 
     ' --- Farben
@@ -246,6 +264,25 @@ SUB seitenleisteMuster(m AS kern.Muster)
     slEbeneMarkieren()
     verlaufLeisteNachziehen()
     farbleisteNachziehen()
+    ilNachziehen()
+END SUB
+
+SUB slReiterGewechselt(stapel AS INTEGER, pspec AS INTEGER, daten AS INTEGER)
+    ilNachziehen()
+END SUB
+
+' Einen Reiter zeigen: "muster", "info" oder "fortschritt"
+SUB seitenleisteReiter(name AS STRING)
+    IF slStapel <> 0 THEN gtk_stack_set_visible_child_name(slStapel, name)
+END SUB
+
+' Info und Fortschritt: nur der sichtbare Reiter wird nachgezogen
+SUB ilNachziehen()
+    fortschrittModusNachziehen()
+    IF slStapel = 0 OR NOT lwHat THEN RETURN
+    DIM s AS STRING : s = gtk_stack_get_visible_child_name(slStapel)
+    IF s = "info" THEN infoleisteNachziehen()
+    IF s = "fortschritt" THEN fortschrittleisteNachziehen()
 END SUB
 
 ' Die Palette zum Muster: der Hersteller der ersten Farbe, sonst die aus den
@@ -280,6 +317,7 @@ SUB seitenleisteZahlen()
         DIM e AS kern.Ebene : e = lwMuster.ebenen.ebenen[a]
         gtk_label_set_text(slEbenenTexte[zeile], e.name + "  (" + ZAHL$(e.stichzahl(), 0) + ")")
     END IF
+    ilNachziehen()
 END SUB
 
 ' --- Farben -------------------------------------------------------------------------------
@@ -294,6 +332,7 @@ SUB seitenleisteFarbeMarkieren()
         gtk_list_box_unselect_all(slFarbListe)
     END IF
     slSperre = FALSE
+    infoleisteFarbeMarkieren()
 END SUB
 
 SUB slFarbeGewaehlt(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)

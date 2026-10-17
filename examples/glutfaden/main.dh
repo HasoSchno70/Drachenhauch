@@ -88,6 +88,7 @@ IMPORT "ansicht/seitenleiste.dh"
 IMPORT "ansicht/flaechenteile.dh"
 IMPORT "ansicht/farbleiste.dh"
 IMPORT "ansicht/willkommen.dh"
+IMPORT "ansicht/infoleiste.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
@@ -131,7 +132,17 @@ CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" +
     " .wk-ktitel { font-size: 13pt; font-weight: 700; } .wk-ktext { font-size: 9pt; color: #8d93a1; }" + _
     " .wk-zuletzt { font-size: 10px; font-weight: 600; color: #8d93a1; letter-spacing: 2px; }" + _
     " .wk-liste { background-color: #22242a; border: 1px solid #3a3c44; border-radius: 8px; padding: 4px; } .wk-liste row { padding: 6px 10px; border-radius: 4px; } .wk-liste row:hover { background-color: #2a2c33; } .wk-liste row:selected { background-color: rgba(255,138,61,0.30); }" + _
-    " .wk-name { font-size: 10pt; font-weight: 600; color: #e4e5ea; } .wk-ort { font-size: 8pt; color: #8d93a1; } .wk-leer { color: #5c606b; font-style: italic; }"
+    " .wk-name { font-size: 10pt; font-weight: 600; color: #e4e5ea; } .wk-ort { font-size: 8pt; color: #8d93a1; } .wk-leer { color: #5c606b; font-style: italic; }" + _
+    " .reiter button { background-image: none; background-color: #2a2c33; color: #b9bdc8; border: 1px solid #3a3c44; box-shadow: none; text-shadow: none; padding: 2px 12px; }" + _
+    " .reiter button:checked { background-color: rgba(255,138,61,0.22); color: #ffffff; border-color: #ff8a3d; }" + _
+    " .ikarte { margin: 1px 14px; padding: 5px 10px; background-color: #26282f; border: 1px solid #33363e; border-radius: 7px; } .ikwert { color: #f2f3f7; font-weight: 700; }" + _
+    " .warnung { color: #e0b040; } .erfolg { color: #40c870; font-weight: 700; }" + _
+    " .fs-zeile { padding: 5px 8px; background-color: #26282f; border: 1px solid #33363e; border-radius: 7px; }" + _
+    " button.fs-modus { background-image: none; background-color: #2f6b45; color: #ffffff; border: none; border-radius: 8px; padding: 8px; font-weight: 700; box-shadow: none; text-shadow: none; } button.fs-modus:hover { background-color: #378050; }" + _
+    " button.fs-modus.fs-an { background-color: #8a3a2a; } button.fs-modus.fs-an:hover { background-color: #a04530; }" + _
+    " progressbar.fs-gesamt trough { min-height: 14px; background-color: #33363e; border: none; } progressbar.fs-gesamt progress { min-height: 14px; background-color: #40c870; border: none; } progressbar.fs-gesamt text { color: #d6d9e1; }" + _
+    " .se-symbol { font-size: 18px; } .se-leise { color: #8d93a1; font-size: 9pt; } entry.se-eigen { font-size: 18px; }" + _
+    " progressbar.fs-klein trough { min-height: 5px; background-color: #33363e; border: none; } progressbar.fs-klein progress { min-height: 5px; background-color: #ff8a3d; border: none; }"
 
 CONST LOGO = "daten/bilder/glutfaden_256.png"
 CONST LOGO_KLEIN = "daten/bilder/glutfaden_32.png"
@@ -560,6 +571,7 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "wz_fortschritt" : werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
         CASE "wz_farbverlauf" : werkzeugWaehlen(WZ_FARBVERLAUF, FALSE)
         CASE "hervorheben" : hervorhebenUmschalten()
+        CASE "stickmodus" : stickenModusUmschalten()
         CASE "willkommen" : willkommenZeigen()
         CASE "farbleiste"
             einst.farbleiste = NOT einst.farbleiste
@@ -807,6 +819,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe15"
     ELSEIF ARG$(a) = "--probe-stufe16" THEN
         probe = "stufe16"
+    ELSEIF ARG$(a) = "--probe-stufe17" THEN
+        probe = "stufe17"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -867,6 +881,7 @@ IF probe = "start" THEN g_timeout_add(300, vorfuehrenStart, 0)
 IF probe = "stufe14" THEN g_timeout_add(300, vorfuehrenStufe14, 0)
 IF probe = "stufe15" THEN g_timeout_add(300, vorfuehrenStufe15, 0)
 IF probe = "stufe16" THEN g_timeout_add(300, vorfuehrenStufe16, 0)
+IF probe = "stufe17" THEN g_timeout_add(300, vorfuehrenStufe17, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 

@@ -64,6 +64,10 @@ DECLARE FUNCTION gtk_stack_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_stack_add_named LIB GTK (stapel AS ZEIGER, kind AS ZEIGER, name AS TEXT)
 DECLARE SUB gtk_stack_set_visible_child_name LIB GTK (stapel AS ZEIGER, name AS TEXT)
 DECLARE FUNCTION gtk_stack_get_visible_child_name LIB GTK (stapel AS ZEIGER) AS TEXT
+DECLARE SUB gtk_stack_add_titled LIB GTK (stapel AS ZEIGER, kind AS ZEIGER, name AS TEXT, titel AS TEXT)
+DECLARE SUB gtk_stack_set_vhomogeneous LIB GTK (stapel AS ZEIGER, gleich AS BOOLEAN)
+DECLARE FUNCTION gtk_stack_switcher_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_stack_switcher_set_stack LIB GTK (umschalter AS ZEIGER, stapel AS ZEIGER)
 DECLARE SUB gtk_image_set_pixel_size LIB GTK (bild AS ZEIGER, groesse AS LONG)
 DECLARE SUB gtk_scrolled_window_set_policy LIB GTK (sw AS ZEIGER, h AS LONG, v AS LONG)
 DECLARE SUB gtk_container_add LIB GTK (behaelter AS ZEIGER, kind AS ZEIGER)
@@ -106,6 +110,22 @@ DECLARE SUB gtk_combo_box_set_active LIB GTK (wahl AS ZEIGER, nr AS LONG)
 DECLARE FUNCTION gtk_combo_box_get_active LIB GTK (wahl AS ZEIGER) AS LONG
 DECLARE FUNCTION gtk_entry_new LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_search_entry_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_entry_set_max_length LIB GTK (feld AS ZEIGER, laenge AS LONG)
+DECLARE SUB gtk_entry_set_width_chars LIB GTK (feld AS ZEIGER, zeichen AS LONG)
+DECLARE SUB gtk_entry_set_alignment LIB GTK (feld AS ZEIGER, lage AS SINGLE)
+DECLARE FUNCTION gtk_frame_new LIB GTK (titel AS TEXT) AS ZEIGER
+DECLARE FUNCTION gtk_flow_box_new LIB GTK () AS ZEIGER
+DECLARE SUB gtk_flow_box_insert LIB GTK (box AS ZEIGER, kind AS ZEIGER, lage AS LONG)
+DECLARE SUB gtk_flow_box_set_min_children_per_line LIB GTK (box AS ZEIGER, n AS ULONG)
+DECLARE SUB gtk_flow_box_set_max_children_per_line LIB GTK (box AS ZEIGER, n AS ULONG)
+DECLARE SUB gtk_flow_box_set_selection_mode LIB GTK (box AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_flow_box_set_homogeneous LIB GTK (box AS ZEIGER, gleich AS BOOLEAN)
+DECLARE SUB gtk_flow_box_set_column_spacing LIB GTK (box AS ZEIGER, abstand AS ULONG)
+DECLARE SUB gtk_flow_box_set_row_spacing LIB GTK (box AS ZEIGER, abstand AS ULONG)
+DECLARE SUB gtk_flow_box_select_child LIB GTK (box AS ZEIGER, kind AS ZEIGER)
+DECLARE SUB gtk_flow_box_unselect_all LIB GTK (box AS ZEIGER)
+DECLARE FUNCTION gtk_flow_box_child_get_index LIB GTK (kind AS ZEIGER) AS LONG
+DECLARE FUNCTION gtk_flow_box_child_is_selected LIB GTK (kind AS ZEIGER) AS BOOLEAN
 DECLARE FUNCTION gtk_entry_get_text LIB GTK (feld AS ZEIGER) AS TEXT
 DECLARE SUB gtk_entry_set_text LIB GTK (feld AS ZEIGER, text AS TEXT)
 DECLARE SUB gtk_entry_set_activates_default LIB GTK (feld AS ZEIGER, an AS BOOLEAN)
@@ -149,6 +169,7 @@ DECLARE SUB gtk_widget_set_visible LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE FUNCTION gtk_widget_get_visible LIB GTK (w AS ZEIGER) AS BOOLEAN
 DECLARE FUNCTION gtk_widget_get_parent LIB GTK (w AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_widget_show LIB GTK (w AS ZEIGER)
+DECLARE SUB gtk_widget_hide LIB GTK (w AS ZEIGER)
 DECLARE SUB gtk_widget_add_events LIB GTK (w AS ZEIGER, maske AS LONG)
 DECLARE SUB gtk_widget_queue_draw LIB GTK (w AS ZEIGER)
 DECLARE FUNCTION gtk_widget_get_allocated_width LIB GTK (w AS ZEIGER) AS LONG
@@ -343,6 +364,7 @@ CONST GTK_POLITIK_NIE = 2
 CONST GTK_AUSRICHTEN_START = 1
 CONST GTK_AUSRICHTEN_ENDE = 2
 CONST GTK_AUSRICHTEN_MITTE = 3
+CONST GTK_ELLIPSE_ANFANG = 1
 CONST GTK_ELLIPSE_MITTE = 2
 CONST GTK_ELLIPSE_ENDE = 3
 CONST GTK_AUSWAHL_KEINE = 0
@@ -383,6 +405,10 @@ CONST PANGO_SCALE = 1024
 ' --- Kleine Helfer
 SUB gtkKlasse(w AS INTEGER, name AS STRING)
     gtk_style_context_add_class(gtk_widget_get_style_context(w), name)
+END SUB
+
+SUB gtkKlasseWeg(w AS INTEGER, name AS STRING)
+    gtk_style_context_remove_class(gtk_widget_get_style_context(w), name)
 END SUB
 
 FUNCTION gtkFehler$(f AS INTEGER) AS STRING
