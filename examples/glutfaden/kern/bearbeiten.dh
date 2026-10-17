@@ -456,6 +456,21 @@ END FUNCTION
 ' --- Listen: Farben und Rueckstiche ------------------------------------------------
 
 ' Vorher-Stand von Farben und Rueckstichen; listenNachher schliesst den Schritt.
+' "Nicht sticken" (PyStickys skip_stitching): die Farbe bleibt im Muster,
+' zaehlt aber in Garnliste, Einkauf und Fortschritt nicht mit -- ein
+' Schritt, den Rueckgaengig nimmt (PySticky setzt das Feld nur und
+' markiert ungesichert). FALSE, wenn sich nichts aendert.
+FUNCTION farbeAuslassen(m AS Muster, v AS Verlauf, nr AS INTEGER, an AS BOOLEAN) AS BOOLEAN
+    IF nr < 0 OR nr >= m.farbanzahl() THEN RETURN FALSE
+    IF m.farben[nr].auslassen = an THEN RETURN FALSE
+    DIM neu AS Farbeintrag : neu = farbeintragKopie(m.farben[nr])
+    neu.auslassen = an
+    DIM t AS Aenderung : t = listenVorher(m, v, IIF(an, "Nicht sticken", "Farbe sticken"))
+    m.farben[nr] = neu
+    listenNachher(m, v, t)
+    RETURN TRUE
+END FUNCTION
+
 FUNCTION listenVorher(m AS Muster, v AS Verlauf, text AS STRING) AS Aenderung
     v.beginnen(text)
     DIM t AS Aenderung : t = v.teil(TEIL_LISTEN)

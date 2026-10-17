@@ -155,6 +155,22 @@ FUNCTION minikarteAusschnitt(vx AS FLOAT, vy AS FLOAT, vw AS FLOAT, vh AS FLOAT,
     RETURN (x, y, w, h)
 END FUNCTION
 
+' --- Hervorheben ------------------------------------------------------------------------
+
+' Eine Farbe hervorheben (PySticky "Nur diese Farbe hervorheben"): die
+' anderen werden mit der Deckkraft max(20, a \ 5) gezeichnet -- a ist die
+' Deckkraft ihrer Ebene in 0..255. Liefert die Farbe ueber dem Stoff.
+FUNCTION gedimmt(farbe AS INTEGER, stoff AS INTEGER, a AS INTEGER) AS INTEGER
+    DIM d AS INTEGER : d = MAX(20, a \ 5)
+    DIM r AS INTEGER : r = (stoff SHR 16) BAND 255
+    DIM g AS INTEGER : g = (stoff SHR 8) BAND 255
+    DIM b AS INTEGER : b = stoff BAND 255
+    r = r + (((farbe SHR 16) BAND 255) - r) * d \ 255
+    g = g + (((farbe SHR 8) BAND 255) - g) * d \ 255
+    b = b + ((farbe BAND 255) - b) * d \ 255
+    RETURN (r SHL 16) BOR (g SHL 8) BOR b
+END FUNCTION
+
 ' --- Kachel-Vorschau ------------------------------------------------------------------
 
 ' Zellgroesse der Kachel-Vorschau in einem Feld bw x bh bei tx x ty Kacheln
