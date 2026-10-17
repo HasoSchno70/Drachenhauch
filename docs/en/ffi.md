@@ -749,8 +749,11 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   through the library: the failed callback returns 0 and the library carries
   on. Further callbacks run as usual (up to 2026.31 they silently returned 0
   -- in a GTK interface no button reacted afterwards, not even the one for
-  closing). The first error is reported. The same applies to a value of the
-  wrong type (a BOOLEAN function where `LONG` is required).
+  closing). The first error is reported, by the call during which the
+  callback ran -- not by a call that a later callback makes itself (up to
+  2026.31 the next call to return picked it up: in a GTK interface every
+  redraw then failed with the same, ever longer message). The same applies
+  to a value of the wrong type (a BOOLEAN function where `LONG` is required).
 * **If the library does not return** -- `gtk_main`, `g_main_loop_run`, a
   message loop --, the error appears on standard error after one second,
   with the line and the name of the function that is still running; every

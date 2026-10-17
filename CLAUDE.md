@@ -2007,6 +2007,43 @@ stehen in jeder Zeile woanders -- `pdReihe` setzt `max_width_chars` 1.
 `tests/pruef/glutfaden_stufe9.dhtest` (7; elf Verfaelschungen von Kern und
 Oberflaeche fallen je in ihrem Fall).
 
+**Stufe 10: Muster anlegen und verwalten** (2026-10-17). `kern/verwalten.dh`
+nach PyStickys Pattern.resize, smart_resize, pattern_diff, session_timer,
+snapshots und den Dialogen fuer neues Projekt, Eigenschaften und eigene
+Vorlagen. **Groesse aendern** zuschneiden/auffuellen oben links (Rueckstiche
+mit einem Ende ausserhalb fallen weg) oder Smart-Resize (naechster Nachbar
+mit `INT(i * sx)`, Rueckstiche gerundet wie Pythons `round`) -- ein Schritt
+im Verlauf (`TEIL_GROESSE`, PySticky leert ihn). **Vergleich** je Zelle
+(neu/weg/anders/gleich ueber das zusammengesetzte Bild, Farben ueber ihren
+Schluessel, damit verschobene Indizes nicht als Aenderung zaehlen) plus
+Rueckstiche. **Stickzeit** in den Metadaten (`total_stitch_seconds`,
+`last_session_start`, Sitzungen ueber 12 h zaehlen nicht), laeuft solange
+das Werkzeug Fortschritt (K) gewaehlt ist -- dafuer neu in der Laufzeit
+**`ZEIT_UNIX()`** (echte UTC-Sekunden als Kommazahl; `ZEIT_JETZT` ist
+Ortszeit, PySticky schreibt `time.time()`), `ZEIT_AUS_UNIX`/
+`ZEIT_NACH_UNIX` (ueber die Sommerzeitgrenze geprueft). **Versionen**
+`snapshots/<Schluessel>/v_JJJJ-MM-TT_hh-mm-ss.pxs` im Einstellungsordner,
+hoechstens 20, beim Sichern und alle fuenf Minuten, wenn etwas ungesichert
+ist und die letzte aelter als 30 Minuten (PySticky haengt sie an sein
+Autosave); ein ungesichertes Muster bekommt eine Kennung, sonst teilten sich
+zwei "Neues Muster" einen Ordner. **Vorlagen**: 31 eingebaute in sieben
+Kategorien, zwoelf DP-Groessen, eigene in `user_templates.json` (Breite/
+Hoehe wie `int()` -- PySticky nimmt 12.7 als 12.7). **Gegen PySticky
+gleich** (ref_verwalten.py, 98 Zeilen) bis auf diese eine Zeile.
+Oberflaeche `ansicht/verwaltungsdialoge.dh`, Knopf "Muster" in der
+Kopfleiste: Neues Projekt (Strg+N; Kategorien, Karten, DP-Preset, Stoff,
+Vorschau; Strg+Umschalt+N bleibt "Neue Ebene"), Eigenschaften (Strg+Alt+P;
+Stickdatum als TT.MM.JJJJ, der 31.02. ist ein Fehler), Groesse aendern
+(Rueckfrage nur beim Verkleinern ohne Smart), Versionen (Strg+Alt+V;
+wiederherstellen laedt ungesichert ohne Pfad, loeschen, mit dem aktuellen
+vergleichen: Alt/Neu/Diff), Vorlagen sichern und verwalten. **Der Fund
+dabei steckt in der Laufzeit** (siehe Dogfooding 12, Punkt 5): ein Fehler im
+Zeichnen der Vorschau machte jedes spaetere Zeichnen kaputt. Foto-Falle: ein
+eben umgelegtes Kaestchen erscheint im Foto noch leer (GTK blendet es ein),
+der Zustand stimmt. `--probe-stufe10`, Sammlung
+`tests/pruef/glutfaden_stufe10.dhtest` (6; zwoelf Verfaelschungen von Kern
+und Oberflaeche fallen je in ihrem Fall).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als
@@ -2037,6 +2074,15 @@ zum Schliessen. VERHALTENSAENDERUNG fuer die Fassungsnotizen. (4) **Jeder
 spaetere Fehler trug die Zeile des ersten**: `err_line_set` blieb stehen, weil
 ein Rueckruf-Fehler nie per CATCH verbraucht wird -- `Vm::fehlerzeile_vergessen`
 vor jedem Rueckruf, `fehlerzeile_setzen` beim Melden (`ERROR_LINE()` stimmt).
+(5, 2026-10-17, Glutfaden Stufe 10) **Den gemerkten Fehler holte der
+naechste Aufruf ab, der zurueckkehrte** -- in `gtk_main` also ein Aufruf IN
+einem spaeteren Rueckruf (`cairo_set_source_rgba` beim naechsten Zeichnen),
+der ihn warf; jeder weitere Rueckruf scheiterte damit, und die Meldung wuchs
+um eine Schale je Rueckruf. `RR_FEHLER` traegt jetzt die Tiefe (`LAUFEND`)
+des laufenden Aufrufs, `rueckruf_fehler(tiefe)` gibt ihn nur dem Aufruf
+dieser Tiefe. Fall "der fehler eines rueckrufs gehoert dem aufruf, der ihn
+ausgeloest hat" in `ffi.dhtest` (qsort, dessen spaetere Vergleiche `abs`
+rufen).
 Nebenbei: `gdk_pixbuf_save` heisst unter Windows `gdk_pixbuf_save_utf8` (in C
 ein Makro), `gdk_pixbuf_savev` ueberall gleich; `gdk_pixbuf_get_from_window`
 liefert unter Windows nur Weiss -- die Vorfuehrung (`--probe --foto ziel`)

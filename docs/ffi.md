@@ -751,7 +751,11 @@ qsort(b, 3, 4, FUNCTION(a, b) SGN(zahlBei(b) - zahlBei(a)))   ' 42 13 -7
   liefert 0, und die Bibliothek arbeitet weiter. Weitere Rückrufe laufen
   wie gewohnt (bis 2026.31 lieferten sie stumm 0 -- in einer GTK-Oberfläche
   reagierte danach kein Knopf mehr, nicht einmal der zum Schließen).
-  Gemeldet wird der erste Fehler. Dasselbe gilt für einen Wert vom falschen
+  Gemeldet wird der erste Fehler, und zwar von dem Aufruf, während dessen
+  der Rückruf lief -- nicht von einem Aufruf, den ein späterer Rückruf
+  selbst macht (bis 2026.31 holte ihn der nächste ab, der zurückkehrte: in
+  einer GTK-Oberfläche scheiterte danach jedes Zeichnen mit derselben,
+  immer längeren Meldung). Dasselbe gilt für einen Wert vom falschen
   Typ (eine BOOLEAN-Funktion, wo `LONG` verlangt ist).
 * **Kehrt die Bibliothek nicht zurück** -- `gtk_main`, `g_main_loop_run`,
   eine Nachrichtenschleife --, steht der Fehler nach einer Sekunde in der
