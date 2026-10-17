@@ -2082,6 +2082,38 @@ Arbeitsordner ueber STARTDIR$), Sammlung `tests/pruef/glutfaden_stufe11.dhtest`
 (5; vierzehn Verfaelschungen fallen je in ihrem Fall -- der Gleichstand erst
 mit einer eigenen Palette aus zwei gleichen Farben).
 
+**Stufe 12: Muster-Vorschau** (2026-10-17). Vorher: das Hauptfenster nimmt
+92 % der Arbeitsflaeche des Bildschirms (`fensterGroesseSetzen` ueber
+`gdk_monitor_get_workarea`, Wunsch des Nutzers), die Leiste rechts bleibt
+400 breit. `kern/qtfarbe.dh` baut Qts `QColor.darker/lighter` nach -- 16 Bit
+je Kanal, HSV in float32 (ueber `BUFFER_SET_F32`), `qRound` und
+`qt_div_257` wie Qt, Ketten bleiben auf 16 Bit; gegen PySide gleich (321
+Farben, alle Faktoren der Vorschau). `ansicht/vorschaubild.dh` zeichnet nach
+preview_render_engine.py/diamond_drill_render.py mit Cairo (ohne Fenster
+nutzbar, `vbPng`): Stoff (Aida-Loecher, Kreuze aus Faeden mit Schatten und
+Glanz, Teilstiche, Knoten, Perlen), Pixel, Symbol (Raster, jede zehnte Linie
+kraeftig ab dem Rand des Ausschnitts), Drills (vier Facetten
+heller145/110, dunkler130/105), Rueckstiche (Schatten, im Symbolplan
+gestrichelt), Erledigtes. **Wie im Original** bleibt die Kantenglaettung
+nach einem Drill aus, bis ein Teilstich/Knoten/Perle sie wieder anschaltet.
+Gegen PyStickys `render_full` sind die Bilder nicht gleich (Cairo und Qt
+glaetten Kanten verschieden), aber nah: Pixel und Drills unter 1,5 %
+deutlich abweichender Punkte, Stoff bei 20 Punkten 0 %, bei 12 rund 4 %,
+darunter mehr, weil fast alles Kante ist. Oberflaeche
+`ansicht/vorschaudialog.dh` (F5, Knopf in der Leiste): Darstellung, Stoff
+(Aida 11..32), Stoff-Farbe, Rueckstiche, Fortschritt, Zoom 20..300 (Regler,
+Einpassen, 1:1, Mausrad um den Punkt unter der Maus, mit Strg in feineren
+Schritten), Ziehen verschiebt, gezeichnet wird nur der sichtbare
+Ausschnitt; "Als Bild speichern" fragt Punkte je Stich und Ziel (ueber 64
+Mio. Punkte mit Rueckfrage) und schreibt mit derselben Einstellung wie die
+Ansicht. Diamond Painting: nur Stoff/Pixel, ohne Stoff-Auswahl. **Pruefen
+ohne Qt-Glyphen:** Qts Offscreen-Plattform zeichnet die meisten Symbole als
+leere Kaestchen -- der Symbolplan wird darum an einem Muster ohne Symbole
+verglichen. Sammlung `tests/pruef/glutfaden_stufe12.dhtest` (3: Qt-Farben,
+zehn Bilder gegen PySticky mit Grenze je Bild, die Probe samt "Export =
+vbPng" und "der Punkt unter der Maus bleibt"); acht Verfaelschungen fallen
+je in ihrem Fall.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

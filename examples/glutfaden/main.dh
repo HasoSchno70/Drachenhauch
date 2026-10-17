@@ -44,6 +44,8 @@
 ' Stickzeit, solange das Werkzeug Fortschritt gewaehlt ist.
 ' Stufe 11: Muster-Bibliothek (Strg+L) mit Kategorien, Suche, Vorschaubildern,
 ' Schlagwoertern und Notizen; Farb-Harmonien (Strg+Umschalt+H) zur Farbe.
+' Stufe 12: Muster-Vorschau (F5) -- gestickt auf Stoff, als Pixel oder als
+' Symbol-Plan, Diamond Painting als Drills; Zoom, Bild-Export.
 '
 ' Aufbau:
 '     kern/      Muster, Ebenen, Garne, Paletten, .pxs, Formen, Verlauf,
@@ -55,7 +57,7 @@
 '
 ' GTK muss da sein: unter Linux fast immer (libgtk-3-0), unter macOS ueber
 ' Homebrew (brew install gtk+3), unter Windows aus MSYS2 im PATH -- oder aus
-' Inkscape. Mit --probe (bzw. --probe-bearbeiten, --probe-stufe3 .. 11) fuehrt
+' Inkscape. Mit --probe (bzw. --probe-bearbeiten, --probe-stufe3 .. 12) fuehrt
 ' sich das Programm selbst vor und endet; --foto
 ' ziel sichert dabei Bilder des Fensters (fuer Pruefungen).
 IMPORT "kern/kern.dh" AS kern
@@ -71,6 +73,8 @@ IMPORT "ansicht/analysedialoge.dh"
 IMPORT "ansicht/planungsdialoge.dh"
 IMPORT "ansicht/verwaltungsdialoge.dh"
 IMPORT "ansicht/sammlungdialoge.dh"
+IMPORT "ansicht/vorschaubild.dh"
+IMPORT "ansicht/vorschaudialog.dh"
 IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/seitenleiste.dh"
 
@@ -377,6 +381,10 @@ SUB sichernGeklickt(knopf AS INTEGER, daten AS INTEGER)
 END SUB
 
 SUB exportGeklickt(knopf AS INTEGER, daten AS INTEGER) : exportDialog() : END SUB
+SUB vorschauGeklickt(k AS INTEGER, daten AS INTEGER)
+    vorschauDialog()
+END SUB
+
 SUB pfadGeklickt(knopf AS INTEGER, daten AS INTEGER) : stickpfadDialog() : END SUB
 
 ' Kreuzstich <-> Diamond Painting (Strg+D, PySticky "Diamond-Painting-Ansicht").
@@ -430,7 +438,7 @@ SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 11", _
+    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 12", _
         "comments", "Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.", _
         "website", "https://github.com/HasoSchno70/Pysticky", "website-label", "PySticky (das Original)", 0)
 END SUB
@@ -497,6 +505,10 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
         END SELECT
         RETURN TRUE
     END IF
+    IF t = &HFFC2 AND NOT alt THEN                       ' F5
+        vorschauDialog()
+        RETURN TRUE
+    END IF
     ' Im Suchfeld gehoeren Buchstaben dem Feld
     IF gtk_widget_has_focus(slSuche) THEN RETURN FALSE
     IF werkzeugTaste(t, FALSE, alt) THEN RETURN TRUE
@@ -534,8 +546,35 @@ DIM stilFehler AS STRING : stilFehler = gtkStil$(STIL)
 IF stilFehler <> "" THEN PRINT "Stylesheet: "; stilFehler
 werkzeugeStart()
 
+' 92 % der Arbeitsflaeche des Bildschirms, mittig (vorher fest 1280 x 840 --
+' auf einem grossen Schirm ein kleines Fenster). PySticky deckelt bei
+' 1920 x 1080; hier nicht, ein grosser Schirm soll genutzt werden.
+DIM fensterBreite AS INTEGER
+
+SUB fensterGroesseSetzen()
+    DIM b AS INTEGER : b = 1280
+    DIM h AS INTEGER : h = 840
+    DIM anzeige AS INTEGER : anzeige = gdk_display_get_default()
+    DIM mon AS INTEGER
+    IF anzeige <> 0 THEN
+        mon = gdk_display_get_primary_monitor(anzeige)
+        IF mon = 0 THEN mon = gdk_display_get_monitor(anzeige, 0)
+    END IF
+    IF mon <> 0 THEN
+        DIM flaeche AS PangoRechteck
+        gdk_monitor_get_workarea(mon, flaeche)
+        IF flaeche.breite > 0 AND flaeche.hoehe > 0 THEN
+            b = INT(flaeche.breite * 0.92)
+            h = INT(flaeche.hoehe * 0.92)
+        END IF
+    END IF
+    fensterBreite = b
+    gtk_window_set_default_size(fenster, b, h)
+    gtk_window_set_position(fenster, 1)                  ' GTK_WIN_POS_CENTER
+END SUB
+
 fenster = gtk_window_new(0)
-gtk_window_set_default_size(fenster, 1280, 840)
+fensterGroesseSetzen()
 gtk_window_set_title(fenster, "Glutfaden")
 gtkKlasse(fenster, "flaeche")
 DIM symFehler AS INTEGER
@@ -554,6 +593,7 @@ DIM kImport AS INTEGER : kImport = knopf("insert-image-symbolic", "Bild importie
 kSichern = knopf("document-save-symbolic", "Sichern (Strg+S) -- Sichern unter: Strg+Umschalt+S")
 DIM kExport AS INTEGER : kExport = knopf("document-send-symbolic", "Exportieren (Strg+E) -- PDF, HTML, Bild, OXS oder Paket")
 DIM kPfad AS INTEGER : kPfad = knopf("mark-location-symbolic", "Stickpfad (Strg+Umschalt+O) -- in welcher Reihenfolge die Stiche jeder Farbe gesetzt werden")
+DIM kVorschau AS INTEGER : kVorschau = knopf("document-print-preview-symbolic", "Muster-Vorschau (F5) -- gestickt auf Stoff, als Pixel oder als Symbol-Plan")
 kZurueck = knopf("edit-undo-symbolic", "Rückgängig (Strg+Z)")
 kVor = knopf("edit-redo-symbolic", "Wiederholen (Strg+Y)")
 gtk_header_bar_pack_start(kopf, kOeffnen)
@@ -561,6 +601,7 @@ gtk_header_bar_pack_start(kopf, kImport)
 gtk_header_bar_pack_start(kopf, kSichern)
 gtk_header_bar_pack_start(kopf, kExport)
 gtk_header_bar_pack_start(kopf, kPfad)
+gtk_header_bar_pack_start(kopf, kVorschau)
 gtk_header_bar_pack_start(kopf, musterKnopf())
 gtk_header_bar_pack_start(kopf, auswertenKnopf())
 gtk_header_bar_pack_start(kopf, kZurueck)
@@ -586,7 +627,8 @@ gtk_box_pack_start(werkzeugzeile, werkzeugleisteNeu(), FALSE, FALSE, 0)
 DIM teilung AS INTEGER : teilung = gtk_paned_new(GTK_WAAGERECHT)
 gtk_paned_pack1(teilung, leinwandNeu(), TRUE, FALSE)
 gtk_paned_pack2(teilung, seitenleisteNeu(), FALSE, FALSE)
-gtk_paned_set_position(teilung, 960)
+' Die Seitenleiste behaelt ihre Breite, der Rest gehoert der Zeichenflaeche
+gtk_paned_set_position(teilung, MAX(600, fensterBreite - 400))
 status = gtk_label_new("")
 gtk_label_set_xalign(status, 0.0)
 gtk_label_set_ellipsize(status, GTK_ELLIPSE_ENDE)
@@ -602,6 +644,7 @@ signal(kImport, "clicked", bildImportierenGeklickt, 0, 0, 0)
 signal(kSichern, "clicked", sichernGeklickt, 0, 0, 0)
 signal(kExport, "clicked", exportGeklickt, 0, 0, 0)
 signal(kPfad, "clicked", pfadGeklickt, 0, 0, 0)
+signal(kVorschau, "clicked", vorschauGeklickt, 0, 0, 0)
 signal(kZurueck, "clicked", zurueckGeklickt, 0, 0, 0)
 signal(kVor, "clicked", vorGeklickt, 0, 0, 0)
 signal(kModus, "clicked", modusGeklickt, 0, 0, 0)
@@ -642,6 +685,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe10"
     ELSEIF ARG$(a) = "--probe-stufe11" THEN
         probe = "stufe11"
+    ELSEIF ARG$(a) = "--probe-stufe12" THEN
+        probe = "stufe12"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -664,6 +709,7 @@ IF probe = "stufe8" THEN g_timeout_add(300, vorfuehrenStufe8, 0)
 IF probe = "stufe9" THEN g_timeout_add(300, vorfuehrenStufe9, 0)
 IF probe = "stufe10" THEN g_timeout_add(300, vorfuehrenStufe10, 0)
 IF probe = "stufe11" THEN g_timeout_add(300, vorfuehrenStufe11, 0)
+IF probe = "stufe12" THEN g_timeout_add(300, vorfuehrenStufe12, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 

@@ -1,0 +1,132 @@
+' Qts QColor::darker/lighter, wie PySticky sie fuer die Muster-Vorschau
+' benutzt (Schatten, Glanz, Loecher im Stoff). Qt rechnet mit 16 Bit je Kanal
+' und in float32 (toHsv, toRgb); eine Kette wie darker(140).lighter(120)
+' bleibt auf 16 Bit -- dazwischen auf 8 Bit zu runden ergibt bei den meisten
+' Farben einen anderen Wert. Eine Farbe hier ist darum ein "Qt-Wert":
+' r16 * 2^32 + g16 * 2^16 + b16 (Deckkraft spielt keine Rolle, sie bleibt).
+
+DIM qfPuffer AS BUFFER : qfPuffer = BUFFER_NEW(4)
+
+' Auf float32 runden (ueber vier Bytes)
+FUNCTION f32(x AS FLOAT) AS FLOAT
+    BUFFER_SET_F32(qfPuffer, 0, x)
+    RETURN BUFFER_GET_F32(qfPuffer, 0)
+END FUNCTION
+
+' qRound(float) fuer d >= 0: int(d + 0.5f)
+FUNCTION qtRunden(d AS FLOAT) AS INTEGER
+    RETURN INT(f32(d + 0.5))
+END FUNCTION
+
+FUNCTION qtWert(f AS INTEGER) AS INTEGER
+    RETURN rotAnteil(f) * 257 * 4294967296 + gruenAnteil(f) * 257 * 65536 + blauAnteil(f) * 257
+END FUNCTION
+
+FUNCTION qtWertAus(r16 AS INTEGER, g16 AS INTEGER, b16 AS INTEGER) AS INTEGER
+    RETURN r16 * 4294967296 + g16 * 65536 + b16
+END FUNCTION
+
+FUNCTION qtR16(q AS INTEGER) AS INTEGER
+    RETURN (q \ 4294967296) BAND 65535
+END FUNCTION
+
+FUNCTION qtG16(q AS INTEGER) AS INTEGER
+    RETURN (q \ 65536) BAND 65535
+END FUNCTION
+
+FUNCTION qtB16(q AS INTEGER) AS INTEGER
+    RETURN q BAND 65535
+END FUNCTION
+
+' qt_div_257: 16 Bit -> 8 Bit, wie beim Malen
+FUNCTION qtAcht(x AS INTEGER) AS INTEGER
+    DIM y AS INTEGER : y = x + 128
+    RETURN (y - (y SHR 8)) SHR 8
+END FUNCTION
+
+' Der Qt-Wert als &HRRGGBB
+FUNCTION qtFarbe(q AS INTEGER) AS INTEGER
+    RETURN RGB(qtAcht(qtR16(q)), qtAcht(qtG16(q)), qtAcht(qtB16(q))) BAND &HFFFFFF
+END FUNCTION
+
+' toHsv: (Ton 0..35999 oder 65535 bei Grau, Saettigung, Wert) in 16 Bit
+FUNCTION qtHsv(q AS INTEGER) AS TUPLE
+    DIM r AS INTEGER : r = qtR16(q)
+    DIM g AS INTEGER : g = qtG16(q)
+    DIM b AS INTEGER : b = qtB16(q)
+    DIM mx AS INTEGER : mx = MAX(r, MAX(g, b))
+    DIM mn AS INTEGER : mn = MIN(r, MIN(g, b))
+    IF mx = mn THEN RETURN (65535, 0, mx)
+    DIM chroma AS FLOAT : chroma = f32(mx - mn)
+    DIM s AS INTEGER : s = qtRunden(f32(f32(chroma / mx) * 65535))
+    DIM h AS FLOAT
+    IF mx = r THEN
+        h = f32(g - b) / chroma
+        h = f32(h)
+        IF h < 0 THEN h = f32(h + 6)
+    ELSEIF mx = g THEN
+        h = f32(2 + f32((b - r) / chroma))
+    ELSE
+        h = f32(4 + f32((r - g) / chroma))
+    END IF
+    RETURN (qtRunden(f32(h * 6000)), s, mx)
+END FUNCTION
+
+' toRgb aus HSV (alles float32)
+FUNCTION qtAusHsv(ton AS INTEGER, sat AS INTEGER, wert AS INTEGER) AS INTEGER
+    IF sat = 0 OR ton = 65535 THEN RETURN qtWertAus(wert, wert, wert)
+    DIM h AS FLOAT : h = IIF(ton = 36000, 0.0, f32(ton / 6000.0))
+    DIM s AS FLOAT : s = f32(sat / 65535.0)
+    DIM v AS FLOAT : v = f32(wert / 65535.0)
+    DIM i AS INTEGER : i = INT(h)
+    DIM f AS FLOAT : f = f32(h - i)
+    DIM p AS FLOAT : p = f32(v * f32(1 - s))
+    DIM r AS FLOAT, g AS FLOAT, b AS FLOAT
+    IF i MOD 2 = 1 THEN
+        DIM q AS FLOAT : q = f32(v * f32(1 - f32(s * f)))
+        SELECT CASE i
+            CASE 1 : r = q : g = v : b = p
+            CASE 3 : r = p : g = q : b = v
+            CASE ELSE : r = v : g = p : b = q
+        END SELECT
+    ELSE
+        DIM t AS FLOAT : t = f32(v * f32(1 - f32(s * f32(1 - f))))
+        SELECT CASE i
+            CASE 0 : r = v : g = t : b = p
+            CASE 2 : r = p : g = v : b = t
+            CASE ELSE : r = t : g = p : b = v
+        END SELECT
+    END IF
+    RETURN qtWertAus(qtRunden(f32(r * 65535)), qtRunden(f32(g * 65535)), qtRunden(f32(b * 65535)))
+END FUNCTION
+
+FUNCTION qtHeller(q AS INTEGER, faktor AS INTEGER) AS INTEGER
+    IF faktor <= 0 THEN RETURN q
+    IF faktor < 100 THEN RETURN qtDunkler(q, 10000 \ faktor)
+    DIM h AS INTEGER, s AS INTEGER, v AS INTEGER
+    (h, s, v) = qtHsv(q)
+    v = (faktor * v) \ 100
+    IF v > 65535 THEN
+        s = s - (v - 65535)
+        IF s < 0 THEN s = 0
+        v = 65535
+    END IF
+    RETURN qtAusHsv(h, s, v)
+END FUNCTION
+
+FUNCTION qtDunkler(q AS INTEGER, faktor AS INTEGER) AS INTEGER
+    IF faktor <= 0 THEN RETURN q
+    IF faktor < 100 THEN RETURN qtHeller(q, 10000 \ faktor)
+    DIM h AS INTEGER, s AS INTEGER, v AS INTEGER
+    (h, s, v) = qtHsv(q)
+    RETURN qtAusHsv(h, s, (v * 100) \ faktor)
+END FUNCTION
+
+' Abkuerzungen auf &HRRGGBB
+FUNCTION farbeDunkler(f AS INTEGER, faktor AS INTEGER) AS INTEGER
+    RETURN qtFarbe(qtDunkler(qtWert(f), faktor))
+END FUNCTION
+
+FUNCTION farbeHeller(f AS INTEGER, faktor AS INTEGER) AS INTEGER
+    RETURN qtFarbe(qtHeller(qtWert(f), faktor))
+END FUNCTION

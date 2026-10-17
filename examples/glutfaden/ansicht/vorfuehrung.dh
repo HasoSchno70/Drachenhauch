@@ -1122,3 +1122,82 @@ FUNCTION vorfuehrenStufe11(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+' --- Stufe 12: Muster-Vorschau ---------------------------------------------------------
+' Das Muster aus dem Aufruf; "drills.pxs" neben dem Arbeitsordner fuer das
+' Diamond Painting.
+FUNCTION vfVorschauInfo$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM l AS INTEGER
+    FOR EACH l IN vdlInfo
+        IF gtk_widget_get_visible(l) THEN ARRAY_PUSH(t, gtk_label_get_text(l))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vorfuehrenStufe12(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            DIM d AS INTEGER : d = vdlBauen(lwMuster)
+            PRINT "vorschau: "; TEXT_AUS_ZEIGER$(gtk_window_get_title(vdlDialog)); " | "; vfVorschauInfo$()
+            PRINT "  "; gtk_label_get_text(vdlArtText)
+        CASE 2
+            PRINT "eingepasst: zoom "; vdlZoom; " zelle "; vdlZelle(); " | regler "; INT(gtk_range_get_value(vdlRegler)); " | "; gtk_label_get_text(vdlZoomText)
+            ok = vfFoto(vdlDialog, "vorschau_stoff")
+            gtk_combo_box_set_active(vdlArt, 1)
+            gtk_combo_box_set_active(vdlStoff, 0)
+            PRINT "pixel, aida 11: "; vfVorschauInfo$(); " | "; LEFT$(gtk_label_get_text(vdlArtText), 14)
+            gtk_combo_box_set_active(vdlStoffFarbe, 6)
+        CASE 3
+            ok = vfFoto(vdlDialog, "vorschau_pixel")
+            gtk_combo_box_set_active(vdlArt, 2)
+            gtk_toggle_button_set_active(vdlFertig, TRUE)
+            PRINT "symbol: stoff waehlbar "; gtk_widget_get_sensitive(vdlStoff); " "; gtk_widget_get_sensitive(vdlStoffFarbe); " | stil "; vdlStil().art; " erledigt "; vdlStil().erledigt
+            vdlKnopf(0, 1)
+            PRINT "1:1: zoom "; vdlZoom; " | "; gtk_label_get_text(vdlZoomText)
+            vdlRadZoom(TRUE, FALSE, 100, 100)
+            PRINT "rad rein: "; vdlZoom; " | rein fein: ";
+            vdlRadZoom(TRUE, TRUE, 100, 100)
+            PRINT vdlZoom; " | raus: ";
+            vdlRadZoom(FALSE, FALSE, 100, 100)
+            PRINT vdlZoom
+            ' gezoomt wird um den Punkt unter der Maus
+            DIM gx AS FLOAT : gx = (100 - vdlPanX) / vdlZelle()
+            DIM gy AS FLOAT : gy = (60 - vdlPanY) / vdlZelle()
+            vdlRadZoom(TRUE, FALSE, 100, 60)
+            PRINT "punkt unter der maus bleibt: "; ABS((100 - vdlPanX) / vdlZelle() - gx) < 0.001 AND ABS((60 - vdlPanY) / vdlZelle() - gy) < 0.001; " | zelle "; vdlZelle()
+            FOR i = 1 TO 40
+                vdlRadZoom(TRUE, FALSE, 0, 0)
+            NEXT
+            PRINT "ganz rein: "; vdlZoom; " zelle "; vdlZelle()
+            FOR i = 1 TO 60
+                vdlRadZoom(FALSE, FALSE, 0, 0)
+            NEXT
+            PRINT "ganz raus: "; vdlZoom; " zelle "; vdlZelle()
+            gtk_range_set_value(vdlRegler, 150)
+            PRINT "regler 150: "; vdlZoom; " | "; gtk_label_get_text(vdlZoomText)
+            vdlEinpassen()
+        CASE 4
+            ok = vfFoto(vdlDialog, "vorschau_symbol")
+            DIM ziel AS STRING : ziel = PATHJOIN(STARTDIR$(), "vorschau_export.png")
+            PRINT "bild: '"; vdlBildSchreiben$(12, ziel); "' | da "; FILEEXISTS(ziel)
+            gtk_widget_destroy(vdlDialog)
+            vdlDialog = 0
+            DIM dp AS kern.Muster : dp = kern.pxsLaden(PATHJOIN(STARTDIR$(), "drills.pxs"))
+            d = vdlBauen(dp)
+            PRINT "drills: arten "; gtk_tree_model_iter_n_children(gtk_combo_box_get_model(vdlArt), 0); " | stoff sichtbar "; gtk_widget_get_visible(vdlStoff); " rueck "; gtk_widget_get_visible(vdlRueck); " | "; vfVorschauInfo$()
+            PRINT "  "; gtk_label_get_text(vdlArtText)
+        CASE 5
+            ok = vfFoto(vdlDialog, "vorschau_drills")
+            gtk_widget_destroy(vdlDialog)
+            vdlDialog = 0
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

@@ -1,0 +1,36 @@
+' Zwei PNGs Punkt fuer Punkt: der Anteil der Punkte, an denen ein Kanal um
+' mehr als 40 abweicht (in Prozent), oder -1, wenn die Groessen nicht
+' passen. Kantenglaettung rechnen Cairo und Qt verschieden -- darum ein
+' Anteil statt Gleichheit.
+FUNCTION gvAbweichung(a AS STRING, b AS STRING) AS FLOAT
+    DIM ia AS IMAGE : ia = LOADIMAGE(a)
+    DIM ib AS IMAGE : ib = LOADIMAGE(b)
+    DIM w AS INTEGER : w = IMAGE_WIDTH(ia)
+    DIM h AS INTEGER : h = IMAGE_HEIGHT(ia)
+    IF w <> IMAGE_WIDTH(ib) OR h <> IMAGE_HEIGHT(ib) THEN
+        IMAGE_FREE(ia) : IMAGE_FREE(ib)
+        RETURN -1.0
+    END IF
+    DIM deutlich AS INTEGER
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO w - 1
+            DIM p AS INTEGER : p = GETPIXEL(ia, x, y)
+            DIM q AS INTEGER : q = GETPIXEL(ib, x, y)
+            IF ABS((p SHR 16 BAND 255) - (q SHR 16 BAND 255)) > 40 OR ABS((p SHR 8 BAND 255) - (q SHR 8 BAND 255)) > 40 OR ABS((p BAND 255) - (q BAND 255)) > 40 THEN deutlich = deutlich + 1
+        NEXT
+    NEXT
+    IMAGE_FREE(ia) : IMAGE_FREE(ib)
+    RETURN 100.0 * deutlich / (w * h)
+END FUNCTION
+
+' Eine Zeile je Bild: Groesse und ob der Anteil unter der Grenze bleibt
+FUNCTION gvZeile$(name AS STRING, a AS STRING, b AS STRING, grenze AS FLOAT) AS STRING
+    DIM d AS FLOAT : d = gvAbweichung(a, b)
+    IF d < 0 THEN RETURN name + ": groesse passt nicht"
+    DIM ib AS IMAGE : ib = LOADIMAGE(b)
+    DIM t AS STRING : t = name + " " + STR$(IMAGE_WIDTH(ib)) + "x" + STR$(IMAGE_HEIGHT(ib)) + ": "
+    IMAGE_FREE(ib)
+    IF d <= grenze THEN RETURN t + "unter " + FORMAT$(grenze, "%.1f") + " %"
+    RETURN t + FORMAT$(d, "%.2f") + " % -- grenze " + FORMAT$(grenze, "%.1f") + " %"
+END FUNCTION
