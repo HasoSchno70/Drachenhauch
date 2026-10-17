@@ -1866,7 +1866,7 @@ ExtGState; GDI und PDF_PREVIEW mischen gegen Weiss), PDF_NEW mit A2/A1/A0,
 Methoden mit dem Namen einer Modulfunktion, `--check` warnt bei einem Text,
 den JSON_TYPE nie liefert ("bool" statt "boolean" -- daran luden
 Wahrheitswerte einer .pxs nie). Ohne Passwortschutz (krilla verschluesselt
-nicht); die Stickpfad-Vorschau (PyStickys Optimierer) fehlt noch.
+nicht); die Stickpfad-Vorschau kam mit Stufe 7.
 
 **Stufe 6: fremde Formate, Diamond, Blends** (2026-10-16). **PyStickys
 Leser fuer .pat und .xsd lesen keine echte Datei** (sie erwarten Kennungen
@@ -1894,6 +1894,41 @@ Dialog Strg+B bzw. [Blend...] neben der Garnsuche. **Fund:**
 `farbeHinzufuegen` legte einen Blend mit anderem Strangverhaeltnis still auf
 den vorhandenen zusammen. `--probe-stufe6`, Sammlung
 `tests/pruef/glutfaden_stufe6.dhtest`.
+
+**Stufe 7: der Stickpfad** (2026-10-17). `kern/stickpfad.dh` = PyStickys
+`stitch_path_optimizer`: zeilenweise (Schlange je Zeile), naechster Nachbar
+(Faecher-Raster mit Ringsuche wie dort, verkettete Listen statt Mengen),
+daenisch, spaltenweise, diagonal; Farben in der Reihenfolge ihres ersten
+Vorkommens, Sprung = Schritt ueber 4 Stiche, Garn 2,5 cm je Stich plus
+0,5 cm je Stich Rueckseite bei 14 ct; `stickplanText$` (PyStickys
+"Als Text exportieren"), `spVergleich` (stabil nach Distanz), `spBewertung$`,
+`spAusschnitt` (eine Seite: Stiche darin, Abstaende und Spruenge neu).
+**Gleichstand beim naechsten Nachbarn:** PySticky nimmt die Reihenfolge
+einer Python-Menge, Glutfaden den oberen, dann den linken Stich. Mit dieser
+Regel (fuer die Aufzeichnung in PySticky eingesetzt) ist der Pfad Stich fuer
+Stich derselbe -- auch am Leuchtturm (1600 x 9 Stiche) --, die vier anderen
+Strategien sind es ohnehin, der Stickplan byte-gleich. Das PDF zeichnet wie
+PySticky (`include_path_preview`, Vorgabe an) auf jeder Musterseite die Pfade
+unter die Symbole (Garnfarbe x 0,7, Deckkraft 0,6; Spruenge rot gestrichelt
+0,5) und den Absatz "Stickpfad: n Stiche | c Farben | j Spruenge", nicht im
+Diamond-Modus; `PdfOptionen.stickpfad`, Kaestchen im Export-Dialog, die
+Stufe-5-Aufzeichnungen laufen mit `stickpfad = FALSE` (`gePdfOptionen`).
+Oberflaeche `ansicht/stickpfaddialog.dh` (Strg+Umschalt+O, Knopf in der
+Kopfleiste) = StitchPathDialog + PathPreviewWidget: Vorschau mit Pfeilen,
+S/E, Nummern ab 16 Punkten, Kontext blass, Grund nach Helligkeit des Garns,
+Rad-Zoom um die Maus, Ziehen, Tooltip je Stich; Tabelle je Farbe mit
+Garnbalken, Summen, Vergleich (waehlt die beste); Export als Text, PNG der
+Farbe (15 Punkte je Stich, Legende) und alle als `01_Name.png`. Anders: der
+Pfad steht beim Oeffnen schon da, kein Faden, Meldungen unten statt Kasten.
+**Fund in der Laufzeit:** das pdf-Modul konnte nicht stricheln -- neu
+`PDF_DASH(p, strich_mm [, luecke_mm])` fuer Linien und Umrisse, im PDF
+(krilla `StrokeDash`), im Windows-Druck (geometrischer GDI-Stift) und in
+`PDF_PREVIEW` (die Folge laeuft ueber die Ecken weiter). `--probe-stufe7`
+(Punktproben an den PNGs), Sammlung `tests/pruef/glutfaden_stufe7.dhtest`
+(9; neun Verfaelschungen des Kerns und acht des Dialogs fallen je in ihrem
+Fall). **Stolperstein:** ein eben sichtbar gemachtes Widget hat im selben
+Schritt noch keine Groesse -- `gtkFoto` gleich danach meldet
+`alloc_needed`; das Foto gehoert in den naechsten Schritt.
 
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
