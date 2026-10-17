@@ -46,6 +46,10 @@
 ' Schlagwoertern und Notizen; Farb-Harmonien (Strg+Umschalt+H) zur Farbe.
 ' Stufe 12: Muster-Vorschau (F5) -- gestickt auf Stoff, als Pixel oder als
 ' Symbol-Plan, Diamond Painting als Drills; Zoom, Bild-Export.
+' Stufe 13: Einstellungen (Muster -> Einstellungen, Strg+Komma) -- Raster,
+' Farben, Zoom, Werkzeuge, Symbole, Export- und Import-Vorgaben, eigene
+' Tastenkuerzel; Raster-Optionen (Strg+Umschalt+R), Zuletzt geoeffnet,
+' automatisch sichern mit Wiederherstellen, .bak vor dem Ueberschreiben.
 '
 ' Aufbau:
 '     kern/      Muster, Ebenen, Garne, Paletten, .pxs, Formen, Verlauf,
@@ -57,7 +61,7 @@
 '
 ' GTK muss da sein: unter Linux fast immer (libgtk-3-0), unter macOS ueber
 ' Homebrew (brew install gtk+3), unter Windows aus MSYS2 im PATH -- oder aus
-' Inkscape. Mit --probe (bzw. --probe-bearbeiten, --probe-stufe3 .. 12) fuehrt
+' Inkscape. Mit --probe (bzw. --probe-bearbeiten, --probe-stufe3 .. 13, --probe-start) fuehrt
 ' sich das Programm selbst vor und endet; --foto
 ' ziel sichert dabei Bilder des Fensters (fuer Pruefungen).
 IMPORT "kern/kern.dh" AS kern
@@ -464,7 +468,7 @@ SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 12", _
+    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 13", _
         "comments", "Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.", _
         "website", "https://github.com/HasoSchno70/Pysticky", "website-label", "PySticky (das Original)", 0)
 END SUB
@@ -741,6 +745,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe12"
     ELSEIF ARG$(a) = "--probe-stufe13" THEN
         probe = "stufe13"
+    ELSEIF ARG$(a) = "--probe-start" THEN
+        probe = "start"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -787,6 +793,7 @@ IF probe = "stufe10" THEN g_timeout_add(300, vorfuehrenStufe10, 0)
 IF probe = "stufe11" THEN g_timeout_add(300, vorfuehrenStufe11, 0)
 IF probe = "stufe12" THEN g_timeout_add(300, vorfuehrenStufe12, 0)
 IF probe = "stufe13" THEN g_timeout_add(300, vorfuehrenStufe13, 0)
+IF probe = "start" THEN g_timeout_add(300, vorfuehrenStart, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 

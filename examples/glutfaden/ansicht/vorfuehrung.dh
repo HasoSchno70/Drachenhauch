@@ -1254,7 +1254,7 @@ FUNCTION vorfuehrenStufe13(daten AS INTEGER) AS BOOLEAN
             PRINT "angezeigt: "; gtk_label_get_text(edKuText[vfKu("sichern")]); " | "; gtk_label_get_text(edKuText[vfKu("vorschau")])
             edUebernehmen()
             PRINT "uebernommen: raster "; einst.rasterHaupt; "/"; einst.rasterNeben; " haupt "; vfHex$(einst.hauptFarbe); " zelle "; einst.zelleStandard; " zoom "; einst.zoomTempo; " pipette "; einst.pipetteDanach; " toleranz "; einst.fuellToleranz; " diagonal "; einst.fuellenDiagonal; " katalog "; einst.katalog; " symbol "; einst.symbolGroesse; " anzeige "; einst.farbAnzeige; " meldung "; einst.meldungSekunden; " autor '"; einst.autor; "'"
-            PRINT "tafel: F2 "; einstTafel["F2"]; " | Strg+S "; einstTafel["Strg+S"]; " | sichern "; kern.kuerzelVon$(einst, "sichern")
+            PRINT "tafel: F2 "; MAPGETOR(einstTafel, "F2", "-"); " | Strg+S "; MAPGETOR(einstTafel, "Strg+S", "-"); " | sichern "; kern.kuerzelVon$(einst, "sichern")
             PRINT "tooltip: "; TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(kSichern))
             PRINT "datei: "; FILEEXISTS(einst.pfad)
             gtk_widget_destroy(edDialog)
@@ -1321,4 +1321,19 @@ FUNCTION vorfuehrenStufe13(daten AS INTEGER) AS BOOLEAN
             RETURN FALSE
     END SELECT
     RETURN TRUE
+END FUNCTION
+
+' --probe-start: was der Start aus den Einstellungen gemacht hat (ohne Datei
+' im Aufruf -- dann gilt die Startaktion), danach zu.
+FUNCTION vorfuehrenStart(daten AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER, h AS INTEGER
+    gtk_window_get_size(fenster, b, h)
+    PRINT "start: "; musterTitel; " | "; lwMuster.breite; "x"; lwMuster.hoehe; " | datei "; BASENAME(musterPfad); " | werkzeug "; wzAktiv; " | fenster "; b; "x"; h; " | zuletzt "; LEN(zlPfade)
+    PRINT "kuerzel: "; TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(kSichern)); " | export "; kern.kuerzelVon$(einst, "export"); " | F2 "; MAPGETOR(einstTafel, "F2", "-")
+    ' wie das Kreuz: Fenster messen, dann zu (gemerkt wird beim Ende)
+    werkzeugWaehlen(WZ_LINIE, FALSE)
+    fensterMessen()
+    schliessenErlaubt = TRUE
+    gtk_widget_destroy(fenster)
+    RETURN FALSE
 END FUNCTION
