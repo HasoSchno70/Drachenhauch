@@ -42,7 +42,7 @@
 '
 ' GTK muss da sein: unter Linux fast immer (libgtk-3-0), unter macOS ueber
 ' Homebrew (brew install gtk+3), unter Windows aus MSYS2 im PATH -- oder aus
-' Inkscape. Mit --probe (bzw. --probe-bearbeiten, --probe-stufe3 .. 7) fuehrt
+' Inkscape. Mit --probe (bzw. --probe-bearbeiten, --probe-stufe3 .. 8) fuehrt
 ' sich das Programm selbst vor und endet; --foto
 ' ziel sichert dabei Bilder des Fensters (fuer Pruefungen).
 IMPORT "kern/kern.dh" AS kern
@@ -54,6 +54,7 @@ IMPORT "ansicht/dialoge.dh"
 IMPORT "ansicht/importdialog.dh"
 IMPORT "ansicht/exportdialog.dh"
 IMPORT "ansicht/stickpfaddialog.dh"
+IMPORT "ansicht/analysedialoge.dh"
 IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/seitenleiste.dh"
 
@@ -75,7 +76,7 @@ CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" +
     " .seitenleiste row:selected label { color: #ffffff; }" + _
     " .ueberschrift { color: #8d93a1; font-weight: 700; font-size: 9pt; margin: 14px 14px 4px 14px; }" + _
     " .farbzeile { padding: 3px 14px; }" + _
-    " .farbzeile label { color: #d6d9e1; } .nebensache { color: #8d93a1; } .wert { color: #ff8a3d; } .benutzt { color: #ffb27a; }" + _
+    " .farbzeile label { color: #d6d9e1; } .nebensache { color: #8d93a1; } .wert { color: #ff8a3d; } .karte { border: 1px solid alpha(#8d93a1, 0.35); border-radius: 8px; padding: 8px 12px; } .kartenwert { font-size: 15pt; font-weight: 700; } .benutzt { color: #ffb27a; }" + _
     " .ebene { padding: 2px 10px; color: #d6d9e1; }" + _
     " .innen { margin: 2px 14px; }" + _
     " .seitenleiste entry, .seitenleiste combobox button { background-image: none; background-color: #2a2c33; color: #e4e5ea; border: 1px solid #3a3c44; box-shadow: none; text-shadow: none; }" + _
@@ -437,6 +438,9 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
             CASE &H65, &H45 : exportDialog()                     ' Strg+E
             CASE &H64, &H44 : modusUmschalten()                  ' Strg+D
             CASE &H62, &H42 : blendDialog()                      ' Strg+B
+            CASE &H67, &H47                                      ' Strg+Umschalt+G
+                IF NOT umschalt THEN RETURN FALSE
+                statistikDialog()
             CASE &H69, &H49                                      ' Strg+I, Strg+Umschalt+I
                 IF umschalt THEN bildNeuImportieren() ELSE bildImportieren()
             CASE &H6E, &H4E                                      ' Strg+Umschalt+N
@@ -510,6 +514,7 @@ gtk_header_bar_pack_start(kopf, kImport)
 gtk_header_bar_pack_start(kopf, kSichern)
 gtk_header_bar_pack_start(kopf, kExport)
 gtk_header_bar_pack_start(kopf, kPfad)
+gtk_header_bar_pack_start(kopf, auswertenKnopf())
 gtk_header_bar_pack_start(kopf, kZurueck)
 gtk_header_bar_pack_start(kopf, kVor)
 kModus = gtk_button_new_with_label("✕ Kreuzstich")
@@ -581,6 +586,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe6"
     ELSEIF ARG$(a) = "--probe-stufe7" THEN
         probe = "stufe7"
+    ELSEIF ARG$(a) = "--probe-stufe8" THEN
+        probe = "stufe8"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -599,5 +606,6 @@ IF probe = "stufe4" THEN g_timeout_add(300, vorfuehrenStufe4, 0)
 IF probe = "stufe5" THEN g_timeout_add(300, vorfuehrenStufe5, 0)
 IF probe = "stufe6" THEN g_timeout_add(300, vorfuehrenStufe6, 0)
 IF probe = "stufe7" THEN g_timeout_add(300, vorfuehrenStufe7, 0)
+IF probe = "stufe8" THEN g_timeout_add(300, vorfuehrenStufe8, 0)
 
 gtk_main()
