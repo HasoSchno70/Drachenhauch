@@ -1761,3 +1761,129 @@ FUNCTION vorfuehrenStufe16(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+
+' --- Stufe 17: Info- und Fortschritts-Leiste, Symbol-Editor ----------------------
+
+DIM v17Vorher AS STRING
+DIM v17Dialog AS INTEGER
+
+' Stand samt Fortschritt und Stoff (vfAlles$ kennt beides nicht)
+FUNCTION v17Stand$() AS STRING
+    DIM p AS kern.Fortschritt : p = kern.fortschrittVon(lwMuster)
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(p.farbeErledigt) - 1
+        ARRAY_PUSH(t, STR$(p.farbeErledigt[i]))
+    NEXT
+    RETURN vfAlles$() + " # " + JOIN$(t, ",") + " # stoff " + STR$(lwMuster.stoff)
+END FUNCTION
+
+FUNCTION v17Karten$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM l AS INTEGER
+    FOR EACH l IN ilKarten
+        ARRAY_PUSH(t, gtk_label_get_text(l))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION v17Zeilen$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(fsNr) - 1
+        ARRAY_PUSH(t, STR$(fsNr[k]) + ":" + gtk_label_get_text(fsProzent[k]) + " " + gtk_label_get_text(fsZahlJe[k]))
+    NEXT
+    RETURN JOIN$(t, "; ")
+END FUNCTION
+
+FUNCTION vorfuehrenStufe17(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v17Vorher = v17Stand$()
+            PRINT "reiter: "; gtk_stack_get_visible_child_name(slStapel)
+            seitenleisteReiter("info")
+            PRINT "info: "; gtk_stack_get_visible_child_name(slStapel)
+            PRINT "karten: "; v17Karten$()
+            PRINT "wie der kern: "; v17Karten$() = JOIN$(kern.infoKarten(lwMuster, lwMuster.modus), " | ")
+            PRINT "stoffe: "; LEN(ilStoffe); " | gewaehlt "; gtk_combo_box_get_active(ilStoff); " = "; ilStoffe[gtk_combo_box_get_active(ilStoff)]
+            DIM t AS ARRAY OF STRING : t = []
+            FOR i = 0 TO LEN(ilFarbTexte) - 1
+                ARRAY_PUSH(t, gtk_label_get_text(ilFarbTexte[i]))
+            NEXT
+            PRINT "farben: "; JOIN$(t, " ; ")
+            PRINT "quellbild: "; gtk_widget_get_visible(ilQuelle); " | "; gtk_label_get_text(ilQuelleText)
+            farbeWaehlen(3)
+            PRINT "markiert 3: "; gtk_list_box_row_get_index(gtk_list_box_get_selected_row(ilFarbListe))
+        CASE 2
+            ok = vfFoto(fenster, "info")
+            ' Stoff ueber die Klappliste: ein Schritt, Masse und Garn folgen
+            DIM idx AS INTEGER : idx = ARRAY_INDEXOF(ilStoffe, 18.0)
+            gtk_combo_box_set_active(ilStoff, idx)
+            PRINT "stoff 18: "; lwMuster.stoff; " | "; gtk_label_get_text(ilKarten[3]); " | "; gtk_label_get_text(ilKarten[6]); " | schritt '"; wzVerlauf.textZurueck$(); "' | geaendert "; istGeaendert()
+            werkzeugZurueck()
+            PRINT "zurueck: "; lwMuster.stoff; " | klappliste "; ilStoffe[gtk_combo_box_get_active(ilStoff)]; " | "; gtk_label_get_text(ilKarten[3])
+            ' eine Zaehlung ausserhalb der Liste kommt dazu
+            lwMuster.stoff = 25
+            infoleisteNachziehen()
+            PRINT "stoff 25: "; LEN(ilStoffe); " eintraege, gewaehlt "; ilStoffe[gtk_combo_box_get_active(ilStoff)]
+            lwMuster.stoff = 14
+            infoleisteNachziehen()
+            ' Zeile der Liste anklicken waehlt die Farbe
+            gtk_list_box_select_row(ilFarbListe, gtk_list_box_get_row_at_index(ilFarbListe, 1))
+            PRINT "liste waehlt: "; wzFarbe; " | farbleiste "; gtk_label_get_text(fbAktuell)
+            seitenleisteReiter("fortschritt")
+            PRINT "fortschritt: "; gtk_label_get_text(fsZahl); " | balken "; TEXT_AUS_ZEIGER$(gtk_progress_bar_get_text(fsBalken)); " | zeilen "; v17Zeilen$()
+            PRINT "knopf: "; fsModusText
+        CASE 3
+            ok = vfFoto(fenster, "fortschritt")
+            ' Sticken-Modus = Fortschritts-Werkzeug, beenden kehrt zurueck
+            werkzeugWaehlen(WZ_LINIE, FALSE)
+            befehlAusfuehren("stickmodus")
+            PRINT "sticken: "; wzAktiv = WZ_FORTSCHRITT; " | "; fsModusText
+            stickenModusUmschalten()
+            PRINT "beendet: "; wzAktiv = WZ_LINIE; " | "; fsModusText
+            ' Alle erledigt fuer die erste Zeile
+            DIM nr AS INTEGER : nr = fsNr[0]
+            farbeAlsErledigtNr(nr)
+            PRINT "alle erledigt "; nr; ": "; gtk_label_get_text(fsZahl); " | "; v17Zeilen$(); " | schritt '"; wzVerlauf.textZurueck$(); "'"
+            fortschrittZuruecksetzen(FALSE)
+            PRINT "zurueckgesetzt: "; gtk_label_get_text(fsZahl); " | balken "; TEXT_AUS_ZEIGER$(gtk_progress_bar_get_text(fsBalken)); " | schritt '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            fortschrittZuruecksetzen(FALSE)
+            PRINT "nochmal: "; meldung
+            werkzeugZurueck()
+            werkzeugZurueck()
+            PRINT "zweimal zurueck: wie vorher "; v17Stand$() = v17Vorher; " | "; gtk_label_get_text(fsZahl)
+            seitenleisteReiter("muster")
+            ' Symbol-Editor fuer Farbe 2
+            v17Dialog = seDialogBauen(2)
+            PRINT "editor: symbole "; LEN(seKinder); " | gewaehlt "; seWahl; " markiert "; gtk_flow_box_child_is_selected(seKinder[ARRAY_INDEXOF(seSymbole, seWahl)])
+        CASE 4
+            ok = vfFoto(v17Dialog, "symboleditor")
+            PRINT "suche circle: "; seFiltern("circle"); " | keine treffer sichtbar "; gtk_widget_get_visible(seLeer)
+            PRINT "suche u+2665: "; seFiltern("u+2665"); " | gibt es nicht: "; seFiltern("kein zeichen"); " "; gtk_widget_get_visible(seLeer)
+            PRINT "suche leer: "; seFiltern("")
+            ' Ein Symbol einer anderen Farbe: abgewiesen
+            DIM alt AS STRING : alt = lwMuster.farben[2].symbol
+            seWaehlen(lwMuster.farben[0].symbol)
+            DIM f0 AS STRING : f0 = seUebernehmen()
+            PRINT "doppelt: "; f0 <> ""; " | symbol 2 bleibt "; lwMuster.farben[2].symbol = alt; " | schritte "; LEN(wzVerlauf.rueck); " | "; REPLACE$(f0, CHR$(10), " / ")
+            ' Leerraum als eigenes Zeichen zaehlt nicht
+            gtk_entry_set_text(seEigen, " ")
+            PRINT "leerraum: "; seWahl = lwMuster.farben[0].symbol
+            gtk_entry_set_text(seEigen, "Ω")
+            PRINT "eigenes: "; seWahl; " | markiert keins "; gtk_flow_box_child_is_selected(seKinder[0]) = FALSE
+            PRINT "uebernommen: '"; seUebernehmen(); "' | symbol 2 "; alt; " -> "; lwMuster.farben[2].symbol; " | schritt '"; wzVerlauf.textZurueck$(); "'"
+            gtk_widget_destroy(v17Dialog)
+            werkzeugZurueck()
+            PRINT "zurueck: "; lwMuster.farben[2].symbol = alt; " | wie vorher "; v17Stand$() = v17Vorher
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
