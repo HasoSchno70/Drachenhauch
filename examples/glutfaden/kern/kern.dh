@@ -30,6 +30,7 @@ IMPORT "harmonie.dh" AS kern
 IMPORT "bibliothek.dh" AS kern
 IMPORT "qtfarbe.dh" AS kern
 IMPORT "einstellungen.dh" AS kern
+IMPORT "farbverwaltung.dh" AS kern
 IMPORT "bildexport.dh" AS kern
 IMPORT "pdfexport.dh" AS kern
 IMPORT "htmlexport.dh" AS kern
