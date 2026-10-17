@@ -303,7 +303,12 @@ END FUNCTION
 SUB minikarteAuffrischen()
     mkNeu = TRUE
     IF mkFeld <> 0 THEN gtk_widget_queue_draw(mkFeld)
-    IF mkInfo <> 0 AND lwHat THEN gtk_label_set_text(mkInfo, STR$(lwMuster.breite) + " × " + STR$(lwMuster.hoehe) + " Stiche")
+    ' den Text nur, wenn er sich aendert -- gtk_label_set_text vermisst auch
+    ' bei gleichem Text neu (siehe verlaufLeisteNachziehen)
+    IF mkInfo <> 0 AND lwHat THEN
+        DIM t AS STRING : t = STR$(lwMuster.breite) + " × " + STR$(lwMuster.hoehe) + " Stiche"
+        IF t <> gtk_label_get_text(mkInfo) THEN gtk_label_set_text(mkInfo, t)
+    END IF
 END SUB
 
 SUB minikarteZeigen(an AS BOOLEAN)
@@ -566,6 +571,7 @@ DIM fvlEndeWahl AS INTEGER
 DIM fvlStart AS INTEGER                ' Farbnummern
 DIM fvlEnde AS INTEGER
 DIM fvlSperre AS BOOLEAN
+DIM fvlListe AS STRING                 ' womit die Listen gefuellt sind
 
 FUNCTION verlaufLeisteNeu() AS INTEGER
     fvlBox = gtk_box_new(GTK_WAAGERECHT, 4)
@@ -601,20 +607,31 @@ END FUNCTION
 ' Die beiden Listen nach den Farben des Musters (nach dem Laden und jedem Umbau)
 SUB verlaufLeisteNachziehen()
     IF fvlStartWahl = 0 OR NOT lwHat THEN RETURN
-    fvlSperre = TRUE
-    gtk_combo_box_text_remove_all(fvlStartWahl)
-    gtk_combo_box_text_remove_all(fvlEndeWahl)
-    DIM f AS kern.Farbeintrag
-    FOR EACH f IN lwMuster.farben
-        gtk_combo_box_text_append_text(fvlStartWahl, f.symbol + " " + f.garn.name)
-        gtk_combo_box_text_append_text(fvlEndeWahl, f.symbol + " " + f.garn.name)
-    NEXT
     DIM n AS INTEGER : n = lwMuster.farbanzahl()
     IF fvlStart >= n THEN fvlStart = MAX(0, n - 1)
     IF fvlEnde >= n THEN fvlEnde = MAX(0, n - 1)
+    ' Neu gefuellt wird nur, wenn sich die Farben geaendert haben: jedes
+    ' Fuellen laesst die Werkzeugleiste neu vermessen, und die Seitenleiste
+    ' frischt oft auf -- ein Foto im selben Takt traf sonst ein Fenster
+    ' mitten im Vermessen (Gtk-CRITICAL "alloc_needed")
+    DIM stand AS STRING
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN lwMuster.farben
+        stand = stand + f.symbol + " " + f.garn.name + CHR$(10)
+    NEXT
+    fvlSperre = TRUE
+    IF stand <> fvlListe THEN
+        fvlListe = stand
+        gtk_combo_box_text_remove_all(fvlStartWahl)
+        gtk_combo_box_text_remove_all(fvlEndeWahl)
+        FOR EACH f IN lwMuster.farben
+            gtk_combo_box_text_append_text(fvlStartWahl, f.symbol + " " + f.garn.name)
+            gtk_combo_box_text_append_text(fvlEndeWahl, f.symbol + " " + f.garn.name)
+        NEXT
+    END IF
     IF n > 0 THEN
-        gtk_combo_box_set_active(fvlStartWahl, fvlStart)
-        gtk_combo_box_set_active(fvlEndeWahl, fvlEnde)
+        IF gtk_combo_box_get_active(fvlStartWahl) <> fvlStart THEN gtk_combo_box_set_active(fvlStartWahl, fvlStart)
+        IF gtk_combo_box_get_active(fvlEndeWahl) <> fvlEnde THEN gtk_combo_box_set_active(fvlEndeWahl, fvlEnde)
     END IF
     fvlSperre = FALSE
 END SUB
