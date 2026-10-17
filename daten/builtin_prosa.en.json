@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2095,
+ "count": 2096,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1153,6 +1153,7 @@
   "JSON_GET_JSON": "JSON_HANDLE — subtree at the path as a document of its own (copy) — the counterpart to JSON_SET_JSON, for example to carry a piece you do not understand along unchanged",
   "JSON_GET_STRING": "STRING — read the value at the path as text (\"nutzer.name\", \"posten.0\")",
   "JSON_HAS": "BOOLEAN — is there anything at the path at all?",
+  "JSON_KEY$": "STRING — field name as a path segment: dot and backslash escaped so that names from JSON_KEYS can be addressed again",
   "JSON_KEYS": "ARRAY OF STRING field names of an object",
   "JSON_LEN": "INTEGER — length of a list or number of fields of an object",
   "JSON_LOAD": "JSON_HANDLE — read JSON from a file",

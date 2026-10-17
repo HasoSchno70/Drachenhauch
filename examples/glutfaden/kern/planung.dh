@@ -1,0 +1,613 @@
+' Planen und Vorrat (PySticky core/inventory.py, core/project_list.py,
+' core/hoop_planner.py und die Rechnungen von palette_conversion_dialog.py
+' und _swap_color_pair).
+'
+' Garn-Vorrat und Projektliste liegen als JSON im Einstellungsordner von
+' Glutfaden, im selben Aufbau wie bei PySticky -- eine inventory.json von
+' dort laesst sich also einfach hineinkopieren.
+IMPORT "json"
+
+' Eine Datei im Einstellungsordner (APPDATA bzw. ~/.config, Unterordner
+' Glutfaden). Der Ordner entsteht erst beim Schreiben.
+FUNCTION einstellungsDatei$(name AS STRING) AS STRING
+    DIM basis AS STRING : basis = GETENV$("APPDATA", "")
+    IF basis = "" THEN basis = PATHJOIN(GETENV$("HOME", TEMPDIR$()), ".config")
+    RETURN PATHJOIN(PATHJOIN(basis, "Glutfaden"), name)
+END FUNCTION
+
+' Eine Datei schreiben, den Ordner davor anlegen (MKDIR legt auch Eltern an).
+SUB textSchreiben(pfad AS STRING, text AS STRING)
+    IF DIRNAME(pfad) <> "" AND NOT DIREXISTS(DIRNAME(pfad)) THEN MKDIR(DIRNAME(pfad))
+    WRITEALL(pfad, text)
+END SUB
+
+' --- Garn-Vorrat -------------------------------------------------------------------
+
+' Der Schluessel eines Garns: "Hersteller::Nummer", Leeres wird "unknown".
+' Fehlen BEIDE, entscheidet der Name ("unknown::unknown::Name") -- sonst
+' teilten sich alle Farben ohne Hersteller und Nummer einen Bestand.
+FUNCTION vorratSchluessel$(hersteller AS STRING, nummer AS STRING, name AS STRING) AS STRING
+    DIM h AS STRING : h = TRIM$(hersteller)
+    DIM n AS STRING : n = TRIM$(nummer)
+    IF h = "" AND n = "" THEN
+        DIM nm AS STRING : nm = TRIM$(name)
+        IF nm <> "" THEN RETURN "unknown::unknown::" + nm
+        RETURN "unknown::unknown"
+    END IF
+    RETURN IIF(h = "", "unknown", h) + "::" + IIF(n = "", "unknown", n)
+END FUNCTION
+
+' Umkehrung: (Hersteller, Nummer, Name) -- der Name nur beim Sonderfall.
+FUNCTION vorratTeile(schluessel AS STRING) AS TUPLE
+    DIM h AS STRING, n AS STRING, nm AS STRING
+    DIM p AS INTEGER : p = INSTR(schluessel, "::")
+    IF p < 0 THEN RETURN (schluessel, "", "")
+    h = LEFT$(schluessel, p)
+    DIM rest AS STRING : rest = MID$(schluessel, p + 2)
+    p = INSTR(rest, "::")
+    IF p < 0 THEN RETURN (h, rest, "")
+    RETURN (h, LEFT$(rest, p), MID$(rest, p + 2))
+END FUNCTION
+
+FUNCTION garnSchluessel$(g AS Garn) AS STRING
+    RETURN vorratSchluessel$(g.hersteller, g.nummer, g.name)
+END FUNCTION
+
+CLASS Vorrat
+    DIM pfad AS STRING
+    DIM daten AS MAP OF INTEGER
+
+    SUB Init()
+        daten = {}
+    END SUB
+
+    FUNCTION holeSchluessel(k AS STRING) AS INTEGER
+        IF MAPHAS(daten, k) THEN RETURN MAPGET(daten, k)
+        RETURN 0
+    END FUNCTION
+
+    FUNCTION hole(g AS Garn) AS INTEGER
+        RETURN holeSchluessel(garnSchluessel$(g))
+    END FUNCTION
+
+    ' 0 oder weniger nimmt den Eintrag heraus.
+    SUB setzeSchluessel(k AS STRING, anzahl AS INTEGER)
+        IF anzahl <= 0 THEN
+            IF MAPHAS(daten, k) THEN MAPREMOVE(daten, k)
+        ELSE
+            MAPPUT(daten, k, anzahl)
+        END IF
+    END SUB
+
+    SUB setze(g AS Garn, anzahl AS INTEGER)
+        setzeSchluessel(garnSchluessel$(g), anzahl)
+    END SUB
+
+    ' Alle Schluessel, sortiert wie Pythons sorted()
+    FUNCTION schluessel() AS ARRAY OF STRING
+        DIM k AS ARRAY OF STRING : k = MAPKEYS(daten)
+        SORT(k)
+        RETURN k
+    END FUNCTION
+
+    FUNCTION anzahl() AS INTEGER
+        RETURN LEN(MAPKEYS(daten))
+    END FUNCTION
+
+    ' Eintraege mit 0 oder weniger (aus einer Datei; setzen legt keine an)
+    FUNCTION leereEntfernen() AS INTEGER
+        DIM weg AS INTEGER
+        DIM k AS STRING
+        FOR EACH k IN MAPKEYS(daten)
+            IF MAPGET(daten, k) <= 0 THEN
+                MAPREMOVE(daten, k)
+                weg = weg + 1
+            END IF
+        NEXT
+        RETURN weg
+    END FUNCTION
+
+    FUNCTION alsJson$() AS STRING
+        DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+        JSON_SET_INT(j, "version", 1)
+        JSON_SET_JSON(j, "stock", JSON_NEW_OBJECT())
+        DIM k AS STRING
+        FOR EACH k IN schluessel()
+            JSON_SET_INT(j, "stock." + JSON_KEY$(k), MAPGET(daten, k))
+        NEXT
+        RETURN JSON_PRETTY(j)
+    END FUNCTION
+
+    SUB sichern()
+        textSchreiben(pfad, alsJson$())
+    END SUB
+END CLASS
+
+' Ein JSON-Wert als ganze Zahl wie Pythons int(): Kommazahlen Richtung null,
+' Text nur aus Ziffern (Leerraum aussen erlaubt), Wahrheitswerte 0/1. Sonst
+' FALSE -- der Eintrag wird uebergangen.
+FUNCTION jsonGanz(j AS JSON_HANDLE, w AS STRING, BYREF zahl AS INTEGER) AS BOOLEAN
+    SELECT CASE JSON_TYPE(j, w)
+        CASE "number"
+            DIM f AS FLOAT : f = JSON_GET_FLOAT(j, w)
+            IF f < 0 THEN zahl = -FLOOR(-f) ELSE zahl = FLOOR(f)
+            RETURN TRUE
+        CASE "boolean"
+            zahl = IIF(JSON_GET_BOOL(j, w), 1, 0)
+            RETURN TRUE
+        CASE "string"
+            DIM t AS STRING : t = TRIM$(JSON_GET_STRING(j, w))
+            IF NOT REGEX_TEST(t, "^[+-]?[0-9]+(_[0-9]+)*$") THEN RETURN FALSE
+            zahl = VAL(REPLACE$(t, "_", ""))
+            RETURN TRUE
+    END SELECT
+    RETURN FALSE
+END FUNCTION
+
+' Den Vorrat lesen; fehlt die Datei oder ist sie kaputt, ist er leer. Die
+' Datei darf auch flach sein (ohne "stock"), wie bei PySticky.
+FUNCTION vorratLaden(pfad AS STRING) AS Vorrat
+    DIM v AS Vorrat : v = NEW Vorrat()
+    v.pfad = pfad
+    IF NOT FILEEXISTS(pfad) THEN RETURN v
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(pfad)
+    CATCH e
+        RETURN v
+    END TRY
+    IF JSON_TYPE(j, "") <> "object" THEN RETURN v
+    DIM wo AS STRING : wo = ""
+    IF JSON_HAS(j, "stock") THEN
+        IF JSON_TYPE(j, "stock") <> "object" THEN RETURN v
+        wo = "stock."
+    END IF
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(j, IIF(wo = "", "", "stock"))
+        DIM z AS INTEGER
+        IF jsonGanz(j, wo + JSON_KEY$(k), z) THEN MAPPUT(v.daten, k, z)
+    NEXT
+    RETURN v
+END FUNCTION
+
+' --- Projektliste ------------------------------------------------------------------
+
+' Ein Pfad ausgeschrieben (wie Path.resolve())
+FUNCTION vollerPfad$(pfad AS STRING) AS STRING
+    TRY
+        RETURN REALPATH$(pfad)
+    CATCH e
+        IF LEFT$(pfad, 1) = "/" OR MID$(pfad, 1, 1) = ":" THEN RETURN pfad
+        RETURN PATHJOIN(CWD$(), pfad)
+    END TRY
+END FUNCTION
+
+CLASS Projektliste
+    DIM pfad AS STRING
+    DIM pfade AS ARRAY OF STRING
+
+    SUB Init()
+        pfade = []
+    END SUB
+
+    ' FALSE, wenn der Pfad schon drin ist
+    FUNCTION hinzu(p AS STRING) AS BOOLEAN
+        DIM voll AS STRING : voll = vollerPfad$(p)
+        DIM q AS STRING
+        FOR EACH q IN pfade
+            IF q = voll THEN RETURN FALSE
+        NEXT
+        ARRAY_PUSH(pfade, voll)
+        RETURN TRUE
+    END FUNCTION
+
+    SUB entfernen(p AS STRING)
+        DIM voll AS STRING : voll = vollerPfad$(p)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(pfade) - 1
+            IF pfade[i] = voll THEN
+                ARRAY_REMOVE_AT(pfade, i)
+                RETURN
+            END IF
+        NEXT
+    END SUB
+
+    FUNCTION alsJson$() AS STRING
+        DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+        JSON_SET_INT(j, "version", 1)
+        JSON_SET_JSON(j, "projects", JSON_NEW_ARRAY())
+        DIM p AS STRING
+        FOR EACH p IN pfade
+            JSON_APPEND_STRING(j, "projects", p)
+        NEXT
+        RETURN JSON_PRETTY(j)
+    END FUNCTION
+
+    SUB sichern()
+        textSchreiben(pfad, alsJson$())
+    END SUB
+END CLASS
+
+FUNCTION projektlisteLaden(pfad AS STRING) AS Projektliste
+    DIM l AS Projektliste : l = NEW Projektliste()
+    l.pfad = pfad
+    IF NOT FILEEXISTS(pfad) THEN RETURN l
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(pfad)
+    CATCH e
+        RETURN l
+    END TRY
+    IF JSON_TYPE(j, "") <> "object" THEN RETURN l
+    IF NOT JSON_HAS(j, "projects") THEN RETURN l
+    IF JSON_TYPE(j, "projects") <> "array" THEN RETURN l
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "projects") - 1
+        DIM w AS STRING : w = "projects." + STR$(i)
+        IF JSON_TYPE(j, w) = "string" THEN
+            ARRAY_PUSH(l.pfade, JSON_GET_STRING(j, w))
+        ELSEIF JSON_TYPE(j, w) = "number" THEN
+            ARRAY_PUSH(l.pfade, JSON_STRINGIFY(JSON_GET_JSON(j, w)))
+        END IF
+    NEXT
+    RETURN l
+END FUNCTION
+
+' --- Einkaufsliste -----------------------------------------------------------------
+
+CLASS Einkaufszeile
+    DIM garn AS Garn
+    DIM schluessel AS STRING
+    DIM stiche AS INTEGER
+    DIM benoetigt AS INTEGER          ' Straenge (Diamond Painting: Drills)
+    DIM vorhanden AS INTEGER
+    DIM kaufen AS INTEGER
+    DIM diamant AS BOOLEAN
+END CLASS
+
+' Stiche je Strang fuer die Stoffzaehlung des Musters (krumme Zaehlung: 500)
+FUNCTION stichJeStrangMuster(m AS Muster) AS INTEGER
+    IF m.stoff = INT(m.stoff) THEN RETURN stichJeStrang(INT(m.stoff))
+    RETURN 500
+END FUNCTION
+
+' Was alle Muster zusammen brauchen, gegen den Vorrat gerechnet -- je echtes
+' Garn ein Eintrag (ein Blend teilt seinen Bedarf auf seine Garne auf, beide
+' mit der vollen Zahl), nach Schluessel sortiert. Der Vorrat wird EINMAL
+' abgezogen, nicht je Muster.
+FUNCTION einkaufslisteMehrere(liste AS ARRAY OF Muster, v AS Vorrat, zuschlag AS FLOAT) AS ARRAY OF Einkaufszeile
+    DIM stiche AS MAP OF INTEGER : stiche = {}
+    DIM bedarf AS MAP OF INTEGER : bedarf = {}
+    DIM platz AS MAP OF INTEGER : platz = {}
+    DIM garne AS ARRAY OF Garn : garne = []
+    DIM diamant AS ARRAY OF BOOLEAN : diamant = []
+    DIM faktor AS FLOAT : faktor = 1 + (zuschlag / 100)
+    DIM m AS Muster
+    FOR EACH m IN liste
+        m.stichzahlenNeu()
+        DIM dp AS BOOLEAN : dp = m.modus = "diamond"
+        DIM spk AS INTEGER : spk = IIF(dp, 1, stichJeStrangMuster(m))
+        DIM f AS Farbeintrag
+        FOR EACH f IN m.farben
+            IF f.auslassen OR f.stichzahl <= 0 THEN CONTINUE
+            DIM n AS INTEGER : n = CEIL((f.stichzahl / spk) * faktor)
+            DIM g AS Garn
+            FOR EACH g IN echteGarne(f.garn)
+                DIM k AS STRING : k = garnSchluessel$(g)
+                IF MAPHAS(bedarf, k) THEN
+                    MAPPUT(stiche, k, MAPGET(stiche, k) + f.stichzahl)
+                    MAPPUT(bedarf, k, MAPGET(bedarf, k) + n)
+                ELSE
+                    MAPPUT(stiche, k, f.stichzahl)
+                    MAPPUT(bedarf, k, n)
+                    MAPPUT(platz, k, LEN(garne))
+                    ARRAY_PUSH(garne, g)
+                    ARRAY_PUSH(diamant, dp)
+                END IF
+            NEXT
+        NEXT
+    NEXT
+    DIM aus AS ARRAY OF Einkaufszeile : aus = []
+    DIM schl AS ARRAY OF STRING : schl = MAPKEYS(bedarf)
+    SORT(schl)
+    DIM s AS STRING
+    FOR EACH s IN schl
+        DIM z AS Einkaufszeile : z = NEW Einkaufszeile()
+        z.schluessel = s
+        z.garn = garne[MAPGET(platz, s)]
+        z.stiche = MAPGET(stiche, s)
+        z.benoetigt = MAPGET(bedarf, s)
+        z.vorhanden = v.holeSchluessel(s)
+        z.kaufen = MAX(0, z.benoetigt - z.vorhanden)
+        z.diamant = diamant[MAPGET(platz, s)]
+        ARRAY_PUSH(aus, z)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION einkaufsliste(m AS Muster, v AS Vorrat, zuschlag AS FLOAT) AS ARRAY OF Einkaufszeile
+    RETURN einkaufslisteMehrere([m], v, zuschlag)
+END FUNCTION
+
+FUNCTION einkaufSumme(liste AS ARRAY OF Einkaufszeile) AS INTEGER
+    DIM s AS INTEGER
+    DIM z AS Einkaufszeile
+    FOR EACH z IN liste
+        s = s + z.kaufen
+    NEXT
+    RETURN s
+END FUNCTION
+
+' Wie die Summe heisst: Straenge, Drills oder -- gemischt -- Farben
+' (gezaehlt werden nur Zeilen, bei denen etwas zu kaufen ist).
+FUNCTION einkaufEinheit$(liste AS ARRAY OF Einkaufszeile) AS STRING
+    DIM dp AS BOOLEAN, kreuz AS BOOLEAN
+    DIM z AS Einkaufszeile
+    FOR EACH z IN liste
+        IF z.kaufen <= 0 THEN CONTINUE
+        IF z.diamant THEN dp = TRUE ELSE kreuz = TRUE
+    NEXT
+    IF dp AND NOT kreuz THEN RETURN "Drills insgesamt zu kaufen"
+    IF kreuz AND NOT dp THEN RETURN "Stränge insgesamt zu kaufen"
+    RETURN "Farben insgesamt zu kaufen"
+END FUNCTION
+
+' --- Palette umwandeln ---------------------------------------------------------------
+
+' Das Garn einer Palette, das einer Farbe am naechsten liegt (CIEDE2000,
+' bei Gleichstand das erste -- Pythons sorted ist stabil); -1 bei leerer.
+FUNCTION paletteNaechstes(p AS Palette, farbe AS INTEGER) AS INTEGER
+    DIM best AS INTEGER : best = -1
+    DIM bd AS FLOAT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(p.garne) - 1
+        DIM d AS FLOAT : d = farbAbstand(p.garne[i].farbe, farbe)
+        IF best < 0 OR d < bd THEN
+            best = i
+            bd = d
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+' Die Garne einer Palette nach Naehe zu einer Farbe (Nummern), samt Abstand.
+FUNCTION paletteNachNaehe(p AS Palette, farbe AS INTEGER, BYREF abstaende AS ARRAY OF FLOAT) AS ARRAY OF INTEGER
+    DIM nr AS ARRAY OF INTEGER : nr = []
+    DIM ab AS ARRAY OF FLOAT : ab = []
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = LEN(p.garne)
+    DIM d[n + 1] AS FLOAT
+    FOR i = 0 TO n - 1
+        d[i] = farbAbstand(farbe, p.garne[i].farbe)
+    NEXT
+    ' stabil sortieren: bei gleichem Abstand entscheidet die Nummer
+    FOR i = 0 TO n - 1 : ARRAY_PUSH(nr, i) : NEXT
+    SORT(nr, FUNCTION(a, b) IIF(d[a] < d[b], -1, IIF(d[a] > d[b], 1, a - b)))
+    FOR EACH i IN nr
+        ARRAY_PUSH(ab, d[i])
+    NEXT
+    abstaende = ab
+    RETURN nr
+END FUNCTION
+
+' Guete einer Zuordnung: 0 gut (bis 10), 1 akzeptabel (bis 25), 2 schlecht
+FUNCTION zuordnungGuete(abstand AS FLOAT) AS INTEGER
+    IF abstand <= 10 THEN RETURN 0
+    IF abstand <= 25 THEN RETURN 1
+    RETURN 2
+END FUNCTION
+
+' Je Farbe des Musters das naechste Garn der Palette (Nummer, -1 ohne) und
+' der Abstand (999 ohne).
+FUNCTION umwandlungRechnen(m AS Muster, p AS Palette, BYREF abstaende AS ARRAY OF FLOAT) AS ARRAY OF INTEGER
+    DIM ziele AS ARRAY OF INTEGER : ziele = []
+    DIM ab AS ARRAY OF FLOAT : ab = []
+    DIM f AS Farbeintrag
+    FOR EACH f IN m.farben
+        DIM z AS INTEGER : z = paletteNaechstes(p, f.garn.farbe)
+        ARRAY_PUSH(ziele, z)
+        IF z < 0 THEN
+            ARRAY_PUSH(ab, 999.0)
+        ELSE
+            ARRAY_PUSH(ab, farbAbstand(f.garn.farbe, p.garne[z].farbe))
+        END IF
+    NEXT
+    abstaende = ab
+    RETURN ziele
+END FUNCTION
+
+' Mehrere Farben, die auf dasselbe Garn fallen: je Gruppe die Namen der
+' Quellfarben, mit Komma (in der Reihenfolge, in der die Ziele zuerst
+' vorkommen).
+FUNCTION umwandlungKollisionen(m AS Muster, p AS Palette, ziele AS ARRAY OF INTEGER) AS ARRAY OF STRING
+    DIM reihe AS ARRAY OF STRING : reihe = []
+    DIM namen AS MAP OF STRING : namen = {}
+    DIM zahl AS MAP OF INTEGER : zahl = {}
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ziele) - 1
+        IF ziele[i] < 0 THEN CONTINUE
+        DIM g AS Garn : g = p.garne[ziele[i]]
+        DIM k AS STRING : k = g.hersteller + CHR$(1) + g.nummer + CHR$(1) + g.name
+        IF MAPHAS(namen, k) THEN
+            MAPPUT(namen, k, MAPGET(namen, k) + ", " + m.farben[i].garn.name)
+            MAPPUT(zahl, k, MAPGET(zahl, k) + 1)
+        ELSE
+            ARRAY_PUSH(reihe, k)
+            MAPPUT(namen, k, m.farben[i].garn.name)
+            MAPPUT(zahl, k, 1)
+        END IF
+    NEXT
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM s AS STRING
+    FOR EACH s IN reihe
+        IF MAPGET(zahl, s) > 1 THEN ARRAY_PUSH(aus, MAPGET(namen, s))
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Jede Farbe bekommt ihr Ziel-Garn (Symbol, Auslassen, Perle usw. bleiben);
+' ein Schritt, anders als bei PySticky rueckgaengig zu machen.
+FUNCTION paletteUmwandeln(m AS Muster, v AS Verlauf, p AS Palette, ziele AS ARRAY OF INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ziele) - 1
+        IF ziele[i] < 0 THEN RETURN 0
+    NEXT
+    DIM t AS Aenderung : t = listenVorher(m, v, "Palette konvertieren")
+    FOR i = 0 TO m.farbanzahl() - 1
+        DIM alt AS Farbeintrag : alt = m.farben[i]
+        DIM neu AS Farbeintrag : neu = neuerFarbeintrag(p.garne[ziele[i]], alt.symbol)
+        neu.stichzahl = alt.stichzahl
+        neu.auslassen = alt.auslassen
+        neu.straenge = alt.straenge
+        neu.istPerle = alt.istPerle
+        neu.istDiamant = alt.istDiamant
+        neu.farbId = alt.farbId
+        m.farben[i] = neu
+    NEXT
+    listenNachher(m, v, t)
+    RETURN m.farbanzahl()
+END FUNCTION
+
+' --- Farben tauschen -----------------------------------------------------------------
+
+' Sichtbare Zellen je Farbe (zusammengesetzt, oberste sichtbare Ebene)
+FUNCTION sichtbareZaehlen(m AS Muster) AS ARRAY OF INTEGER
+    DIM n AS INTEGER : n = m.farbanzahl()
+    DIM z[n + 1] AS INTEGER
+    DIM f AS ARRAY OF INTEGER, t AS ARRAY OF INTEGER, e AS ARRAY OF INTEGER
+    m.ebenen.zusammensetzen(f, t, e)
+    DIM c AS INTEGER
+    FOR EACH c IN f
+        IF c >= 0 AND c < n THEN z[c] = z[c] + 1
+    NEXT
+    RETURN z
+END FUNCTION
+
+' Zwei Farben gegenseitig tauschen: jede sichtbare Zelle der einen bekommt
+' die andere (wie farbeErsetzen). Liefert die Zahl der Zellen, 0 = nichts.
+FUNCTION farbenTauschen(m AS Muster, v AS Verlauf, a AS INTEGER, b AS INTEGER) AS INTEGER
+    IF a = b OR a < 0 OR b < 0 OR a >= m.farbanzahl() OR b >= m.farbanzahl() THEN RETURN 0
+    DIM ziel[m.farbanzahl()] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1 : ziel[i] = -1 : NEXT
+    ziel[a] = b
+    ziel[b] = a
+    RETURN farbenUmsetzen(m, v, ziel, "Farben tauschen")
+END FUNCTION
+
+' --- Rahmenaufteilung ----------------------------------------------------------------
+
+CLASS Rahmensektor
+    DIM nr AS INTEGER
+    DIM reihe AS INTEGER
+    DIM spalte AS INTEGER
+    DIM x0 AS INTEGER                 ' einschliesslich
+    DIM y0 AS INTEGER
+    DIM x1 AS INTEGER                 ' ausschliesslich
+    DIM y1 AS INTEGER
+    DIM stiche AS INTEGER             ' sichtbare Stiche darin
+END CLASS
+
+CLASS Rahmenplan
+    DIM breite AS INTEGER
+    DIM hoehe AS INTEGER
+    DIM rahmenB AS INTEGER
+    DIM rahmenH AS INTEGER
+    DIM ueberlappung AS INTEGER
+    DIM reihen AS INTEGER
+    DIM spalten AS INTEGER
+    DIM sektoren AS ARRAY OF Rahmensektor
+
+    SUB Init()
+        sektoren = []
+    END SUB
+
+    FUNCTION einRahmen() AS BOOLEAN
+        RETURN reihen * spalten <= 1
+    END FUNCTION
+END CLASS
+
+CONST RAHMEN_HOECHSTENS = 2000      ' mehr Sektoren zeigt der Dialog nicht
+
+' Nur (Reihen, Spalten), ohne die Sektoren -- fuer die Vorpruefung.
+FUNCTION rahmenRaster(pb AS INTEGER, ph AS INTEGER, rb AS INTEGER, rh AS INTEGER, ueber AS INTEGER) AS TUPLE
+    IF rb <= 0 OR rh <= 0 THEN THROW "Rahmenbreite und -höhe müssen größer als 0 sein"
+    IF ueber < 0 THEN THROW "Die Überlappung darf nicht negativ sein"
+    IF ueber >= rb OR ueber >= rh THEN THROW "Die Überlappung muss kleiner als der Rahmen sein"
+    DIM sx AS INTEGER : sx = rb - ueber
+    DIM sy AS INTEGER : sy = rh - ueber
+    DIM spalten AS INTEGER : spalten = 1
+    DIM reihen AS INTEGER : reihen = 1
+    IF pb > rb THEN spalten = MAX(1, CEIL((pb - ueber) / sx))
+    IF ph > rh THEN reihen = MAX(1, CEIL((ph - ueber) / sy))
+    RETURN (reihen, spalten)
+END FUNCTION
+
+' Das Muster in Rahmen-Sektoren teilen. Der letzte einer Reihe bzw. Spalte
+' rueckt an den Rand zurueck, damit er den ganzen Rahmen nutzt.
+FUNCTION rahmenPlanen(m AS Muster, rb AS INTEGER, rh AS INTEGER, ueber AS INTEGER) AS Rahmenplan
+    DIM pl AS Rahmenplan : pl = NEW Rahmenplan()
+    DIM pb AS INTEGER : pb = m.breite
+    DIM ph AS INTEGER : ph = m.hoehe
+    DIM reihen AS INTEGER, spalten AS INTEGER
+    (reihen, spalten) = rahmenRaster(pb, ph, rb, rh, ueber)
+    pl.breite = pb : pl.hoehe = ph
+    pl.rahmenB = rb : pl.rahmenH = rh
+    pl.ueberlappung = ueber
+    pl.reihen = reihen : pl.spalten = spalten
+    ' Summen je Zeile ueber das zusammengesetzte Raster: ein Sektor zaehlt so
+    ' in O(Hoehe) statt O(Flaeche)
+    DIM fa AS ARRAY OF INTEGER, ta AS ARRAY OF INTEGER, ea AS ARRAY OF INTEGER
+    m.ebenen.zusammensetzen(fa, ta, ea)
+    DIM summe[(pb + 1) * ph + 1] AS INTEGER
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO ph - 1
+        DIM s AS INTEGER : s = 0
+        FOR x = 0 TO pb - 1
+            IF fa[y * pb + x] >= 0 THEN s = s + 1
+            summe[y * (pb + 1) + x + 1] = s
+        NEXT
+    NEXT
+    DIM sx AS INTEGER : sx = rb - ueber
+    DIM sy AS INTEGER : sy = rh - ueber
+    DIM r AS INTEGER, c AS INTEGER
+    FOR r = 0 TO reihen - 1
+        FOR c = 0 TO spalten - 1
+            DIM se AS Rahmensektor : se = NEW Rahmensektor()
+            se.nr = LEN(pl.sektoren)
+            se.reihe = r : se.spalte = c
+            se.x0 = c * sx : se.y0 = r * sy
+            se.x1 = MIN(se.x0 + rb, pb)
+            se.y1 = MIN(se.y0 + rh, ph)
+            IF c = spalten - 1 AND se.x1 - se.x0 < rb AND pb >= rb THEN
+                se.x0 = pb - rb : se.x1 = pb
+            END IF
+            IF r = reihen - 1 AND se.y1 - se.y0 < rh AND ph >= rh THEN
+                se.y0 = ph - rh : se.y1 = ph
+            END IF
+            DIM n AS INTEGER : n = 0
+            IF se.x1 > se.x0 THEN
+                FOR y = MAX(se.y0, 0) TO MIN(se.y1, ph) - 1
+                    n = n + summe[y * (pb + 1) + se.x1] - summe[y * (pb + 1) + se.x0]
+                NEXT
+            END IF
+            se.stiche = n
+            ARRAY_PUSH(pl.sektoren, se)
+        NEXT
+    NEXT
+    RETURN pl
+END FUNCTION
+
+' Die ueblichen Rahmen (Name, Seitenlaenge in Stichen bei Aida 14).
+FUNCTION rahmenVorlagen() AS ARRAY OF STRING
+    RETURN ["4 Zoll (10 cm)", "5 Zoll (13 cm)", "6 Zoll (15 cm)", "7 Zoll (18 cm)", "8 Zoll (20 cm)", "10 Zoll (25 cm)", "12 Zoll (30 cm)"]
+END FUNCTION
+
+FUNCTION rahmenVorlagenStiche() AS ARRAY OF INTEGER
+    RETURN [55, 71, 82, 99, 110, 137, 165]
+END FUNCTION
+
+' Eine Vorlage auf die Stoffzaehlung des Musters umgerechnet
+FUNCTION rahmenFuerStoff(stiche14 AS INTEGER, stoff AS FLOAT) AS INTEGER
+    RETURN pyRunden(stiche14 * (stoff / 14))
+END FUNCTION

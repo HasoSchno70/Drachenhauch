@@ -4497,6 +4497,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 _ => Ok(Value::Bool(false)),
             }
         }
+        // JSON_KEY$(name$) -- ein Schluessel als Pfad-Segment: ein Punkt darin
+        // trennt dann nicht mehr ("a.b" -> "a\.b"), ein Rueckstrich wird "\\".
+        // Fuer Schluessel, die man nicht selbst gewaehlt hat (aus JSON_KEYS,
+        // Nutzertext).
+        "json_key$" => {
+            arity!(1);
+            Ok(Value::str_rc(json_schluessel_segment(need_str(&a[0], "JSON_KEY$")?)))
+        }
         "json_keys" => {
             // Zugabe beim Schreib-Ausbau: JSON_LEN lieferte fuer ein Objekt
             // schon immer die Anzahl seiner Schluessel -- an die Schluessel
@@ -5766,16 +5774,43 @@ fn json_resolve<'a>(root: &'a serde_json::Value, path: &str, fn_: &str) -> Resul
     json_try_resolve(root, path).ok_or_else(|| format!("{}: Pfad '{}' nicht aufloesbar", fn_, path))
 }
 
+/// Die Segmente eines Pfads: getrennt an `.`, aber `\.` ist ein Punkt IM
+/// Schluessel und `\\` ein Rueckstrich (JSON_KEY$ schreibt einen Schluessel
+/// so). Ohne das war ein Schluessel mit Punkt weder les- noch schreibbar --
+/// der Garn-Vorrat in Glutfaden hat welche ("unknown::unknown::Farbe 1.5").
+/// Ein Rueckstrich vor etwas anderem bleibt stehen, wie er ist.
+pub(crate) fn json_segmente(path: &str) -> Vec<String> {
+    let mut teile = vec![String::new()];
+    let mut it = path.chars();
+    while let Some(c) = it.next() {
+        match c {
+            '\\' => match it.next() {
+                Some(n @ ('.' | '\\')) => teile.last_mut().unwrap().push(n),
+                Some(n) => { let s = teile.last_mut().unwrap(); s.push('\\'); s.push(n); }
+                None => teile.last_mut().unwrap().push('\\'),
+            },
+            '.' => teile.push(String::new()),
+            _ => teile.last_mut().unwrap().push(c),
+        }
+    }
+    teile
+}
+
+/// Ein Schluessel als Pfad-Segment: Punkt und Rueckstrich geschuetzt (JSON_KEY$).
+pub(crate) fn json_schluessel_segment(name: &str) -> String {
+    name.replace('\\', "\\\\").replace('.', "\\.")
+}
+
 fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a serde_json::Value> {
     if path.is_empty() { return Some(root); }
     let mut cur = root;
-    for part in path.split('.') {
+    for part in json_segmente(path) {
         match cur {
             serde_json::Value::Array(arr) => {
                 let idx: usize = part.parse().ok()?;
                 cur = arr.get(idx)?;
             }
-            serde_json::Value::Object(obj) => { cur = obj.get(part)?; }
+            serde_json::Value::Object(obj) => { cur = obj.get(&part)?; }
             _ => return None,
         }
     }
@@ -5989,7 +6024,7 @@ fn json_wert(v: serde_json::Value) -> Value {
 fn json_eltern<'a>(root: &'a mut serde_json::Value, path: &str, fn_: &str)
     -> Result<(&'a mut serde_json::Value, String, bool), String>
 {
-    let teile: Vec<&str> = path.split('.').collect();
+    let teile: Vec<String> = json_segmente(path);
     let (letztes, zwischen) = teile.split_last().unwrap();   // split immer >= 1
     let mut cur = root;
     let mut bisher = String::new();
@@ -6002,14 +6037,14 @@ fn json_eltern<'a>(root: &'a mut serde_json::Value, path: &str, fn_: &str)
         if cur.is_null() { *cur = serde_json::json!({}); }
         match cur {
             serde_json::Value::Object(obj) => {
-                if !obj.contains_key(*seg) {
+                if !obj.contains_key(seg.as_str()) {
                     if seg.parse::<usize>().is_ok() {
                         return Err(json_zahl_hinweis(fn_, &bisher, seg));
                     }
                     obj.insert(seg.to_string(), serde_json::json!({}));
                     neu_angelegt = true;
                 }
-                cur = obj.get_mut(*seg).unwrap();
+                cur = obj.get_mut(seg.as_str()).unwrap();
             }
             serde_json::Value::Array(arr) => {
                 let laenge = arr.len();
@@ -6980,4 +7015,23 @@ pub fn echter_pfad(p: &str) -> String {
         }
     };
     s.strip_prefix(r"\\?\").map(|x| x.to_string()).unwrap_or(s)
+}
+
+#[cfg(test)]
+mod json_segment_tests {
+    use super::{json_schluessel_segment, json_segmente};
+
+    #[test]
+    fn punkt_im_schluessel_und_rueckweg() {
+        assert_eq!(json_segmente("a.b"), vec!["a", "b"]);
+        assert_eq!(json_segmente(r"a\.b.c"), vec!["a.b", "c"]);
+        assert_eq!(json_segmente(r"a\\.b"), vec![r"a\", "b"]);
+        assert_eq!(json_segmente(r"a\xb"), vec![r"a\xb"]);
+        assert_eq!(json_segmente(""), vec![""]);
+        for name in ["Farbe 1.5", r"C:\pfad\x.y", "ohne", "..", r"\"] {
+            let seg = json_schluessel_segment(name);
+            assert_eq!(json_segmente(&seg), vec![name.to_string()], "{}", name);
+            assert_eq!(json_segmente(&format!("stock.{}", seg)), vec!["stock".to_string(), name.to_string()]);
+        }
+    }
 }

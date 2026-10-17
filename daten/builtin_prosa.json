@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2100,
+ "count": 2101,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1153,6 +1153,7 @@
   "JSON_GET_JSON": "JSON_HANDLE — Teilbaum am Pfad als eigenes Dokument (Kopie) — das Gegenstück zu JSON_SET_JSON, etwa um ein Stück, das man nicht versteht, unverändert mitzuführen",
   "JSON_GET_STRING": "STRING — Wert am Pfad als Text lesen (\"nutzer.name\", \"posten.0\")",
   "JSON_HAS": "BOOLEAN — gibt es am Pfad ueberhaupt etwas?",
+  "JSON_KEY$": "STRING — Feldname als Pfad-Segment: Punkt und Rückstrich maskiert, damit JSON_KEYS-Namen wieder adressierbar sind",
   "JSON_KEYS": "ARRAY OF STRING Feldnamen eines Objekts",
   "JSON_LEN": "INTEGER — Laenge einer Liste bzw. Zahl der Felder eines Objekts",
   "JSON_LOAD": "JSON_HANDLE — JSON aus einer Datei einlesen",

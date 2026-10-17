@@ -696,3 +696,152 @@ FUNCTION vorfuehrenStufe8(daten AS INTEGER) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
+
+' Stufe 9: planen und Vorrat -- Garn-Vorrat (drei Reiter, sichern),
+' Einkaufsliste in der Statistik, Palette konvertieren und zuruecknehmen,
+' Farben tauschen und zuruecknehmen, Rahmenaufteilung. Der Vorrat liegt im
+' Einstellungsordner (APPDATA bzw. HOME) -- eine Pruefung setzt ihn um.
+FUNCTION vfZeilen$(liste AS ARRAY OF kern.Einkaufszeile) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM z AS kern.Einkaufszeile
+    FOR EACH z IN liste
+        ARRAY_PUSH(t, z.schluessel + " " + STR$(z.benoetigt) + "/" + STR$(z.vorhanden) + "/" + STR$(z.kaufen))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vfSichtbar(zeilen AS ARRAY OF INTEGER) AS INTEGER
+    DIM n AS INTEGER
+    DIM z AS INTEGER
+    FOR EACH z IN zeilen
+        IF gtk_widget_get_visible(z) THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+
+DIM vfTausch AS INTEGER
+
+FUNCTION vorfuehrenStufe9(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            DIM d AS INTEGER : d = vdBauen()
+            PRINT "vorrat datei: "; BASENAME(pdVorratDatei$()); " | "; BASENAME(DIRNAME(pdVorratDatei$()))
+            PRINT "im muster: "; LEN(vdMSchl); " zeilen"
+            FOR i = 0 TO LEN(vdMSchl) - 1
+                PRINT "  "; vdMSchl[i]; " bedarf "; vdMBedarf[i]; " bestand "; gtk_spin_button_get_value_as_int(vdMSpin[i]); " kaufen "; gtk_label_get_text(vdMKauf[i])
+            NEXT
+            PRINT "alle: "; JOIN$(vdASchl, " | ")
+            gtk_spin_button_set_value(vdMSpin[0], 5)
+            PRINT "gesetzt "; vdMSchl[0]; " = 5: vorrat "; vdVorrat.holeSchluessel(vdMSchl[0]); " | kaufen "; gtk_label_get_text(vdMKauf[0]); " | geaendert "; vdGeaendert
+            DIM j AS INTEGER
+            FOR j = 0 TO LEN(vdASchl) - 1
+                IF vdASchl[j] = vdMSchl[0] THEN PRINT "  im zweiten reiter: "; gtk_spin_button_get_value_as_int(vdASpin[j])
+            NEXT
+            gtk_spin_button_set_value(vdMSpin[1], 0)
+            PRINT "auf 0: "; vdMSchl[1]; " im vorrat "; MAPHAS(vdVorrat.daten, vdMSchl[1])
+        CASE 2
+            ok = vfFoto(vdDialog, "vorrat")
+            gtk_notebook_set_current_page(vdReiter, 1)
+            gtk_entry_set_text(vdASuche, "dmc")
+            vdFiltern(0, 0)
+            PRINT "suche dmc: "; vfSichtbar(vdAZeile); " von "; LEN(vdAZeile)
+            gtk_entry_set_text(vdASuche, "")
+            vdFiltern(0, 0)
+            gtk_spin_button_set_value(vdASpin[0], 7)
+            PRINT "zweiter reiter "; vdASchl[0]; " = 7: vorrat "; vdVorrat.holeSchluessel(vdASchl[0])
+            PRINT "leere entfernt: "; vdVorrat.leereEntfernen(); " | "; JOIN$(vdVorrat.schluessel(), " | ")
+            vdAlleFuellen()
+        CASE 3
+            ok = vfFoto(vdDialog, "vorrat_alle")
+            vdProjektAufnehmen(musterPfad)
+            vdProjektAufnehmen(musterPfad)
+            PRINT "projekte: "; LEN(vdProjekte.pfade); " | "; BASENAME(vdProjekte.pfade[0]); " | warnung "; gtk_widget_get_visible(vdPWarnung)
+            PRINT "mehrere: "; gtk_label_get_text(vdPSumme)
+            PRINT "  wie kern: "; vfZeilen$(kern.einkaufslisteMehrere(vdPMuster, vdVorrat, 20)) = vfZeilen$(kern.einkaufsliste(lwMuster, vdVorrat, 20))
+            vdProjektAufnehmen(PATHJOIN(DIRNAME(musterPfad), "gibt_es_nicht.pxs"))
+            PRINT "fehlt: "; gtk_widget_get_visible(vdPWarnung); " | "; LEFT$(gtk_label_get_text(vdPWarnung), 40)
+            vdProjekte.entfernen(PATHJOIN(DIRNAME(musterPfad), "gibt_es_nicht.pxs"))
+            vdProjekteFuellen()
+            gtk_notebook_set_current_page(vdReiter, 2)
+        CASE 4
+            ok = vfFoto(vdDialog, "vorrat_projekte")
+            PRINT "sichern: "; vdAntwort(GTK_ANTWORT_OK)
+            gtk_widget_destroy(vdDialog)
+            vdDialog = 0
+            vdPTabelle = 0
+            DIM gelesen AS kern.Vorrat : gelesen = kern.vorratLaden(pdVorratDatei$())
+            PRINT "gelesen: "; JOIN$(gelesen.schluessel(), " | ")
+            PRINT "projekte gelesen: "; LEN(kern.projektlisteLaden(pdProjekteDatei$()).pfade)
+            ' bei 32 ct liegt Rot zwischen 0 und 50 % Zuschlag ueber einer Stranggrenze
+            lwMuster.stoff = 32
+            d = adStatistikBauen()
+            gtk_notebook_set_current_page(adReiter, 5)
+            PRINT "einkauf 32 ct 20 %: "; gtk_label_get_text(adEinkaufSumme); " | wie kern "; vfZeilen$(adEinkaufLetzte) = vfZeilen$(kern.einkaufsliste(lwMuster, gelesen, 20))
+            gtk_spin_button_set_value(adZuschlag, 0)
+            PRINT "einkauf 0 %: "; gtk_label_get_text(adEinkaufSumme); " | "; vfZeilen$(adEinkaufLetzte)
+            gtk_spin_button_set_value(adZuschlag, 50)
+            PRINT "einkauf 50 %: "; gtk_label_get_text(adEinkaufSumme); " | "; vfZeilen$(adEinkaufLetzte)
+            PRINT "  wie kern: "; vfZeilen$(adEinkaufLetzte) = vfZeilen$(kern.einkaufsliste(lwMuster, gelesen, 50))
+        CASE 5
+            ok = vfFoto(adDialog, "statistik_einkauf")
+            gtk_widget_destroy(adDialog)
+            adDialog = 0
+            lwMuster.stoff = 16
+            DIM pd AS INTEGER : pd = pkBauen()
+            PRINT "palette: "; pkNamen[gtk_combo_box_get_active(pkWahl)]; " "; gtk_label_get_text(pkInfo)
+            FOR i = 0 TO LEN(pkNamen) - 1
+                IF pkNamen[i] = "Anchor" THEN gtk_combo_box_set_active(pkWahl, i)
+            NEXT
+            PRINT "anchor: "; gtk_label_get_text(pkInfo); " | "; gtk_label_get_text(pkSumme)
+            PRINT "  ziel 1: "; pkPalette.garne[pkZiele[1]].nummer; " "; FORMAT$(pkAbstaende[1], "%.1f"); " | kollisionen "; JOIN$(kern.umwandlungKollisionen(lwMuster, pkPalette, pkZiele), " / ")
+        CASE 6
+            ok = vfFoto(pkDialog, "palette")
+            DIM alt AS STRING : alt = lwMuster.farben[1].garn.hersteller + " " + lwMuster.farben[1].garn.nummer
+            DIM sym AS STRING : sym = lwMuster.farben[1].symbol
+            pkKonvertieren()
+            PRINT "konvertiert: "; alt; " -> "; lwMuster.farben[1].garn.hersteller; " "; lwMuster.farben[1].garn.nummer; " | symbol bleibt "; lwMuster.farben[1].symbol = sym; " | "; meldung
+            gtk_widget_destroy(pkDialog)
+            pkDialog = 0
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.farben[1].garn.hersteller; " "; lwMuster.farben[1].garn.nummer
+            vfTausch = ftBauen()
+            gtk_combo_box_set_active(ftA, 1)
+            gtk_combo_box_set_active(ftB, 3)
+            PRINT "tauschen: "; gtk_label_get_text(ftInfo)
+        CASE 7
+            ok = vfFoto(vfTausch, "tauschen")
+            gtk_widget_destroy(vfTausch)
+            DIM vor1 AS INTEGER : vor1 = lwMuster.farben[1].stichzahl
+            DIM vor3 AS INTEGER : vor3 = lwMuster.farben[3].stichzahl
+            tauschenAusfuehren(1, 3)
+            PRINT "getauscht: "; meldung; " | zahlen "; vor1; " "; vor3; " -> "; lwMuster.farben[1].stichzahl; " "; lwMuster.farben[3].stichzahl
+            werkzeugZurueck()
+            PRINT "rueckgaengig: "; lwMuster.farben[1].stichzahl; " "; lwMuster.farben[3].stichzahl
+            DIM rd AS INTEGER : rd = rdBauen()
+            PRINT "rahmen: "; gtk_label_get_text(rdSumme)
+            gtk_spin_button_set_value(rdBreite, 12)
+            gtk_spin_button_set_value(rdHoehe, 10)
+            gtk_spin_button_set_value(rdUeber, 2)
+            PRINT "rahmen 12x10/2: "; gtk_label_get_text(rdSumme); " | sektoren "; LEN(rdPlan.sektoren)
+            DIM letzt AS INTEGER : letzt = LEN(rdPlan.sektoren) - 1
+            PRINT "  erster "; rdPlan.sektoren[0].x0; ".."; rdPlan.sektoren[0].x1 - 1; " letzter "; rdPlan.sektoren[letzt].x0; ".."; rdPlan.sektoren[letzt].x1 - 1
+        CASE 8
+            ok = vfFoto(rdDialog, "rahmen")
+            gtk_spin_button_set_value(rdUeber, 20)
+            PRINT "ueberlappung geklemmt: "; gtk_spin_button_get_value_as_int(rdUeber)
+            rdVorlage(0, 0)
+            PRINT "vorlage 4 zoll: "; gtk_spin_button_get_value_as_int(rdBreite); " | "; gtk_label_get_text(rdSumme)
+            gtk_spin_button_set_value(rdHoehe, 5)
+            PRINT "hoehe unter 10: "; gtk_spin_button_get_value_as_int(rdHoehe)
+            gtk_widget_destroy(rdDialog)
+            rdDialog = 0
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
