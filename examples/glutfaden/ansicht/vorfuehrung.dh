@@ -1440,7 +1440,7 @@ FUNCTION vorfuehrenStufe14(daten AS INTEGER) AS BOOLEAN
             PRINT "alle 4: "; vfFvNamen$()
             vfFvWaehle([4, 1])
             fvAktion(0, 5)
-            PRINT "zusammen (blau bleibt? nein, oben gewaehlt bleibt): "; vfFvNamen$(); " | "; gtk_label_get_text(fvKopf)
+            PRINT "zusammen, die obere bleibt: "; vfFvNamen$(); " | "; gtk_label_get_text(fvKopf)
             vfFvWaehle([1])
             fvAktion(0, 3)
             PRINT "ans ende: "; vfFvNamen$()

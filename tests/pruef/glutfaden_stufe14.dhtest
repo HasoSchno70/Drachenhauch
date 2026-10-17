@@ -1,0 +1,322 @@
+' Glutfaden Stufe 14: Farben verwalten (kern/farbverwaltung.dh,
+' ansicht/farbdialog.dh).
+'
+' ref_farbverwaltung.txt hat PySticky selbst aufgezeichnet: der
+' ColorManagementDialog mit Bedienschritten (loeschen, zusammenfuehren,
+' verschieben, Faeden, Ungenutzte) an farbprobe.pxs -- drei Ebenen, eine
+' davon gesperrt, Perlen, Drill, Rueckstiche, eine ungenutzte Farbe -- und
+' die Reihenfolge je Sortierung. Bei Ablaeufen, die VERSCHIEBEN, zaehlen
+' nur Farben und Rueckstiche: PyStickys _swap_colors setzt dabei jeden
+' Stich als vollen Stich und uebergeht gesperrte Ebenen. Dass Glutfaden
+' das Bild behaelt, prueft der zweite Fall.
+
+=== wie pysticky: loeschen, zusammenfuehren, verschieben, faeden, ungenutzte, sortieren
+IMPORT "helfer.dh"
+DIM ref AS STRING : ref = fvRefOhneVerschoben$(geLies$("ref.txt"))
+PRINT geVergleich$(ref, farbverwaltungText$(ref, "farbprobe.pxs"))
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_farbverwaltung.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- datei ref.txt
+ablauf loeschen 2
+farben: rot/●/1/00 | Blau/○/2/00 | Gelb/□/1/00 | blau/▲/2/00 | Perle Gold/△/3/10 | Drill Weiss/◆/1/01 | Ungenutzt/◇/2/00 | Zimt/★/3/00
+ebene 0: 1,0=1:9:0 2,0=1:1:0 3,0=3:0:0 4,0=0:1:0 5,0=1:0:0 7,0=2:0:0 8,0=7:0:0 11,0=0:3:0 0,1=3:0:0 1,1=7:1:0 2,1=7:7:0 3,1=7:1:1 5,1=1:2:0 6,1=0:3:0 7,1=1:0:0 9,1=4:10:0 10,1=7:7:1 0,2=2:2:0 1,2=4:10:1 2,2=2:0:0 3,2=4:10:0 6,2=7:7:0 7,2=7:1:0 8,2=7:1:1 9,2=2:0:1 2,3=5:11:1 3,3=0:2:0 4,3=4:10:0 6,3=2:0:0 7,3=0:3:0 8,3=7:3:0 9,3=7:1:1 10,3=0:3:0 11,3=3:2:0 0,4=3:0:0 1,4=7:0:0 3,4=0:2:0 4,4=1:7:0 5,4=0:0:0 6,4=2:7:0 7,4=7:0:0 8,4=0:0:0 9,4=0:0:0 0,5=0:2:0 2,5=1:9:0 3,5=7:1:0 4,5=3:0:0 5,5=0:0:1 6,5=5:11:0 7,5=0:0:1 8,5=7:0:0 9,5=5:11:1 10,5=4:10:0 11,5=0:2:0 2,6=0:0:0 4,6=3:0:0 5,6=0:7:0 6,6=3:2:0 8,6=3:0:0 9,6=4:10:0 10,6=5:11:0 11,6=2:7:0 2,7=0:7:0 3,7=3:0:0 4,7=2:9:0 5,7=2:0:1 8,7=4:10:0 9,7=7:1:1 10,7=0:0:0 11,7=0:0:0 0,8=4:10:1 1,8=0:0:1 2,8=0:2:0 4,8=4:10:0 5,8=7:2:0 6,8=7:1:1 7,8=7:9:0 8,8=7:2:1 11,8=2:0:0
+ebene 1: 0,0=0:0:0 3,0=1:0:0 4,0=2:1:0 10,0=0:7:0 4,2=2:0:1 5,3=1:0:0 8,3=1:0:1 11,3=3:1:0 2,4=0:9:0 11,4=0:0:1 0,5=4:10:1 4,5=1:0:0 5,5=1:2:0 6,5=7:9:0 11,5=4:10:1 1,6=7:7:0 7,6=4:10:0 11,6=0:2:0 0,7=7:0:1 8,7=2:7:0 3,8=5:11:0 4,8=7:9:0
+ebene 2: 0,0=4:10:1 8,0=0:1:0 0,1=3:0:0 1,1=1:7:0 8,1=0:1:1 10,1=2:0:1 3,2=2:1:0 5,2=7:3:0 6,2=0:9:0 10,2=3:3:0 1,4=7:3:1 3,4=7:1:0 4,4=0:0:1 11,4=5:11:0 9,6=4:10:1 2,7=1:0:0 8,7=2:7:1 11,7=5:11:0 6,8=7:0:0
+rueck: 0,0,6,6:0 4,0,4,10:3 1,9,9,1:7 3,3,5,7:1
+ablauf loeschen 1 4 7
+farben: rot/●/1/00 | grün/■/3/00 | Gelb/□/1/00 | Perle Gold/△/3/10 | Drill Weiss/◆/1/01 | Zimt/★/3/00
+ebene 0: 4,0=0:1:0 7,0=2:0:0 8,0=5:0:0 9,0=1:0:0 11,0=0:3:0 1,1=5:1:0 2,1=5:7:0 3,1=5:1:1 6,1=0:3:0 8,1=1:1:0 9,1=3:10:0 10,1=5:7:1 0,2=2:2:0 1,2=3:10:1 2,2=2:0:0 3,2=3:10:0 6,2=5:7:0 7,2=5:1:0 8,2=5:1:1 9,2=2:0:1 2,3=4:11:1 3,3=0:2:0 4,3=3:10:0 6,3=2:0:0 7,3=0:3:0 8,3=5:3:0 9,3=5:1:1 10,3=0:3:0 1,4=5:0:0 3,4=0:2:0 5,4=0:0:0 6,4=2:7:0 7,4=5:0:0 8,4=0:0:0 9,4=0:0:0 0,5=0:2:0 3,5=5:1:0 5,5=0:0:1 6,5=4:11:0 7,5=0:0:1 8,5=5:0:0 9,5=4:11:1 10,5=3:10:0 11,5=0:2:0 2,6=0:0:0 3,6=1:7:0 5,6=0:7:0 9,6=3:10:0 10,6=4:11:0 11,6=2:7:0 0,7=1:9:1 2,7=0:7:0 4,7=2:9:0 5,7=2:0:1 7,7=1:7:0 8,7=3:10:0 9,7=5:1:1 10,7=0:0:0 11,7=0:0:0 0,8=3:10:1 1,8=0:0:1 2,8=0:2:0 4,8=3:10:0 5,8=5:2:0 6,8=5:1:1 7,8=5:9:0 8,8=5:2:1 9,8=1:1:0 10,8=1:0:1 11,8=2:0:0
+ebene 1: 0,0=0:0:0 4,0=2:1:0 10,0=0:7:0 4,2=2:0:1 2,4=0:9:0 4,4=1:2:0 7,4=1:3:1 11,4=0:0:1 0,5=3:10:1 6,5=5:9:0 11,5=3:10:1 1,6=5:7:0 5,6=1:0:0 7,6=3:10:0 10,6=1:3:0 11,6=0:2:0 0,7=5:0:1 8,7=2:7:0 3,8=4:11:0 4,8=5:9:0
+ebene 2: 0,0=3:10:1 1,0=1:0:0 8,0=0:1:0 5,1=1:3:0 8,1=0:1:1 10,1=2:0:1 3,2=2:1:0 5,2=5:3:0 6,2=0:9:0 1,3=1:7:0 1,4=5:3:1 3,4=5:1:0 4,4=0:0:1 11,4=4:11:0 9,6=3:10:1 8,7=2:7:1 11,7=4:11:0 4,8=1:7:0 6,8=5:0:0 10,8=1:0:0
+rueck: 0,0,6,6:0 2,2,8,2:1 1,9,9,1:5
+ablauf zusammen 3 5 0
+farben: Blau/○/2/00 | grün/■/3/00 | Gelb/□/1/00 | blau/▲/2/00 | Drill Weiss/◆/1/01 | Ungenutzt/◇/2/00 | Zimt/★/3/00
+ebene 0: 1,0=0:9:0 2,0=0:1:0 3,0=3:0:0 4,0=2:1:0 5,0=0:0:0 7,0=2:0:0 8,0=6:0:0 9,0=1:0:0 11,0=2:3:0 0,1=3:0:0 1,1=6:1:0 2,1=6:7:0 3,1=6:1:1 5,1=0:2:0 6,1=2:3:0 7,1=0:0:0 8,1=1:1:0 9,1=2:0:0 10,1=6:7:1 0,2=2:2:0 1,2=2:0:1 2,2=2:0:0 3,2=2:0:0 6,2=6:7:0 7,2=6:1:0 8,2=6:1:1 9,2=2:0:1 2,3=4:11:1 3,3=2:2:0 4,3=2:0:0 6,3=2:0:0 7,3=2:3:0 8,3=6:3:0 9,3=6:1:1 10,3=2:3:0 11,3=3:2:0 0,4=3:0:0 1,4=6:0:0 3,4=2:2:0 4,4=0:7:0 5,4=2:0:0 6,4=2:7:0 7,4=6:0:0 8,4=2:0:0 9,4=2:0:0 0,5=2:2:0 2,5=0:9:0 3,5=6:1:0 4,5=3:0:0 5,5=2:0:1 6,5=4:11:0 7,5=2:0:1 8,5=6:0:0 9,5=4:11:1 10,5=2:0:0 11,5=2:2:0 2,6=2:0:0 3,6=1:7:0 4,6=3:0:0 5,6=2:7:0 6,6=3:2:0 8,6=3:0:0 9,6=2:0:0 10,6=4:11:0 11,6=2:7:0 0,7=1:9:1 2,7=2:7:0 3,7=3:0:0 4,7=2:9:0 5,7=2:0:1 7,7=1:7:0 8,7=2:0:0 9,7=6:1:1 10,7=2:0:0 11,7=2:0:0 0,8=2:0:1 1,8=2:0:1 2,8=2:2:0 4,8=2:0:0 5,8=6:2:0 6,8=6:1:1 7,8=6:9:0 8,8=6:2:1 9,8=1:1:0 10,8=1:0:1 11,8=2:0:0
+ebene 1: 0,0=2:0:0 3,0=0:0:0 4,0=2:1:0 10,0=2:7:0 4,2=2:0:1 5,3=0:0:0 8,3=0:0:1 11,3=3:1:0 2,4=2:9:0 4,4=1:2:0 7,4=1:3:1 11,4=2:0:1 0,5=2:0:1 4,5=0:0:0 5,5=0:2:0 6,5=6:9:0 11,5=2:0:1 1,6=6:7:0 5,6=1:0:0 7,6=2:0:0 10,6=1:3:0 11,6=2:2:0 0,7=6:0:1 8,7=2:7:0 3,8=4:11:0 4,8=6:9:0
+ebene 2: 0,0=2:0:1 1,0=1:0:0 8,0=2:1:0 0,1=3:0:0 1,1=0:7:0 5,1=1:3:0 8,1=2:1:1 10,1=2:0:1 3,2=2:1:0 5,2=6:3:0 6,2=2:9:0 10,2=3:3:0 1,3=1:7:0 1,4=6:3:1 3,4=6:1:0 4,4=2:0:1 11,4=4:11:0 9,6=2:0:1 2,7=0:0:0 8,7=2:7:1 11,7=4:11:0 4,8=1:7:0 6,8=6:0:0 10,8=1:0:0
+rueck: 0,0,6,6:2 2,2,8,2:1 4,0,4,10:3 1,9,9,1:6 3,3,5,7:0
+ablauf zusammen 5 6
+farben: rot/●/1/00 | Blau/○/2/00 | grün/■/3/00 | Gelb/□/1/00 | blau/▲/2/00 | Perle Gold/△/3/10 | Ungenutzt/◇/2/00 | Zimt/★/3/00
+ebene 0: 1,0=1:9:0 2,0=1:1:0 3,0=4:0:0 4,0=0:1:0 5,0=1:0:0 7,0=3:0:0 8,0=7:0:0 9,0=2:0:0 11,0=0:3:0 0,1=4:0:0 1,1=7:1:0 2,1=7:7:0 3,1=7:1:1 5,1=1:2:0 6,1=0:3:0 7,1=1:0:0 8,1=2:1:0 9,1=5:10:0 10,1=7:7:1 0,2=3:2:0 1,2=5:10:1 2,2=3:0:0 3,2=5:10:0 6,2=7:7:0 7,2=7:1:0 8,2=7:1:1 9,2=3:0:1 2,3=5:10:1 3,3=0:2:0 4,3=5:10:0 6,3=3:0:0 7,3=0:3:0 8,3=7:3:0 9,3=7:1:1 10,3=0:3:0 11,3=4:2:0 0,4=4:0:0 1,4=7:0:0 3,4=0:2:0 4,4=1:7:0 5,4=0:0:0 6,4=3:7:0 7,4=7:0:0 8,4=0:0:0 9,4=0:0:0 0,5=0:2:0 2,5=1:9:0 3,5=7:1:0 4,5=4:0:0 5,5=0:0:1 6,5=5:10:0 7,5=0:0:1 8,5=7:0:0 9,5=5:10:1 10,5=5:10:0 11,5=0:2:0 2,6=0:0:0 3,6=2:7:0 4,6=4:0:0 5,6=0:7:0 6,6=4:2:0 8,6=4:0:0 9,6=5:10:0 10,6=5:10:0 11,6=3:7:0 0,7=2:9:1 2,7=0:7:0 3,7=4:0:0 4,7=3:9:0 5,7=3:0:1 7,7=2:7:0 8,7=5:10:0 9,7=7:1:1 10,7=0:0:0 11,7=0:0:0 0,8=5:10:1 1,8=0:0:1 2,8=0:2:0 4,8=5:10:0 5,8=7:2:0 6,8=7:1:1 7,8=7:9:0 8,8=7:2:1 9,8=2:1:0 10,8=2:0:1 11,8=3:0:0
+ebene 1: 0,0=0:0:0 3,0=1:0:0 4,0=3:1:0 10,0=0:7:0 4,2=3:0:1 5,3=1:0:0 8,3=1:0:1 11,3=4:1:0 2,4=0:9:0 4,4=2:2:0 7,4=2:3:1 11,4=0:0:1 0,5=5:10:1 4,5=1:0:0 5,5=1:2:0 6,5=7:9:0 11,5=5:10:1 1,6=7:7:0 5,6=2:0:0 7,6=5:10:0 10,6=2:3:0 11,6=0:2:0 0,7=7:0:1 8,7=3:7:0 3,8=5:10:0 4,8=7:9:0
+ebene 2: 0,0=5:10:1 1,0=2:0:0 8,0=0:1:0 0,1=4:0:0 1,1=1:7:0 5,1=2:3:0 8,1=0:1:1 10,1=3:0:1 3,2=3:1:0 5,2=7:3:0 6,2=0:9:0 10,2=4:3:0 1,3=2:7:0 1,4=7:3:1 3,4=7:1:0 4,4=0:0:1 11,4=5:10:0 9,6=5:10:1 2,7=1:0:0 8,7=3:7:1 11,7=5:10:0 4,8=2:7:0 6,8=7:0:0 10,8=2:0:0
+rueck: 0,0,6,6:0 2,2,8,2:2 4,0,4,10:4 1,9,9,1:7 3,3,5,7:1
+ablauf zusammen 1 4 ; zusammen 0 1
+farben: rot/●/1/00 | grün/■/3/00 | Gelb/□/1/00 | Perle Gold/△/3/10 | Drill Weiss/◆/1/01 | Ungenutzt/◇/2/00 | Zimt/★/3/00
+ebene 0: 1,0=0:9:0 2,0=0:1:0 3,0=0:0:0 4,0=0:1:0 5,0=0:0:0 7,0=2:0:0 8,0=6:0:0 9,0=1:0:0 11,0=0:3:0 0,1=0:0:0 1,1=6:1:0 2,1=6:7:0 3,1=6:1:1 5,1=0:2:0 6,1=0:3:0 7,1=0:0:0 8,1=1:1:0 9,1=3:10:0 10,1=6:7:1 0,2=2:2:0 1,2=3:10:1 2,2=2:0:0 3,2=3:10:0 6,2=6:7:0 7,2=6:1:0 8,2=6:1:1 9,2=2:0:1 2,3=4:11:1 3,3=0:2:0 4,3=3:10:0 6,3=2:0:0 7,3=0:3:0 8,3=6:3:0 9,3=6:1:1 10,3=0:3:0 11,3=0:2:0 0,4=0:0:0 1,4=6:0:0 3,4=0:2:0 4,4=0:7:0 5,4=0:0:0 6,4=2:7:0 7,4=6:0:0 8,4=0:0:0 9,4=0:0:0 0,5=0:2:0 2,5=0:9:0 3,5=6:1:0 4,5=0:0:0 5,5=0:0:1 6,5=4:11:0 7,5=0:0:1 8,5=6:0:0 9,5=4:11:1 10,5=3:10:0 11,5=0:2:0 2,6=0:0:0 3,6=1:7:0 4,6=0:0:0 5,6=0:7:0 6,6=0:2:0 8,6=0:0:0 9,6=3:10:0 10,6=4:11:0 11,6=2:7:0 0,7=1:9:1 2,7=0:7:0 3,7=0:0:0 4,7=2:9:0 5,7=2:0:1 7,7=1:7:0 8,7=3:10:0 9,7=6:1:1 10,7=0:0:0 11,7=0:0:0 0,8=3:10:1 1,8=0:0:1 2,8=0:2:0 4,8=3:10:0 5,8=6:2:0 6,8=6:1:1 7,8=6:9:0 8,8=6:2:1 9,8=1:1:0 10,8=1:0:1 11,8=2:0:0
+ebene 1: 0,0=0:0:0 3,0=0:0:0 4,0=2:1:0 10,0=0:7:0 4,2=2:0:1 5,3=0:0:0 8,3=0:0:1 11,3=0:1:0 2,4=0:9:0 4,4=1:2:0 7,4=1:3:1 11,4=0:0:1 0,5=3:10:1 4,5=0:0:0 5,5=0:2:0 6,5=6:9:0 11,5=3:10:1 1,6=6:7:0 5,6=1:0:0 7,6=3:10:0 10,6=1:3:0 11,6=0:2:0 0,7=6:0:1 8,7=2:7:0 3,8=4:11:0 4,8=6:9:0
+ebene 2: 0,0=3:10:1 1,0=1:0:0 8,0=0:1:0 0,1=0:0:0 1,1=0:7:0 5,1=1:3:0 8,1=0:1:1 10,1=2:0:1 3,2=2:1:0 5,2=6:3:0 6,2=0:9:0 10,2=0:3:0 1,3=1:7:0 1,4=6:3:1 3,4=6:1:0 4,4=0:0:1 11,4=4:11:0 9,6=3:10:1 2,7=0:0:0 8,7=2:7:1 11,7=4:11:0 4,8=1:7:0 6,8=6:0:0 10,8=1:0:0
+rueck: 0,0,6,6:0 2,2,8,2:1 4,0,4,10:0 1,9,9,1:6 3,3,5,7:0
+ablauf hoch 3 ; runter 0 ; anfang 6 ; ende 1
+farben: Drill Weiss/◆/1/01 | rot/●/1/00 | Gelb/□/1/00 | grün/■/3/00 | blau/▲/2/00 | Perle Gold/△/3/10 | Ungenutzt/◇/2/00 | Zimt/★/3/00 | Blau/○/2/00
+ebene 0: 1,0=8:0:0 2,0=8:0:0 3,0=4:0:0 4,0=1:0:0 5,0=8:0:0 7,0=2:0:0 8,0=7:0:0 9,0=3:0:0 11,0=1:0:0 0,1=4:0:0 1,1=7:0:0 2,1=7:0:0 3,1=7:0:1 5,1=8:0:0 6,1=1:0:0 7,1=8:0:0 8,1=3:0:0 9,1=5:0:0 10,1=7:0:1 0,2=2:0:0 1,2=5:0:1 2,2=2:0:0 3,2=5:0:0 6,2=7:0:0 7,2=7:0:0 8,2=7:0:1 9,2=2:0:1 2,3=0:0:1 3,3=1:0:0 4,3=5:0:0 6,3=2:0:0 7,3=1:0:0 8,3=7:0:0 9,3=7:0:1 10,3=1:0:0 11,3=4:0:0 0,4=4:0:0 1,4=7:0:0 3,4=1:0:0 4,4=8:0:0 5,4=1:0:0 6,4=2:0:0 7,4=7:0:0 8,4=1:0:0 9,4=1:0:0 0,5=1:0:0 2,5=8:0:0 3,5=7:0:0 4,5=4:0:0 5,5=1:0:1 6,5=0:0:0 7,5=1:0:1 8,5=7:0:0 9,5=0:0:1 10,5=5:0:0 11,5=1:0:0 2,6=1:0:0 3,6=3:0:0 4,6=4:0:0 5,6=1:0:0 6,6=4:0:0 8,6=4:0:0 9,6=5:0:0 10,6=0:0:0 11,6=2:0:0 0,7=3:0:1 2,7=1:0:0 3,7=4:0:0 4,7=2:0:0 5,7=2:0:1 7,7=3:0:0 8,7=5:0:0 9,7=7:0:1 10,7=1:0:0 11,7=1:0:0 0,8=5:0:1 1,8=1:0:1 2,8=1:0:0 4,8=5:0:0 5,8=7:0:0 6,8=7:0:1 7,8=7:0:0 8,8=7:0:1 9,8=3:0:0 10,8=3:0:1 11,8=2:0:0
+ebene 1: 0,0=0:0:0 3,0=1:0:0 4,0=3:1:0 10,0=0:7:0 4,2=3:0:1 5,3=1:0:0 8,3=1:0:1 11,3=4:1:0 2,4=0:9:0 4,4=2:2:0 7,4=2:3:1 11,4=0:0:1 0,5=5:10:1 4,5=1:0:0 5,5=1:2:0 6,5=8:9:0 11,5=5:10:1 1,6=8:7:0 5,6=2:0:0 7,6=5:10:0 10,6=2:3:0 11,6=0:2:0 0,7=8:0:1 8,7=3:7:0 3,8=6:11:0 4,8=8:9:0
+ebene 2: 0,0=5:0:1 1,0=3:0:0 8,0=1:0:0 0,1=4:0:0 1,1=8:0:0 5,1=3:0:0 8,1=1:0:1 10,1=2:0:1 3,2=2:0:0 5,2=7:0:0 6,2=1:0:0 10,2=4:0:0 1,3=3:0:0 1,4=7:0:1 3,4=7:0:0 4,4=1:0:1 11,4=0:0:0 9,6=5:0:1 2,7=8:0:0 8,7=2:0:1 11,7=0:0:0 4,8=3:0:0 6,8=7:0:0 10,8=3:0:0
+rueck: 0,0,6,6:1 2,2,8,2:3 4,0,4,10:4 1,9,9,1:7 3,3,5,7:8
+ablauf faeden 2 6 ; faeden 0 3 5 4
+farben: rot/●/4/00 | Blau/○/2/00 | grün/■/6/00 | Gelb/□/4/00 | blau/▲/2/00 | Perle Gold/△/4/10 | Drill Weiss/◆/1/01 | Ungenutzt/◇/2/00 | Zimt/★/3/00
+ebene 0: 1,0=1:9:0 2,0=1:1:0 3,0=4:0:0 4,0=0:1:0 5,0=1:0:0 7,0=3:0:0 8,0=8:0:0 9,0=2:0:0 11,0=0:3:0 0,1=4:0:0 1,1=8:1:0 2,1=8:7:0 3,1=8:1:1 5,1=1:2:0 6,1=0:3:0 7,1=1:0:0 8,1=2:1:0 9,1=5:10:0 10,1=8:7:1 0,2=3:2:0 1,2=5:10:1 2,2=3:0:0 3,2=5:10:0 6,2=8:7:0 7,2=8:1:0 8,2=8:1:1 9,2=3:0:1 2,3=6:11:1 3,3=0:2:0 4,3=5:10:0 6,3=3:0:0 7,3=0:3:0 8,3=8:3:0 9,3=8:1:1 10,3=0:3:0 11,3=4:2:0 0,4=4:0:0 1,4=8:0:0 3,4=0:2:0 4,4=1:7:0 5,4=0:0:0 6,4=3:7:0 7,4=8:0:0 8,4=0:0:0 9,4=0:0:0 0,5=0:2:0 2,5=1:9:0 3,5=8:1:0 4,5=4:0:0 5,5=0:0:1 6,5=6:11:0 7,5=0:0:1 8,5=8:0:0 9,5=6:11:1 10,5=5:10:0 11,5=0:2:0 2,6=0:0:0 3,6=2:7:0 4,6=4:0:0 5,6=0:7:0 6,6=4:2:0 8,6=4:0:0 9,6=5:10:0 10,6=6:11:0 11,6=3:7:0 0,7=2:9:1 2,7=0:7:0 3,7=4:0:0 4,7=3:9:0 5,7=3:0:1 7,7=2:7:0 8,7=5:10:0 9,7=8:1:1 10,7=0:0:0 11,7=0:0:0 0,8=5:10:1 1,8=0:0:1 2,8=0:2:0 4,8=5:10:0 5,8=8:2:0 6,8=8:1:1 7,8=8:9:0 8,8=8:2:1 9,8=2:1:0 10,8=2:0:1 11,8=3:0:0
+ebene 1: 0,0=0:0:0 3,0=1:0:0 4,0=3:1:0 10,0=0:7:0 4,2=3:0:1 5,3=1:0:0 8,3=1:0:1 11,3=4:1:0 2,4=0:9:0 4,4=2:2:0 7,4=2:3:1 11,4=0:0:1 0,5=5:10:1 4,5=1:0:0 5,5=1:2:0 6,5=8:9:0 11,5=5:10:1 1,6=8:7:0 5,6=2:0:0 7,6=5:10:0 10,6=2:3:0 11,6=0:2:0 0,7=8:0:1 8,7=3:7:0 3,8=6:11:0 4,8=8:9:0
+ebene 2: 0,0=5:10:1 1,0=2:0:0 8,0=0:1:0 0,1=4:0:0 1,1=1:7:0 5,1=2:3:0 8,1=0:1:1 10,1=3:0:1 3,2=3:1:0 5,2=8:3:0 6,2=0:9:0 10,2=4:3:0 1,3=2:7:0 1,4=8:3:1 3,4=8:1:0 4,4=0:0:1 11,4=6:11:0 9,6=5:10:1 2,7=1:0:0 8,7=3:7:1 11,7=6:11:0 4,8=2:7:0 6,8=8:0:0 10,8=2:0:0
+rueck: 0,0,6,6:0 2,2,8,2:2 4,0,4,10:4 1,9,9,1:8 3,3,5,7:1
+ablauf alle 6 ; faeden 1 2
+farben: rot/●/6/00 | Blau/○/2/00 | grün/■/6/00 | Gelb/□/6/00 | blau/▲/6/00 | Perle Gold/△/6/10 | Drill Weiss/◆/6/01 | Ungenutzt/◇/6/00 | Zimt/★/6/00
+ebene 0: 1,0=1:9:0 2,0=1:1:0 3,0=4:0:0 4,0=0:1:0 5,0=1:0:0 7,0=3:0:0 8,0=8:0:0 9,0=2:0:0 11,0=0:3:0 0,1=4:0:0 1,1=8:1:0 2,1=8:7:0 3,1=8:1:1 5,1=1:2:0 6,1=0:3:0 7,1=1:0:0 8,1=2:1:0 9,1=5:10:0 10,1=8:7:1 0,2=3:2:0 1,2=5:10:1 2,2=3:0:0 3,2=5:10:0 6,2=8:7:0 7,2=8:1:0 8,2=8:1:1 9,2=3:0:1 2,3=6:11:1 3,3=0:2:0 4,3=5:10:0 6,3=3:0:0 7,3=0:3:0 8,3=8:3:0 9,3=8:1:1 10,3=0:3:0 11,3=4:2:0 0,4=4:0:0 1,4=8:0:0 3,4=0:2:0 4,4=1:7:0 5,4=0:0:0 6,4=3:7:0 7,4=8:0:0 8,4=0:0:0 9,4=0:0:0 0,5=0:2:0 2,5=1:9:0 3,5=8:1:0 4,5=4:0:0 5,5=0:0:1 6,5=6:11:0 7,5=0:0:1 8,5=8:0:0 9,5=6:11:1 10,5=5:10:0 11,5=0:2:0 2,6=0:0:0 3,6=2:7:0 4,6=4:0:0 5,6=0:7:0 6,6=4:2:0 8,6=4:0:0 9,6=5:10:0 10,6=6:11:0 11,6=3:7:0 0,7=2:9:1 2,7=0:7:0 3,7=4:0:0 4,7=3:9:0 5,7=3:0:1 7,7=2:7:0 8,7=5:10:0 9,7=8:1:1 10,7=0:0:0 11,7=0:0:0 0,8=5:10:1 1,8=0:0:1 2,8=0:2:0 4,8=5:10:0 5,8=8:2:0 6,8=8:1:1 7,8=8:9:0 8,8=8:2:1 9,8=2:1:0 10,8=2:0:1 11,8=3:0:0
+ebene 1: 0,0=0:0:0 3,0=1:0:0 4,0=3:1:0 10,0=0:7:0 4,2=3:0:1 5,3=1:0:0 8,3=1:0:1 11,3=4:1:0 2,4=0:9:0 4,4=2:2:0 7,4=2:3:1 11,4=0:0:1 0,5=5:10:1 4,5=1:0:0 5,5=1:2:0 6,5=8:9:0 11,5=5:10:1 1,6=8:7:0 5,6=2:0:0 7,6=5:10:0 10,6=2:3:0 11,6=0:2:0 0,7=8:0:1 8,7=3:7:0 3,8=6:11:0 4,8=8:9:0
+ebene 2: 0,0=5:10:1 1,0=2:0:0 8,0=0:1:0 0,1=4:0:0 1,1=1:7:0 5,1=2:3:0 8,1=0:1:1 10,1=3:0:1 3,2=3:1:0 5,2=8:3:0 6,2=0:9:0 10,2=4:3:0 1,3=2:7:0 1,4=8:3:1 3,4=8:1:0 4,4=0:0:1 11,4=6:11:0 9,6=5:10:1 2,7=1:0:0 8,7=3:7:1 11,7=6:11:0 4,8=2:7:0 6,8=8:0:0 10,8=2:0:0
+rueck: 0,0,6,6:0 2,2,8,2:2 4,0,4,10:4 1,9,9,1:8 3,3,5,7:1
+ablauf ungenutzte
+farben: rot/●/1/00 | Blau/○/2/00 | grün/■/3/00 | Gelb/□/1/00 | blau/▲/2/00 | Perle Gold/△/3/10 | Drill Weiss/◆/1/01 | Zimt/★/3/00
+ebene 0: 1,0=1:9:0 2,0=1:1:0 3,0=4:0:0 4,0=0:1:0 5,0=1:0:0 7,0=3:0:0 8,0=7:0:0 9,0=2:0:0 11,0=0:3:0 0,1=4:0:0 1,1=7:1:0 2,1=7:7:0 3,1=7:1:1 5,1=1:2:0 6,1=0:3:0 7,1=1:0:0 8,1=2:1:0 9,1=5:10:0 10,1=7:7:1 0,2=3:2:0 1,2=5:10:1 2,2=3:0:0 3,2=5:10:0 6,2=7:7:0 7,2=7:1:0 8,2=7:1:1 9,2=3:0:1 2,3=6:11:1 3,3=0:2:0 4,3=5:10:0 6,3=3:0:0 7,3=0:3:0 8,3=7:3:0 9,3=7:1:1 10,3=0:3:0 11,3=4:2:0 0,4=4:0:0 1,4=7:0:0 3,4=0:2:0 4,4=1:7:0 5,4=0:0:0 6,4=3:7:0 7,4=7:0:0 8,4=0:0:0 9,4=0:0:0 0,5=0:2:0 2,5=1:9:0 3,5=7:1:0 4,5=4:0:0 5,5=0:0:1 6,5=6:11:0 7,5=0:0:1 8,5=7:0:0 9,5=6:11:1 10,5=5:10:0 11,5=0:2:0 2,6=0:0:0 3,6=2:7:0 4,6=4:0:0 5,6=0:7:0 6,6=4:2:0 8,6=4:0:0 9,6=5:10:0 10,6=6:11:0 11,6=3:7:0 0,7=2:9:1 2,7=0:7:0 3,7=4:0:0 4,7=3:9:0 5,7=3:0:1 7,7=2:7:0 8,7=5:10:0 9,7=7:1:1 10,7=0:0:0 11,7=0:0:0 0,8=5:10:1 1,8=0:0:1 2,8=0:2:0 4,8=5:10:0 5,8=7:2:0 6,8=7:1:1 7,8=7:9:0 8,8=7:2:1 9,8=2:1:0 10,8=2:0:1 11,8=3:0:0
+ebene 1: 0,0=0:0:0 3,0=1:0:0 4,0=3:1:0 10,0=0:7:0 4,2=3:0:1 5,3=1:0:0 8,3=1:0:1 11,3=4:1:0 2,4=0:9:0 4,4=2:2:0 7,4=2:3:1 11,4=0:0:1 0,5=5:10:1 4,5=1:0:0 5,5=1:2:0 6,5=7:9:0 11,5=5:10:1 1,6=7:7:0 5,6=2:0:0 7,6=5:10:0 10,6=2:3:0 11,6=0:2:0 0,7=7:0:1 8,7=3:7:0 3,8=6:11:0 4,8=7:9:0
+ebene 2: 0,0=5:10:1 1,0=2:0:0 8,0=0:1:0 0,1=4:0:0 1,1=1:7:0 5,1=2:3:0 8,1=0:1:1 10,1=3:0:1 3,2=3:1:0 5,2=7:3:0 6,2=0:9:0 10,2=4:3:0 1,3=2:7:0 1,4=7:3:1 3,4=7:1:0 4,4=0:0:1 11,4=6:11:0 9,6=5:10:1 2,7=1:0:0 8,7=3:7:1 11,7=6:11:0 4,8=2:7:0 6,8=7:0:0 10,8=2:0:0
+rueck: 0,0,6,6:0 2,2,8,2:2 4,0,4,10:4 1,9,9,1:7 3,3,5,7:1
+ablauf zusammen 2 7 ; loeschen 2 ; ende 0 ; faeden 0 5
+farben: Blau/○/5/00 | Gelb/□/1/00 | blau/▲/2/00 | Perle Gold/△/3/10 | Drill Weiss/◆/1/01 | Zimt/★/3/00 | rot/●/1/00
+ebene 0: 1,0=0:0:0 2,0=0:0:0 3,0=2:0:0 4,0=6:0:0 5,0=0:0:0 7,0=1:0:0 8,0=5:0:0 11,0=6:0:0 0,1=2:0:0 1,1=5:0:0 2,1=5:0:0 3,1=5:0:1 5,1=0:0:0 6,1=6:0:0 7,1=0:0:0 9,1=3:0:0 10,1=5:0:1 0,2=1:0:0 1,2=3:0:1 2,2=1:0:0 3,2=3:0:0 6,2=5:0:0 7,2=5:0:0 8,2=5:0:1 9,2=1:0:1 2,3=4:0:1 3,3=6:0:0 4,3=3:0:0 6,3=1:0:0 7,3=6:0:0 8,3=5:0:0 9,3=5:0:1 10,3=6:0:0 11,3=2:0:0 0,4=2:0:0 1,4=5:0:0 3,4=6:0:0 4,4=0:0:0 5,4=6:0:0 6,4=1:0:0 7,4=5:0:0 8,4=6:0:0 9,4=6:0:0 0,5=6:0:0 2,5=0:0:0 3,5=5:0:0 4,5=2:0:0 5,5=6:0:1 6,5=4:0:0 7,5=6:0:1 8,5=5:0:0 9,5=4:0:1 10,5=3:0:0 11,5=6:0:0 2,6=6:0:0 4,6=2:0:0 5,6=6:0:0 6,6=2:0:0 8,6=2:0:0 9,6=3:0:0 10,6=4:0:0 11,6=1:0:0 2,7=6:0:0 3,7=2:0:0 4,7=1:0:0 5,7=1:0:1 8,7=3:0:0 9,7=5:0:1 10,7=6:0:0 11,7=6:0:0 0,8=3:0:1 1,8=6:0:1 2,8=6:0:0 4,8=3:0:0 5,8=5:0:0 6,8=5:0:1 7,8=5:0:0 8,8=5:0:1 11,8=1:0:0
+ebene 1: 0,0=0:0:0 3,0=1:0:0 4,0=2:1:0 10,0=0:7:0 4,2=2:0:1 5,3=1:0:0 8,3=1:0:1 11,3=3:1:0 2,4=0:9:0 11,4=0:0:1 0,5=4:10:1 4,5=1:0:0 5,5=1:2:0 6,5=6:9:0 11,5=4:10:1 1,6=6:7:0 7,6=4:10:0 11,6=0:2:0 0,7=6:0:1 8,7=2:7:0 3,8=5:11:0 4,8=6:9:0
+ebene 2: 0,0=3:0:1 8,0=6:0:0 0,1=2:0:0 1,1=0:0:0 8,1=6:0:1 10,1=1:0:1 3,2=1:0:0 5,2=5:0:0 6,2=6:0:0 10,2=2:0:0 1,4=5:0:1 3,4=5:0:0 4,4=6:0:1 11,4=4:0:0 9,6=3:0:1 2,7=0:0:0 8,7=1:0:1 11,7=4:0:0 6,8=5:0:0
+rueck: 0,0,6,6:6 4,0,4,10:2 1,9,9,1:5 3,3,5,7:0
+ablauf zusammen 8 6 4 ; ungenutzte ; anfang 5 ; hoch 2
+farben: Zimt/★/3/00 | Blau/○/2/00 | rot/●/1/00 | grün/■/3/00 | Gelb/□/1/00 | Perle Gold/△/3/10
+ebene 0: 1,0=1:0:0 2,0=1:0:0 3,0=0:0:0 4,0=2:0:0 5,0=1:0:0 7,0=4:0:0 8,0=0:0:0 9,0=3:0:0 11,0=2:0:0 0,1=0:0:0 1,1=0:0:0 2,1=0:0:0 3,1=0:0:1 5,1=1:0:0 6,1=2:0:0 7,1=1:0:0 8,1=3:0:0 9,1=5:0:0 10,1=0:0:1 0,2=4:0:0 1,2=5:0:1 2,2=4:0:0 3,2=5:0:0 6,2=0:0:0 7,2=0:0:0 8,2=0:0:1 9,2=4:0:1 2,3=0:0:1 3,3=2:0:0 4,3=5:0:0 6,3=4:0:0 7,3=2:0:0 8,3=0:0:0 9,3=0:0:1 10,3=2:0:0 11,3=0:0:0 0,4=0:0:0 1,4=0:0:0 3,4=2:0:0 4,4=1:0:0 5,4=2:0:0 6,4=4:0:0 7,4=0:0:0 8,4=2:0:0 9,4=2:0:0 0,5=2:0:0 2,5=1:0:0 3,5=0:0:0 4,5=0:0:0 5,5=2:0:1 6,5=0:0:0 7,5=2:0:1 8,5=0:0:0 9,5=0:0:1 10,5=5:0:0 11,5=2:0:0 2,6=2:0:0 3,6=3:0:0 4,6=0:0:0 5,6=2:0:0 6,6=0:0:0 8,6=0:0:0 9,6=5:0:0 10,6=0:0:0 11,6=4:0:0 0,7=3:0:1 2,7=2:0:0 3,7=0:0:0 4,7=4:0:0 5,7=4:0:1 7,7=3:0:0 8,7=5:0:0 9,7=0:0:1 10,7=2:0:0 11,7=2:0:0 0,8=5:0:1 1,8=2:0:1 2,8=2:0:0 4,8=5:0:0 5,8=0:0:0 6,8=0:0:1 7,8=0:0:0 8,8=0:0:1 9,8=3:0:0 10,8=3:0:1 11,8=4:0:0
+ebene 1: 0,0=0:0:0 3,0=1:0:0 4,0=3:1:0 10,0=0:7:0 4,2=3:0:1 5,3=1:0:0 8,3=1:0:1 11,3=5:1:0 2,4=0:9:0 4,4=2:2:0 7,4=2:3:1 11,4=0:0:1 0,5=4:10:1 4,5=1:0:0 5,5=1:2:0 6,5=5:9:0 11,5=4:10:1 1,6=5:7:0 5,6=2:0:0 7,6=4:10:0 10,6=2:3:0 11,6=0:2:0 0,7=5:0:1 8,7=3:7:0 3,8=5:0:0 4,8=5:9:0
+ebene 2: 0,0=5:0:1 1,0=3:0:0 8,0=2:0:0 0,1=0:0:0 1,1=1:0:0 5,1=3:0:0 8,1=2:0:1 10,1=4:0:1 3,2=4:0:0 5,2=0:0:0 6,2=2:0:0 10,2=0:0:0 1,3=3:0:0 1,4=0:0:1 3,4=0:0:0 4,4=2:0:1 11,4=0:0:0 9,6=5:0:1 2,7=1:0:0 8,7=4:0:1 11,7=0:0:0 4,8=3:0:0 6,8=0:0:0 10,8=3:0:0
+rueck: 0,0,6,6:2 2,2,8,2:3 4,0,4,10:0 1,9,9,1:0 3,3,5,7:1
+sortiert 1: Blau | blau | Drill Weiss | Gelb | grün | Perle Gold | rot | Ungenutzt | Zimt
+sortiert 2: Zimt | Ungenutzt | rot | Perle Gold | grün | Gelb | Drill Weiss | Blau | blau
+sortiert 3: Blau | blau | Gelb | rot | Ungenutzt | Drill Weiss | Zimt | Perle Gold | grün
+sortiert 4: Drill Weiss | Gelb | Perle Gold | grün | Zimt | rot | Blau | blau | Ungenutzt
+sortiert 5: Ungenutzt | Blau | blau | rot | Zimt | grün | Perle Gold | Gelb | Drill Weiss
+sortiert 6: rot | Zimt | grün | Gelb | Blau | Perle Gold | blau | Drill Weiss | Ungenutzt
+sortiert 7: Ungenutzt | Drill Weiss | blau | Blau | Perle Gold | grün | Gelb | Zimt | rot
+--- datei farbprobe.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+gleich (64 Zeilen)
+
+=== umordnen und sortieren behalten das bild, auch auf der gesperrten ebene; strg+z nimmt alles
+IMPORT "helfer.dh"
+' Das Bild: je Ebene und Zelle die GARNFARBE, Typ und erledigt, dazu die
+' Rueckstiche nach Garnfarbe -- ein Plan, der nur die Reihenfolge aendert,
+' darf daran nichts aendern. Die Nummern im Stand aendern sich dagegen.
+FUNCTION bild$(m AS kern.Muster) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM e AS kern.Ebene
+    FOR EACH e IN m.ebenen.ebenen
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(e.raster) - 1
+            IF e.raster[i] >= 0 THEN ARRAY_PUSH(t, STR$(i) + "=" + HEX$(m.farben[e.raster[i]].garn.farbe) + ":" + STR$(e.art[i]) + ":" + STR$(e.erledigt[i]))
+        NEXT
+        ARRAY_PUSH(t, "|")
+    NEXT
+    DIM r AS kern.Rueckstich
+    FOR EACH r IN m.rueckstiche
+        ARRAY_PUSH(t, STR$(r.x1) + "," + STR$(r.y1) + "," + STR$(r.x2) + "," + STR$(r.y2) + ":" + HEX$(m.farben[r.farbe].garn.farbe))
+    NEXT
+    RETURN JOIN$(t, " ")
+END FUNCTION
+
+FUNCTION namen$(m AS kern.Muster) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN m.farben
+        ARRAY_PUSH(t, f.garn.name)
+    NEXT
+    RETURN JOIN$(t, ",")
+END FUNCTION
+
+DIM gesperrt AS STRING
+DIM m0 AS kern.Muster : m0 = kern.pxsLaden("farbprobe.pxs")
+DIM k AS INTEGER
+FOR k = 0 TO m0.ebenen.anzahl() - 1
+    gesperrt = gesperrt + IIF(m0.ebenen.ebenen[k].gesperrt, "g", "-") + IIF(m0.ebenen.ebenen[k].sichtbar, "s", "-")
+NEXT
+PRINT "ebenen: "; gesperrt
+
+DIM art AS INTEGER
+FOR art = 0 TO 8
+    DIM m AS kern.Muster : m = kern.pxsLaden("farbprobe.pxs")
+    m.stichzahlenNeu()
+    DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+    DIM vorher AS STRING : vorher = fvStand$(m)
+    DIM bv AS STRING : bv = bild$(m)
+    DIM p AS kern.Farbplan : p = kern.neuerFarbplan(m)
+    IF art = 8 THEN
+        ' umgekehrt, ueber Verschieben zusammengesetzt
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(p.folge) - 1
+            kern.planVerschieben(p, LEN(p.folge) - 1, i)
+        NEXT
+    ELSEIF art > 0 THEN
+        kern.planSortieren(m, p, art)
+    END IF
+    DIM ok AS BOOLEAN : ok = kern.planAnwenden(m, v, p)
+    DIM nachher AS STRING : nachher = fvStand$(m)
+    PRINT "art "; art; ": geaendert "; ok; " | bild gleich "; bild$(m) = bv; " | stand anders "; nachher <> vorher; " | "; namen$(m)
+    ok = v.zurueckNehmen(m)
+    PRINT "  zurueck: stand gleich "; fvStand$(m) = vorher; " | stichzahlen "; m.farben[0].stichzahl
+    ok = v.wiederholen(m)
+    PRINT "  vor: wie danach "; fvStand$(m) = nachher
+NEXT
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_farbverwaltung.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- datei farbprobe.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+ebenen: -sgs--
+art 0: geaendert FALSE | bild gleich TRUE | stand anders FALSE | rot,Blau,grün,Gelb,blau,Perle Gold,Drill Weiss,Ungenutzt,Zimt
+  zurueck: stand gleich TRUE | stichzahlen 30
+  vor: wie danach TRUE
+art 1: geaendert TRUE | bild gleich TRUE | stand anders TRUE | Blau,blau,Drill Weiss,Gelb,grün,Perle Gold,rot,Ungenutzt,Zimt
+  zurueck: stand gleich TRUE | stichzahlen 30
+  vor: wie danach TRUE
+art 2: geaendert TRUE | bild gleich TRUE | stand anders TRUE | Zimt,Ungenutzt,rot,Perle Gold,grün,Gelb,Drill Weiss,Blau,blau
+  zurueck: stand gleich TRUE | stichzahlen 30
+  vor: wie danach TRUE
+art 3: geaendert TRUE | bild gleich TRUE | stand anders TRUE | Blau,blau,Gelb,rot,Ungenutzt,Drill Weiss,Zimt,Perle Gold,grün
+  zurueck: stand gleich TRUE | stichzahlen 30
+  vor: wie danach TRUE
+art 4: geaendert TRUE | bild gleich TRUE | stand anders TRUE | Drill Weiss,Gelb,Perle Gold,grün,Zimt,rot,Blau,blau,Ungenutzt
+  zurueck: stand gleich TRUE | stichzahlen 30
+  vor: wie danach TRUE
+art 5: geaendert TRUE | bild gleich TRUE | stand anders TRUE | Ungenutzt,Blau,blau,rot,Zimt,grün,Perle Gold,Gelb,Drill Weiss
+  zurueck: stand gleich TRUE | stichzahlen 30
+  vor: wie danach TRUE
+art 6: geaendert TRUE | bild gleich TRUE | stand anders TRUE | rot,Zimt,grün,Gelb,Blau,Perle Gold,blau,Drill Weiss,Ungenutzt
+  zurueck: stand gleich TRUE | stichzahlen 30
+  vor: wie danach TRUE
+art 7: geaendert TRUE | bild gleich TRUE | stand anders TRUE | Ungenutzt,Drill Weiss,blau,Blau,Perle Gold,grün,Gelb,Zimt,rot
+  zurueck: stand gleich TRUE | stichzahlen 30
+  vor: wie danach TRUE
+art 8: geaendert TRUE | bild gleich TRUE | stand anders TRUE | Zimt,Ungenutzt,Drill Weiss,Perle Gold,blau,Gelb,grün,Blau,rot
+  zurueck: stand gleich TRUE | stichzahlen 30
+  vor: wie danach TRUE
+
+=== loeschen und zusammenfuehren als ein schritt, auch auf der gesperrten ebene
+IMPORT "helfer.dh"
+DIM m AS kern.Muster : m = kern.pxsLaden("farbprobe.pxs")
+m.stichzahlenNeu()
+DIM v AS kern.Verlauf : v = kern.neuerVerlauf()
+DIM vorher AS STRING : vorher = fvStand$(m)
+DIM p AS kern.Farbplan : p = kern.neuerFarbplan(m)
+PRINT "stiche je farbe: "; kern.planStiche(m, p, 1); " "; kern.planStiche(m, p, 4); " "; kern.planStiche(m, p, 7)
+kern.planZusammen(p, 1, [4])
+kern.planLoeschen(p, [0])
+DIM n AS INTEGER : n = kern.planUngenutzte(m, p)
+PRINT "ungenutzte: "; n; " | plan "; LEN(p.folge)
+p.straenge[p.folge[0]] = 6
+DIM ok AS BOOLEAN : ok = kern.planAnwenden(m, v, p)
+PRINT "angewendet "; ok; " | schritte "; LEN(v.rueck); " | text "; v.textZurueck$()
+PRINT fvStand$(m)
+PRINT "gesperrte ebene bleibt gesperrt: "; m.ebenen.ebenen[1].gesperrt; " | unsichtbare bleibt unsichtbar: "; NOT m.ebenen.ebenen[2].sichtbar
+ok = v.zurueckNehmen(m)
+PRINT "zurueck: wie vorher "; fvStand$(m) = vorher
+' eine Farbe nur mit Rueckstichen ist nicht ungenutzt (PySticky loescht sie)
+DIM m2 AS kern.Muster : m2 = kern.pxsLaden("farbprobe.pxs")
+m2.stichzahlenNeu()
+ARRAY_PUSH(m2.rueckstiche, kern.neuerRueckstich(0, 0, 2, 2, 7))
+DIM p2 AS kern.Farbplan : p2 = kern.neuerFarbplan(m2)
+PRINT "nur rueckstiche: ungenutzt "; kern.planUngenutzte(m2, p2); " | plan "; LEN(p2.folge)
+' ein leerer Plan aendert nichts und legt keinen Schritt an
+DIM leer AS kern.Farbplan : leer = kern.neuerFarbplan(m)
+' (sonst waere das Wiederholen weg)
+PRINT "leerer plan: "; kern.planAnwenden(m, v, leer); " | wiederholbar "; LEN(v.vor); " | zuruecknehmbar "; LEN(v.rueck)
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_farbverwaltung.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- datei farbprobe.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+stiche je farbe: 14 12 0
+ungenutzte: 1 | plan 6
+angewendet TRUE | schritte 1 | text Farben verwalten
+farben: Blau/○/6/00 | grün/■/3/00 | Gelb/□/1/00 | Perle Gold/△/3/10 | Drill Weiss/◆/1/01 | Zimt/★/3/00
+ebene 0: 1,0=0:9:0 2,0=0:1:0 3,0=0:0:0 5,0=0:0:0 7,0=2:0:0 8,0=5:0:0 9,0=1:0:0 0,1=0:0:0 1,1=5:1:0 2,1=5:7:0 3,1=5:1:1 5,1=0:2:0 7,1=0:0:0 8,1=1:1:0 9,1=3:10:0 10,1=5:7:1 0,2=2:2:0 1,2=3:10:1 2,2=2:0:0 3,2=3:10:0 6,2=5:7:0 7,2=5:1:0 8,2=5:1:1 9,2=2:0:1 2,3=4:11:1 4,3=3:10:0 6,3=2:0:0 8,3=5:3:0 9,3=5:1:1 11,3=0:2:0 0,4=0:0:0 1,4=5:0:0 4,4=0:7:0 6,4=2:7:0 7,4=5:0:0 2,5=0:9:0 3,5=5:1:0 4,5=0:0:0 6,5=4:11:0 8,5=5:0:0 9,5=4:11:1 10,5=3:10:0 3,6=1:7:0 4,6=0:0:0 6,6=0:2:0 8,6=0:0:0 9,6=3:10:0 10,6=4:11:0 11,6=2:7:0 0,7=1:9:1 3,7=0:0:0 4,7=2:9:0 5,7=2:0:1 7,7=1:7:0 8,7=3:10:0 9,7=5:1:1 0,8=3:10:1 4,8=3:10:0 5,8=5:2:0 6,8=5:1:1 7,8=5:9:0 8,8=5:2:1 9,8=1:1:0 10,8=1:0:1 11,8=2:0:0
+ebene 1: 3,0=0:0:0 4,0=2:1:0 4,2=2:0:1 5,3=0:0:0 8,3=0:0:1 11,3=0:1:0 4,4=1:2:0 7,4=1:3:1 0,5=3:10:1 4,5=0:0:0 5,5=0:2:0 6,5=5:9:0 11,5=3:10:1 1,6=5:7:0 5,6=1:0:0 7,6=3:10:0 10,6=1:3:0 0,7=5:0:1 8,7=2:7:0 3,8=4:11:0 4,8=5:9:0
+ebene 2: 0,0=3:10:1 1,0=1:0:0 0,1=0:0:0 1,1=0:7:0 5,1=1:3:0 10,1=2:0:1 3,2=2:1:0 5,2=5:3:0 10,2=0:3:0 1,3=1:7:0 1,4=5:3:1 3,4=5:1:0 11,4=4:11:0 9,6=3:10:1 2,7=0:0:0 8,7=2:7:1 11,7=4:11:0 4,8=1:7:0 6,8=5:0:0 10,8=1:0:0
+rueck: 2,2,8,2:1 4,0,4,10:0 1,9,9,1:5 3,3,5,7:0
+gesperrte ebene bleibt gesperrt: TRUE | unsichtbare bleibt unsichtbar: TRUE
+zurueck: wie vorher TRUE
+nur rueckstiche: ungenutzt 0 | plan 9
+leerer plan: FALSE | wiederholbar 1 | zuruecknehmbar 0
+
+=== probe: dialog farben verwalten
+IMPORT "helfer.dh"
+' --probe-stufe14 mit farbprobe.pxs: der Dialog (Liste, Knoepfe je Auswahl,
+' Sortieren, Faeden, Zusammenfuehren, ans Ende, Loeschen, Ungenutzte, Suche),
+' Uebernehmen als ein Schritt samt Strg+Z/Strg+Y und der aktuellen Farbe,
+' Abbrechen und Zuruecksetzen.
+MKDIR("app")
+SETENV("APPDATA", CWD$() + "/app")
+SETENV("HOME", CWD$() + "/app")
+dlStarten(["run", BEISPIEL, "--", "--probe-stufe14", "--foto", "d", "farbprobe.pxs"])
+IF INSTR(dlAus, "GTK nicht gefunden") >= 0 OR INSTR(dlAus, "keinen Bildschirm") >= 0 THEN
+    PRINT "UEBERSPRINGEN: kein GTK mit Bildschirm"
+ELSE
+    PRINT "rueckgabe "; dlCode
+    PRINT REPLACE$(dlAus, CHR$(13), "");
+    IF dlErr <> "" THEN PRINT "stderr: "; dlErr
+    DIM f AS STRING
+    FOR EACH f IN ["farben", "farben_geplant"]
+        PRINT f; " "; FILEEXISTS("d_" + f + ".png")
+    NEXT
+    PRINT "datei unveraendert: "; geLies$("farbprobe.pxs") = geLies$("vorher.pxs")
+END IF
+--- argumente
+{sammlung}/../../examples/glutfaden
+--- datei helfer.dh
+IMPORT "{sammlung}/../../examples/glutfaden/kern/kern.dh" AS kern
+IMPORT "{sammlung}/_hilfen/glutfaden_export.dh"
+IMPORT "{sammlung}/_hilfen/glutfaden_farbverwaltung.dh"
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
+--- datei farbprobe.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- datei vorher.pxs
+{"format":"pysticky","version":"1.5","saved_at":"2026-10-17T17:40:16.211663","pattern":{"name":"Farbprobe","width":12,"height":9,"fabric_count":14,"metadata":{},"colors":[{"name":"rot","color":"#C81E28","manufacturer":"DMC","catalog_number":"321","symbol":"●","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"e218043a"},{"name":"Blau","color":"#2846BE","manufacturer":"Anchor","catalog_number":"132","symbol":"○","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"b1845328"},{"name":"grün","color":"#28A046","manufacturer":"","catalog_number":"","symbol":"■","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"d04ed6fa"},{"name":"Gelb","color":"#F0D21E","manufacturer":"DMC","catalog_number":"444","symbol":"□","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":false,"color_id":"2d3927c7"},{"name":"blau","color":"#2846BE","manufacturer":"DMC","catalog_number":"820","symbol":"▲","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"1556fc18"},{"name":"Perle Gold","color":"#C8A03C","manufacturer":"Mill Hill","catalog_number":"00557","symbol":"△","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":true,"is_diamond":false,"color_id":"1631db04"},{"name":"Drill Weiss","color":"#FAFAFA","manufacturer":"DMC Diamond","catalog_number":"B5200","symbol":"◆","stitch_count":0,"skip_stitching":false,"strands":1,"is_bead":false,"is_diamond":true,"color_id":"f5c8425d"},{"name":"Ungenutzt","color":"#0A0A0A","manufacturer":"DMC","catalog_number":"310","symbol":"◇","stitch_count":0,"skip_stitching":false,"strands":2,"is_bead":false,"is_diamond":false,"color_id":"ba5fb24e"},{"name":"Zimt","color":"#A05A28","manufacturer":"Madeira","catalog_number":"2306","symbol":"★","stitch_count":0,"skip_stitching":false,"strands":3,"is_bead":false,"is_diamond":false,"color_id":"f3660dd9"}],"layers":[{"name":"Hintergrund","visible":true,"locked":false,"opacity":1.0,"stitches":[[1,0,1],[2,0,1],[3,0,4],[4,0,0],[5,0,1],[7,0,3],[8,0,8],[9,0,2],[11,0,0],[0,1,4],[1,1,8],[2,1,8],[3,1,8],[5,1,1],[6,1,0],[7,1,1],[8,1,2],[9,1,5],[10,1,8],[0,2,3],[1,2,5],[2,2,3],[3,2,5],[6,2,8],[7,2,8],[8,2,8],[9,2,3],[2,3,6],[3,3,0],[4,3,5],[6,3,3],[7,3,0],[8,3,8],[9,3,8],[10,3,0],[11,3,4],[0,4,4],[1,4,8],[3,4,0],[4,4,1],[5,4,0],[6,4,3],[7,4,8],[8,4,0],[9,4,0],[0,5,0],[2,5,1],[3,5,8],[4,5,4],[5,5,0],[6,5,6],[7,5,0],[8,5,8],[9,5,6],[10,5,5],[11,5,0],[2,6,0],[3,6,2],[4,6,4],[5,6,0],[6,6,4],[8,6,4],[9,6,5],[10,6,6],[11,6,3],[0,7,2],[2,7,0],[3,7,4],[4,7,3],[5,7,3],[7,7,2],[8,7,5],[9,7,8],[10,7,0],[11,7,0],[0,8,5],[1,8,0],[2,8,0],[4,8,5],[5,8,8],[6,8,8],[7,8,8],[8,8,8],[9,8,2],[10,8,2],[11,8,3]],"completed_stitches":[[3,1],[10,1],[1,2],[8,2],[9,2],[2,3],[9,3],[5,5],[7,5],[9,5],[0,7],[5,7],[9,7],[0,8],[1,8],[6,8],[8,8],[10,8]],"stitch_types":[[1,0,9],[2,0,1],[4,0,1],[11,0,3],[1,1,1],[2,1,7],[3,1,1],[5,1,2],[6,1,3],[8,1,1],[9,1,10],[10,1,7],[0,2,2],[1,2,10],[3,2,10],[6,2,7],[7,2,1],[8,2,1],[2,3,11],[3,3,2],[4,3,10],[7,3,3],[8,3,3],[9,3,1],[10,3,3],[11,3,2],[3,4,2],[4,4,7],[6,4,7],[0,5,2],[2,5,9],[3,5,1],[6,5,11],[9,5,11],[10,5,10],[11,5,2],[3,6,7],[5,6,7],[6,6,2],[9,6,10],[10,6,11],[11,6,7],[0,7,9],[2,7,7],[4,7,9],[7,7,7],[8,7,10],[9,7,1],[0,8,10],[2,8,2],[4,8,10],[5,8,2],[6,8,1],[7,8,9],[8,8,2],[9,8,1]]},{"name":"Oben","visible":true,"locked":true,"opacity":1.0,"stitches":[[0,0,0],[3,0,1],[4,0,3],[10,0,0],[4,2,3],[5,3,1],[8,3,1],[11,3,4],[2,4,0],[4,4,2],[7,4,2],[11,4,0],[0,5,5],[4,5,1],[5,5,1],[6,5,8],[11,5,5],[1,6,8],[5,6,2],[7,6,5],[10,6,2],[11,6,0],[0,7,8],[8,7,3],[3,8,6],[4,8,8]],"completed_stitches":[[4,2],[8,3],[7,4],[11,4],[0,5],[11,5],[0,7]],"stitch_types":[[4,0,1],[10,0,7],[11,3,1],[2,4,9],[4,4,2],[7,4,3],[0,5,10],[5,5,2],[6,5,9],[11,5,10],[1,6,7],[7,6,10],[10,6,3],[11,6,2],[8,7,7],[3,8,11],[4,8,9]]},{"name":"Versteckt","visible":false,"locked":false,"opacity":1.0,"stitches":[[0,0,5],[1,0,2],[8,0,0],[0,1,4],[1,1,1],[5,1,2],[8,1,0],[10,1,3],[3,2,3],[5,2,8],[6,2,0],[10,2,4],[1,3,2],[1,4,8],[3,4,8],[4,4,0],[11,4,6],[9,6,5],[2,7,1],[8,7,3],[11,7,6],[4,8,2],[6,8,8],[10,8,2]],"completed_stitches":[[0,0],[8,1],[10,1],[1,4],[4,4],[9,6],[8,7]],"stitch_types":[[0,0,10],[8,0,1],[1,1,7],[5,1,3],[8,1,1],[3,2,1],[5,2,3],[6,2,9],[10,2,3],[1,3,7],[1,4,3],[3,4,1],[11,4,11],[9,6,10],[8,7,7],[11,7,11],[4,8,7]]}],"active_layer":2,"backstitches":[{"x1":0,"y1":0,"x2":6,"y2":6,"color_index":0},{"x1":2,"y1":2,"x2":8,"y2":2,"color_index":2},{"x1":4,"y1":0,"x2":4,"y2":10,"color_index":4},{"x1":1,"y1":9,"x2":9,"y2":1,"color_index":8},{"x1":3,"y1":3,"x2":5,"y2":7,"color_index":1}],"source_image_path":null,"source_image_crop":[0,0,1,1],"source_palette_name":null,"mode":"stitch"}}
+--- erwartet
+rueckgabe 0
+kopf: 9 Farben (8 verwendet)
+liste: rot/1 | Blau/2 | grün/3 | Gelb/1 | blau/2 | Perle Gold/3 | Drill Weiss/1 | Ungenutzt/2 | Zimt/3
+knoepfe ohne wahl: 000000
+eine gewaehlt: 111110 | □ Gelb / DMC 444 / 16 Stiche
+zwei gewaehlt: 000011 | 2 Farben gewählt / Zusammenführen: „Blau“ bleibt
+hell -> dunkel: Drill Weiss/1 | Gelb/1 | Perle Gold/3 | grün/3 | Zimt/3 | rot/1 | Blau/2 | blau/2 | Ungenutzt/2
+auswahl folgt: 2 | 2 Farben gewählt / Zusammenführen: „Gelb“ bleibt
+sortiert uebernommen: TRUE | bild gleich TRUE | aktuelle farbe Gelb | Farben verwaltet: 9 Farben (Strg+Z nimmt es zurück).
+zurueck: alles wie vorher TRUE | aktuelle farbe Gelb
+faeden 5 fuer zwei: rot/5 | Blau/2 | grün/5 | Gelb/1 | blau/2 | Perle Gold/3 | Drill Weiss/1 | Ungenutzt/2 | Zimt/3
+alle 4: rot/4 | Blau/4 | grün/4 | Gelb/4 | blau/4 | Perle Gold/4 | Drill Weiss/4 | Ungenutzt/4 | Zimt/4
+zusammen, die obere bleibt: rot/4 | Blau/4 | grün/4 | Gelb/4 | Perle Gold/4 | Drill Weiss/4 | Ungenutzt/4 | Zimt/4 | 8 Farben (7 verwendet) -- vorher 9
+ans ende: rot/4 | grün/4 | Gelb/4 | Perle Gold/4 | Drill Weiss/4 | Ungenutzt/4 | Zimt/4 | Blau/4
+geloescht: rot/4 | Gelb/4 | Perle Gold/4 | Drill Weiss/4 | Ungenutzt/4 | Zimt/4 | Blau/4
+ungenutzte weg: rot/4 | Gelb/4 | Perle Gold/4 | Drill Weiss/4 | Zimt/4 | Blau/4 | 6 Farben (6 verwendet) -- vorher 9
+suche dmc: 3 von 6
+uebernommen: TRUE | 9 -> 6 Farben | aktuelle Gelb | rueckstiche 4
+farben: rot/4/30 | Gelb/4/16 | Perle Gold/4/14 | Drill Weiss/4/7 | Zimt/4/27 | Blau/4/26
+zurueck: alles wie vorher TRUE
+vor: wieder wie danach TRUE | aktuelle farbe Gelb
+abbrechen nach loeschen: plan 5 | muster 9
+abgebrochen: alles wie vorher TRUE
+zurueckgesetzt: rot/1 | Blau/2 | grün/3 | Gelb/1 | blau/2 | Perle Gold/3 | Drill Weiss/1 | Ungenutzt/2 | Zimt/3 | sortierung 0 | aendert FALSE
+farben TRUE
+farben_geplant TRUE
+datei unveraendert: TRUE
