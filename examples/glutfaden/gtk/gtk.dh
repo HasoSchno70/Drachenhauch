@@ -220,6 +220,11 @@ DECLARE SUB cairo_line_to LIB CAIRO (cr AS ZEIGER, x AS FLOAT, y AS FLOAT)
 DECLARE SUB cairo_close_path LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_new_sub_path LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_set_antialias LIB CAIRO (cr AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_scale_set_draw_value LIB GTK (regler AS ZEIGER, zeigen AS BOOLEAN)
+DECLARE FUNCTION gtk_window_get_title LIB GTK (fenster AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_combo_box_get_model LIB GTK (wahl AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_tree_model_iter_n_children LIB GTK (modell AS ZEIGER, eintrag AS ZEIGER) AS LONG
+DECLARE SUB gtk_widget_set_no_show_all LIB GTK (w AS ZEIGER, nicht AS BOOLEAN)
 DECLARE SUB cairo_fill_preserve LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_set_line_cap LIB CAIRO (cr AS ZEIGER, art AS LONG)
 DECLARE SUB cairo_set_line_join LIB CAIRO (cr AS ZEIGER, art AS LONG)
