@@ -21,7 +21,9 @@ DIM lwHat AS BOOLEAN
 DIM lwFarbe AS ARRAY OF INTEGER       ' zusammengesetzt: Farbindex je Zelle
 DIM lwTyp AS ARRAY OF INTEGER
 DIM lwFertig AS ARRAY OF INTEGER
-DIM lwRgb AS ARRAY OF INTEGER         ' je Farbindex
+DIM lwRgb AS ARRAY OF INTEGER         ' je Farbindex, so wie gezeichnet (gedimmt beim Hervorheben)
+DIM lwRgbEcht AS ARRAY OF INTEGER     ' je Farbindex ohne Hervorheben (Uebersicht, Kacheln)
+DIM lwHervor AS INTEGER : lwHervor = -1   ' hervorgehobene Farbe, -1 = keine
 DIM lwPuffer AS BUFFER
 DIM lwBild AS INTEGER                 ' cairo_surface_t, 0 = keins
 DIM lwZelle AS FLOAT
@@ -77,6 +79,15 @@ SUB leinwandAufbauen()
     FOR i = 0 TO n - 1
         rgb[i] = kern.farbenblind(lwMuster.farben[i].garn.farbe, fbArt)   ' nur die Anzeige
     NEXT
+    lwRgbEcht = ARRAY_COPY(rgb)
+    ' Hervorheben: alle anderen Farben gedimmt ueber dem Stoff (PySticky
+    ' zeichnet sie mit Deckkraft max(20, a / 5))
+    IF lwHervor >= n THEN lwHervor = -1
+    IF lwHervor >= 0 THEN
+        FOR i = 0 TO n - 1
+            IF i <> lwHervor THEN rgb[i] = kern.gedimmt(rgb[i], einst.stoff, 255)
+        NEXT
+    END IF
     lwRgb = rgb
     DIM b AS INTEGER : b = lwMuster.breite
     DIM h AS INTEGER : h = lwMuster.hoehe
@@ -484,6 +495,7 @@ SUB lwSymbole(cr AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS 
         FOR x = x0 TO x1
             c = lwFarbe[y * b + x]
             IF c < 0 OR c >= n THEN CONTINUE
+            IF lwHervor >= 0 AND c <> lwHervor THEN CONTINUE     ' gedimmte ohne Symbol
             t = lwTyp[y * b + x]
             IF t = kern.KNOTEN OR t = kern.PERLE THEN CONTINUE
             pango_layout_set_text(layout, lwMuster.farben[c].symbol, -1)

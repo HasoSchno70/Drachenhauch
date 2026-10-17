@@ -1328,7 +1328,18 @@ END FUNCTION
 FUNCTION vorfuehrenStart(daten AS INTEGER) AS BOOLEAN
     DIM b AS INTEGER, h AS INTEGER
     gtk_window_get_size(fenster, b, h)
-    PRINT "start: "; musterTitel; " | "; lwMuster.breite; "x"; lwMuster.hoehe; " | datei "; BASENAME(musterPfad); " | werkzeug "; wzAktiv; " | fenster "; b; "x"; h; " | zuletzt "; LEN(zlPfade)
+    IF lwHat THEN
+        PRINT "start: "; musterTitel; " | "; lwMuster.breite; "x"; lwMuster.hoehe; " | datei "; BASENAME(musterPfad); " | werkzeug "; wzAktiv; " | fenster "; b; "x"; h; " | zuletzt "; LEN(zlPfade)
+    ELSE
+        PRINT "start: willkommensseite "; willkommenSichtbar(); " | zuletzt "; LEN(wkPfade); " | werkzeug "; wzAktiv; " | fenster "; b; "x"; h; " | werkzeugzeile gesperrt "; NOT gtk_widget_get_sensitive(werkzeugzeile)
+        DIM ok AS BOOLEAN : ok = vfFoto(fenster, "willkommen")
+        ' ohne Muster: ein Befehl, der eins braucht, meldet sich nur
+        befehlAusfuehren("export")
+        PRINT "  ohne muster: "; meldung; " | status "; gtk_label_get_text(status)
+        ' die Demo-Kachel: das Beispiel als neues Muster ohne Datei
+        willkommenAktion(3)
+        PRINT "  demo: "; lwHat; " "; musterTitel; " | datei '"; musterPfad; "' | willkommensseite "; willkommenSichtbar(); " | werkzeugzeile frei "; gtk_widget_get_sensitive(werkzeugzeile); " | ungesichert "; istGeaendert()
+    END IF
     PRINT "kuerzel: "; TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(kSichern)); " | export "; kern.kuerzelVon$(einst, "export"); " | F2 "; MAPGETOR(einstTafel, "F2", "-")
     ' wie das Kreuz: Fenster messen, dann zu (gemerkt wird beim Ende)
     werkzeugWaehlen(WZ_LINIE, FALSE)
@@ -1658,4 +1669,95 @@ FUNCTION v15Plan$(p AS ARRAY OF INTEGER, f AS ARRAY OF INTEGER, typ AS INTEGER) 
         ARRAY_PUSH(t, STR$(p[2 * i]) + "," + STR$(p[2 * i + 1]) + "=" + STR$(f[i]) + ":" + STR$(typ))
     NEXT
     RETURN JOIN$(t, " ")
+END FUNCTION
+
+' --- Stufe 16: Farbleiste, Hervorheben, Nicht sticken, Willkommensseite ----------------
+FUNCTION v16Farben$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN lwMuster.farben
+        ARRAY_PUSH(t, f.symbol + IIF(f.auslassen, "⊘", ""))
+    NEXT
+    RETURN JOIN$(t, " ")
+END FUNCTION
+
+DIM v16Vorher AS STRING
+
+FUNCTION vorfuehrenStufe16(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v16Vorher = vfAlles$()
+            PRINT "farbleiste: sichtbar "; gtk_widget_get_visible(fbBox); " | felder "; fbBreite(); "x"; fbHoehe(); " | zahl "; gtk_label_get_text(fbZahl); " | aktuell "; gtk_label_get_text(fbAktuell)
+            ' Treffer: Mitte jedes Felds, der Abstand dazwischen, hinter dem letzten
+            DIM t AS ARRAY OF STRING : t = []
+            FOR i = 0 TO lwMuster.farbanzahl() - 1
+                ARRAY_PUSH(t, STR$(fbTreffer(fbFeldX(i) + fbBreite() / 2, 20)))
+            NEXT
+            PRINT "treffer: "; JOIN$(t, ","); " | abstand "; fbTreffer(fbFeldX(1) - 2, 20); " | dahinter "; fbTreffer(fbFeldX(lwMuster.farbanzahl()) + 5, 20); " | unten "; fbTreffer(5, fbHoehe() + 1)
+            farbeWaehlen(2)
+            PRINT "gewaehlt 2: "; gtk_label_get_text(fbAktuell)
+        CASE 2
+            ok = vfFoto(fenster, "farbleiste")
+            ' Tauschen per Ziehen: derselbe Weg wie Farben tauschen
+            DIM vorher0 AS INTEGER : vorher0 = lwMuster.farben[0].stichzahl
+            DIM vorher1 AS INTEGER : vorher1 = lwMuster.farben[1].stichzahl
+            farbleisteTauschen(0, 1)
+            PRINT "getauscht: stiche "; vorher0; "/"; vorher1; " -> "; lwMuster.farben[0].stichzahl; "/"; lwMuster.farben[1].stichzahl; " | schritt '"; wzVerlauf.textZurueck$(); "'"
+            werkzeugZurueck()
+            PRINT "zurueck: wie vorher "; vfAlles$() = v16Vorher
+            farbleisteTauschen(1, 1)
+            PRINT "mit sich selbst: wie vorher "; vfAlles$() = v16Vorher
+            ' Hervorheben (Strg+H): die anderen gedimmt, ohne Symbol
+            befehlAusfuehren("hervorheben")
+            PRINT "hervorgehoben: "; lwHervor; " | farbe 2 "; HEX$(lwRgb[2]); " = "; HEX$(lwRgbEcht[2]); " | farbe 0 "; HEX$(lwRgb[0]); " statt "; HEX$(lwRgbEcht[0]); " erwartet "; HEX$(kern.gedimmt(lwRgbEcht[0], einst.stoff, 255)); " | "; meldung
+        CASE 3
+            ok = vfFoto(fenster, "hervorgehoben")
+            befehlAusfuehren("hervorheben")
+            PRINT "aufgehoben: "; lwHervor; " | farbe 0 "; HEX$(lwRgb[0]) = HEX$(lwRgbEcht[0])
+            ' ueber das Menue: eine andere Farbe hervorheben, dann wieder aus
+            farbleisteAktion(4, 2)
+            PRINT "menue hervorheben 4: "; lwHervor
+            farbleisteAktion(4, 2)
+            PRINT "menue aufheben: "; lwHervor
+            ' Nicht sticken: ein Schritt, Garnliste ohne die Farbe
+            DIM g0 AS kern.Garnrechnung : g0 = kern.garnRechnen(lwMuster, 14, 0.0, 0.0)
+            farbleisteAktion(3, 3)
+            DIM g1 AS kern.Garnrechnung : g1 = kern.garnRechnen(lwMuster, 14, 0.0, 0.0)
+            PRINT "nicht sticken: "; v16Farben$(); " | garnzeilen "; LEN(g0.zeilen); " -> "; LEN(g1.zeilen); " | ausgelassen "; g1.ausgelasseneFarben; " | schritt '"; wzVerlauf.textZurueck$(); "' | "; meldung
+        CASE 4
+            ok = vfFoto(fenster, "nicht_sticken")
+            werkzeugZurueck()
+            PRINT "zurueck: "; v16Farben$(); " | wie vorher "; vfAlles$() = v16Vorher
+            werkzeugVor()
+            PRINT "vor: "; v16Farben$()
+            farbleisteAktion(3, 3)
+            PRINT "wieder sticken: "; v16Farben$(); " | wie vorher "; vfAlles$() = v16Vorher
+            ' Groesse 30 und aus/an
+            einst.farbleisteGroesse = 30
+            farbleisteNachziehen()
+            PRINT "groesse 30: felder "; fbBreite(); "x"; fbHoehe(); " | treffer 1 bei "; fbTreffer(fbFeldX(1) + 15, 10)
+            befehlAusfuehren("farbleiste")
+            PRINT "aus: "; gtk_widget_get_visible(fbBox); " | gemerkt "; kern.einstellungenLaden(einst.pfad).farbleiste; " "; kern.einstellungenLaden(einst.pfad).farbleisteGroesse
+            befehlAusfuehren("farbleiste")
+            PRINT "an: "; gtk_widget_get_visible(fbBox)
+        CASE 5
+            ok = vfFoto(fenster, "farbleiste_30")
+            einst.farbleisteGroesse = 48
+            farbleisteNachziehen()
+            ' Willkommensseite mit Muster: Zurueck-Knopf, nichts gesperrt
+            befehlAusfuehren("willkommen")
+            PRINT "startseite: "; willkommenSichtbar(); " | zurueck-knopf "; gtk_widget_get_visible(wkZurueck); " | werkzeugzeile frei "; gtk_widget_get_sensitive(werkzeugzeile); " | zuletzt "; LEN(wkPfade)
+        CASE 6
+            ok = vfFoto(fenster, "startseite")
+            willkommenAktion(4)
+            PRINT "zurueck zum muster: "; willkommenSichtbar(); " | wie vorher "; vfAlles$() = v16Vorher
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
 END FUNCTION

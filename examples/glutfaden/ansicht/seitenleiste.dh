@@ -245,6 +245,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
     seitenleisteFarbeMarkieren()
     slEbeneMarkieren()
     verlaufLeisteNachziehen()
+    farbleisteNachziehen()
 END SUB
 
 ' Die Palette zum Muster: der Hersteller der ersten Farbe, sonst die aus den

@@ -321,7 +321,7 @@ SUB mkBauen(bw AS INTEGER, bh AS INTEGER)
     ' in der Breite, wenn die Seitenleiste schmal ist
     mkX = (bw - mkB) \ 2
     mkY = (bh - mkH) \ 2
-    DIM p AS ARRAY OF INTEGER : p = kern.minikartePunkte(lwFarbe, lwMuster.breite, lwMuster.hoehe, lwRgb[0:lwMuster.farbanzahl()], mkB, mkH)
+    DIM p AS ARRAY OF INTEGER : p = kern.minikartePunkte(lwFarbe, lwMuster.breite, lwMuster.hoehe, lwRgbEcht[0:lwMuster.farbanzahl()], mkB, mkH)
     IF mkBild <> 0 THEN cairo_surface_destroy(mkBild) : mkBild = 0
     DIM zeile AS INTEGER : zeile = cairo_format_stride_for_width(CAIRO_ARGB32, mkB)
     mkPuffer = BUFFER_NEW(zeile * mkH)
@@ -469,7 +469,7 @@ FUNCTION kvBauen() AS INTEGER
     IF kvBild <> 0 THEN cairo_surface_destroy(kvBild) : kvBild = 0
     DIM b AS INTEGER : b = lwMuster.breite
     DIM h AS INTEGER : h = lwMuster.hoehe
-    DIM p AS ARRAY OF INTEGER : p = kern.minikartePunkte(lwFarbe, b, h, lwRgb[0:lwMuster.farbanzahl()], b, h)
+    DIM p AS ARRAY OF INTEGER : p = kern.minikartePunkte(lwFarbe, b, h, lwRgbEcht[0:lwMuster.farbanzahl()], b, h)
     DIM zl AS INTEGER : zl = cairo_format_stride_for_width(CAIRO_ARGB32, b)
     kvPuffer = BUFFER_NEW(zl * h)
     DIM x AS INTEGER, y AS INTEGER
