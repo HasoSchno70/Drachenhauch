@@ -1,5 +1,6 @@
 ' Qts darker/lighter als Text -- dieselben Zeilen, die ref_qtfarbe.py aus
 ' PySide aufzeichnet (16 Bit je Kanal, dazu die Kette und 8 Bit).
+IMPORT "../../../examples/glutfaden/kern/kern.dh" AS kern
 FUNCTION gqW$(q AS INTEGER) AS STRING
     RETURN RIGHT$("0000" + HEX$(kern.qtR16(q)), 4) + RIGHT$("0000" + HEX$(kern.qtG16(q)), 4) + RIGHT$("0000" + HEX$(kern.qtB16(q)), 4)
 END FUNCTION
