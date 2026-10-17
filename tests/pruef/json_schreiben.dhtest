@@ -344,3 +344,48 @@ PRINT JSON_TYPE(h, "1")
 [60,null,62]
 null
 
+
+=== schluessel mit punkt ueber JSON_KEY$
+' Vorher teilte der Punkt jeden Pfad -- "Garn 1.5" war nicht zu erreichen,
+' obwohl JSON_KEYS den Namen geliefert hat.
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""v"": {""DMC::310"": 2, ""unknown::unknown::Garn 1.5"": 3}}")
+FOR EACH k IN JSON_KEYS(h, "v")
+    PRINT k; " = "; JSON_GET_INT(h, "v." + JSON_KEY$(k))
+NEXT
+PRINT JSON_HAS(h, "v.unknown::unknown::Garn 1.5")
+--- erwartet
+DMC::310 = 2
+unknown::unknown::Garn 1.5 = 3
+FALSE
+
+=== punkt und rueckstrich schreiben und zuruecklesen
+IMPORT "json"
+DIM h AS JSON_HANDLE
+DIM name AS STRING
+h = JSON_NEW_OBJECT()
+name = "a.b" + CHR$(92) + "c"
+PRINT JSON_KEY$(name)
+JSON_SET_INT(h, JSON_KEY$(name), 7)
+JSON_SET_STRING(h, "x" + CHR$(92) + ".y", "z")
+PRINT JSON_STRINGIFY(h)
+PRINT JSON_GET_INT(h, JSON_KEY$(JSON_KEYS(h, "")[0]))
+PRINT JSON_REMOVE(h, "x" + CHR$(92) + ".y")
+PRINT JSON_STRINGIFY(h)
+--- erwartet
+a\.b\\c
+{"a.b\\c":7,"x.y":"z"}
+7
+TRUE
+{"a.b\\c":7}
+
+=== andere rueckstrich-folgen bleiben woertlich
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""c:\\temp"": 1, ""a"": {""b"": 2}}")
+PRINT JSON_GET_INT(h, "c:" + CHR$(92) + "temp")
+PRINT JSON_GET_INT(h, "a.b")
+--- erwartet
+1
+2

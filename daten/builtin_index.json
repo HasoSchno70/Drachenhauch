@@ -6915,6 +6915,12 @@
    "module": "json"
   },
   {
+   "name": "JSON_KEY$",
+   "kind": "core",
+   "signature": "JSON_KEY$(name: STRING) AS STRING",
+   "module": "json"
+  },
+  {
    "name": "JSON_LEN",
    "kind": "core",
    "signature": "JSON_LEN(h: ?, path: STRING)",

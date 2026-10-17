@@ -22,6 +22,7 @@ IMPORT "json"
 | `JSON_LEN(h, path$)` | INTEGER | Laenge einer Liste bzw. Zahl der Felder eines Objekts |
 | `JSON_TYPE(h, path$)` | STRING | was steht am Pfad? (`object`, `array`, `string`, `number`, `boolean`, `null`) |
 | `JSON_KEYS(h, path$)` | ARRAY OF STRING | Feldnamen eines Objekts |
+| `JSON_KEY$(name$)` | STRING | Feldname als Pfad-Segment: Punkt und Rückstrich maskiert, damit `JSON_KEYS`-Namen wieder adressierbar sind |
 | `JSON_GET_JSON(h, pfad$)` | JSON_HANDLE | Teilbaum am Pfad als eigenes Dokument (**Kopie**) — das Gegenstück zu `JSON_SET_JSON`, etwa um ein Stück, das man nicht versteht, unverändert mitzuführen |
 
 **Schreiben:**
@@ -178,8 +179,20 @@ NEXT
    `JSON_REMOVE`. Für JSON ist sie bedeutungslos, aber wer einen Rumpf
    signiert oder zwei Ausgaben vergleicht, sieht den Unterschied.
 
-**Ein Punkt im Schlüsselnamen ist nicht adressierbar** — er trennt die
-Pfad-Segmente. Das gilt beim Lesen wie beim Schreiben.
+**Ein Punkt im Schlüsselnamen** trennt sonst die Pfad-Segmente. Im Pfad
+schreibt man ihn darum als `\.` (einen Rückstrich als `\\`); `JSON_KEY$`
+macht das aus einem beliebigen Namen. So lassen sich auch Schlüssel aus
+`JSON_KEYS` wieder ansprechen, die einen Punkt tragen. Das gilt beim Lesen
+wie beim Schreiben; jede andere Folge mit Rückstrich bleibt, wie sie ist.
+
+```basic
+DIM preise AS JSON_HANDLE
+preise = JSON_PARSE("{""Garn 1.5"": 3}")
+FOR EACH k IN JSON_KEYS(preise, "")
+    PRINT k; " = "; JSON_GET_INT(preise, JSON_KEY$(k))   ' Garn 1.5 = 3
+NEXT
+JSON_SET_INT(preise, "Garn 2\.0", 4)                      ' Schlüssel "Garn 2.0"
+```
 
 ## Roundtrip
 

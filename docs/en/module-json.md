@@ -22,6 +22,7 @@ IMPORT "json"
 | `JSON_LEN(h, path$)` | INTEGER | length of a list or number of fields of an object |
 | `JSON_TYPE(h, path$)` | STRING | what is at the path? (`object`, `array`, `string`, `number`, `boolean`, `null`) |
 | `JSON_KEYS(h, path$)` | ARRAY OF STRING | field names of an object |
+| `JSON_KEY$(name$)` | STRING | field name as a path segment: dot and backslash escaped so that names from `JSON_KEYS` can be addressed again |
 | `JSON_GET_JSON(h, pfad$)` | JSON_HANDLE | subtree at the path as a document of its own (**copy**) — the counterpart to `JSON_SET_JSON`, for example to carry a piece you do not understand along unchanged |
 
 **Writing:**
@@ -178,8 +179,20 @@ NEXT
    `JSON_REMOVE`. For JSON it is meaningless, but whoever signs a body
    or compares two outputs sees the difference.
 
-**A dot in a key name cannot be addressed** — it separates the
-path segments. That applies when reading as well as when writing.
+**A dot in a key name** would otherwise separate the path segments. In a
+path you therefore write it as `\.` (a backslash as `\\`); `JSON_KEY$`
+does that for any name. This way keys from `JSON_KEYS` that contain a dot
+can be addressed again. That applies when reading as well as when writing;
+any other sequence with a backslash stays as it is.
+
+```basic
+DIM preise AS JSON_HANDLE
+preise = JSON_PARSE("{""Garn 1.5"": 3}")
+FOR EACH k IN JSON_KEYS(preise, "")
+    PRINT k; " = "; JSON_GET_INT(preise, JSON_KEY$(k))   ' Garn 1.5 = 3
+NEXT
+JSON_SET_INT(preise, "Garn 2\.0", 4)                      ' key "Garn 2.0"
+```
 
 ## Round trip
 
