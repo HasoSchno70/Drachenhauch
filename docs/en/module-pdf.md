@@ -34,6 +34,7 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_FONT(p, schrift$, größe_pt)` | font and size |
 | `PDF_FONT_LOAD(p, pfad$, name$)` | load your own TrueType/OpenType font, afterwards available to `PDF_FONT` as `name$` |
 | `PDF_COLOR(p, farbe)` | `RGB(…)` — applies to text, strokes and fills |
+| `PDF_DASH(p, strich_mm[, luecke_mm])` | dashed for all following lines and outlines; without a gap as long as the dash, `PDF_DASH(p, 0)` solid again |
 | `PDF_LINE_WIDTH(p, mm)` | stroke width |
 | `PDF_TEXT(p, x, y, text$[, winkel])` | set text; `winkel` (angle) in degrees counter-clockwise, rotated about (x, y) |
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | width in mm, in the current font and size |

@@ -499,3 +499,105 @@ FUNCTION vorfuehrenStufe6(daten AS INTEGER) AS BOOLEAN
     RETURN TRUE
 END FUNCTION
 
+' Stufe 7: der Stickpfad -- Dialog, Strategie wechseln, Tooltip, Zoom mit
+' Nummern, alle vergleichen, die drei Exporte; dazu der Schalter im
+' Export-Dialog.
+FUNCTION vfDialogFoto(name AS STRING) AS BOOLEAN
+    IF fotoZiel = "" THEN RETURN TRUE
+    DIM ok AS BOOLEAN : ok = gtkFoto(sdDialog, fotoZiel + "_" + name + ".png")
+    IF NOT ok THEN PRINT "Foto nicht gesichert: "; name
+    RETURN ok
+END FUNCTION
+
+FUNCTION vfSumme$() AS STRING
+    DIM t AS STRING
+    DIM w AS INTEGER
+    FOR EACH w IN sdSumme
+        t = t + " | " + gtk_label_get_text(w)
+    NEXT
+    RETURN MID$(t, 3, 999)
+END FUNCTION
+
+FUNCTION vorfuehrenStufe7(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            DIM d AS INTEGER : d = sdDialogBauen()
+            PRINT "dialog: "; kern.spName$(gtk_combo_box_get_active(sdStrategie)); " stoff "; gtk_spin_button_get_value_as_int(sdStoff); " | "; vfSumme$()
+            PRINT "farben "; LEN(sdZeilen); " gewaehlt "; sdAktiv; " "; sdGarnName$(sdErg.pfade[sdAktiv]); " | vergleich sichtbar "; gtk_widget_get_visible(sdVergleich)
+        CASE 2
+            ok = vfDialogFoto("stickpfad")
+            gtk_combo_box_set_active(sdStrategie, kern.SP_NACHBAR)
+            PRINT "naechster nachbar: "; vfSumme$()
+            gtk_list_box_select_row(sdListe, sdZeilen[1])
+            DIM p AS kern.Farbpfad : p = sdErg.pfade[sdAktiv]
+            DIM z AS FLOAT : z = SD_ZELLE * sdZoom
+            DIM i AS INTEGER : i = sdStichBei(sdOx + (p.xs[2] + 0.5) * z, sdOy + (p.ys[2] + 0.5) * z)
+            PRINT "farbe 2 "; sdGarnName$(p); " | maus auf stich 3: "; sdTipp$(i); " | daneben "; sdStichBei(sdOx - 5, sdOy - 5)
+            ' einen Sprung suchen
+            FOR i = 1 TO p.stiche() - 1
+                IF p.istSprung(i) THEN
+                    PRINT "sprung: "; sdTipp$(i)
+                    EXIT FOR
+                END IF
+            NEXT
+        CASE 3
+            gtk_toggle_button_set_active(sdNummern, TRUE)
+            DIM vorher AS FLOAT : vorher = sdZoom
+            sdZoomKnopf(0, 1) : sdZoomKnopf(0, 1) : sdZoomKnopf(0, 1)
+            PRINT "zoom x1.25^3: "; ABS(sdZoom / vorher - 1.953125) < 0.0001; " | "; gtk_label_get_text(sdZoomText) <> ""
+            ok = vfDialogFoto("stickpfad_nummern")
+            sdZoomKnopf(0, 0)
+            PRINT "eingepasst: "; ABS(sdZoom - vorher) < 0.0001
+        CASE 4
+            gtk_spin_button_set_value(sdStoff, 18)
+            ' vorher eine andere Strategie -- der Vergleich soll die beste waehlen
+            gtk_combo_box_set_active(sdStrategie, kern.SP_DIAGONAL)
+            PRINT "vor dem vergleich: "; kern.spName$(gtk_combo_box_get_active(sdStrategie)); " | "; vfSumme$()
+            sdAlleVergleichen(0, 0)
+            PRINT "verglichen: "; kern.spName$(gtk_combo_box_get_active(sdStrategie)); " | "; vfSumme$(); " | vergleich sichtbar "; gtk_widget_get_visible(sdVergleich)
+            DIM r AS kern.Stickpfad
+            FOR EACH r IN sdVergleiche
+                PRINT "  "; sdKurzname$(r.strategie); " "; FORMAT$(r.distanz, "%.1f"); " "; r.spruenge; " "; FORMAT$(r.garnCm, "%.0f"); " "; kern.spBewertung$(r.distanz, sdVergleiche[0].distanz)
+            NEXT
+        CASE 5
+            ' erst jetzt: die eben gezeigte Tabelle hat im selben Schritt noch keine Groesse
+            ok = vfDialogFoto("stickpfad_vergleich")
+            DIM ziel AS STRING : ziel = IIF(fotoZiel <> "", fotoZiel, PATHJOIN(TEMPDIR$(), "glutfaden_stufe7"))
+            PRINT "text: ["; sdTextSichern$(ziel + "_plan.txt"); "] "; LEFT$(READLINES(ziel + "_plan.txt")[4], 99)
+            PRINT "bild: "; sdBildSichern(ziel + "_pfad.png")
+            DIM b AS IMAGE : b = LOADIMAGE(ziel + "_pfad.png")
+            PRINT "  "; IMAGE_WIDTH(b); " x "; IMAGE_HEIGHT(b); " = "; lwMuster.breite * 15 + 60; " x "; lwMuster.hoehe * 15 + 120
+            DIM ordner AS STRING : ordner = ziel + "_alle"
+            IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+            DIM fehler AS ARRAY OF STRING
+            PRINT "alle: "; sdAlleBilder(ordner, fehler); " fehler "; LEN(fehler)
+            DIM namen AS ARRAY OF STRING : namen = DIRLIST(ordner)
+            SORT(namen)
+            PRINT "  "; JOIN$(namen, ", ")
+            ' Grund nach der Helligkeit des Garns (dunkel -> hell, hell -> dunkel),
+            ' ein Stich in seiner Farbe, die Legende unten
+            DIM k AS INTEGER
+            FOR k = 0 TO 1
+                DIM pb AS IMAGE : pb = LOADIMAGE(PATHJOIN(ordner, namen[k]))
+                DIM q AS kern.Farbpfad : q = sdErg.pfade[k]
+                PRINT "  "; namen[k]; ": grund "; kern.farbeAlsHex$(GETPIXEL(pb, 3, 3)); " stich 3 "; kern.farbeAlsHex$(GETPIXEL(pb, 30 + q.xs[2] * 15 + 13, 30 + q.ys[2] * 15 + 2)); " garn "; kern.farbeAlsHex$(lwMuster.farben[q.farbe].garn.farbe)
+            NEXT
+            gtk_widget_destroy(sdDialog)
+            sdDialog = 0
+        CASE 6
+            DIM ed AS INTEGER : ed = exDialogBauen()
+            PRINT "export: stickpfad vorgewaehlt "; gtk_toggle_button_get_active(exStickpfad)
+            gtk_toggle_button_set_active(exStickpfad, FALSE)
+            exWahlMerken()
+            gtk_widget_destroy(ed)
+            PRINT "abgewaehlt gemerkt: "; NOT exWahlStickpfad
+            exWahlStickpfad = TRUE
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

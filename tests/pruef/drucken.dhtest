@@ -269,3 +269,78 @@ text TRUE
 gedreht TRUE
 flaechen TRUE
 standard unveraendert TRUE
+
+=== die vorschau strichelt linien und umrisse
+' A4 bei 420 Punkten: 2 Punkte je mm. Eine Linie von 20 bis 120 mm auf
+' Hoehe 50 mm, 4 mm Strich und 2 mm Luecke: 17 Striche zu 8 Punkten, dazwischen
+' 4 Punkte Papier (200 Punkte = 16 volle Folgen und ein Strich); darunter dieselbe Linie durchgezogen. Der Umriss eines
+' Rechtecks ab (20, 100) mm ist an der Oberkante ebenso unterbrochen. (Die Oberkante hat 10 Striche, dazu der Punkt in der Ecke, an dem die linke Kante endet.)
+IMPORT "pdf"
+IMPORT "imgfx"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM p AS PDF : p = PDF_NEW()
+PDF_DASH(p, 4, 2)
+PDF_LINE(p, 20, 50, 120, 50)
+PDF_RECT(p, 20, 100, 60, 30)
+PDF_DASH(p, 0)
+PDF_LINE(p, 20, 70, 120, 70)
+DIM b AS IMAGE : b = PDF_PREVIEW(p, 1, 420)
+FUNCTION zeile$(b AS IMAGE, y AS INTEGER, x0 AS INTEGER, x1 AS INTEGER) AS STRING
+    DIM n AS INTEGER, laeufe AS INTEGER, x AS INTEGER, vorher AS BOOLEAN
+    FOR x = x0 TO x1
+        DIM an AS BOOLEAN : an = GETPIXEL(b, x, y) <> &HFFFFFF
+        IF an THEN n = n + 1
+        IF an AND NOT vorher THEN laeufe = laeufe + 1
+        vorher = an
+    NEXT
+    RETURN STR$(n) + " punkte in " + STR$(laeufe) + " stuecken"
+END FUNCTION
+PRINT "gestrichelt "; zeile$(b, 100, 30, 250)
+PRINT "durchgezogen "; zeile$(b, 140, 30, 250)
+PRINT "rechteck oben "; zeile$(b, 200, 30, 170)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+gestrichelt 136 punkte in 17 stuecken
+durchgezogen 200 punkte in 1 stuecken
+rechteck oben 81 punkte in 11 stuecken
+
+=== der drucker strichelt
+' Ein gestrichelter GDI-Stift (ExtCreatePen mit eigener Folge): der Treiber
+' schreibt daraus wieder eine Strichelung ins PDF, 2 zu 1 wie bestellt.
+IMPORT "pdf"
+IMPORT "leser.dh"
+DIM da AS BOOLEAN : da = FALSE
+DIM n AS STRING
+FOR EACH n IN PRINTERS()
+    IF n = "Microsoft Print to PDF" THEN da = TRUE
+NEXT
+IF NOT da THEN
+    PRINT "UEBERSPRINGEN: kein 'Microsoft Print to PDF' auf dieser Maschine"
+    EXIT(0)
+END IF
+DIM vorher AS STRING : vorher = PRINTER_DEFAULT$()
+DIM p AS PDF : p = PDF_NEW()
+PDF_LINE_WIDTH(p, 1)
+PDF_DASH(p, 4, 2)
+PDF_LINE(p, 20, 50, 120, 50)
+PDF_PRINT(p, "Microsoft Print to PDF", 1, "druck.pdf")
+DIM s AS ARRAY OF STRING : s = pdfSeiten("druck.pdf")
+DIM w AS ARRAY OF STRING : w = pdfWoerter()
+DIM i AS INTEGER, gefunden AS BOOLEAN
+FOR i = 3 TO LEN(w) - 1
+    IF w[i] = "d" AND w[i - 2] = "]" THEN
+        gefunden = TRUE
+        PRINT "strichelung 2 zu 1 "; ABS(VAL(w[i - 4]) / VAL(w[i - 3]) - 2) < 0.01
+    END IF
+NEXT
+PRINT "gefunden "; gefunden
+PRINT "standard unveraendert "; (PRINTER_DEFAULT$() = vorher)
+--- datei leser.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+--- system windows
+--- erwartet
+strichelung 2 zu 1 TRUE
+gefunden TRUE
+standard unveraendert TRUE

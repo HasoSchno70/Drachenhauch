@@ -34,6 +34,7 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_FONT_LOAD(p, pfad$, name$)` | eine eigene TrueType-/OpenType-Schrift laden, danach unter `name$` für `PDF_FONT` da |
 | `PDF_COLOR(p, farbe)` | `RGB(…)` — gilt für Text, Striche und Flächen |
 | `PDF_LINE_WIDTH(p, mm)` | Strichstärke |
+| `PDF_DASH(p, strich_mm[, luecke_mm])` | gestrichelt für alle folgenden Linien und Umrisse; ohne Lücke so lang wie der Strich, `PDF_DASH(p, 0)` wieder durchgezogen |
 | `PDF_TEXT(p, x, y, text$[, winkel])` | Text setzen; `winkel` in Grad gegen den Uhrzeigersinn, gedreht um (x, y) |
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | Breite in mm, in der aktuellen Schrift und Größe |
 | `PDF_LINE(p, x1, y1, x2, y2)` | Linie zeichnen |

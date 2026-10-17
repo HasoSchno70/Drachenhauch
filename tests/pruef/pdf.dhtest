@@ -531,3 +531,61 @@ a2 420.0 x 594.0
 a1 594.0 x 841.0
 a0 841.0 x 1189.0
 a1 quer 841.0 x 594.0
+
+=== strichelung steht im pdf und gilt bis pdf_dash 0
+' PDF_DASH(p, 4, 2) -> [11.338583 5.6692915] 0 d vor den Linien (4 und 2 mm
+' in Punkten), auch beim Rechteck-Umriss; nach PDF_DASH(p, 0) keine Strichelung
+' mehr. Ohne Luecke so lang wie der Strich.
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_DASH(p, 4, 2)
+PDF_LINE(p, 20, 50, 120, 50)
+PDF_RECT(p, 20, 80, 50, 30)
+PDF_DASH(p, 0)
+PDF_LINE(p, 20, 150, 120, 150)
+PDF_DASH(p, 3)
+PDF_CIRCLE(p, 100, 200, 10)
+PDF_SAVE(p, "a.pdf")
+--- datei pdftext.dh
+IMPORT "{sammlung}/_hilfen/pdftext.dh"
+
+--- nachher
+IMPORT "pdftext.dh"
+DIM s AS ARRAY OF STRING : s = pdfSeiten("a.pdf")
+DIM w AS ARRAY OF STRING : w = pdfWoerter()
+DIM i AS INTEGER, zuege AS INTEGER
+FOR i = 0 TO LEN(w) - 1
+    IF w[i] = "d" THEN PRINT "strichelung "; w[i - 3]; " "; w[i - 2]; " "; w[i - 1]
+    IF w[i] = "S" THEN zuege = zuege + 1
+NEXT
+PRINT "umrisse "; zuege
+--- erwartet
+strichelung [11.338583 5.6692915 ]0
+strichelung [11.338583 5.6692915 ]0
+strichelung [8.503937 8.503937 ]0
+umrisse 4
+
+=== pdf_dash prueft strich und luecke
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+TRY
+    PDF_DASH(p, 2, 0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PDF_DASH(p, -1, 1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PDF_DASH(p)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+PDF_DASH: Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht 2 und 0
+PDF_DASH: Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht -1 und 1
+PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht 1

@@ -8373,6 +8373,12 @@
    "module": "pdf"
   },
   {
+   "name": "PDF_DASH",
+   "kind": "core",
+   "signature": "PDF_DASH(p: PDF, strich_mm [, luecke_mm])",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_FONT",
    "kind": "core",
    "signature": "PDF_FONT(p: PDF, schrift$, groesse_pt)",

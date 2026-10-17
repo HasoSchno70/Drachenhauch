@@ -97,6 +97,7 @@ DECLARE FUNCTION gtk_drawing_area_new LIB GTK () AS ZEIGER
 ' --- Widgets allgemein
 DECLARE SUB gtk_widget_set_size_request LIB GTK (w AS ZEIGER, b AS LONG, h AS LONG)
 DECLARE SUB gtk_widget_set_tooltip_text LIB GTK (w AS ZEIGER, text AS TEXT)
+DECLARE SUB gtk_widget_set_has_tooltip LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_widget_set_hexpand LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_widget_set_vexpand LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_widget_set_halign LIB GTK (w AS ZEIGER, art AS LONG)
@@ -106,6 +107,7 @@ DECLARE SUB gtk_widget_grab_focus LIB GTK (w AS ZEIGER)
 DECLARE FUNCTION gtk_widget_has_focus LIB GTK (w AS ZEIGER) AS BOOLEAN
 DECLARE SUB gtk_widget_set_sensitive LIB GTK (w AS ZEIGER, an AS BOOLEAN)
 DECLARE SUB gtk_widget_set_visible LIB GTK (w AS ZEIGER, an AS BOOLEAN)
+DECLARE FUNCTION gtk_widget_get_visible LIB GTK (w AS ZEIGER) AS BOOLEAN
 DECLARE SUB gtk_widget_show LIB GTK (w AS ZEIGER)
 DECLARE SUB gtk_widget_add_events LIB GTK (w AS ZEIGER, maske AS LONG)
 DECLARE SUB gtk_widget_queue_draw LIB GTK (w AS ZEIGER)
@@ -175,6 +177,8 @@ DECLARE SUB cairo_close_path LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_arc LIB CAIRO (cr AS ZEIGER, x AS FLOAT, y AS FLOAT, r AS FLOAT, a1 AS FLOAT, a2 AS FLOAT)
 DECLARE SUB cairo_new_path LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_set_line_width LIB CAIRO (cr AS ZEIGER, b AS FLOAT)
+' Strichelung: Laengen als double[n] (BUFFER_ZEIGER), n = 0 durchgezogen
+DECLARE SUB cairo_set_dash LIB CAIRO (cr AS ZEIGER, laengen AS ZEIGER, n AS LONG, versatz AS FLOAT)
 DECLARE SUB cairo_save LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_restore LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_translate LIB CAIRO (cr AS ZEIGER, x AS FLOAT, y AS FLOAT)
@@ -208,6 +212,7 @@ DECLARE SUB pango_cairo_update_layout LIB PANGOCAIRO (cr AS ZEIGER, layout AS ZE
 DECLARE SUB pango_layout_set_text LIB PANGO (layout AS ZEIGER, text AS TEXT, laenge AS LONG)
 DECLARE SUB pango_layout_set_font_description LIB PANGO (layout AS ZEIGER, schrift AS ZEIGER)
 DECLARE SUB pango_layout_get_pixel_size LIB PANGO (layout AS ZEIGER, BYREF b AS LONG, BYREF h AS LONG)
+DECLARE FUNCTION pango_layout_get_baseline LIB PANGO (layout AS ZEIGER) AS LONG
 DECLARE SUB pango_layout_get_pixel_extents LIB PANGO (layout AS ZEIGER, tinte AS PangoRechteck, logisch AS PangoRechteck)
 DECLARE SUB pango_font_description_free LIB PANGO (schrift AS ZEIGER)
 DECLARE FUNCTION pango_font_description_from_string LIB PANGO (text AS TEXT) AS ZEIGER
@@ -263,6 +268,7 @@ CONST GDK_UMSCHALT = 1
 CONST GDK_STRG = 4
 CONST GDK_ALT = 8
 CONST GTK_DATEI_OEFFNEN = 0
+CONST GTK_DATEI_ORDNER = 2                ' GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER
 CONST GTK_ANTWORT_ANNEHMEN = -3
 CONST GTK_ANTWORT_ABBRECHEN = -6
 CONST GTK_VORRANG_ANWENDUNG = 600

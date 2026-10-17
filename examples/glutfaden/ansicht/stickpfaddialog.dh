@@ -1,0 +1,816 @@
+' Der Stickpfad -- in welcher Reihenfolge man die Stiche einer Farbe setzt
+' (PySticky ui/dialogs/stitch_path_dialog.py mit ui/widgets/path_preview.py,
+' gerechnet in kern/stickpfad.dh).
+'
+' Oben Strategie und Stoff; darunter die Vorschau der gewaehlten Farbe: ihre
+' Stiche, der Pfad mit Pfeilen, Spruenge rot gestrichelt, S = Start und
+' E = Ende, die anderen Farben blass dahinter. Das Rad zoomt um die Maus,
+' Ziehen verschiebt, ueber einem Stich stehen Nummer, Lage und Abstand. Der
+' Grund richtet sich nach der Helligkeit des Garns (helles Garn, dunkler
+' Grund), damit der Pfad immer zu sehen ist. Darunter je Farbe Stiche,
+' Distanz, Spruenge und Garn (mit Balken), die Summen und -- nach "Alle
+' vergleichen" -- die fuenf Strategien mit Bewertung. Exportiert werden der
+' Stickplan als Text und der Pfad einer Farbe oder aller als PNG.
+'
+' Anders als PySticky: der Pfad steht beim Oeffnen schon da (zeilenweise)
+' statt erst nach "Optimieren"; gerechnet wird ohne eigenen Faden und ohne
+' Fortschrittsbalken (auch 200 x 200 Stiche dauern nur einen Augenblick);
+' Meldungen zum Export stehen in der Zeile unten statt in einem Kasten.
+
+DIM sdDialog AS INTEGER
+DIM sdMuster AS kern.Muster
+DIM sdStrategie AS INTEGER
+DIM sdStoff AS INTEGER
+DIM sdNummern AS INTEGER
+DIM sdSpruenge AS INTEGER
+DIM sdKontext AS INTEGER
+DIM sdZoomText AS INTEGER
+DIM sdFlaeche AS INTEGER
+DIM sdListe AS INTEGER
+DIM sdZeilen AS ARRAY OF INTEGER
+DIM sdSumme AS ARRAY OF INTEGER      ' Stiche, Farben, Distanz, Spruenge, Garn
+DIM sdVergleich AS INTEGER           ' Rahmen, versteckt bis "Alle vergleichen"
+DIM sdVergleichListe AS INTEGER
+DIM sdMeldung AS INTEGER
+DIM sdErg AS kern.Stickpfad
+DIM sdVergleiche AS ARRAY OF kern.Stickpfad
+DIM sdAktiv AS INTEGER               ' gewaehlter Pfad (Platz in sdErg.pfade), -1 = keiner
+DIM sdZoom AS FLOAT
+DIM sdOx AS FLOAT
+DIM sdOy AS FLOAT
+DIM sdFlB AS INTEGER                 ' Groesse der Flaeche beim letzten Einpassen
+DIM sdFlH AS INTEGER
+DIM sdZiehen AS BOOLEAN
+DIM sdMausX AS FLOAT
+DIM sdMausY AS FLOAT
+DIM sdSperre AS BOOLEAN              ' beim Fuellen feuern die Signale nicht
+
+CONST SD_ZELLE = 10                  ' Zelle bei 100 %
+CONST SD_ZOOM_MIN = 0.1
+CONST SD_ZOOM_MAX = 10.0
+CONST SD_SPRUNG = &HDC5050
+CONST SD_START = &H1EDC1E
+CONST SD_ENDE = &HDC3232
+
+' --- Farben -----------------------------------------------------------------------
+
+FUNCTION sdRgb(r AS FLOAT, g AS FLOAT, b AS FLOAT) AS INTEGER
+    RETURN RGB(CLAMP(INT(r + 0.5), 0, 255), CLAMP(INT(g + 0.5), 0, 255), CLAMP(INT(b + 0.5), 0, 255))
+END FUNCTION
+
+' QColor.darker(f) / lighter(f): der Wert (HSV) mal 100/f bzw. f/100; wird er
+' heller als 255, sinkt statt dessen die Saettigung (wie Qt).
+FUNCTION sdDunkler(c AS INTEGER, f AS FLOAT) AS INTEGER
+    RETURN sdRgb(((c SHR 16) BAND 255) * 100 / f, ((c SHR 8) BAND 255) * 100 / f, (c BAND 255) * 100 / f)
+END FUNCTION
+
+FUNCTION sdHeller(c AS INTEGER, f AS FLOAT) AS INTEGER
+    DIM r AS FLOAT : r = (c SHR 16) BAND 255
+    DIM g AS FLOAT : g = (c SHR 8) BAND 255
+    DIM b AS FLOAT : b = c BAND 255
+    DIM mx AS FLOAT : mx = MAX(r, MAX(g, b))
+    DIM mn AS FLOAT : mn = MIN(r, MIN(g, b))
+    IF mx = 0 THEN RETURN c
+    DIM v AS FLOAT : v = mx * f / 100
+    IF v <= 255 THEN RETURN sdRgb(r * f / 100, g * f / 100, b * f / 100)
+    DIM s AS FLOAT : s = MAX(0.0, (mx - mn) * 255 / mx - (v - 255))
+    DIM nmn AS FLOAT : nmn = 255 - s
+    IF mx = mn THEN RETURN sdRgb(255, 255, 255)
+    RETURN sdRgb(nmn + (r - mn) * s / (mx - mn), nmn + (g - mn) * s / (mx - mn), nmn + (b - mn) * s / (mx - mn))
+END FUNCTION
+
+SUB sdFarbe(cr AS INTEGER, c AS INTEGER, deck AS FLOAT)
+    cairo_set_source_rgba(cr, ((c SHR 16) BAND 255) / 255.0, ((c SHR 8) BAND 255) / 255.0, (c BAND 255) / 255.0, deck)
+END SUB
+
+FUNCTION sdHelligkeit() AS FLOAT
+    IF IS_NIL(sdErg) OR sdAktiv < 0 OR sdAktiv >= LEN(sdErg.pfade) THEN RETURN 0.5
+    RETURN kern.helligkeit(sdMuster.farben[sdErg.pfade[sdAktiv].farbe].garn.farbe)
+END FUNCTION
+
+' Grund, Gitter und Text nach der Helligkeit des Garns (path_preview.py)
+FUNCTION sdGrund() AS INTEGER
+    DIM l AS FLOAT : l = sdHelligkeit()
+    IF l > 0.6 THEN RETURN &H32323A
+    IF l < 0.4 THEN RETURN &HEBEBF0
+    RETURN &HAAAAB4
+END FUNCTION
+
+FUNCTION sdGitter() AS INTEGER
+    DIM l AS FLOAT : l = sdHelligkeit()
+    IF l > 0.6 THEN RETURN &H50505A
+    IF l < 0.4 THEN RETURN &HC8C8D2
+    RETURN &H9696A0
+END FUNCTION
+
+FUNCTION sdTextfarbe() AS INTEGER
+    RETURN IIF(sdHelligkeit() > 0.6, &HC8C8C8, &H3C3C3C)
+END FUNCTION
+
+' --- Zeichnen -------------------------------------------------------------------------
+
+SUB sdStrichel(cr AS INTEGER, an AS FLOAT, aus AS FLOAT)
+    IF an <= 0 THEN
+        cairo_set_dash(cr, 0, 0, 0.0)
+        RETURN
+    END IF
+    DIM b AS BUFFER : b = BUFFER_NEW(16)
+    BUFFER_SET_F64(b, 0, an)
+    BUFFER_SET_F64(b, 8, aus)
+    cairo_set_dash(cr, BUFFER_ZEIGER(b), 2, 0.0)
+END SUB
+
+FUNCTION sdLayout(cr AS INTEGER, text AS STRING, px AS FLOAT, fett AS BOOLEAN) AS INTEGER
+    DIM l AS INTEGER : l = pango_cairo_create_layout(cr)
+    DIM fd AS INTEGER : fd = pango_font_description_from_string(IIF(fett, "DejaVu Sans Bold", "DejaVu Sans"))
+    pango_font_description_set_absolute_size(fd, px * PANGO_SCALE)
+    pango_layout_set_font_description(l, fd)
+    pango_font_description_free(fd)
+    pango_layout_set_text(l, text, -1)
+    RETURN l
+END FUNCTION
+
+' Text mittig in einem Rechteck
+SUB sdTextMitte(cr AS INTEGER, text AS STRING, px AS FLOAT, fett AS BOOLEAN, x AS FLOAT, y AS FLOAT, b AS FLOAT, h AS FLOAT)
+    DIM l AS INTEGER : l = sdLayout(cr, text, px, fett)
+    DIM tb AS INTEGER, th AS INTEGER
+    pango_layout_get_pixel_size(l, tb, th)
+    cairo_move_to(cr, x + (b - tb) / 2, y + (h - th) / 2)
+    pango_cairo_show_layout(cr, l)
+    g_object_unref(l)
+END SUB
+
+' Text mit der Grundlinie bei y (wie QPainter.drawText(x, y, text))
+SUB sdTextGrund(cr AS INTEGER, text AS STRING, px AS FLOAT, fett AS BOOLEAN, x AS FLOAT, y AS FLOAT)
+    DIM l AS INTEGER : l = sdLayout(cr, text, px, fett)
+    cairo_move_to(cr, x, y - pango_layout_get_baseline(l) / PANGO_SCALE)
+    pango_cairo_show_layout(cr, l)
+    g_object_unref(l)
+END SUB
+
+' Eine kleine Pfeilspitze kurz vor dem Ende der Linie (_draw_arrowhead)
+SUB sdPfeil(cr AS INTEGER, x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT, z AS FLOAT)
+    DIM dx AS FLOAT : dx = x2 - x1
+    DIM dy AS FLOAT : dy = y2 - y1
+    DIM l AS FLOAT : l = SQR(dx * dx + dy * dy)
+    IF l < 1 THEN RETURN
+    DIM ux AS FLOAT : ux = dx / l
+    DIM uy AS FLOAT : uy = dy / l
+    DIM g AS FLOAT : g = MIN(z * 0.3, 8)
+    DIM tx AS FLOAT : tx = x2 - ux * 2
+    DIM ty AS FLOAT : ty = y2 - uy * 2
+    cairo_new_path(cr)
+    cairo_move_to(cr, tx, ty)
+    cairo_line_to(cr, tx - ux * g - uy * g, ty - uy * g + ux * g)
+    cairo_line_to(cr, tx - ux * g + uy * g, ty - uy * g - ux * g)
+    cairo_close_path(cr)
+    cairo_fill(cr)
+END SUB
+
+' Der Inhalt -- auf der Flaeche und beim Export (_paint_content): Gitter,
+' Rahmen, die anderen Farben blass, die gewaehlte mit Pfad und Markern.
+SUB sdInhalt(cr AS INTEGER, ox AS FLOAT, oy AS FLOAT, z AS FLOAT)
+    DIM m AS kern.Muster : m = sdMuster
+    DIM gitter AS INTEGER : gitter = sdGitter()
+    DIM x AS INTEGER, y AS INTEGER
+    sdStrichel(cr, 0, 0)
+    IF z >= 3 THEN
+        sdFarbe(cr, gitter, 1)
+        cairo_set_line_width(cr, 1)
+        FOR x = 0 TO m.breite
+            cairo_move_to(cr, INT(ox + x * z) + 0.5, INT(oy) + 0.5)
+            cairo_line_to(cr, INT(ox + x * z) + 0.5, INT(oy + m.hoehe * z) + 0.5)
+        NEXT
+        FOR y = 0 TO m.hoehe
+            cairo_move_to(cr, INT(ox) + 0.5, INT(oy + y * z) + 0.5)
+            cairo_line_to(cr, INT(ox + m.breite * z) + 0.5, INT(oy + y * z) + 0.5)
+        NEXT
+        cairo_stroke(cr)
+    END IF
+    sdFarbe(cr, sdDunkler(gitter, 120), 1)
+    cairo_set_line_width(cr, 2)
+    cairo_rectangle(cr, ox, oy, m.breite * z, m.hoehe * z)
+    cairo_stroke(cr)
+    IF IS_NIL(sdErg) OR sdAktiv < 0 OR sdAktiv >= LEN(sdErg.pfade) THEN RETURN
+    DIM p AS kern.Farbpfad : p = sdErg.pfade[sdAktiv]
+    DIM i AS INTEGER
+    ' Kontext: alle anderen Farben blass
+    IF gtk_toggle_button_get_active(sdKontext) THEN
+        DIM q AS kern.Farbpfad
+        FOR EACH q IN sdErg.pfade
+            IF q.farbe = p.farbe THEN CONTINUE
+            sdFarbe(cr, m.farben[q.farbe].garn.farbe, 45 / 255)
+            FOR i = 0 TO q.stiche() - 1
+                cairo_rectangle(cr, ox + q.xs[i] * z + 1, oy + q.ys[i] * z + 1, z - 2, z - 2)
+            NEXT
+            cairo_fill(cr)
+        NEXT
+    END IF
+    DIM c AS INTEGER : c = m.farben[p.farbe].garn.farbe
+    DIM hell AS FLOAT : hell = kern.helligkeit(c)
+    sdFarbe(cr, c, 1)
+    FOR i = 0 TO p.stiche() - 1
+        cairo_rectangle(cr, ox + p.xs[i] * z + 0.5, oy + p.ys[i] * z + 0.5, z - 1, z - 1)
+    NEXT
+    cairo_fill(cr)
+    ' Linien mit Pfeilspitzen
+    DIM breite AS FLOAT : breite = MAX(1, INT(z / 8))
+    DIM linie AS INTEGER : linie = IIF(hell > 0.5, sdDunkler(c, 150), sdHeller(c, 150))
+    DIM spr AS BOOLEAN : spr = gtk_toggle_button_get_active(sdSpruenge)
+    cairo_set_line_width(cr, breite)
+    FOR i = 1 TO p.stiche() - 1
+        DIM x1 AS FLOAT : x1 = ox + p.xs[i - 1] * z + z / 2
+        DIM y1 AS FLOAT : y1 = oy + p.ys[i - 1] * z + z / 2
+        DIM x2 AS FLOAT : x2 = ox + p.xs[i] * z + z / 2
+        DIM y2 AS FLOAT : y2 = oy + p.ys[i] * z + z / 2
+        DIM sprung AS BOOLEAN : sprung = p.istSprung(i) AND spr
+        sdFarbe(cr, IIF(sprung, SD_SPRUNG, linie), 1)
+        IF sprung THEN sdStrichel(cr, 4 * breite, 2 * breite)
+        cairo_move_to(cr, x1, y1)
+        cairo_line_to(cr, x2, y2)
+        cairo_stroke(cr)
+        IF sprung THEN sdStrichel(cr, 0, 0)
+        IF z >= 12 THEN sdPfeil(cr, x1, y1, x2, y2, z)
+    NEXT
+    ' Nummern
+    IF gtk_toggle_button_get_active(sdNummern) AND z >= 16 THEN
+        sdFarbe(cr, IIF(hell > 0.5, &H000000, &HFFFFFF), 1)
+        FOR i = 0 TO p.stiche() - 1
+            sdTextMitte(cr, STR$(i + 1), MAX(8, INT(z / 3)), FALSE, ox + p.xs[i] * z, oy + p.ys[i] * z, z, z)
+        NEXT
+    END IF
+    ' Start (gruener Kreis) und Ende (rotes Quadrat)
+    IF p.stiche() = 0 THEN RETURN
+    DIM mg AS FLOAT : mg = MAX(z * 0.8, 10)
+    DIM sb AS FLOAT : sb = MAX(2, INT(z / 5))
+    DIM sx AS FLOAT : sx = ox + p.xs[0] * z + z / 2
+    DIM sy AS FLOAT : sy = oy + p.ys[0] * z + z / 2
+    cairo_new_path(cr)
+    cairo_arc(cr, sx, sy, mg / 2, 0, 2 * PI)
+    sdFarbe(cr, SD_START, 50 / 255)
+    cairo_fill(cr)
+    cairo_arc(cr, sx, sy, mg / 2, 0, 2 * PI)
+    sdFarbe(cr, SD_START, 1)
+    cairo_set_line_width(cr, sb)
+    cairo_stroke(cr)
+    IF z >= 10 THEN sdTextMitte(cr, "S", MAX(10, INT(z / 2)), TRUE, sx - z, sy - z * 1.5, z * 2, z)
+    DIM n AS INTEGER : n = p.stiche() - 1
+    DIM ex AS FLOAT : ex = ox + p.xs[n] * z + z / 2
+    DIM ey AS FLOAT : ey = oy + p.ys[n] * z + z / 2
+    cairo_rectangle(cr, ex - mg / 2, ey - mg / 2, mg, mg)
+    sdFarbe(cr, SD_ENDE, 50 / 255)
+    cairo_fill(cr)
+    cairo_rectangle(cr, ex - mg / 2, ey - mg / 2, mg, mg)
+    sdFarbe(cr, SD_ENDE, 1)
+    cairo_stroke(cr)
+    IF z >= 10 THEN sdTextMitte(cr, "E", MAX(10, INT(z / 2)), TRUE, ex - z, ey + z * 0.5, z * 2, z)
+END SUB
+
+' Ganz einpassen (fit_to_view): 20 Punkte Rand, hoechstens 1000 %.
+SUB sdEinpassen()
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(sdFlaeche)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(sdFlaeche)
+    sdFlB = b : sdFlH = h
+    DIM pw AS FLOAT : pw = sdMuster.breite * SD_ZELLE
+    DIM ph AS FLOAT : ph = sdMuster.hoehe * SD_ZELLE
+    IF pw = 0 OR ph = 0 THEN RETURN
+    sdZoom = MAX(SD_ZOOM_MIN, MIN(MIN(MAX(100, b - 40) / pw, MAX(100, h - 40) / ph), SD_ZOOM_MAX))
+    sdOx = (b - pw * sdZoom) / 2
+    sdOy = (h - ph * sdZoom) / 2
+    sdZoomNachziehen()
+END SUB
+
+SUB sdZoomNachziehen()
+    gtk_label_set_text(sdZoomText, STR$(INT(sdZoom * 100)) + " %")
+    gtk_widget_queue_draw(sdFlaeche)
+END SUB
+
+' Zoomen um einen Punkt der Flaeche
+SUB sdZoomUm(neu AS FLOAT, x AS FLOAT, y AS FLOAT)
+    neu = MAX(SD_ZOOM_MIN, MIN(neu, SD_ZOOM_MAX))
+    IF neu = sdZoom THEN RETURN
+    sdOx = x - (x - sdOx) * neu / sdZoom
+    sdOy = y - (y - sdOy) * neu / sdZoom
+    sdZoom = neu
+    sdZoomNachziehen()
+END SUB
+
+FUNCTION sdZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM b AS INTEGER : b = gtk_widget_get_allocated_width(w)
+    DIM h AS INTEGER : h = gtk_widget_get_allocated_height(w)
+    IF b <> sdFlB OR h <> sdFlH THEN sdEinpassen()
+    sdFarbe(cr, sdGrund(), 1)
+    cairo_paint(cr)
+    sdInhalt(cr, sdOx, sdOy, SD_ZELLE * sdZoom)
+    ' die Zeile unten
+    DIM t AS STRING : t = "Zoom: " + STR$(INT(sdZoom * 100)) + "%  |  Mausrad: Zoom  |  Ziehen: Verschieben"
+    IF NOT IS_NIL(sdErg) AND sdAktiv >= 0 THEN t = t + "  |  " + STR$(sdErg.pfade[sdAktiv].stiche()) + " Stiche, " + STR$(sdErg.pfade[sdAktiv].spruenge) + " Sprünge"
+    sdFarbe(cr, sdTextfarbe(), 1)
+    sdTextGrund(cr, t, 11, FALSE, 5, h - 5)
+    RETURN FALSE
+END FUNCTION
+
+' --- Maus -----------------------------------------------------------------------------
+
+' Der Schritt der gewaehlten Farbe unter einem Punkt, -1 = keiner
+FUNCTION sdStichBei(x AS FLOAT, y AS FLOAT) AS INTEGER
+    IF IS_NIL(sdErg) OR sdAktiv < 0 THEN RETURN -1
+    DIM z AS FLOAT : z = SD_ZELLE * sdZoom
+    DIM gx AS INTEGER : gx = FLOOR((x - sdOx) / z)
+    DIM gy AS INTEGER : gy = FLOOR((y - sdOy) / z)
+    DIM p AS kern.Farbpfad : p = sdErg.pfade[sdAktiv]
+    DIM i AS INTEGER
+    FOR i = 0 TO p.stiche() - 1
+        IF p.xs[i] = gx AND p.ys[i] = gy THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION sdTipp$(i AS INTEGER) AS STRING
+    DIM p AS kern.Farbpfad : p = sdErg.pfade[sdAktiv]
+    DIM t AS STRING : t = "Schritt " + STR$(i + 1) + "  |  Position (" + STR$(p.xs[i]) + ", " + STR$(p.ys[i]) + ")  |  Distanz: " + FORMAT$(p.abstand(i), "%.1f")
+    IF p.istSprung(i) THEN t = t + "  |  ⚠ Sprung!"
+    RETURN t
+END FUNCTION
+
+FUNCTION sdDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM k AS INTEGER
+    IF NOT gdk_event_get_button(ereignis, k) THEN RETURN FALSE
+    IF k <> 1 AND k <> 2 THEN RETURN FALSE
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, sdMausX, sdMausY)
+    sdZiehen = TRUE
+    gtk_widget_set_has_tooltip(sdFlaeche, FALSE)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION sdBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM x AS FLOAT, y AS FLOAT
+    IF NOT gdk_event_get_coords(ereignis, x, y) THEN RETURN FALSE
+    IF sdZiehen THEN
+        sdOx = sdOx + x - sdMausX
+        sdOy = sdOy + y - sdMausY
+        sdMausX = x : sdMausY = y
+        gtk_widget_queue_draw(sdFlaeche)
+        RETURN TRUE
+    END IF
+    DIM i AS INTEGER : i = sdStichBei(x, y)
+    IF i < 0 THEN
+        gtk_widget_set_has_tooltip(sdFlaeche, FALSE)
+    ELSE
+        gtk_widget_set_tooltip_text(sdFlaeche, sdTipp$(i))
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION sdLos(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    sdZiehen = FALSE
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION sdRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    DIM x AS FLOAT, y AS FLOAT
+    DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, x, y)
+    DIM richtung AS INTEGER
+    ok = gdk_event_get_scroll_direction(ereignis, richtung)
+    DIM schritt AS FLOAT
+    IF richtung = GDK_RAD_HOCH THEN
+        schritt = -1
+    ELSEIF richtung = GDK_RAD_RUNTER THEN
+        schritt = 1
+    ELSE
+        DIM dx AS FLOAT, dy AS FLOAT
+        ok = gdk_event_get_scroll_deltas(ereignis, dx, dy)
+        schritt = dy
+    END IF
+    IF schritt = 0 THEN RETURN TRUE
+    sdZoomUm(sdZoom * IIF(schritt < 0, 1.15, 1 / 1.15), x, y)
+    RETURN TRUE
+END FUNCTION
+
+SUB sdZoomKnopf(w AS INTEGER, art AS INTEGER)
+    IF art = 0 THEN
+        sdEinpassen()
+    ELSE
+        sdZoomUm(sdZoom * IIF(art = 1, 1.25, 1 / 1.25), gtk_widget_get_allocated_width(sdFlaeche) / 2, gtk_widget_get_allocated_height(sdFlaeche) / 2)
+    END IF
+END SUB
+
+SUB sdOptionGeaendert(w AS INTEGER, daten AS INTEGER)
+    gtk_widget_queue_draw(sdFlaeche)
+END SUB
+
+' --- Tabellen -------------------------------------------------------------------------
+
+FUNCTION sdMaske$(t AS STRING) AS STRING
+    RETURN REPLACE$(REPLACE$(REPLACE$(t, "&", "&amp;"), "<", "&lt;"), ">", "&gt;")
+END FUNCTION
+
+FUNCTION sdZelle(text AS STRING, breite AS INTEGER, rechts AS BOOLEAN) AS INTEGER
+    DIM l AS INTEGER : l = gtk_label_new("")
+    gtk_label_set_markup(l, text)
+    gtk_label_set_xalign(l, IIF(rechts, 1.0, 0.0))
+    IF breite > 0 THEN
+        gtk_widget_set_size_request(l, breite, -1)
+    ELSE
+        gtk_widget_set_hexpand(l, TRUE)
+        gtk_label_set_ellipsize(l, GTK_ELLIPSE_ENDE)
+    END IF
+    RETURN l
+END FUNCTION
+
+FUNCTION sdTabellenzeile(texte AS ARRAY OF STRING, breiten AS ARRAY OF INTEGER) AS INTEGER
+    DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 12)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(texte) - 1
+        gtk_box_pack_start(z, sdZelle(texte[i], breiten[i], i > 0), breiten[i] = 0, TRUE, 0)
+    NEXT
+    RETURN z
+END FUNCTION
+
+FUNCTION sdGarnName$(p AS kern.Farbpfad) AS STRING
+    RETURN sdMuster.farben[p.farbe].garn.name
+END FUNCTION
+
+FUNCTION sdKurzname$(s AS INTEGER) AS STRING
+    SELECT CASE s
+        CASE kern.SP_ZEILEN : RETURN "Zeilenweise"
+        CASE kern.SP_DAENISCH : RETURN "Dänische Methode"
+    END SELECT
+    RETURN kern.spName$(s)
+END FUNCTION
+
+' Liste, Summen und Vorschau nach einem neuen Ergebnis (_update_display)
+SUB sdAnzeigen()
+    DIM r AS kern.Stickpfad : r = sdErg
+    gtk_label_set_markup(sdSumme[0], "<b>" + STR$(r.stiche) + "</b>")
+    gtk_label_set_markup(sdSumme[1], "<b>" + STR$(LEN(r.pfade)) + "</b>")
+    gtk_label_set_markup(sdSumme[2], "<b>" + FORMAT$(r.distanz, "%.1f") + "</b>")
+    gtk_label_set_markup(sdSumme[3], "<b>" + STR$(r.spruenge) + "</b>")
+    gtk_label_set_markup(sdSumme[4], "<b>" + FORMAT$(r.garnCm, "%.0f") + " cm (" + FORMAT$(r.garnCm / 100, "%.1f") + " m)</b>")
+    sdSperre = TRUE
+    DIM z AS INTEGER
+    FOR EACH z IN sdZeilen
+        gtk_widget_destroy(z)
+    NEXT
+    sdZeilen = []
+    DIM garn AS ARRAY OF FLOAT : garn = []
+    DIM hoechst AS FLOAT : hoechst = 0
+    DIM p AS kern.Farbpfad
+    FOR EACH p IN r.pfade
+        ARRAY_PUSH(garn, p.garnCm(r.stoff))
+        hoechst = MAX(hoechst, p.garnCm(r.stoff))
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(r.pfade) - 1
+        p = r.pfade[i]
+        DIM c AS INTEGER : c = sdMuster.farben[p.farbe].garn.farbe
+        DIM name AS STRING : name = "<span background='" + kern.farbeAlsHex$(c) + "' foreground='" + IIF(kern.helligkeit(c) > 0.5, "#000000", "#ffffff") + "'>  " + sdMaske$(sdGarnName$(p)) + "  </span>"
+        ' Garn mit Balken-Hintergrund: wenig = gruen, viel = orange/rot
+        DIM anteil AS FLOAT : anteil = IIF(hoechst > 0, garn[i] / hoechst, 0.0)
+        DIM balken AS INTEGER : balken = RGB(INT(MIN(255, anteil * 400)), INT(MAX(0, 200 - anteil * 150)), 60)
+        DIM g AS STRING : g = "<span background='" + kern.farbeAlsHex$(balken) + "' bgalpha='31%'>  " + FORMAT$(garn[i], "%.0f") + "  </span>"
+        DIM zeile AS INTEGER : zeile = sdTabellenzeile([name, STR$(p.stiche()), FORMAT$(p.distanz, "%.1f"), STR$(p.spruenge), g], [0, 70, 80, 70, 90])
+        gtk_list_box_insert(sdListe, zeile, -1)
+        ARRAY_PUSH(sdZeilen, gtk_list_box_get_row_at_index(sdListe, i))
+    NEXT
+    gtk_widget_show_all(sdListe)
+    sdSperre = FALSE
+    sdAktiv = -1
+    IF LEN(r.pfade) > 0 THEN gtk_list_box_select_row(sdListe, sdZeilen[0])
+    IF LEN(r.pfade) > 0 AND sdAktiv < 0 THEN sdAktiv = 0
+    gtk_widget_queue_draw(sdFlaeche)
+END SUB
+
+SUB sdZeileGewaehlt(liste AS INTEGER, zeile AS INTEGER, daten AS INTEGER)
+    IF sdSperre OR zeile = 0 THEN RETURN
+    sdAktiv = gtk_list_box_row_get_index(zeile)
+    gtk_widget_queue_draw(sdFlaeche)
+END SUB
+
+SUB sdVergleichZeigen()
+    ' leeren: die Liste neu anlegen ist einfacher als Zeilen zu suchen
+    DIM alt AS INTEGER : alt = sdVergleichListe
+    sdVergleichListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(sdVergleichListe, GTK_AUSWAHL_KEINE)
+    gtkKlasse(sdVergleichListe, "liste")
+    gtk_widget_destroy(alt)
+    gtk_box_pack_start(sdVergleich, sdVergleichListe, FALSE, FALSE, 0)
+    DIM beste AS FLOAT : beste = sdVergleiche[0].distanz
+    DIM r AS kern.Stickpfad
+    FOR EACH r IN sdVergleiche
+        DIM bew AS STRING : bew = kern.spBewertung$(r.distanz, beste)
+        IF INSTR(bew, "Beste") >= 0 THEN bew = "<span foreground='#64ff64'>" + bew + "</span>"
+        gtk_list_box_insert(sdVergleichListe, sdTabellenzeile([sdKurzname$(r.strategie), FORMAT$(r.distanz, "%.1f"), STR$(r.spruenge), FORMAT$(r.garnCm, "%.0f"), bew], [0, 80, 70, 90, 110]), -1)
+    NEXT
+    gtk_widget_set_visible(sdVergleich, TRUE)
+    gtk_widget_show_all(sdVergleich)
+END SUB
+
+' --- Rechnen --------------------------------------------------------------------------
+
+SUB sdRechnen()
+    DIM s AS INTEGER : s = MAX(0, gtk_combo_box_get_active(sdStrategie))
+    sdErg = kern.stickpfadBerechnen(sdMuster, s, gtk_spin_button_get_value_as_int(sdStoff))
+    sdAnzeigen()
+    sdMelden("")
+END SUB
+
+SUB sdGeaendert(w AS INTEGER, daten AS INTEGER)
+    IF sdSperre THEN RETURN
+    sdRechnen()
+END SUB
+
+' Alle vergleichen: die beste Strategie wird gewaehlt und gezeigt.
+SUB sdAlleVergleichen(w AS INTEGER, daten AS INTEGER)
+    sdVergleiche = kern.spVergleich(sdMuster, gtk_spin_button_get_value_as_int(sdStoff))
+    sdSperre = TRUE
+    gtk_combo_box_set_active(sdStrategie, sdVergleiche[0].strategie)
+    sdSperre = FALSE
+    sdErg = sdVergleiche[0]
+    sdAnzeigen()
+    sdVergleichZeigen()
+    sdMelden("Beste Strategie: " + kern.spName$(sdErg.strategie))
+END SUB
+
+SUB sdMelden(text AS STRING)
+    gtk_label_set_text(sdMeldung, text)
+END SUB
+
+' --- Export ---------------------------------------------------------------------------
+
+' Einen Pfad als Bild (render_to_image): 15 Punkte je Stich, 30 Rand, unten
+' eine Legende.
+FUNCTION sdBildSichern(pfad AS STRING) AS BOOLEAN
+    DIM p AS kern.Farbpfad : p = sdErg.pfade[sdAktiv]
+    DIM z AS INTEGER : z = 15
+    DIM b AS INTEGER : b = sdMuster.breite * z + 60
+    DIM h AS INTEGER : h = sdMuster.hoehe * z + 120
+    DIM fl AS INTEGER : fl = cairo_image_surface_create(CAIRO_ARGB32, b, h)
+    DIM cr AS INTEGER : cr = cairo_create(fl)
+    sdFarbe(cr, sdGrund(), 1)
+    cairo_paint(cr)
+    sdInhalt(cr, 30, 30, z)
+    sdFarbe(cr, sdTextfarbe(), 1)
+    sdTextGrund(cr, "Farbe: " + sdGarnName$(p), 14, TRUE, 30, h - 50)
+    sdTextGrund(cr, "Stiche: " + STR$(p.stiche()) + "  |  Sprünge: " + STR$(p.spruenge) + "  |  Distanz: " + FORMAT$(p.distanz, "%.1f"), 12, FALSE, 30, h - 32)
+    sdTextGrund(cr, "○ S = Start  |  □ E = Ende  |  - - - = Sprung", 12, FALSE, 30, h - 14)
+    DIM st AS INTEGER : st = cairo_surface_write_to_png(fl, pfad)
+    cairo_destroy(cr)
+    cairo_surface_destroy(fl)
+    RETURN st = 0
+END FUNCTION
+
+' Dateiname aus dem Garn: Leerzeichen zu _, Schraegstriche zu -
+FUNCTION sdDateiname$(p AS kern.Farbpfad) AS STRING
+    RETURN REPLACE$(REPLACE$(REPLACE$(sdGarnName$(p), " ", "_"), "/", "-"), CHR$(92), "-")
+END FUNCTION
+
+FUNCTION sdZiel$(titel AS STRING, vorschlag AS STRING, ordner AS BOOLEAN) AS STRING
+    DIM d AS INTEGER : d = gtk_file_chooser_dialog_new(titel, sdDialog, IIF(ordner, GTK_DATEI_ORDNER, GTK_DATEI_SICHERN), _
+        "Abbrechen", GTK_ANTWORT_ABBRECHEN, IIF(ordner, "Wählen", "Sichern"), GTK_ANTWORT_ANNEHMEN, 0)
+    IF NOT ordner THEN
+        gtk_file_chooser_set_do_overwrite_confirmation(d, TRUE)
+        gtk_file_chooser_set_current_name(d, vorschlag)
+    END IF
+    IF musterPfad <> "" THEN
+        DIM ok AS BOOLEAN : ok = gtk_file_chooser_set_current_folder(d, DIRNAME(musterPfad))
+    END IF
+    DIM pfad AS STRING
+    IF gtk_dialog_run(d) = GTK_ANTWORT_ANNEHMEN THEN
+        DIM zg AS INTEGER : zg = gtk_file_chooser_get_filename(d)
+        pfad = TEXT_AUS_ZEIGER$(zg)
+        g_free(zg)
+    END IF
+    gtk_widget_destroy(d)
+    RETURN pfad
+END FUNCTION
+
+' Der Stickplan als Text; "" = gesichert, sonst der Fehler.
+FUNCTION sdTextSichern$(pfad AS STRING) AS STRING
+    TRY
+        WRITEALL(pfad, kern.stickplanText$(sdMuster, sdErg))
+    CATCH f
+        RETURN f
+    END TRY
+    RETURN ""
+END FUNCTION
+
+' Alle Pfade als Bilder in einen Ordner (01_Name.png ...); liefert die Zahl
+' der geschriebenen und die Namen der fehlgeschlagenen.
+FUNCTION sdAlleBilder(ordner AS STRING, BYREF fehler AS ARRAY OF STRING) AS INTEGER
+    DIM vorher AS INTEGER : vorher = sdAktiv
+    DIM n AS INTEGER
+    fehler = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(sdErg.pfade) - 1
+        sdAktiv = i
+        DIM name AS STRING : name = sdDateiname$(sdErg.pfade[i])
+        IF sdBildSichern(PATHJOIN(ordner, FORMAT$(i + 1, "%02d") + "_" + name + ".png")) THEN n = n + 1 ELSE ARRAY_PUSH(fehler, name)
+    NEXT
+    sdAktiv = vorher
+    RETURN n
+END FUNCTION
+
+SUB sdExport(w AS INTEGER, art AS INTEGER)
+    IF IS_NIL(sdErg) THEN RETURN
+    DIM pfad AS STRING
+    SELECT CASE art
+        CASE 0
+            pfad = sdZiel$("Stickplan als Text exportieren", "stickplan.txt", FALSE)
+            IF pfad = "" THEN RETURN
+            DIM f AS STRING : f = sdTextSichern$(pfad)
+            sdMelden(IIF(f = "", "Stickplan exportiert: " + BASENAME(pfad), "Fehler beim Export: " + f))
+        CASE 1
+            IF sdAktiv < 0 THEN
+                sdMelden("Bitte zuerst eine Farbe wählen.")
+                RETURN
+            END IF
+            pfad = sdZiel$("Pfad als Bild exportieren", "stickpfad_" + sdDateiname$(sdErg.pfade[sdAktiv]) + ".png", FALSE)
+            IF pfad = "" THEN RETURN
+            sdMelden(IIF(sdBildSichern(pfad), "Pfad-Bild exportiert: " + BASENAME(pfad), "Bild konnte nicht gesichert werden."))
+        CASE 2
+            pfad = sdZiel$("Ordner für Pfad-Bilder wählen", "", TRUE)
+            IF pfad = "" THEN RETURN
+            DIM fehler AS ARRAY OF STRING
+            DIM n AS INTEGER : n = sdAlleBilder(pfad, fehler)
+            IF LEN(fehler) = 0 THEN
+                sdMelden("Alle " + STR$(n) + " Pfad-Bilder exportiert nach " + pfad)
+            ELSE
+                sdMelden(STR$(n) + " von " + STR$(LEN(sdErg.pfade)) + " Bildern exportiert -- Fehler bei: " + JOIN$(fehler, ", "))
+            END IF
+    END SELECT
+END SUB
+
+' --- Aufbau ---------------------------------------------------------------------------
+
+FUNCTION sdKnopf(text AS STRING, tipp AS STRING) AS INTEGER
+    DIM k AS INTEGER : k = gtk_button_new_with_label(text)
+    IF tipp <> "" THEN gtk_widget_set_tooltip_text(k, tipp)
+    RETURN k
+END FUNCTION
+
+FUNCTION sdSymbolknopf(symbol AS STRING, tipp AS STRING) AS INTEGER
+    DIM k AS INTEGER : k = gtk_button_new_from_icon_name(symbol, GTK_ICON_KNOPF)
+    gtk_widget_set_tooltip_text(k, tipp)
+    RETURN k
+END FUNCTION
+
+FUNCTION sdKaestchen(text AS STRING, an AS BOOLEAN) AS INTEGER
+    DIM k AS INTEGER : k = gtk_check_button_new_with_label(text)
+    gtk_toggle_button_set_active(k, an)
+    signal(k, "toggled", sdOptionGeaendert, 0, 0, 0)
+    RETURN k
+END FUNCTION
+
+' Den Dialog bauen und zeigen (noch nicht laufen lassen -- die Vorfuehrung
+' bedient ihn so); 0, wenn kein Muster offen ist.
+FUNCTION sdDialogBauen() AS INTEGER
+    IF NOT lwHat THEN RETURN 0
+    sdMuster = lwMuster
+    sdErg = NIL
+    sdVergleiche = []
+    sdAktiv = -1
+    sdFlB = -1 : sdFlH = -1
+    sdZiehen = FALSE
+    sdDialog = gtk_dialog_new_with_buttons("Stickpfad-Optimierung", fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        "Schließen", GTK_ANTWORT_OK, 0)
+    gtk_window_set_default_size(sdDialog, 1100, 840)
+    DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(sdDialog)
+    gtk_container_set_border_width(innen, 12)
+
+    ' Einstellungen
+    DIM ein AS INTEGER : ein = gtk_box_new(GTK_WAAGERECHT, 8)
+    gtk_box_pack_start(ein, gtk_label_new("Strategie:"), FALSE, FALSE, 0)
+    sdStrategie = gtk_combo_box_text_new()
+    DIM s AS INTEGER
+    FOR s = kern.SP_ZEILEN TO kern.SP_DIAGONAL
+        gtk_combo_box_text_append_text(sdStrategie, kern.spName$(s))
+    NEXT
+    gtk_combo_box_set_active(sdStrategie, kern.SP_ZEILEN)
+    gtk_box_pack_start(ein, sdStrategie, FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new("     Stoffzählung:"), FALSE, FALSE, 0)
+    sdStoff = gtk_spin_button_new_with_range(6, 32, 1)
+    gtk_spin_button_set_value(sdStoff, CLAMP(INT(sdMuster.stoff + 0.5), 6, 32))
+    gtk_box_pack_start(ein, sdStoff, FALSE, FALSE, 0)
+    gtk_box_pack_start(ein, gtk_label_new("ct"), FALSE, FALSE, 0)
+    DIM kVergleich AS INTEGER : kVergleich = sdKnopf("Alle vergleichen", "Alle fünf Strategien rechnen, die beste wählen")
+    DIM kOpt AS INTEGER : kOpt = sdKnopf("Optimieren", "Den Pfad mit der gewählten Strategie neu rechnen")
+    gtk_box_pack_end(ein, kVergleich, FALSE, FALSE, 0)
+    gtk_box_pack_end(ein, kOpt, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, ein, FALSE, FALSE, 4)
+
+    ' Kopf der Vorschau
+    DIM kopfzeile AS INTEGER : kopfzeile = gtk_box_new(GTK_WAAGERECHT, 6)
+    DIM vt AS INTEGER : vt = gtk_label_new("Pfad-Vorschau")
+    gtkKlasse(vt, "abschnitt")
+    gtk_box_pack_start(kopfzeile, vt, FALSE, FALSE, 0)
+    DIM kEin AS INTEGER : kEin = sdSymbolknopf("zoom-fit-best-symbolic", "Einpassen")
+    DIM kPlus AS INTEGER : kPlus = sdSymbolknopf("zoom-in-symbolic", "Größer")
+    sdZoomText = gtk_label_new("100 %")
+    gtk_widget_set_size_request(sdZoomText, 56, -1)
+    DIM kMinus AS INTEGER : kMinus = sdSymbolknopf("zoom-out-symbolic", "Kleiner")
+    gtk_box_pack_end(kopfzeile, kEin, FALSE, FALSE, 0)
+    gtk_box_pack_end(kopfzeile, kPlus, FALSE, FALSE, 0)
+    gtk_box_pack_end(kopfzeile, sdZoomText, FALSE, FALSE, 0)
+    gtk_box_pack_end(kopfzeile, kMinus, FALSE, FALSE, 0)
+    sdKontext = sdKaestchen("Kontext", TRUE)
+    sdSpruenge = sdKaestchen("Sprünge", TRUE)
+    sdNummern = sdKaestchen("Nummern", FALSE)
+    gtk_box_pack_end(kopfzeile, sdKontext, FALSE, FALSE, 8)
+    gtk_box_pack_end(kopfzeile, sdSpruenge, FALSE, FALSE, 0)
+    gtk_box_pack_end(kopfzeile, sdNummern, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, kopfzeile, FALSE, FALSE, 0)
+
+    ' Vorschau oben, Farben unten
+    DIM teil AS INTEGER : teil = gtk_paned_new(GTK_SENKRECHT)
+    sdFlaeche = gtk_drawing_area_new()
+    gtk_widget_set_size_request(sdFlaeche, -1, 300)
+    gtk_widget_add_events(sdFlaeche, GDK_MASKE_BEWEGUNG BOR GDK_MASKE_DRUCK BOR GDK_MASKE_LOSLASSEN BOR GDK_MASKE_RAD BOR GDK_MASKE_RAD_FEIN)
+    gtk_paned_pack1(teil, sdFlaeche, TRUE, FALSE)
+    DIM unten AS INTEGER : unten = gtk_box_new(GTK_SENKRECHT, 4)
+    DIM ft AS INTEGER : ft = gtk_label_new("Farben und Pfade")
+    gtk_label_set_xalign(ft, 0.0)
+    gtkKlasse(ft, "abschnitt")
+    gtk_box_pack_start(unten, ft, FALSE, FALSE, 0)
+    gtk_box_pack_start(unten, sdTabellenzeile(["<b>Farbe</b>", "<b>Stiche</b>", "<b>Distanz</b>", "<b>Sprünge</b>", "<b>Garn (cm)</b>"], [0, 70, 80, 70, 90]), FALSE, FALSE, 0)
+    DIM rolle AS INTEGER : rolle = gtk_scrolled_window_new(0, 0)
+    gtk_scrolled_window_set_policy(rolle, GTK_POLITIK_NIE, GTK_POLITIK_AUTO)
+    sdListe = gtk_list_box_new()
+    gtk_list_box_set_selection_mode(sdListe, GTK_AUSWAHL_EINE)
+    gtkKlasse(sdListe, "liste")
+    gtk_container_add(rolle, sdListe)
+    gtk_box_pack_start(unten, rolle, TRUE, TRUE, 0)
+    gtk_paned_pack2(teil, unten, FALSE, FALSE)
+    gtk_paned_set_position(teil, 480)
+    gtk_box_pack_start(innen, teil, TRUE, TRUE, 0)
+    sdZeilen = []
+
+    ' Zusammenfassung
+    DIM summe AS INTEGER : summe = gtk_box_new(GTK_WAAGERECHT, 6)
+    sdSumme = []
+    DIM t AS STRING
+    FOR EACH t IN ["Stiche:", "Farben:", "Rückseiten-Distanz:", "Sprünge:", "Geschätzter Garnverbrauch:"]
+        gtk_box_pack_start(summe, gtk_label_new(t), FALSE, FALSE, 0)
+        DIM wert AS INTEGER : wert = gtk_label_new("-")
+        gtkKlasse(wert, "wert")
+        gtk_box_pack_start(summe, wert, FALSE, FALSE, 0)
+        gtk_box_pack_start(summe, gtk_label_new("   "), FALSE, FALSE, 0)
+        ARRAY_PUSH(sdSumme, wert)
+    NEXT
+    gtk_box_pack_start(innen, summe, FALSE, FALSE, 0)
+
+    ' Vergleich, versteckt bis zum ersten Vergleich
+    sdVergleich = gtk_box_new(GTK_SENKRECHT, 4)
+    DIM vk AS INTEGER : vk = gtk_label_new("Strategievergleich")
+    gtk_label_set_xalign(vk, 0.0)
+    gtkKlasse(vk, "abschnitt")
+    gtk_box_pack_start(sdVergleich, vk, FALSE, FALSE, 0)
+    gtk_box_pack_start(sdVergleich, sdTabellenzeile(["<b>Strategie</b>", "<b>Distanz</b>", "<b>Sprünge</b>", "<b>Garn (cm)</b>", "<b>Bewertung</b>"], [0, 80, 70, 90, 110]), FALSE, FALSE, 0)
+    sdVergleichListe = gtk_list_box_new()
+    gtk_box_pack_start(sdVergleich, sdVergleichListe, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, sdVergleich, FALSE, FALSE, 0)
+
+    ' Export und Meldung
+    DIM fuss AS INTEGER : fuss = gtk_box_new(GTK_WAAGERECHT, 6)
+    sdMeldung = gtk_label_new("")
+    gtk_label_set_xalign(sdMeldung, 0.0)
+    gtk_label_set_ellipsize(sdMeldung, GTK_ELLIPSE_ENDE)
+    gtk_widget_set_hexpand(sdMeldung, TRUE)
+    gtkKlasse(sdMeldung, "nebensache")
+    gtk_box_pack_start(fuss, sdMeldung, TRUE, TRUE, 0)
+    DIM kText AS INTEGER : kText = sdKnopf("Als Text …", "Den Stickplan als Textdatei: je Farbe jeder Stich mit Lage, Abstand und Sprung")
+    DIM kBild AS INTEGER : kBild = sdKnopf("Pfad als Bild …", "Den Pfad der gewählten Farbe als PNG")
+    DIM kAlle AS INTEGER : kAlle = sdKnopf("Alle als Bilder …", "Jede Farbe als eigenes PNG in einen Ordner")
+    gtk_box_pack_start(fuss, kText, FALSE, FALSE, 0)
+    gtk_box_pack_start(fuss, kBild, FALSE, FALSE, 0)
+    gtk_box_pack_start(fuss, kAlle, FALSE, FALSE, 0)
+    gtk_box_pack_start(innen, fuss, FALSE, FALSE, 0)
+
+    signalZeichnen(sdFlaeche, "draw", sdZeichnen, 0, 0, 0)
+    signalEreignis(sdFlaeche, "button-press-event", sdDruck, 0, 0, 0)
+    signalEreignis(sdFlaeche, "button-release-event", sdLos, 0, 0, 0)
+    signalEreignis(sdFlaeche, "motion-notify-event", sdBewegung, 0, 0, 0)
+    signalEreignis(sdFlaeche, "scroll-event", sdRad, 0, 0, 0)
+    signal(sdStrategie, "changed", sdGeaendert, 0, 0, 0)
+    signal(sdStoff, "value-changed", sdGeaendert, 0, 0, 0)
+    signal(kOpt, "clicked", sdGeaendert, 0, 0, 0)
+    signal(kVergleich, "clicked", sdAlleVergleichen, 0, 0, 0)
+    signal(kEin, "clicked", sdZoomKnopf, 0, 0, 0)
+    signal(kPlus, "clicked", sdZoomKnopf, 1, 0, 0)
+    signal(kMinus, "clicked", sdZoomKnopf, 2, 0, 0)
+    signal(kText, "clicked", sdExport, 0, 0, 0)
+    signal(kBild, "clicked", sdExport, 1, 0, 0)
+    signal(kAlle, "clicked", sdExport, 2, 0, 0)
+    signalZeile(sdListe, "row-selected", sdZeileGewaehlt, 0, 0, 0)
+    gtk_widget_show_all(sdDialog)
+    gtk_widget_set_visible(sdVergleich, FALSE)
+    sdRechnen()
+    RETURN sdDialog
+END FUNCTION
+
+SUB stickpfadDialog()
+    IF sdDialogBauen() = 0 THEN RETURN
+    DIM a AS INTEGER : a = gtk_dialog_run(sdDialog)
+    gtk_widget_destroy(sdDialog)
+    sdDialog = 0
+END SUB

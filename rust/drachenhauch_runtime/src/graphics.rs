@@ -5111,8 +5111,30 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                         }
                     }
                 }
+                Op::Linie { x1, y1, x2, y2, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    vorschau_strichzug(&mut img, &[(*x1 * f, *y1 * f), (*x2 * f, *y2 * f)], (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
                 Op::Linie { x1, y1, x2, y2, farbe: c, deck, .. } => {
                     img.draw_line(px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c, *deck));
+                }
+                // gestrichelte Umrisse: als Zug, die Strichfolge laeuft ueber
+                // die Ecken weiter
+                Op::Rechteck { x, y, b, h, fuellen: false, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    let z = [(*x, *y), (*x + *b, *y), (*x + *b, *y + *h), (*x, *y + *h), (*x, *y)];
+                    let z: Vec<(f64, f64)> = z.iter().map(|q| (q.0 * f, q.1 * f)).collect();
+                    vorschau_strichzug(&mut img, &z, (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Kreis { x, y, r, fuellen: false, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    let z: Vec<(f64, f64)> = (0..=72).map(|k| {
+                        let w = k as f64 / 72.0 * std::f64::consts::TAU;
+                        ((*x + *r * w.cos()) * f, (*y + *r * w.sin()) * f)
+                    }).collect();
+                    vorschau_strichzug(&mut img, &z, (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
+                }
+                Op::Vieleck { punkte, fuellen: false, farbe: c, deck, strichel, .. } if strichel.0 > 0.0 => {
+                    let mut z: Vec<(f64, f64)> = punkte.iter().map(|q| (q.0 * f, q.1 * f)).collect();
+                    z.push(z[0]);
+                    vorschau_strichzug(&mut img, &z, (strichel.0 * f, strichel.1 * f), farbe(*c, *deck));
                 }
                 Op::Rechteck { x, y, b, h, fuellen, farbe: c, deck, .. } => {
                     if *fuellen {
@@ -9018,3 +9040,30 @@ pub fn zeiger_form(name: &str) -> Option<&'static str> {
         _ => return None,
     })
 }
+
+/// Ein gestrichelter Zug fuer die PDF-Vorschau: Punkte, Strich und Luecke in
+/// Bildpunkten; die Folge laeuft ueber die Ecken weiter wie im PDF.
+#[cfg(feature = "pdf")]
+fn vorschau_strichzug(img: &mut Image, punkte: &[(f64, f64)], strichel: (f64, f64), farbe: Color) {
+    let (an, aus) = (strichel.0.max(1.0), strichel.1.max(1.0));
+    let mut stand = 0.0_f64;              // Lage in der Folge an + aus
+    for w in punkte.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let laenge = ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
+        if laenge <= 0.0 { continue; }
+        let mut s = 0.0;
+        while s < laenge {
+            let in_folge = stand % (an + aus);
+            let (strich, rest) = if in_folge < an { (true, an - in_folge) } else { (false, an + aus - in_folge) };
+            let e = (s + rest).min(laenge);
+            if strich {
+                let p = |t: f64| (a.0 + (b.0 - a.0) * t / laenge, a.1 + (b.1 - a.1) * t / laenge);
+                let (p1, p2) = (p(s), p(e));
+                img.draw_line(p1.0.round() as i32, p1.1.round() as i32, p2.0.round() as i32, p2.1.round() as i32, farbe);
+            }
+            stand += e - s;
+            s = e;
+        }
+    }
+}
+
