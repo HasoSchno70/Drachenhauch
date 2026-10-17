@@ -5222,6 +5222,20 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "pdf_get_opacity" => { let i = bi_int(a, 0, "PDF_GET_OPACITY")?; Value::Float(self.pdf_d(i)?.deckkraft()) }
+            // PDF_DASH(p, strich_mm [, luecke_mm]) -- gestrichelt fuer alle
+            // folgenden Linien und Umrisse; ohne Luecke so lang wie der
+            // Strich, PDF_DASH(p, 0) zieht wieder durch (Glutfaden Stufe 7:
+            // die Spruenge im Stickpfad).
+            "pdf_dash" => {
+                if a.len() != 2 && a.len() != 3 {
+                    return Err(format!("PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}", a.len()));
+                }
+                let i = bi_int(a, 0, "PDF_DASH")?;
+                let an = bi_num(a, 1, "PDF_DASH")?;
+                let aus = if a.len() > 2 { bi_num(a, 2, "PDF_DASH")? } else { an };
+                self.pdf_d(i)?.setze_strichel(an, aus).map_err(|e| format!("PDF_DASH: {}", e))?;
+                Value::Nil
+            }
             "pdf_circle" | "pdf_circle_fill" => {
                 let fn_ = if name == "pdf_circle" { "PDF_CIRCLE" } else { "PDF_CIRCLE_FILL" };
                 let i = bi_int(a, 0, fn_)?;

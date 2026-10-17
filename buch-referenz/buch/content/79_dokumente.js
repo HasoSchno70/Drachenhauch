@@ -89,6 +89,13 @@ module.exports = (H) => [
     [
       "PDF_POLYGON_FILL(p, [20.0, 40, 30], [180.0, 180, 195])   ' ein Dreieck",
     ]),
+  H.cmd("PDF_DASH", "PDF_DASH(p, strich_mm [, luecke_mm])",
+    "Strichelt alle folgenden Linien und Umrisse von Rechteck, Kreis und Vieleck: strich_mm Strich, luecke_mm Lücke; ohne Lücke ist sie so lang wie der Strich. PDF_DASH(p, 0) zieht wieder durch. Die Folge läuft über die Ecken eines Umrisses weiter. Auch der Druck unter Windows und PDF_PREVIEW stricheln.",
+    [
+      "PDF_DASH(p, 2, 1)",
+      "PDF_LINE(p, 20, 100, 190, 100)   ' gestrichelt",
+      "PDF_DASH(p, 0)",
+    ]),
   H.cmd("PDF_OPACITY · PDF_GET_OPACITY", "PDF_OPACITY(p, deckkraft)   PDF_GET_OPACITY(p) AS FLOAT",
     "Die Deckkraft von 0 (unsichtbar) bis 1 (deckend) für alles, was danach gezeichnet wird – auch über einen Seitenwechsel hinweg. Im PDF ist das echte Durchsicht; beim Drucken unter Windows und in PDF_PREVIEW wird die Farbe gegen das weiße Papier gemischt.",
     [

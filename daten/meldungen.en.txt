@@ -1750,6 +1750,8 @@ RENDERTARGET_IMAGE: das Ziel ist noch offen -- erst RENDERTARGET_END	RENDERTARGE
 PDF_IMAGE: erwartet 5 oder 6 Argumente (pdf, bild, x, y, b [, h]), nicht {}	PDF_IMAGE: expects 5 or 6 arguments (pdf, image, x, y, w [, h]), not {}
 PDF_IMAGE: kein Bild geladen -- ein Bild kommt aus LOADIMAGE, IMAGE_NEW oder RENDERTARGET_IMAGE	PDF_IMAGE: no image loaded -- an image comes from LOADIMAGE, IMAGE_NEW or RENDERTARGET_IMAGE
 PDF_IMAGE: dieser Bau hat keine Grafik	PDF_IMAGE: this build has no graphics
+PDF_DASH: erwartet 2 oder 3 Argumente (pdf, strich_mm [, luecke_mm]), nicht {}	PDF_DASH: expects 2 or 3 arguments (pdf, dash_mm [, gap_mm]), not {}
+Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht {} und {}	dash and gap must both be greater than 0 (or both 0 for solid), not {} and {}
 die Breite muss groesser als 0 sein, nicht {}	the width must be greater than 0, not {}
 das Bild ist leer	the image is empty
 {}: das Bild ist leer	{}: the image is empty

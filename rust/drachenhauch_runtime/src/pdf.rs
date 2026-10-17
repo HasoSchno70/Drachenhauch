@@ -44,13 +44,15 @@ pub enum Op {
     /// `winkel` in Grad gegen den Uhrzeigersinn, gedreht um (x, y) -- die
     /// linke obere Ecke des Textes, wie ohne Winkel.
     Text { x: f64, y: f64, text: String, schrift: usize, groesse_pt: f64, farbe: (f64, f64, f64), winkel: f64, deck: f64 },
-    Linie { x1: f64, y1: f64, x2: f64, y2: f64, breite_mm: f64, farbe: (f64, f64, f64), deck: f64 },
-    Rechteck { x: f64, y: f64, b: f64, h: f64, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64 },
+    /// `strichel` (an, aus) in mm, (0, 0) = durchgezogen (PDF_DASH) -- auch
+    /// bei den Umrissen von Rechteck, Kreis und Vieleck.
+    Linie { x1: f64, y1: f64, x2: f64, y2: f64, breite_mm: f64, farbe: (f64, f64, f64), deck: f64, strichel: (f64, f64) },
+    Rechteck { x: f64, y: f64, b: f64, h: f64, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64, strichel: (f64, f64) },
     /// PDF_CIRCLE / PDF_CIRCLE_FILL: Mittelpunkt und Radius in mm.
-    Kreis { x: f64, y: f64, r: f64, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64 },
+    Kreis { x: f64, y: f64, r: f64, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64, strichel: (f64, f64) },
     /// PDF_POLYGON / PDF_POLYGON_FILL: geschlossener Zug, mindestens drei
     /// Punkte; gefuellt nach der Nicht-Null-Regel (wie PostScript `fill`).
-    Vieleck { punkte: Vec<(f64, f64)>, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64 },
+    Vieleck { punkte: Vec<(f64, f64)>, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64), deck: f64, strichel: (f64, f64) },
     /// PDF_IMAGE: ein Bild, RGBA Zeile fuer Zeile, `pw` x `ph` Punkte, in das
     /// Rechteck x/y/b/h (mm) gestreckt.
     Bild { x: f64, y: f64, b: f64, h: f64, rgba: Arc<Vec<u8>>, pw: u32, ph: u32, deck: f64 },
@@ -81,6 +83,8 @@ pub struct Dokument {
     strich_mm: f64,
     /// PDF_OPACITY: gilt fuer alles, was danach gezeichnet wird.
     deck: f64,
+    /// PDF_DASH: (an, aus) in mm, (0, 0) = durchgezogen.
+    strichel: (f64, f64),
     pub titel: String,
     /// Mit PDF_FONT_LOAD geladene Schriften: (Name, Dateiinhalt). Ihre
     /// Nummern beginnen hinter den eingebauten.
@@ -142,7 +146,7 @@ impl Dokument {
     pub fn neu(breite_mm: f64, hoehe_mm: f64) -> Dokument {
         let mut d = Dokument {
             seiten: Vec::new(), breite_mm, hoehe_mm,
-            schrift: 0, groesse_pt: 11.0, farbe: (0.0, 0.0, 0.0), strich_mm: 0.2, deck: 1.0,
+            schrift: 0, groesse_pt: 11.0, farbe: (0.0, 0.0, 0.0), strich_mm: 0.2, deck: 1.0, strichel: (0.0, 0.0),
             titel: String::new(), geladen: Vec::new(),
         };
         d.neue_seite();
@@ -251,6 +255,21 @@ impl Dokument {
 
     pub fn deckkraft(&self) -> f64 { self.deck }
 
+    /// Strichelung fuer Linien und Umrisse: `an` mm Strich, `aus` mm Luecke;
+    /// beide 0 = durchgezogen. Nur einer 0 oder etwas Negatives ist ein
+    /// Fehler -- eine Luecke ohne Strich zeichnete nichts, ohne dass man es
+    /// merkt.
+    pub fn setze_strichel(&mut self, an: f64, aus: f64) -> Result<(), String> {
+        if an == 0.0 && aus == 0.0 { self.strichel = (0.0, 0.0); return Ok(()); }
+        if !(an > 0.0) || !(aus > 0.0) {
+            return Err(format!("Strich und Luecke muessen beide groesser als 0 sein (oder beide 0 fuer durchgezogen), nicht {} und {}", an, aus));
+        }
+        self.strichel = (an, aus);
+        Ok(())
+    }
+
+    pub fn strichelung(&self) -> (f64, f64) { self.strichel }
+
     pub fn text(&mut self, x: f64, y: f64, text: &str, winkel: f64) -> Result<(), String> {
         let (schrift, groesse_pt, farbe, deck) = (self.schrift, self.groesse_pt, self.farbe, self.deck);
         zeichen_pruefen(self.schrift_daten(schrift), &self.schrift_name(schrift), text)?;
@@ -266,22 +285,22 @@ impl Dokument {
     }
 
     pub fn linie(&mut self, x1: f64, y1: f64, x2: f64, y2: f64) {
-        let (farbe, breite_mm, deck) = (self.farbe, self.strich_mm, self.deck);
-        self.hier().ops.push(Op::Linie { x1, y1, x2, y2, breite_mm, farbe, deck });
+        let (farbe, breite_mm, deck, strichel) = (self.farbe, self.strich_mm, self.deck, self.strichel);
+        self.hier().ops.push(Op::Linie { x1, y1, x2, y2, breite_mm, farbe, deck, strichel });
     }
 
     /// Rechteck von (x,y) mit Breite/Hoehe -- `fuellen` entscheidet zwischen
     /// Flaeche und Umriss.
     pub fn rechteck(&mut self, x: f64, y: f64, b: f64, h: f64, fuellen: bool) {
-        let (farbe, breite_mm, deck) = (self.farbe, self.strich_mm, self.deck);
-        self.hier().ops.push(Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe, deck });
+        let (farbe, breite_mm, deck, strichel) = (self.farbe, self.strich_mm, self.deck, self.strichel);
+        self.hier().ops.push(Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe, deck, strichel });
     }
 
     /// Kreis um (x, y) mit Radius r (mm); ein Radius <= 0 ist ein Fehler.
     pub fn kreis(&mut self, x: f64, y: f64, r: f64, fuellen: bool) -> Result<(), String> {
         if !(r > 0.0) { return Err(format!("der Radius muss groesser als 0 sein, nicht {}", r)); }
-        let (farbe, breite_mm, deck) = (self.farbe, self.strich_mm, self.deck);
-        self.hier().ops.push(Op::Kreis { x, y, r, fuellen, breite_mm, farbe, deck });
+        let (farbe, breite_mm, deck, strichel) = (self.farbe, self.strich_mm, self.deck, self.strichel);
+        self.hier().ops.push(Op::Kreis { x, y, r, fuellen, breite_mm, farbe, deck, strichel });
         Ok(())
     }
 
@@ -290,8 +309,8 @@ impl Dokument {
         if punkte.len() < 3 {
             return Err(format!("ein Vieleck braucht mindestens drei Punkte, nicht {}", punkte.len()));
         }
-        let (farbe, breite_mm, deck) = (self.farbe, self.strich_mm, self.deck);
-        self.hier().ops.push(Op::Vieleck { punkte, fuellen, breite_mm, farbe, deck });
+        let (farbe, breite_mm, deck, strichel) = (self.farbe, self.strich_mm, self.deck, self.strichel);
+        self.hier().ops.push(Op::Vieleck { punkte, fuellen, breite_mm, farbe, deck, strichel });
         Ok(())
     }
 
@@ -326,17 +345,21 @@ impl Dokument {
             rgb::Color::new(k(f.0), k(f.1), k(f.2))
         }
         let fuellung = |f| Fill { paint: farbe(f).into(), ..Default::default() };
-        let strich = |f, mm: f64| Stroke { paint: farbe(f).into(), width: (mm * MM) as f32, ..Default::default() };
+        let strich = |f, mm: f64, s: (f64, f64)| Stroke {
+            paint: farbe(f).into(), width: (mm * MM) as f32,
+            dash: if s.0 > 0.0 { Some(krilla::paint::StrokeDash { array: vec![(s.0 * MM) as f32, (s.1 * MM) as f32], offset: 0.0 }) } else { None },
+            ..Default::default()
+        };
         let p = |v: f64| (v * MM) as f32;
         // Flaeche oder Umriss -- dieselbe Entscheidung fuer Rechteck, Kreis und
         // Vieleck.
-        let malen = |fl: &mut krilla::surface::Surface<'_>, pfad: &krilla::geom::Path, fuellen: bool, f: (f64, f64, f64), mm: f64| {
+        let malen = |fl: &mut krilla::surface::Surface<'_>, pfad: &krilla::geom::Path, fuellen: bool, f: (f64, f64, f64), mm: f64, s: (f64, f64)| {
             if fuellen {
                 fl.set_stroke(None);
                 fl.set_fill(Some(fuellung(f)));
             } else {
                 fl.set_fill(None);
-                fl.set_stroke(Some(strich(f, mm)));
+                fl.set_stroke(Some(strich(f, mm, s)));
             }
             fl.draw_path(pfad);
         };
@@ -387,17 +410,17 @@ impl Dokument {
                                           font, *groesse_pt as f32, text, false, TextDirection::Auto);
                         if gedreht { flaeche.pop(); }
                     }
-                    Op::Linie { x1, y1, x2, y2, breite_mm, farbe: f, .. } => {
+                    Op::Linie { x1, y1, x2, y2, breite_mm, farbe: f, strichel, .. } => {
                         let mut pb = PathBuilder::new();
                         pb.move_to(p(*x1), p(*y1));
                         pb.line_to(p(*x2), p(*y2));
                         if let Some(pfad) = pb.finish() {
                             flaeche.set_fill(None);
-                            flaeche.set_stroke(Some(strich(*f, *breite_mm)));
+                            flaeche.set_stroke(Some(strich(*f, *breite_mm, *strichel)));
                             flaeche.draw_path(&pfad);
                         }
                     }
-                    Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe: f, .. } => {
+                    Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe: f, strichel, .. } => {
                         let mut pb = PathBuilder::new();
                         pb.move_to(p(*x), p(*y));
                         pb.line_to(p(*x + *b), p(*y));
@@ -405,10 +428,10 @@ impl Dokument {
                         pb.line_to(p(*x), p(*y + *h));
                         pb.close();
                         if let Some(pfad) = pb.finish() {
-                            malen(&mut flaeche, &pfad, *fuellen, *f, *breite_mm);
+                            malen(&mut flaeche, &pfad, *fuellen, *f, *breite_mm, *strichel);
                         }
                     }
-                    Op::Kreis { x, y, r, fuellen, breite_mm, farbe: f, .. } => {
+                    Op::Kreis { x, y, r, fuellen, breite_mm, farbe: f, strichel, .. } => {
                         // vier Bezier-Viertel; k = 4/3 * (sqrt(2) - 1) haelt den
                         // Radius in der Mitte jedes Viertels auf 0,03 % genau
                         let (cx, cy, rr) = (p(*x), p(*y), p(*r));
@@ -421,16 +444,16 @@ impl Dokument {
                         pb.cubic_to(cx + k, cy - rr, cx + rr, cy - k, cx + rr, cy);
                         pb.close();
                         if let Some(pfad) = pb.finish() {
-                            malen(&mut flaeche, &pfad, *fuellen, *f, *breite_mm);
+                            malen(&mut flaeche, &pfad, *fuellen, *f, *breite_mm, *strichel);
                         }
                     }
-                    Op::Vieleck { punkte, fuellen, breite_mm, farbe: f, .. } => {
+                    Op::Vieleck { punkte, fuellen, breite_mm, farbe: f, strichel, .. } => {
                         let mut pb = PathBuilder::new();
                         pb.move_to(p(punkte[0].0), p(punkte[0].1));
                         for q in &punkte[1..] { pb.line_to(p(q.0), p(q.1)); }
                         pb.close();
                         if let Some(pfad) = pb.finish() {
-                            malen(&mut flaeche, &pfad, *fuellen, *f, *breite_mm);
+                            malen(&mut flaeche, &pfad, *fuellen, *f, *breite_mm, *strichel);
                         }
                     }
                     Op::Bild { x, y, b, h, rgba, pw, ph, .. } => {

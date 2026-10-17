@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/en und dem englischen Buch von `dhrt doku prosa` -- NICHT von Hand aendern. Der Hover nimmt sie mit DHRT_LANG=en.",
- "count": 2094,
+ "count": 2095,
  "docs": {
   "ABS": "Absolute value.",
   "ACOS": "Arc sine/cosine (x in [-1, 1])",
@@ -1412,6 +1412,7 @@
   "PDF_CIRCLE_FILL": "circle around (x, y), outline / fill",
   "PDF_CLOSE": "free the memory",
   "PDF_COLOR": "RGB(…) — applies to text, strokes and fills",
+  "PDF_DASH": "dashed for all following lines and outlines; without a gap as long as the dash, PDF_DASH(p, 0) solid again",
   "PDF_FONT": "font and size",
   "PDF_FONT_LOAD": "load your own TrueType/OpenType font, afterwards available to PDF_FONT as name$",
   "PDF_GET_OPACITY": "opacity 0..1 for everything that follows (watermarks)",

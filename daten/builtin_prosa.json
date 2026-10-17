@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 2099,
+ "count": 2100,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1413,6 +1413,7 @@
   "PDF_CIRCLE_FILL": "Kreis um (x, y), Umriss / Fläche",
   "PDF_CLOSE": "Speicher freigeben",
   "PDF_COLOR": "RGB(…) — gilt für Text, Striche und Flächen",
+  "PDF_DASH": "gestrichelt für alle folgenden Linien und Umrisse; ohne Lücke so lang wie der Strich, PDF_DASH(p, 0) wieder durchgezogen",
   "PDF_FONT": "Schrift und Größe",
   "PDF_FONT_LOAD": "eine eigene TrueType-/OpenType-Schrift laden, danach unter name$ für PDF_FONT da",
   "PDF_GET_OPACITY": "Deckkraft 0..1 für alles Folgende (Wasserzeichen)",

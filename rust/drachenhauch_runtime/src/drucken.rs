@@ -142,9 +142,19 @@ mod plattform {
     }
 
     #[cfg(feature = "pdf")]
+    /// Ein Stift: durchgezogen oder (PDF_DASH) gestrichelt -- dann ein
+    /// geometrischer Stift mit eigener Strichfolge in Geraetepunkten.
+    unsafe fn stift_neu(dick: i32, c: COLORREF, strichel: (u32, u32)) -> HPEN {
+        if strichel.0 == 0 { return CreatePen(PS_SOLID, dick, c); }
+        let pinsel = LOGBRUSH { lbStyle: BS_SOLID, lbColor: c, lbHatch: 0 };
+        let folge = [strichel.0, strichel.1];
+        ExtCreatePen(PEN_STYLE(PS_GEOMETRIC.0 | PS_USERSTYLE.0 | PS_ENDCAP_FLAT.0), dick as u32, &pinsel, Some(&folge))
+    }
+
+    #[cfg(feature = "pdf")]
     /// Eine Form als Flaeche (Pinsel, kein Stift) oder als Umriss (Stift,
     /// leerer Pinsel) -- Kreis und Vieleck teilen sich das.
-    unsafe fn form_zeichnen(hdc: HDC, fuellen: bool, dick: i32, c: COLORREF, leer: HGDIOBJ, f: impl FnOnce(HDC)) {
+    unsafe fn form_zeichnen(hdc: HDC, fuellen: bool, dick: i32, c: COLORREF, leer: HGDIOBJ, strichel: (u32, u32), f: impl FnOnce(HDC)) {
         if fuellen {
             let pinsel = CreateSolidBrush(c);
             let stift = GetStockObject(NULL_PEN);
@@ -155,7 +165,7 @@ mod plattform {
             SelectObject(hdc, alt_b);
             let _ = DeleteObject(pinsel.into());
         } else {
-            let stift = CreatePen(PS_SOLID, dick, c);
+            let stift = stift_neu(dick, c, strichel);
             let alt_s = SelectObject(hdc, stift.into());
             let alt_b = SelectObject(hdc, leer);
             f(hdc);
@@ -190,6 +200,10 @@ mod plattform {
         let off_y = GetDeviceCaps(Some(hdc), PHYSICALOFFSETY) as f64;
         let px = |mm: f64| (mm / 25.4 * dpi_x - off_x).round() as i32;
         let py = |mm: f64| (mm / 25.4 * dpi_y - off_y).round() as i32;
+        // Strichelung in Geraetepunkten, mindestens einer
+        let stp = |s: (f64, f64)| if s.0 > 0.0 {
+            (((s.0 / 25.4 * dpi_x).round() as u32).max(1), ((s.1 / 25.4 * dpi_x).round() as u32).max(1))
+        } else { (0, 0) };
         let titel = wide(if doc.titel.is_empty() { "Drachenhauch" } else { &doc.titel });
         let ziel = wide(zieldatei);
         let info = DOCINFOW {
@@ -231,17 +245,17 @@ mod plattform {
                             SelectObject(hdc, alt);
                             let _ = DeleteObject(font.into());
                         }
-                        Op::Linie { x1, y1, x2, y2, breite_mm, farbe: f, deck } => {
+                        Op::Linie { x1, y1, x2, y2, breite_mm, farbe: f, deck, strichel } => {
                             let f = &crate::pdf::gegen_weiss(*f, *deck);
                             let dick = ((breite_mm / 25.4 * dpi_x).round() as i32).max(1);
-                            let stift = CreatePen(PS_SOLID, dick, farbe(*f));
+                            let stift = stift_neu(dick, farbe(*f), stp(*strichel));
                             let alt = SelectObject(hdc, stift.into());
                             let _ = MoveToEx(hdc, px(*x1), py(*y1), None);
                             let _ = LineTo(hdc, px(*x2), py(*y2));
                             SelectObject(hdc, alt);
                             let _ = DeleteObject(stift.into());
                         }
-                        Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe: f, deck } => {
+                        Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe: f, deck, strichel } => {
                             let f = &crate::pdf::gegen_weiss(*f, *deck);
                             let r = RECT { left: px(*x), top: py(*y), right: px(*x + *b), bottom: py(*y + *h) };
                             if *fuellen {
@@ -250,7 +264,7 @@ mod plattform {
                                 let _ = DeleteObject(pinsel.into());
                             } else {
                                 let dick = ((breite_mm / 25.4 * dpi_x).round() as i32).max(1);
-                                let stift = CreatePen(PS_SOLID, dick, farbe(*f));
+                                let stift = stift_neu(dick, farbe(*f), stp(*strichel));
                                 let alt_s = SelectObject(hdc, stift.into());
                                 let alt_b = SelectObject(hdc, leer);
                                 let _ = Rectangle(hdc, r.left, r.top, r.right, r.bottom);
@@ -259,16 +273,16 @@ mod plattform {
                                 let _ = DeleteObject(stift.into());
                             }
                         }
-                        Op::Kreis { x, y, r, fuellen, breite_mm, farbe: f, deck } => {
+                        Op::Kreis { x, y, r, fuellen, breite_mm, farbe: f, deck, strichel } => {
                             let f = crate::pdf::gegen_weiss(*f, *deck);
                             let (l, t, rr, bb) = (px(*x - *r), py(*y - *r), px(*x + *r), py(*y + *r));
-                            form_zeichnen(hdc, *fuellen, ((breite_mm / 25.4 * dpi_x).round() as i32).max(1), farbe(f), leer,
+                            form_zeichnen(hdc, *fuellen, ((breite_mm / 25.4 * dpi_x).round() as i32).max(1), farbe(f), leer, stp(*strichel),
                                           |hdc| { let _ = Ellipse(hdc, l, t, rr, bb); });
                         }
-                        Op::Vieleck { punkte, fuellen, breite_mm, farbe: f, deck } => {
+                        Op::Vieleck { punkte, fuellen, breite_mm, farbe: f, deck, strichel } => {
                             let f = crate::pdf::gegen_weiss(*f, *deck);
                             let pkt: Vec<POINT> = punkte.iter().map(|q| POINT { x: px(q.0), y: py(q.1) }).collect();
-                            form_zeichnen(hdc, *fuellen, ((breite_mm / 25.4 * dpi_x).round() as i32).max(1), farbe(f), leer,
+                            form_zeichnen(hdc, *fuellen, ((breite_mm / 25.4 * dpi_x).round() as i32).max(1), farbe(f), leer, stp(*strichel),
                                           |hdc| { let _ = Polygon(hdc, &pkt); });
                         }
                         Op::Bild { x, y, b, h, rgba, pw, ph, deck } => {
