@@ -1,0 +1,731 @@
+' Einstellungen (PySticky ui/dialogs/settings_dialog.py, settings_tabs/,
+' grid_options_dialog.py und ui/shortcuts_registry.py).
+'
+' Eine Datei einstellungen.json im Einstellungsordner, die Schluessel heissen
+' wie PyStickys QSettings. Hier steht NUR, was in Glutfaden auch wirkt --
+' PySticky hatte lange ganze Reiter, die nur in QSettings schrieben und nie
+' gelesen wurden (seine Kommentare erzaehlen es). Nicht uebernommen: Sprache,
+' Datei-Protokoll, Stoff-Textur, magnetisches Raster, laufende Ameisen,
+' Tablet/Touch, Farbleiste, Querverweis-Paletten, Bibliotheks-/Vorlagenpfad.
+'
+' Tastenkuerzel: eine Tafel aus Kennung, Name und Vorgabe; eigene Kuerzel
+' liegen unter "shortcuts" und gelten nur, wenn sie mit keinem anderen
+' zusammenstossen (wie apply_saved_overrides). Ein Kuerzel ist Text wie
+' "Strg+Umschalt+S", mehrere durch Komma getrennt.
+IMPORT "json"
+
+' --- Die Einstellungen ------------------------------------------------------------
+
+CLASS Einstellungen
+    DIM pfad AS STRING
+    ' Allgemein
+    DIM autosichern AS BOOLEAN           ' autosave_enabled
+    DIM autosichernMinuten AS INTEGER    ' autosave_interval 1..60
+    DIM sicherungskopie AS BOOLEAN       ' autosave_backup: .bak vor dem Ueberschreiben
+    DIM schnappschussMinuten AS INTEGER  ' snapshot_interval_minutes 5..240
+    DIM startAktion AS INTEGER           ' start_action, siehe startAktionen()
+    DIM zuletztAnzahl AS INTEGER         ' max_recent_files 0..20
+    DIM fensterMerken AS BOOLEAN         ' restore_window
+    DIM beendenFragen AS BOOLEAN         ' confirm_exit
+    DIM ueberschreibenFragen AS BOOLEAN  ' confirm_overwrite
+    DIM meldungSekunden AS INTEGER       ' status_timeout 1..30
+    DIM autor AS STRING                  ' default_author
+    DIM copyright AS STRING              ' default_copyright
+    ' Zeichenflaeche
+    DIM raster AS BOOLEAN                ' show_grid
+    DIM rasterHaupt AS INTEGER           ' major_grid_interval 5..50
+    DIM rasterNeben AS INTEGER           ' minor_grid_interval 1..20, kleiner als das Haupt-Raster
+    DIM nebenraster AS BOOLEAN           ' show_minor_grid
+    DIM rasterFarbe AS INTEGER           ' grid_color_normal
+    DIM nebenFarbe AS INTEGER            ' grid_color_minor
+    DIM hauptFarbe AS INTEGER            ' grid_color_major
+    DIM zelleStandard AS INTEGER         ' default_cell_size (= 100 %)
+    DIM zelleMin AS INTEGER              ' min_cell_size 1..20
+    DIM zelleMax AS INTEGER              ' max_cell_size 30..100
+    DIM zoomTempo AS INTEGER             ' zoom_speed 10..50 = Faktor 1,0..5,0 je Schritt
+    DIM hintergrund AS INTEGER           ' canvas_bg
+    DIM stoff AS INTEGER                 ' empty_cell_color
+    ' Werkzeuge
+    DIM startWerkzeug AS INTEGER         ' default_tool (Nummer wie WZ_*)
+    DIM werkzeugMerken AS BOOLEAN        ' remember_tool
+    DIM letztesWerkzeug AS INTEGER       ' last_tool
+    DIM pipetteDanach AS INTEGER         ' pipette_behavior: 0 Stift, 1 bleiben, 2 Auswahl
+    DIM pipetteInfo AS BOOLEAN           ' pipette_show_info
+    DIM fuellenDiagonal AS BOOLEAN       ' fill_diagonal
+    DIM fuellToleranz AS INTEGER         ' fill_tolerance 0..100 %
+    DIM rueckBreite AS INTEGER           ' backstitch_width 1..5
+    DIM rueckEinrasten AS BOOLEAN        ' backstitch_snap: Ecken, Kantenmitten, Mitte; aus = nur Ecken
+    ' Farben
+    DIM palette AS STRING                ' default_palette
+    DIM katalog AS BOOLEAN               ' show_catalog
+    DIM symbolSchrift AS STRING          ' symbol_font
+    DIM symbolGroesse AS INTEGER         ' symbol_size 6..20 (10 = wie vorgesehen)
+    DIM symboleAuto AS BOOLEAN           ' auto_symbols
+    DIM farbAnzeige AS INTEGER           ' color_display: 0 Farbe, 1 Farbe+Symbol, 2 Symbol
+    ' Dateien
+    DIM ordner AS STRING                 ' default_path
+    DIM pdfZellen AS INTEGER             ' pdf_cells_per_page 0 (Vorgabe des Formats), 20..60
+    DIM ueberlappung AS INTEGER          ' export/page_overlap_stitches 0..20
+    DIM mystery AS BOOLEAN               ' export/mystery_mode
+    DIM importFarben AS INTEGER          ' import_max_colors 1..100
+    DIM dithering AS INTEGER             ' dither_method 0..2
+    ' Gemerktes
+    DIM zuletzt AS ARRAY OF STRING       ' recent_files
+    DIM fensterB AS INTEGER              ' window/width, 0 = noch keins
+    DIM fensterH AS INTEGER
+    DIM fensterMax AS BOOLEAN
+    DIM kuerzel AS MAP OF STRING         ' shortcuts: Kennung -> eigenes Kuerzel
+
+    SUB Init()
+        einstellungenVorgabe(Self)
+    END SUB
+END CLASS
+
+' Alles auf die Vorgabe -- die Gemerkten (Pfad, zuletzt, Fenster) bleiben.
+SUB einstellungenVorgabe(e AS Einstellungen)
+    e.autosichern = TRUE
+    e.autosichernMinuten = 5
+    e.sicherungskopie = TRUE
+    e.schnappschussMinuten = 30
+    e.startAktion = 0
+    e.zuletztAnzahl = 10
+    e.fensterMerken = TRUE
+    e.beendenFragen = FALSE
+    e.ueberschreibenFragen = TRUE
+    e.meldungSekunden = 3
+    e.autor = ""
+    e.copyright = ""
+    e.raster = TRUE
+    e.rasterHaupt = 10
+    e.rasterNeben = 5
+    e.nebenraster = TRUE
+    ' Was PySticky beim Start wirklich benutzt (Canvas-Grundwert fuer
+    ' "normal", die Vorgaben der Einstellungen fuer Neben/Haupt)
+    e.rasterFarbe = &H2D2D2D
+    e.nebenFarbe = &H303050
+    e.hauptFarbe = &H404060
+    e.zelleStandard = 20
+    e.zelleMin = 1
+    e.zelleMax = 60
+    e.zoomTempo = 12
+    e.hintergrund = &H1A1A2E
+    e.stoff = &HFAFAF5
+    e.startWerkzeug = 0
+    e.werkzeugMerken = FALSE
+    e.letztesWerkzeug = 0
+    e.pipetteDanach = 0
+    e.pipetteInfo = TRUE
+    e.fuellenDiagonal = FALSE
+    e.fuellToleranz = 0
+    e.rueckBreite = 2
+    e.rueckEinrasten = TRUE
+    e.palette = "DMC"                    ' PySticky: Anchor; Glutfaden nahm schon immer DMC
+    e.katalog = TRUE
+    e.symbolSchrift = "Segoe UI Symbol"
+    e.symbolGroesse = 10
+    e.symboleAuto = TRUE
+    e.farbAnzeige = 1
+    e.ordner = ""
+    e.pdfZellen = 0
+    e.ueberlappung = 0
+    e.mystery = FALSE
+    e.importFarben = 20
+    e.dithering = 0
+    e.kuerzel = {}
+END SUB
+
+FUNCTION startAktionen() AS ARRAY OF STRING
+    RETURN ["Beispielmuster öffnen", "Leeres Muster", "Neues Muster (Dialog)", "Letzte Datei öffnen"]
+END FUNCTION
+
+FUNCTION pipettenArten() AS ARRAY OF STRING
+    RETURN ["Zum Stift wechseln", "Beim Werkzeug bleiben", "Zur Auswahl wechseln"]
+END FUNCTION
+
+FUNCTION farbAnzeigen() AS ARRAY OF STRING
+    RETURN ["Nur Farbe", "Farbe + Symbol", "Nur Symbol"]
+END FUNCTION
+
+' Faktor je Zoomschritt (Rad, + und -)
+FUNCTION zoomFaktor(e AS Einstellungen) AS FLOAT
+    RETURN MAX(1.01, e.zoomTempo / 10.0)
+END FUNCTION
+
+' Schranken wie die Drehfelder des Originals, dazu: Neben-Raster echt kleiner
+' als das Haupt-Raster (sonst faellt jede Nebenlinie auf eine Hauptlinie und
+' ist nie zu sehen -- grid_options_dialog.py _sync_minor_max), und die
+' Standard-Zellgroesse zwischen Min und Max.
+SUB einstellungenOrdnen(e AS Einstellungen)
+    e.autosichernMinuten = CLAMP(e.autosichernMinuten, 1, 60)
+    e.schnappschussMinuten = CLAMP(e.schnappschussMinuten, 5, 240)
+    e.startAktion = CLAMP(e.startAktion, 0, LEN(startAktionen()) - 1)
+    e.zuletztAnzahl = CLAMP(e.zuletztAnzahl, 0, 20)
+    e.meldungSekunden = CLAMP(e.meldungSekunden, 1, 30)
+    e.rasterHaupt = CLAMP(e.rasterHaupt, 5, 50)
+    e.rasterNeben = CLAMP(e.rasterNeben, 1, MIN(20, e.rasterHaupt - 1))
+    e.zelleMin = CLAMP(e.zelleMin, 1, 20)
+    e.zelleMax = CLAMP(e.zelleMax, 30, 100)
+    e.zelleStandard = CLAMP(e.zelleStandard, e.zelleMin, e.zelleMax)
+    e.zoomTempo = CLAMP(e.zoomTempo, 10, 50)
+    e.startWerkzeug = CLAMP(e.startWerkzeug, 0, LEN(werkzeugNamen()) - 1)
+    e.letztesWerkzeug = CLAMP(e.letztesWerkzeug, 0, LEN(werkzeugNamen()) - 1)
+    e.pipetteDanach = CLAMP(e.pipetteDanach, 0, 2)
+    e.fuellToleranz = CLAMP(e.fuellToleranz, 0, 100)
+    e.rueckBreite = CLAMP(e.rueckBreite, 1, 5)
+    e.symbolGroesse = CLAMP(e.symbolGroesse, 6, 20)
+    e.farbAnzeige = CLAMP(e.farbAnzeige, 0, 2)
+    IF e.pdfZellen <> 0 THEN e.pdfZellen = CLAMP(e.pdfZellen, 20, 60)
+    e.ueberlappung = CLAMP(e.ueberlappung, 0, 20)
+    e.importFarben = CLAMP(e.importFarben, 1, 100)
+    e.dithering = CLAMP(e.dithering, 0, 2)
+    IF LEN(e.zuletzt) > e.zuletztAnzahl THEN e.zuletzt = e.zuletzt[0:e.zuletztAnzahl]
+END SUB
+
+' Die Werkzeuge in der Reihenfolge der WZ_*-Nummern, als Name im Original
+' (Tool-Enum) -- so steht es in der Datei, nicht als Zahl.
+FUNCTION werkzeugNamen() AS ARRAY OF STRING
+    RETURN ["PENCIL", "ERASER", "FILL", "PIPETTE", "LINE", "RECT", "ELLIPSE", "MOVE", "SELECT", "SELECT_LASSO", "POLYGON", "TEXT", "BACKSTITCH", "PROGRESS"]
+END FUNCTION
+
+' --- Lesen und Schreiben ----------------------------------------------------------
+
+FUNCTION esBool(j AS JSON_HANDLE, k AS STRING, BYREF b AS BOOLEAN) AS BOOLEAN
+    IF NOT JSON_HAS(j, k) THEN RETURN FALSE
+    SELECT CASE JSON_TYPE(j, k)
+        CASE "boolean" : b = JSON_GET_BOOL(j, k)
+        CASE "number" : b = JSON_GET_FLOAT(j, k) <> 0
+        CASE "string"
+            ' QSettings unter Linux schreibt Wahrheitswerte als Text
+            DIM t AS STRING : t = LOWER$(TRIM$(JSON_GET_STRING(j, k)))
+            IF t = "true" THEN
+                b = TRUE
+            ELSEIF t = "false" THEN
+                b = FALSE
+            ELSE
+                RETURN FALSE
+            END IF
+        CASE ELSE : RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION esText(j AS JSON_HANDLE, k AS STRING, BYREF t AS STRING) AS BOOLEAN
+    IF NOT JSON_HAS(j, k) THEN RETURN FALSE
+    IF JSON_TYPE(j, k) <> "string" THEN RETURN FALSE
+    t = JSON_GET_STRING(j, k)
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION esFarbe(j AS JSON_HANDLE, k AS STRING, BYREF f AS INTEGER) AS BOOLEAN
+    DIM t AS STRING
+    IF NOT esText(j, k, t) THEN RETURN FALSE
+    DIM g AS INTEGER : g = farbeAusHex(t)
+    IF g < 0 THEN RETURN FALSE
+    f = g
+    RETURN TRUE
+END FUNCTION
+
+' Wo ein Wert fehlt oder nicht passt, bleibt die Vorgabe; Zahlen ausserhalb
+' werden auf den Bereich geklemmt (wie ein Drehfeld es taete).
+FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
+    DIM e AS Einstellungen : e = NEW Einstellungen()
+    e.pfad = pfad
+    e.zuletzt = []
+    IF NOT FILEEXISTS(pfad) THEN RETURN e
+    DIM j AS JSON_HANDLE
+    TRY
+        j = JSON_LOAD(pfad)
+    CATCH fehler
+        RETURN e
+    END TRY
+    IF JSON_TYPE(j, "") <> "object" THEN RETURN e
+    DIM b AS BOOLEAN, z AS INTEGER, t AS STRING, f AS INTEGER
+    IF esBool(j, "autosave_enabled", b) THEN e.autosichern = b
+    IF jsonGanz(j, "autosave_interval", z) THEN e.autosichernMinuten = z
+    IF esBool(j, "autosave_backup", b) THEN e.sicherungskopie = b
+    IF jsonGanz(j, "snapshot_interval_minutes", z) THEN e.schnappschussMinuten = z
+    IF jsonGanz(j, "start_action", z) THEN e.startAktion = z
+    IF jsonGanz(j, "max_recent_files", z) THEN e.zuletztAnzahl = z
+    IF esBool(j, "restore_window", b) THEN e.fensterMerken = b
+    IF esBool(j, "confirm_exit", b) THEN e.beendenFragen = b
+    IF esBool(j, "confirm_overwrite", b) THEN e.ueberschreibenFragen = b
+    IF jsonGanz(j, "status_timeout", z) THEN e.meldungSekunden = z
+    IF esText(j, "default_author", t) THEN e.autor = TRIM$(t)
+    IF esText(j, "default_copyright", t) THEN e.copyright = TRIM$(t)
+    IF esBool(j, "show_grid", b) THEN e.raster = b
+    IF jsonGanz(j, "major_grid_interval", z) THEN e.rasterHaupt = z
+    IF jsonGanz(j, "minor_grid_interval", z) THEN e.rasterNeben = z
+    IF esBool(j, "show_minor_grid", b) THEN e.nebenraster = b
+    IF esFarbe(j, "grid_color_normal", f) THEN e.rasterFarbe = f
+    IF esFarbe(j, "grid_color_minor", f) THEN e.nebenFarbe = f
+    IF esFarbe(j, "grid_color_major", f) THEN e.hauptFarbe = f
+    IF jsonGanz(j, "default_cell_size", z) THEN e.zelleStandard = z
+    IF jsonGanz(j, "min_cell_size", z) THEN e.zelleMin = z
+    IF jsonGanz(j, "max_cell_size", z) THEN e.zelleMax = z
+    IF jsonGanz(j, "zoom_speed", z) THEN e.zoomTempo = z
+    IF esFarbe(j, "canvas_bg", f) THEN e.hintergrund = f
+    IF esFarbe(j, "empty_cell_color", f) THEN e.stoff = f
+    DIM namen AS ARRAY OF STRING : namen = werkzeugNamen()
+    IF esText(j, "default_tool", t) THEN
+        z = ARRAY_INDEXOF(namen, UPPER$(TRIM$(t)))
+        IF z >= 0 THEN e.startWerkzeug = z
+    END IF
+    IF esBool(j, "remember_tool", b) THEN e.werkzeugMerken = b
+    IF esText(j, "last_tool", t) THEN
+        z = ARRAY_INDEXOF(namen, UPPER$(TRIM$(t)))
+        IF z >= 0 THEN e.letztesWerkzeug = z
+    END IF
+    IF jsonGanz(j, "pipette_behavior", z) THEN e.pipetteDanach = z
+    IF esBool(j, "pipette_show_info", b) THEN e.pipetteInfo = b
+    IF esBool(j, "fill_diagonal", b) THEN e.fuellenDiagonal = b
+    IF jsonGanz(j, "fill_tolerance", z) THEN e.fuellToleranz = z
+    IF jsonGanz(j, "backstitch_width", z) THEN e.rueckBreite = z
+    IF esBool(j, "backstitch_snap", b) THEN e.rueckEinrasten = b
+    IF esText(j, "default_palette", t) THEN
+        IF TRIM$(t) <> "" THEN e.palette = TRIM$(t)
+    END IF
+    IF esBool(j, "show_catalog", b) THEN e.katalog = b
+    IF esText(j, "symbol_font", t) THEN
+        IF TRIM$(t) <> "" THEN e.symbolSchrift = TRIM$(t)
+    END IF
+    IF jsonGanz(j, "symbol_size", z) THEN e.symbolGroesse = z
+    IF esBool(j, "auto_symbols", b) THEN e.symboleAuto = b
+    IF jsonGanz(j, "color_display", z) THEN e.farbAnzeige = z
+    IF esText(j, "default_path", t) THEN e.ordner = TRIM$(t)
+    IF jsonGanz(j, "pdf_cells_per_page", z) THEN e.pdfZellen = z
+    IF jsonGanz(j, "export/page_overlap_stitches", z) THEN e.ueberlappung = z
+    IF esBool(j, "export/mystery_mode", b) THEN e.mystery = b
+    IF jsonGanz(j, "import_max_colors", z) THEN e.importFarben = z
+    IF jsonGanz(j, "dither_method", z) THEN e.dithering = z
+    IF JSON_HAS(j, "recent_files") THEN
+        IF JSON_TYPE(j, "recent_files") = "array" THEN
+            DIM i AS INTEGER
+            FOR i = 0 TO JSON_LEN(j, "recent_files") - 1
+                IF JSON_TYPE(j, "recent_files." + STR$(i)) = "string" THEN ARRAY_PUSH(e.zuletzt, JSON_GET_STRING(j, "recent_files." + STR$(i)))
+            NEXT
+        END IF
+    END IF
+    IF jsonGanz(j, "window/width", z) THEN e.fensterB = MAX(0, z)
+    IF jsonGanz(j, "window/height", z) THEN e.fensterH = MAX(0, z)
+    IF esBool(j, "window/maximized", b) THEN e.fensterMax = b
+    IF JSON_HAS(j, "shortcuts") THEN
+        IF JSON_TYPE(j, "shortcuts") = "object" THEN
+            DIM k AS STRING
+            FOR EACH k IN JSON_KEYS(j, "shortcuts")
+                IF JSON_TYPE(j, "shortcuts." + JSON_KEY$(k)) = "string" THEN MAPPUT(e.kuerzel, k, JSON_GET_STRING(j, "shortcuts." + JSON_KEY$(k)))
+            NEXT
+        END IF
+    END IF
+    einstellungenOrdnen(e)
+    RETURN e
+END FUNCTION
+
+FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
+    DIM j AS JSON_HANDLE : j = JSON_NEW_OBJECT()
+    JSON_SET_BOOL(j, "autosave_enabled", e.autosichern)
+    JSON_SET_INT(j, "autosave_interval", e.autosichernMinuten)
+    JSON_SET_BOOL(j, "autosave_backup", e.sicherungskopie)
+    JSON_SET_INT(j, "snapshot_interval_minutes", e.schnappschussMinuten)
+    JSON_SET_INT(j, "start_action", e.startAktion)
+    JSON_SET_INT(j, "max_recent_files", e.zuletztAnzahl)
+    JSON_SET_BOOL(j, "restore_window", e.fensterMerken)
+    JSON_SET_BOOL(j, "confirm_exit", e.beendenFragen)
+    JSON_SET_BOOL(j, "confirm_overwrite", e.ueberschreibenFragen)
+    JSON_SET_INT(j, "status_timeout", e.meldungSekunden)
+    JSON_SET_STRING(j, "default_author", e.autor)
+    JSON_SET_STRING(j, "default_copyright", e.copyright)
+    JSON_SET_BOOL(j, "show_grid", e.raster)
+    JSON_SET_INT(j, "major_grid_interval", e.rasterHaupt)
+    JSON_SET_INT(j, "minor_grid_interval", e.rasterNeben)
+    JSON_SET_BOOL(j, "show_minor_grid", e.nebenraster)
+    JSON_SET_STRING(j, "grid_color_normal", LOWER$(farbeAlsHex$(e.rasterFarbe)))
+    JSON_SET_STRING(j, "grid_color_minor", LOWER$(farbeAlsHex$(e.nebenFarbe)))
+    JSON_SET_STRING(j, "grid_color_major", LOWER$(farbeAlsHex$(e.hauptFarbe)))
+    JSON_SET_INT(j, "default_cell_size", e.zelleStandard)
+    JSON_SET_INT(j, "min_cell_size", e.zelleMin)
+    JSON_SET_INT(j, "max_cell_size", e.zelleMax)
+    JSON_SET_INT(j, "zoom_speed", e.zoomTempo)
+    JSON_SET_STRING(j, "canvas_bg", LOWER$(farbeAlsHex$(e.hintergrund)))
+    JSON_SET_STRING(j, "empty_cell_color", LOWER$(farbeAlsHex$(e.stoff)))
+    JSON_SET_STRING(j, "default_tool", werkzeugNamen()[e.startWerkzeug])
+    JSON_SET_BOOL(j, "remember_tool", e.werkzeugMerken)
+    JSON_SET_STRING(j, "last_tool", werkzeugNamen()[e.letztesWerkzeug])
+    JSON_SET_INT(j, "pipette_behavior", e.pipetteDanach)
+    JSON_SET_BOOL(j, "pipette_show_info", e.pipetteInfo)
+    JSON_SET_BOOL(j, "fill_diagonal", e.fuellenDiagonal)
+    JSON_SET_INT(j, "fill_tolerance", e.fuellToleranz)
+    JSON_SET_INT(j, "backstitch_width", e.rueckBreite)
+    JSON_SET_BOOL(j, "backstitch_snap", e.rueckEinrasten)
+    JSON_SET_STRING(j, "default_palette", e.palette)
+    JSON_SET_BOOL(j, "show_catalog", e.katalog)
+    JSON_SET_STRING(j, "symbol_font", e.symbolSchrift)
+    JSON_SET_INT(j, "symbol_size", e.symbolGroesse)
+    JSON_SET_BOOL(j, "auto_symbols", e.symboleAuto)
+    JSON_SET_INT(j, "color_display", e.farbAnzeige)
+    JSON_SET_STRING(j, "default_path", e.ordner)
+    JSON_SET_INT(j, "pdf_cells_per_page", e.pdfZellen)
+    JSON_SET_INT(j, JSON_KEY$("export/page_overlap_stitches"), e.ueberlappung)
+    JSON_SET_BOOL(j, JSON_KEY$("export/mystery_mode"), e.mystery)
+    JSON_SET_INT(j, "import_max_colors", e.importFarben)
+    JSON_SET_INT(j, "dither_method", e.dithering)
+    JSON_SET_JSON(j, "recent_files", textListe(e.zuletzt))
+    JSON_SET_INT(j, JSON_KEY$("window/width"), e.fensterB)
+    JSON_SET_INT(j, JSON_KEY$("window/height"), e.fensterH)
+    JSON_SET_BOOL(j, JSON_KEY$("window/maximized"), e.fensterMax)
+    DIM ks AS JSON_HANDLE : ks = JSON_NEW_OBJECT()
+    DIM namen AS ARRAY OF STRING : namen = MAPKEYS(e.kuerzel)
+    SORT(namen)
+    DIM k AS STRING
+    FOR EACH k IN namen
+        JSON_SET_STRING(ks, JSON_KEY$(k), e.kuerzel[k])
+    NEXT
+    JSON_SET_JSON(j, "shortcuts", ks)
+    RETURN JSON_PRETTY(j)
+END FUNCTION
+
+SUB einstellungenSichern(e AS Einstellungen)
+    IF e.pfad = "" THEN RETURN
+    textSchreiben(e.pfad, einstellungenJson$(e))
+END SUB
+
+' Eine geoeffnete Datei vorn in die Liste (ohne Doppelte, auf die Anzahl
+' gekuerzt). Verglichen wird der volle Pfad, unter Windows ohne Gross/klein.
+SUB zuletztHinzufuegen(e AS Einstellungen, pfad AS STRING)
+    DIM voll AS STRING : voll = vollerPfad$(pfad)
+    DIM neu AS ARRAY OF STRING : neu = [voll]
+    DIM p AS STRING
+    FOR EACH p IN e.zuletzt
+        IF NOT gleicherPfad(p, voll) THEN ARRAY_PUSH(neu, p)
+    NEXT
+    IF LEN(neu) > e.zuletztAnzahl THEN neu = neu[0:e.zuletztAnzahl]
+    e.zuletzt = neu
+END SUB
+
+FUNCTION gleicherPfad(a AS STRING, b AS STRING) AS BOOLEAN
+    IF a = b THEN RETURN TRUE
+    IF INSTR(a, "\") >= 0 OR MID$(a, 1, 1) = ":" THEN RETURN LOWER$(REPLACE$(a, "\", "/")) = LOWER$(REPLACE$(b, "\", "/"))
+    RETURN FALSE
+END FUNCTION
+
+' Die Liste, wie das Menue sie zeigt: nur Dateien, die es noch gibt
+FUNCTION zuletztVorhanden(e AS Einstellungen) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM p AS STRING
+    FOR EACH p IN e.zuletzt
+        IF FILEEXISTS(p) THEN ARRAY_PUSH(aus, p)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' --- Raster-Farben gegen den Stoff -------------------------------------------------
+
+' Relative Leuchtdichte nach WCAG
+FUNCTION leuchtdichte(f AS INTEGER) AS FLOAT
+    DIM s AS ARRAY OF FLOAT : s = [((f SHR 16) BAND 255) / 255.0, ((f SHR 8) BAND 255) / 255.0, (f BAND 255) / 255.0]
+    DIM l AS ARRAY OF FLOAT : l = [0.0, 0.0, 0.0]
+    DIM i AS INTEGER
+    FOR i = 0 TO 2
+        IF s[i] <= 0.03928 THEN l[i] = s[i] / 12.92 ELSE l[i] = ((s[i] + 0.055) / 1.055) ^ 2.4
+    NEXT
+    RETURN 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2]
+END FUNCTION
+
+' Eine Rasterfarbe, die auf dem Stoff kaum zu sehen waere, wird ersetzt
+' (color_utils.ensure_contrast: Verhaeltnis unter 2 -> helles oder dunkles Grau)
+FUNCTION kontrastFarbe(f AS INTEGER, grund AS INTEGER) AS INTEGER
+    DIM lg AS FLOAT : lg = leuchtdichte(grund)
+    DIM lf AS FLOAT : lf = leuchtdichte(f)
+    IF (MAX(lg, lf) + 0.05) / (MIN(lg, lf) + 0.05) >= 2.0 THEN RETURN f
+    IF lg < 0.5 THEN RETURN &HD2D2D2
+    RETURN &H373737
+END FUNCTION
+
+' Die Voreinstellungen der Raster-Optionen: Name, normal, neben, haupt
+FUNCTION rasterVoreinstellungen() AS ARRAY OF STRING
+    RETURN ["Standard", "Hell", "Blau", "Rot"]
+END FUNCTION
+
+SUB rasterVoreinstellung(e AS Einstellungen, nr AS INTEGER)
+    e.rasterHaupt = 10
+    e.rasterNeben = 5
+    e.nebenraster = TRUE
+    SELECT CASE nr
+        CASE 0 : e.rasterFarbe = &H505050 : e.nebenFarbe = &H787878 : e.hauptFarbe = &H646464
+        CASE 1 : e.rasterFarbe = &HB4B4B4 : e.nebenFarbe = &H8C8C8C : e.hauptFarbe = &H646464
+        CASE 2 : e.rasterFarbe = &H3C5064 : e.nebenFarbe = &H5078A0 : e.hauptFarbe = &H2864B4
+        CASE 3 : e.rasterFarbe = &H643C3C : e.nebenFarbe = &HA05050 : e.hauptFarbe = &HB42828
+    END SELECT
+END SUB
+
+' --- Tastenkuerzel -----------------------------------------------------------------
+
+CLASS Kuerzelaktion
+    DIM kennung AS STRING
+    DIM name AS STRING
+    DIM vorgabe AS STRING
+END CLASS
+
+FUNCTION ka(kennung AS STRING, name AS STRING, vorgabe AS STRING) AS Kuerzelaktion
+    DIM a AS Kuerzelaktion : a = NEW Kuerzelaktion()
+    a.kennung = kennung
+    a.name = name
+    a.vorgabe = vorgabe
+    RETURN a
+END FUNCTION
+
+' Die Tafel: alles, was ein Kuerzel hat und sich umlegen laesst. Was nur in
+' einem Zustand gilt (Esc, Entf und R/H/V an einer Auswahl, Pfeile im
+' Fortschritt, Alt+Ziffer fuer die Stichart), bleibt fest -- wie bei PySticky,
+' das nur QActions und Werkzeugknoepfe eintraegt.
+FUNCTION kuerzelAktionen() AS ARRAY OF Kuerzelaktion
+    RETURN [ka("neu", "Neues Muster", "Strg+N"), _
+        ka("oeffnen", "Öffnen", "Strg+O"), _
+        ka("sichern", "Sichern", "Strg+S"), _
+        ka("sichern_unter", "Sichern unter", "Strg+Umschalt+S"), _
+        ka("export", "Exportieren", "Strg+E"), _
+        ka("import", "Bild importieren", "Strg+I"), _
+        ka("import_neu", "Erneut aus dem Quellbild", "Strg+Umschalt+I"), _
+        ka("zurueck", "Rückgängig", "Strg+Z"), _
+        ka("vor", "Wiederholen", "Strg+Y, Strg+Umschalt+Z"), _
+        ka("kopieren", "Kopieren", "Strg+C"), _
+        ka("ausschneiden", "Ausschneiden", "Strg+X"), _
+        ka("einfuegen", "Einfügen", "Strg+V"), _
+        ka("alles", "Alles auswählen", "Strg+A"), _
+        ka("ersetzen", "Farbe ersetzen", "Strg+R"), _
+        ka("modus", "Kreuzstich / Diamond Painting", "Strg+D"), _
+        ka("blend", "Garn-Blend", "Strg+B"), _
+        ka("statistik", "Statistik", "Strg+Umschalt+G"), _
+        ka("ebene", "Neue Ebene", "Strg+Umschalt+N"), _
+        ka("tauschen", "Farben tauschen", "Strg+Umschalt+T"), _
+        ka("palette", "Palette umwandeln", "Strg+Umschalt+K"), _
+        ka("bibliothek", "Bibliothek", "Strg+L"), _
+        ka("harmonie", "Farb-Harmonien", "Strg+Umschalt+H"), _
+        ka("stickpfad", "Stickpfad", "Strg+Umschalt+O"), _
+        ka("eigenschaften", "Eigenschaften", "Strg+Alt+P"), _
+        ka("versionen", "Versionen", "Strg+Alt+V"), _
+        ka("vorschau", "Muster-Vorschau", "F5"), _
+        ka("einstellungen", "Einstellungen", "Strg+Komma"), _
+        ka("raster", "Raster-Optionen", "Strg+Umschalt+R"), _
+        ka("zoom_rein", "Vergrößern", "Plus, ="), _
+        ka("zoom_raus", "Verkleinern", "Minus"), _
+        ka("einpassen", "Einpassen", "0"), _
+        ka("zoom_100", "100 %", "1"), _
+        ka("wz_stift", "Stift", "P"), _
+        ka("wz_radierer", "Radierer", "E"), _
+        ka("wz_fuellen", "Füllen", "F"), _
+        ka("wz_pipette", "Pipette", "I"), _
+        ka("wz_linie", "Linie", "L"), _
+        ka("wz_rechteck", "Rechteck", "R"), _
+        ka("wz_rechteck_voll", "Rechteck gefüllt", "Umschalt+R"), _
+        ka("wz_ellipse", "Ellipse", "O"), _
+        ka("wz_ellipse_voll", "Ellipse gefüllt", "Umschalt+O"), _
+        ka("wz_hand", "Verschieben", "M"), _
+        ka("wz_auswahl", "Auswahl", "S"), _
+        ka("wz_lasso", "Lasso", "Umschalt+S"), _
+        ka("wz_vieleck", "Vieleck", "G"), _
+        ka("wz_vieleck_voll", "Vieleck gefüllt", "Umschalt+G"), _
+        ka("wz_text", "Text", "T"), _
+        ka("wz_rueckstich", "Rückstich", "B"), _
+        ka("wz_fortschritt", "Fortschritt", "K")]
+END FUNCTION
+
+' Namen der Sondertasten: (Name, Keyval) -- der erste Name je Keyval ist der,
+' den Glutfaden schreibt; die uebrigen versteht es beim Lesen.
+FUNCTION tastenNamen() AS ARRAY OF STRING
+    RETURN ["Entf", "Einfg", "Pos1", "Ende", "Bild auf", "Bild ab", "Leertaste", "Enter", "Tab", "Rücktaste", "Esc", _
+        "Links", "Rechts", "Hoch", "Runter", "Plus", "Minus", "Komma", "Punkt", _
+        "Del", "Delete", "Ins", "Insert", "Home", "End", "PgUp", "PageUp", "PgDown", "PageDown", "Space", "Return", "Backspace", "Escape", _
+        "Left", "Right", "Up", "Down", "Comma", "Period"]
+END FUNCTION
+
+FUNCTION tastenWerte() AS ARRAY OF INTEGER
+    RETURN [&HFFFF, &HFF63, &HFF50, &HFF57, &HFF55, &HFF56, &H20, &HFF0D, &HFF09, &HFF08, &HFF1B, _
+        &HFF51, &HFF53, &HFF52, &HFF54, &H2B, &H2D, &H2C, &H2E, _
+        &HFFFF, &HFFFF, &HFF63, &HFF63, &HFF50, &HFF57, &HFF55, &HFF55, &HFF56, &HFF56, &H20, &HFF0D, &HFF08, &HFF1B, _
+        &HFF51, &HFF53, &HFF52, &HFF54, &H2C, &H2E]
+END FUNCTION
+
+' Keyval -> Tastenname ("" fuer Umschalt, Strg & Co. allein)
+FUNCTION tastenName$(t AS INTEGER) AS STRING
+    IF t >= &H61 AND t <= &H7A THEN RETURN CHR$(t - 32)
+    IF t >= &H41 AND t <= &H5A THEN RETURN CHR$(t)
+    IF t >= &H30 AND t <= &H39 THEN RETURN CHR$(t)
+    IF t >= &HFFB0 AND t <= &HFFB9 THEN RETURN CHR$(t - &HFFB0 + &H30)     ' Ziffernblock
+    IF t >= &HFFBE AND t <= &HFFC9 THEN RETURN "F" + STR$(t - &HFFBE + 1)
+    SELECT CASE t
+        CASE &HFFAB : t = &H2B                  ' Ziffernblock +, -, ., Enter
+        CASE &HFFAD : t = &H2D
+        CASE &HFFAE : t = &H2E
+        CASE &HFF8D : t = &HFF0D
+    END SELECT
+    DIM w AS ARRAY OF INTEGER : w = tastenWerte()
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(w, t)
+    IF i >= 0 THEN RETURN tastenNamen()[i]
+    IF (t >= &H21 AND t <= &H7E) OR (t >= &HA1 AND t <= &HFF) THEN RETURN UPPER$(CHR$(t))
+    RETURN ""
+END FUNCTION
+
+' Zaehlt Umschalt mit? Bei Zeichen nicht -- das Zeichen traegt es schon
+' (Umschalt+0 ist auf deutscher Tastatur "=", nicht "Umschalt+=").
+FUNCTION tasteMitUmschalt(name AS STRING) AS BOOLEAN
+    IF LEN(name) > 1 THEN RETURN name <> "Plus" AND name <> "Minus" AND name <> "Komma" AND name <> "Punkt"
+    IF (name >= "A" AND name <= "Z") OR (name >= "0" AND name <= "9") THEN RETURN TRUE
+    RETURN UPPER$(name) <> LOWER$(name)      ' Buchstaben wie Ä
+END FUNCTION
+
+FUNCTION kuerzelBauen$(strg AS BOOLEAN, alt AS BOOLEAN, umschalt AS BOOLEAN, name AS STRING) AS STRING
+    IF name = "" THEN RETURN ""
+    DIM t AS STRING
+    IF strg THEN t = t + "Strg+"
+    IF alt THEN t = t + "Alt+"
+    IF umschalt AND tasteMitUmschalt(name) THEN t = t + "Umschalt+"
+    RETURN t + name
+END FUNCTION
+
+' Ein Tastendruck als Kuerzel-Text
+FUNCTION kuerzelAusTaste$(t AS INTEGER, strg AS BOOLEAN, alt AS BOOLEAN, umschalt AS BOOLEAN) AS STRING
+    RETURN kuerzelBauen$(strg, alt, umschalt, tastenName$(t))
+END FUNCTION
+
+' Ein Kuerzel in die Form, die Glutfaden schreibt ("ctrl+shift+s" ->
+' "Strg+Umschalt+S"); mehrere durch Komma. "" bei leerem oder krummem Text --
+' kuerzelGueltig sagt, welches von beiden.
+FUNCTION kuerzelEins$(text AS STRING) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(TRIM$(text), "+")
+    ' "Strg++" -- das letzte Plus ist die Taste
+    IF RIGHT$(TRIM$(text), 2) = "++" THEN
+        teile = SPLIT$(LEFT$(TRIM$(text), LEN(TRIM$(text)) - 2), "+")
+        ARRAY_PUSH(teile, "Plus")
+    END IF
+    IF LEN(teile) = 0 THEN RETURN ""
+    DIM strg AS BOOLEAN, alt AS BOOLEAN, umschalt AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 2
+        SELECT CASE LOWER$(TRIM$(teile[i]))
+            CASE "strg", "ctrl", "control" : strg = TRUE
+            CASE "alt" : alt = TRUE
+            CASE "umschalt", "shift" : umschalt = TRUE
+            CASE ELSE : RETURN ""
+        END SELECT
+    NEXT
+    DIM n AS STRING : n = TRIM$(teile[LEN(teile) - 1])
+    IF n = "" THEN RETURN ""
+    DIM name AS STRING
+    IF LEN(n) = 1 THEN
+        name = UPPER$(n)
+        IF name = "+" THEN name = "Plus"
+        IF name = "-" THEN name = "Minus"
+        IF name = "," THEN name = "Komma"
+        IF name = "." THEN name = "Punkt"
+        IF name = " " THEN RETURN ""
+    ELSEIF REGEX_TEST(UPPER$(n), "^F([1-9]|1[0-2])$") THEN
+        name = UPPER$(n)
+    ELSE
+        DIM namen AS ARRAY OF STRING : namen = tastenNamen()
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(namen) - 1
+            IF LOWER$(namen[k]) = LOWER$(n) THEN
+                name = tastenName$(tastenWerte()[k])
+                EXIT FOR
+            END IF
+        NEXT
+        IF name = "" THEN RETURN ""
+    END IF
+    RETURN kuerzelBauen$(strg, alt, umschalt, name)
+END FUNCTION
+
+FUNCTION kuerzelNormal$(text AS STRING) AS STRING
+    IF TRIM$(text) = "" THEN RETURN ""
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM s AS STRING
+    FOR EACH s IN SPLIT$(text, ",")
+        DIM n AS STRING : n = kuerzelEins$(s)
+        IF n = "" THEN RETURN ""
+        IF ARRAY_INDEXOF(aus, n) < 0 THEN ARRAY_PUSH(aus, n)
+    NEXT
+    RETURN JOIN$(aus, ", ")
+END FUNCTION
+
+FUNCTION kuerzelGueltig(text AS STRING) AS BOOLEAN
+    RETURN TRIM$(text) = "" OR kuerzelNormal$(text) <> ""
+END FUNCTION
+
+' Die Kuerzel, die gerade gelten, je Aktion in Reihenfolge der Tafel. Ein
+' eigenes Kuerzel, das mit einem anderen zusammenstoesst, wird uebergangen --
+' die Aktion behaelt ihre Vorgabe (apply_saved_overrides).
+FUNCTION kuerzelWirksam(e AS Einstellungen) AS ARRAY OF STRING
+    DIM aktionen AS ARRAY OF Kuerzelaktion : aktionen = kuerzelAktionen()
+    DIM w AS ARRAY OF STRING : w = []
+    DIM a AS Kuerzelaktion
+    FOR EACH a IN aktionen
+        ARRAY_PUSH(w, kuerzelNormal$(a.vorgabe))
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(aktionen) - 1
+        IF NOT MAPHAS(e.kuerzel, aktionen[i].kennung) THEN CONTINUE
+        DIM eigen AS STRING : eigen = kuerzelNormal$(e.kuerzel[aktionen[i].kennung])
+        IF eigen = "" THEN CONTINUE
+        IF kuerzelKonflikt(w, eigen, i) < 0 THEN w[i] = eigen
+    NEXT
+    RETURN w
+END FUNCTION
+
+' Welche andere Aktion (Nummer in der Tafel) hat schon eine dieser Tasten?
+' -1 = keine.
+FUNCTION kuerzelKonflikt(w AS ARRAY OF STRING, kuerzel AS STRING, ausser AS INTEGER) AS INTEGER
+    IF kuerzel = "" THEN RETURN -1
+    DIM s AS STRING
+    FOR EACH s IN SPLIT$(kuerzel, ", ")
+        DIM j AS INTEGER
+        FOR j = 0 TO LEN(w) - 1
+            IF j = ausser OR w[j] = "" THEN CONTINUE
+            IF ARRAY_INDEXOF(SPLIT$(w[j], ", "), s) >= 0 THEN RETURN j
+        NEXT
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Taste -> Kennung der Aktion, fuer die Tastenabfrage
+FUNCTION kuerzelTafel(e AS Einstellungen) AS MAP OF STRING
+    DIM tafel AS MAP OF STRING : tafel = {}
+    DIM aktionen AS ARRAY OF Kuerzelaktion : aktionen = kuerzelAktionen()
+    DIM w AS ARRAY OF STRING : w = kuerzelWirksam(e)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(aktionen) - 1
+        IF w[i] = "" THEN CONTINUE
+        DIM s AS STRING
+        FOR EACH s IN SPLIT$(w[i], ", ")
+            MAPPUT(tafel, s, aktionen[i].kennung)
+        NEXT
+    NEXT
+    RETURN tafel
+END FUNCTION
+
+' Fuer die Anzeige: das wirksame Kuerzel einer Aktion
+FUNCTION kuerzelVon$(e AS Einstellungen, kennung AS STRING) AS STRING
+    DIM aktionen AS ARRAY OF Kuerzelaktion : aktionen = kuerzelAktionen()
+    DIM w AS ARRAY OF STRING : w = kuerzelWirksam(e)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(aktionen) - 1
+        IF aktionen[i].kennung = kennung THEN RETURN w[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' --- Fuellen mit Toleranz ----------------------------------------------------------
+
+' Welche Farbnummern beim Fuellen als "gleich" gelten: die Zielfarbe selbst
+' und, mit Toleranz, jede Farbe mit CIEDE2000 <= 50 * Toleranz/100 zur Zielfarbe
+' (fill_tool.py). Ohne Stich (-1) zaehlt nur ohne Stich. passt[k+1] fuer k.
+FUNCTION fuellPassend(farben AS ARRAY OF INTEGER, ziel AS INTEGER, toleranz AS INTEGER) AS ARRAY OF INTEGER
+    DIM n AS INTEGER : n = LEN(farben)
+    DIM passt[n + 1] AS INTEGER
+    passt[ziel + 1] = 1
+    IF ziel < 0 OR ziel >= n OR toleranz <= 0 THEN RETURN passt
+    DIM grenze AS FLOAT : grenze = 50.0 * toleranz / 100.0
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        IF farbAbstand(farben[ziel], farben[k]) <= grenze THEN passt[k + 1] = 1
+    NEXT
+    RETURN passt
+END FUNCTION

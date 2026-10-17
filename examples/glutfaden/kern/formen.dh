@@ -231,6 +231,57 @@ FUNCTION fuellung(e AS Ebene, x AS INTEGER, y AS INTEGER, neu AS INTEGER) AS ARR
     RETURN p
 END FUNCTION
 
+' Fuellen wie fuellung, aber mit den Einstellungen (fill_tool.py): als gleich
+' gilt jede Farbe k mit passt[k + 1] = 1 (fuellPassend: die Zielfarbe und mit
+' Toleranz aehnliche), und diagonal haengen auch die vier Ecknachbarn an.
+' Hat die Startzelle schon die neue Farbe, leer -- auch mit Toleranz.
+FUNCTION fuellungWie(e AS Ebene, x AS INTEGER, y AS INTEGER, neu AS INTEGER, passt AS ARRAY OF INTEGER, diagonal AS BOOLEAN) AS ARRAY OF INTEGER
+    DIM leer AS ARRAY OF INTEGER : leer = []
+    IF NOT e.drin(x, y) THEN RETURN leer
+    DIM b AS INTEGER : b = e.breite
+    DIM h AS INTEGER : h = e.hoehe
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    IF r[y * b + x] = neu THEN RETURN leer
+    DIM np AS INTEGER : np = LEN(passt)
+    DIM n AS INTEGER : n = b * h
+    DIM gesehen[n] AS INTEGER
+    DIM warte[n] AS INTEGER
+    DIM ende AS INTEGER : ende = 1
+    warte[0] = y * b + x
+    gesehen[y * b + x] = 1
+    DIM kopf AS INTEGER
+    DIM i AS INTEGER, cx AS INTEGER, cy AS INTEGER, j AS INTEGER, dx AS INTEGER, dy AS INTEGER, nx AS INTEGER, ny AS INTEGER, f AS INTEGER
+    WHILE kopf < ende
+        i = warte[kopf]
+        kopf = kopf + 1
+        cx = i MOD b
+        cy = i \ b
+        FOR dy = -1 TO 1
+            FOR dx = -1 TO 1
+                IF dx = 0 AND dy = 0 THEN CONTINUE
+                IF NOT diagonal AND dx <> 0 AND dy <> 0 THEN CONTINUE
+                nx = cx + dx
+                ny = cy + dy
+                IF nx < 0 OR nx >= b OR ny < 0 OR ny >= h THEN CONTINUE
+                j = ny * b + nx
+                IF gesehen[j] <> 0 THEN CONTINUE
+                f = r[j] + 1
+                IF f < 0 OR f >= np THEN CONTINUE
+                IF passt[f] = 0 THEN CONTINUE
+                gesehen[j] = 1
+                warte[ende] = j
+                ende = ende + 1
+            NEXT
+        NEXT
+    WEND
+    DIM p[2 * ende] AS INTEGER
+    FOR i = 0 TO ende - 1
+        p[2 * i] = warte[i] MOD b
+        p[2 * i + 1] = warte[i] \ b
+    NEXT
+    RETURN p
+END FUNCTION
+
 ' --- Vieleck (PySticky ui/tools/polygon_tool.py) ------------------------------------
 ' Umriss: eine Linie je Kante, auch die schliessende. Gefuellt: der Umriss und
 ' je Zeile die Spannen zwischen den Kantenschnitten (gerade/ungerade, Kante

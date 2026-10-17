@@ -327,7 +327,9 @@ FUNCTION anteileText$(g AS Garn) AS STRING
     RETURN t
 END FUNCTION
 
-FUNCTION farbeHinzufuegen(m AS Muster, v AS Verlauf, g AS Garn, symbole AS ARRAY OF STRING, perle AS BOOLEAN, diamant AS BOOLEAN) AS INTEGER
+' ohneSymbol (Einstellungen -> Farben -> "Symbole automatisch" aus): "?" als
+' Platzhalter wie PySticky add_color(auto_symbol=False) -- zum Vergeben von Hand.
+FUNCTION farbeHinzufuegen(m AS Muster, v AS Verlauf, g AS Garn, symbole AS ARRAY OF STRING, perle AS BOOLEAN, diamant AS BOOLEAN, ohneSymbol AS BOOLEAN = FALSE) AS INTEGER
     DIM i AS INTEGER
     ' schon im Muster? (PySticky add_color_to_pattern): gleicher Hersteller und
     ' gleiche Nummer -- bei Blends auch dasselbe Strangverhaeltnis, denn die
@@ -347,8 +349,10 @@ FUNCTION farbeHinzufuegen(m AS Muster, v AS Verlauf, g AS Garn, symbole AS ARRAY
         MAPPUT(benutzt, f.symbol, TRUE)
     NEXT
     DIM symbol AS STRING
+    IF ohneSymbol THEN symbol = "?"
     DIM s AS STRING
     FOR EACH s IN symbole
+        IF symbol <> "" THEN EXIT FOR
         IF NOT MAPHAS(benutzt, s) THEN
             symbol = s
             BREAK
