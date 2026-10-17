@@ -178,5 +178,6 @@ FUNCTION gePdfOptionen(pal AS ARRAY OF kern.Palette, papier AS STRING, zellen AS
     o.notizen = notizen
     o.mystery = mystery
     o.wasserzeichen = wasser
+    o.stickpfad = FALSE              ' die Referenzen sind ohne Pfadlinien aufgenommen
     RETURN o
 END FUNCTION

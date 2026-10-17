@@ -35,9 +35,11 @@ CLASS PdfOptionen
     DIM mystery AS BOOLEAN
     DIM titel AS STRING              ' leer = Dateiname ohne Endung
     DIM datum AS STRING              ' TT.MM.JJJJ, leer = heute
+    DIM stickpfad AS BOOLEAN         ' Pfadlinien auf den Musterseiten (wie PySticky: an)
 
     SUB Init()
         papier = "A4"
+        stickpfad = TRUE
         kreuz = []
         paletten = []
     END SUB
@@ -606,6 +608,9 @@ CLASS PdfLauf2
     DIM dp AS BOOLEAN
     DIM titel AS STRING
     DIM datum AS STRING
+    DIM pfad AS Stickpfad            ' naechster Nachbar ueber das ganze Muster
+    DIM mitPfad AS BOOLEAN
+    DIM seitenPfade AS ARRAY OF Farbpfad   ' die der laufenden Musterseite
 END CLASS
 
 FUNCTION pdfEinheit$(r AS PdfLauf2) AS STRING
@@ -962,6 +967,7 @@ SUB pdfRaster(s AS PdfSatz, r AS PdfLauf2, x0 AS INTEGER, y0 AS INTEGER, x1 AS I
         DIM zehn2 AS BOOLEAN : zehn2 = (y0 + i) MOD 10 = 0
         zLine(s, kopf, gy + i * z, kopf + bw * z, gy + i * z, IIF(zehn2, &H333333, &HCCCCCC), IIF(zehn2, 1.0, 0.25))
     NEXT
+    IF r.mitPfad THEN pdfPfadlinien(s, r, kopf, gy, z)
     DIM fs AS FLOAT : fs = MAX(5, MIN(z * 0.7, 9))
     DIM x AS INTEGER, y AS INTEGER
     FOR y = 0 TO bh - 1
@@ -1001,6 +1007,27 @@ SUB pdfRaster(s AS PdfSatz, r AS PdfLauf2, x0 AS INTEGER, y0 AS INTEGER, x1 AS I
     pdfZeichnungEnde(s, w, h)
 END SUB
 
+' Die Pfadlinien einer Musterseite (_create_pattern_drawing_with_paths):
+' je Farbe von Stich zu Stich durch die Zellmitten, in der Garnfarbe
+' abgedunkelt und durchscheinend; ein Sprung rot gestrichelt.
+SUB pdfPfadlinien(s AS PdfSatz, r AS PdfLauf2, kopf AS FLOAT, gy AS FLOAT, z AS FLOAT)
+    DIM breite AS FLOAT : breite = MAX(0.3, MIN(z / 12, 0.8))
+    DIM p AS Farbpfad
+    FOR EACH p IN r.seitenPfade
+        DIM c AS INTEGER : c = r.m.farben[p.farbe].garn.farbe
+        DIM dunkel AS INTEGER : dunkel = RGB(INT((c SHR 16 BAND 255) * 0.7), INT((c SHR 8 BAND 255) * 0.7), INT((c BAND 255) * 0.7))
+        DIM i AS INTEGER
+        FOR i = 1 TO p.stiche() - 1
+            DIM sprung AS BOOLEAN : sprung = p.istSprung(i)
+            PDF_OPACITY(s.pdf, IIF(sprung, 0.5, 0.6))
+            IF sprung THEN PDF_DASH(s.pdf, pdfMm(1.5))
+            zLine(s, kopf + p.xs[i - 1] * z + z / 2, gy + p.ys[i - 1] * z + z / 2, kopf + p.xs[i] * z + z / 2, gy + p.ys[i] * z + z / 2, IIF(sprung, &HE64D4D, dunkel), breite)
+            IF sprung THEN PDF_DASH(s.pdf, 0)
+        NEXT
+    NEXT
+    PDF_OPACITY(s.pdf, 1)
+END SUB
+
 SUB pdfMusterseite(s AS PdfSatz, r AS PdfLauf2, n AS INTEGER)
     DIM m AS Muster : m = r.m
     DIM x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER
@@ -1015,6 +1042,8 @@ SUB pdfMusterseite(s AS PdfSatz, r AS PdfLauf2, n AS INTEGER)
     IF LEN(teile) > 0 THEN kopf = kopf + "  |  <font size='8' color='#888'>" + JOIN$(teile, "  ") + "</font>"
     pdfAbsatz(s, "CenterText", kopf)
     pdfAbstand(s, 3)
+    r.seitenPfade = []
+    IF r.mitPfad THEN r.seitenPfade = spAusschnitt(r.pfad, x0, y0, x1, y1)
     pdfRaster(s, r, x0, y0, x1, y1)
     pdfAbstand(s, 3)
     DIM zf AS ARRAY OF INTEGER : zf = seitenFarben(r.k, LEN(m.farben), x0, y0, x1, y1)
@@ -1040,6 +1069,16 @@ SUB pdfMusterseite(s AS PdfSatz, r AS PdfLauf2, n AS INTEGER)
         IF da > 12 THEN lt = lt + "  |  ... (+" + STR$(da - 12) + " weitere)"
         pdfAbsatz(s, "Normal", "<font size='7'><b>Farben:</b> " + lt + "</font>")
     END IF
+    ' im Diamond-Modus nicht: Drills folgen keinem Stickpfad
+    IF LEN(r.seitenPfade) > 0 AND NOT r.dp THEN
+        DIM pst AS INTEGER, psp AS INTEGER
+        DIM sp AS Farbpfad
+        FOR EACH sp IN r.seitenPfade
+            pst = pst + sp.stiche()
+            psp = psp + sp.spruenge
+        NEXT
+        pdfAbsatz(s, "Normal", "<font size='7'><b>Stickpfad:</b> " + STR$(pst) + " Stiche  |  " + STR$(LEN(r.seitenPfade)) + " Farben  |  " + STR$(psp) + " Sprünge  |  <font color='#dd5555'>- - -</font> = Sprung</font>")
+    END IF
     pdfAbstand(s, 2)
     pdfAbsatz(s, "CenterText", "<font size='7' color='#999999'>" + pdfMaske$(r.titel) + " · Seite " + STR$(n + 1) + "/" + STR$(r.plan.anzahl()) + " · " + r.datum + "</font>")
 END SUB
@@ -1058,6 +1097,11 @@ FUNCTION pdfBauen(m AS Muster, o AS PdfOptionen, titel AS STRING) AS PdfSatz
     r.plan = seitenplanFuer(m, o.papier, o.zellen, o.ueberlappung)
     r.titel = IIF(o.titel <> "", o.titel, titel)
     r.datum = o.datum
+    r.seitenPfade = []
+    IF o.stickpfad THEN
+        r.pfad = stickpfadBerechnen(m, SP_NACHBAR, m.stoff)
+        r.mitPfad = TRUE
+    END IF
     IF r.datum = "" THEN r.datum = RIGHT$(DATE$(), 2) + "." + MID$(DATE$(), 5, 2) + "." + LEFT$(DATE$(), 4)
     DIM s AS PdfSatz : s = NEW PdfSatz()
     s.ablauf = []
