@@ -241,6 +241,8 @@ DECLARE FUNCTION gtk_window_get_title LIB GTK (fenster AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_combo_box_get_model LIB GTK (wahl AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_tree_model_iter_n_children LIB GTK (modell AS ZEIGER, eintrag AS ZEIGER) AS LONG
 DECLARE SUB gtk_widget_set_no_show_all LIB GTK (w AS ZEIGER, nicht AS BOOLEAN)
+DECLARE FUNCTION gtk_widget_get_toplevel LIB GTK (w AS ZEIGER) AS ZEIGER
+DECLARE SUB gtk_container_check_resize LIB GTK (behaelter AS ZEIGER)
 DECLARE SUB cairo_fill_preserve LIB CAIRO (cr AS ZEIGER)
 DECLARE SUB cairo_set_line_cap LIB CAIRO (cr AS ZEIGER, art AS LONG)
 DECLARE SUB cairo_set_line_join LIB CAIRO (cr AS ZEIGER, art AS LONG)
@@ -421,6 +423,10 @@ FUNCTION gtkFoto(w AS INTEGER, pfad AS STRING) AS BOOLEAN
     WHILE gtk_events_pending()
         DIM weiter AS BOOLEAN : weiter = gtk_main_iteration_do(FALSE)
     WEND
+    ' ... und das Vermessen: das macht GTK im Takt der Bildwiederholung, nicht
+    ' beim Abholen der Ereignisse. Hat im selben Takt etwas eine neue Groesse
+    ' verlangt, verteilt erst das hier sie (sonst wieder "alloc_needed")
+    gtk_container_check_resize(gtk_widget_get_toplevel(w))
     DIM flaeche AS INTEGER : flaeche = cairo_image_surface_create(CAIRO_ARGB32, gtk_widget_get_allocated_width(w), gtk_widget_get_allocated_height(w))
     DIM cr AS INTEGER : cr = cairo_create(flaeche)
     gtk_widget_draw(w, cr)
