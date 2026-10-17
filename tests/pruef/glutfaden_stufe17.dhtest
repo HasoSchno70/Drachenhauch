@@ -339,6 +339,7 @@ markiert 3: 3
 stoff 18: 18.0 | 2.0 × 1.1 cm | ~5.14 m | schritt 'Stoff ändern' | geaendert TRUE
 zurueck: 14.0 | klappliste 14.0 | 2.5 × 1.5 cm
 stoff 25: 8 eintraege, gewaehlt 25.0
+stoff 40: 8 eintraege, letzter 40.0, gewaehlt 40.0
 liste waehlt: 1 | farbleiste ✎ ○ F1
 fortschritt: 35 / 115 Stiche | balken 30.4 % | zeilen 0:20% 3/15; 1:18% 3/17; 2:24% 4/17; 3:20% 3/15; 4:24% 5/21; 5:57% 17/30
 knopf: ✓  Sticken-Modus starten

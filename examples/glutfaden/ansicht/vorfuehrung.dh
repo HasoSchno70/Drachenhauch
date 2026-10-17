@@ -1830,6 +1830,9 @@ FUNCTION vorfuehrenStufe17(daten AS INTEGER) AS BOOLEAN
             lwMuster.stoff = 25
             infoleisteNachziehen()
             PRINT "stoff 25: "; LEN(ilStoffe); " eintraege, gewaehlt "; ilStoffe[gtk_combo_box_get_active(ilStoff)]
+            lwMuster.stoff = 40
+            infoleisteNachziehen()
+            PRINT "stoff 40: "; LEN(ilStoffe); " eintraege, letzter "; ilStoffe[LEN(ilStoffe) - 1]; ", gewaehlt "; ilStoffe[gtk_combo_box_get_active(ilStoff)]
             lwMuster.stoff = 14
             infoleisteNachziehen()
             ' Zeile der Liste anklicken waehlt die Farbe
