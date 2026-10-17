@@ -1337,3 +1337,174 @@ FUNCTION vorfuehrenStart(daten AS INTEGER) AS BOOLEAN
     gtk_widget_destroy(fenster)
     RETURN FALSE
 END FUNCTION
+
+' --- Stufe 14: Farben verwalten ---------------------------------------------------------
+' Das Muster im Aufruf (die Pruefung nimmt eins mit Perle, Drill, einer
+' ungenutzten Farbe und drei Ebenen, davon eine unsichtbar und eine gesperrt).
+' Das Bild: je Ebene und Zelle die GARNFARBE, Typ und erledigt -- ein Umbau,
+' der nur die Reihenfolge aendert, darf daran nichts aendern.
+FUNCTION vfBild$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM e AS kern.Ebene
+    FOR EACH e IN lwMuster.ebenen.ebenen
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(e.raster) - 1
+            IF e.raster[i] >= 0 THEN ARRAY_PUSH(t, HEX$(lwMuster.farben[e.raster[i]].garn.farbe) + ":" + STR$(e.art[i]) + ":" + STR$(e.erledigt[i]))
+            IF e.raster[i] < 0 THEN ARRAY_PUSH(t, "-")
+        NEXT
+    NEXT
+    DIM r AS kern.Rueckstich
+    FOR EACH r IN lwMuster.rueckstiche
+        ARRAY_PUSH(t, "r" + STR$(r.x1) + "," + STR$(r.y1) + "," + STR$(r.x2) + "," + STR$(r.y2) + ":" + HEX$(lwMuster.farben[r.farbe].garn.farbe))
+    NEXT
+    RETURN JOIN$(t, " ")
+END FUNCTION
+
+' Das ganze Muster: Liste (Name/Symbol/Faeden) und Bild
+FUNCTION vfAlles$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN lwMuster.farben
+        ARRAY_PUSH(t, f.garn.name + "/" + f.symbol + "/" + STR$(f.straenge))
+    NEXT
+    RETURN JOIN$(t, "|") + " # " + vfBild$()
+END FUNCTION
+
+FUNCTION vfFvNamen$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM k AS INTEGER
+    FOR EACH k IN fvPlan.folge
+        ARRAY_PUSH(t, lwMuster.farben[k].garn.name + "/" + STR$(fvPlan.straenge[k]))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION
+
+FUNCTION vfFvKnoepfe$() AS STRING
+    DIM t AS STRING
+    DIM k AS INTEGER
+    FOR EACH k IN fvKnoepfe
+        t = t + IIF(gtk_widget_get_sensitive(k), "1", "0")
+    NEXT
+    RETURN t
+END FUNCTION
+
+SUB vfFvWaehle(stellen AS ARRAY OF INTEGER)
+    gtk_list_box_unselect_all(fvListe)
+    DIM s AS INTEGER
+    FOR EACH s IN stellen
+        gtk_list_box_select_row(fvListe, fvZeilen[s])
+    NEXT
+END SUB
+
+DIM fvAllesVorher AS STRING
+DIM fvBildVorher AS STRING
+
+FUNCTION vorfuehrenStufe14(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM d AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            fvAllesVorher = vfAlles$()
+            fvBildVorher = vfBild$()
+            wzFarbe = 3
+            d = fvBauen()
+            fvFragenAus = TRUE
+            PRINT "kopf: "; gtk_label_get_text(fvKopf)
+            PRINT "liste: "; vfFvNamen$()
+            PRINT "knoepfe ohne wahl: "; vfFvKnoepfe$()
+            vfFvWaehle([3])
+            PRINT "eine gewaehlt: "; vfFvKnoepfe$(); " | "; REPLACE$(gtk_label_get_text(fvInfo), CHR$(10), " / ")
+            vfFvWaehle([1, 4])
+            PRINT "zwei gewaehlt: "; vfFvKnoepfe$(); " | "; REPLACE$(gtk_label_get_text(fvInfo), CHR$(10), " / ")
+            ok = vfFoto(fvDialog, "farben")
+        CASE 2
+            ' nur sortieren: das Bild bleibt, die Reihenfolge nicht
+            gtk_combo_box_set_active(fvSortierung, 4)
+            PRINT "hell -> dunkel: "; vfFvNamen$()
+            PRINT "auswahl folgt: "; LEN(fvGewaehlt()); " | "; REPLACE$(gtk_label_get_text(fvInfo), CHR$(10), " / ")
+            ok = fvUebernehmen()
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+            PRINT "sortiert uebernommen: "; ok; " | bild gleich "; vfBild$() = fvBildVorher; " | aktuelle farbe "; lwMuster.farben[wzFarbe].garn.name; " | "; meldung
+            werkzeugZurueck()
+            PRINT "zurueck: alles wie vorher "; vfAlles$() = fvAllesVorher; " | aktuelle farbe "; lwMuster.farben[wzFarbe].garn.name
+        CASE 3
+            d = fvBauen()
+            fvFragenAus = TRUE
+            vfFvWaehle([0, 2])
+            gtk_spin_button_set_value(fvFaeden, 5)
+            PRINT "faeden 5 fuer zwei: "; vfFvNamen$()
+            gtk_spin_button_set_value(fvAlleFaeden, 4)
+            fvAlleFaedenGeklickt(0, 0)
+            PRINT "alle 4: "; vfFvNamen$()
+            vfFvWaehle([4, 1])
+            fvAktion(0, 5)
+            PRINT "zusammen (blau bleibt? nein, oben gewaehlt bleibt): "; vfFvNamen$(); " | "; gtk_label_get_text(fvKopf)
+            vfFvWaehle([1])
+            fvAktion(0, 3)
+            PRINT "ans ende: "; vfFvNamen$()
+            vfFvWaehle([1])
+            fvAktion(0, 4)
+            PRINT "geloescht: "; vfFvNamen$()
+            fvAktion(0, 6)
+            PRINT "ungenutzte weg: "; vfFvNamen$(); " | "; gtk_label_get_text(fvKopf)
+            gtk_entry_set_text(fvSuche, "dmc")
+            fvFiltern(0, 0)
+            DIM sichtbar AS INTEGER, z AS INTEGER
+            FOR EACH z IN fvZeilen
+                IF gtk_widget_get_visible(z) THEN sichtbar = sichtbar + 1
+            NEXT
+            PRINT "suche dmc: "; sichtbar; " von "; LEN(fvZeilen)
+            gtk_entry_set_text(fvSuche, "")
+            fvFiltern(0, 0)
+            ok = vfFoto(fvDialog, "farben_geplant")
+        CASE 4
+            DIM vor AS INTEGER : vor = lwMuster.farbanzahl()
+            ok = fvUebernehmen()
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+            DIM nachher AS STRING : nachher = vfAlles$()
+            PRINT "uebernommen: "; ok; " | "; vor; " -> "; lwMuster.farbanzahl(); " Farben | aktuelle "; IIF(wzFarbe >= 0, lwMuster.farben[wzFarbe].garn.name, "-"); " | rueckstiche "; LEN(lwMuster.rueckstiche)
+            PRINT "farben: "; vfFarbListe$()
+            werkzeugZurueck()
+            PRINT "zurueck: alles wie vorher "; vfAlles$() = fvAllesVorher
+            werkzeugVor()
+            PRINT "vor: wieder wie danach "; vfAlles$() = nachher; " | aktuelle farbe "; lwMuster.farben[wzFarbe].garn.name
+            werkzeugZurueck()
+        CASE 5
+            ' Abbrechen: der Plan geht verloren, das Muster bleibt
+            d = fvBauen()
+            fvFragenAus = TRUE
+            vfFvWaehle([0, 1, 2])
+            fvAktion(0, 4)
+            fvAktion(0, 6)
+            PRINT "abbrechen nach loeschen: plan "; LEN(fvPlan.folge); " | muster "; lwMuster.farbanzahl()
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+            PRINT "abgebrochen: alles wie vorher "; vfAlles$() = fvAllesVorher
+            ' Zuruecksetzen im Dialog
+            d = fvBauen()
+            vfFvWaehle([0, 1])
+            fvAktion(0, 5)
+            gtk_combo_box_set_active(fvSortierung, 1)
+            fvAktion(0, 7)
+            PRINT "zurueckgesetzt: "; vfFvNamen$(); " | sortierung "; gtk_combo_box_get_active(fvSortierung); " | aendert "; kern.planAnwenden(lwMuster, wzVerlauf, fvPlan)
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION vfFarbListe$() AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM f AS kern.Farbeintrag
+    FOR EACH f IN lwMuster.farben
+        ARRAY_PUSH(t, f.garn.name + "/" + STR$(f.straenge) + "/" + STR$(f.stichzahl))
+    NEXT
+    RETURN JOIN$(t, " | ")
+END FUNCTION

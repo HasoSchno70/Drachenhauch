@@ -81,6 +81,7 @@ IMPORT "ansicht/sammlungdialoge.dh"
 IMPORT "ansicht/vorschaubild.dh"
 IMPORT "ansicht/vorschaudialog.dh"
 IMPORT "ansicht/autosichern.dh"
+IMPORT "ansicht/farbdialog.dh"
 IMPORT "ansicht/einstellungsdialog.dh"
 IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/seitenleiste.dh"
@@ -501,6 +502,7 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "palette" : paletteDialog()
         CASE "bibliothek" : bibliothekDialog()
         CASE "harmonie" : harmonieDialog()
+        CASE "farben" : farbverwaltungDialog()
         CASE "stickpfad" : stickpfadDialog()
         CASE "eigenschaften" : eigenschaftenDialog()
         CASE "versionen" : versionenDialog()
@@ -747,6 +749,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe13"
     ELSEIF ARG$(a) = "--probe-start" THEN
         probe = "start"
+    ELSEIF ARG$(a) = "--probe-stufe14" THEN
+        probe = "stufe14"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -794,6 +798,7 @@ IF probe = "stufe11" THEN g_timeout_add(300, vorfuehrenStufe11, 0)
 IF probe = "stufe12" THEN g_timeout_add(300, vorfuehrenStufe12, 0)
 IF probe = "stufe13" THEN g_timeout_add(300, vorfuehrenStufe13, 0)
 IF probe = "start" THEN g_timeout_add(300, vorfuehrenStart, 0)
+IF probe = "stufe14" THEN g_timeout_add(300, vorfuehrenStufe14, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 
