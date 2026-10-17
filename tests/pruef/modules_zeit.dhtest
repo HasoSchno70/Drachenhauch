@@ -306,3 +306,35 @@ DIM b AS STRING : b = ZEIT_TEXT$(ZEIT_JETZT())
 PRINT LEFT$(a, 16) = LEFT$(b, 16)
 --- erwartet
 TRUE
+
+=== unix-zeit passt zur ortszeit
+' ZEIT_UNIX ist die Zahl, die andere Programme meinen (UTC, mit Bruchteil);
+' ueber ZEIT_AUS_UNIX ist sie dieselbe Uhrzeit wie ZEIT_JETZT.
+IMPORT "zeit"
+DIM u AS FLOAT : u = ZEIT_UNIX()
+PRINT TYPEOF(u); " "; u > 1.7E9
+PRINT ABS(ZEIT_DIFF(ZEIT_AUS_UNIX(u), ZEIT_JETZT())) <= 2
+PRINT ABS(ZEIT_NACH_UNIX(ZEIT_JETZT()) - u) <= 2
+DIM t AS INTEGER : t = ZEIT_PARSE("2026-07-01 14:00:00")
+PRINT ZEIT_AUS_UNIX(ZEIT_NACH_UNIX(t)) = t
+--- erwartet
+FLOAT TRUE
+TRUE
+TRUE
+TRUE
+
+=== unix-zeit: falsche argumente
+IMPORT "zeit"
+TRY
+    PRINT ZEIT_UNIX(1)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT ZEIT_AUS_UNIX("x")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+ZEIT_UNIX: erwartet keine Argumente
+ZEIT_AUS_UNIX: erwartet Unix-Sekunden (eine Zahl)

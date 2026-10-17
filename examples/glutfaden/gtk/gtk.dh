@@ -28,6 +28,7 @@ DECLARE SUB gtk_header_bar_pack_end LIB GTK (leiste AS ZEIGER, kind AS ZEIGER)
 DECLARE FUNCTION gtk_box_new LIB GTK (richtung AS LONG, abstand AS LONG) AS ZEIGER
 DECLARE SUB gtk_box_pack_start LIB GTK (box AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, fuellen AS BOOLEAN, rand AS ULONG)
 DECLARE SUB gtk_box_pack_end LIB GTK (box AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, fuellen AS BOOLEAN, rand AS ULONG)
+DECLARE SUB gtk_box_set_homogeneous LIB GTK (box AS ZEIGER, gleich AS BOOLEAN)
 DECLARE FUNCTION gtk_paned_new LIB GTK (richtung AS LONG) AS ZEIGER
 DECLARE FUNCTION gtk_notebook_new LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_notebook_append_page LIB GTK (nb AS ZEIGER, kind AS ZEIGER, reiter AS ZEIGER) AS LONG

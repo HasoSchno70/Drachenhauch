@@ -113,7 +113,9 @@ END SUB
 SUB werkzeugWaehlen(nr AS INTEGER, gefuellt AS BOOLEAN)
     IF wzZug <> ZUG_KEINER THEN RETURN
     IF nr <> wzAktiv THEN mehrWechsel(nr)
+    DIM vorher AS INTEGER : vorher = wzAktiv
     wzAktiv = nr
+    IF vorher <> nr THEN stickzeitWerkzeug(vorher, nr)
     wzGefuellt = gefuellt AND wzKannGefuellt(nr)
     wzKnopfSperre = TRUE
     DIM i AS INTEGER

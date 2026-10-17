@@ -965,8 +965,9 @@ thread_local! {
     /// Die VM, die die Funktionen der Rueckrufe ausfuehrt -- gesetzt vor
     /// jedem Aufruf einer Bibliothek (wie `Kontext::vm` im Maschinencode).
     static VM: std::cell::Cell<*mut crate::vm::Vm<'static>> = const { std::cell::Cell::new(std::ptr::null_mut()) };
-    /// Der Fehler eines Rueckrufs, bis der Aufruf der Bibliothek ihn meldet.
-    static RR_FEHLER: RefCell<Option<(String, u32)>> = const { RefCell::new(None) };
+    /// Der Fehler eines Rueckrufs, bis der Aufruf der Bibliothek ihn meldet --
+    /// mit der Tiefe dieses Aufrufs (wie viele Bibliotheksfunktionen liefen).
+    static RR_FEHLER: RefCell<Option<(String, u32, usize)>> = const { RefCell::new(None) };
     /// Die Bibliotheksfunktionen, die gerade laufen (innen zuletzt) -- fuer
     /// die Meldung des Waechters.
     static LAUFEND: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
@@ -991,7 +992,7 @@ static WACHE_GEMELDET: std::sync::atomic::AtomicBool = std::sync::atomic::Atomic
 #[cfg(feature = "ffi")]
 fn rueckruf_gescheitert(meldung: String, zeile: u32) {
     use std::sync::atomic::Ordering;
-    let laufend = LAUFEND.with(|l| l.borrow().last().cloned()).unwrap_or_default();
+    let (laufend, tiefe) = LAUFEND.with(|l| { let l = l.borrow(); (l.last().cloned().unwrap_or_default(), l.len()) });
     let text = if zeile > 0 {
         match crate::preprocess::lauf_stelle(zeile) {
             Some(wo) => format!("{} ({})", meldung, wo),
@@ -1000,7 +1001,7 @@ fn rueckruf_gescheitert(meldung: String, zeile: u32) {
     } else { meldung.clone() };
     let neu = RR_FEHLER.with(|f| {
         let mut f = f.borrow_mut();
-        if f.is_none() { *f = Some((meldung, zeile)); true } else { false }
+        if f.is_none() { *f = Some((meldung, zeile, tiefe)); true } else { false }
     });
     if !neu {
         if WACHE_GEMELDET.load(Ordering::SeqCst) {
@@ -1240,10 +1241,22 @@ unsafe fn eingang_innen(nummer: u64, plaetze: *const u64, rueck: *mut u64) {
     }
 }
 
-/// Nach dem Aufruf einer Bibliothek: hat ein Rueckruf einen Fehler gemerkt?
+/// Nach dem Aufruf einer Bibliothek (der `tiefe`-te, der lief): hat ein
+/// Rueckruf, den DIESER Aufruf ausgeloest hat, einen Fehler gemerkt?
+///
+/// Nur dieser meldet ihn (2026-10-17, Glutfaden Stufe 10). Vorher holte ihn
+/// der naechste Aufruf ab, der zurueckkehrte -- in einer Hauptschleife also
+/// ein Aufruf IN einem spaeteren Rueckruf (`cairo_set_source_rgba` beim
+/// naechsten Zeichnen). Der warf ihn dort, der spaetere Rueckruf scheiterte
+/// damit selbst, und so fort: jeder Rueckruf nach dem ersten Fehler war
+/// kaputt, und die Meldung wuchs mit jedem um eine Schale.
 #[cfg(feature = "ffi")]
-fn rueckruf_fehler() -> Option<String> {
-    if let Some((e, zeile)) = RR_FEHLER.with(|f| f.borrow_mut().take()) {
+fn rueckruf_fehler(tiefe: usize) -> Option<String> {
+    let gemerkt = RR_FEHLER.with(|f| {
+        let mut f = f.borrow_mut();
+        if matches!(&*f, Some((_, _, t)) if *t >= tiefe) { f.take() } else { None }
+    });
+    if let Some((e, zeile, _)) = gemerkt {
         WACHE_NR.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         WACHE_GEMELDET.store(false, std::sync::atomic::Ordering::SeqCst);
         let vm = VM.with(|v| v.get());
@@ -1796,7 +1809,7 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     let worte = auf.rueck_struct.as_ref().map(|s| (s.groesse as usize).div_ceil(8)).unwrap_or(0).max(4);
     let (mut rp_fest, mut rp_vec) = ([0u64; 4], Vec::new());
     let rueck_platz: &mut [u64] = if worte <= 4 { &mut rp_fest[..] } else { rp_vec = vec![0u64; worte]; &mut rp_vec[..] };
-    LAUFEND.with(|l| l.borrow_mut().push(sig.name.clone()));
+    let tiefe = LAUFEND.with(|l| { let mut l = l.borrow_mut(); l.push(sig.name.clone()); l.len() });
     let gerufen = if variadisch {
         let mut r = 0u64;
         let g = variadisch_rufen(auf, fest, &plaetze[..n], &weitere, &mut r);
@@ -1812,7 +1825,7 @@ fn rufen_mit(auf: &Aufruf, args: &[Value]) -> Result<Value, String> {
     drop(breite);
     drop(kopien);
     let _ = &ablage;
-    if let Some(e) = rueckruf_fehler() { return Err(format!("{}: {}", sig.name, e)); }
+    if let Some(e) = rueckruf_fehler(tiefe) { return Err(format!("{}: {}", sig.name, e)); }
     let rueck = rueck_platz[0];
     let ergebnis = match sig.rueck {
         'x' => {
