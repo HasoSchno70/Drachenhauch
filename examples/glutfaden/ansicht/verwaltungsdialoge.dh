@@ -1003,6 +1003,7 @@ SUB musterGeklickt(w AS INTEGER, was AS INTEGER)
         CASE 6 : bibliothekDialog()
         CASE 7 : einstellungenDialog()
         CASE 8 : rasterDialog()
+        CASE 9 : kachelDialog()
     END SELECT
 END SUB
 
@@ -1078,12 +1079,12 @@ END SUB
 FUNCTION musterKnopf() AS INTEGER
     DIM mb AS INTEGER : mb = gtk_menu_button_new()
     gtk_container_add(mb, gtk_image_new_from_icon_name("document-new-symbolic", GTK_ICON_KNOPF))
-    tipp(mb, "Muster -- neu ({neu}), Eigenschaften ({eigenschaften}), Größe, Versionen ({versionen}), Vorlagen, Bibliothek ({bibliothek}), Einstellungen ({einstellungen})")
+    tipp(mb, "Muster -- neu ({neu}), Eigenschaften ({eigenschaften}), Größe, Versionen ({versionen}), Vorlagen, Bibliothek ({bibliothek}), Einstellungen ({einstellungen}), Kachel-Vorschau ({kacheln})")
     gtk_widget_set_can_focus(mb, FALSE)
     musterPopover = gtk_popover_new(mb)
     DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 2)
     gtk_container_set_border_width(box, 8)
-    DIM texte AS ARRAY OF STRING : texte = ["Neues Muster …", "Eigenschaften …", "Größe ändern …", "Versionen …", "Als Vorlage speichern …", "Vorlagen verwalten …", "Bibliothek …", "Einstellungen …", "Raster-Optionen …"]
+    DIM texte AS ARRAY OF STRING : texte = ["Neues Muster …", "Eigenschaften …", "Größe ändern …", "Versionen …", "Als Vorlage speichern …", "Vorlagen verwalten …", "Bibliothek …", "Einstellungen …", "Raster-Optionen …", "Kachel-Vorschau …"]
     DIM i AS INTEGER
     FOR i = 0 TO LEN(texte) - 1
         IF i = 4 OR i = 6 OR i = 7 THEN gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)

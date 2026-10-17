@@ -337,6 +337,13 @@ FUNCTION fvBauen() AS INTEGER
     RETURN fvDialog
 END FUNCTION
 
+' Wo steht die alte Farbe nr nach dem Plan (-1 = geloescht)?
+FUNCTION fvNeueNummer(nr AS INTEGER) AS INTEGER
+    IF nr < 0 OR nr >= LEN(fvPlan.ziel) THEN RETURN -1
+    IF fvPlan.ziel[nr] = kern.FP_WEG THEN RETURN -1
+    RETURN ARRAY_INDEXOF(fvPlan.folge, IIF(fvPlan.ziel[nr] >= 0, fvPlan.ziel[nr], nr))
+END FUNCTION
+
 ' Den Plan ins Muster: ein Schritt; die aktuelle Farbe wandert mit, die
 ' Zwischenablage gilt nicht mehr (ihre Nummern sind andere)
 FUNCTION fvUebernehmen() AS BOOLEAN
@@ -348,6 +355,9 @@ FUNCTION fvUebernehmen() AS BOOLEAN
         IF fvPlan.ziel[alteFarbe] <> kern.FP_WEG THEN wzFarbe = ARRAY_INDEXOF(fvPlan.folge, z)
     END IF
     IF wzFarbe < 0 AND lwMuster.farbanzahl() > 0 THEN wzFarbe = 0
+    ' die Farben des Verlaufswerkzeugs ebenso (sonst zeigten sie danach auf andere)
+    fvlStart = MAX(0, fvNeueNummer(fvlStart))
+    fvlEnde = MAX(0, fvNeueNummer(fvlEnde))
     mrAblage = NIL
     allesNeu()
     statusMeldung("Farben verwaltet: " + STR$(lwMuster.farbanzahl()) + " Farben (" + kern.kuerzelVon$(einst, "zurueck") + " nimmt es zurück).")
