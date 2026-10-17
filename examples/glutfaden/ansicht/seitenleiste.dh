@@ -36,6 +36,7 @@ FUNCTION seitenleisteNeu() AS INTEGER
     gtkKlasse(rolle, "seitenleiste")
     slBox = gtk_box_new(GTK_SENKRECHT, 0)
     gtk_container_add(rolle, slBox)
+    gtk_box_pack_start(slBox, minikarteNeu(), FALSE, FALSE, 0)
     slEbenenKnoepfe = []
     slSchrift = pango_font_description_from_string("DejaVu Sans Bold 11")
     slPaletten = kern.palettenLaden(PATHJOIN(CWD$(), "daten/paletten"))
@@ -243,6 +244,7 @@ SUB seitenleisteMuster(m AS kern.Muster)
     slSperre = FALSE
     seitenleisteFarbeMarkieren()
     slEbeneMarkieren()
+    verlaufLeisteNachziehen()
 END SUB
 
 ' Die Palette zum Muster: der Hersteller der ersten Farbe, sonst die aus den

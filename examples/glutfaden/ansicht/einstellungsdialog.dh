@@ -23,6 +23,8 @@ DIM edAutor AS INTEGER
 DIM edCopyright AS INTEGER
 ' Zeichenflaeche
 DIM edRaster AS INTEGER
+DIM edLineale AS INTEGER
+DIM edUebersicht AS INTEGER
 DIM edHaupt AS INTEGER
 DIM edNebenAn AS INTEGER
 DIM edNeben AS INTEGER
@@ -200,6 +202,10 @@ FUNCTION edBauen() AS INTEGER
     edAbschnitt(s, "Raster")
     edRaster = edKaestchen("Raster zeigen", "")
     edRein(s, edRaster)
+    edLineale = edKaestchen("Lineale oben und links", "Stichnummern am Rand; ein Klick holt Spalte oder Zeile in die Mitte")
+    edRein(s, edLineale)
+    edUebersicht = edKaestchen("Übersicht in der Seitenleiste", "Das ganze Muster klein, mit dem sichtbaren Ausschnitt")
+    edRein(s, edUebersicht)
     edHaupt = adSpin(5, 50, 1, 10, 0)
     edRein(s, edZeile("Kräftige Linie alle (Stiche):", edHaupt, ""))
     edNebenAn = edKaestchen("Neben-Raster zeigen", "Eine zweite, eigene Linie zwischen den kräftigen")
@@ -375,6 +381,8 @@ SUB edFuellen(e AS kern.Einstellungen)
     gtk_entry_set_text(edAutor, e.autor)
     gtk_entry_set_text(edCopyright, e.copyright)
     gtk_toggle_button_set_active(edRaster, e.raster)
+    gtk_toggle_button_set_active(edLineale, e.lineale)
+    gtk_toggle_button_set_active(edUebersicht, e.uebersicht)
     gtk_spin_button_set_value(edHaupt, e.rasterHaupt)
     gtk_toggle_button_set_active(edNebenAn, e.nebenraster)
     gtk_spin_button_set_range(edNeben, 1, MIN(20, MAX(1, e.rasterHaupt - 1)))
@@ -432,6 +440,8 @@ SUB edUebernehmen()
     einst.autor = TRIM$(gtk_entry_get_text(edAutor))
     einst.copyright = TRIM$(gtk_entry_get_text(edCopyright))
     einst.raster = gtk_toggle_button_get_active(edRaster)
+    einst.lineale = gtk_toggle_button_get_active(edLineale)
+    einst.uebersicht = gtk_toggle_button_get_active(edUebersicht)
     einst.rasterHaupt = gtk_spin_button_get_value_as_int(edHaupt)
     einst.nebenraster = gtk_toggle_button_get_active(edNebenAn)
     einst.rasterNeben = gtk_spin_button_get_value_as_int(edNeben)
@@ -609,6 +619,8 @@ SUB einstellungenAnwenden()
     lwSchrift = pango_font_description_from_string(einst.symbolSchrift + " Bold 10")
     exVorbelegt = FALSE
     zuletztNachziehen()
+    flLinealeZeigen(einst.lineale)
+    minikarteZeigen(einst.uebersicht)
     IF lwHat THEN
         lwZelle = CLAMP(lwZelle, einst.zelleMin, einst.zelleMax)
         seitenleisteMuster(lwMuster)

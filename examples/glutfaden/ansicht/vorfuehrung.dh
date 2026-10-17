@@ -1355,7 +1355,10 @@ FUNCTION vfBild$() AS STRING
     NEXT
     DIM r AS kern.Rueckstich
     FOR EACH r IN lwMuster.rueckstiche
-        ARRAY_PUSH(t, "r" + STR$(r.x1) + "," + STR$(r.y1) + "," + STR$(r.x2) + "," + STR$(r.y2) + ":" + HEX$(lwMuster.farben[r.farbe].garn.farbe))
+        ' eine Farbnummer ausserhalb der Liste (alte Dateien) als sie selbst
+        DIM rf AS STRING : rf = "#" + STR$(r.farbe)
+        IF r.farbe >= 0 AND r.farbe < lwMuster.farbanzahl() THEN rf = HEX$(lwMuster.farben[r.farbe].garn.farbe)
+        ARRAY_PUSH(t, "r" + STR$(r.x1) + "," + STR$(r.y1) + "," + STR$(r.x2) + "," + STR$(r.y2) + ":" + rf)
     NEXT
     RETURN JOIN$(t, " ")
 END FUNCTION
@@ -1507,4 +1510,152 @@ FUNCTION vfFarbListe$() AS STRING
         ARRAY_PUSH(t, f.garn.name + "/" + STR$(f.straenge) + "/" + STR$(f.stichzahl))
     NEXT
     RETURN JOIN$(t, " | ")
+END FUNCTION
+
+' --- Stufe 15: Zeichenflaeche (Lineale, Uebersicht, Kacheln, Farbverlauf) ---------------
+' Die Zellen der aktiven Ebene entlang einer Punktliste: "x,y=farbe:typ"
+FUNCTION v15Zellen$(p AS ARRAY OF INTEGER) AS STRING
+    DIM e AS kern.Ebene : e = lwMuster.ebenen.aktiveEbene()
+    DIM t AS ARRAY OF STRING : t = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(p) - 2 STEP 2
+        DIM i AS INTEGER : i = p[k + 1] * e.breite + p[k]
+        ARRAY_PUSH(t, STR$(p[k]) + "," + STR$(p[k + 1]) + "=" + STR$(e.raster[i]) + ":" + STR$(e.art[i]))
+    NEXT
+    RETURN JOIN$(t, " ")
+END FUNCTION
+
+FUNCTION v15Sichtbar$() AS STRING
+    RETURN "lineale " + STR$(gtk_widget_get_visible(flOben)) + "/" + STR$(gtk_widget_get_visible(flLinks)) + " uebersicht " + STR$(gtk_widget_get_visible(mkBox)) + " verlaufsleiste " + STR$(gtk_widget_get_visible(fvlBox))
+END FUNCTION
+
+DIM v15Vorher AS STRING
+
+FUNCTION vorfuehrenStufe15(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM d AS INTEGER
+    DIM vx AS INTEGER, vy AS INTEGER, vw AS INTEGER, vh AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            PRINT "start: "; v15Sichtbar$(); " | werkzeuge "; WZ_ANZAHL; " | "; kern.werkzeugNamen()[WZ_FARBVERLAUF]; " "; kern.kuerzelVon$(einst, "wz_farbverlauf")
+            PRINT "uebersicht: "; gtk_label_get_text(mkInfo)
+            leinwandZoom(30, 0, 0)
+            lwX = 40 : lwY = 30
+            lwMausX = 4 : lwMausY = 2
+            gtk_widget_queue_draw(lwFlaeche)
+        CASE 2
+            ok = vfFoto(fenster, "flaeche")
+            (vx, vy, vw, vh) = mkAusschnitt()
+            PRINT "minikarte: bild "; mkB; "x"; mkH; " bei "; mkX; ","; mkY; " | ausschnitt "; vx; ","; vy; " "; vw; "x"; vh
+            ' Lineal: Spalte 10 in die Mitte, Zeile 3 in die Mitte
+            linealSpringen(FALSE, 10)
+            linealSpringen(TRUE, 3)
+            DIM mx AS FLOAT : mx = lwX + 10.5 * lwZelle
+            DIM my AS FLOAT : my = lwY + 3.5 * lwZelle
+            PRINT "lineal: spalte 10 in der mitte "; ABS(mx - gtk_widget_get_allocated_width(lwFlaeche) / 2) <= 1; " | zeile 3 "; ABS(my - gtk_widget_get_allocated_height(lwFlaeche) / 2) <= 1
+            ' Minikarte: die rechte untere Ecke in die Mitte
+            minikarteSpringen(1.0, 1.0)
+            PRINT "minikarte: ecke in der mitte "; ABS(lwX + lwMuster.breite * lwZelle - gtk_widget_get_allocated_width(lwFlaeche) / 2) <= 1
+            musterZentrieren()
+            PRINT "zentriert: "; ABS(lwX * 2 + lwMuster.breite * lwZelle - gtk_widget_get_allocated_width(lwFlaeche)) <= 1; " zelle "; lwZelle
+        CASE 3
+            ' Farbverlauf: Werkzeug, Leiste, Zug von links oben nach rechts unten
+            ' gemalt wird auf einer sichtbaren Ebene
+            lwMuster.ebenen.aktiv = 0
+            seitenleisteMuster(lwMuster)
+            befehlAusfuehren("wz_farbverlauf")
+            PRINT "werkzeug: "; wzAktiv = WZ_FARBVERLAUF; " | "; v15Sichtbar$()
+            v15Vorher = vfAlles$()
+            fvlStart = 0 : fvlEnde = lwMuster.farbanzahl() - 1
+            verlaufLeisteNachziehen()
+            PRINT "leiste: "; gtk_combo_box_get_active(fvlStartWahl); " -> "; gtk_combo_box_get_active(fvlEndeWahl); " von "; lwMuster.farben[gtk_combo_box_get_active(fvlStartWahl)].garn.name
+            DIM z AS INTEGER : z = wzDruck(0, 0, 1, FALSE)
+            wzZiehen(8, 5, FALSE)
+            PRINT "vorschau: "; LEN(wzVorschau) \ 2; " punkte, farben "; JOIN$(wzVorschauFarben, ",")
+            ' ueber den Rand gezogen: das Ende bleibt im Muster
+            wzZiehen(400, 300, FALSE)
+            PRINT "ueber den rand: ende "; wzVorschau[LEN(wzVorschau) - 2]; ","; wzVorschau[LEN(wzVorschau) - 1]
+            wzZiehen(lwMuster.breite - 1, lwMuster.hoehe - 1, FALSE)
+            ok = vfFoto(fenster, "verlauf_vorschau")
+        CASE 4
+            DIM p AS ARRAY OF INTEGER : p = wzVorschau
+            DIM f AS ARRAY OF INTEGER : f = wzVorschauFarben
+            wzLos(lwMuster.breite - 1, lwMuster.hoehe - 1, FALSE)
+            PRINT "gesetzt: "; v15Zellen$(p)
+            PRINT "wie geplant: "; v15Zellen$(p) = v15Plan$(p, f, 0); " | schritt '"; wzVerlauf.textZurueck$(); "' | vorschau weg "; LEN(wzVorschau) = 0
+            werkzeugZurueck()
+            PRINT "zurueck: alles wie vorher "; vfAlles$() = v15Vorher
+            ' mit Spiegel und Halbstich: das Spiegelbild in der Farbe seines Punkts
+            spiegelWaehlen(1)
+            stichartWaehlen(kern.HALB_OL_UR)
+            fvlStart = 1 : fvlEnde = 2
+            zug(1, [1, 1, 5, 1], FALSE)
+            DIM b AS INTEGER : b = lwMuster.breite
+            PRINT "gespiegelt: "; v15Zellen$([1, 1, 5, 1]); " | "; v15Zellen$([b - 2, 1, b - 6, 1])
+            werkzeugZurueck()
+            spiegelWaehlen(0)
+            stichartWaehlen(kern.VOLL)
+            ' Start ausserhalb: kein Zug
+            PRINT "start draussen: "; wzDruck(-1, 2, 1, FALSE)
+            PRINT "nach allem: wie vorher "; vfAlles$() = v15Vorher
+        CASE 5
+            ' gesperrte Ebene: nichts, eine Meldung
+            lwMuster.ebenen.aktiveEbene().gesperrt = TRUE
+            zug(1, [0, 0, 3, 0], FALSE)
+            PRINT "gesperrt: "; meldung; " | unveraendert "; vfAlles$() = v15Vorher
+            lwMuster.ebenen.aktiveEbene().gesperrt = FALSE
+            ' Farben verwalten verschiebt die Nummern -- die Verlaufsfarben wandern mit
+            fvlStart = 2 : fvlEnde = 4
+            DIM namenVorher AS STRING : namenVorher = lwMuster.farben[2].garn.name + " -> " + lwMuster.farben[4].garn.name
+            d = fvBauen()
+            fvFragenAus = TRUE
+            gtk_combo_box_set_active(fvSortierung, 2)
+            ok = fvUebernehmen()
+            gtk_widget_destroy(fvDialog)
+            fvDialog = 0
+            PRINT "farben verwaltet: "; namenVorher; " | danach "; fvlStart; ","; fvlEnde; " "; lwMuster.farben[fvlStart].garn.name; " -> "; lwMuster.farben[fvlEnde].garn.name; " | leiste "; lwMuster.farben[gtk_combo_box_get_active(fvlStartWahl)].garn.name
+            werkzeugZurueck()
+            PRINT "zurueck: "; lwMuster.farben[fvlStart].garn.name; " -> "; lwMuster.farben[fvlEnde].garn.name; " | alles wie vorher "; vfAlles$() = v15Vorher
+        CASE 6
+            ' Kachel-Vorschau
+            d = kvBauen()
+            ok = vfFoto(kvDialog, "kacheln")
+        CASE 7
+            PRINT "kacheln 3x3: zelle "; kvZelle
+            gtk_spin_button_set_value(kvX, 5)
+            gtk_spin_button_set_value(kvY, 4)
+            gtk_toggle_button_set_active(kvGrenzen, FALSE)
+        CASE 8
+            ok = vfFoto(kvDialog, "kacheln_5x4")
+            PRINT "kacheln 5x4: zelle "; kvZelle; " | erwartet "; kern.kachelZelle(lwMuster.breite, lwMuster.hoehe, gtk_widget_get_allocated_width(kvFeld), gtk_widget_get_allocated_height(kvFeld), 5, 4)
+            gtk_widget_destroy(kvDialog)
+            kvDialog = 0
+            kvFeld = 0
+            ' Lineale und Uebersicht aus -- gemerkt
+            befehlAusfuehren("lineale")
+            befehlAusfuehren("uebersicht")
+            PRINT "aus: "; v15Sichtbar$(); " | gemerkt "; kern.einstellungenLaden(einst.pfad).lineale; " "; kern.einstellungenLaden(einst.pfad).uebersicht
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+        CASE 9
+            ok = vfFoto(fenster, "ohne_lineale")
+            befehlAusfuehren("lineale")
+            befehlAusfuehren("uebersicht")
+            PRINT "wieder an: "; v15Sichtbar$()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
+
+' Was der Verlauf p/f auf der aktiven Ebene ergeben muss (Typ wie die Stichart)
+FUNCTION v15Plan$(p AS ARRAY OF INTEGER, f AS ARRAY OF INTEGER, typ AS INTEGER) AS STRING
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(f) - 1
+        ARRAY_PUSH(t, STR$(p[2 * i]) + "," + STR$(p[2 * i + 1]) + "=" + STR$(f[i]) + ":" + STR$(typ))
+    NEXT
+    RETURN JOIN$(t, " ")
 END FUNCTION

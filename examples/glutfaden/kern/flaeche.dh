@@ -1,0 +1,172 @@
+' Rechenteile fuer die Zeichenflaeche: das Werkzeug "Farbverlauf" (PyStickys
+' GradientTool), die Minikarte (MinimapWidget) und die Kachel-Vorschau
+' (TilePreviewWidget). Was hier steht, kennt kein Fenster -- die Ansicht
+' zeichnet nur, was diese Funktionen liefern.
+
+' --- Farbverlauf -----------------------------------------------------------------------
+
+' Bresenham von (x1, y1) nach (x2, y2) in DIESER Richtung. linie() tauscht die
+' Enden, damit eine Linie in beide Zugrichtungen dieselben Punkte hat -- beim
+' Verlauf zaehlt die Richtung: der erste Punkt bekommt die Startfarbe.
+FUNCTION gerichteteLinie(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER) AS ARRAY OF INTEGER
+    DIM p AS ARRAY OF INTEGER : p = []
+    DIM dx AS INTEGER : dx = ABS(x2 - x1)
+    DIM dy AS INTEGER : dy = ABS(y2 - y1)
+    DIM sx AS INTEGER : sx = IIF(x1 < x2, 1, -1)
+    DIM sy AS INTEGER : sy = IIF(y1 < y2, 1, -1)
+    DIM fehler AS INTEGER : fehler = dx - dy
+    DIM x AS INTEGER : x = x1
+    DIM y AS INTEGER : y = y1
+    DO
+        ARRAY_PUSH(p, x)
+        ARRAY_PUSH(p, y)
+        IF x = x2 AND y = y2 THEN EXIT DO
+        DIM e2 AS INTEGER : e2 = 2 * fehler
+        IF e2 > -dy THEN
+            fehler = fehler - dy
+            x = x + sx
+        END IF
+        IF e2 < dx THEN
+            fehler = fehler + dx
+            y = y + sy
+        END IF
+    LOOP
+    RETURN p
+END FUNCTION
+
+' Die Palettenfarbe, die der Garnfarbe f am naechsten kommt (CIEDE2000, bei
+' Gleichstand die erste) -- wie GradientTool._find_closest_color.
+FUNCTION naechsteFarbe(m AS Muster, f AS INTEGER) AS INTEGER
+    DIM best AS INTEGER : best = 0
+    DIM bestAbstand AS FLOAT : bestAbstand = 1E300
+    DIM i AS INTEGER
+    FOR i = 0 TO m.farbanzahl() - 1
+        DIM d AS FLOAT : d = farbAbstand(f, m.farben[i].garn.farbe)
+        IF d < bestAbstand THEN
+            bestAbstand = d
+            best = i
+        END IF
+    NEXT
+    RETURN best
+END FUNCTION
+
+' Der Verlauf von (x1, y1) nach (x2, y2): (punkte [x0, y0, ...], farben je
+' Punkt). Je Punkt der Linie die Farbe zwischen Start- und Endfarbe (Anteil
+' i / (n - 1), je Kanal abgeschnitten wie Pythons int()) und davon die
+' naechste der Palette. Ein einzelner Punkt bekommt die Startfarbe; eine
+' Farbnummer ausserhalb der Palette ergibt nichts.
+FUNCTION farbverlauf(m AS Muster, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, start AS INTEGER, ende AS INTEGER) AS TUPLE
+    DIM p AS ARRAY OF INTEGER : p = gerichteteLinie(x1, y1, x2, y2)
+    DIM f AS ARRAY OF INTEGER : f = []
+    DIM n AS INTEGER : n = LEN(p) \ 2
+    IF n <= 1 THEN RETURN ([x1, y1], [start])
+    IF start < 0 OR start >= m.farbanzahl() OR ende < 0 OR ende >= m.farbanzahl() THEN RETURN ([], [])
+    DIM a AS INTEGER : a = m.farben[start].garn.farbe
+    DIM b AS INTEGER : b = m.farben[ende].garn.farbe
+    DIM ar AS INTEGER : ar = (a SHR 16) BAND 255
+    DIM ag AS INTEGER : ag = (a SHR 8) BAND 255
+    DIM ab AS INTEGER : ab = a BAND 255
+    DIM br AS INTEGER : br = (b SHR 16) BAND 255
+    DIM bg AS INTEGER : bg = (b SHR 8) BAND 255
+    DIM bb AS INTEGER : bb = b BAND 255
+    ' dieselbe Zwischenfarbe kommt oft vor -- CIEDE2000 ueber die ganze
+    ' Palette nur einmal je Farbe
+    DIM schon AS MAP OF INTEGER : schon = {}
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM t AS FLOAT : t = i / MAX(1, n - 1)
+        DIM r AS INTEGER : r = INT(ar + t * (br - ar))
+        DIM g AS INTEGER : g = INT(ag + t * (bg - ag))
+        DIM bl AS INTEGER : bl = INT(ab + t * (bb - ab))
+        DIM z AS INTEGER : z = (r SHL 16) BOR (g SHL 8) BOR bl
+        DIM k AS STRING : k = STR$(z)
+        IF NOT MAPHAS(schon, k) THEN MAPPUT(schon, k, naechsteFarbe(m, z))
+        ARRAY_PUSH(f, MAPGET(schon, k))
+    NEXT
+    RETURN (p, f)
+END FUNCTION
+
+' --- Minikarte -------------------------------------------------------------------------
+
+CONST MINIKARTE_GRUND = &HFAFAF5      ' wo kein Stich ist (Cremeweiss)
+
+' Bildmasse der Minikarte in einem Feld bw x bh -- wie MinimapWidget._rebuild_cache:
+' 8 Punkte Rand, das Muster eingepasst, mindestens 10 x 10. Das Feld ist
+' mindestens 120 x 100 (setMinimumSize).
+FUNCTION minikarteMass(b AS INTEGER, h AS INTEGER, bw AS INTEGER, bh AS INTEGER) AS TUPLE
+    bw = MAX(bw, 120)
+    bh = MAX(bh, 100)
+    DIM aw AS INTEGER : aw = MAX(20, bw - 16)
+    DIM ah AS INTEGER : ah = MAX(20, bh - 16)
+    DIM seiten AS FLOAT : seiten = b / h
+    DIM iw AS INTEGER, ih AS INTEGER
+    IF seiten > aw / ah THEN
+        iw = aw
+        ih = INT(aw / seiten)
+    ELSE
+        ih = ah
+        iw = INT(ah * seiten)
+    END IF
+    RETURN (MAX(10, iw), MAX(10, ih), (bw - MAX(10, iw)) \ 2, (bh - MAX(10, ih)) \ 2)
+END FUNCTION
+
+' Die Punkte der Minikarte (&HRRGGBB, zeilenweise): je Bildpunkt die Zelle
+' (i * b) \ iw -- naechster Nachbar wie im Original. farben = zusammengesetzt
+' (oberste sichtbare Ebene gewinnt), rgb je Farbnummer.
+FUNCTION minikartePunkte(farben AS ARRAY OF INTEGER, b AS INTEGER, h AS INTEGER, rgb AS ARRAY OF INTEGER, iw AS INTEGER, ih AS INTEGER) AS ARRAY OF INTEGER
+    DIM n AS INTEGER : n = LEN(rgb)
+    DIM sx[iw] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO iw - 1 : sx[i] = MIN(b - 1, (i * b) \ iw) : NEXT
+    DIM aus[iw * ih] AS INTEGER
+    DIM x AS INTEGER, y AS INTEGER
+    FOR y = 0 TO ih - 1
+        DIM zeile AS INTEGER : zeile = MIN(h - 1, (y * h) \ ih) * b
+        FOR x = 0 TO iw - 1
+            DIM c AS INTEGER : c = farben[zeile + sx[x]]
+            IF c >= 0 AND c < n THEN
+                aus[y * iw + x] = rgb[c]
+            ELSE
+                aus[y * iw + x] = MINIKARTE_GRUND
+            END IF
+        NEXT
+    NEXT
+    RETURN aus
+END FUNCTION
+
+' Das Rechteck des sichtbaren Ausschnitts in der Minikarte. vx..vh sind
+' Anteile am Muster (0..1, wie set_viewport geklemmt); bx, by, iw, ih das Bild
+' im Feld. Wie _get_viewport_screen_rect -- mit Qts right() = links + Breite - 1.
+FUNCTION minikarteAusschnitt(vx AS FLOAT, vy AS FLOAT, vw AS FLOAT, vh AS FLOAT, bx AS INTEGER, by AS INTEGER, iw AS INTEGER, ih AS INTEGER) AS TUPLE
+    vx = CLAMP(vx, 0.0, 1.0)
+    vy = CLAMP(vy, 0.0, 1.0)
+    vw = CLAMP(vw, 0.01, 1.0)
+    vh = CLAMP(vh, 0.01, 1.0)
+    DIM x AS INTEGER : x = bx + INT(vx * iw)
+    DIM y AS INTEGER : y = by + INT(vy * ih)
+    DIM w AS INTEGER : w = MAX(4, INT(vw * iw))
+    DIM h AS INTEGER : h = MAX(4, INT(vh * ih))
+    DIM rechts AS INTEGER : rechts = bx + iw - 1
+    DIM unten AS INTEGER : unten = by + ih - 1
+    IF x < bx THEN x = bx
+    IF y < by THEN y = by
+    IF x + w > rechts THEN w = rechts - x
+    IF y + h > unten THEN h = unten - y
+    RETURN (x, y, w, h)
+END FUNCTION
+
+' --- Kachel-Vorschau ------------------------------------------------------------------
+
+' Zellgroesse der Kachel-Vorschau in einem Feld bw x bh bei tx x ty Kacheln
+' (je 1..5) -- wie TilePreviewWidget._calculate_cell_size: 20 Punkte Rand
+' quer, 30 hoch, hoechstens 12, mindestens 1.
+FUNCTION kachelZelle(b AS INTEGER, h AS INTEGER, bw AS INTEGER, bh AS INTEGER, tx AS INTEGER, ty AS INTEGER) AS INTEGER
+    tx = CLAMP(tx, 1, 5)
+    ty = CLAMP(ty, 1, 5)
+    bw = MAX(bw, 250)          ' setMinimumSize(250, 200)
+    bh = MAX(bh, 200)
+    IF b <= 0 OR h <= 0 THEN RETURN 4
+    DIM zw AS INTEGER : zw = FLOOR((bw - 20) / (b * tx))
+    DIM zh AS INTEGER : zh = FLOOR((bh - 30) / (h * ty))
+    RETURN MAX(1, MIN(MIN(zw, zh), 12))
+END FUNCTION

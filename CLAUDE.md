@@ -2194,6 +2194,40 @@ Bild bleibt bei neun Umordnungen samt gesperrter Ebene und Strg+Z/Strg+Y;
 Loeschen/Zusammenfuehren als ein Schritt; die Probe); elf Verfaelschungen
 fallen je in ihrem Fall.
 
+**Stufe 15: Zeichenflaeche** (2026-10-17). Kern `kern/flaeche.dh`:
+`farbverlauf` (PyStickys GradientTool: Bresenham IN Zugrichtung --
+`linie()` tauscht die Enden, hier bekommt der erste Punkt die Startfarbe --,
+je Punkt der Anteil i/(n-1), je Kanal abgeschnitten wie Pythons `int()`, davon
+die naechste Palettenfarbe nach CIEDE2000; ein einzelner Punkt nimmt die
+Startfarbe, eine Farbnummer ausserhalb ergibt nichts), `minikarteMass/
+-Punkte/-Ausschnitt` (MinimapWidget: 8 Punkte Rand, eingepasst, Feld
+mindestens 120 x 100, naechster Nachbar ueber `(i * b) \ iw`, das
+Ausschnitt-Rechteck mit Qts `right()` = links + Breite - 1) und `kachelZelle`
+(TilePreviewWidget: 20/30 Punkte Rand, hoechstens 12). Ansicht
+`ansicht/flaechenteile.dh`: **Lineale** oben und links (Striche am
+Haupt-Raster statt fest alle 10 wie PySticky, beschriftet nur, wo die Zahlen
+nicht ineinanderlaufen; Zeile/Spalte unter dem Zeiger gruen; ein Klick holt
+sie in die Mitte, die Ecke zentriert ohne Zoom), die **Uebersicht** oben in
+der Seitenleiste (Klicken/Ziehen springt), die **Kachel-Vorschau**
+(Strg+Umschalt+P, Muster-Knopf; modal statt Dock) und das Werkzeug
+**Farbverlauf** (D) mit eigener Leiste (Start, Ende, tauschen), Vorschau je
+Punkt in seiner Farbe, Ende ins Muster gezogen, Symmetrie (jedes Spiegelbild
+in der Farbe seines Punkts) und Stichart. Lineale und Uebersicht nachgezogen
+werden an EINER Stelle (`flaecheNachziehen` am Ende des Zeichnens, wenn sich
+Lage, Zoom, Maus oder Groesse geaendert haben) statt an jeder, die
+lwX/lwY/lwZelle setzt; abschaltbar (Strg+Umschalt+L/U, Einstellungen),
+gemerkt als `show_rulers`/`show_minimap` (PySticky merkt Docks im
+Fensterzustand). Start- und Endfarbe wandern bei Farben verwalten und
+Rueckgaengig mit wie die aktuelle Farbe (`wzKennungen`). Die Kuerzel-Tafel
+hat damit 54 Befehle. Sammlung `tests/pruef/glutfaden_stufe15.dhtest` (3:
+PySticky-Referenz 132 Zeilen, die Minikarte als MD5; Randfaelle des
+Verlaufs; die Probe samt Lineal-Marke im Foto -- gezaehlt nur im Streifen
+des linken Lineals, die Marke ist halbdurchsichtig und die Statuszeile
+traegt gruene Punkte); 17 Verfaelschungen
+fallen je in ihrem Fall (Runden statt Abschneiden faellt nur an einer
+eigens gebauten Palette -- in den Referenzdaten aendert es nie die naechste
+Farbe).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

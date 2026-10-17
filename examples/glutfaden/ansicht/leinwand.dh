@@ -55,7 +55,7 @@ FUNCTION leinwandNeu() AS INTEGER
     lwSchrift = pango_font_description_from_string(einst.symbolSchrift + " Bold 10")
     lwZelle = einst.zelleStandard
     lwMausX = -1
-    RETURN lwFlaeche
+    RETURN flaecheMitLinealen(lwFlaeche)
 END FUNCTION
 
 SUB leinwandMuster(m AS kern.Muster)
@@ -96,6 +96,7 @@ SUB leinwandAufbauen()
         NEXT
     NEXT
     lwBild = cairo_image_surface_create_for_data(BUFFER_ZEIGER(lwPuffer), CAIRO_ARGB32, b, h, lwZeile)
+    minikarteAuffrischen()
 END SUB
 
 ' Hat eine sichtbare Ebene weniger als volle Deckkraft?
@@ -171,6 +172,7 @@ SUB leinwandZellen(p AS ARRAY OF INTEGER)
     NEXT
     cairo_surface_mark_dirty(lwBild)
     gtk_widget_queue_draw(lwFlaeche)
+    minikarteAuffrischen()
 END SUB
 
 ' --- Zoom und Lage ---------------------------------------------------------------
@@ -374,8 +376,27 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         END IF
     END IF
 
+    ' Der Farbverlauf, der gerade gezogen wird: je Punkt seine Farbe
+    IF LEN(wzVorschauFarben) > 0 AND LEN(wzVorschauFarben) * 2 = LEN(wzVorschau) THEN
+        DIM vk AS INTEGER
+        FOR vk = 0 TO LEN(wzVorschauFarben) - 1
+            DIM vc AS INTEGER : vc = wzVorschauFarben[vk]
+            IF vc < 0 OR vc >= lwMuster.farbanzahl() THEN CONTINUE
+            DIM vrgb AS INTEGER : vrgb = lwRgb[vc]
+            cairo_set_source_rgba(cr, ((vrgb SHR 16) BAND 255) / 255.0, ((vrgb SHR 8) BAND 255) / 255.0, (vrgb BAND 255) / 255.0, 180 / 255.0)
+            cairo_rectangle(cr, lwX + wzVorschau[2 * vk] * z, lwY + wzVorschau[2 * vk + 1] * z, z, z)
+            cairo_fill(cr)
+        NEXT
+        ' Start gruen, Ende rot umrandet
+        cairo_set_line_width(cr, 2.0)
+        cairo_set_source_rgb(cr, 0.0, 1.0, 0.0)
+        cairo_rectangle(cr, lwX + wzVorschau[0] * z, lwY + wzVorschau[1] * z, z, z)
+        cairo_stroke(cr)
+        cairo_set_source_rgb(cr, 1.0, 0.0, 0.0)
+        cairo_rectangle(cr, lwX + wzVorschau[LEN(wzVorschau) - 2] * z, lwY + wzVorschau[LEN(wzVorschau) - 1] * z, z, z)
+        cairo_stroke(cr)
     ' Die Form, die gerade gezogen wird, halb durchsichtig in der Farbe
-    IF LEN(wzVorschau) > 0 AND wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl() THEN
+    ELSEIF LEN(wzVorschau) > 0 AND wzFarbe >= 0 AND wzFarbe < lwMuster.farbanzahl() THEN
         DIM vf AS INTEGER : vf = lwRgb[wzFarbe]
         cairo_set_source_rgba(cr, ((vf SHR 16) BAND 255) / 255.0, ((vf SHR 8) BAND 255) / 255.0, (vf BAND 255) / 255.0, 0.6)
         DIM k AS INTEGER
@@ -401,6 +422,7 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         cairo_rectangle(cr, lwX + lwMausX * z, lwY + lwMausY * z, z, z)
         cairo_stroke(cr)
     END IF
+    flaecheNachziehen()
     RETURN TRUE
 END FUNCTION
 

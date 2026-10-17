@@ -85,6 +85,7 @@ IMPORT "ansicht/farbdialog.dh"
 IMPORT "ansicht/einstellungsdialog.dh"
 IMPORT "ansicht/leinwand.dh"
 IMPORT "ansicht/seitenleiste.dh"
+IMPORT "ansicht/flaechenteile.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
@@ -530,6 +531,16 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "wz_text" : werkzeugWaehlen(WZ_TEXT, FALSE)
         CASE "wz_rueckstich" : werkzeugWaehlen(WZ_RUECKSTICH, FALSE)
         CASE "wz_fortschritt" : werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+        CASE "wz_farbverlauf" : werkzeugWaehlen(WZ_FARBVERLAUF, FALSE)
+        CASE "kacheln" : kachelDialog()
+        CASE "lineale"
+            einst.lineale = NOT einst.lineale
+            flLinealeZeigen(einst.lineale)
+            einstellungenMerken()
+        CASE "uebersicht"
+            einst.uebersicht = NOT einst.uebersicht
+            minikarteZeigen(einst.uebersicht)
+            einstellungenMerken()
     END SELECT
 END SUB
 
@@ -713,6 +724,8 @@ signalEreignis(fenster, "key-press-event", taste, 0, 0, 0)
 signalEreignis(fenster, "delete-event", schliessenAngefragt, 0, 0, 0)
 signal(fenster, "destroy", fensterZu, 0, 0, 0)
 gtk_widget_show_all(fenster)
+flLinealeZeigen(einst.lineale)
+minikarteZeigen(einst.uebersicht)
 leinwandZeiger()
 
 ' Welche Datei? Das Argument, sonst das Beispielmuster.
@@ -751,6 +764,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "start"
     ELSEIF ARG$(a) = "--probe-stufe14" THEN
         probe = "stufe14"
+    ELSEIF ARG$(a) = "--probe-stufe15" THEN
+        probe = "stufe15"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -799,6 +814,7 @@ IF probe = "stufe12" THEN g_timeout_add(300, vorfuehrenStufe12, 0)
 IF probe = "stufe13" THEN g_timeout_add(300, vorfuehrenStufe13, 0)
 IF probe = "start" THEN g_timeout_add(300, vorfuehrenStart, 0)
 IF probe = "stufe14" THEN g_timeout_add(300, vorfuehrenStufe14, 0)
+IF probe = "stufe15" THEN g_timeout_add(300, vorfuehrenStufe15, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 

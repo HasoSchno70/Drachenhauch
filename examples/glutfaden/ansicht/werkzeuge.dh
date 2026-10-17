@@ -30,7 +30,8 @@ CONST WZ_VIELECK = 10
 CONST WZ_TEXT = 11
 CONST WZ_RUECKSTICH = 12
 CONST WZ_FORTSCHRITT = 13
-CONST WZ_ANZAHL = 14
+CONST WZ_FARBVERLAUF = 14
+CONST WZ_ANZAHL = 15
 
 CONST ZUG_KEINER = 0
 CONST ZUG_WERKZEUG = 1
@@ -49,6 +50,7 @@ DIM wzStartY AS INTEGER
 DIM wzLetzteX AS INTEGER
 DIM wzLetzteY AS INTEGER
 DIM wzVorschau AS ARRAY OF INTEGER    ' [x0, y0, ...], leer = keine
+DIM wzVorschauFarben AS ARRAY OF INTEGER  ' je Punkt eine Farbe (Farbverlauf), sonst leer
 DIM wzKnoepfe AS ARRAY OF INTEGER     ' Werkzeugknoepfe der Leiste
 DIM wzKnopfSperre AS BOOLEAN          ' beim Umschalten nicht noch einmal ausloesen
 DIM wzStichWahl AS INTEGER            ' GtkComboBoxText
@@ -94,6 +96,7 @@ FUNCTION wzName$(nr AS INTEGER) AS STRING
         CASE WZ_TEXT : RETURN "Text ({wz_text})"
         CASE WZ_RUECKSTICH : RETURN "Rückstich ({wz_rueckstich}) -- Klick für Klick eine Linie, rechte Taste entfernt"
         CASE WZ_FORTSCHRITT : RETURN "Fortschritt ({wz_fortschritt}) -- ziehen markiert erledigt, rechts zurück; Pfeile springen, Enter markiert"
+        CASE WZ_FARBVERLAUF : RETURN "Farbverlauf ({wz_farbverlauf}) -- eine Linie ziehen: von der Start- zur Endfarbe, dazwischen die nächsten Farben der Palette"
     END SELECT
     RETURN ""
 END FUNCTION
@@ -101,6 +104,7 @@ END FUNCTION
 SUB werkzeugeStart()
     wzVerlauf = kern.neuerVerlauf()
     wzVorschau = []
+    wzVorschauFarben = []
     wzFarbe = -1
     wzKnoepfe = []
     mrEcken = []
@@ -140,6 +144,7 @@ SUB werkzeugWaehlen(nr AS INTEGER, gefuellt AS BOOLEAN)
         gtk_widget_queue_draw(wzKnoepfe[i])
     NEXT
     wzKnopfSperre = FALSE
+    verlaufLeisteZeigen(nr = WZ_FARBVERLAUF)
     leinwandZeiger()
     statusNachziehen()
 END SUB
@@ -267,6 +272,15 @@ FUNCTION wzDruck(x AS INTEGER, y AS INTEGER, taste AS INTEGER, umschalt AS BOOLE
             IF NOT wzFarbeDa() THEN RETURN ZUG_KEINER
             wzZug = ZUG_WERKZEUG
             wzVorschauBauen(x, y, umschalt)
+        CASE WZ_FARBVERLAUF
+            ' wie im Original: nur im Muster beginnen, das Ende wird hineingezogen
+            IF x < 0 OR y < 0 OR x >= lwMuster.breite OR y >= lwMuster.hoehe THEN RETURN ZUG_KEINER
+            IF lwMuster.farbanzahl() = 0 THEN
+                statusMeldung("Erst Farben ins Muster holen -- der Verlauf nimmt sie aus der Palette.")
+                RETURN ZUG_KEINER
+            END IF
+            wzZug = ZUG_WERKZEUG
+            wzVorschauBauen(x, y, umschalt)
     END SELECT
     RETURN wzZug
 END FUNCTION
@@ -304,6 +318,13 @@ SUB wzLos(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
                 wzVorschauBauen(x, y, umschalt)
                 DIM p AS ARRAY OF INTEGER : p = wzVorschau
                 wzVorschau = []
+                IF wzAktiv = WZ_FARBVERLAUF THEN
+                    DIM pf AS ARRAY OF INTEGER : pf = wzVorschauFarben
+                    wzVorschauFarben = []
+                    wzVerlaufAnwenden(p, pf)
+                    gtk_widget_queue_draw(lwFlaeche)
+                    RETURN
+                END IF
                 DIM text AS STRING
                 SELECT CASE wzAktiv
                     CASE WZ_LINIE : text = "Linie"
@@ -342,6 +363,34 @@ SUB wzAnwenden(p AS ARRAY OF INTEGER, farbe AS INTEGER, text AS STRING)
     wzAnwendenOhneSpiegel(kern.gespiegelt(p, lwMuster.breite, lwMuster.hoehe, wzSpiegel), farbe, text)
 END SUB
 
+' Der Farbverlauf: je Punkt eine eigene Farbe, mit Symmetrie (jedes
+' Spiegelbild in der Farbe seines Punkts, wie _apply_changes_with_mirror)
+SUB wzVerlaufAnwenden(p AS ARRAY OF INTEGER, f AS ARRAY OF INTEGER)
+    IF LEN(p) = 0 THEN
+        statusMeldung("Start- oder Endfarbe fehlt -- in der Leiste wählen.")
+        RETURN
+    END IF
+    IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
+        statusMeldung("Die Ebene „" + lwMuster.ebenen.aktiveEbene().name + "“ ist gesperrt.")
+        RETURN
+    END IF
+    DIM pp AS ARRAY OF INTEGER : pp = []
+    DIM ff AS ARRAY OF INTEGER : ff = []
+    DIM aa AS ARRAY OF INTEGER : aa = []
+    DIM i AS INTEGER, k AS INTEGER
+    FOR i = 0 TO LEN(f) - 1
+        DIM s AS ARRAY OF INTEGER : s = kern.spiegelZellen(p[2 * i], p[2 * i + 1], lwMuster.breite, lwMuster.hoehe, wzSpiegel)
+        FOR k = 0 TO LEN(s) - 2 STEP 2
+            ARRAY_PUSH(pp, s[k]) : ARRAY_PUSH(pp, s[k + 1])
+            ARRAY_PUSH(ff, f[i])
+            ARRAY_PUSH(aa, wzStichart)
+        NEXT
+    NEXT
+    DIM n AS INTEGER : n = kern.zellenSetzenJe(lwMuster, wzVerlauf, pp, ff, aa, "Farbverlauf")
+    IF n > 0 THEN leinwandZellen(pp)
+    nachAenderung()
+END SUB
+
 SUB wzAnwendenOhneSpiegel(p AS ARRAY OF INTEGER, farbe AS INTEGER, text AS STRING)
     IF LEN(p) = 0 THEN RETURN
     IF lwMuster.ebenen.aktiveEbene().gesperrt THEN
@@ -356,7 +405,12 @@ END SUB
 SUB wzVorschauBauen(x AS INTEGER, y AS INTEGER, umschalt AS BOOLEAN)
     DIM ex AS INTEGER : ex = x
     DIM ey AS INTEGER : ey = y
+    wzVorschauFarben = []
     SELECT CASE wzAktiv
+        CASE WZ_FARBVERLAUF
+            ex = CLAMP(x, 0, lwMuster.breite - 1)
+            ey = CLAMP(y, 0, lwMuster.hoehe - 1)
+            (wzVorschau, wzVorschauFarben) = kern.farbverlauf(lwMuster, wzStartX, wzStartY, ex, ey, fvlStart, fvlEnde)
         CASE WZ_LINIE
             IF umschalt THEN (ex, ey) = kern.winkelGerade(wzStartX, wzStartY, x, y)
             wzVorschau = kern.linie(wzStartX, wzStartY, ex, ey)
@@ -388,23 +442,37 @@ FUNCTION wzFarbKennung$(nr AS INTEGER) AS STRING
 END FUNCTION
 
 SUB wzFarbeWiederfinden(kennung AS STRING)
-    IF kennung = "" OR wzFarbKennung$(wzFarbe) = kennung THEN RETURN
+    wzFarbe = wzNummerWiederfinden(wzFarbe, kennung)
+END SUB
+
+FUNCTION wzNummerWiederfinden(nr AS INTEGER, kennung AS STRING) AS INTEGER
+    IF kennung = "" OR wzFarbKennung$(nr) = kennung THEN RETURN nr
     DIM i AS INTEGER
     FOR i = 0 TO lwMuster.farbanzahl() - 1
-        IF wzFarbKennung$(i) = kennung THEN
-            wzFarbe = i
-            RETURN
-        END IF
+        IF wzFarbKennung$(i) = kennung THEN RETURN i
     NEXT
-    IF wzFarbe >= lwMuster.farbanzahl() THEN wzFarbe = -1
+    IF nr >= lwMuster.farbanzahl() THEN RETURN -1
+    RETURN nr
+END FUNCTION
+
+' Vorher: die Kennungen von aktueller, Start- und Endfarbe; nachher dieselben
+' Eintraege wieder (Rueckgaengig stellt die Liste um, nicht die Nummern)
+FUNCTION wzKennungen() AS ARRAY OF STRING
+    RETURN [wzFarbKennung$(wzFarbe), wzFarbKennung$(fvlStart), wzFarbKennung$(fvlEnde)]
+END FUNCTION
+
+SUB wzKennungenWiederfinden(k AS ARRAY OF STRING)
+    wzFarbeWiederfinden(k[0])
+    fvlStart = MAX(0, wzNummerWiederfinden(fvlStart, k[1]))
+    fvlEnde = MAX(0, wzNummerWiederfinden(fvlEnde, k[2]))
 END SUB
 
 SUB werkzeugZurueck()
     IF wzZug <> ZUG_KEINER THEN RETURN
     DIM text AS STRING : text = wzVerlauf.textZurueck$()
-    DIM kennung AS STRING : kennung = wzFarbKennung$(wzFarbe)
+    DIM kennung AS ARRAY OF STRING : kennung = wzKennungen()
     IF wzVerlauf.zurueckNehmen(lwMuster) THEN
-        wzFarbeWiederfinden(kennung)
+        wzKennungenWiederfinden(kennung)
         allesNeu()
         statusMeldung("Zurückgenommen: " + text)
     END IF
@@ -413,9 +481,9 @@ END SUB
 SUB werkzeugVor()
     IF wzZug <> ZUG_KEINER THEN RETURN
     DIM text AS STRING : text = wzVerlauf.textVor$()
-    DIM kennung AS STRING : kennung = wzFarbKennung$(wzFarbe)
+    DIM kennung AS ARRAY OF STRING : kennung = wzKennungen()
     IF wzVerlauf.wiederholen(lwMuster) THEN
-        wzFarbeWiederfinden(kennung)
+        wzKennungenWiederfinden(kennung)
         allesNeu()
         statusMeldung("Wiederholt: " + text)
     END IF
@@ -429,7 +497,7 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
     DIM box AS INTEGER : box = gtk_box_new(GTK_WAAGERECHT, 2)
     gtkKlasse(box, "werkzeuge")
     DIM folge AS ARRAY OF INTEGER : folge = [WZ_STIFT, WZ_RADIERER, WZ_FUELLEN, WZ_PIPETTE, -1, _
-        WZ_LINIE, WZ_RECHTECK, WZ_ELLIPSE, WZ_VIELECK, -1, WZ_AUSWAHL, WZ_LASSO, WZ_TEXT, -1, _
+        WZ_LINIE, WZ_RECHTECK, WZ_ELLIPSE, WZ_VIELECK, WZ_FARBVERLAUF, -1, WZ_AUSWAHL, WZ_LASSO, WZ_TEXT, -1, _
         WZ_RUECKSTICH, WZ_FORTSCHRITT, -1, WZ_HAND]
     DIM kn[WZ_ANZAHL] AS INTEGER
     wzKnoepfe = kn
@@ -477,6 +545,7 @@ FUNCTION werkzeugleisteNeu() AS INTEGER
     gtk_combo_box_set_active(wzSpiegelWahl, 0)
     signal(wzSpiegelWahl, "changed", wzSpiegelGeaendert, 0, 0, 0)
     gtk_box_pack_start(box, wzSpiegelWahl, FALSE, FALSE, 4)
+    gtk_box_pack_start(box, verlaufLeisteNeu(), FALSE, FALSE, 4)
     werkzeugWaehlen(WZ_STIFT, FALSE)
     RETURN box
 END FUNCTION
@@ -574,6 +643,17 @@ FUNCTION wzSymbolZeichnen(w AS INTEGER, cr AS INTEGER, nr AS INTEGER) AS BOOLEAN
             cairo_arc(cr, 3, 15, 1.6, 0, TAU) : cairo_fill(cr)
             cairo_arc(cr, 9, 9, 1.6, 0, TAU) : cairo_fill(cr)
             cairo_arc(cr, 16, 3, 1.6, 0, TAU) : cairo_fill(cr)
+        CASE WZ_FARBVERLAUF
+            ' vier Kaestchen von Glut nach Blau
+            DIM vk AS INTEGER
+            FOR vk = 0 TO 3
+                cairo_set_source_rgb(cr, (255 - vk * 60) / 255.0, (138 - vk * 10) / 255.0, (61 + vk * 50) / 255.0)
+                cairo_rectangle(cr, 2 + vk * 4, 6, 4, 8)
+                cairo_fill(cr)
+            NEXT
+            IF nr = wzAktiv THEN cairo_set_source_rgb(cr, 1.0, 0.60, 0.25) ELSE cairo_set_source_rgb(cr, 0.84, 0.85, 0.88)
+            cairo_rectangle(cr, 1.5, 5.5, 17, 9)
+            cairo_stroke(cr)
         CASE WZ_FORTSCHRITT
             cairo_set_line_width(cr, 2.2)
             cairo_move_to(cr, 3, 10) : cairo_line_to(cr, 8, 15) : cairo_line_to(cr, 17, 4)
@@ -629,6 +709,7 @@ FUNCTION werkzeugTaste(t AS INTEGER, strg AS BOOLEAN, alt AS BOOLEAN) AS BOOLEAN
             IF wzZug = ZUG_WERKZEUG AND LEN(wzVorschau) > 0 THEN
                 wzZug = ZUG_KEINER
                 wzVorschau = []
+                wzVorschauFarben = []
                 gtk_widget_queue_draw(lwFlaeche)
             END IF
         CASE ELSE : RETURN FALSE
