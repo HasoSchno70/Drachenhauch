@@ -31,6 +31,9 @@
 ' Stufe 7: der Stickpfad (Strg+Umschalt+O) -- in welcher Reihenfolge man die
 ' Stiche jeder Farbe setzt, fuenf Strategien, Vorschau mit Spruengen,
 ' Vergleich, Stickplan als Text und Bild; die Pfade auch im PDF.
+' Stufe 8: auswerten (Knopf in der Kopfleiste) -- Statistik und Garnverbrauch
+' (Strg+Umschalt+G, CSV), Heatmap, aehnliche Farben zusammenfuehren,
+' Farbenblindheit der Zeichenflaeche.
 '
 ' Aufbau:
 '     kern/      Muster, Ebenen, Garne, Paletten, .pxs, Formen, Verlauf,
@@ -400,7 +403,7 @@ SUB ueberGeklickt(knopf AS INTEGER, daten AS INTEGER)
     DIM f AS INTEGER
     DIM bild AS INTEGER : bild = gdk_pixbuf_new_from_file_at_size(PATHJOIN(CWD$(), LOGO), 128, 128, f)
     IF bild = 0 THEN g_error_free(f)
-    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 7", _
+    gtk_show_about_dialog(fenster, "program-name", "Glutfaden", "logo", bild, "version", "Stufe 8", _
         "comments", "Kreuzstich-Muster ansehen und bearbeiten -- eine Portierung von PySticky nach Drachenhauch und GTK 3.", _
         "website", "https://github.com/HasoSchno70/Pysticky", "website-label", "PySticky (das Original)", 0)
 END SUB
