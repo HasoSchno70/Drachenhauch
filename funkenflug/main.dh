@@ -33,6 +33,7 @@ CONST STIL = "window { background-color: #12131a; color: #e6e6f0; }" + _
     " .pinliste { font-family: monospace; font-size: 10pt; }"
 
 CONST GTK_KNOEPFE_OK = 1              ' GTK_BUTTONS_OK
+CONST LOGO = "daten/bilder/funkenflug_256.png"
 
 DIM gFenster AS INTEGER
 DIM gKopf AS INTEGER
@@ -1196,6 +1197,9 @@ DIM stilFehler AS STRING : stilFehler = gtkStil$(STIL)
 
 gFenster = gtk_window_new(0)
 gtk_window_set_default_size(gFenster, 1000, 700)
+' Fenster-Symbol (dhrt startet im Ordner des Skripts -- CWD$() ist funkenflug/)
+DIM symbolFehler AS INTEGER
+IF NOT gtk_window_set_icon_from_file(gFenster, PATHJOIN(CWD$(), LOGO), symbolFehler) THEN PRINT "Fenster-Symbol: "; gtkFehler$(symbolFehler)
 gKopf = gtk_header_bar_new()
 gtk_header_bar_set_show_close_button(gKopf, TRUE)
 gtk_header_bar_set_title(gKopf, "Funkenflug")
