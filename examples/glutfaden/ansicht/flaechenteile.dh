@@ -36,7 +36,7 @@ FUNCTION flLinealNeu(links AS BOOLEAN) AS INTEGER
     signalEreignis(l, "motion-notify-event", flLinealBewegung, IIF(links, 1, 0), 0, 0)
     signalEreignis(l, "button-press-event", flLinealDruck, IIF(links, 1, 0), 0, 0)
     signalEreignis(l, "leave-notify-event", flLinealVerlassen, IIF(links, 1, 0), 0, 0)
-    tipp(l, "Klicken holt diese " + IIF(links, "Zeile", "Spalte") + " in die Mitte")
+    tipp(l, IIF(links, tr$("Klicken holt diese Zeile in die Mitte"), tr$("Klicken holt diese Spalte in die Mitte")))
     RETURN l
 END FUNCTION
 
@@ -48,7 +48,7 @@ FUNCTION flaecheMitLinealen(flaeche AS INTEGER) AS INTEGER
     gtk_widget_add_events(flEcke, GDK_MASKE_DRUCK)
     signalZeichnen(flEcke, "draw", flEckeZeichnen, 0, 0, 0)
     signalEreignis(flEcke, "button-press-event", flEckeDruck, 0, 0, 0)
-    tipp(flEcke, "Klicken zentriert das Muster")
+    tipp(flEcke, tr$("Klicken zentriert das Muster"))
     flOben = flLinealNeu(FALSE)
     flLinks = flLinealNeu(TRUE)
     gtk_grid_attach(flRaster, flEcke, 0, 0, 1, 1)
@@ -316,7 +316,7 @@ DIM mkZiehen AS BOOLEAN
 
 FUNCTION minikarteNeu() AS INTEGER
     mkBox = gtk_box_new(GTK_SENKRECHT, 2)
-    gtk_box_pack_start(mkBox, slUeberschrift("Übersicht"), FALSE, FALSE, 0)
+    gtk_box_pack_start(mkBox, slUeberschrift(tr$("Übersicht")), FALSE, FALSE, 0)
     mkFeld = gtk_drawing_area_new()
     gtk_widget_set_size_request(mkFeld, -1, 150)
     gtkKlasse(mkFeld, "innen")
@@ -325,7 +325,7 @@ FUNCTION minikarteNeu() AS INTEGER
     signalEreignis(mkFeld, "button-press-event", mkDruck, 0, 0, 0)
     signalEreignis(mkFeld, "motion-notify-event", mkBewegung, 0, 0, 0)
     signalEreignis(mkFeld, "button-release-event", mkLoslassen, 0, 0, 0)
-    tipp(mkFeld, "Klicken oder ziehen: diese Stelle in die Mitte holen")
+    tipp(mkFeld, tr$("Klicken oder ziehen: diese Stelle in die Mitte holen"))
     gtk_box_pack_start(mkBox, mkFeld, FALSE, FALSE, 0)
     mkInfo = gtk_label_new("")
     gtkKlasse(mkInfo, "nebensache")
@@ -341,7 +341,7 @@ SUB minikarteAuffrischen()
     ' den Text nur, wenn er sich aendert -- gtk_label_set_text vermisst auch
     ' bei gleichem Text neu (siehe verlaufLeisteNachziehen)
     IF mkInfo <> 0 AND lwHat THEN
-        DIM t AS STRING : t = STR$(lwMuster.breite) + " × " + STR$(lwMuster.hoehe) + " Stiche"
+        DIM t AS STRING : t = trf$("{0} × {1} Stiche", [STR$(lwMuster.breite), STR$(lwMuster.hoehe)])
         IF t <> gtk_label_get_text(mkInfo) THEN gtk_label_set_text(mkInfo, t)
     END IF
 END SUB
@@ -467,17 +467,17 @@ DIM kvPuffer AS BUFFER
 DIM kvZelle AS INTEGER                ' zuletzt gezeichnete Zellgroesse
 
 FUNCTION kvBauen() AS INTEGER
-    kvDialog = gtk_dialog_new_with_buttons("Kachel-Vorschau — " + lwMuster.name, fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
-        "Schließen", GTK_ANTWORT_OK, 0)
+    kvDialog = gtk_dialog_new_with_buttons(trf$("Kachel-Vorschau — {0}", [lwMuster.name]), fenster, GTK_DIALOG_MODAL BOR GTK_DIALOG_EIGENE_LEISTE, _
+        tr$("Schließen"), GTK_ANTWORT_OK, 0)
     gtk_window_set_default_size(kvDialog, 760, 620)
     DIM innen AS INTEGER : innen = gtk_dialog_get_content_area(kvDialog)
     gtk_container_set_border_width(innen, 10)
-    DIM l AS INTEGER : l = gtk_label_new("Das Muster mehrfach nebeneinander -- für Wiederholungsmuster und Bordüren: passen die Ränder aneinander?")
+    DIM l AS INTEGER : l = gtk_label_new(tr$("Das Muster mehrfach nebeneinander -- für Wiederholungsmuster und Bordüren: passen die Ränder aneinander?"))
     gtk_label_set_xalign(l, 0.0)
     gtk_label_set_line_wrap(l, TRUE)
     gtk_box_pack_start(innen, l, FALSE, FALSE, 4)
     DIM zeile AS INTEGER : zeile = gtk_box_new(GTK_WAAGERECHT, 8)
-    gtk_box_pack_start(zeile, gtk_label_new("Kacheln:"), FALSE, FALSE, 0)
+    gtk_box_pack_start(zeile, gtk_label_new(tr$("Kacheln:")), FALSE, FALSE, 0)
     gtk_box_pack_start(zeile, gtk_label_new("waagerecht"), FALSE, FALSE, 0)
     kvX = gtk_spin_button_new_with_range(1, 5, 1)
     gtk_spin_button_set_value(kvX, 3)
@@ -486,7 +486,7 @@ FUNCTION kvBauen() AS INTEGER
     kvY = gtk_spin_button_new_with_range(1, 5, 1)
     gtk_spin_button_set_value(kvY, 3)
     gtk_box_pack_start(zeile, kvY, FALSE, FALSE, 0)
-    kvGrenzen = gtk_check_button_new_with_label("Kachelgrenzen anzeigen")
+    kvGrenzen = gtk_check_button_new_with_label(tr$("Kachelgrenzen anzeigen"))
     gtk_toggle_button_set_active(kvGrenzen, TRUE)
     gtk_box_pack_start(zeile, kvGrenzen, FALSE, FALSE, 12)
     gtk_box_pack_start(innen, zeile, FALSE, FALSE, 4)
@@ -580,7 +580,7 @@ FUNCTION kvZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
     cairoFarbe(cr, uiFarbe(&H9AA0AD))
     DIM layout AS INTEGER : layout = pango_cairo_create_layout(cr)
     pango_layout_set_font_description(layout, flSchrift)
-    pango_layout_set_text(layout, STR$(pw) + "×" + STR$(ph) + " Stiche | " + STR$(tx) + "×" + STR$(ty) + " Kacheln", -1)
+    pango_layout_set_text(layout, trf$("{0}×{1} Stiche | {2}×{3} Kacheln", [STR$(pw), STR$(ph), STR$(tx), STR$(ty)]), -1)
     DIM tw AS INTEGER, th AS INTEGER
     pango_layout_get_pixel_size(layout, tw, th)
     cairo_move_to(cr, 10, bh - 6 - th)
@@ -611,21 +611,21 @@ DIM fvlListe AS STRING                 ' womit die Listen gefuellt sind
 FUNCTION verlaufLeisteNeu() AS INTEGER
     fvlBox = gtk_box_new(GTK_WAAGERECHT, 4)
     gtk_widget_set_no_show_all(fvlBox, TRUE)
-    DIM l AS INTEGER : l = gtk_label_new("Verlauf von")
+    DIM l AS INTEGER : l = gtk_label_new(tr$("Verlauf von"))
     gtk_box_pack_start(fvlBox, l, FALSE, FALSE, 4)
     fvlStartWahl = gtk_combo_box_text_new()
     gtk_widget_set_can_focus(fvlStartWahl, FALSE)
-    gtk_widget_set_tooltip_text(fvlStartWahl, "Startfarbe -- der erste Punkt der gezogenen Linie")
+    gtk_widget_set_tooltip_text(fvlStartWahl, tr$("Startfarbe -- der erste Punkt der gezogenen Linie"))
     gtk_box_pack_start(fvlBox, fvlStartWahl, FALSE, FALSE, 0)
     DIM n AS INTEGER : n = gtk_label_new("nach")
     gtk_box_pack_start(fvlBox, n, FALSE, FALSE, 0)
     fvlEndeWahl = gtk_combo_box_text_new()
     gtk_widget_set_can_focus(fvlEndeWahl, FALSE)
-    gtk_widget_set_tooltip_text(fvlEndeWahl, "Endfarbe -- dazwischen nimmt jeder Punkt die nächste Farbe der Palette")
+    gtk_widget_set_tooltip_text(fvlEndeWahl, tr$("Endfarbe -- dazwischen nimmt jeder Punkt die nächste Farbe der Palette"))
     gtk_box_pack_start(fvlBox, fvlEndeWahl, FALSE, FALSE, 0)
     DIM k AS INTEGER : k = gtk_button_new_with_label("⇄")
     gtk_widget_set_can_focus(k, FALSE)
-    gtk_widget_set_tooltip_text(k, "Start- und Endfarbe tauschen")
+    gtk_widget_set_tooltip_text(k, tr$("Start- und Endfarbe tauschen"))
     signal(k, "clicked", fvlTauschen, 0, 0, 0)
     gtk_box_pack_start(fvlBox, k, FALSE, FALSE, 0)
     signal(fvlStartWahl, "changed", fvlGewaehlt, 0, 0, 0)

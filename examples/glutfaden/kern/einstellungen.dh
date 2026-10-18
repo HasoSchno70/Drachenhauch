@@ -70,6 +70,7 @@ CLASS Einstellungen
     ' Farben
     DIM palette AS STRING                ' default_palette
     DIM thema AS STRING                  ' theme: dark / light
+    DIM sprache AS STRING                ' ui_language: auto / de / en (ab dem naechsten Start)
     DIM katalog AS BOOLEAN               ' show_catalog
     DIM farbleiste AS BOOLEAN            ' show_color_bar (eigener Schluessel, PySticky: Dock)
     DIM farbleisteGroesse AS INTEGER     ' color_bar_size 20..60
@@ -149,6 +150,7 @@ SUB einstellungenVorgabe(e AS Einstellungen)
     e.gesten = FALSE
     e.palette = "DMC"                    ' PySticky: Anchor; Glutfaden nahm schon immer DMC
     e.thema = "dark"
+    e.sprache = "auto"
     e.katalog = TRUE
     e.farbleiste = TRUE
     e.farbleisteGroesse = 48
@@ -195,6 +197,7 @@ SUB einstellungenOrdnen(e AS Einstellungen)
     e.startAktion = CLAMP(e.startAktion, 0, LEN(startAktionen()) - 1)
     e.zuletztAnzahl = CLAMP(e.zuletztAnzahl, 0, 20)
     IF e.thema <> "light" THEN e.thema = "dark"
+    IF e.sprache <> "de" AND e.sprache <> "en" THEN e.sprache = "auto"
     e.meldungSekunden = CLAMP(e.meldungSekunden, 1, 30)
     e.rasterHaupt = CLAMP(e.rasterHaupt, 5, 50)
     e.rasterNeben = CLAMP(e.rasterNeben, 1, MIN(20, e.rasterHaupt - 1))
@@ -334,6 +337,7 @@ FUNCTION einstellungenLaden(pfad AS STRING) AS Einstellungen
     IF jsonGanz(j, "tablet/max_brush_size", z) THEN e.pinselGroesse = z
     IF esBool(j, "touch/gestures_enabled", b) THEN e.gesten = b
     IF esText(j, "theme", t) THEN e.thema = t
+    IF esText(j, "ui_language", t) THEN e.sprache = LOWER$(TRIM$(t))
     IF esText(j, "default_palette", t) THEN
         IF TRIM$(t) <> "" THEN e.palette = TRIM$(t)
     END IF
@@ -428,6 +432,7 @@ FUNCTION einstellungenJson$(e AS Einstellungen) AS STRING
     JSON_SET_BOOL(j, JSON_KEY$("touch/gestures_enabled"), e.gesten)
     JSON_SET_STRING(j, "default_palette", e.palette)
     JSON_SET_STRING(j, "theme", e.thema)
+    JSON_SET_STRING(j, "ui_language", e.sprache)
     JSON_SET_BOOL(j, "show_catalog", e.katalog)
     JSON_SET_BOOL(j, "show_color_bar", e.farbleiste)
     JSON_SET_INT(j, "color_bar_size", e.farbleisteGroesse)
@@ -848,7 +853,8 @@ FUNCTION kuerzelListe(e AS Einstellungen) AS ARRAY OF STRING
     DIM aus AS ARRAY OF STRING : aus = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(aktionen) - 1
-        ARRAY_PUSH(aus, aktionen[i].name + CHR$(9) + w[i])
+        ' angezeigt: der Name in der Sprache der Oberflaeche, Tasten wie Ctrl/Shift
+        ARRAY_PUSH(aus, tr$(aktionen[i].name) + CHR$(9) + kuerzelAnzeige$(w[i]))
     NEXT
     RETURN aus
 END FUNCTION

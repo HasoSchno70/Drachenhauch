@@ -856,6 +856,7 @@ CONST BEISPIEL = "{sammlung}/../../examples/glutfaden/main.dh"
   "touch/gestures_enabled": false,
   "default_palette": "DMC",
   "theme": "dark",
+  "ui_language": "auto",
   "show_catalog": true,
   "show_color_bar": true,
   "color_bar_size": 48,

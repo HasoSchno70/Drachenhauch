@@ -145,8 +145,8 @@ END SUB
 FUNCTION ebenenZugText$(art AS INTEGER, a AS INTEGER, b AS INTEGER) AS STRING
     IF art = 0 OR NOT lwHat THEN RETURN ""
     DIM ez AS ARRAY OF kern.Ebene : ez = lwMuster.ebenen.ebenen
-    IF art = 2 THEN RETURN "Loslassen: „" + ez[a].name + "“ mit „" + ez[b].name + "“ zusammenführen"
-    RETURN "Loslassen: „" + ez[a].name + "“ an Stelle " + STR$(lwMuster.ebenen.anzahl() - b) + " von oben"
+    IF art = 2 THEN RETURN trf$("Loslassen: „{0}“ mit „{1}“ zusammenführen", [ez[a].name, ez[b].name])
+    RETURN trf$("Loslassen: „{0}“ an Stelle {1} von oben", [ez[a].name, STR$(lwMuster.ebenen.anzahl() - b)])
 END FUNCTION
 
 ' Ein Zug in der Ebenenliste, mit Zeilen wie die Liste sie zeigt (auch fuer die Probe)
@@ -168,12 +168,12 @@ SUB ebenenZugAusfuehren(art AS INTEGER, a AS INTEGER, b AS INTEGER)
     DIM qn AS STRING : qn = lwMuster.ebenen.ebenen[a].name
     DIM zn AS STRING : zn = lwMuster.ebenen.ebenen[b].name
     IF lwMuster.ebenen.ebenen[a].gesperrt OR lwMuster.ebenen.ebenen[b].gesperrt THEN
-        statusMeldung("Gesperrte Ebenen lassen sich nicht zusammenführen -- erst entsperren.")
+        statusMeldung(tr$("Gesperrte Ebenen lassen sich nicht zusammenführen -- erst entsperren."))
         RETURN
     END IF
     IF kern.ebenenZusammenfuehren(lwMuster, wzVerlauf, a, b) THEN
         allesNeu()
-        statusMeldung("„" + qn + "“ mit „" + zn + "“ zusammengeführt (" + kern.kuerzelVon$(einst, "zurueck") + " nimmt es zurück)")
+        statusMeldung(trf$("„{0}“ mit „{1}“ zusammengeführt ({2} nimmt es zurück)", [qn, zn, kz$("zurueck")]))
     END IF
 END SUB
 

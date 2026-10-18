@@ -15,6 +15,7 @@ DIM edBak AS INTEGER
 DIM edSchnapp AS INTEGER
 DIM edStart AS INTEGER
 DIM edThema AS INTEGER
+DIM edSprache AS INTEGER
 DIM edZuletzt AS INTEGER
 DIM edFenster AS INTEGER
 DIM edBeenden AS INTEGER
@@ -200,6 +201,10 @@ FUNCTION edBauen() AS INTEGER
     edRein(s, edStickzeit)
     edThema = imKlappliste(["Dunkel", "Hell"], 0)
     edRein(s, edZeile("Erscheinungsbild:", edThema, "Gilt sofort nach Übernehmen"))
+    ' Die Sprachen in ihrer eigenen Sprache: wer die jetzige nicht lesen kann,
+    ' findet seine trotzdem
+    edSprache = imKlappliste([tr$("Automatisch (Systemsprache)"), "Deutsch", "English"], 0)
+    edRein(s, edZeile(tr$("Sprache / Language:"), edSprache, tr$("Gilt ab dem nächsten Start")))
     edAbschnitt(s, "Nachfragen und Meldungen")
     edBeenden = edKaestchen("Vor dem Beenden fragen", "Fragt auch dann, wenn nichts ungesichert ist")
     edRein(s, edBeenden)
@@ -321,7 +326,7 @@ FUNCTION edBauen() AS INTEGER
     edAbschnitt(s, "Anzeige")
     edAnzeige = imKlappliste(kern.farbAnzeigen(), 1)
     edRein(s, edZeile("Auf der Zeichenfläche:", edAnzeige, "Symbole erscheinen ab 12 Pixel je Kästchen"))
-    edHervorheben = edKaestchen("Gewählte Farbe hervorheben", "Jede gewählte Farbe wie mit " + kern.kuerzelVon$(einst, "hervorheben") + " voll zeigen, die anderen gedämpft")
+    edHervorheben = edKaestchen("Gewählte Farbe hervorheben", "Jede gewählte Farbe wie mit " + kz$("hervorheben") + " voll zeigen, die anderen gedämpft")
     edRein(s, edHervorheben)
 
     ' Dateien
@@ -361,7 +366,7 @@ FUNCTION edBauen() AS INTEGER
     FOR EACH a IN kern.kuerzelAktionen()
         DIM z AS INTEGER : z = gtk_box_new(GTK_WAAGERECHT, 10)
         gtk_container_set_border_width(z, 4)
-        DIM n AS INTEGER : n = gtk_label_new(a.name)
+        DIM n AS INTEGER : n = gtk_label_new(tr$(a.name))
         gtk_label_set_xalign(n, 0.0)
         gtk_widget_set_hexpand(n, TRUE)
         DIM t AS INTEGER : t = gtk_label_new("")
@@ -420,6 +425,7 @@ SUB edFuellen(e AS kern.Einstellungen)
     gtk_spin_button_set_value(edSchnapp, e.schnappschussMinuten)
     gtk_combo_box_set_active(edStart, e.startAktion)
     gtk_combo_box_set_active(edThema, IIF(e.thema = "light", 1, 0))
+    gtk_combo_box_set_active(edSprache, MAX(0, ARRAY_INDEXOF(["auto", "de", "en"], e.sprache)))
     gtk_spin_button_set_value(edZuletzt, e.zuletztAnzahl)
     gtk_toggle_button_set_active(edFenster, e.fensterMerken)
     gtk_toggle_button_set_active(edBeenden, e.beendenFragen)
@@ -493,6 +499,9 @@ SUB edUebernehmen()
     einst.schnappschussMinuten = gtk_spin_button_get_value_as_int(edSchnapp)
     einst.startAktion = MAX(0, gtk_combo_box_get_active(edStart))
     einst.thema = IIF(gtk_combo_box_get_active(edThema) = 1, "light", "dark")
+    DIM spVorher AS STRING : spVorher = einst.sprache
+    einst.sprache = ["auto", "de", "en"][CLAMP(gtk_combo_box_get_active(edSprache), 0, 2)]
+    IF einst.sprache <> spVorher THEN statusMeldung(tr$("Die Sprache wechselt beim nächsten Start."))
     einst.zuletztAnzahl = gtk_spin_button_get_value_as_int(edZuletzt)
     einst.fensterMerken = gtk_toggle_button_get_active(edFenster)
     einst.beendenFragen = gtk_toggle_button_get_active(edBeenden)
@@ -602,8 +611,8 @@ SUB edKuAnzeigen()
     DIM aktionen AS ARRAY OF kern.Kuerzelaktion : aktionen = kern.kuerzelAktionen()
     DIM i AS INTEGER
     FOR i = 0 TO LEN(edKuText) - 1
-        DIM t AS STRING : t = w[i]
-        IF t <> kern.kuerzelNormal$(aktionen[i].vorgabe) THEN t = t + "  (eigen)"
+        DIM t AS STRING : t = kern.kuerzelAnzeige$(w[i])
+        IF w[i] <> kern.kuerzelNormal$(aktionen[i].vorgabe) THEN t = t + tr$("  (eigen)")
         gtk_label_set_text(edKuText[i], t)
     NEXT
 END SUB
@@ -671,7 +680,7 @@ FUNCTION ekTaste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     IF k = "Esc" THEN RETURN FALSE             ' bricht ab
     IF k = "Enter" AND ekText <> "" THEN RETURN FALSE
     ekText = k
-    gtk_label_set_text(ekAnzeige, k)
+    gtk_label_set_text(ekAnzeige, kern.kuerzelAnzeige$(k))
     RETURN TRUE
 END FUNCTION
 
@@ -685,7 +694,7 @@ SUB edKuAendern(i AS INTEGER)
     gtk_container_set_border_width(innen, 14)
     gtk_box_pack_start(innen, gtk_label_new("Neue Taste für „" + aktionen[i].name + "“ drücken:"), FALSE, FALSE, 4)
     ekText = ""
-    ekAnzeige = gtk_label_new(kern.kuerzelWirksam(edKuStand())[i])
+    ekAnzeige = gtk_label_new(kern.kuerzelAnzeige$(kern.kuerzelWirksam(edKuStand())[i]))
     gtkKlasse(ekAnzeige, "kartenwert")
     gtk_box_pack_start(innen, ekAnzeige, FALSE, FALSE, 8)
     signalEreignis(d, "key-press-event", ekTaste, 0, 0, 0)

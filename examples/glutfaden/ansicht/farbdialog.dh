@@ -360,7 +360,7 @@ FUNCTION fvUebernehmen() AS BOOLEAN
     fvlEnde = MAX(0, fvNeueNummer(fvlEnde))
     mrAblage = NIL
     allesNeu()
-    statusMeldung("Farben verwaltet: " + STR$(lwMuster.farbanzahl()) + " Farben (" + kern.kuerzelVon$(einst, "zurueck") + " nimmt es zurück).")
+    statusMeldung("Farben verwaltet: " + STR$(lwMuster.farbanzahl()) + " Farben (" + kz$("zurueck") + " nimmt es zurück).")
     RETURN TRUE
 END FUNCTION
 

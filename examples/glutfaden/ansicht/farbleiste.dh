@@ -61,7 +61,7 @@ FUNCTION farbleisteNeu() AS INTEGER
     fbBox = gtk_box_new(GTK_SENKRECHT, 0)
     gtkKlasse(fbBox, "farbleiste")
     DIM kopf AS INTEGER : kopf = gtk_box_new(GTK_WAAGERECHT, 8)
-    DIM titel AS INTEGER : titel = gtk_label_new("● MUSTERFARBEN")
+    DIM titel AS INTEGER : titel = gtk_label_new(tr$("● MUSTERFARBEN"))
     gtkKlasse(titel, "fb-titel")
     gtk_box_pack_start(kopf, titel, FALSE, FALSE, 0)
     fbZahl = gtk_label_new("0")
@@ -277,8 +277,8 @@ SUB fbTippSetzen(i AS INTEGER)
     DIM t AS STRING
     IF i >= 0 THEN
         DIM f AS kern.Farbeintrag : f = lwMuster.farben[i]
-        t = f.symbol + " " + f.garn.name + CHR$(10) + f.garn.hersteller + CHR$(10) + "Nr.: " + IIF(f.garn.nummer = "", "-", f.garn.nummer) + CHR$(10) + ZAHL$(f.stichzahl, 0) + " Stiche"
-        IF f.auslassen THEN t = t + CHR$(10) + "⊘ Wird nicht gestickt"
+        t = trf$("{0} {1}{2}{3}{4}Nr.: {5}{6}{7} Stiche", [f.symbol, f.garn.name, CHR$(10), f.garn.hersteller, CHR$(10), IIF(f.garn.nummer = "", "-", f.garn.nummer), CHR$(10), zahlText$(f.stichzahl, 0)])
+        IF f.auslassen THEN t = trf$("{0}{1}⊘ Wird nicht gestickt", [t, CHR$(10)])
     END IF
     IF t = fbTipp THEN RETURN
     fbTipp = t
@@ -407,15 +407,15 @@ SUB fbMenue(i AS INTEGER, ereignis AS INTEGER)
     fbMenueFarbe = i
     DIM f AS kern.Farbeintrag : f = lwMuster.farben[i]
     DIM m AS INTEGER : m = gtk_menu_new()
-    fbMenuePunkt(m, "🔤 Symbol ändern …", 0)
-    fbMenuePunkt(m, "🎨 Farb-Harmonien suchen …", 1)
+    fbMenuePunkt(m, tr$("🔤 Symbol ändern …"), 0)
+    fbMenuePunkt(m, tr$("🎨 Farb-Harmonien suchen …"), 1)
     gtk_menu_shell_append(m, gtk_separator_menu_item_new())
-    fbMenuePunkt(m, IIF(lwHervor = i, "❌ Farb-Hervorhebung aufheben", "🔍 Nur diese Farbe hervorheben"), 2)
+    fbMenuePunkt(m, IIF(lwHervor = i, tr$("❌ Farb-Hervorhebung aufheben"), tr$("🔍 Nur diese Farbe hervorheben")), 2)
     gtk_menu_shell_append(m, gtk_separator_menu_item_new())
-    fbMenuePunkt(m, IIF(f.auslassen, "✓ Farbe sticken", "⊘ Nicht sticken (Stofffarbe)"), 3)
+    fbMenuePunkt(m, IIF(f.auslassen, tr$("✓ Farbe sticken"), tr$("⊘ Nicht sticken (Stofffarbe)")), 3)
     gtk_menu_shell_append(m, gtk_separator_menu_item_new())
-    fbMenuePunkt(m, "⇄ Farbe ersetzen …", 4)
-    IF lwMuster.farbanzahl() >= 2 THEN fbMenuePunkt(m, "⇅ Mit anderer Farbe tauschen …", 5)
+    fbMenuePunkt(m, tr$("⇄ Farbe ersetzen …"), 4)
+    IF lwMuster.farbanzahl() >= 2 THEN fbMenuePunkt(m, tr$("⇅ Mit anderer Farbe tauschen …"), 5)
     gtk_widget_show_all(m)
     gtk_menu_popup_at_pointer(m, ereignis)
 END SUB
@@ -446,7 +446,7 @@ SUB farbleisteAktion(i AS INTEGER, was AS INTEGER)
             DIM an AS BOOLEAN : an = NOT lwMuster.farben[i].auslassen
             IF kern.farbeAuslassen(lwMuster, wzVerlauf, i, an) THEN
                 allesNeu()
-                statusMeldung("Farbe „" + lwMuster.farben[i].garn.name + "“ wird " + IIF(an, "nicht ", "") + "gestickt.")
+                statusMeldung(IIF(an, trf$("Farbe „{0}“ wird nicht gestickt.", [lwMuster.farben[i].garn.name]), trf$("Farbe „{0}“ wird gestickt.", [lwMuster.farben[i].garn.name])))
             END IF
         CASE 4
             farbeWaehlen(i)
@@ -468,9 +468,9 @@ SUB farbeHervorheben(i AS INTEGER)
     gtk_widget_queue_draw(lwFlaeche)
     IF fbFeld <> 0 THEN gtk_widget_queue_draw(fbFeld)
     IF i < 0 THEN
-        statusMeldung("Farb-Hervorhebung aufgehoben")
+        statusMeldung(tr$("Farb-Hervorhebung aufgehoben"))
     ELSE
-        statusMeldung("Hervorgehoben: " + lwMuster.farben[i].garn.name + " (" + kern.kuerzelVon$(einst, "hervorheben") + " zum Aufheben)")
+        statusMeldung(trf$("Hervorgehoben: {0} ({1} zum Aufheben)", [lwMuster.farben[i].garn.name, kz$("hervorheben")]))
     END IF
 END SUB
 

@@ -706,7 +706,7 @@ FUNCTION aeZusammenfuehren$() AS STRING
     IF f <> "" THEN RETURN f
     IF wzFarbe >= lwMuster.farbanzahl() THEN wzFarbe = lwMuster.farbanzahl() - 1
     allesNeu()
-    statusMeldung(STR$(vorher - lwMuster.farbanzahl()) + " Farbe(n) zusammengeführt, " + STR$(n) + " Stiche umgefärbt (" + kern.kuerzelVon$(einst, "zurueck") + " nimmt es zurück).")
+    statusMeldung(STR$(vorher - lwMuster.farbanzahl()) + " Farbe(n) zusammengeführt, " + STR$(n) + " Stiche umgefärbt (" + kz$("zurueck") + " nimmt es zurück).")
     RETURN ""
 END FUNCTION
 
@@ -779,7 +779,7 @@ SUB farbenblindSetzen(art AS INTEGER)
     fbArt = art
     leinwandAufbauen()
     gtk_widget_queue_draw(lwFlaeche)
-    statusMeldung(IIF(art = kern.FARBENBLIND_KEINE, "Farben wieder wie gestickt.", "Ansicht: " + kern.farbenblindNamen()[art] + " -- nur die Anzeige, die Farben bleiben."))
+    statusMeldung(IIF(art = kern.FARBENBLIND_KEINE, tr$("Farben wieder wie gestickt."), trf$("Ansicht: {0} -- nur die Anzeige, die Farben bleiben.", [kern.farbenblindNamen()[art]])))
 END SUB
 
 DIM fbKnoepfe AS ARRAY OF INTEGER
@@ -807,17 +807,17 @@ END SUB
 FUNCTION auswertenKnopf() AS INTEGER
     DIM mb AS INTEGER : mb = gtk_menu_button_new()
     gtk_container_add(mb, gtk_image_new_from_icon_name("x-office-spreadsheet-symbolic", GTK_ICON_KNOPF))
-    tipp(mb, "Auswerten und planen -- Statistik ({statistik}), Heatmap, ähnliche Farben, Garn-Vorrat, Palette ({palette}), Farben tauschen ({tauschen}), Rahmen, Farbenblindheit")
+    tipp(mb, tr$("Auswerten und planen -- Statistik ({statistik}), Heatmap, ähnliche Farben, Garn-Vorrat, Palette ({palette}), Farben tauschen ({tauschen}), Rahmen, Farbenblindheit"))
     gtk_widget_set_can_focus(mb, FALSE)
     auswertenPopover = gtk_popover_new(mb)
     DIM box AS INTEGER : box = gtk_box_new(GTK_SENKRECHT, 2)
     gtk_container_set_border_width(box, 8)
-    DIM texte AS ARRAY OF STRING : texte = ["Statistik & Garnverbrauch …", "Heatmap …", "Ähnliche Farben zusammenführen …", "Garn-Vorrat …", "Palette konvertieren …", "Farben tauschen …", "Rahmenaufteilung …"]
+    DIM texte AS ARRAY OF STRING : texte = [tr$("Statistik & Garnverbrauch …"), tr$("Heatmap …"), tr$("Ähnliche Farben zusammenführen …"), tr$("Garn-Vorrat …"), tr$("Palette konvertieren …"), tr$("Farben tauschen …"), tr$("Rahmenaufteilung …")]
     DIM i AS INTEGER
     FOR i = 0 TO LEN(texte) - 1
         IF i = 3 THEN
             gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)
-            gtk_box_pack_start(box, adUeberschrift("Planen & Vorrat"), FALSE, FALSE, 0)
+            gtk_box_pack_start(box, adUeberschrift(tr$("Planen & Vorrat")), FALSE, FALSE, 0)
         END IF
         DIM k AS INTEGER : k = gtk_button_new_with_label(texte[i])
         gtkKlasse(k, "flat")
@@ -825,7 +825,7 @@ FUNCTION auswertenKnopf() AS INTEGER
         signal(k, "clicked", auswertenGeklickt, i, 0, 0)
     NEXT
     gtk_box_pack_start(box, gtk_separator_new(GTK_WAAGERECHT), FALSE, FALSE, 4)
-    gtk_box_pack_start(box, adUeberschrift("Farbenblindheit simulieren"), FALSE, FALSE, 0)
+    gtk_box_pack_start(box, adUeberschrift(tr$("Farbenblindheit simulieren")), FALSE, FALSE, 0)
     fbKnoepfe = []
     DIM gruppe AS INTEGER : gruppe = 0
     DIM n AS STRING

@@ -2857,3 +2857,124 @@ FUNCTION vorfuehrenStufe23(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+
+' --- Sprache: was in den gebauten Fenstern steht ---------------------------------------
+' Laeuft alle Widgets ab (auch Popover von Menueknoepfen) und sammelt, was
+' angezeigt wird: Beschriftungen, Knoepfe, Tooltips, Platzhalter, Kopfleiste,
+' die gewaehlte Zeile einer Klappliste.
+
+DIM vsTexte AS ARRAY OF STRING
+DIM vsF1 AS ARRAY OF STRING
+
+SUB vsDazu(t AS STRING)
+    t = TRIM$(t)
+    IF t <> "" AND ARRAY_INDEXOF(vsTexte, t) < 0 THEN ARRAY_PUSH(vsTexte, t)
+END SUB
+
+FUNCTION vsZeiger$(z AS INTEGER) AS STRING
+    IF z = 0 THEN RETURN ""
+    RETURN TEXT_AUS_ZEIGER$(z)
+END FUNCTION
+
+SUB vsSammeln(w AS INTEGER)
+    IF w = 0 THEN RETURN
+    DIM typ AS STRING : typ = vsZeiger$(g_type_name_from_instance(w))
+    DIM z AS INTEGER : z = gtk_widget_get_tooltip_text(w)
+    IF z <> 0 THEN
+        vsDazu(TEXT_AUS_ZEIGER$(z))
+        g_free(z)
+    END IF
+    SELECT CASE typ
+        CASE "GtkLabel", "GtkAccelLabel" : vsDazu(gtk_label_get_text(w))
+        CASE "GtkButton", "GtkToggleButton", "GtkCheckButton", "GtkRadioButton", "GtkMenuButton", "GtkModelButton" : vsDazu(vsZeiger$(gtk_button_get_label(w)))
+        CASE "GtkHeaderBar"
+            vsDazu(vsZeiger$(gtk_header_bar_get_title(w)))
+            vsDazu(vsZeiger$(gtk_header_bar_get_subtitle(w)))
+        CASE "GtkEntry", "GtkSearchEntry" : vsDazu(vsZeiger$(gtk_entry_get_placeholder_text(w)))
+        CASE "GtkComboBoxText"
+            DIM a AS INTEGER : a = gtk_combo_box_text_get_active_text(w)
+            IF a <> 0 THEN
+                vsDazu(TEXT_AUS_ZEIGER$(a))
+                g_free(a)
+            END IF
+    END SELECT
+    IF typ = "GtkMenuButton" THEN vsSammeln(gtk_menu_button_get_popover(w))
+    IF NOT g_type_check_instance_is_a(w, gtk_container_get_type()) THEN RETURN
+    DIM liste AS INTEGER : liste = gtk_container_get_children(w)
+    DIM knoten AS INTEGER : knoten = liste
+    WHILE knoten <> 0
+        DIM b AS BUFFER : b = BUFFER_AUS_ZEIGER(knoten, 16)
+        vsSammeln(BUFFER_GET_I64(b, 0))
+        knoten = BUFFER_GET_I64(b, 8)
+    WEND
+    IF liste <> 0 THEN g_list_free(liste)
+END SUB
+
+' Sieht der Text deutsch aus? Umlaute, ß und haeufige deutsche Woerter
+FUNCTION vsDeutsch(t AS STRING) AS BOOLEAN
+    ' Dateinamen und Pfade sind Daten, keine Oberflaeche
+    IF REGEX_TEST(t, "\.pxs|[\\/]") THEN RETURN FALSE
+    IF REGEX_TEST(t, "[äöüÄÖÜß]") THEN RETURN TRUE
+    RETURN REGEX_TEST(" " + t + " ", "(?i)[^a-z](und|der|die|das|mit|nicht|ist|zum|zur|für|oder|aus|auf|alle|eine?|Muster|Farbe|Farben|Ebene|Ebenen|Stiche?|Sichern|Einstellungen|Garn|Zeile|Spalte|Klicken|Rückgängig|Werkzeug)[^a-z]")
+END FUNCTION
+
+FUNCTION vsF1Zu(daten AS INTEGER) AS BOOLEAN
+    vsTexte = []
+    vsSammeln(kuDialog)
+    vsF1 = vsTexte
+    gtk_dialog_response(kuDialog, GTK_ANTWORT_ABBRECHEN)
+    RETURN FALSE
+END FUNCTION
+
+SUB vsDeutscheZeigen(titel AS STRING, liste AS ARRAY OF STRING)
+    DIM d AS ARRAY OF STRING : d = []
+    DIM t AS STRING
+    FOR EACH t IN liste
+        IF vsDeutsch(t) THEN ARRAY_PUSH(d, REPLACE$(t, CHR$(10), " / "))
+    NEXT
+    SORT(d)
+    PRINT titel; ": "; LEN(liste); " texte, deutsch aussehend "; LEN(d)
+    FOR EACH t IN d
+        PRINT "  "; LEFT$(t, 110)
+    NEXT
+END SUB
+
+FUNCTION vorfuehrenSprache(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "sprache: "; kern.spracheJetzt$(); " | englisch "; kern.englisch(); " | einstellung '"; einst.sprache; "'"
+            PRINT "tr: "; tr$("Muster öffnen"); " | unbekannt bleibt: "; tr$("Gibt es nicht"); " | trf: "; trf$("Die Ebene „{0}“ ist gesperrt.", ["Ebene 1"])
+            PRINT "kuerzel: "; kz$("sichern_unter"); " | "; kz$("zurueck"); " | "; kern.kuerzelAnzeige$("Strg+Umschalt+Entf, Alt+Bild auf, Leertaste")
+            PRINT "zahlen: "; zahlText$(1234567.891, 2); " | "; zahlText$(2.5, 1); " | "; zahlText$(400000, -1)
+            PRINT "tooltip mit kuerzel: "; LEFT$(TEXT_AUS_ZEIGER$(gtk_widget_get_tooltip_text(kSichern)), 60)
+            ok = vfFoto(fenster, "hauptfenster")
+            vsTexte = []
+            vsSammeln(fenster)
+            vsDeutscheZeigen("hauptfenster", vsTexte)
+        CASE 2
+            ' Die Uebersicht der Kuerzel (F1)
+            DIM t AS INTEGER : t = g_timeout_add(400, vsF1Zu, 0)
+            befehlAusfuehren("tastenkuerzel")
+            vsDeutscheZeigen("f1", vsF1)
+            DIM zeile AS STRING
+            FOR EACH zeile IN kern.kuerzelListe(einst)
+                IF LEFT$(zeile, 4) = "Undo" OR LEFT$(zeile, 7) = "Save as" THEN PRINT "  f1-zeile: "; REPLACE$(zeile, CHR$(9), " -> ")
+            NEXT
+        CASE 3
+            ' Die Sprache in den Einstellungen
+            DIM ed AS INTEGER : ed = edBauen()
+            PRINT "einstellungen: sprache "; gtk_combo_box_get_active(edSprache); " '"; vsZeiger$(gtk_combo_box_text_get_active_text(edSprache)); "'"
+            gtk_combo_box_set_active(edSprache, 1)
+            edUebernehmen()
+            gtk_widget_destroy(ed)
+            PRINT "uebernommen: '"; einst.sprache; "' | gemerkt '"; kern.einstellungenLaden(einst.pfad).sprache; "' | "; meldung; " | oberflaeche bleibt "; kern.spracheJetzt$()
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

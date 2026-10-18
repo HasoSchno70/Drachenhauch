@@ -8,6 +8,53 @@ einst = kern.einstellungenLaden(kern.einstellungsDatei$("einstellungen.json"))
 DIM einstTafel AS MAP OF STRING
 einstTafel = kern.kuerzelTafel(einst)
 
+' --- Sprache der Oberflaeche -----------------------------------------------------------
+' Gilt ab dem Start: die Fenster sind danach gebaut (wie PySticky). Eine Probe
+' (--probe, --probe-...) bleibt deutsch, auch wenn das System englisch ist --
+' ihre Erwartungen stehen deutsch da; DH_GLUT_SPRACHE ueberstimmt beides.
+' Ohne GTK gibt es keine Systemsprache: das Programm muss bis zur Pruefung in
+' main.dh kommen, die sagt, was fehlt (vorher brach es hier ab).
+FUNCTION systemSprache$() AS STRING
+    TRY
+        DIM l AS INTEGER : l = gtk_get_default_language()
+        IF l = 0 THEN RETURN ""
+        RETURN TEXT_AUS_ZEIGER$(pango_language_to_string(l))
+    CATCH e
+        RETURN ""
+    END TRY
+END FUNCTION
+
+FUNCTION spracheBeimStart$() AS STRING
+    IF GETENV$("DH_GLUT_SPRACHE", "") <> "" THEN RETURN kern.spracheAufloesen$(GETENV$("DH_GLUT_SPRACHE", ""), "de")
+    DIM a AS INTEGER
+    FOR a = 0 TO ARGC() - 1
+        IF LEFT$(ARG$(a), 7) = "--probe" THEN RETURN "de"
+    NEXT
+    RETURN kern.spracheAufloesen$(einst.sprache, systemSprache$())
+END FUNCTION
+
+DIM spracheGeladen AS BOOLEAN
+spracheGeladen = kern.spracheLaden(spracheBeimStart$(), PATHJOIN(CWD$(), "daten/sprache/en.txt"))
+
+' Die Kurzformen fuer die Ansicht
+FUNCTION tr$(t AS STRING) AS STRING
+    RETURN kern.tr$(t)
+END FUNCTION
+
+FUNCTION trf$(t AS STRING, werte AS ARRAY OF STRING) AS STRING
+    RETURN kern.trf$(t, werte)
+END FUNCTION
+
+' Eine Zahl so, wie sie angezeigt wird (1.234,5 / 1,234.5)
+FUNCTION zahlText$(x AS FLOAT, stellen AS INTEGER) AS STRING
+    RETURN kern.zahlAnzeige$(x, stellen)
+END FUNCTION
+
+' Das Kuerzel einer Aktion so, wie es angezeigt wird
+FUNCTION kz$(kennung AS STRING) AS STRING
+    RETURN kern.kuerzelAnzeige$(kern.kuerzelVon$(einst, kennung))
+END FUNCTION
+
 ' Sichern, ohne dass ein Fehler beim Schreiben das Programm anhaelt
 SUB einstellungenMerken()
     TRY
@@ -36,13 +83,13 @@ FUNCTION mitKuerzeln$(text AS STRING) AS STRING
     IF INSTR(text, "{") < 0 THEN RETURN text
     DIM a AS kern.Kuerzelaktion
     FOR EACH a IN kern.kuerzelAktionen()
-        IF INSTR(text, "{" + a.kennung + "}") >= 0 THEN text = REPLACE$(text, "{" + a.kennung + "}", kern.kuerzelVon$(einst, a.kennung))
+        IF INSTR(text, "{" + a.kennung + "}") >= 0 THEN text = REPLACE$(text, "{" + a.kennung + "}", kz$(a.kennung))
     NEXT
     RETURN text
 END FUNCTION
 
 FUNCTION kuerzelHinweis$(kennung AS STRING) AS STRING
-    DIM k AS STRING : k = kern.kuerzelVon$(einst, kennung)
+    DIM k AS STRING : k = kz$(kennung)
     IF k = "" THEN RETURN ""
     RETURN " (" + k + ")"
 END FUNCTION

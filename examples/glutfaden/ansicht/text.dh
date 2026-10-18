@@ -86,7 +86,7 @@ END FUNCTION
 SUB textBeginnen(x AS INTEGER, y AS INTEGER)
     IF TRIM$(txText) = "" THEN
         IF tlFeld <> 0 THEN gtk_widget_grab_focus(tlFeld)
-        statusMeldung("Erst einen Text eingeben -- oben in der Leiste.")
+        statusMeldung(tr$("Erst einen Text eingeben -- oben in der Leiste."))
         RETURN
     END IF
     IF NOT wzFarbeDa() THEN RETURN
@@ -101,13 +101,13 @@ END FUNCTION
 SUB textAnhaengen()
     DIM s AS kern.Ausschnitt : s = textAusschnitt(txText, txSchrift, txGroesse, txFett, txKursiv, wzFarbe, wzStichart)
     IF s.breite = 0 THEN
-        statusMeldung("Der Text ergibt keine Stiche -- groesser schreiben?")
+        statusMeldung(tr$("Der Text ergibt keine Stiche -- groesser schreiben?"))
         RETURN
     END IF
     mrEinfuegen = TRUE
-    mrEinfuegenText = "Text"
+    mrEinfuegenText = tr$("Text")
     mrEinfuegenAus = s
-    statusMeldung(STR$(s.stiche()) + " Stiche, " + STR$(s.breite) + " x " + STR$(s.hoehe) + " -- klicken setzt, ESC bricht ab.")
+    statusMeldung(trf$("{0} Stiche, {1} x {2} -- klicken setzt, ESC bricht ab.", [STR$(s.stiche()), STR$(s.breite), STR$(s.hoehe)]))
     gtk_widget_queue_draw(lwFlaeche)
 END SUB
 

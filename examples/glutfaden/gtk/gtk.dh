@@ -92,6 +92,20 @@ DECLARE FUNCTION gtk_drag_dest_get_target_list LIB GTK (w AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_selection_data_set_text LIB GTK (sel AS ZEIGER, text AS TEXT, laenge AS LONG) AS BOOLEAN
 DECLARE FUNCTION gtk_selection_data_get_text LIB GTK (sel AS ZEIGER) AS ZEIGER
 DECLARE SUB gdk_drag_status LIB GDK (kontext AS ZEIGER, aktion AS LONG, zeit AS ULONG)
+' Systemsprache fuer ui_language "auto" (z. B. "de-de", "en-us")
+DECLARE FUNCTION gtk_get_default_language LIB GTK () AS ZEIGER
+DECLARE FUNCTION pango_language_to_string LIB PANGO (sprache AS ZEIGER) AS ZEIGER
+' Widgets durchlaufen (die Sprach-Probe)
+DECLARE FUNCTION gtk_container_get_children LIB GTK (behaelter AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_container_get_type LIB GTK () AS ZEIGER
+DECLARE FUNCTION g_type_check_instance_is_a LIB GOBJECT (objekt AS ZEIGER, typ AS ZEIGER) AS BOOLEAN
+DECLARE FUNCTION g_type_name_from_instance LIB GOBJECT (objekt AS ZEIGER) AS ZEIGER
+DECLARE SUB g_list_free LIB GLIB (liste AS ZEIGER)
+DECLARE FUNCTION gtk_menu_button_get_popover LIB GTK (knopf AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_header_bar_get_title LIB GTK (kopf AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_header_bar_get_subtitle LIB GTK (kopf AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_entry_get_placeholder_text LIB GTK (feld AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_combo_box_text_get_active_text LIB GTK (wahl AS ZEIGER) AS ZEIGER
 ' Stiftdruck: FALSE, wenn das Geraet keine Druck-Achse hat (Maus)
 DECLARE FUNCTION gdk_event_get_axis LIB GDK (ereignis AS ZEIGER, achse AS LONG, BYREF wert AS FLOAT) AS BOOLEAN
 CONST GDK_ACHSE_DRUCK = 3             ' GDK_AXIS_PRESSURE

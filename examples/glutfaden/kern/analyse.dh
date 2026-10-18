@@ -625,7 +625,7 @@ END FUNCTION
 ' --- Farbenblindheit ---------------------------------------------------------------
 
 FUNCTION farbenblindNamen() AS ARRAY OF STRING
-    RETURN ["Keine Simulation", "Protanopie (Rot-Blindheit)", "Deuteranopie (Grün-Blindheit)", "Tritanopie (Blau-Blindheit)"]
+    RETURN [tr$("Keine Simulation"), tr$("Protanopie (Rot-Blindheit)"), tr$("Deuteranopie (Grün-Blindheit)"), tr$("Tritanopie (Blau-Blindheit)")]
 END FUNCTION
 
 ' Wie die Farbe bei der Farbenblindheit `art` aussieht (Vienot 1999)

@@ -2525,6 +2525,41 @@ Abschnitt, statt Zahl und Reihenfolge festzuhalten. Sammlung
 `snap_position`, `_brush_cells` und `_handle_gesture` mit Stellvertretern auf:
 gleich); Stufen 13 und 20 nachgezogen; 20 von 20 Verfaelschungen fallen.
 
+**Stufe 24: Deutsch und Englisch, Teil 1** (2026-10-18, Wunsch des
+Nutzers; Teil 2 = alle Dialoge, Teil 3 = Texte aus dem Kern: Verlauf,
+PDF/HTML/Druck, Meldungen, "Ebene N"). `kern/sprache.dh`: jeder Anzeigetext
+geht durch `tr$("deutsch")` (auf Deutsch unveraendert, auf Englisch aus
+`daten/sprache/en.txt`, je Zeile Deutsch TAB Englisch -- KEIN JSON, das
+json-Modul liest einen Punkt im Schluessel als Pfad), Texte mit Werten durch
+`trf$("... {0} ...", [w])`: erst uebersetzen, dann einsetzen (von hinten,
+ein Wert wird nicht noch einmal gelesen). PySticky schrieb `t(f"...")` und
+hat solche Texte darum nie uebersetzt. Einstellung `ui_language`
+(auto/de/en, `einst.sprache`, im Dialog unter Allgemein), gilt ab dem
+naechsten Start; "auto" ueber `gtk_get_default_language` (beginnt mit "de"
+-> Deutsch, sonst Englisch). **Eine Probe (`--probe-...`) bleibt deutsch**,
+ihre Erwartungen stehen deutsch da; `DH_GLUT_SPRACHE` ueberstimmt beides.
+Kuerzel bleiben deutsch GESPEICHERT und werden englisch ANGEZEIGT
+(`kuerzelAnzeige$`: Strg -> Ctrl, Umschalt -> Shift, Entf -> Del ...),
+Zahlen ueber `zahlText$`/`zahlAnzeige$` (ZAHL$ schreibt immer deutsch, auf
+Englisch werden Punkt und Komma getauscht). Eingepackt hat ein Werkzeug
+(Ketten mit `+` zu `trf$`, ausgenommen Vergleiche, PRINT, CASE-Marken,
+Schrift- und Symbolnamen), danach von Hand nachgesehen. **Die Fallen:**
+(1) ein Anzeigetext, der als SCHLUESSEL dient (`mrEinfuegenText` verglich
+mit "Einfuegen"), muss auf beiden Seiten eingepackt sein; (2)
+zusammengesetztes Deutsch ("Vor dem {0} sichern?", "wird {1}gestickt")
+laesst sich nicht uebersetzen -- ganze Saetze je Fall
+(`ungesichertFrage$`); (3) Schriftnamen wurden mit eingepackt.
+`daten/neuigkeiten.en.txt` fuer Englisch. Sammlung
+`tests/pruef/glutfaden_sprache.dhtest` (3): der erste liest den QUELLTEXT
+(jedes Literal in tr$/trf$ und jeder Name der Kuerzel-Tafel steht in der
+Tafel, gleiche Platzhalter, keine verwaisten oder doppelten Eintraege, kein
+tr$ mit {0}, kein trf$ ohne) -- ein fehlender Eintrag ist sonst unsichtbar,
+der Text bleibt einfach deutsch; die Probe sammelt alle Texte des
+Hauptfensters und der F1-Uebersicht und listet deutsch aussehende (0 von
+631 bzw. 143). Stufe 13 nachgezogen; 10 von 10 Verfaelschungen fallen --
+eine davon (Wiederholen-Tooltip) nur im Quelltext-Fall, weil das Programm
+den Tooltip der Verlaufsknoepfe ohnehin ueberschreibt.
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

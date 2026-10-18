@@ -625,10 +625,10 @@ END SUB
 
 FUNCTION ansichtName$(was AS INTEGER) AS STRING
     SELECT CASE was
-        CASE 0 : RETURN "Rückstiche anzeigen"
-        CASE 1 : RETURN "Fortschritt anzeigen"
+        CASE 0 : RETURN tr$("Rückstiche anzeigen")
+        CASE 1 : RETURN tr$("Fortschritt anzeigen")
     END SELECT
-    RETURN "Zentrierhilfe"
+    RETURN tr$("Zentrierhilfe")
 END FUNCTION
 
 FUNCTION ansichtAn(was AS INTEGER) AS BOOLEAN
