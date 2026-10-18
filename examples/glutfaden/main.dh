@@ -871,6 +871,7 @@ werkzeugWaehlen(IIF(einst.werkzeugMerken, einst.letztesWerkzeug, einst.startWerk
 IMPORT "ansicht/vorfuehrung.dh"
 ' Die Fotoproben vor Stufe 16 zaehlen Farben im Bereich der Zeichenflaeche --
 ' die Farbleiste darunter zeigt dieselben Farben und zaehlte mit
+IF probe <> "" THEN lwOhneMaus = TRUE
 IF probe <> "" AND probe <> "stufe16" AND probe <> "start" THEN
     fbProbeAus = TRUE
     farbleisteZeigen(FALSE)

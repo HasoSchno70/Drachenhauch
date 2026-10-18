@@ -28,6 +28,11 @@ DIM lwHervor AS INTEGER : lwHervor = -1   ' hervorgehobene Farbe, -1 = keine
 ' nur die Anzeige, das Muster bleibt
 DIM lwNurAktiv AS BOOLEAN             ' nur die aktive Ebene, auch wenn sie ausgeblendet ist
 DIM lwAbdunkeln AS BOOLEAN            ' die anderen mit halber Deckkraft
+' Waehrend einer Probe zaehlt die echte Maus nicht: Proben rufen die Werkzeuge
+' selbst, und ein Fenster, das unter dem Zeiger auf- oder zugeht, schickt
+' Bewegungen, die einen laufenden Zug an eine fremde Stelle setzten (unter
+' voller Last fiel so die Farbverlauf-Probe der Stufe 15).
+DIM lwOhneMaus AS BOOLEAN
 DIM lwPuffer AS BUFFER
 DIM lwBild AS INTEGER                 ' cairo_surface_t, 0 = keins
 DIM lwZelle AS FLOAT
@@ -562,6 +567,7 @@ END SUB
 
 ' --- Maus ---------------------------------------------------------------------------
 FUNCTION lwRad(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF lwOhneMaus THEN RETURN TRUE
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
     DIM richtung AS INTEGER
@@ -620,6 +626,7 @@ FUNCTION lwHalbAchse(r AS FLOAT) AS INTEGER
 END FUNCTION
 
 FUNCTION lwDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF lwOhneMaus THEN RETURN TRUE
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
     gtk_widget_grab_focus(lwFlaeche)
@@ -633,6 +640,7 @@ FUNCTION lwDruck(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
 END FUNCTION
 
 FUNCTION lwLoslassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF lwOhneMaus THEN RETURN TRUE
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
     lwZiehen = FALSE
@@ -641,6 +649,7 @@ FUNCTION lwLoslassen(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOO
 END FUNCTION
 
 FUNCTION lwBewegung(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
+    IF lwOhneMaus THEN RETURN TRUE
     DIM px AS FLOAT, py AS FLOAT
     DIM ok AS BOOLEAN : ok = gdk_event_get_coords(ereignis, px, py)
     IF lwHat THEN lwHalbRechnen(px, py)
