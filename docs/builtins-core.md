@@ -290,7 +290,7 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 | `UPPER$(s)`, `LOWER$(s)` | Groß-/Kleinschreibung |
 | `LEFT$(s, n)`, `RIGHT$(s, n)` | erste/letzte n Zeichen |
 | `MID$(s, start[, n])` | Teilstring ab Position start (0-basiert), n Zeichen oder bis Ende |
-| `INSTR(s, sub[, start])` → INTEGER | Position von sub in s, oder -1 |
+| `INSTR(s, sub[, start])` → INTEGER | Position von sub in s (0-basiert), oder -1 |
 | `REPLACE$(s, alt, neu)` | alle Vorkommen ersetzen |
 | `TRIM$(s)` | Whitespace vorne/hinten weg |
 | `SPLIT$(s, delim)` → ARRAY OF STRING | Zerlegen |
@@ -300,6 +300,13 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 | `SPACE$(n)` | n Leerzeichen |
 | `HEX$(n)` | INT als Hex-String |
 | `FORMAT$(value, mask)` | printf-Stil. `FORMAT$(42, "%05d")` → `"00042"`. Sechs Spezifizierer: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — dazu `%%` für ein wörtliches Prozentzeichen. Breite, Nullen und Genauigkeit wie gewohnt (`%05d`, `%-6d`, `%.2f`). Alles andere meldet „unbekannter Spezifizierer“ |
+
+> **Anders als QBasic/VB:** `MID$` und `INSTR` zählen ab **0**, und `INSTR`
+> liefert bei „nicht gefunden“ **-1**, nicht 0. Aus QBasic übernommene Muster
+> gehen darum still daneben: `IF INSTR(s, t) > 0` übersieht einen Treffer am
+> Anfang (richtig: `>= 0`, oder gleich `t IN s` / `STARTSWITH`), und
+> `MID$(s, LEN(praefix) + 1)` schneidet ein Zeichen zu viel ab (richtig:
+> `MID$(s, LEN(praefix))`).
 
 Erweiterungen *(nur native Runtime)*:
 
@@ -321,9 +328,12 @@ Erweiterungen *(nur native Runtime)*:
 
 ```basic
 PRINT UPPER$("hallo")           ' "HALLO"
-PRINT LEFT$("Drachenhauch", 4)     ' "Game"
-PRINT MID$("Drachenhauch", 4, 5)   ' "Basic"
+PRINT LEFT$("Drachenhauch", 4)     ' "Drac"
+PRINT MID$("Drachenhauch", 4, 5)   ' "henha"  (0-basiert: ab dem 5. Zeichen)
 PRINT INSTR("hello world", "world")   ' 6
+PRINT INSTR("hello", "he")           ' 0  -- ein Treffer ganz vorn
+PRINT INSTR("hello", "xy")           ' -1 -- nicht gefunden
+PRINT MID$("pre:rest", LEN("pre:"))  ' "rest" -- ohne + 1
 PRINT REPLACE$("a-b-c", "-", "_")     ' "a_b_c"
 
 DIM teile AS ARRAY OF STRING

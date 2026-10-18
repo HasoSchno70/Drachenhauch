@@ -212,7 +212,9 @@ RETURN "text"               ' in a FUNCTION ... AS INTEGER
 Plus three cases that do not involve a conversion but go wrong just as
 surely:
 
-* **A fractional number assigned to an integer variable** (`n = 7 / 2`) — here the
+* **A fractional number assigned to an integer variable** (`n = 7 / 2`, likewise to an
+  `INTEGER` field, an `INTEGER` parameter or after `RETURN` in a
+  `FUNCTION ... AS INTEGER`) — here the
   runtime rule depends on the value (`n = f * 2.0` works for `f = 1.5` and fails for
   `f = 1.6`), but the line is reported anyway.
 * **A typed FUNCTION without any `RETURN`** — it silently returns `NIL`,
@@ -402,7 +404,14 @@ Plain strings (`"..."`) are **not** interpolated — `{name}` stays literal. Onl
   (since 2026-09-24; before that, `8 / 2` was the integer 4 -- the type depended on the value).
   The result is therefore not suitable as an array index or for commands that require an integer (`MID$`,
   `LEFT$` ...); `dhrt --check` reports an
-  index that is certainly a fractional number.
+  index that is certainly a fractional number. It also warns when a `/` result
+  goes to something integer: an `INTEGER` variable or an `INTEGER` field
+  (`n = a / b`, `obj.field = a / b`), an `INTEGER` parameter of your own
+  SUB/FUNCTION (`show(n / 2)`) and after `RETURN` in a `FUNCTION ... AS INTEGER`
+  (`RETURN n / 2`). At run time this only stops when the division does not come
+  out even -- `((0 + 100 / 2) / 100) * 100` gives `50.0` and slips through
+  silently where old code meant `/` as integer division and `0`.
+  `RETURN n \ 2`, `INT(n / 2)` and `ROUND(n / 2)` stay quiet.
 - `\` is integer division (returns INTEGER, INTEGER even with FLOAT input).
 - `^` is exponentiation: `2 ^ 8 = 256`.
 

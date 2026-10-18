@@ -1601,16 +1601,34 @@ impl Compiler {
     /// den Text, der Fehler hing am Wert. Fuer die entscheidbaren Faelle muss
     /// sie nicht schweigen.
     fn warn_komma_an_ganzzahl(&mut self, ziel_typ: &str, ziel: &str, wert: &Node) {
-        if ziel_typ != "integer" { return; }
-        if self.statischer_typ(wert).as_deref() != Some("float") { return; }
-        let hinweis = match wert {
-            Node::BinaryOp { op, .. } if op == "/" =>
-                " Fuer ganzzahlige Division `\\` statt `/` nehmen.",
-            _ => " Mit INT() abschneiden oder ROUND() runden.",
-        };
+        let Some(hinweis) = self.komma_an_ganzzahl(ziel_typ, wert) else { return };
         let zeile = self.ctx.cur_line;
         self.warnings.push((zeile, format!(
             "'{}' ist als INTEGER angesagt, rechts steht eine Kommazahl. Das bricht beim Laufen ab, sobald der Wert nicht ganzzahlig ist ('passt nicht verlustfrei in INTEGER').{}", ziel, hinweis)));
+    }
+
+    /// Geht hier sicher eine Kommazahl an ein INTEGER-Ziel? Dann der Hinweis
+    /// fuer die Meldung, sonst None. Gemeinsam fuer Zuweisung, RETURN und
+    /// Argumente -- an allen drei Stellen wandelt die Laufzeit mit derselben
+    /// wertabhaengigen Regel um.
+    ///
+    /// Steckt ein `/` im Rechenausdruck (auch tiefer, `(a / b) * 100`), ist
+    /// fast immer die alte Ganzzahl-Division gemeint: dann der Hinweis auf
+    /// `\`. Ein `/` in einem Aufruf (`INT(a / b) * 1.5`) zaehlt nicht -- dort
+    /// ist es nicht der Grund fuer die Kommazahl.
+    fn komma_an_ganzzahl(&self, ziel_typ: &str, wert: &Node) -> Option<&'static str> {
+        if ziel_typ != "integer" { return None; }
+        if self.statischer_typ(wert).as_deref() != Some("float") { return None; }
+        fn mit_teilung(n: &Node) -> bool {
+            match n {
+                Node::BinaryOp { op, left, right } =>
+                    op == "/" || mit_teilung(left) || mit_teilung(right),
+                Node::UnaryOp { operand, .. } => mit_teilung(operand),
+                _ => false,
+            }
+        }
+        Some(if mit_teilung(wert) { " Fuer ganzzahlige Division `\\` statt `/` nehmen." }
+             else { " Mit INT() abschneiden oder ROUND() runden." })
     }
 
     /// Kann ein Wert vom Typ `quelle` NIEMALS in ein Ziel vom Typ `ziel`?
@@ -1721,6 +1739,16 @@ impl Compiler {
     fn warn_rueckgabe_typ(&mut self, wert: &Node) {
         let ziel = self.ctx.return_type.clone();
         if ziel.is_empty() || ziel == "any" { return; }
+        // FLOAT an eine FUNCTION ... AS INTEGER: wertabhaengig wie bei der
+        // Zuweisung. `RETURN n / 2` bricht bei ungeradem n ab -- und bei
+        // geradem liefert es still den Kommawert, wo alter Code mit `/` als
+        // Ganzzahl-Division etwas anderes meinte.
+        if let Some(hinweis) = self.komma_an_ganzzahl(&ziel, wert) {
+            let zeile = self.ctx.cur_line;
+            self.warnings.push((zeile, format!(
+                "Diese Funktion ist als INTEGER angesagt, hinter RETURN steht eine Kommazahl. Das bricht beim Laufen ab, sobald der Wert nicht ganzzahlig ist ('passt nicht verlustfrei in INTEGER').{}", hinweis)));
+            return;
+        }
         let Some(quelle) = self.statischer_typ(wert) else { return };
         if !Self::passt_nie(&quelle, &ziel) { return; }
         let zeile = self.ctx.cur_line;
@@ -1791,9 +1819,15 @@ impl Compiler {
             if idx >= grenze { continue; }
             let Some(ziel_typ) = sig.param_types.get(idx) else { continue };
             if ziel_typ.is_empty() || ziel_typ == "any" { continue; }
+            let pname = sig.param_names.get(idx).cloned().unwrap_or_default();
+            if let Some(hinweis) = self.komma_an_ganzzahl(ziel_typ, wert) {
+                raus.push((self.ctx.cur_line, format!(
+                    "{}: Parameter '{}' ist als INTEGER angesagt, hier steht eine Kommazahl. Das bricht beim Laufen ab, sobald der Wert nicht ganzzahlig ist ('passt nicht verlustfrei in INTEGER').{}",
+                    wo, pname, hinweis)));
+                continue;
+            }
             let Some(quelle) = self.statischer_typ(wert) else { continue };
             if !Self::passt_nie(&quelle, ziel_typ) { continue; }
-            let pname = sig.param_names.get(idx).cloned().unwrap_or_default();
             raus.push((self.ctx.cur_line, format!(
                 "{}: Parameter '{}' ist als {} angesagt, hier steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
                 wo, pname, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),

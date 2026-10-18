@@ -1104,7 +1104,7 @@
   "INPUT_RESET": "Alle Bindings + State leeren",
   "INPUT_UNBIND": "Action loeschen",
   "INPUT_UPDATE": "Frame-Snapshot (Pflicht jeden Frame, pollt auch Gamepads)",
-  "INSTR": "Position von sub in s, oder -1",
+  "INSTR": "Position von sub in s (0-basiert), oder -1",
   "INT": "Zahl zu INT (floor). INT(3.7) = 3, INT(-1.5) = -2.",
   "ISBOOL": "Typ-Prädikate (Bool ist KEINE Zahl)",
   "ISINT": "Typ-Prädikate (Bool ist KEINE Zahl)",

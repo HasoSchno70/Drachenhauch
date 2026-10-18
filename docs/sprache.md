@@ -212,7 +212,9 @@ RETURN "text"               ' in einer FUNCTION ... AS INTEGER
 Dazu drei Fälle, die keine Umwandlung betreffen, aber genauso sicher
 schiefgehen:
 
-* **Kommazahl an eine ganzzahlige Variable** (`n = 7 / 2`) — hier ist die
+* **Kommazahl an eine ganzzahlige Variable** (`n = 7 / 2`, ebenso an ein
+  `INTEGER`-Feld, einen `INTEGER`-Parameter oder hinter `RETURN` einer
+  `FUNCTION ... AS INTEGER`) — hier ist die
   Laufzeit-Regel wertabhängig (`n = f * 2.0` geht bei `f = 1.5` gut und bei
   `f = 1.6` schief), gemeldet wird die Zeile trotzdem.
 * **Eine typisierte FUNCTION ohne jedes `RETURN`** — sie liefert still `NIL`,
@@ -402,7 +404,14 @@ Plain-Strings (`"..."`) werden **nicht** interpoliert — `{name}` bleibt buchst
   (seit 2026-09-24; vorher war `8 / 2` die ganze Zahl 4 -- der Typ hing am Wert).
   Als Feld-Index oder fuer Befehle, die eine ganze Zahl verlangen (`MID$`,
   `LEFT$` ...), taugt das Ergebnis darum nicht; `dhrt --check` meldet einen
-  Index, der sicher eine Kommazahl ist.
+  Index, der sicher eine Kommazahl ist. Ebenso gewarnt wird, wenn ein `/`-Ergebnis
+  an etwas Ganzzahliges geht: an eine `INTEGER`-Variable oder ein
+  `INTEGER`-Feld (`n = a / b`, `obj.feld = a / b`), an einen `INTEGER`-Parameter
+  einer eigenen SUB/FUNCTION (`zeige(n / 2)`) und hinter `RETURN` in einer
+  `FUNCTION ... AS INTEGER` (`RETURN n / 2`). Zur Laufzeit bricht das nur ab,
+  wenn die Division nicht aufgeht -- `((0 + 100 / 2) / 100) * 100` ergibt `50.0`
+  und rutscht still durch, wo alter Code mit `/` als Ganzzahl-Division `0`
+  meinte. `RETURN n \ 2`, `INT(n / 2)` und `ROUND(n / 2)` bleiben still.
 - `\` ist ganzzahlige Division (gibt INTEGER, INTEGER auch bei FLOAT-Eingabe).
 - `^` ist Potenz: `2 ^ 8 = 256`.
 
