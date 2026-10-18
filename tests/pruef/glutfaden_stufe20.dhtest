@@ -386,7 +386,8 @@ zurueck: notiz '' feld '' tipp ''
 vor: notiz 'Schatten links' feld 'Schatten links' | neu gebaut, schritte +0
 ebene gewechselt: aktiv 0 | oben 'Vordergrund' | feld jetzt ''
 vor dem befehl: unten 'Grund'
-dreimal zurueck: wie vorher TRUE | notizen '' ''
+vor dem neuaufbau: unten 'Rand' | feld 'Rand'
+viermal zurueck: wie vorher TRUE | notizen '' ''
 f1: war offen TRUE | zeilen 75
 schalter: rueck TRUE fortschritt TRUE mitte FALSE | knoepfe TRUE TRUE FALSE
 ohne rueckstiche: FALSE knopf FALSE | anders TRUE | Rückstiche anzeigen: aus

@@ -2280,10 +2280,16 @@ FUNCTION vorfuehrenStufe20(daten AS INTEGER) AS BOOLEAN
             gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), "Grund", -1)
             befehlAusfuehren("zoom_rein")
             PRINT "vor dem befehl: unten '"; lwMuster.ebenen.ebenen[0].notiz; "'"
+            ' Getippt, dann baut ein Knopf (Rueckgaengig in der Kopfleiste ruft
+            ' werkzeugZurueck direkt) die Leiste neu: die Notiz kommt vorher an
+            gtk_text_buffer_set_text(gtk_text_view_get_buffer(slNotiz), "Rand", -1)
+            allesNeu()
+            PRINT "vor dem neuaufbau: unten '"; lwMuster.ebenen.ebenen[0].notiz; "' | feld '"; textSichtText$(slNotiz); "'"
             werkzeugZurueck()
             werkzeugZurueck()
             werkzeugZurueck()
-            PRINT "dreimal zurueck: wie vorher "; vfAlles$() = v20Vorher; " | notizen '"; lwMuster.ebenen.ebenen[0].notiz; "' '"; lwMuster.ebenen.ebenen[1].notiz; "'"
+            werkzeugZurueck()
+            PRINT "viermal zurueck: wie vorher "; vfAlles$() = v20Vorher; " | notizen '"; lwMuster.ebenen.ebenen[0].notiz; "' '"; lwMuster.ebenen.ebenen[1].notiz; "'"
             leinwandEinpassen()
             ' F1: die Uebersicht geht auf und wieder zu
             DIM t AS INTEGER : t = g_timeout_add(400, v20F1Zu, 0)
