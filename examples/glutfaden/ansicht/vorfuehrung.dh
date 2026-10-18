@@ -2501,3 +2501,205 @@ FUNCTION vorfuehrenStufe21(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+
+' --- Stufe 22: Auswahlkante, Aida, Ziehen, Pfade, Hervorheben, Stickzeit, Neu ------
+
+DIM v22Stand AS INTEGER
+DIM v22Bild AS INTEGER
+
+' Eine leere Zelle (von hinten gesucht: durch (0,0) laeuft in alle.pxs ein
+' Rueckstich) und eine mit vollem Stich
+FUNCTION v22Zelle(leer AS BOOLEAN) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = LEN(lwFarbe) - 1 TO 0 STEP -1
+        IF leer AND lwFarbe[i] < 0 THEN RETURN i
+        IF NOT leer AND lwFarbe[i] >= 0 AND lwTyp[i] = 0 THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION v22Mitte(f AS INTEGER, i AS INTEGER) AS INTEGER
+    DIM x AS INTEGER : x = i MOD lwMuster.breite
+    DIM y AS INTEGER : y = i \ lwMuster.breite
+    RETURN v20Punkt(f, FLOOR(lwX + x * lwZelle + lwZelle / 2), FLOOR(lwY + y * lwZelle + lwZelle / 2))
+END FUNCTION
+
+' Wie viele Punkte der oberen Kante der Auswahl Glut sind und wie viele dunkel
+FUNCTION v22Kante$(f AS INTEGER) AS STRING
+    DIM y AS INTEGER : y = FLOOR(lwY + mrAuswahl.y0 * lwZelle)
+    DIM x0 AS INTEGER : x0 = FLOOR(lwX + mrAuswahl.x0 * lwZelle) + 2
+    DIM x1 AS INTEGER : x1 = FLOOR(lwX + (mrAuswahl.x1 + 1) * lwZelle) - 2
+    DIM glut AS INTEGER, dunkel AS INTEGER, x AS INTEGER
+    FOR x = x0 TO x1
+        DIM p AS INTEGER : p = v20Punkt(f, x, y)
+        DIM r AS INTEGER : r = (p SHR 16) BAND 255
+        DIM b AS INTEGER : b = p BAND 255
+        IF r > 200 AND b < 120 THEN glut = glut + 1
+        IF r < 60 AND b < 80 THEN dunkel = dunkel + 1
+    NEXT
+    RETURN "glut " + IIF(glut > 0, "ja", "nein") + " dunkel " + IIF(dunkel > 0, "ja", "nein") + " | beide etwa gleich " + IIF(ABS(glut - dunkel) <= (x1 - x0) \ 4, "ja", "nein")
+END FUNCTION
+
+FUNCTION v22Ebenen$() AS STRING
+    DIM a AS ARRAY OF STRING : a = []
+    DIM e AS kern.Ebene
+    FOR EACH e IN lwMuster.ebenen.ebenen
+        ARRAY_PUSH(a, e.name + "(" + STR$(e.stichzahl()) + ")")
+    NEXT
+    RETURN JOIN$(a, " ") + " | aktiv " + STR$(lwMuster.ebenen.aktiv)
+END FUNCTION
+
+FUNCTION vorfuehrenStufe22(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    SELECT CASE schritt
+        CASE 1
+            PRINT "vorgaben: ameisen "; einst.ameisen; " | textur "; einst.stoffTextur; " | stickzeit "; einst.stickzeit; " | hervorheben "; einst.hervorheben; " | bibliothek '"; einst.bibliothekPfad; "' | vorlagen '"; einst.vorlagenPfad; "'"
+            ' Aida: der Punkt in der Mitte einer leeren Zelle, nicht in einer gefuellten
+            lwZelle = 24
+            lwX = 10
+            lwY = 10
+            DIM leer AS INTEGER : leer = v22Zelle(TRUE)
+            DIM voll AS INTEGER : voll = v22Zelle(FALSE)
+            DIM f AS INTEGER : f = v20Bild()
+            DIM mitte AS INTEGER : mitte = v22Mitte(f, leer)
+            DIM vollAn AS INTEGER : vollAn = v22Mitte(f, voll)
+            PRINT "textur an: leere zelle "; leer MOD lwMuster.breite; ","; leer \ lwMuster.breite; " mitte "; IIF(mitte = einst.stoff, "stoff", "punkt"); " | dunkler "; kern.helligkeit(mitte) < kern.helligkeit(einst.stoff)
+            cairo_surface_destroy(f)
+            einst.stoffTextur = FALSE
+            f = v20Bild()
+            PRINT "textur aus: leere mitte "; IIF(v22Mitte(f, leer) = einst.stoff, "stoff", "punkt"); " | volle zelle "; voll MOD lwMuster.breite; ","; voll \ lwMuster.breite; " gleich wie mit textur "; v22Mitte(f, voll) = vollAn
+            cairo_surface_destroy(f)
+            einst.stoffTextur = TRUE
+            lwZelle = 7
+            f = v20Bild()
+            PRINT "unter 8 punkten: "; IIF(v22Mitte(f, leer) = einst.stoff, "stoff", "punkt")
+            cairo_surface_destroy(f)
+            leinwandEinpassen()
+        CASE 2
+            ' Die laufende Auswahlkante
+            lwZelle = 24
+            lwX = 10
+            lwY = 10
+            werkzeugWaehlen(WZ_AUSWAHL, FALSE)
+            mrAuswahl = kern.auswahlRechteck(lwMuster.breite, lwMuster.hoehe, 2, 2, 9, 5)
+            v22Bild = v20Bild()
+            v22Stand = mrAmeisenStand
+            PRINT "auswahl: takt laeuft "; mrAmeisenNr <> 0; " | kante "; v22Kante$(v22Bild)
+        CASE 3
+            DIM g AS INTEGER : g = v20Bild()
+            PRINT "nach 300 ms: weitergerueckt "; mrAmeisenStand <> v22Stand; " | kante bewegt "; v20AndersAuf(v22Bild, g, lwX + 2 * lwZelle + 2, lwY + 2 * lwZelle, lwX + 10 * lwZelle - 2, lwY + 2 * lwZelle, 60) > 0
+            cairo_surface_destroy(g)
+            cairo_surface_destroy(v22Bild)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+        CASE 4
+            PRINT "anderes werkzeug: takt aus "; mrAmeisenNr = 0; " | auswahl weg "; IS_NIL(mrAuswahl)
+            einst.ameisen = FALSE
+            werkzeugWaehlen(WZ_AUSWAHL, FALSE)
+            mrAuswahl = kern.auswahlRechteck(lwMuster.breite, lwMuster.hoehe, 2, 2, 9, 5)
+            v22Bild = v20Bild()
+            PRINT "ohne einstellung: takt "; mrAmeisenNr <> 0; " | kante "; v22Kante$(v22Bild)
+        CASE 5
+            DIM g2 AS INTEGER : g2 = v20Bild()
+            PRINT "ohne einstellung nach 300 ms: steht "; v20AndersAuf(v22Bild, g2, lwX + 2 * lwZelle + 2, lwY + 2 * lwZelle, lwX + 10 * lwZelle - 2, lwY + 2 * lwZelle, 60) = 0
+            cairo_surface_destroy(g2)
+            cairo_surface_destroy(v22Bild)
+            einst.ameisen = TRUE
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            leinwandEinpassen()
+            ' Ziehen: Quellen und Ziele sind eingerichtet
+            DIM r0 AS INTEGER : r0 = gtk_list_box_get_row_at_index(slKatListe, 0)
+            DIM e0 AS INTEGER : e0 = gtk_list_box_get_row_at_index(slEbenenListe, 0)
+            PRINT "ziehen: katalogzeile "; gtk_drag_source_get_target_list(gtk_bin_get_child(r0)) <> 0; " | ebenenzeile "; gtk_drag_source_get_target_list(gtk_bin_get_child(e0)) <> 0; " | farbleiste nimmt "; gtk_drag_dest_get_target_list(fbBox) <> 0; " | ebenenliste nimmt "; gtk_drag_dest_get_target_list(slEbenenListe) <> 0
+            ' Ein Garn auf die Farbleiste (der Weg nach dem Ablegen)
+            DIM vorher AS INTEGER : vorher = lwMuster.farbanzahl()
+            DIM pal AS kern.Palette : pal = slPaletten[slPalette]
+            DIM gn AS INTEGER : gn = LEN(pal.garne) - 1
+            zhVormerken(3, slPalette, gn)
+        CASE 6
+            DIM fa AS kern.Farbeintrag : fa = lwMuster.farben[lwMuster.farbanzahl() - 1]
+            PRINT "garn abgelegt: farben "; lwMuster.farbanzahl(); " | neu '"; fa.garn.name; "' | aktuell "; wzFarbe = lwMuster.farbanzahl() - 1
+            garnAbgelegt(slPalette, 99999)
+            garnAbgelegt(-1, 0)
+            PRINT "falsche nummern: farben "; lwMuster.farbanzahl()
+            ' Ebenen ziehen: die Stelle in der echten Liste, dann zusammenfuehren
+            DIM z1 AS INTEGER : z1 = gtk_list_box_get_row_at_index(slEbenenListe, 1)
+            DIM lage AS PangoRechteck
+            gtk_widget_get_allocation(z1, lage)
+            DIM zi AS INTEGER, an AS FLOAT
+            (zi, an) = zhEbeneStelle(slEbenenListe, lage.y + lage.hoehe \ 2)
+            PRINT "stelle: zeile "; zi; " | mitte "; ABS(an - 0.5) < 0.1; " | darunter "; zhEbeneStelle(slEbenenListe, lage.y + 5 * lage.hoehe)[0]
+            PRINT "vorher: "; v22Ebenen$()
+            PRINT "hinweis: "; ebenenZugText$(2, 2, 1)
+            ebenenZiehen(0, 1, 0.5)
+            PRINT "zusammen: "; v22Ebenen$(); " | "; LEFT$(meldung, 60)
+            befehlAusfuehren("zurueck")
+            PRINT "zurueck: "; v22Ebenen$()
+            ebenenZiehen(0, 2, 0.9)
+            PRINT "verschoben: "; v22Ebenen$()
+            befehlAusfuehren("zurueck")
+            lwMuster.ebenen.ebenen[1].gesperrt = TRUE
+            ebenenZiehen(0, 1, 0.5)
+            PRINT "gesperrt: "; v22Ebenen$(); " | "; LEFT$(meldung, 50)
+            lwMuster.ebenen.ebenen[1].gesperrt = FALSE
+            ' Ueber den vorgemerkten Weg (wie nach dem Ablegen)
+            zhVormerken(2, 2, 0)
+        CASE 7
+            PRINT "vorgemerkt zusammen: "; v22Ebenen$()
+            befehlAusfuehren("zurueck")
+            ' Gewaehlte Farbe hervorheben
+            farbeHervorheben(-1)
+            farbeWaehlen(1)
+            PRINT "hervorheben aus: "; lwHervor
+            einst.hervorheben = TRUE
+            farbeWaehlen(2)
+            PRINT "hervorheben an: "; lwHervor;
+            farbeWaehlen(3)
+            PRINT " -> "; lwHervor
+            einst.hervorheben = FALSE
+            farbeHervorheben(-1)
+            ' Stickzeit
+            einst.stickzeit = FALSE
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            PRINT "stickzeit aus: laeuft "; kern.stickzeitLaeuft(lwMuster);
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            einst.stickzeit = TRUE
+            werkzeugWaehlen(WZ_FORTSCHRITT, FALSE)
+            PRINT " | an: laeuft "; kern.stickzeitLaeuft(lwMuster)
+            werkzeugWaehlen(WZ_STIFT, FALSE)
+            ' Ordner fuer Bibliothek und Vorlagen
+            einst.bibliothekPfad = v19Ort$("eigene bib")
+            einst.vorlagenPfad = v19Ort$("vorl")
+            PRINT "bibliothek: "; BASENAME(kern.bibliothekOrdner$(einst.bibliothekPfad)); " angelegt "; DIREXISTS(v19Ort$("eigene bib")); " | vorlagen: "; BASENAME(DIRNAME(vwVorlagenDatei$())); "/"; BASENAME(vwVorlagenDatei$())
+            WRITEALL(v19Ort$("datei"), "x")
+            einst.bibliothekPfad = v19Ort$("datei")
+            einst.vorlagenPfad = "   "
+            PRINT "geht nicht: bibliothek "; BASENAME(kern.bibliothekOrdner$(einst.bibliothekPfad)); " | vorlagen "; BASENAME(vwVorlagenDatei$()); " im einstellungsordner "; DIRNAME(vwVorlagenDatei$()) = DIRNAME(kern.einstellungsDatei$("x"))
+            einst.bibliothekPfad = ""
+            einst.vorlagenPfad = ""
+        CASE 8
+            ' Neu in Glutfaden
+            DIM d AS INTEGER : d = neuigkeitenBauen()
+            DIM titel AS ARRAY OF STRING, texte AS ARRAY OF STRING
+            (titel, texte) = kern.neuigkeitenLesen(PATHJOIN(CWD$(), NEUIGKEITEN))
+            PRINT "neu: "; LEN(titel); " abschnitte | oben '"; titel[0]; "' | absaetze oben "; LEN(SPLIT$(texte[0], CHR$(10) + CHR$(10)))
+            ok = vfFoto(d, "neu")
+            gtk_widget_destroy(d)
+            ' Die Einstellungen im Dialog
+            DIM ed AS INTEGER : ed = edBauen()
+            PRINT "dialog: textur "; gtk_toggle_button_get_active(edTextur); " | ameisen "; gtk_toggle_button_get_active(edAmeisen); " | stickzeit "; gtk_toggle_button_get_active(edStickzeit); " | hervorheben "; gtk_toggle_button_get_active(edHervorheben)
+            gtk_toggle_button_set_active(edTextur, FALSE)
+            gtk_toggle_button_set_active(edHervorheben, TRUE)
+            gtk_entry_set_text(edBibOrdner, "  " + v19Ort$("bib2") + " ")
+            edUebernehmen()
+            gtk_widget_destroy(ed)
+            DIM gem AS kern.Einstellungen : gem = kern.einstellungenLaden(einst.pfad)
+            PRINT "uebernommen: textur "; einst.stoffTextur; " | hervorheben "; einst.hervorheben; " | bibliothek "; BASENAME(einst.bibliothekPfad); " | gemerkt "; gem.stoffTextur; " "; gem.hervorheben; " "; BASENAME(gem.bibliothekPfad)
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION

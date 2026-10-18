@@ -948,6 +948,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe20"
     ELSEIF ARG$(a) = "--probe-stufe21" THEN
         probe = "stufe21"
+    ELSEIF ARG$(a) = "--probe-stufe22" THEN
+        probe = "stufe22"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -1014,6 +1016,7 @@ IF probe = "stufe18" THEN g_timeout_add(300, vorfuehrenStufe18, 0)
 IF probe = "stufe19" THEN g_timeout_add(300, vorfuehrenStufe19, 0)
 IF probe = "stufe20" THEN g_timeout_add(300, vorfuehrenStufe20, 0)
 IF probe = "stufe21" THEN g_timeout_add(300, vorfuehrenStufe21, 0)
+IF probe = "stufe22" THEN g_timeout_add(300, vorfuehrenStufe22, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 
