@@ -296,6 +296,99 @@ FUNCTION istTPunkt(bl AS Blatt, x AS INTEGER, y AS INTEGER) AS BOOLEAN
     RETURN FALSE
 END FUNCTION
 
+' Einen Draht saeubern: doppelte Ecken weg, Ecken mitten auf einer Geraden
+' weg (eine Spitze, die zurueckfuehrt, bleibt). Ein T-Anschluss an einer
+' entfernten Ecke bleibt verbunden -- die T-Regel greift auf dem Segment.
+SUB drahtAufraeumen(w AS Draht)
+    DIM p AS ARRAY OF Punkt : p = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(w.punkte) - 1
+        IF LEN(p) = 0 THEN
+            ARRAY_PUSH(p, w.punkte[i])
+        ELSEIF NOT punktGleich(p[LEN(p) - 1], w.punkte[i]) THEN
+            ARRAY_PUSH(p, w.punkte[i])
+        END IF
+    NEXT
+    DIM weiter AS BOOLEAN : weiter = TRUE
+    WHILE weiter
+        weiter = FALSE
+        FOR i = 1 TO LEN(p) - 2
+            DIM a AS Punkt : a = p[i - 1]
+            DIM m AS Punkt : m = p[i]
+            DIM c AS Punkt : c = p[i + 1]
+            DIM kreuz AS INTEGER : kreuz = (m.x - a.x) * (c.y - a.y) - (m.y - a.y) * (c.x - a.x)
+            IF kreuz = 0 AND m.x >= MIN(a.x, c.x) AND m.x <= MAX(a.x, c.x) AND m.y >= MIN(a.y, c.y) AND m.y <= MAX(a.y, c.y) THEN
+                ARRAY_REMOVE_AT(p, i)
+                weiter = TRUE
+                BREAK
+            END IF
+        NEXT
+    WEND
+    w.punkte = p
+END SUB
+
+' Haengt am Blattpunkt etwas anderes als der Draht "ohne"? Pin, Label,
+' Ecke oder Segment eines anderen Drahtes.
+FUNCTION punktAngeschlossen(bl AS Blatt, x AS INTEGER, y AS INTEGER, ohne AS Draht) AS BOOLEAN
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(bl.bauteile) - 1
+        FOR j = 0 TO LEN(bl.bauteile[i].sym.pins) - 1
+            DIM pp AS Punkt : pp = bl.bauteile[i].pinPunkt(j)
+            IF pp.x = x AND pp.y = y THEN RETURN TRUE
+        NEXT
+    NEXT
+    FOR i = 0 TO LEN(bl.labels) - 1
+        IF bl.labels[i].anker.x = x AND bl.labels[i].anker.y = y THEN RETURN TRUE
+    NEXT
+    FOR i = 0 TO LEN(bl.draehte) - 1
+        DIM w AS Draht : w = bl.draehte[i]
+        IF w = ohne THEN CONTINUE
+        FOR j = 0 TO LEN(w.punkte) - 1
+            IF w.punkte[j].x = x AND w.punkte[j].y = y THEN RETURN TRUE
+            IF j < LEN(w.punkte) - 1 THEN
+                IF aufSegment(w.punkte[j].x, w.punkte[j].y, w.punkte[j + 1].x, w.punkte[j + 1].y, x, y) THEN RETURN TRUE
+            END IF
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Wie viele Stellen tragen diesen Netznamen? (Labels und Versorgungssymbole)
+FUNCTION namensStellen(bl AS Blatt, name AS STRING) AS INTEGER
+    DIM c AS INTEGER : c = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bl.labels) - 1
+        IF bl.labels[i].text = name THEN c = c + 1
+    NEXT
+    FOR i = 0 TO LEN(bl.bauteile) - 1
+        IF bl.bauteile[i].sym.einheitLeistung THEN
+            IF versorgungsName(bl.bauteile[i]) = name THEN c = c + 1
+        END IF
+    NEXT
+    RETURN c
+END FUNCTION
+
+' Einen Netznamen an allen Stellen ersetzen; liefert die Zahl der Stellen.
+FUNCTION namenUmbenennen(bl AS Blatt, alt AS STRING, neu AS STRING) AS INTEGER
+    DIM c AS INTEGER : c = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bl.labels) - 1
+        IF bl.labels[i].text = alt THEN
+            bl.labels[i].text = neu
+            c = c + 1
+        END IF
+    NEXT
+    FOR i = 0 TO LEN(bl.bauteile) - 1
+        IF bl.bauteile[i].sym.einheitLeistung THEN
+            IF versorgungsName(bl.bauteile[i]) = alt THEN
+                bl.bauteile[i].wert = neu
+                c = c + 1
+            END IF
+        END IF
+    NEXT
+    RETURN c
+END FUNCTION
+
 ' Knoten neu bestimmen: wo >=3 Enden treffen oder ein Ende auf einem Segment.
 SUB autoKnoten(bl AS Blatt)
     DIM neu AS ARRAY OF Knoten : neu = []

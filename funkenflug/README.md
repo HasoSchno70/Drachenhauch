@@ -24,7 +24,7 @@ einem Programm, das es mitbringt (**Inkscape**, GIMP). Die Bibliotheks-Namen in
 
 | Werkzeug | |
 |---|---|
-| **Auswahl** (Taste `A`) | Bauteil oder Label anklicken, ziehen zum Verschieben; **Doppelklick**, `E` oder `Enter` bearbeitet (Bauteil: Referenz/Wert, Label: Text) |
+| **Auswahl** (Taste `A`) | Bauteil, Label oder Draht anklicken, ziehen zum Verschieben; **Doppelklick**, `E` oder `Enter` bearbeitet (Bauteil: Referenz/Wert; Label und Draht: Netz umbenennen) |
 | **Draht** (Taste `W`) | klicken setzt Eckpunkte, Doppelklick / `Enter` / rechte Maustaste schließt ab, `Esc` bricht ab. Enden fangen an Pins und Drahtenden |
 | **Label** (Taste `L`) | klicken, Netznamen eingeben. Der Anker ist der elektrische Punkt; **gleichnamige Labels sind ein Netz** |
 | **Bauteil** | in der Leiste aus der Liste wählen, dann auf die Fläche klicken; rechte Maustaste oder `R` dreht die Vorschau |
@@ -34,6 +34,21 @@ Kopfleiste machen rückgängig und wiederholen. `R` dreht die Auswahl, `Entf`
 löscht sie, Mausrad zoomt um den Zeiger, mittlere Maustaste schiebt,
 `+`/`-`/`0` zoomen, `Strg+S` speichert, `Strg+O` öffnet. Eine schon vergebene
 Referenz lehnt der Eigenschaften-Dialog ab.
+
+**Drähte:** Ein Klick wählt das Segment unter der Maus. Ziehen verschiebt nur
+dieses Segment – waagrechte senkrecht, senkrechte waagrecht, damit die Nachbarn
+rechtwinklig bleiben. Hängt an einem Drahtende etwas (Pin, Label, anderer
+Draht), bleibt das Ende stehen und ein Verbindungsknick entsteht: Ziehen reißt
+keine Verbindung ab. Danach räumt Funkenflug den Draht auf (Ecken auf einer
+Geraden fallen weg). `Entf` löscht das Segment, der Draht zerfällt in die
+Reststücke; `Umschalt+Entf` löscht den ganzen Draht.
+
+**Umbenennen** (`F2`, oder Doppelklick auf Label/Draht): Ein Netzname wird an
+**allen Stellen** ersetzt – gleichnamige Labels und Versorgungssymbole (aus GND
+wird so z. B. `AGND`, es bleibt trotzdem SPICE-Masse). Bei einem Label lässt
+ein Haken auch nur dieses eine umbenennen. Hat das Netz nur einen automatischen
+Namen, setzt Funkenflug ein Label an die angeklickte Stelle. Trägt ein anderes
+Netz den neuen Namen schon, fragt es vorher – Umbenennen würde beide verbinden.
 
 **Netze:** Fährt die Maus über einen Draht, einen Pin oder ein Label, zeigt die
 Statuszeile den Netznamen samt Pinzahl und die Drähte des Netzes leuchten auf.
@@ -79,8 +94,9 @@ Die Tests laufen ohne Mensch: `dhrt run funkenflug/pruef_kern.dh` prüft Modell,
 Transform, Raster, Netze (auch T-Verbindung und Labels) und Save/Load.
 `main.dh -- --foto bild.png` spielt die Werkzeuge durch – **samt der echten
 Dialoge**, die ein Timer ausfüllt und bestätigt –, prüft Undo/Redo, gibt je
-Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (32 Prüfungen,
-darunter ERC, Netz unter der Maus und SPICE-Export).
+Prüfung `ok`/`FEHLER` aus und zeichnet das Fenster in eine PNG (48 Prüfungen,
+darunter Draht ziehen/löschen, Umbenennen samt Rückfrage, ERC, Netz unter der
+Maus und SPICE-Export).
 
 ## Was gegenüber SparkNode bewusst anders ist
 
@@ -123,6 +139,6 @@ zweiten Kondensator wieder „C1".
 
 ## Noch offen (nächste Runden)
 
-Drähte auswählen und löschen, Netze/Labels umbenennen über alle Stellen,
-mehrere Blätter in der Oberfläche, eigene Symbole und ICs mit Pin-Typen,
+Bauteile mit angeschlossenen Drähten ziehen (Gummiband), Mehrfachauswahl,
+Kopieren/Einfügen, mehrere Blätter in der Oberfläche, eigene Symbole und ICs mit Pin-Typen,
 Stückliste (BOM), Bild-/PDF-Export, Platinen-Layout.

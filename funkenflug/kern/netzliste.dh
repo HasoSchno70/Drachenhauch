@@ -65,9 +65,9 @@ FUNCTION netzlisteCsv$(bl AS Blatt) AS STRING
 END FUNCTION
 
 ' --- SPICE
-' Knotenname: GND wird 0, sonst nur Buchstaben, Ziffern und _.
+' Knotenname: nur Buchstaben, Ziffern und _ (Masse regelt spiceKnotenListe).
 FUNCTION spiceKnoten$(name AS STRING) AS STRING
-    IF UPPER$(name) = "GND" OR name = "0" THEN RETURN "0"
+    IF name = "0" THEN RETURN "0"
     DIM r AS STRING : r = ""
     DIM i AS INTEGER
     FOR i = 0 TO LEN(name) - 1                     ' MID$ zaehlt ab 0
@@ -112,8 +112,26 @@ FUNCTION spiceModell$(praefix AS STRING, wert AS STRING) AS STRING
     RETURN praefix + "_" + spiceKnoten$(wert)
 END FUNCTION
 
+' SPICE-Knoten je Netz: Knoten 0 ist das Netz mit einem GND-Symbol (auch
+' wenn es umbenannt wurde, etwa in AGND) oder dem Namen GND.
+FUNCTION spiceKnotenListe(bl AS Blatt, n AS Netze) AS ARRAY OF STRING
+    DIM k AS ARRAY OF STRING : k = []
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        DIM masse AS BOOLEAN : masse = UPPER$(n.liste[i].name) = "GND"
+        FOR j = 0 TO LEN(n.liste[i].pins) - 1
+            IF n.liste[i].pins[j].versorgung THEN
+                IF bl.bauteile[n.liste[i].pins[j].bauteil].sym.id = "GND" THEN masse = TRUE
+            END IF
+        NEXT
+        IF masse THEN ARRAY_PUSH(k, "0") ELSE ARRAY_PUSH(k, spiceKnoten$(n.liste[i].name))
+    NEXT
+    RETURN k
+END FUNCTION
+
 FUNCTION netzlisteSpice$(bl AS Blatt, titel AS STRING) AS STRING
     DIM n AS Netze : n = netzeBerechnen(bl)
+    DIM knoten AS ARRAY OF STRING : knoten = spiceKnotenListe(bl, n)
     DIM t AS STRING : t = "* " + titel + " -- Funkenflug" + NL_ZEILE
     DIM modelle AS MAP OF STRING
     DIM i AS INTEGER, j AS INTEGER
@@ -124,7 +142,7 @@ FUNCTION netzlisteSpice$(bl AS Blatt, titel AS STRING) AS STRING
         DIM k AS ARRAY OF STRING : k = []
         FOR j = 0 TO LEN(b.sym.pins) - 1
             DIM pp AS Punkt : pp = b.pinPunkt(j)
-            ARRAY_PUSH(k, spiceKnoten$(n.liste[n.netzAn(pp.x, pp.y)].name))
+            ARRAY_PUSH(k, knoten[n.netzAn(pp.x, pp.y)])
         NEXT
         SELECT CASE b.sym.id
             CASE "R"

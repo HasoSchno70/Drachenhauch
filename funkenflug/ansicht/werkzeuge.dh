@@ -22,6 +22,7 @@ CONST K_PLUS = &H2B
 CONST K_GLEICH = &H3D
 CONST K_MINUS = &H2D
 CONST K_NULL = &H30
+CONST K_F2 = &HFFBF
 
 FUNCTION evKnopf(ev AS INTEGER) AS INTEGER
     DIM k AS INTEGER
@@ -53,6 +54,183 @@ END SUB
 SUB auswahlAufheben()
     gHatGewaehlt = FALSE
     gHatLabel = FALSE
+    gHatDraht = FALSE
+END SUB
+
+' --- Draehte waehlen und ziehen ------------------------------------------
+
+SUB drahtWaehlen(wi AS INTEGER, si AS INTEGER)
+    auswahlAufheben()
+    gDrahtGewaehlt = gBlatt.draehte[wi]
+    gHatDraht = TRUE
+    gSegment = si
+    ' Klickpunkt aufs Segment legen und rastern -- dort entsteht ggf. ein Label
+    DIM a AS kern.Punkt : a = gDrahtGewaehlt.punkte[si]
+    DIM b AS kern.Punkt : b = gDrahtGewaehlt.punkte[si + 1]
+    DIM dx AS FLOAT : dx = b.x - a.x
+    DIM dy AS FLOAT : dy = b.y - a.y
+    DIM t AS FLOAT : t = 0
+    IF dx * dx + dy * dy > 0 THEN t = CLAMP(((gMausRX - a.x) * dx + (gMausRY - a.y) * dy) / (dx * dx + dy * dy), 0.0, 1.0)
+    DIM kx AS INTEGER : kx = kern.rastern(ROUND(a.x + t * dx), kern.RASTER)
+    DIM ky AS INTEGER : ky = kern.rastern(ROUND(a.y + t * dy), kern.RASTER)
+    IF kern.aufSegment(a.x, a.y, b.x, b.y, kx, ky) OR (kx = a.x AND ky = a.y) OR (kx = b.x AND ky = b.y) THEN
+        gDrahtKlickX = kx : gDrahtKlickY = ky
+    ELSE
+        gDrahtKlickX = a.x : gDrahtKlickY = a.y      ' schraeges Segment: Ecke nehmen
+    END IF
+END SUB
+
+DIM gSegmentOrig AS INTEGER
+
+SUB drahtZiehBeginn()
+    gDrahtOrig = ARRAY_COPY(gDrahtGewaehlt.punkte)
+    gSegmentOrig = gSegment
+    gZiehStartX = gMausWX
+    gZiehStartY = gMausWY
+    gZiehGemerkt = FALSE
+END SUB
+
+' Das gegriffene Segment um (dx, dy) verschieben, gerechnet ab dem Stand bei
+' Zugbeginn. Waagrechte Segmente gehen nur senkrecht, senkrechte nur
+' waagrecht -- so bleiben die Nachbarsegmente rechtwinklig. Haengt an einem
+' Drahtende etwas (Pin, Label, anderer Draht), bleibt es stehen und ein
+' Verbindungsknick entsteht: Ziehen reisst keine Verbindung ab.
+SUB drahtZiehenUm(dx AS INTEGER, dy AS INTEGER)
+    DIM o AS ARRAY OF kern.Punkt : o = gDrahtOrig
+    DIM a AS INTEGER : a = gSegmentOrig
+    DIM b AS INTEGER : b = gSegmentOrig + 1
+    IF b >= LEN(o) THEN RETURN
+    IF o[a].y = o[b].y THEN dx = 0
+    IF o[a].x = o[b].x THEN dy = 0
+    IF dx = 0 AND dy = 0 AND NOT gZiehGemerkt THEN RETURN
+    IF NOT gZiehGemerkt THEN verlaufMerken() : gZiehGemerkt = TRUE
+    DIM neu AS ARRAY OF kern.Punkt : neu = []
+    DIM i AS INTEGER
+    FOR i = 0 TO a - 1
+        ARRAY_PUSH(neu, o[i])
+    NEXT
+    gSegment = a
+    IF a = 0 AND kern.punktAngeschlossen(gBlatt, o[0].x, o[0].y, gDrahtGewaehlt) THEN
+        ARRAY_PUSH(neu, o[0])
+        gSegment = a + 1
+    END IF
+    ARRAY_PUSH(neu, NEW kern.Punkt(o[a].x + dx, o[a].y + dy))
+    ARRAY_PUSH(neu, NEW kern.Punkt(o[b].x + dx, o[b].y + dy))
+    IF b = LEN(o) - 1 AND kern.punktAngeschlossen(gBlatt, o[b].x, o[b].y, gDrahtGewaehlt) THEN ARRAY_PUSH(neu, o[b])
+    FOR i = b + 1 TO LEN(o) - 1
+        ARRAY_PUSH(neu, o[i])
+    NEXT
+    gDrahtGewaehlt.punkte = neu
+    netzeVeraltet()
+    gGeaendert = TRUE
+    titelNachziehen()
+END SUB
+
+SUB drahtZiehEnde()
+    IF NOT gZiehGemerkt THEN RETURN
+    kern.drahtAufraeumen(gDrahtGewaehlt)
+    IF LEN(gDrahtGewaehlt.punkte) < 2 THEN
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(gBlatt.draehte) - 1
+            IF gBlatt.draehte[i] = gDrahtGewaehlt THEN
+                ARRAY_REMOVE_AT(gBlatt.draehte, i)
+                BREAK
+            END IF
+        NEXT
+        auswahlAufheben()
+    ELSEIF gSegment > LEN(gDrahtGewaehlt.punkte) - 2 THEN
+        gSegment = LEN(gDrahtGewaehlt.punkte) - 2
+    END IF
+    kern.autoKnoten(gBlatt)
+    geaendert()
+END SUB
+
+' --- Umbenennen ------------------------------------------------------------
+
+' Traegt ein ANDERES Netz als das am Blattpunkt (x,y) diesen Namen schon?
+FUNCTION nameAufAnderemNetz(name AS STRING, x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    DIM n AS kern.Netze : n = aktuelleNetze()
+    DIM eigen AS INTEGER : eigen = n.netzAn(x, y)
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = 0 TO LEN(n.liste) - 1
+        IF i = eigen THEN CONTINUE
+        IF n.liste[i].name = name THEN RETURN TRUE
+        FOR j = 0 TO LEN(n.liste[i].labelNamen) - 1
+            IF n.liste[i].labelNamen[j] = name THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Verbindet das Umbenennen zwei Netze, fragt es vorher.
+FUNCTION umbenennenErlaubt(neu AS STRING, x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    IF NOT nameAufAnderemNetz(neu, x, y) THEN RETURN TRUE
+    RETURN bestaetigen("Netze zusammenfuehren?", "Den Namen " + neu + " traegt schon ein anderes Netz." + CHR$(10) + "Umbenennen verbindet beide Netze elektrisch.", "Zusammenfuehren")
+END FUNCTION
+
+' Ein Label umbenennen: gleichnamige Labels und Versorgungen mit (Haken),
+' sonst nur dieses eine.
+SUB labelUmbenennen()
+    DIM la AS kern.Label : la = gLabelGewaehlt
+    DIM alt AS STRING : alt = la.text
+    DIM stellen AS INTEGER : stellen = kern.namensStellen(gBlatt, alt)
+    DIM haken AS STRING : haken = ""
+    IF stellen > 1 THEN haken = "alle " + STR$(stellen) + " Stellen namens " + alt + " umbenennen"
+    DIM neu AS STRING : neu = TRIM$(umbenennenDialog$("Netz umbenennen", "Neuer Name:", alt, haken))
+    IF neu = "" OR neu = alt THEN RETURN
+    IF NOT umbenennenErlaubt(neu, la.anker.x, la.anker.y) THEN RETURN
+    verlaufMerken()
+    IF stellen > 1 AND gDlgHakenWert THEN
+        DIM z AS INTEGER : z = kern.namenUmbenennen(gBlatt, alt, neu)
+    ELSE
+        la.text = neu
+    END IF
+    geaendert()
+END SUB
+
+' Das Netz an einem Blattpunkt umbenennen. Hat es einen Namen (Label oder
+' Versorgung), aendert sich jede Stelle mit diesem Namen; hat es nur einen
+' automatischen, entsteht ein Label am Ort (ortX, ortY).
+SUB netzUmbenennenBei(vx AS INTEGER, vy AS INTEGER, ortX AS INTEGER, ortY AS INTEGER)
+    DIM n AS kern.Netze : n = aktuelleNetze()
+    DIM i AS INTEGER : i = n.netzAn(vx, vy)
+    DIM alt AS STRING : alt = ""
+    DIM benannt AS BOOLEAN : benannt = FALSE
+    IF i >= 0 THEN
+        alt = n.liste[i].name
+        benannt = NOT n.liste[i].automatisch
+    END IF
+    DIM hinweis AS STRING : hinweis = "Neuer Name:"
+    IF benannt THEN
+        DIM st AS INTEGER : st = kern.namensStellen(gBlatt, alt)
+        hinweis = "Neuer Name (" + STR$(st) + IIF(st = 1, " Stelle", " Stellen") + "):"
+    END IF
+    DIM neu AS STRING : neu = TRIM$(umbenennenDialog$("Netz umbenennen", hinweis, alt, ""))
+    IF neu = "" OR neu = alt THEN RETURN
+    IF NOT umbenennenErlaubt(neu, vx, vy) THEN RETURN
+    verlaufMerken()
+    IF benannt THEN
+        DIM z AS INTEGER : z = kern.namenUmbenennen(gBlatt, alt, neu)
+    ELSE
+        ARRAY_PUSH(gBlatt.labels, NEW kern.Label(neu, NEW kern.Punkt(ortX, ortY), kern.LA_LOKAL))
+    END IF
+    geaendert()
+END SUB
+
+' F2: das Netz der Auswahl umbenennen.
+SUB umbenennenAuswahl()
+    gZieht = FALSE
+    IF gHatLabel THEN
+        labelUmbenennen()
+    ELSEIF gHatDraht THEN
+        DIM v AS kern.Punkt : v = gDrahtGewaehlt.punkte[gSegment]
+        netzUmbenennenBei(v.x, v.y, gDrahtKlickX, gDrahtKlickY)
+    ELSEIF gHatGewaehlt THEN
+        IF gGewaehlt.sym.einheitLeistung THEN
+            DIM p AS kern.Punkt : p = gGewaehlt.pinPunkt(0)
+            netzUmbenennenBei(p.x, p.y, p.x, p.y)
+        END IF
+    END IF
 END SUB
 
 SUB werkzeugWaehlen(wz AS INTEGER, ref AS STRING)
@@ -125,6 +303,7 @@ SUB drahtEndePunkt()
                 ARRAY_PUSH(w.punkte, p)
             END IF
         NEXT
+        kern.drahtAufraeumen(w)              ' drei Klicks auf einer Geraden = ein Segment
         IF LEN(w.punkte) >= 2 THEN
             verlaufMerken()
             ARRAY_PUSH(gBlatt.draehte, w)
@@ -137,9 +316,36 @@ SUB drahtEndePunkt()
     neuZeichnen()
 END SUB
 
-SUB auswahlLoeschen()
-    DIM i AS INTEGER
-    IF gHatLabel THEN
+' Loeschen. Bei einem Draht: nur das gewaehlte Segment (der Draht zerfaellt in
+' bis zu zwei Teile), mit ganzerDraht der ganze Draht.
+SUB auswahlLoeschen(ganzerDraht AS BOOLEAN)
+    DIM i AS INTEGER, k AS INTEGER
+    IF gHatDraht THEN
+        FOR i = 0 TO LEN(gBlatt.draehte) - 1
+            IF gBlatt.draehte[i] = gDrahtGewaehlt THEN
+                verlaufMerken()
+                DIM w AS kern.Draht : w = gDrahtGewaehlt
+                ARRAY_REMOVE_AT(gBlatt.draehte, i)
+                IF NOT ganzerDraht THEN
+                    DIM links AS kern.Draht : links = NEW kern.Draht()
+                    links.id = w.id
+                    FOR k = 0 TO gSegment
+                        ARRAY_PUSH(links.punkte, w.punkte[k])
+                    NEXT
+                    DIM rechts AS kern.Draht : rechts = NEW kern.Draht()
+                    FOR k = gSegment + 1 TO LEN(w.punkte) - 1
+                        ARRAY_PUSH(rechts.punkte, w.punkte[k])
+                    NEXT
+                    IF LEN(links.punkte) >= 2 THEN ARRAY_PUSH(gBlatt.draehte, links)
+                    IF LEN(rechts.punkte) >= 2 THEN ARRAY_PUSH(gBlatt.draehte, rechts)
+                END IF
+                kern.autoKnoten(gBlatt)
+                auswahlAufheben()
+                geaendert()
+                RETURN
+            END IF
+        NEXT
+    ELSEIF gHatLabel THEN
         FOR i = 0 TO LEN(gBlatt.labels) - 1
             IF gBlatt.labels[i] = gLabelGewaehlt THEN
                 verlaufMerken()
@@ -167,7 +373,7 @@ SUB auswahlDrehen()
         verlaufMerken()
         gGewaehlt.lage.drehung = (gGewaehlt.lage.drehung + 90) MOD 360
         geaendert()
-    ELSEIF NOT gHatLabel THEN
+    ELSEIF NOT gHatLabel AND NOT gHatDraht THEN
         gPlatzDreh = (gPlatzDreh + 90) MOD 360     ' Vorschau beim Platzieren
         neuZeichnen()
     END IF
@@ -188,16 +394,12 @@ SUB labelSetzen()
     geaendert()
 END SUB
 
-' Doppelklick / E / Enter: das Gewaehlte bearbeiten.
+' Doppelklick / E / Enter: das Gewaehlte bearbeiten. Label und Draht:
+' Netz umbenennen; Bauteil: Eigenschaften.
 SUB auswahlBearbeiten()
     gZieht = FALSE
-    IF gHatLabel THEN
-        DIM text AS STRING : text = TRIM$(textAbfrage$("Label bearbeiten", "Netzname:", gLabelGewaehlt.text))
-        IF text <> "" AND text <> gLabelGewaehlt.text THEN
-            verlaufMerken()
-            gLabelGewaehlt.text = text
-            geaendert()
-        END IF
+    IF gHatLabel OR gHatDraht THEN
+        umbenennenAuswahl()
     ELSEIF gHatGewaehlt THEN
         eigenschaftenDialog(gGewaehlt)
     END IF
@@ -250,6 +452,13 @@ FUNCTION lwDruck(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
                     gZieht = TRUE
                     gZiehDX = gGewaehlt.lage.pos.x - gMausWX
                     gZiehDY = gGewaehlt.lage.pos.y - gMausWY
+                ELSE
+                    DIM wi AS INTEGER, si AS INTEGER
+                    IF drahtUnter(px, py, wi, si) THEN
+                        drahtWaehlen(wi, si)
+                        gZieht = TRUE
+                        drahtZiehBeginn()
+                    END IF
                 END IF
             END IF
             neuZeichnen()
@@ -275,6 +484,7 @@ END FUNCTION
 
 FUNCTION lwLos(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
     gPan = FALSE
+    IF gZieht AND gHatDraht THEN drahtZiehEnde()
     gZieht = FALSE
     gZiehGemerkt = FALSE
     RETURN TRUE
@@ -311,7 +521,13 @@ FUNCTION lwBewegung(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         RETURN TRUE
     END IF
     mausSetzen(px, py)
-    IF gZieht THEN ziehenNach(gMausWX + gZiehDX, gMausWY + gZiehDY)
+    IF gZieht THEN
+        IF gHatDraht THEN
+            drahtZiehenUm(gMausWX - gZiehStartX, gMausWY - gZiehStartY)
+        ELSE
+            ziehenNach(gMausWX + gZiehDX, gMausWY + gZiehDY)
+        END IF
+    END IF
     hoverBestimmen(px, py)
     neuZeichnen()
     statusAktualisieren()
@@ -374,7 +590,9 @@ FUNCTION lwTaste(w AS INTEGER, ev AS INTEGER, daten AS INTEGER) AS BOOLEAN
         CASE K_E
             auswahlBearbeiten()
         CASE K_DELETE, K_BACKSPACE
-            auswahlLoeschen()
+            auswahlLoeschen((z BAND GDK_UMSCHALT) <> 0)   ' Umschalt: ganzer Draht
+        CASE K_F2
+            umbenennenAuswahl()
         CASE K_R
             auswahlDrehen()
         CASE K_W

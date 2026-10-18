@@ -105,6 +105,27 @@ PRINT "ERC der LED-Schaltung: "; LEN(kern.ercPruefen(sb)); " Verstoesse  (erwart
 PRINT "--- CSV ---"
 PRINT kern.netzlisteCsv$(sb);
 
+' Umbenennen: GND -> AGND bleibt SPICE-Masse, VCC -> +5V wird Knoten _5V
+PRINT "Stellen GND: "; kern.namensStellen(sb, "GND"); "  (erwartet 1)"
+PRINT "umbenannt GND->AGND: "; kern.namenUmbenennen(sb, "GND", "AGND"); "  (erwartet 1)"
+PRINT "umbenannt VCC->+5V:  "; kern.namenUmbenennen(sb, "VCC", "+5V"); "  (erwartet 1)"
+DIM sp2 AS STRING : sp2 = kern.netzlisteSpice$(sb, "Pruefung")
+PRINT "SPICE AGND bleibt Masse: "; CONTAINS(sp2, "D1 N1 0 D_LED"); "  (erwartet TRUE)"
+PRINT "SPICE +5V als _5V:       "; CONTAINS(sp2, "R1 _5V N1 4.7k"); "  (erwartet TRUE)"
+
+' Draht aufraeumen: Doppelte und Ecken auf der Geraden weg, Spitze bleibt
+DIM wa AS kern.Draht : wa = NEW kern.Draht()
+ARRAY_PUSH(wa.punkte, NEW kern.Punkt(0, 0)) : ARRAY_PUSH(wa.punkte, NEW kern.Punkt(0, 0))
+ARRAY_PUSH(wa.punkte, NEW kern.Punkt(0, 500)) : ARRAY_PUSH(wa.punkte, NEW kern.Punkt(0, 1000))
+ARRAY_PUSH(wa.punkte, NEW kern.Punkt(500, 1000)) : ARRAY_PUSH(wa.punkte, NEW kern.Punkt(500, 1000))
+kern.drahtAufraeumen(wa)
+PRINT "aufgeraeumt: "; LEN(wa.punkte); " Ecken  (erwartet 3)"
+DIM wsp AS kern.Draht : wsp = NEW kern.Draht()
+ARRAY_PUSH(wsp.punkte, NEW kern.Punkt(0, 0)) : ARRAY_PUSH(wsp.punkte, NEW kern.Punkt(0, 1000)) : ARRAY_PUSH(wsp.punkte, NEW kern.Punkt(0, 500))
+kern.drahtAufraeumen(wsp)
+PRINT "Spitze bleibt: "; LEN(wsp.punkte); " Ecken  (erwartet 3)"
+PRINT "Pin angeschlossen: "; kern.punktAngeschlossen(sb, 2000, 1800, wa); "  frei: "; kern.punktAngeschlossen(sb, 9000, 9000, wa); "  (erwartet TRUE FALSE)"
+
 ' Save / Load
 DIM pfad AS STRING : pfad = "C:/Programmieren/Python/GameBasic/funkenflug/pruef.fkn"
 PRINT "Speichern: "; kern.dokumentSpeichern(dok, pfad)

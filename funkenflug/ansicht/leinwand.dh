@@ -57,8 +57,16 @@ DIM gZiehDX AS INTEGER
 DIM gZiehDY AS INTEGER
 DIM gZiehGemerkt AS BOOLEAN      ' Undo-Schnappschuss fuer diesen Zug schon genommen?
 
-DIM gLabelGewaehlt AS kern.Label ' Auswahl ist entweder ein Bauteil ODER ein Label
+DIM gLabelGewaehlt AS kern.Label ' Auswahl ist entweder ein Bauteil, ein Label ODER ein Draht
 DIM gHatLabel AS BOOLEAN
+DIM gDrahtGewaehlt AS kern.Draht
+DIM gHatDraht AS BOOLEAN
+DIM gSegment AS INTEGER          ' gewaehltes Segment (Ecke gSegment .. gSegment+1)
+DIM gDrahtKlickX AS INTEGER      ' Rasterpunkt auf dem Segment, wo geklickt wurde
+DIM gDrahtKlickY AS INTEGER
+DIM gDrahtOrig AS ARRAY OF kern.Punkt   ' Ecken bei Zugbeginn
+DIM gZiehStartX AS INTEGER
+DIM gZiehStartY AS INTEGER
 
 ' Netze: einmal je Aenderung berechnet (netzeVeraltet() macht sie ungueltig)
 DIM gNetze AS kern.Netze
@@ -121,6 +129,7 @@ SUB leinwandDokument(d AS kern.Dokument)
     gBlatt = d.blaetter[0]
     gHatGewaehlt = FALSE
     gHatLabel = FALSE
+    gHatDraht = FALSE
     gDrahtAktiv = FALSE
     vEingepasst = FALSE
     netzeVeraltet()
@@ -227,7 +236,16 @@ FUNCTION lwZeichnen(w AS INTEGER, cr AS INTEGER, daten AS INTEGER) AS BOOLEAN
         DIM dr AS kern.Draht : dr = gBlatt.draehte[i]
         DIM hell AS BOOLEAN : hell = FALSE
         IF hw >= 0 AND LEN(dr.punkte) > 0 THEN hell = aktuelleNetze().wurzelAn(dr.punkte[0].x, dr.punkte[0].y) = hw
-        IF hell THEN
+        IF gHatDraht AND dr = gDrahtGewaehlt THEN
+            drahtZeichnen(cr, dr, C_AUSWAHL, 2.5)
+            ' das gegriffene Segment kraeftiger
+            IF gSegment >= 0 AND gSegment < LEN(dr.punkte) - 1 THEN
+                cairo_set_line_width(cr, 5.0)
+                cairo_move_to(cr, sx(dr.punkte[gSegment].x), sy(dr.punkte[gSegment].y))
+                cairo_line_to(cr, sx(dr.punkte[gSegment + 1].x), sy(dr.punkte[gSegment + 1].y))
+                cairo_stroke(cr)
+            END IF
+        ELSEIF hell THEN
             drahtZeichnen(cr, dr, C_HOVER, 3.5)
         ELSE
             drahtZeichnen(cr, dr, C_DRAHT, 2.0)
@@ -321,6 +339,22 @@ FUNCTION abstandQ(px AS FLOAT, py AS FLOAT, ax AS FLOAT, ay AS FLOAT, bx AS FLOA
     DIM qx AS FLOAT : qx = ax + t * dx - px
     DIM qy AS FLOAT : qy = ay + t * dy - py
     RETURN qx * qx + qy * qy
+END FUNCTION
+
+' Draht und Segment unter dem Bildschirmpunkt (6 Pixel Naehe)?
+FUNCTION drahtUnter(px AS FLOAT, py AS FLOAT, BYREF wi AS INTEGER, BYREF si AS INTEGER) AS BOOLEAN
+    DIM i AS INTEGER, j AS INTEGER
+    FOR i = LEN(gBlatt.draehte) - 1 TO 0 STEP -1
+        DIM w AS kern.Draht : w = gBlatt.draehte[i]
+        FOR j = 0 TO LEN(w.punkte) - 2
+            IF abstandQ(px, py, sx(w.punkte[j].x), sy(w.punkte[j].y), sx(w.punkte[j + 1].x), sy(w.punkte[j + 1].y)) <= 36.0 THEN
+                wi = i
+                si = j
+                RETURN TRUE
+            END IF
+        NEXT
+    NEXT
+    RETURN FALSE
 END FUNCTION
 
 ' Welches Netz liegt unter dem Bildschirmpunkt? Draht, Pin oder Label in

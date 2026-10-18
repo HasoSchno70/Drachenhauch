@@ -46,6 +46,8 @@ DIM fotoZiel AS STRING
 DIM gDlg AS INTEGER
 DIM gDlgFeld1 AS INTEGER
 DIM gDlgFeld2 AS INTEGER
+DIM gDlgHakenWert AS BOOLEAN      ' Ergebnis des Hakens im Umbenennen-Dialog
+DIM gFragen AS INTEGER            ' wie oft bestaetigen() gefragt hat (Selbsttest)
 
 FUNCTION basisName$(p AS STRING) AS STRING
     DIM i AS INTEGER
@@ -68,7 +70,8 @@ SUB statusAktualisieren()
     IF gMausDrin THEN pos = "   X " + STR$(gMausWX / 100) + " mm   Y " + STR$(gMausWY / 100) + " mm"
     DIM wahl AS STRING : wahl = ""
     IF gHatGewaehlt THEN wahl = "   Auswahl: " + gGewaehlt.referenz + " " + gGewaehlt.wert + " (" + gGewaehlt.sym.name + ")"
-    IF gHatLabel THEN wahl = "   Label: " + gLabelGewaehlt.text
+    IF gHatLabel THEN wahl = "   Label: " + gLabelGewaehlt.text + " (F2 benennt um)"
+    IF gHatDraht THEN wahl = "   Draht: Segment " + STR$(gSegment + 1) + " von " + STR$(LEN(gDrahtGewaehlt.punkte) - 1) + " (Entf: Segment, Umschalt+Entf: Draht, F2: Netz umbenennen)"
     DIM netz AS STRING : netz = hoverText$()
     IF netz <> "" THEN netz = "   " + netz
     gtk_label_set_text(gStatus, wz + "   Zoom " + STR$(zoom) + "%" + pos + netz + wahl + "   [" + STR$(LEN(gBlatt.bauteile)) + " Bauteile, " + STR$(LEN(gBlatt.draehte)) + " Draehte, " + STR$(LEN(gBlatt.labels)) + " Labels]")
@@ -140,6 +143,53 @@ FUNCTION textAbfrage$(titel AS STRING, frage AS STRING, vorgabe AS STRING) AS ST
     gDlg = 0 : gDlgFeld1 = 0
     gtk_widget_destroy(d)
     RETURN text
+END FUNCTION
+
+' Neuen Netznamen abfragen; mit hakenText einen Haken darunter (Vorgabe: an),
+' dessen Stand danach in gDlgHakenWert steht. "" bei Abbruch.
+FUNCTION umbenennenDialog$(titel AS STRING, frage AS STRING, vorgabe AS STRING, hakenText AS STRING) AS STRING
+    DIM d AS INTEGER : d = dialogNeu(titel)
+    DIM vb AS INTEGER : vb = gtk_box_new(GTK_SENKRECHT, 8)
+    gtk_container_set_border_width(vb, 12)
+    DIM zeile AS INTEGER : zeile = gtk_box_new(GTK_WAAGERECHT, 8)
+    gtk_box_pack_start(zeile, etikettNeu(frage), FALSE, FALSE, 0)
+    DIM feld AS INTEGER : feld = feldNeu(vorgabe)
+    gtk_box_pack_start(zeile, feld, TRUE, TRUE, 0)
+    gtk_box_pack_start(vb, zeile, FALSE, FALSE, 0)
+    DIM haken AS INTEGER : haken = 0
+    IF hakenText <> "" THEN
+        haken = gtk_check_button_new_with_label(hakenText)
+        gtk_toggle_button_set_active(haken, TRUE)
+        gtk_box_pack_start(vb, haken, FALSE, FALSE, 0)
+    END IF
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), vb, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = feld : gDlgFeld2 = 0
+    DIM text AS STRING : text = ""
+    IF gtk_dialog_run(d) = GTK_ANTWORT_OK THEN text = gtk_entry_get_text(feld)
+    gDlgHakenWert = FALSE
+    IF haken <> 0 THEN gDlgHakenWert = gtk_toggle_button_get_active(haken)
+    gDlg = 0 : gDlgFeld1 = 0
+    gtk_widget_destroy(d)
+    RETURN text
+END FUNCTION
+
+' Ja/Nein-Rueckfrage; TRUE, wenn der Nutzer "knopf" waehlt.
+FUNCTION bestaetigen(titel AS STRING, text AS STRING, knopf AS STRING) AS BOOLEAN
+    gFragen = gFragen + 1
+    DIM d AS INTEGER : d = gtk_dialog_new_with_buttons(titel, gFenster, GTK_DIALOG_MODAL, "Abbrechen", GTK_ANTWORT_ABBRECHEN, knopf, GTK_ANTWORT_OK, NIL)
+    DIM l AS INTEGER : l = etikettNeu(text)
+    gtk_widget_set_margin_start(l, 12)
+    gtk_widget_set_margin_end(l, 12)
+    gtk_widget_set_margin_top(l, 12)
+    gtk_widget_set_margin_bottom(l, 12)
+    gtk_box_pack_start(gtk_dialog_get_content_area(d), l, TRUE, TRUE, 0)
+    gtk_widget_show_all(d)
+    gDlg = d : gDlgFeld1 = 0 : gDlgFeld2 = 0
+    DIM ja AS BOOLEAN : ja = gtk_dialog_run(d) = GTK_ANTWORT_OK
+    gDlg = 0
+    gtk_widget_destroy(d)
+    RETURN ja
 END FUNCTION
 
 ' Referenz und Wert eines Bauteils aendern. Eine schon vergebene Referenz
@@ -457,6 +507,16 @@ SUB pruefe(was AS STRING, ist AS STRING, soll AS STRING)
     END IF
 END SUB
 
+FUNCTION ptListe$(w AS kern.Draht) AS STRING
+    DIM t AS STRING : t = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(w.punkte) - 1
+        IF i > 0 THEN t = t + " "
+        t = t + STR$(w.punkte[i].x) + "," + STR$(w.punkte[i].y)
+    NEXT
+    RETURN t
+END FUNCTION
+
 ' Fuellt den offenen Dialog aus und bestaetigt ihn (laeuft in dessen Schleife).
 FUNCTION dialogBestaetigen(daten AS INTEGER) AS BOOLEAN
     IF gDlg = 0 THEN RETURN TRUE                 ' noch nicht offen: nochmal
@@ -479,7 +539,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             gMausWX = 3000 : gMausWY = 4400
             bauteilPlatzieren()
             pruefe("zweites C, Referenz", gBlatt.bauteile[5].referenz, "C2")
-            auswahlLoeschen()
+            auswahlLoeschen(FALSE)
             pruefe("C2 geloescht, Bauteile", STR$(LEN(gBlatt.bauteile)), "5")
         CASE 2
             ' Draht mit doppeltem Endpunkt (wie beim Doppelklick)
@@ -555,6 +615,78 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             gHatGewaehlt = TRUE
             statusAktualisieren()
         CASE 6
+            ' Draehte: treffen, Segment ziehen (Verbindung bleibt), Segment und
+            ' ganzen Draht loeschen -- jeweils per Undo zurueck
+            werkzeugWaehlen(WZ_AUSWAHL, "")
+            DIM wi AS INTEGER, si AS INTEGER
+            DIM getroffen AS BOOLEAN : getroffen = drahtUnter(sx(3600), sy(2300), wi, si)
+            pruefe("Draht getroffen (Draht/Segment)", STR$(wi) + "/" + STR$(si), "3/1")
+            gMausRX = 3600 : gMausRY = 2300 : gMausWX = 3600 : gMausWY = 2300
+            drahtWaehlen(wi, si)
+            drahtZiehBeginn()
+            drahtZiehenUm(400, 300)                ' senkrechtes Segment: nur waagrecht
+            drahtZiehEnde()
+            pruefe("Segment gezogen, Ende bleibt am Label", ptListe$(gBlatt.draehte[3]), "3200,2000 4000,2000 4000,2600 3600,2600")
+            pruefe("Verbindung C1 ~ Label bleibt", STR$(aktuelleNetze().gleich(3200, 2000, 3600, 2600)), STR$(TRUE))
+            verlaufZurueck()
+            pruefe("Undo Ziehen", ptListe$(gBlatt.draehte[3]), "3200,2000 3600,2000 3600,2600")
+            getroffen = drahtUnter(sx(3400), sy(2000), wi, si)
+            gMausRX = 3400 : gMausRY = 2000
+            drahtWaehlen(wi, si)
+            auswahlLoeschen(FALSE)
+            pruefe("Segment geloescht, Draehte", STR$(LEN(gBlatt.draehte)), "4")
+            pruefe("C1 vom Label getrennt", STR$(aktuelleNetze().gleich(3200, 2000, 3600, 2600)), STR$(FALSE))
+            verlaufZurueck()
+            drahtWaehlen(3, 0)
+            auswahlLoeschen(TRUE)
+            pruefe("ganzer Draht geloescht, Draehte", STR$(LEN(gBlatt.draehte)), "3")
+            verlaufZurueck()
+            pruefe("Undo: Draehte wieder", STR$(LEN(gBlatt.draehte)), "4")
+        CASE 7
+            ' Umbenennen: Label an allen Stellen, Versorgung ueber den Draht,
+            ' automatisches Netz bekommt ein Label, Zusammenfuehren fragt nach
+            DIM fragenVorher AS INTEGER : fragenVorher = gFragen
+            auswahlAufheben()
+            gLabelGewaehlt = gBlatt.labels[0]
+            gHatLabel = TRUE
+            probeText1 = "SIG"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            umbenennenAuswahl()
+            pruefe("Label an allen Stellen", gBlatt.labels[0].text + "/" + gBlatt.labels[1].text, "SIG/SIG")
+            ' GND ueber seinen Draht umbenennen
+            gMausRX = 2000 : gMausRY = 3400
+            drahtWaehlen(2, 0)
+            probeText1 = "AGND"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            umbenennenAuswahl()
+            pruefe("Versorgung umbenannt", gBlatt.bauteile[3].wert, "AGND")
+            pruefe("Netzname am Draht", aktuelleNetze().liste[aktuelleNetze().netzAn(2000, 3200)].name, "AGND")
+            pruefe("AGND bleibt SPICE-Masse", STR$(CONTAINS(kern.netzlisteSpice$(gBlatt, "P"), " 0 D_LED")), STR$(TRUE))
+            ' automatisches Netz R7-D1: ein Label entsteht am Klickpunkt
+            gMausRX = 2000 : gMausRY = 2500
+            drahtWaehlen(1, 0)
+            probeText1 = "LED_A"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            umbenennenAuswahl()
+            pruefe("neues Label", STR$(LEN(gBlatt.labels)) + " " + gBlatt.labels[2].text + " @" + STR$(gBlatt.labels[2].anker.x) + "," + STR$(gBlatt.labels[2].anker.y), "3 LED_A @2000,2500")
+            pruefe("ohne Rueckfrage bisher", STR$(gFragen - fragenVorher), "0")
+            ' LED_A -> SIG: SIG liegt auf dem VCC-Netz -> Rueckfrage, dann verbunden
+            auswahlAufheben()
+            gLabelGewaehlt = gBlatt.labels[2]
+            gHatLabel = TRUE
+            probeText1 = "SIG"
+            g_timeout_add(150, dialogBestaetigen, 0)
+            g_timeout_add(400, dialogBestaetigen, 0)
+            umbenennenAuswahl()
+            pruefe("Zusammenfuehren fragt nach", STR$(gFragen - fragenVorher), "1")
+            pruefe("Netze verbunden", STR$(aktuelleNetze().gleich(2000, 2200, 2000, 1200)), STR$(TRUE))
+            ' alles zurueck
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
+            verlaufZurueck()
+            pruefe("Undo: Namen zurueck", gBlatt.labels[0].text + " " + gBlatt.bauteile[3].wert + "|" + STR$(LEN(gBlatt.labels)), "VCC5 |2")
+        CASE 8
             ' Netz unter der Maus: VCC-Draht, GND-Draht, Statuszeile
             gMausDrin = TRUE
             hoverBestimmen(sx(2000), sy(1650))
@@ -564,7 +696,7 @@ FUNCTION probe(daten AS INTEGER) AS BOOLEAN
             hoverBestimmen(sx(2000), sy(1650))
             statusAktualisieren()
             pruefe("Statuszeile nennt das Netz", STR$(CONTAINS(gtk_label_get_text(gStatus), "Netz: VCC")), STR$(TRUE))
-        CASE 7
+        CASE 9
             ' ERC: genau zwei Warnungen; Zeile 2 anklicken springt zu C1.1
             ercAusfuehren()
             pruefe("ERC-Verstoesse", STR$(LEN(gErc)), "2")
