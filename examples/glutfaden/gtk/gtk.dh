@@ -231,6 +231,9 @@ DECLARE FUNCTION gdk_screen_get_default LIB GDK () AS ZEIGER
 ' --- Datei waehlen
 DECLARE FUNCTION gtk_file_chooser_dialog_new LIB GTK (titel AS TEXT, eltern AS ZEIGER, art AS LONG, knopf AS TEXT, ...) AS ZEIGER
 DECLARE FUNCTION gtk_dialog_run LIB GTK (dialog AS ZEIGER) AS LONG
+DECLARE SUB gtk_menu_popup_at_widget LIB GTK (menue AS ZEIGER, w AS ZEIGER, anker AS LONG, menueAnker AS LONG, ereignis AS ZEIGER)
+CONST GDK_SCHWERE_UNTEN_LINKS = 7     ' GDK_GRAVITY_SOUTH_WEST
+CONST GDK_SCHWERE_OBEN_LINKS = 1      ' GDK_GRAVITY_NORTH_WEST
 DECLARE FUNCTION gtk_file_chooser_get_filename LIB GTK (wahl AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_file_filter_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_file_filter_set_name LIB GTK (filter AS ZEIGER, name AS TEXT)
