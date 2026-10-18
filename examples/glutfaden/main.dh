@@ -92,6 +92,7 @@ IMPORT "ansicht/infoleiste.dh"
 IMPORT "ansicht/optionsleisten.dh"
 IMPORT "ansicht/farbquellen.dh"
 IMPORT "ansicht/drucken.dh"
+IMPORT "ansicht/ablage.dh"
 
 ' Farben: dunkel wie das Logo, Glut (#ff8a3d) fuer alles, was gewaehlt ist
 CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" + _
@@ -117,6 +118,7 @@ CONST STIL = "window, .flaeche { background-color: #1b1c20; color: #e4e5ea; }" +
     " .ebene { padding: 2px 10px; color: #d6d9e1; }" + _
     " .innen { margin: 2px 14px; }" + _
     " .seitenleiste entry, .seitenleiste combobox button { background-image: none; background-color: #2a2c33; color: #e4e5ea; border: 1px solid #3a3c44; box-shadow: none; text-shadow: none; }" + _
+    " textview.notiz { border: 1px solid #3a3c44; font-size: 9pt; } textview.notiz text { background-color: #2a2c33; color: #e4e5ea; }" + _
     " .werkzeugzeile combobox cellview, .werkzeugzeile combobox button label, .seitenleiste combobox cellview, .seitenleiste combobox button label { color: #e4e5ea; }" + _
     " .abschnitt { font-weight: 700; margin-top: 4px; }" + _
     " button.klein { background-image: none; background-color: #2a2c33; color: #d6d9e1; border: 1px solid #3a3c44; border-radius: 6px; padding: 2px 6px; box-shadow: none; text-shadow: none; }" + _
@@ -516,6 +518,8 @@ END SUB
 ' die Tasten selbst stehen in den Einstellungen und lassen sich umlegen.
 SUB befehlAusfuehren(kennung AS STRING)
     DIM ok AS BOOLEAN
+    ' eine Notiz, die noch im Feld steht, gehoert vor jeden Befehl ins Muster
+    ok = slNotizUebernehmen()
     ' Ohne Muster (Willkommensseite) nur, was keins braucht
     IF NOT lwHat AND NOT ohneMusterErlaubt(kennung) THEN
         statusMeldung("Erst ein Muster öffnen oder anlegen.")
@@ -585,6 +589,11 @@ SUB befehlAusfuehren(kennung AS STRING)
         CASE "vereinen" : ebenenVereinenBefehl(TRUE)
         CASE "nur_aktive" : ebenenAnsicht(0, NOT lwNurAktiv)
         CASE "abdunkeln" : ebenenAnsicht(1, NOT lwAbdunkeln)
+        CASE "ebene_leeren" : ebeneLeerenBefehl(TRUE)
+        CASE "rueckstiche_zeigen" : ansichtSchalter(0, NOT lwRueckZeigen)
+        CASE "fortschritt_zeigen" : ansichtSchalter(1, NOT lwFortschrittZeigen)
+        CASE "mittelkreuz" : ansichtSchalter(2, NOT lwMittelkreuz)
+        CASE "tastenkuerzel" : kuerzelUebersicht()
         CASE "drucken" : druckenDialog()
         CASE "bildschirm_pipette" : bildschirmPipette()
         CASE "palette_export" : paletteExportieren()
@@ -629,6 +638,9 @@ FUNCTION taste(w AS INTEGER, ereignis AS INTEGER, daten AS INTEGER) AS BOOLEAN
     IF k <> "" AND MAPHAS(einstTafel, k) THEN
         befehlAusfuehren(einstTafel[k])
         RETURN TRUE
+    END IF
+    IF NOT strg AND NOT alt AND NOT umschalt THEN
+        IF leinwandPfeil(t) THEN RETURN TRUE
     END IF
     RETURN werkzeugTaste(t, strg, alt)
 END FUNCTION
@@ -789,6 +801,7 @@ signal(kKleiner, "clicked", kleinerGeklickt, 0, 0, 0)
 signal(kGroesser, "clicked", groesserGeklickt, 0, 0, 0)
 signal(kEinpassen, "clicked", einpassenGeklickt, 0, 0, 0)
 signalEreignis(fenster, "key-press-event", taste, 0, 0, 0)
+ablageEinrichten(fenster)
 signalEreignis(fenster, "delete-event", schliessenAngefragt, 0, 0, 0)
 signal(fenster, "destroy", fensterZu, 0, 0, 0)
 gtk_widget_show_all(fenster)
@@ -843,6 +856,8 @@ FOR a = 0 TO ARGC() - 1
         probe = "stufe18"
     ELSEIF ARG$(a) = "--probe-stufe19" THEN
         probe = "stufe19"
+    ELSEIF ARG$(a) = "--probe-stufe20" THEN
+        probe = "stufe20"
     ELSEIF ARG$(a) = "--foto" AND a < ARGC() - 1 THEN
         fotoZiel = ARGPATH$(a + 1)
         a = a + 1
@@ -907,6 +922,7 @@ IF probe = "stufe16" THEN g_timeout_add(300, vorfuehrenStufe16, 0)
 IF probe = "stufe17" THEN g_timeout_add(300, vorfuehrenStufe17, 0)
 IF probe = "stufe18" THEN g_timeout_add(300, vorfuehrenStufe18, 0)
 IF probe = "stufe19" THEN g_timeout_add(300, vorfuehrenStufe19, 0)
+IF probe = "stufe20" THEN g_timeout_add(300, vorfuehrenStufe20, 0)
 ' Alle fuenf Minuten ein Schnappschuss, wenn etwas ungesichert ist
 DIM takt AS INTEGER : takt = g_timeout_add(300000, vwTakt, 0)
 

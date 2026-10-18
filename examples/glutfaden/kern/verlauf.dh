@@ -21,6 +21,7 @@ CONST TEIL_NAME = 4
 CONST TEIL_LISTEN = 5             ' Farbliste und Rueckstiche, ohne Umnummerieren
 CONST TEIL_GROESSE = 6            ' Mustergroesse samt Ebenen und Rueckstichen
 CONST TEIL_STOFF = 7              ' Stoffzaehlung (Kaestchen je Zoll)
+CONST TEIL_NOTIZ = 8              ' Notiz einer Ebene (textVorher/Nachher)
 
 CLASS Aenderung
     DIM art AS INTEGER
@@ -45,7 +46,7 @@ CLASS Aenderung
     DIM zurueck AS ARRAY OF INTEGER
     DIM rueckVorher AS ARRAY OF Rueckstich
     DIM rueckNachher AS ARRAY OF Rueckstich
-    ' TEIL_NAME
+    ' TEIL_NAME, TEIL_NOTIZ
     DIM textVorher AS STRING
     DIM textNachher AS STRING
     ' TEIL_GROESSE (dazu ebenenVorher/Nachher, aktiv*, rueckVorher/Nachher)
@@ -267,6 +268,8 @@ SUB teilAnwenden(m AS Muster, t AS Aenderung, hin AS BOOLEAN)
         CASE TEIL_NAME
             ' Umbenannt wird die Ebene selbst (die Liste haelt Objekte)
             t.ebene.name = IIF(hin, t.textNachher, t.textVorher)
+        CASE TEIL_NOTIZ
+            t.ebene.notiz = IIF(hin, t.textNachher, t.textVorher)
         CASE TEIL_STOFF
             m.stoff = IIF(hin, t.stoffNachher, t.stoffVorher)
     END SELECT

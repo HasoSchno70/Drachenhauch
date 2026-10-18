@@ -360,6 +360,23 @@ CONST SPIEGEL_SENKRECHT = 2       ' oben/unten
 CONST SPIEGEL_VIERFACH = 3
 CONST SPIEGEL_ACHTFACH = 4        ' nur bei quadratischen Mustern, sonst vierfach
 
+' Der Spiegel, der wirklich gilt: Achtfach nur bei quadratischen Mustern.
+FUNCTION spiegelWirksam(modus AS INTEGER, b AS INTEGER, h AS INTEGER) AS INTEGER
+    IF modus = SPIEGEL_ACHTFACH AND b <> h THEN RETURN SPIEGEL_VIERFACH
+    RETURN CLAMP(modus, SPIEGEL_AUS, SPIEGEL_ACHTFACH)
+END FUNCTION
+
+' Kurzname fuer die Mitte der Leinwand (PySticky mode_labels)
+FUNCTION spiegelKurz$(modus AS INTEGER) AS STRING
+    SELECT CASE modus
+        CASE SPIEGEL_WAAGERECHT : RETURN "2x↔"
+        CASE SPIEGEL_SENKRECHT : RETURN "2x↕"
+        CASE SPIEGEL_VIERFACH : RETURN "4x"
+        CASE SPIEGEL_ACHTFACH : RETURN "8x"
+    END SELECT
+    RETURN ""
+END FUNCTION
+
 ' Die Zelle und ihre Spiegelbilder, ohne Doppelte, nur innerhalb des Musters.
 ' Die Formeln des Originals (mit Mitte b/2 und halben Zellen) ergeben genau
 ' b-1-x und h-1-y, beim Achtfachen zusaetzlich die vertauschten Achsen.

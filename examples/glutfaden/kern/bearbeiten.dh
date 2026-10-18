@@ -358,6 +358,51 @@ FUNCTION ebeneUmbenennen(m AS Muster, v AS Verlauf, nr AS INTEGER, name AS STRIN
     RETURN TRUE
 END FUNCTION
 
+' Eine Ebene leeren (PySticky ClearLayerCommand): alle Zellen ohne Stich,
+' Typ und erledigt weg, als EIN Schritt. Rueckstiche gehoeren dem Muster und
+' bleiben. Liefert die Zahl entfernter Stiche; 0 bei gesperrter oder schon
+' leerer Ebene (PySticky legte auch dann einen Schritt an).
+FUNCTION ebeneLeeren(m AS Muster, v AS Verlauf, nr AS INTEGER) AS INTEGER
+    IF nr < 0 OR nr >= m.ebenen.anzahl() THEN RETURN 0
+    DIM e AS Ebene : e = m.ebenen.ebenen[nr]
+    IF e.gesperrt THEN RETURN 0
+    DIM r AS ARRAY OF INTEGER : r = e.raster
+    DIM n AS INTEGER : n = LEN(r)
+    DIM c AS INTEGER, i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF r[i] <> KEIN_STICH THEN c = c + 1
+    NEXT
+    IF c = 0 THEN RETURN 0
+    DIM p[2 * c] AS INTEGER
+    DIM f[c] AS INTEGER
+    DIM a[c] AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO n - 1
+        IF r[i] = KEIN_STICH THEN CONTINUE
+        p[2 * k] = i MOD e.breite
+        p[2 * k + 1] = i \ e.breite
+        f[k] = -1
+        k = k + 1
+    NEXT
+    RETURN zellenAufEbene(m, v, e, p, f, a, "Ebene '" + e.name + "' geleert")
+END FUNCTION
+
+' Die Notiz einer Ebene setzen (PySticky: beim Verlassen des Notizfelds).
+' Ein Schritt, damit Strg+Z sie zuruecknimmt; FALSE, wenn gleich.
+FUNCTION ebeneNotizSetzen(m AS Muster, v AS Verlauf, nr AS INTEGER, notiz AS STRING) AS BOOLEAN
+    IF nr < 0 OR nr >= m.ebenen.anzahl() THEN RETURN FALSE
+    DIM e AS Ebene : e = m.ebenen.ebenen[nr]
+    IF notiz = e.notiz THEN RETURN FALSE
+    v.beginnen("Ebenen-Notiz ändern")
+    DIM t AS Aenderung : t = v.teil(TEIL_NOTIZ)
+    t.ebene = e
+    t.textVorher = e.notiz
+    t.textNachher = notiz
+    e.notiz = notiz
+    v.beenden()
+    RETURN TRUE
+END FUNCTION
+
 ' --- Farben ---------------------------------------------------------------------
 
 ' Ein Garn ins Muster nehmen. Gibt es dasselbe (Hersteller und Nummer) schon,

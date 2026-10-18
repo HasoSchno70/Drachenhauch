@@ -2380,6 +2380,49 @@ die Probe die Lage des DRUCKAUFTRAGS (nicht die Rechnung des Kerns) und die
 Kanalfolge der Pipette an einem gefuellten Pixbuf prueft; vorher verglich
 sie `bpPunkt` mit sich selbst.
 
+**Stufe 20: Ebene leeren und Notiz, Ansichtsschalter, Pfeile und
+Rollbalken, Ablegen, F1** (2026-10-18). `kern.ebeneLeeren` (PySticky
+`ClearLayerCommand`, ueber `zellenAufEbene`, ein Schritt; Rueckstiche gehoeren
+dem Muster und bleiben) -- gegen PySticky aufgezeichnet (drei Muster, je
+Ebene leeren und zurueck, die GEFUEHRTEN Stichzahlen ohne Neuzaehlen): gleich
+bis auf eine bewusste Abweichung, eine schon leere Ebene ist hier kein
+Schritt. Die Notiz der aktiven Ebene steht in einem Feld unter der
+Deckkraft und wird ein Schritt (`TEIL_NOTIZ`), wenn man das Feld verlaesst,
+die Ebene wechselt, einen Befehl ausloest oder die Leiste neu entsteht --
+**aber nur, wenn im Feld etwas anderes steht als geladen**, sonst schriebe
+ein Neuaufbau nach Strg+Z die alte Notiz gleich wieder hinein. **Fund der
+Probe:** der Neuaufbau zerstoerte das Feld, bevor es gelesen wurde -- der
+leere Text galt als geaendert und loeschte die Notiz (samt GTK-CRITICAL);
+jetzt wird ganz am Anfang von `seitenleisteMuster` uebernommen, und ein
+`destroy`-Rueckruf setzt den Zeiger auf 0. Werkzeugleiste: drei
+Ansichtsschalter (Rueckstiche, Fortschritt, Zentrierhilfe; gezeichnete
+Sinnbilder -- die Zeichen ↙ ✓ ✞ waren winzig) fuer die Sitzung wie in
+PySticky; Rueckstiche hier per Vorgabe AN (PySticky: aus, bis man das
+Werkzeug waehlt), das Rueckstich- bzw. Fortschritt-Werkzeug schaltet die
+Anzeige wieder ein. Spiegelachsen (blau, orange, bei Achtfach die
+Diagonalen, der Modus in der Mitte) erscheinen, solange gespiegelt wird;
+Achtfach gilt nur bei quadratischen Mustern (`kern.spiegelWirksam`).
+Pfeiltasten schieben das Muster um 20 Punkte, aber nur mit dem Fokus auf
+der Flaeche (oder nirgends) und nach den umlegbaren Kuerzeln. Rollbalken
+rechts und unten (`kern.rollBereich` nach PySticky `_update_scrollbars`,
+nur waechst der Bereich mit, wenn das Muster weiter verschoben ist -- Qt
+klemmte still, und der erste Griff liess es springen). Dateien aufs
+Fenster ziehen (`ansicht/ablage.dh`, text/uri-list, `g_filename_from_uri`):
+Muster oeffnen nach der Rueckfrage, Bilder in den Bild-Import; abgearbeitet
+einen Augenblick SPAETER, nicht im Rueckruf -- eine Rueckfrage mitten in
+der Ziehen-Schleife des Systems. F1 zeigt alle 75 Kuerzel mit dem
+WIRKSAMEN Kuerzel (`kern.kuerzelListe`, dieselbe Tafel wie der
+Einstellungsreiter). Die Probe vergleicht die Leinwand als Bild mit sich
+selbst (`v20Bild` + Punktvergleich) statt fester Pixel. **Formatgrenze:**
+eine `--- datei`-Beilage darf kein Leerzeichen im Namen tragen -- die Datei
+"mit leer.pxs" legt der Fall selbst an. Sammlung
+`tests/pruef/glutfaden_stufe20.dhtest` (4); Stufe 13 mit 75 Kuerzeln. Von 19
+Verfaelschungen fallen 18; die neunzehnte (Sperre in `ebeneLeeren` weg)
+faengt `zellenAufEbene` mit derselben Pruefung ab. Eine fiel erst nach
+einem Nachtrag: ohne das Uebernehmen vor dem Abbau ging getippter Text bei
+einem Neuaufbau verloren, der nicht ueber `befehlAusfuehren` laeuft
+(Rueckgaengig in der Kopfleiste ruft `werkzeugZurueck` direkt).
+
 ## Dogfooding 12: Fotobetrachter mit GTK 3 (2026-10-14)
 
 Wunsch des Nutzers: ein Fotobetrachter mit einer externen Bibliothek als

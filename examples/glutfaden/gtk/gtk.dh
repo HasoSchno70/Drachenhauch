@@ -51,12 +51,28 @@ DECLARE SUB gtk_spin_button_set_digits LIB GTK (s AS ZEIGER, stellen AS ULONG)
 DECLARE FUNCTION gtk_spin_button_get_value LIB GTK (s AS ZEIGER) AS FLOAT
 DECLARE SUB gtk_spin_button_set_range LIB GTK (s AS ZEIGER, von AS FLOAT, bis AS FLOAT)
 DECLARE SUB gtk_widget_set_margin_top LIB GTK (w AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_widget_set_margin_start LIB GTK (w AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_widget_set_margin_end LIB GTK (w AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_widget_set_margin_bottom LIB GTK (w AS ZEIGER, rand AS LONG)
 DECLARE SUB gtk_paned_pack1 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, schrumpfen AS BOOLEAN)
 DECLARE SUB gtk_paned_pack2 LIB GTK (p AS ZEIGER, kind AS ZEIGER, dehnen AS BOOLEAN, schrumpfen AS BOOLEAN)
 DECLARE SUB gtk_paned_set_position LIB GTK (p AS ZEIGER, pos AS LONG)
 DECLARE FUNCTION gtk_scrolled_window_new LIB GTK (h AS ZEIGER, v AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_scrolled_window_get_hadjustment LIB GTK (sw AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION gtk_adjustment_get_value LIB GTK (a AS ZEIGER) AS FLOAT
+DECLARE FUNCTION gtk_adjustment_new LIB GTK (wert AS FLOAT, unten AS FLOAT, oben AS FLOAT, schritt AS FLOAT, seite AS FLOAT, seitengroesse AS FLOAT) AS ZEIGER
+DECLARE SUB gtk_adjustment_configure LIB GTK (a AS ZEIGER, wert AS FLOAT, unten AS FLOAT, oben AS FLOAT, schritt AS FLOAT, seite AS FLOAT, seitengroesse AS FLOAT)
+DECLARE FUNCTION gtk_adjustment_get_lower LIB GTK (a AS ZEIGER) AS FLOAT
+DECLARE FUNCTION gtk_scrollbar_new LIB GTK (richtung AS LONG, a AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_window_get_focus LIB GTK (fenster AS ZEIGER) AS ZEIGER
+' Ziehen und Ablegen von Dateien (text/uri-list)
+DECLARE SUB gtk_drag_dest_set LIB GTK (w AS ZEIGER, flags AS LONG, ziele AS ZEIGER, n AS LONG, aktionen AS LONG)
+DECLARE SUB gtk_drag_dest_add_uri_targets LIB GTK (w AS ZEIGER)
+DECLARE FUNCTION gtk_selection_data_get_data LIB GTK (sel AS ZEIGER) AS ZEIGER
+DECLARE FUNCTION gtk_selection_data_get_length LIB GTK (sel AS ZEIGER) AS LONG
+DECLARE FUNCTION g_filename_from_uri LIB GLIB (uri AS TEXT, BYREF rechner AS ZEIGER, BYREF fehler AS ZEIGER) AS ZEIGER
+CONST GTK_ZIEL_ALLES = 7              ' GTK_DEST_DEFAULT_ALL
+CONST GDK_AKTION_KOPIEREN = 2         ' GDK_ACTION_COPY
 DECLARE SUB gtk_adjustment_set_value LIB GTK (a AS ZEIGER, wert AS FLOAT)
 DECLARE FUNCTION gtk_adjustment_get_upper LIB GTK (a AS ZEIGER) AS FLOAT
 DECLARE FUNCTION gtk_adjustment_get_page_size LIB GTK (a AS ZEIGER) AS FLOAT
@@ -91,6 +107,7 @@ DECLARE FUNCTION gtk_label_get_text LIB GTK (label AS ZEIGER) AS TEXT
 DECLARE SUB gtk_label_set_xalign LIB GTK (label AS ZEIGER, x AS SINGLE)
 DECLARE SUB gtk_label_set_ellipsize LIB GTK (label AS ZEIGER, art AS LONG)
 DECLARE FUNCTION gtk_toggle_button_new LIB GTK () AS ZEIGER
+DECLARE FUNCTION gtk_toggle_button_new_with_label LIB GTK (text AS TEXT) AS ZEIGER
 DECLARE FUNCTION gtk_list_box_new LIB GTK () AS ZEIGER
 DECLARE SUB gtk_list_box_set_selection_mode LIB GTK (box AS ZEIGER, art AS LONG)
 DECLARE SUB gtk_list_box_set_activate_on_single_click LIB GTK (box AS ZEIGER, an AS BOOLEAN)
@@ -136,6 +153,9 @@ DECLARE SUB gtk_entry_set_placeholder_text LIB GTK (feld AS ZEIGER, text AS TEXT
 DECLARE FUNCTION gtk_text_view_new LIB GTK () AS ZEIGER
 DECLARE FUNCTION gtk_text_view_get_buffer LIB GTK (sicht AS ZEIGER) AS ZEIGER
 DECLARE SUB gtk_text_view_set_wrap_mode LIB GTK (sicht AS ZEIGER, art AS LONG)
+DECLARE SUB gtk_text_view_set_left_margin LIB GTK (sicht AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_text_view_set_right_margin LIB GTK (sicht AS ZEIGER, rand AS LONG)
+DECLARE SUB gtk_text_view_set_top_margin LIB GTK (sicht AS ZEIGER, rand AS LONG)
 DECLARE SUB gtk_text_buffer_set_text LIB GTK (puffer AS ZEIGER, text AS TEXT, laenge AS LONG)
 DECLARE SUB gtk_text_buffer_get_bounds LIB GTK (puffer AS ZEIGER, anfang AS ZEIGER, ende AS ZEIGER)
 DECLARE FUNCTION gtk_text_buffer_get_text LIB GTK (puffer AS ZEIGER, anfang AS ZEIGER, ende AS ZEIGER, verborgen AS BOOLEAN) AS ZEIGER
@@ -326,6 +346,7 @@ DECLARE SUB cairo_surface_mark_dirty LIB CAIRO (flaeche AS ZEIGER)
 DECLARE SUB cairo_surface_flush LIB CAIRO (flaeche AS ZEIGER)
 DECLARE FUNCTION cairo_image_surface_get_data LIB CAIRO (flaeche AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION cairo_image_surface_get_stride LIB CAIRO (flaeche AS ZEIGER) AS LONG
+DECLARE FUNCTION cairo_image_surface_get_height LIB CAIRO (flaeche AS ZEIGER) AS LONG
 DECLARE FUNCTION cairo_create LIB CAIRO (flaeche AS ZEIGER) AS ZEIGER
 DECLARE FUNCTION cairo_surface_write_to_png LIB CAIRO (flaeche AS ZEIGER, pfad AS TEXT) AS LONG
 DECLARE SUB cairo_destroy LIB CAIRO (cr AS ZEIGER)
@@ -380,6 +401,10 @@ DECLARE FUNCTION signalEreignis LIB GOBJECT ALIAS "g_signal_connect_data" _
 ' draw-page: Druckvorgang, Kontext, Seitennummer
 DECLARE FUNCTION signalSeite LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, kontext AS ZEIGER, seite AS LONG, daten AS ZEIGER), _
+     daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
+' drag-data-received: Kontext, x, y, Auswahl, Art, Zeit
+DECLARE FUNCTION signalAblage LIB GOBJECT ALIAS "g_signal_connect_data" _
+    (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, kontext AS ZEIGER, x AS LONG, y AS LONG, auswahl AS ZEIGER, art AS ULONG, zeit AS ULONG, daten AS ZEIGER), _
      daten AS ZEIGER, freigabe AS ZEIGER, flags AS LONG) AS ULONG
 DECLARE FUNCTION signalZeile LIB GOBJECT ALIAS "g_signal_connect_data" _
     (objekt AS ZEIGER, name AS TEXT, rueckruf AS SUB(objekt AS ZEIGER, zeile AS ZEIGER, daten AS ZEIGER), _
