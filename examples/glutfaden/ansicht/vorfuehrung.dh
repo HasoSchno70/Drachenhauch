@@ -2002,3 +2002,133 @@ FUNCTION vorfuehrenStufe18(daten AS INTEGER) AS BOOLEAN
     END SELECT
     RETURN TRUE
 END FUNCTION
+
+
+' --- Stufe 19: Optionsleisten, Bildschirm-Pipette, Paletten, Drucken -------------
+
+DIM v19Vorher AS STRING
+DIM v19Pixel AS INTEGER
+
+' Dateien der Probe ins Startverzeichnis -- dhrt run arbeitet im Ordner des
+' Programms, dort haette sie sonst Glutfaden zugemuellt
+FUNCTION v19Ort$(name AS STRING) AS STRING
+    RETURN PATHJOIN(STARTDIR$(), name)
+END FUNCTION
+
+' Die Pipette schliesst sich selbst: nimmt den Punkt (10, 10) des Fotos
+FUNCTION v19PipetteZu(daten AS INTEGER) AS BOOLEAN
+    DIM ok AS BOOLEAN : ok = vfFoto(bpFenster, "pipette")
+    v19Pixel = bpPunkt(bpBild, 10, 10)
+    bpFarbe = v19Pixel
+    bpEnde()
+    RETURN FALSE
+END FUNCTION
+
+' Die Druckseite als Bild (wie die Seite eines A4-Blatts in 96 dpi)
+FUNCTION v19DruckBild(pfad AS STRING, b AS INTEGER, h AS INTEGER) AS BOOLEAN
+    DIM f AS INTEGER : f = cairo_image_surface_create(CAIRO_ARGB32, b, h)
+    DIM cr AS INTEGER : cr = cairo_create(f)
+    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
+    cairo_paint(cr)
+    druckZeichnen(cr, b, h)
+    cairo_destroy(cr)
+    DIM st AS INTEGER : st = cairo_surface_write_to_png(f, pfad)
+    cairo_surface_destroy(f)
+    RETURN st = 0
+END FUNCTION
+
+FUNCTION vorfuehrenStufe19(daten AS INTEGER) AS BOOLEAN
+    schritt = schritt + 1
+    DIM ok AS BOOLEAN
+    DIM i AS INTEGER
+    SELECT CASE schritt
+        CASE 1
+            v19Vorher = vfAlles$()
+            PRINT "kuerzel drucken "; kern.kuerzelVon$(einst, "drucken")
+            befehlAusfuehren("wz_rueckstich")
+            PRINT "rueckstich: leiste "; gtk_widget_get_visible(rlBox); " text "; gtk_widget_get_visible(tlBox); " | dicke "; gtk_spin_button_get_value_as_int(rlDicke); " linie "; gtk_combo_box_get_active(rlLinie); " enden "; gtk_combo_box_get_active(rlEnden); " einrasten "; gtk_toggle_button_get_active(rlEinrasten)
+            ' ueber die Leiste: Linie gestrichelt, Enden flach, Dicke 4
+            gtk_combo_box_set_active(rlLinie, 1)
+            gtk_combo_box_set_active(rlEnden, 2)
+            gtk_spin_button_set_value(rlDicke, 4)
+            gtk_toggle_button_set_active(rlEinrasten, FALSE)
+            DIM e AS kern.Einstellungen : e = kern.einstellungenLaden(einst.pfad)
+            PRINT "gesetzt: "; einst.rueckBreite; " "; einst.rueckLinie; " "; einst.rueckKappe; " "; einst.rueckEinrasten; " | gemerkt "; e.rueckBreite; " "; e.rueckLinie; " "; e.rueckKappe; " "; e.rueckEinrasten
+        CASE 2
+            ok = vfFoto(fenster, "rueckstich")
+            ' Zurueck auf die Vorgabe, die Leiste folgt
+            rueckOptionenSetzen(2, 0, 0, TRUE)
+            PRINT "zurueck: linie "; gtk_combo_box_get_active(rlLinie); " dicke "; gtk_spin_button_get_value_as_int(rlDicke); " einrasten "; gtk_toggle_button_get_active(rlEinrasten)
+            ' Text: ohne Text kein Anhaengen, mit Text haengt er an der Maus
+            befehlAusfuehren("wz_text")
+            PRINT "text: leiste "; gtk_widget_get_visible(tlBox); " rueck "; gtk_widget_get_visible(rlBox); " | schrift "; gtk_combo_box_get_active(tlSchrift); " groesse "; gtk_spin_button_get_value_as_int(tlGroesse)
+            farbeWaehlen(2)
+            txText = "" : textLeisteNachziehen()
+            DIM z AS INTEGER : z = wzDruck(3, 3, 1, FALSE)
+            PRINT "ohne text: haengt "; mrEinfuegen; " | "; meldung
+            gtk_entry_set_text(tlFeld, "Hi")
+            PRINT "eingetippt: "; txText; " haengt "; mrEinfuegen
+            z = wzDruck(3, 3, 1, FALSE)
+            DIM b1 AS INTEGER : b1 = mrEinfuegenAus.breite
+            PRINT "klick: haengt "; mrEinfuegen; " breite > 0 "; b1 > 0
+            gtk_entry_set_text(tlFeld, "Hiiii")
+            PRINT "laenger: haengt "; mrEinfuegen; " breiter "; mrEinfuegenAus.breite > b1
+            gtk_toggle_button_set_active(tlFett, TRUE)
+            PRINT "fett: "; txFett; " haengt "; mrEinfuegen
+        CASE 3
+            ok = vfFoto(fenster, "text")
+            gtk_entry_set_text(tlFeld, "")
+            PRINT "geleert: haengt "; mrEinfuegen
+            gtk_entry_set_text(tlFeld, "Hi")
+            textAusLeiste()
+            PRINT "enter: haengt "; mrEinfuegen
+            mehrAbbrechen()
+            befehlAusfuehren("wz_stift")
+            PRINT "stift: leisten "; gtk_widget_get_visible(rlBox); " "; gtk_widget_get_visible(tlBox); " | muster unberuehrt "; vfAlles$() = v19Vorher
+            ' Bildschirm-Pipette: das Foto, ein Punkt, das Fenster (schliesst sich selbst)
+            DIM x0 AS INTEGER, y0 AS INTEGER
+            DIM foto AS INTEGER : foto = bpFoto(x0, y0)
+            PRINT "foto: "; foto <> 0; " | ausserhalb "; bpPunkt(foto, -1, 0); " "; bpPunkt(foto, 0, 100000); " | innen "; bpPunkt(foto, 10, 10) >= 0
+            g_object_unref(foto)
+            DIM t AS INTEGER : t = g_timeout_add(400, v19PipetteZu, 0)
+            DIM gepickt AS INTEGER : gepickt = bpWaehlen()
+            PRINT "pipette: "; gepickt = v19Pixel; " | fenster weg "; bpFenster = 0
+            ' Uebernehmen: das naechste DMC-Garn, so wie der Kern es findet
+            DIM abst AS FLOAT
+            DIM erw AS INTEGER : erw = kern.naechstesGarnIn(&H3A6E2A, slPaletten[slPalette], abst)
+            DIM n0 AS INTEGER : n0 = lwMuster.farbanzahl()
+            bildschirmFarbeUebernehmen(&H3A6E2A)
+            PRINT "uebernommen: "; lwMuster.farben[wzFarbe].garn.nummer = slPaletten[slPalette].garne[erw].nummer; " | farben "; n0; " -> "; lwMuster.farbanzahl(); " | '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            werkzeugZurueck()
+            DIM pal AS INTEGER : pal = slPalette
+            slPalette = -1
+            bildschirmFarbeUebernehmen(&H123456)
+            PRINT "ohne palette: "; lwMuster.farben[wzFarbe].garn.name; " "; HEX$(lwMuster.farben[wzFarbe].garn.farbe); " | "; meldung
+            werkzeugZurueck()
+            slPalette = pal
+            PRINT "zurueck: wie vorher "; vfAlles$() = v19Vorher
+        CASE 4
+            ' Palette als Datei: schreiben, dieselbe wieder lesen (nichts Neues),
+            ' eine mit einer neuen Farbe, eine kaputte
+            PRINT "export: '"; paletteExportNach(v19Ort$("palette.json")); "' | gleich dem kern "; JOIN$(READLINES(v19Ort$("palette.json")), CHR$(10)) = kern.paletteDateiText$(lwMuster)
+            DIM sv AS INTEGER : sv = LEN(wzVerlauf.rueck)
+            PRINT "gleiche palette: "; paletteImportVon(v19Ort$("palette.json"), FALSE); " farben, im muster "; lwMuster.farbanzahl(); " | schritte "; LEN(wzVerlauf.rueck) - sv; " | "; meldung
+            WRITEALL(v19Ort$("neu.json"), "{" + CHR$(34) + "format" + CHR$(34) + ": " + CHR$(34) + "pysticky_palette" + CHR$(34) + ", " + CHR$(34) + "name" + CHR$(34) + ": " + CHR$(34) + "Probe" + CHR$(34) + ", " + CHR$(34) + "colors" + CHR$(34) + ": [{" + CHR$(34) + "name" + CHR$(34) + ": " + CHR$(34) + "Moos" + CHR$(34) + ", " + CHR$(34) + "color" + CHR$(34) + ": {" + CHR$(34) + "r" + CHR$(34) + ": 58, " + CHR$(34) + "g" + CHR$(34) + ": 110, " + CHR$(34) + "b" + CHR$(34) + ": 42}, " + CHR$(34) + "symbol" + CHR$(34) + ": " + CHR$(34) + "M" + CHR$(34) + "}]}")
+            PRINT "neue farbe: "; paletteImportVon(v19Ort$("neu.json"), FALSE); " | im muster "; lwMuster.farbanzahl(); " "; lwMuster.farben[lwMuster.farbanzahl() - 1].garn.name; " symbol "; lwMuster.farben[lwMuster.farbanzahl() - 1].symbol; " | '"; wzVerlauf.textZurueck$(); "' | "; meldung
+            werkzeugZurueck()
+            WRITEALL(v19Ort$("kaputt.json"), "{" + CHR$(34) + "format" + CHR$(34) + ": " + CHR$(34) + "andere" + CHR$(34) + "}")
+            PRINT "kaputt: "; paletteImportVon(v19Ort$("kaputt.json"), FALSE); " | "; meldung
+            PRINT "zurueck: wie vorher "; vfAlles$() = v19Vorher
+            ' Drucken: dieselbe Seite als PDF ohne Dialog, und als Bild
+            PRINT "drucken als pdf: '"; druckenNach(v19Ort$("druck.pdf")); "' | da "; FILEEXISTS(v19Ort$("druck.pdf")); " | quer "; kern.druckQuer(lwMuster.breite, lwMuster.hoehe)
+            PRINT "druckbild: "; v19DruckBild(v19Ort$("d_druck.png"), 794, 1123)
+            DIM zz AS FLOAT, ox AS FLOAT, oy AS FLOAT
+            (zz, ox, oy) = kern.druckLage(lwMuster.breite, lwMuster.hoehe, 794, 1123)
+            PRINT "lage: zelle "; FORMAT$(zz, "%.2f"); " links "; FORMAT$(ox, "%.2f"); " oben "; FORMAT$(oy, "%.2f")
+        CASE ELSE
+            schliessenErlaubt = TRUE
+            gtk_widget_destroy(fenster)
+            RETURN FALSE
+    END SELECT
+    RETURN TRUE
+END FUNCTION
